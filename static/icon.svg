@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#161a21"/><g transform="translate(96 80) scale(1.25)" fill="none" stroke="#2dd4bf" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M22 112 L78 168 L234 40"/>
+  <!-- long lazy arms -->
+  <path d="M146 170 C138 152 134 138 134 126"/>
+  <path d="M190 164 C198 134 198 104 192 80"/>
+  <!-- claws hooked over the branch -->
+  <path d="M124 124 C124 108 136 106 142 114" stroke-width="8"/>
+  <path d="M182 78 C182 62 194 60 200 68" stroke-width="8"/>
+  <!-- body -->
+  <path d="M146 180 C132 214 148 242 168 242 C190 242 206 214 190 178"/>
+  <!-- head -->
+  <circle cx="168" cy="160" r="28"/>
+  <!-- sloth eye mask stripes + sleepy eyes + nose + smile -->
+  <path d="M158 154 L147 164 M178 154 L189 164" stroke-width="9"/>
+  <circle cx="168" cy="163" r="3" fill="#2dd4bf" stroke="none"/>
+  <path d="M161 175 q7 5 14 0" stroke-width="5"/>
+</g></svg>

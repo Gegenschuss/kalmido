@@ -1,0 +1,8 @@
+# test-only dependencies (the app itself needs none of these)
+requests==2.34.2
+icalendar==7.3.0
+recurring-ical-events==3.8.2
+cryptography==50.0.1
+http-ece==1.2.1
+openapi-spec-validator==0.9.0
+pillow==12.3.0

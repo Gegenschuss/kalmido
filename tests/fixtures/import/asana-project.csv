@@ -1,0 +1,6 @@
+Task ID,Created At,Completed At,Last Modified,Name,Section/Column,Assignee,Assignee Email,Start Date,Due Date,Tags,Notes,Projects,Parent task,Blocked By (Dependencies),Blocking (Dependencies),Priority,Budget
+1205000000000001,2026-08-01,,2026-09-01,Launch campaign,Planning,Bob Builder,bob@example.com,2026-10-01,2026-10-15,"marketing,q4",Kick-off with the team,Marketing Q4,,,,High,5000
+1205000000000002,2026-08-02,2026-08-20,2026-08-20,Write brief,Planning,Alice Example,alice@example.com,,2026-08-18,,,Marketing Q4,Launch campaign,,,,
+1205000000000003,2026-08-03,,2026-09-02,Book ads,Execution,Zed Unknown,zed@nowhere.example,,2026-10-20,ads,,Marketing Q4,,1205000000000001,,Low,
+1205000000000004,2026-08-04,,2026-09-02,Orphan subtask,Execution,,,,,,,Marketing Q4,Does not exist,,,,
+1205000000000005,2026-08-05,,2026-09-02,Bad date,Execution,,,,32/13/2026,,,Marketing Q4,,,,,

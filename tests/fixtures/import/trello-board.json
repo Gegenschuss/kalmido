@@ -1,0 +1,39 @@
+{
+  "id": "65f0a1b2c3d4e5f601234567",
+  "name": "Website Relaunch",
+  "desc": "",
+  "closed": false,
+  "labels": [
+    {"id": "lab1", "idBoard": "65f0a1b2c3d4e5f601234567", "name": "Design", "color": "purple"},
+    {"id": "lab2", "idBoard": "65f0a1b2c3d4e5f601234567", "name": "", "color": "red"}
+  ],
+  "members": [{"id": "mem1", "fullName": "Alice Example", "username": "alice"}, {"id": "mem2", "fullName": "Zed Unknown", "username": "zed"}],
+  "lists": [
+    {"id": "list1", "name": "To Do", "closed": false, "pos": 16384},
+    {"id": "list2", "name": "Doing", "closed": false, "pos": 32768},
+    {"id": "list3", "name": "Old ideas", "closed": true, "pos": 49152}
+  ],
+  "cards": [
+    {"id": "65f0a1b2c3d4e5f601230001", "name": "Homepage mockup", "desc": "Hero + **pricing**", "closed": false, "idList": "list1", "pos": 1,
+     "due": "2026-11-05T14:00:00.000Z", "dueComplete": false, "dueReminder": 60, "start": "2026-11-01T00:00:00.000Z", "idLabels": ["lab1", "lab2"], "labels": [],
+     "idMembers": ["mem1"], "idChecklists": ["cl1", "cl2"], "dateLastActivity": "2026-09-20T10:00:00.000Z",
+     "attachments": [{"id": "att1", "name": "mockup.png", "url": "https://trello.com/1/cards/x/attachments/att1/download/mockup.png", "isUpload": true}],
+     "customFieldItems": []},
+    {"id": "65f0a1b2c3d4e5f601230002", "name": "Copywriting", "desc": "", "closed": false, "idList": "list2", "pos": 2, "due": null, "dueComplete": true,
+     "idLabels": [], "idMembers": ["mem2"], "dateLastActivity": "2026-09-21T10:00:00.000Z", "attachments": []},
+    {"id": "65f0a1b2c3d4e5f601230003", "name": "Archived card", "closed": true, "idList": "list1", "pos": 3, "idLabels": []},
+    {"id": "65f0a1b2c3d4e5f601230004", "name": "Card in archived list", "closed": false, "idList": "list3", "pos": 4, "idLabels": []}
+  ],
+  "checklists": [
+    {"id": "cl1", "idCard": "65f0a1b2c3d4e5f601230001", "name": "Sections", "pos": 1, "checkItems": [
+      {"id": "ci1", "name": "Hero", "state": "complete", "pos": 1},
+      {"id": "ci2", "name": "Pricing", "state": "incomplete", "pos": 2, "due": "2026-11-03T12:00:00.000Z"}]},
+    {"id": "cl2", "idCard": "65f0a1b2c3d4e5f601230001", "name": "Review", "pos": 2, "checkItems": [
+      {"id": "ci3", "name": "Legal <b>check</b>", "state": "incomplete", "pos": 1}]}
+  ],
+  "actions": [
+    {"id": "a1", "type": "commentCard", "date": "2026-09-19T09:00:00.000Z", "memberCreator": {"fullName": "Alice Example"},
+     "data": {"text": "Looks good, see https://example.com/spec", "card": {"id": "65f0a1b2c3d4e5f601230001"}}},
+    {"id": "a2", "type": "updateCard", "date": "2026-09-19T09:05:00.000Z", "data": {"card": {"id": "65f0a1b2c3d4e5f601230001"}}}
+  ]
+}

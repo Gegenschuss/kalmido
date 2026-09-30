@@ -1,0 +1,9 @@
+{
+  "name": "kalmido-tests",
+  "private": true,
+  "description": "jsdom UI tests for Kalmido (see tests/README.md)",
+  "license": "MIT",
+  "devDependencies": {
+    "jsdom": "24.1.3"
+  }
+}

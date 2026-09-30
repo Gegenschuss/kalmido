@@ -1,0 +1,9 @@
+{"type":"summary","summary":"SECRET PROMPT TEXT summary","leafUuid":"u0"}
+{"type":"user","message":{"role":"user","content":"SECRET PROMPT TEXT: please fix the bug"},"uuid":"u1","sessionId":"sess-1234abcd"}
+{"type":"assistant","requestId":"req_1","uuid":"a1","message":{"id":"msg_01","model":"claude-sonnet-4-5","role":"assistant","content":[{"type":"thinking","thinking":"SECRET PROMPT TEXT thinking"}],"usage":{"input_tokens":10,"cache_creation_input_tokens":2000,"cache_read_input_tokens":15000,"output_tokens":120}}}
+{"type":"assistant","requestId":"req_1","uuid":"a2","message":{"id":"msg_01","model":"claude-sonnet-4-5","role":"assistant","content":[{"type":"text","text":"SECRET PROMPT TEXT answer"}],"usage":{"input_tokens":10,"cache_creation_input_tokens":2000,"cache_read_input_tokens":15000,"output_tokens":120}}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"SECRET PROMPT TEXT file contents"}]},"uuid":"u2"}
+{"type":"assistant","requestId":"req_2","uuid":"a3","message":{"id":"msg_02","model":"claude-sonnet-4-5","role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"ls"}}],"usage":{"input_tokens":5,"cache_creation_input_tokens":300,"cache_read_input_tokens":17000,"output_tokens":40}}}
+{"type":"assistant","requestId":"req_3","uuid":"a4","message":{"id":"msg_03","model":"claude-haiku-4-5","role":"assistant","content":[{"type":"text","text":"SECRET PROMPT TEXT sub"}],"usage":{"input_tokens":800,"output_tokens":60}}}
+{"type":"assistant","uuid":"a5","message":{"id":"msg_04","model":"<synthetic>","role":"assistant","content":[{"type":"text","text":"No response requested."}],"usage":{"input_tokens":0,"output_tokens":0}}}
+this line is not json

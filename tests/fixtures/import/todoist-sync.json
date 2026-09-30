@@ -1,0 +1,23 @@
+{
+  "full_sync": true,
+  "projects": [
+    {"id": "220474322", "name": "Inbox", "inbox_project": true, "view_style": "list", "is_archived": false},
+    {"id": "220474323", "name": "Reise", "view_style": "board", "is_archived": false},
+    {"id": "220474324", "name": "Packliste", "parent_id": "220474323", "view_style": "list", "is_archived": false},
+    {"id": "220474325", "name": "Alt", "is_archived": true}
+  ],
+  "sections": [{"id": "7025", "name": "Vorher", "project_id": "220474323", "section_order": 1}],
+  "collaborators": [{"id": "5001", "full_name": "Bob Builder", "email": "bob@example.com"}],
+  "items": [
+    {"id": "2995104339", "content": "Milch kaufen @einkauf", "description": "", "project_id": "220474322", "priority": 1, "child_order": 1, "labels": ["laden"], "checked": false, "added_at": "2026-01-02T10:00:00.000000Z"},
+    {"id": "2995104340", "content": "Visum beantragen", "description": "Botschaft **Termin**", "project_id": "220474323", "section_id": "7025", "priority": 4, "child_order": 1,
+     "due": {"date": "2026-11-03T09:30:00", "is_recurring": false, "string": "Nov 3 9:30", "lang": "en", "timezone": null}, "labels": [], "checked": false, "responsible_uid": "5001",
+     "duration": {"amount": 45, "unit": "minute"}},
+    {"id": "2995104341", "content": "Passfoto", "project_id": "220474323", "parent_id": "2995104340", "priority": 3, "child_order": 1, "checked": true, "completed_at": "2026-09-01T08:00:00Z"},
+    {"id": "2995104342", "content": "Pflanzen gießen", "project_id": "220474323", "priority": 2, "child_order": 2,
+     "due": {"date": "2026-10-01", "is_recurring": true, "string": "every 3 days", "lang": "en"}, "checked": false},
+    {"id": "2995104343", "content": "Zahnbürste", "project_id": "220474324", "priority": 1, "child_order": 1, "checked": false},
+    {"id": "2995104344", "content": "Archiviert", "project_id": "220474325", "priority": 1, "child_order": 1, "checked": false}
+  ],
+  "notes": [{"id": "1", "item_id": "2995104340", "posted_uid": "5001", "content": "Formular ausgedruckt", "file_attachment": {"file_name": "antrag.pdf", "file_url": "https://example.com/antrag.pdf"}}]
+}

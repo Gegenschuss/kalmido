@@ -1,0 +1,21 @@
+name: Feature request
+description: An idea for Kalmido
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What do you want to do?
+      description: Describe the situation and what is missing or hard today.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Idea
+      description: How could it work? Screenshots or examples from other apps are welcome.
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: Would you like to work on it yourself?

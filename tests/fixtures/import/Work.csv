@@ -1,0 +1,8 @@
+TYPE,CONTENT,DESCRIPTION,PRIORITY,INDENT,AUTHOR,RESPONSIBLE,DATE,DATE_LANG,TIMEZONE,DURATION,DURATION_UNIT
+task,Send report @work,,1,1,Alice (1),,every monday at 9am,en,Europe/Berlin,,
+task,Review PR,,2,1,Alice (1),,Jan 15 2027 14:00,en,Europe/Berlin,,
+task,Plan offsite,,4,1,Alice (1),,every! 3 months,en,Europe/Berlin,,
+task,Call bank,,4,1,Alice (1),,tomorrow,en,Europe/Berlin,,
+task,Standup,,4,1,Alice (1),,every weekday,en,Europe/Berlin,,
+task,Weird,,4,1,Alice (1),,every 3rd friday of the month,en,Europe/Berlin,,
+task,Japanese date,,4,1,Alice (1),,毎週月曜日,ja,Asia/Tokyo,,

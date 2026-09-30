@@ -1,0 +1,22 @@
+services:
+  kalmido:
+    build: .
+    # kalmido:local = built from this folder; KALMIDO_IMAGE=ghcr.io/gegenschuss/kalmido:<version> in .env
+    # uses the prebuilt image instead (docker compose pull && docker compose up -d)
+    image: ${KALMIDO_IMAGE:-kalmido:local}
+    container_name: kalmido
+    restart: unless-stopped
+    user: "1000:1000"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    env_file: .env
+    volumes:
+      - ./data:/data
+    ports:
+      # Built-in login by default (setup page on the first start). Keep it on localhost behind a
+      # reverse proxy with HTTPS for use outside your network.
+      - "127.0.0.1:3040:3040"
+      # Single sign-on via a trusted proxy header (see .env.example / README): map the proxy port
+      # only to the address your proxy connects to, e.g. instead of the line above:
+      # - "127.0.0.1:3040:3045"

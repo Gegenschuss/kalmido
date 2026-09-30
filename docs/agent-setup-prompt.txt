@@ -1,0 +1,26 @@
+Set up an Kalmido AI colleague on this Linux machine, following the Kalmido guides docs/AGENT-SETUP.md (path B, "Do it yourself") and docs/AGENT-SECURITY.md (host sandbox recipe) from https://github.com/Gegenschuss/kalmido. Read both guides first and follow them exactly; where this prompt and the guides differ, the guides win.
+
+My values:
+- Kalmido address: <KALMIDO_URL>
+- Env file with the agent's token: <TOKEN_ENV_FILE> (I created it myself with KALMIDO_URL=... and KALMIDO_TOKEN=abk_..., chmod 600)
+- Linux user for the agent: <AGENT_USER>
+- The only person who may give the agent instructions: <OWNER_NAME>, Kalmido account id <OWNER_ID>
+
+Rules for you while you set this up:
+- Never print, cat, echo, log or copy the token or the contents of the env file. Only check that the file exists, belongs to <AGENT_USER> and has mode 600.
+- Show me every command that needs sudo before you run it, and explain in one line what it does.
+- Do not add <AGENT_USER> to the sudo, wheel, docker or adm group, and do not give it SSH keys.
+- Do not open ports, do not change other services, and do not touch Kalmido's own data or configuration.
+- Verify each step before you go to the next one, and tell me what you checked.
+
+Steps:
+1. Create <AGENT_USER> without sudo rights, with a locked password and a 0700 home directory. Move the env file to ~/.config/kalmido/agent.env of that user (owner <AGENT_USER>, mode 600) if it is not there yet.
+2. Set up the egress firewall for <AGENT_USER>: only DNS, the Kalmido address and public HTTPS (the model API) are allowed; the local network and everything else are blocked. Load it at boot.
+3. Install Claude Code for <AGENT_USER> and let me log it in (I do the login myself).
+4. Clone the Kalmido repository to ~/kalmido of <AGENT_USER> (only the mcp/ folder is used) and create the MCP wrapper ~/kalmido/mcp/run.sh that reads the env file and starts kalmido_mcp.py. Register it for the work directory ~/agent.
+5. Create ~/agent/CLAUDE.md from the template in the guide, with <OWNER_NAME> and <OWNER_ID> filled in.
+6. Create ~/agent/.claude/settings.json from the guide (defaultMode dontAsk, only the Kalmido MCP tools and ./bin/events.sh allowed, the env file denied) with the usage hook mcp/claude_usage_hook.py as Stop hook.
+7. Create the event monitor ~/agent/bin/events.sh from the guide (long polling, back-off on every answer other than HTTP 200).
+8. Create the systemd user unit kalmido-agent.service that runs mcp/agent_launcher.sh (runtime settings from Kalmido), enable lingering for <AGENT_USER> and start the unit.
+9. Run the operating system checks from docs/AGENT-SECURITY.md as <AGENT_USER> and show me the results.
+10. Finish with the test checklist from the guide (mention, chat, kill switch, the 7 prompt-injection cases): tell me what to type in Kalmido for each case and what the expected answer is; I run them and tell you the results.

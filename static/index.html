@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#13171d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Kalmido">
+<title>Kalmido</title>
+<link rel="manifest" href="/manifest.json" crossorigin="use-credentials">
+<link rel="icon" href="/static/icon-192.png">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
+<link rel="preload" href="/static/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/static/fonts/GeistMono-Variable.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div id="app">
+  <nav id="rail"></nav>
+  <aside id="side"></aside>
+  <main id="main">
+    <header id="top"></header>
+    <div id="view"></div>
+  </main>
+  <section id="detail" class="hidden"></section>
+  <nav id="tabs"></nav>
+  <button id="fab" aria-label="New task"></button>
+  <div id="scrim" class="hidden"></div>
+  <div id="pop" class="hidden"></div>
+  <div id="toast" class="hidden"></div>
+</div>
+<script src="/static/i18n.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+TYPE,CONTENT,DESCRIPTION,PRIORITY,INDENT,AUTHOR,RESPONSIBLE,DATE,DATE_LANG,TIMEZONE,DURATION,DURATION_UNIT,DEADLINE,DEADLINE_LANG
+meta,view_style=list,,,,,,,,,,,,
+task,Müll rausbringen @zuhause,Gelbe Tonne nicht vergessen,4,1,Max (38121),,jeden Montag,de,Europe/Berlin,,,,
+task,Steuererklärung abgeben @büro @wichtig,,1,1,Max (38121),,15. Okt,de,Europe/Berlin,,,,
+task,Belege sammeln,,4,2,Max (38121),,,,,,,,
+task,Kontoauszüge,,4,3,Max (38121),,,,,,,,
+task,Sehr tief,,4,4,Max (38121),,,,,,,,
+note,"Bitte bis Freitag [[file {""file_name"":""quittung.pdf"",""file_size"":1234,""file_type"":""application/pdf"",""file_url"":""https://files.todoist.com/abc/quittung.pdf""}]]",,,,Max (38121),,,,,,,,
+,,,,,,,,,,,,,
+section,Garten,,,,,,,,,,,,
+task,Rasen mähen,,2,1,Max (38121),Anna (99887),morgen um 10 Uhr,de,Europe/Berlin,90,minute,,
+task,Hecke schneiden,,3,1,Max (38121),,alle 2 Wochen,de,Europe/Berlin,,,,
+task,Kompost umsetzen,,4,1,Max (38121),,irgendwann mal,de,Europe/Berlin,,,,
+task,* Überschrift ohne Haken,,4,1,Max (38121),,,,,,,,
+task,=HYPERLINK("http://evil.example/x";"klick") @formel,,4,1,Max (38121),,,,,,,,
+task,<img src=x onerror=alert(1)> Script <script>alert(2)</script>,,4,1,Max (38121),,,,,,,,
+task,Zahnarzt,,4,1,Max (38121),,,,,,,1.11.2026,de

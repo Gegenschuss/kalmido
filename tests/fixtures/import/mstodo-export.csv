@@ -1,0 +1,4 @@
+List,Title,Status,Importance,DueDateTime,Body,Categories,CompletedDateTime,CreatedDateTime,Steps
+Groceries,Eggs,notStarted,high,2026-10-02T00:00:00.0000000,Free range,Food,,2026-09-01T10:00:00Z,"[x] Check fridge; Buy"
+Groceries,Bread,completed,normal,,,,2026-09-10T08:00:00Z,2026-09-01T10:00:00Z,
+Work,Quarterly report,notStarted,normal,2026-12-31T00:00:00.0000000,,,,2026-09-01T10:00:00Z,

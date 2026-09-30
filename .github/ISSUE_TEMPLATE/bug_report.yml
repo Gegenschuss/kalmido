@@ -1,0 +1,49 @@
+name: Bug report
+description: Something does not work as described
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! **Security problems:** please do not report them here, write to hello@kalmido.com (see SECURITY.md).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. See ...
+  - type: input
+    id: version
+    attributes:
+      label: Kalmido version
+      description: Settings > Help, or the VERSION file
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: login
+    attributes:
+      label: Login
+      options:
+        - Built-in login
+        - Single sign-on (proxy header)
+  - type: input
+    id: client
+    attributes:
+      label: Browser / device
+      placeholder: "Firefox 140 on Linux, installed PWA on Android 16, ..."
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: "`docker compose logs --tail 50` or the browser console, if relevant (remove personal data)"
+      render: text
