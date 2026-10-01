@@ -16,8 +16,12 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   const bell = d.querySelector('#top .bell');
   check(bell && bell.querySelector('.nbadge')?.textContent === String(st.unread) && st.unread > 0, `bell with badge ${st.unread}`);
   check(d.querySelector('#side .srow[data-go="news"] .c')?.textContent === String(st.unread), 'sidebar News row with count');
+  // 2.6.1 (#403): the bell opens a dropdown with the newest News; "Show all" goes to #news
+  const mod0 = w.eval('S.route.mod');
   bell.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true})); await sleep(700);
-  check(w.eval('S.route.mod') === 'news' && d.querySelector('#top h1').textContent === 'News', 'bell opens #news');
+  check(w.eval('S.route.mod') === mod0 && d.querySelector('#pop:not(.hidden) .bpop .nitem'), 'bell opens the dropdown, the view stays');
+  d.querySelector('#pop [data-bp="all"]').dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true})); await sleep(700);
+  check(w.eval('S.route.mod') === 'news' && d.querySelector('#top h1').textContent === 'News' && d.querySelector('#pop').classList.contains('hidden'), '"Show all" opens #news');
   let rows = [...d.querySelectorAll('#view .nitem')];
   check(rows.length === st.items.length && rows.length > 0, `rows rendered ${rows.length}/${st.items.length}`);
   check(/Robin|Bob/.test(rows[1]?.textContent) && /mentioned you/.test(d.querySelector('#view').textContent), 'English texts');

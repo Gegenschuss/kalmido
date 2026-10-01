@@ -1358,6 +1358,8 @@ function topFits(t, ht, nd) {
   const cr = t.getBoundingClientRect(), right = cr.right - parseFloat(getComputedStyle(t).paddingRight || 0) + .5;
   if (t.scrollWidth > t.clientWidth + 1) return 0;
   for (const e of t.children) if (e.offsetWidth && e.getBoundingClientRect().right > right) return 0;
+  // 2.6.1: a pill squeezed so far that its own content is cut (the timer's time, the agents' dots) does not fit either
+  for (const e of t.querySelectorAll(':scope > .tmini, :scope > .achip, :scope > .stchip')) if (e.offsetWidth && e.scrollWidth > e.clientWidth + 1) return 0;
   if (!ht || !nd) return 2;
   const w = ht.getBoundingClientRect().width;
   return w + .02 >= nd.full ? 2 : w + 1 >= Math.min(nd.need, nd.full) ? 1 : 0;  // 2 = whole title, 1 = at least 12 characters
@@ -3619,11 +3621,70 @@ async function saveLink(v) {
 // Server feed of what concerns me (mentions, comments on my tasks, assignments, completions, sharing);
 // texts are built here from structured items. Unread count + a change marker come with /api/state and
 // /api/version, the feed itself is fetched while the view is open (never queued offline).
-S.nf = {items: null, users: {}, sig: null, filter: LS.get('newsFilter', '') ? 'me' : '', unread: !!LS.get('newsUnread', false)};  // #302 unread only: per device  // 1.9.0: 'mentions' became 'me' (mentions + assigned to me)
+S.nf = {items: null, users: {}, sig: null, filter: LS.get('newsFilter', '') ? 'me' : '', unread: !!LS.get('newsUnread', false), kind: LS.get('newsKind', '')};  // #302 unread only: per device  // 1.9.0: 'mentions' became 'me' (mentions + assigned to me)
+// 2.6.1 (#403): the bell opens the newest News right where I am (desktop: a dropdown under it, phone: a sheet from the
+// bottom); "Show all" goes to the full view, a click outside / Esc closes it and I stay in my list
 function bellBtn() {
   if (!collab()) return '';
   const n = S.news?.unread || 0;
-  return `<button class="iconbtn bell ${S.route.mod === 'news' ? 'on' : ''}" data-go="news" title="${esc(tr('News'))}" aria-label="${esc(n ? trn('{0} unread news item', '{0} unread news items', n) : tr('News'))}">${ic('bell')}${n ? `<span class="nbadge">${n > 99 ? '99+' : n}</span>` : ''}</button>`;
+  return `<button class="iconbtn bell ${S.route.mod === 'news' ? 'on' : ''}" data-act="bell-pop" aria-haspopup="dialog" title="${esc(tr('News'))}" aria-label="${esc(n ? trn('{0} unread news item', '{0} unread news items', n) : tr('News'))}">${ic('bell')}${n ? `<span class="nbadge">${n > 99 ? '99+' : n}</span>` : ''}</button>`;
+}
+// 2.6.1 (#404): filter chips (view only, per device): which kinds of News show, in the News view and under the bell
+const NEWS_CHIPS = [['mention', 'at', N_('Mentions'), ['mention']], ['comment', 'comment', N_('Comments'), ['comment']],
+  ['assign', 'user', N_('Assignments'), ['assign', 'unassign']], ['newtask', 'plus', N_('New tasks'), ['newtask']],
+  ['complete', 'check', N_('Completed'), ['complete', 'unblock']], ['status', 'pulse', N_('Status'), ['status']],
+  ['agents', 'bot', N_('Agents'), ['approval', 'proposal', 'usage']], ['share', 'users', N_('Sharing'), ['share', 'role', 'unshare', 'owner']],
+  ['followup', 'hourglass', N_('Follow-ups'), ['followup']]];
+const newsKindOk = (it, k = S.nf.kind) => { const c = k && NEWS_CHIPS.find(x => x[0] === k); return !c || c[3].includes(it.kind); };
+function newsChipsHtml(items, attr) {
+  const k = S.nf.kind, have = NEWS_CHIPS.filter(c => c[0] === k || (items || []).some(it => c[3].includes(it.kind)));
+  if (!have.length || (have.length === 1 && !k)) return '';
+  const da = attr === 'data-nk' ? 'data-act="news-kind"' : '';
+  return `<div class="nchips" role="group" aria-label="${esc(tr('Show only'))}"><button type="button" class="nchip ${k ? '' : 'on'}" ${da} ${attr}="" aria-pressed="${!k}">${tr('All')}</button>${have.map(([v, i, n]) => `<button type="button" class="nchip ${k === v ? 'on' : ''}" ${da} ${attr}="${v}" aria-pressed="${k === v}">${ic(i, 's')}${tr(n)}</button>`).join('')}</div>`;
+}
+function newsKindSet(k) { S.nf.kind = !k || S.nf.kind === k ? '' : k; LS.set('newsKind', S.nf.kind); }
+const BELL_N = 8;
+function bellPopHtml() {
+  const mine = S.nf.items && S.nf.f === S.nf.filter ? S.nf.items : null, n = S.news?.unread || 0;
+  const all = (mine || []).map((it, i) => [it, i]).filter(([it]) => !S.nf.unread || !it.read || it.keep);
+  const shown = all.filter(([it]) => newsKindOk(it)).slice(0, BELL_N);
+  const head = `<div class="bphead"><b id="bp-h">${tr('News')}</b>${n ? `<span class="muted">${esc(trn('{0} unread', '{0} unread', n))}</span>` : ''}<span class="spacer"></span>${n ? `<button type="button" class="btn sm" data-bp="readall">${ic('check', 's')}<span>${tr('Mark all as read')}</span></button>` : ''}<button type="button" class="iconbtn" data-bp="settings" title="${esc(tr('What shows up here'))}" aria-label="${esc(tr('What shows up here'))}">${ic('gear', 's')}</button></div>`;
+  let body;
+  if (!mine) body = `<div class="empty bpempty">${S.nf.err === 'offline' ? tr('News are only available online.') : S.nf.err ? esc(S.nf.err) : tr('Loading…')}</div>`;
+  else if (!shown.length) body = `<div class="empty bpempty">${ic('bell')}<span>${all.length ? tr('Nothing of this kind.') : S.nf.unread && mine.length ? tr('No unread news') : tr('No news')}</span></div>`;
+  else body = `<div class="nlist bplist">${shown.map(([it, i]) => newsItemHtml(it, i, true)).join('')}</div>`;
+  return `<div class="bpop" role="dialog" aria-labelledby="bp-h">${head}${mine ? newsChipsHtml(all.map(x => x[0]), 'data-bpk') : ''}${body}<div class="bpfoot"><button type="button" class="btn pri" data-bp="all">${tr('Show all')}${mine && all.length > shown.length ? ` <span class="bpn">${all.length}</span>` : ''}</button></div></div>`;
+}
+function bellPop(anchor) {
+  if (!collab()) return;
+  if (!$('#pop').classList.contains('hidden') && $('#pop .bpop')) { closePop(); return; }  // a second tap closes it
+  const p = openPop(anchor, bellPopHtml(), () => { $('#top .bell')?.setAttribute('aria-expanded', 'false'); });
+  p.classList.add('bellpop');
+  anchor?.setAttribute?.('aria-expanded', 'true');
+  const redraw = () => { if ($('#pop .bpop') && !$('#pop').classList.contains('hidden')) { p.innerHTML = bellPopHtml(); if (!isMobile()) bellPlace(p, anchor); } };
+  bellPlace(p, anchor);
+  const fresh = S.nf.sig === (S.news?.sig ?? '') && S.nf.f === S.nf.filter && !!S.nf.items;
+  if (!fresh) loadNews().then(redraw);
+  setTimeout(() => $('#pop .bpop [data-bp="all"]')?.focus({preventScroll: true}), 30);
+  p.onclick = async e => {
+    const k = e.target.closest('[data-bpk]');
+    if (k) { newsKindSet(k.dataset.bpk); redraw(); return; }
+    const b = e.target.closest('[data-bp]'); if (!b) return;
+    const i = +b.dataset.i, q = b.dataset.bp;
+    if (q === 'dismiss') { e.stopPropagation(); await newsDismiss(i); redraw(); return; }
+    if (q === 'open') { closePop(); newsOpen(i); return; }
+    if (q === 'readall') { S.nf.items?.forEach(x => { x.read = true; }); await newsRead({all: true}); redraw(); return; }
+    if (q === 'settings') { closePop(); settingsModal('newskinds'); return; }
+    if (q === 'all') { closePop(); go('news'); }
+  };
+  p.onkeydown = e => { const it = e.target.closest?.('[data-bp="open"]'); if (it && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); it.click(); } };
+}
+// desktop: right-aligned under the bell (openPop places it at the anchor's left edge)
+function bellPlace(p, anchor) {
+  if (isMobile() || !anchor?.getBoundingClientRect) return;
+  const r = anchor.getBoundingClientRect(), w = p.offsetWidth;
+  if (!w) return;
+  p.style.left = Math.max(12, Math.min(r.right - w, innerWidth - w - 12)) + 'px';
 }
 function relTime(iso) {
   const min = Math.round((Date.now() - new Date(iso)) / 60000);
@@ -3671,14 +3732,14 @@ function newsText(it, U) {
   return tr('{0} changed something', who);
 }
 const NEWS_ICON = {mention: 'at', comment: 'comment', assign: 'user', unassign: 'user', complete: 'check', share: 'users', role: 'users', unshare: 'users', unblock: 'deps', status: 'pulse', newtask: 'plus', approval: 'bot', followup: 'hourglass', usage: 'chart', proposal: 'bot'};
-function newsItemHtml(it, i) {
+function newsItemHtml(it, i, pop) {
   const U = S.nf.users;
   const task = it.task_id ? `<div class="ntask"><span class="nt">${esc(it.task_title || '')}</span><span class="muted">${esc(newsListName(it))}</span></div>` : '';
   const ex = it.excerpt ? `<div class="nexc">${newsExcerpt(it.excerpt, U)}</div>` : '';
-  return `<div class="nitem ${it.read ? '' : 'unread'} k-${esc(it.kind)}" role="button" tabindex="0" data-act="news-open" data-i="${i}" aria-label="${esc((it.read ? '' : tr('Unread') + ': ') + newsText(it, U).replace(/<[^>]+>/g, ''))}">
+  return `<div class="nitem ${it.read ? '' : 'unread'} k-${esc(it.kind)}" role="button" tabindex="0" ${pop ? 'data-bp="open"' : 'data-act="news-open"'} data-i="${i}" aria-label="${esc((it.read ? '' : tr('Unread') + ': ') + newsText(it, U).replace(/<[^>]+>/g, ''))}">
     ${av(it.actor_id, uname(it.actor_id, U), 'avatar', '', `<i class="nk">${ic(NEWS_ICON[it.kind] || 'bell', 's')}</i>`)}
     <div class="nmain"><div class="ntext">${newsText(it, U)}</div>${task}${ex}</div>
-    <time title="${esc(fmtWhen(it.created_at))}">${relTime(it.created_at)}</time>${isTouch() ? '' : `<button class="iconbtn ndel" data-act="news-dismiss" data-i="${i}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button>`}</div>`;
+    <time title="${esc(fmtWhen(it.created_at))}">${relTime(it.created_at)}</time>${isTouch() ? '' : `<button class="iconbtn ndel" ${pop ? 'data-bp="dismiss"' : 'data-act="news-dismiss"'} data-i="${i}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button>`}</div>`;
 }
 function viewNews() {
   const f = S.nf.filter, fresh = S.nf.sig === (S.news?.sig ?? '') && S.nf.f === f && !!S.nf.items;
@@ -3689,10 +3750,13 @@ function viewNews() {
   const mine = S.nf.items && S.nf.f === f ? S.nf.items : null;
   if (!mine && (S.nf.loading || S.nf.queued)) return bar + `<div class="empty">${tr('Loading…')}</div>`;
   // #302 unread only: read items hide (one opened just now stays until the next load); data-i keeps the index in S.nf.items
-  const shown = (mine || []).map((it, i) => [it, i]).filter(([it]) => !S.nf.unread || !it.read || it.keep);
-  if (mine && mine.length && !shown.length) return bar + `<div class="empty nempty">${ic('bell')}<b>${tr('No unread news')}</b><span>${tr('Everything is read. Switch off “Unread only” to see older news.')}</span></div>`;
+  const vis = (mine || []).map((it, i) => [it, i]).filter(([it]) => !S.nf.unread || !it.read || it.keep);
+  const chips = mine ? newsChipsHtml(vis.map(x => x[0]), 'data-nk') : '';
+  const shown = vis.filter(([it]) => newsKindOk(it));
+  if (mine && mine.length && !vis.length) return bar + `<div class="empty nempty">${ic('bell')}<b>${tr('No unread news')}</b><span>${tr('Everything is read. Switch off “Unread only” to see older news.')}</span></div>`;
   if (!mine || !mine.length) return bar + `<div class="empty nempty">${ic('bell')}<b>${tr('No news')}</b><span>${f ? tr('No mentions or assignments.') : tr('Mentions, comments on your tasks, assignments and shared lists show up here.')}</span></div>`;
-  return bar + `<div class="nlist">${shown.map(([it, i]) => newsItemHtml(it, i)).join('')}</div>${isTouch() ? `<div class="muted nswipe">${tr('Swipe an item sideways to remove it.')}</div>` : ''}`;
+  if (!shown.length) return bar + chips + `<div class="empty nempty">${ic('bell')}<b>${tr('Nothing of this kind.')}</b></div>`;
+  return bar + chips + `<div class="nlist">${shown.map(([it, i]) => newsItemHtml(it, i)).join('')}</div>${isTouch() ? `<div class="muted nswipe">${tr('Swipe an item sideways to remove it.')}</div>` : ''}`;
 }
 async function loadNews() {
   if (S.nf.loading) return;
@@ -4649,7 +4713,7 @@ function openPop(anchor, html, onClose) {
 }
 function menu(anchor, items) {
   items = items.filter(Boolean);
-  const btn = (it, i, j) => `<button role="menuitem" data-i="${i}" ${j != null ? `data-j="${j}"` : ''} class="${it.on ? 'on' : ''} ${it.cls || ''}" ${it.dis ? 'disabled aria-disabled="true"' : ''} ${it.title ? `title="${esc(it.title)}"` : ''}>${it.icon ? ic(it.icon, 's') : ''}<span class="ml">${esc(it.label)}</span>${it.keys && !isMobile() ? kb(it.keys) : ''}</button>`;
+  const btn = (it, i, j) => `<button role="menuitem" data-i="${i}" ${j != null ? `data-j="${j}"` : ''} class="${it.on ? 'on' : ''} ${it.cls || ''}" ${it.dis ? 'disabled aria-disabled="true"' : ''} ${it.title ? `title="${esc(it.title)}"` : ''}>${it.dot ? `<span class="mdot">${hdot(it.dot)}</span>` : it.icon ? ic(it.icon, 's') : ''}<span class="ml">${esc(it.label)}</span>${it.keys && !isMobile() ? kb(it.keys) : ''}</button>`;
   // {row: [item, item]} = one line of equal buttons (1.5.1: "Today" / "Tomorrow" on top of the task menu)
   const p = openPop(anchor, `<div class="menu-list" role="menu">${items.map((it, i) => it === '-' ? '<hr>' : it.row ? `<div class="mquick" role="group">${it.row.map((x, j) => btn(x, i, j)).join('')}</div>` : btn(it, i)).join('')}</div>`);
   p.onclick = e => { const b = e.target.closest('[data-i]'); if (!b || b.disabled) return; let it = items[+b.dataset.i]; if (it.row) it = it.row[+b.dataset.j]; closePop(); it.fn(); };
@@ -4729,10 +4793,55 @@ function prioMenu(anchor, id) {
   if (!canEdit(t)) { roToast(); return; }
   menu(anchor, [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', on: t.priority === p, cls: p ? 'flag-' + p : '', fn: () => patchTask(id, {priority: p})})));
 }
+// 2.6.1 (#401): by default every change in the date popover (day, time, start, duration, reminders, repeat) is saved at
+// once (a short pause bundles quick taps); the popover stays open for more, "Saved" shows in its foot, and closing it
+// leaves ONE undo step for the whole visit with a toast "Date: … · Undo". "Undo" in the foot puts everything back and
+// closes. Settings > General > "Confirm changes with OK" (date_confirm) brings back Cancel / OK.
+const dateInstant = () => S.settings?.date_confirm !== '1';
 function datePop(anchor, id) {
   const t = taskById(id);
   if (!canEdit(t)) { roToast(); return; }
   const st = {due: t.due, due_time: t.due_time, reminders: t.reminders, repeat: t.repeat, repeat_from: t.repeat_from, start: t.start, duration: t.duration, month: (t.due || today()).slice(0, 7)};
+  const instant = dateInstant(), before = snapTask(t);
+  const body = () => ({due: st.due, due_time: st.due ? st.due_time : null, reminders: st.due ? st.reminders : '', repeat: st.due ? st.repeat : '', repeat_from: st.repeat_from,
+    start: st.due && st.start && st.start < st.due ? st.start : null, duration: st.due_time ? (st.duration || 30) : null});
+  const msgOf = () => st.due ? tr('Date: {0}', dayLabel(st.due)) : tr('Date removed');
+  // instant mode: what was sent last, the running request chain, the dependent tasks the server moved along (first prev)
+  const I = {sig: JSON.stringify(body()), timer: null, chain: Promise.resolve(), saved: false, shifted: new Map(), done: false, last: null};
+  const send = () => {
+    clearTimeout(I.timer); I.timer = null;
+    const b = body(), sig = JSON.stringify(b);
+    if (sig === I.sig) return I.chain;
+    I.sig = sig;
+    I.chain = I.chain.then(async () => {
+      const r = await patchTask(id, b, true);
+      I.saved = true; I.last = r;
+      for (const x of r?.shifted || []) { const o = I.shifted.get(x.id); I.shifted.set(x.id, o ? {...x, prev_start: o.prev_start, prev_due: o.prev_due} : x); }
+      const f = $('#pop .psaved'); if (f && !I.done) { f.innerHTML = `${ic('check', 's')}<span>${tr('Saved')}</span>`; f.classList.add('on'); }
+      const u = $('#pop [data-q="revert"]'); if (u && !I.done) u.hidden = false;
+    }).catch(() => { /* api() showed the error; the popover shows the state it has */ });
+    return I.chain;
+  };
+  const changed = () => { if (!instant || I.done) return; clearTimeout(I.timer); I.timer = setTimeout(send, 350); };
+  // closing (Done, the scrim, Esc, another popover): send what is left, then one history step + the toast
+  const finish = async () => {
+    if (I.done) return; I.done = true;
+    await send();
+    if (!I.saved) return;
+    const cur = S.tasks.get(id) || I.last;
+    shiftUndo(before, cur ? {...cur, id, shifted: [...I.shifted.values()]} : null, msgOf());
+  };
+  const revert = async () => {
+    I.done = true; clearTimeout(I.timer);
+    await I.chain;
+    if (!I.saved) return;
+    const back = {}; for (const k of ['due', 'due_time', 'reminders', 'repeat', 'repeat_from', 'start', 'duration']) back[k] = before[k] ?? (k === 'reminders' || k === 'repeat' ? '' : null);
+    try { await patchTask(id, back, true); } catch { return; }
+    // dependent tasks the server moved along: back to where they were
+    const items = {}; for (const x of I.shifted.values()) items[x.id] = {start: x.prev_start, due: x.prev_due};
+    if (Object.keys(items).length) { try { await histBatch('patch_each', Object.keys(items).map(Number), {items}); await load(); render(); } catch { /* shown */ } }
+    toast(tr('Changes undone'));
+  };
   const draw = () => {
     const [y, m] = st.month.split('-').map(Number);
     const start = weekStartOf(`${st.month}-01`);
@@ -4759,11 +4868,16 @@ function datePop(anchor, id) {
         <details class="rrx" ${cu.extra ? 'open' : ''}><summary>${tr('Advanced · rule text (RRULE)')}</summary><input id="p-rrule" value="${esc(cur)}" spellcheck="false" autocapitalize="off" aria-label="RRULE" placeholder="FREQ=WEEKLY;INTERVAL=3;BYDAY=MO,TH"></details></div>` : ''}
       ${st.repeat ? `<div class="prow" style="padding-left:1.375rem"><span class="muted" style="font-size:var(--fs-s)">${tr('Ends')}</span><select id="p-end" style="max-width:8.125rem"><option value="never" ${end.type === 'never' ? 'selected' : ''}>${tr('never')}</option><option value="count" ${end.type === 'count' ? 'selected' : ''}>${tr('after count')}</option><option value="until" ${end.type === 'until' ? 'selected' : ''}>${tr('on date')}</option></select>${end.type === 'count' ? `<input type="number" id="p-endn" min="1" max="999" value="${esc(end.val)}" style="max-width:4.625rem"><span class="muted" style="font-size:var(--fs-s)">${trn('time', 'times', end.val)}</span>` : end.type === 'until' ? dateIn('p-endd', end.val, {label: tr('on date'), clear: false, min: st.due || ''}) : ''}</div>` : ''}
       ${st.repeat ? `<div class="prow" style="padding-left:1.375rem"><label style="display:flex;gap:.5rem;align-items:center;font-size:var(--fs-m)"><input type="checkbox" id="p-from" ${st.repeat_from === 'done' ? 'checked' : ''} style="flex:none"> ${tr('repeat from completion date')}</label></div>` : ''}
-      <div class="popfoot"><button class="btn" data-q="cancel">${tr('Cancel')}</button><button class="btn pri" data-q="ok">${tr('OK')}</button></div>`;
+      ${instant ? `<div class="popfoot pinst"><span class="psaved ${I.saved ? 'on' : ''}" role="status" aria-live="polite">${I.saved ? `${ic('check', 's')}<span>${tr('Saved')}</span>` : esc(tr('Changes apply at once'))}</span><button class="btn" data-q="revert" ${I.saved ? '' : 'hidden'}>${tr('Undo')}</button><button class="btn pri" data-q="done">${tr('Done')}</button></div>`
+    : `<div class="popfoot"><button class="btn" data-q="cancel">${tr('Cancel')}</button><button class="btn pri" data-q="ok">${tr('OK')}</button></div>`}`;
   };
-  const p = openPop(anchor, draw());
+  const p = openPop(anchor, draw(), instant ? () => { finish(); } : null);
   const redraw = () => { p.innerHTML = draw(); };
   p.onclick = async e => {
+    await dateClick(e);
+    changed();
+  };
+  const dateClick = async e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.d) { st.due = b.dataset.d; redraw(); }
     if (b.dataset.mm) { const [y, m] = st.month.split('-').map(Number); st.month = ds(new Date(y, m - 1 + +b.dataset.mm, 1)).slice(0, 7); redraw(); }
@@ -4781,13 +4895,18 @@ function datePop(anchor, id) {
       st.repeat = rrSetEnd(rrBuild(cu), rrEnd(st.repeat)); redraw(); $(`#pop [data-rwd="${b.dataset.rwd}"]`)?.focus();
     }
     if (q === 'cancel') closePop();
+    if (q === 'done') closePop();  // instant: popOnClose -> finish()
+    if (q === 'revert') { popOnClose = null; closePop(); await revert(); }
     if (q === 'ok') {
       closePop();
-      await patchUndoable(id, {due: st.due, due_time: st.due ? st.due_time : null, reminders: st.due ? st.reminders : '', repeat: st.due ? st.repeat : '', repeat_from: st.repeat_from,
-        start: st.due && st.start && st.start < st.due ? st.start : null, duration: st.due_time ? (st.duration || 30) : null}, st.due ? tr('Date: {0}', dayLabel(st.due)) : tr('Date removed'));
+      await patchUndoable(id, body(), msgOf());
     }
   };
   p.onchange = e => {
+    dateChange(e);
+    changed();
+  };
+  const dateChange = e => {
     if (e.target.id === 'p-time') {
       st.due_time = e.target.value || null; if (!st.due) st.due = today();
       if (st.due_time && !st.reminders && S.settings.default_reminder !== '') st.reminders = S.settings.default_reminder;
@@ -5305,21 +5424,61 @@ function listMenuItems(id, anchor) {
   return items;
 }
 // 2.1.0 (#317): the bell of a list (mine only): all / default (the matrix in Settings > Notifications) / mute
+// 2.6.1 (#404): + custom = my own choice per event (News and Push each), for this list only
 const BELLS = [['all', N_('All activity'), N_('every comment, new task and change in this list')], ['default', N_('Default'), N_('as in Settings > Notifications')],
-  ['mute', N_('Mute'), N_('only mentions of me and tasks assigned to me')]];
-const BELL_ICON = {all: 'bellring', default: 'bell', mute: 'belloff'};
-const bellLabel = m => tr(BELLS.find(b => b[0] === (m || 'default'))[1]);
-async function bellSet(id, mode) {
-  const l = listById(id); if (!l || (l.bell || 'default') === mode) return;
-  const prev = l.bell || 'default';
-  try { await api('PUT', `/api/lists/${id}/bell`, {mode}); } catch { return; }
-  l.bell = mode; renderSide(); render();
-  const sel = $('#l-bell'); if (sel) sel.value = mode;
-  toast(tr('Notifications for {0}: {1}', lname(l), bellLabel(mode)), async () => { await api('PUT', `/api/lists/${id}/bell`, {mode: prev}); l.bell = prev; renderSide(); render(); const s2 = $('#l-bell'); if (s2) s2.value = prev; });
+  ['mute', N_('Mute'), N_('only mentions of me and tasks assigned to me')], ['custom', N_('Custom selection…'), N_('your own choice per event, for News and Push')]];
+const BELL_ICON = {all: 'bellring', default: 'bell', mute: 'belloff', custom: 'sliders'};
+const bellLabel = m => tr(BELLS.find(b => b[0] === (m || 'default'))[1]).replace(/…$/, '');
+// the events of the custom bell (server: BELL_CUSTOM_ROWS); a ticked one comes from every task of the list
+const BELL_ROWS = [['newtask', N_('New tasks'), N_('created by someone else')], ['comment', N_('Comments'), N_('every comment in this list, replies included')],
+  ['mention', N_('Mentions of me')], ['assign', N_('Tasks assigned to me (or taken away)')], ['complete', N_('Completed tasks'), N_('completed by someone else')],
+  ['status', N_('Project status changes')], ['unblock', N_('A task I wait on was completed'), '', 'deps'], ['approval', N_('An agent waits for my approval'), N_('proposals and approvals of agents'), 'agents']];
+// what a custom bell starts with: the stored choice, else what the matrix (Settings > Notifications) says today
+function bellCustomOf(l) {
+  const m = notifMatrix(S.settings), c = l?.bell_custom || {}, out = {};
+  for (const [r] of BELL_ROWS) out[r] = {news: 'news' in (c[r] || {}) ? !!c[r].news : !!m[r]?.news, push: 'push' in (c[r] || {}) ? !!c[r].push : !!m[r]?.push};
+  return out;
+}
+async function bellSet(id, mode, custom) {
+  const l = listById(id); if (!l || ((l.bell || 'default') === mode && !custom)) return;
+  const prev = l.bell || 'default', prevC = l.bell_custom || {};
+  let j;
+  try { j = await api('PUT', `/api/lists/${id}/bell`, custom ? {mode, custom} : {mode}); } catch { return; }
+  l.bell = mode; if (j?.custom) l.bell_custom = j.custom;
+  renderSide(); render();
+  const sel = $('#l-bell'); if (sel) { sel.value = mode; sel.dispatchEvent(new Event('bell-sync')); }
+  toast(tr('Notifications for {0}: {1}', lname(l), bellLabel(mode)), async () => {
+    const r = await api('PUT', `/api/lists/${id}/bell`, prev === 'custom' || custom ? {mode: prev, custom: prevC} : {mode: prev});
+    l.bell = prev; l.bell_custom = r?.custom || prevC; renderSide(); render(); const s2 = $('#l-bell'); if (s2) { s2.value = prev; s2.dispatchEvent(new Event('bell-sync')); }
+  });
 }
 function bellMenu(anchor, id) {
   const l = listById(id); if (!l) return;
-  menu(anchor, BELLS.map(([m, n, h]) => ({label: tr(n), title: tr(h), icon: BELL_ICON[m], on: (l.bell || 'default') === m, fn: () => bellSet(id, m)})));
+  menu(anchor, BELLS.map(([m, n, h]) => ({label: tr(n), title: tr(h), icon: BELL_ICON[m], on: (l.bell || 'default') === m, fn: () => m === 'custom' ? bellCustomModal(id) : bellSet(id, m)})));
+}
+// "Custom selection…": the events x News / Push for this list (same table as Settings > Notifications)
+function bellCustomModal(id) {
+  const l = listById(id); if (!l) return;
+  const v = bellCustomOf(l), social = collab();
+  const rows = BELL_ROWS.filter(([, , , f]) => !f || (f === 'deps' ? depsOn() : feat('agents') && (S.agents || []).length));
+  const box = (r, ch, lab) => `<input type="checkbox" data-bc="${r}" data-ch="${ch}" ${v[r][ch] ? 'checked' : ''} aria-label="${esc(tr(lab) + ': ' + (ch === 'news' ? tr('News') : tr('Push')))}">`;
+  const md = modal(`<h3 id="bc-h">${esc(tr('Notifications for {0}', lname(l)))}</h3>
+    <div class="shint">${tr('Ticked events reach you from every task of this list, unticked ones never. News = under the bell, Push = on your devices. Only for you; reminders and lists shared with you follow Settings > Notifications.')}</div>
+    <div class="nmx bcmx" role="table" aria-labelledby="bc-h"><div class="nmh" role="row"><span role="columnheader">${tr('Event')}</span><span role="columnheader">${tr('News')}</span><span role="columnheader">${tr('Push')}</span></div>
+    ${rows.map(([r, n, d]) => `<div class="nmr" role="row"><span class="nml" role="cell">${tr(n)}${d ? `<small>${tr(d)}</small>` : ''}</span><span role="cell">${social ? box(r, 'news', n) : '<span class="nmna">–</span>'}</span><span role="cell">${box(r, 'push', n)}</span></div>`).join('')}</div>
+    <div class="row mfoot"><button class="btn sm" data-bcq="none">${tr('Tick none')}</button><span class="spacer"></span><button class="btn" data-bcq="cancel">${tr('Cancel')}</button><button class="btn pri" data-bcq="save">${tr('Save')}</button></div>`);
+  md.classList.add('bcmodal');
+  onRemove(md, () => { const sel = $('#l-bell'); if (sel) { sel.value = listById(id)?.bell || 'default'; sel.dispatchEvent(new Event('bell-sync')); } });  // closed without saving: the list dialog shows the bell as it is
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('[data-bcq]'); if (!b) return;
+    if (b.dataset.bcq === 'none') { $$('[data-bc]', md).forEach(x => { x.checked = false; }); return; }
+    if (b.dataset.bcq === 'cancel') { md.remove(); return; }
+    const custom = {};
+    for (const x of $$('[data-bc]', md)) (custom[x.dataset.bc] ||= {})[x.dataset.ch] = x.checked ? 1 : 0;
+    md.remove();
+    await bellSet(id, 'custom', custom);
+  });
+  setTimeout(() => $('[data-bc]', md)?.focus(), 30);
 }
 function listMenu(anchor, id) { const it = listMenuItems(id, anchor); if (it.length) menu(anchor, it); }
 // archive / restore a list: one history step (undo brings it back), the toast offers the undo too
@@ -5466,7 +5625,8 @@ function listModal(id, folder = '', o = {}) {
     </div>
     ${id && shareOk(l) ? `<h4>${tr(collab() ? N_('Sharing') : N_('Owner'))}</h4><div class="row shsum"><span class="muted" id="l-shsum">${esc(shareSummary(l))}</span><button class="btn sm" data-m="share-open">${ic('users', 's')} ${tr(collab() ? N_('Share…') : N_('Ownership…'))}</button></div>` : ''}
     ${id && !l.is_inbox && collab() && l.shared ? `<h4>${tr('Notifications')}</h4><div class="row"><label for="l-bell">${ic(BELL_ICON[l.bell || 'default'], 's')} ${tr('This list')}</label><select id="l-bell" data-native>${BELLS.map(([m, n]) => `<option value="${m}" ${(l.bell || 'default') === m ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
-    <div class="shint lhint" id="l-bellhint">${tr(BELLS.find(b => b[0] === (l.bell || 'default'))[2])} · ${tr('only for you')}</div>` : ''}
+    <div class="shint lhint" id="l-bellhint">${tr(BELLS.find(b => b[0] === (l.bell || 'default'))[2])} · ${tr('only for you')}</div>
+    <div class="row" id="l-bellc" ${l.bell === 'custom' ? '' : 'hidden'}><span class="spacer"></span><button type="button" class="btn sm" data-m="bell-custom">${ic('sliders', 's')} ${tr('Choose events…')}</button></div>` : ''}
     ${id && !l.is_inbox && collab() && (l.shared || listTags(id).length) ? `<h4>${tr('List tags')}</h4><div class="shint lhint">${tr('Tags of this list: everyone in it sees them, with their colour. Personal tags (with the person icon) stay yours.')}</div><div class="members" id="l-ltags">${ltagsBoxHtml(l)}</div>` : ''}
     <div class="foot">${id && !l.is_inbox && own ? (l.archived ? `<button class="btn" data-m="arch">${ic('undo', 's')} ${tr('Restore from the archive')}</button><button class="btn danger" data-m="del">${ic('trash', 's')} ${tr('Delete permanently…')}</button>` : `<button class="btn" data-m="arch" title="${tr('Hidden from your lists; undo or restore any time. Deleting for good is only possible from the archive.')}">${ic('archive', 's')} ${tr('Archive')}</button>`) : ''}${id && !own ? `<button class="btn danger" data-m="leave">${ic('logout', 's')} ${tr('Leave list')}</button>` : ''}${id ? `<button class="btn" data-m="tpl" title="${tr('Save the sections and open tasks as a template')}">${ic('copy', 's')} ${tr('Save as template')}</button>` : ''}<span class="spacer"></span>${id ? '' : `<button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Create')}</button>`}</div>`);
   if (id) md.classList.add('lmodal'); else md.classList.add('lnew');
@@ -5475,7 +5635,10 @@ function listModal(id, folder = '', o = {}) {
   }).catch(() => {});
   if (id && !l.is_inbox) repoWire(md, id);  // 2.2.0 (#271)
   if (id && !l.is_inbox && collab()) ltagsWire(md, id);
-  $('#l-bell', md)?.addEventListener('change', async e => { e.stopPropagation(); await bellSet(id, e.target.value); const h = $('#l-bellhint', md); if (h) h.textContent = tr(BELLS.find(x => x[0] === e.target.value)[2]) + ' · ' + tr('only for you'); });
+  const bellHint = v => { const h = $('#l-bellhint', md); if (h) h.textContent = tr(BELLS.find(x => x[0] === v)[2]) + ' · ' + tr('only for you'); const c = $('#l-bellc', md); if (c) c.hidden = v !== 'custom'; };
+  $('#l-bell', md)?.addEventListener('change', async e => { e.stopPropagation(); if (e.target.value === 'custom') { bellHint('custom'); bellCustomModal(id); return; } await bellSet(id, e.target.value); bellHint(e.target.value); });
+  $('#l-bell', md)?.addEventListener('bell-sync', e => bellHint(e.target.value));
+  $('[data-m="bell-custom"]', md)?.addEventListener('click', e => { e.stopPropagation(); bellCustomModal(id); });
   // ---- autosave (existing lists)
   const pend = new Map();
   const formBody = () => {
@@ -5846,8 +6009,9 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-trem': ['time_remind_h', N_('Reminder after'), 'num'], 's-tstop': ['time_autostop_h', N_('Stop automatically after'), 'num'], 's-tfocus': ['time_focus', N_('Focus sessions'), 'chk'],
   's-icalscope': ['ical_scope', N_('Calendar subscription'), 'sel'], 's-icalalarm': ['ical_alarms', N_('as calendar alarms'), 'chk'],
   's-plkeep': ['paperless_keep', N_('Also keep the attachment in Kalmido'), 'chk'], 's-caltoday': ['cal_today', N_('Events on Today'), 'chk'],
+  's-dateok': ['date_confirm', N_('Confirm changes with OK'), 'chk'],  // 2.6.1 (#401)
 };
-const SET_RENDER = ['features', 'nav_order', 'show_done_views', 'hide_blocked_today', 'progress_subtasks', 'cal_today', 'time_target', 'lang'];
+const SET_RENDER = ['features', 'nav_order', 'show_done_views', 'hide_blocked_today', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden'];
 function setVal(el, kind) {  // the value a control stands for; undefined = not valid (nothing is saved)
   const v = el.value;
   if (kind === 'chk') return el.checked ? '1' : '0';
@@ -5911,6 +6075,7 @@ function settingsSync() {
     else { el.value = s[k] ?? ''; if (el.dataset.dp) dpSync(el); }
   }
   for (const el of $$('[data-feat]', md)) el.checked = feat(el.dataset.feat);
+  for (const el of $$('[data-agvis]', md)) el.checked = !agentHidden().has(+el.dataset.agvis);
   $$('[data-modrow]', md).forEach(r => r.classList.toggle('off', !feat(r.dataset.modrow)));
   const nm = $('#a-name', md); if (nm && nm !== document.activeElement && S.me) nm.value = S.me.display_name;
   $$('#s-lang [data-lang-set]', md).forEach(b => b.classList.toggle('on', b.dataset.langSet === (s.lang || 'en')));
@@ -5989,7 +6154,8 @@ function aiHtml(hint, want) {
     ${feat('agents') ? '' : `<div class="shint aimodoff">${ic('grid', 's')} <span>${tr('The Agents module (the tab with their status, jobs to approve and the chat) is switched off for you.')}</span> <button class="btn sm" data-m="go-modules">${tr('Open Modules')}</button></div>`}
     ${collab() ? '' : hint(tr('Agents work together with you in shared lists: switch on Collaboration (Settings > Modules) as well.'))}
     <div class="members aglist" id="${adm ? 's-ags' : 's-myags'}"><div class="muted mhint">${tr('Loading…')}</div></div>
-    <div class="row aibtns">${adm ? `<button class="btn sm" data-ag="new">${ic('plus', 's')} ${tr('Add agent')}</button>` : ''}<button class="btn sm" data-m="ag-guide" title="${esc(tr('Set up an agent step by step, or let Claude Code do it'))}">${ic('help', 's')} ${tr('Setup guide')}</button></div>`)}
+    <div class="row aibtns">${adm ? `<button class="btn sm" data-ag="new">${ic('plus', 's')} ${tr('Add agent')}</button>` : ''}<button class="btn sm" data-m="ag-guide" title="${esc(tr('Set up an agent step by step, or let Claude Code do it'))}">${ic('help', 's')} ${tr('Setup guide')}</button></div>
+    ${agDotsHtml(hint)}`)}
     ${pane('lists', `<h4 id="s-ai-lists-h">${ags.length > 1 ? tr('Which lists they see') : tr('Which lists it sees')}</h4>
     ${hint(tr('An agent sees exactly the lists shared with it, nothing else. Share or stop sharing below or in the list’s Share dialog; taking a list out ends the access at once.'))}
     ${mine && collab() ? `<div class="aishare" id="s-ai-share"></div><div class="aitblctl" id="s-ai-tblctl"></div>
@@ -6031,6 +6197,9 @@ function settingsModal(focus) {
       <h4>${tr('Celebrations')}</h4>
       <div class="row"><label>${tr('Sloth')}</label>${chk('s-celebrate', s.celebrate !== '0', tr('Celebrate completions'))}</div>
       ${hint(tr('When Today is cleared or a list or project is complete, the sloth swings by with a one-liner. With reduced motion (system setting) it just says hello.'))}
+      <h4 id="s-dates-h">${tr('Date and reminders')}</h4>
+      <div class="row"><label>${tr('Changes')}</label>${chk('s-dateok', s.date_confirm === '1', tr('Confirm changes with OK'))}</div>
+      ${hint(tr('Off: a new day, time, start, repeat or reminder is saved as soon as you pick it; “Undo” in the message takes the whole change back. On: changes wait for OK.'))}
       <h4>${tr('Projects')}</h4>
       ${depsOn() ? `<div class="row"><label>${tr('Today')}</label>${chk('s-hideblk', s.hide_blocked_today === '1', tr('Hide tasks that are still waiting on another task'))}</div>` : ''}
       <div class="row"><label>${tr('List progress')}</label>${chk('s-progsub', s.progress_subtasks === '1', tr('Count subtasks too'))}</div>`,
@@ -6086,7 +6255,7 @@ function settingsModal(focus) {
       ${sampleHtml(hint)}
       <h4>${tr('Completed tasks')}</h4>
       <div class="row"><label>${tr('Clean up')}</label><button class="btn sm danger" data-m="purge">${ic('trash', 's')} ${tr('Delete all completed')}</button><span class="muted" style="font-size:var(--fs-s)">${tr('they go to the trash')}</span></div>`,
-    ai: S.me ? aiHtml(hint, {agents: 'agents', usage: 'usage', activity: 'log'}[focus]) : '',
+    ai: S.me ? aiHtml(hint, {agents: 'agents', agentdots: 'agents', usage: 'usage', activity: 'log'}[focus]) : '',
     users: S.me?.is_admin ? usersHtml() + orphHtml() + instanceHtml(chk, hint) + signinHtml(hint) + plaHtml() + bkHtml() + aaHtml() : '',  // 1.9.0: users first
     help: `<h4>${tr('Getting started')}</h4>
       <div class="row"><button class="btn sm" data-m="tour">${ic('arrow', 's')} ${tr('Restart the welcome tour')}</button>${isMobile() ? '' : `<button class="btn sm" data-m="keys">${ic('help', 's')} ${tr('Keyboard shortcuts')} ${kb('?')}</button>`}<button class="btn sm" data-m="cele-try">${ic('check', 's')} ${tr('Show the celebration')}</button></div>
@@ -6107,7 +6276,7 @@ function settingsModal(focus) {
   };
   pane.help += aboutHtml(chk, hint);
   const secs = SET_SECS.filter(([k]) => pane[k]);
-  let cur = {tabbar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', usage: 'ai', activity: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'integr', tokens: 'account', about: 'help'}[focus] || focus;
+  let cur = {tabbar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'integr', tokens: 'account', about: 'help'}[focus] || focus;
   if (!secs.some(([k]) => k === cur)) cur = LS.get('settingsSec', 'general');
   if (!secs.some(([k]) => k === cur)) cur = 'general';
   const md = modal(`<div class="shdr"><h3>${tr('Settings')}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
@@ -6116,6 +6285,7 @@ function settingsModal(focus) {
   md.classList.add('smodal');
   if (focus === 'tabbar') setTimeout(() => $('#s-tabbar-h', md)?.scrollIntoView({block: 'start'}), 0);
   if (focus === 'newskinds' || focus === 'share') setTimeout(() => $(focus === 'share' ? '#s-share-h' : '#s-news-h', md)?.scrollIntoView({block: 'start'}), 0);
+  if (focus === 'agentdots') setTimeout(() => $('#s-agdots-h', md)?.scrollIntoView({block: 'start'}), 0);
   const show = k => {
     cur = k; LS.set('settingsSec', k);
     $$('.snav button', md).forEach(b => { b.classList.toggle('on', b.dataset.sec === k); b.setAttribute('aria-selected', b.dataset.sec === k); });
@@ -6162,6 +6332,12 @@ function settingsModal(focus) {
     const el = e.target;
     if (el.id === 'a-name') { saveName(); return; }
     if (SETS[el.id]) { saveEl(el); if (el.id === 's-pushch') { ntfyShow(md); wpState(md); } return; }
+    if (el.dataset.agvis) {  // 2.6.1 (#402): which agents show a status dot in the header
+      const hid = agentHidden(), aid = +el.dataset.agvis;
+      el.checked ? hid.delete(aid) : hid.add(aid);
+      setApply({agents_hidden: [...hid].sort((a, b) => a - b).join(',')}, `${tr('In the header')} · ${agentById(aid)?.name || aid}`);
+      return;
+    }
     if (el.dataset.nm) {  // 2.1.0 (#317) the notification matrix
       const row = NOTIF_ROWS.find(x => x[0] === el.dataset.nm);
       setApply(notifPatch(S.settings, el.dataset.nm, el.dataset.ch, el.checked), `${tr(row[1])} · ${el.dataset.ch === 'news' ? tr('News') : tr('Push')}`)
@@ -8823,6 +8999,8 @@ document.addEventListener('click', async e => {
     case 'open-id': openDetail(id); break;
     case 'tv-stop': timerStop(); break;
     case 'news-open': newsOpen(+a.dataset.i); break;
+    case 'bell-pop': bellPop(a); break;
+    case 'news-kind': newsKindSet(a.dataset.nk); renderView(); break;
     case 'news-dismiss': newsDismiss(+a.dataset.i); break;
     case 'news-settings': settingsModal('newskinds'); break;
     case 'news-unread': S.nf.unread = !S.nf.unread; LS.set('newsUnread', S.nf.unread); renderView(); break;
@@ -8852,7 +9030,7 @@ document.addEventListener('click', async e => {
     case 'user-menu': menu(a, [{label: tr('Account'), icon: 'user', fn: () => { closeSide(); settingsModal('account'); }},
       ...(S.me?.auth === 'session' ? [{label: tr('Log out'), icon: 'logout', fn: logout}] : [])]); break;
     case 'tabs-more': tabsMore(a); break;
-    case 'list-new': menu(a, [{label: tr('New list'), icon: 'list', fn: () => { closeSide(); listModal(); }}, {label: tr('New project…'), icon: 'brief', fn: () => { closeSide(); listModal(null, '', {kind: 'project'}); }}, {label: tr('New folder…'), icon: 'folder', fn: () => { closeSide(); newFolder(); }}, ...(tplOf('list').length ? [{label: tr('New list from template'), icon: 'copy', fn: () => { closeSide(); templateMenu($('#top h1'), 'list'); }}] : []), {label: tr('New folder'), icon: 'folder', fn: () => newFolder()}, ...(propOn() ? [{label: tr('New project from briefing…'), icon: 'bot', fn: () => { closeSide(); propRequest('project'); }}] : [])]); break;
+    case 'list-new': menu(a, [{label: tr('New list'), icon: 'list', fn: () => { closeSide(); listModal(); }}, {label: tr('New project…'), icon: 'brief', fn: () => { closeSide(); listModal(null, '', {kind: 'project'}); }}, {label: tr('New folder…'), icon: 'folder', fn: () => { closeSide(); newFolder(); }}, ...(tplOf('list').length ? [{label: tr('New list from template'), icon: 'copy', fn: () => { closeSide(); templateMenu($('#top h1'), 'list'); }}] : []), ...(propOn() ? [{label: tr('New project from briefing…'), icon: 'bot', fn: () => { closeSide(); propRequest('project'); }}] : [])]); break;
     case 'tpl-use': if (a.closest('.qadd.sheet')) { closePop(); templateMenu($('#fab'), 'task'); } else templateMenu(a, 'task'); break;
     case 'stats-mode': S.st.mode = a.dataset.k; LS.set('statsMode', S.st.mode); renderView(); break;
     case 'status': statusModal(id); break;
@@ -10487,36 +10665,83 @@ function agentBusy() {
   const run = busy.reduce((n, a) => n + (agentOffline(a) ? 0 : a.running), 0), wait = busy.reduce((n, a) => n + a.waiting, 0), unread = busy.reduce((n, a) => n + a.chat_unread, 0);
   return {busy, run, wait, unread, n: run + wait + unread || busy.length};
 }
+// ---- 2.6.1 (#402): one status dot per agent in the header, ALWAYS (not only while one works): green ready, blue working,
+// yellow waiting for me, grey (hollow) offline / paused / not connected, red error / limit reached. The dots sit in the
+// agent pill (with "Claude · 2 running …" next to them while something runs) and, from header level tl2 on with a timer
+// running, in the merged status chip; hover = names + states, a tap = the menu with every agent. Settings > Agents >
+// Overview > "In the header" picks the agents (setting agents_hidden, default: all shown).
+const AG_HST = {ready: N_('ready'), working: N_('working'), waiting: N_('waiting for you'), offline: N_('offline'), error: N_('error')};
+const HDOT_MAX = 5;
+const agentHidden = () => new Set(String(S.settings?.agents_hidden || '').split(',').filter(Boolean).map(Number));
+const shownAgents = () => { if (!agentsOn()) return []; const h = agentHidden(); return (S.agents || []).filter(a => !h.has(a.id)); };
+function agentHst(a) {
+  if (!a.enabled || agentOffline(a)) return 'offline';
+  if (a.status === 'error' || a.limit_reached) return 'error';
+  if (a.status === 'working' || a.running) return 'working';
+  if (a.status === 'waiting' || a.waiting) return 'waiting';
+  return 'ready';
+}
+const agentHstLine = a => `${a.name}: ${agentSt(a)}${a.status_text && agentHst(a) !== 'offline' ? ' · ' + a.status_text : ''}`;
+const hdot = st => `<i class="hdot hs-${st}" aria-hidden="true"></i>`;
+function hdotsHtml(ags, max = HDOT_MAX) {
+  if (!ags.length) return '';
+  const more = ags.length > max ? ags.length - (max - 1) : 0, show = more ? ags.slice(0, max - 1) : ags;
+  return `<span class="hdots">${show.map(a => hdot(agentHst(a))).join('')}${more ? `<span class="hdm">+${more}</span>` : ''}</span>`;
+}
+function agDotsHtml(hint) {
+  const ags = S.agents || [];
+  if (!ags.length || !collab()) return '';
+  const hid = agentHidden();
+  return `<h4 id="s-agdots-h">${tr('In the header')}</h4>
+    ${hint(tr('A dot per agent shows how it is: green ready, blue working, yellow waiting for you, grey offline, red error. Point at it or tap it for names and details. Untick an agent to leave its dot out.'))}
+    <div class="agdots" role="group" aria-labelledby="s-agdots-h">${ags.map(a => `<label class="chkl agdl"><input type="checkbox" data-agvis="${a.id}" ${hid.has(a.id) ? '' : 'checked'}> ${hdot(agentHst(a))}<span>${esc(a.name)}</span><span class="muted">${esc(agentSt(a))}</span></label>`).join('')}</div>`;
+}
 function agentChip() {
-  const ab = agentBusy(); if (!ab) return '';
-  const {busy, run, wait, unread} = ab;
-  const parts = [run && trn('{0} running', '{0} running', run), wait && trn('{0} waiting', '{0} waiting', wait), unread && trn('{0} new message', '{0} new messages', unread)].filter(Boolean);
-  if (!parts.length) parts.push(agentSt(busy[0]));
-  const who = busy.length === 1 ? busy[0].name : tr('Agents'), txt = [who, ...parts].join(' · ');
-  const st = agentBusyState(), tip = [txt, ...agentStatusLines()].join('\n');
-  return `<button class="achip ${wait || unread ? 'attn' : ''} ${st === 'working' ? 'aspin' : st === 'waiting' ? 'await' : ''}" data-act="agent-chip" title="${esc(tip)}" aria-label="${esc(txt)}">${busy.length === 1 ? av(busy[0].id, busy[0].name, 'avatar sm') : ic('bot', 's')}<span class="act">${esc(txt)}</span><span class="acn" aria-hidden="true">${ic('bot', 's')}${ab.n}</span></button>`;  // 2.5.2 (K01): phones show the bot + a number
+  const ab = agentBusy(), ags = shownAgents();
+  if (!ab && !ags.length) return '';
+  const lines = ags.map(agentHstLine);
+  let txt = '', attn = false, st = '';
+  if (ab) {
+    const {busy, run, wait, unread} = ab;
+    const parts = [run && trn('{0} running', '{0} running', run), wait && trn('{0} waiting', '{0} waiting', wait), unread && trn('{0} new message', '{0} new messages', unread)].filter(Boolean);
+    if (!parts.length) parts.push(agentSt(busy[0]));
+    txt = [busy.length === 1 ? busy[0].name : tr('Agents'), ...parts].join(' · ');
+    attn = !!(wait || unread); st = agentBusyState();
+  }
+  const lab = txt || `${tr('Agents')}: ${ags.map(a => `${a.name} ${agentSt(a)}`).join(', ')}`;
+  const tip = [txt, ...(lines.length ? lines : agentStatusLines())].filter(Boolean).join('\n');
+  // without dots (all hidden) the pill keeps its old look: bot / avatar + the ring while one works (with dots the ring is
+  // hidden by CSS: the dots say it)
+  const lead = ags.length ? hdotsHtml(ags) : ab.busy.length === 1 ? av(ab.busy[0].id, ab.busy[0].name, 'avatar sm') : ic('bot', 's');
+  const ring = st === 'working' ? 'aspin' : st === 'waiting' ? 'await' : '';
+  return `<button class="achip ${ab ? 'busy' : 'calm'} ${attn ? 'attn' : ''} ${ring || ''}" data-act="agent-chip" aria-haspopup="menu" title="${esc(tip)}" aria-label="${esc(lab)}">${lead}${ab ? `<span class="act">${esc(txt)}</span><span class="acn" aria-hidden="true">${ic('bot', 's')}${ab.n}</span>` : ''}</button>`;  // 2.5.2 (K01): phones show the bot + a number
 }
 // 2.6.0 (K01): the agent pill and the running indicator merged into one compact chip (shown from header level tl2 on):
 // bot + number, dot + time; a tap opens the one that is there, or a menu with both
 function stChip() {
-  const ab = agentBusy(), it = runItems();
-  if (!ab || !it.length) return '';  // only one of them: its own pill shrinks instead (tl1)
-  const x = it[0], lab = [ab.busy.length === 1 ? ab.busy[0].name : tr('Agents'), ...it.map(r => `${tr(RUN_KIND[r.k][1])} ${r.txt}`)].join(' · ');
-  const st = agentBusyState();
-  return `<button class="stchip ${ab.wait || ab.unread ? 'attn' : ''} ${st === 'working' ? 'aspin' : ''}" data-act="st-chip" title="${esc(lab)}" aria-label="${esc(lab)}" aria-haspopup="menu"><span class="sta">${ic('bot', 's')}<b>${ab.n}</b></span><span class="str k-${x.k}"><span class="rec"></span>${it.length === 1 ? `<span ${x.attr}>${x.txt}</span>` : `<b>${it.length}</b>`}</span></button>`;
+  const ab = agentBusy(), ags = shownAgents(), it = runItems();
+  if ((!ab && !ags.length) || !it.length) return '';  // only one of them: its own pill shrinks instead (tl1)
+  const x = it[0], who = ab ? (ab.busy.length === 1 ? ab.busy[0].name : tr('Agents')) : ags.map(a => `${a.name} ${agentSt(a)}`).join(', ');
+  const lab = [who, ...it.map(r => `${tr(RUN_KIND[r.k][1])} ${r.txt}`)].join(' · ');
+  const st = ab ? agentBusyState() : '';
+  return `<button class="stchip ${ab && (ab.wait || ab.unread) ? 'attn' : ''} ${st === 'working' ? 'aspin' : ''}" data-act="st-chip" title="${esc([lab, ...ags.map(agentHstLine)].join('\n'))}" aria-label="${esc(lab)}" aria-haspopup="menu"><span class="sta">${ags.length ? hdotsHtml(ags, 3) : ic('bot', 's')}${ab ? `<b>${ab.n}</b>` : ''}</span><span class="str k-${x.k}"><span class="rec"></span>${it.length === 1 ? `<span ${x.attr}>${x.txt}</span>` : `<b>${it.length}</b>`}</span></button>`;
 }
 function stChipMenu(a) {
-  const ab = agentBusy(), it = runItems();
-  if (!ab) return runPop(a);
+  const ab = agentBusy(), ags = shownAgents(), it = runItems();
+  if (!ab && !ags.length) return runPop(a);
   if (!it.length) return agentChipMenu(a);
+  const albl = ab ? [ab.busy.length === 1 ? ab.busy[0].name : tr('Agents'), ...[ab.run && trn('{0} running', '{0} running', ab.run), ab.wait && trn('{0} waiting', '{0} waiting', ab.wait), ab.unread && trn('{0} new message', '{0} new messages', ab.unread)].filter(Boolean)].join(' · ') : tr('Agents');
   menu(a, [...it.map(r => ({label: `${tr(RUN_KIND[r.k][1])} · ${r.txt} · ${r.title}`, icon: RUN_KIND[r.k][0], fn: () => runPop($('#top [data-act="st-chip"]') || a)})),
-    '-', {label: [ab.busy.length === 1 ? ab.busy[0].name : tr('Agents'), ...[ab.run && trn('{0} running', '{0} running', ab.run), ab.wait && trn('{0} waiting', '{0} waiting', ab.wait), ab.unread && trn('{0} new message', '{0} new messages', ab.unread)].filter(Boolean)].join(' · '), icon: 'bot', fn: () => agentChipMenu($('#top [data-act="st-chip"]') || a)}]);
+    '-', {label: albl, icon: 'bot', fn: () => agentChipMenu($('#top [data-act="st-chip"]') || a)}]);
 }
+// 2.6.1 (#402): every agent with its dot and state (shown ones; all of them while none is shown), then the Agents view,
+// the chats and where to choose the dots
 function agentChipMenu(a) {
-  const ags = S.agents || [];
-  menu(a, [...ags.filter(x => x.enabled && x.status !== 'idle').map(x => ({label: `${x.name}: ${agentSt(x)}${x.status_text ? ' · ' + x.status_text : ''}`, icon: x.status === 'working' ? 'sync' : 'bot', cls: 'minfo', fn: () => chatOpen(x.id)})),
-    {label: tr('Agents and jobs'), icon: 'bot', fn: () => go('agents')},
-    ...ags.filter(x => x.enabled).map(x => ({label: tr('Chat with {0}', x.name) + (x.chat_unread ? ` (${x.chat_unread})` : ''), icon: 'comment', fn: () => chatOpen(x.id)}))]);
+  const ags = S.agents || [], sh = shownAgents(), list = sh.length ? sh : ags;
+  menu(a, [...list.map(x => ({label: agentHstLine(x), dot: agentHst(x), cls: 'minfo', fn: () => x.enabled ? chatOpen(x.id) : go('agents')})),
+    '-', {label: tr('Agents and jobs'), icon: 'bot', fn: () => go('agents')},
+    ...ags.filter(x => x.enabled).map(x => ({label: tr('Chat with {0}', x.name) + (x.chat_unread ? ` (${x.chat_unread})` : ''), icon: 'comment', fn: () => chatOpen(x.id)})),
+    {label: tr('Choose the agents shown…'), icon: 'gear', fn: () => settingsModal('agentdots')}]);
 }
 
 // ---- reactions + suggestions in the comments
@@ -11696,6 +11921,9 @@ function agentLive() {
 // 2.4.1 (#375): an open chat's header follows the clock too (a typing signal runs out after 10 s, "offline" after 5 minutes
 // without a poll), without asking the server
 setInterval(() => { if (S.chat.aid && !document.hidden && $('#chat-st')) agentLive(); }, 2000);
+// 2.6.1 (#402): the header dots follow the clock too ("offline" once an agent stopped polling), without asking the server
+let hdSig = '';
+setInterval(() => { if (document.hidden || !$('#top')) return; const sg = shownAgents().map(a => a.id + agentHst(a)).join(); if (sg !== hdSig) { const first = !hdSig; hdSig = sg; if (!first) renderTop(); } }, 30000);
 // sync while typing in the task panel: no full reload, but the agents' status still comes along
 async function agentPoll() {
   if (!agentsOn()) return;

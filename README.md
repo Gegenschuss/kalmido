@@ -16,6 +16,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.6.1** (2026-10-01): Date and reminder changes save at once with Undo, a status dot per agent in the header, the
+  bell opens the newest News in place, a per-event choice for a list's bell and filter chips for News.
 - **2.6.0** (2026-10-01): A header that keeps the title, "…" and the bell on every screen, a separate Share dialog,
   "not connected" agents, one name "Agents", bigger touch targets, better contrast and one date format.
 - **2.5.2** (2026-10-01): Hotfix from the second usability review: "…" and the bell always visible on phones, a
@@ -23,8 +25,6 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   ntfy.sh unless chosen, and smaller fixes (task panel header, file picker, plurals, chart labels).
 - **2.5.1** (2026-10-01): Settings > *AI colleague* in four short sub-tabs (Agents, Lists, Usage, Log) instead of one
   long page, clickable avatars in comments, branch suggestions `kalmido-<id>`.
-- **2.5.0** (2026-10-01): The first public release of Kalmido: tasks, projects, habits, focus timer, time tracking,
-  shared lists, calendars, a REST API with webhooks and AI agents in one self-hosted app.
 
 All changes: [CHANGELOG.md](CHANGELOG.md) · [GitHub Releases](https://github.com/Gegenschuss/kalmido/releases)
 
@@ -62,6 +62,10 @@ All changes: [CHANGELOG.md](CHANGELOG.md) · [GitHub Releases](https://github.co
 - A website link per task, shown as a small domain chip (paste a URL in quick add or share a page from Android)
 - Natural-language quick add in English and German, whatever the interface language: `Dentist tomorrow 3pm !high #private ~Work` or `Zahnarzt morgen 15 Uhr !hoch #privat ~Arbeit`
 - Recurring tasks (daily, weekdays, weekly, monthly, yearly, every n days / weeks / months with weekdays, or any RRULE for experts) with end date, count and skip
+- **Dates save as you pick them** (2.6.1): in the date popover every tap (day, time, start, duration, reminders,
+  repeat) is saved at once and the popover stays open for more; *Done* (or a click outside, Esc) closes it and leaves
+  one undo step with *Date: … · Undo*, *Undo* in its foot puts everything back. *Settings > General > Confirm changes
+  with OK* brings back Cancel / OK
 - Smart lists (inbox, the start view; today, tomorrow, next 7 days, now doable, all), combinable filters (list, date, priority, tag)
 - **Now doable** (`g d`): what you can start right now: open, not waiting on another task, due today, overdue or
   undated, and yours (assigned to you, or unassigned in your own lists; everything with collaboration off). In the
@@ -500,8 +504,16 @@ public links (*View and tick off* makes a shared shopping list for the whole hou
   changes them.
 - **The bell of a list** (list menu > *Notifications*, or the list dialog), for you only: *All activity* = every
   comment, new task and change in that list as News and push; *Default* = the table above; *Mute* = nothing from that
-  list except mentions of you and tasks assigned to you (those follow the table). Reminders and follow-ups are your
-  own and are never muted. A muted list shows a crossed-out bell in the sidebar.
+  list except mentions of you and tasks assigned to you (those follow the table); *Custom selection…* (2.6.1) = your
+  own choice per event for this list, News and Push each: new tasks, comments, mentions, assignments, completions,
+  project status, unblocked tasks, agents waiting for approval. A ticked event reaches you from every task of the
+  list, an unticked one never; the choice is kept when you switch to another mode and back. Reminders and follow-ups
+  are your own and are never muted. A muted list shows a crossed-out bell in the sidebar.
+- **The bell in the top bar** (2.6.1) opens the newest News right where you are (a dropdown on the desktop, a sheet
+  from the bottom on a phone): open an item, remove it, *Mark all as read*, *Show all* for the full view; a click
+  outside or Esc closes it and you stay in your list. **Filter chips** (*Mentions*, *Comments*, *Assignments*, *New
+  tasks*, *Completed*, *Status*, *Agents*, …, only the kinds that are there) narrow the dropdown and the News view;
+  they only change what you see, per device.
 - Items are kept for 90 days, at most 500 per person (`TASKS_NEWS_DAYS`, `TASKS_NEWS_MAX`).
 
 ## Calendar subscriptions (other calendars in Kalmido)
@@ -633,6 +645,11 @@ like and talks to Kalmido through the REST API, webhooks or the MCP server.
   in a fresh session: [docs/AGENTS.md](docs/AGENTS.md#runtime-settings).
 - Chat status (2.4.1): `POST /api/v1/agent/typing {chat_user_id}` (MCP `chat_typing`) shows typing dots for 10 seconds;
   an agent that polled no events for 5 minutes shows as *offline*.
+- **Status dots in the header** (2.6.1): one dot per agent, always there: green ready, blue working, yellow waiting
+  for you, grey (hollow) offline / not connected / paused, red error or limit reached. Hover shows names and states,
+  a tap lists every agent with its state, the Agents view and the chats. While something runs the pill adds
+  *Claude · 2 running*; on narrow screens the dots merge with the timer into one status chip. *Settings > Agents >
+  Overview > In the header* picks the agents whose dot you see (default: all).
 
 **Security.** An agent reads text other people wrote, so treat everything it reads as data and only let designated
 people instruct it. Kalmido keeps agents out of admin rights and unshared lists, and gives you a kill switch, usage limits

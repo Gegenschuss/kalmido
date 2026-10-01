@@ -2651,3 +2651,51 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
   .linkbtn{min-width:2.75rem}
   .shmodal .rolehelp>summary{min-height:2.75rem;display:flex;align-items:center}
 }
+
+/* ---- 2.6.1 */
+/* #402: one status dot per agent in the header (green ready, blue working, yellow waiting for me, grey hollow offline,
+   red error); in the agent pill, the merged status chip, the agent menu and Settings > Agents > Overview */
+.hdots{display:inline-flex;align-items:center;gap:.1875rem;flex:none}
+.hdot{display:inline-block;width:.5625rem;height:.5625rem;border-radius:50%;flex:none;box-sizing:border-box;background:var(--faint)}
+.hdot.hs-ready{background:var(--ok)}
+.hdot.hs-working{background:var(--p1);animation:adot 1.6s ease-in-out infinite}
+.hdot.hs-waiting{background:var(--p3)}
+.hdot.hs-error{background:var(--danger)}
+.hdot.hs-offline{background:transparent;border:2px solid var(--faint)}
+@media (prefers-reduced-motion:reduce){.hdot.hs-working{animation:none}}
+.hdm{font:600 .6875rem/1 var(--mono);color:var(--text2);margin-left:.0625rem}
+.achip:has(>.hdots)::before,.achip:has(>.hdots)::after{content:none}
+.achip.calm{background:color-mix(in srgb,var(--accent) 6%,transparent);padding:.25rem .5rem;gap:.25rem}
+.achip.busy .hdots{margin-right:.125rem}
+#top:is(.tl1,.tl2,.tl3,.tl4) .achip .hdots{margin-right:0}
+.stchip .sta .hdots{gap:.125rem}
+.mdot{display:inline-flex;align-items:center;justify-content:center;width:1rem;height:1rem;flex:none}
+.agdots{display:flex;flex-direction:column;gap:.125rem;margin:.25rem 0 .5rem}
+.agdots .agdl{display:flex;align-items:center;gap:.5rem;min-height:2.75rem}
+.agdots .agdl .muted{margin-left:auto;font-size:var(--fs-s)}
+/* #401: the date popover saves at once: "Saved" on the left of its foot, Undo + Done */
+.popfoot.pinst{align-items:center}
+.popfoot .psaved{display:inline-flex;align-items:center;gap:.25rem;margin-right:auto;font-size:var(--fs-s);color:var(--muted);min-width:0}
+.popfoot .psaved.on{color:var(--ok)}
+.popfoot [hidden]{display:none}
+/* #403: the bell's dropdown (desktop) / sheet (phone) with the newest News */
+#pop.bellpop{width:min(26rem,calc(100vw - 1.5rem));padding:0;overflow:hidden}
+#pop.bellpop.sheet{width:auto;padding:0 0 var(--safe-b)}
+.bpop{display:flex;flex-direction:column;max-height:min(36rem,75dvh)}
+.bphead{display:flex;align-items:center;gap:.5rem;padding:.5rem .5rem .5rem .875rem;border-bottom:1px solid var(--line);flex:none}
+.bphead .muted{font-size:var(--fs-s)}
+.bplist{overflow-y:auto;flex:1 1 auto;padding:.25rem;max-width:none}
+.bplist .nitem{padding:.5rem}
+.bpempty{padding:1.5rem 1rem;display:flex;flex-direction:column;align-items:center;gap:.5rem;text-align:center}
+.bpfoot{display:flex;justify-content:flex-end;padding:.5rem .75rem;border-top:1px solid var(--line);flex:none}
+.bpfoot .bpn{font:600 .75rem/1 var(--mono);opacity:.8}
+/* #404: filter chips (view only) in the News view and under the bell */
+.nchips{display:flex;gap:.375rem;overflow-x:auto;padding:.125rem 0 .5rem;scrollbar-width:none;max-width:47.5rem}
+.nchips::-webkit-scrollbar{display:none}
+.bpop .nchips{padding:.5rem .75rem;flex:none;border-bottom:1px solid var(--line)}
+.nchip{display:inline-flex;align-items:center;gap:.3125rem;height:2rem;padding:0 .75rem;border-radius:99rem;border:1px solid var(--line2);background:transparent;color:var(--text2);font-size:.8125rem;white-space:nowrap;cursor:pointer;flex:none}
+.nchip .i{width:.875rem;height:.875rem}
+.nchip.on{background:color-mix(in srgb,var(--accent) 16%,transparent);border-color:var(--accent);color:var(--text)}
+@media (pointer:coarse){.nchip{height:2.75rem}}
+.bcmodal .nmx{margin:.5rem 0}
+.bcmodal .mfoot{margin-top:.75rem;gap:.5rem}

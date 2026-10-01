@@ -260,7 +260,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   click(w, d.querySelector('#pop [data-dpfor="p-time"]')); await sleep(60);
   click(w, d.querySelector('#dpop [data-th="14"]')); click(w, d.querySelector('#dpop [data-tm="45"]')); await sleep(40);
   check(d.querySelector('#pop #p-time')?.value === '14:45', 'tap hour + minutes -> 14:45');
-  click(w, d.querySelector('#pop [data-q="ok"]'));
+  click(w, d.querySelector('#pop [data-q="ok"]') || d.querySelector('#pop [data-q="done"]'));  // 2.6.1 (#401): saved at once, "Done" closes
   check(await until(async () => (await st()).tasks.find(t => t.id === plan).due_time === '14:45'), 'saved with the task (stored format HH:MM)');
   check(w.eval(`parseHM('9:30 pm')`) === '21:30' && w.eval(`parseHM('21 Uhr')`) === '21:00' && w.eval(`parseHM('25:00')`) === null, 'time parser (pm, "Uhr", invalid)');
   // custom repeat: a small form, RRULE only as expert field (U06)

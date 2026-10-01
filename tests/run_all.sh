@@ -228,6 +228,12 @@ fresh; run p208_ui node p208_ui.js
 # bell, toast, date column, week title, contrast and the 44 px touch targets
        run p260_api "$PY" p260_api_test.py "$KALMIDO_TEST_DATA"
        run p260_ui node p260_ui.js "$KALMIDO_TEST_DATA"
+# 2.6.1: the settings date_confirm + agents_hidden, the list bell "custom" (validation, kept across modes, News per event, the
+# token API) (own container); then the date popover that saves at once (+ Undo / the OK setting), a status dot per agent in the
+# header, the bell's dropdown, the News filter chips and the custom bell dialog in jsdom, and in Firefox at 360 / 390 (touch)
+# and 1280 / 1920: "…", the bell and the dots in view, the bell's sheet / dropdown inside the viewport, 44 px targets
+       run p261_api "$PY" p261_api_test.py "$KALMIDO_TEST_DATA"
+       run p261_ui node p261_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

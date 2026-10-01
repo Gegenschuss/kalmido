@@ -744,6 +744,8 @@ MIGRATIONS = [
     ("agents", "typing_until", "ALTER TABLE agents ADD COLUMN typing_until REAL NOT NULL DEFAULT 0"),
     # 2.4.1 (#379): the one agent that tidies up a list (NULL = the first agent with edit rights, see tidy_agent_of)
     ("lists", "tidy_agent", "ALTER TABLE lists ADD COLUMN tidy_agent INTEGER"),
+    # 2.6.1 (#404): the bell "custom": my own choice of events for this list, json {event: {news: 0|1, push: 0|1}}
+    ("list_bell", "custom", "ALTER TABLE list_bell ADD COLUMN custom TEXT"),
 ]
 INDEXES = """
 CREATE INDEX IF NOT EXISTS lists_owner ON lists(owner_id);
@@ -811,6 +813,10 @@ USER_DEFAULTS = {
     "hide_blocked_today": "0",  # 1 = tasks waiting on an open blocker are left out of "Today"
     "progress_subtasks": "0",   # 1 = the list progress counts subtasks too (else only main tasks)
     "hide_progress": "",        # D2: comma list of list ids whose progress bar this user hid (the "x" on the bar)
+    # 2.6.1 (#401): 1 = date, time, repeat and reminder changes wait for OK (default: they apply at once, with Undo)
+    "date_confirm": "0",
+    # 2.6.1 (#402): comma list of agent ids whose status dot this user hid in the header ('' = every agent shown)
+    "agents_hidden": "",
     # D3: the roadmap ("All" as a timeline), json: {v: list|timeline, z: week|month|quarter, po: projects only (null = auto),
     # hd: hide done, who: assignee filter, ls: list ids (empty = all), def: auto|c|e (collapse default), t: {group: 0|1},
     # nd (2.0.6): "No date" rows in open lists (default on)}
@@ -3884,7 +3890,7 @@ def visible_lists(c, uid):
             if m["user_id"] in ag:
                 m["agent"] = True
     snames = user_names(c, [r["status_by"] for r in rows])
-    bells = {r[0]: r[1] for r in c.execute("SELECT list_id, mode FROM list_bell WHERE user_id=?", (uid,))}
+    bells = {r[0]: (r[1], r[2]) for r in c.execute("SELECT list_id, mode, custom FROM list_bell WHERE user_id=?", (uid,))}
     repos = git_repos_of_lists(c, ids)  # 2.2.0 (#271)
     out = []
     for r in rows:
@@ -3900,7 +3906,8 @@ def visible_lists(c, uid):
         d["tags"] = ltags.get(r["id"], [])
         d["owner_name"] = names.get(r["owner_id"], "")
         d["icon"] = list_icon_url(r)  # 2.0.2: URL of the own list icon, "" = none
-        d["bell"] = bells.get(r["id"], "default")  # 2.1.0 (#317): my bell for this list
+        d["bell"], bc = bells.get(r["id"], ("default", None))  # 2.1.0 (#317): my bell for this list
+        d["bell_custom"] = bell_custom_of(bc)  # 2.6.1 (#404): my own choice of events (kept while another mode is set)
         d["repos"] = repos.get(r["id"], [])
         # 2.4.1 (#379): the one agent that tidies it up (same rule as tidy_agent_of, from the rows already loaded)
         cands = sorted(([r["owner_id"]] if r["owner_id"] in ag else [])
@@ -7437,7 +7444,7 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
     before = {r[0] for r in c.execute("SELECT DISTINCT user_id FROM comments WHERE task_id=? AND deleted_at IS NULL AND id<?",
                                       (t["id"], cid))}
     ids |= before
-    ids |= bell_all_users(c, t["list_id"])  # 2.1.0 (#317): the bell "All" of a list: every comment
+    ids |= bell_all_users(c, t["list_id"], "comment")  # 2.1.0 (#317): the bell "All" of a list: every comment (2.6.1: or "custom")
     if only is not None:
         ids = set(only)
     prev = c.execute("SELECT user_id FROM comments WHERE task_id=? AND deleted_at IS NULL AND id<? ORDER BY id DESC LIMIT 1",
@@ -7505,7 +7512,7 @@ def task_event(c, tid, kind, prev_assignee=None):
     else:  # complete: only in shared lists (in a private list the creator is the one completing), or via a public link
         if actor and not c.execute("SELECT 1 FROM list_members WHERE list_id=?", (t["list_id"],)).fetchone():
             return
-        rcpt = {t["created_by"], t["assigned_by"]} | bell_all_users(c, t["list_id"])  # 2.1.0: bell "All"
+        rcpt = {t["created_by"], t["assigned_by"]} | bell_all_users(c, t["list_id"], "complete")  # 2.1.0: bell "All" (2.6.1: "custom")
     rcpt.discard(None)
     rcpt.discard(actor)
     rcpt -= agent_ids(c)  # 2.0.0: agents get events (agent_assign_event), no pushes / News
@@ -7647,7 +7654,12 @@ NOTIF_PUSH_DEFAULT = {"comment": 1, "reply": 1, "follow": 1, "mention": 1, "assi
 NOTIF_NO_NEWS = ("reminder",)
 NOTIF_UNMUTED = ("mention", "assign")        # still come through a muted list
 NOTIF_NO_BELL = ("reminder", "followup", "usage", "proposal")  # never changed by a list bell
-BELL_MODES = ("all", "default", "mute")
+BELL_MODES = ("all", "default", "mute", "custom")
+# 2.6.1 (#404): the bell "custom" = my own choice per event for this list (News and push each): a ticked event comes from
+# every task of the list (like "all" for that event), an unticked one never; reply / follow count as "comment". Events
+# without a choice here (sharing, reminders, follow-ups, usage, proposals I asked for) follow the matrix as before.
+BELL_CUSTOM_ROWS = ("newtask", "comment", "mention", "assign", "complete", "status", "unblock", "approval")
+BELL_CUSTOM_KEY = {"reply": "comment", "follow": "comment"}
 KIND_ROW = {"mention": "mention", "comment": "comment", "assign": "assign", "unassign": "assign", "complete": "complete",
             "share": "share", "role": "share", "unshare": "share", "unblock": "unblock", "status": "status",
             "newtask": "newtask", "approval": "approval", "followup": "followup", "usage": "usage", "owner": "share",
@@ -7715,10 +7727,37 @@ def notif_update(s, v):
 
 
 def list_bell(c, uid, lid):
+    """(mode, custom choice dict) of my bell for list lid."""
     if not lid:
-        return "default"
-    r = c.execute("SELECT mode FROM list_bell WHERE user_id=? AND list_id=?", (uid, lid)).fetchone()
-    return r["mode"] if r else "default"
+        return "default", {}
+    r = c.execute("SELECT mode, custom FROM list_bell WHERE user_id=? AND list_id=?", (uid, lid)).fetchone()
+    return (r["mode"], bell_custom_of(r["custom"])) if r else ("default", {})
+
+
+def bell_custom_of(raw):
+    try:
+        o = json.loads(raw or "{}")
+    except ValueError:
+        return {}
+    return {k: {ch: int(bool(v[ch])) for ch in ("news", "push") if ch in v} for k, v in o.items()
+            if k in BELL_CUSTOM_ROWS and isinstance(v, dict)} if isinstance(o, dict) else {}
+
+
+def bell_custom_clean(v):
+    """A custom choice from a client -> the stored json; BadInput if invalid."""
+    bad = BadInput(tr("Invalid value: {0}", "custom"))
+    if v is None:
+        return "{}"
+    if not isinstance(v, dict) or len(v) > len(BELL_CUSTOM_ROWS):
+        raise bad
+    out = {}
+    for k, x in v.items():
+        if k not in BELL_CUSTOM_ROWS or not isinstance(x, dict) or any(ch not in ("news", "push") for ch in x) or \
+                any(y not in (0, 1, True, False) for y in x.values()):
+            raise bad
+        if x:
+            out[k] = {ch: int(bool(y)) for ch, y in sorted(x.items())}
+    return json.dumps(out, separators=(",", ":"), sort_keys=True)
 
 
 def notif_ok(c, uid, s, row, ch, lid=None):
@@ -7726,16 +7765,26 @@ def notif_ok(c, uid, s, row, ch, lid=None):
     m = notif_matrix(s)[row]
     if ch == "news" and m["news"] is None:
         return False
-    bell = list_bell(c, uid, lid) if lid and row not in NOTIF_NO_BELL else "default"
+    bell, cust = list_bell(c, uid, lid) if lid and row not in NOTIF_NO_BELL else ("default", {})
     if bell == "mute" and row not in NOTIF_UNMUTED:
         return False
     if bell == "all":
         return True
+    key = BELL_CUSTOM_KEY.get(row, row)
+    if bell == "custom" and key in BELL_CUSTOM_ROWS:
+        x = cust.get(key, {})
+        return bool(x[ch]) if ch in x else bool(m[ch])  # not chosen yet: as in the matrix
     return bool(m[ch])
 
 
-def bell_all_users(c, lid):
-    return {r[0] for r in c.execute("SELECT user_id FROM list_bell WHERE list_id=? AND mode='all'", (lid,))}
+def bell_all_users(c, lid, row=None):
+    """Who wants every event of this list: the bell "all", and (2.6.1, #404) "custom" with event row ticked (News or push)."""
+    out = set()
+    key = BELL_CUSTOM_KEY.get(row, row)
+    for r in c.execute("SELECT user_id, mode, custom FROM list_bell WHERE list_id=? AND mode IN ('all','custom')", (lid,)):
+        if r["mode"] == "all" or (key and any(bell_custom_of(r["custom"]).get(key, {}).values())):
+            out.add(r["user_id"])
+    return out
 
 
 def list_push(c, uid, row, lid, title_fn, msg_fn, click=None):
@@ -8805,7 +8854,8 @@ def _time_watch_one(c, r, users, S, LG, ref):
 # ---------------------------------------------------------------- settings / export (per user)
 
 SETTINGS_SERVER_ONLY = ("digest_sent", "ntfy_topic", "features_rev", "onboard", "sample_ask", "agent_share")
-SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "time_focus", "paperless_keep", "celebrate", "cal_today")
+SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "time_focus", "paperless_keep", "celebrate", "cal_today",
+                  "date_confirm")
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24)}
 
@@ -8827,7 +8877,7 @@ def clean_setting(k, v):
         return sv
     if k == "default_reminder":
         return clean_reminders(sv)
-    if k == "hide_progress":
+    if k in ("hide_progress", "agents_hidden"):
         ids = [x.strip() for x in sv.split(",") if x.strip()]
         if len(ids) > 500 or not all(x.isdigit() and len(x) < 12 for x in ids):
             raise bad
@@ -10555,25 +10605,32 @@ def list_progress(c, ids, subtasks, uid=None):
 
 @app.put("/api/lists/<int:lid>/bell")
 def list_bell_set(lid):
-    """2.1.0 (#317): {mode: all | default | mute} -- my notifications about this list (only mine)."""
+    """2.1.0 (#317): {mode: all | default | mute | custom, custom?: {event: {news?, push?}}} -- my notifications about this
+    list (only mine). 2.6.1 (#404): custom = my own choice per event (BELL_CUSTOM_ROWS); without "custom" the stored
+    choice stays."""
     c = db()
     if not list_role(c, lid, me()):
         raise Denied(404)
-    mode = body().get("mode")
+    b = body()
+    mode = b.get("mode")
     if mode not in BELL_MODES:
         return err(tr("Invalid value: {0}", "mode"))
-    bell_store(c, me(), lid, mode)
+    cust = bell_custom_clean(b["custom"]) if mode == "custom" and "custom" in b else None
+    bell_store(c, me(), lid, mode, cust)
     bump(c)
     c.commit()
-    return jsonify(ok=True, mode=mode)
+    return jsonify(ok=True, mode=mode, custom=list_bell(c, me(), lid)[1])
 
 
-def bell_store(c, uid, lid, mode):
+def bell_store(c, uid, lid, mode, custom=None):
+    """custom (stored json) only replaces the choice when given; it is kept while another mode is set, so switching
+    back to "custom" brings it back."""
     if mode == "default":
-        c.execute("DELETE FROM list_bell WHERE user_id=? AND list_id=?", (uid, lid))
+        c.execute("UPDATE list_bell SET mode='default' WHERE user_id=? AND list_id=? AND custom IS NOT NULL AND custom!='{}'", (uid, lid))
+        c.execute("DELETE FROM list_bell WHERE user_id=? AND list_id=? AND mode!='default'", (uid, lid))
     else:
-        c.execute("INSERT INTO list_bell(user_id,list_id,mode) VALUES(?,?,?) ON CONFLICT(user_id,list_id) "
-                  "DO UPDATE SET mode=excluded.mode", (uid, lid, mode))
+        c.execute("INSERT INTO list_bell(user_id,list_id,mode,custom) VALUES(?,?,?,?) ON CONFLICT(user_id,list_id) "
+                  "DO UPDATE SET mode=excluded.mode, custom=COALESCE(?, custom)", (uid, lid, mode, custom, custom))
 
 
 @app.post("/api/lists/<int:lid>/status")
@@ -16240,9 +16297,12 @@ def v1_me():
 
 def v1_notif(c, uid):
     """2.1.0 (#317): my notification settings: the matrix + the bells of my lists (only lists not on "default")."""
+    rows = c.execute(f"SELECT list_id, mode, custom FROM list_bell WHERE user_id=? AND mode!='default' AND list_id IN {vis_sql()}",
+                     (uid, uid, uid)).fetchall()
     return {"events": notif_matrix(usettings(c, uid)),
-            "lists": {str(r[0]): r[1] for r in c.execute(f"SELECT list_id, mode FROM list_bell WHERE user_id=? AND list_id IN {vis_sql()}",
-                                                        (uid, uid, uid))}}
+            "lists": {str(r[0]): r[1] for r in rows},
+            # 2.6.1 (#404): the event choice of lists on "custom" (events missing there = as in the matrix)
+            "custom": {str(r[0]): bell_custom_of(r[2]) for r in rows if r[1] == "custom"}}
 
 
 @app.patch("/api/v1/me/notifications")
@@ -16263,11 +16323,17 @@ def v1_notif_update():
             raise BadInput(tr("Invalid value: {0}", "lists"))
         for k, mode in b["lists"].items():
             lid = as_int(k, "lists", 1)
+            cust = None
+            if isinstance(mode, dict):  # 2.6.1 (#404): {mode: "custom", events: {event: {news?, push?}}}
+                if set(mode) - {"mode", "events"} or mode.get("mode") != "custom":
+                    raise BadInput(tr("Invalid value: {0}", "lists"))
+                cust = bell_custom_clean(mode.get("events") or {})
+                mode = "custom"
             if mode not in BELL_MODES:
                 raise BadInput(tr("Invalid value: {0}", "lists"))
             if not list_role(c, lid, uid):
                 raise Denied(404)
-            bell_store(c, uid, lid, mode)
+            bell_store(c, uid, lid, mode, cust)
     bump(c)
     c.commit()
     return jsonify(v1_notif(c, uid))
@@ -17041,11 +17107,20 @@ def openapi_spec():
             "events": {"type": "object", "description": "Per event: news (null = the event has no News) and push. Events: " + ", ".join(NOTIF_ROWS),
                        "additionalProperties": {"type": "object", "properties": {"news": nul("boolean"), "push": {"type": "boolean"}}}},
             "lists": {"type": "object", "description": "List id -> bell (lists on default are left out)",
-                      "additionalProperties": {"type": "string", "enum": list(BELL_MODES)}}}},
+                      "additionalProperties": {"type": "string", "enum": list(BELL_MODES)}},
+            "custom": {"type": "object", "description": "List id -> the own event choice of lists on custom (events: "
+                       + ", ".join(BELL_CUSTOM_ROWS) + "; a missing one follows the events matrix)",
+                       "additionalProperties": {"type": "object", "additionalProperties": {
+                           "type": "object", "properties": {"news": {"type": "integer", "enum": [0, 1]}, "push": {"type": "integer", "enum": [0, 1]}}}}}}},
         "NotificationsInput": {"type": "object", "additionalProperties": False, "properties": {
             "events": {"type": "object", "additionalProperties": {"type": "object", "additionalProperties": False,
                                                                   "properties": {"news": {"type": "boolean"}, "push": {"type": "boolean"}}}},
-            "lists": {"type": "object", "additionalProperties": {"type": "string", "enum": list(BELL_MODES)}}}},
+            "lists": {"type": "object", "additionalProperties": {"oneOf": [
+                {"type": "string", "enum": list(BELL_MODES)},
+                {"type": "object", "additionalProperties": False, "required": ["mode"], "properties": {
+                    "mode": {"type": "string", "enum": ["custom"]},
+                    "events": {"type": "object", "additionalProperties": {"type": "object", "additionalProperties": False,
+                                                                          "properties": {"news": {"type": "boolean"}, "push": {"type": "boolean"}}}}}}]}}}},
         "AdminUser": {"type": "object", "properties": {
             "id": {"type": "integer"}, "username": {"type": "string"}, "display_name": {"type": "string"}, "is_admin": {"type": "boolean"},
             "disabled": {"type": "boolean"}, "created_at": {"type": "string", "format": "date-time"}, "has_password": {"type": "boolean"},
@@ -17086,7 +17161,9 @@ def openapi_spec():
         "/me/notifications": {"patch": op("Change your notification settings (events x News / push, the bell per list)", "Account",
                                           ok(ref("Notifications")) | errs("400", "404"), body=ref("NotificationsInput"), scope="write",
                                           desc="Partial: only the events / lists you send. A list bell: all = every event of that list, "
-                                               "default = the events matrix, mute = only mentions of you and assignments to you.")},
+                                               "default = the events matrix, mute = only mentions of you and assignments to you, custom = your own choice "
+                                               "per event ({mode: \"custom\", events: {comment: {news: true, push: false}, …}}; "
+                                               "a ticked event comes from every task of the list, an unticked one never).")},
         "/lists": {"get": op("Lists you can see (own and shared)", L, ok(ref("ListPage")) | errs()),
                    "post": op("Create a list", L, ok(ref("List"), "Created", "201") | errs("400"), body=ref("ListInput"), scope="write")},
         "/lists/{id}": {"get": op("One list with its sections", L, ok(ref("ListDetail")) | errs("404"), [pid("id", "List id")])},

@@ -7,6 +7,41 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.6.1] - 2026-10-01
+
+**In short:** Date and reminder changes save as you pick them (with Undo, or with OK if you prefer), every agent has a
+status dot in the header, the bell opens the newest News right where you are, and a list's bell can follow your own
+choice per event, with filter chips in News.
+
+### Added
+- **Dates save at once** (#401): in the date popover every change (day, time, start, duration, reminders, repeat) is
+  saved as you pick it; the popover stays open, its foot says *Saved* and offers *Undo* (puts everything back and
+  closes) and *Done*. Closing it leaves one undo step for the whole visit with the toast *Date: … · Undo*. New setting
+  *Settings > General > Confirm changes with OK* (`date_confirm`, default off) brings back Cancel / OK.
+- **A status dot per agent in the header** (#402), always, not only while one works: green ready, blue working, yellow
+  waiting for you, grey (hollow) offline / not connected / paused, red error or limit reached. The tooltip and the
+  label name every agent with its state; a tap opens a menu with every agent, the Agents view, the chats and *Choose
+  the agents shown…*. With a timer running on a narrow screen the dots sit in the merged status chip. New setting
+  *Settings > Agents > Overview > In the header* (`agents_hidden`, the ids of hidden agents; default: all shown).
+- **The bell opens a dropdown** (#403) with the newest News instead of leaving the view: a dropdown under the bell on
+  the desktop, a sheet from the bottom on phones; open an item, remove it, *Mark all as read*, *Show all* for the
+  full News view; Esc or a click outside closes it.
+- **Custom selection for a list's bell** (#404): the fourth option next to *All activity*, *Default* and *Mute*: per
+  event (new tasks, comments, mentions, assignments, completions, project status, unblocked tasks, agents waiting for
+  approval) a News and a Push checkbox; a ticked event comes from every task of the list, an unticked one never. The
+  choice is kept while another mode is set. `PUT /api/lists/<id>/bell` takes `{mode: "custom", custom: {...}}`,
+  `/api/state` lists carry `bell_custom`, `GET /api/v1/me` returns `notifications.custom` and
+  `PATCH /api/v1/me/notifications` accepts `{mode: "custom", events: {...}}` per list.
+- **Filter chips in News** (#404): *Mentions*, *Comments*, *Assignments*, *New tasks*, *Completed*, *Status*,
+  *Agents*, *Sharing*, *Follow-ups* (only the kinds that are there) in the News view and in the bell's dropdown; view
+  only, remembered per device.
+
+### Fixed
+- The list "+" menu showed *New folder* twice.
+- The offline notes ("Changes are sent as soon as the server is reachable") name no host any more.
+- The header counts a pill whose own content is cut (the timer's time, the agents' dots) as not fitting and folds one
+  level further instead.
+
 ## [2.6.0] - 2026-10-01
 
 **In short:** The second usability package: the header always keeps the list title readable plus "…" and the bell, the
@@ -171,7 +206,8 @@ of people.
   multi-arch image (`ghcr.io/gegenschuss/kalmido`, linux/amd64 and linux/arm64), an installable web app that works
   offline, English and German.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.6.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.6.1...HEAD
+[2.6.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.6.1
 [2.6.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.6.0
 [2.5.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.5.2
 [2.5.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.5.1

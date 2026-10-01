@@ -30,7 +30,7 @@ const TOKEN = 'bob-ui-server-token-4c2e', PTOKEN = 'bob-ui-personal-token-9d1f';
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v(6[0-9]|7[0-2])'/.test(SW), 'service worker cache v60 (2.1.1: v61, 2.1.2: v62, 2.2.0: v63, 2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70, 2.5.2: v71, 2.6.0: v72)');
+  check(/const CACHE = 'tasks-shell-v(6[0-9]|7[0-3])'/.test(SW), 'service worker cache v60 (2.1.1: v61, 2.1.2: v62, 2.2.0: v63, 2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70, 2.5.2: v71, 2.6.0: v72, 2.6.1: v73)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en'});
@@ -80,7 +80,7 @@ const TOKEN = 'bob-ui-server-token-4c2e', PTOKEN = 'bob-ui-personal-token-9d1f';
   check(items.includes('Notifications: Default'), 'list menu: Notifications: Default ' + items);
   w.eval(`bellMenu(document.querySelector('#top h1'), ${TEAM})`); await sleep(200);
   const bells = [...d.querySelectorAll('#pop .menu-list button')];
-  check(bells.map(b => b.textContent.trim()).join('|') === 'All activity|Default|Mute' && bells[1].classList.contains('on'), 'bell menu: All / Default (on) / Mute');
+  check(bells.map(b => b.textContent.trim()).join('|') === 'All activity|Default|Mute|Custom selection…' && bells[1].classList.contains('on'), 'bell menu: All / Default (on) / Mute (2.6.1: + Custom selection…)');
   click(w, bells[2]); await sleep(700);
   check((await call('GET', '/api/state', null, CKB)).lists.find(l => l.id === TEAM).bell === 'mute', 'muted (server)');
   check(d.querySelector(`#side .srow[data-list="${TEAM}"] .bellm`), 'sidebar: the muted icon');

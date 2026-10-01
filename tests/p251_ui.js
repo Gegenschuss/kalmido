@@ -68,7 +68,7 @@ c.commit()`, path.join(DATA, 'tasks.db'), JSON.stringify(ids)]);
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v7[0-2]'/.test(SW), 'service worker cache v70 (2.5.2: v71, 2.6.0: v72)');
+  check(/const CACHE = 'tasks-shell-v7[0-3]'/.test(SW), 'service worker cache v70 (2.5.2: v71, 2.6.0: v72, 2.6.1: v73)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en'});

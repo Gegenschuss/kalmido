@@ -125,7 +125,7 @@ const TOUCH = `(() => {
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v72'/.test(SW), 'service worker cache v72');
+  check(/const CACHE = 'tasks-shell-v7[23]'/.test(SW), 'service worker cache v72');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en', tour: 'done'});
@@ -150,7 +150,8 @@ const TOUCH = `(() => {
   check((await call('POST', '/api/proposals', {agent_id: ag.id, kind: 'subtasks', task_id: T})).id, 'a running job for the agent (a proposal asked for)');
   let w = await boot({user: 'alice', hash: 'l/' + L}), d = w.document;
   check(w.eval(`agentSt(agentById(${ag.id}))`) === 'not connected' && w.eval(`agentById(${ag.id}).webhook`) === false && w.eval(`agentById(${ag.id}).contact_age`) === null, 'never in touch: "not connected"');
-  check(!d.querySelector('#top .achip') && !d.querySelector('#top .stchip'), 'its running job does not show the agent pill');
+  // 2.6.1 (#402): the pill is always there now (its dot), but calm: no "running" text, a grey dot
+  check(d.querySelector('#top .achip.calm .hdot.hs-offline') && !d.querySelector('#top .achip .act') && !d.querySelector('#top .stchip'), 'its running job does not make the agent pill busy (2.6.1: grey dot only)');
   check(w.eval(`agentDot(${ag.id})`).includes('st-offline'), 'the grey dot');
   w.close();
   check((await v1(ag.token, 'GET', '/agent/events')).status === 200, 'agent polls once');
