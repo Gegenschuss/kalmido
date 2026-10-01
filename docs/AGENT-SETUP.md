@@ -374,7 +374,7 @@ sending: `python3 ~/kalmido/mcp/claude_usage_hook.py --dry-run ~/.config/kalmido
 ### 11. Test checklist
 
 Run it before you let colleagues talk to the agent. Use a **test user** (not an admin) who shares one **test list**
-with the agent; delete both afterwards. Watch the answers and *Settings > AI colleague > Activity log*.
+with the agent; delete both afterwards. Watch the answers and *Settings > AI colleague > Log*.
 
 **Basics**
 
@@ -382,7 +382,7 @@ with the agent; delete both afterwards. Watch the answers and *Settings > AI col
 |---|---|---|
 | Mention | As the owner, comment `@<agent> what is open here?` on a task in the test list. | Within a minute the status dot turns to *working* and the agent answers in a comment. |
 | Chat | Open the chat with the agent (as the owner) and ask for the open tasks of the test list. | Typing dots, then a correct answer. |
-| Kill switch | *Settings > AI colleague > (agent) > Pause*. | Its calls get 403 (denied in the activity log), the launcher stops the agent, `events.sh` backs off. After *Resume* it works again. |
+| Kill switch | *Settings > AI colleague > (agent) > Pause*. | Its calls get 403 (denied in the log), the launcher stops the agent, `events.sh` backs off. After *Resume* it works again. |
 
 **Prompt injection** (as the test user unless noted)
 

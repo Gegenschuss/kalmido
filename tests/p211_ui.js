@@ -21,7 +21,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v6[1-9]'/.test(SW), 'service worker cache v61 (2.1.2: v62, 2.2.0: v63, 2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69)');
+  check(/const CACHE = 'tasks-shell-v(6[1-9]|70)'/.test(SW), 'service worker cache v61 (2.1.2: v62, 2.2.0: v63, 2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en'});
@@ -48,18 +48,20 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
     const w = await boot({user: 'alice', mobile, hash: 'today'}), d = w.document;
     w.eval(`settingsModal('usage')`); await sleep(1200);
     const box = d.querySelector('#sp-ai #s-aiu');
-    check(box && !d.querySelector('#sp-ai').classList.contains('hidden') && /Usage/.test(d.querySelector('#s-aiu-h')?.textContent || ''), `${lab}: the usage section in AI colleague`);
-    const rows = [...box.querySelectorAll('.aiur[data-aiu-agent]')];
+    check(box && !d.querySelector('#sp-ai').classList.contains('hidden') && !d.querySelector('#aisp-usage').hidden && d.querySelector('[data-aisub="usage"]').getAttribute('aria-selected') === 'true', `${lab}: the sub-tab Usage in AI colleague`);
+    // 2.5.1 (#393): one summary card per agent; the charts behind "Details" (closed)
+    const rows = [...box.querySelectorAll('.aiusum[data-aiu-agent]')];
+    check(box.querySelector('details#aiu-det') && !box.querySelector('details#aiu-det').open, `${lab}: Details closed at first`);
     check(rows.length === 2 && /Claude/.test(rows[0].textContent) && /Codex/.test(rows[1].textContent), `${lab}: every agent (admin) ${rows.length}`);
     check(/24(\.|,)5K|24(\.|,)5k/i.test(rows[0].querySelectorAll('.aiuv')[0].textContent), `${lab}: Claude today 24.5K tokens (${rows[0].querySelectorAll('.aiuv')[0]?.textContent})`);
     check(box.querySelector('svg.chart .ch-bar') && /Tokens per day/.test(box.textContent), `${lab}: the chart per day`);
     const tops = [...box.querySelectorAll('.aiutasks [data-aiu-open]')];
-    check(tops.length === 3 && tops[0].textContent.includes('Write the release notes'), `${lab}: top tasks, biggest first (${tops.map(x => x.textContent).join('|')})`);
+    check(tops.length === 3 && tops.length <= 5 && tops[0].textContent.includes('Write the release notes'), `${lab}: top tasks, biggest first (${tops.map(x => x.textContent).join('|')})`);
     check(/Per list/.test(box.textContent) && /Per model/.test(box.textContent), `${lab}: per list + per model (SVG labels)`);
     check(/claude-small/.test(box.innerHTML) && /Secret/.test(box.innerHTML), `${lab}: model + list names in the charts`);
     if (!mobile) {
       click(w, box.querySelector('[data-aiu-m="cost"]')); await sleep(300);
-      check(/\$0\.47/.test(d.querySelector('#s-aiu .aiur[data-aiu-agent]').textContent) && /Cost per day/.test(d.querySelector('#s-aiu').textContent), 'cost view: $0.47');
+      check(/\$0\.47/.test(d.querySelector('#s-aiu .aiusum[data-aiu-agent]').textContent) && /Cost per day/.test(d.querySelector('#s-aiu').textContent), 'cost view: $0.47');
       click(w, d.querySelector('#s-aiu [data-aiu-m="tokens"]')); await sleep(300);
       const sel = d.querySelector('#aiu-ag'); sel.value = String(ag2.id); change(w, sel); await sleep(900);
       check([...d.querySelectorAll('#s-aiu .aiutasks [data-aiu-open]')].map(x => x.textContent.trim()).join() === 'Secret plan', 'one agent: its tasks only');
@@ -90,8 +92,12 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   let adm = (await call('GET', '/api/admin/agents')).agents.find(a => a.id === ag.id);
   check(adm.limits && adm.limits.soft === 20000 && adm.limits.hard === 30000 && adm.limits.period === 'day' && adm.limits.metric === 'tokens', 'limits saved: ' + JSON.stringify(adm.limits));
   await sleep(600);
+  // 2.5.1 (#393): the agent card names a limit only once it is reached; the Usage tab shows it as a bar with the line
   const row = d.querySelector(`#s-ags [data-agid="${ag.id}"]`);
-  check(row && /hard limit 30K tokens/i.test(row.textContent) && /per day/.test(row.textContent), 'agent row: the limit line: ' + row?.textContent.replace(/\s+/g, ' ').slice(0, 200));
+  check(row && !/hard limit/i.test(row.textContent), 'agent card: no limit line while under the limit');
+  click(w, d.querySelector('.smodal [data-aisub="usage"]')); await sleep(1000);
+  const lim = d.querySelector(`#s-aiu .aiusum[data-aiu-agent="${ag.id}"] .aiulim`);
+  check(lim && lim.querySelector('.aiub i') && /hard limit 30K tokens/i.test(lim.textContent) && /per day/.test(lim.textContent), 'usage card: the limit bar + line: ' + lim?.textContent.replace(/\s+/g, ' ').slice(0, 200));
   w.close();
   // over the hard limit: "limit reached"
   await v1(ag.token, 'POST', '/agent/usage', {model: 'claude-big', input_tokens: 10000, output_tokens: 0});
@@ -102,9 +108,9 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   const uc = d.querySelector('#view .aiucard');
   check(uc && /AI usage/.test(uc.textContent) && /Claude/.test(uc.textContent) && !/Codex/.test(uc.textContent) && /limit reached/.test(uc.textContent), 'Agents view: the usage card (bob: only Claude)');
   click(w, uc.querySelector('[data-act="aiu-more"]')); await sleep(1200);
-  check(d.querySelector('.smodal #sp-ai:not(.hidden) #s-aiu .aiur[data-aiu-agent]'), '"Details" opens Settings > AI colleague > Usage');
+  check(d.querySelector('.smodal #sp-ai:not(.hidden) #aisp-usage:not([hidden]) #s-aiu .aiusum[data-aiu-agent]'), '"Details" opens Settings > AI colleague > Usage');
   const bb = d.querySelector('#s-aiu');
-  check(bb.querySelectorAll('.aiur[data-aiu-agent]').length === 1 && !/hard limit/.test(bb.textContent) && !/Secret plan/.test(bb.innerHTML) && !/gpt-x/.test(bb.innerHTML),
+  check(bb.querySelectorAll('.aiusum[data-aiu-agent]').length === 1 && !/hard limit/.test(bb.textContent) && !/Secret plan/.test(bb.innerHTML) && !/gpt-x/.test(bb.innerHTML),
     'bob: only Claude, no limits, nothing of the secret list');
   check(/counted in the lists you see/.test(d.querySelector('#sp-ai').textContent), 'bob: the member hint');
   w.close();
@@ -128,7 +134,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   await call('PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
   w.eval(`settingsModal('usage')`); await sleep(1200);
-  check(/Verbrauch/.test(d.querySelector('#s-aiu-h')?.textContent || '') && /Tokens pro Tag/.test(d.querySelector('#s-aiu').textContent) && /Limit erreicht/.test(d.querySelector('#s-aiu').textContent), 'German');
+  check(/Verbrauch/.test(d.querySelector('[data-aisub="usage"]')?.textContent || '') && /Tokens pro Tag/.test(d.querySelector('#s-aiu').textContent) && /Limit erreicht/.test(d.querySelector('#s-aiu').textContent), 'German');
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});
 

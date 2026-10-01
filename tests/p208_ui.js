@@ -32,7 +32,7 @@ function swEnv() {
   return {L, shown, opened};
 }
 async function swTests() {
-  check(/const CACHE = 'tasks-shell-v(59|6[0-9])'/.test(SW), 'service worker cache v59 (2.1.0: v60, 2.1.1: v61, 2.1.2: v62, 2.2.0: v63, 2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69)');
+  check(/const CACHE = 'tasks-shell-v((59|6[0-9])|70)'/.test(SW), 'service worker cache v59 (2.1.0: v60, 2.1.1: v61, 2.1.2: v62, 2.2.0: v63, 2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70)');
   const S = swEnv();
   const e = {data: {json: () => ({title: 'Task X', body: 'Bob commented: look', tag: 't-7', url: '/#t/7', task: 7,
     actions: [{action: 'reply', title: 'Reply', url: '/#reply/7'}, {action: 'done', title: 'Done', url: '/#done/7'}]})}, waitUntil(p) { this.p = p; }};
@@ -118,8 +118,13 @@ async function swTests() {
   // ================= #321 Settings > AI colleague: the lists table
   for (const [mobile, lab] of [[false, 'desktop'], [true, 'phone']]) {
     w = await boot({user: 'alice', mobile, hash: 'today'}); d = w.document;
-    w.eval(`settingsModal('ai')`); await sleep(900);
+    w.eval(`settingsModal('ai')`); await sleep(500);
+    click(w, d.querySelector('.modal.smodal [data-aisub="lists"]')); await sleep(800);  // 2.5.1 (#393): the sub-tab Lists
     const tb = d.querySelector('.modal.smodal #s-ai-tbl');
+    // 2.5.1: first only the shared lists + "Show all (2)"
+    const first = [...(tb?.querySelectorAll('.airow:not(.aihead)') || [])];
+    check(first.length === 1 && +first[0].dataset.lid === WEB && /Show all \(2\)/.test(tb.querySelector('[data-aiall="1"]')?.textContent || ''), `${lab}: first the shared list + Show all (2)`);
+    click(w, tb.querySelector('[data-aiall="1"]')); await sleep(300);
     const rows = [...(tb?.querySelectorAll('.airow:not(.aihead)') || [])];
     check(tb && rows.length === 2 && rows.some(r => +r.dataset.lid === WEB) && rows.some(r => +r.dataset.lid === HOME) && !rows.some(r => +r.dataset.lid === BOBS),
       `${lab}: every list I manage (not Bob's, not the inbox): ${rows.map(r => r.textContent.trim().slice(0, 20))}`);
@@ -130,7 +135,12 @@ async function swTests() {
     w.close();
   }
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
+  w.eval(`settingsModal('ai')`); await sleep(500);
+  click(w, d.querySelector('.modal.smodal [data-aisub="lists"]')); await sleep(800);
+  d.querySelector('.modal.smodal').remove();
   w.eval(`settingsModal('ai')`); await sleep(900);
+  check(d.querySelector('.modal.smodal [data-aisub="lists"]').getAttribute('aria-selected') === 'true' && !d.querySelector('#aisp-lists').hidden, 'reopened: the sub-tab Lists is remembered on this device');
+  click(w, d.querySelector('#s-ai-tbl [data-aiall="1"]')); await sleep(300);
   click(w, d.querySelector(`#s-ai-tbl .airow[data-lid="${HOME}"] [data-aid="${AG}"]`)); await sleep(1200);
   let st = await call('GET', '/api/state');
   check((st.lists.find(l => l.id === HOME).members || []).some(m => m.user_id === AG && m.role === 'edit'), 'click: shared with the agent (Member)');
@@ -146,8 +156,9 @@ async function swTests() {
   w.close();
   await call('PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  w.eval(`settingsModal('ai')`); await sleep(900);
-  check(/Agent sieht sie/.test(d.querySelector('#s-ai-tbl .aihead')?.textContent || '') && /Deine Listen im Überblick/.test(d.querySelector('#s-ai-ov-h')?.textContent || ''), 'German heads');
+  w.eval(`settingsModal('ai')`); await sleep(500);
+  click(w, d.querySelector('.modal.smodal [data-aisub="lists"]')); await sleep(900);
+  check(/Agent sieht sie/.test(d.querySelector('#s-ai-tbl .aihead')?.textContent || '') && /Welche Listen er sieht/.test(d.querySelector('#s-ai-lists-h')?.textContent || '') && /Listen/.test(d.querySelector('[data-aisub="lists"]')?.textContent || ''), 'German heads');
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});
 

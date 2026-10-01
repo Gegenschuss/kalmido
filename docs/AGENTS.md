@@ -467,8 +467,9 @@ The task and the list must be ones the agent sees, the job one of its own. **Tok
 input + output + cache writes; cache reads are cheap and huge in long sessions, so they are listed apart. Report once per
 turn or per job, not per API call of your model: many tiny rows help nobody. MCP: `report_usage`, `get_usage`.
 
-**Dashboard.** Settings > AI colleague > *Usage* shows today / 7 days / 30 days per agent, the last 30 days as a chart,
-the top tasks, the lists and the models, in tokens or (when reported) cost. Admins see every agent; everyone else sees the
+**Dashboard.** Settings > AI colleague > *Usage* shows one card per agent with today / 7 days / 30 days (admins: the
+limit as a bar); *Details* opens the last 30 days as a chart, the top 5 tasks, the lists and the models, in tokens or
+(when reported) cost. Admins see every agent; everyone else sees the
 agents they share a list with, counted only in the lists they see (participants: only their tasks). Tasks and lists the
 viewer cannot see are counted without a name. The **Agents** view has a compact card of the same numbers, and the task
 panel shows *AI usage* on tasks with reports (only to people who see the task).
@@ -516,11 +517,14 @@ bodies), status code, the task / list id when the path or the body names one, an
 too: 401 (expired token), 403 (paused, wrong scope, a list it does not see) and 429 (rate or usage limit). Requests of
 people's tokens and invalid tokens are not.
 
-- **Settings > AI colleague > Activity log** (admins only): newest first, filter by agent, status class (2xx, 4xx, 5xx,
-  *Denied*) and day, 100 rows per page, *CSV* exports everything that matches (up to 20,000 rows). Denied calls are
-  marked in red.
+- **Settings > AI colleague > Log** (admins only): newest first, 20 rows and *Load more* (+50), filter by agent, status
+  class (2xx, 4xx, 5xx, *Denied*) and day (on phones behind *Filter*), *CSV* exports everything that matches (up to
+  20,000 rows). Event polling (`GET /api/v1/agent/events`) is hidden by default (switch *Hide event polling*); a summary
+  line shows today's requests and denied calls. Rows name the task / list where you can see it. Denied calls are marked
+  in red.
 - **API**: `GET /api/admin/agents/audit` (all agents, `?agent_id=`) and `GET /api/admin/agents/{id}/audit` with an admin
-  session, `?status=`, `?day=`, `?before=<id>`, `?limit=`, `?format=csv`; `GET /api/v1/admin/agents/{id}/audit` with a
+  session, `?status=`, `?day=`, `?hide_poll=1` (2.5.1), `?before=<id>`, `?limit=`, `?format=csv`; JSON rows carry
+  `task_title` / `list_name` where the admin sees that task / list, the first page `today` {`requests`, `denied`, `polls`}; `GET /api/v1/admin/agents/{id}/audit` with a
   token of scope *admin-read* (`?status=`, `?day=`, cursor pages).
 - **Retention**: `KALMIDO_AUDIT_DAYS` (default 90) days, removed hourly; `0` = no log at all. The request only queues the
   row in memory; a background writer stores the rows in batches every two seconds, so the log costs next to nothing
@@ -588,7 +592,7 @@ on a dev machine, opens a pull request and merges only after a person approved.
 Kalmido's part:
 
 - The `assigned` event (every task event in such a list) and `GET /api/v1/tasks/{id}` carry `repo`: `provider`,
-  `web_url`, `api_url`, `owner`, `repo`, `full_name`, `default_branch`, a suggested `branch` (`kalmido-<id>-<slug>`), the
+  `web_url`, `api_url`, `owner`, `repo`, `full_name`, `default_branch`, a suggested `branch` (`kalmido-<id>`), the
   linked pull requests `prs` (state, CI) and `commits`. A branch named like that, or `#<id>` in a commit or pull request,
   links them to the task; the panel shows them under *Code*.
 - When the pull request is ready, the agent posts a comment with the structured field
@@ -622,7 +626,7 @@ You are the coding agent of the Kalmido list "<list>". You work through the Kalm
 
 ## Working a ticket
 1. `set_status(working, "<short plan>", task_id)`, read the task with `get_task` (notes, comments, `repo`).
-2. Branch from `repo.default_branch` with the name `repo.branch` (`kalmido-<id>-<slug>`). Never commit to the
+2. Branch from `repo.default_branch` with the name `repo.branch` (`kalmido-<id>`). Never commit to the
    default branch, never force-push shared branches.
 3. Keep pull requests small: one ticket, one pull request. Mention `#<id>` in the title; `fixes #<id>` in the
    description only when merging it really finishes the task.

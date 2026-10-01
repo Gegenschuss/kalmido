@@ -223,7 +223,7 @@ TOOLS = [
      lambda api, a: api.call("GET", "/search", _pick(a, ("q", "limit")))),
     ("get_task", "One task with its comments (reactions, suggestions included). In a list connected to a repository also `code` "
                  "(linked pull requests with state + CI, commits) and `repo` (provider, web_url, owner, repo, default_branch, a "
-                 "suggested branch name kalmido-<id>-<slug>).",
+                 "suggested branch name kalmido-<id>).",
      _obj({"task_id": S_ID}, ["task_id"]), t_get_task),
     ("create_task", "Create a task (or a subtask with parent_id) in a list the agent may change.",
      _obj(TASK_FIELDS, ["title"]), lambda api, a: api.call("POST", "/tasks", body=a)),

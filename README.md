@@ -16,6 +16,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.5.1** (2026-10-01): Settings > *AI colleague* in four short sub-tabs (Agents, Lists, Usage, Log) instead of one
+  long page, clickable avatars in comments, branch suggestions `kalmido-<id>`.
 - **2.5.0** (2026-10-01): The first public release of Kalmido: tasks, projects, habits, focus timer, time tracking,
   shared lists, calendars, a REST API with webhooks and AI colleagues in one self-hosted app.
 
@@ -140,11 +142,11 @@ All changes: [CHANGELOG.md](CHANGELOG.md) · [GitHub Releases](https://github.co
 - **Agents as team members**: an admin adds an agent (Claude Code, Codex, n8n, a local model, your own script) as a
   user of type *Agent*: never an admin, no Paperless, sees only the lists shared with it, with its own API token, an
   optional webhook and an on/off switch that stops everything at once
-- **Settings > AI colleague**: one tab for all of it: what an agent is, the module switch, which lists it sees (the
-  lists shared with it, with a shortcut to share one), the agents' status; admins add, edit, test and pause them there
-  (username, display name and profile picture: a preset, an own photo or the initials).
-  A table shows every list you manage: which agent sees it (one click shares or unshares), its tidy mode and which
-  agent tidies it up
+- **Settings > AI colleague**: one tab in four sub-tabs (2.5.1). *Agents*: a card per agent with its state, lists and
+  usage; admins add, edit, test and pause them there (username, display name and profile picture: a preset, an own
+  photo or the initials). *Lists*: which lists each agent sees, *Share all* / *New lists automatically*, and a table
+  of the lists you manage (shared ones first, *Show all*, search): which agent sees it (one click shares or unshares),
+  its tidy mode and which agent tidies it up. *Usage* and *Log* (admins) below
 - Agents get **events** as signed webhooks or by **long-polling** (no public endpoint needed): @mentions, assignments,
   comments on their tasks, chat messages and reactions. A task event
   brings the task's newest comments and the list's sections along, so the agent can act at once; list pages can be
@@ -167,16 +169,16 @@ All changes: [CHANGELOG.md](CHANGELOG.md) · [GitHub Releases](https://github.co
   guide*): an AI colleague step by step, either by pasting one prompt into Claude Code or by hand (sandbox user,
   firewall, MCP wrapper, rules, event loop, autostart, test checklist)
 - **Usage and limits** (2.1.1): agents report their model usage (tokens, optionally the cost; numbers only, never
-  prompts); *Settings > AI colleague > Usage* shows today / 7 / 30 days per agent, a chart per day, top tasks, lists and
+  prompts); *Settings > AI colleague > Usage* shows today / 7 / 30 days per agent, behind *Details* a chart per day, top tasks, lists and
   models (admins: every agent; others: the agents and lists they share), the Agents view a compact card, the task panel
   *AI usage*. Per agent a soft limit (News + push to the admins at 80 % / 100 %) and a hard limit (its API calls get
   `429` until the next day / month or a higher limit). A Claude Code Stop hook ([mcp/claude_usage_hook.py](mcp/claude_usage_hook.py))
   reports a session's usage by itself
 - **Activity log** (2.2.1): every API request an agent makes (route, status, task / list, duration; never content) in
-  *Settings > AI colleague > Activity log* for admins, filtered by agent, status and day, denied calls marked, CSV export;
+  *Settings > AI colleague > Log* for admins, filtered by agent, status and day, event polling hidden by default, denied calls marked, CSV export;
   kept `KALMIDO_AUDIT_DAYS` days (default 90)
 - **Git integration** (2.2.0): connect a project list to GitHub or Gitea / Forgejo; pull requests (state, CI), commits
-  and branches show up at their tasks (`#123`, `kalmido-123-…`), `fixes #123` in a merged pull request completes the
+  and branches show up at their tasks (`#123`, `kalmido-123`), `fixes #123` in a merged pull request completes the
   task. Works by polling, so the server needs no public address. **Hand a ticket to a coding agent**: it gets the
   repository and a branch name with the assignment and merges only after your 👍 on its *Ready to merge* comment
   ([Git integration](#git-integration))
@@ -647,7 +649,7 @@ admins connect, change or remove them; everyone in the list sees the results.
   Internal Git servers need the host on the admin allow-list (*Settings > Administration > Advanced*, or
   `KALMIDO_CALENDAR_ALLOW_HOSTS`), the same SSRF guard as calendar subscriptions and Paperless.
 - **Matching** (tasks of the connected list only): `#123` (the task number, in the address `#t/123`) in a commit
-  message, a pull request title or description, or a branch named `kalmido-123-…`, `task-123-…` or `123-…`.
+  message, a pull request title or description, or a branch named `kalmido-123` (also `kalmido-123-…`), `task-123-…` or `123-…`.
 - **Task panel > Code** (after the fields, before the comments): the linked pull requests (open / merged / closed,
   author, CI ✓ ✗ ⏲ from the combined status and the check runs) and the latest commits, a button that copies a branch
   name for the task, and *… is working on it* while an assigned agent works on it. Rows show a chip with the pull request
@@ -665,7 +667,7 @@ admins connect, change or remove them; everyone in the list sees the results.
 
 Assign a task in a connected list to an agent (for example Claude Code with the MCP server on a dev machine). Its
 `assigned` event and `get_task` carry `repo`: provider, web address, owner / name, default branch, a suggested branch
-`kalmido-<id>-<slug>` and the linked pull requests with CI. The agent works in its own checkout, pushes the branch with its
+`kalmido-<id>` and the linked pull requests with CI. The agent works in its own checkout, pushes the branch with its
 own credentials, opens a pull request and asks for approval (`request_merge_approval`): a *Ready to merge* comment with
 the pull request, its CI and *Approve* / *Reject* for the list owner, list admins, the assignee and admins. 👍 / 👎 sends
 the agent a `reaction` event with `approval` and `merge_request`; only then does it merge. A sample `CLAUDE.md` for such

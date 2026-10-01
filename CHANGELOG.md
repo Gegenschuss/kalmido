@@ -7,6 +7,39 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.5.1] - 2026-10-01
+
+**In short:** Settings > *AI colleague* is tidied up into four sub-tabs instead of one very long page, comment avatars
+open the person's card, and suggested branch names are just `kalmido-<id>`.
+
+### Changed
+- **AI colleague settings in sub-tabs** (#393): *Agents*, *Lists*, *Usage* and *Log* (admins). Each sub-tab loads only
+  when you open it, and the last one is remembered on the device. The default tab is about 200 px high on a desktop
+  instead of about 5,900 px for the old single page.
+  - *Agents*: one compact card per agent (state and number of lists, today's and this week's usage, a red line only
+    for a reached limit or a failing webhook; more details in the tooltip). *Add agent* and *Setup guide* sit side by
+    side. The explanation is folded away once an agent exists, and the module switch only shows while the module is
+    off (it is always in Settings > Modules).
+  - *Lists*: one hint instead of two, one line per agent ("sees 9 of your 25 lists", *Share all*, *New lists
+    automatically*). The table first shows only the lists an agent sees, with *Show all (n)*, a search above 10 lists
+    and shared lists first. The tidy-up select has short labels, and the tidy agent appears next to it only when tidying
+    is on and more than one agent could do it. The heading reads "Which lists they see" when there are several agents.
+  - *Usage*: one summary card per agent (today, 7 days, 30 days, and the limit as a bar for admins). The chart, the top 5
+    tasks and the per-list and per-model bars are behind *Details*. The chart's date labels no longer overlap.
+  - *Log*: 20 requests first, *Load more* adds 50. Event polling (`GET /api/v1/agent/events`, usually most of the
+    log) is hidden by default with a switch, a summary line shows today's requests and denied calls (click to filter),
+    and task and list names appear where you can see them. On phones the filters sit behind a *Filter* button.
+- **Branch suggestion** (#396): the suggested branch name is `kalmido-<id>` without the title part, in the task's
+  *Code* section, *Link code…*, the agent events (`repo.branch`), `get_task` and the docs. Branches named
+  `kalmido-<id>-…`, `task-<id>-…` and `<id>-…` still link to their task.
+
+### Added
+- **Clickable avatars in comments** (#395): a comment author's avatar opens the same card as an @mention (role, open
+  tasks, *Assign this task*, *Mention*, an agent's state and chat).
+- `GET /api/admin/agents/audit`: `hide_poll=1` leaves out event polling; JSON rows carry `task_title` / `list_name`
+  where the admin can see that task or list, and the first page has `today` {`requests`, `denied`, `polls`}. The v1
+  audit route is unchanged.
+
 ## [2.5.0] - 2026-10-01
 
 **In short:** The first public release of Kalmido, a self-hosted task app for households and small teams: personal
@@ -39,5 +72,6 @@ of people.
   multi-arch image (`ghcr.io/gegenschuss/kalmido`, linux/amd64 and linux/arm64), an installable web app that works
   offline, English and German.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.5.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.5.1...HEAD
+[2.5.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.5.1
 [2.5.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.5.0

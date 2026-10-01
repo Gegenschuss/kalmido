@@ -29,7 +29,7 @@ function swEnv(tags) {
 }
 const pushEv = d => ({data: {json: () => d, text: () => JSON.stringify(d)}, waitUntil(p) { this.p = p; }});
 async function swTests() {
-  check(/const CACHE = 'tasks-shell-v(5[789]|6[0-9])'/.test(SW), 'service worker cache v57 (2.0.6: v58, 2.0.8: v59, 2.1.0: v60, 2.1.1: v61, 2.1.2: v62, 2.2.0: v63, 2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69)');
+  check(/const CACHE = 'tasks-shell-v((5[789]|6[0-9])|70)'/.test(SW), 'service worker cache v57 (2.0.6: v58, 2.0.8: v59, 2.1.0: v60, 2.1.1: v61, 2.1.2: v62, 2.2.0: v63, 2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70)');
   let S = swEnv(['t-1', 't-2', 'digest']);
   let e = pushEv({type: 'dismiss', tags: ['t-1', 't-9']}); S.L.push(e); await e.p;
   check(JSON.stringify(S.closed) === '["t-1"]' && !S.shown.length, 'dismiss push: closes t-1 only, shows nothing');
@@ -79,17 +79,22 @@ async function swTests() {
   for (let i = 0; i < 40 && !row; i++) { await sleep(150); row = [...d.querySelectorAll('#s-ags [data-agid]')].find(r => /Carl/.test(r.textContent)); }
   md = d.querySelector('.modal.smodal');
   check(md.querySelector('.snav .on')?.dataset.sec === 'ai' && !md.querySelector('[data-pane="ai"]').classList.contains('hidden'), "settingsModal('agents') opens the AI colleague tab");
-  check(row && md.querySelector('#s-ag-h') && md.querySelector('[data-pane="ai"] [data-ag="new"]'), 'admin: agent list + "Add agent" in the tab (anchor #s-ag-h kept)');
+  check(row && !md.querySelector('#aisp-agents').hidden && md.querySelector('#aisp-agents [data-ag="new"]'), 'admin: agent list + "Add agent" in the sub-tab Agents (2.5.1)');
   const pane = md.querySelector('[data-pane="ai"]');
   check(/team member for an AI assistant/.test(pane.textContent) && pane.querySelector('a[href$="AGENTS.md"]'), 'explanation + link to AGENTS.md');
   check(/sees exactly the lists shared with it/.test(pane.textContent) && !pane.querySelector('[data-m="ai-share"]') && pane.querySelector('#s-ai-share'), 'hint: list access = sharing; 2.4.2 (#391): no "Share a list with an agent…" button, the per-agent share block instead');
-  const aiSw = pane.querySelector('[data-feat="agents"]'), modSw = md.querySelector('[data-pane="modules"] [data-feat="agents"]');
-  check(aiSw && modSw && aiSw.checked && modSw.checked, 'agents switch in both tabs');
-  click(w, aiSw); aiSw.checked = false; aiSw.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(900);
-  check(!modSw.checked && modSw.closest('[data-modrow]').classList.contains('off'), 'switched off in AI colleague -> Modules follows');
+  // 2.5.1 (#393): the module switch shows in AI colleague only while the module is off (Settings > Modules has it always)
+  const modSw = md.querySelector('[data-pane="modules"] [data-feat="agents"]');
+  check(!pane.querySelector('[data-feat="agents"]') && modSw && modSw.checked, 'agents on: the switch only in Modules');
+  modSw.checked = false; modSw.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(900);
   check(!(await call('alice', 'GET', '/api/state')).settings.features.split(',').includes('agents'), 'saved: agents off');
-  modSw.checked = true; modSw.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(900);
-  check(pane.querySelector('[data-feat="agents"]').checked && (await call('alice', 'GET', '/api/state')).settings.features.split(',').includes('agents'), 'switched on in Modules -> AI colleague follows, saved');
+  [...d.querySelectorAll('.modal')].forEach(m => m.remove());
+  w.eval(`settingsModal('agents')`); await sleep(600);
+  md = d.querySelector('.modal.smodal');
+  const aiSw = md.querySelector('[data-pane="ai"] [data-feat="agents"]'), modSw2 = md.querySelector('[data-pane="modules"] [data-feat="agents"]');
+  check(aiSw && !aiSw.checked && !modSw2.checked, 'agents off: the switch in AI colleague too');
+  aiSw.checked = true; aiSw.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(900);
+  check(modSw2.checked && (await call('alice', 'GET', '/api/state')).settings.features.split(',').includes('agents'), 'switched on in AI colleague -> Modules follows, saved');
   // 2.4.2 (#391): the "Share a list with an agent…" button is gone (the table below covers it)
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
   // palette: the tab is searchable
@@ -111,7 +116,7 @@ async function swTests() {
   md = d.querySelector('.modal.smodal');
   const bp = md.querySelector('[data-pane="ai"]');
   check(bp && !bp.classList.contains('hidden'), 'bob: AI colleague tab');
-  check(bp.querySelector('[data-feat="agents"]') && /team member for an AI assistant/.test(bp.textContent), 'bob: switch + explanation');
+  check(!bp.querySelector('[data-feat="agents"]') && /team member for an AI assistant/.test(bp.textContent), 'bob: explanation, no switch while the module is on (2.5.1)');
   check(!bp.querySelector('#s-ags') && !bp.querySelector('[data-ag]'), 'bob: no management');
   const my = bp.querySelector('#s-myags [data-agid]');
   check(my && /Carl/.test(my.textContent) && /ready/.test(my.textContent), 'bob: his agent with its status: ' + (my?.textContent || '').trim());

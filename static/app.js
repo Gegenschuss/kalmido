@@ -3784,7 +3784,7 @@ function mdMentions(html, t) {
 function mentionCard(anchor) {
   const id = +anchor.dataset.mcard, t = taskById(S.sel), l = t ? listById(t.list_id) : null;
   const p = listPeople(l).find(x => x.user_id === id), a = agentById(id);
-  const name = p?.name || a?.name || anchor.textContent.replace(/^@/, ''), meId = S.me?.id;
+  const name = p?.name || a?.name || anchor.dataset.mname || anchor.textContent.replace(/^@/, ''), meId = S.me?.id;
   const role = p ? roleLabel(p.role) : '', U = S.tl.users || {};
   const st = a ? `<span class="mcst st-${esc(!a.enabled ? 'paused' : agentOffline(a) ? 'offline' : a.status || 'idle')}">${esc(agentSt(a))}${a.status_text ? ' · ' + esc(a.status_text) : ''}</span>` : '';
   const mine = l ? openTasks().filter(x => x.list_id === l.id && x.assignee_id === id && x.id !== t?.id).sort(bySort) : [];
@@ -3826,7 +3826,9 @@ function commentHtml(c, U, ro = false) {
   const files = c.attachments?.length ? `<div class="atts catts">${c.attachments.map(a => cattHtml(a, c.id, editing)).join('')}</div>` : '';
   const main = editing ? `<div class="cedit"><textarea class="c-edit-input" data-cid="${c.id}" rows="2">${esc(decodeMentions(c.body, U))}</textarea><div class="mpick hidden"></div>${files}<div class="cbar"><span class="spacer"></span><button class="btn sm" data-act="c-edit-cancel">${tr('Cancel')}</button><button class="btn sm pri" data-act="c-edit-save" data-cid="${c.id}">${tr('Save')}</button></div></div>`
     : `${c.body ? `<div class="cbody">${commentBody(c.body, U)}</div>` : ''}${files}${sugHtml(c, ro)}${reactHtml(c, ro)}`;
-  return `<div class="cm ${isNew ? 'new' : ''}" data-cid="${c.id}">${av(c.user_id, uname(c.user_id, U))}<div class="cmain"><div class="chead"><b>${esc(uname(c.user_id, U))}</b>${isAgentUser(c.user_id) ? agentBadge() : ''}<span class="muted">${fmtWhen(c.created_at)}${c.edited_at ? ' · ' + tr('edited') : ''}</span>${acts}</div>${main}</div></div>`;
+  // 2.5.1 (#395): the author's avatar opens the same card as an @mention (only in the comment list, not read-only copies)
+  const cav = ro ? av(c.user_id, uname(c.user_id, U)) : `<button type="button" class="cmav" data-mcard="${c.user_id}" data-mname="${esc(uname(c.user_id, U))}" aria-haspopup="dialog" title="${esc(tr('Show {0}', uname(c.user_id, U)))}">${av(c.user_id, uname(c.user_id, U))}</button>`;
+  return `<div class="cm ${isNew ? 'new' : ''}" data-cid="${c.id}">${cav}<div class="cmain"><div class="chead"><b>${esc(uname(c.user_id, U))}</b>${isAgentUser(c.user_id) ? agentBadge() : ''}<span class="muted">${fmtWhen(c.created_at)}${c.edited_at ? ' · ' + tr('edited') : ''}</span>${acts}</div>${main}</div></div>`;
 }
 function timelineItems(ro = false) {
   const T = S.tl, soc = cmSocial(taskById(T.id));
@@ -5840,26 +5842,42 @@ function modRowHtml(k, opt = () => '') {
   return `<div class="modrow ${feat(k) ? '' : 'off'}" data-modrow="${k}"><label class="mmain"><span class="swc"><input type="checkbox" data-feat="${k}" ${feat(k) ? 'checked' : ''} ${srv ? '' : 'disabled'}><span class="swt" aria-hidden="true"></span></span><span><b>${tr(n)}</b><small class="muted">${tr(MOD_DESC[k] || FEAT_DESC[k] || '')}</small>${srv ? '' : `<small class="muted cnote" id="${k === 'collab' ? 's-collabnote' : 's-timenote'}">${tr('Turned off on this server, for everyone. Your own setting applies again once an admin turns it back on.')}</small>`}</span></label>${all}${opt(k)}</div>`;
 }
 // 2.0.5 (#313): Settings > AI colleague bundles the agents: what they are, the switch, how they get lists, their status;
-// admins also manage them here (was Settings > Administration > Agents; settingsModal('agents') still lands here)
-function aiHtml(hint) {
-  const adm = !!S.me?.is_admin, ags = S.agents || [];
+// admins also manage them here (was Settings > Administration > Agents; settingsModal('agents') still lands here).
+// 2.5.1 (#393): four sub-tabs instead of one long page: Agents (cards, Add agent + Setup guide), Lists (sharing + tidy table),
+// Usage (one summary card per agent, the charts behind "Details"), Log (admins). The last one is remembered per device;
+// settingsModal('agents' / 'usage' / 'activity') opens the matching one. Each sub-tab loads its data only when shown.
+const AI_SUBS = [['agents', 'bot', N_('Agents')], ['lists', 'list', N_('Lists')], ['usage', 'chart', N_('Usage')], ['log', 'clock', N_('Log')]];
+const aiSubs = () => AI_SUBS.filter(([k]) => k === 'log' ? !!S.me?.is_admin : k === 'usage' ? !!S.me?.is_admin || (S.agents || []).length > 0 : true);
+function aiSubCur(want) { const ks = aiSubs().map(x => x[0]), k = want || LS.get('aiSub', 'agents'); return ks.includes(k) ? k : 'agents'; }
+function aiHtml(hint, want) {
+  const adm = !!S.me?.is_admin, ags = S.agents || [], cur = aiSubCur(want);
   const mine = S.lists.some(l => !l.archived && !l.is_inbox && canManage(l));
-  return `${hint(`${tr('An agent is a team member for an AI assistant or a bot (Claude Code, Codex, n8n, a local model …): it works only through the API, is never an admin, gets no Paperless access and sees only the lists shared with it. Kalmido tells it about mentions, assignments, chat messages and reactions by webhook or through an event queue it polls; Kalmido itself never starts an AI.')} <a href="${API_DOCS.replace('API.md', 'AGENTS.md')}" target="_blank" rel="noopener noreferrer">${tr('How to connect an agent')}</a>`)}
-    <div class="modlist">${modRowHtml('agents')}</div>
-    <div class="row"><button class="btn sm" data-m="ag-guide">${ic('help', 's')} ${tr('Setup guide')}</button><span class="muted aighint">${tr('Set up an AI colleague step by step, or let Claude Code do it')}</span></div>
+  const pane = (k, body) => `<div class="aisp" data-aisp="${k}" id="aisp-${k}" role="tabpanel" aria-labelledby="ais-${k}" ${k === cur ? '' : 'hidden'}>${body}</div>`;
+  const subs = aiSubs();
+  return `<div class="seg aisub" role="tablist" aria-label="${esc(tr('AI colleague'))}">${subs.map(([k, i, n]) => `<button type="button" role="tab" id="ais-${k}" data-aisub="${k}" aria-controls="aisp-${k}" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}">${ic(i, 's')}<span>${tr(n)}</span></button>`).join('')}</div>
+    ${pane('agents', `<details class="shelp sdet aiexp" ${ags.length ? '' : 'open'}><summary>${tr('Agents are AI team members: they work only through the API and see only the lists shared with them.')}</summary>
+      <p>${tr('An agent is a team member for an AI assistant or a bot (Claude Code, Codex, n8n, a local model …): it works only through the API, is never an admin, gets no Paperless access and sees only the lists shared with it. Kalmido tells it about mentions, assignments, chat messages and reactions by webhook or through an event queue it polls; Kalmido itself never starts an AI.')} <a href="${API_DOCS.replace('API.md', 'AGENTS.md')}" target="_blank" rel="noopener noreferrer">${tr('How to connect an agent')}</a></p></details>
+    ${feat('agents') ? '' : `<div class="modlist">${modRowHtml('agents')}</div>`}
     ${collab() ? '' : hint(tr('Agents work together with you in shared lists: switch on Collaboration (Settings > Modules) as well.'))}
-    <h4 id="s-ai-lists-h">${tr('Which lists it sees')}</h4>
-    ${hint(tr('An agent sees exactly the lists shared with it, nothing else. To give it a list, share the list with it like with a person: list dialog > Sharing. Taking it out of the sharing ends the access at once.'))}
-    ${mine && collab() ? `<div class="aishare" id="s-ai-share"></div>
-    <h4 id="s-ai-ov-h">${tr('Your lists at a glance')}</h4>
-    ${hint(tr('Every list you manage: which agent sees it (click to share or unshare; a new agent joins as a member) and whether it may tidy up new entries.'))}
-    <div class="aitbl" id="s-ai-tbl" role="table" aria-labelledby="s-ai-ov-h"><div class="muted mhint">${tr('Loading…')}</div></div>` : ''}
-    ${adm || ags.length ? `<h4 id="s-aiu-h">${tr('Usage')}</h4>
-    ${hint(adm ? tr('What the agents report about their model usage: tokens and, if they send it, the cost. You see every agent; limits are set per agent (Edit).') : tr('What the agents in your lists report about their model usage, counted in the lists you see.'))}
-    <div class="aiu" id="s-aiu"></div>` : ''}
-    ${adm ? agAdminHtml() : `<h4>${tr('Your agents')}</h4><div class="members" id="s-myags">${ags.length ? ags.map(a => `<div class="mrow ${a.enabled ? '' : 'off'}" data-agid="${a.id}">${av(a.id, a.name)}<span class="n"><b>${esc(a.name)}</b>
-      <small class="muted">${esc(agentSt(a))}${a.status_text ? ' · ' + esc(a.status_text) : ''}${a.running || a.waiting ? ' · ' + esc([a.running && trn('{0} running', '{0} running', a.running), a.waiting && trn('{0} waiting', '{0} waiting', a.waiting)].filter(Boolean).join(' · ')) : ''}</small></span></div>`).join('')
-      : `<div class="muted mhint">${tr('No agent works in your lists yet. An admin adds agents; then share a list with one.')}</div>`}</div>`}`;
+    <div class="members aglist" id="${adm ? 's-ags' : 's-myags'}"><div class="muted mhint">${tr('Loading…')}</div></div>
+    <div class="row aibtns">${adm ? `<button class="btn sm" data-ag="new">${ic('plus', 's')} ${tr('Add agent')}</button>` : ''}<button class="btn sm" data-m="ag-guide" title="${esc(tr('Set up an AI colleague step by step, or let Claude Code do it'))}">${ic('help', 's')} ${tr('Setup guide')}</button></div>`)}
+    ${pane('lists', `<h4 id="s-ai-lists-h">${ags.length > 1 ? tr('Which lists they see') : tr('Which lists it sees')}</h4>
+    ${hint(tr('An agent sees exactly the lists shared with it, nothing else. Share or stop sharing below or in the list dialog > Sharing; taking a list out ends the access at once.'))}
+    ${mine && collab() ? `<div class="aishare" id="s-ai-share"></div><div class="aitblctl" id="s-ai-tblctl"></div>
+    <div class="aitbl" id="s-ai-tbl" role="table" aria-labelledby="s-ai-lists-h"><div class="muted mhint">${tr('Loading…')}</div></div>` : `<div class="muted mhint">${tr('You do not manage any list yet.')}</div>`}`)}
+    ${subs.some(x => x[0] === 'usage') ? pane('usage', `${hint(adm ? tr('What the agents report about their model usage: tokens and, if they send it, the cost. You see every agent; limits are set per agent (Edit).') : tr('What the agents in your lists report about their model usage, counted in the lists you see.'))}
+    <div class="aiu" id="s-aiu"></div>`) : ''}
+    ${adm ? pane('log', audHtml()) : ''}`;
+}
+// shows one sub-tab and loads what it needs (save: remember it for this device)
+function aiSubShow(md, want, save) {
+  const k = aiSubCur(want); if (save) LS.set('aiSub', k);
+  $$('[data-aisub]', md).forEach(b => { const on = b.dataset.aisub === k; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
+  $$('[data-aisp]', md).forEach(p => { p.hidden = p.dataset.aisp !== k; });
+  if (k === 'agents') return agDraw(md);
+  if (k === 'lists') return aiTblDraw(md);
+  if (k === 'usage') return aiuDraw(md);
+  if (k === 'log') return audDraw(md);
 }
 function settingsModal(focus) {
   const s = S.settings;
@@ -5939,7 +5957,7 @@ function settingsModal(focus) {
       ${sampleHtml(hint)}
       <h4>${tr('Completed tasks')}</h4>
       <div class="row"><label>${tr('Clean up')}</label><button class="btn sm danger" data-m="purge">${ic('trash', 's')} ${tr('Delete all completed')}</button><span class="muted" style="font-size:var(--fs-s)">${tr('they go to the trash')}</span></div>`,
-    ai: S.me ? aiHtml(hint) : '',
+    ai: S.me ? aiHtml(hint, {agents: 'agents', usage: 'usage', activity: 'log'}[focus]) : '',
     users: S.me?.is_admin ? usersHtml() + orphHtml() + instanceHtml(chk, hint) + signinHtml(hint) + plaHtml() + bkHtml() + aaHtml() : '',  // 1.9.0: users first
     help: `<h4>${tr('Getting started')}</h4>
       <div class="row"><button class="btn sm" data-m="tour">${ic('arrow', 's')} ${tr('Restart the welcome tour')}</button>${isMobile() ? '' : `<button class="btn sm" data-m="keys">${ic('help', 's')} ${tr('Keyboard shortcuts')} ${kb('?')}</button>`}<button class="btn sm" data-m="cele-try">${ic('check', 's')} ${tr('Show the celebration')}</button></div>
@@ -5978,7 +5996,7 @@ function settingsModal(focus) {
     if (k === 'integr') { icalDraw(md); calsDraw(md); whDraw(md); }
     if (k === 'notify') wpDraw(md);
     if (k === 'users') { aaDraw(md); bkDraw(md); orphDraw(md); }
-    if (k === 'ai') { agDraw(md); aiTblDraw(md); aiuDraw(md); if (S.me?.is_admin) audDraw(md); }
+    if (k === 'ai') aiSubShow(md);  // 2.5.1 (#393): only the shown sub-tab loads
     if (k === 'account') { tfaDraw(md); tokDraw(md); }
     $(`.snav [data-sec="${k}"]`, md)?.scrollIntoView({block: 'nearest', inline: 'nearest'});
   };
@@ -6045,12 +6063,8 @@ function settingsModal(focus) {
   ntfyShow(md);
   if (cur === 'users') { aaDraw(md); bkDraw(md); orphDraw(md); }
   aiTblWire(md);
-  if (cur === 'ai') {
-    const tbl = aiTblDraw(md), us = aiuDraw(md), ags = agDraw(md), aud = S.me?.is_admin ? audDraw(md) : null;  // 2.2.1 (#358)
-    if (focus === 'agents' || focus === 'usage' || focus === 'activity') setTimeout(() => $(focus === 'usage' ? '#s-aiu-h' : focus === 'activity' ? '#s-aud-h' : '#s-ag-h', md)?.scrollIntoView({block: 'start'}), 0);
-    // 2.1.1: the sections above grow once loaded; scroll to the usage again then
-    if (focus === 'usage' || focus === 'activity') Promise.all([tbl, us, ags, aud]).then(() => setTimeout(() => md.isConnected && $(focus === 'usage' ? '#s-aiu-h' : '#s-aud-h', md)?.scrollIntoView({block: 'start'}), 0));
-  }
+  if (cur === 'ai') aiSubShow(md, {agents: 'agents', usage: 'usage', activity: 'log'}[focus]);  // 2.5.1 (#393)
+  md.addEventListener('click', e => { const b = e.target.closest('[data-aisub]'); if (b) aiSubShow(md, b.dataset.aisub, true); });
   aiuWire(md, only => { const box = $('#s-aiu', md); if (only && box && S.aiu.data) box.innerHTML = aiuHtml(S.aiu.data, Math.max(240, Math.min(720, (box.clientWidth || 560) - 8))); else aiuDraw(md); });  // 2.1.1 (#326)
   if (cur === 'account' && S.me) { tfaDraw(md); tokDraw(md); }
   if (S.me) { tfaWire(md); tokWire(md); }
@@ -7663,15 +7677,15 @@ const shortDay = s => pd(s).toLocaleDateString(LOCALE(), {day: 'numeric', month:
 function yGrid(W, padL, padT, ih, max, fmt) {
   return [0, max / 2, max].map(v => { const y = padT + ih - ih * v / max; return `<line class="ch-grid" x1="${padL}" x2="${W}" y1="${y}" y2="${y}"/><text class="ch-ax" x="${padL - 6}" y="${y + 4 * uiZ()}" text-anchor="end">${esc(fmt(v))}</text>`; }).join('');
 }
-function barChart(vals, labels, {fmt = v => String(v), tip, label, w}) {  // w: own width (2.1.1: charts in a dialog)
+function barChart(vals, labels, {fmt = v => String(v), tip, label, w, lw}) {  // w: own width (2.1.1: charts in a dialog); lw: px per axis label (2.5.1)
   const z = uiZ(), W = w || chartW(), H = Math.round(170 * z), padL = Math.round(36 * z), padT = 10, padB = Math.round(24 * z), ih = H - padT - padB, n = vals.length;
   const max = niceMax(Math.max(1, ...vals)), slot = (W - padL) / n, bw = Math.max(4, slot - Math.max(2, Math.min(10, slot * .28)));
-  const every = Math.ceil(n * 46 * z / (W - padL));
+  const every = Math.ceil(n * Math.max(46, lw || 0) * z / (W - padL));
   let h = yGrid(W, padL, padT, ih, max, fmt);
   vals.forEach((v, i) => {
     const x = padL + i * slot + (slot - bw) / 2, bh = ih * v / max;
     h += `<path class="ch-bar" d="${topRound(x, padT + ih - bh, bw, bh, 4)}"/>`;
-    if ((n - 1 - i) % every === 0) h += `<text class="ch-ax" x="${x + bw / 2}" y="${H - 6 * z}" text-anchor="middle">${esc(labels[i])}</text>`;
+    if ((n - 1 - i) % every === 0) h += `<text class="ch-ax" x="${i === n - 1 ? x + bw : x + bw / 2}" y="${H - 6 * z}" text-anchor="${i === n - 1 ? 'end' : 'middle'}">${esc(labels[i])}</text>`;  // 2.5.1: the last label inside the chart
     h += `<rect class="ch-hit" x="${padL + i * slot}" y="${padT}" width="${slot}" height="${ih}"><title>${esc(tip(i))}</title></rect>`;
   });
   return `<svg class="chart" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label + ': ' + vals.map((v, i) => tip(i)).join('; '))}">${h}</svg>`;
@@ -10816,42 +10830,64 @@ document.addEventListener('input', e => { if (e.target.id === 'chat-in') { S.dra
 // ---- 2.0.8 (#321) Settings > AI colleague: every list I manage in one table. "Agent sees it": one chip per agent,
 // click shares the list with it (role Member, like the list dialog's default) or ends the sharing (after a confirm);
 // "Tidy up": the list dialog's agent_tidy (off / suggest / auto), only where an agent is in the list.
+// 2.5.1 (#393): first only the lists an agent sees (all of them while none is shared yet) + "Show all (n)", a search above
+// 10 lists (always over all lists), shared ones first; one tidy select with short labels, the tidy agent next to it only
+// while tidying is on and more than one agent could do it.
+const TIDY_SHORT = {off: N_('Off'), suggest: N_('Suggest'), auto: N_('Automatically')};
 async function aiTblDraw(md) {
   const box = $('#s-ai-tbl', md); if (!box) return;
   if (!box._ags) {
     try { box._ags = (await api('GET', '/api/users')).users.filter(u => u.agent && !u.disabled).map(u => ({id: u.id, name: u.display_name})); }
     catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
   }
-  const ags = box._ags, lists = S.lists.filter(l => !l.archived && !l.is_inbox && canManage(l));
+  const ags = box._ags, lists = S.lists.filter(l => !l.archived && !l.is_inbox && canManage(l)), ctl = $('#s-ai-tblctl', md);
   aiShareDraw(md, ags);
-  if (!ags.length) { box.innerHTML = `<div class="muted mhint">${tr('No agents yet. An admin adds them; then they show up here.')}</div>`; return; }
-  if (!lists.length) { box.innerHTML = `<div class="muted mhint">${tr('You do not manage any list yet.')}</div>`; return; }
+  if (!ags.length) { box.innerHTML = `<div class="muted mhint">${tr('No agents yet. An admin adds them; then they show up here.')}</div>`; if (ctl) ctl.innerHTML = ''; return; }
+  if (!lists.length) { box.innerHTML = `<div class="muted mhint">${tr('You do not manage any list yet.')}</div>`; if (ctl) ctl.innerHTML = ''; return; }
+  const sees = l => { const people = listPeople(l); return ags.filter(a => people.some(p => p.user_id === a.id)); };
+  if (ctl && lists.length > 10 && !$('#ai-q', ctl)) ctl.innerHTML = `<input type="search" id="ai-q" placeholder="${esc(tr('Search lists'))}" aria-label="${esc(tr('Search lists'))}" autocomplete="off" value="${esc(box._q || '')}">`;
+  else if (ctl && lists.length <= 10) ctl.innerHTML = '';
+  const q = lists.length > 10 ? (box._q || '').trim().toLowerCase() : '', shared = lists.filter(l => sees(l).length);
+  const all = q || box._all || !shared.length;
+  const shown = (q ? lists.filter(l => lname(l).toLowerCase().includes(q)) : all ? lists : shared).sort((x, y) => (sees(y).length ? 1 : 0) - (sees(x).length ? 1 : 0));
+  let two = false;
   const row = l => {
-    const people = listPeople(l), has = ags.filter(a => people.some(p => p.user_id === a.id));
+    const people = listPeople(l), has = sees(l);
     const chips = ags.map(a => { const p = people.find(x => x.user_id === a.id), on = !!p;
       return `<button type="button" class="aichip ${on ? 'on' : ''}" data-aish="${l.id}" data-aid="${a.id}" aria-pressed="${on}" ${p?.role === 'owner' ? 'disabled' : ''} title="${esc(on ? tr('{0} sees this list ({1}); click to stop sharing', a.name, roleLabel(p.role)) : tr('Share this list with {0}', a.name))}">${ic(on ? 'check' : 'plus', 's')}<span>${esc(a.name)}</span></button>`; }).join('');
-    const tidy = has.length && tidyCands(l).length ? `<select data-aitidy="${l.id}" aria-label="${esc(tr('Tidy up') + ': ' + lname(l))}">${TIDY.map(([k, n]) => `<option value="${k}" ${(l.agent_tidy || 'off') === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>`
-        + (tidyCands(l).length > 1 ? tidyAgentSel(l, '', `data-aitidyag="${l.id}" aria-label="${esc(tr('Tidy up by') + ': ' + lname(l))}"`) : '')
+    const cur = l.agent_tidy || 'off', agSel = cur !== 'off' && tidyCands(l).length > 1;
+    if (agSel) two = true;
+    const tidy = has.length && tidyCands(l).length ? `<select data-aitidy="${l.id}" aria-label="${esc(tr('Tidy up') + ': ' + lname(l))}">${TIDY.map(([k, n]) => `<option value="${k}" title="${esc(tr(n))}" ${cur === k ? 'selected' : ''}>${tr(TIDY_SHORT[k])}</option>`).join('')}</select>`
+        + (agSel ? tidyAgentSel(l, '', `data-aitidyag="${l.id}" aria-label="${esc(tr('Tidy up by') + ': ' + lname(l))}"`) : '')
       : `<span class="muted" title="${esc(has.length ? tr('Give an agent of this list edit rights first') : tr('Share the list with an agent first'))}">–</span>`;
     return `<div class="airow" role="row" data-lid="${l.id}"><span class="ailn" role="cell">${esc(lname(l))}</span><span class="aiag" role="cell">${chips}</span><span class="aitd" role="cell">${tidy}</span></div>`;
   };
-  box.innerHTML = `<div class="airow aihead" role="row"><span role="columnheader">${tr('List')}</span><span role="columnheader">${tr('Agent sees it')}</span><span role="columnheader">${tr('Tidy up')}</span></div>` + lists.map(row).join('');
+  const rows = shown.map(row).join('');
+  const more = !q && !all ? `<div class="aimore"><button type="button" class="btn sm" data-aiall="1">${tr('Show all ({0})', lists.length)}</button></div>`
+    : !q && box._all && shared.length && shared.length < lists.length ? `<div class="aimore"><button type="button" class="btn sm" data-aiall="0">${tr('Only shared lists')}</button></div>` : '';
+  box.classList.toggle('two', two);
+  box.innerHTML = `<div class="airow aihead" role="row"><span role="columnheader">${tr('List')}</span><span role="columnheader">${tr('Agent sees it')}</span><span role="columnheader">${tr('Tidy up')}</span></div>`
+    + (rows || `<div class="muted mhint">${tr('No list matches.')}</div>`) + more;
 }
 // 2.4.2 (#391): per agent "Share all existing lists" + "Share new lists automatically" (both after a warning). Only the
 // lists I own (never the inbox, never archived ones); lists I stopped sharing with the agent in the table stay out.
+// 2.5.1 (#393): one line per agent: "sees 8 of 25 · [Share all] · [x] New lists automatically".
 function aiShareOf() { let d = {}; try { d = JSON.parse(S.settings.agent_share || '{}') || {}; } catch { /* default */ } return {auto: d.auto || [], skip: d.skip || {}}; }
 function aiShareDraw(md, ags) {
   const box = $('#s-ai-share', md); if (!box) return;
   if (!ags.length) { box.innerHTML = ''; return; }
   const own = S.lists.filter(l => !l.archived && !l.is_inbox && S.me && l.owner_id === S.me.id), d = aiShareOf();
   box.innerHTML = ags.map(a => {
-    const skip = new Set(d.skip[a.id] || []), miss = own.filter(l => !listPeople(l).some(p => p.user_id === a.id) && !skip.has(l.id)).length, auto = d.auto.includes(a.id);
-    return `<div class="mrow aisrow" data-aisag="${a.id}">${av(a.id, a.name)}<span class="n"><b>${esc(a.name)}</b><small class="muted">${esc(miss ? trn('{0} of your lists does not see it yet', '{0} of your lists do not see it yet', miss) : tr('Sees all of your lists'))}${skip.size ? ' · ' + esc(trn('{0} left out by you', '{0} left out by you', skip.size)) : ''}</small></span>
-      <span class="aisacts"><button type="button" class="btn sm" data-aisall="${a.id}" ${miss ? '' : 'disabled'}>${ic('users', 's')} ${tr('Share all existing lists')}</button>
-      <label class="chkl swl"><span class="swc"><input type="checkbox" data-aisauto="${a.id}" ${auto ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('Share new lists automatically')}</span></label></span></div>`;
+    const skip = new Set(d.skip[a.id] || []), seen = own.filter(l => listPeople(l).some(p => p.user_id === a.id)).length;
+    const miss = own.filter(l => !listPeople(l).some(p => p.user_id === a.id) && !skip.has(l.id)).length, auto = d.auto.includes(a.id);
+    return `<div class="mrow aisrow" data-aisag="${a.id}">${av(a.id, a.name)}<span class="n"><b>${esc(a.name)}</b><small class="muted">${esc(tr('sees {0} of your {1} lists', seen, own.length))}${skip.size ? ' · ' + esc(trn('{0} left out by you', '{0} left out by you', skip.size)) : ''}</small></span>
+      <span class="aisacts"><button type="button" class="btn sm" data-aisall="${a.id}" ${miss ? '' : 'disabled'} title="${esc(tr('Share all existing lists'))}">${ic('users', 's')} ${tr('Share all')}</button>
+      <label class="chkl swl"><span class="swc"><input type="checkbox" data-aisauto="${a.id}" ${auto ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('New lists automatically')}</span></label></span></div>`;
   }).join('');
 }
 function aiTblWire(md) {
+  md.addEventListener('click', e => { const b = e.target.closest('[data-aiall]'); if (!b) return; const t = $('#s-ai-tbl', md); if (t) { t._all = b.dataset.aiall === '1'; aiTblDraw(md); } });
+  md.addEventListener('input', e => { if (e.target.id !== 'ai-q') return; const t = $('#s-ai-tbl', md); if (t) { t._q = e.target.value; aiTblDraw(md); } });
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-aisall]'); if (!b || b.disabled) return;
     const aid = +b.dataset.aisall, a = ($('#s-ai-tbl', md)?._ags || []).find(x => x.id === aid); if (!a) return;
@@ -10936,31 +10972,32 @@ function agGuideModal() {
     if (b.dataset.m === 'agg-copy') { try { await navigator.clipboard.writeText(fill()); toast(tr('Copied')); } catch { toast(tr('Copy failed, select the text by hand')); } }
   });
 }
-// ---- Settings > AI colleague > Agents (admins; 2.0.5, was under Administration)
-const agAdminHtml = () => `<h4 id="s-ag-h">${tr('Agents')}</h4>
-  <div class="members" id="s-ags"><div class="muted mhint">${tr('Loading…')}</div></div>
-  <div class="row"><button class="btn sm" data-ag="new">${ic('plus', 's')} ${tr('Add agent')}</button></div>
-  ${audHtml()}`;
 // ---- 2.2.1 (#358) Settings > AI colleague > Activity log (admins): every API request made with an agent's token (time,
 // agent, method + route template, status, task / list id, duration; never content), newest first, filtered by agent,
-// status class and day, 100 per page, CSV export of everything that matches. Denied calls (401 / 403 / 429) are marked.
-S.aud = {ag: '', st: '', day: '', rows: [], next: null, agents: [], days: 90, err: null};
+// status class and day, CSV export of everything that matches. Denied calls (401 / 403 / 429) are marked.
+// 2.5.1 (#393): 20 rows first, "Load more" adds 50; the event polling (GET /api/v1/agent/events, most of the rows) hidden by
+// default (switch, per device); a summary of today (the denied count filters); task / list titles where the admin sees
+// them; the filters behind a "Filter" button on phones.
+S.aud = {ag: '', st: '', day: '', rows: [], next: null, agents: [], days: 90, err: null, today: null, poll: LS.get('audPoll', '1') !== '0'};
+const AUD_FIRST = 20, AUD_MORE = 50;
 const AUD_ST = [['', N_('All statuses')], ['2xx', N_('Successful (2xx)')], ['4xx', N_('Client errors (4xx)')], ['5xx', N_('Server errors (5xx)')], ['denied', N_('Denied (401 / 403 / 429)')]];
-const audQuery = () => new URLSearchParams(Object.entries({agent_id: S.aud.ag, status: S.aud.st, day: S.aud.day}).filter(([, v]) => v)).toString();
-const audHtml = () => `<h4 id="s-aud-h">${tr('Activity log')}</h4>
-  <div class="shint">${tr('Every API request made with an agent’s token: when, which route, the answer and how long it took; never what was sent or read. Denied calls (401 / 403 / 429) are marked in red, e.g. while an agent is paused or over its limit.')} <span id="aud-keep"></span></div>
-  <div class="audctl"><select id="aud-ag" aria-label="${esc(tr('Agent'))}"><option value="">${tr('All agents')}</option></select>
-    <select id="aud-st" aria-label="${esc(tr('Status'))}">${AUD_ST.map(([k, n]) => `<option value="${k}" ${S.aud.st === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>
-    ${dateIn('aud-day', S.aud.day, {label: tr('Day'), empty: tr('All days'), max: today()})}<span class="spacer"></span>
+const audQuery = () => new URLSearchParams(Object.entries({agent_id: S.aud.ag, status: S.aud.st, day: S.aud.day, hide_poll: S.aud.poll ? '1' : ''}).filter(([, v]) => v)).toString();
+const audHtml = () => `<div class="shint">${tr('Every API request made with an agent’s token, never what was sent or read. Denied calls are marked in red.')} <span id="aud-keep"></span></div>
+  <div class="audsum" id="aud-sum" role="status"></div>
+  <div class="audbar"><label class="chkl swl"><span class="swc"><input type="checkbox" id="aud-poll" ${S.aud.poll ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('Hide event polling')}</span></label><span class="spacer"></span>
+    <button type="button" class="btn sm audfbtn" data-aud="filters" aria-expanded="false" aria-controls="aud-ctl">${ic('filter', 's')} ${tr('Filter')}</button>
     <a class="btn sm" id="aud-csv" href="/api/admin/agents/audit?format=csv" download>${ic('download', 's')} CSV</a></div>
-  <div class="audtbl" id="s-aud" role="table" aria-labelledby="s-aud-h"><div class="muted mhint">${tr('Loading…')}</div></div>`;
+  <div class="audctl" id="aud-ctl"><select id="aud-ag" aria-label="${esc(tr('Agent'))}"><option value="">${tr('All agents')}</option></select>
+    <select id="aud-st" aria-label="${esc(tr('Status'))}">${AUD_ST.map(([k, n]) => `<option value="${k}" ${S.aud.st === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>
+    ${dateIn('aud-day', S.aud.day, {label: tr('Day'), empty: tr('All days'), max: today()})}</div>
+  <div class="audtbl" id="s-aud" role="table" aria-label="${esc(tr('Activity log'))}"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 function audRow(r) {
   const d = new Date(r.at), time = d.toLocaleTimeString(LOCALE(), {hour: '2-digit', minute: '2-digit', second: '2-digit'});
   const cls = r.denied ? 'den' : r.status >= 500 ? 'err' : r.status < 400 ? 'ok' : '';
-  const ids = [r.task_id ? tr('Task {0}', '#' + r.task_id) : '', r.list_id ? tr('List {0}', '#' + r.list_id) : ''].filter(Boolean).join(' · ');
+  const ids = [r.task_id ? (r.task_title ? `#${r.task_id} ${r.task_title}` : tr('Task {0}', '#' + r.task_id)) : '', r.list_id ? (r.list_name ? tr('List {0}', r.list_name) : tr('List {0}', '#' + r.list_id)) : ''].filter(Boolean).join(' · ');
   return `<div class="audr ${r.denied ? 'den' : ''}" role="row" data-audid="${r.id}"><span class="audt" role="cell" title="${esc(d.toLocaleString(LOCALE()))}">${esc(time)}${ds(d) === today() ? '' : `<small>${esc(shortDay(ds(d)))}</small>`}</span>
     <span class="auda" role="cell">${esc(r.agent_name)}</span><span class="audrt" role="cell" title="${esc(r.method + ' ' + r.route)}"><b>${esc(r.method)}</b>${esc(r.route)}</span>
-    <span class="auds" role="cell"><span class="audc ${cls}" ${r.denied ? `title="${esc(tr('Denied'))}"` : ''}>${r.status}</span></span><span class="audi" role="cell">${esc(ids || '–')}</span><span class="audd" role="cell">${esc(tr('{0} ms', r.ms))}</span></div>`;
+    <span class="auds" role="cell"><span class="audc ${cls}" ${r.denied ? `title="${esc(tr('Denied'))}"` : ''}>${r.status}</span></span><span class="audi" role="cell" ${ids ? `title="${esc(ids)}"` : ''}>${esc(ids || '–')}</span><span class="audd" role="cell">${esc(tr('{0} ms', r.ms))}</span></div>`;
 }
 function audPaint(md) {
   const box = $('#s-aud', md); if (!box) return;
@@ -10968,6 +11005,8 @@ function audPaint(md) {
   const keep = $('#aud-keep', md); if (keep) keep.textContent = S.aud.days > 0 ? trn('Kept for {0} day.', 'Kept for {0} days.', S.aud.days) : tr('The log is turned off on this server (KALMIDO_AUDIT_DAYS=0).');
   const sel = $('#aud-ag', md);
   if (sel) sel.innerHTML = `<option value="">${tr('All agents')}</option>` + S.aud.agents.map(a => `<option value="${a.id}" ${+S.aud.ag === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('');
+  const sum = $('#aud-sum', md), t = S.aud.today;
+  if (sum) sum.innerHTML = t ? `${ic('chart', 's')}<span>${esc(trn('{0} request today', '{0} requests today', t.requests))}${t.denied ? ` · <button type="button" class="linkbtn audden" data-aud="denied">${esc(trn('{0} denied', '{0} denied', t.denied))}</button>` : ''}${S.aud.poll && t.polls ? ` · <span class="muted">${esc(trn('{0} event poll hidden', '{0} event polls hidden', t.polls))}</span>` : ''}</span>` : '';
   if (S.aud.err) { box.innerHTML = `<div class="muted mhint">${esc(S.aud.err)}</div>`; return; }
   if (!S.aud.rows.length) { box.innerHTML = `<div class="muted mhint">${S.aud.ag || S.aud.st || S.aud.day ? tr('No requests match these filters.') : tr('No agent has called the API yet.')}</div>`; return; }
   box.innerHTML = `<div class="audr audh" role="row"><span class="audt" role="columnheader">${tr('Time')}</span><span class="auda" role="columnheader">${tr('Agent')}</span><span class="audrt" role="columnheader">${tr('Route')}</span><span class="auds" role="columnheader">${tr('Status')}</span><span class="audi" role="columnheader">${tr('Task / list')}</span><span class="audd" role="columnheader">${tr('Duration')}</span></div>`
@@ -10975,31 +11014,62 @@ function audPaint(md) {
 }
 async function audDraw(md, more) {
   if (!$('#s-aud', md)) return;
-  const q = audQuery() + (more && S.aud.next ? (audQuery() ? '&' : '') + 'before=' + S.aud.next : '');
+  const q = audQuery(), lim = 'limit=' + (more ? AUD_MORE : AUD_FIRST);
   try {
-    const j = await api('GET', '/api/admin/agents/audit' + (q ? '?' + q : ''));
+    const j = await api('GET', '/api/admin/agents/audit?' + [q, lim, more && S.aud.next ? 'before=' + S.aud.next : ''].filter(Boolean).join('&'));
     S.aud.rows = more ? [...S.aud.rows, ...j.data] : j.data; S.aud.next = j.next_before; S.aud.agents = j.agents; S.aud.days = j.days; S.aud.err = null;
+    if (j.today) S.aud.today = j.today;
   } catch (e) { S.aud.err = e instanceof Offline ? tr('Only available online.') : e.message; }
   if (md.isConnected) audPaint(md);
 }
 function audWire(md) {
   md.addEventListener('change', e => {
-    const id = e.target.id; if (!['aud-ag', 'aud-st', 'aud-day'].includes(id)) return;
+    const id = e.target.id;
+    if (id === 'aud-poll') { S.aud.poll = e.target.checked; LS.set('audPoll', S.aud.poll ? '1' : '0'); audDraw(md); return; }
+    if (!['aud-ag', 'aud-st', 'aud-day'].includes(id)) return;
     S.aud[{'aud-ag': 'ag', 'aud-st': 'st', 'aud-day': 'day'}[id]] = e.target.value;
     audDraw(md);
   });
-  md.addEventListener('click', e => { if (e.target.closest('[data-aud="more"]')) { e.target.closest('[data-aud]').disabled = true; audDraw(md, true); } });
+  md.addEventListener('click', e => {
+    const b = e.target.closest('[data-aud]'); if (!b) return;
+    if (b.dataset.aud === 'more') { b.disabled = true; audDraw(md, true); }
+    if (b.dataset.aud === 'filters') { const c = $('#aud-ctl', md), on = !c.classList.contains('open'); c.classList.toggle('open', on); b.setAttribute('aria-expanded', on); }
+    if (b.dataset.aud === 'denied') { S.aud.st = 'denied'; S.aud.day = today(); const st = $('#aud-st', md); if (st) st.value = 'denied'; audSetDay(md); audDraw(md); }
+  });
+}
+// the day picker shows S.aud.day after the summary set it
+function audSetDay(md) { const inp = $('#aud-day', md); if (inp) { inp.value = S.aud.day; dpSync(inp); } }
+// 2.5.1 (#393): one card per agent: name, status dot, at most two facts (state · lists), a third line only for a reached
+// limit or a failing webhook, the usage of today / 7 days on the right. Admins: Test / Edit / Pause; others: no actions.
+function agCardHtml(a, adm) {
+  const u = (S.aiu.data?.agents || []).find(x => x.id === a.id), m = S.aiu.data?.cost && S.aiu.m === 'cost' ? 'cost' : 'tokens';
+  const off = !a.enabled, st = off ? 'paused' : agentOffline(a) ? 'offline' : a.limit_reached || a.usage?.reached ? 'error' : a.status || 'idle';
+  const facts = [off ? tr('paused') : agentSt(a), adm ? trn('{0} list', '{0} lists', (a.lists || []).length) : a.running || a.waiting ? [a.running && trn('{0} running', '{0} running', a.running), a.waiting && trn('{0} waiting', '{0} waiting', a.waiting)].filter(Boolean).join(' · ') : ''].filter(Boolean);
+  const more = [a.status_text, adm && a.webhook ? tr('webhook') : adm ? tr('polling only') : '', a.last_event_at ? tr('last event {0}', relTime(a.last_event_at)) : '', a.note].filter(Boolean).join(' · ');
+  const wh = adm && a.webhook && (!a.webhook.enabled || (a.webhook.last && !a.webhook.last.ok)) ? `<small class="agwarn">${tr('webhook')} ${whState(a.webhook)}</small>` : '';
+  const lim = a.usage?.reached || u?.limit_reached ? `<small class="agwarn aiulr">${ic('chart', 's')} ${a.usage ? aiuLimLine(a.usage) : esc(tr('limit reached'))}</small>` : '';
+  const use = u && u.totals.d30.calls ? `<span class="agu" title="${esc(tr('Usage') + ': ' + tr('Today') + ' / ' + tr('7 days'))}"><small class="muted">${tr('Today')}</small> ${esc(aiuVal(u.totals.today, m))}<small class="muted">· ${tr('7 days')}</small> ${esc(aiuVal(u.totals.d7, m))}</span>` : '';
+  return `<div class="mrow agsrow ${off ? 'off' : ''}" data-agid="${a.id}">${av(a.id, a.name)}<span class="n" ${more ? `title="${esc(more)}"` : ''}><span class="agnm"><b>${esc(a.name)}</b>${adm && a.username ? ` <span class="muted">${esc(a.username)}</span>` : ''}</span>
+      <small class="muted agfacts"><i class="adot st-${esc(st)}" aria-hidden="true"></i>${esc(facts.join(' · '))}</small>${lim}${wh}</span>${use}
+    ${adm ? `<span class="agacts"><button class="iconbtn" data-ag="test" title="${tr('Send test')}" aria-label="${tr('Send test')}" ${a.enabled ? '' : 'disabled'}>${ic('send', 's')}</button>
+      <button class="iconbtn" data-ag="edit" title="${tr('Edit')}" aria-label="${tr('Edit')}">${ic('edit', 's')}</button>
+      <button class="iconbtn ${a.enabled ? 'danger' : ''}" data-ag="pause" title="${a.enabled ? tr('Pause (kill switch): its token and webhook stop at once') : tr('Resume')}" aria-label="${a.enabled ? tr('Pause') : tr('Resume')}">${ic(a.enabled ? 'pause' : 'play', 's')}</button></span>` : ''}</div>`;
 }
 async function agDraw(md) {
-  const box = $('#s-ags', md); if (!box) return;
-  let j; try { j = await api('GET', '/api/admin/agents'); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
+  const adm = !!S.me?.is_admin, box = $(adm ? '#s-ags' : '#s-myags', md); if (!box) return;
+  const us = S.aiu.data ? null : aiuLoad();  // the usage of the cards (one request, the Usage tab reuses it)
+  if (!adm) {
+    const ags = S.agents || [];
+    if (!ags.length) { box.innerHTML = `<div class="muted mhint">${tr('No agent works in your lists yet. An admin adds agents; then share a list with one.')}</div>`; return; }
+    box.innerHTML = ags.map(a => agCardHtml(a, false)).join('');
+    if (us) { await us; if (box.isConnected) box.innerHTML = ags.map(a => agCardHtml(a, false)).join(''); }
+    return;
+  }
+  let j; try { [j] = await Promise.all([api('GET', '/api/admin/agents'), us]); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
   box._j = j;
-  box.innerHTML = j.agents.length ? j.agents.map(a => `<div class="mrow ${a.enabled ? '' : 'off'}" data-agid="${a.id}">${av(a.id, a.name)}<span class="n"><b>${esc(a.name)}</b> <span class="muted">${esc(a.username)}</span>
-      <small class="muted">${esc(a.enabled ? agentSt(a) : tr('paused'))}${a.status_text ? ' · ' + esc(a.status_text) : ''} · ${esc(trn('{0} list', '{0} lists', a.lists.length))} · ${a.webhook ? esc(tr('webhook')) + ' ' + whState(a.webhook) : esc(tr('polling only'))}${a.last_event_at ? ' · ' + esc(tr('last event {0}', relTime(a.last_event_at))) : ''}</small>${a.note ? `<small class="muted">${esc(a.note)}</small>` : ''}${a.usage ? `<small class="muted ${a.usage.reached ? 'aiulr' : ''}">${ic('chart', 's')} ${aiuLimLine(a.usage)}</small>` : ''}</span>
-      <button class="iconbtn" data-ag="test" title="${tr('Send test')}" aria-label="${tr('Send test')}" ${a.enabled ? '' : 'disabled'}>${ic('send', 's')}</button>
-      <button class="iconbtn" data-ag="edit" title="${tr('Edit')}" aria-label="${tr('Edit')}">${ic('edit', 's')}</button>
-      <button class="iconbtn ${a.enabled ? 'danger' : ''}" data-ag="pause" title="${a.enabled ? tr('Pause (kill switch): its token and webhook stop at once') : tr('Resume')}" aria-label="${a.enabled ? tr('Pause') : tr('Resume')}">${ic(a.enabled ? 'pause' : 'play', 's')}</button></div>`).join('')
-    : `<div class="muted mhint">${tr('No agents yet.')}</div>`;
+  if (!box.isConnected) return;
+  box.innerHTML = j.agents.length ? j.agents.map(a => agCardHtml(a, true)).join('') : `<div class="muted mhint">${tr('No agents yet.')}</div>`;
+  const ex = $('.aiexp', md); if (ex && j.agents.length) ex.open = false;  // the explanation stays open only while there is no agent
 }
 function agWire(md) {
   md.addEventListener('click', async e => {
@@ -11127,28 +11197,32 @@ async function aiuLoad() {
   catch (e) { S.aiu.err = e instanceof Offline ? tr('Only available online.') : e.message; }
   return S.aiu.data;
 }
+// 2.5.1 (#393): one summary card per agent (today / 7 days / 30 days, the limit as a bar for admins); the chart, the top 5
+// tasks, the lists and the models behind "Details" (closed unless opened in this session)
 function aiuHtml(j, w) {
   if (!j) return `<div class="muted mhint">${esc(S.aiu.err || tr('Loading…'))}</div>`;
   if (!j.agents.length) return `<div class="muted mhint">${tr('No agent works in your lists yet. An admin adds agents; then share a list with one.')}</div>`;
   const m = j.cost && S.aiu.m === 'cost' ? 'cost' : 'tokens', v = x => aiuVal(x, m), num = x => m === 'cost' ? (+x.cost || 0) : x.tokens;
   const any = j.agents.some(a => a.totals.d30.calls);
-  const ctl = `<div class="aiuctl"><select id="aiu-ag" aria-label="${esc(tr('Agent'))}"><option value="">${tr('All agents')}</option>${j.agents.map(a => `<option value="${a.id}" ${+S.aiu.aid === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select>
-    ${j.cost ? `<div class="seg" role="group" aria-label="${esc(tr('Show'))}"><button type="button" class="${m === 'tokens' ? 'on' : ''}" data-aiu-m="tokens" aria-pressed="${m === 'tokens'}">${tr('Tokens')}</button><button type="button" class="${m === 'cost' ? 'on' : ''}" data-aiu-m="cost" aria-pressed="${m === 'cost'}">${tr('Cost')}</button></div>` : ''}</div>`;
-  const tbl = `<div class="aiutbl" role="table" aria-label="${esc(tr('Usage per agent'))}"><div class="aiur aiuh" role="row"><span role="columnheader">${tr('Agent')}</span><span role="columnheader">${tr('Today')}</span><span role="columnheader">${tr('7 days')}</span><span role="columnheader">${tr('30 days')}</span></div>
-    ${j.agents.map(a => `<div class="aiur ${a.limit_reached ? 'lim' : ''}" role="row" data-aiu-agent="${a.id}"><span class="aiun" role="cell">${av(a.id, a.name)}<span><b>${esc(a.name)}</b>${a.limit_reached ? `<small class="aiulr">${tr('limit reached')}</small>` : ''}${j.admin && a.limit ? `<small class="muted">${aiuLimLine(a.limit)}</small>` : ''}</span></span>
-      ${['today', 'd7', 'd30'].map(k => `<span role="cell" class="aiuv" title="${esc(tr('{0} tokens', (a.totals[k].tokens || 0).toLocaleString(LOCALE())) + ' · ' + tr('input {0}, output {1}, cache writes {2}, cache reads {3}', fmtTok(a.totals[k].input), fmtTok(a.totals[k].output), fmtTok(a.totals[k].cache_write), fmtTok(a.totals[k].cache_read)) + (a.totals[k].cost !== null ? ' · ' + fmtUsd(a.totals[k].cost) : ''))}">${esc(v(a.totals[k]))}</span>`).join('')}</div>`).join('')}</div>`;
-  if (!any) return ctl + tbl + `<div class="shint">${tr('No usage reported yet. Agents report it through the API (POST /api/v1/agent/usage), the MCP tool report_usage or the Claude Code hook in mcp/claude_usage_hook.py.')}</div>`;
+  const seg = j.cost ? `<div class="aiuctl"><div class="seg" role="group" aria-label="${esc(tr('Show'))}"><button type="button" class="${m === 'tokens' ? 'on' : ''}" data-aiu-m="tokens" aria-pressed="${m === 'tokens'}">${tr('Tokens')}</button><button type="button" class="${m === 'cost' ? 'on' : ''}" data-aiu-m="cost" aria-pressed="${m === 'cost'}">${tr('Cost')}</button></div></div>` : '';
+  const limBar = l => { const pct = l.hard_pct ?? l.soft_pct; return `<div class="aiulim">${pct !== null && pct !== undefined ? `<span class="aiub ${pct >= 100 ? 'full' : pct >= 80 ? 'warn' : ''}"><i style="width:${Math.max(2, Math.min(100, Math.round(pct)))}%"></i></span>` : ''}<small class="muted">${aiuLimLine(l)}</small></div>`; };
+  const cards = `<div class="aiusums" role="list" aria-label="${esc(tr('Usage per agent'))}">${j.agents.map(a => `<div class="aiusum ${a.limit_reached ? 'lim' : ''}" role="listitem" data-aiu-agent="${a.id}"><div class="aiun">${av(a.id, a.name)}<b>${esc(a.name)}</b>${a.limit_reached ? `<small class="aiulr">${tr('limit reached')}</small>` : ''}</div>
+      <div class="aiuk">${[['today', tr('Today')], ['d7', tr('7 days')], ['d30', tr('30 days')]].map(([k, n]) => `<span title="${esc(tr('{0} tokens', (a.totals[k].tokens || 0).toLocaleString(LOCALE())) + ' · ' + tr('input {0}, output {1}, cache writes {2}, cache reads {3}', fmtTok(a.totals[k].input), fmtTok(a.totals[k].output), fmtTok(a.totals[k].cache_write), fmtTok(a.totals[k].cache_read)) + (a.totals[k].cost !== null ? ' · ' + fmtUsd(a.totals[k].cost) : ''))}"><small class="muted">${n}</small><b class="aiuv">${esc(v(a.totals[k]))}</b></span>`).join('')}</div>
+      ${j.admin && a.limit ? limBar(a.limit) : ''}</div>`).join('')}</div>`;
+  if (!any) return seg + cards + `<div class="shint">${tr('No usage reported yet. Agents report it through the API (POST /api/v1/agent/usage), the MCP tool report_usage or the Claude Code hook in mcp/claude_usage_hook.py.')}</div>`;
   const fmt = x => m === 'cost' ? fmtUsd(x) : fmtTok(x);
-  const days = j.per_day, vals = days.map(num);
-  const chart = barChart(vals, days.map(x => w && w < 480 ? String(pd(x.day).getDate()) : shortDay(x.day)), {fmt, w, tip: i => `${shortDay(days[i].day)}: ${fmt(vals[i])}`, label: m === 'cost' ? tr('Cost per day') : tr('Tokens per day')});
-  const max = Math.max(...j.tasks.map(num), 0) || 1;
-  const tasks = j.tasks.length ? `<div class="aiutasks">${j.tasks.map(t => `<div class="aiut">${t.task_id ? `<button type="button" class="runtask" data-aiu-open="${t.task_id}">${ic('arrow', 's')}<span>${esc(t.title || '')}</span></button>` : `<span class="muted">${tr('Tasks you cannot see')}</span>`}<span class="aiub"><i style="width:${Math.max(2, Math.round(100 * num(t) / max))}%"></i></span><span class="aiuv">${esc(fmt(num(t)))}</span></div>`).join('')}</div>`
+  const days = j.per_day, vals = days.map(num), labs = days.map(x => w && w < 480 ? String(pd(x.day).getDate()) : shortDay(x.day));
+  const chart = barChart(vals, labs, {fmt, w, lw: Math.max(...labs.map(x => x.length)) * 7 + 12, tip: i => `${shortDay(days[i].day)}: ${fmt(vals[i])}`, label: m === 'cost' ? tr('Cost per day') : tr('Tokens per day')});
+  const top = j.tasks.slice(0, 5), max = Math.max(...top.map(num), 0) || 1;
+  const tasks = top.length ? `<div class="aiutasks">${top.map(t => `<div class="aiut">${t.task_id ? `<button type="button" class="runtask" data-aiu-open="${t.task_id}">${ic('arrow', 's')}<span>${esc(t.title || '')}</span></button>` : `<span class="muted">${tr('Tasks you cannot see')}</span>`}<span class="aiub"><i style="width:${Math.max(2, Math.round(100 * num(t) / max))}%"></i></span><span class="aiuv">${esc(fmt(num(t)))}</span></div>`).join('')}</div>`
     : `<div class="muted stempty">${tr('Nothing in this period.')}</div>`;
   const lname2 = l => l.list_id ? (listById(l.list_id) ? lname(listById(l.list_id)) : l.name || '') : l.hidden ? tr('Lists you cannot see') : tr('No list');
-  return ctl + tbl + `<h5>${m === 'cost' ? tr('Cost per day') : tr('Tokens per day')} · ${tr('30 days')}</h5>${chart}
+  return seg + cards + `<details class="aiudet" id="aiu-det" ${S.aiu.open ? 'open' : ''}><summary>${tr('Details')}</summary>
+    ${j.agents.length > 1 ? `<div class="aiuctl"><select id="aiu-ag" aria-label="${esc(tr('Agent'))}"><option value="">${tr('All agents')}</option>${j.agents.map(a => `<option value="${a.id}" ${+S.aiu.aid === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select></div>` : ''}
+    <h5>${m === 'cost' ? tr('Cost per day') : tr('Tokens per day')} · ${tr('30 days')}</h5>${chart}
     <h5>${tr('Top tasks')}</h5>${tasks}
     <h5>${tr('Per list')}</h5>${hbarChart(j.lists.map(l => ({name: lname2(l), v: num(l)})).filter(x => x.v), {fmt, w, label: tr('Per list')})}
-    ${j.models.length > 1 ? `<h5>${tr('Per model')}</h5>${hbarChart(j.models.map(x => ({name: x.model, v: num(x)})).filter(x => x.v), {fmt, w, label: tr('Per model')})}` : ''}`;
+    ${j.models.length > 1 ? `<h5>${tr('Per model')}</h5>${hbarChart(j.models.map(x => ({name: x.model, v: num(x)})).filter(x => x.v), {fmt, w, label: tr('Per model')})}` : ''}</details>`;
 }
 async function aiuDraw(md) {
   const box = $('#s-aiu', md); if (!box) return;
@@ -11159,6 +11233,7 @@ async function aiuDraw(md) {
 }
 function aiuWire(root, redraw) {
   root.addEventListener('change', e => { if (e.target.id === 'aiu-ag') { S.aiu.aid = e.target.value; redraw(); } });
+  root.addEventListener('toggle', e => { if (e.target.id === 'aiu-det') S.aiu.open = e.target.open; }, true);  // 2.5.1: Details stays open on a redraw
   root.addEventListener('click', async e => {
     const o = e.target.closest('[data-aiu-open]');
     if (o) {  // a top task: close the dialog, open the task (fetched when it is not in the state, e.g. completed long ago)
@@ -11573,11 +11648,11 @@ function codeHtml(t) {
   const repos = listRepos(t.list_id), c = t.code || {prs: [], commits: []};
   const a = agentOnIt(t);
   const prs = c.prs.map(prRow).join(''), cms = c.commits.map(commitRow).join('');
-  const hint = !prs && !cms ? `<div class="muted ghint">${esc(tr('Nothing linked yet: mention #{0} in a commit or pull request, or name the branch {1}.', t.id, `kalmido-${t.id}-…`))}</div>` : '';
+  const hint = !prs && !cms ? `<div class="muted ghint">${esc(tr('Nothing linked yet: mention #{0} in a commit or pull request, or name the branch {1}.', t.id, `kalmido-${t.id}`))}</div>` : '';
   return `<div class="dsec gitsec" id="d-code"><h5>${tr('Code')}${repos.length ? ` <span class="muted h5note">${esc(repos.map(r => r.full_name).join(', '))}</span>` : ''}${repos.length ? `<button class="iconbtn gref" data-act="git-refresh" data-lid="${t.list_id}" title="${esc(tr('Check the repository now'))}" aria-label="${esc(tr('Check the repository now'))}">${ic('sync', 's')}</button>` : ''}</h5>
     ${a ? `<div class="gitagent" role="status">${ic('bot', 's')}<span>${esc(tr('{0} is working on it', a.name))}</span>${a.status_text ? `<span class="muted">· ${esc(a.status_text)}</span>` : ''}</div>` : ''}${prs ? `<div class="gitl">${prs}</div>` : ''}${cms ? `<div class="gitl">${cms}</div>` : ''}${hint}${repos.length ? `<button class="linkbtn gbranch" data-act="git-branch" data-id="${t.id}" title="${esc(tr('Copy a branch name for this task'))}">${ic('copy', 's')}<code>${esc(gitBranch(t))}</code></button>` : ''}</div>`;
 }
-const gitBranch = t => `kalmido-${t.id}-${(String(t.title || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40).replace(/-+$/, '')) || 'task'}`;
+const gitBranch = t => `kalmido-${t.id}`;  // 2.5.1 (#396): the id only, no title part (old <prefix>-<id>-slug branches still match)
 async function gitCopyBranch(t) {
   try { await navigator.clipboard.writeText(gitBranch(t)); toast(tr('Copied: {0}', gitBranch(t))); } catch { toast(gitBranch(t)); }
 }

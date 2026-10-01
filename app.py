@@ -20410,6 +20410,7 @@ AUDIT_FLUSH_S = 2.0
 AUDIT_PAGE, AUDIT_PAGE_MAX, AUDIT_CSV_MAX = 100, 500, 20000
 AUDIT_DENIED = (401, 403, 429)
 AUDIT_STATUS = ("2xx", "3xx", "4xx", "5xx", "denied")
+AUDIT_POLL = ("GET", "/api/v1/agent/events")            # 2.5.1 (#393): event polling, hidden in the web log by default (hide_poll=1)
 _AUDIT = {"rows": [], "lock": threading.Lock(), "wlock": threading.Lock(), "thread": None, "clean_at": 0.0}
 _AUDIT_EVT = threading.Event()
 _RULE_ARG = re.compile(r"<(?:[^:<>]+:)?([^<>]+)>")
@@ -20512,6 +20513,9 @@ def audit_query(c, a, aid=None, csv_out=False):
             raise BadInput(tr("Invalid value: {0}", "day"))
         where.append("day=?")
         args.append(a.get("day"))
+    if a.get("hide_poll") in ("1", "true"):  # 2.5.1 (#393): without the event polling (most of the rows)
+        where.append("NOT (method=? AND route=?)")
+        args += list(AUDIT_POLL)
     before = a.get("before") or a.get("cursor")
     if before and not csv_out:
         where.append("id<?")
@@ -20551,7 +20555,9 @@ def audit_csv(rows, names, aid=None):
 @app.get("/api/admin/agents/<int:aid>/audit")
 def admin_agents_audit(aid=None):
     """The audit log (admins): ?agent_id= (all agents: the first route), status= 2xx|3xx|4xx|5xx|denied, day=YYYY-MM-DD,
-    before= (id of the last row seen), limit= 1-500 (default 100), format=csv (up to AUDIT_CSV_MAX rows, all pages)."""
+    hide_poll=1 (2.5.1: without GET /api/v1/agent/events), before= (id of the last row seen), limit= 1-500 (default 100),
+    format=csv (up to AUDIT_CSV_MAX rows, all pages). JSON rows carry task_title / list_name where the admin sees them,
+    the first page `today` {requests, denied, polls}."""
     c = db()
     if aid is not None:
         need_agent_admin(c, aid)
@@ -20562,8 +20568,34 @@ def admin_agents_audit(aid=None):
     names = audit_names(c)
     if csv_out:
         return audit_csv(rows, names, aid or request.args.get("agent_id"))
-    return jsonify(data=[audit_dict(r, names) for r in rows], next_before=rows[-1]["id"] if more and rows else None,
-                   agents=[{"id": k, "name": v} for k, v in sorted(names.items())], days=AUDIT_DAYS, statuses=list(AUDIT_STATUS))
+    data = [audit_dict(r, names) for r in rows]
+    # 2.5.1 (#393): task / list titles for the rows, only where the viewing admin sees that task / list themselves
+    uid, tt, ln = me(), {}, {}
+    for d in data:
+        tid, lid = d["task_id"], d["list_id"]
+        if tid and tid not in tt:
+            tt[tid] = None
+            if task_visible(c, tid, uid):
+                r = c.execute("SELECT title FROM tasks WHERE id=?", (tid,)).fetchone()
+                tt[tid] = r["title"] if r else None
+        if lid and lid not in ln:
+            ln[lid] = None
+            if list_role(c, lid, uid):
+                r = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()
+                ln[lid] = r["name"] if r else None
+        d["task_title"], d["list_name"] = tt.get(tid) if tid else None, ln.get(lid) if lid else None
+    out = dict(data=data, next_before=rows[-1]["id"] if more and rows else None,
+               agents=[{"id": k, "name": v} for k, v in sorted(names.items())], days=AUDIT_DAYS, statuses=list(AUDIT_STATUS))
+    if not request.args.get("before"):  # 2.5.1 (#393): today's summary (the selected agent), polling counted apart
+        w, wa = "day=?", [local_now().date().isoformat()]
+        sel = aid if aid is not None else (as_int(request.args["agent_id"], "agent_id", 1) if request.args.get("agent_id") else None)
+        if sel is not None:
+            w += " AND agent_id=?"
+            wa.append(sel)
+        r = c.execute(f"""SELECT COUNT(*) n, COALESCE(SUM(status IN ({','.join(map(str, AUDIT_DENIED))})), 0) den,
+                                 COALESCE(SUM(method=? AND route=?), 0) poll FROM agent_audit WHERE {w}""", (*AUDIT_POLL, *wa)).fetchone()
+        out["today"] = {"requests": r["n"], "denied": r["den"], "polls": r["poll"]}
+    return jsonify(**out)
 
 
 @app.get("/api/v1/admin/agents/<int:aid>/audit")
@@ -21323,7 +21355,7 @@ def checklist_action(lid):
 # check runs of at most GIT_CI pull request heads whose CI is unknown / pending / changed. Every request goes through the SSRF
 # guard of the calendar subscriptions (internal hosts only where an admin allowed them), no redirects are followed.
 # MATCHING (only tasks of the connected list): "#<task id>" in a commit message, pull request title or body; branch names
-# kalmido-<id>..., task-<id>..., <id>-slug (the last path segment). Only linked pull requests / commits are stored.
+# kalmido-<id> / kalmido-<id>-..., task-<id>..., <id>-slug (the last path segment; older suggestions had a title slug). Only linked pull requests / commits are stored.
 # KEYWORDS: "fixes / closes / resolves #<id>" (also fix / fixed, close / closed, resolve / resolved, German "erledigt") in a
 # MERGED pull request (title / body) or a commit on the default branch that came after the connection was made complete the
 # task, once per task (git_closes; the activity names the pull request / commit, "Undo" reopens it).
@@ -21331,7 +21363,7 @@ def checklist_action(lid):
 # Gitea / Forgejo (X-Gitea-Signature / X-Forgejo-Signature) HMAC-SHA256 of a per-connection secret only triggers the next
 # poll at once; its body is never trusted.
 # #339: an agent assigned to a task in such a list gets the repository in its task events (data.repo: provider, URLs,
-# owner / repo, default branch, a suggested branch kalmido-<id>-<slug>, the linked pull requests + CI); when its pull request
+# owner / repo, default branch, a suggested branch kalmido-<id> (2.5.1, #396: no title part), the linked pull requests + CI); when its pull request
 # is ready it posts a comment with suggestion {kind: "merge_request", pr_url, summary} (MCP request_merge_approval): 👍 / 👎
 # by an approver (list owner / admin, the assignee, an instance admin) sets it approved / rejected and sends the agent the
 # usual "reaction" event with approval + merge_request. Kalmido never merges anything: the agent does, with its own credentials.
@@ -21395,11 +21427,6 @@ def git_urls(provider, base):
     if provider == "github":
         return ("https://api.github.com", "https://github.com") if not base else (base + "/api/v3", base)
     return base + "/api/v1", base
-
-
-def git_slug(title, n=40):
-    s = re.sub(r"[^a-z0-9]+", "-", unicodedata.normalize("NFKD", str(title or "")).encode("ascii", "ignore").decode().lower()).strip("-")
-    return s[:n].rstrip("-") or "task"
 
 
 def git_ids(text):
@@ -21789,7 +21816,7 @@ def git_repo_for_task(c, t):
     first = git_public(c, rows[0])
     code = git_code_for(c, [t["id"]]).get(t["id"], {"prs": [], "commits": []})
     d = {k: first[k] for k in ("provider", "base_url", "web_url", "owner", "repo", "full_name", "default_branch")}
-    d.update(api_url=git_urls(rows[0]["provider"], rows[0]["base_url"])[0], branch=f"kalmido-{t['id']}-{git_slug(t['title'])}",
+    d.update(api_url=git_urls(rows[0]["provider"], rows[0]["base_url"])[0], branch=f"kalmido-{t['id']}",
              prs=code["prs"], commits=code["commits"])
     if len(rows) > 1:
         d["others"] = [{k: x[k] for k in ("provider", "web_url", "full_name", "default_branch")} for x in (git_public(c, y) for y in rows[1:])]

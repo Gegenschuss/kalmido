@@ -63,7 +63,7 @@ async function firefox(fn) {
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v(68|69)'/.test(SW), 'service worker cache v68 (2.5.0: v69)');
+  check(/const CACHE = 'tasks-shell-v((68|69)|70)'/.test(SW), 'service worker cache v68 (2.5.0: v69, 2.5.1: v70)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en'});
@@ -148,7 +148,7 @@ async function firefox(fn) {
   let copied = null; Object.defineProperty(w.navigator, 'clipboard', {configurable: true, value: {writeText: async x => { copied = x; }}});
   w.eval(`taskMenu(document.querySelector('#top h1'), ${TB})`); await sleep(150);
   click(w, [...d.querySelectorAll('#pop .menu-list button')].find(b => /Link code/.test(b.textContent))); await sleep(200);
-  check(new RegExp(`^kalmido-${TB}-bob-s-other-task$`).test(copied || ''), 'Link code…: copies the branch name ' + copied);
+  check(new RegExp(`^kalmido-${TB}$`).test(copied || ''), 'Link code…: copies the branch name kalmido-<id> (2.5.1, #396) ' + copied);
   for (const [set, lab] of [[`taskById(${TB}).ttype = 'bug'`, 'bug'], [`taskById(${TB}).ttype = 'feature'`, 'feature'], [`taskById(${TB}).assignee_id = ${ag.id}`, 'agent assignee'], [`taskById(${TB}).code = {prs: [{n: 3, state: 'open', title: 'x', url: 'https://example.com/p/3'}], commits: []}`, 'linked pull request']]) {
     w.eval(`taskById(${TB}).ttype = ''; taskById(${TB}).assignee_id = ${BOB}; taskById(${TB}).code = {prs: [], commits: []}; ${set}; renderDetail()`);
     ml = await menuLabels();
@@ -183,13 +183,14 @@ async function firefox(fn) {
   // ================= #391 share block
   const ag2 = await call('POST', '/api/admin/agents', {username: 'helper', display_name: 'Helper'});
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  w.eval(`settingsModal('ai')`); await sleep(1200);
+  w.eval(`settingsModal('ai')`); await sleep(500);
+  click(w, d.querySelector('.modal.smodal [data-aisub="lists"]')); await sleep(1200);  // 2.5.1 (#393): the sub-tab Lists
   let pane = d.querySelector('.modal.smodal [data-pane="ai"]');
   check(pane && !pane.querySelector('[data-m="ai-share"]') && !/Share a list with an agent/.test(pane.textContent), 'no "Share a list with an agent…" button');
   let rows = [...pane.querySelectorAll('#s-ai-share [data-aisag]')];
   check(rows.length === 2 && rows.every(r => r.querySelector('[data-aisall]') && r.querySelector('[data-aisauto]')), 'a row per agent with both actions');
   const hr = () => pane.querySelector(`#s-ai-share [data-aisag="${ag2.id}"]`);
-  check(/3 of your lists do not see it yet/.test(hr()?.textContent || ''), 'helper: 3 lists missing: ' + hr()?.textContent);
+  check(/sees 0 of your 3 lists/.test(hr()?.textContent || ''), 'helper: sees 0 of 3 (2.5.1): ' + hr()?.textContent);
   let asked = []; w.confirm = m => { asked.push(m); return false; };
   click(w, hr().querySelector('[data-aisall]')); await sleep(600);
   check(asked.length === 1 && /private ones too/.test(asked[0]) && /Never the inbox/.test(asked[0]), 'Share all: a warning first');
@@ -198,7 +199,7 @@ async function firefox(fn) {
   click(w, hr().querySelector('[data-aisall]')); await sleep(1500);
   const st = await call('GET', '/api/state');
   check([L, F1, F2].every(id => st.lists.find(l => l.id === id).members.some(m => m.user_id === ag2.id && m.role === 'edit')), 'accepted: all own lists shared (role edit)');
-  check(/Sees all of your lists/.test(hr()?.textContent || '') && hr().querySelector('[data-aisall]').disabled, 'row: sees all, button off');
+  check(/sees 3 of your 3 lists/.test(hr()?.textContent || '') && hr().querySelector('[data-aisall]').disabled, 'row: sees all, button off');
   const sw = hr().querySelector('[data-aisauto]');
   w.confirm = m => { asked.push(m); return false; };
   sw.checked = true; sw.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(600);
@@ -231,9 +232,10 @@ async function firefox(fn) {
   w = await boot({user: 'alice', hash: 't/' + T}); d = w.document;
   await until(() => d.querySelector('#d-tl [data-act="tl-order"]'));
   check(/Älteste zuerst/.test(d.querySelector('#d-tl [data-act="tl-order"]').textContent), 'German: "Älteste zuerst"');
-  w.eval(`settingsModal('ai')`); await sleep(1200);
+  w.eval(`settingsModal('ai')`); await sleep(500);
+  click(w, d.querySelector('.modal.smodal [data-aisub="lists"]')); await sleep(1200);
   pane = d.querySelector('.modal.smodal [data-pane="ai"]');
-  check(/Installationshilfe/.test(pane.textContent) && /Alle bestehenden Listen teilen/.test(pane.textContent) && /Neue Listen automatisch teilen/.test(pane.textContent), 'German: Installationshilfe, share block');
+  check(/Installationshilfe/.test(pane.textContent) && /Alle teilen/.test(pane.querySelector('#s-ai-share').textContent) && /Neue Listen automatisch/.test(pane.textContent) && /sieht \d von deinen \d Listen/.test(pane.textContent), 'German: Installationshilfe, share block');
   click(w, pane.querySelector('[data-m="ag-guide"]')); await sleep(400);
   check(/KI-Kollegen einrichten/.test(d.querySelector('.modal.agguide')?.textContent || '') && /Selbst einrichten/.test(d.querySelector('.modal.agguide').textContent), 'German: setup guide');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
@@ -263,7 +265,7 @@ async function firefox(fn) {
       const m2 = await fit('#pop');
       check(good(m2) && await ev(`!!document.querySelector('#pop .mcard')`), `${W}px: the mention card fits ${JSON.stringify(m2)}`);
       await shot(`p242-card-${W}.png`);
-      await ev(`closePop(); closeDetail(); settingsModal('ai')`); await sleep(1500);
+      await ev(`closePop(); closeDetail(); settingsModal('ai'); document.querySelector('.smodal [data-aisub="lists"]').click()`); await sleep(1500);
       await ev(`document.querySelector('#s-ai-share').scrollIntoView()`); await sleep(200);
       const m3 = await fit('#s-ai-share');
       check(good(m3, false), `${W}px: the share block fits ${JSON.stringify(m3)}`);

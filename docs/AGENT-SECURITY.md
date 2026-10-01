@@ -53,7 +53,7 @@ These hold no matter what the model decides:
 - **Usage limits.** A hard limit answers **429** to every call (except reporting usage and status) until the period rolls
   over or an admin raises it.
 - **Audit log (2.2.1).** Every request made with an agent's token is logged: time, method, route template, status, task /
-  list id and duration, never bodies or query values. Settings > AI colleague > *Activity log* (admins) filters by agent,
+  list id and duration, never bodies or query values. Settings > AI colleague > *Log* (admins) filters by agent,
   status class and day and exports CSV; denied calls (401 / 403 / 429) are marked. Retention: `KALMIDO_AUDIT_DAYS`
   (default 90, `0` = off). API: `GET /api/admin/agents/{id}/audit`, `GET /api/v1/admin/agents/{id}/audit` (scope
   *admin-read*).

@@ -212,6 +212,11 @@ fresh; run p208_ui node p208_ui.js
        run p242_ui node p242_ui.js "$KALMIDO_TEST_DATA"
 # 2.5.0: the app name Kalmido in the web app, the API, backups and the KALMIDO_* configuration (own containers)
        run p250_rename "$PY" p250_rename_test.py "$KALMIDO_TEST_DATA"
+# 2.5.1: the agents' log for the sub-tab Log (hide_poll, today's summary, titles only where visible) and the branch suggestion
+# kalmido-<id> against the fake GitHub (own container); then Settings > AI colleague in sub-tabs (#393) and clickable comment
+# avatars (#395) in jsdom and Firefox (390 x 844, 1280 x 800)
+       run p251_api "$PY" p251_api_test.py "$KALMIDO_TEST_DATA"
+       run p251_ui node p251_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

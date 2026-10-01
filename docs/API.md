@@ -202,7 +202,7 @@ listed (name, type, size) but not transferred through the API.
 requests `[{repo, n, title, state: open | merged | closed, ci: success | failure | pending | null, author, url, branch}]`,
 open first, and the latest commits `[{repo, sha, short, message, author, url, branch, at}]`, at most 5 each) and `repo`
 (the list's first repository: `provider`, `base_url`, `web_url`, `api_url`, `owner`, `repo`, `full_name`,
-`default_branch`, a suggested `branch` `kalmido-<id>-<slug>`, `prs`, `commits`, and `others` when the list has more).
+`default_branch`, a suggested `branch` `kalmido-<id>`, `prs`, `commits`, and `others` when the list has more).
 Tasks in `GET /tasks` carry `code` when something is linked. See *Git integration* in the README.
 
 ## Roadmap

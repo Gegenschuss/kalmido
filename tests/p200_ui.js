@@ -169,7 +169,7 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
   w.eval(`settingsModal('agents')`);
   let agrow;  // (CI timing) wait for the agent list of the AI colleague tab
   for (let i = 0; i < 50 && !agrow; i++) { await sleep(200); agrow = d.querySelector('#s-ags [data-agid]'); }
-  check(agrow && /Claude/.test(agrow.textContent) && /polling only/.test(agrow.textContent), 'AI colleague > Agents lists the agent');
+  check(agrow && /Claude/.test(agrow.textContent) && /polling only/.test(agrow.querySelector('.n')?.title || ''), 'AI colleague > Agents lists the agent (2.5.1: details in the tooltip)');
   d.querySelector('[data-ag="new"]').click(); await sleep(300);
   d.querySelector('#ag-user').value = 'robo'; d.querySelector('#ag-name').value = 'Robo';
   d.querySelector('.modal:last-of-type [data-m="ok"]').click(); await sleep(1200);

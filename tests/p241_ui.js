@@ -58,7 +58,7 @@ async function firefox(fn) {
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v6[7-9]'/.test(SW), 'service worker cache v67 (2.4.2: v68, 2.5.0: v69)');
+  check(/const CACHE = 'tasks-shell-v(6[7-9]|70)'/.test(SW), 'service worker cache v67 (2.4.2: v68, 2.5.0: v69, 2.5.1: v70)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en'});
@@ -121,7 +121,8 @@ async function firefox(fn) {
   check(/Helper turns long/.test(d.querySelector('#l-tidyrow .lhint')?.textContent || ''), 'hint names the tidy agent');
   w.close();
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  w.eval(`settingsModal('ai')`); await sleep(1000);
+  w.eval(`settingsModal('ai')`); await sleep(500);
+  click(w, d.querySelector('.smodal [data-aisub="lists"]')); await sleep(1000);  // 2.5.1 (#393): the sub-tab Lists
   const row = d.querySelector(`#s-ai-tbl .airow[data-lid="${L}"]`);
   sel = row?.querySelector('select[data-aitidyag]');
   check(sel && sel.value === String(ag2.id) && [...sel.options].length === 2, 'AI colleague table: Tidy up by select');

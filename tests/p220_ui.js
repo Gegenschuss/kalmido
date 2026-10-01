@@ -39,7 +39,7 @@ const taskOf = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v6[3-9]'/.test(SW), 'service worker cache v63 (2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69)');
+  check(/const CACHE = 'tasks-shell-v(6[3-9]|70)'/.test(SW), 'service worker cache v63 (2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en'});
@@ -71,7 +71,7 @@ const taskOf = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)
     check(rows.length === 2 && /Fix login/.test(rows[0].textContent) && /open/.test(rows[0].querySelector('.gst')?.textContent || '') && rows[0].querySelector('.ci-failure')
       && rows[0].getAttribute('href') === `${GH}/acme/app/pull/5` && rows[0].target === '_blank', `${lab}: the pull request row with state + CI`);
     check(rows[1] && /c0ffee1/.test(rows[1].textContent) && /Refactor login/.test(rows[1].textContent), `${lab}: the commit row`);
-    check(sec && /kalmido-\d+-login-broken/.test(sec.querySelector('.gbranch')?.textContent || ''), `${lab}: branch name button`);
+    check(sec && /^kalmido-\d+$/.test((sec.querySelector('.gbranch')?.textContent || '').trim()), `${lab}: branch name button`);
     const order = [...d.querySelectorAll('#detail .dsec')].map(x => x.id || x.className);
     const ic = order.indexOf('d-code'), it = order.findIndex(x => x === 'd-tl'), iti = order.findIndex(x => /fields/.test(x));
     check(ic > iti && (it < 0 || ic < it), `${lab}: Code after the fields, before the comments: ${order.join(',')}`);
