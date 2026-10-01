@@ -16,14 +16,14 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.7.2** (2026-10-01): Personal agents with setup guides for Linux, macOS and Windows, reactions and delivery status in
+  the agent chat, clickable people, breadcrumbs in the task panel and "Show completed at the bottom" for every list.
 - **2.7.1** (2026-10-01): A *Project overview* in every project: description, key links, milestones, project files,
   members, status updates and the tracked time in one place.
 - **2.7.0** (2026-10-01): Reminders up to a year ahead with deadlines, reminders that repeat until done, time sums in
   hours and days, steady layout on foldables, a simpler first start and a resizable News dropdown.
 - **2.6.1** (2026-10-01): Date and reminder changes save at once with Undo, a status dot per agent in the header, the
   bell opens the newest News in place, a per-event choice for a list's bell and filter chips for News.
-- **2.6.0** (2026-10-01): A header that keeps the title, "…" and the bell on every screen, a separate Share dialog,
-  "not connected" agents, one name "Agents", bigger touch targets, better contrast and one date format.
 
 All changes: [CHANGELOG.md](CHANGELOG.md) · [GitHub Releases](https://github.com/Gegenschuss/kalmido/releases)
 
@@ -101,9 +101,9 @@ All changes: [CHANGELOG.md](CHANGELOG.md) · [GitHub Releases](https://github.co
 - **Own date and time pickers** in the app language: a small month grid (the week starts on your locale's first day)
   and hours / minutes you can also type (`930`, `9:30 pm`, `21 Uhr`); keyboard and touch friendly
 - **Templates**: save a task with its subtasks, or a whole list with sections, and reuse it with dates relative to today
-- **List types**: *List*, *Shopping & packing list* (what you tick off stays at the bottom and comes back with one
-  tap) or *Project* (time tracking, dependencies with the Gantt timeline, custom fields, progress and status for that
-  list only). Set it in the list dialog or the list's menu; plain lists stay free of project controls (the repository
+- **List types**: *List* or *Project* (time tracking, dependencies with the Gantt timeline, custom fields, progress and
+  status for that list only). Every list can **show completed at the bottom** (what you tick off stays there and comes
+  back with one tap: shopping and packing lists). Set it in the list dialog or the list's menu; plain lists stay free of project controls (the repository
   section shows only for projects or a list that already has one)
 - **Running indicator** in the top bar: time tracking, a focus session or the stopwatch, each with its own icon, the
   time and the task; a click shows the task with Pause / Stop. The *Time tracking* page shows a running timer as a
@@ -190,8 +190,7 @@ All changes: [CHANGELOG.md](CHANGELOG.md) · [GitHub Releases](https://github.co
   Kalmido only stores them; the agent's host applies them ([mcp/agent_launcher.sh](mcp/agent_launcher.sh) for Claude Code)
 - **MCP server** ([mcp/](mcp/)) so agents can use Kalmido as a tool, and a protocol description in
   [docs/AGENTS.md](docs/AGENTS.md)
-- **Setup guide** ([docs/AGENT-SETUP.md](docs/AGENT-SETUP.md), in the app under *Settings > Agents > Setup
-  guide*): an agent step by step, either by pasting one prompt into Claude Code or by hand (sandbox user,
+- **Setup guide** ([docs/AGENT-SETUP.md](docs/AGENT-SETUP.md), in the app under *Settings > Agents > Set up*): an agent step by step, either by pasting one prompt into Claude Code or by hand (sandbox user,
   firewall, MCP wrapper, rules, event loop, autostart, test checklist)
 - **Usage and limits** (2.1.1): agents report their model usage (tokens, optionally the cost; numbers only, never
   prompts); *Settings > Agents > Usage* shows today / 7 / 30 days per agent, behind *Details* a chart per day, top tasks, lists and
@@ -295,7 +294,8 @@ modules it needs on). More projects any time: *Lists > + > New project*.
 language: *Example: Image film for client Muster* with the phases Concept, Pre-production, Shoot, Edit and Approval,
 about fifteen tasks around today (overdue, today, next week, undated) with start dates for the timeline, dependencies
 for *Flow* and *Now doable*, all four matrix quadrants, subtasks, a Markdown checklist, tags, a weekly status call, a
-comment, custom fields, a time entry and a project status, plus the checklist *Example: Shoot day packing list*. It only
+comment, custom fields, a time entry and a project status, plus the list *Example: Shoot day packing list* (completed
+items at the bottom). It only
 uses the modules that are on, stays private and quiet (no reminders, pushes, News or webhooks, not in the daily
 digest). *Settings > Data > Sample project* creates it again or removes exactly what it created: sample tasks go even
 if you edited them, tasks you added yourself stay, and so does their list.
@@ -446,14 +446,16 @@ assignees, tags, files, custom fields or anything from other lists; task notes o
 - Admins can turn public links off for everyone (*Settings > Administration > Whole server*; existing links then stop working
   but are kept); `KALMIDO_PUBLIC_LINKS=0` turns them off for good.
 
-### Shopping & packing lists
+### Show completed at the bottom
 
-For lists you work through again and again (groceries, packing, a cleaning routine): *Edit list > Type: Shopping &
-packing list* (called *Checklist* before 2.7.0; the API keeps the type name `checklist`).
+For lists you work through again and again (groceries, packing, a cleaning routine): *Show completed at the bottom* in
+the list's *…* menu, its *Sort* menu or the list dialog (2.7.2; before, this was the list type *Shopping & packing list*
+/ *Checklist*: such lists became plain lists with the option on, nothing changed for their items).
 Ticked-off items move to a **Done** section at the bottom (open, collapsible) instead of disappearing, sorted by name,
 and go back on the list with one tap (↺). *Uncheck all* puts everything back, *Clear done* moves the done items to the
-trash. The rows are compact (no dates or priority colours), quick add works as usual, and it works with sharing and
-public links (*View and tick off* makes a shared shopping list for the whole household, no accounts needed).
+trash. Quick add works as usual, and it works with sharing and public links (*View and tick off* makes a shared shopping
+list for the whole household, no accounts needed). API: the list field `done_at_bottom`; `kind: "checklist"` and the
+boolean `checklist` are still accepted as deprecated aliases.
 
 ### Comments and activity
 
@@ -639,7 +641,10 @@ is served at `/api/v1/openapi.json`.
 
 Agents are external programs (Claude Code, Codex, n8n, a local model, a script) that work in Kalmido like a team
 member: an admin creates them under *Settings > Agents* (or turns an existing user into an agent), shares lists
-with them and gives them a token. Kalmido itself never starts an AI or any other process; the agent runs wherever you
+with them and gives them a token. When an admin allows it (*Settings > Agents > Set up > Users may create their own
+agents*, off by default, a limit per person), everyone can create **personal agents** (2.7.2): owned by their creator,
+seeing only the lists the creator shares with them, chatting only with the creator, never admins; admins see and can
+pause or delete every agent. Kalmido itself never starts an AI or any other process; the agent runs wherever you
 like and talks to Kalmido through the REST API, webhooks or the MCP server.
 
 - Events (mention, assignment, comment, chat, reaction, job action, tidy request, wake (API), runtime change / reset
@@ -650,6 +655,13 @@ like and talks to Kalmido through the REST API, webhooks or the MCP server.
 - Approval semantics, status reporting, jobs, chat, the *tidy up* setting, payloads and an example session:
   **[docs/AGENTS.md](docs/AGENTS.md)**. MCP server (stdio and HTTP): **[mcp/](mcp/)**.
 - Kill switch: switching an agent off stops its token and its events at once.
+- Chat (2.7.2): 👍 👎 ❤️ on chat messages (a person's 👍 on the agent's message is an approval, the agent gets the event
+  `reaction` with `chat_message`), *Sent* / *Delivered* per message (`delivered_at`, set when the agent fetches it) and
+  typing dots while an online agent works on the answer, or *offline – will answer later*.
+- Setup guides (2.7.2) in the app under *Settings > Agents > Set up* and in
+  [docs/AGENTS.md](docs/AGENTS.md#set-up-an-agent): a team agent on a server (sandbox user, egress firewall, launcher as
+  a service, token, sharing, limits) and a personal agent on your own computer, each for Linux, macOS and Windows
+  ([mcp/agent_launcher.ps1](mcp/agent_launcher.ps1) for PowerShell).
 - Usage (2.1.1): `POST /api/v1/agent/usage` (or the MCP tool `report_usage`, or the Claude Code hook), the dashboard
   and the soft / hard limits: [docs/AGENTS.md](docs/AGENTS.md#usage-and-limits).
 - Activity log (2.2.1): every call with an agent's token, for admins: [docs/AGENTS.md](docs/AGENTS.md#audit-log).

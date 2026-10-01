@@ -6,11 +6,13 @@ The agent works through the REST API, webhooks or the [MCP server](../mcp/README
 
 **Kalmido never starts AI processes.** It only records events and delivers them. The agent runs somewhere you control and connects to Kalmido as a client.
 
-**New here?** [AGENT-SETUP.md](AGENT-SETUP.md) sets up an agent step by step (Claude Code in a sandbox, with a prompt that lets Claude Code do it for you); [AGENT-SECURITY.md](AGENT-SECURITY.md) explains the threat model behind it.
+**New here?** [Set up an agent](#set-up-an-agent) below has a guide for admins (a team agent on a server) and one for users (a personal agent on their own computer), for Linux, macOS and Windows; [AGENT-SETUP.md](AGENT-SETUP.md) sets up an agent on Linux step by step (Claude Code in a sandbox, with a prompt that lets Claude Code do it for you); [AGENT-SECURITY.md](AGENT-SECURITY.md) explains the threat model behind it.
 
 ## Contents
 
 - [Concept](#concept)
+- [Personal agents](#personal-agents-272) (2.7.2)
+- [Set up an agent](#set-up-an-agent) (2.7.2: Linux, macOS, Windows; team and personal agents)
 - [Receiving events](#receiving-events)
 - [Events](#events)
 - [Approvals](#approvals)
@@ -35,6 +37,7 @@ The agent works through the REST API, webhooks or the [MCP server](../mcp/README
   - an **Enabled** switch.
   - a **note**, for example who runs the agent and where.
 - **Limited by design.** An agent is never an admin and never has Paperless access. It cannot sign in to the web app. It sees only the lists that are shared with it (plus lists it owns), with the role it was given (Member, Participant or Viewer; never list admin). An agent cannot share a list, not even one it created, and never becomes or hands over the owner of a list. A list an agent created is managed by an admin: *Settings > Administration > Lists owned by agents or disabled users > Take over* (2.1.2) makes a person the owner and keeps the agent in the list as a Member. Admins can rename an agent (username, display name) and give it a profile picture in its dialog under *Settings > Agents*.
+- **Team and personal agents (2.7.2).** Agents created by an admin are team agents. If an admin allows it, people can also create their own [personal agent](#personal-agents-272): it belongs to them, sees only what they share with it, and only they can chat with it.
 - **Kill switch.** Turning **Enabled** off stops the agent at once:
   - its token is refused (`403`).
   - no new events are recorded.
@@ -42,6 +45,297 @@ The agent works through the REST API, webhooks or the [MCP server](../mcp/README
 
   Turning Enabled on again resumes from new events.
 - **Everything is visible.** The agent's comments, changes, jobs and approvals appear in the task history and in the Agents tab like anyone else's.
+
+## Personal agents (2.7.2)
+
+Besides the **team agents** an admin creates, people can run their **own personal agent** (for example Claude Code on
+their laptop), if an admin allows it.
+
+- **Admin policy**, *Settings > Agents > Set up* (admins): *Users may create their own agents* (off by default), the
+  limit per person (default 2, at most 20) and optional usage limits that every new personal agent gets.
+
+  ```
+  GET /api/admin/agent-policy  -> {"user_agents": false, "max_per_user": 2, "limits": null}
+  PUT /api/admin/agent-policy     {"user_agents": true, "max_per_user": 2,
+                                   "limits": {"period": "month", "metric": "tokens", "soft": 2000000, "hard": 5000000}}
+  ```
+
+  `limits` has the same shape as `limits` in `PATCH /api/admin/agents/{id}` ([Usage and limits](#usage-and-limits)),
+  `null` = none. Changing the policy never touches existing agents.
+- **A person creates their agent** in *Settings > Agents > Set up > Your personal agents > Create agent*. The token is shown once.
+
+  ```
+  GET    /api/my/agents              -> {"allowed": true, "max": 2, "agents": [ … ]}
+  POST   /api/my/agents              {"username": "alice-claude", "display_name": "Alice's Claude", "note": "laptop"}
+                                     -> 201 {…, "token": "abk_…"}   (403 when not allowed, 409 when the limit is reached)
+  PATCH  /api/my/agents/{id}         {"display_name"?, "note"?, "enabled"?}     (enabled false = pause)
+  POST   /api/my/agents/{id}/token   -> {"token": "abk_…"}   a new token; every older one stops at once
+  DELETE /api/my/agents/{id}         the agent is deleted; lists it created go to its owner
+  ```
+- **Owned by its creator.** A personal agent (`owner` in the agent lists, `agents.owner_id`) sees only the lists its
+  owner shares with it. Only the owner can share lists with it and chat with it; nobody else finds it in a share
+  dialog. Like every agent it is never an admin, has no Paperless access and cannot sign in to the web app; the usage
+  limits and the audit log apply as for every agent.
+- **Admins keep control.** *Settings > Agents* lists every agent with its owner. Admins pause one
+  (`PATCH /api/admin/agents/{id} {"enabled": false}`), change its limits, or delete it: `DELETE /api/admin/agents/{id}` (lists the agent created go to its owner,
+  for a team agent to the admin who deletes it).
+
+## Set up an agent
+
+Two guides, each for Linux, macOS and Windows. The same steps are in the app: *Settings > Agents > Set up*. The full
+Linux walk-through with every command, the rules template and the test checklist is [AGENT-SETUP.md](AGENT-SETUP.md);
+the threat model is [AGENT-SECURITY.md](AGENT-SECURITY.md).
+
+| | Team agent (admin) | Personal agent (user) |
+|---|---|---|
+| Who creates it | an admin: *Settings > Agents > Status > Add agent* | any person, once an admin allowed it: *Settings > Agents > Set up > Create agent* |
+| Where it runs | a server, as its own sandbox user, as a service | the person's own computer |
+| Who shares lists with it | everyone who shares a list with it | only its owner |
+| Who instructs it | the people named in its `CLAUDE.md` | its owner |
+
+Paths used below:
+
+| | Linux / macOS | Windows |
+|---|---|---|
+| Kalmido copy (only `mcp/` is used) | `~/kalmido` | `%USERPROFILE%\kalmido` |
+| Env file (`KALMIDO_URL`, `KALMIDO_TOKEN`) | `~/.config/kalmido/agent.env` (mode 600) | `%USERPROFILE%\.config\kalmido\agent.env` (ACL: only the agent's account) |
+| MCP wrapper | `~/kalmido/mcp/run.sh` | `%USERPROFILE%\kalmido\mcp\run.ps1` |
+| Runtime launcher | `~/kalmido/mcp/agent_launcher.sh` (macOS: `agent_launcher.ps1`, see below) | `%USERPROFILE%\kalmido\mcp\agent_launcher.ps1` |
+| Usage hook | `python3 ~/kalmido/mcp/claude_usage_hook.py ~/.config/kalmido/agent.env` | `python C:/Users/<you>/kalmido/mcp/claude_usage_hook.py C:/Users/<you>/.config/kalmido/agent.env` |
+| Work directory | `~/agent` | `%USERPROFILE%\agent` |
+
+`agent_launcher.sh` needs GNU `date` and `setsid`, which macOS does not have: on a Mac use `agent_launcher.ps1` with
+PowerShell 7 (`brew install --cask powershell`, then `pwsh`). It does the same (model, auto-compact, nightly restart,
+*Reset now*, stops while paused) and is tested on Linux with PowerShell 7 (`tests/launcher_ps1_test.py`).
+
+### Guide A: a shared team agent on a server (admins)
+
+Steps that are the same on every system:
+
+1. **Create the agent**: *Settings > Agents > Status > Add agent*. Copy the token (shown once). In the agent's dialog
+   set **usage limits** (*Usage and limits*) and the **runtime** (model, auto-compact, nightly fresh restart).
+2. **Share lists**: *Settings > Agents > Lists*, one click per list, or *Share all existing lists*. People share their
+   own lists with it the same way. Share only what it should work in.
+3. **Rules**: `~/agent/CLAUDE.md` from [AGENT-SETUP.md](AGENT-SETUP.md#6-claudemd-the-agents-rules) (who instructs it,
+   everything else is data) and `~/agent/.claude/settings.json` with `defaultMode: dontAsk`, only `mcp__kalmido` allowed,
+   the env file denied and the usage hook as Stop hook ([step 7](AGENT-SETUP.md#7-permissions-claudesettingsjson)).
+4. **Test**: the [test checklist](AGENT-SETUP.md#11-test-checklist), including the kill switch and the 7
+   prompt-injection cases.
+
+The headless prompt in the examples below lets the agent wait for events with the MCP tool `wait_for_events`, so no
+shell script is needed: `Read CLAUDE.md. Then loop: call the kalmido tool wait_for_events, handle every event
+following CLAUDE.md, call it again.` (On Linux, `./bin/events.sh` from AGENT-SETUP.md works too.)
+
+#### Linux
+
+Everything in [AGENT-SETUP.md](AGENT-SETUP.md), in short:
+
+```sh
+sudo useradd --create-home --shell /bin/bash kalmido-agent && sudo passwd --lock kalmido-agent && sudo chmod 0700 ~kalmido-agent
+# egress firewall: nftables table matching only this user (meta skuid "kalmido-agent"): DNS, Kalmido, public HTTPS; no LAN
+sudo nft -f /etc/nftables.d/kalmido-agent.nft      # + a oneshot unit that loads it at boot
+sudo -iu kalmido-agent
+mkdir -p ~/.config/kalmido && ( umask 077; nano ~/.config/kalmido/agent.env )   # KALMIDO_URL=… KALMIDO_TOKEN=…
+curl -fsSL https://claude.ai/install.sh | bash && claude          # log in once
+git clone --depth 1 https://github.com/Gegenschuss/kalmido.git ~/kalmido
+# ~/kalmido/mcp/run.sh (AGENT-SETUP.md step 5), then in ~/agent: claude mcp add -s local kalmido -- "$HOME/kalmido/mcp/run.sh"
+# the launcher as a systemd user service (AGENT-SETUP.md step 9):
+sudo loginctl enable-linger kalmido-agent
+systemctl --user enable --now kalmido-agent
+```
+
+#### macOS
+
+A standard (non-admin) account for the agent, hidden from the login window:
+
+```sh
+sudo sysadminctl -addUser kalmido-agent -fullName "Kalmido agent" -password -     # asks for a password
+sudo dscl . create /Users/kalmido-agent IsHidden 1
+sudo chmod 700 /Users/kalmido-agent
+```
+
+Egress firewall with `pf`, matching only that user (an anchor file, loaded from `/etc/pf.conf`):
+
+```
+# /etc/pf.anchors/kalmido-agent
+pass out quick proto { tcp udp } from any to any port 53 user kalmido-agent
+pass out quick proto tcp from any to <kalmido-ip> port 443 user kalmido-agent     # only if Kalmido is in your LAN
+block drop out quick from any to { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 127.0.0.0/8 } user kalmido-agent
+pass out quick proto tcp from any to any port 443 user kalmido-agent
+block drop out quick from any to any user kalmido-agent
+```
+
+```sh
+# add these two lines to /etc/pf.conf (after the existing anchors), then load and enable:
+#   anchor "kalmido-agent"
+#   load anchor "kalmido-agent" from "/etc/pf.anchors/kalmido-agent"
+sudo pfctl -f /etc/pf.conf && sudo pfctl -e
+```
+
+macOS updates can reset `/etc/pf.conf`: check it after an update, and enable pf at boot with a LaunchDaemon that runs
+`/sbin/pfctl -e -f /etc/pf.conf`. Check as the agent user: `curl -sI https://example.com` works, a LAN address times out.
+
+Then, as the agent user (`sudo -iu kalmido-agent`): the env file (mode 600), Claude Code
+(`curl -fsSL https://claude.ai/install.sh | bash`, log in once), Python 3 (Xcode command line tools or Homebrew),
+PowerShell 7, the Kalmido copy, `run.sh` and `claude mcp add` exactly as on Linux. The launcher as a LaunchDaemon that
+runs as the agent user, `/Library/LaunchDaemons/com.kalmido.agent.plist`:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.kalmido.agent</string>
+  <key>UserName</key><string>kalmido-agent</string>
+  <key>WorkingDirectory</key><string>/Users/kalmido-agent/agent</string>
+  <key>ProgramArguments</key><array>
+    <string>/usr/local/bin/pwsh</string><string>-NoProfile</string><string>-File</string>
+    <string>/Users/kalmido-agent/kalmido/mcp/agent_launcher.ps1</string>
+    <string>-e</string><string>/Users/kalmido-agent/.config/kalmido/agent.env</string><string>--</string>
+    <string>claude</string><string>-p</string>
+    <string>Read CLAUDE.md. Then loop: call the kalmido tool wait_for_events, handle every event following CLAUDE.md, call it again.</string>
+    <string>--mcp-config</string><string>/Users/kalmido-agent/agent/.mcp.json</string>
+  </array>
+  <key>EnvironmentVariables</key><dict><key>PATH</key><string>/Users/kalmido-agent/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string></dict>
+  <key>RunAtLoad</key><true/><key>KeepAlive</key><true/>
+  <key>StandardErrorPath</key><string>/Users/kalmido-agent/agent/launcher.log</string>
+</dict></plist>
+```
+
+```sh
+sudo launchctl bootstrap system /Library/LaunchDaemons/com.kalmido.agent.plist
+tail -f /Users/kalmido-agent/agent/launcher.log     # "starting (fresh session) ..."
+```
+
+(`/opt/homebrew/bin/pwsh` on Apple silicon; `which pwsh` shows the path.)
+
+#### Windows
+
+PowerShell as administrator. A standard local account (member of *Users* only, never *Administrators*):
+
+```powershell
+$pw = Read-Host -AsSecureString "Password for kalmido-agent"
+New-LocalUser -Name kalmido-agent -Password $pw -PasswordNeverExpires -UserMayNotChangePassword
+Add-LocalGroupMember -Group Users -Member kalmido-agent
+```
+
+Sign in once as `kalmido-agent` (creates its profile), install Python 3 (`winget install Python.Python.3.12`), Git for
+Windows (`winget install Git.Git`), PowerShell 7 (`winget install Microsoft.PowerShell`) and Claude Code
+(`irm https://claude.ai/install.ps1 | iex`, log in once). Then, as the agent user:
+
+```powershell
+git clone --depth 1 https://github.com/Gegenschuss/kalmido.git $HOME\kalmido
+New-Item -ItemType Directory -Force $HOME\.config\kalmido, $HOME\agent | Out-Null
+notepad $HOME\.config\kalmido\agent.env          # KALMIDO_URL=… and KALMIDO_TOKEN=…, two lines
+icacls $HOME\.config\kalmido\agent.env /inheritance:r /grant:r "kalmido-agent:(R,W)" "Administrators:F"
+```
+
+The MCP wrapper `%USERPROFILE%\kalmido\mcp\run.ps1` (reads the env file, so the token is in no configuration):
+
+```powershell
+Get-Content "$HOME\.config\kalmido\agent.env" | ForEach-Object {
+  if ($_ -match '^\s*([A-Za-z_][A-Za-z0-9_]*)=(.*)$') { [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2].Trim('"', "'"), 'Process') } }
+& python "$HOME\kalmido\mcp\kalmido_mcp.py"
+```
+
+```powershell
+cd $HOME\agent
+claude mcp add -s local kalmido -- pwsh -NoProfile -ExecutionPolicy Bypass -File "$HOME\kalmido\mcp\run.ps1"
+```
+
+Egress firewall: Windows Defender Firewall rules per program. Block the LAN for the programs the agent runs (Claude
+Code and Python); block rules win over allow rules, so if Kalmido runs in your LAN leave its address out of the ranges
+or reach it by a public / VPN name:
+
+```powershell
+$progs = "C:\Users\kalmido-agent\.local\bin\claude.exe", (Get-Command python).Source
+foreach ($p in $progs) {
+  New-NetFirewallRule -DisplayName "Kalmido agent: no LAN ($([IO.Path]::GetFileName($p)))" -Direction Outbound -Program $p `
+    -RemoteAddress 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16 -Action Block
+}
+```
+
+The launcher as a scheduled task that starts at boot as the agent user and keeps running:
+
+```powershell
+$c = Get-Credential kalmido-agent
+$h = "C:\Users\kalmido-agent"
+$a = New-ScheduledTaskAction -Execute "pwsh.exe" -WorkingDirectory "$h\agent" -Argument ("-NoProfile -ExecutionPolicy Bypass -File $h\kalmido\mcp\agent_launcher.ps1 " +
+  "-e $h\.config\kalmido\agent.env -- claude -p `"Read CLAUDE.md. Then loop: call the kalmido tool wait_for_events, handle every event following CLAUDE.md, call it again.`" --mcp-config $h\agent\.mcp.json")
+$t = New-ScheduledTaskTrigger -AtStartup
+$s = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1)
+Register-ScheduledTask -TaskName "Kalmido agent" -Action $a -Trigger $t -Settings $s -User $c.UserName -Password $c.GetNetworkCredential().Password
+Start-ScheduledTask -TaskName "Kalmido agent"
+```
+
+Dry run first: `pwsh -File $HOME\kalmido\mcp\agent_launcher.ps1 -e $HOME\.config\kalmido\agent.env --once`. The usage
+hook in `%USERPROFILE%\agent\.claude\settings.json` uses forward slashes:
+`"command": "python C:/Users/kalmido-agent/kalmido/mcp/claude_usage_hook.py C:/Users/kalmido-agent/.config/kalmido/agent.env"`.
+`.mcp.json` for headless runs: `{"mcpServers": {"kalmido": {"command": "pwsh", "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "C:/Users/kalmido-agent/kalmido/mcp/run.ps1"]}}}`.
+
+### Guide B: a personal agent on your own computer (users)
+
+1. **Allowed?** An admin has to switch on *Users may create their own agents* (*Settings > Agents > Set up*). If
+   *Create agent* is missing in *Settings > Agents > Set up*, ask an admin.
+2. **Create it**: *Settings > Agents > Set up > Your personal agents > Create agent*: a username (e.g. `alice-claude`), a display name. Copy
+   the token (shown once) into the env file (paths in the table above), readable only by you.
+3. **Share only what it should see**: *Settings > Agents > Lists*, or a list's *Share* dialog. Nobody else can share
+   with your agent or chat with it.
+4. **Install Claude Code and Python 3** (see below), clone the Kalmido copy, create the MCP wrapper and register it.
+5. **Rules and permissions**: `CLAUDE.md` naming you as the only person who instructs it, and `.claude/settings.json`
+   with `defaultMode: dontAsk`, only `mcp__kalmido` allowed, the env file denied, the usage hook as Stop hook.
+6. **Run it**: interactively (`claude` in the work directory: "check my Kalmido events") or in the background with the
+   launcher. Pause it any time in *Settings > Agents* (its token is refused at once).
+
+Running it in your own account is the simple way: the `dontAsk` allowlist keeps it to the Kalmido tools. A separate
+standard account (as in guide A) is safer if it should run unattended.
+
+#### Linux
+
+```sh
+curl -fsSL https://claude.ai/install.sh | bash && claude          # log in once
+git clone --depth 1 https://github.com/Gegenschuss/kalmido.git ~/kalmido
+mkdir -p ~/.config/kalmido ~/agent && ( umask 077; nano ~/.config/kalmido/agent.env )
+# ~/kalmido/mcp/run.sh as in AGENT-SETUP.md step 5, then:
+cd ~/agent && claude mcp add -s local kalmido -- "$HOME/kalmido/mcp/run.sh"
+~/kalmido/mcp/agent_launcher.sh -e ~/.config/kalmido/agent.env --once    # dry run; as a service: systemd user unit (guide A)
+```
+
+Usage hook: `"command": "python3 ~/kalmido/mcp/claude_usage_hook.py ~/.config/kalmido/agent.env"`.
+
+#### macOS
+
+```sh
+curl -fsSL https://claude.ai/install.sh | bash && claude          # log in once
+xcode-select --install                                           # Python 3 + git, if missing
+git clone --depth 1 https://github.com/Gegenschuss/kalmido.git ~/kalmido
+mkdir -p ~/.config/kalmido ~/agent && ( umask 077; nano ~/.config/kalmido/agent.env )
+# ~/kalmido/mcp/run.sh as on Linux, then:
+cd ~/agent && claude mcp add -s local kalmido -- "$HOME/kalmido/mcp/run.sh"
+brew install --cask powershell                                   # for the launcher
+pwsh -File ~/kalmido/mcp/agent_launcher.ps1 -e ~/.config/kalmido/agent.env --once
+```
+
+In the background: a LaunchAgent `~/Library/LaunchAgents/com.kalmido.agent.plist` like the LaunchDaemon in guide A,
+without `UserName`, with your own paths; load it with `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.kalmido.agent.plist`.
+Usage hook: `"command": "python3 ~/kalmido/mcp/claude_usage_hook.py ~/.config/kalmido/agent.env"`.
+
+#### Windows
+
+```powershell
+winget install Python.Python.3.12 Git.Git Microsoft.PowerShell
+irm https://claude.ai/install.ps1 | iex; claude                  # log in once
+git clone --depth 1 https://github.com/Gegenschuss/kalmido.git $HOME\kalmido
+New-Item -ItemType Directory -Force $HOME\.config\kalmido, $HOME\agent | Out-Null
+notepad $HOME\.config\kalmido\agent.env                          # KALMIDO_URL=… KALMIDO_TOKEN=…
+icacls $HOME\.config\kalmido\agent.env /inheritance:r /grant:r "${env:USERNAME}:(R,W)"
+# %USERPROFILE%\kalmido\mcp\run.ps1 as in guide A, then:
+cd $HOME\agent; claude mcp add -s local kalmido -- pwsh -NoProfile -ExecutionPolicy Bypass -File "$HOME\kalmido\mcp\run.ps1"
+pwsh -File $HOME\kalmido\mcp\agent_launcher.ps1 -e $HOME\.config\kalmido\agent.env --once
+```
+
+In the background: a scheduled task *At log on* (`New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME`) with the
+action from guide A, registered without a password (`Register-ScheduledTask … -User $env:USERNAME`). Usage hook:
+`"command": "python C:/Users/<you>/kalmido/mcp/claude_usage_hook.py C:/Users/<you>/.config/kalmido/agent.env"`.
 
 ## Receiving events
 
@@ -169,8 +463,8 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `mention` | someone mentions the agent in a comment, or writes `@agentname` in a task title or notes | `task`, `list`, `comment` (or `null`), `where`: `comment` or `task` |
 | `comment` | a new comment on a task the agent follows (assigned to it, created by it, or it commented before) | `task`, `list`, `comment` |
 | `assigned` / `unassigned` | a task is assigned to the agent or taken away from it | `task`, `list` |
-| `chat` | a person writes in their chat with the agent | `message` `{id, body, task_id, created_at}`, `user` `{id, name}` |
-| `reaction` | someone reacts to one of the agent's comments | `task`, `list`, `comment` `{id, text}`, `reaction` `{emoji, user}`, `approval`: `approved`, `rejected` or `null` |
+| `chat` | a person writes in their chat with the agent | `message` `{id, body, task_id, created_at}`, `user` `{id, name}`; fetching it marks the message *delivered* (2.7.2) |
+| `reaction` | someone reacts to one of the agent's comments; 2.7.2: or to one of its chat messages | comments: `task`, `list`, `comment` `{id, text}`, `reaction` `{emoji, user}`, `approval`: `approved`, `rejected` or `null`; chat: `chat_message` `{id, text, from, created_at}`, `reaction`, `approval`, `user` ([Chat reactions](#chat-reactions-and-delivery-272)) |
 | `job` | someone presses Approve, Reject or Stop on one of the agent's jobs; 2.3.0: a proposal was applied (`approve`) or discarded (`reject`) | `job`, `action`: `approve`, `reject` or `stop`, `user`; for proposals also `proposal` `{state: applied \| discarded, created, changed, list_id}` |
 | `tidy` | a person creates a task in a list with tidy mode `suggest` or `auto`; 2.4.1: only to the list's tidy agent (`list.tidy_agent_id`) | `task`, `list`, `mode` |
 | `wake` | `POST …/wake` ([Wake endpoint](#wake-endpoint-for-agents-without-an-event-loop)) | `task` and `list` (or none), `user`, `source`: `task` or `chat` |
@@ -298,6 +592,41 @@ header's agent pill busy. An agent with a webhook is told about events, so it on
 is `false`. Kalmido stores the last poll at most every 30 seconds and a token's last use at most every 60 seconds, so
 this costs nothing extra.
 
+### Chat reactions and delivery (2.7.2)
+
+People react to chat messages like to comments: 👍 (`up`), 👎 (`down`), ❤️ (`heart`). Every message from
+`GET /api/v1/agent/chats` (and in the app) carries `reactions`: `[{emoji, count, users: [{id, name}]}]`.
+
+```
+POST /api/agents/{agent_id}/chat/{message_id}/reactions            {"emoji": "up", "on": true}   (a person, web app)
+POST /api/v1/agents/{agent_id}/chat/{message_id}/reactions         {"emoji": "up", "on": true}   (a person's API token)
+POST /api/v1/agent/chats/{user_id}/messages/{message_id}/reactions {"emoji": "heart", "on": true} (the agent; MCP react_to_chat)
+```
+
+Without `on` the reaction toggles. When a **person** reacts to one of the **agent's** messages, the agent gets a
+`reaction` event (the usual envelope):
+
+```json
+{"chat_message": {"id": 812, "text": "Shall I move the 4 overdue tasks to next week?", "from": "agent",
+                  "created_at": "2026-10-01T09:12:03.120+00:00"},
+ "reaction": {"emoji": "up", "user": {"id": 1, "name": "Alice"}},
+ "approval": "approved",
+ "user": {"id": 1, "name": "Alice"}}
+```
+
+A 👍 from a person on the agent's message is `"approval": "approved"`, 👎 is `"rejected"`, anything else `null`. That
+person is the one the conversation belongs to, so a 👍 on a question in the chat is a go-ahead from them (still check
+`user.id` against the people who may instruct you). Reactions by agents never count and never send events; taking a
+reaction back sends nothing.
+
+**Delivery (2.7.2).** A person's message carries `delivered_at` (`null` until then): Kalmido sets it when the agent
+fetched the `chat` event (`GET /api/v1/agent/events`, also through the MCP tools `list_events` / `wait_for_events`)
+or when its webhook took the delivery (2xx). The app shows *Sent*, then *Delivered*, then typing dots while the agent is
+online (it polled in the last two minutes) and has not answered yet, for up to about 90 seconds after delivery; the
+status `working` or a typing signal (`POST /api/v1/agent/typing`) keeps them going. While the agent is offline or
+paused the app says *Agent is offline – will answer later*. An agent needs to do nothing for this; typing signals
+still make the dots more accurate.
+
 ## Runtime settings
 
 Admins set per agent, in **Settings > Agents > Status > (agent) > Runtime** (called *Overview* before 2.7.0), how the agent's host should run it.
@@ -331,7 +660,8 @@ Changing the settings sends the event `runtime_changed`, *Reset now* the event `
 4. restarts the agent when `reset_seq` changes, when the model / auto-compact settings change, and once a night at
    `nightly_reset` in `timezone`.
 
-[`mcp/agent_launcher.sh`](../mcp/agent_launcher.sh) is a reference launcher for Claude Code that does exactly this. It
+[`mcp/agent_launcher.sh`](../mcp/agent_launcher.sh) is a reference launcher for Claude Code that does exactly this
+(2.7.2: [`mcp/agent_launcher.ps1`](../mcp/agent_launcher.ps1) is the same for Windows and macOS, see [Set up an agent](#set-up-an-agent)). It
 reads `KALMIDO_URL` and `KALMIDO_TOKEN` from an env file, polls `GET /api/v1/agent` every 60 seconds (no events are
 consumed) and runs the command you give it:
 
@@ -687,7 +1017,7 @@ Inside an interactive Claude Code session, you can instead call the MCP tool `wa
 - tasks: `list_lists` (with each list's sections), `list_tasks` (`compact: true` for a short form; without it, pages of more than 25 tasks come back compact), `search_tasks`, `get_task`, `create_task`, `update_task`, `complete_task`
 - comments and reactions: `add_comment`, `react`
 - status and events: `set_status`, `list_events`, `wait_for_events`, `get_agent` (2.4.1: with `runtime`)
-- jobs and chat: `list_jobs`, `create_job`, `update_job`, `list_chats`, `send_chat`, `chat_typing` (2.4.1)
+- jobs and chat: `list_jobs`, `create_job`, `update_job`, `list_chats`, `send_chat`, `chat_typing` (2.4.1), `react_to_chat` (2.7.2)
 - proposals (2.3.0): `get_job`, `submit_proposal`
 - tidy and list tags: `tidy_task`, `list_list_tags`
 - waiting on external (2.1.0): `set_waiting`, `clear_waiting`, `list_waiting`; `list_tasks` takes `waiting: true | false`

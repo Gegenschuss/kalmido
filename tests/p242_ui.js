@@ -63,7 +63,7 @@ async function firefox(fn) {
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v((68|69)|7[0-5])'/.test(SW), 'service worker cache v68 (2.5.0: v69, 2.5.1: v70, 2.5.2: v71, 2.6.0: v72, 2.6.1: v73, 2.7.0: v74, 2.7.1: v75)');
+  check(/const CACHE = 'tasks-shell-v((68|69)|7[0-6])'/.test(SW), 'service worker cache v68 (2.5.0: v69, 2.5.1: v70, 2.5.2: v71, 2.6.0: v72, 2.6.1: v73, 2.7.0: v74, 2.7.1: v75, 2.7.2: v76)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en'});
@@ -212,7 +212,8 @@ async function firefox(fn) {
 
   // ================= #392 setup guide
   pane = d.querySelector('.modal.smodal [data-pane="ai"]');
-  click(w, pane.querySelector('[data-m="ag-guide"]')); await sleep(400);
+  click(w, pane.querySelector('[data-m="ag-guide"]')); await sleep(400);  // 2.7.2 (#420): the Set up tab; the prompt behind its button
+  click(w, pane.querySelector('[data-m="ag-guide-cc"]')); await sleep(300);
   const gm = d.querySelector('.modal.agguide');
   const pr = gm?.querySelector('#agg-prompt')?.textContent || '';
   check(gm && pr.includes(B.replace(/\/$/, '')) && pr.includes('Alice, Kalmido account id ' + me) && pr.includes('kalmido-agent') && !/<KALMIDO_URL>|<OWNER_NAME>|<OWNER_ID>/.test(pr), 'prompt: this server, Alice + her id, the Linux user');
@@ -237,6 +238,7 @@ async function firefox(fn) {
   pane = d.querySelector('.modal.smodal [data-pane="ai"]');
   check(/Installationshilfe/.test(pane.textContent) && /Alle teilen/.test(pane.querySelector('#s-ai-share').textContent) && /Neue Listen automatisch/.test(pane.textContent) && /sieht \d von deinen \d Listen/.test(pane.textContent), 'German: Installationshilfe, share block');
   click(w, pane.querySelector('[data-m="ag-guide"]')); await sleep(400);
+  click(w, pane.querySelector('[data-m="ag-guide-cc"]')); await sleep(300);  // 2.7.2 (#420): the Set up tab, the prompt behind its button
   check(/Agent einrichten/.test(d.querySelector('.modal.agguide')?.textContent || '') && /Selbst einrichten/.test(d.querySelector('.modal.agguide').textContent), 'German: setup guide');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
   w.close();
@@ -271,6 +273,9 @@ async function firefox(fn) {
       check(good(m3, false), `${W}px: the share block fits ${JSON.stringify(m3)}`);
       await shot(`p242-share-${W}.png`);
       await ev(`document.querySelector('[data-m="ag-guide"]').click()`); await sleep(600);
+      const m4s = await fit('#aisp-setup');  // 2.7.2 (#420): the Set up tab with the guides
+      check(good(m4s, false), `${W}px: the Set up tab fits ${JSON.stringify(m4s)}`);
+      await ev(`document.querySelector('[data-m="ag-guide-cc"]').click()`); await sleep(600);
       const m4 = await fit('.modal.agguide .card');
       check(good(m4, false), `${W}px: the setup guide fits ${JSON.stringify(m4)}`);
       await shot(`p242-guide-${W}.png`);

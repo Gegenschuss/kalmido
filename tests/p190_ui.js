@@ -90,13 +90,14 @@ const clip = w => { w.__clip = []; Object.defineProperty(w.navigator, 'clipboard
   check([...d.querySelectorAll('#d-tl .cm')].some(c => /Second while you type/.test(c.textContent)) && d.querySelector('#c-input').value === 'typing…', 'new comment appears while typing, draft kept');
   ta.blur(); w.eval('closeDetail?.()'); await sleep(300);
 
-  // ---- refresh button (shared list only, desktop)
+  // ---- refresh (shared list only): 2.7.2 (#432) no header button any more, "…" > Refresh everywhere
   w.eval(`go('l/${SH}')`); await sleep(400);
-  check(!!d.querySelector('#top [data-act="refresh"]'), 'refresh button on the shared list');
+  check(!d.querySelector('#top [data-act="refresh"]') && w.eval('topMoreItems()').some(x => x.label === 'Refresh'), 'shared list: Refresh in "…", no header button');
   await call('bob', 'POST', '/api/tasks', {title: 'Added by Bob', list_id: SH});
-  d.querySelector('#top [data-act="refresh"]').click(); await sleep(900);
+  w.eval(`topMoreItems().find(x => x.label === 'Refresh').fn()`); await sleep(900);
   check(/Added by Bob/.test(d.querySelector('#view').textContent) && /Up to date/.test(d.querySelector('#toast').textContent), 'refresh loads Bob\'s task + "Up to date"');
   w.eval(`go('l/${PRIV}')`); await sleep(400);
+  check(!w.eval('topMoreItems()').some(x => x.label === 'Refresh'), 'no Refresh on a private list');
   check(!d.querySelector('#top [data-act="refresh"]'), 'no refresh button on a private list');
 
   // ---- delete a tag from the sidebar

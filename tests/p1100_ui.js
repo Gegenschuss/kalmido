@@ -89,7 +89,7 @@ const menuItems = d => [...d.querySelectorAll('.menu-list [role="menuitem"]')];
   const pc = d.querySelector(`.trow[data-id="${T1}"] .wcell .whob`);
   check(pc && pc.querySelector('.who')?.textContent === 'P', 'phone: assignee cell at the row end');
   pc.click(); await sleep(300);
-  check(menuItems(d).length === 5, 'phone: the same assign menu');
+  check(menuItems(d).length === 6 && /Show/.test(menuItems(d)[0].textContent), 'phone: the same assign menu (2.7.2: "Show …" first)');
   d.body.click(); w.close();
 
   // ---- admin: manages members (picker), no picker for the owner

@@ -120,21 +120,20 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   check(/Module/.test(bm.querySelector('.snav .on').textContent) && /Ansichten/.test(bm.textContent), 'German: Module / Ansichten');
   await closeW(wb);
 
-  // ================= slim checklist panel (U07, owner decision 3)
+  // ================= 2.7.2 (#414): the checklist type is gone (U07's slim panel with it): an item of a list with
+  // "Show completed at the bottom" is a full task
   w = await boot({user: 'alice', hash: 'l/' + SHOP}); d = w.document;
   w.eval(`openDetail(${milk})`); await sleep(300);
   const det = d.querySelector('#detail');
-  check(det.querySelector('#d-title') && det.querySelector('#d-content')?.getAttribute('placeholder') === 'Note', 'checklist item: title and note');
-  check(!det.querySelector('.attadd') && !det.querySelector('#d-sub') && !det.querySelector('#d-tag') && !det.querySelector('#d-url') && !det.querySelector('.linkf') && !det.querySelector('#d-list'),
-    'no attachments, subtasks, tags, link, list');
-  check(!det.querySelector('#d-tl') && !det.querySelector('[data-act="timer-toggle"]') && !det.querySelector('[data-act="pomo-task"]') && !det.querySelector('[data-act="date"]') && !det.querySelector('[data-act="prio"]'),
-    'no comments / history, time, focus, date, priority');
+  check(det.querySelector('#d-title') && det.querySelector('#d-content')?.getAttribute('placeholder') === 'Description', 'item: title and description (2.7.2)');
+  check(det.querySelector('#d-sub') && det.querySelector('#d-list') && det.querySelector('[data-act="date"]') && det.querySelector('[data-act="prio"]'),
+    'full task: subtasks, list, date, priority (2.7.2)');
   check(!det.querySelector('#d-assignee'), 'not shared: no assignee');
   const m0 = (await st()).tasks.find(t => t.id === milk);
   check(m0.tags.includes('dairy') && m0.url === 'https://example.org/milk' && m0.content === 'the good one', 'the data stays (tags, link, note)');
   click(w, det.querySelector('[data-act="task-menu"]')); await sleep(80);
   const ckm = [...d.querySelectorAll('#pop .menu-list button')].map(b => b.textContent);
-  check(!ckm.some(x => /focus|time|Snooze/i.test(x)), 'checklist task menu without focus / time / snooze: ' + ckm);
+  check(ckm.some(x => /Snooze/i.test(x)), 'the full task menu (2.7.2): ' + ckm);
   w.eval('closePop()');
   await call('PUT', `/api/lists/${SHOP}/members`, {user_id: BOB, role: 'edit'});
   await w.eval('load()'); w.eval('render(); renderDetail()'); await sleep(200);

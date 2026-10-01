@@ -28,6 +28,8 @@ FAILED=()
 run() {  # run <name> <cmd...>: prints the summary line, remembers failures
   mine || return 0
   local name=$1; shift
+  # ONLY="a b" tests/run_all.sh: just these suites (2.7.2; the containers of their groups are still started)
+  [[ -n "${ONLY:-}" && " $ONLY " != *" $name "* ]] && return 0
   local out rc
   out=$("$@" 2>&1); rc=$?
   echo "$out" | grep -E "^FAIL|ok, [0-9]+ failed|Error|Traceback" | head -40
@@ -248,6 +250,15 @@ shard 4  # ---------------------------------------------------------------- shar
 # 44 px targets, the milestone date picker and the timeline markers
        run p271_api "$PY" p271_api_test.py "$KALMIDO_TEST_DATA"
        run p271_ui node p271_ui.js "$KALMIDO_TEST_DATA"
+# 2.7.2: the list option "Show completed at the bottom" instead of the checklist type (#414: aliases, migration), personal
+# agents (#420: policy, owner-only sharing / chat, admin pause / delete), reactions in the agent chat (#421) and delivered_at
+# (#422), project files leave the disk with the sample / an import undo (own container); then the robot before the bell
+# (#417), person cards (#418), breadcrumbs (#424), Sent / Delivered / typing dots, Settings > Agents > Set up, the viewport
+# fix (the keyboard never flips the layout while typing) in jsdom, and in Firefox at 360 / 390 (touch) and 1280 / 1920
+       run p272_api "$PY" p272_api_test.py "$KALMIDO_TEST_DATA"
+       run p272_ui node p272_ui.js "$KALMIDO_TEST_DATA"
+# 2.7.2 (#420): the Windows launcher agent_launcher.ps1 against a stub API (skipped without pwsh)
+       run launcher_ps1 "$PY" launcher_ps1_test.py
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

@@ -117,19 +117,34 @@ const isMobile = () => matchMedia('(max-width:899px)').matches;
 // page is scaled down by a few percent instead), so it keeps the tablet layout. Phones and tablets with a clear portrait
 // or landscape shape keep the plain device width.
 const VIEWPORT = 'width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content';
+// 2.7.2 (hotfix): the orientation comes from the PHYSICAL screen (screen.orientation / screen.width), never from the media
+// query (orientation: landscape): on Android that follows the viewport, so the on-screen keyboard (it shrinks the height)
+// flipped it, the meta changed, the page re-laid out, the input lost its focus and the keyboard closed at once. And the meta
+// never changes while something editable has the focus (it waits until the focus leaves).
+const editFocused = () => { const e = document.activeElement; return !!e && (e.isContentEditable || (/^(INPUT|TEXTAREA|SELECT)$/.test(e.tagName) && !['button', 'checkbox', 'radio', 'submit', 'range', 'color', 'file'].includes(e.type))); };
+function screenLandscape() {
+  const t = screen.orientation?.type;
+  if (typeof t === 'string' && t) return t.startsWith('landscape');
+  return screen.width > screen.height;
+}
+let vpPending = false;
 function stableViewport() {
   const m = document.querySelector('meta[name="viewport"]'); if (!m) return;
   let want = VIEWPORT;
   try {
     const a = screen.width, b = screen.height, lo = Math.min(a, b), hi = Math.max(a, b);
     const square = matchMedia('(pointer:coarse)').matches && lo >= 760 && hi >= 900 && hi / lo < 1.3;
-    const w = matchMedia('(orientation: landscape)').matches ? hi : lo;
+    const w = screenLandscape() ? hi : lo;
     if (square && w < 900) want = 'width=900, viewport-fit=cover, interactive-widget=resizes-content';
   } catch { /* no screen info: keep the default */ }
-  if (m.getAttribute('content') !== want) m.setAttribute('content', want);
+  if (m.getAttribute('content') === want) { vpPending = false; return; }
+  if (editFocused()) { vpPending = true; return; }  // typing (the keyboard is up): later, when the focus leaves
+  vpPending = false;
+  m.setAttribute('content', want);
 }
 stableViewport();
-try { matchMedia('(orientation: landscape)').addEventListener('change', stableViewport); } catch { /* old browsers */ }
+try { if (screen.orientation?.addEventListener) screen.orientation.addEventListener('change', stableViewport); else window.addEventListener('orientationchange', stableViewport); } catch { /* old browsers */ }
+document.addEventListener('focusout', () => { if (vpPending) setTimeout(() => { if (!editFocused()) stableViewport(); }, 0); }, true);
 const LS = {
   get(k, d) { try { const v = localStorage.getItem('tasks.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem('tasks.' + k, JSON.stringify(v)); } catch { /* private mode */ } },
@@ -307,6 +322,16 @@ function av(id, name, cls = 'avatar', attrs = '', inner = '') {
   const u = avUrl(id), ag = id ? agentDot(id) : '';  // 2.0.0: agents get a status dot
   if (ag) { cls += ' agent'; inner += ag; }
   return `<span class="${cls}${u ? ' pic' : ''}" ${attrs}>${u ? `<img src="${esc(u)}" alt="" loading="lazy" decoding="async" draggable="false">` : esc(initials(name))}${inner}</span>`;
+}
+// 2.7.2 (#418): a person's picture as a button: a tap / click opens the person card (agents: status, chat, current task;
+// people: their tasks, mention). The capture handler below takes the click before the row / dialog under it.
+const avBtn = (id, name, cls = 'avatar', attrs = '') => id ? `<button type="button" class="avb" data-mcard="${+id}" data-mname="${esc(name || '')}" aria-haspopup="dialog" title="${esc(tr('Show {0}', name || '?'))}" aria-label="${esc(tr('Show {0}', name || '?'))}">${av(id, name, cls, attrs)}</button>` : av(id, name, cls, attrs);
+function personNameAny(id) {
+  id = +id;
+  if (S.me && S.me.id === id) return S.me.display_name;
+  const a = agentById(id); if (a) return a.name;
+  for (const l of S.lists) { const p = listPeople(l).find(x => x.user_id === id); if (p?.name) return p.name; }
+  return '';
 }
 function roToast() {  // participants: their role, not "view only", keeps them from the change
   const k = S.route.key, lid = k.startsWith('l:') ? +k.slice(2) : taskById(S.sel)?.list_id;
@@ -591,8 +616,21 @@ setInterval(async () => {
     }
     if ((v !== S.v || (n !== undefined && collab() && n !== S.news?.sig)) && !editing()) { await load(); render(); }
     else if (v !== S.v && editing() && S.sel > 0 && (cmtOn() || collab()) && S.tl.id === S.sel && S.tlPollV !== v) { S.tlPollV = v; loadTimeline(S.sel); agentPoll(); }  // 1.9.0
-  } catch { /* offline */ }
+    S.syncOk = Date.now(); staleDraw();
+  } catch { staleDraw(); /* offline */ }
 }, 4000);
+// 2.7.2 (#432): instead of a refresh button in the header of shared lists, a small hint once the change check has failed
+// for more than 30 s: "Offline – last update N min ago"; a tap tries again (refreshNow). "…" keeps "Refresh".
+S.syncOk = Date.now();
+function staleDraw() {
+  const age = Date.now() - (S.syncOk || Date.now()), on = age > 30000 && !document.hidden;
+  let el = $('#stale');
+  if (!on) { if (el) el.remove(); return; }
+  if (!el) { el = document.createElement('button'); el.id = 'stale'; el.type = 'button'; el.setAttribute('role', 'status'); el.addEventListener('click', () => refreshNow().then(staleDraw).catch(() => {})); document.body.appendChild(el); }
+  const min = Math.floor(age / 60000);
+  el.innerHTML = `${ic('sync', 's')}<span>${esc(min < 1 ? tr('Offline – last update less than a minute ago') : trn('Offline – last update {0} min ago', 'Offline – last update {0} min ago', min))}</span>`;
+  el.title = tr('Tap to try again');
+}
 document.addEventListener('visibilitychange', async () => {
   if (!document.hidden) { try { await load(); render(); } catch { /* offline */ } }
 });
@@ -658,6 +696,7 @@ function parseHash() {
   if (a === 'f' && b) return {mod: 'tasks', key: 'f:' + b};
   if (a === 'l') return {mod: 'tasks', key: 'l:' + b};
   if (a === 'tag') return {mod: 'tasks', key: 'tag:' + b};
+  if (a === 'who' && +b) return {mod: 'tasks', key: 'who:' + +b};  // 2.7.2 (#418): "Tasks of …"
   if (a === 'folder' && b) return {mod: 'tasks', key: 'folder:' + h.slice(7)};  // 2.4.0: a path has a slash
   if (a === 'agents') return {mod: 'agents', key: 'agents', agent: +b || null};
   if (['cal', 'matrix', 'habits', 'pomo', 'news', 'stats', 'time', 'overview'].includes(a)) return {mod: a, key: a};
@@ -707,7 +746,7 @@ function replyFocus(id, n = 0) {
   try { ci.focus({preventScroll: true}); } catch { ci.focus(); }
   ci.scrollIntoView?.({block: 'nearest'});
 }
-const keyToHash = k => k.startsWith('l:') ? 'l/' + k.slice(2) : k.startsWith('f:') ? 'f/' + k.slice(2) : k.startsWith('tag:') ? 'tag/' + encodeURIComponent(k.slice(4)) : k.startsWith('folder:') ? 'folder/' + encodeURIComponent(k.slice(7)) : k;
+const keyToHash = k => k.startsWith('who:') ? 'who/' + k.slice(4) : k.startsWith('l:') ? 'l/' + k.slice(2) : k.startsWith('f:') ? 'f/' + k.slice(2) : k.startsWith('tag:') ? 'tag/' + encodeURIComponent(k.slice(4)) : k.startsWith('folder:') ? 'folder/' + encodeURIComponent(k.slice(7)) : k;
 // 1.5.2: folder view (key "folder:<name>"): the open tasks of every active list in that sidebar folder, grouped by list
 const folderLists = f => sideOrder().filter(l => fUnder(l.folder, f) && !l.archived && !l.is_inbox);  // 2.4.0: subfolders too
 window.addEventListener('hashchange', route);
@@ -969,6 +1008,10 @@ function viewTasks() {
     const lid = k === 'inbox' ? inbox().id : +k.slice(2);
     return {...pick(t => t.list_id === lid, 'section', {list: lid}), done: doneRecent.filter(t => t.list_id === lid)};
   }
+  if (k.startsWith('who:')) {  // 2.7.2 (#418): open tasks assigned to one person, in the lists I see
+    const id = +k.slice(4);
+    return {...pick(t => t.assignee_id === id, 'list'), done: doneRecent.filter(t => t.assignee_id === id)};
+  }
   if (k.startsWith('tag:')) {
     const tg = k.slice(4);
     return {...pick(t => hasTag(t, tg), 'list'), done: doneRecent.filter(t => hasTag(t, tg))};
@@ -1031,7 +1074,7 @@ function doneViews() { try { const o = JSON.parse(S.settings.show_done_views || 
 const showDone = (key = S.route.key) => { const v = doneViews()[key]; return v === undefined ? true : !!+v; };
 const showDoneCal = () => showDone('cal');
 // the views that have a "Completed" group (and so the toggle)
-const doneToggleView = () => { const k = S.route.key, l = routeList(); return S.route.mod === 'tasks' && !NOLIST_KEYS.includes(k) && !isKanban() && !isTimeline() && !isRoadmap() && !isOverview() && !(l && (l.kind === 'checklist' || l.checklist)); };
+const doneToggleView = () => { const k = S.route.key, l = routeList(); return S.route.mod === 'tasks' && !NOLIST_KEYS.includes(k) && !isKanban() && !isTimeline() && !isRoadmap() && !isOverview() && !(l && l.checklist); };  // 2.7.2 (#414): "Show completed at the bottom" has its own group
 async function setShowDone(on, key = S.route.key) {
   const was = doneViews()[key], to = on ? 1 : 0;
   const put = async v => {  // only this view's entry changes: a choice made for another view meanwhile stays
@@ -1132,6 +1175,7 @@ function titleFor(k) {
   if (SMART[k]) return tr(SMART[k].name);
   if (k.startsWith('l:')) return lname(listById(+k.slice(2))) || tr('List');
   if (k.startsWith('tag:')) return '#' + k.slice(4);
+  if (k.startsWith('who:')) { const id = +k.slice(4); return S.me && id === S.me.id ? tr('My tasks') : tr('Tasks of {0}', personNameAny(id) || '?'); }
   if (k.startsWith('f:')) return (S.filters.find(f => f.id === +k.slice(2)) || {}).name || tr('Filters');
   if (k.startsWith('folder:')) return fDisp(k.slice(7));
   if (k === 'cal') return tr('Calendar');
@@ -1144,6 +1188,7 @@ function quickDefaults() {
   if (k.startsWith('l:')) d.list_id = +k.slice(2);
   if (k === 'inbox') d.list_id = inbox().id;
   if (k === 'assigned' && S.me) d.assignee_id = S.me.id;
+  if (k.startsWith('who:') && S.me && +k.slice(4) === S.me.id) d.assignee_id = S.me.id;
   if (k.startsWith('tag:')) d.tags = [k.slice(4)];
   if (k.startsWith('folder:')) { const fl = folderLists(k.slice(7)).filter(l => canEditList(l.id)); if (fl.length) d.list_id = fl[0].id; }  // the folder's first list (~list picks another)
   if (S.route.mod === 'cal') d.due = S.calSel;
@@ -1361,11 +1406,10 @@ function renderTop() {
     const l = k === 'inbox' ? inbox() : listById(+k.slice(2));
     if (l) {
       const v = curView(l), vc = viewChoices(l);  // 2.7.1 (#410): + "Project overview" in project lists
-      if (vc.length > 1 && !l.checklist && !isMobile()) acts += `<div class="seg vseg tf" role="group" aria-label="${esc(tr('View'))}">${vc.map(([k, n, i]) => `<button class="${v === k ? 'on' : ''}" data-act="view-${k}" data-ico="${i}" title="${esc(tr(n))}" aria-pressed="${v === k}">${ic(i, 's')}</button>`).join('')}</div>`;
-      if (!isMobile() && fieldsOf(l.id).length && v === 'list' && !l.checklist) acts += `<button class="iconbtn tf ${fieldCols(l.id) ? 'on' : ''}" data-act="field-cols" data-ico="columns" data-id="${l.id}" title="${tr('Show custom fields as columns')}">${ic('columns')}</button>`;
+      if (vc.length > 1 && !isMobile()) acts += `<div class="seg vseg tf" role="group" aria-label="${esc(tr('View'))}">${vc.map(([k, n, i]) => `<button class="${v === k ? 'on' : ''}" data-act="view-${k}" data-ico="${i}" title="${esc(tr(n))}" aria-pressed="${v === k}">${ic(i, 's')}</button>`).join('')}</div>`;
+      if (!isMobile() && fieldsOf(l.id).length && v === 'list') acts += `<button class="iconbtn tf ${fieldCols(l.id) ? 'on' : ''}" data-act="field-cols" data-ico="columns" data-id="${l.id}" title="${tr('Show custom fields as columns')}">${ic('columns')}</button>`;
       // 2.6.0 (K12): Share next to the title (desktop / tablets; phones: in "…")
       if (!l.is_inbox && !l.archived && collab() && !isMobile()) acts += `<button class="iconbtn tf shbtn" data-act="share-list" data-ico="users" data-id="${l.id}" title="${esc(tr('Share…'))}" aria-label="${esc(tr('Share…'))}">${ic('users', 's')}<span class="bl">${tr('Share')}</span></button>`;
-      if (l.shared && collab() && !isTouch()) acts += `<button class="iconbtn tf" data-act="refresh" data-ico="sync" title="${esc(tr('Refresh'))}" aria-label="${esc(tr('Refresh'))}">${ic('sync')}</button>`;
     }
   }
   // 2.4.2 (#390): a folder switches between its list view and the matrix of all its lists (subfolders included), like a list
@@ -1386,7 +1430,7 @@ function renderTop() {
   const pal = `<button class="kbtn tf4" data-act="palette" data-ico="search" title="${esc(tr('Search and commands'))} (${kbText('Mod+K')})">${ic('search', 's')}<span>${tr('Search')}</span>${kb('Mod+K')}</button>`;
   const kl = m === 'tasks' && k.startsWith('l:') ? listById(+k.slice(2)) : null;
   const badge = kl?.kind === 'project' ? `<span class="kbadge" title="${esc(projectParts().join(', '))}">${tr('Project')}</span>` : '';
-  $('#top').innerHTML = `<button class="iconbtn menu" data-act="side" aria-label="${tr('Menu')}">${ic('menu')}</button><h1 title="${esc(title)}">${kl?.icon ? licon(kl, 'licon h') : ''}<span class="ht">${esc(title)}</span>${badge}${nOpen ? `<span class="hn" aria-label="${esc(trn('{0} open task', '{0} open tasks', nOpen))}">${nOpen}</span>` : ''}</h1>${cf}${off}${agentChip()}${timerPill()}${stChip()}${pm}${acts}${isMobile() ? '' : histBtns()}${pal}${bellBtn()}`;  // 2.7.0 (#405): touch tablets / an unfolded Fold have the room for ← →
+  $('#top').innerHTML = `<button class="iconbtn menu" data-act="side" aria-label="${tr('Menu')}">${ic('menu')}</button><h1 title="${esc(title)}">${kl?.icon ? licon(kl, 'licon h') : ''}<span class="ht">${esc(title)}</span>${badge}${nOpen ? `<span class="hn" aria-label="${esc(trn('{0} open task', '{0} open tasks', nOpen))}">${nOpen}</span>` : ''}</h1>${cf}${off}${timerPill()}${pm}${acts}${isMobile() ? '' : histBtns()}${pal}${stChip()}${agentChip()}${bellBtn()}`;  // 2.7.2 (#417): the agents' robot + dots directly before the bell  // 2.7.0 (#405): touch tablets / an unfolded Fold have the room for ← →
   fitTop();
 }
 // ---- 2.6.0 (K01 + K02, UX audit 2): the header has a fixed priority on every width. The title comes first: it keeps at
@@ -1468,6 +1512,7 @@ function topMoreItems() {
     sec.push({label: S.multiMode ? tr('End selection') : tr('Select multiple'), icon: 'select', on: S.multiMode, fn: () => { S.multiMode = !S.multiMode; if (!S.multiMode) S.multi.clear(); render(); }},
       {label: tr('Sort…'), icon: 'sort', fn: () => sortMenu($('#top [data-act="top-more"]') || $('#top h1'))});
   if (doneToggleView()) sec.push(doneItem());
+  { const rl = m === 'tasks' ? routeList() : null; if (rl && isOwner(rl) && !rl.is_inbox && listView(rl) === 'list' && !isOverview()) sec.push(dabItem(rl)); }  // 2.7.2 (#414)
   sec.push(...collapseItems());
   const mxk = m === 'tasks' ? (k === 'inbox' ? 'l:' + inbox()?.id : k.startsWith('l:') || k.startsWith('f:') || k.startsWith('folder:') ? k : '') : '';
   if (mxk && feat('matrix')) sec.push({label: tr('Show as matrix'), icon: 'grid', fn: () => { mxSet({scope: mxk}); go('matrix'); }});
@@ -1475,13 +1520,13 @@ function topMoreItems() {
   if (mxs.startsWith('folder:') || mxs.startsWith('l:') || mxs.startsWith('f:')) sec.push({label: tr('Show as list'), icon: 'list', fn: () => go(keyToHash(mxs))});
   if (m === 'tasks' && k.startsWith('f:')) sec.push({label: tr('Edit filter'), icon: 'edit', fn: () => filterModal(+k.slice(2))});
   const l = m === 'tasks' && (k.startsWith('l:') || k === 'inbox') ? (k === 'inbox' ? inbox() : listById(+k.slice(2))) : null;
-  if (l && isMobile() && !l.checklist && viewChoices(l).length > 1) {  // phones: the view switch lives here too (room for the title)
+  if (l && isMobile() && viewChoices(l).length > 1) {  // phones: the view switch lives here too (room for the title)
     const v = curView(l), set = x => async () => { if (x === v) return; await setListView(l, x); };
     sec.unshift(...viewChoices(l).map(([k, n, i]) => ({label: tr(n), icon: i, on: v === k, fn: set(k)})), '-');
   }
   if (l) { if (sec.length && sec[sec.length - 1] !== '-') sec.push('-'); sec.push(...listMenuItems(l.id, () => $('#top [data-act="top-more"]') || $('#top h1'))); }
   if (m === 'tasks' && k.startsWith('tag:')) { if (sec.length) sec.push('-'); sec.push(tagDeleteItem(k.slice(4))); }
-  if (S.route.mod === 'tasks' && sharedRoute() && isTouch()) sec.unshift({label: tr('Refresh'), icon: 'sync', fn: () => refreshNow()});
+  if (S.route.mod === 'tasks' && sharedRoute()) sec.unshift({label: tr('Refresh'), icon: 'sync', fn: () => refreshNow()});  // 2.7.2 (#432): no header button any more
   const rest = [...out, ...(out.length && sec.length ? ['-'] : []), ...sec];
   // 2.6.0 (K01): "…" is there on every view; where a view has nothing of its own it offers search (+ the shortcuts)
   if (!rest.length && !fold.some(x => x.icon === 'search')) rest.push({label: tr('Search and commands'), icon: 'search', keys: 'Mod+K', fn: () => openPalette()}, ...(isTouch() ? [] : [{label: tr('Keyboard shortcuts'), icon: 'help', keys: '?', fn: shortcutsModal}]));
@@ -1523,7 +1568,7 @@ let refreshing = false;
 async function refreshNow() {
   if (refreshing) return;
   refreshing = true; $$('[data-act="refresh"]').forEach(b => b.classList.add('spin'));
-  try { await flushSaves(); await load(); render(); if (S.sel && (cmtOn() || collab())) loadTimeline(S.sel); toast(tr('Up to date')); }
+  try { await flushSaves(); await load(); render(); if (S.sel && (cmtOn() || collab())) loadTimeline(S.sel); S.syncOk = Date.now(); toast(tr('Up to date')); }
   catch (e) { if (e instanceof Offline) toast(tr('You are offline')); }
   finally { refreshing = false; $$('[data-act="refresh"]').forEach(b => b.classList.remove('spin')); }
 }
@@ -1532,7 +1577,7 @@ function routeList() {
   if (S.route.mod !== 'tasks') return null;
   return k === 'inbox' ? inbox() : k.startsWith('l:') ? listById(+k.slice(2)) : null;
 }
-const listView = l => !l.checklist && ((l.view === 'kanban' && feat('kanban')) || (l.view === 'timeline' && feat('timeline'))) ? l.view : 'list';
+const listView = l => ((l.view === 'kanban' && feat('kanban')) || (l.view === 'timeline' && feat('timeline'))) ? l.view : 'list';
 function isKanban() { const l = routeList(); return !!l && !povOn(l) && listView(l) === 'kanban'; }
 function isTimeline() { const l = routeList(); return !!l && !povOn(l) && listView(l) === 'timeline'; }
 function renderView() {
@@ -1617,8 +1662,9 @@ function taskRow(t, opts = {}) {
   if (ac) who = whoCell(t);
   else if (t.assignee_id && collab()) {
     const name = personName(t.list_id, t.assignee_id), cls = `who ${S.me && t.assignee_id === S.me.id ? 'me' : ''}`, tip = esc(tr('Assigned to {0}', name || '?'));
-    meta.push(av(t.assignee_id, name, cls + mc, `title="${tip}"`));
-    if (tc) who = av(t.assignee_id, name, cls, `title="${tip}"`);
+    const pv = isTouch() ? av : avBtn;  // 2.7.2 (#418): the picture opens the person card (touch: the row opens the task)
+    meta.push(pv(t.assignee_id, name, cls + mc, `title="${tip}"`));
+    if (tc) who = pv(t.assignee_id, name, cls, `title="${tip}"`);
   }
   if (!opts.cols && !opts.trash) for (const f of fieldsOf(t.list_id).filter(x => x.pinned)) { const c = fieldChip(f, t.fields?.[f.id], t.list_id); if (c) meta.push(c); }
   for (const g of t.ltags || []) meta.push(ltagChip(g, t.list_id));
@@ -1654,16 +1700,18 @@ function whoCell(t) {
   const tip = t.assignee_id ? tr('Assigned to {0}', name || '?') : tr('Nobody assigned');
   // 2.6.0 (K11): nobody assigned = no icon in checklists and on subtasks; elsewhere the dashed circle only shows on hover /
   // keyboard focus (desktop) and not at all on touch screens (assign from the task panel or the task's menu there)
-  if (!t.assignee_id && (listById(t.list_id)?.checklist || t.parent_id)) return '';
+  if (!t.assignee_id && (listById(t.list_id)?.checklist || t.parent_id)) return '';  // 2.7.2: lists with completed at the bottom (shopping) too
   const inner = t.assignee_id ? av(t.assignee_id, name, `who ${me ? 'me' : ''}`) : `<span class="who none">${ic('user', 's')}</span>`;
   return canAssign(t) ? `<button type="button" class="whob${t.assignee_id ? '' : ' wnone'}" data-act="assign" title="${esc(tip + ' · ' + tr('Assign…'))}" aria-label="${esc(tip + ' · ' + tr('Assign…'))}" aria-haspopup="menu">${inner}</button>`
-    : t.assignee_id ? `<span class="whob ro" title="${esc(tip)}">${inner}</span>` : '';
+    : t.assignee_id ? `<span class="whob ro" title="${esc(tip)}">${avBtn(t.assignee_id, name, `who ${me ? 'me' : ''}`)}</span>` : '';  // 2.7.2 (#418)
 }
 function assignMenu(anchor, id) {
   const t = taskById(id); if (!t) return;
   if (!canAssign(t)) { roToast(); return; }
   const set = uid => { if ((t.assignee_id || null) !== uid) patchTask(id, {assignee_id: uid}); };
-  menu(anchor, [{label: tr('Nobody'), icon: 'x', on: !t.assignee_id, fn: () => set(null)}, '-',
+  const cur = t.assignee_id ? personName(t.list_id, t.assignee_id) || personNameAny(t.assignee_id) : '';
+  menu(anchor, [...(t.assignee_id ? [{label: tr('Show {0}', cur || '?'), icon: 'user', cls: 'mshow', fn: () => personCard(anchor, t.assignee_id)}, '-'] : []),  // 2.7.2 (#418)
+    {label: tr('Nobody'), icon: 'x', on: !t.assignee_id, fn: () => set(null)}, '-',
     ...listPeople(listById(t.list_id)).map(p => ({label: p.name + (S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : '') + (p.role === 'participant' ? ' · ' + tr('Participant') : p.role === 'view' ? ' · ' + tr('Viewer') : ''),
       icon: 'user', on: p.user_id === t.assignee_id, fn: () => set(p.user_id)}))]);
 }
@@ -1687,7 +1735,7 @@ function fieldChip(f, v, lid) {
   const tip = esc(f.name + ': ' + (f.type === 'url' ? v : f.type === 'date' ? fmtDate(v) : txt));
   if (f.type === 'select') { const o = selOpt(f, v); return `<span class="fchip sel" style="${cssColor(o.color) ? '--fc:' + cssColor(o.color) : ''}" title="${tip}">${esc(o.name)}</span>`; }
   if (f.type === 'checkbox') return `<span class="fchip" title="${tip}">${ic('check', 's')}${esc(f.name)}</span>`;
-  if (f.type === 'person') return av(+v, txt, 'who', `title="${tip}"`);
+  if (f.type === 'person') return (isTouch() ? av : avBtn)(+v, txt, 'who', `title="${tip}"`);
   if (f.type === 'url') return `<a class="lnk" href="${esc(v)}" target="_blank" rel="noopener noreferrer" title="${tip}">${ic('link', 's')}${esc(txt)}</a>`;
   if (f.type === 'date') return `<span class="fchip ${v < today() ? 'over' : ''}" title="${tip}">${ic('cal', 's')}${esc(txt)}</span>`;
   return `<span class="fchip" title="${tip}">${f.type === 'number' ? `<i>${esc(f.name)}</i> ` : ''}${esc(txt.length > 40 ? txt.slice(0, 39) + '…' : txt)}</span>`;
@@ -1742,7 +1790,7 @@ function viewListBody() {
   const groups = groupTasks(v), flow = sortMode() === 'flow', crd = sortMode().startsWith('created');
   const showList = !v.list;
   const rl = v.list && listById(v.list), ro = rl && !canEditList(rl.id), ck = !!(rl && rl.checklist);
-  const cols = rl && fieldCols(rl.id) && !ck ? fieldsOf(rl.id).slice(0, 6) : null;
+  const cols = rl && fieldCols(rl.id) ? fieldsOf(rl.id).slice(0, 6) : null;
   let h = (rl ? listHead(rl) : v.folder ? folderHead(v.folder) : '') + (ro ? `<div class="rohint">${ic(isPart(rl.id) ? 'user' : 'eye', 's')}${esc(isPart(rl.id) ? tr('Participant: you see only the tasks assigned to you, shared by {0}', rl.owner_name) : tr('View only, shared by {0}', rl.owner_name))}</div>` : '');
   if (S.route.key === 'today') h += overdueBanner() + cevTodayBlock();
   if (flow && FLOW.cyc) h += `<div class="flowhint">${ic('deps', 's')}${esc(tr('Some tasks wait on each other in a circle; they are ordered by date.'))}</div>`;
@@ -1760,22 +1808,23 @@ function viewListBody() {
     if (g.sub && g.sub !== lastSub) h += `<div class="fsubhd" data-go="${esc(keyToHash('folder:' + g.sub))}" role="link" tabindex="0">${ic('folder', 's')}<span>${esc(fName(g.sub))}</span></div>`;
     lastSub = g.sub || lastSub;
     const closed = S.collapsed.has(g.id);
-    const sadd = g.section !== undefined && !ro && !ck && v.list && canAddTo(v.list);
+    const sadd = g.section !== undefined && !ro && v.list && canAddTo(v.list);
     if (g.name) h += `<div class="group"><div class="ghead ${g.cls || ''} ${closed ? 'closed' : ''}" data-act="collapse" data-key="${g.id}" ${g.section !== undefined ? `data-section="${g.section ?? ''}"` : ''}>${g.section && !ro ? secHandle(g.section) : ''}${ic('chev', 's')}${g.img ? `<img class="gicon" src="${esc(g.img)}" alt="">` : g.color ? `<span class="gsw" style="background:${cssColor(g.color)}"></span>` : ''}${esc(g.name)} <span class="c">${g.tasks.length}</span>${sadd ? `<button class="iconbtn gact gadd" data-act="sec-add" data-sec="${g.section || 0}" title="${esc(tr('Add a task to {0}', g.name))}" aria-label="${esc(tr('Add a task to {0}', g.name))}">${ic('plus', 's')}</button>` : ''}${g.section && !ro ? `<button class="iconbtn gact" data-act="section-menu" data-id="${g.section}">${ic('dots', 's')}</button>` : ''}</div>`;
     if (g.name && !closed && sadd) h += secAddHtml(g);
     // 1.7.0 Flow: the first task of each group that waits on nothing is marked "Next" (2.0.4: "Ready to start", and only
     // when some open task shown here waits on something; without dependencies the badge would say nothing)
-    const nx = flow && !ck && flowDeps ? g.tasks.find(t => t.status === 0 && !t.context && !(t.blocked && dFor(t)))?.id : 0;
-    if (!closed) h += g.tasks.map(t => taskRow(t, {showList, tree: true, cols, tcols: ck ? null : {list: showList}, checklist: ck, next: t.id === nx, crd})).join('');
+    const nx = flow && flowDeps ? g.tasks.find(t => t.status === 0 && !t.context && !(t.blocked && dFor(t)))?.id : 0;
+    if (!closed) h += g.tasks.map(t => taskRow(t, {showList, tree: true, cols, tcols: {list: showList}, next: t.id === nx, crd})).join('');
     if (!closed && g.section !== undefined && !g.tasks.length && !ro) h += `<div class="sdrop" data-section="${g.section ?? ''}">${tr('Drop tasks here')}</div>`;  // shown while a task is dragged
     if (g.name) h += '</div>';
   }
   if (v.list && !ro) h += `<button class="iconbtn" data-act="section-new" style="margin:.375rem 0 0 -.25rem">${ic('plus', 's')} ${tr('Section')}</button>`;
-  if (ck) {  // checklist mode: done items stay below in "Done" (open by default), one tap puts them back on the list
+  if (ck) {  // 2.7.2 (#414) "Show completed at the bottom" (was the checklist type): done items stay below in "Done" (open by
+    // default), one tap puts them back on the list
     const k = 'ckdone:' + rl.id, closed = S.collapsed.has(k), done = v.done.slice().sort((a, b) => a.title.localeCompare(b.title, LOCALE()));
     h += `<div class="group ckdone"><div class="ghead ${closed ? 'closed' : ''}" data-act="collapse" data-key="${k}" title="${esc(tr('Ticked-off items land here and can be put back on the list with one tap.'))}">${ic('chev', 's')}${tr('Done|checklist')} <span class="c">${done.length}</span>${done.length && !ro ? `<button class="btn sm gact" data-act="ck-uncheck" data-id="${rl.id}">${ic('undo', 's')} ${tr('Uncheck all')}</button><button class="btn sm gact" data-act="ck-clear" data-id="${rl.id}">${ic('trash', 's')} ${tr('Clear done')}</button>` : ''}</div>`;
     if (done.length) hintDone('ckdone');  // used once: the hint has done its job
-    if (!closed) h += done.length ? done.map(t => taskRow(t, {drag: false, checklist: true, ckback: true})).join('') : hintOnce('ckdone', tr('Ticked-off items land here and can be put back on the list with one tap.'), 'ckempty');
+    if (!closed) h += done.length ? done.map(t => taskRow(t, {drag: false, cols, ckback: true})).join('') : hintOnce('ckdone', tr('Ticked-off items land here and can be put back on the list with one tap.'), 'ckempty');
     return h + '</div>';
   }
   if (v.done.length && showDone()) {
@@ -1792,7 +1841,7 @@ function viewListBody() {
 async function doneCleanup() {
   let all;
   try { all = (await api('GET', '/api/tasks?scope=done&limit=2000')).tasks || []; } catch { return; }
-  const isCk = t => { const l = listById(t.list_id); return !!l && (l.kind === 'checklist' || !!l.checklist); };
+  const isCk = t => !!listById(t.list_id)?.checklist;  // 2.7.2 (#414): lists with "Show completed at the bottom"
   const cand = all.filter(t => !isCk(t));
   const pick = days => { const c = days ? new Date(Date.now() - days * 864e5).toISOString() : null; return cand.filter(t => !c || (t.completed_at || '') < c); };
   const may = arr => arr.filter(t => canEdit(t)), ro = arr => arr.length - may(arr).length;
@@ -1800,7 +1849,7 @@ async function doneCleanup() {
   let age = 0;
   const okLabel = () => trn('Move {0} task to the trash', 'Move {0} tasks to the trash', may(pick(age)).length);
   const html = `<div class="dcopts" role="radiogroup">${opts.map(([d, n]) => `<label class="chkl"><input type="radio" name="dc-age" value="${d}" ${d === age ? 'checked' : ''}> ${esc(n)} <span class="muted">(${may(pick(d)).length})</span></label>`).join('')}</div>
-    <p class="muted" id="dc-note">${[tr('They can be restored from the trash.'), ro(pick(age)) ? trn('{0} task in a list you may only view stays.', '{0} tasks in lists you may only view stay.', ro(pick(age))) : '', all.length > cand.length ? tr('Items of checklists stay.') : ''].filter(Boolean).map(esc).join(' ')}</p>`;
+    <p class="muted" id="dc-note">${[tr('They can be restored from the trash.'), ro(pick(age)) ? trn('{0} task in a list you may only view stays.', '{0} tasks in lists you may only view stay.', ro(pick(age))) : '', all.length > cand.length ? tr('Items of lists that show completed tasks at the bottom stay.') : ''].filter(Boolean).map(esc).join(' ')}</p>`;
   const onCh = e => {
     if (e.target.name !== 'dc-age') return;
     age = +e.target.value;
@@ -2880,6 +2929,12 @@ function rmSumHtml(G, r) {
   return `<div class="rm-sum${ed ? '' : ' ro'}${b.cl ? ' cl-l' : ''}${b.cr ? ' cl-r' : ''}" data-lid="${l.id}" style="left:${b.L}px;width:${b.R - b.L}px${col ? ';--lc:' + col : ''}" tabindex="0" role="button" aria-haspopup="menu" aria-label="${esc(tip)}" title="${esc(tip + (ed ? ' · ' + (isTouch() ? tr('Long-press to move the project') : tr('Drag to move the whole project')) : ''))}"><i class="rm-fill" style="width:${pct ?? 0}%"></i><i class="cap l"></i><i class="cap r"></i></div>` +
     `<span class="rm-lbl" style="left:${b.R + 6}px">${em ? `<span class="rm-em">${em}</span>` : ''}${pct != null ? `<b>${pct}%</b>` : ''}<span class="rm-dt">${esc(when)}</span></span>`;
 }
+// 2.7.2: the milestones of a project (2.7.1, #410) as markers in its summary row of the "All" timeline too
+function rmMsHtml(G, l) {
+  if (l.kind !== 'project') return '';
+  const t0 = today();
+  return (l.milestones || []).filter(m => m.day >= G.start && m.day <= G.end).map(m => `<i class="tl-ms rm-ms ${m.done ? 'done' : m.day < t0 ? 'over' : ''}" style="left:${rmX(G, m.day) + G.dw / 2}px" title="${esc(m.name + ' · ' + fmtDateLoc(m.day))}" role="img" aria-label="${esc(tr('Milestone') + ': ' + m.name + ', ' + fmtDateLoc(m.day))}"></i>`).join('');
+}
 function rmRowHtml(G, M, r) {
   const y = G.hh + r.i * G.rh;
   if (r.type === 'f') {
@@ -2889,7 +2944,7 @@ function rmRowHtml(G, M, r) {
   if (r.type === 'g') {
     const l = r.l, col = cssColor(l.color), em = leadEmoji(l.name);
     const sw = em ? '' : `<span class="sw" style="${col ? 'background:' + col : ''}"></span>`;
-    return `<div class="tl-row rm-row rm-g${r.open ? ' open' : ''}" data-l="${l.id}" style="top:${y}px"><div class="tl-name rm-gname" data-act="rm-toggle" data-key="${esc(r.key)}" role="button" tabindex="0" aria-expanded="${r.open}" title="${esc(lname(l))}">${ic('chev', 's rm-car' + (r.open ? '' : ' closed'))}${sw}<span class="n">${esc(lname(l))}</span>${l.role === 'view' ? `<span class="rm-ro" title="${esc(tr('View only'))}">${ic('eye', 's')}</span>` : ''}<button type="button" class="iconbtn rm-go" data-go="l/${l.id}" title="${esc(tr('Open list'))}" aria-label="${esc(tr('Open list'))}">${ic('arrow', 's')}</button></div><div class="tl-track">${rmSumHtml(G, r)}</div></div>`;
+    return `<div class="tl-row rm-row rm-g${r.open ? ' open' : ''}" data-l="${l.id}" style="top:${y}px"><div class="tl-name rm-gname" data-act="rm-toggle" data-key="${esc(r.key)}" role="button" tabindex="0" aria-expanded="${r.open}" title="${esc(lname(l))}">${ic('chev', 's rm-car' + (r.open ? '' : ' closed'))}${sw}<span class="n">${esc(lname(l))}</span>${l.role === 'view' ? `<span class="rm-ro" title="${esc(tr('View only'))}">${ic('eye', 's')}</span>` : ''}<button type="button" class="iconbtn rm-go" data-go="l/${l.id}" title="${esc(tr('Open list'))}" aria-label="${esc(tr('Open list'))}">${ic('arrow', 's')}</button></div><div class="tl-track">${rmSumHtml(G, r)}${rmMsHtml(G, l)}</div></div>`;
   }
   if (r.type === 'nh') return `<div class="tl-row rm-row rm-nh" data-l="${r.l.id}" style="top:${y}px"><div class="tl-name rm-gname" data-act="rm-ndfold" data-key="${esc(r.key)}" role="button" tabindex="0" aria-expanded="${r.open}">${ic('chev', 's rm-car' + (r.open ? '' : ' closed'))}<span class="n">${tr('No date')}</span><span class="c">${r.n}</span></div><div class="tl-track"></div></div>`;
   if (r.type === 'u') {
@@ -3571,6 +3626,29 @@ function taskById(id) { return S.tasks.get(id) || (S.extra || []).find(t => t.id
 // 2.0.6 (#316 / #322): the task panel below the title and the description, top to bottom; the comments and
 // the history come last, the comment box stays at the bottom edge of the panel (sticky, see cmComposer())
 const DETAIL_ORDER = ['subtasks', 'deps', 'tags', 'attachments', 'paperless', 'fields', 'custom', 'time', 'code', 'history', 'comments'];  // code: 2.2.0 (#271)  // history: private lists only (2.0.7)
+// 2.7.2 (#424): where a task lives, at the top of its panel: Folder › List › Section › (parent task). Every part jumps
+// there (the list, scrolled to the section / the parent) and closes the bell's dropdown. Only lists the viewer has.
+function crumbsHtml(t, l, parent) {
+  if (!l || t.id <= 0) return '';
+  const sec = t.section_id && S.sections.find(x => x.id === t.section_id && x.list_id === l.id);
+  const b = (k, id, icon, label, title) => `<button type="button" class="dcb" data-act="crumb" data-k="${k}" data-id="${esc(String(id))}" title="${esc(title || label)}">${icon ? ic(icon, 's') : ''}<span>${esc(label)}</span></button>`;
+  const parts = [];
+  if (l.folder && !l.is_inbox) parts.push(b('folder', l.folder, 'folder', fDisp(l.folder)));
+  parts.push(b('list', l.id, l.is_inbox ? 'inbox' : 'list', lname(l)));
+  if (sec) parts.push(b('sec', sec.id, '', sec.name));
+  if (parent) parts.push(b('parent', parent.id, 'sub', parent.title));
+  return `<nav class="dcrumbs" aria-label="${esc(tr('Where this task is'))}">${parts.join(`<span class="dcsep" aria-hidden="true">›</span>`)}</nav>`;
+}
+function crumbGo(k, id) {
+  closePop();
+  const t = taskById(S.sel), l = t && listById(t.list_id); if (!l) return;
+  if (k === 'folder') { if (isMobile()) closeDetail(); go('folder/' + encodeURIComponent(id)); return; }
+  const where = k === 'sec' ? `#view .ghead[data-section="${+id}"]` : k === 'parent' ? `#view .trow[data-id="${+id}"]` : '';
+  if (k === 'parent') { go(keyToHash('l:' + l.id)); setTimeout(() => { openDetail(+id); $(where)?.scrollIntoView?.({block: 'center'}); }, 120); return; }
+  if (isMobile()) closeDetail();
+  go(keyToHash(l.is_inbox ? 'inbox' : 'l:' + l.id));
+  if (where) setTimeout(() => { const el = $(where); if (el) { if (el.classList.contains('closed')) el.click(); el.scrollIntoView?.({block: 'start'}); } }, 150);
+}
 function renderDetail() {
   const t = taskById(S.sel); if (!t) return;
   const l = listById(t.list_id);
@@ -3580,9 +3658,8 @@ function renderDetail() {
   const dueTxt = t.due ? dueLabel(t) : tr('Date');
   const mdMode = t.content && !S.editContent;
   const ro = !canEdit(t), shared = l && l.shared;
-  // U07 (owner decision 3): an item of a checklist only gets title, note and (shared, with collaboration) the assignee;
-  // everything else stays in the data but is not shown
-  const ck = !!l && (l.kind === 'checklist' || !!l.checklist);
+  // U07 (owner decision 3) applied to the checklist type; 2.7.2 (#414): the type is gone, every item is a full task
+  const ck = false;
   // 2.0.6 (#315): comments everywhere (module "comments"), also in private lists and without collaboration (personal
   // notes); never in checklists. Replaces U18 (comments only in shared lists). Without comments a private task shows
   // only "+ Comment"; a shared list with collaboration keeps the whole section (its history of changes lives there)
@@ -3637,7 +3714,7 @@ function renderDetail() {
     </div>
     <div class="dbody ${ck ? 'ckbody' : ''} ${dtab === 'comments' ? 'dtab-c' : ''}">
       ${cm === 'full' && isMobile() ? `<div class="seg dtabs" role="tablist" aria-label="${esc(tr('Task'))}"><button role="tab" data-act="d-tab" data-tab="details" class="${dtab === 'details' ? 'on' : ''}" aria-selected="${dtab === 'details'}">${tr('Details')}</button><button role="tab" data-act="d-tab" data-tab="comments" class="${dtab === 'comments' ? 'on' : ''}" aria-selected="${dtab === 'comments'}">${tr('Comments')}<span class="c" id="d-tab-count">${ncm || ''}</span></button></div>` : ''}
-      ${parent ? `<button class="dchip" data-act="open-id" data-id="${parent.id}" style="align-self:flex-start;padding-left:0">${ic('back', 's')}${esc(parent.title)}</button>` : ''}
+      ${crumbsHtml(t, l, parent)}
       <div class="dtitle"><textarea id="d-title" rows="1" placeholder="${tr('Title')}" aria-label="${tr('Title')}" ${ro ? 'readonly' : ''}>${esc(t.title)}</textarea></div>
       ${!ck && t.due && (t.deadline || nagOf(t)) && t.status === 0 ? `<div class="ddl">${dlChip(t, 'big')}${nagOf(t) ? `<button type="button" class="dnag" data-act="date" data-id="${t.id}" title="${esc(tr('Change'))}">${ic('repeat', 's')}${esc(tr('Repeat reminder') + ': ' + nagLabel(nagOf(t)))}</button>` : ''}</div>` : ''}
       ${t.waiting_at && !ck ? waitBar(t, ro) : ''}
@@ -3880,7 +3957,7 @@ function newsItemHtml(it, i, pop) {
   const task = it.task_id ? `<div class="ntask"><span class="nt">${esc(it.task_title || '')}</span><span class="muted">${esc(newsListName(it))}</span></div>` : '';
   const ex = it.excerpt ? `<div class="nexc">${newsExcerpt(it.excerpt, U)}</div>` : '';
   return `<div class="nitem ${it.read ? '' : 'unread'} k-${esc(it.kind)}" role="button" tabindex="0" ${pop ? 'data-bp="open"' : 'data-act="news-open"'} data-i="${i}" aria-label="${esc((it.read ? '' : tr('Unread') + ': ') + newsText(it, U).replace(/<[^>]+>/g, ''))}">
-    ${av(it.actor_id, uname(it.actor_id, U), 'avatar', '', `<i class="nk">${ic(NEWS_ICON[it.kind] || 'bell', 's')}</i>`)}
+    ${it.actor_id ? `<button type="button" class="avb" data-mcard="${+it.actor_id}" data-mname="${esc(uname(it.actor_id, U))}" aria-haspopup="dialog" title="${esc(tr('Show {0}', uname(it.actor_id, U)))}" aria-label="${esc(tr('Show {0}', uname(it.actor_id, U)))}">` : ''}${av(it.actor_id, uname(it.actor_id, U), 'avatar', '', `<i class="nk">${ic(NEWS_ICON[it.kind] || 'bell', 's')}</i>`)}${it.actor_id ? '</button>' : ''}
     <div class="nmain"><div class="ntext">${newsText(it, U)}</div>${task}${ex}</div>
     <time title="${esc(fmtWhen(it.created_at))}">${relTime(it.created_at)}</time>${isTouch() ? '' : `<button class="iconbtn ndel" ${pop ? 'data-bp="dismiss"' : 'data-act="news-dismiss"'} data-i="${i}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button>`}</div>`;
 }
@@ -4076,32 +4153,47 @@ function mdMentions(html, t) {
     return part.replace(re, (m, pre, n) => { const hit = names.find(([x]) => esc(x).toLowerCase() === n.toLowerCase()); return hit ? pre + mentionTag(hit[1], n.startsWith(esc(hit[0])) ? hit[0] : n) : m; });
   }).join('');
 }
-function mentionCard(anchor) {
-  const id = +anchor.dataset.mcard, t = taskById(S.sel), l = t ? listById(t.list_id) : null;
+function mentionCard(anchor) { personCard(anchor, +anchor.dataset.mcard); }
+// 2.5.1 / 2.7.2 (#418): the card of a person or an agent. Inside the task panel with the task's list as context (role,
+// tasks assigned in that list, Assign, Mention); elsewhere without a list. Only what the viewer may see: names come from
+// lists they share, tasks from their own state.
+function personCard(anchor, id) {
+  const inTask = !!anchor.closest?.('#detail, .dsheet, .dpanel') && !!S.sel;
+  const t = inTask ? taskById(S.sel) : null, l = t ? listById(t.list_id) : null;
   const p = listPeople(l).find(x => x.user_id === id), a = agentById(id);
-  const name = p?.name || a?.name || anchor.dataset.mname || anchor.textContent.replace(/^@/, ''), meId = S.me?.id;
+  const name = p?.name || a?.name || anchor.dataset.mname || personNameAny(id) || anchor.textContent.replace(/^@/, ''), meId = S.me?.id;
   const role = p ? roleLabel(p.role) : '', U = S.tl.users || {};
   const st = a ? `<span class="mcst st-${esc(!a.enabled ? 'paused' : agentOffline(a) ? 'offline' : a.status || 'idle')}">${esc(agentSt(a))}${a.status_text ? ' · ' + esc(a.status_text) : ''}</span>` : '';
   const mine = l ? openTasks().filter(x => x.list_id === l.id && x.assignee_id === id && x.id !== t?.id).sort(bySort) : [];
   const acts = [];
   if (a && a.enabled && typeof chatOpen === 'function') acts.push(['chat', 'comment', tr('Open chat')]);
   if (a && feat('agents')) acts.push(['jobs', 'bot', tr('Jobs')]);
+  if (!a) acts.push(['who', 'list', id === meId ? tr('My tasks') : tr('Tasks of {0}', name)]);  // 2.7.2 (#418)
   if (t && !t.context && id !== t.assignee_id && canAssign(t) && p) acts.push(['assign', 'user', tr('Assign this task')]);
-  if ($('#c-input') && cmSocial(t) && id !== meId && p) acts.push(['mention', 'at', tr('Mention')]);
+  if (t && $('#c-input') && cmSocial(t) && id !== meId && p) acts.push(['mention', 'at', tr('Mention')]);
+  // 2.7.2 (#418): what an agent works on right now (only a task the viewer sees)
+  const cur = a ? [a.status_task, ...(a.job_tasks || [])].filter(Boolean).filter((x, i, arr) => arr.indexOf(x) === i).slice(0, 3) : [];
+  const curHtml = a ? `<div class="mcsec"><div class="mch">${esc(tr('Working on'))}</div>${cur.map(x => { const tk = taskById(x); return `<button type="button" class="mctask" data-mc="task" data-id="${x}">${ic('sub', 's')}<span>${esc(tk ? tk.title : tr('Task {0}', '#' + x))}</span></button>`; }).join('') || `<div class="muted mhint">${esc(tr('No task right now'))}</div>`}</div>` : '';
   const pop = openPop(anchor, `<div class="mcard" role="dialog" aria-label="${esc(name)}"><div class="mchead">${av(id, name, 'avatar lg')}<div class="mcn"><b>${esc(name)}${id === meId ? ' ' + esc(tr('(me)')) : ''}</b>${a ? agentBadge() : ''}
       <span class="muted">${esc(role || (U[id] ? '' : tr('Not a member of this list')))}</span>${st}</div></div>
     ${l && p ? `<div class="mcsec"><div class="mch">${esc(tr('Assigned in {0}', lname(l)))} <span class="c">${mine.length}</span></div>${mine.slice(0, 5).map(x => `<button type="button" class="mctask" data-mc="task" data-id="${x.id}">${ic('check', 's')}<span>${esc(x.title)}</span></button>`).join('') || `<div class="muted mhint">${esc(tr('No other open tasks'))}</div>`}${mine.length > 5 ? `<div class="muted mhint">${esc(trn('and {0} more', 'and {0} more', mine.length - 5))}</div>` : ''}</div>` : ''}
+    ${curHtml}
     ${acts.length ? `<div class="mcacts">${acts.map(([k, i, lab]) => `<button type="button" class="btn sm" data-mc="${k}">${ic(i, 's')} ${esc(lab)}</button>`).join('')}</div>` : ''}</div>`);
   pop.onclick = async e => {
     const b = e.target.closest('[data-mc]'); if (!b) return;
     const k = b.dataset.mc; closePop();
-    if (k === 'task') openDetail(+b.dataset.id);
+    if (k === 'task') { const x = +b.dataset.id; if (S.tasks.get(x)) openDetail(x); else go('t/' + x); }
+    else if (k === 'who') { if (S.sel && isMobile()) closeDetail(); go('who/' + id); }
     else if (k === 'chat') chatOpen(id);
     else if (k === 'jobs') go('agents');
     else if (k === 'assign') patchTask(t.id, {assignee_id: id});
     else if (k === 'mention') { const ta = $('#c-input'); if (!ta) return; const add = (ta.value && !/\s$/.test(ta.value) ? ' ' : '') + '@' + name + ' '; ta.value += add; S.drafts[S.sel] = ta.value; ta.closest('.ccomp')?.classList.add('used'); autosize(ta); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
   };
 }
+document.addEventListener('click', e => {  // 2.7.2 (#418): before the row / list / dialog handlers under the picture
+  const b = e.target.closest?.('.avb[data-mcard]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation(); personCard(b, +b.dataset.mcard);
+}, true);
 const decodeMentions = (body, U) => String(body || '').replace(/<@(\d+)>/g, (_, id) => '@' + uname(+id, U));
 function encodeMentions(text, people) {
   for (const p of [...(people || [])].sort((a, b) => b.name.length - a.name.length))
@@ -5347,11 +5439,6 @@ function taskMenu(anchor, id) {
   if (!canEdit(t)) { roToast(); return; }
   const sib = siblings(t), i = sib.findIndex(x => x.id === t.id);
   const l = listById(t.list_id);
-  if (l && (l.kind === 'checklist' || l.checklist)) {  // U07: a checklist item has no dates, focus or time
-    menu(anchor, [{label: tr('Duplicate'), icon: 'sub', fn: () => createTask({title: t.title, content: t.content, list_id: t.list_id, section_id: t.section_id})},
-      ...(canDelete(t) ? ['-', {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => deleteTask(id)}] : [])]);
-    return;
-  }
   menu(anchor, [
     quickDueRow(id), '-',
     {label: t.pinned ? tr('Unpin') : tr('Pin'), icon: 'pin', fn: () => patchTask(id, {pinned: t.pinned ? 0 : 1})},
@@ -5411,7 +5498,15 @@ function sortMenu(anchor) {
   menu(anchor, [...[['prio', N_('Priority, then manual')], ['custom', N_('Manual only')], ['date', N_('Date')], ['title', N_('Title')], ...(depsOn() ? [['flow', N_('Flow|sort')]] : [])].map(([m, n]) => ({label: tr(n), on: cur === m, fn: () => set(m)})),
     {label: !crOn ? tr('Created|sort') : cur === 'created' ? tr('Created: newest first') : tr('Created: oldest first'), on: crOn, cls: 'sortcr', title: crOn ? tr('Click again to reverse the direction') : '', fn: () => set(cur === 'created' ? 'created_asc' : 'created')},
     ...(cfs.length ? ['-', ...cfs.map(f => ({label: tr('Field: {0}', f.name), icon: FT_ICON[f.type], on: cur === 'cf:' + f.id, fn: () => set('cf:' + f.id)}))] : []),
-    ...(doneToggleView() ? ['-', doneItem()] : [])]);
+    ...(doneToggleView() ? ['-', doneItem()] : []),
+    ...(l && isOwner(l) && listView(l) === 'list' && !isOverview() ? ['-', dabItem(l)] : [])]);
+}
+// 2.7.2 (#414): the list option "Show completed at the bottom" (owner; for everyone in the list, one undo step)
+const dabItem = l => ({label: tr('Show completed at the bottom'), icon: 'cart', on: !!l.checklist, cls: 'dabitem', fn: () => setDab(l.id, !l.checklist)});
+async function setDab(id, on) {
+  const l = listById(id); if (!l) return;
+  const e = await listPatch(id, {checklist: on}, tr('Show completed at the bottom'));
+  if (e) offerUndo(on ? tr('Completed tasks stay at the bottom') : tr('Completed tasks are listed as before'), e);
 }
 
 // ---- 1.9.0 (Galaxy Fold): dialogs follow the visual viewport. On Android the on-screen keyboard can leave the visual
@@ -5478,8 +5573,8 @@ const LCOLORS = ['', '#2dd4bf', '#6d8cff', '#6ee7b7', '#4ade80', '#f5b041', '#f8
 const EMOJIS = ['📥', '📌', '⭐', '🔥', '✅', '📅', '⏰', '🎯', '💡', '🧠', '🏠', '🏡', '🛒', '🍎', '🍳', '☕', '💼', '🖥️', '💻', '📱', '📞', '✉️', '📝', '📚', '📖', '✏️', '🎓', '💰', '💳', '🧾', '🏦', '📊', '🚗', '🚲', '✈️', '🏖️', '🧳', '🗺️', '🎁', '🎉', '🎵', '🎹', '🎧', '🎬', '📷', '🎨', '🌀', '🧵', '🛠️', '🔧', '🏃', '🏋️', '🧘', '❤️', '🩺', '💊', '👶', '🧒', '👪', '🐶', '🐱', '🐭', '🌱', '🌻', '☀️', '🌙', '♻️', '🔒', '🤶', '🎄'];
 const EMO_RE = /^((?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|\uFE0F|\u200D)+)\s*/u;
 // list type (1.2): the choices, a hint per type (project: only the features whose module is on), the menu
-// 2.7.0 (#414): the type "checklist" is called "Shopping & packing list" (stored kind stays 'checklist')
-const LKINDS = [['list', N_('List')], ['checklist', N_('Shopping & packing list')], ['project', N_('Project')]];
+// 2.7.2 (#414): two types only; the old checklist type is the list option "Show completed at the bottom" (lists.checklist)
+const LKINDS = [['list', N_('List')], ['project', N_('Project')]];
 const LKIND_ICON = {list: 'list', checklist: 'cart', project: 'pulse'};
 // 2.4.0 (#243): project types = built-in project templates (server: PTYPES); '' = a blank project. Offered in the "New list"
 // dialog (type Project, next to the person's own list templates, #328), the setup and the welcome tour.
@@ -5533,7 +5628,6 @@ function projectParts() {
     fieldsOn() && tr('custom fields'), progressOn() && tr('progress and status')].filter(Boolean);
 }
 function kindHint(k) {
-  if (k === 'checklist') return `${ic('cart', 's')} ${tr('What you tick off stays at the bottom and comes back with one tap.')} <span class="muted">${tr('For shopping and packing lists; no dates or priorities in the rows.')}</span>`;
   if (k === 'project') { const p = projectParts(); return p.length ? tr('This list gets {0}.', esc(p.join(', '))) : tr('The project features are switched off (Settings > Modules).'); }
   return tr('A plain task list. Make it a project for time tracking, dependencies, custom fields and progress.');
 }
@@ -5544,8 +5638,8 @@ async function setListKind(id, kind) {
 }
 // list settings (type, name, colour, folder, view, "move dependent tasks along", hourly rate, archived) as one history
 // step; _prev = the values after, so a setting changed elsewhere meanwhile stays. false = the request failed
-const LIST_HIST = ['name', 'color', 'folder', 'view', 'kind', 'dep_shift', 'rate', 'archived', 'tickets', 'nag', 'day_hours'];  // 2.7.0: nag, day_hours
-const lv = (k, v) => k === 'dep_shift' || k === 'archived' || k === 'tickets' ? (v ? 1 : 0) : k === 'rate' || k === 'day_hours' ? (v === '' || v == null ? null : +String(v).replace(',', '.')) : v ?? '';
+const LIST_HIST = ['name', 'color', 'folder', 'view', 'kind', 'dep_shift', 'rate', 'archived', 'tickets', 'nag', 'day_hours', 'checklist'];  // 2.7.0: nag, day_hours; 2.7.2: checklist = "Show completed at the bottom"
+const lv = (k, v) => k === 'dep_shift' || k === 'archived' || k === 'tickets' || k === 'checklist' ? (v ? 1 : 0) : k === 'rate' || k === 'day_hours' ? (v === '' || v == null ? null : +String(v).replace(',', '.')) : v ?? '';
 async function listPatch(id, body, label, o = {}) {
   const l = listById(id); if (!l) return false;
   const before = {}, after = {};
@@ -5555,7 +5649,7 @@ async function listPatch(id, body, label, o = {}) {
   if (!Object.keys(before).length) return null;
   const go = (to, from) => async () => {
     const r = await api('PATCH', '/api/lists/' + id, {...to, _prev: from});
-    return {skipped: (r.conflicts || []).map(c => `${qn(lname(listById(id)) || '')}: ${tr({name: N_('Name'), color: N_('Colour'), folder: N_('Folder'), view: N_('View'), kind: N_('Type'), dep_shift: N_('Move dependent tasks along'), rate: N_('Hourly rate'), archived: N_('Archived')}[c.field] || c.field)}`)};
+    return {skipped: (r.conflicts || []).map(c => `${qn(lname(listById(id)) || '')}: ${tr({name: N_('Name'), color: N_('Colour'), folder: N_('Folder'), view: N_('View'), kind: N_('Type'), checklist: N_('Show completed at the bottom'), dep_shift: N_('Move dependent tasks along'), rate: N_('Hourly rate'), archived: N_('Archived')}[c.field] || c.field)}`)};
   };
   return histAdd({label: label || tr('Settings of {0}', qn(lname(l))), undo: go(before, after), redo: go(after, before), post: o.post});
 }
@@ -5689,7 +5783,7 @@ function shareModal(id) {
   let users = null;
   const roleSel = (attr, cur_, lab) => `<select ${attr} aria-label="${esc(lab || tr('Role'))}">${ROLES.map(([v, n, h]) => `<option value="${v}" title="${esc(tr(h))}" ${v === cur_ ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>`;
   const isAg = p => !!(p.agent || agentById(p.user_id));
-  const row = (cur, p, mng) => `<div class="mrow" data-uid="${p.user_id}">${av(p.user_id, p.name)}<span class="n">${esc(p.name)}${S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : ''}${isAg(p) ? agentBadge() : ''}</span>${mng && p.role !== 'owner' && !(S.me && p.user_id === S.me.id)
+  const row = (cur, p, mng) => `<div class="mrow" data-uid="${p.user_id}">${avBtn(p.user_id, p.name)}<span class="n">${esc(p.name)}${S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : ''}${isAg(p) ? agentBadge() : ''}</span>${mng && p.role !== 'owner' && !(S.me && p.user_id === S.me.id)
       ? `${roleSel(`data-mrole="${p.user_id}"`, p.role, tr('Role of {0}', p.name))}<button class="iconbtn" data-mrm="${p.user_id}" title="${esc(isAg(p) ? tr('Stop sharing with {0}', p.name) : tr('Remove from list'))}" aria-label="${esc(isAg(p) ? tr('Stop sharing with {0}', p.name) : tr('Remove {0} from this list', p.name))}">${ic('x', 's')}</button>`
       : `<span class="muted" title="${esc(roleHelp(p.role))}">${esc(roleLabel(p.role))}</span>`}</div>`;
   const draw = () => {
@@ -5789,8 +5883,10 @@ function listModal(id, folder = '', o = {}) {
     ${id && !l.is_inbox && (l.kind || 'list') === 'project' ? repoBoxHtml(l) : ''}
     </div>
     ${id && !l.is_inbox && (l.kind || 'list') !== 'project' && (l.repos || []).length ? repoBoxHtml(l) : ''}
-    ${(l.kind || 'list') !== 'checklist' ? `<div class="row lnagrow"><label for="l-nag">${tr('Repeat reminders')}</label><select id="l-nag" ${dis}><option value="">${tr('Off|nag')}</option>${NAG_OPTS.slice(1).map(([v, n]) => `<option value="${v}" ${(l.nag || '') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
-    <div class="shint lhint">${tr('Default for the tasks of this list with a date: the reminder repeats until the task is done (a task can choose otherwise in its date dialog). Quiet hours: Settings > Notifications.')}</div>` : ''}
+    ${own ? `<div class="row ldabrow"><label>${tr('Completed')}</label><label class="chkl"><input type="checkbox" id="l-dab" ${l.checklist ? 'checked' : ''}> ${tr('Show completed at the bottom')}</label></div>
+    <div class="shint lhint">${ic('cart', 's')} ${tr('What you tick off stays visible at the bottom and comes back with one tap: handy for shopping and packing lists.')}</div>` : ''}
+    <div class="row lnagrow"><label for="l-nag">${tr('Repeat reminders')}</label><select id="l-nag" ${dis}><option value="">${tr('Off|nag')}</option>${NAG_OPTS.slice(1).map(([v, n]) => `<option value="${v}" ${(l.nag || '') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
+    <div class="shint lhint">${tr('Default for the tasks of this list with a date: the reminder repeats until the task is done (a task can choose otherwise in its date dialog). Quiet hours: Settings > Notifications.')}</div>
     ${id && shareOk(l) ? `<h4>${tr(collab() ? N_('Sharing') : N_('Owner'))}</h4><div class="row shsum"><span class="muted" id="l-shsum">${esc(shareSummary(l))}</span><button class="btn sm" data-m="share-open">${ic('users', 's')} ${tr(collab() ? N_('Share…') : N_('Ownership…'))}</button></div>` : ''}
     ${id && !l.is_inbox && collab() && l.shared ? `<h4>${tr('Notifications')}</h4><div class="row"><label for="l-bell">${ic(BELL_ICON[l.bell || 'default'], 's')} ${tr('This list')}</label><select id="l-bell" data-native>${BELLS.map(([m, n]) => `<option value="${m}" ${(l.bell || 'default') === m ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     <div class="shint lhint" id="l-bellhint">${tr(BELLS.find(b => b[0] === (l.bell || 'default'))[2])} · ${tr('only for you')}</div>
@@ -5812,7 +5908,7 @@ function listModal(id, folder = '', o = {}) {
   const formBody = () => {
     const nm = $('#l-name', md).value.trim().replace(EMO_RE, '');
     const body = own ? {name: l.is_inbox && !emo && nm === tr('Inbox') ? 'Eingang' : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: $('#l-rate', md).value.trim()} : {}), ...($('#l-tickets', md) ? {tickets: $('#l-tickets', md).checked} : {}),
-      ...($('#l-nag', md) ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dayh', md) ? {day_hours: $('#l-dayh', md).value.trim()} : {})}
+      ...($('#l-nag', md) ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dayh', md) ? {day_hours: $('#l-dayh', md).value.trim()} : {}), ...($('#l-dab', md) ? {checklist: $('#l-dab', md).checked} : {})}
       : {folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value};  // members: only their own placement / view
     if (own && !nm) delete body.name;  // an empty name is never saved (leaving the field puts the saved one back)
     return body;
@@ -5837,6 +5933,7 @@ function listModal(id, folder = '', o = {}) {
     if ($('#l-rate', md) && document.activeElement !== $('#l-rate', md)) $('#l-rate', md).value = x.rate != null ? String(x.rate).replace('.', LOCALE().startsWith('de') ? ',' : '.') : '';
     if ($('#l-dayh', md) && document.activeElement !== $('#l-dayh', md)) $('#l-dayh', md).value = x.day_hours != null ? String(x.day_hours).replace('.', LOCALE().startsWith('de') ? ',' : '.') : '';
     if ($('#l-nag', md)) $('#l-nag', md).value = x.nag || '';
+    if ($('#l-dab', md)) $('#l-dab', md).checked = !!x.checklist;
   };
   let saving = Promise.resolve();
   const autosave = () => {
@@ -5863,7 +5960,7 @@ function listModal(id, folder = '', o = {}) {
   }
   md.addEventListener('change', e => {
     if (e.target.id === 'l-kind') { const k = e.target.value; $('#l-khint', md).innerHTML = kindHint(k); $('.kproj', md).hidden = k !== 'project'; if ($('.lptype', md)) $('.lptype', md).hidden = k !== 'project'; if (id) autosave(); return; }
-    if (id && ['l-view', 'l-depshift', 'l-tickets', 'l-nag'].includes(e.target.id)) { autosave(); return; }
+    if (id && ['l-view', 'l-depshift', 'l-tickets', 'l-nag', 'l-dab'].includes(e.target.id)) { autosave(); return; }
     if (id && e.target.id === 'l-showprog') { setProgHidden(id, !e.target.checked).then(() => lsaved(null)); return; }
   });
   const drawFields = () => { const box = $('#l-fields', md); if (box) box.innerHTML = fieldsBox(id); };
@@ -5932,7 +6029,7 @@ function listModal(id, folder = '', o = {}) {
     if (a === 'save' && !id) {  // a new list (an existing one saves itself)
       const nm = $('#l-name', md).value.trim().replace(EMO_RE, '');
       if (!nm) return $('#l-name', md).focus();
-      const body = own ? {name: l.is_inbox && !emo && nm === tr('Inbox') ? 'Eingang' : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: $('#l-rate', md).value.trim()} : {}), ...($('#l-nag', md)?.value ? {nag: $('#l-nag', md).value} : {})}
+      const body = own ? {name: l.is_inbox && !emo && nm === tr('Inbox') ? 'Eingang' : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: $('#l-rate', md).value.trim()} : {}), ...($('#l-nag', md)?.value ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dab', md)?.checked ? {checklist: true} : {})}
         : {folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value};  // members: only their own placement / view
       if (body.folder && !folderNames().includes(body.folder)) await api('PATCH', '/api/settings', {folders: JSON.stringify([...folderNames(), body.folder])});
       const {rate, nag, day_hours: _dh, ...b0} = body;
@@ -6314,7 +6411,7 @@ function modRowHtml(k, opt = () => '') {
 // settingsModal('agents' / 'usage' / 'activity') opens the matching one. Each sub-tab loads its data only when shown.
 // 2.7.0 (#405 S2): the Agents page only with the module on, or for an admin while agents exist (they manage them there)
 const aiPaneOn = () => !!S.me && (feat('agents') || (!!S.me.is_admin && (S.agents || []).length > 0));
-const AI_SUBS = [['agents', 'bot', N_('Status|agents')], ['lists', 'list', N_('Lists')], ['usage', 'chart', N_('Usage')], ['log', 'clock', N_('Log')]];
+const AI_SUBS = [['agents', 'bot', N_('Status|agents')], ['lists', 'list', N_('Lists')], ['usage', 'chart', N_('Usage')], ['log', 'clock', N_('Log')], ['setup', 'help', N_('Set up|agents')]];  // 2.7.2 (#420): Set up
 const aiSubs = () => AI_SUBS.filter(([k]) => k === 'log' ? !!S.me?.is_admin : k === 'usage' ? !!S.me?.is_admin || (S.agents || []).length > 0 : true);
 function aiSubCur(want) { const ks = aiSubs().map(x => x[0]), k = want || LS.get('aiSub', 'agents'); return ks.includes(k) ? k : 'agents'; }
 function aiHtml(hint, want) {
@@ -6336,7 +6433,90 @@ function aiHtml(hint, want) {
     <div class="aitbl" id="s-ai-tbl" role="table" aria-labelledby="s-ai-lists-h"><div class="muted mhint">${tr('Loading…')}</div></div>` : `<div class="muted mhint">${tr('You do not manage any list yet.')}</div>`}`)}
     ${subs.some(x => x[0] === 'usage') ? pane('usage', `${hint(adm ? tr('What the agents report about their model usage: tokens and, if they send it, the cost. You see every agent; limits are set per agent (Edit).') : tr('What the agents in your lists report about their model usage, counted in the lists you see.'))}
     <div class="aiu" id="s-aiu"></div>`) : ''}
-    ${adm ? pane('log', audHtml()) : ''}`;
+    ${adm ? pane('log', audHtml()) : ''}
+    ${pane('setup', agSetupPaneHtml(hint))}`;
+}
+// ---- 2.7.2 (#420) Settings > Agents > Set up: my personal agents (when an admin allows them), the admins' switch for
+// that, and the two guides (a team agent on a server / a personal agent on your own computer), each for Linux, macOS and
+// Windows. The texts of the guides: AG_GUIDES (the same steps as docs/AGENTS.md).
+function agSetupPaneHtml(hint) {
+  const adm = !!S.me?.is_admin, g = LS.get('agGuide', adm ? 'team' : 'own'), os = LS.get('agOs', /Win/.test(navigator.platform || '') ? 'win' : /Mac/.test(navigator.platform || '') ? 'mac' : 'linux');
+  const seg = (k, cur, opts) => `<div class="seg agsseg" role="tablist" data-agseg="${k}">${opts.map(([v, n, i]) => `<button type="button" role="tab" data-agsv="${v}" aria-selected="${v === cur}" class="${v === cur ? 'on' : ''}">${i ? ic(i, 's') : ''}<span>${tr(n)}</span></button>`).join('')}</div>`;
+  return `<h4 id="s-myown-h">${tr('Your personal agents')}</h4>
+    ${hint(tr('A personal agent is yours: it sees only the lists you share with it, only you can chat with it, and it is never an admin. You run it on your own computer.'))}
+    <div class="members aglist" id="s-myown" aria-labelledby="s-myown-h"><div class="muted mhint">${tr('Loading…')}</div></div>
+    ${adm ? `<h4 id="s-uag-h">${tr('Personal agents for everyone')}</h4>
+    <div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" id="s-uag"><span class="swt" aria-hidden="true"></span></span><span>${tr('Users may create their own agents')}</span></label></div>
+    <div class="row"><label for="s-uagmax">${tr('Per person at most')}</label><input id="s-uagmax" type="number" inputmode="numeric" min="1" max="20" value="2" class="numin"></div>
+    ${hint(tr('Off by default. You see every agent under Status and can pause or delete it; usage limits apply to them like to every agent.'))}` : ''}
+    <h4 id="s-agg-h">${tr('Guides')}</h4>
+    ${seg('guide', g, [['team', N_('Team agent on a server'), 'users'], ['own', N_('Personal agent on your computer'), 'user']])}
+    ${seg('os', os, [['linux', 'Linux'], ['mac', 'macOS'], ['win', 'Windows']])}
+    <div class="agguidebox" id="s-agguide" role="tabpanel">${agSetupHtml(g, os)}</div>
+    <div class="row aibtns"><button class="btn sm" data-m="ag-guide-cc" title="${esc(tr('Set up an agent step by step, or let Claude Code do it'))}">${ic('bot', 's')} ${tr('Let Claude Code set it up (Linux)')}</button></div>`;
+}
+async function agSetupDraw(md) {
+  const box = $('#s-myown', md); if (!box) return;
+  let j;
+  try { j = await api('GET', '/api/my/agents'); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
+  box._j = j;
+  const row = a => `<div class="mrow agsrow ${a.enabled ? '' : 'off'}" data-myag="${a.id}">${avBtn(a.id, a.name)}<span class="n"><span class="agnm"><b>${esc(a.name)}</b> <span class="muted">${esc(a.username)}</span></span>
+      <small class="muted agfacts">${hdot(agentHst(a))}${esc([a.enabled ? agentSt(a) : a.admin_paused ? tr('paused by an admin') : tr('paused'), trn('{0} list', '{0} lists', (a.lists || []).length)].join(' · '))}</small></span>
+    <span class="agacts"><button class="iconbtn" data-myag-act="token" title="${esc(tr('New API token'))}" aria-label="${esc(tr('New API token'))}">${ic('key', 's')}</button>
+      <button class="iconbtn ${a.enabled ? 'danger' : ''}" data-myag-act="pause" title="${esc(a.enabled ? tr('Pause') : tr('Resume'))}" aria-label="${esc(a.enabled ? tr('Pause') : tr('Resume'))}" ${!a.enabled && a.admin_paused ? 'disabled' : ''}>${ic(a.enabled ? 'pause' : 'play', 's')}</button>
+      <button class="iconbtn danger" data-myag-act="del" title="${esc(tr('Delete'))}" aria-label="${esc(tr('Delete'))}">${ic('trash', 's')}</button></span></div>`;
+  const add = j.allowed && j.count < j.max ? `<div class="row myagnew"><input id="myag-user" placeholder="${esc(tr('Username, e.g. my-claude'))}" aria-label="${esc(tr('Username'))}" maxlength="32" autocapitalize="off" autocomplete="off" spellcheck="false"><input id="myag-name" placeholder="${esc(tr('Display name'))}" aria-label="${esc(tr('Display name'))}" maxlength="60"><button class="btn sm pri" data-myag-act="new">${ic('plus', 's')} ${tr('Create agent')}</button></div>
+    <div class="shint">${esc(trn('You can have {0} personal agent.', 'You can have {0} personal agents.', j.max))}</div>` : '';
+  box.innerHTML = (j.agents.map(row).join('') || (j.allowed ? '' : `<div class="muted mhint">${tr('Your admin has not allowed personal agents on this server.')}</div>`)) + add;
+  if (S.me?.is_admin) {
+    try { const p = await api('GET', '/api/admin/agent-policy'); const sw = $('#s-uag', md), mx = $('#s-uagmax', md); if (sw) sw.checked = p.user_agents; if (mx) { mx.value = p.max_per_user; mx.disabled = !p.user_agents; } } catch { /* offline */ }
+  }
+}
+function agSetupWire(md) {
+  md.addEventListener('click', async e => {
+    const sg = e.target.closest('[data-agsv]');
+    if (sg) {
+      const k = sg.closest('[data-agseg]').dataset.agseg; LS.set(k === 'guide' ? 'agGuide' : 'agOs', sg.dataset.agsv);
+      $$(`[data-agseg="${k}"] [data-agsv]`, md).forEach(b => { const on = b === sg; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
+      const box = $('#s-agguide', md); if (box) box.innerHTML = agSetupHtml($('[data-agseg="guide"] .on', md)?.dataset.agsv || 'own', $('[data-agseg="os"] .on', md)?.dataset.agsv || 'linux');
+      return;
+    }
+    if (e.target.closest('[data-m="ag-guide-cc"]')) { agGuideModal(); return; }
+    const b = e.target.closest('[data-myag-act]'); if (!b) return;
+    const box = $('#s-myown', md), k = b.dataset.myagAct, a = (box?._j?.agents || []).find(x => x.id === +b.closest('[data-myag]')?.dataset.myag);
+    try {
+      if (k === 'new') {
+        const un = $('#myag-user', md).value.trim().toLowerCase(); if (!un) { $('#myag-user', md).focus(); return; }
+        b.disabled = true;
+        const r = await api('POST', '/api/my/agents', {username: un, display_name: $('#myag-name', md).value.trim()});
+        secretModal(tr('API token of {0}', r.name), r.token, tr('Copy it now into the agent’s configuration: it is shown only this once.') + ' ' + tr('Then share lists with the agent (list dialog > Sharing).'));
+        await load(); render();
+      }
+      if (!a) { agSetupDraw(md); return; }
+      if (k === 'token') {
+        if (!await askConfirm(tr('Create a new API token for {0}?', a.name), tr('Every older token of this agent stops working at once.'), {ok: tr('New API token'), danger: true})) return;
+        const r = await api('POST', `/api/my/agents/${a.id}/token`);
+        secretModal(tr('API token of {0}', a.name), r.token, tr('Copy it now into the agent’s configuration: it is shown only this once.'));
+      }
+      if (k === 'pause') {
+        if (a.enabled && !await askConfirm(tr('Pause {0}?', a.name), tr('Its API token is refused and no events are sent until you resume it. Nothing is deleted.'), {ok: tr('Pause'), danger: true})) return;
+        await api('PATCH', `/api/my/agents/${a.id}`, {enabled: !a.enabled}); toast(a.enabled ? tr('Paused') : tr('Resumed'));
+        await load(); render();
+      }
+      if (k === 'del') {
+        if (!await askConfirm(tr('Delete the agent “{0}”?', a.name), tr('Its tokens, events, jobs and chats are deleted; lists it owns come to you. Its comments stay.'), {ok: tr('Delete'), danger: true})) return;
+        await api('DELETE', `/api/my/agents/${a.id}`); toast(tr('Deleted'));
+        await load(); render();
+      }
+    } catch { /* api() showed it */ } finally { b.disabled = false; }
+    agSetupDraw(md);
+  });
+  md.addEventListener('change', async e => {
+    if (e.target.id !== 's-uag' && e.target.id !== 's-uagmax') return;
+    const body = e.target.id === 's-uag' ? {user_agents: e.target.checked} : {max_per_user: Math.max(1, Math.min(20, +e.target.value || 2))};
+    try { await api('PUT', '/api/admin/agent-policy', body); toast(tr('Saved')); } catch { /* shown */ }
+    agSetupDraw(md);
+  });
 }
 // shows one sub-tab and loads what it needs (save: remember it for this device)
 function aiSubShow(md, want, save) {
@@ -6347,6 +6527,7 @@ function aiSubShow(md, want, save) {
   if (k === 'lists') return aiTblDraw(md);
   if (k === 'usage') return aiuDraw(md);
   if (k === 'log') return audDraw(md);
+  if (k === 'setup') return agSetupDraw(md);
 }
 function settingsModal(focus) {
   const s = S.settings;
@@ -6441,6 +6622,8 @@ function settingsModal(focus) {
       <div class="shelp">${tr('Every change can be undone: the ← / → buttons at the top (on a phone in the “…” menu), the “Undo” in the message, Ctrl+Z / ⌘Z. Settings too. Offline, the change is simply not sent.')}</div>
       <h4>${tr('Formatting (Markdown)')}</h4>
       <div class="shelp">${tr('<b>Descriptions:</b> <code>**bold**</code>, <code>*italic*</code>, <code>~~strikethrough~~</code>, <code>&#96;code&#96;</code>, links as <code>[text](https://…)</code> or a plain https:// address, headings <code>#</code> / <code>##</code> / <code>###</code>, lists <code>- item</code> or <code>1. item</code>, checklists <code>- [ ]</code> / <code>- [x]</code> (tick them right in the formatted text). “Turn the open checklist items into subtasks” below the formatted description makes real subtasks of the unticked items.')}${collab() ? '<br>' + tr('<b>Comments:</b> the same bold, italic, strikethrough, code and links, plus line breaks and @mentions; no headings, lists or checklists.') : ''}</div>
+      <h4>${tr('Lists and projects')}</h4>
+      <div class="shelp">${tr('A list is a plain task list; a project adds the project modules you switched on (list menu … > Project). For shopping or packing lists: list menu … (or Sort) > Show completed at the bottom: what you tick off stays visible at the bottom and comes back with one tap.')}</div>
       <h4>${tr('Templates')}</h4>
       <div class="shelp">${tr('Task menu (…) or list dialog > Save as template. The template button in the add bar creates the task in the current list, Lists > + > New list from template a whole list. Manage them under Settings > Data.')}</div>
       ${timeOn() ? `<h4>${tr('Time tracking')}</h4><div class="shelp">${tr('Start a timer from a task (detail panel, task menu …) or add time by hand; the running timer shows in the top bar on every device. Sidebar > Time tracking: hours per list and task for a week, month or any range, CSV export and a printable timesheet. In shared lists everyone sees the time of all members, but only changes their own entries. Finished focus sessions on a task count as time unless a timer ran at the same time.')}</div>` : ''}
@@ -6550,6 +6733,7 @@ function settingsModal(focus) {
   if (focus === 'sample') setTimeout(() => $('#s-sample-h', md)?.scrollIntoView({block: 'start'}), 0);
   if (cur === 'integr') { icalDraw(md); calsDraw(md); whDraw(md); }
   calsWire(md); whWire(md); if (S.me?.is_admin) { agWire(md); audWire(md); }
+  agSetupWire(md);  // 2.7.2 (#420)
   plcWire(md); if (S.me?.is_admin) plaWire(md);
   if (cur === 'notify') wpDraw(md);
   ntfyShow(md);
@@ -6612,7 +6796,7 @@ function settingsModal(focus) {
     if (b.dataset.m === 'tour') { md.remove(); tourStart(); return; }
     if (b.dataset.m === 'keys') { md.remove(); shortcutsModal(); return; }
     if (b.dataset.m === 'hints-reset') { LS.del('hintsSeen'); toast(tr('Done')); render(); return; }
-    if (b.dataset.m === 'ag-guide') { agGuideModal(); return; }  // 2.4.2 (#392)
+    if (b.dataset.m === 'ag-guide') { aiSubShow(md, 'setup', true); return; }  // 2.4.2 (#392); 2.7.2 (#420): the Set up tab
     if (b.dataset.m === 'go-share') { $('.snav [data-sec="integr"]', md)?.click(); setTimeout(() => $('#s-share-h', md)?.scrollIntoView?.({block: 'start'}), 50); return; }  // 2.7.0 (#405 S3)
     if (b.dataset.m === 'go-modules') { $('.snav [data-sec="modules"]', md)?.click(); setTimeout(() => $('[data-pane="modules"] [data-modrow="agents"]', md)?.scrollIntoView?.({block: 'center'}), 50); return; }  // 2.6.0 (K09)
     if (b.dataset.m === 'cele-try') { celebrate('today', {force: true}); return; }
@@ -7905,7 +8089,7 @@ const SETUP_MODS = [['cal', N_('Calendar'), N_('Month, week and day view of your
   ['paperless', N_('Paperless link'), N_('Link documents from Paperless-ngx to tasks')],
   ['comments', N_('Comments'), N_('Timestamped notes on your tasks; in shared lists with collaboration also @mentions and News')]];
 // 2.7.0 (K21, #405): "Simple list" is the start of a new instance (comments off too); one question "Start with" below
-const SETUP_PRESETS = {simple: {name: N_('Simple list'), icon: 'check', desc: N_('A plain task list: lists, subtasks, reminders and the calendar'),
+const SETUP_PRESETS = {simple: {name: N_('Simple list'), icon: 'check', desc: N_('A plain task list: lists, subtasks, reminders and the calendar; for shopping or packing, completed items can stay at the bottom'),
     off: ['timeline', 'kanban', 'matrix', 'habits', 'pomo', 'stats', 'progress', 'deps', 'fields', 'collab', 'time', 'comments']},
   solo: {name: N_('Just me'), icon: 'user', desc: N_('All views for one person: timeline, kanban, matrix, habits, focus and statistics'), off: ['collab', 'time', 'deps', 'fields']},
   team: {name: N_('Projects & team'), icon: 'users', desc: N_('Everything: sharing, assigning, comments, time tracking, a timeline with dependencies, custom fields and project progress'), off: []}};
@@ -8438,7 +8622,7 @@ function teRow(e, {task = true, day = true} = {}) {
   const s = new Date(e.start), en = e.end ? new Date(e.end) : null;
   const src = e.source === 'focus' ? `<span class="tesrc" title="${tr('From a focus session')}">${ic('timer', 's')}</span>`
     : e.auto_stopped ? `<span class="tesrc warn" title="${tr('Stopped automatically, please check the end')}">${ic('alert', 's')}</span>` : '';
-  const who = e.mine ? '' : av(e.user_id, e.user_name, 'who', `title="${esc(e.user_name)}"`);
+  const who = e.mine ? '' : avBtn(e.user_id, e.user_name, 'who', `title="${esc(e.user_name)}"`);
   const title = task ? `<span class="tett" ${e.task_id ? `data-act="te-open" data-id="${e.task_id}"` : ''}>${esc(e.title || tr('No task'))}</span>` : '';
   const acts = e.mine ? `<span class="teacts">${!e.running && (e.task_id || e.list_id) ? `<button class="iconbtn" data-act="te-resume" data-eid="${e.id}" title="${tr('Continue (same task and note)')}">${ic('play', 's')}</button>` : ''}<button class="iconbtn" data-act="te-edit" data-eid="${e.id}" title="${tr('Edit')}">${ic('edit', 's')}</button><button class="iconbtn danger" data-act="te-del" data-eid="${e.id}" title="${tr('Delete')}">${ic('trash', 's')}</button></span>` : '';
   return `<div class="terow ${e.running ? 'live' : ''}">${day ? `<span class="ted">${esc(dayLabel(ds(s)))}</span>` : ''}<span class="tet">${fmtClock(s)}–${en ? fmtClock(en) : tr('now')}</span>${title}<span class="ten">${esc(e.note)}</span>${src}${who}<b class="tedur" ${e.running ? 'data-timer-live' : ''}>${e.running ? fmtT(timerElapsed()) : hmm(e.seconds)}</b>${acts}</div>`;
@@ -8912,13 +9096,14 @@ function viewProjOv() {
   const tf = j.task_files.map(f => `<div class="povf"><a href="${attUrl(f, !(f.mime === 'application/pdf' || isImg(f)))}" ${f.mime === 'application/pdf' || isImg(f) ? 'target="_blank" rel="noopener"' : 'download'} title="${esc(f.name)}">${ic(f.mime === 'application/pdf' ? 'pdf' : 'file')}<span class="pfn">${esc(f.name)}</span><span class="muted pfs">${fmtSize(f.size)}</span></a><button class="povt" data-pov="task" data-id="${f.task_id}" title="${esc(tr('Open task'))}">${ic('sub', 's')}<span>${esc(f.task_title)}</span></button></div>`).join('') +
     (feat('paperless') ? j.task_paperless.map(p => povPl(p, `<button class="povt" data-pov="task" data-id="${p.task_id}" title="${esc(tr('Open task'))}">${ic('sub', 's')}<span>${esc(p.task_title)}</span></button>`)).join('') : '');
   const filesSec = povSec('files', tr('Project files'), `<div class="povfl">${files || `<div class="muted povempty">${tr('No project files yet: contracts, briefings, plans.')}</div>`}</div>
+      ${can && !isTouch() ? `<div class="muted povdz">${ic('upload', 's')} ${tr('Or drop files here')}</div>` : ''}
       ${tf ? `<details class="povtf" ${LS.get('povTf', true) ? 'open' : ''}><summary>${tr('Attachments from tasks')} <span class="muted">${j.task_files.length + (feat('paperless') ? j.task_paperless.length : 0)}</span></summary><div class="povfl">${tf}</div></details>` : ''}`, fAdd);
   // side: key links, members, time
   const links = j.links.map((x, i) => `<div class="povl"><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" title="${esc(x.url)}">${ic(povLinkIcon(x.url), 's')}<span class="pln">${esc(x.title)}</span><span class="muted plh">${esc(povHost(x.url))}</span></a>
       ${can ? `<span class="povlb">${i ? `<button class="iconbtn" data-pov="link-up" data-id="${x.id}" title="${esc(tr('Move up'))}" aria-label="${esc(tr('Move up'))}">${ic('chev', 's up')}</button>` : ''}<button class="iconbtn" data-pov="link-edit" data-id="${x.id}" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit'))}">${ic('edit', 's')}</button></span>` : ''}</div>`).join('');
   let side = povSec('links', tr('Key links'), links || `<div class="muted povempty">${tr('Repository, designs, documents: the addresses everyone needs.')}</div>`, can ? `<button class="btn sm" data-pov="link-add">${ic('plus', 's')}<span>${tr('Add link')}</span></button>` : '');
   if (collab() && j.members.length) {
-    side += povSec('people', tr('Members'), `<div class="povp">${j.members.map(p => `<div class="povpm">${av(p.user_id, p.name)}<span class="ppn">${esc(p.name)}${S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : ''}</span><span class="muted">${esc(roleLabel(p.role))}</span></div>`).join('')}</div>`,
+    side += povSec('people', tr('Members'), `<div class="povp">${j.members.map(p => `<div class="povpm">${avBtn(p.user_id, p.name)}<span class="ppn">${esc(p.name)}${S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : ''}</span><span class="muted">${esc(roleLabel(p.role))}</span></div>`).join('')}</div>`,
       canManage(l) && !l.archived ? `<button class="btn sm" data-act="share-list" data-id="${l.id}">${ic('users', 's')}<span>${tr('Share…')}</span></button>` : '');
   }
   const ts = timeSumHtml([l]);
@@ -9004,6 +9189,15 @@ document.addEventListener('change', e => {
   if (e.target.id === 'pov-file') { const l = routeList(); if (l) povUpload(l, e.target.files); e.target.value = ''; }
 });
 document.addEventListener('toggle', e => { if (e.target.classList?.contains('povtf')) LS.set('povTf', e.target.open); }, true);
+// 2.7.2: drag files from the desktop onto "Project files" (editors only, i.e. where "Add file" is shown)
+const povDropZone = e => { const z = e.target.closest?.('#pov-files'); return z && z.querySelector('#pov-file') && [...(e.dataTransfer?.types || [])].includes('Files') ? z : null; };
+document.addEventListener('dragover', e => { const z = povDropZone(e); if (!z) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; z.classList.add('povdrop'); });
+document.addEventListener('dragleave', e => { const z = e.target.closest?.('#pov-files'); if (z && !z.contains(e.relatedTarget)) z.classList.remove('povdrop'); });
+document.addEventListener('drop', e => {
+  const z = povDropZone(e); if (!z) return;
+  e.preventDefault(); z.classList.remove('povdrop');
+  const l = routeList(); if (l) povUpload(l, e.dataTransfer.files);
+});
 
 // ------------------------------------------------------------------ dependencies (detail panel, package 3)
 S.dp = {id: null};
@@ -9396,6 +9590,8 @@ document.addEventListener('click', async e => {
     case 'tag-promote': tagPromote(taskById(S.sel), a.dataset.tag); break;
     case 'open': if (!swiped) openDetail(id); break;
     case 'open-id': openDetail(id); break;
+    case 'crumb': crumbGo(a.dataset.k, a.dataset.id); break;  // 2.7.2 (#424)
+    case 'chat-react': e.stopPropagation(); chatReact(+a.dataset.mid, a.dataset.e); break;  // 2.7.2 (#421)
     case 'tv-stop': timerStop(); break;
     case 'news-open': newsOpen(+a.dataset.i); break;
     case 'bell-pop': bellPop(a); break;
@@ -10845,7 +11041,7 @@ function tourSteps() {
   if (m) s.push({id: 'tabs', sel: '#tabs', t: N_('Tab bar'), d: feat('habits') || feat('pomo') ? N_('Your modules: calendar, habits, focus and more. Pin lists or filters here under Settings > Appearance.') : N_('Your lists and views. Pin lists or filters here under Settings > Appearance.'), r: rect('#tabs')});
   else if (!touch) s.push({id: 'keys', sel: '#top .kbtn', t: N_('Keyboard first'), d: N_('{0} opens search and commands for everything, {1} lists all shortcuts. j and k move through tasks, x completes.'), args: [kbText('Mod+K'), '?'], r: rect('#top .kbtn')});
   const pp = S.me?.is_admin || collab() ? projectParts() : [];  // "Make a list a project": admins and teams, when a project module is on
-  s.push({id: 'settings', sel: m ? '#tabs [data-act="tabs-more"]' : '#rail [data-act="settings"]', t: N_('Settings and modules'), d: pp.length ? N_('Switch modules on or off, pick the language and the appearance. Make a list a project (list menu … > Project) to get {0}. This tour can be restarted under Settings > Help.') : N_('Switch modules on or off, pick the language and the appearance (theme, font size, font, accent color). This tour can be restarted under Settings > Help.'), args: pp.length ? [pp.join(', ')] : [],
+  s.push({id: 'settings', sel: m ? '#tabs [data-act="tabs-more"]' : '#rail [data-act="settings"]', t: N_('Settings and modules'), d: pp.length ? N_('Switch modules on or off, pick the language and the appearance. Make a list a project (list menu … > Project) to get {0}; for shopping or packing: … > Show completed at the bottom. This tour can be restarted under Settings > Help.') : N_('Switch modules on or off, pick the language and the appearance (theme, font size, font, accent color). Shopping or packing? List menu … > Show completed at the bottom. This tour can be restarted under Settings > Help.'), args: pp.length ? [pp.join(', ')] : [],
     r: rect(m ? () => $('#tabs [data-act="tabs-more"]') || $('#tabs [data-act="settings"]') || $('#top .menu') : '#rail [data-act="settings"]')});
   if (collab()) s.push({id: 'news', sel: '#top .bell', t: N_('News'), d: N_('Mentions, assignments and comments on your tasks arrive here.'), r: rect('#top .bell')});
   return s.slice(0, 6);
@@ -11111,9 +11307,10 @@ function agentChip() {
   const tip = [txt, ...(lines.length ? lines : agentStatusLines())].filter(Boolean).join('\n');
   // without dots (all hidden) the pill keeps its old look: bot / avatar + the ring while one works (with dots the ring is
   // hidden by CSS: the dots say it)
-  const lead = ags.length ? hdotsHtml(ags) : ab.busy.length === 1 ? av(ab.busy[0].id, ab.busy[0].name, 'avatar sm') : ic('bot', 's');
+  // 2.7.2 (#417): a robot always leads (the agents' status), the dots follow it
+  const lead = `<span class="abot" aria-hidden="true">${ic('bot', 's')}</span>` + (ags.length ? hdotsHtml(ags) : ab.busy.length === 1 ? av(ab.busy[0].id, ab.busy[0].name, 'avatar sm') : '');
   const ring = st === 'working' ? 'aspin' : st === 'waiting' ? 'await' : '';
-  return `<button class="achip ${ab ? 'busy' : 'calm'} ${attn ? 'attn' : ''} ${ring || ''}" data-act="agent-chip" aria-haspopup="menu" title="${esc(tip)}" aria-label="${esc(lab)}">${lead}${ab ? `<span class="act">${esc(txt)}</span><span class="acn" aria-hidden="true">${ic('bot', 's')}${ab.n}</span>` : ''}</button>`;  // 2.5.2 (K01): phones show the bot + a number
+  return `<button class="achip ${ab ? 'busy' : 'calm'} ${attn ? 'attn' : ''} ${ring || ''}" data-act="agent-chip" aria-haspopup="menu" title="${esc(tip)}" aria-label="${esc(lab)}">${lead}${ab ? `<span class="act">${esc(txt)}</span><span class="acn" aria-hidden="true">${ab.n}</span>` : ''}</button>`;  // 2.5.2 (K01): phones show the bot + a number
 }
 // 2.6.0 (K01): the agent pill and the running indicator merged into one compact chip (shown from header level tl2 on):
 // bot + number, dot + time; a tap opens the one that is there, or a menu with both
@@ -11123,7 +11320,7 @@ function stChip() {
   const x = it[0], who = ab ? (ab.busy.length === 1 ? ab.busy[0].name : tr('Agents')) : ags.map(a => `${a.name} ${agentSt(a)}`).join(', ');
   const lab = [who, ...it.map(r => `${tr(RUN_KIND[r.k][1])} ${r.txt}`)].join(' · ');
   const st = ab ? agentBusyState() : '';
-  return `<button class="stchip ${ab && (ab.wait || ab.unread) ? 'attn' : ''} ${st === 'working' ? 'aspin' : ''}" data-act="st-chip" title="${esc([lab, ...ags.map(agentHstLine)].join('\n'))}" aria-label="${esc(lab)}" aria-haspopup="menu"><span class="sta">${ags.length ? hdotsHtml(ags, 3) : ic('bot', 's')}${ab ? `<b>${ab.n}</b>` : ''}</span><span class="str k-${x.k}"><span class="rec"></span>${it.length === 1 ? `<span ${x.attr}>${x.txt}</span>` : `<b>${it.length}</b>`}</span></button>`;
+  return `<button class="stchip ${ab && (ab.wait || ab.unread) ? 'attn' : ''} ${st === 'working' ? 'aspin' : ''}" data-act="st-chip" title="${esc([lab, ...ags.map(agentHstLine)].join('\n'))}" aria-label="${esc(lab)}" aria-haspopup="menu"><span class="sta"><span class="abot">${ic('bot', 's')}</span>${ags.length ? hdotsHtml(ags, 3) : ''}${ab ? `<b>${ab.n}</b>` : ''}</span><span class="str k-${x.k}"><span class="rec"></span>${it.length === 1 ? `<span ${x.attr}>${x.txt}</span>` : `<b>${it.length}</b>`}</span></button>`;
 }
 function stChipMenu(a) {
   const ab = agentBusy(), ags = shownAgents(), it = runItems();
@@ -11310,7 +11507,7 @@ function viewAgents() {
   if (S.jobs.items === null) { S.jobs.items = []; loadJobs(); aiuLoad().then(() => { if (S.route.mod === 'agents') renderView(); }); }  // 2.1.1: the usage card
   if (S.route.agent && isMobile()) return chatViewHtml(S.route.agent);
   const ags = S.agents || [];
-  const card = a => `<div class="agcard ${a.enabled ? '' : 'off'}">${av(a.id, a.name, 'avatar lg')}<div class="agi"><b>${esc(a.name)}</b><span class="muted">${esc(agentSt(a))}${a.status_text ? ' · ' + esc(a.status_text) : ''}</span>
+  const card = a => `<div class="agcard ${a.enabled ? '' : 'off'}">${avBtn(a.id, a.name, 'avatar lg')}<div class="agi"><b>${esc(a.name)}</b><span class="muted">${esc(agentSt(a))}${a.status_text ? ' · ' + esc(a.status_text) : ''}</span>
       <span class="muted agn">${esc([a.running && trn('{0} running', '{0} running', a.running), a.waiting && trn('{0} waiting', '{0} waiting', a.waiting)].filter(Boolean).join(' · '))}</span></div>
       <div class="agb"><button class="btn sm" data-act="chat-open" data-aid="${a.id}" ${a.enabled ? '' : 'disabled'}>${ic('comment', 's')} ${tr('Chat')}${a.chat_unread ? ` <span class="nbadge">${a.chat_unread}</span>` : ''}</button></div></div>`;
   const items = S.jobs.items || [];
@@ -11586,7 +11783,11 @@ function chatOpen(aid) {
 function chatClose() { S.chat = {aid: null, msgs: [], err: null}; $('#achat')?.classList.add('hidden'); document.body.classList.remove('chat-open'); if (S.route.mod === 'agents' && S.route.agent) go('agents'); }
 async function chatLoad() {
   const aid = S.chat.aid; if (!aid) return;
-  try { const j = await api('GET', `/api/agents/${aid}/chat`); if (S.chat.aid !== aid) return; S.chat.msgs = j.messages; S.chat.err = null; const a = agentById(aid); if (a) a.chat_unread = 0; }
+  try {
+    const j = await api('GET', `/api/agents/${aid}/chat`); if (S.chat.aid !== aid) return; S.chat.msgs = j.messages; S.chat.err = null;
+    if (j.now) S.chat.off = Date.now() - Date.parse(j.now);  // 2.7.2 (#422): the server's clock
+    const a = agentById(aid); if (a) { if (j.agent) { Object.assign(a, j.agent); S.agentsAt = Date.now(); } a.chat_unread = 0; }
+  }
   catch (e) { S.chat.err = e instanceof Offline ? tr('Only available online.') : e.message; }
   chatDraw(); renderTop(); if (S.route.mod === 'agents' && !S.route.agent) renderView();
 }
@@ -11594,14 +11795,57 @@ function chatMsgs() {
   const a = agentById(S.chat.aid);
   if (S.chat.err) return `<div class="muted mhint">${esc(S.chat.err)}</div>`;
   if (!S.chat.msgs.length) return `<div class="muted cmempty">${tr('Ask {0} something, or ask it to plan, comment or create tasks in the lists you share.', esc(a?.name || ''))}</div>`;
-  return S.chat.msgs.map(m => { const t = m.task_id && taskById(m.task_id);
-    return `<div class="cmsg ${m.from === 'agent' ? 'ag' : 'me'}"><div class="cbub">${m.from === 'agent' ? commentBody(m.body, {}) : esc(m.body).replace(/\n/g, '<br>')}</div>${t ? `<button class="runtask" data-act="open-id" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : ''}<time>${fmtWhen(m.created_at)}</time></div>`; }).join('');
+  const pend = chatPending(), off = a && pend && (!a.enabled || agentOffline(a));
+  return S.chat.msgs.map(m => { const t = m.task_id && taskById(m.task_id), mine = m.from !== 'agent';
+    // 2.7.2 (#422): my messages say Sent / Delivered (the agent fetched it); (#421) reactions, quick 👍 👎 ❤️ on the agent's
+    const dlv = mine ? `<span class="cdlv ${m.delivered_at ? 'on' : ''}" title="${esc(m.delivered_at ? tr('Delivered') + ' · ' + fmtWhen(m.delivered_at) : tr('Sent'))}">${ic('check', 's')}${m.delivered_at ? ic('check', 's') : ''}<span>${m.delivered_at ? tr('Delivered') : tr('Sent')}</span></span>` : '';
+    return `<div class="cmsg ${mine ? 'me' : 'ag'}" data-mid="${m.id}"><div class="cbub">${!mine ? commentBody(m.body, {}) : esc(m.body).replace(/\n/g, '<br>')}</div>${t ? `<button class="runtask" data-act="open-id" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : ''}${chatRxHtml(m, a)}<div class="cmeta"><time>${fmtWhen(m.created_at)}</time>${dlv}</div></div>`; }).join('')
+    + (off ? `<div class="chpend off" role="status">${ic('clock', 's')}<span>${esc(tr('{0} is offline – will answer later', a.name))}</span></div>` : '');
 }
+// 2.7.2 (#421): reactions on a chat message. On the agent's messages 👍 / 👎 / ❤️ are always there (👍 from me = approval);
+// on mine only what the agent reacted with
+function chatRxHtml(m, a) {
+  const rs = m.reactions || [], ag = m.from === 'agent', on = !!a?.enabled;
+  const pill = r => { const me = r.users.some(u => S.me && u.id === S.me.id); return `<button type="button" class="rx ${me ? 'on' : ''}" data-act="chat-react" data-mid="${m.id}" data-e="${esc(r.emoji)}" title="${esc(r.users.map(u => u.name).join(', ') + ' · ' + rxName(r.emoji))}" aria-label="${esc(rxName(r.emoji) + ': ' + r.users.map(u => u.name).join(', '))}" aria-pressed="${me}" ${on ? '' : 'disabled'}>${esc(rxEmoji(r.emoji))}<span class="rxn">${r.count}</span></button>`; };
+  const quick = ag && on ? RX.filter(([k]) => !rs.some(r => r.emoji === k)).map(([k, em, n]) => `<button type="button" class="rx add" data-act="chat-react" data-mid="${m.id}" data-e="${k}" title="${esc(tr(n))}" aria-label="${esc(tr(n))}">${em}</button>`) : [];
+  const h = rs.map(pill).join('') + quick.join('');
+  return h ? `<div class="rxbar chrx">${h}</div>` : '';
+}
+async function chatReact(mid, emoji) {
+  const aid = S.chat.aid, m = S.chat.msgs.find(x => x.id === mid); if (!aid || !m) return;
+  try { const r = await api('POST', `/api/agents/${aid}/chat/${mid}/reactions`, {emoji}); m.reactions = r.reactions; if (r.approval === 'approved') toast(tr('Approved')); }
+  catch { return; }
+  chatDraw();
+}
+// 2.7.2 (#422): my last message the agent has not answered yet (null = none); the dots come by themselves while the agent
+// is online (event poll in the last 2 minutes or a webhook) for 90 s after it fetched the message, longer while it reports
+// "working" or sends its typing signal; offline / paused: "answers later" instead
+function chatPending() {
+  const ms = S.chat.msgs; let last = null;
+  for (let i = ms.length - 1; i >= 0; i--) { if (ms[i].from === 'agent') break; last = last || ms[i]; }
+  return last;
+}
+function chatAutoTyping(a) {
+  const m = chatPending(); if (!m || !a || !a.enabled || agentOffline(a) || a.limit_reached) return false;
+  const online = a.webhook || (a.poll_age != null && a.poll_age + agentAge() <= 120);
+  if (!online || !m.delivered_at) return false;
+  if (a.status === 'working' || (a.typing || 0) - agentAge() > 0) return true;
+  return (Date.now() - (S.chat.off || 0) - Date.parse(m.delivered_at)) / 1000 <= 90;
+}
+// while a message waits for its answer, the open chat asks the server every 3 s (delivered, the agent's state), at most
+// 3 minutes after it was sent
+setInterval(() => {
+  if (!S.chat.aid || document.hidden || !$('#chat-msgs')) return;
+  const m = chatPending(); if (!m) return;
+  if (Date.now() - (S.chat.off || 0) - Date.parse(m.created_at) > 180000) return;
+  chatLoad();
+}, 3000);
 // 2.4.1 (#375) the chat header: typing dots while the agent writes to me (its typing signal, or "working" on nothing in
 // particular, on a task of this chat or on a job of mine) + its state in words: working on #…, waiting for you, ready,
 // paused, limit reached, offline
 function chatTyping(a) {
   if (!a || !a.enabled || agentOffline(a)) return false;
+  if (S.chat.aid === a.id && chatAutoTyping(a)) return true;  // 2.7.2 (#422)
   if ((a.typing || 0) - agentAge() > 0) return true;
   if (a.status !== 'working') return false;
   return !a.status_task || a.my_job || (S.chat.aid === a.id && S.chat.msgs.some(m => m.task_id === a.status_task));
@@ -11615,7 +11859,7 @@ function chatStHtml(a) {
 }
 function chatInner(aid) {
   const a = agentById(aid); if (!a) return `<div class="muted mhint">${tr('Agent not found')}</div>`;
-  return `<div class="chath">${av(a.id, a.name, 'avatar')}<div class="chn"><b>${esc(a.name)}</b>${chatStHtml(a)}</div><span class="spacer"></span>
+  return `<div class="chath">${avBtn(a.id, a.name, 'avatar')}<div class="chn"><b>${esc(a.name)}</b>${chatStHtml(a)}</div><span class="spacer"></span>
       <button class="iconbtn" data-act="chat-close" title="${tr('Close')}" aria-label="${tr('Close')}">${ic(isMobile() ? 'back' : 'x')}</button></div>
     <div class="chmsgs" id="chat-msgs">${chatMsgs()}</div>
     ${typingHtml(chatTyping(a) ? [a] : [], 'chat-typing')}
@@ -11627,10 +11871,15 @@ function chatViewHtml(aid) {
   return `<div class="chview">${chatInner(aid)}</div>`;
 }
 function chatDraw() {
-  const p = $('#achat');
-  if (p && !p.classList.contains('hidden') && S.chat.aid && !isMobile()) { const d = S.drafts['chat:' + S.chat.aid] = $('#chat-in', p)?.value ?? S.drafts['chat:' + S.chat.aid]; p.innerHTML = chatInner(S.chat.aid); if (d !== undefined) $('#chat-in', p).value = d; }
-  else { const m = $('#chat-msgs'); if (m) m.innerHTML = chatMsgs(); }
-  const m = $('#chat-msgs'); if (m) m.scrollTop = m.scrollHeight;
+  const p = $('#achat'), m0 = $('#chat-msgs');
+  const near = !m0 || m0.scrollHeight - m0.scrollTop - m0.clientHeight < 80;  // only follow new messages from the bottom
+  if (p && !p.classList.contains('hidden') && S.chat.aid && !isMobile() && (p.dataset.aid !== String(S.chat.aid) || !$('#chat-msgs', p))) {
+    const d = S.drafts['chat:' + S.chat.aid] = $('#chat-in', p)?.value ?? S.drafts['chat:' + S.chat.aid]; p.innerHTML = chatInner(S.chat.aid); p.dataset.aid = S.chat.aid; if (d !== undefined) $('#chat-in', p).value = d;
+  } else {  // 2.7.2 (#422): the open chat refreshes in place (the box keeps its focus, the keyboard stays)
+    const m = $('#chat-msgs'); if (m) m.innerHTML = chatMsgs();
+    agentLive();
+  }
+  const m = $('#chat-msgs'); if (m && near) m.scrollTop = m.scrollHeight;
 }
 async function chatSend() {
   const ta = $('#chat-in'), aid = S.chat.aid; if (!ta || !aid) return;
@@ -11750,6 +11999,79 @@ function aiTblWire(md) {
     try { await api('PATCH', `/api/lists/${lid}`, ag ? {tidy_agent_id: +sel.value} : {agent_tidy: sel.value}); toast(tr('Saved')); await load(); render(); aiTblDraw(md); }
     catch { const l = listById(lid); sel.value = ag ? String(l?.tidy_agent_id ?? '') : l?.agent_tidy || 'off'; }
   });
+}
+
+// ---- 2.7.2 (#420) Settings > Agents > Set up: two guides (team agent on a server by an admin / personal agent on the
+// user's own computer), each for Linux, macOS and Windows. Steps = [title, text, command]; titles and texts are translated,
+// commands are not (short versions; the full ones are in docs/AGENTS.md "Set up an agent").
+const AG_OS = [['linux', 'Linux'], ['mac', 'macOS'], ['win', 'Windows']];
+const AG_HEADLESS = 'Read CLAUDE.md. Then loop: call the kalmido tool wait_for_events, handle every event following CLAUDE.md, call it again.';
+const AG_S = {
+  create: [N_('Create the agent'), N_('Settings > Agents > Status > Add agent. Copy the token: it is shown only once. In its dialog set usage limits and the runtime (model, auto-compact, nightly restart).'), ''],
+  share: [N_('Share lists'), N_('Settings > Agents > Lists: one click per list, or “Share all existing lists”. Share only what it should work in.'), ''],
+  rules: [N_('Rules and permissions'), N_('CLAUDE.md names who may instruct it; everything else is data. .claude/settings.json: defaultMode dontAsk, only the Kalmido tools allowed, the env file denied, the usage hook as Stop hook.'), ''],
+  test: [N_('Test'), N_('Mention it in a comment, write to it in the chat, pause it (it has to stop) and try the prompt-injection cases from the guide.'), ''],
+  ownAllowed: [N_('Allowed on this server?'), N_('An admin has to switch on “Users may create their own agents” (Settings > Agents > Set up). Without it, “Create agent” is missing: ask an admin.'), ''],
+  ownCreate: [N_('Create your agent'), N_('Settings > Agents > Set up > Your personal agents: a username, then “Create agent”. Copy the token: it is shown only once. Only you can share lists with it and chat with it.'), ''],
+  ownShare: [N_('Share only what it should see'), N_('Settings > Agents > Lists or a list’s Share dialog. It sees nothing else.'), ''],
+  ownRules: [N_('Rules and permissions'), N_('CLAUDE.md: only you instruct it. .claude/settings.json: defaultMode dontAsk, only the Kalmido tools allowed, the env file denied, the usage hook as Stop hook.'), ''],
+  ownRun: [N_('Run it'), N_('Interactively: claude in the work directory. In the background: the launcher (dry run first with --once). Pause it any time in Settings > Agents.'), '']
+};
+const AG_GUIDES = {
+  team: {
+    linux: [AG_S.create, AG_S.share,
+      [N_('A user without admin rights'), N_('Its own Linux user: no sudo or docker group, no SSH keys, a locked password.'), 'sudo useradd --create-home --shell /bin/bash kalmido-agent\nsudo passwd --lock kalmido-agent\nsudo chmod 0700 ~kalmido-agent'],
+      [N_('Token in an env file'), N_('Two lines, KALMIDO_URL=… and KALMIDO_TOKEN=…, readable only by the agent’s account.'), 'sudo -iu kalmido-agent\nmkdir -p ~/.config/kalmido && (umask 077; nano ~/.config/kalmido/agent.env)'],
+      [N_('Egress firewall'), N_('Only DNS, Kalmido and public HTTPS (the model API); no local network. nftables matches only the agent user (meta skuid).'), 'sudo nft -f /etc/nftables.d/kalmido-agent.nft'],
+      [N_('Claude Code and the MCP server'), N_('Install Claude Code as the agent user and log in once. A small wrapper reads the env file and starts the MCP server, so the token is never in a configuration.'), 'curl -fsSL https://claude.ai/install.sh | bash\ngit clone --depth 1 https://github.com/Gegenschuss/kalmido.git ~/kalmido\ncd ~/agent && claude mcp add -s local kalmido -- "$HOME/kalmido/mcp/run.sh"'],
+      AG_S.rules,
+      [N_('Launcher as a service'), N_('A systemd user unit runs mcp/agent_launcher.sh: it applies the runtime settings from Kalmido and stops the agent while it is paused.'), 'sudo loginctl enable-linger kalmido-agent\nsystemctl --user enable --now kalmido-agent'],
+      AG_S.test],
+    mac: [AG_S.create, AG_S.share,
+      [N_('A user without admin rights'), N_('A standard account for the agent, hidden from the login window.'), 'sudo sysadminctl -addUser kalmido-agent -fullName "Kalmido agent" -password -\nsudo dscl . create /Users/kalmido-agent IsHidden 1\nsudo chmod 700 /Users/kalmido-agent'],
+      [N_('Token in an env file'), N_('Two lines, KALMIDO_URL=… and KALMIDO_TOKEN=…, readable only by the agent’s account.'), 'sudo -iu kalmido-agent\nmkdir -p ~/.config/kalmido && (umask 077; nano ~/.config/kalmido/agent.env)'],
+      [N_('Egress firewall'), N_('pf rules for the agent user only: DNS, Kalmido and public HTTPS allowed, the local network blocked. Check them again after macOS updates.'), 'sudo pfctl -f /etc/pf.conf && sudo pfctl -e'],
+      [N_('Claude Code and the MCP server'), N_('Install Claude Code as the agent user and log in once. A small wrapper reads the env file and starts the MCP server, so the token is never in a configuration.'), 'curl -fsSL https://claude.ai/install.sh | bash\ngit clone --depth 1 https://github.com/Gegenschuss/kalmido.git ~/kalmido\ncd ~/agent && claude mcp add -s local kalmido -- "$HOME/kalmido/mcp/run.sh"'],
+      AG_S.rules,
+      [N_('Launcher as a service'), N_('A LaunchDaemon with UserName kalmido-agent runs mcp/agent_launcher.ps1 with PowerShell 7 (the shell version needs GNU tools that macOS lacks).'), 'brew install --cask powershell\nsudo launchctl bootstrap system /Library/LaunchDaemons/com.kalmido.agent.plist'],
+      AG_S.test],
+    win: [AG_S.create, AG_S.share,
+      [N_('A user without admin rights'), N_('A standard local account, member of Users only, never Administrators. Sign in once to create its profile.'), '$pw = Read-Host -AsSecureString\nNew-LocalUser -Name kalmido-agent -Password $pw -PasswordNeverExpires\nAdd-LocalGroupMember -Group Users -Member kalmido-agent'],
+      [N_('Token in an env file'), N_('Two lines, KALMIDO_URL=… and KALMIDO_TOKEN=…, readable only by the agent’s account.'), 'notepad $HOME\\.config\\kalmido\\agent.env\nicacls $HOME\\.config\\kalmido\\agent.env /inheritance:r /grant:r "kalmido-agent:(R,W)" "Administrators:F"'],
+      [N_('Egress firewall'), N_('Windows Defender Firewall: block the local network for the programs the agent runs (Claude Code, Python). Block rules win, so leave a Kalmido in your network out of the ranges.'), 'New-NetFirewallRule -DisplayName "Kalmido agent: no LAN" -Direction Outbound -Program <claude.exe> -RemoteAddress 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16 -Action Block'],
+      [N_('Claude Code and the MCP server'), N_('Install Python 3, Git, PowerShell 7 and Claude Code, log in once. The wrapper run.ps1 reads the env file and starts the MCP server.'), 'winget install Python.Python.3.12 Git.Git Microsoft.PowerShell\nirm https://claude.ai/install.ps1 | iex\ngit clone --depth 1 https://github.com/Gegenschuss/kalmido.git $HOME\\kalmido\ncd $HOME\\agent; claude mcp add -s local kalmido -- pwsh -NoProfile -File "$HOME\\kalmido\\mcp\\run.ps1"'],
+      AG_S.rules,
+      [N_('Launcher as a service'), N_('A scheduled task at startup runs mcp/agent_launcher.ps1 as the agent user and restarts it if it stops.'), 'Register-ScheduledTask -TaskName "Kalmido agent" -Trigger (New-ScheduledTaskTrigger -AtStartup) -Action (New-ScheduledTaskAction -Execute pwsh.exe -Argument "-File …\\agent_launcher.ps1 -e …\\agent.env -- claude -p …") -User kalmido-agent -Password …'],
+      AG_S.test]
+  },
+  own: {
+    linux: [AG_S.ownAllowed, AG_S.ownCreate,
+      [N_('Install Claude Code and the MCP server'), N_('Log in to Claude Code once. Put the token into an env file only you can read; a small wrapper starts the MCP server with it.'), 'curl -fsSL https://claude.ai/install.sh | bash\ngit clone --depth 1 https://github.com/Gegenschuss/kalmido.git ~/kalmido\nmkdir -p ~/.config/kalmido ~/agent && (umask 077; nano ~/.config/kalmido/agent.env)\ncd ~/agent && claude mcp add -s local kalmido -- "$HOME/kalmido/mcp/run.sh"'],
+      AG_S.ownShare, AG_S.ownRules,
+      [N_('Usage hook'), N_('In .claude/settings.json as Stop hook: reports token usage to Kalmido, never text.'), 'python3 ~/kalmido/mcp/claude_usage_hook.py ~/.config/kalmido/agent.env'],
+      [AG_S.ownRun[0], AG_S.ownRun[1], '~/kalmido/mcp/agent_launcher.sh -e ~/.config/kalmido/agent.env --once']],
+    mac: [AG_S.ownAllowed, AG_S.ownCreate,
+      [N_('Install Claude Code and the MCP server'), N_('Log in to Claude Code once. Put the token into an env file only you can read; a small wrapper starts the MCP server with it.'), 'curl -fsSL https://claude.ai/install.sh | bash\nxcode-select --install\ngit clone --depth 1 https://github.com/Gegenschuss/kalmido.git ~/kalmido\nmkdir -p ~/.config/kalmido ~/agent && (umask 077; nano ~/.config/kalmido/agent.env)\ncd ~/agent && claude mcp add -s local kalmido -- "$HOME/kalmido/mcp/run.sh"'],
+      AG_S.ownShare, AG_S.ownRules,
+      [N_('Usage hook'), N_('In .claude/settings.json as Stop hook: reports token usage to Kalmido, never text.'), 'python3 ~/kalmido/mcp/claude_usage_hook.py ~/.config/kalmido/agent.env'],
+      [AG_S.ownRun[0], AG_S.ownRun[1], 'brew install --cask powershell\npwsh -File ~/kalmido/mcp/agent_launcher.ps1 -e ~/.config/kalmido/agent.env --once']],
+    win: [AG_S.ownAllowed, AG_S.ownCreate,
+      [N_('Install Claude Code and the MCP server'), N_('Log in to Claude Code once. Put the token into an env file only you can read; the wrapper run.ps1 starts the MCP server with it.'), 'winget install Python.Python.3.12 Git.Git Microsoft.PowerShell\nirm https://claude.ai/install.ps1 | iex\ngit clone --depth 1 https://github.com/Gegenschuss/kalmido.git $HOME\\kalmido\nnotepad $HOME\\.config\\kalmido\\agent.env\ncd $HOME\\agent; claude mcp add -s local kalmido -- pwsh -NoProfile -File "$HOME\\kalmido\\mcp\\run.ps1"'],
+      AG_S.ownShare, AG_S.ownRules,
+      [N_('Usage hook'), N_('In .claude/settings.json as Stop hook: reports token usage to Kalmido, never text.'), 'python C:/Users/<you>/kalmido/mcp/claude_usage_hook.py C:/Users/<you>/.config/kalmido/agent.env'],
+      [AG_S.ownRun[0], AG_S.ownRun[1], 'pwsh -File $HOME\\kalmido\\mcp\\agent_launcher.ps1 -e $HOME\\.config\\kalmido\\agent.env --once']]
+  }
+};
+function agSetupHtml(guide, os) {
+  const g = AG_GUIDES[guide] ? guide : 'team', o = AG_GUIDES[g][os] ? os : 'linux';
+  const intro = g === 'team'
+    ? tr('A team agent runs on a server you control, as its own user without admin rights, walled off from your network. Everyone who shares a list with it can work with it.')
+    : tr('A personal agent runs on your own computer and belongs to you: it sees only the lists you share with it, and only you can chat with it.');
+  const steps = AG_GUIDES[g][o].map(([h, t, cmd]) => `<li><b>${tr(h)}</b><span>${tr(t)}</span>${cmd ? `<pre class="agcmd">${esc(cmd)}</pre>` : ''}</li>`).join('');
+  return `<div class="shint">${esc(intro)} ${esc(tr('Kalmido never starts or downloads an AI: you run the agent yourself.'))}</div>
+    <ol class="agsteps agb">${steps}</ol>
+    <div class="shint">${esc(tr('Headless prompt for the launcher:'))} <code>${esc(AG_HEADLESS)}</code></div>
+    <div class="shint">${esc(tr('Every command, for all three systems:'))} <a href="${API_DOCS.replace('API.md', 'AGENTS.md')}#set-up-an-agent" target="_blank" rel="noopener noreferrer">${esc(tr('Set up an agent (docs/AGENTS.md)'))}</a></div>`;
 }
 
 // ---- 2.4.2 (#392) Settings > Agents > Setup guide: two ways to run an agent next to Kalmido. A: a prompt for
@@ -11876,7 +12198,7 @@ function agCardHtml(a, adm) {
   const wh = adm && a.webhook && (!a.webhook.enabled || (a.webhook.last && !a.webhook.last.ok)) ? `<small class="agwarn">${tr('webhook')} ${whState(a.webhook)}</small>` : '';
   const lim = a.usage?.reached || u?.limit_reached ? `<small class="agwarn aiulr">${ic('chart', 's')} ${a.usage ? aiuLimLine(a.usage) : esc(tr('limit reached'))}</small>` : '';
   const use = u && u.totals.d30.calls ? `<span class="agu" title="${esc(tr('Usage') + ': ' + tr('Today') + ' / ' + tr('7 days'))}"><small class="muted">${tr('Today')}</small> ${esc(aiuVal(u.totals.today, m))}<small class="muted">· ${tr('7 days')}</small> ${esc(aiuVal(u.totals.d7, m))}</span>` : '';
-  return `<div class="mrow agsrow ${off ? 'off' : ''}" data-agid="${a.id}">${av(a.id, a.name)}<span class="n" ${more ? `title="${esc(more)}"` : ''}><span class="agnm"><b>${esc(a.name)}</b>${adm && a.username ? ` <span class="muted">${esc(a.username)}</span>` : ''}</span>
+  return `<div class="mrow agsrow ${off ? 'off' : ''}" data-agid="${a.id}">${av(a.id, a.name)}<span class="n" ${more ? `title="${esc(more)}"` : ''}><span class="agnm"><b>${esc(a.name)}</b>${adm && a.username ? ` <span class="muted">${esc(a.username)}</span>` : ''}${adm && a.owner ? ` <span class="agown" title="${esc(tr('Personal agent of {0}', a.owner.name))}">${ic('user', 's')}${esc(a.owner.name)}</span>` : ''}</span>
       <small class="muted agfacts"><i class="adot st-${esc(st)}" aria-hidden="true"></i>${esc(facts.join(' · '))}</small>${lim}${wh}</span>${use}
     ${adm ? `<span class="agacts"><button class="iconbtn" data-ag="test" title="${tr('Send test')}" aria-label="${tr('Send test')}" ${a.enabled ? '' : 'disabled'}>${ic('send', 's')}</button>
       <button class="iconbtn" data-ag="edit" title="${tr('Edit')}" aria-label="${tr('Edit')}">${ic('edit', 's')}</button>
@@ -11977,8 +12299,8 @@ function agModal(a, done) {
         return;
       }
       if (m === 'del') {
-        if (!await askConfirm(tr('Delete the agent “{0}”?', a.name), tr('Its tokens, events, jobs and chats are deleted. Lists it owns must be deleted or handed over first; its comments stay.'), {ok: tr('Delete'), danger: true})) return;
-        await calReq('DELETE', `/api/users/${a.id}`);
+        if (!await askConfirm(tr('Delete the agent “{0}”?', a.name), a.owner ? tr('Its tokens, events, jobs and chats are deleted; lists it owns go to {0}. Its comments stay.', a.owner.name) : tr('Its tokens, events, jobs and chats are deleted; lists it owns come to you. Its comments stay.'), {ok: tr('Delete'), danger: true})) return;
+        await calReq('DELETE', `/api/admin/agents/${a.id}`);  // 2.7.2 (#420)
         md.remove(); done && done(); load().then(render).catch(() => {}); return;
       }
       const rt = agRtBody(md); if (!rt) return;

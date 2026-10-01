@@ -165,13 +165,13 @@ check(A.patch(B + f"/api/tasks/{pt}", json={"fields": {str(fid): "3"}}).status_c
 check(A.post(B + f"/api/lists/{PL}/status", json={"status": "on_track"}).status_code == 409, "plain list: no project status")
 check(A.post(B + "/api/tasks", json={"list_id": PL, "title": "x", "fields": {str(fid): "1"}}).status_code == 409, "plain list: no field values on create")
 CKL = A.post(B + "/api/lists", json={"name": "Shopping", "checklist": True}).json()["id"]
-check(lst(A, CKL)["kind"] == "checklist" and lst(A, CKL)["checklist"] == 1, "compat: checklist=true creates a checklist")
+check(lst(A, CKL)["kind"] == "list" and lst(A, CKL)["checklist"] == 1, "compat: checklist=true = a list with completed at the bottom (2.7.2)")
 A.patch(B + f"/api/lists/{CKL}", json={"checklist": False})
 check(lst(A, CKL)["kind"] == "list" and lst(A, CKL)["checklist"] == 0, "compat: checklist=false -> plain list")
 A.patch(B + f"/api/lists/{CKL}", json={"kind": "checklist"})
 check(lst(A, CKL)["checklist"] == 1, "kind checklist sets the checklist flag")
 A.patch(B + f"/api/lists/{CKL}", json={"kind": "project"})
-check(lst(A, CKL)["checklist"] == 0 and lst(A, CKL)["kind"] == "project", "kind project clears it")
+check(lst(A, CKL)["checklist"] == 1 and lst(A, CKL)["kind"] == "project", "kind project keeps the option (2.7.2)")
 check(A.patch(B + f"/api/lists/{CKL}", json={"kind": "board"}).status_code == 400, "unknown kind refused")
 check(Bb.patch(B + f"/api/lists/{W}", json={"kind": "list"}).status_code == 403, "only the owner changes the type")
 tok2 = A.post(B + "/api/me/tokens", json={"name": "k", "scopes": ["read", "write"]}).json()["token"]
@@ -181,7 +181,7 @@ check(next(x for x in vl if x["id"] == W)["kind"] == "project" and next(x for x 
 r = requests.post(B + "/api/v1/lists", headers=VH, json={"name": "API project", "kind": "project"})
 check(r.status_code == 201 and r.json()["kind"] == "project", f"API v1: create with kind: {r.text[:120]}")
 r = requests.post(B + "/api/v1/lists", headers=VH, json={"name": "API check", "checklist": True})
-check(r.status_code == 201 and r.json()["kind"] == "checklist" and r.json()["checklist"] is True, "API v1: checklist=true still works")
+check(r.status_code == 201 and r.json()["kind"] == "list" and r.json()["checklist"] is True, "API v1: checklist=true still works (alias, 2.7.2)")
 # switching a project back to a list hides its time and dependencies (nothing deleted), and back again
 TP = A.post(B + "/api/lists", json={"name": "Client X", "kind": "project"}).json()["id"]
 tp1, tp2 = A.post(B + "/api/tasks", json={"list_id": TP, "title": "Brief"}).json()["id"], A.post(B + "/api/tasks", json={"list_id": TP, "title": "Pitch"}).json()["id"]

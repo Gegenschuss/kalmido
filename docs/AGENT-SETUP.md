@@ -3,7 +3,8 @@
 This guide sets up an agent for Kalmido step by step: an agent (here Claude Code) that people can mention, assign
 tasks to and chat with, running in a sandbox on a machine you control. It is the practical companion of
 [AGENTS.md](AGENTS.md) (the protocol) and [AGENT-SECURITY.md](AGENT-SECURITY.md) (the threat model and the sandbox
-recipe). The same guide is in the app: *Settings > Agents > Setup guide*.
+recipe). The same guide is in the app: *Settings > Agents > Set up*. For macOS and Windows, and for a personal agent on your own
+computer, see [AGENTS.md: Set up an agent](AGENTS.md#set-up-an-agent).
 
 **Kalmido never runs an AI itself.** It does not download, start or host a model. You bring the agent (Claude Code,
 another coding assistant, an n8n flow, a local model or a script) and run it on your own machine with your own
@@ -64,7 +65,7 @@ chat. Then copy this prompt, replace the placeholders and paste it into Claude C
 - `<TOKEN_ENV_FILE>`: the path of the env file you created
 - `<AGENT_USER>`: the Linux user for the agent, e.g. `kalmido-agent`
 - `<OWNER_NAME>` and `<OWNER_ID>`: the one person who may instruct the agent, and their Kalmido account id
-  (*Settings > Agents > Setup guide* fills in the URL, your name and your id for you; otherwise open
+  (*Settings > Agents > Set up* fills in the URL, your name and your id for you; otherwise open
   `<KALMIDO_URL>/api/me` in the browser while signed in as that person: the field `id`)
 
 ```text

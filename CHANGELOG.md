@@ -7,6 +7,55 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.7.2] - 2026-10-01
+
+**In short:** Personal agents with setup guides for Linux, macOS and Windows, reactions and Sent / Delivered in the agent
+chat, clickable people everywhere, breadcrumbs in the task panel and "Show completed at the bottom" on every list.
+
+### Added
+- **Personal agents** (#420): admins can let people create their own agents (*Settings > Agents > Set up > Users may
+  create their own agents*, off by default, at most 2 per person by default, default usage limits). A personal agent
+  belongs to its creator: only they share lists with it, chat with it, rename, pause, re-token or delete it; it is never
+  an admin and gets no Paperless access; other people never find it in their share pickers. Admins see every agent with
+  its owner and can pause it (the owner cannot resume an admin pause) or delete it (its lists go to the owner).
+  API: `GET` / `PUT /api/admin/agent-policy`, `GET` / `POST /api/my/agents`, `PATCH` / `DELETE /api/my/agents/<id>`,
+  `POST /api/my/agents/<id>/token`, `DELETE /api/admin/agents/<id>`.
+- **Setup guides** (#420) in *Settings > Agents > Set up* and in `docs/AGENTS.md`: a team agent on a server (sandbox
+  user, egress firewall, launcher as a service, token, sharing, limits) and a personal agent on your own computer, each
+  for Linux, macOS and Windows; `mcp/agent_launcher.ps1`, a PowerShell port of the launcher.
+- **Reactions in the agent chat** (#421): 👍 👎 ❤️ on chat messages; a person's 👍 / 👎 on an agent's message is an
+  approval / rejection and sends the agent the event `reaction` with `chat_message`; reactions of agents never approve.
+  API: `POST /api/agents/<id>/chat/<message_id>/reactions`, `POST /api/v1/agents/{id}/chat/{mid}/reactions`,
+  `POST /api/v1/agent/chats/{user_id}/messages/{mid}/reactions`; MCP tool `react_to_chat`.
+- **Chat feedback without the agent's help** (#422): every message says *Sent* or *Delivered* (`delivered_at`, set when
+  the agent fetches it by event poll, MCP, webhook or reading its chats); while an online agent has not answered yet the
+  chat shows typing dots for up to 90 seconds (longer while it reports *working* or its typing signal); an offline or
+  paused agent shows *offline – will answer later*. An open chat refreshes itself every 3 seconds while it waits.
+- **People are clickable everywhere** (#418): pictures in the assignee column / menu, rows, comments, members, News, the
+  chat and the Agents page open a card: agents with their status, *Open chat* and what they work on; people with
+  *Tasks of …* (a filtered view of the lists you see) and *Mention* in the task panel.
+- **Breadcrumbs** at the top of the task panel (#424): folder › list › section › parent task, each opens that place
+  (scrolled to the section / the parent) and closes the News dropdown.
+- **Show completed at the bottom** (#414) on every list (*…* menu, *Sort* menu, list dialog).
+- The robot icon leads the agents' status dots, directly before the bell (#417).
+- Milestones as markers in the *All* timeline too; drag and drop files into a project's *Project files*.
+
+### Changed
+- The list type *Shopping & packing list* (*Checklist*) is gone (#414): only *List* and *Project*. Such lists became
+  plain lists with *Show completed at the bottom* on; their items are full tasks again. The API accepts
+  `kind: "checklist"` and the boolean `checklist` as deprecated aliases of `done_at_bottom`.
+- `mcp/README.md` and the launcher name the current menu path *Settings > Agents*.
+
+- Shared lists: the refresh button left the header (#432); *…* > *Refresh* stays, and when the check for changes has
+  failed for more than 30 seconds a small hint says *Offline – last update N min ago* (a tap tries again).
+
+### Fixed
+- Phones and foldables: the on-screen keyboard closed right after opening it to add a task, and the timeline could
+  rescale when a bar was touched. The layout width of a near-square screen now follows the physical screen orientation
+  only (never the viewport) and never changes while you type.
+- Project files leave the disk when the sample project is removed or an import is undone.
+- Tests: one shared Firefox helper (with the start retry) for the layout suites.
+
 ## [2.7.1] - 2026-10-01
 
 **In short:** A Project overview in every project list: description, key links, milestones, project files, members,
@@ -288,7 +337,8 @@ of people.
   multi-arch image (`ghcr.io/gegenschuss/kalmido`, linux/amd64 and linux/arm64), an installable web app that works
   offline, English and German.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.7.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.7.2...HEAD
+[2.7.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.7.2
 [2.7.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.7.1
 [2.7.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.7.0
 [2.6.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.6.1

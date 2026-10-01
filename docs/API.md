@@ -96,11 +96,13 @@ carry `blocked` and `fields`, and `fields` can still be written (the same as the
 modules). `GET /me` reports all four under `features`: `collaboration`, `time_tracking`, `dependencies`,
 `custom_fields`.
 
-**List types**: every list has `kind` (`list`, `checklist` or `project`). Time entries, dependencies, custom field
+**List types**: every list has `kind` (`list` or `project`). Time entries, dependencies, custom field
 values and a project status need a project list (both lists for a dependency): otherwise `409 conflict` with a message
 such as *Make this list a project to track time*. Time entries of lists that are not projects (any more) are left out
-of `GET /time/entries`. The older `checklist` boolean still works: it reads as `kind == "checklist"`, and
-`checklist: true` when creating a list makes a checklist.
+of `GET /time/entries`. 2.7.2: the separate type *Shopping & packing list* (`kind: "checklist"`) is gone; every list
+has the display option `done_at_bottom` (*Show completed at the bottom*: completed tasks stay visible at the bottom and
+come back with one tap). Existing checklists became `kind: "list"` with `done_at_bottom: true`. **Deprecated aliases**
+(still accepted): `kind: "checklist"` = `kind: "list"` + `done_at_bottom: true`; the boolean `checklist` = `done_at_bottom`.
 
 **Dependent tasks move along**: if a list has *Move dependent tasks along* switched on (list dialog in the app), a
 `PATCH /tasks/{id}` that postpones a task's `due` also moves the open tasks of that list that wait on it and would now
@@ -125,10 +127,10 @@ had been made in the app. Webhooks fire too.
 |---|---|---|
 | `GET /me` | read | The token's user, its scopes and expiry, which modules are on, and (2.1.0) `notifications`: `events` (per event `{news, push}`, `news` null = the event has no News) and `lists` (list id -> bell `all` / `mute` / `custom`; lists on `default` are left out), (2.6.1) `custom` (list id -> the own event choice of lists on `custom`, `{event: {news: 0\|1, push: 0\|1}}`, an event not listed follows `events`) |
 | `PATCH /me/notifications` | write | 2.1.0: change them partially: `{events?: {event: {news?, push?}}, lists?: {list_id: "all" \| "default" \| "mute" \| "custom" \| {mode: "custom", events: {event: {news?, push?}}}}}` (2.6.1: `custom` = your own choice per event for that list, events `newtask`, `comment`, `mention`, `assign`, `complete`, `status`, `unblock`, `approval`; a ticked one comes from every task of the list, an unticked one never; `"custom"` alone brings back the stored choice). Events: `comment`, `reply`, `follow`, `mention`, `assign`, `newtask`, `complete`, `status`, `share`, `unblock`, `approval`, `followup`, `reminder` (push only), `nag` (2.7.0, push only: reminders repeated until done; a muted list bell stops them) |
-| `GET /lists` | read | Lists the user can see: own and shared, with role (`owner`, `admin`, `edit` = member, `participant`, `view` = viewer), checklist flag, progress, `icon` (URL of the list's own picture, empty = none; set in the app), `agent_tidy`, and (2.0.8) its sections `[{id, name}]` |
-| `POST /lists` | write | Create a list: `{name, color?, folder?, kind?, checklist?, nag?, day_hours?}` (`kind`: `list` default, `checklist` = *Shopping & packing list* in the app, `project`) |
+| `GET /lists` | read | Lists the user can see: own and shared, with role (`owner`, `admin`, `edit` = member, `participant`, `view` = viewer), `done_at_bottom` (2.7.2; `checklist` = the same, deprecated), progress, `icon` (URL of the list's own picture, empty = none; set in the app), `agent_tidy`, and (2.0.8) its sections `[{id, name}]` |
+| `POST /lists` | write | Create a list: `{name, color?, folder?, kind?, done_at_bottom?, nag?, day_hours?}` (`kind`: `list` default or `project`; `checklist` (deprecated) = `list` + `done_at_bottom`) |
 | `GET /lists/{id}` | read | One list with its sections |
-| `PATCH /lists/{id}` | write | 2.7.0: change a list. The owner: `name`, `color`, `kind`, `nag` (default nag interval of its tasks: `5`, `10`, `15`, `30`, `60` minutes, `1d`; empty / `off` = none), `day_hours` (hours per day / shift for the time sums, 1 to 24; `null` = the server's value). Members change only their own `folder` and `view` |
+| `PATCH /lists/{id}` | write | 2.7.0: change a list. The owner: `name`, `color`, `kind`, `done_at_bottom` (2.7.2), `nag` (default nag interval of its tasks: `5`, `10`, `15`, `30`, `60` minutes, `1d`; empty / `off` = none), `day_hours` (hours per day / shift for the time sums, 1 to 24; `null` = the server's value). Members change only their own `folder` and `view` |
 | `GET /lists/{id}/repos` | read | 2.2.0: repositories connected to a (project) list: `provider` (`github` / `gitea`), `base_url`, `web_url`, `owner`, `repo`, `full_name`, `default_branch`, `status` (`new` / `ok` / `error`), `error`, `polled_at`. Never a token; connecting is only in the app (list owner / list admins). Lists also carry `repos` |
 | `POST /lists/{id}/owner` | write | 2.1.2: transfer the ownership `{user_id}` to another active person (never an agent); the old owner stays as a list admin. Admins may take over a list whose owner is an agent or a disabled user. Agent tokens always `403`, inboxes `409` |
 | `GET /tasks` | read | Tasks (not in the trash), oldest first; filters below |
@@ -158,6 +160,7 @@ had been made in the app. Webhooks fire too.
 | `GET` · `POST /lists/{id}/milestones`, `PATCH` · `DELETE /lists/{id}/milestones/{milestone_id}` | read · write | Milestones `{name, day, done?}` (at most 100) |
 | `GET` · `POST /lists/{id}/files`, `GET` · `DELETE /lists/{id}/files/{file_id}` | read · write | Project files (multipart `file`, the attachment size limit; images / PDFs inline, everything else as a download) |
 | `GET /agents` | read | Agents you share a list with: status and job counts |
+| `POST /agents/{id}/chat/{message_id}/reactions` | write | 2.7.2: react to a message in your chat with the agent: `{emoji: up \| down \| heart, on?}` (toggles without `on`); your 👍 / 👎 on the agent's message is sent to it as an approval (`reaction` event, see [AGENTS.md](AGENTS.md#chat-reactions-and-delivery-272)) |
 | `GET /agent` … `/agent/events` … `/agent/jobs` … `/agent/chats` · `PUT /agent/status` · `POST /tasks/{id}/tidy` | read / write | **Agent tokens only**: the agent protocol, see [AGENTS.md](AGENTS.md); the status may name the task it works on (`task_id`, shows "… is writing" there) |
 | `POST /agent/usage` · `GET /agent/usage?from=&to=&group=` | write / read | **Agent tokens only** (2.1.1): report model usage (numbers and ids only), read it grouped by day, task, list or model; over its hard limit an agent gets `429` on every other call, see [AGENTS.md](AGENTS.md#usage-and-limits) |
 | `GET /search?q=` | read | Search titles, notes, links and custom field values |

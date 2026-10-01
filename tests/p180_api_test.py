@@ -79,7 +79,7 @@ L = next(l for l in S["lists"] if l["id"] == r["list_id"])
 check(L["name"] == "Example: Image film for client Muster" and L["kind"] == "project", "project list: " + L["name"] + " " + L["kind"])
 check(L.get("status") == "on_track", "project status set")
 PK = next((l for l in S["lists"] if l["name"] == "Example: Shoot day packing list"), None)
-check(PK and PK["kind"] == "checklist" and PK["checklist"] == 1, "packing list is a checklist")
+check(PK and PK["kind"] == "list" and PK["checklist"] == 1, "packing list: a list with completed at the bottom (2.7.2)")
 secs = [s for s in S["sections"] if s["list_id"] == L["id"]]
 check([s["name"] for s in secs] == ["Concept", "Pre-production", "Shoot", "Edit", "Approval"], "sections: " + str([s["name"] for s in secs]))
 TT = [t for t in S["tasks"] if t["list_id"] == L["id"]]

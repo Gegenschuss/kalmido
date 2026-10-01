@@ -42,7 +42,7 @@ const TABLET = {'(min-width:600px) and (min-height:600px)': true};
   const plan = await mk('Team plan', TEAM);
   const css0 = await (await fetch(B + 'static/app.css')).text();
   const SW = fs.readFileSync(path.join(__dirname, '..', 'static', 'sw.js'), 'utf8');
-  check(/const CACHE = 'tasks-shell-v((5[89]|6[0-9])|7[0-5])'/.test(SW), 'service worker cache v58 (2.0.8: v59, 2.1.0: v60, 2.1.1: v61, 2.1.2: v62, 2.2.0: v63, 2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70, 2.5.2: v71, 2.6.0: v72, 2.6.1: v73, 2.7.0: v74, 2.7.1: v75)');
+  check(/const CACHE = 'tasks-shell-v((5[89]|6[0-9])|7[0-6])'/.test(SW), 'service worker cache v58 (2.0.8: v59, 2.1.0: v60, 2.1.1: v61, 2.1.2: v62, 2.2.0: v63, 2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70, 2.5.2: v71, 2.6.0: v72, 2.6.1: v73, 2.7.0: v74, 2.7.1: v75, 2.7.2: v76)');
 
   // ================= #315 comments in a private list: the box (one line) at the bottom edge -> a note; no @ hint, no activity
   let w = await boot({user: 'alice', hash: 'l/' + PRIV}), d = w.document;
@@ -80,7 +80,7 @@ const TABLET = {'(min-width:600px) and (min-height:600px)': true};
   w.eval(`openDetail(${plan})`); await sleep(800);
   check(d.querySelector('#detail #d-tl') && d.querySelector('#detail .dcomp #c-input')?.placeholder === 'Write a comment… (@ mentions someone)' && d.querySelector('#detail [data-act="tl-act"]'), 'shared list: the list with the history (activity switch), @ hint');
   w.eval(`go('l/${CKL}'); openDetail(${milk})`); await sleep(600);
-  check(!d.querySelector('#detail #d-tl') && !d.querySelector('#detail #c-input'), 'checklist item: no comments at all');
+  check(d.querySelector('#detail #d-title'), 'an item of a list with completed at the bottom opens as a full task (2.7.2; was: no comments)');
   w.close();
 
   // ================= #315 the Comments module switch; off: nothing anywhere

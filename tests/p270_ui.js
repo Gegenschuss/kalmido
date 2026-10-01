@@ -33,39 +33,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
 const task = async id => (await call('GET', `/api/tasks/${id}`));
 const closeAll = w => { [...w.document.querySelectorAll('.modal')].forEach(m => m.remove()); w.eval('popOnClose = null; closePop()'); };
 
-async function firefox(fn, touch) {
-  try { execFileSync('firefox', ['--version'], {stdio: 'ignore'}); } catch { console.log('p270_ui: Firefox part skipped (no firefox on PATH)'); return; }
-  const PORT = 9300 + Math.floor(Math.random() * 600);
-  const prof = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), 'kalmido-p270-'));
-  const prefs = [['browser.shell.checkDefaultBrowser', false], ['datareporting.policy.dataSubmissionEnabled', false], ['ui.prefersReducedMotion', 1],
-    ...(touch ? [['ui.primaryPointerCapabilities', 1], ['ui.allPointerCapabilities', 1], ['dom.w3c_touch_events.enabled', 1]] : [['ui.primaryPointerCapabilities', 6], ['ui.allPointerCapabilities', 6]])];
-  fs.writeFileSync(path.join(prof, 'user.js'), prefs.map(([k, v]) => `user_pref("${k}", ${JSON.stringify(v)});`).join('\n') + '\n');
-  const ff = spawn('firefox', ['--headless', '--no-remote', '--profile', prof, `--remote-debugging-port=${PORT}`, 'about:blank'], {stdio: 'ignore'});
-  let ws, seq = 0; const pend = new Map();
-  try {
-    for (let i = 0; i < 90 && !ws; i++) {
-      try { const w = new WS(`ws://127.0.0.1:${PORT}/session`); await new Promise((res, rej) => { w.onopen = res; w.onerror = rej; }); ws = w; } catch { await sleep(500); }
-    }
-    if (!ws) { check(false, 'no WebDriver BiDi connection to Firefox'); return; }
-    ws.onmessage = m => { const j = JSON.parse(m.data); if (j.id && pend.has(j.id)) { const p = pend.get(j.id); pend.delete(j.id); j.type === 'error' ? p.rej(new Error(p.method + ': ' + j.error + ' ' + j.message)) : p.res(j.result); } };
-    const cmd = (method, params = {}) => new Promise((res, rej) => { const id = ++seq; pend.set(id, {res, rej, method}); ws.send(JSON.stringify({id, method, params})); });
-    const unwrap = v => !v ? v : v.type === 'array' ? v.value.map(unwrap) : v.type === 'object' ? Object.fromEntries(v.value.map(([k, x]) => [typeof k === 'string' ? k : unwrap(k), unwrap(x)])) : v.value;
-    await cmd('session.new', {capabilities: {}});
-    const ctx = (await cmd('browsingContext.getTree', {})).contexts[0].context;
-    const ev = async expr => { const r = await cmd('script.evaluate', {expression: expr, target: {context: ctx}, awaitPromise: true, resultOwnership: 'none', serializationOptions: {maxObjectDepth: 6}}); if (r.type === 'exception') throw new Error('JS: ' + r.exceptionDetails.text); return unwrap(r.result); };
-    const nav = url => cmd('browsingContext.navigate', {context: ctx, url, wait: 'complete'});
-    const shot = async name => { const dir = process.env.P270_SHOTS; if (!dir) return; const r = await cmd('browsingContext.captureScreenshot', {context: ctx}); fs.writeFileSync(path.join(dir, name), Buffer.from(r.data, 'base64')); };
-    // a drag with the mouse (desktop) or one finger (touch) from (x0, y0) by (dx, dy)
-    const drag = (x0, y0, dx, dy, kind = 'mouse') => cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'p1', parameters: {pointerType: kind},
-      actions: [{type: 'pointerMove', x: Math.round(x0), y: Math.round(y0)}, {type: 'pointerDown', button: 0}, {type: 'pointerMove', x: Math.round(x0 + dx / 2), y: Math.round(y0 + dy / 2), duration: 120},
-        {type: 'pointerMove', x: Math.round(x0 + dx), y: Math.round(y0 + dy), duration: 120}, {type: 'pointerUp', button: 0}]}]}).then(() => cmd('input.releaseActions', {context: ctx}));
-    await fn({cmd, ev, nav, ctx, shot, drag});
-  } catch (e) { check(false, 'Firefox: ' + e.message); } finally {
-    try { ws && ws.close(); } catch { /* gone */ }
-    try { ff.kill(); } catch { /* gone */ }
-    await sleep(500); fs.rmSync(prof, {recursive: true, force: true});
-  }
-}
+const firefox = require('./ff')({tag: 'p270_ui', check, shots: 'P270_SHOTS'});  // 2.7.2: the shared Firefox helper (with the start retry)
 const HEAD = `(() => {
   const t = document.querySelector('#top'); if (!t || !t.querySelector('h1')) return {none: location.href};
   const vw = document.documentElement.clientWidth;
@@ -82,7 +50,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v7[45]'/.test(SW), 'service worker cache v74 (2.7.1: v75)');
+  check(/const CACHE = 'tasks-shell-v7[4-6]'/.test(SW), 'service worker cache v74 (2.7.1: v75, 2.7.2: v76)');
   check(/action === 'nagoff'/.test(SW) && /maxActions/.test(SW), 'SW: "Stop reminding" in the background, as many buttons as the platform shows');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
@@ -157,14 +125,16 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(ln && ln.value === '', 'list dialog: Repeat reminders (off)');
   ln.value = '1d'; change(w, ln); await sleep(900);
   check((await call('GET', '/api/state')).lists.find(l => l.id === L).nag === '1d', 'list default saved: daily');
-  // #414
+  // #414 (2.7.2): the type is gone; "Show completed at the bottom" with the cart hint instead
   const ks = md.querySelector('#l-kind');
-  check([...ks.options].map(o => o.textContent).join('|') === 'List|Shopping & packing list|Project', 'type: "Shopping & packing list": ' + [...ks.options].map(o => o.textContent).join('|'));
-  ks.value = 'checklist'; change(w, ks); await sleep(900);
-  check(/stays at the bottom and comes back with one tap/.test(md.querySelector('#l-khint').textContent) && md.querySelector('#l-khint svg'), 'hint with the cart');
-  check((await call('GET', '/api/state')).lists.find(l => l.id === L).kind === 'checklist', 'stored kind stays "checklist"');
+  check([...ks.options].map(o => o.textContent).join('|') === 'List|Project', 'types: List|Project (2.7.2): ' + [...ks.options].map(o => o.textContent).join('|'));
+  const dab = md.querySelector('#l-dab');
+  dab.checked = true; change(w, dab); await sleep(900);
+  check(/comes back with one tap/.test(md.textContent) && md.querySelector('.ldabrow'), 'the option with its hint');
+  check((await call('GET', '/api/state')).lists.find(l => l.id === L).checklist === 1, 'stored as the option, kind list');
   closeAll(w);
-  check(w.eval(`listMenuItems(${L}, () => document.querySelector('#top h1'))`).some(x => x.label === 'Shopping & packing list' && x.icon === 'cart'), 'list menu: the type with the cart');
+  check(w.eval(`topMoreItems()`).some(x => x.label === 'Show completed at the bottom' && x.icon === 'cart'), '"…": the option with the cart');
+  await call('PATCH', `/api/lists/${L}`, {checklist: false});
   await call('PATCH', `/api/lists/${L}`, {kind: 'list'});
   // ================= #407 the time sum
   await w.eval('load().then(render)'); w.eval(`go('l/${P}')`); await sleep(500);
@@ -247,7 +217,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   // German renames (S5) + 2.7.0 strings
   await call('PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
-  check(w.eval(`tr('Completed tasks')`) === 'Erledigte Aufgaben' && w.eval(`tr('Ownership…')`) === 'Eigentümer…' && w.eval(`tr('Shopping & packing list')`) === 'Einkaufs- & Packliste', 'German: Erledigte Aufgaben, Eigentümer…, Einkaufs- & Packliste');
+  check(w.eval(`tr('Completed tasks')`) === 'Erledigte Aufgaben' && w.eval(`tr('Ownership…')`) === 'Eigentümer…' && w.eval(`tr('Show completed at the bottom')`) === 'Erledigte unten zeigen', 'German: Erledigte Aufgaben, Eigentümer…, Erledigte unten zeigen');
   check(/noch 30 Tage/.test(row(D2)?.querySelector('.dlc')?.textContent || ''), 'German: "noch 30 Tage"');
   w.eval(`datePop(document.querySelector('#top h1'), ${D2})`); await sleep(150);
   check(/Nachhaken/.test(d.querySelector('#pop').textContent) && /2 Wochen/.test(d.querySelector('#pop [data-rem="20160"]').textContent), 'German popover: Nachhaken, 2 Wochen');

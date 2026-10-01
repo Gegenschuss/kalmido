@@ -554,6 +554,10 @@ CREATE TABLE IF NOT EXISTS agent_chat (           -- 2.0.0: one conversation per
   sender TEXT NOT NULL,                         -- user | agent
   body TEXT NOT NULL, task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL, created_at TEXT NOT NULL, read_at TEXT);
 CREATE INDEX IF NOT EXISTS agent_chat_pair ON agent_chat(agent_id, user_id, id);
+CREATE TABLE IF NOT EXISTS chat_reactions (       -- 2.7.2 (#421): heart | up | down (or one emoji) per person and chat message
+  message_id INTEGER NOT NULL REFERENCES agent_chat(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  emoji TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (message_id, user_id, emoji));
 CREATE TABLE IF NOT EXISTS agent_usage (          -- 2.1.1 (#326): model usage an agent reports (numbers + ids, never prompts)
   id INTEGER PRIMARY KEY, agent_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   model TEXT NOT NULL, input_tokens INTEGER NOT NULL DEFAULT 0, output_tokens INTEGER NOT NULL DEFAULT 0,
@@ -775,6 +779,11 @@ MIGRATIONS = [
     ("lists", "day_hours", "ALTER TABLE lists ADD COLUMN day_hours REAL"),
     # 2.7.1 (#410): the description of a project list (Markdown, its overview)
     ("lists", "description", "ALTER TABLE lists ADD COLUMN description TEXT NOT NULL DEFAULT ''"),
+    # 2.7.2 (#422): when the agent fetched a person's chat message (event poll, MCP, webhook delivered, chat read)
+    ("agent_chat", "delivered_at", "ALTER TABLE agent_chat ADD COLUMN delivered_at TEXT"),
+    # 2.7.2 (#420): a personal agent belongs to the person who created it (NULL = a team agent of the admins)
+    ("agents", "owner_id", "ALTER TABLE agents ADD COLUMN owner_id INTEGER"),
+    ("agents", "admin_paused", "ALTER TABLE agents ADD COLUMN admin_paused INTEGER NOT NULL DEFAULT 0"),  # its owner cannot resume it
 ]
 INDEXES = """
 CREATE INDEX IF NOT EXISTS lists_owner ON lists(owner_id);
@@ -1220,6 +1229,13 @@ def init_db(guard=True):
                                OR status!='')""").rowcount
             gset(c, "migr_kind", "1")
             print("list types:", n, "lists with project data became projects", flush=True)
+        # 2.7.2 (#414), once: the type "checklist" is gone; such lists become plain lists with "Show completed at the
+        # bottom" on (the column checklist stays 1), so nothing changes for their items
+        if gsetting(c, "migr_kind272") != "1":
+            n = c.execute("UPDATE lists SET kind='list', checklist=1 WHERE kind='checklist'").rowcount
+            gset(c, "migr_kind272", "1")
+            if n:
+                print("list types:", n, "checklists became lists with 'Show completed at the bottom'", flush=True)
         # features_rev 8: the setup's default modules (from before 1.2) get "deps" / "fields" like the users below
         dfs = gsetting(c, "default_features")
         if dfs and gsetting(c, "migr_feat8") != "1":
@@ -4088,7 +4104,11 @@ def task_get(tid):
 # ---------------------------------------------------------------- lists / sections
 
 LIST_FIELDS = ("name", "color", "folder", "sort", "view", "archived", "checklist", "dep_shift", "kind", "tickets", "nag")
-LIST_KINDS = ("list", "checklist", "project")
+LIST_KINDS = ("list", "project")
+# 2.7.2 (#414): the type "checklist" (2.7.0 "Shopping & packing list") is gone. Every list has the display option "Show
+# completed at the bottom" instead (column lists.checklist, API field done_at_bottom); kind "checklist" is still accepted
+# as a deprecated alias (= kind list + the option on), the boolean "checklist" as an alias of done_at_bottom.
+LIST_KIND_ALIASES = {"checklist": "list"}
 MEMBER_LIST_FIELDS = ("folder", "sort", "view")  # a member's own sidebar placement / view
 LIST_VIEWS = ("list", "kanban", "timeline")
 LIST_COLOR_RE = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})")
@@ -4181,9 +4201,9 @@ def clean_list_value(k, v, member=False):
     if k in ("archived", "checklist", "dep_shift", "tickets"):
         return 1 if v else 0
     if k == "kind":
-        if v not in LIST_KINDS:
+        if v not in LIST_KINDS and v not in LIST_KIND_ALIASES:
             raise BadInput(tr("Invalid value: {0}", "kind"))
-        return v
+        return LIST_KIND_ALIASES.get(v, v)
     if k == "nag":  # 2.7.0 (#413): the list's default for nags ('' / 'off' = none)
         v = "" if v in (None, "off") else v
         if v not in NAG_VALUES:
@@ -4204,13 +4224,15 @@ def list_create():
         c.commit()
         return jsonify({**dict(c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()), "modules_on": on})
     view = clean_list_value("view", b.get("view") or "list")
-    kind = clean_list_value("kind", b["kind"]) if b.get("kind") else "checklist" if b.get("checklist") else "list"
+    kind = clean_list_value("kind", b["kind"]) if b.get("kind") else "list"
+    # 2.7.2 (#414): "Show completed at the bottom" (done_at_bottom; the old checklist flag / kind "checklist" are aliases)
+    dab = 1 if b.get("done_at_bottom", b.get("checklist")) or b.get("kind") == "checklist" else 0
     c = db()
     uid = me()
     srt = my_max_sort(c, uid) + 1
     # 2.2.1 (#359): dep_shift ("Move dependent tasks along") is taken at creation too (before, only PATCH set it)
     cur = c.execute("INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind,dep_shift,tickets) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-                    (name, color, folder, srt, view, iso(now_utc()), uid, 1 if kind == "checklist" else 0, kind,
+                    (name, color, folder, srt, view, iso(now_utc()), uid, dab, kind,
                      clean_list_value("dep_shift", b.get("dep_shift")), clean_list_value("tickets", b.get("tickets"))))
     agent_autoshare(c, uid, cur.lastrowid)  # 2.4.2 (#391)
     bump(c)
@@ -4242,12 +4264,11 @@ def list_update(lid):
             if k in b and k in (*LIST_FIELDS, "rate") and _norm(cur.get(k)) != _norm(old) and _norm(cur.get(k)) != _norm(b[k]):
                 conflicts.append({"field": k, "server": cur.get(k), "mine": b[k]})
                 del b[k]
+    if "done_at_bottom" in b:  # 2.7.2 (#414): the API name of the display option (column checklist)
+        b = {**{k: v for k, v in b.items() if k != "done_at_bottom"}, "checklist": b["done_at_bottom"]}
     vals = {k: clean_list_value(k, b[k], member=role != "owner") for k in LIST_FIELDS if k in b}  # BadInput: 400
-    if "kind" in vals:  # the type decides; the old checklist flag follows it
-        vals["checklist"] = 1 if vals["kind"] == "checklist" else 0
-    elif "checklist" in vals:  # older clients / API: checklist on -> type checklist, off -> back to a plain list
-        cur_kind = c.execute("SELECT kind FROM lists WHERE id=?", (lid,)).fetchone()[0]
-        vals["kind"] = "checklist" if vals["checklist"] else ("list" if cur_kind == "checklist" else cur_kind)
+    if b.get("kind") == "checklist" and "checklist" not in vals:  # deprecated alias: a plain list with the option on
+        vals["checklist"] = 1
     if role == "owner":
         if "archived" in vals:  # 1.6.1: archived_at follows the flag (set on the change to archived, cleared on restore)
             c.execute("UPDATE lists SET archived_at=CASE WHEN ?=0 THEN NULL WHEN archived=0 THEN ? ELSE archived_at END "
@@ -4371,7 +4392,7 @@ def member_set(lid):
     except (TypeError, ValueError):
         uid = 0
     u = c.execute("SELECT id FROM users WHERE id=? AND disabled=0", (uid,)).fetchone()
-    if not u or uid == me():
+    if not u or uid == me() or personal_agent_foreign(c, uid, me()):  # 2.7.2 (#420): only the owner shares with a personal agent
         return err(tr("unknown user"), 404)
     if uid == c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0]:
         return err(tr("The owner's role cannot be changed"), 403)
@@ -4460,7 +4481,7 @@ def agent_share_target(c, aid):
     u = c.execute("SELECT kind FROM users WHERE id=?", (me(),)).fetchone()
     if not u or u["kind"] == "agent":
         raise Denied(403)
-    if not c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent' AND disabled=0", (aid,)).fetchone():
+    if not c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent' AND disabled=0", (aid,)).fetchone() or personal_agent_foreign(c, aid, me()):
         raise Denied(404, tr("unknown user"))
 
 
@@ -5404,8 +5425,8 @@ def check_assignee(c, lid, aid):
 # 2.2.1 (#359): the fields the web API's task / list / comment endpoints know (others: warning, see web_fields)
 WEB_TASK_NEW = frozenset(TASK_FIELDS) | {"tags", "ltags", "fields"}
 WEB_TASK_EDIT = WEB_TASK_NEW | {"add_tags", "_prev", "_act"}
-WEB_LIST_NEW = frozenset({"name", "color", "folder", "view", "kind", "checklist", "dep_shift", "tickets", "ptype"})
-WEB_LIST_EDIT = frozenset(LIST_FIELDS) | {"rate", "agent_tidy", "tidy_agent_id", "_prev", "ticket_tpl", "day_hours"}
+WEB_LIST_NEW = frozenset({"name", "color", "folder", "view", "kind", "checklist", "done_at_bottom", "dep_shift", "tickets", "ptype"})
+WEB_LIST_EDIT = frozenset(LIST_FIELDS) | {"rate", "agent_tidy", "tidy_agent_id", "_prev", "ticket_tpl", "day_hours", "done_at_bottom"}
 WEB_COMMENT = frozenset({"body", "suggestion"})
 
 
@@ -9545,9 +9566,10 @@ def sample_create(c, uid):
         note = tr("Shoot dates confirmed with the client", lg=lg)
         c.execute("UPDATE lists SET status='on_track', status_note=?, status_by=?, status_at=? WHERE id=?", (note, uid, ts, lid))
         c.execute("INSERT INTO list_status(list_id,user_id,status,note,created_at) VALUES(?,?,?,?,?)", (lid, uid, "on_track", note, ts))
-    # the packing list: a checklist (ticked items stay in "Done" and can be reused for the next shoot)
+    # the packing list: a plain list with "Show completed at the bottom" (2.7.2, #414; ticked items stay below and can be
+    # reused for the next shoot)
     cl = c.execute("INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind) VALUES(?,?,?,?,?,?,?,?,?)",
-                   (tr("Example: Shoot day packing list", lg=lg), "#f59e0b", "", srt + 2, "list", ts, uid, 1, "checklist")).lastrowid
+                   (tr("Example: Shoot day packing list", lg=lg), "#f59e0b", "", srt + 2, "list", ts, uid, 1, "list")).lastrowid
     track("list", cl)
     for i, n in enumerate(SAMPLE_PACKING):
         track("task", c.execute("INSERT INTO tasks(list_id,title,sort,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?)",
@@ -9574,13 +9596,16 @@ def sample_remove(c, uid):
     for sid in rows("section"):
         c.execute("DELETE FROM sections WHERE id=? AND NOT EXISTS (SELECT 1 FROM tasks WHERE section_id=?)", (sid, sid))
     lists = kept_lists = 0
+    gone = []
     for lid in rows("list"):
         if c.execute("SELECT 1 FROM lists WHERE id=? AND owner_id=?", (lid, uid)).fetchone():
             if c.execute("SELECT 1 FROM tasks WHERE list_id=?", (lid,)).fetchone():
                 kept_lists += 1
             else:
-                lists += c.execute("DELETE FROM lists WHERE id=?", (lid,)).rowcount
+                lists += list_row_purge(c, lid, gone)  # 2.7.2: its project files leave the disk too
     c.execute("DELETE FROM sample_items WHERE user_id=?", (uid,))
+    files += [p for _, _, ps in gone for p in ps]
+    g.purge_icons = [(lid, icon) for lid, icon, _ in gone] if has_request_context() else []
     return {"tasks": len(mine), "lists": lists, "kept_lists": kept_lists, "kept_tasks": kept}, files
 
 
@@ -9612,6 +9637,8 @@ def sample_delete():
     bump(c)
     c.commit()
     unlink_files(files)
+    for lid, icon in g.pop("purge_icons", []):
+        list_icon_drop_file(lid, icon)
     print("sample removed, user", uid, "tasks", counts["tasks"], flush=True)
     return jsonify(ok=True, **counts)
 
@@ -9640,7 +9667,9 @@ def users_list():
         return jsonify(users=[user_admin_dict(c, u) for u in c.execute("SELECT * FROM users ORDER BY id")])
     if not collab_all():  # nobody to share with
         return jsonify(users=[user_public(g.user)])
-    return jsonify(users=[user_public(u) for u in c.execute("SELECT * FROM users WHERE disabled=0 ORDER BY id")])
+    mine = me()  # 2.7.2 (#420): somebody else's personal agent is not in the list
+    return jsonify(users=[user_public(u) for u in c.execute("""SELECT * FROM users WHERE disabled=0 AND id NOT IN
+                                                                 (SELECT user_id FROM agents WHERE owner_id IS NOT NULL AND owner_id!=?) ORDER BY id""", (mine,))])
 
 
 def _proxy_taken(c, login, uid=None):
@@ -9790,6 +9819,16 @@ def user_delete(uid):
     if n:
         return err(trn("The user still owns {0} list. Delete it or disable the user instead.",
                        "The user still owns {0} lists. Delete them or disable the user instead.", n), 409)
+    files = user_purge(c, uid)
+    bump(c)
+    c.commit()
+    unlink_files(files)
+    avatar_drop_file(uid, u["avatar"])
+    return jsonify(ok=True)
+
+
+def user_purge(c, uid):
+    """Deletes user uid (no own lists besides the inbox left; the caller checked and commits). Returns the files to unlink."""
     inbox = [r[0] for r in c.execute("SELECT id FROM lists WHERE owner_id=?", (uid,))]
     files = attachment_files(c, [r[0] for r in c.execute(
         f"SELECT id FROM tasks WHERE list_id IN ({','.join('?' * len(inbox)) or 'NULL'})", inbox)])
@@ -9804,12 +9843,11 @@ def user_delete(uid):
     c.execute("UPDATE tasks SET created_by=NULL WHERE created_by=?", (uid,))
     c.execute("DELETE FROM task_field_values WHERE value=? AND field_id IN (SELECT id FROM list_fields WHERE type='person')", (str(uid),))
     pl_forget_user(c, uid)  # 2.1.0: personal Paperless connections, tokens, grants; list bells
+    a = c.execute("SELECT webhook_id FROM agents WHERE user_id=?", (uid,)).fetchone()
+    if a and a["webhook_id"]:
+        c.execute("DELETE FROM webhooks WHERE id=?", (a["webhook_id"],))
     c.execute("DELETE FROM users WHERE id=?", (uid,))  # cascades: settings, memberships, sessions
-    bump(c)
-    c.commit()
-    unlink_files(files)
-    avatar_drop_file(uid, u["avatar"])
-    return jsonify(ok=True)
+    return files
 
 
 @app.get("/api/me")
@@ -10191,6 +10229,8 @@ def tpl_clean(kind, d):
             "view": d.get("view") if d.get("view") in ("list", "kanban", "timeline") else "list",
             # list type (D2); older templates with custom fields become projects when used
             "kind": d.get("kind") if d.get("kind") in LIST_KINDS else "project" if d.get("fields") else "list",
+            # 2.7.2 (#414): "Show completed at the bottom" (older templates: kind "checklist")
+            "done_at_bottom": 1 if d.get("done_at_bottom") or d.get("kind") == "checklist" else 0,
             "sections": secs, "tasks": tasks, "fields": tpl_clean_fields(d.get("fields")),
             # 2.4.0 (#328 / #340): dates relative to the project start (rel), its length in days (span), the dependencies,
             # the list's ticket types + templates and "Move dependent tasks along"
@@ -10272,6 +10312,7 @@ def template_create():
                                       (lst["view"], lid, uid)).fetchone() or ["list"])[0],
                                   "sections": [s["name"] for s in secs], "tasks": tasks, "fields": fdefs,
                                   "rel": rel, "deps": deps, "tickets": lst["tickets"], "dep_shift": lst["dep_shift"],
+                                  "done_at_bottom": lst["checklist"],
                                   "ticket_tpl": json.loads(lst["ticket_tpl"] or "{}") if role == "owner" else {}}
         else:
             kind = b.get("kind") if b.get("kind") in ("task", "list") else None
@@ -10424,7 +10465,7 @@ def tpl_apply_list(c, uid, d, name, folder, start, end=None, color=None):
     lid = c.execute("""INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,kind,checklist,tickets,ticket_tpl,dep_shift)
                        VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (name, d.get("color") or "" if color is None else color, folder, my_max_sort(c, uid) + 1, d.get("view") or "list",
-                     iso(now_utc()), uid, lk, 1 if lk == "checklist" else 0, 1 if d.get("tickets") else 0,
+                     iso(now_utc()), uid, lk, 1 if d.get("done_at_bottom") or d.get("kind") == "checklist" else 0, 1 if d.get("tickets") else 0,
                      json.dumps(tt, ensure_ascii=False) if tt else "", 1 if d.get("dep_shift") else 0)).lastrowid
     secs = [c.execute("INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, s, i)).lastrowid
             for i, s in enumerate(d.get("sections") or [])]
@@ -11154,6 +11195,24 @@ def list_file_delete(fid):
 def list_files_drop(paths):
     """The files of a list deleted for good (after its rows are gone)."""
     unlink_files(paths)
+
+
+def list_row_purge(c, lid, gone):
+    """2.7.2: deletes the row of list lid (cascades) and remembers its project files + own icon in gone (a list) so the
+    caller removes them from disk after the commit (list_purge_files). Returns the number of rows deleted."""
+    r = c.execute("SELECT icon FROM lists WHERE id=?", (lid,)).fetchone()
+    if not r:
+        return 0
+    paths = [x[0] for x in c.execute("SELECT path FROM list_files WHERE list_id=?", (lid,))]
+    n = c.execute("DELETE FROM lists WHERE id=?", (lid,)).rowcount
+    gone.append((lid, r["icon"], paths))
+    return n
+
+
+def list_purge_files(gone):
+    for lid, icon, paths in gone:
+        list_icon_drop_file(lid, icon)
+        list_files_drop(paths)
 
 
 # ---- Paperless documents of the list (same connections + rules as on tasks)
@@ -13305,6 +13364,7 @@ def imp_undo(c, uid, iid):
         files += [x[0] for x in c.execute(f"SELECT path FROM attachments WHERE task_id IN ({q})", part)]
         c.execute(f"DELETE FROM tasks WHERE id IN ({q})", part)
     secs = lists = kept_lists = 0
+    gone = []
     for sid in cr.get("sections") or []:
         if not c.execute("SELECT 1 FROM tasks WHERE section_id=?", (sid,)).fetchone():
             secs += c.execute("DELETE FROM sections WHERE id=?", (sid,)).rowcount
@@ -13313,11 +13373,12 @@ def imp_undo(c, uid, iid):
             if c.execute("SELECT 1 FROM tasks WHERE list_id=?", (lid,)).fetchone():
                 kept_lists += 1
             else:
-                lists += c.execute("DELETE FROM lists WHERE id=?", (lid,)).rowcount
+                lists += list_row_purge(c, lid, gone)  # 2.7.2: its project files leave the disk too
     c.execute("UPDATE imports SET undone_at=? WHERE id=?", (iso(now_utc()), iid))
     bump(c)
     c.commit()
     unlink_files(files)
+    list_purge_files(gone)
     print("import undo", iid, "user", uid, "tasks", len(mine), flush=True)
     return {"tasks": len(mine), "lists": lists, "sections": secs, "kept_lists": kept_lists, "kept_tasks": kept}
 
@@ -16844,7 +16905,8 @@ def v1_one(c, tid):
 def v1_list(d):
     name = "Inbox" if d["is_inbox"] and d["name"] == "Eingang" else d["name"]
     return {"id": d["id"], "name": name, "color": d["color"], "folder": d["folder"], "is_inbox": bool(d["is_inbox"]),
-            "archived": bool(d["archived"]), "checklist": bool(d.get("checklist")), "kind": d.get("kind") or "list", "view": d["view"], "role": d["role"],
+            "archived": bool(d["archived"]), "done_at_bottom": bool(d.get("checklist")), "checklist": bool(d.get("checklist")),
+            "kind": d.get("kind") or "list", "view": d["view"], "role": d["role"],
             "owner_id": d["owner_id"], "owner_name": d["owner_name"], "shared": d["shared"],
             "status": d.get("status") or None, "progress": d["progress"], "created_at": d["created_at"],
             "tags": d.get("tags") or [], "agent_tidy": d.get("agent_tidy") or "off", "tidy_agent_id": d.get("tidy_agent_id"),
@@ -16990,7 +17052,7 @@ def v1_lists():
 def v1_list_create():
     v1_args(())
     b = v1_json()
-    unknown = sorted(k for k in b if k not in ("name", "color", "folder", "checklist", "kind", "tickets", "project_type", "nag", "day_hours"))
+    unknown = sorted(k for k in b if k not in ("name", "color", "folder", "checklist", "done_at_bottom", "kind", "tickets", "project_type", "nag", "day_hours"))
     if unknown:
         raise UnknownFields(unknown)
     later = {k: b.pop(k) for k in ("nag", "day_hours") if k in b}  # 2.7.0: set right after the list exists
@@ -16998,15 +17060,16 @@ def v1_list_create():
         clean_list_value("nag", later["nag"])
     if "day_hours" in later and clean_day_hours(later["day_hours"]) is False:
         raise BadInput(tr("Hours per day: a number from 1 to 24"))
-    if "checklist" in b and not isinstance(b["checklist"], bool):
-        raise BadInput(tr("Invalid value: {0}", "checklist"))
+    for k in ("checklist", "done_at_bottom"):
+        if k in b and not isinstance(b[k], bool):
+            raise BadInput(tr("Invalid value: {0}", k))
     if "tickets" in b and not isinstance(b["tickets"], bool):
         raise BadInput(tr("Invalid value: {0}", "tickets"))
     if b.get("project_type") is not None and b["project_type"] not in PTYPES:
         raise BadInput(tr("Invalid value: {0}", "project_type"))
     if b.get("project_type"):
-        b = {**{k: v for k, v in b.items() if k not in ("project_type", "kind", "checklist", "tickets")}, "ptype": b["project_type"]}
-    if "kind" in b and b["kind"] not in LIST_KINDS:
+        b = {**{k: v for k, v in b.items() if k not in ("project_type", "kind", "checklist", "done_at_bottom", "tickets")}, "ptype": b["project_type"]}
+    if "kind" in b and b["kind"] not in LIST_KINDS and b["kind"] not in LIST_KIND_ALIASES:
         raise BadInput(tr("Invalid value: {0}", "kind"))
     j = v1_call(list_create, body=b)
     if later:
@@ -17018,12 +17081,16 @@ def v1_list_create():
 @app.patch("/api/v1/lists/<int:lid>")
 @v1_view
 def v1_list_patch(lid):
-    """2.7.0: change a list: name, color, folder (yours), view, kind, nag (default of the list's tasks), day_hours."""
+    """2.7.0: change a list: name, color, folder (yours), view, kind, nag (default of the list's tasks), day_hours;
+    2.7.2 (#414): done_at_bottom ("Show completed at the bottom"; checklist = deprecated alias)."""
     v1_args(())
     b = v1_json()
-    unknown = sorted(k for k in b if k not in ("name", "color", "folder", "view", "kind", "nag", "day_hours"))
+    unknown = sorted(k for k in b if k not in ("name", "color", "folder", "view", "kind", "nag", "day_hours", "done_at_bottom", "checklist"))
     if unknown:
         raise UnknownFields(unknown)
+    for k in ("checklist", "done_at_bottom"):
+        if k in b and not isinstance(b[k], bool):
+            raise BadInput(tr("Invalid value: {0}", k))
     c = db()
     need_list(c, lid, write=False)
     v1_call(list_update, lid, body=b)
@@ -17660,8 +17727,10 @@ def openapi_spec():
             "id": {"type": "integer"}, "name": {"type": "string"}, "color": {"type": "string"},
             "folder": {"type": "string", "description": "Your folder path, at most 2 levels: \"Clients/Company X\" (2.4.0); empty = none"},
             "tickets": {"type": "boolean", "description": "Ticket types bug / feature / task on (2.4.0)"},
-            "is_inbox": {"type": "boolean"}, "archived": {"type": "boolean"}, "checklist": {"type": "boolean", "description": "Same as kind == checklist"},
-            "kind": {"type": "string", "enum": list(LIST_KINDS), "description": "List type; project lists have time tracking, dependencies, custom fields and progress"},
+            "is_inbox": {"type": "boolean"}, "archived": {"type": "boolean"},
+            "done_at_bottom": {"type": "boolean", "description": "2.7.2: \"Show completed at the bottom\": completed tasks stay visible below the open ones and come back with one tap"},
+            "checklist": {"type": "boolean", "deprecated": True, "description": "Deprecated (2.7.2): same as done_at_bottom"},
+            "kind": {"type": "string", "enum": list(LIST_KINDS), "description": "List type; project lists have time tracking, dependencies, custom fields and progress (2.7.2: the type checklist is gone, see done_at_bottom)"},
             "view": {"type": "string", "enum": list(LIST_VIEWS)}, "role": {"type": "string", "enum": ["owner", "admin", "edit", "participant", "view"]},
             "owner_id": {"type": "integer"}, "owner_name": {"type": "string"}, "shared": {"type": "boolean"},
             "status": nul("string", enum=[*LIST_STATUSES, None]), "progress": ref("Progress"), "created_at": {"type": "string", "format": "date-time"},
@@ -17671,7 +17740,9 @@ def openapi_spec():
         "ListInput": {"type": "object", "additionalProperties": False, "required": ["name"], "properties": {
             "name": {"type": "string"}, "color": {"type": "string", "description": "#rgb / #rrggbb or empty"},
             "folder": {"type": "string", "description": "Folder path, at most 2 levels (\"Clients/Company X\"); deeper: 400"},
-            "checklist": {"type": "boolean", "description": "true = kind checklist"}, "kind": {"type": "string", "enum": list(LIST_KINDS)},
+            "done_at_bottom": {"type": "boolean", "description": "2.7.2: show completed tasks at the bottom"},
+            "checklist": {"type": "boolean", "deprecated": True, "description": "Deprecated (2.7.2): same as done_at_bottom"},
+            "kind": {"type": "string", "enum": [*LIST_KINDS, *LIST_KIND_ALIASES], "description": "list | project; \"checklist\" is a deprecated alias of list + done_at_bottom"},
             "tickets": {"type": "boolean", "description": "Ticket types on (2.4.0)"},
             "project_type": {"type": "string", "enum": list(PTYPES), "description": "2.4.0: a project of a built-in type (sections, "
                              "custom fields, view, ticket types; switches the modules it needs on for you); kind / checklist / tickets are ignored"},
@@ -17679,7 +17750,10 @@ def openapi_spec():
             "day_hours": nul("number", minimum=1, maximum=24, description="2.7.0: hours per day / shift (owner); null = the server's value")}},
         "ListPatch": {"type": "object", "additionalProperties": False, "properties": {
             "name": {"type": "string"}, "color": {"type": "string"}, "folder": {"type": "string"},
-            "view": {"type": "string", "enum": list(LIST_VIEWS)}, "kind": {"type": "string", "enum": list(LIST_KINDS)},
+            "view": {"type": "string", "enum": list(LIST_VIEWS)},
+            "kind": {"type": "string", "enum": [*LIST_KINDS, *LIST_KIND_ALIASES], "description": "list | project; \"checklist\" is a deprecated alias of list + done_at_bottom"},
+            "done_at_bottom": {"type": "boolean", "description": "2.7.2: show completed tasks at the bottom (owner)"},
+            "checklist": {"type": "boolean", "deprecated": True, "description": "Deprecated (2.7.2): same as done_at_bottom"},
             "nag": {"type": "string", "enum": list(NAG_VALUES), "description": "Default nag interval of the list's tasks (owner); off / empty = none"},
             "day_hours": nul("number", minimum=1, maximum=24, description="Hours per day / shift (owner); null = the server's value")}},
         "ListPage": page("ListDetail"),  # 2.0.8: the list page carries each list's sections too
@@ -18218,6 +18292,9 @@ def wh_result(c, r, res):
     wh_log(c, w["id"], r["delivery"], r["event"], att, ok, status, errc, ms)
     if ok:
         c.execute("DELETE FROM webhook_queue WHERE id=?", (r["id"],))
+        if w["agent"] and r["event"] == "chat":  # 2.7.2 (#422): the agent's webhook took the chat message
+            with contextlib.suppress(ValueError, TypeError):
+                chat_delivered(c, w["user_id"], chat_event_mids([json.loads(r["payload"])]))
     elif att > len(WH_BACKOFF):  # the last retry failed: turn the webhook off, tell the admins
         c.execute("DELETE FROM webhook_queue WHERE webhook_id=?", (w["id"],))
         c.execute("UPDATE webhooks SET enabled=0, disabled_reason='failures', updated_at=? WHERE id=?", (iso(now_utc()), w["id"]))
@@ -18733,7 +18810,10 @@ def is_approver(c, t, uid):
 
 
 def agent_shares(c, aid, uid):
-    """Does uid share a list with agent aid (or is uid an admin)?"""
+    """Does uid share a list with agent aid (or is uid an admin)? 2.7.2 (#420): a personal agent only with its owner."""
+    o = agent_owner(c, aid)
+    if o is not None:
+        return o == uid
     u = c.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone()
     if u and u["is_admin"]:
         return True
@@ -19294,9 +19374,57 @@ def agent_job_action(jid):
     return jsonify(job_dict(c, j))
 
 
-def chat_dict(r):
+def chat_dict(r, rx=None):
+    """rx: {message id: reactions} of chat_reactions_of (2.7.2, #421); delivered_at (#422): when the agent fetched a person's
+    message (null = not yet; the agent's own messages: null)."""
     return {"id": r["id"], "agent_id": r["agent_id"], "user_id": r["user_id"], "from": r["sender"], "body": r["body"],
-            "task_id": r["task_id"], "created_at": r["created_at"]}
+            "task_id": r["task_id"], "created_at": r["created_at"], "delivered_at": r["delivered_at"],
+            "reactions": (rx or {}).get(r["id"], [])}
+
+
+def chat_reactions_of(c, mids):
+    """2.7.2 (#421): {message id: [{emoji, count, users: [{id, name}]}]} like reactions_of for comments."""
+    out, mids = {}, [x for x in mids if x]
+    if not mids:
+        return out
+    for r in c.execute(f"""SELECT r.message_id, r.emoji, r.user_id, u.display_name, u.username FROM chat_reactions r
+                           JOIN users u ON u.id=r.user_id WHERE r.message_id IN ({','.join('?' * len(mids))})
+                           ORDER BY r.created_at, r.user_id""", mids):
+        lst = out.setdefault(r["message_id"], [])
+        e = next((x for x in lst if x["emoji"] == r["emoji"]), None)
+        if not e:
+            e = {"emoji": r["emoji"], "count": 0, "users": []}
+            lst.append(e)
+        e["count"] += 1
+        e["users"].append({"id": r["user_id"], "name": r["display_name"] or r["username"]})
+    return out
+
+
+def chat_delivered(c, aid, mids=None, user_id=None):
+    """2.7.2 (#422): the agent has the person's messages now (mids: these; else every message of the conversation with
+    user_id, or of all its conversations). The caller commits. Returns how many changed."""
+    q, args = "UPDATE agent_chat SET delivered_at=? WHERE agent_id=? AND sender='user' AND delivered_at IS NULL", [iso_ms(now_utc()), aid]
+    if mids is not None:
+        mids = [int(x) for x in mids if isinstance(x, int)]
+        if not mids:
+            return 0
+        q += f" AND id IN ({','.join('?' * len(mids))})"
+        args += mids
+    elif user_id:
+        q += " AND user_id=?"
+        args.append(user_id)
+    return c.execute(q, args).rowcount
+
+
+def chat_event_mids(envs):
+    """The chat message ids inside event envelopes (event chat, data.message.id)."""
+    out = []
+    for e in envs:
+        if isinstance(e, dict) and e.get("event") == "chat":
+            m = (e.get("data") or {}).get("message") or {}
+            if isinstance(m.get("id"), int):
+                out.append(m["id"])
+    return out
 
 
 @app.get("/api/agents/<int:aid>/chat")
@@ -19310,7 +19438,9 @@ def agent_chat_get(aid):
     if c.execute("UPDATE agent_chat SET read_at=? WHERE agent_id=? AND user_id=? AND sender='agent' AND read_at IS NULL",
                  (iso(now_utc()), aid, me())).rowcount:
         c.commit()
-    return jsonify(agent=agent_public(c, a, me()), messages=[chat_dict(r) for r in rows])
+    rx = chat_reactions_of(c, [r["id"] for r in rows])
+    # 2.7.2 (#422): the server's clock, so the app can tell how long ago a message was delivered
+    return jsonify(agent=agent_public(c, a, me()), messages=[chat_dict(r, rx) for r in rows], now=iso_ms(now_utc()))
 
 
 def chat_task(c, v, uid_a, uid_b):
@@ -19359,6 +19489,60 @@ def agent_chat_post(aid):
     agent_emit(c, aid, "chat", data)
     c.commit()
     return jsonify(chat_dict(r)), 201
+
+
+# ---- 2.7.2 (#421): reactions on chat messages. Both sides may react (the person on the agent's answers and on their own
+# messages, the agent on the person's); a person's 👍 / 👎 on one of the AGENT's messages is an approval / rejection and the
+# agent gets the event "reaction" (the envelope of comment reactions: reaction + approval, with chat_message instead of a
+# comment). Reactions of agents never approve anything and send no event.
+def chat_react(c, m, uid, emoji, on):
+    """Adds (on) / removes uid's reaction on chat row m. Returns {approval} (caller commits)."""
+    res = {"approval": None}
+    if not on:
+        c.execute("DELETE FROM chat_reactions WHERE message_id=? AND user_id=? AND emoji=?", (m["id"], uid, emoji))
+        return res
+    if not c.execute("INSERT OR IGNORE INTO chat_reactions(message_id,user_id,emoji,created_at) VALUES(?,?,?,?)",
+                     (m["id"], uid, emoji, iso_ms(now_utc()))).rowcount:
+        return res
+    u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
+    if is_agent(u) or m["sender"] != "agent" or uid != m["user_id"]:
+        return res  # only the person of the conversation reacting to the agent's message counts
+    if emoji in ("up", "down"):
+        res["approval"] = "approved" if emoji == "up" else "rejected"
+    who = {"id": uid, "name": user_names(c, [uid]).get(uid, "")}
+    data = {"chat_message": {"id": m["id"], "text": m["body"][:AGENT_EVENT_COMMENT_CHARS], "from": m["sender"], "created_at": m["created_at"],
+                             "task_id": m["task_id"]},
+            "reaction": {"emoji": emoji, "user": who}, "approval": res["approval"], "user": who}
+    if m["task_id"] and task_visible(c, m["task_id"], m["agent_id"], full=True):
+        data.update(agent_task_data(c, m["task_id"], m["agent_id"]))
+    agent_emit(c, m["agent_id"], "reaction", data)
+    return res
+
+
+def chat_react_req(c, m, uid):
+    b = body() if not getattr(g, "v1_body", None) else g.v1_body
+    emoji = clean_emoji(b.get("emoji"))
+    if "on" in b and not isinstance(b["on"], bool):
+        raise BadInput(tr("Invalid value: {0}", "on"))
+    have = bool(c.execute("SELECT 1 FROM chat_reactions WHERE message_id=? AND user_id=? AND emoji=?", (m["id"], uid, emoji)).fetchone())
+    on = b["on"] if isinstance(b.get("on"), bool) else not have
+    res = chat_react(c, m, uid, emoji, on)
+    c.commit()
+    return {"ok": True, "message_id": m["id"], "reactions": chat_reactions_of(c, [m["id"]]).get(m["id"], []), **res}
+
+
+@app.post("/api/agents/<int:aid>/chat/<int:mid>/reactions")
+def agent_chat_react(aid, mid):
+    """{emoji: up|down|heart or one emoji, on?: bool} -- toggles my reaction on a message of my chat with agent aid."""
+    c = db()
+    need_chat_agent(c, aid)
+    m = c.execute("SELECT * FROM agent_chat WHERE id=? AND agent_id=? AND user_id=?", (mid, aid, me())).fetchone()
+    if not m:
+        raise Denied(404)
+    try:
+        return jsonify(chat_react_req(c, m, me()))
+    except BadInput as e:
+        return err(str(e))
 
 
 def wake_limit():
@@ -19424,6 +19608,8 @@ def agent_admin_dict(c, a):
             "limits": usage_limits(a), "usage": usage_state(c, a),  # 2.1.1 (#326)
             "proposals": prop_mode(a),  # 2.3.0: off | shared | all
             "runtime": agent_runtime(a),  # 2.4.1 (#377)
+            "owner": ({"id": a["owner_id"], "name": user_names(c, [a["owner_id"]]).get(a["owner_id"], "")} if a["owner_id"] else None),  # 2.7.2 (#420)
+            "admin_paused": bool(a["admin_paused"]),
             "lists": [{"id": d["id"], "name": d["name"], "role": d["role"]} for d in visible_lists(c, a["user_id"]) if not d["is_inbox"]]}
 
 
@@ -19595,6 +19781,8 @@ def admin_agent_update(aid):
         if not isinstance(b["enabled"], bool):
             return err(tr("Invalid value: {0}", "enabled"))
         agent_enable(c, aid, b["enabled"])
+        if a0["owner_id"] and a0["owner_id"] != me():  # 2.7.2 (#420): an admin paused somebody's personal agent: only an admin resumes it
+            c.execute("UPDATE agents SET admin_paused=? WHERE user_id=?", (0 if b["enabled"] else 1, aid))
         print("agent", aid, "enabled" if b["enabled"] else "PAUSED (kill switch)", "by", g.user["username"], flush=True)
     bump(c)
     c.commit()
@@ -19673,6 +19861,204 @@ def admin_agent_test(aid):
         out["webhook"] = {"ok": ok, "status": status, "ms": ms, "error": errc, "error_text": wh_err_text(errc, status) if errc else ""}
     c.commit()
     return jsonify(out)
+
+
+# ---- 2.7.2 (#420): personal agents. An admin allows people to create their own agents (instance setting user_agents, off
+# by default; user_agents_max per person, default 2; user_agents_limits = the usage limits every new one starts with).
+# A personal agent belongs to its creator (agents.owner_id): only the owner shares lists with it, chats with it and manages
+# it (name, note, pause, new token, delete); other people never find it in their share pickers. It is never an admin and
+# gets no Paperless (make_agent). Admins see every agent (with its owner) and can pause or delete it.
+USER_AGENTS_MAX_DEFAULT, USER_AGENTS_MAX_CAP = 2, 20
+
+
+def agent_policy(c):
+    try:
+        mx = int(gsetting(c, "user_agents_max") or USER_AGENTS_MAX_DEFAULT)
+    except ValueError:
+        mx = USER_AGENTS_MAX_DEFAULT
+    lim = gsetting(c, "user_agents_limits") or ""
+    return {"user_agents": gsetting(c, "user_agents") == "1", "max_per_user": max(1, min(USER_AGENTS_MAX_CAP, mx)),
+            "limits": json.loads(lim) if lim else None}
+
+
+def agent_owner(c, aid):
+    r = c.execute("SELECT owner_id FROM agents WHERE user_id=?", (aid,)).fetchone() if aid else None
+    return r["owner_id"] if r else None
+
+
+def personal_agent_foreign(c, aid, uid):
+    """True if aid is somebody else's personal agent (uid may not share with / find it)."""
+    o = agent_owner(c, aid)
+    return o is not None and o != uid
+
+
+@app.get("/api/admin/agent-policy")
+def admin_agent_policy_get():
+    need_admin()
+    return jsonify(agent_policy(db()))
+
+
+@app.put("/api/admin/agent-policy")
+def admin_agent_policy_put():
+    """{user_agents?: bool, max_per_user?: 1..20, limits?: usage limits or null} -- who may create personal agents."""
+    need_admin()
+    b, c = body(), db()
+    unknown = sorted(k for k in b if k not in ("user_agents", "max_per_user", "limits"))
+    if unknown:
+        return err(tr("Invalid value: {0}", ", ".join(unknown)))
+    if "user_agents" in b:
+        if not isinstance(b["user_agents"], bool):
+            return err(tr("Invalid value: {0}", "user_agents"))
+        gset(c, "user_agents", "1" if b["user_agents"] else "0")
+    if "max_per_user" in b:
+        v = b["max_per_user"]
+        if isinstance(v, bool) or not isinstance(v, int) or not 1 <= v <= USER_AGENTS_MAX_CAP:
+            return err(tr("Invalid value: {0}", "max_per_user"))
+        gset(c, "user_agents_max", str(v))
+    if "limits" in b:
+        try:
+            gset(c, "user_agents_limits", usage_limits_clean(b["limits"]))
+        except BadInput as e:
+            c.rollback()
+            return err(str(e))
+    bump(c)
+    c.commit()
+    print("agent policy", json.dumps(agent_policy(c)), "by", g.user["username"], flush=True)
+    return jsonify(agent_policy(c))
+
+
+def need_own_agent(c, aid):
+    """A personal agent of the current person (404 otherwise)."""
+    a = agent_row(c, aid)
+    if not a or is_agent(g.user) or a["owner_id"] != me():
+        raise Denied(404)
+    return a
+
+
+def my_agents(c, uid):
+    return [agent_admin_dict(c, a) for a in c.execute("""SELECT a.*, u.username, u.display_name, u.avatar, u.disabled FROM agents a
+                                                         JOIN users u ON u.id=a.user_id WHERE u.kind='agent' AND a.owner_id=? ORDER BY u.id""", (uid,))]
+
+
+@app.get("/api/my/agents")
+def my_agents_get():
+    """My personal agents + whether I may create (more)."""
+    c = db()
+    if is_agent(g.user):
+        raise Denied(403, tr("Agents cannot use this endpoint"))
+    pol = agent_policy(c)
+    ags = my_agents(c, me())
+    return jsonify(allowed=pol["user_agents"] and API_ON, max=pol["max_per_user"], count=len(ags), agents=ags, api=API_ON)
+
+
+@app.post("/api/my/agents")
+def my_agent_create():
+    """{username, display_name?, note?} -> my new personal agent + its API token (shown this once)."""
+    c = db()
+    if is_agent(g.user):
+        raise Denied(403, tr("Agents cannot use this endpoint"))
+    need_api()
+    pol = agent_policy(c)
+    if not pol["user_agents"]:
+        raise Denied(403, tr("Personal agents are switched off on this server"))
+    c.execute("BEGIN IMMEDIATE")
+    n = c.execute("SELECT COUNT(*) FROM agents WHERE owner_id=?", (me(),)).fetchone()[0]
+    if n >= pol["max_per_user"]:
+        c.rollback()
+        return err(trn("You can have at most {0} personal agent", "You can have at most {0} personal agents", pol["max_per_user"]), 409)
+    b = body()
+    username = (b.get("username") or "").strip().lower()
+    if not USERNAME_RE.fullmatch(username):
+        c.rollback()
+        return err(tr("Username: 1-32 characters a-z, 0-9, dot, dash, underscore"))
+    if c.execute("SELECT 1 FROM users WHERE username=?", (username,)).fetchone():
+        c.rollback()
+        return err(tr("Username already exists"), 409)
+    uid = create_user(c, username, (b.get("display_name") or "").strip()[:60] or username, None, None, False, paperless_access=False)
+    make_agent(c, uid)
+    c.execute("UPDATE agents SET note=?, owner_id=?, usage_limits=? WHERE user_id=?",
+              (str(b.get("note") or "")[:AGENT_NOTE_MAX], me(), gsetting(c, "user_agents_limits") or "", uid))
+    c.execute("UPDATE users SET avatar=? WHERE id=?", ("p:robot", uid))
+    uset(c, uid, "lang", usettings(c, me())["lang"])
+    ensure_inbox(c, uid)
+    tok = agent_token_new(c, uid)
+    bump(c)
+    c.commit()
+    print("personal agent", username, "(id", uid, ") created by", g.user["username"], flush=True)
+    return jsonify({**agent_admin_dict(c, agent_row(c, uid)), "token": tok}), 201
+
+
+@app.patch("/api/my/agents/<int:aid>")
+def my_agent_update(aid):
+    """{display_name?, note?, enabled?} -- the owner renames / pauses / resumes a personal agent."""
+    c = db()
+    a = need_own_agent(c, aid)
+    b = body()
+    unknown = sorted(k for k in b if k not in ("display_name", "note", "enabled"))
+    if unknown:
+        return err(tr("Invalid value: {0}", ", ".join(unknown)))
+    if "enabled" in b and not isinstance(b["enabled"], bool):
+        return err(tr("Invalid value: {0}", "enabled"))
+    if "display_name" in b:
+        c.execute("UPDATE users SET display_name=? WHERE id=?", ((str(b["display_name"] or "")).strip()[:60] or a["username"], aid))
+    if "note" in b:
+        c.execute("UPDATE agents SET note=? WHERE user_id=?", (str(b["note"] or "")[:AGENT_NOTE_MAX], aid))
+    if "enabled" in b:
+        if b["enabled"] and a["admin_paused"]:
+            c.rollback()
+            return err(tr("An admin paused this agent; only an admin can resume it"), 403)
+        agent_enable(c, aid, b["enabled"])
+        print("personal agent", aid, "enabled" if b["enabled"] else "PAUSED", "by its owner", g.user["username"], flush=True)
+    bump(c)
+    c.commit()
+    return jsonify(agent_admin_dict(c, agent_row(c, aid)))
+
+
+@app.post("/api/my/agents/<int:aid>/token")
+def my_agent_token(aid):
+    """A new API token for my personal agent; every older one stops at once. Shown this once."""
+    need_api()
+    c = db()
+    need_own_agent(c, aid)
+    c.execute("DELETE FROM api_tokens WHERE user_id=?", (aid,))
+    tok = agent_token_new(c, aid)
+    c.commit()
+    return jsonify(token=tok)
+
+
+def agent_delete(c, aid, heir):
+    """Deletes agent aid; the lists it owns (besides its inbox) go to heir first. The caller commits; returns files to unlink."""
+    for lr in c.execute("SELECT * FROM lists WHERE owner_id=? AND is_inbox=0", (aid,)).fetchall():
+        owner_transfer(c, lr, heir)
+    return user_purge(c, aid)
+
+
+@app.delete("/api/my/agents/<int:aid>")
+def my_agent_delete(aid):
+    c = db()
+    a = need_own_agent(c, aid)
+    files = agent_delete(c, aid, me())
+    bump(c)
+    c.commit()
+    unlink_files(files)
+    avatar_drop_file(aid, a["avatar"])
+    print("personal agent", aid, "deleted by its owner", g.user["username"], flush=True)
+    return jsonify(ok=True)
+
+
+@app.delete("/api/admin/agents/<int:aid>")
+def admin_agent_delete(aid):
+    """An admin deletes any agent; its own lists go to the owner of a personal agent, else to the admin."""
+    c = db()
+    a = need_agent_admin(c, aid)
+    heir = a["owner_id"] if a["owner_id"] and c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (a["owner_id"],)).fetchone() else me()
+    files = agent_delete(c, aid, heir)
+    bump(c)
+    c.commit()
+    unlink_files(files)
+    avatar_drop_file(aid, a["avatar"])
+    print("agent", aid, "deleted by", g.user["username"], flush=True)
+    return jsonify(ok=True)
 
 
 # ---- agents: the REST API of the agent itself (token of an agent account)
@@ -19811,6 +20197,11 @@ def v1_agent_events():
     more = len(rows) > limit
     rows = rows[:limit]
     data = [json.loads(r["payload"]) for r in rows]
+    mids = chat_event_mids(data)
+    if mids:  # 2.7.2 (#422): these chat messages reached the agent
+        c2 = db()
+        if chat_delivered(c2, aid, mids):
+            c2.commit()
     resp = jsonify(data=data, cursor=rows[-1]["id"] if rows else since, has_more=more, busy=busy, waited=waited)
     if busy:
         resp.headers["Retry-After"] = "5"
@@ -20655,7 +21046,7 @@ def proposal_undo(jid):
         others = c.execute(f"SELECT COUNT(*) FROM tasks WHERE list_id=? AND id NOT IN ({q})", (lid, *ids)).fetchone()[0] if lid else 1
         if j["kind"] == "project" and lid and not others and len(mine) == len(ids) and \
                 c.execute("SELECT 1 FROM lists WHERE id=? AND owner_id=?", (lid, me())).fetchone():
-            c.execute("DELETE FROM lists WHERE id=?", (lid,))  # the whole new project (sections, tasks, deps, members)
+            list_row_purge(c, lid, g.setdefault("purge_lists", []))  # the whole new project (sections, tasks, deps, members, files)
             rec["list_deleted"] = True
             n = len(ids)
         else:
@@ -20669,6 +21060,7 @@ def proposal_undo(jid):
     c.execute("UPDATE agent_jobs SET applied=?, updated_at=? WHERE id=?", (json.dumps(rec, ensure_ascii=False), ts, jid))
     bump(c)
     c.commit()
+    list_purge_files(g.pop("purge_lists", []))
     return jsonify(undone=n, skipped=skipped, none=n == 0)
 
 
@@ -20807,8 +21199,12 @@ def v1_agent_chats():
     rows = c.execute(q + " ORDER BY id LIMIT ?", (*args, limit + 1)).fetchall()
     more = len(rows) > limit
     rows = rows[:limit]
+    if chat_delivered(c, aid, [r["id"] for r in rows if r["sender"] == "user" and not r["delivered_at"]]):  # 2.7.2 (#422)
+        c.commit()
+        rows = [c.execute("SELECT * FROM agent_chat WHERE id=?", (r["id"],)).fetchone() for r in rows]
     names = user_names(c, [r["user_id"] for r in rows])
-    return jsonify(data=[{**chat_dict(r), "user": {"id": r["user_id"], "name": names.get(r["user_id"], "")}} for r in rows],
+    rx = chat_reactions_of(c, [r["id"] for r in rows])
+    return jsonify(data=[{**chat_dict(r, rx), "user": {"id": r["user_id"], "name": names.get(r["user_id"], "")}} for r in rows],
                    cursor=rows[-1]["id"] if rows else since, has_more=more)
 
 
@@ -20838,6 +21234,47 @@ def v1_agent_chat_post(uid):
     bump(c)
     c.commit()
     return jsonify(chat_dict(r)), 201
+
+
+@app.post("/api/v1/agent/chats/<int:uid>/messages/<mid>/reactions")
+@v1_view
+def v1_agent_chat_react(uid, mid):
+    """2.7.2 (#421): the agent reacts to a message of its chat with person uid ({emoji, on?}); never an approval, no event."""
+    v1_args(())
+    aid = need_agent()
+    c = db()
+    mid = as_int(mid, "mid", 1)  # a named path segment, so the OpenAPI path can call it {mid}
+    b = v1_json()
+    unknown = sorted(k for k in b if k not in ("emoji", "on"))
+    if unknown:
+        raise UnknownFields(unknown)
+    m = c.execute("SELECT * FROM agent_chat WHERE id=? AND agent_id=? AND user_id=?", (mid, aid, uid)).fetchone()
+    if not m or not agent_shares(c, aid, uid):
+        raise Denied(404)
+    g.v1_body = b
+    return jsonify(chat_react_req(c, m, aid))
+
+
+@app.post("/api/v1/agents/<int:aid>/chat/<mid>/reactions")
+@v1_view
+def v1_person_chat_react(aid, mid):
+    """2.7.2 (#421): a person (token) reacts to a message of their chat with agent aid ({emoji, on?}); 👍 / 👎 on the agent's
+    message = approval / rejection, the agent gets the event reaction."""
+    v1_args(())
+    if is_agent(g.user):
+        raise Denied(403, tr("Agents cannot use this endpoint"))
+    c = db()
+    mid = as_int(mid, "mid", 1)
+    b = v1_json()
+    unknown = sorted(k for k in b if k not in ("emoji", "on"))
+    if unknown:
+        raise UnknownFields(unknown)
+    need_chat_agent(c, aid)
+    m = c.execute("SELECT * FROM agent_chat WHERE id=? AND agent_id=? AND user_id=?", (mid, aid, me())).fetchone()
+    if not m:
+        raise Denied(404)
+    g.v1_body = b
+    return jsonify(chat_react_req(c, m, me()))
 
 
 @app.post("/api/v1/agent/typing")
@@ -21608,7 +22045,15 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                               "job_tasks": {"type": "array", "items": {"type": "integer"}}, "running": {"type": "integer"}, "waiting": {"type": "integer"},
                                               "enabled": {"type": "boolean"}}}
     msg = {"type": "object", "properties": {"id": {"type": "integer"}, "user_id": {"type": "integer"}, "from": {"type": "string", "enum": ["user", "agent"]},
-                                            "body": {"type": "string"}, "task_id": nul("integer"), "created_at": {"type": "string"}}}
+                                            "body": {"type": "string"}, "task_id": nul("integer"), "created_at": {"type": "string"},
+                                            "delivered_at": nul("string", description="2.7.2 (#422): when the agent fetched the person's message (event poll, MCP, webhook, chat read); null = not yet / an agent message"),
+                                            "reactions": {"type": "array", "description": "2.7.2 (#421)", "items": {"type": "object", "properties": {
+                                                "emoji": {"type": "string"}, "count": {"type": "integer"},
+                                                "users": {"type": "array", "items": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}}}}}}}}}
+    chat_rx_in = {"type": "object", "required": ["emoji"], "additionalProperties": False, "properties": {
+        "emoji": {"type": "string", "description": "up, down, heart or one emoji"}, "on": {"type": "boolean", "description": "Set (true) / remove (false); missing = toggle"}}}
+    chat_rx_out = {"type": "object", "properties": {"ok": {"type": "boolean"}, "message_id": {"type": "integer"}, "reactions": {"type": "array", "items": {"type": "object"}},
+                                                    "approval": nul("string", enum=["approved", "rejected", None])}}
     ltag = {"type": "object", "properties": {"id": {"type": "integer"}, "list_id": {"type": "integer"}, "name": {"type": "string"},
                                              "color": {"type": "string"}, "tasks": {"type": "integer"}, "open": {"type": "integer"}}}
     sug = {"type": "object", "additionalProperties": False, "properties": {
@@ -21704,7 +22149,13 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
             "get": op("The agent's own usage, grouped", AG, ok(ref("UsagePage")) | errs("400", "403"),
                       [q("from", "First local day (YYYY-MM-DD), default 29 days before `to`"), q("to", "Last local day, default today"),
                        q("group", "day (default), task, list or model", {"type": "string", "enum": list(USAGE_GROUPS)})])},
+        "/agent/chats/{id}/messages/{mid}/reactions": {"post": op("React to a message of the chat with a person (2.7.2; never an approval)", AG,
+                                                                  ok(chat_rx_out) | errs("400", "403", "404"), [pid("id", "User id"), pid("mid", "Message id")],
+                                                                  scope=W, body=chat_rx_in)},
         "/agents": {"get": op("Agents you share lists with (an agent: itself)", AG, ok(ref("AgentPage")) | errs())},
+        "/agents/{id}/chat/{mid}/reactions": {"post": op("React to a message of your chat with an agent (2.7.2): 👍 / 👎 on the agent's message = "
+                                                         "approval / rejection; the agent gets the event reaction", AG, ok(chat_rx_out) | errs("400", "403", "404"),
+                                                         [pid("id", "Agent id"), pid("mid", "Message id")], scope=W, body=chat_rx_in)},
         "/tasks/{id}/tidy": {"post": op("Tidy a task (agents; list set to automatic)", AG, ok(ref("Task")) | errs("400", "403", "404", "409"),
                                         [pid()], scope=W, body=ref("TidyInput"))},
         "/comments/{id}/reactions": {"post": op("React to a comment", C_ := "Comments", ok(ref("Comment")) | errs("400", "403", "404"),

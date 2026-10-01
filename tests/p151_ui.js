@@ -390,7 +390,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   const doneMine = (await call('GET', '/api/tasks?scope=done')).tasks.filter(t => t.list_id !== BL && t.list_id !== CKL);
   check(dlg() && dlg().querySelectorAll('input[name="dc-age"]').length === 3, 'dialog: all / 30 / 90 days');
   check(new RegExp(`Move ${doneMine.length} tasks? to the trash`).test(dlg().querySelector('[data-cd="yes"]').textContent), 'OK names the count: ' + dlg().querySelector('[data-cd="yes"]').textContent + ' / ' + doneMine.length);
-  check(/1 task in a list you may only view stays/.test(dlg().textContent) && /Items of checklists stay/.test(dlg().textContent), 'says what stays: ' + dlg().querySelector('#dc-note').textContent);
+  check(/1 task in a list you may only view stays/.test(dlg().textContent) && /Items of lists that show completed tasks at the bottom stay/.test(dlg().textContent), 'says what stays: ' + dlg().querySelector('#dc-note').textContent);
   const r90 = dlg().querySelector('input[value="90"]'); r90.checked = true; r90.dispatchEvent(new w.Event('change', {bubbles: true}));
   check(dlg().querySelector('[data-cd="yes"]').disabled && /Move 0 tasks/.test(dlg().querySelector('[data-cd="yes"]').textContent), 'older than 90 days: nothing, OK disabled');
   const r0 = dlg().querySelector('input[value="0"]'); r0.checked = true; r0.dispatchEvent(new w.Event('change', {bubbles: true}));

@@ -34,8 +34,8 @@ const set = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', 
   // ---- checklist view
   let w = await boot({user: 'alice', hash: 'l/' + L.id}), d = w.document;
   const row = id => d.querySelector(`#view .trow[data-id="${id}"]`);
-  check(row(milk.id)?.classList.contains('ck') && !row(milk.id).querySelector('.dt') && !row(milk.id).classList.contains('pr5')
-    && row(milk.id).querySelector('.chk.p0'), 'checklist rows: compact (no date, no priority color)');
+  // 2.7.2 (#414): "Show completed at the bottom" is a list option; the rows are full tasks (date, priority)
+  check(row(milk.id) && !row(milk.id).classList.contains('ck') && row(milk.id).querySelector('.dt') && row(milk.id).classList.contains('pr5'), 'rows are full tasks (2.7.2)');
   const done = () => d.querySelector('#view .ckdone');
   check(done() && /Done/.test(done().querySelector('.ghead').textContent) && done().querySelector('.ghead .c').textContent === '1', 'Done section with count');
   check(done().contains(row(eggs.id)) && row(eggs.id).querySelector('.ckback') && done().querySelector('[data-act="ck-uncheck"]') && done().querySelector('[data-act="ck-clear"]'),
@@ -56,7 +56,7 @@ const set = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', 
   // list dialog: switch + public link
   w.eval(`listModal(${L.id})`); await sleep(400);
   let md = d.querySelector('.modal');
-  check(md.querySelector('#l-kind')?.value === 'checklist' && !md.querySelector('#l-kind').disabled, 'list dialog: type Checklist (owner)');
+  check(md.querySelector('#l-kind')?.value === 'list' && md.querySelector('#l-dab')?.checked && !md.querySelector('#l-dab').disabled, 'list dialog: List + "Show completed at the bottom" on (owner, 2.7.2)');
   // 2.6.0 (K12): the public link lives in the Share dialog
   md.remove(); w.eval(`shareModal(${L.id})`); await sleep(500);
   md = d.querySelector('.modal.shmodal');
@@ -77,8 +77,8 @@ const set = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', 
   click(w, md.querySelector('[data-lp="off"]')); await sleep(600);
   check(!md.querySelector('#lp-url') && md.querySelector('[data-lp="save"]') && (await call(ca, 'GET', `/api/lists/${L.id}/public-link`)).link === null, 'turn off');
   md.remove(); w.eval(`listModal(${L.id})`); await sleep(400); md = d.querySelector('.modal');
-  md.querySelector('#l-kind').value = 'list';
-  md.querySelector('#l-kind').dispatchEvent(new w.Event('change', {bubbles: true}));  // 1.5.1: the dialog saves itself
+  md.querySelector('#l-dab').checked = false;
+  md.querySelector('#l-dab').dispatchEvent(new w.Event('change', {bubbles: true}));  // 1.5.1: the dialog saves itself
   click(w, md.querySelector('[data-m="close"]')); await sleep(900);
   check(w.eval(`listById(${L.id}).checklist`) === 0 && !d.querySelector('#view .ckdone'), 'checklist mode off: normal list');
   w.eval(`openDetail(${eggs.id})`); await sleep(900);
@@ -159,7 +159,7 @@ const set = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', 
   w = await boot({user: 'alice', hash: 'l/' + L.id}); d = w.document;
   check(/Erledigt/.test(d.querySelector('#view .ckdone .ghead')?.textContent || '') && d.querySelector('[data-act="ck-uncheck"]')?.textContent.includes('Alle zurücksetzen'), 'German: Done section');
   w.eval(`listModal(${L.id})`); await sleep(400);
-  check(/Einkaufs- & Packliste/.test(d.querySelector('.modal #l-kind').textContent) && /Projekt/.test(d.querySelector('.modal #l-kind').textContent) && /Teilen…/.test(d.querySelector('.modal').textContent), 'German: list dialog');
+  check(/Liste/.test(d.querySelector('.modal #l-kind').textContent) && /Projekt/.test(d.querySelector('.modal #l-kind').textContent) && /Erledigte unten zeigen/.test(d.querySelector('.modal').textContent) && /Teilen…/.test(d.querySelector('.modal').textContent), 'German: list dialog');
   d.querySelector('.modal').remove();
   w.eval(`shareModal(${L.id})`); await sleep(400);
   check(/Öffentlicher Link/.test(d.querySelector('.modal.shmodal')?.textContent || ''), 'German: Share dialog');

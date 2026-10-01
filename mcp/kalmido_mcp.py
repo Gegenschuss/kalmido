@@ -7,7 +7,7 @@ Paperless access. Kalmido itself never starts AI processes; this server runs whe
 
 Configuration (environment):
   KALMIDO_URL     base address of the instance, e.g. https://tasks.example.com
-  KALMIDO_TOKEN   the agent's API token (abk_...), Settings > Users > Agents
+  KALMIDO_TOKEN   the agent's API token (abk_...), Settings > Agents (team agents: admins; personal agents: Set up)
   MCP_HTTP_TOKEN optional: HTTP mode requires "Authorization: Bearer <this>" from the MCP client
 
 Transports:
@@ -27,7 +27,7 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 SERVER_NAME = "kalmido"
-SERVER_VERSION = "2.4.1"
+SERVER_VERSION = "2.7.2"
 PROTOCOLS = ("2025-06-18", "2025-03-26", "2024-11-05")
 WAIT_MAX = 60
 
@@ -156,6 +156,12 @@ def t_react(api, a):
     return api.call("POST", f"/comments/{cid}/reactions", body={"emoji": a["emoji"]})
 
 
+def t_react_chat(api, a):
+    """2.7.2 (#421): a reaction on a message of the chat with person user_id (never an approval; no event)."""
+    return api.call("POST", f"/agent/chats/{int(a['user_id'])}/messages/{int(a['message_id'])}/reactions",
+                    body={"emoji": a["emoji"], "on": not a.get("remove")})
+
+
 def t_wait(api, a):
     w = max(0, min(WAIT_MAX, int(a.get("wait", 30))))
     return api.call("GET", "/agent/events", {"since": a.get("since"), "wait": w, "limit": a.get("limit")}, timeout=w + 20)
@@ -256,6 +262,13 @@ TOOLS = [
      _obj({"comment_id": S_ID, "emoji": {"type": "string", "minLength": 1, "maxLength": 16,
                                          "description": "up, down, heart or one emoji character"}, "remove": {"type": "boolean"}},
           ["comment_id", "emoji"]), t_react),
+    ("react_to_chat", "Add (or with remove=true take back) a reaction on a chat message of the conversation with person user_id "
+                      "(message ids from list_chats / chat events): up (👍), down (👎), heart (❤️) or one emoji. A person's 👍 / 👎 on "
+                      "YOUR chat message arrives as the event reaction with data.chat_message and approval approved / rejected: a 👍 "
+                      "on your question is the go-ahead.",
+     _obj({"user_id": S_ID, "message_id": S_ID, "emoji": {"type": "string", "minLength": 1, "maxLength": 16,
+                                                         "description": "up, down, heart or one emoji character"}, "remove": {"type": "boolean"}},
+          ["user_id", "message_id", "emoji"]), t_react_chat),
     ("set_status", "Report the agent's status, shown on its avatar: idle | working | waiting (for approval) | error, plus a short text. "
                    "task_id (optional): the task you are working on; while working, its comment area shows '<agent> is writing ...'.",
      _obj({"status": {"type": "string", "enum": ["idle", "working", "waiting", "error"]}, "text": {"type": "string", "maxLength": 200},
@@ -265,7 +278,9 @@ TOOLS = [
      "job_request, runtime_changed, reset) after cursor `since`. runtime_changed / reset: your host should restart you (see get_agent "
      "runtime). job_request = a person asks for a proposal: read data.input, answer with submit_proposal. "
      "Store the returned cursor and pass it next time. Task events carry the task with its newest comments (task.comments, at most 20, "
-     "task.comments_total) and the list with its sections and agent_tidy mode: no get_task / list_lists needed.",
+     "task.comments_total) and the list with its sections and agent_tidy mode: no get_task / list_lists needed. A reaction on one of "
+     "your chat messages: event reaction with data.chat_message {id, text, from, created_at}, data.reaction {emoji, user} and "
+     "data.approval (approved = a person's 👍, rejected = 👎). Fetching a chat event marks the message delivered for the person.",
      _obj({"since": {"type": "integer", "minimum": 0}, "limit": {"type": "integer", "minimum": 1, "maximum": 500}}),
      lambda api, a: api.call("GET", "/agent/events", _pick(a, ("since", "limit")))),
     ("wait_for_events", "Long-poll: like list_events, but waits up to `wait` seconds (max 60) until an event arrives.",
@@ -293,7 +308,8 @@ TOOLS = [
     ("update_job", "Update a job: state, title, log (replace) or append_log (add lines).",
      _obj({"job_id": S_ID, "title": {"type": "string"}, "state": {"type": "string", "enum": ["running", "waiting", "done", "failed", "stopped"]},
            "log": {"type": "string"}, "append_log": {"type": "string"}}, ["job_id"]), t_update_job),
-    ("list_chats", "Chat messages people sent to the agent (all conversations) after message id `since`.",
+    ("list_chats", "Chat messages people sent to the agent (all conversations) after message id `since`, with reactions and "
+                   "delivered_at (reading them marks them delivered).",
      _obj({"since": {"type": "integer", "minimum": 0}}), lambda api, a: api.call("GET", "/agent/chats", _pick(a, ("since",)))),
     ("chat_typing", "Show typing dots in one person's chat for 10 seconds while you write an answer (call again to keep them; "
                     "send_chat ends them).",

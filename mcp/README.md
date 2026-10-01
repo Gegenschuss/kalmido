@@ -7,7 +7,7 @@ Kalmido never starts AI processes itself. You run this server (and your agent) o
 
 ## Before you start
 
-1. An admin creates the agent in **Settings > AI colleague > Agents** (admins; up to 2.0.4 under Administration). Copy its API token (it is shown once).
+1. An admin creates the agent in **Settings > Agents > Status > Add agent**, or (2.7.2, when an admin allows it) you create your own personal agent in **Settings > Agents > Set up > Create agent**. Copy its API token (it is shown once). Step-by-step guides for Linux, macOS and Windows: **Settings > Agents > Set up** and [docs/AGENTS.md](../docs/AGENTS.md#set-up-an-agent).
 2. Share the lists that the agent should work in with the agent (role Member, Participant or Viewer).
 
 ## Claude Code
@@ -62,6 +62,7 @@ By default the server binds to `127.0.0.1`. It rejects requests with an `Origin`
 | `get_job` / `submit_proposal` | 2.3.0: one job (a proposal job with its input) / answer a `job_request` with a structured proposal ([Proposals](../docs/AGENTS.md#proposals)) | `/api/v1/agent/jobs/{id}`, `.../proposal` |
 | `list_chats` / `send_chat` | chat with people | `GET /api/v1/agent/chats`, `POST /api/v1/agent/chats/{user_id}` |
 | `chat_typing` | typing dots in one person's chat for 10 s (2.4.1) | `POST /api/v1/agent/typing` |
+| `react_to_chat` | 2.7.2: 👍 / 👎 / ❤️ on a chat message (`user_id`, `message_id`, `emoji`, `on`, default true); a person's 👍 on your message arrives as a `reaction` event with `approval: "approved"` | `POST /api/v1/agent/chats/{user_id}/messages/{id}/reactions` |
 | `tidy_task` | tidy a task (lists in tidy mode "auto") | `POST /api/v1/tasks/{id}/tidy` |
 | `set_waiting` / `clear_waiting` | 2.1.0: mark a task as waiting on external (`note`, follow-up day `until`) or end it | `PUT` / `DELETE /api/v1/tasks/{id}/waiting` |
 | `list_waiting` | 2.1.0: open tasks waiting on external (`list_tasks` also takes `waiting: true / false`) | `GET /api/v1/tasks?waiting=true` |
@@ -83,6 +84,16 @@ auto-compact, nightly fresh restart, *Reset now*), always in a fresh session, an
 ```
 
 The env file holds `KALMIDO_URL` and `KALMIDO_TOKEN`. Details and a systemd unit: [docs/AGENTS.md](../docs/AGENTS.md#runtime-settings).
+
+**Windows and macOS (2.7.2):** [`agent_launcher.ps1`](agent_launcher.ps1) is the same launcher in PowerShell (Windows
+PowerShell 5.1 or PowerShell 7; on macOS PowerShell 7, since `agent_launcher.sh` needs GNU `date` and `setsid`):
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File agent_launcher.ps1 -e $HOME\.config\kalmido\agent.env --once   # dry run
+pwsh -NoProfile -ExecutionPolicy Bypass -File agent_launcher.ps1 -e $HOME\.config\kalmido\agent.env -- claude -p "Work through your Kalmido events"
+```
+
+A scheduled task (Windows) and a launchd plist (macOS): [docs/AGENTS.md](../docs/AGENTS.md#set-up-an-agent).
 
 ## Claude Code usage hook
 
@@ -109,4 +120,5 @@ The env file holds `KALMIDO_URL` and `KALMIDO_TOKEN` (optional `KALMIDO_USAGE_PR
 ```sh
 python3 tests/mcp_test.py   # stub API server, stdio + HTTP; no Docker needed
 python3 tests/usage_hook_test.py   # the usage hook against a stub API with a sample transcript
+python3 tests/launcher_ps1_test.py # agent_launcher.ps1 against a stub API (needs pwsh; skipped without it)
 ```

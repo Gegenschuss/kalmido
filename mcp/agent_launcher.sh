@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # agent_launcher.sh -- reference launcher for an agent host (Claude Code) that follows Kalmido's runtime settings (2.4.1).
 #
-# Kalmido never runs an agent. An admin only chooses runtime settings in Settings > AI colleague > (agent) > Runtime and
+# Kalmido never runs an agent. An admin only chooses runtime settings in Settings > Agents > (agent) > Runtime and
 # Kalmido hands them to the agent: GET /api/v1/agent -> "runtime" {model, autocompact, autocompact_pct, nightly_reset,
 # reset_seq, timezone}. This script runs on the agent's host and applies them:
 #   - starts the agent command, ALWAYS in a fresh session (Claude Code starts a new conversation unless it gets
@@ -16,7 +16,7 @@
 # usage: agent_launcher.sh [-e ENV_FILE] [--once] [-- COMMAND ...]
 #   ENV_FILE  default ./kalmido-agent.env (chmod 600), shell syntax:
 #               KALMIDO_URL=https://tasks.example.com
-#               KALMIDO_TOKEN=abk_...            the agent's API token (Settings > AI colleague > Agents)
+#               KALMIDO_TOKEN=abk_...            the agent's API token (Settings > Agents)
 #             everything in it is exported to the command too (the MCP server mcp/kalmido_mcp.py reads the same two)
 #   COMMAND   what to start (default: claude). Example, a headless loop that works through its events:
 #               agent_launcher.sh -e ~/.config/kalmido/agent.env -- claude -p "$(cat ~/agent/prompt.md)" --permission-mode acceptEdits

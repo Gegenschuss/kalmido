@@ -136,7 +136,7 @@ names = {t["name"] for t in tools}
 want = {"list_lists", "list_tasks", "search_tasks", "get_task", "create_task", "update_task", "complete_task", "add_comment", "react",
         "set_status", "list_events", "wait_for_events", "get_agent", "create_job", "update_job", "list_jobs", "send_chat", "list_chats",
         "tidy_task", "list_list_tags", "set_waiting", "clear_waiting", "list_waiting", "report_usage", "get_usage", "get_job",
-        "submit_proposal", "chat_typing", "get_project_overview"}
+        "submit_proposal", "chat_typing", "get_project_overview", "react_to_chat"}
 check(want <= names, f"all tools listed (missing {want - names})")
 check(all(isinstance(t["inputSchema"], dict) and t["inputSchema"].get("type") == "object" and t["description"] for t in tools),
       "every tool has an object schema + description")
@@ -190,6 +190,9 @@ CASES = [
      "POST", "/api/v1/agent/jobs/5/proposal", {"kind": "subtasks", "items": [{"title": "A"}, {"title": "B"}], "dependencies": [[1, 0]]}, {}),
     # 2.4.1 (#375) typing dots in a person's chat
     ("chat_typing", {"chat_user_id": 3}, "POST", "/api/v1/agent/typing", {"chat_user_id": 3}, {}),
+    # 2.7.2 (#421) reactions on chat messages
+    ("react_to_chat", {"user_id": 3, "message_id": 41, "emoji": "up"}, "POST", "/api/v1/agent/chats/3/messages/41/reactions", {"emoji": "up", "on": True}, {}),
+    ("react_to_chat", {"user_id": 3, "message_id": 41, "emoji": "heart", "remove": True}, "POST", "/api/v1/agent/chats/3/messages/41/reactions", {"emoji": "heart", "on": False}, {}),
 ]
 for name, args, m, p, b, q in CASES:
     n0 = len(REQS)

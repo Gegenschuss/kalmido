@@ -23,39 +23,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
 const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,progress,deps,fields,agents,comments';
 const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
-async function firefox(fn, touch) {
-  try { execFileSync('firefox', ['--version'], {stdio: 'ignore'}); } catch { console.log('p271_ui: Firefox part skipped (no firefox on PATH)'); return; }
-  const PORT = 9300 + Math.floor(Math.random() * 600);
-  const prof = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), 'kalmido-p271-'));
-  const prefs = [['browser.shell.checkDefaultBrowser', false], ['datareporting.policy.dataSubmissionEnabled', false], ['ui.prefersReducedMotion', 1],
-    ...(touch ? [['ui.primaryPointerCapabilities', 1], ['ui.allPointerCapabilities', 1], ['dom.w3c_touch_events.enabled', 1]] : [['ui.primaryPointerCapabilities', 6], ['ui.allPointerCapabilities', 6]])];
-  fs.writeFileSync(path.join(prof, 'user.js'), prefs.map(([k, v]) => `user_pref("${k}", ${JSON.stringify(v)});`).join('\n') + '\n');
-  const ff = spawn('firefox', ['--headless', '--no-remote', '--profile', prof, `--remote-debugging-port=${PORT}`, 'about:blank'], {stdio: 'ignore'});
-  let ws, seq = 0; const pend = new Map();
-  try {
-    for (let i = 0; i < 90 && !ws; i++) {
-      try { const w = new WS(`ws://127.0.0.1:${PORT}/session`); await new Promise((res, rej) => { w.onopen = res; w.onerror = rej; }); ws = w; } catch { await sleep(500); }
-    }
-    if (!ws) { check(false, 'no WebDriver BiDi connection to Firefox'); return; }
-    ws.onmessage = m => { const j = JSON.parse(m.data); if (j.id && pend.has(j.id)) { const p = pend.get(j.id); pend.delete(j.id); j.type === 'error' ? p.rej(new Error(p.method + ': ' + j.error + ' ' + j.message)) : p.res(j.result); } };
-    const cmd = (method, params = {}) => new Promise((res, rej) => { const id = ++seq; pend.set(id, {res, rej, method}); ws.send(JSON.stringify({id, method, params})); });
-    const unwrap = v => !v ? v : v.type === 'array' ? v.value.map(unwrap) : v.type === 'object' ? Object.fromEntries(v.value.map(([k, x]) => [typeof k === 'string' ? k : unwrap(k), unwrap(x)])) : v.value;
-    await cmd('session.new', {capabilities: {}});
-    const ctx = (await cmd('browsingContext.getTree', {})).contexts[0].context;
-    const ev = async expr => { const r = await cmd('script.evaluate', {expression: expr, target: {context: ctx}, awaitPromise: true, resultOwnership: 'none', serializationOptions: {maxObjectDepth: 6}}); if (r.type === 'exception') throw new Error('JS: ' + r.exceptionDetails.text); return unwrap(r.result); };
-    const nav = url => cmd('browsingContext.navigate', {context: ctx, url, wait: 'complete'});
-    const shot = async name => { const dir = process.env.P271_SHOTS; if (!dir) return; const r = await cmd('browsingContext.captureScreenshot', {context: ctx}); fs.writeFileSync(path.join(dir, name), Buffer.from(r.data, 'base64')); };
-    // a drag with the mouse (desktop) or one finger (touch) from (x0, y0) by (dx, dy)
-    const drag = (x0, y0, dx, dy, kind = 'mouse') => cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'p1', parameters: {pointerType: kind},
-      actions: [{type: 'pointerMove', x: Math.round(x0), y: Math.round(y0)}, {type: 'pointerDown', button: 0}, {type: 'pointerMove', x: Math.round(x0 + dx / 2), y: Math.round(y0 + dy / 2), duration: 120},
-        {type: 'pointerMove', x: Math.round(x0 + dx), y: Math.round(y0 + dy), duration: 120}, {type: 'pointerUp', button: 0}]}]}).then(() => cmd('input.releaseActions', {context: ctx}));
-    await fn({cmd, ev, nav, ctx, shot, drag});
-  } catch (e) { check(false, 'Firefox: ' + e.message); } finally {
-    try { ws && ws.close(); } catch { /* gone */ }
-    try { ff.kill(); } catch { /* gone */ }
-    await sleep(500); fs.rmSync(prof, {recursive: true, force: true});
-  }
-}
+const firefox = require('./ff')({tag: 'p271_ui', check, shots: 'P271_SHOTS'});  // 2.7.2: the shared Firefox helper (with the start retry)
 const HEAD = `(() => {
   const t = document.querySelector('#top'); if (!t || !t.querySelector('h1')) return {none: location.href};
   const vw = document.documentElement.clientWidth;
@@ -72,7 +40,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v75'/.test(SW), 'service worker cache v75');
+  check(/const CACHE = 'tasks-shell-v7[56]'/.test(SW), 'service worker cache v75 (2.7.2: v76)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en', tour: 'done'});
