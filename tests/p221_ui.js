@@ -28,15 +28,19 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
 
 async function firefox(fn) {
   try { execFileSync('firefox', ['--version'], {stdio: 'ignore'}); } catch { console.log('p221_ui: Firefox part skipped (no firefox on PATH)'); return; }
-  const PORT = 9300 + Math.floor(Math.random() * 600);
+  let PORT = 9300 + Math.floor(Math.random() * 600);
   const prof = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), 'kalmido-p221-'));
   fs.writeFileSync(path.join(prof, 'user.js'), [['browser.shell.checkDefaultBrowser', false], ['datareporting.policy.dataSubmissionEnabled', false], ['ui.prefersReducedMotion', 1]]
     .map(([k, v]) => `user_pref("${k}", ${JSON.stringify(v)});`).join('\n') + '\n');
-  const ff = spawn('firefox', ['--headless', '--no-remote', '--profile', prof, `--remote-debugging-port=${PORT}`, 'about:blank'], {stdio: 'ignore'});
+  let ff = spawn('firefox', ['--headless', '--no-remote', '--profile', prof, `--remote-debugging-port=${PORT}`, 'about:blank'], {stdio: 'ignore'});
   let ws, seq = 0; const pend = new Map();
   try {
-    for (let i = 0; i < 90 && !ws; i++) {
-      try { const w = new WS(`ws://127.0.0.1:${PORT}/session`); await new Promise((res, rej) => { w.onopen = res; w.onerror = rej; }); ws = w; } catch { await sleep(500); }
+    // 2.7.1: a Firefox that does not answer within 45 s (seen once on a CI runner) gets one more try on another port
+    for (let attempt = 0; attempt < 2 && !ws; attempt++) {
+      if (attempt) { try { ff.kill(); } catch { /* gone */ } await sleep(1000); PORT = 9300 + Math.floor(Math.random() * 600); ff = spawn('firefox', ['--headless', '--no-remote', '--profile', prof, `--remote-debugging-port=${PORT}`, 'about:blank'], {stdio: 'ignore'}); }
+      for (let i = 0; i < 90 && !ws; i++) {
+        try { const w = new WS(`ws://127.0.0.1:${PORT}/session`); await new Promise((res, rej) => { w.onopen = res; w.onerror = rej; }); ws = w; } catch { await sleep(500); }
+      }
     }
     if (!ws) { check(false, 'no WebDriver BiDi connection to Firefox'); return; }
     ws.onmessage = m => { const j = JSON.parse(m.data); if (j.id && pend.has(j.id)) { const p = pend.get(j.id); pend.delete(j.id); j.type === 'error' ? p.rej(new Error(p.method + ': ' + j.error + ' ' + j.message)) : p.res(j.result); } };
