@@ -257,9 +257,10 @@ const TABLET = {'(min-width:600px) and (min-height:600px)': true};
   // ================= #318 a menu from inside a dialog goes above it (phone sheet and desktop)
   for (const mobile of [false, true]) {
     w = await boot({user: 'alice', mobile}); d = w.document;
-    w.eval(`settingsModal('ai')`); await sleep(500);
-    // 2.4.2 (#391): the share button is gone; a menu anchored inside the settings dialog (same list picker as before)
-    const sb = d.querySelector('.modal.smodal [data-m="ag-guide"]');
+    w.eval(`settingsModal('account')`); await sleep(500);
+    // 2.4.2 (#391): the share button is gone; a menu anchored inside the settings dialog (same list picker as before;
+    // 2.7.0: anchored in Account, the Agents page only shows with the module or agents)
+    const sb = d.querySelector('.modal.smodal [data-m="go-share"]');
     w.__sb = sb;
     w.eval(`menu(window.__sb, S.lists.filter(l => !l.archived && !l.is_inbox && canManage(l)).map(l => ({label: lname(l), icon: 'list', fn: () => { document.querySelector('.modal.smodal')?.remove(); shareModal(l.id); }})))`); await sleep(200);
     const pop = d.querySelector('#pop');

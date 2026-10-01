@@ -127,7 +127,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   w.close();
   w = await boot({user: 'bob', hash: 'today'}); d = w.document;
   w.eval(`settingsModal('notify')`); await sleep(700);
-  check(!d.querySelector('[data-nm="usage"]') && [...d.querySelectorAll('#sp-notify .nmr')].filter(r => !r.querySelector('[data-nm="proposal"]')).length === 13, 'bob: no usage row (13 rows; 2.3.0: + the proposal row)');
+  check(!d.querySelector('[data-nm="usage"]') && [...d.querySelectorAll('#sp-notify .nmr')].filter(r => !r.querySelector('[data-nm="proposal"]')).length === 14, 'bob: no usage row (14 rows; 2.3.0: + the proposal row, 2.7.0: + repeated reminders)');
   w.close();
 
   // ================= German

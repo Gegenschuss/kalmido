@@ -525,7 +525,7 @@ check(A.patch(B + f"/api/lists/{PRIV}", json={"agent_tidy": "suggest"}).status_c
 check(A.patch(B + f"/api/lists/{L}", json={"agent_tidy": "sometimes"}).status_code == 400, "bad mode: 400")
 check(A.patch(B + f"/api/lists/{L}", json={"agent_tidy": "suggest"}).ok, "owner sets suggest")
 check(next(x for x in cl.get("/lists").json()["data"] if x["id"] == L)["agent_tidy"] == "suggest", "agent reads the setting (v1 lists)")
-check(cl.patch(f"/lists/{L}", json={"agent_tidy": "auto"}).status_code in (403, 404, 405), "no v1 route to change it")
+check(cl.patch(f"/lists/{L}", json={"agent_tidy": "auto"}).status_code in (400, 403, 404, 405), "no v1 route to change it (2.7.0: PATCH /lists/{id} exists, agent_tidy is an unknown field there: 400)")
 cur = events(cl, 0)["cursor"]
 raw = "so we need to fix the export thing that crashes when the file is big and also check the codec"
 T9 = mk(Bo, title=raw, list_id=L)
