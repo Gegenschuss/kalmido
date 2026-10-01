@@ -7,6 +7,31 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.7.1] - 2026-10-01
+
+**In short:** A Project overview in every project list: description, key links, milestones, project files, members,
+status updates and the tracked time in one place.
+
+### Added
+- **Project overview** (#410): a tab next to List / Kanban / Timeline in every project list (phones: in "…"; German
+  *Projektübersicht*, separate from the *Where is it stuck?* view across all projects). It shows the project's
+  **description** (Markdown), **key links** (title + address, ordered, an icon from the address, no favicons fetched),
+  **milestones** (name, date, reached; also as markers in the project's timeline), **project files** uploaded on the
+  list itself plus Paperless documents linked to it and, read-only, the **attachments of its tasks** with a link to each
+  task, the **members** with their roles (with collaboration), the **status updates** with *Set status* and the
+  **tracked time** with the budget. Owner, list admins and members change it; viewers and participants read it
+  (participants see the files of their own tasks only). Which lists show the overview is remembered per device; the
+  list's own view stays.
+- Project files use the attachment rules: the size limit of `TASKS_MAX_FILE_MB`, safe file names, images and PDFs
+  inline, everything else (HTML, SVG, …) only as a download with a sandboxed CSP; stored below
+  `data/attachments/lists/<id>/` (in backups and the data export) and deleted with the list.
+- Web API: `GET` / `PATCH /api/lists/<id>/overview`, `/api/lists/<id>/links` (+ `/order`), `/api/lists/<id>/milestones`,
+  `/api/lists/<id>/files`, `/api/list-files/<id>`, `/api/lists/<id>/paperless`; `/api/state` lists carry `description`
+  and `milestones`.
+- Token API + OpenAPI: `GET` / `PATCH /api/v1/lists/{id}/overview`, `/lists/{id}/links` (+ `/order`, `/{link_id}`),
+  `/lists/{id}/milestones` (+ `/{milestone_id}`), `/lists/{id}/files` (+ `/{file_id}`).
+- MCP: the read-only tool `get_project_overview`.
+
 ## [2.7.0] - 2026-10-01
 
 **In short:** Reminders up to a year ahead and deadlines that count down, reminders that repeat until a task is done
@@ -263,7 +288,8 @@ of people.
   multi-arch image (`ghcr.io/gegenschuss/kalmido`, linux/amd64 and linux/arm64), an installable web app that works
   offline, English and German.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.7.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.7.1...HEAD
+[2.7.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.7.1
 [2.7.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.7.0
 [2.6.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.6.1
 [2.6.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.6.0

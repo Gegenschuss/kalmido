@@ -136,7 +136,7 @@ names = {t["name"] for t in tools}
 want = {"list_lists", "list_tasks", "search_tasks", "get_task", "create_task", "update_task", "complete_task", "add_comment", "react",
         "set_status", "list_events", "wait_for_events", "get_agent", "create_job", "update_job", "list_jobs", "send_chat", "list_chats",
         "tidy_task", "list_list_tags", "set_waiting", "clear_waiting", "list_waiting", "report_usage", "get_usage", "get_job",
-        "submit_proposal", "chat_typing"}
+        "submit_proposal", "chat_typing", "get_project_overview"}
 check(want <= names, f"all tools listed (missing {want - names})")
 check(all(isinstance(t["inputSchema"], dict) and t["inputSchema"].get("type") == "object" and t["description"] for t in tools),
       "every tool has an object schema + description")
@@ -181,6 +181,7 @@ CASES = [
     ("get_usage", {"group": "task", "from": "2031-01-01"}, "GET", "/api/v1/agent/usage", None, {"group": "task", "from": "2031-01-01"}),
     # 2.2.0 (#271 / #339) code
     ("list_repos", {"list_id": 4}, "GET", "/api/v1/lists/4/repos", None, {}),
+    ("get_project_overview", {"list_id": 4}, "GET", "/api/v1/lists/4/overview", None, {}),  # 2.7.1 (#410)
     ("request_merge_approval", {"task_id": 7, "pr_url": "https://github.com/acme/app/pull/12", "summary": "Adds X"}, "POST", "/api/v1/tasks/7/comments",
      {"body": "Ready to merge: https://github.com/acme/app/pull/12\n\nAdds X",
       "suggestion": {"kind": "merge_request", "pr_url": "https://github.com/acme/app/pull/12", "summary": "Adds X"}}, {}),    # 2.3.0 (#260-#263) proposals

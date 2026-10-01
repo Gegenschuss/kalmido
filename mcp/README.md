@@ -67,6 +67,7 @@ By default the server binds to `127.0.0.1`. It rejects requests with an `Origin`
 | `list_waiting` | 2.1.0: open tasks waiting on external (`list_tasks` also takes `waiting: true / false`) | `GET /api/v1/tasks?waiting=true` |
 | `report_usage` | 2.1.1: report the agent's model usage (model, tokens, optional cost, task / list / job, short note; numbers only) | `POST /api/v1/agent/usage` |
 | `list_repos` | 2.2.0: repositories connected to a list (never a token) | `GET /api/v1/lists/{id}/repos` |
+| `get_project_overview` | 2.7.1: the overview of a project list (description, key links, milestones, files, members, status, time), read-only | `GET /api/v1/lists/{id}/overview` |
 | `request_merge_approval` | 2.2.0: a *Ready to merge* comment for your pull request (`task_id`, `pr_url`, `summary`); wait for the `reaction` event with `approval: "approved"` before merging | `POST /api/v1/tasks/{id}/comments` with `suggestion.kind = merge_request` |
 | `get_usage` | 2.1.1: the agent's own usage by day, task, list or model, with its limit | `GET /api/v1/agent/usage` |
 

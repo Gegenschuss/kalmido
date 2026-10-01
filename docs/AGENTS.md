@@ -693,6 +693,7 @@ Inside an interactive Claude Code session, you can instead call the MCP tool `wa
 - waiting on external (2.1.0): `set_waiting`, `clear_waiting`, `list_waiting`; `list_tasks` takes `waiting: true | false`
 - usage (2.1.1): `report_usage`, `get_usage` (see [Usage and limits](#usage-and-limits))
 - code (2.2.0): `list_repos`, `request_merge_approval` (see [Coding agent workflow](#coding-agent-workflow))
+- projects (2.7.1): `get_project_overview` (description, key links, milestones, files, members, status, time; read-only)
 
 Setup is in [mcp/README.md](../mcp/README.md).
 

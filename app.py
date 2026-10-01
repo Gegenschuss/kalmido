@@ -629,6 +629,24 @@ CREATE INDEX IF NOT EXISTS git_links_conn ON git_links(conn_id, kind, ref);
 CREATE TABLE IF NOT EXISTS git_closes (           -- completions by "fixes #id": once per task; undo = what do_complete filled
   task_id INTEGER PRIMARY KEY REFERENCES tasks(id) ON DELETE CASCADE, conn_id INTEGER NOT NULL, kind TEXT NOT NULL,
   ref TEXT NOT NULL, undo TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL, undone_at TEXT);
+CREATE TABLE IF NOT EXISTS list_links (           -- 2.7.1 (#410): key links of a project list (overview), ordered
+  id INTEGER PRIMARY KEY, list_id INTEGER NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
+  title TEXT NOT NULL, url TEXT NOT NULL, sort REAL NOT NULL DEFAULT 0, created_by INTEGER, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS list_links_list ON list_links(list_id, sort);
+CREATE TABLE IF NOT EXISTS list_milestones (      -- 2.7.1 (#410): milestones of a project list (local day; timeline markers)
+  id INTEGER PRIMARY KEY, list_id INTEGER NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
+  name TEXT NOT NULL, day TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0, created_by INTEGER, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS list_milestones_list ON list_milestones(list_id, day);
+CREATE TABLE IF NOT EXISTS list_files (           -- 2.7.1 (#410): project files uploaded on the list itself (ATT_DIR/lists/<id>/)
+  id INTEGER PRIMARY KEY, list_id INTEGER NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
+  name TEXT NOT NULL, mime TEXT NOT NULL DEFAULT '', size INTEGER NOT NULL DEFAULT 0,
+  path TEXT NOT NULL, user_id INTEGER, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS list_files_list ON list_files(list_id);
+CREATE TABLE IF NOT EXISTS list_paperless (       -- 2.7.1 (#410): Paperless documents linked to a project list
+  id INTEGER PRIMARY KEY, list_id INTEGER NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
+  conn_id INTEGER, doc_id INTEGER, title TEXT NOT NULL DEFAULT '', correspondent TEXT NOT NULL DEFAULT '',
+  created TEXT NOT NULL DEFAULT '', added_by INTEGER, added_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS list_paperless_list ON list_paperless(list_id);
 """
 # Bumped when the database layout changes (stored in PRAGMA user_version). A backup can be restored when its
 # schema version is not newer than this one (older ones are migrated by init_db).
@@ -755,6 +773,8 @@ MIGRATIONS = [
     ("lists", "nag", "ALTER TABLE lists ADD COLUMN nag TEXT NOT NULL DEFAULT ''"),
     # 2.7.0 (#407): hours of a working day / shift for this list (NULL = the instance's value, admin setting time_day_h)
     ("lists", "day_hours", "ALTER TABLE lists ADD COLUMN day_hours REAL"),
+    # 2.7.1 (#410): the description of a project list (Markdown, its overview)
+    ("lists", "description", "ALTER TABLE lists ADD COLUMN description TEXT NOT NULL DEFAULT ''"),
 ]
 INDEXES = """
 CREATE INDEX IF NOT EXISTS lists_owner ON lists(owner_id);
@@ -3172,7 +3192,8 @@ def need_list(c, lid, write=True, owner=False, manage=False):
 PROJECT_ONLY = {"time": N_("Make this list a project to track time"),
                 "deps": N_("Make both lists projects to link their tasks"),
                 "fields": N_("Make this list a project to use custom fields"),
-                "status": N_("Make this list a project to set a status")}
+                "status": N_("Make this list a project to set a status"),
+                "overview": N_("Make this list a project to use its overview")}
 PROJ_SQL = "(SELECT id FROM lists WHERE kind='project')"
 
 
@@ -3379,7 +3400,7 @@ def headers(resp):
     resp.headers.setdefault("Referrer-Policy", "same-origin")
     resp.headers.setdefault("X-Frame-Options", "DENY")
     resp.headers.setdefault("Permissions-Policy", PERMISSIONS_POLICY)
-    if request.path.startswith("/api/") and not request.path.startswith(("/api/attachments/", "/api/avatar/", "/api/list-icon/")):
+    if request.path.startswith("/api/") and not request.path.startswith(("/api/attachments/", "/api/avatar/", "/api/list-icon/", "/api/list-files/")):
         resp.headers["Cache-Control"] = "no-store"
     return resp
 
@@ -3909,6 +3930,7 @@ def visible_lists(c, uid):
     snames = user_names(c, [r["status_by"] for r in rows])
     bells = {r[0]: (r[1], r[2]) for r in c.execute("SELECT list_id, mode, custom FROM list_bell WHERE user_id=?", (uid,))}
     repos = git_repos_of_lists(c, ids)  # 2.2.0 (#271)
+    mss = milestones_of_lists(c, [r["id"] for r in rows if r["kind"] == "project"])  # 2.7.1 (#410): timeline markers
     out = []
     for r in rows:
         d = {k: r[k] for k in r.keys() if not k.startswith("m_")}
@@ -3926,6 +3948,7 @@ def visible_lists(c, uid):
         d["bell"], bc = bells.get(r["id"], ("default", None))  # 2.1.0 (#317): my bell for this list
         d["bell_custom"] = bell_custom_of(bc)  # 2.6.1 (#404): my own choice of events (kept while another mode is set)
         d["repos"] = repos.get(r["id"], [])
+        d["milestones"] = mss.get(r["id"], [])
         # 2.4.1 (#379): the one agent that tidies it up (same rule as tidy_agent_of, from the rows already loaded)
         cands = sorted(([r["owner_id"]] if r["owner_id"] in ag else [])
                        + [m["user_id"] for m in d["members"] if m.get("agent") and m["role"] in WRITE_ROLES])
@@ -4319,10 +4342,12 @@ def list_delete(lid):
     c.execute("UPDATE tasks SET deleted_at=COALESCE(deleted_at,?), list_id=?, section_id=NULL, assignee_id=NULL WHERE list_id=?",
               (ts, inbox, lid))
     icon = c.execute("SELECT icon FROM lists WHERE id=?", (lid,)).fetchone()[0]
+    lfiles = [r[0] for r in c.execute("SELECT path FROM list_files WHERE list_id=?", (lid,))]  # 2.7.1 (#410)
     c.execute("DELETE FROM lists WHERE id=?", (lid,))
     bump(c)
     c.commit()
     list_icon_drop_file(lid, icon)
+    list_files_drop(lfiles)
     return jsonify(ok=True)
 
 
@@ -9286,6 +9311,11 @@ def export_json():
         "task_field_values": (f"SELECT * FROM task_field_values WHERE task_id IN {task_ids}", (uid,)),
         "task_deps": (f"SELECT * FROM task_deps WHERE task_id IN {task_ids} OR blocker_id IN {task_ids}", (uid, uid)),
         "list_status": (f"SELECT * FROM list_status WHERE list_id IN {own}", (uid,)),
+        # 2.7.1 (#410): the overview of project lists (project files stay in data/attachments/lists/)
+        "list_links": (f"SELECT * FROM list_links WHERE list_id IN {own}", (uid,)),
+        "list_milestones": (f"SELECT * FROM list_milestones WHERE list_id IN {own}", (uid,)),
+        "list_files": (f"SELECT * FROM list_files WHERE list_id IN {own}", (uid,)),
+        "list_paperless": (f"SELECT * FROM list_paperless WHERE list_id IN {own}", (uid,)),
         # calendar subscriptions without the (encrypted) link / password
         "calendar_subscriptions": ("SELECT id, kind, name, color, visible, interval, url_hint, username, created_at FROM cal_subs "
                                    "WHERE user_id=?", (uid,)),
@@ -9297,9 +9327,9 @@ def export_json():
     }
     data = {t: [dict(r) for r in c.execute(sql, args)] for t, (sql, args) in q.items()}
     pl_ok = pl_usable_ids(c, uid)  # 2.1.0: documents of connections I cannot use: no titles
-    for p in data["paperless_links"]:
+    for p in data["paperless_links"] + data["list_paperless"]:
         if (p.get("conn_id") or 0) not in pl_ok:
-            p.update(doc_id=None, title="", correspondent="", created="", message="")
+            p.update(doc_id=None, title="", correspondent="", created="", **({"message": ""} if "message" in p else {}))
     for a in data["activity"]:
         if a["kind"] in ("paperless", "paperless_rm") and (json.loads(a["data"] or "{}").get("conn") or 0) not in pl_ok:
             a["data"] = "{}"
@@ -10767,6 +10797,397 @@ def list_status_history(lid):
     names = user_names(c, [r["user_id"] for r in rows])
     return jsonify(items=[{"id": r["id"], "user_id": r["user_id"], "name": names.get(r["user_id"], ""), "status": r["status"],
                            "note": r["note"], "created_at": r["created_at"]} for r in rows])
+
+
+# ---------------------------------------------------------------- 2.7.1 (#410): the overview of a project list
+# Every project list has an overview next to List / Kanban / Timeline: a description (Markdown), key links (title + URL,
+# in an order the editors choose), milestones (name + local day + done; also markers in the timeline), project files
+# (uploaded on the list itself: the same size limit, file names and download rules as task files, stored below
+# ATT_DIR/lists/<list id>/), Paperless documents linked to the list, and read-only: the files of the list's tasks (each
+# with its task), Paperless documents of its tasks, members + roles, the status history and the tracked time.
+# Reading: everyone who sees the list (a participant: the task files of the tasks they fully see only). Changing: owner,
+# list admins and members (edit); viewers and participants read only. Only lists of the type "project".
+OV_DESC_MAX = 20000      # characters of the description
+OV_LINKS_MAX = 50        # key links per list
+OV_MS_MAX = 100          # milestones per list
+OV_FILES_MAX = 200       # project files per list
+OV_TASK_FILES_MAX = 300  # task files shown in the overview (newest first)
+OV_TITLE_MAX = 120
+LIST_FILES_SUB = "lists"  # below ATT_DIR
+
+
+def need_overview(c, lid, write=False):
+    role = need_list(c, lid, write=write)
+    need_project(c, lid, "overview")
+    return role
+
+
+def ov_day(v):
+    try:
+        return date.fromisoformat(str(v or "")[:10]).isoformat() if len(str(v or "")) == 10 else None
+    except ValueError:
+        return None
+
+
+def ov_link_dict(r):
+    return {"id": r["id"], "title": r["title"], "url": r["url"], "sort": r["sort"]}
+
+
+def ov_ms_dict(r):
+    return {"id": r["id"], "name": r["name"], "day": r["day"], "done": bool(r["done"])}
+
+
+def ov_file_dict(r, names=None):
+    return {"id": r["id"], "name": r["name"], "mime": r["mime"], "size": r["size"], "created_at": r["created_at"],
+            "user_id": r["user_id"], "user_name": (names or {}).get(r["user_id"], "")}
+
+
+def milestones_of_lists(c, ids):
+    """{list id: [milestones by day]} of the given (project) lists, for /api/state (timeline markers, offline)."""
+    out = {}
+    if not ids:
+        return out
+    q = ",".join("?" * len(ids))
+    for r in c.execute(f"SELECT * FROM list_milestones WHERE list_id IN ({q}) ORDER BY day, id", list(ids)):
+        out.setdefault(r["list_id"], []).append(ov_ms_dict(r))
+    return out
+
+
+def list_paperless_dicts(c, lid, uid):
+    pl_ok = pl_usable_ids(c, uid)
+    out = []
+    for p in c.execute("SELECT * FROM list_paperless WHERE list_id=? ORDER BY id", (lid,)):
+        d = {"id": p["id"], "doc_id": p["doc_id"], "title": p["title"], "correspondent": p["correspondent"], "created": p["created"],
+             "conn": p["conn_id"] or 0, "added_at": p["added_at"]}
+        if d["conn"] not in pl_ok:  # a connection the viewer cannot use: only that there is a document
+            d.update(doc_id=None, title=tr("Paperless document"), correspondent="", created="", hidden=True, conn=None)
+        out.append(d)
+    return out
+
+
+def overview_build(c, lid, uid):
+    """Everything of the overview of list lid as uid sees it (the caller checked need_overview)."""
+    role = list_role(c, lid, uid)
+    lst = c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()
+    links = [ov_link_dict(r) for r in c.execute("SELECT * FROM list_links WHERE list_id=? ORDER BY sort, id", (lid,))]
+    ms = [ov_ms_dict(r) for r in c.execute("SELECT * FROM list_milestones WHERE list_id=? ORDER BY day, id", (lid,))]
+    frows = c.execute("SELECT * FROM list_files WHERE list_id=? ORDER BY id DESC", (lid,)).fetchall()
+    names = user_names(c, [r["user_id"] for r in frows] + [lst["owner_id"]])
+    # the files of the list's tasks (not in the trash; not files of comments): a participant only those of the tasks they
+    # fully see (never the parent chain they get as context)
+    cond, args = "", [lid]
+    if role == "participant":
+        _, wr, _ = pvis(c, uid, lid)
+        cond = f" AND t.id IN ({','.join(str(int(x)) for x in wr) or '0'})"
+    tfiles = [{"id": r["id"], "name": r["name"], "mime": r["mime"], "size": r["size"], "created_at": r["created_at"],
+               "task_id": r["task_id"], "task_title": r["title"]}
+              for r in c.execute(f"""SELECT a.id, a.name, a.mime, a.size, a.created_at, a.task_id, t.title FROM attachments a
+                                     JOIN tasks t ON t.id=a.task_id WHERE t.list_id=? AND t.deleted_at IS NULL
+                                     AND a.comment_id IS NULL{cond} ORDER BY a.id DESC LIMIT {OV_TASK_FILES_MAX}""", args)]
+    pl_ok = pl_usable_ids(c, uid)
+    tpl = []
+    for p in c.execute(f"""SELECT p.id, p.doc_id, p.title, p.correspondent, p.created, p.conn_id, p.task_id, t.title AS task_title
+                           FROM paperless_links p JOIN tasks t ON t.id=p.task_id WHERE t.list_id=? AND t.deleted_at IS NULL
+                           AND p.status='ok'{cond} ORDER BY p.id DESC LIMIT {OV_TASK_FILES_MAX}""", args):
+        d = {"id": p["id"], "doc_id": p["doc_id"], "title": p["title"], "correspondent": p["correspondent"], "created": p["created"],
+             "conn": p["conn_id"] or 0, "task_id": p["task_id"], "task_title": p["task_title"]}
+        if d["conn"] not in pl_ok:
+            d.update(doc_id=None, title=tr("Paperless document"), correspondent="", created="", hidden=True, conn=None)
+        tpl.append(d)
+    members = []
+    if collab_all():
+        members = [{"user_id": lst["owner_id"], "name": names.get(lst["owner_id"], ""), "role": "owner"}]
+        ag = agent_ids(c)
+        for m in c.execute("""SELECT m.user_id, m.role, u.username, u.display_name FROM list_members m JOIN users u ON u.id=m.user_id
+                              WHERE m.list_id=? ORDER BY m.added_at, u.id""", (lid,)):
+            members.append({"user_id": m["user_id"], "name": m["display_name"] or m["username"], "role": m["role"],
+                            **({"agent": True} if m["user_id"] in ag else {})})
+    status = []
+    if collab_all():
+        srows = c.execute("SELECT * FROM list_status WHERE list_id=? ORDER BY id DESC LIMIT 10", (lid,)).fetchall()
+        sn = user_names(c, [r["user_id"] for r in srows])
+        status = [{"id": r["id"], "user_id": r["user_id"], "name": sn.get(r["user_id"], ""), "status": r["status"], "note": r["note"],
+                   "created_at": r["created_at"]} for r in srows]
+    out = {"list_id": lid, "name": lst["name"], "role": role, "can_edit": role in WRITE_ROLES,
+           "description": lst["description"] or "", "links": links, "milestones": ms,
+           "files": [ov_file_dict(r, names) for r in frows], "paperless": list_paperless_dicts(c, lid, uid),
+           "task_files": tfiles, "task_paperless": tpl, "members": members,
+           "status": {"current": lst["status"] or None, "note": lst["status_note"] or "", "at": lst["status_at"], "history": status},
+           "time": None}
+    if time_all():
+        t = time_list_totals(c, uid).get(lid) or {"s": 0, "b": None}
+        dh = lst["day_hours"] or time_day_h(c)
+        out["time"] = {"seconds": t["s"] or 0, "budget_h": t["b"], "day_hours": dh}
+    return out
+
+
+@app.get("/api/lists/<int:lid>/overview")
+def overview_get(lid):
+    c = db()
+    need_overview(c, lid)
+    return jsonify(overview_build(c, lid, me()))
+
+
+@app.patch("/api/lists/<int:lid>/overview")
+def overview_patch(lid):
+    """{description}: Markdown, at most OV_DESC_MAX characters."""
+    b = web_fields(body(), {"description"}, "PATCH /api/lists/{lid}/overview")
+    c = db()
+    need_overview(c, lid, write=True)
+    if "description" in b:
+        d = b["description"]
+        if d is None:
+            d = ""
+        if not isinstance(d, str):
+            raise BadInput(tr("Invalid value: {0}", "description"))
+        d = d.replace("\r\n", "\n").strip()
+        if len(d) > OV_DESC_MAX:
+            raise BadInput(tr("The description is too long (at most {0} characters)", OV_DESC_MAX))
+        c.execute("UPDATE lists SET description=? WHERE id=?", (d, lid))
+        bump(c)
+        c.commit()
+    return jsonify(overview_build(c, lid, me()))
+
+
+def ov_link_clean(b, old=None):
+    url = str(b.get("url", old["url"] if old else "") or "").strip()
+    if not valid_url(url):
+        raise BadInput(tr("Link: an address starting with http:// or https://"))
+    title = str(b.get("title", old["title"] if old else "") or "").strip()[:OV_TITLE_MAX] or url_title(url)
+    return title, url
+
+
+@app.post("/api/lists/<int:lid>/links")
+def ov_link_add(lid):
+    """{title?, url}: a key link at the end (title: the address' domain + path when empty)."""
+    b = web_fields(body(), {"title", "url"}, "POST /api/lists/{lid}/links")
+    c = db()
+    need_overview(c, lid, write=True)
+    title, url = ov_link_clean(b)
+    if c.execute("SELECT COUNT(*) FROM list_links WHERE list_id=?", (lid,)).fetchone()[0] >= OV_LINKS_MAX:
+        return err(tr("At most {0} links", OV_LINKS_MAX), 409)
+    srt = c.execute("SELECT COALESCE(MAX(sort), 0) + 1 FROM list_links WHERE list_id=?", (lid,)).fetchone()[0]
+    nid = c.execute("INSERT INTO list_links(list_id,title,url,sort,created_by,created_at) VALUES(?,?,?,?,?,?)",
+                    (lid, title, url, srt, me(), iso(now_utc()))).lastrowid
+    bump(c)
+    c.commit()
+    return jsonify(ov_link_dict(c.execute("SELECT * FROM list_links WHERE id=?", (nid,)).fetchone()))
+
+
+def need_ov_row(c, table, lid, rid):
+    r = c.execute(f"SELECT * FROM {table} WHERE id=? AND list_id=?", (rid, lid)).fetchone()
+    if not r:
+        raise Denied(404)
+    return r
+
+
+@app.patch("/api/lists/<int:lid>/links/<int:rid>")
+def ov_link_update(lid, rid):
+    b = web_fields(body(), {"title", "url"}, "PATCH /api/lists/{lid}/links/{id}")
+    c = db()
+    need_overview(c, lid, write=True)
+    old = need_ov_row(c, "list_links", lid, rid)
+    title, url = ov_link_clean(b, old)
+    c.execute("UPDATE list_links SET title=?, url=? WHERE id=?", (title, url, rid))
+    bump(c)
+    c.commit()
+    return jsonify(ov_link_dict(c.execute("SELECT * FROM list_links WHERE id=?", (rid,)).fetchone()))
+
+
+@app.delete("/api/lists/<int:lid>/links/<int:rid>")
+def ov_link_delete(lid, rid):
+    c = db()
+    need_overview(c, lid, write=True)
+    need_ov_row(c, "list_links", lid, rid)
+    c.execute("DELETE FROM list_links WHERE id=?", (rid,))
+    bump(c)
+    c.commit()
+    return jsonify(ok=True)
+
+
+@app.put("/api/lists/<int:lid>/links/order")
+def ov_link_order(lid):
+    """{ids: [link ids in the new order]}: every link of the list exactly once."""
+    b = web_fields(body(), {"ids"}, "PUT /api/lists/{lid}/links/order")
+    c = db()
+    need_overview(c, lid, write=True)
+    ids = b.get("ids")
+    have = [r[0] for r in c.execute("SELECT id FROM list_links WHERE list_id=?", (lid,))]
+    if not isinstance(ids, list) or any(not isinstance(x, int) or isinstance(x, bool) for x in ids) or sorted(ids) != sorted(have):
+        raise BadInput(tr("Invalid value: {0}", "ids"))
+    for i, x in enumerate(ids):
+        c.execute("UPDATE list_links SET sort=? WHERE id=?", (i + 1, x))
+    bump(c)
+    c.commit()
+    return jsonify(data=[ov_link_dict(r) for r in c.execute("SELECT * FROM list_links WHERE list_id=? ORDER BY sort, id", (lid,))])
+
+
+def ov_ms_clean(b, old=None):
+    name = str(b.get("name", old["name"] if old else "") or "").strip()[:OV_TITLE_MAX]
+    if not name:
+        raise BadInput(tr("Name missing"))
+    day = ov_day(b.get("day", old["day"] if old else None))
+    if not day:
+        raise BadInput(tr("Date: YYYY-MM-DD"))
+    done = b.get("done", bool(old["done"]) if old else False)
+    if not isinstance(done, bool):
+        raise BadInput(tr("Invalid value: {0}", "done"))
+    return name, day, int(done)
+
+
+@app.post("/api/lists/<int:lid>/milestones")
+def ov_ms_add(lid):
+    """{name, day: YYYY-MM-DD, done?}"""
+    b = web_fields(body(), {"name", "day", "done"}, "POST /api/lists/{lid}/milestones")
+    c = db()
+    need_overview(c, lid, write=True)
+    name, day, done = ov_ms_clean(b)
+    if c.execute("SELECT COUNT(*) FROM list_milestones WHERE list_id=?", (lid,)).fetchone()[0] >= OV_MS_MAX:
+        return err(tr("At most {0} milestones", OV_MS_MAX), 409)
+    nid = c.execute("INSERT INTO list_milestones(list_id,name,day,done,created_by,created_at) VALUES(?,?,?,?,?,?)",
+                    (lid, name, day, done, me(), iso(now_utc()))).lastrowid
+    bump(c)
+    c.commit()
+    return jsonify(ov_ms_dict(c.execute("SELECT * FROM list_milestones WHERE id=?", (nid,)).fetchone()))
+
+
+@app.patch("/api/lists/<int:lid>/milestones/<int:rid>")
+def ov_ms_update(lid, rid):
+    b = web_fields(body(), {"name", "day", "done"}, "PATCH /api/lists/{lid}/milestones/{id}")
+    c = db()
+    need_overview(c, lid, write=True)
+    old = need_ov_row(c, "list_milestones", lid, rid)
+    name, day, done = ov_ms_clean(b, old)
+    c.execute("UPDATE list_milestones SET name=?, day=?, done=? WHERE id=?", (name, day, done, rid))
+    bump(c)
+    c.commit()
+    return jsonify(ov_ms_dict(c.execute("SELECT * FROM list_milestones WHERE id=?", (rid,)).fetchone()))
+
+
+@app.delete("/api/lists/<int:lid>/milestones/<int:rid>")
+def ov_ms_delete(lid, rid):
+    c = db()
+    need_overview(c, lid, write=True)
+    need_ov_row(c, "list_milestones", lid, rid)
+    c.execute("DELETE FROM list_milestones WHERE id=?", (rid,))
+    bump(c)
+    c.commit()
+    return jsonify(ok=True)
+
+
+# ---- project files: same rules as task files (size limit, safe file names, download unless a harmless type)
+@app.post("/api/lists/<int:lid>/files")
+def list_file_upload(lid):
+    c = db()
+    need_overview(c, lid, write=True)
+    files = request.files.getlist("file")
+    if not files:
+        return err(tr("File missing"))
+    if c.execute("SELECT COUNT(*) FROM list_files WHERE list_id=?", (lid,)).fetchone()[0] + len(files) > OV_FILES_MAX:
+        return err(tr("At most {0} files per project", OV_FILES_MAX), 409)
+    try:
+        os.makedirs(os.path.join(ATT_DIR, LIST_FILES_SUB, str(lid)), exist_ok=True)
+    except OSError as e:
+        aa_count("storage", "attachments", aa_oserr(e))
+        raise
+    ts, saved = iso(now_utc()), []
+    for f in files:
+        name = safe_name(f.filename)
+        rel = os.path.join(LIST_FILES_SUB, str(lid), f"{uuid.uuid4().hex[:12]}-{name}")
+        full = os.path.join(ATT_DIR, rel)
+        try:
+            f.save(full)
+        except OSError as e:
+            aa_count("storage", "attachments", aa_oserr(e))
+            c.rollback()
+            unlink_files(saved)
+            raise
+        saved.append(rel)
+        size = os.path.getsize(full)
+        if size > MAX_FILE_MB * 1024 * 1024:
+            c.rollback()
+            unlink_files(saved)
+            return err(tr("{0}: larger than {1} MB", name, MAX_FILE_MB))
+        mime = (f.mimetype if f.mimetype and f.mimetype != "application/octet-stream" else None) \
+            or mimetypes.guess_type(name)[0] or "application/octet-stream"
+        c.execute("INSERT INTO list_files(list_id,name,mime,size,path,user_id,created_at) VALUES(?,?,?,?,?,?,?)",
+                  (lid, name, mime, size, rel, me(), ts))
+    bump(c)
+    c.commit()
+    return jsonify(overview_build(c, lid, me()))
+
+
+def need_list_file(c, fid, write):
+    r = c.execute("SELECT * FROM list_files WHERE id=?", (fid,)).fetchone()
+    if not r:
+        raise Denied(404)
+    need_overview(c, r["list_id"], write=write)
+    return r
+
+
+@app.get("/api/list-files/<int:fid>")
+def list_file_get(fid):
+    a = need_list_file(db(), fid, False)
+    full = os.path.join(ATT_DIR, a["path"])
+    if not os.path.isfile(full):
+        return err(tr("File missing on the server"), 404)
+    inline = a["mime"] in INLINE_TYPES and request.args.get("dl") != "1"
+    resp = send_file(full, mimetype=a["mime"] if inline else "application/octet-stream",
+                     as_attachment=not inline, download_name=a["name"], conditional=True, max_age=0)
+    if a["mime"] != "application/pdf":  # the browser pdf viewer does not run inside a sandboxed CSP
+        resp.headers["Content-Security-Policy"] = "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox"
+    resp.headers["Cache-Control"] = "private, max-age=86400"
+    return resp
+
+
+@app.delete("/api/list-files/<int:fid>")
+def list_file_delete(fid):
+    c = db()
+    a = need_list_file(c, fid, True)
+    c.execute("DELETE FROM list_files WHERE id=?", (fid,))
+    bump(c)
+    c.commit()
+    unlink_files([a["path"]])
+    return jsonify(ok=True)
+
+
+def list_files_drop(paths):
+    """The files of a list deleted for good (after its rows are gone)."""
+    unlink_files(paths)
+
+
+# ---- Paperless documents of the list (same connections + rules as on tasks)
+@app.post("/api/lists/<int:lid>/paperless")
+def list_paperless_link(lid):
+    c = db()
+    need_overview(c, lid, write=True)
+    b = body()
+    cid = pl_conn_arg(b.get("conn"))
+    cn = need_paperless(c, cid)
+    try:
+        doc_id = int(b.get("doc_id") or 0)
+    except (TypeError, ValueError):
+        return err(tr("unknown"))
+    if not c.execute("SELECT 1 FROM list_paperless WHERE list_id=? AND doc_id=? AND COALESCE(conn_id,0)=?", (lid, doc_id, cid)).fetchone():
+        d = pl_doc(cn, doc_id)
+        c.execute("""INSERT INTO list_paperless(list_id,conn_id,doc_id,title,correspondent,created,added_by,added_at)
+                     VALUES(?,?,?,?,?,?,?,?)""", (lid, cid or None, d["doc_id"], d["title"], d["correspondent"], d["created"],
+                                                  me(), iso(now_utc())))
+        bump(c)
+        c.commit()
+    return jsonify(overview_build(c, lid, me()))
+
+
+@app.delete("/api/lists/<int:lid>/paperless/<int:rid>")
+def list_paperless_unlink(lid, rid):
+    c = db()
+    need_overview(c, lid, write=True)
+    r = need_ov_row(c, "list_paperless", lid, rid)
+    need_paperless(c, r["conn_id"] or 0)
+    c.execute("DELETE FROM list_paperless WHERE id=?", (rid,))
+    bump(c)
+    c.commit()
+    return jsonify(overview_build(c, lid, me()))
 
 
 # ---------------------------------------------------------------- custom fields, package 3
@@ -17491,6 +17912,7 @@ def openapi_spec():
     }
     agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page)
     git_spec(paths, schemas, op, ok, errs, ref, pid, nul, page)
+    overview_spec(paths, schemas, op, ok, errs, ref, pid, nul, page)
     _SPEC["s"] = {
         "openapi": "3.1.0",
         "info": {"title": f"{APP_NAME} REST API", "version": API_VERSION,
@@ -22479,6 +22901,247 @@ def v1_git_list(lid):
     rows = c.execute("SELECT * FROM git_conns WHERE list_id=? ORDER BY id", (lid,)).fetchall()
     return jsonify(data=[git_public(c, r) for r in rows])
 
+
+
+# ---------------------------------------------------------------- 2.7.1 (#410): the project overview in the token API
+# ---- the token API (scopes as usual: reads read, changes write)
+@app.get("/api/v1/lists/<int:lid>/overview")
+@v1_view
+def v1_overview(lid):
+    v1_args(())
+    return jsonify(v1_call(overview_get, lid))
+
+
+@app.patch("/api/v1/lists/<int:lid>/overview")
+@v1_view
+def v1_overview_patch(lid):
+    v1_args(())
+    b = v1_json()
+    unknown = sorted(k for k in b if k != "description")
+    if unknown:
+        raise UnknownFields(unknown)
+    return jsonify(v1_call(overview_patch, lid, body=b))
+
+
+@app.get("/api/v1/lists/<int:lid>/links")
+@v1_view
+def v1_ov_links(lid):
+    v1_args(())
+    c = db()
+    need_overview(c, lid)
+    return jsonify(data=[ov_link_dict(r) for r in c.execute("SELECT * FROM list_links WHERE list_id=? ORDER BY sort, id", (lid,))],
+                   next_cursor=None)
+
+
+@app.post("/api/v1/lists/<int:lid>/links")
+@v1_view
+def v1_ov_link_add(lid):
+    v1_args(())
+    b = v1_json()
+    unknown = sorted(k for k in b if k not in ("title", "url"))
+    if unknown:
+        raise UnknownFields(unknown)
+    return jsonify(v1_call(ov_link_add, lid, body=b)), 201
+
+
+@app.patch("/api/v1/lists/<int:lid>/links/<link_id>")  # not <int:>: the spec path keeps its own name
+@v1_view
+def v1_ov_link_update(lid, link_id):
+    v1_args(())
+    rid = as_int(link_id, "link_id", 1)
+    b = v1_json()
+    unknown = sorted(k for k in b if k not in ("title", "url"))
+    if unknown:
+        raise UnknownFields(unknown)
+    return jsonify(v1_call(ov_link_update, lid, rid, body=b))
+
+
+@app.delete("/api/v1/lists/<int:lid>/links/<link_id>")
+@v1_view
+def v1_ov_link_delete(lid, link_id):
+    v1_args(())
+    rid = as_int(link_id, "link_id", 1)
+    v1_call(ov_link_delete, lid, rid)
+    return "", 204
+
+
+@app.put("/api/v1/lists/<int:lid>/links/order")
+@v1_view
+def v1_ov_link_order(lid):
+    v1_args(())
+    b = v1_json()
+    unknown = sorted(k for k in b if k != "ids")
+    if unknown:
+        raise UnknownFields(unknown)
+    return jsonify({**v1_call(ov_link_order, lid, body=b), "next_cursor": None})
+
+
+@app.get("/api/v1/lists/<int:lid>/milestones")
+@v1_view
+def v1_ov_milestones(lid):
+    v1_args(())
+    c = db()
+    need_overview(c, lid)
+    return jsonify(data=[ov_ms_dict(r) for r in c.execute("SELECT * FROM list_milestones WHERE list_id=? ORDER BY day, id", (lid,))],
+                   next_cursor=None)
+
+
+@app.post("/api/v1/lists/<int:lid>/milestones")
+@v1_view
+def v1_ov_ms_add(lid):
+    v1_args(())
+    b = v1_json()
+    unknown = sorted(k for k in b if k not in ("name", "day", "done"))
+    if unknown:
+        raise UnknownFields(unknown)
+    return jsonify(v1_call(ov_ms_add, lid, body=b)), 201
+
+
+@app.patch("/api/v1/lists/<int:lid>/milestones/<milestone_id>")
+@v1_view
+def v1_ov_ms_update(lid, milestone_id):
+    v1_args(())
+    rid = as_int(milestone_id, "milestone_id", 1)
+    b = v1_json()
+    unknown = sorted(k for k in b if k not in ("name", "day", "done"))
+    if unknown:
+        raise UnknownFields(unknown)
+    return jsonify(v1_call(ov_ms_update, lid, rid, body=b))
+
+
+@app.delete("/api/v1/lists/<int:lid>/milestones/<milestone_id>")
+@v1_view
+def v1_ov_ms_delete(lid, milestone_id):
+    v1_args(())
+    rid = as_int(milestone_id, "milestone_id", 1)
+    v1_call(ov_ms_delete, lid, rid)
+    return "", 204
+
+
+@app.get("/api/v1/lists/<int:lid>/files")
+@v1_view
+def v1_list_files(lid):
+    v1_args(())
+    c = db()
+    need_overview(c, lid)
+    rows = c.execute("SELECT * FROM list_files WHERE list_id=? ORDER BY id DESC", (lid,)).fetchall()
+    names = user_names(c, [r["user_id"] for r in rows])
+    return jsonify(data=[ov_file_dict(r, names) for r in rows], next_cursor=None)
+
+
+@app.post("/api/v1/lists/<int:lid>/files")
+@v1_view
+def v1_list_file_upload(lid):
+    v1_args(())
+    j = v1_call(list_file_upload, lid)
+    return jsonify(data=j["files"], next_cursor=None), 201
+
+
+@app.get("/api/v1/lists/<int:lid>/files/<file_id>")
+@v1_view
+def v1_list_file_get(lid, file_id):
+    v1_args(("dl",))
+    fid = as_int(file_id, "file_id", 1)
+    c = db()
+    r = c.execute("SELECT list_id FROM list_files WHERE id=?", (fid,)).fetchone()
+    if not r or r["list_id"] != lid:
+        raise Denied(404)
+    return list_file_get(fid)
+
+
+@app.delete("/api/v1/lists/<int:lid>/files/<file_id>")
+@v1_view
+def v1_list_file_delete(lid, file_id):
+    v1_args(())
+    fid = as_int(file_id, "file_id", 1)
+    c = db()
+    r = c.execute("SELECT list_id FROM list_files WHERE id=?", (fid,)).fetchone()
+    if not r or r["list_id"] != lid:
+        raise Denied(404)
+    v1_call(list_file_delete, fid)
+    return "", 204
+
+
+def overview_spec(paths, schemas, op, ok, errs, ref, pid, nul, page):
+    """2.7.1 (#410) additions to the OpenAPI document."""
+    W, L = "write", "Lists"
+    lp = pid("id", "List id (a project list)")
+    sub = lambda n, d: {"name": n, "in": "path", "required": True, "description": d, "schema": {"type": "integer"}}  # noqa: E731
+    link = {"type": "object", "properties": {"id": {"type": "integer"}, "title": {"type": "string"}, "url": {"type": "string", "format": "uri"},
+                                             "sort": {"type": "number"}}}
+    ms = {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "day": {"type": "string", "format": "date"},
+                                           "done": {"type": "boolean"}}}
+    lfile = {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "mime": {"type": "string"},
+                                              "size": {"type": "integer"}, "created_at": {"type": "string", "format": "date-time"},
+                                              "user_id": nul("integer"), "user_name": {"type": "string"}}}
+    schemas.update({
+        "KeyLink": link, "KeyLinkPage": page("KeyLink"), "Milestone": ms, "MilestonePage": page("Milestone"),
+        "ProjectFile": lfile, "ProjectFilePage": page("ProjectFile"),
+        "ProjectOverview": {"type": "object", "description": "The overview of a project list (2.7.1). Task files and Paperless "
+                                                             "documents of tasks are read-only here (change them on the task).",
+                            "properties": {
+                                "list_id": {"type": "integer"}, "name": {"type": "string"}, "role": {"type": "string"},
+                                "can_edit": {"type": "boolean"}, "description": {"type": "string", "description": "Markdown"},
+                                "links": {"type": "array", "items": ref("KeyLink")}, "milestones": {"type": "array", "items": ref("Milestone")},
+                                "files": {"type": "array", "items": ref("ProjectFile")},
+                                "paperless": {"type": "array", "items": {"type": "object"}, "description": "Documents linked to the list "
+                                              "(hidden: true = a connection the token's user cannot use)"},
+                                "task_files": {"type": "array", "items": {"type": "object"}, "description": "Files of the list's tasks, "
+                                               "each with task_id + task_title (download: GET /tasks/{id} ... the web app's file URL)"},
+                                "task_paperless": {"type": "array", "items": {"type": "object"}},
+                                "members": {"type": "array", "items": {"type": "object"}, "description": "Owner + members with role "
+                                            "(empty while collaboration is off)"},
+                                "status": {"type": "object", "description": "current, note, at, history (newest first, at most 10)"},
+                                "time": nul("object", description="seconds, budget_h, day_hours (null while time tracking is off)")}},
+    })
+    body_link = {"type": "object", "required": ["url"], "additionalProperties": False,
+                 "properties": {"title": {"type": "string", "maxLength": OV_TITLE_MAX}, "url": {"type": "string", "format": "uri"}}}
+    body_ms = {"type": "object", "required": ["name", "day"], "additionalProperties": False,
+               "properties": {"name": {"type": "string", "maxLength": OV_TITLE_MAX}, "day": {"type": "string", "format": "date"},
+                              "done": {"type": "boolean"}}}
+    paths.update({
+        "/lists/{id}/overview": {
+            "get": op("The overview of a project list: description, key links, milestones, files, members, status, time", L,
+                      ok(ref("ProjectOverview")) | errs("403", "404", "409"), [lp]),
+            "patch": op("Change the project description (Markdown; owner, list admins, members)", L,
+                        ok(ref("ProjectOverview")) | errs("400", "403", "404", "409"), [lp], scope=W,
+                        body={"type": "object", "additionalProperties": False,
+                              "properties": {"description": {"type": "string", "maxLength": OV_DESC_MAX}}})},
+        "/lists/{id}/links": {
+            "get": op("Key links of a project list, in their order", L, ok(ref("KeyLinkPage")) | errs("404", "409"), [lp]),
+            "post": op("Add a key link (at the end)", L, ok(ref("KeyLink"), "Created", "201") | errs("400", "403", "404", "409"), [lp],
+                       scope=W, body=body_link)},
+        "/lists/{id}/links/order": {
+            "put": op("Reorder the key links (every link id exactly once)", L, ok(ref("KeyLinkPage")) | errs("400", "403", "404", "409"),
+                      [lp], scope=W, body={"type": "object", "required": ["ids"], "properties": {
+                          "ids": {"type": "array", "items": {"type": "integer"}}}})},
+        "/lists/{id}/links/{link_id}": {
+            "patch": op("Change a key link", L, ok(ref("KeyLink")) | errs("400", "403", "404", "409"), [lp, sub("link_id", "Link id")],
+                        scope=W, body={**body_link, "required": []}),
+            "delete": op("Remove a key link", L, {"204": {"description": "Deleted"}} | errs("403", "404", "409"),
+                         [lp, sub("link_id", "Link id")], scope=W)},
+        "/lists/{id}/milestones": {
+            "get": op("Milestones of a project list (by day)", L, ok(ref("MilestonePage")) | errs("404", "409"), [lp]),
+            "post": op("Add a milestone", L, ok(ref("Milestone"), "Created", "201") | errs("400", "403", "404", "409"), [lp],
+                       scope=W, body=body_ms)},
+        "/lists/{id}/milestones/{milestone_id}": {
+            "patch": op("Change a milestone (name, day, done)", L, ok(ref("Milestone")) | errs("400", "403", "404", "409"),
+                        [lp, sub("milestone_id", "Milestone id")], scope=W, body={**body_ms, "required": []}),
+            "delete": op("Remove a milestone", L, {"204": {"description": "Deleted"}} | errs("403", "404", "409"),
+                         [lp, sub("milestone_id", "Milestone id")], scope=W)},
+        "/lists/{id}/files": {
+            "get": op("Project files of a list (uploaded on the list itself, newest first)", L, ok(ref("ProjectFilePage")) | errs("404", "409"), [lp]),
+            "post": {**op(f"Upload project files (multipart field `file`, repeatable; at most {MAX_FILE_MB} MB each, "
+                          f"{OV_FILES_MAX} per list)", L, ok(ref("ProjectFilePage"), "Created", "201") | errs("400", "403", "404", "409", "413"),
+                          [lp], scope=W),
+                     "requestBody": {"required": True, "content": {"multipart/form-data": {"schema": {
+                         "type": "object", "properties": {"file": {"type": "array", "items": {"type": "string", "format": "binary"}}}}}}}}},
+        "/lists/{id}/files/{file_id}": {
+            "get": op("Download a project file (images and PDFs inline unless ?dl=1, everything else as a download)", L,
+                      {"200": {"description": "The file"}} | errs("404", "409"), [lp, sub("file_id", "File id")]),
+            "delete": op("Delete a project file", L, {"204": {"description": "Deleted"}} | errs("403", "404", "409"),
+                         [lp, sub("file_id", "File id")], scope=W)},
+    })
 
 
 def watchdog():

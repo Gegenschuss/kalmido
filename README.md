@@ -16,15 +16,14 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.7.1** (2026-10-01): A *Project overview* in every project: description, key links, milestones, project files,
+  members, status updates and the tracked time in one place.
 - **2.7.0** (2026-10-01): Reminders up to a year ahead with deadlines, reminders that repeat until done, time sums in
   hours and days, steady layout on foldables, a simpler first start and a resizable News dropdown.
 - **2.6.1** (2026-10-01): Date and reminder changes save at once with Undo, a status dot per agent in the header, the
   bell opens the newest News in place, a per-event choice for a list's bell and filter chips for News.
 - **2.6.0** (2026-10-01): A header that keeps the title, "…" and the bell on every screen, a separate Share dialog,
   "not connected" agents, one name "Agents", bigger touch targets, better contrast and one date format.
-- **2.5.2** (2026-10-01): Hotfix from the second usability review: "…" and the bell always visible on phones, a
-  compact proposal review without stray commas, the first-run tour fits every screen, admin alerts never to the public
-  ntfy.sh unless chosen, and smaller fixes (task panel header, file picker, plurals, chart labels).
 
 All changes: [CHANGELOG.md](CHANGELOG.md) · [GitHub Releases](https://github.com/Gegenschuss/kalmido/releases)
 
@@ -147,6 +146,7 @@ All changes: [CHANGELOG.md](CHANGELOG.md) · [GitHub Releases](https://github.co
 - **Dependencies:** a task can wait on other tasks (also in other lists); it shows *waiting* until they are done, and its assignee gets a message when the last one is finished
 - **Waiting on external** (2.1.0): mark a task as waiting for someone outside (a client, an office, a delivery) with a note and a follow-up day (task menu > *Waiting on external…*). It shows an hourglass chip, sits in the smart view *Waiting on external*, and on the follow-up day you get a reminder and a News item, while agents that follow the task get the event `followup_due`. One click (the × on the bar in the task panel) ends it. API: `PUT` / `DELETE /api/v1/tasks/{id}/waiting`, `GET /api/v1/tasks?waiting=true`; MCP `set_waiting`, `clear_waiting`, `list_waiting`
 - **Project status and progress:** a progress bar per list, a status (*On track*, *At risk*, *Off track*, *On hold*, *Complete*) with a short note, and a *Where is it stuck?* overview of overdue, waiting and unassigned tasks across all lists
+- **Project overview:** every project list has a tab next to List / Kanban / Timeline with its description (Markdown), key links, milestones (also in the timeline), project files plus the files of its tasks, members, status updates and the tracked time
 - **Custom fields** per list: text, number (with unit), selection with colours, date, checkbox, person or link; shown as chips or columns, usable in filters, sorting and search
 - Push notifications for new comments, mentions, assignments and completions, bundled so a busy task does not spam you
 - **Public links**: share one list with people who have no account through a secret link, view only or *view and tick off*, with an optional password and expiry
@@ -910,6 +910,17 @@ small **×** next to it (*Show progress* in the list's … menu or the list dial
 - **Where is it stuck?** (sidebar, rail or a pinned tab; shown once you have two lists or a shared one): per list
   the status, the progress, overdue tasks grouped by assignee, waiting tasks and, in shared lists, tasks without an
   assignee, with *Needs attention* to hide the calm ones. Everything is clickable.
+- **Project overview** (2.7.1, project lists only; a tab next to List / Kanban / Timeline, on phones in "…"): the place
+  for what belongs to the project as a whole. *Description* in Markdown; *Key links* (title + address, in your order,
+  an icon from the address such as a repository or a design file, nothing is fetched from the linked site);
+  *Milestones* (name, date, reached; they also show as diamonds in the timeline); *Project files* uploaded on the
+  project itself (same size limit and download rules as task files: images and PDFs open, everything else downloads),
+  Paperless documents linked to the project (with the Paperless module) and, read-only, *Attachments from tasks* with
+  a link to each task; *Members* with their roles (with collaboration); *Status updates* with *Set status*; the
+  tracked time with the budget. Owner, list admins and members change it, viewers and participants read it
+  (participants only see the files of their own tasks). The choice of the tab is remembered per device; the list's own
+  view stays. Token API: `/api/v1/lists/{id}/overview`, `/links`, `/milestones`, `/files`; MCP tool
+  `get_project_overview`.
 - **Custom fields:** the list owner adds fields in the list dialog: text, number (optional unit such as € or h),
   selection (options with colours), date, checkbox, person (owner or member of the list) or link. Values are the
   same for everyone in the list; view-only members see them but cannot change them. Up to two fields show as chips

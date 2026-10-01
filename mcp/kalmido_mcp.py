@@ -208,6 +208,11 @@ TOOLS = [
     ("list_repos", "Repositories connected to a list (provider, web_url, owner/repo, default branch, poll status). Never a token: "
                    "clone and push with your own git credentials.",
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/repos")),
+    ("get_project_overview", "The overview of a project list (read-only): description (Markdown), key links (title + url, in "
+                             "order), milestones (name, day, done), project files and Paperless documents of the list, the files "
+                             "of its tasks (with task_id), members with roles, the project status with its history and the tracked "
+                             "time. 409 for lists that are not projects.",
+     _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/overview")),
     ("list_list_tags", "Shared tags of one list (name, color).",
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/tags")),
     ("list_tasks", "Tasks the agent can see, filtered. status: open (default) | done | wont_do | all; assignee: me | none | user id. "

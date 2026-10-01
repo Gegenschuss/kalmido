@@ -29,7 +29,7 @@ function swEnv(tags) {
 }
 const pushEv = d => ({data: {json: () => d, text: () => JSON.stringify(d)}, waitUntil(p) { this.p = p; }});
 async function swTests() {
-  check(/const CACHE = 'tasks-shell-v((5[789]|6[0-9])|7[0-4])'/.test(SW), 'service worker cache v57 (2.0.6: v58, 2.0.8: v59, 2.1.0: v60, 2.1.1: v61, 2.1.2: v62, 2.2.0: v63, 2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70, 2.5.2: v71, 2.6.0: v72, 2.6.1: v73, 2.7.0: v74)');
+  check(/const CACHE = 'tasks-shell-v((5[789]|6[0-9])|7[0-5])'/.test(SW), 'service worker cache v57 (2.0.6: v58, 2.0.8: v59, 2.1.0: v60, 2.1.1: v61, 2.1.2: v62, 2.2.0: v63, 2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70, 2.5.2: v71, 2.6.0: v72, 2.6.1: v73, 2.7.0: v74, 2.7.1: v75)');
   let S = swEnv(['t-1', 't-2', 'digest']);
   let e = pushEv({type: 'dismiss', tags: ['t-1', 't-9']}); S.L.push(e); await e.p;
   check(JSON.stringify(S.closed) === '["t-1"]' && !S.shown.length, 'dismiss push: closes t-1 only, shows nothing');

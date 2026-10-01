@@ -151,6 +151,12 @@ had been made in the app. Webhooks fire too.
 | `GET /lists/{id}/tags` | read | The list tags of a list (shared by its members) |
 | `POST /lists/{id}/tags` | write | Create a list tag `{name, color?}` (members with edit rights) |
 | `PATCH /lists/{id}/tags/{tag_id}` · `DELETE …` | write | Rename / recolour · delete a list tag (removed from every task) |
+| `GET /lists/{id}/overview` | read | 2.7.1: the overview of a project list: description, key links, milestones, project files, Paperless documents, the files of its tasks, members, status history, tracked time (409 for other list types) |
+| `PATCH /lists/{id}/overview` | write | The description `{description}` (Markdown, at most 20000 characters; owner, list admins, members) |
+| `GET` · `POST /lists/{id}/links` | read · write | Key links `{title?, url}` (http / https; at most 50) |
+| `PATCH` · `DELETE /lists/{id}/links/{link_id}`, `PUT /lists/{id}/links/order` | write | Change · remove a link, reorder `{ids}` |
+| `GET` · `POST /lists/{id}/milestones`, `PATCH` · `DELETE /lists/{id}/milestones/{milestone_id}` | read · write | Milestones `{name, day, done?}` (at most 100) |
+| `GET` · `POST /lists/{id}/files`, `GET` · `DELETE /lists/{id}/files/{file_id}` | read · write | Project files (multipart `file`, the attachment size limit; images / PDFs inline, everything else as a download) |
 | `GET /agents` | read | Agents you share a list with: status and job counts |
 | `GET /agent` … `/agent/events` … `/agent/jobs` … `/agent/chats` · `PUT /agent/status` · `POST /tasks/{id}/tidy` | read / write | **Agent tokens only**: the agent protocol, see [AGENTS.md](AGENTS.md); the status may name the task it works on (`task_id`, shows "… is writing" there) |
 | `POST /agent/usage` · `GET /agent/usage?from=&to=&group=` | write / read | **Agent tokens only** (2.1.1): report model usage (numbers and ids only), read it grouped by day, task, list or model; over its hard limit an agent gets `429` on every other call, see [AGENTS.md](AGENTS.md#usage-and-limits) |

@@ -241,6 +241,12 @@ fresh; run p208_ui node p208_ui.js
 # a narrow list column, the popover, the time sum, timeline labels, dragging the bell's grip / the sheet's handle
        run p270_api "$PY" p270_api_test.py "$KALMIDO_TEST_DATA"
        run p270_ui node p270_ui.js "$KALMIDO_TEST_DATA"
+# 2.7.1 (#410): the overview of a project list: description, key links, milestones, project files (attachment rules), Paperless
+# documents of the list, task files per role, the token API + OpenAPI (own container with the fake Paperless); then the tab,
+# the sections, German wording and roles in jsdom, and in Firefox at 360 / 390 (touch) and 1280 / 1920: no overflow, columns,
+# 44 px targets, the milestone date picker and the timeline markers
+       run p271_api "$PY" p271_api_test.py "$KALMIDO_TEST_DATA"
+       run p271_ui node p271_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

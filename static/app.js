@@ -263,7 +263,7 @@ const NOLIST_KEYS = ['done', 'trash', 'search', 'archived'];
 // 2.0.6 (#188): tablets in portrait (phone layout, but >= 600 x 600 px) get the docked composer of the desktop instead of
 // the "+" button wherever a view has one; phones keep the "+"
 const tabletDock = () => isMobile() && matchMedia('(min-width:600px) and (min-height:600px)').matches;
-const noFab = () => ['habits', 'pomo', 'news', 'stats', 'time', 'overview', 'agents'].includes(S.route.mod) || NOLIST_KEYS.includes(S.route.key);
+const noFab = () => ['habits', 'pomo', 'news', 'stats', 'time', 'overview', 'agents'].includes(S.route.mod) || NOLIST_KEYS.includes(S.route.key) || isOverview();
 // package 3: progress bar / overview (switch "progress"), project status (+ collaboration), custom fields, dependencies
 const progressOn = () => feat('progress');
 const statusOn = () => progressOn() && collab();
@@ -1031,7 +1031,7 @@ function doneViews() { try { const o = JSON.parse(S.settings.show_done_views || 
 const showDone = (key = S.route.key) => { const v = doneViews()[key]; return v === undefined ? true : !!+v; };
 const showDoneCal = () => showDone('cal');
 // the views that have a "Completed" group (and so the toggle)
-const doneToggleView = () => { const k = S.route.key, l = routeList(); return S.route.mod === 'tasks' && !NOLIST_KEYS.includes(k) && !isKanban() && !isTimeline() && !isRoadmap() && !(l && (l.kind === 'checklist' || l.checklist)); };
+const doneToggleView = () => { const k = S.route.key, l = routeList(); return S.route.mod === 'tasks' && !NOLIST_KEYS.includes(k) && !isKanban() && !isTimeline() && !isRoadmap() && !isOverview() && !(l && (l.kind === 'checklist' || l.checklist)); };
 async function setShowDone(on, key = S.route.key) {
   const was = doneViews()[key], to = on ? 1 : 0;
   const put = async v => {  // only this view's entry changes: a choice made for another view meanwhile stays
@@ -1360,8 +1360,8 @@ function renderTop() {
   if (m === 'tasks' && (k.startsWith('l:') || k === 'inbox')) {
     const l = k === 'inbox' ? inbox() : listById(+k.slice(2));
     if (l) {
-      const v = listView(l);
-      if ((feat('kanban') || feat('timeline')) && !l.checklist && !isMobile()) acts += `<div class="seg vseg tf"><button class="${v === 'list' ? 'on' : ''}" data-act="view-list" data-ico="list" title="${tr('List')}">${ic('list', 's')}</button>${feat('kanban') ? `<button class="${v === 'kanban' ? 'on' : ''}" data-act="view-kanban" data-ico="kanban" title="${tr('Kanban')}">${ic('kanban', 's')}</button>` : ''}${feat('timeline') ? `<button class="${v === 'timeline' ? 'on' : ''}" data-act="view-timeline" data-ico="timeline" title="${tr('Timeline')}">${ic('timeline', 's')}</button>` : ''}</div>`;
+      const v = curView(l), vc = viewChoices(l);  // 2.7.1 (#410): + "Project overview" in project lists
+      if (vc.length > 1 && !l.checklist && !isMobile()) acts += `<div class="seg vseg tf" role="group" aria-label="${esc(tr('View'))}">${vc.map(([k, n, i]) => `<button class="${v === k ? 'on' : ''}" data-act="view-${k}" data-ico="${i}" title="${esc(tr(n))}" aria-pressed="${v === k}">${ic(i, 's')}</button>`).join('')}</div>`;
       if (!isMobile() && fieldsOf(l.id).length && v === 'list' && !l.checklist) acts += `<button class="iconbtn tf ${fieldCols(l.id) ? 'on' : ''}" data-act="field-cols" data-ico="columns" data-id="${l.id}" title="${tr('Show custom fields as columns')}">${ic('columns')}</button>`;
       // 2.6.0 (K12): Share next to the title (desktop / tablets; phones: in "…")
       if (!l.is_inbox && !l.archived && collab() && !isMobile()) acts += `<button class="iconbtn tf shbtn" data-act="share-list" data-ico="users" data-id="${l.id}" title="${esc(tr('Share…'))}" aria-label="${esc(tr('Share…'))}">${ic('users', 's')}<span class="bl">${tr('Share')}</span></button>`;
@@ -1464,7 +1464,7 @@ function topFolded() {
 function topMoreItems() {
   const m = S.route.mod, k = S.route.key, fold = topFolded(), out = [], sec = [];
   if (isMobile()) for (const dir of ['undo', 'redo']) { const b = histBtn(dir); out.push({label: b.lab, icon: dir, dis: b.off, cls: 'hmi' + (b.p ? ' pend' : ''), title: b.p ? tr('waiting for the connection') : '', fn: () => histStep(dir)}); }
-  if (m === 'tasks' && !NOLIST_KEYS.includes(k) && !isKanban() && !isTimeline() && !isRoadmap())
+  if (m === 'tasks' && !NOLIST_KEYS.includes(k) && !isKanban() && !isTimeline() && !isRoadmap() && !isOverview())
     sec.push({label: S.multiMode ? tr('End selection') : tr('Select multiple'), icon: 'select', on: S.multiMode, fn: () => { S.multiMode = !S.multiMode; if (!S.multiMode) S.multi.clear(); render(); }},
       {label: tr('Sort…'), icon: 'sort', fn: () => sortMenu($('#top [data-act="top-more"]') || $('#top h1'))});
   if (doneToggleView()) sec.push(doneItem());
@@ -1475,10 +1475,9 @@ function topMoreItems() {
   if (mxs.startsWith('folder:') || mxs.startsWith('l:') || mxs.startsWith('f:')) sec.push({label: tr('Show as list'), icon: 'list', fn: () => go(keyToHash(mxs))});
   if (m === 'tasks' && k.startsWith('f:')) sec.push({label: tr('Edit filter'), icon: 'edit', fn: () => filterModal(+k.slice(2))});
   const l = m === 'tasks' && (k.startsWith('l:') || k === 'inbox') ? (k === 'inbox' ? inbox() : listById(+k.slice(2))) : null;
-  if (l && isMobile() && !l.checklist && (feat('kanban') || feat('timeline'))) {  // phones: the view switch lives here too (room for the title)
-    const v = listView(l), set = x => async () => { if (x === v) return; await api('PATCH', '/api/lists/' + l.id, {view: x}); await load(); render(); };
-    sec.unshift({label: tr('List'), icon: 'list', on: v === 'list', fn: set('list')}, ...(feat('kanban') ? [{label: tr('Kanban'), icon: 'kanban', on: v === 'kanban', fn: set('kanban')}] : []),
-      ...(feat('timeline') ? [{label: tr('Timeline'), icon: 'timeline', on: v === 'timeline', fn: set('timeline')}] : []), '-');
+  if (l && isMobile() && !l.checklist && viewChoices(l).length > 1) {  // phones: the view switch lives here too (room for the title)
+    const v = curView(l), set = x => async () => { if (x === v) return; await setListView(l, x); };
+    sec.unshift(...viewChoices(l).map(([k, n, i]) => ({label: tr(n), icon: i, on: v === k, fn: set(k)})), '-');
   }
   if (l) { if (sec.length && sec[sec.length - 1] !== '-') sec.push('-'); sec.push(...listMenuItems(l.id, () => $('#top [data-act="top-more"]') || $('#top h1'))); }
   if (m === 'tasks' && k.startsWith('tag:')) { if (sec.length) sec.push('-'); sec.push(tagDeleteItem(k.slice(4))); }
@@ -1534,8 +1533,8 @@ function routeList() {
   return k === 'inbox' ? inbox() : k.startsWith('l:') ? listById(+k.slice(2)) : null;
 }
 const listView = l => !l.checklist && ((l.view === 'kanban' && feat('kanban')) || (l.view === 'timeline' && feat('timeline'))) ? l.view : 'list';
-function isKanban() { const l = routeList(); return !!l && listView(l) === 'kanban'; }
-function isTimeline() { const l = routeList(); return !!l && listView(l) === 'timeline'; }
+function isKanban() { const l = routeList(); return !!l && !povOn(l) && listView(l) === 'kanban'; }
+function isTimeline() { const l = routeList(); return !!l && !povOn(l) && listView(l) === 'timeline'; }
 function renderView() {
   const m = S.route.mod, el = $('#view');
   const scroll = el.scrollTop;
@@ -1558,6 +1557,7 @@ function renderView() {
   else if (S.route.key === 'done' || S.route.key === 'trash') el.innerHTML = viewHistory();
   else if (S.route.key === 'archived') el.innerHTML = viewArchived();
   else if (isRoadmap()) el.innerHTML = viewRoadmap();
+  else if (isOverview()) el.innerHTML = viewProjOv();  // 2.7.1 (#410)
   else if (isKanban()) el.innerHTML = viewKanban();
   else if (isTimeline()) el.innerHTML = viewTimeline(routeList().id);
   else el.innerHTML = viewList();
@@ -2366,7 +2366,9 @@ function viewTimeline(listId, inCal) {
   const dated = all.filter(t => t.due && t.due >= start && (t.start || t.due) <= end);
   const undated = all.filter(t => !t.due).length;
   const ndOn = tlNdOn(listId), und = ndOn ? all.filter(t => !t.due) : [];
-  const groups = S.lists.filter(l => dated.some(t => t.list_id === l.id) || und.some(t => t.list_id === l.id)).map(l => ({l, ts: dated.filter(t => t.list_id === l.id).sort((a, b) => (a.start || a.due).localeCompare(b.start || b.due) || bySort(a, b)), nd: und.filter(t => t.list_id === l.id)}));
+  // 2.7.1 (#410): milestones of project lists as markers in the list's row (a list with only milestones in range shows too)
+  const msIn = l => l.kind === 'project' && (!listId || l.id === listId) ? (l.milestones || []).filter(m => m.day >= start && m.day <= end) : [];
+  const groups = S.lists.filter(l => dated.some(t => t.list_id === l.id) || und.some(t => t.list_id === l.id) || (listId === l.id && msIn(l).length)).map(l => ({l, ts: dated.filter(t => t.list_id === l.id).sort((a, b) => (a.start || a.due).localeCompare(b.start || b.due) || bySort(a, b)), nd: und.filter(t => t.list_id === l.id)}));
   let head = '', months = '', lastM = '';
   for (let i = 0; i < TL_DAYS; i++) {
     const d = addDays(start, i), dd = pd(d), wk = dd.getDay() === 0 || dd.getDay() === 6;
@@ -2378,7 +2380,8 @@ function viewTimeline(listId, inCal) {
   const bars = new Map();
   const bar = t => { bars.set(t.id, 1); return tlBarHtml(t, start, end, DW, pick, deps); };
   // 2.7.0 (K14): names cut with "…" (full name in the tooltip)
-  const rows = groups.map(g => `<div class="tl-row tl-grp"><div class="tl-name" title="${esc(lname(g.l))}"><span class="tln">${esc(lname(g.l))}</span></div><div class="tl-track"></div></div>` +
+  const msMark = l => msIn(l).map(m => `<i class="tl-ms ${m.done ? 'done' : m.day < t0 ? 'over' : ''}" style="left:${diffDays(start, m.day) * DW + DW / 2}px" title="${esc(m.name + ' · ' + fmtDateLoc(m.day))}" role="img" aria-label="${esc(tr('Milestone') + ': ' + m.name + ', ' + fmtDateLoc(m.day))}"></i>`).join('');
+  const rows = groups.map(g => `<div class="tl-row tl-grp"><div class="tl-name" title="${esc(lname(g.l))}"><span class="tln">${esc(lname(g.l))}</span></div><div class="tl-track">${msMark(g.l)}</div></div>` +
     g.ts.map(t => `<div class="tl-row"><div class="tl-name" data-act="open" data-id="${t.id}" title="${esc(t.title)}">${t.parent_id ? '<span class="muted">↳ </span>' : ''}<span class="tln">${esc(t.title)}</span></div><div class="tl-track">${bar(t)}</div></div>`).join('') + (g.nd.length ? tlNdRows(g.l, g.nd) : '')).join('');
   S.tlL = {bars};
   const from = pick && S.tasks.get(pick.from);
@@ -2393,6 +2396,7 @@ function viewTimeline(listId, inCal) {
       ${inCal ? tlCalRows(start, end, DW) : ''}
       ${rows || `<div class="tl-row"><div class="tl-name muted">${tr('No dated tasks')}</div><div class="tl-track"></div></div>`}
       <i class="tl-now" style="left:calc(var(--tl-name) + ${todayX + DW / 2}px)"></i>
+      ${listId ? msIn(listById(listId) || {}).map(m => `<i class="tl-msl" style="left:calc(var(--tl-name) + ${diffDays(start, m.day) * DW + DW / 2}px)"></i>`).join('') : ''}
       ${deps ? '<svg class="tl-deps" id="tl-deps" aria-hidden="true"></svg>' : ''}
     </div></div>
     ${hintOnce('tlrange', tr('Set a date range via “Start” in the date dialog.'))}<div class="muted tl-foot">${hint} ${dhint ? dhint + ' ' : ''}${undated && !ndOn ? ' ' + trn('{0} task without a date is not shown.', '{0} tasks without a date are not shown.', undated) : ''}</div></div>`;
@@ -4306,7 +4310,7 @@ function plPick(anchor) {
     popOnClose = () => setTimeout(() => { if (!done) res(null); }, 0);  // closed without a pick
   });
 }
-function plSearchModal(taskId) {
+function plSearchModal(taskId, o = {}) {  // 2.7.1 (#410): o.pick(doc, conn) + o.linked ('conn:doc') = the list's documents
   const cs = plConns();
   let conn = cs.some(c => c.id === +LS.get('plConn', -1)) ? +LS.get('plConn', -1) : cs[0]?.id ?? 0;
   const md = modal(`<h3>${tr('Link Paperless document')}</h3>
@@ -4316,7 +4320,7 @@ function plSearchModal(taskId) {
     <div class="plres" id="pl-res"><div class="muted" style="padding:.75rem">${tr('Loading…')}</div></div>
     <div class="foot"><a class="btn" id="pl-open" href="${esc(plConn(conn)?.url || '')}" target="_blank" rel="noopener">${ic('archive', 's')} ${tr('Open Paperless')}</a><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
   md.classList.add('plmodal');
-  const linked = () => new Set((taskById(taskId)?.paperless || []).filter(p => (p.conn || 0) === conn).map(p => p.doc_id));
+  const linked = () => o.linked ? new Set([...o.linked].filter(k => k.startsWith(conn + ':')).map(k => +k.split(':')[1])) : new Set((taskById(taskId)?.paperless || []).filter(p => (p.conn || 0) === conn).map(p => p.doc_id));
   let timer, seq = 0;
   const run = async q => {
     const my = ++seq, ln = linked();
@@ -4333,6 +4337,7 @@ function plSearchModal(taskId) {
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-doc]'); if (!b) return;
     if (b.classList.contains('on')) { toast(tr('Already linked')); return; }
+    if (o.pick) { try { await o.pick(+b.dataset.doc, conn); } catch { return; } md.remove(); toast(tr('Linked')); return; }
     const t = await api('POST', `/api/tasks/${taskId}/paperless`, {doc_id: +b.dataset.doc, conn});
     putTask(t); md.remove(); render(); if (S.sel === taskId) renderDetail(); toast(tr('Linked'));
   });
@@ -8816,6 +8821,190 @@ function viewOverview() {
   return h + `<p class="muted stnote">${tr('Progress: completed vs. all main tasks of the list (subtasks too if set in Settings > General), won’t do and the trash left out, recurring tasks count once. Waiting = at least one task it waits on is still open.')}</p></div>`;
 }
 
+// ---- 2.7.1 (#410): the overview of a project list (tab next to List / Kanban / Timeline, project lists only; not the
+// "Where is it stuck?" view across all projects). Description (Markdown), key links, milestones, project files + Paperless
+// documents of the list, the files of its tasks (read-only), members, status updates and the tracked time. Loaded from
+// GET /api/lists/<id>/overview (online); the milestones also come with the list in /api/state (timeline markers).
+// Which lists show their overview is remembered per device (LS pov); the list's own view (List / Kanban / Timeline) stays.
+S.pov = new Set(LS.get('pov', []));
+S.povD = {};  // list id -> {j, v, busy, err}
+const povOn = l => !!l && l.kind === 'project' && !l.is_inbox && S.pov.has(l.id);
+function isOverview() { return povOn(routeList()); }
+function povSet(l, on) {
+  if (on) S.pov.add(l.id); else S.pov.delete(l.id);
+  LS.set('pov', [...S.pov].slice(-200));
+}
+async function setListView(l, v) {  // List / Kanban / Timeline (stored on the server) or the overview (this device)
+  if (v === 'overview') { povSet(l, true); render(); return; }
+  const was = povOn(l);
+  povSet(l, false);
+  if (v !== listView(l)) { await api('PATCH', '/api/lists/' + l.id, {view: v}); await load(); }
+  if (was || v !== listView(l)) render(); else render();
+}
+const viewChoices = l => [['list', N_('List'), 'list'], ...(feat('kanban') ? [['kanban', N_('Kanban'), 'kanban']] : []), ...(feat('timeline') ? [['timeline', N_('Timeline'), 'timeline']] : []),
+  ...(l.kind === 'project' && !l.is_inbox ? [['overview', N_('Project overview'), 'brief']] : [])];
+const curView = l => povOn(l) ? 'overview' : listView(l);
+async function povLoad(lid, force) {
+  const d = S.povD[lid] || (S.povD[lid] = {});
+  if (d.busy || (!force && d.j && d.v === S.v)) return;
+  d.busy = true;
+  try { d.j = await rawFetch('GET', `/api/lists/${lid}/overview`); d.v = S.v; d.err = ''; }
+  catch (e) { if (e.message === 'auth') return; d.err = e instanceof Offline ? 'offline' : e.message; d.v = S.v; }
+  finally { d.busy = false; }
+  if (routeList()?.id === lid && isOverview()) renderView();
+}
+const povHost = u => { try { return new URL(u).host.replace(/^www\./, ''); } catch { return ''; } };
+// an icon from the address alone (nothing is fetched from the linked site)
+function povLinkIcon(u) {
+  const h = povHost(u);
+  if (/(^|\.)(github\.com|gitlab\.com|codeberg\.org|bitbucket\.org)$|gitea|forgejo/.test(h)) return 'git';
+  if (/figma\.com$|miro\.com$|canva\.com$|sketch\.com$/.test(h)) return 'palette';
+  if (/docs\.google\.com$|drive\.google\.com$|dropbox\.com$|onedrive|sharepoint\.com$|nextcloud|box\.com$/.test(h)) return 'folder';
+  if (/meet\.|zoom\.us$|teams\.microsoft\.com$/.test(h)) return 'users';
+  if (/\.pdf($|\?)/i.test(u)) return 'pdf';
+  return 'link';
+}
+const povFileUrl = (f, dl) => `/api/list-files/${encodeURIComponent(f.id)}${dl ? '?dl=1' : ''}`;
+function povFile(f, url, del) {
+  const pdf = f.mime === 'application/pdf', img = isImg(f);
+  return `<div class="povf"><a href="${url(f, !(pdf || img))}" ${pdf || img ? 'target="_blank" rel="noopener"' : 'download'} title="${esc(f.name)}">${ic(img ? 'file' : pdf ? 'pdf' : 'file')}<span class="pfn">${esc(f.name)}</span><span class="muted pfs">${fmtSize(f.size)}</span></a>${del || ''}</div>`;
+}
+function povPl(p, del) {
+  const cn = !p.hidden && plConn(p.conn);
+  if (p.hidden || !plOn() || !cn?.usable) return `<div class="povf">${ic('archive')}<span class="pfn">${tr('Paperless document')}</span><span class="muted pfs">${tr('Linked through a Paperless connection you cannot use')}</span></div>`;
+  const sub = [p.correspondent, p.created ? fmtDate(p.created) : ''].filter(Boolean).join(' · ');
+  return `<div class="povf"><a href="${esc(cn.url)}/documents/${encodeURIComponent(p.doc_id)}/details" target="_blank" rel="noopener">${ic('archive')}<span class="pfn">${esc(p.title)}</span><span class="muted pfs">${esc(sub)}</span></a>${del || ''}</div>`;
+}
+const povDel = (k, id, lab) => `<button class="iconbtn povx" data-pov="${k}" data-id="${id}" title="${esc(lab)}" aria-label="${esc(lab)}">${ic('x', 's')}</button>`;
+function povSec(id, title, body, extra = '') {
+  return `<section class="povs" id="pov-${id}"><div class="povh"><h3>${title}</h3><span class="spacer"></span>${extra}</div>${body}</section>`;
+}
+function viewProjOv() {
+  const l = routeList(), d = S.povD[l.id];
+  if (!d || (!d.busy && d.v !== S.v)) setTimeout(() => povLoad(l.id), 0);
+  const head = `${listHead(l)}`;
+  if (!d?.j) return `<div class="pov">${head}<div class="muted mhint">${d?.err ? (d.err === 'offline' ? tr('Only available online.') : esc(d.err)) : tr('Loading…')}</div></div>`;
+  const j = d.j, can = !!j.can_edit && !l.archived, t0 = today();
+  // description
+  const ed = S.povEdit === l.id;
+  const desc = ed ? `<textarea id="pov-desc" rows="8" maxlength="20000" placeholder="${esc(tr('Goal, scope, contacts, where things are…'))}">${esc(j.description)}</textarea>
+      <div class="povbar"><span class="muted">${tr('Markdown')}</span><span class="spacer"></span><button class="btn" data-pov="desc-cancel">${tr('Cancel')}</button><button class="btn pri" data-pov="desc-save">${tr('Save')}</button></div>`
+    : j.description ? `<div class="md povmd">${renderMd(j.description).replace(/<input type="checkbox"/g, '<input type="checkbox" disabled')}</div>`
+      : `<div class="muted povempty">${can ? tr('No description yet. What is this project about, what is the goal?') : tr('No description yet.')}</div>`;
+  let h = povSec('desc', tr('Description'), desc, can && !ed ? `<button class="btn sm" data-pov="desc-edit">${ic('edit', 's')}<span>${tr('Edit')}</span></button>` : '');
+  // status updates (with collaboration: the existing project status + its history)
+  if (statusFor(l)) {
+    const hist = (j.status.history || []).slice(0, 5);
+    const body = `${hist.length ? `<div class="sthist povst">${hist.map(x => `<div class="shi"><span class="stdot st-${esc(x.status || 'none')}"></span><div><div><b>${esc(x.status ? statusLabel(x.status) : tr('Status cleared'))}</b> <span class="muted">${esc(x.name || tr('Someone'))} · ${esc(fmtWhen(x.created_at))}</span></div>${x.note ? `<div class="shn">${esc(x.note)}</div>` : ''}</div></div>`).join('')}</div>` : `<div class="muted povempty">${tr('No status updates yet.')}</div>`}`;
+    h += povSec('status', tr('Status updates'), body, `${l.status ? statusPill(l) : ''}${canEditList(l.id) && !l.archived ? `<button class="btn sm" data-act="status" data-id="${l.id}">${ic('pulse', 's')}<span>${tr('Set status')}</span></button>` : ''}`);
+  }
+  // milestones
+  const ms = j.milestones.map(m => `<div class="povm ${m.done ? 'done' : m.day < t0 ? 'over' : ''}">
+      <button class="chk ${m.done ? 'on' : ''}" data-pov="ms-done" data-id="${m.id}" role="checkbox" aria-checked="${m.done}" aria-label="${esc(tr('Reached: {0}', m.name))}" ${can ? '' : 'disabled'}>${m.done ? ic('check') : ''}</button>
+      <span class="pmn">${ic('flag', 's')}<span>${esc(m.name)}</span></span><span class="pmd">${esc(fmtDateLoc(m.day))}</span>
+      ${can ? `<button class="iconbtn" data-pov="ms-edit" data-id="${m.id}" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit'))}">${ic('edit', 's')}</button>` : ''}</div>`).join('');
+  const msMain = povSec('ms', tr('Milestones'), ms || `<div class="muted povempty">${tr('No milestones yet. They also show in the timeline.')}</div>`, can ? `<button class="btn sm" data-pov="ms-add">${ic('plus', 's')}<span>${tr('Add milestone')}</span></button>` : '');
+  // files
+  const plList = feat('paperless') && (plOn() || j.paperless.length);
+  const files = j.files.map(f => povFile(f, povFileUrl, can ? povDel('file-del', f.id, tr('Remove')) : '')).join('') +
+    (plList ? j.paperless.map(p => povPl(p, can && !p.hidden && plOn() ? povDel('pl-del', p.id, tr('Remove link')) : '')).join('') : '');
+  const fAdd = can ? `<label class="btn sm povup" title="${esc(tr('Images, PDFs, documents'))}">${ic('upload', 's')}<span>${tr('Add file')}</span><input type="file" id="pov-file" multiple hidden></label>${plList && plOn() ? `<button class="btn sm" data-pov="pl-add">${ic('archive', 's')}<span>${tr('Link document')}</span></button>` : ''}` : '';
+  const tf = j.task_files.map(f => `<div class="povf"><a href="${attUrl(f, !(f.mime === 'application/pdf' || isImg(f)))}" ${f.mime === 'application/pdf' || isImg(f) ? 'target="_blank" rel="noopener"' : 'download'} title="${esc(f.name)}">${ic(f.mime === 'application/pdf' ? 'pdf' : 'file')}<span class="pfn">${esc(f.name)}</span><span class="muted pfs">${fmtSize(f.size)}</span></a><button class="povt" data-pov="task" data-id="${f.task_id}" title="${esc(tr('Open task'))}">${ic('sub', 's')}<span>${esc(f.task_title)}</span></button></div>`).join('') +
+    (feat('paperless') ? j.task_paperless.map(p => povPl(p, `<button class="povt" data-pov="task" data-id="${p.task_id}" title="${esc(tr('Open task'))}">${ic('sub', 's')}<span>${esc(p.task_title)}</span></button>`)).join('') : '');
+  const filesSec = povSec('files', tr('Project files'), `<div class="povfl">${files || `<div class="muted povempty">${tr('No project files yet: contracts, briefings, plans.')}</div>`}</div>
+      ${tf ? `<details class="povtf" ${LS.get('povTf', true) ? 'open' : ''}><summary>${tr('Attachments from tasks')} <span class="muted">${j.task_files.length + (feat('paperless') ? j.task_paperless.length : 0)}</span></summary><div class="povfl">${tf}</div></details>` : ''}`, fAdd);
+  // side: key links, members, time
+  const links = j.links.map((x, i) => `<div class="povl"><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" title="${esc(x.url)}">${ic(povLinkIcon(x.url), 's')}<span class="pln">${esc(x.title)}</span><span class="muted plh">${esc(povHost(x.url))}</span></a>
+      ${can ? `<span class="povlb">${i ? `<button class="iconbtn" data-pov="link-up" data-id="${x.id}" title="${esc(tr('Move up'))}" aria-label="${esc(tr('Move up'))}">${ic('chev', 's up')}</button>` : ''}<button class="iconbtn" data-pov="link-edit" data-id="${x.id}" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit'))}">${ic('edit', 's')}</button></span>` : ''}</div>`).join('');
+  let side = povSec('links', tr('Key links'), links || `<div class="muted povempty">${tr('Repository, designs, documents: the addresses everyone needs.')}</div>`, can ? `<button class="btn sm" data-pov="link-add">${ic('plus', 's')}<span>${tr('Add link')}</span></button>` : '');
+  if (collab() && j.members.length) {
+    side += povSec('people', tr('Members'), `<div class="povp">${j.members.map(p => `<div class="povpm">${av(p.user_id, p.name)}<span class="ppn">${esc(p.name)}${S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : ''}</span><span class="muted">${esc(roleLabel(p.role))}</span></div>`).join('')}</div>`,
+      canManage(l) && !l.archived ? `<button class="btn sm" data-act="share-list" data-id="${l.id}">${ic('users', 's')}<span>${tr('Share…')}</span></button>` : '');
+  }
+  const ts = timeSumHtml([l]);
+  if (timeOn() && j.time) side += povSec('time', tr('Tracked time'), ts || `<div class="muted povempty">${tr('No time tracked yet.')}</div>`);
+  return `<div class="pov">${head}<div class="povg"><div class="povc">${h}${msMain}${filesSec}</div><div class="povc povside">${side}</div></div></div>`;
+}
+async function povApi(method, url, body) {
+  const lid = routeList()?.id;
+  const r = await api(method, url, body);
+  if (r && r.list_id === lid && r.links) { S.povD[lid] = {j: r, v: S.v}; renderView(); }
+  else povLoad(lid, true);
+  return r;
+}
+function povLinkModal(l, x) {
+  const md = modal(`<h3>${x ? tr('Edit link') : tr('Add link')}</h3>
+    <div class="row"><label for="pl-url">${tr('Address')}</label><input id="pl-url" type="url" inputmode="url" placeholder="https://…" value="${esc(x?.url || '')}" maxlength="2000"></div>
+    <div class="row"><label for="pl-ttl">${tr('Title')}</label><input id="pl-ttl" maxlength="120" placeholder="${esc(tr('e.g. Repository, Designs'))}" value="${esc(x?.title || '')}"></div>
+    <div class="foot">${x ? `<button class="btn danger" data-m="del">${tr('Remove')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
+  md.classList.add('povmodal');
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('[data-m]'); if (!b) return;
+    if (b.dataset.m === 'close') { md.remove(); return; }
+    try {
+      if (b.dataset.m === 'del') await povApi('DELETE', `/api/lists/${l.id}/links/${x.id}`);
+      else await povApi(x ? 'PATCH' : 'POST', `/api/lists/${l.id}/links${x ? '/' + x.id : ''}`, {url: $('#pl-url', md).value.trim(), title: $('#pl-ttl', md).value.trim()});
+    } catch { return; }
+    md.remove();
+  });
+  if (!isMobile()) setTimeout(() => $('#pl-url', md)?.focus(), 30);
+}
+function povMsModal(l, m) {
+  const md = modal(`<h3>${m ? tr('Edit milestone') : tr('Add milestone')}</h3>
+    <div class="row"><label for="pm-name">${tr('Name')}</label><input id="pm-name" maxlength="120" placeholder="${esc(tr('e.g. Launch, Handover'))}" value="${esc(m?.name || '')}"></div>
+    <div class="row"><label for="pm-day">${tr('Date')}</label>${dateIn('pm-day', m?.day || '', {label: tr('Date'), clear: false})}</div>
+    <div class="foot">${m ? `<button class="btn danger" data-m="del">${tr('Remove')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
+  md.classList.add('povmodal');
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('[data-m]'); if (!b) return;
+    if (b.dataset.m === 'close') { md.remove(); return; }
+    try {
+      if (b.dataset.m === 'del') await povApi('DELETE', `/api/lists/${l.id}/milestones/${m.id}`);
+      else {
+        const day = $('#pm-day', md).value;
+        if (!day) { toast(tr('Pick a date')); return; }
+        await povApi(m ? 'PATCH' : 'POST', `/api/lists/${l.id}/milestones${m ? '/' + m.id : ''}`, {name: $('#pm-name', md).value.trim(), day});
+      }
+    } catch { return; }
+    md.remove(); await load(); render();  // the timeline markers come with the list
+  });
+  if (!isMobile()) setTimeout(() => $('#pm-name', md)?.focus(), 30);
+}
+async function povUpload(l, files) {
+  files = [...files].filter(Boolean);
+  if (!files.length) return;
+  const max = 50 * 1024 * 1024, big = files.find(f => f.size > max);
+  if (big) { toast(tr('{0} is larger than 50 MB', big.name)); return; }
+  const fd = new FormData();
+  files.forEach(f => fd.append('file', f, f.name));
+  toast(files.length === 1 ? tr('Uploading…') : tr('Uploading {0} files…', files.length));
+  try { await povApi('POST', `/api/lists/${l.id}/files`, fd); toast(files.length === 1 ? tr('Attached') : tr('{0} files attached', files.length)); } catch { /* shown */ }
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-pov]'); if (!b || !b.closest('.pov')) return;
+  const l = routeList(), d = l && S.povD[l.id], j = d?.j; if (!j) return;
+  const id = +b.dataset.id || 0;
+  switch (b.dataset.pov) {
+    case 'desc-edit': S.povEdit = l.id; renderView(); setTimeout(() => { const t = $('#pov-desc'); if (t) { t.focus(); autosize(t); } }, 20); break;
+    case 'desc-cancel': S.povEdit = null; renderView(); break;
+    case 'desc-save': { const v = $('#pov-desc')?.value ?? ''; try { await povApi('PATCH', `/api/lists/${l.id}/overview`, {description: v}); } catch { return; } S.povEdit = null; renderView(); toast(tr('Saved')); break; }
+    case 'link-add': povLinkModal(l, null); break;
+    case 'link-edit': povLinkModal(l, j.links.find(x => x.id === id)); break;
+    case 'link-up': { const ids = j.links.map(x => x.id), i = ids.indexOf(id); if (i > 0) { [ids[i - 1], ids[i]] = [ids[i], ids[i - 1]]; try { await povApi('PUT', `/api/lists/${l.id}/links/order`, {ids}); } catch { /* shown */ } } break; }
+    case 'ms-add': povMsModal(l, null); break;
+    case 'ms-edit': povMsModal(l, j.milestones.find(x => x.id === id)); break;
+    case 'ms-done': { const m = j.milestones.find(x => x.id === id); if (!m) break; try { await povApi('PATCH', `/api/lists/${l.id}/milestones/${id}`, {done: !m.done}); } catch { return; } await load(); render(); break; }
+    case 'file-del': { const f = j.files.find(x => x.id === id); if (!f || !await askConfirm(tr('Delete “{0}”?', f.name), tr('The file is removed for everyone in this project.'), {ok: tr('Delete'), danger: true})) break; try { await povApi('DELETE', `/api/list-files/${id}`); } catch { /* shown */ } break; }
+    case 'pl-add': plSearchModal(0, {linked: new Set(j.paperless.filter(p => !p.hidden).map(p => `${p.conn || 0}:${p.doc_id}`)), pick: async (doc, conn) => { await povApi('POST', `/api/lists/${l.id}/paperless`, {doc_id: doc, conn}); }}); break;
+    case 'pl-del': try { await povApi('DELETE', `/api/lists/${l.id}/paperless/${id}`); } catch { /* shown */ } break;
+    case 'task': if (S.tasks.get(id)) openDetail(id); else go('t/' + id); break;
+  }
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'pov-file') { const l = routeList(); if (l) povUpload(l, e.target.files); e.target.value = ''; }
+});
+document.addEventListener('toggle', e => { if (e.target.classList?.contains('povtf')) LS.set('povTf', e.target.open); }, true);
+
 // ------------------------------------------------------------------ dependencies (detail panel, package 3)
 S.dp = {id: null};
 async function loadDeps(id) {
@@ -9264,15 +9453,15 @@ document.addEventListener('click', async e => {
     case 'top-more': menu(a, topMoreItems()); break;
     case 'fview': if (a.classList.contains('on')) break; if (a.dataset.k === 'matrix') { mxSet({scope: 'folder:' + a.dataset.f}); go('matrix'); } else go('folder/' + encodeURIComponent(a.dataset.f)); break;  // 2.4.2 (#390)
     case 'prog-hide': setProgHidden(id, true); break;
-    case 'view-list': case 'view-kanban': case 'view-timeline': {
+    case 'view-list': case 'view-kanban': case 'view-timeline': case 'view-overview': {
       const l = routeList();
       // phones: only the current view is shown (room for ← / →), a tap on it offers the others
       if (isTouch() && a.classList.contains('on') && a.closest('.vseg')) {
-        menu(a, $$('.vseg button', a.closest('.vseg')).map(b => ({label: b.title, icon: {'view-list': 'list', 'view-kanban': 'kanban', 'view-timeline': 'timeline'}[b.dataset.act], on: b === a,
-          fn: async () => { if (b === a) return; await api('PATCH', '/api/lists/' + l.id, {view: b.dataset.act.slice(5)}); await load(); render(); }})));
+        menu(a, $$('.vseg button', a.closest('.vseg')).map(b => ({label: b.title, icon: b.dataset.ico, on: b === a,
+          fn: async () => { if (b === a) return; await setListView(l, b.dataset.act.slice(5)); }})));
         break;
       }
-      await api('PATCH', '/api/lists/' + l.id, {view: act.slice(5)}); await load(); render(); break;
+      await setListView(l, act.slice(5)); break;
     }
     case 'pin': { const t = taskById(id); patchTask(id, {pinned: t.pinned ? 0 : 1}); break; }
     case 'conflicts': conflictModal(); break;
