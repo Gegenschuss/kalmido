@@ -61,15 +61,15 @@ jobs:
       - run: semgrep scan --config p/python --config p/flask --config p/javascript --metrics=off --exclude tests app.py static tools
 
   tests:
-    # 2.2.1: the suites run as 3 parallel shards (tests/run_all.sh --shard N/3, ~14 min each instead of ~42 min in one
+    # 2.2.1: the suites run as parallel shards (2.7.1: 4, tests/run_all.sh --shard N/4, ~15 min each instead of ~60 min in one
     # job). fail-fast off: every shard reports its own failures. The job "Test suites" below needs all of them.
-    name: Test suites ${{ matrix.shard }}/3 (API, UI, security)
+    name: Test suites ${{ matrix.shard }}/4 (API, UI, security)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -90,7 +90,7 @@ jobs:
         env:
           TZ: Europe/Berlin
           PYTHON: python
-        run: tests/run_all.sh --shard ${{ matrix.shard }}/3
+        run: tests/run_all.sh --shard ${{ matrix.shard }}/4
       - name: Container log on failure
         if: failure()
         run: docker logs kalmido-test 2>&1 | tail -100 || true

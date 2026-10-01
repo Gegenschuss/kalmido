@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # run_all.sh -- every suite, each group against a fresh test container (see start.sh for the settings).
 #   BUILD=1 tests/run_all.sh     build the image from the repo first (docker build -t $KALMIDO_TEST_IMAGE .)
-#   tests/run_all.sh --shard 2/3  only the second of the 3 shards (CI runs the shards as parallel jobs, see ci.yml).
+#   tests/run_all.sh --shard 2/4  only the second of the 4 shards (CI runs the shards as parallel jobs, see ci.yml).
 #                                The `shard N` lines below split the groups; each group (a `fresh` container and the
 #                                suites after it) stays whole. Keep the shards about equal (~14 min each on CI) by moving
 #                                a marker when one grows; new suites go at the end (shard 3).
@@ -13,7 +13,7 @@ cd "$HERE"
 export KALMIDO_TEST_IMAGE=${KALMIDO_TEST_IMAGE:-kalmido:test}
 export KALMIDO_TEST_DATA=${KALMIDO_TEST_DATA:-$HERE/.data}
 PY=${PYTHON:-python3}
-SHARDS_DEFINED=3
+SHARDS_DEFINED=4
 SHARD=0; CUR=1
 if [[ "${1:-}" == "--shard" ]]; then
   [[ "${2:-}" =~ ^([0-9]+)/([0-9]+)$ ]] || { echo "usage: run_all.sh [--shard N/$SHARDS_DEFINED]"; exit 2; }
@@ -75,7 +75,7 @@ fresh; run v1 "$PY" v1_test.py "$KALMIDO_TEST_DATA"
 # package A: backups + restore (own containers), two-factor + passkeys (software authenticator), OIDC (fake provider inside
 # the container), then the sign-in / backup UI in jsdom (own container, page on http://localhost for WebAuthn)
        run backup "$PY" backup_test.py "$KALMIDO_TEST_DATA"
-shard 2  # ---------------------------------------------------------------- shard 2 of 3
+shard 2  # ---------------------------------------------------------------- shard 2 of 4
 fresh; run twofa "$PY" twofa_test.py "$KALMIDO_TEST_DATA"
        run oidc "$PY" oidc_test.py "$KALMIDO_TEST_DATA"
        run signin_ui node signin_ui.js "$KALMIDO_TEST_DATA"
@@ -126,7 +126,7 @@ fresh; run p181_ui node p181_ui.js
 # 1.9.0: share from the phone (HTTP Shortcuts import, iPhone guide), profile pictures (presets, photo resized + EXIF
 # stripped, access), delete a tag, News inbox (dismiss, filter, which events), stale update check; then the UI (refresh
 # of shared lists, live comments, Fold dialogs, users first in Administration)
-shard 3  # ---------------------------------------------------------------- shard 3 of 3
+shard 3  # ---------------------------------------------------------------- shard 3 of 4
 fresh; run p190_api "$PY" p190_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p190_ui node p190_ui.js
 # 1.10.0: list roles (admin / member / participant / viewer): leak tests of every read path for a participant against an
@@ -193,6 +193,7 @@ fresh; run p208_ui node p208_ui.js
 # app itself sends no unknown fields
        run p221_api "$PY" p221_api_test.py "$KALMIDO_TEST_DATA"
        run p221_ui node p221_ui.js "$KALMIDO_TEST_DATA"
+shard 4  # ---------------------------------------------------------------- shard 4 of 4 (2.7.1: shard 3 had reached the 30 min job limit)
 # 2.3.0: agent proposals (#260 project from a briefing, #261 break down, #262 sort the inbox, #263 tasks from notes): who may ask
 # which agent, requests with exactly the sent input, validation per kind, apply as the person with one undo step, inbox
 # consent, discard, retention (own containers); then the entry points, request + review dialogs in jsdom and Firefox

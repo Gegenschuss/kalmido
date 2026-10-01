@@ -109,7 +109,7 @@ python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
 npm ci
 BUILD=1 ./run_all.sh          # builds kalmido:test from the repo, then runs every suite
-./run_all.sh --shard 2/3      # only the 2nd of the 3 shards (CI: 3 parallel jobs, ~14 min each)
+./run_all.sh --shard 2/4      # only the 2nd of the 4 shards (CI: 4 parallel jobs, ~15 min each)
 ```
 
 `run_all.sh` prints one summary line per suite and exits non-zero if anything failed. Single suites:
