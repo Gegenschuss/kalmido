@@ -300,7 +300,7 @@ this costs nothing extra.
 
 ## Runtime settings
 
-Admins set per agent, in **Settings > Agents > Overview > (agent) > Runtime**, how the agent's host should run it.
+Admins set per agent, in **Settings > Agents > Status > (agent) > Runtime** (called *Overview* before 2.7.0), how the agent's host should run it.
 **Kalmido stores these settings and never applies them itself**: it runs no AI process. The host reads them and starts the
 agent accordingly.
 

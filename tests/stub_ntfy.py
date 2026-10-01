@@ -5,7 +5,7 @@ class H(http.server.BaseHTTPRequestHandler):
         t = self.headers.get('Title') or ''
         try: t = t.encode('latin-1').decode('utf-8')
         except Exception: pass
-        rec = {'topic': self.path.strip('/'), 'title': t, 'msg': body, 'click': self.headers.get('Click'), 'prio': self.headers.get('Priority')}
+        rec = {'topic': self.path.strip('/'), 'title': t, 'msg': body, 'click': self.headers.get('Click'), 'prio': self.headers.get('Priority'), 'actions': self.headers.get('Actions')}
         with open('/data/ntfy.log', 'a') as f: f.write(json.dumps(rec, ensure_ascii=False) + '\n')
         if rec['topic'].startswith('fail-'):  # admin_alerts_test.py: a topic whose publishes fail
             self.send_response(500); self.end_headers(); return

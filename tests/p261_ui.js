@@ -72,7 +72,7 @@ const HEAD = `(() => {
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v73'/.test(SW), 'service worker cache v73');
+  check(/const CACHE = 'tasks-shell-v7[34]'/.test(SW), 'service worker cache v73 (2.7.0: v74)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en', tour: 'done'});

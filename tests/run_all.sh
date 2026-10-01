@@ -234,6 +234,13 @@ fresh; run p208_ui node p208_ui.js
 # and 1280 / 1920: "…", the bell and the dots in view, the bell's sheet / dropdown inside the viewport, 44 px targets
        run p261_api "$PY" p261_api_test.py "$KALMIDO_TEST_DATA"
        run p261_ui node p261_ui.js "$KALMIDO_TEST_DATA"
+# 2.7.0: reminders up to a year ahead + deadlines (#412), nags with quiet hours, the list default, dedupe and stop rules, the
+# token API (#413), hours per day + time sums (#407) (own container, the isolated test database aged for the intervals); then
+# the date popover, deadlines on Today, the list dialog (nag, hours per day, "Shopping & packing list"), the IA fixes of #405,
+# the setup's start, the resizable bell in jsdom, and in Firefox at 360 / 390 / 904 (touch) and 1280 / 1920: two-line rows in
+# a narrow list column, the popover, the time sum, timeline labels, dragging the bell's grip / the sheet's handle
+       run p270_api "$PY" p270_api_test.py "$KALMIDO_TEST_DATA"
+       run p270_ui node p270_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

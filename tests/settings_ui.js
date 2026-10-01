@@ -10,7 +10,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   w.eval('settingsModal()'); await sleep(400);
   let md = d.querySelector('.modal.smodal');
   const secs = [...md.querySelectorAll('.snav [data-sec]')].map(b => b.dataset.sec);
-  check(JSON.stringify(secs) === JSON.stringify(['account', 'general', 'look', 'modules', 'notify', 'integr', 'ai', 'data', 'users', 'help']), 'admin: all sections ' + secs);
+  check(JSON.stringify(secs) === JSON.stringify(['account', 'general', 'look', 'modules', 'notify', 'integr', 'data', 'users', 'help']), 'admin: all sections (2.7.0: Agents only with the module or agents) ' + secs);
   check(md.querySelector('.snav .on')?.dataset.sec === 'general', 'default section: General');
   check(md.querySelectorAll('.spane:not(.hidden)').length === 1, 'exactly one pane visible');
   for (const k of secs) {
@@ -25,8 +25,8 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   check(md.querySelector('[data-pane="modules"] #s-collaball')?.checked === true, 'admin: instance switch shown next to it (Modules), on');
   check(/Kalmido v\d+\.\d+\.\d+/.test(md.querySelector('[data-pane="help"]').textContent), 'help: version line');
   check(md.querySelector('[data-pane="notify"] #s-allday') && md.querySelector('[data-pane="notify"] #s-digest') && md.querySelector('[data-pane="notify"] [data-m="test"]'), 'notifications pane: topic test, reminders, digest');
-  check(md.querySelector('[data-pane="data"] #s-import') && md.querySelector('[data-pane="data"] [data-m="purge"]'), 'data pane: import + purge');
-  check(md.querySelector('[data-pane="account"] #a-name') && md.querySelector('[data-pane="account"] [data-acc="token"]'), 'account pane');
+  check(md.querySelector('[data-pane="data"] #s-import') && !md.querySelector('[data-pane="data"] [data-m="purge"]'), 'data pane: import; 2.7.0 (#405 S4): "Delete all completed" only in the Completed view');
+  check(md.querySelector('[data-pane="account"] #a-name') && md.querySelector('[data-pane="account"] [data-m="go-share"]'), 'account pane (2.7.0: the upload token is a link to Share from your phone)');
   // last section remembered
   click(w, md.querySelector('.snav [data-sec="modules"]')); await sleep(30);
   click(w, md.querySelector('.shdr [data-m="close"]')); await sleep(50);
@@ -77,7 +77,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   w = await boot({user: 'bob', mobile: true}); d = w.document;
   w.eval('settingsModal()'); await sleep(400); md = d.querySelector('.smodal');
   const bsecs = [...md.querySelectorAll('.snav [data-sec]')].map(b => b.dataset.sec);
-  check(!bsecs.includes('users') && bsecs.length === 9, 'non-admin: no Administration section');
+  check(!bsecs.includes('users') && !bsecs.includes('ai') && bsecs.length === 8, 'non-admin: no Administration section (2.7.0: no Agents page without the module)');
   const txt = md.textContent;
   check(/Allgemein/.test(txt) && /Benachrichtigungen/.test(txt) && /Integrationen/.test(txt) && /Hilfe/.test(txt) && /Dieses Gerät/.test(txt), 'German section labels');
   for (const k of bsecs) click(w, md.querySelector(`.snav [data-sec="${k}"]`));

@@ -1,5 +1,7 @@
-// First-run setup (jsdom): step 1 creates the admin, step 2 "What do you want to use?" (presets "Simple list" /
-// "Just me" / "Projects & team", fine-tuning, skip, language) sets the instance switches + default modules. Then: the admin
+// First-run setup (jsdom): step 1 creates the admin, step 2 "What do you want to use?" (presets "Simple list" (2.7.0: the
+// preselected start of a new instance, comments off too) / "Just me" / "Projects & team", fine-tuning, skip, language) and
+// "Start with" (2.7.0, K21: Empty / Sample project / Agency / Software / Personal as cards) sets the instance switches +
+// default modules. Then: the admin
 // creates the second user while collaboration is off -> "Turn on collaboration now?".
 // Restarts the test container (start.sh) for every fresh install.
 const {execFileSync} = require('child_process');
@@ -48,13 +50,18 @@ async function step1(w, user = 'admin') {
 const feats = st => st.settings.features.split(',');
 
 (async () => {
-  // ---- 1: preset "Just me" (preselected) -> collaboration + time tracking off, all other modules on
+  // ---- 1: preset "Just me" -> collaboration + time tracking off, all other modules on (2.7.0: "Simple list" is preselected)
   fresh();
   let jar = {}, w = await open(jar), d = w.document;
   check(await step1(w), 'setup: step 2 appears after the admin was created');
   check(/What do you want to use\?/.test(d.querySelector('.setupcard').textContent), 'step 2 title');
   check([...d.querySelectorAll('[data-su-preset]')].map(b => b.dataset.suPreset).join() === 'simple,solo,team', 'three preset cards: Simple list, Just me, Projects & team');
-  check(d.querySelector('[data-su-preset="solo"]').classList.contains('on') && d.querySelector('[data-su-preset="solo"]').getAttribute('aria-pressed') === 'true' && !d.querySelector('[data-su-preset="team"]').classList.contains('on') && !d.querySelector('[data-su-preset="simple"]').classList.contains('on'), '"Just me" preselected');
+  check(d.querySelector('[data-su-preset="simple"]').classList.contains('on') && d.querySelector('[data-su-preset="simple"]').getAttribute('aria-pressed') === 'true' && !d.querySelector('[data-su-preset="solo"]').classList.contains('on'), '2.7.0: "Simple list" preselected');
+  check(!d.querySelector('[data-use="comments"]').checked && !d.querySelector('[data-use="collab"]').checked, '2.7.0: Simple list: comments + collaboration off');
+  check([...d.querySelectorAll('[data-su-start]')].map(b => b.dataset.suStart).join() === ',sample,agency,software,private' && d.querySelector('[data-su-start=""]').classList.contains('on'), 'K21: "Start with": Empty (preselected), Sample, Agency, Software, Personal');
+  check(!d.querySelector('#su-ptype') && !d.querySelector('[data-su-sample]'), 'K21: no project select, no sample checkbox any more');
+  click(w, d.querySelector('[data-su-preset="solo"]')); await sleep(100);
+  check(d.querySelector('[data-su-preset="solo"]').classList.contains('on'), '"Just me" picked');
   check(!d.querySelector('[data-use="collab"]').checked && !d.querySelector('[data-use="time"]').checked && d.querySelector('[data-use="habits"]').checked && d.querySelector('[data-use="timeline"]').checked, 'Just me: collab + time unticked, views ticked');
   check(d.querySelector('[data-use="deps"]') && !d.querySelector('[data-use="deps"]').checked && !d.querySelector('[data-use="fields"]').checked, 'Just me: dependencies + custom fields listed, unticked');
   check(!d.querySelector('[data-use="paperless"]'), 'Paperless hidden when not configured');
@@ -150,7 +157,8 @@ const feats = st => st.settings.features.split(',');
   jar = {}; w = await open(jar); d = w.document;
   await step1(w);
   click(w, d.querySelector('[data-su-lang="de"]')); await sleep(600);
-  check(/Was möchtest du nutzen\?/.test(d.querySelector('.setupcard').textContent) && /Für mich/.test(d.querySelector('.setupcard').textContent), 'language switch: step 2 in German');
+  check(/Was möchtest du nutzen\?/.test(d.querySelector('.setupcard').textContent) && /Für mich/.test(d.querySelector('.setupcard').textContent) && /Womit starten\?/.test(d.querySelector('.setupcard').textContent), 'language switch: step 2 in German');
+  click(w, d.querySelector('[data-su-preset="solo"]')); await sleep(100);
   for (const k of ['time', 'habits', 'matrix']) { const c = d.querySelector(`[data-use="${k}"]`); c.checked = !c.checked; c.dispatchEvent(new w.Event('change', {bubbles: true})); }
   check(!d.querySelector('.supreset.on'), 'custom choice: no preset highlighted');
   click(w, d.querySelector('[data-su="go"]')); await sleep(800);

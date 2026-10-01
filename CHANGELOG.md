@@ -7,6 +7,63 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-10-01
+
+**In short:** Reminders up to a year ahead and deadlines that count down, reminders that repeat until a task is done
+(with quiet hours), the tracked time of a project in hours and days, a steady layout on unfolded foldables, a simpler
+first start, the list type "Shopping & packing list", a resizable News dropdown and a handful of settings tidied up.
+
+### Added
+- **Reminders well ahead** (#412): the date popover offers *On time*, *15 min*, *1 h*, *1 day*, *1 week*, *2 weeks* and
+  *1 month* as chips and *Other…* for any number of minutes, hours, days or weeks up to a year (the server's limit,
+  366 days); own ones show as chips too. *Settings > Notifications > Default reminder* has 2 weeks and 1 month.
+- **Deadlines** (#412): *Deadline* in the date popover marks the due date as one: the row and the task panel count
+  down (*12 days left*, *Deadline today*, *3 days over*), highlighted from the first reminder on. *On Today from the
+  first reminder* also lists the task on Today (and in its count) from then on. Task field `deadline` (0 / 1 / 2), token
+  API `deadline` + `deadline_in_today` (booleans).
+- **Repeat reminder until done** (#413): per task (date popover) or as a list's default (list dialog, owner): every 5,
+  10, 15, 30 or 60 minutes or daily, from the first reminder on (without reminders: from the due time), until the task
+  is completed. Combines with early reminders, e.g. *2 weeks before the deadline, then daily*. The push carries
+  *Done*, *Stop reminding* and *Snooze* (the service worker shows as many as the platform allows, `#nagoff/<id>` in the
+  app). New settings *Quiet from* / *Quiet until* (`quiet_from` / `quiet_to`, default 22:00 to 07:00; empty = none):
+  nothing repeats in between, the next one comes when they end. A new row *Repeated reminders* in the notification
+  matrix (push only); a muted list bell stops them too. One push per interval at most (the due date and the time of
+  the last one are stored with the task, a reminder of the same moment counts), at most 30 per person and hour;
+  completed, deleted and archived tasks and tasks without a date stop at once. Fields `tasks.nag` ('' = the list's
+  default, `off`, `5`, `10`, `15`, `30`, `60`, `1d`), `lists.nag`; token API: the task field `nag`, `nag` / `day_hours`
+  on `POST /api/v1/lists` and the new `PATCH /api/v1/lists/{id}` (OpenAPI updated).
+- **Time sum in the list header** (#407, time tracking on): a project list shows its tracked time in hours and working
+  days (*12.5 h · 1.6 days*), a folder view the sum of its project lists. Hours per day / shift: one value for the
+  whole server (*Settings > Administration > Time sums*, `time_day_h`, default 8) that a list can override in its
+  dialog (`day_hours`, the owner sets it, the same for everyone in the list). A number field *Budget h* adds a budget
+  bar with tracked / budget hours. `/api/state` carries `time_lists` and `time_day_h`.
+- **The News dropdown is resizable**: on the desktop a grip at its bottom-left corner (drag, arrow keys, double-click =
+  default size), on phones the sheet's handle drags it up to the full height (a tap toggles); the size is kept per
+  device.
+  Its heading *News* is a link to the News view (with a "›" and a hover state).
+
+### Changed
+- **"Checklist" is now "Shopping & packing list"** (#414) with a cart icon and the hint *What you tick off stays at the
+  bottom and comes back with one tap.* The stored type stays `checklist`.
+- **First start** (K21): *Simple list* is preselected (now with comments off as well), and one question *Start with*
+  replaces the project select and the sample checkbox: *Empty*, *Sample project*, *Agency*, *Software / AI dev* or
+  *Personal* as cards; a project type switches the modules it needs on. The welcome tour no longer claims the app
+  opens on the Inbox.
+- **Unfolded foldables** (K13): a near-square touch screen gets a layout width of at least 900 px in both orientations,
+  so it keeps the tablet layout instead of flipping to the phone layout when turned. Task rows follow the width of the
+  list column (container query): a narrow column (a foldable with the sidebar, a desktop with the task panel) shows
+  date, list and assignee in a second line like on a phone, so titles keep their room. Touch tablets keep undo / redo
+  in the header while there is room.
+- **Timeline labels** (K14): names are cut with "…" (full name in the tooltip), the label of a short bar near the end
+  of the range sits left of it and never runs past the range, weekday letters are easier to read.
+- **Settings tidied up** (#405): the *Agents* page shows while the module is on (admins also while agents exist); the
+  upload token lives only under *Integrations > Share from your phone* (Account links there); *Delete all completed*
+  is only in the *Completed* view; the agents' first sub-tab is called *Status*; the tab *Time* is called *Time
+  tracking* like everywhere else; German: *Erledigte Aufgaben*, *Eigentümer…*; `settingsModal('layout' / 'collab' /
+  'focus' / 'time')` land on their module row and open its options; the repository section of the list dialog shows
+  for projects or a list that already has a repository.
+- Service worker cache v74.
+
 ## [2.6.1] - 2026-10-01
 
 **In short:** Date and reminder changes save as you pick them (with Undo, or with OK if you prefer), every agent has a
@@ -206,7 +263,8 @@ of people.
   multi-arch image (`ghcr.io/gegenschuss/kalmido`, linux/amd64 and linux/arm64), an installable web app that works
   offline, English and German.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.6.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.7.0...HEAD
+[2.7.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.7.0
 [2.6.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.6.1
 [2.6.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.6.0
 [2.5.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.5.2

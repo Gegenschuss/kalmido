@@ -746,6 +746,15 @@ MIGRATIONS = [
     ("lists", "tidy_agent", "ALTER TABLE lists ADD COLUMN tidy_agent INTEGER"),
     # 2.6.1 (#404): the bell "custom": my own choice of events for this list, json {event: {news: 0|1, push: 0|1}}
     ("list_bell", "custom", "ALTER TABLE list_bell ADD COLUMN custom TEXT"),
+    # 2.7.0 (#412): the due date is a deadline (0 no, 1 yes, 2 yes + on Today from the first reminder on)
+    ("tasks", "deadline", "ALTER TABLE tasks ADD COLUMN deadline INTEGER NOT NULL DEFAULT 0"),
+    # 2.7.0 (#413): nags = the reminder repeats until the task is done. tasks.nag: '' = the list's default, 'off', or an
+    # interval (NAG_VALUES); tasks.nag_at = "<due> <time>|<last nag>" (dedupe, a new date starts over); lists.nag = the default
+    ("tasks", "nag", "ALTER TABLE tasks ADD COLUMN nag TEXT NOT NULL DEFAULT ''"),
+    ("tasks", "nag_at", "ALTER TABLE tasks ADD COLUMN nag_at TEXT NOT NULL DEFAULT ''"),
+    ("lists", "nag", "ALTER TABLE lists ADD COLUMN nag TEXT NOT NULL DEFAULT ''"),
+    # 2.7.0 (#407): hours of a working day / shift for this list (NULL = the instance's value, admin setting time_day_h)
+    ("lists", "day_hours", "ALTER TABLE lists ADD COLUMN day_hours REAL"),
 ]
 INDEXES = """
 CREATE INDEX IF NOT EXISTS lists_owner ON lists(owner_id);
@@ -815,6 +824,8 @@ USER_DEFAULTS = {
     "hide_progress": "",        # D2: comma list of list ids whose progress bar this user hid (the "x" on the bar)
     # 2.6.1 (#401): 1 = date, time, repeat and reminder changes wait for OK (default: they apply at once, with Undo)
     "date_confirm": "0",
+    # 2.7.0 (#413): quiet hours of nags (HH:MM each, '' = none): no nag push in between, it comes when they end
+    "quiet_from": "22:00", "quiet_to": "07:00",
     # 2.6.1 (#402): comma list of agent ids whose status dot this user hid in the header ('' = every agent shown)
     "agents_hidden": "",
     # D3: the roadmap ("All" as a timeline), json: {v: list|timeline, z: week|month|quarter, po: projects only (null = auto),
@@ -3221,6 +3232,7 @@ def my_max_sort(c, uid):
 def task_dict(r, tags):
     d = dict(r)
     d.pop("reminded", None)
+    d.pop("nag_at", None)
     d["tags"] = tags.get(r["id"], [])
     return d
 
@@ -3671,7 +3683,7 @@ def about_info(c, u):
     if u and u["is_admin"]:
         info = update_state(c)
         latest, cur = semver(info.get("latest")), semver(APP_VERSION)
-        d.update(collab_all=collab_all(), time_all=time_all(), update_check=gsetting(c, "update_check") != "0", update_env=UPDATE_CHECK_ENV,
+        d.update(time_day_h=time_day_h(c), collab_all=collab_all(), time_all=time_all(), update_check=gsetting(c, "update_check") != "0", update_env=UPDATE_CHECK_ENV,
                  checked_at=info.get("checked_at") or "", latest=info.get("latest") or "", error=info.get("error") or "",
                  url=info.get("url") or "", available=bool(update_enabled(c) and latest and cur and latest > cur),
                  cal_on=CAL_ON, cal_allow_hosts=gsetting(c, "cal_allow_hosts"),
@@ -3770,6 +3782,11 @@ def admin_settings():
             hosts = None
         else:
             gset(c, "cal_allow_hosts", hosts)
+    if "time_day_h" in b:  # 2.7.0 (#407): hours per day / shift for every list without its own value
+        dh = clean_day_hours(b["time_day_h"])
+        if dh is False:
+            return err(tr("Hours per day: a number from 1 to 24"))
+        gset(c, "time_day_h", "" if dh is None else str(dh))
     e = _apply_instance(c, b)
     if e:
         return e
@@ -3988,6 +4005,8 @@ def state():
                                               (uid,))],
         timer=time_running(c, uid) if time_all() else None,
         time_totals=time_totals(c, uid) if time_all() else {},
+        time_lists=time_list_totals(c, uid) if time_all() else {},  # 2.7.0 (#407)
+        time_day_h=time_day_h(c),
         collab_all=collab_all(),
         time_all=time_all(),
         about=about_info(c, u),
@@ -4045,7 +4064,7 @@ def task_get(tid):
 
 # ---------------------------------------------------------------- lists / sections
 
-LIST_FIELDS = ("name", "color", "folder", "sort", "view", "archived", "checklist", "dep_shift", "kind", "tickets")
+LIST_FIELDS = ("name", "color", "folder", "sort", "view", "archived", "checklist", "dep_shift", "kind", "tickets", "nag")
 LIST_KINDS = ("list", "checklist", "project")
 MEMBER_LIST_FIELDS = ("folder", "sort", "view")  # a member's own sidebar placement / view
 LIST_VIEWS = ("list", "kanban", "timeline")
@@ -4142,6 +4161,11 @@ def clean_list_value(k, v, member=False):
         if v not in LIST_KINDS:
             raise BadInput(tr("Invalid value: {0}", "kind"))
         return v
+    if k == "nag":  # 2.7.0 (#413): the list's default for nags ('' / 'off' = none)
+        v = "" if v in (None, "off") else v
+        if v not in NAG_VALUES:
+            raise BadInput(tr("Invalid value: {0}", tr("Repeat reminder")))
+        return v
     return v
 
 
@@ -4218,8 +4242,13 @@ def list_update(lid):
             c.execute("UPDATE lists SET rate=? WHERE id=?", (rate, lid))
         if "ticket_tpl" in b:  # 2.4.0 (#340): {bug?, feature?} note templates of new tickets ('' / missing = built-in)
             c.execute("UPDATE lists SET ticket_tpl=? WHERE id=?", (clean_ticket_tpl(b["ticket_tpl"]), lid))
+        if "day_hours" in b:  # 2.7.0 (#407): hours per day / shift of this list (None / '' = the instance's value)
+            dh = clean_day_hours(b["day_hours"])
+            if dh is False:
+                return err(tr("Hours per day: a number from 1 to 24"))
+            c.execute("UPDATE lists SET day_hours=? WHERE id=?", (dh, lid))
     else:
-        if "rate" in b or "ticket_tpl" in b or any(k in b for k in LIST_FIELDS if k not in MEMBER_LIST_FIELDS):
+        if "rate" in b or "ticket_tpl" in b or "day_hours" in b or any(k in b for k in LIST_FIELDS if k not in MEMBER_LIST_FIELDS):
             return err(tr("Only the owner can change this list"), 403)
         for k in MEMBER_LIST_FIELDS:
             if k in vals:
@@ -4873,7 +4902,7 @@ def section_delete(sid):
 
 TASK_FIELDS = ("list_id", "section_id", "parent_id", "title", "content", "priority",
                "due", "due_time", "reminders", "repeat", "repeat_from", "sort",
-               "pinned", "start", "duration", "assignee_id", "url", "ttype")
+               "pinned", "start", "duration", "assignee_id", "url", "ttype", "deadline", "nag")
 # 2.4.0 (#340): ticket types of a task (API v1 / MCP / events: "type"); '' = none
 TICKET_TYPES = ("bug", "feature", "task")
 
@@ -4957,6 +4986,11 @@ DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
 HM_RE = re.compile(r"(?:[01]\d|2[0-3]):[0-5]\d")
 DATE_MIN_Y, DATE_MAX_Y = 1900, 2999
 REM_MIN, REM_MAX, REM_COUNT = -1440, 366 * 1440, 10   # reminder offsets (minutes before due)
+# 2.7.0 (#413): nag intervals ('' on a task = its list's default, '' on a list = none, 'off' = none on this task)
+NAG_VALUES = ("", "off", "5", "10", "15", "30", "60", "1d")
+NAG_MINUTES = {"5": 5, "10": 10, "15": 15, "30": 30, "60": 60, "1d": 1440}
+NAG_HOUR_CAP = 30   # at most this many nag pushes per person and hour, all tasks together (the rest waits a round)
+DAY_HOURS_DEFAULT = 8.0  # 2.7.0 (#407): hours of a working day / shift (admin: time_day_h, a list: lists.day_hours)
 DURATION_MAX = 7 * 1440
 TITLE_MAX, CONTENT_MAX = 2000, 200000
 PRIORITIES = (0, 1, 3, 5)
@@ -5156,6 +5190,12 @@ def clean_task(b):
                 v = "" if v is None else clean_repeat(v)
             if k == "repeat_from":
                 v = "done" if v == "done" else "due"
+            if k == "deadline":  # 2.7.0 (#412): 0 no, 1 deadline, 2 deadline + on Today from the first reminder on
+                v = 1 if v is True else 0 if v in (False, None) else as_int(v, tr("Deadline"), 0, 2)
+            if k == "nag":  # 2.7.0 (#413)
+                v = "" if v is None else v
+                if v not in NAG_VALUES:
+                    raise BadInput(tr("Invalid value: {0}", tr("Repeat reminder")))
             if k == "ttype":
                 v = "" if v in (None, "") else v
                 if v and v not in TICKET_TYPES:
@@ -5340,7 +5380,7 @@ def check_assignee(c, lid, aid):
 WEB_TASK_NEW = frozenset(TASK_FIELDS) | {"tags", "ltags", "fields"}
 WEB_TASK_EDIT = WEB_TASK_NEW | {"add_tags", "_prev", "_act"}
 WEB_LIST_NEW = frozenset({"name", "color", "folder", "view", "kind", "checklist", "dep_shift", "tickets", "ptype"})
-WEB_LIST_EDIT = frozenset(LIST_FIELDS) | {"rate", "agent_tidy", "tidy_agent_id", "_prev", "ticket_tpl"}
+WEB_LIST_EDIT = frozenset(LIST_FIELDS) | {"rate", "agent_tidy", "tidy_agent_id", "_prev", "ticket_tpl", "day_hours"}
 WEB_COMMENT = frozenset({"body", "suggestion"})
 
 
@@ -7633,6 +7673,7 @@ def news_wanted(s, kind):
 #   unblock   a task I wait on was completed    approval  an agent waits for my approval
 #   followup  the follow-up day of a task "waiting on external" (#335)    reminder  due reminders (push only)
 #   usage     2.1.1 (#326, admins only): an agent reached 80 % / 100 % of its soft limit or its hard limit
+#   nag       2.7.0 (#413): a reminder repeating until the task is done (push only); unlike reminders it follows a list's bell
 # A comment counts once, as the first matching event of: mention, comment, reply, follow.
 # News of the events that existed before 2.1.0 stays in the setting news_kinds (their "News" column; reply and follow
 # default to its "comment"), everything else in the setting "notify" (json {event: {news?: 0|1, push?: 0|1}}). Defaults
@@ -7643,15 +7684,16 @@ def news_wanted(s, kind):
 # follow the matrix). Reminders and follow-ups are my own and never muted by a bell.
 NOTIF_ROWS = ("comment", "reply", "follow", "mention", "assign", "newtask", "complete", "status", "share", "unblock",
               "approval", "followup", "reminder", "usage",  # 2.1.1 (#326): usage = an agent's usage limit (admins only)
-              "proposal")  # 2.3.0: an agent's proposal I asked for is ready
+              "proposal",  # 2.3.0: an agent's proposal I asked for is ready
+              "nag")  # 2.7.0 (#413): a reminder that repeats until the task is done (push only; a muted list bell stops it)
 NOTIF_NEWS_GROUP = {"comment": "comment", "reply": "comment", "follow": "comment", "mention": "mention", "assign": "assign",
                     "complete": "complete", "status": "status", "share": "share", "unblock": "unblock"}
 NOTIF_NEWS_PRIMARY = ("comment", "mention", "assign", "complete", "status", "share", "unblock")  # News = news_kinds
 NOTIF_NEWS_NEW = {"newtask": 0, "approval": 0, "followup": 1, "usage": 1, "proposal": 1}
 NOTIF_PUSH_DEFAULT = {"comment": 1, "reply": 1, "follow": 1, "mention": 1, "assign": 1, "newtask": 0, "complete": 1,
                       "status": 0, "share": 0, "unblock": 1, "approval": 1, "followup": 1, "reminder": 1, "usage": 1,
-                      "proposal": 1}
-NOTIF_NO_NEWS = ("reminder",)
+                      "proposal": 1, "nag": 1}
+NOTIF_NO_NEWS = ("reminder", "nag")
 NOTIF_UNMUTED = ("mention", "assign")        # still come through a muted list
 NOTIF_NO_BELL = ("reminder", "followup", "usage", "proposal")  # never changed by a list bell
 BELL_MODES = ("all", "default", "mute", "custom")
@@ -8433,6 +8475,56 @@ def time_totals(c, uid):
     return out
 
 
+def clean_day_hours(v):
+    """2.7.0 (#407): hours per day / shift: None for '' / None (= the instance's value), False if invalid."""
+    if v in (None, ""):
+        return None
+    try:
+        x = float(str(v).replace(",", "."))
+    except (TypeError, ValueError):
+        return False
+    return round(x, 2) if math.isfinite(x) and 1 <= x <= 24 else False
+
+
+def time_day_h(c):
+    """2.7.0 (#407): the instance's hours per day / shift (Administration > Server; default 8)."""
+    v = clean_day_hours(gsetting(c, "time_day_h"))
+    return v or DAY_HOURS_DEFAULT
+
+
+BUDGET_FIELD_NAMES = ("budget h", "budget (h)", "budget hours", "budget std", "budget (std)", "budget-stunden", "budgetstunden")
+
+
+def time_list_totals(c, uid):
+    """2.7.0 (#407): {list_id: {"s": seconds of everyone I can see, "b": budget hours or None}} of my project lists with
+    time: the finished entries (with or without a task; the client adds my running timer) and the sum of a number field
+    called "Budget h" (the agency project type's field, any language) over the list's tasks."""
+    out = {}
+    for r in c.execute(f"""SELECT list_id, SUM(seconds) AS s FROM time_entries WHERE end IS NOT NULL AND list_id IN {PROJ_SQL}
+                           AND (user_id=? OR list_id IN {vis_sql()}) AND {evis(c, uid, "")} GROUP BY list_id""", (uid, uid, uid)):
+        if r["s"]:
+            out[r["list_id"]] = {"s": r["s"], "b": None}
+    names = set(BUDGET_FIELD_NAMES) | {tr("Budget h", lg=x).lower() for x in LANGS}
+    part = set(plists(c, uid))  # a participant sees only some tasks: no budget sum there
+    for r in c.execute(f"""SELECT f.list_id, f.id, f.name FROM list_fields f WHERE f.type='number' AND f.list_id IN {vis_sql()}
+                           AND f.list_id IN {PROJ_SQL}""", (uid, uid)).fetchall():
+        if (r["name"] or "").strip().lower() not in names or r["list_id"] in part:
+            continue
+        tot = 0.0
+        for (v,) in c.execute("""SELECT v.value FROM task_field_values v JOIN tasks t ON t.id=v.task_id
+                                 WHERE v.field_id=? AND t.deleted_at IS NULL""", (r["id"],)):
+            try:
+                x = float(str(v).replace(",", "."))
+            except (TypeError, ValueError):
+                continue
+            if math.isfinite(x) and x > 0:
+                tot += x
+        if tot > 0:
+            o = out.setdefault(r["list_id"], {"s": 0, "b": None})
+            o["b"] = round((o["b"] or 0) + tot, 2)
+    return out
+
+
 def stop_timer(c, r, at, ts):
     end = max(parse_iso(r["start"]), at)
     sec = int((end - parse_iso(r["start"])).total_seconds())
@@ -8877,6 +8969,10 @@ def clean_setting(k, v):
         return sv
     if k == "default_reminder":
         return clean_reminders(sv)
+    if k in ("quiet_from", "quiet_to"):  # 2.7.0 (#413)
+        if sv and not valid_hm(sv):
+            raise bad
+        return sv
     if k in ("hide_progress", "agents_hidden"):
         ids = [x.strip() for x in sv.split(",") if x.strip()]
         if len(ids) > 500 or not all(x.isdigit() and len(x) < 12 for x in ids):
@@ -13159,7 +13255,9 @@ def webpush_payload(title, msg, prio, click=None, actions=None, tag=None, task=N
     if actions:  # at most 2 buttons (some platforms show no more): comments Reply + Done, reminders Done + Snooze
         acts = [{"action": urllib.parse.urlsplit(u).fragment.split("/")[0] or "open", "title": label[:40],
                  "url": "/#" + urllib.parse.urlsplit(u).fragment} for label, u in actions]
-        p["actions"] = sorted(acts, key=lambda a: {"reply": 0, "done": 1}.get(a["action"], 2))[:2]
+        # 2.7.0 (#413): nags carry a third one (Done, Stop reminding, Snooze); the service worker shows as many as the
+        # platform can (Notification.maxActions, at least 2)
+        p["actions"] = sorted(acts, key=lambda a: {"reply": 0, "done": 1}.get(a["action"], 2))[:3]
     while len(json.dumps(p, ensure_ascii=False).encode()) > WEBPUSH_MAX_PAYLOAD and len(p["body"]) > 1:
         p["body"] = p["body"][:len(p["body"]) * 3 // 4].rstrip("…") + "…"  # (long digest) shorten the text
     return p
@@ -13234,6 +13332,7 @@ def watchdog_tick(c):
     _wd_section(c, "time", time_watchdog, users, S, LG)
     now = local_now()
     _wd_section(c, "reminders", _wd_reminders, users, S, LG, now)
+    _wd_section(c, "nags", _wd_nags, users, S, LG, now)  # 2.7.0 (#413), after the reminders (a reminder counts as a nag)
     _wd_section(c, "follow-ups", _wd_followups, users, S, LG, now)  # 2.1.0 (#335)
     _wd_section(c, "focus", _wd_focus, users, S, LG)
     _wd_section(c, "habits", _wd_habits, users, S, LG, now)
@@ -13244,7 +13343,7 @@ def watchdog_tick(c):
 def _wd_reminders(c, users, S, LG, now):
     # task reminders -- fire once per (due, offset); skip if missed by > 6 h. Goes to the assignee,
     # unassigned tasks to their creator.
-    rows = c.execute("""SELECT t.*, l.name AS list_name, l.is_inbox AS list_inbox, l.owner_id AS list_owner
+    rows = c.execute("""SELECT t.*, l.name AS list_name, l.is_inbox AS list_inbox, l.owner_id AS list_owner, l.nag AS list_nag
                         FROM tasks t JOIN lists l ON l.id=t.list_id
                         WHERE t.status=0 AND t.deleted_at IS NULL AND t.due IS NOT NULL
                           AND t.reminders!='' AND l.archived=0""").fetchall()  # 1.5.1: none for archived lists
@@ -13282,9 +13381,107 @@ def _wd_reminder(c, t, users, S, LG, now):
                actions=[(tr("Snooze", lg=lg), f"{PUBLIC_URL}/#snooze/{t['id']}"),
                         (tr("Done|action", lg=lg), f"{PUBLIC_URL}/#done/{t['id']}")],
                task=t["id"], due=t["due"] if t["repeat"] else None)
+        if nag_minutes(t["nag"], t["list_nag"]):  # 2.7.0 (#413): this reminder counts as a nag (the next one an interval later)
+            c.execute("UPDATE tasks SET nag_at=? WHERE id=?", (f"{nag_key(t)}|{now.isoformat()}", t["id"]))
     if changed:
         c.execute("UPDATE tasks SET reminded=? WHERE id=?", (json.dumps(fired[-20:]), t["id"]))
         c.commit()
+
+
+# ---- 2.7.0 (#413): nags. A task (or, by default, every task of its list) can repeat its reminder until it is done:
+# every 5 / 10 / 15 / 30 / 60 minutes or daily, from its first reminder on (no reminders: from the due time). Pushes only,
+# to the person a reminder goes to; never during that person's quiet hours (quiet_from / quiet_to: the nag comes when they
+# end), never for a muted list bell or with "Reminders again" off in the notification settings. Dedupe: tasks.nag_at keeps
+# the due date + the time of the last nag (a reminder that fires counts as one), so a tick, a restart or a second worker
+# never sends one twice; a new date (snooze, repeat, edit) starts over. Completed, deleted, archived and undated tasks
+# are not looked at, so the nags stop with them. At most NAG_HOUR_CAP nag pushes per person and hour.
+_NAG_SENT = {}
+
+
+def nag_minutes(task_nag, list_nag):
+    """The interval of a task in minutes (0 = no nags): its own choice, else its list's default."""
+    v = task_nag or ""
+    if v == "off":
+        return 0
+    return NAG_MINUTES.get(v or (list_nag or ""), 0)
+
+
+def nag_key(t):
+    return f"{t['due']} {t['due_time'] or ''}"
+
+
+def nag_last(raw, key):
+    """The time of the last nag for this due date (None = none yet / the date changed since)."""
+    k, _, at = (raw or "").partition("|")
+    if k != key or not at:
+        return None
+    try:
+        d = datetime.fromisoformat(at)
+    except ValueError:
+        return None
+    return d if d.tzinfo else d.replace(tzinfo=TZ)
+
+
+def in_quiet(s, now):
+    """True during the person's quiet hours (local HH:MM range, may span midnight)."""
+    a, b = s.get("quiet_from") or "", s.get("quiet_to") or ""
+    if not (valid_hm(a) and valid_hm(b)) or a == b:
+        return False
+    hm = now.strftime("%H:%M")
+    return a <= hm < b if a < b else hm >= a or hm < b
+
+
+def nag_start(t, s):
+    """When the nags begin: the first reminder (the largest offset), else the due time."""
+    allday = s.get("allday_time") if valid_hm(s.get("allday_time")) else "09:00"
+    base = datetime.fromisoformat(f"{t['due']}T{t['due_time'] or allday}").replace(tzinfo=TZ)
+    offs = [int(x) for x in str(t["reminders"] or "").split(",") if re.fullmatch(r"-?\d{1,7}", x.strip())]
+    return base - timedelta(minutes=max(offs)) if offs else base
+
+
+def _wd_nags(c, users, S, LG, now):
+    rows = c.execute("""SELECT t.*, l.name AS list_name, l.is_inbox AS list_inbox, l.owner_id AS list_owner, l.nag AS list_nag
+                        FROM tasks t JOIN lists l ON l.id=t.list_id
+                        WHERE t.status=0 AND t.deleted_at IS NULL AND t.due IS NOT NULL AND l.archived=0
+                          AND ((t.nag NOT IN ('', 'off')) OR (t.nag='' AND l.nag!=''))""").fetchall()
+    for t in rows:
+        try:
+            _wd_nag(c, t, users, S, LG, now)
+        except Exception as e:  # noqa: BLE001
+            _wd_fail(c, "nag of task", t["id"], e)
+
+
+def _wd_nag(c, t, users, S, LG, now):
+    mins = nag_minutes(t["nag"], t["list_nag"])
+    rcpt = reminder_recipient(c, t, users)
+    if not mins or not rcpt:
+        return
+    s, lg = S.get(rcpt, USER_DEFAULTS), LG.get(rcpt, "en")
+    if now < nag_start(t, s):
+        return
+    key, last = nag_key(t), nag_last(t["nag_at"], nag_key(t))
+    if last and now < last + timedelta(minutes=mins) - timedelta(seconds=20):
+        return
+    if in_quiet(s, now) or not notif_ok(c, rcpt, s, "nag", "push", t["list_id"]):
+        return
+    sent = [x for x in _NAG_SENT.get(rcpt, []) if x > time.time() - 3600]
+    c.execute("UPDATE tasks SET nag_at=? WHERE id=?", (f"{key}|{now.isoformat()}", t["id"]))  # before sending: never twice
+    c.commit()
+    if len(sent) >= NAG_HOUR_CAP:
+        _NAG_SENT[rcpt] = sent
+        return
+    _NAG_SENT[rcpt] = sent + [time.time()]
+    when = tr("all day", lg=lg) if not t["due_time"] else tr("at {0}", t["due_time"], lg=lg)
+    day = tr("today", lg=lg) if t["due"] == now.date().isoformat() else \
+        date.fromisoformat(t["due"]).strftime("%d.%m." if lg == "de" else "%d %b")
+    lname = tr("Inbox", lg=lg) if t["list_inbox"] and t["list_name"] == "Eingang" else t["list_name"]
+    head = tr("Deadline", lg=lg) if t["deadline"] else tr("Still open", lg=lg)
+    notify(rcpt, t["title"], tr("{0} · due {1} {2} · {3}", head, day, when, lname, lg=lg),
+           push_prio(s, 4 if t["priority"] == 5 else None), f"{PUBLIC_URL}/#t/{t['id']}", s=s,
+           actions=[(tr("Done|action", lg=lg), f"{PUBLIC_URL}/#done/{t['id']}"),
+                    (tr("Stop reminding", lg=lg), f"{PUBLIC_URL}/#nagoff/{t['id']}"),
+                    (tr("Snooze", lg=lg), f"{PUBLIC_URL}/#snooze/{t['id']}")],
+           task=t["id"], due=t["due"] if t["repeat"] else None)
 
 
 def _wd_focus(c, users, S, LG):
@@ -16125,7 +16322,11 @@ def task_core(r, tags, fields):
             "assignee_id": r["assignee_id"], "created_by": r["created_by"], "completed_by": r["completed_by"],
             "created_at": r["created_at"], "updated_at": r["updated_at"], "completed_at": r["completed_at"],
             "deleted": bool(r["deleted_at"]), "fields": fields, "waiting": waiting_of(r),
-            "type": (r["ttype"] if "ttype" in r.keys() else "") or None}
+            "type": (r["ttype"] if "ttype" in r.keys() else "") or None,
+            # 2.7.0 (#412, #413): the due date is a deadline (+ on Today from the first reminder on), the nag interval
+            "deadline": bool(r["deadline"]) if "deadline" in r.keys() else False,
+            "deadline_in_today": (r["deadline"] == 2) if "deadline" in r.keys() else False,
+            "nag": (r["nag"] if "nag" in r.keys() else "") or ""}
 
 
 def waiting_of(r):
@@ -16152,7 +16353,8 @@ def task_for(c, row, uid):
 
 
 V1_TASK_IN = ("title", "notes", "list_id", "section_id", "parent_id", "priority", "due", "due_time", "start", "duration",
-              "reminders", "repeat", "repeat_from", "url", "tags", "assignee_id", "pinned", "fields", "list_tags", "type")
+              "reminders", "repeat", "repeat_from", "url", "tags", "assignee_id", "pinned", "fields", "list_tags", "type",
+              "deadline", "deadline_in_today", "nag")
 
 
 def v1_task_in(b, allowed=V1_TASK_IN):
@@ -16189,8 +16391,19 @@ def v1_task_in(b, allowed=V1_TASK_IN):
             if v is not None and v not in TICKET_TYPES:
                 raise BadInput(tr("Invalid value: {0}", "type"))
             out["ttype"] = v or ""
+        elif k in ("deadline", "deadline_in_today"):  # 2.7.0 (#412): booleans -> the internal 0 / 1 / 2
+            if not isinstance(v, bool):
+                raise BadInput(tr("Invalid value: {0}", k))
+        elif k == "nag":  # 2.7.0 (#413): '' = the list's default, 'off', or an interval
+            if v not in NAG_VALUES:
+                raise BadInput(tr("Invalid value: {0}", "nag"))
+            out["nag"] = v
         else:
             out[k] = v
+    if "deadline" in b or "deadline_in_today" in b:
+        # deadline false = none; true (or only deadline_in_today) = a deadline, on Today from the first reminder when
+        # deadline_in_today is true
+        out["deadline"] = 0 if b.get("deadline") is False else 2 if b.get("deadline_in_today") is True else 1
     return out
 
 
@@ -16215,7 +16428,8 @@ def v1_list(d):
             "status": d.get("status") or None, "progress": d["progress"], "created_at": d["created_at"],
             "tags": d.get("tags") or [], "agent_tidy": d.get("agent_tidy") or "off", "tidy_agent_id": d.get("tidy_agent_id"),
             "icon": d.get("icon") or "",
-            "repos": d.get("repos") or [], "tickets": bool(d.get("tickets"))}
+            "repos": d.get("repos") or [], "tickets": bool(d.get("tickets")),
+            "nag": d.get("nag") or "", "day_hours": d.get("day_hours")}  # 2.7.0 (#413, #407)
 
 
 # ---- token management (Settings > Account > API tokens; session / proxy login only, a token cannot reach these)
@@ -16355,9 +16569,14 @@ def v1_lists():
 def v1_list_create():
     v1_args(())
     b = v1_json()
-    unknown = sorted(k for k in b if k not in ("name", "color", "folder", "checklist", "kind", "tickets", "project_type"))
+    unknown = sorted(k for k in b if k not in ("name", "color", "folder", "checklist", "kind", "tickets", "project_type", "nag", "day_hours"))
     if unknown:
         raise UnknownFields(unknown)
+    later = {k: b.pop(k) for k in ("nag", "day_hours") if k in b}  # 2.7.0: set right after the list exists
+    if "nag" in later:
+        clean_list_value("nag", later["nag"])
+    if "day_hours" in later and clean_day_hours(later["day_hours"]) is False:
+        raise BadInput(tr("Hours per day: a number from 1 to 24"))
     if "checklist" in b and not isinstance(b["checklist"], bool):
         raise BadInput(tr("Invalid value: {0}", "checklist"))
     if "tickets" in b and not isinstance(b["tickets"], bool):
@@ -16369,8 +16588,28 @@ def v1_list_create():
     if "kind" in b and b["kind"] not in LIST_KINDS:
         raise BadInput(tr("Invalid value: {0}", "kind"))
     j = v1_call(list_create, body=b)
+    if later:
+        v1_call(list_update, j["id"], body=later)
     d = next(x for x in visible_lists(db(), me()) if x["id"] == j["id"])
     return jsonify(v1_list(d)), 201
+
+
+@app.patch("/api/v1/lists/<int:lid>")
+@v1_view
+def v1_list_patch(lid):
+    """2.7.0: change a list: name, color, folder (yours), view, kind, nag (default of the list's tasks), day_hours."""
+    v1_args(())
+    b = v1_json()
+    unknown = sorted(k for k in b if k not in ("name", "color", "folder", "view", "kind", "nag", "day_hours"))
+    if unknown:
+        raise UnknownFields(unknown)
+    c = db()
+    need_list(c, lid, write=False)
+    v1_call(list_update, lid, body=b)
+    d = next((x for x in visible_lists(c, me()) if x["id"] == lid), None)
+    if not d:
+        raise Denied(404)
+    return jsonify(v1_list(d))
 
 
 @app.get("/api/v1/lists/<int:lid>")
@@ -16960,7 +17199,12 @@ def openapi_spec():
         "fields": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Custom field values by field id"},
         "waiting": {"oneOf": [{"type": "null"}, ref("Waiting")], "description": "Waiting on external (2.1.0); null = not waiting"},
         "type": nul("string", enum=[*TICKET_TYPES, None], description="Ticket type (2.4.0); a new bug / feature in a list with ticket "
-                    "types on gets the list's note template when its notes are empty")}
+                    "types on gets the list's note template when its notes are empty"),
+        "deadline": {"type": "boolean", "description": "2.7.0: the due date is a deadline (countdown, highlighted from the first reminder on)"},
+        "deadline_in_today": {"type": "boolean", "description": "2.7.0: a deadline that shows on Today from its first reminder on "
+                              "(setting it true also sets deadline)"},
+        "nag": {"type": "string", "enum": list(NAG_VALUES), "description": "2.7.0: repeat the reminder until done: 5 / 10 / 15 / 30 / 60 "
+                "minutes or 1d (daily), from the first reminder on; off = never; empty = the list's default"}}
     task_in = {k: v for k, v in task_props.items() if k in V1_TASK_IN}
     task_in["priority"] = {"oneOf": [prio, {"type": "integer", "enum": list(PRIORITIES)}]}
     task_in["reminders"] = {"oneOf": [{"type": "array", "items": {"type": "integer"}}, {"type": "string"}]}
@@ -16999,7 +17243,9 @@ def openapi_spec():
             "kind": {"type": "string", "enum": list(LIST_KINDS), "description": "List type; project lists have time tracking, dependencies, custom fields and progress"},
             "view": {"type": "string", "enum": list(LIST_VIEWS)}, "role": {"type": "string", "enum": ["owner", "admin", "edit", "participant", "view"]},
             "owner_id": {"type": "integer"}, "owner_name": {"type": "string"}, "shared": {"type": "boolean"},
-            "status": nul("string", enum=[*LIST_STATUSES, None]), "progress": ref("Progress"), "created_at": {"type": "string", "format": "date-time"}}},
+            "status": nul("string", enum=[*LIST_STATUSES, None]), "progress": ref("Progress"), "created_at": {"type": "string", "format": "date-time"},
+            "nag": {"type": "string", "enum": [x for x in NAG_VALUES if x != "off"], "description": "2.7.0: default nag interval of the list's tasks; empty = none"},
+            "day_hours": nul("number", description="2.7.0: hours of a working day / shift for this list's time sums; null = the server's value")}},
         "ListDetail": {"allOf": [ref("List"), {"type": "object", "properties": {"sections": {"type": "array", "items": ref("Section")}}}]},
         "ListInput": {"type": "object", "additionalProperties": False, "required": ["name"], "properties": {
             "name": {"type": "string"}, "color": {"type": "string", "description": "#rgb / #rrggbb or empty"},
@@ -17007,7 +17253,14 @@ def openapi_spec():
             "checklist": {"type": "boolean", "description": "true = kind checklist"}, "kind": {"type": "string", "enum": list(LIST_KINDS)},
             "tickets": {"type": "boolean", "description": "Ticket types on (2.4.0)"},
             "project_type": {"type": "string", "enum": list(PTYPES), "description": "2.4.0: a project of a built-in type (sections, "
-                             "custom fields, view, ticket types; switches the modules it needs on for you); kind / checklist / tickets are ignored"}}},
+                             "custom fields, view, ticket types; switches the modules it needs on for you); kind / checklist / tickets are ignored"},
+            "nag": {"type": "string", "enum": list(NAG_VALUES), "description": "2.7.0: default nag interval of the list's tasks (owner)"},
+            "day_hours": nul("number", minimum=1, maximum=24, description="2.7.0: hours per day / shift (owner); null = the server's value")}},
+        "ListPatch": {"type": "object", "additionalProperties": False, "properties": {
+            "name": {"type": "string"}, "color": {"type": "string"}, "folder": {"type": "string"},
+            "view": {"type": "string", "enum": list(LIST_VIEWS)}, "kind": {"type": "string", "enum": list(LIST_KINDS)},
+            "nag": {"type": "string", "enum": list(NAG_VALUES), "description": "Default nag interval of the list's tasks (owner); off / empty = none"},
+            "day_hours": nul("number", minimum=1, maximum=24, description="Hours per day / shift (owner); null = the server's value")}},
         "ListPage": page("ListDetail"),  # 2.0.8: the list page carries each list's sections too
         "Roadmap": {"type": "object", "properties": {
             "from": {"type": "string", "format": "date"}, "to": {"type": "string", "format": "date"}, "projects_only": {"type": "boolean"},
@@ -17166,7 +17419,11 @@ def openapi_spec():
                                                "a ticked event comes from every task of the list, an unticked one never).")},
         "/lists": {"get": op("Lists you can see (own and shared)", L, ok(ref("ListPage")) | errs()),
                    "post": op("Create a list", L, ok(ref("List"), "Created", "201") | errs("400"), body=ref("ListInput"), scope="write")},
-        "/lists/{id}": {"get": op("One list with its sections", L, ok(ref("ListDetail")) | errs("404"), [pid("id", "List id")])},
+        "/lists/{id}": {"get": op("One list with its sections", L, ok(ref("ListDetail")) | errs("404"), [pid("id", "List id")]),
+                        "patch": op("Change a list (2.7.0)", L, ok(ref("List")) | errs("400", "403", "404"), [pid("id", "List id")],
+                                    body=ref("ListPatch"), scope="write",
+                                    desc="Owner: name, color, kind, nag (default nag interval of its tasks), day_hours (hours per day / "
+                                         "shift for the time sums). Members change only their own folder and view.")},
         "/lists/{id}/shift": {"post": op("Move a whole list (project) in time", L, ok(ref("ShiftResult")) | errs("400", "403", "404", "409"),
                                          [pid("id", "List id")], body=ref("ShiftInput"), scope="write",
                                          desc=f"Every open task with a date (subtasks too) moves by `days`, start and due, in one transaction; "

@@ -1,5 +1,5 @@
-// 1.8.0 UI tests (jsdom): the sample project. Setup step 2: "Create a sample project" follows the preset (on for
-// "Projects & team", off for "Simple list" / "Just me", a manual tick wins) and is created with Start. The sample in the
+// 1.8.0 UI tests (jsdom): the sample project. Setup step 2: 2.7.0 (K21) "Start with" offers the sample project as one of
+// the cards (Empty preselected, one start at a time) and Start creates it. The sample in the
 // app: Flow order + "Next", "Now doable" skips the waiting task. Settings > Data: remove (own dialog naming the lists and
 // the number of tasks; Cancel keeps it), create again (opens the list), the command palette entry. Welcome tour (own
 // container with KALMIDO_ONBOARDING=1): the first card offers it (preticked with the project modules, unticked without,
@@ -54,17 +54,16 @@ async function openSetup(jar) {  // the app with a cookie jar of its own (the se
   d.querySelector('#au-user').value = 'admin'; d.querySelector('#au-name').value = 'Admin'; d.querySelector('#au-pw').value = 'password123';
   f.dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true}));
   await until(() => d.querySelector('.setupcard'));
-  const box = () => d.querySelector('[data-su-sample]');
-  check(box() && /Create a sample project/.test(box().closest('label').textContent), 'setup: "Create a sample project" offered');
-  check(!box().checked, 'setup: off for the preselected "Just me"');
+  // 2.7.0 (K21): one question "Start with" (cards): Empty (preselected) or the sample project or a project type
+  const card = k => d.querySelector(`[data-su-start="${k}"]`);
+  check(card('sample') && /Sample project/.test(card('sample').textContent), 'setup: "Sample project" offered as a start');
+  check(card('').classList.contains('on') && !card('sample').classList.contains('on'), 'setup: "Empty" preselected');
   click(w, d.querySelector('[data-su-preset="team"]')); await sleep(50);
-  check(box().checked, 'setup: on for "Projects & team"');
-  click(w, d.querySelector('[data-su-preset="simple"]')); await sleep(50);
-  check(!box().checked, 'setup: off for "Simple list"');
-  click(w, d.querySelector('[data-su-preset="team"]')); await sleep(50);
-  change(w, box(), false); change(w, d.querySelector('[data-use="habits"]'), false); await sleep(50);
-  check(!box().checked, 'setup: a manual untick stays while modules change');
-  change(w, box(), true);
+  check(card('').classList.contains('on'), 'setup: the preset does not change the start');
+  click(w, card('agency')); await sleep(50);
+  check(card('agency').classList.contains('on') && card('agency').getAttribute('aria-checked') === 'true', 'setup: a project type can be picked');
+  click(w, card('sample')); await sleep(50);
+  check(card('sample').classList.contains('on') && !card('agency').classList.contains('on'), 'setup: one start at a time');
   click(w, d.querySelector('[data-su="go"]')); await sleep(1200);
   let st = await call('GET', '/api/state', null, jar.c);
   check(st.sample && st.sample.tasks === 27 && st.sample.lists.length === 2, 'setup: Start created the sample: ' + JSON.stringify(st.sample)?.slice(0, 120));

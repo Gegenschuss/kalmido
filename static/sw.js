@@ -2,7 +2,7 @@
 // API calls always go to the network (data must be live). Language files: de.json is precached,
 // any other static/i18n/<code>.json lands in the cache via the network-first handler on first use
 // (the client also keeps the active one in localStorage as a last offline fallback).
-const CACHE = 'tasks-shell-v73';
+const CACHE = 'tasks-shell-v74';
 const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/static/i18n/de.json', '/static/app.js', '/static/icon-192.png', '/static/icon-512.png',
   '/static/icon.svg', '/static/badge-96.png', '/static/fonts/Geist-Variable.woff2', '/static/fonts/GeistMono-Variable.woff2', '/static/sloth-quips.json',
   // Atkinson Hyperlegible (Appearance > Font): regular + bold precached (35 KB), the italics are cached on first use
@@ -49,7 +49,9 @@ function pushOptions(d) {
     data: {url: SAME(d.url || '/'), task: d.task || null, due: d.due || null, actions: {}}, timestamp: d.ts || Date.now()};
   if (d.tag) { o.tag = d.tag; o.renotify = true; }
   if (+d.prio >= 5) o.requireInteraction = true;
-  const acts = Array.isArray(d.actions) ? d.actions.slice(0, 2) : [];
+  // 2.7.0 (#413): nags carry three buttons (Done, Stop reminding, Snooze); as many as the platform shows (at least 2)
+  const max = Math.max(2, Math.min(3, (self.Notification && +self.Notification.maxActions) || 2));
+  const acts = Array.isArray(d.actions) ? d.actions.slice(0, max) : [];
   if (acts.length) {
     o.actions = acts.map(a => ({action: String(a.action), title: String(a.title)}));
     for (const a of acts) o.data.actions[a.action] = SAME(a.url || '/');
@@ -85,8 +87,20 @@ async function openApp(path) {
 // "Done" completes the task in the background with the session cookie (+ the CSRF header, like the app);
 // without a valid session (login proxy expired, logged out) it opens the app at #done/<id> instead, which is
 // what the ntfy button does. "Snooze" and every other button open their link (#snooze/<id> = snooze sheet, 2.0.8:
-// #reply/<id> = the task with the comment box focused). Comment pushes carry Reply + Done, reminders Done + Snooze.
+// #reply/<id> = the task with the comment box focused). Comment pushes carry Reply + Done, reminders Done + Snooze,
+// nags (2.7.0) Done + Stop reminding + Snooze.
 async function pushClick(action, data) {
+  // 2.7.0 (#413): "Stop reminding" switches the task's nags off in the background (else: the app at #nagoff/<id>)
+  if (action === 'nagoff' && data.task) {
+    try {
+      const r = await fetch(`/api/tasks/${data.task}`, {method: 'PATCH', credentials: 'same-origin', redirect: 'manual',
+        headers: {'X-Requested-With': 'kalmido', 'Content-Type': 'application/json'}, body: JSON.stringify({nag: 'off'})});
+      if (r.ok && (r.headers.get('content-type') || '').includes('json')) {
+        (await self.clients.matchAll({type: 'window'})).forEach(w => w.postMessage({type: 'refresh'}));
+        return 'nagoff';
+      }
+    } catch { /* offline -> open the app */ }
+  }
   if (action === 'done' && data.task) {
     try {
       // X-Kalmido-Device: this device closed its notification itself, the others get theirs closed (2.0.5)

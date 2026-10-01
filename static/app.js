@@ -51,6 +51,7 @@ const P = {
   undo: '<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>',
   redo: '<path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 15-6.7L21 13"/>',
   folder: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
+  cart: '<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.6 12.4a2 2 0 0 0 2 1.6h8.6a2 2 0 0 0 2-1.5L22 7H6"/>',
   sort: '<path d="M11 5h10M11 9h7M11 13h4M3 17l3 3 3-3M6 18V4"/>',
   eye: '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
   ban: '<circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/>',
@@ -110,6 +111,25 @@ const cssColor = v => typeof v === 'string' && /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const isMobile = () => matchMedia('(max-width:899px)').matches;
+// ---- 2.7.0 (K13, #405): one layout for an unfolded foldable in both orientations. The phone / desktop switch is at
+// 900 px; a near-square touch screen (an unfolded Fold is ~880-910 px each way) sat right on it and flipped between the
+// tab bar and rail + sidebar when turned. Such a screen gets a layout width of at least 900 px in both orientations (the
+// page is scaled down by a few percent instead), so it keeps the tablet layout. Phones and tablets with a clear portrait
+// or landscape shape keep the plain device width.
+const VIEWPORT = 'width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content';
+function stableViewport() {
+  const m = document.querySelector('meta[name="viewport"]'); if (!m) return;
+  let want = VIEWPORT;
+  try {
+    const a = screen.width, b = screen.height, lo = Math.min(a, b), hi = Math.max(a, b);
+    const square = matchMedia('(pointer:coarse)').matches && lo >= 760 && hi >= 900 && hi / lo < 1.3;
+    const w = matchMedia('(orientation: landscape)').matches ? hi : lo;
+    if (square && w < 900) want = 'width=900, viewport-fit=cover, interactive-widget=resizes-content';
+  } catch { /* no screen info: keep the default */ }
+  if (m.getAttribute('content') !== want) m.setAttribute('content', want);
+}
+stableViewport();
+try { matchMedia('(orientation: landscape)').addEventListener('change', stableViewport); } catch { /* old browsers */ }
 const LS = {
   get(k, d) { try { const v = localStorage.getItem('tasks.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem('tasks.' + k, JSON.stringify(v)); } catch { /* private mode */ } },
@@ -446,7 +466,7 @@ window.addEventListener('online', () => flush());
 
 // ------------------------------------------------------------------ conflicts (edited here and elsewhere)
 S.conflicts = LS.get('conflicts', []);
-const FIELD_NAMES = {ttype: N_('Type'), title: N_('Title'), content: N_('Description'), due: N_('Date'), due_time: N_('Time'), priority: N_('Priority'), list_id: N_('List'), tags: N_('Tags'), reminders: N_('Reminder'), repeat: N_('Repeat'), repeat_from: N_('Repeat from'), start: N_('Start|date'), section_id: N_('Section'), parent_id: N_('Parent task'), pinned: N_('Pinned'), duration: N_('Duration'), url: N_('Link')};
+const FIELD_NAMES = {ttype: N_('Type'), title: N_('Title'), content: N_('Description'), due: N_('Date'), due_time: N_('Time'), priority: N_('Priority'), list_id: N_('List'), tags: N_('Tags'), reminders: N_('Reminder'), repeat: N_('Repeat'), repeat_from: N_('Repeat from'), start: N_('Start|date'), section_id: N_('Section'), parent_id: N_('Parent task'), pinned: N_('Pinned'), duration: N_('Duration'), url: N_('Link'), deadline: N_('Deadline'), nag: N_('Repeat reminder')};
 function addConflicts(tid, list, title) {
   for (const c of list) {
     S.conflicts = S.conflicts.filter(x => !(x.tid === tid && x.field === c.field));
@@ -515,6 +535,7 @@ function applyState(j) {
   S.news = j.news || {unread: 0, sig: ''};
   S.templates = j.templates || [];
   S.timer = j.timer || null; S.timeTotals = j.time_totals || {};
+  S.timeLists = j.time_lists || {}; S.timeDayH = +j.time_day_h || 8;  // 2.7.0 (#407)
   S.fields = j.fields || [];
   S.collabAll = j.collab_all !== false; S.timeAll = j.time_all !== false; S.about = j.about || {};
   S.calendars = j.calendars || {enabled: false, subs: 0};
@@ -632,6 +653,7 @@ function parseHash() {
   if (a === 'reply' && b) return {mod: 'tasks', key: S.route.key || START_KEY, task: +b, reply: true};  // 2.0.8 (#331): push button "Reply"
   if (a === 'snooze' && b) return {mod: 'tasks', key: LS.get('lastKey', START_KEY), snooze: +b};
   if (a === 'done' && b) return {mod: 'tasks', key: LS.get('lastKey', START_KEY), complete: +b};
+  if (a === 'nagoff' && b) return {mod: 'tasks', key: LS.get('lastKey', START_KEY), nagoff: +b};  // 2.7.0 (#413): push "Stop reminding"
   if (a === 'prop' && b) return {mod: 'tasks', key: LS.get('lastKey', START_KEY), prop: +b};  // 2.3.0: push "Proposal ready"
   if (a === 'f' && b) return {mod: 'tasks', key: 'f:' + b};
   if (a === 'l') return {mod: 'tasks', key: 'l:' + b};
@@ -662,11 +684,12 @@ async function route() {
   closeSide();
   if (r.task) { render(); if (taskById(r.task)?.unread || r.reply) S.tlScroll = r.task; openDetail(r.task); history.replaceState(null, '', '#' + keyToHash(S.route.key)); if (r.reply) replyFocus(r.task); return; }
   if (r.prop) { history.replaceState(null, '', '#' + keyToHash(S.route.key)); render(); propOpen(r.prop); return; }
-  if (r.snooze || r.complete) {
+  if (r.snooze || r.complete || r.nagoff) {
     history.replaceState(null, '', '#' + keyToHash(S.route.key));
     render();
-    const t = taskById(r.snooze || r.complete);
+    const t = taskById(r.snooze || r.complete || r.nagoff);
     if (!t) { toast(tr('Task not found')); return; }
+    if (r.nagoff) { if (nagOf(t)) await patchUndoable(t.id, {nag: 'off'}, tr('No more repeated reminders for “{0}”', t.title)); else toast(tr('This task does not repeat its reminder')); return; }
     if (r.complete) { if (t.status === 0) toggleTask(t.id); else toast(tr('Already completed')); }
     else snoozeSheet(t.id);
     return;
@@ -886,8 +909,40 @@ function repeatLabelBase(r) {
   if (p.FREQ === 'YEARLY') return n === 1 ? tr('Yearly') : tr('Every {0} years', n);
   return tr('Repeats');
 }
-const REM_OPTS = [['0', N_('On time')], ['5', N_('5 min before')], ['15', N_('15 min')], ['30', N_('30 min')], ['60', N_('1 h')], ['120', N_('2 h')], ['1440', N_('1 day')], ['2880', N_('2 days')], ['10080', N_('1 week')]];
-const remLabel = m => tr((REM_OPTS.find(o => o[0] === String(m)) || [0, m + ' min'])[1]);
+const REM_OPTS = [['0', N_('On time')], ['5', N_('5 min before')], ['15', N_('15 min')], ['30', N_('30 min')], ['60', N_('1 h')], ['120', N_('2 h')], ['1440', N_('1 day')], ['2880', N_('2 days')], ['10080', N_('1 week')],
+  ['20160', N_('2 weeks')], ['43200', N_('1 month')]];  // 2.7.0 (#412): up to a month in the presets, anything up to a year via "Other…"
+// ---- 2.7.0 (#412): reminders are minutes before the due time, from 0 up to 366 days (the server's limit). The date
+// popover offers the common ones as chips and "Other…" for any number of minutes / hours / days / weeks.
+const REM_CHIPS = ['0', '15', '60', '1440', '10080', '20160', '43200'];
+const REM_MAX = 366 * 1440;
+const REM_UNITS = [['1', N_('minutes')], ['60', N_('hours')], ['1440', N_('days')], ['10080', N_('weeks')]];
+function remDur(m) {  // "3 weeks", "90 minutes"
+  const a = Math.abs(+m);
+  return a % 10080 === 0 ? trn('{0} week', '{0} weeks', a / 10080) : a % 1440 === 0 ? trn('{0} day', '{0} days', a / 1440) : a % 60 === 0 ? trn('{0} hour', '{0} hours', a / 60) : trn('{0} minute', '{0} minutes', a);
+}
+const fmtRem = m => !+m ? tr('On time') : +m < 0 ? tr('{0} after', remDur(m)) : tr('{0} before', remDur(m));
+const fmtNum = (n, d = 1) => (+n).toLocaleString(LOCALE(), {maximumFractionDigits: d});
+const remChip = v => { const o = REM_OPTS.find(x => x[0] === String(v)); return o ? tr(o[1]) : +v < 0 ? fmtRem(v) : remDur(v); };
+const remLabel = m => { const o = REM_OPTS.find(x => x[0] === String(m)); return o ? tr(o[1]) : fmtRem(m); };
+// ---- 2.7.0 (#412): a due date can be a deadline: the rows and the task panel count down ("12 days left") and highlight
+// it from its first reminder on (no reminder: from the due day); deadline 2 = also on Today from the first reminder on
+function remStart(t) {  // the first reminder of a task (Date), null without a due date
+  if (!t?.due) return null;
+  const at = new Date(`${t.due}T${t.due_time || S.settings?.allday_time || '09:00'}`);
+  const offs = String(t.reminders || '').split(',').filter(x => /^-?\d+$/.test(x.trim())).map(Number);
+  return offs.length ? new Date(at - Math.max(...offs) * 60000) : at;
+}
+const dlActive = t => !!t?.deadline && !!t.due && t.status === 0 && (t.due <= today() || Date.now() >= +remStart(t));
+const dlToday = t => t?.deadline === 2 && dlActive(t);
+function dlLeft(t) {  // "12 days left" / "due today" / "3 days over"
+  const n = diffDays(today(), t.due);
+  return n > 0 ? trn('{0} day left', '{0} days left', n) : n === 0 ? tr('Deadline today') : trn('{0} day over', '{0} days over', -n);
+}
+const dlChip = (t, cls = '') => t.deadline && t.due && t.status === 0 ? `<span class="dlc ${dlActive(t) ? 'hot' : ''} ${cls}" title="${esc(tr('Deadline') + ': ' + dayLabel(t.due))}">${ic('flag', 's')}${esc(dlLeft(t))}</span>` : '';
+// ---- 2.7.0 (#413): nags = the reminder repeats until the task is done; '' on a task = its list's default
+const NAG_OPTS = [['off', N_('Off|nag')], ['5', N_('every 5 min')], ['10', N_('every 10 min')], ['15', N_('every 15 min')], ['30', N_('every 30 min')], ['60', N_('every hour')], ['1d', N_('daily')]];
+const nagLabel = v => tr((NAG_OPTS.find(x => x[0] === v) || NAG_OPTS[0])[1]);
+const nagOf = t => { const v = t?.nag || ''; return v === 'off' ? '' : v || listById(t?.list_id)?.nag || ''; };
 
 // ------------------------------------------------------------------ view selection
 function viewTasks() {
@@ -903,7 +958,7 @@ function viewTasks() {
     return {open: m.filter(t => !t.parent_id || !ids.has(t.parent_id)), group, ...extra};
   };
   // 1.5.1: every view has its own "Show completed" (list "…" menu), so every view offers its completed tasks
-  if (k === 'today') return {...pick(t => t.due && t.due <= t0 && !(t.blocked && hideBlockedToday()), 'date'), done: doneRecent.filter(t => t.due && t.due <= t0 && doneSince(t))};
+  if (k === 'today') return {...pick(t => ((t.due && t.due <= t0) || dlToday(t)) && !(t.blocked && hideBlockedToday()), 'date'), done: doneRecent.filter(t => t.due && t.due <= t0 && doneSince(t))};  // 2.7.0 (#412): deadlines from their first reminder
   if (k === 'tomorrow') return {...pick(t => t.due === addDays(t0, 1), 'none'), done: doneRecent.filter(t => t.due === addDays(t0, 1))};
   if (k === 'week') return {...pick(t => t.due && t.due <= addDays(t0, 6), 'date'), done: doneRecent.filter(t => t.due && t.due <= addDays(t0, 6) && doneSince(t))};
   if (k === 'doable') return {...pick(t => doable(t, t0), 'none'), done: doneRecent.filter(t => doneSince(t) && mineTask(t) && !(t.due && t.due > t0))};
@@ -1147,7 +1202,7 @@ function tabItem(id) {
   if (id === 'news') return collab() ? {id, go: 'news', icon: ic('bell', 'l'), label: tr('News'), mod: 'news'} : null;
   if (id === 'agents') return feat('agents') && agentsOn() ? {id, go: 'agents', icon: ic('bot', 'l'), label: tr('Agents'), mod: 'agents'} : null;
   if (id === 'stats') return feat('stats') ? {id, go: 'stats', icon: ic('chart', 'l'), label: tr('Statistics'), mod: 'stats'} : null;
-  if (id === 'time') return timeOn() ? {id, go: 'time', icon: ic('clock', 'l'), label: tr('Time|tracked'), mod: 'time'} : null;
+  if (id === 'time') return timeOn() ? {id, go: 'time', icon: ic('clock', 'l'), label: tr('Time tracking'), mod: 'time'} : null;  // 2.7.0 (#405 S5): one name
   if (id === 'overview') return overviewOn() ? {id, go: 'overview', icon: ic('pulse', 'l'), label: tr('Overview'), mod: 'overview'} : null;
   if (id === 'search') return {id, go: 'search', icon: ic('search', 'l'), label: tr('Search'), key: 'search'};
   if (id === 'settings') return {id, act: 'settings', icon: ic('gear', 'l'), label: tr('Settings'), upd: updDot()};
@@ -1221,7 +1276,7 @@ function counts() {
     c.lists[t.list_id] = (c.lists[t.list_id] || 0) + 1;
     for (const g of new Set([...t.tags, ...(t.ltags || [])])) c.tags[g] = (c.tags[g] || 0) + 1;
     if (!t.due) continue;
-    if (t.due <= t0 && !(t.blocked && hideBlockedToday())) c.today++;
+    if ((t.due <= t0 || dlToday(t)) && !(t.blocked && hideBlockedToday())) c.today++;
     if (t.due < t0) c.over++;
     if (t.due === addDays(t0, 1)) c.tomorrow++;
     if (t.due <= addDays(t0, 6)) c.week++;
@@ -1321,7 +1376,7 @@ function renderTop() {
   if (m === 'tasks' && k === 'done' && (S.extra || []).length) acts += `<button class="btn sm" data-act="done-clean" title="${esc(tr('Move completed tasks to the trash'))}">${ic('trash', 's')}<span class="bl">${tr('Delete completed…')}</span></button>`;
   if (m === 'tasks' && S.multiMode) acts += `<button class="iconbtn on" data-act="multi" title="${tr('End selection')}" aria-label="${tr('End selection')}">${ic('select')}</button>`;
   // everything rarer sits in "…" (phones: undo / redo there too); the title keeps its room
-  acts += `<button class="iconbtn tmore" data-act="top-more" aria-haspopup="menu" title="${tr('More actions')}" aria-label="${tr('More actions')}">${ic('dots')}${isTouch() && HIST.undo.length && histPending(HIST.undo[HIST.undo.length - 1]) ? '<span class="pdot"></span>' : ''}</button>`;
+  acts += `<button class="iconbtn tmore" data-act="top-more" aria-haspopup="menu" title="${tr('More actions')}" aria-label="${tr('More actions')}">${ic('dots')}${isMobile() && HIST.undo.length && histPending(HIST.undo[HIST.undo.length - 1]) ? '<span class="pdot"></span>' : ''}</button>`;
   const pm = '';  // focus / stopwatch are part of the running indicator (timerPill) now
   const oflab = OUT.online ? tr('sync|pending changes') : tr('offline'), ofn = OUT.q.length ? trn('{0} change waiting', '{0} changes waiting', OUT.q.length) : '';
   const off = !OUT.online || OUT.q.length ? `<span class="offline" role="status" title="${esc([oflab, ofn, tr('Changes are sent as soon as the server is reachable')].filter(Boolean).join(' · '))}" aria-label="${esc([oflab, ofn].filter(Boolean).join(' · '))}">${ic(OUT.online ? 'sync' : 'cloudoff', 's')}<span class="ofl">${oflab}</span>${OUT.q.length ? `<span class="ofn">${OUT.q.length}</span>` : ''}</span>` : '';
@@ -1331,7 +1386,7 @@ function renderTop() {
   const pal = `<button class="kbtn tf4" data-act="palette" data-ico="search" title="${esc(tr('Search and commands'))} (${kbText('Mod+K')})">${ic('search', 's')}<span>${tr('Search')}</span>${kb('Mod+K')}</button>`;
   const kl = m === 'tasks' && k.startsWith('l:') ? listById(+k.slice(2)) : null;
   const badge = kl?.kind === 'project' ? `<span class="kbadge" title="${esc(projectParts().join(', '))}">${tr('Project')}</span>` : '';
-  $('#top').innerHTML = `<button class="iconbtn menu" data-act="side" aria-label="${tr('Menu')}">${ic('menu')}</button><h1 title="${esc(title)}">${kl?.icon ? licon(kl, 'licon h') : ''}<span class="ht">${esc(title)}</span>${badge}${nOpen ? `<span class="hn" aria-label="${esc(trn('{0} open task', '{0} open tasks', nOpen))}">${nOpen}</span>` : ''}</h1>${cf}${off}${agentChip()}${timerPill()}${stChip()}${pm}${acts}${isTouch() ? '' : histBtns()}${pal}${bellBtn()}`;
+  $('#top').innerHTML = `<button class="iconbtn menu" data-act="side" aria-label="${tr('Menu')}">${ic('menu')}</button><h1 title="${esc(title)}">${kl?.icon ? licon(kl, 'licon h') : ''}<span class="ht">${esc(title)}</span>${badge}${nOpen ? `<span class="hn" aria-label="${esc(trn('{0} open task', '{0} open tasks', nOpen))}">${nOpen}</span>` : ''}</h1>${cf}${off}${agentChip()}${timerPill()}${stChip()}${pm}${acts}${isMobile() ? '' : histBtns()}${pal}${bellBtn()}`;  // 2.7.0 (#405): touch tablets / an unfolded Fold have the room for ← →
   fitTop();
 }
 // ---- 2.6.0 (K01 + K02, UX audit 2): the header has a fixed priority on every width. The title comes first: it keeps at
@@ -1408,7 +1463,7 @@ function topFolded() {
 // view actions (select, sort), then the list's own menu or the filter
 function topMoreItems() {
   const m = S.route.mod, k = S.route.key, fold = topFolded(), out = [], sec = [];
-  if (isTouch()) for (const dir of ['undo', 'redo']) { const b = histBtn(dir); out.push({label: b.lab, icon: dir, dis: b.off, cls: 'hmi' + (b.p ? ' pend' : ''), title: b.p ? tr('waiting for the connection') : '', fn: () => histStep(dir)}); }
+  if (isMobile()) for (const dir of ['undo', 'redo']) { const b = histBtn(dir); out.push({label: b.lab, icon: dir, dis: b.off, cls: 'hmi' + (b.p ? ' pend' : ''), title: b.p ? tr('waiting for the connection') : '', fn: () => histStep(dir)}); }
   if (m === 'tasks' && !NOLIST_KEYS.includes(k) && !isKanban() && !isTimeline() && !isRoadmap())
     sec.push({label: S.multiMode ? tr('End selection') : tr('Select multiple'), icon: 'select', on: S.multiMode, fn: () => { S.multiMode = !S.multiMode; if (!S.multiMode) S.multi.clear(); render(); }},
       {label: tr('Sort…'), icon: 'sort', fn: () => sortMenu($('#top [data-act="top-more"]') || $('#top h1'))});
@@ -1541,7 +1596,8 @@ function taskRow(t, opts = {}) {
   if (lst) meta.push(`<span class="lst${mc}">${esc(lst)}</span>`);
   if (t.due && !opts.checklist) meta.push(`<span class="dt ${dueClass(t)}${mc}">${ic('cal', 's')}${due}</span>`);
   if (t.repeat && !opts.checklist) meta.push(`<span>${ic('repeat', 's')}</span>`);
-  if (t.reminders && t.due && !opts.checklist) meta.push(`<span>${ic('bell', 's')}</span>`);
+  if (t.reminders && t.due && !opts.checklist) meta.push(`<span${nagOf(t) ? ` class="nagm" title="${esc(tr('Repeat reminder') + ': ' + nagLabel(nagOf(t)))}"` : ''}>${ic('bell', 's')}${nagOf(t) ? ic('repeat', 's') : ''}</span>`);
+  if (t.deadline && t.due && !opts.checklist && !opts.trash) meta.push(dlChip(t));  // 2.7.0 (#412)
   if (kids.length) meta.push(`<span class="subc">${ic('sub', 's')}${kids.length - openKids}/${kids.length}</span>`);
   if (t.content && !opts.compact) meta.push(`<span>${ic('edit', 's')}</span>`);
   if (t.attachments?.length) meta.push(`<span>${ic('clip', 's')}${t.attachments.length}</span>`);
@@ -1687,7 +1743,7 @@ function viewListBody() {
   const showList = !v.list;
   const rl = v.list && listById(v.list), ro = rl && !canEditList(rl.id), ck = !!(rl && rl.checklist);
   const cols = rl && fieldCols(rl.id) && !ck ? fieldsOf(rl.id).slice(0, 6) : null;
-  let h = (rl ? listHead(rl) : '') + (ro ? `<div class="rohint">${ic(isPart(rl.id) ? 'user' : 'eye', 's')}${esc(isPart(rl.id) ? tr('Participant: you see only the tasks assigned to you, shared by {0}', rl.owner_name) : tr('View only, shared by {0}', rl.owner_name))}</div>` : '');
+  let h = (rl ? listHead(rl) : v.folder ? folderHead(v.folder) : '') + (ro ? `<div class="rohint">${ic(isPart(rl.id) ? 'user' : 'eye', 's')}${esc(isPart(rl.id) ? tr('Participant: you see only the tasks assigned to you, shared by {0}', rl.owner_name) : tr('View only, shared by {0}', rl.owner_name))}</div>` : '');
   if (S.route.key === 'today') h += overdueBanner() + cevTodayBlock();
   if (flow && FLOW.cyc) h += `<div class="flowhint">${ic('deps', 's')}${esc(tr('Some tasks wait on each other in a circle; they are ordered by date.'))}</div>`;
   if (cols) h += `<div class="fcolhead"><span class="spacer"></span>${cols.map(f => `<span class="fcell t-${esc(f.type)}" title="${esc(f.name)}">${esc(f.name)}</span>`).join('')}</div>`;
@@ -2281,7 +2337,11 @@ function tlBarHtml(t, start, end, DW, pick, deps) {
   const when = t.start && t.start < t.due ? `${fmtDayAbs(t.start)} – ${fmtDayAbs(t.due)}` : fmtDayAbs(t.due);
   const tip = [t.title, when, wait ? blockedTitle(t) : '', conf ? tr('Starts before “{0}” is due', conf.title) : '', t.status === 2 ? tr('done') : ''].filter(Boolean).join(' · ');
   const mark = pick ? (tlCanLink(pick.from, t.id) ? ' tl-ok' : ' tl-no') + (pick.from === t.id ? ' tl-from' : '') : '';
-  return `<div class="tl-bar p${t.priority} ${w < 110 ? 'short' : ''}${wait ? ' wait' : ''}${conf ? ' conf' : ''}${ed ? '' : ' ro'}${t.status ? ' done' : ''}${mark}" data-id="${t.id}" style="left:${x + pad}px;width:${Math.max(TL_MINW, w - 2 * pad)}px" title="${esc(tip)}" tabindex="0" role="button" aria-label="${esc(tip)}">${wait ? ic('lock', 's tl-lk') : ''}<span>${esc(t.title)}</span><i class="h l"></i><i class="h r"></i></div>` +
+  // 2.7.0 (K14): the label of a short bar goes right of it, or left of it near the end of the range; it never runs past the
+  // range, and on the left it stops before the name column (max-width in px, the room there)
+  const span = TL_DAYS * DW, room = span - (x + w) - 24, lroom = x - 16, left = w < 110 && room < 120 && lroom > room;
+  const lmax = w < 110 ? Math.max(40, Math.min(220, left ? lroom : room)) : 0;
+  return `<div class="tl-bar p${t.priority} ${w < 110 ? 'short' : ''}${left ? ' lbl-l' : ''}${wait ? ' wait' : ''}${conf ? ' conf' : ''}${ed ? '' : ' ro'}${t.status ? ' done' : ''}${mark}" data-id="${t.id}" style="left:${x + pad}px;width:${Math.max(TL_MINW, w - 2 * pad)}px" title="${esc(tip)}" tabindex="0" role="button" aria-label="${esc(tip)}">${wait ? ic('lock', 's tl-lk') : ''}<span${lmax ? ` style="max-width:${Math.round(lmax)}px"` : ''}>${esc(t.title)}</span><i class="h l"></i><i class="h r"></i></div>` +
     (deps && ed && !pick && dFor(t) ? `<button type="button" class="tl-knob" data-knob="${t.id}" style="left:${x + Math.max(w, TL_MINW + 2 * pad) + 9}px" tabindex="-1" aria-hidden="true" title="${tr('Drag onto the task that waits on this one')}"></button>` : '');
 }
 // 1.5.3 (q): undated tasks in the timeline: per list a folding group "No date (n)" at the end, one row per task with an
@@ -2317,8 +2377,9 @@ function viewTimeline(listId, inCal) {
   const deps = depsOn(), pick = S.tlPick && deps ? S.tlPick : null;
   const bars = new Map();
   const bar = t => { bars.set(t.id, 1); return tlBarHtml(t, start, end, DW, pick, deps); };
-  const rows = groups.map(g => `<div class="tl-row tl-grp"><div class="tl-name">${esc(lname(g.l))}</div><div class="tl-track"></div></div>` +
-    g.ts.map(t => `<div class="tl-row"><div class="tl-name" data-act="open" data-id="${t.id}">${t.parent_id ? '<span class="muted">↳ </span>' : ''}${esc(t.title)}</div><div class="tl-track">${bar(t)}</div></div>`).join('') + (g.nd.length ? tlNdRows(g.l, g.nd) : '')).join('');
+  // 2.7.0 (K14): names cut with "…" (full name in the tooltip)
+  const rows = groups.map(g => `<div class="tl-row tl-grp"><div class="tl-name" title="${esc(lname(g.l))}"><span class="tln">${esc(lname(g.l))}</span></div><div class="tl-track"></div></div>` +
+    g.ts.map(t => `<div class="tl-row"><div class="tl-name" data-act="open" data-id="${t.id}" title="${esc(t.title)}">${t.parent_id ? '<span class="muted">↳ </span>' : ''}<span class="tln">${esc(t.title)}</span></div><div class="tl-track">${bar(t)}</div></div>`).join('') + (g.nd.length ? tlNdRows(g.l, g.nd) : '')).join('');
   S.tlL = {bars};
   const from = pick && S.tasks.get(pick.from);
   const hint = isMobile() ? tr('Long-press and drag a bar: the middle moves it, the ends change start / due date.') : tr('Drag a bar to move it, drag its ends to change start / due date.');
@@ -3574,6 +3635,7 @@ function renderDetail() {
       ${cm === 'full' && isMobile() ? `<div class="seg dtabs" role="tablist" aria-label="${esc(tr('Task'))}"><button role="tab" data-act="d-tab" data-tab="details" class="${dtab === 'details' ? 'on' : ''}" aria-selected="${dtab === 'details'}">${tr('Details')}</button><button role="tab" data-act="d-tab" data-tab="comments" class="${dtab === 'comments' ? 'on' : ''}" aria-selected="${dtab === 'comments'}">${tr('Comments')}<span class="c" id="d-tab-count">${ncm || ''}</span></button></div>` : ''}
       ${parent ? `<button class="dchip" data-act="open-id" data-id="${parent.id}" style="align-self:flex-start;padding-left:0">${ic('back', 's')}${esc(parent.title)}</button>` : ''}
       <div class="dtitle"><textarea id="d-title" rows="1" placeholder="${tr('Title')}" aria-label="${tr('Title')}" ${ro ? 'readonly' : ''}>${esc(t.title)}</textarea></div>
+      ${!ck && t.due && (t.deadline || nagOf(t)) && t.status === 0 ? `<div class="ddl">${dlChip(t, 'big')}${nagOf(t) ? `<button type="button" class="dnag" data-act="date" data-id="${t.id}" title="${esc(tr('Change'))}">${ic('repeat', 's')}${esc(tr('Repeat reminder') + ': ' + nagLabel(nagOf(t)))}</button>` : ''}</div>` : ''}
       ${t.waiting_at && !ck ? waitBar(t, ro) : ''}
       <div class="md ${mdMode ? '' : 'hidden'} ${mdClamp ? 'clamp' : ''}" id="d-md" title="${tr('Click to edit')}">${mdMode ? mdMentions(renderMd(t.content), t) : ''}</div>
       ${mdLong ? `<button class="linkbtn mdmore" data-act="md-more" aria-expanded="${!mdClamp}">${mdClamp ? tr('Show more') : tr('Show less')}</button>` : ''}
@@ -3648,21 +3710,98 @@ function bellPopHtml() {
   const mine = S.nf.items && S.nf.f === S.nf.filter ? S.nf.items : null, n = S.news?.unread || 0;
   const all = (mine || []).map((it, i) => [it, i]).filter(([it]) => !S.nf.unread || !it.read || it.keep);
   const shown = all.filter(([it]) => newsKindOk(it)).slice(0, BELL_N);
-  const head = `<div class="bphead"><b id="bp-h">${tr('News')}</b>${n ? `<span class="muted">${esc(trn('{0} unread', '{0} unread', n))}</span>` : ''}<span class="spacer"></span>${n ? `<button type="button" class="btn sm" data-bp="readall">${ic('check', 's')}<span>${tr('Mark all as read')}</span></button>` : ''}<button type="button" class="iconbtn" data-bp="settings" title="${esc(tr('What shows up here'))}" aria-label="${esc(tr('What shows up here'))}">${ic('gear', 's')}</button></div>`;
+  const head = `<div class="bphead"><button type="button" class="bphl" data-bp="news" title="${esc(tr('Show all'))}"><b id="bp-h">${tr('News')}</b><span class="bpchev" aria-hidden="true">›</span></button>${n ? `<span class="muted">${esc(trn('{0} unread', '{0} unread', n))}</span>` : ''}<span class="spacer"></span>${n ? `<button type="button" class="btn sm" data-bp="readall">${ic('check', 's')}<span>${tr('Mark all as read')}</span></button>` : ''}<button type="button" class="iconbtn" data-bp="settings" title="${esc(tr('What shows up here'))}" aria-label="${esc(tr('What shows up here'))}">${ic('gear', 's')}</button></div>`;
   let body;
   if (!mine) body = `<div class="empty bpempty">${S.nf.err === 'offline' ? tr('News are only available online.') : S.nf.err ? esc(S.nf.err) : tr('Loading…')}</div>`;
   else if (!shown.length) body = `<div class="empty bpempty">${ic('bell')}<span>${all.length ? tr('Nothing of this kind.') : S.nf.unread && mine.length ? tr('No unread news') : tr('No news')}</span></div>`;
   else body = `<div class="nlist bplist">${shown.map(([it, i]) => newsItemHtml(it, i, true)).join('')}</div>`;
-  return `<div class="bpop" role="dialog" aria-labelledby="bp-h">${head}${mine ? newsChipsHtml(all.map(x => x[0]), 'data-bpk') : ''}${body}<div class="bpfoot"><button type="button" class="btn pri" data-bp="all">${tr('Show all')}${mine && all.length > shown.length ? ` <span class="bpn">${all.length}</span>` : ''}</button></div></div>`;
+  const grab = isMobile() ? `<div class="bpgrab" data-bpgrab role="button" tabindex="0" aria-label="${esc(tr('Drag up for more room, tap for full height'))}" title="${esc(tr('Drag up for more room, tap for full height'))}"><i></i></div>`
+    : `<button type="button" class="bpgrip" data-bpgrip aria-label="${esc(tr('Resize (arrow keys; double-click: default size)'))}" title="${esc(tr('Drag to resize · double-click: default size'))}"></button>`;
+  return `<div class="bpop" role="dialog" aria-labelledby="bp-h">${isMobile() ? grab : ''}${head}${mine ? newsChipsHtml(all.map(x => x[0]), 'data-bpk') : ''}${body}<div class="bpfoot"><button type="button" class="btn pri" data-bp="all">${tr('Show all')}${mine && all.length > shown.length ? ` <span class="bpn">${all.length}</span>` : ''}</button></div>${isMobile() ? '' : grab}</div>`;
+}
+// ---- 2.7.0: the bell's dropdown is resizable. Desktop: the grip at its bottom-left corner (it hangs right-aligned under
+// the bell, so it grows to the left and down), arrow keys on the grip, double-click = the default size. Phone: the
+// handle on top of the sheet drags it up to the full height (a tap toggles full / default; dragged far down it closes).
+// The size is kept per device (rem, so it follows the font size).
+const BELL_MIN = {w: 18, h: 14}, BELL_MAX_W = 48;
+const remPx = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+function bellSize(p) {
+  const pop = $('.bpop', p); if (!pop) return;
+  const r = remPx();
+  if (isMobile()) {
+    const h = +LS.get('bellSheetH', 0) || 0, maxH = innerHeight - 8;
+    pop.style.height = h ? Math.min(h * r, maxH) + 'px' : ''; pop.style.maxHeight = h ? 'none' : '';
+    p.classList.toggle('bpfull', !!h && h * r >= maxH - 2);
+    return;
+  }
+  const sz = LS.get('bellSize', null);
+  if (!sz || !(sz.w > 0) || !(sz.h > 0)) { p.style.width = ''; pop.style.height = ''; pop.style.maxHeight = ''; return; }
+  const top = p.getBoundingClientRect().top || 60;
+  p.style.width = Math.min(sz.w * r, innerWidth - 24) + 'px';
+  pop.style.height = Math.max(BELL_MIN.h * r, Math.min(sz.h * r, innerHeight - top - 12)) + 'px'; pop.style.maxHeight = 'none';
+}
+function bellResizeWire(p, anchor) {
+  const pop = () => $('.bpop', p);
+  const save = (w, h) => LS.set('bellSize', {w: Math.round(w / remPx() * 100) / 100, h: Math.round(h / remPx() * 100) / 100});
+  const apply = (w, h) => {  // desktop: keep the right edge, clamp to the window
+    const r = remPx(), right = p.getBoundingClientRect().right, top = p.getBoundingClientRect().top;
+    w = Math.max(BELL_MIN.w * r, Math.min(w, BELL_MAX_W * r, right - 12)); h = Math.max(BELL_MIN.h * r, Math.min(h, innerHeight - top - 12));
+    p.style.width = w + 'px'; p.style.left = (right - w) + 'px'; pop().style.height = h + 'px'; pop().style.maxHeight = 'none';
+    return [w, h];
+  };
+  p.onpointerdown = e => {
+    const grip = e.target.closest?.('[data-bpgrip]'), grab = e.target.closest?.('[data-bpgrab]');
+    if (!grip && !grab) return;
+    e.preventDefault();
+    const x0 = e.clientX, y0 = e.clientY, w0 = p.offsetWidth, h0 = pop().offsetHeight;
+    let moved = false, last = [w0, h0];
+    try { (grip || grab).setPointerCapture(e.pointerId); } catch { /* old browsers */ }
+    const mv = ev => {
+      if (Math.abs(ev.clientX - x0) + Math.abs(ev.clientY - y0) > 4) moved = true;
+      if (grip) last = apply(w0 - (ev.clientX - x0), h0 + (ev.clientY - y0));
+      else { const h = Math.max(BELL_MIN.h * remPx() * .5, Math.min(innerHeight - 8, h0 - (ev.clientY - y0))); pop().style.height = h + 'px'; pop().style.maxHeight = 'none'; last = [0, h]; }
+    };
+    const up = () => {
+      removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
+      if (grip) { if (moved) save(...last); return; }
+      const r = remPx(), full = innerHeight - 8;
+      if (!moved) { const was = +LS.get('bellSheetH', 0); if (was * r >= full - 2) LS.del('bellSheetH'); else LS.set('bellSheetH', Math.round(full / r * 100) / 100); bellSize(p); return; }
+      if (last[1] < BELL_MIN.h * r * .75) { closePop(); return; }  // dragged far down: close
+      LS.set('bellSheetH', Math.round(Math.min(last[1], full) / r * 100) / 100); bellSize(p);
+    };
+    addEventListener('pointermove', mv); addEventListener('pointerup', up); addEventListener('pointercancel', up);
+  };
+  p.ondblclick = e => { if (!e.target.closest?.('[data-bpgrip]')) return; LS.del('bellSize'); bellSize(p); bellPlace(p, anchor); };
+  p.addEventListener('keydown', bellGripKey);
+}
+function bellGripKey(e) {
+  const g = e.target.closest?.('[data-bpgrip], [data-bpgrab]'); if (!g) return;
+  const p = $('#pop'), pop = $('.bpop', p); if (!pop) return;
+  const r = remPx(), step = r * (e.shiftKey ? 4 : 1);
+  if (g.dataset.bpgrab !== undefined) {  // phone handle: Enter / Space = full height or back
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault(); const was = +LS.get('bellSheetH', 0); if (was * r >= innerHeight - 10) LS.del('bellSheetH'); else LS.set('bellSheetH', Math.round((innerHeight - 8) / r * 100) / 100); bellSize(p); return;
+  }
+  const d = {ArrowLeft: [step, 0], ArrowRight: [-step, 0], ArrowDown: [0, step], ArrowUp: [0, -step]}[e.key];
+  if (!d && e.key !== 'Home') return;
+  e.preventDefault(); e.stopPropagation();
+  if (e.key === 'Home') { LS.del('bellSize'); bellSize(p); bellPlace(p, $('#top .bell')); return; }
+  const right = p.getBoundingClientRect().right, top = p.getBoundingClientRect().top;
+  const w = Math.max(BELL_MIN.w * r, Math.min(p.offsetWidth + d[0], BELL_MAX_W * r, right - 12)), h = Math.max(BELL_MIN.h * r, Math.min(pop.offsetHeight + d[1], innerHeight - top - 12));
+  p.style.width = w + 'px'; p.style.left = (right - w) + 'px'; pop.style.height = h + 'px'; pop.style.maxHeight = 'none';
+  LS.set('bellSize', {w: Math.round(w / r * 100) / 100, h: Math.round(h / r * 100) / 100});
 }
 function bellPop(anchor) {
   if (!collab()) return;
   if (!$('#pop').classList.contains('hidden') && $('#pop .bpop')) { closePop(); return; }  // a second tap closes it
-  const p = openPop(anchor, bellPopHtml(), () => { $('#top .bell')?.setAttribute('aria-expanded', 'false'); });
+  const p = openPop(anchor, bellPopHtml(), () => {
+    $('#top .bell')?.setAttribute('aria-expanded', 'false');
+    p.onpointerdown = null; p.ondblclick = null; p.removeEventListener('keydown', bellGripKey); p.style.width = ''; p.classList.remove('bpfull', 'bellpop');
+  });
   p.classList.add('bellpop');
   anchor?.setAttribute?.('aria-expanded', 'true');
-  const redraw = () => { if ($('#pop .bpop') && !$('#pop').classList.contains('hidden')) { p.innerHTML = bellPopHtml(); if (!isMobile()) bellPlace(p, anchor); } };
-  bellPlace(p, anchor);
+  const redraw = () => { if ($('#pop .bpop') && !$('#pop').classList.contains('hidden')) { p.innerHTML = bellPopHtml(); bellSize(p); if (!isMobile()) bellPlace(p, anchor); } };
+  bellSize(p); bellPlace(p, anchor); bellResizeWire(p, anchor);
   const fresh = S.nf.sig === (S.news?.sig ?? '') && S.nf.f === S.nf.filter && !!S.nf.items;
   if (!fresh) loadNews().then(redraw);
   setTimeout(() => $('#pop .bpop [data-bp="all"]')?.focus({preventScroll: true}), 30);
@@ -3675,7 +3814,7 @@ function bellPop(anchor) {
     if (q === 'open') { closePop(); newsOpen(i); return; }
     if (q === 'readall') { S.nf.items?.forEach(x => { x.read = true; }); await newsRead({all: true}); redraw(); return; }
     if (q === 'settings') { closePop(); settingsModal('newskinds'); return; }
-    if (q === 'all') { closePop(); go('news'); }
+    if (q === 'all' || q === 'news') { closePop(); go('news'); }  // 2.7.0: the heading opens the News view too
   };
   p.onkeydown = e => { const it = e.target.closest?.('[data-bp="open"]'); if (it && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); it.click(); } };
 }
@@ -4356,7 +4495,7 @@ function shiftUndo(before, t, msg) {
 // /api/tasks/batch, one transaction however many tasks it touches. Offline: a step whose operation still waits in the
 // outbox is taken out of the queue and the local state restored (never sent); otherwise task steps are queued like
 // any other change (the buttons show the pending state). Steps on lists that became view-only refuse.
-const UNDO_FIELDS = ['list_id', 'section_id', 'parent_id', 'due', 'due_time', 'start', 'duration', 'reminders', 'repeat', 'repeat_from', 'priority', 'pinned', 'assignee_id', 'ttype'];  // 2.4.0: ttype (#340)
+const UNDO_FIELDS = ['list_id', 'section_id', 'parent_id', 'due', 'due_time', 'start', 'duration', 'reminders', 'repeat', 'repeat_from', 'priority', 'pinned', 'assignee_id', 'ttype', 'deadline', 'nag'];  // 2.4.0: ttype (#340), 2.7.0: deadline, nag
 const HIST_FIELDS = [...UNDO_FIELDS, 'title', 'content', 'url', 'tags', 'fields'];
 const HIST_MAX = 30, HIST_MENU = 10;
 const HIST = {undo: [], redo: [], busy: false, group: null, gToast: null, toastE: null, sess: 0, ids: {}, secmap: new Map()};
@@ -4697,6 +4836,7 @@ let popOnClose = null;
 function openPop(anchor, html, onClose) {
   const p = $('#pop');
   p.onclick = null;  // a click handler of the previous popover (menu, calendar event) never carries over
+  p.onpointerdown = null; p.ondblclick = null; p.classList.remove('bellpop', 'bpfull'); p.style.width = '';  // 2.7.0: nothing of the bell's dropdown carries over
   p.innerHTML = html; p.classList.remove('hidden');
   $('#scrim').classList.remove('hidden');
   // #318: a menu opened from inside a dialog (e.g. Settings > Agents > "Share a list with an agent…") goes above it
@@ -4801,10 +4941,12 @@ const dateInstant = () => S.settings?.date_confirm !== '1';
 function datePop(anchor, id) {
   const t = taskById(id);
   if (!canEdit(t)) { roToast(); return; }
-  const st = {due: t.due, due_time: t.due_time, reminders: t.reminders, repeat: t.repeat, repeat_from: t.repeat_from, start: t.start, duration: t.duration, month: (t.due || today()).slice(0, 7)};
+  const st = {due: t.due, due_time: t.due_time, reminders: t.reminders, repeat: t.repeat, repeat_from: t.repeat_from, start: t.start, duration: t.duration, month: (t.due || today()).slice(0, 7),
+    deadline: t.deadline || 0, nag: t.nag || ''};
   const instant = dateInstant(), before = snapTask(t);
   const body = () => ({due: st.due, due_time: st.due ? st.due_time : null, reminders: st.due ? st.reminders : '', repeat: st.due ? st.repeat : '', repeat_from: st.repeat_from,
-    start: st.due && st.start && st.start < st.due ? st.start : null, duration: st.due_time ? (st.duration || 30) : null});
+    start: st.due && st.start && st.start < st.due ? st.start : null, duration: st.due_time ? (st.duration || 30) : null,
+    ...(st.due ? {deadline: st.deadline, nag: st.nag} : {deadline: 0})});
   const msgOf = () => st.due ? tr('Date: {0}', dayLabel(st.due)) : tr('Date removed');
   // instant mode: what was sent last, the running request chain, the dependent tasks the server moved along (first prev)
   const I = {sig: JSON.stringify(body()), timer: null, chain: Promise.resolve(), saved: false, shifted: new Map(), done: false, last: null};
@@ -4835,7 +4977,7 @@ function datePop(anchor, id) {
     I.done = true; clearTimeout(I.timer);
     await I.chain;
     if (!I.saved) return;
-    const back = {}; for (const k of ['due', 'due_time', 'reminders', 'repeat', 'repeat_from', 'start', 'duration']) back[k] = before[k] ?? (k === 'reminders' || k === 'repeat' ? '' : null);
+    const back = {}; for (const k of ['due', 'due_time', 'reminders', 'repeat', 'repeat_from', 'start', 'duration', 'deadline', 'nag']) back[k] = before[k] ?? (k === 'reminders' || k === 'repeat' || k === 'nag' ? '' : k === 'deadline' ? 0 : null);
     try { await patchTask(id, back, true); } catch { return; }
     // dependent tasks the server moved along: back to where they were
     const items = {}; for (const x of I.shifted.values()) items[x.id] = {start: x.prev_start, due: x.prev_due};
@@ -4859,7 +5001,10 @@ function datePop(anchor, id) {
       <div class="prow">${ic('clock', 's')}${timeIn('p-time', st.due_time || '', {label: tr('Time'), empty: tr('all day')})}${st.due_time ? `<button class="iconbtn" data-q="notime" title="${tr('All day')}" aria-label="${tr('All day')}">${ic('x', 's')}</button>` : ''}</div>
       ${st.due_time ? `<div class="prow">${ic('timer', 's')}<select id="p-dur">${[15, 30, 45, 60, 90, 120, 180, 240].map(v => `<option value="${v}" ${(st.duration || 30) === v ? 'selected' : ''}>${tr('Duration {0}', v < 60 ? v + ' min' : v / 60 + ' h')}</option>`).join('')}</select></div>` : ''}
       <div class="prow">${ic('timeline', 's')}<span class="muted" style="font-size:var(--fs-s)">${tr('Start|date')}</span>${dateIn('p-start', st.start || '', {max: st.due || '', label: tr('Start|date'), empty: tr('none')})}${st.start ? `<button class="iconbtn" data-q="nostart" title="${tr('No date range')}" aria-label="${tr('No date range')}">${ic('x', 's')}</button>` : ''}</div>
-      <div class="prow">${ic('bell', 's')}<div class="remchips">${REM_OPTS.slice(0, 7).map(([v, n]) => `<button class="${rems.has(v) ? 'on' : ''}" data-rem="${v}">${tr(n)}</button>`).join('')}</div></div>
+      <div class="prow">${ic('bell', 's')}<div class="remchips" role="group" aria-label="${esc(tr('Reminder'))}">${[...REM_CHIPS, ...[...rems].filter(v => !REM_CHIPS.includes(v)).sort((a, b) => a - b)].map(v => `<button class="${rems.has(v) ? 'on' : ''}" data-rem="${v}" aria-pressed="${rems.has(v)}" title="${esc(fmtRem(v))}">${esc(remChip(v))}</button>`).join('')}<button class="${st.remc ? 'on' : ''}" data-q="remc" aria-expanded="${!!st.remc}">${tr('Other…|reminder')}</button></div></div>
+      ${st.remc ? `<div class="prow remcust" role="group" aria-label="${esc(tr('Own reminder'))}"><input type="number" id="p-remn" min="1" max="999" inputmode="numeric" value="${esc(String(st.remn || 3))}" aria-label="${esc(tr('How many'))}"><select id="p-remu" aria-label="${esc(tr('Unit'))}">${REM_UNITS.map(([v, n]) => `<option value="${v}" ${String(st.remu || '1440') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select><span class="muted">${tr('before|reminder')}</span><button class="btn sm" data-q="remadd">${tr('Add')}</button></div>` : ''}
+      ${st.due ? `<div class="prow pdl"><label class="chkl"><input type="checkbox" id="p-dl" ${st.deadline ? 'checked' : ''}> ${ic('flag', 's')}${tr('Deadline')}</label>${st.deadline ? `<label class="chkl"><input type="checkbox" id="p-dlt" ${st.deadline === 2 ? 'checked' : ''}> ${tr('On Today from the first reminder')}</label>` : ''}</div>
+      <div class="prow">${ic('repeat', 's')}<label class="muted pnagl" for="p-nag">${tr('Repeat reminder')}</label><select id="p-nag">${[['', tr('as the list ({0})', listById(t.list_id)?.nag ? nagLabel(listById(t.list_id).nag) : tr('Off|nag'))], ...NAG_OPTS.map(([v, n]) => [v, tr(n)])].map(([v, n]) => `<option value="${v}" ${st.nag === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>` : ''}
       <div class="prow">${ic('repeat', 's')}<select id="p-rep">${presets.map(([v, n]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${n}</option>`).join('')}${custom ? `<option value="${esc(cur)}" selected>${esc(repeatLabelBase(cur))}</option>` : ''}<option value="__custom">${tr('Custom…')}</option></select>${custom && !cu ? `<button class="iconbtn" data-q="cust" title="${tr('Edit')}" aria-label="${tr('Edit repeat')}">${ic('edit', 's')}</button>` : ''}</div>
       ${cu ? `<div class="rrcust" role="group" aria-label="${tr('Custom repeat')}">
         <div class="prow"><span class="muted">${tr('Every|repeat')}</span><input type="number" id="p-rn" min="1" max="99" value="${cu.n}" inputmode="numeric" aria-label="${tr('Interval')}"><select id="p-rf" aria-label="${tr('Unit')}">${[['DAILY', trn('day', 'days', cu.n)], ['WEEKLY', trn('week', 'weeks', cu.n)], ['MONTHLY', trn('month', 'months', cu.n)], ['YEARLY', trn('year', 'years', cu.n)]].map(([v, n]) => `<option value="${v}" ${cu.f === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
@@ -4882,6 +5027,14 @@ function datePop(anchor, id) {
     if (b.dataset.d) { st.due = b.dataset.d; redraw(); }
     if (b.dataset.mm) { const [y, m] = st.month.split('-').map(Number); st.month = ds(new Date(y, m - 1 + +b.dataset.mm, 1)).slice(0, 7); redraw(); }
     if (b.dataset.rem !== undefined) { const s = new Set((st.reminders || '').split(',').filter(Boolean)); s.has(b.dataset.rem) ? s.delete(b.dataset.rem) : s.add(b.dataset.rem); st.reminders = [...s].join(','); if (!st.due) st.due = today(); redraw(); }
+    if (b.dataset.q === 'remc') { st.remc = !st.remc; redraw(); if (st.remc) $('#p-remn')?.focus(); return; }
+    if (b.dataset.q === 'remadd') {  // 2.7.0 (#412): an own reminder, e.g. 3 weeks before
+      const n = Math.round(+$('#p-remn')?.value || 0), u = +($('#p-remu')?.value || 1440), m = n * u;
+      if (!(n >= 1) || m > REM_MAX) { toast(tr('A reminder can be at most a year before the date')); return; }
+      const s = new Set((st.reminders || '').split(',').filter(Boolean));
+      if (s.size >= 10) { toast(tr('At most {0} reminders', 10)); return; }
+      s.add(String(m)); st.reminders = [...s].join(','); st.remc = false; st.remn = n; st.remu = String(u); if (!st.due) st.due = today(); redraw(); return;
+    }
     const q = b.dataset.q;
     if (q === '0' || q === '1') { st.due = addDays(today(), +q); st.month = st.due.slice(0, 7); redraw(); }
     if (q === 'w') { st.due = nextWeekday(1); st.month = st.due.slice(0, 7); redraw(); }
@@ -4907,6 +5060,10 @@ function datePop(anchor, id) {
     changed();
   };
   const dateChange = e => {
+    if (e.target.id === 'p-remn' || e.target.id === 'p-remu') { st.remn = +$('#p-remn').value || 1; st.remu = $('#p-remu').value; return; }
+    if (e.target.id === 'p-dl') { st.deadline = e.target.checked ? 1 : 0; redraw(); }
+    if (e.target.id === 'p-dlt') { st.deadline = e.target.checked ? 2 : 1; redraw(); }
+    if (e.target.id === 'p-nag') { st.nag = e.target.value; redraw(); }
     if (e.target.id === 'p-time') {
       st.due_time = e.target.value || null; if (!st.due) st.due = today();
       if (st.due_time && !st.reminders && S.settings.default_reminder !== '') st.reminders = S.settings.default_reminder;
@@ -5316,7 +5473,9 @@ const LCOLORS = ['', '#2dd4bf', '#6d8cff', '#6ee7b7', '#4ade80', '#f5b041', '#f8
 const EMOJIS = ['📥', '📌', '⭐', '🔥', '✅', '📅', '⏰', '🎯', '💡', '🧠', '🏠', '🏡', '🛒', '🍎', '🍳', '☕', '💼', '🖥️', '💻', '📱', '📞', '✉️', '📝', '📚', '📖', '✏️', '🎓', '💰', '💳', '🧾', '🏦', '📊', '🚗', '🚲', '✈️', '🏖️', '🧳', '🗺️', '🎁', '🎉', '🎵', '🎹', '🎧', '🎬', '📷', '🎨', '🌀', '🧵', '🛠️', '🔧', '🏃', '🏋️', '🧘', '❤️', '🩺', '💊', '👶', '🧒', '👪', '🐶', '🐱', '🐭', '🌱', '🌻', '☀️', '🌙', '♻️', '🔒', '🤶', '🎄'];
 const EMO_RE = /^((?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|\uFE0F|\u200D)+)\s*/u;
 // list type (1.2): the choices, a hint per type (project: only the features whose module is on), the menu
-const LKINDS = [['list', N_('List')], ['checklist', N_('Checklist')], ['project', N_('Project')]];
+// 2.7.0 (#414): the type "checklist" is called "Shopping & packing list" (stored kind stays 'checklist')
+const LKINDS = [['list', N_('List')], ['checklist', N_('Shopping & packing list')], ['project', N_('Project')]];
+const LKIND_ICON = {list: 'list', checklist: 'cart', project: 'pulse'};
 // 2.4.0 (#243): project types = built-in project templates (server: PTYPES); '' = a blank project. Offered in the "New list"
 // dialog (type Project, next to the person's own list templates, #328), the setup and the welcome tour.
 const PTYPE_UI = [['', N_('Blank'), 'list', N_('An empty project: add sections and fields as you go')],
@@ -5369,7 +5528,7 @@ function projectParts() {
     fieldsOn() && tr('custom fields'), progressOn() && tr('progress and status')].filter(Boolean);
 }
 function kindHint(k) {
-  if (k === 'checklist') return tr('For shopping and packing lists: ticked-off items move to a “Done” section at the bottom and go back on the list with one tap; no dates or priorities in the rows.');
+  if (k === 'checklist') return `${ic('cart', 's')} ${tr('What you tick off stays at the bottom and comes back with one tap.')} <span class="muted">${tr('For shopping and packing lists; no dates or priorities in the rows.')}</span>`;
   if (k === 'project') { const p = projectParts(); return p.length ? tr('This list gets {0}.', esc(p.join(', '))) : tr('The project features are switched off (Settings > Modules).'); }
   return tr('A plain task list. Make it a project for time tracking, dependencies, custom fields and progress.');
 }
@@ -5380,8 +5539,8 @@ async function setListKind(id, kind) {
 }
 // list settings (type, name, colour, folder, view, "move dependent tasks along", hourly rate, archived) as one history
 // step; _prev = the values after, so a setting changed elsewhere meanwhile stays. false = the request failed
-const LIST_HIST = ['name', 'color', 'folder', 'view', 'kind', 'dep_shift', 'rate', 'archived', 'tickets'];
-const lv = (k, v) => k === 'dep_shift' || k === 'archived' || k === 'tickets' ? (v ? 1 : 0) : k === 'rate' ? (v === '' || v == null ? null : +String(v).replace(',', '.')) : v ?? '';
+const LIST_HIST = ['name', 'color', 'folder', 'view', 'kind', 'dep_shift', 'rate', 'archived', 'tickets', 'nag', 'day_hours'];  // 2.7.0: nag, day_hours
+const lv = (k, v) => k === 'dep_shift' || k === 'archived' || k === 'tickets' ? (v ? 1 : 0) : k === 'rate' || k === 'day_hours' ? (v === '' || v == null ? null : +String(v).replace(',', '.')) : v ?? '';
 async function listPatch(id, body, label, o = {}) {
   const l = listById(id); if (!l) return false;
   const before = {}, after = {};
@@ -5414,7 +5573,7 @@ function listMenuItems(id, anchor) {
     if (l.is_inbox && own) items.push({label: propWith(N_('Sort the inbox with {0}…'), N_('Sort the inbox with an agent…')), icon: 'bot', fn: () => propRequest('triage', {})});
     else if (!l.is_inbox && canEditList(id)) items.push({label: tr('Tasks from notes…'), icon: 'bot', fn: () => propRequest('extract', {lid: id})});
   }
-  if (own) items.push('-', ...LKINDS.map(([v, n]) => ({label: tr(n), icon: v === 'project' ? 'pulse' : v === 'checklist' ? 'check' : 'list', on: k === v, fn: () => setListKind(id, v)})));
+  if (own) items.push('-', ...LKINDS.map(([v, n]) => ({label: tr(n), icon: LKIND_ICON[v], on: k === v, fn: () => setListKind(id, v)})));
   if (collab() && l.shared) items.push({label: acolOn(id) ? tr('Hide assignee column') : tr('Show assignee column'), icon: 'user', fn: () => { LS.set('acol.' + id, !acolOn(id)); render(); }});
   if (collab() && l.shared) items.push({label: tr('Notifications: {0}', bellLabel(l.bell)), icon: BELL_ICON[l.bell || 'default'], fn: () => bellMenu(at(), id)});
   if (progressFor(l) && !l.is_inbox) items.push('-', progHidden(id) ? {label: tr('Show progress'), icon: 'eye', fn: () => setProgHidden(id, false)} : {label: tr('Hide progress'), icon: 'x', fn: () => setProgHidden(id, true)});
@@ -5615,14 +5774,18 @@ function listModal(id, folder = '', o = {}) {
     ${own && !l.is_inbox ? `<div class="row"><label>${tr('Ticket types')}</label><label class="chkl"><input type="checkbox" id="l-tickets" ${l.tickets ? 'checked' : ''}> ${tr('Bug, feature, task')}</label>${id ? `<button class="btn sm" data-m="tt-tpl" type="button">${tr('Templates…')}</button>` : ''}</div>
     <div class="shint lhint">${tr('Tasks get a type with an icon, a filter and quick add !bug / !feature; new bugs and features start with a note template.')}</div>` : ''}
     ${id && progressOn() ? `<div class="row"><label>${tr('Progress')}</label><label class="chkl"><input type="checkbox" id="l-showprog" ${progHidden(id) ? '' : 'checked'}> ${tr('Show the progress bar')}</label><span class="muted">${tr('only for you')}</span></div>` : ''}
+    ${id && timeOn() && (own || l.day_hours) ? `<div class="row"><label for="l-dayh">${tr('Hours per day')}</label><input id="l-dayh" inputmode="decimal" value="${l.day_hours != null ? esc(String(l.day_hours).replace('.', LOCALE().startsWith('de') ? ',' : '.')) : ''}" placeholder="${esc(fmtNum(S.timeDayH || 8))}" style="max-width:5rem" ${dis}><span class="muted">${tr('h per day / shift, for the time sum in the header · empty = {0} h (server)', fmtNum(S.timeDayH || 8))}</span></div>` : ''}
     ${timeOn() && (own || l.rate) ? `<div class="row"><label>${tr('Hourly rate')}</label><input id="l-rate" inputmode="decimal" value="${l.rate != null ? esc(String(l.rate).replace('.', LOCALE().startsWith('de') ? ',' : '.')) : ''}" placeholder="${tr('optional')}" style="max-width:6.875rem" ${dis}><span class="muted">${esc(S.settings.time_currency || '')} · ${tr('time reports')}</span></div>` : ''}
     <div class="row"><label>${tr('Color')}</label><div class="colors" id="l-col">${LCOLORS.map(c => `<button style="background:${c || 'var(--bg4)'}" class="${(l.color || '') === c ? 'on' : ''}" data-c="${c}" ${dis}></button>`).join('')}</div></div>
     ${id && !l.is_inbox && statusOn() && l.kind === 'project' ? `<div class="row"><label>${tr('Project status')}</label>${statusPill(l, true, true)}</div>` : ''}
     ${id && own && depsOn() ? `<div class="row"><label>${tr('Dependencies')}</label><label class="chkl"><input type="checkbox" id="l-depshift" ${l.dep_shift ? 'checked' : ''}> ${tr('Move dependent tasks along')}</label></div>
     <div class="shint lhint">${tr('When a task is postponed, the tasks of this list that wait on it and would now start too early move by the same number of days (also in the timeline). One undo takes the whole chain back.')}</div>` : ''}
     ${id && own && fieldsOn() ? `<h4 title="${esc(tr('Own columns for this list: budget, stage, client, …'))}">${tr('Custom fields')}</h4><div class="members" id="l-fields">${fieldsBox(id)}</div>` : id && fieldsOf(id).length ? `<h4>${tr('Custom fields')}</h4><div class="muted mhint">${esc(fieldsOf(id).map(f => f.name).join(', '))} · ${tr('only the owner can change them')}</div>` : ''}
-    ${id && !l.is_inbox ? repoBoxHtml(l) : ''}
+    ${id && !l.is_inbox && (l.kind || 'list') === 'project' ? repoBoxHtml(l) : ''}
     </div>
+    ${id && !l.is_inbox && (l.kind || 'list') !== 'project' && (l.repos || []).length ? repoBoxHtml(l) : ''}
+    ${(l.kind || 'list') !== 'checklist' ? `<div class="row lnagrow"><label for="l-nag">${tr('Repeat reminders')}</label><select id="l-nag" ${dis}><option value="">${tr('Off|nag')}</option>${NAG_OPTS.slice(1).map(([v, n]) => `<option value="${v}" ${(l.nag || '') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
+    <div class="shint lhint">${tr('Default for the tasks of this list with a date: the reminder repeats until the task is done (a task can choose otherwise in its date dialog). Quiet hours: Settings > Notifications.')}</div>` : ''}
     ${id && shareOk(l) ? `<h4>${tr(collab() ? N_('Sharing') : N_('Owner'))}</h4><div class="row shsum"><span class="muted" id="l-shsum">${esc(shareSummary(l))}</span><button class="btn sm" data-m="share-open">${ic('users', 's')} ${tr(collab() ? N_('Share…') : N_('Ownership…'))}</button></div>` : ''}
     ${id && !l.is_inbox && collab() && l.shared ? `<h4>${tr('Notifications')}</h4><div class="row"><label for="l-bell">${ic(BELL_ICON[l.bell || 'default'], 's')} ${tr('This list')}</label><select id="l-bell" data-native>${BELLS.map(([m, n]) => `<option value="${m}" ${(l.bell || 'default') === m ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     <div class="shint lhint" id="l-bellhint">${tr(BELLS.find(b => b[0] === (l.bell || 'default'))[2])} · ${tr('only for you')}</div>
@@ -5643,7 +5806,8 @@ function listModal(id, folder = '', o = {}) {
   const pend = new Map();
   const formBody = () => {
     const nm = $('#l-name', md).value.trim().replace(EMO_RE, '');
-    const body = own ? {name: l.is_inbox && !emo && nm === tr('Inbox') ? 'Eingang' : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: $('#l-rate', md).value.trim()} : {}), ...($('#l-tickets', md) ? {tickets: $('#l-tickets', md).checked} : {})}
+    const body = own ? {name: l.is_inbox && !emo && nm === tr('Inbox') ? 'Eingang' : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: $('#l-rate', md).value.trim()} : {}), ...($('#l-tickets', md) ? {tickets: $('#l-tickets', md).checked} : {}),
+      ...($('#l-nag', md) ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dayh', md) ? {day_hours: $('#l-dayh', md).value.trim()} : {})}
       : {folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value};  // members: only their own placement / view
     if (own && !nm) delete body.name;  // an empty name is never saved (leaving the field puts the saved one back)
     return body;
@@ -5666,6 +5830,8 @@ function listModal(id, folder = '', o = {}) {
     if ($('#l-depshift', md)) $('#l-depshift', md).checked = !!x.dep_shift;
     if ($('#l-tickets', md)) $('#l-tickets', md).checked = !!x.tickets;
     if ($('#l-rate', md) && document.activeElement !== $('#l-rate', md)) $('#l-rate', md).value = x.rate != null ? String(x.rate).replace('.', LOCALE().startsWith('de') ? ',' : '.') : '';
+    if ($('#l-dayh', md) && document.activeElement !== $('#l-dayh', md)) $('#l-dayh', md).value = x.day_hours != null ? String(x.day_hours).replace('.', LOCALE().startsWith('de') ? ',' : '.') : '';
+    if ($('#l-nag', md)) $('#l-nag', md).value = x.nag || '';
   };
   let saving = Promise.resolve();
   const autosave = () => {
@@ -5686,13 +5852,13 @@ function listModal(id, folder = '', o = {}) {
   };
   const later = el => { clearTimeout(pend.get(el.id)); pend.set(el.id, setTimeout(autosave, 900)); };
   if (id) {
-    md.addEventListener('input', e => { if (['l-name', 'l-folder', 'l-rate'].includes(e.target.id)) later(e.target); });
-    md.addEventListener('focusout', e => { if (['l-name', 'l-folder', 'l-rate'].includes(e.target.id)) { const empty = e.target.id === 'l-name' && !e.target.value.trim().replace(EMO_RE, ''); autosave().then(() => { if (empty) lsync(true); }); } });
+    md.addEventListener('input', e => { if (['l-name', 'l-folder', 'l-rate', 'l-dayh'].includes(e.target.id)) later(e.target); });
+    md.addEventListener('focusout', e => { if (['l-name', 'l-folder', 'l-rate', 'l-dayh'].includes(e.target.id)) { const empty = e.target.id === 'l-name' && !e.target.value.trim().replace(EMO_RE, ''); autosave().then(() => { if (empty) lsync(true); }); } });
     onRemove(md, () => { if (pend.size) autosave(); });
   }
   md.addEventListener('change', e => {
     if (e.target.id === 'l-kind') { const k = e.target.value; $('#l-khint', md).innerHTML = kindHint(k); $('.kproj', md).hidden = k !== 'project'; if ($('.lptype', md)) $('.lptype', md).hidden = k !== 'project'; if (id) autosave(); return; }
-    if (id && ['l-view', 'l-depshift', 'l-tickets'].includes(e.target.id)) { autosave(); return; }
+    if (id && ['l-view', 'l-depshift', 'l-tickets', 'l-nag'].includes(e.target.id)) { autosave(); return; }
     if (id && e.target.id === 'l-showprog') { setProgHidden(id, !e.target.checked).then(() => lsaved(null)); return; }
   });
   const drawFields = () => { const box = $('#l-fields', md); if (box) box.innerHTML = fieldsBox(id); };
@@ -5761,10 +5927,10 @@ function listModal(id, folder = '', o = {}) {
     if (a === 'save' && !id) {  // a new list (an existing one saves itself)
       const nm = $('#l-name', md).value.trim().replace(EMO_RE, '');
       if (!nm) return $('#l-name', md).focus();
-      const body = own ? {name: l.is_inbox && !emo && nm === tr('Inbox') ? 'Eingang' : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: $('#l-rate', md).value.trim()} : {})}
+      const body = own ? {name: l.is_inbox && !emo && nm === tr('Inbox') ? 'Eingang' : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: $('#l-rate', md).value.trim()} : {}), ...($('#l-nag', md)?.value ? {nag: $('#l-nag', md).value} : {})}
         : {folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value};  // members: only their own placement / view
       if (body.folder && !folderNames().includes(body.folder)) await api('PATCH', '/api/settings', {folders: JSON.stringify([...folderNames(), body.folder])});
-      const {rate, ...b0} = body;
+      const {rate, nag, day_hours: _dh, ...b0} = body;
       const pt = body.kind === 'project' ? $('.ptcard.on', md)?.dataset.pt || '' : '';
       let n;
       if (pt.startsWith('tpl:')) {  // 2.4.0 (#328): the person's own template, dates from the project start (optionally to an end)
@@ -5772,7 +5938,7 @@ function listModal(id, folder = '', o = {}) {
       } else {
         try { n = await api('POST', '/api/lists', pt ? {name: b0.name, folder: b0.folder, color: b0.color, ptype: pt} : b0); } catch { return; }
       }
-      if (rate) await api('PATCH', '/api/lists/' + n.id, {rate}).catch(() => {});
+      if (rate || nag) await api('PATCH', '/api/lists/' + n.id, {...(rate ? {rate} : {}), ...(nag ? {nag} : {})}).catch(() => {});
       md.remove(); await load(); go('l/' + n.id);
       modulesOnToast(n.modules_on);
       if (pt === 'software') projectNextSteps(n.id);
@@ -6010,6 +6176,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-icalscope': ['ical_scope', N_('Calendar subscription'), 'sel'], 's-icalalarm': ['ical_alarms', N_('as calendar alarms'), 'chk'],
   's-plkeep': ['paperless_keep', N_('Also keep the attachment in Kalmido'), 'chk'], 's-caltoday': ['cal_today', N_('Events on Today'), 'chk'],
   's-dateok': ['date_confirm', N_('Confirm changes with OK'), 'chk'],  // 2.6.1 (#401)
+  's-qfrom': ['quiet_from', N_('Quiet from'), 'time'], 's-qto': ['quiet_to', N_('Quiet until'), 'time'],  // 2.7.0 (#413)
 };
 const SET_RENDER = ['features', 'nav_order', 'show_done_views', 'hide_blocked_today', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden'];
 function setVal(el, kind) {  // the value a control stands for; undefined = not valid (nothing is saved)
@@ -6140,7 +6307,9 @@ function modRowHtml(k, opt = () => '') {
 // 2.5.1 (#393): four sub-tabs instead of one long page: Agents (cards, Add agent + Setup guide), Lists (sharing + tidy table),
 // Usage (one summary card per agent, the charts behind "Details"), Log (admins). The last one is remembered per device;
 // settingsModal('agents' / 'usage' / 'activity') opens the matching one. Each sub-tab loads its data only when shown.
-const AI_SUBS = [['agents', 'bot', N_('Overview')], ['lists', 'list', N_('Lists')], ['usage', 'chart', N_('Usage')], ['log', 'clock', N_('Log')]];
+// 2.7.0 (#405 S2): the Agents page only with the module on, or for an admin while agents exist (they manage them there)
+const aiPaneOn = () => !!S.me && (feat('agents') || (!!S.me.is_admin && (S.agents || []).length > 0));
+const AI_SUBS = [['agents', 'bot', N_('Status|agents')], ['lists', 'list', N_('Lists')], ['usage', 'chart', N_('Usage')], ['log', 'clock', N_('Log')]];
 const aiSubs = () => AI_SUBS.filter(([k]) => k === 'log' ? !!S.me?.is_admin : k === 'usage' ? !!S.me?.is_admin || (S.agents || []).length > 0 : true);
 function aiSubCur(want) { const ks = aiSubs().map(x => x[0]), k = want || LS.get('aiSub', 'agents'); return ks.includes(k) ? k : 'agents'; }
 function aiHtml(hint, want) {
@@ -6218,8 +6387,11 @@ function settingsModal(focus) {
       ${notifMatrixHtml(s, hint)}
       <h4>${tr('Reminders')}</h4>
       <div class="row"><label for="s-allday">${tr('All-day reminder at')}</label>${timeIn('s-allday', s.allday_time, {label: tr('All-day reminder at'), clear: false})}</div>
-      <div class="row"><label for="s-defrem">${tr('Default reminder')}</label><select id="s-defrem"><option value="">${tr('none')}</option>${REM_OPTS.map(([v, n]) => `<option value="${v}" ${s.default_reminder === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
-      <div class="row"><label for="s-digest">${tr('Daily digest at')}</label>${timeIn('s-digest', s.digest_time, {label: tr('Daily digest at'), empty: tr('off')})}</div>`,
+      <div class="row"><label for="s-defrem">${tr('Default reminder')}</label><select id="s-defrem"><option value="">${tr('none')}</option>${REM_OPTS.map(([v, n]) => `<option value="${v}" ${s.default_reminder === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}${s.default_reminder && !REM_OPTS.some(o => o[0] === s.default_reminder) ? `<option value="${esc(s.default_reminder)}" selected>${esc(s.default_reminder.split(',').map(fmtRem).join(', '))}</option>` : ''}</select></div>
+      <div class="row"><label for="s-digest">${tr('Daily digest at')}</label>${timeIn('s-digest', s.digest_time, {label: tr('Daily digest at'), empty: tr('off')})}</div>
+      <h4 id="s-quiet-h">${tr('Repeated reminders')}</h4>
+      <div class="row"><label for="s-qfrom">${tr('Quiet from')}</label>${timeIn('s-qfrom', s.quiet_from ?? '22:00', {label: tr('Quiet from'), empty: tr('none')})}<label for="s-qto" class="qtol">${tr('until|time')}</label>${timeIn('s-qto', s.quiet_to ?? '07:00', {label: tr('Quiet until'), empty: tr('none')})}</div>
+      ${hint(tr('A task or a list can repeat its reminder until the task is done (date dialog > Repeat reminder; list dialog for all its tasks). During the quiet hours nothing repeats; the next one comes when they end.'))}`,
     integr: calsHtml(chk, hint) + `<h4 id="s-ical-h">${tr('Calendar subscription')}</h4>
       ${hint(tr('Your open tasks with a date as a calendar for Google Calendar, Apple Calendar, Outlook or Thunderbird: read-only, the calendar app refreshes it by itself (usually every few hours, some apps every 15 minutes). Timed tasks appear with their duration, all-day tasks as all-day events, recurring tasks with all future dates.'))}
       <div id="s-ical"><div class="muted mhint">${tr('Loading…')}</div></div>
@@ -6252,10 +6424,8 @@ function settingsModal(focus) {
       <h4 id="s-tpl-h">${tr('Templates')}</h4>
       ${hint(tr('Private to you. Save a task (with subtasks) from its menu (…) or a list from the list dialog; use them from the template button in the add bar or under Lists > +. Dates are kept as “days after use”.'))}
       <div class="members" id="s-tpls"><div class="muted mhint">${tr('Loading…')}</div></div>
-      ${sampleHtml(hint)}
-      <h4>${tr('Completed tasks')}</h4>
-      <div class="row"><label>${tr('Clean up')}</label><button class="btn sm danger" data-m="purge">${ic('trash', 's')} ${tr('Delete all completed')}</button><span class="muted" style="font-size:var(--fs-s)">${tr('they go to the trash')}</span></div>`,
-    ai: S.me ? aiHtml(hint, {agents: 'agents', agentdots: 'agents', usage: 'usage', activity: 'log'}[focus]) : '',
+      ${sampleHtml(hint)}`,
+    ai: aiPaneOn() ? aiHtml(hint, {agents: 'agents', agentdots: 'agents', usage: 'usage', activity: 'log'}[focus]) : '',  // 2.7.0 (#405 S2)
     users: S.me?.is_admin ? usersHtml() + orphHtml() + instanceHtml(chk, hint) + signinHtml(hint) + plaHtml() + bkHtml() + aaHtml() : '',  // 1.9.0: users first
     help: `<h4>${tr('Getting started')}</h4>
       <div class="row"><button class="btn sm" data-m="tour">${ic('arrow', 's')} ${tr('Restart the welcome tour')}</button>${isMobile() ? '' : `<button class="btn sm" data-m="keys">${ic('help', 's')} ${tr('Keyboard shortcuts')} ${kb('?')}</button>`}<button class="btn sm" data-m="cele-try">${ic('check', 's')} ${tr('Show the celebration')}</button></div>
@@ -6286,6 +6456,9 @@ function settingsModal(focus) {
   if (focus === 'tabbar') setTimeout(() => $('#s-tabbar-h', md)?.scrollIntoView({block: 'start'}), 0);
   if (focus === 'newskinds' || focus === 'share') setTimeout(() => $(focus === 'share' ? '#s-share-h' : '#s-news-h', md)?.scrollIntoView({block: 'start'}), 0);
   if (focus === 'agentdots') setTimeout(() => $('#s-agdots-h', md)?.scrollIntoView({block: 'start'}), 0);
+  // 2.7.0 (#405 S8): the module keys land on their row (and open its options), not just on top of Modules
+  const modFocus = {layout: 'cal', collab: 'collab', focus: 'pomo', time: 'time'}[focus];
+  if (modFocus) setTimeout(() => { const r = $(`[data-pane="modules"] [data-modrow="${modFocus}"]`, md); if (!r) return; const o = $('details.mopt', r); if (o) o.open = true; r.scrollIntoView?.({block: 'start'}); r.classList.add('flash'); }, 0);
   const show = k => {
     cur = k; LS.set('settingsSec', k);
     $$('.snav button', md).forEach(b => { b.classList.toggle('on', b.dataset.sec === k); b.setAttribute('aria-selected', b.dataset.sec === k); });
@@ -6356,6 +6529,15 @@ function settingsModal(focus) {
   });
   md.addEventListener('keydown', e => { if (e.key === 'Enter' && (SETS[e.target.id] || e.target.id === 'a-name') && isText(e.target)) { e.preventDefault(); e.target.id === 'a-name' ? saveName() : saveEl(e.target); } });
   md.addEventListener('change', e => { if (['s-collaball', 's-timeall', 's-updcheck', 's-2fareq', 's-pklogin', 's-oidcauto', 's-publinks'].includes(e.target.id)) adminSwitch(md, e.target); });
+  md.addEventListener('change', async e => {  // 2.7.0 (#407): hours per day / shift for the whole server, one history step
+    if (e.target.id !== 's-dayh') return;
+    const from = S.timeDayH || 8, to = +String(e.target.value).replace(',', '.');
+    if (!(to >= 1 && to <= 24)) { toast(tr('Hours per day: a number from 1 to 24')); e.target.value = fmtNum(from, 2); return; }
+    if (to === from) return;
+    const put = async v => { const j = await api('PATCH', '/api/admin/settings', {time_day_h: v}); S.about = {...S.about, ...j}; S.timeDayH = +j.time_day_h || v; const f = $('#s-dayh'); if (f && f !== document.activeElement) f.value = fmtNum(S.timeDayH, 2); render(); return {skipped: []}; };
+    try { await put(to); } catch { return; }
+    setSaved(histAdd({label: tr('Changed setting: {0}', tr('Hours per day')), sett: true, undo: () => put(from), redo: () => put(to)}));
+  });
   onRemove(md, () => { if (!md._noflush) flush(); });
   $('.snav', md).addEventListener('click', e => { const b = e.target.closest('[data-sec]'); if (b) show(b.dataset.sec); });
   setTimeout(() => $(`.snav [data-sec="${cur}"]`, md)?.scrollIntoView({block: 'nearest', inline: 'nearest'}), 0);
@@ -6426,6 +6608,7 @@ function settingsModal(focus) {
     if (b.dataset.m === 'keys') { md.remove(); shortcutsModal(); return; }
     if (b.dataset.m === 'hints-reset') { LS.del('hintsSeen'); toast(tr('Done')); render(); return; }
     if (b.dataset.m === 'ag-guide') { agGuideModal(); return; }  // 2.4.2 (#392)
+    if (b.dataset.m === 'go-share') { $('.snav [data-sec="integr"]', md)?.click(); setTimeout(() => $('#s-share-h', md)?.scrollIntoView?.({block: 'start'}), 50); return; }  // 2.7.0 (#405 S3)
     if (b.dataset.m === 'go-modules') { $('.snav [data-sec="modules"]', md)?.click(); setTimeout(() => $('[data-pane="modules"] [data-modrow="agents"]', md)?.scrollIntoView?.({block: 'center'}), 50); return; }  // 2.6.0 (K09)
     if (b.dataset.m === 'cele-try') { celebrate('today', {force: true}); return; }
     const trw = b.closest('[data-tpl]');
@@ -6448,12 +6631,6 @@ function settingsModal(focus) {
     }
     if (a === 'sample-add') { md.remove(); await sampleCreate(); return; }
     if (a === 'sample-rm') { b.disabled = true; try { await sampleRemove(); } finally { const r = $('#s-sample', md); if (r) r.innerHTML = sampleRowHtml(); } return; }
-    if (a === 'purge') {
-      const n = [...S.tasks.values()].filter(t => t.status !== 0).length;
-      if (!await askConfirm(tr('Move all completed tasks to the trash?'), n ? tr('(at least {0})', n) : '', {ok: tr('Move to trash')})) return;
-      const j = await api('POST', '/api/tasks/purge-done');
-      await load(); render(); toast(j.count === undefined ? tr('Will be deleted once back online') : trn('{0} completed task moved to the trash', '{0} completed tasks moved to the trash', j.count));
-    }
     if (a === 'test') { const j = await api('POST', '/api/ntfy/test'); toast(j.ok ? tr('Test sent') : tr('ntfy not reachable')); }
     if (a === 'ptest') { const j = await api('POST', '/api/push/test'); toast(j.ok ? tr('Test sent') : tr('Not delivered: no device accepted it and ntfy is not reachable')); }
     if (a === 'wp-test') { const j = await api('POST', '/api/push/test', {id: +b.dataset.sub}); toast(j.ok ? tr('Test sent to this device') : tr('The push service did not accept it')); if (!j.ok) wpDraw(md); }
@@ -6583,6 +6760,9 @@ function instanceHtml(chk, hint) {
       <label class="wide"><input type="checkbox" id="s-publinks" ${a.public_links !== false && a.public_links_env !== false ? 'checked' : ''} ${a.public_links_env === false ? 'disabled' : ''}><span>${tr('Public links to lists')}<small class="muted">${a.public_links_env === false ? `<span title="KALMIDO_PUBLIC_LINKS=0">${tr('Switched off by the server operator.')}</span>` : tr('List owners can share a list with people without an account through a secret link (view only or tick off). Off: every public link stops working at once; nothing is deleted.')}</small></span></label>
       <label class="wide"><input type="checkbox" id="s-updcheck" ${a.update_check !== false && a.update_env !== false ? 'checked' : ''} ${a.update_env === false ? 'disabled' : ''}><span>${tr('Check daily for a new version')}<small class="muted">${a.update_env === false ? `<span title="KALMIDO_UPDATE_CHECK=0">${tr('Switched off by the server operator.')}</span>` : tr('The server asks GitHub once a day for the latest release; nothing is installed automatically and the browser never contacts GitHub. Result under Help.')}</small></span></label>
     </div>
+    ${S.timeAll !== false ? `<h4 id="s-dayh-h">${tr('Time sums')}</h4>
+    <div class="row"><label for="s-dayh">${tr('Hours per day')}</label><input id="s-dayh" inputmode="decimal" class="numin" value="${esc(fmtNum(a.time_day_h || S.timeDayH || 8, 2))}"><span class="muted">${tr('h per working day / shift')}</span></div>
+    ${hint(tr('Project lists show their tracked time in hours and in days of this length. A list can set its own value (list dialog); it then applies to everyone in that list.'))}` : ''}
     ${a.cal_on || S.webhooks?.enabled ? `<details class="sdev"><summary>${ic('key', 's')}${tr('Advanced · for developers')}</summary><h4 id="s-calhosts-h">${tr('Allowed internal hosts')}</h4>
     ${hint(tr('Calendar subscriptions and webhooks may only reach public addresses. List servers in your own network here (host or host:port, separated by commas), for example your own Nextcloud, Radicale or n8n; every user can then use them. Webhooks may use http:// only for these hosts.') + (a.cal_allow_env ? ' ' + esc(tr('Also allowed by the server configuration: {0}', a.cal_allow_env)) : ''))}
     <div class="row"><textarea id="s-calhosts" rows="2" spellcheck="false" autocapitalize="off" aria-labelledby="s-calhosts-h" placeholder="nextcloud.home.arpa, 10.0.0.20:5232">${esc(a.cal_allow_hosts || '')}</textarea></div>
@@ -7083,7 +7263,6 @@ async function dropTokenNew(md) {
   let j;
   try { j = await api('POST', '/api/me/drop-token'); } catch { return; }
   const tok = j.drop_token || '';
-  const a = $('#a-tok', md); if (a) { a.textContent = tok; $('#a-tokrow', md)?.classList.remove('hidden'); }
   const i = $('#s-droptok', md); if (i) { i.value = tok; i.type = 'text'; i.dataset.real = '1'; }
   toast(tr('New upload token created: update the shortcuts on your phones'));
 }
@@ -7133,19 +7312,20 @@ const NOTIF_ROWS = [
   ['approval', N_('An agent waits for my approval'), '', 'agents'],
   ['followup', N_('Follow-up day of a task waiting on external')],
   ['reminder', N_('Reminders'), N_('due dates of my tasks')],
+  ['nag', N_('Repeated reminders'), N_('until the task is done; not during your quiet hours')],  // 2.7.0 (#413)
   ['usage', N_('An agent reached a usage limit'), N_('admins: 80 % and 100 % of a limit'), 'admin'],  // 2.1.1 (#326)
   ['proposal', N_('A proposal I asked an agent for is ready'), '', 'propose']];  // 2.3.0: only with an agent I may ask
 const NM_GROUP = {comment: 'comment', reply: 'comment', follow: 'comment', mention: 'mention', assign: 'assign', complete: 'complete', status: 'status', share: 'share', unblock: 'unblock'};
 const NM_PRIMARY = ['comment', 'mention', 'assign', 'complete', 'status', 'share', 'unblock'];
 const NM_NEWS_NEW = {newtask: 0, approval: 0, followup: 1, usage: 1, proposal: 1};
-const NM_PUSH = {comment: 1, reply: 1, follow: 1, mention: 1, assign: 1, newtask: 0, complete: 1, status: 0, share: 0, unblock: 1, approval: 1, followup: 1, reminder: 1, usage: 1, proposal: 1};
+const NM_PUSH = {comment: 1, reply: 1, follow: 1, mention: 1, assign: 1, newtask: 0, complete: 1, status: 0, share: 0, unblock: 1, approval: 1, followup: 1, reminder: 1, usage: 1, proposal: 1, nag: 1};
 const NM_SOCIAL = ['comment', 'reply', 'follow', 'mention', 'assign', 'newtask', 'complete', 'status', 'share', 'unblock', 'approval', 'proposal'];
 const nmStored = s => { try { const o = JSON.parse(s.notify || '{}'); return o && typeof o === 'object' ? o : {}; } catch { return {}; } };
 function notifMatrix(s) {
   const nk = new Set(String(s.news_kinds ?? 'mention,assign,comment,unblock,share,status').split(',')), o = nmStored(s), out = {};
   for (const [r] of NOTIF_ROWS) {
     const x = o[r] && typeof o[r] === 'object' ? o[r] : {};
-    const news = r === 'reminder' ? null : NM_PRIMARY.includes(r) ? nk.has(NM_GROUP[r]) : 'news' in x ? !!x.news : r in NM_GROUP ? nk.has(NM_GROUP[r]) : !!NM_NEWS_NEW[r];
+    const news = r === 'reminder' || r === 'nag' ? null : NM_PRIMARY.includes(r) ? nk.has(NM_GROUP[r]) : 'news' in x ? !!x.news : r in NM_GROUP ? nk.has(NM_GROUP[r]) : !!NM_NEWS_NEW[r];
     out[r] = {news, push: 'push' in x ? !!x.push : !!NM_PUSH[r]};
   }
   return out;
@@ -7179,8 +7359,7 @@ function accountHtml() {
     ${m.auth === 'session' ? `<div class="row"><label></label><button class="btn sm" data-acc="logout">${ic('logout', 's')} ${tr('Log out')}</button></div>` : ''}
     ${tfaHtml()}
     <details class="sdev"><summary>${ic('key', 's')}${tr('Advanced · for developers')}</summary>
-    <div class="row"><label>${tr('Upload token')}</label><button class="btn sm" data-acc="token">${ic('key', 's')} ${tr('Show')}</button><span class="muted" style="font-size:var(--fs-s)">${tr('for POST /drop (HTTP Shortcuts), header Authorization: Bearer …')}</span></div>
-    <div class="row hidden" id="a-tokrow"><label></label><code class="topic" id="a-tok"></code><button class="btn sm danger" data-acc="token-new">${tr('New token')}</button></div>
+    <div class="row"><label>${tr('Upload token')}</label><button class="btn sm" data-m="go-share">${ic('phone', 's')} ${tr('Share from your phone')}</button><span class="muted" style="font-size:var(--fs-s)">${tr('shown and renewed there')}</span></div>
     ${apiHtml()}</details>`;
 }
 const usersHtml = () => `<h4>${tr('Users')}</h4><div class="members" id="a-users"><div class="muted mhint">${tr('Loading…')}</div></div>
@@ -7216,8 +7395,6 @@ function accountWire(md) {
         await api('PATCH', '/api/me', {current_password: $('#a-cur', md).value, password: nw});
         $('#a-cur', md).value = ''; $('#a-new', md).value = ''; toast(tr('Password changed'));
       }
-      if (a === 'token') { const j = await api('GET', '/api/me'); $('#a-tok', md).textContent = j.drop_token || '–'; $('#a-tokrow', md).classList.remove('hidden'); }
-      if (a === 'token-new') await dropTokenNew(md);
       if (a === 'logout') logout();
       if (a === 'user-new') userModal(null, drawUsers);
       if (a === 'user-edit') userModal(users.find(u => u.id === +b.dataset.uid), drawUsers);
@@ -7722,8 +7899,9 @@ const SETUP_MODS = [['cal', N_('Calendar'), N_('Month, week and day view of your
   ['deps', N_('Dependencies'), N_('Tasks that wait on other tasks, with arrows in the timeline (Gantt)')], ['fields', N_('Custom fields'), N_('Own fields per list, such as budget, client or phase')],
   ['paperless', N_('Paperless link'), N_('Link documents from Paperless-ngx to tasks')],
   ['comments', N_('Comments'), N_('Timestamped notes on your tasks; in shared lists with collaboration also @mentions and News')]];
+// 2.7.0 (K21, #405): "Simple list" is the start of a new instance (comments off too); one question "Start with" below
 const SETUP_PRESETS = {simple: {name: N_('Simple list'), icon: 'check', desc: N_('A plain task list: lists, subtasks, reminders and the calendar'),
-    off: ['timeline', 'kanban', 'matrix', 'habits', 'pomo', 'stats', 'progress', 'deps', 'fields', 'collab', 'time']},
+    off: ['timeline', 'kanban', 'matrix', 'habits', 'pomo', 'stats', 'progress', 'deps', 'fields', 'collab', 'time', 'comments']},
   solo: {name: N_('Just me'), icon: 'user', desc: N_('All views for one person: timeline, kanban, matrix, habits, focus and statistics'), off: ['collab', 'time', 'deps', 'fields']},
   team: {name: N_('Projects & team'), icon: 'users', desc: N_('Everything: sharing, assigning, comments, time tracking, a timeline with dependencies, custom fields and project progress'), off: []}};
 async function setupChoices(el, logo) {
@@ -7732,9 +7910,12 @@ async function setupChoices(el, logo) {
   const langs = st.languages || [{code: 'en', name: 'English'}];
   const pl = !!st.paperless?.configured;
   const all = [...SETUP_MAIN, ...SETUP_MODS].map(x => x[0]);
-  let lang = I18N.code || 'en', preset = 'solo', picked, custOpen = false, sample = false, ptype = '';
-  const apply = k => { preset = k; picked = new Set(all.filter(x => !SETUP_PRESETS[k].off.includes(x))); sample = k === 'team'; };
-  apply('solo');
+  let lang = I18N.code || 'en', preset = 'simple', picked, custOpen = false, start = '';
+  const apply = k => { preset = k; picked = new Set(all.filter(x => !SETUP_PRESETS[k].off.includes(x))); };
+  apply('simple');
+  // 2.7.0 (K21): one question "Start with": empty, the sample project, or a project of a built-in type (agency, software, personal)
+  const STARTS = [['', N_('Empty'), 'list', N_('Your Inbox and Today, nothing else')], ['sample', N_('Sample project'), 'eye', N_('A small video production with dates and a packing list, to look around; remove it any time under Settings > Data')],
+    ...PTYPE_UI.slice(1).map(([k, n, i, d]) => [k, n, i, d])];
   const row = ([k, n, d]) => `<label class="suse"><input type="checkbox" data-use="${k}" ${picked.has(k) ? 'checked' : ''}><span><b>${tr(n)}</b><small class="muted">${tr(d)}</small></span></label>`;
   const matches = k => all.every(x => picked.has(x) === !SETUP_PRESETS[k].off.includes(x));
   const draw = () => {
@@ -7746,16 +7927,15 @@ async function setupChoices(el, logo) {
       <details class="sucust" ${custOpen ? 'open' : ''}><summary>${tr('Customize…')} <span class="muted">${tr('{0} of {1} modules on', [...picked].filter(k => k !== 'paperless' || pl).length, SETUP_MAIN.length + SETUP_MODS.filter(([k]) => k !== 'paperless' || pl).length)}</span></summary>
       <div class="suse-main">${SETUP_MAIN.map(row).join('')}</div>
       <div class="suse-list">${SETUP_MODS.filter(([k]) => k !== 'paperless' || pl).map(row).join('')}</div></details>
-      <div class="suse suproj"><span><b>${tr('Start with a project')}</b><small class="muted">${tr('Sections, fields and settings for your kind of work. More any time: New list > Project.')}</small></span><select id="su-ptype" aria-label="${esc(tr('Start with a project'))}">${[['', N_('No project')], ...PTYPE_UI.slice(1)].map(([k, n]) => `<option value="${k}" ${k === ptype ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
-      <label class="suse susample"><input type="checkbox" data-su-sample ${sample ? 'checked' : ''}><span><b>${tr('Create a sample project')}</b><small class="muted">${tr('A small video production with sections, dates, dependencies and a packing list, to see how everything works. Remove it any time under Settings > Data.')}</small></span></label>
+      <h3 id="su-start-h">${tr('Start with')}</h3>
+      <div class="sustarts ptcards" role="radiogroup" aria-labelledby="su-start-h">${STARTS.map(([k, n, i, d]) => `<button type="button" class="ptcard ${k === start ? 'on' : ''}" role="radio" aria-checked="${k === start}" data-su-start="${k}">${ic(i, 's')}<b>${tr(n)}</b><small class="muted">${tr(d)}</small></button>`).join('')}</div>
+      <p class="muted sunote">${tr('More projects any time: Lists > + > New project.')}</p>
       <div class="aerr" id="su-err"></div>
       <div class="sufoot"><button type="button" class="btn pri" data-su="go">${tr('Start')}</button></div></div>`;
     $('.sucust', el)?.addEventListener('toggle', e => { custOpen = e.target.open; });
   };
   draw();
   el.addEventListener('change', e => {
-    if (e.target.matches('[data-su-sample]')) { sample = e.target.checked; return; }
-    if (e.target.id === 'su-ptype') { ptype = e.target.value; return; }  // 2.4.0 (#243)
     const c = e.target.closest('[data-use]'); if (!c) return;
     c.checked ? picked.add(c.dataset.use) : picked.delete(c.dataset.use);
     $$('[data-su-preset]', el).forEach(b => { b.classList.toggle('on', matches(b.dataset.suPreset)); b.setAttribute('aria-pressed', matches(b.dataset.suPreset)); });
@@ -7765,9 +7945,15 @@ async function setupChoices(el, logo) {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.suLang) { lang = b.dataset.suLang; await i18nLoad(lang); LS.set('lang', lang); draw(); return; }
     if (b.dataset.suPreset) { apply(b.dataset.suPreset); draw(); return; }
+    if (b.dataset.suStart !== undefined) {
+      start = b.dataset.suStart;
+      // a project type needs its modules (agency: time tracking + custom fields, software: kanban + dependencies)
+      for (const m of {agency: ['time', 'fields'], software: ['kanban', 'deps']}[start] || []) picked.add(m);
+      draw(); return;
+    }
     const post = async (url, body) => { const r = await fetch(url, {method: url.endsWith('settings') ? 'PATCH' : 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify(body)}); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || tr('Error {0}', r.status)); };
     try {
-      if (b.dataset.su === 'go') await post('/api/admin/setup', {lang, collab_all: picked.has('collab'), time_all: picked.has('time'), modules: SETUP_MODS.map(x => x[0]).filter(k => picked.has(k) || (k === 'paperless' && !pl)), sample, ...(ptype ? {project_type: ptype} : {})});
+      if (b.dataset.su === 'go') await post('/api/admin/setup', {lang, collab_all: picked.has('collab'), time_all: picked.has('time'), modules: SETUP_MODS.map(x => x[0]).filter(k => picked.has(k) || (k === 'paperless' && !pl)), sample: start === 'sample', ...(start && start !== 'sample' ? {project_type: start} : {})});
       else return;
       location.replace('/');
     } catch (err) { $('#su-err', el).textContent = err.message || tr('Server not reachable.'); }
@@ -8522,9 +8708,33 @@ function statusNote(l) {
 }
 function listHead(l) {
   if (!l || l.is_inbox) return '';
-  const p = l.progress || {done: 0, total: 0, overdue: 0}, showP = progressFor(l) && p.total > 0 && !progHidden(l.id), pill = statusPill(l);
-  if (!showP && !pill) return '';
-  return `<div class="lhead">${showP ? progBar(p) + progMeta(p) + `<button class="iconbtn lpx" data-act="prog-hide" data-id="${l.id}" title="${tr('Hide progress')}" aria-label="${tr('Hide progress')}">${ic('x', 's')}</button>` : ''}<span class="spacer"></span>${pill}</div>${statusNote(l)}`;
+  const p = l.progress || {done: 0, total: 0, overdue: 0}, showP = progressFor(l) && p.total > 0 && !progHidden(l.id), pill = statusPill(l), ts = timeSumHtml([l]);
+  if (!showP && !pill && !ts) return '';
+  return `<div class="lhead">${showP ? progBar(p) + progMeta(p) + `<button class="iconbtn lpx" data-act="prog-hide" data-id="${l.id}" title="${tr('Hide progress')}" aria-label="${tr('Hide progress')}">${ic('x', 's')}</button>` : ''}<span class="spacer"></span>${ts}${pill}</div>${statusNote(l)}`;
+}
+// ---- 2.7.0 (#407): the tracked time of a project list (or of a folder's project lists) in its header, in hours and in
+// working days. Hours per day / shift: the list's own value (list dialog, owner; the same for every member), else the
+// server's (Administration; default 8). A number field "Budget h" (agency projects) adds a budget bar: tracked / budget.
+// Time tracking on only; the running timer counts along.
+const dayHOf = l => +l?.day_hours || S.timeDayH || 8;
+const listSecs = lid => (S.timeLists?.[lid]?.s || 0) + (S.timer && S.timer.list_id === lid ? timerElapsed() : 0);
+function timeSumHtml(lists) {
+  if (!timeOn()) return '';
+  const ls = lists.filter(l => l && l.kind === 'project');
+  if (!ls.length) return '';
+  let sec = 0, days = 0, bud = 0;
+  for (const l of ls) { const x = listSecs(l.id); sec += x; days += x / 3600 / dayHOf(l); bud += +(S.timeLists?.[l.id]?.b || 0); }
+  if (sec < 60 && !bud) return '';
+  const h = sec / 3600, dh = new Set(ls.map(dayHOf));
+  const dtxt = Math.abs(days - 1) < .05 ? tr('{0} day|time', fmtNum(1)) : tr('{0} days|time', fmtNum(days));
+  const tip = [tr('Tracked: {0}', fmtDur(sec)), dh.size === 1 ? tr('{0} at {1} h per day', dtxt, fmtNum([...dh][0])) : tr('{0}, each list with its own hours per day', dtxt),
+    bud ? tr('Budget: {0} h', fmtNum(bud)) : ''].filter(Boolean).join(' · ');
+  const pct = bud ? Math.min(100, Math.round(h / bud * 100)) : 0;
+  return `<span class="tsum ${bud && h > bud ? 'over' : ''}" title="${esc(tip)}" aria-label="${esc(tip)}">${ic('clock', 's')}<b>${esc(fmtNum(h))} h</b><span class="tsd">${esc(dtxt)}</span>${bud ? `<span class="tbud" role="img" aria-label="${esc(tr('{0} % of the budget', Math.round(h / bud * 100)))}"><i style="width:${pct}%"></i></span><span class="tbn">${esc(fmtNum(h))}/${esc(fmtNum(bud))} h</span>` : ''}</span>`;
+}
+function folderHead(f) {
+  const ts = timeSumHtml(folderLists(f));
+  return ts ? `<div class="lhead fhd"><span class="spacer"></span>${ts}</div>` : '';
 }
 async function statusModal(lid) {
   const l = listById(lid); if (!l) return;
@@ -10330,7 +10540,7 @@ function palAll() {
   for (const [k, icon, n] of SET_SECS) {
     if (k === 'account' && !S.me) continue;
     if (k === 'users' && !S.me?.is_admin) continue;
-    if (k === 'time' && !timeOn()) continue;
+    if (k === 'ai' && !aiPaneOn()) continue;  // 2.7.0 (#405 S2/S8: was a dead branch for a "time" tab)
     add('s:' + k, 'setting', tr('Settings: {0}', tr(n)), icon, () => settingsModal(k), {keys: k === 'general' ? 'g s' : ''});
   }
   // tasks (open ones + the recently completed that are in the state)
@@ -10437,8 +10647,8 @@ function unionRect(els) {
 function tourSteps() {
   const m = isMobile(), touch = isTouch(), s = [];
   const rect = sel => () => { const e = typeof sel === 'function' ? sel() : $(sel); return e ? e.getBoundingClientRect() : null; };
-  s.push(m ? {id: 'side', t: N_('Smart lists'), d: N_('The Inbox comes first: new tasks land there and the app opens on it. Today, Tomorrow and Next 7 days collect tasks from all your lists. Lists, filters and tags are in this menu.'), sel: '#top .menu', r: rect('#top .menu')}
-    : {id: 'side', sel: '#side > .srow', t: N_('Smart lists'), d: N_('The Inbox comes first: new tasks land there and the app opens on it. Today, Tomorrow and Next 7 days collect tasks from all your lists. Your own lists, filters and tags follow below.'),
+  s.push(m ? {id: 'side', t: N_('Smart lists'), d: N_('The Inbox comes first: new tasks without a list land there. Today, Tomorrow and Next 7 days collect tasks from all your lists. Lists, filters and tags are in this menu.'), sel: '#top .menu', r: rect('#top .menu')}
+    : {id: 'side', sel: '#side > .srow', t: N_('Smart lists'), d: N_('The Inbox comes first: new tasks without a list land there. Today, Tomorrow and Next 7 days collect tasks from all your lists. Your own lists, filters and tags follow below.'),
       r: () => unionRect($$('#side > .srow').slice(0, 4))});
   s.push({id: 'add', sel: m ? '#fab' : '#view .qadd .box', t: N_('Quick add'), d: N_('Type the way you think: “Dentist tomorrow 3pm !high #private in Family”. Dates, priority, tags and the list (~list, “in list …”) are picked up as you type.'), r: rect(m ? '#fab' : '#view .qadd .box')});
   s.push({id: 'detail', sel: '#view .trow', t: N_('Details'), d: touch ? N_('Tap a task for notes, subtasks, files and comments. Swipe right to complete, left to reschedule.') : N_('Click a task for notes, subtasks, files and comments. Drag it onto a day or a list to move it.'), r: rect('#view .trow')});

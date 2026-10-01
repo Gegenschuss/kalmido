@@ -16,6 +16,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.7.0** (2026-10-01): Reminders up to a year ahead with deadlines, reminders that repeat until done, time sums in
+  hours and days, steady layout on foldables, a simpler first start and a resizable News dropdown.
 - **2.6.1** (2026-10-01): Date and reminder changes save at once with Undo, a status dot per agent in the header, the
   bell opens the newest News in place, a per-event choice for a list's bell and filter chips for News.
 - **2.6.0** (2026-10-01): A header that keeps the title, "…" and the bell on every screen, a separate Share dialog,
@@ -23,8 +25,6 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **2.5.2** (2026-10-01): Hotfix from the second usability review: "…" and the bell always visible on phones, a
   compact proposal review without stray commas, the first-run tour fits every screen, admin alerts never to the public
   ntfy.sh unless chosen, and smaller fixes (task panel header, file picker, plurals, chart labels).
-- **2.5.1** (2026-10-01): Settings > *AI colleague* in four short sub-tabs (Agents, Lists, Usage, Log) instead of one
-  long page, clickable avatars in comments, branch suggestions `kalmido-<id>`.
 
 All changes: [CHANGELOG.md](CHANGELOG.md) · [GitHub Releases](https://github.com/Gegenschuss/kalmido/releases)
 
@@ -66,6 +66,16 @@ All changes: [CHANGELOG.md](CHANGELOG.md) · [GitHub Releases](https://github.co
   repeat) is saved at once and the popover stays open for more; *Done* (or a click outside, Esc) closes it and leaves
   one undo step with *Date: … · Undo*, *Undo* in its foot puts everything back. *Settings > General > Confirm changes
   with OK* brings back Cancel / OK
+- **Reminders well ahead and deadlines** (2.7.0): reminders from *On time* to *1 month* before as chips, or any number
+  of minutes, hours, days or weeks up to a year with *Other…* (also as the default reminder). Tick *Deadline* and the
+  task counts down on its row and in the task panel (*12 days left*), highlighted from its first reminder on;
+  *On Today from the first reminder* also puts it on Today from then on
+- **Repeat reminder until done** (2.7.0): a task's reminder can repeat every 5, 10, 15, 30 or 60 minutes or daily
+  until it is completed, starting with its first reminder (e.g. *2 weeks before the deadline, then daily*). Set it per
+  task in the date popover, or as the default of a list (list dialog). The push offers *Done*, *Stop reminding* and
+  *Snooze*. Nothing repeats during your quiet hours (*Settings > Notifications*, 22:00 to 07:00 by default), for a
+  list whose bell is muted, or with *Repeated reminders* switched off in the notification matrix; completed, deleted
+  and archived tasks stop at once, and every interval sends one push at most
 - Smart lists (inbox, the start view; today, tomorrow, next 7 days, now doable, all), combinable filters (list, date, priority, tag)
 - **Now doable** (`g d`): what you can start right now: open, not waiting on another task, due today, overdue or
   undated, and yours (assigned to you, or unassigned in your own lists; everything with collaboration off). In the
@@ -76,11 +86,11 @@ All changes: [CHANGELOG.md](CHANGELOG.md) · [GitHub Releases](https://github.co
 - Multi-select with batch actions, snooze, trash with restore, search in titles, notes and links
 - **Undo and redo history**: ← / → in the top bar step back and forward through your last 30 changes (edits,
   completing, deleting, moves, sections, list settings, batch actions, moving projects); right-click or long-press ←
-  to jump back several steps. Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, Ctrl+Y; on phones and touch tablets *Undo* / *Redo* sit at the top of the header's “…” menu.
+  to jump back several steps. Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, Ctrl+Y; on phones *Undo* / *Redo* sit at the top of the header's “…” menu (touch tablets and an unfolded foldable keep the arrows in the header while there is room).
   Settings changes are steps too. Never overwrites what others changed meanwhile, works offline
 - **Settings save themselves**: every switch, field and choice applies at once with a small *Saved · Undo*; one
-  *Modules* page with a sentence per module; developer things (API tokens, upload token, webhooks, rule texts) folded
-  under *Advanced*
+  *Modules* page with a sentence per module; developer things (API tokens, webhooks, rule texts) folded under
+  *Advanced*; the upload token for sharing from a phone lives in one place, *Integrations > Share from your phone*
 - **Archive instead of delete** for lists (undoable); deleting for good only from the archive, with a dialog that names
   what is lost. All questions use the app's own dialog, and whatever can be undone asks nothing. Tasks of an archived
   list stay out of Today, filters, the calendar, reminders and the digest until you restore it. *Archived* in the
@@ -92,9 +102,10 @@ All changes: [CHANGELOG.md](CHANGELOG.md) · [GitHub Releases](https://github.co
 - **Own date and time pickers** in the app language: a small month grid (the week starts on your locale's first day)
   and hours / minutes you can also type (`930`, `9:30 pm`, `21 Uhr`); keyboard and touch friendly
 - **Templates**: save a task with its subtasks, or a whole list with sections, and reuse it with dates relative to today
-- **List types**: *List*, *Checklist* (shopping and packing: ticked-off items move to a *Done* section and go back on
-  the list with one tap) or *Project* (time tracking, dependencies with the Gantt timeline, custom fields, progress and
-  status for that list only). Set it in the list dialog or the list's menu; plain lists stay free of project controls
+- **List types**: *List*, *Shopping & packing list* (what you tick off stays at the bottom and comes back with one
+  tap) or *Project* (time tracking, dependencies with the Gantt timeline, custom fields, progress and status for that
+  list only). Set it in the list dialog or the list's menu; plain lists stay free of project controls (the repository
+  section shows only for projects or a list that already has one)
 - **Running indicator** in the top bar: time tracking, a focus session or the stopwatch, each with its own icon, the
   time and the task; a click shows the task with Pause / Stop. The *Time tracking* page shows a running timer as a
   large card (live time, task, project, start, Stop)
@@ -117,6 +128,10 @@ All changes: [CHANGELOG.md](CHANGELOG.md) · [GitHub Releases](https://github.co
 - Pomodoro timer and stopwatch, focus minutes per task
 - **Time tracking** (project lists): a timer on any task that follows you across devices, manual entries, hours per list and task
   for any period, rounding, hourly rates, CSV export and a printable timesheet
+- **Time sum in the list header** (2.7.0): a project list (and a folder of them) shows its tracked time in hours and in
+  working days, e.g. *12.5 h · 1.6 days*. The length of a day / shift is one value for the whole server
+  (*Settings > Administration*, 8 h by default) that a list can override in its dialog, the same for everyone in it. A
+  number field *Budget h* (the agency project type has one) adds a budget bar: tracked against the sum of the budgets
 
 **Together**
 - Several users, each with their own inbox, habits, filters, tags, settings and notifications
@@ -151,7 +166,8 @@ All changes: [CHANGELOG.md](CHANGELOG.md) · [GitHub Releases](https://github.co
 - **Agents as team members**: an admin adds an agent (Claude Code, Codex, n8n, a local model, your own script) as a
   user of type *Agent*: never an admin, no Paperless, sees only the lists shared with it, with its own API token, an
   optional webhook and an on/off switch that stops everything at once
-- **Settings > Agents** (called *AI colleague* before 2.6.0): one tab in four sub-tabs (2.5.1). *Overview*: a card per agent with its state, lists and
+- **Settings > Agents** (called *AI colleague* before 2.6.0; 2.7.0: shown while the *Agents* module is on, and to
+  admins while agents exist): one tab in four sub-tabs (2.5.1). *Status* (2.7.0, was *Overview*): a card per agent with its state, lists and
   usage; admins add, edit, test and pause them there (username, display name and profile picture: a preset, an own
   photo or the initials). *Lists*: which lists each agent sees, *Share all* / *New lists automatically*, and a table
   of the lists you manage (shared ones first, *Show all*, search): which agent sees it (one click shares or unshares),
@@ -261,8 +277,8 @@ starting points:
 
 | Preset | For | On |
 |---|---|---|
-| **Simple list** | a plain to-do list, a household | lists, subtasks, reminders, the calendar |
-| **Just me** (preselected) | one person who likes views | also timeline, kanban, matrix, habits, focus, statistics, project progress |
+| **Simple list** (preselected) | a plain to-do list, a household | lists, subtasks, reminders, the calendar |
+| **Just me** | one person who likes views | also timeline, kanban, matrix, habits, focus, statistics, project progress, comments |
 | **Projects & team** | small teams up to about ten people, e.g. an agency | everything: sharing, assigning, comments, time tracking, the Gantt timeline with dependencies, custom fields |
 
 Under *Customize…* below the cards you can switch single modules on or off (the matching card stays highlighted),
@@ -270,8 +286,12 @@ and pick the language; *Start* stays in view. The modules become the default for
 server. The welcome tour and the *Getting started* list only mention modules that are on. All of it can be changed
 later in *Settings*.
 
-**Sample project.** *Create a sample project* below the cards (ticked for *Projects & team*) and on the first card of
-every new account's welcome tour (ticked when the project modules are on) adds a realistic example in the user's
+Below that, one question: **Start with**: *Empty*, the *Sample project*, or a project of the type *Agency*,
+*Software / AI dev* or *Personal* (sections, fields and settings for that kind of work; picking one switches the
+modules it needs on). More projects any time: *Lists > + > New project*.
+
+**Sample project.** *Sample project* under *Start with* and on the first card of every new account's welcome tour
+(ticked when the project modules are on) adds a realistic example in the user's
 language: *Example: Image film for client Muster* with the phases Concept, Pre-production, Shoot, Edit and Approval,
 about fifteen tasks around today (overdue, today, next week, undated) with start dates for the timeline, dependencies
 for *Flow* and *Now doable*, all four matrix quadrants, subtasks, a Markdown checklist, tags, a weekly status call, a
@@ -280,7 +300,7 @@ uses the modules that are on, stays private and quiet (no reminders, pushes, New
 digest). *Settings > Data > Sample project* creates it again or removes exactly what it created: sample tasks go even
 if you edited them, tasks you added yourself stay, and so does their list.
 
-<p align="center"><img src="docs/setup.png" width="560" alt="First-run setup: three preset cards Simple list, Just me and Projects and team, a project type and an optional sample project"></p>
+<p align="center"><img src="docs/setup.png" width="560" alt="First-run setup: three preset cards Simple list, Just me and Projects and team, then Start with: Empty, Sample project, Agency, Software and Personal"></p>
 
 > [!IMPORTANT]
 > Use HTTPS (a reverse proxy) for anything beyond your own machine: the login sends your password and
@@ -426,9 +446,10 @@ assignees, tags, files, custom fields or anything from other lists; task notes o
 - Admins can turn public links off for everyone (*Settings > Administration > Whole server*; existing links then stop working
   but are kept); `KALMIDO_PUBLIC_LINKS=0` turns them off for good.
 
-### Checklist mode
+### Shopping & packing lists
 
-For lists you work through again and again (groceries, packing, a cleaning routine): *Edit list > Type: Checklist*.
+For lists you work through again and again (groceries, packing, a cleaning routine): *Edit list > Type: Shopping &
+packing list* (called *Checklist* before 2.7.0; the API keeps the type name `checklist`).
 Ticked-off items move to a **Done** section at the bottom (open, collapsible) instead of disappearing, sorted by name,
 and go back on the list with one tap (↺). *Uncheck all* puts everything back, *Clear done* moves the done items to the
 trash. The rows are compact (no dates or priority colours), quick add works as usual, and it works with sharing and
@@ -498,7 +519,7 @@ public links (*View and tick off* makes a shared shopping list for the whole hou
   replies to your comment (the comment right before is yours), comments on tasks you follow (you commented on them),
   mentions, assignments, new tasks in shared lists (someone else created them), completions by others, project status,
   lists shared with you, unblocked tasks, an agent waiting for your approval, the follow-up day of a task *waiting on
-  external*, reminders (push only) and, for admins, an agent reaching a usage limit (2.1.1). A comment counts once, as the first of: mention, your task, reply, follow.
+  external*, reminders (push only), repeated reminders (2.7.0, push only; a muted list bell stops them) and, for admins, an agent reaching a usage limit (2.1.1). A comment counts once, as the first of: mention, your task, reply, follow.
   Defaults = the behaviour before 2.1.0 (completions only as a push; status and sharing only in News); new tasks in
   shared lists are off, replies and follow-ups on. `GET /api/v1/me` shows the settings, `PATCH /api/v1/me/notifications`
   changes them.
@@ -649,7 +670,7 @@ like and talks to Kalmido through the REST API, webhooks or the MCP server.
   for you, grey (hollow) offline / not connected / paused, red error or limit reached. Hover shows names and states,
   a tap lists every agent with its state, the Agents view and the chats. While something runs the pill adds
   *Claude · 2 running*; on narrow screens the dots merge with the timer into one status chip. *Settings > Agents >
-  Overview > In the header* picks the agents whose dot you see (default: all).
+  Status > In the header* picks the agents whose dot you see (default: all).
 
 **Security.** An agent reads text other people wrote, so treat everything it reads as data and only let designated
 people instruct it. Kalmido keeps agents out of admin rights and unshared lists, and gives you a kill switch, usage limits

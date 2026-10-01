@@ -125,7 +125,7 @@ const TOUCH = `(() => {
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v7[23]'/.test(SW), 'service worker cache v72');
+  check(/const CACHE = 'tasks-shell-v7[234]'/.test(SW), 'service worker cache v72 (2.6.1: v73, 2.7.0: v74)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en', tour: 'done'});
@@ -186,7 +186,7 @@ const TOUCH = `(() => {
   w.eval(`settingsModal('ai')`); await sleep(700);
   let md = d.querySelector('.smodal');
   check(/Agents/.test(md.querySelector('.snav [data-sec="ai"]').textContent) && !/AI colleague/.test(md.textContent), 'Settings tab "Agents", no "AI colleague"');
-  check(md.querySelector('[data-aisub="agents"]').textContent.trim() === 'Overview', 'first sub-tab: Overview');
+  check(md.querySelector('[data-aisub="agents"]').textContent.trim() === 'Status', 'first sub-tab: Status (2.7.0, #405 S5: was Overview)');
   check(!md.querySelector('[data-pane="ai"] [data-feat="agents"]') && !md.querySelector('.aimodoff'), 'module on: no switch, no hint');
   md.remove();
   await call('PATCH', '/api/settings', {features: ALL.replace(',agents', '')});
@@ -203,7 +203,7 @@ const TOUCH = `(() => {
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
   w.eval(`settingsModal('ai')`); await sleep(700);
   md = d.querySelector('.smodal');
-  check(/Agenten/.test(md.querySelector('.snav [data-sec="ai"]').textContent) && /Übersicht/.test(md.querySelector('[data-aisub="agents"]').textContent) && !/KI-Kollege/.test(md.textContent), 'German: Agenten, Übersicht, no "KI-Kollege"');
+  check(/Agenten/.test(md.querySelector('.snav [data-sec="ai"]').textContent) && /Status/.test(md.querySelector('[data-aisub="agents"]').textContent) && !/KI-Kollege/.test(md.textContent), 'German: Agenten, Status (2.7.0), no "KI-Kollege"');
   md.remove();
   // ================= K24: one short number format, a table
   check(w.eval('fmtTok(59100)') === '59,1 Tsd.' && w.eval('fmtTok(1250000)') === '1,3 Mio.' && w.eval('fmtTok(940)') === '940', 'German: 59,1 Tsd. / 1,3 Mio.: ' + w.eval('fmtTok(59100)'));

@@ -30,7 +30,7 @@ const TOKEN = 'bob-ui-server-token-4c2e', PTOKEN = 'bob-ui-personal-token-9d1f';
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v(6[0-9]|7[0-3])'/.test(SW), 'service worker cache v60 (2.1.1: v61, 2.1.2: v62, 2.2.0: v63, 2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70, 2.5.2: v71, 2.6.0: v72, 2.6.1: v73)');
+  check(/const CACHE = 'tasks-shell-v(6[0-9]|7[0-4])'/.test(SW), 'service worker cache v60 (2.1.1: v61, 2.1.2: v62, 2.2.0: v63, 2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70, 2.5.2: v71, 2.6.0: v72, 2.6.1: v73, 2.7.0: v74)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en'});
@@ -48,7 +48,7 @@ const TOKEN = 'bob-ui-server-token-4c2e', PTOKEN = 'bob-ui-personal-token-9d1f';
     w.eval(`settingsModal('notify')`); await sleep(700);
     const mx = d.querySelector('#sp-notify .nmx');
     const rows = [...(mx?.querySelectorAll('.nmr') || [])];
-    check(mx && rows.length === 13 && /Event.*News.*Push/.test(mx.querySelector('.nmh').textContent), `${lab}: matrix with every event (${rows.length})`);
+    check(mx && rows.length === 14 && /Event.*News.*Push/.test(mx.querySelector('.nmh').textContent), `${lab}: matrix with every event (${rows.length})`);
     const rem = rows.find(r => /Reminders/.test(r.textContent));
     check(rem && !rem.querySelector('[data-ch="news"]') && rem.querySelector('.nmna') && rem.querySelector('[data-nm="reminder"][data-ch="push"]').checked, `${lab}: reminders push only`);
     check(d.querySelector('[data-nm="reply"][data-ch="push"]').checked && d.querySelector('[data-nm="newtask"][data-ch="push"]').checked === mobile  // the desktop run switched it on

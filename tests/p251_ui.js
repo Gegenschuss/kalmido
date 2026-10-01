@@ -68,7 +68,7 @@ c.commit()`, path.join(DATA, 'tasks.db'), JSON.stringify(ids)]);
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v7[0-3]'/.test(SW), 'service worker cache v70 (2.5.2: v71, 2.6.0: v72, 2.6.1: v73)');
+  check(/const CACHE = 'tasks-shell-v7[0-4]'/.test(SW), 'service worker cache v70 (2.5.2: v71, 2.6.0: v72, 2.6.1: v73, 2.7.0: v74)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en'});
@@ -116,7 +116,7 @@ c.commit()`, path.join(DATA, 'tasks.db'), JSON.stringify(ids)]);
   await until(() => d.querySelectorAll('#s-ags [data-agid]').length === 2);
   let md = d.querySelector('.modal.smodal'), pane = md.querySelector('[data-pane="ai"]');
   const subs = [...pane.querySelectorAll('.aisub [data-aisub]')];
-  check(subs.map(b => b.dataset.aisub).join() === 'agents,lists,usage,log' && subs.map(b => b.textContent.trim()).join() === 'Overview,Lists,Usage,Log', 'sub-tabs Overview / Lists / Usage / Log (2.6.0: Agents -> Overview)');
+  check(subs.map(b => b.dataset.aisub).join() === 'agents,lists,usage,log' && subs.map(b => b.textContent.trim()).join() === 'Status,Lists,Usage,Log', 'sub-tabs Status / Lists / Usage / Log (2.6.0: Agents -> Overview, 2.7.0: Status)');
   check(subs[0].getAttribute('aria-selected') === 'true' && !pane.querySelector('#aisp-agents').hidden && ['lists', 'usage', 'log'].every(k => pane.querySelector('#aisp-' + k).hidden), 'Agents first, the others hidden');
   check(pane.querySelector('details.aiexp') && !pane.querySelector('details.aiexp').open && /team member for an AI assistant/.test(pane.querySelector('details.aiexp').textContent), 'explanation closed once an agent exists');
   check(!pane.querySelector('[data-feat="agents"]'), 'no module switch while the module is on');
@@ -208,7 +208,7 @@ c.commit()`, path.join(DATA, 'tasks.db'), JSON.stringify(ids)]);
   check(!d.querySelector('.smodal #aisp-agents').hidden, "settingsModal('agents') opens Agents");
   w.close();
 
-  // no agent yet: explanation open; module off: the switch
+  // module off: an admin with agents keeps the page (2.7.0, #405 S2), with a hint; the switch only in Modules
   await call('PATCH', '/api/settings', {features: ALL.replace(',agents', '')});
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
   w.eval(`settingsModal('ai')`); await sleep(800);
@@ -253,7 +253,7 @@ c.commit()`, path.join(DATA, 'tasks.db'), JSON.stringify(ids)]);
   w.eval(`settingsModal('activity')`);
   await until(() => d.querySelector('#s-aud .audr:not(.audh)'));
   pane = d.querySelector('.smodal [data-pane="ai"]');
-  check([...pane.querySelectorAll('[data-aisub]')].map(b => b.textContent.trim()).join() === 'Übersicht,Listen,Verbrauch,Protokoll', 'German sub-tabs: ' + [...pane.querySelectorAll('[data-aisub]')].map(b => b.textContent.trim()).join());
+  check([...pane.querySelectorAll('[data-aisub]')].map(b => b.textContent.trim()).join() === 'Status,Listen,Verbrauch,Protokoll', 'German sub-tabs: ' + [...pane.querySelectorAll('[data-aisub]')].map(b => b.textContent.trim()).join());
   check(/Ereignis-Abfragen ausblenden/.test(pane.textContent) && /Anfragen/.test(pane.querySelector('#aud-sum').textContent) && /Welche Listen sie sehen/.test(pane.textContent) && /Agenten sind KI-Teammitglieder/.test(pane.textContent), 'German texts');
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});

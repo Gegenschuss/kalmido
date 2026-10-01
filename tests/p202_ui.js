@@ -167,11 +167,12 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
   d.querySelector('[data-m="close"]').click(); await sleep(200);
   w.eval(`settingsModal('share')`); await sleep(700);
   d.querySelector('[data-m="drop-copy-tok"]').click(); await sleep(500);  // loads the real token into the field
+  // 2.7.0 (#405 S3): the upload token lives only under Share from your phone; Account links there
   w.eval(`settingsModal('account')`); await sleep(500);
   const sm = d.querySelector('.modal');
-  sm.querySelector('[data-acc="token-new"]').click(); await sleep(1000);
-  const tok2 = (await call('alice', 'GET', '/api/me')).drop_token;
-  check(tok2 !== tok1 && sm.querySelector('#a-tok').textContent === tok2 && sm.querySelector('#s-droptok').value === tok2, 'New token under Account: the share field of the same dialog shows it too (was stale)');
+  check(!sm.querySelector('[data-acc="token-new"]') && sm.querySelector('[data-pane="account"] [data-m="go-share"]'), 'Account: no second "New token", a link to Share from your phone');
+  sm.querySelector('[data-m="go-share"]').click(); await sleep(200);
+  check(sm.querySelector('.snav [data-sec="integr"]').classList.contains('on') && sm.querySelector('#s-droptok'), 'the link opens Share from your phone');
   sm.querySelector('[data-m="close"]').click(); await sleep(200);
 
   // ---- #299 "Claude is writing …"

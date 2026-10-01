@@ -2699,3 +2699,93 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 @media (pointer:coarse){.nchip{height:2.75rem}}
 .bcmodal .nmx{margin:.5rem 0}
 .bcmodal .mfoot{margin-top:.75rem;gap:.5rem}
+/* ================= 2.7.0 ================= */
+/* #412: reminders up to a year ahead ("Other…" = an own one), deadlines with a countdown */
+.remcust{gap:.375rem;padding-left:1.375rem;flex-wrap:wrap}
+.remcust input{width:4.5rem;max-width:4.5rem}
+.remcust select{max-width:8rem}
+.pdl{gap:.75rem;flex-wrap:wrap;padding-left:.125rem}
+.pdl .chkl{display:inline-flex;align-items:center;gap:.375rem;font-size:var(--fs-m)}
+.pdl .chkl .i{color:var(--p5)}
+.pnagl{font-size:var(--fs-s);white-space:nowrap}
+#p-nag{flex:1;min-width:0}
+.dlc{display:inline-flex;align-items:center;gap:.1875rem;font-size:var(--fs-s);color:var(--muted);white-space:nowrap}
+.dlc .i{width:.75rem;height:.75rem}
+.dlc.hot{color:var(--p5);font-weight:600}
+.meta .nagm .i + .i{margin-left:-.125rem;width:.625rem;height:.625rem}
+.ddl{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;padding:0 1rem .375rem}
+.ddl .dlc.big{font-size:var(--fs-b);padding:.1875rem .5rem;border-radius:var(--r-s);background:var(--bg3)}
+.ddl .dlc.big.hot{background:color-mix(in srgb,var(--p5) 14%,var(--bg3))}
+.ddl .dnag{display:inline-flex;align-items:center;gap:.3125rem;font-size:var(--fs-s);color:var(--muted);background:none;border:0;padding:.1875rem .25rem;border-radius:var(--r-s);cursor:pointer}
+.ddl .dnag:hover{color:var(--text);background:var(--bg3)}
+.qtol{min-width:0!important;margin:0 .25rem}
+@media (pointer:coarse){
+  .remchips button{min-height:2.75rem;min-width:2.75rem}
+  .ddl .dnag,.ddl .dlc.big{min-height:2.75rem}
+  .remcust input{min-height:2.75rem}
+}
+/* #407: tracked time in the list / folder header: hours, days, budget bar */
+.tsum{display:inline-flex;align-items:center;gap:.375rem;font-size:var(--fs-s);color:var(--muted);white-space:nowrap;min-width:0}
+.tsum b{font:600 var(--fs-s) var(--mono);color:var(--text);font-variant-numeric:tabular-nums}
+.tsum .tsd::before{content:"·";margin-right:.375rem}
+.tsum .tbud{display:inline-block;position:relative;width:4rem;height:.375rem;border-radius:99rem;background:var(--bg4);overflow:hidden}
+.tsum .tbud i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);border-radius:99rem}
+.tsum.over .tbud i{background:var(--p5)}
+.tsum .tbn{font:var(--fs-xs) var(--mono);font-variant-numeric:tabular-nums}
+.tsum.over .tbn{color:var(--p5)}
+.lhead.fhd{padding-top:.25rem}
+@media (max-width:30rem){ .tsum .tbn{display:none} .lhead{flex-wrap:wrap;row-gap:.25rem} }
+/* #414: the shopping & packing list hint with its cart */
+.lhint .i{vertical-align:-.125rem;color:var(--accent)}
+/* K21: setup "Start with": cards instead of a select + a checkbox */
+.sustarts{margin:.25rem 0 .25rem}
+.sustarts .ptcard{cursor:pointer}
+.sustarts .ptcard.on{border-color:var(--accent);box-shadow:inset 0 0 0 .0625rem var(--accent)}
+.sunote{font-size:var(--fs-s);margin:.25rem 0 0}
+@media (pointer:coarse){ .sustarts .ptcard{min-height:2.75rem} }
+/* K13: the rows follow the width of the list, not of the window: a narrow list column (an unfolded Fold with the sidebar,
+   a desktop with the task panel open) gets the phone rows (title, then date / list / assignee in the second line) */
+@media (min-width:900px){
+  .lwrap{container:lrows / inline-size}
+  @container lrows (max-width:48rem){
+    .trow.hascols{align-items:flex-start}
+    .trow.hascols .chk{margin-top:calc((var(--row-fs) * 1.45 - 1rem) / 2)}
+    .trow.hascols .tmain{flex-direction:column;align-items:stretch;gap:0}
+    .trow.hascols .ttl{white-space:normal;overflow:visible}
+    .trow.hascols .meta{flex-wrap:wrap;overflow:visible;margin-top:1px;flex:none}
+    .trow.hascols .meta .m-col{display:inline-flex}
+    .trow.hascols .tcols{display:none}
+    .trow.hascols .wcell{display:flex}
+  }
+}
+/* K14: timeline names cut with "…", a short bar's label left of it near the end, readable weekdays */
+.tl-name .tln{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tl-bar.short.lbl-l span{left:auto;right:calc(100% + .375rem);text-align:right}
+.tl .tl-bar.short.lbl-l span{left:auto;right:calc(100% + .375rem)}
+.tl-bar.short span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tl-d span{opacity:1;color:var(--muted)}
+.tl-d.we{color:color-mix(in srgb,var(--muted) 85%,transparent)}
+.tl-d.today span{color:var(--accent)}
+/* 2.7.0: the bell's dropdown is resizable (desktop: grip bottom left; phone: the sheet's handle up to full height) */
+#pop.bellpop{max-width:calc(100vw - 1.5rem)}
+.bpop{position:relative}
+.bpgrip{position:absolute;left:0;bottom:0;width:1.25rem;height:1.25rem;padding:0;border:0;background:none;cursor:nesw-resize;z-index:2;border-bottom-left-radius:var(--radius)}
+.bpgrip::before{content:"";position:absolute;left:.3125rem;bottom:.3125rem;width:.5rem;height:.5rem;border-left:.125rem solid var(--faint);border-bottom:.125rem solid var(--faint);border-bottom-left-radius:.125rem}
+.bpgrip:hover::before,.bpgrip:focus-visible::before{border-color:var(--accent)}
+.bpgrip:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.bpgrab{display:flex;justify-content:center;align-items:center;min-height:2.75rem;margin-bottom:-.75rem;cursor:ns-resize;touch-action:none;flex:none}
+.bpgrab i{width:2.5rem;height:.3125rem;border-radius:99rem;background:var(--line2)}
+.bpgrab:focus-visible i{background:var(--accent)}
+#pop.bellpop.sheet{max-height:none;max-width:none}
+.bpop .bpempty{flex:1 1 auto;justify-content:center}
+#pop.bellpop.sheet.bpfull{border-radius:0;padding-top:var(--safe-t)}
+.bpop .bplist{min-height:0}
+/* #405 S3: the account's link to "Share from your phone" */
+[data-pane="account"] [data-m="go-share"] .i{margin-right:.25rem}
+/* 2.7.0: the dropdown's heading "News" is a link to the News view (chevron + hover) */
+.bphl{display:inline-flex;align-items:center;gap:.25rem;background:none;border:0;padding:.25rem .375rem;margin-left:-.375rem;border-radius:var(--r-s);color:var(--text);cursor:pointer;font:inherit}
+.bphl .bpchev{color:var(--muted);font-size:1.125rem;line-height:1;transition:transform .12s}
+.bphl:hover,.bphl:focus-visible{background:var(--bg3)}
+.bphl:hover .bpchev,.bphl:focus-visible .bpchev{color:var(--accent);transform:translateX(.125rem)}
+@media (pointer:coarse){ .bphl{min-height:2.75rem;min-width:2.75rem} }
+@media (prefers-reduced-motion:reduce){ .bphl .bpchev{transition:none} }

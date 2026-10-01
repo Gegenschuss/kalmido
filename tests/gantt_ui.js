@@ -212,12 +212,12 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
   change(w, md.querySelector('#l-kind'), 'project');
   check(!md.querySelector('.kproj').hidden && /time tracking, dependencies with the Gantt timeline, custom fields, progress and status/.test(md.querySelector('#l-khint').textContent), 'type Project: hint names the features that are on');
   change(w, md.querySelector('#l-kind'), 'checklist');
-  check(/shopping and packing/.test(md.querySelector('#l-khint').textContent), 'type Checklist: its hint');
+  check(/shopping and packing/i.test(md.querySelector('#l-khint').textContent) && /stays at the bottom and comes back with one tap/.test(md.querySelector('#l-khint').textContent), 'type Shopping & packing list (2.7.0): its hint');
   md.remove();
   const srow = d.querySelector(`#side .srow[data-list="${PL}"]`);
   srow.dispatchEvent(new w.MouseEvent('contextmenu', {bubbles: true, cancelable: true})); await sleep(100);
   pop = d.querySelector('#pop:not(.hidden)');
-  check(pop && /Checklist/.test(pop.textContent) && /Project/.test(pop.textContent) && /Edit list…/.test(pop.textContent), 'sidebar context menu: the types');
+  check(pop && /Shopping & packing list/.test(pop.textContent) && /Project/.test(pop.textContent) && /Edit list…/.test(pop.textContent), 'sidebar context menu: the types');
   [...pop.querySelectorAll('button')].find(b => b.textContent.trim() === 'Project').click();
   check(await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === PL).kind === 'project'), 'context menu: type changed on the server');
   check(await until(() => d.querySelector('#top .kbadge') && /Project/.test(d.querySelector('#top .kbadge').textContent)), 'Project badge in the header');

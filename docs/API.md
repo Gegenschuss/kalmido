@@ -124,10 +124,11 @@ had been made in the app. Webhooks fire too.
 | Method and path | Scope | What it does |
 |---|---|---|
 | `GET /me` | read | The token's user, its scopes and expiry, which modules are on, and (2.1.0) `notifications`: `events` (per event `{news, push}`, `news` null = the event has no News) and `lists` (list id -> bell `all` / `mute` / `custom`; lists on `default` are left out), (2.6.1) `custom` (list id -> the own event choice of lists on `custom`, `{event: {news: 0\|1, push: 0\|1}}`, an event not listed follows `events`) |
-| `PATCH /me/notifications` | write | 2.1.0: change them partially: `{events?: {event: {news?, push?}}, lists?: {list_id: "all" \| "default" \| "mute" \| "custom" \| {mode: "custom", events: {event: {news?, push?}}}}}` (2.6.1: `custom` = your own choice per event for that list, events `newtask`, `comment`, `mention`, `assign`, `complete`, `status`, `unblock`, `approval`; a ticked one comes from every task of the list, an unticked one never; `"custom"` alone brings back the stored choice). Events: `comment`, `reply`, `follow`, `mention`, `assign`, `newtask`, `complete`, `status`, `share`, `unblock`, `approval`, `followup`, `reminder` (push only) |
+| `PATCH /me/notifications` | write | 2.1.0: change them partially: `{events?: {event: {news?, push?}}, lists?: {list_id: "all" \| "default" \| "mute" \| "custom" \| {mode: "custom", events: {event: {news?, push?}}}}}` (2.6.1: `custom` = your own choice per event for that list, events `newtask`, `comment`, `mention`, `assign`, `complete`, `status`, `unblock`, `approval`; a ticked one comes from every task of the list, an unticked one never; `"custom"` alone brings back the stored choice). Events: `comment`, `reply`, `follow`, `mention`, `assign`, `newtask`, `complete`, `status`, `share`, `unblock`, `approval`, `followup`, `reminder` (push only), `nag` (2.7.0, push only: reminders repeated until done; a muted list bell stops them) |
 | `GET /lists` | read | Lists the user can see: own and shared, with role (`owner`, `admin`, `edit` = member, `participant`, `view` = viewer), checklist flag, progress, `icon` (URL of the list's own picture, empty = none; set in the app), `agent_tidy`, and (2.0.8) its sections `[{id, name}]` |
-| `POST /lists` | write | Create a list: `{name, color?, folder?, kind?, checklist?}` (`kind`: `list` default, `checklist`, `project`) |
+| `POST /lists` | write | Create a list: `{name, color?, folder?, kind?, checklist?, nag?, day_hours?}` (`kind`: `list` default, `checklist` = *Shopping & packing list* in the app, `project`) |
 | `GET /lists/{id}` | read | One list with its sections |
+| `PATCH /lists/{id}` | write | 2.7.0: change a list. The owner: `name`, `color`, `kind`, `nag` (default nag interval of its tasks: `5`, `10`, `15`, `30`, `60` minutes, `1d`; empty / `off` = none), `day_hours` (hours per day / shift for the time sums, 1 to 24; `null` = the server's value). Members change only their own `folder` and `view` |
 | `GET /lists/{id}/repos` | read | 2.2.0: repositories connected to a (project) list: `provider` (`github` / `gitea`), `base_url`, `web_url`, `owner`, `repo`, `full_name`, `default_branch`, `status` (`new` / `ok` / `error`), `error`, `polled_at`. Never a token; connecting is only in the app (list owner / list admins). Lists also carry `repos` |
 | `POST /lists/{id}/owner` | write | 2.1.2: transfer the ownership `{user_id}` to another active person (never an agent); the old owner stays as a list admin. Admins may take over a list whose owner is an agent or a disabled user. Agent tokens always `403`, inboxes `409` |
 | `GET /tasks` | read | Tasks (not in the trash), oldest first; filters below |
@@ -185,14 +186,18 @@ had been made in the app. Webhooks fire too.
   "created_by": 1, "completed_by": null,
   "created_at": "2026-09-29T08:15:00+00:00", "updated_at": "2026-09-29T08:15:00+00:00", "completed_at": null,
   "deleted": false, "fields": {"3": "opt2"}, "blocked": false, "comment_count": 0,
-  "attachments": [{"id": 5, "name": "x-ray.pdf", "mime": "application/pdf", "size": 81234}]
+  "attachments": [{"id": 5, "name": "x-ray.pdf", "mime": "application/pdf", "size": 81234}],
+  "deadline": false, "deadline_in_today": false, "nag": ""
 }
 ```
 
 Writable fields for `POST /tasks` and `PATCH /tasks/{id}`: `title` (required on create), `notes`, `list_id`,
 `section_id`, `parent_id`, `priority`, `due`, `due_time`, `start`, `duration` (minutes), `reminders` (minutes before the
-due time), `repeat` (an RRULE body such as `FREQ=WEEKLY;BYDAY=MO`, daily or longer), `repeat_from` (`due` / `done`),
-`url`, `tags` (replaces your tags on the task), `list_tags` (replaces the list tags of the task; names, missing ones are
+due time, up to 366 days = 527040), `repeat` (an RRULE body such as `FREQ=WEEKLY;BYDAY=MO`, daily or longer), `repeat_from` (`due` / `done`),
+`url`, (2.7.0) `deadline` (boolean: the due date is a deadline, the app counts down and highlights it from the first
+reminder on), `deadline_in_today` (boolean: also on Today from the first reminder on; `true` sets `deadline` too), `nag`
+(repeat the reminder until done: `5`, `10`, `15`, `30`, `60` (minutes) or `1d`; `off` = never, empty = the list's
+default; from the first reminder on, not during the person's quiet hours), `tags` (replaces your tags on the task), `list_tags` (replaces the list tags of the task; names, missing ones are
 created when you may change the list), `assignee_id` (someone who can see the list), `pinned`, `fields`
 (custom field values by field id); `content` is accepted as an alias of `notes` (2.2.1). `tags` are personal: every user has their own tags on a shared task; `list_tags`
 belong to the list and everyone in it sees them. Attachments are

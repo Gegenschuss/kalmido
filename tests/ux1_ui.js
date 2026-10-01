@@ -95,7 +95,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   // ================= Settings > Modules (U04, U05, U06)
   w.eval(`settingsModal('layout')`); await sleep(300); md = [...d.querySelectorAll('.modal.smodal')].pop();
   const secs = [...md.querySelectorAll('.snav [data-sec]')].map(b => b.dataset.sec);
-  check(JSON.stringify(secs) === JSON.stringify(['account', 'general', 'look', 'modules', 'notify', 'integr', 'ai', 'data', 'users', 'help']), 'sections: ' + secs);
+  check(JSON.stringify(secs) === JSON.stringify(['account', 'general', 'look', 'modules', 'notify', 'integr', 'data', 'users', 'help']), 'sections (2.7.0: no Agents page without the module and agents): ' + secs);
   check(md.querySelector('.snav .on')?.dataset.sec === 'modules', 'old link "layout" opens Modules');
   const mp = md.querySelector('[data-pane="modules"]');
   const rows = [...mp.querySelectorAll('[data-modrow]')];
@@ -106,7 +106,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   check(mp.querySelector('[data-modrow="pomo"] details #s-pf') && mp.querySelector('[data-modrow="time"] details #s-trnd'), 'focus and time options folded under their module');
   check(!md.querySelector('#s-nav') && !md.querySelector('[data-pane="layout"]') && !md.querySelector('[data-pane="collab"]'), 'the duplicate module list and the Collaboration tab are gone');
   check(md.querySelector('[data-pane="look"] #s-tabbar'), 'tab bar under Appearance');
-  check(md.querySelector('[data-pane="account"] details.sdev [data-acc="token"]'), 'upload / API tokens folded under "Advanced · for developers"');
+  check(md.querySelector('[data-pane="account"] details.sdev [data-m="go-share"]') && !md.querySelector('[data-acc="token"]'), 'API tokens folded under "Advanced · for developers"; 2.7.0 (#405 S3): the upload token only under Share from your phone, a link here');
   // 1.9.0: /drop moved out of "Advanced" into Integrations > Share from your phone (the address to copy)
   check(md.querySelector('[data-pane="integr"] #s-share-h') && /^https?:\/\/[^/]+$/.test(md.querySelector('[data-pane="integr"] #s-dropurl')?.value || ''), 'server address (2.0.2: without /drop) in Integrations > Share from your phone');
   const prio = [...md.querySelectorAll('#s-pushprio option')].map(o => o.textContent);
@@ -315,7 +315,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   check(d.querySelector('#side').classList.contains('open') && !d.querySelector('#scrim').classList.contains('hidden'), 'the rail button opens the sidebar as an overlay');
   click(w, d.querySelector('#scrim')); await sleep(50);
   check(!d.querySelector('#side').classList.contains('open'), 'tap next to it closes it');
-  check(!d.querySelector('#top [data-act="hist-undo"]'), 'touch tablet: undo / redo in "…" too');
+  check(d.querySelector('#top [data-act="hist-undo"]'), '2.7.0 (#405): touch tablet with room: undo / redo in the header (they fold into "…" when tight)');
   w.eval('closeDetail()'); await sleep(50);
   check(!d.querySelector('#app').classList.contains('side-rail'), 'panel closed: sidebar back');
   Object.defineProperty(w, 'innerWidth', {configurable: true, value: 1600});
