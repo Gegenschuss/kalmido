@@ -23,7 +23,8 @@ const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now(
   const ts = (await call('POST', '/api/tasks', {title: 'Shared job', list_id: SH}, BK)).id;
   // inside today (the report shows this week: right after midnight on a Monday, 3 h ago would be last week)
   const mid = new Date(); mid.setHours(0, 0, 0, 0); const since = Math.floor((Date.now() - mid) / 6e4);
-  await call('POST', '/api/time/entries', {task_id: ts, start: new Date(since >= 185 ? Date.now() - 3 * 36e5 : +mid).toISOString(), minutes: since >= 185 ? 45 : Math.max(1, Math.min(45, since - 1)), note: 'bob work'}, BK);
+  const BOBM = since >= 185 ? 45 : Math.max(1, Math.min(45, since - 1));  // 2.7.2: shorter right after midnight (the check below follows)
+  await call('POST', '/api/time/entries', {task_id: ts, start: new Date(since >= 185 ? Date.now() - 3 * 36e5 : +mid).toISOString(), minutes: BOBM, note: 'bob work'}, BK);
 
   // ================= timer from the detail panel, pill, chips
   let w = await boot({user: 'alice', hash: 'l/' + WORK}); let d = w.document;
@@ -109,7 +110,7 @@ const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now(
   w.eval(`openDetail(${ts})`); await sleep(800);
   const rows = d.querySelectorAll('#d-time .terow');
   check(rows.length === 1 && !rows[0].querySelector('[data-act="te-edit"]') && rows[0].querySelector('.who'), "bob's entry: shown with avatar, no edit buttons");
-  check(/0:45 in total|45m in total/.test(d.querySelector('#d-time h5').textContent), 'section total: ' + d.querySelector('#d-time h5').textContent);
+  check(new RegExp(`0:${String(BOBM).padStart(2, '0')} in total|\\b${BOBM}m in total`).test(d.querySelector('#d-time h5').textContent), 'section total: ' + d.querySelector('#d-time h5').textContent);
   w.eval('closeDetail()');
   // task menu
   w.eval(`taskMenu($('#top h1'), ${t1})`); await sleep(100);

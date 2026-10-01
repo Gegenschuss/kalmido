@@ -62,6 +62,7 @@ const TOKEN = 'bob-ui-server-token-4c2e', PTOKEN = 'bob-ui-personal-token-9d1f';
       st = await call('GET', '/api/state', null, CKB);
       check(st.notify.complete.news === true && st.settings.news_kinds.split(',').includes('complete'), 'toggle a News of an old event: news_kinds');
       click(w, d.querySelector('.smodal .ssaved [data-m="s-undo"]')); await sleep(900);
+      for (let i = 0; i < 20 && (await call('GET', '/api/state', null, CKB)).notify.complete.news !== false; i++) await sleep(300);  // 2.7.2: slow CI runner
       st = await call('GET', '/api/state', null, CKB);
       check(st.notify.complete.news === false && st.notify.newtask.push === true, 'undo takes back the last change');
     }
