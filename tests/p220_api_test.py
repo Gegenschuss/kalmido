@@ -377,13 +377,14 @@ r = A.patch(B + f"/api/repos/{RID}", json={"token": TOKEN})
 
 def poke_ok():  # 2.4.1: CI flake (a slow runner missed the 12 s window): make the connection due again on every try
     c = sqlite3.connect(os.path.join(DATA, "tasks.db"))
-    c.execute("UPDATE git_conns SET next_at=0 WHERE id=? AND fails>0", (RID,))
+    c.execute("UPDATE git_conns SET next_at=0 WHERE id=? AND (fails>0 OR last_error!='')", (RID,))
     c.commit()
     c.close()
-    return dbq("SELECT fails FROM git_conns WHERE id=?", (RID,))[0][0] == 0
+    # 2.7.2: wait for both (fails and last_error); a slow CI runner once saw fails 0 before last_error was cleared
+    return tuple(dbq("SELECT fails, last_error FROM git_conns WHERE id=?", (RID,))[0]) == (0, "")
 
 
-until(poke_ok, 40)
+until(poke_ok, 60)
 check(dbq("SELECT fails, last_error FROM git_conns WHERE id=?", (RID,))[0] == (0, ""), "recovers after the token is fixed")
 check(Bo.post(B + f"/api/repos/{RID}/refresh").ok, "a member may ask for a check")
 
