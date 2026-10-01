@@ -57,7 +57,10 @@ const set = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', 
   w.eval(`listModal(${L.id})`); await sleep(400);
   let md = d.querySelector('.modal');
   check(md.querySelector('#l-kind')?.value === 'checklist' && !md.querySelector('#l-kind').disabled, 'list dialog: type Checklist (owner)');
-  check(md.querySelector('#l-pub') && /Public link/.test(md.textContent), 'list dialog: public link section');
+  // 2.6.0 (K12): the public link lives in the Share dialog
+  md.remove(); w.eval(`shareModal(${L.id})`); await sleep(500);
+  md = d.querySelector('.modal.shmodal');
+  check(md && md.querySelector('#l-pub') && /Public link/.test(md.textContent), 'Share dialog: public link section');
   click(w, md.querySelector('[data-lp="save"]')); await sleep(700);
   const url = md.querySelector('#lp-url')?.value || '';
   check(/\/s\/[A-Za-z0-9_-]{32,}$/.test(url), 'create public link: URL shown ' + url);
@@ -73,6 +76,7 @@ const set = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', 
   await fetch(B + tp + '/tick', {method: 'POST', body: new URLSearchParams({task: String(eggs.id), to: 'done'}), redirect: 'manual'});
   click(w, md.querySelector('[data-lp="off"]')); await sleep(600);
   check(!md.querySelector('#lp-url') && md.querySelector('[data-lp="save"]') && (await call(ca, 'GET', `/api/lists/${L.id}/public-link`)).link === null, 'turn off');
+  md.remove(); w.eval(`listModal(${L.id})`); await sleep(400); md = d.querySelector('.modal');
   md.querySelector('#l-kind').value = 'list';
   md.querySelector('#l-kind').dispatchEvent(new w.Event('change', {bubbles: true}));  // 1.5.1: the dialog saves itself
   click(w, md.querySelector('[data-m="close"]')); await sleep(900);
@@ -131,8 +135,8 @@ const set = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', 
   pls.checked = false; pls.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(700);
   check(w.eval('S.publicLinks') === false && (await call(ca, 'GET', '/api/about')).public_links === false, 'switch off');
   md.remove();
-  w.eval(`listModal(${L.id})`); await sleep(300);
-  check(!d.querySelector('.modal #l-pub'), 'switched off: no public link section');
+  w.eval(`shareModal(${L.id})`); await sleep(300);
+  check(d.querySelector('.modal.shmodal') && !d.querySelector('.modal #l-pub'), 'switched off: no public link section');
   d.querySelector('.modal').remove();
   await call(ca, 'PATCH', '/api/admin/settings', {public_links: true});
   // "via API" in the history
@@ -155,7 +159,10 @@ const set = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', 
   w = await boot({user: 'alice', hash: 'l/' + L.id}); d = w.document;
   check(/Erledigt/.test(d.querySelector('#view .ckdone .ghead')?.textContent || '') && d.querySelector('[data-act="ck-uncheck"]')?.textContent.includes('Alle zurücksetzen'), 'German: Done section');
   w.eval(`listModal(${L.id})`); await sleep(400);
-  check(/Checkliste/.test(d.querySelector('.modal #l-kind').textContent) && /Projekt/.test(d.querySelector('.modal #l-kind').textContent) && /Öffentlicher Link/.test(d.querySelector('.modal').textContent), 'German: list dialog');
+  check(/Checkliste/.test(d.querySelector('.modal #l-kind').textContent) && /Projekt/.test(d.querySelector('.modal #l-kind').textContent) && /Teilen…/.test(d.querySelector('.modal').textContent), 'German: list dialog');
+  d.querySelector('.modal').remove();
+  w.eval(`shareModal(${L.id})`); await sleep(400);
+  check(/Öffentlicher Link/.test(d.querySelector('.modal.shmodal')?.textContent || ''), 'German: Share dialog');
   d.querySelector('.modal').remove();
   w.eval(`settingsModal('account')`); await sleep(500);
   check(/API-Tokens/.test(d.querySelector('.smodal').textContent), 'German: API tokens');

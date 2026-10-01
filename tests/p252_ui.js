@@ -58,7 +58,7 @@ async function firefox(fn) {
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v71'/.test(SW), 'service worker cache v71');
+  check(/const CACHE = 'tasks-shell-v7[12]'/.test(SW), 'service worker cache v71 (2.6.0: v72)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en', tour: 'done'});
@@ -174,12 +174,12 @@ async function firefox(fn) {
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: W, height: Hh}});
       await nav(B + 'static/icon.svg'); await nav(B + '#l/' + L); await sleep(2500);
       // K01: "…" and the bell stay inside the viewport while the agent pill and the timer pill show
-      const hd = await ev(`({vw: innerWidth, more: ${rect('#top [data-act="top-more"]')}, bell: ${rect('#top .bell')}, achip: ${rect('#top .achip')}, tmini: ${rect('#top .tmini')}, acn: (() => { const e = document.querySelector('#top .achip .acn'); return e ? getComputedStyle(e).display : null; })(), doc: document.documentElement.scrollWidth - innerWidth})`);
+      const hd = await ev(`({vw: innerWidth, more: ${rect('#top [data-act="top-more"]')}, bell: ${rect('#top .bell')}, achip: ${rect('#top .achip')}, tmini: ${rect('#top .tmini')}, st: ${rect('#top .stchip')}, acn: (() => { const e = document.querySelector('#top .achip .acn'); return e ? getComputedStyle(e).display : null; })(), doc: document.documentElement.scrollWidth - innerWidth})`);
       if (W !== 904) {
-        check(hd.achip && hd.tmini, `${W}px: agent pill and timer pill shown ${JSON.stringify(hd)}`);
+        check((hd.achip && hd.tmini) || hd.st, `${W}px: agent pill and timer pill shown (2.6.0: or merged into the status chip) ${JSON.stringify(hd)}`);
         check(hd.more && hd.bell && hd.more[0] >= 0 && hd.more[2] <= hd.vw && hd.bell[2] <= hd.vw && hd.doc <= 0, `${W}px: "…" and the bell inside the viewport ${JSON.stringify(hd)}`);
       }
-      if (W <= 390) check(hd.acn && hd.acn !== 'none', `${W}px: the agent pill is the bot + a number`);
+      if (W <= 390) check(hd.st || (hd.acn && hd.acn !== 'none'), `${W}px: the agent pill is the bot + a number (2.6.0: or the merged status chip)`);
       await shot(`p252-head-${W}.png`);
       // K06 / K22: the panel
       await ev(`openDetail(${T})`); await sleep(700);

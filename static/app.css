@@ -2561,3 +2561,93 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 .meta .nxt{white-space:nowrap;min-width:0;max-width:100%;flex:0 1 auto}
 .meta .nxt .nxl{min-width:3.5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .meta .nxt .i{flex:none}
+
+/* ---- 2.6.0: UX2 */
+/* K01 + K02: the header's fixed priority (see fitTop() in app.js). The title never shrinks below its first ~12 characters
+   (min-width set from a measurement), "…" and the bell never shrink; the levels tl1 … tl4 make room step by step */
+#top h1{flex:1 1 0;min-width:0}
+#top h1 .ht{flex:0 1 auto}
+#top .tmore,#top .bell,#top .menu{flex:none}
+#top .tmore[hidden]{display:none}
+.stchip{display:none;align-items:center;gap:.5rem;padding:.25rem .5rem;border-radius:var(--radius);background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--text);font-size:.8125rem;border:1px solid transparent;cursor:pointer;flex:none;position:relative;white-space:nowrap}
+.stchip.attn{border-color:color-mix(in srgb,var(--p3) 60%,transparent)}
+.stchip .sta,.stchip .str{display:inline-flex;align-items:center;gap:.25rem;font:600 .8125rem/1 var(--mono);font-variant-numeric:tabular-nums}
+.stchip .sta .i{width:.875rem;height:.875rem}
+.stchip .rec{width:.5rem;height:.5rem;border-radius:50%;background:var(--accent);flex:none;display:inline-block}
+#top.tl1 .achip{flex:0 1 auto;min-width:0;max-width:none;padding:.25rem .5rem;gap:.25rem}
+#top.tl1 .achip>.avatar,#top.tl1 .achip>.i,#top.tl1 .achip .act{display:none}
+#top.tl1 .achip .acn{display:inline-flex;align-items:center;gap:.25rem;font:600 .8125rem/1 var(--mono)}
+#top.tl1 .tmini .tmt,#top.tl1 .kbtn>span,#top.tl1 .kbtn kbd,#top.tl1 .offline .ofl,#top.tl1 .kbadge{display:none}
+#top.tl1 .tmini{flex:none;min-width:0}
+#top.tl1 .kbtn{padding:0 .5rem}
+#top:is(.tl2,.tl3,.tl4) .achip,#top:is(.tl2,.tl3,.tl4) .tmini.run,#top:is(.tl2,.tl3,.tl4) .tmini .tmt,
+#top:is(.tl2,.tl3,.tl4) .kbtn>span,#top:is(.tl2,.tl3,.tl4) .kbtn kbd,#top:is(.tl2,.tl3,.tl4) .offline .ofl,#top:is(.tl2,.tl3,.tl4) .kbadge{display:none}
+#top:is(.tl2,.tl3,.tl4) .stchip{display:inline-flex}
+#top:is(.tl2,.tl3,.tl4) .kbtn{padding:0 .5rem}
+/* only one of the two pills: it stays (shrunk), there is nothing to merge */
+#top:is(.tl2,.tl3,.tl4):not(:has(.stchip)) .achip{display:flex;flex:0 1 auto;min-width:0;max-width:none;padding:.25rem .5rem;gap:.25rem}
+#top:is(.tl2,.tl3,.tl4):not(:has(.stchip)) .achip>.avatar,#top:is(.tl2,.tl3,.tl4):not(:has(.stchip)) .achip>.i,#top:is(.tl2,.tl3,.tl4):not(:has(.stchip)) .achip .act{display:none}
+#top:is(.tl2,.tl3,.tl4):not(:has(.stchip)) .achip .acn{display:inline-flex;align-items:center;gap:.25rem;font:600 .8125rem/1 var(--mono)}
+#top:is(.tl2,.tl3,.tl4):not(:has(.stchip)) .tmini.run{display:flex;flex:none;min-width:0}
+#top:is(.tl3,.tl4) .tf{display:none}
+#top.tl4 .tf4,#top.tl4 h1 .hn{display:none}
+#top.tl4 .stchip .str [data-timer-mini],#top.tl4 .stchip .str [data-pomo-mini]{display:none}
+#top.tl4:not(:has(.stchip)) .tmini.run .rk{display:none}
+@media (pointer:coarse){ #top .stchip,#top .achip{min-width:2.75rem;min-height:2.75rem;justify-content:center} }
+@media (prefers-reduced-motion:no-preference){ .stchip .rec{animation:recpulse 1.6s ease-in-out infinite} }
+/* K11: the "nobody assigned" circle is quiet: hover / focus only (desktop), gone on touch screens */
+.whob.wnone{opacity:0;transition:opacity .12s}
+.trow:hover .whob.wnone,.whob.wnone:focus-visible,.trow.sel .whob.wnone{opacity:1}
+@media (hover:none),(pointer:coarse){ .whob.wnone{display:none} }
+.aimodoff{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.aimodoff>span{flex:1 1 14rem}
+/* K07: the date column: one sans format like everywhere else, cut on the right (never on the left), a range = a small
+   range icon (the full range is in the tooltip and in the task panel) */
+@media (min-width:900px){
+  .tcols .c-date{width:8.5rem;font-family:var(--sans);gap:.25rem;justify-content:flex-end}
+  .tcols .c-date .cdt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tcols .c-date .rngi{flex:none;width:.75rem;height:.75rem;opacity:.7}
+}
+.meta .dt{font-family:var(--sans);font-size:var(--fs-s)}
+/* K17: small text meets WCAG AA (4.5:1) in both themes: --faint is for lines, icons and placeholders only, text uses
+   --muted; plain links in dialogs use the accent (the browser's default blue was 1.9:1 on the dark theme) */
+.pitem .pk,.rm-hname,.rm-hname:hover,.rm-gname .c,.rm-lbl .rm-dt,.rm-none,.menu-list .hhead,.qadd.dock .qhint,.cmsg time,.rm-nh .c,.selsheet .ssgrp{color:var(--muted)}
+.modal a:not([class]),.smodal a:not([class]),#pop a:not([class]){color:var(--accent)}
+/* K24: the usage card in the Agents view: a small table (agent · today · 7 days · 30 days) */
+.aiug{display:grid;grid-template-columns:minmax(0,1fr) repeat(3,minmax(3.5rem,auto));column-gap:1rem;row-gap:.375rem;align-items:center}
+.aiug>.aiugh,.aiug>.aiucr{display:contents}
+.aiugh span{font-size:var(--fs-xs);color:var(--muted);text-align:right}
+.aiug .aiucr .n{display:flex;align-items:center;gap:.5rem;min-width:0;font-size:var(--fs-s)}
+.aiug .aiucr .n>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.aiug .aiuv{text-align:right;font:var(--fs-s) var(--mono)}
+/* K10: touch targets of the 2.x building blocks reach 44 x 44 px on touch screens (UX1's rule, extended): segments, small
+   buttons, icon buttons, the calendar / timeline navigation, the proposal checkboxes and date buttons, the notification
+   matrix, the agent buttons, the chat; small inline controls in a row get an invisible 44 px hit area instead of a bigger look */
+.ppcl{display:inline-grid;place-items:center;flex:none;align-self:flex-start;cursor:pointer}
+@media (pointer:coarse){
+  .seg button,.btn.sm,.btn,.linkbtn,select,.odban .btn,.mrow .linkbtn,.emobtn{min-height:2.75rem}
+  .seg button,.btn,.emobtn{min-width:2.75rem}
+  .lhead .lpx{width:2.75rem;min-width:2.75rem}
+  .iconbtn{min-width:2.75rem;min-height:2.75rem;justify-content:center}
+  .pprow .dpbtn{min-height:2.75rem}
+  .ppcl{width:2.75rem;height:2.75rem;margin:-.625rem -.5rem -.625rem -.75rem}
+  .chk::after{inset:-1rem}
+  .chkl{min-height:2.75rem;display:flex;align-items:center;gap:.5rem}
+  .ghead[data-act="collapse"],.hname,.tvl{min-height:2.75rem}
+  .drun,.dep .dt,.runtask,.tvr-task,.stpill,.caret,.whob{position:relative}
+  .drun::before,.dep .dt::before,.runtask::before,.tvr-task::before,.stpill::before,.caret::before,.whob::before{content:"";position:absolute;left:min(0rem,calc(50% - 1.375rem));right:min(0rem,calc(50% - 1.375rem));top:calc(50% - 1.375rem);bottom:calc(50% - 1.375rem)}
+}
+/* K12: the Share dialog + the "Sharing" summary row in the list dialog */
+.shsum{flex-wrap:wrap;gap:.5rem}
+.shsum #l-shsum{flex:1 1 12rem;font-size:var(--fs-s)}
+.shmodal .rolehelp.sdet{display:block}
+.shmodal .rolehelp>summary{cursor:pointer;color:var(--muted);font-size:var(--fs-s)}
+.shmodal .rolehelp[open]{display:grid}
+.shmodal #sh-owner{margin-bottom:.25rem}
+#top .shbtn .bl{font-size:var(--fs-s)}
+#top:is(.tl1,.tl2,.tl3,.tl4) .shbtn .bl{display:none}
+@container (max-width:52rem){ #top .shbtn .bl{display:none} }
+@media (pointer:coarse){
+  .linkbtn{min-width:2.75rem}
+  .shmodal .rolehelp>summary{min-height:2.75rem;display:flex;align-items:center}
+}

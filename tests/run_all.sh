@@ -222,6 +222,12 @@ fresh; run p208_ui node p208_ui.js
 # Firefox (360 x 780, 390 x 844, 904 x 1080, 1280 x 800: "…" and the bell in view while an agent works and a timer runs)
        run p252_api "$PY" p252_api_test.py "$KALMIDO_TEST_DATA"
        run p252_ui node p252_ui.js "$KALMIDO_TEST_DATA"
+# 2.6.0 (UX2): the agents' contact age + webhook flag, the refused test alert in plain words (own container); then the header
+# levels + status chip, "not connected", one term "Agents", the assignee circle, one date format, the usage table, the week
+# title, the Share dialog in jsdom, and in Firefox at 360 / 390 / 904 (touch) and 1280 / 1920, dark + light: title, "…" and
+# bell, toast, date column, week title, contrast and the 44 px touch targets
+       run p260_api "$PY" p260_api_test.py "$KALMIDO_TEST_DATA"
+       run p260_ui node p260_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

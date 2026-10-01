@@ -7,6 +7,65 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-10-01
+
+**In short:** The second usability package: the header always keeps the list title readable plus "…" and the bell, the
+agent and timer pills shrink into one status chip when space is short, sharing has its own *Share* dialog, agents that
+are not connected say so, "Agents" is the one name for them everywhere, and touch targets, contrast, dates, toasts and a
+few texts are tidied up.
+
+### Changed
+- **Header with a fixed priority** (K01, K02): on every width the title comes first: it is never cut below its first
+  ~12 characters and is shown in full whenever anything else can make room (on a desktop at 1280 and 1920 px also with
+  the task panel open). "…" and the bell are always on screen. When space gets short, step by step: the agent pill becomes
+  the bot + a number and the timer pill drops the task name; then both merge into one status chip (bot + number, dot +
+  time; a tap opens the timer or the agents); then the view switch, field columns, refresh, *Share* and undo / redo move
+  into "…"; last, search moves into "…" too. "…" is there on every view (search and the shortcuts where a view has
+  nothing of its own). Measured after every render, on resize and once the fonts are loaded.
+- **Sharing in its own dialog** (K12): *Share…* in a list's "…" menu, a *Share* button next to the list title (desktop)
+  and *Sharing > Share…* in the list dialog open the Share dialog: **People** (roles, *Share with …* + role to invite,
+  remove; *What the roles may do* folded), **Agents** (the list's agents with their role, *Share with an agent …*,
+  *Stop sharing*, the tidy-up setting), **Public link** (owner) and **Owner** (*Transfer ownership…* / *Take over…*,
+  history). The list dialog keeps the list's own settings and shows a one-line summary ("Shared with 2 people · 1 agent").
+  Admins without collaboration find *Ownership…* there instead.
+- **One term: Agents** (K09): the Settings tab *AI colleague* is now *Agents* (German *Agenten*), its first sub-tab
+  *Overview*; "AI usage" is "Agent usage"; texts, the setup guide and the docs follow. The module switch lives only under
+  *Settings > Modules*; while the module is off, the Agents tab shows a short hint with *Open Modules*.
+- **Agent status** (K08): an agent that never got in touch (no event poll, no API call) or has not for 5 minutes shows
+  *not connected* (grey) instead of a green *ready*; its running jobs and its last reported state no longer keep the
+  header pill busy (only approvals and unread chat messages do). Webhook agents are unchanged. People's agent lists
+  (`/api/state`, `GET /api/agents`, `GET /api/v1/agents`, `GET /api/admin/agents`) carry `webhook` (bool) and
+  `contact_age` (seconds since the last poll or API call, `null` = never).
+- **Assignee circle only where it means something** (K11): an unassigned task shows the dashed circle only on hover or
+  keyboard focus (desktop) and not at all on touch screens; checklists and unassigned subtasks have none. Assigned tasks
+  keep their avatar; assigning works as before (click the circle, the task menu, the panel).
+- **One date format** (K07): rows, the date column and the task panel all write dates like "Mon, Oct 5" / "Mo, 5. Okt"
+  (no more numeric "Mi, 07.10." for the next days), a time after a comma ("Today, 17:30"). The desktop date column
+  is wider, cut on the right only, in the normal font, and shows a range as a small range icon with the full range in
+  the tooltip.
+- **Week view title** (K25): the week's own dates, short enough for one line on a phone: "Sep 28 – Oct 4 · Week 40"
+  (the year where it is not this one).
+- **Usage card** (K24): the card in the Agents view is a small table with the columns *Today*, *7 days*, *30 days*;
+  token counts use one short form in every language ("59.1k" / "59,1 Tsd.", "1.3M" / "1,3 Mio.").
+- **Plain words** (K23): settings switched off by the server configuration say "Switched off by the server operator"
+  (the variable is in the tooltip) instead of `KALMIDO_UPDATE_CHECK=0` and the like, also for public links, admin
+  alerts, the admin topic, the backup passphrase and the agents' log; the refused test alert says the same.
+
+### Fixed
+- **Touch targets** (K10): on touch screens the 2.x building blocks reach 44 x 44 px: segment buttons, small buttons,
+  icon buttons, the calendar and timeline navigation, the proposal checkboxes and date buttons, the notification matrix
+  and settings checkboxes, the agent buttons, the chat; small controls inside rows (assignee, subtask caret, status pill,
+  linked tasks) get an invisible 44 px hit area. A new test scans the main views at 390 px and fails on anything smaller
+  that is not on its short list of justified exceptions.
+- **Contrast** (K17): small texts that used the faint colour (roadmap dates and counts, the palette's type column, chat
+  times, group labels in menus and sheets) use the muted colour and meet WCAG AA (4.5:1) in both themes; plain links in
+  dialogs use the accent (the dark theme showed the browser's blue at 1.9:1).
+- **Toast position** (K18): "Done · Undo" and other toasts sit above the composer, the tab bar and the + button instead
+  of on top of them.
+
+Decisions: the Share dialog (K12) came forward from 2.7.0; the agent status counts any API call as contact, not only an
+event poll, so an agent that works through tools only is not shown as "not connected" while it is busy.
+
 ## [2.5.2] - 2026-10-01
 
 **In short:** A hotfix from the second usability review: on phones the header always keeps "…" and the bell, the
@@ -112,7 +171,8 @@ of people.
   multi-arch image (`ghcr.io/gegenschuss/kalmido`, linux/amd64 and linux/arm64), an installable web app that works
   offline, English and German.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.5.2...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.6.0...HEAD
+[2.6.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.6.0
 [2.5.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.5.2
 [2.5.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.5.1
 [2.5.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.5.0

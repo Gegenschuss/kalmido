@@ -13853,7 +13853,7 @@ def admin_alerts_test():
     """A clearly labelled test alert with the saved settings (also while the switch is off), now."""
     need_admin()
     if not AA_ENV:
-        return err(tr("Admin alerts are turned off on this server (KALMIDO_ADMIN_ALERTS=0)"), 409)
+        return err(tr("Admin alerts are switched off by the server operator."), 409)
     c = db()
     cfg = {**aa_cfg(c), "on": True}
     if not aa_recipients(c, cfg):
@@ -17954,6 +17954,13 @@ def agent_online(a):
     return (now_utc() - parse_iso(a["last_poll_at"])).total_seconds() <= AGENT_OFFLINE_S
 
 
+def agent_contact_age(c, a):
+    """2.6.0 (K08): seconds since the agent's last event poll or API call (its tokens' last_used_at), None = never."""
+    used = c.execute("SELECT MAX(last_used_at) FROM api_tokens WHERE user_id=?", (a["user_id"],)).fetchone()[0]
+    last = max([x for x in (a["last_poll_at"], used) if x] or [None], key=lambda x: x or "")
+    return round((now_utc() - parse_iso(last)).total_seconds()) if last else None
+
+
 def agent_typing_to(a, uid):
     """Seconds left of the agent's typing signal to person uid in the chat (0 = none)."""
     if not uid or a["typing_user"] != uid:
@@ -18041,6 +18048,10 @@ def agent_public(c, a, uid=None):
             # 2.4.1 (#375): the chat header: offline (no event poll for 5 minutes; null = cannot tell), its typing signal to
             # the viewer (seconds left), a running job for the viewer
             "online": agent_online(a), "last_poll_at": a["last_poll_at"], "typing": agent_typing_to(a, uid),
+            # 2.6.0 (K08): seconds since its last contact (an event poll or any API call with its token; null = never): the
+            # app shows "not connected" after 5 minutes without one. A webhook agent is told about events, so for it only
+            # "online": false counts
+            "webhook": bool(a["webhook_id"]), "contact_age": agent_contact_age(c, a),
             "poll_age": round((now_utc() - parse_iso(a["last_poll_at"])).total_seconds()) if a["last_poll_at"] else None,
             "my_job": bool(uid) and any(j["state"] == "running" and j["user_id"] == uid for j in jobs)}
 

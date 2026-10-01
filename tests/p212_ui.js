@@ -24,7 +24,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v(6[2-9]|7[01])'/.test(SW), 'service worker cache v62 (2.2.0: v63, 2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70, 2.5.2: v71)');
+  check(/const CACHE = 'tasks-shell-v(6[2-9]|7[0-2])'/.test(SW), 'service worker cache v62 (2.2.0: v63, 2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70, 2.5.2: v71, 2.6.0: v72)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en'});
@@ -42,11 +42,11 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   await call('PUT', `/api/lists/${ERIN}/members`, {user_id: 1, role: 'edit'}, CKE);
   await call('PATCH', `/api/users/${ids.erin}`, {disabled: true});
 
-  // ================= the owner transfers from the list dialog
+  // ================= the owner transfers from the Share dialog (2.6.0: out of the list dialog)
   let w = await boot({user: 'alice', hash: 'l/' + TEAM}), d = w.document;
-  w.eval(`listModal(${TEAM})`);
-  let btn = await until(() => d.querySelector('.lmodal #l-owner [data-m="own-xfer"]'));
-  check(btn && /Transfer ownership…/.test(btn.textContent), 'owner: "Transfer ownership…" in the list dialog');
+  w.eval(`shareModal(${TEAM})`);
+  let btn = await until(() => d.querySelector('.shmodal #l-owner [data-m="own-xfer"]'));
+  check(btn && /Transfer ownership…/.test(btn.textContent), 'owner: "Transfer ownership…" in the Share dialog (2.6.0, K12)');
   click(w, btn); await sleep(300);
   let om = d.querySelector('.modal.owmodal');
   const opts = [...(om?.querySelectorAll('#ow-to option') || [])];
@@ -57,12 +57,12 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   w.confirm = m => { asked = m; return true; };
   click(w, om.querySelector('[data-m="ok"]')); await sleep(1500);
   check(/Make Bob the owner of “Team”\?/.test(asked), 'confirm asked: ' + asked);
-  check(!d.querySelector('.modal.owmodal') && !d.querySelector('.lmodal'), 'both dialogs closed');
+  check(!d.querySelector('.modal.owmodal') && !d.querySelector('.shmodal'), 'both dialogs closed');
   check(w.eval(`listById(${TEAM}).role`) === 'admin' && w.eval(`listById(${TEAM}).owner_name`) === 'Bob', 'alice is now a list admin, Bob the owner');
-  w.eval(`listModal(${TEAM})`);
-  await until(() => d.querySelector('.lmodal .owhist'));
-  check(/Ownership transferred from Alice to Bob/.test(d.querySelector('.lmodal .owhist')?.textContent || ''), 'the history line');
-  check(!d.querySelector('.lmodal [data-m="own-xfer"]'), 'no transfer button for a member');
+  w.eval(`shareModal(${TEAM})`);
+  await until(() => d.querySelector('.shmodal .owhist'));
+  check(/Ownership transferred from Alice to Bob/.test(d.querySelector('.shmodal .owhist')?.textContent || ''), 'the history line');
+  check(!d.querySelector('.shmodal [data-m="own-xfer"]'), 'no transfer button for a member');
   w.close();
   // bob: the News item
   w = await boot({user: 'bob', hash: 'news'}); d = w.document; await sleep(600);
@@ -71,9 +71,9 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
 
   // ================= an admin in the list of a disabled user: "Take over…"
   w = await boot({user: 'alice', hash: 'l/' + ERIN}); d = w.document;
-  w.eval(`listModal(${ERIN})`);
-  btn = await until(() => d.querySelector('.lmodal #l-owner [data-m="own-xfer"]'));
-  check(btn && /Take over…/.test(btn.textContent) && /The owner Erin is disabled/.test(d.querySelector('.lmodal #l-owner').textContent), 'admin: "Take over…" with the reason');
+  w.eval(`shareModal(${ERIN})`);
+  btn = await until(() => d.querySelector('.shmodal #l-owner [data-m="own-xfer"]'));
+  check(btn && /Take over…/.test(btn.textContent) && /The owner Erin is disabled/.test(d.querySelector('.shmodal #l-owner').textContent), 'admin: "Take over…" with the reason');
   click(w, btn); await sleep(300);
   om = d.querySelector('.modal.owmodal');
   check(om && om.querySelector('#ow-to').value === '1' && /Take over “Erins list”/.test(om.textContent) && /Erin stays in the list/.test(om.textContent), 'takeover dialog: default me');
@@ -108,7 +108,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
     // #346 the users list: the agent as a row
     const agrow = d.querySelector(`#a-users [data-urow="${ag.id}"]`);
     check(agrow && agrow.querySelector('.abadge') && agrow.querySelector('[data-acc="agent-edit"]') && !agrow.querySelector('[data-acc="user-edit"]')
-      && /Managed under AI colleague/.test(agrow.textContent), `${lab}: agent row with badge + "Managed under AI colleague"`);
+      && /Managed under Agents/.test(agrow.textContent), `${lab}: agent row with badge + "Managed under Agents"`);
     check(d.querySelector(`#a-users [data-urow="${ids.bob}"] [data-acc="user-edit"]`), `${lab}: people keep the edit button`);
     w.close();
   }
@@ -148,7 +148,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   w.eval(`settingsModal('users')`);
   await until(() => d.querySelector('#s-orph-h'));
   check(/Listen von Agenten oder deaktivierten Benutzern/.test(d.querySelector('#s-orph-h').textContent), 'German: the Administration section');
-  check(/Verwaltet unter KI-Kollege/.test((await until(() => d.querySelector(`#a-users [data-urow="${ag.id}"]`)))?.textContent || ''), 'German: agent row');
+  check(/Verwaltet unter Agenten/.test((await until(() => d.querySelector(`#a-users [data-urow="${ag.id}"]`)))?.textContent || ''), 'German: agent row');
   w.close();
 
   check(errs.length === 0, 'no script errors: ' + errs.join(' | '));

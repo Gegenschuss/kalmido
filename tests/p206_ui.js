@@ -42,7 +42,7 @@ const TABLET = {'(min-width:600px) and (min-height:600px)': true};
   const plan = await mk('Team plan', TEAM);
   const css0 = await (await fetch(B + 'static/app.css')).text();
   const SW = fs.readFileSync(path.join(__dirname, '..', 'static', 'sw.js'), 'utf8');
-  check(/const CACHE = 'tasks-shell-v((5[89]|6[0-9])|7[01])'/.test(SW), 'service worker cache v58 (2.0.8: v59, 2.1.0: v60, 2.1.1: v61, 2.1.2: v62, 2.2.0: v63, 2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70, 2.5.2: v71)');
+  check(/const CACHE = 'tasks-shell-v((5[89]|6[0-9])|7[0-2])'/.test(SW), 'service worker cache v58 (2.0.8: v59, 2.1.0: v60, 2.1.1: v61, 2.1.2: v62, 2.2.0: v63, 2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70, 2.5.2: v71, 2.6.0: v72)');
 
   // ================= #315 comments in a private list: the box (one line) at the bottom edge -> a note; no @ hint, no activity
   let w = await boot({user: 'alice', hash: 'l/' + PRIV}), d = w.document;
@@ -261,12 +261,12 @@ const TABLET = {'(min-width:600px) and (min-height:600px)': true};
     // 2.4.2 (#391): the share button is gone; a menu anchored inside the settings dialog (same list picker as before)
     const sb = d.querySelector('.modal.smodal [data-m="ag-guide"]');
     w.__sb = sb;
-    w.eval(`menu(window.__sb, S.lists.filter(l => !l.archived && !l.is_inbox && canManage(l)).map(l => ({label: lname(l), icon: 'list', fn: () => { document.querySelector('.modal.smodal')?.remove(); listModal(l.id); }})))`); await sleep(200);
+    w.eval(`menu(window.__sb, S.lists.filter(l => !l.archived && !l.is_inbox && canManage(l)).map(l => ({label: lname(l), icon: 'list', fn: () => { document.querySelector('.modal.smodal')?.remove(); shareModal(l.id); }})))`); await sleep(200);
     const pop = d.querySelector('#pop');
     check(!pop.classList.contains('hidden') && pop.classList.contains('overmodal') && d.querySelector('#scrim').classList.contains('overmodal'), `${mobile ? 'phone' : 'desktop'}: the share menu is marked to show above the dialog`);
     const it = [...pop.querySelectorAll('button')].find(b => /Website/.test(b.textContent));
     click(w, it); await sleep(700);
-    check(!pop.classList.contains('overmodal') && d.querySelector('.modal #l-members') && !d.querySelector('.modal.smodal'), `${mobile ? 'phone' : 'desktop'}: picked: the list dialog at Sharing`);
+    check(!pop.classList.contains('overmodal') && d.querySelector('.modal #l-members') && !d.querySelector('.modal.smodal'), `${mobile ? 'phone' : 'desktop'}: picked: the Share dialog (2.6.0)`);
     [...d.querySelectorAll('.modal')].forEach(m => m.remove());
     w.eval(`menu(document.querySelector('#top h1'), [{label: 'x', fn() {}}])`);
     check(!d.querySelector('#pop').classList.contains('overmodal'), 'a menu outside a dialog stays at its usual level');

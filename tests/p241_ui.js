@@ -58,7 +58,7 @@ async function firefox(fn) {
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v(6[7-9]|7[01])'/.test(SW), 'service worker cache v67 (2.4.2: v68, 2.5.0: v69, 2.5.1: v70, 2.5.2: v71)');
+  check(/const CACHE = 'tasks-shell-v(6[7-9]|7[0-2])'/.test(SW), 'service worker cache v67 (2.4.2: v68, 2.5.0: v69, 2.5.1: v70, 2.5.2: v71, 2.6.0: v72)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en'});
@@ -110,9 +110,9 @@ async function firefox(fn) {
 
   // ================= #379 Tidy up by: list dialog + AI colleague table
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
-  w.eval(`listModal(${L})`); await sleep(600);
+  w.eval(`shareModal(${L})`); await sleep(600);
   let sel = d.querySelector('#l-tidyag');
-  check(sel && [...sel.options].map(o => o.textContent).join() === 'Claude,Helper' && sel.disabled, 'list dialog: Tidy up by (Claude, Helper; not the participant Robo), disabled while off');
+  check(sel && [...sel.options].map(o => o.textContent).join() === 'Claude,Helper' && sel.disabled, 'Share dialog (2.6.0): Tidy up by (Claude, Helper; not the participant Robo), disabled while off');
   change(w, d.querySelector('#l-tidy'), 'suggest'); await sleep(1000);
   sel = d.querySelector('#l-tidyag');
   check(sel && !sel.disabled && sel.value === String(ag.id), 'tidy on: the select is live, Claude by default');
@@ -161,8 +161,8 @@ async function firefox(fn) {
   await v1(ag.token, 'PUT', '/agent/status', {status: 'waiting'});
   w.eval('load().then(render)'); await sleep(800);
   check(/waiting for you/.test(st().textContent) && st().querySelector('.adot.st-waiting'), 'waiting for you');
-  w.eval(`agentById(${ag.id}).online = true; agentById(${ag.id}).poll_age = 290; S.agentsAt = Date.now() - 20000; agentLive()`);
-  check(/offline/.test(st().textContent) && st().querySelector('.adot.st-offline'), 'offline: 5 minutes without a poll (counted on the client)');
+  w.eval(`agentById(${ag.id}).online = true; agentById(${ag.id}).poll_age = 290; agentById(${ag.id}).contact_age = 290; S.agentsAt = Date.now() - 20000; agentLive()`);
+  check(/not connected/.test(st().textContent) && st().querySelector('.adot.st-offline'), 'not connected (2.6.0, K08; was "offline"): 5 minutes without contact (counted on the client)');
   await call('PATCH', `/api/admin/agents/${ag.id}`, {limits: {period: 'day', metric: 'tokens', hard: 10}});
   await v1(ag.token, 'POST', '/agent/usage', {model: 'x', input_tokens: 100, output_tokens: 1});
   await v1(ag.token, 'GET', '/agent/events?since=0');
@@ -202,7 +202,7 @@ async function firefox(fn) {
   md = await until(() => d.querySelector('#ag-model')?.closest('.modal'));
   check(/Laufzeit/.test(md.querySelector('#ag-rt-h').textContent) && /Jetzt zurücksetzen/.test(md.textContent) && /Nächtlicher Neustart/.test(md.textContent) && /Auto-Kompaktieren/.test(md.textContent), 'German: Laufzeit, Jetzt zurücksetzen');
   click(w, md.querySelector('[data-m="close"]'));
-  w.eval(`listModal(${L})`); await sleep(600);
+  w.eval(`shareModal(${L})`); await sleep(600);
   check(/Aufräumen durch/.test(d.querySelector('#l-tidyrow')?.textContent || ''), 'German: Aufräumen durch');
   d.querySelector('.modal [data-m="close"]')?.click();
   await v1(ag.token, 'PUT', '/agent/status', {status: 'working', task_id: T2});
@@ -232,10 +232,10 @@ async function firefox(fn) {
       check(rows.every(Boolean), `${W}px: runtime fields inside the dialog ${JSON.stringify(rows)}`);
       await shot(`p241-runtime-${W}.png`);
       await ev(`document.querySelector('.modal [data-m="close"]').click()`); await sleep(300);
-      await ev(`listModal(${L})`); await sleep(700);
+      await ev(`shareModal(${L})`); await sleep(700);
       await ev(`document.querySelector('#l-tidyag').scrollIntoView()`); await sleep(200);
       const m2 = await fit('.modal .card');
-      check(good(m2, false), `${W}px: list dialog with Tidy up by fits ${JSON.stringify(m2)}`);
+      check(good(m2, false), `${W}px: Share dialog with Tidy up by fits ${JSON.stringify(m2)}`);
       await shot(`p241-tidyagent-${W}.png`);
       await ev(`document.querySelector('.modal').remove()`);
       if (W < 900) { await nav(B + '#agents/' + ag.id); await sleep(2500); }

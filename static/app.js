@@ -189,13 +189,22 @@ function dayLabel(s, long) {
   if (s === addDays(t, 1)) return tr('Tomorrow');
   if (s === addDays(t, -1)) return tr('Yesterday');
   const d = pd(s), diff = (d - pd(t)) / 864e5;
-  if (diff > 1 && diff < 7) return long ? WDL[d.getDay()] : fmtDay('near', d);
+  if (diff > 1 && diff < 7 && long) return WDL[d.getDay()];
   return fmtDay(d.getFullYear() !== new Date().getFullYear() ? 'year' : 'short', d);
 }
+// 2.6.0 (K07): one way to write a task's date everywhere (rows, the date column, the task panel): "Mo, 5. Okt", a range
+// "So, 4. Okt – Mo, 5. Okt", a time after a comma ("Heute, 17:30")
+const dueLabel = (t, range = true) => !t.due ? '' : (range && t.start && t.start < t.due ? dayLabel(t.start) + ' – ' : '') + dayLabel(t.due) + (t.due_time ? ', ' + t.due_time : '');
 const dueClass = t => !t.due || t.status ? '' : t.due < today() ? 'over' : t.due === today() ? 'today' : '';
 // timeline, roadmap, statistics and time reports use weekStartOf (the locale's first weekday, 1.5.1); habits keep Mondays
 function mondayOf(s) { const d = pd(s); const k = (d.getDay() + 6) % 7; d.setDate(d.getDate() - k); return ds(d); }
 
+// a date without its weekday in the language's own short pattern ("4. Okt" / "Oct 4"), with the year if it is not this one
+const dayNoWd = (d, year) => fmtDay(year ? 'year' : 'short', d).replace(/^[^\d{]*?(?=\d|[A-Za-zÀ-ÿ]+\s\d)/, '').replace(/^\s*[,.]\s*/, '');
+function weekTitle(first) {
+  const a = pd(first), b = pd(addDays(first, 6)), y = new Date().getFullYear(), other = a.getFullYear() !== y || b.getFullYear() !== y;
+  return `${dayNoWd(a, other && a.getFullYear() !== b.getFullYear())} – ${dayNoWd(b, other)} · ${tr('Week {0}', isoWeek(addDays(first, 3)))}`;
+}
 // ------------------------------------------------------------------ state
 const S = {
   lists: [], sections: [], tasks: new Map(), habits: [], pomo: null, pomoToday: {count: 0, minutes: 0},
@@ -1297,35 +1306,106 @@ function renderTop() {
     const l = k === 'inbox' ? inbox() : listById(+k.slice(2));
     if (l) {
       const v = listView(l);
-      if ((feat('kanban') || feat('timeline')) && !l.checklist && !isMobile()) acts += `<div class="seg vseg"><button class="${v === 'list' ? 'on' : ''}" data-act="view-list" title="${tr('List')}">${ic('list', 's')}</button>${feat('kanban') ? `<button class="${v === 'kanban' ? 'on' : ''}" data-act="view-kanban" title="${tr('Kanban')}">${ic('kanban', 's')}</button>` : ''}${feat('timeline') ? `<button class="${v === 'timeline' ? 'on' : ''}" data-act="view-timeline" title="${tr('Timeline')}">${ic('timeline', 's')}</button>` : ''}</div>`;
-      if (!isMobile() && fieldsOf(l.id).length && v === 'list' && !l.checklist) acts += `<button class="iconbtn ${fieldCols(l.id) ? 'on' : ''}" data-act="field-cols" data-id="${l.id}" title="${tr('Show custom fields as columns')}">${ic('columns')}</button>`;
-      if (l.shared && collab() && !isTouch()) acts += `<button class="iconbtn" data-act="refresh" title="${esc(tr('Refresh'))}" aria-label="${esc(tr('Refresh'))}">${ic('sync')}</button>`;
+      if ((feat('kanban') || feat('timeline')) && !l.checklist && !isMobile()) acts += `<div class="seg vseg tf"><button class="${v === 'list' ? 'on' : ''}" data-act="view-list" data-ico="list" title="${tr('List')}">${ic('list', 's')}</button>${feat('kanban') ? `<button class="${v === 'kanban' ? 'on' : ''}" data-act="view-kanban" data-ico="kanban" title="${tr('Kanban')}">${ic('kanban', 's')}</button>` : ''}${feat('timeline') ? `<button class="${v === 'timeline' ? 'on' : ''}" data-act="view-timeline" data-ico="timeline" title="${tr('Timeline')}">${ic('timeline', 's')}</button>` : ''}</div>`;
+      if (!isMobile() && fieldsOf(l.id).length && v === 'list' && !l.checklist) acts += `<button class="iconbtn tf ${fieldCols(l.id) ? 'on' : ''}" data-act="field-cols" data-ico="columns" data-id="${l.id}" title="${tr('Show custom fields as columns')}">${ic('columns')}</button>`;
+      // 2.6.0 (K12): Share next to the title (desktop / tablets; phones: in "…")
+      if (!l.is_inbox && !l.archived && collab() && !isMobile()) acts += `<button class="iconbtn tf shbtn" data-act="share-list" data-ico="users" data-id="${l.id}" title="${esc(tr('Share…'))}" aria-label="${esc(tr('Share…'))}">${ic('users', 's')}<span class="bl">${tr('Share')}</span></button>`;
+      if (l.shared && collab() && !isTouch()) acts += `<button class="iconbtn tf" data-act="refresh" data-ico="sync" title="${esc(tr('Refresh'))}" aria-label="${esc(tr('Refresh'))}">${ic('sync')}</button>`;
     }
   }
   // 2.4.2 (#390): a folder switches between its list view and the matrix of all its lists (subfolders included), like a list
   const fk = m === 'tasks' && k.startsWith('folder:') ? k.slice(7) : m === 'matrix' && mxGet().scope.startsWith('folder:') ? mxGet().scope.slice(7) : '';
-  if (fk && feat('matrix') && !isMobile()) acts += `<div class="seg vseg fseg" role="group" aria-label="${esc(tr('View'))}"><button class="${m === 'tasks' ? 'on' : ''}" data-act="fview" data-k="list" data-f="${esc(fk)}" title="${esc(tr('List'))}" aria-pressed="${m === 'tasks'}">${ic('list', 's')}</button><button class="${m === 'matrix' ? 'on' : ''}" data-act="fview" data-k="matrix" data-f="${esc(fk)}" title="${esc(tr('Matrix'))}" aria-pressed="${m === 'matrix'}">${ic('grid', 's')}</button></div>`;
-  if (m === 'tasks' && k === 'all' && feat('timeline')) { const v = isRoadmap() ? 'timeline' : 'list'; acts += `<div class="seg" role="group" aria-label="${tr('View')}"><button class="${v === 'list' ? 'on' : ''}" data-act="rm-view" data-k="list" title="${tr('List')}" aria-pressed="${v === 'list'}">${ic('list', 's')}</button><button class="${v === 'timeline' ? 'on' : ''}" data-act="rm-view" data-k="timeline" title="${tr('Timeline')}" aria-pressed="${v === 'timeline'}">${ic('timeline', 's')}</button></div>`; }
+  if (fk && feat('matrix') && !isMobile()) acts += `<div class="seg vseg fseg tf" role="group" aria-label="${esc(tr('View'))}"><button class="${m === 'tasks' ? 'on' : ''}" data-act="fview" data-k="list" data-ico="list" data-f="${esc(fk)}" title="${esc(tr('List'))}" aria-pressed="${m === 'tasks'}">${ic('list', 's')}</button><button class="${m === 'matrix' ? 'on' : ''}" data-act="fview" data-k="matrix" data-ico="grid" data-f="${esc(fk)}" title="${esc(tr('Matrix'))}" aria-pressed="${m === 'matrix'}">${ic('grid', 's')}</button></div>`;
+  if (m === 'tasks' && k === 'all' && feat('timeline')) { const v = isRoadmap() ? 'timeline' : 'list'; acts += `<div class="seg tf" role="group" aria-label="${tr('View')}"><button class="${v === 'list' ? 'on' : ''}" data-act="rm-view" data-k="list" data-ico="list" title="${tr('List')}" aria-pressed="${v === 'list'}">${ic('list', 's')}</button><button class="${v === 'timeline' ? 'on' : ''}" data-act="rm-view" data-k="timeline" data-ico="timeline" title="${tr('Timeline')}" aria-pressed="${v === 'timeline'}">${ic('timeline', 's')}</button></div>`; }
   if (m === 'tasks' && k === 'trash' && (S.extra || []).some(t => !t.keep)) acts += `<button class="btn sm danger" data-act="trash-empty">${tr('Empty')}</button>`;
   if (m === 'tasks' && k === 'done' && (S.extra || []).length) acts += `<button class="btn sm" data-act="done-clean" title="${esc(tr('Move completed tasks to the trash'))}">${ic('trash', 's')}<span class="bl">${tr('Delete completed…')}</span></button>`;
   if (m === 'tasks' && S.multiMode) acts += `<button class="iconbtn on" data-act="multi" title="${tr('End selection')}" aria-label="${tr('End selection')}">${ic('select')}</button>`;
   // everything rarer sits in "…" (phones: undo / redo there too); the title keeps its room
-  if (topMoreItems().length) acts += `<button class="iconbtn tmore" data-act="top-more" aria-haspopup="menu" title="${tr('More actions')}" aria-label="${tr('More actions')}">${ic('dots')}${isTouch() && HIST.undo.length && histPending(HIST.undo[HIST.undo.length - 1]) ? '<span class="pdot"></span>' : ''}</button>`;
+  acts += `<button class="iconbtn tmore" data-act="top-more" aria-haspopup="menu" title="${tr('More actions')}" aria-label="${tr('More actions')}">${ic('dots')}${isTouch() && HIST.undo.length && histPending(HIST.undo[HIST.undo.length - 1]) ? '<span class="pdot"></span>' : ''}</button>`;
   const pm = '';  // focus / stopwatch are part of the running indicator (timerPill) now
   const oflab = OUT.online ? tr('sync|pending changes') : tr('offline'), ofn = OUT.q.length ? trn('{0} change waiting', '{0} changes waiting', OUT.q.length) : '';
   const off = !OUT.online || OUT.q.length ? `<span class="offline" role="status" title="${esc([oflab, ofn, tr('Changes are sent as soon as the server is reachable')].filter(Boolean).join(' · '))}" aria-label="${esc([oflab, ofn].filter(Boolean).join(' · '))}">${ic(OUT.online ? 'sync' : 'cloudoff', 's')}<span class="ofl">${oflab}</span>${OUT.q.length ? `<span class="ofn">${OUT.q.length}</span>` : ''}</span>` : '';
   const cf = S.conflicts?.length ? `<button class="cfpill" data-act="conflicts" title="${tr('Review conflicts')}">${ic('alert', 's')}${S.conflicts.length}</button>` : '';
   // open tasks of the view next to the title (Geist Mono), task views only
   const nOpen = m === 'tasks' && !NOLIST_KEYS.includes(k) ? viewTasks().open.length : 0;
-  const pal = `<button class="kbtn" data-act="palette" title="${esc(tr('Search and commands'))} (${kbText('Mod+K')})">${ic('search', 's')}<span>${tr('Search')}</span>${kb('Mod+K')}</button>`;
+  const pal = `<button class="kbtn tf4" data-act="palette" data-ico="search" title="${esc(tr('Search and commands'))} (${kbText('Mod+K')})">${ic('search', 's')}<span>${tr('Search')}</span>${kb('Mod+K')}</button>`;
   const kl = m === 'tasks' && k.startsWith('l:') ? listById(+k.slice(2)) : null;
   const badge = kl?.kind === 'project' ? `<span class="kbadge" title="${esc(projectParts().join(', '))}">${tr('Project')}</span>` : '';
-  $('#top').innerHTML = `<button class="iconbtn menu" data-act="side" aria-label="${tr('Menu')}">${ic('menu')}</button><h1 title="${esc(title)}">${kl?.icon ? licon(kl, 'licon h') : ''}<span class="ht">${esc(title)}</span>${badge}${nOpen ? `<span class="hn" aria-label="${esc(trn('{0} open task', '{0} open tasks', nOpen))}">${nOpen}</span>` : ''}</h1>${cf}${off}${agentChip()}${timerPill()}${pm}${acts}${isTouch() ? '' : histBtns()}${pal}${bellBtn()}`;
+  $('#top').innerHTML = `<button class="iconbtn menu" data-act="side" aria-label="${tr('Menu')}">${ic('menu')}</button><h1 title="${esc(title)}">${kl?.icon ? licon(kl, 'licon h') : ''}<span class="ht">${esc(title)}</span>${badge}${nOpen ? `<span class="hn" aria-label="${esc(trn('{0} open task', '{0} open tasks', nOpen))}">${nOpen}</span>` : ''}</h1>${cf}${off}${agentChip()}${timerPill()}${stChip()}${pm}${acts}${isTouch() ? '' : histBtns()}${pal}${bellBtn()}`;
+  fitTop();
+}
+// ---- 2.6.0 (K01 + K02, UX audit 2): the header has a fixed priority on every width. The title comes first: it keeps at
+// least ~12 characters (or all of it, when shorter) and is shown in full whenever any level below makes room; "…" and the
+// bell are always on screen. Everything else gives way step by step (classes tl1 … tl4 on #top, the lowest level that
+// fits wins, measured after every render and on resize):
+//   tl1  the agent pill = bot + number, the timer pill = icon + time (no task name), Search = icon, no offline label
+//   tl2  the agent pill and the timer pill merge into one status chip (.stchip: bot + number, dot + time)
+//   tl3  the view switch, field columns, refresh and undo / redo move into "…" (.tf, as menu items)
+//   tl4  Search moves into "…" too (.tf4), the open count goes, the status chip is only its dot + number
+// jsdom has no layout (every width is 0), so there everything fits at level 0.
+const TOP_LVLS = 4;
+let topW = 0;
+function topLevel() { const t = $('#top'); const m = t && /\btl(\d)\b/.exec(t.className); return m ? +m[1] : 0; }
+// width the first 12 characters of the title need (with "…"), measured on its text
+function topNeed(ht) {
+  const n = ht && ht.firstChild; if (!n || n.nodeType !== 3) return 0;
+  const len = n.textContent.length, r = document.createRange();
+  r.setStart(n, 0); r.setEnd(n, Math.min(len, 12));
+  const w = r.getBoundingClientRect().width, all = len > 12 ? (r.setEnd(n, len), r.getBoundingClientRect().width) : w;
+  return {need: w + (len > 12 ? parseFloat(getComputedStyle(ht).fontSize) * .7 : 0), full: all};
+}
+function topFits(t, ht, nd) {
+  const cr = t.getBoundingClientRect(), right = cr.right - parseFloat(getComputedStyle(t).paddingRight || 0) + .5;
+  if (t.scrollWidth > t.clientWidth + 1) return 0;
+  for (const e of t.children) if (e.offsetWidth && e.getBoundingClientRect().right > right) return 0;
+  if (!ht || !nd) return 2;
+  const w = ht.getBoundingClientRect().width;
+  return w + .02 >= nd.full ? 2 : w + 1 >= Math.min(nd.need, nd.full) ? 1 : 0;  // 2 = whole title, 1 = at least 12 characters
+}
+function fitTop() {
+  const t = $('#top'); if (!t || !t.isConnected) return;
+  topW = t.clientWidth;
+  const ht = $('h1 .ht', t), h1 = $('h1', t), more = $('[data-act="top-more"]', t);
+  const nd = t.clientWidth ? topNeed(ht) : 0;
+  const set = l => {
+    for (let i = 1; i <= TOP_LVLS; i++) t.classList.toggle('tl' + i, i === l);
+    if (more) more.hidden = !topMoreItems().length;
+    // the title never gets less than its first 12 characters (plus its icon / badge / count): the rest has to make room
+    if (h1 && nd) {
+      const kids = [...h1.children].filter(e => e !== ht && e.offsetWidth), gap = parseFloat(getComputedStyle(h1).columnGap) || 0;
+      h1.style.minWidth = Math.ceil(kids.reduce((n, e) => n + e.getBoundingClientRect().width, 0) + gap * kids.length + Math.min(nd.need, nd.full) + 1) + 'px';
+    }
+  };
+  set(0);
+  if (!t.clientWidth) return;  // no layout (hidden, jsdom)
+  // the lowest level that shows the whole title; otherwise the one that gives the title the most room
+  let best = -1, wide = -1, ww = -1;
+  for (let l = 0; l <= TOP_LVLS; l++) {
+    if (l) set(l);
+    const f = topFits(t, ht, nd);
+    if (f === 2) { best = l; break; }
+    const w = f ? ht.getBoundingClientRect().width : -1;
+    if (f && w > ww + 4) { wide = l; ww = w; }
+  }
+  set(best >= 0 ? best : wide >= 0 ? wide : TOP_LVLS);
+}
+if (document.fonts?.ready) document.fonts.ready.then(() => fitTop()).catch(() => {});
+if (typeof ResizeObserver !== 'undefined') {
+  let topRO = null;
+  const topWatch = () => { const t = $('#top'); if (!t || topRO) return; topRO = new ResizeObserver(() => { if (t.clientWidth !== topW) fitTop(); }); topRO.observe(t); };
+  if (document.readyState === 'loading') addEventListener('DOMContentLoaded', topWatch); else topWatch();
+} else addEventListener('resize', () => fitTop());
+// the header items that moved into "…" (tl3 / tl4), as menu items that click the hidden button
+function topFolded() {
+  const l = topLevel(); if (l < 3) return [];
+  const els = $$('#top .tf [data-act], #top [data-act].tf' + (l >= 4 ? ', #top [data-act].tf4' : ''));
+  return els.filter(b => !b.disabled || b.closest('.hist')).map(b => ({label: (b.getAttribute('aria-label') || b.title || b.textContent || '').replace(/\s*\([^)]*\)\s*$/, '').trim(), icon: b.dataset.ico || (/hist-undo/.test(b.dataset.act) ? 'undo' : /hist-redo/.test(b.dataset.act) ? 'redo' : ''),
+    on: b.classList.contains('on'), dis: b.disabled, fn: () => b.click()}));
 }
 // UX1 (U01, owner decision 4): the header's "…" menu. Phones: "Undo: …" / "Redo: …" first (no ← → there), then the rarer
 // view actions (select, sort), then the list's own menu or the filter
 function topMoreItems() {
-  const m = S.route.mod, k = S.route.key, out = [], sec = [];
+  const m = S.route.mod, k = S.route.key, fold = topFolded(), out = [], sec = [];
   if (isTouch()) for (const dir of ['undo', 'redo']) { const b = histBtn(dir); out.push({label: b.lab, icon: dir, dis: b.off, cls: 'hmi' + (b.p ? ' pend' : ''), title: b.p ? tr('waiting for the connection') : '', fn: () => histStep(dir)}); }
   if (m === 'tasks' && !NOLIST_KEYS.includes(k) && !isKanban() && !isTimeline() && !isRoadmap())
     sec.push({label: S.multiMode ? tr('End selection') : tr('Select multiple'), icon: 'select', on: S.multiMode, fn: () => { S.multiMode = !S.multiMode; if (!S.multiMode) S.multi.clear(); render(); }},
@@ -1346,7 +1426,10 @@ function topMoreItems() {
   if (l) { if (sec.length && sec[sec.length - 1] !== '-') sec.push('-'); sec.push(...listMenuItems(l.id, () => $('#top [data-act="top-more"]') || $('#top h1'))); }
   if (m === 'tasks' && k.startsWith('tag:')) { if (sec.length) sec.push('-'); sec.push(tagDeleteItem(k.slice(4))); }
   if (S.route.mod === 'tasks' && sharedRoute() && isTouch()) sec.unshift({label: tr('Refresh'), icon: 'sync', fn: () => refreshNow()});
-  return [...out, ...(out.length && sec.length ? ['-'] : []), ...sec];
+  const rest = [...out, ...(out.length && sec.length ? ['-'] : []), ...sec];
+  // 2.6.0 (K01): "…" is there on every view; where a view has nothing of its own it offers search (+ the shortcuts)
+  if (!rest.length && !fold.some(x => x.icon === 'search')) rest.push({label: tr('Search and commands'), icon: 'search', keys: 'Mod+K', fn: () => openPalette()}, ...(isTouch() ? [] : [{label: tr('Keyboard shortcuts'), icon: 'help', keys: '?', fn: shortcutsModal}]));
+  return [...fold, ...(fold.length && rest.length ? ['-'] : []), ...rest];
 }
 // ---- 1.9.0: delete a tag completely (sidebar: right-click / long-press on the tag, or "…" in the tag view). Tags are
 // personal: only my tag goes, from every task that has it (the tasks stay); one step in the undo history.
@@ -1442,7 +1525,7 @@ function taskRow(t, opts = {}) {
   // desktop list views: date / list / assignee / tracked time also as right-aligned columns (.tcols);
   // the same items stay in the meta line with class m-col, which the phone layout shows instead
   const tc = !!opts.tcols && !opts.trash, mc = tc ? ' m-col' : '';
-  const due = t.due ? `${t.start && t.start < t.due ? dayLabel(t.start) + ' – ' : ''}${dayLabel(t.due)}${t.due_time ? ' ' + t.due_time : ''}` : '';
+  const due = dueLabel(t);
   const lst = opts.showList && listById(t.list_id) ? lname(listById(t.list_id)) : '';
   let time = null, who = '';
   if (t.ttype && !opts.trash && ticketsOn(t.list_id)) meta.push(ttChip(t));  // 2.4.0 (#340)
@@ -1490,7 +1573,7 @@ function taskRow(t, opts = {}) {
   const collapsed = S.collapsed.has('t' + t.id);
   const ro = !opts.trash && !canEdit(t);
   const caret = opts.tree && openKids ? `<button class="caret ${collapsed ? 'closed' : ''}" data-act="collapse" data-key="t${t.id}">${ic('chev', 's')}</button>` : '';
-  const cols = tc ? `<div class="tcols" data-act="open">${timeOn() && (opts.tcols.list || isProject(t.list_id)) ? `<span class="c-time ${time?.live ? 'live' : ''}" title="${time ? time.tip : ''}">${time ? time.txt : ''}</span>` : ''}${collab() ? `<span class="c-who">${who}</span>` : ''}${opts.tcols.list ? `<span class="c-list" title="${esc(lst)}"><span>${esc(lst)}</span></span>` : ''}<span class="c-date ${dueClass(t)}" title="${esc(t.due ? fmtDate(t.due) : '')}">${esc(due)}</span></div>` : '';
+  const cols = tc ? `<div class="tcols" data-act="open">${timeOn() && (opts.tcols.list || isProject(t.list_id)) ? `<span class="c-time ${time?.live ? 'live' : ''}" title="${time ? time.tip : ''}">${time ? time.txt : ''}</span>` : ''}${collab() ? `<span class="c-who">${who}</span>` : ''}${opts.tcols.list ? `<span class="c-list" title="${esc(lst)}"><span>${esc(lst)}</span></span>` : ''}<span class="c-date ${dueClass(t)}" title="${esc(due)}">${t.start && t.start < t.due ? ic('timeline', 's rngi') : ''}<span class="cdt">${esc(dueLabel(t, false))}</span></span></div>` : '';
   let h = `<div class="trow ${t.priority && !opts.checklist ? 'pr' + t.priority : ''} ${opts.checklist ? 'ck' : ''} ${tc ? 'hascols' : ''} ${t.status ? 'done' : ''} ${opts.depth ? 'sub d' + opts.depth : ''} ${opts.subRow ? 'subrow' : ''} ${S.sel === t.id ? 'sel' : ''} ${S.kf === t.id && !opts.subRow ? 'kfocus' : ''} ${S.multi.has(t.id) ? 'msel' : ''} ${ro ? 'ro' : ''} ${opts.next && !opts.depth ? 'flownext' : ''}" data-id="${t.id}" ${opts.drag !== false && !opts.trash && !ro && !isMobile() ? 'draggable="true"' : ''}>
     ${caret}
     ${opts.trash ? `<span class="chk ${chk}">${t.status === 2 ? ic('check') : ''}</span>` : `<button class="chk ${chk}" data-act="toggle" aria-label="${tr('done')}" ${ro ? 'disabled' : ''}>${t.status === 2 ? ic('check') : t.status === -1 ? ic('x') : ''}</button>`}
@@ -1511,9 +1594,12 @@ const acolOn = lid => { const l = listById(lid); return collab() && !!l && !!l.s
 function whoCell(t) {
   const name = t.assignee_id ? personName(t.list_id, t.assignee_id) : '', me = !!S.me && t.assignee_id === S.me.id;
   const tip = t.assignee_id ? tr('Assigned to {0}', name || '?') : tr('Nobody assigned');
+  // 2.6.0 (K11): nobody assigned = no icon in checklists and on subtasks; elsewhere the dashed circle only shows on hover /
+  // keyboard focus (desktop) and not at all on touch screens (assign from the task panel or the task's menu there)
+  if (!t.assignee_id && (listById(t.list_id)?.checklist || t.parent_id)) return '';
   const inner = t.assignee_id ? av(t.assignee_id, name, `who ${me ? 'me' : ''}`) : `<span class="who none">${ic('user', 's')}</span>`;
-  return canAssign(t) ? `<button type="button" class="whob" data-act="assign" title="${esc(tip + ' · ' + tr('Assign…'))}" aria-label="${esc(tip + ' · ' + tr('Assign…'))}" aria-haspopup="menu">${inner}</button>`
-    : `<span class="whob ro" title="${esc(tip)}">${inner}</span>`;
+  return canAssign(t) ? `<button type="button" class="whob${t.assignee_id ? '' : ' wnone'}" data-act="assign" title="${esc(tip + ' · ' + tr('Assign…'))}" aria-label="${esc(tip + ' · ' + tr('Assign…'))}" aria-haspopup="menu">${inner}</button>`
+    : t.assignee_id ? `<span class="whob ro" title="${esc(tip)}">${inner}</span>` : '';
 }
 function assignMenu(anchor, id) {
   const t = taskById(id); if (!t) return;
@@ -2140,7 +2226,9 @@ function viewWeek() {
     }).join('');
     return `<div class="wcol ${d === t0 ? 'today' : ''}" data-day="${d}">${blocks}${d === t0 ? `<i class="nowline" style="top:${nowTop}px"></i>` : ''}</div>`;
   }).join('');
-  const title = day ? fmtDay('long', pd(S.calSel)) : `${MON[pd(days[0]).getMonth()]} ${pd(days[0]).getFullYear()} · ${tr('Week {0}', isoWeek(addDays(days[0], 3)))}`;
+  // 2.6.0 (K25): the week's own dates ("28. Sep – 4. Okt · KW 40"), short enough for one line on a phone; the month and
+  // year of a week that spans two follow its middle (Thursday) where only one is shown
+  const title = day ? fmtDay('long', pd(S.calSel)) : weekTitle(days[0]);
   return `${calBar(title)}<div class="week ${day ? 'oneday' : ''}" style="--cols:${days.length};--h:${H}px">
     <div class="whead"><div></div>${days.map(d => `<div class="wh ${d === t0 ? 'today' : ''}" data-day="${d}"><span>${WD[pd(d).getDay()]}</span><b>${pd(d).getDate()}</b></div>`).join('')}</div>
     <div class="wallday"><div class="wlbl">${tr('all day|short')}</div>${days.map(d => `<div class="wad" data-day="${d}">${evsOf(d).filter(e => !cevTimed(e, d)).map(e => cevChip(e, d)).join('')}${(map.get(d) || []).filter(t => !t.due_time).map(chip).join('')}</div>`).join('')}</div>
@@ -3422,7 +3510,7 @@ function renderDetail() {
   const kids = children(t.id);
   const parent = t.parent_id && S.tasks.get(t.parent_id);
   const secs = S.sections.filter(s => s.list_id === t.list_id);
-  const dueTxt = t.due ? (t.start && t.start < t.due ? dayLabel(t.start) + ' – ' : '') + dayLabel(t.due) + (t.due_time ? ', ' + t.due_time : '') : tr('Date');
+  const dueTxt = t.due ? dueLabel(t) : tr('Date');
   const mdMode = t.content && !S.editContent;
   const ro = !canEdit(t), shared = l && l.shared;
   // U07 (owner decision 3): an item of a checklist only gets title, note and (shared, with collaboration) the assignee;
@@ -4411,7 +4499,7 @@ function histBtn(dir) {
   return {lab, tip: lab + (e ? ` (${kbText(dir === 'undo' ? 'Mod+Z' : 'Mod+Shift+Z')})` : '') + (p ? ' · ' + tr('waiting for the connection') : ''), off: !e || HIST.busy, p};
 }
 function histBtns() {
-  return `<div class="hist" role="group" aria-label="${esc(tr('History'))}">${['undo', 'redo'].map(dir => { const b = histBtn(dir); return `<button type="button" class="iconbtn hbtn${b.p ? ' pend' : ''}" data-act="hist-${dir}" aria-label="${esc(b.lab)}" title="${esc(b.tip)}"${b.off ? ' disabled' : ''}>${ic(dir === 'undo' ? 'undo' : 'redo')}</button>`; }).join('')}</div>`;
+  return `<div class="hist tf" role="group" aria-label="${esc(tr('History'))}">${['undo', 'redo'].map(dir => { const b = histBtn(dir); return `<button type="button" class="iconbtn hbtn${b.p ? ' pend' : ''}" data-act="hist-${dir}" aria-label="${esc(b.lab)}" title="${esc(b.tip)}"${b.off ? ' disabled' : ''}>${ic(dir === 'undo' ? 'undo' : 'redo')}</button>`; }).join('')}</div>`;
 }
 function renderHist() {  // in place: keeps the keyboard focus on the button
   for (const dir of ['undo', 'redo']) {
@@ -4547,7 +4635,7 @@ function openPop(anchor, html, onClose) {
   p.onclick = null;  // a click handler of the previous popover (menu, calendar event) never carries over
   p.innerHTML = html; p.classList.remove('hidden');
   $('#scrim').classList.remove('hidden');
-  // #318: a menu opened from inside a dialog (e.g. Settings > AI colleague > "Share a list with an agent…") goes above it
+  // #318: a menu opened from inside a dialog (e.g. Settings > Agents > "Share a list with an agent…") goes above it
   const om = !!anchor?.closest?.('.modal'); p.classList.toggle('overmodal', om); $('#scrim').classList.toggle('overmodal', om);
   popOnClose = onClose || null;
   if (isMobile()) { p.classList.add('sheet'); return p; }
@@ -5201,7 +5289,7 @@ async function setProgHidden(id, hide) {
 function listMenuItems(id, anchor) {
   const l = listById(id); if (!l) return [];
   const own = isOwner(l), k = l.kind || 'list', at = () => typeof anchor === 'function' ? anchor() : anchor;
-  const items = [{label: tr('Edit list…'), icon: 'edit', fn: () => listModal(id)}];
+  const items = [{label: tr('Edit list…'), icon: 'edit', fn: () => listModal(id)}, ...(shareOk(l) && !l.archived ? [{label: tr(collab() ? N_('Share…') : N_('Ownership…')), icon: 'users', fn: () => shareModal(id)}] : [])];
   if (!l.is_inbox && !l.archived) items.push({label: tr('Move to folder…'), icon: 'folder', fn: () => folderPick(at(), id)});
   if (propOn() && !l.archived) {  // 2.3.0 (#262 #263)
     if (l.is_inbox && own) items.push({label: propWith(N_('Sort the inbox with {0}…'), N_('Sort the inbox with an agent…')), icon: 'bot', fn: () => propRequest('triage', {})});
@@ -5256,6 +5344,96 @@ async function listDeleteForGood(id) {
   await load(); render(); toast(tr('“{0}” deleted', lname(l)));
   return true;
 }
+// ---- 2.6.0 (K12): the Share dialog, out of the long list dialog: people + roles and inviting, the agents of the list (share /
+// stop sharing, the tidy agent), the public link, transferring the ownership. From the list's "…" menu, the header's Share
+// button and the list dialog (Sharing > Share…). Admins without collaboration only see the ownership part.
+const shareOk = l => !!l && !l.is_inbox && (collab() || !!S.me?.is_admin);
+function shareSummary(l) {
+  const ppl = listPeople(l).filter(p => !(S.me && p.user_id === S.me.id) && !agentById(p.user_id) && !p.agent), ags = listAgents(l);
+  if (!collab()) return tr('Owner: {0}', l.owner_name || S.me?.display_name || '');
+  return [ppl.length ? trn('Shared with {0} person', 'Shared with {0} people', ppl.length) : tr('Not shared with anyone yet'), ags.length ? trn('{0} agent', '{0} agents', ags.length) : ''].filter(Boolean).join(' · ');
+}
+function shareModal(id) {
+  const l0 = listById(id); if (!shareOk(l0)) return;
+  const own = isOwner(l0), hint = t => `<div class="shint lhint">${t}</div>`;
+  const md = modal(`<div class="lhdr"><h3>${esc(tr(collab() ? N_('Share “{0}”') : N_('Owner of “{0}”'), lname(l0)))}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
+    ${collab() ? `<h4 id="sh-people-h">${tr('People')}</h4><div class="members" id="l-members" aria-labelledby="sh-people-h"></div>` : ''}
+    ${collab() && agentsOn() ? `<div id="sh-agwrap"></div>` : ''}
+    ${own && S.publicLinks ? `<h4 id="l-pub-h">${tr('Public link')}</h4><div id="l-pub"><div class="muted mhint">${tr('Loading…')}</div></div>` : ''}
+    <div id="sh-ownwrap"><h4 id="sh-own-h">${tr('Owner')}</h4><div class="muted mhint" id="sh-owner"></div><div id="l-owner"></div></div>
+    <div class="foot"><button class="btn" data-m="list-edit">${ic('edit', 's')} ${tr('List settings…')}</button><span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);
+  md.classList.add('shmodal');
+  let users = null;
+  const roleSel = (attr, cur_, lab) => `<select ${attr} aria-label="${esc(lab || tr('Role'))}">${ROLES.map(([v, n, h]) => `<option value="${v}" title="${esc(tr(h))}" ${v === cur_ ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>`;
+  const isAg = p => !!(p.agent || agentById(p.user_id));
+  const row = (cur, p, mng) => `<div class="mrow" data-uid="${p.user_id}">${av(p.user_id, p.name)}<span class="n">${esc(p.name)}${S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : ''}${isAg(p) ? agentBadge() : ''}</span>${mng && p.role !== 'owner' && !(S.me && p.user_id === S.me.id)
+      ? `${roleSel(`data-mrole="${p.user_id}"`, p.role, tr('Role of {0}', p.name))}<button class="iconbtn" data-mrm="${p.user_id}" title="${esc(isAg(p) ? tr('Stop sharing with {0}', p.name) : tr('Remove from list'))}" aria-label="${esc(isAg(p) ? tr('Stop sharing with {0}', p.name) : tr('Remove {0} from this list', p.name))}">${ic('x', 's')}</button>`
+      : `<span class="muted" title="${esc(roleHelp(p.role))}">${esc(roleLabel(p.role))}</span>`}</div>`;
+  const draw = () => {
+    if (!md.isConnected) return;
+    const cur = listById(id) || l0, people = listPeople(cur), mng = canManage(cur);
+    const box = $('#l-members', md);
+    if (box) {
+      const ppl = people.filter(p => !isAg(p));
+      const cand = users && users.filter(u => !u.agent && u.id !== S.me?.id && !people.some(p => p.user_id === u.id));
+      box.innerHTML = ppl.map(p => row(cur, p, mng)).join('') +
+        (mng ? (users === null ? `<div class="muted mhint">${tr('Loading…')}</div>` : cand.length ? `<div class="mrow madd"><select id="l-adduser" aria-label="${esc(tr('Invite'))}"><option value="">${tr('Share with …')}</option>${cand.map(u => `<option value="${u.id}">${esc(u.display_name)}</option>`).join('')}</select>${roleSel('id="l-addrole"', 'edit')}<button class="btn sm" data-m="share">${ic('plus', 's')} ${tr('Add')}</button></div>`
+          : `<div class="muted mhint">${users.filter(u => !u.agent).length > 1 ? tr('Shared with everyone') : tr('No other users yet. An admin can add them in the settings.')}</div>`) + `<details class="rolehelp sdet"><summary>${tr('What the roles may do')}</summary>${ROLES.map(([, n, h]) => `<div><b>${tr(n)}</b> <span class="muted">${tr(h)}</span></div>`).join('')}</details>`
+          : `<div class="muted mhint olock"><span>${esc(tr('Owner'))}: ${esc(cur.owner_name)}</span><button type="button" class="iconbtn" data-m="owner-info" title="${esc(tr('Owner: {0}. Only the owner can rename or archive this list; the owner and list admins manage who is in it.', cur.owner_name))}" aria-label="${esc(tr('Owner: {0}. Only the owner can rename or archive this list; the owner and list admins manage who is in it.', cur.owner_name))}">${ic('lock', 's')}</button></div>`);
+    }
+    const aw = $('#sh-agwrap', md);
+    if (aw) {
+      const ags = people.filter(isAg), acand = users ? users.filter(u => u.agent && !people.some(p => p.user_id === u.id)) : [];
+      aw.innerHTML = ags.length || (mng && acand.length) ? `<h4 id="sh-ag-h">${tr('Agents')}</h4>${hint(tr('An agent sees exactly the lists shared with it, nothing else. Stopping the sharing ends its access at once.'))}
+        <div class="members" id="sh-agents">${ags.map(p => row(cur, p, mng)).join('')}${mng && acand.length ? `<div class="mrow madd"><select id="sh-addagent" aria-label="${esc(tr('Share with an agent'))}"><option value="">${tr('Share with an agent …')}</option>${acand.map(u => `<option value="${u.id}">${esc(u.display_name)}</option>`).join('')}</select>${roleSel('id="sh-agrole"', 'edit')}<button class="btn sm" data-m="share-ag">${ic('plus', 's')} ${tr('Add')}</button></div>` : ''}</div>
+        <div id="l-tidyrow">${tidyRowHtml(cur)}</div>` : '';
+    }
+    const ow = $('#sh-owner', md); if (ow) ow.textContent = cur.owner_name || (own ? S.me?.display_name || '' : '');
+    const sum = $('#l-shsum'); if (sum) sum.textContent = shareSummary(cur);
+  };
+  // "Transfer ownership…" (owner) / "Take over…" (admins, owner = agent or disabled user) + the history (2.1.2, #349)
+  const drawOwner = async () => {
+    const box = $('#l-owner', md); if (!box) return;
+    let j; try { j = await calReq('GET', `/api/lists/${id}/owner`); } catch { box.innerHTML = ''; return; }
+    if (!md.isConnected) return;
+    box._j = j;
+    const hist = j.history.slice(0, 3).map(h => `<div class="muted mhint owhist">${esc(tr('Ownership transferred from {0} to {1}', h.from, h.to))} · ${esc(relTime(h.at))}</div>`).join('');
+    const why = j.owner.agent ? tr('The owner is the agent {0}: agents cannot manage who is in a list. As an admin you can take it over.', j.owner.name)
+      : tr('The owner {0} is disabled. As an admin you can take the list over.', j.owner.name);
+    box.innerHTML = (j.mode === 'owner' ? `<div class="row owrow"><button class="btn sm" data-m="own-xfer">${ic('user', 's')} ${tr('Transfer ownership…')}</button></div>`
+      : j.mode === 'takeover' ? `<div class="shint lhint">${esc(why)}</div><div class="row owrow"><button class="btn sm" data-m="own-xfer">${ic('user', 's')} ${tr('Take over…')}</button></div>` : '') + hist;
+  };
+  draw(); drawOwner();
+  if (own && S.publicLinks) pubWire(md, id);
+  if (collab()) {
+    tidyWire(md, id);
+    if (canManage(l0)) api('GET', '/api/users').then(j => { users = j.users.filter(u => !u.disabled).map(u => ({id: u.id, display_name: u.display_name, agent: !!u.agent})); draw(); }).catch(() => { users = []; draw(); });
+  }
+  const act = async (fn, msg) => { try { await fn(); await load(); render(); draw(); if (msg) toast(msg); } catch { /* api() showed it */ } };
+  md.addEventListener('change', e => {
+    const r = e.target.closest('[data-mrole]');
+    if (r) act(() => api('PUT', `/api/lists/${id}/members`, {user_id: +r.dataset.mrole, role: r.value}));
+  });
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const m = b.dataset.m;
+    if (m === 'close') { md.remove(); return; }
+    if (m === 'list-edit') { md.remove(); listModal(id); return; }
+    if (m === 'share' || m === 'share-ag') {
+      const [us, rs] = m === 'share' ? ['#l-adduser', '#l-addrole'] : ['#sh-addagent', '#sh-agrole'];
+      const u = +$(us, md).value; if (!u) return;
+      act(() => api('PUT', `/api/lists/${id}/members`, {user_id: u, role: $(rs, md).value}), tr('Shared')); return;
+    }
+    if (b.dataset.mrm) {
+      const p = listPeople(listById(id)).find(x => x.user_id === +b.dataset.mrm), ag = p && isAg(p);
+      if (!await askConfirm(ag ? tr('Stop sharing with {0}?', p?.name || '') : tr('Remove {0} from this list?', p?.name || ''), ag ? tr('The agent loses access to this list and its tasks at once.') : tr('They no longer see the list and its tasks; their tasks stay.'), {ok: ag ? tr('Stop sharing') : tr('Remove'), danger: true})) return;
+      act(() => api('DELETE', `/api/lists/${id}/members/${b.dataset.mrm}`)); return;
+    }
+    if (m === 'owner-info') { toast(b.title); return; }
+    if (m === 'own-xfer') { const j = $('#l-owner', md)?._j; if (j) ownerModal(id, lname(listById(id) || l0), j, () => md.remove()); return; }
+  });
+  return md;
+}
 function listModal(id, folder = '', o = {}) {
   const l = id ? listById(id) : {name: '', color: '', folder, view: 'list', kind: o.kind || 'list', tickets: 0};
   const own = isOwner(l), dis = own ? '' : 'disabled';
@@ -5286,55 +5464,18 @@ function listModal(id, folder = '', o = {}) {
     ${id && own && fieldsOn() ? `<h4 title="${esc(tr('Own columns for this list: budget, stage, client, …'))}">${tr('Custom fields')}</h4><div class="members" id="l-fields">${fieldsBox(id)}</div>` : id && fieldsOf(id).length ? `<h4>${tr('Custom fields')}</h4><div class="muted mhint">${esc(fieldsOf(id).map(f => f.name).join(', '))} · ${tr('only the owner can change them')}</div>` : ''}
     ${id && !l.is_inbox ? repoBoxHtml(l) : ''}
     </div>
-    ${id && !l.is_inbox && collab() ? `<h4>${tr('Sharing')}</h4><div class="members" id="l-members"></div>` : ''}${id && !l.is_inbox && (collab() || S.me?.is_admin) ? '<div id="l-owner"></div>' : ''}
+    ${id && shareOk(l) ? `<h4>${tr(collab() ? N_('Sharing') : N_('Owner'))}</h4><div class="row shsum"><span class="muted" id="l-shsum">${esc(shareSummary(l))}</span><button class="btn sm" data-m="share-open">${ic('users', 's')} ${tr(collab() ? N_('Share…') : N_('Ownership…'))}</button></div>` : ''}
     ${id && !l.is_inbox && collab() && l.shared ? `<h4>${tr('Notifications')}</h4><div class="row"><label for="l-bell">${ic(BELL_ICON[l.bell || 'default'], 's')} ${tr('This list')}</label><select id="l-bell" data-native>${BELLS.map(([m, n]) => `<option value="${m}" ${(l.bell || 'default') === m ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     <div class="shint lhint" id="l-bellhint">${tr(BELLS.find(b => b[0] === (l.bell || 'default'))[2])} · ${tr('only for you')}</div>` : ''}
     ${id && !l.is_inbox && collab() && (l.shared || listTags(id).length) ? `<h4>${tr('List tags')}</h4><div class="shint lhint">${tr('Tags of this list: everyone in it sees them, with their colour. Personal tags (with the person icon) stay yours.')}</div><div class="members" id="l-ltags">${ltagsBoxHtml(l)}</div>` : ''}
-    ${id && !l.is_inbox && collab() && listAgents(l).length ? `<h4>${tr('Agent')}</h4><div id="l-tidyrow">${tidyRowHtml(l)}</div>` : ''}
-    ${id && !l.is_inbox && own && S.publicLinks ? `<h4 id="l-pub-h">${tr('Public link')}</h4><div id="l-pub"><div class="muted mhint">${tr('Loading…')}</div></div>` : ''}
     <div class="foot">${id && !l.is_inbox && own ? (l.archived ? `<button class="btn" data-m="arch">${ic('undo', 's')} ${tr('Restore from the archive')}</button><button class="btn danger" data-m="del">${ic('trash', 's')} ${tr('Delete permanently…')}</button>` : `<button class="btn" data-m="arch" title="${tr('Hidden from your lists; undo or restore any time. Deleting for good is only possible from the archive.')}">${ic('archive', 's')} ${tr('Archive')}</button>`) : ''}${id && !own ? `<button class="btn danger" data-m="leave">${ic('logout', 's')} ${tr('Leave list')}</button>` : ''}${id ? `<button class="btn" data-m="tpl" title="${tr('Save the sections and open tasks as a template')}">${ic('copy', 's')} ${tr('Save as template')}</button>` : ''}<span class="spacer"></span>${id ? '' : `<button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Create')}</button>`}</div>`);
   if (id) md.classList.add('lmodal'); else md.classList.add('lnew');
   if (!id && tplOf('list').length) api('GET', '/api/templates').then(j => {  // 2.4.0 (#328): what each own template brings
     for (const tp of j.templates || []) { const el = $(`[data-ptd="${tp.id}"]`, md); if (el) el.textContent = tp.data?.rel ? tr('Dates from the project start · {0} days', tp.data.span || 0) : trn('{0} task', '{0} tasks', tp.count); }
   }).catch(() => {});
-  let users = null;
-  const drawMembers = () => {
-    const box = $('#l-members', md); if (!box) return;
-    const cur = listById(id) || l, people = listPeople(cur);
-    const mng = canManage(cur);  // 1.10.0: the owner and list admins manage members and roles (never the owner's)
-    const roleSel = (attr, cur_) => `<select ${attr} aria-label="${esc(tr('Role'))}">${ROLES.map(([v, n, h]) => `<option value="${v}" title="${esc(tr(h))}" ${v === cur_ ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>`;
-    box.innerHTML = people.map(p => `<div class="mrow" data-uid="${p.user_id}">${av(p.user_id, p.name)}<span class="n">${esc(p.name)}${S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : ''}${p.agent || agentById(p.user_id) ? agentBadge() : ''}</span>${mng && p.role !== 'owner' && !(S.me && p.user_id === S.me.id)
-      ? `${roleSel(`data-mrole="${p.user_id}"`, p.role)}<button class="iconbtn" data-mrm="${p.user_id}" title="${tr('Remove from list')}">${ic('x', 's')}</button>`
-      : `<span class="muted" title="${esc(roleHelp(p.role))}">${esc(roleLabel(p.role))}</span>`}</div>`).join('') +
-      (mng ? `<div class="rolehelp">${ROLES.map(([, n, h]) => `<div><b>${tr(n)}</b> <span class="muted">${tr(h)}</span></div>`).join('')}</div>` : '') +
-      (mng ? (users === null ? `<div class="muted mhint">${tr('Loading…')}</div>` : (() => {
-        const cand = users.filter(u => u.id !== S.me?.id && !people.some(p => p.user_id === u.id));
-        return cand.length ? `<div class="mrow madd"><select id="l-adduser"><option value="">${tr('Share with …')}</option>${cand.map(u => `<option value="${u.id}">${esc(u.display_name)}${u.agent ? ' · ' + esc(tr('Agent')) : ''}</option>`).join('')}</select>${roleSel('id="l-addrole"', 'edit')}<button class="btn sm" data-m="share">${ic('plus', 's')} ${tr('Add')}</button></div>`
-          : `<div class="muted mhint">${users.length > 1 ? tr('Shared with everyone') : tr('No other users yet. An admin can add them in the settings.')}</div>`;
-      })()) : `<div class="muted mhint olock"><span>${esc(tr('Owner'))}: ${esc(cur.owner_name)}</span><button type="button" class="iconbtn" data-m="owner-info" title="${esc(tr('Owner: {0}. Only the owner can rename or archive this list; the owner and list admins manage who is in it.', cur.owner_name))}" aria-label="${esc(tr('Owner: {0}. Only the owner can rename or archive this list; the owner and list admins manage who is in it.', cur.owner_name))}">${ic('lock', 's')}</button></div>`);
-  };
-  if (id && !l.is_inbox && own && S.publicLinks) pubWire(md, id);
   if (id && !l.is_inbox) repoWire(md, id);  // 2.2.0 (#271)
-  if (id && !l.is_inbox && collab()) { ltagsWire(md, id); tidyWire(md, id); }
+  if (id && !l.is_inbox && collab()) ltagsWire(md, id);
   $('#l-bell', md)?.addEventListener('change', async e => { e.stopPropagation(); await bellSet(id, e.target.value); const h = $('#l-bellhint', md); if (h) h.textContent = tr(BELLS.find(x => x[0] === e.target.value)[2]) + ' · ' + tr('only for you'); });
-  // 2.1.2 (#349): "Transfer ownership…" (owner) / "Take over…" (admins, owner = agent or disabled user) + the history
-  const drawOwner = async () => {
-    const box = $('#l-owner', md); if (!box) return;
-    let j; try { j = await calReq('GET', `/api/lists/${id}/owner`); } catch { box.innerHTML = ''; return; }
-    if (!md.isConnected) return;
-    box._j = j;
-    const hist = j.history.slice(0, 3).map(h => `<div class="muted mhint owhist">${esc(tr('Ownership transferred from {0} to {1}', h.from, h.to))} · ${esc(relTime(h.at))}</div>`).join('');
-    const why = j.owner.agent ? tr('The owner is the agent {0}: agents cannot manage who is in a list. As an admin you can take it over.', j.owner.name)
-      : tr('The owner {0} is disabled. As an admin you can take the list over.', j.owner.name);
-    box.innerHTML = (j.mode === 'owner' ? `<div class="row owrow"><button class="btn sm" data-m="own-xfer">${ic('user', 's')} ${tr('Transfer ownership…')}</button></div>`
-      : j.mode === 'takeover' ? `<div class="shint lhint">${esc(why)}</div><div class="row owrow"><button class="btn sm" data-m="own-xfer">${ic('user', 's')} ${tr('Take over…')}</button></div>` : '') + hist;
-  };
-  if (id && !l.is_inbox && (collab() || S.me?.is_admin)) drawOwner();
-  if (id && !l.is_inbox && collab()) {
-    drawMembers();
-    if (canManage(l)) api('GET', '/api/users').then(j => { users = j.users.filter(u => !u.disabled).map(u => ({id: u.id, display_name: u.display_name, agent: !!u.agent})); drawMembers(); }).catch(() => { users = []; drawMembers(); });
-  }
-  const memberAct = async (fn, msg) => { try { await fn(); await load(); render(); drawMembers(); if (msg) toast(msg); } catch { /* api() showed it */ } };
   // ---- autosave (existing lists)
   const pend = new Map();
   const formBody = () => {
@@ -5390,8 +5531,6 @@ function listModal(id, folder = '', o = {}) {
     if (e.target.id === 'l-kind') { const k = e.target.value; $('#l-khint', md).innerHTML = kindHint(k); $('.kproj', md).hidden = k !== 'project'; if ($('.lptype', md)) $('.lptype', md).hidden = k !== 'project'; if (id) autosave(); return; }
     if (id && ['l-view', 'l-depshift', 'l-tickets'].includes(e.target.id)) { autosave(); return; }
     if (id && e.target.id === 'l-showprog') { setProgHidden(id, !e.target.checked).then(() => lsaved(null)); return; }
-    const r = e.target.closest('[data-mrole]');
-    if (r) memberAct(() => api('PUT', `/api/lists/${id}/members`, {user_id: +r.dataset.mrole, role: r.value}));
   });
   const drawFields = () => { const box = $('#l-fields', md); if (box) box.innerHTML = fieldsBox(id); };
   md.addEventListener('click', async e => {
@@ -5411,16 +5550,7 @@ function listModal(id, folder = '', o = {}) {
       try { await api('PATCH', '/api/fields/' + fs[i].id, {sort: fs[i - 1].sort}); await api('PATCH', '/api/fields/' + fs[i - 1].id, {sort: fs[i].sort === fs[i - 1].sort ? fs[i].sort + 1 : fs[i].sort}); } catch { return; }
       await load(); render(); drawFields(); return;
     }
-    if (b.dataset.m === 'share') {
-      const u = +$('#l-adduser', md).value; if (!u) return;
-      memberAct(() => api('PUT', `/api/lists/${id}/members`, {user_id: u, role: $('#l-addrole', md).value}), tr('Shared')); return;
-    }
-    if (b.dataset.mrm) {
-      const p = listPeople(listById(id)).find(x => x.user_id === +b.dataset.mrm);
-      if (!await askConfirm(tr('Remove {0} from this list?', p?.name || ''), tr('They no longer see the list and its tasks; their tasks stay.'), {ok: tr('Remove'), danger: true})) return;
-      memberAct(() => api('DELETE', `/api/lists/${id}/members/${b.dataset.mrm}`)); return;
-    }
-    if (b.dataset.m === 'owner-info') { toast(b.title); return; }
+    if (b.dataset.m === 'share-open') { await autosave(); md.remove(); shareModal(id); return; }  // 2.6.0 (K12)
     if (b.dataset.m === 'tt-tpl') { await autosave(); ticketTplModal(id); return; }
     if (b.dataset.pt !== undefined) {  // 2.4.0 (#243 / #328): what the new project starts from
       $$('.ptcard', md).forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', x === b); });
@@ -5432,7 +5562,6 @@ function listModal(id, folder = '', o = {}) {
       if (!$('#l-name', md).value.trim() && (tp || (pt && pt[0]))) $('#l-name', md).value = tp ? $('b', b).textContent : tr(pt[1]);
       return;
     }
-    if (b.dataset.m === 'own-xfer') { const j = $('#l-owner', md)?._j; if (j) ownerModal(id, lname(listById(id) || l), j, () => md.remove()); return; }
     if (b.dataset.m === 'leave') {
       if (!await askConfirm(tr('Leave the list “{0}”?', listName(l.name)), tr('You will no longer see its tasks. The owner can share it with you again.'), {ok: tr('Leave list'), danger: true})) return;
       try { await api('DELETE', `/api/lists/${id}/members/${S.me.id}`); } catch { return; }
@@ -5703,7 +5832,7 @@ async function wpDraw(md) {
 // The last opened section is remembered per device (LS settingsSec).
 // U05: 9 sections (8 without admin rights); Layout, Collaboration, Focus and Time tracking live in Modules now
 const SET_SECS = [['account', 'user', N_('Account')], ['general', 'sliders', N_('General')], ['look', 'palette', N_('Appearance')], ['modules', 'grid', N_('Modules')],
-  ['notify', 'bell', N_('Notifications')], ['integr', 'link', N_('Integrations')], ['ai', 'bot', N_('AI colleague')], ['data', 'download', N_('Data')], ['users', 'users', N_('Administration')], ['help', 'help', N_('Help')]];
+  ['notify', 'bell', N_('Notifications')], ['integr', 'link', N_('Integrations')], ['ai', 'bot', N_('Agents')], ['data', 'download', N_('Data')], ['users', 'users', N_('Administration')], ['help', 'help', N_('Help')]];
 // ---- UX1 (U03, owner decision 2): settings save themselves. Every control applies at once, "Saved · Undo" shows in the
 // dialog header and each change is one step in the undo history ("Changed setting: …"). Text, number and time fields save
 // on blur or Enter (and after a short pause while typing); closing the dialog saves whatever is still pending.
@@ -5834,19 +5963,19 @@ function modulesHtml(hint) {
   return `${hint(tr('Switch on only what you need; everything else disappears from the menus. Nothing is deleted: switched back on, everything is there again.'))}
     ${MOD_GROUPS.map(([g, ks]) => { const r = ks.filter(k => k !== 'paperless' || S.paperless?.enabled || feat('paperless')); return r.length ? `<h4>${tr(g)}</h4><div class="modlist">${r.map(row).join('')}</div>` : ''; }).join('')}`;
 }
-// one module switch (Settings > Modules; 2.0.5: the agents switch also in Settings > AI colleague, both stay in step)
+// one module switch (Settings > Modules; 2.6.0 (K09): the agents switch only there, Settings > Agents links to it)
 function modRowHtml(k, opt = () => '') {
   const adm = !!S.me?.is_admin;
   const n = FEATS.find(x => x[0] === k)?.[1] || k, srv = k === 'collab' ? S.collabAll !== false : k === 'time' ? S.timeAll !== false : true;
   const all = adm && (k === 'collab' || k === 'time') ? `<label class="mall" title="${esc(k === 'collab' ? tr('Off: nobody can share lists, assign tasks, comment, or get News and collaboration notifications; shared lists are then only visible to their owner.') : tr('Off: nobody sees timers, time entries or reports; running timers are stopped at that moment, focus sessions no longer become time entries.'))}"><span class="swc"><input type="checkbox" id="${k === 'collab' ? 's-collaball' : 's-timeall'}" ${srv ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('for everyone')}</span></label>` : '';
   return `<div class="modrow ${feat(k) ? '' : 'off'}" data-modrow="${k}"><label class="mmain"><span class="swc"><input type="checkbox" data-feat="${k}" ${feat(k) ? 'checked' : ''} ${srv ? '' : 'disabled'}><span class="swt" aria-hidden="true"></span></span><span><b>${tr(n)}</b><small class="muted">${tr(MOD_DESC[k] || FEAT_DESC[k] || '')}</small>${srv ? '' : `<small class="muted cnote" id="${k === 'collab' ? 's-collabnote' : 's-timenote'}">${tr('Turned off on this server, for everyone. Your own setting applies again once an admin turns it back on.')}</small>`}</span></label>${all}${opt(k)}</div>`;
 }
-// 2.0.5 (#313): Settings > AI colleague bundles the agents: what they are, the switch, how they get lists, their status;
+// 2.0.5 (#313): Settings > Agents bundles the agents: what they are, the switch, how they get lists, their status;
 // admins also manage them here (was Settings > Administration > Agents; settingsModal('agents') still lands here).
 // 2.5.1 (#393): four sub-tabs instead of one long page: Agents (cards, Add agent + Setup guide), Lists (sharing + tidy table),
 // Usage (one summary card per agent, the charts behind "Details"), Log (admins). The last one is remembered per device;
 // settingsModal('agents' / 'usage' / 'activity') opens the matching one. Each sub-tab loads its data only when shown.
-const AI_SUBS = [['agents', 'bot', N_('Agents')], ['lists', 'list', N_('Lists')], ['usage', 'chart', N_('Usage')], ['log', 'clock', N_('Log')]];
+const AI_SUBS = [['agents', 'bot', N_('Overview')], ['lists', 'list', N_('Lists')], ['usage', 'chart', N_('Usage')], ['log', 'clock', N_('Log')]];
 const aiSubs = () => AI_SUBS.filter(([k]) => k === 'log' ? !!S.me?.is_admin : k === 'usage' ? !!S.me?.is_admin || (S.agents || []).length > 0 : true);
 function aiSubCur(want) { const ks = aiSubs().map(x => x[0]), k = want || LS.get('aiSub', 'agents'); return ks.includes(k) ? k : 'agents'; }
 function aiHtml(hint, want) {
@@ -5854,15 +5983,15 @@ function aiHtml(hint, want) {
   const mine = S.lists.some(l => !l.archived && !l.is_inbox && canManage(l));
   const pane = (k, body) => `<div class="aisp" data-aisp="${k}" id="aisp-${k}" role="tabpanel" aria-labelledby="ais-${k}" ${k === cur ? '' : 'hidden'}>${body}</div>`;
   const subs = aiSubs();
-  return `<div class="seg aisub" role="tablist" aria-label="${esc(tr('AI colleague'))}">${subs.map(([k, i, n]) => `<button type="button" role="tab" id="ais-${k}" data-aisub="${k}" aria-controls="aisp-${k}" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}">${ic(i, 's')}<span>${tr(n)}</span></button>`).join('')}</div>
+  return `<div class="seg aisub" role="tablist" aria-label="${esc(tr('Agents'))}">${subs.map(([k, i, n]) => `<button type="button" role="tab" id="ais-${k}" data-aisub="${k}" aria-controls="aisp-${k}" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}">${ic(i, 's')}<span>${tr(n)}</span></button>`).join('')}</div>
     ${pane('agents', `<details class="shelp sdet aiexp" ${ags.length ? '' : 'open'}><summary>${tr('Agents are AI team members: they work only through the API and see only the lists shared with them.')}</summary>
       <p>${tr('An agent is a team member for an AI assistant or a bot (Claude Code, Codex, n8n, a local model …): it works only through the API, is never an admin, gets no Paperless access and sees only the lists shared with it. Kalmido tells it about mentions, assignments, chat messages and reactions by webhook or through an event queue it polls; Kalmido itself never starts an AI.')} <a href="${API_DOCS.replace('API.md', 'AGENTS.md')}" target="_blank" rel="noopener noreferrer">${tr('How to connect an agent')}</a></p></details>
-    ${feat('agents') ? '' : `<div class="modlist">${modRowHtml('agents')}</div>`}
+    ${feat('agents') ? '' : `<div class="shint aimodoff">${ic('grid', 's')} <span>${tr('The Agents module (the tab with their status, jobs to approve and the chat) is switched off for you.')}</span> <button class="btn sm" data-m="go-modules">${tr('Open Modules')}</button></div>`}
     ${collab() ? '' : hint(tr('Agents work together with you in shared lists: switch on Collaboration (Settings > Modules) as well.'))}
     <div class="members aglist" id="${adm ? 's-ags' : 's-myags'}"><div class="muted mhint">${tr('Loading…')}</div></div>
-    <div class="row aibtns">${adm ? `<button class="btn sm" data-ag="new">${ic('plus', 's')} ${tr('Add agent')}</button>` : ''}<button class="btn sm" data-m="ag-guide" title="${esc(tr('Set up an AI colleague step by step, or let Claude Code do it'))}">${ic('help', 's')} ${tr('Setup guide')}</button></div>`)}
+    <div class="row aibtns">${adm ? `<button class="btn sm" data-ag="new">${ic('plus', 's')} ${tr('Add agent')}</button>` : ''}<button class="btn sm" data-m="ag-guide" title="${esc(tr('Set up an agent step by step, or let Claude Code do it'))}">${ic('help', 's')} ${tr('Setup guide')}</button></div>`)}
     ${pane('lists', `<h4 id="s-ai-lists-h">${ags.length > 1 ? tr('Which lists they see') : tr('Which lists it sees')}</h4>
-    ${hint(tr('An agent sees exactly the lists shared with it, nothing else. Share or stop sharing below or in the list dialog > Sharing; taking a list out ends the access at once.'))}
+    ${hint(tr('An agent sees exactly the lists shared with it, nothing else. Share or stop sharing below or in the list’s Share dialog; taking a list out ends the access at once.'))}
     ${mine && collab() ? `<div class="aishare" id="s-ai-share"></div><div class="aitblctl" id="s-ai-tblctl"></div>
     <div class="aitbl" id="s-ai-tbl" role="table" aria-labelledby="s-ai-lists-h"><div class="muted mhint">${tr('Loading…')}</div></div>` : `<div class="muted mhint">${tr('You do not manage any list yet.')}</div>`}`)}
     ${subs.some(x => x[0] === 'usage') ? pane('usage', `${hint(adm ? tr('What the agents report about their model usage: tokens and, if they send it, the cost. You see every agent; limits are set per agent (Edit).') : tr('What the agents in your lists report about their model usage, counted in the lists you see.'))}
@@ -6121,6 +6250,7 @@ function settingsModal(focus) {
     if (b.dataset.m === 'keys') { md.remove(); shortcutsModal(); return; }
     if (b.dataset.m === 'hints-reset') { LS.del('hintsSeen'); toast(tr('Done')); render(); return; }
     if (b.dataset.m === 'ag-guide') { agGuideModal(); return; }  // 2.4.2 (#392)
+    if (b.dataset.m === 'go-modules') { $('.snav [data-sec="modules"]', md)?.click(); setTimeout(() => $('[data-pane="modules"] [data-modrow="agents"]', md)?.scrollIntoView?.({block: 'center'}), 50); return; }  // 2.6.0 (K09)
     if (b.dataset.m === 'cele-try') { celebrate('today', {force: true}); return; }
     const trw = b.closest('[data-tpl]');
     if (trw) {
@@ -6274,8 +6404,8 @@ function instanceHtml(chk, hint) {
   return `<h4 id="s-instance-h">${tr('Whole server')}</h4>
     ${hint(tr('Apply to every user at once. Nothing is deleted: switched back on, everything is there again.') + ' ' + tr('Collaboration and time tracking for everyone: Settings > Modules.'))}
     <div class="featgrid">
-      <label class="wide"><input type="checkbox" id="s-publinks" ${a.public_links !== false && a.public_links_env !== false ? 'checked' : ''} ${a.public_links_env === false ? 'disabled' : ''}><span>${tr('Public links to lists')}<small class="muted">${a.public_links_env === false ? tr('Public links are off (KALMIDO_PUBLIC_LINKS=0)') : tr('List owners can share a list with people without an account through a secret link (view only or tick off). Off: every public link stops working at once; nothing is deleted.')}</small></span></label>
-      <label class="wide"><input type="checkbox" id="s-updcheck" ${a.update_check !== false && a.update_env !== false ? 'checked' : ''} ${a.update_env === false ? 'disabled' : ''}><span>${tr('Check daily for a new version')}<small class="muted">${a.update_env === false ? tr('Update check is off (KALMIDO_UPDATE_CHECK=0)') : tr('The server asks GitHub once a day for the latest release; nothing is installed automatically and the browser never contacts GitHub. Result under Help.')}</small></span></label>
+      <label class="wide"><input type="checkbox" id="s-publinks" ${a.public_links !== false && a.public_links_env !== false ? 'checked' : ''} ${a.public_links_env === false ? 'disabled' : ''}><span>${tr('Public links to lists')}<small class="muted">${a.public_links_env === false ? `<span title="KALMIDO_PUBLIC_LINKS=0">${tr('Switched off by the server operator.')}</span>` : tr('List owners can share a list with people without an account through a secret link (view only or tick off). Off: every public link stops working at once; nothing is deleted.')}</small></span></label>
+      <label class="wide"><input type="checkbox" id="s-updcheck" ${a.update_check !== false && a.update_env !== false ? 'checked' : ''} ${a.update_env === false ? 'disabled' : ''}><span>${tr('Check daily for a new version')}<small class="muted">${a.update_env === false ? `<span title="KALMIDO_UPDATE_CHECK=0">${tr('Switched off by the server operator.')}</span>` : tr('The server asks GitHub once a day for the latest release; nothing is installed automatically and the browser never contacts GitHub. Result under Help.')}</small></span></label>
     </div>
     ${a.cal_on || S.webhooks?.enabled ? `<details class="sdev"><summary>${ic('key', 's')}${tr('Advanced · for developers')}</summary><h4 id="s-calhosts-h">${tr('Allowed internal hosts')}</h4>
     ${hint(tr('Calendar subscriptions and webhooks may only reach public addresses. List servers in your own network here (host or host:port, separated by commas), for example your own Nextcloud, Radicale or n8n; every user can then use them. Webhooks may use http:// only for these hosts.') + (a.cal_allow_env ? ' ' + esc(tr('Also allowed by the server configuration: {0}', a.cal_allow_env)) : ''))}
@@ -6307,7 +6437,7 @@ async function plcDraw(md) {
       <div class="row"><label for="plc-tok">${tr('API token')}</label>${plTokenIn('plc-tok')}</div>
       <div class="shint">${tr('In Paperless: your profile (top right) > My Profile > API Auth Token. The token is stored encrypted and never shown again; only you can use this connection.')}</div>
       <div class="row"><label></label><button class="btn sm pri" data-plc-act="add">${ic('plus', 's')} ${tr('Add')}</button></div></details>`
-      : `<div class="shint">${tr('Tokens cannot be stored on this server yet: an admin has to set KALMIDO_SECRET_KEY.')}</div>`);
+      : `<div class="shint">${tr('Tokens cannot be stored on this server yet: the server operator has to set a secret key first (KALMIDO_SECRET_KEY, see the installation guide).')}</div>`);
 }
 function plcWire(md) {
   if (!$('#s-plc', md)) return;
@@ -6400,11 +6530,11 @@ async function aaDraw(md, j) {
   const rc = j.topic ? tr('Goes to the admin topic {0}.', `<code class="topic">${esc(j.topic)}</code>`)
     : j.admins.length ? tr('Goes to each admin over their own notification channel: {0}.', j.admins.map(a => `${esc(a.username)}: ${via(a)}`).join(', ')) : '';
   const meA = j.admins.find(a => a.me), meNone = !j.topic && meA && !meA.devices && !meA.topic;
-  let h = j.env ? '' : hint(tr('Admin alerts are turned off on this server (KALMIDO_ADMIN_ALERTS=0)'));
+  let h = j.env ? '' : hint(`<span title="KALMIDO_ADMIN_ALERTS=0">${tr('Admin alerts are switched off by the server operator.')}</span>`);
   h += `<div class="featgrid"><label class="wide"><input type="checkbox" id="aa-on" ${j.on && j.env ? 'checked' : ''} ${j.env ? '' : 'disabled'}><span>${tr('Admin alerts')}<small class="muted">${tr('Warnings about the server go to the admins over their own notification channel (Web Push to their devices, ntfy only if they chose it or an admin topic is set): updates, delivery problems, watchdog errors, integrations, security events, disk space. Only counts, ids, usernames, device labels and error classes, never task contents.')}</small></span></label></div>
     ${meNone && j.on && j.env ? `<div class="shint aanone">${ic('bell', 's')} <span>${tr('No device subscribed for push yet. Until you subscribe one, admin alerts are only listed here.')}</span> <button class="btn sm" data-aa="notify">${tr('Subscribe this device')}</button></div>` : ''}
     <div class="row"><label for="aa-topic">${tr('Admin topic')}</label><input id="aa-topic" value="${esc(j.topic)}" autocapitalize="off" placeholder="${tr('empty = each admin’s own topic')}" ${j.topic_env ? 'readonly' : ''}></div>
-    ${hint((j.topic_env ? tr('Set by KALMIDO_ADMIN_TOPIC.') + ' ' : '') + rc)}
+    ${hint((j.topic_env ? `<span title="KALMIDO_ADMIN_TOPIC">${tr('Set by the server operator.')}</span> ` : '') + rc)}
     <div class="row"><label for="aa-prio">${tr('How urgent')}</label><select id="aa-prio">${[['3', N_('Normal')], ['4', N_('Loud')], ['5', N_('Urgent')]].map(([v, n]) => `<option value="${v}" ${j.prio === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     <div class="row"><label for="aa-mode">${tr('Delivery')}</label><select id="aa-mode"><option value="instant" ${j.mode === 'instant' ? 'selected' : ''}>${tr('Instantly')}</option><option value="digest" ${j.mode === 'digest' ? 'selected' : ''}>${tr('Daily summary')}</option></select>${timeIn('aa-dtime', j.digest_time, {label: tr('Time of the daily summary'), clear: false, hidden: j.mode !== 'digest'})}</div>
     <div class="featgrid" id="aa-kinds">${j.all_kinds.map(k => `<label><input type="checkbox" data-aakind="${esc(k.kind)}" ${j.kinds.includes(k.kind) ? 'checked' : ''}> ${esc(k.label)}</label>`).join('')}</div>
@@ -6884,9 +7014,9 @@ function accountWire(md) {
   const drawUsers = async () => {
     const box = $('#a-users', md); if (!box) return;
     try { users = (await api('GET', '/api/users')).users; } catch { return; }
-    // 2.1.2 (#346): agents are rows too (badge); they are edited in their own dialog (Settings > AI colleague)
+    // 2.1.2 (#346): agents are rows too (badge); they are edited in their own dialog (Settings > Agents)
     box.innerHTML = users.map(u => `<div class="mrow ${u.disabled ? 'off' : ''}" data-urow="${u.id}">${u.avatar ? `<span class="avatar pic"><img src="${esc(u.avatar)}" alt="" loading="lazy"></span>` : av(0, u.display_name)}<span class="n">${esc(u.display_name)}${u.kind === 'agent' ? ' ' + agentBadge() : ''} <span class="muted">${esc(u.username)}${u.is_admin ? ' · ' + tr('Admin') : ''}${u.disabled ? ' · ' + tr('disabled') : ''}${u.proxy_login ? ' · ' + tr('SSO: {0}', u.proxy_login) : ''}${u.paperless_access && S.paperless?.configured ? ' · Paperless' : ''}${u.twofa?.length ? ' · ' + tr('2FA') : ''}${u.oidc_linked ? ' · OIDC' : ''}</span></span>${u.kind === 'agent'
-      ? `<button class="linkbtn agmng" data-acc="agent-edit" data-uid="${u.id}" title="${esc(tr('Open the agent dialog'))}">${tr('Managed under AI colleague')}</button>`
+      ? `<button class="linkbtn agmng" data-acc="agent-edit" data-uid="${u.id}" title="${esc(tr('Open the agent dialog'))}">${tr('Managed under Agents')}</button>`
       : `<button class="iconbtn" data-acc="user-edit" data-uid="${u.id}" title="${tr('Edit user')}">${ic('edit', 's')}</button>`}</div>`).join('');
   };
   drawUsers();
@@ -6936,7 +7066,7 @@ function userModal(u, done) {
     ${u?.has_password ? `<div class="row"><label></label><label class="chkl"><input type="checkbox" id="u-nopw"> ${tr('Remove password (single sign-on only)')}</label></div>` : ''}
     ${u?.twofa?.length ? `<div class="row"><label>${tr('Two-factor')}</label><label class="chkl"><input type="checkbox" id="u-2fareset"> ${tr('Reset (lost phone / passkey and recovery codes)')}</label></div>` : ''}
     ${u?.oidc_linked ? `<div class="row"><label>OIDC</label><label class="chkl"><input type="checkbox" id="u-oidcun"> ${tr('Unlink (the next OIDC login links again by user name or e-mail)')}</label></div>` : ''}
-    <div class="muted" style="font-size:var(--fs-s);line-height:1.6">${tr('Every user gets an own inbox, habits, filters, tags and settings. Lists are shared from the list dialog.')}</div>
+    <div class="muted" style="font-size:var(--fs-s);line-height:1.6">${tr('Every user gets an own inbox, habits, filters, tags and settings. Lists are shared from the list’s “…” menu > Share….')}</div>
     <div class="foot">${u && u.id !== S.me.id ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   md.addEventListener('click', e => {  // the picture choice is sent with "Save"
     const p = e.target.closest('#u-avpick [data-av]'); if (!p) return;
@@ -6962,7 +7092,7 @@ function userModal(u, done) {
         const pw = $('#u-pw', md).value;
         if (pw) body.password = pw; else if ($('#u-nopw', md)?.checked) body.password = '';
         if ($('#u-kind', md) && $('#u-kind', md).value !== (u.kind || 'user')) {
-          if ($('#u-kind', md).value === 'agent' && !await askConfirm(tr('Make “{0}” an agent?', u.display_name), tr('An agent works only through its API tokens: no web login, never admin, no Paperless. Its lists and tokens stay. Manage it under Settings > AI colleague.'), {ok: tr('Make agent')})) return;
+          if ($('#u-kind', md).value === 'agent' && !await askConfirm(tr('Make “{0}” an agent?', u.display_name), tr('An agent works only through its API tokens: no web login, never admin, no Paperless. Its lists and tokens stay. Manage it under Settings > Agents.'), {ok: tr('Make agent')})) return;
           body.kind = $('#u-kind', md).value;
         }
         if (u) { body.disabled = $('#u-dis', md).checked; await api('PATCH', '/api/users/' + u.id, body); }
@@ -7313,7 +7443,7 @@ async function bkDraw(md, j) {
     <div class="row"><label for="bk-time">${tr('Time')}</label>${timeIn('bk-time', j.time, {label: tr('Time'), clear: false})}</div>
     <div class="row"><label for="bk-daily">${tr('Keep')}</label><input type="number" class="aanum" id="bk-daily" min="1" max="365" value="${j.keep_daily}"><span class="muted">${tr('daily')}</span><input type="number" class="aanum" id="bk-weekly" min="0" max="520" value="${j.keep_weekly}"><span class="muted">${tr('weekly')}</span></div>
     <div class="featgrid"><label class="wide"><input type="checkbox" id="bk-enc" ${j.encrypt ? 'checked' : ''}><span>${tr('Encrypt backups')}<small class="muted">${tr('AES-256 with a passphrase. Without the passphrase an encrypted backup cannot be restored, not even by you or the admin. Write it down somewhere safe (password manager).')}</small></span></label></div>
-    <div class="row"><label for="bk-pass">${tr('Passphrase')}</label><input type="password" id="bk-pass" autocomplete="new-password" placeholder="${j.passphrase_env ? tr('set by KALMIDO_BACKUP_PASSPHRASE') : j.passphrase_set ? tr('set (unchanged)') : tr('at least 10 characters')}" ${j.passphrase_env ? 'readonly' : ''}></div>
+    <div class="row"><label for="bk-pass">${tr('Passphrase')}</label><input type="password" id="bk-pass" autocomplete="new-password" placeholder="${j.passphrase_env ? tr('set by the server operator') : j.passphrase_set ? tr('set (unchanged)') : tr('at least 10 characters')}" ${j.passphrase_env ? 'readonly' : ''}></div>
     <div class="row"><button class="btn sm" data-bk="now" ${j.running ? 'disabled' : ''}>${ic('archive', 's')} ${tr('Back up now')}</button></div>`;
   const st = [j.running ? (j.running === 'restore' ? tr('A restore is running…') : tr('Backup running…')) : j.last_ok ? tr('Last backup: {0}.', esc(aaWhen(j.last_ok))) : tr('No backup yet.'),
     tr('Backups use {0}, {1} free on the disk.', fmtBytes(j.total_bytes), j.free_bytes ? fmtBytes(j.free_bytes) : '?')];
@@ -8477,11 +8607,22 @@ function actField(d) {
 
 // ------------------------------------------------------------------ toast
 let toastTimer;
+// 2.6.0 (K18): the toast sits above whatever is docked at the bottom (the composer "Add task…", the tab bar, the + button),
+// never on top of it; measured each time it shows
+function toastPlace(el) {
+  let top = innerHeight;
+  for (const s of ['#view .qdock .qadd', '#tabs', '#fab:not(.gone)', '.mbar:not(.hidden)']) {
+    const e = $(s); if (!e || !e.offsetWidth) continue;
+    const r = e.getBoundingClientRect(); if (r.top > innerHeight * .5 && r.top < top && r.bottom > innerHeight - 160) top = r.top;
+  }
+  el.style.bottom = top < innerHeight ? Math.round(innerHeight - top + 12) + 'px' : '';
+}
 function toast(msg, undo, ms) {
   const el = $('#toast');
   if (!undo) HIST.toastE = null;  // any other message ends the toast's shortcut (the history keeps the step)
   el.innerHTML = `<span>${esc(msg)}</span>${undo ? `<button>${tr('Undo')}</button>${isMobile() ? '' : kb('Mod+Z')}` : ''}`;
   el.classList.remove('hidden');
+  toastPlace(el);
   if (undo) el.querySelector('button').onclick = () => { el.classList.add('hidden'); undo(); };
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { el.classList.add('hidden'); if (undo) HIST.toastE = null; }, ms || (undo ? 6000 : 2500));
@@ -8658,6 +8799,8 @@ document.addEventListener('click', async e => {
   const id = +(a.dataset.id || (row && row.dataset.id) || 0);
   switch (act) {
     case 'agent-chip': agentChipMenu(a); break;
+    case 'st-chip': stChipMenu(a); break;
+    case 'share-list': shareModal(+a.dataset.id); break;
     case 'chat-open': chatOpen(+a.dataset.aid); break;
     case 'chat-close': chatClose(); break;
     case 'chat-send': chatSend(); break;
@@ -10321,9 +10464,11 @@ const JOB_ST = {running: N_('running'), waiting: N_('waiting for approval'), don
 // 2.4.1 (#375): offline = no event poll for 5 minutes (online null: a webhook agent / never polled, so nobody can tell);
 // the age counts on from the last state load, so the header turns "offline" without a reload
 const agentAge = () => (Date.now() - (S.agentsAt || Date.now())) / 1000;
-const agentOffline = a => a.online === false || (a.online === true && a.poll_age !== null && a.poll_age !== undefined && a.poll_age + agentAge() > 300);
-const agentSt = a => !a.enabled ? tr('paused') : agentOffline(a) ? tr('offline') : a.limit_reached ? tr('limit reached') : tr(AGENT_ST[a.status] || AGENT_ST.idle);  // 2.1.1 (#326)
-const agentDot = id => { const a = agentById(id); return a ? `<i class="adot st-${a.enabled ? esc(a.status) : 'paused'}" title="${esc(a.name + ': ' + agentSt(a) + (a.status_text ? ' · ' + a.status_text : ''))}"></i>` : ''; };
+// 2.6.0 (K08): "not connected" (grey) instead of a green "ready" for an agent that never got in touch (no event poll, no API
+// call) or has not for 5 minutes; a webhook agent is told about events, so only its explicit "offline" counts
+const agentOffline = a => !!a && (a.online === false || (!a.webhook && (a.contact_age === null || a.contact_age === undefined || a.contact_age + agentAge() > 300)));
+const agentSt = a => !a.enabled ? tr('paused') : agentOffline(a) ? tr('not connected') : a.limit_reached ? tr('limit reached') : tr(AGENT_ST[a.status] || AGENT_ST.idle);  // 2.1.1 (#326)
+const agentDot = id => { const a = agentById(id); return a ? `<i class="adot st-${!a.enabled ? 'paused' : agentOffline(a) ? 'offline' : esc(a.status)}" title="${esc(a.name + ': ' + agentSt(a) + (a.status_text ? ' · ' + a.status_text : ''))}"></i>` : ''; };
 const agentBadge = () => `<span class="abadge" title="${esc(tr('Agent: an AI assistant or bot that works through the API'))}">${ic('bot', 's')}${tr('Agent')}</span>`;
 // agents of a list that can pick up this task (participant agents only their own tasks)
 function taskAgents(t) {
@@ -10333,16 +10478,39 @@ function taskAgents(t) {
 const listAgents = l => !l ? [] : listPeople(l).map(p => agentById(p.user_id)).filter(Boolean);
 
 // ---- header chip (like the timer pill): "Claude · 2 running · 1 waiting"
+// 2.6.0 (K08): an agent that is not connected (never polled, or no poll for 5 minutes) does not keep the chip busy with its
+// "running" jobs or its last reported state; only what needs me (approval, unread chat) still shows
+function agentBusy() {
+  if (!agentsOn()) return null;
+  const busy = (S.agents || []).filter(a => a.waiting || a.chat_unread || (!agentOffline(a) && (a.running || (a.enabled && ['working', 'waiting', 'error'].includes(a.status)))));
+  if (!busy.length) return null;
+  const run = busy.reduce((n, a) => n + (agentOffline(a) ? 0 : a.running), 0), wait = busy.reduce((n, a) => n + a.waiting, 0), unread = busy.reduce((n, a) => n + a.chat_unread, 0);
+  return {busy, run, wait, unread, n: run + wait + unread || busy.length};
+}
 function agentChip() {
-  if (!agentsOn()) return '';
-  const busy = (S.agents || []).filter(a => a.running || a.waiting || a.chat_unread || (a.enabled && ['working', 'waiting', 'error'].includes(a.status)));
-  if (!busy.length) return '';
-  const run = busy.reduce((n, a) => n + a.running, 0), wait = busy.reduce((n, a) => n + a.waiting, 0), unread = busy.reduce((n, a) => n + a.chat_unread, 0);
+  const ab = agentBusy(); if (!ab) return '';
+  const {busy, run, wait, unread} = ab;
   const parts = [run && trn('{0} running', '{0} running', run), wait && trn('{0} waiting', '{0} waiting', wait), unread && trn('{0} new message', '{0} new messages', unread)].filter(Boolean);
   if (!parts.length) parts.push(agentSt(busy[0]));
   const who = busy.length === 1 ? busy[0].name : tr('Agents'), txt = [who, ...parts].join(' · ');
   const st = agentBusyState(), tip = [txt, ...agentStatusLines()].join('\n');
-  return `<button class="achip ${wait || unread ? 'attn' : ''} ${st === 'working' ? 'aspin' : st === 'waiting' ? 'await' : ''}" data-act="agent-chip" title="${esc(tip)}" aria-label="${esc(txt)}">${busy.length === 1 ? av(busy[0].id, busy[0].name, 'avatar sm') : ic('bot', 's')}<span class="act">${esc(txt)}</span><span class="acn" aria-hidden="true">${ic('bot', 's')}${run + wait + unread || busy.length}</span></button>`;  // 2.5.2 (K01): phones show the bot + a number
+  return `<button class="achip ${wait || unread ? 'attn' : ''} ${st === 'working' ? 'aspin' : st === 'waiting' ? 'await' : ''}" data-act="agent-chip" title="${esc(tip)}" aria-label="${esc(txt)}">${busy.length === 1 ? av(busy[0].id, busy[0].name, 'avatar sm') : ic('bot', 's')}<span class="act">${esc(txt)}</span><span class="acn" aria-hidden="true">${ic('bot', 's')}${ab.n}</span></button>`;  // 2.5.2 (K01): phones show the bot + a number
+}
+// 2.6.0 (K01): the agent pill and the running indicator merged into one compact chip (shown from header level tl2 on):
+// bot + number, dot + time; a tap opens the one that is there, or a menu with both
+function stChip() {
+  const ab = agentBusy(), it = runItems();
+  if (!ab || !it.length) return '';  // only one of them: its own pill shrinks instead (tl1)
+  const x = it[0], lab = [ab.busy.length === 1 ? ab.busy[0].name : tr('Agents'), ...it.map(r => `${tr(RUN_KIND[r.k][1])} ${r.txt}`)].join(' · ');
+  const st = agentBusyState();
+  return `<button class="stchip ${ab.wait || ab.unread ? 'attn' : ''} ${st === 'working' ? 'aspin' : ''}" data-act="st-chip" title="${esc(lab)}" aria-label="${esc(lab)}" aria-haspopup="menu"><span class="sta">${ic('bot', 's')}<b>${ab.n}</b></span><span class="str k-${x.k}"><span class="rec"></span>${it.length === 1 ? `<span ${x.attr}>${x.txt}</span>` : `<b>${it.length}</b>`}</span></button>`;
+}
+function stChipMenu(a) {
+  const ab = agentBusy(), it = runItems();
+  if (!ab) return runPop(a);
+  if (!it.length) return agentChipMenu(a);
+  menu(a, [...it.map(r => ({label: `${tr(RUN_KIND[r.k][1])} · ${r.txt} · ${r.title}`, icon: RUN_KIND[r.k][0], fn: () => runPop($('#top [data-act="st-chip"]') || a)})),
+    '-', {label: [ab.busy.length === 1 ? ab.busy[0].name : tr('Agents'), ...[ab.run && trn('{0} running', '{0} running', ab.run), ab.wait && trn('{0} waiting', '{0} waiting', ab.wait), ab.unread && trn('{0} new message', '{0} new messages', ab.unread)].filter(Boolean)].join(' · '), icon: 'bot', fn: () => agentChipMenu($('#top [data-act="st-chip"]') || a)}]);
 }
 function agentChipMenu(a) {
   const ags = S.agents || [];
@@ -10523,7 +10691,7 @@ function viewAgents() {
       <div class="agb"><button class="btn sm" data-act="chat-open" data-aid="${a.id}" ${a.enabled ? '' : 'disabled'}>${ic('comment', 's')} ${tr('Chat')}${a.chat_unread ? ` <span class="nbadge">${a.chat_unread}</span>` : ''}</button></div></div>`;
   const items = S.jobs.items || [];
   return `<div class="agview">
-    ${ags.length ? `<div class="agcards">${ags.map(card).join('')}</div>` : `<div class="empty">${ic('bot')}<p>${tr('No agents yet. An admin adds them under Settings > AI colleague and shares lists with them.')}</p></div>`}
+    ${ags.length ? `<div class="agcards">${ags.map(card).join('')}</div>` : `<div class="empty">${ic('bot')}<p>${tr('No agents yet. An admin adds them under Settings > Agents and shares lists with them.')}</p></div>`}
     ${ags.length ? aiuCardHtml() : ''}
     <div class="agjh"><h2>${tr('Jobs')}</h2><span class="spacer"></span><div class="seg" role="group"><button class="${S.jobs.f === 'open' ? 'on' : ''}" data-act="jobs-f" data-f="open">${tr('Open|jobs')}</button><button class="${S.jobs.f === 'all' ? 'on' : ''}" data-act="jobs-f" data-f="all">${tr('All')}</button></div></div>
     ${S.jobs.err ? `<div class="muted mhint">${esc(S.jobs.err)}</div>` : ''}
@@ -10692,7 +10860,7 @@ function propItemHtml(k, x, o = {}) {  // one entry: checkbox, title, date and t
   // 2.5.2 (K03): one compact line (checkbox · title · date on the right), the fields of its kind and the chips below
   const on = S.prop.sel.has(k), id = ppSafe(k), extra = (o.fields || '') + (o.chips || '');
   return `<div class="ppi ${o.sub ? 'sub' : ''} ${on ? '' : 'off'}" data-k="${k}">
-    <input type="checkbox" class="ppc" id="ppc-${id}" ${on ? 'checked' : ''} aria-label="${esc(tr('Select {0}', x.title))}">
+    <label class="ppcl"><input type="checkbox" class="ppc" id="ppc-${id}" ${on ? 'checked' : ''} aria-label="${esc(tr('Select {0}', x.title))}"></label>
     <div class="ppb">${o.orig ? `<div class="ppo muted">${esc(o.orig)}</div>` : ''}
       <div class="pprow"><input class="ppt" data-f="title" value="${esc(x.title)}" maxlength="300" aria-label="${esc(tr('Title'))}">${dateIn('ppd-' + id, x.due || '', {label: tr('Due date'), empty: tr('No date|clear'), attrs: 'data-f="due"'})}</div>
       ${extra.trim() ? `<div class="ppf">${extra}</div>` : ''}
@@ -10862,7 +11030,7 @@ document.addEventListener('keydown', e => {
 }, true);
 document.addEventListener('input', e => { if (e.target.id === 'chat-in') { S.drafts['chat:' + S.chat.aid] = e.target.value; autosize(e.target); } });
 
-// ---- 2.0.8 (#321) Settings > AI colleague: every list I manage in one table. "Agent sees it": one chip per agent,
+// ---- 2.0.8 (#321) Settings > Agents: every list I manage in one table. "Agent sees it": one chip per agent,
 // click shares the list with it (role Member, like the list dialog's default) or ends the sharing (after a confirm);
 // "Tidy up": the list dialog's agent_tidy (off / suggest / auto), only where an agent is in the list.
 // 2.5.1 (#393): first only the lists an agent sees (all of them while none is shared yet) + "Show all (n)", a search above
@@ -10960,14 +11128,14 @@ function aiTblWire(md) {
   });
 }
 
-// ---- 2.4.2 (#392) Settings > AI colleague > Setup guide: two ways to run an AI colleague next to Kalmido. A: a prompt for
+// ---- 2.4.2 (#392) Settings > Agents > Setup guide: two ways to run an agent next to Kalmido. A: a prompt for
 // Claude Code (placeholders filled in: this server, you as the only one who instructs it; token file + Linux user editable),
 // B: the steps with the key commands; the full commands are in docs/AGENT-SETUP.md (the prompt text is the same file,
 // docs/agent-setup-prompt.txt). Kalmido itself never starts or downloads an agent.
 const AG_SETUP_DOC = API_DOCS.replace('API.md', 'AGENT-SETUP.md');
-const AG_PROMPT = "Set up an Kalmido AI colleague on this Linux machine, following the Kalmido guides docs/AGENT-SETUP.md (path B, \"Do it yourself\") and docs/AGENT-SECURITY.md (host sandbox recipe) from https://github.com/Gegenschuss/kalmido. Read both guides first and follow them exactly; where this prompt and the guides differ, the guides win.\n\nMy values:\n- Kalmido address: <KALMIDO_URL>\n- Env file with the agent's token: <TOKEN_ENV_FILE> (I created it myself with KALMIDO_URL=... and KALMIDO_TOKEN=abk_..., chmod 600)\n- Linux user for the agent: <AGENT_USER>\n- The only person who may give the agent instructions: <OWNER_NAME>, Kalmido account id <OWNER_ID>\n\nRules for you while you set this up:\n- Never print, cat, echo, log or copy the token or the contents of the env file. Only check that the file exists, belongs to <AGENT_USER> and has mode 600.\n- Show me every command that needs sudo before you run it, and explain in one line what it does.\n- Do not add <AGENT_USER> to the sudo, wheel, docker or adm group, and do not give it SSH keys.\n- Do not open ports, do not change other services, and do not touch Kalmido's own data or configuration.\n- Verify each step before you go to the next one, and tell me what you checked.\n\nSteps:\n1. Create <AGENT_USER> without sudo rights, with a locked password and a 0700 home directory. Move the env file to ~/.config/kalmido/agent.env of that user (owner <AGENT_USER>, mode 600) if it is not there yet.\n2. Set up the egress firewall for <AGENT_USER>: only DNS, the Kalmido address and public HTTPS (the model API) are allowed; the local network and everything else are blocked. Load it at boot.\n3. Install Claude Code for <AGENT_USER> and let me log it in (I do the login myself).\n4. Clone the Kalmido repository to ~/kalmido of <AGENT_USER> (only the mcp/ folder is used) and create the MCP wrapper ~/kalmido/mcp/run.sh that reads the env file and starts kalmido_mcp.py. Register it for the work directory ~/agent.\n5. Create ~/agent/CLAUDE.md from the template in the guide, with <OWNER_NAME> and <OWNER_ID> filled in.\n6. Create ~/agent/.claude/settings.json from the guide (defaultMode dontAsk, only the Kalmido MCP tools and ./bin/events.sh allowed, the env file denied) with the usage hook mcp/claude_usage_hook.py as Stop hook.\n7. Create the event monitor ~/agent/bin/events.sh from the guide (long polling, back-off on every answer other than HTTP 200).\n8. Create the systemd user unit kalmido-agent.service that runs mcp/agent_launcher.sh (runtime settings from Kalmido), enable lingering for <AGENT_USER> and start the unit.\n9. Run the operating system checks from docs/AGENT-SECURITY.md as <AGENT_USER> and show me the results.\n10. Finish with the test checklist from the guide (mention, chat, kill switch, the 7 prompt-injection cases): tell me what to type in Kalmido for each case and what the expected answer is; I run them and tell you the results.";
+const AG_PROMPT = "Set up a Kalmido agent on this Linux machine, following the Kalmido guides docs/AGENT-SETUP.md (path B, \"Do it yourself\") and docs/AGENT-SECURITY.md (host sandbox recipe) from https://github.com/Gegenschuss/kalmido. Read both guides first and follow them exactly; where this prompt and the guides differ, the guides win.\n\nMy values:\n- Kalmido address: <KALMIDO_URL>\n- Env file with the agent's token: <TOKEN_ENV_FILE> (I created it myself with KALMIDO_URL=... and KALMIDO_TOKEN=abk_..., chmod 600)\n- Linux user for the agent: <AGENT_USER>\n- The only person who may give the agent instructions: <OWNER_NAME>, Kalmido account id <OWNER_ID>\n\nRules for you while you set this up:\n- Never print, cat, echo, log or copy the token or the contents of the env file. Only check that the file exists, belongs to <AGENT_USER> and has mode 600.\n- Show me every command that needs sudo before you run it, and explain in one line what it does.\n- Do not add <AGENT_USER> to the sudo, wheel, docker or adm group, and do not give it SSH keys.\n- Do not open ports, do not change other services, and do not touch Kalmido's own data or configuration.\n- Verify each step before you go to the next one, and tell me what you checked.\n\nSteps:\n1. Create <AGENT_USER> without sudo rights, with a locked password and a 0700 home directory. Move the env file to ~/.config/kalmido/agent.env of that user (owner <AGENT_USER>, mode 600) if it is not there yet.\n2. Set up the egress firewall for <AGENT_USER>: only DNS, the Kalmido address and public HTTPS (the model API) are allowed; the local network and everything else are blocked. Load it at boot.\n3. Install Claude Code for <AGENT_USER> and let me log it in (I do the login myself).\n4. Clone the Kalmido repository to ~/kalmido of <AGENT_USER> (only the mcp/ folder is used) and create the MCP wrapper ~/kalmido/mcp/run.sh that reads the env file and starts kalmido_mcp.py. Register it for the work directory ~/agent.\n5. Create ~/agent/CLAUDE.md from the template in the guide, with <OWNER_NAME> and <OWNER_ID> filled in.\n6. Create ~/agent/.claude/settings.json from the guide (defaultMode dontAsk, only the Kalmido MCP tools and ./bin/events.sh allowed, the env file denied) with the usage hook mcp/claude_usage_hook.py as Stop hook.\n7. Create the event monitor ~/agent/bin/events.sh from the guide (long polling, back-off on every answer other than HTTP 200).\n8. Create the systemd user unit kalmido-agent.service that runs mcp/agent_launcher.sh (runtime settings from Kalmido), enable lingering for <AGENT_USER> and start the unit.\n9. Run the operating system checks from docs/AGENT-SECURITY.md as <AGENT_USER> and show me the results.\n10. Finish with the test checklist from the guide (mention, chat, kill switch, the 7 prompt-injection cases): tell me what to type in Kalmido for each case and what the expected answer is; I run them and tell you the results.";
 const AG_STEPS = [
-  [N_('Create the agent in Kalmido'), N_('Settings > AI colleague > Add agent (admins). Copy the API token: it is shown only once. Share the lists it should work in (table below, or “Share all existing lists”), pick the tidy agent and its runtime settings.'), ''],
+  [N_('Create the agent in Kalmido'), N_('Settings > Agents > Add agent (admins). Copy the API token: it is shown only once. Share the lists it should work in (table below, or “Share all existing lists”), pick the tidy agent and its runtime settings.'), ''],
   [N_('A Linux user without sudo'), N_('Its own user, no sudo / docker group, no SSH keys, a locked password. The token goes only into a file with mode 600.'), 'sudo useradd --create-home --shell /bin/bash kalmido-agent\nsudo passwd --lock kalmido-agent\nsudo chmod 0700 ~kalmido-agent\n# as kalmido-agent: ~/.config/kalmido/agent.env (KALMIDO_URL=…, KALMIDO_TOKEN=…), chmod 600'],
   [N_('Egress firewall'), N_('Only DNS, Kalmido and the model API over HTTPS; no local network, no other services. The guide has an nftables example that matches only the agent user.'), ''],
   [N_('Install Claude Code'), N_('As the agent user, with the official installer; log in once.'), 'sudo -iu kalmido-agent\nclaude --version'],
@@ -10983,11 +11151,11 @@ function agGuideModal() {
   const fill = () => AG_PROMPT.replaceAll('<KALMIDO_URL>', location.origin).replaceAll('<OWNER_NAME>', S.me?.display_name || S.me?.username || '')
     .replaceAll('<OWNER_ID>', String(S.me?.id ?? '')).replaceAll('<TOKEN_ENV_FILE>', d.env || '<TOKEN_ENV_FILE>').replaceAll('<AGENT_USER>', d.user || '<AGENT_USER>');
   const tab = LS.get('agGuideTab', 'a') === 'b' ? 'b' : 'a';
-  const md = modal(`<div class="kbhead"><h3>${tr('Set up an AI colleague')}</h3><button class="iconbtn" data-m="close" aria-label="${tr('Close')}">${ic('x')}</button></div>
+  const md = modal(`<div class="kbhead"><h3>${tr('Set up an agent')}</h3><button class="iconbtn" data-m="close" aria-label="${tr('Close')}">${ic('x')}</button></div>
     <div class="shint">${tr('Kalmido never starts or downloads an AI: you run the agent (for example Claude Code) on a machine you control, walled off from everything else. Kalmido gives it an account, a token, events and an MCP server.')}</div>
     <div class="seg agtabs" role="tablist"><button role="tab" data-agt="a" aria-selected="${tab === 'a'}" class="${tab === 'a' ? 'on' : ''}">${ic('bot', 's')} ${tr('Let Claude Code set it up')}</button><button role="tab" data-agt="b" aria-selected="${tab === 'b'}" class="${tab === 'b' ? 'on' : ''}">${ic('code', 's')} ${tr('Do it yourself')}</button></div>
     <div class="agpane" data-agp="a" ${tab === 'a' ? '' : 'hidden'}>
-      <ol class="agsteps"><li>${tr('Create the agent (Settings > AI colleague > Add agent, admins) and copy its token.')}</li>
+      <ol class="agsteps"><li>${tr('Create the agent (Settings > Agents > Add agent, admins) and copy its token.')}</li>
         <li>${tr('On the machine for the agent, put the token into a file only you can read (mode 600), with the two lines KALMIDO_URL=… and KALMIDO_TOKEN=….')}</li>
         <li>${tr('Adjust the two values below, copy the prompt and paste it into Claude Code on that machine (in a normal user account with sudo). It shows you every sudo command before it runs it.')}</li></ol>
       <div class="row"><label for="agg-env">${tr('Token file')}</label><input id="agg-env" value="${esc(d.env)}" autocomplete="off" spellcheck="false"></div>
@@ -11007,7 +11175,7 @@ function agGuideModal() {
     if (b.dataset.m === 'agg-copy') { try { await navigator.clipboard.writeText(fill()); toast(tr('Copied')); } catch { toast(tr('Copy failed, select the text by hand')); } }
   });
 }
-// ---- 2.2.1 (#358) Settings > AI colleague > Activity log (admins): every API request made with an agent's token (time,
+// ---- 2.2.1 (#358) Settings > Agents > Activity log (admins): every API request made with an agent's token (time,
 // agent, method + route template, status, task / list id, duration; never content), newest first, filtered by agent,
 // status class and day, CSV export of everything that matches. Denied calls (401 / 403 / 429) are marked.
 // 2.5.1 (#393): 20 rows first, "Load more" adds 50; the event polling (GET /api/v1/agent/events, most of the rows) hidden by
@@ -11037,7 +11205,7 @@ function audRow(r) {
 function audPaint(md) {
   const box = $('#s-aud', md); if (!box) return;
   const csv = $('#aud-csv', md); if (csv) csv.href = '/api/admin/agents/audit?format=csv' + (audQuery() ? '&' + audQuery() : '');
-  const keep = $('#aud-keep', md); if (keep) keep.textContent = S.aud.days > 0 ? trn('Kept for {0} day.', 'Kept for {0} days.', S.aud.days) : tr('The log is turned off on this server (KALMIDO_AUDIT_DAYS=0).');
+  const keep = $('#aud-keep', md); if (keep) keep.textContent = S.aud.days > 0 ? trn('Kept for {0} day.', 'Kept for {0} days.', S.aud.days) : tr('The log is switched off by the server operator.');
   const sel = $('#aud-ag', md);
   if (sel) sel.innerHTML = `<option value="">${tr('All agents')}</option>` + S.aud.agents.map(a => `<option value="${a.id}" ${+S.aud.ag === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('');
   const sum = $('#aud-sum', md), t = S.aud.today;
@@ -11207,10 +11375,12 @@ function agModal(a, done) {
 }
 
 // ---- 2.1.1 (#326) model usage of the agents: what they report (POST /api/v1/agent/usage), totals today / 7 d / 30 d per
-// agent, the days as a chart, the top tasks, the lists and the models. Settings > AI colleague > Usage (admins: every agent
+// agent, the days as a chart, the top tasks, the lists and the models. Settings > Agents > Usage (admins: every agent
 // and the limits; others: the agents they share a list with, counted only in lists they see) and a compact card in the
 // Agents view. Tokens = input + output + cache writes (cache reads apart), cost only when the agent reports it.
-const fmtTok = v => (+v || 0).toLocaleString(LOCALE(), {notation: 'compact', maximumFractionDigits: 1});
+// 2.6.0 (K24): the same short form in every language ("59.1k" / "59,1 Tsd.", "1.2M" / "1,2 Mio."); Intl's German compact
+// form spelled thousands out ("59.100")
+const fmtTok = v => { v = +v || 0; const f = x => x.toLocaleString(LOCALE(), {maximumFractionDigits: 1}); return v >= 1e6 ? tr('{0}M|million, short', f(v / 1e6)) : v >= 1e3 ? tr('{0}k|thousand, short', f(v / 1e3)) : f(v); };
 const fmtUsd = v => v === null || v === undefined ? '–' : +v > 0 && +v < .01 ? '<$0.01' : '$' + (+v).toFixed(2);
 const aiuVal = (x, m) => m === 'cost' ? fmtUsd(x.cost) : fmtTok(x.tokens);
 const aiuLimFmt = (v, metric) => metric === 'cost' ? fmtUsd(v) : tr('{0} tokens', fmtTok(v));
@@ -11280,15 +11450,17 @@ function aiuWire(root, redraw) {
     S.aiu.m = b.dataset.aiuM; LS.set('aiuMetric', S.aiu.m); redraw(true);
   });
 }
-// the compact card in the Agents view: per agent today / 7 d / 30 d, "Details" opens Settings > AI colleague > Usage
+// the compact card in the Agents view: per agent today / 7 d / 30 d, "Details" opens Settings > Agents > Usage
 function aiuCardHtml() {
   const j = S.aiu.data; if (!j || !j.agents.some(a => a.totals.d30.calls)) return '';
   const m = j.cost && S.aiu.m === 'cost' ? 'cost' : 'tokens';
-  return `<div class="aiucard"><div class="aiuch">${ic('chart', 's')}<b>${tr('AI usage')}</b><span class="muted">${m === 'cost' ? tr('Cost') : tr('Tokens')} · ${tr('Today')} / ${tr('7 days')} / ${tr('30 days')}</span><span class="spacer"></span><button class="btn sm" data-act="aiu-more">${tr('Details')}</button></div>
-    ${j.agents.filter(a => a.totals.d30.calls).map(a => `<div class="aiucr">${av(a.id, a.name)}<span class="n">${esc(a.name)}${a.limit_reached ? ` <small class="aiulr">${tr('limit reached')}</small>` : ''}</span><span class="aiuv">${esc(aiuVal(a.totals.today, m))} / ${esc(aiuVal(a.totals.d7, m))} / ${esc(aiuVal(a.totals.d30, m))}</span></div>`).join('')}</div>`;
+  // 2.6.0 (K24): three labelled columns instead of "59.100 / 59.100 / 59.100"
+  return `<div class="aiucard"><div class="aiuch">${ic('chart', 's')}<b>${tr('Agent usage')}</b><span class="muted">${m === 'cost' ? tr('Cost') : tr('Tokens')}</span><span class="spacer"></span><button class="btn sm" data-act="aiu-more">${tr('Details')}</button></div>
+    <div class="aiug" role="table" aria-label="${esc(tr('Agent usage'))}"><div class="aiugh" role="row"><span role="columnheader"></span><span role="columnheader">${tr('Today')}</span><span role="columnheader">${tr('7 days')}</span><span role="columnheader">${tr('30 days')}</span></div>
+    ${j.agents.filter(a => a.totals.d30.calls).map(a => `<div class="aiucr" role="row"><span class="n" role="rowheader">${av(a.id, a.name)}<span>${esc(a.name)}${a.limit_reached ? ` <small class="aiulr">${tr('limit reached')}</small>` : ''}</span></span><span class="aiuv" role="cell">${esc(aiuVal(a.totals.today, m))}</span><span class="aiuv" role="cell">${esc(aiuVal(a.totals.d7, m))}</span><span class="aiuv" role="cell">${esc(aiuVal(a.totals.d30, m))}</span></div>`).join('')}</div></div>`;
 }
-// the task panel: "AI usage" of a task agents reported usage for (only on tasks the viewer sees: it comes with the task)
-const aiuTaskLine = t => t.ai_usage ? `<label>${tr('AI usage')}</label><div class="aiuse" title="${esc(tr('Model usage agents reported for this task'))}">${ic('chart', 's')}<span>${esc(tr('{0} tokens', fmtTok(t.ai_usage.tokens)))}${t.ai_usage.cost !== null && t.ai_usage.cost !== undefined ? ' · ' + esc(fmtUsd(t.ai_usage.cost)) : ''} · ${esc(trn('{0} report', '{0} reports', t.ai_usage.calls))}</span></div>` : '';
+// the task panel: "Agent usage" of a task agents reported usage for (only on tasks the viewer sees: it comes with the task)
+const aiuTaskLine = t => t.ai_usage ? `<label>${tr('Agent usage')}</label><div class="aiuse" title="${esc(tr('Model usage agents reported for this task'))}">${ic('chart', 's')}<span>${esc(tr('{0} tokens', fmtTok(t.ai_usage.tokens)))}${t.ai_usage.cost !== null && t.ai_usage.cost !== undefined ? ' · ' + esc(fmtUsd(t.ai_usage.cost)) : ''} · ${esc(trn('{0} report', '{0} reports', t.ai_usage.calls))}</span></div>` : '';
 // the admin's limit fields in the agent dialog
 function aiuLimFields(a) {
   const l = a?.limits || {}, st = a?.usage;
@@ -11507,7 +11679,7 @@ function typingHtml(ags, id) {
   if (!ags.length) return `<div class="atyping hidden" id="${id}" role="status" aria-live="polite"></div>`;
   return `<div class="atyping" id="${id}" role="status" aria-live="polite"><span class="atdots" aria-hidden="true"><i></i><i></i><i></i></span><span class="ttx">${ags.map(a => esc(tr('{0} is writing …', a.name)) + (a.status_text ? ` <span class="muted">· ${esc(a.status_text)}</span>` : '')).join('<br>')}</span></div>`;
 }
-const agentBusyState = () => { const ags = (S.agents || []).filter(a => a.enabled); return ags.some(a => a.status === 'working') ? 'working' : ags.some(a => a.status === 'waiting' || a.waiting) ? 'waiting' : ''; };
+const agentBusyState = () => { const ags = (S.agents || []).filter(a => a.enabled && !agentOffline(a)); return ags.some(a => a.status === 'working') ? 'working' : ags.some(a => a.status === 'waiting' || a.waiting) ? 'waiting' : ''; };
 const agentStatusLines = () => (S.agents || []).filter(a => a.enabled && a.status !== 'idle').map(a => `${a.name}: ${agentSt(a)}${a.status_text ? ' · ' + a.status_text : ''}`);
 // live update without re-rendering what someone may be typing in (task panel, chat)
 function agentLive() {

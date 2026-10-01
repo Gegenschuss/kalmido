@@ -38,7 +38,7 @@ const menuItems = d => [...d.querySelectorAll('.menu-list [role="menuitem"]')];
 
   // ---- owner: members dialog with the role picker
   let w = await boot({user: 'alice', hash: 'l/' + L}), d = w.document;
-  w.eval(`listModal(${L})`); await sleep(900);
+  w.eval(`shareModal(${L})`); await sleep(900);
   let md = [...d.querySelectorAll('.modal')].at(-1);
   const sel = md.querySelector(`[data-mrole="${id.pete}"]`);
   check(sel && [...sel.options].map(o => o.value).join() === 'admin,edit,participant,view' && sel.value === 'participant', 'role picker: 4 roles, current selected');
@@ -68,9 +68,9 @@ const menuItems = d => [...d.querySelectorAll('.menu-list [role="menuitem"]')];
   check(d.querySelector(`.trow[data-id="${T3}"] .c-who .who`)?.textContent === 'C', 'column shows the new assignee');
   // subtask in the detail panel: own assign cell
   w.eval(`openDetail(${T2})`); await sleep(800);
-  const subBtn = d.querySelector(`#detail .subs .trow[data-id="${T2b}"] .wcell .whob`);
-  check(subBtn && subBtn.querySelector('.who.none'), 'subtask row in the detail panel: assign cell');
-  subBtn.click(); await sleep(300);
+  // 2.6.0 (K11): an unassigned subtask shows no circle; it is assigned from its menu (here: the assign menu itself)
+  check(!d.querySelector(`#detail .subs .trow[data-id="${T2b}"] .whob`), 'unassigned subtask row in the detail panel: no circle (K11)');
+  w.eval(`assignMenu(document.querySelector('#detail .subs .trow[data-id="${T2b}"]'), ${T2b})`); await sleep(300);
   menuItems(d).find(b => /Bob/.test(b.textContent)).click(); await sleep(900);
   check((await call('alice', 'GET', `/api/tasks/${T2b}`)).assignee_id === id.bob, 'subtask assigned independently of its parent');
   check((await call('alice', 'GET', `/api/tasks/${T2}`)).assignee_id === id.carol, 'parent keeps its assignee');
@@ -94,14 +94,14 @@ const menuItems = d => [...d.querySelectorAll('.menu-list [role="menuitem"]')];
 
   // ---- admin: manages members (picker), no picker for the owner
   w = await boot({user: 'bob', hash: 'l/' + L}); d = w.document;
-  w.eval(`listModal(${L})`); await sleep(900);
+  w.eval(`shareModal(${L})`); await sleep(900);
   md = [...d.querySelectorAll('.modal')].at(-1);
   check(md.querySelector(`[data-mrole="${id.pete}"]`) && md.querySelector(`[data-mrole="${id.carol}"]`), 'admin: role pickers for members');
   check(!md.querySelector(`[data-mrole="${id.alice}"]`) && !md.querySelector(`[data-mrole="${id.bob}"]`), 'admin: none for the owner or himself');
   w.close();
   // member: names and roles only
   w = await boot({user: 'carol', hash: 'l/' + L}); d = w.document;
-  w.eval(`listModal(${L})`); await sleep(900);
+  w.eval(`shareModal(${L})`); await sleep(900);
   md = [...d.querySelectorAll('.modal')].at(-1);
   check(!md.querySelector('[data-mrole]') && /Participant/.test(md.querySelector(`.mrow[data-uid="${id.pete}"]`).textContent), 'member: roles as text, no pickers');
   w.close();
@@ -145,7 +145,7 @@ const menuItems = d => [...d.querySelectorAll('.menu-list [role="menuitem"]')];
   // ---- German
   await call('alice', 'PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
-  w.eval(`listModal(${L})`); await sleep(900);
+  w.eval(`shareModal(${L})`); await sleep(900);
   md = [...d.querySelectorAll('.modal')].at(-1);
   check([...md.querySelector(`[data-mrole="${id.pete}"]`).options].map(o => o.textContent).join() === 'Admin,Mitglied,Teilnehmer,Betrachter', 'German role names');
   check(/Sieht nur die eigenen, zugewiesenen Aufgaben/.test(md.querySelector('.rolehelp').textContent), 'German explanations');

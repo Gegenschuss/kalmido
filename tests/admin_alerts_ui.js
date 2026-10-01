@@ -18,7 +18,7 @@ const api = async (w, m, u, b) => (await w.fetch(u, {method: m, headers: {'Conte
   check(box && md.querySelector('#s-aa-h')?.textContent === 'Admin alerts', 'users pane: Admin alerts section');
   check(md.querySelector('#aa-on')?.checked === true, 'switch on');
   const topic = md.querySelector('#aa-topic');
-  check(topic && topic.readOnly && topic.value === 'env-admins' && /KALMIDO_ADMIN_TOPIC/.test(box.textContent), 'env topic: read-only with a note');
+  check(topic && topic.readOnly && topic.value === 'env-admins' && /Set by the server operator/.test(box.textContent) && box.querySelector('[title="KALMIDO_ADMIN_TOPIC"]'), 'env topic: read-only with a note (2.6.0, K23: plain words, the variable in the tooltip)');
   check(md.querySelectorAll('[data-aakind]').length === 6 && [...md.querySelectorAll('[data-aakind]')].every(x => x.checked), 'six kinds, all on');
   check(md.querySelectorAll('.aarow').length > 0 && /share inbox was not started/.test(box.textContent), 'recent list shows the alerts');
   check(md.querySelector('#aa-dtime-w').hidden, 'summary time hidden in instant mode');

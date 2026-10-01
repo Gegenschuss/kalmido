@@ -63,7 +63,7 @@ async function firefox(fn) {
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v((68|69)|7[01])'/.test(SW), 'service worker cache v68 (2.5.0: v69, 2.5.1: v70, 2.5.2: v71)');
+  check(/const CACHE = 'tasks-shell-v((68|69)|7[0-2])'/.test(SW), 'service worker cache v68 (2.5.0: v69, 2.5.1: v70, 2.5.2: v71, 2.6.0: v72)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en'});
@@ -237,7 +237,7 @@ async function firefox(fn) {
   pane = d.querySelector('.modal.smodal [data-pane="ai"]');
   check(/Installationshilfe/.test(pane.textContent) && /Alle teilen/.test(pane.querySelector('#s-ai-share').textContent) && /Neue Listen automatisch/.test(pane.textContent) && /sieht \d von deinen \d Listen/.test(pane.textContent), 'German: Installationshilfe, share block');
   click(w, pane.querySelector('[data-m="ag-guide"]')); await sleep(400);
-  check(/KI-Kollegen einrichten/.test(d.querySelector('.modal.agguide')?.textContent || '') && /Selbst einrichten/.test(d.querySelector('.modal.agguide').textContent), 'German: setup guide');
+  check(/Agent einrichten/.test(d.querySelector('.modal.agguide')?.textContent || '') && /Selbst einrichten/.test(d.querySelector('.modal.agguide').textContent), 'German: setup guide');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en', comment_order: 'new'});

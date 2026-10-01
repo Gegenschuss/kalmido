@@ -1,4 +1,4 @@
-Set up an Kalmido AI colleague on this Linux machine, following the Kalmido guides docs/AGENT-SETUP.md (path B, "Do it yourself") and docs/AGENT-SECURITY.md (host sandbox recipe) from https://github.com/Gegenschuss/kalmido. Read both guides first and follow them exactly; where this prompt and the guides differ, the guides win.
+Set up a Kalmido agent on this Linux machine, following the Kalmido guides docs/AGENT-SETUP.md (path B, "Do it yourself") and docs/AGENT-SECURITY.md (host sandbox recipe) from https://github.com/Gegenschuss/kalmido. Read both guides first and follow them exactly; where this prompt and the guides differ, the guides win.
 
 My values:
 - Kalmido address: <KALMIDO_URL>

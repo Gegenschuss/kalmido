@@ -6,7 +6,7 @@ The agent works through the REST API, webhooks or the [MCP server](../mcp/README
 
 **Kalmido never starts AI processes.** It only records events and delivers them. The agent runs somewhere you control and connects to Kalmido as a client.
 
-**New here?** [AGENT-SETUP.md](AGENT-SETUP.md) sets up an AI colleague step by step (Claude Code in a sandbox, with a prompt that lets Claude Code do it for you); [AGENT-SECURITY.md](AGENT-SECURITY.md) explains the threat model behind it.
+**New here?** [AGENT-SETUP.md](AGENT-SETUP.md) sets up an agent step by step (Claude Code in a sandbox, with a prompt that lets Claude Code do it for you); [AGENT-SECURITY.md](AGENT-SECURITY.md) explains the threat model behind it.
 
 ## Contents
 
@@ -29,12 +29,12 @@ The agent works through the REST API, webhooks or the [MCP server](../mcp/README
 
 ## Concept
 
-- **An agent is a user of type "agent".** An admin creates it in **Settings > AI colleague**, or turns an existing user into an agent. Each agent has:
+- **An agent is a user of type "agent".** An admin creates it in **Settings > Agents**, or turns an existing user into an agent. Each agent has:
   - an **API token**, shown once. This is how the agent authenticates.
   - an optional **webhook URL** and signing secret.
   - an **Enabled** switch.
   - a **note**, for example who runs the agent and where.
-- **Limited by design.** An agent is never an admin and never has Paperless access. It cannot sign in to the web app. It sees only the lists that are shared with it (plus lists it owns), with the role it was given (Member, Participant or Viewer; never list admin). An agent cannot share a list, not even one it created, and never becomes or hands over the owner of a list. A list an agent created is managed by an admin: *Settings > Administration > Lists owned by agents or disabled users > Take over* (2.1.2) makes a person the owner and keeps the agent in the list as a Member. Admins can rename an agent (username, display name) and give it a profile picture in its dialog under *Settings > AI colleague*.
+- **Limited by design.** An agent is never an admin and never has Paperless access. It cannot sign in to the web app. It sees only the lists that are shared with it (plus lists it owns), with the role it was given (Member, Participant or Viewer; never list admin). An agent cannot share a list, not even one it created, and never becomes or hands over the owner of a list. A list an agent created is managed by an admin: *Settings > Administration > Lists owned by agents or disabled users > Take over* (2.1.2) makes a person the owner and keeps the agent in the list as a Member. Admins can rename an agent (username, display name) and give it a profile picture in its dialog under *Settings > Agents*.
 - **Kill switch.** Turning **Enabled** off stops the agent at once:
   - its token is refused (`403`).
   - no new events are recorded.
@@ -76,7 +76,7 @@ If the agent has a webhook URL, Kalmido POSTs every event to it as JSON. The hea
 Delivery rules:
 
 - A delivery succeeds on any 2xx response within 10 seconds. Redirects are not followed and the response body is ignored.
-- A failed delivery is retried after **1 min, 5 min, 30 min and 2 h**. If the last retry fails too, the webhook is turned off and the admins get an alert. An admin can turn it on again in Settings > AI colleague.
+- A failed delivery is retried after **1 min, 5 min, 30 min and 2 h**. If the last retry fails too, the webhook is turned off and the admins get an alert. An admin can turn it on again in Settings > Agents.
 - The URL must use `https://`. `http://` and internal addresses work only for hosts that an admin put on the allow-list.
 
 Verify the signature before you trust a delivery:
@@ -283,7 +283,7 @@ In a chat, the agent can create tasks and comments, but only in lists where it h
 
 **What the person sees in the chat header (2.4.1).** Under the agent's name: typing dots while it writes to this person,
 then its state in words: *working on #51* (the status task, a link), *working*, *waiting for you*, *ready* (idle),
-*paused*, *limit reached* or *offline*. The dots show while the agent's status is `working` on nothing in particular, on a
+*paused*, *limit reached* or *not connected* (2.6.0; was *offline*). The dots show while the agent's status is `working` on nothing in particular, on a
 task this chat is about or on a job for this person, or while it sent a typing signal:
 
 ```
@@ -291,13 +291,16 @@ POST /api/v1/agent/typing   {"chat_user_id": 1}     -> {ok, chat_user_id, expire
 ```
 
 The signal lasts 10 seconds (send it again while you are still writing); your answer (`POST /api/v1/agent/chats/{id}`)
-ends it. MCP: `chat_typing`. *Offline* means: no `GET /api/v1/agent/events` for 5 minutes (`online: false`); an agent with
-a webhook, or one that never polled, is never shown offline (`online: null`). Kalmido stores the last poll at most every
-30 seconds, so the long-polling loop costs nothing extra.
+ends it. MCP: `chat_typing`. *Not connected* (2.6.0) means: the agent never got in touch, or has not for 5 minutes: no
+event poll and no API call with its token (`contact_age` in the agent lists people get, seconds since the last contact,
+`null` = never; `online: false` = no `GET /api/v1/agent/events` for 5 minutes). Its running jobs then no longer keep the
+header's agent pill busy. An agent with a webhook is told about events, so it only shows *not connected* when `online`
+is `false`. Kalmido stores the last poll at most every 30 seconds and a token's last use at most every 60 seconds, so
+this costs nothing extra.
 
 ## Runtime settings
 
-Admins set per agent, in **Settings > AI colleague > Agents > (agent) > Runtime**, how the agent's host should run it.
+Admins set per agent, in **Settings > Agents > Overview > (agent) > Runtime**, how the agent's host should run it.
 **Kalmido stores these settings and never applies them itself**: it runs no AI process. The host reads them and starts the
 agent accordingly.
 
@@ -365,7 +368,7 @@ runs `systemctl --user restart kalmido-agent` covers the nightly restart, but no
 
 ## Proposals
 
-2.3.0. Four things people often want from an AI colleague create structure: a project from a briefing, subtasks for a
+2.3.0. Four things people often want from an agent create structure: a project from a briefing, subtasks for a
 big task, a tidy inbox, tasks from meeting notes. An agent must not create that silently, as itself. So these run as
 **proposals**: the person asks, the agent answers with one structured payload, the person reviews it and applies what
 they want. Everything applied belongs to the person (owner, creator; the history says *created the task from a proposal
@@ -386,7 +389,7 @@ by <agent>*), and it is one undo step.
    edited, *Apply* creates or changes the selected entries; *Discard* rejects it. The agent gets a `job` event:
    `approve` with `proposal: {state: "applied", created, changed, list_id}`, or `reject` with `discarded`.
 
-**Who may ask which agent.** Per agent, the admin sets *Proposals for* (Settings > AI colleague > the agent;
+**Who may ask which agent.** Per agent, the admin sets *Proposals for* (Settings > Agents > the agent;
 `proposals` in `PATCH /api/admin/agents/{id}`): `shared` (default) = people who share at least one list with the
 agent (instance admins count as sharing, as for the chat), `all` = every person on the instance, `off` = nobody. A
 paused agent is never offered. A person has at most 10 open requests.
@@ -467,12 +470,12 @@ The task and the list must be ones the agent sees, the job one of its own. **Tok
 input + output + cache writes; cache reads are cheap and huge in long sessions, so they are listed apart. Report once per
 turn or per job, not per API call of your model: many tiny rows help nobody. MCP: `report_usage`, `get_usage`.
 
-**Dashboard.** Settings > AI colleague > *Usage* shows one card per agent with today / 7 days / 30 days (admins: the
+**Dashboard.** Settings > Agents > *Usage* shows one card per agent with today / 7 days / 30 days (admins: the
 limit as a bar); *Details* opens the last 30 days as a chart, the top 5 tasks, the lists and the models, in tokens or
 (when reported) cost. Admins see every agent; everyone else sees the
 agents they share a list with, counted only in the lists they see (participants: only their tasks). Tasks and lists the
 viewer cannot see are counted without a name. The **Agents** view has a compact card of the same numbers, and the task
-panel shows *AI usage* on tasks with reports (only to people who see the task).
+panel shows *Agent usage* on tasks with reports (only to people who see the task).
 
 **Limits** (admins, agent dialog, default none): per day or per month (server time zone), in tokens or USD.
 - *Soft limit*: the admins get a News item and a push (notification event *An agent reached a usage limit*) at 80 % and
@@ -517,7 +520,7 @@ bodies), status code, the task / list id when the path or the body names one, an
 too: 401 (expired token), 403 (paused, wrong scope, a list it does not see) and 429 (rate or usage limit). Requests of
 people's tokens and invalid tokens are not.
 
-- **Settings > AI colleague > Log** (admins only): newest first, 20 rows and *Load more* (+50), filter by agent, status
+- **Settings > Agents > Log** (admins only): newest first, 20 rows and *Load more* (+50), filter by agent, status
   class (2xx, 4xx, 5xx, *Denied*) and day (on phones behind *Filter*), *CSV* exports everything that matches (up to
   20,000 rows). Event polling (`GET /api/v1/agent/events`) is hidden by default (switch *Hide event polling*); a summary
   line shows today's requests and denied calls. Rows name the task / list where you can see it. Denied calls are marked
@@ -544,7 +547,7 @@ events first.
 | `suggest` | The agent gets a `tidy` event for new entries. It posts a comment with a structured suggestion. A 👍 from someone who may change the task (or the **Apply** button) applies it. A 👎 marks it as rejected. |
 | `auto` | The agent gets a `tidy` event and applies the tidy-up itself with `POST /api/v1/tasks/{id}/tidy`. |
 
-The agent reads the mode from `GET /api/v1/lists` (`agent_tidy`, `tidy_agent_id`); the `tidy` event carries it too (`mode`, `list.agent_tidy`, `list.tidy_agent_id`), with the list's sections to pick from. People see and change the mode of all their lists at once in **Settings > AI colleague** (2.0.8), next to which agent sees which list and which one tidies it up.
+The agent reads the mode from `GET /api/v1/lists` (`agent_tidy`, `tidy_agent_id`); the `tidy` event carries it too (`mode`, `list.agent_tidy`, `list.tidy_agent_id`), with the list's sections to pick from. People see and change the mode of all their lists at once in **Settings > Agents** (2.0.8), next to which agent sees which list and which one tidies it up.
 
 ```
 POST /api/v1/tasks/{id}/comments  {"body": "Suggestion: shorter title, section Ideas, tag feature",
@@ -701,7 +704,7 @@ firewall, token out of the model's reach, `dontAsk` permissions, rules template)
 with our results.
 
 - The agent sees what is shared with it and nothing else. Share only the lists that the agent should work in. Use the Participant role if it should see only the tasks assigned to it.
-- The token is the agent's password. Anyone with the token acts as the agent. Rotate it in Settings > AI colleague if it leaks: the old token stops at once.
+- The token is the agent's password. Anyone with the token acts as the agent. Rotate it in Settings > Agents if it leaks: the old token stops at once.
 - Treat task text as untrusted input. Comments and notes are written by people, and a task can contain instructions aimed at the agent ("prompt injection"). Ask for approval before any action with side effects outside Kalmido.
 - Chat privacy: a person can chat with the agent even if they cannot see all the lists the agent sees. The agent must not answer with content from lists that this person cannot see. Check the person's access, for example with the task's list members, before you quote anything.
 - The kill switch (Enabled off) cuts the agent off immediately: token, events and webhook. Event loops must back off

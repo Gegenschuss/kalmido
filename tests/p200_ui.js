@@ -159,10 +159,12 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
   w.eval(`listModal(${L})`); await sleep(600);
   check(d.querySelector('#l-ltags')?.textContent.includes('#bug') && d.querySelector('#l-ltnew'), 'list dialog: list tags');
-  const sel = d.querySelector('#l-tidy');
-  check(sel && sel.value === 'suggest' && !sel.disabled, 'list dialog: tidy setting');
+  w.eval(`shareModal(${L})`); await sleep(600);  // 2.6.0 (K12): the tidy setting lives in the Share dialog (Agents)
+  const sel = d.querySelector('.shmodal #l-tidy');
+  check(sel && sel.value === 'suggest' && !sel.disabled, 'Share dialog: tidy setting');
   sel.value = 'auto'; sel.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(900);
   check((await v1('GET', '/lists')).data.find(x => x.id === L).agent_tidy === 'auto', 'tidy saved (agent reads auto)');
+  d.querySelector('.modal.shmodal')?.remove();
   d.querySelector('#l-ltnew').value = 'music'; d.querySelector('[data-lt="new"]').click(); await sleep(900);
   check((await v1('GET', `/lists/${L}/tags`)).data.some(x => x.name === 'music'), 'new list tag from the dialog');
   d.querySelector('.modal [data-m="close"]')?.click(); await sleep(200);

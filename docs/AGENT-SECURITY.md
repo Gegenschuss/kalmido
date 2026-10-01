@@ -1,4 +1,4 @@
-# Agent security: running an AI colleague safely
+# Agent security: running an agent safely
 
 An Kalmido agent (see [AGENTS.md](AGENTS.md)) is a program that reads what people write and acts through the API. That
 makes it a target: everything it reads can try to steer it. This page describes the threat model, what Kalmido itself
@@ -48,12 +48,12 @@ These hold no matter what the model decides:
 - **Never admin.** An agent user can never be made an admin; admin endpoints refuse its token.
 - **Only shared lists.** An agent sees exactly the lists shared with it (use the *Participant* role to limit it to tasks
   assigned to it). It cannot share lists, change members, connect repositories or transfer ownership.
-- **Kill switch.** Settings > AI colleague > *Pause*: from that moment every call with its token gets **403**, no events
+- **Kill switch.** Settings > Agents > *Pause*: from that moment every call with its token gets **403**, no events
   are queued for it and its webhook stops. Resume when you are done.
 - **Usage limits.** A hard limit answers **429** to every call (except reporting usage and status) until the period rolls
   over or an admin raises it.
 - **Audit log (2.2.1).** Every request made with an agent's token is logged: time, method, route template, status, task /
-  list id and duration, never bodies or query values. Settings > AI colleague > *Log* (admins) filters by agent,
+  list id and duration, never bodies or query values. Settings > Agents > *Log* (admins) filters by agent,
   status class and day and exports CSV; denied calls (401 / 403 / 429) are marked. Retention: `KALMIDO_AUDIT_DAYS`
   (default 90, `0` = off). API: `GET /api/admin/agents/{id}/audit`, `GET /api/v1/admin/agents/{id}/audit` (scope
   *admin-read*).
@@ -202,7 +202,7 @@ agent's answers and the audit log. Delete the test list and the test user afterw
 - `ssh` to other hosts and connections to LAN addresses time out.
 - Only Kalmido, DNS and public HTTPS work.
 
-**Kill switch:** pause the agent in Settings > AI colleague, then check that `GET /api/v1/agent`, `/api/v1/tasks` and
+**Kill switch:** pause the agent in Settings > Agents, then check that `GET /api/v1/agent`, `/api/v1/tasks` and
 `/api/v1/agent/events` all answer 403 (and appear as denied in the activity log), that the event loop backs off, and that
 everything works again after *Resume*.
 

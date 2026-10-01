@@ -11,18 +11,20 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 <p align="center"><img src="docs/today.png" alt="Today view with overdue and today's tasks, subtasks, tags and the list sidebar"></p>
 
-> **Language:** the interface is **English** by default, with **German** included (switch under *Settings > General > Language*); more languages are welcome, see [TRANSLATING.md](TRANSLATING.md). The name comes from the German *abhaken*, to tick off.
+> **Language:** the interface is **English** by default, with **German** included (switch under *Settings > General > Language*); more languages are welcome, see [TRANSLATING.md](TRANSLATING.md). Kalmido = calm + the Japanese -do (道, “the way”, as in aikido or judo): the calm way of getting things done.
 > Kalmido is an independent project and not affiliated with any other task app.
 
 ## What's new
 
+- **2.6.0** (2026-10-01): A header that keeps the title, "…" and the bell on every screen, a separate Share dialog,
+  "not connected" agents, one name "Agents", bigger touch targets, better contrast and one date format.
 - **2.5.2** (2026-10-01): Hotfix from the second usability review: "…" and the bell always visible on phones, a
   compact proposal review without stray commas, the first-run tour fits every screen, admin alerts never to the public
   ntfy.sh unless chosen, and smaller fixes (task panel header, file picker, plurals, chart labels).
 - **2.5.1** (2026-10-01): Settings > *AI colleague* in four short sub-tabs (Agents, Lists, Usage, Log) instead of one
   long page, clickable avatars in comments, branch suggestions `kalmido-<id>`.
 - **2.5.0** (2026-10-01): The first public release of Kalmido: tasks, projects, habits, focus timer, time tracking,
-  shared lists, calendars, a REST API with webhooks and AI colleagues in one self-hosted app.
+  shared lists, calendars, a REST API with webhooks and AI agents in one self-hosted app.
 
 All changes: [CHANGELOG.md](CHANGELOG.md) · [GitHub Releases](https://github.com/Gegenschuss/kalmido/releases)
 
@@ -145,7 +147,7 @@ All changes: [CHANGELOG.md](CHANGELOG.md) · [GitHub Releases](https://github.co
 - **Agents as team members**: an admin adds an agent (Claude Code, Codex, n8n, a local model, your own script) as a
   user of type *Agent*: never an admin, no Paperless, sees only the lists shared with it, with its own API token, an
   optional webhook and an on/off switch that stops everything at once
-- **Settings > AI colleague**: one tab in four sub-tabs (2.5.1). *Agents*: a card per agent with its state, lists and
+- **Settings > Agents** (called *AI colleague* before 2.6.0): one tab in four sub-tabs (2.5.1). *Overview*: a card per agent with its state, lists and
   usage; admins add, edit, test and pause them there (username, display name and profile picture: a preset, an own
   photo or the initials). *Lists*: which lists each agent sees, *Share all* / *New lists automatically*, and a table
   of the lists you manage (shared ones first, *Show all*, search): which agent sees it (one click shares or unshares),
@@ -168,17 +170,17 @@ All changes: [CHANGELOG.md](CHANGELOG.md) · [GitHub Releases](https://github.co
   Kalmido only stores them; the agent's host applies them ([mcp/agent_launcher.sh](mcp/agent_launcher.sh) for Claude Code)
 - **MCP server** ([mcp/](mcp/)) so agents can use Kalmido as a tool, and a protocol description in
   [docs/AGENTS.md](docs/AGENTS.md)
-- **Setup guide** ([docs/AGENT-SETUP.md](docs/AGENT-SETUP.md), in the app under *Settings > AI colleague > Setup
-  guide*): an AI colleague step by step, either by pasting one prompt into Claude Code or by hand (sandbox user,
+- **Setup guide** ([docs/AGENT-SETUP.md](docs/AGENT-SETUP.md), in the app under *Settings > Agents > Setup
+  guide*): an agent step by step, either by pasting one prompt into Claude Code or by hand (sandbox user,
   firewall, MCP wrapper, rules, event loop, autostart, test checklist)
 - **Usage and limits** (2.1.1): agents report their model usage (tokens, optionally the cost; numbers only, never
-  prompts); *Settings > AI colleague > Usage* shows today / 7 / 30 days per agent, behind *Details* a chart per day, top tasks, lists and
+  prompts); *Settings > Agents > Usage* shows today / 7 / 30 days per agent, behind *Details* a chart per day, top tasks, lists and
   models (admins: every agent; others: the agents and lists they share), the Agents view a compact card, the task panel
   *AI usage*. Per agent a soft limit (News + push to the admins at 80 % / 100 %) and a hard limit (its API calls get
   `429` until the next day / month or a higher limit). A Claude Code Stop hook ([mcp/claude_usage_hook.py](mcp/claude_usage_hook.py))
   reports a session's usage by itself
 - **Activity log** (2.2.1): every API request an agent makes (route, status, task / list, duration; never content) in
-  *Settings > AI colleague > Log* for admins, filtered by agent, status and day, event polling hidden by default, denied calls marked, CSV export;
+  *Settings > Agents > Log* for admins, filtered by agent, status and day, event polling hidden by default, denied calls marked, CSV export;
   kept `KALMIDO_AUDIT_DAYS` days (default 90)
 - **Git integration** (2.2.0): connect a project list to GitHub or Gitea / Forgejo; pull requests (state, CI), commits
   and branches show up at their tasks (`#123`, `kalmido-123`), `fixes #123` in a merged pull request completes the
@@ -325,20 +327,25 @@ own list with the same name is reused) or one existing list you can edit. The im
 
 ## Users and sharing
 
-<p align="center"><img src="docs/share.png" width="760" alt="Edit list dialog with the Sharing section: owner, a member and a participant, and what each role may do"></p>
+<p align="center"><img src="docs/share.png" width="760" alt="The Share dialog of a project: people with their roles and Invite, the agents of the list, the public link"></p>
 
 - **Accounts:** admins manage users under *Settings > Administration* (username, display name, optional password,
   optional SSO login, admin flag, Paperless access, ntfy topic, disable / delete). Everyone can change their own display name and
   password under *Settings > Account*, and a profile picture there (a sloth preset, an own photo or just the initials;
   admins can set a preset for someone else, e.g. the bot user of an API integration). The *Users* block comes first
   under *Settings > Administration*; agents are listed there too (with the *Agent* badge) and open their own dialog
-  (*Managed under AI colleague*). A user who still owns lists cannot be deleted (delete the lists or
+  (*Managed under Agents*). A user who still owns lists cannot be deleted (delete the lists or
   disable the user instead); deleting removes their inbox, habits, filters and focus history.
 - **Private per user:** inbox, habits, focus sessions, filters, folders and sidebar order, tags (two people can tag
   the same shared task differently; right-click or long-press a tag in the sidebar, or "…" in the tag view, >
   *Delete tag…* removes it from all your tasks after showing how many, the tasks stay, undo brings it back), settings (language, notifications, digest, ...), ntfy topic, upload token.
-- **Sharing and roles:** open a list's menu (*Edit list > Sharing*) and add people with a role (each one is explained
-  under the member list):
+- **The Share dialog** (2.6.0): *Share…* in a list's "…" menu, the *Share* button next to the list title (desktop), or
+  *Sharing > Share…* in the list dialog. One place for everything about who sees a list: **People** (members with their
+  role, *Share with …* + role + *Add* to invite, remove), **Agents** (the agents of the list, *Share with an agent …*,
+  *Stop sharing*, which agent may tidy up entries), the **Public link** (owner) and the **Owner** (*Transfer
+  ownership…* / *Take over…* with the history). Members see who is in the list, read-only. The list dialog keeps the
+  list's own settings and shows a one-line summary ("Shared with 2 people · 1 agent").
+- **Sharing and roles:** in the Share dialog add people with a role (*What the roles may do* explains each one):
 
   | Role | Sees | Changes |
   |---|---|---|
@@ -352,14 +359,14 @@ own list with the same name is reused) or one existing list you can edit. The im
   pushes, reminders, the REST API, webhooks), not only hidden in the app; sections show only when they hold one of
   their tasks. Changing a role takes effect at once. Lists shared before 1.10.0 keep their meaning: *Can edit* is now
   *Member*, *View only* is *Viewer*. Members can leave a list; the inbox cannot be shared.
-- **Transfer ownership:** the owner hands a list to another person under *Edit list > Sharing > Transfer ownership…*
+- **Transfer ownership:** the owner hands a list to another person in the Share dialog (*Owner > Transfer ownership…*)
   (a member or anyone they could share with; confirmed twice). The new owner gets it in the same folder and place
   where they had it as a member (otherwise at the end of their sidebar) and a News item; the old owner stays in the
-  list as a **list admin**, where it was in their sidebar. Every transfer is noted under *Sharing* ("Ownership
+  list as a **list admin**, where it was in their sidebar. Every transfer is noted under *Owner* in the Share dialog ("Ownership
   transferred from X to Y"). Agents never become owners and never transfer; inboxes cannot be transferred.
   **Admins take over** lists whose owner is an agent or a disabled user, which nobody could manage otherwise (agents
   cannot share, disabled users cannot log in): *Settings > Administration > Lists owned by agents or disabled users >
-  Take over* (for themselves or another person), or *Take over…* in the list dialog when they are in the list. An
+  Take over* (for themselves or another person), or *Take over…* in the Share dialog when they are in the list. An
   agent that owned the list stays in it as a *Member* (agents are never list admins). API:
   `POST /api/v1/lists/{id}/owner` with `{"user_id": …}` (scope write; agent tokens get 403).
   Moving a task into a list needs edit rights there, moving it out needs edit rights on its current list. Members
@@ -397,7 +404,7 @@ own list with the same name is reused) or one existing list you can edit. The im
 
 ### Public links
 
-A list owner can share one list with people who have **no account**: *Edit list > Public link > Create public link*.
+A list owner can share one list with people who have **no account**: *Share… > Public link > Create public link* (the Share dialog, 2.6.0).
 The link (`/s/<token>`, 192 random bits) opens a plain page with only that list: its sections, open tasks with their
 subtasks and due dates, and the tasks completed in the last 7 days (in a checklist: all done items). Never comments,
 assignees, tags, files, custom fields or anything from other lists; task notes only if you tick *Show task notes*
@@ -598,7 +605,7 @@ is served at `/api/v1/openapi.json`.
 ## AI agents
 
 Agents are external programs (Claude Code, Codex, n8n, a local model, a script) that work in Kalmido like a team
-member: an admin creates them under *Settings > AI colleague* (or turns an existing user into an agent), shares lists
+member: an admin creates them under *Settings > Agents* (or turns an existing user into an agent), shares lists
 with them and gives them a token. Kalmido itself never starts an AI or any other process; the agent runs wherever you
 like and talks to Kalmido through the REST API, webhooks or the MCP server.
 

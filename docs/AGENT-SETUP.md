@@ -1,9 +1,9 @@
-# Set up an AI colleague
+# Set up an agent
 
-This guide sets up an AI colleague for Kalmido step by step: an agent (here Claude Code) that people can mention, assign
+This guide sets up an agent for Kalmido step by step: an agent (here Claude Code) that people can mention, assign
 tasks to and chat with, running in a sandbox on a machine you control. It is the practical companion of
 [AGENTS.md](AGENTS.md) (the protocol) and [AGENT-SECURITY.md](AGENT-SECURITY.md) (the threat model and the sandbox
-recipe). The same guide is in the app: *Settings > AI colleague > Setup guide*.
+recipe). The same guide is in the app: *Settings > Agents > Setup guide*.
 
 **Kalmido never runs an AI itself.** It does not download, start or host a model. You bring the agent (Claude Code,
 another coding assistant, an n8n flow, a local model or a script) and run it on your own machine with your own
@@ -35,7 +35,7 @@ subscription or API key. Kalmido provides:
 
 ## Before you start
 
-- Kalmido 2.4.2 or later, with the modules *Collaboration* and *AI colleague* switched on (Settings > Modules), and an
+- Kalmido 2.4.2 or later, with the modules *Collaboration* and *Agents* switched on (Settings > Modules), and an
   admin account (only admins create agents).
 - A Linux machine for the agent with systemd, `sudo`, Python 3, `curl`, `jq`, `git` and nftables. It can be the Kalmido
   host itself or another machine that reaches Kalmido over HTTPS.
@@ -64,11 +64,11 @@ chat. Then copy this prompt, replace the placeholders and paste it into Claude C
 - `<TOKEN_ENV_FILE>`: the path of the env file you created
 - `<AGENT_USER>`: the Linux user for the agent, e.g. `kalmido-agent`
 - `<OWNER_NAME>` and `<OWNER_ID>`: the one person who may instruct the agent, and their Kalmido account id
-  (*Settings > AI colleague > Setup guide* fills in the URL, your name and your id for you; otherwise open
+  (*Settings > Agents > Setup guide* fills in the URL, your name and your id for you; otherwise open
   `<KALMIDO_URL>/api/me` in the browser while signed in as that person: the field `id`)
 
 ```text
-Set up an Kalmido AI colleague on this Linux machine, following the Kalmido guides docs/AGENT-SETUP.md (path B, "Do it yourself") and docs/AGENT-SECURITY.md (host sandbox recipe) from https://github.com/Gegenschuss/kalmido. Read both guides first and follow them exactly; where this prompt and the guides differ, the guides win.
+Set up a Kalmido agent on this Linux machine, following the Kalmido guides docs/AGENT-SETUP.md (path B, "Do it yourself") and docs/AGENT-SECURITY.md (host sandbox recipe) from https://github.com/Gegenschuss/kalmido. Read both guides first and follow them exactly; where this prompt and the guides differ, the guides win.
 
 My values:
 - Kalmido address: <KALMIDO_URL>
@@ -105,11 +105,11 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
 
 ### 1. Create the agent in Kalmido
 
-1. *Settings > AI colleague > Agents > Add agent* (admins): a username (e.g. `claude`), a display name and optionally a
+1. *Settings > Agents > Overview > Add agent* (admins): a username (e.g. `claude`), a display name and optionally a
    note (who runs it and where). Copy the **API token**: it is shown only once. You can rotate it later in the agent's
    dialog; the old token stops at once.
 2. **Share lists** with it in the table *Your lists at a glance*: one click on the agent's chip shares a list (role
-   *Member*) or ends the sharing. Share only what the agent should work in. Use the list dialog > *Sharing* for the
+   *Member*) or ends the sharing. Share only what the agent should work in. Use the list's Share dialog (*…* > *Share…* > *Agents*) for the
    roles *Participant* (only tasks assigned to it) or *Viewer*.
 3. Optional, per agent above the table:
    - **Share all existing lists** shares every list you own with the agent (role *Member*), except your inbox and the
@@ -329,7 +329,7 @@ The token goes to curl on stdin, never on its command line. Inside an interactiv
 ### 9. Autostart with the runtime launcher
 
 [`mcp/agent_launcher.sh`](../mcp/agent_launcher.sh) starts Claude Code with the runtime settings an admin chose in
-Kalmido (*Settings > AI colleague > (agent) > Runtime*: model, auto-compact, nightly fresh restart, *Reset now*),
+Kalmido (*Settings > Agents > (agent) > Runtime*: model, auto-compact, nightly fresh restart, *Reset now*),
 always in a fresh session, restarts it when they change, and stops it while the agent is paused. A dry run first:
 
 ```sh
@@ -366,7 +366,7 @@ journalctl --user -u kalmido-agent -f            # "starting (fresh session) ...
 ### 10. Usage reporting
 
 [`mcp/claude_usage_hook.py`](../mcp/claude_usage_hook.py) runs after every turn as a Claude Code *Stop* hook (wired in
-step 7) and reports the token usage to Kalmido: numbers only, never prompt or answer text. *Settings > AI colleague >
+step 7) and reports the token usage to Kalmido: numbers only, never prompt or answer text. *Settings > Agents >
 Usage* then shows it, and the limits in the agent's dialog apply. Optional keys in the env file:
 `KALMIDO_USAGE_PRICES` (a price table to show costs), `KALMIDO_USAGE_TASK`, `KALMIDO_USAGE_STATE_DIR`. Test it without
 sending: `python3 ~/kalmido/mcp/claude_usage_hook.py --dry-run ~/.config/kalmido/agent.env < /dev/null`.
@@ -374,7 +374,7 @@ sending: `python3 ~/kalmido/mcp/claude_usage_hook.py --dry-run ~/.config/kalmido
 ### 11. Test checklist
 
 Run it before you let colleagues talk to the agent. Use a **test user** (not an admin) who shares one **test list**
-with the agent; delete both afterwards. Watch the answers and *Settings > AI colleague > Log*.
+with the agent; delete both afterwards. Watch the answers and *Settings > Agents > Log*.
 
 **Basics**
 
@@ -382,7 +382,7 @@ with the agent; delete both afterwards. Watch the answers and *Settings > AI col
 |---|---|---|
 | Mention | As the owner, comment `@<agent> what is open here?` on a task in the test list. | Within a minute the status dot turns to *working* and the agent answers in a comment. |
 | Chat | Open the chat with the agent (as the owner) and ask for the open tasks of the test list. | Typing dots, then a correct answer. |
-| Kill switch | *Settings > AI colleague > (agent) > Pause*. | Its calls get 403 (denied in the log), the launcher stops the agent, `events.sh` backs off. After *Resume* it works again. |
+| Kill switch | *Settings > Agents > (agent) > Pause*. | Its calls get 403 (denied in the log), the launcher stops the agent, `events.sh` backs off. After *Resume* it works again. |
 
 **Prompt injection** (as the test user unless noted)
 

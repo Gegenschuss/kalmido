@@ -29,7 +29,7 @@ function swEnv(tags) {
 }
 const pushEv = d => ({data: {json: () => d, text: () => JSON.stringify(d)}, waitUntil(p) { this.p = p; }});
 async function swTests() {
-  check(/const CACHE = 'tasks-shell-v((5[789]|6[0-9])|7[01])'/.test(SW), 'service worker cache v57 (2.0.6: v58, 2.0.8: v59, 2.1.0: v60, 2.1.1: v61, 2.1.2: v62, 2.2.0: v63, 2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70, 2.5.2: v71)');
+  check(/const CACHE = 'tasks-shell-v((5[789]|6[0-9])|7[0-2])'/.test(SW), 'service worker cache v57 (2.0.6: v58, 2.0.8: v59, 2.1.0: v60, 2.1.1: v61, 2.1.2: v62, 2.2.0: v63, 2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70, 2.5.2: v71, 2.6.0: v72)');
   let S = swEnv(['t-1', 't-2', 'digest']);
   let e = pushEv({type: 'dismiss', tags: ['t-1', 't-9']}); S.L.push(e); await e.p;
   check(JSON.stringify(S.closed) === '["t-1"]' && !S.shown.length, 'dismiss push: closes t-1 only, shows nothing');
@@ -71,7 +71,7 @@ async function swTests() {
   const secs = [...md.querySelectorAll('.snav [data-sec]')].map(b => b.dataset.sec);
   check(JSON.stringify(secs) === JSON.stringify(['account', 'general', 'look', 'modules', 'notify', 'integr', 'ai', 'data', 'users', 'help']), 'admin tabs incl. ai: ' + secs);
   const tab = md.querySelector('.snav [data-sec="ai"]');
-  check(/AI colleague/.test(tab.textContent) && tab.querySelector('svg, use, .ic, i') !== null, 'tab "AI colleague" with an icon');
+  check(/Agents/.test(tab.textContent) && tab.querySelector('svg, use, .ic, i') !== null, 'tab "Agents" with an icon (2.6.0, K09: was "AI colleague")');
   check(!md.querySelector('[data-pane="users"] #s-ags'), 'Administration no longer holds the agents block');
   md.remove();
   w.eval(`settingsModal('agents')`);
@@ -91,22 +91,23 @@ async function swTests() {
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
   w.eval(`settingsModal('agents')`); await sleep(600);
   md = d.querySelector('.modal.smodal');
-  const aiSw = md.querySelector('[data-pane="ai"] [data-feat="agents"]'), modSw2 = md.querySelector('[data-pane="modules"] [data-feat="agents"]');
-  check(aiSw && !aiSw.checked && !modSw2.checked, 'agents off: the switch in AI colleague too');
-  aiSw.checked = true; aiSw.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(900);
-  check(modSw2.checked && (await call('alice', 'GET', '/api/state')).settings.features.split(',').includes('agents'), 'switched on in AI colleague -> Modules follows, saved');
+  // 2.6.0 (K09): the switch only lives in Modules; the Agents tab shows a hint with "Open Modules"
+  const modSw2 = md.querySelector('[data-pane="modules"] [data-feat="agents"]');
+  check(!md.querySelector('[data-pane="ai"] [data-feat="agents"]') && md.querySelector('[data-pane="ai"] .aimodoff [data-m="go-modules"]') && !modSw2.checked, 'agents off: a hint in Agents, the switch only in Modules');
+  modSw2.checked = true; modSw2.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(900);
+  check((await call('alice', 'GET', '/api/state')).settings.features.split(',').includes('agents'), 'switched on in Modules, saved');
   // 2.4.2 (#391): the "Share a list with an agent…" button is gone (the table below covers it)
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
   // palette: the tab is searchable
   const pal = w.eval(`JSON.stringify(palAll().filter(x => x.id === 's:ai').map(x => x.label))`);
-  check(pal === '["Settings: AI colleague"]', 'command palette: Settings: AI colleague ' + pal);
+  check(pal === '["Settings: Agents"]', 'command palette: Settings: Agents ' + pal);
   // German
   await call('alice', 'PATCH', '/api/settings', {lang: 'de'});
   w.close();
   w = await boot({user: 'alice'}); d = w.document;
   w.eval(`settingsModal('ai')`); await sleep(600);
   md = d.querySelector('.modal.smodal');
-  check(/KI-Kollege/.test(md.querySelector('.snav [data-sec="ai"]').textContent) && /Welche Listen er sieht/.test(md.textContent), 'German: KI-Kollege');
+  check(/Agenten/.test(md.querySelector('.snav [data-sec="ai"]').textContent) && /Welche Listen er sieht/.test(md.textContent), 'German: Agenten');
   w.close();
   await call('alice', 'PATCH', '/api/settings', {lang: 'en'});
 
@@ -115,11 +116,11 @@ async function swTests() {
   w.eval(`settingsModal('ai')`); await sleep(600);
   md = d.querySelector('.modal.smodal');
   const bp = md.querySelector('[data-pane="ai"]');
-  check(bp && !bp.classList.contains('hidden'), 'bob: AI colleague tab');
+  check(bp && !bp.classList.contains('hidden'), 'bob: Agents tab');
   check(!bp.querySelector('[data-feat="agents"]') && /team member for an AI assistant/.test(bp.textContent), 'bob: explanation, no switch while the module is on (2.5.1)');
   check(!bp.querySelector('#s-ags') && !bp.querySelector('[data-ag]'), 'bob: no management');
   const my = bp.querySelector('#s-myags [data-agid]');
-  check(my && /Carl/.test(my.textContent) && /ready/.test(my.textContent), 'bob: his agent with its status: ' + (my?.textContent || '').trim());
+  check(my && /Carl/.test(my.textContent) && /not connected/.test(my.textContent), 'bob: his agent with its status (2.6.0, K08: never in touch = not connected): ' + (my?.textContent || '').trim());
   check(!md.querySelector('.snav [data-sec="users"]'), 'bob: still no Administration');
   w.close();
 
