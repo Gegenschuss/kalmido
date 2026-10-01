@@ -72,8 +72,9 @@ def db_files(suffix_from="", suffix_to=".away"):
             os.rename(p + suffix_from, p + suffix_to)
 
 
+subprocess.run(["docker", "rm", "-f", os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")], capture_output=True)  # 2.7.2: the old container must not write while its data goes
 subprocess.run(["rm", "-rf", DATA])
-os.makedirs(DATA)
+os.makedirs(DATA, exist_ok=True)
 r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=dict(os.environ, KEEP="1"), capture_output=True, text=True)
 assert r.returncode == 0, r.stdout + r.stderr
 

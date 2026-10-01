@@ -92,8 +92,9 @@ def wait_checked(s, after, timeout=8):
 
 
 # ------------------------------------------------------------------ container: update check on, fake release API
+subprocess.run(["docker", "rm", "-f", os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")], capture_output=True)  # 2.7.2: the old container must not write while its data goes
 subprocess.run(["rm", "-rf", DATA])
-os.makedirs(DATA)
+os.makedirs(DATA, exist_ok=True)
 open(os.path.join(DATA, "fake_release.py"), "w").write(FAKE)
 release({"tag_name": "v99.0.1", "html_url": "https://github.com/example/kalmido/releases/tag/v99.0.1"})
 env = dict(os.environ, KEEP="1", EXTRA=" ".join([

@@ -84,8 +84,9 @@ def wait_for(pred, timeout=12):
     return pred()
 
 
+subprocess.run(["docker", "rm", "-f", os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")], capture_output=True)  # 2.7.2: the old container must not write while its data goes
 subprocess.run(["rm", "-rf", DATA])
-os.makedirs(DATA)
+os.makedirs(DATA, exist_ok=True)
 subprocess.run(["cp", os.path.join(N, "stub_webhook.py"), DATA])
 r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA],
                    env=dict(os.environ, KEEP="1", EXTRA="-e KALMIDO_WEBHOOK_ALLOW_HOSTS=127.0.0.1:8097 -e KALMIDO_WEBHOOK_TICK=1"),
