@@ -63,7 +63,7 @@ async function firefox(fn) {
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v((68|69)|70)'/.test(SW), 'service worker cache v68 (2.5.0: v69, 2.5.1: v70)');
+  check(/const CACHE = 'tasks-shell-v((68|69)|7[01])'/.test(SW), 'service worker cache v68 (2.5.0: v69, 2.5.1: v70, 2.5.2: v71)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en'});

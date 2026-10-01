@@ -13367,7 +13367,7 @@ AA_WD_WHAT = {"section": N_("a whole watchdog part"), "settings of user": N_("us
               "digest of user": N_("daily digests"), "paperless link": N_("Paperless uploads"),
               "collab push": N_("collaboration pushes"), "time entry": N_("time tracking"), "tick": N_("the watchdog loop")}
 AA_SWITCH_LABEL = {"collab_all": N_("Collaboration for everyone"), "time_all": N_("Time tracking for everyone"),
-                   "update_check": N_("Check daily for a new version"), "aa_on": N_("Admin alerts via ntfy"),
+                   "update_check": N_("Check daily for a new version"), "aa_on": N_("Admin alerts"),
                    "twofa_required": N_("Require two-factor authentication for built-in logins"),
                    "passkey_login": N_("Allow logging in with a passkey without the password"),
                    "oidc_autocreate": N_("Create accounts on the first OIDC login"), "bk_on": N_("Automatic backups"),
@@ -13479,27 +13479,50 @@ def aa_row_text(r, lg):
         return r["message"]
 
 
+# 2.5.2 (UX audit 2, K04): nothing goes to the PUBLIC ntfy.sh unless someone chose it. With NTFY_URL on ntfy.sh (the
+# default) an admin on the default channel Web Push gets the alerts on their subscribed devices, and none at all while no
+# device is subscribed (Settings > Notifications); ntfy only for the channels ntfy / both or a shared admin topic. With an
+# own ntfy server (NTFY_URL elsewhere) the admins' own topics keep getting them, whatever channel they use (as before).
+NTFY_PUBLIC = (urllib.parse.urlsplit(NTFY_URL).hostname or "").lower().rstrip(".") in ("ntfy.sh", "www.ntfy.sh")
+
+
+def aa_admin_via(c, uid, s=None):
+    """How the admin alerts reach this admin (without a shared admin topic): {"ntfy": topic or "", "webpush": n devices}."""
+    s = s or usettings(c, uid)
+    ch, t = push_channel(s), s.get("ntfy_topic") or ""
+    dev = webpush_count(c, uid) if WEBPUSH_ON and ch in ("webpush", "both") else 0
+    t_ok = bool(t) and bool(NTFY_TOPIC_RE.fullmatch(t)) and (ch in ("ntfy", "both") or not WEBPUSH_ON or not NTFY_PUBLIC)
+    return {"ntfy": t if t_ok else "", "webpush": 0 if t_ok and ch == "webpush" else dev}
+
+
 def aa_recipients(c, cfg):
-    """[(topic, language)]: the shared admin topic (in the first admin's language) or each enabled admin's own
-    ntfy topic (a topic shared by two admins gets one message)."""
+    """[(via, target, language)]: ("ntfy", the shared admin topic, the first admin's language), else per enabled admin
+    ("ntfy", own topic, language) and / or ("webpush", user id, language), see aa_admin_via (a topic shared by two admins
+    gets one message)."""
     if cfg["topic"]:
-        return [(cfg["topic"], lang(c, default_uid(c)))] if NTFY_TOPIC_RE.fullmatch(cfg["topic"]) else []
+        return [("ntfy", cfg["topic"], lang(c, default_uid(c)))] if NTFY_TOPIC_RE.fullmatch(cfg["topic"]) else []
     out, seen = [], set()
     for (uid,) in c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0 ORDER BY id").fetchall():
         s = usettings(c, uid)
-        t = s.get("ntfy_topic") or ""
-        if t and t not in seen and NTFY_TOPIC_RE.fullmatch(t):
-            seen.add(t)
-            out.append((t, s.get("lang") if s.get("lang") in LANGS else "en"))
+        lg = s.get("lang") if s.get("lang") in LANGS else "en"
+        v = aa_admin_via(c, uid, s)
+        if v["ntfy"] and v["ntfy"] not in seen:
+            seen.add(v["ntfy"])
+            out.append(("ntfy", v["ntfy"], lg))
+        if v["webpush"]:
+            out.append(("webpush", uid, lg))
     return out
 
 
 def aa_deliver(c, cfg, title_fn, body_fn, click=None):
-    """ntfy to every recipient, each in their language. Returns the number of topics that accepted it."""
-    ok = 0
-    for topic, lg in aa_recipients(c, cfg):
-        if ntfy(title_fn(lg), body_fn(lg), cfg["prio"], click or f"{PUBLIC_URL}/#settings", topic=topic, admin=True):
-            ok += 1
+    """ntfy / Web Push to every recipient, each in their language. Returns the number of recipients that accepted it."""
+    ok, click = 0, click or f"{PUBLIC_URL}/#settings"
+    for via, target, lg in aa_recipients(c, cfg):
+        if via == "ntfy":
+            ok += 1 if ntfy(title_fn(lg), body_fn(lg), cfg["prio"], click, topic=target, admin=True) else 0
+        else:
+            ok += 1 if webpush_user(target, webpush_payload(title_fn(lg), body_fn(lg), cfg["prio"], click),
+                                    cfg["prio"]) else 0
     return ok
 
 
@@ -13526,6 +13549,8 @@ def aa_emit(c, cfg, kind, key, text, args=(), n=None, click=None):
     elif kind != "test" and c.execute("SELECT COUNT(*) FROM admin_alerts WHERE kind!='test' AND state IN ('sent','failed') "
                                       "AND sent_at>?", (iso(now - timedelta(hours=1)),)).fetchone()[0] >= cfg["max_hour"]:
         state = "capped"
+    elif not aa_recipients(c, cfg):  # 2.5.2 (K04): nobody to send it to yet (no device / topic): only listed
+        state = "listed"
     else:
         ok = aa_deliver(c, cfg, lambda lg: aa_title(kind, lg), lambda lg: aa_text(text, n, args, lg), click)
         state, sent = ("sent" if ok else "failed"), iso(now_utc())
@@ -13740,14 +13765,17 @@ def aa_public(c):
         items.append({"id": r["id"], "kind": r["kind"], "label": tr(AA_LABEL.get(r["kind"], r["kind"])), "message": aa_row_text(r, lg),
                       "created_at": r["created_at"], "sent_at": r["sent_at"], "delivered": bool(r["delivered"]),
                       "state": r["state"], "repeats": r["repeats"]})
-    admins = [{"username": u["username"], "topic": usettings(c, u["id"]).get("ntfy_topic") or ""}
-              for u in c.execute("SELECT id, username FROM users WHERE is_admin=1 AND disabled=0 ORDER BY id").fetchall()]
+    admins = []
+    for u in c.execute("SELECT id, username FROM users WHERE is_admin=1 AND disabled=0 ORDER BY id").fetchall():
+        v = aa_admin_via(c, u["id"])  # 2.5.2 (K04): topic = only where it really goes; devices = Web Push
+        admins.append({"username": u["username"], "topic": v["ntfy"], "devices": v["webpush"], "me": u["id"] == me()})
     return {"env": AA_ENV, "topic_env": bool(AA_TOPIC_ENV), "on": gsetting(c, "aa_on") != "0",
             "topic": AA_TOPIC_ENV or gsetting(c, "aa_topic"), "prio": cfg["prio"], "kinds": cfg["kinds"],
             "all_kinds": [{"kind": k, "label": tr(AA_LABEL[k])} for k in AA_KINDS], "mode": cfg["mode"],
             "digest_time": cfg["digest_time"], "cooldown_h": cfg["cooldown_h"], "max_hour": cfg["max_hour"],
             "disk_pct": cfg["disk_pct"], "disk_mb": cfg["disk_mb"], "integ_min": cfg["integ_min"], "admins": admins,
-            "ntfy_url": NTFY_URL, "storage": _AA["storage"], "quick_check": _AA["qc"], "items": items}
+            "ntfy_url": NTFY_URL, "ntfy_public": NTFY_PUBLIC, "webpush": WEBPUSH_ON,
+            "storage": _AA["storage"], "quick_check": _AA["qc"], "items": items}
 
 
 @app.get("/api/admin/alerts")
@@ -13829,7 +13857,7 @@ def admin_alerts_test():
     c = db()
     cfg = {**aa_cfg(c), "on": True}
     if not aa_recipients(c, cfg):
-        return err(tr("No admin has an ntfy topic and no admin topic is set"), 409)
+        return err(tr("No admin can receive admin alerts yet: subscribe a device under Settings > Notifications or set an admin topic"), 409)
     st = aa_emit(c, cfg, "test", f"test:{int(time.time())}", N_("Test from {0}: admin alerts arrive on this topic."),
                  [g.user["username"]])
     return jsonify(ok=st == "sent", alerts=aa_public(c))

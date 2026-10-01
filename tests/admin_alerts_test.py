@@ -158,7 +158,8 @@ check(j["env"] is True and j["on"] is True and j["topic"] == "" and j["prio"] ==
       f"defaults: on, own topics, prio 4, instant: {[j.get(k) for k in ('env', 'on', 'topic', 'prio', 'mode')]}")
 check(j["kinds"] == ["update", "webpush", "watchdog", "integration", "security", "storage"], f"every kind on by default: {j['kinds']}")
 check((j["cooldown_h"], j["max_hour"], j["disk_pct"], j["disk_mb"], j["integ_min"]) == (6, 10, 5, 1024, 15), "default limits")
-check(j["admins"] == [{"username": "alice", "topic": "t-alice"}], f"recipients: the admins with their topics: {j['admins']}")
+check([{k: a[k] for k in ("username", "topic", "devices")} for a in j["admins"]] == [{"username": "alice", "topic": "t-alice", "devices": 0}],
+      f"recipients: the admins with their topics (2.5.2: + devices): {j['admins']}")
 
 # ---- validation
 for bad in ({"topic": "bad topic!"}, {"prio": "7"}, {"kinds": ["update", "nope"]}, {"kinds": "update"}, {"mode": "weekly"},
@@ -354,14 +355,14 @@ patch({"mode": "instant"})
 clear()
 check(patch({"on": False}).ok, "alerts off")
 m = admin_msgs("t-alice")
-check(len(m) == 1 and "Admin alerts via ntfy" in m[0]["msg"] and "off" in m[0]["msg"], f"switching off is still reported: {m}")
+check(len(m) == 1 and "Admin alerts" in m[0]["msg"] and "off" in m[0]["msg"], f"switching off is still reported: {m}")
 switch("collab_all", False)
 switch("collab_all", True)
 time.sleep(2)
 check(len(admin_msgs()) == 2, "off: no more alerts (only the off notice to both admins)")
 check(A.post(B + "/api/admin/alerts/test").json()["ok"] is True, "the test alert works while switched off")
 patch({"on": True})
-wait_for(lambda: [x for x in admin_msgs("t-alice") if "Admin alerts via ntfy" in x["msg"] and " on" in x["msg"]])
+wait_for(lambda: [x for x in admin_msgs("t-alice") if "Admin alerts" in x["msg"] and " on" in x["msg"]])
 
 # ---- shared admin topic + priority
 clear()

@@ -124,12 +124,12 @@ const pane = async w => { w.eval(`settingsModal('notify')`); await sleep(700); r
 const text = el => (el?.textContent || '').replace(/\s+/g, ' ');
 
 async function uiTests() {
-  // carol: channel webpush (migrated), no device, ntfy topic -> "using ntfy for now"
+  // carol: channel webpush (migrated), no device, ntfy topic -> "until then … ntfy topic" (2.5.2: neutral)
   let f = fakePush();
   let w = await boot({user: 'carol', setup: f.setup});
   let p = await pane(w);
   check(p.querySelector('#s-pushch')?.value === 'webpush', 'channel select: Web Push');
-  check(/No device subscribed yet — using ntfy for now\./.test(text(p.querySelector('#s-wpstate'))) && p.querySelector('#s-wpstate').classList.contains('warn'), 'no device yet: "using ntfy for now" shown');
+  check(/No device subscribed for push yet\. Until then, notifications go to your ntfy topic\./.test(text(p.querySelector('#s-wpstate'))) && !p.querySelector('#s-wpstate').classList.contains('warn'), 'no device yet: the neutral "until then … ntfy topic" hint (2.5.2: not red)');
   check(p.querySelector('#s-wpdev') && !p.querySelector('#s-wpdev').checked && !p.querySelector('[data-m="wp-test"]'), 'toggle off, no device test button yet');
   check(/Your browser asks for permission once/.test(text(p)), 'permission hint');
   check(p.querySelector('.topic') && p.querySelector('[data-m="test"]'), 'ntfy topic + ntfy test still there');
@@ -167,7 +167,7 @@ async function uiTests() {
   click(w, p.querySelector('.wpdevs [data-m="wp-del"]')); await sleep(900);
   p = w.document.querySelector('.smodal [data-pane="notify"]');
   check(f.unsub === 1 && !(await api(w, 'GET', '/api/push/subs')).subs.length && !p.querySelector('.wpdevs'), 'remove: server + browser subscription gone');
-  check(/using ntfy for now/.test(text(p.querySelector('#s-wpstate'))) && !p.querySelector('#s-wpdev').checked, 'back to "using ntfy for now"');
+  check(/Until then, notifications go to your ntfy topic/.test(text(p.querySelector('#s-wpstate'))) && !p.querySelector('#s-wpdev').checked, 'back to "until then … ntfy topic"');
   // on again, then off with the toggle
   let t2 = p.querySelector('#s-wpdev'); t2.checked = true; t2.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(1200);
   check((await api(w, 'GET', '/api/push/subs')).subs.length === 1 && f.asked === 1, 'on again (permission not asked twice)');
@@ -218,7 +218,7 @@ async function uiTests() {
   w.close();
   w = await boot({user: 'carol', setup: f.setup});
   p = await pane(w);
-  check(/Auf diesem Gerät benachrichtigen/.test(text(p)) && /Noch kein Gerät angemeldet – bis dahin kommt alles über ntfy\./.test(text(p)) && /Zustellung/.test(text(p)), 'German strings');
+  check(/Auf diesem Gerät benachrichtigen/.test(text(p)) && /Noch kein Gerät für Push angemeldet\. Bis dahin kommen Benachrichtigungen über dein ntfy-Topic\./.test(text(p)) && /Zustellung/.test(text(p)), 'German strings');
   await api(w, 'PATCH', '/api/settings', {lang: 'en'});
   w.close();
 }

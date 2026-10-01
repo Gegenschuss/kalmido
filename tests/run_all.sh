@@ -217,6 +217,11 @@ fresh; run p208_ui node p208_ui.js
 # avatars (#395) in jsdom and Firefox (390 x 844, 1280 x 800)
        run p251_api "$PY" p251_api_test.py "$KALMIDO_TEST_DATA"
        run p251_ui node p251_ui.js "$KALMIDO_TEST_DATA"
+# 2.5.2 (UX audit 2 hotfix): admin alerts never to the public ntfy.sh unless chosen (own containers, ntfy.sh unreachable);
+# then the review dialog, tour, notification hints, panel header, file buttons, plurals + chart labels, error text in jsdom and
+# Firefox (360 x 780, 390 x 844, 904 x 1080, 1280 x 800: "…" and the bell in view while an agent works and a timer runs)
+       run p252_api "$PY" p252_api_test.py "$KALMIDO_TEST_DATA"
+       run p252_ui node p252_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

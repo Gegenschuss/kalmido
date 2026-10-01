@@ -1449,7 +1449,7 @@ function taskRow(t, opts = {}) {
   if (t.context) meta.push(`<span class="ctxm" title="${esc(tr('The main task of a subtask assigned to you: read-only, without notes, files and comments'))}">${ic('sub', 's')}${tr('Context')}</span>`);
   // 2.0.4 (#308): "Ready to start" only when the view has dependencies at all (see renderList); a button: tap / click
   // explains where it comes from (toast), without opening the task
-  if (opts.next && !opts.depth) meta.push(`<button type="button" class="nxt" data-act="flow-why" title="${esc(tr(FLOW_WHY))}" aria-label="${esc(tr('Ready to start|flow') + ': ' + tr(FLOW_WHY))}">${ic('arrow', 's')}${tr('Ready to start|flow')}</button>`);
+  if (opts.next && !opts.depth) meta.push(`<button type="button" class="nxt" data-act="flow-why" title="${esc(tr(FLOW_WHY))}" aria-label="${esc(tr('Ready to start|flow') + ': ' + tr(FLOW_WHY))}">${ic('arrow', 's')}<span class="nxl">${tr('Ready to start|flow')}</span></button>`);
   if (t.blocked && t.status === 0 && !opts.trash && dFor(t)) meta.push(`<span class="blk" title="${esc(blockedTitle(t))}">${ic('lock', 's')}${tr('waiting')}</span>`);
   if (t.waiting_at && t.status === 0 && !opts.trash) meta.push(waitChip(t));  // 2.1.0 (#335)
   if (t.pinned && !opts.trash) meta.push(`<span class="pinm">${ic('pin', 's')}</span>`);
@@ -3471,7 +3471,7 @@ function renderDetail() {
     <div class="dtop">
       <button class="iconbtn back" data-act="close-detail" aria-label="${tr('Back')}">${ic('back')}</button>
       <button class="chk ${t.status === 2 ? 'on' : t.status === -1 ? 'wont' : 'p' + t.priority}" data-act="toggle" data-id="${t.id}" aria-label="${tr('done')}" title="${esc(kt(tr('Complete task'), 'x'))}" ${ro ? 'disabled' : ''}>${t.status === 2 ? ic('check') : ''}</button>
-      ${ck ? '' : `<button class="dchip ${t.due ? 'set ' + dueClass(t) : ''}" data-act="date" data-id="${t.id}" title="${esc(kt(tr('Change date'), 'd'))}" ${ro ? 'disabled' : ''}>${ic('cal', 's')}${dueTxt}${t.repeat ? ' ' + ic('repeat', 's') : ''}${t.reminders && t.due ? ' ' + ic('bell', 's') : ''}</button>`}
+      ${ck ? '' : `<button class="dchip ${t.due ? 'set ' + dueClass(t) : ''}" data-act="date" data-id="${t.id}" title="${esc((t.due ? dueTxt + ' · ' : '') + kt(tr('Change date'), 'd'))}" ${ro ? 'disabled' : ''}>${ic('cal', 's')}<span class="dct">${dueTxt}</span>${t.repeat ? ' ' + ic('repeat', 's') : ''}${t.reminders && t.due ? ' ' + ic('bell', 's') : ''}</button>`}
       ${ck || ro ? '' : [[0, 'sun', tr('Today')], [1, 'sunrise', tr('Tomorrow')]].map(([n, i, lab]) => `<button class="iconbtn dq ${t.due === addDays(today(), n) ? 'on' : ''}" data-act="due-q" data-d="${n}" data-id="${t.id}" title="${esc(kt(tr('Due: {0}', lab), n ? 'Shift+T' : 't'))}" aria-label="${esc(tr('Due: {0}', lab))}">${ic(i, 's')}</button>`).join('')}
       <span class="spacer"></span>
       ${ro ? (t.context ? `<span class="rotag" title="${esc(tr('The main task of a subtask assigned to you: read-only, without notes, files and comments'))}">${ic('sub', 's')}${tr('Context')}</span>`
@@ -5671,10 +5671,10 @@ function wpState(md, j = md._wp) {
   const el = $('#s-wpstate', md); if (!el || !j) return;
   const ch = $('#s-pushch', md)?.value || j.channel, n = j.subs.length;
   el.textContent = ch === 'ntfy' ? tr('Everything goes to ntfy.')
-    : !n ? (j.ntfy ? tr('No device subscribed yet — using ntfy for now.') : tr('No device subscribed yet — no notifications.'))
+    : !n ? (j.ntfy ? tr('No device subscribed for push yet. Until then, notifications go to your ntfy topic.') : tr('No device subscribed for push yet. Turn on “Notify on this device” above.'))
     : ch === 'both' ? trn('Web Push to {0} device and ntfy.', 'Web Push to {0} devices and ntfy.', n)
     : trn('Web Push to {0} device. ntfy only if no device accepts a push.', 'Web Push to {0} devices. ntfy only if no device accepts a push.', n);
-  el.classList.toggle('warn', ch !== 'ntfy' && !n);
+  el.classList.remove('warn');  // 2.5.2 (K04): a neutral hint, not a red warning
 }
 async function wpDraw(md) {
   const box = $('#s-wp', md); if (!box || !S.webpush?.enabled) return;
@@ -5946,7 +5946,7 @@ function settingsModal(focus) {
       ${hint(tr('Move your tasks over from another app. You see a preview first; importing the same file again skips what is already there, and an import can be undone for 24 hours. Nothing inside the file is fetched from the internet.'))}
       <div class="row"><label for="s-imp-src">${tr('From')}</label><select id="s-imp-src">${IMP_SRC.map(([k, n]) => `<option value="${k}">${esc(tr(n))}</option>`).join('')}</select></div>
       <div class="shelp impHelp" id="s-imp-help">${impHelp('todoist')}</div>
-      <div class="row"><label for="s-import">${tr('File')}</label><input type="file" id="s-import" accept="${IMP_ACCEPT.todoist}"></div>
+      <div class="row"><label for="s-import">${tr('File')}</label>${fileBtn('s-import', IMP_ACCEPT.todoist)}</div>
       <div id="s-imp-out"></div>
       <div class="members" id="s-imp-hist"></div>
       <h4>${tr('Export')}</h4>
@@ -6176,6 +6176,12 @@ function impHelp(src) {
     ticktick: tr('<b>TickTick:</b> Settings > Account > Generate backup (CSV). Imported directly, without a preview.'),
   }[src] || '';
 }
+// 2.5.2 (K15): an own file button in the app's language (+ the chosen file's name) instead of the browser's "Browse… No file selected."
+const fileBtn = (id, accept) => `<span class="filebtn"><label class="btn sm">${ic('file', 's')} ${tr('Choose a file…')}<input type="file" id="${id}" accept="${esc(accept)}" hidden></label><span class="muted fname" id="${id}-name">${tr('No file chosen')}</span></span>`;
+document.addEventListener('change', e => {
+  const f = e.target; if (!f?.matches?.('.filebtn input[type=file]')) return;
+  const n = document.getElementById(f.id + '-name'); if (n) n.textContent = f.files?.[0]?.name || tr('No file chosen');
+}, true);
 function impInit(md) {
   const I = {src: 'todoist', file: null, opts: {}, last: null};
   const out = $('#s-imp-out', md), inp = $('#s-import', md);
@@ -6221,7 +6227,7 @@ function impInit(md) {
   }
   hist();
   $('#s-imp-src', md).addEventListener('change', e => {
-    I.src = e.target.value; I.opts = {}; I.file = null; inp.value = ''; inp.accept = IMP_ACCEPT[I.src] || ''; out.innerHTML = '';
+    I.src = e.target.value; I.opts = {}; I.file = null; inp.value = ''; const fn = $('#s-import-name', md); if (fn) fn.textContent = tr('No file chosen'); inp.accept = IMP_ACCEPT[I.src] || ''; out.innerHTML = '';
     $('#s-imp-help', md).innerHTML = impHelp(I.src);
   });
   inp.addEventListener('change', async e => {
@@ -6383,16 +6389,20 @@ function plaWire(md) {
   });
 }
 const aaHtml = () => `<h4 id="s-aa-h">${tr('Admin alerts')}</h4><div id="s-aa"><div class="muted mhint">${tr('Loading…')}</div></div>`;
-const AA_STATE = {sent: N_('delivered'), failed: N_('not delivered'), queued: N_('waiting for the summary'), summarized: N_('in the summary'), capped: N_('hourly limit reached')};
+const AA_STATE = {sent: N_('delivered'), failed: N_('not delivered'), queued: N_('waiting for the summary'), summarized: N_('in the summary'), capped: N_('hourly limit reached'), listed: N_('only listed (no device or topic yet)')};
 function aaWhen(x) { return x ? new Date(x).toLocaleString(I18N.code || 'en', {dateStyle: 'short', timeStyle: 'short'}) : ''; }
 async function aaDraw(md, j) {
   const box = $('#s-aa', md); if (!box) return;
   if (!j) { try { j = await api('GET', '/api/admin/alerts'); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; } }
   const hint = t => `<div class="shint">${t}</div>`, num = (id, v, lo, hi, w) => `<input type="number" class="aanum${w ? ' wide' : ''}" id="${id}" value="${esc(v)}" min="${lo}" max="${hi}">`;
+  // 2.5.2 (K04): where the alerts really go per admin (Web Push devices and / or an ntfy topic); nowhere yet = a neutral hint
+  const via = a => [a.devices ? trn('Web Push to {0} device', 'Web Push to {0} devices', a.devices) : '', a.topic ? `ntfy <code class="topic">${esc(a.topic)}</code>` : ''].filter(Boolean).join(' + ') || `<span class="muted">${tr('nowhere yet')}</span>`;
   const rc = j.topic ? tr('Goes to the admin topic {0}.', `<code class="topic">${esc(j.topic)}</code>`)
-    : j.admins.length ? tr('Goes to each admin’s own ntfy topic: {0}.', j.admins.map(a => `${esc(a.username)} ${a.topic ? `<code class="topic">${esc(a.topic)}</code>` : `<span class="muted">(${tr('no topic')})</span>`}`).join(', ')) : '';
+    : j.admins.length ? tr('Goes to each admin over their own notification channel: {0}.', j.admins.map(a => `${esc(a.username)}: ${via(a)}`).join(', ')) : '';
+  const meA = j.admins.find(a => a.me), meNone = !j.topic && meA && !meA.devices && !meA.topic;
   let h = j.env ? '' : hint(tr('Admin alerts are turned off on this server (KALMIDO_ADMIN_ALERTS=0)'));
-  h += `<div class="featgrid"><label class="wide"><input type="checkbox" id="aa-on" ${j.on && j.env ? 'checked' : ''} ${j.env ? '' : 'disabled'}><span>${tr('Admin alerts via ntfy')}<small class="muted">${tr('Warnings about the server go to the admins via ntfy, whatever notification channel they use: updates, delivery problems, watchdog errors, integrations, security events, disk space. Only counts, ids, usernames, device labels and error classes, never task contents.')}</small></span></label></div>
+  h += `<div class="featgrid"><label class="wide"><input type="checkbox" id="aa-on" ${j.on && j.env ? 'checked' : ''} ${j.env ? '' : 'disabled'}><span>${tr('Admin alerts')}<small class="muted">${tr('Warnings about the server go to the admins over their own notification channel (Web Push to their devices, ntfy only if they chose it or an admin topic is set): updates, delivery problems, watchdog errors, integrations, security events, disk space. Only counts, ids, usernames, device labels and error classes, never task contents.')}</small></span></label></div>
+    ${meNone && j.on && j.env ? `<div class="shint aanone">${ic('bell', 's')} <span>${tr('No device subscribed for push yet. Until you subscribe one, admin alerts are only listed here.')}</span> <button class="btn sm" data-aa="notify">${tr('Subscribe this device')}</button></div>` : ''}
     <div class="row"><label for="aa-topic">${tr('Admin topic')}</label><input id="aa-topic" value="${esc(j.topic)}" autocapitalize="off" placeholder="${tr('empty = each admin’s own topic')}" ${j.topic_env ? 'readonly' : ''}></div>
     ${hint((j.topic_env ? tr('Set by KALMIDO_ADMIN_TOPIC.') + ' ' : '') + rc)}
     <div class="row"><label for="aa-prio">${tr('How urgent')}</label><select id="aa-prio">${[['3', N_('Normal')], ['4', N_('Loud')], ['5', N_('Urgent')]].map(([v, n]) => `<option value="${v}" ${j.prio === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
@@ -6431,12 +6441,13 @@ function aaWire(md) {
   });
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-aa]'); if (!b) return;
+    if (b.dataset.aa === 'notify') { $('.snav [data-sec="notify"]', md)?.click(); return; }  // 2.5.2 (K04)
     b.disabled = true;
     try {
       if (b.dataset.aa === 'test') {
         await save();  // the test uses what the form shows
         const j = await api('POST', '/api/admin/alerts/test');
-        toast(j.ok ? tr('Test alert sent') : tr('ntfy not reachable')); await aaDraw(md, j.alerts);
+        toast(j.ok ? tr('Test alert sent') : tr('Test alert not delivered')); await aaDraw(md, j.alerts);
       }
       if (b.dataset.aa === 'clear') { if (!await askConfirm(tr('Clear the list of admin alerts?'), '', {ok: tr('Clear list'), danger: true})) return; await aaDraw(md, await api('DELETE', '/api/admin/alerts')); }
     } catch { /* api() showed it */ } finally { b.disabled = false; }
@@ -7312,7 +7323,7 @@ async function bkDraw(md, j) {
       <small class="muted" style="display:block">${x.unreadable ? tr('unreadable') : `${trn('{0} task', '{0} tasks', x.counts.tasks || 0)}, ${trn('{0} file', '{0} files', x.attachment_files || 0)}, ${trn('{0} user', '{0} users', x.counts.users || 0)} · v${esc(x.app_version)}`}</small></span>
       <a class="iconbtn" href="/api/admin/backups/${encodeURIComponent(x.name)}/download" download="${esc(x.name)}" title="${tr('Download')}">${ic('download', 's')}</a>
       <button class="iconbtn" data-bk="verify" title="${tr('Check')}">${ic('check', 's')}</button><button class="iconbtn" data-bk="restore" title="${tr('Restore')}">${ic('undo', 's')}</button><button class="iconbtn" data-bk="del" title="${tr('Delete')}">${ic('trash', 's')}</button></div>`).join('')}</div>` : `<div class="muted mhint">${tr('No backups yet.')}</div>`;
-  h += `<div class="row"><label for="bk-file">${tr('Restore from a file')}</label><input type="file" id="bk-file" accept=".zip,.enc,application/zip"></div>
+  h += `<div class="row"><label for="bk-file">${tr('Restore from a file')}</label>${fileBtn('bk-file', '.zip,.enc,application/zip')}</div>
     ${hint(tr('Larger files: copy them into the backup folder on the server instead, they then show up in the list.'))}`;
   box.innerHTML = h;
   box._body = bkBody(md);
@@ -7677,15 +7688,28 @@ const shortDay = s => pd(s).toLocaleDateString(LOCALE(), {day: 'numeric', month:
 function yGrid(W, padL, padT, ih, max, fmt) {
   return [0, max / 2, max].map(v => { const y = padT + ih - ih * v / max; return `<line class="ch-grid" x1="${padL}" x2="${W}" y1="${y}" y2="${y}"/><text class="ch-ax" x="${padL - 6}" y="${y + 4 * uiZ()}" text-anchor="end">${esc(fmt(v))}</text>`; }).join('');
 }
+// 2.5.2 (K16): x-axis labels from the right end, each only where it does not touch the one to its right (the width
+// comes from the label's length in the mono axis font, so "21. Sept." no longer runs into "28. Sept.")
+function axLabels(n, labels, xOf, y, z) {
+  let h = '', minL = Infinity;
+  for (let i = n - 1; i >= 0; i--) {
+    const s = String(labels[i] ?? ''), w = (s.length * 6.9 + 2) * z, x = xOf(i), end = i === n - 1;
+    const l = end ? x - w : x - w / 2, r = end ? x : x + w / 2;
+    if (!s || r + 8 * z > minL) continue;
+    minL = l;
+    h += `<text class="ch-ax" x="${x}" y="${y}" text-anchor="${end ? 'end' : 'middle'}">${esc(s)}</text>`;
+  }
+  return h;
+}
 function barChart(vals, labels, {fmt = v => String(v), tip, label, w, lw}) {  // w: own width (2.1.1: charts in a dialog); lw: px per axis label (2.5.1)
   const z = uiZ(), W = w || chartW(), H = Math.round(170 * z), padL = Math.round(36 * z), padT = 10, padB = Math.round(24 * z), ih = H - padT - padB, n = vals.length;
   const max = niceMax(Math.max(1, ...vals)), slot = (W - padL) / n, bw = Math.max(4, slot - Math.max(2, Math.min(10, slot * .28)));
-  const every = Math.ceil(n * Math.max(46, lw || 0) * z / (W - padL));
   let h = yGrid(W, padL, padT, ih, max, fmt);
+  const bx = i => padL + i * slot + (slot - bw) / 2;
+  h += axLabels(n, labels, i => i === n - 1 ? bx(i) + bw : bx(i) + bw / 2, H - 6 * z, z);  // 2.5.1: the last label inside the chart
   vals.forEach((v, i) => {
-    const x = padL + i * slot + (slot - bw) / 2, bh = ih * v / max;
+    const x = bx(i), bh = ih * v / max;
     h += `<path class="ch-bar" d="${topRound(x, padT + ih - bh, bw, bh, 4)}"/>`;
-    if ((n - 1 - i) % every === 0) h += `<text class="ch-ax" x="${i === n - 1 ? x + bw : x + bw / 2}" y="${H - 6 * z}" text-anchor="${i === n - 1 ? 'end' : 'middle'}">${esc(labels[i])}</text>`;  // 2.5.1: the last label inside the chart
     h += `<rect class="ch-hit" x="${padL + i * slot}" y="${padT}" width="${slot}" height="${ih}"><title>${esc(tip(i))}</title></rect>`;
   });
   return `<svg class="chart" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label + ': ' + vals.map((v, i) => tip(i)).join('; '))}">${h}</svg>`;
@@ -7694,12 +7718,11 @@ function lineChart(vals, labels, {tip, label}) {
   const z = uiZ(), W = chartW(), H = Math.round(160 * z), padL = Math.round(36 * z), padT = 12, padB = Math.round(24 * z), ih = H - padT - padB, n = vals.length;
   const max = niceMax(Math.max(1, ...vals)), slot = (W - padL - 12) / Math.max(1, n - 1);
   const X = i => padL + 6 + i * slot, Y = v => padT + ih - ih * v / max;
-  const every = Math.ceil(n * 46 * z / (W - padL));
   let h = yGrid(W, padL, padT, ih, max, v => String(v));
   h += `<polyline class="ch-line" points="${vals.map((v, i) => `${X(i)},${Y(v)}`).join(' ')}"/>`;
+  h += axLabels(n, labels, X, H - 6 * z, z);
   vals.forEach((v, i) => {
     h += `<circle class="ch-dot" cx="${X(i)}" cy="${Y(v)}" r="4"/>`;
-    if ((n - 1 - i) % every === 0) h += `<text class="ch-ax" x="${X(i)}" y="${H - 6 * z}" text-anchor="${i === n - 1 ? 'end' : 'middle'}">${esc(labels[i])}</text>`;
     h += `<rect class="ch-hit" x="${X(i) - slot / 2}" y="${padT}" width="${slot}" height="${ih}"><title>${esc(tip(i))}</title></rect>`;
   });
   return `<svg class="chart" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label + ': ' + vals.map((v, i) => tip(i)).join('; '))}">${h}</svg>`;
@@ -10126,8 +10149,8 @@ function tourStart() {
   setTimeout(() => tourGo(0), 60);
 }
 // ring around the target + card placement: right of narrow targets on the left (sidebar, rail), else below / above
-function tourPlace(r, vw, vh) {
-  const z = typeof uiZ === 'function' ? uiZ() : 1, pad = 6, cw = Math.min(340 * z, vw - 24), ch = 210 * z;
+function tourPlace(r, vw, vh, mh) {  // mh: the card's measured height (2.5.2, K05: was a fixed 210 px)
+  const z = typeof uiZ === 'function' ? uiZ() : 1, pad = 6, cw = Math.min(340 * z, vw - 24), ch = Math.min(mh || 210 * z, vh - 24);
   // no target (or it is hidden): the card in the middle of the screen (1.8.1: was 30 % from the top, high on tall tablets)
   if (!r || !(r.width || r.height)) return {ring: '', card: `width:${cw}px;left:50%;top:50%;transform:translate(-50%,-50%);max-height:calc(100dvh - 24px);overflow:auto`};
   const ring = `left:${r.left - pad}px;top:${r.top - pad}px;width:${r.width + pad * 2}px;height:${r.height + pad * 2}px`;
@@ -10151,8 +10174,16 @@ function tourGo(i) {
     ${TOUR.i === 0 && TOUR.sample && !TOUR.sampleSent ? `<label class="tsample"><input type="checkbox" id="t-sample" ${TOUR.sampleOn ? 'checked' : ''}><span><b>${tr('Create a sample project')}</b><small>${tr('A small video production with dates, dependencies and a packing list. Remove it any time under Settings > Data.')}</small></span></label>
     <label class="tsample tptype"><span><b>${tr('Start with a project')}</b><small>${tr('Sections, fields and settings for your kind of work.')}</small></span><select id="t-ptype">${[['', N_('No project')], ...PTYPE_UI.slice(1)].map(([k, n]) => `<option value="${k}" ${k === (TOUR.ptype || '') ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></label>` : ''}
     <div class="tfoot"><button class="btn sm tskip" data-tour="skip">${tr('Skip tour')}</button><span class="spacer"></span>${TOUR.i ? `<button class="btn sm" data-tour="back">${tr('Back')}</button>` : ''}<button class="btn sm pri" data-tour="next">${last ? tr('Done') : tr('Next')}</button></div>`;
-  const r = st.r && st.r(), pl = tourPlace(r, innerWidth, innerHeight);
+  const r = st.r && st.r();
+  let pl = tourPlace(r, innerWidth, innerHeight);
   ring.classList.toggle('none', !pl.ring); ring.style.cssText = pl.ring; card.style.cssText = pl.card;
+  // 2.5.2 (K05): place again with the real height of the card, then keep it inside the window (Back / Next always visible)
+  const mh = card.offsetHeight;
+  if (mh) {
+    pl = tourPlace(r, innerWidth, innerHeight, mh); card.style.cssText = pl.card + ';max-height:calc(100dvh - 24px);overflow-y:auto';
+    const cr = card.getBoundingClientRect();
+    if (cr.height && pl.ring && (cr.bottom > innerHeight - 12 || cr.top < 12)) { card.style.bottom = 'auto'; card.style.top = Math.max(12, Math.min(innerHeight - cr.height - 12, cr.top)) + 'px'; }
+  }
   $('[data-tour="next"]', card)?.focus();
 }
 async function tourSample() {  // once, when the first card is left (Next, Skip, Esc)
@@ -10311,7 +10342,7 @@ function agentChip() {
   if (!parts.length) parts.push(agentSt(busy[0]));
   const who = busy.length === 1 ? busy[0].name : tr('Agents'), txt = [who, ...parts].join(' · ');
   const st = agentBusyState(), tip = [txt, ...agentStatusLines()].join('\n');
-  return `<button class="achip ${wait || unread ? 'attn' : ''} ${st === 'working' ? 'aspin' : st === 'waiting' ? 'await' : ''}" data-act="agent-chip" title="${esc(tip)}" aria-label="${esc(txt)}">${busy.length === 1 ? av(busy[0].id, busy[0].name, 'avatar sm') : ic('bot', 's')}<span class="act">${esc(txt)}</span></button>`;
+  return `<button class="achip ${wait || unread ? 'attn' : ''} ${st === 'working' ? 'aspin' : st === 'waiting' ? 'await' : ''}" data-act="agent-chip" title="${esc(tip)}" aria-label="${esc(txt)}">${busy.length === 1 ? av(busy[0].id, busy[0].name, 'avatar sm') : ic('bot', 's')}<span class="act">${esc(txt)}</span><span class="acn" aria-hidden="true">${ic('bot', 's')}${run + wait + unread || busy.length}</span></button>`;  // 2.5.2 (K01): phones show the bot + a number
 }
 function agentChipMenu(a) {
   const ags = S.agents || [];
@@ -10609,7 +10640,9 @@ function propKeys(v) {
 }
 async function propOpen(jid) {
   let v;
-  try { v = await calReq('GET', `/api/proposals/${jid}`); } catch (e) { toast(e.message); return; }
+  try { v = await rawFetch('GET', `/api/proposals/${jid}`); } catch (e) {  // 2.5.2 (K19): a readable reason instead of "unknown"
+    toast(e instanceof Offline ? tr('Offline: only works again with a connection') : e.status === 404 ? tr('This proposal is not available: only the person who asked for it can open it, or it was removed.') : e.message); return;
+  }
   $('.ppm')?.remove();
   const md = modal('');
   md.classList.add('ppm');
@@ -10656,12 +10689,13 @@ function propSecSel(lid, sid) {
   return `<select data-f="section_id" aria-label="${esc(tr('Section'))}" ${l && l.sections.length ? '' : 'hidden'}><option value="">${tr('No section')}</option>${(l?.sections || []).map(s => `<option value="${s.id}" ${s.id === sid ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>`;
 }
 function propItemHtml(k, x, o = {}) {  // one entry: checkbox, title, date and the fields of its kind
-  const on = S.prop.sel.has(k), id = ppSafe(k);
+  // 2.5.2 (K03): one compact line (checkbox · title · date on the right), the fields of its kind and the chips below
+  const on = S.prop.sel.has(k), id = ppSafe(k), extra = (o.fields || '') + (o.chips || '');
   return `<div class="ppi ${o.sub ? 'sub' : ''} ${on ? '' : 'off'}" data-k="${k}">
     <input type="checkbox" class="ppc" id="ppc-${id}" ${on ? 'checked' : ''} aria-label="${esc(tr('Select {0}', x.title))}">
     <div class="ppb">${o.orig ? `<div class="ppo muted">${esc(o.orig)}</div>` : ''}
-      <input class="ppt" data-f="title" value="${esc(x.title)}" maxlength="300" aria-label="${esc(tr('Title'))}">
-      <div class="ppf">${dateIn('ppd-' + id, x.due || '', {label: tr('Due date'), empty: tr('No date|clear'), attrs: 'data-f="due"'})}${o.fields || ''}${o.chips || ''}</div>
+      <div class="pprow"><input class="ppt" data-f="title" value="${esc(x.title)}" maxlength="300" aria-label="${esc(tr('Title'))}">${dateIn('ppd-' + id, x.due || '', {label: tr('Due date'), empty: tr('No date|clear'), attrs: 'data-f="due"'})}</div>
+      ${extra.trim() ? `<div class="ppf">${extra}</div>` : ''}
       ${x.notes ? `<div class="ppn muted">${esc(x.notes.replace(/\s+/g, ' ').slice(0, 240))}</div>` : ''}</div></div>`;
 }
 function propItemsHtml() {
@@ -10675,12 +10709,12 @@ function propItemsHtml() {
   }
   if (v.kind === 'subtasks') return p.items.map((t, i) => propItemHtml(String(i), t, {
     chips: (t.estimate ? `<span class="ppchip">${ic('clock', 's')}${esc(fmtDur(t.estimate * 60))}</span>` : '')
-      + p.dependencies.filter(d => d[0] === i).map(d => `<span class="ppchip">${ic('deps', 's')}${esc(tr('waits on {0}', '“' + p.items[d[1]].title.slice(0, 24) + '”'))}</span>`).join('')}));
+      + p.dependencies.filter(d => d[0] === i).map(d => `<span class="ppchip">${ic('deps', 's')}${esc(tr('waits on {0}', '“' + p.items[d[1]].title.slice(0, 24) + '”'))}</span>`).join('')})).join('');  // 2.5.2 (K03): no stray commas
   if (v.kind === 'extract') {
     const secs = [...new Set([...(inp.list?.sections || []), ...p.tasks.map(t => t.section).filter(Boolean)])];
     return p.tasks.map((t, i) => propItemHtml(String(i), t, {
       fields: `<select data-f="assignee_id" aria-label="${esc(tr('Assignee'))}"><option value="">${tr('Nobody')}</option>${(inp.members || []).map(m => `<option value="${m.id}" ${m.id === t.assignee_id ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select>
-        <select data-f="section" aria-label="${esc(tr('Section'))}"><option value="">${tr('No section')}</option>${secs.map(s => `<option ${s === t.section ? 'selected' : ''}>${esc(s)}${(inp.list?.sections || []).includes(s) ? '' : ' ' + esc(tr('(new)'))}</option>`).join('')}</select>`}));
+        <select data-f="section" aria-label="${esc(tr('Section'))}"><option value="">${tr('No section')}</option>${secs.map(s => `<option ${s === t.section ? 'selected' : ''}>${esc(s)}${(inp.list?.sections || []).includes(s) ? '' : ' ' + esc(tr('(new)'))}</option>`).join('')}</select>`})).join('');
   }
   // triage: the inbox item as it is now, where it should go
   return p.items.map((t, i) => {
@@ -10692,8 +10726,8 @@ function propItemsHtml() {
   }).join('');
 }
 function propCount() {
-  const P = S.prop, n = P.sel.size, all = propKeys(P.v).length, b = $('[data-pp="apply"]', P.md), c = $('.ppcount', P.md);
-  if (c) c.textContent = tr('{0} of {1} selected', n, all);
+  const P = S.prop, n = P.sel.size, all = propKeys(P.v).length, b = $('[data-pp="apply"]', P.md);
+  $$('.ppcount', P.md).forEach(c => { c.textContent = tr('{0} of {1} selected', n, all); });
   if (b) { b.disabled = !n; b.innerHTML = `${ic('check', 's')} ${esc(trn('Apply {0} entry', 'Apply {0} entries', n))}`; }
 }
 function propDraw() {
@@ -10707,16 +10741,17 @@ function propDraw() {
       ${v.kind === 'project' ? `<div class="row"><label for="pp-name">${tr('List name')}</label><input id="pp-name" maxlength="120" value="${esc(p.name)}"></div>
         <div class="row"><label for="pp-folder">${tr('Folder')}</label><input id="pp-folder" maxlength="60" value="${esc(p.folder || v.input.folder || '')}" placeholder="${esc(tr('optional'))}"></div>
         <label class="ppshare"><input type="checkbox" id="pp-share"> ${tr('Share the new list with {0}', esc(v.agent.name))}</label>` : ''}
-      <div class="ppbar"><button class="btn sm" data-pp="all">${tr('Select all')}</button><button class="btn sm" data-pp="none">${tr('Select none')}</button><span class="spacer"></span><span class="muted ppcount"></span></div>
+      <div class="ppbar"><button class="btn sm" data-pp="all">${tr('Select all')}</button><button class="btn sm" data-pp="none">${tr('Select none')}</button></div>
       <div class="ppl">${propItemsHtml()}</div>
       <div class="shint">${v.kind === 'triage' ? tr('Applying moves and changes the selected inbox items as you; one step, undo takes it back.') : tr('Applying creates the selected entries as you (you own them, the history names {0}); one step, undo takes it back.', esc(v.agent.name))}</div>`;
-    foot = `<button class="btn danger" data-pp="discard">${tr('Discard')}</button>${foot}<button class="btn pri" data-pp="apply"></button>`;
+    // 2.5.2 (K03): the footer stays visible below the entries (sticky), with the count next to Apply
+    foot = `<button class="btn danger" data-pp="discard">${tr('Discard')}</button><span class="spacer"></span><span class="muted ppcount ppfc"></span><button class="btn" data-pp="close">${tr('Close')}</button><button class="btn pri" data-pp="apply"></button>`;
   } else {
     main = `<div class="ppwait">${ic(st === 'applied' ? 'check' : 'x')}<p>${st === 'applied' ? (v.applied?.undone ? tr('Applied, then undone.') : tr('Applied.')) : tr('Discarded. {0} was told.', agent)}</p></div>`;
   }
   P.md.querySelector('.card').innerHTML = `<h3>${ic('bot', 's')} ${esc(j.title)}</h3>
     <div class="pphead muted"><span class="jst">${esc(tr(PROP_ST[st] || st))}</span>${agent} · ${esc(relTime(j.updated_at))}</div>
-    <div class="calerr" id="pp-err" hidden></div>${main}<div class="foot">${foot}</div>`;
+    <div class="calerr" id="pp-err" hidden></div>${main}<div class="foot ${st === 'ready' ? 'ppfoot' : ''}">${foot}</div>`;
   if (st === 'ready') propCount();
 }
 async function propApply(b) {

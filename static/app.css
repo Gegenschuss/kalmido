@@ -2506,3 +2506,58 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
   .audctl.open{display:flex}
   .audctl select{flex:1 1 10rem;max-width:none}
 }
+
+/* ---- 2.5.2: hotfix from UX audit 2 */
+/* K01 (minimal): in a narrow header (phones, Fold cover ~360 px, Fold inside / a desktop with the panel open) the agent pill is
+   the bot + a number; on phones (<= 480 px) the timer pill is a dot + the time; both may shrink, "…" and the bell never leave
+   the screen (the full header rework follows in 2.6.0) */
+.achip .acn{display:none}
+@container (max-width:46rem){
+  #top .achip{flex:0 1 auto;min-width:0;max-width:none;padding:.25rem .5rem;gap:.25rem}
+  #top .achip>.avatar,#top .achip>.i,#top .achip .act{display:none}
+  #top .achip .acn{display:inline-flex;align-items:center;gap:.25rem;font:600 .8125rem/1 var(--mono)}
+  #top .achip.aspin::before{left:.25rem}
+  #top .achip.await::after{left:1.125rem}
+}
+@media (max-width:30rem){
+  #top .tmini{flex:0 1 auto;min-width:0;overflow:hidden;padding:.25rem .4375rem;gap:.3125rem}
+  #top .tmini.k-time .rec{display:inline-block}
+  #top .tmini.k-time .rk{display:none}
+  #top .tmini.multi .rk~.rk{display:none}
+  #top .tmore,#top .bell,#top .menu{flex:none}
+  #top h1{min-width:min(4.5rem,24%)}
+  #top{gap:.1875rem}
+}
+/* K03: compact proposal entries (checkbox · title · date), the footer with Apply stays in view */
+.ppi{padding:.3125rem .5rem;gap:.5rem}
+.ppi .ppc{margin-top:.5625rem}
+.ppb{gap:.25rem}
+.pprow{display:flex;align-items:center;gap:.375rem;min-width:0}
+.pprow .ppt{flex:1 1 auto;min-width:0;width:auto}
+.ppb .ppt:not(:focus):not(:hover){border-color:transparent;background:transparent}
+.pprow .dpw{flex:none}
+.pprow .dpbtn{font-size:var(--fs-s);min-height:1.875rem;padding:.125rem .5rem}
+.ppm .card>.foot.ppfoot{position:sticky;bottom:-1.25rem;z-index:2;margin:1rem -1.25rem -1.25rem;padding:.75rem 1.25rem;background:var(--bg2);border-top:1px solid var(--line2);align-items:center}
+.ppfoot .ppfc{font-size:var(--fs-s)}
+@media (max-width:899px){
+  .ppm .card>.foot.ppfoot{bottom:calc(-1.25rem - var(--safe-b));margin-bottom:calc(-1.25rem - var(--safe-b));padding-bottom:calc(.75rem + var(--safe-b))}
+  .ppfoot .ppfc{flex-basis:100%;order:-1;text-align:end}
+}
+/* K04: the admin-alert "nowhere yet" hint with its button */
+#s-aa .shint.aanone{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+#s-aa .aanone>span{flex:1 1 14rem}
+/* K06 + K22: the panel header fits (the date chip shrinks with an ellipsis instead of sliding under the checkbox); on touch
+   screens Pin and Today / Tomorrow live in "…" and the date picker; nothing in the panel scrolls sideways */
+.dtop .dchip{flex:0 1 auto;min-width:0;overflow:hidden;justify-content:flex-start}
+.dtop .dchip .dct{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dtop .dchip .i{flex:none}
+@media (pointer:coarse){ .dtop .dq,.dtop [data-act="pin"]{display:none} }
+#detail{overflow-x:hidden}
+.mdsub{max-width:100%;white-space:normal;text-align:start;height:auto;min-height:1.75rem}
+/* K15: own file button */
+.filebtn{display:inline-flex;align-items:center;gap:.5rem;flex-wrap:wrap;min-width:0}
+.filebtn .fname{font-size:var(--fs-s);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:14rem}
+/* K20: "Ready to start" stays on one line */
+.meta .nxt{white-space:nowrap;min-width:0;max-width:100%;flex:0 1 auto}
+.meta .nxt .nxl{min-width:3.5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.meta .nxt .i{flex:none}

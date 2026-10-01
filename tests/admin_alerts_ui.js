@@ -67,7 +67,7 @@ const api = async (w, m, u, b) => (await w.fetch(u, {method: m, headers: {'Conte
   // German
   w = await boot({user: 'carol'}); d = w.document;
   w.eval(`settingsModal('users')`); await sleep(800); md = d.querySelector('.smodal');
-  check(md.querySelector('#s-aa-h')?.textContent === 'Admin-Warnungen' && /Admin-Warnungen per ntfy/.test(md.querySelector('#s-aa').textContent)
+  check(md.querySelector('#s-aa-h')?.textContent === 'Admin-Warnungen' && /Warnungen zum Server gehen an die Admins über ihren eigenen Benachrichtigungskanal/.test(md.querySelector('#s-aa').textContent)
     && /Sicherheitsereignisse/.test(md.querySelector('#aa-kinds').textContent), 'German labels');
   md.remove(); w.close();
   // non-admin

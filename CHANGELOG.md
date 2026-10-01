@@ -7,6 +7,46 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.5.2] - 2026-10-01
+
+**In short:** A hotfix from the second usability review: on phones the header always keeps "…" and the bell, the
+review dialog of a proposal is compact and without stray commas, the first-run tour fits on a laptop screen, and admin
+alerts no longer go to the public ntfy.sh unless someone chose it.
+
+### Fixed
+- **Header on phones** (K01, minimal form; the full header rework follows in 2.6.0): while an agent is working or a timer
+  runs, the agent pill shrinks to the bot with a number and the timer pill to a dot with the time (phones, the Fold cover
+  screen and any narrow header, e.g. the Fold inside), so "…" (list menu, view, undo) and the bell always stay on screen.
+- **Proposal review** (K03): no more commas between the entries of a "Break down" or "Tasks from notes" proposal; each
+  entry is one compact line (checkbox, title, date on the right) with its other fields below, and the footer with the
+  count and *Apply* stays visible.
+- **First-run tour** (K05): the card is placed with its real height and kept inside the window, so step 5 (*Settings and
+  modules*) shows *Back* / *Next* at 1280 x 800 and on every other size.
+- **Task panel header** (K06): on phones the checkbox no longer sits on top of the date chip; a long date is shortened
+  with "…" (the full date is in the tooltip). On touch screens *Pin* and *Today* / *Tomorrow* are in the task's "…" menu
+  and the date picker.
+- **Task panel** (K22): no horizontal scroll bar any more (desktop and phone).
+- **File picker** (K15): *Data > Import* and *Backups > Restore from a file* use a button in the app's language with the
+  chosen file name instead of the browser's "Browse… No file selected.".
+- **Plurals and charts** (K16): German "1 Tag" / "1 Woche" (was "1 Tage") and a few more singular forms; the date labels
+  of the statistics and usage charts are thinned out so they never overlap.
+- **Error text** (K19): opening someone else's proposal (e.g. via its link) explains why instead of showing "unknown".
+- **"Ready to start"** (K20) stays on one line in list rows.
+
+### Changed
+- **Admin alerts** (K04): they follow each admin's own notification channel. With the public `ntfy.sh` (the default
+  `NTFY_URL`) an admin on *Web Push* (the default) gets them on their subscribed devices and none until a device is
+  subscribed (they are then only listed in the settings, with a neutral hint and *Subscribe this device*); ntfy only
+  for the channels *ntfy* / *Both* or a shared admin topic. With your own ntfy server nothing changes. If you relied on
+  admin alerts reaching an ntfy.sh topic while using Web Push: set your channel to *Both* or set an admin topic.
+  `GET /api/admin/alerts` lists `topic` (only where it really goes), `devices` and `me` per admin and `ntfy_public`;
+  an alert without any destination has the state `listed`. The switch is now called *Admin alerts*.
+- **Notification hint** (K04): "No device subscribed for push yet" is a neutral hint instead of a red warning.
+
+Decisions for this release (open questions of the review): on phones the agent pill is an icon with a number; admin
+alerts are on by default but only via Web Push to an admin's subscribed device (otherwise nowhere until enabled); the
+separate *Share* dialog (K12) moves to 2.6.0.
+
 ## [2.5.1] - 2026-10-01
 
 **In short:** Settings > *AI colleague* is tidied up into four sub-tabs instead of one very long page, comment avatars
@@ -72,6 +112,7 @@ of people.
   multi-arch image (`ghcr.io/gegenschuss/kalmido`, linux/amd64 and linux/arm64), an installable web app that works
   offline, English and German.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.5.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.5.2...HEAD
+[2.5.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.5.2
 [2.5.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.5.1
 [2.5.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.5.0

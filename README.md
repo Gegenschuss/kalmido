@@ -16,6 +16,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.5.2** (2026-10-01): Hotfix from the second usability review: "…" and the bell always visible on phones, a
+  compact proposal review without stray commas, the first-run tour fits every screen, admin alerts never to the public
+  ntfy.sh unless chosen, and smaller fixes (task panel header, file picker, plurals, chart labels).
 - **2.5.1** (2026-10-01): Settings > *AI colleague* in four short sub-tabs (Agents, Lists, Usage, Log) instead of one
   long page, clickable avatars in comments, branch suggestions `kalmido-<id>`.
 - **2.5.0** (2026-10-01): The first public release of Kalmido: tasks, projects, habits, focus timer, time tracking,
@@ -136,7 +139,7 @@ All changes: [CHANGELOG.md](CHANGELOG.md) · [GitHub Releases](https://github.co
   accounts an admin created (or automatic accounts, if you want), optional group check and admin group
 - **Automatic backups** of the database and all attachments, daily with retention, optionally encrypted, downloadable,
   and a **restore** right in the app (checked, with a safety backup of the current state first)
-- **Admin alerts** via ntfy: a new version, devices that stopped taking pushes, watchdog errors, failing integrations, repeated failed logins, low disk space or a failed database check reach the admins, never with task contents
+- **Admin alerts** over each admin's own channel (Web Push or ntfy): a new version, devices that stopped taking pushes, watchdog errors, failing integrations, repeated failed logins, low disk space or a failed database check reach the admins, never with task contents
 
 **AI agents**
 - **Agents as team members**: an admin adds an agent (Claude Code, Codex, n8n, a local model, your own script) as a
@@ -1193,10 +1196,14 @@ Delivery goes through the push service, so it also reaches a phone that cannot r
 
 ### Admin alerts
 
-Things that need an admin's eye go out via ntfy to the admins, whatever channel they use for their own pushes, so
-an admin who only uses Web Push still gets them once an ntfy topic is set. By default each enabled admin gets them
-on their own topic; *Settings > Administration > Whole server > Admin alerts* can set one shared admin topic instead (or
-`KALMIDO_ADMIN_TOPIC` fixes it), the priority (default *High*, 4) and *Send test alert* (labelled "Kalmido test alert").
+Things that need an admin's eye go to the admins over their own notification channel (2.5.2). With the public
+`ntfy.sh` (the default `NTFY_URL`) nothing goes there unless someone chose it: an admin on *Web Push* (the default) gets
+the alerts on their subscribed devices, and none at all until they subscribe a device under *Settings > Notifications*
+(the alerts are then only listed in the settings); the channels *ntfy* / *Both* send them to the admin's own topic. With
+your own ntfy server (`NTFY_URL` elsewhere) each admin's own topic gets them whatever channel they use, as before.
+*Settings > Administration > Whole server > Admin alerts* shows where they go per admin and can set one shared admin
+topic instead (or `KALMIDO_ADMIN_TOPIC` fixes it), the priority (default *High*, 4) and *Send test alert* (labelled
+"Kalmido test alert").
 Regular users never get them. Each alert comes in the admin's language.
 
 | Kind (each can be switched off) | When |
