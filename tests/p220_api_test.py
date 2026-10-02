@@ -384,8 +384,9 @@ def poke_ok():  # 2.4.1: CI flake (a slow runner missed the 12 s window): make t
     return tuple(dbq("SELECT fails, last_error FROM git_conns WHERE id=?", (RID,))[0]) == (0, "")
 
 
-until(poke_ok, 60)
-check(dbq("SELECT fails, last_error FROM git_conns WHERE id=?", (RID,))[0] == (0, ""), "recovers after the token is fixed")
+until(poke_ok, 120)  # 2.9.0: 60 s were not always enough on a busy CI runner
+st_ = dbq("SELECT fails, last_error, next_at FROM git_conns WHERE id=?", (RID,))[0]
+check(st_[:2] == (0, ""), f"recovers after the token is fixed: {st_[0]} fails, {st_[1]!r}, next in {round(st_[2] - time.time())} s")
 check(Bo.post(B + f"/api/repos/{RID}/refresh").ok, "a member may ask for a check")
 
 # ================================================================== #339 merge requests + the agent's view
