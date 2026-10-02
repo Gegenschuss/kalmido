@@ -289,6 +289,11 @@ shard 4  # ---------------------------------------------------------------- shar
 # typing / answers / status changes, the list is only patched; in Firefox at 390 (touch) and 1280: pinned to the bottom,
 # scrolled up the place is kept + "New message", "Load older messages" keeps the message in view
        run p2122_ui node p2122_ui.js "$KALMIDO_TEST_DATA"
+# 2.13.0 (#453): the polish round: one regression check per review finding (chat reactions + approvals, waiting jobs in
+# the pill / Today, Kanban touch edge, keyboard focus / skip link / sidebar as one tab stop, the bell, the view switch,
+# day plan, offline in words, selection bar, setup step 2, helper texts behind (i), …) in jsdom and Firefox at 390 touch
+# (light, German), Fold 904 touch (dark, French) and 1440 (light + dark)
+       run p2130_ui node p2130_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

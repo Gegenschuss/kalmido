@@ -2124,7 +2124,7 @@ body.kb-open #tabs,body.kb-open #fab,body.kb-open .chview .chnote{display:none}
 .rxgrid button{font-size:1.125rem;line-height:1;padding:.3125rem 0;border-radius:var(--r-s)}
 .rxgrid button:hover,.rxgrid button:focus-visible{background:var(--bg3)}
 .rxcustom{display:flex;gap:.375rem}.rxcustom input{flex:1;min-width:0}
-@media (min-width:900px){body.chat-open #view{padding-right:min(26rem,40vw)}}
+@media (min-width:1000px){body.chat-open #main{margin-right:min(26rem,40vw)}}  /* 2.13.0: the main area resizes beside the panel */
 /* ---- 2.0.2: comments under the description (#242), inline title edit (#182), section "+" (#283), list icons (#245),
    agent typing / working indicators (#299), iOS home-screen gap (#286) */
 .md.clamp{max-height:calc(8 * 1.45em);overflow:hidden;-webkit-mask-image:linear-gradient(#000 62%,transparent);mask-image:linear-gradient(#000 62%,transparent)}
@@ -3132,3 +3132,189 @@ button.gchip:hover{color:var(--text)}
 @media (pointer:coarse){
   .dpbar .btn,.dptabs .seg button,.dpm .foot .btn,.dpm [data-dp="close"],.rvcard .btn,.rvhd .iconbtn{min-height:2.75rem;min-width:2.75rem;justify-content:center}
 }
+/* ================= 2.13.0 polish (#453) */
+/* A2: chat reactions appear on hover / focus / long press as a small bar over the bubble's corner; the newest open question
+   shows them inline with the hint "👍 = approval" */
+.cmsg.ag{position:relative}
+.chrxq{position:absolute;top:-1.25rem;right:0;z-index:3;display:flex;align-items:center;gap:.125rem;padding:.125rem;border-radius:62.5rem;background:var(--bg2);border:1px solid var(--line2);box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .12s}
+@media (hover:hover){ .cmsg.ag:hover .chrxq{opacity:1;pointer-events:auto} }
+.cmsg.ag:focus-within .chrxq,.cmsg.rxshow .chrxq{opacity:1;pointer-events:auto}
+.chrxq.open{position:static;opacity:1;pointer-events:auto;background:none;border:0;box-shadow:none;padding:0;margin-top:.25rem;flex-wrap:wrap}
+.chrxq .rx.add{opacity:1;border-style:solid;filter:none;border-color:transparent}
+.chrxq.open .rx.add{border-color:var(--line2)}
+.rxhint,.rxok{display:inline-flex;align-items:center;gap:.25rem;font-size:var(--fs-xs);color:var(--muted);margin-left:.25rem}
+.rxok{color:var(--accent)}.rxok .i{width:.75rem;height:.75rem}
+@media (pointer:coarse){ .chrxq .rx{min-width:2.75rem;min-height:2.75rem;justify-content:center} }
+/* P11: the phone chat: its header replaces the page header, "back" on the left */
+body.in-chat #top{display:none}
+@media (max-width:899px){ body.in-chat .chview{height:calc(100dvh - 4rem)} }
+@media (min-width:900px){ body.in-chat .chview{height:100dvh} body.in-chat #view{padding-bottom:0} }
+.chath .chback{margin-left:-.375rem}
+/* A4: no snapping while a card is dragged along the board's edge */
+.kanban.kbscroll{scroll-snap-type:none}
+/* A9: keyboard: a visible focus ring everywhere (inside the sidebar and lists drawn inside so nothing clips it), the skip link */
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#side :focus-visible,#view .trow:focus-visible,.menu-list :focus-visible,#tabs :focus-visible{outline-offset:-2px}
+#view:focus{outline:none}
+.skip{position:fixed;left:.75rem;top:.75rem;z-index:300;padding:.625rem 1rem;min-height:2.75rem;border-radius:var(--radius);border:2px solid var(--accent);background:var(--bg2);color:var(--text);font:inherit;font-weight:600;transform:translateY(-300%);transition:transform .12s}
+.skip:focus{transform:none}
+/* A5: the bell: the list name gives way before the task title; one excerpt line in the sheet, so more items fit */
+.ntask .nt{flex:0 1 auto}
+.ntask .muted.nl{flex:0 50 auto;max-width:40%;min-width:2.5rem}
+.bplist .nexc{-webkit-line-clamp:1}
+@media (max-width:899px){ .bplist .nitem{padding:.4375rem .5rem;gap:.625rem} .bplist .nitem .avatar{width:1.75rem;height:1.75rem} }
+/* A6: Today: the card "N jobs wait for you" */
+.waitcard{border:1px solid var(--line2);border-left:.1875rem solid var(--st-wait);border-radius:var(--r-l);background:var(--bg2);padding:.625rem .75rem;margin:.25rem 0 .75rem}
+.waitcard h3{margin:0 0 .375rem;font-size:var(--fs-l);display:flex;align-items:center;gap:.5rem}
+.wcrow{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.375rem 0;border-top:1px solid var(--line)}
+.wcrow:first-of-type{border-top:0}
+.wci{display:flex;flex-direction:column;min-width:0;flex:1 1 12rem}
+.wci b{overflow-wrap:anywhere}.wci .muted{font-size:var(--fs-s);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wcb{display:flex;gap:.375rem;flex-wrap:wrap}
+@media (pointer:coarse){ .wcb .btn,.waitcard .linkbtn{min-height:2.75rem} }
+.menu-list .mwait .ml{white-space:normal}
+/* helper texts behind (i): the button next to its heading / label, the shared tooltip */
+.shint.iisrc{display:none}
+.ib{display:inline-flex;align-items:center;justify-content:center;gap:.25rem;vertical-align:middle;width:1.375rem;height:1.375rem;margin:0 0 0 .25rem;padding:0;border:0;border-radius:50%;background:none;color:var(--muted);cursor:help;flex:none;position:relative}
+.ib::after{content:"";position:absolute;inset:-.6875rem}
+.ib:hover,.ib[aria-expanded="true"]{color:var(--accent)}
+.ib .i{width:.9375rem;height:.9375rem}
+.ib.ibl{width:auto;border-radius:var(--radius);padding:0 .25rem;font-size:var(--fs-xs);margin:-.25rem 0 .375rem}
+#iitip{position:fixed;z-index:400;max-width:min(22rem,calc(100vw - 1rem));padding:.5rem .625rem;border-radius:var(--radius);background:var(--bg2);color:var(--text);border:1px solid var(--line2);box-shadow:var(--shadow);font-size:var(--fs-s);line-height:1.45;font-weight:400;text-transform:none;letter-spacing:0;white-space:normal;pointer-events:none}
+#iitip.pin{pointer-events:auto}
+#iitip.hidden{display:none}
+.chnm{display:flex;align-items:center;min-width:0}.chnm b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* A7: the view switch under the list title on phones; a check on the active menu entry */
+.vsegm{display:flex;gap:.25rem;overflow-x:auto;scrollbar-width:none;margin:.25rem 0 .5rem;padding:.1875rem;background:var(--bg3);border-radius:var(--radius)}
+.vsegm::-webkit-scrollbar{display:none}
+.vsegm button{flex:1 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:.375rem;min-height:2.75rem;padding:0 .75rem;border:0;border-radius:calc(var(--radius) - .125rem);background:none;color:var(--text2);font:inherit;font-size:var(--fs-s);white-space:nowrap;cursor:pointer}
+.vsegm button.on{background:var(--bg);color:var(--text);font-weight:600;box-shadow:0 0 0 1px var(--line2)}
+.menu-list .mchk{margin-left:auto;padding-left:.5rem;color:var(--accent);display:inline-flex}
+/* P1: the progress bar keeps its × next to it; the time sum says what it is */
+.lpg{display:inline-flex;align-items:center;gap:.25rem;min-width:0}
+.tsum .tsl{color:var(--muted);font-size:var(--fs-xs)}
+/* A8: "Plan my day": the footer stays in view, the entries that do not fit have actions */
+.dpm .foot.ppfoot{position:sticky;bottom:-1.25rem;z-index:2;background:var(--bg2);margin:0 -1.25rem -1.25rem;padding:.625rem 1.25rem 1.25rem;border-top:1px solid var(--line)}
+.dprow.nofit{flex-wrap:wrap}
+.dpna{display:flex;gap:.375rem;flex-wrap:wrap;width:100%;margin-top:.25rem}
+@media (pointer:coarse){ .dpna .btn{min-height:2.75rem} }
+/* A11: habit day cells are tapped every day: 44 px on touch screens */
+@media (pointer:coarse){
+  .hweek{grid-template-columns:minmax(0,1fr) repeat(7,2.75rem) 3rem}
+  .hc{width:2.75rem;height:2.75rem;font-size:var(--fs-s)}
+}
+@media (pointer:coarse) and (max-width:899px){ .hweek{grid-template-columns:repeat(7,minmax(0,1fr)) 2.25rem;column-gap:.125rem;padding-left:.25rem;padding-right:.25rem} .hc{width:min(2.75rem,100%);height:auto;aspect-ratio:1} }
+#toast.totop{top:calc(env(safe-area-inset-top,0px) + .75rem);bottom:auto}
+/* A14: the selection bar: icon + label per action */
+#mbar .mbb{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:.125rem;min-width:2.75rem;min-height:2.75rem;padding:.125rem .375rem;border:0;border-radius:var(--radius);background:none;color:var(--text2);font:inherit;font-size:var(--fs-xs);line-height:1.1;cursor:pointer;flex:none}
+#mbar .mbb:hover{background:var(--bg4);color:var(--text)}
+#mbar .mbb.danger{color:var(--danger)}
+#mbar .mbb .mbl{white-space:nowrap}
+#mbar .mbb[hidden]{display:none}
+@media (max-width:899px){ #mbar{gap:0;padding:.25rem .375rem} #mbar .mcount{padding:0 .25rem;font-size:var(--fs-xs)} }
+/* A15: fold the sidebar away below ~1100 px (Fold unfolded, small windows) */
+.sbrand .sfold{margin-right:-.25rem}
+.sbrand .sfold .i{transform:rotate(90deg)}
+.sbrand .sfold[aria-pressed="true"] .i{transform:rotate(-90deg)}
+@media (pointer:coarse){ .sbrand .sfold{min-width:2.75rem;min-height:2.75rem} }
+/* P3: the overdue card: the × sits in its corner, never alone on a line; P14: its buttons are 44 px on touch */
+.odban{position:relative;padding-right:2.75rem}
+.odban .spacer{display:none}
+.odban [data-act="od-hide"]{position:absolute;top:.125rem;right:.125rem}
+@media (pointer:coarse){ .odban .btn.sm,.odban [data-act="od-hide"]{min-height:2.75rem;min-width:2.75rem} }
+/* P5: the date sheet: a label for the reminders, "Done" always in view, the quick days in full words */
+.prow .plab{font-size:var(--fs-s);flex:none}
+.prow:has(.remchips){flex-wrap:wrap}
+.prow .remchips{flex:1 1 100%}
+#pop.sheet .popfoot{position:sticky;bottom:calc(-.75rem - var(--safe-b));z-index:2;background:var(--bg2);margin:.5rem -.75rem calc(-.75rem - var(--safe-b));padding:.625rem .75rem calc(.75rem + var(--safe-b));border-top:1px solid var(--line)}
+#pop .quick button{white-space:normal;text-align:center;line-height:1.15}
+/* P7: sign-in: 44 px fields, show the password */
+.authscreen input:not([type=checkbox]){min-height:2.75rem}
+.pwwrap{position:relative;display:flex}
+.pwwrap input{flex:1;padding-right:2.75rem}
+.pwwrap .pweye{position:absolute;right:0;top:50%;transform:translateY(-50%);min-width:2.75rem;min-height:2.75rem}
+body.qsheet-open #fab{display:none}
+/* P12: on touch the resize grips show only once a bar is held (they only work then) */
+@media (pointer:coarse){ .tl-bar:not(.drag) .h{opacity:0} }
+/* P13: inactive tab labels readable (WCAG AA 4.5:1 in light and dark) */
+#tabs button:not(.on){color:var(--text2);opacity:1}
+#tabs button:not(.on) svg{opacity:.85}
+/* P14: touch targets of at least 44 px: milestone "Reached", small avatars (a larger invisible hit area), event rows */
+@media (pointer:coarse){
+  .povm .chk,.pov .avb,.agb-a .avb{position:relative}
+  .povm .chk::after,.pov .avb::after{content:"";position:absolute;inset:-.6875rem}
+  .cevrow{min-height:2.75rem}
+}
+/* P15: the calendar's week / day view: only the hour grid scrolls */
+#view.calfit{padding-bottom:0}
+@media (max-width:899px){ #view.calfit{padding-bottom:calc(var(--tabs-h) + var(--safe-b))} }
+/* P16: the logo follows the accent */
+svg.logo{color:var(--acc-d,var(--accent));flex:none}
+.sbrand svg.logo{width:1.25rem;height:1.25rem}
+.authscreen .alogo svg.logo{width:2.125rem;height:2.125rem}
+/* P20: settings search (every tab), the phone's tab row shows that it scrolls */
+.shdr{position:relative}
+.ssearch{display:flex;align-items:center;gap:.375rem;padding:0 .5rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg);color:var(--muted);min-width:0;flex:0 1 14rem}
+.ssearch input{border:0;background:none;padding:.375rem 0;min-height:2.25rem;flex:1;min-width:0}
+.ssres{position:absolute;right:.875rem;top:calc(100% - .25rem);z-index:5;width:min(24rem,calc(100% - 1.75rem));max-height:60dvh;overflow-y:auto;background:var(--bg2);border:1px solid var(--line2);border-radius:var(--radius);box-shadow:var(--shadow);padding:.25rem;display:flex;flex-direction:column}
+.ssres.hidden{display:none}
+.ssres button{display:block;text-align:left;padding:.5rem .625rem;min-height:2.75rem;border-radius:var(--r-s);font-size:var(--fs-m)}
+.ssres button:hover,.ssres button:focus-visible{background:var(--bg3)}
+@media (max-width:899px){
+  .shdr{flex-wrap:wrap}
+  .ssearch{order:3;flex:1 1 100%}
+  .snav{-webkit-mask-image:linear-gradient(90deg,#000 85%,transparent);mask-image:linear-gradient(90deg,#000 85%,transparent)}
+}
+/* P19: done items of a "done at the bottom" list: as tall as the others, the put-back icon level with the text */
+.trow.ck.done{align-items:center}
+.trow.ck.done .meta:empty{display:none}
+.trow.ck .ckback{margin:-.5rem 0;min-width:2.75rem;min-height:2.75rem}
+@media (pointer:coarse){ .nchip{min-width:2.75rem;justify-content:center} }
+.nmhit{display:inline-grid;place-items:center;cursor:pointer}
+@media (pointer:coarse){ .nmhit{min-width:2.75rem;min-height:2.75rem} .nmh,.nmr{grid-template-columns:minmax(0,1fr) 3.25rem 3.25rem;padding-top:.125rem;padding-bottom:.125rem} }
+/* usage card on the Agents page: values never squeezed away (narrow widths: the name on its own line) */
+.aiucr .aiuv{flex:none}
+@media (max-width:30rem){ .aiucr{flex-wrap:wrap} .aiucr .n{flex:1 1 100%} }
+/* iPhone (#453): bottom sheets and the add sheet sit right above the keyboard (iOS keeps the layout viewport, only the
+   visual viewport shrinks: --vvb = the part hidden below); the chat never gets wider than the screen */
+@media (max-width:899px),(min-width:900px) and (pointer:coarse){
+  .qadd.sheet{bottom:var(--vvb,0px)}
+  #pop.sheet{bottom:var(--vvb,0px);max-height:min(86dvh,calc(var(--vvh,100dvh) - 1rem))}
+}
+.chview,.chcomp,.chcomp textarea,.cmsg,.cbub{min-width:0}
+.chview{max-width:min(44rem,100%)}
+.cmsg .cmeta{flex-wrap:wrap}
+/* Fold screenshots: the agent chip has no amber outline (the dot / number say "waiting" / "new"); a denser sidebar on
+   touch tablets (44 px rows, the desktop's text size); the phone's + a little smaller */
+.achip.attn{border-color:transparent}
+@media (min-width:900px) and (pointer:coarse){ #side .srow,#side .fhead{font-size:var(--fs-m);gap:.5rem} #side .sgroup+.sgroup{margin-top:.25rem} }
+@media (max-width:899px){ #fab{width:3rem;height:3rem} }
+/* #429: the font size slider; below 100 % touch screens keep 44 px hit areas (2.75rem / --ui = 44 px), only text and
+   spacing shrink */
+.lkfs{display:flex;align-items:center;gap:.625rem;flex-wrap:wrap}
+.lkfs input[type=range]{flex:1 1 10rem;min-width:8rem;accent-color:var(--accent);min-height:2.75rem}
+.lkfs .lkA{font-size:.75rem;color:var(--muted)}.lkfs .lkA2{font-size:1.25rem}
+.lkfs output{font:600 var(--fs-m) var(--mono);min-width:3.5rem;text-align:right}
+@media (pointer:coarse){
+  :root.ui-small :is(button,select,summary,[role=button],.srow,.fhead,.iconbtn){min-height:calc(2.75rem / var(--ui))}
+  :root.ui-small :is(.iconbtn,.rx){min-width:calc(2.75rem / var(--ui))}
+  :root.ui-small :is(#top,#tabs,#side,#detail) :is(button,.iconbtn){min-height:calc(2.75rem / var(--ui))}
+  :root.ui-small :is(#top,#detail) .iconbtn{min-width:calc(2.75rem / var(--ui))}
+}
+/* small avatars (assignee, people) get a 44 px hit area on touch screens */
+@media (pointer:coarse){ .avb{position:relative} .avb::after{content:"";position:absolute;inset:-.625rem} }
+/* a field changed elsewhere while it was edited: a calm bar under it, the draft stays */
+.cfbar{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap;margin:.375rem 0;padding:.375rem .5rem;border-radius:var(--radius);background:var(--wait-soft);border:1px solid color-mix(in srgb,var(--st-wait) 45%,transparent);font-size:var(--fs-s);color:var(--text)}
+.cfbar span{flex:1 1 12rem}
+@media (pointer:coarse){ .cfbar .btn{min-height:2.75rem} }
+.att.broken .as{color:var(--danger)}
+.att.broken .as{color:var(--danger)}
+/* 2.13.0: the task number in the panel's breadcrumbs (a tap copies / shares the link) */
+.dcrumbs .dcid{margin-left:auto;font:var(--fs-xs) var(--mono);color:var(--muted);padding:.125rem .375rem;border-radius:var(--r-s);flex:none}
+.dcrumbs .dcid:hover{color:var(--accent);background:var(--bg3)}
+@media (pointer:coarse){ .dcrumbs .dcid{min-height:2.75rem;min-width:2.75rem} }
+/* 2.13.0: the logo goes to Today; Search sits at the top of the sidebar */
+.sbrand .sbhome{display:inline-flex;align-items:center;gap:.625rem;font:inherit;color:inherit;padding:.125rem .25rem;margin:-.125rem -.25rem;border-radius:var(--radius)}
+.sbrand .sbhome:hover{background:var(--bg3)}
+#side .srow.ssrch{margin-bottom:.25rem}
+@media (pointer:coarse){ .sbrand .sbhome{min-height:2.75rem} }

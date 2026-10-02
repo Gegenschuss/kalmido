@@ -118,8 +118,13 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   w = await boot({user: 'bob', hash: 'l/' + L, mobile: true, media: {'(hover: none)': true}}); d = w.document;
   touch(w, row(t2), 'touchstart'); await sleep(450);
   const te = touch(w, row(t2), 'touchend'); await sleep(150);
+  // 2.13.0 (#453 A14): a long press without moving selects the task in a list (Kanban keeps "Move to column…"); the
+  // section picker itself is the same
+  check(te.defaultPrevented && w.eval('S.multiMode') && w.eval(`S.multi.has(${t2})`), 'long-press on a task without moving: selects it (2.13.0)');
+  w.eval('S.multi.clear(); S.multiMode = false; render()');
+  w.eval(`sectionPicker(document.querySelector('#view .trow[data-id="${t2}"]'), ${t2})`); await sleep(150);
   let pop = d.querySelector('#pop:not(.hidden)');
-  check(te.defaultPrevented && pop && /Nicht zugeordnet/.test(pop.textContent) && /Later/.test(pop.textContent), 'long-press on a task without moving: section picker (German)');
+  check(pop && /Nicht zugeordnet/.test(pop.textContent) && /Later/.test(pop.textContent), 'section picker (German)');
   [...pop.querySelectorAll('button')].find(b => b.textContent.trim() === 'Later').click();
   check(await until(async () => (await taskOf(t2, BK)).section_id === C), 'picked: moved to "Later"');
   check(await until(() => /In Abschnitt „Later“ verschoben/.test(toastText(d))), `German toast: ${toastText(d)}`);

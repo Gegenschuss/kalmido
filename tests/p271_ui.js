@@ -61,7 +61,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   // ================= the view switch
   let w = await boot({user: 'alice', hash: 'l/' + P}), d = w.document;
   const seg = () => [...d.querySelectorAll('#top .vseg button')].map(b => b.dataset.act);
-  check(seg().join() === 'view-list,view-kanban,view-timeline,view-overview', 'project: List / Kanban / Timeline / Project overview: ' + seg());
+  check(seg().join() === 'view-overview,view-list,view-kanban,view-timeline', 'project (2.13.0: the overview first): Project overview / List / Kanban / Timeline: ' + seg());
   check(d.querySelector('#top [data-act="view-overview"]').title === 'Project overview', 'tab title "Project overview"');
   w.eval(`go('l/${PL}')`); await sleep(300);
   check(!seg().includes('view-overview'), 'a plain list has no overview tab: ' + seg());
@@ -153,13 +153,13 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});
 
-  // phones: the view switch in "…"
+  // phones: the view switch (2.13.0, #453 A7: a segmented control under the title instead of entries in "…")
   w = await boot({user: 'alice', hash: 'l/' + P, mobile: true}); d = w.document;
-  const items = w.eval('topMoreItems()').map(x => x.label);
-  check(items.includes('Project overview') && items.includes('List'), 'phone: "Project overview" in "…": ' + items.slice(0, 6));
-  w.eval(`topMoreItems().find(x => x.label === 'Project overview').fn()`);
+  const vsg = d.querySelector('#view .vsegm [data-act="view-overview"]');
+  check(vsg && !w.eval('topMoreItems()').some(x => x.label === 'Project overview'), 'phone: "Overview" in the view switch under the title, not in "…"');
+  vsg.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
   await until(() => d.querySelector('#view .pov'));
-  check(w.eval('isOverview()'), 'phone: the overview opens from "…"');
+  check(w.eval('isOverview()'), 'phone: the overview opens from the view switch');
   w.close();
 
   // a viewer reads only; collaboration off: no members section

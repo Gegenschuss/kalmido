@@ -25,7 +25,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const change = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('change', {bubbles: true})); };
 const last = d => [...d.querySelectorAll('.modal')].pop();
-const ds = d => d.toISOString().slice(0, 10);
+const ds = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;  // local date (2.13.0: the UTC date failed between 0 and 2 o'clock)
 const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e => e.offsetWidth && getComputedStyle(e).visibility !== 'hidden').map(e => {
   const b = e.getBoundingClientRect(); return [e.className || e.tagName, (e.textContent || '').trim().slice(0, 16), Math.round(b.width), Math.round(b.height)]; }).filter(x => x[2] < 43.5 || x[3] < 43.5))()`;
 

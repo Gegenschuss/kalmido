@@ -2041,7 +2041,7 @@ def auth_login():
                        N_("Login rate limit reached for an unknown user name (logins refused for {0} min)."), [FAIL_WINDOW // 60])
         aa_count("security", "logins", client_ip(), user=username if u else "?")
         print("login failed for", repr(username), "from", client_ip(), flush=True)
-        return err(tr("Wrong username or password"), 401)
+        return err(tr("Wrong username or password", lg=_accept_lang(lang())), 401)  # 2.13.0 (#453 P7): the page's language
     remember = bool(b.get("remember", True))
     methods = twofa_methods(c, u)
     if methods:  # second step: a code, a passkey or a recovery code (POST /api/auth/2fa...)
@@ -2078,6 +2078,8 @@ def auth_setup():
                       onboard=not c.execute("SELECT 1 FROM tasks LIMIT 1").fetchone())
     adopt_orphans(c, uid)
     ensure_inbox(c, uid)
+    if b.get("wizard") is True:  # 2.13.0 (#453 A16): the setup page's step 2 comes back after a reload until it is finished
+        gset(c, "setup_step2", "pending")
     bump(c)
     tok, age = start_session(c, uid, True) if pw else (None, None)
     c.commit()
@@ -4154,6 +4156,7 @@ def admin_setup():
         sample_create(c, me())
     elif "sample" in b:
         uset(c, me(), "sample_ask", "0")  # decided here: the welcome tour does not ask again
+    gset(c, "setup_step2", "done")
     bump(c)
     c.commit()
     return jsonify(about_info(c, g.user))
@@ -4301,6 +4304,7 @@ def state():
         v=int(gsetting(c, "version")),
         me={**user_public(u), "is_admin": bool(u["is_admin"]), "auth": g.auth_via, "has_password": bool(u["password_hash"]),
             "ntfy_inbox": bool(NTFY_IN["token"]) and inbox_user(c) == uid},
+        setup_pending=bool(u["is_admin"]) and gsetting(c, "setup_step2") == "pending",  # 2.13.0 (#453 A16)
         lists=visible_lists(c, uid),
         filters=[{**dict(r), "rules": json.loads(r["rules"] or "{}")}
                  for r in c.execute("SELECT * FROM filters WHERE user_id=? ORDER BY sort, id", (uid,))],
@@ -6190,6 +6194,11 @@ def task_create():
         if f.get("parent_id"):  # subtasks append at the end
             f["sort"] = c.execute("SELECT COALESCE(MAX(sort),0)+1 FROM tasks WHERE parent_id=?",
                                   (f["parent_id"],)).fetchone()[0]
+        elif c.execute("SELECT 1 FROM lists WHERE id=? AND checklist=1", (f["list_id"],)).fetchone():
+            # 2.13.0 (#453 P19): a list with "done at the bottom" (shopping, packing) adds new items at the end, in the
+            # order they are typed
+            f["sort"] = c.execute("SELECT COALESCE(MAX(sort),0)+1 FROM tasks WHERE list_id=? AND parent_id IS NULL",
+                                  (f["list_id"],)).fetchone()[0]
     if b.get("fields"):
         need_project(c, f["list_id"], "fields")
     if f.get("ttype") and not (f.get("content") or "").strip():  # 2.4.0 (#340): a new bug / feature gets its note template
@@ -7094,14 +7103,20 @@ def need_attachment(c, aid, write):
 def attachment_get(aid):
     a = need_attachment(db(), aid, False)
     full = os.path.join(ATT_DIR, a["path"])
-    if not os.path.isfile(full):
-        return err(tr("File missing on the server"), 404)
+    if not os.path.isfile(full) or (a["size"] and os.path.getsize(full) != a["size"]):  # 2.13.0: also empty / cut off
+        if os.path.isfile(full):
+            print(f"WARNING file {a['id']}: {os.path.getsize(full)} bytes on disk, {a['size']} recorded", flush=True)
+        e = err(tr("File damaged or missing"), 410 if os.path.isfile(full) else 404)
+        e[0].headers["Cache-Control"] = "no-store"  # never cache a broken answer
+        return e
     inline = a["mime"] in INLINE_TYPES and request.args.get("dl") != "1"
     resp = send_file(full, mimetype=a["mime"] if inline else "application/octet-stream",
                      as_attachment=not inline, download_name=a["name"], conditional=True, max_age=0)
     if a["mime"] != "application/pdf":  # the browser pdf viewer does not run inside a sandboxed CSP
         resp.headers["Content-Security-Policy"] = "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox"
-    resp.headers["Cache-Control"] = "private, max-age=86400"
+    # 2.13.0: the app asks with ?v=<size>: only that versioned address is cached for a day; anything else revalidates
+    # (ETag), so a repaired file is never hidden behind a cached broken answer
+    resp.headers["Cache-Control"] = "private, max-age=86400" if request.args.get("v") == str(a["size"]) else "private, no-cache"
     return resp
 
 
@@ -8686,6 +8701,7 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
                 f"SELECT id, list_id FROM tasks WHERE list_id IN ({','.join(str(x) for x in pl)})")})
         return pv["lists"].get(tid) not in pl or tid in pv["wr" if full else "vis"]
     out, uids = [], set()
+    agents = {x[0] for x in c.execute("SELECT id FROM users WHERE kind='agent'")}
     for r in rows:
         kind = r["kind"]
         if (mentions_only and kind != "mention") or (to_me and kind not in NEWS_TO_ME):
@@ -8718,6 +8734,17 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
                 prev["actors"].append(r["actor_id"])
             uids.add(r["actor_id"])
             continue
+        # 2.13.0 (#453 A5): an agent's plain comments (no mention of me) one after the other, on any tasks, are ONE item
+        # ("Claude left 12 comments on 5 tasks", one unread) instead of one per task: an agent working through a list
+        # used to fill the bell with hundreds of unread items. Mentions, assignments and approvals stay single items.
+        if kind == "comment" and r["actor_id"] in agents and prev and prev["kind"] == "comment" and prev["actors"] == [r["actor_id"]] \
+                and prev.get("agent") and _news_age_h(prev["created_at"], r["created_at"]) <= 12:
+            prev["ids"].append(r["id"])
+            prev["count"] += 1
+            prev["read"] = prev["read"] and read
+            if not any(x["id"] == r["task_id"] for x in prev["tasks"]):
+                prev["tasks"].append({"id": r["task_id"], "title": r["t_title"]})
+            continue
         body = ""
         if kind in ("mention", "comment"):
             body = r["c_body"] or ""
@@ -8739,7 +8766,16 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
                     "list_id": r["t_list"] if r["task_id"] and not lk else r["list_id"],
                     "comment_id": r["comment_id"], "excerpt": body, "data": data, "created_at": r["created_at"],
                     "read": read})
+        if kind == "comment" and r["actor_id"] in agents:
+            out[-1].update(agent=True, tasks=[{"id": r["task_id"], "title": r["t_title"]}])
     return out, user_names(c, uids)
+
+
+def _news_age_h(newer, older):
+    try:
+        return (datetime.fromisoformat(newer.replace("Z", "+00:00")) - datetime.fromisoformat(older.replace("Z", "+00:00"))).total_seconds() / 3600
+    except (ValueError, AttributeError):
+        return 0
 
 
 def news_unread(c, uid, s=None):
@@ -8783,9 +8819,21 @@ def news_read():
     uid = me()
     ts = iso(now_utc())
     tids = set()  # 2.0.5: the tasks of the items read -> close their notifications on my other devices
+    marked = []
+    if b.get("unread"):  # 2.13.0 (#453 A5): the undo of "Mark all as read": {unread: true, ids: [...]} -> unread again
+        try:
+            ids = [int(x) for x in (b.get("ids") or [])][:5000]
+        except (TypeError, ValueError):
+            return err(tr("Invalid data"))
+        for i in range(0, len(ids), 500):
+            part = ids[i:i + 500]
+            c.execute(f"UPDATE notifications SET read_at=NULL WHERE user_id=? AND id IN ({','.join('?' * len(part))})", (uid, *part))
+        c.commit()
+        return jsonify(ok=True, unread=news_unread(c, uid), sig=news_sig(c, uid))
     if b.get("all"):
         tids |= {r[0] for r in c.execute("SELECT DISTINCT task_id FROM notifications WHERE user_id=? AND read_at IS NULL "
                                          "AND task_id IS NOT NULL", (uid,))}
+        marked = [r[0] for r in c.execute("SELECT id FROM notifications WHERE user_id=? AND read_at IS NULL ORDER BY id DESC LIMIT 5000", (uid,))]
         c.execute("UPDATE notifications SET read_at=? WHERE user_id=? AND read_at IS NULL", (ts, uid))
     else:
         try:
@@ -8801,7 +8849,7 @@ def news_read():
                       (ts, uid, *part))
     push_handled(c, uid, sorted(tids))
     c.commit()
-    return jsonify(ok=True, unread=news_unread(c, uid), sig=news_sig(c, uid))
+    return jsonify(ok=True, unread=news_unread(c, uid), sig=news_sig(c, uid), **({"marked": marked} if b.get("all") else {}))
 
 
 NEWS_CLEAN = {"at": 0.0}
@@ -11918,8 +11966,12 @@ def need_list_file(c, fid, write):
 def list_file_get(fid):
     a = need_list_file(db(), fid, False)
     full = os.path.join(ATT_DIR, a["path"])
-    if not os.path.isfile(full):
-        return err(tr("File missing on the server"), 404)
+    if not os.path.isfile(full) or (a["size"] and os.path.getsize(full) != a["size"]):  # 2.13.0: also empty / cut off
+        if os.path.isfile(full):
+            print(f"WARNING file {a['id']}: {os.path.getsize(full)} bytes on disk, {a['size']} recorded", flush=True)
+        e = err(tr("File damaged or missing"), 410 if os.path.isfile(full) else 404)
+        e[0].headers["Cache-Control"] = "no-store"  # never cache a broken answer
+        return e
     inline = a["mime"] in INLINE_TYPES and request.args.get("dl") != "1"
     resp = send_file(full, mimetype=a["mime"] if inline else "application/octet-stream",
                      as_attachment=not inline, download_name=a["name"], conditional=True, max_age=0)
@@ -18511,6 +18563,26 @@ def need_backups():
         raise Denied(404, tr("Backups are turned off on this server (KALMIDO_BACKUPS=0)"))
 
 
+# 2.13.0: Settings > Administration > "Check storage": every task attachment and project file whose file is missing,
+# empty or of another size than recorded (e.g. after copying the data folder to another machine). Read-only.
+@app.get("/api/admin/storage-check")
+def storage_check():
+    need_admin()
+    c, out, n = db(), [], 0
+    for kind, sql in (("attachment", "SELECT a.id, a.task_id AS owner, a.name, a.size, a.path, t.title AS where_ FROM attachments a "
+                                     "LEFT JOIN tasks t ON t.id=a.task_id"),
+                      ("list_file", "SELECT f.id, f.list_id AS owner, f.name, f.size, f.path, l.name AS where_ FROM list_files f "
+                                    "LEFT JOIN lists l ON l.id=f.list_id")):
+        for r in c.execute(sql):
+            n += 1
+            full = os.path.join(ATT_DIR, r["path"] or "")
+            disk = os.path.getsize(full) if r["path"] and os.path.isfile(full) else None
+            if disk is None or (r["size"] and disk != r["size"]):
+                out.append({"kind": kind, "id": r["id"], "owner": r["owner"], "where": r["where_"] or "", "name": r["name"],
+                            "size": r["size"], "disk": disk, "problem": "missing" if disk is None else "empty" if not disk else "size"})
+    return jsonify(checked=n, problems=out)
+
+
 @app.get("/api/admin/backups")
 def backups_get():
     need_backups()
@@ -22072,7 +22144,16 @@ def chat_dict(r, rx=None):
     message (null = not yet; the agent's own messages: null)."""
     return {"id": r["id"], "agent_id": r["agent_id"], "user_id": r["user_id"], "from": r["sender"], "body": r["body"],
             "task_id": r["task_id"], "created_at": r["created_at"], "delivered_at": r["delivered_at"],
-            "reactions": (rx or {}).get(r["id"], [])}
+            "reactions": (rx or {}).get(r["id"], []), "asks": r["sender"] == "agent" and chat_asks(r["body"])}
+
+
+# 2.13.0 (#453 A2): a 👍 / 👎 of the person counts as an approval / rejection only on an agent message that asks something:
+# a question mark outside code blocks, inline code and links. A casual 👍 on a status report stays a plain reaction.
+_CHAT_ASK_STRIP = re.compile(r"```.*?```|`[^`\n]*`|https?://\S+", re.S)
+
+
+def chat_asks(body):
+    return "?" in _CHAT_ASK_STRIP.sub(" ", body or "")
 
 
 def chat_reactions_of(c, mids):
@@ -22193,7 +22274,8 @@ def agent_chat_post(aid):
 
 
 # ---- 2.7.2 (#421): reactions on chat messages. Both sides may react (the person on the agent's answers and on their own
-# messages, the agent on the person's); a person's 👍 / 👎 on one of the AGENT's messages is an approval / rejection and the
+# messages, the agent on the person's); a person's 👍 / 👎 on one of the AGENT's messages that asks something (2.13.0:
+# chat_asks) is an approval / rejection and the
 # agent gets the event "reaction" (the envelope of comment reactions: reaction + approval, with chat_message instead of a
 # comment). Reactions of agents never approve anything and send no event.
 def chat_react(c, m, uid, emoji, on):
@@ -22208,7 +22290,7 @@ def chat_react(c, m, uid, emoji, on):
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if is_agent(u) or m["sender"] != "agent" or uid != m["user_id"]:
         return res  # only the person of the conversation reacting to the agent's message counts
-    if emoji in ("up", "down"):
+    if emoji in ("up", "down") and chat_asks(m["body"]):  # 2.13.0 (#453 A2): only on a question
         res["approval"] = "approved" if emoji == "up" else "rejected"
     who = {"id": uid, "name": user_names(c, [uid]).get(uid, "")}
     data = {"chat_message": {"id": m["id"], "text": m["body"][:AGENT_EVENT_COMMENT_CHARS], "from": m["sender"], "created_at": m["created_at"],
@@ -24786,6 +24868,7 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
     msg = {"type": "object", "properties": {"id": {"type": "integer"}, "user_id": {"type": "integer"}, "from": {"type": "string", "enum": ["user", "agent"]},
                                             "body": {"type": "string"}, "task_id": nul("integer"), "created_at": {"type": "string"},
                                             "delivered_at": nul("string", description="2.7.2 (#422): when the agent fetched the person's message (event poll, MCP, webhook, chat read); null = not yet / an agent message"),
+                                            "asks": {"type": "boolean", "description": "2.13.0: an agent message that asks something (a question mark outside code and links); only there a 👍 / 👎 of the person is an approval / rejection"},
                                             "reactions": {"type": "array", "description": "2.7.2 (#421)", "items": {"type": "object", "properties": {
                                                 "emoji": {"type": "string"}, "count": {"type": "integer"},
                                                 "users": {"type": "array", "items": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}}}}}}}}}
@@ -24893,8 +24976,8 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                                                   ok(chat_rx_out) | errs("400", "403", "404"), [pid("id", "User id"), pid("mid", "Message id")],
                                                                   scope=W, body=chat_rx_in)},
         "/agents": {"get": op("Agents you share lists with (an agent: itself)", AG, ok(ref("AgentPage")) | errs())},
-        "/agents/{id}/chat/{mid}/reactions": {"post": op("React to a message of your chat with an agent (2.7.2): 👍 / 👎 on the agent's message = "
-                                                         "approval / rejection; the agent gets the event reaction", AG, ok(chat_rx_out) | errs("400", "403", "404"),
+        "/agents/{id}/chat/{mid}/reactions": {"post": op("React to a message of your chat with an agent (2.7.2): 👍 / 👎 on an agent's message "
+                                                         "that asks something (asks, 2.13.0) = approval / rejection; the agent gets the event reaction", AG, ok(chat_rx_out) | errs("400", "403", "404"),
                                                          [pid("id", "Agent id"), pid("mid", "Message id")], scope=W, body=chat_rx_in)},
         "/tasks/{id}/tidy": {"post": op("Tidy a task (agents; list set to automatic)", AG, ok(ref("Task")) | errs("400", "403", "404", "409"),
                                         [pid()], scope=W, body=ref("TidyInput"))},

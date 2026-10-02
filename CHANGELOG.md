@@ -7,6 +7,93 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.13.0] - 2026-10-03
+
+**In short:** A polish round from a hands-on usability review (#453): calmer chat, approvals you can find, keyboard
+access on desktops, a quieter bell, the view switch on phones, and helper texts behind a small (i).
+
+### Changed
+- Agent chat: the quick reactions (👍 👎 ❤️) no longer sit as three empty circles under every agent message; they appear
+  on hover / keyboard focus, or with a long press on touch screens. A 👍 / 👎 counts as an approval / rejection only on an
+  agent message that asks something (a question mark outside code and links; the API marks it with `asks`); the newest
+  unanswered question shows its buttons with "👍 = approval", and a given 👍 says "Counted as approval".
+- Chat header: the typing dots show once (in the line under the messages); on phones the chat header replaces the page
+  header and Back sits on the left; the note about when the agent answers moved behind (i) next to its name.
+- Jobs waiting for your approval show up first in the agent pill's menu (Approve / Reject right there) and as a card
+  "N jobs wait for you" in Today.
+- The bell: an agent's plain comments one after the other (on any tasks, within 12 hours) are one item, "Claude left
+  12 comments on 5 tasks", counted once as unread; mentions, assignments and approvals stay single items. A task opened
+  from the bell returns to the bell when you go back. "Mark all as read" can be undone. The list name gives way before
+  the task title.
+- News: one filter row ("All", "Mentions & assigned to me" and the kinds) instead of two.
+- Phones: the views of a list (List / Kanban / Timeline / Overview) are a segmented control under the title; the "…"
+  menu no longer repeats them, names the list type "Type: List / Project" and shows a check on the active choice.
+- Helper texts: lines that only explain are behind a small (i) next to their heading (hover or focus shows them, a tap
+  toggles them); lines about security, data loss, a state or a step you need stay inline.
+- Settings: a search over every tab.
+- Task numbers: the task panel always shows its "#447" (a tap copies or shares the link to it), the command palette
+  and the search jump straight to a task by "#447" or "447", and any list can "Show task numbers" (list menu, per device;
+  lists with ticket types always show them).
+- Projects: "Project overview" is the first view (segmented control and menus).
+- Sidebar: "Search" sits at the top (under the command bar); the logo goes to Today.
+- Touch screens: dialogs no longer focus a text field on opening (no keyboard popping up, e.g. in the list dialog).
+- Appearance (#429): the font size is a slider from 50 to 150 % in 5 % steps (per device; the old steps become 90 / 100
+  / 112 / 125 %), with a live preview, "Reset (100 %)" and Ctrl / ⌘ + / − / 0 on desktops. Below 100 % touch screens keep
+  44 px touch targets.
+- Fold / tablets: the round "+" is gone (the docked "Add task" bar, or the header's "New task" in views without it);
+  the agent chip lost its amber outline; the sidebar uses the desktop's text size.
+- Selection: a long press on a task selects it; the selection bar has labels (on phones four actions and "More").
+- "Plan my day": the footer stays in view, the header says what is planned and what is still free, tasks that do not
+  fit offer "Tomorrow" (planned start tomorrow, the due date stays) and "Plan on …". The daily review names the day it
+  plans and no longer repeats the open tasks listed below it.
+- Lists with "done at the bottom" (shopping, packing) add new items at the end.
+- Quick add: a task that lands outside the open view says where it went ("Inbox · Tomorrow 10:00 · Open").
+- Desktops / an unfolded Fold below 1100 px: the sidebar can be folded away (remembered per device).
+- The logo inside the app follows the accent colour (the installed app icon keeps its colours).
+
+### Fixed
+- Attachments: a file that is missing, empty or cut off on disk (seen after copying the data folder to another machine)
+  answered with an empty image that the browser then cached; now it answers 404 / 410 (never cached), the task shows
+  "File damaged or missing" instead of a broken image (remove / add a new one as usual), and image addresses carry the
+  file size, so a repaired file is fetched again. Settings > Administration > "Check storage" lists such files.
+- Task notes on an unstable connection: typing could end in "A field was changed elsewhere" and the field was taken
+  away mid-typing (text lost). The title and the description are now saved when you leave the field (and every 5 s
+  while typing, and when the app goes to the background) instead of every 600 ms; queued offline text is coalesced into
+  one change; a "conflict" with your own earlier save (its answer got lost) is recognised and the newest text simply goes
+  on top; a real conflict (someone else changed the field) never takes the field away: your draft stays and a bar under
+  the field offers "Keep mine", "Show the other" and "Merge".
+- Unfolded Fold / tablets: with the agent chat open the list was squeezed into a narrow column (or covered by the
+  panel) and rotating the device while the chat was open broke the layout. Below 1000 px the chat is now a full page
+  with Back (beside the sidebar); wider, the main area resizes beside the panel and the sidebar folds into its drawer
+  when the list would get too narrow. The layout is recomputed on every resize / rotation, keeping the draft, the focus
+  and the newest message.
+- "writing …" showed permanently while an agent was only working; the dots now mean its typing signal (or the 90 s after
+  it fetched your message), the header shows "working · …".
+- Fold / tablets: no second "+" button next to the docked "Add task" bar.
+- iPhone: focusing a field zoomed the page (fields below 16 px), so the chat looked cut off at the right and the input
+  sat apart from the keyboard; the add sheet and bottom sheets now sit right above the keyboard (iOS keeps the layout
+  viewport, they follow the visual viewport).
+- Keyboard: a visible focus ring on every control, a "Skip to content" link, the sidebar is one tab stop (↑ ↓ Home End
+  walk through it) instead of 30+.
+- Kanban by touch: a card held at the screen edge scrolled three columns in 300 ms; the board now scrolls smoothly,
+  faster the deeper the finger is in the edge zone, and a drop beside the cards lands in the column under the finger.
+- `#agents/<id>` (the push "… answered") opens the chat on tablets and desktops too.
+- First-run setup: reloading the page after creating the admin skipped step 2 ("What do you want to use?") and left all
+  modules on; it now comes back until Start is pressed.
+- Offline: a chip "Offline · 2 changes waiting" instead of only an icon.
+- A message (Undo) no longer covers an open bottom sheet.
+- Sign-in: the error message is in the page's language, 44 px fields, "Show password", nothing behind the sign-in page
+  is reachable with Tab.
+- Accessibility: names for the calendar / timeline arrows, the search field, Kanban and matrix "+ Task", the focus
+  timer's task and the date sheet's selects; inactive tab bar labels with 4.5:1 contrast; 44 px touch targets for habit
+  days, the overdue card, milestones, small avatars, event rows and the notification matrix.
+- The calendar's week and day view scroll only the hour grid (no second scroll bar).
+- Timeline: a title that would be cut inside its bar is shown next to it; on touch screens the resize grips show once a
+  bar is held.
+- Project header: the × stays next to the progress bar, "Next due: …", the time sum says "Tracked"; "Set status" shows
+  once in the overview.
+- Translations: the software project sections "Next" / "Done", "Next week" in full, "1,5 h" with the decimal comma.
+
 ## [2.12.2] - 2026-10-02
 
 **In short:** Live updates no longer interrupt typing: the agent chat keeps its scroll position and the keyboard, fields in
@@ -534,7 +621,8 @@ of people.
   multi-arch image (`ghcr.io/gegenschuss/kalmido`, linux/amd64 and linux/arm64), an installable web app that works
   offline, English and German.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.12.2...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.13.0...HEAD
+[2.13.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.13.0
 [2.12.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.12.2
 [2.12.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.12.1
 [2.12.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.12.0

@@ -202,7 +202,7 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
   w.eval('load().then(render)'); await sleep(700);
   w.eval(`chatOpen(${CL})`); await sleep(800);
   ty = d.querySelector('#chat-typing');
-  check(ty && !ty.classList.contains('hidden') && /Claude is writing …/.test(ty.textContent), 'chat: under the last message');
+  check(ty && ty.classList.contains('hidden'), 'chat: "working" alone is no typing (2.13.0: the dots only for a typing signal or right after it fetched my message)');
   check(d.querySelector('#side [data-go="agents"].aspin'), 'sidebar agents row: spinning ring');
   w.eval('chatClose()');
   w.close();

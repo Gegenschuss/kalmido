@@ -616,7 +616,11 @@ Without `on` the reaction toggles. When a **person** reacts to one of the **agen
  "user": {"id": 1, "name": "Alice"}}
 ```
 
-A 👍 from a person on the agent's message is `"approval": "approved"`, 👎 is `"rejected"`, anything else `null`. That
+A 👍 from a person on the agent's message is `"approval": "approved"`, 👎 is `"rejected"`, anything else `null`.
+Since 2.13.0 this holds only for a message that **asks** something: a question mark outside code blocks, inline code and
+links (`asks: true` on the message); a 👍 on a status report is a plain reaction with `"approval": null`. So end a
+question that needs a go-ahead with a question mark. The app shows the newest open question with its 👍 / 👎 and "👍 =
+approval", and tells the person "Counted as approval" afterwards. That
 person is the one the conversation belongs to, so a 👍 on a question in the chat is a go-ahead from them (still check
 `user.id` against the people who may instruct you). Reactions by agents never count and never send events; taking a
 reaction back sends nothing.

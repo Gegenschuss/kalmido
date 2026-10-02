@@ -85,6 +85,8 @@ const P = {
   at: icPath('M13 10A3 3 0 1 1 7 10A3 3 0 0 1 13 10M13 7V11.5A2.5 2.5 0 0 0 18 11.5V10A8 8 0 1 0 14 17'),
   palette: icPath('M10 17A7 7 0 1 1 17 10C17 12 15.5 13 14 13H12.5A1.5 1.5 0 0 0 11.5 15.5') + icDot(13, 6.5, 1.6) + icFill(7, 7) + icFill(6.5, 11),
   sliders: icPath('M3 5H17M3 10H17M3 15H17') + icDot(13, 5) + icFill(7, 10, 2) + icFill(11, 15, 2),
+  hash: icPath('M8 3L6 17M14 3L12 17M4 7.5H16M3.5 12.5H15.5'),  // 2.13.0: task numbers
+  info: icPath('M17 10A7 7 0 1 1 3 10A7 7 0 0 1 17 10M10 9V14') + icDot(10, 6.3, 1.2),  // 2.13.0: the (i) of the helper texts
   help: icPath('M17 10A7 7 0 1 1 3 10A7 7 0 0 1 17 10M7.8 8A2.2 2.2 0 1 1 11 9.9C10.4 10.3 10 10.8 10 11.5') + icDot(10, 14.2, 1.3),
   comment: icPath('M17 10A7 7 0 0 1 6.5 16L3 17L4 13.5A7 7 0 1 1 17 10') + icDot(10, 10, 1.6),
   send: icPath('M17 3L10.5 17L8.5 11.5L3 9.5ZM8.5 11.5L17 3'),
@@ -121,7 +123,10 @@ const isMobile = () => matchMedia('(max-width:899px)').matches;
 // tab bar and rail + sidebar when turned. Such a screen gets a layout width of at least 900 px in both orientations (the
 // page is scaled down by a few percent instead), so it keeps the tablet layout. Phones and tablets with a clear portrait
 // or landscape shape keep the plain device width.
-const VIEWPORT = 'width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content';
+// 2.13.0 (#453, iPhone): iOS Safari zooms into any field with a font below 16 px when it gets the focus (the page then
+// looks cut off at the right and the input sits apart from the keyboard); maximum-scale=1 stops only that zoom, pinch
+// zoom keeps working on iOS. iOS also ignores interactive-widget: bottom sheets follow the visual viewport (--vvb, vvSync)
+const VIEWPORT = 'width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content' + (/iPad|iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1) ? ', maximum-scale=1' : '');
 // 2.7.2 (hotfix): the orientation comes from the PHYSICAL screen (screen.orientation / screen.width), never from the media
 // query (orientation: landscape): on Android that follows the viewport, so the on-screen keyboard (it shrinks the height)
 // flipped it, the meta changed, the page re-laid out, the input lost its focus and the keyboard closed at once. And the meta
@@ -159,11 +164,64 @@ const LS = {
 // these device preferences. Wiped on logout and when another user logs in in the same browser.
 // 1.5.3: helper lines are tooltips now; where there is no hover (touch) a hint shows once, until it is dismissed (×) or
 // used. Settings > Appearance > "Show tips again" brings them back on this device.
+// 2.13.0 (#453 P16): the logo inside the app follows the accent colour (the installed app icon keeps its own colours)
+const logoSvg = (sz = 20) => `<svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="${sz}" height="${sz}" aria-hidden="true" focusable="false"><rect width="512" height="512" rx="112" fill="#161a21"/><g transform="translate(96 80) scale(1.25)" fill="none" stroke="currentColor" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"> <path d="M22 112 L78 168 L234 40"/>  <path d="M146 170 C138 152 134 138 134 126"/> <path d="M190 164 C198 134 198 104 192 80"/>  <path d="M124 124 C124 108 136 106 142 114" stroke-width="8"/> <path d="M182 78 C182 62 194 60 200 68" stroke-width="8"/>  <path d="M146 180 C132 214 148 242 168 242 C190 242 206 214 190 178"/>  <circle cx="168" cy="160" r="28"/>  <path d="M158 154 L147 164 M178 154 L189 164" stroke-width="9"/> <circle cx="168" cy="163" r="3" fill="currentColor" stroke="none"/> <path d="M161 175 q7 5 14 0" stroke-width="5"/></g></svg>`;
 const hintSeen = k => (LS.get('hintsSeen', []) || []).includes(k);
 function hintDone(k) { if (!hintSeen(k)) LS.set('hintsSeen', [...(LS.get('hintsSeen', []) || []), k]); }
 const hintOnce = (k, text, cls = '') => isTouch() && !hintSeen(k) ? `<div class="muted mhint once ${cls}" data-hint="${k}"><span>${esc(text)}</span><button type="button" class="iconbtn hx" data-act="hint-x" data-k="${k}" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>` : '';
+// 2.13.0 (#453): helper texts. A helper line (.shint) that only explains is no longer printed inline: it moves behind
+// a small (i) button next to its heading / label (hover or keyboard focus shows it as a tooltip, a tap toggles it; the text
+// stays in the DOM as the button's aria-describedby). Inline stay only lines that prevent data loss or security mistakes,
+// that are needed to finish the step, or that show a state: class "keep", the kinds below, lines with links / buttons /
+// code / fields, empty status lines that get filled later. One MutationObserver handles every dialog, sheet and view.
+const II_KEEP = '.keep,.cnote,.warn,.wpstate,.updline,.aanone,.aimodoff,.trkeep,.rpsec,[role],[aria-live]';
+let iiN = 0;
+function infoize(root) {
+  for (const h of (root.querySelectorAll ? root.querySelectorAll('.shint:not([data-ii])') : [])) {
+    h.dataset.ii = '0';
+    if (h.matches(II_KEEP) || h.querySelector('a, button, code, input, select, textarea') || !h.textContent.trim()) continue;
+    let a = null;
+    for (let p = h.previousElementSibling, n = 0; p && n < 3 && !a; p = p.previousElementSibling, n++) {
+      if (p.matches('h2, h3, h4, label, legend, .shead')) a = p;
+      else if (p.matches('.row, .srow, .lrow')) a = p.querySelector(':scope > label, :scope > b, :scope > span:first-child');
+      else if (p.querySelector?.(':scope > label, :scope > h4')) a = p.querySelector(':scope > label, :scope > h4');
+      if (p.matches('.shint')) break;
+    }
+    if (!a && h.parentElement?.matches('details')) a = h.parentElement.querySelector(':scope > summary');
+    h.dataset.ii = '1'; h.id = h.id || 'ii' + (++iiN); h.classList.add('iisrc');
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'ib' + (a ? '' : ' ibl'); b.dataset.ii = h.id; b.setAttribute('aria-describedby', h.id); b.setAttribute('aria-expanded', 'false');
+    b.setAttribute('aria-label', tr('More information')); b.innerHTML = ic('info', 's') + (a ? '' : `<span>${esc(tr('More information'))}</span>`);
+    if (a) a.appendChild(b); else h.before(b);
+  }
+}
+new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) { if (n.classList.contains('shint')) infoize(n.parentElement || n); else if (n.getElementsByClassName('shint').length) infoize(n); } })
+  .observe(document.documentElement, {childList: true, subtree: true});
+function iiShow(b, pinned) {
+  const src = document.getElementById(b.dataset.ii); if (!src) return;
+  let t = $('#iitip');
+  if (!t) { t = document.createElement('div'); t.id = 'iitip'; t.setAttribute('role', 'tooltip'); document.body.appendChild(t); }
+  t.textContent = src.textContent.trim(); t.classList.remove('hidden'); t.dataset.for = b.dataset.ii; t.classList.toggle('pin', !!pinned);
+  $$('.ib[aria-expanded="true"]').forEach(x => x !== b && x.setAttribute('aria-expanded', 'false')); b.setAttribute('aria-expanded', String(!!pinned));
+  const r = b.getBoundingClientRect(), w = Math.min(t.offsetWidth, innerWidth - 16), h = t.offsetHeight;
+  t.style.left = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, innerWidth - w - 8)) + 'px';
+  t.style.top = (r.bottom + 6 + h > innerHeight - 8 && r.top - 6 - h > 8 ? r.top - 6 - h : r.bottom + 6) + 'px';
+}
+function iiHide(force) { const t = $('#iitip'); if (!t || (t.classList.contains('pin') && !force)) return; t.classList.add('hidden'); t.classList.remove('pin'); $$('.ib[aria-expanded="true"]').forEach(x => x.setAttribute('aria-expanded', 'false')); }
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('.ib[data-ii]');
+  if (b) { e.preventDefault(); e.stopPropagation(); const t = $('#iitip'); if (t && !t.classList.contains('hidden') && t.classList.contains('pin') && t.dataset.for === b.dataset.ii) iiHide(true); else iiShow(b, true); return; }
+  if (!e.target.closest?.('#iitip')) iiHide(true);
+}, true);
+document.addEventListener('mouseover', e => { const b = e.target.closest?.('.ib[data-ii]'); if (b && !isTouch()) iiShow(b); });
+document.addEventListener('mouseout', e => { if (e.target.closest?.('.ib[data-ii]')) iiHide(); });
+document.addEventListener('focusin', e => { if (e.target.matches?.('.ib[data-ii]')) iiShow(e.target); });
+document.addEventListener('focusout', e => { if (e.target.matches?.('.ib[data-ii]')) iiHide(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#iitip:not(.hidden)')) { iiHide(true); e.stopPropagation(); } }, true);
+document.addEventListener('scroll', () => iiHide(true), true);
+const hintK = t => `<div class="shint keep">${t}</div>`;  // 2.13.0: a helper line that stays inline (security, data loss, a state)
 const kt = (label, keys) => isTouch() ? label : `${label} (${kbText(keys)})`;  // a label with its keyboard shortcut
-const LS_KEEP = new Set(['tasks.theme', 'tasks.i18n', 'tasks.density', 'tasks.fsize', 'tasks.font', 'tasks.accent', 'tasks.accentMig280', 'tasks.sideGroups', 'tasks.agband']);
+const LS_KEEP = new Set(['tasks.theme', 'tasks.i18n', 'tasks.density', 'tasks.fsize', 'tasks.font', 'tasks.accent', 'tasks.accentMig280', 'tasks.sideGroups', 'tasks.agband', 'tasks.sideFold']);
 function clearLocal() {
   try {
     const ks = [];
@@ -204,13 +262,30 @@ try { if (localStorage.getItem('tasks.accent') === '"amber"') localStorage.setIt
 try { if (!localStorage.getItem('tasks.accentMig280')) { if (localStorage.getItem('tasks.accent') === '"mint"') localStorage.removeItem('tasks.accent'); localStorage.setItem('tasks.accentMig280', '1'); } } catch { /* private mode */ }
 const lookPref = k => { const v = LS.get(k, null); return (LOOK[k].find(x => x[0] === v) || LOOK[k][0])[0]; };
 const lookRow = k => LOOK[k].find(x => x[0] === lookPref(k));
-const uiZ = () => lookRow('fsize')[2];  // UI scale factor for sizes drawn in JS (week grid, charts, tour card)
+// 2.13.0 (#429): the font size is a percentage 50-150 in steps of 5 (per device, LS fsize); the old steps s / m / l / xl
+// (90 / 100 / 112 / 125) are read as their percentages. Named steps keep data-fsize (the CSS rules), any other value sets
+// --ui inline. Below 100 % touch screens keep 44 px hit areas (app.css: .ui-small), only the text and spacing shrink.
+const FS_OLD = {s: 90, m: 100, l: 112, xl: 125};
+const fsPct = () => { const v = LS.get('fsize', null); if (typeof v === 'string' && v in FS_OLD) return FS_OLD[v]; const n = +v; return n >= 50 && n <= 150 ? Math.round(n) : 100; };
+const uiZ = () => fsPct() / 100;  // UI scale factor for sizes drawn in JS (week grid, charts, tour card)
 function applyLook() {
-  const r = document.documentElement.dataset;
-  r.fsize = lookPref('fsize'); r.font = lookPref('font'); r.accent = lookPref('accent');
+  const r = document.documentElement.dataset, pct = fsPct(), named = Object.keys(FS_OLD).find(k => FS_OLD[k] === pct);
+  r.fsize = named || 'custom'; document.documentElement.style.setProperty('--ui', named ? '' : String(pct / 100));
+  if (named) document.documentElement.style.removeProperty('--ui');
+  document.documentElement.classList.toggle('ui-small', pct < 100);
+  r.font = lookPref('font'); r.accent = lookPref('accent');
 }
 applyLook();
 // one setter for all device appearance settings (settings pane, palette); v = null -> default
+// 2.13.0 (#429): one step (±5 %) or back to 100 % (0); also Ctrl / ⌘ + / − / 0 on desktops (the app's size, not the
+// browser zoom)
+function fsStep(d) { const v = d ? Math.max(50, Math.min(150, fsPct() + d)) : 100; lookSet('fsize', v === 100 ? null : v); const sl = $('#s-fsize'); if (sl) { sl.value = v; fsLabel(v); } toast(tr('Font size: {0}', v + ' %')); }
+function fsLabel(v) { const o = $('#s-fsv'); if (o) o.textContent = v + ' %'; const sl = $('#s-fsize'); if (sl) sl.setAttribute('aria-valuetext', v + ' %'); const r = $('[data-m="fs-reset"]'); if (r) r.disabled = +v === 100; }
+document.addEventListener('keydown', e => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || isTouch()) return;
+  const d = {'+': 5, '=': 5, '-': -5, '_': -5, '0': 0}[e.key]; if (d === undefined) return;
+  e.preventDefault(); fsStep(d);
+});
 function lookSet(k, v) {
   if (v == null) LS.del(k); else LS.set(k, v);
   if (k === 'theme') applyTheme(); else if (k === 'density') applyDensity(); else applyLook();
@@ -289,6 +364,10 @@ const NOLIST_KEYS = ['done', 'trash', 'search', 'archived'];
 const tabletDock = () => isMobile() && matchMedia('(min-width:600px) and (min-height:600px)').matches;
 const noFab = () => ['habits', 'pomo', 'news', 'stats', 'time', 'overview', 'agents'].includes(S.route.mod) || NOLIST_KEYS.includes(S.route.key) || isOverview();
 // package 3: progress bar / overview (switch "progress"), project status (+ collaboration), custom fields, dependencies
+// 2.13.0 (#453, Fold screenshots): the round + only on phones; tablets / an unfolded Fold add with the docked "Add task"
+// bar or, in views without it (calendar, Kanban, timeline), the header's "New task" button
+const dockView = () => S.route.mod === 'tasks' && !isKanban() && !isTimeline() && !isRoadmap() && !isOverview() && !noFab();
+const fabOff = () => noFab() || (isTouch() && (!isMobile() || tabletDock()));
 const progressOn = () => feat('progress');
 const statusOn = () => progressOn() && collab();
 // "Where is it stuck?" only pays off with several projects: 2+ active lists, or a shared list
@@ -362,7 +441,7 @@ function openTasks(ctx = false) { return [...S.tasks.values()].filter(t => t.sta
 // cached for offline start. Every queued op carries the user id: ops of another user are never replayed.
 class Offline extends Error {}
 const OUT = {q: LS.get('outbox', []), online: true, flushing: false};
-function setOnline(b) { if (OUT.online !== b) { OUT.online = b; renderTop(); if (b) flush(); } }
+function setOnline(b) { if (OUT.online !== b) { OUT.online = b; renderTop(); if (b) flush(); setTimeout(() => typeof staleDraw === 'function' && staleDraw(), 0); } }
 async function rawFetch(method, url, body) {
   const opt = {method, headers: {'X-Requested-With': 'kalmido'}, redirect: 'manual'};
   const dev = wpDevHeader(url); if (dev) opt.headers['X-Kalmido-Device'] = dev;
@@ -399,6 +478,13 @@ function enqueue(method, url, body) {
   if (pm && body && !body._prev && +pm[1] > 0) {
     const t = S.tasks.get(+pm[1]);
     if (t) body = {...body, _prev: Object.fromEntries(Object.keys(body).filter(k => !k.startsWith('_')).map(k => [k, k === 'tags' ? [...(t.tags || [])] : (t[k] ?? null)]))};
+  }
+  // 2.13.0 (#453): typed text waiting in the outbox is coalesced: a newer title / description of the same task replaces
+  // the queued one (which keeps its _prev = the base the server last confirmed), so a replay sends only the latest text
+  const tk = pm && body ? Object.keys(body).filter(k => !k.startsWith('_')) : [];
+  if (tk.length === 1 && (tk[0] === 'title' || tk[0] === 'content')) {
+    const q = OUT.q.find((x, i) => (i > 0 || !OUT.flushing) && x.method === 'PATCH' && x.url === url && !x.done && Object.keys(x.body || {}).filter(k => !k.startsWith('_')).join() === tk[0]);
+    if (q) { q.body = {...q.body, [tk[0]]: body[tk[0]]}; LS.set('outbox', OUT.q); return applyLocal({method, url, body}); }
   }
   const e = {method, url, body, uid: S.me?.id};
   if (method === 'POST' && url === '/api/tasks') e.tmp = -Date.now() - Math.floor(Math.random() * 1000);
@@ -476,7 +562,12 @@ async function flush() {
       try {
         const j = await rawFetch(e.method, url, body);
         if (e.tmp) { idmap[e.tmp] = j.id; HIST.ids[e.tmp] = j.id; LS.set('idmap', idmap); if (S.sel === e.tmp) S.sel = j.id; }
-        if (j && j.conflicts?.length) addConflicts(j.id, j.conflicts, j.title);
+        if (j && j.conflicts?.length) {
+          // 2.13.0: a "conflict" with a text this device sent itself (its answer got lost) is replayed on top of it
+          const own = j.conflicts.filter(c => ownVal(j.id + ':' + c.field, c.server) && body && c.field in body);
+          if (own.length === j.conflicts.length && !e.rebased) { e.rebased = true; e.body = {...body, _prev: Object.fromEntries(own.map(c => [c.field, c.server]))}; continue; }
+          addConflicts(j.id, j.conflicts, j.title);
+        }
         if (j && j.skipped) skipped++;
         e.res = j;
       } catch (err) {
@@ -509,6 +600,27 @@ function addConflicts(tid, list, title) {
   LS.set('conflicts', S.conflicts);
   renderTop();
   setTimeout(() => toast(list.length === 1 ? tr('A field was changed elsewhere in the meantime, please review') : tr('{0} fields were changed elsewhere in the meantime, please review', list.length)), 300);
+}
+// the calm bar under a field that was changed elsewhere while it was being edited (2.13.0)
+function cfInline(id, field, c, mine) {
+  const el = $(field === 'title' ? '#d-title' : '#d-content'); if (!el || !c) return;
+  el.parentElement.querySelector(`.cfbar[data-f="${field}"]`)?.remove();
+  const b = document.createElement('div'); b.className = 'cfbar'; b.dataset.f = field; b.setAttribute('role', 'status');
+  b.innerHTML = `<span>${esc(tr('Changed elsewhere in the meantime'))}</span><button type="button" class="btn sm" data-cfi="mine">${tr('Keep mine')}</button><button type="button" class="btn sm" data-cfi="other">${tr('Show the other')}</button>${field === 'content' ? `<button type="button" class="btn sm" data-cfi="merge">${tr('Merge')}</button>` : ''}`;
+  el.after(b);
+  const done = () => { b.remove(); S.conflicts = S.conflicts.filter(x => !(x.tid === id && x.field === field)); LS.set('conflicts', S.conflicts); renderTop(); };
+  b.addEventListener('mousedown', e => e.preventDefault());  // the field keeps its focus (and the keyboard)
+  b.addEventListener('click', async e => {
+    const a = e.target.closest('[data-cfi]')?.dataset.cfi; if (!a) return;
+    const cur = el.value;
+    if (a === 'other') { conflictModal(); return; }
+    if (a === 'merge') { el.value = cur + (cur.endsWith('\n') ? '' : '\n') + '\n' + String(c.server ?? ''); el.dispatchEvent(new Event('input', {bubbles: true})); }
+    const t = taskById(id); if (t) t[field] = c.server;  // the other version is now the base of the next save
+    saveTimers[id + ':' + field] && clearTimeout(saveTimers[id + ':' + field].t);
+    saveTimers[id + ':' + field] = {t: 0, id, field, value: el.value, base: c.server, sess: HIST.sess};
+    done(); await doSave(id + ':' + field, true).catch(() => {});
+    if (a !== 'merge') toast(tr('Saved'));
+  });
 }
 function fmtVal(field, v) {
   if (v == null || v === '' || (Array.isArray(v) && !v.length)) return tr('(empty)');
@@ -575,7 +687,7 @@ function applyState(j) {
   S.calendars = j.calendars || {enabled: false, subs: 0};
   S.api = j.api || {enabled: false}; S.caldav = j.caldav || {enabled: false}; S.webhooks = j.webhooks || {enabled: false}; S.publicLinks = !!j.public_links;
   S.sample = j.sample || null;
-  S.agents = j.agents || []; S.agentsAt = Date.now();
+  S.agents = j.agents || []; S.agentsAt = Date.now(); S.setupPending = !!j.setup_pending;  // 2.13.0 (#453 A16)
   S.proposers = j.proposers || [];  // 2.3.0: agents I may ask for a proposal
   S.groups = j.groups || []; S.myGroups = j.my_groups || [];  // 2.10.0 (#441)
   S.dayplan = j.dayplan || {work_start: '09:00', work_end: '17:00', review_time: '', default_duration: 30};  // 2.10.0 (#440)
@@ -619,7 +731,7 @@ function putTask(t) { S.tasks.set(t.id, t); }
 setInterval(async () => {
   if (document.hidden) return;
   try {
-    if (OUT.q.length) { flush(); return; }
+    if (OUT.q.length) { flush(); staleDraw(); return; }  // 2.13.0 (#453 A13): the chip says how many changes wait
     const {v, n, c} = await api('GET', '/api/version');
     if (c !== undefined && c !== S.calSig) {  // calendar subscriptions synced / changed: fetch the shown range again
       const first = S.calSig === undefined; S.calSig = c;
@@ -636,13 +748,18 @@ setInterval(async () => {
 // 2.7.2 (#433): instead of a refresh button in the header of shared lists, a small hint once the change check has failed
 // for more than 30 s: "Offline – last update N min ago"; a tap tries again (refreshNow). "…" keeps "Refresh".
 S.syncOk = Date.now();
+// 2.13.0 (#453 A13): offline (or changes not sent yet) is said in words too, not only with the cloud icon: "Offline · 2
+// changes waiting"; a tap explains it and tries again
 function staleDraw() {
-  const age = Date.now() - (S.syncOk || Date.now()), on = age > 30000 && !document.hidden;
+  const age = Date.now() - (S.syncOk || Date.now()), q = OUT.q.length, off = !OUT.online;
+  const on = !document.hidden && (age > 30000 || off || (q && age > 8000));
   let el = $('#stale');
   if (!on) { if (el) el.remove(); return; }
-  if (!el) { el = document.createElement('button'); el.id = 'stale'; el.type = 'button'; el.setAttribute('role', 'status'); el.addEventListener('click', () => refreshNow().then(staleDraw).catch(() => {})); document.body.appendChild(el); }
+  if (!el) { el = document.createElement('button'); el.id = 'stale'; el.type = 'button'; el.setAttribute('role', 'status'); el.addEventListener('click', () => { if (OUT.q.length || !OUT.online) toast(tr('Changes are sent as soon as the server is reachable'), null, 4000); refreshNow().then(staleDraw).catch(() => {}); }); document.body.appendChild(el); }
   const min = Math.floor(age / 60000);
-  el.innerHTML = `${ic('sync', 's')}<span>${esc(min < 1 ? tr('Offline – last update less than a minute ago') : trn('Offline – last update {0} min ago', 'Offline – last update {0} min ago', min))}</span>`;
+  const txt = (off || age > 30000) ? (q ? tr('Offline') + ' · ' + trn('{0} change waiting', '{0} changes waiting', q) : min < 1 ? tr('Offline – last update less than a minute ago') : trn('Offline – last update {0} min ago', 'Offline – last update {0} min ago', min))
+    : trn('{0} change waiting', '{0} changes waiting', q);
+  el.innerHTML = `${ic(off ? 'cloudoff' : 'sync', 's')}<span>${esc(txt)}</span>`;
   el.title = tr('Tap to try again');
 }
 document.addEventListener('visibilitychange', async () => {
@@ -740,6 +857,7 @@ async function route() {
     r.mod = 'tasks'; r.key = LS.get('lastKey', START_KEY);
   }
   if (r.key.startsWith('f:') && !S.filters.some(f => f.id === +r.key.slice(2))) r.key = START_KEY;
+  if (!r.task) S.bellBack = false;
   S.route = {mod: r.mod, key: r.key, ...(r.agent ? {agent: r.agent} : {}), ...(r.review ? {review: true} : {})};  // 2.10.0: review = #today/review
   if (r.mod === 'agents') S.jobs.items = null;
   if (S.route.mod !== 'tasks' || r.key !== S.lastRouteKey) { S.multi.clear(); S.multiMode = false; }
@@ -762,6 +880,8 @@ async function route() {
     return;
   }
   render();
+  // 2.13.0 (#453 A10): #agents/<id> (the push "… answered") opens the chat right away on Fold / desktop too
+  if (r.mod === 'agents' && r.agent && !chatFull() && !$('#achat:not(.hidden)') && agentById(r.agent)) chatOpen(r.agent);
 }
 // 2.0.8 (#331): the push button "Reply" opens the task with the comment box focused (the sticky box of 2.0.6; on a phone
 // with the Details / Comments tabs, the Comments tab); the panel may still be loading, so it tries for a moment
@@ -785,6 +905,8 @@ window.addEventListener('hashchange', route);
 const TTYPES = [['bug', N_('Bug'), 'bug'], ['feature', N_('Feature'), 'bulb'], ['task', N_('Task|ticket'), 'tsq']];
 const TT_WORDS = {bug: 'bug', fehler: 'bug', feature: 'feature', funktion: 'feature', task: 'task', aufgabe: 'task'};
 const ticketsOn = lid => !!listById(lid)?.tickets;
+// 2.13.0: "Show task numbers" for any list (per device; lists with tickets always show them)
+const idsOn = lid => !!LS.get('ids.' + lid, false);
 const ticketsAny = () => S.lists.some(l => l.tickets && !l.archived);
 const ttName = k => tr((TTYPES.find(x => x[0] === k) || [0, ''])[1]);
 const ttChip = t => { const x = TTYPES.find(y => y[0] === t.ttype); return x ? `<span class="ttchip tt-${x[0]}" title="${esc(tr('Type: {0}', tr(x[1])))}">${ic(x[2], 's')}${esc(tr(x[1]))}</span>` : ''; };
@@ -1320,9 +1442,11 @@ function quickDefaults() {
 
 // ------------------------------------------------------------------ render: shell
 function render() {
+  const sk = $('#skip'); if (sk && sk.textContent !== tr('Skip to content')) sk.textContent = tr('Skip to content');  // 2.13.0 (#453 A9)
+  document.body.classList.toggle('in-chat', chatFull() && S.route.mod === 'agents' && !!S.route.agent);  // 2.13.0 (#453 P11)
   fitLayout(true); renderSide(); renderTop(); renderView(); renderTabs();
   $('#fab').innerHTML = ic('plus'); $('#fab').setAttribute('aria-label', tr('New task')); $('#fab').title = kt(tr('New task'), 'n');
-  $('#fab').classList.toggle('gone', noFab() || S.multi.size > 0 || (tabletDock() && !!$('#view .qdock')));
+  $('#fab').classList.toggle('gone', fabOff() || S.multi.size > 0 || (!!$('#view .qdock') && (tabletDock() || !isMobile())));
   if (S.sel && S.tasks.has(S.sel) && !$('#detail').contains(document.activeElement)) renderDetail();
   if (S.sel && !S.tasks.has(S.sel) && !(S.extra || []).some(t => t.id === S.sel)) closeDetail();
   agentLive();
@@ -1507,8 +1631,9 @@ function renderSide() {
     ...ags.map(a => `<button class="srow steam" data-act="team-agent" data-aid="${a.id}" title="${esc(agentHstLine(a))}"><span class="sdot">${hdot(agentHst(a))}</span><span class="n">${esc(a.name)}</span><span class="sk">${tr('Agent')}</span>${a.waiting || a.chat_unread ? `<span class="c nunread">${a.waiting + a.chat_unread}</span>` : ''}</button>`)].join('');
   const grp = (g, label, body, acts = '', n = '', tip = '') => `<div class="sgroup sg-${g}">${head(g, label, acts, n, tip)}${sideOpen(g) ? body : ''}</div>`;
   $('#side').innerHTML = `
-    <div class="sbrand"><img src="/static/icon.svg" alt="" width="20" height="20"><span>${esc(APP_NAME)}</span></div>
+    <div class="sbrand"><button type="button" class="sbhome" data-go="today" title="${esc(tr('Go to Today'))}" aria-label="${esc(tr('Go to Today'))}">${logoSvg(20)}<span>${esc(APP_NAME)}</span></button>${!isMobile() && innerWidth < 1100 ? `<span class="spacer"></span><button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}</div>
     <button class="scmd" data-act="palette" title="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span></button>
+    <button class="srow ssrch ${onTasks && k === 'search' ? 'on' : ''}" data-go="search" title="${esc(kt(tr('Search'), '/'))}">${ic('search')}<span class="n">${tr('Search')}</span></button>
     ${S.me ? `<div class="sdtop"><button class="srow suser" data-act="user-menu" title="${esc(S.me.username)}">${av(S.me.id, S.me.display_name)}<span class="n">${esc(S.me.display_name)}</span></button><button class="iconbtn sgear" data-act="settings" title="${tr('Settings')}" aria-label="${tr('Settings')}">${ic('gear')}${updDot() ? '<span class="dot"></span>' : ''}</button></div>` : ''}
     ${grp('focus', tr('Focus|nav'), focus)}
     ${views ? grp('views', tr('Views'), views) : ''}
@@ -1524,11 +1649,35 @@ function renderSide() {
         const on = onTasks && (k === 'archived' || archived.some(l => k === 'l:' + l.id));
         return `<button class="srow sarch ${on ? 'on' : ''}" data-go="archived">${ic('archive')}<span class="n">${tr('Archived')}</span><span class="c">${archived.length}</span></button>`;
       })() : ''}
-      <button class="srow ${onTasks && k === 'search' ? 'on' : ''}" data-go="search" title="${esc(kt(tr('Search'), '/'))}">${ic('search')}<span class="n">${tr('Search')}</span></button>
       <button class="srow sset" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}">${ic('gear')}<span class="n">${tr('Settings')}</span>${updDot() ? `<span class="c nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button>
       ${S.me ? `<button class="srow suser sdesk" data-act="user-menu" title="${esc(S.me.username)}">${av(S.me.id, S.me.display_name)}<span class="n">${esc(S.me.display_name)}</span></button>` : ''}
     </div>`;
+  sideRove();
 }
+// 2.13.0 (#453 A9): the sidebar is ONE tab stop (roving tabindex): Tab lands on the open view's row (or the first one),
+// ↑ / ↓ / Home / End walk through every row, folder and group header, Enter / Space open it, Tab goes on to the content.
+// Before, 30+ stops stood between the top of the page and the content.
+const sideItems = () => $$('#side button, #side [data-act="folder-toggle"], #side a[href]').filter(b => !b.disabled && b.offsetParent !== null && !b.closest('.hidden'));
+function sideRove(cur) {
+  const it = sideItems(); if (!it.length) return;
+  const keep = cur || it.find(b => b === document.activeElement) || it.find(b => b.classList.contains('srow') && b.classList.contains('on')) || it.find(b => b.classList.contains('srow')) || it[0];
+  for (const b of $$('#side button, #side [data-act="folder-toggle"], #side a[href]')) b.tabIndex = b === keep ? 0 : -1;
+}
+document.addEventListener('focusin', e => { if (e.target.closest?.('#side') && e.target.tabIndex === -1 && sideItems().includes(e.target)) sideRove(e.target); });
+document.addEventListener('keydown', e => {
+  if (!e.target.closest?.('#side') || e.ctrlKey || e.metaKey || e.altKey || typing(e.target)) return;
+  const it = sideItems(), i = it.indexOf(e.target); if (i < 0) return;
+  const to = {ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: it.length - 1}[e.key];
+  if (to === undefined) { if ((e.key === 'Enter' || e.key === ' ') && e.target.dataset.act === 'folder-toggle') { e.preventDefault(); e.target.click(); } return; }
+  e.preventDefault(); e.stopPropagation();
+  const n = it[Math.max(0, Math.min(it.length - 1, to))]; sideRove(n); n.focus();
+}, true);
+// the skip link "Skip to content" (first stop of the page): focuses the view's first control
+function skipToContent() {
+  const v = $('#view'); if (!v) return;
+  v.tabIndex = -1; v.focus({preventScroll: true});  // the next Tab goes to the view's first control
+}
+$('#skip')?.addEventListener('click', skipToContent);
 function renderTop() {
   const m = S.route.mod, k = S.route.key;
   let title = m === 'tasks' ? titleFor(k) : tr({cal: N_('Calendar'), matrix: N_('Eisenhower matrix'), habits: N_('Habits'), pomo: N_('Focus'), news: N_('News'), stats: N_('Statistics'), time: N_('Time tracking'), overview: N_('Where is it stuck?'), agents: N_('Agents')}[m]);
@@ -1562,7 +1711,7 @@ function renderTop() {
   const nOpen = m === 'tasks' && !NOLIST_KEYS.includes(k) ? viewTasks().open.length : 0;
   // 2.8.0 (#434): the command bar (search + commands + the agents' chat) and "New task" (mouse screens; touch has the + button)
   const pal = `<button class="kbtn cmdbar tf4" data-act="palette" data-ico="search" title="${esc(tr('Search and commands'))} (${kbText('Mod+K')})" aria-label="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span>${kb('Mod+K')}</button>`;
-  const tnew = !isTouch() && m === 'tasks' && !noFab() && !S.multiMode ? `<button class="btn pri tnew tf4" data-act="new-task" data-ico="plus" title="${esc(kt(tr('New task'), 'n'))}" aria-label="${esc(tr('New task'))}">${ic('plus', 's')}<span>${tr('New task')}</span></button>` : '';
+  const tnew = (!isTouch() || ((!isMobile() || tabletDock()) && !dockView())) && (m === 'tasks' || (m === 'cal' && isTouch())) && !noFab() && !S.multiMode ? `<button class="btn pri tnew tf4" data-act="new-task" data-ico="plus" title="${esc(kt(tr('New task'), 'n'))}" aria-label="${esc(tr('New task'))}">${ic('plus', 's')}<span>${tr('New task')}</span></button>` : '';
   const ms = (() => {  // the next open milestone of a project list
     const l = m === 'tasks' && k.startsWith('l:') ? listById(+k.slice(2)) : null;
     const x = l?.kind === 'project' ? (l.milestones || []).filter(y => !y.done).sort((a, b) => a.day.localeCompare(b.day))[0] : null;
@@ -1661,17 +1810,16 @@ function topMoreItems() {
   if (mxs.startsWith('folder:') || mxs.startsWith('l:') || mxs.startsWith('f:')) sec.push({label: tr('Show as list'), icon: 'list', fn: () => go(keyToHash(mxs))});
   if (m === 'tasks' && k.startsWith('f:')) sec.push({label: tr('Edit filter'), icon: 'edit', fn: () => filterModal(+k.slice(2))});
   const l = m === 'tasks' && (k.startsWith('l:') || k === 'inbox') ? (k === 'inbox' ? inbox() : listById(+k.slice(2))) : null;
-  if (l && isMobile() && viewChoices(l).length > 1) {  // phones: the view switch lives here too (room for the title)
-    const v = curView(l), set = x => async () => { if (x === v) return; await setListView(l, x); };
-    sec.unshift(...viewChoices(l).map(([k, n, i]) => ({label: tr(n), icon: i, on: v === k, fn: set(k)})), '-');
-  }
+  // 2.13.0 (#453 A7): phones switch the view with the segmented control under the title (vsegHtml), no longer here
   if (l) { if (sec.length && sec[sec.length - 1] !== '-') sec.push('-'); sec.push(...listMenuItems(l.id, () => $('#top [data-act="top-more"]') || $('#top h1'))); }
   if (m === 'tasks' && k.startsWith('tag:')) { if (sec.length) sec.push('-'); sec.push(tagDeleteItem(k.slice(4))); }
   if (S.route.mod === 'tasks' && sharedRoute()) sec.unshift({label: tr('Refresh'), icon: 'sync', fn: () => refreshNow()});  // 2.7.2 (#433): no header button any more
   const rest = [...out, ...(out.length && sec.length ? ['-'] : []), ...sec];
   // 2.6.0 (K01): "…" is there on every view; where a view has nothing of its own it offers search (+ the shortcuts)
   if (!rest.length && !fold.some(x => x.icon === 'search')) rest.push({label: tr('Search and commands'), icon: 'search', keys: 'Mod+K', fn: () => openPalette()}, ...(isTouch() ? [] : [{label: tr('Keyboard shortcuts'), icon: 'help', keys: '?', fn: shortcutsModal}]));
-  return [...fold, ...(fold.length && rest.length ? ['-'] : []), ...rest];
+  // 2.13.0 (#453 A7): an entry that is already there (a folded header button, e.g. "Share…") comes only once
+  const seen = new Set(fold.map(x => x.label)), rest2 = rest.filter(x => x === '-' || x.row || !seen.has(x.label));
+  return [...fold, ...(fold.length && rest2.length ? ['-'] : []), ...rest2].filter((x, i, a) => x !== '-' || (i > 0 && a[i - 1] !== '-' && i < a.length - 1));
 }
 // ---- 1.9.0: delete a tag completely (sidebar: right-click / long-press on the tag, or "…" in the tag view). Tags are
 // personal: only my tag goes, from every task that has it (the tasks stay); one step in the undo history.
@@ -1721,11 +1869,22 @@ function routeList() {
 const listView = l => ((l.view === 'kanban' && feat('kanban')) || (l.view === 'timeline' && feat('timeline'))) ? l.view : 'list';
 function isKanban() { const l = routeList(); return !!l && !povOn(l) && listView(l) === 'kanban'; }
 function isTimeline() { const l = routeList(); return !!l && !povOn(l) && listView(l) === 'timeline'; }
+// 2.13.0 (#453 P15): week / day view: the hour grid fills exactly the room below its header, so only the grid scrolls
+// (before, the page scrolled too: two scroll bars nested)
+function calFit() {
+  const wb = $('#wbody'), v = $('#view');
+  v?.classList.toggle('calfit', !!wb);
+  if (!wb || !v.clientHeight) return;
+  const tabs = $('#tabs'), tb = tabs && getComputedStyle(tabs).display !== 'none' ? tabs.getBoundingClientRect().height : 0;
+  const h = Math.max(240, Math.floor(innerHeight - tb - wb.getBoundingClientRect().top - 12));
+  wb.style.height = h + 'px';
+}
+window.addEventListener('resize', () => { if (S.route?.mod === 'cal') calFit(); });
 function renderView() {
   const m = S.route.mod, el = $('#view');
   // 2.12.2 (#451): the open phone chat is never rebuilt (that took the focus, closed the keyboard and jumped to the top):
   // it is patched in place
-  if (m === 'agents' && S.route.agent && isMobile() && S.chat.aid === +S.route.agent && $('#view .chview')?.dataset.aid === String(S.chat.aid) && $('#chat-in')) { chatPatch(); agentLive(); renderMultiBar(); return; }
+  if (m === 'agents' && S.route.agent && chatFull() && S.chat.aid === +S.route.agent && $('#view .chview')?.dataset.aid === String(S.chat.aid) && $('#chat-in')) { chatPatch(); agentLive(); renderMultiBar(); return; }
   const scroll = el.scrollTop;
   const wbs = $('#wbody')?.scrollTop, tls = $('#tlscroll')?.scrollLeft, tlt = $('#tlscroll')?.scrollTop, wasRm = !!$('.tl.rm');
   const qi = $('#qinput'), qf = !!qi && document.activeElement === qi, qv = qi ? qi.value : '';  // the composer survives a re-render
@@ -1737,7 +1896,8 @@ function renderView() {
     ? (fa.id ? () => document.getElementById(fa.id) : 'kadd' in fa.dataset ? () => [...el.querySelectorAll('[data-kadd]')].find(x => x.dataset.kadd === fa.dataset.kadd) : null) : null;
   const fv = fk && fa.value, fs = fk && [fa.selectionStart, fa.selectionEnd];
   if (sai && S.secAdd) S.secAdd.v = sai.value;
-  if (m === 'cal') el.innerHTML = viewCal();
+  if (m !== 'cal') el.classList.remove('calfit');
+  if (m === 'cal') { el.innerHTML = viewCal(); requestAnimationFrame(calFit); }
   else if (m === 'matrix') el.innerHTML = viewMatrix();
   else if (m === 'habits') el.innerHTML = viewHabits();
   else if (m === 'pomo') { el.innerHTML = viewPomo(); loadPomoStats(); }
@@ -1752,7 +1912,7 @@ function renderView() {
   else if (isRoadmap()) el.innerHTML = viewRoadmap();
   else if (isOverview()) el.innerHTML = viewProjOv();  // 2.7.1 (#410)
   else if (isKanban()) el.innerHTML = viewKanban();
-  else if (isTimeline()) el.innerHTML = viewTimeline(routeList().id);
+  else if (isTimeline()) el.innerHTML = vsegHtml(routeList()) + viewTimeline(routeList().id);  // 2.13.0 (#453 A7)
   else el.innerHTML = viewList();
   el.scrollTop = scroll;
   if (m === 'agents' && $('#view .chview')) { chatFit(); chatPatch({bottom: true}); } else document.body.classList.remove('kb-open');  // 2.12.2 (#451): a chat opens at its newest message
@@ -1833,7 +1993,7 @@ function taskRow(t, opts = {}) {
   // lists with tickets, the ticket number in a mono gutter
   const work = t.status === 0 && t.id > 0 && (S.agents || []).some(a => a.enabled && a.status === 'working' && a.status_task === t.id);
   const chk = (t.status === 2 ? 'on' : t.status === -1 ? 'wont' : 'p' + (opts.checklist ? 0 : t.priority)) + (work ? ' work' : '');
-  const gut = !opts.checklist && t.id > 0 && ticketsOn(t.list_id) ? `<span class="tgut" aria-label="${esc(tr('Ticket {0}', '#' + t.id))}">#${t.id}</span>` : '';
+  const gut = !opts.checklist && t.id > 0 && (ticketsOn(t.list_id) || idsOn(t.list_id)) ? `<span class="tgut" aria-label="${esc(tr('Ticket {0}', '#' + t.id))}">#${t.id}</span>` : '';
   const collapsed = S.collapsed.has('t' + t.id);
   const ro = !opts.trash && !canEdit(t);
   const caret = opts.tree && openKids ? `<button class="caret ${collapsed ? 'closed' : ''}" data-act="collapse" data-key="t${t.id}">${ic('chev', 's')}</button>` : '';
@@ -1941,7 +2101,7 @@ function blockedTitle(t) {
 }
 const hideBlockedToday = () => depsOn() && S.settings.hide_blocked_today === '1';
 function qaddBox(extraCls = '') {
-  return `<div class="qadd inline ${extraCls}"><div class="box">${ic('plus')}<input id="qinput" placeholder="${tr('Add task: “Dentist tomorrow 3pm !high #private ~list”')}" autocomplete="off" enterkeyhint="done">${tplBtn()}</div><div class="chips" id="qchips"></div></div>`;
+  return `<div class="qadd inline ${extraCls}"><div class="box">${ic('plus')}<input id="qinput" aria-label="${esc(tr('Add task…'))}" placeholder="${tr('Add task: “Dentist tomorrow 3pm !high #private ~list”')}" autocomplete="off" enterkeyhint="done">${tplBtn()}</div><div class="chips" id="qchips"></div></div>`;
 }
 function tplBtn() {
   return tplOf('task').length ? `<button class="iconbtn qtpl" data-act="tpl-use" title="${tr('New from template')}" aria-label="${tr('New from template')}">${ic('copy', 's')}</button>` : '';
@@ -1952,7 +2112,7 @@ function tplBtn() {
 // adds and keeps the focus, Esc leaves it. Phones keep the + button (FAB).
 const QEX = N_('Type the way you think: “Dentist tomorrow 3pm !high #private ~list”');
 function qdockHtml() {
-  return `<div class="qdock"><div class="qadd dock"><div class="box"><span class="qplus" aria-hidden="true">${ic('plus', 's')}</span><input id="qinput" placeholder="${tr('Add task…')}" title="${esc(tr(QEX))}" aria-label="${tr('New task')}" autocomplete="off" enterkeyhint="done">${tplBtn()}${isTouch() ? '' : `<span class="qkey" title="${esc(kt(tr('New task'), 'n'))}">${kb('n')}</span>`}</div>
+  return `<div class="qdock"><div class="qadd dock"><div class="box"><span class="qplus" aria-hidden="true">${ic('plus', 's')}</span><input id="qinput" aria-label="${esc(tr('Add task…'))}" placeholder="${tr('Add task…')}" title="${esc(tr(QEX))}" aria-label="${tr('New task')}" autocomplete="off" enterkeyhint="done">${tplBtn()}${isTouch() ? '' : `<span class="qkey" title="${esc(kt(tr('New task'), 'n'))}">${kb('n')}</span>`}</div>
     <div class="qdmore"><div class="qdchips" id="qdchips"></div><div class="chips" id="qchips"></div>${hintSeen('qsyntax') ? '' : `<div class="qhint">${tr(QEX)}</div>`}</div></div></div>`;
 }
 // the chips of the docked composer: what the task will get (a chip set here wins over the text)
@@ -1978,7 +2138,7 @@ function viewListBody() {
   const rl = v.list && listById(v.list), ro = rl && !canEditList(rl.id), ck = !!(rl && rl.checklist);
   const cols = rl && fieldCols(rl.id) ? fieldsOf(rl.id).slice(0, 6) : null;
   let h = (rl ? listHead(rl) : v.folder ? folderHead(v.folder) : agBandHtml()) + (ro ? `<div class="rohint">${ic(isPart(rl.id) ? 'user' : 'eye', 's')}${esc(isPart(rl.id) ? tr('Participant: you see only the tasks assigned to you, shared by {0}', rl.owner_name) : tr('View only, shared by {0}', rl.owner_name))}</div>` : '');
-  if (S.route.key === 'today') h += reviewCard() + dayplanBar() + overdueBanner() + cevTodayBlock();  // 2.10.0 (#440): review + planner
+  if (S.route.key === 'today') h += waitCard() + reviewCard() + dayplanBar() + overdueBanner() + cevTodayBlock();  // 2.10.0 (#440): review + planner
   if (flow && FLOW.cyc) h += `<div class="flowhint">${ic('deps', 's')}${esc(tr('Some tasks wait on each other in a circle; they are ordered by date.'))}</div>`;
   if (cols) h += `<div class="fcolhead"><span class="spacer"></span>${cols.map(f => `<span class="fcell t-${esc(f.type)}" title="${esc(f.name)}">${esc(f.name)}</span>`).join('')}</div>`;
   const total = groups.reduce((n, g) => n + g.tasks.length, 0);
@@ -2085,7 +2245,7 @@ function viewHistory() {
   return [...g.entries()].map(([k, ts]) => `<div class="group"><div class="ghead">${dayLabel(k, true)} <span class="c">${ts.length}</span></div>${ts.map(t => taskRow(t, {showList: true, drag: false, tcols: {list: true}})).join('')}</div>`).join('');
 }
 function viewSearch() {
-  return `<div class="search"><input id="searchq" placeholder="${tr('Search titles and notes')}" autocomplete="off" enterkeyhint="search"></div><div id="sresults">${S.searchRes ? renderSearchRes() : ''}</div>`;
+  return `<div class="search"><input id="searchq" type="search" aria-label="${esc(tr('Search'))}" placeholder="${tr('Search titles and notes')}" autocomplete="off" enterkeyhint="search"></div><div id="sresults">${S.searchRes ? renderSearchRes() : ''}</div>`;
 }
 function renderSearchRes() {
   if (!S.searchRes.length) return `<div class="empty">${tr('No results.')}</div>`;
@@ -2098,6 +2258,9 @@ async function doSearch(q) {
   searchTimer = setTimeout(async () => {
     if (!q.trim()) { S.searchRes = null; $('#sresults').innerHTML = ''; return; }
     const j = await api('GET', '/api/tasks?scope=search&q=' + encodeURIComponent(q));
+    // 2.13.0: "#447" / "447" puts that task (one this person sees) first
+    const nm = q.trim().match(/^#?(\d{1,9})$/), hit = nm && taskById(+nm[1]);
+    if (hit) j.tasks = [hit, ...j.tasks.filter(t => t.id !== hit.id)];
     S.searchRes = j.tasks; S.extra = j.tasks;
     $('#sresults').innerHTML = renderSearchRes();
   }, 200);
@@ -2117,7 +2280,7 @@ function viewKanban() {
     <div class="kcol" data-kcol="${c.id ?? ''}">
       <div class="khead" ${c.id ? `data-ksec="${c.id}"` : ''}>${c.id && !ro ? secHandle(c.id) : ''}${esc(c.name)} <span class="c">${c.tasks.length}</span>${c.id && !ro ? `<button class="iconbtn" data-act="section-menu" data-id="${c.id}">${ic('dots', 's')}</button>` : ''}</div>
       <div class="kcards">${c.tasks.map(t => taskRow(t, {compact: true})).join('')}</div>
-      ${ro ? '' : `<div class="kadd"><input placeholder="${tr('+ Task')}" data-kadd="${c.id ?? ''}" enterkeyhint="done"></div>`}
+      ${ro ? '' : `<div class="kadd"><input placeholder="${tr('+ Task')}" aria-label="${esc(tr('New task in {0}', c.name))}" data-kadd="${c.id ?? ''}" enterkeyhint="done"></div>`}
     </div>`).join('')}
     ${ro ? '' : `<div class="knew"><button class="btn sm" data-act="section-new">${ic('plus', 's')} ${tr('Column')}</button></div>`}</div>`;
 }
@@ -2299,7 +2462,7 @@ function tlCalRows(start, end, DW) {  // calendar timeline: one row per subscrip
 
 // Settings > Integrations > Calendars (own requests, applied at once) + the admin allow-list (Settings > Users)
 function calsHtml(chk, hint) {
-  if (!S.calendars?.enabled) return `<h4 id="s-cals-h">${tr('Calendars')}</h4>${hint(tr('Calendar subscriptions are turned off on this server'))}`;
+  if (!S.calendars?.enabled) return `<h4 id="s-cals-h">${tr('Calendars')}</h4>${hintK(tr('Calendar subscriptions are turned off on this server'))}`;
   return `<h4 id="s-cals-h">${tr('Calendars')}</h4>
     ${hint(tr('Show events from Google Calendar, iCloud, Outlook or any CalDAV server next to your tasks: in the calendar, the timeline and on Today. Read-only, and only you see them.'))}
     <div class="members" id="s-cals"><div class="muted mhint">${tr('Loading…')}</div></div>
@@ -2415,7 +2578,7 @@ function calAddModal(done) {
       const auth = {url: $('#ca-srv', md).value.trim(), username: $('#ca-user', md).value.trim(), password: $('#ca-pw', md).value};
       if (!found) {
         found = (await calReq('POST', '/api/calendars/discover', auth)).calendars;
-        $('#ca-cals', md).innerHTML = `<div class="shint">${tr('Which calendars should be shown?')}</div>` + found.map((c, i) => `<label class="wide"><input type="checkbox" data-ci="${i}" checked><span><i class="cevdot" style="--cc:${cssColor(c.color) || '#94a3b8'}"></i> ${esc(c.name)}</span></label>`).join('');
+        $('#ca-cals', md).innerHTML = `<div class="shint keep">${tr('Which calendars should be shown?')}</div>` + found.map((c, i) => `<label class="wide"><input type="checkbox" data-ci="${i}" checked><span><i class="cevdot" style="--cc:${cssColor(c.color) || '#94a3b8'}"></i> ${esc(c.name)}</span></label>`).join('');
         b.textContent = tr('Add'); return;
       }
       const cals = found.filter((_, i) => $(`[data-ci="${i}"]`, md)?.checked);
@@ -2426,7 +2589,7 @@ function calAddModal(done) {
       done && done(j);
     } catch (x) { showErr(x.message); } finally { b.disabled = false; }
   });
-  setTimeout(() => $('#ca-url', md)?.focus(), 50);
+  if (!isTouch()) setTimeout(() => $('#ca-url', md)?.focus(), 50);  // 2.13.0: no keyboard popping up on touch
 }
 function calEditModal(x, colors, done) {
   let color = x.color;
@@ -2461,7 +2624,7 @@ function calBar(title, done = true, extra = '') {
   const on = showDoneCal(), dn = done ? `<button class="btn sm chip ${on ? 'on' : ''}" data-act="cal-done" aria-pressed="${on}" aria-label="${esc(tr('Completed'))}" title="${esc(on ? tr('Hide completed') : tr('Show completed'))}">${ic('eye', 's')}<span class="cdl">${tr('Completed')}</span></button>` : '';
   const modes = [['month', N_('Month')], ['week', N_('Week')], ['day', N_('Day')], ...(feat('timeline') ? [['timeline', N_('Timeline')]] : [])].map(([k, n]) => [k, tr(n)]);
   return `<div class="calbar"><h2>${title}</h2><div class="seg">${modes.map(([k, n]) => `<button class="${S.calMode === k ? 'on' : ''}" data-act="cal-mode" data-k="${k}">${n}</button>`).join('')}</div>${dn}${extra}
-    <div class="calnav"><button class="iconbtn" data-act="cal-prev">${ic('left')}</button><button class="btn sm" data-act="cal-today">${tr('Today')}</button><button class="iconbtn" data-act="cal-next">${ic('right')}</button></div></div>`;
+    <div class="calnav"><button class="iconbtn" data-act="cal-prev" title="${esc(tr('Previous period'))}" aria-label="${esc(tr('Previous period'))}">${ic('left')}</button><button class="btn sm" data-act="cal-today">${tr('Today')}</button><button class="iconbtn" data-act="cal-next" title="${esc(tr('Next period'))}" aria-label="${esc(tr('Next period'))}">${ic('right')}</button></div></div>`;
 }
 function viewCal() {
   if (S.calMode === 'timeline' && !feat('timeline')) S.calMode = 'month';
@@ -2574,9 +2737,11 @@ function tlBarHtml(t, start, end, DW, pick, deps) {
   const mark = pick ? (tlCanLink(pick.from, t.id) ? ' tl-ok' : ' tl-no') + (pick.from === t.id ? ' tl-from' : '') : '';
   // 2.7.0 (K14): the label of a short bar goes right of it, or left of it near the end of the range; it never runs past the
   // range, and on the left it stops before the name column (max-width in px, the room there)
-  const span = TL_DAYS * DW, room = span - (x + w) - 24, lroom = x - 16, left = w < 110 && room < 120 && lroom > room;
-  const lmax = w < 110 ? Math.max(40, Math.min(220, left ? lroom : room)) : 0;
-  return `<div class="tl-bar p${t.priority} ${w < 110 ? 'short' : ''}${left ? ' lbl-l' : ''}${wait ? ' wait' : ''}${conf ? ' conf' : ''}${ed ? '' : ' ro'}${t.status ? ' done' : ''}${mark}" data-id="${t.id}" style="left:${x + pad}px;width:${Math.max(TL_MINW, w - 2 * pad)}px" title="${esc(tip)}" tabindex="0" role="button" aria-label="${esc(tip)}">${wait ? ic('lock', 's tl-lk') : ''}<span${lmax ? ` style="max-width:${Math.round(lmax)}px"` : ''}>${esc(t.title)}</span><i class="h l"></i><i class="h r"></i></div>` +
+  // 2.13.0 (#453 P12): a title that would be cut inside its bar goes next to it too (not only bars under 110 px)
+  const sh = w < 110 || String(t.title || '').length * 6.5 + 24 > w;
+  const span = TL_DAYS * DW, room = span - (x + w) - 24, lroom = x - 16, left = sh && room < 120 && lroom > room;
+  const lmax = sh ? Math.max(40, Math.min(220, left ? lroom : room)) : 0;
+  return `<div class="tl-bar p${t.priority} ${sh ? 'short' : ''}${left ? ' lbl-l' : ''}${wait ? ' wait' : ''}${conf ? ' conf' : ''}${ed ? '' : ' ro'}${t.status ? ' done' : ''}${mark}" data-id="${t.id}" style="left:${x + pad}px;width:${Math.max(TL_MINW, w - 2 * pad)}px" title="${esc(tip)}" tabindex="0" role="button" aria-label="${esc(tip)}">${wait ? ic('lock', 's tl-lk') : ''}<span${lmax ? ` style="max-width:${Math.round(lmax)}px"` : ''}>${esc(t.title)}</span><i class="h l"></i><i class="h r"></i></div>` +
     (deps && ed && !pick && dFor(t) ? `<button type="button" class="tl-knob" data-knob="${t.id}" style="left:${x + Math.max(w, TL_MINW + 2 * pad) + 9}px" tabindex="-1" aria-hidden="true" title="${tr('Drag onto the task that waits on this one')}"></button>` : '');
 }
 // 1.5.3 (q): undated tasks in the timeline: per list a folding group "No date (n)" at the end, one row per task with an
@@ -2623,7 +2788,7 @@ function viewTimeline(listId, inCal) {
   const hint = isMobile() ? tr('Long-press and drag a bar: the middle moves it, the ends change start / due date.') : tr('Drag a bar to move it, drag its ends to change start / due date.');
   const dhint = !deps || ![...bars.keys()].some(i => dFor(S.tasks.get(i))) ? '' : isTouch() ? tr('Long-press a bar and let go for more: connect it to the task that waits on it, remove a dependency.') : tr('Drag the dot at the end of a bar onto another bar: that task then waits on it. Click an arrow to remove it.');
   const ndBtn = tlNdBtn(ndOn, undated);
-  return `${inCal ? '' : `<div class="calbar"><h2>${tr('Timeline')}</h2>${ndBtn}<div class="calnav"><button class="iconbtn" data-act="tl-prev">${ic('left')}</button><button class="btn sm" data-act="tl-today">${tr('Today')}</button><button class="iconbtn" data-act="tl-next">${ic('right')}</button></div></div>`}
+  return `${inCal ? '' : `<div class="calbar"><h2>${tr('Timeline')}</h2>${ndBtn}<div class="calnav"><button class="iconbtn" data-act="tl-prev" title="${esc(tr('Previous period'))}" aria-label="${esc(tr('Previous period'))}">${ic('left')}</button><button class="btn sm" data-act="tl-today">${tr('Today')}</button><button class="iconbtn" data-act="tl-next" title="${esc(tr('Next period'))}" aria-label="${esc(tr('Next period'))}">${ic('right')}</button></div></div>`}
     ${from ? `<div class="tl-pick" role="status">${ic('deps', 's')}<span>${tr('Tap the task that waits on “{0}”', esc(from.title))}</span><span class="spacer"></span><button class="btn sm" data-act="tl-pick-list">${ic('search', 's')} ${tr('Pick from a list…')}</button><button class="btn sm" data-act="tl-pick-cancel">${tr('Cancel')}</button></div>` : ''}
     <div class="tl${pick ? ' picking' : ''}" style="--dw:${DW}px;--days:${TL_DAYS}">
     <div class="tl-scroll" id="tlscroll"><div class="tl-inner">
@@ -3309,7 +3474,7 @@ function rmMoveDialog(lid) {
   if (!open.length) { toast(tr('No open tasks with a date in this list')); return; }
   if (open.length > RM_SHIFT_MAX) { toast(tr('This list has {0} tasks with a date, at most {1} can be moved at once', open.length, RM_SHIFT_MAX)); return; }
   const md = modal(`<h3>${tr('Move project by…')}</h3>
-    <div class="shint">${esc(lname(l))} · ${esc(trn('{0} open task with a date', '{0} open tasks with a date', open.length))} · ${tr('tasks without a date stay')}</div>
+    <div class="shint keep">${esc(lname(l))} · ${esc(trn('{0} open task with a date', '{0} open tasks with a date', open.length))} · ${tr('tasks without a date stay')}</div>
     <div class="rm-mv"><button type="button" class="btn rm-step" data-st="-1" aria-label="${tr('Earlier')}">−</button><input id="rm-n" type="number" inputmode="numeric" value="1" step="1" aria-label="${tr('Move by')}"><button type="button" class="btn rm-step" data-st="1" aria-label="${tr('Later')}">+</button>
       <div class="seg" id="rm-unit" role="group"><button type="button" class="on" data-u="7">${tr('weeks')}</button><button type="button" data-u="1">${tr('days')}</button></div></div>
     <div class="rm-quick">${[[-7, tr('1 week earlier')], [1, tr('1 day later')], [7, tr('1 week later')], [14, tr('2 weeks later')], [28, tr('4 weeks later')]].map(([n, t]) => `<button type="button" class="btn sm" data-q="${n}">${t}</button>`).join('')}</div>
@@ -3528,7 +3693,7 @@ function viewMatrix() {
     const ts = all.filter(t => t.priority === p).sort((a, b) => dueKey(a).localeCompare(dueKey(b)) || bySort(a, b));
     return `<div class="quad q${p}" data-quad="${p}"><h3><span class="${p ? 'flag-' + p : 'muted'}">${ic('flag', 's')}</span>${tr(n)} <span class="c">${ts.length}</span></h3>
       <div class="qlist">${ts.map(t => taskRow(t, {showList: true, compact: true})).join('') || `<div class="muted" style="padding:.5rem .375rem;font-size:var(--fs-m)">${tr('empty')}</div>`}</div>
-      <div class="kadd"><input placeholder="${tr('+ Task')}" data-qadd="${p}" enterkeyhint="done"></div></div>`;
+      <div class="kadd"><input placeholder="${tr('+ Task')}" aria-label="${esc(tr('New task'))}" data-qadd="${p}" enterkeyhint="done"></div></div>`;
   }).join('')}</div>`;
 }
 
@@ -3671,7 +3836,7 @@ function habitModal(id) {
     clearTimeout(noteTimer);
     noteTimer = setTimeout(async () => { await api('POST', `/api/habits/${x.id}/log`, {day, note: v}); render(); }, 600);
   });
-  if (!id) setTimeout(() => $('#h-name', md).focus(), 50);
+  if (!isTouch() && (!id))  setTimeout(() => $('#h-name', md).focus(), 50);
 }
 
 // ------------------------------------------------------------------ pomodoro
@@ -3700,7 +3865,7 @@ function viewPomo() {
       <div class="t"><b id="ptime">${sw ? fmtT(el) : fmtMS(rem)}</b><span>${p ? (p.paused_at ? tr('paused') : tt ? esc(tt.title) : p.kind === 'focus' ? tr('Focus') : sw ? tr('stopwatch running') : tr('Break')) : sw ? tr('Stopwatch') : kind === 'focus' ? tr('ready') : tr('Break')}</span></div></div>
     <div class="ctrls">${!p ? `<button class="btn pri" data-act="pomo-start" aria-label="${sw ? tr('Start stopwatch') : kind === 'focus' ? tr('Start focus session') : tr('Start break')}">${ic('play', 's')} ${sw ? tr('Start stopwatch') : kind === 'focus' ? tr('Start focus session') : tr('Start break')}</button>`
       : `${p.paused_at ? `<button class="btn pri" data-act="pomo-resume">${ic('play', 's')} ${tr('Resume')}</button>` : `<button class="btn" data-act="pomo-pause">${ic('pause', 's')} ${tr('Pause')}</button>`}<button class="btn" data-act="pomo-stop">${ic('stop', 's')} ${tr('Stop')}</button>`}</div>
-    ${kind === 'focus' || sw ? `<select id="pomo-task" ${p ? 'disabled' : ''}><option value="">${tr('No task')}</option>${opts}</select>` : ''}
+    ${kind === 'focus' || sw ? `<select id="pomo-task" aria-label="${esc(tr('Task'))}" ${p ? 'disabled' : ''}><option value="">${tr('No task')}</option>${opts}</select>` : ''}
     <div id="pstats">${pomoStatsCache ? pomoStatsHtml(pomoStatsCache) : ''}</div>
   </div>`;
 }
@@ -3791,6 +3956,7 @@ function closeDetail(fromPop) {
   $$('.trow.sel').forEach(r => r.classList.remove('sel'));
   setTimeout(() => { if (!S.sel) d.classList.add('hidden'); }, isMobile() ? 230 : 0);
   if (isMobile() && !fromPop && history.state && history.state.detail) history.back();
+  if (S.bellBack) { S.bellBack = false; setTimeout(() => { const b = $('#top .bell'); if (b && !S.sel && $('#pop').classList.contains('hidden')) bellPop(b); }, isMobile() ? 260 : 0); }  // 2.13.0 (#453 A5)
 }
 window.addEventListener('popstate', () => { if (S.sel && isMobile()) closeDetail(true); });
 // U02 (owner decision 1), 2.8.0 (#434): sidebar + list + task panel side by side only while the list keeps ~420 px (Fold
@@ -3800,8 +3966,11 @@ const LIST_MIN_PX = 420;
 function fitLayout(quiet) {
   const app = $('#app'); if (!app) return;
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-  const narrow = innerWidth - (15 + (app.classList.contains('detail-open') ? 25.5 : 0)) * rem < LIST_MIN_PX;
-  const on = !isMobile() && narrow;
+  // 2.13.0: the open chat panel takes its room too: the sidebar folds into the drawer instead of squeezing the list
+  const narrow = innerWidth - (15 + (app.classList.contains('detail-open') ? 25.5 : 0) + (document.body.classList.contains('chat-open') ? Math.min(26, innerWidth * .4 / rem) : 0)) * rem < LIST_MIN_PX;
+  // 2.13.0 (#453 A15): below ~1100 px (an unfolded Fold, small windows) the sidebar can be folded away by hand (remembered
+  // per device); the header's menu button opens it as a drawer then, like on a phone
+  const on = !isMobile() && (narrow || (innerWidth < 1100 && !!LS.get('sideFold', false)));
   if (app.classList.contains('side-rail') === on) return;
   app.classList.toggle('side-rail', on);
   if (!on && $('#side').classList.contains('open') && !isMobile()) closeSide();
@@ -3809,6 +3978,18 @@ function fitLayout(quiet) {
 }
 let fitT = null;
 window.addEventListener('resize', () => { clearTimeout(fitT); fitT = setTimeout(() => fitLayout(), 80); });
+function sideFold(on) { LS.set('sideFold', !!on); fitLayout(); closeSide(); render(); }
+// 2.13.0 (#453 A15): folding / unfolding a Fold while typing switches between the phone and the tablet layout; the field
+// that had the focus gets it back (same id), with its text and caret
+try {
+  matchMedia('(max-width:899px)').addEventListener('change', () => {
+    const a = document.activeElement, id = a && a.id && editFocused() ? a.id : null, v = id ? a.value : null, sel = id ? [a.selectionStart, a.selectionEnd] : null;
+    if (!S.booted) return;
+    render();
+    if (!id) return;
+    requestAnimationFrame(() => { const n = document.getElementById(id); if (!n || !n.offsetParent) return; if (n.value !== v && v != null) n.value = v; try { n.focus({preventScroll: true}); if (sel) n.setSelectionRange(...sel); } catch { /* not a text field */ } });
+  });
+} catch { /* old browsers */ }
 function taskById(id) { return S.tasks.get(id) || (S.extra || []).find(t => t.id === id); }
 // 2.0.6 (#316 / #322): the task panel below the title and the description, top to bottom; the comments and
 // the history come last, the comment box stays at the bottom edge of the panel (sticky, see cmComposer())
@@ -3824,7 +4005,14 @@ function crumbsHtml(t, l, parent) {
   parts.push(b('list', l.id, l.is_inbox ? 'inbox' : 'list', lname(l)));
   if (sec) parts.push(b('sec', sec.id, '', sec.name));
   if (parent) parts.push(b('parent', parent.id, 'sub', parent.title));
-  return `<nav class="dcrumbs" aria-label="${esc(tr('Where this task is'))}">${parts.join(`<span class="dcsep" aria-hidden="true">›</span>`)}</nav>`;
+  // 2.13.0: the task number, always: a tap copies the link to the task (#t/<id>)
+  const num = `<button type="button" class="dcid" data-act="copy-id" data-id="${t.id}" title="${esc(tr('Copy the link to this task'))}" aria-label="${esc(tr('Task {0}: copy the link', '#' + t.id))}">#${t.id}</button>`;
+  return `<nav class="dcrumbs" aria-label="${esc(tr('Where this task is'))}">${parts.join(`<span class="dcsep" aria-hidden="true">›</span>`)}${num}</nav>`;
+}
+async function copyTaskLink(id) {
+  const url = `${location.origin}/#t/${id}`;
+  try { if (isTouch() && navigator.share) { await navigator.share({url, title: '#' + id + ' ' + (taskById(id)?.title || '')}); return; } await navigator.clipboard.writeText(url); toast(tr('Link to {0} copied', '#' + id)); }
+  catch { toast(url, null, 6000); }
 }
 function crumbGo(k, id) {
   closePop();
@@ -4080,8 +4268,9 @@ function bellPop(anchor) {
     const b = e.target.closest('[data-bp]'); if (!b) return;
     const i = +b.dataset.i, q = b.dataset.bp;
     if (q === 'dismiss') { e.stopPropagation(); await newsDismiss(i); redraw(); return; }
-    if (q === 'open') { closePop(); newsOpen(i); return; }
-    if (q === 'readall') { S.nf.items?.forEach(x => { x.read = true; }); await newsRead({all: true}); redraw(); return; }
+    // 2.13.0 (#453 A5): a task opened from the bell comes back to the bell (Back / closing the panel)
+    if (q === 'open') { const it = (S.nf.items || [])[i]; closePop(); S.bellBack = !!it?.task_id && !['proposal', 'usage'].includes(it.kind) && (it.tasks || []).length < 2; newsOpen(i); return; }
+    if (q === 'readall') { await newsReadAll(); redraw(); return; }
     if (q === 'settings') { closePop(); settingsModal('newskinds'); return; }
     if (q === 'all' || q === 'news') { closePop(); go('news'); }  // 2.7.0: the heading opens the News view too
   };
@@ -4119,7 +4308,8 @@ function newsText(it, U) {
   const d = it.data || {}, who = `<b>${esc(viaName(d, it.actor_id, U))}</b>`, q = x => `<b>${esc(x)}</b>`;
   switch (it.kind) {
     case 'mention': return tr('{0} mentioned you', who);
-    case 'comment': return it.count > 1 ? trn('{1} left {0} comments', '{1} left {0} comments', it.count, (it.actors || [it.actor_id]).map(a => `<b>${esc(uname(a, U))}</b>`).join(', ')) : tr('{0} commented', who);
+    case 'comment': if ((it.tasks || []).length > 1) return trn('{1} left {0} comments on {2} tasks', '{1} left {0} comments on {2} tasks', it.count, who, it.tasks.length);  // 2.13.0 (#453 A5)
+      return it.count > 1 ? trn('{1} left {0} comments', '{1} left {0} comments', it.count, (it.actors || [it.actor_id]).map(a => `<b>${esc(uname(a, U))}</b>`).join(', ')) : tr('{0} commented', who);
     case 'assign': return d.group ? tr('{0} assigned a task to your group {1}', who, q(d.group)) : tr('{0} assigned a task to you', who);
     case 'take': return tr('{0} took a task of your group {1}', who, q(d.group || ''));  // 2.10.0 (#441)
     case 'unassign': return tr('{0} removed you as assignee', who);
@@ -4144,7 +4334,9 @@ function newsText(it, U) {
 const NEWS_ICON = {mention: 'at', comment: 'comment', assign: 'user', unassign: 'user', take: 'check', complete: 'check', share: 'users', role: 'users', unshare: 'users', unblock: 'deps', status: 'pulse', newtask: 'plus', approval: 'bot', followup: 'hourglass', usage: 'chart', proposal: 'bot'};
 function newsItemHtml(it, i, pop) {
   const U = S.nf.users;
-  const task = it.task_id ? `<div class="ntask"><span class="nt">${esc(it.task_title || '')}</span><span class="muted">${esc(newsListName(it))}</span></div>` : '';
+  const many = (it.tasks || []).length > 1;  // 2.13.0 (#453 A5): an agent's comments on several tasks
+  const task = many ? `<div class="ntask"><span class="nt">${esc(it.tasks.slice(0, 2).map(x => x.title).join(' · '))}</span>${it.tasks.length > 2 ? `<span class="muted">+${it.tasks.length - 2}</span>` : ''}</div>`
+    : it.task_id ? `<div class="ntask"><span class="nt">${esc(it.task_title || '')}</span><span class="muted nl">${esc(newsListName(it))}</span></div>` : '';
   const ex = it.excerpt ? `<div class="nexc">${newsExcerpt(it.excerpt, U)}</div>` : '';
   return `<div class="nitem ${it.read ? '' : 'unread'} k-${esc(it.kind)}" role="button" tabindex="0" ${pop ? 'data-bp="open"' : 'data-act="news-open"'} data-i="${i}" aria-label="${esc((it.read ? '' : tr('Unread') + ': ') + newsText(it, U).replace(/<[^>]+>/g, ''))}">
     ${it.actor_id ? `<button type="button" class="avb" data-mcard="${+it.actor_id}" data-mname="${esc(uname(it.actor_id, U))}" aria-haspopup="dialog" title="${esc(tr('Show {0}', uname(it.actor_id, U)))}" aria-label="${esc(tr('Show {0}', uname(it.actor_id, U)))}">` : ''}${av(it.actor_id, uname(it.actor_id, U), 'avatar', '', `<i class="nk">${ic(NEWS_ICON[it.kind] || 'bell', 's')}</i>`)}${it.actor_id ? '</button>' : ''}
@@ -4155,13 +4347,18 @@ function viewNews() {
   const f = S.nf.filter, fresh = S.nf.sig === (S.news?.sig ?? '') && S.nf.f === f && !!S.nf.items;
   // 1.9.0 (#246): "Loading…" only while a request really runs; an empty feed says so instead of loading forever
   if (!fresh && !S.nf.loading && !S.nf.queued) { S.nf.queued = true; setTimeout(() => { S.nf.queued = false; loadNews(); }, 0); }
-  const bar = `<div class="nbar"><div class="seg"><button class="${f ? '' : 'on'}" data-act="news-filter" data-f="" aria-pressed="${!f}">${tr('All')}</button><button class="${f ? 'on' : ''}" data-act="news-filter" data-f="me" aria-pressed="${!!f}">${ic('at', 's')}${tr('Mentions & assigned to me')}</button></div><button class="btn sm ntog ${S.nf.unread ? 'on' : ''}" data-act="news-unread" aria-pressed="${S.nf.unread}" title="${esc(tr('Hide news you have already read'))}">${ic('eye', 's')}${tr('Unread only')}</button><span class="spacer"></span>${S.news?.unread ? `<button class="btn sm" data-act="news-readall">${ic('check', 's')}${tr('Mark all as read')}</button>` : ''}<button class="iconbtn" data-act="news-settings" title="${esc(tr('What shows up here'))}" aria-label="${esc(tr('What shows up here'))}">${ic('gear', 's')}</button></div>`;
+  // 2.13.0 (#453 P9): ONE filter row: "All" (clears both), "Mentions & assigned to me" (server filter) and the kinds
+  const k0 = S.nf.kind, fchips = (items) => { const h = newsChipsHtml(items || [], 'data-nk').replace(/^<div class="nchips"[^>]*>/, '').replace(/<\/div>$/, '').replace(/<button type="button" class="nchip [^"]*" data-act="news-kind" data-nk="" aria-pressed="[^"]*">[^<]*<\/button>/, '');
+    return `<div class="nchips nfrow" role="group" aria-label="${esc(tr('Show only'))}"><button type="button" class="nchip ${f || k0 ? '' : 'on'}" data-act="news-filter" data-f="" data-nk="" aria-pressed="${!f && !k0}">${tr('All')}</button><button type="button" class="nchip ${f ? 'on' : ''}" data-act="news-filter" data-f="me" data-fme aria-pressed="${!!f}">${ic('at', 's')}${tr('Mentions & assigned to me')}</button>${h}</div>`; };
+  const bar0 = `<div class="nbar"><button class="btn sm ntog ${S.nf.unread ? 'on' : ''}" data-act="news-unread" aria-pressed="${S.nf.unread}" title="${esc(tr('Hide news you have already read'))}">${ic('eye', 's')}${tr('Unread only')}</button><span class="spacer"></span>${S.news?.unread ? `<button class="btn sm" data-act="news-readall">${ic('check', 's')}${tr('Mark all as read')}</button>` : ''}<button class="iconbtn" data-act="news-settings" title="${esc(tr('What shows up here'))}" aria-label="${esc(tr('What shows up here'))}">${ic('gear', 's')}</button></div>`;
+  const mine0 = S.nf.items && S.nf.f === f ? S.nf.items : null;
+  const bar = bar0 + fchips((mine0 || []).filter(it => !S.nf.unread || !it.read || it.keep));
   if (S.nf.err && !S.nf.items) return bar + `<div class="empty">${S.nf.err === 'offline' ? tr('News are only available online.') : esc(S.nf.err)}</div>`;
   const mine = S.nf.items && S.nf.f === f ? S.nf.items : null;
   if (!mine && (S.nf.loading || S.nf.queued)) return bar + `<div class="empty">${tr('Loading…')}</div>`;
   // #302 unread only: read items hide (one opened just now stays until the next load); data-i keeps the index in S.nf.items
   const vis = (mine || []).map((it, i) => [it, i]).filter(([it]) => !S.nf.unread || !it.read || it.keep);
-  const chips = mine ? newsChipsHtml(vis.map(x => x[0]), 'data-nk') : '';
+  const chips = '';  // 2.13.0: in the one filter row of the bar
   const shown = vis.filter(([it]) => newsKindOk(it));
   if (mine && mine.length && !vis.length) return bar + `<div class="empty nempty">${ic('bell')}<b>${tr('No unread news')}</b><span>${tr('Everything is read. Switch off “Unread only” to see older news.')}</span></div>`;
   if (!mine || !mine.length) return bar + `<div class="empty nempty">${ic('bell')}<b>${tr('No news')}</b><span>${f ? tr('No mentions or assignments.') : tr('Mentions, comments on your tasks, assignments and shared lists show up here.')}</span></div>`;
@@ -4185,11 +4382,25 @@ async function loadNews() {
   } finally { S.nf.loading = false; }
   if (S.route.mod === 'news') renderView();
 }
+// 2.13.0 (#453 A5): "Mark all as read" says how many and can be undone (the server returns the ids it marked)
+async function newsReadAll() {
+  const before = (S.nf.items || []).filter(x => !x.read), n = S.news?.unread || before.length;
+  before.forEach(x => { x.read = true; });
+  const j = await newsRead({all: true});
+  const ids = j?.marked || before.flatMap(x => x.ids || []);
+  if (!ids.length) return;
+  toast(trn('{0} marked as read', '{0} marked as read', n), async () => {
+    before.forEach(x => { x.read = false; x.keep = true; });
+    try { const k = await rawFetch('POST', '/api/news/read', {unread: true, ids}); S.news = {unread: k.unread, sig: k.sig}; S.nf.sig = null; } catch { toast(tr('Only available online.')); }
+    render(); if ($('#pop .bpop')) { const b = $('#top .bell'); closePop(); if (b) bellPop(b); }
+  });
+}
 async function newsRead(body) {
   wpCloseLocal(body.all ? (S.nf.items || []).map(x => x.task_id) : (S.nf.items || []).filter(x => (x.ids || []).some(i => (body.ids || []).includes(i))).map(x => x.task_id));
   try {
     const j = await rawFetch('POST', '/api/news/read', body);
     S.news = {unread: j.unread, sig: j.sig}; S.nf.sig = j.sig;
+    render(); return j;
   } catch { /* offline: stays unread on the server */ }
   render();
 }
@@ -4557,9 +4768,18 @@ document.addEventListener('keydown', e => {
 }, true);
 document.addEventListener('mousedown', e => { if (e.target.closest('.mpick')) e.preventDefault(); });  // keep the caret in the box
 // ------------------------------------------------------------------ attachments
-const attUrl = (a, dl) => `/api/attachments/${encodeURIComponent(a.id)}${dl ? '?dl=1' : ''}`;
+// 2.13.0: versioned by its size, so a repaired / replaced file gets a new address (no stale cached broken answer)
+const attUrl = (a, dl) => `/api/attachments/${encodeURIComponent(a.id)}?v=${encodeURIComponent(a.size ?? 0)}${dl ? '&dl=1' : ''}`;
 const fmtSize = b => b < 1024 ? b + ' B' : b < 1048576 ? Math.round(b / 1024) + ' KB' : (b / 1048576).toFixed(1).replace('.', ',') + ' MB';
 const isImg = a => /^image\/(png|jpeg|gif|webp|avif|bmp)$/.test(a.mime);
+// 2.13.0: an image that cannot be loaded (the file is missing / empty on the server) becomes a file tile that says so,
+// not a broken-image icon
+document.addEventListener('error', e => {
+  const img = e.target; if (img?.tagName !== 'IMG' || !img.closest?.('.att.img')) return;
+  const box = img.closest('.att.img'), a = img.closest('a');
+  box.classList.replace('img', 'file'); box.classList.add('broken');
+  if (a) a.innerHTML = `${ic('file')}<span class="an">${esc(img.alt || '')}</span><span class="as">${esc(tr('File damaged or missing'))}</span>`;
+}, true);
 function attHtml(a) {
   const t = taskById(S.sel), sending = (t?.paperless || []).some(p => p.status === 'pending' && p.att_id === a.id);
   const del = !canEdit(t) ? '' : `<button class="attdel" data-act="att-del" data-att="${a.id}" title="${tr('Remove')}">${ic('x', 's')}</button>` +
@@ -4712,21 +4932,49 @@ function renderMd(src) {
 }
 function autosize(el) { if (!el) return; el.style.height = 'auto'; if (el.scrollHeight) el.style.height = el.scrollHeight + 'px'; }
 // base: the value before the edit when the caller already changed the local copy (markdown checkbox)
+// 2.13.0 (#453, flaky phone network): typed text (title, description) is saved when the field is left, plus every 5 s
+// while typing (and when the app goes to the background), not every 600 ms. Every value this device sent is remembered
+// per field (S.sentVals): when the server reports a "conflict" whose current value is one of OUR earlier saves (a save
+// that arrived although its answer got lost, a queued replay), it is no conflict: the newest text is sent again on top of
+// it. A real conflict (someone else changed the field) never takes the field away while it has the focus: the draft
+// stays, an inline bar offers "Keep mine" / "Show the other" / "Merge".
+const TEXT_SAVE_MS = 5000;
+S.sentVals = {};
+const ownVal = (key, v) => (S.sentVals[key] || []).some(x => x === v);
 function queueSave(id, field, value, base0) {
   const key = id + ':' + field;
   const old = saveTimers[key], t = taskById(id);
   clearTimeout(old?.t);
   const base = old ? old.base : base0 !== undefined ? base0 : (t ? t[field] : undefined);  // value before this round of typing
-  saveTimers[key] = {t: setTimeout(() => doSave(key), 600), id, field, value, base, sess: HIST.sess};
+  saveTimers[key] = {t: setTimeout(() => doSave(key), field === 'title' || field === 'content' ? TEXT_SAVE_MS : 600), id, field, value, base, sess: HIST.sess};
 }
-async function doSave(key) {
+addEventListener('pagehide', () => { flushSaves(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) flushSaves(); });
+async function doSave(key, retry) {
   const s = saveTimers[key]; if (!s) return;
   delete saveTimers[key];
   if (s.field === 'title' && !s.value.trim()) return;
   const body = {[s.field]: s.value};
   if (s.base !== undefined && s.id > 0) body._prev = {[s.field]: s.base};
+  (S.sentVals[key] ||= []).push(s.value); if (S.sentVals[key].length > 30) S.sentVals[key].shift();
+  const lt = S.tasks.get(s.id); if (lt) lt[s.field] = s.value;  // the next round of typing builds on what was just sent
   const t = await api('PATCH', '/api/tasks/' + s.id, body);
-  if (t.conflicts?.length) { addConflicts(s.id, t.conflicts, t.title); putTask(t); if (S.sel === s.id) renderDetail(); return; }
+  if (t.conflicts?.length) {
+    const own = t.conflicts.filter(c => c.field === s.field && ownVal(key, c.server));
+    if (own.length === t.conflicts.length && !retry) {  // only our own earlier text: send the newest on top of it
+      if (saveTimers[key]) { saveTimers[key].base = own[0].server; return; }  // newer text is waiting: it goes on top of that
+      saveTimers[key] = {...s, base: own[0].server, t: 0};
+      return doSave(key, true);
+    }
+    addConflicts(s.id, t.conflicts, t.title);
+    const field = $(s.field === 'title' ? '#d-title' : s.field === 'content' ? '#d-content' : null);
+    const focused = S.sel === s.id && field && document.activeElement === field;
+    const keep = {...t}; if (focused) keep[s.field] = s.value;  // the draft stays where it is typed
+    putTask(keep);
+    if (focused || (S.sel === s.id && field && field.value === s.value)) cfInline(s.id, s.field, t.conflicts.find(c => c.field === s.field), s.value);
+    else if (S.sel === s.id) renderDetail();
+    return;
+  }
   putTask(t);
   const row = $$(`#view .trow[data-id="${s.id}"] .ttl`); row.forEach(r => { r.textContent = t.title; });
   if (s.base !== undefined) histText(s, t);
@@ -5121,7 +5369,7 @@ async function createTask(body) {
 }
 
 // ------------------------------------------------------------------ popovers
-function closePop() { $('#pop').classList.add('hidden'); $('#pop').classList.remove('sheet', 'overmodal'); $('#scrim').classList.add('hidden'); $('#scrim').classList.remove('clear', 'overmodal'); popOnClose && popOnClose(); popOnClose = null; }
+function closePop() { const t = $('#toast'); if (t && !t.classList.contains('hidden') && $('#pop.sheet:not(.hidden)')) requestAnimationFrame(() => toastPlace(t)); $('#pop').classList.add('hidden'); $('#pop').classList.remove('sheet', 'overmodal'); $('#scrim').classList.add('hidden'); $('#scrim').classList.remove('clear', 'overmodal'); popOnClose && popOnClose(); popOnClose = null; }
 let popOnClose = null;
 function openPop(anchor, html, onClose) {
   const p = $('#pop');
@@ -5132,7 +5380,7 @@ function openPop(anchor, html, onClose) {
   // #318: a menu opened from inside a dialog (e.g. Settings > Agents > "Share a list with an agent…") goes above it
   const om = !!anchor?.closest?.('.modal'); p.classList.toggle('overmodal', om); $('#scrim').classList.toggle('overmodal', om);
   popOnClose = onClose || null;
-  if (isMobile()) { p.classList.add('sheet'); return p; }
+  if (isMobile()) { p.classList.add('sheet'); const t = $('#toast'); if (t && !t.classList.contains('hidden')) requestAnimationFrame(() => toastPlace(t)); return p; }  // 2.13.0 (#453 A12)
   $('#scrim').classList.add('clear');
   const r = anchor.getBoundingClientRect();
   const w = p.offsetWidth, h = p.offsetHeight;
@@ -5143,7 +5391,7 @@ function openPop(anchor, html, onClose) {
 }
 function menu(anchor, items) {
   items = items.filter(Boolean);
-  const btn = (it, i, j) => `<button role="menuitem" data-i="${i}" ${j != null ? `data-j="${j}"` : ''} class="${it.on ? 'on' : ''} ${it.cls || ''}" ${it.dis ? 'disabled aria-disabled="true"' : ''} ${it.title ? `title="${esc(it.title)}"` : ''}>${it.dot ? `<span class="mdot">${hdot(it.dot)}</span>` : it.icon ? ic(it.icon, 's') : ''}<span class="ml">${esc(it.label)}</span>${it.keys && !isMobile() ? kb(it.keys) : ''}</button>`;
+  const btn = (it, i, j) => `<button role="menuitem" data-i="${i}" ${j != null ? `data-j="${j}"` : ''} class="${it.on ? 'on' : ''} ${it.cls || ''}" ${it.dis ? 'disabled aria-disabled="true"' : ''} ${it.title ? `title="${esc(it.title)}"` : ''}>${it.dot ? `<span class="mdot">${hdot(it.dot)}</span>` : it.icon ? ic(it.icon, 's') : ''}<span class="ml">${esc(it.label)}</span>${it.keys && !isMobile() ? kb(it.keys) : ''}${it.on ? `<span class="mchk" aria-hidden="true">${ic('check', 's')}</span>` : ''}</button>`;
   // {row: [item, item]} = one line of equal buttons (1.5.1: "Today" / "Tomorrow" on top of the task menu)
   const p = openPop(anchor, `<div class="menu-list" role="menu">${items.map((it, i) => it === '-' ? '<hr>' : it.row ? `<div class="mquick" role="group">${it.row.map((x, j) => btn(x, i, j)).join('')}</div>` : btn(it, i)).join('')}</div>`);
   p.onclick = e => { const b = e.target.closest('[data-i]'); if (!b || b.disabled) return; let it = items[+b.dataset.i]; if (it.row) it = it.row[+b.dataset.j]; closePop(); it.fn(); };
@@ -5289,19 +5537,19 @@ function datePop(anchor, id) {
         <button data-q="0">${ic('sun')}${tr('Today')}</button><button data-q="1">${ic('sunrise')}${tr('Tomorrow')}</button><button data-q="w">${ic('week')}${tr('Next week')}</button><button data-q="x">${ic('ban')}${tr('No date|clear')}</button></div>
       <div class="mcal"><div class="mh"><button class="iconbtn" data-mm="-1">${ic('left')}</button>${MON[m - 1]} ${y}<button class="iconbtn" data-mm="1">${ic('right')}</button></div><div class="grid">${g}</div></div>
       <div class="prow">${ic('clock', 's')}${timeIn('p-time', st.due_time || '', {label: tr('Time'), empty: tr('all day')})}${st.due_time ? `<button class="iconbtn" data-q="notime" title="${tr('All day')}" aria-label="${tr('All day')}">${ic('x', 's')}</button>` : ''}</div>
-      ${st.due_time ? `<div class="prow">${ic('timer', 's')}<select id="p-dur">${[15, 30, 45, 60, 90, 120, 180, 240].map(v => `<option value="${v}" ${(st.duration || 30) === v ? 'selected' : ''}>${tr('Duration {0}', v < 60 ? v + ' min' : v / 60 + ' h')}</option>`).join('')}</select></div>` : ''}
+      ${st.due_time ? `<div class="prow">${ic('timer', 's')}<select id="p-dur" aria-label="${esc(tr('Duration'))}">${[15, 30, 45, 60, 90, 120, 180, 240].map(v => `<option value="${v}" ${(st.duration || 30) === v ? 'selected' : ''}>${tr('Duration {0}', v < 60 ? v + ' min' : fmtNum(v / 60) + ' h')}</option>`).join('')}</select></div>` : ''}
       <div class="prow">${ic('timeline', 's')}<span class="muted" style="font-size:var(--fs-s)">${tr('Start|date')}</span>${dateIn('p-start', st.start || '', {max: st.due || '', label: tr('Start|date'), empty: tr('none')})}${st.start ? `<button class="iconbtn" data-q="nostart" title="${tr('No date range')}" aria-label="${tr('No date range')}">${ic('x', 's')}</button>` : ''}</div>
-      <div class="prow">${ic('bell', 's')}<div class="remchips" role="group" aria-label="${esc(tr('Reminder'))}">${[...REM_CHIPS, ...[...rems].filter(v => !REM_CHIPS.includes(v)).sort((a, b) => a - b)].map(v => `<button class="${rems.has(v) ? 'on' : ''}" data-rem="${v}" aria-pressed="${rems.has(v)}" title="${esc(fmtRem(v))}">${esc(remChip(v))}</button>`).join('')}<button class="${st.remc ? 'on' : ''}" data-q="remc" aria-expanded="${!!st.remc}">${tr('Other…|reminder')}</button></div></div>
+      <div class="prow">${ic('bell', 's')}<span class="muted plab">${tr('Reminder')}</span><div class="remchips" role="group" aria-label="${esc(tr('Reminder'))}">${[...REM_CHIPS, ...[...rems].filter(v => !REM_CHIPS.includes(v)).sort((a, b) => a - b)].map(v => `<button class="${rems.has(v) ? 'on' : ''}" data-rem="${v}" aria-pressed="${rems.has(v)}" title="${esc(fmtRem(v))}">${esc(remChip(v))}</button>`).join('')}<button class="${st.remc ? 'on' : ''}" data-q="remc" aria-expanded="${!!st.remc}">${tr('Other…|reminder')}</button></div></div>
       ${st.remc ? `<div class="prow remcust" role="group" aria-label="${esc(tr('Own reminder'))}"><input type="number" id="p-remn" min="1" max="999" inputmode="numeric" value="${esc(String(st.remn || 3))}" aria-label="${esc(tr('How many'))}"><select id="p-remu" aria-label="${esc(tr('Unit'))}">${REM_UNITS.map(([v, n]) => `<option value="${v}" ${String(st.remu || '1440') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select><span class="muted">${tr('before|reminder')}</span><button class="btn sm" data-q="remadd">${tr('Add')}</button></div>` : ''}
       ${st.due ? `<div class="prow pdl"><label class="chkl"><input type="checkbox" id="p-dl" ${st.deadline ? 'checked' : ''}> ${ic('flag', 's')}${tr('Deadline')}</label>${st.deadline ? `<label class="chkl"><input type="checkbox" id="p-dlt" ${st.deadline === 2 ? 'checked' : ''}> ${tr('On Today from the first reminder')}</label>` : ''}</div>
       <div class="prow">${ic('repeat', 's')}<label class="muted pnagl" for="p-nag">${tr('Repeat reminder')}</label><select id="p-nag">${[['', tr('as the list ({0})', listById(t.list_id)?.nag ? nagLabel(listById(t.list_id).nag) : tr('Off|nag'))], ...NAG_OPTS.map(([v, n]) => [v, tr(n)])].map(([v, n]) => `<option value="${v}" ${st.nag === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>` : ''}
-      <div class="prow">${ic('repeat', 's')}<select id="p-rep">${presets.map(([v, n]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${n}</option>`).join('')}${custom ? `<option value="${esc(cur)}" selected>${esc(repeatLabelBase(cur))}</option>` : ''}<option value="__custom">${tr('Custom…')}</option></select>${custom && !cu ? `<button class="iconbtn" data-q="cust" title="${tr('Edit')}" aria-label="${tr('Edit repeat')}">${ic('edit', 's')}</button>` : ''}</div>
+      <div class="prow">${ic('repeat', 's')}<select id="p-rep" aria-label="${esc(tr('Repeat'))}">${presets.map(([v, n]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${n}</option>`).join('')}${custom ? `<option value="${esc(cur)}" selected>${esc(repeatLabelBase(cur))}</option>` : ''}<option value="__custom">${tr('Custom…')}</option></select>${custom && !cu ? `<button class="iconbtn" data-q="cust" title="${tr('Edit')}" aria-label="${tr('Edit repeat')}">${ic('edit', 's')}</button>` : ''}</div>
       ${cu ? `<div class="rrcust" role="group" aria-label="${tr('Custom repeat')}">
         <div class="prow"><span class="muted">${tr('Every|repeat')}</span><input type="number" id="p-rn" min="1" max="99" value="${cu.n}" inputmode="numeric" aria-label="${tr('Interval')}"><select id="p-rf" aria-label="${tr('Unit')}">${[['DAILY', trn('day', 'days', cu.n)], ['WEEKLY', trn('week', 'weeks', cu.n)], ['MONTHLY', trn('month', 'months', cu.n)], ['YEARLY', trn('year', 'years', cu.n)]].map(([v, n]) => `<option value="${v}" ${cu.f === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
         ${cu.f === 'WEEKLY' ? `<div class="prow rrwd" role="group" aria-label="${tr('On')}">${wdOrder().map(i => `<button class="${cu.days.has(RR_WD[i]) ? 'on' : ''}" data-rwd="${RR_WD[i]}" aria-pressed="${cu.days.has(RR_WD[i])}" aria-label="${esc(WDL[i])}">${esc(WD[i])}</button>`).join('')}</div>` : ''}
-        ${cu.extra ? `<div class="shint">${tr('This rule has more parts than the form shows; edit it below.')}</div>` : ''}
+        ${cu.extra ? `<div class="shint keep">${tr('This rule has more parts than the form shows; edit it below.')}</div>` : ''}
         <details class="rrx" ${cu.extra ? 'open' : ''}><summary>${tr('Advanced · rule text (RRULE)')}</summary><input id="p-rrule" value="${esc(cur)}" spellcheck="false" autocapitalize="off" aria-label="RRULE" placeholder="FREQ=WEEKLY;INTERVAL=3;BYDAY=MO,TH"></details></div>` : ''}
-      ${st.repeat ? `<div class="prow" style="padding-left:1.375rem"><span class="muted" style="font-size:var(--fs-s)">${tr('Ends')}</span><select id="p-end" style="max-width:8.125rem"><option value="never" ${end.type === 'never' ? 'selected' : ''}>${tr('never')}</option><option value="count" ${end.type === 'count' ? 'selected' : ''}>${tr('after count')}</option><option value="until" ${end.type === 'until' ? 'selected' : ''}>${tr('on date')}</option></select>${end.type === 'count' ? `<input type="number" id="p-endn" min="1" max="999" value="${esc(end.val)}" style="max-width:4.625rem"><span class="muted" style="font-size:var(--fs-s)">${trn('time', 'times', end.val)}</span>` : end.type === 'until' ? dateIn('p-endd', end.val, {label: tr('on date'), clear: false, min: st.due || ''}) : ''}</div>` : ''}
+      ${st.repeat ? `<div class="prow" style="padding-left:1.375rem"><span class="muted" style="font-size:var(--fs-s)">${tr('Ends')}</span><select id="p-end" style="max-width:8.125rem" aria-label="${esc(tr('Ends'))}"><option value="never" ${end.type === 'never' ? 'selected' : ''}>${tr('never')}</option><option value="count" ${end.type === 'count' ? 'selected' : ''}>${tr('after count')}</option><option value="until" ${end.type === 'until' ? 'selected' : ''}>${tr('on date')}</option></select>${end.type === 'count' ? `<input type="number" id="p-endn" min="1" max="999" value="${esc(end.val)}" style="max-width:4.625rem"><span class="muted" style="font-size:var(--fs-s)">${trn('time', 'times', end.val)}</span>` : end.type === 'until' ? dateIn('p-endd', end.val, {label: tr('on date'), clear: false, min: st.due || ''}) : ''}</div>` : ''}
       ${st.repeat ? `<div class="prow" style="padding-left:1.375rem"><label style="display:flex;gap:.5rem;align-items:center;font-size:var(--fs-m)"><input type="checkbox" id="p-from" ${st.repeat_from === 'done' ? 'checked' : ''} style="flex:none"> ${tr('repeat from completion date')}</label></div>` : ''}
       ${instant ? `<div class="popfoot pinst"><span class="psaved ${I.saved ? 'on' : ''}" role="status" aria-live="polite">${I.saved ? `${ic('check', 's')}<span>${tr('Saved')}</span>` : esc(tr('Changes apply at once'))}</span><button class="btn" data-q="revert" ${I.saved ? '' : 'hidden'}>${tr('Undo')}</button><button class="btn pri" data-q="done">${tr('Done')}</button></div>`
     : `<div class="popfoot"><button class="btn" data-q="cancel">${tr('Cancel')}</button><button class="btn pri" data-q="ok">${tr('OK')}</button></div>`}`;
@@ -5715,6 +5963,9 @@ function vvSync() {
   if (vv.height >= window.innerHeight - 2 && (window.scrollY || document.documentElement.scrollTop)) window.scrollTo(0, 0);
   if (!editFocused() || !(S.vvMax > 0)) S.vvMax = vv.height;  // the height without a keyboard
   chatFit();
+  // the focused field of a sheet / the docked composer stays above the keyboard (iOS does not resize the layout)
+  const a = document.activeElement;
+  if (editFocused() && a && a.getBoundingClientRect && !a.closest('#view .chview')) { const r = a.getBoundingClientRect(), lim = vv.offsetTop + vv.height; if (r.bottom > lim - 4) a.scrollIntoView?.({block: 'nearest'}); }
 }
 if (window.visualViewport) {
   visualViewport.addEventListener('resize', vvSync);
@@ -5867,7 +6118,8 @@ function listMenuItems(id, anchor) {
     if (l.is_inbox && own) items.push({label: propWith(N_('Sort the inbox with {0}…'), N_('Sort the inbox with an agent…')), icon: 'bot', fn: () => propRequest('triage', {})});
     else if (!l.is_inbox && canEditList(id)) items.push({label: tr('Tasks from notes…'), icon: 'bot', fn: () => propRequest('extract', {lid: id})});
   }
-  if (own) items.push('-', ...LKINDS.map(([v, n]) => ({label: tr(n), icon: LKIND_ICON[v], on: k === v, fn: () => setListKind(id, v)})));
+  if (own) items.push('-', ...LKINDS.map(([v, n]) => ({label: tr('Type: {0}', tr(n)), icon: LKIND_ICON[v], on: k === v, fn: () => setListKind(id, v)})));  // 2.13.0 (#453 A7): "Type: List", not a second "List"
+  if (!l.tickets) items.push({label: tr('Show task numbers'), icon: 'hash', on: idsOn(id), fn: () => { LS.set('ids.' + id, !idsOn(id)); render(); }});
   if (collab() && l.shared) items.push({label: acolOn(id) ? tr('Hide assignee column') : tr('Show assignee column'), icon: 'user', fn: () => { LS.set('acol.' + id, !acolOn(id)); render(); }});
   if (collab() && l.shared) items.push({label: tr('Notifications: {0}', bellLabel(l.bell)), icon: BELL_ICON[l.bell || 'default'], fn: () => bellMenu(at(), id)});
   if (progressFor(l) && !l.is_inbox) items.push('-', progHidden(id) ? {label: tr('Show progress'), icon: 'eye', fn: () => setProgHidden(id, false)} : {label: tr('Hide progress'), icon: 'x', fn: () => setProgHidden(id, true)});
@@ -5914,7 +6166,7 @@ function bellCustomModal(id) {
   const l = listById(id); if (!l) return;
   const v = bellCustomOf(l), social = collab();
   const rows = BELL_ROWS.filter(([, , , f]) => !f || (f === 'deps' ? depsOn() : feat('agents') && (S.agents || []).length));
-  const box = (r, ch, lab) => `<input type="checkbox" data-bc="${r}" data-ch="${ch}" ${v[r][ch] ? 'checked' : ''} aria-label="${esc(tr(lab) + ': ' + (ch === 'news' ? tr('News') : tr('Push')))}">`;
+  const box = (r, ch, lab) => `<label class="nmhit"><input type="checkbox" data-bc="${r}" data-ch="${ch}" ${v[r][ch] ? 'checked' : ''} aria-label="${esc(tr(lab) + ': ' + (ch === 'news' ? tr('News') : tr('Push')))}"></label>`;
   const md = modal(`<h3 id="bc-h">${esc(tr('Notifications for {0}', lname(l)))}</h3>
     <div class="shint">${tr('Ticked events reach you from every task of this list, unticked ones never. News = under the bell, Push = on your devices. Only for you; reminders and lists shared with you follow Settings > Notifications.')}</div>
     <div class="nmx bcmx" role="table" aria-labelledby="bc-h"><div class="nmh" role="row"><span role="columnheader">${tr('Event')}</span><span role="columnheader">${tr('News')}</span><span role="columnheader">${tr('Push')}</span></div>
@@ -6016,7 +6268,7 @@ function shareModal(id) {
     const why = j.owner.agent ? tr('The owner is the agent {0}: agents cannot manage who is in a list. As an admin you can take it over.', j.owner.name)
       : tr('The owner {0} is disabled. As an admin you can take the list over.', j.owner.name);
     box.innerHTML = (j.mode === 'owner' ? `<div class="row owrow"><button class="btn sm" data-m="own-xfer">${ic('user', 's')} ${tr('Transfer ownership…')}</button></div>`
-      : j.mode === 'takeover' ? `<div class="shint lhint">${esc(why)}</div><div class="row owrow"><button class="btn sm" data-m="own-xfer">${ic('user', 's')} ${tr('Take over…')}</button></div>` : '') + hist;
+      : j.mode === 'takeover' ? `<div class="shint keep lhint">${esc(why)}</div><div class="row owrow"><button class="btn sm" data-m="own-xfer">${ic('user', 's')} ${tr('Take over…')}</button></div>` : '') + hist;
   };
   draw(); drawOwner();
   if (own && S.publicLinks) pubWire(md, id);
@@ -6256,13 +6508,13 @@ function listModal(id, folder = '', o = {}) {
     if (a === 'del') { if (await listDeleteForGood(id)) md.remove(); }
   });
   md.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.id !== 'l-emocustom' && !e.target.id.startsWith('lp-')) { if (id) { e.preventDefault(); autosave(); } else $('[data-m="save"]', md).click(); } });
-  if (!own) { setTimeout(() => $('#l-folder', md).focus(), 50); return; }
+  if (!own) { if (!isTouch()) setTimeout(() => $('#l-folder', md).focus(), 50); return; }
   md.addEventListener('input', e => {  // any emoji typed (or picked from the OS keyboard) into the custom field
     if (e.target.id !== 'l-emocustom') return;
     const m = e.target.value.match(EMO_RE);
     if (m) { emo = m[1]; $('#l-emo', md).innerHTML = emo; $$('#l-emogrid button', md).forEach(x => x.classList.remove('on')); if (id) later(e.target); }
   });
-  setTimeout(() => $('#l-name', md).focus(), 50);
+  if (!isTouch()) setTimeout(() => $('#l-name', md).focus(), 50);  // 2.13.0: touch: no keyboard popping up on open
 }
 // 2.1.2 (#349): hand a list to another person. j = GET /api/lists/{id}/owner (mode owner | takeover, candidates: active
 // people, members first with their role). Two steps: pick the person, then confirm.
@@ -6272,7 +6524,7 @@ async function ownerModal(lid, name, j, done) {
   const def = (take ? cands.find(c => S.me && c.id === S.me.id) : cands.find(c => c.role)) || cands[0];
   const md = modal(`<h3>${esc(take ? tr('Take over “{0}”', name) : tr('Transfer ownership of “{0}”', name))}</h3>
     <div class="row"><label for="ow-to">${tr('New owner')}</label><select id="ow-to">${cands.map(c => `<option value="${c.id}" ${c.id === def.id ? 'selected' : ''}>${esc(c.name)}${S.me && c.id === S.me.id ? ' ' + tr('(me)') : ''}${c.role ? ' · ' + esc(roleLabel(c.role)) : ''}</option>`).join('')}</select></div>
-    <div class="shint">${esc(take ? tr('The new owner can rename, archive and delete the list and decides who is in it. {0} stays in the list: an agent as a member, a person as a list admin.', j.owner?.name || '')
+    <div class="shint keep">${esc(take ? tr('The new owner can rename, archive and delete the list and decides who is in it. {0} stays in the list: an agent as a member, a person as a list admin.', j.owner?.name || '')
       : tr('The new owner can rename, archive and delete the list and decides who is in it. You stay in the list as a list admin. Agents cannot own lists.'))}</div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${take ? tr('Take over') : tr('Transfer')}</button></div>`);
   md.classList.add('owmodal');
@@ -6316,7 +6568,6 @@ const zPct = z => `${Math.round(z * 100)} %`;
 function lookHtml() {
   const on = (k, v) => `data-look="${k}" data-v="${v}" aria-pressed="${lookCur(k) === v}" class="${lookCur(k) === v ? 'on' : ''}"`;
   const seg = (k, opts) => `<div class="seg wrap" id="s-${k}" role="group">${opts.map(([v, n]) => `<button ${on(k, v)}>${tr(n)}</button>`).join('')}</div>`;
-  const sizes = FSIZE_ORDER.map(v => LOOK.fsize.find(x => x[0] === v));
   return `<div class="lookpv" inert aria-hidden="true">
       <div class="lpv-head"><b>${tr('Today')}</b><span class="lpv-n">2</span></div>
       <div class="trow pr5"><span class="chk p5"></span><div class="tmain"><div class="ttl">${tr('Call the plumber about the kitchen tap')}</div><div class="meta"><span class="dt today">${ic('cal', 's')}${tr('Today')} 09:30</span><span class="tag">#${tr('home')}</span></div></div></div>
@@ -6329,7 +6580,7 @@ function lookHtml() {
     <div class="row">${seg('density', DENSITIES)}</div>
     <div class="shint">${tr('Compact fits more tasks on the screen; comfortable has larger rows for touch. Default: comfortable on phones, compact on computers.')}</div>
     <h4>${tr('Font size')}</h4>
-    <div class="lkopts lksize" id="s-fsize" role="group">${sizes.map(([v, n, z]) => `<button ${on('fsize', v)}><span class="lkA" style="font-size:${(15 * z).toFixed(1)}px">A</span><span class="lkn">${tr(n)}</span><span class="lkv">${zPct(z)}</span></button>`).join('')}</div>
+    <div class="row lkfs"><span class="lkA" aria-hidden="true">A</span><input type="range" id="s-fsize" min="50" max="150" step="5" value="${fsPct()}" aria-label="${esc(tr('Font size'))}" aria-valuetext="${fsPct()} %"><span class="lkA lkA2" aria-hidden="true">A</span><output id="s-fsv" for="s-fsize">${fsPct()} %</output><button class="btn sm" data-m="fs-reset" ${fsPct() === 100 ? 'disabled' : ''}>${tr('Reset (100 %)')}</button></div>
     <div class="shint">${tr('Scales the whole interface: text, rows, icons, spacing and dialogs.')}</div>
     <h4>${tr('Font')}</h4>
     <div class="lkopts lkfont" id="s-font" role="group">${LOOK.font.map(([v, n]) => `<button ${on('font', v)}><span class="lkAa lkf-${v}">Aa</span><span class="lkn">${tr(n)}</span></button>`).join('')}</div>
@@ -6338,7 +6589,7 @@ function lookHtml() {
     <div class="lkopts lkacc" id="s-accent" role="group">${LOOK.accent.map(([v, n, d, l]) => `<button ${on('accent', v)} style="--sw-d:${d};--sw-l:${l}" title="${tr(n)}"><i class="lksw"></i><span class="lkn">${tr(n)}</span></button>`).join('')}</div>
     <div class="row lkreset"><button class="btn sm" data-m="look-reset">${ic('undo', 's')} ${tr('Reset to defaults')}</button><span class="muted">${tr('Applies to this device only.')}</span></div>`;
 }
-const lookCur = k => k === 'theme' ? LS.get('theme', 'auto') : k === 'density' ? densityPref() : lookPref(k);
+const lookCur = k => k === 'theme' ? LS.get('theme', 'auto') : k === 'density' ? densityPref() : k === 'fsize' ? fsPct() : lookPref(k);
 function lookRedraw(md, focusSel) {  // re-render the pane (states + preview) and keep the keyboard focus
   const p = $('#s-lookin', md); if (!p) return;
   p.innerHTML = lookHtml();
@@ -6450,11 +6701,11 @@ async function wpDraw(md) {
   const sub = await wpSub(), mine = sub && j.subs.find(x => x.endpoint === sub.endpoint);
   const hint = t => `<div class="shint">${t}</div>`;
   let h = '';
-  if (isIOS() && !isStandalone()) h += hint(tr('Add Kalmido to your Home Screen to get notifications on iPhone: Share > Add to Home Screen (iOS 16.4 or newer), then open it from there and turn it on here.'));
-  else if (!wpSupported()) h += hint(tr('This browser does not support Web Push'));
+  if (isIOS() && !isStandalone()) h += hintK(tr('Add Kalmido to your Home Screen to get notifications on iPhone: Share > Add to Home Screen (iOS 16.4 or newer), then open it from there and turn it on here.'));
+  else if (!wpSupported()) h += hintK(tr('This browser does not support Web Push'));
   else {
     h += `<div class="row"><label>${tr('Web Push')}</label><label class="chkl"><input type="checkbox" id="s-wpdev" ${mine ? 'checked' : ''}> ${tr('Notify on this device')}</label>${mine ? `<button class="btn sm" data-m="wp-test" data-sub="${mine.id}">${ic('bell', 's')} ${tr('Send test to this device')}</button>` : ''}</div>`;
-    if (Notification.permission === 'denied') h += hint(tr('Notifications are blocked for this site. Allow them in the browser or system settings.'));
+    if (Notification.permission === 'denied') h += hintK(tr('Notifications are blocked for this site. Allow them in the browser or system settings.'));
     else if (!mine) h += hint(tr('Your browser asks for permission once. Pushes arrive even when Kalmido is closed.'));
   }
   if (j.subs.length) {
@@ -6674,7 +6925,7 @@ async function agSetupDraw(md) {
       <button class="iconbtn ${a.enabled ? 'danger' : ''}" data-myag-act="pause" title="${esc(a.enabled ? tr('Pause') : tr('Resume'))}" aria-label="${esc(a.enabled ? tr('Pause') : tr('Resume'))}" ${!a.enabled && a.admin_paused ? 'disabled' : ''}>${ic(a.enabled ? 'pause' : 'play', 's')}</button>
       <button class="iconbtn danger" data-myag-act="del" title="${esc(tr('Delete'))}" aria-label="${esc(tr('Delete'))}">${ic('trash', 's')}</button></span></div>`;
   const add = j.allowed && j.count < j.max ? `<div class="row myagnew"><input id="myag-user" placeholder="${esc(tr('Username, e.g. my-claude'))}" aria-label="${esc(tr('Username'))}" maxlength="32" autocapitalize="off" autocomplete="off" spellcheck="false"><input id="myag-name" placeholder="${esc(tr('Display name'))}" aria-label="${esc(tr('Display name'))}" maxlength="60"><button class="btn sm pri" data-myag-act="new">${ic('plus', 's')} ${tr('Create agent')}</button></div>
-    <div class="shint">${esc(trn('You can have {0} personal agent.', 'You can have {0} personal agents.', j.max))}</div>` : '';
+    <div class="shint keep">${esc(trn('You can have {0} personal agent.', 'You can have {0} personal agents.', j.max))}</div>` : '';
   box.innerHTML = (j.agents.map(row).join('') || (j.allowed ? '' : `<div class="muted mhint">${tr('Your admin has not allowed personal agents on this server.')}</div>`)) + add;
   if (S.me?.is_admin) {
     try { const p = await api('GET', '/api/admin/agent-policy'); const sw = $('#s-uag', md), mx = $('#s-uagmax', md); if (sw) sw.checked = p.user_agents; if (mx) { mx.value = p.max_per_user; mx.disabled = !p.user_agents; } } catch { /* offline */ }
@@ -6801,7 +7052,7 @@ function settingsModal(focus) {
         <li>${tr('<b>Thunderbird:</b> Calendar > New Calendar > On the Network, paste the link.')}</li>
         <li>${tr('<b>Outlook:</b> Add calendar > Subscribe from web.')}</li>
         <li>${tr('<b>Only reachable at home or over a VPN?</b> Google Calendar, iCloud and Outlook.com fetch the feed from their own servers and then cannot reach it. Use an app that fetches on the device instead: on Android ICSx⁵ (the calendar then shows up in every calendar app), on a Mac the location “On My Mac” instead of iCloud, or Thunderbird.')}</li></ul></details>
-      ${hint(tr('Anyone who knows the link sees these tasks. If it got out, create a new link: the old one stops working at once.'))}
+      ${hintK(tr('Anyone who knows the link sees these tasks. If it got out, create a new link: the old one stops working at once.'))}
       ${caldavHtml(hint)}
       ${S.paperless?.personal || S.paperless?.enabled ? `<h4 id="s-pl-h">Paperless</h4>
       ${hint(tr('Link documents from Paperless-ngx to tasks. Your connections: the ones an admin set up for you (you enter your own API token, so Paperless shows you exactly what you may see there) and your own, which only you see and use.'))}
@@ -6825,7 +7076,7 @@ function settingsModal(focus) {
       <div class="members" id="s-tpls"><div class="muted mhint">${tr('Loading…')}</div></div>
       ${sampleHtml(hint)}`,
     ai: aiPaneOn() ? aiHtml(hint, {agents: 'agents', agentdots: 'agents', usage: 'usage', activity: 'log'}[focus]) : '',  // 2.7.0 (#405 S2)
-    users: S.me?.is_admin ? usersHtml() + grpHtml() + orphHtml() + instanceHtml(chk, hint) + `<div id="s-signin">${signinHtml(hint)}</div>` + plaHtml() + bkHtml() + aaHtml() : '',  // 1.9.0: users first
+    users: S.me?.is_admin ? usersHtml() + grpHtml() + orphHtml() + instanceHtml(chk, hint) + `<div id="s-signin">${signinHtml(hint)}</div>` + plaHtml() + bkHtml() + stoHtml() + aaHtml() : '',  // 1.9.0: users first
     help: `<h4>${tr('Getting started')}</h4>
       <div class="row"><button class="btn sm" data-m="tour">${ic('arrow', 's')} ${tr('Restart the welcome tour')}</button>${isMobile() ? '' : `<button class="btn sm" data-m="keys">${ic('help', 's')} ${tr('Keyboard shortcuts')} ${kb('?')}</button>`}<button class="btn sm" data-m="cele-try">${ic('check', 's')} ${tr('Show the celebration')}</button></div>
       ${isMobile() ? '' : `<div class="shelp">${tr('{0}: search and commands for everything (tasks, lists, views, settings). j / k move through the tasks, x completes, s snoozes, g t goes to Today.', kbText('Mod+K'))}</div>`}
@@ -6850,10 +7101,13 @@ function settingsModal(focus) {
   let cur = {tabbar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'integr', caldav: 'integr', tokens: 'account', apppw: 'account', about: 'help', groups: 'users', dayplan: 'general'}[focus] || focus;
   if (!secs.some(([k]) => k === cur)) cur = LS.get('settingsSec', 'general');
   if (!secs.some(([k]) => k === cur)) cur = 'general';
-  const md = modal(`<div class="shdr"><h3>${tr('Settings')}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
+  const md = modal(`<div class="shdr"><h3>${tr('Settings')}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><span class="ssearch">${ic('search', 's')}<input type="search" id="s-search" placeholder="${esc(tr('Search settings'))}" aria-label="${esc(tr('Search settings'))}" autocomplete="off" aria-controls="s-sres"></span><div class="ssres hidden" id="s-sres" role="listbox" aria-label="${esc(tr('Search settings'))}"></div><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
     <div class="sbody"><nav class="snav" role="tablist" aria-label="${tr('Settings')}">${secs.map(([k, i, n]) => `<button role="tab" id="st-${k}" aria-controls="sp-${k}" aria-selected="${k === cur}" data-sec="${k}" class="${k === cur ? 'on' : ''}">${ic(i, 's')}<span>${tr(n)}</span></button>`).join('')}</nav>
       <div class="spanes">${secs.map(([k]) => `<section class="spane ${k === cur ? '' : 'hidden'}" role="tabpanel" id="sp-${k}" aria-labelledby="st-${k}" data-pane="${k}">${pane[k]}</section>`).join('')}</div></div>`);
   md.classList.add('smodal');
+  // 2.13.0 (#429): the font size slider applies live while it moves; the views drawn in px follow when it is let go
+  md.addEventListener('input', e => { if (e.target.id !== 's-fsize') return; const v = +e.target.value; if (v === 100) LS.del('fsize'); else LS.set('fsize', v); applyLook(); fsLabel(v); });
+  md.addEventListener('change', e => { if (e.target.id === 's-fsize' && S.settings) render(); });
   if (focus === 'tabbar') setTimeout(() => $('#s-tabbar-h', md)?.scrollIntoView({block: 'start'}), 0);
   if (focus === 'newskinds' || focus === 'share') setTimeout(() => $(focus === 'share' ? '#s-share-h' : '#s-news-h', md)?.scrollIntoView({block: 'start'}), 0);
   if (focus === 'agentdots') setTimeout(() => $('#s-agdots-h', md)?.scrollIntoView({block: 'start'}), 0);
@@ -6943,6 +7197,25 @@ function settingsModal(focus) {
   });
   onRemove(md, () => { if (!md._noflush) flush(); });
   $('.snav', md).addEventListener('click', e => { const b = e.target.closest('[data-sec]'); if (b) show(b.dataset.sec); });
+  // 2.13.0 (#453 P20): search every tab's headings, labels and options; a hit opens its tab and scrolls to it
+  const sres = $('#s-sres', md);
+  $('#s-search', md).addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase(); if (!q) { sres.classList.add('hidden'); sres.innerHTML = ''; return; }
+    const hits = [];
+    for (const p of $$('.spane', md)) for (const el of $$('h4, .row > label, label.chkl, .modrow b, summary', p)) {
+      const t = el.textContent.trim(); if (t && t.toLowerCase().includes(q) && !hits.some(h => h.el === el)) hits.push({el, t, k: p.dataset.pane});
+      if (hits.length >= 12) break;
+    }
+    const tab = k => $(`.snav [data-sec="${k}"] span`, md)?.textContent || k;
+    sres.innerHTML = hits.length ? hits.map((h, i) => `<button type="button" role="option" data-hit="${i}"><span class="muted">${esc(tab(h.k))} ›</span> ${esc(h.t.slice(0, 80))}</button>`).join('') : `<div class="muted mhint">${tr('Nothing found')}</div>`;
+    sres._hits = hits; sres.classList.remove('hidden');
+  });
+  sres.addEventListener('click', e => {
+    const b = e.target.closest('[data-hit]'); if (!b) return;
+    const h = sres._hits[+b.dataset.hit]; sres.classList.add('hidden'); $('#s-search', md).value = '';
+    show(h.k); const r = h.el.closest('.row, .modrow, details, h4') || h.el;
+    setTimeout(() => { r.scrollIntoView?.({block: 'center'}); r.classList.add('flash'); setTimeout(() => r.classList.remove('flash'), 1600); }, 30);
+  });
   setTimeout(() => $(`.snav [data-sec="${cur}"]`, md)?.scrollIntoView({block: 'nearest', inline: 'nearest'}), 0);
   if (cur === 'data') templatesDraw(md).then(() => { if (focus === 'templates') $('#s-tpl-h', md)?.scrollIntoView({block: 'start'}); });
   if (focus === 'sample') setTimeout(() => $('#s-sample-h', md)?.scrollIntoView({block: 'start'}), 0);
@@ -7000,6 +7273,8 @@ function settingsModal(focus) {
     if (b.dataset.m === 's-undo') { const el = $('.ssaved', md); if (el?._e && HIST.undo[HIST.undo.length - 1] === el._e) { el.classList.remove('on'); histStep('undo'); } return; }
     if (b.dataset.m === 'tab-reset') { tabSet(null); return; }
     if (b.dataset.langSet) { setLang(b.dataset.langSet); return; }
+    if (b.dataset.m === 'fs-reset') { fsStep(0); return; }  // 2.13.0 (#429)
+    if (b.dataset.m === 'sto-check') { stoCheck(md); return; }  // 2.13.0
     if (b.dataset.look) {
       const k = b.dataset.look, v = b.dataset.v, n = {theme: N_('Color scheme'), density: N_('Density'), fsize: N_('Font size'), font: N_('Font'), accent: N_('Accent color')}[k];
       setLocal(tr(n), () => lookCur(k), x => { lookSet(k, x); lookRedraw(md, `[data-look="${k}"][data-v="${x}"]`); }, v); return;
@@ -7196,9 +7471,9 @@ async function plcDraw(md) {
       <div class="row"><label for="plc-name">${tr('Name')}</label><input id="plc-name" maxlength="60" placeholder="${esc(tr('e.g. Private'))}"></div>
       <div class="row"><label for="plc-url">${tr('Address')}</label><input id="plc-url" type="url" inputmode="url" placeholder="https://paperless.example.com"></div>
       <div class="row"><label for="plc-tok">${tr('API token')}</label>${plTokenIn('plc-tok')}</div>
-      <div class="shint">${tr('In Paperless: your profile (top right) > My Profile > API Auth Token. The token is stored encrypted and never shown again; only you can use this connection.')}</div>
+      <div class="shint keep">${tr('In Paperless: your profile (top right) > My Profile > API Auth Token. The token is stored encrypted and never shown again; only you can use this connection.')}</div>
       <div class="row"><label></label><button class="btn sm pri" data-plc-act="add">${ic('plus', 's')} ${tr('Add')}</button></div></details>`
-      : `<div class="shint">${tr('Tokens cannot be stored on this server yet: the server operator has to set a secret key first (KALMIDO_SECRET_KEY, see the installation guide).')}</div>`);
+      : `<div class="shint keep">${tr('Tokens cannot be stored on this server yet: the server operator has to set a secret key first (KALMIDO_SECRET_KEY, see the installation guide).')}</div>`);
 }
 function plcWire(md) {
   if (!$('#s-plc', md)) return;
@@ -7241,7 +7516,7 @@ async function plaDraw(md) {
     ${j.servers.map(c => `<details class="plsrv" data-pla="${c.id}"><summary>${ic('archive', 's')}<b>${esc(c.name)}</b> <span class="muted">${esc(c.url)} · ${trn('{0} user', '{0} users', c.users.length)} · ${trn('{0} token set', '{0} tokens set', c.tokens)}</span></summary>
       <div class="row"><label>${tr('Name')}</label><input data-pla-f="name" maxlength="60" value="${esc(c.name)}"></div>
       <div class="row"><label>${tr('Address')}</label><input data-pla-f="url" type="url" value="${esc(c.url)}"></div>
-      <div class="shint">${tr('A new address removes the tokens stored for it.')}</div>
+      <div class="shint keep">${tr('A new address removes the tokens stored for it.')}</div>
       <div class="row"><label>${tr('Who may use it')}</label>${ulist(c.users, c.id)}</div>
       <div class="row"><label></label><button class="btn sm danger" data-pla-act="del">${ic('trash', 's')} ${tr('Remove connection')}</button></div></details>`).join('')}
     <details class="plnew"><summary>${ic('plus', 's')} ${tr('New server connection')}</summary>
@@ -7291,7 +7566,7 @@ async function aaDraw(md, j) {
   const rc = j.topic ? tr('Goes to the admin topic {0}.', `<code class="topic">${esc(j.topic)}</code>`)
     : j.admins.length ? tr('Goes to each admin over their own notification channel: {0}.', j.admins.map(a => `${esc(a.username)}: ${via(a)}`).join(', ')) : '';
   const meA = j.admins.find(a => a.me), meNone = !j.topic && meA && !meA.devices && !meA.topic;
-  let h = j.env ? '' : hint(`<span title="KALMIDO_ADMIN_ALERTS=0">${tr('Admin alerts are switched off by the server operator.')}</span>`);
+  let h = j.env ? '' : hintK(`<span title="KALMIDO_ADMIN_ALERTS=0">${tr('Admin alerts are switched off by the server operator.')}</span>`);
   h += `<div class="featgrid"><label class="wide"><input type="checkbox" id="aa-on" ${j.on && j.env ? 'checked' : ''} ${j.env ? '' : 'disabled'}><span>${tr('Admin alerts')}<small class="muted">${tr('Warnings about the server go to the admins over their own notification channel (Web Push to their devices, ntfy only if they chose it or an admin topic is set): updates, delivery problems, watchdog errors, integrations, security events, disk space. Only counts, ids, usernames, device labels and error classes, never task contents.')}</small></span></label></div>
     ${meNone && j.on && j.env ? `<div class="shint aanone">${ic('bell', 's')} <span>${tr('No device subscribed for push yet. Until you subscribe one, admin alerts are only listed here.')}</span> <button class="btn sm" data-aa="notify">${tr('Subscribe this device')}</button></div>` : ''}
     <div class="row"><label for="aa-topic">${tr('Admin topic')}</label><input id="aa-topic" value="${esc(j.topic)}" autocapitalize="off" placeholder="${tr('empty = each admin’s own topic')}" ${j.topic_env ? 'readonly' : ''}></div>
@@ -7360,7 +7635,7 @@ function aboutHtml(chk, hint) {
     const when = new Date(a.checked_at).toLocaleString(I18N.code || 'en');
     h += hint(a.error ? tr('The last update check failed ({0}); it tries again later.', esc(a.error)) : a.latest ? tr('Up to date (checked {0}).', esc(when)) : tr('Checked {0}.', esc(when)));
   }
-  if (!a.update_env || !a.update_check) h += hint(tr('The update check is off (Settings > Administration).'));
+  if (!a.update_env || !a.update_check) h += hintK(tr('The update check is off (Settings > Administration).'));
   return h;
 }
 const ADMIN_SW = {'s-collaball': ['collab_all', N_('Collaboration for everyone')], 's-timeall': ['time_all', N_('Time tracking for everyone')], 's-updcheck': ['update_check', N_('Check daily for a new version')],
@@ -7471,12 +7746,12 @@ function tokModal(done) {
       secretModal(tr('Your new API token'), j.token, tr('Copy it now: it is shown only this once. Anyone with this token can act as you within its access rights. Example:') + ` <code class="topic">curl -H "Authorization: Bearer ${esc(j.prefix)}…" ${esc(location.origin)}/api/v1/me</code>`);
     } catch (x) { err.textContent = x.message; err.hidden = false; } finally { b.disabled = false; }
   });
-  setTimeout(() => $('#tk-name', md)?.focus(), 50);
+  if (!isTouch()) setTimeout(() => $('#tk-name', md)?.focus(), 50);  // 2.13.0: no keyboard popping up on touch
 }
 // ------------------------------------------------------------------ 2.9.0 (#435): calendar apps (CalDAV) + app passwords
 const DAV_DOCS = 'https://github.com/Gegenschuss/kalmido/blob/main/docs/CALDAV.md';
 const apwHtml = () => S.caldav?.enabled ? `<h4 id="s-apw-h">${tr('App passwords')}</h4>
-  <div class="shint">${tr('For calendar apps (CalDAV): one password per device, shown only once. Your Kalmido password never goes into a calendar app. If a device gets lost, revoke its password; the other devices keep working.')}</div>
+  <div class="shint keep">${tr('For calendar apps (CalDAV): one password per device, shown only once. Your Kalmido password never goes into a calendar app. If a device gets lost, revoke its password; the other devices keep working.')}</div>
   <div class="members" id="s-apws"><div class="muted mhint">${tr('Loading…')}</div></div>
   <div class="row"><button class="btn sm" data-apw="new">${ic('key', 's')} ${tr('New app password')}</button><button class="btn sm" data-apw="howto">${ic('cal', 's')} ${tr('Set up calendar apps')}</button></div>` : '';
 async function apwDraw(md) {
@@ -7528,7 +7803,7 @@ function caldavHtml(hint) {
     ${hint(tr('Your lists as task lists in Reminders (iPhone, iPad, Mac), Thunderbird, Evolution or on Android with Tasks.org or DAVx⁵: changes go both ways. Every list you see is one task list there; completed tasks stay for {0} days.', d.done_days))}
     ${cp(tr('Server'), d.server, 'dav-srv')}${cp(tr('CalDAV address'), d.url, 'dav-url')}${cp(tr('User name'), d.username, 'dav-user')}
     <div class="row"><label>${tr('Password')}</label><button class="btn sm pri" data-apw="new">${ic('key', 's')} ${tr('New app password')}</button><button class="linkbtn" data-apw="list">${tr('Manage app passwords')}</button></div>
-    ${hint(tr('Log in with your user name and an app password, never with your Kalmido password.'))}
+    ${hintK(tr('Log in with your user name and an app password, never with your Kalmido password.'))}
     <details class="shelp sdet"><summary>${tr('Step by step')}</summary><ul class="slist">
       <li>${tr('<b>iPhone / iPad:</b> Settings > Apps > Calendar > Calendar Accounts > Add Account > Other > Add CalDAV Account. Server {0}, your user name and the app password. Then switch on Reminders in the new account. Not found? Advanced Settings > Account URL {1}.', srv, prin)}</li>
       <li>${tr('<b>Mac:</b> System Settings > Internet Accounts > Add Account > Add Other Account > CalDAV account. Account type Manual, user name, app password, server address {0}; then tick Reminders. Not found? Account type Advanced, server path {1}, port 443, SSL on.', srv, `<code class="topic">${esc(new URL(d.principal).pathname)}</code>`)}</li>
@@ -7592,10 +7867,10 @@ function whModal(w, j, done) {
   const md = modal(`<h3>${w ? tr('Edit webhook') : tr('Add webhook')}</h3>
     <div class="row"><label for="wh-name">${tr('Name')}</label><input id="wh-name" maxlength="60" value="${esc(w?.name || '')}" placeholder="${tr('optional')}"></div>
     <div class="row"><label for="wh-url">${tr('URL')}</label><input id="wh-url" type="url" value="${esc(w?.url || '')}" placeholder="https://…" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
-    <div class="shint">${tr('https:// only; http:// and addresses in your own network only for hosts an admin allowed (Settings > Administration > Advanced).')}</div>
+    <div class="shint keep">${tr('https:// only; http:// and addresses in your own network only for hosts an admin allowed (Settings > Administration > Advanced).')}</div>
     <div class="featgrid" id="wh-evs">${evs.map(x => `<label><input type="checkbox" data-whev="${esc(x)}" ${on.has(x) ? 'checked' : ''}> ${esc(tr(WH_EV_NAMES[x] || x))} <code class="muted">${esc(x)}</code></label>`).join('')}</div>
     ${w ? `<div class="row"><label></label><label class="chkl"><input type="checkbox" id="wh-on" ${w.enabled ? 'checked' : ''}> ${tr('Active')}</label><button class="btn sm" data-m="secret">${ic('key', 's')} ${tr('New secret')}</button></div>` : ''}
-    <div class="shint">${tr('Only tasks and lists you can see are sent, with your tags. The signing secret is shown once after saving.')}</div>
+    <div class="shint keep">${tr('Only tasks and lists you can see are sent, with your tags. The signing secret is shown once after saving.')}</div>
     <div class="calerr" id="wh-err" hidden></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Save')}</button></div>`);
   md.addEventListener('click', async e => {
@@ -7619,11 +7894,11 @@ function whModal(w, j, done) {
       else toast(tr('Saved'));
     } catch (x) { show(x.message); } finally { b.disabled = false; }
   });
-  setTimeout(() => $(w ? '#wh-name' : '#wh-url', md)?.focus(), 50);
+  if (!isTouch()) setTimeout(() => $(w ? '#wh-name' : '#wh-url', md)?.focus(), 50);  // 2.13.0: no keyboard popping up on touch
 }
 async function whLog(w) {
   let j; try { j = await api('GET', `/api/me/webhooks/${w.id}/log`); } catch { return; }
-  const md = modal(`<h3>${tr('Delivery log')}</h3><div class="shint">${esc(w.name || urlHost(w.url))} · ${tr('the last {0} attempts, newest first; bodies are never stored', 50)}</div>
+  const md = modal(`<h3>${tr('Delivery log')}</h3><div class="shint keep">${esc(w.name || urlHost(w.url))} · ${tr('the last {0} attempts, newest first; bodies are never stored', 50)}</div>
     <div class="members whlog">${j.items.length ? j.items.map(x => `<div class="mrow ${x.ok ? '' : 'off'}"><span class="n"><b>${esc(x.event)}</b>${x.attempt > 1 ? ' · ' + esc(tr('attempt {0}', x.attempt)) : ''} · ${x.ok ? esc(tr('ok')) : `<span class="calerr">${esc(x.error_text || tr('failed'))}</span>`}${x.status ? ` · HTTP ${esc(String(x.status))}` : ''} · ${esc(String(x.ms))} ms<small class="muted">${esc(fmtWhen(x.created_at))}${x.delivery ? ' · ' + esc(x.delivery.slice(0, 8)) : ''}</small></span></div>`).join('') : `<div class="muted mhint">${tr('Nothing sent yet.')}</div>`}</div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
   md.addEventListener('click', e => { if (e.target.closest('[data-m="close"]')) md.remove(); });
@@ -7635,7 +7910,7 @@ function pubDraw(md, lid, j) {
   const k = j.link;
   box._j = j;
   box.innerHTML = `${k ? `<div class="row icalrow"><input id="lp-url" readonly value="${esc(k.url)}" aria-label="${tr('Public link')}"><button class="btn sm pri" data-lp="copy">${ic('copy', 's')} ${tr('Copy')}</button></div>
-      <div class="shint">${k.expired ? `<span class="calerr">${tr('Expired')}</span> · ` : ''}${esc(trn('opened {0} time', 'opened {0} times', k.views))}${k.last_used_at ? ' · ' + esc(tr('last {0}', relTime(k.last_used_at))) : ''}</div>` : `<div class="shint">${tr('People without an account can open the list through a secret link: only this list, without comments, assignees or files.')}</div>`}
+      <div class="shint">${k.expired ? `<span class="calerr">${tr('Expired')}</span> · ` : ''}${esc(trn('opened {0} time', 'opened {0} times', k.views))}${k.last_used_at ? ' · ' + esc(tr('last {0}', relTime(k.last_used_at))) : ''}</div>` : `<div class="shint keep">${tr('People without an account can open the list through a secret link: only this list, without comments, assignees or files.')}</div>`}
     <div class="row"><label for="lp-mode">${tr('Access')}</label><select id="lp-mode"><option value="view">${tr('View only')}</option><option value="tick" ${k?.mode === 'tick' ? 'selected' : ''}>${tr('View and tick off')}</option></select></div>
     <div class="row"><label for="lp-exp">${tr('Valid until')}</label>${dateIn('lp-exp', pubDate(k?.expires_at), {min: today(), label: tr('Valid until'), empty: tr('no expiry')})}</div>
     <div class="row"><label for="lp-pw">${tr('Password')}</label><input type="password" id="lp-pw" autocomplete="new-password" placeholder="${k?.has_password ? tr('saved, empty = keep') : tr('optional')}">${k?.has_password ? `<label class="chkl"><input type="checkbox" id="lp-nopw"> ${tr('remove')}</label>` : ''}</div>
@@ -7752,13 +8027,13 @@ function shareHtml(hint) {
       <li>${tr('In HTTP Shortcuts: menu ⋮ > Import / Export > Import from file, choose the downloaded ZIP.')}</li>
       <li>${tr('Then in any app: Share > HTTP Shortcuts > <b>Kalmido</b> for photos and files (also several), <b>Kalmido text</b> for links and text.')}</li>
     </ol>
-    ${hint(tr('The file contains your personal upload token: keep it to yourself like a password. Links and text also work with Share > Kalmido once the app is installed.'))}
+    ${hintK(tr('The file contains your personal upload token: keep it to yourself like a password. Links and text also work with Share > Kalmido once the app is installed.'))}
     <h5 class="ssub">${ic('phone', 's')}iPhone / iPad</h5>
     ${ios ? `<div class="row"><a class="btn sm" href="${esc(ios)}" target="_blank" rel="noopener noreferrer">${ic('plus', 's')} ${tr('Add the Kalmido shortcut')}</a></div>` : ''}
     <div class="row"><label for="s-dropurl">${tr('Server address')}</label><input id="s-dropurl" readonly value="${esc(dropBase(sh))}"><button class="btn sm" data-m="drop-copy-url">${ic('copy', 's')} ${tr('Copy')}</button></div>
-    <div class="shint">${tr('Without /drop: the shortcut adds it. (An address ending in /drop works too.)')}</div>
+    <div class="shint keep">${tr('Without /drop: the shortcut adds it. (An address ending in /drop works too.)')}</div>
     <div class="row"><label for="s-droptok">${tr('Upload token')}</label><input id="s-droptok" readonly type="password" value="••••••••••••" autocomplete="off"><button class="btn sm" data-m="drop-copy-tok">${ic('copy', 's')} ${tr('Copy')}</button><button class="btn sm" data-m="drop-new-tok" title="${esc(tr('The old token stops working'))}">${ic('key', 's')} ${tr('New token')}</button></div>
-    ${hint(tr('After a new token: paste it into the iPhone shortcut (or set the shortcut up again) and download the HTTP Shortcuts import again.'))}
+    ${hintK(tr('After a new token: paste it into the iPhone shortcut (or set the shortcut up again) and download the HTTP Shortcuts import again.'))}
     <details class="shelp sdet"><summary>${tr('Set it up in the Shortcuts app')}</summary><ol class="slist">
       ${ios ? `<li>${tr('Easiest: tap “Add the Kalmido shortcut” above, then Add Shortcut. It asks two questions: paste the server address (without /drop), then the upload token (copy them here first).')}</li>` : ''}
       <li>${tr('By hand: Shortcuts app > + (new shortcut), name it “Kalmido”.')}</li>
@@ -7818,7 +8093,7 @@ function notifMatrixHtml(s, hint) {
   const m = notifMatrix(s), social = collab();
   const rows = NOTIF_ROWS.filter(([r, , , f]) => (social || !NM_SOCIAL.includes(r)) && (!f || (f === 'deps' ? depsOn() : f === 'admin' ? !!S.me?.is_admin : f === 'propose' ? propOn() : feat('agents'))));
   const box = (r, ch, lab) => m[r][ch] === null ? `<span class="nmna" aria-label="${esc(tr('not available'))}">–</span>`
-    : `<input type="checkbox" data-nm="${r}" data-ch="${ch}" ${m[r][ch] ? 'checked' : ''} aria-label="${esc(tr(lab) + ': ' + (ch === 'news' ? tr('News') : tr('Push')))}">`;
+    : `<label class="nmhit"><input type="checkbox" data-nm="${r}" data-ch="${ch}" ${m[r][ch] ? 'checked' : ''} aria-label="${esc(tr(lab) + ': ' + (ch === 'news' ? tr('News') : tr('Push')))}"></label>`;  // 2.13.0: a 44 px hit area
   return `<h4 id="s-news-h">${tr('What notifies you')}</h4>
     ${hint(tr('News = under the bell in the app, Push = a notification on your devices. Your own actions never notify you. Each list can override this with its bell (list menu > Notifications).'))}
     <div class="nmx" role="table" aria-labelledby="s-news-h"><div class="nmh" role="row"><span role="columnheader">${tr('Event')}</span><span role="columnheader">${tr('News')}</span><span role="columnheader">${tr('Push')}</span></div>
@@ -7890,7 +8165,7 @@ async function grpEdit(smd, gid) {
     try { await calReq(g ? 'PATCH' : 'POST', g ? `/api/admin/groups/${gid}` : '/api/admin/groups', q); } catch (x) { err.textContent = x.message; err.hidden = false; b.disabled = false; return; }
     md.remove(); await load().catch(() => {}); render(); grpDraw(smd); toast(g ? tr('Group saved') : tr('Group created'));
   });
-  setTimeout(() => $('#gr-name', md)?.focus(), 50);
+  if (!isTouch()) setTimeout(() => $('#gr-name', md)?.focus(), 50);  // 2.13.0: no keyboard popping up on touch
 }
 // the "Groups" part of the share dialog of a list: shared directly (role + remove) or through a folder (read-only here)
 function shareGroupsHtml(cur, mng, roleSel) {
@@ -8023,7 +8298,7 @@ function userModal(u, done) {
       await load(); render();
     } catch { /* api() showed it */ }
   });
-  if (!u) setTimeout(() => $('#u-user', md).focus(), 50);
+  if (!isTouch() && (!u))  setTimeout(() => $('#u-user', md).focus(), 50);
 }
 async function logout() {
   if (OUT.q.length && !await askConfirm(trn('{0} change is not synced yet and will be lost. Log out anyway?', '{0} changes are not synced yet and will be lost. Log out anyway?', OUT.q.length), '', {ok: tr('Log out'), danger: true})) return;
@@ -8041,7 +8316,7 @@ async function authScreen(j) {
   const kind = info.setup ? 'setup' : j.auth;
   const el = document.createElement('div');
   el.className = 'modal authscreen';
-  const logo = `<div class="alogo"><img src="/static/icon.svg" alt=""><b>${APP_NAME}</b></div>`;
+  const logo = `<div class="alogo">${logoSvg(40)}<b>${APP_NAME}</b></div>`;
   if (kind === 'no_account' || kind === 'disabled') {
     el.innerHTML = `<div class="card">${logo}<p>${kind === 'disabled' ? esc(tr('The account “{0}” is disabled.', j.login || '')) : esc(tr('There is no {0} account for “{1}” yet.', APP_NAME, j.login || ''))}</p><p class="muted">${tr('Please ask the admin to create one (or to enable it).')}</p></div>`;
   } else {
@@ -8051,7 +8326,7 @@ async function authScreen(j) {
       <form id="auth-form" autocomplete="on">
         <label class="aulab" for="au-user">${tr('Username')}</label><input id="au-user" name="username" autocapitalize="off" autocomplete="username" required value="${setup && info.login ? esc(String(info.login).toLowerCase()) : ''}">
         ${setup ? `<label class="aulab" for="au-name">${tr('Display name')}</label><input id="au-name" maxlength="60" autocomplete="name" placeholder="${tr('optional')}">` : ''}
-        <label class="aulab" for="au-pw">${tr('Password')}</label><input id="au-pw" name="password" type="password" autocomplete="${setup ? 'new-password' : 'current-password'}" ${setup && info.login ? '' : 'required'} ${setup ? `placeholder="${tr('at least {0} characters', 8)}"` : ''}>
+        <label class="aulab" for="au-pw">${tr('Password')}</label><span class="pwwrap"><input id="au-pw" name="password" type="password" autocomplete="${setup ? 'new-password' : 'current-password'}" ${setup && info.login ? '' : 'required'} ${setup ? `placeholder="${tr('at least {0} characters', 8)}"` : ''}><button type="button" class="iconbtn pweye" data-au="pwshow" aria-pressed="false" aria-label="${esc(tr('Show password'))}" title="${esc(tr('Show password'))}">${ic('eye', 's')}</button></span>
         ${setup ? '' : `<label class="chkl"><input type="checkbox" id="au-rem" checked> ${tr('Stay logged in')}</label>`}
         <div class="aerr" id="au-err"></div>
         <button class="btn pri" type="submit">${setup ? tr('Create account') : tr('Log in')}</button>
@@ -8066,11 +8341,12 @@ async function authScreen(j) {
       const rem = $('#au-rem', el)?.checked !== false;
       if (b.dataset.au === 'oidc') location.href = '/api/auth/oidc/start?remember=' + (rem ? 1 : 0);
       if (b.dataset.au === 'passkey') authPasskey($('#au-err', el), rem);
+      if (b.dataset.au === 'pwshow') { const i = $('#au-pw', el), on = i.type === 'password'; i.type = on ? 'text' : 'password'; b.setAttribute('aria-pressed', String(on)); i.focus(); }  // 2.13.0 (#453 P7)
     });
     el.querySelector('#auth-form').addEventListener('submit', async e => {
       e.preventDefault();
       const errEl = $('#au-err', el);
-      const body = setup ? {username: $('#au-user', el).value.trim(), display_name: $('#au-name', el).value.trim(), password: $('#au-pw', el).value}
+      const body = setup ? {username: $('#au-user', el).value.trim(), display_name: $('#au-name', el).value.trim(), password: $('#au-pw', el).value, wizard: true}
         : {username: $('#au-user', el).value.trim(), password: $('#au-pw', el).value, remember: $('#au-rem', el).checked};
       try {
         const r = await fetch(setup ? '/api/auth/setup' : '/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify(body)});
@@ -8084,6 +8360,7 @@ async function authScreen(j) {
     });
   }
   document.body.appendChild(el);
+  $('#app')?.setAttribute('inert', '');  // 2.13.0 (#453 P7): nothing behind the login (the hidden "New task" button) gets the focus
   setTimeout(() => $('#au-user', el)?.focus(), 50);
 }
 // ------------------------------------------------------------------ passkeys (WebAuthn), two-factor, backups
@@ -8181,11 +8458,11 @@ async function tfaDraw(md, j) {
   }
   const when = x => x ? new Date(x).toLocaleDateString(I18N.code || 'en') : '';
   const on = j.totp || j.passkeys.length;
-  let h = j.required ? hint(tr('Required on this server: keep at least one method (authenticator app or passkey).')) : '';
+  let h = j.required ? hintK(tr('Required on this server: keep at least one method (authenticator app or passkey).')) : '';
   h += `<div class="row"><label>${tr('Authenticator app')}</label><span class="tfastate ${j.totp ? 'on' : ''}">${j.totp ? tr('On') : tr('Off')}</span>
       ${j.totp ? `<button class="btn sm" data-tfa="totp-off">${tr('Turn off')}</button>` : `<button class="btn sm pri" data-tfa="totp-on">${ic('lock', 's')} ${tr('Set up')}</button>`}</div>`;
   h += `<div class="row"><label>${tr('Passkeys')}</label><button class="btn sm" data-tfa="pk-add" ${pkSupported() ? '' : 'disabled'}>${ic('key', 's')} ${tr('Add a passkey')}</button></div>`;
-  if (!pkSupported()) h += hint(tr('Passkeys need HTTPS (or localhost), a host name instead of an IP address and a current browser.'));
+  if (!pkSupported()) h += hintK(tr('Passkeys need HTTPS (or localhost), a host name instead of an IP address and a current browser.'));
   if (j.passkeys.length) h += `<div class="members pklist">${j.passkeys.map(p => `<div class="mrow" data-pk="${p.id}"><span class="avatar">${ic('key', 's')}</span><span class="n">${esc(p.name)} <small class="muted">${tr('added {0}', esc(when(p.created_at)))}${p.last_used_at ? ' · ' + tr('last used {0}', esc(when(p.last_used_at))) : ''}${p.synced ? ' · ' + tr('synced') : ''}</small></span><button class="iconbtn" data-tfa="pk-ren" title="${tr('Rename')}">${ic('edit', 's')}</button><button class="iconbtn" data-tfa="pk-del" title="${tr('Remove')}">${ic('trash', 's')}</button></div>`).join('')}</div>`;
   if (on) h += `<div class="row"><label>${tr('Recovery codes')}</label><span class="muted">${trn('{0} left', '{0} left', j.recovery_left)}</span><button class="btn sm" data-tfa="rc-new">${tr('New codes')}</button></div>`;
   h += hint(on ? tr('After your password, the login asks for a code from the app or your passkey.') + (j.passkey_login && j.passkeys.length ? ' ' + tr('A passkey also logs you in without the password (“Log in with a passkey”).') : '')
@@ -8367,10 +8644,10 @@ function oidcForm(o, hint) {
   }).join('');
   return `<details class="shelp sdet oidcform" ${o.configured ? '' : 'open'}><summary>${o.configured ? tr('Change the provider settings') : tr('Set up the provider')}</summary>
     ${f}
-    ${hint(tr('Admin e-mail domains: comma-separated. Whoever logs in with a verified e-mail of one of them becomes an admin, like the admin group (and no longer is one otherwise; the last admin always stays).'))}
+    ${hintK(tr('Admin e-mail domains: comma-separated. Whoever logs in with a verified e-mail of one of them becomes an admin, like the admin group (and no longer is one otherwise; the last admin always stays).'))}
     ${env.size ? hint(tr('Fields set with KALMIDO_OIDC_* environment variables are locked here: the environment always wins.')) : ''}
     ${o.secret_lost ? `<div class="shint cnote">${tr('The stored client secret cannot be read with the current KALMIDO_SECRET_KEY: enter it again.')}</div>` : ''}
-    ${!o.secret_key && !env.has('client_secret') ? hint(tr('Without KALMIDO_SECRET_KEY on the server the client secret can only be set as an environment variable.')) : ''}
+    ${!o.secret_key && !env.has('client_secret') ? hintK(tr('Without KALMIDO_SECRET_KEY on the server the client secret can only be set as an environment variable.')) : ''}
     <div class="row"><button class="btn sm pri" data-oidc="save">${tr('Save')}</button>${o.configured ? `<button class="btn sm" data-oidc="check">${ic('check', 's')} ${tr('Check provider')}</button>` : ''}<a class="btn sm" href="${OIDC_DOCS}" target="_blank" rel="noopener noreferrer">${ic('help', 's')} ${tr('Provider guides')}</a></div>
     <div class="shint" id="oi-res" role="status" aria-live="polite"></div></details>`;
 }
@@ -8397,6 +8674,16 @@ function oidcWire(md) {
   });
 }
 // ---- Settings > Users > Whole server > Backups
+// 2.13.0: "Check storage": files of tasks / projects that are missing, empty or cut off on disk (read-only)
+const stoHtml = () => `<h4 id="s-sto-h">${tr('Check storage')}</h4><div class="row"><button class="btn sm" data-m="sto-check">${ic('search', 's')} ${tr('Check storage')}</button></div><div id="s-sto" role="status" aria-live="polite"></div>`;
+async function stoCheck(md) {
+  const box = $('#s-sto', md); if (!box) return;
+  box.innerHTML = `<div class="muted mhint">${tr('Loading…')}</div>`;
+  let j; try { j = await api('GET', '/api/admin/storage-check'); } catch { box.innerHTML = ''; return; }
+  const P = {missing: N_('missing'), empty: N_('empty'), size: N_('incomplete')};
+  box.innerHTML = !j.problems.length ? `<div class="muted mhint">${esc(trn('{0} file checked, all fine', '{0} files checked, all fine', j.checked))}</div>`
+    : `<div class="mhint warn">${esc(trn('{0} damaged or missing file', '{0} damaged or missing files', j.problems.length))}</div><ul class="stol">${j.problems.map(p => `<li><b>${esc(p.name)}</b> <span class="muted">${esc(p.where)} · ${esc(tr(P[p.problem]))}</span>${p.kind === 'attachment' && p.owner ? ` <button class="linkbtn" data-act="open-id" data-id="${p.owner}">${tr('Open')}</button>` : ''}</li>`).join('')}</ul>`;
+}
 const bkHtml = () => `<h4 id="s-bk-h">${tr('Backups')}</h4><div id="s-bk"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 const BK_KIND = {auto: N_('automatic'), manual: N_('manual'), safety: N_('before a restore')};
 const fmtBytes = n => n >= 1e9 ? (n / 1e9).toFixed(1) + ' GB' : n >= 1e6 ? (n / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round((n || 0) / 1e3)) + ' kB';
@@ -8683,7 +8970,7 @@ function tplUseModal(tp) {
     let j; try { j = await api('POST', `/api/templates/${tp.id}/apply`, {name, folder: fNorm($('#tu-folder', md).value), start: $('#tu-start', md).value || today(), ...(end ? {end} : {})}); } catch { return; }
     md.remove(); await load(); go('l/' + j.list_id); toast(tr('List created from template'));
   });
-  setTimeout(() => $('#tu-name', md).focus(), 50);
+  if (!isTouch()) setTimeout(() => $('#tu-name', md).focus(), 50);  // 2.13.0: no keyboard popping up on touch
 }
 function templateMenu(anchor, kind) {
   const ts = tplOf(kind);
@@ -8729,9 +9016,9 @@ function templateModal(tp, done) {
       <div class="row"><label>${tr('Time')}</label>${timeIn('tp-time', root.due_time || '', {label: tr('Time'), empty: tr('all day')})}${root.repeat ? `<span class="muted" style="font-size:var(--fs-s)">${ic('repeat', 's')} ${esc(repeatLabel(root.repeat))}</span>` : ''}</div>
       <div class="row"><label>${tr('Tags')}</label><input id="tp-tags" value="${esc((root.tags || []).join(', '))}" placeholder="${tr('tag1, tag2')}"></div>
       <h4>${tr('Subtasks')}</h4>`
-    : `<div class="row"><label>${tr('List name')}</label><input id="tp-lname" value="${esc(d.name || '')}"></div>${d.rel ? `<div class="shint">${esc(tr('Dates count from the project start (Start + n days); the last task is due on day {0}. Using it asks for the start.', d.span || 0))}${d.deps?.length ? ' ' + esc(trn('{0} dependency is kept.', '{0} dependencies are kept.', d.deps.length)) : ''}</div>` : ''}${d.fields?.length ? `<div class="row"><label>${tr('Custom fields')}</label><span class="muted">${esc(d.fields.map(f => f.name).join(', '))}</span></div>` : ''}<h4>${tr('Sections and tasks')}</h4>`}
+    : `<div class="row"><label>${tr('List name')}</label><input id="tp-lname" value="${esc(d.name || '')}"></div>${d.rel ? `<div class="shint keep">${esc(tr('Dates count from the project start (Start + n days); the last task is due on day {0}. Using it asks for the start.', d.span || 0))}${d.deps?.length ? ' ' + esc(trn('{0} dependency is kept.', '{0} dependencies are kept.', d.deps.length)) : ''}</div>` : ''}${d.fields?.length ? `<div class="row"><label>${tr('Custom fields')}</label><span class="muted">${esc(d.fields.map(f => f.name).join(', '))}</span></div>` : ''}<h4>${tr('Sections and tasks')}</h4>`}
     <textarea id="tp-outline" class="tpoutline" rows="9" spellcheck="false">${esc(task ? tplOutline(root.children || []) : tplListOutline(d))}</textarea>
-    <div class="shint">${task ? tr('One subtask per line, indent with two spaces for a further level (at most 3 levels in total).') : tr('One task per line, indent with two spaces for subtasks. A line “# Name” starts a section.')} ${tr('Lines that keep their title keep their dates, priority and notes.')}</div>
+    <div class="shint keep">${task ? tr('One subtask per line, indent with two spaces for a further level (at most 3 levels in total).') : tr('One task per line, indent with two spaces for subtasks. A line “# Name” starts a section.')} ${tr('Lines that keep their title keep their dates, priority and notes.')}</div>
     <div class="foot"><button class="btn danger" data-m="del">${tr('Delete')}</button><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   md.classList.add('tpmodal');
   md.addEventListener('click', async e => {
@@ -8761,7 +9048,7 @@ function templateModal(tp, done) {
     } catch { return; }  // api() showed it
     md.remove(); await load(); render(); done && done(); toast(b.dataset.m === 'del' ? tr('Template deleted') : tr('Saved'));
   });
-  setTimeout(() => $('#tp-name', md).focus(), 50);
+  if (!isTouch()) setTimeout(() => $('#tp-name', md).focus(), 50);  // 2.13.0: no keyboard popping up on touch
 }
 async function templatesDraw(md) {
   const box = $('#s-tpls', md); if (!box) return;
@@ -9119,7 +9406,7 @@ function entryModal(e, preset = {}) {
     await timeChanged(j);
   });
   md.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.tagName === 'INPUT') $('[data-m="save"]', md).click(); });
-  setTimeout(() => $(e ? '#te-note' : run ? '#te-from' : '#te-dur', md)?.focus(), 50);
+  if (!isTouch()) setTimeout(() => $(e ? '#te-note' : run ? '#te-from' : '#te-dur', md)?.focus(), 50);  // 2.13.0: no keyboard popping up on touch
 }
 async function teDelete(id) {
   const e = findEntry(id); if (!e) return;
@@ -9308,7 +9595,7 @@ function progBar(p, cls = '') {
 }
 function progMeta(p) {
   return (p.overdue ? `<span class="lmeta over">${trn('{0} overdue', '{0} overdue', p.overdue)}</span>` : '') +
-    (p.next_due ? `<span class="lmeta">${tr('next: {0}', esc(dayLabel(p.next_due)))}</span>` : '');
+    (p.next_due ? `<span class="lmeta">${tr('Next due: {0}', esc(dayLabel(p.next_due)))}</span>` : '');  // 2.13.0 (#453 P1): says what "next" is
 }
 function statusPill(l, act = true, empty = l.shared) {
   if (!statusFor(l) || l.is_inbox) return '';
@@ -9319,11 +9606,19 @@ function statusNote(l) {
   if (!statusFor(l) || !l.status || !l.status_note) return '';
   return `<div class="lnote"><span>${esc(l.status_note)}</span><span class="muted">${esc([l.status_by_name, l.status_at ? relTime(l.status_at) : ''].filter(Boolean).join(' · '))}</span></div>`;
 }
-function listHead(l) {
-  if (!l || l.is_inbox) return agBandHtml();
-  const p = l.progress || {done: 0, total: 0, overdue: 0}, showP = progressFor(l) && p.total > 0 && !progHidden(l.id), pill = statusPill(l), ts = timeSumHtml([l]);
-  if (!showP && !pill && !ts) return agBandHtml();
-  return `<div class="lhead">${showP ? progBar(p) + progMeta(p) + `<button class="iconbtn lpx" data-act="prog-hide" data-id="${l.id}" title="${tr('Hide progress')}" aria-label="${tr('Hide progress')}">${ic('x', 's')}</button>` : ''}<span class="spacer"></span>${ts}${pill}</div>${statusNote(l)}${agBandHtml()}`;
+// 2.13.0 (#453 A7): phones (and a folded Fold): the views of a list as a compact segmented control right under the title
+// (before: only in "…" with 18 entries); the active one is marked (aria-pressed + fill)
+function vsegHtml(l) {
+  if (!l || !isMobile()) return '';
+  const ch = viewChoices(l); if (ch.length < 2) return '';
+  const v = curView(l), short = {overview: N_('Overview')};
+  return `<div class="vsegm" role="group" aria-label="${esc(tr('View'))}">${ch.map(([k, n, i]) => `<button type="button" class="${v === k ? 'on' : ''}" data-act="view-${k}" aria-pressed="${v === k}" title="${esc(tr(n))}">${ic(i, 's')}<span>${esc(tr(short[k] || n))}</span></button>`).join('')}</div>`;
+}
+function listHead(l, o = {}) {
+  if (!l || l.is_inbox) return vsegHtml(l) + agBandHtml();
+  const p = l.progress || {done: 0, total: 0, overdue: 0}, showP = progressFor(l) && p.total > 0 && !progHidden(l.id), pill = o.noPill ? '' : statusPill(l), ts = timeSumHtml([l]);
+  if (!showP && !pill && !ts) return vsegHtml(l) + agBandHtml();
+  return `${vsegHtml(l)}<div class="lhead">${showP ? `<span class="lpg">${progBar(p)}<button class="iconbtn lpx" data-act="prog-hide" data-id="${l.id}" title="${tr('Hide progress')}" aria-label="${tr('Hide progress')}">${ic('x', 's')}</button></span>` + progMeta(p) : ''}<span class="spacer"></span>${ts}${pill}</div>${statusNote(l)}${agBandHtml()}`;
 }
 // ---- 2.7.0 (#407): the tracked time of a project list (or of a folder's project lists) in its header, in hours and in
 // working days. Hours per day / shift: the list's own value (list dialog, owner; the same for every member), else the
@@ -9343,7 +9638,7 @@ function timeSumHtml(lists) {
   const tip = [tr('Tracked: {0}', fmtDur(sec)), dh.size === 1 ? tr('{0} at {1} h per day', dtxt, fmtNum([...dh][0])) : tr('{0}, each list with its own hours per day', dtxt),
     bud ? tr('Budget: {0} h', fmtNum(bud)) : ''].filter(Boolean).join(' · ');
   const pct = bud ? Math.min(100, Math.round(h / bud * 100)) : 0;
-  return `<span class="tsum ${bud && h > bud ? 'over' : ''}" title="${esc(tip)}" aria-label="${esc(tip)}">${ic('clock', 's')}<b>${esc(fmtNum(h))} h</b><span class="tsd">${esc(dtxt)}</span>${bud ? `<span class="tbud" role="img" aria-label="${esc(tr('{0} % of the budget', Math.round(h / bud * 100)))}"><i style="width:${pct}%"></i></span><span class="tbn">${esc(fmtNum(h))}/${esc(fmtNum(bud))} h</span>` : ''}</span>`;
+  return `<span class="tsum ${bud && h > bud ? 'over' : ''}" title="${esc(tip)}" aria-label="${esc(tip)}">${ic('clock', 's')}<span class="tsl">${tr('Tracked')}</span><b>${esc(fmtNum(h))} h</b><span class="tsd">${esc(dtxt)}</span>${bud ? `<span class="tbud" role="img" aria-label="${esc(tr('{0} % of the budget', Math.round(h / bud * 100)))}"><i style="width:${pct}%"></i></span><span class="tbn">${esc(fmtNum(h))}/${esc(fmtNum(bud))} h</span>` : ''}</span>`;
 }
 function folderHead(f) {
   const ts = timeSumHtml(folderLists(f));
@@ -9356,7 +9651,7 @@ async function statusModal(lid) {
   const md = modal(`<h3>${tr('Project status')} · ${esc(lname(l))}</h3>
     ${can ? `<div class="stchoice">${STATUSES.map(([k, n]) => `<button class="stopt st-${k} ${sel === k ? 'on' : ''}" data-st="${k}"><i></i>${tr(n)}</button>`).join('')}<button class="stopt st-none ${sel ? '' : 'on'}" data-st=""><i></i>${tr('No status')}</button></div>
       <textarea id="st-note" rows="3" maxlength="500" placeholder="${tr('Short update: what is going on, what is needed?')}">${esc(l.status_note || '')}</textarea>
-      <div class="shint">${collab() && l.shared ? tr('Everyone in this list sees the status and gets it in their News.') : tr('Shown in the list header, the sidebar and the overview.')}</div>`
+      <div class="shint keep">${collab() && l.shared ? tr('Everyone in this list sees the status and gets it in their News.') : tr('Shown in the list header, the sidebar and the overview.')}</div>`
     : `<div class="rohint">${ic('eye', 's')}${tr('View only')}</div>`}
     <h4>${tr('History')}</h4><div class="sthist" id="st-hist"><div class="muted mhint">${tr('Loading…')}</div></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button>${can ? `<button class="btn pri" data-m="save">${tr('Update status')}</button>` : ''}</div>`);
@@ -9449,8 +9744,8 @@ async function setListView(l, v) {  // List / Kanban / Timeline (stored on the s
   if (v !== listView(l)) { await api('PATCH', '/api/lists/' + l.id, {view: v}); await load(); }
   if (was || v !== listView(l)) render(); else render();
 }
-const viewChoices = l => [['list', N_('List'), 'list'], ...(feat('kanban') ? [['kanban', N_('Kanban'), 'kanban']] : []), ...(feat('timeline') ? [['timeline', N_('Timeline'), 'timeline']] : []),
-  ...(l.kind === 'project' && !l.is_inbox ? [['overview', N_('Project overview'), 'brief']] : [])];
+// 2.13.0: in projects the overview comes first
+const viewChoices = l => [...(l.kind === 'project' && !l.is_inbox ? [['overview', N_('Project overview'), 'brief']] : []), ['list', N_('List'), 'list'], ...(feat('kanban') ? [['kanban', N_('Kanban'), 'kanban']] : []), ...(feat('timeline') ? [['timeline', N_('Timeline'), 'timeline']] : [])];
 const curView = l => povOn(l) ? 'overview' : listView(l);
 async function povLoad(lid, force) {
   const d = S.povD[lid] || (S.povD[lid] = {});
@@ -9490,7 +9785,7 @@ function povSec(id, title, body, extra = '') {
 function viewProjOv() {
   const l = routeList(), d = S.povD[l.id];
   if (!d || (!d.busy && d.v !== S.v)) setTimeout(() => povLoad(l.id), 0);
-  const head = `${listHead(l)}`;
+  const head = `${listHead(l, {noPill: true})}`;  // 2.13.0 (#453 P1): "Set status" only once (in the status section)
   if (!d?.j) return `<div class="pov">${head}<div class="muted mhint">${d?.err ? (d.err === 'offline' ? tr('Only available online.') : esc(d.err)) : tr('Loading…')}</div></div>`;
   const j = d.j, can = !!j.can_edit && !l.archived, t0 = today();
   // description
@@ -9653,7 +9948,7 @@ function depPicker(tid, dir) {
   const have = new Set((dir === 'by' ? D.blocked_by : D.blocking).filter(x => x.id).map(x => x.id));
   const self = taskById(tid);
   const md = modal(`<h3>${dir === 'by' ? tr('Waiting on…') : tr('Blocking…')}</h3>
-    <div class="shint">${dir === 'by' ? tr('“{0}” can only really start once the chosen task is done.', esc(self?.title || '')) : tr('The chosen task waits on “{0}”.', esc(self?.title || ''))}</div>
+    <div class="shint keep">${dir === 'by' ? tr('“{0}” can only really start once the chosen task is done.', esc(self?.title || '')) : tr('The chosen task waits on “{0}”.', esc(self?.title || ''))}</div>
     <input id="dp-q" placeholder="${tr('Search open tasks')}" autocomplete="off" style="width:100%;margin-top:.5rem">
     <div class="dplist" id="dp-list"></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button></div>`);
@@ -9724,8 +10019,8 @@ function fieldModal(lid, f, done) {
   const extra = () => {
     const x = $('#fd-extra', md);
     if (st.type === 'number') x.innerHTML = `<div class="row"><label>${tr('Unit')}</label><input id="fd-unit" value="${esc(f?.options?.unit || '')}" maxlength="12" placeholder="${tr('optional, e.g. € or h')}" style="max-width:8.75rem"></div>`;
-    else if (st.type === 'select') x.innerHTML = `<h4>${tr('Options')}</h4><div class="optlist">${st.opts.map((o, i) => `<div class="optrow" data-i="${i}"><button class="swc" data-ocol="${i}" style="background:${cssColor(o.color) || 'var(--bg4)'}" title="${tr('Color')}"></button><input data-oname="${i}" value="${esc(o.name)}" maxlength="60" placeholder="${tr('Option')}"><button class="iconbtn" data-orm="${i}" title="${tr('Remove')}">${ic('x', 's')}</button></div>`).join('')}</div><button class="btn sm" data-m="opt-add">${ic('plus', 's')} ${tr('Option')}</button>${edit ? `<div class="shint">${tr('Removing an option clears it in all tasks.')}</div>` : ''}`;
-    else x.innerHTML = st.type === 'person' ? `<div class="shint">${tr('Pick the owner or a member of the list.')}</div>` : '';
+    else if (st.type === 'select') x.innerHTML = `<h4>${tr('Options')}</h4><div class="optlist">${st.opts.map((o, i) => `<div class="optrow" data-i="${i}"><button class="swc" data-ocol="${i}" style="background:${cssColor(o.color) || 'var(--bg4)'}" title="${tr('Color')}"></button><input data-oname="${i}" value="${esc(o.name)}" maxlength="60" placeholder="${tr('Option')}"><button class="iconbtn" data-orm="${i}" title="${tr('Remove')}">${ic('x', 's')}</button></div>`).join('')}</div><button class="btn sm" data-m="opt-add">${ic('plus', 's')} ${tr('Option')}</button>${edit ? `<div class="shint keep">${tr('Removing an option clears it in all tasks.')}</div>` : ''}`;
+    else x.innerHTML = st.type === 'person' ? `<div class="shint keep">${tr('Pick the owner or a member of the list.')}</div>` : '';
   };
   extra();
   md.addEventListener('change', e => { if (e.target.id === 'fd-type') { st.type = e.target.value; extra(); } });
@@ -9809,12 +10104,17 @@ function toastPlace(el) {
     const e = $(s); if (!e || !e.offsetWidth) continue;
     const r = e.getBoundingClientRect(); if (r.top > innerHeight * .5 && r.top < top && r.bottom > innerHeight - 160) top = r.top;
   }
-  el.style.bottom = top < innerHeight ? Math.round(innerHeight - top + 12) + 'px' : '';
+  // 2.13.0 (#453 A12): an open bottom sheet (snooze, date, menus) is never covered: the toast sits above its top edge,
+  // or at the top of the screen when the sheet is that tall
+  const sh = $('#pop.sheet:not(.hidden)'), sr = sh && sh.offsetHeight ? sh.getBoundingClientRect() : null;
+  el.classList.toggle('totop', !!sr && sr.top < innerHeight * .3);
+  if (sr && sr.top >= innerHeight * .3) top = Math.min(top, sr.top);
+  el.style.bottom = el.classList.contains('totop') ? '' : top < innerHeight ? Math.round(innerHeight - top + 12) + 'px' : '';
 }
-function toast(msg, undo, ms) {
+function toast(msg, undo, ms, label) {  // label: the button's text instead of "Undo" (2.13.0: "Open")
   const el = $('#toast');
-  if (!undo) HIST.toastE = null;  // any other message ends the toast's shortcut (the history keeps the step)
-  el.innerHTML = `<span>${esc(msg)}</span>${undo ? `<button>${tr('Undo')}</button>${isMobile() ? '' : kb('Mod+Z')}` : ''}`;
+  if (!undo || label) HIST.toastE = null;  // any other message ends the toast's shortcut (the history keeps the step)
+  el.innerHTML = `<span>${esc(msg)}</span>${undo ? `<button>${esc(label || tr('Undo'))}</button>${isMobile() || label ? '' : kb('Mod+Z')}` : ''}`;
   el.classList.remove('hidden');
   toastPlace(el);
   if (undo) el.querySelector('button').onclick = () => { el.classList.add('hidden'); undo(); };
@@ -9860,6 +10160,13 @@ async function submitQuick(input, extra = {}) {
   const created = await createTask(body);
   if (cap) { captureDone(created, body); return; }
   if (created?.id && input.id === 'qinput') hintDone('qsyntax');
+  // 2.13.0 (#453 P8): a task that does not show up in the open view (e.g. "… tomorrow 10:00" typed in Today lands in the
+  // Inbox) says where it went, with "Open"
+  if (created?.id && !d.files?.length) setTimeout(() => {
+    if ($(`#view .trow[data-id="${created.id}"]`)) return;
+    const t = taskById(created.id) || created, l = listById(t.list_id);
+    toast([l ? lname(l) : '', t.due ? dayLabel(t.due) + (t.due_time ? ' ' + t.due_time : '') : ''].filter(Boolean).join(' · ') || tr('Added'), () => openDetail(created.id), 5000, tr('Open'));
+  }, 350);
   if (d.files?.length && created?.id) { await uploadFiles(created.id, d.files); openDetail(created.id); }
   const again = document.body.contains(input) ? input : $('#' + input.id); if (again) again.focus();
 }
@@ -9873,7 +10180,8 @@ function openQuickSheet(prefill = '', preset = {}) {
     document.body.appendChild(q);
   }
   $('#scrim').classList.remove('hidden');
-  popOnClose = () => { q.remove(); S.quickPreset = {}; };
+  document.body.classList.add('qsheet-open');  // 2.13.0 (#453 P8): the + button does not peek out behind the sheet
+  popOnClose = () => { q.remove(); S.quickPreset = {}; document.body.classList.remove('qsheet-open'); };
   const nf = preset.files?.length || 0;
   const hint = [preset.due ? dayLabel(preset.due) + (preset.due_time ? ' ' + preset.due_time : '') : '', preset.content ? tr('Link as description') : '', preset.url ? tr('Link: {0}', urlHost(preset.url)) : '',
     nf ? (nf === 1 ? tr('Attachment: {0}', preset.files[0].name) : tr('{0} attachments', nf)) : ''].filter(Boolean).join(' · ');
@@ -9910,10 +10218,10 @@ function captureHelp() {  // /capture without a page: the bookmarklet + the keyb
     <p class="muted">${tr('Capture a thought or the page you are reading into the inbox, from anywhere. The quick add syntax works: tomorrow, !high, #tag, ~list.')}</p>
     <h4>${tr('Bookmarklet')}</h4>
     <div class="row caprow"><a class="btn pri capbm" href="${esc(bookmarklet())}" data-act="bm-hint" draggable="true">${ic('zap', 's')} ${tr('Add to Kalmido')}</a></div>
-    <div class="shint">${tr('Drag the button to your bookmarks bar. On any page, click it: a small window opens with the page title and address, Enter saves it to your inbox. It runs no code of ours on that page and uses your normal sign-in.')}</div>
+    <div class="shint keep">${tr('Drag the button to your bookmarks bar. On any page, click it: a small window opens with the page title and address, Enter saves it to your inbox. It runs no code of ours on that page and uses your normal sign-in.')}</div>
     <h4>${tr('Keyboard')}</h4>
     <div class="kbrow"><span>${tr('In the app')}</span>${kb('q')} ${kb('Ctrl+Space')}</div>
-    <div class="shint">${tr('Installed app: its icon menu (right-click in the taskbar or dock, long-press on phones) has “Quick add”. A system-wide key: Windows: Start menu > right-click Kalmido > More > Open file location > Properties > Shortcut key; macOS: Shortcuts app > New shortcut “Open URL” with {0} > Add keyboard shortcut; Linux (GNOME / KDE): a custom shortcut that opens {0} in your browser.', location.origin + '/capture')}</div>
+    <div class="shint keep">${tr('Installed app: its icon menu (right-click in the taskbar or dock, long-press on phones) has “Quick add”. A system-wide key: Windows: Start menu > right-click Kalmido > More > Open file location > Properties > Shortcut key; macOS: Shortcuts app > New shortcut “Open URL” with {0} > Add keyboard shortcut; Linux (GNOME / KDE): a custom shortcut that opens {0} in your browser.', location.origin + '/capture')}</div>
     <div class="foot"><span class="spacer"></span><a class="btn" href="/#inbox">${tr('Open Kalmido')}</a><button class="btn pri" data-m="cap">${ic('plus', 's')} ${tr('Capture now')}</button></div>`);
   md.classList.add('capmodal');
   md.addEventListener('click', e => {
@@ -10026,8 +10334,8 @@ document.addEventListener('click', async e => {
     case 'news-dismiss': newsDismiss(+a.dataset.i); break;
     case 'news-settings': settingsModal('newskinds'); break;
     case 'news-unread': S.nf.unread = !S.nf.unread; LS.set('newsUnread', S.nf.unread); renderView(); break;
-    case 'news-readall': S.nf.items?.forEach(x => { x.read = true; }); newsRead({all: true}); break;
-    case 'news-filter': S.nf.filter = a.dataset.f; LS.set('newsFilter', a.dataset.f); S.nf.items = null; renderView(); break;
+    case 'news-readall': newsReadAll().then(() => { if (S.route.mod === 'news') renderView(); }); break;  // 2.13.0: with undo
+    case 'news-filter': if (a.dataset.nk === '') newsKindSet(''); S.nf.filter = 'fme' in a.dataset && S.nf.filter === 'me' && a.getAttribute('aria-pressed') === 'true' ? '' : a.dataset.f; LS.set('newsFilter', S.nf.filter);  /* 2.13.0: the chip toggles */ S.nf.items = null; renderView(); break;
     case 'toggle': e.stopPropagation(); toggleTask(id); break;
     case 'flow-why': e.stopPropagation(); e.preventDefault(); toast(tr(FLOW_WHY), null, 6000); break;
     case 'assign': e.stopPropagation(); assignMenu(a, id); break;
@@ -10077,6 +10385,9 @@ document.addEventListener('click', async e => {
     case 'refresh': refreshNow(); break;
     case 'agband': LS.set('agband', LS.get('agband', true) === false); renderView(); break;
     case 'side-group': sideGroupToggle(a.dataset.g); break;
+    case 'copy-id': copyTaskLink(+a.dataset.id); break;  // 2.13.0
+    case 'ids-toggle': { const lid = +a.dataset.id; LS.set('ids.' + lid, !idsOn(lid)); render(); break; }
+    case 'side-fold': sideFold(!LS.get('sideFold', false)); break;  // 2.13.0 (#453 A15)
     case 'side-timeline': closeSide(); S.rmScrollReset = true; if (S.route.mod === 'tasks' && S.route.key === 'all') rmSet({v: 'timeline'}, 'all'); else { rmSet({v: 'timeline'}, 'none'); go('all'); } break;
     case 'team-agent': { closeSide(); const ag = agentById(a.dataset.aid); if (ag && ag.enabled) chatOpen(ag.id); else go('agents'); break; }
     case 'side-tags': S.collapsed.has('side:tags-open') ? S.collapsed.delete('side:tags-open') : S.collapsed.add('side:tags-open'); LS.set('collapsed', [...S.collapsed]); renderSide(); break;
@@ -10256,6 +10567,7 @@ document.addEventListener('click', async e => {
     case 'mb-sort': propRequest('triage', {ids: [...S.multi]}); break;  // 2.3.0 (#262)
     case 'mb-all': $$('#view .trow').forEach(r => S.multi.add(+r.dataset.id)); render(); break;
     case 'mb-close': S.multi.clear(); S.multiMode = false; render(); break;
+    case 'mb-more': menu(a, $$('#mbar .mbh').map(h => ({label: h.getAttribute('aria-label'), icon: h.dataset.ico, cls: h.classList.contains('danger') ? 'flag-5' : '', fn: () => h.click()}))); break;  // 2.13.0 (#453 A14)
     case 'pomo-pause': case 'pomo-resume': case 'pomo-stop': {
       const swStop = act === 'pomo-stop' && S.pomo?.kind === 'stopwatch' ? Math.round(pomoElapsed(S.pomo) / 60) : null;
       const j = await api('POST', `/api/pomo/${S.pomo.id}/${act.slice(5)}`);
@@ -10394,11 +10706,18 @@ function renderMultiBar() {
   if (!b) { b = document.createElement('div'); b.id = 'mbar'; document.body.appendChild(b); }
   const n = S.multi.size;
   b.classList.toggle('hidden', !(S.multiMode || n));
-  $('#fab').classList.toggle('gone', noFab() || S.multiMode || n > 0 || (tabletDock() && !!$('#view .qdock')));
+  $('#fab').classList.toggle('gone', fabOff() || S.multiMode || n > 0 || (!!$('#view .qdock') && (tabletDock() || !isMobile())));
+  // 2.13.0 (#453 A14): every action has its label; a phone shows the four common ones and "More" (the bar used to be 11
+  // bare icons, the last one cut off)
+  const A = [['mb-today', 'sun', tr('Today')], ['mb-tomorrow', 'sunrise', tr('Tomorrow')], ['mb-date', 'cal', tr('Date')], ['mb-prio', 'flag', tr('Priority')], ['mb-list', 'folder', tr('List')],
+    ['mb-tag', 'tag', tr('Add tag')], ['mb-pin', 'pin', tr('Pin')], ['mb-done', 'done', tr('Completed')], ['mb-del', 'trash', tr('Delete'), 'danger'],
+    ...(propInboxSel() ? [['mb-sort', 'bot', propWith(N_('Sort with {0}…'), N_('Sort with an agent…'))]] : [])];
+  const MAIN = ['mb-today', 'mb-date', 'mb-list', 'mb-done'], mob = isMobile();
+  const btn = ([act, i, lab, cls], hid) => `<button class="mbb ${cls || ''} ${hid ? 'mbh' : ''}" data-act="${act}" data-ico="${i}" title="${esc(lab)}" aria-label="${esc(lab)}" ${hid ? 'hidden' : ''}>${ic(i, 's')}<span class="mbl">${esc(lab)}</span></button>`;
   b.innerHTML = `<span class="mcount">${n ? tr('{0} selected', n) : tr('Tap tasks')}</span>
-    <button class="iconbtn" data-act="mb-all" title="${tr('All')}">${ic('all')}</button>
-    ${n ? `<button class="iconbtn" data-act="mb-today" title="${esc(tr('Due: {0}', tr('Today')))}" aria-label="${esc(tr('Due: {0}', tr('Today')))}">${ic('sun')}</button><button class="iconbtn" data-act="mb-tomorrow" title="${esc(tr('Due: {0}', tr('Tomorrow')))}" aria-label="${esc(tr('Due: {0}', tr('Tomorrow')))}">${ic('sunrise')}</button><button class="iconbtn" data-act="mb-date" title="${tr('Date')}">${ic('cal')}</button><button class="iconbtn" data-act="mb-prio" title="${tr('Priority')}">${ic('flag')}</button><button class="iconbtn" data-act="mb-list" title="${tr('List')}">${ic('folder')}</button><button class="iconbtn" data-act="mb-tag" title="${tr('Add tag')}">${ic('tag')}</button><button class="iconbtn" data-act="mb-pin" title="${tr('Pin')}">${ic('pin')}</button><button class="iconbtn" data-act="mb-done" title="${tr('Completed')}">${ic('done')}</button><button class="iconbtn danger" data-act="mb-del" title="${tr('Delete')}">${ic('trash')}</button>${propInboxSel() ? `<button class="iconbtn" data-act="mb-sort" title="${esc(propWith(N_('Sort with {0}…'), N_('Sort with an agent…')))}" aria-label="${esc(propWith(N_('Sort with {0}…'), N_('Sort with an agent…')))}">${ic('bot')}</button>` : ''}` : ''}
-    <button class="iconbtn" data-act="mb-close" title="${tr('Done')}">${ic('x')}</button>`;
+    <button class="mbb" data-act="mb-all" title="${tr('All')}" aria-label="${esc(tr('Select all'))}">${ic('all', 's')}<span class="mbl">${tr('All')}</span></button>
+    ${n ? (mob ? A.filter(x => MAIN.includes(x[0])).map(x => btn(x)).join('') + A.filter(x => !MAIN.includes(x[0])).map(x => btn(x, true)).join('') + `<button class="mbb" data-act="mb-more" aria-haspopup="menu" title="${esc(tr('More'))}">${ic('dots', 's')}<span class="mbl">${tr('More')}</span></button>` : A.map(x => btn(x)).join('')) : ''}
+    <button class="iconbtn" data-act="mb-close" title="${tr('Done')}" aria-label="${tr('Done')}">${ic('x')}</button>`;
 }
 async function batch(action, data, clear, ids = [...S.multi], note = '') {
   if (!ids.length) return;
@@ -11139,12 +11458,40 @@ document.addEventListener('touchmove', e => {
   } else if (lp.edge && t.clientX >= 26) { clearTimeout(lp.edge); lp.edge = null; }
   const v = $('#view'), vr = v.getBoundingClientRect();
   if (t.clientY < vr.top + 60) v.scrollBy(0, -14); else if (t.clientY > vr.bottom - 110) v.scrollBy(0, 14);
-  const k = $('.kanban'); if (k) { if (t.clientX < 30) k.scrollBy(-16, 0); else if (t.clientX > innerWidth - 30) k.scrollBy(16, 0); }
+  kbEdge(t.clientX, t.clientY);
   const wb = $('#wbody'); if (wb) { const r = wb.getBoundingClientRect(); if (t.clientY < r.top + 40) wb.scrollBy(0, -12); else if (t.clientY > r.bottom - 40) wb.scrollBy(0, 12); }
 }, {passive: false});
+// 2.13.0 (#453 A4): Kanban by touch: near the left / right edge the board scrolls smoothly, the deeper in the edge zone the
+// faster (at most ~1 column per second), with snapping off while dragging; it used to jump a column per touchmove (the
+// mandatory snap turned every 16 px into a whole column: 3 columns in 300 ms)
+const KB_EDGE = 56, KB_MAX = 5;
+function kbEdge(x, y) {
+  const k = $('#view .kanban'); if (!k || !lp) return;
+  const r = k.getBoundingClientRect(), a = Math.max(0, r.left), b = Math.min(innerWidth, r.right);
+  const v = x < a + KB_EDGE ? -KB_MAX * Math.min(1, (a + KB_EDGE - x) / KB_EDGE) : x > b - KB_EDGE ? KB_MAX * Math.min(1, (x - (b - KB_EDGE)) / KB_EDGE) : 0;
+  lp.kv = v; lp.kx = x; lp.ky = y;
+  if (v && !lp.kraf) {
+    k.classList.add('kbscroll');
+    const step = () => {
+      if (!lp || !lp.active || !lp.kv || !k.isConnected) { if (lp) lp.kraf = 0; return; }
+      const before = k.scrollLeft; k.scrollLeft = before + lp.kv;
+      if (k.scrollLeft !== before) markDrop(document.elementFromPoint(lp.kx, lp.ky), lp.id, lp.ky);
+      lp.kraf = requestAnimationFrame(step);
+    };
+    lp.kraf = requestAnimationFrame(step);
+  }
+}
+function kbEdgeEnd(st) { if (st.kraf) cancelAnimationFrame(st.kraf); $('#view .kanban.kbscroll')?.classList.remove('kbscroll'); }
+// a drop beside the cards of a Kanban column (the gap, the board's padding, the edge) lands in the column under the finger
+function kbColAt(x) {
+  const cols = $$('#view .kanban .kcol'); if (!cols.length) return null;
+  let best = null, bd = Infinity;
+  for (const c of cols) { const r = c.getBoundingClientRect(); if (r.right < 0 || r.left > innerWidth) continue; const d = x < r.left ? r.left - x : x > r.right ? x - r.right : 0; if (d < bd) { bd = d; best = c; } }
+  return best;
+}
 function endTouchDrag(e) {
   if (!lp) return;
-  clearTimeout(lp.timer);
+  clearTimeout(lp.timer); kbEdgeEnd(lp);
   const st = lp; lp = null;
   if (!st.active) return;
   if (e && e.cancelable) e.preventDefault();  // no click after the hold (it would close a menu opened here)
@@ -11152,10 +11499,12 @@ function endTouchDrag(e) {
   st.ghost.remove(); st.r.classList.remove('dragging'); document.body.classList.remove('tdrag');
   if (st.opened) setTimeout(() => { closeSide(); $('#detail').style.visibility = ''; }, 150);
   swiped = true; setTimeout(() => { swiped = false; }, 400);
-  const el = st.ly != null ? document.elementFromPoint(st.lx, st.ly) : null;
+  let el = st.ly != null ? document.elementFromPoint(st.lx, st.ly) : null;
+  if (el && isKanban() && !el.closest(DROP_SEL) && el.closest('#view')) el = kbColAt(st.lx) || el;  // #453 A4
   $$('.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
   if (el) dropTask(st.id, el, st.ly);
-  else if (st.ly == null && st.r.closest('#view') && S.sections.some(x => x.list_id === S.tasks.get(st.id)?.list_id) && (isKanban() || routeList())) sectionPicker(st.r, st.id);  // held without moving
+  else if (st.ly == null && st.r.closest('#view') && isKanban() && S.sections.some(x => x.list_id === S.tasks.get(st.id)?.list_id)) sectionPicker(st.r, st.id);  // held without moving: "Move to column…"
+  else if (st.ly == null && st.r.matches('#view .trow') && !isKanban()) { S.multiMode = true; S.multi.add(st.id); S.multiLast = st.id; render(); }  // 2.13.0 (#453 A14): long press = select
 }
 document.addEventListener('touchend', endTouchDrag);
 document.addEventListener('touchcancel', endTouchDrag);
@@ -11334,9 +11683,8 @@ function palAll() {
   add('a:density', 'action', dens === 'compact' ? tr('Density: comfortable') : tr('Density: compact'), 'sliders', () => { LS.set('density', dens === 'compact' ? 'comfortable' : 'compact'); applyDensity(); });
   // appearance (per device): only listed when searching, e.g. "font", "accent", "size", "theme"
   for (const [k, n] of THEMES) add('a:theme-' + k, 'action', tr('Color scheme: {0}', tr(n)), 'eye', () => lookSet('theme', k), {qonly: true});
-  const fi = FSIZE_ORDER.indexOf(lookPref('fsize'));
-  if (fi < FSIZE_ORDER.length - 1) add('a:fsize-up', 'action', tr('Font size: larger'), 'plus', () => lookSet('fsize', FSIZE_ORDER[fi + 1]), {qonly: true});
-  if (fi > 0) add('a:fsize-down', 'action', tr('Font size: smaller'), 'sliders', () => lookSet('fsize', FSIZE_ORDER[fi - 1]), {qonly: true});
+  if (fsPct() < 150) add('a:fsize-up', 'action', tr('Font size: larger'), 'plus', () => fsStep(5), {qonly: true, keys: 'Mod+='});
+  if (fsPct() > 50) add('a:fsize-down', 'action', tr('Font size: smaller'), 'sliders', () => fsStep(-5), {qonly: true, keys: 'Mod+-'});
   for (const v of FSIZE_ORDER) { const [, n, z] = LOOK.fsize.find(x => x[0] === v); add('a:fsize-' + v, 'action', tr('Font size: {0}', `${tr(n)} (${zPct(z)})`), 'sliders', () => lookSet('fsize', v), {qonly: true}); }
   for (const [v, n] of LOOK.font) add('a:font-' + v, 'action', tr('Font: {0}', tr(n)), 'edit', () => lookSet('font', v), {qonly: true});
   for (const [v, n, d, l] of LOOK.accent) add('a:accent-' + v, 'action', tr('Accent color: {0}', tr(n)), 'palette', () => lookSet('accent', v), {qonly: true, sw: light ? l : d});
@@ -11396,8 +11744,11 @@ function palItems() {
     return [...viewed, ...recent, ...all.filter(x => !seen.has(x.id) && !x.qonly && x.kind in order).sort((a, b) => order[a.kind] - order[b.kind]).map(x => ({...x, group: x.kind}))];
   }
   const boost = {action: 30, task: 40, view: 25, list: 20, filter: 15, tag: 10, setting: 5, tasks: 0};
-  return all.map(x => ({...x, score: Math.max(fuzzy(q, x.label), x.sub ? fuzzy(q, x.sub) * 0.3 : 0)}))
-    .filter(x => x.score > 0).map(x => ({...x, score: x.score + boost[x.kind]})).sort((a, b) => b.score - a.score).slice(0, 60);
+  // 2.13.0: "#447" or "447" jumps straight to that task (only one this person can see)
+  const nm = q.match(/^#?(\d{1,9})$/), hit = nm && taskById(+nm[1]);
+  const jump = hit ? [{id: 'tid:' + hit.id, kind: 'tasks', label: `#${hit.id} ${hit.title}`, sub: lname(listById(hit.list_id)) || '', icon: 'hash', fn: () => openDetail(hit.id)}] : [];
+  return jump.concat(all.map(x => ({...x, score: Math.max(fuzzy(q, x.label), x.sub ? fuzzy(q, x.sub) * 0.3 : 0)}))
+    .filter(x => x.score > 0).map(x => ({...x, score: x.score + boost[x.kind]})).sort((a, b) => b.score - a.score).slice(0, 60));
 }
 const PAL_GROUP = {viewed: N_('Recently viewed'), recent: N_('Recent'), task: N_('Selected task'), action: N_('Actions'), view: N_('Go to')};
 function palDraw() {
@@ -11687,7 +12038,7 @@ const agentAge = () => (Date.now() - (S.agentsAt || Date.now())) / 1000;
 // call) or has not for 5 minutes; a webhook agent is told about events, so only its explicit "offline" counts
 const agentOffline = a => !!a && (a.online === false || (!a.webhook && (a.contact_age === null || a.contact_age === undefined || a.contact_age + agentAge() > 300)));
 const agentSt = a => !a.enabled ? tr('paused') : agentOffline(a) ? tr('not connected') : a.limit_reached ? tr('limit reached') : tr(AGENT_ST[a.status] || AGENT_ST.idle);  // 2.1.1 (#326)
-const agentDot = id => { const a = agentById(id); return a ? `<i class="adot st-${!a.enabled ? 'paused' : agentOffline(a) ? 'offline' : esc(a.status)}" title="${esc(a.name + ': ' + agentSt(a) + (a.status_text ? ' · ' + a.status_text : ''))}"></i>` : ''; };
+const agentDot = id => { const a = agentById(id); return a ? `<i class="adot st-${!a.enabled ? 'paused' : agentOffline(a) ? 'offline' : esc(a.status)}" title="${esc(agentHstLine(a))}"></i>` : ''; };
 const agentBadge = () => `<span class="abadge" title="${esc(tr('Agent: an AI assistant or bot that works through the API'))}">${ic('bot', 's')}${tr('Agent')}</span>`;
 // agents of a list that can pick up this task (participant agents only their own tasks)
 function taskAgents(t) {
@@ -11778,8 +12129,28 @@ function bandJobsLoad() {
   S.bandJobs.busy = true;
   api('GET', '/api/agents/jobs?state=open').then(j => { S.bandJobs.items = j.jobs || []; }).catch(() => {}).finally(() => {
     S.bandJobs.busy = false; const sig = JSON.stringify(S.bandJobs.items.map(x => x.id + x.state)); S.bandJobs.v = S.v;
-    if (sig !== S.bandJobs.sig) { S.bandJobs.sig = sig; if ($('#view .agband')) renderView(); }
+    if (sig !== S.bandJobs.sig) { S.bandJobs.sig = sig; if ($('#view .agband')) renderView(); else if (S.route.key === 'today' && S.route.mod === 'tasks') viewSafeRender(); }  // 2.13.0: + the Today card
   });
+}
+// 2.13.0 (#453 A6): the jobs that wait for ME (approve / reject, or a proposal of mine that is ready), for the agent pill's
+// sheet and the card "Waiting for you" in Today (phones have no agent band)
+function waitJobs() {
+  if ((S.agents || []).some(a => a.waiting)) bandJobsLoad(); else return [];
+  return (S.bandJobs.items || []).filter(j => j.state === 'waiting' && ((!j.kind && j.can_act) || (j.kind && S.me && j.user_id === S.me.id && j.proposal_state === 'ready')));
+}
+async function waitJobsFresh() {
+  if (!(S.agents || []).some(a => a.waiting) || S.bandJobs.v === S.v) return waitJobs();
+  try { S.bandJobs.items = (await api('GET', '/api/agents/jobs?state=open')).jobs || []; S.bandJobs.v = S.v; } catch { /* offline: what we have */ }
+  return waitJobs();
+}
+const waitJobBtns = j => j.kind ? `<button class="btn sm pri" data-act="prop-open" data-jid="${j.id}">${tr('Review the proposal')}</button>`
+  : `<button class="btn sm pri" data-act="job-do" data-jid="${j.id}" data-a="approve">\u{1F44D} ${tr('Approve')}</button><button class="btn sm" data-act="job-do" data-jid="${j.id}" data-a="reject">${ic('x', 's')} ${tr('Reject')}</button>`;
+function waitCard() {
+  if (S.route.key !== 'today' || !feat('agents') || !collab()) return '';
+  const js = waitJobs(); if (!js.length) return '';
+  return `<section class="waitcard" aria-labelledby="wc-h"><h3 id="wc-h">${hdot('waiting')} ${esc(trn('{0} job waits for you', '{0} jobs wait for you', js.length))}</h3>
+    ${js.slice(0, 5).map(j => `<div class="wcrow"><div class="wci"><b>${esc(j.title)}</b><span class="muted">${esc(j.agent_name)}${j.task_id ? ` · #${j.task_id} ${esc(j.task_title || '')}` : ''}</span></div><div class="wcb">${waitJobBtns(j)}</div></div>`).join('')}
+    ${js.length > 5 ? `<a class="linkbtn" href="#agents">${esc(trn('and {0} more', 'and {0} more', js.length - 5))}</a>` : ''}</section>`;
 }
 function agBandHtml() {
   const ags = bandAgents(); if (!ags.length) return '';
@@ -11818,9 +12189,14 @@ function stChipMenu(a) {
 }
 // 2.6.1 (#402): every agent with its dot and state (shown ones; all of them while none is shown), then the Agents view,
 // the chats and where to choose the dots
-function agentChipMenu(a) {
+async function agentChipMenu(a) {
   const ags = S.agents || [], sh = shownAgents(), list = sh.length ? sh : ags;
-  menu(a, [...list.map(x => ({label: agentHstLine(x), dot: agentHst(x), cls: 'minfo', fn: () => x.enabled ? chatOpen(x.id) : go('agents')})),
+  // 2.13.0 (#453 A6): what waits for me comes first, with its buttons
+  const wj = (await waitJobsFresh()).slice(0, 3);
+  const wait = wj.flatMap(j => [{label: `${tr('{0} waits for you', j.agent_name)}: ${j.title}`, dot: 'waiting', cls: 'minfo mwait', fn: () => go('agents')},
+    j.kind ? {label: tr('Review the proposal'), icon: 'bot', fn: () => propOpen(j.id)}
+      : {row: [{label: '\u{1F44D} ' + tr('Approve'), cls: 'pri', fn: () => jobDo(j.id, 'approve')}, {label: tr('Reject'), icon: 'x', fn: () => jobDo(j.id, 'reject')}]}, '-']);
+  menu(a, [...wait, ...list.map(x => ({label: agentHstLine(x), dot: agentHst(x), cls: 'minfo', fn: () => x.enabled ? chatOpen(x.id) : go('agents')})),
     '-', {label: tr('Agents and jobs'), icon: 'bot', fn: () => go('agents')},
     ...ags.filter(x => x.enabled).map(x => ({label: tr('Chat with {0}', x.name) + (x.chat_unread ? ` (${x.chat_unread})` : ''), icon: 'comment', fn: () => chatOpen(x.id)})),
     {label: tr('Choose the agents shown…'), icon: 'gear', fn: () => settingsModal('agentdots')}]);
@@ -11991,9 +12367,9 @@ function jobHtml(j) {
 }
 function viewAgents() {
   if (S.jobs.items === null) { S.jobs.items = []; loadJobs(); aiuLoad().then(() => { if (S.route.mod === 'agents') renderView(); }); }  // 2.1.1: the usage card
-  if (S.route.agent && isMobile()) return chatViewHtml(S.route.agent);
+  if (S.route.agent && chatFull()) return chatViewHtml(S.route.agent);
   const ags = S.agents || [];
-  const card = a => `<div class="agcard ${a.enabled ? '' : 'off'}">${avBtn(a.id, a.name, 'avatar lg')}<div class="agi"><b>${esc(a.name)}</b><span class="muted">${esc(agentSt(a))}${a.status_text ? ' · ' + esc(a.status_text) : ''}</span>
+  const card = a => `<div class="agcard ${a.enabled ? '' : 'off'}">${avBtn(a.id, a.name, 'avatar lg')}<div class="agi"><b>${esc(a.name)}</b><span class="muted">${esc(agentSt(a))}${a.status_text && agentHst(a) !== 'offline' ? ' · ' + esc(a.status_text) : ''}</span>
       <span class="muted agn">${esc([a.running && trn('{0} running', '{0} running', a.running), a.waiting && trn('{0} waiting', '{0} waiting', a.waiting)].filter(Boolean).join(' · '))}</span></div>
       <div class="agb"><button class="btn sm" data-act="chat-open" data-aid="${a.id}" ${a.enabled ? '' : 'disabled'}>${ic('comment', 's')} ${tr('Chat')}${a.chat_unread ? ` <span class="nbadge">${a.chat_unread}</span>` : ''}</button></div></div>`;
   const items = S.jobs.items || [];
@@ -12220,7 +12596,7 @@ function propDraw() {
         <label class="ppshare"><input type="checkbox" id="pp-share"> ${tr('Share the new list with {0}', esc(v.agent.name))}</label>` : ''}
       <div class="ppbar"><button class="btn sm" data-pp="all">${tr('Select all')}</button><button class="btn sm" data-pp="none">${tr('Select none')}</button></div>
       <div class="ppl">${propItemsHtml()}</div>
-      <div class="shint">${v.kind === 'dayplan' ? tr('Applying sets the planned start and duration of the selected tasks as you; due dates stay as they are. One step, undo takes it back.') : v.kind === 'triage' ? tr('Applying moves and changes the selected inbox items as you; one step, undo takes it back.') : tr('Applying creates the selected entries as you (you own them, the history names {0}); one step, undo takes it back.', esc(v.agent.name))}</div>`;
+      <div class="shint keep">${v.kind === 'dayplan' ? tr('Applying sets the planned start and duration of the selected tasks as you; due dates stay as they are. One step, undo takes it back.') : v.kind === 'triage' ? tr('Applying moves and changes the selected inbox items as you; one step, undo takes it back.') : tr('Applying creates the selected entries as you (you own them, the history names {0}); one step, undo takes it back.', esc(v.agent.name))}</div>`;
     // 2.5.2 (K03): the footer stays visible below the entries (sticky), with the count next to Apply
     foot = `<button class="btn danger" data-pp="discard">${tr('Discard')}</button><span class="spacer"></span><span class="muted ppcount ppfc"></span><button class="btn" data-pp="close">${tr('Close')}</button><button class="btn pri" data-pp="apply"></button>`;
   } else {
@@ -12284,8 +12660,10 @@ function dpTimeline(rows, defer, o = {}) {
       <span class="dpb"><span class="dpn">${esc(r.title)}</span><span class="muted dps">${esc(r.list || '')}${r.list ? ' · ' : ''}${r.estimated ? '≈ ' : ''}${esc(fmtH(r.duration))}${r.reason ? ' · ' + esc(tr(DP_REASON[r.reason] || r.reason)) : ''}${r.note ? ' · ' + esc(r.note) : ''}</span></span></div>`;
   };
   // 2.11.0: what does not fit is only listed (no checkbox): its due date, time and deadline stay as they are
+  // 2.13.0 (#453 A8): no dead end: "Tomorrow" plans it for tomorrow's start of work (its due date stays), "Plan on …"
+  // opens its date dialog
   const dfr = defer.map(r => `<div class="dprow nofit"><span class="dpt">${ic('clock', 's')}</span>
-    <span class="dpb"><span class="dpn">${esc(r.title)}</span><span class="muted dps">${[r.due ? tr('Due: {0}', fmtDayAbs(r.due)) : '', r.note || ''].filter(Boolean).map(esc).join(' · ')}</span></span></div>`).join('');
+    <span class="dpb"><span class="dpn">${esc(r.title)}</span><span class="muted dps">${[r.due ? tr('Due: {0}', fmtDayAbs(r.due)) : '', r.note || ''].filter(Boolean).map(esc).join(' · ')}</span></span>${o.acts && r.task_id ? `<span class="dpna"><button class="btn sm" data-dp="nofit-tm" data-id="${r.task_id}">${tr('Tomorrow')}</button><button class="btn sm" data-dp="nofit-date" data-id="${r.task_id}">${tr('Plan on …')}</button></span>` : ''}</div>`).join('');
   const all = rows.slice().sort((a, b) => dpMin(a.start) - dpMin(b.start) || (a.kind === 'plan') - (b.kind === 'plan'));
   return `<div class="dptl">${all.map(item).join('') || `<div class="muted mhint">${tr('Nothing to plan: no open tasks fit into the free time.')}</div>`}</div>
     ${dfr ? `<h4 class="dph">${tr('Does not fit today')}</h4><div class="dptl">${dfr}</div>` : ''}`;
@@ -12306,10 +12684,10 @@ async function dayplanModal(mode = 'day', day = today()) {
     md.querySelector('.card').innerHTML = `<div class="lhdr"><h3>${st.mode === 'fill' ? tr('Fill free time') : tr('Plan my day')}</h3><span class="spacer"></span><button class="iconbtn" data-dp="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
       <div class="dptabs"><div class="seg" role="group" aria-label="${esc(tr('What to plan'))}"><button data-dp="mode" data-v="day" class="${st.mode === 'day' ? 'on' : ''}" aria-pressed="${st.mode === 'day'}">${tr('Plan my day')}</button><button data-dp="mode" data-v="fill" class="${st.mode === 'fill' ? 'on' : ''}" aria-pressed="${st.mode === 'fill'}">${tr('Fill free time')}</button></div>
         <div class="seg" role="group" aria-label="${esc(tr('Day'))}"><button data-dp="day" data-v="${today()}" class="${st.day === today() ? 'on' : ''}" aria-pressed="${st.day === today()}">${tr('Today')}</button><button data-dp="day" data-v="${alt}" class="${st.day === alt ? 'on' : ''}" aria-pressed="${st.day === alt}">${alt === addDays(today(), 1) ? tr('Tomorrow') : esc(fmtDayAbs(alt))}</button></div></div>
-      <div class="dpsum muted">${esc(tr('{0}, working hours {1}–{2}', fmtDayAbs(p.date), p.work.start, p.work.end))} · ${esc(trn('{0} event', '{0} events', ev))} · ${esc(tr('{0} free', fmtH(p.free_min)))}${allDay.length ? ' · ' + esc(tr('all day: {0}', allDay.map(e => e.title).join(', '))) : ''}</div>
+      <div class="dpsum muted">${esc(tr('{0}, working hours {1}–{2}', fmtDayAbs(p.date), p.work.start, p.work.end))} · ${esc(trn('{0} event', '{0} events', ev))} · ${esc(tr('{0} planned', fmtH(p.plan.reduce((n, t) => n + (t.duration || 0), 0))))} · ${esc(tr('{0} still free', fmtH(p.free_min)))}${allDay.length ? ' · ' + esc(tr('all day: {0}', allDay.map(e => e.title).join(', '))) : ''}</div>
       <div class="calerr" id="dp-err" hidden></div>
-      ${dpTimeline(rows, defer, {sel: st.sel})}
-      <div class="shint">${tr('Applying sets the planned start and duration of the selected tasks (a task without a duration gets {0} minutes); due dates and deadlines stay as they are. One step, undo takes it back.', p.default_duration)}</div>
+      ${dpTimeline(rows, defer, {sel: st.sel, acts: true})}
+      <div class="shint keep">${tr('Applying sets the planned start and duration of the selected tasks (a task without a duration gets {0} minutes); due dates and deadlines stay as they are. One step, undo takes it back.', p.default_duration)}</div>
       <div class="foot ppfoot">${ags.length ? `<button class="btn" data-dp="agent">${ic('bot', 's')} ${tr('Let an agent plan')}</button>` : ''}<span class="spacer"></span><button class="btn" data-dp="close">${tr('Cancel')}</button><button class="btn pri" data-dp="apply" ${n ? '' : 'disabled'}>${ic('check', 's')} ${esc(trn('Apply {0} entry', 'Apply {0} entries', n))}</button></div>`;
   };
   const fetchPlan = async () => {
@@ -12330,6 +12708,8 @@ async function dayplanModal(mode = 'day', day = today()) {
     if (a === 'close') { md.remove(); return; }
     if (a === 'mode' || a === 'day') { st[a] = b.dataset.v; fetchPlan(); return; }
     if (a === 'agent') { dpAskAgent(b, st.day, st.mode, md); return; }
+    if (a === 'nofit-tm') { b.disabled = true; if (await dpApply([[+b.dataset.id, {plan_start: `${addDays(st.p.date, 1)}T${st.p.work.start}`}]], tr('Planned for tomorrow'))) fetchPlan(); else b.disabled = false; return; }
+    if (a === 'nofit-date') { const t = taskById(+b.dataset.id); if (t) { md.remove(); datePop($(`#view .trow[data-id="${t.id}"]`) || $("#top h1"), t.id); } return; }
     if (a === 'apply') {
       const p = st.p, items = [];
       p.plan.forEach((t, i) => { if (st.sel.has(String(i))) items.push([t.task_id, {plan_start: `${p.date}T${t.start}`, duration: t.duration}]); });
@@ -12394,29 +12774,46 @@ function reviewCard() {
   const tm = r.tomorrow;
   return `<section class="rvcard" aria-labelledby="rv-h"><div class="rvhd"><h3 id="rv-h">${ic('done', 's')} ${tr('Daily review')}</h3><span class="spacer"></span><button class="iconbtn" data-act="review-hide" title="${esc(tr('Hide for today'))}" aria-label="${esc(tr('Hide for today'))}">${ic('x', 's')}</button></div>
     <div class="rvnums"><span><b>${r.done.length}</b> ${tr('done|review')}</span><span><b>${r.open.length}</b> ${tr('still open')}</span><span><b>${r.moved.length}</b> ${tr('moved')}</span></div>
-    ${r.done.length ? `<ul class="rvl">${li(r.done, 'ok')}</ul>` : ''}${r.open.length ? `<h4>${tr('Still open')}</h4><ul class="rvl">${li(r.open, '')}</ul>` : ''}
+    ${r.done.length ? `<ul class="rvl">${li(r.done, 'ok')}</ul>` : ''}
     <div class="rvtm"><span class="muted">${esc(tm.count ? tr('Suggestion for {0}: {1}', fmtDayAbs(tm.date), tm.plan.slice(0, 3).map(x => x.start + ' ' + x.title).join(', ')) : tr('Nothing planned for {0} yet.', fmtDayAbs(tm.date)))}</span>
-      <button class="btn sm" data-act="dayplan" data-mode="day" data-day="${esc(tm.date)}">${ic('cal', 's')} ${tr('Plan tomorrow')}</button></div></section>`;
+      <button class="btn sm" data-act="dayplan" data-mode="day" data-day="${esc(tm.date)}">${ic('cal', 's')} ${tm.date === addDays(today(), 1) ? tr('Plan tomorrow') : esc(tr('Plan {0}', fmtDayAbs(tm.date)))}</button></div></section>`;
 }
 
 // ---- chat (desktop: side panel #achat, phone: the view agents/<id>)
+// 2.13.0 (#453, Fold screenshots): the side panel only where sidebar + list + panel fit (>= 1000 px); below (phones, an
+// unfolded Fold, tablets in portrait) the chat is a full page with Back. Decided again on every resize / rotation
+// (chatRelayout), keeping the draft, the focus and the newest message in view.
+const chatFull = () => isMobile() || innerWidth < 1000;
+let chatRelT = 0;
+function chatRelayout() {
+  if (!S.booted || imeOn || !S.chat.aid) return;
+  const aid = S.chat.aid, panel = $('#achat:not(.hidden)'), ci = $('#chat-in'), f = !!ci && document.activeElement === ci;
+  if (ci) S.drafts['chat:' + aid] = ci.value;
+  if (panel && chatFull()) { panel.classList.add('hidden'); panel.innerHTML = ''; delete panel.dataset.aid; document.body.classList.remove('chat-open'); if (!/^#agents\//.test(location.hash)) S.chatBack = location.hash.slice(1); go('agents/' + aid); }
+  else if (!panel && !chatFull() && S.route.mod === 'agents' && S.route.agent === aid) route();
+  else return;
+  if (f) setTimeout(() => { const n = $('#chat-in'); if (n) { n.focus({preventScroll: true}); chatBottom(); } }, 60);
+}
+window.addEventListener('resize', () => { clearTimeout(chatRelT); chatRelT = setTimeout(chatRelayout, 150); });
+try { screen.orientation?.addEventListener('change', () => { clearTimeout(chatRelT); chatRelT = setTimeout(chatRelayout, 150); }); } catch { /* old browsers */ }
 S.chat = {aid: null, msgs: [], err: null};
 function chatOpen(aid) {
-  if (isMobile()) { go('agents/' + aid); return; }
+  if (chatFull()) { if (!/^#agents\//.test(location.hash)) S.chatBack = location.hash.slice(1); go('agents/' + aid); return; }
   S.chat = {aid: +aid, msgs: S.chat.aid === +aid ? S.chat.msgs : [], more: S.chat.aid === +aid && S.chat.more, err: null};
   let p = $('#achat');
   if (!p) { p = document.createElement('aside'); p.id = 'achat'; p.setAttribute('aria-label', tr('Chat')); document.body.appendChild(p); }
-  p.classList.remove('hidden'); document.body.classList.add('chat-open'); chatDraw(); chatLoad().then(() => $('#chat-in')?.focus());
+  p.classList.remove('hidden'); document.body.classList.add('chat-open'); fitLayout(); chatDraw(); chatLoad().then(() => $('#chat-in')?.focus());
 }
-function chatClose() { S.chat = {aid: null, msgs: [], err: null}; $('#achat')?.classList.add('hidden'); document.body.classList.remove('chat-open'); if (S.route.mod === 'agents' && S.route.agent) go('agents'); }
+function chatClose() { S.chat = {aid: null, msgs: [], err: null}; $('#achat')?.classList.add('hidden'); document.body.classList.remove('chat-open'); fitLayout(); if (S.route.mod === 'agents' && S.route.agent) { const b = S.chatBack; S.chatBack = null; go(b || 'agents'); } }
 const CHAT_PAGE = 30;
 async function chatLoad() {
   const aid = S.chat.aid; if (!aid) return;
   try {
     // 2.12.2 (#451): first the newest CHAT_PAGE messages ("Load older messages" pages back); a refresh asks for the loaded
     // ones and everything newer (Delivered, reactions), the older pages stay as they are
-    const first = S.chat.msgs.length ? S.chat.msgs[0].id : 0;
+    const first = S.chat.msgs.length ? S.chat.msgs[0].id : 0, seq = S.chat.seq = (S.chat.seq || 0) + 1;
     const j = await api('GET', `/api/agents/${aid}/chat?` + (first ? `after=${first - 1}` : `limit=${CHAT_PAGE}`)); if (S.chat.aid !== aid) return;
+    if (S.chat.mutAt && seq < S.chat.mutAt) return chatLoad();  // 2.13.0: an answer older than my own reaction / message: fetch again
     if (first) { const lo = j.messages.length ? j.messages[0].id : Infinity; S.chat.msgs = [...S.chat.msgs.filter(m => m.id < lo), ...j.messages]; }
     else { S.chat.msgs = j.messages; S.chat.more = !!j.has_more; }
     S.chat.err = null;
@@ -12439,18 +12836,38 @@ function chatMsgs() {
     return `<div class="cmsg ${mine ? 'me' : 'ag'}" data-k="m${m.id}" data-mid="${m.id}"><div class="cbub">${!mine ? commentBody(m.body, {}) : esc(m.body).replace(/\n/g, '<br>')}</div>${t ? `<button class="runtask" data-act="open-id" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : ''}${chatRxHtml(m, a)}<div class="cmeta"><time>${fmtWhen(m.created_at)}</time>${dlv}</div></div>`; }).join('')
     + (off ? `<div class="chpend off" data-k="off" role="status">${ic('clock', 's')}<span>${esc(tr('{0} is offline – will answer later', a.name))}</span></div>` : '');
 }
-// 2.7.2 (#421): reactions on a chat message. On the agent's messages 👍 / 👎 / ❤️ are always there (👍 from me = approval);
-// on mine only what the agent reacted with
+// 2.7.2 (#421): reactions on a chat message. 2.13.0 (#453 A2): the quick 👍 / 👎 / ❤️ no longer sit as three empty circles
+// under every agent message: they appear on hover / keyboard focus (desktop) or a long press (touch) as a small bar over the
+// bubble's corner. Only an agent message that asks something (m.asks, server: chat_asks) counts a 👍 / 👎 as approval /
+// rejection: there the newest unanswered question shows the bar right away with the hint "👍 = approval", and a given 👍 / 👎
+// says "Counted as approval / rejection". Existing reactions always show as pills; on mine only what the agent reacted with.
 function chatRxHtml(m, a) {
-  const rs = m.reactions || [], ag = m.from === 'agent', on = !!a?.enabled;
+  const rs = m.reactions || [], ag = m.from === 'agent', on = !!a?.enabled, ask = ag && !!m.asks;
+  const meR = e => rs.some(r => r.emoji === e && r.users.some(u => S.me && u.id === S.me.id));
   const pill = r => { const me = r.users.some(u => S.me && u.id === S.me.id); return `<button type="button" class="rx ${me ? 'on' : ''}" data-act="chat-react" data-mid="${m.id}" data-e="${esc(r.emoji)}" title="${esc(r.users.map(u => u.name).join(', ') + ' · ' + rxName(r.emoji))}" aria-label="${esc(rxName(r.emoji) + ': ' + r.users.map(u => u.name).join(', '))}" aria-pressed="${me}" ${on ? '' : 'disabled'}>${esc(rxEmoji(r.emoji))}<span class="rxn">${r.count}</span></button>`; };
-  const quick = ag && on ? RX.filter(([k]) => !rs.some(r => r.emoji === k)).map(([k, em, n]) => `<button type="button" class="rx add" data-act="chat-react" data-mid="${m.id}" data-e="${k}" title="${esc(tr(n))}" aria-label="${esc(tr(n))}">${em}</button>`) : [];
-  const h = rs.map(pill).join('') + quick.join('');
-  return h ? `<div class="rxbar chrx">${h}</div>` : '';
+  const qn = (k, n) => ask && k === 'up' ? N_('Approve (counts as approval)') : ask && k === 'down' ? N_('Reject (counts as rejection)') : n;
+  const quick = ag && on ? RX.filter(([k]) => !rs.some(r => r.emoji === k)).map(([k, em, n]) => `<button type="button" class="rx add" data-act="chat-react" data-mid="${m.id}" data-e="${k}" title="${esc(tr(qn(k, n)))}" aria-label="${esc(tr(qn(k, n)))}">${em}</button>`) : [];
+  const voted = ask && (meR('up') ? tr('Counted as approval') : meR('down') ? tr('Counted as rejection') : '');
+  // the newest agent message, a question nobody answered yet: its bar is open
+  const open = ask && !voted && S.chat.msgs.length && S.chat.msgs[S.chat.msgs.length - 1].id === m.id;
+  const pills = rs.length || voted ? `<div class="rxbar chrx">${rs.map(pill).join('')}${voted ? `<span class="rxok">${ic('check', 's')}${esc(voted)}</span>` : ''}</div>` : '';
+  const q = quick.length ? `<div class="chrxq ${open ? 'open' : ''}" role="group" aria-label="${esc(tr('React'))}">${quick.join('')}${open ? `<span class="rxhint">${esc(tr('👍 = approval'))}</span>` : ''}</div>` : '';
+  return pills + q;
+}
+// touch: a long press on an agent message opens its reaction bar (another tap elsewhere closes it)
+{
+  let lp = null;
+  document.addEventListener('touchstart', e => {
+    const m = e.target.closest?.('#chat-msgs .cmsg.ag'); if (!m || e.touches.length !== 1 || e.target.closest('button, a')) { lp = null; return; }
+    const p = e.touches[0]; lp = {m, x: p.clientX, y: p.clientY, t: setTimeout(() => { $$('#chat-msgs .cmsg.rxshow').forEach(x => x !== m && x.classList.remove('rxshow')); m.classList.add('rxshow'); if (navigator.vibrate) navigator.vibrate(10); lp = null; }, 450)};
+  }, {passive: true});
+  document.addEventListener('touchmove', e => { if (lp && Math.hypot(e.touches[0].clientX - lp.x, e.touches[0].clientY - lp.y) > 8) { clearTimeout(lp.t); lp = null; } }, {passive: true});
+  document.addEventListener('touchend', () => { if (lp) { clearTimeout(lp.t); lp = null; } }, {passive: true});
+  document.addEventListener('click', e => { if (!e.target.closest?.('.cmsg.rxshow .chrxq')) $$('#chat-msgs .cmsg.rxshow').forEach(x => !x.contains(e.target) && x.classList.remove('rxshow')); }, true);
 }
 async function chatReact(mid, emoji) {
   const aid = S.chat.aid, m = S.chat.msgs.find(x => x.id === mid); if (!aid || !m) return;
-  try { const r = await api('POST', `/api/agents/${aid}/chat/${mid}/reactions`, {emoji}); m.reactions = r.reactions; if (r.approval === 'approved') toast(tr('Approved')); }
+  try { const r = await api('POST', `/api/agents/${aid}/chat/${mid}/reactions`, {emoji}); for (const x of [m, S.chat.msgs.find(y => y.id === mid)]) if (x) x.reactions = r.reactions; S.chat.mutAt = (S.chat.seq || 0) + 1; if (r.approval === 'approved') toast(tr('Approved')); else if (r.approval === 'rejected') toast(tr('Rejected')); }
   catch { return; }
   chatDraw();
 }
@@ -12466,7 +12883,7 @@ function chatAutoTyping(a) {
   const m = chatPending(); if (!m || !a || !a.enabled || agentOffline(a) || a.limit_reached) return false;
   const online = a.webhook || (a.poll_age != null && a.poll_age + agentAge() <= 120);
   if (!online || !m.delivered_at) return false;
-  if (a.status === 'working' || (a.typing || 0) - agentAge() > 0) return true;
+  if ((a.typing || 0) - agentAge() > 0) return true;
   return (Date.now() - (S.chat.off || 0) - Date.parse(m.delivered_at)) / 1000 <= 90;
 }
 // while a message waits for its answer, the open chat asks the server every 3 s (delivered, the agent's state), at most
@@ -12483,26 +12900,31 @@ setInterval(() => {
 function chatTyping(a) {
   if (!a || !a.enabled || agentOffline(a)) return false;
   if (S.chat.aid === a.id && chatAutoTyping(a)) return true;  // 2.7.2 (#422)
-  if ((a.typing || 0) - agentAge() > 0) return true;
-  if (a.status !== 'working') return false;
-  return !a.status_task || a.my_job || (S.chat.aid === a.id && S.chat.msgs.some(m => m.task_id === a.status_task));
+  // 2.13.0 (#453, Fold screenshots): "writing …" only for the agent's typing signal or the 90 s after it fetched my
+  // message; "working" alone is its state ("working · <text>"), not typing
+  return (a.typing || 0) - agentAge() > 0;
 }
 function chatStHtml(a) {
   const typing = chatTyping(a), off = agentOffline(a);
   const st = !a.enabled || off || a.limit_reached || a.status !== 'working' || !a.status_task ? esc(agentSt(a))
     : tr('working on {0}', `<button class="linkbtn chtask" data-act="open-id" data-id="${a.status_task}" title="${esc(taskById(a.status_task)?.title || '')}">#${a.status_task}</button>`);
   const cls = !a.enabled ? 'paused' : off ? 'offline' : a.limit_reached ? 'limit' : esc(a.status || 'idle');
-  return `<span class="chst st-${cls}" id="chat-st" role="status" aria-live="polite">${typing ? `<span class="atdots" aria-hidden="true"><i></i><i></i><i></i></span>` : `<i class="adot st-${cls === 'limit' ? 'error' : cls}" aria-hidden="true"></i>`}<span class="chstx">${typing ? esc(tr('writing …')) + ' · ' : ''}${st}${a.status_text && a.enabled && !off ? ' · ' + esc(a.status_text) : ''}</span></span>`;
+  // 2.13.0 (#453 P11): the typing dots only once, in the line under the messages (#chat-typing); the header keeps the state
+  return `<span class="chst st-${cls}${typing ? ' typing' : ''}" id="chat-st" role="status" aria-live="polite"><i class="adot st-${cls === 'limit' ? 'error' : cls}" aria-hidden="true"></i><span class="chstx">${st}${a.status_text && a.enabled && !off ? ' · ' + esc(a.status_text) : ''}</span></span>`;
 }
 function chatInner(aid) {
   const a = agentById(aid); if (!a) return `<div class="muted mhint">${tr('Agent not found')}</div>`;
-  return `<div class="chath">${avBtn(a.id, a.name, 'avatar')}<div class="chn"><b>${esc(a.name)}</b>${chatStHtml(a)}</div><span class="spacer"></span>
-      <button class="iconbtn" data-act="chat-close" title="${tr('Close')}" aria-label="${tr('Close')}">${ic(isMobile() ? 'back' : 'x')}</button></div>
+  // 2.13.0 (#453 P11): on the phone "back" sits on the left (where every back button is) and the chat header replaces the
+  // page header (body.in-chat hides #top)
+  const back = chatFull() ? `<button class="iconbtn chback" data-act="chat-close" title="${esc(tr('Back'))}" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : '';
+  // 2.13.0 (#453): the note that used to sit under the input is behind the (i) next to the name
+  const info = `<button type="button" class="ib" data-ii="chat-info" aria-describedby="chat-info" aria-expanded="false" aria-label="${esc(tr('More information'))}">${ic('info', 's')}</button><span class="shint iisrc" id="chat-info" data-ii="1">${tr('{0} answers when it next looks at its events (right away with a webhook or long-polling). It only sees the lists shared with it.', esc(a.name))}</span>`;
+  return `<div class="chath">${back}${avBtn(a.id, a.name, 'avatar')}<div class="chn"><span class="chnm"><b>${esc(a.name)}</b>${info}</span>${chatStHtml(a)}</div><span class="spacer"></span>
+      ${back ? '' : `<button class="iconbtn" data-act="chat-close" title="${tr('Close')}" aria-label="${tr('Close')}">${ic('x')}</button>`}</div>
     <div class="chmsgs" id="chat-msgs">${chatMsgs()}</div>
     <button type="button" class="chnew hidden" id="chat-new" data-act="chat-bottom">${tr('New message')} <span aria-hidden="true">↓</span></button>
     ${typingHtml(chatTyping(a) ? [a] : [], 'chat-typing')}
-    <div class="chcomp"><textarea id="chat-in" rows="1" placeholder="${esc(tr('Message to {0}…', a.name))}" ${a.enabled ? '' : 'disabled'}>${esc(S.drafts['chat:' + a.id] || '')}</textarea><button class="btn sm pri" data-act="chat-send" ${a.enabled ? '' : 'disabled'}>${ic('send', 's')} ${tr('Send')}</button></div>
-    <div class="shint chnote">${tr('{0} answers when it next looks at its events (right away with a webhook or long-polling). It only sees the lists shared with it.', esc(a.name))}</div>`;
+    <div class="chcomp"><textarea id="chat-in" rows="1" placeholder="${esc(tr('Message to {0}…', a.name))}" ${a.enabled ? '' : 'disabled'}>${esc(S.drafts['chat:' + a.id] || '')}</textarea><button class="btn sm pri" data-act="chat-send" ${a.enabled ? '' : 'disabled'}>${ic('send', 's')} ${tr('Send')}</button></div>`;
 }
 function chatViewHtml(aid) {
   if (S.chat.aid !== +aid) { S.chat = {aid: +aid, msgs: [], err: null}; setTimeout(chatLoad, 0); }
@@ -12510,7 +12932,7 @@ function chatViewHtml(aid) {
 }
 function chatDraw(o = {}) {
   const p = $('#achat');
-  if (p && !p.classList.contains('hidden') && S.chat.aid && !isMobile() && (p.dataset.aid !== String(S.chat.aid) || !$('#chat-msgs', p))) {
+  if (p && !p.classList.contains('hidden') && S.chat.aid && !chatFull() && (p.dataset.aid !== String(S.chat.aid) || !$('#chat-msgs', p))) {
     const d = S.drafts['chat:' + S.chat.aid] = $('#chat-in', p)?.value ?? S.drafts['chat:' + S.chat.aid]; p.innerHTML = chatInner(S.chat.aid); p.dataset.aid = S.chat.aid; if (d !== undefined) $('#chat-in', p).value = d;
     o = {bottom: true};
   }
@@ -12538,7 +12960,7 @@ const chatNear = box => box.scrollHeight - box.scrollTop - box.clientHeight <= 3
 // bottom stays at the bottom, so the newest message is right above the input
 function chatFit() {
   const v = $('#view .chview');
-  if (!v || !isMobile()) { document.body.classList.remove('kb-open'); if (v) v.style.height = ''; return; }
+  if (!v || !chatFull()) { document.body.classList.remove('kb-open'); if (v) v.style.height = ''; return; }
   const vv = window.visualViewport, bottom = vv ? vv.offsetTop + vv.height : innerHeight, box = $('#chat-msgs');
   const kb = !!vv && editFocused() && v.contains(document.activeElement) && vv.height < (S.vvMax || innerHeight) - 120;
   document.body.classList.toggle('kb-open', kb);
@@ -12946,7 +13368,7 @@ function agWire(md) {
 function agModal(a, done) {
   const md = modal(`<h3>${a ? tr('Edit agent') : tr('Add agent')}</h3>
     <div class="row"><label for="ag-user">${tr('Username')}</label><input id="ag-user" value="${esc(a?.username || '')}" autocapitalize="off" autocomplete="off" spellcheck="false" maxlength="32" placeholder="claude"></div>
-    ${a ? `<div class="shint">${tr('a-z, 0-9, . - _ · its API tokens keep working after a rename')}</div>` : ''}
+    ${a ? `<div class="shint keep">${tr('a-z, 0-9, . - _ · its API tokens keep working after a rename')}</div>` : ''}
     <div class="row"><label for="ag-name">${tr('Display name')}</label><input id="ag-name" value="${esc(a?.name || '')}" maxlength="60" placeholder="Claude"></div>
     <div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="ag-avpick">${avPickHtml(a ? a.avatar || '' : '/static/avatars/robot.svg', !!a, a?.name || 'AI')}</div></div>
     <div class="row"><label for="ag-note">${tr('Note')}</label><input id="ag-note" value="${esc(a?.note || '')}" maxlength="2000" placeholder="${tr('What it is for (only admins see this)')}"></div>
@@ -12955,7 +13377,7 @@ function agModal(a, done) {
     <div class="row"><label for="ag-url">${tr('Webhook URL')}</label><input id="ag-url" type="url" value="${esc(a?.webhook?.url || '')}" placeholder="${tr('optional: https://… (empty = the agent polls)')}" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
     <div class="shint">${tr('With a webhook every event is POSTed there at once, signed like the webhooks. Without one the agent fetches its events: GET /api/v1/agent/events (with ?wait=60 it gets them within seconds).')}</div>
     ${a ? `<div class="row"><label></label><button class="btn sm" data-m="token">${ic('key', 's')} ${tr('New API token')}</button>${a.webhook ? `<button class="btn sm" data-m="secret">${ic('key', 's')} ${tr('New signing secret')}</button>` : ''}</div>
-    <div class="shint">${esc(trn('{0} list shared with it', '{0} lists shared with it', a.lists.length))}${a.lists.length ? ': ' + esc(a.lists.map(l => l.name).join(', ')) : ''}</div>` : ''}
+    <div class="shint keep">${esc(trn('{0} list shared with it', '{0} lists shared with it', a.lists.length))}${a.lists.length ? ': ' + esc(a.lists.map(l => l.name).join(', ')) : ''}</div>` : ''}
     ${aiuLimFields(a)}
     ${agRtFields(a)}
     <div class="calerr" id="ag-err" hidden></div>
@@ -13063,7 +13485,7 @@ function aiuHtml(j, w) {
   const cards = `<div class="aiusums" role="list" aria-label="${esc(tr('Usage per agent'))}">${j.agents.map(a => `<div class="aiusum ${a.limit_reached ? 'lim' : ''}" role="listitem" data-aiu-agent="${a.id}"><div class="aiun">${av(a.id, a.name)}<b>${esc(a.name)}</b>${a.limit_reached ? `<small class="aiulr">${tr('limit reached')}</small>` : ''}</div>
       <div class="aiuk">${[['today', tr('Today')], ['d7', tr('7 days')], ['d30', tr('30 days')]].map(([k, n]) => `<span title="${esc(tr('{0} tokens', (a.totals[k].tokens || 0).toLocaleString(LOCALE())) + ' · ' + tr('input {0}, output {1}, cache writes {2}, cache reads {3}', fmtTok(a.totals[k].input), fmtTok(a.totals[k].output), fmtTok(a.totals[k].cache_write), fmtTok(a.totals[k].cache_read)) + (a.totals[k].cost !== null ? ' · ' + fmtUsd(a.totals[k].cost) : ''))}"><small class="muted">${n}</small><b class="aiuv">${esc(v(a.totals[k]))}</b></span>`).join('')}</div>
       ${j.admin && a.limit ? limBar(a.limit) : ''}</div>`).join('')}</div>`;
-  if (!any) return seg + cards + `<div class="shint">${tr('No usage reported yet. Agents report it through the API (POST /api/v1/agent/usage), the MCP tool report_usage or the Claude Code hook in mcp/claude_usage_hook.py.')}</div>`;
+  if (!any) return seg + cards + `<div class="shint keep">${tr('No usage reported yet. Agents report it through the API (POST /api/v1/agent/usage), the MCP tool report_usage or the Claude Code hook in mcp/claude_usage_hook.py.')}</div>`;
   const fmt = x => m === 'cost' ? fmtUsd(x) : fmtTok(x);
   const days = j.per_day, vals = days.map(num), labs = days.map(x => w && w < 480 ? String(pd(x.day).getDate()) : shortDay(x.day));
   const chart = barChart(vals, labs, {fmt, w, lw: Math.max(...labs.map(x => x.length)) * 7 + 12, tip: i => `${shortDay(days[i].day)}: ${fmt(vals[i])}`, label: m === 'cost' ? tr('Cost per day') : tr('Tokens per day')});
@@ -13329,7 +13751,7 @@ function typingHtml(ags, id) {
   return `<div class="atyping" id="${id}" role="status" aria-live="polite"><span class="atdots" aria-hidden="true"><i></i><i></i><i></i></span><span class="ttx">${ags.map(a => esc(tr('{0} is writing …', a.name)) + (a.status_text ? ` <span class="muted">· ${esc(a.status_text)}</span>` : '')).join('<br>')}</span></div>`;
 }
 const agentBusyState = () => { const ags = (S.agents || []).filter(a => a.enabled && !agentOffline(a)); return ags.some(a => a.status === 'working') ? 'working' : ags.some(a => a.status === 'waiting' || a.waiting) ? 'waiting' : ''; };
-const agentStatusLines = () => (S.agents || []).filter(a => a.enabled && a.status !== 'idle').map(a => `${a.name}: ${agentSt(a)}${a.status_text ? ' · ' + a.status_text : ''}`);
+const agentStatusLines = () => (S.agents || []).filter(a => a.enabled && a.status !== 'idle').map(agentHstLine);  // 2.13.0 (#453 P10): no stale status text while not connected
 // live update without re-rendering what someone may be typing in (task panel, chat)
 function agentLive() {
   const t = S.sel && taskById(S.sel), d = $('#d-typing');
@@ -13409,6 +13831,9 @@ document.addEventListener('drop', dsStop, true);
   const i18nBoot = i18nLoad(uiLang());  // last used language (localStorage), in parallel with the state
   try { await load(); if (!S.lists.length) throw new Error('no state'); } catch (e) { if (e.message === 'auth') return; await i18nBoot; $('#view').innerHTML = `<div class="empty">${tr('Server not reachable.')}<br>${tr('Reload the page once the server is reachable again.')}</div>`; return; }
   await i18nBoot; await i18nLoad(uiLang()); S.booted = true;  // render in the server-side language
+  // 2.13.0 (#453 A16): the first-run step 2 ("What do you want to use?") was not finished (tab reloaded / closed after the
+  // admin account was created): it comes back until "Start" is pressed
+  if (S.setupPending && !$('.authscreen')) { const el = document.createElement('div'); el.className = 'modal authscreen'; document.body.appendChild(el); $('#app')?.setAttribute('inert', ''); setupChoices(el, `<div class="alogo">${logoSvg(40)}<b>${APP_NAME}</b></div>`); }
   if (new URLSearchParams(location.search).get('share') === 'err') {
     history.replaceState(null, '', '/#inbox'); await route();
     toast(tr('Share: the file could not be received'));
@@ -13569,7 +13994,7 @@ function repoWire(md, lid) {
         <div class="row"><label for="rp-base">${tr('Server')}</label><input id="rp-base" type="url" inputmode="url" autocomplete="off" placeholder="${esc(tr('empty = github.com'))}"></div>
         <div class="row"><label for="rp-name">${tr('Repository')}</label><input id="rp-name" autocomplete="off" placeholder="owner/name"></div>
         <div class="row"><label for="rp-tok">${tr('Access token')}</label><input id="rp-tok" type="password" autocomplete="off" placeholder="${esc(tr('read-only is enough; empty for a public repository'))}" ${j.key ? '' : 'disabled'}></div>
-        ${j.key ? '' : `<div class="shint lhint">${esc(tr('Set KALMIDO_SECRET_KEY on the server to store repository tokens (32 random bytes, base64)'))}</div>`}
+        ${j.key ? '' : `<div class="shint keep lhint">${esc(tr('Set KALMIDO_SECRET_KEY on the server to store repository tokens (32 random bytes, base64)'))}</div>`}
         <div class="row rprow"><span class="spacer"></span><button class="btn sm pri" data-rp="add">${ic('plus', 's')} ${tr('Connect')}</button></div></div>` : '';
     box.innerHTML = rows + (listById(lid)?.kind === 'project' ? add : `<div class="muted mhint">${tr('Make this list a project to connect a repository')}</div>`)
       + (!j.may && !j.repos.length && listById(lid)?.kind === 'project' ? `<div class="muted mhint">${tr('The list owner and list admins connect repositories.')}</div>` : '');

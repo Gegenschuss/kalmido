@@ -9,12 +9,13 @@ const fs = require('fs'), os = require('os'), path = require('path');
 const WS = globalThis.WebSocket || require('ws');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-module.exports = ({tag, check, shots}) => async function firefox(fn, touch) {
+// prefs: extra Firefox preferences for one suite (2.13.0)
+module.exports = ({tag, check, shots, prefs: extra = []}) => async function firefox(fn, touch) {
   try { execFileSync('firefox', ['--version'], {stdio: 'ignore'}); } catch { console.log(`${tag}: Firefox part skipped (no firefox on PATH)`); return; }
   const prof = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), `kalmido-${tag}-`));
   const prefs = [['browser.shell.checkDefaultBrowser', false], ['datareporting.policy.dataSubmissionEnabled', false], ['ui.prefersReducedMotion', 1],
     ...(touch === true ? [['ui.primaryPointerCapabilities', 1], ['ui.allPointerCapabilities', 1], ['dom.w3c_touch_events.enabled', 1]]
-      : touch === false ? [['ui.primaryPointerCapabilities', 6], ['ui.allPointerCapabilities', 6]] : [])];
+      : touch === false ? [['ui.primaryPointerCapabilities', 6], ['ui.allPointerCapabilities', 6]] : []), ...extra];
   fs.writeFileSync(path.join(prof, 'user.js'), prefs.map(([k, v]) => `user_pref("${k}", ${JSON.stringify(v)});`).join('\n') + '\n');
   const start = port => spawn('firefox', ['--headless', '--no-remote', '--profile', prof, `--remote-debugging-port=${port}`, 'about:blank'], {stdio: 'ignore'});
   let PORT = 9300 + Math.floor(Math.random() * 600), ff = start(PORT);

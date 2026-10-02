@@ -82,20 +82,21 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   const pane = () => md.querySelector('[data-pane="look"]');
   check(['#s-theme', '#s-density', '#s-fsize', '#s-font', '#s-accent'].every(s => pane().querySelector(s)), 'pane: theme, density, font size, font, accent');
   check(pane().querySelector('.devtag'), 'pane tagged "This device"');
-  check(pane().querySelectorAll('#s-fsize button').length === 4 && pane().querySelectorAll('#s-font button').length === 3 && pane().querySelectorAll('#s-accent button').length === 7, 'option counts 4 / 3 / 7');
+  check(pane().querySelector('#s-fsize').type === 'range' && pane().querySelector('#s-fsize').min === '50' && pane().querySelector('#s-fsize').max === '150' && pane().querySelector('#s-fsize').step === '5' && pane().querySelectorAll('#s-font button').length === 3 && pane().querySelectorAll('#s-accent button').length === 7, 'font size: a slider 50-150 % in 5 % steps (2.13.0, #429); fonts 3, accents 7');
   const pv = pane().querySelector('.lookpv');
   check(pv && pv.hasAttribute('inert') && pv.querySelector('.trow .chk') && pv.querySelector('.trow .meta .dt') && pv.querySelector('.btn.pri') && pv.querySelector('.lpv-link'), 'live preview: sample rows, date, button, link (inert)');
-  check(pane().querySelector('[data-look="fsize"][data-v="m"]').classList.contains('on') && pane().querySelector('[data-look="accent"][data-v="violet"]').getAttribute('aria-pressed') === 'true', 'current values marked (class + aria-pressed)');
+  check(pane().querySelector('#s-fsize').value === '100' && /100 %/.test(pane().querySelector('#s-fsv').textContent) && pane().querySelector('[data-look="accent"][data-v="violet"]').getAttribute('aria-pressed') === 'true', 'current values marked (class + aria-pressed)');
   const pick = async (k, v) => { click(w, pane().querySelector(`[data-look="${k}"][data-v="${v}"]`)); await sleep(40); };
   // font size
-  for (const [v, z] of [['s', 0.9], ['l', 1.12], ['xl', 1.25]]) {
-    await pick('fsize', v);
-    check(de.fsize === v && w.__store['tasks.fsize'] === JSON.stringify(v) && w.eval('uiZ()') === z, `font size ${v}: applied + stored (${z})`);
-    check(pane().querySelector(`[data-look="fsize"][data-v="${v}"]`).classList.contains('on') && pane().querySelectorAll('#s-fsize .on').length === 1, `font size ${v}: marked`);
+  const slide = async v => { const sl = pane().querySelector('#s-fsize'); sl.value = String(v); sl.dispatchEvent(new w.Event('input', {bubbles: true})); sl.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(40); };
+  for (const [v, k] of [[50, 'custom'], [150, 'custom'], [90, 's'], [112, 'l'], [125, 'xl']]) {
+    await slide(v);
+    check(de.fsize === k && w.__store['tasks.fsize'] === JSON.stringify(v) && Math.abs(w.eval('uiZ()') - v / 100) < 1e-9 && (k !== 'custom' || d.documentElement.style.getPropertyValue('--ui') === String(v / 100)), `font size ${v} %: applied + stored`);
+    check(pane().querySelector('#s-fsv').textContent === v + ' %' && d.documentElement.classList.contains('ui-small') === v < 100, `font size ${v} %: shown`);
   }
   check(w.eval('weekH()') === 55 && w.eval('tlDW()') === 45, 'JS-drawn sizes scale (week grid 55 px/h, timeline 45 px/day at 125 %)');
   check(!md.classList.contains('dirty'), 'no Save needed (dialog not dirty)');
-  check(d.activeElement?.dataset?.v === 'xl', 'keyboard focus stays on the picked option');
+  key(w, '-', {ctrlKey: true}, d.body); check(w.__store['tasks.fsize'] === '120', 'Ctrl + -: 5 % smaller'); key(w, '0', {ctrlKey: true}, d.body); check(!('tasks.fsize' in w.__store) && de.fsize === 'm', 'Ctrl + 0: back to 100 %'); await slide(125);
   // font
   for (const v of ['atkinson', 'system']) { await pick('font', v); check(de.font === v && w.__store['tasks.font'] === JSON.stringify(v), `font ${v}: applied + stored`); }
   // accent
@@ -125,7 +126,7 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   // reset to defaults
   w.eval(`settingsModal('look')`); await sleep(300);
   md = d.querySelector('.modal.smodal');
-  await pick('accent', 'violet'); await pick('fsize', 'l');
+  await pick('accent', 'violet'); { const sl = pane().querySelector('#s-fsize'); sl.value = '110'; sl.dispatchEvent(new w.Event('input', {bubbles: true})); await sleep(40); }
   click(w, pane().querySelector('[data-m="look-reset"]')); await sleep(80);
   x = d.documentElement.dataset;
   check(x.fsize === 'm' && x.font === 'geist' && x.accent === 'violet' && x.theme === 'auto' && x.density === 'compact', 'reset: defaults applied');
@@ -145,11 +146,11 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   check(!/Accent color|Font size/.test(d.querySelector('.palette .plist').textContent), 'palette: appearance items only when searching');
   key(w, 'Escape', {}, d.querySelector('.palette .pqin')); await sleep(40);
   await run('accent violet'); check(d.documentElement.dataset.accent === 'violet' && w.__store['tasks.accent'] === '"violet"', 'palette: "accent violet"');
-  await run('font size larger'); check(d.documentElement.dataset.fsize === 'l', 'palette: font size larger (100 -> 112 %)');
-  await run('font size larger'); check(d.documentElement.dataset.fsize === 'xl', 'palette: font size larger again (125 %)');
-  await pal('font size larger'); check(!/larger/.test(d.querySelector('.palette .plist').textContent), 'palette: no "larger" at the largest size');
+  await run('font size larger'); check(w.eval('fsPct()') === 105, 'palette: font size larger (100 -> 105 %)');
+  await run('font size larger'); check(w.eval('fsPct()') === 110, 'palette: font size larger again (110 %)');
+  w.eval(`LS.set('fsize', 150); applyLook()`); await pal('font size larger'); check(!/larger/.test(d.querySelector('.palette .plist').textContent), 'palette: no "larger" at the largest size');
   key(w, 'Escape', {}, d.querySelector('.palette .pqin')); await sleep(40);
-  await run('font size smaller'); check(d.documentElement.dataset.fsize === 'l', 'palette: font size smaller');
+  await run('font size smaller'); check(w.eval('fsPct()') === 145, 'palette: font size smaller (5 %)');
   await run('font atkinson'); check(d.documentElement.dataset.font === 'atkinson', 'palette: font Atkinson');
   await run('color scheme dark'); check(d.documentElement.dataset.theme === 'dark', 'palette: color scheme dark');
   const accItem = (await pal('accent sky'));
@@ -170,7 +171,7 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   w.eval(`settingsModal('look')`); await sleep(300);
   md = d.querySelector('.modal.smodal');
   const t = md.querySelector('[data-pane="look"]').textContent;
-  check(/Darstellung/.test(md.querySelector('.snav [data-sec="look"]').textContent) && /Schriftgröße/.test(t) && /Akzentfarbe/.test(t) && /Sehr groß/.test(t) && /Auf Standard zurücksetzen/.test(t), 'German labels');
+  check(/Darstellung/.test(md.querySelector('.snav [data-sec="look"]').textContent) && /Schriftgröße/.test(t) && /Akzentfarbe/.test(t) && /Zurücksetzen \(100 %\)/.test(t) && /Auf Standard zurücksetzen/.test(t), 'German labels');
   md.remove();
   key(w, 'k', {ctrlKey: true}); await sleep(80);
   const i = d.querySelector('.palette .pqin'); i.value = 'akzent'; i.dispatchEvent(new w.Event('input', {bubbles: true})); await sleep(40);

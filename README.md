@@ -698,7 +698,7 @@ like and talks to Kalmido through the REST API, webhooks or the MCP server.
 - Approval semantics, status reporting, jobs, chat, the *tidy up* setting, payloads and an example session:
   **[docs/AGENTS.md](docs/AGENTS.md)**. MCP server (stdio and HTTP): **[mcp/](mcp/)**.
 - Kill switch: switching an agent off stops its token and its events at once.
-- Chat (2.7.2): 👍 👎 ❤️ on chat messages (a person's 👍 on the agent's message is an approval, the agent gets the event
+- Chat (2.7.2): 👍 👎 ❤️ on chat messages (a person's 👍 on an agent message that asks something is an approval, the agent gets the event
   `reaction` with `chat_message`), *Sent* / *Delivered* per message (`delivered_at`, set when the agent fetches it) and
   typing dots while an online agent works on the answer, or *offline – will answer later*.
 - Setup guides (2.7.2) in the app under *Settings > Agents > Set up* and in

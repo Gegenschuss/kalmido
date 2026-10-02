@@ -140,11 +140,11 @@ async function firefox(fn) {
   w.eval(`chatOpen(${ag.id})`); await sleep(900);
   const hd = () => d.querySelector('#achat .chath');
   const st = () => d.querySelector('#chat-st');
-  check(hd() && !hd().querySelector('[data-act="agent-wake"]') && hd().querySelectorAll('button:not(.avb)').length === 1, 'chat header: no Wake button (only close; 2.7.2: the picture is a card button)');
+  check(hd() && !hd().querySelector('[data-act="agent-wake"]') && hd().querySelectorAll('button:not(.avb):not(.ib)').length === 1, 'chat header: no Wake button (only close; 2.7.2: the picture is a card button)');
   check(st() && /ready/.test(st().textContent) && st().querySelector('.adot.st-idle') && !st().querySelector('.atdots'), 'ready: green dot, no typing dots');
   await v1(ag.token, 'POST', '/agent/typing', {chat_user_id: me});
   w.eval('load().then(render)'); await sleep(800);
-  check(st().querySelector('.atdots') && /writing …/.test(st().textContent) && !d.querySelector('#chat-typing').classList.contains('hidden'), 'typing signal: dots in the header + the line under the messages');
+  check(!st().querySelector('.atdots') && st().classList.contains('typing') && !d.querySelector('#chat-typing').classList.contains('hidden'), 'typing signal: the line under the messages (2.13.0: the dots only once, not in the header too)');
   w.eval('S.agentsAt -= 11000; agentLive()');
   check(!st().querySelector('.atdots') && d.querySelector('#chat-typing').classList.contains('hidden'), 'after 10 s: the dots are gone (no server round trip)');
   await v1(ag.token, 'POST', `/agent/chats/${me}`, {body: 'Hi Alice'});  // the answer ends the typing signal
@@ -155,7 +155,7 @@ async function firefox(fn) {
   check(!st().querySelector('.atdots'), 'working on a task this chat is not about: no dots');
   await v1(ag.token, 'POST', `/agent/chats/${me}`, {body: 'About this one', task_id: T2});
   w.eval('load().then(render)'); await sleep(1000);
-  check(st().querySelector('.atdots'), 'working on a task of this chat: dots');
+  check(d.querySelector('#chat-typing').classList.contains('hidden') && /working on/.test(st().textContent), 'working on a task of this chat: its state, no typing dots (2.13.0: dots only for typing)');
   click(w, st().querySelector('[data-act="open-id"]')); await sleep(800);
   check(w.eval('S.sel') === T2, 'the #id opens the task');
   await v1(ag.token, 'PUT', '/agent/status', {status: 'waiting'});

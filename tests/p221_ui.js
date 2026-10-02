@@ -125,7 +125,7 @@ const firefox = require('./ff')({tag: 'p221_ui', check, shots: 'P221_SHOTS'});  
   const ti = d.querySelector('#d-title'), co = d.querySelector('#d-content');
   if (ti) { ti.value = 'From the app, renamed'; ti.dispatchEvent(new w.Event('input', {bubbles: true})); }
   if (co) { co.value = 'Notes typed in the app'; co.dispatchEvent(new w.Event('input', {bubbles: true})); }
-  await sleep(1400);
+  await w.eval('flushSaves()'); await sleep(600);  // 2.13.0: typed text is saved when the field is left (or after 5 s)
   await w.eval(`patchTask(${nt.id}, {priority: 3, pinned: 1})`);
   const ci = d.querySelector('#c-input');
   if (ci) { ci.value = 'A comment from the app'; await w.eval('sendComment()'); }

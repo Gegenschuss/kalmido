@@ -294,10 +294,10 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
         // the chat with reactions
         await ev(`(() => { chatOpen(${AG}); return 1; })()`); await sleep(1200);
         if (touch) await open('agents/' + AG);
-        const rx = await ev(`(() => { const b = [...document.querySelectorAll('#chat-msgs .chrx .rx')].filter(e => e.offsetWidth); return b.length; })()`);
+        const rx = await ev(`(() => { const b = [...document.querySelectorAll('#chat-msgs .chrx .rx, #chat-msgs .chrxq .rx')].filter(e => e.offsetWidth); return b.length; })()`);
         check(rx >= 3, `${vw}px: chat reactions shown (${rx})`);
         if (touch) {
-          const small = await ev(SMALL('#chat-msgs .chrx .rx'));
+          const small = await ev(SMALL('#chat-msgs .chrx .rx, #chat-msgs .chrxq .rx'));
           check(!small.length, `${vw}px: chat reactions >= 44 px: ${JSON.stringify(small)}`);
         }
         const ov = await ev(`(() => { const m = document.querySelector('#chat-msgs'); return m ? {sw: m.scrollWidth, cw: m.clientWidth} : null; })()`);
