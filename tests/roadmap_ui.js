@@ -170,7 +170,9 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   await call('PATCH', `/api/lists/${FILM}`, {dep_shift: true});
   await w.eval('load().then(() => render())'); await sleep(300);
   ptr(w, sum(WEB), 'pointerdown', 100); ptr(w, d, 'pointermove', 100 + 10 * DW); ptr(w, d, 'pointerup', 100 + 10 * DW);
-  check(await until(async () => (await taskOf(f1)).start === ds(22)), 'dependent task in another list moved along (Shoot waits on Design)');
+  // the shift with dependents can take longer than 4 s on a busy CI runner (2.11.0: the toast came, the poll had given up)
+  check(await until(async () => (await taskOf(f1)).start === ds(22), 20000), 'dependent task in another list moved along (Shoot waits on Design)');
+  await until(async () => (await taskOf(f2)).start === ds(31), 8000);
   const f2x = await taskOf(f2); check(f2x.start === ds(31), `and its own dependent (Cut waits on Shoot): ${f2x.start} ${f2x.due}`);
   check(await until(() => /3 tasks moved · 2 dependent tasks moved/.test(toastText(d))), `toast names both: ${toastText(d)}`);
   d.querySelector('#toast button').click();
