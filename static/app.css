@@ -3096,12 +3096,12 @@ button.gchip:hover{color:var(--text)}
 .dprow .dps{font:var(--fs-xs) var(--mono)}
 .dprow.event{background:var(--bg3);border-style:dashed;color:var(--text2)}
 .dprow.fixed{background:var(--bg3);color:var(--text2)}
-.dprow.plan{border-left:3px solid var(--accent)}
-.dprow.defer{border-left:3px solid var(--st-wait)}
+.dprow.plan{border-left:.1875rem solid var(--accent)}
+.dprow.defer{border-left:.1875rem solid var(--st-wait)}
 .dprow.off{opacity:.55}
 .dprow .ppcl{align-self:flex-start}
 .dprow .ppc{width:1.125rem;height:1.125rem;margin-top:.125rem}
-.rvcard{border:1px solid var(--line2);border-left:3px solid var(--accent);border-radius:var(--r-l);background:var(--bg2);padding:.625rem .75rem;margin:.25rem 0 .75rem}
+.rvcard{border:1px solid var(--line2);border-left:.1875rem solid var(--accent);border-radius:var(--r-l);background:var(--bg2);padding:.625rem .75rem;margin:.25rem 0 .75rem}
 .rvhd{display:flex;align-items:center;gap:.5rem}
 .rvhd h3{margin:0;font-size:var(--fs-l);display:flex;align-items:center;gap:.375rem}
 .rvnums{display:flex;gap:1rem;flex-wrap:wrap;margin:.375rem 0;font:var(--fs-s) var(--mono);color:var(--text2)}
