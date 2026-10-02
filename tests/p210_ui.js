@@ -63,8 +63,10 @@ const TOKEN = 'bob-ui-server-token-4c2e', PTOKEN = 'bob-ui-personal-token-9d1f';
       check(st.notify.complete.news === true && st.settings.news_kinds.split(',').includes('complete'), 'toggle a News of an old event: news_kinds');
       // 2.9.0: on a slow CI runner the second save could still be settling in the undo history when Undo was clicked
       // (Undo then took back the first change): wait until the saved note names the second change
-      for (let i = 0; i < 30 && !/News|complete/i.test(d.querySelector('.smodal .ssaved')?.textContent || ''); i++) await sleep(150);
-      await sleep(600);
+      // 2.12.2: wait for the note to hold the newest undo entry, then click at once (the note drops its Undo after 6 s; the
+      // old wait for "News" in the note never matched, it says "Saved · Undo", so the click came after ~6 s on slow runners)
+      const top = () => w.eval(`(() => { const el = [...document.querySelectorAll('.smodal .ssaved')].pop(); return !!(el && el._e && HIST.undo[HIST.undo.length - 1] === el._e); })()`);
+      for (let i = 0; i < 30 && !top(); i++) await sleep(100);
       click(w, d.querySelector('.smodal .ssaved [data-m="s-undo"]')); await sleep(900);
       for (let i = 0; i < 20 && (await call('GET', '/api/state', null, CKB)).notify.complete.news !== false; i++) await sleep(300);  // 2.7.2: slow CI runner
       st = await call('GET', '/api/state', null, CKB);
