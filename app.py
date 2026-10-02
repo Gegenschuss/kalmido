@@ -22122,18 +22122,26 @@ def chat_event_mids(envs):
 
 @app.get("/api/agents/<int:aid>/chat")
 def agent_chat_get(aid):
-    """My conversation with an agent (?after=<id>: only newer messages); marks its answers read."""
+    """My conversation with an agent, oldest first: the newest ?limit= messages (default 300, max 300); ?after=<id>: only
+    newer ones; 2.12.2 (#451) ?before=<id>: the page of older ones (has_more: there are even older ones). Marks its answers read."""
     c = db()
     a = need_chat_agent(c, aid)
     after = as_int(request.args.get("after", 0), "after", 0)
-    rows = c.execute("SELECT * FROM agent_chat WHERE agent_id=? AND user_id=? AND id>? ORDER BY id DESC LIMIT 300",
-                     (aid, me(), after)).fetchall()[::-1]
+    before = as_int(request.args.get("before", 0), "before", 0)
+    limit = as_int(request.args.get("limit", 300), "limit", 1, 300)
+    q, args = "SELECT * FROM agent_chat WHERE agent_id=? AND user_id=? AND id>?", [aid, me(), after]
+    if before:
+        q += " AND id<?"
+        args.append(before)
+    rows = c.execute(q + " ORDER BY id DESC LIMIT ?", (*args, limit)).fetchall()[::-1]
+    more = bool(rows) and bool(c.execute("SELECT 1 FROM agent_chat WHERE agent_id=? AND user_id=? AND id<? LIMIT 1",
+                                         (aid, me(), rows[0]["id"])).fetchone())
     if c.execute("UPDATE agent_chat SET read_at=? WHERE agent_id=? AND user_id=? AND sender='agent' AND read_at IS NULL",
                  (iso(now_utc()), aid, me())).rowcount:
         c.commit()
     rx = chat_reactions_of(c, [r["id"] for r in rows])
     # 2.7.2 (#422): the server's clock, so the app can tell how long ago a message was delivered
-    return jsonify(agent=agent_public(c, a, me()), messages=[chat_dict(r, rx) for r in rows], now=iso_ms(now_utc()))
+    return jsonify(agent=agent_public(c, a, me()), messages=[chat_dict(r, rx) for r in rows], now=iso_ms(now_utc()), has_more=more)
 
 
 def chat_task(c, v, uid_a, uid_b):

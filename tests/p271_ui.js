@@ -80,9 +80,9 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(/Copy is late/.test(d.querySelector('#pov-status').textContent) && d.querySelector('#pov-status [data-act="status"]'), 'status updates + "Set status"');
   // description
   click(w, d.querySelector('[data-pov="desc-edit"]')); await sleep(50);
-  d.querySelector('#pov-desc').value = '## Goal\nNew **site** by June\n- [ ] item';
+  d.querySelector('#pov-desc-in').value = '## Goal\nNew **site** by June\n- [ ] item';
   click(w, d.querySelector('[data-pov="desc-save"]'));
-  await until(() => d.querySelector('#pov-desc') === null && d.querySelector('.povmd b'));
+  await until(() => d.querySelector('#pov-desc-in') === null && d.querySelector('.povmd b'));
   check(d.querySelector('.povmd h5')?.textContent === 'Goal' && d.querySelector('.povmd b')?.textContent === 'site', 'Markdown rendered');
   check(d.querySelector('.povmd input[type="checkbox"]')?.disabled, 'checkboxes in the description are read-only');
   check((await call('GET', `/api/lists/${P}/overview`)).description.startsWith('## Goal'), 'saved on the server');

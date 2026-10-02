@@ -7,6 +7,35 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.12.2] - 2026-10-02
+
+**In short:** Live updates no longer interrupt typing: the agent chat keeps its scroll position and the keyboard, fields in
+the main view keep focus and text; the chat loads only the newest messages.
+
+### Fixed
+- Agent chat (#451): when the agent fetched a message (Delivered), showed its typing dots, changed its state or answered,
+  the chat was rebuilt: on phones the list jumped to the top and the input lost its focus, so the keyboard closed. The
+  open chat is now patched in place (new messages are appended, status chips and the typing row change on their own),
+  the input box and the list are never replaced. At the bottom the chat stays at the bottom; scrolled up it keeps its
+  place and shows *New message ↓*.
+- Task comments: a refresh only swaps the comments that changed instead of redrawing all of them; the bell's dropdown
+  keeps its scroll position when an item is removed or everything is marked read.
+- Typing anywhere is no longer interrupted by live updates (#453): Kanban *+ Task*, the search, the project overview's
+  description and every other field in the main view kept losing focus and text when someone else changed something.
+  Updates now wait while a field has the focus (on touch screens always, on desktops unless it is the empty *Add task*
+  box) or an IME composition runs, and arrive as soon as you leave it; a field that is redrawn anyway comes back focused
+  with its text and caret. The description editor keeps its draft until *Save* or *Cancel*.
+- Project overview: *Save* in the description editor stored an empty description (the editor and its section shared
+  one id).
+- Phone chat with the keyboard open (#453): the chat fills exactly the visible area, the tab bar and the note below the
+  input give way, and the newest message stays right above the input.
+
+### Changed
+- The chat opens with the newest 30 messages; *Load older messages* at the top fetches the previous page and keeps the
+  message you were looking at in place. `GET /api/agents/{id}/chat` (web app) takes `limit` (1-300, default 300) and
+  `before=<message id>` and returns `has_more`. The agents' API (`GET /api/v1/agent/chats`) is unchanged (it already
+  pages with `since` / `limit` / `has_more`).
+
 ## [2.12.1] - 2026-10-02
 
 **In short:** Fixes from the full test run before the launch: a stricter XML check for CalDAV and HSTS on https.
@@ -505,7 +534,8 @@ of people.
   multi-arch image (`ghcr.io/gegenschuss/kalmido`, linux/amd64 and linux/arm64), an installable web app that works
   offline, English and German.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.12.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.12.2...HEAD
+[2.12.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.12.2
 [2.12.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.12.1
 [2.12.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.12.0
 [2.11.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.11.0

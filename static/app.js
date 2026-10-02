@@ -625,8 +625,11 @@ setInterval(async () => {
       const first = S.calSig === undefined; S.calSig = c;
       if (!first && calEvOn() && !editing()) { calInvalidate(); if (S.route.mod === 'cal' || S.route.key === 'today') renderView(); }
     }
-    if ((v !== S.v || (n !== undefined && collab() && n !== S.news?.sig)) && !editing()) { await load(); render(); }
+    const chg = v !== S.v || (n !== undefined && collab() && n !== S.news?.sig);
+    if (chg && !editing()) { S.viewStale = false; await load(); render(); }
     else if (v !== S.v && editing() && S.sel > 0 && (cmtOn() || collab()) && S.tl.id === S.sel && S.tlPollV !== v) { S.tlPollV = v; loadTimeline(S.sel); agentPoll(); }  // 1.9.0
+    else if (chg && editing() && S.chat.aid && collab() && S.chatPollV !== `${v}/${n}`) { S.chatPollV = `${v}/${n}`; chatLoad(); agentPoll(); }  // 2.12.2 (#451): typing, the chat still updates (patched)
+    else if (S.viewStale && !editing()) viewSafeRender();
     S.syncOk = Date.now(); staleDraw();
   } catch { staleDraw(); /* offline */ }
 }, 4000);
@@ -643,9 +646,21 @@ function staleDraw() {
   el.title = tr('Tap to try again');
 }
 document.addEventListener('visibilitychange', async () => {
-  if (!document.hidden) { try { await load(); render(); } catch { /* offline */ } }
+  if (!document.hidden && !editing()) { try { await load(); render(); } catch { /* offline */ } }
 });
-const editing = () => { const a = document.activeElement; return a && /INPUT|TEXTAREA|SELECT/.test(a.tagName) && a.closest('#detail,.qadd,.modal,#pop'); };
+// 2.12.2 (#451, #453 B2/B3): live updates wait while someone types ANYWHERE: the task panel, the add sheet, dialogs and
+// popovers as before, plus any other focused field (Kanban "+ Task", search, inline editors; only an empty "Add task" box
+// on a desktop lets updates through, renderView keeps it), an IME composition and an open editor of the project overview
+let imeOn = false;
+document.addEventListener('compositionstart', () => { imeOn = true; }, true);
+document.addEventListener('compositionend', () => { imeOn = false; }, true);
+const editing = () => {
+  if (imeOn || (S.povEdit && $('#pov-desc-in'))) return true;
+  const a = document.activeElement; if (!a || !editFocused()) return false;
+  return !!a.closest('#detail,.qadd,.modal,#pop') || a.id !== 'qinput' || !!a.value || isTouch();  // an empty composer of the list survives a re-render (renderView)
+};
+// a re-render of the view a live update asked for while someone types in it: done once the field is left (the poll)
+function viewSafeRender() { if (editing() && $('#view')?.contains(document.activeElement)) { S.viewStale = true; return; } S.viewStale = false; renderView(); }
 // 1.9.0 pull-to-refresh (touch, shared lists): pull down at the very top of the list by 4.5rem and let go
 (() => {
   let y0 = null, x0 = 0, pull = 0, el = null;
@@ -1708,12 +1723,19 @@ function isKanban() { const l = routeList(); return !!l && !povOn(l) && listView
 function isTimeline() { const l = routeList(); return !!l && !povOn(l) && listView(l) === 'timeline'; }
 function renderView() {
   const m = S.route.mod, el = $('#view');
+  // 2.12.2 (#451): the open phone chat is never rebuilt (that took the focus, closed the keyboard and jumped to the top):
+  // it is patched in place
+  if (m === 'agents' && S.route.agent && isMobile() && S.chat.aid === +S.route.agent && $('#view .chview')?.dataset.aid === String(S.chat.aid) && $('#chat-in')) { chatPatch(); agentLive(); renderMultiBar(); return; }
   const scroll = el.scrollTop;
   const wbs = $('#wbody')?.scrollTop, tls = $('#tlscroll')?.scrollLeft, tlt = $('#tlscroll')?.scrollTop, wasRm = !!$('.tl.rm');
   const qi = $('#qinput'), qf = !!qi && document.activeElement === qi, qv = qi ? qi.value : '';  // the composer survives a re-render
   const tin = $('#view .ttlin'), tinF = !!tin && document.activeElement === tin;  // 2.0.2: inline title edit + section input too
   if (tin && S.ie) { S.ie.v = tin.value; S.ie.s = tin.selectionStart; S.ie.e = tin.selectionEnd; }
   const sai = $('#view .secadd-in'), saiF = !!sai && document.activeElement === sai;
+  // 2.12.2 (#453 B2): any other focused field of the view (Kanban "+ Task", search, …) comes back with its text, caret and focus
+  const fa = document.activeElement, fk = fa && el.contains(fa) && editFocused() && fa !== qi && fa !== tin && fa !== sai
+    ? (fa.id ? () => document.getElementById(fa.id) : 'kadd' in fa.dataset ? () => [...el.querySelectorAll('[data-kadd]')].find(x => x.dataset.kadd === fa.dataset.kadd) : null) : null;
+  const fv = fk && fa.value, fs = fk && [fa.selectionStart, fa.selectionEnd];
   if (sai && S.secAdd) S.secAdd.v = sai.value;
   if (m === 'cal') el.innerHTML = viewCal();
   else if (m === 'matrix') el.innerHTML = viewMatrix();
@@ -1733,6 +1755,7 @@ function renderView() {
   else if (isTimeline()) el.innerHTML = viewTimeline(routeList().id);
   else el.innerHTML = viewList();
   el.scrollTop = scroll;
+  if (m === 'agents' && $('#view .chview')) { chatFit(); chatPatch({bottom: true}); } else document.body.classList.remove('kb-open');  // 2.12.2 (#451): a chat opens at its newest message
   if (S.ie) inlineEditMount(tinF);
   const sa2 = $('#view .secadd-in'); if (sa2 && S.secAdd) { sa2.value = S.secAdd.v || ''; if (saiF) sa2.focus(); }
   const q2 = $('#qinput'); if (q2 && qi && q2 !== qi) { q2.value = qv; if (qf) { q2.focus(); updateChips(q2); } }
@@ -1742,6 +1765,8 @@ function renderView() {
   else if (tl) { tl.scrollLeft = tls ?? Math.max(0, diffDays(S.tlStart, today()) - 2) * tlDW(); tlAfterRender(tl); }
   else if (S.tlPick) S.tlPick = null;  // left the timeline: "Connect to…" ends
   renderMultiBar();
+  const f2 = fk && fk();
+  if (f2 && f2 !== fa && document.activeElement !== f2) { if (fv != null && 'value' in f2) f2.value = fv; f2.focus({preventScroll: true}); try { if (fs[0] != null) f2.setSelectionRange(fs[0], fs[1]); } catch { /* no caret */ } }
   if (S.route.key === 'search') { const i = $('#searchq'); if (i && document.activeElement !== i) { i.value = S.searchQ || ''; if (!isMobile()) i.focus(); } }
 }
 
@@ -4044,7 +4069,7 @@ function bellPop(anchor) {
   });
   p.classList.add('bellpop');
   anchor?.setAttribute?.('aria-expanded', 'true');
-  const redraw = () => { if ($('#pop .bpop') && !$('#pop').classList.contains('hidden')) { p.innerHTML = bellPopHtml(); bellSize(p); if (!isMobile()) bellPlace(p, anchor); } };
+  const redraw = () => { if ($('#pop .bpop') && !$('#pop').classList.contains('hidden')) { const y = $('#pop .bplist')?.scrollTop || 0; p.innerHTML = bellPopHtml(); bellSize(p); if (!isMobile()) bellPlace(p, anchor); const l = $('#pop .bplist'); if (l) l.scrollTop = y; } };  // 2.12.2 (#451): the list keeps its place
   bellSize(p); bellPlace(p, anchor); bellResizeWire(p, anchor);
   const fresh = S.nf.sig === (S.news?.sig ?? '') && S.nf.f === S.nf.filter && !!S.nf.items;
   if (!fresh) loadNews().then(redraw);
@@ -4424,7 +4449,7 @@ function cmComposer(t, top = false) {  // top: 2.4.2 (#386) newest first, the bo
 }
 function drawTimeline() {
   if (S.tl.id !== S.sel) return;
-  const box = $('#d-tl-items'); if (box) box.innerHTML = timelineItems();
+  const box = $('#d-tl-items'); if (box) patchKids(box, timelineItems());  // 2.12.2 (#451): only changed / new comments
   const hb = $('#d-hist-items'); if (hb) hb.innerHTML = histItems();
   const n = $('#d-tl-count'); if (n) n.textContent = S.tl.comments?.length || '';
   const n2 = $('#d-tab-count'); if (n2) n2.textContent = S.tl.comments?.length || '';
@@ -4451,7 +4476,7 @@ async function loadTimeline(id) {
   if (S.cedit && !j.comments.some(c => c.id === S.cedit)) S.cedit = null;
   drawTimeline();
   const t = S.tasks.get(id), top = Math.max(0, ...j.comments.map(c => c.id));
-  if (t && (t.unread || t.comment_count !== j.comments.length)) { t.unread = 0; t.comment_count = j.comments.length; renderView(); }
+  if (t && (t.unread || t.comment_count !== j.comments.length)) { t.unread = 0; t.comment_count = j.comments.length; viewSafeRender(); }
   if (top > (j.seen || 0)) rawFetch('POST', `/api/tasks/${id}/seen`).catch(() => {});
 }
 async function capi(method, url, body) {  // comments: never queued, clear message when offline
@@ -5688,11 +5713,13 @@ function vvSync() {
   st.setProperty('--vvh', Math.round(vv.height) + 'px');
   st.setProperty('--vvb', Math.max(0, Math.round(window.innerHeight - vv.offsetTop - vv.height)) + 'px');  // hidden below (keyboard)
   if (vv.height >= window.innerHeight - 2 && (window.scrollY || document.documentElement.scrollTop)) window.scrollTo(0, 0);
+  if (!editFocused() || !(S.vvMax > 0)) S.vvMax = vv.height;  // the height without a keyboard
+  chatFit();
 }
 if (window.visualViewport) {
   visualViewport.addEventListener('resize', vvSync);
   visualViewport.addEventListener('scroll', vvSync);
-  window.addEventListener('orientationchange', () => setTimeout(vvSync, 250));
+  window.addEventListener('orientationchange', () => { S.vvMax = 0; setTimeout(vvSync, 250); });
   vvSync();
 }
 // ------------------------------------------------------------------ modals
@@ -9432,7 +9459,7 @@ async function povLoad(lid, force) {
   try { d.j = await rawFetch('GET', `/api/lists/${lid}/overview`); d.v = S.v; d.err = ''; }
   catch (e) { if (e.message === 'auth') return; d.err = e instanceof Offline ? 'offline' : e.message; d.v = S.v; }
   finally { d.busy = false; }
-  if (routeList()?.id === lid && isOverview()) renderView();
+  if (routeList()?.id === lid && isOverview()) viewSafeRender();
 }
 const povHost = u => { try { return new URL(u).host.replace(/^www\./, ''); } catch { return ''; } };
 // an icon from the address alone (nothing is fetched from the linked site)
@@ -9468,7 +9495,7 @@ function viewProjOv() {
   const j = d.j, can = !!j.can_edit && !l.archived, t0 = today();
   // description
   const ed = S.povEdit === l.id;
-  const desc = ed ? `<textarea id="pov-desc" rows="8" maxlength="20000" placeholder="${esc(tr('Goal, scope, contacts, where things are…'))}">${esc(j.description)}</textarea>
+  const desc = ed ? `<textarea id="pov-desc-in" rows="8" maxlength="20000" placeholder="${esc(tr('Goal, scope, contacts, where things are…'))}">${esc(S.drafts['pov:' + l.id] ?? j.description)}</textarea>
       <div class="povbar"><span class="muted">${tr('Markdown')}</span><span class="spacer"></span><button class="btn" data-pov="desc-cancel">${tr('Cancel')}</button><button class="btn pri" data-pov="desc-save">${tr('Save')}</button></div>`
     : j.description ? `<div class="md povmd">${renderMd(j.description).replace(/<input type="checkbox"/g, '<input type="checkbox" disabled')}</div>`
       : `<div class="muted povempty">${can ? tr('No description yet. What is this project about, what is the goal?') : tr('No description yet.')}</div>`;
@@ -9567,9 +9594,9 @@ document.addEventListener('click', async e => {
   const l = routeList(), d = l && S.povD[l.id], j = d?.j; if (!j) return;
   const id = +b.dataset.id || 0;
   switch (b.dataset.pov) {
-    case 'desc-edit': S.povEdit = l.id; renderView(); setTimeout(() => { const t = $('#pov-desc'); if (t) { t.focus(); autosize(t); } }, 20); break;
-    case 'desc-cancel': S.povEdit = null; renderView(); break;
-    case 'desc-save': { const v = $('#pov-desc')?.value ?? ''; try { await povApi('PATCH', `/api/lists/${l.id}/overview`, {description: v}); } catch { return; } S.povEdit = null; renderView(); toast(tr('Saved')); break; }
+    case 'desc-edit': S.povEdit = l.id; renderView(); setTimeout(() => { const t = $('#pov-desc-in'); if (t) { t.focus(); autosize(t); } }, 20); break;
+    case 'desc-cancel': S.povEdit = null; delete S.drafts['pov:' + l.id]; renderView(); break;
+    case 'desc-save': { const v = $('#pov-desc-in')?.value ?? ''; S.povEdit = null; try { await povApi('PATCH', `/api/lists/${l.id}/overview`, {description: v}); } catch { S.povEdit = l.id; return; } delete S.drafts['pov:' + l.id]; renderView(); toast(tr('Saved')); break; }
     case 'link-add': povLinkModal(l, null); break;
     case 'link-edit': povLinkModal(l, j.links.find(x => x.id === id)); break;
     case 'link-up': { const ids = j.links.map(x => x.id), i = ids.indexOf(id); if (i > 0) { [ids[i - 1], ids[i]] = [ids[i], ids[i - 1]]; try { await povApi('PUT', `/api/lists/${l.id}/links/order`, {ids}); } catch { /* shown */ } } break; }
@@ -9582,6 +9609,7 @@ document.addEventListener('click', async e => {
     case 'task': if (S.tasks.get(id)) openDetail(id); else go('t/' + id); break;
   }
 });
+document.addEventListener('input', e => { if (e.target.id === 'pov-desc-in') { const l = routeList(); if (l) S.drafts['pov:' + l.id] = e.target.value; } });  // 2.12.2 (#453 B3): the draft survives any re-render
 document.addEventListener('change', e => {
   if (e.target.id === 'pov-file') { const l = routeList(); if (l) povUpload(l, e.target.files); e.target.value = ''; }
 });
@@ -9970,6 +9998,8 @@ document.addEventListener('click', async e => {
     case 'chat-open': chatOpen(+a.dataset.aid); break;
     case 'chat-close': chatClose(); break;
     case 'chat-send': chatSend(); break;
+    case 'chat-older': chatOlder(); break;  // 2.12.2 (#451)
+    case 'chat-bottom': chatBottom(); break;
     case 'job-do': jobDo(+a.dataset.jid, a.dataset.a); break;
     case 'prop-open': propOpen(+a.dataset.jid); break;  // 2.3.0
     case 'aiu-more': settingsModal('usage'); break;
@@ -12356,7 +12386,7 @@ function reviewCard() {
   if (!want || LS.get('reviewHidden', '') === t0 && !S.route.review) return '';
   if (S.review.day !== t0 && !S.review.busy) {
     S.review.busy = true;
-    calReq('GET', '/api/dayplan/review').then(j => { S.review = {day: t0, data: j, busy: false}; if (S.route.key === 'today') renderView(); }).catch(() => { S.review.busy = false; });
+    calReq('GET', '/api/dayplan/review').then(j => { S.review = {day: t0, data: j, busy: false}; if (S.route.key === 'today') viewSafeRender(); }).catch(() => { S.review.busy = false; });
     return '';
   }
   const r = S.review.data; if (!r) return '';
@@ -12373,16 +12403,23 @@ function reviewCard() {
 S.chat = {aid: null, msgs: [], err: null};
 function chatOpen(aid) {
   if (isMobile()) { go('agents/' + aid); return; }
-  S.chat = {aid: +aid, msgs: S.chat.aid === +aid ? S.chat.msgs : [], err: null};
+  S.chat = {aid: +aid, msgs: S.chat.aid === +aid ? S.chat.msgs : [], more: S.chat.aid === +aid && S.chat.more, err: null};
   let p = $('#achat');
   if (!p) { p = document.createElement('aside'); p.id = 'achat'; p.setAttribute('aria-label', tr('Chat')); document.body.appendChild(p); }
   p.classList.remove('hidden'); document.body.classList.add('chat-open'); chatDraw(); chatLoad().then(() => $('#chat-in')?.focus());
 }
 function chatClose() { S.chat = {aid: null, msgs: [], err: null}; $('#achat')?.classList.add('hidden'); document.body.classList.remove('chat-open'); if (S.route.mod === 'agents' && S.route.agent) go('agents'); }
+const CHAT_PAGE = 30;
 async function chatLoad() {
   const aid = S.chat.aid; if (!aid) return;
   try {
-    const j = await api('GET', `/api/agents/${aid}/chat`); if (S.chat.aid !== aid) return; S.chat.msgs = j.messages; S.chat.err = null;
+    // 2.12.2 (#451): first the newest CHAT_PAGE messages ("Load older messages" pages back); a refresh asks for the loaded
+    // ones and everything newer (Delivered, reactions), the older pages stay as they are
+    const first = S.chat.msgs.length ? S.chat.msgs[0].id : 0;
+    const j = await api('GET', `/api/agents/${aid}/chat?` + (first ? `after=${first - 1}` : `limit=${CHAT_PAGE}`)); if (S.chat.aid !== aid) return;
+    if (first) { const lo = j.messages.length ? j.messages[0].id : Infinity; S.chat.msgs = [...S.chat.msgs.filter(m => m.id < lo), ...j.messages]; }
+    else { S.chat.msgs = j.messages; S.chat.more = !!j.has_more; }
+    S.chat.err = null;
     if (j.now) S.chat.off = Date.now() - Date.parse(j.now);  // 2.7.2 (#422): the server's clock
     const a = agentById(aid); if (a) { if (j.agent) { Object.assign(a, j.agent); S.agentsAt = Date.now(); } a.chat_unread = 0; }
   }
@@ -12391,14 +12428,16 @@ async function chatLoad() {
 }
 function chatMsgs() {
   const a = agentById(S.chat.aid);
-  if (S.chat.err) return `<div class="muted mhint">${esc(S.chat.err)}</div>`;
-  if (!S.chat.msgs.length) return `<div class="muted cmempty">${tr('Ask {0} something, or ask it to plan, comment or create tasks in the lists you share.', esc(a?.name || ''))}</div>`;
+  // 2.12.2 (#451): every row has a key (data-k), so chatPatch() only swaps or appends the rows that changed
+  if (S.chat.err && !S.chat.msgs.length) return `<div class="muted mhint" data-k="err">${esc(S.chat.err)}</div>`;  // a failed refresh keeps the messages
+  if (!S.chat.msgs.length) return `<div class="muted cmempty" data-k="empty">${tr('Ask {0} something, or ask it to plan, comment or create tasks in the lists you share.', esc(a?.name || ''))}</div>`;
   const pend = chatPending(), off = a && pend && (!a.enabled || agentOffline(a));
-  return S.chat.msgs.map(m => { const t = m.task_id && taskById(m.task_id), mine = m.from !== 'agent';
+  const older = S.chat.more ? `<div class="chold" data-k="older"><button type="button" class="btn sm" data-act="chat-older">${tr('Load older messages')}</button></div>` : '';
+  return older + S.chat.msgs.map(m => { const t = m.task_id && taskById(m.task_id), mine = m.from !== 'agent';
     // 2.7.2 (#422): my messages say Sent / Delivered (the agent fetched it); (#421) reactions, quick 👍 👎 ❤️ on the agent's
     const dlv = mine ? `<span class="cdlv ${m.delivered_at ? 'on' : ''}" title="${esc(m.delivered_at ? tr('Delivered') + ' · ' + fmtWhen(m.delivered_at) : tr('Sent'))}">${ic('check', 's')}${m.delivered_at ? ic('check', 's') : ''}<span>${m.delivered_at ? tr('Delivered') : tr('Sent')}</span></span>` : '';
-    return `<div class="cmsg ${mine ? 'me' : 'ag'}" data-mid="${m.id}"><div class="cbub">${!mine ? commentBody(m.body, {}) : esc(m.body).replace(/\n/g, '<br>')}</div>${t ? `<button class="runtask" data-act="open-id" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : ''}${chatRxHtml(m, a)}<div class="cmeta"><time>${fmtWhen(m.created_at)}</time>${dlv}</div></div>`; }).join('')
-    + (off ? `<div class="chpend off" role="status">${ic('clock', 's')}<span>${esc(tr('{0} is offline – will answer later', a.name))}</span></div>` : '');
+    return `<div class="cmsg ${mine ? 'me' : 'ag'}" data-k="m${m.id}" data-mid="${m.id}"><div class="cbub">${!mine ? commentBody(m.body, {}) : esc(m.body).replace(/\n/g, '<br>')}</div>${t ? `<button class="runtask" data-act="open-id" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : ''}${chatRxHtml(m, a)}<div class="cmeta"><time>${fmtWhen(m.created_at)}</time>${dlv}</div></div>`; }).join('')
+    + (off ? `<div class="chpend off" data-k="off" role="status">${ic('clock', 's')}<span>${esc(tr('{0} is offline – will answer later', a.name))}</span></div>` : '');
 }
 // 2.7.2 (#421): reactions on a chat message. On the agent's messages 👍 / 👎 / ❤️ are always there (👍 from me = approval);
 // on mine only what the agent reacted with
@@ -12460,34 +12499,100 @@ function chatInner(aid) {
   return `<div class="chath">${avBtn(a.id, a.name, 'avatar')}<div class="chn"><b>${esc(a.name)}</b>${chatStHtml(a)}</div><span class="spacer"></span>
       <button class="iconbtn" data-act="chat-close" title="${tr('Close')}" aria-label="${tr('Close')}">${ic(isMobile() ? 'back' : 'x')}</button></div>
     <div class="chmsgs" id="chat-msgs">${chatMsgs()}</div>
+    <button type="button" class="chnew hidden" id="chat-new" data-act="chat-bottom">${tr('New message')} <span aria-hidden="true">↓</span></button>
     ${typingHtml(chatTyping(a) ? [a] : [], 'chat-typing')}
     <div class="chcomp"><textarea id="chat-in" rows="1" placeholder="${esc(tr('Message to {0}…', a.name))}" ${a.enabled ? '' : 'disabled'}>${esc(S.drafts['chat:' + a.id] || '')}</textarea><button class="btn sm pri" data-act="chat-send" ${a.enabled ? '' : 'disabled'}>${ic('send', 's')} ${tr('Send')}</button></div>
     <div class="shint chnote">${tr('{0} answers when it next looks at its events (right away with a webhook or long-polling). It only sees the lists shared with it.', esc(a.name))}</div>`;
 }
 function chatViewHtml(aid) {
   if (S.chat.aid !== +aid) { S.chat = {aid: +aid, msgs: [], err: null}; setTimeout(chatLoad, 0); }
-  return `<div class="chview">${chatInner(aid)}</div>`;
+  return `<div class="chview" data-aid="${+aid}">${chatInner(aid)}</div>`;
 }
-function chatDraw() {
-  const p = $('#achat'), m0 = $('#chat-msgs');
-  const near = !m0 || m0.scrollHeight - m0.scrollTop - m0.clientHeight < 80;  // only follow new messages from the bottom
+function chatDraw(o = {}) {
+  const p = $('#achat');
   if (p && !p.classList.contains('hidden') && S.chat.aid && !isMobile() && (p.dataset.aid !== String(S.chat.aid) || !$('#chat-msgs', p))) {
     const d = S.drafts['chat:' + S.chat.aid] = $('#chat-in', p)?.value ?? S.drafts['chat:' + S.chat.aid]; p.innerHTML = chatInner(S.chat.aid); p.dataset.aid = S.chat.aid; if (d !== undefined) $('#chat-in', p).value = d;
-  } else {  // 2.7.2 (#422): the open chat refreshes in place (the box keeps its focus, the keyboard stays)
-    const m = $('#chat-msgs'); if (m) m.innerHTML = chatMsgs();
-    agentLive();
+    o = {bottom: true};
   }
-  const m = $('#chat-msgs'); if (m && near) m.scrollTop = m.scrollHeight;
+  chatPatch(o);  // 2.7.2 (#422) / 2.12.2 (#451): the open chat refreshes in place (the box keeps its focus, the keyboard stays)
+  agentLive();
+}
+// 2.12.2 (#451): only the rows that changed are swapped, new ones appended; the list (its scroll position) and the input box
+// are never replaced. Like a messenger: at the bottom (within 3rem) it stays at the bottom, scrolled up it stays where it
+// is and "New message ↓" shows up; older pages above keep the message in view (keep)
+function chatPatch(o = {}) {
+  const box = $('#chat-msgs'); if (!box) return;
+  const a = agentById(S.chat.aid), near = chatNear(box), top = box.scrollTop, h = box.scrollHeight, last = +(box.dataset.last || 0);
+  patchKids(box, chatMsgs());
+  const ms = S.chat.msgs, nl = ms.length ? ms[ms.length - 1].id : 0; box.dataset.last = nl;
+  if (o.keep) box.scrollTop = top + box.scrollHeight - h;
+  else if (near || o.bottom) { box.scrollTop = box.scrollHeight; chatNewPill(false); S.chat.pin = true; }
+  else { if (box.scrollTop !== top) box.scrollTop = top; if (last && nl > last && ms.some(m => m.id > last && m.from === 'agent')) chatNewPill(true); }
+  const on = !!a?.enabled, ci = $('#chat-in'), sb = $('[data-act="chat-send"]');  // paused / resumed: the same box
+  if (ci && ci.disabled === on) ci.disabled = !on;
+  if (sb && sb.disabled === on && !S.chat.sending) sb.disabled = !on;
+}
+const chatNear = box => box.scrollHeight - box.scrollTop - box.clientHeight <= 3 * remPx();
+// 2.12.2 (#453 N4): the phone chat fills exactly what is visible (the visual viewport minus the header and, without a
+// keyboard, the tab bar); with the keyboard up (body.kb-open) the tab bar and the note go, and a chat that was at the
+// bottom stays at the bottom, so the newest message is right above the input
+function chatFit() {
+  const v = $('#view .chview');
+  if (!v || !isMobile()) { document.body.classList.remove('kb-open'); if (v) v.style.height = ''; return; }
+  const vv = window.visualViewport, bottom = vv ? vv.offsetTop + vv.height : innerHeight, box = $('#chat-msgs');
+  const kb = !!vv && editFocused() && v.contains(document.activeElement) && vv.height < (S.vvMax || innerHeight) - 120;
+  document.body.classList.toggle('kb-open', kb);
+  const tabs = $('#tabs'), tb = tabs && getComputedStyle(tabs).display !== 'none' ? tabs.getBoundingClientRect().height : 0;
+  const h = Math.max(160, Math.floor(bottom - v.getBoundingClientRect().top - tb)) + 'px';
+  if (v.style.height !== h) v.style.height = h;
+  if (box && S.chat.pin !== false) box.scrollTop = box.scrollHeight;
+}
+window.addEventListener('resize', () => chatFit());
+document.addEventListener('focusin', e => { if (e.target.id === 'chat-in') setTimeout(chatFit, 0); });
+document.addEventListener('focusout', e => { if (e.target.id === 'chat-in') setTimeout(chatFit, 0); });
+function chatNewPill(on) { const b = $('#chat-new'); if (b && b.classList.contains('hidden') === on) b.classList.toggle('hidden', !on); }
+function chatBottom() { const box = $('#chat-msgs'); if (box) box.scrollTop = box.scrollHeight; chatNewPill(false); }
+document.addEventListener('scroll', e => { if (e.target.id !== 'chat-msgs') return; S.chat.pin = chatNear(e.target); if (S.chat.pin) chatNewPill(false); }, true);
+async function chatOlder() {
+  const aid = S.chat.aid; if (!aid || !S.chat.msgs.length || S.chat.busy) return;
+  S.chat.busy = true;
+  try {
+    const j = await api('GET', `/api/agents/${aid}/chat?before=${S.chat.msgs[0].id}&limit=${CHAT_PAGE}`); if (S.chat.aid !== aid) return;
+    const lo = S.chat.msgs.length ? S.chat.msgs[0].id : Infinity;
+    S.chat.msgs = [...j.messages.filter(m => m.id < lo), ...S.chat.msgs]; S.chat.more = !!j.has_more;
+  } catch (e) { toast(e instanceof Offline ? tr('Only available online.') : e.message); return; }
+  finally { S.chat.busy = false; }
+  chatPatch({keep: true});
+}
+// 2.12.2 (#451): replaces only the children of box that changed, by their key (data-k) or else by position; the box itself,
+// its scroll position and anything focused outside of it stay
+function patchKids(box, html) {
+  const t = document.createElement('template'); t.innerHTML = html;
+  const key = n => n.getAttribute('data-k') || (n.hasAttribute('data-cid') ? 'c' + n.getAttribute('data-cid') : null), old = new Map();
+  [...box.children].forEach(n => { const k = key(n); if (k) old.set(k, n); });
+  const keep = new Set(); let prev = null;
+  for (const n of [...t.content.children]) {
+    const k = key(n), at0 = prev ? prev.nextElementSibling : box.firstElementChild;
+    const o = k ? old.get(k) : at0 && !key(at0) && !keep.has(at0) ? at0 : null;
+    let use = n;
+    if (o && o.isEqualNode(n)) use = o;
+    else if (o) o.replaceWith(n);
+    const at = prev ? prev.nextElementSibling : box.firstElementChild;
+    if (at !== use) box.insertBefore(use, at);
+    keep.add(use); prev = use;
+  }
+  [...box.children].forEach(c => { if (!keep.has(c)) c.remove(); });
+  [...box.childNodes].forEach(c => { if (c.nodeType === 3) c.remove(); });
 }
 async function chatSend() {
   const ta = $('#chat-in'), aid = S.chat.aid; if (!ta || !aid) return;
   const body = ta.value.trim(); if (!body) return;
   const btn = $('[data-act="chat-send"]'); if (btn) btn.disabled = true;
-  let sent = false;
+  let sent = false; S.chat.sending = true;
   try { const m = await rawFetch('POST', `/api/agents/${aid}/chat`, {body}); S.chat.msgs.push(m); ta.value = ''; delete S.drafts['chat:' + aid]; sent = true; }
   catch (e) { toast(e instanceof Offline ? tr('You are offline: the message was not sent and stays in the box') : e.message); }
-  finally { if (btn) btn.disabled = false; }
-  chatDraw();
+  finally { S.chat.sending = false; if (btn) btn.disabled = false; }
+  chatDraw({bottom: sent});
   // 2.0.8 (#320): on a phone a sent message closes the keyboard (the answer gets the whole screen); the desktop keeps
   // typing, and a message that was not sent keeps the focus everywhere
   const ci = $('#chat-in');
@@ -13229,9 +13334,13 @@ const agentStatusLines = () => (S.agents || []).filter(a => a.enabled && a.statu
 function agentLive() {
   const t = S.sel && taskById(S.sel), d = $('#d-typing');
   if (d) d.outerHTML = typingHtml(taskTypers(t), 'd-typing');
-  const c = $('#chat-typing'), a = S.chat.aid && agentById(S.chat.aid);
-  if (c) c.outerHTML = typingHtml(chatTyping(a) ? [a] : [], 'chat-typing');
-  const cs = $('#chat-st'); if (cs && a) cs.outerHTML = chatStHtml(a);
+  // 2.12.2 (#451): the typing row and the state chip are swapped only when they changed; the dots appearing make the list
+  // shorter, so a list that was at the bottom is put back to the bottom
+  const c = $('#chat-typing'), a = S.chat.aid && agentById(S.chat.aid), box = $('#chat-msgs'), pin = !!box && chatNear(box);
+  const swap = (el, h) => { if (el && el._h !== h && el.outerHTML !== h) { el.outerHTML = h; const n = $('#' + el.id); if (n) n._h = h; } };
+  if (c) swap(c, typingHtml(chatTyping(a) ? [a] : [], 'chat-typing'));
+  if (a) swap($('#chat-st'), chatStHtml(a));
+  if (pin && box.isConnected && !chatNear(box)) box.scrollTop = box.scrollHeight;
   const st = agentBusyState();
   const more = $('#tabs [data-act="tabs-more"]'), inMore = !!more && tabOverflow().more.some(x => x.id === 'agents');
   $$('#side [data-go="agents"], #tabs [data-go="agents"]').forEach(b => { b.classList.toggle('aspin', st === 'working'); b.classList.toggle('await', st === 'waiting'); });

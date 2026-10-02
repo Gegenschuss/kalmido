@@ -2111,6 +2111,12 @@ button.tvr-task:hover{color:var(--accent)}
 .chcomp textarea:focus{outline:none;border-color:var(--accent)}
 .cmsg .runtask{display:inline-flex;align-items:center;gap:.25rem;padding:.125rem .25rem;color:var(--muted);font-size:.8125rem;max-width:100%}
 .chnote{padding:0 .75rem .75rem;margin:0}
+/* 2.12.2 (#451): "Load older messages" above the newest 30, "New message ↓" over the bottom edge of the list while scrolled up */
+.chold{display:flex;justify-content:center;padding:.125rem 0 .25rem}
+.chnew{position:relative;z-index:2;align-self:center;display:inline-flex;align-items:center;gap:.375rem;min-height:2.75rem;margin:-3.25rem 0 .5rem;padding:0 1rem;border:1px solid var(--line2);border-radius:62.5rem;background:var(--bg2);color:var(--accent);font:inherit;font-size:var(--fs-s);font-weight:600;box-shadow:var(--shadow);cursor:pointer}
+.chnew.hidden{display:none}
+/* 2.12.2 (#453 N4): phone chat with the keyboard up: all the room for the messages (height set by chatFit()) */
+body.kb-open #tabs,body.kb-open #fab,body.kb-open .chview .chnote{display:none}
 @media (max-width:899px){.achip .act{max-width:34vw}.agview{padding:.5rem .75rem 7rem}.chview{height:calc(100dvh - 7.5rem)}}
 .rx.rxplus{padding:0 .375rem}.rx.rxplus .i{width:.75rem;height:.75rem}
 .rxpick{padding:.5rem;display:flex;flex-direction:column;gap:.5rem;max-width:17rem}
@@ -2823,7 +2829,7 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 .povh .btn .i{width:.875rem;height:.875rem}
 .povempty{font-size:var(--fs-m);padding:.25rem 0}
 .povmd{cursor:default;font-size:var(--fs-b)}
-#pov-desc{width:100%;min-height:10rem;font:inherit;font-size:var(--fs-b);line-height:1.5;resize:vertical}
+#pov-desc-in{width:100%;min-height:10rem;font:inherit;font-size:var(--fs-b);line-height:1.5;resize:vertical}
 .povbar{display:flex;align-items:center;gap:.5rem;margin-top:.5rem;font-size:var(--fs-s)}
 .povm{display:flex;align-items:center;gap:.625rem;min-height:2.25rem;border-top:1px solid var(--line);font-size:var(--fs-b)}
 .povm:first-of-type{border-top:0}
