@@ -7,6 +7,38 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.8.0] - 2026-10-02
+
+**In short:** A new look, "Leitstand": one sidebar with grouped navigation instead of the icon rail, a command bar, an
+agent band under the list header, ticket numbers in the rows, an own icon set and a raspberry accent, in light and dark.
+
+### Changed
+- **One sidebar instead of icon rail + sidebar** (#434): grouped text navigation with the counts right after the labels:
+  *Focus* (Inbox, Today, Tomorrow, Next 7 days, Now doable, Waiting, Assigned to me, News), *Views* (Calendar, Timeline,
+  Matrix, Habits, Focus, Time tracking, Statistics, Overview, Agents; switched-off modules are left out), *Lists* (a dot,
+  the count and the progress of a project), *Filters*, *Tags*, *Team* (the people you share lists with and the agents with
+  their status dot), then All, Completed, Trash, Archived, Search and Settings. Every group folds (per device). The tab bar
+  setting is for phones only now. When the task panel leaves the list too little room, the sidebar becomes a drawer behind
+  the menu button in the header.
+- **Command bar** in the header (*Jump, create, ask an agent…*, Ctrl/Cmd K) and in the drawer, plus a *New task* button on
+  mouse screens; the view switch of a list (List / Kanban / Timeline / Project overview) is a row of text tabs; the next
+  open milestone of a project sits next to its title.
+- **Agent band** under the header of a list, a folder and the smart lists (desktop and tablets): every agent with its status
+  (ready, working, waiting, offline, error), the task it works on with its ticket number, a thin progress line and the first
+  job waiting for your approval with 👍 / ✕ (the same as Approve / Reject in the Agents view). It folds (remembered per
+  device); while it is on screen the header leaves out the agent dots. Phones keep the header pill.
+- **Rows**: a round status glyph (its colour is the priority; an agent working on the task turns it into an open arc with a
+  dot), the ticket number in a mono gutter in lists with tickets, the selected row marked by an accent bar on the left,
+  40 px rows on the desktop and 44 px on touch screens.
+- **Icons "Punkt"**: an own icon set on a 20 px grid with open arcs, 1.6 strokes and one filled dot per icon; the dot takes
+  the accent where an icon stands alone or is active.
+- **Colours**: neutral greys and a raspberry accent (#BE185D light, #F472B6 dark; text on it meets WCAG AA). Devices that
+  had the old default (mint) switch to the new default once; mint stays selectable and other choices are kept. Sign-in,
+  setup and the public list pages use the new colours too.
+
+### Fixed
+- The 2.7.2 notes credited the removed refresh button to #432; it was #433.
+
 ## [2.7.2] - 2026-10-01
 
 **In short:** Personal agents with setup guides for Linux, macOS and Windows, reactions and Sent / Delivered in the agent
@@ -46,7 +78,7 @@ chat, clickable people everywhere, breadcrumbs in the task panel and "Show compl
   `kind: "checklist"` and the boolean `checklist` as deprecated aliases of `done_at_bottom`.
 - `mcp/README.md` and the launcher name the current menu path *Settings > Agents*.
 
-- Shared lists: the refresh button left the header (#432); *…* > *Refresh* stays, and when the check for changes has
+- Shared lists: the refresh button left the header (#433); *…* > *Refresh* stays, and when the check for changes has
   failed for more than 30 seconds a small hint says *Offline – last update N min ago* (a tap tries again).
 
 ### Fixed
@@ -337,7 +369,8 @@ of people.
   multi-arch image (`ghcr.io/gegenschuss/kalmido`, linux/amd64 and linux/arm64), an installable web app that works
   offline, English and German.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.7.2...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.8.0...HEAD
+[2.8.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.8.0
 [2.7.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.7.2
 [2.7.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.7.1
 [2.7.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.7.0

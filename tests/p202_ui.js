@@ -203,7 +203,7 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
   w.eval(`chatOpen(${CL})`); await sleep(800);
   ty = d.querySelector('#chat-typing');
   check(ty && !ty.classList.contains('hidden') && /Claude is writing …/.test(ty.textContent), 'chat: under the last message');
-  check(d.querySelector('#rail [data-go="agents"].aspin'), 'rail agents button: spinning ring');
+  check(d.querySelector('#side [data-go="agents"].aspin'), 'sidebar agents row: spinning ring');
   w.eval('chatClose()');
   w.close();
 

@@ -22,9 +22,9 @@ const START = {'tasks.lastKey': null};  // boot.js seeds "today" for the older s
   let w = await boot({user: 'alice', ls: START}), d = w.document;
   check(w.eval('S.route.key') === 'inbox' && w.location.hash === '', 'no hash, first start: the Inbox (' + w.eval('S.route.key') + ')');
   check(/In the inbox/.test(d.querySelector('#view').textContent), 'the Inbox view is shown');
-  const side = [...d.querySelectorAll('#side > .srow')].map(r => r.dataset.go);
+  const side = [...d.querySelectorAll('#side .sg-focus .srow')].map(r => r.dataset.go);
   check(side[0] === 'inbox' && side.slice(1, 5).join() === 'today,tomorrow,week,doable', 'sidebar: Inbox first, then Today ... Now doable: ' + side);
-  check(d.querySelector('#side > .srow[data-go="inbox"]').classList.contains('on'), 'sidebar: Inbox is the open view');
+  check(d.querySelector('#side .sg-focus .srow[data-go="inbox"]').classList.contains('on'), 'sidebar: Inbox is the open view');
   check(w.eval('SMART_TABS[0]') === 'inbox' && w.eval('Object.keys(SMART)[0]') === 'inbox', 'tab choices + smart list order start with the Inbox');
   w.eval('openPalette()'); await sleep(100);
   const views = w.eval(`palAll().filter(x => x.id.startsWith('v:')).map(x => x.id)`);
@@ -53,7 +53,7 @@ const START = {'tasks.lastKey': null};  // boot.js seeds "today" for the older s
   // phone: drawer + default tab bar
   w = await boot({user: 'alice', mobile: true, ls: START}); d = w.document;
   check(w.eval('S.route.key') === 'inbox', 'phone: starts on the Inbox');
-  check(d.querySelector('#side > .srow')?.dataset.go === 'inbox', 'phone drawer: Inbox first');
+  check(d.querySelector('#side .sg-focus .srow')?.dataset.go === 'inbox', 'phone drawer: Inbox first');
   const tasksTab = d.querySelector('#tabs [data-go]');
   check(tasksTab && tasksTab.dataset.go === 'inbox' && tasksTab.classList.contains('on'), 'default tab bar: Tasks opens the Inbox: ' + tasksTab?.dataset.go);
   w.close();
@@ -61,7 +61,7 @@ const START = {'tasks.lastKey': null};  // boot.js seeds "today" for the older s
   // German
   await call('PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', ls: START}); d = w.document;
-  check(/Eingang steht oben/.test(w.eval(`tr(tourSteps()[0].d)`)) && d.querySelector('#side > .srow .n')?.textContent === 'Eingang', 'German: tour text + sidebar');
+  check(/Eingang steht oben/.test(w.eval(`tr(tourSteps()[0].d)`)) && d.querySelector('#side .sg-focus .srow .n')?.textContent === 'Eingang', 'German: tour text + sidebar');
   w.close();
 
   const bad = errs.filter(e => !/Could not parse CSS/.test(e));

@@ -5,106 +5,111 @@
 const APP_NAME = 'Kalmido';
 
 // ------------------------------------------------------------------ icons
+// 2.8.0 (#434) icon set "Punkt": a 20 x 20 grid, open arcs and lines (1.6, round caps), and one filled dot per icon where it
+// carries meaning (class d: the accent, or the text colour in dense places, see app.css). Few strokes, no boxes in boxes.
+const icDot = (x, y, r = 2) => `<circle class="d" cx="${x}" cy="${y}" r="${r}"/>`;
+const icFill = (x, y, r = 1.2) => `<circle class="f" cx="${x}" cy="${y}" r="${r}"/>`;
+const icPath = d => `<path d="${d}"/>`;
 const P = {
-  check: '<path d="M20 6 9 17l-5-5"/>',
-  zap: '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>',
-  plus: '<path d="M12 5v14M5 12h14"/>',
-  x: '<path d="M18 6 6 18M6 6l12 12"/>',
-  pr: '<circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M6 8.5v7M18 15.5V9a3 3 0 0 0-3-3h-4M13 3.5 10.5 6 13 8.5"/>',
-  commit: '<circle cx="12" cy="12" r="3.5"/><path d="M3 12h5.5M15.5 12H21"/>',
-  git: '<circle cx="6" cy="5.5" r="2.5"/><circle cx="6" cy="18.5" r="2.5"/><circle cx="18" cy="8" r="2.5"/><path d="M6 8v8M18 10.5a6 6 0 0 1-6 6H8.5"/>',
-  bot: '<rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M9.5 4h5M9 13h.01M15 13h.01M9.5 16.5h5"/>',
-  inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
-  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
-  sunrise: '<path d="M12 2v8M4.93 10.93l1.41 1.41M2 18h2M20 18h2M19.07 10.93l-1.41 1.41M22 22H2M8 6l4-4 4 4M16 18a4 4 0 0 0-8 0"/>',
-  week: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>',
-  cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
-  all: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
-  done: '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
-  trash: '<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
-  list: '<path d="M3 12h18M3 6h18M3 18h12"/>',
-  tag: '<path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><path d="M7 7h.01"/>',
-  grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>',
-  habit: '<path d="M12 22c5.5 0 9-3.5 9-8 0-5-4-8-9-12C7 6 3 9 3 14c0 4.5 3.5 8 9 8z"/><path d="m9 13 2 2 4-4"/>',
-  timer: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/>',
-  search: '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
-  gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
-  menu: '<path d="M3 12h18M3 6h18M3 18h18"/>',
-  back: '<path d="m15 18-6-6 6-6"/>',
-  chev: '<path d="m6 9 6 6 6-6"/>',
-  left: '<path d="m15 18-6-6 6-6"/>',
-  right: '<path d="m9 18 6-6-6-6"/>',
-  flag: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/>',
-  bell: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
-  belloff: '<path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="M18.63 13A17.9 17.9 0 0 1 18 8"/><path d="M6.26 6.26A5.9 5.9 0 0 0 6 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 0 0-9.33-5"/><path d="m2 2 20 20"/>',
-  bellring: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="M2 8c0-2 .7-4 2-5.5M22 8c0-2-.7-4-2-5.5"/>',
-  hourglass: '<path d="M6 2h12M6 22h12"/><path d="M7 2c0 5 5 6.5 5 10S7 17 7 22M17 2c0 5-5 6.5-5 10s5 5 5 10"/>',
-  repeat: '<path d="m17 1 4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
-  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
-  dots: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
-  sub: '<path d="M9 6h11M9 12h11M9 18h11M4 6v12"/>',
-  kanban: '<rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="4" height="8" rx="1"/>',
-  play: '<path d="M6 4l14 8-14 8z"/>',
-  pause: '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>',
-  stop: '<rect x="5" y="5" width="14" height="14" rx="2"/>',
-  edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/>',
-  undo: '<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>',
-  redo: '<path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 15-6.7L21 13"/>',
-  folder: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
-  cart: '<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.6 12.4a2 2 0 0 0 2 1.6h8.6a2 2 0 0 0 2-1.5L22 7H6"/>',
-  sort: '<path d="M11 5h10M11 9h7M11 13h4M3 17l3 3 3-3M6 18V4"/>',
-  eye: '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
-  ban: '<circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/>',
-  upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>',
-  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
-  arrow: '<path d="M5 12h14M12 5l7 7-7 7"/>',
-  pin: '<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>',
-  mappin: '<path d="M20 10c0 4.99-5.54 10.19-7.4 11.8a1 1 0 0 1-1.2 0C9.54 20.19 4 14.99 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
-  select: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="m8 12 3 3 5-6"/>',
-  timeline: '<path d="M3 6h9M7 12h11M5 18h8"/>',
-  filter: '<path d="M22 3H2l8 9.46V19l4 2v-8.54z"/>',
-  indent: '<path d="m3 8 4 4-4 4M21 12H11M21 6H11M21 18H11"/>',
-  outdent: '<path d="m7 8-4 4 4 4M21 12H11M21 6H11M21 18H11"/>',
-  alert: '<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/>',
-  skip: '<path d="m5 4 10 8-10 8z"/><path d="M19 5v14"/>',
-  stopwatch: '<circle cx="12" cy="14" r="8"/><path d="M12 10v4M10 2h4M18.5 6.5 20 5"/>',
-  archive: '<rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4"/>',
-  clip: '<path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>',
-  file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>',
-  pdf: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 15h1.5a1.5 1.5 0 0 0 0-3H8v5M13 12v5h1a2 2 0 0 0 2-2v-1a2 2 0 0 0-2-2z"/>',
-  users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
-  user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
-  logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
-  key: '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"/>',
-  link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
-  at: '<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"/>',
-  palette: '<path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z"/><circle cx="13.5" cy="6.5" r="1"/><circle cx="17.5" cy="10.5" r="1"/><circle cx="6.5" cy="12.5" r="1"/><circle cx="8.5" cy="7.5" r="1"/>',
-  sliders: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',
-  help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"/>',
-  comment: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
-  send: '<path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/>',
-  chart: '<path d="M3 3v18h18"/><path d="M7 16v-5M12 16V8M17 16v-8"/>',
-  phone: '<rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/>',
-  copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
-  lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
-  pulse: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
-  columns: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18"/>',
-  deps: '<circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 9v3a3 3 0 0 0 3 3h6"/><path d="m13 12 3 3-3 3"/>',
-  collapse: '<path d="m7 20 5-5 5 5M7 4l5 5 5-5"/>',
-  grip: '<circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/>',
-  expand: '<path d="m7 15 5 5 5-5M7 9l5-5 5 5"/>',
-  cloudoff: '<path d="m2 2 20 20"/><path d="M5.8 8.2A6 6 0 0 0 7 20h9.5M21 16.8A4.5 4.5 0 0 0 17.5 10h-1.3A7 7 0 0 0 9.4 5.3"/>',
-  sync: '<path d="M21 12a9 9 0 0 1-15.5 6.2L3 16M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5M3 21v-5h5"/>',
-  panel: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/>',
+  check: icPath('M4 10.5L8 14.5L16 5.5'),
+  zap: icPath('M11 3L5.5 11H10.5L9 17') + icDot(15.5, 6),
+  plus: icPath('M10 4V16M4 10H16'),
+  x: icPath('M5 5L15 15M15 5L5 15'),
+  pr: icPath('M6 3.5V16.5M14 14V9.5A3.5 3.5 0 0 0 10.5 6H8M10 4L8 6L10 8') + icDot(14, 16),
+  commit: icPath('M2.5 10H6.5M13.5 10H17.5M13.5 10A3.5 3.5 0 1 1 6.5 10A3.5 3.5 0 0 1 13.5 10') + icDot(10, 10, 1.4),
+  git: icPath('M6 3.5V16.5M6 13A6.5 6.5 0 0 0 12.5 6.5') + icDot(14.5, 5),
+  bot: icPath('M4 16V11A6 6 0 0 1 16 11V16H4') + icDot(10, 11),
+  inbox: icPath('M3 10V16H17V10M3 10H7A3 3 0 0 0 13 10H17') + icDot(10, 5),
+  sun: icPath('M16 10A6 6 0 1 1 10 4') + icDot(15.5, 4.5),
+  sunrise: icPath('M2.5 15H17.5M5 15A5 5 0 0 1 15 15') + icDot(10, 5.5),
+  week: icPath('M3 5H17M3 10H17M3 15H11') + icDot(15.5, 15),
+  cal: icPath('M17 9V15A2 2 0 0 1 15 17H5A2 2 0 0 1 3 15V6A2 2 0 0 1 5 4H12M3 8.5H10.5M7 2.5V5.5') + icDot(15.5, 4.5),
+  all: icPath('M3 4H17M3 8H17M3 12H17M3 16H10') + icDot(14.5, 16),
+  done: icPath('M17 10A7 7 0 1 1 10 3M7 10L9.5 12.5L13.5 7.5') + icDot(15.5, 4.5),
+  trash: icPath('M3.5 5.5H16.5M8 5.5V3.5H12V5.5M5 5.5L6 17H14L15 5.5') + icDot(10, 11.5, 1.6),
+  list: icPath('M7 5H17M7 10H17M7 15H17') + icDot(3.5, 5) + icFill(3.5, 10) + icFill(3.5, 15),
+  tag: icPath('M10 3H3V10L10 17L17 10L11.5 4.5') + icDot(7, 7, 1.7),
+  grid: icPath('M3 3H8.5V8.5H3ZM11.5 11.5H17V17H11.5ZM11.5 8.5V3H17') + icDot(5.75, 14.25),
+  habit: icPath('M4 16C4 9 9 4 16 4C16 11 11 16 4 16M4 16L9.5 10.5') + icDot(12.5, 7.5, 1.7),
+  timer: icPath('M16 11A6 6 0 1 1 10 5M10 8V11M8 2.5H12') + icDot(15, 6, 1.8),
+  search: icPath('M14 9A5 5 0 1 1 4 9A5 5 0 0 1 14 9M13 13L17 17') + icDot(9, 9),
+  gear: icPath('M3 6H17M3 14H17') + icDot(7, 6) + icFill(13, 14, 2),
+  menu: icPath('M3 5H17M3 10H17M3 15H12'),
+  back: icPath('M12.5 4.5L7 10L12.5 15.5'),
+  chev: icPath('M5 7.5L10 12.5L15 7.5'),
+  left: icPath('M12.5 4.5L7 10L12.5 15.5'),
+  right: icPath('M7.5 4.5L13 10L7.5 15.5'),
+  flag: icPath('M4.5 17.5V3.5M4.5 4H15L12.5 8L15 12H4.5') + icDot(15.5, 16.5, 1.6),
+  bell: icPath('M5 14V9A5 5 0 0 1 15 9V14M3 14H17') + icDot(10, 17.5),
+  belloff: icPath('M5 14V9A5 5 0 0 1 12.5 4.7M15 9V14M3 14H17M3 3L17 17') + icDot(10, 17.5),
+  bellring: icPath('M5 14V9A5 5 0 0 1 15 9V14M3 14H17M2 7A7.5 7.5 0 0 1 4 3M18 7A7.5 7.5 0 0 0 16 3') + icDot(10, 17.5),
+  hourglass: icPath('M5 3H15M5 17H15M6 3C6 8 14 7 14 11.5M14 3C14 6 12 7.5 10 9M6 17C6 14 8 12.5 10 11.5') + icDot(10, 14.8, 1.7),
+  repeat: icPath('M16 10A6 6 0 0 1 5 13.5M4 10A6 6 0 0 1 15 6.5M15 3V6.5H11.5') + icDot(4.5, 15.5, 1.7),
+  clock: icPath('M17 10A7 7 0 1 1 10 3M10 7V10L13 12') + icDot(15.5, 4.5),
+  dots: icFill(4.5, 10, 1.4) + icFill(10, 10, 1.4) + icFill(15.5, 10, 1.4),
+  sub: icPath('M4 3V12A2 2 0 0 0 6 14H11M8 6H16') + icDot(15, 14),
+  kanban: icPath('M4 3V17M10 3V12M16 3V9') + icDot(16, 14),
+  play: icPath('M6 4L16 10L6 16Z'),
+  pause: icPath('M7 4V16M13 4V16'),
+  stop: icPath('M5 5H15V15H5Z'),
+  edit: icPath('M4 16V12.5L12.5 4L16 7.5L7.5 16H4M10.5 6L14 9.5') + icDot(16, 16, 1.6),
+  undo: icPath('M7 4.5L3.5 8L7 11.5M4 8H12A4.5 4.5 0 0 1 12 17H9'),
+  redo: icPath('M13 4.5L16.5 8L13 11.5M16 8H8A4.5 4.5 0 0 0 8 17H11'),
+  folder: icPath('M17 9V15A2 2 0 0 1 15 17H5A2 2 0 0 1 3 15V5A2 2 0 0 1 5 3H8L10 5.5H13') + icDot(16, 5.5),
+  cart: icPath('M2.5 3.5H5L7 13H15L17 6.5H8') + icFill(8, 16.5, 1.3) + icDot(14.5, 16.5, 1.6),
+  sort: icPath('M4.5 4V16M2 13.5L4.5 16L7 13.5M9.5 5H17M9.5 10H15M9.5 15H12.5'),
+  eye: icPath('M2 10C4 6 7 4.5 10 4.5S16 6 18 10C16 14 13 15.5 10 15.5S4 14 2 10') + icDot(10, 10, 2.2),
+  ban: icPath('M17 10A7 7 0 1 1 3 10A7 7 0 0 1 17 10M5 5L15 15'),
+  upload: icPath('M3 13V16H17V13M10 3.5V12M6 7.5L10 3.5L14 7.5'),
+  download: icPath('M3 13V16H17V13M10 3.5V12M6 8L10 12L14 8'),
+  arrow: icPath('M4 10H16M11 5L16 10L11 15'),
+  pin: icPath('M10 13.5V18M5.5 13.5H14.5M7 3H13M8 3V8L5.5 13.5M12 3V8L14.5 13.5'),
+  mappin: icPath('M16 8.5C16 13 10 18 10 18S4 13 4 8.5A6 6 0 0 1 16 8.5') + icDot(10, 8.5),
+  select: icPath('M16 10.5V15A2 2 0 0 1 14 17H5A2 2 0 0 1 3 15V5A2 2 0 0 1 5 3H11M7 9.5L10 12.5L17 4'),
+  timeline: icPath('M3 5H9M3 10H13M3 15H7') + icDot(16.5, 10),
+  filter: icPath('M3 4H17L11.5 10.5V16L8.5 17.5V10.5L5.5 7'),
+  indent: icPath('M3 6.5L6 9.5L3 12.5M9 5H17M9 10H17M9 15H17'),
+  outdent: icPath('M6 6.5L3 9.5L6 12.5M9 5H17M9 10H17M9 15H17'),
+  alert: icPath('M10 3L17.5 16.5H2.5ZM10 8V11.5') + icFill(10, 14, 1.1),
+  skip: icPath('M5 4L13 10L5 16ZM15.5 4V16'),
+  stopwatch: icPath('M16 11.5A6 6 0 1 1 10 5.5M10 9V11.5M8 2.5H12') + icDot(15.2, 7, 1.8),
+  archive: icPath('M3 4H17V7.5H3ZM4.5 7.5V15A2 2 0 0 0 6.5 17H13.5A2 2 0 0 0 15.5 15V7.5') + icDot(10, 12, 1.8),
+  clip: icPath('M15.5 9.5L10 15A3.5 3.5 0 0 1 5 10L11 4A2.3 2.3 0 0 1 14.3 7.3L8.5 13A1.2 1.2 0 0 1 6.8 11.3L12 6'),
+  file: icPath('M11.5 3H6A2 2 0 0 0 4 5V15A2 2 0 0 0 6 17H14A2 2 0 0 0 16 15V8M7.5 11H12.5M7.5 14H10.5') + icDot(15, 4.5, 1.8),
+  pdf: icPath('M11.5 3H6A2 2 0 0 0 4 5V15A2 2 0 0 0 6 17H14A2 2 0 0 0 16 15V8M7.5 15V10.5H9.5A1.5 1.5 0 0 1 9.5 13.5H7.5M12.5 10.5V15') + icDot(15, 4.5, 1.8),
+  users: icPath('M2.5 17A5 5 0 0 1 12.5 17M10.5 8A3 3 0 1 1 4.5 8A3 3 0 0 1 10.5 8M14.5 12A4 4 0 0 1 17.5 16') + icDot(14.5, 7.5, 2.2),
+  user: icPath('M4 17A6 6 0 0 1 16 17M13 8A3 3 0 1 1 7 8A3 3 0 0 1 13 8') + icDot(16, 4),
+  logout: icPath('M8 3H5A2 2 0 0 0 3 5V15A2 2 0 0 0 5 17H8M12 6L16 10L12 14M16 10H7'),
+  key: icPath('M9.5 14A3.5 3.5 0 1 1 6 10.5M8.5 11.5L16.5 3.5M13.5 6.5L15.5 8.5') + icDot(6, 14, 1.5),
+  link: icPath('M8.5 11.5L11.5 8.5M9 5.5L10.5 4A3.2 3.2 0 0 1 16 8.5L14.5 10M11 14.5L9.5 16A3.2 3.2 0 0 1 4 11.5L5.5 10'),
+  at: icPath('M13 10A3 3 0 1 1 7 10A3 3 0 0 1 13 10M13 7V11.5A2.5 2.5 0 0 0 18 11.5V10A8 8 0 1 0 14 17'),
+  palette: icPath('M10 17A7 7 0 1 1 17 10C17 12 15.5 13 14 13H12.5A1.5 1.5 0 0 0 11.5 15.5') + icDot(13, 6.5, 1.6) + icFill(7, 7) + icFill(6.5, 11),
+  sliders: icPath('M3 5H17M3 10H17M3 15H17') + icDot(13, 5) + icFill(7, 10, 2) + icFill(11, 15, 2),
+  help: icPath('M17 10A7 7 0 1 1 3 10A7 7 0 0 1 17 10M7.8 8A2.2 2.2 0 1 1 11 9.9C10.4 10.3 10 10.8 10 11.5') + icDot(10, 14.2, 1.3),
+  comment: icPath('M17 10A7 7 0 0 1 6.5 16L3 17L4 13.5A7 7 0 1 1 17 10') + icDot(10, 10, 1.6),
+  send: icPath('M17 3L10.5 17L8.5 11.5L3 9.5ZM8.5 11.5L17 3'),
+  chart: icPath('M3 3V17H17M7 14V10M11 14V6') + icDot(15, 12, 1.8),
+  phone: icPath('M6 4A2 2 0 0 1 8 2H12A2 2 0 0 1 14 4V16A2 2 0 0 1 12 18H8A2 2 0 0 1 6 16Z') + icDot(10, 15, 1.2),
+  copy: icPath('M8 8H16V16H8ZM12 5V4H4V12H5'),
+  lock: icPath('M4.5 9H15.5V17H4.5ZM7 9V6.5A3 3 0 0 1 13 6.5V9') + icDot(10, 13, 1.6),
+  pulse: icPath('M2 10H5.5L8 4L12 16L14.5 10H15') + icDot(17.5, 10, 1.6),
+  columns: icPath('M3 3H17V17H3ZM8 3V17M12.5 3V17'),
+  deps: icPath('M5 7.5V9A3 3 0 0 0 8 12H15.5M12.5 9L15.5 12L12.5 15') + icDot(5, 4.5),
+  collapse: icPath('M6 17L10 13L14 17M6 3L10 7L14 3'),
+  grip: icFill(7.5, 5) + icFill(12.5, 5) + icFill(7.5, 10) + icFill(12.5, 10) + icFill(7.5, 15) + icFill(12.5, 15),
+  expand: icPath('M6 13L10 17L14 13M6 7L10 3L14 7'),
+  cloudoff: icPath('M3 3L17 17M6 7.5A4.5 4.5 0 0 0 6 16H14M17 14.3A3.5 3.5 0 0 0 14 8.5A5 5 0 0 0 8.5 5.2'),
+  sync: icPath('M16 10A6 6 0 0 1 5 13.5M4 10A6 6 0 0 1 15 6.5M15 3V6.5H11.5M5 17V13.5H8.5'),
+  panel: icPath('M3 3H17V17H3ZM8 3V17'),
   // 2.4.0: ticket types (#340), project types (#243)
-  bug: '<path d="m8 2 1.9 1.9M14.1 3.9 16 2M9 7.1v-1a3 3 0 1 1 6 0v1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6M12 20v-9M6.5 13H3M21 13h-3.5M6 9 3.5 7.5M18 9l2.5-1.5M6 17l-2.5 1.5M18 17l2.5 1.5"/>',
-  bulb: '<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5M9 18h6M10 22h4"/>',
-  tsq: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/>',
-  brief: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
-  code: '<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>',
-  home: '<path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
+  bug: icPath('M6 9A4 4 0 0 1 14 9V12A4 4 0 0 1 6 12ZM10 9V16M3 11H6M14 11H17M4 6.5L6 7.5M16 6.5L14 7.5M4 16L6 14.5M16 16L14 14.5') + icDot(10, 4.2, 1.8),
+  bulb: icPath('M7.5 13.5C7.5 12 5 10.5 5 7.5A5 5 0 0 1 15 7.5C15 10.5 12.5 12 12.5 13.5ZM8 16.5H12') + icDot(10, 7.5, 1.8),
+  tsq: icPath('M16 10.5V15A2 2 0 0 1 14 17H5A2 2 0 0 1 3 15V5A2 2 0 0 1 5 3H11M7 10L10 13') + icDot(15, 5),
+  brief: icPath('M3 7H17V16H3ZM7 7V4H13V7') + icDot(10, 11.5, 1.6),
+  code: icPath('M13 6L17 10L13 14M7 6L3 10L7 14'),
+  home: icPath('M3 9L10 3L17 9M5 7.5V17H15V7.5') + icDot(10, 13, 1.8),
 };
-const ic = (n, c = '') => `<svg class="i ${c}" viewBox="0 0 24 24">${P[n] || ''}</svg>`;
+const ic = (n, c = '') => `<svg class="i ${c}" viewBox="0 0 20 20" aria-hidden="true">${P[n] || ''}</svg>`;
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 // colors from the server only ever reach a style attribute as a plain hex value
 const cssColor = v => typeof v === 'string' && /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(v) ? v : '';
@@ -158,7 +163,7 @@ const hintSeen = k => (LS.get('hintsSeen', []) || []).includes(k);
 function hintDone(k) { if (!hintSeen(k)) LS.set('hintsSeen', [...(LS.get('hintsSeen', []) || []), k]); }
 const hintOnce = (k, text, cls = '') => isTouch() && !hintSeen(k) ? `<div class="muted mhint once ${cls}" data-hint="${k}"><span>${esc(text)}</span><button type="button" class="iconbtn hx" data-act="hint-x" data-k="${k}" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>` : '';
 const kt = (label, keys) => isTouch() ? label : `${label} (${kbText(keys)})`;  // a label with its keyboard shortcut
-const LS_KEEP = new Set(['tasks.theme', 'tasks.i18n', 'tasks.density', 'tasks.fsize', 'tasks.font', 'tasks.accent']);
+const LS_KEEP = new Set(['tasks.theme', 'tasks.i18n', 'tasks.density', 'tasks.fsize', 'tasks.font', 'tasks.accent', 'tasks.accentMig280', 'tasks.sideGroups', 'tasks.agband']);
 function clearLocal() {
   try {
     const ks = [];
@@ -171,7 +176,7 @@ function applyTheme() {
   const pref = LS.get('theme', 'auto');
   document.documentElement.dataset.theme = pref;
   const light = pref === 'light' || (pref === 'auto' && matchMedia('(prefers-color-scheme: light)').matches);
-  const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = light ? '#ffffff' : '#13171d';
+  const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = light ? '#f8f8f9' : '#16171a';
 }
 applyTheme();
 try { matchMedia('(prefers-color-scheme: light)').addEventListener('change', applyTheme); } catch { /* old browser */ }
@@ -189,10 +194,13 @@ const LOOK = {
   fsize: [['m', N_('Normal'), 1], ['s', N_('Small'), .9], ['l', N_('Large'), 1.12], ['xl', N_('Extra large'), 1.25]],
   font: [['geist', 'Geist'], ['system', N_('System font')], ['atkinson', 'Atkinson Hyperlegible']],
   // [key, name, dark, light] (ink colours and the CSS variables live in app.css :root[data-accent=...])
-  accent: [['mint', N_('Mint'), '#2dd4bf', '#0a766b'], ['sky', N_('Sky'), '#38bdf8', '#0b6aa2'], ['violet', N_('Violet'), '#a78bfa', '#6d4bd8'],
+  // 2.8.0 (#434): raspberry is the default (first entry); mint (the old default) stays selectable
+  accent: [['raspberry', N_('Raspberry'), '#f472b6', '#be185d'], ['mint', N_('Mint'), '#2dd4bf', '#0a766b'], ['sky', N_('Sky'), '#38bdf8', '#0b6aa2'], ['violet', N_('Violet'), '#a78bfa', '#6d4bd8'],
     ['rose', N_('Rose'), '#f472b6', '#b8306f'], ['orange', N_('Orange'), '#fb923c', '#ad4c07'], ['lime', N_('Lime'), '#a3e635', '#4a7110']],
 };
 try { if (localStorage.getItem('tasks.accent') === '"amber"') localStorage.setItem('tasks.accent', '"orange"'); } catch { /* private mode */ }  // 1.1.3: Amber became Orange
+// 2.8.0 (#434): a device that had the old default (mint) gets the new default once; a colour picked later stays
+try { if (!localStorage.getItem('tasks.accentMig280')) { if (localStorage.getItem('tasks.accent') === '"mint"') localStorage.removeItem('tasks.accent'); localStorage.setItem('tasks.accentMig280', '1'); } } catch { /* private mode */ }
 const lookPref = k => { const v = LS.get(k, null); return (LOOK[k].find(x => x[0] === v) || LOOK[k][0])[0]; };
 const lookRow = k => LOOK[k].find(x => x[0] === lookPref(k));
 const uiZ = () => lookRow('fsize')[2];  // UI scale factor for sizes drawn in JS (week grid, charts, tour card)
@@ -619,7 +627,7 @@ setInterval(async () => {
     S.syncOk = Date.now(); staleDraw();
   } catch { staleDraw(); /* offline */ }
 }, 4000);
-// 2.7.2 (#432): instead of a refresh button in the header of shared lists, a small hint once the change check has failed
+// 2.7.2 (#433): instead of a refresh button in the header of shared lists, a small hint once the change check has failed
 // for more than 30 s: "Offline – last update N min ago"; a tap tries again (refreshNow). "…" keeps "Refresh".
 S.syncOk = Date.now();
 function staleDraw() {
@@ -1204,7 +1212,7 @@ function quickDefaults() {
 
 // ------------------------------------------------------------------ render: shell
 function render() {
-  renderRail(); renderSide(); renderTop(); renderView(); renderTabs();
+  fitLayout(true); renderSide(); renderTop(); renderView(); renderTabs();
   $('#fab').innerHTML = ic('plus'); $('#fab').setAttribute('aria-label', tr('New task')); $('#fab').title = kt(tr('New task'), 'n');
   $('#fab').classList.toggle('gone', noFab() || S.multi.size > 0 || (tabletDock() && !!$('#view .qdock')));
   if (S.sel && S.tasks.has(S.sel) && !$('#detail').contains(document.activeElement)) renderDetail();
@@ -1268,25 +1276,8 @@ function tabBtn(t, on, cls = '') {
   const nb = t.id === 'news' && S.news?.unread ? `<span class="nbadge">${S.news.unread > 99 ? '99+' : S.news.unread}</span>` : '';
   return `<button class="${cls} ${on ? 'on' : ''}" ${tgt} title="${esc(GO_KEY[t.mod || t.key || t.id] ? kt(t.label, GO_KEY[t.mod || t.key || t.id]) : t.label)}">${t.icon}<span>${esc(t.label)}</span>${t.mod === 'pomo' && S.pomo ? '<span class="dot"></span>' : ''}${t.mod === 'time' && S.timer ? '<span class="dot rec"></span>' : ''}${t.upd ? `<span class="dot" title="${esc(tr('Update available'))}"></span>` : ''}${nb}</button>`;
 }
-// 2.0.6 (#314): the desktop rail follows the tab bar setting exactly: its items in their order, then every switched-on
-// module that is not in it (desktop: nothing hidden), search and settings at the bottom unless placed in the tab bar.
-// The sidebar holds only lists, folders, filters, tags, All / Completed / Trash; the phone drawer keeps its shortcuts.
-function renderRail() {
-  const items = tabItems(), on = tabOn(items.filter(t => t.id !== 'search' && t.id !== 'settings'));
-  const has = id => items.some(t => t.id === id);
-  const extra = [...mods().filter(([m]) => !items.some(t => t.mod === m)).map(([m]) => tabItem('m:' + m)),
-    ...['agents', 'overview', 'stats', 'time'].filter(k => !has(k)).map(tabItem)].filter(Boolean);
-  const railBtn = t => {
-    if (t.id === 'search') return `<button class="rbtn ${S.route.key === 'search' ? 'on' : ''}" data-go="search" title="${esc(kt(tr('Search'), '/'))}">${ic('search', 'l')}<span>${esc(t.label)}</span></button>`;
-    if (t.id === 'settings') return `<button class="rbtn" data-act="settings" title="${esc(updDot() ? kt(tr('Settings'), 'g s') + ' · ' + tr('Update available') : kt(tr('Settings'), 'g s'))}">${ic('gear', 'l')}<span>${esc(t.label)}</span>${updDot() ? '<span class="dot"></span>' : ''}</button>`;
-    const b = tabBtn(t, t.id === on && S.route.key !== 'search', 'rbtn');
-    return t.id === 'agents' && (S.agents || []).some(x => x.waiting || x.chat_unread) ? b.replace('</button>', '<span class="dot"></span></button>') : t.id === 'overview' ? b.replace(/title="[^"]*"/, `title="${esc(tr('Where is it stuck?'))}"`) : b;
-  };
-  $('#rail').innerHTML = `<div class="logo"><img src="/static/icon.svg" alt="Kalmido"></div>` +
-    `<button class="rbtn rside" data-act="side" title="${tr('Lists and filters')}" aria-label="${tr('Lists and filters')}">${ic('panel')}</button>` +
-    [...items, ...extra].map(railBtn).join('') + '<div class="spacer"></div>' +
-    (has('search') ? '' : railBtn(tabItem('search'))) + (has('settings') ? '' : railBtn(tabItem('settings')));
-}
+// 2.8.0 (#434): no icon rail any more. The desktop has one sidebar with grouped text navigation (renderSide) and the
+// command bar in the header; the tab bar setting is for phones only.
 // what "Mehr" offers: overflow tabs + enabled modules that are not pinned + search/settings if not pinned
 function tabOverflow() {
   const items = tabItems(), shown = items.length > TAB_MAX ? items.slice(0, TAB_MAX - 1) : items;
@@ -1328,18 +1319,33 @@ function counts() {
   }
   return c;
 }
+// 2.8.0 (#434) "Leitstand": one sidebar, grouped text navigation. Focus (smart lists, with icons), Views (the modules),
+// Lists (folders + lists: a dot, the label, the count right after it, the progress of a project on the right), Filters,
+// Tags, Team (people + agents with their status dot), then All / Completed / Trash / Archived, Search, Settings and the
+// account. Switched-off modules are left out. Each group folds (per device, LS sideGroups).
+const sideOpen = g => !(LS.get('sideGroups', []) || []).includes(g);
+function sideGroupToggle(g) { const x = new Set(LS.get('sideGroups', []) || []); x.has(g) ? x.delete(g) : x.add(g); LS.set('sideGroups', [...x]); renderSide(); }
+function teamPeople() {
+  if (!collab()) return [];
+  const seen = new Map();
+  for (const l of S.lists) for (const p of listPeople(l)) if (p.user_id && (!S.me || p.user_id !== S.me.id) && !agentById(p.user_id) && !seen.has(p.user_id)) seen.set(p.user_id, p.name || personNameAny(p.user_id));
+  return [...seen.entries()].map(([id, name]) => ({id, name})).sort((a, b) => a.name.localeCompare(b.name));
+}
 function renderSide() {
   const c = counts(), k = S.route.key, onTasks = S.route.mod === 'tasks';
   const row = (key, icon, name, n, extra = '', after = '') =>
-    `<button class="srow ${onTasks && k === key ? 'on' : ''}" data-go="${esc(keyToHash(key))}" data-drop="${esc(key)}" ${GO_KEY[key] && !isTouch() ? `title="${esc(kt(name, GO_KEY[key]))}"` : ''} ${extra}>${icon}<span class="n">${esc(name)}</span>${after}<span class="c ${key === 'today' && c.over ? 'over' : ''}">${n || ''}</span></button>`;
+    `<button class="srow ${onTasks && k === key && !(key === 'all' && isRoadmap()) ? 'on' : ''}" data-go="${esc(keyToHash(key))}" data-drop="${esc(key)}" ${GO_KEY[key] && !isTouch() ? `title="${esc(kt(name, GO_KEY[key]))}"` : ''} ${extra}>${icon}<span class="n">${esc(name)}</span><span class="c ${key === 'today' && c.over ? 'over' : ''}">${n || ''}</span>${after}</button>`;
+  const mrow = (mod, icon, name, after = '', attrs = '') => `<button class="srow smod ${S.route.mod === mod ? 'on' : ''}" data-go="${mod}" ${GO_KEY[mod] && !isTouch() ? `title="${esc(kt(name, GO_KEY[mod]))}"` : ''} ${attrs}>${ic(icon)}<span class="n">${esc(name)}</span>${after}</button>`;
+  const head = (g, label, acts = '', n = '', tip = '') => `<div class="shead sgh ${g === 'lists' ? 'lroot' : ''} ${sideOpen(g) ? '' : 'closed'}" ${tip ? `title="${esc(tip)}"` : ''}><button class="sgt" data-act="side-group" data-g="${g}" aria-expanded="${sideOpen(g)}">${ic('chev', 's fcar')}<span>${esc(label)}</span>${!sideOpen(g) && n ? `<span class="c">${n}</span>` : ''}</button><span class="spacer"></span>${acts}</div>`;
   const lists = S.lists.filter(l => !l.is_inbox && !l.archived);
   const listRow = l => {
     const sw = l.icon ? licon(l, 'licon') : l.color || /^\p{L}/u.test(l.name) ? `<span class="sw" style="${cssColor(l.color) ? 'background:' + cssColor(l.color) : ''}"></span>` : '';
+    const pg = progressFor(l) && l.progress?.total ? `<span class="spct" title="${esc(tr('{0} of {1} done ({2}%)', l.progress.done, l.progress.total, pct(l.progress)))}">${pct(l.progress)} %</span>` : '';
     const shr = (l.status && statusFor(l) ? `<span class="stdot st-${esc(l.status)}" title="${esc(statusLabel(l.status))}"></span>` : '') +
       (l.shared && collab() && l.bell === 'mute' ? `<span class="shr bellm" title="${esc(tr('Notifications: {0}', bellLabel('mute')))}">${ic('belloff', 's')}</span>` : '') +
       (l.shared && collab() ? `<span class="shr" title="${esc(isOwner(l) ? tr('Shared by you') : tr('Shared by {0}', l.owner_name))}">${ic('users', 's')}</span>` : '');
     if (S.listReorder) return `<div class="srow reorder" data-list="${l.id}">${sw}<span class="n">${esc(listName(l.name))}</span>${shr}<button class="iconbtn" data-lfolder="${l.id}" title="${tr('Move to folder')}">${ic('folder', 's')}</button><button class="iconbtn" data-lmove="-1" data-id="${l.id}" title="${tr('move up')}">${ic('chev', 's up')}</button><button class="iconbtn" data-lmove="1" data-id="${l.id}" title="${tr('move down')}">${ic('chev', 's')}</button></div>`;
-    return row('l:' + l.id, sw, listName(l.name), c.lists[l.id], `data-list="${l.id}" ${isMobile() ? '' : 'draggable="true"'}`, shr);
+    return row('l:' + l.id, sw, listName(l.name), c.lists[l.id], `data-list="${l.id}" ${isMobile() ? '' : 'draggable="true"'}`, shr + pg);
   };
   let lh = lists.filter(l => !l.folder).map(listRow).join('');
   // 2.4.0 (#361): a tree: top folder, its own lists, then its subfolders (header + lists, one level deeper)
@@ -1367,18 +1373,37 @@ function renderSide() {
   const archived = S.lists.filter(l => l.archived);
   const tags = Object.keys(c.tags).sort((a, b) => a.localeCompare(b, 'de'));
   const tagsOpen = S.collapsed.has('side:tags-open') || tags.some(t => onTasks && k === 'tag:' + t);
+  // Focus: the smart lists
+  const focus = [row('inbox', ic('inbox'), tr('Inbox'), c.lists[inbox()?.id]), row('today', ic('sun'), tr('Today'), c.today), row('tomorrow', ic('sunrise'), tr('Tomorrow'), c.tomorrow),
+    row('week', ic('week'), tr('Next 7 days'), c.week), row('doable', ic('zap'), tr('Now doable'), c.doable),
+    c.waiting || (onTasks && k === 'waiting') ? row('waiting', ic('hourglass'), tr('Waiting on external'), c.waiting) : '',
+    collab() && (hasSharing() || c.assigned) ? row('assigned', ic('user'), tr('Assigned to me'), c.assigned) : '',
+    collab() && (hasSharing() || S.news?.unread) ? `<button class="srow ${S.route.mod === 'news' ? 'on' : ''}" data-go="news">${ic('bell')}<span class="n">${tr('News')}</span><span class="c ${S.news?.unread ? 'nunread' : ''}">${S.news?.unread || ''}</span></button>` : ''].join('');
+  // Views: every switched-on module (the rail's old job)
+  const aw = (S.agents || []).reduce((n, x) => n + x.waiting + x.chat_unread, 0);
+  const views = [feat('cal') ? mrow('cal', 'cal', tr('Calendar')) : '',
+    feat('timeline') ? `<button class="srow smod ${isRoadmap() ? 'on' : ''}" data-act="side-timeline">${ic('timeline')}<span class="n">${tr('Timeline')}</span></button>` : '',
+    feat('matrix') ? mrow('matrix', 'grid', tr('Matrix')) : '', feat('habits') ? mrow('habits', 'habit', tr('Habits')) : '',
+    feat('pomo') ? mrow('pomo', 'timer', tr('Focus (Pomodoro)'), S.pomo ? '<span class="c"><span class="recdot"></span></span>' : '') : '',
+    timeOn() ? mrow('time', 'clock', tr('Time tracking'), S.timer ? '<span class="c"><span class="recdot"></span></span>' : '') : '',
+    feat('stats') ? mrow('stats', 'chart', tr('Statistics')) : '',
+    overviewOn() ? mrow('overview', 'pulse', tr('Overview'), `<span class="c ${ovProblems() ? 'over' : ''}">${ovProblems() || ''}</span>`, `title="${esc(tr('Where is it stuck?'))}"`) : '',
+    feat('agents') && agentsOn() ? mrow('agents', 'bot', tr('Agents'), `<span class="c ${aw ? 'nunread' : ''}">${aw || ''}</span>`) : ''].join('');
+  // Team: the people I share lists with (their tasks) and the agents (status dot; a click opens the chat)
+  const ags = shownAgents(), ppl = teamPeople().slice(0, 12);
+  const team = [...ppl.map(p => `<button class="srow steam ${onTasks && k === 'who:' + p.id ? 'on' : ''}" data-go="who/${p.id}" title="${esc(tr('Tasks of {0}', p.name))}"><span class="sdot"><i class="pdot"></i></span><span class="n">${esc(p.name)}</span><span class="sk">${tr('Person')}</span></button>`),
+    ...ags.map(a => `<button class="srow steam" data-act="team-agent" data-aid="${a.id}" title="${esc(agentHstLine(a))}"><span class="sdot">${hdot(agentHst(a))}</span><span class="n">${esc(a.name)}</span><span class="sk">${tr('Agent')}</span>${a.waiting || a.chat_unread ? `<span class="c nunread">${a.waiting + a.chat_unread}</span>` : ''}</button>`)].join('');
+  const grp = (g, label, body, acts = '', n = '', tip = '') => `<div class="sgroup sg-${g}">${head(g, label, acts, n, tip)}${sideOpen(g) ? body : ''}</div>`;
   $('#side').innerHTML = `
+    <div class="sbrand"><img src="/static/icon.svg" alt="" width="20" height="20"><span>${esc(APP_NAME)}</span></div>
+    <button class="scmd" data-act="palette" title="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span></button>
     ${S.me ? `<div class="sdtop"><button class="srow suser" data-act="user-menu" title="${esc(S.me.username)}">${av(S.me.id, S.me.display_name)}<span class="n">${esc(S.me.display_name)}</span></button><button class="iconbtn sgear" data-act="settings" title="${tr('Settings')}" aria-label="${tr('Settings')}">${ic('gear')}${updDot() ? '<span class="dot"></span>' : ''}</button></div>` : ''}
-    ${row('inbox', ic('inbox'), tr('Inbox'), c.lists[inbox()?.id])}
-    ${row('today', ic('sun'), tr('Today'), c.today)}
-    ${row('tomorrow', ic('sunrise'), tr('Tomorrow'), c.tomorrow)}
-    ${row('week', ic('week'), tr('Next 7 days'), c.week)}
-    ${row('doable', ic('zap'), tr('Now doable'), c.doable)}
-    ${c.waiting || (onTasks && k === 'waiting') ? row('waiting', ic('hourglass'), tr('Waiting on external'), c.waiting) : ''}
-    ${collab() && (hasSharing() || c.assigned) ? row('assigned', ic('user'), tr('Assigned to me'), c.assigned) : ''}${collab() && (hasSharing() || S.news?.unread) ? `<button class="srow ${S.route.mod === 'news' ? 'on' : ''}" data-go="news">${ic('bell')}<span class="n">${tr('News')}</span><span class="c ${S.news?.unread ? 'nunread' : ''}">${S.news?.unread || ''}</span></button>` : ''}
-    <div class="sgroup"><div class="shead lroot"><span class="spacer">${tr('Lists')}</span><button data-act="lists-reorder" class="${S.listReorder ? 'on' : ''}" title="${tr('Sort lists')}">${ic('sort', 's')}</button><button data-act="list-new" title="${tr('New list')}">${ic('plus', 's')}</button></div>${lh || `<div class="folder">${tr('No lists yet')}</div>`}</div>
-    <div class="sgroup"><div class="shead" title="${esc(tr('Combine lists, dates, priorities, tags'))}"><span class="spacer">${tr('Filters')}</span><button data-act="filter-new" title="${esc(tr('New filter') + ' · ' + tr('Combine lists, dates, priorities, tags'))}" aria-label="${tr('New filter')}">${ic('plus', 's')}</button></div>${S.filters.map(f => row('f:' + f.id, ic('filter'), f.name, c.filters[f.id])).join('')}</div>
+    ${grp('focus', tr('Focus|nav'), focus)}
+    ${views ? grp('views', tr('Views'), views) : ''}
+    <div class="sgroup sg-lists">${head('lists', tr('Lists'), `<button data-act="lists-reorder" class="${S.listReorder ? 'on' : ''}" title="${tr('Sort lists')}">${ic('sort', 's')}</button><button data-act="list-new" title="${tr('New list')}">${ic('plus', 's')}</button>`, lists.length)}${sideOpen('lists') ? lh || `<div class="folder">${tr('No lists yet')}</div>` : ''}</div>
+    ${grp('filters', tr('Filters'), S.filters.map(f => row('f:' + f.id, ic('filter'), f.name, c.filters[f.id])).join(''), `<button data-act="filter-new" title="${esc(tr('New filter') + ' · ' + tr('Combine lists, dates, priorities, tags'))}" aria-label="${tr('New filter')}">${ic('plus', 's')}</button>`, S.filters.length, tr('Combine lists, dates, priorities, tags'))}
     ${tags.length ? `<div class="sgroup"><button class="shead stoggle ${tagsOpen ? '' : 'closed'}" data-act="side-tags" aria-expanded="${tagsOpen}">${ic('chev', 's fcar')}<span class="spacer">${tr('Tags')}</span><span class="c">${tagsOpen ? '' : tags.length}</span></button>${tagsOpen ? tags.map(t => row('tag:' + t, ic('tag'), t, c.tags[t])).join('') : ''}</div>` : ''}
+    ${team ? grp('team', tr('Team'), team, '', ppl.length + ags.length) : ''}
     <div class="sgroup sfoot">
       ${row('all', ic('all'), tr('All'), c.all)}
       ${row('done', ic('done'), tr('Completed'), '')}
@@ -1387,13 +1412,8 @@ function renderSide() {
         const on = onTasks && (k === 'archived' || archived.some(l => k === 'l:' + l.id));
         return `<button class="srow sarch ${on ? 'on' : ''}" data-go="archived">${ic('archive')}<span class="n">${tr('Archived')}</span><span class="c">${archived.length}</span></button>`;
       })() : ''}
-      ${overviewOn() ? `<button class="srow dupnav ${S.route.mod === 'overview' ? 'on' : ''}" data-go="overview" title="${tr('Where is it stuck?')}">${ic('pulse')}<span class="n">${tr('Overview')}</span><span class="c ${ovProblems() ? 'over' : ''}">${ovProblems() || ''}</span></button>` : ''}
-      ${feat('agents') && agentsOn() ? (() => { const w = (S.agents || []).reduce((n, x) => n + x.waiting + x.chat_unread, 0);
-        return `<button class="srow dupnav ${S.route.mod === 'agents' ? 'on' : ''}" data-go="agents">${ic('bot')}<span class="n">${tr('Agents')}</span><span class="c ${w ? 'nunread' : ''}">${w || ''}</span></button>`; })() : ''}
-      ${feat('stats') ? `<button class="srow dupnav ${S.route.mod === 'stats' ? 'on' : ''}" data-go="stats">${ic('chart')}<span class="n">${tr('Statistics')}</span></button>` : ''}
-      ${timeOn() ? `<button class="srow dupnav ${S.route.mod === 'time' ? 'on' : ''}" data-go="time">${ic('clock')}<span class="n">${tr('Time tracking')}</span>${S.timer ? '<span class="c"><span class="recdot"></span></span>' : ''}</button>` : ''}
-      <button class="srow dupnav" data-go="search" title="${esc(kt(tr('Search'), '/'))}">${ic('search')}<span class="n">${tr('Search')}</span></button>
-      <button class="srow dupnav" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}">${ic('gear')}<span class="n">${tr('Settings')}</span>${updDot() ? `<span class="c nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button>
+      <button class="srow ${onTasks && k === 'search' ? 'on' : ''}" data-go="search" title="${esc(kt(tr('Search'), '/'))}">${ic('search')}<span class="n">${tr('Search')}</span></button>
+      <button class="srow sset" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}">${ic('gear')}<span class="n">${tr('Settings')}</span>${updDot() ? `<span class="c nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button>
       ${S.me ? `<button class="srow suser sdesk" data-act="user-menu" title="${esc(S.me.username)}">${av(S.me.id, S.me.display_name)}<span class="n">${esc(S.me.display_name)}</span></button>` : ''}
     </div>`;
 }
@@ -1406,7 +1426,8 @@ function renderTop() {
     const l = k === 'inbox' ? inbox() : listById(+k.slice(2));
     if (l) {
       const v = curView(l), vc = viewChoices(l);  // 2.7.1 (#410): + "Project overview" in project lists
-      if (vc.length > 1 && !isMobile()) acts += `<div class="seg vseg tf" role="group" aria-label="${esc(tr('View'))}">${vc.map(([k, n, i]) => `<button class="${v === k ? 'on' : ''}" data-act="view-${k}" data-ico="${i}" title="${esc(tr(n))}" aria-pressed="${v === k}">${ic(i, 's')}</button>`).join('')}</div>`;
+      // 2.8.0 (#434): the view switch as text tabs (List / Kanban / Timeline / Project overview)
+      if (vc.length > 1 && !isMobile()) acts += `<div class="seg vseg ttabs tf" role="group" aria-label="${esc(tr('View'))}">${vc.map(([k, n, i]) => `<button class="${v === k ? 'on' : ''}" data-act="view-${k}" data-ico="${i}" title="${esc(tr(n))}" aria-pressed="${v === k}">${esc(tr(n))}</button>`).join('')}</div>`;
       if (!isMobile() && fieldsOf(l.id).length && v === 'list') acts += `<button class="iconbtn tf ${fieldCols(l.id) ? 'on' : ''}" data-act="field-cols" data-ico="columns" data-id="${l.id}" title="${tr('Show custom fields as columns')}">${ic('columns')}</button>`;
       // 2.6.0 (K12): Share next to the title (desktop / tablets; phones: in "…")
       if (!l.is_inbox && !l.archived && collab() && !isMobile()) acts += `<button class="iconbtn tf shbtn" data-act="share-list" data-ico="users" data-id="${l.id}" title="${esc(tr('Share…'))}" aria-label="${esc(tr('Share…'))}">${ic('users', 's')}<span class="bl">${tr('Share')}</span></button>`;
@@ -1427,10 +1448,18 @@ function renderTop() {
   const cf = S.conflicts?.length ? `<button class="cfpill" data-act="conflicts" title="${tr('Review conflicts')}">${ic('alert', 's')}${S.conflicts.length}</button>` : '';
   // open tasks of the view next to the title (Geist Mono), task views only
   const nOpen = m === 'tasks' && !NOLIST_KEYS.includes(k) ? viewTasks().open.length : 0;
-  const pal = `<button class="kbtn tf4" data-act="palette" data-ico="search" title="${esc(tr('Search and commands'))} (${kbText('Mod+K')})">${ic('search', 's')}<span>${tr('Search')}</span>${kb('Mod+K')}</button>`;
+  // 2.8.0 (#434): the command bar (search + commands + the agents' chat) and "New task" (mouse screens; touch has the + button)
+  const pal = `<button class="kbtn cmdbar tf4" data-act="palette" data-ico="search" title="${esc(tr('Search and commands'))} (${kbText('Mod+K')})" aria-label="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span>${kb('Mod+K')}</button>`;
+  const tnew = !isTouch() && m === 'tasks' && !noFab() && !S.multiMode ? `<button class="btn pri tnew tf4" data-act="new-task" data-ico="plus" title="${esc(kt(tr('New task'), 'n'))}" aria-label="${esc(tr('New task'))}">${ic('plus', 's')}<span>${tr('New task')}</span></button>` : '';
+  const ms = (() => {  // the next open milestone of a project list
+    const l = m === 'tasks' && k.startsWith('l:') ? listById(+k.slice(2)) : null;
+    const x = l?.kind === 'project' ? (l.milestones || []).filter(y => !y.done).sort((a, b) => a.day.localeCompare(b.day))[0] : null;
+    return x ? `<span class="hms ${x.day < today() ? 'over' : ''}" title="${esc(tr('Milestone') + ': ' + x.name + ', ' + fmtDateLoc(x.day))}">◆ ${esc(x.name)} · ${esc(dayLabel(x.day))}</span>` : '';
+  })();
   const kl = m === 'tasks' && k.startsWith('l:') ? listById(+k.slice(2)) : null;
   const badge = kl?.kind === 'project' ? `<span class="kbadge" title="${esc(projectParts().join(', '))}">${tr('Project')}</span>` : '';
-  $('#top').innerHTML = `<button class="iconbtn menu" data-act="side" aria-label="${tr('Menu')}">${ic('menu')}</button><h1 title="${esc(title)}">${kl?.icon ? licon(kl, 'licon h') : ''}<span class="ht">${esc(title)}</span>${badge}${nOpen ? `<span class="hn" aria-label="${esc(trn('{0} open task', '{0} open tasks', nOpen))}">${nOpen}</span>` : ''}</h1>${cf}${off}${timerPill()}${pm}${acts}${isMobile() ? '' : histBtns()}${pal}${stChip()}${agentChip()}${bellBtn()}`;  // 2.7.2 (#417): the agents' robot + dots directly before the bell  // 2.7.0 (#405): touch tablets / an unfolded Fold have the room for ← →
+  S.bandOn = bandAgents().length > 0;  // 2.8.0 (#434): the band shows the agents' dots, the header pill keeps only the robot
+  $('#top').innerHTML = `<button class="iconbtn menu" data-act="side" aria-label="${tr('Menu')}">${ic('menu')}</button><h1 title="${esc(title)}">${kl?.icon ? licon(kl, 'licon h') : ''}<span class="ht">${esc(title)}</span>${badge}${nOpen ? `<span class="hn" aria-label="${esc(trn('{0} open task', '{0} open tasks', nOpen))}">${nOpen}</span>` : ''}${ms}</h1>${cf}${off}${timerPill()}${pm}${acts}${isMobile() ? '' : histBtns()}${pal}${tnew}${stChip()}${agentChip()}${bellBtn()}`;  // 2.7.2 (#417): the agents' robot + dots directly before the bell  // 2.7.0 (#405): touch tablets / an unfolded Fold have the room for ← →
   fitTop();
 }
 // ---- 2.6.0 (K01 + K02, UX audit 2): the header has a fixed priority on every width. The title comes first: it keeps at
@@ -1526,7 +1555,7 @@ function topMoreItems() {
   }
   if (l) { if (sec.length && sec[sec.length - 1] !== '-') sec.push('-'); sec.push(...listMenuItems(l.id, () => $('#top [data-act="top-more"]') || $('#top h1'))); }
   if (m === 'tasks' && k.startsWith('tag:')) { if (sec.length) sec.push('-'); sec.push(tagDeleteItem(k.slice(4))); }
-  if (S.route.mod === 'tasks' && sharedRoute()) sec.unshift({label: tr('Refresh'), icon: 'sync', fn: () => refreshNow()});  // 2.7.2 (#432): no header button any more
+  if (S.route.mod === 'tasks' && sharedRoute()) sec.unshift({label: tr('Refresh'), icon: 'sync', fn: () => refreshNow()});  // 2.7.2 (#433): no header button any more
   const rest = [...out, ...(out.length && sec.length ? ['-'] : []), ...sec];
   // 2.6.0 (K01): "…" is there on every view; where a view has nothing of its own it offers search (+ the shortcuts)
   if (!rest.length && !fold.some(x => x.icon === 'search')) rest.push({label: tr('Search and commands'), icon: 'search', keys: 'Mod+K', fn: () => openPalette()}, ...(isTouch() ? [] : [{label: tr('Keyboard shortcuts'), icon: 'help', keys: '?', fn: shortcutsModal}]));
@@ -1673,14 +1702,18 @@ function taskRow(t, opts = {}) {
   if (!opts.trash && !opts.checklist && t.created_at && opts.crd) meta.push(`<span class="crd" title="${esc(tr('Created {0}', fmtWhen(t.created_at)))}">${ic('plus', 's')}${dayLabel(ds(new Date(t.created_at)))}</span>`);
   if (opts.trash) meta.push(`<span>${tr('deleted {0}', dayLabel(t.deleted_at.slice(0, 10)))}</span>`);
   if (opts.trash && t.keep) meta.push(`<span class="tkeep" title="${esc(tr('Only the list owner can delete it for good'))}">${ic('lock', 's')}${tr('stays')}</span>`);  // 2.0.5
-  const chk = t.status === 2 ? 'on' : t.status === -1 ? 'wont' : 'p' + (opts.checklist ? 0 : t.priority);
+  // 2.8.0 (#434): the status glyph (circle; priority = its colour; an agent working on it = an open arc + dot) and, in
+  // lists with tickets, the ticket number in a mono gutter
+  const work = t.status === 0 && t.id > 0 && (S.agents || []).some(a => a.enabled && a.status === 'working' && a.status_task === t.id);
+  const chk = (t.status === 2 ? 'on' : t.status === -1 ? 'wont' : 'p' + (opts.checklist ? 0 : t.priority)) + (work ? ' work' : '');
+  const gut = !opts.checklist && t.id > 0 && ticketsOn(t.list_id) ? `<span class="tgut" aria-label="${esc(tr('Ticket {0}', '#' + t.id))}">#${t.id}</span>` : '';
   const collapsed = S.collapsed.has('t' + t.id);
   const ro = !opts.trash && !canEdit(t);
   const caret = opts.tree && openKids ? `<button class="caret ${collapsed ? 'closed' : ''}" data-act="collapse" data-key="t${t.id}">${ic('chev', 's')}</button>` : '';
   const cols = tc ? `<div class="tcols" data-act="open">${timeOn() && (opts.tcols.list || isProject(t.list_id)) ? `<span class="c-time ${time?.live ? 'live' : ''}" title="${time ? time.tip : ''}">${time ? time.txt : ''}</span>` : ''}${collab() ? `<span class="c-who">${who}</span>` : ''}${opts.tcols.list ? `<span class="c-list" title="${esc(lst)}"><span>${esc(lst)}</span></span>` : ''}<span class="c-date ${dueClass(t)}" title="${esc(due)}">${t.start && t.start < t.due ? ic('timeline', 's rngi') : ''}<span class="cdt">${esc(dueLabel(t, false))}</span></span></div>` : '';
-  let h = `<div class="trow ${t.priority && !opts.checklist ? 'pr' + t.priority : ''} ${opts.checklist ? 'ck' : ''} ${tc ? 'hascols' : ''} ${t.status ? 'done' : ''} ${opts.depth ? 'sub d' + opts.depth : ''} ${opts.subRow ? 'subrow' : ''} ${S.sel === t.id ? 'sel' : ''} ${S.kf === t.id && !opts.subRow ? 'kfocus' : ''} ${S.multi.has(t.id) ? 'msel' : ''} ${ro ? 'ro' : ''} ${opts.next && !opts.depth ? 'flownext' : ''}" data-id="${t.id}" ${opts.drag !== false && !opts.trash && !ro && !isMobile() ? 'draggable="true"' : ''}>
+  let h = `<div class="trow ${t.priority && !opts.checklist ? 'pr' + t.priority : ''} ${opts.checklist ? 'ck' : ''} ${tc ? 'hascols' : ''} ${t.status ? 'done' : ''} ${opts.depth ? 'sub d' + opts.depth : ''} ${opts.subRow ? 'subrow' : ''} ${S.sel === t.id ? 'sel' : ''} ${gut ? 'hasgut' : ''} ${S.kf === t.id && !opts.subRow ? 'kfocus' : ''} ${S.multi.has(t.id) ? 'msel' : ''} ${ro ? 'ro' : ''} ${opts.next && !opts.depth ? 'flownext' : ''}" data-id="${t.id}" ${opts.drag !== false && !opts.trash && !ro && !isMobile() ? 'draggable="true"' : ''}>
     ${caret}
-    ${opts.trash ? `<span class="chk ${chk}">${t.status === 2 ? ic('check') : ''}</span>` : `<button class="chk ${chk}" data-act="toggle" aria-label="${tr('done')}" ${ro ? 'disabled' : ''}>${t.status === 2 ? ic('check') : t.status === -1 ? ic('x') : ''}</button>`}
+    ${opts.trash ? `<span class="chk ${chk}">${t.status === 2 ? ic('check') : ''}</span>` : `<button class="chk ${chk}" data-act="toggle" aria-label="${tr('done')}" ${ro ? 'disabled' : ''}>${t.status === 2 ? ic('check') : t.status === -1 ? ic('x') : ''}</button>`}${gut}
     <div class="tmain" data-act="${opts.trash ? '' : 'open'}"><div class="ttl">${esc(t.title)}</div><div class="meta">${meta.join('')}</div></div>
     ${opts.cols ? `<div class="fcols" data-act="open">${opts.cols.map(f => `<span class="fcell t-${esc(f.type)}">${fieldCell(f, t.fields?.[f.id], t.list_id)}</span>`).join('')}</div>` : ''}
     ${cols}
@@ -1791,7 +1824,7 @@ function viewListBody() {
   const showList = !v.list;
   const rl = v.list && listById(v.list), ro = rl && !canEditList(rl.id), ck = !!(rl && rl.checklist);
   const cols = rl && fieldCols(rl.id) ? fieldsOf(rl.id).slice(0, 6) : null;
-  let h = (rl ? listHead(rl) : v.folder ? folderHead(v.folder) : '') + (ro ? `<div class="rohint">${ic(isPart(rl.id) ? 'user' : 'eye', 's')}${esc(isPart(rl.id) ? tr('Participant: you see only the tasks assigned to you, shared by {0}', rl.owner_name) : tr('View only, shared by {0}', rl.owner_name))}</div>` : '');
+  let h = (rl ? listHead(rl) : v.folder ? folderHead(v.folder) : agBandHtml()) + (ro ? `<div class="rohint">${ic(isPart(rl.id) ? 'user' : 'eye', 's')}${esc(isPart(rl.id) ? tr('Participant: you see only the tasks assigned to you, shared by {0}', rl.owner_name) : tr('View only, shared by {0}', rl.owner_name))}</div>` : '');
   if (S.route.key === 'today') h += overdueBanner() + cevTodayBlock();
   if (flow && FLOW.cyc) h += `<div class="flowhint">${ic('deps', 's')}${esc(tr('Some tasks wait on each other in a circle; they are ordered by date.'))}</div>`;
   if (cols) h += `<div class="fcolhead"><span class="spacer"></span>${cols.map(f => `<span class="fcell t-${esc(f.type)}" title="${esc(f.name)}">${esc(f.name)}</span>`).join('')}</div>`;
@@ -3607,21 +3640,22 @@ function closeDetail(fromPop) {
   if (isMobile() && !fromPop && history.state && history.state.detail) history.back();
 }
 window.addEventListener('popstate', () => { if (S.sel && isMobile()) closeDetail(true); });
-// U02 (owner decision 1): rail + sidebar + list + task panel side by side only while the list keeps ~420 px (Fold
-// unfolded, small laptop windows, large font sizes). Otherwise the sidebar folds into the icon rail while the panel is
-// open; the rail's "Lists" button opens it as an overlay (like the phone drawer).
+// U02 (owner decision 1), 2.8.0 (#434): sidebar + list + task panel side by side only while the list keeps ~420 px (Fold
+// unfolded, small laptop windows, large font sizes). Otherwise the sidebar becomes a drawer: the header's menu button opens
+// it as an overlay (like the phone drawer). An unfolded Fold (~904 px) keeps the sidebar next to the list.
 const LIST_MIN_PX = 420;
-function fitLayout() {
+function fitLayout(quiet) {
   const app = $('#app'); if (!app) return;
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-  const on = !isMobile() && app.classList.contains('detail-open') && innerWidth - (3.25 + 15 + 25.5) * rem < LIST_MIN_PX;
+  const narrow = innerWidth - (15 + (app.classList.contains('detail-open') ? 25.5 : 0)) * rem < LIST_MIN_PX;
+  const on = !isMobile() && narrow;
   if (app.classList.contains('side-rail') === on) return;
   app.classList.toggle('side-rail', on);
   if (!on && $('#side').classList.contains('open') && !isMobile()) closeSide();
-  renderRail();
+  if (S.settings && !quiet) renderTop();
 }
 let fitT = null;
-window.addEventListener('resize', () => { clearTimeout(fitT); fitT = setTimeout(fitLayout, 80); });
+window.addEventListener('resize', () => { clearTimeout(fitT); fitT = setTimeout(() => fitLayout(), 80); });
 function taskById(id) { return S.tasks.get(id) || (S.extra || []).find(t => t.id === id); }
 // 2.0.6 (#316 / #322): the task panel below the title and the description, top to bottom; the comments and
 // the history come last, the comment box stays at the bottom edge of the panel (sticky, see cmComposer())
@@ -3989,7 +4023,7 @@ async function loadNews() {
     if (j.avatars) S.avatars = {...(S.avatars || {}), ...j.avatars};
     const changed = !S.news || S.news.unread !== j.unread || S.news.sig !== j.sig;
     S.news = {unread: j.unread, sig: j.sig};
-    if (changed) { renderTop(); renderTabs(); renderRail(); renderSide(); }
+    if (changed) { renderTop(); renderTabs(); renderSide(); }
   } catch (e) {
     if (e.message !== 'auth') { S.nf.err = e instanceof Offline ? 'offline' : e.message; S.nf.sig = S.news?.sig ?? ''; S.nf.f = f; }
   } finally { S.nf.loading = false; }
@@ -4009,7 +4043,7 @@ async function newsDismiss(i) {
   const it = (S.nf.items || [])[i]; if (!it) return;
   S.nf.items.splice(i, 1);
   if (!it.read && S.news) S.news.unread = Math.max(0, (S.news.unread || 0) - 1);
-  renderView(); renderTop(); renderTabs(); renderRail(); renderSide();
+  renderView(); renderTop(); renderTabs(); renderSide();
   try {
     const j = await rawFetch('POST', '/api/news/dismiss', {ids: it.ids});
     S.news = {unread: j.unread, sig: j.sig}; S.nf.sig = j.sig;
@@ -6543,7 +6577,7 @@ function settingsModal(focus) {
       <h4>${tr('Tips')}</h4><div class="row"><label>${tr('Hints')}</label><button class="btn sm" data-m="hints-reset">${ic('undo', 's')} ${tr('Show tips again')}</button></div>
       ${hint(tr('Brings back the one-time hints on this device (touch screens show helper texts once).'))}
       <h4 id="s-tabbar-h">${tr('Tab bar')}${dev}</h4>
-      ${hint(tr('At the bottom on a phone, on the left on desktop. A phone fits {0} tabs, the rest goes under “More”.', TAB_MAX))}
+      ${hint(tr('At the bottom on a phone (the desktop shows every module in the sidebar). A phone fits {0} tabs, the rest goes under “More”.', TAB_MAX))}
       <div class="navlist" id="s-tabbar"></div>
       <div class="row" style="margin-top:.5rem"><select id="s-tabadd" style="flex:1" aria-label="${tr('+ Add tab …')}"></select><button class="btn sm" data-m="tab-reset">${tr('Default')}</button></div>`,
     general: `<h4 id="s-lang-h">${tr('Language')}</h4>
@@ -6767,7 +6801,7 @@ function settingsModal(focus) {
       grp(N_('Other'), (collab() ? opt('news', tr('News')) : '') + (feat('agents') && agentsOn() ? opt('agents', tr('Agents')) : '') + (overviewOn() ? opt('overview', tr('Overview')) : '') + (feat('stats') ? opt('stats', tr('Statistics')) : '') + (timeOn() ? opt('time', tr('Time tracking')) : '') + opt('search', tr('Search')) + opt('settings', tr('Settings')));
   };
   md._tabDraw = tabDraw;
-  const tabApply = ids => { if (ids) LS.set('tabbar', ids); else LS.set('tabbar', null); tabDraw(); renderTabs(); renderRail(); };
+  const tabApply = ids => { if (ids) LS.set('tabbar', ids); else LS.set('tabbar', null); tabDraw(); renderTabs(); };
   const tabSet = ids => setLocal(tr('Tab bar'), () => LS.get('tabbar', null), tabApply, ids);
   tabDraw();
   $('#s-tabadd', md).addEventListener('change', e => { if (e.target.value) tabSet([...tabIds(), e.target.value]); });
@@ -8896,10 +8930,10 @@ function statusNote(l) {
   return `<div class="lnote"><span>${esc(l.status_note)}</span><span class="muted">${esc([l.status_by_name, l.status_at ? relTime(l.status_at) : ''].filter(Boolean).join(' · '))}</span></div>`;
 }
 function listHead(l) {
-  if (!l || l.is_inbox) return '';
+  if (!l || l.is_inbox) return agBandHtml();
   const p = l.progress || {done: 0, total: 0, overdue: 0}, showP = progressFor(l) && p.total > 0 && !progHidden(l.id), pill = statusPill(l), ts = timeSumHtml([l]);
-  if (!showP && !pill && !ts) return '';
-  return `<div class="lhead">${showP ? progBar(p) + progMeta(p) + `<button class="iconbtn lpx" data-act="prog-hide" data-id="${l.id}" title="${tr('Hide progress')}" aria-label="${tr('Hide progress')}">${ic('x', 's')}</button>` : ''}<span class="spacer"></span>${ts}${pill}</div>${statusNote(l)}`;
+  if (!showP && !pill && !ts) return agBandHtml();
+  return `<div class="lhead">${showP ? progBar(p) + progMeta(p) + `<button class="iconbtn lpx" data-act="prog-hide" data-id="${l.id}" title="${tr('Hide progress')}" aria-label="${tr('Hide progress')}">${ic('x', 's')}</button>` : ''}<span class="spacer"></span>${ts}${pill}</div>${statusNote(l)}${agBandHtml()}`;
 }
 // ---- 2.7.0 (#407): the tracked time of a project list (or of a folder's project lists) in its header, in hours and in
 // working days. Hours per day / shift: the list's own value (list dialog, owner; the same for every member), else the
@@ -8923,7 +8957,7 @@ function timeSumHtml(lists) {
 }
 function folderHead(f) {
   const ts = timeSumHtml(folderLists(f));
-  return ts ? `<div class="lhead fhd"><span class="spacer"></span>${ts}</div>` : '';
+  return (ts ? `<div class="lhead fhd"><span class="spacer"></span>${ts}</div>` : '') + agBandHtml();
 }
 async function statusModal(lid) {
   const l = listById(lid); if (!l) return;
@@ -9619,7 +9653,8 @@ document.addEventListener('click', async e => {
       if (e.target.closest('.gact, .shandle') || secHeld) break;
       const k = a.dataset.key; S.collapsed.has(k) ? S.collapsed.delete(k) : S.collapsed.add(k); LS.set('collapsed', [...S.collapsed]); renderView(); break;
     }
-    case 'palette': openPalette(); break;
+    case 'palette': closeSide(); openPalette(); break;
+    case 'new-task': { const q = currentQuickInput(); if (q && (!isMobile() || tabletDock())) q.focus(); else openQuickSheet(); break; }
     case 'side': $('#side').classList.add('open'); $('#scrim').classList.remove('hidden'); popOnClose = closeSide; break;
     case 'settings': closeSide(); settingsModal(); break;
     case 'user-menu': menu(a, [{label: tr('Account'), icon: 'user', fn: () => { closeSide(); settingsModal('account'); }},
@@ -9643,6 +9678,10 @@ document.addEventListener('click', async e => {
     case 'arch-restore': listArchive(+a.dataset.id, false); break;
     case 'arch-del': listDeleteForGood(+a.dataset.id); break;
     case 'refresh': refreshNow(); break;
+    case 'agband': LS.set('agband', LS.get('agband', true) === false); renderView(); break;
+    case 'side-group': sideGroupToggle(a.dataset.g); break;
+    case 'side-timeline': closeSide(); S.rmScrollReset = true; if (S.route.mod === 'tasks' && S.route.key === 'all') rmSet({v: 'timeline'}, 'all'); else { rmSet({v: 'timeline'}, 'none'); go('all'); } break;
+    case 'team-agent': { closeSide(); const ag = agentById(a.dataset.aid); if (ag && ag.enabled) chatOpen(ag.id); else go('agents'); break; }
     case 'side-tags': S.collapsed.has('side:tags-open') ? S.collapsed.delete('side:tags-open') : S.collapsed.add('side:tags-open'); LS.set('collapsed', [...S.collapsed]); renderSide(); break;
     case 'lists-reorder': S.listReorder = !S.listReorder; renderSide(); break;
     case 'list-menu': listMenu(a, id); break;
@@ -10916,6 +10955,12 @@ function palAll() {
   if (collab()) add('v:assigned', 'view', tr('Assigned to me'), 'user', () => go('assigned'));
   for (const [m, icon, name] of [['cal', 'cal', N_('Calendar')], ['matrix', 'grid', N_('Eisenhower matrix')], ['habits', 'habit', N_('Habits')], ['pomo', 'timer', N_('Focus')], ['news', 'bell', N_('News')], ['stats', 'chart', N_('Statistics')], ['time', 'clock', N_('Time tracking')], ['overview', 'pulse', N_('Where is it stuck?')]])
     if (modOn(m)) add('v:' + m, 'view', tr(name), icon, () => go(m), {keys: m === 'cal' ? 'g c' : ''});
+  // 2.8.0 (#434): the command bar also opens the timeline, the agents and their chats ("ask an agent")
+  if (feat('timeline')) add('v:timeline', 'view', tr('Timeline'), 'timeline', () => { S.rmScrollReset = true; rmSet({v: 'timeline'}, 'none'); go('all'); });
+  if (feat('agents') && agentsOn()) {
+    add('v:agents', 'view', tr('Agents'), 'bot', () => go('agents'));
+    for (const a of (S.agents || []).filter(x => x.enabled)) add('a:chat-' + a.id, 'action', tr('Chat with {0}', a.name), 'comment', () => chatOpen(a.id));
+  }
   // lists, filters, tags
   for (const l of S.lists.filter(x => !x.archived && !x.is_inbox)) add('l:' + l.id, 'list', lname(l), 'list', () => go('l/' + l.id), {sw: cssColor(l.color), img: l.icon || '', ...(l.folder ? {sub: fDisp(l.folder)} : {})});
   for (const f of folderNames()) add('folder:' + f, 'folder', fDisp(f), 'folder', () => go('folder/' + encodeURIComponent(f)));  // 2.4.0 (#361)
@@ -11033,16 +11078,16 @@ function tourSteps() {
   const m = isMobile(), touch = isTouch(), s = [];
   const rect = sel => () => { const e = typeof sel === 'function' ? sel() : $(sel); return e ? e.getBoundingClientRect() : null; };
   s.push(m ? {id: 'side', t: N_('Smart lists'), d: N_('The Inbox comes first: new tasks without a list land there. Today, Tomorrow and Next 7 days collect tasks from all your lists. Lists, filters and tags are in this menu.'), sel: '#top .menu', r: rect('#top .menu')}
-    : {id: 'side', sel: '#side > .srow', t: N_('Smart lists'), d: N_('The Inbox comes first: new tasks without a list land there. Today, Tomorrow and Next 7 days collect tasks from all your lists. Your own lists, filters and tags follow below.'),
-      r: () => unionRect($$('#side > .srow').slice(0, 4))});
+    : {id: 'side', sel: '#side .sg-focus .srow', t: N_('Smart lists'), d: N_('The Inbox comes first: new tasks without a list land there. Today, Tomorrow and Next 7 days collect tasks from all your lists. Your own lists, filters and tags follow below.'),
+      r: () => unionRect($$('#side .sg-focus .srow').slice(0, 4))});
   s.push({id: 'add', sel: m ? '#fab' : '#view .qadd .box', t: N_('Quick add'), d: N_('Type the way you think: “Dentist tomorrow 3pm !high #private in Family”. Dates, priority, tags and the list (~list, “in list …”) are picked up as you type.'), r: rect(m ? '#fab' : '#view .qadd .box')});
   s.push({id: 'detail', sel: '#view .trow', t: N_('Details'), d: touch ? N_('Tap a task for notes, subtasks, files and comments. Swipe right to complete, left to reschedule.') : N_('Click a task for notes, subtasks, files and comments. Drag it onto a day or a list to move it.'), r: rect('#view .trow')});
   // steps only name modules that are on (a "Simple list" setup has no habits / focus)
   if (m) s.push({id: 'tabs', sel: '#tabs', t: N_('Tab bar'), d: feat('habits') || feat('pomo') ? N_('Your modules: calendar, habits, focus and more. Pin lists or filters here under Settings > Appearance.') : N_('Your lists and views. Pin lists or filters here under Settings > Appearance.'), r: rect('#tabs')});
   else if (!touch) s.push({id: 'keys', sel: '#top .kbtn', t: N_('Keyboard first'), d: N_('{0} opens search and commands for everything, {1} lists all shortcuts. j and k move through tasks, x completes.'), args: [kbText('Mod+K'), '?'], r: rect('#top .kbtn')});
   const pp = S.me?.is_admin || collab() ? projectParts() : [];  // "Make a list a project": admins and teams, when a project module is on
-  s.push({id: 'settings', sel: m ? '#tabs [data-act="tabs-more"]' : '#rail [data-act="settings"]', t: N_('Settings and modules'), d: pp.length ? N_('Switch modules on or off, pick the language and the appearance. Make a list a project (list menu … > Project) to get {0}; for shopping or packing: … > Show completed at the bottom. This tour can be restarted under Settings > Help.') : N_('Switch modules on or off, pick the language and the appearance (theme, font size, font, accent color). Shopping or packing? List menu … > Show completed at the bottom. This tour can be restarted under Settings > Help.'), args: pp.length ? [pp.join(', ')] : [],
-    r: rect(m ? () => $('#tabs [data-act="tabs-more"]') || $('#tabs [data-act="settings"]') || $('#top .menu') : '#rail [data-act="settings"]')});
+  s.push({id: 'settings', sel: m ? '#tabs [data-act="tabs-more"]' : '#side .sset', t: N_('Settings and modules'), d: pp.length ? N_('Switch modules on or off, pick the language and the appearance. Make a list a project (list menu … > Project) to get {0}; for shopping or packing: … > Show completed at the bottom. This tour can be restarted under Settings > Help.') : N_('Switch modules on or off, pick the language and the appearance (theme, font size, font, accent color). Shopping or packing? List menu … > Show completed at the bottom. This tour can be restarted under Settings > Help.'), args: pp.length ? [pp.join(', ')] : [],
+    r: rect(m ? () => $('#tabs [data-act="tabs-more"]') || $('#tabs [data-act="settings"]') || $('#top .menu') : '#side .sset')});
   if (collab()) s.push({id: 'news', sel: '#top .bell', t: N_('News'), d: N_('Mentions, assignments and comments on your tasks arrive here.'), r: rect('#top .bell')});
   return s.slice(0, 6);
 }
@@ -11279,7 +11324,7 @@ function agentHst(a) {
 const agentHstLine = a => `${a.name}: ${agentSt(a)}${a.status_text && agentHst(a) !== 'offline' ? ' · ' + a.status_text : ''}`;
 const hdot = st => `<i class="hdot hs-${st}" aria-hidden="true"></i>`;
 function hdotsHtml(ags, max = HDOT_MAX) {
-  if (!ags.length) return '';
+  if (!ags.length || S.bandOn) return '';
   const more = ags.length > max ? ags.length - (max - 1) : 0, show = more ? ags.slice(0, max - 1) : ags;
   return `<span class="hdots">${show.map(a => hdot(agentHst(a))).join('')}${more ? `<span class="hdm">+${more}</span>` : ''}</span>`;
 }
@@ -11311,6 +11356,46 @@ function agentChip() {
   const lead = `<span class="abot" aria-hidden="true">${ic('bot', 's')}</span>` + (ags.length ? hdotsHtml(ags) : ab.busy.length === 1 ? av(ab.busy[0].id, ab.busy[0].name, 'avatar sm') : '');
   const ring = st === 'working' ? 'aspin' : st === 'waiting' ? 'await' : '';
   return `<button class="achip ${ab ? 'busy' : 'calm'} ${attn ? 'attn' : ''} ${ring || ''}" data-act="agent-chip" aria-haspopup="menu" title="${esc(tip)}" aria-label="${esc(lab)}">${lead}${ab ? `<span class="act">${esc(txt)}</span><span class="acn" aria-hidden="true">${ab.n}</span>` : ''}</button>`;  // 2.5.2 (K01): phones show the bot + a number
+}
+// ---- 2.8.0 (#434) the agent band under the list / project header (desktop + tablets): every shown agent of the view
+// (a list: its agents; a folder: the agents of its lists; Inbox / Today / Next 7 days / All / Assigned: all shown agents)
+// with its status dot, the task it works on, a thin progress line (the task's subtasks; working without subtasks = a running
+// line) and the first job waiting for my approval (👍 = approve, ✕ = reject, the same as in the Agents view). Folds per
+// device (LS agband). While the band is on screen the header leaves out its agent dots (no duplicate).
+const BAND_KEYS = ['inbox', 'today', 'tomorrow', 'week', 'all', 'assigned', 'doable'];
+function bandAgents() {
+  if (isMobile() || S.route.mod !== 'tasks' || !feat('agents')) return [];
+  const sh = shownAgents(); if (!sh.length) return [];
+  const k = S.route.key;
+  if (k.startsWith('l:')) { const l = listById(+k.slice(2)), ids = new Set(listAgents(l).map(a => a.id)); return sh.filter(a => ids.has(a.id)); }
+  if (k.startsWith('folder:')) { const ids = new Set(folderLists(k.slice(7)).flatMap(listAgents).map(a => a.id)); return sh.filter(a => ids.has(a.id)); }
+  return BAND_KEYS.includes(k) && !isRoadmap() ? sh : [];
+}
+S.bandJobs = {v: -1, items: [], busy: false};
+function bandJobsLoad() {
+  if (S.bandJobs.busy || S.bandJobs.v === S.v) return;
+  S.bandJobs.busy = true;
+  api('GET', '/api/agents/jobs?state=open').then(j => { S.bandJobs.items = j.jobs || []; }).catch(() => {}).finally(() => {
+    S.bandJobs.busy = false; const sig = JSON.stringify(S.bandJobs.items.map(x => x.id + x.state)); S.bandJobs.v = S.v;
+    if (sig !== S.bandJobs.sig) { S.bandJobs.sig = sig; if ($('#view .agband')) renderView(); }
+  });
+}
+function agBandHtml() {
+  const ags = bandAgents(); if (!ags.length) return '';
+  const open = LS.get('agband', true) !== false, ids = new Set(ags.map(a => a.id));
+  if (ags.some(a => a.waiting)) bandJobsLoad();
+  const job = ags.some(a => a.waiting) ? (S.bandJobs.items || []).find(j => ids.has(j.agent_id) && j.state === 'waiting' && ((!j.kind && j.can_act) || (j.kind && S.me && j.user_id === S.me.id && j.proposal_state === 'ready'))) : null;
+  const cell = a => {
+    const st = agentHst(a), t = a.status_task ? taskById(a.status_task) : null, kids = t ? children(t.id) : [];
+    const p = kids.length ? Math.round(100 * kids.filter(x => x.status).length / kids.length) : null;
+    const what = t ? `<span class="mono">#${t.id}</span> ${esc(t.title)}` : esc(a.status_text || (st === 'offline' ? agentSt(a) : '–'));
+    return `<button class="agb-a hs-${st}" data-act="team-agent" data-aid="${a.id}" title="${esc(agentHstLine(a))}"><span class="agb-h">${hdot(st)}<b>${esc(a.name)}</b><span class="muted">${esc(tr(AG_HST[st]))}</span></span><span class="agb-t">${what}</span><span class="agb-p ${st === 'working' && p === null ? 'run' : ''}" aria-hidden="true"><i style="width:${p ?? (st === 'working' ? 40 : 0)}%"></i></span></button>`;
+  };
+  const wait = job ? `<div class="agb-w" role="group" aria-label="${esc(tr('{0} waits for you', job.agent_name))}"><div class="agb-wi"><span class="agb-h">${hdot('waiting')}<b>${esc(tr('{0} waits for you', job.agent_name))}</b></span><span class="agb-t">${job.task_id ? `<span class="mono">#${job.task_id}</span> ` : ''}${esc(job.title)}</span></div>${job.kind
+    ? `<button class="btn sm pri" data-act="prop-open" data-jid="${job.id}">${tr('Review the proposal')}</button>`
+    : `<button class="btn sm pri agb-ok" data-act="job-do" data-jid="${job.id}" data-a="approve" aria-label="${esc(tr('Approve'))}">\u{1F44D} ${tr('Yes|approve')}</button><button class="iconbtn agb-no" data-act="job-do" data-jid="${job.id}" data-a="reject" title="${esc(tr('Reject'))}" aria-label="${esc(tr('Reject'))}">✕</button>`}</div>` : '';
+  const sum = ags.map(a => hdot(agentHst(a))).join('');
+  return `<section class="agband ${open ? '' : 'closed'}" aria-label="${esc(tr('Agents live'))}"><button class="agb-tog" data-act="agband" aria-expanded="${open}" title="${esc(open ? tr('Fold the agents') : tr('Show the agents'))}" aria-label="${esc(open ? tr('Fold the agents') : tr('Show the agents'))}">${ic('chev', 's')}${open ? '' : `<span class="agb-sum">${sum}<span>${esc(ags.map(a => a.name).join(', '))}</span></span>`}</button>${open ? `<div class="agb-cells">${ags.map(cell).join('')}${wait}</div>` : (job ? `<span class="agb-wmini">${hdot('waiting')}${esc(tr('{0} waits for you', job.agent_name))}</span>` : '')}</section>`;
 }
 // 2.6.0 (K01): the agent pill and the running indicator merged into one compact chip (shown from header level tl2 on):
 // bot + number, dot + time; a tap opens the one that is there, or a menu with both
@@ -12636,7 +12721,7 @@ function agentLive() {
   const cs = $('#chat-st'); if (cs && a) cs.outerHTML = chatStHtml(a);
   const st = agentBusyState();
   const more = $('#tabs [data-act="tabs-more"]'), inMore = !!more && tabOverflow().more.some(x => x.id === 'agents');
-  $$('#rail [data-go="agents"], #tabs [data-go="agents"]').forEach(b => { b.classList.toggle('aspin', st === 'working'); b.classList.toggle('await', st === 'waiting'); });
+  $$('#side [data-go="agents"], #tabs [data-go="agents"]').forEach(b => { b.classList.toggle('aspin', st === 'working'); b.classList.toggle('await', st === 'waiting'); });
   if (more) { more.classList.toggle('aspin', st === 'working' && inMore); more.classList.toggle('await', st === 'waiting' && inMore); }
 }
 // 2.4.1 (#375): an open chat's header follows the clock too (a typing signal runs out after 10 s, "offline" after 5 minutes
@@ -12684,7 +12769,7 @@ function dsStep() {
   }
   if (moved || Date.now() - DS.last < 400) DS.raf = requestAnimationFrame(dsStep);
 }
-document.addEventListener('dragstart', e => { if (isTouch() && isMobile()) return; if (e.target.closest?.('#view, #side, #rail')) { DS.on = true; DS.box = null; } }, true);
+document.addEventListener('dragstart', e => { if (isTouch() && isMobile()) return; if (e.target.closest?.('#view, #side')) { DS.on = true; DS.box = null; } }, true);
 document.addEventListener('dragover', e => {
   if (!DS.on) return;
   DS.x = e.clientX; DS.y = e.clientY; DS.last = Date.now();

@@ -1,11 +1,11 @@
 /* Kalmido public list page (/s/<token>): no scripts, no app shell; same palette and fonts as the app */
 @font-face{font-family:"Geist";src:url("/static/fonts/Geist-Variable.woff2") format("woff2");font-weight:100 900;font-display:swap}
 @font-face{font-family:"Geist Mono";src:url("/static/fonts/GeistMono-Variable.woff2") format("woff2");font-weight:100 900;font-display:swap}
-:root{--bg:#0e1116;--bg2:#13171d;--bg3:#1b2028;--line:#1f252d;--line2:#2a323c;--text:#e3e7ec;--text2:#aab3be;--muted:#848e9b;
-  --accent:#2dd4bf;--ink:#04201c;--p5:#e5776e;--p3:#d6a54a;--p1:#79a3dc;--danger:#ef7068;color-scheme:dark;
+:root{--bg:#0f1012;--bg2:#16171a;--bg3:#1e2024;--line:#212328;--line2:#2a2c31;--text:#eeeef0;--text2:#b8bbc2;--muted:#9497a0;
+  --accent:#f472b6;--ink:#2a0716;--p5:#e5776e;--p3:#d6a54a;--p1:#79a3dc;--danger:#ef7068;color-scheme:dark;
   --sans:"Geist",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;--mono:"Geist Mono",ui-monospace,Menlo,Consolas,monospace}
-@media (prefers-color-scheme:light){:root{--bg:#f7f8fa;--bg2:#ffffff;--bg3:#eef1f4;--line:#e3e7ec;--line2:#d5dbe2;--text:#161b22;
-  --text2:#3d4652;--muted:#5f6b78;--accent:#0a766b;--ink:#fff;--p5:#c2433a;--p3:#9a6a12;--p1:#3a67a8;--danger:#c2433a;color-scheme:light}}
+@media (prefers-color-scheme:light){:root{--bg:#ffffff;--bg2:#f8f8f9;--bg3:#efeff1;--line:#eeeef0;--line2:#e3e3e6;--text:#131418;
+  --text2:#464951;--muted:#60636c;--accent:#be185d;--ink:#fff;--p5:#b3372f;--p3:#97600b;--p1:#3565a8;--danger:#b3372f;color-scheme:light}}
 *{box-sizing:border-box}
 html{font-size:16px;-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
@@ -20,7 +20,7 @@ li.t{display:grid;grid-template-columns:auto 1fr;column-gap:.75rem;align-items:s
 li.t>ul{grid-column:1 / -1}
 li.t li.t:last-child{border-bottom:0}
 form{margin:0}
-.chk{display:block;width:1.375rem;height:1.375rem;border:2px solid var(--line2);border-radius:50%;background:transparent;margin-top:.0625rem;
+.chk{display:block;width:1.375rem;height:1.375rem;border:2px solid var(--muted);border-radius:50%;background:transparent;margin-top:.0625rem;
   cursor:pointer;padding:0;position:relative}
 span.chk{cursor:default}
 li.p5>.chk,li.p5>form .chk{border-color:var(--p5)}li.p3>.chk,li.p3>form .chk{border-color:var(--p3)}li.p1>.chk,li.p1>form .chk{border-color:var(--p1)}

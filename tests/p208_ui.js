@@ -32,7 +32,7 @@ function swEnv() {
   return {L, shown, opened};
 }
 async function swTests() {
-  check(/const CACHE = 'tasks-shell-v((59|6[0-9])|7[0-6])'/.test(SW), 'service worker cache v59 (2.1.0: v60, 2.1.1: v61, 2.1.2: v62, 2.2.0: v63, 2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70, 2.5.2: v71, 2.6.0: v72, 2.6.1: v73, 2.7.0: v74, 2.7.1: v75, 2.7.2: v76)');
+  check(/const CACHE = 'tasks-shell-v((59|6[0-9])|7[0-7])'/.test(SW), 'service worker cache v59 (2.1.0: v60, 2.1.1: v61, 2.1.2: v62, 2.2.0: v63, 2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70, 2.5.2: v71, 2.6.0: v72, 2.6.1: v73, 2.7.0: v74, 2.7.1: v75, 2.7.2: v76, 2.8.0: v77)');
   const S = swEnv();
   const e = {data: {json: () => ({title: 'Task X', body: 'Bob commented: look', tag: 't-7', url: '/#t/7', task: 7,
     actions: [{action: 'reply', title: 'Reply', url: '/#reply/7'}, {action: 'done', title: 'Done', url: '/#done/7'}]})}, waitUntil(p) { this.p = p; }};

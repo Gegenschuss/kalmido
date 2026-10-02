@@ -44,7 +44,7 @@ const HEAD = `(() => {
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v7[3-6]'/.test(SW), 'service worker cache v73 (2.7.0: v74, 2.7.1: v75, 2.7.2: v76)');
+  check(/const CACHE = 'tasks-shell-v7[3-7]'/.test(SW), 'service worker cache v73 (2.7.0: v74, 2.7.1: v75, 2.7.2: v76, 2.8.0: v77)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en', tour: 'done'});
@@ -116,8 +116,10 @@ const HEAD = `(() => {
   await call('PATCH', '/api/settings', {date_confirm: '0'});
   w.close();
 
-  // ================= #402 status dots for every agent, always
-  w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
+  // ================= #402 status dots for every agent, always (2.8.0: in views without the agent band, e.g. the calendar;
+  // where the band shows, the dots live there and the pill keeps only the robot)
+  w = await boot({user: 'alice', hash: 'cal'}); d = w.document;
+  check(!d.querySelector('#view .agband'), 'calendar: no agent band');
   let chip = d.querySelector('#top .achip');
   check(chip && chip.classList.contains('calm') && chip.querySelectorAll('.hdot').length === 2 && chip.querySelectorAll('.hdot.hs-offline').length === 2 && !chip.querySelector('.act'),
     'two agents never connected: the pill with two grey dots, no busy text');
@@ -127,6 +129,9 @@ const HEAD = `(() => {
   await v1(ag.token, 'GET', '/agent/events'); await v1(ag2.token, 'GET', '/agent/events');
   await v1(ag.token, 'PUT', '/agent/status', {status: 'working', task_id: T, text: 'Checking links'});
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
+  check(d.querySelector('#view .agband .agb-a.hs-working') && d.querySelector('#view .agband .agb-a.hs-ready') && d.querySelector('#top .achip .abot') && !d.querySelector('#top .achip .hdot'), '2.8.0: list with agents: the dots in the band, the robot in the header');
+  w.close();
+  w = await boot({user: 'alice', hash: 'cal'}); d = w.document;
   chip = d.querySelector('#top .achip');
   check(chip.querySelector('.hdot.hs-working') && chip.querySelector('.hdot.hs-ready') && chip.classList.contains('busy') && /Claude/.test(chip.querySelector('.act')?.textContent || ''),
     'working = blue dot, idle = green dot, busy text next to them: ' + chip.textContent);
@@ -266,7 +271,9 @@ const HEAD = `(() => {
         await open('l/' + L); await sleep(2200);
         const hd = await ev(HEAD);
         check(hd.more && hd.bell && hd.more[1] <= vw + .5 && hd.bell[1] <= vw + .5 && !hd.out.length, `${vw}px: "…" and the bell in view, nothing sticking out ${JSON.stringify(hd)}`);
-        check(hd.dots.length >= 1 && (hd.ach || hd.st), `${vw}px: the agents' dots are on screen (${hd.dots.length}) ${hd.lvl}`);
+        // 2.8.0 (#434): on the desktop the list's agent band carries the dots (the header keeps the robot)
+        const bandDots = touch ? 0 : await ev(`document.querySelectorAll('#view .agband .hdot').length`);
+        check((hd.dots.length >= 1 || bandDots >= 1) && (hd.ach || hd.st), `${vw}px: the agents' dots are on screen (${hd.dots.length} header, ${bandDots} band) ${hd.lvl}`);
         check(!hd.clip.length, `${vw}px: no pill cut inside (timer time, dots): ${hd.clip.join(',')} ${hd.lvl}`);
         if (touch) {
           const tgt = hd.st || hd.ach;

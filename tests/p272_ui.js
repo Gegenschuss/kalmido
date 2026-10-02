@@ -41,7 +41,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v76'/.test(SW), 'service worker cache v76');
+  check(/const CACHE = 'tasks-shell-v7[67]'/.test(SW), 'service worker cache v76 (2.8.0: v77)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en', tour: 'done'});
@@ -91,10 +91,10 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});
 
-  // ================= #417 robot before the bell
+  // ================= #417 robot before the bell (2.8.0: the dots in the agent band where it shows, here the list has one)
   w = await boot({user: 'alice', hash: 'l/' + P}); d = w.document;
   let chip = d.querySelector('#top .achip');
-  check(chip && chip.querySelector('.abot') && chip.querySelector('.hdot'), 'the robot leads the agents\' dots');
+  check(chip && chip.querySelector('.abot') && !chip.querySelector('.hdot') && d.querySelector('#view .agband .hdot'), 'the robot in the header, the agents\' dots in the band');
   check(chip && chip.nextElementSibling === d.querySelector('#top .bell'), 'directly before the bell');
   // ================= #424 breadcrumbs
   w.eval(`openDetail(${T2})`); await sleep(300);

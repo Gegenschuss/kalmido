@@ -42,7 +42,7 @@ const TABLET = {'(min-width:600px) and (min-height:600px)': true};
   const plan = await mk('Team plan', TEAM);
   const css0 = await (await fetch(B + 'static/app.css')).text();
   const SW = fs.readFileSync(path.join(__dirname, '..', 'static', 'sw.js'), 'utf8');
-  check(/const CACHE = 'tasks-shell-v((5[89]|6[0-9])|7[0-6])'/.test(SW), 'service worker cache v58 (2.0.8: v59, 2.1.0: v60, 2.1.1: v61, 2.1.2: v62, 2.2.0: v63, 2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70, 2.5.2: v71, 2.6.0: v72, 2.6.1: v73, 2.7.0: v74, 2.7.1: v75, 2.7.2: v76)');
+  check(/const CACHE = 'tasks-shell-v((5[89]|6[0-9])|7[0-7])'/.test(SW), 'service worker cache v58 (2.0.8: v59, 2.1.0: v60, 2.1.1: v61, 2.1.2: v62, 2.2.0: v63, 2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70, 2.5.2: v71, 2.6.0: v72, 2.6.1: v73, 2.7.0: v74, 2.7.1: v75, 2.7.2: v76, 2.8.0: v77)');
 
   // ================= #315 comments in a private list: the box (one line) at the bottom edge -> a note; no @ hint, no activity
   let w = await boot({user: 'alice', hash: 'l/' + PRIV}), d = w.document;
@@ -107,21 +107,16 @@ const TABLET = {'(min-width:600px) and (min-height:600px)': true};
   w.close();
   await call('PATCH', '/api/settings', {features: ALL});
 
-  // ================= #314 the rail follows the tab bar setting
+  // ================= #314 -> 2.8.0 (#434): no rail; the desktop sidebar shows every switched-on module whatever the tab bar
+  // setting says (that one is for phones)
   w = await boot({user: 'alice', hash: 'today', ls: {'tasks.tabbar': JSON.stringify(['m:cal', 'search', 'm:tasks', 'stats'])}}); d = w.document;
-  let rk = [...d.querySelectorAll('#rail > *')].map(x => x.classList.contains('spacer') ? '|' : x.dataset.go || x.dataset.act || '').filter(Boolean);
-  const iOf = k => rk.findIndex(x => x === k || x.startsWith(k + '/') || (k === 'tasks' && x === 'today'));
-  check(rk[0] === 'side' && iOf('cal') < iOf('search') && iOf('search') < iOf('today') && iOf('today') < iOf('stats'), 'rail: the tab bar items in their order (search where it was placed): ' + rk.join(','));
-  check(['matrix', 'habits', 'pomo', 'time'].every(k => rk.includes(k) && rk.indexOf(k) > iOf('stats') && rk.indexOf(k) < rk.indexOf('|')), 'rail: switched-on modules not in the tab bar appended: ' + rk.join(','));
-  check(rk.filter(x => x === 'search').length === 1 && rk.indexOf('settings') > rk.indexOf('|'), 'rail: search once (placed), settings at the bottom (not placed)');
-  check(!d.querySelector('#rail .rdup'), 'rail: nothing marked as hidden');
+  check(!d.querySelector('#rail'), 'no rail');
   const css = await (await fetch(B + 'static/app.css')).text();
-  check(/@media \(min-width:900px\)\{ #side \.sdtop\{display:none\} #side \.dupnav\{display:none\} \}/.test(css) && !/#rail \.rdup\{display:none\}/.test(css), 'CSS: desktop sidebar without the module shortcuts, rail without hiding');
-  check(d.querySelectorAll('#side .sfoot .dupnav').length >= 4, 'the phone drawer keeps them (same sidebar markup)');
+  check(['cal', 'matrix', 'habits', 'pomo', 'time', 'stats'].every(k => d.querySelector(`#side [data-go="${k}"]`)) && d.querySelectorAll('#side [data-go="search"]').length === 1 && d.querySelector('#side .sset'), 'sidebar: every module, search once, settings');
   // settings: the add select offers agents / stats / time / overview / search / settings
   w.eval(`settingsModal('tabbar')`); await sleep(300);
   md = d.querySelector('.modal.smodal');
-  check(/on the left on desktop/.test(md.querySelector('[data-pane="look"]').textContent), 'tab bar hint: bottom on phones, left on desktop');
+  check(/every module in the sidebar/.test(md.querySelector('[data-pane="look"]').textContent), 'tab bar hint: bottom on phones, the desktop sidebar has every module');
   md.remove();
   w.close();
 

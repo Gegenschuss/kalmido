@@ -29,14 +29,14 @@ const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now(
   // ================= timer from the detail panel, pill, chips
   let w = await boot({user: 'alice', hash: 'l/' + WORK}); let d = w.document;
   check(d.querySelector('#side [data-go="time"]'), 'sidebar: Time tracking row');
-  check(d.querySelector('#rail [data-go="time"]'), 'rail: time button');
+  check(d.querySelector('#side [data-go="time"]'), 'sidebar: time row');
   w.eval(`openDetail(${t1})`); await sleep(700);
   check(d.querySelector('#d-time h5')?.textContent.startsWith('Time'), 'detail: Time section');
   d.querySelector('#d-time [data-act="timer-toggle"]').click();
   check(await until(() => d.querySelector('#top .tmini')), 'pill appears after start');
   check(/Write report/.test(d.querySelector('#top .tmini').textContent), 'pill shows the task');
   check(d.querySelector(`#view .trow[data-id="${t1}"] .tchip.live`), 'row chip: live');
-  check(d.querySelector('#rail [data-go="time"] .dot.rec'), 'rail: red dot while running');
+  check(d.querySelector('#side [data-go="time"] .recdot'), 'sidebar: red dot while running');
   check(d.querySelector('#d-time .recon [data-timer-live]'), 'detail: stop button with live time');
   await sleep(2200);
   check(/^00:0[1-9]$/.test(d.querySelector('[data-timer-mini]').textContent), 'pill ticks: ' + d.querySelector('[data-timer-mini]').textContent);

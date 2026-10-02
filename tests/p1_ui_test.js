@@ -185,7 +185,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   check(d.querySelectorAll('.sttiles > div').length === 5, 'five tiles (incl. tracked time)');
   check(/Reading/.test(d.querySelector('.sthabits')?.textContent || ''), 'habits section');
   check(d.querySelector('#fab').classList.contains('gone'), 'no + button on the stats view');
-  check(d.querySelector('#side [data-go="stats"]') && d.querySelector('#rail [data-go="stats"]'), 'reachable from sidebar and rail');
+  check(d.querySelector('#side [data-go="stats"]'), 'reachable from the sidebar');
   check(d.querySelector('.ch-hit title'), 'bars have tooltips');
   d.querySelector('[data-act="stats-mode"][data-k="day"]').click(); await sleep(100);
   check(d.querySelectorAll('#view rect.hm').length >= 7, 'day heatmap');

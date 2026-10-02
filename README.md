@@ -16,14 +16,14 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.8.0** (2026-10-02): A new look: one sidebar with grouped navigation, a command bar, an agent band under the list
+  header, ticket numbers in the rows, own icons and a raspberry accent, in light and dark.
 - **2.7.2** (2026-10-01): Personal agents with setup guides for Linux, macOS and Windows, reactions and delivery status in
   the agent chat, clickable people, breadcrumbs in the task panel and "Show completed at the bottom" for every list.
 - **2.7.1** (2026-10-01): A *Project overview* in every project: description, key links, milestones, project files,
   members, status updates and the tracked time in one place.
 - **2.7.0** (2026-10-01): Reminders up to a year ahead with deadlines, reminders that repeat until done, time sums in
   hours and days, steady layout on foldables, a simpler first start and a resizable News dropdown.
-- **2.6.1** (2026-10-01): Date and reminder changes save at once with Undo, a status dot per agent in the header, the
-  bell opens the newest News in place, a per-event choice for a list's bell and filter chips for News.
 
 All changes: [CHANGELOG.md](CHANGELOG.md) · [GitHub Releases](https://github.com/Gegenschuss/kalmido/releases)
 
@@ -217,7 +217,7 @@ All changes: [CHANGELOG.md](CHANGELOG.md) · [GitHub Releases](https://github.co
 - Installable web app (PWA) for phone and desktop, works offline: changes queue up and sync later, with conflict detection
 - Sorting per view: priority, manual, date, title, *Created* (newest or oldest first, with the creation day on the rows), Flow and custom fields
 - On phones every choice list (list, section, assignee, settings) opens as a bottom sheet like the app's menus: icons, a check on the current value, a search field for long lists
-- Mobile layout with swipe gestures, long-press drag, configurable tab bar per device (on the desktop the left rail shows the same items in the same order; the sidebar keeps lists, filters and tags); tablets in portrait keep the composer at the bottom
+- Mobile layout with swipe gestures, long-press drag, configurable tab bar per device (on the desktop one sidebar with grouped navigation: Focus, Views, Lists, Filters, Tags and Team); tablets in portrait keep the composer at the bottom
 - Push notifications without an extra app (Web Push: Chrome, Edge, Firefox, Safari, iPhone and iPad from the Home Screen) or via [ntfy](https://ntfy.sh): reminders with *Done* / *Snooze*, focus end, habit reminders, daily digest, comments and assignments; a notification you handled on one device (task completed or opened, News read) closes on your other devices
 - Share from your phone into the inbox: a ready-made import for the Android app HTTP Shortcuts, a guide for the iPhone Shortcuts app (see below); app shortcuts (long-press the icon: new task, today, news, search)
 - Profile pictures: ten sloth presets or your own photo (cropped square, resized, metadata removed), shown wherever the initials were
@@ -225,7 +225,7 @@ All changes: [CHANGELOG.md](CHANGELOG.md) · [GitHub Releases](https://github.co
 - Optional [Paperless-ngx](https://docs.paperless-ngx.com) integration: link documents to tasks, send attachments to Paperless
 - **Import from Todoist, Trello, Asana, Microsoft To Do, TickTick and any ICS / VTODO file** (Apple Reminders exports, Nextcloud Tasks, Thunderbird) with a preview, re-import without duplicates and undo ([Moving from other apps](#moving-from-other-apps)); export everything as JSON (incl. your time entries)
 - **REST API** with personal access tokens (`/api/v1`, OpenAPI 3.1) and signed **webhooks** for Home Assistant, n8n or your own scripts ([docs/API.md](docs/API.md))
-- **Appearance per device**: dark or light theme, compact or comfortable rows, font size from 90 to 125 % (the whole interface scales, not just the text), Geist, your system font or the low-vision friendly [Atkinson Hyperlegible](https://www.brailleinstitute.org/freefont/), and six accent colors that all meet WCAG AA in both themes
+- **Appearance per device**: dark or light theme, compact or comfortable rows, font size from 90 to 125 % (the whole interface scales, not just the text), Geist, your system font or the low-vision friendly [Atkinson Hyperlegible](https://www.brailleinstitute.org/freefont/), and seven accent colors (raspberry by default) that all meet WCAG AA in both themes
 - English and German interface (translations are plain JSON files, [add yours](TRANSLATING.md))
 
 | | | |
@@ -781,7 +781,7 @@ a project agent: [docs/AGENTS.md](docs/AGENTS.md#coding-agent-workflow).
 | Settings > Modules | Date picker |
 |---|---|
 | <img src="docs/settings-modules.png" alt="Settings, Modules tab: every module with a switch and one sentence, grouped into views, for you, projects and team; Saved and Undo in the header"> | <img src="docs/datepicker.png" alt="Task date dialog with the own month grid and a second picker for the start date"> |
-- **Statistics** (module, on by default; sidebar, rail or a pinned tab) for the last 12 weeks: completed tasks per
+- **Statistics** (module, on by default; sidebar, command bar or a pinned tab) for the last 12 weeks: completed tasks per
   week or per day and per list, on-time rate (completed on or before the due day), the overdue trend (your open
   tasks past their due date at the end of each week), focus minutes per week and per list, habit rates and streaks.
   A completion counts for the person who ticked the task off, also in shared lists.
@@ -806,7 +806,7 @@ entries are there again.
   total-time chip.
 - **Focus sessions** (Pomodoro or stopwatch) on a task count as time entries when they end, unless a timer ran at
   the same time: the timer wins, nothing is counted twice. Can be turned off in *Settings > Modules > Time tracking settings*.
-- **Reports** (sidebar *Time tracking*, the rail or a pinned tab): this week, last week, this month, last month or a
+- **Reports** (sidebar *Time tracking*, the command bar or a pinned tab): this week, last week, this month, last month or a
   custom range; totals per list and task, per day and per person, filtered by lists and, with shared lists, *only
   mine* or *all members*. **CSV export** (one row per entry: list, task, user, start, end, duration in hours and
   h:mm, rounded hours, amount, note; UTF-8 with BOM, in German with `;` and decimal commas for Excel) and a
@@ -919,7 +919,7 @@ small **×** next to it (*Show progress* in the list's … menu or the list dial
 - **Status** (with *Collaboration* on): the owner and editors set *On track*, *At risk*, *Off track*, *On hold* or
   *Complete* with a short note. It shows as a coloured pill in the list header, a dot in the sidebar and in the
   overview; everyone else in the list gets it in their News. Each list keeps a status history.
-- **Where is it stuck?** (sidebar, rail or a pinned tab; shown once you have two lists or a shared one): per list
+- **Where is it stuck?** (sidebar, command bar or a pinned tab; shown once you have two lists or a shared one): per list
   the status, the progress, overdue tasks grouped by assignee, waiting tasks and, in shared lists, tasks without an
   assignee, with *Needs attention* to hide the calm ones. Everything is clickable.
 - **Project overview** (2.7.1, project lists only; a tab next to List / Kanban / Timeline, on phones in "…"): the place

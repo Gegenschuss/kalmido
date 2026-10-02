@@ -603,7 +603,7 @@
   "Appearance": "Darstellung",
   "Reminders": "Erinnerungen",
   "Tab bar": "Tab-Leiste",
-  "At the bottom on a phone, on the left on desktop. A phone fits {0} tabs, the rest goes under “More”.": "Am Handy unten, am Desktop links. Am Handy passen {0} Tabs, der Rest steckt unter „Mehr“.",
+  "At the bottom on a phone (the desktop shows every module in the sidebar). A phone fits {0} tabs, the rest goes under “More”.": "Am Handy unten (am Desktop stehen alle Module in der Seitenleiste). Am Handy passen {0} Tabs, der Rest steckt unter „Mehr“.",
   "Single files also via the ntfy app:": "Einzelne Dateien auch über die ntfy-App:",
   "Gestures (phone)": "Gesten (Handy)",
   "Swipe right: complete · swipe left: snooze / delete · long-press and drag: reorder, move to another column, quadrant or onto a day; drag to the left edge and hold briefly to open the lists (dropping a subtask there = standalone task in that list).": "Nach rechts wischen: erledigt · nach links wischen: verschieben / löschen · lange drücken und ziehen: umsortieren, in andere Spalte, Quadrant oder auf einen Tag; an den linken Rand ziehen und kurz halten öffnet die Listen (Unteraufgabe dort ablegen = eigenständige Aufgabe in dieser Liste).",
@@ -1924,7 +1924,6 @@
   "Time tracking is off (Settings > Modules)": "Zeiterfassung ist aus (Einstellungen > Module)",
   "The overview needs “Project progress” (Settings > Modules) and at least two lists": "Die Übersicht braucht „Projektfortschritt“ (Einstellungen > Module) und mindestens zwei Listen",
   "Statistics are off (Settings > Modules)": "Statistik ist aus (Einstellungen > Module)",
-  "Lists and filters": "Listen und Filter",
   "End selection": "Auswahl beenden",
   "More actions": "Weitere Aktionen",
   "sync|pending changes": "Sync",
@@ -3272,5 +3271,15 @@
   "An admin paused this agent; only an admin can resume it": "Ein Admin hat diesen Agenten pausiert; nur ein Admin kann ihn fortsetzen",
   "Offline – last update less than a minute ago": "Offline – letzte Aktualisierung vor weniger als einer Minute",
   "Offline – last update {0} min ago": ["Offline – letzte Aktualisierung vor {0} Min.", "Offline – letzte Aktualisierung vor {0} Min."],
-  "Tap to try again": "Tippen, um es erneut zu versuchen"
+  "Tap to try again": "Tippen, um es erneut zu versuchen",
+  "Raspberry": "Himbeere",
+  "Jump, create, ask an agent…": "Springen, anlegen, Agent fragen…",
+  "Focus|nav": "Fokus",
+  "Team": "Team",
+  "Ticket {0}": "Ticket {0}",
+  "{0} waits for you": "{0} wartet auf dich",
+  "Yes|approve": "Ja",
+  "Agents live": "Agenten live",
+  "Fold the agents": "Agenten einklappen",
+  "Show the agents": "Agenten zeigen"
 }

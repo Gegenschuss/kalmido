@@ -13,7 +13,7 @@ const sql = q => execFileSync('python3', ['-c', 'import sqlite3,sys; c=sqlite3.c
   sql(`UPDATE settings SET value='1' WHERE key='update_check'`);
   sql(`UPDATE settings SET value='{"checked_at": "2026-09-01T00:00:00Z", "latest": "99.0.0", "url": "https://github.com/example/kalmido/releases/tag/v99.0.0"}' WHERE key='update_info'`);
   let w = await boot({user: 'alice'}), d = w.document;
-  check(d.querySelector('#rail .rbtn[data-act="settings"] .dot') || d.querySelector('.srow[data-act="settings"] .nunread'), 'admin: update dot on the settings gear');
+  check(d.querySelector('.srow[data-act="settings"] .nunread'), 'admin: update dot on the settings gear');
   w.eval(`settingsModal('help')`); await sleep(300);
   let md = d.querySelector('.smodal');
   const help = md.querySelector('[data-pane="help"]').textContent;
@@ -36,7 +36,7 @@ const sql = q => execFileSync('python3', ['-c', 'import sqlite3,sys; c=sqlite3.c
   check(w.eval('collab()') === false && !d.querySelector('.srow[data-go="news"]'), 'off: collaboration UI gone for the admin too');
   md.remove(); w.close();
   w = await boot({user: 'bob'}); d = w.document;
-  check(!d.querySelector('#rail .rbtn[data-act="settings"] .dot') && !d.querySelector('.srow[data-act="settings"] .nunread'), 'non-admin: no update dot');
+  check(!d.querySelector('.srow[data-act="settings"] .nunread'), 'non-admin: no update dot');
   check(!w.eval('S.lists').some(l => l.name === 'Shared'), 'off: bob no longer sees the shared list');
   w.eval(`settingsModal('collab')`); await sleep(300); md = d.querySelector('.smodal');
   check(md.querySelector('[data-feat="collab"]').disabled && !md.querySelector('#s-collaball'), 'non-admin: disabled personal switch, no instance switch');
@@ -56,7 +56,7 @@ const sql = q => execFileSync('python3', ['-c', 'import sqlite3,sys; c=sqlite3.c
   // time tracking for everyone: off -> module gone, personal switch disabled with a note, options hidden
   const ta = md.querySelector('#s-timeall');
   ta.checked = false; ta.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(1500); md = d.querySelector('.smodal');
-  check(w.eval('timeOn()') === false && !d.querySelector('#rail [data-go="time"]') && !d.querySelector('#side [data-go="time"]'), 'time off: module gone from the navigation');
+  check(w.eval('timeOn()') === false && !d.querySelector('#side [data-go="time"]'), 'time off: module gone from the navigation');
   md.remove();
   w.eval(`settingsModal('layout')`); await sleep(300); md = d.querySelector('.smodal');
   check(md.querySelector('[data-pane="modules"] [data-feat="time"]').disabled && /Turned off on this server/.test(md.querySelector('[data-modrow="time"]').textContent), 'time off: personal switch disabled + note');

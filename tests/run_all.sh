@@ -128,6 +128,11 @@ fresh; run p181_ui node p181_ui.js
 # 1.9.0: share from the phone (HTTP Shortcuts import, iPhone guide), profile pictures (presets, photo resized + EXIF
 # stripped, access), delete a tag, News inbox (dismiss, filter, which events), stale update check; then the UI (refresh
 # of shared lists, live comments, Fold dialogs, users first in Administration)
+# 2.8.0 "Leitstand" (#434, here in shard 2: shard 4 was already at 18 min on CI): no icon rail, the grouped sidebar
+# reaches every module (switched-off ones gone), command bar, agent band (approve / reject, folds per device, no duplicate
+# header dots), ticket gutter rows, the icon set "Punkt", the raspberry accent + migration; Firefox at 360 / 390 / 904
+# (touch) and 1280 / 1440 / 1920 (mouse): layout, 44 px, contrast
+       run p280_ui node p280_ui.js "$KALMIDO_TEST_DATA"
 shard 3  # ---------------------------------------------------------------- shard 3 of 4
 fresh; run p190_api "$PY" p190_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p190_ui node p190_ui.js

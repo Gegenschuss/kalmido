@@ -229,7 +229,7 @@ const ds = n => { const d = new Date(Date.now() + n * 864e5); return `${d.getFul
   // ================= overview
   await call('POST', '/api/deps', {task_id: t2, blocker_id: t1});
   await w.eval('load().then(render)');
-  check(d.querySelector('#side [data-go="overview"]') && d.querySelector('#rail [data-go="overview"]'), 'overview in sidebar + rail');
+  check(d.querySelector('#side [data-go="overview"]'), 'overview in the sidebar');
   w.location.hash = 'overview'; await sleep(400);
   check(d.querySelector('#top h1').textContent === 'Where is it stuck?', 'overview title');
   const cards = [...d.querySelectorAll('.ovcard')];

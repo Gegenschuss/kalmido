@@ -81,10 +81,10 @@ const call = async (u, method, url, body) => { const r = await fetch(B + url.rep
   w = await boot({user: 'alice', mobile: true, hash: 'inbox'}); d = w.document;
   check(d.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')?.content === 'black', 'status bar style "black" (page starts below it)');
   check(!d.documentElement.classList.contains('iosgap') && w.eval('typeof iosGapSync') === 'undefined', 'no bottom-edge shift any more');
-  check(d.querySelector('meta[name="theme-color"]')?.content === '#13171d', 'theme-color = tab bar colour (dark)');
+  check(d.querySelector('meta[name="theme-color"]')?.content === '#16171a', 'theme-color = tab bar colour (dark)');
   w.close();
   const man = await (await fetch(B + 'manifest.json')).json();
-  check(man.theme_color === '#13171d' && man.background_color === '#13171d', 'manifest colours = tab bar colour');
+  check(man.theme_color === '#16171a' && man.background_color === '#16171a', 'manifest colours = tab bar colour');
 
   const errList = errs.filter(e => !/Could not load|ECONNREFUSED|NetworkError|ResizeObserver/.test(e));
   check(!errList.length, 'no script errors: ' + errList.slice(0, 3).join(' | '));

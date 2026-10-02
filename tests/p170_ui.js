@@ -199,7 +199,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   check(v.includes(spec) === false, 'Spec (due in 2 days): not shown');
   check(w.eval('sortMode()') === 'flow', 'Now doable sorts by Flow');
   check(v.indexOf(o1) < v.indexOf(onToday) && v.indexOf(onToday) < v.indexOf(nd1), 'order: overdue, today, undated: ' + v);
-  const side = [...d.querySelectorAll('#side > .srow')].map(r => r.dataset.go);
+  const side = [...d.querySelectorAll('#side .sg-focus .srow')].map(r => r.dataset.go);
   check(side.indexOf('doable') === side.indexOf('week') + 1, 'sidebar: row right after Next 7 days: ' + side);
   const cnt = +(d.querySelector('#side .srow[data-go="doable"] .c')?.textContent || 0);
   const tops = d.querySelectorAll('#view .trow:not(.sub)').length;

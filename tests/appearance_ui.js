@@ -26,9 +26,9 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   const vars = sel => { const m = css.match(new RegExp(sel.replace(/[[\]()"=]/g, '\\$&') + '\\{([^}]*)\\}')); const o = {}; if (m) for (const [, k, v] of m[1].matchAll(/--([\w-]+):([^;]+)/g)) o[k] = v.trim(); return o; };
   const root = vars(':root'), light = vars(':root[data-theme="light"]');
   check(light.accent === 'var(--acc-l)' && light['accent-ink'] === 'var(--acc-ink-l)', 'light theme takes the light accent variables');
-  const accents = {mint: {d: root['acc-d'], id: root['acc-ink-d'], l: root['acc-l'], il: root['acc-ink-l']}};
+  const accents = {raspberry: {d: root['acc-d'], id: root['acc-ink-d'], l: root['acc-l'], il: root['acc-ink-l']}};
   for (const [, k, body] of css.matchAll(/:root\[data-accent="(\w+)"\]\{([^}]*)\}/g)) { const o = {}; for (const [, n, v] of body.matchAll(/--([\w-]+):([^;]+)/g)) o[n] = v.trim(); accents[k] = {d: o['acc-d'], id: o['acc-ink-d'], l: o['acc-l'], il: o['acc-ink-l']}; }
-  check(Object.keys(accents).length === 6, 'six accents in app.css: ' + Object.keys(accents));
+  check(Object.keys(accents).length === 7, 'seven accents in app.css (2.8.0: raspberry default + mint): ' + Object.keys(accents));
   const darkBg = [root.bg, root.bg2, root.bg3], lightBg = [light.bg, light.bg2, light.bg3];
   let worst = 99;
   for (const [k, a] of Object.entries(accents)) {
@@ -69,7 +69,7 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   let w = await boot({user: 'alice'}), d = w.document;
   const de = d.documentElement.dataset;
-  check(de.fsize === 'm' && de.font === 'geist' && de.accent === 'mint' && de.theme === 'auto' && de.density === 'compact', 'defaults: normal size, Geist, mint, automatic, compact');
+  check(de.fsize === 'm' && de.font === 'geist' && de.accent === 'raspberry' && de.theme === 'auto' && de.density === 'compact', 'defaults: normal size, Geist, raspberry (2.8.0), automatic, compact');
   check(w.eval('uiZ()') === 1 && w.eval('weekH()') === 44, 'default scale 1 (week grid 44 px per hour)');
   const before = (await (await w.fetch('/api/state')).json()).settings;
   w.eval(`settingsModal('look')`); await sleep(300);
@@ -82,10 +82,10 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   const pane = () => md.querySelector('[data-pane="look"]');
   check(['#s-theme', '#s-density', '#s-fsize', '#s-font', '#s-accent'].every(s => pane().querySelector(s)), 'pane: theme, density, font size, font, accent');
   check(pane().querySelector('.devtag'), 'pane tagged "This device"');
-  check(pane().querySelectorAll('#s-fsize button').length === 4 && pane().querySelectorAll('#s-font button').length === 3 && pane().querySelectorAll('#s-accent button').length === 6, 'option counts 4 / 3 / 6');
+  check(pane().querySelectorAll('#s-fsize button').length === 4 && pane().querySelectorAll('#s-font button').length === 3 && pane().querySelectorAll('#s-accent button').length === 7, 'option counts 4 / 3 / 7 (2.8.0: + raspberry)');
   const pv = pane().querySelector('.lookpv');
   check(pv && pv.hasAttribute('inert') && pv.querySelector('.trow .chk') && pv.querySelector('.trow .meta .dt') && pv.querySelector('.btn.pri') && pv.querySelector('.lpv-link'), 'live preview: sample rows, date, button, link (inert)');
-  check(pane().querySelector('[data-look="fsize"][data-v="m"]').classList.contains('on') && pane().querySelector('[data-look="accent"][data-v="mint"]').getAttribute('aria-pressed') === 'true', 'current values marked (class + aria-pressed)');
+  check(pane().querySelector('[data-look="fsize"][data-v="m"]').classList.contains('on') && pane().querySelector('[data-look="accent"][data-v="raspberry"]').getAttribute('aria-pressed') === 'true', 'current values marked (class + aria-pressed)');
   const pick = async (k, v) => { click(w, pane().querySelector(`[data-look="${k}"][data-v="${v}"]`)); await sleep(40); };
   // font size
   for (const [v, z] of [['s', 0.9], ['l', 1.12], ['xl', 1.25]]) {
@@ -102,7 +102,7 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   for (const v of ['sky', 'violet', 'rose', 'orange', 'lime']) { await pick('accent', v); check(de.accent === v && w.__store['tasks.accent'] === JSON.stringify(v), `accent ${v}: applied + stored`); }
   // theme + density (moved here)
   await pick('theme', 'light'); check(de.theme === 'light' && w.__store['tasks.theme'] === '"light"', 'theme light: applied + stored');
-  check(d.querySelector('meta[name="theme-color"]').content === '#ffffff', 'theme-color meta follows');
+  check(d.querySelector('meta[name="theme-color"]').content === '#f8f8f9', 'theme-color meta follows');
   await pick('density', 'comfortable'); check(de.density === 'comfortable' && w.__store['tasks.density'] === '"comfortable"', 'density comfortable: applied + stored');
   const after = (await (await w.fetch('/api/state')).json()).settings;
   check(JSON.stringify(before) === JSON.stringify(after), 'nothing stored on the server');
@@ -117,21 +117,21 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   check(x.fsize === 'xl' && x.font === 'system' && x.accent === 'lime' && x.theme === 'light' && x.density === 'comfortable', 'same device: restored on the next start');
   w.close();
   w = await boot({user: 'alice'}); d = w.document; x = d.documentElement.dataset;
-  check(x.fsize === 'm' && x.font === 'geist' && x.accent === 'mint', 'other device: defaults (per device)');
+  check(x.fsize === 'm' && x.font === 'geist' && x.accent === 'raspberry', 'other device: defaults (per device)');
   w.close();
   // garbage in localStorage -> defaults
   w = await boot({user: 'alice', ls: {'tasks.fsize': '"huge"', 'tasks.font': '"comic"', 'tasks.accent': '"<x>"', 'tasks.theme': '"light"'}}); d = w.document; x = d.documentElement.dataset;
-  check(x.fsize === 'm' && x.font === 'geist' && x.accent === 'mint', 'unknown stored values fall back to the defaults');
+  check(x.fsize === 'm' && x.font === 'geist' && x.accent === 'raspberry', 'unknown stored values fall back to the defaults');
   // reset to defaults
   w.eval(`settingsModal('look')`); await sleep(300);
   md = d.querySelector('.modal.smodal');
   await pick('accent', 'violet'); await pick('fsize', 'l');
   click(w, pane().querySelector('[data-m="look-reset"]')); await sleep(80);
   x = d.documentElement.dataset;
-  check(x.fsize === 'm' && x.font === 'geist' && x.accent === 'mint' && x.theme === 'auto' && x.density === 'compact', 'reset: defaults applied');
+  check(x.fsize === 'm' && x.font === 'geist' && x.accent === 'raspberry' && x.theme === 'auto' && x.density === 'compact', 'reset: defaults applied');
   check(!['theme', 'density', 'fsize', 'font', 'accent'].some(k => ('tasks.' + k) in w.__store), 'reset: stored values removed');
   check(/reset/i.test(d.querySelector('#toast')?.textContent || ''), 'reset: toast');
-  check(pane().querySelector('[data-look="accent"][data-v="mint"]').classList.contains('on'), 'reset: pane redrawn');
+  check(pane().querySelector('[data-look="accent"][data-v="raspberry"]').classList.contains('on'), 'reset: pane redrawn');
   md.remove();
 
   // ---- command palette
@@ -155,7 +155,7 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   const accItem = (await pal('accent sky'));
   check(accItem && accItem.querySelector('.psw')?.getAttribute('style')?.includes('#38bdf8'), 'palette: accent items show the swatch');
   key(w, 'Escape', {}, d.querySelector('.palette .pqin')); await sleep(40);
-  await run('reset appearance'); check(d.documentElement.dataset.accent === 'mint' && d.documentElement.dataset.fsize === 'm' && d.documentElement.dataset.font === 'geist', 'palette: reset appearance');
+  await run('reset appearance'); check(d.documentElement.dataset.accent === 'raspberry' && d.documentElement.dataset.fsize === 'm' && d.documentElement.dataset.font === 'geist', 'palette: reset appearance');
   await run('settings appearance'); check(d.querySelector('.smodal .snav .on')?.dataset.sec === 'look', 'palette: Settings: Appearance');
   d.querySelector('.smodal')?.remove();
   w.close();

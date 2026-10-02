@@ -41,17 +41,13 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
 
   // ================= (a) navigation exists once
   let w = await boot({user: 'alice', hash: 'today'}), d = w.document;
-  // 2.0.6 (#314): the rail follows the tab bar setting and hides nothing on the desktop; the sidebar footer copies are
-  // hidden there by the stylesheet (they stay for the phone drawer)
-  const rail = [...d.querySelectorAll('#rail .rbtn')];
-  const railK = rail.map(x => x.dataset.go || x.dataset.act);
+  // 2.8.0 (#434): no rail; the sidebar holds search / statistics / time / overview / settings once (desktop and drawer)
+  check(!d.querySelector('#rail'), 'no rail any more');
+  const navK = [...d.querySelectorAll('#side .srow')].map(x => x.dataset.go || x.dataset.act);
   const want = ['search', 'stats', 'time', ...(w.eval('overviewOn()') ? ['overview'] : []), 'settings'];
-  check(want.every(k => railK.includes(k)) && !rail.some(x => x.classList.contains('rdup')), 'rail: search / statistics / time / overview / settings, none marked as a duplicate: ' + railK);
-  const foot = [...d.querySelectorAll('#side .sfoot .dupnav')].map(x => x.dataset.go || x.dataset.act);
-  check(want.every(k => foot.includes(k)), 'sidebar footer keeps them for the phone drawer: ' + foot);
+  check(want.every(k => navK.filter(x => x === k).length === 1), 'sidebar: search / statistics / time / overview / settings, each once: ' + navK);
   const css = await (await fetch(B + 'static/app.css')).text();
-  check(/@media \(min-width:900px\)\{ #side \.sdtop\{display:none\} #side \.dupnav\{display:none\} \}/.test(css), 'CSS: desktop sidebar without the copies (they live in the rail)');
-  check(!/#rail \.rdup\{display:none\}/.test(css), 'CSS: nothing in the rail is hidden any more');
+  check(!/#side \.dupnav\{display:none\}/.test(css.split('2.8.0 "Leitstand"').pop()), 'CSS: nothing in the new sidebar is hidden on the desktop');
 
   // ================= (e) archived lists: hidden outside the list
   const txt = () => d.querySelector('#view').textContent;
@@ -256,9 +252,9 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   nw.querySelector('#l-name').value = 'Fresh'; click(w, nw.querySelector('[data-m="save"]'));
   check(await until(async () => (await st()).lists.some(l => l.name === 'Fresh')), 'Create works');
 
-  // ================= (i) rail: search sits at the bottom, right above the settings gear
-  const rk = [...d.querySelectorAll('#rail > *')].map(x => x.classList.contains('spacer') ? 'spacer' : x.dataset.go || x.dataset.act || '');
-  check(rk.indexOf('search') === rk.indexOf('settings') - 1 && rk.indexOf('search') > rk.indexOf('spacer'), 'rail: search right above settings, below the spacer: ' + rk.join(','));
+  // ================= (i) sidebar footer: search right above the settings
+  const rk = [...d.querySelectorAll('#side .sfoot > *')].map(x => x.dataset.go || x.dataset.act || '');
+  check(rk.indexOf('search') === rk.indexOf('settings') - 1, 'sidebar: search right above settings: ' + rk.join(','));
 
   // ================= (h) time page: the running timer as a card
   const PRJ = (await call('POST', '/api/lists', {name: 'Client X', kind: 'project', color: '#f59e0b'})).id;

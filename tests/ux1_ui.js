@@ -71,10 +71,10 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   // modules
   const hab = md.querySelector('[data-feat="habits"]'); hab.checked = false; hab.dispatchEvent(new w.Event('change', {bubbles: true}));
   check(await until(async () => !(await st()).settings.features.split(',').includes('habits')), 'module switch saves at once');
-  check(await until(() => !d.querySelector('#rail [data-go="habits"]')), 'the module disappears from the rail');
+  check(await until(() => !d.querySelector('#side [data-go="habits"]')), 'the module disappears from the sidebar');
   check(/Habits off/.test(w.eval('HIST.undo[HIST.undo.length - 1].label')), 'history: "Changed setting: Habits off"');
   md.remove(); await w.eval(`histStep('undo')`);
-  check((await st()).settings.features.split(',').includes('habits') && d.querySelector('#rail [data-go="habits"]'), 'undo (← / Ctrl+Z path) brings the module back');
+  check((await st()).settings.features.split(',').includes('habits') && d.querySelector('#side [data-go="habits"]'), 'undo (← / Ctrl+Z path) brings the module back');
   // display name: pending text is saved when the dialog closes
   w.eval(`settingsModal('account')`); await sleep(300); md = [...d.querySelectorAll('.modal.smodal')].pop();
   check(!md.querySelector('[data-acc="name"]'), 'no separate "Save" for the display name');
@@ -309,9 +309,9 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   w = await boot({user: 'alice', hash: 'l/' + TEAM, media: {'(hover: none)': true}, setup: x => { Object.defineProperty(x, 'innerWidth', {configurable: true, value: 1000}); }}); d = w.document;
   check(!d.querySelector('#app').classList.contains('side-rail'), 'no panel: sidebar stays');
   w.eval(`openDetail(${plan})`); await sleep(100);
-  check(d.querySelector('#app').classList.contains('side-rail') && d.querySelector('#rail .rside'), 'panel open at 1000 px: sidebar folds into the rail');
-  click(w, d.querySelector('#rail .rside')); await sleep(50);
-  check(d.querySelector('#side').classList.contains('open') && !d.querySelector('#scrim').classList.contains('hidden'), 'the rail button opens the sidebar as an overlay');
+  check(d.querySelector('#app').classList.contains('side-rail') && d.querySelector('#top .menu'), 'panel open at 1000 px: the sidebar becomes a drawer (menu button)');
+  click(w, d.querySelector('#top .menu')); await sleep(50);
+  check(d.querySelector('#side').classList.contains('open') && !d.querySelector('#scrim').classList.contains('hidden'), 'the menu button opens the sidebar as an overlay');
   click(w, d.querySelector('#scrim')); await sleep(50);
   check(!d.querySelector('#side').classList.contains('open'), 'tap next to it closes it');
   check(d.querySelector('#top [data-act="hist-undo"]'), '2.7.0 (#405): touch tablet with room: undo / redo in the header (they fold into "…" when tight)');
@@ -326,7 +326,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   const css = await (await fetch(B + 'static/app.css')).text();
   const coarse = [...css.matchAll(/@media \(pointer:coarse\)\{([\s\S]*?)\n\}/g)].map(m => m[1]).join('\n');
   check(/#top \.iconbtn[^{]*\{[^}]*min-width:2\.75rem;min-height:2\.75rem/.test(coarse), 'header icons 44 px');
-  check(/\.chk::after\{inset:-\.875rem\}/.test(coarse), 'checkbox hit area 16 + 2 x 14 = 44 px');
+  check(/\.chk::after\{inset:-1\.0625rem\}/.test(coarse), 'status glyph hit area 14 + 2 x 17 >= 44 px (2.8.0)');
   check(/\.hc::before\{[^}]*1\.375rem/.test(coarse) && /\.shead button::before/.test(coarse), 'habit cells and sidebar "+" hit areas');
   check(/\.mcal \.d,\.dpd\{min-height:2\.75rem\}/.test(coarse), 'calendar days 44 px high');
   // U24: light red one step darker
