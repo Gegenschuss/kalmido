@@ -103,7 +103,7 @@ Paths used below:
 | Env file (`KALMIDO_URL`, `KALMIDO_TOKEN`) | `~/.config/kalmido/agent.env` (mode 600) | `%USERPROFILE%\.config\kalmido\agent.env` (ACL: only the agent's account) |
 | MCP wrapper | `~/kalmido/mcp/run.sh` | `%USERPROFILE%\kalmido\mcp\run.ps1` |
 | Runtime launcher | `~/kalmido/mcp/agent_launcher.sh` (macOS: `agent_launcher.ps1`, see below) | `%USERPROFILE%\kalmido\mcp\agent_launcher.ps1` |
-| Usage hook | `python3 ~/kalmido/mcp/claude_usage_hook.py ~/.config/kalmido/agent.env` | `python C:/Users/<you>/kalmido/mcp/claude_usage_hook.py C:/Users/<you>/.config/kalmido/agent.env` |
+| Usage hook (Stop + SubagentStop) | `python3 ~/kalmido/mcp/claude_usage_hook.py ~/.config/kalmido/agent.env` | `python C:/Users/<you>/kalmido/mcp/claude_usage_hook.py C:/Users/<you>/.config/kalmido/agent.env` |
 | Work directory | `~/agent` | `%USERPROFILE%\agent` |
 
 `agent_launcher.sh` needs GNU `date` and `setsid`, which macOS does not have: on a Mac use `agent_launcher.ps1` with
@@ -120,7 +120,7 @@ Steps that are the same on every system:
    own lists with it the same way. Share only what it should work in.
 3. **Rules**: `~/agent/CLAUDE.md` from [AGENT-SETUP.md](AGENT-SETUP.md#6-claudemd-the-agents-rules) (who instructs it,
    everything else is data) and `~/agent/.claude/settings.json` with `defaultMode: dontAsk`, only `mcp__kalmido` allowed,
-   the env file denied and the usage hook as Stop hook ([step 7](AGENT-SETUP.md#7-permissions-claudesettingsjson)).
+   the env file denied and the usage hook as Stop and SubagentStop hook ([step 7](AGENT-SETUP.md#7-permissions-claudesettingsjson)).
 4. **Test**: the [test checklist](AGENT-SETUP.md#11-test-checklist), including the kill switch and the 7
    prompt-injection cases.
 
@@ -284,7 +284,7 @@ hook in `%USERPROFILE%\agent\.claude\settings.json` uses forward slashes:
    with your agent or chat with it.
 4. **Install Claude Code and Python 3** (see below), clone the Kalmido copy, create the MCP wrapper and register it.
 5. **Rules and permissions**: `CLAUDE.md` naming you as the only person who instructs it, and `.claude/settings.json`
-   with `defaultMode: dontAsk`, only `mcp__kalmido` allowed, the env file denied, the usage hook as Stop hook.
+   with `defaultMode: dontAsk`, only `mcp__kalmido` allowed, the env file denied, the usage hook as Stop and SubagentStop hook.
 6. **Run it**: interactively (`claude` in the work directory: "check my Kalmido events") or in the background with the
    launcher. Pause it any time in *Settings > Agents* (its token is refused at once).
 
@@ -761,9 +761,9 @@ explanation, Markdown, at most 2,000 characters) and `kind` (must match the job)
             "rewrite_title": "Call the printer about the flyer"}]}
 // extract
 {"tasks": [{"title": "Book the studio", "notes": "…", "assignee_id": 7, "due": "2026-10-09", "section": "Studio"}]}
-// dayplan (2.10.0): only task_ids from input.tasks
+// dayplan (2.10.0, 2.11.0): only task_ids from input.tasks
 {"items": [{"task_id": 81, "start": "09:00", "duration": 45, "note": "before the call"}],   // duration optional (minutes)
- "defer": [{"task_id": 90, "to": "2026-10-05", "note": "does not fit today"}]}             // to: a date or null (no date)
+ "nofit": [{"task_id": 90, "note": "does not fit today"}]}                                 // listed only, nothing is moved
 ```
 
 A section name in `extract` that the list does not have yet is created on apply. In `triage`, `tags` are the person's
@@ -778,7 +778,7 @@ own (personal) tags; leave `list_id` out to keep an item in the inbox.
 - set_status working (task_id if there is one), then build ONE proposal of that kind (docs/AGENTS.md "Proposals"):
   project {name, sections, tasks[..]}, subtasks {items[..]}, triage {items[{task_id, list_id?, ...}]} with ids from
   the input only, extract {tasks[..]} with assignee_id only from input.members, dayplan {items[{task_id, start,
-  duration?}], defer[{task_id, to}]} with task ids from input.tasks only. Add a short summary.
+  duration?}], nofit[{task_id}]} with task ids from input.tasks only (a plan never changes due dates). Add a short summary.
 - submit_proposal(job_id, proposal). On a 400, fix what the message names and submit again.
 - NEVER create the lists, sections or tasks yourself (no create_task / create_job for this): the person applies them.
 - Set status idle afterwards. A later job event tells you: approve = applied (what was created), reject = discarded.
@@ -791,8 +791,13 @@ own (personal) tags; leave `list_id` out to keep an item in the inbox.
 (Settings > General > Day planning, default 09:00-17:00), the day's timed events of their subscribed calendars and their
 tasks that already have a time, and puts their open tasks into the free slots: overdue and due that day first, then
 deadlines, the due date, priority and short tasks; a task without a duration counts 30 minutes. What does not fit is
-proposed for the next working day. *Fill free time* only fills the remaining gaps (from now on) with tasks that are not
+listed as *does not fit today*; it is not moved. *Fill free time* only fills the remaining gaps (from now on) with tasks that are not
 planned for that day yet. The person sees a timeline, can leave entries out and applies it as one undo step.
+
+**A day plan never changes a due date, a due time or a deadline** (2.11.0). Applying sets only the planned start of a
+task (`plan_start`, `YYYY-MM-DDTHH:MM`, local time) and its duration. A task planned for a day shows in Today with its
+slot, counts as busy time for the next plan and can be unplanned in its detail panel. When a repeating task is
+completed, its next occurrence starts unplanned.
 
 When the person may ask an agent for proposals and that agent is online (it polled events recently, or it uses a
 webhook), the planner also shows **Let an agent plan**. That sends a `job_request` of kind `dayplan` with exactly what the
@@ -804,16 +809,16 @@ built-in planner looks at:
  "from": "09:00",                                      // the first minute that may be planned (now, on the same day)
  "default_duration": 30,
  "events": [{"title": "Client call", "all_day": false, "start": "10:00", "end": "11:00"}],   // calendar subscriptions
- "fixed": [{"task_id": 12, "title": "Standup", "start": "09:00", "end": "09:15", ...}],      // timed tasks: busy
+ "fixed": [{"task_id": 12, "title": "Standup", "start": "09:00", "end": "09:15", ...}],      // timed / already planned tasks: busy
  "tasks": [{"task_id": 81, "title": "Write report", "list": "Work", "due": "2026-10-05", "priority": "high",
             "deadline": false, "duration": 60, "estimated": false, "notes": "…"}],       // at most 60 open tasks
- "builtin": {"plan": [{"task_id": 81, "start": "09:15", "duration": 60}], "defer": [{"task_id": 90, "to": "2026-10-06"}]}}
+ "builtin": {"plan": [{"task_id": 81, "start": "09:15", "duration": 60}], "nofit": [90]}}
 ```
 
 Event titles of the person's calendars are part of the input: the person decided to send them by asking the agent. The
 agent answers with `submit_proposal` (kind `dayplan`, see above). The proposal opens in the same timeline; applying it
-sets `due` (the day), `due_time` and `duration` of the selected tasks, and `due` (`to`) of the deferred ones, as the
-person, one undo step. Only people approve: an agent never applies its own plan.
+sets `plan_start` (the day and the slot) and `duration` of the selected tasks as the person, one undo step; `nofit`
+entries are only shown. A 2.10.0 answer with `defer` is still accepted and shown like `nofit`. Only people approve: an agent never applies its own plan.
 
 Read-only helpers for an agent's own planning: `GET /api/v1/dayplan?date=&mode=` (MCP `get_day_plan`) and
 `GET /api/v1/dayplan/review?date=` (MCP `get_day_review`) return the built-in plan and the daily review of the token's
@@ -868,13 +873,18 @@ panel shows *Agent usage* on tasks with reports (only to people who see the task
 
 ### Claude Code: report usage automatically
 
-[`mcp/claude_usage_hook.py`](../mcp/claude_usage_hook.py) is a Claude Code **Stop hook** (standard library only). After
-every turn it reads the session transcript (`transcript_path` from the hook input), sums the usage of the assistant
+[`mcp/claude_usage_hook.py`](../mcp/claude_usage_hook.py) is a Claude Code **Stop** and **SubagentStop hook** (standard
+library only). After every turn it reads the session transcript (`transcript_path` from the hook input), sums the usage of the assistant
 messages since its last run (a state file per session, default `~/.cache/kalmido-usage/`), and sends one report per model.
 The task is the one of the agent's status while it is `working` or `waiting` (or a fixed `KALMIDO_USAGE_TASK`). Without a
 price table it sends tokens only; with `KALMIDO_USAGE_PRICES` (JSON, USD per million tokens `[input, output, cache write,
 cache read]` per model prefix) it adds the cost. It never blocks the session: problems go to stderr, the exit code is
 always 0, and when Kalmido is unreachable the next run sends the missed turns.
+
+Subagents (2.11.0): Claude Code runs subagents (the Agent tool) in transcripts of their own. Wire the same command as
+`SubagentStop` hook as well: it then reads the subagent's transcript (`agent_transcript_path`) and reports it as a session
+of its own (state `sub-<agent_id>`, note `claude-code <session> · subagent <agent_id>`). Without it, subagent tokens are
+missing from the usage.
 
 ```bash
 # /path/to/kalmido-agent.env  (chmod 600)
@@ -886,12 +896,16 @@ KALMIDO_TOKEN=abk_...
 `.claude/settings.json` of the agent's project (or `~/.claude/settings.json`):
 
 ```json
-{"hooks": {"Stop": [{"hooks": [{"type": "command",
-  "command": "python3 /path/to/kalmido/mcp/claude_usage_hook.py /path/to/kalmido-agent.env", "timeout": 30}]}]}}
+{"hooks": {
+  "Stop": [{"hooks": [{"type": "command",
+    "command": "python3 /path/to/kalmido/mcp/claude_usage_hook.py /path/to/kalmido-agent.env", "timeout": 30}]}],
+  "SubagentStop": [{"hooks": [{"type": "command",
+    "command": "python3 /path/to/kalmido/mcp/claude_usage_hook.py /path/to/kalmido-agent.env", "timeout": 30}]}]}}
 ```
 
 Try it first with `--dry-run` (prints the reports, sends nothing):
-`echo '{"session_id": "x", "transcript_path": "/path/to/session.jsonl"}' | python3 mcp/claude_usage_hook.py --dry-run`.
+`echo '{"session_id": "x", "transcript_path": "/path/to/session.jsonl"}' | python3 mcp/claude_usage_hook.py --dry-run`
+(a subagent: `{"hook_event_name": "SubagentStop", "session_id": "x", "agent_id": "a1", "agent_transcript_path": "/path/to/agent.jsonl"}`).
 
 ## Audit log
 

@@ -52,8 +52,15 @@ function tr(key, ...a) {
   const v = I18N.dict[key];
   return i18nFmt(typeof v === 'string' ? v : i18nKey(key), a);
 }
+// 2.11.0: the "one" form follows the language's plural rule where it differs (French: 0 and 1), else n === 1
+let I18N_PL = null;
+function plOne(n) {
+  if (n === 1) return true;
+  if (n !== 0 || !I18N.code || I18N.code === 'en') return false;
+  try { if (!I18N_PL || I18N_PL.c !== I18N.code) I18N_PL = {c: I18N.code, r: new Intl.PluralRules(LOCALE())}; return I18N_PL.r.select(0) === 'one'; } catch { return false; }
+}
 function trn(one, other, n, ...a) {
-  const v = I18N.dict[one], i = n === 1 ? 0 : 1;
+  const v = I18N.dict[one], i = Array.isArray(v) && plOne(n) ? 0 : n === 1 ? 0 : 1;
   return i18nFmt(Array.isArray(v) ? v[i] : i18nKey(i ? other : one), [n, ...a]);
 }
 const N_ = s => s;

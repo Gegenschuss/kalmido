@@ -2,7 +2,9 @@
 
 Kalmido is written in English. Every text in the code is English and doubles as its own lookup key;
 every other language is one JSON file in [`static/i18n/`](static/i18n/). German
-([`de.json`](static/i18n/de.json)) is the reference translation. Adding a language needs no code changes:
+([`de.json`](static/i18n/de.json)) is the reference translation; French, Spanish, Italian and Dutch (2.11.0) are
+machine-translated and marked beta (`"beta": true` in `_meta`): reviews and fixes by native speakers are welcome, see
+[CONTRIBUTING.md](CONTRIBUTING.md#translations). Adding a language needs no code changes:
 drop in a file and it shows up under *Settings > Language*.
 
 ## Add a language
@@ -23,7 +25,8 @@ drop in a file and it shows up under *Settings > Language*.
    python3 tools/i18n_check.py fr
    ```
 
-   It must report `100%`, no missing keys and no errors (exit code 0).
+   It must report `100%`, no missing keys, no errors and no unused keys (exit code 0). `python3 tests/i18n_test.py`
+   checks every language at once (keys, unused keys, placeholders, plurals, HTML tags, `_meta`).
 5. Rebuild and run (`docker compose up -d --build`), open *Settings > Language* and pick your language.
    Click through the views (today, calendar, matrix, habits, focus, settings, a task's detail panel) and
    check that nothing is cut off or reads oddly.
@@ -50,7 +53,8 @@ Keys that start with `_` are settings, everything else is a translation.
 | Key | Meaning |
 |---|---|
 | `_meta.name` | Name of the language in the language itself, shown in the language selector (`Deutsch`, `Français`) |
-| `_meta.locale` | BCP 47 locale for number and date formatting by the browser (`de-DE`, `fr-FR`), used for full dates such as "created on ..." |
+| `_meta.locale` | BCP 47 locale for number and date formatting by the browser (`de-DE`, `fr-FR`), used for full dates such as "created on ...", the first day of the week and the plural rule |
+| `_meta.beta` | optional, `true` for a machine-translated or unreviewed file: the language pickers show a *Beta* mark |
 | `_weekdays`, `_weekdays_short` | 7 names, **starting with Sunday** (the order of JavaScript's `Date.getDay()`). The calendar still starts its weeks on Monday. |
 | `_months`, `_months_short` | 12 names, January first |
 | `_date_formats` | Patterns for the short date labels in task rows and the calendar, see below. A missing format falls back to English. |
@@ -81,7 +85,8 @@ Some values contain HTML (`<b>`, `<br>`, `<code>`): keep the tags, translate onl
 ### Plurals
 
 A value that is a list `[one, other]` is a plural. The app picks `one` when the number is exactly 1 and
-`other` for everything else (0, 2, 3, ...). The key is the English singular; `{0}` is always the number:
+`other` for everything else (0, 2, 3, ...); where the language's plural rule (the browser's `Intl.PluralRules` for
+`_meta.locale`) also uses the singular for 0, as French does, 0 takes `one` too (the server does the same for `fr`). The key is the English singular; `{0}` is always the number:
 
 ```json
 "{0} task today": ["{0} tâche aujourd'hui", "{0} tâches aujourd'hui"]
@@ -133,6 +138,8 @@ missing, removed ones as unused.
   a server setting because the push notifications are sent from there.
 - English needs no file: the keys are the English texts, English weekday / month names and date formats live
   in `static/i18n.js`.
+- Server-side number and date formats (pushes, CSV, public pages) use `short_day()`, `fmt_int()` and `dec_comma()` in
+  `app.py`; a new language with a decimal comma goes into `COMMA_LANGS` there.
 - The service worker precaches `de.json`; any other language file is cached on first use, and the app keeps
   the active one in `localStorage`, so the chosen language also works offline.
 

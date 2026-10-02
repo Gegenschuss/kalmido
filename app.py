@@ -838,6 +838,8 @@ MIGRATIONS = [
     ("list_members", "own_role", "ALTER TABLE list_members ADD COLUMN own_role TEXT"),
     ("list_members", "grole", "ALTER TABLE list_members ADD COLUMN grole TEXT"),
     ("tasks", "assignee_group_id", "ALTER TABLE tasks ADD COLUMN assignee_group_id INTEGER"),
+    # 2.11.0 (#440 follow-up): the day plan's slot "YYYY-MM-DDTHH:MM" (local); planning never touches due / deadline
+    ("tasks", "plan_start", "ALTER TABLE tasks ADD COLUMN plan_start TEXT"),
 ]
 INDEXES = """
 CREATE INDEX IF NOT EXISTS lists_owner ON lists(owner_id);
@@ -994,8 +996,8 @@ LANGS = load_languages()
 
 def languages():
     """[{code, name}] for the language selector, sorted by name."""
-    return sorted(({"code": k, "name": (v.get("_meta") or {}).get("name") or k} for k, v in LANGS.items()),
-                  key=lambda x: x["name"].casefold())
+    return sorted(({"code": k, "name": (v.get("_meta") or {}).get("name") or k, "beta": bool((v.get("_meta") or {}).get("beta"))}
+                   for k, v in LANGS.items()), key=lambda x: x["name"].casefold())  # 2.11.0: beta = machine-translated
 
 
 def lang(c=None, uid=None):
@@ -1037,11 +1039,48 @@ def tr(key, *a, lg=None):
     return s.format(*a) if a else s
 
 
+def plural_one(n, lg):
+    """The "one" form for n? 1 everywhere; 2.11.0: French also uses it for 0 (like the browser's Intl.PluralRules)."""
+    return n == 1 or (n == 0 and str(lg or "").split("-")[0] == "fr")
+
+
 def trn(one, other, n, *a, lg=None):
-    """Plural: one/other picked by n (n == 1 -> one); {0} = n, {1}.. = a."""
-    v = LANGS.get(lg or lang(), {}).get(one)
-    s = v[0 if n == 1 else 1] if isinstance(v, list) and len(v) == 2 else _key(one if n == 1 else other)
+    """Plural: one/other picked by n (n == 1 -> one; French: 0 and 1); {0} = n, {1}.. = a."""
+    lg = lg or lang()
+    v = LANGS.get(lg, {}).get(one)
+    s = v[0 if plural_one(n, lg) else 1] if isinstance(v, list) and len(v) == 2 else _key(one if n == 1 else other)
     return s.format(n, *a)
+
+
+# 2.11.0 (#439): number and short date formats of the server texts (pushes, CSV, public pages) per language
+COMMA_LANGS = ("de", "fr", "es", "it", "nl")  # decimal comma (and ";" as the CSV separator, as their spreadsheets expect)
+
+
+def lg_base(lg=None):
+    return str(lg or lang()).split("-")[0]
+
+
+def dec_comma(lg=None):
+    return lg_base(lg) in COMMA_LANGS
+
+
+def fmt_int(n, lg=None):
+    """12345 -> 12,345 (en) / 12.345 (de, es, it, nl) / 12 345 (fr, narrow no-break space)."""
+    s = f"{int(n or 0):,}"
+    b = lg_base(lg)
+    return s.replace(",", "\u202f") if b == "fr" else s.replace(",", ".") if b in COMMA_LANGS else s
+
+
+def short_day(d, lg=None, year=False):
+    """A date in pushes / public pages: 03.10. (de), 3 Oct (en), 3 oct. / 3 ott / 3 okt (the language's short month)."""
+    lg = lg or lang()
+    b = lg_base(lg)
+    if b == "de":
+        return d.strftime("%d.%m.%Y" if year else "%d.%m.")
+    mons = LANGS.get(lg, {}).get("_months_short")
+    if b == "en" or not (isinstance(mons, list) and len(mons) == 12):
+        return d.strftime("%d %b %Y" if year else "%d %b")
+    return f"{d.day} {mons[d.month - 1]}" + (f" {d.year}" if year else "")
 
 
 def now_utc():
@@ -1678,13 +1717,14 @@ class _Gate:
 GATE = _Gate()
 
 
-def _accept_lang():
-    """UI language from the browser (no database access: used while a restore runs)."""
+def _accept_lang(default="en"):
+    """UI language from the browser (no database access: used while a restore runs). Accept-Language in its order,
+    region dropped (fr-CA -> fr); 2.11.0: every language file counts (de, fr, es, it, nl)."""
     for part in (request.headers.get("Accept-Language") or "").split(","):
         code = part.split(";")[0].strip().lower()[:2]
         if code in LANGS:
             return code
-    return "en"
+    return default
 
 
 @app.before_request
@@ -1951,7 +1991,9 @@ def auth_info():
     """What the login screen needs (open): setup needed?, language, why a proxy login failed, the extra
     login buttons (OIDC provider, passkey)."""
     c = db()
-    return jsonify(setup=not c.execute("SELECT 1 FROM users").fetchone(), lang=lang(),
+    setup = not c.execute("SELECT 1 FROM users").fetchone()
+    # 2.11.0 (#439): before login the browser's language wins (first setup: else English; login: else the admin's)
+    return jsonify(setup=setup, lang=lang() if g.user else _accept_lang("en" if setup else lang()),
                    languages=languages(), user=user_public(g.user) if g.user else None,
                    auth_error=g.auth_error, login=g.proxy_login or proxy_login_value(),
                    oidc={"label": oidc_cfg(c)["label"]} if oidc_cfg(c)["on"] else None, passkey_login=gsetting(c, "passkey_login") != "0",
@@ -5614,7 +5656,8 @@ def section_delete(sid):
 TASK_FIELDS = ("list_id", "section_id", "parent_id", "title", "content", "priority",
                "due", "due_time", "reminders", "repeat", "repeat_from", "sort",
                "pinned", "start", "duration", "assignee_id", "url", "ttype", "deadline", "nag",
-               "assignee_group_id")  # 2.10.0 (#441): assigned to a group (whoever has time); excludes assignee_id
+               "assignee_group_id",  # 2.10.0 (#441): assigned to a group (whoever has time); excludes assignee_id
+               "plan_start")  # 2.11.0: planned start "YYYY-MM-DDTHH:MM" (day plan), independent of the due date
 # 2.4.0 (#340): ticket types of a task (API v1 / MCP / events: "type"); '' = none
 TICKET_TYPES = ("bug", "feature", "task")
 
@@ -5715,6 +5758,11 @@ def valid_date(v):
         return DATE_MIN_Y <= date.fromisoformat(v).year <= DATE_MAX_Y
     except ValueError:
         return False
+
+
+def valid_plan_start(v):
+    """2.11.0: a day plan slot, local "YYYY-MM-DDTHH:MM"."""
+    return isinstance(v, str) and len(v) == 16 and v[10] == "T" and valid_date(v[:10]) and valid_hm(v[11:])
 
 
 def valid_hm(v):
@@ -5870,7 +5918,7 @@ def clean_task(b):
     for k in TASK_FIELDS:
         if k in b:
             v = b[k]
-            if k in ("due", "due_time", "section_id", "parent_id", "start", "duration", "list_id") and v in ("", None):
+            if k in ("due", "due_time", "section_id", "parent_id", "start", "duration", "list_id", "plan_start") and v in ("", None):
                 v = None
             if k in ("assignee_id", "assignee_group_id") and v in ("", None, 0):
                 v = None
@@ -5894,6 +5942,8 @@ def clean_task(b):
                 raise BadInput(tr("Invalid value: {0}", tr("Date") if k == "due" else tr("Start|date")))
             if k == "due_time" and v is not None and not valid_hm(v):
                 raise BadInput(tr("Invalid value: {0}", tr("Time")))
+            if k == "plan_start" and v is not None and not valid_plan_start(v):
+                raise BadInput(tr("Invalid value: {0}", "plan_start"))
             if k == "duration" and v is not None:
                 v = as_int(v, tr("Duration"), 1, DURATION_MAX)
             if k == "reminders":
@@ -6677,7 +6727,7 @@ def do_complete(c, tid, status=2, undo=None):
     nxt = next_due(t) if status == 2 and (cnt is None or cnt > 1) else None
     if undo is not None:
         undo.update(op="complete", at=ts, status=t["status"], repeat=t["repeat"], due=t["due"], start=t["start"],
-                    reminded=t["reminded"], copy_id=None, kids=[])
+                    reminded=t["reminded"], copy_id=None, kids=[], plan_start=t["plan_start"])
     if status == 2 and t["repeat"] and not nxt:  # last repeat (COUNT used up / past UNTIL): done for good
         c.execute("UPDATE tasks SET repeat='' WHERE id=?", (tid,))
     if nxt:
@@ -6696,7 +6746,7 @@ def do_complete(c, tid, status=2, undo=None):
         start = t["start"]
         if start:  # timeline range moves along with the due date
             start = (date.fromisoformat(start) + (date.fromisoformat(nxt) - date.fromisoformat(t["due"]))).isoformat()
-        c.execute("UPDATE tasks SET due=?, start=?, reminded='[]', updated_at=? WHERE id=?", (nxt, start, ts, tid))
+        c.execute("UPDATE tasks SET due=?, start=?, plan_start=NULL, reminded='[]', updated_at=? WHERE id=?", (nxt, start, ts, tid))
         if cnt:
             c.execute("UPDATE tasks SET repeat=? WHERE id=?", (rr_with_count(t["repeat"], cnt - 1), tid))
         for d in descendants(c, tid):
@@ -6779,8 +6829,9 @@ def undo_status(c, tid, u):
             rem = json.dumps([str(x) for x in json.loads(u.get("reminded") or "[]")][-20:])
         except (ValueError, TypeError):
             return tr("unknown")
-        c.execute("UPDATE tasks SET due=?, start=?, repeat=?, reminded=?, updated_at=? WHERE id=?",
-                  (due, start, str(u.get("repeat") or "")[:500], rem, ts, tid))
+        ps = u.get("plan_start") if valid_plan_start(u.get("plan_start")) else None
+        c.execute("UPDATE tasks SET due=?, start=?, plan_start=?, repeat=?, reminded=?, updated_at=? WHERE id=?",
+                  (due, start, ps, str(u.get("repeat") or "")[:500], rem, ts, tid))
         for k in u.get("kids") or []:
             try:
                 d, st, cat, cby = int(k[0]), int(k[1]), when(k[2]), who(k[3])
@@ -6844,7 +6895,7 @@ def task_skip(tid):
     if start:
         start = (date.fromisoformat(start) + (date.fromisoformat(nxt) - date.fromisoformat(t["due"]))).isoformat()
     rep_new = rr_with_count(t["repeat"], cnt - 1) if cnt else t["repeat"]
-    c.execute("UPDATE tasks SET due=?, start=?, repeat=?, reminded='[]', updated_at=? WHERE id=?",
+    c.execute("UPDATE tasks SET due=?, start=?, plan_start=NULL, repeat=?, reminded='[]', updated_at=? WHERE id=?",
               (nxt, start, rep_new, iso(now_utc()), tid))
     log_act(c, tid, "skip", {"next": nxt})
     bump(c)
@@ -8269,7 +8320,7 @@ def comment_push_extra(t, lg):
 
 def push_day(due, due_time, lg):
     day = tr("today", lg=lg) if due == local_now().date().isoformat() else \
-        date.fromisoformat(due).strftime("%d.%m." if lg == "de" else "%d %b")
+        short_day(date.fromisoformat(due), lg)
     return day + (" " + due_time if due_time else "")
 
 
@@ -9613,7 +9664,7 @@ def time_csv():
     uid = me()
     rep = time_report(c, uid, dict(request.args))
     lg = lang()
-    de = lg == "de"
+    de = dec_comma(lg)  # 2.11.0: every decimal-comma language
     num = (lambda x: f"{x:.2f}".replace(".", ",")) if de else (lambda x: f"{x:.2f}")
     names = {l["id"]: l["name"] for l in rep["lists"]}
     buf = io.StringIO()
@@ -9662,7 +9713,7 @@ def _time_watch_one(c, r, users, S, LG, ref):
     seen = r["list_id"] is not None and list_role(c, r["list_id"], uid) and \
         (not r["task_id"] or task_visible(c, r["task_id"], uid, full=True))
     label = (r["t_title"] if seen else None) or r["task_title"] or tr("No task", lg=lg)
-    fnum = (lambda x: f"{x:.1f}".rstrip("0").rstrip(".").replace(".", "," if lg == "de" else "."))
+    fnum = (lambda x: f"{x:.1f}".rstrip("0").rstrip(".").replace(".", "," if dec_comma(lg) else "."))
     if stop_h > 0 and hrs >= stop_h:
         end = start + timedelta(hours=stop_h)
         n = c.execute("UPDATE time_entries SET end=?, seconds=?, auto_stopped=1, updated_at=? WHERE id=? AND end IS NULL",
@@ -15910,7 +15961,7 @@ def _wd_reminder(c, t, users, S, LG, now):
             continue  # 2.1.0 (#317): reminders can be switched off in the notification settings
         when = tr("all day", lg=lg) if not t["due_time"] else tr("at {0}", t["due_time"], lg=lg)
         day = tr("today", lg=lg) if t["due"] == now.date().isoformat() else \
-            date.fromisoformat(t["due"]).strftime("%d.%m." if lg == "de" else "%d %b")
+            short_day(date.fromisoformat(t["due"]), lg)
         lname = tr("Inbox", lg=lg) if t["list_inbox"] and t["list_name"] == "Eingang" else t["list_name"]
         notify(rcpt, t["title"], tr("Due {0} {1} · {2}", day, when, lname, lg=lg),
                push_prio(s, 4 if t["priority"] == 5 else None), f"{PUBLIC_URL}/#t/{t['id']}", s=s,
@@ -16009,7 +16060,7 @@ def _wd_nag(c, t, users, S, LG, now):
     _NAG_SENT[rcpt] = sent + [time.time()]
     when = tr("all day", lg=lg) if not t["due_time"] else tr("at {0}", t["due_time"], lg=lg)
     day = tr("today", lg=lg) if t["due"] == now.date().isoformat() else \
-        date.fromisoformat(t["due"]).strftime("%d.%m." if lg == "de" else "%d %b")
+        short_day(date.fromisoformat(t["due"]), lg)
     lname = tr("Inbox", lg=lg) if t["list_inbox"] and t["list_name"] == "Eingang" else t["list_name"]
     head = tr("Deadline", lg=lg) if t["deadline"] else tr("Still open", lg=lg)
     notify(rcpt, t["title"], tr("{0} · due {1} {2} · {3}", head, day, when, lname, lg=lg),
@@ -18867,7 +18918,8 @@ def task_core(r, tags, fields):
             # 2.7.0 (#412, #413): the due date is a deadline (+ on Today from the first reminder on), the nag interval
             "deadline": bool(r["deadline"]) if "deadline" in r.keys() else False,
             "deadline_in_today": (r["deadline"] == 2) if "deadline" in r.keys() else False,
-            "nag": (r["nag"] if "nag" in r.keys() else "") or ""}
+            "nag": (r["nag"] if "nag" in r.keys() else "") or "",
+            "plan_start": r["plan_start"] if "plan_start" in r.keys() else None}  # 2.11.0: day plan slot
 
 
 def waiting_of(r):
@@ -18895,7 +18947,7 @@ def task_for(c, row, uid):
 
 V1_TASK_IN = ("title", "notes", "list_id", "section_id", "parent_id", "priority", "due", "due_time", "start", "duration",
               "reminders", "repeat", "repeat_from", "url", "tags", "assignee_id", "pinned", "fields", "list_tags", "type",
-              "deadline", "deadline_in_today", "nag", "assignee_group_id")
+              "deadline", "deadline_in_today", "nag", "assignee_group_id", "plan_start")
 
 
 def v1_task_in(b, allowed=V1_TASK_IN):
@@ -19801,9 +19853,11 @@ def v1_task_take(tid):
 # person's subscribed calendars, their already timed tasks and their working hours (user settings work_start / work_end,
 # default 09:00-17:00) and puts their open tasks into the free slots (overdue / due today first, then deadlines, due date,
 # priority, short ones first; a task without a duration counts DAYPLAN_DEFAULT_MIN minutes). mode "day" plans today's
-# untimed tasks and proposes to move the ones that do not fit to the next working day; mode "fill" ("Fill free time")
-# only fills the remaining gaps from now on with tasks that are not planned for today yet. The plan is a preview: the web
-# app applies it as one undo step (due = the day, due_time = the slot, duration). With an agent the same structured input
+# untimed tasks and lists the ones that do not fit as "nofit" (nothing is moved); mode "fill" ("Fill free time") only
+# fills the remaining gaps from now on with tasks that are not planned for today yet. The plan is a preview: the web app
+# applies it as one undo step. 2.11.0: applying sets ONLY the planned start (tasks.plan_start = "day THH:MM") and the
+# duration; due date, due time and deadline are never changed. A task planned for the day counts as busy time
+# ("planned" in fixed). With an agent the same structured input
 # goes out as a proposal job (kind "dayplan", see docs/AGENTS.md); its answer shows in the same preview and only the person
 # applies it. Evening review: done / still open / moved today + a short plan for the next working day, as a card in Today
 # and (setting review_time, default off) one push at that time.
@@ -19913,10 +19967,11 @@ def dayplan_compute(c, uid, day, mode="day", now=None):
     rows = dayplan_tasks(c, uid, day)
     fixed, today, later = [], [], []
     for r in rows:
-        if r["due"] == ds and r["due_time"]:
-            a = _hm_min(r["due_time"], "00:00")
+        ps = r["plan_start"] if valid_plan_start(r["plan_start"]) else None
+        if (ps and ps[:10] == ds) or (r["due"] == ds and r["due_time"]):
+            a = _hm_min(ps[11:] if ps and ps[:10] == ds else r["due_time"], "00:00")
             b = min(1440, a + (r["duration"] or DAYPLAN_DEFAULT_MIN))
-            fixed.append(_dp_task(r, a, b, "fixed"))
+            fixed.append(_dp_task(r, a, b, "planned" if ps and ps[:10] == ds else "fixed"))
             busy.append((a, b))
         elif r["parent_id"] and not r["due"]:
             continue  # undated subtasks belong to their parent's work
@@ -19951,7 +20006,7 @@ def dayplan_compute(c, uid, day, mode="day", now=None):
                 f[0] = a + dur
                 return a
         return None
-    plan, defer = [], []
+    plan, nofit = [], []
     cands = ([] if mode == "fill" else [(r, True) for r in today]) + [(r, False) for r in later]
     for r, is_today in cands[:DAYPLAN_MAX_TASKS]:
         dur = min(r["duration"] or DAYPLAN_DEFAULT_MIN, w1 - w0)
@@ -19959,14 +20014,14 @@ def dayplan_compute(c, uid, day, mode="day", now=None):
         if a is not None:
             reason = ("overdue" if r["due"] < ds else "today") if is_today else ("deadline" if r["deadline"] else "due" if r["due"] else "priority")
             plan.append(_dp_task(r, a, a + dur, reason))
-        elif is_today:
-            defer.append({**_dp_task(r), "to": next_workday(max(day, now.date())).isoformat()})
+        elif is_today:  # 2.11.0: only listed ("does not fit today"), its dates stay as they are
+            nofit.append(_dp_task(r))
     plan.sort(key=lambda x: x["start"])
     free_min = sum(max(0, f[1] - -(-f[0] // DAYPLAN_STEP) * DAYPLAN_STEP) for f in free)
     return {"date": ds, "mode": mode, "work": {"start": _min_hm(w0), "end": _min_hm(w1) if w1 < 1440 else "24:00"},
             "from": _min_hm(start) if start < 1440 else "24:00", "default_duration": DAYPLAN_DEFAULT_MIN,
             "events": [{k: e[k] for k in ("title", "all_day", "start", "end")} for e in events],
-            "fixed": fixed, "plan": plan, "defer": defer, "free_min": free_min,
+            "fixed": fixed, "plan": plan, "nofit": nofit, "free_min": free_min,
             "open_today": len(today), "candidates": len(today) + len(later)}
 
 
@@ -19996,26 +20051,35 @@ def dayplan_get():
     return jsonify(dayplan_compute(c, me(), dayplan_day(request.args.get("date")), dayplan_mode(request.args.get("mode"))))
 
 
+def _dp_open(r, ds):
+    """A task the day plan may still place on day ds (not already timed or planned for it, no undated subtask)."""
+    if r["due"] == ds and r["due_time"]:
+        return False
+    if (r["plan_start"] or "")[:10] == ds:
+        return False
+    return not (r["parent_id"] and not r["due"])
+
+
 def dayplan_input(c, uid, day, mode):
     """The job input of a day plan proposal: exactly what the built-in planner looks at (and its plan as a hint)."""
     p = dayplan_compute(c, uid, day, mode)
-    rows = dayplan_tasks(c, uid, day)
     ds = day.isoformat()
-    tasks = [_dp_task(r) for r in rows if not (r["due"] == ds and r["due_time"])
-             and not (r["parent_id"] and not r["due"])][:DAYPLAN_MAX_TASKS]
-    for t, r in zip(tasks, [r for r in rows if not (r["due"] == ds and r["due_time"]) and not (r["parent_id"] and not r["due"])]):
+    rows = [r for r in dayplan_tasks(c, uid, day) if _dp_open(r, ds)][:DAYPLAN_MAX_TASKS]
+    tasks = [_dp_task(r) for r in rows]
+    for t, r in zip(tasks, rows):
         t["notes"] = (r["content"] or "")[:500]
     return {"date": ds, "mode": mode, "now": local_now().strftime("%Y-%m-%dT%H:%M"), "work": p["work"], "from": p["from"],
             "default_duration": DAYPLAN_DEFAULT_MIN, "events": p["events"], "fixed": p["fixed"], "tasks": tasks,
             "builtin": {"plan": [{"task_id": x["task_id"], "start": x["start"], "duration": x["duration"]} for x in p["plan"]],
-                        "defer": [{"task_id": x["task_id"], "to": x["to"]} for x in p["defer"]]}}
+                        "nofit": [x["task_id"] for x in p["nofit"]]}}
 
 
 def dayplan_validate(b, inp):
-    """An agent's day plan {summary, items: [{task_id, start, duration?}], defer: [{task_id, to}]} -> normalized."""
-    _p_keys(b, "", ("kind", "summary", "items", "defer"))
+    """An agent's day plan {summary, items: [{task_id, start, duration?}], nofit: [{task_id, note?}]} -> normalized.
+    2.11.0: a plan never moves dates; "defer" (2.10.0) is still accepted and read as nofit (its "to" is ignored)."""
+    _p_keys(b, "", ("kind", "summary", "items", "nofit", "defer"))
     ids = {t["task_id"] for t in inp.get("tasks", [])}
-    out, seen = {"items": [], "defer": []}, set()
+    out, seen = {"items": []}, set()
     for i, t in enumerate(_p_list(b.get("items"), "items", DAYPLAN_MAX_TASKS)):
         w = f"items[{i}]"
         _p_keys(t, w, ("task_id", "start", "duration", "note"))
@@ -20029,35 +20093,35 @@ def dayplan_validate(b, inp):
         dur = t.get("duration")
         dur = None if dur in (None, "") else _p_int(dur, w + ".duration", 5, 720)
         out["items"].append({"task_id": tid, "start": st, "duration": dur, "note": _p_str(t.get("note"), w + ".note", 300)})
-    for i, t in enumerate(_p_list(b.get("defer"), "defer", DAYPLAN_MAX_TASKS)):
-        w = f"defer[{i}]"
-        _p_keys(t, w, ("task_id", "to", "note"))
-        tid = _p_int(t.get("task_id"), w + ".task_id")
-        if tid not in ids or tid in seen:
-            raise BadInput(tr("Invalid value: {0}", w + ".task_id"))
-        seen.add(tid)
-        to = _p_date(t.get("to"), w + ".to")
-        if to and to < inp.get("date", ""):
-            raise BadInput(tr("Invalid value: {0}", w + ".to"))
-        out["defer"].append({"task_id": tid, "to": to, "note": _p_str(t.get("note"), w + ".note", 300)})
-    if not out["items"] and not out["defer"]:
+    out = {"items": out["items"], "nofit": []}
+    for name in ("nofit", "defer"):
+        for i, t in enumerate(_p_list(b.get(name), name, DAYPLAN_MAX_TASKS)):
+            w = f"{name}[{i}]"
+            _p_keys(t, w, ("task_id", "to", "note"))
+            tid = _p_int(t.get("task_id"), w + ".task_id")
+            if tid not in ids or tid in seen:
+                raise BadInput(tr("Invalid value: {0}", w + ".task_id"))
+            seen.add(tid)
+            out["nofit"].append({"task_id": tid, "note": _p_str(t.get("note"), w + ".note", 300)})
+    if not out["items"] and not out["nofit"]:
         raise BadInput(tr("Missing field: {0}", "items"))
     out["items"].sort(key=lambda x: x["start"])
     return out
 
 
 def dayplan_want(prop, inp, key, e):
-    """The task change of one selected entry (key = index into items, then defer) of a day plan proposal."""
-    items, defer = prop["items"], prop["defer"]
-    i = int(key.split(".")[0])
-    if i < len(items):
+    """The task change of one selected entry (key = index into items) of a day plan proposal: the planned start on the
+    plan's day and the duration. 2.11.0: never due / due_time / deadline; nofit entries change nothing."""
+    items = prop["items"]
+    try:
+        i = int(key.split(".")[0])
+    except ValueError:
+        return None, None
+    if 0 <= i < len(items):
         it = items[i]
         dur = e.get("duration", it["duration"]) or next((t["duration"] for t in inp.get("tasks", []) if t["task_id"] == it["task_id"]),
                                                         DAYPLAN_DEFAULT_MIN)
-        return it["task_id"], {"due": inp["date"], "due_time": e.get("time", it["start"]), "duration": dur}
-    if i - len(items) < len(defer):
-        it = defer[i - len(items)]
-        return it["task_id"], {"due": e.get("due", it["to"]), "due_time": None}
+        return it["task_id"], {"plan_start": f'{inp["date"]}T{e.get("time", it["start"])}', "duration": dur}
     return None, None
 
 
@@ -20153,8 +20217,8 @@ def dayplan_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "duration": {"type": "integer", "description": "Minutes (the task's duration, else the default)"},
         "estimated": {"type": "boolean", "description": "The task has no duration: the default was used"},
         "start": {"type": "string", "description": "HH:MM"}, "end": {"type": "string", "description": "HH:MM"},
-        "reason": {"type": "string", "enum": ["fixed", "overdue", "today", "deadline", "due", "priority"]},
-        "to": {"type": "string", "format": "date", "description": "defer: the suggested new due date"}}}
+        "reason": {"type": "string", "enum": ["fixed", "planned", "overdue", "today", "deadline", "due", "priority"],
+                   "description": "fixed = due at a time that day, planned = already planned for that day (plan_start)"}}}
     schemas["DayPlanSlot"] = slot
     schemas["DayPlan"] = {"type": "object", "properties": {
         "date": {"type": "string", "format": "date"}, "mode": {"type": "string", "enum": ["day", "fill"]},
@@ -20164,7 +20228,8 @@ def dayplan_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "events": {"type": "array", "items": {"type": "object", "properties": {"title": {"type": "string"}, "all_day": {"type": "boolean"},
                                                                                "start": nul("string"), "end": nul("string")}}},
         "fixed": {"type": "array", "items": ref("DayPlanSlot")}, "plan": {"type": "array", "items": ref("DayPlanSlot")},
-        "defer": {"type": "array", "items": ref("DayPlanSlot")}, "free_min": {"type": "integer"},
+        "nofit": {"type": "array", "items": ref("DayPlanSlot"), "description": "2.11.0: open tasks of the day that do not fit any more; "
+                  "listed only, their dates are not changed"}, "free_min": {"type": "integer"},
         "open_today": {"type": "integer"}, "candidates": {"type": "integer"}}}
     lst = {"type": "array", "items": {"type": "object", "properties": {"task_id": {"type": "integer"}, "title": {"type": "string"},
                                                                        "due": nul("string", format="date")}}}
@@ -20178,7 +20243,8 @@ def dayplan_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                                           {"type": "string", "enum": ["day", "fill"]})],
                                    desc="Free slots between the day's calendar events and timed tasks within the working hours, "
                                         "filled with open tasks (overdue / today first, then deadlines, due date, priority). "
-                                        "Nothing changes: apply it with PATCH /tasks/{id} (due, due_time, duration).")}
+                                        "Nothing changes: apply it with PATCH /tasks/{id} (plan_start = date + 'T' + start, "
+                                        "duration). Planning never changes due, due_time or deadline.")}
     paths["/dayplan/review"] = {"get": op("The daily review: done, open, moved today; a plan for the next working day", D,
                                           ok(ref("DayReview")) | errs("400"), [dq])}
 
@@ -20275,7 +20341,10 @@ def openapi_spec():
         "deadline_in_today": {"type": "boolean", "description": "2.7.0: a deadline that shows on Today from its first reminder on "
                               "(setting it true also sets deadline)"},
         "nag": {"type": "string", "enum": list(NAG_VALUES), "description": "2.7.0: repeat the reminder until done: 5 / 10 / 15 / 30 / 60 "
-                "minutes or 1d (daily), from the first reminder on; off = never; empty = the list's default"}}
+                "minutes or 1d (daily), from the first reminder on; off = never; empty = the list's default"},
+        "plan_start": nul("string", pattern="^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-2][0-9]:[0-5][0-9]$",
+                          description="2.11.0: planned start YYYY-MM-DDTHH:MM (local; set by the day plan, see /dayplan); "
+                                      "independent of due / deadline, which planning never changes; null = not planned")}
     task_in = {k: v for k, v in task_props.items() if k in V1_TASK_IN}
     task_in["priority"] = {"oneOf": [prio, {"type": "integer", "enum": list(PRIORITIES)}]}
     task_in["reminders"] = {"oneOf": [{"type": "array", "items": {"type": "integer"}}, {"type": "string"}]}
@@ -23384,9 +23453,7 @@ def prop_edit(kind, key, e, inp, prop):
             out["time"] = e["time"]
         if "duration" in e:
             out["duration"] = _p_int(e["duration"], "duration", 5, 720)
-        if "due" in e:
-            out["due"] = _p_date(e["due"], "due")
-        return out
+        return out  # 2.11.0: no "due" edit, a day plan never moves dates
     if "title" in e:
         out["title"] = _p_str(e["title"], "title", PROP_TITLE_MAX, True)
     if "due" in e:
@@ -23545,7 +23612,7 @@ def prop_run(c, j, sel, ed, extra):
                                             e.get("due", t["due"]), assignee_id=asg, sort=base + i))
         rec["list"] = lid
         return rec
-    if kind == "dayplan":  # 2.10.0 (#440): due / due_time / duration of the person's own tasks (undo like triage)
+    if kind == "dayplan":  # 2.10.0 (#440): planned start (2.11.0, never due / deadline) + duration of the person's own tasks
         for key in sel:
             tid, want = dayplan_want(prop, inp, key, edits.get(key, {}))
             if not tid or str(tid) in rec["changes"]:
@@ -24091,8 +24158,7 @@ def usage_fmt(v, metric, lg=None):
     """1234567 tokens -> "1,234,567 tokens" (German: 1.234.567 Tokens); cost -> "$1.23"."""
     if metric == "cost":
         return "$" + ("%.2f" % (v or 0))
-    n = f"{int(v or 0):,}"
-    return tr("{0} tokens", n.replace(",", ".") if (lg or lang()) == "de" else n, lg=lg)
+    return tr("{0} tokens", fmt_int(v, lg), lg=lg)
 
 
 def usage_block(c, aid):
@@ -24422,7 +24488,7 @@ def audit_dict(r, names):
 def audit_csv(rows, names, aid=None):
     lg = lang()
     buf = io.StringIO()
-    w = csv.writer(buf, delimiter=";" if lg == "de" else ",", lineterminator="\r\n")
+    w = csv.writer(buf, delimiter=";" if dec_comma(lg) else ",", lineterminator="\r\n")
     w.writerow([tr("Time"), tr("Agent"), tr("Method"), tr("Route"), tr("Status"), tr("Task"), tr("List"), tr("Duration (ms)")])
     for r in rows:
         w.writerow([parse_iso(r["at"]).astimezone(TZ).strftime("%Y-%m-%d %H:%M:%S"), _csv_cell(names.get(r["agent_id"], f"#{r['agent_id']}")),
@@ -24777,8 +24843,8 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                   "description": f"project: {{name, folder?, sections[], tasks[{{title, notes?, section?, due?, start?, priority?, subtasks[], "
                                  f"depends_on[]}}]}}; subtasks: {{items[{{title, notes?, due?, estimate?}}], dependencies[[a, b]]?}}; triage: "
                                  f"{{items[{{task_id, list_id?, section_id?, tags[], priority?, due?, rewrite_title?}}]}}; extract: {{tasks[{{title, "
-                                 f"notes?, assignee_id?, due?, section?}}]}}; dayplan (2.10.0): {{items[{{task_id, start (HH:MM), duration?, note?}}], defer[{{task_id, "
-                                 f"to (date) | null, note?}}]}} (task ids from input.tasks). At most {PROP_MAX_ITEMS} entries, {PROP_MAX_BYTES // 1024} KB."})},
+                                 f"notes?, assignee_id?, due?, section?}}]}}; dayplan (2.10.0): {{items[{{task_id, start (HH:MM), duration?, note?}}], nofit[{{task_id, "
+                                 f"note?}}]}} (2.11.0: applying sets plan_start + duration, never due dates; task ids from input.tasks). At most {PROP_MAX_ITEMS} entries, {PROP_MAX_BYTES // 1024} KB."})},
         "/agent/chats": {"get": op("Chat messages after a cursor", AG, ok(ref("ChatPage")) | errs("400", "403"),
                                    [q("since", "Message id", {"type": "integer"}), q("user_id", "One person", {"type": "integer"}), q("limit", "At most 500", {"type": "integer"})])},
         "/agent/typing": {"post": op(f"Typing dots in one person's chat for {AGENT_TYPING_S} s (2.4.1)", AG, ok({"type": "object"}) | errs("400", "403", "404"),
@@ -25031,7 +25097,7 @@ def pub_day(d, lg):
         return tr("today", lg=lg)
     if dd == t + timedelta(days=1):
         return tr("tomorrow", lg=lg)
-    return dd.strftime("%d.%m.%Y" if lg == "de" else "%d %b %Y")
+    return short_day(dd, lg, year=True)
 
 
 def pub_pw_page(token, lg, wrong=False):

@@ -41,10 +41,34 @@ test for what you change; security fixes need a regression test in `tests/securi
 
 ## Translations
 
-User-facing strings go through `tr('English text')` / `trn(one, other, n)` in `app.js` and `tr()` in
-`app.py`; every other language is one JSON file. `python3 tools/i18n_check.py` must report 100 % for every
-included language (German is maintained by the author; please add the German text if you can, otherwise say
-so in the pull request). Adding a language: see [TRANSLATING.md](TRANSLATING.md).
+Kalmido ships in English (the source), German (maintained by the author) and, since 2.11.0, French, Spanish, Italian
+and Dutch. Those four are machine-translated and marked *Beta* in the language picker, so **corrections from native
+speakers are very welcome**, from a single wrong word to a full review.
+
+How it works:
+
+- Every user-facing string in the code is English and is its own key: `tr('English text')` / `trn(one, other, n)` in
+  `static/app.js`, `tr()` / `trn()` in `app.py` (push notifications, e-mails, error messages, setup).
+- Every other language is one file `static/i18n/<code>.json` (`de.json`, `fr.json`, `es.json`, `it.json`, `nl.json`):
+  the English key on the left, the translation on the right. `_meta` holds the name shown in the picker, the locale
+  for dates and numbers and `"beta": true` for machine-translated files; `_weekdays`, `_months` and `_date_formats` set
+  the date labels. Details and the file format: [TRANSLATING.md](TRANSLATING.md).
+
+To **fix a translation**, edit the value in the language's JSON file (never the key) and open a pull request; a
+screenshot of where the text appears helps. To **add a language**, copy `de.json` to `<code>.json`, set `_meta`
+(with `"beta": true` until a native speaker has reviewed it) and translate every value.
+
+Check your change before the pull request:
+
+```sh
+python3 tools/i18n_check.py fr        # one language: 100 %, 0 missing, 0 errors, 0 unused
+python3 tests/i18n_test.py            # all languages: keys, unused keys, placeholders, plurals, HTML tags, _meta
+```
+
+When you change or add an English text in the code, every language file needs the new key (the checker lists it as
+missing); add the German text if you can, otherwise say so in the pull request and the maintainer fills the rest.
+A hosted translation platform (such as Weblate) may come later to make reviews easier; until then, pull requests
+and issues are the way.
 
 ## Code style
 

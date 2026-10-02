@@ -43,7 +43,7 @@ const CONTRAST = `(() => {
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v7[7-9]'/.test(SW), 'service worker cache v77 or newer (2.9.0: v78, 2.10.0: v79)');
+  check(/const CACHE = 'tasks-shell-v(?:7[7-9]|8[0-9])'/.test(SW), 'service worker cache v77 or newer (2.9.0: v78, 2.10.0: v79, 2.11.0: v80)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en', tour: 'done'});
@@ -126,8 +126,8 @@ const CONTRAST = `(() => {
   check(icn.filter(([, s]) => /class="d"/.test(s)).length >= 50, 'most icons carry the dot');
   const css = await (await fetch(B + 'static/app.css')).text();
   check(/svg\.i\{[^}]*stroke-width:1\.6/.test(css) && /svg\.i \.d\{fill:var\(--dot,var\(--accent\)\)/.test(css), 'CSS: 1.6 strokes, dot in the accent');
-  check(/--acc-l:#be185d/.test(css) && /--acc-d:#f472b6/.test(css), 'raspberry tokens');
-  check(d.documentElement.dataset.accent === 'raspberry', 'raspberry = default accent');
+  check(/--acc-l:#be185d/.test(css) && /--acc-d:#f472b6/.test(css), 'raspberry tokens (selectable since 2.11.0)');
+  check(d.documentElement.dataset.accent === 'violet', 'violet = default accent (2.11.0, #449)');
   // module gating: switched off -> gone from the sidebar
   await call('PATCH', '/api/settings', {features: 'kanban,collab,agents,comments,progress'});
   w.close();
@@ -137,9 +137,9 @@ const CONTRAST = `(() => {
   check(d.querySelector('#side [data-go="agents"]') && d.querySelector('#side .sset'), 'agents + settings still there');
   w.close();
   await call('PATCH', '/api/settings', {features: ALL});
-  // accent migration: mint (the old default) -> raspberry once; another colour stays
+  // accent migration: mint (the old default) -> the default once (2.11.0: violet); another colour stays
   w = await boot({user: 'alice', hash: 'today', ls: {'tasks.accent': '"mint"'}}); d = w.document;
-  check(d.documentElement.dataset.accent === 'raspberry' && !w.__store['tasks.accent'] && w.__store['tasks.accentMig280'] === '1', 'mint device migrates to raspberry');
+  check(d.documentElement.dataset.accent === 'violet' && !w.__store['tasks.accent'] && w.__store['tasks.accentMig280'] === '1', 'mint device migrates to the default (violet since 2.11.0)');
   w.close();
   w = await boot({user: 'alice', hash: 'today', ls: {'tasks.accent': '"mint"', 'tasks.accentMig280': '1'}}); d = w.document;
   check(d.documentElement.dataset.accent === 'mint', 'mint picked again after the migration stays');

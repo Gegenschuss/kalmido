@@ -5,7 +5,9 @@
 // sidebar group under Team and its view, "Take it" (panel button, menu) with undo; #440 Settings > General > Day planning,
 // Today's "Plan my day" / "Fill free time" (the timeline with events, fixed tasks, entries, "does not fit"; leaving an
 // entry out, Apply = one undo step), "Let an agent plan" (only with an online agent) and the agent's dayplan proposal in
-// the same timeline, the daily review card (counts, hide for today, #today/review), German texts, SW v79. Then Firefox
+// the same timeline, the daily review card (counts, hide for today, #today/review), German texts, SW v79. 2.11.0: Apply
+// sets only the planned start + duration (due dates untouched), "Does not fit today" is listed without a checkbox, the
+// planned slot as a row chip + in the task panel (Unplan, undo), a planned task shows in Today. Then Firefox
 // headless (ff.js): touch 360 x 780 / 390 x 844 and a mouse at 1280 x 800, dark + light: the planner, the review card, the
 // group settings and the share dialog without horizontal overflow, 44 px touch targets.
 const {execFileSync} = require('child_process');
@@ -30,7 +32,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v79'/.test(SW), 'service worker cache v79');
+  check(/const CACHE = 'tasks-shell-v(?:79|8[0-9])'/.test(SW), 'service worker cache v79');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', work_start: '08:00', work_end: '18:00'});
@@ -145,21 +147,41 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(rows.some(r => r.classList.contains('fixed') && /Standup/.test(r.textContent)), 'timeline: the timed task stays fixed');
   check(rows.some(r => r.classList.contains('plan') && /Write report/.test(r.textContent) && /08:30/.test(r.textContent)), 'timeline: the report right after the standup');
   check(rows.some(r => r.classList.contains('plan') && /Call supplier/.test(r.textContent) && /≈/.test(r.textContent)), 'no duration: estimated (≈ 30m)');
-  check(rows.some(r => r.classList.contains('defer') && /Huge migration/.test(r.textContent)), '"Does not fit any more": the 15 h task');
+  const nf = rows.find(r => r.classList.contains('nofit') && /Huge migration/.test(r.textContent));
+  check(nf && !nf.querySelector('.ppc') && /Does not fit today/.test(md.textContent), '"Does not fit today": the 15 h task, only listed (no checkbox)');
+  check(/due dates and deadlines stay as they are/.test(md.textContent), 'the hint says due dates stay');
   check(/working hours 08:00–18:00/.test(md.querySelector('.dpsum').textContent), 'summary with the working hours');
   check(!md.querySelector('[data-dp="agent"]'), 'no agent online: no "Let an agent plan"');
   const callRow = rows.find(r => /Call supplier/.test(r.textContent));
   callRow.querySelector('.ppc').checked = false;
   callRow.querySelector('.ppc').dispatchEvent(new w.Event('change', {bubbles: true}));
-  check(/Apply 2 entries/.test(md.querySelector('[data-dp="apply"]').textContent), 'leaving one out: Apply 2 entries');
+  check(/Apply 1 entry/.test(md.querySelector('[data-dp="apply"]').textContent), 'leaving one out: Apply 1 entry (nofit is not an entry)');
   click(w, md.querySelector('[data-dp="apply"]'));
-  check(await until(async () => (await call('GET', `/api/tasks/${A1}`)).due_time === '08:30'), 'applied: the report at 08:30');
-  check((await call('GET', `/api/tasks/${A2}`)).due_time === null, 'the left-out task is unchanged');
+  check(await until(async () => (await call('GET', `/api/tasks/${A1}`)).plan_start === TM + 'T08:30'), 'applied: the report planned at 08:30');
+  const a1 = await call('GET', `/api/tasks/${A1}`);
+  check(a1.due === TM && a1.due_time === null && a1.duration === 90, `due date + time untouched, duration kept (${a1.due} ${a1.due_time})`);
+  check((await call('GET', `/api/tasks/${A2}`)).plan_start === null, 'the left-out task is unchanged');
   const huge = await call('GET', `/api/tasks/${A3}`);
-  check(huge.due > TM, `the huge task moved to the next working day (${huge.due})`);
+  check(huge.due === TM && huge.plan_start === null, `the huge task is not moved (${huge.due})`);
   await sleep(300);
   w.eval("histStep('undo')");
-  check(await until(async () => (await call('GET', `/api/tasks/${A1}`)).due_time === null && (await call('GET', `/api/tasks/${A3}`)).due === TM), 'one undo takes the whole plan back');
+  check(await until(async () => (await call('GET', `/api/tasks/${A1}`)).plan_start === null), 'one undo takes the whole plan back');
+  w.close();
+  // a task planned for today: in Today (even when due later), the row chip, the panel line, Unplan (undo)
+  const LATER = await mk('Later report', {due: ds(new Date(Date.now() + 5 * 86400000)), duration: 30});
+  await call('PATCH', `/api/tasks/${LATER}`, {plan_start: ds(new Date()) + 'T23:30'});
+  w = await boot({user: 'alice'}); d = w.document;
+  const prow = await until(() => [...d.querySelectorAll('.trow')].find(r => /Later report/.test(r.textContent)));
+  check(prow && prow.querySelector('.pchip') && /23:30|11:30\s?PM/i.test(prow.querySelector('.pchip').textContent), 'Today: the planned task with its slot chip (locale time)');
+  w.openDetail(LATER); await sleep(400);
+  const dpl = d.querySelector('#detail .dplan');
+  check(dpl && /Planned: (23:30|11:30\s?PM)/i.test(dpl.textContent) && dpl.querySelector('[data-act="unplan"]'), 'panel: "Planned: 23:30" + Unplan');
+  click(w, dpl.querySelector('[data-act="unplan"]'));
+  check(await until(async () => (await call('GET', `/api/tasks/${LATER}`)).plan_start === null), 'Unplan clears the slot only');
+  check((await call('GET', `/api/tasks/${LATER}`)).due === ds(new Date(Date.now() + 5 * 86400000)), 'Unplan keeps the due date');
+  await sleep(300); w.eval("histStep('undo')");
+  check(await until(async () => (await call('GET', `/api/tasks/${LATER}`)).plan_start === ds(new Date()) + 'T23:30'), 'undo brings the slot back');
+  await call('DELETE', `/api/tasks/${LATER}`);
   w.close();
 
   // agent: online (never polled = cannot tell = offered), its dayplan proposal in the same timeline
@@ -178,10 +200,11 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(r.status === 201, `agent proposal accepted (${r.status})`);
   w.propOpen(job.id); await sleep(700);
   md = d.querySelector('.ppm');
-  check(md && md.querySelectorAll('.dprow.plan').length === 2 && md.querySelector('.dprow.fixed') && md.querySelector('.dprow.defer'), 'the proposal shows as the same timeline');
-  check(/Deep work first/.test(md.textContent) && /remove the date/.test(md.textContent), 'summary + "remove the date"');
+  check(md && md.querySelectorAll('.dprow.plan').length === 2 && md.querySelector('.dprow.fixed') && md.querySelector('.dprow.nofit'), 'the proposal shows as the same timeline');
+  check(/Deep work first/.test(md.textContent) && /Does not fit today/.test(md.textContent) && !md.querySelector('.dprow.nofit .ppc'), 'summary + "Does not fit today" (old defer answer, only listed)');
   click(w, md.querySelector('[data-pp="apply"]'));
-  check(await until(async () => (await call('GET', `/api/tasks/${A2}`)).due_time === '09:00'), 'applied as alice');
+  check(await until(async () => (await call('GET', `/api/tasks/${A2}`)).plan_start === TM + 'T09:00'), 'applied as alice (planned start)');
+  check((await call('GET', `/api/tasks/${A3}`)).due === TM && (await call('GET', `/api/tasks/${A2}`)).due === TM, 'no due date moved by the agent plan');
   w.close();
 
   // ================= the daily review card

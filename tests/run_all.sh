@@ -187,10 +187,13 @@ fresh; run p208_ui node p208_ui.js
 # 2.1.1 (#326): model usage of agents: reporting (validation, visibility), the agent's own view, the dashboard (admins / members /
 # participants, nameless for what the viewer cannot see), ai_usage on tasks, limits (soft alerts once per period, hard = 429
 # except usage / status, raising it, cost, month), the notification row (own container with the fake push service); then the
-# UI in jsdom; the Claude Code Stop hook against a stub API (no container)
+# UI in jsdom; the Claude Code Stop / SubagentStop hook against a stub API (no container)
        run p211_api "$PY" p211_api_test.py "$KALMIDO_TEST_DATA"
        run p211_ui node p211_ui.js "$KALMIDO_TEST_DATA"
        run usage_hook "$PY" usage_hook_test.py
+# 2.11.0 (#439): every translation file complete (100 % of the keys, none unused, placeholders, plurals, HTML tags,
+# _meta + beta marks) and the server's per-language number / date / plural helpers (no container)
+       run i18n "$PY" i18n_test.py
 # 2.1.2: transfer list ownership (#349: owner -> person, admin takeover of lists of agents / disabled users, history, News, the
 # token API) + agents' username / picture and the agents in the user list (#346); then the UI in jsdom
        run p212_api "$PY" p212_api_test.py "$KALMIDO_TEST_DATA"

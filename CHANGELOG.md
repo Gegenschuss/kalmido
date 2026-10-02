@@ -7,6 +7,36 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-10-02
+
+**In short:** Kalmido now speaks French, Spanish, Italian and Dutch (beta); planning your day never moves a due date;
+violet is the new default accent; usage reports include Claude Code subagents.
+
+### Added
+- **French, Spanish, Italian and Dutch** (#439, beta): the whole interface, push notifications, e-mail and server texts.
+  Machine-translated and marked *Beta* in the language pickers (*Settings > General > Language*, first-run setup);
+  corrections are welcome (see *Translations* in CONTRIBUTING.md). Dates, numbers and CSV exports follow the language
+  (decimal comma and `;` separator, short month names in pushes, weeks start on Monday), French uses the singular for
+  0 too. Before login the browser's language is used when Kalmido has it.
+- **Translation check** (`tests/i18n_test.py`): every language file has every key, no unused ones, the same
+  placeholders, plural shapes and HTML tags as the English text.
+- **Usage hook for subagents** (#448): `mcp/claude_usage_hook.py` also runs as a Claude Code `SubagentStop` hook and
+  reports each subagent's own transcript (`agent_transcript_path`) as a session of its own; the setup guides
+  (*Settings > Agents > Set up*, docs) show both hooks.
+
+### Changed
+- **The day plan never changes due dates** (#440): *Plan my day*, *Fill free time* and an agent's day plan set only the
+  planned start (new task field `plan_start`, date + time) and the duration. Due date, due time and deadline stay as
+  they are; tasks that do not fit are listed as *Does not fit today* instead of being moved. A planned task shows in
+  Today with its time, counts as busy for the next plan and can be unplanned in its panel. API: `GET /dayplan` returns
+  `nofit` instead of `defer`; a dayplan proposal takes `nofit` (an older `defer` answer is still accepted and only
+  listed). A repeating task's next occurrence starts unplanned.
+- **Violet is the default accent** (#449): devices that never picked a colour switch to violet; raspberry (the 2.8.0
+  default) and every other colour stay selectable, a colour you picked stays. Public list pages use violet too.
+
+### Fixed
+- The public list page's text size is in rem like the rest of the app.
+
 ## [2.10.0] - 2026-10-02
 
 **In short:** Groups for sharing lists and folders and for tasks "whoever has time"; "Plan my day" fills the free time
@@ -437,7 +467,8 @@ of people.
   multi-arch image (`ghcr.io/gegenschuss/kalmido`, linux/amd64 and linux/arm64), an installable web app that works
   offline, English and German.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.10.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.11.0...HEAD
+[2.11.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.11.0
 [2.10.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.10.0
 [2.9.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.9.0
 [2.8.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.8.0

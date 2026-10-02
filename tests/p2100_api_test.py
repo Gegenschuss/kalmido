@@ -10,9 +10,11 @@ move / delete, assigning a task to a group (list must be shared with it, person 
 "Assigned to me" via the API filter), "Take it" (members only, participants too), participant role via a group, CalDAV
 calendars of group lists, API v1 (groups, list groups, take) + OpenAPI;
 #440 day planning: working hours (validation), the built-in plan (free slots between calendar events and timed tasks,
-order, default duration, overflow deferred to the next working day, mode fill), the agent proposal of kind dayplan
+order, default duration, overflow listed as "does not fit today", mode fill), the agent proposal of kind dayplan
 (request, input, validation, apply as the person, undo / redo, only the person), the daily review (done / open / moved,
-tomorrow) and its push.
+tomorrow) and its push. 2.11.0: a day plan NEVER changes due / due_time / deadline: applying sets plan_start + duration
+only (web PATCH, proposal apply / undo / redo), planned tasks count as busy, a 2.10.0 "defer" answer is only listed,
+plan_start validation, the API field, a repeating task's next occurrence starts unplanned.
 usage: p2100_api_test.py <datadir>"""
 import json
 import os
@@ -116,6 +118,9 @@ class Api:
 
     def put(self, p, **k):
         return self.req("PUT", p, **k)
+
+    def patch(self, p, **k):
+        return self.req("PATCH", p, **k)
 
     def delete(self, p, **k):
         return self.req("DELETE", p, **k)
@@ -344,11 +349,12 @@ check(any(x["task_id"] == LO and x["estimated"] for x in p["plan"]), "the defaul
 check(slots.get(SOON) == ("11:00", "11:30"), f"then a task due soon, after the event: {slots.get(SOON)}")
 check(NODATE not in slots and BIG not in slots, "no backlog without priority; the 3 h task does not fit")
 nxt = D + timedelta(days=1)
-check([(x["task_id"], x["to"]) for x in p["defer"]] == [(BIG, nxt.isoformat())], f"the 3 h task is proposed for the next working day: {p['defer']}")
+check([x["task_id"] for x in p["nofit"]] == [BIG] and "to" not in p["nofit"][0] and "defer" not in p,
+      f"the 3 h task is only listed as not fitting (no new date): {p.get('nofit')}")
 ov = [(a, b) for a, b in sorted(slots.values())]
 check(all(ov[i][1] <= ov[i + 1][0] for i in range(len(ov) - 1)) and all("08:00" <= a and b <= "12:00" for a, b in ov), "no overlaps, inside the hours")
 f = A.get(B + "/api/dayplan", params={"date": DS, "mode": "fill"}).json()
-check({x["task_id"] for x in f["plan"]} == {SOON} and not f["defer"], f"fill: only tasks not planned for that day ({f['plan']})")
+check({x["task_id"] for x in f["plan"]} == {SOON} and not f["nofit"], f"fill: only tasks not planned for that day ({f['plan']})")
 check(A.get(B + "/api/dayplan", params={"date": "x"}).status_code == 400 and A.get(B + "/api/dayplan", params={"mode": "z"}).status_code == 400,
       "bad date / mode 400")
 check(Bo.get(B + "/api/dayplan", params={"date": DS}).json()["plan"] == [], "bob's plan holds none of alice's tasks")
@@ -372,24 +378,67 @@ check(ac.post(f"/agent/jobs/{J}/proposal", json={"kind": "dayplan", "items": [{"
 check(ac.post(f"/agent/jobs/{J}/proposal", json={"kind": "dayplan", "items": [{"task_id": HI, "start": "08:00", "x": 1}]}).status_code == 400,
       "unknown field 400")
 good = {"kind": "dayplan", "summary": "Focus first", "items": [{"task_id": LO, "start": "08:00"}, {"task_id": HI, "start": "11:00", "duration": 60}],
-        "defer": [{"task_id": BIG, "to": nxt.isoformat()}]}
+        "defer": [{"task_id": BIG, "to": nxt.isoformat()}]}  # 2.10.0 shape: still accepted, read as nofit
 r = ac.post(f"/agent/jobs/{J}/proposal", json=good)
 check(r.status_code == 201, f"agent proposal accepted ({r.status_code} {r.text[:200]})")
 check(ac.post(f"/agent/jobs/{J}/proposal", json=good).status_code in (200, 201), "the agent may replace it until it is applied")
 v = A.get(B + f"/api/proposals/{J}").json()
 check(v["state"] == "ready" and v["proposal"]["items"][0]["task_id"] == LO, "the person sees it (ready)")
+check(v["proposal"].get("nofit") == [{"task_id": BIG, "note": ""}] and "defer" not in v["proposal"], f"defer is read as nofit, without a date: {v['proposal']}")
+BEFORE = {i: A.get(B + f"/api/tasks/{i}").json() for i in (LO, HI, BIG)}
 check(Bo.post(B + f"/api/proposals/{J}/apply", json={"select": ["0"]}).status_code == 404, "another person cannot apply it")
 check(ac.post(f"/agent/jobs/{J}/approve").status_code in (400, 403, 404, 405, 409), "the agent cannot approve its own proposal")
 r = A.post(B + f"/api/proposals/{J}/apply", json={"select": ["0", "1", "2"], "edits": {"1": {"time": "11:00", "duration": 45}}})
-check(r.ok and r.json()["changed"] == 3, f"applied 3 changes ({r.text[:200]})")
+check(r.ok and r.json()["changed"] == 2, f"applied 2 changes; the nofit entry changes nothing ({r.text[:200]})")
 t = {i: A.get(B + f"/api/tasks/{i}").json() for i in (LO, HI, BIG)}
-check((t[LO]["due"], t[LO]["due_time"], t[LO]["duration"]) == (DS, "08:00", 30), f"Tidy desk 08:00, 30 min ({t[LO]['due_time']})")
-check((t[HI]["due_time"], t[HI]["duration"]) == ("11:00", 45), "Report 11:00 with the edited 45 min")
-check(t[BIG]["due"] == nxt.isoformat() and t[BIG]["due_time"] is None, "Big thing moved to the next working day")
+check((t[LO]["plan_start"], t[LO]["duration"]) == (DS + "T08:00", 30), f"Tidy desk planned 08:00, 30 min ({t[LO]['plan_start']})")
+check((t[HI]["plan_start"], t[HI]["duration"]) == (DS + "T11:00", 45), "Report planned 11:00 with the edited 45 min")
+check(all((t[i]["due"], t[i]["due_time"], t[i]["deadline"]) == (BEFORE[i]["due"], BEFORE[i]["due_time"], BEFORE[i]["deadline"]) for i in t),
+      "2.11.0: due date, due time and deadline of every task unchanged")
+check(t[BIG] == BEFORE[BIG], "Big thing (does not fit) completely unchanged")
 r = A.post(B + f"/api/proposals/{J}/undo")
 t = {i: A.get(B + f"/api/tasks/{i}").json() for i in (LO, HI, BIG)}
-check(r.ok and t[LO]["due_time"] is None and t[LO]["duration"] is None and t[HI]["duration"] == 60 and t[BIG]["due"] == DS, "undo: all back")
-check(A.post(B + f"/api/proposals/{J}/redo").ok and A.get(B + f"/api/tasks/{LO}").json()["due_time"] == "08:00", "redo")
+check(r.ok and t[LO]["plan_start"] is None and t[LO]["duration"] is None and t[HI]["duration"] == 60 and t[HI]["plan_start"] is None
+      and t[BIG]["due"] == DS, "undo: all back")
+check(A.post(B + f"/api/proposals/{J}/redo").ok and A.get(B + f"/api/tasks/{LO}").json()["plan_start"] == DS + "T08:00", "redo")
+t = A.get(B + f"/api/tasks/{LO}").json()
+check(t["due"] == DS and t["due_time"] is None, "redo: the due date still untouched")
+# planned tasks are busy time and no candidates any more; the rest of the day is planned around them
+p2 = A.get(B + "/api/dayplan", params={"date": DS}).json()
+fx = {x["task_id"]: (x["start"], x["reason"]) for x in p2["fixed"]}
+check(fx.get(LO) == ("08:00", "planned") and fx.get(HI) == ("11:00", "planned") and fx.get(FIX) == ("09:00", "fixed"),
+      f"planned tasks show as fixed 'planned' slots: {fx}")
+check(not {LO, HI} & {x["task_id"] for x in p2["plan"]}, "planned tasks are not offered again")
+s2 = sorted([(x["start"], x["end"]) for x in p2["plan"] + p2["fixed"]])
+check(all(s2[i][1] <= s2[i + 1][0] for i in range(len(s2) - 1)), f"no overlaps with planned slots: {s2}")
+A.post(B + f"/api/proposals/{J}/undo")
+# the web app's way: PATCH plan_start + duration; due stays; an overdue task keeps its old due date
+OVER = mk("Overdue report", due=(D - timedelta(days=2)).isoformat(), deadline=1)
+r = A.patch(B + f"/api/tasks/{OVER}", json={"plan_start": DS + "T08:30", "duration": 20})
+t = A.get(B + f"/api/tasks/{OVER}").json()
+check(r.ok and t["plan_start"] == DS + "T08:30" and t["due"] == (D - timedelta(days=2)).isoformat() and t["deadline"], f"PATCH plan_start: due + deadline kept ({t})")
+for bad in ("2026-13-01T08:00", DS + " 08:00", DS + "T25:00", DS, 5):
+    check(A.patch(B + f"/api/tasks/{OVER}", json={"plan_start": bad}).status_code == 400, f"plan_start {bad!r}: 400")
+check(A.patch(B + f"/api/tasks/{OVER}", json={"plan_start": ""}).ok and A.get(B + f"/api/tasks/{OVER}").json()["plan_start"] is None, "'' clears it")
+check(ta.patch(f"/tasks/{OVER}", json={"plan_start": DS + "T09:45"}).ok and ta.get(f"/tasks/{OVER}").json()["plan_start"] == DS + "T09:45",
+      "API v1: plan_start writable + readable")
+spec = ta.get("/openapi.json").json()
+check("plan_start" in spec["components"]["schemas"]["Task"]["properties"], "OpenAPI: Task.plan_start")
+check("nofit" in spec["components"]["schemas"]["DayPlan"]["properties"] and "defer" not in spec["components"]["schemas"]["DayPlan"]["properties"],
+      "OpenAPI: DayPlan.nofit")
+A.delete(B + f"/api/tasks/{OVER}")
+# a repeating task: the next occurrence starts unplanned
+REP = mk("Weekly review", due=DS, repeat="FREQ=WEEKLY")
+A.patch(B + f"/api/tasks/{REP}", json={"plan_start": DS + "T08:00"})
+r = A.post(B + f"/api/tasks/{REP}/complete", json={})
+t = A.get(B + f"/api/tasks/{REP}").json()
+check(r.ok and t["status"] == 0 and t["due"] > DS and t["plan_start"] is None, f"repeat: next occurrence unplanned ({t['due']}, {t['plan_start']})")
+u = r.json().get("undo")
+if u:
+    A.post(B + f"/api/tasks/{REP}/undo", json=u)
+    t = A.get(B + f"/api/tasks/{REP}").json()
+    check(t["due"] == DS and t["plan_start"] == DS + "T08:00", f"undo of the completion brings the plan back ({t['plan_start']})")
+A.delete(B + f"/api/tasks/{REP}")
 check(A.post(B + "/api/proposals", json={"agent_id": AG, "kind": "dayplan", "date": DS, "secret": 1}).status_code == 400, "unknown request field 400")
 
 # the daily review

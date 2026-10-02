@@ -11,19 +11,19 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 <p align="center"><img src="docs/today.png" alt="Today view with overdue and today's tasks, subtasks, tags and the list sidebar"></p>
 
-> **Language:** the interface is **English** by default, with **German** included (switch under *Settings > General > Language*); more languages are welcome, see [TRANSLATING.md](TRANSLATING.md). Kalmido = calm + the Japanese -do (道, “the way”, as in aikido or judo): the calm way of getting things done.
+> **Language:** the interface is **English** by default, with **German** included and **French, Spanish, Italian and Dutch** in beta (machine-translated, corrections welcome); switch under *Settings > General > Language*. More languages are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md#translations) and [TRANSLATING.md](TRANSLATING.md). Kalmido = calm + the Japanese -do (道, “the way”, as in aikido or judo): the calm way of getting things done.
 > Kalmido is an independent project and not affiliated with any other task app.
 
 ## What's new
 
+- **2.11.0** (2026-10-02): French, Spanish, Italian and Dutch (beta), a day plan that never moves due dates, violet as
+  the default accent, subagent usage in the Claude Code hook.
 - **2.10.0** (2026-10-02): Groups for sharing and "whoever has time" tasks, *Plan my day* between your appointments
   (built in or by an agent), an evening review, real client addresses behind a proxy.
 - **2.9.0** (2026-10-02): Your lists in Reminders, Thunderbird, Tasks.org and other CalDAV apps, both ways, with app
   passwords; OIDC sign-in set up in the settings.
 - **2.8.0** (2026-10-02): A new look: one sidebar with grouped navigation, a command bar, an agent band under the list
   header, ticket numbers in the rows, own icons and a raspberry accent, in light and dark.
-- **2.7.2** (2026-10-01): Personal agents with setup guides for Linux, macOS and Windows, reactions and delivery status in
-  the agent chat, clickable people, breadcrumbs in the task panel and "Show completed at the bottom" for every list.
 
 ## Why Kalmido
 
@@ -76,9 +76,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - Smart lists (inbox, the start view; today, tomorrow, next 7 days, now doable, all), combinable filters (list, date, priority, tag)
 - **Plan my day** (2.10.0): in Today, *Plan my day* puts your open tasks into the free time between the day's calendar
   events and timed tasks within your working hours (*Settings > General > Day planning*): overdue and due first, then
-  deadlines and priority, 30 minutes for a task without a duration; what does not fit is proposed for the next working
-  day. *Fill free time* only fills the gaps with tasks not planned yet. A timeline preview, leave out what you like, one
-  undo step. With an agent online, *Let an agent plan* asks it for the same plan as a proposal that you approve
+  deadlines and priority, 30 minutes for a task without a duration; what does not fit is listed as *does not fit
+  today*. *Fill free time* only fills the gaps with tasks not planned yet. A timeline preview, leave out what you like,
+  one undo step. Planning sets only a task's planned start and duration (2.11.0): **due dates, times and deadlines never
+  change**; planned tasks show in Today with their time and can be unplanned in the task panel. With an agent online, *Let an agent plan* asks it for the same plan as a proposal that you approve
 - **Daily review** (2.10.0): after your working hours Today shows what you finished, what is still open and what you
   moved, with a suggestion for the next working day; optionally as a push at a time you choose
 - **Now doable** (`g d`): what you can start right now: open, not waiting on another task, due today, overdue or
@@ -206,7 +207,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   models (admins: every agent; others: the agents and lists they share), the Agents view a compact card, the task panel
   *AI usage*. Per agent a soft limit (News + push to the admins at 80 % / 100 %) and a hard limit (its API calls get
   `429` until the next day / month or a higher limit). A Claude Code Stop hook ([mcp/claude_usage_hook.py](mcp/claude_usage_hook.py))
-  reports a session's usage by itself
+  reports a session's usage by itself, and as SubagentStop hook (2.11.0) the usage of its subagents too
 - **Activity log** (2.2.1): every API request an agent makes (route, status, task / list, duration; never content) in
   *Settings > Agents > Log* for admins, filtered by agent, status and day, event polling hidden by default, denied calls marked, CSV export;
   kept `KALMIDO_AUDIT_DAYS` days (default 90)
@@ -235,8 +236,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - Optional [Paperless-ngx](https://docs.paperless-ngx.com) integration: link documents to tasks, send attachments to Paperless
 - **Import from Todoist, Trello, Asana, Microsoft To Do, TickTick and any ICS / VTODO file** (Apple Reminders exports, Nextcloud Tasks, Thunderbird) with a preview, re-import without duplicates and undo ([Moving from other apps](#moving-from-other-apps)); export everything as JSON (incl. your time entries)
 - **REST API** with personal access tokens (`/api/v1`, OpenAPI 3.1) and signed **webhooks** for Home Assistant, n8n or your own scripts ([docs/API.md](docs/API.md))
-- **Appearance per device**: dark or light theme, compact or comfortable rows, font size from 90 to 125 % (the whole interface scales, not just the text), Geist, your system font or the low-vision friendly [Atkinson Hyperlegible](https://www.brailleinstitute.org/freefont/), and seven accent colors (raspberry by default) that all meet WCAG AA in both themes
-- English and German interface (translations are plain JSON files, [add yours](TRANSLATING.md))
+- **Appearance per device**: dark or light theme, compact or comfortable rows, font size from 90 to 125 % (the whole interface scales, not just the text), Geist, your system font or the low-vision friendly [Atkinson Hyperlegible](https://www.brailleinstitute.org/freefont/), and seven accent colors (violet by default) that all meet WCAG AA in both themes
+- English and German interface, French, Spanish, Italian and Dutch in beta (translations are plain JSON files, [fix or add yours](CONTRIBUTING.md#translations))
 
 | | | |
 |---|---|---|

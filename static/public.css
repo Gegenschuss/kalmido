@@ -2,13 +2,13 @@
 @font-face{font-family:"Geist";src:url("/static/fonts/Geist-Variable.woff2") format("woff2");font-weight:100 900;font-display:swap}
 @font-face{font-family:"Geist Mono";src:url("/static/fonts/GeistMono-Variable.woff2") format("woff2");font-weight:100 900;font-display:swap}
 :root{--bg:#0f1012;--bg2:#16171a;--bg3:#1e2024;--line:#212328;--line2:#2a2c31;--text:#eeeef0;--text2:#b8bbc2;--muted:#9497a0;
-  --accent:#f472b6;--ink:#2a0716;--p5:#e5776e;--p3:#d6a54a;--p1:#79a3dc;--danger:#ef7068;color-scheme:dark;
+  --accent:#a78bfa;--ink:#1a1033;--p5:#e5776e;--p3:#d6a54a;--p1:#79a3dc;--danger:#ef7068;color-scheme:dark;
   --sans:"Geist",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;--mono:"Geist Mono",ui-monospace,Menlo,Consolas,monospace}
 @media (prefers-color-scheme:light){:root{--bg:#ffffff;--bg2:#f8f8f9;--bg3:#efeff1;--line:#eeeef0;--line2:#e3e3e6;--text:#131418;
-  --text2:#464951;--muted:#60636c;--accent:#be185d;--ink:#fff;--p5:#b3372f;--p3:#97600b;--p1:#3565a8;--danger:#b3372f;color-scheme:light}}
+  --text2:#464951;--muted:#60636c;--accent:#6d4bd8;--ink:#fff;--p5:#b3372f;--p3:#97600b;--p1:#3565a8;--danger:#b3372f;color-scheme:light}}
 *{box-sizing:border-box}
 html{font-size:16px;-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+body{margin:0;background:var(--bg);color:var(--text);font:.9375rem/1.5 var(--sans);-webkit-font-smoothing:antialiased}
 main{max-width:40rem;margin:0 auto;padding:1.5rem 1rem 2rem}
 header{margin:0 0 1rem}
 h1{font-size:1.375rem;font-weight:600;margin:0 0 .25rem;overflow-wrap:anywhere}

@@ -12,10 +12,10 @@
 @font-face{font-family:"Atkinson Hyperlegible";src:url("/static/fonts/AtkinsonHyperlegible-Italic.woff2") format("woff2");font-weight:400;font-style:italic;font-display:swap}
 @font-face{font-family:"Atkinson Hyperlegible";src:url("/static/fonts/AtkinsonHyperlegible-BoldItalic.woff2") format("woff2");font-weight:700;font-style:italic;font-display:swap}
 :root{
-  /* 2.8.0 "Leitstand" (#434): neutral greys, raspberry accent, status colours for agents and work */
+  /* 2.8.0 "Leitstand" (#434): neutral greys, violet accent (2.11.0, was raspberry), status colours for agents and work */
   --bg:#0f1012;--bg2:#16171a;--bg3:#1e2024;--bg4:#2c2e33;--line:#212328;--line2:#2a2c31;
   --text:#eeeef0;--text2:#b8bbc2;--muted:#9497a0;--faint:#6b6e76;
-  --acc-d:#f472b6;--acc-ink-d:#2a0716;--acc-l:#be185d;--acc-ink-l:#ffffff;--accent:var(--acc-d);--accent-ink:var(--acc-ink-d);
+  --acc-d:#a78bfa;--acc-ink-d:#1a1033;--acc-l:#6d4bd8;--acc-ink-l:#ffffff;--accent:var(--acc-d);--accent-ink:var(--acc-ink-d);
   --accent-soft:color-mix(in srgb,var(--accent) 9%,var(--bg));
   --p5:#e5776e;--p3:#d6a54a;--p1:#79a3dc;--ok:#51cf66;--danger:#ef7068;
   --st-ready:#51cf66;--st-work:#4dabf7;--st-wait:#fcc419;--st-wait-t:#fcc419;--st-off:#8d9096;--st-err:#ef7068;--wait-soft:#2a2410;
@@ -34,10 +34,11 @@
 /* font per device; the mono details (dates, times, counters, tags, kbd) always stay Geist Mono */
 :root[data-font="system"]{--sans:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
 :root[data-font="atkinson"]{--sans:"Atkinson Hyperlegible",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
-/* accent per device (2.8.0: raspberry is the default in :root, mint has its own rule): dark value + ink (text on an accent fill), light value + ink; all pairs WCAG AA (>= 4.5:1)
+/* accent per device (2.11.0: violet is the default in :root; raspberry, the 2.8.0 default, and mint have their own rules): dark value + ink (text on an accent fill), light value + ink; all pairs WCAG AA (>= 4.5:1)
    against --bg/--bg2/--bg3 of their theme (tests/appearance_ui.js checks every combination) */
 :root[data-accent="mint"]{--acc-d:#2dd4bf;--acc-ink-d:#04201c;--acc-l:#0a766b;--acc-ink-l:#ffffff}
 :root[data-accent="sky"]{--acc-d:#38bdf8;--acc-ink-d:#03202e;--acc-l:#0b6aa2;--acc-ink-l:#ffffff}
+:root[data-accent="raspberry"]{--acc-d:#f472b6;--acc-ink-d:#2a0716;--acc-l:#be185d;--acc-ink-l:#ffffff}
 :root[data-accent="violet"]{--acc-d:#a78bfa;--acc-ink-d:#1a1033;--acc-l:#6d4bd8;--acc-ink-l:#ffffff}
 :root[data-accent="rose"]{--acc-d:#f472b6;--acc-ink-d:#2e0a1c;--acc-l:#b8306f;--acc-ink-l:#ffffff}
 :root[data-accent="orange"]{--acc-d:#fb923c;--acc-ink-d:#2a1203;--acc-l:#ad4c07;--acc-ink-l:#ffffff}
@@ -128,6 +129,10 @@ svg.i.up{transform:rotate(180deg)}
 .seg button{padding:.25rem .5625rem;border-radius:var(--r-s);color:var(--muted);font-size:var(--fs-m);display:inline-flex;align-items:center;gap:.3125rem}
 .seg button:hover{color:var(--text)}
 .seg button.on{background:var(--bg3);color:var(--text)}
+/* 2.11.0 (#439): six languages: the pickers wrap instead of overflowing; "Beta" mark of machine-translated ones */
+#s-lang,#su-lang{display:flex;flex-wrap:wrap;max-width:100%}
+#s-lang button,#su-lang button{min-height:2.75rem}
+.lbeta{font:500 var(--fs-xs) var(--mono);text-transform:uppercase;letter-spacing:.04em;color:var(--accent);border:1px solid currentColor;border-radius:var(--r-s);padding:0 .25rem;line-height:1.3}
 .kbtn{display:inline-flex;align-items:center;gap:.5rem;height:1.875rem;padding:0 .375rem 0 .625rem;border:1px solid var(--line2);border-radius:var(--radius);color:var(--muted);font-size:var(--fs-m);background:var(--bg)}
 .kbtn:hover{color:var(--text);border-color:var(--faint)}
 .kbtn kbd{background:transparent}
@@ -2730,6 +2735,12 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 .ddl .dlc.big.hot{background:color-mix(in srgb,var(--p5) 14%,var(--bg3))}
 .ddl .dnag{display:inline-flex;align-items:center;gap:.3125rem;font-size:var(--fs-s);color:var(--muted);background:none;border:0;padding:.1875rem .25rem;border-radius:var(--r-s);cursor:pointer}
 .ddl .dnag:hover{color:var(--text);background:var(--bg3)}
+/* 2.11.0: the day plan's slot of a task (detail line + row chip); never its due date */
+.dplan{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem .75rem;padding:0 1rem .375rem;font-size:var(--fs-s);color:var(--text2)}
+.dplan .dplt{min-width:0;overflow-wrap:anywhere}
+.dplan .linkbtn{min-height:2.75rem;padding:0 .25rem}
+.meta .pchip{display:inline-flex;align-items:center;gap:.1875rem;font:var(--fs-xs) var(--mono);font-variant-numeric:tabular-nums;color:var(--accent)}
+.meta .pchip b{font-weight:500}
 .qtol{min-width:0!important;margin:0 .25rem}
 @media (pointer:coarse){
   .remchips button{min-height:2.75rem;min-width:2.75rem}
@@ -3097,7 +3108,8 @@ button.gchip:hover{color:var(--text)}
 .dprow.event{background:var(--bg3);border-style:dashed;color:var(--text2)}
 .dprow.fixed{background:var(--bg3);color:var(--text2)}
 .dprow.plan{border-left:.1875rem solid var(--accent)}
-.dprow.defer{border-left:.1875rem solid var(--st-wait)}
+.dprow.nofit{border-left:.1875rem solid var(--st-wait);min-height:0;background:var(--bg3);color:var(--text2)}
+.dprow.nofit .dpt{position:static;width:auto;color:var(--faint)}
 .dprow.off{opacity:.55}
 .dprow .ppcl{align-self:flex-start}
 .dprow .ppc{width:1.125rem;height:1.125rem;margin-top:.125rem}

@@ -194,8 +194,9 @@ const LOOK = {
   fsize: [['m', N_('Normal'), 1], ['s', N_('Small'), .9], ['l', N_('Large'), 1.12], ['xl', N_('Extra large'), 1.25]],
   font: [['geist', 'Geist'], ['system', N_('System font')], ['atkinson', 'Atkinson Hyperlegible']],
   // [key, name, dark, light] (ink colours and the CSS variables live in app.css :root[data-accent=...])
-  // 2.8.0 (#434): raspberry is the default (first entry); mint (the old default) stays selectable
-  accent: [['raspberry', N_('Raspberry'), '#f472b6', '#be185d'], ['mint', N_('Mint'), '#2dd4bf', '#0a766b'], ['sky', N_('Sky'), '#38bdf8', '#0b6aa2'], ['violet', N_('Violet'), '#a78bfa', '#6d4bd8'],
+  // 2.11.0 (#449): violet is the default (first entry); raspberry (the 2.8.0 default) and mint (before) stay selectable.
+  // The default is never stored (lookSet null), so every device that never picked a colour gets violet; picked ones stay.
+  accent: [['violet', N_('Violet'), '#a78bfa', '#6d4bd8'], ['raspberry', N_('Raspberry'), '#f472b6', '#be185d'], ['mint', N_('Mint'), '#2dd4bf', '#0a766b'], ['sky', N_('Sky'), '#38bdf8', '#0b6aa2'],
     ['rose', N_('Rose'), '#f472b6', '#b8306f'], ['orange', N_('Orange'), '#fb923c', '#ad4c07'], ['lime', N_('Lime'), '#a3e635', '#4a7110']],
 };
 try { if (localStorage.getItem('tasks.accent') === '"amber"') localStorage.setItem('tasks.accent', '"orange"'); } catch { /* private mode */ }  // 1.1.3: Amber became Orange
@@ -1009,7 +1010,7 @@ function viewTasks() {
     return {open: m.filter(t => !t.parent_id || !ids.has(t.parent_id)), group, ...extra};
   };
   // 1.5.1: every view has its own "Show completed" (list "…" menu), so every view offers its completed tasks
-  if (k === 'today') return {...pick(t => ((t.due && t.due <= t0) || dlToday(t)) && !(t.blocked && hideBlockedToday()), 'date'), done: doneRecent.filter(t => t.due && t.due <= t0 && doneSince(t))};  // 2.7.0 (#412): deadlines from their first reminder
+  if (k === 'today') return {...pick(t => ((t.due && t.due <= t0) || dlToday(t) || planToday(t, t0)) && !(t.blocked && hideBlockedToday()), 'date'), done: doneRecent.filter(t => t.due && t.due <= t0 && doneSince(t))};  // 2.7.0 (#412): deadlines from their first reminder
   if (k === 'tomorrow') return {...pick(t => t.due === addDays(t0, 1), 'none'), done: doneRecent.filter(t => t.due === addDays(t0, 1))};
   if (k === 'week') return {...pick(t => t.due && t.due <= addDays(t0, 6), 'date'), done: doneRecent.filter(t => t.due && t.due <= addDays(t0, 6) && doneSince(t))};
   if (k === 'doable') return {...pick(t => doable(t, t0), 'none'), done: doneRecent.filter(t => doneSince(t) && mineTask(t) && !(t.due && t.due > t0))};
@@ -1053,11 +1054,19 @@ function mineTask(t) {
 // 2.10.0 (#441): "Assigned to me" = assigned to me or to one of my groups
 const mineAssigned = t => !!S.me && (t.assignee_id === S.me.id || myGroup(t.assignee_group_id));
 // a subtask without its own due date follows its open parent (an undated step of a later task is not doable yet)
+// 2.11.0: the day plan's slot of an open task (plan_start "YYYY-MM-DDTHH:MM") from today on, else null
+const planToday = (t, t0 = today()) => (t.plan_start || '').slice(0, 10) === t0;  // 2.11.0: Today also shows the day plan's tasks
+const planOf = t => t.status === 0 && /^\d{4}-\d\d-\d\dT\d\d:\d\d$/.test(t.plan_start || '') && t.plan_start.slice(0, 10) >= today() ? t.plan_start : null;
+const planLabel = (t, short) => { const p = planOf(t); if (!p) return ''; const d = p.slice(0, 10), hm = fmtTimeLoc(p.slice(11)), e = t.duration ? fmtTimeLoc(dpHm(Math.min(1439, dpMin(p.slice(11)) + t.duration))) : '';
+  return (d === today() ? '' : dayLabel(d) + ' ') + hm + (e && !short ? '–' + e : ''); };
 function doable(t, t0 = today()) {
+  if (t.status === 0 && planToday(t, t0) && mineTask(t) && !(t.blocked && dFor(t))) return true;  // 2.11.0: planned for today
   if (!(t.status === 0 && !(t.blocked && dFor(t)) && (!t.due || t.due <= t0) && !(t.start && t.start > t0) && mineTask(t))) return false;
   const p = t.parent_id && !t.due ? S.tasks.get(t.parent_id) : null;
   return !(p && p.status === 0 && !doable(p, t0));
 }
+// 2.11.0 (#439): a language in the pickers; machine-translated ones carry a "Beta" mark (_meta.beta in their file)
+const langName = L => esc(L.name) + (L.beta ? ` <span class="lbeta" title="${esc(tr('Machine-translated, corrections welcome'))}">${tr('Beta')}</span>` : '');
 const DATE_OPTS = [['overdue', N_('Overdue')], ['today', N_('Today')], ['tomorrow', N_('Tomorrow')], ['3d', N_('Next 3 days')], ['7d', N_('Next 7 days')], ['month', N_('This month')], ['later', N_('Later')], ['nodate', N_('No date')]];
 function dateMatch(t, d) {
   const t0 = today();
@@ -1168,7 +1177,7 @@ function groupRest(v, arr) {
   if (v.group === 'date') {
     const g = new Map();
     for (const t of arr) {
-      const key = !t.due ? 'zz' : t.due < t0 ? 'over' : t.due;
+      const key = S.route.key === 'today' && planToday(t, t0) && !(t.due && t.due < t0) ? t0 : !t.due ? 'zz' : t.due < t0 ? 'over' : t.due;  // 2.11.0: planned = today
       if (!g.has(key)) g.set(key, []);
       g.get(key).push(t);
     }
@@ -1323,8 +1332,8 @@ function counts() {
     if (mineAssigned(t)) c.assigned++;
     c.lists[t.list_id] = (c.lists[t.list_id] || 0) + 1;
     for (const g of new Set([...t.tags, ...(t.ltags || [])])) c.tags[g] = (c.tags[g] || 0) + 1;
+    if ((t.due && t.due <= t0 || dlToday(t) || planToday(t, t0)) && !(t.blocked && hideBlockedToday())) c.today++;  // 2.11.0: + planned for today
     if (!t.due) continue;
-    if ((t.due <= t0 || dlToday(t)) && !(t.blocked && hideBlockedToday())) c.today++;
     if (t.due < t0) c.over++;
     if (t.due === addDays(t0, 1)) c.tomorrow++;
     if (t.due <= addDays(t0, 6)) c.week++;
@@ -1701,6 +1710,7 @@ function taskRow(t, opts = {}) {
       time = {live, tip, txt: fmtDur(ta)};
     }
   }
+  if (planOf(t) && !opts.trash) meta.push(`<span class="pchip" title="${esc(tr('Planned: {0}', planLabel(t)))}">${ic('clock', 's')}<b>${esc(planLabel(t, true))}</b></span>`);  // 2.11.0
   if (t.code?.prs?.length && !opts.trash) meta.push(codeChip(t));  // 2.2.0 (#271)
   if (t.comment_count && cmtOn()) meta.push(`<span class="cmc ${t.unread ? 'unread' : ''}" title="${esc(t.unread ? trn('{0} new comment', '{0} new comments', t.unread) : trn('{0} comment', '{0} comments', t.comment_count))}">${ic('comment', 's')}${t.comment_count}</span>`);
   const ac = !opts.trash && t.id > 0 && acolOn(t.list_id);  // 1.10.0: assignee column (own cell, click = assign)
@@ -3797,6 +3807,7 @@ function renderDetail() {
       ${crumbsHtml(t, l, parent)}
       <div class="dtitle"><textarea id="d-title" rows="1" placeholder="${tr('Title')}" aria-label="${tr('Title')}" ${ro ? 'readonly' : ''}>${esc(t.title)}</textarea></div>
       ${!ck && t.due && (t.deadline || nagOf(t)) && t.status === 0 ? `<div class="ddl">${dlChip(t, 'big')}${nagOf(t) ? `<button type="button" class="dnag" data-act="date" data-id="${t.id}" title="${esc(tr('Change'))}">${ic('repeat', 's')}${esc(tr('Repeat reminder') + ': ' + nagLabel(nagOf(t)))}</button>` : ''}</div>` : ''}
+      ${!ck && planOf(t) ? `<div class="dplan">${ic('clock', 's')}<span class="dplt">${esc(tr('Planned: {0}', planLabel(t)))}</span>${ro ? '' : `<button type="button" class="linkbtn" data-act="unplan" data-id="${t.id}">${tr('Unplan')}</button>`}</div>` : ''}
       ${t.waiting_at && !ck ? waitBar(t, ro) : ''}
       <div class="md ${mdMode ? '' : 'hidden'} ${mdClamp ? 'clamp' : ''}" id="d-md" title="${tr('Click to edit')}">${mdMode ? mdMentions(renderMd(t.content), t) : ''}</div>
       ${mdLong ? `<button class="linkbtn mdmore" data-act="md-more" aria-expanded="${!mdClamp}">${mdClamp ? tr('Show more') : tr('Show less')}</button>` : ''}
@@ -4676,7 +4687,7 @@ function shiftUndo(before, t, msg) {
 // /api/tasks/batch, one transaction however many tasks it touches. Offline: a step whose operation still waits in the
 // outbox is taken out of the queue and the local state restored (never sent); otherwise task steps are queued like
 // any other change (the buttons show the pending state). Steps on lists that became view-only refuse.
-const UNDO_FIELDS = ['list_id', 'section_id', 'parent_id', 'due', 'due_time', 'start', 'duration', 'reminders', 'repeat', 'repeat_from', 'priority', 'pinned', 'assignee_id', 'ttype', 'deadline', 'nag', 'assignee_group_id'];  // 2.10.0: assignee_group_id  // 2.4.0: ttype (#340), 2.7.0: deadline, nag
+const UNDO_FIELDS = ['list_id', 'section_id', 'parent_id', 'due', 'due_time', 'start', 'duration', 'reminders', 'repeat', 'repeat_from', 'priority', 'pinned', 'assignee_id', 'ttype', 'deadline', 'nag', 'assignee_group_id', 'plan_start'];  // 2.11.0: plan_start  // 2.10.0: assignee_group_id  // 2.4.0: ttype (#340), 2.7.0: deadline, nag
 const HIST_FIELDS = [...UNDO_FIELDS, 'title', 'content', 'url', 'tags', 'fields'];
 const HIST_MAX = 30, HIST_MENU = 10;
 const HIST = {undo: [], redo: [], busy: false, group: null, gToast: null, toastE: null, sess: 0, ids: {}, secmap: new Map()};
@@ -4941,6 +4952,7 @@ function histLabel(b, a) {
   if (ch.length === 1 && has('pinned')) return a.pinned ? tr('Pinned {0}', n) : tr('Unpinned {0}', n);
   if (ch.length === 1 && has('url')) return tr('Link of {0}', n);
   if (ch.length === 1 && has('section_id')) return tr('Moved {0} to section {1}', n, secName(a.section_id));
+  if (has('plan_start') && !has('due')) return a.plan_start ? tr('Planned {0}', n) : tr('Unplanned {0}', n);  // 2.11.0
   if (has('due') || has('start') || has('due_time')) return a.due ? tr('Date of {0}: {1}', n, dayLabel(a.due)) : tr('Date of {0} removed', n);
   if (has('repeat') || has('repeat_from')) return tr('Repeat of {0}', n);
   if (has('reminders')) return tr('Reminder of {0}', n);
@@ -6644,7 +6656,7 @@ function settingsModal(focus) {
       <div class="navlist" id="s-tabbar"></div>
       <div class="row" style="margin-top:.5rem"><select id="s-tabadd" style="flex:1" aria-label="${tr('+ Add tab …')}"></select><button class="btn sm" data-m="tab-reset">${tr('Default')}</button></div>`,
     general: `<h4 id="s-lang-h">${tr('Language')}</h4>
-      <div class="row"><div class="seg" id="s-lang" role="group" aria-labelledby="s-lang-h">${(S.languages || []).map(({code, name}) => `<button data-lang-set="${esc(code)}" class="${(s.lang || 'en') === code ? 'on' : ''}">${esc(name)}</button>`).join('')}</div></div>
+      <div class="row"><div class="seg" id="s-lang" role="group" aria-labelledby="s-lang-h">${(S.languages || []).map(L => `<button data-lang-set="${esc(L.code)}" class="${(s.lang || 'en') === L.code ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div></div>
       ${hint(tr('Applies to all devices and to the notifications. Quick add always understands German and English.'))}
       <h4>${tr('Celebrations')}</h4>
       <div class="row"><label>${tr('Sloth')}</label>${chk('s-celebrate', s.celebrate !== '0', tr('Celebrate completions'))}</div>
@@ -8422,7 +8434,7 @@ async function setupChoices(el, logo) {
   const matches = k => all.every(x => picked.has(x) === !SETUP_PRESETS[k].off.includes(x));
   const draw = () => {
     el.innerHTML = `<div class="card setupcard">${logo}
-      <div class="seg" id="su-lang">${langs.map(({code, name}) => `<button type="button" data-su-lang="${esc(code)}" class="${code === lang ? 'on' : ''}">${esc(name)}</button>`).join('')}</div>
+      <div class="seg" id="su-lang">${langs.map(L => `<button type="button" data-su-lang="${esc(L.code)}" class="${L.code === lang ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div>
       <h3>${tr('What do you want to use?')}</h3>
       <p class="muted">${tr('Pick a start, untick what you do not need. Everything can be changed later in Settings.')}</p>
       <div class="supresets">${Object.entries(SETUP_PRESETS).map(([k, p]) => `<button type="button" class="supreset ${matches(k) ? 'on' : ''}" data-su-preset="${k}" aria-pressed="${matches(k)}"><b>${ic(p.icon, 's')}${tr(p.name)}</b><small class="muted">${tr(p.desc)}</small></button>`).join('')}</div>
@@ -9919,6 +9931,7 @@ document.addEventListener('click', async e => {
     case 'assign': e.stopPropagation(); assignMenu(a, id); break;
     case 'take': e.stopPropagation(); takeTask(id || S.sel); break;  // 2.10.0 (#441)
     case 'dayplan': dayplanModal(a.dataset.mode || 'day', a.dataset.day || today()); break;  // 2.10.0 (#440)
+    case 'unplan': patchUndoable(+a.dataset.id, {plan_start: null}, tr('Unplanned {0}', qn(String(taskById(+a.dataset.id)?.title || '').slice(0, 40)))); break;  // 2.11.0: the day plan's slot only
     case 'review-hide': LS.set('reviewHidden', today()); if (S.route.review) go('today'); else renderView(); break;
     case 'ck-uncheck': case 'ck-clear': {
       e.stopPropagation();
@@ -11996,7 +12009,7 @@ S.prop = null;
 function propKeys(v) {
   const p = v.proposal; if (!p) return [];
   if (v.kind === 'project') return p.tasks.flatMap((t, i) => [String(i), ...t.subtasks.map((s, k) => `${i}.${k}`)]);
-  if (v.kind === 'dayplan') return [...p.items, ...p.defer].map((x, i) => String(i));  // 2.10.0 (#440)
+  if (v.kind === 'dayplan') return p.items.map((x, i) => String(i));  // 2.10.0 (#440); 2.11.0: "does not fit" entries change nothing
   return (v.kind === 'extract' ? p.tasks : p.items).map((x, i) => String(i));
 }
 async function propOpen(jid) {
@@ -12105,7 +12118,7 @@ function propDraw() {
         <label class="ppshare"><input type="checkbox" id="pp-share"> ${tr('Share the new list with {0}', esc(v.agent.name))}</label>` : ''}
       <div class="ppbar"><button class="btn sm" data-pp="all">${tr('Select all')}</button><button class="btn sm" data-pp="none">${tr('Select none')}</button></div>
       <div class="ppl">${propItemsHtml()}</div>
-      <div class="shint">${v.kind === 'dayplan' ? tr('Applying sets the date, time and duration of the selected tasks as you; one step, undo takes it back.') : v.kind === 'triage' ? tr('Applying moves and changes the selected inbox items as you; one step, undo takes it back.') : tr('Applying creates the selected entries as you (you own them, the history names {0}); one step, undo takes it back.', esc(v.agent.name))}</div>`;
+      <div class="shint">${v.kind === 'dayplan' ? tr('Applying sets the planned start and duration of the selected tasks as you; due dates stay as they are. One step, undo takes it back.') : v.kind === 'triage' ? tr('Applying moves and changes the selected inbox items as you; one step, undo takes it back.') : tr('Applying creates the selected entries as you (you own them, the history names {0}); one step, undo takes it back.', esc(v.agent.name))}</div>`;
     // 2.5.2 (K03): the footer stays visible below the entries (sticky), with the count next to Apply
     foot = `<button class="btn danger" data-pp="discard">${tr('Discard')}</button><span class="spacer"></span><span class="muted ppcount ppfc"></span><button class="btn" data-pp="close">${tr('Close')}</button><button class="btn pri" data-pp="apply"></button>`;
   } else {
@@ -12147,9 +12160,10 @@ async function propDiscard() {
 // ------------------------------------------------------------------ 2.10.0 (#440): day planning
 // "Plan my day" / "Fill free time" in Today: the server's built-in planner (GET /api/dayplan) proposes slots between the
 // day's calendar events and timed tasks within the working hours; the preview shows them as a timeline, every entry can be
-// left out, "Apply" sets due / time / duration in one step (undo takes it back). With an agent that is online, "Let an
+// left out, "Apply" sets the planned start (plan_start) and the duration in one step (undo takes it back); 2.11.0: due
+// dates, times and deadlines never change, tasks that do not fit are only listed. With an agent that is online, "Let an
 // agent plan" sends the same input as a proposal (kind dayplan); its answer opens in the same timeline (proposal dialog).
-const DP_REASON = {overdue: N_('overdue'), today: N_('due today'), deadline: N_('deadline'), due: N_('due soon'), priority: N_('priority'), fixed: N_('fixed')};
+const DP_REASON = {overdue: N_('overdue'), today: N_('due today'), deadline: N_('deadline'), due: N_('due soon'), priority: N_('priority'), fixed: N_('fixed'), planned: N_('planned')};
 const dpMin = hm => { const [h, m] = String(hm || '0:0').split(':'); return +h * 60 + +m; };
 const dpHm = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 const dpAgents = () => (S.proposers || []).filter(a => a.online !== false && !a.limit_reached);
@@ -12162,20 +12176,20 @@ function dpTimeline(rows, defer, o = {}) {
   const hgt = d => `style="min-height:${Math.min(8, 2.75 + Math.max(0, (d || 30) - 30) / 30 * 0.75).toFixed(2)}rem"`;
   const item = r => {
     const on = !o.sel || o.sel.has(r.key);
-    if (r.kind === 'event' || r.kind === 'fixed') return `<div class="dprow ${r.kind}" ${hgt(dpMin(r.end) - dpMin(r.start))}><span class="dpt">${esc(r.start)}<small>${esc(r.end)}</small></span><span class="dpb">${ic(r.kind === 'event' ? 'cal' : 'lock', 's')}<span class="dpn">${esc(r.title)}</span><span class="muted dps">${r.kind === 'event' ? tr('Event') : tr('fixed')}</span></span></div>`;
+    if (r.kind === 'event' || r.kind === 'fixed') return `<div class="dprow ${r.kind}" ${hgt(dpMin(r.end) - dpMin(r.start))}><span class="dpt">${esc(r.start)}<small>${esc(r.end)}</small></span><span class="dpb">${ic(r.kind === 'event' ? 'cal' : 'lock', 's')}<span class="dpn">${esc(r.title)}</span><span class="muted dps">${r.kind === 'event' ? tr('Event') : tr(DP_REASON[r.reason] || 'fixed')}</span></span></div>`;
     return `<div class="dprow plan ppi ${on ? '' : 'off'}" data-k="${esc(r.key)}" ${hgt(r.duration)}><span class="dpt">${esc(r.start)}<small>${esc(r.end)}</small></span>
       <label class="ppcl"><input type="checkbox" class="ppc" ${on ? 'checked' : ''} aria-label="${esc(tr('Select {0}', r.title))}"></label>
       <span class="dpb"><span class="dpn">${esc(r.title)}</span><span class="muted dps">${esc(r.list || '')}${r.list ? ' · ' : ''}${r.estimated ? '≈ ' : ''}${esc(fmtH(r.duration))}${r.reason ? ' · ' + esc(tr(DP_REASON[r.reason] || r.reason)) : ''}${r.note ? ' · ' + esc(r.note) : ''}</span></span></div>`;
   };
-  const dfr = defer.map(r => { const on = !o.sel || o.sel.has(r.key); return `<div class="dprow defer ppi ${on ? '' : 'off'}" data-k="${esc(r.key)}"><span class="dpt">${ic('arrow', 's')}</span>
-    <label class="ppcl"><input type="checkbox" class="ppc" ${on ? 'checked' : ''} aria-label="${esc(tr('Select {0}', r.title))}"></label>
-    <span class="dpb"><span class="dpn">${esc(r.title)}</span><span class="muted dps">${r.to ? esc(tr('move to {0}', fmtDayAbs(r.to))) : esc(tr('remove the date'))}${r.note ? ' · ' + esc(r.note) : ''}</span></span></div>`; }).join('');
+  // 2.11.0: what does not fit is only listed (no checkbox): its due date, time and deadline stay as they are
+  const dfr = defer.map(r => `<div class="dprow nofit"><span class="dpt">${ic('clock', 's')}</span>
+    <span class="dpb"><span class="dpn">${esc(r.title)}</span><span class="muted dps">${[r.due ? tr('Due: {0}', fmtDayAbs(r.due)) : '', r.note || ''].filter(Boolean).map(esc).join(' · ')}</span></span></div>`).join('');
   const all = rows.slice().sort((a, b) => dpMin(a.start) - dpMin(b.start) || (a.kind === 'plan') - (b.kind === 'plan'));
   return `<div class="dptl">${all.map(item).join('') || `<div class="muted mhint">${tr('Nothing to plan: no open tasks fit into the free time.')}</div>`}</div>
-    ${dfr ? `<h4 class="dph">${tr('Does not fit any more')}</h4><div class="dptl">${dfr}</div>` : ''}`;
+    ${dfr ? `<h4 class="dph">${tr('Does not fit today')}</h4><div class="dptl">${dfr}</div>` : ''}`;
 }
 const dpRowsOf = p => [...p.events.filter(e => !e.all_day).map(e => ({kind: 'event', start: e.start, end: e.end, title: e.title})),
-  ...p.fixed.map(t => ({kind: 'fixed', start: t.start, end: t.end, title: t.title}))];
+  ...p.fixed.map(t => ({kind: 'fixed', start: t.start, end: t.end, title: t.title, reason: t.reason}))];
 async function dayplanModal(mode = 'day', day = today()) {
   $('.dpm')?.remove();
   const md = modal(`<div class="calerr" id="dp-err" hidden></div><div class="muted mhint">${tr('Loading…')}</div>`);
@@ -12184,7 +12198,7 @@ async function dayplanModal(mode = 'day', day = today()) {
   const draw = () => {
     const p = st.p; if (!p || !md.isConnected) return;
     const rows = [...dpRowsOf(p), ...p.plan.map((t, i) => ({...t, kind: 'plan', key: String(i)}))];
-    const defer = p.defer.map((t, i) => ({...t, key: 'd' + i}));
+    const defer = p.nofit || [];
     const ev = p.events.filter(e => !e.all_day).length, allDay = p.events.filter(e => e.all_day);
     const ags = dpAgents(), n = st.sel.size;
     md.querySelector('.card').innerHTML = `<div class="lhdr"><h3>${st.mode === 'fill' ? tr('Fill free time') : tr('Plan my day')}</h3><span class="spacer"></span><button class="iconbtn" data-dp="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
@@ -12193,12 +12207,12 @@ async function dayplanModal(mode = 'day', day = today()) {
       <div class="dpsum muted">${esc(tr('{0}, working hours {1}–{2}', fmtDayAbs(p.date), p.work.start, p.work.end))} · ${esc(trn('{0} event', '{0} events', ev))} · ${esc(tr('{0} free', fmtH(p.free_min)))}${allDay.length ? ' · ' + esc(tr('all day: {0}', allDay.map(e => e.title).join(', '))) : ''}</div>
       <div class="calerr" id="dp-err" hidden></div>
       ${dpTimeline(rows, defer, {sel: st.sel})}
-      <div class="shint">${tr('Applying sets the date, time and duration of the selected tasks (a task without a duration gets {0} minutes); one step, undo takes it back.', p.default_duration)}</div>
+      <div class="shint">${tr('Applying sets the planned start and duration of the selected tasks (a task without a duration gets {0} minutes); due dates and deadlines stay as they are. One step, undo takes it back.', p.default_duration)}</div>
       <div class="foot ppfoot">${ags.length ? `<button class="btn" data-dp="agent">${ic('bot', 's')} ${tr('Let an agent plan')}</button>` : ''}<span class="spacer"></span><button class="btn" data-dp="close">${tr('Cancel')}</button><button class="btn pri" data-dp="apply" ${n ? '' : 'disabled'}>${ic('check', 's')} ${esc(trn('Apply {0} entry', 'Apply {0} entries', n))}</button></div>`;
   };
   const fetchPlan = async () => {
     try { st.p = await calReq('GET', `/api/dayplan?date=${st.day}&mode=${st.mode}`); } catch (x) { const e = $('#dp-err', md); if (e) { e.textContent = x.message; e.hidden = false; } return; }
-    st.sel = new Set([...st.p.plan.map((x, i) => String(i)), ...st.p.defer.map((x, i) => 'd' + i)]);
+    st.sel = new Set(st.p.plan.map((x, i) => String(i)));
     draw();
   };
   md.addEventListener('change', e => {
@@ -12216,15 +12230,14 @@ async function dayplanModal(mode = 'day', day = today()) {
     if (a === 'agent') { dpAskAgent(b, st.day, st.mode, md); return; }
     if (a === 'apply') {
       const p = st.p, items = [];
-      p.plan.forEach((t, i) => { if (st.sel.has(String(i))) items.push([t.task_id, {due: p.date, due_time: t.start, duration: t.duration}]); });
-      p.defer.forEach((t, i) => { if (st.sel.has('d' + i)) items.push([t.task_id, {due: t.to, due_time: null}]); });
+      p.plan.forEach((t, i) => { if (st.sel.has(String(i))) items.push([t.task_id, {plan_start: `${p.date}T${t.start}`, duration: t.duration}]); });
       b.disabled = true;
       if (await dpApply(items, st.mode === 'fill' ? tr('Filled free time') : tr('Planned the day'))) md.remove(); else b.disabled = false;
     }
   });
   fetchPlan();
 }
-// applies [[task id, {due, due_time, duration?}]] as ONE history step (batch patch_each; undo sets the old values back)
+// applies [[task id, {plan_start, duration}]] as ONE history step (batch patch_each; undo sets the old values back)
 async function dpApply(items, label) {
   const pairs = [], data = {};
   for (const [id, v] of items) {
@@ -12252,13 +12265,13 @@ async function dpAskAgent(anchor, day, mode, md) {
   };
   if (ags.length === 1) ask(ags[0]); else menu(anchor, ags.map(a => ({label: a.name, icon: 'bot', fn: () => ask(a)})));
 }
-// the dayplan proposal of an agent in the proposal dialog: the same timeline (keys = index into items, then defer)
+// the dayplan proposal of an agent in the proposal dialog: the same timeline (keys = index into items; nofit only listed)
 function propDayplanHtml() {
   const {v} = S.prop, p = v.proposal, inp = v.input, tk = id => (inp.tasks || []).find(t => t.task_id === id) || {};
   const plan = p.items.map((x, i) => { const t = tk(x.task_id), d = x.duration || t.duration || inp.default_duration || 30, e = S.prop.ed[String(i)] || {};
     const st = e.time || x.start, du = e.duration || d;
     return {kind: 'plan', key: String(i), start: st, end: dpHm(Math.min(1439, dpMin(st) + du)), title: t.title || '?', list: t.list, duration: du, estimated: !x.duration && t.estimated, note: x.note}; });
-  const defer = p.defer.map((x, i) => ({key: String(p.items.length + i), title: tk(x.task_id).title || '?', to: x.to, note: x.note}));
+  const defer = (p.nofit || p.defer || []).map(x => ({title: tk(x.task_id).title || '?', due: tk(x.task_id).due, note: x.note}));
   const fake = {events: inp.events || [], fixed: inp.fixed || []};
   return `<div class="dpsum muted">${esc(tr('{0}, working hours {1}–{2}', fmtDayAbs(inp.date), inp.work?.start || '', inp.work?.end || ''))}</div>` + dpTimeline([...dpRowsOf(fake), ...plan], defer, {sel: S.prop.sel});
 }
@@ -12522,12 +12535,12 @@ const AG_HEADLESS = 'Read CLAUDE.md. Then loop: call the kalmido tool wait_for_e
 const AG_S = {
   create: [N_('Create the agent'), N_('Settings > Agents > Status > Add agent. Copy the token: it is shown only once. In its dialog set usage limits and the runtime (model, auto-compact, nightly restart).'), ''],
   share: [N_('Share lists'), N_('Settings > Agents > Lists: one click per list, or “Share all existing lists”. Share only what it should work in.'), ''],
-  rules: [N_('Rules and permissions'), N_('CLAUDE.md names who may instruct it; everything else is data. .claude/settings.json: defaultMode dontAsk, only the Kalmido tools allowed, the env file denied, the usage hook as Stop hook.'), ''],
+  rules: [N_('Rules and permissions'), N_('CLAUDE.md names who may instruct it; everything else is data. .claude/settings.json: defaultMode dontAsk, only the Kalmido tools allowed, the env file denied, the usage hook as Stop and SubagentStop hook.'), ''],
   test: [N_('Test'), N_('Mention it in a comment, write to it in the chat, pause it (it has to stop) and try the prompt-injection cases from the guide.'), ''],
   ownAllowed: [N_('Allowed on this server?'), N_('An admin has to switch on “Users may create their own agents” (Settings > Agents > Set up). Without it, “Create agent” is missing: ask an admin.'), ''],
   ownCreate: [N_('Create your agent'), N_('Settings > Agents > Set up > Your personal agents: a username, then “Create agent”. Copy the token: it is shown only once. Only you can share lists with it and chat with it.'), ''],
   ownShare: [N_('Share only what it should see'), N_('Settings > Agents > Lists or a list’s Share dialog. It sees nothing else.'), ''],
-  ownRules: [N_('Rules and permissions'), N_('CLAUDE.md: only you instruct it. .claude/settings.json: defaultMode dontAsk, only the Kalmido tools allowed, the env file denied, the usage hook as Stop hook.'), ''],
+  ownRules: [N_('Rules and permissions'), N_('CLAUDE.md: only you instruct it. .claude/settings.json: defaultMode dontAsk, only the Kalmido tools allowed, the env file denied, the usage hook as Stop and SubagentStop hook.'), ''],
   ownRun: [N_('Run it'), N_('Interactively: claude in the work directory. In the background: the launcher (dry run first with --once). Pause it any time in Settings > Agents.'), '']
 };
 const AG_GUIDES = {
@@ -12561,17 +12574,17 @@ const AG_GUIDES = {
     linux: [AG_S.ownAllowed, AG_S.ownCreate,
       [N_('Install Claude Code and the MCP server'), N_('Log in to Claude Code once. Put the token into an env file only you can read; a small wrapper starts the MCP server with it.'), 'curl -fsSL https://claude.ai/install.sh | bash\ngit clone --depth 1 https://github.com/Gegenschuss/kalmido.git ~/kalmido\nmkdir -p ~/.config/kalmido ~/agent && (umask 077; nano ~/.config/kalmido/agent.env)\ncd ~/agent && claude mcp add -s local kalmido -- "$HOME/kalmido/mcp/run.sh"'],
       AG_S.ownShare, AG_S.ownRules,
-      [N_('Usage hook'), N_('In .claude/settings.json as Stop hook: reports token usage to Kalmido, never text.'), 'python3 ~/kalmido/mcp/claude_usage_hook.py ~/.config/kalmido/agent.env'],
+      [N_('Usage hook'), N_('In .claude/settings.json as Stop and SubagentStop hook (the same command): reports token usage to Kalmido, subagents included, never text.'), 'python3 ~/kalmido/mcp/claude_usage_hook.py ~/.config/kalmido/agent.env'],
       [AG_S.ownRun[0], AG_S.ownRun[1], '~/kalmido/mcp/agent_launcher.sh -e ~/.config/kalmido/agent.env --once']],
     mac: [AG_S.ownAllowed, AG_S.ownCreate,
       [N_('Install Claude Code and the MCP server'), N_('Log in to Claude Code once. Put the token into an env file only you can read; a small wrapper starts the MCP server with it.'), 'curl -fsSL https://claude.ai/install.sh | bash\nxcode-select --install\ngit clone --depth 1 https://github.com/Gegenschuss/kalmido.git ~/kalmido\nmkdir -p ~/.config/kalmido ~/agent && (umask 077; nano ~/.config/kalmido/agent.env)\ncd ~/agent && claude mcp add -s local kalmido -- "$HOME/kalmido/mcp/run.sh"'],
       AG_S.ownShare, AG_S.ownRules,
-      [N_('Usage hook'), N_('In .claude/settings.json as Stop hook: reports token usage to Kalmido, never text.'), 'python3 ~/kalmido/mcp/claude_usage_hook.py ~/.config/kalmido/agent.env'],
+      [N_('Usage hook'), N_('In .claude/settings.json as Stop and SubagentStop hook (the same command): reports token usage to Kalmido, subagents included, never text.'), 'python3 ~/kalmido/mcp/claude_usage_hook.py ~/.config/kalmido/agent.env'],
       [AG_S.ownRun[0], AG_S.ownRun[1], 'brew install --cask powershell\npwsh -File ~/kalmido/mcp/agent_launcher.ps1 -e ~/.config/kalmido/agent.env --once']],
     win: [AG_S.ownAllowed, AG_S.ownCreate,
       [N_('Install Claude Code and the MCP server'), N_('Log in to Claude Code once. Put the token into an env file only you can read; the wrapper run.ps1 starts the MCP server with it.'), 'winget install Python.Python.3.12 Git.Git Microsoft.PowerShell\nirm https://claude.ai/install.ps1 | iex\ngit clone --depth 1 https://github.com/Gegenschuss/kalmido.git $HOME\\kalmido\nnotepad $HOME\\.config\\kalmido\\agent.env\ncd $HOME\\agent; claude mcp add -s local kalmido -- pwsh -NoProfile -File "$HOME\\kalmido\\mcp\\run.ps1"'],
       AG_S.ownShare, AG_S.ownRules,
-      [N_('Usage hook'), N_('In .claude/settings.json as Stop hook: reports token usage to Kalmido, never text.'), 'python C:/Users/<you>/kalmido/mcp/claude_usage_hook.py C:/Users/<you>/.config/kalmido/agent.env'],
+      [N_('Usage hook'), N_('In .claude/settings.json as Stop and SubagentStop hook (the same command): reports token usage to Kalmido, subagents included, never text.'), 'python C:/Users/<you>/kalmido/mcp/claude_usage_hook.py C:/Users/<you>/.config/kalmido/agent.env'],
       [AG_S.ownRun[0], AG_S.ownRun[1], 'pwsh -File $HOME\\kalmido\\mcp\\agent_launcher.ps1 -e $HOME\\.config\\kalmido\\agent.env --once']]
   }
 };
@@ -12592,7 +12605,7 @@ function agSetupHtml(guide, os) {
 // B: the steps with the key commands; the full commands are in docs/AGENT-SETUP.md (the prompt text is the same file,
 // docs/agent-setup-prompt.txt). Kalmido itself never starts or downloads an agent.
 const AG_SETUP_DOC = API_DOCS.replace('API.md', 'AGENT-SETUP.md');
-const AG_PROMPT = "Set up a Kalmido agent on this Linux machine, following the Kalmido guides docs/AGENT-SETUP.md (path B, \"Do it yourself\") and docs/AGENT-SECURITY.md (host sandbox recipe) from https://github.com/Gegenschuss/kalmido. Read both guides first and follow them exactly; where this prompt and the guides differ, the guides win.\n\nMy values:\n- Kalmido address: <KALMIDO_URL>\n- Env file with the agent's token: <TOKEN_ENV_FILE> (I created it myself with KALMIDO_URL=... and KALMIDO_TOKEN=abk_..., chmod 600)\n- Linux user for the agent: <AGENT_USER>\n- The only person who may give the agent instructions: <OWNER_NAME>, Kalmido account id <OWNER_ID>\n\nRules for you while you set this up:\n- Never print, cat, echo, log or copy the token or the contents of the env file. Only check that the file exists, belongs to <AGENT_USER> and has mode 600.\n- Show me every command that needs sudo before you run it, and explain in one line what it does.\n- Do not add <AGENT_USER> to the sudo, wheel, docker or adm group, and do not give it SSH keys.\n- Do not open ports, do not change other services, and do not touch Kalmido's own data or configuration.\n- Verify each step before you go to the next one, and tell me what you checked.\n\nSteps:\n1. Create <AGENT_USER> without sudo rights, with a locked password and a 0700 home directory. Move the env file to ~/.config/kalmido/agent.env of that user (owner <AGENT_USER>, mode 600) if it is not there yet.\n2. Set up the egress firewall for <AGENT_USER>: only DNS, the Kalmido address and public HTTPS (the model API) are allowed; the local network and everything else are blocked. Load it at boot.\n3. Install Claude Code for <AGENT_USER> and let me log it in (I do the login myself).\n4. Clone the Kalmido repository to ~/kalmido of <AGENT_USER> (only the mcp/ folder is used) and create the MCP wrapper ~/kalmido/mcp/run.sh that reads the env file and starts kalmido_mcp.py. Register it for the work directory ~/agent.\n5. Create ~/agent/CLAUDE.md from the template in the guide, with <OWNER_NAME> and <OWNER_ID> filled in.\n6. Create ~/agent/.claude/settings.json from the guide (defaultMode dontAsk, only the Kalmido MCP tools and ./bin/events.sh allowed, the env file denied) with the usage hook mcp/claude_usage_hook.py as Stop hook.\n7. Create the event monitor ~/agent/bin/events.sh from the guide (long polling, back-off on every answer other than HTTP 200).\n8. Create the systemd user unit kalmido-agent.service that runs mcp/agent_launcher.sh (runtime settings from Kalmido), enable lingering for <AGENT_USER> and start the unit.\n9. Run the operating system checks from docs/AGENT-SECURITY.md as <AGENT_USER> and show me the results.\n10. Finish with the test checklist from the guide (mention, chat, kill switch, the 7 prompt-injection cases): tell me what to type in Kalmido for each case and what the expected answer is; I run them and tell you the results.";
+const AG_PROMPT = "Set up a Kalmido agent on this Linux machine, following the Kalmido guides docs/AGENT-SETUP.md (path B, \"Do it yourself\") and docs/AGENT-SECURITY.md (host sandbox recipe) from https://github.com/Gegenschuss/kalmido. Read both guides first and follow them exactly; where this prompt and the guides differ, the guides win.\n\nMy values:\n- Kalmido address: <KALMIDO_URL>\n- Env file with the agent's token: <TOKEN_ENV_FILE> (I created it myself with KALMIDO_URL=... and KALMIDO_TOKEN=abk_..., chmod 600)\n- Linux user for the agent: <AGENT_USER>\n- The only person who may give the agent instructions: <OWNER_NAME>, Kalmido account id <OWNER_ID>\n\nRules for you while you set this up:\n- Never print, cat, echo, log or copy the token or the contents of the env file. Only check that the file exists, belongs to <AGENT_USER> and has mode 600.\n- Show me every command that needs sudo before you run it, and explain in one line what it does.\n- Do not add <AGENT_USER> to the sudo, wheel, docker or adm group, and do not give it SSH keys.\n- Do not open ports, do not change other services, and do not touch Kalmido's own data or configuration.\n- Verify each step before you go to the next one, and tell me what you checked.\n\nSteps:\n1. Create <AGENT_USER> without sudo rights, with a locked password and a 0700 home directory. Move the env file to ~/.config/kalmido/agent.env of that user (owner <AGENT_USER>, mode 600) if it is not there yet.\n2. Set up the egress firewall for <AGENT_USER>: only DNS, the Kalmido address and public HTTPS (the model API) are allowed; the local network and everything else are blocked. Load it at boot.\n3. Install Claude Code for <AGENT_USER> and let me log it in (I do the login myself).\n4. Clone the Kalmido repository to ~/kalmido of <AGENT_USER> (only the mcp/ folder is used) and create the MCP wrapper ~/kalmido/mcp/run.sh that reads the env file and starts kalmido_mcp.py. Register it for the work directory ~/agent.\n5. Create ~/agent/CLAUDE.md from the template in the guide, with <OWNER_NAME> and <OWNER_ID> filled in.\n6. Create ~/agent/.claude/settings.json from the guide (defaultMode dontAsk, only the Kalmido MCP tools and ./bin/events.sh allowed, the env file denied) with the usage hook mcp/claude_usage_hook.py as Stop and SubagentStop hook.\n7. Create the event monitor ~/agent/bin/events.sh from the guide (long polling, back-off on every answer other than HTTP 200).\n8. Create the systemd user unit kalmido-agent.service that runs mcp/agent_launcher.sh (runtime settings from Kalmido), enable lingering for <AGENT_USER> and start the unit.\n9. Run the operating system checks from docs/AGENT-SECURITY.md as <AGENT_USER> and show me the results.\n10. Finish with the test checklist from the guide (mention, chat, kill switch, the 7 prompt-injection cases): tell me what to type in Kalmido for each case and what the expected answer is; I run them and tell you the results.";
 const AG_STEPS = [
   [N_('Create the agent in Kalmido'), N_('Settings > Agents > Add agent (admins). Copy the API token: it is shown only once. Share the lists it should work in (table below, or “Share all existing lists”), pick the tidy agent and its runtime settings.'), ''],
   [N_('A Linux user without sudo'), N_('Its own user, no sudo / docker group, no SSH keys, a locked password. The token goes only into a file with mode 600.'), 'sudo useradd --create-home --shell /bin/bash kalmido-agent\nsudo passwd --lock kalmido-agent\nsudo chmod 0700 ~kalmido-agent\n# as kalmido-agent: ~/.config/kalmido/agent.env (KALMIDO_URL=…, KALMIDO_TOKEN=…), chmod 600'],
@@ -12603,7 +12616,7 @@ const AG_STEPS = [
   [N_('Permissions in .claude/settings.json'), N_('An allowlist: only the Kalmido MCP tools and the event monitor; the env file is denied.'), ''],
   [N_('Event monitor with back-off'), N_('Long polling of the agent events; after an error it waits longer and longer (up to 5 minutes).'), ''],
   [N_('Autostart'), N_('A systemd user unit runs mcp/agent_launcher.sh: it applies the runtime settings from Kalmido (model, auto-compact, nightly fresh restart, Reset now).'), 'loginctl enable-linger kalmido-agent\nsystemctl --user enable --now kalmido-agent.service'],
-  [N_('Usage reporting'), N_('mcp/claude_usage_hook.py as Stop hook reports tokens and cost; limits per agent are set by admins.'), ''],
+  [N_('Usage reporting'), N_('mcp/claude_usage_hook.py as Stop and SubagentStop hook reports tokens and cost, subagents included; limits per agent are set by admins.'), ''],
   [N_('Test'), N_('Mention it in a comment, write to it in the chat, pause it with the switch (it has to stop), and try the 7 prompt-injection cases from the guide: it has to refuse every one.'), '']];
 function agGuideModal() {
   const d = {env: '~/kalmido-agent.env', user: 'kalmido-agent'};

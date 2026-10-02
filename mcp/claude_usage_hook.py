@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Claude Code Stop hook: reports the model usage of a Claude Code session to Kalmido (POST /api/v1/agent/usage).
+"""Claude Code Stop / SubagentStop hook: reports the model usage of a Claude Code session to Kalmido (POST /api/v1/agent/usage).
 
 Python 3 standard library only. Claude Code runs it after every turn ("Stop" hook) and passes a JSON object on stdin with
 `session_id` and `transcript_path` (the session's JSONL transcript). The hook sums the usage of the assistant messages that
@@ -7,6 +7,11 @@ were added since its last run in this session (a small state file per session re
 model, and POSTs the numbers to Kalmido with the agent's token. Only numbers and ids leave the machine: model, input /
 output / cache tokens, the optional cost, the task the agent works on and a short note ("claude-code <session>") -- never
 prompt or answer text.
+
+Subagents (2.11.0): Claude Code runs subagents (the Agent tool) in transcripts of their own. Wired as a "SubagentStop" hook
+too, the hook gets `agent_id` and `agent_transcript_path` and reports that transcript as a session of its own (state
+"sub-<agent_id>", note "... · subagent <id> ..."), so their tokens are counted as well. A SubagentStop input without
+agent_transcript_path is ignored (never the main transcript twice).
 
 Configuration (environment, or an env file given as the first argument / with --env FILE, lines KEY=VALUE):
   KALMIDO_URL               base address of the instance, e.g. https://tasks.example.com
@@ -19,8 +24,11 @@ Configuration (environment, or an env file given as the first argument / with --
                            is used while the agent is "working" or "waiting".
 
 Wire it in .claude/settings.json (project) or ~/.claude/settings.json (user):
-  {"hooks": {"Stop": [{"hooks": [{"type": "command",
-     "command": "python3 /path/to/kalmido/mcp/claude_usage_hook.py /path/to/kalmido-agent.env", "timeout": 30}]}]}}
+  {"hooks": {
+     "Stop": [{"hooks": [{"type": "command",
+       "command": "python3 /path/to/kalmido/mcp/claude_usage_hook.py /path/to/kalmido-agent.env", "timeout": 30}]}],
+     "SubagentStop": [{"hooks": [{"type": "command",
+       "command": "python3 /path/to/kalmido/mcp/claude_usage_hook.py /path/to/kalmido-agent.env", "timeout": 30}]}]}}
 
 The hook never blocks Claude Code: it always exits 0 and only writes problems to stderr. When Kalmido cannot be reached the
 state does not move on, so the next run reports the missed turns too. --dry-run prints the reports instead of sending them.
@@ -33,7 +41,7 @@ import sys
 import urllib.error
 import urllib.request
 
-VERSION = "2.1.1"
+VERSION = "2.11.0"
 NOTE_MAX = 200
 KEEP_IDS = 200  # message ids remembered per session (Claude Code writes one line per content block of a message)
 
@@ -159,13 +167,14 @@ def current_task(base, token):
     return a.get("status_task") if a.get("status") in ("working", "waiting") else None
 
 
-def reports(sums, session_id, task_id, prices):
+def reports(sums, session_id, task_id, prices, agent_id=None):
     out = []
+    who = f"claude-code {str(session_id or '')[:8]}" + (f" · subagent {str(agent_id)[:12]}" if agent_id else "")
     for model, s in sums.items():
         if not (s["input_tokens"] or s["output_tokens"] or s["cache_read_tokens"] or s["cache_write_tokens"]):
             continue
         r = {"model": model[:100], **{k: s[k] for k in ("input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens")},
-             "note": f"claude-code {str(session_id or '')[:8]} · {s['messages']} messages"[:NOTE_MAX]}
+             "note": f"{who} · {s['messages']} messages"[:NOTE_MAX]}
         c = cost_of(model, s, prices)
         if c is not None:
             r["cost_usd"] = c
@@ -178,6 +187,15 @@ def reports(sums, session_id, task_id, prices):
 def run(hook, env, dry_run=False, out=sys.stdout):
     """One hook run; returns the reports it sent (or would send). Raises nothing the caller must handle."""
     transcript, session_id = hook.get("transcript_path"), hook.get("session_id") or ""
+    agent_id, state_key = None, session_id
+    if hook.get("agent_transcript_path") or hook.get("hook_event_name") == "SubagentStop":
+        # 2.11.0 (#448): a subagent's own transcript, reported as its own session
+        transcript = hook.get("agent_transcript_path")
+        agent_id = str(hook.get("agent_id") or "") or None
+        state_key = "sub-" + (agent_id or session_id or "unknown")
+        if not transcript:
+            print("kalmido usage hook: SubagentStop without agent_transcript_path (nothing reported)", file=sys.stderr)
+            return []
     if not transcript or not os.path.isfile(transcript):
         print("kalmido usage hook: no transcript_path in the hook input", file=sys.stderr)
         return []
@@ -186,7 +204,7 @@ def run(hook, env, dry_run=False, out=sys.stdout):
         print("kalmido usage hook: KALMIDO_URL and KALMIDO_TOKEN must be set", file=sys.stderr)
         return []
     sdir = env.get("KALMIDO_USAGE_STATE_DIR") or os.path.join(os.path.expanduser("~"), ".cache", "kalmido-usage")
-    sp = state_path(sdir, session_id)
+    sp = state_path(sdir, state_key)
     st = load_state(sp)
     sums, off, ids = read_new(transcript, st)
     prices = {}
@@ -201,7 +219,7 @@ def run(hook, env, dry_run=False, out=sys.stdout):
         task = int(env["KALMIDO_USAGE_TASK"])
     elif sums and not dry_run:
         task = current_task(base, token)
-    reps = reports(sums, session_id, task, prices)
+    reps = reports(sums, session_id, task, prices, agent_id)
     if dry_run:
         for r in reps:
             print(json.dumps(r), file=out)
@@ -227,7 +245,7 @@ def run(hook, env, dry_run=False, out=sys.stdout):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="Claude Code Stop hook: report model usage to Kalmido")
+    ap = argparse.ArgumentParser(description="Claude Code Stop / SubagentStop hook: report model usage to Kalmido")
     ap.add_argument("env_file", nargs="?", help="env file with KALMIDO_URL / KALMIDO_TOKEN (optional)")
     ap.add_argument("--env", dest="env_opt", help="env file (same as the positional argument)")
     ap.add_argument("--dry-run", action="store_true", help="print the reports instead of sending them (state unchanged)")

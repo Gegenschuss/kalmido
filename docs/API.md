@@ -155,7 +155,7 @@ had been made in the app. Webhooks fire too.
 | `GET /lists/{id}/groups` | read | 2.10.0: the groups a list is shared with: `group_id`, `name`, `role`, `via` (`list` = directly, else the owner's folder) |
 | `PUT /lists/{id}/groups/{group_id}` · `DELETE …` | write | 2.10.0: share a list with a group `{role}` (owner / list admin) or stop it. Every member (also later ones) gets access; a person's role is the higher of their own and the group's |
 | `POST /tasks/{id}/take` | write | 2.10.0: take a task assigned to one of your groups (`assignee_group_id`): it becomes yours (also for participants) |
-| `GET /dayplan?date=&mode=` | read | 2.10.0: the built-in day plan (a preview, nothing changes): working hours, calendar events, fixed timed tasks, `plan [{task_id, start, end, duration, estimated, reason}]`, `defer [{task_id, to}]`, `free_min`; `mode=day` (default) or `fill` |
+| `GET /dayplan?date=&mode=` | read | 2.10.0: the built-in day plan (a preview, nothing changes): working hours, calendar events, fixed timed tasks, `plan [{task_id, start, end, duration, estimated, reason}]`, `nofit [...]` (tasks of the day that do not fit; 2.11.0: listed only), `free_min`; `mode=day` (default) or `fill`. Apply with `PATCH /tasks/{id}` `plan_start` + `duration`: planning never changes due dates |
 | `GET /dayplan/review?date=` | read | 2.10.0: the daily review: `done`, `open`, `moved` (tasks moved away that day) and `tomorrow` (a plan for the next working day) |
 | `POST /lists/{id}/shift` | write | Move every open dated task of a list by `{days}` in one transaction, see [Roadmap](#roadmap) |
 | `GET /tags` | read | The user's personal tags (`kind: personal`) and the tags of the lists they see (`kind: list`, with `list_id`, `color`), with task counts |
@@ -205,7 +205,7 @@ had been made in the app. Webhooks fire too.
   "created_at": "2026-09-29T08:15:00+00:00", "updated_at": "2026-09-29T08:15:00+00:00", "completed_at": null,
   "deleted": false, "fields": {"3": "opt2"}, "blocked": false, "comment_count": 0,
   "attachments": [{"id": 5, "name": "x-ray.pdf", "mime": "application/pdf", "size": 81234}],
-  "deadline": false, "deadline_in_today": false, "nag": ""
+  "deadline": false, "deadline_in_today": false, "nag": "", "plan_start": null
 }
 ```
 
@@ -217,7 +217,8 @@ reminder on), `deadline_in_today` (boolean: also on Today from the first reminde
 (repeat the reminder until done: `5`, `10`, `15`, `30`, `60` (minutes) or `1d`; `off` = never, empty = the list's
 default; from the first reminder on, not during the person's quiet hours), `tags` (replaces your tags on the task), `list_tags` (replaces the list tags of the task; names, missing ones are
 created when you may change the list), `assignee_id` (someone who can see the list), `assignee_group_id` (2.10.0: a group the
-list is shared with; setting one clears the other), `pinned`, `fields`
+list is shared with; setting one clears the other), (2.11.0) `plan_start` (the day plan's slot, `YYYY-MM-DDTHH:MM` local
+time or `null`; independent of `due`), `pinned`, `fields`
 (custom field values by field id); `content` is accepted as an alias of `notes` (2.2.1). `tags` are personal: every user has their own tags on a shared task; `list_tags`
 belong to the list and everyone in it sees them. Attachments are
 listed (name, type, size) but not transferred through the API.

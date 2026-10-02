@@ -102,12 +102,16 @@ A scheduled task (Windows) and a launchd plist (macOS): [docs/AGENTS.md](../docs
 ## Claude Code usage hook
 
 [`claude_usage_hook.py`](claude_usage_hook.py) (2.1.1) reports a Claude Code session's token usage to Kalmido after every turn,
-as a **Stop hook**: it reads the session transcript, sums the new assistant messages per model and calls
+as a **Stop hook**, and (2.11.0) for subagents as a **SubagentStop hook** with the same command: it reads the session
+(or subagent) transcript, sums the new assistant messages per model and calls
 `POST /api/v1/agent/usage` with the agent's token (numbers only, never text). Wire it in `.claude/settings.json`:
 
 ```json
-{"hooks": {"Stop": [{"hooks": [{"type": "command",
-  "command": "python3 /path/to/kalmido/mcp/claude_usage_hook.py /path/to/kalmido-agent.env", "timeout": 30}]}]}}
+{"hooks": {
+  "Stop": [{"hooks": [{"type": "command",
+    "command": "python3 /path/to/kalmido/mcp/claude_usage_hook.py /path/to/kalmido-agent.env", "timeout": 30}]}],
+  "SubagentStop": [{"hooks": [{"type": "command",
+    "command": "python3 /path/to/kalmido/mcp/claude_usage_hook.py /path/to/kalmido-agent.env", "timeout": 30}]}]}}
 ```
 
 The env file holds `KALMIDO_URL` and `KALMIDO_TOKEN` (optional `KALMIDO_USAGE_PRICES`, `KALMIDO_USAGE_TASK`,

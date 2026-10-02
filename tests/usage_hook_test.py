@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.1.1 (#326): mcp/claude_usage_hook.py (the Claude Code Stop hook) against a stub Kalmido API, no container.
+"""2.1.1 (#326), 2.11.0 (#448): mcp/claude_usage_hook.py (the Claude Code Stop / SubagentStop hook) against a stub Kalmido API, no container.
 A sample transcript (tests/fixtures/claude_transcript.jsonl): one message written on two lines counts once, one report per
 model, synthetic messages and broken lines are skipped, no text of the transcript is ever sent; the state per session (only
 new messages next time, a half-written last line waits), the cost from a price table, the task of the agent's status,
@@ -155,6 +155,36 @@ for bad in ("not json", "", json.dumps({"transcript_path": "/nonexistent"})):
 out = io.StringIO()
 check(hook.run({"transcript_path": tr, "session_id": "new-session"}, {"KALMIDO_USAGE_STATE_DIR": ENV["KALMIDO_USAGE_STATE_DIR"]}, dry_run=True, out=out)
       and "SECRET" not in out.getvalue(), "a new session starts at the beginning (dry run, no URL needed)")
+
+# 2.11.0 (#448): SubagentStop -- the subagent's own transcript (agent_transcript_path) as a session of its own
+sub = os.path.join(tmp, "agent-a1.jsonl")
+with open(sub, "w", encoding="utf-8") as f:
+    f.write('{"type":"user","message":{"content":"SECRET subagent prompt"}}\n')
+    f.write('{"type":"assistant","message":{"id":"msg_s1","model":"claude-haiku-4-5","usage":{"input_tokens":21,"output_tokens":5,'
+            '"cache_creation_input_tokens":100,"cache_read_input_tokens":400},"content":[{"type":"text","text":"SECRET answer"}]}}\n')
+SUBHOOK = {"session_id": "sess-1234abcd", "transcript_path": tr, "hook_event_name": "SubagentStop", "agent_id": "a1b2c3d4e5f6a7b8",
+           "agent_transcript_path": sub, "stop_hook_active": False}
+main_before = hook.load_state(hook.state_path(ENV["KALMIDO_USAGE_STATE_DIR"], "sess-1234abcd"))
+p = run(h=SUBHOOK)
+check(len(p) == 1 and p[0]["b"]["model"] == "claude-haiku-4-5" and p[0]["b"]["input_tokens"] == 21 and p[0]["b"]["cache_read_tokens"] == 400,
+      f"subagent transcript reported: {[r['b'] for r in p]}")
+check(p and "subagent a1b2c3d4e5f6" in p[0]["b"]["note"] and p[0]["b"]["note"].startswith("claude-code sess-123"), f"note names the subagent: {p and p[0]['b']['note']}")
+check(os.path.exists(hook.state_path(ENV["KALMIDO_USAGE_STATE_DIR"], "sub-a1b2c3d4e5f6a7b8")), "own state file per subagent")
+check(hook.load_state(hook.state_path(ENV["KALMIDO_USAGE_STATE_DIR"], "sess-1234abcd")) == main_before, "the main session's state is untouched")
+check("SECRET" not in json.dumps(REQS), "no subagent text is sent")
+check(run(h=SUBHOOK) == [], "subagent: nothing new, nothing sent")
+with open(sub, "a", encoding="utf-8") as f:
+    f.write('{"type":"assistant","message":{"id":"msg_s2","model":"claude-haiku-4-5","usage":{"input_tokens":3,"output_tokens":2}}}\n')
+p = run(h=SUBHOOK)
+check(len(p) == 1 and p[0]["b"]["input_tokens"] == 3, "subagent: only the new message next time")
+check(run(h={**SUBHOOK, "agent_transcript_path": None}) == [], "SubagentStop without agent_transcript_path: nothing (never the main transcript)")
+sub2 = os.path.join(tmp, "agent-b2.jsonl")
+shutil.copy(sub, sub2)
+p = run(h={**SUBHOOK, "agent_id": "b2", "agent_transcript_path": sub2})
+check(len(p) == 1 and p[0]["b"]["input_tokens"] == 24, f"a second subagent counts separately: {[r['b'] for r in p]}")
+cp = subprocess.run([sys.executable, os.path.join(HERE, "..", "mcp", "claude_usage_hook.py"), "--dry-run", envf],
+                    input=json.dumps({**SUBHOOK, "agent_id": "c3"}), capture_output=True, text=True, env=clean_env, timeout=30)
+check(cp.returncode == 0 and "subagent c3" in cp.stdout, f"CLI dry run with SubagentStop input: {cp.stdout} {cp.stderr}")
 shutil.rmtree(tmp, ignore_errors=True)
 srv.shutdown()
 print(f"\n{OKS[0]} ok, {len(FAILS)} failed")

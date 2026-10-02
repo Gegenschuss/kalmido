@@ -242,8 +242,8 @@ TOOLS = [
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/groups")),
     # 2.10.0 (#440): the built-in day plan + the daily review of the token's user (read-only previews)
     ("get_day_plan", "The built-in day plan of your user for a day (preview, nothing changes): working hours, calendar events, "
-                     "fixed timed tasks, plan [{task_id, title, start, end, duration, estimated, reason}], defer [{task_id, to}] "
-                     "and free_min. mode: day = plan the day's tasks, fill = only fill free time with other tasks. For a person's "
+                     "fixed timed tasks, plan [{task_id, title, start, end, duration, estimated, reason}], nofit (tasks of the day "
+                     "that do not fit; never moved) and free_min. Applying a plan sets plan_start + duration only, never due dates. mode: day = plan the day's tasks, fill = only fill free time with other tasks. For a person's "
                      "plan answer their job_request of kind dayplan with submit_proposal instead.",
      _obj({"date": {"type": "string", "description": "YYYY-MM-DD, default today"}, "mode": {"type": "string", "enum": ["day", "fill"]}}),
      lambda api, a: api.call("GET", "/dayplan", _pick(a, ("date", "mode")))),
@@ -325,7 +325,8 @@ TOOLS = [
                         "triage: {items: [{task_id, list_id?, section_id?, tags?, priority?, due?, rewrite_title?}]} (only ids from "
                         "the input); extract: {tasks: [{title, notes?, assignee_id? (a member id from the input), due?, section?}]}; "
                         "dayplan (2.10.0): {items: [{task_id, start (HH:MM), duration? (minutes, default the task's or input."
-                        "default_duration), note?}], defer: [{task_id, to (YYYY-MM-DD) | null, note?}]} -- only task ids from "
+                        "default_duration), note?}], nofit: [{task_id, note?}]} -- applying sets only plan_start + duration, due dates "
+                        "and deadlines never change; only task ids from "
                         "input.tasks; the input has date, now, work {start, end}, events, fixed (busy) and the built-in plan as a hint. "
                         "Every kind may add summary (a short explanation). Dates YYYY-MM-DD, priority none | low | medium | high. "
                         "At most 200 entries; resubmitting replaces the proposal until the person applied or discarded it.",

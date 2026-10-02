@@ -90,7 +90,7 @@ Steps:
 3. Install Claude Code for <AGENT_USER> and let me log it in (I do the login myself).
 4. Clone the Kalmido repository to ~/kalmido of <AGENT_USER> (only the mcp/ folder is used) and create the MCP wrapper ~/kalmido/mcp/run.sh that reads the env file and starts kalmido_mcp.py. Register it for the work directory ~/agent.
 5. Create ~/agent/CLAUDE.md from the template in the guide, with <OWNER_NAME> and <OWNER_ID> filled in.
-6. Create ~/agent/.claude/settings.json from the guide (defaultMode dontAsk, only the Kalmido MCP tools and ./bin/events.sh allowed, the env file denied) with the usage hook mcp/claude_usage_hook.py as Stop hook.
+6. Create ~/agent/.claude/settings.json from the guide (defaultMode dontAsk, only the Kalmido MCP tools and ./bin/events.sh allowed, the env file denied) with the usage hook mcp/claude_usage_hook.py as Stop and SubagentStop hook.
 7. Create the event monitor ~/agent/bin/events.sh from the guide (long polling, back-off on every answer other than HTTP 200).
 8. Create the systemd user unit kalmido-agent.service that runs mcp/agent_launcher.sh (runtime settings from Kalmido), enable lingering for <AGENT_USER> and start the unit.
 9. Run the operating system checks from docs/AGENT-SECURITY.md as <AGENT_USER> and show me the results.
@@ -280,12 +280,15 @@ instruction cannot wait for someone to click *Allow*:
     "deny": ["Edit", "Write", "WebFetch", "WebSearch", "Read(./.env)", "Read(./**/.env)",
              "Read(~/.config/kalmido/**)", "Bash(cat:*)", "Bash(curl:*)"]
   },
-  "hooks": {"Stop": [{"hooks": [{"type": "command",
-    "command": "python3 ~/kalmido/mcp/claude_usage_hook.py ~/.config/kalmido/agent.env", "timeout": 30}]}]}
+  "hooks": {
+    "Stop": [{"hooks": [{"type": "command",
+      "command": "python3 ~/kalmido/mcp/claude_usage_hook.py ~/.config/kalmido/agent.env", "timeout": 30}]}],
+    "SubagentStop": [{"hooks": [{"type": "command",
+      "command": "python3 ~/kalmido/mcp/claude_usage_hook.py ~/.config/kalmido/agent.env", "timeout": 30}]}]}
 }
 ```
 
-The Stop hook is step 10. Check with `claude` in `~/agent`: `/permissions` lists exactly these rules.
+The Stop and SubagentStop hooks are step 10. Check with `claude` in `~/agent`: `/permissions` lists exactly these rules.
 
 ### 8. Event monitor with back-off
 
@@ -366,8 +369,8 @@ journalctl --user -u kalmido-agent -f            # "starting (fresh session) ...
 
 ### 10. Usage reporting
 
-[`mcp/claude_usage_hook.py`](../mcp/claude_usage_hook.py) runs after every turn as a Claude Code *Stop* hook (wired in
-step 7) and reports the token usage to Kalmido: numbers only, never prompt or answer text. *Settings > Agents >
+[`mcp/claude_usage_hook.py`](../mcp/claude_usage_hook.py) runs after every turn as a Claude Code *Stop* hook and after
+every subagent as *SubagentStop* hook (both wired in step 7, the same command) and reports the token usage to Kalmido: numbers only, never prompt or answer text. *Settings > Agents >
 Usage* then shows it, and the limits in the agent's dialog apply. Optional keys in the env file:
 `KALMIDO_USAGE_PRICES` (a price table to show costs), `KALMIDO_USAGE_TASK`, `KALMIDO_USAGE_STATE_DIR`. Test it without
 sending: `python3 ~/kalmido/mcp/claude_usage_hook.py --dry-run ~/.config/kalmido/agent.env < /dev/null`.
