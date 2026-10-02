@@ -166,10 +166,16 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   const wr = calls.filter(c => c[0] !== 'GET' && /\/api\/tasks/.test(c[1]));
   check(wr.length === 1 && /\/api\/tasks\/batch/.test(wr[0][1]), `the undo is one request too: ${JSON.stringify(wr)}`);
   // with dependents in another list (Film: setting on)
-  await until(() => !w.eval('HIST.busy'));  // the undo reloads and redraws after the server answered
+  // the undo reloads and redraws after the server answered; on a busy CI runner that can take longer than 4 s, and a drag
+  // that starts before it ends races its reload (2.12.1: the drag below then never reached the server)
+  check(await until(() => !w.eval('HIST.busy'), 20000), 'the undo has finished (reload + redraw)');
   await call('PATCH', `/api/lists/${FILM}`, {dep_shift: true});
-  await w.eval('load().then(() => render())'); await sleep(300);
+  await w.eval('load().then(() => render())');
+  await until(() => sum(WEB) && w.eval('!!S.rmV') && !w.eval('HIST.busy'), 8000); await sleep(300);
+  calls.length = 0;
   ptr(w, sum(WEB), 'pointerdown', 100); ptr(w, d, 'pointermove', 100 + 10 * DW); ptr(w, d, 'pointerup', 100 + 10 * DW);
+  check(await until(() => calls.some(c => c[0] === 'POST' && /\/api\/lists\/\d+\/shift/.test(c[1])), 8000),
+    `the drag sends the shift request: ${JSON.stringify(calls.slice(-4))} ${toastText(d)}`);
   // the shift with dependents can take longer than 4 s on a busy CI runner (2.11.0: the toast came, the poll had given up)
   check(await until(async () => (await taskOf(f1)).start === ds(22), 20000), 'dependent task in another list moved along (Shoot waits on Design)');
   await until(async () => (await taskOf(f2)).start === ds(31), 8000);
