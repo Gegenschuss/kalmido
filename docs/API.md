@@ -127,6 +127,9 @@ had been made in the app. Webhooks fire too.
 |---|---|---|
 | `GET /me` | read | The token's user, its scopes and expiry, which modules are on, and (2.1.0) `notifications`: `events` (per event `{news, push}`, `news` null = the event has no News) and `lists` (list id -> bell `all` / `mute` / `custom`; lists on `default` are left out), (2.6.1) `custom` (list id -> the own event choice of lists on `custom`, `{event: {news: 0\|1, push: 0\|1}}`, an event not listed follows `events`) |
 | `PATCH /me/notifications` | write | 2.1.0: change them partially: `{events?: {event: {news?, push?}}, lists?: {list_id: "all" \| "default" \| "mute" \| "custom" \| {mode: "custom", events: {event: {news?, push?}}}}}` (2.6.1: `custom` = your own choice per event for that list, events `newtask`, `comment`, `mention`, `assign`, `complete`, `status`, `unblock`, `approval`; a ticked one comes from every task of the list, an unticked one never; `"custom"` alone brings back the stored choice). Events: `comment`, `reply`, `follow`, `mention`, `assign`, `newtask`, `complete`, `status`, `share`, `unblock`, `approval`, `followup`, `reminder` (push only), `nag` (2.7.0, push only: reminders repeated until done; a muted list bell stops them) |
+| `GET /me/app-passwords` | read | 2.9.0: your app passwords for calendar apps (`id`, `name`, `created_at`, `last_used_at`, `last_client`; never the password) and `caldav` (`url`, `server`, `username`, `principal`, `home`, `done_days`). Persons only: an agent's token gets `403` |
+| `POST /me/app-passwords` | write | 2.9.0: `{name}` -> `201` with `password` (shown only in this answer; Kalmido keeps a hash). At most 20. Log in to `/dav/` with your user name and it (see [CALDAV.md](CALDAV.md)) |
+| `DELETE /me/app-passwords/{id}` | write | 2.9.0: revoke it; the calendar app using it stops at once |
 | `GET /lists` | read | Lists the user can see: own and shared, with role (`owner`, `admin`, `edit` = member, `participant`, `view` = viewer), `done_at_bottom` (2.7.2; `checklist` = the same, deprecated), progress, `icon` (URL of the list's own picture, empty = none; set in the app), `agent_tidy`, and (2.0.8) its sections `[{id, name}]` |
 | `POST /lists` | write | Create a list: `{name, color?, folder?, kind?, done_at_bottom?, nag?, day_hours?}` (`kind`: `list` default or `project`; `checklist` (deprecated) = `list` + `done_at_bottom`) |
 | `GET /lists/{id}` | read | One list with its sections |
@@ -493,8 +496,8 @@ sends `task.completed` only.
 
 - `id` = the delivery id, also in the `X-Kalmido-Delivery` header, **the same for every retry**: use it to ignore
   duplicates.
-- `actor` = who made the change (`null` for someone using a public list link), `via` = `web` (the app), `api` or
-  `public_link`.
+- `actor` = who made the change (`null` for someone using a public list link), `via` = `web` (the app), `api`,
+  `public_link` or (2.9.0) `caldav` (a calendar app).
 - `data.task` has the same fields as the API, as the webhook's owner sees the task (their own tags). `data.changes`
   (for `task.updated`), `data.permanent` (for `task.deleted`), `data.comment` (`{id, author_id, text, created_at,
   files}` for `comment.created`), `data.member` and `data.role` (for `list.shared`).

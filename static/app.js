@@ -572,7 +572,7 @@ function applyState(j) {
   S.fields = j.fields || [];
   S.collabAll = j.collab_all !== false; S.timeAll = j.time_all !== false; S.about = j.about || {};
   S.calendars = j.calendars || {enabled: false, subs: 0};
-  S.api = j.api || {enabled: false}; S.webhooks = j.webhooks || {enabled: false}; S.publicLinks = !!j.public_links;
+  S.api = j.api || {enabled: false}; S.caldav = j.caldav || {enabled: false}; S.webhooks = j.webhooks || {enabled: false}; S.publicLinks = !!j.public_links;
   S.sample = j.sample || null;
   S.agents = j.agents || []; S.agentsAt = Date.now();
   S.proposers = j.proposers || [];  // 2.3.0: agents I may ask for a proposal
@@ -4106,7 +4106,7 @@ function fmtWhen(iso) {
 }
 const fmtDayAbs = s => fmtDay(pd(s).getFullYear() !== new Date().getFullYear() ? 'year' : 'short', pd(s));
 function actText(a, U) {  // "via API" after lines written through a personal access token
-  return actText0(a, U) + (a.data?.via === 'api' ? ` <span class="via">${tr('via API')}</span>` : '');
+  return actText0(a, U) + (a.data?.via === 'api' ? ` <span class="via">${tr('via API')}</span>` : a.data?.via === 'caldav' ? ` <span class="via">${tr('via CalDAV')}</span>` : '');
 }
 const viaName = (d, id, U) => d?.via === 'public_link' && !id ? tr('Someone via the public link') : uname(id, U);
 function actText0(a, U) {
@@ -6624,6 +6624,7 @@ function settingsModal(focus) {
         <li>${tr('<b>Outlook:</b> Add calendar > Subscribe from web.')}</li>
         <li>${tr('<b>Only reachable at home or over a VPN?</b> Google Calendar, iCloud and Outlook.com fetch the feed from their own servers and then cannot reach it. Use an app that fetches on the device instead: on Android ICSx⁵ (the calendar then shows up in every calendar app), on a Mac the location “On My Mac” instead of iCloud, or Thunderbird.')}</li></ul></details>
       ${hint(tr('Anyone who knows the link sees these tasks. If it got out, create a new link: the old one stops working at once.'))}
+      ${caldavHtml(hint)}
       ${S.paperless?.personal || S.paperless?.enabled ? `<h4 id="s-pl-h">Paperless</h4>
       ${hint(tr('Link documents from Paperless-ngx to tasks. Your connections: the ones an admin set up for you (you enter your own API token, so Paperless shows you exactly what you may see there) and your own, which only you see and use.'))}
       <div class="members" id="s-plc"><div class="muted mhint">${tr('Loading…')}</div></div>
@@ -6646,7 +6647,7 @@ function settingsModal(focus) {
       <div class="members" id="s-tpls"><div class="muted mhint">${tr('Loading…')}</div></div>
       ${sampleHtml(hint)}`,
     ai: aiPaneOn() ? aiHtml(hint, {agents: 'agents', agentdots: 'agents', usage: 'usage', activity: 'log'}[focus]) : '',  // 2.7.0 (#405 S2)
-    users: S.me?.is_admin ? usersHtml() + orphHtml() + instanceHtml(chk, hint) + signinHtml(hint) + plaHtml() + bkHtml() + aaHtml() : '',  // 1.9.0: users first
+    users: S.me?.is_admin ? usersHtml() + orphHtml() + instanceHtml(chk, hint) + `<div id="s-signin">${signinHtml(hint)}</div>` + plaHtml() + bkHtml() + aaHtml() : '',  // 1.9.0: users first
     help: `<h4>${tr('Getting started')}</h4>
       <div class="row"><button class="btn sm" data-m="tour">${ic('arrow', 's')} ${tr('Restart the welcome tour')}</button>${isMobile() ? '' : `<button class="btn sm" data-m="keys">${ic('help', 's')} ${tr('Keyboard shortcuts')} ${kb('?')}</button>`}<button class="btn sm" data-m="cele-try">${ic('check', 's')} ${tr('Show the celebration')}</button></div>
       ${isMobile() ? '' : `<div class="shelp">${tr('{0}: search and commands for everything (tasks, lists, views, settings). j / k move through the tasks, x completes, s snoozes, g t goes to Today.', kbText('Mod+K'))}</div>`}
@@ -6668,7 +6669,7 @@ function settingsModal(focus) {
   };
   pane.help += aboutHtml(chk, hint);
   const secs = SET_SECS.filter(([k]) => pane[k]);
-  let cur = {tabbar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'integr', tokens: 'account', about: 'help'}[focus] || focus;
+  let cur = {tabbar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'integr', caldav: 'integr', tokens: 'account', apppw: 'account', about: 'help'}[focus] || focus;
   if (!secs.some(([k]) => k === cur)) cur = LS.get('settingsSec', 'general');
   if (!secs.some(([k]) => k === cur)) cur = 'general';
   const md = modal(`<div class="shdr"><h3>${tr('Settings')}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
@@ -6678,6 +6679,7 @@ function settingsModal(focus) {
   if (focus === 'tabbar') setTimeout(() => $('#s-tabbar-h', md)?.scrollIntoView({block: 'start'}), 0);
   if (focus === 'newskinds' || focus === 'share') setTimeout(() => $(focus === 'share' ? '#s-share-h' : '#s-news-h', md)?.scrollIntoView({block: 'start'}), 0);
   if (focus === 'agentdots') setTimeout(() => $('#s-agdots-h', md)?.scrollIntoView({block: 'start'}), 0);
+  if (focus === 'caldav' || focus === 'apppw') setTimeout(() => $(focus === 'caldav' ? '#s-dav-h' : '#s-apw-h', md)?.scrollIntoView({block: 'start'}), 0);
   // 2.7.0 (#405 S8): the module keys land on their row (and open its options), not just on top of Modules
   const modFocus = {layout: 'cal', collab: 'collab', focus: 'pomo', time: 'time'}[focus];
   if (modFocus) setTimeout(() => { const r = $(`[data-pane="modules"] [data-modrow="${modFocus}"]`, md); if (!r) return; const o = $('details.mopt', r); if (o) o.open = true; r.scrollIntoView?.({block: 'start'}); r.classList.add('flash'); }, 0);
@@ -6691,7 +6693,7 @@ function settingsModal(focus) {
     if (k === 'notify') wpDraw(md);
     if (k === 'users') { aaDraw(md); bkDraw(md); orphDraw(md); }
     if (k === 'ai') aiSubShow(md);  // 2.5.1 (#393): only the shown sub-tab loads
-    if (k === 'account') { tfaDraw(md); tokDraw(md); }
+    if (k === 'account') { tfaDraw(md); tokDraw(md); apwDraw(md); }
     $(`.snav [data-sec="${k}"]`, md)?.scrollIntoView({block: 'nearest', inline: 'nearest'});
   };
   // ---- autosave
@@ -6776,8 +6778,9 @@ function settingsModal(focus) {
   if (cur === 'ai') aiSubShow(md, {agents: 'agents', usage: 'usage', activity: 'log'}[focus]);  // 2.5.1 (#393)
   md.addEventListener('click', e => { const b = e.target.closest('[data-aisub]'); if (b) aiSubShow(md, b.dataset.aisub, true); });
   aiuWire(md, only => { const box = $('#s-aiu', md); if (only && box && S.aiu.data) box.innerHTML = aiuHtml(S.aiu.data, Math.max(240, Math.min(720, (box.clientWidth || 560) - 8))); else aiuDraw(md); });  // 2.1.1 (#326)
-  if (cur === 'account' && S.me) { tfaDraw(md); tokDraw(md); }
-  if (S.me) { tfaWire(md); tokWire(md); }
+  if (cur === 'account' && S.me) { tfaDraw(md); tokDraw(md); apwDraw(md); }
+  if (S.me) { tfaWire(md); tokWire(md); apwWire(md); }
+  if (S.me?.is_admin) oidcWire(md);
   if (S.me?.is_admin) { aaWire(md); bkWire(md); orphWire(md); }
   md.addEventListener('change', async e => {
     if (e.target.id !== 's-wpdev') return;
@@ -7291,6 +7294,76 @@ function tokModal(done) {
   });
   setTimeout(() => $('#tk-name', md)?.focus(), 50);
 }
+// ------------------------------------------------------------------ 2.9.0 (#435): calendar apps (CalDAV) + app passwords
+const DAV_DOCS = 'https://github.com/Gegenschuss/kalmido/blob/main/docs/CALDAV.md';
+const apwHtml = () => S.caldav?.enabled ? `<h4 id="s-apw-h">${tr('App passwords')}</h4>
+  <div class="shint">${tr('For calendar apps (CalDAV): one password per device, shown only once. Your Kalmido password never goes into a calendar app. If a device gets lost, revoke its password; the other devices keep working.')}</div>
+  <div class="members" id="s-apws"><div class="muted mhint">${tr('Loading…')}</div></div>
+  <div class="row"><button class="btn sm" data-apw="new">${ic('key', 's')} ${tr('New app password')}</button><button class="btn sm" data-apw="howto">${ic('cal', 's')} ${tr('Set up calendar apps')}</button></div>` : '';
+async function apwDraw(md) {
+  const box = $('#s-apws', md); if (!box) return;
+  let j; try { j = await api('GET', '/api/me/app-passwords'); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
+  box._t = j.items;
+  box.innerHTML = j.items.length ? j.items.map(t => `<div class="mrow tokrow" data-apwid="${t.id}"><span class="n"><b>${esc(t.name)}</b><small class="muted">${esc(tr('created {0}', fmtWhen(t.created_at)))} · ${t.last_used_at ? esc(tr('last used {0}', relTime(t.last_used_at))) : tr('never used')}${t.last_client ? ' · ' + esc(t.last_client.slice(0, 60)) : ''}</small></span><button class="iconbtn danger" data-apw="del" title="${tr('Revoke')}" aria-label="${esc(tr('Revoke the app password “{0}”', t.name))}">${ic('trash', 's')}</button></div>`).join('')
+    : `<div class="muted mhint">${tr('No app passwords yet.')}</div>`;
+}
+function apwModal(md) {
+  const m = modal(`<h3>${tr('New app password')}</h3>
+    <div class="row"><label for="apw-name">${tr('Name')}</label><input id="apw-name" maxlength="60" placeholder="${tr('e.g. iPhone, Thunderbird')}"></div>
+    <div class="calerr" id="apw-err" hidden></div>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Create')}</button></div>`);
+  m.addEventListener('click', async e => {
+    const b = e.target.closest('button[data-m]'); if (!b) return;
+    if (b.dataset.m === 'close') { m.remove(); return; }
+    const name = $('#apw-name', m).value.trim(), er = $('#apw-err', m);
+    if (!name) { $('#apw-name', m).focus(); return; }
+    b.disabled = true;
+    try {
+      const j = await calReq('POST', '/api/me/app-passwords', {name});
+      m.remove(); apwDraw(md);
+      secretModal(tr('Your new app password'), j.password, tr('Enter it in the calendar app now, together with your user name {0}: it is shown only this once.', `<code class="topic">${esc(S.caldav?.username || S.me?.username || '')}</code>`));
+    } catch (x) { er.textContent = x.message; er.hidden = false; } finally { b.disabled = false; }
+  });
+  m.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'apw-name') { e.preventDefault(); $('[data-m="ok"]', m).click(); } });
+  setTimeout(() => $('#apw-name', m)?.focus(), 50);
+}
+function apwWire(md) {
+  md.addEventListener('click', async e => {
+    const c = e.target.closest('[data-davcopy]');
+    if (c) { try { await navigator.clipboard.writeText(c.dataset.davcopy); toast(tr('Copied')); } catch { toast(tr('Copy failed')); } return; }
+    const b = e.target.closest('[data-apw]'); if (!b) return;
+    if (b.dataset.apw === 'new') { apwModal(md); return; }
+    if (b.dataset.apw === 'howto') { $('.snav [data-sec="integr"]', md)?.click(); setTimeout(() => $('#s-dav-h', md)?.scrollIntoView({block: 'start'}), 0); return; }
+    if (b.dataset.apw === 'list') { $('.snav [data-sec="account"]', md)?.click(); setTimeout(() => $('#s-apw-h', md)?.scrollIntoView({block: 'start'}), 0); return; }
+    const row = b.closest('[data-apwid]'), t = ($('#s-apws', md)?._t || []).find(x => x.id === +row?.dataset.apwid); if (!t) return;
+    if (!await askConfirm(tr('Revoke the app password “{0}”?', t.name), tr('The calendar app that uses it stops syncing at once.'), {ok: tr('Revoke'), danger: true})) return;
+    try { await api('DELETE', `/api/me/app-passwords/${t.id}`); toast(tr('App password revoked')); } catch { /* api() showed it */ }
+    apwDraw(md);
+  });
+}
+function caldavHtml(hint) {
+  const d = S.caldav; if (!d?.enabled || !S.me) return '';
+  const cp = (label, v, id) => `<div class="row davrow"><label for="${id}">${label}</label><input id="${id}" readonly value="${esc(v)}" spellcheck="false"><button class="btn sm" data-davcopy="${esc(v)}" aria-label="${esc(tr('Copy {0}', label))}">${ic('copy', 's')} ${tr('Copy')}</button></div>`;
+  const srv = `<code class="topic">${esc(d.server)}</code>`, url = `<code class="topic">${esc(d.url)}</code>`, prin = `<code class="topic">${esc(d.principal)}</code>`;
+  return `<h4 id="s-dav-h">${tr('Calendar apps (CalDAV)')}</h4>
+    ${hint(tr('Your lists as task lists in Reminders (iPhone, iPad, Mac), Thunderbird, Evolution or on Android with Tasks.org or DAVx⁵: changes go both ways. Every list you see is one task list there; completed tasks stay for {0} days.', d.done_days))}
+    ${cp(tr('Server'), d.server, 'dav-srv')}${cp(tr('CalDAV address'), d.url, 'dav-url')}${cp(tr('User name'), d.username, 'dav-user')}
+    <div class="row"><label>${tr('Password')}</label><button class="btn sm pri" data-apw="new">${ic('key', 's')} ${tr('New app password')}</button><button class="linkbtn" data-apw="list">${tr('Manage app passwords')}</button></div>
+    ${hint(tr('Log in with your user name and an app password, never with your Kalmido password.'))}
+    <details class="shelp sdet"><summary>${tr('Step by step')}</summary><ul class="slist">
+      <li>${tr('<b>iPhone / iPad:</b> Settings > Apps > Calendar > Calendar Accounts > Add Account > Other > Add CalDAV Account. Server {0}, your user name and the app password. Then switch on Reminders in the new account. Not found? Advanced Settings > Account URL {1}.', srv, prin)}</li>
+      <li>${tr('<b>Mac:</b> System Settings > Internet Accounts > Add Account > Add Other Account > CalDAV account. Account type Manual, user name, app password, server address {0}; then tick Reminders. Not found? Account type Advanced, server path {1}, port 443, SSL on.', srv, `<code class="topic">${esc(new URL(d.principal).pathname)}</code>`)}</li>
+      <li>${tr('<b>Thunderbird (Windows, macOS, Linux):</b> Tasks > New Calendar > On the Network. User name and location {0}, Find Calendars; enter the app password when asked and let Thunderbird remember it. Tick the lists you want: their tasks show under Tasks.', url)}</li>
+      <li>${tr('<b>Android, Tasks.org:</b> Settings > Synchronization > Add account > CalDAV. URL {0}, user name, app password. Every list becomes a list in Tasks.org.', url)}</li>
+      <li>${tr('<b>Android, DAVx⁵:</b> + > Login with URL and user name. Base URL {0}, user name, app password, Create account. Under CalDAV tick the lists; DAVx⁵ asks which task app shows them (Tasks.org, jtx Board or OpenTasks).', url)}</li>
+      <li>${tr('<b>Linux, Evolution:</b> File > New > Task List, type CalDAV, URL {0}, user name, Find Task Lists, pick a list.', url)}</li>
+      <li>${tr('<b>Windows:</b> the Windows Calendar app and Outlook do not sync tasks over CalDAV. Use Thunderbird.')}</li></ul></details>
+    <details class="shelp sdet"><summary>${tr('What syncs')}</summary><ul class="slist">
+      <li>${tr('Title, notes, due date and time, start, priority, done / won\'t do, tags, subtasks, repeat rules (daily to yearly), reminders and the link. Assignee, sections, comments, files and custom fields stay in Kalmido; other details a calendar app saves come back to it unchanged.')}</li>
+      <li>${tr('Lists you may only view are read-only there. Deleting a task in a calendar app moves it to the trash in Kalmido. New lists are created in Kalmido.')}</li>
+      <li>${tr('Reminders on iPhone and Mac keep tags and subtasks to themselves: what you set in Kalmido stays.')}</li></ul></details>
+    ${S.me.is_admin ? hint(tr('Admins: behind a login proxy (forward auth, single sign-on) the paths /dav/ and /.well-known/caldav must bypass the proxy login, because calendar apps cannot log in there. Kalmido checks the app password itself.') + ` <a href="${DAV_DOCS}" target="_blank" rel="noopener noreferrer">${tr('CalDAV guide')}</a>`) : ''}`;
+}
 // Settings > Integrations > Webhooks
 const WH_EV_NAMES = {'task.created': N_('Task created'), 'task.updated': N_('Task changed'), 'task.completed': N_('Task completed'), 'task.reopened': N_('Task reopened'),
   'task.deleted': N_('Task deleted'), 'comment.created': N_('New comment'), 'list.shared': N_('List shared')};
@@ -7581,6 +7654,7 @@ function accountHtml() {
     ${pw ? `<div class="row"><label>${tr('Password')}</label><input type="password" id="a-cur" placeholder="${tr('current password')}" autocomplete="current-password"><input type="password" id="a-new" placeholder="${tr('new password')}" autocomplete="new-password"><button class="btn sm" data-acc="pw">${tr('Change')}</button></div>` : ''}
     ${m.auth === 'session' ? `<div class="row"><label></label><button class="btn sm" data-acc="logout">${ic('logout', 's')} ${tr('Log out')}</button></div>` : ''}
     ${tfaHtml()}
+    ${apwHtml()}
     <details class="sdev"><summary>${ic('key', 's')}${tr('Advanced · for developers')}</summary>
     <div class="row"><label>${tr('Upload token')}</label><button class="btn sm" data-m="go-share">${ic('phone', 's')} ${tr('Share from your phone')}</button><span class="muted" style="font-size:var(--fs-s)">${tr('shown and renewed there')}</span></div>
     ${apiHtml()}</details>`;
@@ -7995,16 +8069,62 @@ function signinHtml(hint) {
       <label class="wide"><input type="checkbox" id="s-pklogin" ${a.passkey_login !== false ? 'checked' : ''}><span>${tr('Allow logging in with a passkey without the password')}<small class="muted">${tr('A passkey someone added in Settings > Account then also works on its own (the device asks for the fingerprint, face or PIN).')}</small></span></label>
     </div>
     <h4 id="s-oidc-h">${tr('Login with an OIDC provider')}</h4>`;
-  if (!o.configured) return h + hint(tr('Not configured. Log in with Authentik, Keycloak, Authelia, Google or any other OpenID Connect provider: set KALMIDO_OIDC_ISSUER, KALMIDO_OIDC_CLIENT_ID and KALMIDO_OIDC_CLIENT_SECRET (see the README) and register this redirect URI at the provider: {0}', `<code class="topic">${esc(o.redirect_uri || '')}</code>`));
+  if (!o.configured) return h + hint(tr('Not configured yet. Log in with Authentik, Keycloak, Authelia, PocketID, Google, Microsoft Entra or any other OpenID Connect provider: fill in the provider below (or set the KALMIDO_OIDC_* variables) and register this redirect URI at the provider: {0}', `<code class="topic">${esc(o.redirect_uri || '')}</code>`)) + oidcForm(o, hint);
   const row = (l, v) => v ? `<div class="row"><label>${l}</label><code class="topic">${esc(v)}</code></div>` : '';
   h += row(tr('Provider'), o.issuer) + row(tr('Client ID'), o.client_id) +
     `<div class="row"><label>${tr('Redirect URI')}</label><code class="topic" id="s-oidcredir">${esc(o.redirect_uri)}</code><button class="btn sm" data-m="oidc-copy">${ic('copy', 's')} ${tr('Copy')}</button></div>` +
     row(tr('Scopes'), o.scopes) + row(tr('User name claim'), o.username_claim) + row(tr('Required group'), o.required_group) + row(tr('Admin group'), o.admin_group) +
-    hint(tr('Set with the KALMIDO_OIDC_* environment variables (restart after a change). The client secret is {0}.', o.secret_set ? tr('set') : tr('not set (public client with PKCE)')) + ' ' +
+    row(tr('Admin e-mail domains'), o.admin_domains) +
+    hint(tr('The client secret is {0}.', o.secret_set ? tr('set') : tr('not set (public client with PKCE)')) + ' ' +
       trn('{0} user is linked to the provider.', '{0} users are linked to the provider.', o.linked || 0)) +
     `<div class="featgrid"><label class="wide"><input type="checkbox" id="s-oidcauto" ${o.autocreate ? 'checked' : ''}><span>${tr('Create accounts on the first OIDC login')}<small class="muted">${tr('Off: only users an admin created can log in; the first login links them by user name or verified e-mail. On: anyone the provider lets through gets an account.')}</small></span></label></div>`;
   if (o.error) h += `<div class="shint cnote">${tr('Last problem with the provider: {0}', esc(o.error))}</div>`;
-  return h;
+  return h + oidcForm(o, hint);
+}
+// 2.9.0 (#438): the provider set up here (stored, the client secret encrypted with KALMIDO_SECRET_KEY); a field set by a
+// KALMIDO_OIDC_* variable is locked (the environment wins)
+const OIDC_DOCS = 'https://github.com/Gegenschuss/kalmido/blob/main/docs/OIDC.md';
+const OIDC_FORM = [['issuer', N_('Provider'), 'https://auth.example.com/application/o/kalmido/'], ['client_id', N_('Client ID'), ''], ['client_secret', N_('Client secret'), ''],
+  ['scopes', N_('Scopes'), 'openid profile email'], ['username_claim', N_('User name claim'), 'preferred_username'], ['groups_claim', N_('Groups claim'), 'groups'],
+  ['required_group', N_('Required group'), ''], ['admin_group', N_('Admin group'), ''], ['admin_domains', N_('Admin e-mail domains'), 'example.com'], ['label', N_('Button label'), 'OpenID Connect']];
+function oidcForm(o, hint) {
+  const env = new Set(o.env || []), st = o.stored || {};
+  const f = OIDC_FORM.map(([k, n, ph]) => {
+    const lock = env.has(k), sec = k === 'client_secret';
+    const val = lock ? (sec ? '' : o[k === 'admin_domains' ? 'admin_domains' : k] || '') : sec ? '' : st[k] || '';
+    const pl = lock ? tr('set by the server environment') : sec ? (o.secret_set && !env.has(k) ? tr('set (unchanged)') : tr('empty = public client with PKCE')) : ph;
+    return `<div class="row"><label for="oi-${k}">${tr(n)}</label><input id="oi-${k}" data-oik="${k}" ${sec ? 'type="password" autocomplete="new-password"' : 'autocomplete="off" spellcheck="false"'} value="${esc(val)}" placeholder="${esc(pl)}" ${lock ? 'readonly' : ''}>${sec && o.secret_set && !lock ? `<button class="btn sm" data-oidc="secret-del">${tr('Remove')}</button>` : ''}</div>`;
+  }).join('');
+  return `<details class="shelp sdet oidcform" ${o.configured ? '' : 'open'}><summary>${o.configured ? tr('Change the provider settings') : tr('Set up the provider')}</summary>
+    ${f}
+    ${hint(tr('Admin e-mail domains: comma-separated. Whoever logs in with a verified e-mail of one of them becomes an admin, like the admin group (and no longer is one otherwise; the last admin always stays).'))}
+    ${env.size ? hint(tr('Fields set with KALMIDO_OIDC_* environment variables are locked here: the environment always wins.')) : ''}
+    ${o.secret_lost ? `<div class="shint cnote">${tr('The stored client secret cannot be read with the current KALMIDO_SECRET_KEY: enter it again.')}</div>` : ''}
+    ${!o.secret_key && !env.has('client_secret') ? hint(tr('Without KALMIDO_SECRET_KEY on the server the client secret can only be set as an environment variable.')) : ''}
+    <div class="row"><button class="btn sm pri" data-oidc="save">${tr('Save')}</button>${o.configured ? `<button class="btn sm" data-oidc="check">${ic('check', 's')} ${tr('Check provider')}</button>` : ''}<a class="btn sm" href="${OIDC_DOCS}" target="_blank" rel="noopener noreferrer">${ic('help', 's')} ${tr('Provider guides')}</a></div>
+    <div class="shint" id="oi-res" role="status" aria-live="polite"></div></details>`;
+}
+function oidcWire(md) {
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('[data-oidc]'); if (!b) return;
+    const res = $('#oi-res', md), env = new Set(S.about?.oidc?.env || []);
+    if (b.dataset.oidc === 'check') {
+      b.disabled = true;
+      try { const j = await calReq('POST', '/api/admin/oidc/check', {}); res.textContent = j.ok ? tr('The provider answers: {0}', j.issuer) : tr('Provider check failed: {0}', j.error); }
+      catch (x) { res.textContent = x.message; } finally { b.disabled = false; }
+      return;
+    }
+    const body = {};
+    if (b.dataset.oidc === 'secret-del') body.client_secret = '';
+    else $$('[data-oik]', md).forEach(i => { const k = i.dataset.oik; if (env.has(k) || (k === 'client_secret' && !i.value)) return; body[k] = i.value.trim(); });
+    b.disabled = true;
+    try {
+      const o = await calReq('PUT', '/api/admin/oidc', body);
+      if (S.about) S.about.oidc = o;
+      toast(tr('Saved'));
+      const box = $('#s-signin', md); if (box) box.innerHTML = signinHtml(t => `<div class="shint">${t}</div>`);
+    } catch (x) { res.textContent = x.message; } finally { b.disabled = false; }
+  });
 }
 // ---- Settings > Users > Whole server > Backups
 const bkHtml = () => `<h4 id="s-bk-h">${tr('Backups')}</h4><div id="s-bk"><div class="muted mhint">${tr('Loading…')}</div></div>`;

@@ -7,6 +7,37 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-10-02
+
+**In short:** Your lists in Reminders, Thunderbird, Tasks.org and other CalDAV apps, both ways, with an app password per
+device; OIDC sign-in can be set up in the settings, with admins by e-mail domain and guides for six providers.
+
+### Added
+- **CalDAV server for tasks** (#435) at `/dav/` (discovery via `/.well-known/caldav`): every list you see is a VTODO
+  calendar for Reminders (iPhone, iPad, Mac), Thunderbird, Evolution, Tasks.org and DAVx⁵ (Tasks.org, jtx Board, OpenTasks).
+  PROPFIND, REPORT (calendar-query, calendar-multiget, sync-collection with sync tokens), GET / PUT (If-Match /
+  If-None-Match) / DELETE (to the trash), ETags and getctag per list. Synced: title, notes, due date and time (any
+  time zone), start, priority, done / won't do, your tags, subtasks (also when a child arrives first), repeat rules
+  (completing moves the task on), reminders and the link; everything else a client writes comes back unchanged. Viewers
+  get read-only lists, participants only their tasks; moving a task to another list in a client moves it in Kalmido;
+  changes show "via CalDAV" in the history (`via: "caldav"` in webhooks and agent events).
+- **App passwords** (#435): *Settings > Account > App passwords* (named, shown once, stored with the password KDF,
+  revocable, last use and client); failed logins lock out like the login form; never the account password, never an
+  agent. Also in the REST API: `GET / POST /api/v1/me/app-passwords`, `DELETE /api/v1/me/app-passwords/{id}`.
+- **Settings > Integrations > Calendar apps (CalDAV)**: server, address, user name, a button for a new app password and
+  step-by-step guides for iPhone / iPad, Mac, Thunderbird, Tasks.org, DAVx⁵, Evolution and Windows.
+- **OIDC set up in the settings** (#438): *Settings > Administration > Sign-in* stores the provider (the client secret
+  encrypted with `KALMIDO_SECRET_KEY`), a `KALMIDO_OIDC_*` variable that is set wins for its field; *Check provider*;
+  admins by verified e-mail domain (`KALMIDO_OIDC_ADMIN_DOMAINS`); Microsoft Entra's `xms_edov` counts as a verified
+  e-mail; auto-created accounts without a usable user name claim are named after the e-mail's local part.
+- docs/CALDAV.md (clients, mapping, which proxy paths must bypass a login proxy, Caddy / Authelia / nginx / Traefik) and
+  docs/OIDC.md (Authentik, Keycloak, Authelia, PocketID, Google Workspace, Microsoft Entra: redirect URI, scopes, groups).
+- Settings: `KALMIDO_CALDAV`, `KALMIDO_CALDAV_DONE_DAYS`, `KALMIDO_CALDAV_HTTP`, `KALMIDO_OIDC_ADMIN_DOMAINS`.
+
+### Security
+- CalDAV accepts HTTP Basic only while `PUBLIC_URL` is https (or with `KALMIDO_CALDAV_HTTP=1` on purpose), refuses DTDs
+  in request bodies, caps bodies at 1 MB and never reads the proxy header on `/dav`.
+
 ## [2.8.0] - 2026-10-02
 
 **In short:** A new look, "Leitstand": one sidebar with grouped navigation instead of the icon rail, a command bar, an
@@ -369,7 +400,8 @@ of people.
   multi-arch image (`ghcr.io/gegenschuss/kalmido`, linux/amd64 and linux/arm64), an installable web app that works
   offline, English and German.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.8.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.9.0...HEAD
+[2.9.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.9.0
 [2.8.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.8.0
 [2.7.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.7.2
 [2.7.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.7.1

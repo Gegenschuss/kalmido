@@ -994,6 +994,10 @@ button.whob:hover .who.none{opacity:1;border-color:var(--accent);color:var(--acc
 .tpmodal .card{max-width:38.75rem}
 .tplic{display:inline-flex;color:var(--muted);width:1.125rem;justify-content:center}
 .icalrow input{flex:1;font:.75rem var(--mono);min-width:0}
+/* 2.9.0 (#435 / #438): CalDAV address rows (copyable), the OIDC provider form */
+.davrow input{flex:1;font:.75rem var(--mono);min-width:0}
+@media (pointer:coarse){ .davrow .btn,.oidcform .btn,[data-apw],#s-apws .iconbtn{min-height:2.75rem;min-width:2.75rem;justify-content:center} }
+.oidcform .row input{flex:1;min-width:0}
 details.sdet{margin:.25rem 0 .625rem}
 details.sdet summary{cursor:pointer;color:var(--accent);font-size:.8125rem;margin-bottom:.375rem}
 

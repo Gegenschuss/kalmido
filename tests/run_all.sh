@@ -77,6 +77,12 @@ fresh; run v1 "$PY" v1_test.py "$KALMIDO_TEST_DATA"
 # package A: backups + restore (own containers), two-factor + passkeys (software authenticator), OIDC (fake provider inside
 # the container), then the sign-in / backup UI in jsdom (own container, page on http://localhost for WebAuthn)
        run backup "$PY" backup_test.py "$KALMIDO_TEST_DATA"
+# 2.9.0: CalDAV for tasks (#435: app passwords, discovery, PROPFIND / REPORT / sync-collection, PUT / GET / DELETE round trips
+# with VTODOs as Reminders, Thunderbird and Tasks.org write them, ETags, roles, lockout, http refused) and the OIDC settings
+# in the database (#438) (own containers); then the settings UI in jsdom and Firefox (360 / 390 touch, 1280 mouse). Shard 1:
+# it was the shortest (15.4 min on CI after 2.8.0)
+       run p290_dav "$PY" p290_dav_test.py "$KALMIDO_TEST_DATA"
+       run p290_ui node p290_ui.js "$KALMIDO_TEST_DATA"
 shard 2  # ---------------------------------------------------------------- shard 2 of 4
 fresh; run twofa "$PY" twofa_test.py "$KALMIDO_TEST_DATA"
        run oidc "$PY" oidc_test.py "$KALMIDO_TEST_DATA"

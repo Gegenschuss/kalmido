@@ -277,6 +277,20 @@ s, r = oidc_login({"sub": "sub-max", "preferred_username": "max", "groups": ["ka
 check(err_of(r) == "ok" and s.get(B + "/api/me").json()["is_admin"] is True, "admin group -> admin")
 s, r = oidc_login({"sub": "sub-max", "preferred_username": "max", "groups": "kalmido"})
 check(err_of(r) == "ok" and s.get(B + "/api/me").json()["is_admin"] is False, "left the admin group -> no longer admin (another admin exists)")
+# 2.9.0 (#438): admins by verified e-mail domain, stored in the settings next to the environment's admin group
+r = A.put(B + "/api/admin/oidc", json={"admin_domains": "corp.test"})
+check(r.status_code == 200 and r.json()["admin_domains"] == "corp.test" and "admin_group" in r.json()["env"], "admin domain stored next to the env group")
+s, r = oidc_login({"sub": "sub-max", "preferred_username": "max", "groups": ["kalmido"], "email": "max@corp.test", "email_verified": True})
+check(err_of(r) == "ok" and s.get(B + "/api/me").json()["is_admin"] is True, "verified e-mail of an admin domain -> admin")
+s, r = oidc_login({"sub": "sub-max", "preferred_username": "max", "groups": ["kalmido"], "email": "max@corp.test", "email_verified": False})
+check(err_of(r) == "ok" and s.get(B + "/api/me").json()["is_admin"] is False, "unverified e-mail of an admin domain -> no admin")
+# 2.9.0: an Entra-style login (user name with @, xms_edov instead of email_verified) creates "eva" when auto-create is on
+A.patch(B + "/api/admin/settings", json={"oidc_autocreate": True})
+s, r = oidc_login({"sub": "sub-eva", "preferred_username": "Eva@corp.test", "groups": ["kalmido"], "email": "eva@corp.test", "xms_edov": True})
+me = s.get(B + "/api/me").json() if err_of(r) == "ok" else {}
+check(me.get("username") == "eva" and me.get("is_admin") is True, f"Entra style: account eva from the verified e-mail, admin by domain ({me})")
+s, r = oidc_login({"sub": "sub-max2", "preferred_username": "max@else.test", "groups": ["kalmido"], "email": "max@else.test", "email_verified": True})
+check(err_of(r) == "taken", "the e-mail local part never links / reuses an existing account (max exists -> taken)")
 
 print(f"\n{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

@@ -16,14 +16,14 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.9.0** (2026-10-02): Your lists in Reminders, Thunderbird, Tasks.org and other CalDAV apps, both ways, with app
+  passwords; OIDC sign-in set up in the settings.
 - **2.8.0** (2026-10-02): A new look: one sidebar with grouped navigation, a command bar, an agent band under the list
   header, ticket numbers in the rows, own icons and a raspberry accent, in light and dark.
 - **2.7.2** (2026-10-01): Personal agents with setup guides for Linux, macOS and Windows, reactions and delivery status in
   the agent chat, clickable people, breadcrumbs in the task panel and "Show completed at the bottom" for every list.
 - **2.7.1** (2026-10-01): A *Project overview* in every project: description, key links, milestones, project files,
   members, status updates and the tracked time in one place.
-- **2.7.0** (2026-10-01): Reminders up to a year ahead with deadlines, reminders that repeat until done, time sums in
-  hours and days, steady layout on foldables, a simpler first start and a resizable News dropdown.
 
 All changes: [CHANGELOG.md](CHANGELOG.md) · [GitHub Releases](https://github.com/Gegenschuss/kalmido/releases)
 
@@ -221,6 +221,7 @@ All changes: [CHANGELOG.md](CHANGELOG.md) · [GitHub Releases](https://github.co
 - Push notifications without an extra app (Web Push: Chrome, Edge, Firefox, Safari, iPhone and iPad from the Home Screen) or via [ntfy](https://ntfy.sh): reminders with *Done* / *Snooze*, focus end, habit reminders, daily digest, comments and assignments; a notification you handled on one device (task completed or opened, News read) closes on your other devices
 - Share from your phone into the inbox: a ready-made import for the Android app HTTP Shortcuts, a guide for the iPhone Shortcuts app (see below); app shortcuts (long-press the icon: new task, today, news, search)
 - Profile pictures: ten sloth presets or your own photo (cropped square, resized, metadata removed), shown wherever the initials were
+- **Calendar apps (CalDAV), both ways**: every list as a task list in Reminders (iPhone, iPad, Mac), Thunderbird, Evolution, Tasks.org or DAVx⁵ on Android, with an app password per device ([Calendar apps](#calendar-apps-caldav))
 - **Calendar subscription**: your open tasks with a date as an ICS feed for Google Calendar, Apple Calendar, Outlook or Thunderbird
 - Optional [Paperless-ngx](https://docs.paperless-ngx.com) integration: link documents to tasks, send attachments to Paperless
 - **Import from Todoist, Trello, Asana, Microsoft To Do, TickTick and any ICS / VTODO file** (Apple Reminders exports, Nextcloud Tasks, Thunderbird) with a preview, re-import without duplicates and undo ([Moving from other apps](#moving-from-other-apps)); export everything as JSON (incl. your time entries)
@@ -611,6 +612,22 @@ how often that happens is up to the calendar app (Google: every few hours).
 The secret in the URL is the only credential: anyone with the link can read these tasks. *New link* replaces it
 (the old URL stops working at once), *Turn off* removes it. Wrong tokens answer 404 and are rate-limited per
 address. With a login proxy, let `/ical/*` bypass it (see *Reverse proxy*); Kalmido never reads the proxy header there.
+
+## Calendar apps (CalDAV)
+
+Kalmido is a CalDAV server for tasks: every list you see (not archived) shows up as a task list in Reminders on iPhone,
+iPad and Mac, Thunderbird, Evolution, Tasks.org or DAVx⁵ (with Tasks.org, jtx Board or OpenTasks) on Android, and changes
+go both ways. *Settings > Account > App passwords* creates a password per device (shown once, stored as a hash,
+revocable, with its last use); *Settings > Integrations > Calendar apps (CalDAV)* shows the server, the address
+`https://<host>/dav/`, your user name and step-by-step guides for each app. iPhone and Mac only need the host name
+(discovery via `/.well-known/caldav`).
+
+What syncs: title, notes, due date (all-day or with a time, any time zone is converted to the server's), start,
+priority, done / won't do, your tags (`CATEGORIES`), subtasks (`RELATED-TO`), repeat rules (daily to yearly; completing
+moves the task on as in the app), reminders (`VALARM`) and the link. Everything else a client writes comes back to it
+unchanged. Viewers get read-only lists, participants only their tasks; deleting moves to the trash; changes show "via
+CalDAV" in the history. Behind a login proxy, `/dav` and `/.well-known/caldav` must bypass the login (see *Reverse
+proxy*). Details, the mapping table and proxy examples (Caddy, Authelia, nginx, Traefik): [docs/CALDAV.md](docs/CALDAV.md).
 
 ## REST API and webhooks
 
@@ -1020,10 +1037,12 @@ your login proxy / identity provider there, and the account page says so. Wrong 
 wrong passwords (5 per user name / 20 per IP in 15 minutes), a login ticket dies after 5 wrong codes, and the answers
 never reveal whether an account exists or has two-factor on.
 
-### OpenID Connect (Authentik, Keycloak, Authelia, Google, ...)
+### OpenID Connect (Authentik, Keycloak, Authelia, PocketID, Google, Microsoft Entra, ...)
 
-A *Log in with ...* button on the login page. Configure it with environment variables (shown read-only in
-*Settings > Administration > Whole server*):
+A *Log in with ...* button on the login page. Set it up in *Settings > Administration > Sign-in* (2.9.0: the client
+secret is stored encrypted with `KALMIDO_SECRET_KEY`, *Check provider* tests the discovery) or with environment
+variables; a variable that is set always wins for its field (the settings show it locked). Step-by-step guides per
+provider (redirect URI, scopes, group claims): [docs/OIDC.md](docs/OIDC.md).
 
 ```ini
 KALMIDO_OIDC_ISSUER=https://auth.example.com          # discovery: <issuer>/.well-known/openid-configuration
@@ -1035,6 +1054,7 @@ KALMIDO_OIDC_BUTTON_LABEL=Authentik
 #KALMIDO_OIDC_GROUPS_CLAIM=groups
 #KALMIDO_OIDC_REQUIRED_GROUP=kalmido                   # only members may log in
 #KALMIDO_OIDC_ADMIN_GROUP=kalmido-admins               # admin flag follows this group (the last admin is never demoted)
+#KALMIDO_OIDC_ADMIN_DOMAINS=example.com               # 2.9.0: a verified e-mail of these domains = admin too
 ```
 
 Register Kalmido at the provider as a confidential client with the redirect URI **`<PUBLIC_URL>/api/auth/oidc/callback`**
@@ -1082,6 +1102,7 @@ except these paths:
 | `/static/shortcuts/*` | Icons of the app shortcuts in the manifest, also fetched without cookies. |
 | `/drop` (and `/drop/drop`) | Upload endpoint for share apps. Protected by each user's own bearer token. `/drop/drop` is an alias for shortcuts that append `/drop` to an address that already ends in it. |
 | `/ical/*` | Calendar subscription. Calendar apps cannot log in; the secret token in the URL protects it. |
+| `/dav`, `/dav/*`, `/.well-known/caldav` | CalDAV (2.9.0). Calendar apps cannot log in at a portal; Kalmido checks the user name + app password itself and never reads the proxy header there ([docs/CALDAV.md](docs/CALDAV.md#reverse-proxy-let-dav-past-the-login-proxy)). |
 | `/s/*`, `/static/public.css`, `/static/fonts/*`, `/static/icon.svg` | Public list links and the stylesheet, fonts and icon of their page. Visitors have no account; the secret token in the URL (and an optional password) protects the links; the static files contain no data. |
 | `/api/v1/*` **with** `Authorization: Bearer abk_...` | REST API. Scripts have a token, not a login cookie. Only let requests with an Kalmido token past the login, and send them to the app port where the proxy header is not trusted (see [docs/API.md](docs/API.md#behind-a-reverse-proxy) for nginx and Traefik). |
 
@@ -1101,6 +1122,9 @@ tasks.example.com {
 			header_regexp Authorization ^Bearer\s+abk_[A-Za-z0-9_-]{20,}$
 		}
 		reverse_proxy @kalmido_api 127.0.0.1:3040
+		# calendar apps (CalDAV): user name + app password, checked by Kalmido
+		@kalmido_dav path /dav /dav/* /.well-known/caldav /.well-known/caldav/*
+		reverse_proxy @kalmido_dav 127.0.0.1:3040
 		@gated not path /manifest.json /static/icon-192.png /static/icon-512.png /static/badge-96.png /static/shortcuts/* /drop /drop/drop /ical/* /s/* /static/public.css /static/fonts/* /static/icon.svg
 		forward_auth @gated authelia:9091 {
 			uri /api/authz/forward-auth
@@ -1165,12 +1189,16 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `KALMIDO_BACKUP_MAX_MB` | `4096` | Largest backup a restore accepts (upload size and unpacked total) |
 | `KALMIDO_WEBAUTHN_RP_ID` | host of the page | Passkeys: relying party ID, e.g. `example.com` to use passkeys on several subdomains |
 | `KALMIDO_WEBAUTHN_ORIGINS` | | Passkeys: extra origins (comma list, e.g. `https://tasks.example.net`) besides `PUBLIC_URL` |
-| `KALMIDO_OIDC_ISSUER`, `KALMIDO_OIDC_CLIENT_ID`, `KALMIDO_OIDC_CLIENT_SECRET` | | OpenID Connect login (see *Login > OpenID Connect*); issuer + client id turn it on |
+| `KALMIDO_OIDC_ISSUER`, `KALMIDO_OIDC_CLIENT_ID`, `KALMIDO_OIDC_CLIENT_SECRET` | | OpenID Connect login (see *Login > OpenID Connect*); issuer + client id turn it on. 2.9.0: also settable in *Settings > Administration > Sign-in*; a set variable wins per field |
+| `KALMIDO_OIDC_ADMIN_DOMAINS` | | Comma list of e-mail domains: a verified e-mail of one of them makes the person an admin (like `KALMIDO_OIDC_ADMIN_GROUP`) |
 | `KALMIDO_OIDC_SCOPES` | `openid profile email` | Scopes requested from the provider |
 | `KALMIDO_OIDC_USERNAME_CLAIM`, `KALMIDO_OIDC_GROUPS_CLAIM` | `preferred_username`, `groups` | Claims for the user name and the groups |
 | `KALMIDO_OIDC_REQUIRED_GROUP`, `KALMIDO_OIDC_ADMIN_GROUP` | | Only members of this group may log in; members of this one are admins |
 | `KALMIDO_OIDC_BUTTON_LABEL` | `OpenID Connect` | Text on the login button ("Log in with ...") |
 | `KALMIDO_OIDC_ALLOW_HOSTS` | | Internal hosts the OIDC requests may reach (`host` or `host:port`), e.g. a provider in your LAN |
+| `KALMIDO_CALDAV` | `1` | `0` turns CalDAV off (`/dav` and `/.well-known/caldav` answer 404, no new app passwords) |
+| `KALMIDO_CALDAV_DONE_DAYS` | `90` | Days completed tasks stay in the calendar apps |
+| `KALMIDO_CALDAV_HTTP` | `0` | `1` allows CalDAV logins while `PUBLIC_URL` is plain `http://` (only inside a trusted network: the app password is sent with every request) |
 | `KALMIDO_API` | `1` | `0` turns the REST API off (every `/api/v1` request answers 404, no new tokens) |
 | `KALMIDO_API_RATE` | `120` | API requests per token and minute |
 | `KALMIDO_WEBHOOKS` | `1` | `0` turns webhooks off (nothing is queued or sent) |
