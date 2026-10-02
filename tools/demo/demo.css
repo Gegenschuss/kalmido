@@ -1,0 +1,23 @@
+/* Kalmido browser demo: the demo bar on top and the notice for server features (uses the app's colour tokens). */
+:root.kdemo{--kd-h:2.75rem}
+:root.kdemo #app{height:calc(100dvh - var(--kd-h))}
+#kd-bar{position:relative;z-index:60;display:flex;align-items:center;gap:.5rem;height:var(--kd-h);box-sizing:border-box;padding:0 .5rem 0 .875rem;
+  background:color-mix(in srgb,var(--accent) 14%,var(--bg));border-bottom:.0625rem solid color-mix(in srgb,var(--accent) 35%,var(--bg));color:var(--text);
+  font:500 .8125rem/1.2 var(--sans);overflow:hidden}
+#kd-bar .kd-dot{flex:none;width:.5rem;height:.5rem;border-radius:50%;background:var(--accent)}
+#kd-bar .kd-txt{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#kd-bar .kd-sp{flex:1}
+.kd-btn{display:inline-flex;align-items:center;justify-content:center;min-height:2.75rem;box-sizing:border-box;padding:0 .75rem;border:0;border-radius:.5rem;
+  background:transparent;color:var(--text);font:600 .8125rem/1 var(--sans);text-decoration:none;cursor:pointer;white-space:nowrap}
+#kd-bar .kd-btn{min-height:2.25rem}
+@media (pointer:coarse){#kd-bar .kd-btn{min-height:2.75rem}}
+.kd-btn:hover{background:color-mix(in srgb,var(--accent) 18%,transparent)}
+.kd-btn:focus-visible{outline:.125rem solid var(--accent);outline-offset:.0625rem}
+.kd-btn.kd-pri{background:var(--accent);color:var(--accent-ink)}
+.kd-btn.kd-pri:hover{background:color-mix(in srgb,var(--accent) 85%,var(--text))}
+@media (max-width:40rem){#kd-bar .kd-pri{display:none}#kd-bar{font-size:.75rem}}
+#kd-note{position:fixed;z-index:9999;left:50%;bottom:1.25rem;transform:translateX(-50%);width:min(28rem,calc(100vw - 2rem));box-sizing:border-box;padding:1rem 1.125rem .75rem;
+  border:.0625rem solid var(--line2,var(--line));border-radius:.875rem;background:var(--bg2,var(--bg));color:var(--text);box-shadow:0 1rem 2.5rem rgba(0,0,0,.35);font:.875rem/1.45 var(--sans)}
+#kd-note b{display:block;font-size:.9375rem;margin-bottom:.25rem}
+#kd-note p{margin:0 0 .5rem;color:var(--muted,var(--text))}
+#kd-note .kd-row{display:flex;gap:.5rem;justify-content:flex-end;flex-wrap:wrap}

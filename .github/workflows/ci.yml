@@ -29,7 +29,7 @@ jobs:
       - name: Python syntax
         run: python -m py_compile app.py tools/*.py tests/*.py mcp/*.py
       - name: JavaScript syntax
-        run: for f in static/*.js tests/*.js; do node --check "$f"; done
+        run: for f in static/*.js tests/*.js tools/demo/*.js; do node --check "$f"; done
       - name: Translations complete
         run: |
           python tools/i18n_check.py
@@ -47,6 +47,37 @@ jobs:
           grep -oE '[A-Za-z0-9_.-]+==[0-9][0-9A-Za-z.]*' Dockerfile > /tmp/requirements.txt
           cat /tmp/requirements.txt
           pip-audit --strict -r /tmp/requirements.txt
+
+  demo:
+    # 2.12.0 (#436): the browser demo builds from the current sources and runs without a server (jsdom smoke test + Firefox
+    # layout when the runner has one), and quick add understands all six languages (on the demo build, no container)
+    name: Browser demo + quick add languages
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
+      - name: Test dependencies
+        run: npm ci --prefix tests
+      - name: Build the demo
+        run: python tools/build_demo.py /tmp/kalmido-demo && test -f /tmp/kalmido-demo/index.html
+      - name: Demo smoke test (jsdom, Firefox)
+        env:
+          TZ: Europe/Berlin
+          PYTHON: python
+        run: cd tests && node demo_test.js
+      - name: Quick add in six languages
+        env:
+          TZ: Europe/Berlin
+          PYTHON: python
+        run: cd tests && node quick_lang_test.js
 
   semgrep:
     name: semgrep (informational)

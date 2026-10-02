@@ -7,6 +7,30 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.12.0] - 2026-10-02
+
+**In short:** Try Kalmido in your browser without an account or server; quick add understands French, Spanish, Italian
+and Dutch.
+
+### Added
+- **Browser demo** (#436): `tools/build_demo.py` builds a static demo of the real app (`static/app.js`, `app.css`, the
+  translations) that runs without any server. An in-browser stand-in for the API (`tools/demo/shim.js`) keeps lists,
+  sections, tasks, tags, fields, dependencies, repeats, comments, time entries, habits, filters, milestones, project
+  status and settings in the browser's storage; Today, Upcoming, kanban, timeline, calendar, matrix, statistics, time
+  reports and the day plan work on it. Sample data in the browser's language (one of the six), a simulated agent with
+  one approval (clearly marked), a bar "Demo – your data stays in this browser" with *Reset demo* and the install link.
+  Server features show a notice with the way to install. The page allows no network connection (CSP
+  `connect-src 'none'`), has no service worker and no analytics. CI builds it and opens it in jsdom and Firefox
+  (`tests/demo_test.js`).
+- **Quick add in French, Spanish, Italian and Dutch**: dates (today, tomorrow, the day after, weekdays, next week /
+  month, weekend, "in 3 days"), times (`15h30`, `a las 9`, `alle 15`, `15 uur`) and repeats in the language the app
+  runs in, on top of English and German. Day / month with a slash (`3/10`, `3/10/27`) works in every language. The
+  quick add hints of these languages use their own words and the symbols `!!!` / `!!` / `!` for the priority.
+  `tests/quick_lang_test.js` covers every language.
+
+### Changed
+- Service worker cache `tasks-shell-v81`.
+
 ## [2.11.0] - 2026-10-02
 
 **In short:** Kalmido now speaks French, Spanish, Italian and Dutch (beta); planning your day never moves a due date;
@@ -467,7 +491,8 @@ of people.
   multi-arch image (`ghcr.io/gegenschuss/kalmido`, linux/amd64 and linux/arm64), an installable web app that works
   offline, English and German.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.11.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.12.0...HEAD
+[2.12.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.12.0
 [2.11.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.11.0
 [2.10.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.10.0
 [2.9.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.9.0

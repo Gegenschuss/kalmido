@@ -63,6 +63,8 @@ Check your change before the pull request:
 ```sh
 python3 tools/i18n_check.py fr        # one language: 100 %, 0 missing, 0 errors, 0 unused
 python3 tests/i18n_test.py            # all languages: keys, unused keys, placeholders, plurals, HTML tags, _meta
+node tests/demo_test.js               # the browser demo: build, boot without a server, reload, reset, no network
+node tests/quick_lang_test.js         # quick add words in all six languages
 ```
 
 When you change or add an English text in the code, every language file needs the new key (the checker lists it as

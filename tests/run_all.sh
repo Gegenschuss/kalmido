@@ -194,6 +194,11 @@ fresh; run p208_ui node p208_ui.js
 # 2.11.0 (#439): every translation file complete (100 % of the keys, none unused, placeholders, plurals, HTML tags,
 # _meta + beta marks) and the server's per-language number / date / plural helpers (no container)
        run i18n "$PY" i18n_test.py
+# 2.12.0 (#436): the browser demo (tools/build_demo.py -> jsdom: boot on the in-browser API, quick add, reload, reset, the
+# simulated agent, notices for server features, no network; Firefox 390 touch / 1280, light + dark) and quick add in all six
+# languages (#436, parseQuick on the demo build) (no container)
+       run demo node demo_test.js
+       run quick_lang node quick_lang_test.js
 # 2.1.2: transfer list ownership (#349: owner -> person, admin takeover of lists of agents / disabled users, history, News, the
 # token API) + agents' username / picture and the agents in the user list (#346); then the UI in jsdom
        run p212_api "$PY" p212_api_test.py "$KALMIDO_TEST_DATA"

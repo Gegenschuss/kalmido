@@ -9,21 +9,23 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 <p align="center"><a href="https://github.com/Gegenschuss/kalmido/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/Gegenschuss/kalmido?label=version"></a> <a href="https://github.com/Gegenschuss/kalmido/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Gegenschuss/kalmido/actions/workflows/ci.yml/badge.svg"></a> <a href="LICENSE"><img alt="License: AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-blue"></a></p>
 
-<p align="center"><img src="docs/today.png" alt="Today view with overdue and today's tasks, subtasks, tags and the list sidebar"></p>
+<p align="center"><picture><source media="(prefers-color-scheme: light)" srcset="docs/today-light.png"><img src="docs/today.png" alt="Today view with an agent waiting for approval, overdue and today's tasks, subtasks, tags and the list sidebar"></picture></p>
+
+<p align="center"><b><a href="https://kalmido.com/demo/">Try it in your browser</a></b>: no account, no server, your data stays in your browser.</p>
 
 > **Language:** the interface is **English** by default, with **German** included and **French, Spanish, Italian and Dutch** in beta (machine-translated, corrections welcome); switch under *Settings > General > Language*. More languages are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md#translations) and [TRANSLATING.md](TRANSLATING.md). Kalmido = calm + the Japanese -do (道, “the way”, as in aikido or judo): the calm way of getting things done.
 > Kalmido is an independent project and not affiliated with any other task app.
 
 ## What's new
 
+- **2.12.0** (2026-10-02): Try Kalmido in your browser without an account (the [demo](https://kalmido.com/demo/)); quick
+  add understands French, Spanish, Italian and Dutch words too.
 - **2.11.0** (2026-10-02): French, Spanish, Italian and Dutch (beta), a day plan that never moves due dates, violet as
   the default accent, subagent usage in the Claude Code hook.
 - **2.10.0** (2026-10-02): Groups for sharing and "whoever has time" tasks, *Plan my day* between your appointments
   (built in or by an agent), an evening review, real client addresses behind a proxy.
 - **2.9.0** (2026-10-02): Your lists in Reminders, Thunderbird, Tasks.org and other CalDAV apps, both ways, with app
   passwords; OIDC sign-in set up in the settings.
-- **2.8.0** (2026-10-02): A new look: one sidebar with grouped navigation, a command bar, an agent band under the list
-  header, ticket numbers in the rows, own icons and a raspberry accent, in light and dark.
 
 ## Why Kalmido
 
@@ -57,7 +59,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - Subtasks up to three levels, drag and drop between lists and levels
 - Priorities, tags, pinned tasks, Markdown notes, attachments (images, PDFs, documents)
 - A website link per task, shown as a small domain chip (paste a URL in quick add or share a page from Android)
-- Natural-language quick add in English and German, whatever the interface language: `Dentist tomorrow 3pm !high #private ~Work` or `Zahnarzt morgen 15 Uhr !hoch #privat ~Arbeit`
+- Natural-language quick add in English and German, whatever the interface language, plus French, Spanish, Italian or Dutch when the app runs in that language: `Dentist tomorrow 3pm !high #private ~Work`, `Zahnarzt morgen 15 Uhr !hoch #privat ~Arbeit`, `Dentiste demain 15h !!! #privé`
 - Recurring tasks (daily, weekdays, weekly, monthly, yearly, every n days / weeks / months with weekdays, or any RRULE for experts) with end date, count and skip
 - **Dates save as you pick them** (2.6.1): in the date popover every tap (day, time, start, duration, reminders,
   repeat) is saved at once and the popover stays open for more; *Done* (or a click outside, Esc) closes it and leaves
@@ -254,7 +256,21 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 | <img src="docs/appearance.png" alt="Settings, Appearance tab with a live preview, color scheme, density, font size, font and accent color"> | <img src="docs/appearance-light.png" alt="Today in the light theme with the violet accent, Atkinson Hyperlegible and the large font size"> |
 | Settings > Appearance | Light, violet, Atkinson Hyperlegible, 112 % |
 
-<p align="center"><img src="docs/mobile.png" width="300" alt="Phone layout with tab bar"></p>
+<p align="center"><img src="docs/mobile.png" width="300" alt="Phone layout with tab bar, dark"> <img src="docs/mobile-light.png" width="300" alt="Phone layout with tab bar, light"></p>
+
+## Try it without installing
+
+[kalmido.com/demo](https://kalmido.com/demo/) runs the real app in your browser with sample data in your language (a
+client website project with sections, tickets, milestones, time entries and dependencies, a personal list, and a
+simulated agent that waits for your approval). There is no server behind it: an in-browser stand-in for the API keeps
+everything in your browser's storage, the page's Content-Security-Policy forbids every network connection
+(`connect-src 'none'`), and there is no analytics. *Reset demo* brings the sample back. Features that need a server
+(push notifications, CalDAV, calendar subscriptions, real agents, Paperless, Git, webhooks, OIDC, more users) show a
+short notice with the way to install.
+
+The demo is built from the current sources by `python3 tools/build_demo.py [out_dir]` (static files only; serve the
+folder with any web server, e.g. `python3 -m http.server` in it). CI builds it and opens it in jsdom
+(`tests/demo_test.js`) so it cannot drift from the app.
 
 ## Quick start
 
@@ -1235,7 +1251,8 @@ Each language other than English is one JSON file in [`static/i18n/`](static/i18
 automatically. Want Kalmido in your language? [TRANSLATING.md](TRANSLATING.md) explains how to add one in a few
 steps (copy `de.json`, translate, run `python3 tools/i18n_check.py`, open a pull request).
 
-Quick add always understands English and German, independent of this setting:
+Quick add always understands English and German; with French, Spanish, Italian or Dutch chosen here it also understands
+that language (2.12.0). Priority, tags and the list are symbols in every language (`!!!` / `!!` / `!`, `#tag`, `~list`):
 
 | | English | German |
 |---|---|---|
@@ -1244,6 +1261,14 @@ Quick add always understands English and German, independent of this setting:
 | Repeat | `daily`, `every day`, `weekdays`, `weekly`, `every monday`, `every 2 weeks`, `monthly`, `yearly` | `täglich`, `werktags`, `wöchentlich`, `jeden montag`, `alle 2 wochen`, `monatlich`, `jährlich` |
 | Priority | `!high`, `!medium`, `!low` (or `!!!`, `!!`, `!`) | `!hoch`, `!mittel`, `!niedrig` |
 | Tag, list | `#tag`, `~list`, `in list Work`, `… in Work` at the end (only an exact list name) | `#tag`, `~liste`, `in Liste Arbeit`, `… in Arbeit` am Ende (nur ein genauer Listenname) |
+
+| | French | Spanish | Italian | Dutch |
+|---|---|---|---|---|
+| Dates | `aujourd'hui`, `demain`, `après-demain`, `vendredi`, `lundi prochain`, `dans 3 jours`, `la semaine prochaine`, `3/10` | `hoy`, `mañana`, `pasado mañana`, `viernes`, `el próximo lunes`, `en 3 días`, `la próxima semana`, `3/10` | `oggi`, `domani`, `dopodomani`, `venerdì`, `lunedì prossimo`, `tra 3 giorni`, `la settimana prossima`, `3/10` | `vandaag`, `morgen`, `overmorgen`, `vrijdag`, `volgende maandag`, `over 3 dagen`, `volgende week`, `3/10` |
+| Times | `15h`, `à 9h30` | `a las 15`, `a las 9:30` | `alle 15`, `alle 9:30` | `15 uur`, `om 9:30` |
+| Repeat | `tous les jours`, `en semaine`, `chaque semaine`, `chaque lundi`, `toutes les 2 semaines`, `chaque mois`, `chaque année` | `todos los días`, `entre semana`, `cada semana`, `cada lunes`, `cada 2 semanas`, `cada mes`, `cada año` | `ogni giorno`, `nei giorni feriali`, `ogni settimana`, `ogni lunedì`, `ogni 2 settimane`, `ogni mese`, `ogni anno` | `dagelijks`, `elke werkdag`, `wekelijks`, `elke maandag`, `elke 2 weken`, `maandelijks`, `jaarlijks` |
+
+Dates with a slash (`3/10`, `3/10/27`) are day / month in every language, like the dotted `3.10.`.
 
 Task titles, list names, tags and notes are never translated.
 

@@ -143,12 +143,13 @@ missing, removed ones as unused.
 - The service worker precaches `de.json`; any other language file is cached on first use, and the app keeps
   the active one in `localStorage`, so the chosen language also works offline.
 
-## Quick add stays English + German
+## Quick add words of a language
 
-The natural-language quick add (`tomorrow 3pm !high #tag ~list`) understands English and German keywords,
-whatever the interface language. Those words are not translations but parser patterns in `static/app.js`:
-`parseQuick()` (regular expressions for repeat, date, time and priority words), `WDAY` (weekday names) and
-`PRIO_WORDS` (`!high`, `!hoch`, ...). To teach it another language, add that language's words there and extend
-the matching regular expressions; the parser is shared by all languages, so avoid words that clash with
-English or German. Keep the quick-add help text in the settings (the translation of the key that starts
-with `today, tomorrow, day after tomorrow`) in line with what the parser really understands.
+The natural-language quick add (`tomorrow 3pm !!! #tag ~list`) always understands English and German keywords, and
+since 2.12.0 also the words of the interface language for French, Spanish, Italian and Dutch. Those words are not
+translations but parser patterns in `static/app.js`: the table `QL` (one entry per language: today / tomorrow / day after
+tomorrow, next week / month, weekend, weekday names, "next <weekday>", "in N days", time words, repeat words; regular
+expression parts, matched case-insensitively between spaces). To teach quick add a new language, add its entry to `QL`
+and cases to `tests/quick_lang_test.js`. Priority, tags and the list stay symbols (`!!!` / `!!` / `!`, `#tag`, `~list`).
+Keep the quick-add hints (the keys that start with `today, tomorrow, day after tomorrow`, `tomorrow 3pm ·` and
+`Add task: “Dentist`) in line with what the parser really understands, in the language's own words.

@@ -313,7 +313,7 @@
   "Dark": "Dunkel",
   "Light": "Hell",
   "Language": "Sprache",
-  "Applies to all devices and to the notifications. Quick add always understands German and English.": "Gilt für alle Geräte und die Benachrichtigungen. Die Schnell-Eingabe versteht immer Deutsch und Englisch.",
+  "Applies to all devices and to the notifications. Quick add understands English, German and the language chosen here.": "Gilt für alle Geräte und die Benachrichtigungen. Die Schnell-Eingabe versteht Englisch, Deutsch und die hier gewählte Sprache.",
   "Completed tasks": "Erledigte Aufgaben",
   "Data": "Daten",
   "Export": "Export",

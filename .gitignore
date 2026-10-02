@@ -8,3 +8,6 @@ tests/node_modules
 tests/ids.json
 tests/news_ids.json
 tests/cal_ids.json
+tests/.demo/
+/demo/
+tests/.demo-quick/

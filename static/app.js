@@ -782,6 +782,36 @@ function nextWeekday(wd, fromNextWeek) {
   if (fromNextWeek && d < 7) { const mon = pd(mondayOf(today())); mon.setDate(mon.getDate() + 7 + ((wd + 6) % 7)); return ds(mon); }
   return addDays(today(), d);
 }
+// 2.12.0: quick add in French, Spanish, Italian and Dutch. English and German words always work (as before); the words of
+// these four only while the app runs in that language (a Spanish "domingo" in an English title stays text). Regex parts,
+// matched case-insensitively between spaces. Priority, tags and the list stay symbols (!!! / #tag / ~list) in every language.
+//   wd: weekday names (Sunday first, like Date.getDay()), pre: "on / this <weekday>", next / nextPost: "next <weekday>" /
+//   "<weekday> next", inN + one + units: "in 3 days" / "in a week", at / atH: times ("à 15h30", "a las 9", "om 15 uur"),
+//   rep: repeat words (daily, weekdays, weekly, monthly, yearly; every: "every <weekday>", everyN: "every 2 weeks")
+const QL = {
+  fr: {today: "aujourd['’]hui", tomorrow: 'demain', after: 'après-demain', nextWeek: '(?:la )?semaine prochaine', nextMonth: '(?:le )?mois prochain', weekend: '(?:ce |le )?week-end',
+    wd: ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'], pre: 'le|ce', next: '', nextPost: 'prochain',
+    inN: 'dans', one: 'une?', units: ['jours?', 'semaines?', 'mois'], at: 'à', atH: true, datePre: 'le',
+    rep: {daily: 'tous les jours|chaque jour|quotidiennement', weekdays: 'en semaine|chaque jour ouvré|les jours ouvrés', weekly: 'chaque semaine|toutes les semaines|hebdomadaire',
+      monthly: 'chaque mois|tous les mois|mensuellement', yearly: 'chaque année|tous les ans|annuellement', every: '(?:chaque|tous les)', everyN: '(?:tous|toutes) les', unitsN: ['jours', 'semaines', 'mois']}},
+  es: {today: 'hoy', tomorrow: 'mañana', after: 'pasado mañana', nextWeek: '(?:la )?(?:próxima semana|semana que viene)', nextMonth: '(?:el )?(?:próximo mes|mes que viene)', weekend: '(?:este |el )?fin de semana',
+    wd: ['domingo', 'lunes', 'martes', 'mi[ée]rcoles', 'jueves', 'viernes', 's[áa]bado'], pre: 'el|este', next: '(?:el )?próximo', nextPost: 'que viene',
+    inN: 'en|dentro de', one: 'una?', units: ['d[íi]as?', 'semanas?', 'mes(?:es)?'], at: 'a las?', atH: false, datePre: 'el',
+    rep: {daily: 'todos los días|cada día|a diario|diariamente', weekdays: 'entre semana|cada día laborable|días laborables', weekly: 'cada semana|todas las semanas|semanalmente',
+      monthly: 'cada mes|todos los meses|mensualmente', yearly: 'cada año|todos los años|anualmente', every: '(?:cada|todos los)', everyN: 'cada', unitsN: ['días', 'semanas', 'meses']}},
+  it: {today: 'oggi', tomorrow: 'domani', after: 'dopodomani', nextWeek: '(?:la )?(?:settimana prossima|prossima settimana)', nextMonth: '(?:il )?(?:mese prossimo|prossimo mese)', weekend: '(?:questo |il |nel )?fine settimana',
+    wd: ['domenica', 'luned[ìi]', 'marted[ìi]', 'mercoled[ìi]', 'gioved[ìi]', 'venerd[ìi]', 'sabato'], pre: 'il|la|questo|questa', next: 'prossim[oa]', nextPost: 'prossim[oa]',
+    inN: 'tra|fra', one: 'una?', units: ['giorni|giorno', 'settimane|settimana', 'mesi|mese'], at: 'alle(?: ore)?', atH: false, datePre: 'il',
+    rep: {daily: 'ogni giorno|tutti i giorni|quotidianamente', weekdays: 'nei giorni feriali|ogni giorno feriale|giorni feriali', weekly: 'ogni settimana|settimanalmente',
+      monthly: 'ogni mese|mensilmente', yearly: 'ogni anno|annualmente', every: 'ogni', everyN: 'ogni', unitsN: ['giorni', 'settimane', 'mesi']}},
+  nl: {today: 'vandaag', tomorrow: 'morgen', after: 'overmorgen', nextWeek: 'volgende week', nextMonth: 'volgende maand', weekend: '(?:dit |het )?weekend',
+    wd: ['zondag', 'maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag'], pre: 'op|deze', next: 'volgende|aanstaande', nextPost: '',
+    inN: 'over', one: 'een|één', units: ['dagen|dag', 'weken|week', 'maanden|maand'], at: 'om', atH: false, uur: true, datePre: 'op',
+    rep: {daily: 'dagelijks|elke dag|iedere dag', weekdays: 'elke werkdag|op werkdagen|doordeweeks', weekly: 'wekelijks|elke week|iedere week',
+      monthly: 'maandelijks|elke maand|iedere maand', yearly: 'jaarlijks|elk jaar|ieder jaar', every: '(?:elke|iedere)', everyN: '(?:elke|iedere|om de)', unitsN: ['dagen', 'weken', 'maanden']}},
+};
+// the weekday number of a name matched by one of the QL patterns
+const qlWd = (L, w) => L.wd.findIndex(p => new RegExp(`^(?:${p})$`, 'i').test(w));
 function parseQuick(text, ignore = new Set()) {
   const out = {title: text, chips: []};
   let s = ' ' + text + ' ';
@@ -804,6 +834,48 @@ function parseQuick(text, ignore = new Set()) {
     else out.repeat = 'FREQ=YEARLY';
     return repeatLabel(out.repeat);
   });
+  const L = QL[I18N.code] || null, dayIn = (n, u) => { const d = pd(today()); if (u === 0) d.setDate(d.getDate() + n); else if (u === 1) d.setDate(d.getDate() + 7 * n); else d.setMonth(d.getMonth() + n); return ds(d); };
+  const unitOf = (us, w) => us.findIndex(p => new RegExp(`^(?:${p})$`, 'i').test(w));
+  if (L) {  // 2.12.0: repeat, dates and times in the app language (fr / es / it / nl), before the English / German ones
+    const R = L.rep, WDS = L.wd.join('|');
+    take(new RegExp(`\\s(${R.daily}|${R.weekdays}|${R.weekly}|${R.monthly}|${R.yearly}|${R.every} (${WDS})s?|${R.everyN} (\\d+) (${R.unitsN.join('|')}))(?=\\s)`, 'i'), 'repeat', m => {
+      const w = m[1];
+      if (m[2]) { const wd = qlWd(L, m[2]); out.repeat = 'FREQ=WEEKLY;BYDAY=' + RR_WD[wd]; out.due = out.due || nextOrToday(wd); }
+      else if (m[3]) { const u = unitOf(R.unitsN, m[4]); out.repeat = `FREQ=${['DAILY', 'WEEKLY', 'MONTHLY'][u]};INTERVAL=${+m[3]}`; }
+      else out.repeat = [[R.daily, 'FREQ=DAILY'], [R.weekdays, 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR'], [R.weekly, 'FREQ=WEEKLY'], [R.monthly, 'FREQ=MONTHLY'], [R.yearly, 'FREQ=YEARLY']]
+        .find(([re]) => new RegExp(`^(?:${re})$`, 'i').test(w))[1];
+      return repeatLabel(out.repeat);
+    });
+    take(new RegExp(`\\s(${L.after}|${L.today}|${L.tomorrow})(?=\\s)`, 'i'), 'date', m => {
+      const w = m[1].toLowerCase();
+      out.due = new RegExp(`^(?:${L.after})$`, 'i').test(w) ? addDays(today(), 2) : new RegExp(`^(?:${L.tomorrow})$`, 'i').test(w) ? addDays(today(), 1) : today();
+      return dayLabel(out.due);
+    });
+    if (!out.due || ignore.has('date')) take(new RegExp(`\\s(${L.nextWeek})(?=\\s)`, 'i'), 'date', () => { out.due = nextWeekday(1); return dayLabel(out.due); });
+    if (!out.due || ignore.has('date')) take(new RegExp(`\\s(${L.nextMonth})(?=\\s)`, 'i'), 'date', () => { const d = pd(today()); d.setMonth(d.getMonth() + 1, 1); out.due = ds(d); return dayLabel(out.due); });
+    if (!out.due || ignore.has('date')) take(new RegExp(`\\s(${L.weekend})(?=\\s)`, 'i'), 'date', () => { out.due = nextOrToday(6); return dayLabel(out.due); });
+    if (!out.due || ignore.has('date')) take(new RegExp(`\\s(?:(${[L.pre, L.next].filter(Boolean).join('|')})\\s)?(${WDS})(?:\\s(${L.nextPost || '(?!)'}))?(?=\\s)`, 'i'), 'date', m => {
+      const wd = qlWd(L, m[2]), nx = (L.next && m[1] && new RegExp(`^(?:${L.next})$`, 'i').test(m[1])) || !!m[3];
+      out.due = nx ? nextWeekday(wd, true) : nextWeekday(wd); return dayLabel(out.due);
+    });
+    if (!out.due || ignore.has('date')) take(new RegExp(`\\s(?:${L.inN}) (\\d+|${L.one}) (${L.units.join('|')})(?=\\s)`, 'i'), 'date', m => {
+      const n = /^\d+$/.test(m[1]) ? +m[1] : 1; out.due = dayIn(n, unitOf(L.units, m[2])); return dayLabel(out.due);
+    });
+  }
+  // 2.12.0: day / month with a slash (3/10, 3/10/27), in every language (day first, like the dotted 3.10.)
+  if (!out.due || ignore.has('date')) take(new RegExp(`\\s(?:(?:${L ? L.datePre : 'am|on'})\\s)?(\\d{1,2})/(\\d{1,2})(?:/(\\d{2}|\\d{4}))?(?=\\s)`, 'i'), 'date', m => {
+    const t = pd(today()); let y = m[3] ? +m[3] : t.getFullYear(); if (y < 100) y += 2000;
+    if (+m[2] < 1 || +m[2] > 12) return false;
+    const d = new Date(y, +m[2] - 1, +m[1]); if (isNaN(d) || d.getDate() !== +m[1]) return false;
+    if (!m[3] && ds(d) < today()) d.setFullYear(y + 1);
+    out.due = ds(d); return dayLabel(out.due);
+  });
+  if (L) {  // times: "à 15h30", "15h", "a las 9", "alle 15:30", "om 15 uur"
+    const hm = (h, mi) => { h = +h; mi = +(mi || 0); if (h > 23 || mi > 59) return false; out.due_time = `${pad(h)}:${pad(mi)}`; out.due = out.due || (out.due_time < nowHM() ? addDays(today(), 1) : today()); return out.due_time; };
+    if (L.atH) take(new RegExp(`\\s(?:(?:${L.at})\\s)?(\\d{1,2})\\s?h(\\d{2})?(?=\\s)`, 'i'), 'time', m => hm(m[1], m[2]));
+    if (L.uur) take(new RegExp(`\\s(?:(?:${L.at})\\s)?(\\d{1,2})(?::(\\d{2}))?\\s?uur(?=\\s)`, 'i'), 'time', m => hm(m[1], m[2]));
+    take(new RegExp(`\\s(?:${L.at})\\s(\\d{1,2})(?:[:h](\\d{2}))?(?=\\s)`, 'i'), 'time', m => hm(m[1], m[2]));
+  }
   take(/\s(übermorgen|(?:the )?day after tomorrow|heute|morgen|today|tomorrow)(?=\s)/i, 'date', m => {
     const w = m[1].toLowerCase();
     out.due = w === 'übermorgen' || w.endsWith('after tomorrow') ? addDays(today(), 2) : (w === 'morgen' || w === 'tomorrow') ? addDays(today(), 1) : today();
@@ -826,7 +898,7 @@ function parseQuick(text, ignore = new Set()) {
     if (!m[3] && ds(d) < today()) d.setFullYear(y + 1);
     out.due = ds(d); return dayLabel(out.due);
   });
-  take(/\s(?:um\s)?(\d{1,2})(?::(\d{2}))?\s?uhr(?=\s)|\sum\s(\d{1,2})(?::(\d{2}))?(?=\s)|\s(?:at\s)?(\d{1,2}):(\d{2})(?=\s)|\s(?:at\s)?(\d{1,2})(?::(\d{2}))?\s?(am|pm)(?=\s)/i, 'time', m => {
+  if (!out.due_time) take(/\s(?:um\s)?(\d{1,2})(?::(\d{2}))?\s?uhr(?=\s)|\sum\s(\d{1,2})(?::(\d{2}))?(?=\s)|\s(?:at\s)?(\d{1,2}):(\d{2})(?=\s)|\s(?:at\s)?(\d{1,2})(?::(\d{2}))?\s?(am|pm)(?=\s)/i, 'time', m => {
     let h = +(m[1] ?? m[3] ?? m[5] ?? m[7]), mi = +(m[2] ?? m[4] ?? m[6] ?? m[8] ?? 0);
     if (m[9]) { if (m[9].toLowerCase() === 'pm' && h < 12) h += 12; if (m[9].toLowerCase() === 'am' && h === 12) h = 0; }
     if (h > 23 || mi > 59) return false;
@@ -6657,7 +6729,7 @@ function settingsModal(focus) {
       <div class="row" style="margin-top:.5rem"><select id="s-tabadd" style="flex:1" aria-label="${tr('+ Add tab …')}"></select><button class="btn sm" data-m="tab-reset">${tr('Default')}</button></div>`,
     general: `<h4 id="s-lang-h">${tr('Language')}</h4>
       <div class="row"><div class="seg" id="s-lang" role="group" aria-labelledby="s-lang-h">${(S.languages || []).map(L => `<button data-lang-set="${esc(L.code)}" class="${(s.lang || 'en') === L.code ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div></div>
-      ${hint(tr('Applies to all devices and to the notifications. Quick add always understands German and English.'))}
+      ${hint(tr('Applies to all devices and to the notifications. Quick add understands English, German and the language chosen here.'))}
       <h4>${tr('Celebrations')}</h4>
       <div class="row"><label>${tr('Sloth')}</label>${chk('s-celebrate', s.celebrate !== '0', tr('Celebrate completions'))}</div>
       ${hint(tr('When Today is cleared or a list or project is complete, the sloth swings by with a one-liner. With reduced motion (system setting) it just says hello.'))}
