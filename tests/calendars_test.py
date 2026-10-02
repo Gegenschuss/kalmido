@@ -295,6 +295,11 @@ r = py_in_app("""try:
 except app.CalError as e:
     print(e.code)""")
 check(r == "parse", "DTD / entity in a CalDAV answer refused: " + r)
+r = py_in_app("""try:
+    app._dav_xml('<?xml version="1.0" encoding="UTF-16"?><!DOCTYPE x [<!ENTITY e "y">]><a>&e;</a>'.encode('utf-16')); print('parsed')
+except app.CalError as e:
+    print(e.code)""")
+check(r == "parse", "DTD / entity in a UTF-16 CalDAV answer refused: " + r)
 r = A.post(B + "/api/calendars/discover", json={"url": STUB + "/dav/xxe/", "username": "alice", "password": "secret-pw"})
 check("root:" not in r.text, "no file content through an XML entity")
 r = A.post(B + "/api/calendars", json={"kind": "caldav", "url": STUB + "/", "username": "alice", "password": "secret-pw",

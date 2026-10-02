@@ -151,8 +151,10 @@ check(login("alice", "password123", "203.0.113.50, 198.51.100.77").ok,
       "only the rightmost X-Forwarded-For entry counts (the one the proxy appended)")
 r = login("alice", "password123", "198.51.100.10", **{"X-Forwarded-Proto": "https"})
 check(r.ok and "Secure" in r.headers.get("Set-Cookie", ""), "X-Forwarded-Proto https from the proxy: Secure cookie")
+check(r.headers.get("Strict-Transport-Security") == "max-age=31536000", "https from the proxy: HSTS header")
 r = login("alice", "password123", "198.51.100.10")
 check(r.ok and "Secure" not in r.headers.get("Set-Cookie", ""), "plain http: no Secure flag")
+check("Strict-Transport-Security" not in r.headers, "plain http: no HSTS header")
 check(login("alice", "password123", "not-an-ip").status_code in (200, 400), "a malformed X-Forwarded-For does not crash the app")
 # the proxy login still trusts the DIRECT peer (+ its port), not a forwarded address
 pp = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PROXY_PORT", "3041")

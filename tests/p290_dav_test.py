@@ -410,6 +410,10 @@ check("STATUS:COMPLETED" in g and "COMPLETED:" in g and "PERCENT-COMPLETE:100" i
 A.post(B + f"/api/tasks/{t1}/reopen", json={})
 check(req(D, "REPORT", WORK, "<x/>", 1).status_code == 403, "an unknown report: 403")
 check(req(D, "PROPFIND", WORK, '<!DOCTYPE x [<!ENTITY a "b">]><D:propfind xmlns:D="DAV:"/>', 0).status_code == 400, "no DTDs / entities: 400")
+u16 = '<?xml version="1.0" encoding="UTF-16"?><!DOCTYPE x [<!ENTITY a "b">]><D:propfind xmlns:D="DAV:"><D:prop>&a;</D:prop></D:propfind>'
+check(req(D, "PROPFIND", WORK, u16.encode("utf-16"), 0).status_code == 400, "no DTDs / entities in a UTF-16 body either: 400")
+late = '<?xml version="1.0"?><!--' + "x" * 5000 + '--><!DOCTYPE x [<!ELEMENT x ANY>]><D:propfind xmlns:D="DAV:"/>'
+check(req(D, "PROPFIND", WORK, late, 0).status_code == 400, "a DOCTYPE after a long comment: 400")
 check(req(D, "PROPFIND", WORK, "<not xml", 0).status_code == 400, "broken XML: 400")
 
 # ---------------------------------------------------------------- status, repeat, subtasks, tags, moves, delete

@@ -7,6 +7,20 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.12.1] - 2026-10-02
+
+**In short:** Fixes from the full test run before the launch: a stricter XML check for CalDAV and HSTS on https.
+
+### Security
+- CalDAV: XML bodies with a DOCTYPE are now refused by the parser itself, in every encoding. Before, a UTF-16 body or a
+  DOCTYPE after a long comment got past the byte check (entities were still limited by the XML library; an app
+  password was needed). The same check now covers answers of subscribed CalDAV servers.
+- `Strict-Transport-Security: max-age=31536000` on every response served over https (directly or from a trusted
+  proxy), so browsers stay on https even if the proxy does not add it. A header the proxy sets itself is kept.
+
+### Tests
+- UTF-16 and late-DOCTYPE CalDAV bodies, a UTF-16 CalDAV server answer, HSTS only over https.
+
 ## [2.12.0] - 2026-10-02
 
 **In short:** Try Kalmido in your browser without an account or server; quick add understands French, Spanish, Italian
@@ -491,7 +505,8 @@ of people.
   multi-arch image (`ghcr.io/gegenschuss/kalmido`, linux/amd64 and linux/arm64), an installable web app that works
   offline, English and German.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.12.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.12.1...HEAD
+[2.12.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.12.1
 [2.12.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.12.0
 [2.11.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.11.0
 [2.10.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.10.0

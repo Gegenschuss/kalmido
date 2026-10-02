@@ -3693,6 +3693,8 @@ def headers(resp):
     resp.headers.setdefault("Referrer-Policy", "same-origin")
     resp.headers.setdefault("X-Frame-Options", "DENY")
     resp.headers.setdefault("Permissions-Policy", PERMISSIONS_POLICY)
+    if request.is_secure:  # https (directly or from a trusted proxy): browsers stay on https; a proxy's own header wins
+        resp.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
     if request.path.startswith("/api/") and not request.path.startswith(("/api/attachments/", "/api/avatar/", "/api/list-icon/", "/api/list-files/")):
         resp.headers["Cache-Control"] = "no-store"
     return resp
@@ -12744,16 +12746,33 @@ def dav_multistatus(parts, extra_tail=""):
     return Response(gen(), 207, content_type="application/xml; charset=utf-8")
 
 
+class _NoDtdBuilder(ET.TreeBuilder):
+    """Refuses any DOCTYPE while parsing: entity declarations only exist inside one. The parser reports it in every
+    encoding (a byte search for "<!ENTITY" misses a UTF-16 body)."""
+
+    def doctype(self, name, pubid, system):
+        raise _DtdRefused()
+
+
+class _DtdRefused(Exception):
+    pass
+
+
+def xml_no_dtd(data):
+    """ElementTree root of data; _DtdRefused for a DTD (no entities: billion laughs, XXE), ET.ParseError when broken."""
+    p = ET.XMLParser(target=_NoDtdBuilder())  # nosec B314
+    p.feed(data)
+    return p.close()
+
+
 def dav_xml(raw):
     """Parses a request body; no DTD / entities (billion laughs), at most DAV_MAX_BODY bytes."""
     if len(raw) > DAV_MAX_BODY:
         raise DavError(413, "Request too large")
-    head = raw[:4096].upper()
-    if b"<!DOCTYPE" in head or b"<!ENTITY" in raw.upper():
-        raise DavError(400, "DTDs are not allowed")
     try:
-        # no DTD / entities (refused above) and the size is capped
-        return ET.fromstring(raw)  # nosec B314
+        return xml_no_dtd(raw)
+    except _DtdRefused:
+        raise DavError(400, "DTDs are not allowed") from None
     except ET.ParseError:
         raise DavError(400, "Invalid XML") from None
 
@@ -17244,12 +17263,9 @@ def cal_expand(raws):
 
 # ---- CalDAV
 def _dav_xml(data):
-    low = data.lower()
-    if b"<!doctype" in low or b"<!entity" in low:  # no DTDs / entities (XXE, entity expansion)
-        raise CalError("parse")
-    try:
-        return ET.fromstring(data)
-    except ET.ParseError:
+    try:  # no DTDs / entities (XXE, entity expansion), in any encoding
+        return xml_no_dtd(data)
+    except (_DtdRefused, ET.ParseError):
         raise CalError("parse") from None
 
 
