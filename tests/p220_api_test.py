@@ -373,9 +373,15 @@ g["token"] = TOKEN
 put_state()
 check(Bo.patch(B + f"/api/repos/{RID}", json={"token": "x"}).status_code == 403, "a member cannot change the token")
 r = A.patch(B + f"/api/repos/{RID}", json={"token": TOKEN})
+check(r.ok, f"the right token again ({r.status_code})")
+TRIES = [0]
 
 
 def poke_ok():  # 2.4.1: CI flake (a slow runner missed the 12 s window): make the connection due again on every try
+    TRIES[0] += 1
+    if TRIES[0] % 20 == 0 and str((dbq("SELECT last_error FROM git_conns WHERE id=?", (RID,)) or [[""]])[0][0]).startswith("auth"):
+        put_state()  # 2.10.0: CI flake (still 401 after 120 s): the fake server's state and the token are written again
+        A.patch(B + f"/api/repos/{RID}", json={"token": TOKEN})
     c = sqlite3.connect(os.path.join(DATA, "tasks.db"))
     c.execute("UPDATE git_conns SET next_at=0 WHERE id=? AND (fails>0 OR last_error!='')", (RID,))
     c.commit()
