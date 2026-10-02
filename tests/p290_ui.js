@@ -23,7 +23,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v78'/.test(SW), 'service worker cache v78');
+  check(/const CACHE = 'tasks-shell-v7[89]'/.test(SW), 'service worker cache v78 or newer (2.10.0: v79)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done'});

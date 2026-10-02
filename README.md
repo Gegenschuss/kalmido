@@ -16,16 +16,14 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.10.0** (2026-10-02): Groups for sharing and "whoever has time" tasks, *Plan my day* between your appointments
+  (built in or by an agent), an evening review, real client addresses behind a proxy.
 - **2.9.0** (2026-10-02): Your lists in Reminders, Thunderbird, Tasks.org and other CalDAV apps, both ways, with app
   passwords; OIDC sign-in set up in the settings.
 - **2.8.0** (2026-10-02): A new look: one sidebar with grouped navigation, a command bar, an agent band under the list
   header, ticket numbers in the rows, own icons and a raspberry accent, in light and dark.
 - **2.7.2** (2026-10-01): Personal agents with setup guides for Linux, macOS and Windows, reactions and delivery status in
   the agent chat, clickable people, breadcrumbs in the task panel and "Show completed at the bottom" for every list.
-- **2.7.1** (2026-10-01): A *Project overview* in every project: description, key links, milestones, project files,
-  members, status updates and the tracked time in one place.
-
-All changes: [CHANGELOG.md](CHANGELOG.md) · [GitHub Releases](https://github.com/Gegenschuss/kalmido/releases)
 
 ## Why Kalmido
 
@@ -76,6 +74,13 @@ All changes: [CHANGELOG.md](CHANGELOG.md) · [GitHub Releases](https://github.co
   list whose bell is muted, or with *Repeated reminders* switched off in the notification matrix; completed, deleted
   and archived tasks stop at once, and every interval sends one push at most
 - Smart lists (inbox, the start view; today, tomorrow, next 7 days, now doable, all), combinable filters (list, date, priority, tag)
+- **Plan my day** (2.10.0): in Today, *Plan my day* puts your open tasks into the free time between the day's calendar
+  events and timed tasks within your working hours (*Settings > General > Day planning*): overdue and due first, then
+  deadlines and priority, 30 minutes for a task without a duration; what does not fit is proposed for the next working
+  day. *Fill free time* only fills the gaps with tasks not planned yet. A timeline preview, leave out what you like, one
+  undo step. With an agent online, *Let an agent plan* asks it for the same plan as a proposal that you approve
+- **Daily review** (2.10.0): after your working hours Today shows what you finished, what is still open and what you
+  moved, with a suggestion for the next working day; optionally as a push at a time you choose
 - **Now doable** (`g d`): what you can start right now: open, not waiting on another task, due today, overdue or
   undated, and yours (assigned to you, or unassigned in your own lists; everything with collaboration off). In the
   order the dependencies allow, with a count in the sidebar; pin it as a tab like the other smart lists
@@ -134,6 +139,10 @@ All changes: [CHANGELOG.md](CHANGELOG.md) · [GitHub Releases](https://github.co
 
 **Together**
 - Several users, each with their own inbox, habits, filters, tags, settings and notifications
+- **Groups** (2.10.0): an admin creates groups (*Office*, *Field team*; optionally synced from a sign-in group of the
+  OIDC provider). Share a list or a whole folder with a group and a role: whoever joins gets access, whoever leaves loses
+  it, and a person's role is the higher of their own and the group's. Assign a task to a group, "whoever has time": it is
+  in *Assigned to me* for every member until one of them takes it. Groups appear under *Team* in the sidebar
 - **Shared list tags** besides your personal tags: tags that belong to a list, with a colour per list, visible to
   everyone in it (`1.9.0`, `bug`, `Client X`). In shared lists the tag input suggests list tags first; your personal
   tags keep a small person icon, and one click turns a personal tag into a list tag. Filters, the sidebar and the API
@@ -972,7 +981,10 @@ small **×** next to it (*Show progress* in the list's … menu or the list dial
 ## Login
 
 **Built-in (default):** username and password (hashed with scrypt), an HttpOnly `SameSite=Lax` session cookie
-("stay logged in" = 30 days), failed logins are rate-limited per user and IP. Upgrading from the single-user
+("stay logged in" = 30 days), failed logins are rate-limited per user name and address (5), per address (20) and per user
+name from all addresses (100, against slow distributed guessing) within 15 minutes, so one attacker cannot lock a person out.
+Behind a reverse proxy Kalmido takes the client address from `X-Forwarded-For` of a trusted proxy (`KALMIDO_TRUSTED_PROXIES`,
+default loopback + the Docker bridge gateway). Upgrading from the single-user
 version: your data is moved to the user `admin` (or `AUTH_BOOTSTRAP_USER`); give it a password once with
 `docker exec -it kalmido python app.py set-password admin`.
 
@@ -1153,6 +1165,8 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `AUTH_PROXY_HEADER` | | Header with the user name from an authenticating proxy (e.g. `Remote-User`); empty = built-in login only |
 | `AUTH_TRUSTED_PROXIES` | | Comma list of IPs / CIDRs whose header is trusted (direct peer) |
 | `AUTH_PROXY_PORT` | | Extra container port; if set, the header is only trusted on it (see *Login*) |
+| `KALMIDO_TRUSTED_PROXIES` | `127.0.0.1,::1,172.17.0.1` | Reverse proxies (IPs / CIDRs of the direct peer) whose `X-Forwarded-For` / `-Proto` / `-Host` are believed: the real client address for login lockouts, logs and alerts, https for cookies and CalDAV. The `AUTH_TRUSTED_PROXIES` peers count too; `none` = trust nobody. A proxy in another container on its own Docker network arrives from that network's gateway (e.g. `172.18.0.1`): add it |
+| `KALMIDO_TRUSTED_PROXY_COUNT` | `1` | Proxies in a row in front of Kalmido; the client is the entry that many places from the right in `X-Forwarded-For` |
 | `AUTH_BOOTSTRAP_USER`, `AUTH_BOOTSTRAP_NAME`, `AUTH_BOOTSTRAP_PROXY_LOGIN` | `admin` | Account that receives the data when upgrading from the single-user version |
 | `AUTH_SESSION_DAYS` | `30` | Lifetime of a "stay logged in" session |
 | `TASKS_DROP_TOKEN` | | Becomes the first admin's `/drop` token (every user has an own one, see *Share from your phone*) |

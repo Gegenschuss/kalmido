@@ -85,6 +85,9 @@ TASK_FIELDS = {
     "due": {"type": ["string", "null"], "description": "YYYY-MM-DD"},
     "due_time": {"type": ["string", "null"], "description": "HH:MM (local), null = all day"},
     "assignee_id": {"type": ["integer", "null"]}, "tags": {**STRS, "description": "the agent's personal tags"},
+    "assignee_group_id": {"type": ["integer", "null"], "description": "2.10.0: assign to a group (whoever has time takes it); "
+                          "the list must be shared with the group; clears assignee_id and the other way round"},
+    "duration": {"type": ["integer", "null"], "minimum": 1, "description": "minutes (the calendar block of a timed task)"},
     "list_tags": {**STRS, "description": "shared list tags (seen by every list member)"},
     "parent_id": S_ID,
     "type": {"type": ["string", "null"], "enum": ["bug", "feature", "task", None],
@@ -112,7 +115,7 @@ COMPACT_AUTO = 25  # 2.0.8: without `compact`, a page with more tasks than this 
 def t_list_tasks(api, a):
     """2.0.8: compact=true -> the API's fields=compact; false -> full tasks; not given -> full for small results,
     compact (client side, with "compact": true in the result) once a page has more than COMPACT_AUTO tasks."""
-    q = _pick(a, ("list_id", "status", "tag", "list_tag", "assignee", "limit", "cursor", "type"))
+    q = _pick(a, ("list_id", "status", "tag", "list_tag", "assignee", "assignee_group", "limit", "cursor", "type"))
     if "waiting" in a:  # 2.1.0 (#335)
         q["waiting"] = "true" if a["waiting"] else "false"
     if a.get("compact") is True:
@@ -228,7 +231,26 @@ TOOLS = [
            "list_tag": {"type": "string"}, "assignee": {"type": "string"}, "limit": {"type": "integer", "minimum": 1, "maximum": 500},
            "cursor": {"type": "string"}, "compact": {"type": "boolean"},
            "waiting": {"type": "boolean", "description": "true = only tasks waiting on external, false = only the others"},
-           "type": {"type": "string", "enum": ["bug", "feature", "task", "none"], "description": "only tickets of this type"}}), t_list_tasks),
+           "type": {"type": "string", "enum": ["bug", "feature", "task", "none"], "description": "only tickets of this type"},
+           "assignee_group": {"type": "string", "description": "2.10.0: mine (assigned to one of your groups) or a group id"}}), t_list_tasks),
+    # 2.10.0 (#441): groups (read) and the groups a list is shared with
+    ("list_groups", "Groups of people (an admin creates them): id, name, members [{user_id, name}], synced (members follow a "
+                    "sign-in group), mine. Lists and folders can be shared with a group; a task can be assigned to a group "
+                    "(assignee_group_id) until one member takes it.",
+     _obj({}), lambda api, a: api.call("GET", "/groups")),
+    ("list_list_groups", "The groups one list is shared with: group_id, name, role, via (list = directly, else the folder).",
+     _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/groups")),
+    # 2.10.0 (#440): the built-in day plan + the daily review of the token's user (read-only previews)
+    ("get_day_plan", "The built-in day plan of your user for a day (preview, nothing changes): working hours, calendar events, "
+                     "fixed timed tasks, plan [{task_id, title, start, end, duration, estimated, reason}], defer [{task_id, to}] "
+                     "and free_min. mode: day = plan the day's tasks, fill = only fill free time with other tasks. For a person's "
+                     "plan answer their job_request of kind dayplan with submit_proposal instead.",
+     _obj({"date": {"type": "string", "description": "YYYY-MM-DD, default today"}, "mode": {"type": "string", "enum": ["day", "fill"]}}),
+     lambda api, a: api.call("GET", "/dayplan", _pick(a, ("date", "mode")))),
+    ("get_day_review", "The daily review of your user: done, still open and moved tasks of a day and a short plan for the next "
+                       "working day.",
+     _obj({"date": {"type": "string", "description": "YYYY-MM-DD, default today"}}),
+     lambda api, a: api.call("GET", "/dayplan/review", _pick(a, ("date",)))),
     ("search_tasks", "Full-text search in titles, notes, links and custom fields of visible tasks.",
      _obj({"q": {"type": "string", "minLength": 1}, "limit": {"type": "integer", "minimum": 1, "maximum": 500}}, ["q"]),
      lambda api, a: api.call("GET", "/search", _pick(a, ("q", "limit")))),
@@ -294,14 +316,17 @@ TOOLS = [
            "state": {"type": "string", "enum": ["running", "waiting", "done", "failed", "stopped"]}, "log": {"type": "string"}}, ["title"]),
      lambda api, a: api.call("POST", "/agent/jobs", body=a)),
     ("get_job", "One of the agent's jobs. A proposal job (event job_request) also carries kind (project | subtasks | triage | "
-                "extract), input (exactly what the person sent: never ask for more), proposal (what you submitted) and limits.",
+                "extract | dayplan), input (exactly what the person sent: never ask for more), proposal (what you submitted) and limits.",
      _obj({"job_id": S_ID}, ["job_id"]), lambda api, a: api.call("GET", f"/agent/jobs/{int(a['job_id'])}")),
     ("submit_proposal", "Answer a job_request with ONE structured proposal; the person reviews, edits and applies it. Never create "
                         "the lists / tasks yourself. proposal by kind -- project: {name, folder?, sections: [names], tasks: [{title, "
                         "notes?, section?, due?, start?, priority?, subtasks: [{title, notes?, due?}], depends_on: [task indices]}]}; "
                         "subtasks: {items: [{title, notes?, due?, estimate? (minutes)}], dependencies?: [[a, b]] (item a waits on b)}; "
                         "triage: {items: [{task_id, list_id?, section_id?, tags?, priority?, due?, rewrite_title?}]} (only ids from "
-                        "the input); extract: {tasks: [{title, notes?, assignee_id? (a member id from the input), due?, section?}]}. "
+                        "the input); extract: {tasks: [{title, notes?, assignee_id? (a member id from the input), due?, section?}]}; "
+                        "dayplan (2.10.0): {items: [{task_id, start (HH:MM), duration? (minutes, default the task's or input."
+                        "default_duration), note?}], defer: [{task_id, to (YYYY-MM-DD) | null, note?}]} -- only task ids from "
+                        "input.tasks; the input has date, now, work {start, end}, events, fixed (busy) and the built-in plan as a hint. "
                         "Every kind may add summary (a short explanation). Dates YYYY-MM-DD, priority none | low | medium | high. "
                         "At most 200 entries; resubmitting replaces the proposal until the person applied or discarded it.",
      _obj({"job_id": S_ID, "proposal": {"type": "object"}}, ["job_id", "proposal"]), t_submit_proposal),

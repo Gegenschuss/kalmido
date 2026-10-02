@@ -136,7 +136,8 @@ names = {t["name"] for t in tools}
 want = {"list_lists", "list_tasks", "search_tasks", "get_task", "create_task", "update_task", "complete_task", "add_comment", "react",
         "set_status", "list_events", "wait_for_events", "get_agent", "create_job", "update_job", "list_jobs", "send_chat", "list_chats",
         "tidy_task", "list_list_tags", "set_waiting", "clear_waiting", "list_waiting", "report_usage", "get_usage", "get_job",
-        "submit_proposal", "chat_typing", "get_project_overview", "react_to_chat"}
+        "submit_proposal", "chat_typing", "get_project_overview", "react_to_chat",
+        "list_groups", "list_list_groups", "get_day_plan", "get_day_review"}  # 2.10.0
 check(want <= names, f"all tools listed (missing {want - names})")
 check(all(isinstance(t["inputSchema"], dict) and t["inputSchema"].get("type") == "object" and t["description"] for t in tools),
       "every tool has an object schema + description")
@@ -144,6 +145,10 @@ check(all(isinstance(t["inputSchema"], dict) and t["inputSchema"].get("type") ==
 CASES = [
     ("get_agent", {}, "GET", "/api/v1/agent", None, {}),
     ("list_lists", {}, "GET", "/api/v1/lists", None, {}),
+    ("list_groups", {}, "GET", "/api/v1/groups", None, {}),  # 2.10.0 (#441)
+    ("list_list_groups", {"list_id": 4}, "GET", "/api/v1/lists/4/groups", None, {}),
+    ("get_day_plan", {"date": "2031-05-01", "mode": "fill"}, "GET", "/api/v1/dayplan", None, {"date": "2031-05-01", "mode": "fill"}),  # 2.10.0 (#440)
+    ("get_day_review", {}, "GET", "/api/v1/dayplan/review", None, {}),
     ("list_list_tags", {"list_id": 4}, "GET", "/api/v1/lists/4/tags", None, {}),
     ("list_tasks", {"list_id": 4, "status": "all", "list_tag": "bug", "assignee": "me", "limit": 20}, "GET", "/api/v1/tasks", None,
      {"list_id": "4", "status": "all", "list_tag": "bug", "assignee": "me", "limit": "20"}),

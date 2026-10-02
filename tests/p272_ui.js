@@ -41,7 +41,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v7[6-8]'/.test(SW), 'service worker cache v76 (2.8.0: v77, 2.9.0: v78)');
+  check(/const CACHE = 'tasks-shell-v7[6-9]'/.test(SW), 'service worker cache v76 (2.8.0: v77, 2.9.0: v78, 2.10.0: v79)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en', tour: 'done'});

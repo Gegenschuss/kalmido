@@ -576,6 +576,8 @@ function applyState(j) {
   S.sample = j.sample || null;
   S.agents = j.agents || []; S.agentsAt = Date.now();
   S.proposers = j.proposers || [];  // 2.3.0: agents I may ask for a proposal
+  S.groups = j.groups || []; S.myGroups = j.my_groups || [];  // 2.10.0 (#441)
+  S.dayplan = j.dayplan || {work_start: '09:00', work_end: '17:00', review_time: '', default_duration: 30};  // 2.10.0 (#440)
   // language changed on another device: switch once its file is loaded (the boot awaits it itself)
   if (S.booted && (j.settings.lang || 'en') !== I18N.code) i18nLoad(j.settings.lang).then(ok => { if (ok) render(); });
 }
@@ -705,6 +707,8 @@ function parseHash() {
   if (a === 'l') return {mod: 'tasks', key: 'l:' + b};
   if (a === 'tag') return {mod: 'tasks', key: 'tag:' + b};
   if (a === 'who' && +b) return {mod: 'tasks', key: 'who:' + +b};  // 2.7.2 (#418): "Tasks of …"
+  if (a === 'grp' && +b) return {mod: 'tasks', key: 'grp:' + +b};  // 2.10.0 (#441): the tasks of a group
+  if (a === 'today' && b === 'review') return {mod: 'tasks', key: 'today', review: true};  // 2.10.0 (#440): push "Daily review"
   if (a === 'folder' && b) return {mod: 'tasks', key: 'folder:' + h.slice(7)};  // 2.4.0: a path has a slash
   if (a === 'agents') return {mod: 'agents', key: 'agents', agent: +b || null};
   if (['cal', 'matrix', 'habits', 'pomo', 'news', 'stats', 'time', 'overview'].includes(a)) return {mod: a, key: a};
@@ -720,7 +724,7 @@ async function route() {
     r.mod = 'tasks'; r.key = LS.get('lastKey', START_KEY);
   }
   if (r.key.startsWith('f:') && !S.filters.some(f => f.id === +r.key.slice(2))) r.key = START_KEY;
-  S.route = {mod: r.mod, key: r.key, ...(r.agent ? {agent: r.agent} : {})};
+  S.route = {mod: r.mod, key: r.key, ...(r.agent ? {agent: r.agent} : {}), ...(r.review ? {review: true} : {})};  // 2.10.0: review = #today/review
   if (r.mod === 'agents') S.jobs.items = null;
   if (S.route.mod !== 'tasks' || r.key !== S.lastRouteKey) { S.multi.clear(); S.multiMode = false; }
   S.lastRouteKey = r.key;
@@ -754,7 +758,7 @@ function replyFocus(id, n = 0) {
   try { ci.focus({preventScroll: true}); } catch { ci.focus(); }
   ci.scrollIntoView?.({block: 'nearest'});
 }
-const keyToHash = k => k.startsWith('who:') ? 'who/' + k.slice(4) : k.startsWith('l:') ? 'l/' + k.slice(2) : k.startsWith('f:') ? 'f/' + k.slice(2) : k.startsWith('tag:') ? 'tag/' + encodeURIComponent(k.slice(4)) : k.startsWith('folder:') ? 'folder/' + encodeURIComponent(k.slice(7)) : k;
+const keyToHash = k => k.startsWith('who:') ? 'who/' + k.slice(4) : k.startsWith('grp:') ? 'grp/' + k.slice(4) : k.startsWith('l:') ? 'l/' + k.slice(2) : k.startsWith('f:') ? 'f/' + k.slice(2) : k.startsWith('tag:') ? 'tag/' + encodeURIComponent(k.slice(4)) : k.startsWith('folder:') ? 'folder/' + encodeURIComponent(k.slice(7)) : k;
 // 1.5.2: folder view (key "folder:<name>"): the open tasks of every active list in that sidebar folder, grouped by list
 const folderLists = f => sideOrder().filter(l => fUnder(l.folder, f) && !l.archived && !l.is_inbox);  // 2.4.0: subfolders too
 window.addEventListener('hashchange', route);
@@ -1011,7 +1015,11 @@ function viewTasks() {
   if (k === 'doable') return {...pick(t => doable(t, t0), 'none'), done: doneRecent.filter(t => doneSince(t) && mineTask(t) && !(t.due && t.due > t0))};
   if (k === 'waiting') return {...pick(t => !!t.waiting_at, 'list'), done: []};  // 2.1.0 (#335)
   if (k === 'all') return {...pick(() => true, 'list'), done: doneRecent};
-  if (k === 'assigned') return {...pick(t => !!S.me && t.assignee_id === S.me.id, 'list'), done: doneRecent.filter(t => !!S.me && t.assignee_id === S.me.id)};
+  if (k === 'assigned') return {...pick(mineAssigned, 'list'), done: doneRecent.filter(t => !!S.me && t.assignee_id === S.me.id)};  // 2.10.0: + my groups' tasks
+  if (k.startsWith('grp:')) {  // 2.10.0 (#441): open tasks assigned to a group, in the lists I see
+    const gid = +k.slice(4);
+    return {...pick(t => t.assignee_group_id === gid, 'list'), done: []};
+  }
   if (k === 'inbox' || k.startsWith('l:')) {
     const lid = k === 'inbox' ? inbox().id : +k.slice(2);
     return {...pick(t => t.list_id === lid, 'section', {list: lid}), done: doneRecent.filter(t => t.list_id === lid)};
@@ -1039,8 +1047,11 @@ function viewTasks() {
 function mineTask(t) {
   if (!collab()) return true;
   if (t.assignee_id) return !!S.me && t.assignee_id === S.me.id;
+  if (t.assignee_group_id) return myGroup(t.assignee_group_id);  // 2.10.0 (#441): my group's tasks are mine until someone takes one
   return isOwner(listById(t.list_id));
 }
+// 2.10.0 (#441): "Assigned to me" = assigned to me or to one of my groups
+const mineAssigned = t => !!S.me && (t.assignee_id === S.me.id || myGroup(t.assignee_group_id));
 // a subtask without its own due date follows its open parent (an undated step of a later task is not doable yet)
 function doable(t, t0 = today()) {
   if (!(t.status === 0 && !(t.blocked && dFor(t)) && (!t.due || t.due <= t0) && !(t.start && t.start > t0) && mineTask(t))) return false;
@@ -1184,6 +1195,7 @@ function titleFor(k) {
   if (k.startsWith('l:')) return lname(listById(+k.slice(2))) || tr('List');
   if (k.startsWith('tag:')) return '#' + k.slice(4);
   if (k.startsWith('who:')) { const id = +k.slice(4); return S.me && id === S.me.id ? tr('My tasks') : tr('Tasks of {0}', personNameAny(id) || '?'); }
+  if (k.startsWith('grp:')) return tr('Group {0}', grpName(+k.slice(4)));
   if (k.startsWith('f:')) return (S.filters.find(f => f.id === +k.slice(2)) || {}).name || tr('Filters');
   if (k.startsWith('folder:')) return fDisp(k.slice(7));
   if (k === 'cal') return tr('Calendar');
@@ -1308,7 +1320,7 @@ function counts() {
     if (t.waiting_at && !(t.parent_id && S.tasks.get(t.parent_id)?.waiting_at)) c.waiting++;  // 2.1.0 (#335)
     if (t.parent_id) continue;
     c.all++;
-    if (S.me && t.assignee_id === S.me.id) c.assigned++;
+    if (mineAssigned(t)) c.assigned++;
     c.lists[t.list_id] = (c.lists[t.list_id] || 0) + 1;
     for (const g of new Set([...t.tags, ...(t.ltags || [])])) c.tags[g] = (c.tags[g] || 0) + 1;
     if (!t.due) continue;
@@ -1391,7 +1403,11 @@ function renderSide() {
     feat('agents') && agentsOn() ? mrow('agents', 'bot', tr('Agents'), `<span class="c ${aw ? 'nunread' : ''}">${aw || ''}</span>`) : ''].join('');
   // Team: the people I share lists with (their tasks) and the agents (status dot; a click opens the chat)
   const ags = shownAgents(), ppl = teamPeople().slice(0, 12);
-  const team = [...ppl.map(p => `<button class="srow steam ${onTasks && k === 'who:' + p.id ? 'on' : ''}" data-go="who/${p.id}" title="${esc(tr('Tasks of {0}', p.name))}"><span class="sdot"><i class="pdot"></i></span><span class="n">${esc(p.name)}</span><span class="sk">${tr('Person')}</span></button>`),
+  // 2.10.0 (#441): my groups (admins: every group with a task); a click shows the tasks assigned to the group
+  const grps = collab() ? (S.groups || []).filter(gr => myGroup(gr.id) || [...S.tasks.values()].some(t => t.status === 0 && t.assignee_group_id === gr.id)) : [];
+  const gcount = gid => [...S.tasks.values()].filter(t => t.status === 0 && !t.deleted_at && t.assignee_group_id === gid).length;
+  const team = [...grps.map(gr => `<button class="srow steam sgrp ${onTasks && k === 'grp:' + gr.id ? 'on' : ''}" data-go="grp/${gr.id}" title="${esc(tr('Tasks of the group {0}', gr.name))}">${ic('users')}<span class="n">${esc(gr.name)}</span><span class="sk">${tr('Group')}</span>${gcount(gr.id) ? `<span class="c">${gcount(gr.id)}</span>` : ''}</button>`),
+    ...ppl.map(p => `<button class="srow steam ${onTasks && k === 'who:' + p.id ? 'on' : ''}" data-go="who/${p.id}" title="${esc(tr('Tasks of {0}', p.name))}"><span class="sdot"><i class="pdot"></i></span><span class="n">${esc(p.name)}</span><span class="sk">${tr('Person')}</span></button>`),
     ...ags.map(a => `<button class="srow steam" data-act="team-agent" data-aid="${a.id}" title="${esc(agentHstLine(a))}"><span class="sdot">${hdot(agentHst(a))}</span><span class="n">${esc(a.name)}</span><span class="sk">${tr('Agent')}</span>${a.waiting || a.chat_unread ? `<span class="c nunread">${a.waiting + a.chat_unread}</span>` : ''}</button>`)].join('');
   const grp = (g, label, body, acts = '', n = '', tip = '') => `<div class="sgroup sg-${g}">${head(g, label, acts, n, tip)}${sideOpen(g) ? body : ''}</div>`;
   $('#side').innerHTML = `
@@ -1403,7 +1419,7 @@ function renderSide() {
     <div class="sgroup sg-lists">${head('lists', tr('Lists'), `<button data-act="lists-reorder" class="${S.listReorder ? 'on' : ''}" title="${tr('Sort lists')}">${ic('sort', 's')}</button><button data-act="list-new" title="${tr('New list')}">${ic('plus', 's')}</button>`, lists.length)}${sideOpen('lists') ? lh || `<div class="folder">${tr('No lists yet')}</div>` : ''}</div>
     ${grp('filters', tr('Filters'), S.filters.map(f => row('f:' + f.id, ic('filter'), f.name, c.filters[f.id])).join(''), `<button data-act="filter-new" title="${esc(tr('New filter') + ' · ' + tr('Combine lists, dates, priorities, tags'))}" aria-label="${tr('New filter')}">${ic('plus', 's')}</button>`, S.filters.length, tr('Combine lists, dates, priorities, tags'))}
     ${tags.length ? `<div class="sgroup"><button class="shead stoggle ${tagsOpen ? '' : 'closed'}" data-act="side-tags" aria-expanded="${tagsOpen}">${ic('chev', 's fcar')}<span class="spacer">${tr('Tags')}</span><span class="c">${tagsOpen ? '' : tags.length}</span></button>${tagsOpen ? tags.map(t => row('tag:' + t, ic('tag'), t, c.tags[t])).join('') : ''}</div>` : ''}
-    ${team ? grp('team', tr('Team'), team, '', ppl.length + ags.length) : ''}
+    ${team ? grp('team', tr('Team'), team, '', ppl.length + ags.length + grps.length) : ''}
     <div class="sgroup sfoot">
       ${row('all', ic('all'), tr('All'), c.all)}
       ${row('done', ic('done'), tr('Completed'), '')}
@@ -1689,7 +1705,11 @@ function taskRow(t, opts = {}) {
   if (t.comment_count && cmtOn()) meta.push(`<span class="cmc ${t.unread ? 'unread' : ''}" title="${esc(t.unread ? trn('{0} new comment', '{0} new comments', t.unread) : trn('{0} comment', '{0} comments', t.comment_count))}">${ic('comment', 's')}${t.comment_count}</span>`);
   const ac = !opts.trash && t.id > 0 && acolOn(t.list_id);  // 1.10.0: assignee column (own cell, click = assign)
   if (ac) who = whoCell(t);
-  else if (t.assignee_id && collab()) {
+  else if (t.assignee_group_id && collab()) {  // 2.10.0 (#441): assigned to a group
+    const gc = grpChip(t);
+    meta.push(gc);
+    if (tc) who = gc;
+  } else if (t.assignee_id && collab()) {
     const name = personName(t.list_id, t.assignee_id), cls = `who ${S.me && t.assignee_id === S.me.id ? 'me' : ''}`, tip = esc(tr('Assigned to {0}', name || '?'));
     const pv = isTouch() ? av : avBtn;  // 2.7.2 (#418): the picture opens the person card (touch: the row opens the task)
     meta.push(pv(t.assignee_id, name, cls + mc, `title="${tip}"`));
@@ -1728,7 +1748,26 @@ function taskRow(t, opts = {}) {
 // whoever may change the whole list (owner, admin, member) assigns with a click. Desktop: a column (.tcols .c-who),
 // phone: a compact cell at the end of the row (.wcell). Per list it can be hidden (list "…" menu, stored per device).
 const acolOn = lid => { const l = listById(lid); return collab() && !!l && !!l.shared && LS.get('acol.' + lid, true) !== false; };
+// 2.10.0 (#441): a task assigned to a group: its name with the group glyph (a button for members: "Take it")
+const grpById = id => (S.groups || []).find(g => g.id === id);
+const myGroup = gid => !!gid && (S.myGroups || []).includes(gid);
+const grpName = gid => grpById(gid)?.name || tr('Group');
+const listGroups = lid => (listById(lid)?.groups || []);
+function grpChip(t) {
+  const n = grpName(t.assignee_group_id), mine = myGroup(t.assignee_group_id), tip = esc(tr('Assigned to the group {0}: whoever has time takes it', n));
+  return canAssign(t) || mine ? `<button type="button" class="gchip ${mine ? 'me' : ''}" data-act="assign" title="${tip}" aria-label="${tip}" aria-haspopup="menu">${ic('users', 's')}<span>${esc(n)}</span></button>`
+    : `<span class="gchip" title="${tip}">${ic('users', 's')}<span>${esc(n)}</span></span>`;
+}
+async function takeTask(id) {
+  const t = taskById(id); if (!t) return;
+  const before = snapTask(t);
+  let r; try { r = await api('POST', `/api/tasks/${id}/take`, {}); } catch { return; }
+  S.tasks.set(id, {...t, ...r}); render();
+  const e = histFields(tr('Took a task'), [[before, {id, assignee_id: r.assignee_id, assignee_group_id: null}, ['assignee_id', 'assignee_group_id']]]);
+  histToast(tr('Taken: it is yours now'), e);
+}
 function whoCell(t) {
+  if (t.assignee_group_id) return grpChip(t);
   const name = t.assignee_id ? personName(t.list_id, t.assignee_id) : '', me = !!S.me && t.assignee_id === S.me.id;
   const tip = t.assignee_id ? tr('Assigned to {0}', name || '?') : tr('Nobody assigned');
   // 2.6.0 (K11): nobody assigned = no icon in checklists and on subtasks; elsewhere the dashed circle only shows on hover /
@@ -1740,14 +1779,21 @@ function whoCell(t) {
 }
 function assignMenu(anchor, id) {
   const t = taskById(id); if (!t) return;
-  if (!canAssign(t)) { roToast(); return; }
-  const set = uid => { if ((t.assignee_id || null) !== uid) patchTask(id, {assignee_id: uid}); };
+  const take = myGroup(t.assignee_group_id) ? [{label: tr('Take it'), icon: 'check', cls: 'mtake', fn: () => takeTask(id)}] : [];  // 2.10.0 (#441)
+  if (!canAssign(t)) { if (take.length) menu(anchor, take); else roToast(); return; }
+  const set = uid => { if ((t.assignee_id || null) !== uid || t.assignee_group_id) patchTask(id, {assignee_id: uid, ...(t.assignee_group_id ? {assignee_group_id: null} : {})}); };
+  const setG = gid => { if (t.assignee_group_id !== gid) patchTask(id, {assignee_group_id: gid, ...(t.assignee_id ? {assignee_id: null} : {})}); };
   const cur = t.assignee_id ? personName(t.list_id, t.assignee_id) || personNameAny(t.assignee_id) : '';
-  menu(anchor, [...(t.assignee_id ? [{label: tr('Show {0}', cur || '?'), icon: 'user', cls: 'mshow', fn: () => personCard(anchor, t.assignee_id)}, '-'] : []),  // 2.7.2 (#418)
-    {label: tr('Nobody'), icon: 'x', on: !t.assignee_id, fn: () => set(null)}, '-',
+  const gs = listGroups(t.list_id);
+  menu(anchor, [...take, ...(take.length ? ['-'] : []), ...(t.assignee_id ? [{label: tr('Show {0}', cur || '?'), icon: 'user', cls: 'mshow', fn: () => personCard(anchor, t.assignee_id)}, '-'] : []),  // 2.7.2 (#418)
+    {label: tr('Nobody'), icon: 'x', on: !t.assignee_id && !t.assignee_group_id, fn: () => set(null)}, '-',
     ...listPeople(listById(t.list_id)).map(p => ({label: p.name + (S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : '') + (p.role === 'participant' ? ' · ' + tr('Participant') : p.role === 'view' ? ' · ' + tr('Viewer') : ''),
-      icon: 'user', on: p.user_id === t.assignee_id, fn: () => set(p.user_id)}))]);
+      icon: 'user', on: p.user_id === t.assignee_id, fn: () => set(p.user_id)})),
+    ...(gs.length ? ['-', ...gs.map(g => ({label: g.name + ' · ' + tr('Group'), icon: 'users', on: g.group_id === t.assignee_group_id, fn: () => setG(g.group_id)}))] : [])]);
 }
+// the assignee select of the task panel: people, then the list's groups (value "g:<id>")
+const assigneeOpts = (t, l) => listPeople(l).map(p => `<option value="${p.user_id}" ${p.user_id === t.assignee_id ? 'selected' : ''}>${esc(p.name)}${S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : ''}</option>`).join('')
+  + (listGroups(l?.id).length ? `<optgroup label="${esc(tr('Groups'))}">${listGroups(l.id).map(g => `<option value="g:${g.group_id}" ${g.group_id === t.assignee_group_id ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}</optgroup>` : '');
 // ---- custom fields: display (chips on the rows, columns, detail panel)
 const numFmt = v => { const x = +v; return Number.isFinite(x) ? x.toLocaleString(LOCALE(), {maximumFractionDigits: 6}) : String(v); };
 const selOpt = (f, v) => (f.options?.options || []).find(o => o.id === v);
@@ -1825,7 +1871,7 @@ function viewListBody() {
   const rl = v.list && listById(v.list), ro = rl && !canEditList(rl.id), ck = !!(rl && rl.checklist);
   const cols = rl && fieldCols(rl.id) ? fieldsOf(rl.id).slice(0, 6) : null;
   let h = (rl ? listHead(rl) : v.folder ? folderHead(v.folder) : agBandHtml()) + (ro ? `<div class="rohint">${ic(isPart(rl.id) ? 'user' : 'eye', 's')}${esc(isPart(rl.id) ? tr('Participant: you see only the tasks assigned to you, shared by {0}', rl.owner_name) : tr('View only, shared by {0}', rl.owner_name))}</div>` : '');
-  if (S.route.key === 'today') h += overdueBanner() + cevTodayBlock();
+  if (S.route.key === 'today') h += reviewCard() + dayplanBar() + overdueBanner() + cevTodayBlock();  // 2.10.0 (#440): review + planner
   if (flow && FLOW.cyc) h += `<div class="flowhint">${ic('deps', 's')}${esc(tr('Some tasks wait on each other in a circle; they are ordered by date.'))}</div>`;
   if (cols) h += `<div class="fcolhead"><span class="spacer"></span>${cols.map(f => `<span class="fcell t-${esc(f.type)}" title="${esc(f.name)}">${esc(f.name)}</span>`).join('')}</div>`;
   const total = groups.reduce((n, g) => n + g.tasks.length, 0);
@@ -3722,12 +3768,12 @@ function renderDetail() {
 </div>`,
     paperless: ck ? '' : `${plOn() || (t.paperless?.length && feat('paperless')) ? `<div class="dsec plsec"><h5>Paperless</h5><div class="plinks">${(t.paperless || []).map(plHtml).join('')}</div>
         ${t.id > 0 && !ro && plOn() ? `<button class="attadd" data-act="pl-search">${ic('archive', 's')}<span>${tr('Link document')}</span></button>` : ''}</div>` : ''}`,
-    fields: ck ? (collab() && shared ? `<div class="dsec fields"><label for="d-assignee">${tr('Assignee')}</label><select id="d-assignee" data-sheet-av ${ro || !canAssign(t) ? 'disabled' : ''}><option value="">${tr('Nobody')}</option>${listPeople(l).map(p => `<option value="${p.user_id}" ${p.user_id === t.assignee_id ? 'selected' : ''}>${esc(p.name)}${S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : ''}</option>`).join('')}</select></div>` : '') : `<div class="dsec fields">
+    fields: ck ? (collab() && shared ? `<div class="dsec fields"><label for="d-assignee">${tr('Assignee')}</label><select id="d-assignee" data-sheet-av ${ro || !canAssign(t) ? 'disabled' : ''}><option value="">${tr('Nobody')}</option>${assigneeOpts(t, l)}</select>${myGroup(t.assignee_group_id) ? `<button class="btn sm dtake" data-act="take" type="button">${ic('check', 's')} ${tr('Take it')}</button>` : ''}</div>` : '') : `<div class="dsec fields">
         <label>${tr('List')}</label><select id="d-list" data-sheet-ico="list" ${ro || !canEditList(t.list_id) ? 'disabled' : ''}>${S.lists.filter(x => (!x.archived && canEditList(x.id)) || x.id === t.list_id).map(x => `<option value="${x.id}" ${x.is_inbox ? 'data-ico="inbox"' : ''} ${x.id === t.list_id ? 'selected' : ''}>${esc(lname(x))}</option>`).join('')}</select>
         ${ticketsOn(t.list_id) ? `<label>${tr('Type')}</label><select id="d-ttype" data-sheet-ico="bug" ${ro ? 'disabled' : ''}><option value="">${tr('None')}</option>${TTYPES.map(([k, n, i]) => `<option value="${k}" data-ico="${i}" ${t.ttype === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>` : ''}
         ${secs.length ? `<label>${tr('Section')}</label><select id="d-sec" data-sheet-ico="columns" ${ro ? 'disabled' : ''}><option value="">${tr('Unassigned')}</option>${secs.map(s => `<option value="${s.id}" ${s.id === t.section_id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>` : ''}
         <label>${tr('Link')}</label>${linkField(t, ro)}
-        ${collab() && (shared || t.assignee_id) ? `<label>${tr('Assignee')}</label><select id="d-assignee" data-sheet-av ${ro || !canAssign(t) ? 'disabled' : ''}><option value="">${tr('Nobody')}</option>${listPeople(l).map(p => `<option value="${p.user_id}" ${p.user_id === t.assignee_id ? 'selected' : ''}>${esc(p.name)}${S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : ''}</option>`).join('')}</select>` : ''}
+        ${collab() && (shared || t.assignee_id) ? `<label>${tr('Assignee')}</label><select id="d-assignee" data-sheet-av ${ro || !canAssign(t) ? 'disabled' : ''}><option value="">${tr('Nobody')}</option>${assigneeOpts(t, l)}</select>${myGroup(t.assignee_group_id) ? `<button class="btn sm dtake" data-act="take" type="button">${ic('check', 's')} ${tr('Take it')}</button>` : ''}` : ''}
         ${t.id > 0 && !t.context ? aiuTaskLine(t) : ''}
       </div>`,
     custom: ck ? '' : `${fieldsOf(t.list_id).length ? `<div class="dsec cfsec"><h5>${tr('Fields')}</h5><div class="fields cf">${fieldsOf(t.list_id).map(f => fieldEditor(f, t, ro)).join('')}</div></div>` : ''}`,
@@ -3808,7 +3854,7 @@ function bellBtn() {
 }
 // 2.6.1 (#404): filter chips (view only, per device): which kinds of News show, in the News view and under the bell
 const NEWS_CHIPS = [['mention', 'at', N_('Mentions'), ['mention']], ['comment', 'comment', N_('Comments'), ['comment']],
-  ['assign', 'user', N_('Assignments'), ['assign', 'unassign']], ['newtask', 'plus', N_('New tasks'), ['newtask']],
+  ['assign', 'user', N_('Assignments'), ['assign', 'unassign', 'take']], ['newtask', 'plus', N_('New tasks'), ['newtask']],
   ['complete', 'check', N_('Completed'), ['complete', 'unblock']], ['status', 'pulse', N_('Status'), ['status']],
   ['agents', 'bot', N_('Agents'), ['approval', 'proposal', 'usage']], ['share', 'users', N_('Sharing'), ['share', 'role', 'unshare', 'owner']],
   ['followup', 'hourglass', N_('Follow-ups'), ['followup']]];
@@ -3966,12 +4012,14 @@ function newsText(it, U) {
   switch (it.kind) {
     case 'mention': return tr('{0} mentioned you', who);
     case 'comment': return it.count > 1 ? trn('{1} left {0} comments', '{1} left {0} comments', it.count, (it.actors || [it.actor_id]).map(a => `<b>${esc(uname(a, U))}</b>`).join(', ')) : tr('{0} commented', who);
-    case 'assign': return tr('{0} assigned a task to you', who);
+    case 'assign': return d.group ? tr('{0} assigned a task to your group {1}', who, q(d.group)) : tr('{0} assigned a task to you', who);
+    case 'take': return tr('{0} took a task of your group {1}', who, q(d.group || ''));  // 2.10.0 (#441)
     case 'unassign': return tr('{0} removed you as assignee', who);
     case 'complete': return tr('{0} completed a task', who);
     case 'share': return d.role === 'view' ? tr('{0} shared the list {1} with you (view only)', who, q(newsListName(it)))
       : d.role === 'participant' ? tr('{0} added you to {1} as a participant (you see the tasks assigned to you)', who, q(newsListName(it)))
-        : d.role === 'admin' ? tr('{0} shared the list {1} with you as an admin', who, q(newsListName(it))) : tr('{0} shared the list {1} with you', who, q(newsListName(it)));
+        : d.role === 'admin' ? tr('{0} shared the list {1} with you as an admin', who, q(newsListName(it)))
+          : d.group ? tr('{0} shared the list {1} with your group {2}', who, q(newsListName(it)), q(d.group)) : tr('{0} shared the list {1} with you', who, q(newsListName(it)));
     case 'role': return tr('{0} changed your role in {1} to {2}', who, q(newsListName(it)), q(roleLabel(d.role)));
     case 'unshare': return tr('{0} removed you from the list {1}', who, q(newsListName(it)));
     case 'owner': return tr('{0} made you the owner of the list {1}', who, q(newsListName(it)));  // 2.1.2 (#349)
@@ -3985,7 +4033,7 @@ function newsText(it, U) {
   }
   return tr('{0} changed something', who);
 }
-const NEWS_ICON = {mention: 'at', comment: 'comment', assign: 'user', unassign: 'user', complete: 'check', share: 'users', role: 'users', unshare: 'users', unblock: 'deps', status: 'pulse', newtask: 'plus', approval: 'bot', followup: 'hourglass', usage: 'chart', proposal: 'bot'};
+const NEWS_ICON = {mention: 'at', comment: 'comment', assign: 'user', unassign: 'user', take: 'check', complete: 'check', share: 'users', role: 'users', unshare: 'users', unblock: 'deps', status: 'pulse', newtask: 'plus', approval: 'bot', followup: 'hourglass', usage: 'chart', proposal: 'bot'};
 function newsItemHtml(it, i, pop) {
   const U = S.nf.users;
   const task = it.task_id ? `<div class="ntask"><span class="nt">${esc(it.task_title || '')}</span><span class="muted">${esc(newsListName(it))}</span></div>` : '';
@@ -4122,6 +4170,8 @@ function actText0(a, U) {
     case 'dep_shift': return tr('{0} moved a task this one waits on, so it moved along to {1}', who, due());
     case 'priority': return tr('{0} changed the priority to {1}', who, q(tr([N_('None'), N_('Low'), '', N_('Medium'), '', N_('High')][+d.p] || N_('None'))));
     case 'assign': return d.to ? tr('{0} assigned the task to {1}', who, q(uname(d.to, U))) : tr('{0} removed the assignee', who);
+    case 'assign_group': return d.group ? tr('{0} assigned the task to the group {1}', who, q(d.group)) : tr('{0} removed the group', who);  // 2.10.0 (#441)
+    case 'take': return tr('{0} took the task (group {1})', who, q(d.group || ''));
     case 'list': return tr('{0} moved the task to the list {1}', who, q(d.inbox && d.name === 'Eingang' ? tr('Inbox') : listName(d.name)));
     case 'section': return d.name ? tr('{0} moved the task to the section {1}', who, q(d.name)) : tr('{0} removed the task from its section', who);
     case 'parent': return d.title ? tr('{0} made the task a subtask of {1}', who, q(d.title)) : tr('{0} made the task a main task', who);
@@ -4626,7 +4676,7 @@ function shiftUndo(before, t, msg) {
 // /api/tasks/batch, one transaction however many tasks it touches. Offline: a step whose operation still waits in the
 // outbox is taken out of the queue and the local state restored (never sent); otherwise task steps are queued like
 // any other change (the buttons show the pending state). Steps on lists that became view-only refuse.
-const UNDO_FIELDS = ['list_id', 'section_id', 'parent_id', 'due', 'due_time', 'start', 'duration', 'reminders', 'repeat', 'repeat_from', 'priority', 'pinned', 'assignee_id', 'ttype', 'deadline', 'nag'];  // 2.4.0: ttype (#340), 2.7.0: deadline, nag
+const UNDO_FIELDS = ['list_id', 'section_id', 'parent_id', 'due', 'due_time', 'start', 'duration', 'reminders', 'repeat', 'repeat_from', 'priority', 'pinned', 'assignee_id', 'ttype', 'deadline', 'nag', 'assignee_group_id'];  // 2.10.0: assignee_group_id  // 2.4.0: ttype (#340), 2.7.0: deadline, nag
 const HIST_FIELDS = [...UNDO_FIELDS, 'title', 'content', 'url', 'tags', 'fields'];
 const HIST_MAX = 30, HIST_MENU = 10;
 const HIST = {undo: [], redo: [], busy: false, group: null, gToast: null, toastE: null, sess: 0, ids: {}, secmap: new Map()};
@@ -5809,6 +5859,7 @@ function shareModal(id) {
   const own = isOwner(l0), hint = t => `<div class="shint lhint">${t}</div>`;
   const md = modal(`<div class="lhdr"><h3>${esc(tr(collab() ? N_('Share “{0}”') : N_('Owner of “{0}”'), lname(l0)))}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
     ${collab() ? `<h4 id="sh-people-h">${tr('People')}</h4><div class="members" id="l-members" aria-labelledby="sh-people-h"></div>` : ''}
+    ${collab() ? `<div id="sh-grpwrap"></div>` : ''}
     ${collab() && agentsOn() ? `<div id="sh-agwrap"></div>` : ''}
     ${own && S.publicLinks ? `<h4 id="l-pub-h">${tr('Public link')}</h4><div id="l-pub"><div class="muted mhint">${tr('Loading…')}</div></div>` : ''}
     <div id="sh-ownwrap"><h4 id="sh-own-h">${tr('Owner')}</h4><div class="muted mhint" id="sh-owner"></div><div id="l-owner"></div></div>
@@ -5817,7 +5868,7 @@ function shareModal(id) {
   let users = null;
   const roleSel = (attr, cur_, lab) => `<select ${attr} aria-label="${esc(lab || tr('Role'))}">${ROLES.map(([v, n, h]) => `<option value="${v}" title="${esc(tr(h))}" ${v === cur_ ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>`;
   const isAg = p => !!(p.agent || agentById(p.user_id));
-  const row = (cur, p, mng) => `<div class="mrow" data-uid="${p.user_id}">${avBtn(p.user_id, p.name)}<span class="n">${esc(p.name)}${S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : ''}${isAg(p) ? agentBadge() : ''}</span>${mng && p.role !== 'owner' && !(S.me && p.user_id === S.me.id)
+  const row = (cur, p, mng) => `<div class="mrow" data-uid="${p.user_id}">${avBtn(p.user_id, p.name)}<span class="n">${esc(p.name)}${S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : ''}${isAg(p) ? agentBadge() : ''}${p.via_group ? ` <span class="muted">${tr('via a group')}</span>` : ''}</span>${mng && p.role !== 'owner' && !(S.me && p.user_id === S.me.id) && !p.via_group
       ? `${roleSel(`data-mrole="${p.user_id}"`, p.role, tr('Role of {0}', p.name))}<button class="iconbtn" data-mrm="${p.user_id}" title="${esc(isAg(p) ? tr('Stop sharing with {0}', p.name) : tr('Remove from list'))}" aria-label="${esc(isAg(p) ? tr('Stop sharing with {0}', p.name) : tr('Remove {0} from this list', p.name))}">${ic('x', 's')}</button>`
       : `<span class="muted" title="${esc(roleHelp(p.role))}">${esc(roleLabel(p.role))}</span>`}</div>`;
   const draw = () => {
@@ -5839,6 +5890,8 @@ function shareModal(id) {
         <div class="members" id="sh-agents">${ags.map(p => row(cur, p, mng)).join('')}${mng && acand.length ? `<div class="mrow madd"><select id="sh-addagent" aria-label="${esc(tr('Share with an agent'))}"><option value="">${tr('Share with an agent …')}</option>${acand.map(u => `<option value="${u.id}">${esc(u.display_name)}</option>`).join('')}</select>${roleSel('id="sh-agrole"', 'edit')}<button class="btn sm" data-m="share-ag">${ic('plus', 's')} ${tr('Add')}</button></div>` : ''}</div>
         <div id="l-tidyrow">${tidyRowHtml(cur)}</div>` : '';
     }
+    const gw = $('#sh-grpwrap', md);  // 2.10.0 (#441)
+    if (gw) { const gh = shareGroupsHtml(cur, mng, roleSel); gw.innerHTML = gh ? `<h4 id="sh-grp-h">${tr('Groups')}</h4><div class="members" id="sh-groups" aria-labelledby="sh-grp-h">${gh}</div>` : ''; }
     const ow = $('#sh-owner', md); if (ow) ow.textContent = cur.owner_name || (own ? S.me?.display_name || '' : '');
     const sum = $('#l-shsum'); if (sum) sum.textContent = shareSummary(cur);
   };
@@ -5864,6 +5917,8 @@ function shareModal(id) {
   md.addEventListener('change', e => {
     const r = e.target.closest('[data-mrole]');
     if (r) act(() => api('PUT', `/api/lists/${id}/members`, {user_id: +r.dataset.mrole, role: r.value}));
+    const gr = e.target.closest('[data-grole]');
+    if (gr) act(() => api('PUT', `/api/lists/${id}/groups/${gr.dataset.grole}`, {role: gr.value}));
   });
   md.addEventListener('click', async e => {
     const b = e.target.closest('button'); if (!b) return;
@@ -5879,6 +5934,12 @@ function shareModal(id) {
       const p = listPeople(listById(id)).find(x => x.user_id === +b.dataset.mrm), ag = p && isAg(p);
       if (!await askConfirm(ag ? tr('Stop sharing with {0}?', p?.name || '') : tr('Remove {0} from this list?', p?.name || ''), ag ? tr('The agent loses access to this list and its tasks at once.') : tr('They no longer see the list and its tasks; their tasks stay.'), {ok: ag ? tr('Stop sharing') : tr('Remove'), danger: true})) return;
       act(() => api('DELETE', `/api/lists/${id}/members/${b.dataset.mrm}`)); return;
+    }
+    if (m === 'share-grp') { const g = +$('#l-addgrp', md).value; if (g) act(() => api('PUT', `/api/lists/${id}/groups/${g}`, {role: $('#l-grprole', md).value}), tr('Shared')); return; }
+    if (b.dataset.grm) {
+      const g = (listById(id)?.groups || []).find(x => x.group_id === +b.dataset.grm);
+      if (!await askConfirm(tr('Stop sharing with the group {0}?', g?.name || ''), tr('Its members lose access unless they have it personally or through another group.'), {ok: tr('Stop sharing'), danger: true})) return;
+      act(() => api('DELETE', `/api/lists/${id}/groups/${b.dataset.grm}`)); return;
     }
     if (m === 'owner-info') { toast(b.title); return; }
     if (m === 'own-xfer') { const j = $('#l-owner', md)?._j; if (j) ownerModal(id, lname(listById(id) || l0), j, () => md.remove()); return; }
@@ -6313,6 +6374,8 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-plkeep': ['paperless_keep', N_('Also keep the attachment in Kalmido'), 'chk'], 's-caltoday': ['cal_today', N_('Events on Today'), 'chk'],
   's-dateok': ['date_confirm', N_('Confirm changes with OK'), 'chk'],  // 2.6.1 (#401)
   's-qfrom': ['quiet_from', N_('Quiet from'), 'time'], 's-qto': ['quiet_to', N_('Quiet until'), 'time'],  // 2.7.0 (#413)
+  's-wfrom': ['work_start', N_('Working hours from'), 'time'], 's-wto': ['work_end', N_('Working hours until'), 'time'],  // 2.10.0 (#440)
+  's-review': ['review_time', N_('Daily review at'), 'time'],
 };
 const SET_RENDER = ['features', 'nav_order', 'show_done_views', 'hide_blocked_today', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden'];
 function setVal(el, kind) {  // the value a control stands for; undefined = not valid (nothing is saved)
@@ -6591,7 +6654,11 @@ function settingsModal(focus) {
       ${hint(tr('Off: a new day, time, start, repeat or reminder is saved as soon as you pick it; “Undo” in the message takes the whole change back. On: changes wait for OK.'))}
       <h4>${tr('Projects')}</h4>
       ${depsOn() ? `<div class="row"><label>${tr('Today')}</label>${chk('s-hideblk', s.hide_blocked_today === '1', tr('Hide tasks that are still waiting on another task'))}</div>` : ''}
-      <div class="row"><label>${tr('List progress')}</label>${chk('s-progsub', s.progress_subtasks === '1', tr('Count subtasks too'))}</div>`,
+      <div class="row"><label>${tr('List progress')}</label>${chk('s-progsub', s.progress_subtasks === '1', tr('Count subtasks too'))}</div>
+      <h4 id="s-plan-h">${tr('Day planning')}</h4>
+      <div class="row"><label for="s-wfrom">${tr('Working hours')}</label>${timeIn('s-wfrom', s.work_start || '09:00', {label: tr('Working hours from'), clear: false})}<label for="s-wto" class="qtol">${tr('until|time')}</label>${timeIn('s-wto', s.work_end || '17:00', {label: tr('Working hours until'), clear: false})}</div>
+      <div class="row"><label for="s-review">${tr('Daily review at')}</label>${timeIn('s-review', s.review_time || '', {label: tr('Daily review at'), empty: tr('off')})}</div>
+      ${hint(tr('“Plan my day” in Today fills the free time between your calendar events within these hours with your open tasks (a task without a duration counts 30 minutes). The daily review shows in Today after the end of your working hours; with a time set it also comes as a push.'))}`,
     modules: modulesHtml(hint),
     notify: `${S.webpush?.enabled ? `<h4>${tr('Delivery')}</h4>
       <div class="row"><label for="s-pushch">${tr('Channel')}</label><select id="s-pushch">${[['webpush', N_('Web Push')], ['ntfy', 'ntfy'], ['both', N_('Both')]].map(([v, n]) => `<option value="${v}" ${(s.push_channel || 'webpush') === v ? 'selected' : ''}>${v === 'ntfy' ? n : tr(n)}</option>`).join('')}</select><button class="btn sm" data-m="ptest">${ic('bell', 's')} ${tr('Send test')}</button></div>
@@ -6647,7 +6714,7 @@ function settingsModal(focus) {
       <div class="members" id="s-tpls"><div class="muted mhint">${tr('Loading…')}</div></div>
       ${sampleHtml(hint)}`,
     ai: aiPaneOn() ? aiHtml(hint, {agents: 'agents', agentdots: 'agents', usage: 'usage', activity: 'log'}[focus]) : '',  // 2.7.0 (#405 S2)
-    users: S.me?.is_admin ? usersHtml() + orphHtml() + instanceHtml(chk, hint) + `<div id="s-signin">${signinHtml(hint)}</div>` + plaHtml() + bkHtml() + aaHtml() : '',  // 1.9.0: users first
+    users: S.me?.is_admin ? usersHtml() + grpHtml() + orphHtml() + instanceHtml(chk, hint) + `<div id="s-signin">${signinHtml(hint)}</div>` + plaHtml() + bkHtml() + aaHtml() : '',  // 1.9.0: users first
     help: `<h4>${tr('Getting started')}</h4>
       <div class="row"><button class="btn sm" data-m="tour">${ic('arrow', 's')} ${tr('Restart the welcome tour')}</button>${isMobile() ? '' : `<button class="btn sm" data-m="keys">${ic('help', 's')} ${tr('Keyboard shortcuts')} ${kb('?')}</button>`}<button class="btn sm" data-m="cele-try">${ic('check', 's')} ${tr('Show the celebration')}</button></div>
       ${isMobile() ? '' : `<div class="shelp">${tr('{0}: search and commands for everything (tasks, lists, views, settings). j / k move through the tasks, x completes, s snoozes, g t goes to Today.', kbText('Mod+K'))}</div>`}
@@ -6669,7 +6736,7 @@ function settingsModal(focus) {
   };
   pane.help += aboutHtml(chk, hint);
   const secs = SET_SECS.filter(([k]) => pane[k]);
-  let cur = {tabbar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'integr', caldav: 'integr', tokens: 'account', apppw: 'account', about: 'help'}[focus] || focus;
+  let cur = {tabbar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'integr', caldav: 'integr', tokens: 'account', apppw: 'account', about: 'help', groups: 'users', dayplan: 'general'}[focus] || focus;
   if (!secs.some(([k]) => k === cur)) cur = LS.get('settingsSec', 'general');
   if (!secs.some(([k]) => k === cur)) cur = 'general';
   const md = modal(`<div class="shdr"><h3>${tr('Settings')}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
@@ -6679,6 +6746,7 @@ function settingsModal(focus) {
   if (focus === 'tabbar') setTimeout(() => $('#s-tabbar-h', md)?.scrollIntoView({block: 'start'}), 0);
   if (focus === 'newskinds' || focus === 'share') setTimeout(() => $(focus === 'share' ? '#s-share-h' : '#s-news-h', md)?.scrollIntoView({block: 'start'}), 0);
   if (focus === 'agentdots') setTimeout(() => $('#s-agdots-h', md)?.scrollIntoView({block: 'start'}), 0);
+  if (focus === 'groups' || focus === 'dayplan') setTimeout(() => $(focus === 'groups' ? '#s-groups-h' : '#s-plan-h', md)?.scrollIntoView({block: 'start'}), 0);  // 2.10.0
   if (focus === 'caldav' || focus === 'apppw') setTimeout(() => $(focus === 'caldav' ? '#s-dav-h' : '#s-apw-h', md)?.scrollIntoView({block: 'start'}), 0);
   // 2.7.0 (#405 S8): the module keys land on their row (and open its options), not just on top of Modules
   const modFocus = {layout: 'cal', collab: 'collab', focus: 'pomo', time: 'time'}[focus];
@@ -6691,7 +6759,7 @@ function settingsModal(focus) {
     if (k === 'data') templatesDraw(md);
     if (k === 'integr') { icalDraw(md); calsDraw(md); whDraw(md); }
     if (k === 'notify') wpDraw(md);
-    if (k === 'users') { aaDraw(md); bkDraw(md); orphDraw(md); }
+    if (k === 'users') { aaDraw(md); bkDraw(md); orphDraw(md); grpDraw(md); }
     if (k === 'ai') aiSubShow(md);  // 2.5.1 (#393): only the shown sub-tab loads
     if (k === 'account') { tfaDraw(md); tokDraw(md); apwDraw(md); }
     $(`.snav [data-sec="${k}"]`, md)?.scrollIntoView({block: 'nearest', inline: 'nearest'});
@@ -6773,7 +6841,7 @@ function settingsModal(focus) {
   plcWire(md); if (S.me?.is_admin) plaWire(md);
   if (cur === 'notify') wpDraw(md);
   ntfyShow(md);
-  if (cur === 'users') { aaDraw(md); bkDraw(md); orphDraw(md); }
+  if (cur === 'users') { aaDraw(md); bkDraw(md); orphDraw(md); grpDraw(md); }
   aiTblWire(md);
   if (cur === 'ai') aiSubShow(md, {agents: 'agents', usage: 'usage', activity: 'log'}[focus]);  // 2.5.1 (#393)
   md.addEventListener('click', e => { const b = e.target.closest('[data-aisub]'); if (b) aiSubShow(md, b.dataset.aisub, true); });
@@ -7661,6 +7729,97 @@ function accountHtml() {
 }
 const usersHtml = () => `<h4>${tr('Users')}</h4><div class="members" id="a-users"><div class="muted mhint">${tr('Loading…')}</div></div>
   <div class="row" style="margin-top:.5rem"><button class="btn sm" data-acc="user-new">${ic('plus', 's')} ${tr('New user')}</button></div>`;
+// ------------------------------------------------------------------ 2.10.0 (#441): groups
+// Settings > Administration > Groups (admins): name, members (people), optionally a sign-in group (OIDC) the members follow
+const grpHtml = () => collab() ? `<h4 id="s-groups-h">${tr('Groups')}</h4>
+  <div class="shint">${tr('Share lists and folders with a group and assign tasks to it (“whoever has time”). New members get access at once, members who leave lose it.')}</div>
+  <div class="members" id="a-groups"></div>
+  <div class="row"><button class="btn sm" data-grp="new">${ic('plus', 's')} ${tr('New group')}</button></div>` : '';
+function grpDraw(md) {
+  const box = $('#a-groups', md); if (!box) return;
+  const gs = S.groups || [];
+  box.innerHTML = gs.length ? gs.map(g => `<div class="mrow" data-grow="${g.id}"><span class="avatar gav">${ic('users', 's')}</span><span class="n">${esc(g.name)} <span class="muted">${g.members.length ? esc(g.members.map(m => m.name).join(', ')) : tr('no members yet')}${g.synced ? ' · ' + esc(tr('sign-in group {0}', g.oidc_group)) : ''}</span></span><button class="iconbtn" data-grp="edit" data-gid="${g.id}" title="${esc(tr('Edit group'))}" aria-label="${esc(tr('Edit group {0}', g.name))}">${ic('edit', 's')}</button></div>`).join('')
+    : `<div class="muted mhint">${tr('No groups yet')}</div>`;
+  if (md._grpWired) return;
+  md._grpWired = true;
+  md.addEventListener('click', e => {
+    const b = e.target.closest('[data-grp]'); if (!b || !md.contains(b)) return;
+    grpEdit(md, b.dataset.grp === 'edit' ? +b.dataset.gid : null);
+  });
+}
+async function grpEdit(smd, gid) {
+  const g = gid ? grpById(gid) : null;
+  let users = [];
+  try { users = (await api('GET', '/api/users')).users.filter(u => u.kind !== 'agent' && !u.disabled); } catch { return; }
+  const sel = new Set((g?.members || []).map(m => m.user_id)), synced = !!g?.oidc_group;
+  const md = modal(`<h3>${g ? tr('Edit group') : tr('New group')}</h3>
+    <div class="row"><label for="gr-name">${tr('Name')}</label><input id="gr-name" maxlength="60" value="${esc(g?.name || '')}" placeholder="${esc(tr('e.g. Office'))}"></div>
+    <div class="row"><label for="gr-oidc">${tr('Sign-in group')}</label><input id="gr-oidc" maxlength="200" value="${esc(g?.oidc_group || '')}" placeholder="${esc(tr('optional · OIDC group name'))}"></div>
+    <div class="shint">${tr('With a sign-in group the members come from the sign-in provider (OIDC): whoever has that group in their login is a member, checked at every login.')}</div>
+    <h4 id="gr-mem-h">${tr('Members')}</h4>
+    <div class="grpmem" id="gr-mem" role="group" aria-labelledby="gr-mem-h">${users.map(u => `<label class="chkl"><input type="checkbox" data-gm="${u.id}" ${sel.has(u.id) ? 'checked' : ''} ${synced ? 'disabled' : ''}> ${esc(u.display_name)} <span class="muted">${esc(u.username)}</span></label>`).join('') || `<div class="muted mhint">${tr('No other users yet. An admin can add them in the settings.')}</div>`}</div>
+    <div class="calerr" id="gr-err" hidden></div>
+    <div class="foot">${g ? `<button class="btn danger" data-m="del">${ic('trash', 's')} ${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${g ? tr('Save') : tr('Create')}</button></div>`);
+  md.classList.add('grpmodal');
+  const syncMem = () => { const on = !!$('#gr-oidc', md).value.trim(); $$('[data-gm]', md).forEach(x => { x.disabled = on; }); };
+  $('#gr-oidc', md).addEventListener('input', syncMem);
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('button[data-m]'); if (!b) return;
+    if (b.dataset.m === 'close') { md.remove(); return; }
+    const err = $('#gr-err', md);
+    if (b.dataset.m === 'del') {
+      if (!await askConfirm(tr('Delete the group {0}?', g.name), tr('Its members lose the access they had only through it; tasks assigned to it become unassigned.'), {ok: tr('Delete'), danger: true})) return;
+      try { await calReq('DELETE', `/api/admin/groups/${gid}`); } catch (x) { err.textContent = x.message; err.hidden = false; return; }
+      md.remove(); await load().catch(() => {}); render(); grpDraw(smd); toast(tr('Group deleted')); return;
+    }
+    const name = $('#gr-name', md).value.trim(), og = $('#gr-oidc', md).value.trim();
+    if (!name) { $('#gr-name', md).focus(); return; }
+    const q = {name, oidc_group: og, ...(og ? {} : {members: $$('[data-gm]', md).filter(x => x.checked).map(x => +x.dataset.gm)})};
+    b.disabled = true;
+    try { await calReq(g ? 'PATCH' : 'POST', g ? `/api/admin/groups/${gid}` : '/api/admin/groups', q); } catch (x) { err.textContent = x.message; err.hidden = false; b.disabled = false; return; }
+    md.remove(); await load().catch(() => {}); render(); grpDraw(smd); toast(g ? tr('Group saved') : tr('Group created'));
+  });
+  setTimeout(() => $('#gr-name', md)?.focus(), 50);
+}
+// the "Groups" part of the share dialog of a list: shared directly (role + remove) or through a folder (read-only here)
+function shareGroupsHtml(cur, mng, roleSel) {
+  const gs = cur.groups || [], cand = (S.groups || []).filter(g => !gs.some(x => x.group_id === g.id && x.via === 'list'));
+  if (!gs.length && !(mng && cand.length)) return '';
+  return gs.map(x => `<div class="mrow" data-gsh="${x.group_id}"><span class="avatar gav">${ic('users', 's')}</span><span class="n">${esc(x.name)}${x.via !== 'list' ? ` <span class="muted">${esc(tr('via the folder {0}', fDisp(x.via)))}</span>` : ''}</span>${mng && x.via === 'list'
+    ? `${roleSel(`data-grole="${x.group_id}"`, x.role, tr('Role of the group {0}', x.name))}<button class="iconbtn" data-grm="${x.group_id}" title="${esc(tr('Stop sharing with the group'))}" aria-label="${esc(tr('Stop sharing with the group {0}', x.name))}">${ic('x', 's')}</button>`
+    : `<span class="muted" title="${esc(roleHelp(x.role))}">${esc(roleLabel(x.role))}</span>`}</div>`).join('')
+    + (mng && cand.length ? `<div class="mrow madd"><select id="l-addgrp" aria-label="${esc(tr('Share with a group'))}"><option value="">${tr('Share with a group …')}</option>${cand.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('')}</select>${roleSel('id="l-grprole"', 'edit')}<button class="btn sm" data-m="share-grp">${ic('plus', 's')} ${tr('Add')}</button></div>` : '');
+}
+// folder menu "Share with a group…": every own list in the folder (and its subfolders, also later ones)
+async function folderGroupsModal(f) {
+  if (!collab() || !(S.groups || []).length) { toast(tr('An admin creates groups in Settings > Administration')); return; }
+  const md = modal(`<div class="lhdr"><h3>${esc(tr('Share the folder “{0}”', fDisp(f)))}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
+    <div class="shint">${tr('Every list of yours in this folder and its subfolders is shared with the group, also lists you put there later. A list taken out of the folder is no longer shared through it.')}</div>
+    <div class="members" id="fg-list"><div class="muted mhint">${tr('Loading…')}</div></div>
+    <div class="foot"><span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);
+  md.classList.add('shmodal');
+  const roleSel = (attr, cur_, lab) => `<select ${attr} aria-label="${esc(lab || tr('Role'))}">${ROLES.map(([v, n, h]) => `<option value="${v}" title="${esc(tr(h))}" ${v === cur_ ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>`;
+  const draw = async () => {
+    let gs; try { gs = (await calReq('GET', '/api/folders/groups?folder=' + encodeURIComponent(f))).groups; } catch { return; }
+    if (!md.isConnected) return;
+    const cand = (S.groups || []).filter(g => !gs.some(x => x.group_id === g.id));
+    $('#fg-list', md).innerHTML = gs.map(x => `<div class="mrow"><span class="avatar gav">${ic('users', 's')}</span><span class="n">${esc(x.name)}</span>${roleSel(`data-fgrole="${x.group_id}"`, x.role, tr('Role of the group {0}', x.name))}<button class="iconbtn" data-fgrm="${x.group_id}" title="${esc(tr('Stop sharing with the group'))}" aria-label="${esc(tr('Stop sharing with the group {0}', x.name))}">${ic('x', 's')}</button></div>`).join('')
+      + (cand.length ? `<div class="mrow madd"><select id="fg-add" aria-label="${esc(tr('Share with a group'))}"><option value="">${tr('Share with a group …')}</option>${cand.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('')}</select>${roleSel('id="fg-role"', 'edit')}<button class="btn sm" data-m="fg-add">${ic('plus', 's')} ${tr('Add')}</button></div>` : '')
+      || `<div class="muted mhint">${tr('No groups yet')}</div>`;
+  };
+  const act = async fn => { try { await fn(); await load(); render(); draw(); } catch { /* api() showed it */ } };
+  md.addEventListener('change', e => {
+    const r = e.target.closest('[data-fgrole]');
+    if (r) act(() => api('PUT', `/api/folders/groups/${r.dataset.fgrole}`, {folder: f, role: r.value}));
+  });
+  md.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.m === 'close') { md.remove(); return; }
+    if (b.dataset.m === 'fg-add') { const g = +$('#fg-add', md).value; if (g) act(() => api('PUT', `/api/folders/groups/${g}`, {folder: f, role: $('#fg-role', md).value})); return; }
+    if (b.dataset.fgrm) act(() => api('DELETE', `/api/folders/groups/${b.dataset.fgrm}?folder=${encodeURIComponent(f)}`));
+  });
+  draw();
+}
 function accountWire(md) {
   let users = [];
   const drawUsers = async () => {
@@ -9758,6 +9917,9 @@ document.addEventListener('click', async e => {
     case 'toggle': e.stopPropagation(); toggleTask(id); break;
     case 'flow-why': e.stopPropagation(); e.preventDefault(); toast(tr(FLOW_WHY), null, 6000); break;
     case 'assign': e.stopPropagation(); assignMenu(a, id); break;
+    case 'take': e.stopPropagation(); takeTask(id || S.sel); break;  // 2.10.0 (#441)
+    case 'dayplan': dayplanModal(a.dataset.mode || 'day', a.dataset.day || today()); break;  // 2.10.0 (#440)
+    case 'review-hide': LS.set('reviewHidden', today()); if (S.route.review) go('today'); else renderView(); break;
     case 'ck-uncheck': case 'ck-clear': {
       e.stopPropagation();
       const dn = [...S.tasks.values()].filter(t => t.list_id === id && t.status !== 0 && !t.parent_id).map(t => t.id), snaps = dn.flatMap(withKids);
@@ -10024,7 +10186,8 @@ document.addEventListener('change', async e => {
   if (t.id === 'd-list') patchUndoable(S.sel, {list_id: +t.value}, tr('Moved to {0}', lname(listById(+t.value))));
   if (t.id === 'd-sec') patchTask(S.sel, {section_id: t.value ? +t.value : null});
   if (t.id === 'd-ttype') patchUndoable(S.sel, {ttype: t.value}, t.value ? tr('Type: {0}', ttName(t.value)) : tr('Type removed'));  // 2.4.0 (#340)
-  if (t.id === 'd-assignee') patchTask(S.sel, {assignee_id: t.value ? +t.value : null});
+  if (t.id === 'd-assignee') patchTask(S.sel, t.value.startsWith('g:') ? {assignee_group_id: +t.value.slice(2), assignee_id: null}
+    : {assignee_id: t.value ? +t.value : null, ...(taskById(S.sel)?.assignee_group_id ? {assignee_group_id: null} : {})});  // 2.10.0 (#441)
   if (t.dataset?.cf !== undefined && t.closest('#detail')) saveField(t);
   if (t.id === 'pomo-task') { pomoTask = t.value; LS.set('pomoTask', t.value); }
   if ((t.id === 'tv-from' || t.id === 'tv-to') && t.value) { S.tv[t.id.slice(3)] = t.value; LS.set(t.id === 'tv-from' ? 'timeFrom' : 'timeTo', t.value); renderView(); }
@@ -10360,6 +10523,7 @@ function folderMenu(anchor, f) {
   const into = folderNames().filter(t => !fParent(t) && t !== f && t !== fParent(f));
   menu(anchor, [
     {label: tr('New list in this folder'), icon: 'plus', fn: () => listModal(null, f)},
+    ...(collab() && (S.groups || []).length && folderLists(f).some(l => isOwner(l)) ? [{label: tr('Share with a group…'), icon: 'users', fn: () => folderGroupsModal(f)}] : []),  // 2.10.0 (#441)
     ...(sub ? [] : [{label: tr('New subfolder…'), icon: 'folder', fn: () => newFolder(null, f)}]),
     {label: tr('Rename'), icon: 'edit', fn: async () => {
       const n = ((await askPrompt(tr('Rename folder'), fName(f), {ok: tr('Rename')})) || '').trim().split(FSEP).join('∕'); if (!n || n === fName(f)) return;
@@ -11024,6 +11188,8 @@ function palAll() {
   add('a:newlist', 'action', tr('New list'), 'list', () => listModal());
   add('a:newproject', 'action', tr('New project…'), 'brief', () => listModal(null, '', {kind: 'project'}));  // 2.4.0 (#243)
   add('a:newfilter', 'action', tr('New filter'), 'filter', () => filterModal());
+  add('a:dayplan', 'action', tr('Plan my day'), 'cal', () => dayplanModal('day'));  // 2.10.0 (#440)
+  add('a:dayfill', 'action', tr('Fill free time'), 'clock', () => dayplanModal('fill'));
   if (feat('habits')) add('a:newhabit', 'action', tr('New habit'), 'habit', () => { go('habits'); habitModal(); });
   if (propOn()) {  // 2.3.0 (#260 #262 #263): ask an agent for a proposal
     add('a:propproject', 'action', tr('New project from briefing…'), 'bot', () => propRequest('project'));
@@ -11830,6 +11996,7 @@ S.prop = null;
 function propKeys(v) {
   const p = v.proposal; if (!p) return [];
   if (v.kind === 'project') return p.tasks.flatMap((t, i) => [String(i), ...t.subtasks.map((s, k) => `${i}.${k}`)]);
+  if (v.kind === 'dayplan') return [...p.items, ...p.defer].map((x, i) => String(i));  // 2.10.0 (#440)
   return (v.kind === 'extract' ? p.tasks : p.items).map((x, i) => String(i));
 }
 async function propOpen(jid) {
@@ -11894,6 +12061,7 @@ function propItemHtml(k, x, o = {}) {  // one entry: checkbox, title, date and t
 }
 function propItemsHtml() {
   const {v} = S.prop, p = v.proposal, inp = v.input;
+  if (v.kind === 'dayplan') return propDayplanHtml();  // 2.10.0 (#440)
   if (v.kind === 'project') {
     const secOpts = cur => `<option value="">${tr('No section')}</option>${p.sections.map(s => `<option ${s === cur ? 'selected' : ''}>${esc(s)}</option>`).join('')}`;
     return p.tasks.map((t, i) => propItemHtml(String(i), t, {
@@ -11937,7 +12105,7 @@ function propDraw() {
         <label class="ppshare"><input type="checkbox" id="pp-share"> ${tr('Share the new list with {0}', esc(v.agent.name))}</label>` : ''}
       <div class="ppbar"><button class="btn sm" data-pp="all">${tr('Select all')}</button><button class="btn sm" data-pp="none">${tr('Select none')}</button></div>
       <div class="ppl">${propItemsHtml()}</div>
-      <div class="shint">${v.kind === 'triage' ? tr('Applying moves and changes the selected inbox items as you; one step, undo takes it back.') : tr('Applying creates the selected entries as you (you own them, the history names {0}); one step, undo takes it back.', esc(v.agent.name))}</div>`;
+      <div class="shint">${v.kind === 'dayplan' ? tr('Applying sets the date, time and duration of the selected tasks as you; one step, undo takes it back.') : v.kind === 'triage' ? tr('Applying moves and changes the selected inbox items as you; one step, undo takes it back.') : tr('Applying creates the selected entries as you (you own them, the history names {0}); one step, undo takes it back.', esc(v.agent.name))}</div>`;
     // 2.5.2 (K03): the footer stays visible below the entries (sticky), with the count next to Apply
     foot = `<button class="btn danger" data-pp="discard">${tr('Discard')}</button><span class="spacer"></span><span class="muted ppcount ppfc"></span><button class="btn" data-pp="close">${tr('Close')}</button><button class="btn pri" data-pp="apply"></button>`;
   } else {
@@ -11961,7 +12129,7 @@ async function propApply(b) {
   const e = histAdd({label: tr('Applied the proposal of {0}', name), snaps: [], after: [], ids: [], lids: r.list_id ? [r.list_id] : [],
     undo: async () => { const x = await api('POST', `/api/proposals/${jid}/undo`); return {skipped: x.skipped || [], none: !!x.none}; },
     redo: async () => { const x = await api('POST', `/api/proposals/${jid}/redo`); return {skipped: x.skipped || [], none: !!x.none}; }});
-  histToast(r.changed ? trn('{0} inbox item sorted', '{0} inbox items sorted', r.changed) : trn('{0} entry created', '{0} entries created', r.created), e);
+  histToast(v.kind === 'dayplan' ? trn('{0} task planned', '{0} tasks planned', r.changed) : r.changed ? trn('{0} inbox item sorted', '{0} inbox items sorted', r.changed) : trn('{0} entry created', '{0} entries created', r.created), e);
   if (v.kind === 'project' && r.list_id && listById(r.list_id)) go('l/' + r.list_id);
   if (S.route.mod === 'agents') loadJobs();
 }
@@ -11974,6 +12142,146 @@ async function propDiscard() {
   toast(req ? tr('Request cancelled') : tr('Proposal discarded'));
   load().then(render).catch(() => {});
   if (S.route.mod === 'agents') loadJobs();
+}
+
+// ------------------------------------------------------------------ 2.10.0 (#440): day planning
+// "Plan my day" / "Fill free time" in Today: the server's built-in planner (GET /api/dayplan) proposes slots between the
+// day's calendar events and timed tasks within the working hours; the preview shows them as a timeline, every entry can be
+// left out, "Apply" sets due / time / duration in one step (undo takes it back). With an agent that is online, "Let an
+// agent plan" sends the same input as a proposal (kind dayplan); its answer opens in the same timeline (proposal dialog).
+const DP_REASON = {overdue: N_('overdue'), today: N_('due today'), deadline: N_('deadline'), due: N_('due soon'), priority: N_('priority'), fixed: N_('fixed')};
+const dpMin = hm => { const [h, m] = String(hm || '0:0').split(':'); return +h * 60 + +m; };
+const dpHm = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+const dpAgents = () => (S.proposers || []).filter(a => a.online !== false && !a.limit_reached);
+function dayplanBar() {  // Today: the two buttons above the list
+  if (S.route.key !== 'today') return '';
+  return `<div class="dpbar"><button class="btn sm" data-act="dayplan" data-mode="day">${ic('cal', 's')} ${tr('Plan my day')}</button><button class="btn sm" data-act="dayplan" data-mode="fill">${ic('clock', 's')} ${tr('Fill free time')}</button></div>`;
+}
+// one timeline: rows sorted by time (events, fixed tasks, planned entries) + the entries that do not fit any more
+function dpTimeline(rows, defer, o = {}) {
+  const hgt = d => `style="min-height:${Math.min(8, 2.75 + Math.max(0, (d || 30) - 30) / 30 * 0.75).toFixed(2)}rem"`;
+  const item = r => {
+    const on = !o.sel || o.sel.has(r.key);
+    if (r.kind === 'event' || r.kind === 'fixed') return `<div class="dprow ${r.kind}" ${hgt(dpMin(r.end) - dpMin(r.start))}><span class="dpt">${esc(r.start)}<small>${esc(r.end)}</small></span><span class="dpb">${ic(r.kind === 'event' ? 'cal' : 'lock', 's')}<span class="dpn">${esc(r.title)}</span><span class="muted dps">${r.kind === 'event' ? tr('Event') : tr('fixed')}</span></span></div>`;
+    return `<div class="dprow plan ppi ${on ? '' : 'off'}" data-k="${esc(r.key)}" ${hgt(r.duration)}><span class="dpt">${esc(r.start)}<small>${esc(r.end)}</small></span>
+      <label class="ppcl"><input type="checkbox" class="ppc" ${on ? 'checked' : ''} aria-label="${esc(tr('Select {0}', r.title))}"></label>
+      <span class="dpb"><span class="dpn">${esc(r.title)}</span><span class="muted dps">${esc(r.list || '')}${r.list ? ' · ' : ''}${r.estimated ? '≈ ' : ''}${esc(fmtH(r.duration))}${r.reason ? ' · ' + esc(tr(DP_REASON[r.reason] || r.reason)) : ''}${r.note ? ' · ' + esc(r.note) : ''}</span></span></div>`;
+  };
+  const dfr = defer.map(r => { const on = !o.sel || o.sel.has(r.key); return `<div class="dprow defer ppi ${on ? '' : 'off'}" data-k="${esc(r.key)}"><span class="dpt">${ic('arrow', 's')}</span>
+    <label class="ppcl"><input type="checkbox" class="ppc" ${on ? 'checked' : ''} aria-label="${esc(tr('Select {0}', r.title))}"></label>
+    <span class="dpb"><span class="dpn">${esc(r.title)}</span><span class="muted dps">${r.to ? esc(tr('move to {0}', fmtDayAbs(r.to))) : esc(tr('remove the date'))}${r.note ? ' · ' + esc(r.note) : ''}</span></span></div>`; }).join('');
+  const all = rows.slice().sort((a, b) => dpMin(a.start) - dpMin(b.start) || (a.kind === 'plan') - (b.kind === 'plan'));
+  return `<div class="dptl">${all.map(item).join('') || `<div class="muted mhint">${tr('Nothing to plan: no open tasks fit into the free time.')}</div>`}</div>
+    ${dfr ? `<h4 class="dph">${tr('Does not fit any more')}</h4><div class="dptl">${dfr}</div>` : ''}`;
+}
+const dpRowsOf = p => [...p.events.filter(e => !e.all_day).map(e => ({kind: 'event', start: e.start, end: e.end, title: e.title})),
+  ...p.fixed.map(t => ({kind: 'fixed', start: t.start, end: t.end, title: t.title}))];
+async function dayplanModal(mode = 'day', day = today()) {
+  $('.dpm')?.remove();
+  const md = modal(`<div class="calerr" id="dp-err" hidden></div><div class="muted mhint">${tr('Loading…')}</div>`);
+  md.classList.add('dpm');
+  const st = {mode, day, p: null, sel: new Set()}, alt = day !== today() ? day : addDays(today(), 1);
+  const draw = () => {
+    const p = st.p; if (!p || !md.isConnected) return;
+    const rows = [...dpRowsOf(p), ...p.plan.map((t, i) => ({...t, kind: 'plan', key: String(i)}))];
+    const defer = p.defer.map((t, i) => ({...t, key: 'd' + i}));
+    const ev = p.events.filter(e => !e.all_day).length, allDay = p.events.filter(e => e.all_day);
+    const ags = dpAgents(), n = st.sel.size;
+    md.querySelector('.card').innerHTML = `<div class="lhdr"><h3>${st.mode === 'fill' ? tr('Fill free time') : tr('Plan my day')}</h3><span class="spacer"></span><button class="iconbtn" data-dp="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
+      <div class="dptabs"><div class="seg" role="group" aria-label="${esc(tr('What to plan'))}"><button data-dp="mode" data-v="day" class="${st.mode === 'day' ? 'on' : ''}" aria-pressed="${st.mode === 'day'}">${tr('Plan my day')}</button><button data-dp="mode" data-v="fill" class="${st.mode === 'fill' ? 'on' : ''}" aria-pressed="${st.mode === 'fill'}">${tr('Fill free time')}</button></div>
+        <div class="seg" role="group" aria-label="${esc(tr('Day'))}"><button data-dp="day" data-v="${today()}" class="${st.day === today() ? 'on' : ''}" aria-pressed="${st.day === today()}">${tr('Today')}</button><button data-dp="day" data-v="${alt}" class="${st.day === alt ? 'on' : ''}" aria-pressed="${st.day === alt}">${alt === addDays(today(), 1) ? tr('Tomorrow') : esc(fmtDayAbs(alt))}</button></div></div>
+      <div class="dpsum muted">${esc(tr('{0}, working hours {1}–{2}', fmtDayAbs(p.date), p.work.start, p.work.end))} · ${esc(trn('{0} event', '{0} events', ev))} · ${esc(tr('{0} free', fmtH(p.free_min)))}${allDay.length ? ' · ' + esc(tr('all day: {0}', allDay.map(e => e.title).join(', '))) : ''}</div>
+      <div class="calerr" id="dp-err" hidden></div>
+      ${dpTimeline(rows, defer, {sel: st.sel})}
+      <div class="shint">${tr('Applying sets the date, time and duration of the selected tasks (a task without a duration gets {0} minutes); one step, undo takes it back.', p.default_duration)}</div>
+      <div class="foot ppfoot">${ags.length ? `<button class="btn" data-dp="agent">${ic('bot', 's')} ${tr('Let an agent plan')}</button>` : ''}<span class="spacer"></span><button class="btn" data-dp="close">${tr('Cancel')}</button><button class="btn pri" data-dp="apply" ${n ? '' : 'disabled'}>${ic('check', 's')} ${esc(trn('Apply {0} entry', 'Apply {0} entries', n))}</button></div>`;
+  };
+  const fetchPlan = async () => {
+    try { st.p = await calReq('GET', `/api/dayplan?date=${st.day}&mode=${st.mode}`); } catch (x) { const e = $('#dp-err', md); if (e) { e.textContent = x.message; e.hidden = false; } return; }
+    st.sel = new Set([...st.p.plan.map((x, i) => String(i)), ...st.p.defer.map((x, i) => 'd' + i)]);
+    draw();
+  };
+  md.addEventListener('change', e => {
+    if (!e.target.classList.contains('ppc')) return;
+    const r = e.target.closest('.ppi'); if (!r) return;
+    e.target.checked ? st.sel.add(r.dataset.k) : st.sel.delete(r.dataset.k);
+    r.classList.toggle('off', !e.target.checked);
+    const b = $('[data-dp="apply"]', md); if (b) { b.disabled = !st.sel.size; b.innerHTML = `${ic('check', 's')} ${esc(trn('Apply {0} entry', 'Apply {0} entries', st.sel.size))}`; }
+  });
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('[data-dp]'); if (!b) return;
+    const a = b.dataset.dp;
+    if (a === 'close') { md.remove(); return; }
+    if (a === 'mode' || a === 'day') { st[a] = b.dataset.v; fetchPlan(); return; }
+    if (a === 'agent') { dpAskAgent(b, st.day, st.mode, md); return; }
+    if (a === 'apply') {
+      const p = st.p, items = [];
+      p.plan.forEach((t, i) => { if (st.sel.has(String(i))) items.push([t.task_id, {due: p.date, due_time: t.start, duration: t.duration}]); });
+      p.defer.forEach((t, i) => { if (st.sel.has('d' + i)) items.push([t.task_id, {due: t.to, due_time: null}]); });
+      b.disabled = true;
+      if (await dpApply(items, st.mode === 'fill' ? tr('Filled free time') : tr('Planned the day'))) md.remove(); else b.disabled = false;
+    }
+  });
+  fetchPlan();
+}
+// applies [[task id, {due, due_time, duration?}]] as ONE history step (batch patch_each; undo sets the old values back)
+async function dpApply(items, label) {
+  const pairs = [], data = {};
+  for (const [id, v] of items) {
+    const t = taskById(id); if (!t) continue;
+    const before = snapTask(t), prev = {};
+    for (const k of Object.keys(v)) prev[k] = t[k] ?? null;
+    data[id] = {...v, _prev: prev};
+    pairs.push([before, {id, ...v}, Object.keys(v)]);
+  }
+  if (!pairs.length) return true;
+  let r;
+  try { r = await api('POST', '/api/tasks/batch', {ids: pairs.map(p => p[0].id), action: 'patch_each', data: {items: data}}); } catch { return false; }
+  await load().catch(() => {}); render();
+  const e = histFields(label, pairs, {res: r});
+  histToast(trn('{0} task planned', '{0} tasks planned', pairs.length), e);
+  return true;
+}
+async function dpAskAgent(anchor, day, mode, md) {
+  const ags = dpAgents(); if (!ags.length) return;
+  const ask = async a => {
+    try { await calReq('POST', '/api/proposals', {agent_id: a.id, kind: 'dayplan', date: day, mode}); } catch (x) { toast(x.message); return; }
+    md?.remove();
+    toast(tr('{0} is planning your day. You get a notification when the plan is ready.', a.name), null, 6000);
+    load().then(render).catch(() => {});
+  };
+  if (ags.length === 1) ask(ags[0]); else menu(anchor, ags.map(a => ({label: a.name, icon: 'bot', fn: () => ask(a)})));
+}
+// the dayplan proposal of an agent in the proposal dialog: the same timeline (keys = index into items, then defer)
+function propDayplanHtml() {
+  const {v} = S.prop, p = v.proposal, inp = v.input, tk = id => (inp.tasks || []).find(t => t.task_id === id) || {};
+  const plan = p.items.map((x, i) => { const t = tk(x.task_id), d = x.duration || t.duration || inp.default_duration || 30, e = S.prop.ed[String(i)] || {};
+    const st = e.time || x.start, du = e.duration || d;
+    return {kind: 'plan', key: String(i), start: st, end: dpHm(Math.min(1439, dpMin(st) + du)), title: t.title || '?', list: t.list, duration: du, estimated: !x.duration && t.estimated, note: x.note}; });
+  const defer = p.defer.map((x, i) => ({key: String(p.items.length + i), title: tk(x.task_id).title || '?', to: x.to, note: x.note}));
+  const fake = {events: inp.events || [], fixed: inp.fixed || []};
+  return `<div class="dpsum muted">${esc(tr('{0}, working hours {1}–{2}', fmtDayAbs(inp.date), inp.work?.start || '', inp.work?.end || ''))}</div>` + dpTimeline([...dpRowsOf(fake), ...plan], defer, {sel: S.prop.sel});
+}
+// ---- the evening review: a card in Today after the end of the working hours (or opened from its push)
+S.review = {day: null, data: null, busy: false, hidden: null};
+function reviewCard() {
+  if (S.route.key !== 'today' || !S.dayplan) return '';
+  const now = new Date(), hm = dpHm(now.getHours() * 60 + now.getMinutes()), t0 = today();
+  const want = S.route.review || hm >= (S.dayplan.work_end || '17:00');
+  if (!want || LS.get('reviewHidden', '') === t0 && !S.route.review) return '';
+  if (S.review.day !== t0 && !S.review.busy) {
+    S.review.busy = true;
+    calReq('GET', '/api/dayplan/review').then(j => { S.review = {day: t0, data: j, busy: false}; if (S.route.key === 'today') renderView(); }).catch(() => { S.review.busy = false; });
+    return '';
+  }
+  const r = S.review.data; if (!r) return '';
+  const li = (arr, cls) => arr.slice(0, 5).map(x => `<li class="${cls}">${esc(x.title)}</li>`).join('') + (arr.length > 5 ? `<li class="muted">${esc(trn('and {0} more', 'and {0} more', arr.length - 5))}</li>` : '');
+  const tm = r.tomorrow;
+  return `<section class="rvcard" aria-labelledby="rv-h"><div class="rvhd"><h3 id="rv-h">${ic('done', 's')} ${tr('Daily review')}</h3><span class="spacer"></span><button class="iconbtn" data-act="review-hide" title="${esc(tr('Hide for today'))}" aria-label="${esc(tr('Hide for today'))}">${ic('x', 's')}</button></div>
+    <div class="rvnums"><span><b>${r.done.length}</b> ${tr('done|review')}</span><span><b>${r.open.length}</b> ${tr('still open')}</span><span><b>${r.moved.length}</b> ${tr('moved')}</span></div>
+    ${r.done.length ? `<ul class="rvl">${li(r.done, 'ok')}</ul>` : ''}${r.open.length ? `<h4>${tr('Still open')}</h4><ul class="rvl">${li(r.open, '')}</ul>` : ''}
+    <div class="rvtm"><span class="muted">${esc(tm.count ? tr('Suggestion for {0}: {1}', fmtDayAbs(tm.date), tm.plan.slice(0, 3).map(x => x.start + ' ' + x.title).join(', ')) : tr('Nothing planned for {0} yet.', fmtDayAbs(tm.date)))}</span>
+      <button class="btn sm" data-act="dayplan" data-mode="day" data-day="${esc(tm.date)}">${ic('cal', 's')} ${tr('Plan tomorrow')}</button></div></section>`;
 }
 
 // ---- chat (desktop: side panel #achat, phone: the view agents/<id>)

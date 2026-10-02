@@ -66,6 +66,10 @@ By default the server binds to `127.0.0.1`. It rejects requests with an `Origin`
 | `tidy_task` | tidy a task (lists in tidy mode "auto") | `POST /api/v1/tasks/{id}/tidy` |
 | `set_waiting` / `clear_waiting` | 2.1.0: mark a task as waiting on external (`note`, follow-up day `until`) or end it | `PUT` / `DELETE /api/v1/tasks/{id}/waiting` |
 | `list_waiting` | 2.1.0: open tasks waiting on external (`list_tasks` also takes `waiting: true / false`) | `GET /api/v1/tasks?waiting=true` |
+| `list_groups` | 2.10.0: groups of people with their members (`mine` = yours) | `GET /api/v1/groups` |
+| `list_list_groups` | 2.10.0: the groups a list is shared with (role, directly or via a folder) | `GET /api/v1/lists/{id}/groups` |
+| `get_day_plan` | 2.10.0: the built-in day plan of your user (preview; `mode` day or fill) | `GET /api/v1/dayplan` |
+| `get_day_review` | 2.10.0: the daily review (done, open, moved, next working day) | `GET /api/v1/dayplan/review` |
 | `report_usage` | 2.1.1: report the agent's model usage (model, tokens, optional cost, task / list / job, short note; numbers only) | `POST /api/v1/agent/usage` |
 | `list_repos` | 2.2.0: repositories connected to a list (never a token) | `GET /api/v1/lists/{id}/repos` |
 | `get_project_overview` | 2.7.1: the overview of a project list (description, key links, milestones, files, members, status, time), read-only | `GET /api/v1/lists/{id}/overview` |

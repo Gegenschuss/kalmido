@@ -151,6 +151,12 @@ had been made in the app. Webhooks fire too.
 | `POST /comments/{id}/reactions` | write | React: `{emoji}` = `up`, `down`, `heart` or any single emoji |
 | `DELETE /comments/{id}/reactions/{emoji}` | write | Take your reaction back |
 | `GET /roadmap` | read | All lists on one timeline: groups with summary spans, progress and dated tasks, see [Roadmap](#roadmap) |
+| `GET /groups` · `GET /groups/{id}` | read | 2.10.0: groups of people (admins create them in the app): `id`, `name`, `members [{user_id, name}]`, `synced` (members follow a sign-in group), `mine` |
+| `GET /lists/{id}/groups` | read | 2.10.0: the groups a list is shared with: `group_id`, `name`, `role`, `via` (`list` = directly, else the owner's folder) |
+| `PUT /lists/{id}/groups/{group_id}` · `DELETE …` | write | 2.10.0: share a list with a group `{role}` (owner / list admin) or stop it. Every member (also later ones) gets access; a person's role is the higher of their own and the group's |
+| `POST /tasks/{id}/take` | write | 2.10.0: take a task assigned to one of your groups (`assignee_group_id`): it becomes yours (also for participants) |
+| `GET /dayplan?date=&mode=` | read | 2.10.0: the built-in day plan (a preview, nothing changes): working hours, calendar events, fixed timed tasks, `plan [{task_id, start, end, duration, estimated, reason}]`, `defer [{task_id, to}]`, `free_min`; `mode=day` (default) or `fill` |
+| `GET /dayplan/review?date=` | read | 2.10.0: the daily review: `done`, `open`, `moved` (tasks moved away that day) and `tomorrow` (a plan for the next working day) |
 | `POST /lists/{id}/shift` | write | Move every open dated task of a list by `{days}` in one transaction, see [Roadmap](#roadmap) |
 | `GET /tags` | read | The user's personal tags (`kind: personal`) and the tags of the lists they see (`kind: list`, with `list_id`, `color`), with task counts |
 | `GET /lists/{id}/tags` | read | The list tags of a list (shared by its members) |
@@ -179,7 +185,7 @@ had been made in the app. Webhooks fire too.
 | `GET /openapi.json` | none | This API as OpenAPI 3.1 |
 
 **Task filters** (`GET /tasks`): `list_id`, `status` (`open` default, `done`, `wont_do`, `all`), `due_from`, `due_to`,
-`tag` (one of your tags or a list tag, without `#`), `list_tag` (only list tags), `assignee` (`me`, `none` or a user id), `updated_since` (ISO timestamp),
+`tag` (one of your tags or a list tag, without `#`), `list_tag` (only list tags), `assignee` (`me`, `none` or a user id), `assignee_group` (2.10.0: `mine` or a group id), `updated_since` (ISO timestamp),
 `parent_id`, `top_level=true`, `waiting=true|false` (2.1.0), `limit`, `cursor`.
 
 **Compact tasks** (2.0.8): `GET /tasks?fields=compact` returns only `id`, `title`, `list_id`, `section_id`, `parent_id`,
@@ -194,7 +200,7 @@ had been made in the app. Webhooks fire too.
   "title": "Dentist", "notes": "call **first**", "priority": "high", "status": "open",
   "due": "2026-10-01", "due_time": "15:00", "start": null, "duration": 30,
   "reminders": [0, 15], "repeat": "", "repeat_from": "due", "url": null,
-  "tags": ["health"], "list_tags": ["urgent"], "pinned": false, "assignee_id": null,
+  "tags": ["health"], "list_tags": ["urgent"], "pinned": false, "assignee_id": null, "assignee_group_id": null,
   "created_by": 1, "completed_by": null,
   "created_at": "2026-09-29T08:15:00+00:00", "updated_at": "2026-09-29T08:15:00+00:00", "completed_at": null,
   "deleted": false, "fields": {"3": "opt2"}, "blocked": false, "comment_count": 0,
@@ -210,7 +216,8 @@ due time, up to 366 days = 527040), `repeat` (an RRULE body such as `FREQ=WEEKLY
 reminder on), `deadline_in_today` (boolean: also on Today from the first reminder on; `true` sets `deadline` too), `nag`
 (repeat the reminder until done: `5`, `10`, `15`, `30`, `60` (minutes) or `1d`; `off` = never, empty = the list's
 default; from the first reminder on, not during the person's quiet hours), `tags` (replaces your tags on the task), `list_tags` (replaces the list tags of the task; names, missing ones are
-created when you may change the list), `assignee_id` (someone who can see the list), `pinned`, `fields`
+created when you may change the list), `assignee_id` (someone who can see the list), `assignee_group_id` (2.10.0: a group the
+list is shared with; setting one clears the other), `pinned`, `fields`
 (custom field values by field id); `content` is accepted as an alias of `notes` (2.2.1). `tags` are personal: every user has their own tags on a shared task; `list_tags`
 belong to the list and everyone in it sees them. Attachments are
 listed (name, type, size) but not transferred through the API.
@@ -568,6 +575,11 @@ Redirects are never followed. `KALMIDO_WEBHOOKS=0` turns webhooks off.
 
 ## Behind a reverse proxy
 
+2.10.0: Kalmido believes `X-Forwarded-For`, `X-Forwarded-Proto` and `X-Forwarded-Host` only from the proxies in
+`KALMIDO_TRUSTED_PROXIES` (default loopback and the Docker bridge gateway `172.17.0.1`). Then rate limits, failed-login
+lockouts, logs and admin alerts see the client's real address. A proxy in another container on its own Docker network
+arrives from that network's gateway: add it (see the README's settings table).
+
 If your proxy puts a login (Authelia, Authentik, oauth2-proxy, ...) in front of Kalmido, API clients cannot pass it:
 they have a token, not a login cookie. Let requests to `/api/v1/` **that carry an Kalmido token** bypass the login, and
 keep everything else behind it. Send them to the app port where the proxy's user header is **not** trusted (if you use
@@ -591,6 +603,7 @@ location /api/v1/ {
     if ($http_authorization !~ "^Bearer abk_[A-Za-z0-9_-]{20,}$") { return 401; }
     proxy_set_header Remote-User "";
     proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
     proxy_read_timeout 90s;   # agents long-poll up to 60 s (GET /api/v1/agent/events?wait=60)
     proxy_pass http://127.0.0.1:3040;
 }

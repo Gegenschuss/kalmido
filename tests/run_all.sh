@@ -206,6 +206,13 @@ fresh; run p208_ui node p208_ui.js
 # app itself sends no unknown fields
        run p221_api "$PY" p221_api_test.py "$KALMIDO_TEST_DATA"
        run p221_ui node p221_ui.js "$KALMIDO_TEST_DATA"
+# 2.10.0: trusted proxies (#445: forwarded client address, lockouts per name + address, https for cookies / CalDAV,
+# "none"), groups (#441: admin CRUD, list / folder shares with roles, membership changes, group assignment + take,
+# participants, CalDAV, API + OpenAPI) and day planning (#440: working hours, the built-in plan, the dayplan proposal of an
+# agent, the daily review + push) (own containers); then the UI in jsdom and Firefox (360 / 390 touch, 1280 mouse, light +
+# dark). Shard 3: it was the shortest (15.4 min on CI after 2.9.0)
+       run p2100_api "$PY" p2100_api_test.py "$KALMIDO_TEST_DATA"
+       run p2100_ui node p2100_ui.js "$KALMIDO_TEST_DATA"
 shard 4  # ---------------------------------------------------------------- shard 4 of 4 (2.7.1: shard 3 had reached the 30 min job limit)
 # 2.3.0: agent proposals (#260 project from a briefing, #261 break down, #262 sort the inbox, #263 tasks from notes): who may ask
 # which agent, requests with exactly the sent input, validation per kind, apply as the person with one undo step, inbox

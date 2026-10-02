@@ -221,7 +221,7 @@ def _nets(s):
             try:
                 out.append(ipaddress.ip_network(part, strict=False))
             except ValueError:
-                print("AUTH_TRUSTED_PROXIES: ignoring invalid entry", repr(part), flush=True)
+                print("trusted proxies (AUTH_TRUSTED_PROXIES / KALMIDO_TRUSTED_PROXIES): ignoring invalid entry", repr(part), flush=True)
     return out
 
 
@@ -230,6 +230,19 @@ def _nets(s):
 AUTH_HEADER = os.environ.get("AUTH_PROXY_HEADER", "").strip()
 AUTH_TRUSTED = _nets(os.environ.get("AUTH_TRUSTED_PROXIES", ""))
 AUTH_PROXY_PORT = os.environ.get("AUTH_PROXY_PORT", "").strip()
+# ---- 2.10.0 (#445): reverse proxies whose X-Forwarded-For / -Proto / -Host are believed (KALMIDO_TRUSTED_PROXIES:
+# comma-separated addresses or networks; default loopback + the docker bridge gateway 172.17.0.1, "none" = trust nobody).
+# The AUTH_TRUSTED_PROXIES peers (proxy login) are trusted proxies too. waitress' own trusted_proxy takes ONE address,
+# so the app wraps itself in waitress' proxy-header parser per peer (proxy_mw below; waitress itself clears nothing).
+# KALMIDO_TRUSTED_PROXY_COUNT: proxies in a row in front of the app (default 1: the rightmost X-Forwarded-For entry,
+# the one the proxy appended, is the client; earlier ones were sent by the client and are ignored).
+_TP_RAW = os.environ.get("KALMIDO_TRUSTED_PROXIES", "127.0.0.1,::1,172.17.0.1").strip()
+TRUSTED_PROXIES = ([] if _TP_RAW.lower() in ("none", "off", "0") else _nets(_TP_RAW)) + AUTH_TRUSTED
+try:
+    TRUSTED_PROXY_COUNT = max(1, min(5, int(os.environ.get("KALMIDO_TRUSTED_PROXY_COUNT", "1"))))
+except ValueError:
+    TRUSTED_PROXY_COUNT = 1
+TRUSTED_PROXY_HEADERS = {"x-forwarded-for", "x-forwarded-proto", "x-forwarded-host"}
 BOOT_USER = (os.environ.get("AUTH_BOOTSTRAP_USER") or "admin").strip().lower()
 BOOT_NAME = (os.environ.get("AUTH_BOOTSTRAP_NAME") or BOOT_USER.capitalize()).strip()
 BOOT_PROXY = os.environ.get("AUTH_BOOTSTRAP_PROXY_LOGIN", "").strip() or None
@@ -667,6 +680,21 @@ CREATE TABLE IF NOT EXISTS dav_meta (
 CREATE INDEX IF NOT EXISTS dav_meta_uid ON dav_meta(uid);
 CREATE INDEX IF NOT EXISTS dav_meta_href ON dav_meta(href);
 CREATE INDEX IF NOT EXISTS dav_meta_parent ON dav_meta(parent_uid) WHERE parent_uid IS NOT NULL;
+-- 2.10.0 (#441): groups of people (admin), their members (oidc_group: synced from that OIDC group claim at every login)
+CREATE TABLE IF NOT EXISTS groups (
+  id INTEGER PRIMARY KEY, name TEXT NOT NULL, oidc_group TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, created_by INTEGER);
+CREATE TABLE IF NOT EXISTS group_members (
+  group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  added_at TEXT NOT NULL, PRIMARY KEY (group_id, user_id));
+CREATE INDEX IF NOT EXISTS group_members_user ON group_members(user_id);
+-- a list (list_id) or a folder of its owner (owner_id + folder, subfolders included) shared with a group, with a role
+CREATE TABLE IF NOT EXISTS group_shares (
+  id INTEGER PRIMARY KEY, group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  list_id INTEGER REFERENCES lists(id) ON DELETE CASCADE, owner_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  folder TEXT, role TEXT NOT NULL DEFAULT 'edit', added_by INTEGER, added_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS group_shares_list ON group_shares(list_id);
+CREATE INDEX IF NOT EXISTS group_shares_owner ON group_shares(owner_id);
 -- sync-collection: the (href -> ETag) set a sync-token stood for (zlib json), the last ones per person and list
 CREATE TABLE IF NOT EXISTS dav_sync (
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -805,6 +833,11 @@ MIGRATIONS = [
     # 2.7.2 (#420): a personal agent belongs to the person who created it (NULL = a team agent of the admins)
     ("agents", "owner_id", "ALTER TABLE agents ADD COLUMN owner_id INTEGER"),
     ("agents", "admin_paused", "ALTER TABLE agents ADD COLUMN admin_paused INTEGER NOT NULL DEFAULT 0"),  # its owner cannot resume it
+    # 2.10.0 (#441): a member row keeps the personal role (own_role, NULL = only via groups) and the best role via groups
+    # (grole); role = the higher of both (see grp_sync). Tasks can be assigned to a group (whoever has time takes it).
+    ("list_members", "own_role", "ALTER TABLE list_members ADD COLUMN own_role TEXT"),
+    ("list_members", "grole", "ALTER TABLE list_members ADD COLUMN grole TEXT"),
+    ("tasks", "assignee_group_id", "ALTER TABLE tasks ADD COLUMN assignee_group_id INTEGER"),
 ]
 INDEXES = """
 CREATE INDEX IF NOT EXISTS lists_owner ON lists(owner_id);
@@ -832,6 +865,9 @@ USER_DEFAULTS = {
     "default_reminder": "0",    # reminder preset for new timed tasks ('' = none)
     "digest_time": "",          # daily "due today" push (HH:MM, '' = off)
     "digest_sent": "",
+    "work_start": "09:00", "work_end": "17:00",  # 2.10.0 (#440): working hours of the day planner
+    "review_time": "",          # 2.10.0 (#440): evening review push (HH:MM, '' = off)
+    "review_sent": "",
     "pomo_focus": "25", "pomo_short": "5", "pomo_long": "15", "pomo_long_every": "4",
     "ntfy_topic": "",           # set by an admin (a user could otherwise push into someone else's topic)
     "push_priority": "4",       # priority of every push to this user: 3 normal, 4 high, 5 urgent (ntfy + Web Push)
@@ -1205,6 +1241,9 @@ def init_db(guard=True):
             c.execute("INSERT INTO task_tags_mu(task_id,user_id,tag) SELECT task_id, 0, tag FROM task_tags")
             c.execute("DROP TABLE task_tags")
             c.execute("ALTER TABLE task_tags_mu RENAME TO task_tags")
+        # 2.10.0 (#441): member rows from before groups (or written by a path that sets no own_role) are personal shares
+        c.execute("UPDATE list_members SET own_role=role WHERE own_role IS NULL AND grole IS NULL")
+        c.execute("CREATE INDEX IF NOT EXISTS tasks_agroup ON tasks(assignee_group_id) WHERE assignee_group_id IS NOT NULL")
         c.execute("DROP INDEX IF EXISTS tasks_tt")  # tt_id is unique per user now (tasks_tt_user)
         c.execute("DROP TRIGGER IF EXISTS time_task_title")
         c.execute(TIME_TITLE_TRIGGER)
@@ -1504,14 +1543,16 @@ def me():
 
 
 def _peer_trusted():
-    """Direct peer is a trusted proxy (and the request came in on the proxy port, if one is set)."""
+    """Direct peer is a trusted proxy (and the request came in on the proxy port, if one is set). 2.10.0 (#445): the peer
+    and the port as they were BEFORE the forwarded headers were applied (proxy_mw keeps them in the environ)."""
+    env = request.environ
     try:
-        ip = ipaddress.ip_address(request.remote_addr or "")
+        ip = ipaddress.ip_address(env.get("kalmido.peer", request.remote_addr) or "")
     except ValueError:
         return False
     if not any(ip in n for n in AUTH_TRUSTED):
         return False
-    return not AUTH_PROXY_PORT or str(request.environ.get("SERVER_PORT", "")) == AUTH_PROXY_PORT
+    return not AUTH_PROXY_PORT or str(env.get("kalmido.port", env.get("SERVER_PORT", ""))) == AUTH_PROXY_PORT
 
 
 def proxy_login_value():
@@ -1527,10 +1568,10 @@ def _token_hash(t):
 
 
 def client_ip():
-    xff = request.headers.get("X-Forwarded-For", "")
-    if xff and _peer_trusted():
-        return xff.split(",")[0].strip()
-    return request.remote_addr or ""
+    """The client's address: with a trusted proxy in front (KALMIDO_TRUSTED_PROXIES) the one it forwarded (proxy_mw already
+    put it into REMOTE_ADDR), else the direct peer. 2.10.0 (#445): before, waitress dropped X-Forwarded-For, so every
+    request behind a proxy had the proxy's address (one lockout for everyone, wrong addresses in logs)."""
+    return (request.remote_addr or "")[:64]
 
 
 def _is_open(path, method):
@@ -1538,16 +1579,51 @@ def _is_open(path, method):
 
 
 def rate_ip():
-    """Client address for rate limits: X-Forwarded-For from a trusted proxy peer on ANY port (the API is reached on the
-    app port, where the peer is the same proxy). Never used for authentication, only to key limits and alerts."""
-    xff = request.headers.get("X-Forwarded-For", "")
+    """Client address for rate limits and alerts (2.10.0: the same as client_ip, see proxy_mw)."""
+    return client_ip()
+
+
+def _ip_in(addr, nets):
     try:
-        peer = ipaddress.ip_address(request.remote_addr or "")
+        ip = ipaddress.ip_address((addr or "").split("%")[0])
     except ValueError:
-        return request.remote_addr or ""
-    if xff and any(peer in n for n in AUTH_TRUSTED):
-        return xff.split(",")[0].strip()[:64]
-    return request.remote_addr or ""
+        return False
+    return any(ip in n for n in nets)
+
+
+def proxy_mw(wsgi):
+    """2.10.0 (#445): X-Forwarded-For / -Proto / -Host only from a trusted proxy (TRUSTED_PROXIES, networks allowed), parsed
+    by waitress' own code (trusted_proxy_count = TRUSTED_PROXY_COUNT): REMOTE_ADDR = the client, wsgi.url_scheme = https
+    behind a TLS proxy, Host = the public name. From anyone else every proxy header is removed. The original peer and
+    port stay in the environ (kalmido.peer / kalmido.port) for the proxy login (_peer_trusted)."""
+    try:
+        from waitress.proxy_headers import PROXY_HEADERS, MalformedProxyHeader, clear_untrusted_headers, parse_proxy_headers
+    except ImportError:  # no waitress (another WSGI server): never believe forwarded headers
+        PROXY_HEADERS, parse_proxy_headers = None, None
+
+    def mw(environ, start_response):
+        environ["kalmido.peer"] = environ.get("REMOTE_ADDR", "")
+        environ["kalmido.port"] = str(environ.get("SERVER_PORT", ""))
+        if parse_proxy_headers is None:
+            for k in [k for k in environ if k.startswith("HTTP_X_FORWARDED_") or k == "HTTP_FORWARDED"]:
+                del environ[k]
+            return wsgi(environ, start_response)
+        untrusted = PROXY_HEADERS
+        if _ip_in(environ["kalmido.peer"], TRUSTED_PROXIES):
+            environ["kalmido.fwd_proto"] = (environ.get("HTTP_X_FORWARDED_PROTO") or "").split(",")[-1].strip().lower()
+            try:
+                untrusted = parse_proxy_headers(environ, trusted_proxy_count=TRUSTED_PROXY_COUNT,
+                                                trusted_proxy_headers=TRUSTED_PROXY_HEADERS)
+            except MalformedProxyHeader as ex:
+                print("malformed proxy header", ex.header, "from", environ["kalmido.peer"], flush=True)
+                start_response("400 Bad Request", [("Content-Type", "text/plain; charset=utf-8")])
+                return [b"Malformed proxy header\n"]
+        clear_untrusted_headers(environ, untrusted)
+        return wsgi(environ, start_response)
+    return mw
+
+
+app.wsgi_app = proxy_mw(app.wsgi_app)
 
 
 # ---- maintenance gate (restore of a backup). Every request and every background tick is an "active holder"; a
@@ -1676,8 +1752,18 @@ _DUMMY_HASH = generate_password_hash(secrets.token_urlsafe(16))  # same algorith
 FAIL_WINDOW = 900  # s
 
 
-def _rate_keys(username):
-    return [("u:" + username, 5), ("ip:" + client_ip(), 20)]
+def _rate_keys(username, pre="", lim=(5, 20, 100)):
+    """2.10.0 (#445): failed logins count per user name AND address ("u:name@ip", 5), per address ("ip:", 20) and, as a
+    ceiling against slow attacks from many addresses, per user name alone ("uall:", 100). One attacker (one address) can
+    no longer lock a person out: only the pair name + attacker's address and the attacker's address are blocked."""
+    ip = client_ip()
+    return [(pre + "u:" + username + "@" + ip, lim[0]), (pre + "ip:" + ip, lim[1]), (pre + "uall:" + username, lim[2])]
+
+
+def _rate_reset(username, pre=""):
+    """A successful login clears the counter of the pair user name + this address."""
+    with _fail_lock:
+        _fails.pop(pre + "u:" + username + "@" + client_ip(), None)
 
 
 def _rate_blocked(keys):
@@ -1878,8 +1964,7 @@ def finish_login(c, u, remember, via, extra=None):
     old = request.cookies.get(COOKIE)
     if old:
         c.execute("DELETE FROM sessions WHERE token_hash=?", (_token_hash(old),))
-    with _fail_lock:
-        _fails.pop("u:" + u["username"], None)
+    _rate_reset(u["username"])
     tok, age = start_session(c, u["id"], remember, via)
     c.commit()
     resp = set_cookie(jsonify(ok=True, user=user_public(u), **(extra or {})), tok, age)
@@ -1903,7 +1988,7 @@ def auth_login():
     if not ok:
         # admin alerts: only real usernames are named (a typo in the name field could be a password)
         for k in _rate_fail(keys):
-            if not k.startswith("u:"):
+            if k.startswith("ip:"):
                 aa_now("security", "ratelimit:" + k, N_("Login rate limit reached for IP {0} (logins refused for {1} min)."),
                        [client_ip(), FAIL_WINDOW // 60])
             elif u:
@@ -2996,6 +3081,7 @@ def oidc_account(c, claims):
         c.execute("UPDATE users SET oidc_subject=?, email=? WHERE id=?", (subject, email or None, uid))
         bump(c)
         aa_now("security", f"oidc:new:{uname}", N_("{0} was created by the first login with the OIDC provider."), [uname])
+        grp_oidc_sync(c, uid, groups)  # 2.10.0 (#441)
         return _user(c, uid)
     if u["disabled"]:
         raise OidcError("disabled", u["username"])
@@ -3010,6 +3096,7 @@ def oidc_account(c, claims):
             aa_now("security", f"oidc:admin:{u['username']}:{int(want)}",
                    N_("{0} is now an admin (set by {1}).") if want else N_("{0} is no longer an admin (OIDC group)."),
                    [u["username"], "OIDC"] if want else [u["username"]])
+    grp_oidc_sync(c, u["id"], groups)  # 2.10.0 (#441): synced groups follow the provider's group claim
     return _user(c, u["id"])
 
 
@@ -3281,7 +3368,8 @@ def _pset_sql(uid, pl, write=False):
     """SELECT of the task ids uid sees (write: may change) in the participant lists pl (ints, inlined; no ? params):
     assigned to uid + all their subtasks; for reading also the parent chain of those (context)."""
     q, u, depth_cap = ",".join(str(int(x)) for x in pl), int(uid), MAX_DEPTH + 7
-    base = f"""WITH RECURSIVE pa(id) AS (SELECT id FROM tasks WHERE assignee_id={u} AND list_id IN ({q})),
+    base = f"""WITH RECURSIVE pa(id) AS (SELECT id FROM tasks WHERE (assignee_id={u} OR assignee_group_id IN
+                                            (SELECT group_id FROM group_members WHERE user_id={u})) AND list_id IN ({q})),
                dn(id, lvl) AS (SELECT id, 0 FROM pa UNION
                                SELECT t.id, dn.lvl + 1 FROM tasks t JOIN dn ON t.parent_id=dn.id
                                WHERE dn.lvl < {depth_cap} AND t.list_id IN ({q}))"""
@@ -4073,10 +4161,12 @@ def visible_lists(c, uid):
     members, names = {}, {}
     if ids and collab_all():
         q = ",".join("?" * len(ids))
-        for m in c.execute(f"""SELECT m.list_id, m.role, u.id, u.username, u.display_name FROM list_members m
+        for m in c.execute(f"""SELECT m.list_id, m.role, m.own_role, m.grole, u.id, u.username, u.display_name FROM list_members m
                                JOIN users u ON u.id=m.user_id WHERE m.list_id IN ({q}) ORDER BY m.added_at, u.id""", ids):
             members.setdefault(m["list_id"], []).append({"user_id": m["id"], "name": m["display_name"] or m["username"],
-                                                         "role": m["role"], "username": m["username"]})  # 2.4.2 (#389): @username
+                                                         "role": m["role"], "username": m["username"],  # 2.4.2 (#389): @username
+                                                         # 2.10.0 (#441): only via a group (no own share) / the role via groups
+                                                         "via_group": bool(m["grole"]) and m["own_role"] is None, "group_role": m["grole"]})
     if ids:
         owners = {r["owner_id"] for r in rows}
         q2 = ",".join("?" * len(owners))
@@ -4094,6 +4184,7 @@ def visible_lists(c, uid):
     bells = {r[0]: (r[1], r[2]) for r in c.execute("SELECT list_id, mode, custom FROM list_bell WHERE user_id=?", (uid,))}
     repos = git_repos_of_lists(c, ids)  # 2.2.0 (#271)
     mss = milestones_of_lists(c, [r["id"] for r in rows if r["kind"] == "project"])  # 2.7.1 (#410): timeline markers
+    has_groups = collab_all() and bool(c.execute("SELECT 1 FROM group_shares LIMIT 1").fetchone())
     out = []
     for r in rows:
         d = {k: r[k] for k in r.keys() if not k.startswith("m_")}
@@ -4112,6 +4203,9 @@ def visible_lists(c, uid):
         d["bell_custom"] = bell_custom_of(bc)  # 2.6.1 (#404): my own choice of events (kept while another mode is set)
         d["repos"] = repos.get(r["id"], [])
         d["milestones"] = mss.get(r["id"], [])
+        # 2.10.0 (#441): the groups the list is shared with (directly or through a folder of its owner)
+        d["groups"] = [{"group_id": gid, "name": grp_name(c, gid), "role": role, "via": via}
+                       for gid, role, via in grp_shares_of_list(c, r["id"])] if has_groups else []
         # 2.4.1 (#379): the one agent that tidies it up (same rule as tidy_agent_of, from the rows already loaded)
         cands = sorted(([r["owner_id"]] if r["owner_id"] in ag else [])
                        + [m["user_id"] for m in d["members"] if m.get("agent") and m["role"] in WRITE_ROLES])
@@ -4178,7 +4272,7 @@ def state():
                            f"AND {tvis(c, uid)}", (uid, uid)).fetchone()[0],
             trash=c.execute(f"SELECT COUNT(*) FROM tasks WHERE list_id IN {wr_sql()} AND deleted_at IS NOT NULL",
                             (uid, uid)).fetchone()[0]),
-        settings={k: v for k, v in s.items() if k not in ("digest_sent",)},
+        settings={k: v for k, v in s.items() if k not in ("digest_sent", "review_sent")},
         notify=notif_matrix(s),  # 2.1.0 (#317)
         paperless=pl_state(c, u),
         ntfy_inbox={"enabled": bool(NTFY_IN["token"]), "server": NTFY_IN["public"], "topic": NTFY_IN["topic"]},
@@ -4202,6 +4296,9 @@ def state():
         sample=sample_state(c, uid),
         agents=agents_for(c, uid),
         proposers=prop_agents(c, uid),  # 2.3.0: agents I may ask for a proposal
+        groups=groups_for(c, full=bool(u["is_admin"])) if collab_all() else [],  # 2.10.0 (#441)
+        my_groups=grp_of_user(c, uid) if collab_all() else [],
+        dayplan=dayplan_state(c, uid),  # 2.10.0 (#440): working hours, review card
     )
 
 
@@ -4382,6 +4479,7 @@ def list_create():
                     (name, color, folder, srt, view, iso(now_utc()), uid, dab, kind,
                      clean_list_value("dep_shift", b.get("dep_shift")), clean_list_value("tickets", b.get("tickets"))))
     agent_autoshare(c, uid, cur.lastrowid)  # 2.4.2 (#391)
+    grp_touch(c, uid)  # 2.10.0 (#441): created inside a folder shared with a group
     bump(c)
     c.commit()
     return jsonify(dict(c.execute("SELECT * FROM lists WHERE id=?", (cur.lastrowid,)).fetchone()))
@@ -4438,6 +4536,8 @@ def list_update(lid):
             if dh is False:
                 return err(tr("Hours per day: a number from 1 to 24"))
             c.execute("UPDATE lists SET day_hours=? WHERE id=?", (dh, lid))
+        if "folder" in vals:
+            grp_touch(c, me())  # 2.10.0 (#441): moved into / out of a folder shared with a group
     else:
         if "rate" in b or "ticket_tpl" in b or "day_hours" in b or any(k in b for k in LIST_FIELDS if k not in MEMBER_LIST_FIELDS):
             return err(tr("Only the owner can change this list"), 403)
@@ -4489,6 +4589,8 @@ def list_reorder():
         folder = clean_folder(folder)
         c.execute("UPDATE lists SET folder=? WHERE id=? AND owner_id=?", (folder, int(lid), uid))
         c.execute("UPDATE list_members SET folder=? WHERE list_id=? AND user_id=?", (folder, int(lid), uid))
+    if fmap:
+        grp_touch(c, uid)  # 2.10.0 (#441)
     bump(c)
     c.commit()
     return jsonify(ok=True, conflicts=conflicts)
@@ -4544,14 +4646,15 @@ def member_set(lid):
     if uid == c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0]:
         return err(tr("The owner's role cannot be changed"), 403)
     lname = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]
-    old = c.execute("SELECT role FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone()
-    if old:
-        c.execute("UPDATE list_members SET role=? WHERE list_id=? AND user_id=?", (role, lid, uid))
-        if old[0] != role:
-            news_add(c, uid, "role", list_id=lid, data={"role": role, "old": old[0], "name": lname})
+    old = c.execute("SELECT role, grole FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone()
+    if old:  # 2.10.0 (#441): the personal role; the effective one is the higher of it and the role via groups
+        eff = role_max(role, old["grole"])
+        c.execute("UPDATE list_members SET role=?, own_role=? WHERE list_id=? AND user_id=?", (eff, role, lid, uid))
+        if old[0] != eff:
+            news_add(c, uid, "role", list_id=lid, data={"role": eff, "old": old[0], "name": lname})
     else:
-        c.execute("INSERT INTO list_members(list_id,user_id,role,sort,added_at) VALUES(?,?,?,?,?)",
-                  (lid, uid, role, my_max_sort(c, uid) + 1, iso(now_utc())))
+        c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?)",
+                  (lid, uid, role, role, my_max_sort(c, uid) + 1, iso(now_utc())))
         news_add(c, uid, "share", list_id=lid, data={"role": role, "name": lname})
         agent_share_skip(c, lid, uid, False)  # 2.4.2 (#391): shared again by hand -> "Share all" includes it again
         who = user_names(c, [me()]).get(me(), "?")
@@ -4603,8 +4706,8 @@ def agent_share_add(c, lid, aid, actor):
     if c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, aid)).fetchone():
         return False
     lname = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]
-    c.execute("INSERT INTO list_members(list_id,user_id,role,sort,added_at) VALUES(?,?,?,?,?)",
-              (lid, aid, "edit", my_max_sort(c, aid) + 1, iso(now_utc())))
+    c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?)",
+              (lid, aid, "edit", "edit", my_max_sort(c, aid) + 1, iso(now_utc())))
     news_add(c, aid, "share", list_id=lid, data={"role": "edit", "name": lname}, actor=actor)
     wh_note_list(lid, "list.shared", {"member_id": aid, "role": "edit"})
     return True
@@ -4691,8 +4794,14 @@ def member_remove(lid, uid):
     role = need_list(c, lid, write=False)
     if uid != me() and role not in MANAGE_ROLES:
         raise Denied(403)
-    if not c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone():
+    mr = c.execute("SELECT grole FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone()
+    if not mr:
         return err(tr("unknown"), 404)
+    if mr["grole"]:  # 2.10.0 (#441): access via a group stays; only the personal share goes
+        c.execute("UPDATE list_members SET own_role=NULL, role=grole WHERE list_id=? AND user_id=?", (lid, uid))
+        bump(c)
+        c.commit()
+        return jsonify(ok=True, via_group=True)
     c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, uid))
     c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, uid))
     c.execute("DELETE FROM task_field_values WHERE value=? AND field_id IN (SELECT id FROM list_fields WHERE list_id=? AND type='person')",
@@ -4704,6 +4813,405 @@ def member_remove(lid, uid):
     bump(c)
     c.commit()
     return jsonify(ok=True)
+
+
+# ---- 2.10.0 (#441): groups. An admin creates groups of people (Settings > Administration > Groups; optionally their
+# members follow an OIDC group claim at every login: oidc_group set = synced, then read-only by hand). A list (owner /
+# list admin) or a whole folder of own lists (its owner) is shared with a group with a role (same roles as people).
+# Group access is MATERIALIZED into list_members: every member of a group gets a member row, so every read path that
+# already respects sharing (state, search, CalDAV, API v1, MCP, News, webhooks, agents) needs no change. list_members
+# keeps the personal role (own_role, NULL = only via groups) and the best role via groups (grole); role = the higher of
+# both. grp_sync recomputes the rows of the affected lists after every change of groups, members, shares or folders.
+# A task can also be assigned to a group (tasks.assignee_group_id, "whoever has time"): it shows in "Assigned to me" for
+# every member until one of them takes it (POST /api/tasks/<id>/take -> assignee_id = them, the group is cleared).
+GROUP_NAME_MAX = 60
+GROUP_MAX = 200
+ROLE_RANK = {"participant": 1, "view": 2, "edit": 3, "admin": 4}
+
+
+def role_max(*roles):
+    rs = [r for r in roles if r in ROLE_RANK]
+    return max(rs, key=ROLE_RANK.get) if rs else None
+
+
+def grp_members(c, gid):
+    """Active persons of group gid (agents are never group members)."""
+    return [r[0] for r in c.execute("""SELECT m.user_id FROM group_members m JOIN users u ON u.id=m.user_id
+                                       WHERE m.group_id=? AND u.kind!='agent' ORDER BY m.user_id""", (gid,))]
+
+
+def grp_of_user(c, uid):
+    return [r[0] for r in c.execute("SELECT group_id FROM group_members WHERE user_id=? ORDER BY group_id", (uid,))]
+
+
+def grp_shares_of_list(c, lid):
+    """[(group_id, role, via)] of list lid: shared directly (via 'list') or through a folder of its owner (via the folder)."""
+    lr = c.execute("SELECT owner_id, folder, is_inbox FROM lists WHERE id=?", (lid,)).fetchone()
+    if not lr or lr["is_inbox"]:
+        return []
+    out = [(r["group_id"], r["role"], "list") for r in c.execute(
+        "SELECT group_id, role FROM group_shares WHERE list_id=?", (lid,))]
+    if lr["folder"]:
+        for r in c.execute("SELECT group_id, role, folder FROM group_shares WHERE list_id IS NULL AND owner_id=?", (lr["owner_id"],)):
+            if folder_under(lr["folder"], r["folder"]):
+                out.append((r["group_id"], r["role"], r["folder"]))
+    return out
+
+
+def grp_list_ids(c, gid=None, owner=None):
+    """Lists touched by the shares of group gid (or by the folder shares of owner): the ones grp_sync must look at."""
+    ids = set()
+    q, a = ("WHERE group_id=?", (gid,)) if gid is not None else ("WHERE owner_id=?", (owner,))
+    for r in c.execute(f"SELECT list_id, owner_id, folder FROM group_shares {q}", a):
+        if r["list_id"]:
+            ids.add(r["list_id"])
+        else:
+            for x in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND folder!='' AND is_inbox=0", (r["owner_id"],)):
+                if folder_under(x["folder"], r["folder"]):
+                    ids.add(x["id"])
+    if gid is not None or owner is not None:  # rows that came from groups before (a share was removed meanwhile)
+        sql = ("SELECT DISTINCT m.list_id FROM list_members m JOIN group_members gm ON gm.user_id=m.user_id "
+               "WHERE m.grole IS NOT NULL AND gm.group_id=?") if gid is not None else \
+              "SELECT DISTINCT m.list_id FROM list_members m JOIN lists l ON l.id=m.list_id WHERE m.grole IS NOT NULL AND l.owner_id=?"
+        ids.update(r[0] for r in c.execute(sql, (gid if gid is not None else owner,)))
+    return ids
+
+
+def grp_sync(c, lids, actor=None):
+    """Recomputes the member rows of lists lids from personal shares + group shares (caller commits). New access, a
+    changed role and lost access give the person a News item (share / role / unshare) and the list webhook list.shared /
+    list.unshared; lost access also clears their assignments in that list (as removing a member does)."""
+    actor = actor if actor is not None else (me() if has_request_context() and getattr(g, "user", None) else None)
+    agents = agent_ids(c)
+    for lid in sorted({int(x) for x in lids if x}):
+        lr = c.execute("SELECT id, owner_id, name, is_inbox FROM lists WHERE id=?", (lid,)).fetchone()
+        if not lr:
+            continue
+        want, gname = {}, {}
+        if not lr["is_inbox"]:
+            for gid, role, _via in grp_shares_of_list(c, lid):
+                for uid in grp_members(c, gid):
+                    if uid == lr["owner_id"] or uid in agents:
+                        continue
+                    if role_max(want.get(uid), role) != want.get(uid):
+                        want[uid], gname[uid] = role_max(want.get(uid), role), gid
+        rows = {r["user_id"]: r for r in c.execute("SELECT * FROM list_members WHERE list_id=?", (lid,))}
+        for uid in sorted(set(rows) | set(want)):
+            r, gr = rows.get(uid), want.get(uid)
+            own = None
+            if r is not None:
+                own = r["own_role"] if r["own_role"] is not None else (r["role"] if r["grole"] is None else None)
+            eff = role_max(own, gr)
+            if r is None:
+                c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,grole,sort,added_at) VALUES(?,?,?,?,?,?,?)",
+                          (lid, uid, eff, None, gr, my_max_sort(c, uid) + 1, iso(now_utc())))
+                news_add(c, uid, "share", list_id=lid, actor=actor,
+                         data={"role": eff, "name": lr["name"], "group": grp_name(c, gname.get(uid))})
+                wh_note_list(lid, "list.shared", {"member_id": uid, "role": eff, "group_id": gname.get(uid)})
+            elif eff is None:
+                c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, uid))
+                c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, uid))
+                c.execute("DELETE FROM task_field_values WHERE value=? AND field_id IN (SELECT id FROM list_fields WHERE list_id=? AND type='person')",
+                          (str(uid), lid))
+                news_add(c, uid, "unshare", list_id=lid, actor=actor, data={"name": lr["name"]})
+            elif (r["role"], r["own_role"], r["grole"]) != (eff, own, gr):
+                c.execute("UPDATE list_members SET role=?, own_role=?, grole=? WHERE list_id=? AND user_id=?", (eff, own, gr, lid, uid))
+                if r["role"] != eff:
+                    news_add(c, uid, "role", list_id=lid, actor=actor, data={"role": eff, "old": r["role"], "name": lr["name"]})
+        # a group assignment stays only while that group still has access to the list
+        gids = {x[0] for x in grp_shares_of_list(c, lid)}
+        for t in c.execute("SELECT id, assignee_group_id FROM tasks WHERE list_id=? AND assignee_group_id IS NOT NULL", (lid,)).fetchall():
+            if t["assignee_group_id"] not in gids:
+                c.execute("UPDATE tasks SET assignee_group_id=NULL WHERE id=?", (t["id"],))
+
+
+def grp_touch(c, owner):
+    """The lists of owner moved between folders / were created: re-sync them if one of their folders is shared."""
+    if c.execute("SELECT 1 FROM group_shares WHERE owner_id=? AND list_id IS NULL", (owner,)).fetchone():
+        grp_sync(c, grp_list_ids(c, owner=owner) | {r[0] for r in c.execute("SELECT id FROM lists WHERE owner_id=?", (owner,))})
+
+
+def grp_name(c, gid):
+    if not gid:
+        return ""
+    r = c.execute("SELECT name FROM groups WHERE id=?", (gid,)).fetchone()
+    return r[0] if r else ""
+
+
+def grp_dict(c, r, full=True):
+    mem = grp_members(c, r["id"])
+    names = user_names(c, mem)
+    d = {"id": r["id"], "name": r["name"], "oidc_group": r["oidc_group"] or "", "synced": bool(r["oidc_group"]),
+         "members": [{"user_id": u, "name": names.get(u, "?")} for u in mem], "created_at": r["created_at"]}
+    if full:
+        d["shares"] = [{"list_id": s["list_id"], "folder": s["folder"], "owner_id": s["owner_id"], "role": s["role"]}
+                       for s in c.execute("SELECT * FROM group_shares WHERE group_id=? ORDER BY id", (r["id"],))]
+    return d
+
+
+def groups_for(c, uid=None, full=False):
+    """Every group with its members (names only; persons see all groups to share with them)."""
+    return [grp_dict(c, r, full) for r in c.execute("SELECT * FROM groups ORDER BY name COLLATE NOCASE, id")]
+
+
+def grp_clean_name(v):
+    if not isinstance(v, str) or not v.strip():
+        raise BadInput(tr("Name missing"))
+    return re.sub(r"\s+", " ", v).strip()[:GROUP_NAME_MAX]
+
+
+def grp_set_members(c, gid, ids, actor=None):
+    """Replaces the members of group gid with ids (active persons only); re-syncs the lists the group reaches."""
+    want = set()
+    for x in ids or []:
+        try:
+            x = int(x)
+        except (TypeError, ValueError):
+            raise BadInput(tr("unknown user")) from None
+        u = c.execute("SELECT kind FROM users WHERE id=?", (x,)).fetchone()
+        if not u or u["kind"] == "agent":
+            raise BadInput(tr("Only people can be group members"))
+        want.add(x)
+    before = grp_list_ids(c, gid)
+    cur = set(grp_members(c, gid))
+    for x in cur - want:
+        c.execute("DELETE FROM group_members WHERE group_id=? AND user_id=?", (gid, x))
+    for x in sorted(want - cur):
+        c.execute("INSERT OR IGNORE INTO group_members(group_id,user_id,added_at) VALUES(?,?,?)", (gid, x, iso(now_utc())))
+    if cur != want:
+        grp_sync(c, before | grp_list_ids(c, gid), actor)
+
+
+def grp_oidc_sync(c, uid, claim_groups):
+    """At an OIDC login: the person is a member of exactly the synced groups whose oidc_group is among their claims."""
+    for r in c.execute("SELECT id, oidc_group FROM groups WHERE oidc_group!=''").fetchall():
+        has = bool(c.execute("SELECT 1 FROM group_members WHERE group_id=? AND user_id=?", (r["id"], uid)).fetchone())
+        want = r["oidc_group"] in claim_groups
+        if has != want:
+            mem = set(grp_members(c, r["id"]))
+            grp_set_members(c, r["id"], sorted(mem | {uid} if want else mem - {uid}), actor=uid)
+
+
+def need_group(c, gid):
+    r = c.execute("SELECT * FROM groups WHERE id=?", (gid,)).fetchone()
+    if not r:
+        raise Denied(404, tr("unknown group"))
+    return r
+
+
+@app.get("/api/groups")
+def groups_get():
+    c = db()
+    return jsonify(groups=groups_for(c, full=bool(g.user["is_admin"])), mine=grp_of_user(c, me()))
+
+
+@app.post("/api/admin/groups")
+def group_create():
+    """{name, members?: [user ids], oidc_group?} -- admins only."""
+    need_admin()
+    need_collab()
+    b = body()
+    c = db()
+    name = grp_clean_name(b.get("name"))
+    if c.execute("SELECT COUNT(*) FROM groups").fetchone()[0] >= GROUP_MAX:
+        return err(tr("At most {0} groups", GROUP_MAX), 409)
+    if c.execute("SELECT 1 FROM groups WHERE name=? COLLATE NOCASE", (name,)).fetchone():
+        return err(tr("A group with this name exists already"), 409)
+    og = str(b.get("oidc_group") or "").strip()[:200]
+    gid = c.execute("INSERT INTO groups(name,oidc_group,created_at,created_by) VALUES(?,?,?,?)",
+                    (name, og, iso(now_utc()), me())).lastrowid
+    if b.get("members") and not og:
+        grp_set_members(c, gid, b["members"])
+    bump(c)
+    c.commit()
+    return jsonify(grp_dict(c, need_group(c, gid)))
+
+
+@app.patch("/api/admin/groups/<int:gid>")
+def group_update(gid):
+    """{name?, members?, oidc_group?} -- members cannot be changed by hand while the group follows an OIDC group."""
+    need_admin()
+    b = body()
+    c = db()
+    r = need_group(c, gid)
+    if "name" in b:
+        name = grp_clean_name(b["name"])
+        if c.execute("SELECT 1 FROM groups WHERE name=? COLLATE NOCASE AND id!=?", (name, gid)).fetchone():
+            return err(tr("A group with this name exists already"), 409)
+        c.execute("UPDATE groups SET name=? WHERE id=?", (name, gid))
+    og = r["oidc_group"]
+    if "oidc_group" in b:
+        og = str(b.get("oidc_group") or "").strip()[:200]
+        c.execute("UPDATE groups SET oidc_group=? WHERE id=?", (og, gid))
+    if "members" in b:
+        if og:
+            return err(tr("The members of this group come from the sign-in provider"), 409)
+        if not isinstance(b["members"], list):
+            return err(tr("Invalid value: {0}", "members"))
+        grp_set_members(c, gid, b["members"])
+    bump(c)
+    c.commit()
+    return jsonify(grp_dict(c, need_group(c, gid)))
+
+
+@app.delete("/api/admin/groups/<int:gid>")
+def group_delete(gid):
+    need_admin()
+    c = db()
+    need_group(c, gid)
+    lids = grp_list_ids(c, gid)
+    c.execute("UPDATE tasks SET assignee_group_id=NULL WHERE assignee_group_id=?", (gid,))
+    c.execute("DELETE FROM group_shares WHERE group_id=?", (gid,))
+    c.execute("DELETE FROM group_members WHERE group_id=?", (gid,))
+    c.execute("DELETE FROM groups WHERE id=?", (gid,))
+    grp_sync(c, lids)
+    bump(c)
+    c.commit()
+    return jsonify(ok=True)
+
+
+def grp_role(b):
+    role = b.get("role", "edit")
+    if role not in ROLES:
+        raise BadInput(tr("Role must be admin, edit, participant or view"))
+    return role
+
+
+@app.get("/api/lists/<int:lid>/groups")
+def list_groups_get(lid):
+    c = db()
+    need_list(c, lid, write=False)
+    return jsonify(groups=[{"group_id": gid, "name": grp_name(c, gid), "role": role, "via": via}
+                           for gid, role, via in grp_shares_of_list(c, lid)])
+
+
+@app.put("/api/lists/<int:lid>/groups/<int:gid>")
+def list_group_set(lid, gid):
+    """{role} -- the owner or a list admin shares the list with group gid (or changes its role)."""
+    need_collab()
+    c = db()
+    need_list(c, lid, write=False, manage=True)
+    need_group(c, gid)
+    if c.execute("SELECT is_inbox FROM lists WHERE id=?", (lid,)).fetchone()[0]:
+        return err(tr("The inbox cannot be shared"))
+    role = grp_role(body())
+    if c.execute("SELECT 1 FROM group_shares WHERE list_id=? AND group_id=?", (lid, gid)).fetchone():
+        c.execute("UPDATE group_shares SET role=? WHERE list_id=? AND group_id=?", (role, lid, gid))
+    else:
+        c.execute("INSERT INTO group_shares(group_id,list_id,role,added_by,added_at) VALUES(?,?,?,?,?)",
+                  (gid, lid, role, me(), iso(now_utc())))
+    grp_sync(c, [lid])
+    bump(c)
+    c.commit()
+    return jsonify(ok=True)
+
+
+@app.delete("/api/lists/<int:lid>/groups/<int:gid>")
+def list_group_del(lid, gid):
+    need_collab()
+    c = db()
+    need_list(c, lid, write=False, manage=True)
+    if not c.execute("DELETE FROM group_shares WHERE list_id=? AND group_id=?", (lid, gid)).rowcount:
+        return err(tr("unknown"), 404)
+    grp_sync(c, [lid])
+    bump(c)
+    c.commit()
+    return jsonify(ok=True)
+
+
+@app.get("/api/folders/groups")
+def folder_groups_get():
+    """?folder=<path>: the groups my folder (and its subfolders) is shared with."""
+    c = db()
+    f = clean_folder(str(request.args.get("folder") or ""), False)
+    return jsonify(groups=[{"group_id": r["group_id"], "name": grp_name(c, r["group_id"]), "role": r["role"]}
+                           for r in c.execute("SELECT group_id, role FROM group_shares WHERE owner_id=? AND list_id IS NULL AND folder=?",
+                                              (me(), f))])
+
+
+@app.put("/api/folders/groups/<int:gid>")
+def folder_group_set(gid):
+    """{folder, role}: share every own list in that folder (and its subfolders, also lists moved there later) with gid."""
+    need_collab()
+    b = body()
+    c = db()
+    need_group(c, gid)
+    f = clean_folder(str(b.get("folder") or ""), False)
+    if not f:
+        return err(tr("Name missing"))
+    role = grp_role(b)
+    if c.execute("SELECT 1 FROM group_shares WHERE owner_id=? AND folder=? AND group_id=? AND list_id IS NULL", (me(), f, gid)).fetchone():
+        c.execute("UPDATE group_shares SET role=? WHERE owner_id=? AND folder=? AND group_id=? AND list_id IS NULL", (role, me(), f, gid))
+    else:
+        c.execute("INSERT INTO group_shares(group_id,owner_id,folder,role,added_by,added_at) VALUES(?,?,?,?,?,?)",
+                  (gid, me(), f, role, me(), iso(now_utc())))
+    grp_sync(c, grp_list_ids(c, owner=me()))
+    bump(c)
+    c.commit()
+    return jsonify(ok=True)
+
+
+@app.delete("/api/folders/groups/<int:gid>")
+def folder_group_del(gid):
+    need_collab()
+    c = db()
+    f = clean_folder(str(request.args.get("folder") or ""), False)
+    before = grp_list_ids(c, owner=me())
+    if not c.execute("DELETE FROM group_shares WHERE owner_id=? AND folder=? AND group_id=? AND list_id IS NULL", (me(), f, gid)).rowcount:
+        return err(tr("unknown"), 404)
+    grp_sync(c, before)
+    bump(c)
+    c.commit()
+    return jsonify(ok=True)
+
+
+def check_group_assignee(c, lid, gid):
+    """None if group gid may be assigned in list lid (the list is shared with it), else an error message."""
+    if gid is None:
+        return None
+    need_collab()
+    return None if gid in {x[0] for x in grp_shares_of_list(c, lid)} else tr("Share the list with this group first")
+
+
+def grp_assign_events(c, tid, gid):
+    """News (+ the usual assignment push gate) for every member of the group the task was just assigned to."""
+    actor = me() if has_request_context() and getattr(g, "user", None) else None
+    t = c.execute("SELECT title, list_id FROM tasks WHERE id=?", (tid,)).fetchone()
+    if not t:
+        return
+    gname = grp_name(c, gid)
+    for uid in grp_members(c, gid):
+        if uid != actor and task_visible(c, tid, uid, full=True):
+            news_add(c, uid, "assign", task_id=tid, actor=actor, data={"group": gname, "group_id": gid})
+
+
+def task_take(c, tid, uid):
+    """uid takes a task assigned to one of their groups: assignee = uid, the group is cleared. Error text or None."""
+    t = c.execute("SELECT * FROM tasks WHERE id=? AND deleted_at IS NULL", (tid,)).fetchone()
+    if not t or not task_visible(c, tid, uid):
+        raise Denied(404)
+    if not t["assignee_group_id"] or t["assignee_group_id"] not in grp_of_user(c, uid):
+        return tr("This task is not assigned to one of your groups")
+    c.execute("UPDATE tasks SET assignee_id=?, assignee_group_id=NULL, assigned_by=?, reminded='[]', updated_at=? WHERE id=?",
+              (uid, uid, iso(now_utc()), tid))
+    log_act(c, tid, "take", {"group": grp_name(c, t["assignee_group_id"])})
+    for m in grp_members(c, t["assignee_group_id"]):
+        if m != uid and task_visible(c, tid, m, full=True):
+            news_add(c, m, "take", task_id=tid, data={"group": grp_name(c, t["assignee_group_id"])})
+    agent_assign_event(c, tid, "assigned", uid)
+    return None
+
+
+@app.post("/api/tasks/<int:tid>/take")
+def task_take_web(tid):
+    """"Take it": a task assigned to my group becomes mine (also for participants of the list)."""
+    c = db()
+    e = task_take(c, tid, me())
+    if e:
+        return err(e, 409)
+    bump(c)
+    c.commit()
+    return jsonify(one_task(c, tid))
 
 
 # ---- 2.1.2 (#349): transfer the ownership of a list. The owner hands it to another active person (a member or anyone they
@@ -4790,9 +5298,10 @@ def owner_transfer(c, lr, new):
         folder, sort, view = "", my_max_sort(c, new) + 1, lr["view"]
     c.execute("DELETE FROM list_members WHERE list_id=? AND user_id IN (?, ?)", (lid, new, old))
     if old and c.execute("SELECT 1 FROM users WHERE id=?", (old,)).fetchone():
-        c.execute("INSERT INTO list_members(list_id,user_id,role,folder,sort,view,added_at) VALUES(?,?,?,?,?,?,?)",
-                  (lid, old, "edit" if old in ag else "admin", lr["folder"] or "", lr["sort"], lr["view"], ts))
+        c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,folder,sort,view,added_at) VALUES(?,?,?,?,?,?,?,?)",
+                  (lid, old, "edit" if old in ag else "admin", "edit" if old in ag else "admin", lr["folder"] or "", lr["sort"], lr["view"], ts))
     c.execute("UPDATE lists SET owner_id=?, folder=?, sort=?, view=? WHERE id=?", (new, folder, sort, view, lid))
+    grp_sync(c, [lid])  # 2.10.0 (#441): the old owner's folder shares no longer reach it, the new owner's may
     names = user_names(c, [old, new, me()])
     c.execute("INSERT INTO list_activity(list_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",
               (lid, me(), "owner", json.dumps({"from": old, "to": new, "from_name": names.get(old, ""), "to_name": names.get(new, "")},
@@ -4922,6 +5431,15 @@ def _folder_move(c, uid, fn):
             arr = []
         arr = [fn(x) for x in arr if isinstance(x, str)]
         uset(c, uid, k, json.dumps(list(dict.fromkeys(x for x in arr if x)), ensure_ascii=False))
+    # 2.10.0 (#441): folder shares with groups follow a renamed / moved folder; a deleted folder's share goes
+    for r in c.execute("SELECT id, folder FROM group_shares WHERE owner_id=? AND list_id IS NULL", (uid,)).fetchall():
+        nf = fn(r["folder"])
+        if not nf or (nf != r["folder"] and folder_under(r["folder"], nf)):  # deleted (its lists went up a level): never widen
+            c.execute("DELETE FROM group_shares WHERE id=?", (r["id"],))
+        elif nf != r["folder"]:
+            c.execute("UPDATE group_shares SET folder=? WHERE id=?", (nf, r["id"]))
+    grp_sync(c, grp_list_ids(c, owner=uid) | {r[0] for r in c.execute("SELECT list_id FROM list_members m JOIN lists l ON l.id=m.list_id "
+                                                                       "WHERE m.grole IS NOT NULL AND l.owner_id=?", (uid,))})
 
 
 @app.post("/api/folders/rename")
@@ -5095,7 +5613,8 @@ def section_delete(sid):
 
 TASK_FIELDS = ("list_id", "section_id", "parent_id", "title", "content", "priority",
                "due", "due_time", "reminders", "repeat", "repeat_from", "sort",
-               "pinned", "start", "duration", "assignee_id", "url", "ttype", "deadline", "nag")
+               "pinned", "start", "duration", "assignee_id", "url", "ttype", "deadline", "nag",
+               "assignee_group_id")  # 2.10.0 (#441): assigned to a group (whoever has time); excludes assignee_id
 # 2.4.0 (#340): ticket types of a task (API v1 / MCP / events: "type"); '' = none
 TICKET_TYPES = ("bug", "feature", "task")
 
@@ -5353,7 +5872,7 @@ def clean_task(b):
             v = b[k]
             if k in ("due", "due_time", "section_id", "parent_id", "start", "duration", "list_id") and v in ("", None):
                 v = None
-            if k == "assignee_id" and v in ("", None, 0):
+            if k in ("assignee_id", "assignee_group_id") and v in ("", None, 0):
                 v = None
             if k == "title":
                 if v is not None and not isinstance(v, str):
@@ -5363,7 +5882,7 @@ def clean_task(b):
                 if v is not None and not isinstance(v, str):
                     raise BadInput(tr("Invalid value: {0}", tr("Description")))
                 v = (v or "")[:CONTENT_MAX]
-            if k in ("list_id", "section_id", "parent_id", "assignee_id") and v is not None:
+            if k in ("list_id", "section_id", "parent_id", "assignee_id", "assignee_group_id") and v is not None:
                 v = as_int(v, k, 1)
             if k == "priority":
                 v = as_int(v or 0, tr("Priority"))
@@ -5547,6 +6066,8 @@ def participant_assignee(c, cur, f):
     """Error text when a participant's change of the assignee (f) is not allowed, else None. Participants cannot
     hand tasks to others or take them away (an unassigned task would vanish from their view); on a new subtask under
     one of their tasks (cur None) they may leave it unassigned or take it themselves."""
+    if "assignee_group_id" in f and f["assignee_group_id"] != (cur["assignee_group_id"] if cur is not None else None):
+        return tr("Participants cannot change who a task is assigned to")  # 2.10.0 (#441): "Take it" is POST .../take
     if "assignee_id" not in f:
         return None
     new = f["assignee_id"]
@@ -5605,7 +6126,10 @@ def task_create():
     if f.get("section_id") and not c.execute("SELECT 1 FROM sections WHERE id=? AND list_id=?",
                                               (f["section_id"], f["list_id"])).fetchone():
         f["section_id"] = None
-    e = check_assignee(c, f["list_id"], f.get("assignee_id")) or check_url(f) or repeat_problem(f.get("repeat"), f.get("due"))
+    if f.get("assignee_group_id"):  # 2.10.0 (#441): a person or a group, never both
+        f["assignee_id"] = None
+    e = check_assignee(c, f["list_id"], f.get("assignee_id")) or check_group_assignee(c, f["list_id"], f.get("assignee_group_id")) \
+        or check_url(f) or repeat_problem(f.get("repeat"), f.get("due"))
     if e:
         return err(e)
     if "sort" not in f:
@@ -5622,7 +6146,7 @@ def task_create():
             f["content"] = tpl
     ts = iso(now_utc())
     f["created_by"] = me()
-    if f.get("assignee_id"):
+    if f.get("assignee_id") or f.get("assignee_group_id"):
         f["assigned_by"] = me()
     cols = list(f) + ["created_at", "updated_at"]
     cur = c.execute(f"INSERT INTO tasks({','.join(cols)}) VALUES({','.join('?' * len(cols))})",
@@ -5638,6 +6162,8 @@ def task_create():
     agent_tidy_events(c, cur.lastrowid)
     if f.get("assignee_id"):
         task_event(c, cur.lastrowid, "assign")
+    if f.get("assignee_group_id"):
+        grp_assign_events(c, cur.lastrowid, f["assignee_group_id"])
     newtask_events(c, cur.lastrowid)
     if f.get("parent_id"):
         log_act(c, f["parent_id"], "subtask", {"id": cur.lastrowid, "title": f["title"][:200]})
@@ -6022,8 +6548,22 @@ def apply_update(c, tid, b, conflicts=None):
             return e
     elif lid != cur["list_id"] and cur["assignee_id"] and cur["assignee_id"] not in list_people(c, lid):
         f["assignee_id"] = None  # the assignee has no access to the new list
+    # 2.10.0 (#441): a group instead of a person (and back); the group must reach the (new) list
+    if f.get("assignee_group_id"):
+        f["assignee_id"] = None
+        if f["assignee_group_id"] != cur["assignee_group_id"] or lid != cur["list_id"]:
+            e = check_group_assignee(c, lid, f["assignee_group_id"])
+            if e:
+                return e
+    elif f.get("assignee_id") and cur["assignee_group_id"]:
+        f["assignee_group_id"] = None
+    elif "assignee_group_id" not in f and cur["assignee_group_id"] and lid != cur["list_id"] \
+            and cur["assignee_group_id"] not in {x[0] for x in grp_shares_of_list(c, lid)}:
+        f["assignee_group_id"] = None
     if "assignee_id" in f and _norm(f["assignee_id"]) != _norm(cur["assignee_id"]):
         f["assigned_by"] = me() if f["assignee_id"] else None
+    if f.get("assignee_group_id") and f["assignee_group_id"] != cur["assignee_group_id"]:
+        f["assigned_by"] = me()
     if "fields" in b:  # custom field values: validated before anything is written
         if b["fields"]:
             need_project(c, lid, "fields")
@@ -6047,8 +6587,12 @@ def apply_update(c, tid, b, conflicts=None):
                 c.execute("UPDATE tasks SET section_id=NULL WHERE id=?", (tid,))
     if f:
         log_changes(c, tid, cur, b.get("_act"))
-        new_a = c.execute("SELECT assignee_id FROM tasks WHERE id=?", (tid,)).fetchone()[0]
+        new_a, new_g = c.execute("SELECT assignee_id, assignee_group_id FROM tasks WHERE id=?", (tid,)).fetchone()
         assignment_events(c, tid, cur["assignee_id"], new_a)
+        if new_g != cur["assignee_group_id"]:
+            log_act(c, tid, "assign_group", {"group": grp_name(c, new_g), "from": grp_name(c, cur["assignee_group_id"])})
+            if new_g:
+                grp_assign_events(c, tid, new_g)
     if f and "list_id" in f and f["list_id"] != cur["list_id"]:
         ltags_follow(c, tid, f["list_id"])
     if "ltags" in b:
@@ -7838,16 +8382,16 @@ def _push_tick_one(c, p, users, S, LG, now):
 # (watchdog, hourly).
 NEWS_KEEP_DAYS = int(os.environ.get("TASKS_NEWS_DAYS", "90"))
 NEWS_KEEP_MAX = int(os.environ.get("TASKS_NEWS_MAX", "500"))
-NEWS_KINDS = ("mention", "comment", "assign", "unassign", "complete", "share", "role", "unshare", "unblock", "status",
+NEWS_KINDS = ("mention", "comment", "assign", "unassign", "take", "complete", "share", "role", "unshare", "unblock", "status",
               "newtask", "approval", "followup",  # 2.1.0
               "usage",  # 2.1.1 (#326): an agent reached 80 % / 100 % of a usage limit (admins)
               "owner")  # 2.1.2 (#349): I am the new owner of a list
 NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner")  # about a list, not a task
 NEWS_EXCERPT = 300
 # 1.9.0: per user (setting news_kinds) which groups of events create a News item; pushes are not affected
-NEWS_GROUPS = {"mention": ("mention",), "assign": ("assign", "unassign"), "comment": ("comment",), "complete": ("complete",),
+NEWS_GROUPS = {"mention": ("mention",), "assign": ("assign", "unassign", "take"), "comment": ("comment",), "complete": ("complete",),
                "unblock": ("unblock",), "share": ("share", "role", "unshare", "owner"), "status": ("status",)}
-NEWS_TO_ME = ("mention", "assign", "unassign")  # filter "Mentions & assigned to me"
+NEWS_TO_ME = ("mention", "assign", "unassign", "take")  # filter "Mentions & assigned to me"
 
 
 def news_wanted(s, kind):
@@ -7898,7 +8442,7 @@ BELL_CUSTOM_KEY = {"reply": "comment", "follow": "comment"}
 KIND_ROW = {"mention": "mention", "comment": "comment", "assign": "assign", "unassign": "assign", "complete": "complete",
             "share": "share", "role": "share", "unshare": "share", "unblock": "unblock", "status": "status",
             "newtask": "newtask", "approval": "approval", "followup": "followup", "usage": "usage", "owner": "share",
-            "proposal": "proposal"}
+            "proposal": "proposal", "take": "assign"}
 
 
 def notif_stored(s):
@@ -9138,7 +9682,7 @@ def _time_watch_one(c, r, users, S, LG, ref):
 
 # ---------------------------------------------------------------- settings / export (per user)
 
-SETTINGS_SERVER_ONLY = ("digest_sent", "ntfy_topic", "features_rev", "onboard", "sample_ask", "agent_share")
+SETTINGS_SERVER_ONLY = ("digest_sent", "review_sent", "ntfy_topic", "features_rev", "onboard", "sample_ask", "agent_share")
 SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "time_focus", "paperless_keep", "celebrate", "cal_today",
                   "date_confirm")
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
@@ -9156,8 +9700,12 @@ def clean_setting(k, v):
         if not valid_hm(sv):
             raise bad
         return sv
-    if k == "digest_time":
+    if k in ("digest_time", "review_time"):
         if sv and not valid_hm(sv):
+            raise bad
+        return sv
+    if k in ("work_start", "work_end"):  # 2.10.0 (#440)
+        if not valid_hm(sv):
             raise bad
         return sv
     if k == "default_reminder":
@@ -12306,10 +12854,15 @@ def apppw_del(pid):
 
 # ---- login
 def dav_secure():
-    """HTTP Basic only where the clients' address is https: PUBLIC_URL https:// (TLS ends at the proxy; waitress drops
-    the X-Forwarded-* headers, so the app cannot see the client's scheme itself) or KALMIDO_CALDAV_HTTP=1 (a plain-http
-    setup inside a trusted network, on the operator's own decision)."""
-    return request.is_secure or PUBLIC_URL.lower().startswith("https://") or DAV_HTTP_OK
+    """HTTP Basic only where the clients' address is https. 2.10.0 (#445): a trusted proxy (KALMIDO_TRUSTED_PROXIES) tells
+    the scheme in X-Forwarded-Proto (https -> request.is_secure; http -> refused unless KALMIDO_CALDAV_HTTP=1). Without that
+    header (a direct request, or a proxy that does not send it) as before: PUBLIC_URL https:// (TLS ends at the proxy) or
+    KALMIDO_CALDAV_HTTP=1 (a plain-http setup inside a trusted network, on the operator's own decision)."""
+    if request.is_secure:
+        return True
+    if request.environ.get("kalmido.fwd_proto"):
+        return DAV_HTTP_OK
+    return PUBLIC_URL.lower().startswith("https://") or DAV_HTTP_OK
 
 
 def dav_401():
@@ -12328,7 +12881,7 @@ def dav_login():
         return None
     username = a.username.strip().lower()[:64]
     pw = apppw_norm(a.password)[:100]
-    keys = [("dav:u:" + username, 10), ("dav:ip:" + client_ip(), 30)]
+    keys = _rate_keys(username, "dav:", (10, 30, 150))
     if _rate_blocked(keys):
         raise DavError(429, "Too many failed logins, please wait a few minutes")
     c = db()
@@ -12363,8 +12916,7 @@ def dav_login():
         aa_count("security", "logins", client_ip(), user=("caldav:" + username) if u else "caldav:?")
         print("caldav login failed for", repr(username), "from", client_ip(), flush=True)
         return None
-    with _fail_lock:
-        _fails.pop("dav:u:" + username, None)
+    _rate_reset(username, "dav:")
     if hit_limit(f"dav:{hit['id']}", DAV_RATE):
         raise DavError(429, "Too many requests, please slow down")
     last = hit["last_used_at"]
@@ -15320,6 +15872,7 @@ def watchdog_tick(c):
     _wd_section(c, "focus", _wd_focus, users, S, LG)
     _wd_section(c, "habits", _wd_habits, users, S, LG, now)
     _wd_section(c, "digest", _wd_digest, users, S, LG, now)
+    _wd_section(c, "review", _wd_review, users, S, LG, now)  # 2.10.0 (#440)
     _wd_section(c, "admin alerts", aa_tick)
 
 
@@ -18307,6 +18860,7 @@ def task_core(r, tags, fields):
             "repeat_from": r["repeat_from"], "url": r["url"], "tags": tags, "list_tags": list(r["ltags"]) if "ltags" in r.keys() else [],
             "pinned": bool(r["pinned"]),
             "assignee_id": r["assignee_id"], "created_by": r["created_by"], "completed_by": r["completed_by"],
+            "assignee_group_id": r["assignee_group_id"] if "assignee_group_id" in r.keys() else None,  # 2.10.0 (#441)
             "created_at": r["created_at"], "updated_at": r["updated_at"], "completed_at": r["completed_at"],
             "deleted": bool(r["deleted_at"]), "fields": fields, "waiting": waiting_of(r),
             "type": (r["ttype"] if "ttype" in r.keys() else "") or None,
@@ -18341,7 +18895,7 @@ def task_for(c, row, uid):
 
 V1_TASK_IN = ("title", "notes", "list_id", "section_id", "parent_id", "priority", "due", "due_time", "start", "duration",
               "reminders", "repeat", "repeat_from", "url", "tags", "assignee_id", "pinned", "fields", "list_tags", "type",
-              "deadline", "deadline_in_today", "nag")
+              "deadline", "deadline_in_today", "nag", "assignee_group_id")
 
 
 def v1_task_in(b, allowed=V1_TASK_IN):
@@ -18697,7 +19251,7 @@ def v1_tasks():
     """Visible tasks (not in the trash), oldest id first, cursor pages. Filters: list_id, status, due_from, due_to,
     tag, assignee (me | none | id), updated_since, parent_id, top_level."""
     a = v1_args(("list_id", "status", "due_from", "due_to", "tag", "list_tag", "assignee", "updated_since", "parent_id", "top_level",
-                 "limit", "cursor", "fields", "waiting", "type"))
+                 "limit", "cursor", "fields", "waiting", "type", "assignee_group"))
     if a.get("fields") not in (None, "", "full", "compact"):
         raise BadInput(tr("Invalid value: {0}", "fields"))
     c, uid = db(), me()
@@ -18733,6 +19287,13 @@ def v1_tasks():
         else:
             where.append("assignee_id=?")
             args.append(uid if a["assignee"] == "me" else as_int(a["assignee"], "assignee", 1))
+    if a.get("assignee_group"):  # 2.10.0 (#441): mine = assigned to one of my groups, or a group id
+        if a["assignee_group"] == "mine":
+            where.append("assignee_group_id IN (SELECT group_id FROM group_members WHERE user_id=?)")
+            args.append(uid)
+        else:
+            where.append("assignee_group_id=?")
+            args.append(as_int(a["assignee_group"], "assignee_group", 1))
     if a.get("updated_since"):
         where.append("updated_at>=?")
         args.append(_v1_since(a["updated_since"]))
@@ -19168,6 +19729,487 @@ def not_allowed(e):
 _SPEC = {}
 
 
+# ---- 2.10.0 (#441): groups in the REST API (and the MCP server): read every group with its members, the groups a list is
+# shared with (directly or through a folder), share a list with a group (owner / list admin), take a group task.
+def v1_group(d):
+    return {"id": d["id"], "name": d["name"], "synced": d["synced"], "members": d["members"]}
+
+
+@app.get("/api/v1/groups")
+@v1_view
+def v1_groups():
+    v1_args(())
+    c = db()
+    mine = set(grp_of_user(c, me()))
+    return jsonify(data=[{**v1_group(d), "mine": d["id"] in mine} for d in groups_for(c)], next_cursor=None)
+
+
+@app.get("/api/v1/groups/<int:gid>")
+@v1_view
+def v1_group_get(gid):
+    v1_args(())
+    c = db()
+    d = grp_dict(c, need_group(c, gid), full=False)
+    return jsonify({**v1_group(d), "mine": gid in grp_of_user(c, me())})
+
+
+@app.get("/api/v1/lists/<int:lid>/groups")
+@v1_view
+def v1_list_groups(lid):
+    v1_args(())
+    return jsonify(data=v1_call(list_groups_get, lid)["groups"], next_cursor=None)
+
+
+def _v1_gid(group_id):
+    try:
+        return int(group_id)
+    except (TypeError, ValueError):
+        raise Denied(404) from None
+
+
+@app.put("/api/v1/lists/<int:lid>/groups/<group_id>")
+@v1_view
+def v1_list_group_set(lid, group_id):
+    v1_args(())
+    b = v1_json()
+    reject_unknown(b, ("role",))
+    v1_call(list_group_set, lid, _v1_gid(group_id), body=b)
+    return jsonify(data=v1_call(list_groups_get, lid)["groups"], next_cursor=None)
+
+
+@app.delete("/api/v1/lists/<int:lid>/groups/<group_id>")
+@v1_view
+def v1_list_group_del(lid, group_id):
+    v1_args(())
+    v1_call(list_group_del, lid, _v1_gid(group_id), body={})
+    return jsonify(ok=True)
+
+
+@app.post("/api/v1/tasks/<int:tid>/take")
+@v1_view
+def v1_task_take(tid):
+    v1_args(())
+    if v1_json():
+        raise UnknownFields(v1_json())
+    c = db()
+    _v1_live(c, tid, write=False)
+    v1_call(task_take_web, tid, body={})
+    return jsonify(v1_one(c, tid))
+
+
+# ---- 2.10.0 (#440): day planning. "Plan my day" in Today: the built-in planner takes the day's timed events of the
+# person's subscribed calendars, their already timed tasks and their working hours (user settings work_start / work_end,
+# default 09:00-17:00) and puts their open tasks into the free slots (overdue / due today first, then deadlines, due date,
+# priority, short ones first; a task without a duration counts DAYPLAN_DEFAULT_MIN minutes). mode "day" plans today's
+# untimed tasks and proposes to move the ones that do not fit to the next working day; mode "fill" ("Fill free time")
+# only fills the remaining gaps from now on with tasks that are not planned for today yet. The plan is a preview: the web
+# app applies it as one undo step (due = the day, due_time = the slot, duration). With an agent the same structured input
+# goes out as a proposal job (kind "dayplan", see docs/AGENTS.md); its answer shows in the same preview and only the person
+# applies it. Evening review: done / still open / moved today + a short plan for the next working day, as a card in Today
+# and (setting review_time, default off) one push at that time.
+DAYPLAN_DEFAULT_MIN = 30
+DAYPLAN_STEP = 5             # minutes: slots start on this grid
+DAYPLAN_MAX_TASKS = 60       # candidates looked at / sent to an agent
+DAYPLAN_MAX_EVENTS = 80
+
+
+def _hm_min(v, default):
+    try:
+        h, m = (v or default).split(":")
+        return max(0, min(1440, int(h) * 60 + int(m)))
+    except (ValueError, AttributeError):
+        h, m = default.split(":")
+        return int(h) * 60 + int(m)
+
+
+def _min_hm(m):
+    m = max(0, min(1439, int(m)))
+    return f"{m // 60:02d}:{m % 60:02d}"
+
+
+def work_hours(s):
+    """(start, end) minutes of the person's working day (settings work_start / work_end; end before start = the default)."""
+    a, b = _hm_min(s.get("work_start"), "09:00"), _hm_min(s.get("work_end"), "17:00")
+    return (a, b) if b > a else (540, 1020)
+
+
+def next_workday(d):
+    d += timedelta(days=1)
+    while d.weekday() >= 5:
+        d += timedelta(days=1)
+    return d
+
+
+def dayplan_events(c, uid, day):
+    """The day's events of uid's visible calendar subscriptions: [{title, start, end (local minutes), all_day}]."""
+    if not CAL_ON:
+        return []
+    out = []
+    ds = day.isoformat()
+    for r in c.execute("""SELECT e.title, e.all_day, e.start, e.end FROM cal_events e JOIN cal_subs s ON s.id=e.sub_id
+                          WHERE s.user_id=? AND s.visible=1 AND e.d1>=? AND e.d0<=? ORDER BY e.start LIMIT ?""",
+                       (uid, ds, ds, DAYPLAN_MAX_EVENTS)):
+        if r["all_day"]:
+            out.append({"title": r["title"], "all_day": True, "start": None, "end": None})
+            continue
+        try:
+            a = parse_iso(r["start"]).astimezone(TZ)
+            b = parse_iso(r["end"]).astimezone(TZ)
+        except (ValueError, TypeError):
+            continue
+        day0 = datetime(day.year, day.month, day.day, tzinfo=TZ)
+        sa = max(0, int((a - day0).total_seconds() // 60))
+        sb = min(1440, int((b - day0).total_seconds() // 60))
+        if sb > sa:
+            out.append({"title": r["title"], "all_day": False, "start": _min_hm(sa), "end": _min_hm(sb) if sb < 1440 else "24:00",
+                        "s": sa, "e": sb})
+    return out
+
+
+def dayplan_mine_sql(uid):
+    """SQL condition (alias t, l = its list) for the tasks that are uid's to do: assigned to them, to one of their groups,
+    or nobody's in a list they own."""
+    u = int(uid)
+    return f"""(t.assignee_id={u} OR t.assignee_group_id IN (SELECT group_id FROM group_members WHERE user_id={u})
+               OR (t.assignee_id IS NULL AND t.assignee_group_id IS NULL AND l.owner_id={u}))"""
+
+
+def dayplan_tasks(c, uid, day):
+    """Open tasks of uid in lists they see (not archived, not waiting, not blocked, no sample items)."""
+    rows = c.execute(f"""SELECT t.*, l.name AS list_name, l.is_inbox AS list_inbox FROM tasks t JOIN lists l ON l.id=t.list_id
+                         WHERE t.status=0 AND t.deleted_at IS NULL AND l.archived=0 AND t.list_id IN {vis_sql()}
+                           AND {tvis(c, uid, 't.')} AND {dayplan_mine_sql(uid)} AND t.waiting_at IS NULL
+                           AND t.id NOT IN (SELECT item_id FROM sample_items WHERE kind='task')
+                           AND NOT EXISTS (SELECT 1 FROM task_deps d JOIN tasks b ON b.id=d.blocker_id
+                                           WHERE d.task_id=t.id AND b.status=0 AND b.deleted_at IS NULL)
+                         ORDER BY t.id""", (uid, uid)).fetchall()
+    return rows
+
+
+def _dp_task(r, s=None, e=None, reason=""):
+    dur = r["duration"] or None
+    d = {"task_id": r["id"], "title": r["title"], "list_id": r["list_id"], "list": tr("Inbox") if r["list_inbox"] else r["list_name"],
+         "due": r["due"], "due_time": r["due_time"], "priority": PRIO_NAMES.get(r["priority"], "none"),
+         "deadline": bool(r["deadline"]), "duration": dur or DAYPLAN_DEFAULT_MIN, "estimated": not dur}
+    if s is not None:
+        d.update(start=_min_hm(s), end=_min_hm(e) if e < 1440 else "24:00", reason=reason)
+    return d
+
+
+def dayplan_compute(c, uid, day, mode="day", now=None):
+    """The built-in plan of uid for `day` (date): see the comment above. Pure: nothing is changed."""
+    s = usettings(c, uid)
+    now = now or local_now()
+    w0, w1 = work_hours(s)
+    start = w0
+    if day == now.date():
+        nm = now.hour * 60 + now.minute
+        start = max(w0, -(-nm // DAYPLAN_STEP) * DAYPLAN_STEP)
+    elif day < now.date():
+        start = w1
+    ds = day.isoformat()
+    events = dayplan_events(c, uid, day)
+    busy = [(e["s"], e["e"]) for e in events if not e["all_day"]]
+    rows = dayplan_tasks(c, uid, day)
+    fixed, today, later = [], [], []
+    for r in rows:
+        if r["due"] == ds and r["due_time"]:
+            a = _hm_min(r["due_time"], "00:00")
+            b = min(1440, a + (r["duration"] or DAYPLAN_DEFAULT_MIN))
+            fixed.append(_dp_task(r, a, b, "fixed"))
+            busy.append((a, b))
+        elif r["parent_id"] and not r["due"]:
+            continue  # undated subtasks belong to their parent's work
+        elif r["due"] and r["due"] <= ds:
+            today.append(r)
+        elif (r["due"] and r["due"] <= (day + timedelta(days=7)).isoformat()) or (not r["due"] and (r["priority"] >= 3 or r["pinned"])):
+            later.append(r)
+
+    def key(r):
+        return (0 if r["deadline"] else 1, r["due"] or "9999", -(r["priority"] or 0), r["duration"] or DAYPLAN_DEFAULT_MIN, r["id"])
+    today.sort(key=key)
+    later.sort(key=key)
+    # free intervals of [start, w1] minus busy
+    busy.sort()
+    free, cur = [], start
+    for a, b in busy:
+        if b <= cur:
+            continue
+        if a > cur:
+            free.append([cur, min(a, w1)])
+        cur = max(cur, b)
+        if cur >= w1:
+            break
+    if cur < w1:
+        free.append([cur, w1])
+    free = [f for f in free if f[1] - f[0] >= DAYPLAN_STEP]
+
+    def place(dur):
+        for f in free:
+            a = -(-f[0] // DAYPLAN_STEP) * DAYPLAN_STEP
+            if f[1] - a >= dur:
+                f[0] = a + dur
+                return a
+        return None
+    plan, defer = [], []
+    cands = ([] if mode == "fill" else [(r, True) for r in today]) + [(r, False) for r in later]
+    for r, is_today in cands[:DAYPLAN_MAX_TASKS]:
+        dur = min(r["duration"] or DAYPLAN_DEFAULT_MIN, w1 - w0)
+        a = place(dur)
+        if a is not None:
+            reason = ("overdue" if r["due"] < ds else "today") if is_today else ("deadline" if r["deadline"] else "due" if r["due"] else "priority")
+            plan.append(_dp_task(r, a, a + dur, reason))
+        elif is_today:
+            defer.append({**_dp_task(r), "to": next_workday(max(day, now.date())).isoformat()})
+    plan.sort(key=lambda x: x["start"])
+    free_min = sum(max(0, f[1] - -(-f[0] // DAYPLAN_STEP) * DAYPLAN_STEP) for f in free)
+    return {"date": ds, "mode": mode, "work": {"start": _min_hm(w0), "end": _min_hm(w1) if w1 < 1440 else "24:00"},
+            "from": _min_hm(start) if start < 1440 else "24:00", "default_duration": DAYPLAN_DEFAULT_MIN,
+            "events": [{k: e[k] for k in ("title", "all_day", "start", "end")} for e in events],
+            "fixed": fixed, "plan": plan, "defer": defer, "free_min": free_min,
+            "open_today": len(today), "candidates": len(today) + len(later)}
+
+
+def dayplan_day(v):
+    if v in (None, ""):
+        return local_now().date()
+    try:
+        d = date.fromisoformat(str(v))
+    except ValueError:
+        raise BadInput(tr("Invalid value: {0}", "date")) from None
+    if abs((d - local_now().date()).days) > 366:
+        raise BadInput(tr("Invalid value: {0}", "date"))
+    return d
+
+
+def dayplan_mode(v):
+    v = v or "day"
+    if v not in ("day", "fill"):
+        raise BadInput(tr("Invalid value: {0}", "mode"))
+    return v
+
+
+@app.get("/api/dayplan")
+def dayplan_get():
+    """?date=YYYY-MM-DD&mode=day|fill -> the built-in plan (a preview, nothing changes)."""
+    c = db()
+    return jsonify(dayplan_compute(c, me(), dayplan_day(request.args.get("date")), dayplan_mode(request.args.get("mode"))))
+
+
+def dayplan_input(c, uid, day, mode):
+    """The job input of a day plan proposal: exactly what the built-in planner looks at (and its plan as a hint)."""
+    p = dayplan_compute(c, uid, day, mode)
+    rows = dayplan_tasks(c, uid, day)
+    ds = day.isoformat()
+    tasks = [_dp_task(r) for r in rows if not (r["due"] == ds and r["due_time"])
+             and not (r["parent_id"] and not r["due"])][:DAYPLAN_MAX_TASKS]
+    for t, r in zip(tasks, [r for r in rows if not (r["due"] == ds and r["due_time"]) and not (r["parent_id"] and not r["due"])]):
+        t["notes"] = (r["content"] or "")[:500]
+    return {"date": ds, "mode": mode, "now": local_now().strftime("%Y-%m-%dT%H:%M"), "work": p["work"], "from": p["from"],
+            "default_duration": DAYPLAN_DEFAULT_MIN, "events": p["events"], "fixed": p["fixed"], "tasks": tasks,
+            "builtin": {"plan": [{"task_id": x["task_id"], "start": x["start"], "duration": x["duration"]} for x in p["plan"]],
+                        "defer": [{"task_id": x["task_id"], "to": x["to"]} for x in p["defer"]]}}
+
+
+def dayplan_validate(b, inp):
+    """An agent's day plan {summary, items: [{task_id, start, duration?}], defer: [{task_id, to}]} -> normalized."""
+    _p_keys(b, "", ("kind", "summary", "items", "defer"))
+    ids = {t["task_id"] for t in inp.get("tasks", [])}
+    out, seen = {"items": [], "defer": []}, set()
+    for i, t in enumerate(_p_list(b.get("items"), "items", DAYPLAN_MAX_TASKS)):
+        w = f"items[{i}]"
+        _p_keys(t, w, ("task_id", "start", "duration", "note"))
+        tid = _p_int(t.get("task_id"), w + ".task_id")
+        if tid not in ids or tid in seen:
+            raise BadInput(tr("Invalid value: {0}", w + ".task_id"))
+        seen.add(tid)
+        st = t.get("start")
+        if not isinstance(st, str) or not valid_hm(st):
+            raise BadInput(tr("Invalid value: {0}", w + ".start"))
+        dur = t.get("duration")
+        dur = None if dur in (None, "") else _p_int(dur, w + ".duration", 5, 720)
+        out["items"].append({"task_id": tid, "start": st, "duration": dur, "note": _p_str(t.get("note"), w + ".note", 300)})
+    for i, t in enumerate(_p_list(b.get("defer"), "defer", DAYPLAN_MAX_TASKS)):
+        w = f"defer[{i}]"
+        _p_keys(t, w, ("task_id", "to", "note"))
+        tid = _p_int(t.get("task_id"), w + ".task_id")
+        if tid not in ids or tid in seen:
+            raise BadInput(tr("Invalid value: {0}", w + ".task_id"))
+        seen.add(tid)
+        to = _p_date(t.get("to"), w + ".to")
+        if to and to < inp.get("date", ""):
+            raise BadInput(tr("Invalid value: {0}", w + ".to"))
+        out["defer"].append({"task_id": tid, "to": to, "note": _p_str(t.get("note"), w + ".note", 300)})
+    if not out["items"] and not out["defer"]:
+        raise BadInput(tr("Missing field: {0}", "items"))
+    out["items"].sort(key=lambda x: x["start"])
+    return out
+
+
+def dayplan_want(prop, inp, key, e):
+    """The task change of one selected entry (key = index into items, then defer) of a day plan proposal."""
+    items, defer = prop["items"], prop["defer"]
+    i = int(key.split(".")[0])
+    if i < len(items):
+        it = items[i]
+        dur = e.get("duration", it["duration"]) or next((t["duration"] for t in inp.get("tasks", []) if t["task_id"] == it["task_id"]),
+                                                        DAYPLAN_DEFAULT_MIN)
+        return it["task_id"], {"due": inp["date"], "due_time": e.get("time", it["start"]), "duration": dur}
+    if i - len(items) < len(defer):
+        it = defer[i - len(items)]
+        return it["task_id"], {"due": e.get("due", it["to"]), "due_time": None}
+    return None, None
+
+
+# ---- the evening review
+def dayplan_review(c, uid, day):
+    """{done, open, moved, tomorrow}: what uid completed on `day`, what is still open (due on or before it), what they moved
+    away from it that day, and the built-in plan for the next working day (first entries)."""
+    ds = day.isoformat()
+    a = datetime(day.year, day.month, day.day, tzinfo=TZ).astimezone(timezone.utc)
+    b = a + timedelta(days=1)
+    lo, hi = iso(a), iso(b)
+    done = [{"task_id": r["id"], "title": r["title"]} for r in c.execute(
+        f"""SELECT t.id, t.title FROM tasks t WHERE t.completed_by=? AND t.status=2 AND t.deleted_at IS NULL
+            AND t.completed_at>=? AND t.completed_at<? AND t.list_id IN {vis_sql()} ORDER BY t.completed_at LIMIT 50""",
+        (uid, lo, hi, uid, uid))]
+    rows = dayplan_tasks(c, uid, day)
+    still = [{"task_id": r["id"], "title": r["title"], "due": r["due"], "overdue": r["due"] < ds}
+             for r in rows if r["due"] and r["due"] <= ds][:50]
+    moved = []
+    for r in c.execute(f"""SELECT DISTINCT a.task_id, t.title, t.due FROM activity a JOIN tasks t ON t.id=a.task_id
+                           WHERE a.user_id=? AND a.kind IN ('due', 'snooze') AND a.created_at>=? AND a.created_at<?
+                             AND t.status=0 AND t.deleted_at IS NULL AND t.due>? AND t.list_id IN {vis_sql()} LIMIT 50""",
+                       (uid, lo, hi, ds, uid, uid)):
+        moved.append({"task_id": r["task_id"], "title": r["title"], "due": r["due"]})
+    nd = next_workday(day)
+    nxt = dayplan_compute(c, uid, nd, "day", now=datetime(nd.year, nd.month, nd.day, tzinfo=TZ))
+    return {"date": ds, "done": done, "open": still, "moved": moved,
+            "tomorrow": {"date": nd.isoformat(), "plan": nxt["plan"][:8], "events": len([e for e in nxt["events"] if not e["all_day"]]),
+                         "count": len(nxt["plan"])}}
+
+
+@app.get("/api/dayplan/review")
+def dayplan_review_get():
+    c = db()
+    return jsonify(dayplan_review(c, me(), dayplan_day(request.args.get("date"))))
+
+
+def dayplan_state(c, uid):
+    """For /api/state: the working hours and when the review card / push is due."""
+    s = usettings(c, uid)
+    w0, w1 = work_hours(s)
+    return {"work_start": _min_hm(w0), "work_end": _min_hm(w1) if w1 < 1440 else "24:00", "review_time": s.get("review_time") or "",
+            "default_duration": DAYPLAN_DEFAULT_MIN}
+
+
+def _wd_review(c, users, S, LG, now):
+    """Watchdog: the evening review push at the person's review_time (once a day, only when there is something to say)."""
+    for uid in users:
+        try:
+            s, lg = S[uid], LG[uid]
+            rt = s.get("review_time") or ""
+            today = now.date().isoformat()
+            if not valid_hm(rt) or s.get("review_sent") == today or now.strftime("%H:%M") < rt:
+                continue
+            uset(c, uid, "review_sent", today)
+            c.commit()
+            r = dayplan_review(c, uid, now.date())
+            if not (r["done"] or r["open"] or r["moved"]):
+                continue
+            parts = [tr("{0} done", len(r["done"]), lg=lg), tr("{0} open", len(r["open"]), lg=lg)]
+            if r["moved"]:
+                parts.append(tr("{0} moved", len(r["moved"]), lg=lg))
+            msg = " · ".join(parts)
+            if r["tomorrow"]["plan"]:
+                msg += "\n" + tr("Tomorrow: {0}", ", ".join(x["title"] for x in r["tomorrow"]["plan"][:3]), lg=lg)
+            notify(uid, tr("Daily review", lg=lg), msg, push_prio(s), f"{PUBLIC_URL}/#today/review", s=s, tag="review", ttl=12 * 3600)
+        except Exception as e:  # noqa: BLE001
+            _wd_fail(c, "review of user", uid, e)
+
+
+@app.get("/api/v1/dayplan")
+@v1_view
+def v1_dayplan():
+    """The built-in day plan of the token's user (a preview; nothing changes)."""
+    a = v1_args(("date", "mode"))
+    c = db()
+    return jsonify(dayplan_compute(c, me(), dayplan_day(a.get("date")), dayplan_mode(a.get("mode"))))
+
+
+@app.get("/api/v1/dayplan/review")
+@v1_view
+def v1_dayplan_review():
+    a = v1_args(("date",))
+    c = db()
+    return jsonify(dayplan_review(c, me(), dayplan_day(a.get("date"))))
+
+
+def dayplan_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
+    D = "Day plan"
+    slot = {"type": "object", "properties": {
+        "task_id": {"type": "integer"}, "title": {"type": "string"}, "list_id": {"type": "integer"}, "list": {"type": "string"},
+        "due": nul("string", format="date"), "due_time": nul("string"), "priority": {"type": "string"}, "deadline": {"type": "boolean"},
+        "duration": {"type": "integer", "description": "Minutes (the task's duration, else the default)"},
+        "estimated": {"type": "boolean", "description": "The task has no duration: the default was used"},
+        "start": {"type": "string", "description": "HH:MM"}, "end": {"type": "string", "description": "HH:MM"},
+        "reason": {"type": "string", "enum": ["fixed", "overdue", "today", "deadline", "due", "priority"]},
+        "to": {"type": "string", "format": "date", "description": "defer: the suggested new due date"}}}
+    schemas["DayPlanSlot"] = slot
+    schemas["DayPlan"] = {"type": "object", "properties": {
+        "date": {"type": "string", "format": "date"}, "mode": {"type": "string", "enum": ["day", "fill"]},
+        "work": {"type": "object", "properties": {"start": {"type": "string"}, "end": {"type": "string"}}},
+        "from": {"type": "string", "description": "First minute that is planned (now on today)"},
+        "default_duration": {"type": "integer"},
+        "events": {"type": "array", "items": {"type": "object", "properties": {"title": {"type": "string"}, "all_day": {"type": "boolean"},
+                                                                               "start": nul("string"), "end": nul("string")}}},
+        "fixed": {"type": "array", "items": ref("DayPlanSlot")}, "plan": {"type": "array", "items": ref("DayPlanSlot")},
+        "defer": {"type": "array", "items": ref("DayPlanSlot")}, "free_min": {"type": "integer"},
+        "open_today": {"type": "integer"}, "candidates": {"type": "integer"}}}
+    lst = {"type": "array", "items": {"type": "object", "properties": {"task_id": {"type": "integer"}, "title": {"type": "string"},
+                                                                       "due": nul("string", format="date")}}}
+    schemas["DayReview"] = {"type": "object", "properties": {
+        "date": {"type": "string", "format": "date"}, "done": lst, "open": lst, "moved": lst,
+        "tomorrow": {"type": "object", "properties": {"date": {"type": "string", "format": "date"}, "count": {"type": "integer"},
+                                                      "events": {"type": "integer"}, "plan": {"type": "array", "items": ref("DayPlanSlot")}}}}}
+    dq = q("date", "The day (YYYY-MM-DD, default today)", {"type": "string", "format": "date"})
+    paths["/dayplan"] = {"get": op("The built-in day plan (preview)", D, ok(ref("DayPlan")) | errs("400"),
+                                   [dq, q("mode", "day = plan the day's tasks, fill = only fill free time with other tasks",
+                                          {"type": "string", "enum": ["day", "fill"]})],
+                                   desc="Free slots between the day's calendar events and timed tasks within the working hours, "
+                                        "filled with open tasks (overdue / today first, then deadlines, due date, priority). "
+                                        "Nothing changes: apply it with PATCH /tasks/{id} (due, due_time, duration).")}
+    paths["/dayplan/review"] = {"get": op("The daily review: done, open, moved today; a plan for the next working day", D,
+                                          ok(ref("DayReview")) | errs("400"), [dq])}
+
+
+def groups_spec(paths, schemas, op, ok, errs, ref, pid, nul, page):
+    G = "Groups"
+    schemas["Group"] = {"type": "object", "properties": {
+        "id": {"type": "integer"}, "name": {"type": "string"},
+        "synced": {"type": "boolean", "description": "Members follow a group claim of the sign-in provider (OIDC)"},
+        "mine": {"type": "boolean", "description": "The token's user is a member"},
+        "members": {"type": "array", "items": {"type": "object", "properties": {"user_id": {"type": "integer"}, "name": {"type": "string"}}}}}}
+    schemas["GroupPage"] = page("Group")
+    schemas["ListGroup"] = {"type": "object", "properties": {
+        "group_id": {"type": "integer"}, "name": {"type": "string"}, "role": {"type": "string", "enum": list(ROLES)},
+        "via": {"type": "string", "description": "list = shared directly; otherwise the owner's folder that is shared"}}}
+    schemas["ListGroupPage"] = page("ListGroup")
+    gp = {"name": "group_id", "in": "path", "required": True, "description": "Group id", "schema": {"type": "integer"}}
+    paths["/groups"] = {"get": op("Groups (admins create them; every person sees them with their members)", G, ok(ref("GroupPage")) | errs())}
+    paths["/groups/{id}"] = {"get": op("One group", G, ok(ref("Group")) | errs("404"), [pid(desc="Group id")])}
+    paths["/lists/{id}/groups"] = {"get": op("The groups a list is shared with (directly or through a folder)", G,
+                                             ok(ref("ListGroupPage")) | errs("404"), [pid(desc="List id")])}
+    paths["/lists/{id}/groups/{group_id}"] = {
+        "put": op("Share a list with a group (or change its role); owner or list admin", G, ok(ref("ListGroupPage")) | errs("400", "403", "404"),
+                  [pid(desc="List id"), gp], body={"type": "object", "properties": {"role": {"type": "string", "enum": list(ROLES)}}},
+                  scope="write", desc="Every member of the group gets access; members who join later too. A person's role is the "
+                                      "higher of their own and the one via groups."),
+        "delete": op("Stop sharing a list with a group", G, ok({"type": "object"}) | errs("403", "404"), [pid(desc="List id"), gp], scope="write")}
+    paths["/tasks/{id}/take"] = {"post": op("Take a task assigned to one of your groups", "Tasks", ok(ref("Task")) | errs("403", "404", "409"),
+                                            [pid()], scope="write", desc="The task becomes yours (assignee_id) and is no longer assigned to the group.")}
+
+
 def openapi_spec():
     if "s" in _SPEC:
         return _SPEC["s"]
@@ -19221,6 +20263,8 @@ def openapi_spec():
         "repeat_from": {"type": "string", "enum": ["due", "done"]}, "url": nul("string", format="uri"),
         "tags": {"type": "array", "items": {"type": "string"}, "description": "The token user's own tags"},
         "pinned": {"type": "boolean"}, "assignee_id": nul("integer"), "created_by": nul("integer"), "completed_by": nul("integer"),
+        "assignee_group_id": nul("integer", description="2.10.0: assigned to a group (whoever has time takes it, POST /tasks/{id}/take); "
+                                 "setting it clears assignee_id and the other way round; the list must be shared with the group"),
         "created_at": {"type": "string", "format": "date-time"}, "updated_at": {"type": "string", "format": "date-time"},
         "completed_at": nul("string", format="date-time"), "deleted": {"type": "boolean"},
         "fields": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Custom field values by field id"},
@@ -19235,7 +20279,7 @@ def openapi_spec():
     task_in = {k: v for k, v in task_props.items() if k in V1_TASK_IN}
     task_in["priority"] = {"oneOf": [prio, {"type": "integer", "enum": list(PRIORITIES)}]}
     task_in["reminders"] = {"oneOf": [{"type": "array", "items": {"type": "integer"}}, {"type": "string"}]}
-    for k in ("list_id", "section_id", "parent_id", "assignee_id"):
+    for k in ("list_id", "section_id", "parent_id", "assignee_id", "assignee_group_id"):
         task_in[k] = nul("integer")
     task_in["content"] = {"type": "string", "description": "Alias of notes (the web API's name, 2.2.1); not together with a different notes"}
     schemas = {
@@ -19444,6 +20488,7 @@ def openapi_spec():
                      q("due_from", "Due on or after (YYYY-MM-DD)", date_s), q("due_to", "Due on or before (YYYY-MM-DD)", date_s),
                      q("tag", "One of your tags or a list tag (without #)"), q("list_tag", "A list tag (without #)"),
                      q("assignee", "me, none or a user id"),
+                     q("assignee_group", "2.10.0: mine (assigned to one of your groups) or a group id"),
                      q("updated_since", "Changed since (ISO date-time)", {"type": "string", "format": "date-time"}),
                      q("parent_id", "Subtasks of this task", {"type": "integer"}), q("top_level", "true = no subtasks", {"type": "boolean"}),
                      q("fields", "compact = only id, title, list_id, section_id, parent_id, status, due, due_time, priority, tags, "
@@ -19548,6 +20593,8 @@ def openapi_spec():
     agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page)
     git_spec(paths, schemas, op, ok, errs, ref, pid, nul, page)
     overview_spec(paths, schemas, op, ok, errs, ref, pid, nul, page)
+    groups_spec(paths, schemas, op, ok, errs, ref, pid, nul, page)  # 2.10.0 (#441)
+    dayplan_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.10.0 (#440)
     _SPEC["s"] = {
         "openapi": "3.1.0",
         "info": {"title": f"{APP_NAME} REST API", "version": API_VERSION,
@@ -19558,7 +20605,7 @@ def openapi_spec():
                  "license": {"name": "AGPL-3.0-only", "identifier": "AGPL-3.0-only"}},
         "servers": [{"url": API_PREFIX.rstrip("/")}],
         "security": [{"bearerAuth": []}],
-        "tags": [{"name": n} for n in ("Account", T, L, "Roadmap", C, S_, TI, H, "Import", A, "Agents")],
+        "tags": [{"name": n} for n in ("Account", T, L, "Roadmap", C, S_, TI, H, "Import", A, "Agents", "Groups", "Day plan")],
         "paths": paths,
         "components": {"securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "abk_ token"}},
                        "schemas": schemas},
@@ -21229,7 +22276,8 @@ def make_agent(c, uid):
     c.execute("UPDATE users SET kind='agent', is_admin=0, paperless_access=0 WHERE id=?", (uid,))
     pl_forget_user(c, uid)  # 2.1.0: an agent has no Paperless (personal connections, tokens, grants go)
     c.execute("DELETE FROM sessions WHERE user_id=?", (uid,))
-    c.execute("UPDATE list_members SET role='edit' WHERE user_id=? AND role='admin'", (uid,))
+    c.execute("UPDATE list_members SET role='edit', own_role='edit' WHERE user_id=? AND role='admin'", (uid,))
+    c.execute("DELETE FROM group_members WHERE user_id=?", (uid,))  # 2.10.0 (#441): agents are never group members
     c.execute("INSERT OR IGNORE INTO agents(user_id,enabled,status,created_at) VALUES(?,1,'idle',?)", (uid, iso(now_utc())))
 
 
@@ -21902,7 +22950,7 @@ def v1_agent_job_update(jid):
 # shared (default: people who share at least one list with the agent; instance admins count as sharing, as for the chat)
 # | all (every person of the instance) | off. The agent never gets general access: the job input is the only data it sees
 # (e.g. the selected inbox items, the lists the person ticked), stored with the job and deleted with it (PROP_KEEP_DAYS).
-PROP_KINDS = ("project", "subtasks", "triage", "extract")
+PROP_KINDS = ("project", "subtasks", "triage", "extract", "dayplan")  # 2.10.0 (#440): dayplan
 PROP_STATES = ("requested", "ready", "applied", "discarded")
 PROP_MODES = ("off", "shared", "all")
 PROP_MAX_ITEMS = 200                    # entries one proposal may create / change (tasks + subtasks)
@@ -21914,6 +22962,7 @@ PROP_TRIAGE_MAX, PROP_LISTS_MAX = 100, 200   # inbox items per request, lists of
 PROP_OPEN_MAX = 10                      # open (running / waiting) proposal requests per person
 PROP_KEEP_DAYS = 30                     # proposal jobs (with their input) are removed after this many days
 PROP_TITLES = {"project": N_("Project from a briefing"), "subtasks": N_("Break down: {0}"), "triage": N_("Sort the inbox"),
+               "dayplan": N_("Day plan: {0}"),
                "extract": N_("Tasks from notes: {0}")}
 PROP_LIMITS = {"max_items": PROP_MAX_ITEMS, "max_bytes": PROP_MAX_BYTES, "title_max": PROP_TITLE_MAX, "notes_max": PROP_NOTES_MAX,
                "name_max": PROP_NAME_MAX, "summary_max": PROP_SUMMARY_MAX, "sections_max": PROP_SECTIONS_MAX,
@@ -21951,7 +23000,8 @@ def prop_agents(c, uid):
         if prop_agent_ok(c, a, uid):
             u = c.execute("SELECT * FROM users WHERE id=?", (a["user_id"],)).fetchone()
             out.append({"id": a["user_id"], "name": a["display_name"] or a["username"], "avatar": avatar_url(u),
-                        "limit_reached": bool(usage_block(c, a["user_id"]))})
+                        "limit_reached": bool(usage_block(c, a["user_id"])),
+                        "online": agent_online(a) is not False})  # 2.10.0 (#440): offers "Let an agent plan" only when online
     return out
 
 
@@ -22177,6 +23227,8 @@ def prop_validate(kind, b, inp):
                           "assignee_id": aid, "due": _p_date(t.get("due"), w + ".due"),
                           "section": _p_str(t.get("section"), w + ".section", 100) or None})
         out["tasks"] = tasks
+    elif kind == "dayplan":  # 2.10.0 (#440)
+        out.update(dayplan_validate(b, inp))
     return out
 
 
@@ -22234,6 +23286,13 @@ def prop_input(c, uid, kind, b):
                "lists": [{"id": d["id"], "name": d["name"], "folder": d["folder"] or None, "sections": secs.get(d["id"], [])}
                          for d in mine[:PROP_LISTS_MAX]]}
         return inp, tr(PROP_TITLES["triage"]), None, inbox
+    if kind == "dayplan":  # 2.10.0 (#440): the same input the built-in planner uses
+        _p_keys(b, "", ("agent_id", "kind", "date", "mode"))
+        day = dayplan_day(b.get("date"))
+        inp = dayplan_input(c, uid, day, dayplan_mode(b.get("mode")))
+        if not inp["tasks"]:
+            raise BadInput(tr("There are no open tasks to plan"))
+        return inp, tr(PROP_TITLES["dayplan"], day.isoformat()), None, None
     _p_keys(b, "", ("agent_id", "kind", "list_id", "text"))
     lid = _p_int(b.get("list_id"), "list_id")
     need_list(c, lid)
@@ -22316,8 +23375,18 @@ def proposal_get(jid):
 
 def prop_edit(kind, key, e, inp, prop):
     """One edited entry of the review dialog (title, due, section, assignee, list) -> clean values."""
-    _p_keys(e, f"edits.{key}", ("title", "due", "section", "assignee_id", "list_id", "section_id"))
+    _p_keys(e, f"edits.{key}", ("title", "due", "section", "assignee_id", "list_id", "section_id", "time", "duration"))
     out = {}
+    if kind == "dayplan":  # 2.10.0 (#440): another slot / length / day
+        if "time" in e:
+            if not isinstance(e["time"], str) or not valid_hm(e["time"]):
+                raise BadInput(tr("Invalid value: {0}", "time"))
+            out["time"] = e["time"]
+        if "duration" in e:
+            out["duration"] = _p_int(e["duration"], "duration", 5, 720)
+        if "due" in e:
+            out["due"] = _p_date(e["due"], "due")
+        return out
     if "title" in e:
         out["title"] = _p_str(e["title"], "title", PROP_TITLE_MAX, True)
     if "due" in e:
@@ -22476,6 +23545,25 @@ def prop_run(c, j, sel, ed, extra):
                                             e.get("due", t["due"]), assignee_id=asg, sort=base + i))
         rec["list"] = lid
         return rec
+    if kind == "dayplan":  # 2.10.0 (#440): due / due_time / duration of the person's own tasks (undo like triage)
+        for key in sel:
+            tid, want = dayplan_want(prop, inp, key, edits.get(key, {}))
+            if not tid or str(tid) in rec["changes"]:
+                continue
+            try:
+                need_task(c, tid)
+            except Denied:
+                continue
+            cur = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
+            if cur["deleted_at"] or cur["status"] != 0:
+                continue
+            before = {k: cur[k] for k in want}
+            msg = apply_update(c, tid, dict(want))
+            if msg:
+                raise BadInput(msg)
+            log_act(c, tid, "proposal", {"agent": aid})
+            rec["changes"][str(tid)] = {"before": before, "after": want}
+        return rec
     # triage: moves / edits of the person's inbox items (normal changes: apply_update checks every move)
     for i, it in enumerate(prop["items"]):
         if str(i) not in selected:
@@ -22582,7 +23670,7 @@ def proposal_undo(jid):
     if j["prop_state"] != "applied" or not rec or rec.get("undone"):
         return err(tr("Nothing to undo"), 409)
     ts, skipped, n = iso(now_utc()), [], 0
-    if j["kind"] == "triage":
+    if j["kind"] in ("triage", "dayplan"):
         for tid, ch in rec["changes"].items():
             try:
                 need_task(c, int(tid))
@@ -22642,7 +23730,7 @@ def proposal_redo(jid):
             c.rollback()
             raise
         n = len(rec["tasks"])
-    elif j["kind"] == "triage":
+    elif j["kind"] in ("triage", "dayplan"):
         for tid, ch in rec["changes"].items():
             try:
                 need_task(c, int(tid))
@@ -23681,7 +24769,7 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                              "get": op("One job of the agent (proposal jobs: kind, input, proposal, limits)", AG, ok(ref("Job")) | errs("403", "404"),
                                        [pid("id", "Job id")])},
         "/agent/jobs/{id}/proposal": {"post": op(
-            "Submit the structured proposal for a job_request (kind project | subtasks | triage | extract; see docs/AGENTS.md). "
+            "Submit the structured proposal for a job_request (kind project | subtasks | triage | extract | dayplan; see docs/AGENTS.md). "
             "Validated; replaces an earlier one until the person applied or discarded it", AG,
             ok(ref("Job"), "Created", "201") | errs("400", "403", "404", "409", "413"), [pid("id", "Job id")], scope=W,
             body={"type": "object", "properties": {"kind": {"type": "string", "enum": list(PROP_KINDS)},
@@ -23689,7 +24777,8 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                   "description": f"project: {{name, folder?, sections[], tasks[{{title, notes?, section?, due?, start?, priority?, subtasks[], "
                                  f"depends_on[]}}]}}; subtasks: {{items[{{title, notes?, due?, estimate?}}], dependencies[[a, b]]?}}; triage: "
                                  f"{{items[{{task_id, list_id?, section_id?, tags[], priority?, due?, rewrite_title?}}]}}; extract: {{tasks[{{title, "
-                                 f"notes?, assignee_id?, due?, section?}}]}}. At most {PROP_MAX_ITEMS} entries, {PROP_MAX_BYTES // 1024} KB."})},
+                                 f"notes?, assignee_id?, due?, section?}}]}}; dayplan (2.10.0): {{items[{{task_id, start (HH:MM), duration?, note?}}], defer[{{task_id, "
+                                 f"to (date) | null, note?}}]}} (task ids from input.tasks). At most {PROP_MAX_ITEMS} entries, {PROP_MAX_BYTES // 1024} KB."})},
         "/agent/chats": {"get": op("Chat messages after a cursor", AG, ok(ref("ChatPage")) | errs("400", "403"),
                                    [q("since", "Message id", {"type": "integer"}), q("user_id", "One person", {"type": "integer"}), q("limit", "At most 500", {"type": "integer"})])},
         "/agent/typing": {"post": op(f"Typing dots in one person's chat for {AGENT_TYPING_S} s (2.4.1)", AG, ok({"type": "object"}) | errs("400", "403", "404"),
@@ -25218,4 +26307,7 @@ if __name__ == "__main__":
     listen = f"0.0.0.0:{port}" + (f" 0.0.0.0:{AUTH_PROXY_PORT}" if AUTH_PROXY_PORT and AUTH_PROXY_PORT != str(port) else "")
     # restore uploads may be larger than attachments (waitress spools the body to a temp file first)
     # 2.0.0: 16 threads (was 8): agents' long-polls (at most KALMIDO_AGENT_WAITERS) each hold one while waiting
-    serve(app, listen=listen, threads=16, max_request_body_size=max(BK_MAX_BYTES, app.config["MAX_CONTENT_LENGTH"]) + 1024 * 1024)
+    # 2.10.0 (#445): forwarded headers are handled by proxy_mw (several trusted proxies / networks, which waitress'
+    # trusted_proxy cannot express); waitress must not clear them before the app sees them.
+    serve(app, listen=listen, threads=16, max_request_body_size=max(BK_MAX_BYTES, app.config["MAX_CONTENT_LENGTH"]) + 1024 * 1024,
+          clear_untrusted_proxy_headers=False)

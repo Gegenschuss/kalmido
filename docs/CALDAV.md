@@ -65,9 +65,9 @@ Changes made over CalDAV show "via CalDAV" in the task history. Webhooks and age
 | --- | --- | --- |
 | `KALMIDO_CALDAV` | `1` | `0` turns CalDAV off: `/dav` and `/.well-known/caldav` answer 404, and no new app passwords can be created. |
 | `KALMIDO_CALDAV_DONE_DAYS` | `90` | How many days completed tasks stay in the apps. |
-| `KALMIDO_CALDAV_HTTP` | `0` | CalDAV sends the app password with every request (HTTP Basic). It is accepted only while `PUBLIC_URL` is `https://`. Set `1` to allow it on a plain-http setup inside a trusted network. |
+| `KALMIDO_CALDAV_HTTP` | `0` | CalDAV sends the app password with every request (HTTP Basic). It is accepted only over https: a trusted proxy (`KALMIDO_TRUSTED_PROXIES`) that sends `X-Forwarded-Proto: https`, or, for requests without that header, while `PUBLIC_URL` is `https://`. A trusted proxy that reports `http` is refused. Set `1` to allow plain http inside a trusted network. |
 
-App passwords are stored only as a hash, using the same key derivation as account passwords. Failed CalDAV logins count like failed web logins: 10 per user name or 30 per address within 15 minutes, after which the user name or address is locked out with 429. They are reported in the admin alerts. Passwords never appear in the log. Agents never get CalDAV.
+App passwords are stored only as a hash, using the same key derivation as account passwords. Failed CalDAV logins count like failed web logins, per client address (behind a proxy the address it forwards, see `KALMIDO_TRUSTED_PROXIES` in the README): 10 per user name and address, 30 per address, and 150 per user name from all addresses together within 15 minutes, then 429. One attacker therefore cannot lock a person out. They are reported in the admin alerts. Passwords never appear in the log. Agents never get CalDAV.
 
 ### Reverse proxy: let /dav past the login proxy
 

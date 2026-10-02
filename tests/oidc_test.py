@@ -291,6 +291,18 @@ me = s.get(B + "/api/me").json() if err_of(r) == "ok" else {}
 check(me.get("username") == "eva" and me.get("is_admin") is True, f"Entra style: account eva from the verified e-mail, admin by domain ({me})")
 s, r = oidc_login({"sub": "sub-max2", "preferred_username": "max@else.test", "groups": ["kalmido"], "email": "max@else.test", "email_verified": True})
 check(err_of(r) == "taken", "the e-mail local part never links / reuses an existing account (max exists -> taken)")
+# 2.10.0 (#441): groups synced from the provider's group claim at every login (people only; the list follows)
+G = A.post(B + "/api/admin/groups", json={"name": "Design", "oidc_group": "design"}).json()["id"]
+L = A.post(B + "/api/lists", json={"name": "Design board"}).json()["id"]
+A.put(B + f"/api/lists/{L}/groups/{G}", json={"role": "edit"})
+MAX = next(u["id"] for u in A.get(B + "/api/users").json()["users"] if u["username"] == "max")
+s, r = oidc_login({"sub": "sub-max", "preferred_username": "max", "groups": ["kalmido", "design"]})
+gm = [m["user_id"] for m in A.get(B + "/api/groups").json()["groups"][0]["members"]]
+check(err_of(r) == "ok" and gm == [MAX] and any(x["id"] == L for x in s.get(B + "/api/state").json()["lists"]),
+      f"OIDC group claim 'design' -> member of the synced group Design, its list appears ({gm})")
+s, r = oidc_login({"sub": "sub-max", "preferred_username": "max", "groups": ["kalmido"]})
+check(err_of(r) == "ok" and not A.get(B + "/api/groups").json()["groups"][0]["members"]
+      and not any(x["id"] == L for x in s.get(B + "/api/state").json()["lists"]), "claim gone -> out of the group, the list is gone")
 
 print(f"\n{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

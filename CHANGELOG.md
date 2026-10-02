@@ -7,6 +7,43 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-10-02
+
+**In short:** Groups for sharing lists and folders and for tasks "whoever has time"; "Plan my day" fills the free time
+between your appointments (built in, or by an agent you approve); an evening review; the real client address behind a
+reverse proxy.
+
+### Added
+- **Groups** (#441): admins create groups of people under *Settings > Administration > Groups*, optionally synced from a
+  sign-in group (OIDC group claim, checked at every login; the members are then read-only). Lists (owner / list admin)
+  and whole folders of own lists (also lists put there later) can be shared with a group with a role; members who join
+  get access at once, members who leave lose it; a person's role is the higher of their own and the group's. Every read
+  path that respects sharing (lists, search, CalDAV, REST API, MCP, News, webhooks, agents) follows automatically.
+- **Assign a task to a group** (#441): it shows in *Assigned to me* for every member until one of them *Takes it*
+  (task panel, the group chip's menu; participants too; undoable). The sidebar's *Team* lists your groups with their
+  open tasks. News: assigned to your group, taken by someone.
+- **REST API + MCP** (#441): `GET /api/v1/groups`, `/groups/{id}`, `/lists/{id}/groups`, `PUT` / `DELETE
+  /lists/{id}/groups/{group_id}`, `POST /tasks/{id}/take`, the task field `assignee_group_id` and the filter
+  `assignee_group=mine`; MCP tools `list_groups`, `list_list_groups`.
+- **Plan my day / Fill free time** (#440) in Today: a built-in planner puts your open tasks into the free slots between
+  the day's calendar events and timed tasks within your working hours (*Settings > General > Day planning*, default
+  09:00-17:00; overdue and due first, then deadlines, due date, priority; 30 minutes for tasks without a duration). A
+  timeline preview, entries can be left out, what does not fit moves to the next working day; *Apply* is one undo step.
+- **Let an agent plan** (#440): with an online agent, the same input goes out as a proposal of kind `dayplan`; its plan
+  opens in the same timeline and only you apply it. Documented in docs/AGENTS.md; MCP `submit_proposal` describes the
+  shape, `get_day_plan` / `get_day_review` and `GET /api/v1/dayplan`, `/dayplan/review` give the previews.
+- **Daily review** (#440): after your working hours a card in Today with what you finished, what is still open, what you
+  moved and a suggestion for the next working day; optionally as a push at a time you choose (default off).
+- `KALMIDO_TRUSTED_PROXIES` / `KALMIDO_TRUSTED_PROXY_COUNT` (#445): the reverse proxies whose `X-Forwarded-For`,
+  `-Proto` and `-Host` Kalmido believes (default loopback + the Docker bridge gateway 172.17.0.1; `none` = nobody).
+
+### Fixed
+- **Security (#445):** behind a reverse proxy every request seemed to come from the proxy (the forwarded client address
+  was dropped), so failed-login lockouts (web login, app passwords) hit everyone at once and logs showed the proxy.
+  Kalmido now takes the client address from a trusted proxy, and lockouts count per user name and address, per address
+  and, as a ceiling, per user name: one attacker can no longer lock a person out. CalDAV and cookies see https from a TLS
+  proxy (`X-Forwarded-Proto`).
+
 ## [2.9.0] - 2026-10-02
 
 **In short:** Your lists in Reminders, Thunderbird, Tasks.org and other CalDAV apps, both ways, with an app password per
@@ -400,7 +437,8 @@ of people.
   multi-arch image (`ghcr.io/gegenschuss/kalmido`, linux/amd64 and linux/arm64), an installable web app that works
   offline, English and German.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.9.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.10.0...HEAD
+[2.10.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.10.0
 [2.9.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.9.0
 [2.8.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.8.0
 [2.7.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.7.2
