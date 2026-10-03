@@ -639,6 +639,10 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
   .wev b{display:none}
   .week:not(.oneday) .wad .ev{font-size:.625rem;padding:0 2px}
   .oneday .wev b{display:inline}
+  /* 2.15.1 (#633): "all day" fits the narrow gutter in two short lines (the row no longer grows), all-day tasks show up to
+     two lines of their title instead of three letters */
+  .wlbl{padding:.25rem 2px;font-size:.5625rem;line-height:1.1;overflow-wrap:anywhere}
+  .week:not(.oneday) .wad .ev{white-space:normal;overflow-wrap:anywhere;line-height:1.2;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2}
   .wbody{height:calc(100dvh - 18.75rem)}
   .tl{--tl-name:6.75rem}
   .tl-name{font-size:.75rem;padding:0 .375rem}
@@ -1298,6 +1302,14 @@ svg.chart{display:block;max-width:100%;overflow:visible}
 /* command palette */
 .palette{place-items:start center;padding-top:12vh;background:rgba(4,6,9,.5)}
 .palette .card{width:min(40rem,100%);padding:0;display:flex;flex-direction:column;max-height:min(35rem,76dvh);overflow:hidden}
+/* 2.15.1 (#633): on a phone the search sits at the top and ends above the keyboard (the visual viewport), without the
+   keyboard hints (Esc, ↑ ↓, Enter, shortcut keys) a touch screen has no use for */
+@media (max-width:899px){
+  .palette{padding:calc(var(--vvt,0px) + var(--safe-t) + .5rem) .5rem 0}
+  .palette .card{border-radius:var(--r-l);padding-bottom:0;max-height:min(35rem,calc(var(--vvh,100dvh) - var(--safe-t) - 1rem))}
+}
+@media (hover:none) and (pointer:coarse){ .palette .kbs,.palette .pfoot{display:none} }
+@media (pointer:coarse){ .palette .pitem{min-height:2.75rem} }
 .pqbar{display:flex;align-items:center;gap:.625rem;padding:0 .75rem 0 1rem;border-bottom:1px solid var(--line)}
 .pqbar>svg{color:var(--muted)}
 .pqbar .pqin{flex:1;background:transparent;border:0;padding:.9375rem 0;font-size:var(--fs-l);border-radius:0}
@@ -2571,6 +2583,18 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
   .ppm .card>.foot.ppfoot{bottom:calc(-1.25rem - var(--safe-b));margin-bottom:calc(-1.25rem - var(--safe-b));padding-bottom:calc(.75rem + var(--safe-b))}
   .ppfoot .ppfc{flex-basis:100%;order:-1;text-align:end}
 }
+/* 2.15.1 (#633): long dialogs (new token, permissions, agent) keep their buttons in view on a phone: the footer sticks to the
+   bottom of the dialog; the new token's expiry sits in it, next to Create */
+.modal .card>.foot.stfoot{position:sticky;bottom:-1.25rem;z-index:2;margin:1rem -1.25rem -1.25rem;padding:.75rem 1.25rem;background:var(--bg2);border-top:1px solid var(--line2);align-items:center}
+.stfoot .calerr{flex-basis:100%;margin:0}
+.stfoot .calerr[hidden]{display:none}
+.stfoot .sfexp{display:flex;align-items:center;gap:.5rem;flex:1 1 auto;min-width:0}
+.stfoot .sfexp label{font-size:var(--fs-s);color:var(--muted);white-space:nowrap}
+.stfoot .sfexp select{width:auto;min-width:0;flex:0 1 auto}
+@media (max-width:899px){
+  .modal .card>.foot.stfoot{bottom:calc(-1.25rem - var(--safe-b));margin-bottom:calc(-1.25rem - var(--safe-b));padding-bottom:calc(.75rem + var(--safe-b))}
+  .stfoot .sfexp{flex-basis:100%}
+}
 /* K04: the admin-alert "nowhere yet" hint with its button */
 #s-aa .shint.aanone{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
 #s-aa .aanone>span{flex:1 1 14rem}
@@ -2579,7 +2603,28 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 .dtop .dchip{flex:0 1 auto;min-width:0;overflow:hidden;justify-content:flex-start}
 .dtop .dchip .dct{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dtop .dchip .i{flex:none}
-@media (pointer:coarse){ .dtop .dq,.dtop [data-act="pin"]{display:none} }
+/* 2.15.1 (#636): Today / Tomorrow are back in the header on touch screens. The header is a size container: below 28rem (every
+   phone, the Fold's side panel) the date and Today / Tomorrow (now with their words) get a second row of their own, so the date
+   is never cut short and nothing scrolls sideways; wider headers keep one row with the two icons. Pin stays in "…" below 36rem. */
+.dtop{container:dtop / inline-size}
+.dtop .dql,.dtop .dbr{display:none}
+@media (pointer:coarse){
+  .dtop{flex-wrap:wrap;row-gap:.375rem}
+  .dtop .dq{flex:none}
+  @container dtop (max-width:35.99rem){ .dtop [data-act="pin"]{display:none} }
+  @container dtop (max-width:27.99rem){
+    .dtop .dbr{display:block;order:8;flex:0 0 100%;height:0}
+    .dtop .dchip,.dtop .dq{order:9}
+    .dtop .dchip{flex:1 1 0}
+    .dtop .dq{border:1px solid var(--line);color:var(--muted)}
+    .dtop .dq.on{border-color:var(--accent);color:var(--accent)}
+  }
+  /* the words next to the icons where they fit (from 23rem: 390 px phones and wider); 360 px phones keep the icons */
+  @container dtop (min-width:23rem) and (max-width:27.99rem){
+    .dtop .dq{padding:0 .625rem}
+    .dtop .dq .dql{display:inline;font-size:var(--fs-s);white-space:nowrap}
+  }
+}
 #detail{overflow-x:hidden}
 .mdsub{max-width:100%;white-space:normal;text-align:start;height:auto;min-height:1.75rem}
 /* K15: own file button */
@@ -3378,6 +3423,13 @@ svg.logo{color:var(--acc-d,var(--accent));flex:none}
 .quad h3{flex-wrap:wrap}
 .quad .trow .ttl{overflow-wrap:anywhere}
 @media (max-width:899px){ .matrix{grid-template-columns:minmax(0,1fr)} }
+/* 2.15.1 (#633): a phone folds a quadrant by its heading (the count stays visible) */
+.quad .qfold{display:flex;align-items:center;gap:.5rem;width:100%;min-height:2.75rem;margin:-.5rem 0 -.25rem;padding:0;background:none;border:0;color:inherit;font:inherit;text-align:start;cursor:pointer}
+.quad .qfold .qcar{margin-inline-start:auto;color:var(--muted);transition:transform .12s}
+.quad.fold .qfold .qcar{transform:rotate(-90deg)}
+.quad.fold .qlist,.quad.fold .kadd{display:none}
+.quad.fold h3{margin-bottom:0}
+@media (prefers-reduced-motion:reduce){ .quad .qfold .qcar{transition:none} }
 /* 2.13.2 (#478 F5): comments: one head per author group; the quick reactions only on hover / focus / long press */
 .cm{position:relative}
 .cm.grp{padding-top:0}

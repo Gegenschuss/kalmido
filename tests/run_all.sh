@@ -325,6 +325,9 @@ shard 4  # ---------------------------------------------------------------- shar
        run parity "$PY" parity_test.py
        run p2150_api "$PY" p2150_api_test.py "$KALMIDO_TEST_DATA"
        run p2150_ui node p2150_ui.js "$KALMIDO_TEST_DATA"
+# 2.15.1 (#636 #633): Today / Tomorrow in the task header on phones (second row), the matrix folds on phones, Search and the
+# palette focused on touch, sticky dialog footers (new token: Expires + Create), the week view on phones; jsdom + Firefox touch
+fresh; run p2151_ui node p2151_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

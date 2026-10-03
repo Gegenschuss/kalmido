@@ -7,6 +7,28 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.15.1] - 2026-10-03
+
+**In short:** A phone round. *Today* and *Tomorrow* are back in a task's header on phones (#636), the Eisenhower matrix
+folds its quadrants, Search opens ready to type, the week view reads better, and the new token dialog keeps *Expires*
+and *Create* in view (#633).
+
+### Changed
+- Phones and the Fold: a task's header shows *Today* and *Tomorrow* again (with their words where they fit), next to the
+  date in a second row of the header, so the whole date stays readable and nothing scrolls sideways. Wider headers keep
+  one row with the two icons; *Pin* is in "…" where room is short.
+- Phones: a tap on a heading of the Eisenhower matrix folds that quadrant (the number of tasks stays visible); the
+  device remembers it.
+- The new API token dialog, the permissions dialog and the agent dialog keep their buttons at the bottom of the screen
+  while the rest scrolls; *Expires* of a new token sits next to *Create*.
+
+### Fixed
+- Phones: opening Search puts the cursor in its field (before, a second tap was needed). The search and command box
+  opens at the top of the screen, ends above the keyboard, leaves out the keyboard hints and has 44 px rows.
+- The agent dialog shows an error (such as a taken user name) next to its buttons, where it is seen.
+- Week view on phones: "all day" no longer makes its row taller, all-day tasks show two lines of their title instead of
+  a few letters, and 07:00 is no longer cut off at the top of the hour grid.
+
 ## [2.15.0] - 2026-10-03
 
 **In short:** The complete agent API (#479). API tokens and agents get permissions (scopes) instead of read / write,
@@ -2188,7 +2210,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.15.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.15.1...HEAD
+[2.15.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.15.1
 [2.15.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.15.0
 [2.14.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.14.0
 [2.13.4]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.13.4

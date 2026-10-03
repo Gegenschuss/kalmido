@@ -42,7 +42,7 @@ const TABLET = {'(min-width:600px) and (min-height:600px)': true};
   const plan = await mk('Team plan', TEAM);
   const css0 = await (await fetch(B + 'static/app.css')).text();
   const SW = fs.readFileSync(path.join(__dirname, '..', 'static', 'sw.js'), 'utf8');
-  check(/const CACHE = 'tasks-shell-v(?:((5[89]|6[0-9])|7[0-9])|8[0-9])'/.test(SW), 'service worker cache v58 (2.0.8: v59, 2.1.0: v60, 2.1.1: v61, 2.1.2: v62, 2.2.0: v63, 2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70, 2.5.2: v71, 2.6.0: v72, 2.6.1: v73, 2.7.0: v74, 2.7.1: v75, 2.7.2: v76, 2.8.0: v77, 2.9.0: v78, 2.10.0: v79, 2.11.0: v80)');
+  check(/const CACHE = 'tasks-shell-v(?:((5[89]|6[0-9])|7[0-9])|8[0-9]|9[0-9])'/.test(SW), 'service worker cache v58 (2.0.8: v59, 2.1.0: v60, 2.1.1: v61, 2.1.2: v62, 2.2.0: v63, 2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70, 2.5.2: v71, 2.6.0: v72, 2.6.1: v73, 2.7.0: v74, 2.7.1: v75, 2.7.2: v76, 2.8.0: v77, 2.9.0: v78, 2.10.0: v79, 2.11.0: v80)');
 
   // ================= #315 comments in a private list: the box (one line) at the bottom edge -> a note; no @ hint, no activity
   let w = await boot({user: 'alice', hash: 'l/' + PRIV}), d = w.document;

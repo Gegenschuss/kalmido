@@ -888,6 +888,7 @@ async function route() {
   S.route = {mod: r.mod, key: r.key, ...(r.agent ? {agent: r.agent} : {}), ...(r.review ? {review: true} : {})};  // 2.10.0: review = #today/review
   if (r.mod === 'agents') S.jobs.items = null;
   if (S.route.mod !== 'tasks' || r.key !== S.lastRouteKey) { S.multi.clear(); S.multiMode = false; }
+  if (r.key === 'search' && S.lastRouteKey !== 'search') S.searchFocus = true;  // 2.15.1 (#633): opening Search focuses its field on a phone too (a re-render or a task closed on top of it does not)
   S.lastRouteKey = r.key;
   if (r.mod === 'tasks' && r.key !== 'search') LS.set('lastKey', r.key);
   if (r.mod === 'tasks' && r.key.startsWith('l:')) recentPush('l', +r.key.slice(2));
@@ -2004,7 +2005,7 @@ function renderView0() {
   if (S.ie) inlineEditMount(tinF);
   const sa2 = $('#view .secadd-in'); if (sa2 && S.secAdd) { sa2.value = S.secAdd.v || ''; if (saiF) sa2.focus(); }
   const q2 = $('#qinput'); if (q2 && qi && q2 !== qi) { q2.value = qv; if (qf) { q2.focus(); updateChips(q2); } }
-  const wb = $('#wbody'); if (wb) wb.scrollTop = wbs ?? 7 * weekH();
+  const wb = $('#wbody'); if (wb) wb.scrollTop = wbs ?? 7 * weekH() - 12;  // 2.15.1 (#633): the 07:00 label in full, not cut at the top
   const tl = $('#tlscroll');
   if (tl && isRoadmap()) { const keep = wasRm && !S.rmScrollReset; S.rmScrollReset = false; rmAfterRender(tl, keep ? tls : undefined, keep ? tlt : undefined); }
   else if (tl) { tl.scrollLeft = tls ?? Math.max(0, diffDays(S.tlStart, today()) - 2) * tlDW(); tlAfterRender(tl); }
@@ -2012,7 +2013,7 @@ function renderView0() {
   renderMultiBar();
   const f2 = fk && fk();
   if (f2 && f2 !== fa && document.activeElement !== f2) { if (fv != null && 'value' in f2) f2.value = fv; f2.focus({preventScroll: true}); try { if (fs[0] != null) f2.setSelectionRange(fs[0], fs[1]); } catch { /* no caret */ } }
-  if (S.route.key === 'search') { const i = $('#searchq'); if (i && document.activeElement !== i) { i.value = S.searchQ || ''; if (!isMobile()) i.focus(); } }
+  if (S.route.key === 'search') { const i = $('#searchq'); if (i && document.activeElement !== i) { i.value = S.searchQ || ''; if (!isMobile() || S.searchFocus) i.focus(); } S.searchFocus = false; }
 }
 
 // ------------------------------------------------------------------ render: task rows
@@ -3968,9 +3969,12 @@ function mxScopeMenu(a) {
 function viewMatrix() {
   const all = mxTasks();
   const dueKey = t => (t.due || '9999') + (t.due_time || '99');
+  // 2.15.1 (#633): on a phone (one column) a tap on a quadrant's heading folds it; remembered per device
+  const fold = isMobile() ? new Set(LS.get('mxFold', [])) : null;
   return `${mxBar()}<div class="matrix">${QUADS.map(([p, n]) => {
     const ts = all.filter(t => t.priority === p).sort((a, b) => dueKey(a).localeCompare(dueKey(b)) || bySort(a, b));
-    return `<div class="quad q${p}" data-quad="${p}"><h3><span class="${p ? 'flag-' + p : 'muted'}">${ic('flag', 's')}</span>${tr(n)} <span class="c">${ts.length}</span></h3>
+    const hd = `<span class="${p ? 'flag-' + p : 'muted'}">${ic('flag', 's')}</span>${tr(n)} <span class="c">${ts.length}</span>`;
+    return `<div class="quad q${p} ${fold?.has(p) ? 'fold' : ''}" data-quad="${p}"><h3>${fold ? `<button type="button" class="qfold" data-act="mx-fold" data-p="${p}" aria-expanded="${!fold.has(p)}">${hd}${ic('chev', 's qcar')}</button>` : hd}</h3>
       <div class="qlist">${ts.map(t => taskRow(t, {showList: true, compact: true})).join('') || `<div class="muted" style="padding:.5rem .375rem;font-size:var(--fs-m)">${tr('empty')}</div>`}</div>
       <div class="kadd"><input placeholder="${tr('+ Task')}" aria-label="${esc(tr('New task'))}" data-qadd="${p}" enterkeyhint="done"></div></div>`;
   }).join('')}</div>`;
@@ -4399,8 +4403,8 @@ function renderDetail0() {
       <button class="iconbtn back" data-act="close-detail" aria-label="${tr('Back')}">${ic('back')}</button>
       <button class="chk ${t.status === 2 ? 'on' : t.status === -1 ? 'wont' : 'p' + t.priority}" data-act="toggle" data-id="${t.id}" aria-label="${tr('done')}" title="${esc(kt(tr('Complete task'), 'x'))}" ${ro ? 'disabled' : ''}>${t.status === 2 ? ic('check') : ''}</button>
       ${ck ? '' : `<button class="dchip ${t.due ? 'set ' + dueClass(t) : ''}" data-act="date" data-id="${t.id}" title="${esc((t.due ? dueTxt + ' · ' : '') + kt(tr('Change date'), 'd'))}" ${ro ? 'disabled' : ''}>${ic('cal', 's')}<span class="dct">${dueTxt}</span>${t.repeat ? ' ' + ic('repeat', 's') : ''}${t.reminders && t.due ? ' ' + ic('bell', 's') : ''}</button>`}
-      ${ck || ro ? '' : [[0, 'sun', tr('Today')], [1, 'sunrise', tr('Tomorrow')]].map(([n, i, lab]) => `<button class="iconbtn dq ${t.due === addDays(today(), n) ? 'on' : ''}" data-act="due-q" data-d="${n}" data-id="${t.id}" title="${esc(kt(tr('Due: {0}', lab), n ? 'Shift+T' : 't'))}" aria-label="${esc(tr('Due: {0}', lab))}">${ic(i, 's')}</button>`).join('')}
-      <span class="spacer"></span>
+      ${ck || ro ? '' : [[0, 'sun', tr('Today')], [1, 'sunrise', tr('Tomorrow')]].map(([n, i, lab]) => `<button class="iconbtn dq ${t.due === addDays(today(), n) ? 'on' : ''}" data-act="due-q" data-d="${n}" data-id="${t.id}" title="${esc(kt(tr('Due: {0}', lab), n ? 'Shift+T' : 't'))}" aria-label="${esc(tr('Due: {0}', lab))}">${ic(i, 's')}<span class="dql">${esc(lab)}</span></button>`).join('')}
+      ${ck ? '' : '<span class="dbr" aria-hidden="true"></span>'}<span class="spacer"></span>
       ${ro ? (t.context ? `<span class="rotag" title="${esc(tr('The main task of a subtask assigned to you: read-only, without notes, files and comments'))}">${ic('sub', 's')}${tr('Context')}</span>`
         : `<span class="rotag" title="${esc(tr('View only, shared by {0}', l?.owner_name || ''))}">${ic('eye', 's')}${tr('View only')}</span>`) : `${ck ? '' : `<button class="iconbtn ${t.pinned ? 'on' : ''}" data-act="pin" data-id="${t.id}" title="${t.pinned ? tr('Unpin') : tr('Pin')}" aria-label="${t.pinned ? tr('Unpin') : tr('Pin')}">${ic('pin')}</button>
       <button class="iconbtn ${t.priority ? 'flag-' + t.priority : ''}" data-act="prio" data-id="${t.id}" title="${tr('Priority')}" aria-label="${tr('Priority')}">${ic('flag')}</button>`}
@@ -8131,8 +8135,7 @@ const ipsRow = (v, id) => `<div class="row"><label for="${id}">${tr('Only from')
     <div class="shint">${tr('Optional: IP addresses or networks such as 203.0.113.0/24, separated by commas. Requests from anywhere else are refused. Behind a reverse proxy this relies on its trusted-proxy setting.')}</div>`;
 function permModal(title, offer, sel, ips, save, extra) {
   const md = modal(`<h3>${esc(title)}</h3>${scopesHtml(offer, sel)}${ipsRow((ips || []).join(', '), 'pm-ips')}${extra || ''}
-    <div class="calerr" id="pm-err" hidden></div>
-    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Save')}</button></div>`);
+    <div class="foot stfoot"><div class="calerr" id="pm-err" hidden></div><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Save')}</button></div>`);
   md.addEventListener('click', async e => {
     const b = e.target.closest('button[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
@@ -8164,9 +8167,9 @@ function tokModal(done, offer) {
     <div class="row"><label for="tk-name">${tr('Name')}</label><input id="tk-name" maxlength="60" placeholder="${tr('e.g. Home Assistant')}"></div>
     ${scopesHtml(offer || [], ['read'])}
     ${ipsRow('', 'tk-ips')}
-    <div class="row"><label for="tk-exp">${tr('Expires')}</label><select id="tk-exp"><option value="30">${tr('in 30 days')}</option><option value="90" selected>${tr('in 90 days')}</option><option value="365">${tr('in a year')}</option><option value="">${tr('never')}</option></select></div>
-    <div class="calerr" id="tk-err" hidden></div>
-    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Create')}</button></div>`);
+    <div class="foot stfoot"><div class="calerr" id="tk-err" hidden></div>
+      <span class="sfexp"><label for="tk-exp">${tr('Expires')}</label><select id="tk-exp"><option value="30">${tr('in 30 days')}</option><option value="90" selected>${tr('in 90 days')}</option><option value="365">${tr('in a year')}</option><option value="">${tr('never')}</option></select></span>
+      <button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Create')}</button></div>`);
   md.addEventListener('click', async e => {
     const b = e.target.closest('button[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
@@ -10975,6 +10978,7 @@ document.addEventListener('click', async e => {
     case 'mx-mine': mxSet({mine: !mxGet().mine}); break;
     case 'mx-due': mxSet({due: a.dataset.k}); break;
     case 'mx-reset': LS.del('mx'); render(); break;
+    case 'mx-fold': { const p = +a.dataset.p, f = new Set(LS.get('mxFold', [])); f.has(p) ? f.delete(p) : f.add(p); LS.set('mxFold', [...f]); renderView(); $(`.quad[data-quad="${p}"] .qfold`)?.scrollIntoView?.({block: 'nearest'}); break; }
     case 'hint-x': hintDone(a.dataset.k); a.closest('[data-hint]')?.remove(); break;
     case 'trash-empty': if (await askConfirm(tr('Empty the trash permanently?'), trn('{0} task is deleted for good. This cannot be undone.', '{0} tasks are deleted for good. This cannot be undone.', (S.extra || []).filter(t => !t.keep).length), {ok: tr('Empty'), danger: true})) {
       const j = await api('DELETE', '/api/trash'); await load(); render();
@@ -12335,6 +12339,8 @@ function openPalette(mode = null) {
   $('.plist', md).addEventListener('click', e => { const b = e.target.closest('[data-pi]'); if (b) palRun(+b.dataset.pi); });
   $('.plist', md).addEventListener('mousemove', e => { const b = e.target.closest('[data-pi]'); if (b && +b.dataset.pi !== PAL.i) { PAL.i = +b.dataset.pi; $$('.pitem', md).forEach(x => x.classList.toggle('on', x === b)); } });
   palDraw();
+  // 2.15.1 (#633): on touch screens focus at once, still inside the tap (iOS opens the keyboard only then)
+  if (isTouch()) inp.focus();
   setTimeout(() => inp.focus(), 0);
 }
 function closePalette() { $('.palette')?.remove(); }
@@ -14043,8 +14049,7 @@ function agModal(a, done) {
     <div class="shint keep">${esc(trn('{0} list shared with it', '{0} lists shared with it', a.lists.length))}${a.lists.length ? ': ' + esc(a.lists.map(l => l.name).join(', ')) : ''}</div>` : ''}
     ${aiuLimFields(a)}
     ${agRtFields(a)}
-    <div class="calerr" id="ag-err" hidden></div>
-    <div class="foot">${a ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${a ? tr('Save') : tr('Create')}</button></div>`);
+    <div class="foot stfoot"><div class="calerr" id="ag-err" hidden></div>${a ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${a ? tr('Save') : tr('Create')}</button></div>`);
   md.addEventListener('change', e => { if (e.target.id === 'ag-ac') $('#ag-acp', md).disabled = !e.target.checked; });  // 2.4.1 (#377)
   // 2.1.2 (#346): the picture: a preset or none is sent with Save, an own photo (existing agents) is uploaded at once
   const avBox = $('#ag-avpick', md), avMark = k => $$('[data-av]', avBox).forEach(x => { x.classList.toggle('on', x.dataset.av === k); x.setAttribute('aria-pressed', x.dataset.av === k); });

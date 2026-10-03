@@ -58,7 +58,7 @@ async function firefox(fn) {
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v(?:7[1-9]|8[0-9])'/.test(SW), 'service worker cache v71 (2.6.0: v72, 2.6.1: v73, 2.7.0: v74, 2.7.1: v75, 2.7.2: v76, 2.8.0: v77, 2.9.0: v78, 2.10.0: v79, 2.11.0: v80)');
+  check(/const CACHE = 'tasks-shell-v(?:7[1-9]|8[0-9]|9[0-9])'/.test(SW), 'service worker cache v71 (2.6.0: v72, 2.6.1: v73, 2.7.0: v74, 2.7.1: v75, 2.7.2: v76, 2.8.0: v77, 2.9.0: v78, 2.10.0: v79, 2.11.0: v80)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en', tour: 'done'});
@@ -181,10 +181,10 @@ async function firefox(fn) {
       }
       if (W <= 390) check(hd.st || (hd.acn && hd.acn !== 'none'), `${W}px: the agent pill is the bot + a number (2.6.0: or the merged status chip)`);
       await shot(`p252-head-${W}.png`);
-      // K06 / K22: the panel
+      // K06 / K22: the panel (2.15.1, #636: on a phone the date and Today / Tomorrow may get a second row)
       await ev(`openDetail(${T})`); await sleep(700);
       const dp = await ev(`(() => { const d = document.getElementById('detail'), c = d.querySelector('.dtop .chk').getBoundingClientRect(), x = d.querySelector('.dtop .dchip').getBoundingClientRect(), t = d.querySelector('.dtop .dchip .dct');
-        return {sw: d.scrollWidth, cw: d.clientWidth, gap: x.left - c.right, clipped: t.scrollWidth > t.clientWidth + 1, ell: getComputedStyle(t).textOverflow, out: [...d.querySelectorAll('.dtop > *')].filter(e => e.offsetWidth && e.getBoundingClientRect().right > d.getBoundingClientRect().left + d.clientWidth + 0.5).length}; })()`);
+        return {sw: d.scrollWidth, cw: d.clientWidth, gap: x.top >= c.bottom - 1 ? 99 : x.left - c.right, clipped: t.scrollWidth > t.clientWidth + 1, ell: getComputedStyle(t).textOverflow, out: [...d.querySelectorAll('.dtop > *')].filter(e => e.offsetWidth && e.getBoundingClientRect().right > d.getBoundingClientRect().left + d.clientWidth + 0.5).length}; })()`);
       check(dp.sw <= dp.cw && dp.gap >= 0 && dp.out === 0 && (!dp.clipped || dp.ell === 'ellipsis'), `${W}px: panel without sideways scroll, checkbox clear of the date ${JSON.stringify(dp)}`);
       await shot(`p252-panel-${W}.png`);
       await ev(`closeDetail ? closeDetail() : null`).catch(() => {});
