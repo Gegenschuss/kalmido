@@ -306,6 +306,9 @@ shard 4  # ---------------------------------------------------------------- shar
 # pill / Send keep the keyboard, the chat panel at the bottom on resize, the "Feinschliff" items and fewer inline helper
 # texts; jsdom + Firefox at 390 / 428 touch (iOS keyboard), Fold 904 (fold / unfold), 1100 / 1440 / 1920 mouse + keyboard
        run p2132_ui node p2132_ui.js "$KALMIDO_TEST_DATA"
+# 2.13.3 (#478 follow-up, Fold): one search entry per layout (the command-bar field in the sidebar / drawer), no + button in the
+# tablet / Fold-portrait layout after rotating, "No date" removes date + time + reminders + repeat reminder and closes the popover
+       run p2133_ui node p2133_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

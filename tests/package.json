@@ -2,7 +2,7 @@
   "name": "kalmido-tests",
   "private": true,
   "description": "jsdom UI tests for Kalmido (see tests/README.md)",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "devDependencies": {
     "jsdom": "24.1.3"
   }

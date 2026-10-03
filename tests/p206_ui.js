@@ -112,7 +112,7 @@ const TABLET = {'(min-width:600px) and (min-height:600px)': true};
   w = await boot({user: 'alice', hash: 'today', ls: {'tasks.tabbar': JSON.stringify(['m:cal', 'search', 'm:tasks', 'stats'])}}); d = w.document;
   check(!d.querySelector('#rail'), 'no rail');
   const css = await (await fetch(B + 'static/app.css')).text();
-  check(['cal', 'matrix', 'habits', 'pomo', 'time', 'stats'].every(k => d.querySelector(`#side [data-go="${k}"]`)) && d.querySelectorAll('#side [data-go="search"]').length === 1 && d.querySelector('#side .sset'), 'sidebar: every module, search once, settings');
+  check(['cal', 'matrix', 'habits', 'pomo', 'time', 'stats'].every(k => d.querySelector(`#side [data-go="${k}"]`)) && d.querySelectorAll('#side .scmd[data-act="palette"]').length === 1 && !d.querySelector('#side [data-go="search"]') && d.querySelector('#side .sset'), 'sidebar: every module, search once (the command-bar field, 2.13.3), settings');
   // settings: the add select offers agents / stats / time / overview / search / settings
   w.eval(`settingsModal('tabbar')`); await sleep(300);
   md = d.querySelector('.modal.smodal');

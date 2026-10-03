@@ -74,7 +74,7 @@ const CONTRAST = `(() => {
   check(!d.querySelector('#rail') && !d.querySelector('.rbtn'), 'no icon rail');
   for (const g of ['focus', 'views', 'lists', 'team']) check(d.querySelector(`#side .sg-${g} .sgh`), `sidebar group ${g}`);
   const reach = {cal: '[data-go="cal"]', timeline: '[data-act="side-timeline"]', matrix: '[data-go="matrix"]', habits: '[data-go="habits"]', pomo: '[data-go="pomo"]',
-    time: '[data-go="time"]', stats: '[data-go="stats"]', overview: '[data-go="overview"]', agents: '[data-go="agents"]', news: '[data-go="news"]', search: '[data-go="search"]', settings: '.sset[data-act="settings"]'};
+    time: '[data-go="time"]', stats: '[data-go="stats"]', overview: '[data-go="overview"]', agents: '[data-go="agents"]', news: '[data-go="news"]', search: '.scmd[data-act="palette"]', settings: '.sset[data-act="settings"]'};
   for (const [k, sel] of Object.entries(reach)) check(d.querySelector('#side ' + sel), `sidebar reaches ${k}`);
   check(d.querySelector('#top .ttabs [data-act="view-kanban"]') && d.querySelector('#top .ttabs [data-act="view-timeline"]'), 'kanban + timeline as text tabs in the list header');
   check(/Kanban/.test(d.querySelector('#top .ttabs').textContent), 'the view tabs are text');

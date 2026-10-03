@@ -1455,11 +1455,15 @@ function render() {
   document.body.classList.toggle('in-chat', chatFull() && S.route.mod === 'agents' && !!S.route.agent);  // 2.13.0 (#453 P11)
   fitLayout(true); renderSide(); renderTop(); renderView(); renderTabs();
   $('#fab').innerHTML = ic('plus'); $('#fab').setAttribute('aria-label', tr('New task')); $('#fab').title = kt(tr('New task'), 'n');
-  $('#fab').classList.toggle('gone', fabOff() || S.multi.size > 0 || (!!$('#view .qdock') && (tabletDock() || !isMobile())));
+  fabSync();
   if (S.sel && S.tasks.has(S.sel) && !$('#detail').contains(document.activeElement)) renderDetail();
   if (S.sel && !S.tasks.has(S.sel) && !(S.extra || []).some(t => t.id === S.sel)) closeDetail();
   agentLive();
 }
+// 2.13.3: the + button follows rotations / folding too (not only a full render): hidden where the add bar or the header's
+// "New task" is there (tablets, an unfolded Fold in portrait)
+function fabSync() { const f = $('#fab'); if (f) f.classList.toggle('gone', fabOff() || S.multi.size > 0 || (!!$('#view .qdock') && (tabletDock() || !isMobile()))); }
+window.addEventListener('resize', () => { if (S.booted) requestAnimationFrame(fabSync); });
 const MODS = [['tasks', 'done', N_('Tasks')], ['cal', 'cal', N_('Calendar')], ['matrix', 'grid', N_('Matrix')], ['habits', 'habit', N_('Habits')], ['pomo', 'timer', N_('Focus')]];
 // tab bar / rail order is a server setting (same on every device), editable in the settings
 function navOrder() {
@@ -1639,10 +1643,12 @@ function renderSide() {
     ...ppl.map(p => `<button class="srow steam ${onTasks && k === 'who:' + p.id ? 'on' : ''}" data-go="who/${p.id}" title="${esc(tr('Tasks of {0}', p.name))}"><span class="sdot"><i class="pdot"></i></span><span class="n">${esc(p.name)}</span><span class="sk">${tr('Person')}</span></button>`),
     ...ags.map(a => `<button class="srow steam" data-act="team-agent" data-aid="${a.id}" title="${esc(agentHstLine(a))}"><span class="sdot">${hdot(agentHst(a))}</span><span class="n">${esc(a.name)}</span><span class="sk">${tr('Agent')}</span>${a.waiting || a.chat_unread ? `<span class="c nunread">${a.waiting + a.chat_unread}</span>` : ''}</button>`)].join('');
   const grp = (g, label, body, acts = '', n = '', tip = '') => `<div class="sgroup sg-${g}">${head(g, label, acts, n, tip)}${sideOpen(g) ? body : ''}</div>`;
+  // 2.13.3 (#478 follow-up, Fold): one search entry in the sidebar / drawer: the command-bar field (search, commands and the
+  // "Search" view inside); no separate "Search" row any more (it doubled the field in the drawer, the field was missing on
+  // an unfolded Fold)
   $('#side').innerHTML = `
     <div class="sbrand"><button type="button" class="sbhome" data-go="today" title="${esc(tr('Go to Today'))}" aria-label="${esc(tr('Go to Today'))}">${logoSvg(20)}<span>${esc(APP_NAME)}</span></button>${!isMobile() && innerWidth < 1100 ? `<span class="spacer"></span><button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}</div>
     <button class="scmd" data-act="palette" title="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span></button>
-    <button class="srow ssrch ${onTasks && k === 'search' ? 'on' : ''}" data-go="search" title="${esc(kt(tr('Search'), '/'))}">${ic('search')}<span class="n">${tr('Search')}</span></button>
     ${S.me ? `<div class="sdtop"><button class="srow suser" data-act="user-menu" title="${esc(S.me.username)}">${av(S.me.id, S.me.display_name)}<span class="n">${esc(S.me.display_name)}</span></button><button class="iconbtn sgear" data-act="settings" title="${tr('Settings')}" aria-label="${tr('Settings')}">${ic('gear')}${updDot() ? '<span class="dot"></span>' : ''}</button></div>` : ''}
     ${grp('focus', tr('Focus|nav'), focus)}
     ${views ? grp('views', tr('Views'), views) : ''}
@@ -5618,7 +5624,7 @@ function datePop(anchor, id) {
   const instant = dateInstant(), before = snapTask(t);
   const body = () => ({due: st.due, due_time: st.due ? st.due_time : null, reminders: st.due ? st.reminders : '', repeat: st.due ? st.repeat : '', repeat_from: st.repeat_from,
     start: st.due && st.start && st.start < st.due ? st.start : null, duration: st.due_time ? (st.duration || 30) : null,
-    ...(st.due ? {deadline: st.deadline, nag: st.nag} : {deadline: 0})});
+    ...(st.due ? {deadline: st.deadline, nag: st.nag} : {deadline: 0, nag: ''})});
   const msgOf = () => st.due ? tr('Date: {0}', dayLabel(st.due)) : tr('Date removed');
   // instant mode: what was sent last, the running request chain, the dependent tasks the server moved along (first prev)
   const I = {sig: JSON.stringify(body()), timer: null, chain: Promise.resolve(), saved: false, shifted: new Map(), done: false, last: null};
@@ -5710,7 +5716,13 @@ function datePop(anchor, id) {
     const q = b.dataset.q;
     if (q === '0' || q === '1') { st.due = addDays(today(), +q); st.month = st.due.slice(0, 7); redraw(); }
     if (q === 'w') { st.due = nextWeekday(1); st.month = st.due.slice(0, 7); redraw(); }
-    if (q === 'x') { st.due = null; st.due_time = null; st.reminders = ''; st.repeat = ''; st.start = null; redraw(); }
+    // 2.13.3: "No date" removes the date with its time, start, reminders, repeat and repeat reminder in one step and closes
+    // the popover (undo in the toast)
+    if (q === 'x') {
+      st.due = null; st.due_time = null; st.reminders = ''; st.repeat = ''; st.start = null; st.nag = ''; st.deadline = 0;
+      closePop(); if (!instant) await patchUndoable(id, body(), msgOf());
+      return;
+    }
     if (q === 'nostart') { st.start = null; redraw(); }
     if (q === 'notime') { st.due_time = null; redraw(); }
     if (q === 'cust') { st.cust = true; redraw(); }

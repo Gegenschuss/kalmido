@@ -44,8 +44,9 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   // 2.8.0 (#434): no rail; the sidebar holds search / statistics / time / overview / settings once (desktop and drawer)
   check(!d.querySelector('#rail'), 'no rail any more');
   const navK = [...d.querySelectorAll('#side .srow')].map(x => x.dataset.go || x.dataset.act);
-  const want = ['search', 'stats', 'time', ...(w.eval('overviewOn()') ? ['overview'] : []), 'settings'];
-  check(want.every(k => navK.filter(x => x === k).length === 1), 'sidebar: search / statistics / time / overview / settings, each once: ' + navK);
+  const want = ['stats', 'time', ...(w.eval('overviewOn()') ? ['overview'] : []), 'settings'];
+  // 2.13.3: the search is the command-bar field at the top (no "Search" row)
+  check(want.every(k => navK.filter(x => x === k).length === 1) && d.querySelectorAll('#side .scmd[data-act="palette"]').length === 1 && !navK.includes('search'), 'sidebar: search (the field) / statistics / time / overview / settings, each once: ' + navK);
   const css = await (await fetch(B + 'static/app.css')).text();
   check(!/#side \.dupnav\{display:none\}/.test(css.split('2.8.0 "Leitstand"').pop()), 'CSS: nothing in the new sidebar is hidden on the desktop');
 
@@ -252,10 +253,10 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   nw.querySelector('#l-name').value = 'Fresh'; click(w, nw.querySelector('[data-m="save"]'));
   check(await until(async () => (await st()).lists.some(l => l.name === 'Fresh')), 'Create works');
 
-  // ================= (i) sidebar: 2.13.0: search at the top, right under the command bar (no longer in the footer)
+  // ================= (i) sidebar: 2.13.0: search at the top (no longer in the footer); 2.13.3: the command-bar field is the one
+  // search entry (no separate "Search" row next to it)
   const rk = [...d.querySelectorAll('#side .sfoot > *')].map(x => x.dataset.go || x.dataset.act || '');
-  const top = d.querySelector('#side .scmd')?.nextElementSibling;
-  check(!rk.includes('search') && top?.dataset.go === 'search' && rk.includes('settings'), 'sidebar: search right under the command bar, settings in the footer: ' + rk.join(','));
+  check(!rk.includes('search') && d.querySelector('#side .scmd[data-act="palette"]') && !d.querySelector('#side [data-go="search"]') && rk.includes('settings'), 'sidebar: the command-bar field at the top is the search, settings in the footer: ' + rk.join(','));
 
   // ================= (h) time page: the running timer as a card
   const PRJ = (await call('POST', '/api/lists', {name: 'Client X', kind: 'project', color: '#f59e0b'})).id;

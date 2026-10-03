@@ -7,6 +7,20 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.13.3] - 2026-10-03
+
+**In short:** Fold follow-up to 2.13.2: one search field in every layout, no + button next to the add bar after rotating,
+and "No date" really removes the date with its reminders.
+
+### Fixed
+- Search (reported on a Galaxy Z Fold): exactly one search entry per layout. The command-bar field at the top of the
+  sidebar or drawer is it (the "Search" view is inside it); the extra "Search" row is gone (it doubled the field in the
+  drawer, while the field was missing on an unfolded Fold); the header's command bar shows only while the sidebar is
+  folded away.
+- The + button follows rotating and folding: gone in the tablet / Fold-portrait layout with the add bar.
+- Date popover: "No date" removes date, time, start, reminders, repeat and the repeat reminder in one step, closes the
+  popover and offers Undo.
+
 ## [2.13.2] - 2026-10-03
 
 **In short:** Polish from the independent re-review of 2.13.0 (#478): on a desktop the task opens next to the chat
@@ -683,7 +697,1390 @@ of people.
   multi-arch image (`ghcr.io/gegenschuss/kalmido`, linux/amd64 and linux/arm64), an installable web app that works
   offline, English and German.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.13.2...HEAD
+<!-- Versions 1.0.0–2.4.2: released before this repository started (history only; no tags here). -->
+
+## [2.4.2] - 2026-09-30
+
+**In short:** Comments can be read newest first, the *Code* section appears only where it helps, @mentions open a small card
+about the person or agent, a folder switches between its list and one Eisenhower matrix of all its lists, each agent can
+get all your lists (or every new one) in one step after a clear warning, and a setup guide walks you through running an
+AI colleague safely, done by Claude Code or by hand.
+
+### Added
+- **Comment order** (#386): *Oldest first / Newest first* next to *With activity* in the task panel, saved per person on
+  all devices (user setting `comment_order`: `old` | `new`). Newest first reverses the comments and puts the comment box
+  right above the newest one instead of the sticky bottom edge, so answering needs no scrolling.
+- **Clickable @mentions** (#389): a mention in a comment, and `@Name` or `@username` of a list member in a description, is
+  a button (never inside code or links; names nobody has stay plain text). It opens a card with the avatar, the name, the
+  role in the list and the person's other open tasks there, plus *Assign this task* and *Mention*; for an agent its live
+  state, *Open chat* and *Jobs*. List members in the web state carry `username`.
+- **Folder matrix** (#390): a folder view has *List | Matrix* in the header (on a phone *Show as matrix* in "…"); the
+  matrix shows the tasks of all lists of the folder, subfolders included, each with its list chip, and *Show as list* /
+  the switch lead back.
+- **Share with an agent in bulk** (#391): per agent in *Settings > AI colleague*, *Share all existing lists* (every list
+  you own with role *Member*; never the inbox or archived lists; lists you stopped sharing with that agent in the table
+  stay out until you share them there again) and the switch *Share new lists automatically* (off by default; new lists,
+  project types, templates and projects from an agent proposal). Both ask first and say that the agent then sees private
+  lists too. API: `GET /api/agents/{id}/share`, `POST /api/agents/{id}/share-all`, `PUT /api/agents/{id}/autoshare {on}`;
+  stored per person in the server-only user setting `agent_share`.
+- **Setup guide** (#392): *Settings > AI colleague > Setup guide* with two ways: *Let Claude Code set it up* (a prompt
+  filled in with this server, you as the only person who instructs the agent, and an editable token file and Linux user;
+  one click copies it) and *Do it yourself* (the steps with the key commands). The full guide is the new
+  [docs/AGENT-SETUP.md](docs/AGENT-SETUP.md): the agent account and token, a Linux user without sudo, an nftables egress
+  firewall, Claude Code, the MCP server behind a wrapper that reads a 0600 env file, a CLAUDE.md template, a
+  `.claude/settings.json` allowlist, an event monitor with back-off, autostart with a systemd user unit and
+  `mcp/agent_launcher.sh`, the usage hook and a test checklist (mention, chat, kill switch, 7 prompt-injection cases).
+  Linked from the README, docs/AGENTS.md and docs/AGENT-SECURITY.md.
+
+### Changed
+- **Code section only where it helps** (#387): in lists with a connected repository it shows when the task has linked
+  pull requests or commits, is a bug or a feature, or is assigned to an agent; otherwise the task's "…" menu offers
+  *Link code…* (copies the branch name). Lists without a repository never show it. Agent events and the API still
+  carry `repo` as before.
+
+### Removed
+- The *Share a list with an agent…* button in *Settings > AI colleague* (#391): the list table below does the same.
+
+## [2.4.1] - 2026-09-30
+
+**In short:** Admins set how each AI colleague runs (model, auto-compact, a nightly fresh restart, *Reset now*) and
+Kalmido hands it to the agent's host; exactly one agent tidies up a list; the chat shows whether the agent is typing,
+working on a task, waiting for you or offline; the *Wake* buttons are gone and nothing destructive sits next to *Send*.
+
+### Added
+- **Agent runtime settings** (#377): *Settings > AI colleague > (agent) > Runtime*: model (free text with the suggestions
+  opus / sonnet / haiku or a full model id, empty = the agent's default), auto-compact on / off with a threshold
+  (10-100 %), a nightly fresh restart (HH:MM, server time zone) and *Reset now*. Kalmido only stores them:
+  `GET /api/v1/agent` returns `runtime {model, autocompact, autocompact_pct, nightly_reset, reset_seq, timezone}`, a
+  change sends the event `runtime_changed`, *Reset now* raises `reset_seq` and sends `reset`
+  (`POST /api/admin/agents/{id}/reset`, `PATCH /api/admin/agents/{id} {runtime}`); MCP `get_agent` includes it. The
+  host contract is in docs/AGENTS.md (*Runtime settings*), with a reference launcher for Claude Code,
+  `mcp/agent_launcher.sh` (`--model`, `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` / `DISABLE_AUTO_COMPACT`, always a fresh
+  session, restarts on a change, on *Reset now* and nightly; a systemd unit recipe).
+- **Agent status in the chat** (#375): the chat header shows typing dots while the agent writes to you and its state in
+  words: *working on #51* (a link to the task), *working*, *waiting for you*, *ready*, *paused*, *limit reached*,
+  *offline* (no event poll for 5 minutes; stored at most every 30 seconds). New `POST /api/v1/agent/typing
+  {chat_user_id}` (10 seconds, the answer ends it; MCP `chat_typing`); the agent objects carry `online`,
+  `last_poll_at`, `poll_age`, `typing` and `my_job`.
+
+### Changed
+- **One tidy agent per list** (#379): *Tidy up by* in the list dialog and in the *AI colleague* list table picks the
+  one agent (with edit rights) that tidies up a list; only it gets `tidy` events, another agent's suggestion or
+  `POST /api/v1/tasks/{id}/tidy` is refused (`403`). Default: the first agent with edit rights; lists that had tidy on
+  keep the agent that got their events first (one-time migration). API / MCP / events: `tidy_agent_id`
+  (`PATCH /api/lists/{id} {tidy_agent_id}`).
+- **Task panel footer** (#385): *Delete* and *Track time* moved from the footer (on a phone *Delete* sat right below the
+  comment box's *Send*) into the task's *…* menu (*Delete* with undo); a running timer still shows there as its pill.
+- Neutral wording (#384): code comments, the README and the changelog describe what Kalmido does without naming other
+  apps (the importers keep their names).
+
+### Removed
+- **Wake agent** buttons (#376) in the task panel, the Agents view and the chat. `POST /api/tasks/{id}/wake` and
+  `POST /api/agents/{id}/wake` stay, documented for agents without an event loop.
+
+## [2.4.0] - 2026-09-30
+
+**In short:** Folders get subfolders, new projects start from a type (Agency, Software / AI dev, Personal) or from your
+own project template with dates counted from the project start, software projects get bug / feature / task tickets,
+and anything can be captured into the inbox from anywhere: `q`, Ctrl+Space, the app icon menu or a bookmarklet.
+
+### Added
+- **Subfolders** (#361): a folder path of at most two levels (`Clients/Company X`), per person as before (owner row,
+  member row, the order in the setting `folders`). Sidebar tree (a folder's lists, then its subfolders), folded folders
+  in the new user setting `folders_closed` (all devices), drag and drop of lists into subfolders and of subfolders into
+  other folders or to the top level, folder menu *New subfolder…* / *Move into a folder…* / *Move to the top level*;
+  deleting a folder moves its lists and subfolders up one level. The folder view shows the lists of the subfolders too,
+  with a header per subfolder; the command palette lists folders; the list dialog takes `Folder / Subfolder`. API v1:
+  `folder` is the path; deeper paths are refused (`400`).
+- **Project types** (#243): *Agency* (sections Request / Concept / Production / Approval / Billing, fields Client and
+  Budget h, time tracking), *Software / AI dev* (Backlog / Next / In progress / Review / Done, Kanban, ticket types,
+  dependencies, a next-steps dialog for the repository and a coding agent), *Personal* (Ideas / Planning / To do). Names
+  in the person's language; the modules a type needs are switched on (`modules_on`). In the new list dialog, the command
+  palette (*New project…*), the setup (*Start with a project*) and the first welcome card. `POST /api/lists {ptype}`,
+  `POST /api/v1/lists {project_type}`.
+- **Project templates with relative dates** (#328): saving a project list keeps its dates as days after the project
+  start, its dependencies (node keys), ticket types and *Move dependent tasks along*; using it asks for the start and
+  an optional end (`POST /api/templates/{id}/apply {start, end}`: the dates are stretched or squeezed to fit).
+- **Ticket types** (#340): per list (`tickets`, owner), a task `ttype` / API `type` bug | feature | task with an icon
+  chip, a select in the task panel, quick add `!bug` / `!feature` / `!task` (`!fehler` / `!funktion` / `!aufgabe`), a
+  filter, `GET /api/v1/tasks?type=`, MCP `type`, `type` in agent events and webhooks. New bugs / features with empty
+  notes get the list's template (`ticket_tpl`, editable) or the built-in one in the person's language.
+- **Quick capture** (#187): `q` / Ctrl+Space open a capture box anywhere (inbox unless a list is named), the app shortcut
+  *Quick add* (`/?action=capture`), and `/capture`: a bookmarklet popup that saves the page title and address into the
+  inbox with the normal session (the page stays through a sign-in), plus how to bind a system-wide key.
+
+### Changed
+- A `/` in an existing folder name now means a subfolder: existing names with a slash are kept as they were (the slash
+  becomes the look-alike `∕`, once, for every person's folders); imported folder names likewise.
+- List templates keep the dependencies between their tasks (also the ones without relative dates).
+
+## [2.3.0] - 2026-09-30
+
+**In short:** Ask an AI colleague for a proposal instead of letting it create things on its own: a whole project from a
+briefing, subtasks for a big task, a sorted inbox, or tasks (with assignees) from meeting notes. The agent gets exactly
+what you send, answers with one structured proposal, and you tick, edit and apply it: everything belongs to you and one
+undo takes it back.
+
+### Added
+- **Agent proposals** (shared by #260-#263): a person asks an agent from the app; Kalmido creates a job (kind `project`,
+  `subtasks`, `triage` or `extract`, shown in the Agents view) and sends the event `job_request` with exactly the input of
+  the request dialog. The agent answers with `POST /api/v1/agent/jobs/{id}/proposal` (MCP `submit_proposal`, new
+  `get_job`): validated per kind (at most 200 entries, 256 KB, text lengths, ids only from the input, no dependency
+  cycles; `400` with the reason, `unknown_field`, `413`). The person gets a News item and a push *Proposal ready* (new
+  notification row, on by default) and reviews it in a dialog (from the push, the News item or the job): a checkbox per
+  entry (a task's subtasks follow it), inline title / date / section / assignee / list, *Apply n entries* or *Discard*.
+  Applying creates / changes everything as the person (owner, creator, history *created the task from a proposal by
+  <agent>*), one undo / redo step (`POST /api/proposals/{id}/undo` / `redo`: a new project list nobody touched is
+  removed, changed entries stay and are named). The agent gets a `job` event (`approve` with the counts, or `reject`).
+- **Who may ask which agent**: per agent *Proposals for* (Settings > AI colleague): people who share a list with it
+  (default; instance admins count as sharing), everyone, or nobody. At most 10 open requests per person.
+- **#260 Project from a briefing**: *New project from briefing…* (Lists > +, command palette): pasted text or a .txt /
+  .md file (PDF: not yet), optional folder; the proposal brings sections, tasks with dates, priorities, subtasks and
+  dependencies; applied as a new project list owned by the person, optionally shared with the agent.
+- **#261 Break down a task**: *Break down with <agent>…* in the task menu and the palette, with an optional hint; the
+  agent sees the task's title, notes and subtask titles; subtasks with dates, estimates (duration) and dependencies.
+- **#262 Sort the inbox**: select inbox items (bot button in the selection bar) or *Sort the inbox with <agent>…* (all
+  open inbox items, at most 100); the person ticks which of their lists the agent may suggest (default all). Per item:
+  list, section, tags, priority, date, a better title.
+- **#263 Tasks from notes**: *Tasks from notes…* in a list's menu and the palette; the agent gets the notes and the
+  names of the list's people and proposes tasks with assignees, dates and sections (a new section is created on apply).
+- `GET /api/v1/agent/jobs/{id}`; jobs carry `kind` and `proposal_state`.
+
+### Privacy
+- An agent never gets access to the inbox or unshared lists through a proposal: the input is exactly what the person
+  sent, stored with the job and removed with it after 30 days (also when the person is deleted). Only the person who
+  asked sees the proposal.
+
+### Changed
+- Service worker cache v65.
+
+## [2.2.1] - 2026-09-30
+
+**In short:** Admins see every API call an AI colleague makes in an activity log (route, status, duration; never
+content), with filters, denied calls marked and a CSV export. The REST API now names unknown JSON fields instead of
+ignoring them, and a new guide, docs/AGENT-SECURITY.md, explains how to run an agent safely: threat model, host sandbox
+recipe and the prompt-injection checklist we tested with.
+
+### Added
+- **Agent audit log** (#358): every request made with an agent's token (REST API, agent endpoints, MCP calls) is one row
+  in the new table `agent_audit`: time, agent, method, route template (`/api/v1/tasks/{tid}`), status, task / list id
+  from the path or the body, duration. Never bodies or query values. Denied calls (401 / 403 / 429: paused agent, scope,
+  rate or usage limit) are logged and marked. Requests only queue the row in memory, a writer thread stores batches every
+  2 s (cheap on a Pi). Retention `KALMIDO_AUDIT_DAYS` (default 90, `0` = off), removed hourly.
+- **Settings > AI colleague > Activity log** (admins): newest first, filter by agent, status class (2xx / 4xx / 5xx /
+  *Denied*) and day (the app's date picker), *Load more*, CSV export of everything that matches; phone layout with the
+  route on its own line. Non-admins see nothing of it.
+- **API**: `GET /api/admin/agents/audit` (all agents) and `GET /api/admin/agents/{id}/audit` (admin session; `status`,
+  `day`, `before`, `limit`, `format=csv`), `GET /api/v1/admin/agents/{id}/audit` (scope *admin-read*, cursor pages; in
+  the OpenAPI spec as `AuditPage`).
+- **docs/AGENT-SECURITY.md** (#357): threat model, what Kalmido enforces, a host sandbox recipe for Claude Code (own
+  user, nftables egress rule by user id, token in a 0600 env file behind a wrapper, `dontAsk` permissions, CLAUDE.md rules
+  template, back-off in the event loop), the 7-case prompt-injection checklist with OS and kill-switch checks, and our
+  results. Linked from SECURITY.md, docs/AGENTS.md and the README.
+
+### Changed
+- **Unknown fields** (#359): the REST API answers unknown JSON fields with `400` and
+  `{"error": {"code": "unknown_field", "message", "fields": [...]}}` everywhere it refused them before with a plain
+  `invalid`; comments with extra fields now get `unknown_field` too (before: *Expected {"body": "..."}*). `content` is
+  accepted as an alias of `notes` on task create / update (both with different values: 400). The web API (`/api`, the
+  app's own) stays lenient but names ignored fields in the response header `X-Kalmido-Unknown-Fields` and logs one
+  warning per endpoint and set of names per hour (never values); it accepts `notes` as an alias of `content`.
+  **Compatibility:** a v1 client that sent junk fields to an endpoint that refused them already gets the same 400 with a
+  new `code`; clients that check `code == "invalid"` for these cases should also accept `unknown_field`.
+- `POST /api/lists` takes `dep_shift` (*Move dependent tasks along*) at creation (before, only `PATCH` set it).
+- CI: the test suites run in 3 parallel shards (`tests/run_all.sh --shard N/3`), each well under 25 minutes; the
+  overall result still needs all of them.
+- Service worker cache v64.
+
+## [2.2.0] - 2026-09-30
+
+**In short:** Project lists meet GitHub and Gitea / Forgejo: connect a repository and the pull requests (with CI),
+commits and branches show up at their tasks, `fixes #123` in a merged pull request completes the task. It works by
+polling, so a server behind a VPN or in the office LAN needs no public address. And tickets can go to a coding agent: it
+gets the repository and a branch name with the assignment and merges only after a person's 👍 on its *Ready to merge*.
+
+### Added
+- **Git integration** (#271, *Edit list > Repository*, project lists): the list owner and list admins connect up to five
+  repositories: GitHub (github.com or GitHub Enterprise) and Gitea / Forgejo, as `owner/name` or the repository's
+  address; the repository is read at once, so a wrong name or token shows in the dialog. The access token (read-only is
+  enough, optional for public repositories) is write-only and encrypted with `KALMIDO_SECRET_KEY` like the Paperless
+  tokens of 2.1.0; without the key only tokenless repositories can be connected. Agents cannot connect repositories or
+  see tokens. Everyone in the list sees the results; *Check now* for everyone, token / webhook / remove for owner and
+  admins.
+- **Polling** in a background thread (every 180 s per repository, `KALMIDO_GIT_POLL`; a few repositories per tick):
+  the newest 30 pull requests, the newest 30 commits of the default branch, the own commits of up to 3 branches of open
+  pull requests (compare with the default branch) and the CI of up to 5 open pull request heads (combined status +
+  GitHub check runs). ETag / `If-None-Match` (a `304` costs GitHub no rate limit), a pause until the reset when fewer
+  than 25 requests are left or on `403` / `429` rate limits, back-off on errors (interval × 2^failures, at most an
+  hour), no redirects, the SSRF guard of calendar subscriptions (internal servers only on the admin allow-list).
+- **Matching** (tasks of the connected list only): `#<id>` in a commit message, pull request title or description;
+  branches `kalmido-<id>…`, `task-<id>…`, `<id>-slug` (the last path segment). Only linked pull requests / commits are
+  stored (new tables `git_conns`, `git_prs`, `git_commits`, `git_links`, `git_closes`).
+- **Task panel > Code** (after the fields, before the comments): linked pull requests (state, title, author, CI icon,
+  link) and the latest commits (short sha, message), a button that copies the branch name `kalmido-<id>-<slug>`, *<agent>
+  is working on it* while an assigned agent works on the task. **Row chip** with the pull request and its CI. History
+  lines when a linked pull request is opened, merged or closed (not for what already existed at the first check).
+- **Keywords:** `fixes` / `closes` / `resolves #<id>` (also fix, fixed, close, closed, resolve, resolved and German
+  `erledigt`) in a merged pull request or a default-branch commit complete the task, once per task, only for changes
+  after the connection; the history names the pull request / commit and offers *Undo* (`POST /api/tasks/{id}/git-undo`).
+- **Optional inbound webhook** per repository (off by default): `POST /api/hooks/git/<id>`, signed with a per-repository
+  secret (shown once, sealed) as `X-Hub-Signature-256` (GitHub) or `X-Gitea-Signature` / `X-Forgejo-Signature`; it
+  only triggers the next check at once, its body is not used.
+- **Hand a ticket to a coding agent** (#339): task events and `get_task` in a connected list carry `repo` (provider,
+  web / API address, owner / name, default branch, a suggested branch, the linked pull requests with CI and commits).
+  An agent's comment with `suggestion: {kind: "merge_request", pr_url, summary}` (only agents, only pull requests of a
+  connected repository; the pull request is linked at once) shows as *Ready to merge* with the pull request, CI and
+  *Approve* / *Reject* for approvers (list owner, list admins, the assignee, admins). 👍 / 👎 by an approver sets it
+  approved / rejected once and sends the agent the `reaction` event with `approval` and `merge_request`; *Apply* is
+  refused. Kalmido never merges: the agent does, with its own credentials.
+- **API:** `GET /api/v1/lists/{id}/repos`, lists carry `repos`, `GET /api/v1/tasks/{id}` carries `code` and `repo`, tasks
+  carry `code`; OpenAPI (`Repo`, `Code`, `MergeRequestInput`). Web app: `GET` / `POST /api/lists/{id}/repos`,
+  `PATCH` / `DELETE /api/repos/{id}`, `POST /api/repos/{id}/refresh`; the timeline carries `approver`.
+- **MCP** 2.2.0: `list_repos`, `request_merge_approval`; `get_task` documents `code` / `repo`.
+- **Docs:** README *Git integration*, docs/AGENTS.md *Coding agent workflow* with a sample `CLAUDE.md` for a project
+  agent, docs/API.md, mcp/README.md.
+- **Tests:** `p220_api_test.py`, `p220_ui.js` against a fake GitHub + Gitea inside the test container (`fake_git.py`).
+
+### Changed
+- Service worker cache v63.
+
+## [2.1.2] - 2026-09-30
+
+**In short:** Lists can change hands: the owner transfers a list to another person and stays in it as a list admin, and
+admins take over lists whose owner is an agent or a disabled user, which nobody could manage before. Agents get an
+editable username and profile picture and appear in the user list.
+
+### Added
+- **Transfer ownership** (#349, *Edit list > Sharing > Transfer ownership…*, with a confirmation): the owner hands the
+  list to another active person, a member or anyone they could share with. The old owner becomes a member with the role
+  *Admin* (an agent: *Member*, agents are never list admins) and keeps the list where it was in their sidebar; the new
+  owner's member row goes, they keep its folder, place and view (not a member before: the end of their sidebar, top
+  level) and get a News item (*… made you the owner of the list …*, event *Lists shared with me*). Agents never become
+  owners and never transfer; inboxes are never transferred (409).
+- **Admin takeover** (#349): instance admins take over a list whose owner is an agent or a disabled user, for
+  themselves or another person: *Settings > Administration > Lists owned by agents or disabled users > Take over*, and
+  *Take over…* in the list dialog. A non-admin cannot; an admin cannot take a list of an active person.
+- **History** of a list's ownership (new table `list_activity`), shown under *Sharing*: *Ownership transferred from X to Y*.
+- **API:** `GET /api/lists/{id}/owner` (owner, whether you may transfer / take over, the candidates, the history),
+  `POST /api/lists/{id}/owner` and `POST /api/v1/lists/{id}/owner` with `{user_id}` (scope write; agent tokens always
+  403), `GET /api/admin/lists/orphaned` (admins).
+- **Agents** (#346): admins change an agent's username (checked, unique; its tokens keep working) and profile picture
+  (presets, an own photo, `POST /api/admin/agents/{id}/avatar`, or none) in its dialog (*Settings > AI colleague*);
+  `PATCH /api/admin/agents/{id}` takes `username` and `avatar_preset`.
+
+### Changed
+- *Settings > Administration > Users* lists agents too, with the *Agent* badge and *Managed under AI colleague*, which
+  opens the agent dialog instead of the user dialog.
+- Service worker cache v62.
+
+## [2.1.1] - 2026-09-30
+
+**In short:** Agents report their model usage (tokens, optionally the cost) and you see it per agent, day, task, list
+and model in *Settings > AI colleague > Usage*, as a card in the Agents view and on the task. Admins can give each agent a
+soft limit (News + push at 80 % and 100 %) and a hard limit that pauses its API calls until the next day or month. A
+Claude Code hook reports a session's usage by itself.
+
+### Added
+- **Usage reports** (#326): `POST /api/v1/agent/usage` (agent tokens only) with model, input / output / cache tokens,
+  optional cost in USD, the task / list / job it was for and a short note (at most 200 characters). Only numbers and ids
+  are stored, never prompt content. `GET /api/v1/agent/usage?from=&to=&group=day|task|list|model` for the agent itself.
+  MCP tools `report_usage` and `get_usage`. "Tokens" = input + output + cache writes; cache reads are listed apart.
+- **Usage dashboard** (#326, *Settings > AI colleague > Usage*): today / 7 days / 30 days per agent, the last 30 days as
+  a chart, top tasks (click opens the task), per list and per model, in tokens or cost (when reported), for all agents or
+  one. Admins see every agent; everyone else sees the agents they share a list with, counted only in the lists they see
+  (participants: their tasks); what the viewer cannot see is counted without a name. A compact card in the **Agents**
+  view, and an *AI usage* line in the task panel on tasks with reports.
+- **Usage limits per agent** (#326, admins, agent dialog; default none): per day or month, in tokens or USD. The soft
+  limit sends the admins a News item and a push at 80 % and 100 % (once per period; new notification event *An agent
+  reached a usage limit*, admins only). The hard limit tells them too and then answers every API call of the agent with
+  `429`, a clear message and `Retry-After`, except reporting usage, the status and `GET /agent`, until the period rolls
+  over or an admin raises it; the agent shows *limit reached*. `GET /api/v1/agent` has `usage_limit`.
+- **Claude Code usage hook** (`mcp/claude_usage_hook.py`): a Stop hook that sums the usage of a session's new assistant
+  messages from its transcript (state per session, one report per model, optional cost from a price table, the task of
+  the agent's status) and reports it; it never blocks the session. Setup in docs/AGENTS.md.
+
+### Changed
+- The MCP server reports version 2.1.1 and accepts numbers (not only integers) for number arguments.
+- CI also runs the usage hook test in the quick checks job; service worker cache v61.
+
+## [2.1.0] - 2026-09-30
+
+**In short:** One table decides what notifies you (every event as News, as a push, both or neither), and every list
+gets its own bell (*All activity*, *Default*, *Mute*). Paperless can have several connections: server ones where each
+person enters their own token, and private ones only their owner sees, with tokens that are write-only and encrypted.
+Tasks can wait on someone outside with a follow-up day that reminds you, and tells your AI colleague.
+
+### Added
+- **Notification settings** (#317, *Settings > Notifications > What notifies you*): a matrix of events x *News* /
+  *Push*. Events: comments on my tasks (created or assigned), **replies to my comment** (the comment right before is
+  mine, new), comments on tasks I follow (I commented on them), mentions, assignments, **new tasks in shared lists**
+  (created by someone else, new), completions by others, project status, shared lists, unblocked tasks, **an agent
+  waiting for my approval** (News new), the **follow-up day** (below) and reminders (push only). A comment counts once,
+  as the first of mention, my task, reply, follow. The defaults keep the behaviour of 2.0.8 exactly (existing News
+  choices included); of the new ones only replies and follow-ups are on. Pushes for project status and shared lists
+  are new (off by default). News and pushes are filtered in one place on the server. The old setting `news_kinds`
+  stays the News column of the events it knew; the rest is the setting `notify`.
+- **A bell per list** (#317, list menu > *Notifications*, list dialog), only for me: *All activity* (every comment, new
+  task and change of that list as News and push), *Default* (the matrix) or *Mute* (only mentions of me and tasks
+  assigned to me come through, following the matrix). Reminders and follow-ups are never muted. A muted list shows a
+  crossed-out bell in the sidebar. `PUT /api/lists/{id}/bell`; lists carry `bell`.
+- **API:** `GET /api/v1/me` has `notifications` (`events`, `lists`); `PATCH /api/v1/me/notifications` changes them.
+- **Several Paperless connections** (#180). The connection from the environment keeps working unchanged (legacy,
+  *Paperless access*). New:
+  - *Server connections* (admins, *Settings > Users > Paperless connections*): name + address, **no shared token**,
+    and who may use it; every such user enters their own API token (*Settings > Integrations*), so Paperless'
+    permissions apply per person. A new address deletes the stored tokens, taking someone off deletes theirs.
+  - *Personal connections* (*Settings > Integrations > Add my own connection*): name, address, token; only the owner
+    sees and uses them. Admins can neither see nor grant them; no API answer shows them to anyone else.
+  - Tokens are **write-only** (only "•••• set" is ever shown) and **encrypted at rest** (AES-GCM) with the new
+    environment variable `KALMIDO_SECRET_KEY` (32 random bytes, base64), which never goes into the database or a
+    backup. Without it no token can be stored (409 with a hint; the admin settings say so). **Losing the key means
+    everyone enters their tokens again.**
+  - Personal connections go through the SSRF guard of the calendar subscriptions (public addresses, internal hosts only
+    on the admin's allow-list); no Paperless request follows a redirect, so a token only reaches its own address.
+  - Linking and *Send to Paperless* ask for the connection when there is more than one. Links remember it (links from
+    before 2.1.0 belong to the environment connection); people who cannot use it see "Paperless document" only, in the
+    task, its history and the JSON export. The export lists my own connections without tokens.
+- **Waiting on external** (#335, German *Warten auf Extern*): task menu > *Waiting on external…* with a note (who /
+  what) and a follow-up day. An hourglass chip on the row, a bar in the task panel (one click ends it, with undo), the
+  smart view *Waiting on external* in the sidebar while there are such tasks. On the follow-up day (at the all-day
+  reminder time) the person it is for gets a push *Follow up* and a News item, and every agent that follows the task
+  the new event **`followup_due`**. API: `PUT` / `DELETE /api/v1/tasks/{id}/waiting`, `GET /api/v1/tasks?waiting=true`,
+  `waiting` on every task; MCP `set_waiting`, `clear_waiting`, `list_waiting` (and `list_tasks` `waiting`).
+
+### Changed
+- *Settings > Notifications > News* (the checkboxes of 1.9.0) became the News column of the matrix.
+- Service worker cache v60.
+
+### Upgrading
+- Nothing is required. To use server or personal Paperless connections, set `KALMIDO_SECRET_KEY` (see `.env.example`)
+  and keep a copy of it somewhere safe.
+
+## [2.0.8] - 2026-09-30
+
+**In short:** Sort any view by *Created*, answer a comment straight from its notification, see and change which agent
+sees which of your lists (and its tidy mode) in one table, pick values on a phone from app-style sheets instead of the
+system dropdowns, a sloth in the Android notification badge, and agents that need fewer API calls.
+
+### Added
+- **Sort: Created** (#319, German *Erstellt*) in the sort menu of every view, *All* included: newest first; picked
+  again while it is on, oldest first (the item says which). While it is on, the rows show the day each task was created.
+  Stored per view like the other sort modes; a manual drag switches back to *Priority, then manual*.
+- **Reply on comment pushes** (#331, German *Antworten*): a comment or mention notification carries *Reply* (opens the
+  task with the comment box focused; on a phone with the Details / Comments tabs, the Comments tab) and *Done*
+  (completes it in the background, like the reminder's button); a completed task gets *Reply* alone, the summary of a
+  burst of comments gets both. Reminders keep *Done* + *Snooze*; at most two buttons, since some platforms show no more.
+  The link `#reply/<id>` works on its own too.
+- **Settings > AI colleague: your lists at a glance** (#321): every list you manage in one table. *Agent sees it*: one
+  chip per agent, a click shares the list with it (role Member) or, after a confirm, ends the sharing. *Tidy up*: off,
+  suggest or automatic, the same setting as in the list dialog, where an agent is in the list.
+- **Agent API** (#333, asked for by an agent): task events (`mention`, `comment`, `assigned`, `tidy`, `reaction`, `wake`
+  with a task) carry the task's newest 20 comments (`task.comments`, oldest first, texts over 2,000 characters cut,
+  `task.comments_total`) and the list's sections and `agent_tidy` (`list.sections`, `list.agent_tidy`), so an agent
+  needs no `get_task` / `list_lists` round trip. `GET /api/v1/lists` (and MCP `list_lists`) include every list's
+  sections `[{id, name}]`. `GET /api/v1/tasks?fields=compact` returns only id, title, list, section, parent, status,
+  due, priority, tags, list tags and assignee; MCP `list_tasks` has `compact` (not given: pages of more than 25 tasks
+  come back compact). Everything is additive; old clients keep working.
+
+### Changed
+- **Pickers on phones** (#323): a `<select>` opens an app-style bottom sheet like the app's menus: the field's name on
+  top, the options with their emoji, icon or avatar, a check on the current value, a search field above 10 options,
+  arrow keys / Home / End / Enter / Esc. One enhancer covers the task panel (list, section, assignee), the dialogs and
+  the settings. It stays the native select on the desktop, for `multiple` / sized / disabled selects and those with
+  fewer than two options, inside a popover or sheet itself (e.g. the date picker's repeat and duration) and wherever
+  `data-native` is set.
+- **Agent chat on a phone** (#320): sending a message closes the keyboard, so the answer gets the screen; the desktop
+  keeps the focus in the box, and a message that could not be sent keeps it everywhere.
+- **Notification badge** (#325, `static/badge-96.png`, Android's small status-bar icon): the check with the hanging
+  sloth of the app icon as a white silhouette, simplified to read at 24 dp.
+- Service worker cache v59.
+
+### Fixed
+- `mcp/README.md` still sent admins to *Settings > Administration > Agents*; agents live in *Settings > AI colleague*
+  since 2.0.5. `list_lists` promised sections that `GET /api/v1/lists` did not return until now.
+
+## [2.0.7] - 2026-09-29
+
+### Fixed
+
+- Private lists (with collaboration on) show the folded **History** of a task again, as up to 2.0.5: every change,
+  your own included, for example "imported the task from Todoist". It stays separate from the comments, so personal
+  notes still have no activity lines between them.
+- Tests: the new users' `features_rev` is 9 since 2.0.6 (the *Comments* module), and the migration test checks that a
+  user already on revision 9 who switched comments off keeps them off.
+
+## [2.0.6] - 2026-09-29
+
+**In short:** Comments are for everyone now, as personal notes in private lists too, with their own *Comments*
+module; they sit at the end of the task panel with the comment box always at the bottom edge. The desktop rail shows
+exactly your tab bar, *No date* reaches the roadmap and the calendar timeline, focus sessions and the stopwatch get a
+card, and the calendar and multi-select have keyboard shortcuts.
+
+### Added
+- **Comments as personal notes** (#315): comments no longer need collaboration or a shared list. In private lists and
+  with collaboration off they are timestamped notes: no @mentions, no News, no pushes, no history of your own changes
+  (changes others made, e.g. through the API or a public link, still show). Old comments of lists that are no longer
+  shared are normal and editable again. Checklists have no comments.
+- **Module *Comments*** (German *Kommentare*) in *Settings > Modules* and in the setup, on by default (also for
+  existing accounts). Off: no comment UI anywhere (the comments stay stored), new comments are refused (409, also
+  `POST /api/v1/tasks/{id}/comments`), no comment News or pushes for you. With collaboration on and comments off,
+  sharing, assigning, the history and the other News keep working. `GET /api/v1/me` reports `features.comments`.
+- **"No date" in the roadmap and the calendar timeline** (#189): in an open list of the roadmap a folding group
+  *No date* with one row per undated task; click a day to give it a due date, drag for a range (touch: tap, hold and
+  drag). A *No date* chip switches it (on by default, stored with the roadmap settings). The calendar's timeline gets
+  the *No date* switch with the count in its bar.
+- **Focus session and stopwatch as a card** (#190) on the time page, like the time-tracking timer: live time, task,
+  list, start, planned minutes, Pause / Resume, Stop and a link to *Focus*; both cards when a timer runs too.
+- **Keyboard shortcuts** (#191): calendar `1` month, `2` week, `3` day, `4` timeline, `←` / `→` previous / next,
+  `.` today; multi-select Ctrl/Cmd+A selects every task of the view, Shift+↓ / Shift+↑ (or Shift+J / K) extend the
+  selection, Shift+X toggles the focused task, then Space / X completes, M moves, D changes the date of the selection,
+  Esc clears it. All in the `?` overview.
+
+### Changed
+- **Task panel reordered** (#316, #322): description, subtasks, dependencies, tags, attachments, Paperless, the
+  fields (list, section, link, assignee, agent), custom fields, time, and the comments with the history at the end. The
+  comment box sits at the bottom edge of the panel (desktop and phone) and stays visible while you scroll; one line
+  until you use it. Comments are no longer folded to the newest one (2.0.2 / 2.0.3): all show, oldest first; opened
+  from a comment (News, a push), the panel scrolls to the newest.
+- **The desktop rail follows the tab bar setting** (#314): exactly its items in their order, then every switched-on
+  module that is not in it; search and settings at the bottom unless you placed them. Statistics, time tracking,
+  overview, agents, search and settings are no longer hidden in the rail and no longer repeated in the desktop
+  sidebar, which keeps lists, folders, filters, tags and All / Completed / Trash. The phone drawer and tab bar are
+  unchanged. *Agents* can be added to the tab bar.
+- **Tablets in portrait** (#188, under 900 px wide but at least 600 × 600): the composer at the bottom of the list,
+  right above the tab bar, instead of the "+" button; "N" focuses it. Phones keep the "+".
+
+### Fixed
+- **"Share a list with an agent…"** (#318) in *Settings > AI colleague* did nothing: the list menu opened behind the
+  settings dialog. Menus opened inside a dialog now show above it (phone and desktop).
+- Tests: the harness ignores a late rejection after a window was closed only when it is exactly that (a TypeError from
+  the closed window's own scripts), no longer every app error (CI showed `loadJobs()` → `renderView()` in p200_ui).
+
+## [2.0.5] - 2026-09-29
+
+**In short:** Admins can empty the trash of shared lists they work in, notifications handled on one device disappear
+from the others, and the AI colleague (agents) gets its own settings tab.
+
+### Added
+- **Settings > AI colleague** (German *KI-Kollege*). Everything about agents in one tab: what an agent is and how to
+  connect one, the *Agents* module switch (the same switch as in *Modules*, both stay in step), which lists an agent
+  sees (exactly the lists shared with it) with a *Share a list with an agent…* button that opens the list dialog at
+  *Sharing*, and the agents themselves. Admins add, edit, test and pause agents here (moved from *Administration*);
+  everyone else sees the status of the agents that work in their lists. Also in the command palette.
+- **Notifications close on your other devices.** When you complete a task, open it or read its News item on one
+  device, its notification disappears from your other phones and computers. Android and desktop browsers get a short,
+  rate-limited "close" push (only for notifications that were really sent there); on iPhone and iPad (Apple does not
+  allow such silent pushes) the handled notifications are closed with the next notification that arrives.
+
+### Changed
+- **Emptying the trash as an admin.** Instance admins now also delete for good what is in the trash of shared lists
+  of other owners where they may edit (for example lists of an agent). For everyone else the owner rule stays: those
+  items remain in the trash, the trash marks them (*stays*) and says how many stay; after *Empty* a message tells how
+  many items were left and why. `DELETE /api/trash` answers `{deleted, kept}`.
+
+## [2.0.4] - 2026-09-29
+
+**In short:** The Flow marker "Next" becomes *Ready to start*, appears only where tasks actually wait on each other
+and explains itself on a tap; the project status picker shows every status in its colour.
+
+### Changed
+- **Flow: *Ready to start* instead of *Next*** (German *Startklar*). The marker on the first task of a section that
+  waits on nothing now shows only when at least one open task in the view has a dependency (*Waiting on*, inside or
+  outside the view); in lists without dependencies the Flow order stays the same, just without a marker. Tap or click
+  the marker (also on phones, also with the keyboard) for a short explanation: it waits on nothing open and is the
+  first task in the flow order (dependencies, then date, then priority). The tap does not open or tick the task.
+
+### Fixed
+- **Project status picker: status colours.** The options in the *Project status* dialog showed grey dots; each one
+  now has the colour of its status pill (light and dark theme).
+
+## [2.0.3] - 2026-09-29
+
+**In short:** The iPhone home-screen app no longer leaves an empty band under the tab bar, the comment box stays
+visible when the comments are folded, and News can show only the unread items.
+
+### Added
+- **News: *Unread only*** next to *All | Mentions & assigned to me*: hides the items you have already read (one you
+  just opened stays until the next reload); remembered per device, combines with the filter.
+
+### Changed
+- **Folded comments keep the comment box**: folding hides only the older comments; the newest one and the box right
+  below it stay visible, so you can answer without unfolding. A draft no longer unfolds the list.
+
+### Fixed
+- **iPhone home-screen app: empty band under the tab bar** (a gap the height of the status bar). The status bar is now
+  plain black (`apple-mobile-web-app-status-bar-style` `black` instead of `black-translucent`), so iOS gives the page
+  the full height below it. The 2.0.2 workaround that moved the tab bar down is gone (it pushed the bar partly out of
+  the screen). On phones, the area outside the page has the tab bar colour; `theme-color` and the manifest colours
+  match the tab bar. **Already installed on the home screen?** Reload the app; if the band stays, remove the icon and
+  add it again from Safari.
+
+## [2.0.2] - 2026-09-29
+
+**In short:** Comments move right below the description, titles are edited in the list, lists get their own
+pictures, sections a "+", and you see when an agent is writing. Plus fixes for the iPhone home-screen app, dragging in
+long lists and the phone share setup.
+
+### Added
+- **Comments right below the description**, folded to the newest one: the bar *Comments (n)* shows all of them with
+  one click (newest at the bottom, the box below); the choice is remembered per device. Long descriptions fold after
+  about eight lines (*Show more*). Phones get *Details | Comments* at the top of the task panel.
+- **Edit a title right in the list**: double-click it (computer) or press **E** on the focused row; Enter saves (one
+  undo step), Esc cancels.
+- **Keyboard**: arrow keys move through the list (J / K as before), **Space** completes, **Enter** opens, a clearer
+  focus ring; the shortcut help (?) shows the new keys.
+- **Recently viewed**: the last five tasks and lists you opened are at the top of the command palette (Ctrl/Cmd+K).
+- **Own list icons**: a picture instead of the emoji, from presets (the Kalmido icon, the sloths) or uploaded
+  (cropped square, re-encoded without metadata, like the profile pictures). Shown in the sidebar, the header, the tab
+  bar, the palette and list groups. Emojis still work; picking one replaces the picture and the other way round.
+  API: `PUT / POST / DELETE /api/lists/{id}/icon`, `icon` in the list (also in `/api/v1`).
+- **"+" on every section header** (computer: on hover, touch: always): an input right in the section, Enter adds the
+  task there (quick-add syntax works) and stays open for the next one.
+- **Collapse all / Expand all** (sections and subtasks) in the list's *…* menu and with **Shift+C**, remembered per
+  device.
+- **"Claude is writing …"**: while an agent reports *working*, a typing indicator with its status text shows under
+  the last chat message and in the comment area of the task it works on. Everywhere, the agent chip in the top bar
+  and the Agents button (rail, tab bar) get a spinning ring; while an agent waits for you, an accent dot. The chip's
+  tooltip / menu names the agent and what it does. Agents can name the task: `PUT /api/v1/agent/status
+  {"status": "working", "task_id": 51}` (MCP `set_status` too); `GET /api/v1/agent` and `/api/agents` report
+  `status_task` and `job_tasks`.
+- *Share from your phone*: **New token** right there, with a note on what to update afterwards (iPhone shortcut,
+  HTTP Shortcuts import).
+
+### Changed
+- *Share from your phone* offers the **server address without `/drop`** for the iPhone shortcut (it adds `/drop`
+  itself); the guide says so.
+
+### Fixed
+- iPhone / iPad home-screen app: a large empty band below the tab bar on some devices (the layout ended above the
+  screen edge by the height of the status bar). Kalmido now measures the gap and moves the tab bar and the other
+  bottom elements down.
+- Dragging sections (and tasks, and lists in the sidebar) in long lists on a computer: the list now scrolls when you
+  come near its top or bottom edge, faster the closer you get.
+- The iPhone shortcut sent to `/drop/drop` when the address already ended in `/drop`: `POST /drop/drop` is now
+  accepted as well.
+- After *New token* under *Account*, *Share from your phone* in the same open dialog still showed the old token.
+
+## [2.0.1] - 2026-09-29
+
+### Fixed
+- The start guard of 2.0.0 (#279) also refused databases whose only finding in `PRAGMA quick_check` is a NOT NULL /
+  CHECK constraint violation. Such a database is readable: Kalmido starts again and the admin alert reports it, as
+  before. Damaged pages, broken indexes or an unreadable file still stop the start.
+
+## [2.0.0] - 2026-09-29
+
+**In short:** AI agents join the team: agent users that get events by signed webhook or long-polling, report status
+and jobs, chat and wait for your 👍. Reactions on comments, shared list tags, an MCP server, and a new license (AGPL-3.0).
+
+### Added
+- **Agent users** (*Settings > Administration > Agents*, admins): a user type *Agent* for external AI agents and automations
+  (Claude Code, Codex, n8n, a local model, a script). An agent is never an admin, has no Paperless access, cannot log in
+  to the web app and sees only the lists shared with it (roles member, participant or viewer; the 1.10 roles apply).
+  Per agent: API token (shown once), optional webhook URL with its own signing secret, a usage note and an
+  **on / off switch** (kill switch: its token and its events stop at once). An existing user can be turned into an
+  agent and back; its lists, shares and tokens stay.
+- **Agent events**: mention (in a comment, a task title or notes), comment on a task the agent follows, assignment /
+  unassignment, chat message, reaction on the agent's comment, job action, tidy request, **wake** and ping. Delivered
+  as signed webhooks (same signature, retries and delivery log as the user webhooks) and kept for polling:
+  `GET /api/v1/agent/events?since=<cursor>` with **long-polling** (`&wait=<seconds, max 60>`: the request answers as
+  soon as an event arrives).
+- **Wake agent** button in the task panel and in the Agents tab / chat: sends an immediate `wake` event.
+- **Reactions** 👍 👎 ❤️ or any single emoji (+) on comments for everyone who can see the task, with the names on hover / tap. 👍 / 👎 on an
+  agent's comment by the list owner, a list admin, the task's assignee or a server admin counts as **approval /
+  rejection** (sent to the agent, shown in the history).
+- **Agent status** (idle, working, waiting for approval, error, a short text, job counts) reported via the API: a dot on
+  the agent's avatar and a chip in the top bar like the timer (*Claude · 2 running · 1 waiting*) that opens the jobs.
+- **Agents** module / tab (opt-in under *Settings > Modules*): jobs reported by agents (running, waiting, done,
+  failed, stopped) with the linked task and a short log; *Approve*, *Reject* and *Stop* send an event to the agent and
+  show up in the task's history.
+- **Chat with an agent**: a side panel on the desktop, a tab on the phone; one conversation per person and agent,
+  stored on the server, delivered as an event and readable via the API; the agent answers via the API.
+- **Tidy up** per list (*Agent may tidy up entries*: off, suggest, automatic; only for lists shared with an agent): the
+  agent turns long, quickly typed entries into a short title, section, tags and priority. The original text is kept
+  word for word at the top of the notes (**Original (Name):** …). *Suggest* posts a suggestion comment that 👍 (or
+  *Apply*) applies; *automatic* applies it right away via `POST /api/v1/tasks/{id}/tidy`.
+- **Shared list tags**: tags that belong to a list, with a colour per list, visible to all its members, next to the
+  personal tags. In shared lists the tag input suggests list tags first; personal tags show a small person icon; a
+  personal tag can be promoted to a list tag. Filters, the sidebar, the REST API (`list_tags`, `/api/v1/lists/{id}/tags`)
+  and the MCP server handle both; agents may set list tags. Existing tags stay personal.
+- **MCP server** for Kalmido in `mcp/` (stdio and HTTP): list / search tasks, read a task with its comments, create,
+  change and complete tasks, comment, react, report the agent status, read and wait for events.
+- **Quick add understands the list in plain words**: `in list Work` / `in Liste Arbeit` / `to list …` anywhere, and
+  `… in Work` / `… auf Einkauf` / `… into Home Office` at the end when it is exactly the name of a list (otherwise the
+  words stay in the title: "Letter to grandma in Berlin" stays text unless a list is called "Berlin"). The chip shows the
+  list; clicking it keeps the words in the title. `~list` works as before.
+- **docs/AGENTS.md**: the agent protocol (events, payloads, signatures, polling and long-polling, approvals, status,
+  jobs, chat, tidy) with an example for a Claude Code session that works through the API.
+
+### Fixed
+- **Never an empty database on top of existing data** (#279): when `tasks.db` was missing, empty, unreadable or
+  damaged (e.g. I/O errors of a failing disk), Kalmido created a new, empty database on start, and the first visitor would
+  have become the admin. Now the data dir gets a marker (`.kalmido-initialized`, also written on the first start of 2.0 of
+  an existing install); with the marker, attachments or backups present, a broken database makes Kalmido refuse to start
+  (clear log line, exit code 3) until the database is repaired or restored. Only an empty data dir starts fresh.
+
+### Changed
+- **License: GNU AGPL-3.0.** Contributions need a DCO sign-off (see CONTRIBUTING.md).
+- The public git history was squashed into one commit "Kalmido 2.0.0"; the old tags and GitHub releases v1.x were
+  removed (the container images 1.x stay on ghcr.io, pinned tags keep working).
+- `GET /api/v1/tags` lists personal and list tags (`kind`: `personal` / `list`); `?tag=` on `GET /api/v1/tasks`
+  matches both.
+
+## [1.10.0] - 2026-09-29
+
+**In short:** Roles per shared list: admins see and manage everything, participants see only the tasks assigned to them; an assignee column with pictures and one-click assigning, also for subtasks.
+
+### Added
+- **List roles** (*Edit list > Sharing*, a picker with a one-line explanation per role):
+  - **Admin**: sees and changes the whole list and manages the members and their roles (never the owner's).
+  - **Member** (before: *Can edit*): sees and changes every task.
+  - **Participant** (new): sees **only the tasks assigned to them**, with all their subtasks, comments, files and time.
+    When only a subtask is theirs, its main task shows above it as read-only **context** (title, dates, status; no
+    notes, link, files, fields or comments). Sections appear only when they hold one of their tasks. A participant may
+    add tasks to the list (they are always assigned to themselves) and subtasks under their tasks, edit, complete and
+    comment on them; they cannot delete tasks, move them to another list, hand them to someone else, or change
+    sections, the list, its members or the project status.
+  - **Viewer** (before: *View only*): sees everything, changes nothing (may comment).
+  - The owner keeps everything only the owner could do: rename, type, archive, delete, public link, custom fields.
+- The participant rule is enforced on the server for **every** way to read data: the app state and sync, single tasks,
+  subtasks, search, completed and trash, filters and smart lists (built from that state), tags, calendar repeats and
+  the ICS feed, the roadmap, project progress, the overview, time entries / report / CSV, templates, the export,
+  comments and files, dependencies, News, pushes, reminders and the daily digest, the REST API (all endpoints, also
+  paging), webhooks (a participant's webhook fires only for their own tasks) and the undo history (checked per task).
+- **Assignee column** in list, section, folder, filter and search views: the assignee's picture (or a dashed circle for
+  nobody) on every task of a shared list; a click opens the assign menu (owner, admins and members). On phones a compact
+  cell at the end of the row. Hide it per list: list *…* > *Hide assignee column*.
+- **Subtasks can be assigned on their own** (from the subtask rows in the task panel or its own panel), independent of
+  the main task; a participant assigned only to a subtask sees it with its main task as context.
+- API: `role` may be `admin` and `participant` too (`PUT /api/lists/{id}/members`); tasks carry `context: true` for a
+  participant's read-only main task.
+
+### Changed
+- The roles *Can edit* and *View only* are now called **Member** and **Viewer**; the stored values `edit` / `view` and
+  what everybody sees stay exactly the same (nothing to migrate). List admins can moderate comments like the owner.
+
+## [1.9.0] - 2026-09-29
+
+**In short:** Share photos, files and links from your phone in two taps, profile pictures (sloths or your own photo), a News inbox that works like mail, deleting a tag everywhere, a refresh button for shared lists, and dialogs that stay put on the Galaxy Fold.
+
+### Added
+- **Share from your phone** (*Settings > Integrations > Share from your phone*). Android: *Download HTTP Shortcuts
+  import* gives a ZIP made for you (address + `/drop`, your upload token, the Kalmido icon) with two shortcuts, *Kalmido*
+  for photos and files (several at once) and *Kalmido text* for links and text; import it in the HTTP Shortcuts app and
+  share. iPhone / iPad: copy buttons for the address and the token and a step-by-step guide for the Shortcuts app; a
+  signed generic shortcut can be linked with `KALMIDO_IOS_SHORTCUT_URL` (the button is hidden while it is empty).
+- **Profile pictures** (*Settings > Account*): ten sloth presets (coffee, headphones, camera, sleepy, laptop, plant,
+  robot, sunglasses, party, reading) or your own photo, cropped square in the browser; the server resizes it to 256 px,
+  turns it upright and stores a fresh JPEG without EXIF / GPS data (below the attachments, so backups include it).
+  Shown wherever the initials were: sidebar, assignee chips, comments, mentions, News, members, time entries and the
+  user list. Only you, admins and people sharing a list with you can load your photo. Admins can set a preset for
+  another user (e.g. an API bot user).
+- **Delete a tag completely:** right-click or long-press a tag in the sidebar (or "…" in the tag view) > *Delete tag…*;
+  the dialog says on how many tasks it is, removes only your tag (tasks stay, other people's tags too), one undo step.
+- **Refresh for shared lists:** a button in the header on desktop, *…* > *Refresh* and pull-to-refresh on touch. (The
+  app keeps polling for changes every 4 seconds while it is visible.)
+- **News like a mail inbox:** unread items bold, *×* (desktop) or a swipe (touch) removes one item, the filter *All |
+  Mentions & assigned to me*, and *Settings > Notifications > News* chooses which events create News (mentions,
+  assignments, comments on my tasks, unblocked, sharing, project status, completions by others). Completions by others
+  are off by default now.
+- API: `GET /api/v1/admin/status` also returns `update_checked_at` and `update_error`.
+
+### Changed
+- *Settings > Administration* starts with the users (and *New user*).
+- The open task shows new comments while you are typing in it (the rest of the page still waits until you are done).
+
+### Fixed
+- **Update check reported an old release** (e.g. `latest_version` 1.2.0 while 1.8 ran): the result was cached for a
+  day and survived updates, so a check made before the update was still shown, and after a failed request (GitHub's
+  rate limit for anonymous requests) the old value stayed. Now a cached release older than the running version is never
+  reported, the check runs again right after an update, every 6 hours, and an hour after a failure.
+- **News showed "Loading…" forever when there was nothing** (or with collaboration off): an empty feed now says
+  *No news*, and *Loading…* only shows while a request runs.
+- **Dialogs slid down on the Galaxy Fold** after the on-screen keyboard closed (e.g. *Create API token*): dialogs now
+  follow the visual viewport and centre again when the keyboard opens or closes.
+
+## [1.8.1] - 2026-09-28
+
+**In short:** The Inbox comes first and is where the app opens, completed tasks are shown everywhere unless you hide them per view, and the sign-in and setup screens are centered on tablets.
+
+### Changed
+- **Inbox first.** The Inbox is the first smart list in the sidebar and the phone drawer (before Today, Tomorrow,
+  Next 7 days and Now doable), in the tab choices (*Settings > Appearance*) and in the command palette, and it is the
+  start view: the app opens on the Inbox until you open another task view (after that it reopens on the last one, as
+  before). When the open list goes away (archived, deleted, left), the app goes to the Inbox instead of Today. The
+  welcome tour says so.
+- **"Show completed" is per view only.** The global switch in *Settings > General* is gone: completed tasks are shown in
+  every list, filter and smart list, and you hide them where you do not want them (*Hide completed* in the view's "…"
+  menu, the sort menu or the command palette). Choices you made per view stay. The stored global value is removed on
+  the first start.
+- **Calendar: its own "Completed" toggle** in the bar of the month, week and day view (also in the command palette),
+  shown by default, per user and synced like the other views (entry `cal` in the setting `show_done_views`), undoable.
+
+### Fixed
+- **Sign-in and first-run setup centered on tablets in portrait** (for example a Galaxy Fold unfolded): below 900 px
+  width these screens were a bottom sheet with the empty space above; they are now centered at every size, rounded on
+  all corners and opaque in the light theme too (the app behind showed through).
+- A welcome tour card without a target is centered on the screen instead of sitting at 30 % from the top.
+
+## [1.8.0] - 2026-09-28
+
+**In short:** New accounts can start with a realistic sample project that shows the project features, and remove it again in one click.
+
+### Added
+- **Sample project.** *Example: Image film for client Muster*: a project list with the sections Concept,
+  Pre-production, Shoot, Edit and Approval, 15 tasks and 3 subtasks with dates relative to today (overdue, today, next
+  week, undated), start dates and durations for the timeline, four dependencies (so *Flow*, *Now doable* and the
+  timeline arrows have something to show), priorities in all four matrix quadrants, a Markdown description with a
+  checklist, tags, a weekly status call, a comment, two pinned custom fields (budget, effort), a 1.5 h time entry and
+  the project status *On track*; plus the checklist *Example: Shoot day packing list*. In the user's language (English,
+  German), and only with the modules that are on: without the project modules it is a plain list without
+  dependencies, fields, time or status.
+- **Where it is offered:** setup step 2 has *Create a sample project* (ticked for *Projects & team*, unticked for
+  *Simple list* and *Just me*, a manual choice wins); the first card of the welcome tour of every new account offers
+  it too (ticked when dependencies, custom fields or time tracking are on; asked once, not again after the setup
+  decided it); *Settings > Data > Sample project* and the command palette create or remove it at any time.
+- **Removing** asks with the app's own dialog, naming the lists and the number of sample tasks, and removes exactly
+  what the sample created (recorded on the server): sample tasks also when you edited them, including the done copies
+  of the repeating task, its sections, fields and time entry. Tasks you added stay (also subtasks below a sample task,
+  which become main tasks), and with them their list, section and custom field.
+- **Quiet and private:** the sample belongs to the user alone, sets no reminders, creates no activity, News, pushes or
+  webhook events, and its tasks are left out of the daily digest. Creating it twice does not duplicate it.
+- API (app): `POST /api/sample` (idempotent: `{created: false, exists: true}` while one exists), `DELETE /api/sample`,
+  `sample` in `GET /api/state`, `sample: true` in `POST /api/admin/setup`.
+
+## [1.7.1] - 2026-09-28
+
+**In short:** Lists scroll to the end again on phones, and the Markdown syntax moved from the description box into Help.
+
+### Fixed
+- **Phones: the last rows of a list sat under the tab bar** and a list only a little longer than the screen (for
+  example *Tomorrow* with a few tasks and subtasks) could not be scrolled at all. Since 1.5.3 the docked composer set
+  the list column's bottom padding to 0, also on phones, where the composer is hidden (the + button is used there).
+  That padding now only goes away on wider screens with the docked composer. New suite `tests/scroll_ui.js` (Firefox
+  headless, skipped without Firefox) checks every view at 360 × 780 and 390 × 844 with touch: the last line clears the
+  tab bar and the + button, the scroll box can scroll and no touch handler cancels a vertical drag.
+
+### Changed
+- The task description box just says **Description** (German *Beschreibung*) instead of listing Markdown syntax.
+- **Settings > Help > Formatting (Markdown)** lists what descriptions understand: bold, italic, strikethrough, code,
+  links (`[text](https://…)` or a plain address), headings `#` to `###`, bullet and numbered lists and checklists
+  `- [ ]` / `- [x]` (tick them in the formatted text), plus the button that turns open checklist items into subtasks.
+  With collaboration on it adds that comments understand bold, italic, strikethrough, code and links, line breaks and
+  @mentions, but no headings, lists or checklists.
+
+## [1.7.0] - 2026-09-28
+
+**In short:** A "Flow" sort that follows the dependencies, all overdue tasks moved in one click, and the smart list "Now doable".
+
+### Added
+- **Sort mode "Flow"** (sort menu; German *Ablauf*; only with the dependencies module): a topological order by
+  *Waiting on*, so a task always comes after the open tasks it waits on inside the view; ties by start date (a task
+  without one starts on its due date), due date and time, priority, then manual order. The first task of each group
+  that waits on nothing gets a subtle *Next* marker; waiting tasks keep the lock and "Waiting on …". Lists order
+  within each section, filters and Today / Next 7 days show one sequence instead of date groups. Dependencies on
+  tasks outside the view are ignored for the order. A circle of dependencies (only possible in old or imported data)
+  falls back to date order with one hint. Project lists use Flow by default while you have not picked a sort (list
+  view; kanban and timeline keep theirs); with the module off the option is hidden and the old default applies. A
+  manual drag switches the view to *Priority, then manual*, like Date and Title do.
+- **Overdue in one click** on Today: when overdue tasks are shown, a compact banner *n overdue → Today / Tomorrow /
+  Next week (Mon) / Pick a date…* moves all of them at once. Only the day changes (time, reminders and repeat stay,
+  like the date popover), tasks in lists you may only view are skipped and counted in the toast, and the whole move is
+  one undo step (one batch request). The × hides the banner until tomorrow on that device. Only on Today.
+- **Smart list "Now doable"** (German *Jetzt machbar*, `#doable`, `g d`): open tasks that wait on nothing, are due
+  today, overdue or undated (an undated subtask follows its parent), do not start later, are not in an archived list, and are yours: assigned to you, or
+  unassigned in a list you own (with collaboration off: every task). Sorted by Flow (by date without the dependencies
+  module). In the sidebar after *Next 7 days* with its count, in the command palette, the shortcuts overlay and the
+  pinnable tabs.
+
+## [1.6.1] - 2026-09-28
+
+**In short:** "Archived" is now a plain sidebar row like Trash that opens a view of all archived lists.
+
+### Changed
+- **Archived lists get their own view.** The folded *Archived (n)* row with its chevron is gone: *Archived* is a
+  plain row in the sidebar footer like *Trash* (icon, name, count; only when there is an archived list, phone drawer
+  too) and opens *Archived* (`#archived`). It lists every archived list with its colour or emoji, name, folder, open
+  and completed tasks, the day it was archived and, for a shared list, its owner. Per list: *Open*, *Restore*
+  (undoable) and *Delete permanently…* (owners, with the dialog that names what is lost). Archived lists no longer
+  show up one by one in the sidebar; while one is open, the *Archived* row is highlighted. The fold state kept on
+  the device is dropped.
+- Lists remember when they were archived (`archived_at`, set on archive, cleared on restore; lists archived before
+  1.6.1 show no date).
+
+## [1.6.0] - 2026-09-28
+
+**In short:** Docked quick add, undated tasks in the timeline, bigger timeline bars, a filterable matrix, tooltips instead of helper lines.
+
+### Added
+- **Quick add docked at the bottom** of the list column (desktop and tablet; phones keep the + button): a card with
+  an accent "+", *Add task…*, the `N` key badge and the template button. Focused, it shows chips for date, list and
+  priority (from what you type and the view; a click changes them and wins over the text) and the recognised tokens.
+  Enter adds and keeps the focus, Esc leaves. Lists, folders, filters, Today and Next 7 days; not kanban, matrix or
+  calendar. The old input on top is gone.
+- **Undated tasks in the timeline.** Per list a folding *No date (n)* group with one row per task (subtasks under
+  their parent) and an empty dashed track: click a day = due that day, drag across days = start and due (touch: hold,
+  then drag). *Remove date* in the bar menu, or drop a bar on *No date*. Every change is one undo step. Header switch
+  *No date* per device, on by default in project lists. Waiting tasks show *waits for …*; auto-shift ignores them.
+- **Matrix scope.** *All lists ▾* picks a list, a folder or a saved filter (same filter engine); chips *Only mine*
+  (with collaboration) and *Due by* (overdue and today, 7 or 30 days); remembered per device, shown in the title with
+  an × to reset. *Show as matrix* in the "…" menu of lists, folders and filters; quick add in a scoped matrix goes
+  into that list (or the folder's first list).
+- *Settings > Appearance > Show tips again* brings back the one-time hints on this device.
+
+### Changed
+- **Timeline and roadmap bars are taller** (34 px, 44 px on touch), the resize handles reach past the bar ends, a
+  1-day bar keeps a minimum width, the dependency dot is bigger and sits outside the bar end.
+- **Tooltips instead of helper lines:** the empty checklist *Done* hint, the attachment drop hint, the timeline's
+  date-range hint, the custom-fields hint and the Filters placeholder became tooltips (touch screens show them once,
+  with ×); the habit day hint disappears after the first tapped day; the owner note of a shared list is a lock icon.
+  Tooltips name the keyboard shortcut (`G T`, `D`, `X`, `T`, `Shift+T`, `N`, …).
+
+### Fixed
+- CI of 1.5.2: a list colour in a group header now goes through `cssColor`, the stylesheet uses rem only.
+
+## [1.5.2] - 2026-09-28
+
+**In short:** Folder view, "Delete completed…", running timer card on the time page, archived lists folded in the sidebar.
+
+### Added
+- **Folder view.** Click a folder's name in the sidebar to see the open tasks of all its lists in one view, grouped
+  by list (with the list colour); the chevron still folds the folder. Own address (`#folder/<name>`), can be pinned
+  as a tab, has its own *Show completed*, sorting and selection; quick add goes into the folder's first list.
+- **"Delete completed…"** on the *Completed* view: all, or those completed more than 30 / 90 days ago, go to the
+  trash (restorable, one undo step). Only what you may change; items of checklists stay; the dialog says what stays.
+- **Running timer on the time page.** While a timer runs, *Time tracking* opens with a large card: the live time,
+  the task (a click opens it), its list or project with colour, the start time and the note, *Stop timer* and *Open
+  task*. Nothing running: a short *No timer running* with the tasks you tracked most, one tap starts the timer again.
+  Stacks on phones.
+
+### Changed
+- The search button in the icon rail (shown while the sidebar is folded) sits at the bottom, right above Settings.
+- **Archived lists fold into one row** *Archived (n)* in the sidebar footer (phone drawer too); a click unfolds it,
+  remembered per device. An archived list you have open stays visible.
+
+### Fixed
+- `tests/checklist_ui.js` still clicked the list dialog's old *Save* button (CI of 1.5.1).
+
+## [1.5.1] - 2026-09-28
+
+**In short:** One-tap Today / Tomorrow, "Show completed" per list, archived lists stay out of the way, no duplicate navigation.
+
+### Added
+- **One tap "Today" / "Tomorrow".** Two buttons on top of the task menu (long-press, right-click, the row's "…"), next
+  to the date in the task panel and in the selection bar; on the keyboard `t` / `Shift+T` for the focused, open or
+  selected tasks (listed in the shortcut help). Only the day changes: time, reminders and repeat stay (a recurring
+  task just moves, like in the date dialog). One step in the undo history.
+
+### Changed
+- **"Show completed" per view.** Every list, filter and smart list (Today, Tomorrow, Next 7 days, Inbox, All,
+  Assigned to me, tags) has its own *Show completed / Hide completed* in its "…" menu (also in *Sort…* and the command
+  palette), stored per user on the server (it follows you to every device, the other members of a shared list keep
+  their own) and undoable. A view without its own choice follows the old setting (*Settings > General*), which the
+  calendar keeps using. Tomorrow, Next 7 days, All, Assigned to me and filters now have a *Completed* group too.
+  New user setting `show_done_views` (json map view -> 0 / 1).
+- **Archived lists stay out of the way.** Their tasks no longer show up in Today, Tomorrow, Next 7 days, Assigned to
+  me, filters, tags, the calendar (incl. repeats), the matrix, the overview, counts and the command palette; they get
+  no reminders, are left out of the daily digest, the calendar subscription (ICS) and the overdue trend of the
+  statistics. Opening the archived list still shows them; restoring it brings everything back.
+- **The list dialog saves itself** like the settings: every change applies at once, *Saved · Undo* in the header, one
+  history step each; no *Save* / *Cancel* any more (a new list keeps *Create*).
+- **The first weekday of your region** (Monday in Germany, Sunday in the US) now also applies to the timeline, the
+  roadmap, the statistics (weekly bars and heatmap; `GET /api/stats?ws=0..6`) and the time reports (*This week*).
+- **No duplicate navigation on desktop.** Statistics, time tracking, overview, search and settings appear once: in
+  the sidebar footer while the sidebar is visible, in the icon rail only while the sidebar is folded into it.
+
+### Fixed
+- The calendar did not show the repeats of a task that just got (or changed) its repeat, was completed or was
+  changed on another device until the visible range changed; the repeats now refetch with every such change and
+  the old ones stay visible while loading.
+
+## [1.5.0] - 2026-09-28
+
+**In short:** Usability: settings save themselves, own date picker, archive lists, slimmer checklists, tablet layout.
+
+### Changed
+- **Settings save themselves.** Every switch, choice and field applies at once (text and numbers when you leave the
+  field, press Enter or pause typing; closing the dialog saves what is still pending) and shows *Saved · Undo* in the
+  dialog header. Each change is a step in the undo history (*Changed setting: …*), including appearance, the tab bar,
+  the display name, the language, admin switches, admin alerts and backups. No *Save* buttons any more.
+- **One Modules page.** *Settings > Modules* lists every module with one sentence, grouped (views, for you, projects
+  and team, connections); focus and time-tracking options fold out under their module, and admins get the *for
+  everyone* switch next to collaboration and time tracking. *Layout*, *Collaboration*, *Focus* and *Time tracking*
+  are gone as tabs (9 sections instead of 12; the tab bar moved to *Appearance*, *Users* is now *Administration*).
+- Developer things (upload token, API tokens, webhooks, `/drop`, allowed internal hosts, rule texts) sit under a
+  folded *Advanced · for developers*; the ntfy details show only when ntfy is a channel; push priority in words
+  (*Normal*, *Loud*, *Urgent*).
+- **Archive instead of delete.** *Delete* in list menus and the list dialog is now *Archive* (undoable). Deleting for
+  good is only possible for archived lists, with a dialog that names what is lost; the server refuses `DELETE
+  /api/lists/{id}` for a list that is not archived (409).
+- **The app's own dialogs** replace every browser `confirm()` / `prompt()`: title, what happens, a red action for
+  destructive ones, Esc = no. What can be undone (deleting selected tasks, removing a link, clearing done checklist
+  items) no longer asks and offers *Undo* instead.
+- **Own date and time pickers** everywhere (task dates, start, repeat end, time entries, reports, custom date fields,
+  templates, habits, public links, settings): in the app language, the week starting on your locale's first day,
+  12 or 24 hours as your locale has it, typing a time (`930`, `9:30 pm`, `21 Uhr`), full keyboard and touch support.
+  Month calendar and week view start on the same day. Stored formats are unchanged.
+- **Custom repeat** is a small form (every n days / weeks / months / years, weekdays); the RRULE text is an expert
+  field under *Advanced*.
+- **Checklist items** get a slim panel: title, note and (shared, with collaboration) the assignee. Nothing else is
+  shown; the data stays.
+- **Comments only in shared lists.** In a private list the comment box is gone; comments from when the list was shared
+  stay readable, folded and read-only. The activity switch says what it shows (*With activity* / *Comments only*).
+- Task panel footer: no focus button (start focus from the task menu or the Focus page); *Track time* and *Delete*
+  carry text; a running timer shows its time on the stop button.
+- **Header:** the list title keeps its room, the running indicator shrinks to icon and time, *Select* and *Sort* moved
+  into the header's “…” menu together with the list menu. Phones and touch tablets: *Undo: …* / *Redo: …* at the top
+  of that menu instead of the ← → buttons (desktop keeps them). The running indicator is neutral with a pulsing accent
+  dot (red stays for “overdue”) and no longer repeats in the settings header. Offline / sync is translated, an icon
+  with a count on phones.
+- **Fold and tablets:** while a task panel is open and the list would get narrower than about 420 px, the sidebar folds
+  into the icon rail; its new *Lists and filters* button opens it as an overlay. Touch tablets use the compact view
+  switch and hide the keyboard search button.
+- Desktop sidebar: no second copy of what the rail has (statistics, time, overview, search, settings); tags fold.
+  Phone drawer: account and a settings gear at the top.
+- Habits: the grid shows the last 7 days up to today; on phones the name sits above its days. *New habit* is a
+  labelled button below the list.
+- Setup: the single modules are under *Customize…*, *Skip* is gone, *Start* stays in view, sign-in fields have labels.
+- Welcome tour: the keyboard step only with a mouse, the project hint only for admins and teams, no line break inside
+  `!high`.
+- Time report: one tile with time and decimal hours, *today* only when the range is longer than today.
+- Command palette: no “action” word on every row.
+
+### Added
+- Quick add says when a date and the repeat do not match (*first on Tue, then every Monday*).
+- *Turn the open checklist items into subtasks* for “- [ ]” lines in a description (one undo step); those checkboxes
+  now look like the app's own.
+
+### Fixed
+- Touch targets are at least 44 × 44 px on touch screens (header icons, checkboxes, habit cells, sidebar buttons,
+  calendar days, switches, menus).
+- Light theme: the red of overdue counts and danger actions is one step darker (AA on the highlighted row, was 4.43:1).
+- Settings tabs on phones: the current tab is never cut off at the edge.
+
+## [1.4.0] - 2026-09-28
+
+**In short:** Undo history: step back and forward through every change, by keyboard or menu.
+
+### Added
+- **Undo and redo history** per device: ← / → in the top bar (on a phone in the header) step back and forward
+  through the last 30 changes, kept until the page is reloaded. The tooltip names the step (*Undo: Completed “Pay
+  invoice”*); a right-click or long-press on ← (or →) lists the last ten steps, and picking one undoes everything up
+  to it in order. Keys: Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z and Ctrl+Y, at any time, but never inside text fields (the
+  browser's own text undo keeps working there). A new change clears the steps forward; the six-second *Undo* toast
+  stays as a shortcut to the newest step.
+- Now undoable (and redoable) as well: title, description, tags, priority, assignee, link and custom field values
+  (typing is one step per field until you leave it), creating a task (undo moves it to the trash) and subtasks, *Skip
+  this occurrence*, sections (add, rename, delete with their tasks at their old place, reorder), lists (type, name,
+  colour, view, *Move dependent tasks along*, hourly rate, archive, folder, order), next to everything that already had
+  an undo (completing, deleting, moves, dates, batch actions, moving a project, dependent tasks, time entries).
+- Conflict safety both ways: a field changed in the meantime, on another device or by another member, is left alone
+  and reported (*Changed elsewhere, not undone: …*); a task someone else changed after it came back from the trash is
+  not deleted again; a section is only removed while it is still empty and unchanged. Steps with several tasks are one
+  transaction. Offline, a step that has not been sent is taken out of the queue; otherwise undo and redo are queued
+  (a dot on the button while they wait). Steps in lists that became view-only are refused.
+
+### Changed
+- On phones the list's view switch shows only the current view; a tap on it offers the others (room for ← / →).
+- Web app API: `POST /api/tasks/batch` reports `conflicts` (per task and field, custom fields as `field:<id>`) and
+  the server time; `complete` takes `expect` (the date it should still have), `reopen` returns undo payloads, `delete`
+  takes a `guard` (not if someone else changed the task after that time). Sections: `POST` takes `sort` and `tasks`,
+  `PATCH` and `DELETE` and the order endpoint take the expected state as `_prev`, `DELETE` returns the section and its
+  tasks. `PATCH /api/lists/{id}` and `POST /api/lists/reorder` take `_prev` too. A `_prev` for custom field values is
+  checked per field.
+
+### Fixed
+- *Events today* (calendar subscriptions) no longer shows on Today while the Calendar module is off, and its setting
+  is hidden then too.
+- The roadmap label reads *29%* without the wide gap in the monospaced font.
+- Tests: `time_api_test.py` fails with a non-zero exit code, and its statistics check no longer breaks on the Monday
+  after the seeded week.
+
+## [1.3.0] - 2026-09-28
+
+**In short:** Roadmap of all projects, moving whole projects, section and sidebar drag and drop on touch.
+
+### Added
+- **Roadmap**: *All* has a view switch *List | Timeline* (with the timeline module). The timeline shows every list
+  on one chart for rough project planning: lists grouped by folder, one row per list with a **summary bar** from the
+  earliest start (or due date) to the latest due date of its open tasks, drawn as a bracket in the list's colour and
+  filled by the project progress (with the progress module). Click a name to collapse a list to that one row; *Collapse
+  all* / *Expand all*; with five or more projects they start collapsed. Filters: *Projects only* (on as soon as one list
+  is a project), *Hide done*, an assignee (with collaboration) and a list / folder picker. Zoom *Week*, *Month* or
+  *Quarter* (week columns, month labels) with *Today* and back / forward. View, zoom, filters and what is collapsed
+  are saved per user, so they follow you to every device.
+- **Move a whole project**: drag its summary bar, or long-press it on a phone (*Move project by…* in days or weeks,
+  also in the bar's menu and with **M** on a focused bar). Every open task with a date in that list, subtasks too,
+  moves by the same number of days and keeps its length; tasks without a date stay. Tasks in other lists that wait on
+  it follow when their list has *Move dependent tasks along* on. One toast (*12 tasks moved*), one *Undo* for all of
+  it. Needs edit rights on the list; at most 500 dated tasks at once.
+- Dependency arrows across lists in the roadmap; into a collapsed list they attach to its summary bar, several
+  merged into one arrow with a count.
+- API: `GET /api/v1/roadmap` (groups with summary spans, progress and dated tasks; `from`, `to`, `projects_only`,
+  `include_done`) and `POST /api/v1/lists/{id}/shift` with `{days}` (write scope, one transaction).
+- **Sections by drag and drop:** drop a task on a section header (it goes to the top of that section; a subtask
+  becomes a standalone task there), empty sections show *Drop tasks here* while you drag, and sections are reordered
+  by the handle on their header, in the list view and on kanban columns (one request, one *Undo*; *Move up / down*
+  in the section menu uses the same). On a phone: long-press a task for *Move to section…*, a section header for
+  *Move section up / down*.
+- **Sidebar drag and drop on touch:** long-press a list and drag it to reorder, onto a folder to move it in, onto
+  *Lists* to take it out (with *Undo*); long-press a folder to reorder folders. A closed folder opens while you hover
+  over it, the drawer scrolls at its edges, a tap still opens the list, and a hold without moving opens the list's
+  menu, which now has *Move to folder…*.
+
+### Changed
+- The roadmap draws only the rows in view, so 50 projects with 1000 tasks scroll smoothly.
+- A switched-off module is gone everywhere: no *Start focus session* button in the task panel with *Focus* off (and
+  no focus entry in the running indicator, the settings, the shortcuts overlay), no *Timeline* shortcuts without the
+  timeline, no *Projects* help without the project modules. Starting a focus session, creating or checking in a
+  habit, and starting a timer or adding time with the module off are refused by the server (409, with the reason);
+  the data stays.
+
+### Fixed
+- The task panel showed *Start focus session* with the *Focus* module off.
+- Touch tablets (a foldable unfolded, an iPad) at 900 px and wider had no "+" button: it now shows bottom right on
+  touch screens without a mouse (left of an open task panel) and opens the quick-add sheet, centred at the bottom.
+
+## [1.2.0] - 2026-09-27
+
+**In short:** Gantt arrows with drag-to-link, list types (list / checklist / project), running-timer indicator.
+
+### Added
+- **Gantt timeline** (list view *Timeline* and *Calendar > Timeline*): dependency arrows finish → start between the
+  bars (orthogonal, rounded, with arrowheads), a red arrow and bar edge when a task starts before a task it waits on is
+  due (*Starts before "X" is due*), hatched waiting bars with a lock, dashed arrows from completed blockers, short stubs
+  with a tooltip for tasks outside the visible range or in other lists. The arrows follow a bar while it is dragged
+  and are redrawn on resize and font size changes.
+- **Link in the timeline:** drag the dot at the end of a bar onto another bar (that task then waits on it), with a
+  rubber band, highlighted valid targets and the server's reason for refused ones (a loop, a task you may only view,
+  itself); a click on the dot, a long-press on a phone (*Connect to…*), the keyboard (**C** on a focused bar, then
+  Enter on the target, Escape to cancel, arrow keys between bars, Shift+F10 / right-click for the bar menu) or
+  *Pick from a list…* do the same. Click an arrow to remove the dependency or open either task.
+- **Move dependent tasks along** (list dialog, owner, off by default): when a task is postponed, the open tasks of
+  that list waiting on it that would now start too early move by the same number of days, keeping their length, down
+  the chain (at most 10 levels and 50 tasks, only tasks you may change; also from the date dialog, dragging onto a day
+  and the API). The toast says *3 dependent tasks moved*; one *Undo* takes the whole chain back. Timeline drags can be
+  undone now too.
+- **Three setup presets** in the first-run setup: *Simple list* (lists, subtasks, reminders, calendar), *Just me*
+  (preselected: all views for one person) and *Projects & team* (everything, for teams up to about ten people), with
+  the single modules below; the welcome tour and the *Getting started* list only mention modules that are on
+  (*Getting started* gets a *Plan a project in the timeline* item when timeline and dependencies are on).
+- `GET /api/deps` (the app's timeline: every dependency between tasks you can see); `/api/v1/me` reports the modules
+  `dependencies` and `custom_fields`.
+
+- **List type** selector (list dialog, new-list dialog, the list's … menu and right-click in the sidebar): *List*
+  (default), *Checklist* (the former checklist switch) or *Project*. Only project lists get time tracking,
+  dependencies, custom fields and progress / status (while their modules are on); plain lists and checklists hide
+  them completely (rows, task details, menus), nothing is deleted. A *Project* badge next to the list title. The server
+  refuses timers, time entries, dependencies (both lists must be projects), field values and a status elsewhere with a
+  clear 409; reports, the timesheet, statistics and *Where is it stuck?* only count project lists. The update makes
+  lists with dependencies, custom fields, a status or at least 5 minutes of tracked time projects and checklists checklists. API: `kind` on
+  lists, the `checklist` flag keeps working. With *Projects & team* the *Getting started* list is a project.
+- **Hide the progress bar** of a project with the small × next to it, per person and list (synced across devices);
+  *Show progress* in the list's … menu or the list dialog brings it back.
+- **Running indicator** in the top bar (and the Settings header) for everything that runs: time tracking, a focus
+  session or break, the stopwatch, each with its own icon, the time and the task, or *2 running*; a click opens the
+  task with Pause / Stop. The task details show what runs on that task; the start buttons say what they start
+  (*Start time tracking*, *Start focus session*, *Start stopwatch*).
+
+### Changed
+- **Dependencies** and **Custom fields** are modules of their own (*Settings > Layout > Views and features*, per
+  person). Off = hidden in the app (details, rows, overview, list dialog, filters, timeline), no *Unblocked* News or
+  push; nothing is deleted and the API keeps working. Existing accounts keep them if they already have dependencies
+  or custom fields in their lists or use the timeline or project progress; everyone else follows the server's default
+  from the setup. A setup default from before 1.2 that includes the timeline or project progress gets both too.
+
+### Fixed
+- The task names on the left of the timeline stay in place while the chart scrolls sideways.
+- A focus session or break whose tab was closed is finished by the server at its planned end (with its time entry, as
+  set under *Finished focus sessions count as time*), and a late *finish* no longer counts the hours in between as
+  focus time. A forgotten stopwatch stops after the same hours as a forgotten timer.
+
+## [1.1.10] - 2026-09-27
+
+**In short:** Importers for Todoist, Trello, Asana, Microsoft To Do and ICS, with preview and undo.
+
+### Added
+- **Importers** (*Settings > Data > Import*): Todoist (CSV per project, the backup ZIP, Sync API JSON; English and
+  German date texts incl. recurring ones, sections, subtasks, @labels, priorities, durations, deadlines, comments),
+  Trello (board JSON: lists as sections or as lists in a folder, checklists as subtasks, labels, members, archived
+  cards skipped or completed, comments and attachment links in the notes), Asana (CSV: sections, parent tasks, tags,
+  dates, completion, assignees when they can see the list), Microsoft To Do (Outlook tasks CSV in English or German,
+  also Windows-1252, CSVs of export tools, ICS) and ICS / VTODO (Apple Reminders exports, Nextcloud Tasks,
+  Thunderbird: time zones, RELATED-TO, RRULE, VALARM, completed / cancelled). One picker with export instructions per
+  app, a **preview** (dry run in the same transaction: counts per list, sample rows, what cannot be mapped), target =
+  new lists or an existing one, idempotent re-import (external id per source), an import report and **Undo** for 24
+  hours (*Recent imports*), history line *imported from ...*.
+- Import safety: 20 MB / 20,000 tasks per import (`KALMIDO_IMPORT_MAX_MB`, `KALMIDO_IMPORT_MAX_TASKS`), 30 imports per
+  user within 10 minutes (`KALMIDO_IMPORT_RATE`), ZIP bomb and nesting limits, encoding detection (UTF-8 / BOM,
+  UTF-16, Windows-1252), control and bidi characters removed, formula cells kept as text, nothing inside a file is
+  fetched, every value validated like the app's own input.
+- API: `POST /api/v1/import/{source}` (multipart, scope write, `dry_run`) and `POST /api/v1/imports/{id}/undo`.
+
+## [1.1.9] - 2026-09-27
+
+**In short:** REST API with tokens, webhooks, public read-only list links, checklist mode.
+
+### Added
+- **REST API** under `/api/v1` with **personal access tokens** (*Settings > Account > API tokens*): name, access
+  (read / write / admin read for admins), optional expiry; shown once (`abk_` + 256 random bits), stored as SHA-256,
+  revocable, last use shown. A token acts as its user and never has more rights (same list roles, module switches;
+  admin rights re-checked on every request; disabled / deleted users' tokens stop at once). Bearer token only (no
+  cookie, no proxy header, so no CSRF header needed). Lists, tasks (filters: list, status, due range, tag, assignee,
+  updated since, parent; create / change / complete / reopen / delete to the trash), subtasks, tags, comments, time
+  entries, habit check-ins, search, admin users and status. JSON, ISO dates, cursor pages, one error format, unknown
+  fields refused. The API uses the app's own endpoints internally: history lines *via API*, notifications and webhooks
+  as in the app. 120 requests per token and minute (`KALMIDO_API_RATE`), invalid tokens limited per address and
+  reported to the admins. OpenAPI 3.1 at `/api/v1/openapi.json`; [docs/API.md](docs/API.md) with curl, Home Assistant,
+  n8n and shell examples. `KALMIDO_API=0`.
+- **Webhooks** (*Settings > Integrations > Webhooks*): up to 10 per user for `task.created`, `task.updated`,
+  `task.completed`, `task.reopened`, `task.deleted`, `comment.created`, `list.shared`, only for lists the user can see.
+  Signed with HMAC-SHA256 (`X-Kalmido-Signature: t=...,v1=...`, secret shown once and stored encrypted), delivered from
+  a queue (10 s timeout, response ignored, no redirects), retried after 1 min, 5 min, 30 min and 2 h, then turned off
+  with an admin alert. *Send test*, delivery log (last 50, no bodies), new secret. SSRF guard like calendar
+  subscriptions: only public https addresses unless an admin allows the host (*Allowed internal hosts*, now shared by
+  calendars and webhooks, or `KALMIDO_WEBHOOK_ALLOW_HOSTS`). `KALMIDO_WEBHOOKS=0`.
+- **Public links** for a list (*Edit list > Public link*, owner only): view only or view and tick off, optional
+  password (hashed, per-link unlock cookie) and expiry, new link / turn off. A script-free page with only that list
+  (sections, open tasks, subtasks, recently completed; notes only when switched on), `noindex`, `no-store`, strict CSP.
+  Ticking off goes through the normal completion (history and News *via the public link*). Rate limits per address, an
+  admin alert when one link is opened unusually often. Admin switch under *Whole server*, `KALMIDO_PUBLIC_LINKS=0`.
+- **Checklist mode** for a list (*Edit list*): done items stay in a *Done* section at the bottom, back on the list with
+  one tap, *Uncheck all*, *Clear done*, compact rows without dates or priorities. Works with sharing and public links.
+
+### Changed
+- *Allowed internal calendar hosts* is now *Allowed internal hosts* and applies to calendar subscriptions and webhooks.
+- The service worker never caches public link pages.
+- API with tokens and webhooks, public list links, checklist mode
+
+## [1.1.8] - 2026-09-27
+
+### Added
+- **Automatic backups + restore** (*Settings > Users > Whole server > Backups*, admins): a daily archive (zip) of the
+  database (SQLite online backup API) and all attachments with a manifest of SHA-256 checksums, at a set time (default
+  03:30), retention (everything of the last 24 hours, 14 daily, 8 weekly, 3 safety backups; adjustable), *Back up
+  now*, download, check, delete. Optional encryption with a passphrase (scrypt + AES-256-GCM in authenticated chunks;
+  without the passphrase an encrypted backup cannot be restored). Restore from a listed backup or an uploaded file
+  after typing `RESTORE`: the archive is fully checked (expected members only, no traversal / links, size, member and
+  ratio limits against zip bombs, checksums, `integrity_check`, no foreign triggers / views, schema version), then
+  maintenance mode, a safety backup of the current state, attachments + database swapped (rollback on failure),
+  migrations, every other session ended. Admin alerts for a failed backup and for no backup in 2 days.
+  `KALMIDO_BACKUPS=0`, `KALMIDO_BACKUP_DIR`, `KALMIDO_BACKUP_PASSPHRASE`, `KALMIDO_BACKUP_MAX_MB`.
+- **Two-factor authentication** for the built-in login (*Settings > Account*): authenticator app (TOTP, QR code made on
+  the server, encrypted secret, no code accepted twice), 10 one-time recovery codes (hashed), **passkeys** (WebAuthn)
+  as second factor and for passwordless login (admin switch), rename / remove, admin reset. Admin policy *Require
+  two-factor authentication for built-in logins*: users set it up at their next login. Proxy-header SSO and OIDC
+  logins are unaffected. `KALMIDO_WEBAUTHN_RP_ID`, `KALMIDO_WEBAUTHN_ORIGINS`.
+- **OpenID Connect login** ("Log in with ..."): Authorization Code + PKCE, discovery, ID token verified against the
+  JWKS (iss, aud, azp, exp, nonce), userinfo, only admin-created users by default (linked by user name or verified
+  e-mail, then by subject), optional auto-create, required group and admin group, requests through the SSRF guard
+  (`KALMIDO_OIDC_ALLOW_HOSTS` for a provider in your network). `KALMIDO_OIDC_*` variables, shown read-only to admins.
+- Users have an optional e-mail (for OIDC linking). Sessions remember how they logged in; a login never keeps a
+  session token the browser brought along.
+
+### Security
+- New dependencies, pinned: `webauthn` 3.0.1 (+ `cbor2`, `pyOpenSSL`, `pyasn1`, `pyasn1-modules`,
+  `typing-extensions`) and `segno` 1.6.6.
+- Backups with restore, two-factor (TOTP, passkeys) and OIDC login
+
+## [1.1.7] - 2026-09-27
+
+### Fixed
+- CI: the control-character filter of calendar texts uses escapes instead of literal bidi characters (bandit B613).
+- Calendar text filter: escaped bidi ranges (bandit B613)
+
+## [1.1.6] - 2026-09-27
+
+### Added
+- Calendar subscriptions (*Settings > Integrations > Calendars*): events from Google Calendar (secret iCal address),
+  iCloud, Outlook or any ICS link (`webcal://` too), or from CalDAV accounts (calendars discovered via
+  `current-user-principal` / `calendar-home-set` / `.well-known/caldav`, pick which to show), read-only next to the
+  tasks in month / week / day view and the calendar timeline, plus an optional *Events today* block on *Today*
+  (per user, on by default). Events are tinted and outlined in the calendar's colour, all-day ones in the all-day row;
+  a click shows a popover (time, place, description as escaped plain text with http / https links, calendar) with
+  *Create task from event*. Per calendar: name, colour, show / hide, refresh every 15 or 60 minutes, last sync and
+  error, *Refresh now*, edit, remove. Private per user, cached for offline use.
+- Server-side sync every 15 / 60 minutes (window: 60 days back, 365 ahead): RRULE / RDATE / EXDATE / RECURRENCE-ID,
+  time zones, floating times, cancelled events; ETag / If-Modified-Since for ICS, getctag / sync-token for CalDAV; at
+  most 10 MB per download and 5,000 occurrences per calendar; sub-daily and never-matching rules are not expanded.
+- SSRF guard for these fetches: private, loopback, link-local, CGNAT, multicast and reserved addresses (IPv4 / IPv6,
+  mapped forms) are refused at connect time and the checked address is the one connected to (no DNS rebinding);
+  admins can allow internal hosts (*Settings > Users > Whole server > Allowed internal calendar hosts*,
+  `KALMIDO_CALENDAR_ALLOW_HOSTS`); changes to that list raise a security alert.
+- Links and CalDAV passwords are stored encrypted (AES-GCM) and never returned to the browser; five failed syncs in a
+  row raise an *Integration problems* admin alert (id, user, error class only).
+- `KALMIDO_CALENDARS=0` turns the feature off; `KALMIDO_CALENDAR_MAX_MB`, `KALMIDO_CALENDAR_MAX_EVENTS`,
+  `KALMIDO_CALENDAR_RATE` tune the limits.
+- Tests: `calendars_test.py` and `calendars_ui.js` with a fake ICS / CalDAV server (`stub_calendar.py`).
+
+### Changed
+- The image installs `icalendar`, `recurring-ical-events` (+ `x-wr-timezone`, `click`), all pinned.
+- Calendar subscriptions: show ICS/CalDAV events next to tasks
+
+## [1.1.5] - 2026-09-27
+
+### Added
+- *Settings > Help* links to the website (kalmido.com), the source code on GitHub and *Report a problem* (GitHub
+  issues), each in a new tab without opener or referrer; the command palette has *Open website* and *Report a problem*.
+- CI: a failing test suite also shows as an annotation on the run page.
+- Help: links to the website, GitHub and issue tracker
+
+## [1.1.4] - 2026-09-27
+
+### Added
+- Admin alerts via ntfy (*Settings > Users > Whole server > Admin alerts*, admins only): operational warnings go to
+  the admins, independent of their own notification channel: update available (once per version), Web Push delivery
+  problems (device removed after 404 / 410 or repeated 4xx, pushes falling back to ntfy), watchdog errors (skipped
+  rows per hour with their ids), integration problems (ntfy share inbox refused / unreachable, Paperless failing for
+  N minutes, ntfy or Web Push failing five times in a row), security events (failed-login bursts and rate-limit trips
+  per user / IP, invalid `/drop` or calendar feed token bursts, a new admin, changed server switches) and storage /
+  health (low disk space, daily `PRAGMA quick_check`, attachment folder errors). Each kind can be switched off; each
+  admin's own topic or one shared admin topic; priority; *Send test alert*; cooldown per identical alert (6 h), at
+  most N per hour (10), or one daily summary; the last 50 alerts are listed with their delivery state. Alerts never
+  carry task titles, comments or other content. `KALMIDO_ADMIN_ALERTS=0` turns them off, `KALMIDO_ADMIN_TOPIC` fixes
+  the topic, `KALMIDO_ADMIN_ALERT_WINDOW` sets the aggregation window.
+- Tests: `admin_alerts_test.py` and `admin_alerts_ui.js`; the other suites run with `KALMIDO_ADMIN_ALERTS=0`.
+- `tools/i18n_check.py` knows `Nn_("one", "other")` (plural texts translated later with `trn`).
+- Admin alerts via ntfy
+
+## [1.1.3] - 2026-09-27
+
+### Added
+- Web Push notifications, no extra app needed: *Settings > Notifications > Notify on this device* (per device, the
+  browser asks for permission once), a list of your devices with remove, *Send test to this device*. Works in Chrome,
+  Edge, Samsung Internet, Opera, Firefox and Safari; on iPhone / iPad in the app added to the Home Screen (iOS 16.4+,
+  the settings show a hint otherwise). Every push kind uses it: reminders (with *Done* and *Snooze* buttons; *Done*
+  completes the task in the background), digest, focus / break end, habits, time tracking, comments, mentions,
+  assignments, completions, unblocked tasks, test. Payloads are end-to-end encrypted (RFC 8291) and signed with the
+  server's own VAPID key (RFC 8292, created on the first start); the server only sends to an allow-list of known push
+  services (`KALMIDO_WEBPUSH_HOSTS` adds more, `KALMIDO_WEBPUSH=0` turns Web Push off, `KALMIDO_VAPID_SUBJECT` sets the
+  contact).
+- Channel per account: Web Push (default), ntfy or both. While no device is subscribed, or none accepts a push, it
+  goes to the ntfy topic instead ("No device subscribed yet — using ntfy for now"), so nothing is lost when switching.
+
+### Changed
+- Existing accounts move to the Web Push channel too; they keep getting ntfy until their first device is subscribed.
+- The accent color Amber is now Orange (dark `#fb923c`, light `#ad4c07`, WCAG AA in both themes, clearly apart from
+  the red of high priority). A stored Amber choice becomes Orange automatically.
+- The image needs `cryptography` (pinned) for the Web Push encryption.
+- Reverse proxy: `/static/badge-96.png` (the notification badge) belongs to the paths fetched without login.
+- Web Push notifications (no extra app needed), alongside ntfy
+
+## [1.1.2] - 2026-09-27
+
+### Added
+- Settings > Appearance collects every visual setting of the device, applied instantly: color scheme, density
+  (both moved here from General), font size (small, normal, large, extra large = 90 / 100 / 112 / 125 %; the whole
+  interface scales: text, rows, icons, spacing, dialogs, calendar grid and charts), font (Geist, the system font or
+  Atkinson Hyperlegible, bundled) and accent color (mint, sky, violet, rose, amber, lime; each tuned for the dark
+  and the light theme, WCAG AA). Live preview and "Reset to defaults". The dates, times, counters and tags stay in
+  Geist Mono; the app icon stays mint.
+- Command palette: color scheme, font size (larger / smaller / a size), font, accent color and "Reset appearance".
+
+### Changed
+- All sizes in the stylesheet are now rem based (1rem = 16px x font size setting).
+- Appearance tab: font size, font (Geist, system, Atkinson Hyperlegible), accent colours, theme and density
+
+## [1.1.1] - 2026-09-27
+
+- Docs: screenshots in the new look
+
+## [1.1.0] - 2026-09-27
+
+### Changed
+- New look, same layout: Geist and Geist Mono (bundled, no external requests), denser rows with a priority bar
+  on the left edge, square checkboxes, hairline separators, date / list / assignee / time as right-aligned
+  columns on desktop, cooler greys, tuned dark and light themes (WCAG AA).
+- Density per device: compact (desktop default) or comfortable (phone default), Settings > General.
+
+### Added
+- Command palette (Ctrl/Cmd+K): fuzzy search over tasks, lists, filters, tags, views, settings and actions,
+  actions on the selected task (complete, snooze, date, move, priority, focus, timer), recent items; text
+  without a match becomes a new task.
+- Keyboard shortcuts overlay (`?`), list navigation (`j` / `k`, Enter, `x`, `s`, `d`, `m`), `g` go-to keys.
+- New accounts get a "Getting started" list (in their language, for their device and modules) and a short
+  welcome tour, restartable under Settings > Help. Existing accounts are unchanged. `KALMIDO_ONBOARDING=0`
+  turns both off.
+- The sloth celebrates an emptied Today and completed lists or projects (swing, checkmark confetti, a dry
+  one-liner in English or German). Settings > General > "Celebrate completions"; reduced motion shows a
+  calm version.
+- v1.1.0: new look (Geist, compact), command palette and shortcuts, onboarding list and welcome tour, sloth celebration
+
+## [1.0.0] - 2026-09-27
+
+The first versioned release. Everything below was built before 1.0.0 and is included.
+
+### Tasks and views
+- Lists with emoji and colour, folders, sections (Kanban columns), archive; subtasks up to three levels with
+  drag and drop between lists and levels.
+- Priorities, tags, pins, Markdown notes, attachments, a website link per task.
+- Natural-language quick add in English and German (`Dentist tomorrow 3pm !high #private ~Work`).
+- Recurring tasks (daily to yearly, any RRULE) with end date, count and skip.
+- Smart lists, combinable filters, multi-select with batch actions, snooze, trash, search.
+- Undo for completing, reopening, deleting, moving, snoozing and batch actions (also offline).
+- Templates for tasks (with subtasks) and whole lists, dates relative to the day of use.
+- Calendar (month, week, day), timeline, Eisenhower matrix, Kanban, statistics for the last 12 weeks.
+
+### Habits, focus and time
+- Habits per day or n times per week, counters, notes, streaks.
+- Pomodoro timer and stopwatch, focus minutes per task.
+- Time tracking: timers that follow you across devices, manual entries, reports per list / task / day /
+  person, rounding, hourly rates, CSV export, printable timesheet, reminders for forgotten timers.
+
+### Together
+- Several users with their own inbox, habits, filters, tags, settings and notifications; built-in login or
+  single sign-on through a trusted reverse proxy header.
+- Shared lists (edit or view only), assignment, comments with @mentions and files, activity history,
+  unread markers, a News inbox, bundled push notifications.
+- Projects: dependencies ("waiting on"), progress and status per list, the *Where is it stuck?* overview,
+  custom fields (text, number, selection, date, checkbox, person, link).
+
+### Everywhere
+- Installable web app (PWA) that works offline: changes queue up and sync later, with conflict detection.
+- Push notifications via ntfy, calendar subscription (ICS feed), sharing from Android, app shortcuts.
+- Optional Paperless-ngx integration, TickTick CSV import, JSON export.
+- English and German interface; translations are plain JSON files with a checker.
+
+### New in 1.0.0
+- **Version and update check:** *Settings > Help* shows the version. Admins get a daily, server-side check
+  against the latest GitHub release (a dot on the settings gear and the update commands when a new version
+  is out). Nothing is installed automatically and the browser never contacts GitHub. Off with
+  `KALMIDO_UPDATE_CHECK=0` or in *Settings > Users > Whole server*.
+- **Instance switches** for admins (*Settings > Users > Whole server*): *Collaboration for everyone* and
+  *Time tracking for everyone*. Off means nobody gets that feature and its API endpoints refuse; running
+  timers are stopped at that moment; nothing is deleted and everything comes back when switched on.
+- **Settings > Collaboration:** the personal collaboration switch moved out of *Layout* into its own tab.
+- **First-run setup, step 2 "What do you want to use?":** presets *Just me* (no collaboration, no time
+  tracking) and *Everything*, then fine-tuning per module and the language. The choices set the instance
+  switches and the modules of new users. When an admin later creates the second user while collaboration is
+  off, Kalmido offers to turn it on.
+- Prebuilt multi-arch images (amd64, arm64) on `ghcr.io/gegenschuss/kalmido`, released automatically from
+  version tags; the installer uses them and falls back to building locally.
+- Tests and CI in the repository: API, UI (jsdom) and security regression suites, `bandit`, `pip-audit`,
+  `semgrep`, OWASP ZAP baseline. `SECURITY.md`, `CONTRIBUTING.md`, issue and pull request templates.
+
+### Security
+Before 1.0.0 an independent AI security review (separate agent, black-box testing plus code review) was run.
+All findings were fixed, re-verified and are covered by `tests/security_test.py`:
+- **High:** the ntfy share inbox could be abused for SSRF / local file reads and could leak its token:
+  attachments are now only fetched from the configured ntfy server (allow-list), through a request wrapper
+  that allows http/https only and same-host redirects; the inbox refuses a guessable topic on the public
+  ntfy.sh.
+- **High:** Paperless-ngx was reachable for every user: access is now granted per user by an admin (admins by
+  default); users without access see neither titles nor document ids of linked documents.
+- **Medium:** strict server-side validation of dates, times, durations, reminders, colours, views and folder
+  names (malformed values could break the reminder watchdog or inject HTML); recurrence rules are limited
+  (no sub-daily rules, rules that never match are refused); parent cycles are impossible.
+- **Medium:** the Markdown renderer no longer allows attribute breakouts in links.
+- **Low:** dependency updates (Flask, Werkzeug, Waitress pinned to fixed versions), constant-time login for
+  unknown users, additional security headers (CSP `frame-ancestors`, `base-uri`, `form-action`, `object-src`,
+  `X-Frame-Options`, `Permissions-Policy`).
+- Design fixes: members of a shared list can no longer move shared tasks out of reach of the owner or delete
+  them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
+  access.
+
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.13.3...HEAD
+[2.13.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.13.3
 [2.13.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.13.2
 [2.13.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.13.1
 [2.13.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.13.0

@@ -2959,7 +2959,9 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 .scmd{display:flex;align-items:center;gap:.5rem;width:100%;height:2.25rem;padding:0 .75rem;margin:0 0 .5rem;border:1px solid var(--line2);border-radius:1.125rem;background:var(--bg);color:var(--muted);font-size:var(--fs-m);text-align:left}
 .scmd span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .scmd:hover{color:var(--text);border-color:var(--faint)}
-@media (min-width:900px){ #app:not(.side-rail) #side .scmd{display:none} }
+/* 2.13.3 (#478 follow-up): the field is the one search entry wherever there is a sidebar (desktop, an unfolded Fold) or a
+   drawer (phones); the header's command bar only while the sidebar is folded away (rail / drawer on a desktop) */
+@media (min-width:900px){ #app:not(.side-rail) #top .cmdbar{display:none} }
 #side .sgroup{margin-top:1.125rem}
 #side .shead{padding:0 .25rem 0 .5rem;min-height:1.625rem;font-size:var(--fs-s);font-weight:400;color:var(--muted)}
 .sgh .sgt{display:inline-flex;align-items:center;gap:.375rem;color:inherit;padding:.125rem 0;border-radius:var(--r-s)}
@@ -3321,7 +3323,6 @@ svg.logo{color:var(--acc-d,var(--accent));flex:none}
 /* 2.13.0: the logo goes to Today; Search sits at the top of the sidebar */
 .sbrand .sbhome{display:inline-flex;align-items:center;gap:.625rem;font:inherit;color:inherit;padding:.125rem .25rem;margin:-.125rem -.25rem;border-radius:var(--radius)}
 .sbrand .sbhome:hover{background:var(--bg3)}
-#side .srow.ssrch{margin-bottom:.25rem}
 @media (pointer:coarse){ .sbrand .sbhome{min-height:2.75rem} }
 /* 2.13.1 (#465): images / files in the agent chat: thumbnails under the bubble (the sender's x to remove), the files
    waiting in the composer, the paperclip with a 44 px target */
