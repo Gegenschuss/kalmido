@@ -114,6 +114,8 @@ const TOUCH = `(() => {
     let w = r.width, h = r.height;
     for (const p of ['::before', '::after']) { const ps = getComputedStyle(e, p); if (ps.content !== 'none' && ps.position === 'absolute' && ps.pointerEvents !== 'none') { w = Math.max(w, parseFloat(ps.width) || 0); h = Math.max(h, parseFloat(ps.height) || 0); } }
     const lab = e.closest('label'); if (lab) { const lr = lab.getBoundingClientRect(); w = Math.max(w, lr.width); h = Math.max(h, lr.height); }
+    // 2.16.0 (#473): a task's title is a keyboard / screen-reader stop; on touch the whole row is the target that opens it
+    const row = e.matches('.ttl[data-kt]') && e.closest('.trow'); if (row) { const rr = row.getBoundingClientRect(); w = Math.max(w, rr.width); h = Math.max(h, rr.height); }
     if (w >= 43.5 && h >= 43.5) continue;
     const cls = typeof e.className === 'string' ? e.className.trim().split(/\\s+/)[0] : '', pe = e.parentElement;
     const par = pe && (pe.id ? '#' + pe.id : typeof pe.className === 'string' && pe.className.trim() ? '.' + pe.className.trim().split(/\\s+/)[0] : '');

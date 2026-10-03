@@ -15,7 +15,7 @@ const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
   const css = await (await fetch(B + 'static/app.css')).text();
   const m = css.match(/@media \(min-width:900px\) and \(hover:none\),\(min-width:900px\) and \(pointer:coarse\)\{([\s\S]*?)\n\}/);
   check(m && /#fab\{display:grid;[^}]*position:fixed;right:1\.25rem;bottom:calc\(var\(--safe-b\) \+ 1\.25rem\)/.test(m[1]), 'stylesheet: the "+" button on touch screens >= 900 px, bottom right with the safe area, no tab bar offset');
-  check(m && /#fab\.gone\{display:none\}/.test(m[1]) && /#app\.detail-open #fab\{right:calc\(25\.5rem \+ 1\.25rem\)\}/.test(m[1]), 'stylesheet: hidden where it does not belong, left of the open detail pane');
+  check(m && /#fab\.gone\{display:none\}/.test(m[1]) && /#app\.detail-open #fab\{right:calc\((?:var\(--detW,25\.5rem\)|25\.5rem) \+ 1\.25rem\)\}/.test(m[1]), 'stylesheet: hidden where it does not belong, left of the open detail pane');
   check(m && /\.qadd\.sheet\{[^}]*bottom:0;left:50%;transform:translateX\(-50%\);width:min\(40rem,100vw\)/.test(m[1]), 'stylesheet: quick add as a centred bottom sheet, at most 40rem wide');
 
   const w = await boot({user: 'alice', hash: 'today', media: {'(hover: none)': true, '(pointer: coarse)': true}}); const d = w.document;
