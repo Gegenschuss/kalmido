@@ -487,6 +487,15 @@ r = requests.post(B + f"/api/hooks/git/{RID2}", data=raw, headers={"X-Gitea-Sign
 check(r.status_code == 404, "a repository without webhook: 404")
 r = requests.post(B + f"/api/hooks/git/{RID}", data=raw, headers={"X-Gitea-Signature": hmac.new(sec.encode(), raw, hashlib.sha256).hexdigest()})
 check(r.status_code == 202, "Gitea signature header accepted")
+# 2.16.0 (#637): a hook within 10 s of the last poll is never dropped: next_at = min(next_at, polled_at + 10 s)
+c = sqlite3.connect(os.path.join(DATA, "tasks.db"))
+t0 = time.time()
+c.execute("UPDATE git_conns SET next_at=?, polled_at=? WHERE id=?", (t0 + 999, datetime.fromtimestamp(t0 - 2, timezone.utc).isoformat(), RID))
+c.commit()
+c.close()
+r = requests.post(B + f"/api/hooks/git/{RID}", data=raw, headers={"X-Hub-Signature-256": sig, "Content-Type": "application/json", "X-GitHub-Event": "push"})
+na = dbq("SELECT next_at FROM git_conns WHERE id=?", (RID,))[0][0]
+check(r.status_code == 202 and t0 + 7 <= na <= t0 + 9, f"a hook 2 s after a poll is kept: the next poll 10 s after the last ({na - t0:.1f} s)")
 check(A.patch(B + f"/api/repos/{RID}", json={"hook": "off"}).ok and requests.post(B + f"/api/hooks/git/{RID}", data=raw, headers={"X-Hub-Signature-256": sig}).status_code == 404,
       "webhook off: 404")
 

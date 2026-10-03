@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # run_all.sh -- every suite, each group against a fresh test container (see start.sh for the settings).
 #   BUILD=1 tests/run_all.sh     build the image from the repo first (docker build -t $KALMIDO_TEST_IMAGE .)
-#   tests/run_all.sh --shard 2/5  only the second of the 5 shards (CI runs the shards as parallel jobs, see ci.yml).
+#   tests/run_all.sh --shard 2/6  only the second of the 6 shards (CI runs the shards as parallel jobs, see ci.yml).
 #                                The `shard N` lines below split the groups; each group (a `fresh` container and the
 #                                suites after it) stays whole. Keep the shards about equal (~14 min each on CI) by moving
 #                                a marker when one grows; new suites go at the end (the last shard).
@@ -13,7 +13,7 @@ cd "$HERE"
 export KALMIDO_TEST_IMAGE=${KALMIDO_TEST_IMAGE:-kalmido:test}
 export KALMIDO_TEST_DATA=${KALMIDO_TEST_DATA:-$HERE/.data}
 PY=${PYTHON:-python3}
-SHARDS_DEFINED=5
+SHARDS_DEFINED=6
 SHARD=0; CUR=1
 if [[ "${1:-}" == "--shard" ]]; then
   [[ "${2:-}" =~ ^([0-9]+)/([0-9]+)$ ]] || { echo "usage: run_all.sh [--shard N/$SHARDS_DEFINED]"; exit 2; }
@@ -276,7 +276,7 @@ shard 4  # ---------------------------------------------------------------- shar
 # 44 px targets, the milestone date picker and the timeline markers
        run p271_api "$PY" p271_api_test.py "$KALMIDO_TEST_DATA"
        run p271_ui node p271_ui.js "$KALMIDO_TEST_DATA"
-shard 5  # ---------------------------------------------------------------- shard 5 of 5 (2.15.1: shard 4 had reached the 30 min job limit)
+shard 5  # ---------------------------------------------------------------- shard 5 of 6 (2.15.1: shard 4 had reached the 30 min job limit)
 # 2.7.2: the list option "Show completed at the bottom" instead of the checklist type (#414: aliases, migration), personal
 # agents (#420: policy, owner-only sharing / chat, admin pause / delete), reactions in the agent chat (#421) and delivered_at
 # (#422), project files leave the disk with the sample / an import undo (own container); then the robot before the bell
@@ -329,6 +329,16 @@ shard 5  # ---------------------------------------------------------------- shar
 # 2.15.1 (#636 #633): Today / Tomorrow in the task header on phones (second row), the matrix folds on phones, Search and the
 # palette focused on touch, sticky dialog footers (new token: Expires + Create), the week view on phones; jsdom + Firefox touch
 fresh; run p2151_ui node p2151_ui.js "$KALMIDO_TEST_DATA"
+shard 6  # ---------------------------------------------------------------- shard 6 of 6 (2.16.0: the accessibility suite alone takes ~12 min)
+# 2.16.0 (#473): accessibility: axe-core (WCAG 2.2 A + AA rules, bundled in tests/node_modules) over the main views, dialogs,
+# the task panel, the chat, the palette and the sign-in page in Firefox at 1280 (mouse) and 390 (touch), light + dark, and
+# every accent colour (own container)
+       run p2160_a11y node p2160_a11y.js "$KALMIDO_TEST_DATA"
+# 2.16.0 (#639 #641 #634 #642 #643 #644 #645 #447): the grips between list | task | chat and in the column titles (keys,
+# per device, standard width), the account picture in the Kalmido row, density "Custom", the reaction button on every chat
+# message, the command field (hints, "Ask <agent>", "Create as task"), the sun icons, the heron's sun; jsdom + Firefox at
+# 1440 (mouse drags), 2560 / 1920 (four columns), 390 / 412 (touch taps)
+       run p2160_ui node p2160_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

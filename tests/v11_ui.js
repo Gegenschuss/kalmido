@@ -83,7 +83,7 @@ async function api(cookie, method, url, body) {
   // no match + Enter = new task (quick add syntax)
   key(w, 'k', {ctrlKey: true}); await sleep(50);
   type('Water plants zz tomorrow'); await sleep(20);
-  check(/Nothing found/.test(d.querySelector('.palette .plist').textContent), 'no match: hint');
+  check(d.querySelector('.palette .pitem.on .plt')?.textContent === 'Create as task: Water plants zz', 'no match: "Create as task" on top (2.16.0: #644) ' + d.querySelector('.palette .pitem .plt')?.textContent);
   key(w, 'Enter', {}, d.querySelector('.palette .pqin')); await sleep(700);
   const nt = [...w.eval('S.tasks').values()].find(t => t.title === 'Water plants zz');
   check(nt && nt.due, 'no match + Enter: new task with a parsed date');

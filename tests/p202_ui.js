@@ -55,6 +55,7 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
 
   // ---- #183 keyboard: arrows, Space, Enter, focus ring; #182 E / double-click edits the title in the list
   w.eval(`go('l/${L}')`); await sleep(500);
+  w.eval('document.activeElement?.blur?.(); S.kf = null');  // 2.16.0 (#473): closing a task puts the focus back on its row; start from nothing here
   key(w, 'ArrowDown'); await sleep(100);
   const first = d.querySelector('#view .trow.kfocus');
   check(first && +first.dataset.id === T1, 'ArrowDown focuses the first task (focus ring class)');

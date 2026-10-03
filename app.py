@@ -19639,7 +19639,7 @@ def v1_tasks():
     """Visible tasks (not in the trash), oldest id first, cursor pages. Filters: list_id, status, due_from, due_to,
     tag, assignee (me | none | id), updated_since, parent_id, top_level."""
     a = v1_args(("list_id", "status", "due_from", "due_to", "tag", "list_tag", "assignee", "updated_since", "parent_id", "top_level",
-                 "limit", "cursor", "fields", "waiting", "type", "assignee_group"))
+                 "limit", "cursor", "fields", "waiting", "type", "assignee_group", "pinned"))
     if a.get("fields") not in (None, "", "full", "compact"):
         raise BadInput(tr("Invalid value: {0}", "fields"))
     c, uid = db(), me()
@@ -19694,6 +19694,10 @@ def v1_tasks():
         if a["waiting"] not in ("1", "true", "0", "false"):
             raise BadInput(tr("Invalid value: {0}", "waiting"))
         where.append("waiting_at IS NOT NULL" if a["waiting"] in ("1", "true") else "waiting_at IS NULL")
+    if a.get("pinned") not in (None, ""):  # 2.16.0 (#648): only pinned tasks (true) / only the others (false)
+        if a["pinned"] not in ("1", "true", "0", "false"):
+            raise BadInput(tr("Invalid value: {0}", "pinned"))
+        where.append("pinned=1" if a["pinned"] in ("1", "true") else "pinned=0")
     if a.get("type") not in (None, ""):  # 2.4.0 (#340): bug | feature | task | none
         if a["type"] not in (*TICKET_TYPES, "none"):
             raise BadInput(tr("Invalid value: {0}", "type"))
@@ -20930,6 +20934,7 @@ def openapi_spec():
                      q("fields", "compact = only id, title, list_id, section_id, parent_id, status, due, due_time, priority, tags, "
                                  "list_tags, assignee_id (default full)", {"type": "string", "enum": ["full", "compact"]}),
                      q("waiting", "true = only tasks waiting on external, false = only the others", {"type": "boolean"}),
+                     q("pinned", "2.16.0: true = only pinned tasks, false = only the others", {"type": "boolean"}),
                      q("type", "Ticket type: bug, feature, task or none (2.4.0)", {"type": "string", "enum": [*TICKET_TYPES, "none"]}),
                      limit, cursor]
     paths = {
@@ -26777,8 +26782,16 @@ def git_hook(cid):
         return err(tr("Invalid signature"), 401)
     if request.headers.get("X-GitHub-Event") == "ping":
         return jsonify(ok=True, ping=True)
-    if r["next_at"] > time.time() + 5 and (not r["polled_at"] or (now_utc() - parse_iso(r["polled_at"])).total_seconds() >= 10):
-        git_wake(c, cid)
+    # 2.16.0 (#637): never drop a hook. Within 10 s of the last poll it used to be ignored (debounce), so a push right after
+    # a poll only showed up with the next regular poll (minutes). Now: next_at = min(next_at, polled_at + 10 s) - the
+    # debounce stays, the hook is never lost (the loop picks it up on its next tick).
+    now = time.time()
+    due = now if not r["polled_at"] else max(now, parse_iso(r["polled_at"]).timestamp() + 10)
+    if r["next_at"] > due + 1:
+        if due <= now:
+            git_wake(c, cid)
+        else:
+            c.execute("UPDATE git_conns SET next_at=? WHERE id=?", (due, cid))
         c.commit()
     return jsonify(ok=True), 202
 

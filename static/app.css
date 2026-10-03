@@ -76,7 +76,7 @@ kbd{display:inline-flex;align-items:center;justify-content:center;min-width:1.12
 
 /* ---------- shell ---------- */
 #app{display:grid;grid-template-columns:3.25rem 15rem 1fr;height:100dvh;overflow:hidden}
-#app.detail-open{grid-template-columns:3.25rem 15rem 1fr 25.5rem}
+#app.detail-open{grid-template-columns:3.25rem 15rem 1fr var(--detW,25.5rem)}
 #rail{background:var(--bg2);border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;padding:.625rem 0;gap:2px}
 #rail .logo{width:2rem;height:2rem;display:grid;place-items:center;margin-bottom:.75rem}
 #rail .logo img{width:2rem;height:2rem;display:block}
@@ -332,7 +332,7 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 .cal .cell{min-height:6.5rem;padding:.25rem;border-right:1px solid var(--line);border-bottom:1px solid var(--line);cursor:pointer;min-width:0;display:flex;flex-direction:column;gap:2px}
 .cal .cell:hover{background:var(--bg2)}
 .cal .cell.out{background:rgba(0,0,0,.2)}
-.cal .cell.out .dn{opacity:.4}
+.cal .cell.out .dn{font-weight:400;color:var(--muted)}  /* 2.16.0 (#473): readable (4.5:1); the cell's shade marks the other month */
 .cal .cell.sel{background:var(--bg2);box-shadow:inset 0 0 0 1px var(--accent)}
 .cal .cell.drop{background:color-mix(in srgb,var(--accent) 14%,transparent)}
 .cal .dn{font:var(--fs-s) var(--mono);color:var(--muted);padding:1px .3125rem;align-self:flex-start;border-radius:var(--r-s)}
@@ -533,7 +533,7 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 .wcol{position:relative;height:calc(24 * var(--h));border-left:1px solid var(--line);background-image:linear-gradient(to bottom,var(--line) 1px,transparent 1px);background-size:100% var(--h);cursor:cell}
 .wcol.today{background-color:color-mix(in srgb,var(--accent) 4%,transparent)}
 .wev{position:absolute;background:color-mix(in srgb,var(--accent) 18%,var(--bg2));border-left:.1875rem solid var(--accent);border-radius:.3125rem;padding:2px .3125rem;font-size:.75rem;overflow:hidden;cursor:pointer;line-height:1.3}
-.wev b{font-weight:600;font-size:.6875rem;color:var(--muted)}
+.wev b{font-weight:600;font-size:.6875rem;color:var(--text2)}
 .nowline{position:absolute;left:0;right:0;height:2px;background:var(--p5);z-index:2}
 .nowline::before{content:'';position:absolute;left:-.25rem;top:-.1875rem;width:.5rem;height:.5rem;border-radius:50%;background:var(--p5)}
 
@@ -554,7 +554,7 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 .tl-days{display:flex;height:2rem}
 .tl-d{flex:0 0 var(--dw);text-align:center;font-size:.6875rem;line-height:1.15;color:var(--muted);padding-top:2px}
 .tl-d span{display:block;font-size:.5625rem;opacity:.7}
-.tl-d.we{color:color-mix(in srgb,var(--muted) 60%,transparent)}
+.tl-d.we{color:var(--muted)}
 .tl-d.today{color:var(--accent);font-weight:700}
 .tl-bar{position:absolute;top:.3125rem;height:2.125rem;border-radius:.4375rem;background:color-mix(in srgb,var(--accent) 30%,var(--bg3));border:1px solid color-mix(in srgb,var(--accent) 60%,transparent);font-size:.75rem;display:flex;align-items:center;padding:0 .5rem;cursor:grab;overflow:hidden;white-space:nowrap;touch-action:pan-x pan-y}
 .tl-bar span{overflow:hidden;text-overflow:ellipsis;pointer-events:none}
@@ -1638,7 +1638,7 @@ div.calerr{font-size:var(--fs-s);padding:.25rem 0}
   #fab{display:grid;place-items:center;position:fixed;right:1.25rem;bottom:calc(var(--safe-b) + 1.25rem);width:3.5rem;height:3.5rem;border-radius:.875rem;background:var(--accent);color:var(--accent-ink);z-index:41;box-shadow:0 .5rem 1.5rem rgba(0,0,0,.45)}
   #fab svg{width:1.5rem;height:1.5rem;stroke-width:2.2}
   #fab.gone{display:none}
-  #app.detail-open #fab{right:calc(25.5rem + 1.25rem)}
+  #app.detail-open #fab{right:calc(var(--detW,25.5rem) + 1.25rem)}
   .qadd.sheet{top:auto;bottom:0;left:50%;transform:translateX(-50%);width:min(40rem,100vw);border-radius:1rem 1rem 0 0;padding:.875rem .875rem calc(.875rem + var(--safe-b))}
   #view{padding-bottom:calc(var(--safe-b) + 6rem)}
 }
@@ -1713,7 +1713,7 @@ body.tdrag .sdrop{display:flex}
 /* U02: sidebar folded into the rail while the task panel is open and the list would get too narrow */
 .rbtn.rside{display:none}
 #app.side-rail .rbtn.rside{display:grid}
-#app.detail-open.side-rail{grid-template-columns:3.25rem minmax(0,1fr) 25.5rem}
+#app.detail-open.side-rail{grid-template-columns:3.25rem minmax(0,1fr) var(--detW,25.5rem)}
 #app.side-rail #side{position:fixed;top:0;bottom:0;left:3.25rem;width:min(17rem,70vw);z-index:56;transform:translateX(calc(-100% - 3.5rem));visibility:hidden;border-right:1px solid var(--line2)}
 #app.side-rail #side.open{transform:none;visibility:visible;box-shadow:.75rem 0 2.5rem rgba(0,0,0,.35)}
 @media (prefers-reduced-motion:no-preference){ #app.side-rail #side{transition:transform .2s ease,visibility .2s} }
@@ -2048,7 +2048,7 @@ button.tvr-task:hover{color:var(--accent)}
 .adot.st-waiting{background:var(--p3)}.adot.st-error{background:var(--danger)}.adot.st-paused{background:var(--faint)}
 @keyframes adot{50%{opacity:.35}}
 @media (prefers-reduced-motion:reduce){.adot.st-working{animation:none}}
-.abadge{display:inline-flex;align-items:center;gap:.1875rem;margin-left:.375rem;padding:0 .3125rem;border-radius:var(--r-s);background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);font:500 var(--fs-xs) var(--mono);line-height:1rem;vertical-align:1px}
+.abadge{display:inline-flex;align-items:center;gap:.1875rem;margin-left:.375rem;padding:0 .3125rem;border-radius:var(--r-s);background:color-mix(in srgb,var(--accent) 14%,transparent);color:color-mix(in srgb,var(--accent) 82%,var(--text));font:500 var(--fs-xs) var(--mono);line-height:1rem;vertical-align:1px}
 .abadge .i{width:.75rem;height:.75rem}
 .achip{display:flex;align-items:center;gap:.4375rem;padding:.25rem .625rem .25rem .375rem;border-radius:var(--radius);background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--text);font-size:.8125rem;max-width:min(46vw,20rem);min-width:0;border:1px solid transparent;cursor:pointer}
 .achip .act{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -2138,7 +2138,7 @@ body.kb-open #tabs,body.kb-open #fab,body.kb-open .chview .chnote{display:none}
 .rxcustom{display:flex;gap:.375rem}.rxcustom input{flex:1;min-width:0}
 /* 2.13.0: the app resizes beside the panel. 2.13.2 (#478 N1): the whole app (sidebar | list | task), not only the list
    area: the task panel sat under the chat. Without room for all three the task takes the chat's place (body.chat-yield) */
-@media (min-width:1000px){body.chat-open:not(.chat-yield) #app{margin-right:min(26rem,40vw)}}
+@media (min-width:1000px){body.chat-open:not(.chat-yield) #app{margin-right:min(var(--chatW,26rem),40vw)} #achat{width:min(var(--chatW,26rem),40vw)}}
 body.chat-yield #achat{display:none}
 .dchatb{display:none!important}
 @media (min-width:1000px){body.chat-yield .dchatb{display:inline-flex!important}}
@@ -2605,13 +2605,13 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 .dtop .dchip .i{flex:none}
 /* 2.15.1 (#636): Today / Tomorrow are back in the header on touch screens. The header is a size container: below 28rem (every
    phone, the Fold's side panel) the date and Today / Tomorrow (now with their words) get a second row of their own, so the date
-   is never cut short and nothing scrolls sideways; wider headers keep one row with the two icons. Pin stays in "…" below 36rem. */
+   is never cut short and nothing scrolls sideways; wider headers keep one row with the two icons. Pin always next to Priority (2.16.0). */
 .dtop{container:dtop / inline-size}
 .dtop .dql,.dtop .dbr{display:none}
 @media (pointer:coarse){
   .dtop{flex-wrap:wrap;row-gap:.375rem}
   .dtop .dq{flex:none}
-  @container dtop (max-width:35.99rem){ .dtop [data-act="pin"]{display:none} }
+  /* 2.16.0 (#648): Pin stays next to Priority on every width (it was in "…" below 36rem) */
   @container dtop (max-width:27.99rem){
     .dtop .dbr{display:block;order:8;flex:0 0 100%;height:0}
     .dtop .dchip,.dtop .dq{order:9}
@@ -2843,7 +2843,7 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 .tl .tl-bar.short.lbl-l span{left:auto;right:calc(100% + .375rem)}
 .tl-bar.short span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tl-d span{opacity:1;color:var(--muted)}
-.tl-d.we{color:color-mix(in srgb,var(--muted) 85%,transparent)}
+.tl-d.we{color:var(--muted)}  /* 2.16.0 (#473): 4.5:1, the weekend column's shade marks it */
 .tl-d.today span{color:var(--accent)}
 /* 2.7.0: the bell's dropdown is resizable (desktop: grip bottom left; phone: the sheet's handle up to full height) */
 #pop.bellpop{max-width:calc(100vw - 1.5rem)}
@@ -2991,9 +2991,9 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 .btn.pri svg.i .d,#fab svg.i .d{fill:currentColor}
 /* shell: sidebar 15rem + list (+ task panel) */
 #app{grid-template-columns:15rem minmax(0,1fr)}
-#app.detail-open{grid-template-columns:15rem minmax(0,1fr) 25.5rem}
+#app.detail-open{grid-template-columns:15rem minmax(0,1fr) var(--detW,25.5rem)}
 #app.side-rail{grid-template-columns:minmax(0,1fr)}
-#app.detail-open.side-rail{grid-template-columns:minmax(0,1fr) 25.5rem}
+#app.detail-open.side-rail{grid-template-columns:minmax(0,1fr) var(--detW,25.5rem)}
 #app.side-rail #side{left:0;width:min(17rem,80vw);transform:translateX(-102%)}
 #app.side-rail #side.open{transform:none}
 #app.side-rail #top .menu{display:inline-flex}
@@ -3613,3 +3613,108 @@ pre.mdpre code{font:inherit;background:none;padding:0;border:0}
 #s-sclim .sclim+.sclim{margin-top:.75rem}
 .agsrow .agfacts{min-width:0}
 .agsrow .agft{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---- 2.16.0 (#473) accessibility (WCAG 2.2 AA) ---------------------------------------------------------------- */
+/* visually hidden, still read by screen readers */
+.sr{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);white-space:nowrap;border:0}
+/* the priority as a shape (! / !! / !!!) next to the title, in the priority colour (the circle alone was colour only) */
+.ttl .prm{font:600 var(--fs-s)/1 var(--mono);margin-left:.375rem;letter-spacing:-.06em;vertical-align:.06em;white-space:nowrap}
+.prm.p5{color:var(--p5)}.prm.p3{color:var(--p3)}.prm.p1{color:var(--p1)}
+.trow.done .prm{display:none}
+/* the row title is a focus stop (roving): the focus ring around the title, not the whole row */
+.trow .ttl[data-kt]:focus{outline:none}
+.trow .ttl[data-kt]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--r-s)}
+.trow:has(.ttl[data-kt]:focus-visible){background:var(--accent-soft)}
+/* fields: a 2 px ring on keyboard focus (a coloured 1 px border alone was faint), dialogs focused as a whole: no ring */
+input:focus-visible,select:focus-visible,textarea:focus-visible{box-shadow:0 0 0 1px var(--accent)}
+.modal>.card:focus{outline:none}
+/* the focused element is never hidden under the sticky group headers / the docked composer (2.4.11) */
+#view{scroll-padding:2.75rem 0 6.5rem}
+.modal .card{scroll-padding:1rem 0 5rem}
+/* reduced motion everywhere: no animations, no slides (the few explicit rules above stay) */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;transition-delay:0s!important;scroll-behavior:auto!important}
+}
+/* Windows high contrast / forced colours: states that were only a background or a colour get a border / outline */
+@media (forced-colors: active){
+  .chk{border-color:CanvasText!important;forced-color-adjust:none;background:Canvas}
+  .chk.on{background:Highlight!important;border-color:Highlight!important;color:HighlightText!important}
+  .trow.sel,.trow.kfocus,.srow.on,.seg button.on,.lkopts button.on,.mquick button.on,.menu-list button.on,[aria-pressed="true"],[aria-selected="true"]{outline:2px solid Highlight;outline-offset:-2px}
+  .btn,.iconbtn,.mbb,.qchip,.chip,.ttchip{border:1px solid ButtonText}
+  .adot,.sdot,.badge,.prm{forced-color-adjust:none}
+  :focus-visible{outline:2px solid Highlight!important;outline-offset:2px}
+  .modal>.card,#pop,#toast,#detail,#side{border:1px solid CanvasText}
+}
+/* fields are recognisable as fields (1.4.11: 3:1 against what is around them) */
+:root{--field-line:#6b6e76}
+:root[data-theme="light"]{--field-line:#86898f}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"]{--field-line:#86898f} }
+input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea{border-color:var(--field-line)}
+input:not([type=checkbox]):not([type=radio]):focus,select:focus,textarea:focus{border-color:var(--accent)}
+#detail:focus{outline:none}
+/* the boxes around borderless fields (composer, comment / chat box, settings search, palette, subtask / tag fields) */
+.qadd .box,.qadd.dock,.ccomp,.ssearch,.chcomp textarea{border-color:var(--field-line)}
+.qadd.dock .box{border-color:transparent}
+.pqbar{border-bottom-color:var(--field-line)}
+.subadd input,#d-tag{border:0;border-bottom:1px solid var(--field-line);border-radius:0}
+.subadd input:focus,#d-tag:focus{border-bottom-color:var(--accent)}
+.dcontent:placeholder-shown{border:1px dashed var(--field-line);border-radius:var(--radius);padding:.5rem .625rem}
+.ferr{flex-basis:100%;width:100%;color:var(--danger);font-size:var(--fs-s);margin-top:.25rem}
+/* 2.16.0 (#641): the account picture at the right of the Kalmido row */
+.sbrand .sbacct{position:relative;display:grid;place-items:center;min-width:2rem;min-height:2rem;border-radius:50%;flex:none}
+.sbrand .sbacct .avatar{width:1.625rem;height:1.625rem;font-size:.6875rem}
+.sbrand .sbacct:hover .avatar{box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 45%,transparent)}
+.sbrand .sbacct .dot{position:absolute;top:0;right:0;width:.5rem;height:.5rem;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--bg2)}
+@media (pointer:coarse){ .sbrand .sbacct{min-width:2.75rem;min-height:2.75rem} }
+.menu-list .mwho{opacity:1!important;color:var(--muted);font-size:var(--fs-s)}
+/* 2.16.0 (#639): the grips between list | task | chat */
+.pgrip{position:fixed;width:.625rem;z-index:61;cursor:col-resize;touch-action:none;display:flex;justify-content:center}
+.pgrip::after{content:"";width:2px;height:100%;background:transparent;border-radius:1px}
+.pgrip:hover::after,.pgrip.drag::after{background:var(--accent)}
+.pgrip:focus{outline:none}
+.pgrip:focus-visible::after{background:var(--accent);width:.1875rem}
+.pgrip:focus-visible{outline:2px solid var(--accent);outline-offset:-1px;border-radius:2px}
+body.pgdrag,body.pgdrag *{cursor:col-resize!important;user-select:none!important}
+@media (max-width:899px){ .pgrip{display:none} }
+/* 2.16.0 (#634): column width grips in the column titles */
+.lchead .lc{position:relative;overflow:visible}
+.lchead .lc .lcn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-flex;align-items:center}
+.lchead .lcg{position:absolute;top:-.25rem;bottom:-.25rem;right:-.4375rem;width:.5rem;cursor:col-resize;touch-action:none;border-radius:2px}
+.lchead .lcg::after{content:"";position:absolute;left:.1875rem;top:0;bottom:0;width:2px;background:transparent}
+.lchead:hover .lcg::after{background:var(--line2)}
+.lchead .lcg:hover::after,.lchead .lcg:focus-visible::after{background:var(--accent)}
+.lchead .lcg:focus{outline:none}.lchead .lcg:focus-visible{outline:2px solid var(--accent)}
+/* 2.16.0 (#642): the sidebar's own density (Compact / Comfortable / Custom). Compact: less room between groups and rows,
+   shorter group headings; on touch the rows stay 44 px (only the gaps shrink) */
+:root[data-sdensity="compact"] #side{--srow-h:1.75rem;padding-top:.875rem}
+:root[data-sdensity="comfortable"] #side{--srow-h:2.25rem}
+:root[data-sdensity="compact"] #side .sgroup{margin-top:.5rem}
+:root[data-sdensity="compact"] #side .sbrand{padding-bottom:.5rem}
+:root[data-sdensity="compact"] #side .scmd{height:2rem;margin-bottom:.25rem}
+:root[data-sdensity="compact"] #side .shead{min-height:1.375rem}
+:root[data-sdensity="compact"] #side .sfoot{margin-top:.625rem;padding-top:.375rem}
+@media (pointer:coarse){
+  :root[data-sdensity="compact"] #side .sgroup{margin-top:.125rem}
+  :root[data-sdensity="compact"] #side .srow,:root[data-sdensity="compact"] #side .fhead{min-height:2.75rem}
+  :root[data-sdensity="compact"] #side .scmd{height:2.75rem}
+  :root[data-sdensity="compact"] #side .shead button,:root[data-sdensity="compact"] .sgh .sgt{min-height:2.25rem}
+  :root[data-sdensity="compact"] #side .shead{min-height:2.25rem}
+  :root[data-sdensity="compact"] #side .sfoot{margin-top:.25rem;padding-top:.125rem}
+}
+.lkdens{align-items:center;gap:.75rem}
+.lkdens .lkdl{min-width:7rem;color:var(--text2);font-size:var(--fs-m)}
+/* 2.16.0 (#643): the smiley that opens the quick reactions: in the message's time line (chat) / after the reactions
+   (comments); always visible on touch (a 44 px target that does not make the line taller), quiet on desktop until hover */
+.rx.rxtog{border:0;background:none;color:var(--muted);padding:0 .25rem;min-height:1.5rem;display:inline-flex;align-items:center;justify-content:center}
+.rx.rxtog .i{width:1rem;height:1rem}
+.rx.rxtog:hover,.rx.rxtog:focus-visible,.rx.rxtog[aria-expanded="true"]{color:var(--text)}
+.cmeta .rx.rxtog{margin-left:.25rem}
+@media (hover:hover) and (pointer:fine){ .cmsg:not(:hover):not(:focus-within) .rx.rxtog:not([aria-expanded="true"]),.cm:not(:hover):not(:focus-within) .rx.rxtog:not([aria-expanded="true"]){opacity:0} }
+@media (pointer:coarse){ .rx.rxtog{min-width:2.75rem;min-height:2.75rem;margin-top:-.625rem;margin-bottom:-.625rem} .cmeta .rx.rxtog{margin-right:-.5rem} }
+.cmsg.me .chrx{justify-content:flex-end}
+/* 2.16.0 (#644): what the command field can do (empty field), "Ask …" / "Create as task" entries */
+.phints{display:grid;gap:.125rem;padding:.5rem .75rem .625rem;border-bottom:1px solid var(--line)}
+.phint{display:flex;align-items:center;gap:.625rem;color:var(--muted);font-size:var(--fs-m);min-height:1.75rem}
+.phint .i{flex:none;color:var(--accent)}
+.pitem.pdo .plt{color:var(--text)}
+.pitem.pdo .pic .i{color:var(--accent)}

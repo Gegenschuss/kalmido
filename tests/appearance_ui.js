@@ -148,7 +148,7 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   await run('accent violet'); check(d.documentElement.dataset.accent === 'violet' && w.__store['tasks.accent'] === '"violet"', 'palette: "accent violet"');
   await run('font size larger'); check(w.eval('fsPct()') === 105, 'palette: font size larger (100 -> 105 %)');
   await run('font size larger'); check(w.eval('fsPct()') === 110, 'palette: font size larger again (110 %)');
-  w.eval(`LS.set('fsize', 150); applyLook()`); await pal('font size larger'); check(!/larger/.test(d.querySelector('.palette .plist').textContent), 'palette: no "larger" at the largest size');
+  w.eval(`LS.set('fsize', 150); applyLook()`); await pal('font size larger'); check(![...d.querySelectorAll('.palette .pitem:not(.pdo)')].some(x => /larger/.test(x.textContent)), 'palette: no "larger" at the largest size (2.16.0: only "Ask … / Create as task: …" with the typed text)');
   key(w, 'Escape', {}, d.querySelector('.palette .pqin')); await sleep(40);
   await run('font size smaller'); check(w.eval('fsPct()') === 145, 'palette: font size smaller (5 %)');
   await run('font atkinson'); check(d.documentElement.dataset.font === 'atkinson', 'palette: font Atkinson');

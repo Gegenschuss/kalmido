@@ -173,7 +173,7 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
     await openTask(o, T);
     const x = await ev(HEAD);
-    headChecks(tag, x, {rows: 2, words: vw >= 390, pin: false});
+    headChecks(tag, x, {rows: 2, words: vw >= 390, pin: true});
     await shot(`p2151-${tag}-header.png`);
     if (vw !== 390) return;
     // a real tap on Tomorrow
@@ -253,7 +253,7 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
     await o.nav(B + '#today'); await ready(ev);
     await ev(`(() => { openDetail(${DT}); return 1; })()`); await sleep(900);
     const x = await ev(HEAD);
-    headChecks('de 390', x, {rows: 2, words: true, pin: false});
+    headChecks('de 390', x, {rows: 2, words: true, pin: true});
     await shot('p2151-de-390-header.png');
   }, true);
 
@@ -263,14 +263,14 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
     check(await ffLogin(o, 'light') === 200, 'fold: login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 904, height: 904}});
     await openTask(o, T);
-    headChecks('fold 904', await ev(HEAD), {rows: 2, words: true, pin: false});
+    headChecks('fold 904', await ev(HEAD), {rows: 2, words: true, pin: true});
     await shot('p2151-904-header.png');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 412, height: 904}}); await sleep(900);
     if (!(await ev(`!!document.querySelector('#detail .dtop')`))) await ev(`(() => { openDetail(${T}); return 1; })()`), await sleep(700);
-    headChecks('fold folded 412', await ev(HEAD), {rows: 2, words: true, pin: false});
+    headChecks('fold folded 412', await ev(HEAD), {rows: 2, words: true, pin: true});
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 904, height: 904}}); await sleep(900);
     if (!(await ev(`!!document.querySelector('#detail .dtop')`))) await ev(`(() => { openDetail(${T}); return 1; })()`), await sleep(700);
-    headChecks('fold unfolded again', await ev(HEAD), {rows: 2, words: true, pin: false});
+    headChecks('fold unfolded again', await ev(HEAD), {rows: 2, words: true, pin: true});
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 880, height: 904}}); await sleep(900);
     if (!(await ev(`!!document.querySelector('#detail .dtop')`))) await ev(`(() => { openDetail(${T}); return 1; })()`), await sleep(700);
     headChecks('880 portrait', await ev(HEAD), {rows: 1, words: false, pin: true});

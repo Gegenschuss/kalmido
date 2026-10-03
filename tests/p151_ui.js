@@ -165,7 +165,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   w.eval(`go('l/${WORK}')`); await sleep(300);
   await call('PATCH', `/api/tasks/${a}`, {due: addD(T0, 3), due_time: '14:30'}); await w.eval('load()'); w.eval('render()');
   w.eval(`taskMenu(document.querySelector('#view .trow[data-id="${a}"]'), ${a})`); await sleep(80);
-  const q = [...d.querySelectorAll('#pop .menu-list > .mquick button')];
+  const q = [...d.querySelectorAll('#pop .menu-list > .mquick:first-child button')];
   check(q.length === 2 && d.querySelector('#pop .menu-list').firstElementChild.classList.contains('mquick'), 'task menu: two buttons on top');
   check(q.map(x => x.textContent.trim()).join('|') === 'Today|Tomorrow', 'labels: ' + q.map(x => x.textContent.trim()));
   click(w, q[1]);

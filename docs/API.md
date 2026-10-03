@@ -237,7 +237,7 @@ had been made in the app. Webhooks fire too.
 
 **Task filters** (`GET /tasks`): `list_id`, `status` (`open` default, `done`, `wont_do`, `all`), `due_from`, `due_to`,
 `tag` (one of your tags or a list tag, without `#`), `list_tag` (only list tags), `assignee` (`me`, `none` or a user id), `assignee_group` (2.10.0: `mine` or a group id), `updated_since` (ISO timestamp),
-`parent_id`, `top_level=true`, `waiting=true|false` (2.1.0), `limit`, `cursor`.
+`parent_id`, `top_level=true`, `waiting=true|false` (2.1.0), `pinned=true|false` (2.16.0, the *Pinned* view), `limit`, `cursor`.
 
 **Compact tasks** (2.0.8): `GET /tasks?fields=compact` returns only `id`, `title`, `list_id`, `section_id`, `parent_id`,
 `status`, `due`, `due_time`, `priority`, `tags`, `list_tags` and `assignee_id` per task, for scanning a large list

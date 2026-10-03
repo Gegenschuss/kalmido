@@ -169,6 +169,8 @@ def t_list_tasks(api, a):
     q = _pick(a, ("list_id", "status", "tag", "list_tag", "assignee", "assignee_group", "limit", "cursor", "type"))
     if "waiting" in a:  # 2.1.0 (#335)
         q["waiting"] = "true" if a["waiting"] else "false"
+    if "pinned" in a:  # 2.16.0 (#648)
+        q["pinned"] = "true" if a["pinned"] else "false"
     if a.get("compact") is True:
         q["fields"] = "compact"
     r = api.call("GET", "/tasks", q)
@@ -321,6 +323,7 @@ TOOLS = [
            "list_tag": {"type": "string"}, "assignee": {"type": "string"}, "limit": {"type": "integer", "minimum": 1, "maximum": 500},
            "cursor": {"type": "string"}, "compact": {"type": "boolean"},
            "waiting": {"type": "boolean", "description": "true = only tasks waiting on external, false = only the others"},
+           "pinned": {"type": "boolean", "description": "2.16.0: true = only pinned tasks (the 'Pinned' view), false = only the others"},
            "type": {"type": "string", "enum": ["bug", "feature", "task", "none"], "description": "only tickets of this type"},
            "assignee_group": {"type": "string", "description": "2.10.0: mine (assigned to one of your groups) or a group id"}}), t_list_tasks),
     # 2.10.0 (#441): groups (read) and the groups a list is shared with

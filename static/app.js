@@ -20,8 +20,13 @@ const P = {
   git: icPath('M6 3.5V16.5M6 13A6.5 6.5 0 0 0 12.5 6.5') + icDot(14.5, 5),
   bot: icPath('M4 16V11A6 6 0 0 1 16 11V16H4') + icDot(10, 11),
   inbox: icPath('M3 10V16H17V10M3 10H7A3 3 0 0 0 13 10H17') + icDot(10, 5),
-  sun: icPath('M16 10A6 6 0 1 1 10 4') + icDot(15.5, 4.5),
-  sunrise: icPath('M2.5 15H17.5M5 15A5 5 0 0 1 15 15') + icDot(10, 5.5),
+  // 2.16.0 (#645): Today = a sun with rays (the open arc read as "reload"), Tomorrow = a half sun on the horizon with rays
+  // (no arrow, it must not read as "upload")
+  sun: icPath('M13.5 10A3.5 3.5 0 1 1 6.5 10A3.5 3.5 0 0 1 13.5 10M10 2.5V4.3M10 15.7V17.5M2.5 10H4.3M15.7 10H17.5M4.7 4.7L5.9 5.9M14.1 14.1L15.3 15.3M4.7 15.3L5.9 14.1M14.1 5.9L15.3 4.7') + icDot(10, 10, 1.5),
+  smile: icPath('M17 10A7 7 0 1 1 10 3A7 7 0 0 1 17 10M7 12.2Q10 15 13 12.2') + icFill(7.6, 8.3, 1) + icFill(12.4, 8.3, 1),  // 2.16.0 (#643)
+  sunrise: icPath('M2.5 15.5H17.5M6 15.5A4 4 0 0 1 14 15.5M10 6.5V8.7M4.4 9.9L5.8 11.3M15.6 9.9L14.2 11.3') + icDot(10, 14, 1.4),
+  up: icPath('M10 16V4.5M5.5 9L10 4.5L14.5 9'),
+  down: icPath('M10 4V15.5M5.5 11L10 15.5L14.5 11'),
   week: icPath('M3 5H17M3 10H17M3 15H11') + icDot(15.5, 15),
   cal: icPath('M17 9V15A2 2 0 0 1 15 17H5A2 2 0 0 1 3 15V6A2 2 0 0 1 5 4H12M3 8.5H10.5M7 2.5V5.5') + icDot(15.5, 4.5),
   all: icPath('M3 4H17M3 8H17M3 12H17M3 16H10') + icDot(14.5, 16),
@@ -226,7 +231,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#iitip:
 document.addEventListener('scroll', () => iiHide(true), true);
 const hintK = t => `<div class="shint keep">${t}</div>`;  // 2.13.0: a helper line that stays inline (security, data loss, a state)
 const kt = (label, keys) => isTouch() ? label : `${label} (${kbText(keys)})`;  // a label with its keyboard shortcut
-const LS_KEEP = new Set(['tasks.theme', 'tasks.i18n', 'tasks.density', 'tasks.fsize', 'tasks.font', 'tasks.accent', 'tasks.accentMig280', 'tasks.sideGroups', 'tasks.agband', 'tasks.sideFold']);
+const LS_KEEP = new Set(['tasks.theme', 'tasks.i18n', 'tasks.density', 'tasks.densitySide', 'tasks.densityRows', 'tasks.fsize', 'tasks.font', 'tasks.accent', 'tasks.accentMig280', 'tasks.pw.det', 'tasks.pw.chat', 'tasks.sideGroups', 'tasks.agband', 'tasks.sideFold']);
 function clearLocal() {
   try {
     const ks = [];
@@ -246,8 +251,13 @@ try { matchMedia('(prefers-color-scheme: light)').addEventListener('change', app
 // density per device: compact (default on desktop) | comfortable (default on phones and touch screens)
 const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || '');
 const isTouch = () => { try { return isMobile() || matchMedia('(hover: none)').matches; } catch { return false; } };
-const densityPref = () => LS.get('density', null) || (isTouch() ? 'comfortable' : 'compact');
-function applyDensity() { document.documentElement.dataset.density = densityPref(); }
+// 2.16.0 (#642): "Custom" = the sidebar (lists, folders, filters) and the task rows each compact or comfortable; Compact /
+// Comfortable set both (before, the sidebar ignored the density)
+const DENS_OK = v => v === 'compact' || v === 'comfortable';
+const densityMode = () => { const v = LS.get('density', null); return v === 'custom' || DENS_OK(v) ? v : (isTouch() ? 'comfortable' : 'compact'); };
+const densityPref = () => { const m = densityMode(); if (m !== 'custom') return m; const v = LS.get('densityRows', null); return DENS_OK(v) ? v : (isTouch() ? 'comfortable' : 'compact'); };
+const sideDensityPref = () => { const m = densityMode(); if (m !== 'custom') return m; const v = LS.get('densitySide', null); return DENS_OK(v) ? v : (isTouch() ? 'comfortable' : 'compact'); };
+function applyDensity() { const r = document.documentElement.dataset; r.density = densityPref(); r.sdensity = sideDensityPref(); }
 applyDensity();
 // Appearance per device (settings > Appearance, command palette): font size (rem scale, see app.css), font, accent.
 // Values are checked against these tables; anything else in localStorage falls back to the default (first entry).
@@ -295,8 +305,11 @@ document.addEventListener('keydown', e => {
   e.preventDefault(); fsStep(d);
 });
 function lookSet(k, v) {
+  const prev = [sideDensityPref(), densityPref()];  // 2.16.0 (#642): "Custom" starts from what is shown now
   if (v == null) LS.del(k); else LS.set(k, v);
-  if (k === 'theme') applyTheme(); else if (k === 'density') applyDensity(); else applyLook();
+  if (k === 'density' && v === 'custom') { LS.set('densitySide', prev[0]); LS.set('densityRows', prev[1]); }
+  if ((k === 'densitySide' || k === 'densityRows') && v != null && LS.get('density', null) !== 'custom') { LS.set(k === 'densitySide' ? 'densityRows' : 'densitySide', k === 'densitySide' ? prev[1] : prev[0]); LS.set('density', 'custom'); }
+  if (k === 'theme') applyTheme(); else if (/^density/.test(k)) applyDensity(); else applyLook();
   if (k === 'fsize' && typeof render === 'function' && S.settings) render();  // week grid, timeline and charts are drawn in px
 }
 
@@ -323,6 +336,9 @@ function dayLabel(s, long) {
 // "So, 4. Okt – Mo, 5. Okt", a time after a comma ("Heute, 17:30")
 const dueLabel = (t, range = true) => !t.due ? '' : (range && t.start && t.start < t.due ? dayLabel(t.start) + ' – ' : '') + dayLabel(t.due) + (t.due_time ? ', ' + t.due_time : '');
 const dueClass = t => !t.due || t.status ? '' : t.due < today() ? 'over' : t.due === today() ? 'today' : '';
+// 2.16.0 (#473, WCAG 1.4.1): the priority as a shape too (! / !! / !!!, like the quick add), named for screen readers
+const PRIO_NAME = {5: N_('High priority'), 3: N_('Medium priority'), 1: N_('Low priority')};
+const prioMark = p => PRIO_NAME[p] ? `<span class="prm p${p}" role="img" aria-label="${esc(tr(PRIO_NAME[p]))}" title="${esc(tr(PRIO_NAME[p]))}">${{5: '!!!', 3: '!!', 1: '!'}[p]}</span>` : '';
 // timeline, roadmap, statistics and time reports use weekStartOf (the locale's first weekday, 1.5.1); habits keep Mondays
 function mondayOf(s) { const d = pd(s); const k = (d.getDay() + 6) % 7; d.setDate(d.getDate() - k); return ds(d); }
 
@@ -846,6 +862,7 @@ const SMART = {
   week: {name: N_('Next 7 days'), icon: 'week'},
   doable: {name: N_('Now doable'), icon: 'zap'},  // 1.7.0
   waiting: {name: N_('Waiting on external'), icon: 'hourglass'},  // 2.1.0 (#335)
+  pinned: {name: N_('Pinned|view'), icon: 'pin'},  // 2.16.0 (#648): every pinned task of every list
   assigned: {name: N_('Assigned to me'), icon: 'user'},
   all: {name: N_('All'), icon: 'all'},
   done: {name: N_('Completed'), icon: 'done'},
@@ -1254,6 +1271,7 @@ function viewTasks() {
   if (k === 'week') return {...pick(t => t.due && t.due <= addDays(t0, 6), 'date'), done: doneRecent.filter(t => t.due && t.due <= addDays(t0, 6) && doneSince(t))};
   if (k === 'doable') return {...pick(t => doable(t, t0), 'none'), done: doneRecent.filter(t => doneSince(t) && mineTask(t) && !(t.due && t.due > t0))};
   if (k === 'waiting') return {...pick(t => !!t.waiting_at, 'list'), done: []};  // 2.1.0 (#335)
+  if (k === 'pinned') return {...pick(t => !!t.pinned, 'list'), done: []};  // 2.16.0 (#648): grouped by list
   if (k === 'all') return {...pick(() => true, 'list'), done: doneRecent};
   if (k === 'assigned') return {...pick(mineAssigned, 'list'), done: doneRecent.filter(t => !!S.me && t.assignee_id === S.me.id)};  // 2.10.0: + my groups' tasks
   if (k.startsWith('grp:')) {  // 2.10.0 (#441): open tasks assigned to a group, in the lists I see
@@ -1497,7 +1515,7 @@ function modHash(m) { return m === 'tasks' ? keyToHash(LS.get('lastKey', START_K
 // ---- tab bar / rail per device (LS 'tabbar'): pinned modules, smart lists, lists, filters, tags,
 // search, settings. null = default = the modules in the server-wide order (settings "Module").
 const TAB_MAX = 5;  // phone: more than this -> first TAB_MAX-1 + "Mehr"
-const SMART_TABS = ['inbox', 'today', 'tomorrow', 'week', 'doable', 'waiting', 'assigned', 'all', 'done', 'trash'];
+const SMART_TABS = ['inbox', 'today', 'tomorrow', 'week', 'doable', 'pinned', 'waiting', 'assigned', 'all', 'done', 'trash'];
 const leadEmoji = n => (String(n ?? '').match(/^((?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|\uFE0F|\u200D)+)/u) || [])[1];
 const tabDefault = () => mods().map(([m]) => 'm:' + m);
 const tabIds = () => LS.get('tabbar', null) || tabDefault();
@@ -1566,12 +1584,13 @@ function tabsMore(anchor) {
     fn: () => t.act ? settingsModal() : go(t.go)})), '-', {label: tr('Customize tab bar'), icon: 'edit', fn: () => settingsModal('tabbar')}]);
 }
 function counts() {
-  const t0 = today(), c = {today: 0, tomorrow: 0, week: 0, doable: 0, over: 0, all: 0, assigned: 0, waiting: 0, lists: {}, tags: {}, filters: {}};
+  const t0 = today(), c = {today: 0, tomorrow: 0, week: 0, doable: 0, over: 0, all: 0, assigned: 0, waiting: 0, pinned: 0, lists: {}, tags: {}, filters: {}};
   for (const f of S.filters) c.filters[f.id] = openTasks().filter(t => !t.parent_id && filterMatch(t, f.rules)).length;
   for (const t of openTasks()) {
     // "Now doable" counts what its view shows at the top level: a subtask only when its parent is not doable itself
     if (doable(t, t0) && !(t.parent_id && S.tasks.get(t.parent_id) && doable(S.tasks.get(t.parent_id), t0))) c.doable++;
     if (t.waiting_at && !(t.parent_id && S.tasks.get(t.parent_id)?.waiting_at)) c.waiting++;  // 2.1.0 (#335)
+    if (t.pinned && !t.context && !(t.parent_id && S.tasks.get(t.parent_id)?.pinned)) c.pinned++;  // 2.16.0 (#648)
     if (t.parent_id) continue;
     c.all++;
     if (mineAssigned(t)) c.assigned++;
@@ -1642,6 +1661,7 @@ function renderSide() {
   // Focus: the smart lists
   const focus = [row('inbox', ic('inbox'), tr('Inbox'), c.lists[inbox()?.id]), row('today', ic('sun'), tr('Today'), c.today), row('tomorrow', ic('sunrise'), tr('Tomorrow'), c.tomorrow),
     row('week', ic('week'), tr('Next 7 days'), c.week), row('doable', ic('zap'), tr('Now doable'), c.doable),
+    c.pinned || (onTasks && k === 'pinned') ? row('pinned', ic('pin'), tr('Pinned|view'), c.pinned) : '',  // 2.16.0 (#648): only while something is pinned
     c.waiting || (onTasks && k === 'waiting') ? row('waiting', ic('hourglass'), tr('Waiting on external'), c.waiting) : '',
     collab() && (hasSharing() || c.assigned) ? row('assigned', ic('user'), tr('Assigned to me'), c.assigned) : '',
     collab() && (hasSharing() || S.news?.unread) ? `<button class="srow ${S.route.mod === 'news' ? 'on' : ''}" data-go="news">${ic('bell')}<span class="n">${tr('News')}</span><span class="c ${S.news?.unread ? 'nunread' : ''}">${S.news?.unread || ''}</span></button>` : ''].join('');
@@ -1668,9 +1688,8 @@ function renderSide() {
   // "Search" view inside); no separate "Search" row any more (it doubled the field in the drawer, the field was missing on
   // an unfolded Fold)
   $('#side').innerHTML = `
-    <div class="sbrand"><button type="button" class="sbhome" data-go="today" title="${esc(tr('Go to Today'))}" aria-label="${esc(tr('Go to Today'))}">${logoSvg(20)}<span>${esc(APP_NAME)}</span></button>${!isMobile() && innerWidth < 1100 ? `<span class="spacer"></span><button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}</div>
+    <div class="sbrand"><button type="button" class="sbhome" data-go="today" title="${esc(tr('Go to Today'))}" aria-label="${esc(tr('Go to Today'))}">${logoSvg(20)}<span>${esc(APP_NAME)}</span></button><span class="spacer"></span>${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(tr('Account') + ': ' + S.me.display_name)}" aria-label="${esc(tr('Account') + ': ' + S.me.display_name)}">${av(S.me.id, S.me.display_name)}${updDot() ? `<span class="dot" title="${esc(tr('Update available'))}"></span>` : ''}</button>` : ''}</div>
     <button class="scmd" data-act="palette" title="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span></button>
-    ${S.me ? `<div class="sdtop"><button class="srow suser" data-act="user-menu" title="${esc(S.me.username)}">${av(S.me.id, S.me.display_name)}<span class="n">${esc(S.me.display_name)}</span></button><button class="iconbtn sgear" data-act="settings" title="${tr('Settings')}" aria-label="${tr('Settings')}">${ic('gear')}${updDot() ? '<span class="dot"></span>' : ''}</button></div>` : ''}
     ${grp('focus', tr('Focus|nav'), focus)}
     ${views ? grp('views', tr('Views'), views) : ''}
     <div class="sgroup sg-lists">${head('lists', tr('Lists'), `<button data-act="lists-reorder" class="${S.listReorder ? 'on' : ''}" title="${tr('Sort lists')}">${ic('sort', 's')}</button><button data-act="list-new" title="${tr('New list')}">${ic('plus', 's')}</button>`, lists.length)}${sideOpen('lists') ? lh || `<div class="folder">${tr('No lists yet')}</div>` : ''}</div>
@@ -1686,7 +1705,6 @@ function renderSide() {
         return `<button class="srow sarch ${on ? 'on' : ''}" data-go="archived">${ic('archive')}<span class="n">${tr('Archived')}</span><span class="c">${archived.length}</span></button>`;
       })() : ''}
       <button class="srow sset" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}">${ic('gear')}<span class="n">${tr('Settings')}</span>${updDot() ? `<span class="c nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button>
-      ${S.me ? `<button class="srow suser sdesk" data-act="user-menu" title="${esc(S.me.username)}">${av(S.me.id, S.me.display_name)}<span class="n">${esc(S.me.display_name)}</span></button>` : ''}
     </div>`;
   sideRove();
 }
@@ -1965,7 +1983,7 @@ function keepFocus(root, fn) {
   if (n && n.offsetParent !== null && !n.disabled) n.focus({preventScroll: true});
   return r;
 }
-function renderView() { return keepFocus($('#view'), renderView0); }
+function renderView() { const r = keepFocus($('#view'), renderView0); rowRove(); return r; }
 function renderView0() {
   const m = S.route.mod, el = $('#view');
   // 2.12.2 (#451): the open phone chat is never rebuilt (that took the focus, closed the keyboard and jumped to the top):
@@ -2039,7 +2057,8 @@ function taskRow(t, opts = {}) {
   if (t.waiting_at && t.status === 0 && !opts.trash) meta.push(waitChip(t));  // 2.1.0 (#335)
   if (t.pinned && !opts.trash) meta.push(`<span class="pinm">${ic('pin', 's')}</span>`);
   if (lst) meta.push(`<span class="lst${mc}">${esc(lst)}</span>`);
-  if (t.due && !opts.checklist && !lc) meta.push(`<span class="dt ${dueClass(t)}${mc}">${ic('cal', 's')}${due}</span>`);
+  // 2.16.0 (#473): overdue is not only red: the alert icon + a word for screen readers
+  if (t.due && !opts.checklist && !lc) meta.push(`<span class="dt ${dueClass(t)}${mc}">${dueClass(t) === 'over' ? ic('alert', 's') + `<span class="sr">${tr('Overdue')}: </span>` : ic('cal', 's')}${due}</span>`);
   if (t.repeat && !opts.checklist) meta.push(`<span>${ic('repeat', 's')}</span>`);
   if (t.reminders && t.due && !opts.checklist) meta.push(`<span${nagOf(t) ? ` class="nagm" title="${esc(tr('Repeat reminder') + ': ' + nagLabel(nagOf(t)))}"` : ''}>${ic('bell', 's')}${nagOf(t) ? ic('repeat', 's') : ''}</span>`);
   if (t.deadline && t.due && !opts.checklist && !opts.trash) meta.push(dlChip(t));  // 2.7.0 (#412)
@@ -2086,7 +2105,7 @@ function taskRow(t, opts = {}) {
   let lcH = '';
   if (lc) {  // 2.14.0 (#425): the cells in the list's order; a cell the width has no room for shows in the second line
     const cells = lc.filter(k => k !== 'id').map(k => [k, lcCell(k, t, {kids, openKids, time, checklist: opts.checklist})]);
-    lcH = `<div class="lcols" data-act="open">${cells.map(([k, c], i) => `<span class="lc ${lcCls(k)} ${lcOvf(i)}">${c}</span>`).join('')}</div>`;
+    lcH = `<div class="lcols" data-act="open">${cells.map(([k, c], i) => `<span class="lc ${lcCls(k)} ${lcOvf(i)}" data-k="${esc(k)}">${c}</span>`).join('')}</div>`;
     cells.forEach(([k, c], i) => { if (c && i >= 2) meta.push(`<span class="mlc ${lcOvf(i)}" data-lc="${esc(k)}">${c}</span>`); });
   }
   const gut = !opts.checklist && t.id > 0 && (lc ? lc.includes('id') : ticketsOn(t.list_id) || idsOn(t.list_id)) ? `<span class="tgut" aria-label="${esc(tr('Ticket {0}', '#' + t.id))}">#${t.id}</span>` : '';
@@ -2096,8 +2115,8 @@ function taskRow(t, opts = {}) {
   const cols = tc ? `<div class="tcols" data-act="open">${timeOn() && (opts.tcols.list || isProject(t.list_id)) ? `<span class="c-time ${time?.live ? 'live' : ''}" title="${time ? time.tip : ''}">${time ? time.txt : ''}</span>` : ''}${collab() ? `<span class="c-who">${who}</span>` : ''}${opts.tcols.list ? `<span class="c-list" title="${esc(lst)}"><span>${esc(lst)}</span></span>` : ''}<span class="c-date ${dueClass(t)}" title="${esc(due)}">${t.start && t.start < t.due ? ic('timeline', 's rngi') : ''}<span class="cdt">${esc(dueLabel(t, false))}</span></span></div>` : '';
   let h = `<div class="trow ${t.priority && !opts.checklist ? 'pr' + t.priority : ''} ${opts.checklist ? 'ck' : ''} ${tc || lc ? 'hascols' : ''} ${lc ? 'haslc' : ''} ${t.status ? 'done' : ''} ${opts.depth ? 'sub d' + opts.depth : ''} ${opts.subRow ? 'subrow' : ''} ${S.sel === t.id ? 'sel' : ''} ${gut ? 'hasgut' : ''} ${S.kf === t.id && !opts.subRow ? 'kfocus' : ''} ${S.multi.has(t.id) ? 'msel' : ''} ${ro ? 'ro' : ''} ${opts.next && !opts.depth ? 'flownext' : ''}" data-id="${t.id}" ${opts.drag !== false && !opts.trash && !ro && !isMobile() ? 'draggable="true"' : ''}>
     ${caret}
-    ${opts.trash ? `<span class="chk ${chk}">${t.status === 2 ? ic('check') : ''}</span>` : `<button class="chk ${chk}" data-act="toggle" aria-label="${tr('done')}" ${ro ? 'disabled' : ''}>${t.status === 2 ? ic('check') : t.status === -1 ? ic('x') : ''}</button>`}${gut}
-    <div class="tmain" data-act="${opts.trash ? '' : 'open'}"><div class="ttl">${esc(t.title)}</div><div class="meta">${meta.join('')}</div></div>
+    ${opts.trash ? `<span class="chk ${chk}">${t.status === 2 ? ic('check') : ''}</span>` : `<button class="chk ${chk}" data-act="toggle" role="checkbox" aria-checked="${t.status === 2}" aria-label="${esc(tr('Complete: {0}', t.title))}" ${ro ? 'disabled' : ''}>${t.status === 2 ? ic('check') : t.status === -1 ? ic('x') : ''}</button>`}${gut}
+    <div class="tmain" data-act="${opts.trash ? '' : 'open'}"><div class="ttl"${opts.trash ? '' : ` data-kt role="button" tabindex="-1" aria-describedby="tm-${t.id}"`}>${esc(t.title)}${t.priority && !opts.checklist && !opts.trash && t.status === 0 && !(lc && lc.includes('prio')) ? prioMark(t.priority) : ''}</div><div class="meta" id="tm-${t.id}">${meta.join('')}</div></div>
     ${opts.cols ? `<div class="fcols" data-act="open">${opts.cols.map(f => `<span class="fcell t-${esc(f.type)}">${fieldCell(f, t.fields?.[f.id], t.list_id)}</span>`).join('')}</div>` : ''}
     ${cols}${lcH}
     ${ac ? `<span class="wcell">${who}</span>` : ''}
@@ -2190,16 +2209,17 @@ function fieldCell(f, v, lid) {  // column view (desktop)
   return `<span title="${esc(fieldText(f, v, lid))}">${esc(fieldText(f, v, lid))}</span>`;
 }
 // ---- 2.14.0: the heron (empty states, welcome, offline, errors). A line drawing in the text colour; its sun (the dot) is
-// the accent and follows theme and accent colour (CSS .heron .hr-sun). Decorative: hidden from screen readers, the text
+// the accent and follows theme and accent colour (CSS .heron .hr-sun); 2.16.0 (#447): standing / welcome / offline: a half sun on
+// the horizon (the dot above the beak read as a balanced stone). Decorative: hidden from screen readers, the text
 // next to it says what it means.
 const HERON = {
   agent: ['0 0 120 120', '<circle class="hr-sun" cx="96" cy="97" r="3.4"/><g transform="translate(-14 0)"><path d="M34 64L24 70"/><path d="M34 64C46 55 68 57 80 67C72 75 54 77 42 72"/><path d="M70 62C66 52 62 44 64 36C66 30 72 29 75 33"/><path d="M75 33L92 41"/><circle class="hr-eye" cx="69" cy="34" r="1.8" /><path d="M60 76V106"/><path d="M60 88L52 84L57 79"/><path d="M42 108H78M50 113H70"/></g><path d="M86 106V96A10 10 0 0 1 106 96V106"/><path d="M96 86V81"/><path d="M111 90A6 6 0 0 1 111 100"/><path d="M82 108H112"/>'],
   done: ['0 0 120 120', '<circle class="hr-sun" cx="95" cy="99" r="6.5"/><path d="M34 64L24 70"/><path d="M34 64C46 55 68 57 80 67C72 75 54 77 42 72"/><path d="M70 62C66 52 62 44 64 36C66 30 72 29 75 33"/><path d="M75 33L93 40"/><path d="M66.8 33.6Q69 35.4 71.2 33.6"/><path d="M60 76V106"/><path d="M60 88L52 84L57 79"/><path d="M42 108H104M50 113H70"/>'],
   error: ['0 0 120 120', '<circle class="hr-sun" cx="77" cy="108" r="2.6"/><path d="M34 64L24 70"/><path d="M34 64C46 55 68 57 80 67C72 75 54 77 42 72"/><path d="M72 63C73 53 79 46 85 48C88 49 89 53 87 57"/><circle class="hr-eye" cx="84.5" cy="51.5" r="1.6" /><path d="M87.5 56L95 74"/><path d="M60 76V106"/><path d="M60 88L52 84L57 79"/><path d="M30 108H71M83 108L100 104.5M48 113H66"/>'],
   empty: ['0 0 120 120', '<circle class="hr-sun" cx="92" cy="104" r="3.2"/><path d="M34 64L24 70"/><path d="M34 64C46 55 68 57 80 67C72 75 54 77 42 72"/><path d="M72 63C76 55 83 51 87 55C90 58 90 63 88 67"/><circle class="hr-eye" cx="86.2" cy="59.5" r="1.6" /><path d="M88.5 66L92 86"/><path d="M60 76V102"/><path d="M60 88L52 84L57 79"/><path d="M36 104H84M100 104H108M48 110H66"/><path d="M84 109Q92 112 100 109"/>'],
-  stand: ['0 0 120 120', '<circle class="hr-sun" cx="88" cy="28" r="9"/><path d="M34 64L24 70"/><path d="M34 64C46 55 68 57 80 67C72 75 54 77 42 72"/><path d="M70 62C66 52 62 44 64 36C66 30 72 29 75 33"/><path d="M75 33L94 38"/><circle class="hr-eye" cx="69" cy="34" r="1.8" /><path d="M60 76V106"/><path d="M60 88L52 84L57 79"/><path d="M42 108H78M50 113H70"/>'],
-  offline: ['0 0 120 120', '<circle class="hr-sun dim" cx="88" cy="28" r="9"/><path d="M34 64L24 70"/><path d="M34 64C46 55 68 57 80 67C72 75 54 77 42 72"/><path d="M72 63C75 56 71 50 65 51C60 52 59 57 62 60"/><path d="M64 54.5Q66 56 68 54.5"/><path d="M61 53L47 58"/><path d="M60 76V106"/><path d="M60 88L52 84L57 79"/><path d="M42 108H78M50 113H70"/>'],
-  welcome: ['0 0 120 120', '<circle class="hr-sun" cx="88" cy="28" r="9"/><path d="M34 64L24 70"/><path d="M34 64C46 55 68 57 80 67C72 75 54 77 42 72"/><path d="M46 61C40 52 40 42 47 35"/><path d="M52 60C48 53 48 47 52 42"/><path d="M70 62C66 52 62 44 64 36C66 30 72 29 75 33"/><path d="M75 33L94 38"/><circle class="hr-eye" cx="69" cy="34" r="1.8" /><path d="M60 76V106"/><path d="M60 88L52 84L57 79"/><path d="M42 108H78M50 113H70"/>'],
+  stand: ['0 0 120 120', '<path class="hr-sun" d="M89 108A9 9 0 0 1 107 108Z"/><path d="M34 64L24 70"/><path d="M34 64C46 55 68 57 80 67C72 75 54 77 42 72"/><path d="M70 62C66 52 62 44 64 36C66 30 72 29 75 33"/><path d="M75 33L94 38"/><circle class="hr-eye" cx="69" cy="34" r="1.8" /><path d="M60 76V106"/><path d="M60 88L52 84L57 79"/><path d="M42 108H112M50 113H70"/>'],
+  offline: ['0 0 120 120', '<path class="hr-sun dim" d="M89 108A9 9 0 0 1 107 108Z"/><path d="M34 64L24 70"/><path d="M34 64C46 55 68 57 80 67C72 75 54 77 42 72"/><path d="M72 63C75 56 71 50 65 51C60 52 59 57 62 60"/><path d="M64 54.5Q66 56 68 54.5"/><path d="M61 53L47 58"/><path d="M60 76V106"/><path d="M60 88L52 84L57 79"/><path d="M42 108H112M50 113H70"/>'],
+  welcome: ['0 0 120 120', '<path class="hr-sun" d="M89 108A9 9 0 0 1 107 108Z"/><path d="M34 64L24 70"/><path d="M34 64C46 55 68 57 80 67C72 75 54 77 42 72"/><path d="M46 61C40 52 40 42 47 35"/><path d="M52 60C48 53 48 47 52 42"/><path d="M70 62C66 52 62 44 64 36C66 30 72 29 75 33"/><path d="M75 33L94 38"/><circle class="hr-eye" cx="69" cy="34" r="1.8" /><path d="M60 76V106"/><path d="M60 88L52 84L57 79"/><path d="M42 108H112M50 113H70"/>'],
 };
 const heron = (pose, cls = '') => { const [vb, inner] = HERON[pose] || HERON.empty; return `<svg class="heron ${cls}" viewBox="${vb}" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`; };
 const heronEmpty = (pose, title, sub = '') => `<div class="empty hempty">${heron(pose)}<b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>`;
@@ -2327,8 +2347,44 @@ async function colSave(id, next, quiet) {
 function lcHead(l, lc) {  // the column titles above the rows (wide layouts)
   const ks = lc.filter(k => k !== 'id');
   if (!ks.length) return '';
-  return `<div class="lchead" aria-hidden="true"><span class="spacer"></span>${ks.map((k, i) => { const n = colName(l, k); return `<span class="lc ${lcCls(k)} ${lcOvf(i)}" title="${esc(n)}">${k === 'who' || k === 'prio' ? ic(COL_ICON[k], 's') : `<span>${esc(colShort(l, k))}</span>`}</span>`; }).join('')}</div>`;
+  lcwApply(l.id);
+  // 2.16.0 (#634): a grip at the right edge of each column title: drag = the column's width on this device (per list),
+  // double-click = its standard width; for the keyboard a separator (← → 0.5 rem, Enter = standard)
+  return `<div class="lchead" data-lid="${l.id}"><span class="spacer"></span>${ks.map((k, i) => { const n = colName(l, k); return `<span class="lc ${lcCls(k)} ${lcOvf(i)}" data-k="${esc(k)}" title="${esc(n)}"><span class="lcn" aria-hidden="true">${k === 'who' || k === 'prio' ? ic(COL_ICON[k], 's') : `<span>${esc(colShort(l, k))}</span>`}</span>${isTouch() ? '' : `<i class="lcg" data-lcg="${esc(k)}" role="separator" aria-orientation="vertical" tabindex="0" aria-label="${esc(tr('Width of the column {0}', n))}"></i>`}</span>`; }).join('')}</div>`;
 }
+// ---- 2.16.0 (#634): column widths per device and list (localStorage lcw.<list>: {key: rem}), applied as one style sheet
+const LCW_MIN = 2.5, LCW_MAX = 24;
+const lcwGet = lid => LS.get('lcw.' + lid, {}) || {};
+function lcwApply(lid) {
+  let st = $('#lcw-style'); if (!st) { st = document.createElement('style'); st.id = 'lcw-style'; document.head.appendChild(st); }
+  const w = lcwGet(lid);
+  st.textContent = Object.entries(w).filter(([, v]) => v > 0).map(([k, v]) => `#view .lc[data-k="${window.CSS?.escape ? CSS.escape(k) : k.replace(/["\\]/g, '')}"]{width:${+v}rem;max-width:none}`).join('\n');
+}
+function lcwSet(lid, k, v) {
+  const w = lcwGet(lid);
+  if (v == null) delete w[k]; else w[k] = Math.round(Math.max(LCW_MIN, Math.min(LCW_MAX, v)) * 4) / 4;
+  Object.keys(w).length ? LS.set('lcw.' + lid, w) : LS.del('lcw.' + lid);
+  lcwApply(lid);
+}
+document.addEventListener('pointerdown', e => {
+  const g = e.target.closest?.('.lchead .lcg'); if (!g || e.button !== 0) return;
+  e.preventDefault(); e.stopPropagation();
+  const lid = +g.closest('.lchead').dataset.lid, k = g.dataset.lcg, cell = g.closest('.lc');
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, x0 = e.clientX, w0 = cell.getBoundingClientRect().width / rem;
+  g.setPointerCapture?.(e.pointerId); document.body.classList.add('pgdrag');
+  const mv = ev => lcwSet(lid, k, w0 + (ev.clientX - x0) / rem);
+  const up = () => { g.removeEventListener('pointermove', mv); document.body.classList.remove('pgdrag'); };
+  g.addEventListener('pointermove', mv); g.addEventListener('pointerup', up, {once: true}); g.addEventListener('pointercancel', up, {once: true});
+}, true);
+document.addEventListener('dblclick', e => { const g = e.target.closest?.('.lchead .lcg'); if (g) lcwSet(+g.closest('.lchead').dataset.lid, g.dataset.lcg, null); });
+document.addEventListener('keydown', e => {
+  const g = e.target.closest?.('.lchead .lcg'); if (!g) return;
+  const lid = +g.closest('.lchead').dataset.lid, k = g.dataset.lcg, rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  const cur = g.closest('.lc').getBoundingClientRect().width / rem || lcwGet(lid)[k] || parseFloat(getComputedStyle(g.closest('.lc')).width) / rem || 7;
+  const to = {ArrowRight: cur + (e.shiftKey ? 2 : .5), ArrowLeft: cur - (e.shiftKey ? 2 : .5)}[e.key];
+  if (to != null) { e.preventDefault(); e.stopPropagation(); lcwSet(lid, k, to); }
+  else if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); lcwSet(lid, k, null); }
+}, true);
 // ---- dependencies: "waiting on" (blocked by open tasks)
 function blockedTitle(t) {
   const names = (t.blockers || []).map(id => S.tasks.get(id)?.title).filter(Boolean), hidden = Math.max(0, (t.blocked || 0) - names.length);
@@ -2366,7 +2422,7 @@ function tplBtn() {
 // adds and keeps the focus, Esc leaves it. Phones keep the + button (FAB).
 const QEX = N_('Type the way you think: “Dentist tomorrow 3pm !high #private ~list”');
 function qdockHtml() {
-  return `<div class="qdock"><div class="qadd dock"><div class="box"><span class="qplus" aria-hidden="true">${ic('plus', 's')}</span><input id="qinput" aria-label="${esc(tr('Add task…'))}" placeholder="${tr('Add task…')}" title="${esc(tr(QEX))}" aria-label="${tr('New task')}" autocomplete="off" enterkeyhint="done">${tplBtn()}${qExtraBtns('qinput')}${isTouch() ? '' : `<span class="qkey" title="${esc(kt(tr('New task'), 'n'))}">${kb('n')}</span>`}</div>
+  return `<div class="qdock"><div class="qadd dock"><div class="box"><span class="qplus" aria-hidden="true">${ic('plus', 's')}</span><input id="qinput" aria-label="${esc(tr('Add task…'))}" placeholder="${tr('Add task…')}" title="${esc(tr(QEX))}" autocomplete="off" enterkeyhint="done">${tplBtn()}${qExtraBtns('qinput')}${isTouch() ? '' : `<span class="qkey" title="${esc(kt(tr('New task'), 'n'))}">${kb('n')}</span>`}</div>
     <div class="qdmore"><div class="qdchips" id="qdchips"></div><div class="chips" id="qchips"></div>${hintSeen('qsyntax') ? '' : `<div class="qhint">${tr(QEX)}</div>`}</div></div></div>`;
 }
 // the chips of the docked composer: what the task will get (a chip set here wins over the text)
@@ -2756,7 +2812,7 @@ function calsHtml(chk, hint) {
       <li>${tr('Servers in your own network (for example 10.x.x.x or a VPN address) are blocked for safety until an admin allows the host under Settings > Administration > Advanced.')}</li></ul></details>`;
 }
 function calStatus(x) {
-  if (x.status === 'error') return `<span class="calerr">${esc(x.error_text || tr('Error'))}</span>` + (x.synced_at ? ' · ' + esc(tr('last synced {0}', relTime(x.synced_at))) : '');
+  if (x.status === 'error') return `<span class="calerr" role="alert">${esc(x.error_text || tr('Error'))}</span>` + (x.synced_at ? ' · ' + esc(tr('last synced {0}', relTime(x.synced_at))) : '');
   if (!x.synced_at) return esc(tr('Not synced yet'));
   return esc(tr('synced {0}', relTime(x.synced_at))) + ' · ' + esc(trn('{0} event', '{0} events', x.events)) + (x.truncated ? ' ' + esc(tr('(limit reached)')) : '');
 }
@@ -2829,7 +2885,7 @@ function calAddModal(done) {
       <div id="ca-cals" class="featgrid"></div></div>
     <div class="row"><label for="ca-int">${tr('Refresh')}</label><select id="ca-int"><option value="15">${tr('every 15 minutes')}</option><option value="60">${tr('every hour')}</option></select></div>
     <div class="shint">${tr('The link and the password are stored encrypted and never shown again. Kalmido only reads the calendar.')}</div>
-    <div class="calerr" id="ca-err" hidden></div>
+    <div class="calerr" role="alert" id="ca-err" hidden></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Add')}</button></div>`);
   let kind = 'ics', found = null;
   const errBox = $('#ca-err', md), ok = $('[data-m="ok"]', md);
@@ -2880,7 +2936,7 @@ function calEditModal(x, colors, done) {
     ${x.kind === 'ics' ? `<div class="row"><label for="ce-url">${tr('Link')}</label><input id="ce-url" type="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${tr('saved ({0}), empty = keep', x.url_hint)}"></div>`
     : `<div class="row"><label for="ce-user">${tr('Username')}</label><input id="ce-user" autocomplete="off" autocapitalize="off" value="${esc(x.username)}"></div>
       <div class="row"><label for="ce-pw">${tr('Password')}</label><input id="ce-pw" type="password" autocomplete="new-password" placeholder="${x.password_saved ? tr('saved, empty = keep') : ''}"></div>`}
-    <div class="calerr" id="ce-err" hidden></div>
+    <div class="calerr" role="alert" id="ce-err" hidden></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   md.addEventListener('click', async e => {
     const cb = e.target.closest('[data-c]');
@@ -2968,7 +3024,7 @@ function viewWeek() {
   return `${calBar(title)}<div class="week ${day ? 'oneday' : ''}" style="--cols:${days.length};--h:${H}px">
     <div class="whead"><div></div>${days.map(d => `<div class="wh ${d === t0 ? 'today' : ''}" data-day="${d}"><span>${WD[pd(d).getDay()]}</span><b>${pd(d).getDate()}</b></div>`).join('')}</div>
     <div class="wallday"><div class="wlbl">${tr('all day|short')}</div>${days.map(d => `<div class="wad" data-day="${d}">${evsOf(d).filter(e => !cevTimed(e, d)).map(e => cevChip(e, d)).join('')}${(map.get(d) || []).filter(t => !t.due_time).map(chip).join('')}</div>`).join('')}</div>
-    <div class="wbody" id="wbody"><div class="wgutter">${[...Array(24)].map((_, h) => `<div class="wtime" style="top:${h * H}px">${pad(h)}:00</div>`).join('')}</div>${cols}</div></div>`;
+    <div class="wbody" id="wbody" tabindex="0" role="region" aria-label="${esc(tr('Hours of the week'))}"><div class="wgutter">${[...Array(24)].map((_, h) => `<div class="wtime" style="top:${h * H}px">${pad(h)}:00</div>`).join('')}</div>${cols}</div></div>`;
 }
 function isoWeek(s) { const d = pd(s); d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7); const w1 = new Date(d.getFullYear(), 0, 4); return 1 + Math.round(((d - w1) / 864e5 - 3 + (w1.getDay() + 6) % 7) / 7); }
 function layoutDay(evs, extra = []) {  // side-by-side lanes for overlapping timed tasks (+ calendar events: {c, s, e})
@@ -4065,18 +4121,18 @@ function habitModal(id) {
   };
   const md = modal(`<h3>${id ? esc(x.name) : tr('New habit')}</h3>
     ${st ? `<div class="hstats"><div><b>${st.streak}</b><span>${tr('current streak')}</span></div><div><b>${st.best}</b><span>${tr('best streak')}</span></div><div><b>${st.total}</b><span>${tr('days total')}</span></div><div><b>${st.rate}%</b><span>${tr('last 30 days')}</span></div></div><div id="heatwrap">${heat()}</div><h4>${tr('Settings')}</h4>` : ''}
-    <div class="row"><label>${tr('Name')}</label><input id="h-name" value="${esc(x.name)}" placeholder="${tr('e.g. reading, workout, water')}"></div>
-    <div class="row"><label>${tr('Goal per day')}</label><input id="h-goal" type="number" min="1" max="50" value="${esc(x.goal)}"></div>
+    <div class="row"><label for="h-name">${tr('Name')}</label><input id="h-name" value="${esc(x.name)}" placeholder="${tr('e.g. reading, workout, water')}"></div>
+    <div class="row"><label for="h-goal">${tr('Goal per day')}</label><input id="h-goal" type="number" min="1" max="50" value="${esc(x.goal)}"></div>
     <div class="row"><label>${tr('Frequency')}</label><div class="seg" id="h-freq"><button data-freq="days" class="${x.per_week ? '' : 'on'}">${tr('Fixed days')}</button><button data-freq="week" class="${x.per_week ? 'on' : ''}">${tr('X times a week')}</button></div></div>
     <div class="row ${x.per_week ? 'hidden' : ''}" id="h-daysrow"><label>${tr('days|label')}</label><div class="wdays" id="h-days">${WD_MO().map((w, i) => `<button class="${x.days.includes(String(i + 1)) ? 'on' : ''}" data-wd="${i + 1}">${w}</button>`).join('')}</div></div>
-    <div class="row ${x.per_week ? '' : 'hidden'}" id="h-pwrow"><label>${tr('Times per week')}</label><input id="h-pw" type="number" min="1" max="7" value="${esc(x.per_week || 3)}" style="max-width:5.625rem"><span class="muted" style="font-size:var(--fs-s)">${tr('on any days')}</span></div>
+    <div class="row ${x.per_week ? '' : 'hidden'}" id="h-pwrow"><label for="h-pw">${tr('Times per week')}</label><input id="h-pw" type="number" min="1" max="7" value="${esc(x.per_week || 3)}" style="max-width:5.625rem"><span class="muted" style="font-size:var(--fs-s)">${tr('on any days')}</span></div>
     <div class="row"><label for="h-rem">${tr('Reminder')}</label>${timeIn('h-rem', x.remind_at, {label: tr('Reminder'), empty: tr('off')})}</div>
-    <div class="row"><label>${tr('Color')}</label><div class="colors" id="h-col">${HCOLORS.map(c => `<button style="background:${c}" class="${(cssColor(x.color) || HCOLORS[0]) === c ? 'on' : ''}" data-c="${c}"></button>`).join('')}</div></div>
+    <div class="row"><label>${tr('Color')}</label><div class="colors" id="h-col" role="group" aria-label="${esc(tr('Color'))}">${HCOLORS.map((c, i) => `<button type="button" style="background:${c}" class="${(cssColor(x.color) || HCOLORS[0]) === c ? 'on' : ''}" aria-pressed="${(cssColor(x.color) || HCOLORS[0]) === c}" aria-label="${esc(tr('Color {0}', i + 1))}" data-c="${c}"></button>`).join('')}</div></div>
     <div class="foot">${id ? `<button class="btn danger" data-m="del">${tr('Delete')}</button><button class="btn" data-m="arch">${x.archived ? tr('Reactivate') : tr('Archive')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   md.addEventListener('click', async e => {
     const b = e.target.closest('button,[data-hday]'); if (!b) return;
     if (b.dataset.wd) b.classList.toggle('on');
-    if (b.dataset.c) { $$('#h-col button', md).forEach(x => x.classList.remove('on')); b.classList.add('on'); }
+    if (b.dataset.c) { $$('#h-col button', md).forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', String(x === b)); }); }
     if (b.dataset.hm) { const [y, m] = month.split('-').map(Number); const d = new Date(y, m - 1 + +b.dataset.hm, 1); month = ds(d).slice(0, 7); S.habitMonth = month; $('#heatwrap', md).innerHTML = heat(); }
     if (b.dataset.freq) {
       $$('#h-freq button', md).forEach(y => y.classList.toggle('on', y === b));
@@ -4221,6 +4277,11 @@ function openDetail(id) {
   $('#app').classList.add('detail-open'); fitLayout();
   renderDetail();
   requestAnimationFrame(() => d.classList.add('open'));
+  // 2.16.0 (#473): the panel is a named region; opened with the keyboard (Enter / o on a row) or on a phone (it covers the
+  // list) it takes the focus, closing it gives the focus back to the row (closeDetail)
+  d.setAttribute('aria-label', tr('Task details'));
+  const kb = S.kbOpen; S.kbOpen = false;
+  if (kb || isMobile()) setTimeout(() => { if (document && S.sel === id && !d.contains(document.activeElement)) { d.tabIndex = -1; try { d.focus({preventScroll: true}); } catch { d.focus(); } } }, 60);
   $$('.trow.sel').forEach(r => r.classList.remove('sel'));
   $$(`.trow[data-id="${id}"]`).forEach(r => r.classList.add('sel'));
   if (isMobile()) history.pushState({detail: id}, '', location.hash);
@@ -4232,6 +4293,8 @@ function openDetail(id) {
 }
 function closeDetail(fromPop) {
   flushSaves();
+  const was = S.sel, a = document.activeElement, back = was && (!a || a === document.body || $('#detail').contains(a));
+  if (back) setTimeout(() => { if (!document) return; const t = $(`#view .trow[data-id="${was}"] .ttl[data-kt]`); const b = document.activeElement; if (t && !S.sel && (!b || b === document.body || !b.isConnected || $('#detail').contains(b))) { rowRove(t); try { t.focus({preventScroll: true}); } catch { t.focus(); } } }, isMobile() ? 260 : 0);
   S.sel = null; S.tl = {id: null}; S.cedit = null; S.editLink = false; mentionClose();
   if ($('#stale.indet')) staleDraw();  // 2.13.2 (#478 F8): back to the bottom edge
   const d = $('#detail');
@@ -4254,11 +4317,13 @@ function fitLayout(quiet) {
   // area: the task panel used to sit under the chat with ~400 px empty next to it). Where list + task + chat do not fit,
   // the task takes the chat's place (body.chat-yield hides the panel, the task header's chat button / the agent pill /
   // closing the task bring it back)
-  const chatOn = document.body.classList.contains('chat-open') && !(isMobile() || innerWidth < 1000), chatW = chatOn ? Math.min(26 * rem, innerWidth * .4) : 0;
-  const yieldC = chatOn && det && innerWidth - chatW - 25.5 * rem < LIST_MIN_PX;
+  panelVars(); requestAnimationFrame(placeGrips);  // 2.16.0 (#639): the widths of the task panel and the chat per device
+  const chatOn = document.body.classList.contains('chat-open') && !(isMobile() || innerWidth < 1000), chatW = chatOn ? Math.min(panelRem('chat') * rem, innerWidth * .4) : 0;
+  const detR = panelRem('det');
+  const yieldC = chatOn && det && innerWidth - chatW - detR * rem < LIST_MIN_PX;
   document.body.classList.toggle('chat-yield', yieldC);
   // 2.13.0: the open chat panel takes its room too: the sidebar folds into the drawer instead of squeezing the list
-  const narrow = innerWidth - (15 + (det ? 25.5 : 0)) * rem - (yieldC ? 0 : chatW) < LIST_MIN_PX;
+  const narrow = innerWidth - (15 + (det ? detR : 0)) * rem - (yieldC ? 0 : chatW) < LIST_MIN_PX;
   // 2.13.0 (#453 A15): below ~1100 px (an unfolded Fold, small windows) the sidebar can be folded away by hand (remembered
   // per device); the header's menu button opens it as a drawer then, like on a phone
   const on = !isMobile() && (narrow || (innerWidth < 1100 && !!LS.get('sideFold', false)));
@@ -4269,6 +4334,68 @@ function fitLayout(quiet) {
 }
 let fitT = null;
 window.addEventListener('resize', () => { clearTimeout(fitT); fitT = setTimeout(() => fitLayout(), 80); });
+// ---- 2.16.0 (#639): grips between list | task | chat (desktop, an unfolded Fold): drag to make the task panel or the chat
+// wider / narrower, remembered per device (localStorage), a double-click = the standard width. The grip is a separator
+// for the keyboard and screen readers: ← → change the width by 1 rem (Shift: 4 rem), Home / End = narrowest / widest,
+// Enter = the standard width. The list never gets narrower than LIST_MIN_PX; phones keep the full-screen panels.
+const PW = {det: [25.5, 20, 48], chat: [26, 20, 44]};  // rem: standard, min, max
+const panelRem = k => { const v = +LS.get('pw.' + k, 0); return v ? Math.max(PW[k][1], Math.min(PW[k][2], v)) : PW[k][0]; };
+function panelVars() { const r = document.documentElement.style; r.setProperty('--detW', panelRem('det') + 'rem'); r.setProperty('--chatW', panelRem('chat') + 'rem'); }
+function panelMax(k) {  // the widest the panel may get now, in rem (the list keeps LIST_MIN_PX)
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, app = $('#app');
+  const side = app.classList.contains('side-rail') || isMobile() ? 0 : 15 * rem;
+  const other = k === 'det' ? (document.body.classList.contains('chat-open') && !document.body.classList.contains('chat-yield') && innerWidth >= 1000 ? Math.min(panelRem('chat') * rem, innerWidth * .4) : 0)
+    : (app.classList.contains('detail-open') ? panelRem('det') * rem : 0);
+  const room = (innerWidth - side - other - LIST_MIN_PX) / rem;
+  return Math.max(PW[k][1], Math.min(PW[k][2], k === 'chat' ? Math.min(room, innerWidth * .4 / rem) : room));
+}
+function panelSet(k, v, quiet) {
+  const x = v == null ? null : Math.round(Math.max(PW[k][1], Math.min(panelMax(k), v)) * 4) / 4;
+  if (x == null || x === PW[k][0]) LS.del('pw.' + k); else LS.set('pw.' + k, x);
+  panelVars(); if (!quiet) fitLayout(); placeGrips();
+}
+function placeGrips() {
+  const want = {det: !isMobile() && $('#app')?.classList.contains('detail-open') && !$('#detail').classList.contains('hidden'),
+    chat: !isMobile() && innerWidth >= 1000 && document.body.classList.contains('chat-open') && !document.body.classList.contains('chat-yield') && !!$('#achat:not(.hidden)')};
+  for (const k of ['det', 'chat']) {
+    let g = $('#pgrip-' + k);
+    if (!want[k]) { if (g) g.hidden = true; continue; }
+    if (!g) {
+      g = document.createElement('div'); g.id = 'pgrip-' + k; g.className = 'pgrip'; g.dataset.k = k; g.tabIndex = 0;
+      g.setAttribute('role', 'separator'); g.setAttribute('aria-orientation', 'vertical');
+      document.body.appendChild(g); gripWire(g);
+    }
+    const el = k === 'det' ? $('#detail') : $('#achat'), r = el.getBoundingClientRect();
+    g.hidden = !r.width;
+    g.style.left = Math.round(r.left - 5) + 'px'; g.style.top = Math.round(r.top) + 'px'; g.style.height = Math.round(r.height) + 'px';
+    const v = panelRem(k);
+    g.setAttribute('aria-label', k === 'det' ? tr('Width of the task panel') : tr('Width of the chat'));
+    g.setAttribute('aria-valuenow', String(v)); g.setAttribute('aria-valuemin', String(PW[k][1])); g.setAttribute('aria-valuemax', String(Math.round(panelMax(k) * 4) / 4));
+    g.setAttribute('aria-valuetext', tr('{0} rem', String(v)));
+    g.title = (k === 'det' ? tr('Width of the task panel') : tr('Width of the chat')) + ' · ' + tr('drag; double-click = standard width');
+  }
+}
+function gripWire(g) {
+  const k = g.dataset.k;
+  g.addEventListener('dblclick', () => panelSet(k, null));
+  g.addEventListener('keydown', e => {
+    const step = e.shiftKey ? 4 : 1, v = panelRem(k);
+    const to = {ArrowLeft: v + step, ArrowRight: v - step, Home: PW[k][1], End: panelMax(k)}[e.key];
+    if (to != null) { e.preventDefault(); e.stopPropagation(); panelSet(k, to); announce(tr('{0} rem', String(panelRem(k)))); }
+    else if (e.key === 'Enter') { e.preventDefault(); panelSet(k, null); announce(tr('Standard width')); }
+  });
+  g.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    e.preventDefault(); g.setPointerCapture?.(e.pointerId); g.classList.add('drag'); document.body.classList.add('pgdrag');
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const right = (k === 'det' ? $('#detail') : $('#achat')).getBoundingClientRect().right;
+    const mv = ev => { panelSet(k, (right - ev.clientX) / rem, true); };
+    const up = () => { g.removeEventListener('pointermove', mv); g.classList.remove('drag'); document.body.classList.remove('pgdrag'); fitLayout(); placeGrips(); };
+    g.addEventListener('pointermove', mv); g.addEventListener('pointerup', up, {once: true}); g.addEventListener('pointercancel', up, {once: true});
+  });
+}
+try { new ResizeObserver(() => placeGrips()).observe(document.documentElement); } catch { /* old engine */ }
+['transitionend'].forEach(t => document.addEventListener(t, e => { if (e.target?.id === 'detail' || e.target?.id === 'achat') placeGrips(); }));
 function sideFold(on) { LS.set('sideFold', !!on); fitLayout(); closeSide(); render(); }
 // 2.13.2 (#478 N3): the same within the phone layout: the docked "Add task" box of a tablet / an unfolded Fold in portrait
 // (600-899 px) disappears on a narrower screen without crossing 899 px (Fold 880 -> 390): its text moves into the quick
@@ -4388,11 +4515,11 @@ function renderDetail0() {
     paperless: ck ? '' : `${plOn() || (t.paperless?.length && feat('paperless')) ? `<div class="dsec plsec"><h5>Paperless</h5><div class="plinks">${(t.paperless || []).map(plHtml).join('')}</div>
         ${t.id > 0 && !ro && plOn() ? `<button class="attadd" data-act="pl-search">${ic('archive', 's')}<span>${tr('Link document')}</span></button>` : ''}</div>` : ''}`,
     fields: ck ? (collab() && shared ? `<div class="dsec fields"><label for="d-assignee">${tr('Assignee')}</label><select id="d-assignee" data-sheet-av ${ro || !canAssign(t) ? 'disabled' : ''}><option value="">${tr('Nobody')}</option>${assigneeOpts(t, l)}</select>${myGroup(t.assignee_group_id) ? `<button class="btn sm dtake" data-act="take" type="button">${ic('check', 's')} ${tr('Take it')}</button>` : ''}</div>` : '') : `<div class="dsec fields">
-        <label>${tr('List')}</label><select id="d-list" data-sheet-ico="list" ${ro || !canEditList(t.list_id) ? 'disabled' : ''}>${S.lists.filter(x => (!x.archived && canEditList(x.id)) || x.id === t.list_id).map(x => `<option value="${x.id}" ${x.is_inbox ? 'data-ico="inbox"' : ''} ${x.id === t.list_id ? 'selected' : ''}>${esc(lname(x))}</option>`).join('')}</select>
-        ${ticketsOn(t.list_id) ? `<label>${tr('Type')}</label><select id="d-ttype" data-sheet-ico="bug" ${ro ? 'disabled' : ''}><option value="">${tr('None')}</option>${TTYPES.map(([k, n, i]) => `<option value="${k}" data-ico="${i}" ${t.ttype === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>` : ''}
-        ${secs.length ? `<label>${tr('Section')}</label><select id="d-sec" data-sheet-ico="columns" ${ro ? 'disabled' : ''}><option value="">${tr('Unassigned')}</option>${secs.map(s => `<option value="${s.id}" ${s.id === t.section_id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>` : ''}
+        <label for="d-list">${tr('List')}</label><select id="d-list" data-sheet-ico="list" ${ro || !canEditList(t.list_id) ? 'disabled' : ''}>${S.lists.filter(x => (!x.archived && canEditList(x.id)) || x.id === t.list_id).map(x => `<option value="${x.id}" ${x.is_inbox ? 'data-ico="inbox"' : ''} ${x.id === t.list_id ? 'selected' : ''}>${esc(lname(x))}</option>`).join('')}</select>
+        ${ticketsOn(t.list_id) ? `<label for="d-ttype">${tr('Type')}</label><select id="d-ttype" data-sheet-ico="bug" ${ro ? 'disabled' : ''}><option value="">${tr('None')}</option>${TTYPES.map(([k, n, i]) => `<option value="${k}" data-ico="${i}" ${t.ttype === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>` : ''}
+        ${secs.length ? `<label for="d-sec">${tr('Section')}</label><select id="d-sec" data-sheet-ico="columns" ${ro ? 'disabled' : ''}><option value="">${tr('Unassigned')}</option>${secs.map(s => `<option value="${s.id}" ${s.id === t.section_id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>` : ''}
         <label>${tr('Link')}</label>${linkField(t, ro)}
-        ${collab() && (shared || t.assignee_id) ? `<label>${tr('Assignee')}</label><select id="d-assignee" data-sheet-av ${ro || !canAssign(t) ? 'disabled' : ''}><option value="">${tr('Nobody')}</option>${assigneeOpts(t, l)}</select>${myGroup(t.assignee_group_id) ? `<button class="btn sm dtake" data-act="take" type="button">${ic('check', 's')} ${tr('Take it')}</button>` : ''}` : ''}
+        ${collab() && (shared || t.assignee_id) ? `<label for="d-assignee">${tr('Assignee')}</label><select id="d-assignee" data-sheet-av ${ro || !canAssign(t) ? 'disabled' : ''}><option value="">${tr('Nobody')}</option>${assigneeOpts(t, l)}</select>${myGroup(t.assignee_group_id) ? `<button class="btn sm dtake" data-act="take" type="button">${ic('check', 's')} ${tr('Take it')}</button>` : ''}` : ''}
         ${t.id > 0 && !t.context ? aiuTaskLine(t) : ''}
       </div>`,
     custom: ck ? '' : `${fieldsOf(t.list_id).length ? `<div class="dsec cfsec"><h5>${tr('Fields')}</h5><div class="fields cf">${fieldsOf(t.list_id).map(f => fieldEditor(f, t, ro)).join('')}</div></div>` : ''}`,
@@ -4406,7 +4533,7 @@ function renderDetail0() {
       ${ck || ro ? '' : [[0, 'sun', tr('Today')], [1, 'sunrise', tr('Tomorrow')]].map(([n, i, lab]) => `<button class="iconbtn dq ${t.due === addDays(today(), n) ? 'on' : ''}" data-act="due-q" data-d="${n}" data-id="${t.id}" title="${esc(kt(tr('Due: {0}', lab), n ? 'Shift+T' : 't'))}" aria-label="${esc(tr('Due: {0}', lab))}">${ic(i, 's')}<span class="dql">${esc(lab)}</span></button>`).join('')}
       ${ck ? '' : '<span class="dbr" aria-hidden="true"></span>'}<span class="spacer"></span>
       ${ro ? (t.context ? `<span class="rotag" title="${esc(tr('The main task of a subtask assigned to you: read-only, without notes, files and comments'))}">${ic('sub', 's')}${tr('Context')}</span>`
-        : `<span class="rotag" title="${esc(tr('View only, shared by {0}', l?.owner_name || ''))}">${ic('eye', 's')}${tr('View only')}</span>`) : `${ck ? '' : `<button class="iconbtn ${t.pinned ? 'on' : ''}" data-act="pin" data-id="${t.id}" title="${t.pinned ? tr('Unpin') : tr('Pin')}" aria-label="${t.pinned ? tr('Unpin') : tr('Pin')}">${ic('pin')}</button>
+        : `<span class="rotag" title="${esc(tr('View only, shared by {0}', l?.owner_name || ''))}">${ic('eye', 's')}${tr('View only')}</span>`) : `${ck ? '' : `<button class="iconbtn ${t.pinned ? 'on' : ''}" data-act="pin" data-id="${t.id}" title="${t.pinned ? tr('Unpin') : tr('Pin')}" aria-label="${tr('Pin')}" aria-pressed="${!!t.pinned}">${ic('pin')}</button>
       <button class="iconbtn ${t.priority ? 'flag-' + t.priority : ''}" data-act="prio" data-id="${t.id}" title="${tr('Priority')}" aria-label="${tr('Priority')}">${ic('flag')}</button>`}
       <button class="iconbtn" data-act="task-menu" data-id="${t.id}" title="${tr('More')}" aria-label="${tr('More')}">${ic('dots')}</button>`}
       <button class="iconbtn dchatb" data-act="chat-unyield" title="${esc(tr('Chat'))}" aria-label="${esc(tr('Chat'))}">${ic('bot')}</button>
@@ -5725,12 +5852,14 @@ async function createTask(body) {
 }
 
 // ------------------------------------------------------------------ popovers
-function closePop() { const t = $('#toast'); if (t && !t.classList.contains('hidden') && $('#pop.sheet:not(.hidden)')) requestAnimationFrame(() => toastPlace(t)); $('#pop').classList.add('hidden'); $('#pop').classList.remove('sheet', 'overmodal'); $('#scrim').classList.add('hidden'); $('#scrim').classList.remove('clear', 'overmodal'); popOnClose && popOnClose(); popOnClose = null; }
+let popRet = null;  // 2.16.0 (#473): where the focus goes back to when a popover / menu closes
+function closePop() { popFocusBack(); const t = $('#toast'); if (t && !t.classList.contains('hidden') && $('#pop.sheet:not(.hidden)')) requestAnimationFrame(() => toastPlace(t)); $('#pop').classList.add('hidden'); $('#pop').classList.remove('sheet', 'overmodal'); $('#scrim').classList.add('hidden'); $('#scrim').classList.remove('clear', 'overmodal'); popOnClose && popOnClose(); popOnClose = null; }
 let popOnClose = null;
 function openPop(anchor, html, onClose) {
   const p = $('#pop');
   p.onclick = null;  // a click handler of the previous popover (menu, calendar event) never carries over
   p.onpointerdown = null; p.ondblclick = null; p.classList.remove('bellpop', 'bpfull'); p.style.width = '';  // 2.7.0: nothing of the bell's dropdown carries over
+  if (p.classList.contains('hidden')) { const ae = document.activeElement; popRet = anchor?.focus && anchor.isConnected && !anchor.closest?.('#pop') ? anchor : ae && ae !== document.body && !ae.closest?.('#pop') ? ae : null; }
   p.innerHTML = html; p.classList.remove('hidden');
   $('#scrim').classList.remove('hidden');
   // #318: a menu opened from inside a dialog (e.g. Settings > Agents > "Share a list with an agent…") goes above it
@@ -5751,8 +5880,25 @@ function menu(anchor, items) {
   // {row: [item, item]} = one line of equal buttons (1.5.1: "Today" / "Tomorrow" on top of the task menu)
   const p = openPop(anchor, `<div class="menu-list" role="menu">${items.map((it, i) => it === '-' ? '<hr>' : it.row ? `<div class="mquick" role="group">${it.row.map((x, j) => btn(x, i, j)).join('')}</div>` : btn(it, i)).join('')}</div>`);
   p.onclick = e => { const b = e.target.closest('[data-i]'); if (!b || b.disabled) return; let it = items[+b.dataset.i]; if (it.row) it = it.row[+b.dataset.j]; closePop(); it.fn(); };
+  // 2.16.0 (#473): the menu gets the focus (first item); ↑ ↓ Home End move in it, Esc / Tab out close it (keydown below)
+  setTimeout(() => { if (document && !p.classList.contains('hidden') && !p.contains(document.activeElement)) p.querySelector('[role="menuitem"]:not([disabled])')?.focus({preventScroll: true}); }, 0);
   return p;
 }
+function popFocusBack() {
+  const r = popRet; popRet = null;
+  if ($('#pop').classList.contains('hidden') || !r || !r.isConnected) return;
+  const a = document.activeElement;
+  if (a && a !== document.body && !$('#pop').contains(a)) return;  // the focus went somewhere on purpose
+  if (isTouch() && typing(r)) return;  // no phone keyboard popping up
+  setTimeout(() => { if (!document) return; const b = document.activeElement; if ((!b || b === document.body || $('#pop').contains(b)) && r.isConnected) { try { r.focus({preventScroll: true}); } catch { /* gone */ } } }, 0);
+}
+document.addEventListener('keydown', e => {
+  const m = e.target.closest?.('#pop [role="menu"]'); if (!m || e.altKey || e.ctrlKey || e.metaKey) return;
+  const it = $$('[role="menuitem"]:not([disabled])', m), i = it.indexOf(e.target.closest('[role="menuitem"]'));
+  const to = {ArrowDown: i + 1, ArrowUp: i - 1, ArrowRight: e.target.closest('.mquick') ? i + 1 : null, ArrowLeft: e.target.closest('.mquick') ? i - 1 : null, Home: 0, End: it.length - 1}[e.key];
+  if (to != null && it.length) { e.preventDefault(); e.stopPropagation(); it[(to + it.length) % it.length].focus(); }
+  else if (e.key === 'Tab') closePop();
+});
 // ---- 2.0.8 (#323): on a phone every <select> opens an app-style bottom sheet (like the menus) instead of the system
 // picker: the field's label on top, the options with their icon / emoji / avatar, a check on the current value, a search
 // field above 10 options, keyboard (↑ ↓ Home End, Enter, Esc). One enhancer for the whole app (task panel, dialogs,
@@ -6245,6 +6391,9 @@ function taskMenu(anchor, id) {
   menu(anchor, [
     quickDueRow(id), '-',
     {label: t.pinned ? tr('Unpin') : tr('Pin'), icon: 'pin', fn: () => patchTask(id, {pinned: t.pinned ? 0 : 1})},
+    // 2.16.0 (#473, WCAG 2.5.7): what dragging does, as menu items (also Alt+↑ / ↓)
+    ...(t.status === 0 && t.id > 0 && S.route.mod === 'tasks' && $(`#view .trow[data-id="${id}"]`) ? [{row: [{label: tr('Move up'), icon: 'up', title: kt(tr('Move up'), 'Alt+ArrowUp'), fn: () => taskNudge(id, -1)}, {label: tr('Move down'), icon: 'down', title: kt(tr('Move down'), 'Alt+ArrowDown'), fn: () => taskNudge(id, 1)}]}] : []),
+    ...(t.status === 0 && !t.parent_id && S.sections.some(x => x.list_id === t.list_id) ? [{label: tr('Move to section…'), icon: 'columns', fn: () => sectionPicker(anchor, id)}] : []),
     {label: tr('Snooze…'), icon: 'clock', keys: 's', fn: () => snoozeSheet(id, anchor)},
     ...(t.status === 0 ? [t.waiting_at ? {label: tr('No longer waiting'), icon: 'hourglass', fn: () => waitClear(id)}
       : {label: tr('Waiting on external…'), icon: 'hourglass', fn: () => waitDialog(id)}] : []),
@@ -6343,7 +6492,37 @@ function modal(html) {
   m.addEventListener('mousedown', e => { if (e.target === m) m.remove(); });
   document.body.appendChild(m);
   vvSync();
+  modalA11y(m);
   return m;
+}
+// 2.16.0 (#473): every dialog is a modal dialog for screen readers (role, name from its heading), keeps Tab inside, gets the
+// focus (its own field if it focuses one, else the dialog itself, so a phone keyboard does not pop up) and gives it back to
+// where it came from when it closes (Esc, backdrop, a button, code)
+const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),summary,[tabindex]:not([tabindex="-1"]),[contenteditable="true"]';
+const focusables = root => $$(FOCUSABLE, root).filter(x => x.offsetParent !== null || x === document.activeElement || !x.getClientRects);
+function modalA11y(m) {
+  const card = m.querySelector('.card');
+  if (!m.hasAttribute('role')) m.setAttribute('role', 'dialog');
+  m.setAttribute('aria-modal', 'true');
+  const h = card && card.querySelector('h1,h2,h3,h4');
+  if (h && !m.hasAttribute('aria-labelledby')) { if (!h.id) h.id = 'mh-' + Math.random().toString(36).slice(2, 8); m.setAttribute('aria-labelledby', h.id); }
+  const prev = document.activeElement;
+  m.addEventListener('keydown', e => {
+    if (e.key !== 'Tab' || e.defaultPrevented) return;
+    const f = focusables(m); if (!f.length) { e.preventDefault(); return; }
+    const a = document.activeElement;
+    if (e.shiftKey && (a === f[0] || !m.contains(a))) { e.preventDefault(); f[f.length - 1].focus(); }
+    else if (!e.shiftKey && (a === f[f.length - 1] || !m.contains(a))) { e.preventDefault(); f[0].focus(); }
+  });
+  setTimeout(() => {
+    if (!document || !m.isConnected || m.contains(document.activeElement) || $('#pop:not(.hidden)')?.contains(document.activeElement)) return;
+    if (card) { card.tabIndex = -1; try { card.focus({preventScroll: true}); } catch { card.focus(); } }
+  }, 90);
+  onRemove(m, () => {
+    if (!document) return;  // the window is gone
+    const a = document.activeElement;
+    if (prev && prev.isConnected && prev !== document.body && (!a || a === document.body || !a.isConnected)) { try { prev.focus({preventScroll: true}); } catch { /* gone */ } }
+  });
 }
 // ---- UX1 (U12): the app's own dialogs instead of window.confirm / window.prompt. askConfirm resolves true / false,
 // askPrompt the text or null. Esc, a click next to it and "Cancel" say no; a destructive action is red and not focused.
@@ -6681,11 +6860,11 @@ function listModal(id, folder = '', o = {}) {
   // 1.5.1: an existing list saves itself like the settings (every change at once, "Saved · Undo", one history step each);
   // a new list keeps Cancel / Create
   const md = modal(`${id ? `<div class="lhdr"><h3>${tr('Edit list')}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>` : `<h3>${tr('New list')}</h3>`}
-    <div class="row"><label>${tr('Name')}</label><button class="emobtn" id="l-emo" title="${tr('Choose icon')}" ${dis}>${id && l.icon ? licon(l, 'licon m') : emo || ic('list')}</button><input id="l-name" value="${esc(base)}" ${dis}></div>
+    <div class="row"><label for="l-name">${tr('Name')}</label><button class="emobtn" id="l-emo" title="${tr('Choose icon')}" ${dis}>${id && l.icon ? licon(l, 'licon m') : emo || ic('list')}</button><input id="l-name" value="${esc(base)}" ${dis}></div>
     <div class="emogrid hidden" id="l-emogrid"><button data-emo="" class="none" title="${tr('No icon')}">${ic('ban', 's')}</button>${EMOJIS.map(e => `<button data-emo="${e}" class="${e === emo && !l.icon ? 'on' : ''}">${e}</button>`).join('')}<input id="l-emocustom" placeholder="${tr('custom')}" maxlength="8">
       ${id && own ? `<div class="lipickw"><span class="muted lipl">${tr('Or a picture')}</span>${liconPickHtml(l)}</div>` : ''}</div>
-    <div class="row"><label>${tr('Folder')}</label><input id="l-folder" value="${esc(fDisp(l.folder))}" list="l-folders" placeholder="${esc(tr('optional · Folder / Subfolder'))}"><datalist id="l-folders">${folderNames().map(f => `<option value="${esc(fDisp(f))}">`).join('')}</datalist></div>
-    <div class="row"><label>${tr('View')}</label><select id="l-view"><option value="list">${tr('List')}</option>${feat('kanban') ? `<option value="kanban" ${l.view === 'kanban' ? 'selected' : ''}>${tr('Kanban')}</option>` : ''}${feat('timeline') ? `<option value="timeline" ${l.view === 'timeline' ? 'selected' : ''}>${tr('Timeline')}</option>` : ''}</select></div>
+    <div class="row"><label for="l-folder">${tr('Folder')}</label><input id="l-folder" value="${esc(fDisp(l.folder))}" list="l-folders" placeholder="${esc(tr('optional · Folder / Subfolder'))}"><datalist id="l-folders">${folderNames().map(f => `<option value="${esc(fDisp(f))}">`).join('')}</datalist></div>
+    <div class="row"><label for="l-view">${tr('View')}</label><select id="l-view"><option value="list">${tr('List')}</option>${feat('kanban') ? `<option value="kanban" ${l.view === 'kanban' ? 'selected' : ''}>${tr('Kanban')}</option>` : ''}${feat('timeline') ? `<option value="timeline" ${l.view === 'timeline' ? 'selected' : ''}>${tr('Timeline')}</option>` : ''}</select></div>
     <div class="row"><label for="l-kind">${tr('Type')}</label><select id="l-kind" ${dis}>${LKINDS.map(([k, n]) => `<option value="${k}" ${(l.kind || 'list') === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     <div class="shint lhint" id="l-khint">${kindHint(l.kind || 'list')}</div>
     ${id ? '' : `<div class="lptype" ${(l.kind || 'list') === 'project' ? '' : 'hidden'}><div class="ptlab">${tr('Start from')}</div><div class="ptcards" role="radiogroup" aria-label="${esc(tr('Start from'))}">${PTYPE_UI.map(([k, n, i, dsc]) => `<button type="button" class="ptcard ${k === (o.ptype || '') ? 'on' : ''}" role="radio" aria-checked="${k === (o.ptype || '')}" data-pt="${k}">${ic(i, 's')}<b>${tr(n)}</b><small class="muted">${tr(dsc)}</small></button>`).join('')}${tplOf('list').map(tp => `<button type="button" class="ptcard" role="radio" aria-checked="false" data-pt="tpl:${tp.id}">${ic('copy', 's')}<b>${esc(tp.name)}</b><small class="muted" data-ptd="${tp.id}">${tr('Your template')}</small></button>`).join('')}</div>
@@ -6695,8 +6874,8 @@ function listModal(id, folder = '', o = {}) {
     <div class="shint lhint">${tr('Tasks get a type with an icon, a filter and quick add !bug / !feature; new bugs and features start with a note template.')}</div>` : ''}
     ${id && progressOn() ? `<div class="row"><label>${tr('Progress')}</label><label class="chkl"><input type="checkbox" id="l-showprog" ${progHidden(id) ? '' : 'checked'}> ${tr('Show the progress bar')}</label><span class="muted">${tr('only for you')}</span></div>` : ''}
     ${id && timeOn() && (own || l.day_hours) ? `<div class="row"><label for="l-dayh">${tr('Hours per day')}</label><input id="l-dayh" inputmode="decimal" value="${l.day_hours != null ? esc(String(l.day_hours).replace('.', LOCALE().startsWith('de') ? ',' : '.')) : ''}" placeholder="${esc(fmtNum(S.timeDayH || 8))}" style="max-width:5rem" ${dis}><span class="muted">${tr('h per day / shift, for the time sum in the header · empty = {0} h (server)', fmtNum(S.timeDayH || 8))}</span></div>` : ''}
-    ${timeOn() && (own || l.rate) ? `<div class="row"><label>${tr('Hourly rate')}</label><input id="l-rate" inputmode="decimal" value="${l.rate != null ? esc(String(l.rate).replace('.', LOCALE().startsWith('de') ? ',' : '.')) : ''}" placeholder="${tr('optional')}" style="max-width:6.875rem" ${dis}><span class="muted">${esc(S.settings.time_currency || '')} · ${tr('time reports')}</span></div>` : ''}
-    <div class="row"><label>${tr('Color')}</label><div class="colors" id="l-col">${LCOLORS.map(c => `<button style="background:${c || 'var(--bg4)'}" class="${(l.color || '') === c ? 'on' : ''}" data-c="${c}" ${dis}></button>`).join('')}</div></div>
+    ${timeOn() && (own || l.rate) ? `<div class="row"><label for="l-rate">${tr('Hourly rate')}</label><input id="l-rate" inputmode="decimal" value="${l.rate != null ? esc(String(l.rate).replace('.', LOCALE().startsWith('de') ? ',' : '.')) : ''}" placeholder="${tr('optional')}" style="max-width:6.875rem" ${dis}><span class="muted">${esc(S.settings.time_currency || '')} · ${tr('time reports')}</span></div>` : ''}
+    <div class="row"><label>${tr('Color')}</label><div class="colors" id="l-col" role="group" aria-label="${esc(tr('Color'))}">${LCOLORS.map((c, i) => `<button type="button" style="background:${c || 'var(--bg4)'}" class="${(l.color || '') === c ? 'on' : ''}" aria-pressed="${(l.color || '') === c}" aria-label="${esc(c ? tr('Color {0}', i) : tr('No color'))}" data-c="${c}" ${dis}></button>`).join('')}</div></div>
     ${id && !l.is_inbox && statusOn() && l.kind === 'project' ? `<div class="row"><label>${tr('Project status')}</label>${statusPill(l, true, true)}</div>` : ''}
     ${id && own && depsOn() ? `<div class="row"><label>${tr('Dependencies')}</label><label class="chkl"><input type="checkbox" id="l-depshift" ${l.dep_shift ? 'checked' : ''}> ${tr('Move dependent tasks along')}</label></div>
     <div class="shint lhint">${tr('When a task is postponed, the tasks of this list that wait on it and would now start too early move by the same number of days (also in the timeline). One undo takes the whole chain back.')}</div>` : ''}
@@ -6748,7 +6927,7 @@ function listModal(id, folder = '', o = {}) {
     if (document.activeElement !== $('#l-folder', md)) $('#l-folder', md).value = fDisp(x.folder || '');
     $('#l-view', md).value = listView(x); $('#l-kind', md).value = x.kind || 'list';
     $('#l-khint', md).innerHTML = kindHint(x.kind || 'list'); $('.kproj', md).hidden = (x.kind || 'list') !== 'project';
-    $$('#l-col button', md).forEach(b => b.classList.toggle('on', (x.color || '') === b.dataset.c));
+    $$('#l-col button', md).forEach(b => { b.classList.toggle('on', (x.color || '') === b.dataset.c); b.setAttribute('aria-pressed', String((x.color || '') === b.dataset.c)); });
     if ($('#l-depshift', md)) $('#l-depshift', md).checked = !!x.dep_shift;
     if ($('#l-tickets', md)) $('#l-tickets', md).checked = !!x.tickets;
     if ($('#l-rate', md) && document.activeElement !== $('#l-rate', md)) $('#l-rate', md).value = x.rate != null ? String(x.rate).replace('.', LOCALE().startsWith('de') ? ',' : '.') : '';
@@ -6923,9 +7102,10 @@ function orphWire(md) {
   });
 }
 // Settings > Appearance: all per-device visual settings, applied instantly (no Save), with a live preview
-const LOOK_KEYS = ['theme', 'density', 'fsize', 'font', 'accent'];
+const LOOK_KEYS = ['theme', 'density', 'densitySide', 'densityRows', 'fsize', 'font', 'accent'];
 const THEMES = [['auto', N_('Automatic')], ['dark', N_('Dark')], ['light', N_('Light')]];
-const DENSITIES = [['compact', N_('Compact')], ['comfortable', N_('Comfortable')]];
+const DENSITIES = [['compact', N_('Compact')], ['comfortable', N_('Comfortable')], ['custom', N_('Custom|density')]];
+const DENS2 = [['compact', N_('Compact')], ['comfortable', N_('Comfortable')]];
 const FSIZE_ORDER = ['s', 'm', 'l', 'xl'];
 const zPct = z => `${Math.round(z * 100)} %`;
 function lookHtml() {
@@ -6941,7 +7121,9 @@ function lookHtml() {
     <div class="row">${seg('theme', THEMES)}</div>
     <h4>${tr('Density')}</h4>
     <div class="row">${seg('density', DENSITIES)}</div>
-    <div class="shint">${tr('Compact fits more tasks on the screen; comfortable has larger rows for touch. Default: comfortable on phones, compact on computers.')}</div>
+    ${densityMode() === 'custom' ? `<div class="row lkdens"><span class="lkdl" id="s-dside-l">${tr('Sidebar')}</span>${seg('densitySide', DENS2).replace('role="group"', 'role="group" aria-labelledby="s-dside-l"')}</div>
+    <div class="row lkdens"><span class="lkdl" id="s-drows-l">${tr('Task rows')}</span>${seg('densityRows', DENS2).replace('role="group"', 'role="group" aria-labelledby="s-drows-l"')}</div>` : ''}
+    <div class="shint">${tr('Compact fits more lists and tasks on the screen; comfortable has more room. Custom: the sidebar and the task rows each on their own. Touch targets stay 44 px. Default: comfortable on phones, compact on computers.')}</div>
     <h4>${tr('Font size')}</h4>
     <div class="row lkfs"><span class="lkA" aria-hidden="true">A</span><input type="range" id="s-fsize" min="${FS_MIN}" max="${FS_MAX}" step="5" value="${fsPct()}" aria-label="${esc(tr('Font size'))}" aria-valuetext="${fsPct()} %"><span class="lkA lkA2" aria-hidden="true">A</span><output id="s-fsv" for="s-fsize">${fsPct()} %</output><button class="btn sm" data-m="fs-reset" ${fsPct() === 100 ? 'disabled' : ''}>${tr('Reset (100 %)')}</button></div>
     <div class="shint">${tr('Scales the whole interface: text, rows, icons, spacing and dialogs.')}</div>
@@ -6952,7 +7134,7 @@ function lookHtml() {
     <div class="lkopts lkacc" id="s-accent" role="group">${LOOK.accent.map(([v, n, d, l]) => `<button ${on('accent', v)} style="--sw-d:${d};--sw-l:${l}" title="${tr(n)}"><i class="lksw"></i><span class="lkn">${tr(n)}</span></button>`).join('')}</div>
     <div class="row lkreset"><button class="btn sm" data-m="look-reset">${ic('undo', 's')} ${tr('Reset to defaults')}</button><span class="muted">${tr('Applies to this device only.')}</span></div>`;
 }
-const lookCur = k => k === 'theme' ? LS.get('theme', 'auto') : k === 'density' ? densityPref() : k === 'fsize' ? fsPct() : lookPref(k);
+const lookCur = k => k === 'theme' ? LS.get('theme', 'auto') : k === 'density' ? densityMode() : k === 'densitySide' ? sideDensityPref() : k === 'densityRows' ? densityPref() : k === 'fsize' ? fsPct() : lookPref(k);
 function lookRedraw(md, focusSel) {  // re-render the pane (states + preview) and keep the keyboard focus
   const p = $('#s-lookin', md); if (!p) return;
   p.innerHTML = lookHtml();
@@ -7315,7 +7497,7 @@ function agSetupWire(md) {
     const box = $('#s-myown', md), k = b.dataset.myagAct, a = (box?._j?.agents || []).find(x => x.id === +b.closest('[data-myag]')?.dataset.myag);
     try {
       if (k === 'new') {
-        const un = $('#myag-user', md).value.trim().toLowerCase(); if (!un) { $('#myag-user', md).focus(); return; }
+        const un = $('#myag-user', md).value.trim().toLowerCase(); if (!un) { need($('#myag-user', md)); return; }
         b.disabled = true;
         const r = await api('POST', '/api/my/agents', {username: un, display_name: $('#myag-name', md).value.trim()});
         secretModal(tr('API token of {0}', r.name), r.token, tr('Copy it now into the agent’s configuration: it is shown only this once.') + ' ' + tr('Then share lists with the agent (list dialog > Sharing).'));
@@ -7486,7 +7668,7 @@ function settingsModal(focus) {
   md.classList.add('smodal');
   // 2.13.2 (#478 F13): phones: a "More ›" at the right end of the cut tab strip while more tabs are hidden to the right
   { const nav = $('.snav', md); nav.insertAdjacentHTML('afterend', `<button type="button" class="snmore hidden" data-snmore tabindex="-1" aria-hidden="true">${tr('More')} ›</button>`);
-    $('[data-snmore]', md).addEventListener('click', () => nav.scrollBy({left: nav.clientWidth * .7, behavior: 'smooth'}));
+    $('[data-snmore]', md).addEventListener('click', () => nav.scrollBy({left: nav.clientWidth * .7, behavior: reducedMotion() ? 'auto' : 'smooth'}));
     nav.addEventListener('scroll', () => snavMore(nav), {passive: true}); setTimeout(() => snavMore(nav), 0); }
   // 2.13.0 (#429): the font size slider applies live while it moves; the views drawn in px follow when it is let go
   md.addEventListener('input', e => { if (e.target.id !== 's-fsize') return; const v = +e.target.value; if (v === 100) LS.del('fsize'); else LS.set('fsize', v); applyLook(); fsLabel(v); });
@@ -7659,7 +7841,7 @@ function settingsModal(focus) {
     if (b.dataset.m === 'fs-reset') { fsStep(0); return; }  // 2.13.0 (#429)
     if (b.dataset.m === 'sto-check') { stoCheck(md); return; }  // 2.13.0
     if (b.dataset.look) {
-      const k = b.dataset.look, v = b.dataset.v, n = {theme: N_('Color scheme'), density: N_('Density'), fsize: N_('Font size'), font: N_('Font'), accent: N_('Accent color')}[k];
+      const k = b.dataset.look, v = b.dataset.v, n = {theme: N_('Color scheme'), density: N_('Density'), densitySide: N_('Density'), densityRows: N_('Density'), fsize: N_('Font size'), font: N_('Font'), accent: N_('Accent color')}[k];
       setLocal(tr(n), () => lookCur(k), x => { lookSet(k, x); lookRedraw(md, `[data-look="${k}"][data-v="${x}"]`); }, v); return;
     }
     if (b.dataset.m === 'look-reset') {
@@ -8135,7 +8317,7 @@ const ipsRow = (v, id) => `<div class="row"><label for="${id}">${tr('Only from')
     <div class="shint">${tr('Optional: IP addresses or networks such as 203.0.113.0/24, separated by commas. Requests from anywhere else are refused. Behind a reverse proxy this relies on its trusted-proxy setting.')}</div>`;
 function permModal(title, offer, sel, ips, save, extra) {
   const md = modal(`<h3>${esc(title)}</h3>${scopesHtml(offer, sel)}${ipsRow((ips || []).join(', '), 'pm-ips')}${extra || ''}
-    <div class="foot stfoot"><div class="calerr" id="pm-err" hidden></div><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Save')}</button></div>`);
+    <div class="foot stfoot"><div class="calerr" role="alert" id="pm-err" hidden></div><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Save')}</button></div>`);
   md.addEventListener('click', async e => {
     const b = e.target.closest('button[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
@@ -8149,7 +8331,7 @@ async function agTokenModal(a, url) {
   const md = modal(`<h3>${esc(tr('New API token for {0}', a.name))}</h3>
     <div class="shint keep warn">${tr('Every older token of this agent stops working at once.')}</div>
     <div class="row"><label for="agt-exp">${tr('Expires')}</label><select id="agt-exp"><option value="">${tr('never')}</option><option value="30">${tr('in 30 days')}</option><option value="90">${tr('in 90 days')}</option><option value="365">${tr('in a year')}</option></select></div>
-    <div class="calerr" id="agt-err" hidden></div>
+    <div class="calerr" role="alert" id="agt-err" hidden></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri danger" data-m="ok">${tr('New API token')}</button></div>`);
   md.addEventListener('click', async e => {
     const b = e.target.closest('button[data-m]'); if (!b) return;
@@ -8167,14 +8349,14 @@ function tokModal(done, offer) {
     <div class="row"><label for="tk-name">${tr('Name')}</label><input id="tk-name" maxlength="60" placeholder="${tr('e.g. Home Assistant')}"></div>
     ${scopesHtml(offer || [], ['read'])}
     ${ipsRow('', 'tk-ips')}
-    <div class="foot stfoot"><div class="calerr" id="tk-err" hidden></div>
+    <div class="foot stfoot"><div class="calerr" role="alert" id="tk-err" hidden></div>
       <span class="sfexp"><label for="tk-exp">${tr('Expires')}</label><select id="tk-exp"><option value="30">${tr('in 30 days')}</option><option value="90" selected>${tr('in 90 days')}</option><option value="365">${tr('in a year')}</option><option value="">${tr('never')}</option></select></span>
       <button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Create')}</button></div>`);
   md.addEventListener('click', async e => {
     const b = e.target.closest('button[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
     const name = $('#tk-name', md).value.trim(), err = $('#tk-err', md);
-    if (!name) { $('#tk-name', md).focus(); return; }
+    if (!name) { need($('#tk-name', md)); return; }
     const scopes = scopesVal(md);
     b.disabled = true;
     try {
@@ -8201,13 +8383,13 @@ async function apwDraw(md) {
 function apwModal(md) {
   const m = modal(`<h3>${tr('New app password')}</h3>
     <div class="row"><label for="apw-name">${tr('Name')}</label><input id="apw-name" maxlength="60" placeholder="${tr('e.g. iPhone, Thunderbird')}"></div>
-    <div class="calerr" id="apw-err" hidden></div>
+    <div class="calerr" role="alert" id="apw-err" hidden></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Create')}</button></div>`);
   m.addEventListener('click', async e => {
     const b = e.target.closest('button[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { m.remove(); return; }
     const name = $('#apw-name', m).value.trim(), er = $('#apw-err', m);
-    if (!name) { $('#apw-name', m).focus(); return; }
+    if (!name) { need($('#apw-name', m)); return; }
     b.disabled = true;
     try {
       const j = await calReq('POST', '/api/me/app-passwords', {name});
@@ -8264,9 +8446,9 @@ const whHtml = () => S.webhooks?.enabled ? `<h4 id="s-wh-h">${tr('Webhooks')}</h
   <div class="members" id="s-whs"><div class="muted mhint">${tr('Loading…')}</div></div>
   <div class="row"><button class="btn sm" data-wh="new">${ic('plus', 's')} ${tr('Add webhook')}</button></div>` : '';
 function whState(w) {
-  if (!w.enabled) return `<span class="calerr">${w.disabled_reason === 'failures' ? tr('turned off after failed deliveries') : tr('off')}</span>`;
+  if (!w.enabled) return `<span class="calerr" role="alert">${w.disabled_reason === 'failures' ? tr('turned off after failed deliveries') : tr('off')}</span>`;
   if (!w.last) return esc(tr('no deliveries yet'));
-  return w.last.ok ? esc(tr('last delivery ok {0}', relTime(w.last.at))) : `<span class="calerr">${esc(tr('last delivery failed: {0}', w.last.error_text))}</span>`;
+  return w.last.ok ? esc(tr('last delivery ok {0}', relTime(w.last.at))) : `<span class="calerr" role="alert">${esc(tr('last delivery failed: {0}', w.last.error_text))}</span>`;
 }
 async function whDraw(md) {
   const box = $('#s-whs', md); if (!box) return;
@@ -8309,7 +8491,7 @@ function whModal(w, j, done) {
     <div class="featgrid" id="wh-evs">${evs.map(x => `<label><input type="checkbox" data-whev="${esc(x)}" ${on.has(x) ? 'checked' : ''}> ${esc(tr(WH_EV_NAMES[x] || x))} <code class="muted">${esc(x)}</code></label>`).join('')}</div>
     ${w ? `<div class="row"><label></label><label class="chkl"><input type="checkbox" id="wh-on" ${w.enabled ? 'checked' : ''}> ${tr('Active')}</label><button class="btn sm" data-m="secret">${ic('key', 's')} ${tr('New secret')}</button></div>` : ''}
     <div class="shint keep">${tr('Only tasks and lists you can see are sent, with your tags. The signing secret is shown once after saving.')}</div>
-    <div class="calerr" id="wh-err" hidden></div>
+    <div class="calerr" role="alert" id="wh-err" hidden></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Save')}</button></div>`);
   md.addEventListener('click', async e => {
     const b = e.target.closest('button[data-m]'); if (!b) return;
@@ -8322,7 +8504,7 @@ function whModal(w, j, done) {
     }
     const body = {name: $('#wh-name', md).value.trim(), url: $('#wh-url', md).value.trim(), events: $$('[data-whev]', md).filter(x => x.checked).map(x => x.dataset.whev)};
     if (w) body.enabled = $('#wh-on', md).checked;
-    if (!body.url) { $('#wh-url', md).focus(); return; }
+    if (!body.url) { need($('#wh-url', md)); return; }
     if (!body.events.length) { show(tr('Choose at least one event')); return; }
     b.disabled = true; show('');
     try {
@@ -8337,7 +8519,7 @@ function whModal(w, j, done) {
 async function whLog(w) {
   let j; try { j = await api('GET', `/api/me/webhooks/${w.id}/log`); } catch { return; }
   const md = modal(`<h3>${tr('Delivery log')}</h3><div class="shint keep">${esc(w.name || urlHost(w.url))} · ${tr('the last {0} attempts, newest first; bodies are never stored', 50)}</div>
-    <div class="members whlog">${j.items.length ? j.items.map(x => `<div class="mrow ${x.ok ? '' : 'off'}"><span class="n"><b>${esc(x.event)}</b>${x.attempt > 1 ? ' · ' + esc(tr('attempt {0}', x.attempt)) : ''} · ${x.ok ? esc(tr('ok')) : `<span class="calerr">${esc(x.error_text || tr('failed'))}</span>`}${x.status ? ` · HTTP ${esc(String(x.status))}` : ''} · ${esc(String(x.ms))} ms<small class="muted">${esc(fmtWhen(x.created_at))}${x.delivery ? ' · ' + esc(x.delivery.slice(0, 8)) : ''}</small></span></div>`).join('') : `<div class="muted mhint">${tr('Nothing sent yet.')}</div>`}</div>
+    <div class="members whlog">${j.items.length ? j.items.map(x => `<div class="mrow ${x.ok ? '' : 'off'}"><span class="n"><b>${esc(x.event)}</b>${x.attempt > 1 ? ' · ' + esc(tr('attempt {0}', x.attempt)) : ''} · ${x.ok ? esc(tr('ok')) : `<span class="calerr" role="alert">${esc(x.error_text || tr('failed'))}</span>`}${x.status ? ` · HTTP ${esc(String(x.status))}` : ''} · ${esc(String(x.ms))} ms<small class="muted">${esc(fmtWhen(x.created_at))}${x.delivery ? ' · ' + esc(x.delivery.slice(0, 8)) : ''}</small></span></div>`).join('') : `<div class="muted mhint">${tr('Nothing sent yet.')}</div>`}</div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
   md.addEventListener('click', e => { if (e.target.closest('[data-m="close"]')) md.remove(); });
 }
@@ -8348,13 +8530,13 @@ function pubDraw(md, lid, j) {
   const k = j.link;
   box._j = j;
   box.innerHTML = `${k ? `<div class="row icalrow"><input id="lp-url" readonly value="${esc(k.url)}" aria-label="${tr('Public link')}"><button class="btn sm pri" data-lp="copy">${ic('copy', 's')} ${tr('Copy')}</button></div>
-      <div class="shint">${k.expired ? `<span class="calerr">${tr('Expired')}</span> · ` : ''}${esc(trn('opened {0} time', 'opened {0} times', k.views))}${k.last_used_at ? ' · ' + esc(tr('last {0}', relTime(k.last_used_at))) : ''}</div>` : `<div class="shint keep">${tr('People without an account can open the list through a secret link: only this list, without comments, assignees or files.')}</div>`}
+      <div class="shint">${k.expired ? `<span class="calerr" role="alert">${tr('Expired')}</span> · ` : ''}${esc(trn('opened {0} time', 'opened {0} times', k.views))}${k.last_used_at ? ' · ' + esc(tr('last {0}', relTime(k.last_used_at))) : ''}</div>` : `<div class="shint keep">${tr('People without an account can open the list through a secret link: only this list, without comments, assignees or files.')}</div>`}
     <div class="row"><label for="lp-mode">${tr('Access')}</label><select id="lp-mode"><option value="view">${tr('View only')}</option><option value="tick" ${k?.mode === 'tick' ? 'selected' : ''}>${tr('View and tick off')}</option></select></div>
     <div class="row"><label for="lp-exp">${tr('Valid until')}</label>${dateIn('lp-exp', pubDate(k?.expires_at), {min: today(), label: tr('Valid until'), empty: tr('no expiry')})}</div>
     <div class="row"><label for="lp-pw">${tr('Password')}</label><input type="password" id="lp-pw" autocomplete="new-password" placeholder="${k?.has_password ? tr('saved, empty = keep') : tr('optional')}">${k?.has_password ? `<label class="chkl"><input type="checkbox" id="lp-nopw"> ${tr('remove')}</label>` : ''}</div>
     <div class="row"><label></label><label class="chkl"><input type="checkbox" id="lp-notes" ${k?.notes ? 'checked' : ''}> ${tr('Show task notes')}</label></div>
     <div class="row">${k ? `<button class="btn sm" data-lp="save">${tr('Save link settings')}</button><button class="btn sm" data-lp="regen">${ic('key', 's')} ${tr('New link')}</button><button class="btn sm danger" data-lp="off">${tr('Turn off')}</button>` : `<button class="btn sm pri" data-lp="save">${ic('link', 's')} ${tr('Create public link')}</button>`}</div>
-    <div class="calerr" id="lp-err" hidden></div>`;
+    <div class="calerr" role="alert" id="lp-err" hidden></div>`;
 }
 function pubWire(md, lid) {
   api('GET', `/api/lists/${lid}/public-link`).then(j => pubDraw(md, lid, j)).catch(() => { const b = $('#l-pub', md); if (b) b.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; });
@@ -8543,7 +8725,7 @@ function accountHtml() {
     <div class="row"><label>${tr('Logged in as')}</label><span class="acct">${av(m.id, m.display_name)}<b>${esc(m.display_name)}</b> <span class="muted">${esc(m.username)}${m.auth === 'proxy' ? ' · ' + tr('via single sign-on') : ''}</span></span></div>
     <div class="row"><label for="a-name">${tr('Display name')}</label><input id="a-name" value="${esc(m.display_name)}" maxlength="60" autocomplete="name" enterkeyhint="done"></div>
     <div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="a-avpick">${avPickHtml()}</div></div>
-    ${pw ? `<div class="row"><label>${tr('Password')}</label><input type="password" id="a-cur" placeholder="${tr('current password')}" autocomplete="current-password"><input type="password" id="a-new" placeholder="${tr('new password')}" autocomplete="new-password"><button class="btn sm" data-acc="pw">${tr('Change')}</button></div>` : ''}
+    ${pw ? `<div class="row"><label for="a-cur">${tr('Password')}</label><input type="password" id="a-cur" placeholder="${tr('current password')}" autocomplete="current-password"><input type="password" id="a-new" placeholder="${tr('new password')}" autocomplete="new-password"><button class="btn sm" data-acc="pw">${tr('Change')}</button></div>` : ''}
     ${m.auth === 'session' ? `<div class="row"><label></label><button class="btn sm" data-acc="logout">${ic('logout', 's')} ${tr('Log out')}</button></div>` : ''}
     ${tfaHtml()}
     ${apwHtml()}
@@ -8582,7 +8764,7 @@ async function grpEdit(smd, gid) {
     <div class="shint">${tr('With a sign-in group the members come from the sign-in provider (OIDC): whoever has that group in their login is a member, checked at every login.')}</div>
     <h4 id="gr-mem-h">${tr('Members')}</h4>
     <div class="grpmem" id="gr-mem" role="group" aria-labelledby="gr-mem-h">${users.map(u => `<label class="chkl"><input type="checkbox" data-gm="${u.id}" ${sel.has(u.id) ? 'checked' : ''} ${synced ? 'disabled' : ''}> ${esc(u.display_name)} <span class="muted">${esc(u.username)}</span></label>`).join('') || `<div class="muted mhint">${tr('No other users yet. An admin can add them in the settings.')}</div>`}</div>
-    <div class="calerr" id="gr-err" hidden></div>
+    <div class="calerr" role="alert" id="gr-err" hidden></div>
     <div class="foot">${g ? `<button class="btn danger" data-m="del">${ic('trash', 's')} ${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${g ? tr('Save') : tr('Create')}</button></div>`);
   md.classList.add('grpmodal');
   const syncMem = () => { const on = !!$('#gr-oidc', md).value.trim(); $$('[data-gm]', md).forEach(x => { x.disabled = on; }); };
@@ -8597,7 +8779,7 @@ async function grpEdit(smd, gid) {
       md.remove(); await load().catch(() => {}); render(); grpDraw(smd); toast(tr('Group deleted')); return;
     }
     const name = $('#gr-name', md).value.trim(), og = $('#gr-oidc', md).value.trim();
-    if (!name) { $('#gr-name', md).focus(); return; }
+    if (!name) { need($('#gr-name', md)); return; }
     const q = {name, oidc_group: og, ...(og ? {} : {members: $$('[data-gm]', md).filter(x => x.checked).map(x => +x.dataset.gm)})};
     b.disabled = true;
     try { await calReq(g ? 'PATCH' : 'POST', g ? `/api/admin/groups/${gid}` : '/api/admin/groups', q); } catch (x) { err.textContent = x.message; err.hidden = false; b.disabled = false; return; }
@@ -8688,12 +8870,12 @@ function accountWire(md) {
 }
 function userModal(u, done) {
   const md = modal(`<h3>${u ? tr('Edit user') : tr('New user')}</h3>
-    <div class="row"><label>${tr('Username')}</label><input id="u-user" value="${esc(u?.username || '')}" ${u ? 'disabled' : ''} autocapitalize="off" placeholder="${tr('a-z, 0-9, . - _')}"></div>
-    <div class="row"><label>${tr('Display name')}</label><input id="u-name" value="${esc(u?.display_name || '')}" maxlength="60"></div>
-    <div class="row"><label>${tr('Password')}</label><input type="password" id="u-pw" autocomplete="new-password" placeholder="${u ? (u.has_password ? tr('unchanged') : tr('none (single sign-on only)')) : tr('optional, min. 8 characters')}"></div>
-    <div class="row"><label>${tr('SSO login')}</label><input id="u-proxy" value="${esc(u?.proxy_login || '')}" autocapitalize="off" placeholder="${tr('user name at the login proxy (optional)')}"></div>
-    <div class="row"><label>${tr('E-mail')}</label><input id="u-email" type="email" value="${esc(u?.email || '')}" autocapitalize="off" placeholder="${tr('optional, links an OIDC login')}"></div>
-    <div class="row"><label>${tr('ntfy topic')}</label><input id="u-topic" value="${esc(u?.ntfy_topic || '')}" autocapitalize="off" placeholder="${tr('empty = random')}"></div>
+    <div class="row"><label for="u-user">${tr('Username')}</label><input id="u-user" value="${esc(u?.username || '')}" ${u ? 'disabled' : ''} autocapitalize="off" placeholder="${tr('a-z, 0-9, . - _')}"></div>
+    <div class="row"><label for="u-name">${tr('Display name')}</label><input id="u-name" value="${esc(u?.display_name || '')}" maxlength="60"></div>
+    <div class="row"><label for="u-pw">${tr('Password')}</label><input type="password" id="u-pw" autocomplete="new-password" placeholder="${u ? (u.has_password ? tr('unchanged') : tr('none (single sign-on only)')) : tr('optional, min. 8 characters')}"></div>
+    <div class="row"><label for="u-proxy">${tr('SSO login')}</label><input id="u-proxy" value="${esc(u?.proxy_login || '')}" autocapitalize="off" placeholder="${tr('user name at the login proxy (optional)')}"></div>
+    <div class="row"><label for="u-email">${tr('E-mail')}</label><input id="u-email" type="email" value="${esc(u?.email || '')}" autocapitalize="off" placeholder="${tr('optional, links an OIDC login')}"></div>
+    <div class="row"><label for="u-topic">${tr('ntfy topic')}</label><input id="u-topic" value="${esc(u?.ntfy_topic || '')}" autocapitalize="off" placeholder="${tr('empty = random')}"></div>
     ${u ? `<div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="u-avpick" data-cur="${esc(u.avatar || '')}">${avPickHtml(u.avatar || '', false)}</div></div>` : ''}
     <div class="row"><label>${tr('Rights')}</label><label class="chkl"><input type="checkbox" id="u-admin" ${u?.is_admin ? 'checked' : ''}> ${tr('Admin')}</label>${S.paperless?.configured ? `<label class="chkl" title="${tr('Search, link and view documents of the Paperless archive')}"><input type="checkbox" id="u-pl" ${u?.paperless_access ? 'checked' : ''}> ${tr('Paperless access')}</label>` : ''}${u ? `<label class="chkl"><input type="checkbox" id="u-dis" ${u.disabled ? 'checked' : ''}> ${tr('disabled')}</label>` : ''}</div>
     ${u && !u.is_admin && u.id !== S.me.id ? `<div class="row"><label for="u-kind">${tr('Type')}</label><select id="u-kind"><option value="user">${tr('Person')}</option><option value="agent" ${u.kind === 'agent' ? 'selected' : ''}>${tr('Agent (API only, never admin, no Paperless)')}</option></select></div>` : ''}
@@ -8768,7 +8950,7 @@ async function authScreen(j) {
         ${setup ? `<label class="aulab" for="au-name">${tr('Display name')}</label><input id="au-name" maxlength="60" autocomplete="name" placeholder="${tr('optional')}">` : ''}
         <label class="aulab" for="au-pw">${tr('Password')}</label><span class="pwwrap"><input id="au-pw" name="password" type="password" autocomplete="${setup ? 'new-password' : 'current-password'}" ${setup && info.login ? '' : 'required'} ${setup ? `placeholder="${tr('at least {0} characters', 8)}"` : ''}><button type="button" class="iconbtn pweye" data-au="pwshow" aria-pressed="false" aria-label="${esc(tr('Show password'))}" title="${esc(tr('Show password'))}">${ic('eye', 's')}</button></span>
         ${setup ? '' : `<label class="chkl"><input type="checkbox" id="au-rem" checked> ${tr('Stay logged in')}</label>`}
-        <div class="aerr" id="au-err"></div>
+        <div class="aerr" role="alert" id="au-err"></div>
         <button class="btn pri" type="submit">${setup ? tr('Create account') : tr('Log in')}</button>
         ${!setup && (info.oidc || (info.passkey_login && pkSupported())) ? `<div class="aor"><span>${tr('or')}</span></div>` : ''}
         ${!setup && info.oidc ? `<button type="button" class="btn" data-au="oidc">${ic('link', 's')} ${esc(tr('Log in with {0}', info.oidc.label))}</button>` : ''}
@@ -8920,7 +9102,7 @@ function tfaWire(md) {
         const pw = await pwPrompt(tr('Set up the authenticator app')); if (!pw) return;
         const t = await api('POST', '/api/me/2fa/totp', {password: pw.password});
         const res = await new Promise(done => {
-          const m = modal(`<h3>${tr('Set up the authenticator app')}</h3><form class="totpform">${totpSetupHtml(t)}<div class="aerr" id="totp-err"></div>
+          const m = modal(`<h3>${tr('Set up the authenticator app')}</h3><form class="totpform">${totpSetupHtml(t)}<div class="aerr" role="alert" id="totp-err"></div>
             <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" type="submit">${tr('Turn on')}</button></div></form>`);
           m.classList.add('totpmodal');
           m.addEventListener('click', ev => { if (ev.target.closest('[data-m="close"]')) { m.remove(); done(null); } });
@@ -8980,7 +9162,7 @@ async function authTwofa(el, logo, methods) {
         ${recovery || methods.includes('totp') ? `<input id="tfa-code" ${recovery ? 'autocapitalize="off" placeholder="xxxxx-xxxxx"' : `inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="${tr('6-digit code')}"`} aria-label="${recovery ? tr('Recovery code') : tr('6-digit code')}" required>
         <button class="btn pri" type="submit">${tr('Verify')}</button>` : ''}
         ${methods.includes('passkey') && !recovery ? `<button type="button" class="btn ${methods.includes('totp') ? '' : 'pri'}" data-tfa="pk" ${pkSupported() ? '' : 'disabled'}>${ic('key', 's')} ${tr('Use a passkey')}</button>` : ''}
-        <div class="aerr" id="tfa-err"></div>
+        <div class="aerr" role="alert" id="tfa-err"></div>
         <div class="alinks">${methods.includes('recovery') && !recovery ? `<button type="button" class="linkbtn" data-tfa="rc">${tr('Use a recovery code')}</button>` : ''}${recovery && (methods.includes('totp') || methods.includes('passkey')) ? `<button type="button" class="linkbtn" data-tfa="back2">${tr('Back')}</button>` : ''}<button type="button" class="linkbtn" data-tfa="restart">${tr('Log in again')}</button></div>
       </form>`;
     setTimeout(() => $('#tfa-code', card)?.focus(), 50);
@@ -9012,7 +9194,7 @@ async function authEnrol(el, logo) {
       <div class="enrolopts"><button type="button" class="btn pri" data-en="totp">${ic('lock', 's')} ${tr('Use an authenticator app')}</button>
       <button type="button" class="btn" data-en="pk" ${pkSupported() ? '' : 'disabled'}>${ic('key', 's')} ${tr('Use a passkey')}</button></div>
       ${pkSupported() ? '' : `<p class="muted">${tr('Passkeys need HTTPS (or localhost), a host name instead of an IP address and a current browser.')}</p>`}
-      <div class="aerr" id="en-err"></div><div class="alinks"><button type="button" class="linkbtn" data-en="restart">${tr('Log in again')}</button></div>`;
+      <div class="aerr" role="alert" id="en-err"></div><div class="alinks"><button type="button" class="linkbtn" data-en="restart">${tr('Log in again')}</button></div>`;
   };
   const fail = x => { if (x.j?.expired) { location.replace('/'); return; } const e = $('#en-err', card) || $('#totp-err', card); if (e) e.textContent = x.message || pkErr(x); };
   start();
@@ -9027,7 +9209,7 @@ async function authEnrol(el, logo) {
       if (b.dataset.en === 'back') start();
       if (b.dataset.en === 'totp') {
         const t = await authPost('/api/auth/enrol/totp');
-        card.innerHTML = `${logo}<form id="en-totp">${totpSetupHtml(t)}<div class="aerr" id="totp-err"></div><button class="btn pri" type="submit">${tr('Turn on')}</button></form><div class="alinks"><button type="button" class="linkbtn" data-en="back">${tr('Back')}</button></div>`;
+        card.innerHTML = `${logo}<form id="en-totp">${totpSetupHtml(t)}<div class="aerr" role="alert" id="totp-err"></div><button class="btn pri" type="submit">${tr('Turn on')}</button></form><div class="alinks"><button type="button" class="linkbtn" data-en="back">${tr('Back')}</button></div>`;
         setTimeout(() => $('#totp-code', card)?.focus(), 50);
       }
       if (b.dataset.en === 'pk') {
@@ -9160,7 +9342,7 @@ function bkRestore(md, src) {
       <p class="muted">${trn('{0} task', '{0} tasks', src.counts?.tasks || 0)}, ${trn('{0} file', '{0} files', src.attachment_files || 0)}, ${trn('{0} user', '{0} users', src.counts?.users || 0)}. ${tr('A safety backup of the current state is made first. Everyone else is logged out.')}</p>
       <form class="pwform">${src.encrypted ? `<input type="password" id="bkr-pass" autocomplete="off" placeholder="${tr('Passphrase (empty = the saved one)')}">` : ''}
       <label for="bkr-word">${tr('Type {0} to confirm', '<b>' + esc(src.word) + '</b>')}</label><input id="bkr-word" autocomplete="off" autocapitalize="characters" spellcheck="false">
-      <div class="aerr" id="bkr-err"></div>
+      <div class="aerr" role="alert" id="bkr-err"></div>
       <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Cancel')}</button><button class="btn danger" type="submit" id="bkr-go" disabled>${tr('Restore')}</button></div></form>`);
     m.classList.add('bkrestore');
     m.addEventListener('input', () => { $('#bkr-go', m).disabled = $('#bkr-word', m).value.trim() !== src.word; });
@@ -9277,7 +9459,7 @@ async function setupChoices(el, logo) {
       <h3 id="su-start-h">${tr('Start with')}</h3>
       <div class="sustarts ptcards" role="radiogroup" aria-labelledby="su-start-h">${STARTS.map(([k, n, i, d]) => `<button type="button" class="ptcard ${k === start ? 'on' : ''}" role="radio" aria-checked="${k === start}" data-su-start="${k}">${ic(i, 's')}<b>${tr(n)}</b><small class="muted">${tr(d)}</small></button>`).join('')}</div>
       <p class="muted sunote">${tr('More projects any time: Lists > + > New project.')}</p>
-      <div class="aerr" id="su-err"></div>
+      <div class="aerr" role="alert" id="su-err"></div>
       <div class="sufoot"><button type="button" class="btn pri" data-su="go">${tr('Start')}</button></div></div>`;
     $('.sucust', el)?.addEventListener('toggle', e => { custOpen = e.target.open; });
   };
@@ -9411,7 +9593,7 @@ function tplUseModal(tp) {
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
-    const name = $('#tu-name', md).value.trim(); if (!name) { $('#tu-name', md).focus(); return; }
+    const name = $('#tu-name', md).value.trim(); if (!name) { need($('#tu-name', md)); return; }
     const end = $('#tu-end', md)?.value || '';
     if (end && end < $('#tu-start', md).value) { toast(tr('The end date is before the start date')); return; }
     let j; try { j = await api('POST', `/api/templates/${tp.id}/apply`, {name, folder: fNorm($('#tu-folder', md).value), start: $('#tu-start', md).value || today(), ...(end ? {end} : {})}); } catch { return; }
@@ -9455,15 +9637,15 @@ function templateModal(tp, done) {
   const d = JSON.parse(JSON.stringify(tp.data)), task = tp.kind === 'task', root = task ? d.task : null;
   const prios = [[0, N_('None')], [1, N_('Low')], [3, N_('Medium')], [5, N_('High')]];
   const md = modal(`<h3>${tr('Edit template')}</h3>
-    <div class="row"><label>${tr('Template name')}</label><input id="tp-name" value="${esc(tp.name)}" maxlength="200"></div>
-    ${task ? `<div class="row"><label>${tr('Title')}</label><input id="tp-title" value="${esc(root.title)}"></div>
-      <div class="row"><label>${tr('Description')}</label><textarea id="tp-content" rows="3">${esc(root.content || '')}</textarea></div>
-      <div class="row"><label>${tr('Priority')}</label><select id="tp-prio">${prios.map(([v, n]) => `<option value="${v}" ${root.priority === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
-      <div class="row"><label>${tr('Due')}</label><input type="number" id="tp-due" min="0" max="3650" value="${root.due_offset ?? ''}" placeholder="–" style="max-width:5rem"><span class="muted" style="font-size:var(--fs-s)">${tr('days after use (0 = same day, empty = no date)')}</span></div>
+    <div class="row"><label for="tp-name">${tr('Template name')}</label><input id="tp-name" value="${esc(tp.name)}" maxlength="200"></div>
+    ${task ? `<div class="row"><label for="tp-title">${tr('Title')}</label><input id="tp-title" value="${esc(root.title)}"></div>
+      <div class="row"><label for="tp-content">${tr('Description')}</label><textarea id="tp-content" rows="3">${esc(root.content || '')}</textarea></div>
+      <div class="row"><label for="tp-prio">${tr('Priority')}</label><select id="tp-prio">${prios.map(([v, n]) => `<option value="${v}" ${root.priority === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
+      <div class="row"><label for="tp-due">${tr('Due')}</label><input type="number" id="tp-due" min="0" max="3650" value="${root.due_offset ?? ''}" placeholder="–" style="max-width:5rem"><span class="muted" style="font-size:var(--fs-s)">${tr('days after use (0 = same day, empty = no date)')}</span></div>
       <div class="row"><label>${tr('Time')}</label>${timeIn('tp-time', root.due_time || '', {label: tr('Time'), empty: tr('all day')})}${root.repeat ? `<span class="muted" style="font-size:var(--fs-s)">${ic('repeat', 's')} ${esc(repeatLabel(root.repeat))}</span>` : ''}</div>
-      <div class="row"><label>${tr('Tags')}</label><input id="tp-tags" value="${esc((root.tags || []).join(', '))}" placeholder="${tr('tag1, tag2')}"></div>
+      <div class="row"><label for="tp-tags">${tr('Tags')}</label><input id="tp-tags" value="${esc((root.tags || []).join(', '))}" placeholder="${tr('tag1, tag2')}"></div>
       <h4>${tr('Subtasks')}</h4>`
-    : `<div class="row"><label>${tr('List name')}</label><input id="tp-lname" value="${esc(d.name || '')}"></div>${d.rel ? `<div class="shint keep">${esc(tr('Dates count from the project start (Start + n days); the last task is due on day {0}. Using it asks for the start.', d.span || 0))}${d.deps?.length ? ' ' + esc(trn('{0} dependency is kept.', '{0} dependencies are kept.', d.deps.length)) : ''}</div>` : ''}${d.fields?.length ? `<div class="row"><label>${tr('Custom fields')}</label><span class="muted">${esc(d.fields.map(f => f.name).join(', '))}</span></div>` : ''}<h4>${tr('Sections and tasks')}</h4>`}
+    : `<div class="row"><label for="tp-lname">${tr('List name')}</label><input id="tp-lname" value="${esc(d.name || '')}"></div>${d.rel ? `<div class="shint keep">${esc(tr('Dates count from the project start (Start + n days); the last task is due on day {0}. Using it asks for the start.', d.span || 0))}${d.deps?.length ? ' ' + esc(trn('{0} dependency is kept.', '{0} dependencies are kept.', d.deps.length)) : ''}</div>` : ''}${d.fields?.length ? `<div class="row"><label>${tr('Custom fields')}</label><span class="muted">${esc(d.fields.map(f => f.name).join(', '))}</span></div>` : ''}<h4>${tr('Sections and tasks')}</h4>`}
     <textarea id="tp-outline" class="tpoutline" rows="9" spellcheck="false">${esc(task ? tplOutline(root.children || []) : tplListOutline(d))}</textarea>
     <div class="shint keep">${task ? tr('One subtask per line, indent with two spaces for a further level (at most 3 levels in total).') : tr('One task per line, indent with two spaces for subtasks. A line “# Name” starts a section.')} ${tr('Lines that keep their title keep their dates, priority and notes.')}</div>
     <div class="foot"><button class="btn danger" data-m="del">${tr('Delete')}</button><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
@@ -9477,10 +9659,10 @@ function templateModal(tp, done) {
         await api('DELETE', '/api/templates/' + tp.id);
       }
       if (b.dataset.m === 'save') {
-        const name = $('#tp-name', md).value.trim(); if (!name) { $('#tp-name', md).focus(); return; }
+        const name = $('#tp-name', md).value.trim(); if (!name) { need($('#tp-name', md)); return; }
         let data;
         if (task) {
-          const title = $('#tp-title', md).value.trim(); if (!title) { $('#tp-title', md).focus(); return; }
+          const title = $('#tp-title', md).value.trim(); if (!title) { need($('#tp-title', md)); return; }
           const due = $('#tp-due', md).value.trim();
           data = {task: {...root, title, content: $('#tp-content', md).value, priority: +$('#tp-prio', md).value,
             due_offset: due === '' ? null : Math.max(0, +due), due_time: due === '' ? null : $('#tp-time', md).value || null,
@@ -9810,11 +9992,11 @@ function entryModal(e, preset = {}) {
   const run = !!(e && e.running), s = e ? new Date(e.start) : null, en = e && e.end ? new Date(e.end) : null;
   const tid = e ? e.task_id : preset.task_id || null, lid = e ? e.list_id : preset.list_id || (tid ? taskById(tid)?.list_id : null) || (isProject(routeList()?.id) ? routeList().id : null) || S.lists.find(l => l.kind === 'project' && !l.archived)?.id;
   const md = modal(`<h3>${run ? tr('Running timer') : e ? tr('Edit time entry') : tr('Add time')}</h3>
-    <div class="row"><label>${tr('Task')}</label><select id="te-target">${targetOptions(tid, lid)}</select></div>
+    <div class="row"><label for="te-target">${tr('Task')}</label><select id="te-target">${targetOptions(tid, lid)}</select></div>
     <div class="row"><label>${tr('Date')}</label>${dateIn('te-date', ds(s || new Date()), {max: today(), label: tr('Date'), clear: false})}</div>
     <div class="row"><label>${run ? tr('Started at') : tr('From – to')}</label>${timeIn('te-from', s ? fmtClock(s) : '', {label: run ? tr('Started at') : tr('From'), empty: '–'})}${run ? '' : `<span class="muted">–</span>${timeIn('te-to', en ? fmtClock(en) : '', {label: tr('To'), empty: '–'})}`}</div>
-    ${run ? '' : `<div class="row"><label>${tr('or duration')}</label><input id="te-dur" placeholder="${tr('e.g. 1:30, 45m or 1.5')}" inputmode="decimal" autocomplete="off"></div>`}
-    <div class="row"><label>${tr('Note')}</label><input id="te-note" value="${esc(e?.note || '')}" maxlength="500" autocomplete="off"></div>
+    ${run ? '' : `<div class="row"><label for="te-dur">${tr('or duration')}</label><input id="te-dur" placeholder="${tr('e.g. 1:30, 45m or 1.5')}" inputmode="decimal" autocomplete="off"></div>`}
+    <div class="row"><label for="te-note">${tr('Note')}</label><input id="te-note" value="${esc(e?.note || '')}" maxlength="500" autocomplete="off"></div>
     ${run ? '' : `<div class="shint">${tr('An end before the start means the next day. Only a duration: the entry ends now (today) or starts at 9:00.')}</div>`}
     <div class="foot">${e && !run ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   const times = () => {
@@ -10458,14 +10640,14 @@ async function saveField(el) {
 function fieldModal(lid, f, done) {
   const edit = !!f, st = {type: f?.type || 'text', opts: JSON.parse(JSON.stringify(f?.options?.options || [{id: '', name: '', color: LCOLORS[1]}]))};
   const md = modal(`<h3>${edit ? tr('Edit field') : tr('New field')}</h3>
-    <div class="row"><label>${tr('Name')}</label><input id="fd-name" value="${esc(f?.name || '')}" maxlength="60" placeholder="${tr('e.g. Budget, Stage, Client')}"></div>
-    <div class="row"><label>${tr('Type')}</label><select id="fd-type" ${edit ? 'disabled' : ''}>${FTYPES.map(([k, n]) => `<option value="${k}" ${st.type === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
+    <div class="row"><label for="fd-name">${tr('Name')}</label><input id="fd-name" value="${esc(f?.name || '')}" maxlength="60" placeholder="${tr('e.g. Budget, Stage, Client')}"></div>
+    <div class="row"><label for="fd-type">${tr('Type')}</label><select id="fd-type" ${edit ? 'disabled' : ''}>${FTYPES.map(([k, n]) => `<option value="${k}" ${st.type === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     <div id="fd-extra"></div>
     <div class="row" ${colCfg(lid) ? 'hidden' : ''}><label>${tr('Task rows')}</label><label class="chkl"><input type="checkbox" id="fd-pin" ${f?.pinned ? 'checked' : ''}> ${tr('show as a chip (at most 2 fields)')}</label></div>
     <div class="foot">${edit ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   const extra = () => {
     const x = $('#fd-extra', md);
-    if (st.type === 'number') x.innerHTML = `<div class="row"><label>${tr('Unit')}</label><input id="fd-unit" value="${esc(f?.options?.unit || '')}" maxlength="12" placeholder="${tr('optional, e.g. € or h')}" style="max-width:8.75rem"></div>`;
+    if (st.type === 'number') x.innerHTML = `<div class="row"><label for="fd-unit">${tr('Unit')}</label><input id="fd-unit" value="${esc(f?.options?.unit || '')}" maxlength="12" placeholder="${tr('optional, e.g. € or h')}" style="max-width:8.75rem"></div>`;
     else if (st.type === 'select') x.innerHTML = `<h4>${tr('Options')}</h4><div class="optlist">${st.opts.map((o, i) => `<div class="optrow" data-i="${i}"><button class="swc" data-ocol="${i}" style="background:${cssColor(o.color) || 'var(--bg4)'}" title="${tr('Color')}"></button><input data-oname="${i}" value="${esc(o.name)}" maxlength="60" placeholder="${tr('Option')}"><button class="iconbtn" data-orm="${i}" title="${tr('Remove')}">${ic('x', 's')}</button></div>`).join('')}</div><button class="btn sm" data-m="opt-add">${ic('plus', 's')} ${tr('Option')}</button>${edit ? `<div class="shint keep">${tr('Removing an option clears it in all tasks.')}</div>` : ''}`;
     else x.innerHTML = st.type === 'person' ? `<div class="shint keep">${tr('Pick the owner or a member of the list.')}</div>` : '';
   };
@@ -10486,7 +10668,7 @@ function fieldModal(lid, f, done) {
       md.remove(); await load(); render(); done && done(); return;
     }
     if (a === 'save') {
-      const name = $('#fd-name', md).value.trim(); if (!name) { $('#fd-name', md).focus(); return; }
+      const name = $('#fd-name', md).value.trim(); if (!name) { need($('#fd-name', md)); return; }
       const options = st.type === 'number' ? {unit: $('#fd-unit', md).value.trim()} : st.type === 'select' ? {options: st.opts.filter(o => o.name.trim())} : {};
       const body = {name, options, pinned: $('#fd-pin', md).checked};
       try { await api(edit ? 'PATCH' : 'POST', edit ? '/api/fields/' + f.id : `/api/lists/${lid}/fields`, edit ? body : {...body, type: st.type}); } catch { return; }
@@ -10558,15 +10740,59 @@ function toastPlace(el) {
   if (sr && sr.top >= innerHeight * .3) top = Math.min(top, sr.top);
   el.style.bottom = el.classList.contains('totop') ? '' : top < innerHeight ? Math.round(innerHeight - top + 12) + 'px' : '';
 }
+// 2.16.0 (#473): status messages for screen readers (WCAG 4.1.3): one polite live region (#srlive in index.html); the
+// text is set a moment after clearing it, so the same message twice is read twice
+let announceT;
+// 2.16.0 (#473, WCAG 3.3.1): an error line of a form / dialog (.calerr, .aerr; role="alert" = read out when it appears) marks
+// its field: the focused one, else the first text field of the same form / dialog: aria-invalid + aria-describedby
+new MutationObserver(ms => {
+  const seen = new Set();
+  for (const m of ms) { const t = m.target.nodeType === 3 ? m.target.parentElement : m.target; const e = t?.closest?.('.calerr,.aerr'); if (e) seen.add(e); }
+  for (const e of seen) {
+    if (!e.id) continue;
+    const box = e.closest('form,.card,.modal,.authscreen') || e.parentElement; if (!box) continue;
+    const on = !!e.textContent.trim() && !e.hidden;
+    const a = document.activeElement;
+    const f = on ? (a && box.contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName) ? a : $('input:not([type=hidden]):not([type=checkbox]):not([type=radio]),textarea,select', box)) : null;
+    for (const x of $$(`[aria-errormessage="${e.id}"]`, box)) if (x !== f) { x.removeAttribute('aria-invalid'); x.removeAttribute('aria-errormessage'); x.setAttribute('aria-describedby', (x.getAttribute('aria-describedby') || '').split(' ').filter(i => i && i !== e.id).join(' ')); if (!x.getAttribute('aria-describedby')) x.removeAttribute('aria-describedby'); }
+    if (f) { f.setAttribute('aria-invalid', 'true'); f.setAttribute('aria-errormessage', e.id); const d = (f.getAttribute('aria-describedby') || '').split(' ').filter(Boolean); if (!d.includes(e.id)) f.setAttribute('aria-describedby', [...d, e.id].join(' ')); }
+  }
+}).observe(document.documentElement, {subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden']});
+// 2.16.0 (#473, WCAG 3.3.1): a required field left empty says so in words (next to the field, read out, aria-invalid)
+// instead of only getting the focus
+function need(el, msg) {
+  if (!el) return;
+  const lab = (selLabel(el) || el.getAttribute('placeholder') || '').replace(/[:*]\s*$/, '');
+  const text = msg || (lab ? tr('Please fill in “{0}”', lab) : tr('Please fill in this field'));
+  let e = el.nextElementSibling?.classList.contains('ferr') ? el.nextElementSibling : null;
+  if (!e) { e = document.createElement('div'); e.className = 'ferr'; e.id = 'fe' + Math.random().toString(36).slice(2, 8); e.setAttribute('role', 'alert'); el.insertAdjacentElement('afterend', e); }
+  e.textContent = text;
+  const d = (el.getAttribute('aria-describedby') || '').split(' ').filter(Boolean);
+  el.setAttribute('aria-invalid', 'true'); if (!d.includes(e.id)) el.setAttribute('aria-describedby', [...d, e.id].join(' '));
+  el.addEventListener('input', () => { e.remove(); el.removeAttribute('aria-invalid'); const r = (el.getAttribute('aria-describedby') || '').split(' ').filter(x => x && x !== e.id).join(' '); r ? el.setAttribute('aria-describedby', r) : el.removeAttribute('aria-describedby'); }, {once: true});
+  el.focus();
+}
+function announce(msg) {
+  let r = $('#srlive');
+  if (!r) { r = document.createElement('div'); r.id = 'srlive'; r.className = 'sr'; r.setAttribute('role', 'status'); r.setAttribute('aria-live', 'polite'); r.setAttribute('aria-atomic', 'true'); document.body.appendChild(r); }
+  r.textContent = ''; clearTimeout(announceT);
+  announceT = setTimeout(() => { r.textContent = String(msg || ''); }, 60);
+}
 function toast(msg, undo, ms, label) {  // label: the button's text instead of "Undo" (2.13.0: "Open")
   const el = $('#toast');
+  announce(msg + (undo ? ' · ' + (label || tr('Undo')) + (isTouch() ? '' : ' (' + kbText('Mod+Z') + ')') : ''));
   if (!undo || label) HIST.toastE = null;  // any other message ends the toast's shortcut (the history keeps the step)
   el.innerHTML = `<span>${esc(msg)}</span>${undo ? `<button>${esc(label || tr('Undo'))}</button>${isMobile() || isTouch() || label ? '' : kb('Mod+Z')}` : ''}`;
   el.classList.remove('hidden');
   toastPlace(el);
   if (undo) el.querySelector('button').onclick = () => { el.classList.add('hidden'); undo(); };
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.classList.add('hidden'); if (undo) HIST.toastE = null; }, ms || (undo ? 6000 : 2500));
+  const hide = () => { el.classList.add('hidden'); if (undo) HIST.toastE = null; };
+  const wait = ms || (undo ? 6000 : 2500);
+  toastTimer = setTimeout(hide, wait);
+  // 2.16.0 (#473, WCAG 2.2.1): the toast stays while the pointer or the keyboard focus is on it
+  el.onmouseenter = el.onfocusin = () => clearTimeout(toastTimer);
+  el.onmouseleave = el.onfocusout = e => { if (e.type === 'focusout' && el.contains(e.relatedTarget)) return; if (el.matches(':hover') && e.type === 'focusout') return; clearTimeout(toastTimer); toastTimer = setTimeout(hide, Math.max(2500, wait / 2)); };
 }
 
 // ------------------------------------------------------------------ quick add wiring
@@ -10814,11 +11040,23 @@ document.addEventListener('click', async e => {
     }
     case 'palette': closeSide(); openPalette(); break;
     case 'new-task': { const q = currentQuickInput(); if (q && (!isMobile() || tabletDock())) q.focus(); else openQuickSheet(); break; }
-    case 'side': $('#side').classList.add('open'); $('#scrim').classList.remove('hidden'); popOnClose = closeSide; break;
+    case 'side': $('#side').classList.add('open'); $('#scrim').classList.remove('hidden'); popOnClose = closeSide; sideRet = a; setTimeout(() => { if (document && $('#side.open') && !$('#side').contains(document.activeElement)) { sideRove(); const f = sideItems().find(x => x.tabIndex === 0) || sideItems()[0]; f?.focus({preventScroll: true}); } }, 60); break;  // 2.16.0 (#473): the drawer takes the focus
     case 'settings': closeSide(); settingsModal(); break;
-    case 'user-menu': menu(a, [{label: tr('Account'), icon: 'user', fn: () => { closeSide(); settingsModal('account'); }},
-      ...(S.me?.auth === 'session' ? [{label: tr('Log out'), icon: 'logout', fn: logout}] : [])]); break;
+    // 2.16.0 (#641): the account sits as the picture at the right of the Kalmido row (sidebar + drawer): Account, Settings,
+    // Log out (the account rows at the top of the drawer / the bottom of the sidebar are gone)
+    case 'user-menu': menu(a, [{label: S.me ? `${S.me.display_name} · ${S.me.username}` : '', icon: 'user', dis: true, cls: 'mwho'}, '-',
+      {label: tr('Account'), icon: 'user', fn: () => { closeSide(); settingsModal('account'); }},
+      {label: tr('Settings'), icon: 'gear', keys: 'g s', fn: () => { closeSide(); settingsModal(); }},
+      ...(S.me?.auth === 'session' ? ['-', {label: tr('Log out'), icon: 'logout', fn: logout}] : [])]); break;
     case 'tabs-more': tabsMore(a); break;
+    case 'rx-tog': {  // 2.16.0 (#643): open / close the quick reactions of a chat message or a comment
+      const host = a.closest('.cmsg, .cm'); if (!host) break;
+      const on = !host.classList.contains('rxshow');
+      $$('.rxshow').forEach(x => { x.classList.remove('rxshow'); x.querySelector('.rxtog')?.setAttribute('aria-expanded', 'false'); });
+      host.classList.toggle('rxshow', on); a.setAttribute('aria-expanded', String(on));
+      if (on) setTimeout(() => host.querySelector('.chrxq .rx, .cmrxq .rx')?.focus({preventScroll: true}), 0);
+      break;
+    }
     case 'list-new': menu(a, [{label: tr('New list'), icon: 'list', fn: () => { closeSide(); listModal(); }}, {label: tr('New project…'), icon: 'brief', fn: () => { closeSide(); listModal(null, '', {kind: 'project'}); }}, {label: tr('New folder…'), icon: 'folder', fn: () => { closeSide(); newFolder(); }}, ...(tplOf('list').length ? [{label: tr('New list from template'), icon: 'copy', fn: () => { closeSide(); templateMenu($('#top h1'), 'list'); }}] : []), ...(propOn() ? [{label: tr('New project from briefing…'), icon: 'bot', fn: () => { closeSide(); propRequest('project'); }}] : [])]); break;
     case 'tpl-use': if (a.closest('.qadd.sheet')) { closePop(); templateMenu($('#fab'), 'task'); } else templateMenu(a, 'task'); break;
     case 'stats-mode': S.st.mode = a.dataset.k; LS.set('statsMode', S.st.mode); renderView(); break;
@@ -11050,7 +11288,12 @@ document.addEventListener('click', async e => {
     case 'tv-sheet': timesheet(); break;
   }
 });
-function closeSide() { $('#side').classList.remove('open'); if (!$('.qadd.sheet') && $('#pop').classList.contains('hidden')) $('#scrim').classList.add('hidden'); }
+let sideRet = null;
+function closeSide() {
+  // 2.16.0 (#473): the focus goes back to the menu button when it was in the drawer
+  if ($('#side.open') && sideRet && sideRet.isConnected && ($('#side').contains(document.activeElement) || document.activeElement === document.body)) { const r = sideRet; setTimeout(() => { if (!document) return; if (!$('#side.open') && (document.activeElement === document.body || !document.activeElement || $('#side').contains(document.activeElement)) && r.isConnected && r.offsetParent) r.focus({preventScroll: true}); }, 0); }
+  sideRet = null;
+  $('#side').classList.remove('open'); if (!$('.qadd.sheet') && $('#pop').classList.contains('hidden')) $('#scrim').classList.add('hidden'); }
 $('#scrim').addEventListener('click', () => { closeSide(); closePop(); });
 $('#fab').addEventListener('click', () => openQuickSheet());
 
@@ -11116,6 +11359,7 @@ document.addEventListener('keydown', async e => {
     if (!$('#pop').classList.contains('hidden') || $('.qadd.sheet')) { closePop(); return; }
     if (S.multi.size || S.multiMode) { S.multi.clear(); S.multiMode = false; render(); return; }
     const m = $$('.modal:not(.authscreen)').pop(); if (m) { m.remove(); return; }
+    if ($('#side.open')) { closeSide(); return; }  // 2.16.0 (#473): Esc closes the drawer
     if (/INPUT|TEXTAREA/.test(t.tagName)) { t.blur(); return; }
     if (S.sel) closeDetail();
     return;
@@ -11253,7 +11497,7 @@ function filterModal(id) {
   const tags = [...new Set([...S.tasks.values()].flatMap(t => t.tags))].sort((a, b) => a.localeCompare(b, 'de'));
   const chips = (key, opts, translate) => `<div class="fchips" data-key="${key}">${opts.map(([v, n]) => (translate ? [v, tr(n)] : [v, n])).map(([v, n]) => `<button class="${r[key].includes(v) ? 'on' : ''}" data-v="${esc(String(v))}">${esc(n)}</button>`).join('')}</div>`;
   const md = modal(`<h3>${id ? tr('Edit filter') : tr('New filter')}</h3>
-    <div class="row"><label>${tr('Name')}</label><input id="f-name" value="${esc(f.name)}" placeholder="${tr('e.g. Important this week')}"></div>
+    <div class="row"><label for="f-name">${tr('Name')}</label><input id="f-name" value="${esc(f.name)}" placeholder="${tr('e.g. Important this week')}"></div>
     <div class="row"><label>${tr('Match')}</label><div class="seg" id="f-op"><button data-op="and" class="${r.op !== 'or' ? 'on' : ''}">${tr('AND: all conditions')}</button><button data-op="or" class="${r.op === 'or' ? 'on' : ''}">${tr('OR: any one')}</button></div></div>
     <h4>${tr('Lists')}</h4>${chips('lists', S.lists.filter(l => !l.archived).map(l => [l.id, lname(l)]))}
     <h4>${tr('Date')}</h4>${chips('dates', DATE_OPTS, true)}
@@ -12088,6 +12332,46 @@ function kfocus(id) {
   $$('#view .trow.kfocus').forEach(r => r.classList.remove('kfocus'));
   const r = id && $(`#view .trow[data-id="${id}"]`);
   if (r) { r.classList.add('kfocus'); r.scrollIntoView({block: 'nearest'}); }
+  // 2.16.0 (#473): the keyboard focus is the real focus (screen readers follow it): the row's title gets it while the
+  // focus is in the list or nowhere
+  const tt = r && $('.ttl[data-kt]', r), a = document.activeElement;
+  if (tt && (!a || a === document.body || a === $('#view') || a.matches?.('.ttl[data-kt],.trow .chk'))) { rowRove(tt); try { tt.focus({preventScroll: true}); } catch { tt.focus(); } }
+}
+// 2.16.0 (#473): one task row per view is a Tab stop (its checkbox and title), ↑ ↓ / j k move it (roving tabindex);
+// before, every row's checkbox was a stop and the title none (a task could not be opened with Tab + Enter)
+function rowRove(cur) {
+  const ts = $$('#view .trow[data-id] > .tmain > .ttl[data-kt]'); if (!ts.length) return;
+  const a = document.activeElement, rowId = x => x.closest('.trow')?.dataset.id;
+  cur = cur || ts.find(x => x === a || x.closest('.trow')?.contains(a)) || (S.kf && ts.find(x => rowId(x) === String(S.kf))) || ts.find(x => x.closest('.trow').classList.contains('sel')) || ts[0];
+  for (const x of ts) {
+    const v = x === cur ? 0 : -1, c = x.closest('.trow').querySelector(':scope > .chk');
+    if (x.tabIndex !== v) x.tabIndex = v;
+    if (c && c.tabIndex !== v) c.tabIndex = v;
+  }
+}
+document.addEventListener('focusin', e => {
+  const tt = e.target.closest?.('#view .trow[data-id] .ttl[data-kt], #view .trow[data-id] > .chk'); if (!tt) return;
+  const row = tt.closest('.trow'), id = +row.dataset.id;
+  let kb = true; try { kb = e.target.matches(':focus-visible'); } catch { /* old engine */ }
+  rowRove(row.querySelector('.ttl[data-kt]'));
+  if (kb && S.kf !== id) { S.kf = id; $$('#view .trow.kfocus').forEach(r => r.classList.remove('kfocus')); row.classList.add('kfocus'); }
+});
+// 2.16.0 (#473, WCAG 2.5.7): move a task one place up / down in its list (section, parent) without dragging: task menu
+// "Move up / down", Alt+↑ / ↓. In a view sorted by priority it moves among the tasks of the same priority; other sort
+// orders switch to "Priority" first (as a drop does)
+async function taskNudge(id, d) {
+  const t = taskById(id); if (!t || !(t.id > 0)) return;
+  if (!canEdit(t)) { roToast(); return; }
+  if (S.route.mod === 'tasks' && !['prio'].includes(sortMode())) LS.set('sort2.' + S.route.key, 'prio');
+  const sib = siblings(t).filter(x => x.priority === t.priority && (x.section_id || null) === (t.section_id || null));
+  const i = sib.findIndex(x => x.id === id), o = sib[i + d];
+  if (i < 0 || !o) { toast(d < 0 ? tr('Already at the top') : tr('Already at the bottom')); return; }
+  const n2 = sib[i + 2 * d];
+  const sort = n2 ? (o.sort + n2.sort) / 2 : o.sort + d;
+  t.sort = sort; render();
+  try { await api('POST', '/api/tasks/reorder', {items: [{id, sort}]}); } catch { await load().catch(() => {}); render(); return; }
+  await load(); render(); kfocus(id);
+  announce(d < 0 ? tr('Moved up') : tr('Moved down'));
 }
 const curTask = () => { const id = S.sel || (S.kf && $(`#view .trow[data-id="${S.kf}"]`) ? S.kf : null); return id ? taskById(id) : null; };
 const typing = t => t && (/INPUT|TEXTAREA|SELECT/.test(t.tagName) || t.isContentEditable);
@@ -12113,6 +12397,10 @@ window.addEventListener('keydown', e => {
     return;
   }
   if ($('.palette')) return;  // its input handles the keys
+  // 2.16.0 (#473, WCAG 2.5.7): Alt+↑ / Alt+↓ moves the focused task up / down (the same as dragging it)
+  if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && (k === 'ArrowUp' || k === 'ArrowDown') && S.kf && !typing(e.target) && !$('.modal') && $('#pop').classList.contains('hidden') && $(`#view .trow[data-id="${S.kf}"]`)) {
+    e.preventDefault(); e.stopPropagation(); taskNudge(S.kf, k === 'ArrowUp' ? -1 : 1); return;
+  }
   if (typing(e.target) || e.ctrlKey || e.metaKey || e.altKey || $('.modal') || !$('#pop').classList.contains('hidden') || $('.qadd.sheet') || $('.lightbox') || $('.tsheet')) { gPending = 0; return; }
   if (k === '?') { e.preventDefault(); e.stopPropagation(); shortcutsModal(); return; }
   if (gPending && Date.now() - gPending < 1200) {
@@ -12123,6 +12411,9 @@ window.addEventListener('keydown', e => {
   if (k === 'g') { gPending = Date.now(); e.preventDefault(); return; }
   const inList = S.route.mod === 'tasks' || S.route.mod === 'cal' || S.route.mod === 'matrix';
   if (!inList) return;
+  // 2.16.0 (#473): a focused row title is the keyboard row (also when the focus came without :focus-visible, e.g. a
+  // screen reader moving it)
+  if (e.target.matches?.('#view .ttl[data-kt]')) { const rid = +e.target.closest('.trow')?.dataset.id; if (rid && rid !== S.kf) { S.kf = rid; $$('#view .trow.kfocus').forEach(r => r.classList.remove('kfocus')); e.target.closest('.trow').classList.add('kfocus'); } }
   if (S.route.mod === 'cal' && !e.shiftKey) {  // 2.0.6 (#191): 1-4 = month / week / day / timeline, ← → = period, . = today
     const mode = CAL_KEYS[k], nav = {ArrowLeft: 'cal-prev', ArrowRight: 'cal-next', '.': 'cal-today'}[k];
     const b = mode ? $(`#view [data-act="cal-mode"][data-k="${mode}"]`) : nav ? $(`#view [data-act="${nav}"]`) : null;
@@ -12159,9 +12450,9 @@ window.addEventListener('keydown', e => {
     return;
   }
   const t = S.kf && $(`#view .trow[data-id="${S.kf}"]`) ? taskById(S.kf) : null;
-  if (!t || (e.target !== document.body && e.target.closest?.('button,a,[tabindex],label'))) return;
+  if (!t || (e.target !== document.body && !e.target.matches?.('.ttl[data-kt]') && e.target.closest?.('button,a,[tabindex],label'))) return;
   const row = $(`#view .trow[data-id="${t.id}"]`);
-  if (k === 'Enter' || k === 'o') { e.preventDefault(); openDetail(t.id); }
+  if (k === 'Enter' || k === 'o') { e.preventDefault(); S.kbOpen = true; openDetail(t.id); }
   else if (k === 'x' || k === ' ') { e.preventDefault(); toggleTask(t.id); }
   else if (k === 'e' || k === 'F2') { e.preventDefault(); inlineEditStart(t.id); }
   else if (k === 's') { e.preventDefault(); snoozeSheet(t.id, row); }
@@ -12246,7 +12537,7 @@ function palAll() {
   if (doneToggleView()) add('a:showdone', 'action', `${showDone() ? tr('Hide completed') : tr('Show completed')}: ${titleFor(S.route.key)}`, 'eye', () => setShowDone(!showDone()));
   else if (S.route.mod === 'cal' && S.calMode !== 'timeline') add('a:showdone', 'action', `${showDoneCal() ? tr('Hide completed') : tr('Show completed')}: ${tr('Calendar')}`, 'eye', () => setShowDone(!showDoneCal(), 'cal'));
   // views
-  for (const k of ['inbox', 'today', 'tomorrow', 'week', 'doable', 'waiting', 'all', 'done', 'trash', 'search']) {
+  for (const k of ['inbox', 'today', 'tomorrow', 'week', 'doable', 'pinned', 'waiting', 'all', 'done', 'trash', 'search']) {
     add('v:' + k, 'view', tr(SMART[k].name), SMART[k].icon, () => go(k), {keys: {today: 'g t', tomorrow: 'g m', week: 'g w', doable: 'g d', inbox: 'g i', all: 'g a'}[k]});
   }
   if (collab()) add('v:assigned', 'view', tr('Assigned to me'), 'user', () => go('assigned'));
@@ -12295,8 +12586,23 @@ function palItems() {
   // 2.13.0: "#447" or "447" jumps straight to that task (only one this person can see)
   const nm = q.match(/^#?(\d{1,9})$/), hit = nm && taskById(+nm[1]);
   const jump = hit ? [{id: 'tid:' + hit.id, kind: 'tasks', label: `#${hit.id} ${hit.title}`, sub: lname(listById(hit.list_id)) || '', icon: 'hash', fn: () => openDetail(hit.id)}] : [];
-  return jump.concat(all.map(x => ({...x, score: Math.max(fuzzy(q, x.label), x.sub ? fuzzy(q, x.sub) * 0.3 : 0)}))
+  const hits = jump.concat(all.map(x => ({...x, score: Math.max(fuzzy(q, x.label), x.sub ? fuzzy(q, x.sub) * 0.3 : 0)}))
     .filter(x => x.score > 0).map(x => ({...x, score: x.score + boost[x.kind]})).sort((a, b) => b.score - a.score).slice(0, 60));
+  // 2.16.0 (#644): what the field can do with the text itself: ask an agent (the text goes to its chat) and create a task
+  // (quick add syntax, the list like the quick add). Real matches first; without one, "Create" is on top (Enter = create)
+  const r = parseQuick(q, new Set()), d = quickDefaults(), tl = listById(r.list_id || d.list_id) || inbox();
+  const create = {id: 'new:', kind: 'action', cls: 'pdo', label: tr('Create as task: {0}', r.title || q), sub: [tl ? lname(tl) : '', r.due ? dayLabel(r.due) + (r.due_time ? ' ' + r.due_time : '') : ''].filter(Boolean).join(' · '), icon: 'plus', fn: () => palCreate(q)};
+  const asks = (S.agents || []).filter(x => x.enabled && x.chat !== false).slice(0, 3).map(x => ({id: 'ask:' + x.id, kind: 'action', cls: 'pdo', label: tr('Ask {0}: {1}', x.name, q), sub: tr('Sends it to the chat'), icon: 'bot', img: x.avatar || null, fn: () => palAsk(x.id, q)}));
+  return hits.length ? [...hits, ...asks, create] : [create, ...asks];
+}
+function palCreate(q) {
+  const r = parseQuick(q, new Set()), d = quickDefaults();
+  return createTask({title: r.title || q, list_id: r.list_id || d.list_id, due: r.due || d.due, due_time: r.due_time, priority: r.priority ?? 0, tags: [...(d.tags || []), ...(r.tags || [])], repeat: r.repeat || ''});
+}
+// 2.16.0 (#644): "Ask <agent>: …" from the command field: the text as a chat message, then the chat opens
+async function palAsk(aid, text) {
+  try { await api('POST', `/api/agents/${aid}/chat`, {body: text}); } catch { return; }
+  chatOpen(aid);
 }
 const PAL_GROUP = {viewed: N_('Recently viewed'), recent: N_('Recent'), task: N_('Selected task'), action: N_('Actions'), view: N_('Go to')};
 function palDraw() {
@@ -12311,7 +12617,15 @@ function palDraw() {
       <span class="pl"><span class="plt">${esc(x.label)}</span>${x.sub ? `<span class="pls">${esc(x.sub)}</span>` : ''}</span>
       ${x.keys ? kb(x.keys) : ''}${x.kind === 'action' || x.kind === 'setting' || x.kind === 'view' ? '' : `<span class="pk">${esc(tr(PAL_KIND[x.kind] || x.kind))}</span>`}</button>`;
   });
-  $('.plist', el).innerHTML = h || `<div class="pempty">${tr('Nothing found. Enter adds it as a new task.')}</div>`;
+  // 2.16.0 (#644): an empty field says what it can do (only what exists; no key hints on touch)
+  const ags = (S.agents || []).filter(x => x.enabled);
+  const hints = !PAL.q.trim() && !PAL.mode ? `<div class="phints" role="note">${[
+    [ic('search', 's'), tr('Type to find tasks, lists, views, settings and actions')],
+    [ic('hash', 's'), tr('#123 jumps to task 123')],
+    [ic('plus', 's'), tr('Text + Enter creates a task: “Dentist tomorrow 3pm !high”')],
+    ...(ags.length ? [[ic('bot', 's'), tr('Ask {0}: type the question, then pick “Ask {0}”', ags[0].name)]] : [])].map(([i, t]) => `<div class="phint">${i}<span>${esc(t)}</span></div>`).join('')}</div>` : '';
+  const hw = $('.phintw', el); if (hw) hw.innerHTML = hints;  // outside the listbox (only options in there)
+  $('.plist', el).innerHTML = h || (hints ? '' : `<div class="pempty">${tr('Nothing found. Enter adds it as a new task.')}</div>`);
   $('.pqin', el).setAttribute('aria-activedescendant', PAL.items.length ? 'pi-' + PAL.i : '');
   $('.plist .pitem.on', el)?.scrollIntoView({block: 'nearest'});
 }
@@ -12323,7 +12637,7 @@ function openPalette(mode = null) {
   md.className = 'modal palette';
   md.innerHTML = `<div class="card" role="dialog" aria-label="${tr('Search and commands')}">
     <div class="pqbar">${ic('search')}${mode === 'move' && t ? `<span class="pmode">${esc(tr('Move “{0}” to', t.title.slice(0, 30)))}</span>` : ''}<input class="pqin" role="combobox" aria-expanded="true" aria-controls="plist" autocomplete="off" spellcheck="false" placeholder="${mode === 'move' ? tr('List…') : tr('Search tasks, lists, views and actions…')}">${kb('Esc')}</div>
-    <div class="plist" id="plist" role="listbox"></div>
+    <div class="phintw"></div><div class="plist" id="plist" role="listbox" aria-label="${esc(tr('Search and commands'))}"></div>
     <div class="pfoot">${kb('↑')}${kb('↓')}<span>${tr('select')}</span>${kb('Enter')}<span>${tr('run')}</span><span class="spacer"></span>${kb('?')}<span>${tr('all shortcuts')}</span></div></div>`;
   md.addEventListener('mousedown', e => { if (e.target === md) closePalette(); });
   document.body.appendChild(md);
@@ -12348,12 +12662,10 @@ function palRun(i) {
   const x = PAL.items[i];
   if (!x) {  // no match: the text becomes a new task (quick add syntax)
     const q = PAL.q.trim(); if (!q || PAL.mode) return;
-    closePalette();
-    const r = parseQuick(q, new Set()), d = quickDefaults();
-    createTask({title: r.title || q, list_id: r.list_id || d.list_id, due: r.due || d.due, due_time: r.due_time, priority: r.priority ?? 0, tags: [...(d.tags || []), ...(r.tags || [])], repeat: r.repeat || ''});
+    closePalette(); palCreate(q);
     return;
   }
-  if (!x.id.startsWith('mv:') && !x.id.startsWith('a:move') && !x.id.startsWith('rv:')) LS.set('palRecent', [x.id, ...LS.get('palRecent', []).filter(y => y !== x.id)].slice(0, 8));
+  if (!x.id.startsWith('mv:') && !x.id.startsWith('ask:') && !x.id.startsWith('new:') && !x.id.startsWith('a:move') && !x.id.startsWith('rv:')) LS.set('palRecent', [x.id, ...LS.get('palRecent', []).filter(y => y !== x.id)].slice(0, 8));
   if (!x.keep) closePalette();
   x.fn();
 }
@@ -12775,7 +13087,7 @@ function reactHtml(c, ro) {
   // 2.13.2 (#478 F5): like the chat: given reactions stay as pills, the quick 👍 👎 + appear on hover / keyboard focus
   // (desktop) or a long press (touch) as a small bar over the comment's corner
   const q = quick.join('') + more;
-  return (rs.length ? `<div class="rxbar">${rs.map(pill).join('')}</div>` : '') + (q ? `<div class="rxbar cmrxq" role="group" aria-label="${esc(tr('React'))}">${q}</div>` : '');
+  return (rs.length || q ? `<div class="rxbar">${rs.map(pill).join('')}${q ? rxTog() : ''}</div>` : '') + (q ? `<div class="rxbar cmrxq" role="group" aria-label="${esc(tr('React'))}">${q}</div>` : '');
 }
 function reactPicker(anchor, cid) {
   const p = openPop(anchor, `<div class="rxpick"><div class="rxgrid">${[...RX.map(x => [x[0], x[1], tr(x[2])]), ...RX_MORE.map(e => [e, e, e])].map(([k, em, n]) => `<button data-rx="${esc(k)}" title="${esc(n)}" aria-label="${esc(n)}">${em}</button>`).join('')}</div>
@@ -13003,7 +13315,7 @@ function propRequest(kind, ctx = {}) {
       <div class="row ppcol"><label for="pp-text">${tr('Notes')}</label><textarea id="pp-text" rows="8" maxlength="50000" placeholder="${esc(tr('Paste the meeting notes'))}"></textarea></div>`;
   }
   const md = modal(`<h3>${ic('bot', 's')} ${esc(title)}</h3>${body}${propAgentRow()}<div class="shint" id="pp-priv"></div>
-    <div class="calerr" id="pp-err" hidden></div>
+    <div class="calerr" role="alert" id="pp-err" hidden></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${ic('bot', 's')} ${tr('Ask for a proposal')}</button></div>`);
   md.classList.add('ppreq');
   const priv = () => {  // what exactly leaves: the consent line under the form
@@ -13033,7 +13345,7 @@ function propRequest(kind, ctx = {}) {
     const q = {agent_id: +$('#pp-agent', md).value, kind};
     if (kind === 'project' || kind === 'extract') {
       q.text = $('#pp-text', md).value.trim();
-      if (!q.text) { $('#pp-text', md).focus(); return; }
+      if (!q.text) { need($('#pp-text', md)); return; }
     }
     if (kind === 'project') { q.folder = $('#pp-folder', md).value.trim() || null; if (ctx.file) q.file_name = ctx.file; }
     if (kind === 'subtasks') { q.task_id = ctx.tid; q.hint = $('#pp-hint', md).value.trim() || null; }
@@ -13173,7 +13485,7 @@ function propDraw() {
   }
   P.md.querySelector('.card').innerHTML = `<h3>${ic('bot', 's')} ${esc(j.title)}</h3>
     <div class="pphead muted"><span class="jst">${esc(tr(PROP_ST[st] || st))}</span>${agent} · ${esc(relTime(j.updated_at))}</div>
-    <div class="calerr" id="pp-err" hidden></div>${main}<div class="foot ${st === 'ready' ? 'ppfoot' : ''}">${foot}</div>`;
+    <div class="calerr" role="alert" id="pp-err" hidden></div>${main}<div class="foot ${st === 'ready' ? 'ppfoot' : ''}">${foot}</div>`;
   if (st === 'ready') propCount();
 }
 async function propApply(b) {
@@ -13241,7 +13553,7 @@ const dpRowsOf = p => [...p.events.filter(e => !e.all_day).map(e => ({kind: 'eve
   ...p.fixed.map(t => ({kind: 'fixed', start: t.start, end: t.end, title: t.title, reason: t.reason}))];
 async function dayplanModal(mode = 'day', day = today()) {
   $('.dpm')?.remove();
-  const md = modal(`<div class="calerr" id="dp-err" hidden></div><div class="muted mhint">${tr('Loading…')}</div>`);
+  const md = modal(`<div class="calerr" role="alert" id="dp-err" hidden></div><div class="muted mhint">${tr('Loading…')}</div>`);
   md.classList.add('dpm');
   const st = {mode, day, p: null, sel: new Set()}, alt = day !== today() ? day : addDays(today(), 1);
   const draw = () => {
@@ -13254,7 +13566,7 @@ async function dayplanModal(mode = 'day', day = today()) {
       <div class="dptabs"><div class="seg" role="group" aria-label="${esc(tr('What to plan'))}"><button data-dp="mode" data-v="day" class="${st.mode === 'day' ? 'on' : ''}" aria-pressed="${st.mode === 'day'}">${tr('Plan my day')}</button><button data-dp="mode" data-v="fill" class="${st.mode === 'fill' ? 'on' : ''}" aria-pressed="${st.mode === 'fill'}">${tr('Fill free time')}</button></div>
         <div class="seg" role="group" aria-label="${esc(tr('Day'))}"><button data-dp="day" data-v="${today()}" class="${st.day === today() ? 'on' : ''}" aria-pressed="${st.day === today()}">${tr('Today')}</button><button data-dp="day" data-v="${alt}" class="${st.day === alt ? 'on' : ''}" aria-pressed="${st.day === alt}">${alt === addDays(today(), 1) ? tr('Tomorrow') : esc(fmtDayAbs(alt))}</button></div></div>
       <div class="dpsum muted">${esc(tr('{0}, working hours {1}–{2}', fmtDayAbs(p.date), p.work.start, p.work.end))} · ${esc(trn('{0} event', '{0} events', ev))} · ${esc(tr('{0} planned', fmtH(p.plan.reduce((n, t) => n + (t.duration || 0), 0))))} · ${esc(tr('{0} still free', fmtH(p.free_min)))}${allDay.length ? ' · ' + esc(tr('all day: {0}', allDay.map(e => e.title).join(', '))) : ''}</div>
-      <div class="calerr" id="dp-err" hidden></div>
+      <div class="calerr" role="alert" id="dp-err" hidden></div>
       ${dpTimeline(rows, defer, {sel: st.sel, acts: true})}
       <div class="shint keep">${tr('Applying sets the planned start and duration of the selected tasks (a task without a duration gets {0} minutes); due dates and deadlines stay as they are. One step, undo takes it back.', p.default_duration)}</div>
       <div class="foot ppfoot">${ags.length ? `<button class="btn" data-dp="agent">${ic('bot', 's')} ${tr('Let an agent plan')}</button>` : ''}<span class="spacer"></span><button class="btn" data-dp="close">${tr('Cancel')}</button><button class="btn pri" data-dp="apply" ${n ? '' : 'disabled'}>${ic('check', 's')} ${esc(trn('Apply {0} entry', 'Apply {0} entries', n))}</button></div>`;
@@ -13403,7 +13715,7 @@ function chatMsgs() {
   return older + S.chat.msgs.map(m => { const t = m.task_id && taskById(m.task_id), mine = m.from !== 'agent';
     // 2.7.2 (#422): my messages say Sent / Delivered (the agent fetched it); (#421) reactions, quick 👍 👎 ❤️ on the agent's
     const dlv = mine ? `<span class="cdlv ${m.delivered_at ? 'on' : ''}" title="${esc(m.delivered_at ? tr('Delivered') + ' · ' + fmtWhen(m.delivered_at) : tr('Sent'))}">${ic('check', 's')}${m.delivered_at ? ic('check', 's') : ''}<span>${m.delivered_at ? tr('Delivered') : tr('Sent')}</span></span>` : '';
-    return `<div class="cmsg ${mine ? 'me' : 'ag'}" data-k="m${m.id}" data-mid="${m.id}">${m.body ? `<div class="cbub">${commentBody(m.body, {})}</div>` : ''}${chatAttHtml(m)}${t ? `<button class="runtask" data-act="open-id" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : ''}${chatRxHtml(m, a)}<div class="cmeta"><time>${fmtWhen(m.created_at)}</time>${dlv}</div></div>`; }).join('')
+    return `<div class="cmsg ${mine ? 'me' : 'ag'}" data-k="m${m.id}" data-mid="${m.id}">${m.body ? `<div class="cbub">${commentBody(m.body, {})}</div>` : ''}${chatAttHtml(m)}${t ? `<button class="runtask" data-act="open-id" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : ''}${chatRxHtml(m, a)}<div class="cmeta"><time>${fmtWhen(m.created_at)}</time>${dlv}${a?.enabled && !(m.from === 'agent' && m.asks && chatRxOpen(m)) ? rxTog() : ''}</div></div>`; }).join('')
     + (off ? `<div class="chpend off" data-k="off" role="status">${ic('clock', 's')}<span>${esc(tr('{0} is offline – will answer later', a.name))}</span></div>` : '');
 }
 // 2.13.1 (#465): the images / files of a chat message: thumbnails (lightbox on click) and file tiles; the sender removes
@@ -13476,12 +13788,17 @@ document.addEventListener('drop', e => {
 // bubble's corner. Only an agent message that asks something (m.asks, server: chat_asks) counts a 👍 / 👎 as approval /
 // rejection: there the newest unanswered question shows the bar right away with the hint "👍 = approval", and a given 👍 / 👎
 // says "Counted as approval / rejection". Existing reactions always show as pills; on mine only what the agent reacted with.
+const rxTog = () => `<button type="button" class="rx rxtog" data-act="rx-tog" aria-expanded="false" title="${esc(tr('React'))}" aria-label="${esc(tr('React'))}">${ic('smile', 's')}</button>`;
+// the newest agent question nobody answered: its quick bar is open anyway (no smiley needed)
+const chatRxOpen = m => { const rs = m.reactions || [], meR = e => rs.some(r => r.emoji === e && r.users.some(u => S.me && u.id === S.me.id)); return !!m.asks && !meR('up') && !meR('down') && S.chat.msgs.length && S.chat.msgs[S.chat.msgs.length - 1].id === m.id; };
 function chatRxHtml(m, a) {
   const rs = m.reactions || [], ag = m.from === 'agent', on = !!a?.enabled, ask = ag && !!m.asks;
   const meR = e => rs.some(r => r.emoji === e && r.users.some(u => S.me && u.id === S.me.id));
   const pill = r => { const me = r.users.some(u => S.me && u.id === S.me.id); return `<button type="button" class="rx ${me ? 'on' : ''}" data-act="chat-react" data-mid="${m.id}" data-e="${esc(r.emoji)}" title="${esc(r.users.map(u => u.name).join(', ') + ' · ' + rxName(r.emoji))}" aria-label="${esc(rxName(r.emoji) + ': ' + r.users.map(u => u.name).join(', '))}" aria-pressed="${me}" ${on ? '' : 'disabled'}>${esc(rxEmoji(r.emoji))}<span class="rxn">${r.count}</span></button>`; };
   const qn = (k, n) => ask && k === 'up' ? N_('Approve (counts as approval)') : ask && k === 'down' ? N_('Reject (counts as rejection)') : n;
-  const quick = ag && on ? RX.filter(([k]) => !rs.some(r => r.emoji === k)).map(([k, em, n]) => `<button type="button" class="rx add" data-act="chat-react" data-mid="${m.id}" data-e="${k}" title="${esc(tr(qn(k, n)))}" aria-label="${esc(tr(qn(k, n)))}">${em}</button>`) : [];
+  // 2.16.0 (#643): every message (the agent's and mine) can get a reaction; a visible smiley button opens the quick bar
+  // (touch: always there; desktop: hover / keyboard focus as before), no long press needed
+  const quick = on ? RX.filter(([k]) => !rs.some(r => r.emoji === k)).map(([k, em, n]) => `<button type="button" class="rx add" data-act="chat-react" data-mid="${m.id}" data-e="${k}" title="${esc(tr(qn(k, n)))}" aria-label="${esc(tr(qn(k, n)))}">${em}</button>`) : [];
   const voted = ask && (meR('up') ? tr('Counted as approval') : meR('down') ? tr('Counted as rejection') : '');
   // the newest agent message, a question nobody answered yet: its bar is open
   const open = ask && !voted && S.chat.msgs.length && S.chat.msgs[S.chat.msgs.length - 1].id === m.id;
@@ -13556,7 +13873,7 @@ function chatInner(aid) {
   const info = `<button type="button" class="ib" data-ii="chat-info" aria-describedby="chat-info" aria-expanded="false" aria-label="${esc(tr('More information'))}">${ic('info', 's')}</button><span class="shint iisrc" id="chat-info" data-ii="1">${tr('{0} answers when it next looks at its events (right away with a webhook or long-polling). It only sees the lists shared with it.', esc(a.name))}</span>`;
   return `<div class="chath">${back}${avBtn(a.id, a.name, 'avatar')}<div class="chn"><span class="chnm"><b>${esc(a.name)}</b>${info}</span>${chatStHtml(a)}</div><span class="spacer"></span>
       ${back ? '' : `<button class="iconbtn" data-act="chat-close" title="${tr('Close')}" aria-label="${tr('Close')}">${ic('x')}</button>`}</div>
-    <div class="chmsgs" id="chat-msgs">${chatMsgs()}</div>
+    <div class="chmsgs" id="chat-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${chatMsgs()}</div>
     <button type="button" class="chnew hidden" id="chat-new" data-act="chat-bottom">${tr('New message')} <span aria-hidden="true">↓</span></button>
     ${typingHtml(chatTyping(a) ? [a] : [], 'chat-typing')}
     <div class="cfiles chfiles" id="chat-files">${chatFilesHtml(a.id)}</div>
@@ -14049,7 +14366,7 @@ function agModal(a, done) {
     <div class="shint keep">${esc(trn('{0} list shared with it', '{0} lists shared with it', a.lists.length))}${a.lists.length ? ': ' + esc(a.lists.map(l => l.name).join(', ')) : ''}</div>` : ''}
     ${aiuLimFields(a)}
     ${agRtFields(a)}
-    <div class="foot stfoot"><div class="calerr" id="ag-err" hidden></div>${a ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${a ? tr('Save') : tr('Create')}</button></div>`);
+    <div class="foot stfoot"><div class="calerr" role="alert" id="ag-err" hidden></div>${a ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${a ? tr('Save') : tr('Create')}</button></div>`);
   md.addEventListener('change', e => { if (e.target.id === 'ag-ac') $('#ag-acp', md).disabled = !e.target.checked; });  // 2.4.1 (#377)
   // 2.1.2 (#346): the picture: a preset or none is sent with Save, an own photo (existing agents) is uploaded at once
   const avBox = $('#ag-avpick', md), avMark = k => $$('[data-av]', avBox).forEach(x => { x.classList.toggle('on', x.dataset.av === k); x.setAttribute('aria-pressed', x.dataset.av === k); });
@@ -14095,7 +14412,7 @@ function agModal(a, done) {
       const body = {display_name: $('#ag-name', md).value.trim(), note: $('#ag-note', md).value.trim(), proposals: $('#ag-prop', md).value, webhook_url: $('#ag-url', md).value.trim(), ...aiuLimBody(md), runtime: rt,
         ...(S.agOffer ? {scopes: scopesVal(md)} : {}), allowed_ips: $('#ag-ips', md).value.trim()};  // 2.15.0 (#479)
       const un = $('#ag-user', md).value.trim().toLowerCase();
-      if (!un) { $('#ag-user', md).focus(); return; }
+      if (!un) { need($('#ag-user', md)); return; }
       if (!a || un !== a.username) body.username = un;
       const avk = avBox.dataset.pick; if (avk) body.avatar_preset = avk === 'none' ? null : avk;
       b.disabled = true; show('');
@@ -14251,6 +14568,7 @@ function inlineEditMount(focus) {
   if (!ttl) return;
   if ($('.ttlin', ttl)) return;
   row.classList.add('iedit'); row.removeAttribute('draggable');
+  ttl.removeAttribute('role'); ttl.removeAttribute('tabindex');  // 2.16.0 (#473): no field inside a button
   ttl.innerHTML = `<input class="ttlin" value="${esc(ie.v)}" aria-label="${esc(tr('Title'))}" maxlength="500" enterkeyhint="done" autocomplete="off">`;
   const i = $('.ttlin', ttl);
   i.addEventListener('input', () => { ie.v = i.value; });
@@ -14692,7 +15010,7 @@ function repoWire(md, lid) {
     const k = b.dataset.rp;
     if (k === 'add') {
       const body = {provider: $('#rp-prov', box).value, base_url: $('#rp-base', box).value.trim(), repo: $('#rp-name', box).value.trim(), token: $('#rp-tok', box).value.trim()};
-      if (!body.repo) { $('#rp-name', box).focus(); return; }
+      if (!body.repo) { need($('#rp-name', box)); return; }
       b.disabled = true;
       try { await api('POST', `/api/lists/${lid}/repos`, body); toast(tr('Repository connected')); } catch { b.disabled = false; return; }
       await reload(); await load(); render();

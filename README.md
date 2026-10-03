@@ -18,6 +18,12 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.16.0** (2026-10-04): Accessibility (WCAG 2.2 AA, see [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md)): the whole app
+  by keyboard with a visible focus, names and states for screen readers, messages read out, errors in words, priorities
+  and overdue dates not only in colour, moving tasks without dragging, high contrast and reduced motion. Also: drag the
+  task panel and the chat wider or narrower, column widths by dragging, your account at the top of the sidebar,
+  density for the sidebar too (and *Custom*), a reaction button on every chat message, the command field asks an
+  agent or creates a task, clearer Today / Tomorrow icons, a *Pinned* view across all lists.
 - **2.15.0** (2026-10-03): Permissions for API tokens and agents (read, tasks, comments, structure, delete, files, time,
   export) with a server-wide limit and address restrictions; an agent's dangerous changes wait for a person's
   approval; the API and the MCP server now cover everything the app does (sections, moving with position, batches,
@@ -67,7 +73,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   handle (list and kanban), lists and folders in the sidebar (long-press on a phone); long-press a task for
   *Move to section…*
 - Subtasks up to three levels, drag and drop between lists and levels
-- Priorities, tags, pinned tasks, Markdown notes, attachments (images, PDFs, documents)
+- Priorities, tags, pinned tasks (the smart list *Pinned* collects them from every list, 2.16), Markdown notes, attachments (images, PDFs, documents)
 - A website link per task, shown as a small domain chip (paste a URL in quick add or share a page from Android)
 - Quick add with two extra buttons (2.14): *Add and open details* creates the task and opens it at once, the paper clip creates it with files attached (the file name is the title when none is typed)
 - Natural-language quick add in English and German, whatever the interface language, plus French, Spanish, Italian or Dutch when the app runs in that language: `Dentist tomorrow 3pm !high #private ~Work`, `Zahnarzt morgen 15 Uhr !hoch #privat ~Arbeit`, `Dentiste demain 15h !!! #privé`
@@ -246,7 +252,13 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   ([Git integration](#git-integration))
 
 **Fast and friendly**
-- Command palette (Ctrl/Cmd+K) for tasks, lists, views and actions, the recently viewed ones on top; keyboard shortcuts (`?` shows them all: arrows, Space to complete, E to rename in the list; calendar 1-4 / ← → / `.`; multi-select Ctrl/Cmd+A, Shift+↓ ↑, Shift+X, then Space, M or D for the selection), compact or comfortable density
+- **Resize the panels** (2.16): drag the edge between the list and the task, or between the task and the chat, to
+  make them wider or narrower (desktops, an unfolded Fold; each device remembers it, a double-click goes back to the
+  standard width; with the keyboard: focus the grip, ← →, Enter). **Column widths** work the same way: the grip at the
+  right of a column title (per device and list)
+- Command palette (Ctrl/Cmd+K, the field at the top of the sidebar) for tasks, lists, views and actions, the recently
+  viewed ones on top; type text and pick *Ask <agent>: …* (sends it to the agent's chat) or *Create as task: …* (quick
+  add syntax; Enter when nothing else matches); `#123` jumps to task 123; keyboard shortcuts (`?` shows them all: arrows, Space to complete, E to rename in the list; calendar 1-4 / ← → / `.`; multi-select Ctrl/Cmd+A, Shift+↓ ↑, Shift+X, then Space, M or D for the selection), compact, comfortable or custom density (the sidebar and the task rows each on their own); your account sits as your picture at the right of the *Kalmido* row (Account, Settings, Log out)
 - New accounts start with a "Getting started" list and a short welcome tour
 - A **sample project** to try things out: an image film for a client with phases, dates, dependencies, custom fields and a packing checklist, offered in the setup and the tour, removed again in one click (Settings > Data)
 - When Today is clear or a list is done, the sloth celebrates (with one of 50 dry one-liners). Can be switched off.
@@ -283,6 +295,15 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 | Settings > Appearance | Light, violet, Atkinson Hyperlegible, 112 % |
 
 <p align="center"><img src="docs/mobile.png" width="300" alt="Phone layout with tab bar, dark"> <img src="docs/mobile-light.png" width="300" alt="Phone layout with tab bar, light"></p>
+
+## Accessibility
+
+Kalmido aims at **WCAG 2.2 level AA**: everything works with the keyboard (one Tab stop per list, ↑ ↓ to move, Enter to
+open, Esc to go back, `?` for all keys), the focus is always visible and never hidden, screen readers get names, roles,
+states and announcements, errors are said in words, colour is never the only signal, every drag has another way
+(menu items, Alt+↑ / Alt+↓, keys on the grips), touch targets are 44 px, *reduce motion* and Windows high contrast are
+respected, and the app reflows at 320 px and 200 % zoom. An automated test with axe-core checks the main views in light
+and dark and with every accent colour on every change. Details and known limits: [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md).
 
 ## Try it without installing
 

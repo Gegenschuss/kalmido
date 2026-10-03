@@ -7,6 +7,56 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.16.0] - 2026-10-04
+
+**In short:** Accessibility to WCAG 2.2 AA (#473): the whole app works with the keyboard and a screen reader, messages
+are read out, errors are said in words, colour is never the only signal and every drag has another way; an automated
+test checks it on every change. Also: resizable task panel, chat and columns (#639, #634), the account at the top of
+the sidebar (#641), density for the sidebar and *Custom* (#642), a reaction button on every chat message (#643), a
+command field that asks agents and creates tasks (#644), clearer Today / Tomorrow icons (#645), the heron's sun on the
+horizon (#447), a *Pinned* view across all lists with the pin button always in the task header (#648), Git webhooks are
+never lost (#637).
+
+### Added
+- **Accessibility** (WCAG 2.2 AA, [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md)): one Tab stop per task list (↑ ↓ /
+  j k move the real focus, Enter opens the task and puts the focus into its panel, Esc closes it and goes back to the
+  row); menus take the focus and move with the arrow keys; every dialog is a named modal dialog that keeps Tab inside
+  and gives the focus back; the task panel is a named region; the side drawer takes the focus and closes with Esc.
+- Screen readers: the task circle is a checkbox named after the task, the title a button described by its details,
+  messages ("Moved to Inbox · Undo") are read out, new chat messages are a log, error lines are alerts tied to their
+  field, colour swatches have names and a pressed state, the week grid is a named scroll region.
+- Not only colour: priorities show `!`, `!!` or `!!!` next to the title, overdue dates an alert icon.
+- Moving without dragging: *Move up / Move down* in the task menu and Alt+↑ / Alt+↓, *Move to section…* in the task menu.
+- Required fields left empty say so next to the field.
+- Reduced motion turns off every animation; Windows high contrast keeps checkboxes, selections and focus visible;
+  fields have a 3:1 edge; a 2 px focus ring on fields; the toast stays while the pointer or the focus is on it.
+- An automated accessibility test: axe-core (WCAG 2.0 / 2.1 / 2.2 A + AA) over all main views, the task panel, the
+  chat, Settings, the palette and dialogs, light + dark, desktop + phone, every accent colour; real key presses, 320 px
+  and 200 % zoom (`tests/p2160_a11y.js`).
+- Drag the edge between list and task or task and chat to resize them (per device; double-click or Enter = standard;
+  ← → on the focused grip) (#639); column widths by the grip in the column titles (#634).
+- Density *Custom*: the sidebar and the task rows each compact or comfortable; *Compact* now makes the sidebar tighter
+  too, touch targets stay 44 px (#642).
+- The command field: when empty it shows what it can do; with text it offers *Ask <agent>: …* (sends it to the chat and
+  opens it) and *Create as task: …* after the real matches, or on top when nothing matches (#644).
+- A reaction button (smiley) on every chat message, mine too; on phones always visible, no long press needed (#643).
+- **Pinned**: a smart list with every pinned task of every list, grouped by list, in the sidebar while something is pinned
+  (also as a tab); the REST API and the MCP tool `list_tasks` filter with `pinned=true` (#648).
+
+### Changed
+- Your account is your picture at the right of the *Kalmido* row (sidebar and phone drawer): Account, Settings, Log
+  out; the account rows at the top of the drawer and the bottom of the sidebar are gone (#641).
+- Today is a sun with rays, Tomorrow a half sun on the horizon (the old Today icon looked like "reload") (#645).
+- The pin button stays next to the priority button in a task's header on every screen width, phones included (it was in "…" on narrow screens) (#648).
+- The heron's sun sits on the horizon instead of above its beak (#447).
+- Low-contrast texts made readable: other-month days in the calendar, weekend days in the timeline, times in the week
+  view, the agent badge.
+
+### Fixed
+- A Git push webhook that came within 10 s of a poll was dropped until the next regular poll; now the next poll is
+  just moved to 10 s after the last one (#637).
+- The list dialog's name, the colour swatches and other fields had no accessible name.
+
 ## [2.15.1] - 2026-10-03
 
 **In short:** A phone round. *Today* and *Tomorrow* are back in a task's header on phones (#636), the Eisenhower matrix
@@ -2210,7 +2260,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.15.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.16.0...HEAD
+[2.16.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.16.0
 [2.15.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.15.1
 [2.15.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.15.0
 [2.14.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.14.0
