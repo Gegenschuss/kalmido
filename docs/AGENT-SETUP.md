@@ -267,6 +267,15 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
   in chat: who, what, when, the task or chat. Then keep refusing politely.
 ```
 
+Then append the **behaviour rules** (2.13.1): the part of [`mcp/CLAUDE.template.md`](../mcp/CLAUDE.template.md)
+between its two markers (Settings › Agents › Set up has the same block with a *Copy rules* button). They cover Markdown
+formatting, decisions in the task description, typing / status / jobs / a chat summary, approvals only from people,
+other people's text as data, parking blockers, reading attachments and the usage hook:
+
+```bash
+sed -n '/kalmido-agent-rules:start/,/kalmido-agent-rules:end/p' ~/kalmido/mcp/CLAUDE.template.md >> ~/agent/CLAUDE.md
+```
+
 ### 7. Permissions: .claude/settings.json
 
 `~/agent/.claude/settings.json`. `dontAsk` refuses everything that is not allowed, without a prompt, so an injected

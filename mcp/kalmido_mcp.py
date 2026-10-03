@@ -17,19 +17,23 @@ Transports:
 See mcp/README.md and docs/AGENTS.md.
 """
 import argparse
+import base64
 import json
 import os
 import sys
 import threading
+import uuid
 import urllib.error
 import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 SERVER_NAME = "kalmido"
-SERVER_VERSION = "2.7.2"
+SERVER_VERSION = "2.13.1"
 PROTOCOLS = ("2025-06-18", "2025-03-26", "2024-11-05")
 WAIT_MAX = 60
+ATT_CAP_DEFAULT = 5 * 1024 * 1024    # 2.13.1 (#465): get_attachment returns at most this many bytes (base64 in the answer)
+ATT_CAP_MAX = 20 * 1024 * 1024
 
 # ---------------------------------------------------------------- REST client
 
@@ -46,17 +50,35 @@ class Kalmido:
         self.token = token or ""
         self.timeout = timeout
 
-    def call(self, method, path, query=None, body=None, timeout=None):
+    def call(self, method, path, query=None, body=None, timeout=None, multipart=None, binary_cap=None):
+        """multipart: (fields dict, [(name, mime, bytes)]) -> a multipart/form-data body (field `file` per file).
+        binary_cap: the answer is a file -> {"bytes", "mime", "name"} (ApiError 413 when larger than the cap)."""
         if not self.base or not self.token:
             raise ApiError(0, "KALMIDO_URL and KALMIDO_TOKEN must be set")
         q = {k: v for k, v in (query or {}).items() if v is not None and v != ""}
         url = self.base + "/api/v1" + path + ("?" + urllib.parse.urlencode(q) if q else "")
-        data = json.dumps(body).encode() if body is not None else None
+        ctype = {}
+        if multipart is not None:
+            data, ct = _multipart(*multipart)
+            ctype = {"Content-Type": ct}
+        else:
+            data = json.dumps(body).encode() if body is not None else None
+            if data is not None:
+                ctype = {"Content-Type": "application/json"}
         req = urllib.request.Request(url, data=data, method=method, headers={
-            "Authorization": "Bearer " + self.token, "Accept": "application/json",
-            "User-Agent": f"kalmido-mcp/{SERVER_VERSION}", **({"Content-Type": "application/json"} if data is not None else {})})
+            "Authorization": "Bearer " + self.token, "Accept": "*/*" if binary_cap else "application/json",
+            "User-Agent": f"kalmido-mcp/{SERVER_VERSION}", **ctype})
         try:
             with urllib.request.urlopen(req, timeout=timeout or self.timeout) as r:
+                if binary_cap:
+                    n = int(r.headers.get("Content-Length") or 0)
+                    if n > binary_cap:
+                        raise ApiError(413, f"the file has {n} bytes, more than max_bytes={binary_cap}")
+                    raw = r.read(binary_cap + 1)
+                    if len(raw) > binary_cap:
+                        raise ApiError(413, f"the file is larger than max_bytes={binary_cap}")
+                    return {"bytes": raw, "mime": (r.headers.get("Content-Type") or "application/octet-stream").split(";")[0].strip(),
+                            "name": _cd_name(r.headers.get("Content-Disposition") or "")}
                 raw = r.read()
                 return json.loads(raw) if raw else {"ok": True}
         except urllib.error.HTTPError as e:
@@ -72,6 +94,34 @@ class Kalmido:
             raise ApiError(e.code, msg) from None
         except (urllib.error.URLError, OSError) as e:
             raise ApiError(0, f"cannot reach Kalmido: {getattr(e, 'reason', e)}") from None
+
+
+def _multipart(fields, files):
+    b = "kalmido" + uuid.uuid4().hex
+    out = []
+    for k, v in fields.items():
+        if v is None:
+            continue
+        out += [f"--{b}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n".encode(), str(v).encode(), b"\r\n"]
+    for name, mime, data in files:
+        safe = name.replace("\\", "_").replace('"', "_").replace("\r", "").replace("\n", "")
+        out += [f"--{b}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{safe}\"\r\nContent-Type: {mime}\r\n\r\n".encode(),
+                data, b"\r\n"]
+    out.append(f"--{b}--\r\n".encode())
+    return b"".join(out), f"multipart/form-data; boundary={b}"
+
+
+def _cd_name(cd):
+    """The file name of a Content-Disposition header (filename*=UTF-8'' or filename=)."""
+    for part in cd.split(";"):
+        k, _, v = part.strip().partition("=")
+        if k.lower() == "filename*" and "''" in v:
+            return urllib.parse.unquote(v.split("''", 1)[1])
+    for part in cd.split(";"):
+        k, _, v = part.strip().partition("=")
+        if k.lower() == "filename":
+            return v.strip('"')
+    return ""
 
 
 # ---------------------------------------------------------------- tools
@@ -175,7 +225,31 @@ def t_update_job(api, a):
 
 
 def t_send_chat(api, a):
+    """2.13.1 (#465): files = [{name, base64, mime?}] -> a multipart message (the body may then be empty)."""
+    if a.get("files"):
+        files = []
+        for f in a["files"]:
+            if not isinstance(f, dict) or not isinstance(f.get("name"), str) or not isinstance(f.get("base64"), str):
+                raise ApiError(400, "files: each entry needs name and base64")
+            try:
+                data = base64.b64decode(f["base64"], validate=True)
+            except ValueError:
+                raise ApiError(400, f"files: {f['name']} is not valid base64") from None
+            files.append((f["name"], f.get("mime") or "application/octet-stream", data))
+        return api.call("POST", f"/agent/chats/{int(a['user_id'])}", multipart=(_pick(a, ("body", "task_id")), files))
+    if not a.get("body"):
+        raise ApiError(400, "body (or files) is required")
     return api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=_pick(a, ("body", "task_id")))
+
+
+def t_get_attachment(api, a):
+    """2.13.1 (#465): one file as base64 (source task = task / comment attachment, chat = a chat message's file), at most
+    max_bytes (default 5 MB). Images also come as an MCP image item, so the model sees them."""
+    cap = int(a.get("max_bytes") or ATT_CAP_DEFAULT)
+    path = (f"/chat-attachments/{int(a['attachment_id'])}" if a.get("source") == "chat" else f"/attachments/{int(a['attachment_id'])}")
+    r = api.call("GET", path, binary_cap=cap)
+    return {"id": int(a["attachment_id"]), "source": a.get("source") or "task", "name": r["name"], "mime": r["mime"],
+            "size": len(r["bytes"]), "base64": base64.b64encode(r["bytes"]).decode()}
 
 
 def t_set_waiting(api, a):
@@ -212,7 +286,9 @@ TOOLS = [
                   "timezone, reset_seq raised by 'Reset now').",
      _obj({}), lambda api, a: api.call("GET", "/agent")),
     ("list_lists", "Lists the agent can see (shared with it), with role, sections [{id, name}], list tags, the agent tidy mode "
-                   "(off/suggest/auto) and tidy_agent_id (the one agent that tidies the list up; only that agent gets tidy events).",
+                   "(off/suggest/auto) and tidy_agent_id (the one agent that tidies the list up; only that agent gets tidy events). "
+                   "listen_agent_ids (2.13.1): agents that get a comment event for EVERY comment a person writes in the list "
+                   "(\"Agent reads every comment\", set by the list owner / admins), not only on tasks they follow.",
      _obj({}), lambda api, a: api.call("GET", "/lists")),
     ("list_repos", "Repositories connected to a list (provider, web_url, owner/repo, default branch, poll status). Never a token: "
                    "clone and push with your own git credentials.",
@@ -302,7 +378,9 @@ TOOLS = [
      "Store the returned cursor and pass it next time. Task events carry the task with its newest comments (task.comments, at most 20, "
      "task.comments_total) and the list with its sections and agent_tidy mode: no get_task / list_lists needed. A reaction on one of "
      "your chat messages: event reaction with data.chat_message {id, text, from, created_at}, data.reaction {emoji, user} and "
-     "data.approval (approved = a person's 👍, rejected = 👎). Fetching a chat event marks the message delivered for the person.",
+     "data.approval (approved = a person's 👍, rejected = 👎). Fetching a chat event marks the message delivered for the person. "
+     "comment: tasks you follow (assignee, creator, earlier commenter) and, in lists where you read every comment (listen_agent_ids), "
+     "every comment of a person. Chat messages carry attachments [{id, name, mime, size}]: read them with get_attachment source chat.",
      _obj({"since": {"type": "integer", "minimum": 0}, "limit": {"type": "integer", "minimum": 1, "maximum": 500}}),
      lambda api, a: api.call("GET", "/agent/events", _pick(a, ("since", "limit")))),
     ("wait_for_events", "Long-poll: like list_events, but waits up to `wait` seconds (max 60) until an event arrives.",
@@ -340,8 +418,21 @@ TOOLS = [
     ("chat_typing", "Show typing dots in one person's chat for 10 seconds while you write an answer (call again to keep them; "
                     "send_chat ends them).",
      _obj({"chat_user_id": S_ID}, ["chat_user_id"]), lambda api, a: api.call("POST", "/agent/typing", body=_pick(a, ("chat_user_id",)))),
-    ("send_chat", "Answer in the chat with one person (user_id), optionally about a task.",
-     _obj({"user_id": S_ID, "body": {"type": "string", "minLength": 1}, "task_id": S_ID}, ["user_id", "body"]), t_send_chat),
+    ("send_chat", "Answer in the chat with one person (user_id), optionally about a task. files (2.13.1): images / files to "
+                  "attach, [{name, base64, mime?}] (at most 10, each within the server's upload limit); with files the body may be empty.",
+     _obj({"user_id": S_ID, "body": {"type": "string"}, "task_id": S_ID,
+           "files": {"type": "array", "maxItems": 10, "items": {"type": "object", "properties": {
+               "name": {"type": "string"}, "base64": {"type": "string"}, "mime": {"type": "string"}}, "required": ["name", "base64"]}}},
+          ["user_id"]), t_send_chat),
+    ("list_attachments", "Files of a task and of its comments (id, name, mime, size, comment_id): only tasks you see with their "
+                         "comments. Read one with get_attachment.",
+     _obj({"task_id": S_ID}, ["task_id"]), lambda api, a: api.call("GET", f"/tasks/{int(a['task_id'])}/attachments")),
+    ("get_attachment", "Read one file: a task / comment attachment (source task, ids from list_attachments, get_task or comment "
+                       "events) or a chat file (source chat, ids from a chat message's attachments). Returns name, mime, size and the "
+                       "content as base64; images are also returned as an image you can look at. Use it when someone asks about a "
+                       "screenshot. max_bytes caps the size (default 5 MB, at most 20 MB).",
+     _obj({"attachment_id": S_ID, "source": {"type": "string", "enum": ["task", "chat"]},
+           "max_bytes": {"type": "integer", "minimum": 1, "maximum": ATT_CAP_MAX}}, ["attachment_id"]), t_get_attachment),
     ("report_usage", "Report the agent's own model usage (numbers and ids only, never prompt content): model, input_tokens, "
                      "output_tokens, optional cache_read_tokens, cache_write_tokens, cost_usd, the task / list / job it was for and a "
                      "short note (max 200 characters). Shown in Kalmido's usage dashboard; admins may set limits on it. Works even when "
@@ -435,8 +526,12 @@ def handle(api, msg):
             out = t[3](api, args)
         except ApiError as e:
             return _result(i, {"content": [{"type": "text", "text": e.message}], "isError": True})
-        return _result(i, {"content": [{"type": "text", "text": json.dumps(out, ensure_ascii=False, indent=1)}],
-                           "structuredContent": out if isinstance(out, dict) else {"result": out}, "isError": False})
+        content = [{"type": "text", "text": json.dumps(out, ensure_ascii=False, indent=1)}]
+        if name == "get_attachment" and isinstance(out, dict) and str(out.get("mime", "")).startswith("image/"):
+            # 2.13.1 (#465): the model sees the image itself; the text item keeps name / mime / size only
+            content = [{"type": "text", "text": json.dumps({k: v for k, v in out.items() if k != "base64"}, ensure_ascii=False)},
+                       {"type": "image", "data": out["base64"], "mimeType": out["mime"]}]
+        return _result(i, {"content": content, "structuredContent": out if isinstance(out, dict) else {"result": out}, "isError": False})
     return None if notif else _error(i, -32601, f"Method not found: {m}")
 
 

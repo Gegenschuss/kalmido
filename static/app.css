@@ -3318,3 +3318,28 @@ svg.logo{color:var(--acc-d,var(--accent));flex:none}
 .sbrand .sbhome:hover{background:var(--bg3)}
 #side .srow.ssrch{margin-bottom:.25rem}
 @media (pointer:coarse){ .sbrand .sbhome{min-height:2.75rem} }
+/* 2.13.1 (#465): images / files in the agent chat: thumbnails under the bubble (the sender's x to remove), the files
+   waiting in the composer, the paperclip with a 44 px target */
+.chatts{max-width:100%;justify-content:flex-end;margin-top:.125rem}
+.cmsg.ag .chatts{justify-content:flex-start}
+.chatts .att.img{width:7.5rem;height:7.5rem;aspect-ratio:auto;flex:none}
+.chatts .att.file{flex:0 1 auto;min-width:0}
+.chatts .att.file a{max-width:15rem;min-height:2.75rem;box-sizing:border-box}
+.chatts .attdel{width:2.75rem;height:2.75rem;top:0;right:0;background:none;opacity:1}
+.chatts .attdel .i{width:1.375rem;height:1.375rem;padding:.25rem;box-sizing:border-box;border-radius:50%;background:rgba(0,0,0,.55);color:#fff}
+@media (hover:hover){ .chatts .attdel{opacity:0} .chatts .att:hover .attdel,.chatts .attdel:focus-visible{opacity:1} }
+.chfiles{padding:.5rem .75rem 0}
+.chfiles .cfile button{min-width:1.75rem;min-height:1.75rem;justify-content:center}
+@media (pointer:coarse){ .chfiles .cfile button{min-width:2.75rem;min-height:2.75rem} }
+.chcomp .chclip{flex:none;min-width:2.75rem;min-height:2.75rem;justify-content:center;padding:0}
+.chcomp .chclip:disabled{opacity:.4}
+.shdest{display:flex;flex-direction:column;gap:.5rem;margin-top:.75rem}
+.shdest .btn{min-height:2.75rem;justify-content:flex-start}
+/* 2.13.1 (#471): the list dialog's "Agent reads every comment" (one checkbox per agent of the list, 44 px rows) */
+.lsnrow .lbl{font-size:.875rem}
+.lsnags{display:flex;flex-wrap:wrap;gap:0 1rem}
+.lsnag{display:inline-flex;align-items:center;gap:.5rem;min-height:2.75rem;font-size:.875rem;cursor:pointer}
+.lsnag input{width:1.125rem;height:1.125rem;margin:0}
+.modal .lsnrow .lbl{min-width:8.75rem;color:var(--muted);font-size:var(--fs-m)}
+.modal .lsnrow .lsnag{min-width:0;color:var(--text)}
+.modal .lsnrow .lsnag input{flex:none}

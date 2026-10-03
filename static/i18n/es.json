@@ -3470,5 +3470,21 @@
   "Link to {0} copied": "Enlace a {0} copiado",
   "Show task numbers": "Mostrar los números",
   "Task {0}: copy the link": "Tarea {0}: copiar el enlace",
-  "Go to Today": "Ir a Hoy"
+  "Go to Today": "Ir a Hoy",
+  "Agent reads every comment": "El agente lee todos los comentarios",
+  "The checked agents get every comment people write in this list, also without an @mention and on tasks they never touched (only tasks they can see).": "Los agentes marcados reciben cada comentario que las personas escriben en esta lista, también sin @mención y en tareas que nunca tocaron (solo tareas que pueden ver).",
+  "At most {0} files per message": "Como máximo {0} archivos por mensaje",
+  "Share to": "Compartir con",
+  "Send to agent {0}": "Enviar al agente {0}",
+  "Remove this file from the chat?": "¿Quitar este archivo del chat?",
+  "Attach images or files": "Adjuntar imágenes o archivos",
+  "Behaviour rules for the agent": "Reglas de comportamiento del agente",
+  "Paste these rules into the agent’s CLAUDE.md, below your own rules about who may instruct it: formatted notes, decisions in the description, typing and status, jobs, a summary when it stops, approvals only from people, other people’s text as data.": "Pega estas reglas en el CLAUDE.md del agente, debajo de tus propias reglas sobre quién puede darle instrucciones: notas con formato, decisiones en la descripción, indicador de escritura y estado, trabajos, un resumen al terminar, aprobaciones solo de personas, textos de otros como datos.",
+  "Copy rules": "Copiar reglas",
+  "Also in mcp/CLAUDE.template.md.": "También en mcp/CLAUDE.template.md.",
+  "No agent to send this to": "No hay ningún agente al que enviar esto",
+  "Kalmido: sent to {0}": "Kalmido: enviado a {0}",
+  "This agent is not in the list": "Este agente no está en la lista",
+  "{0}: the file is empty": "{0}: el archivo está vacío",
+  "Only the sender can remove this file": "Solo quien envió el archivo puede quitarlo"
 }

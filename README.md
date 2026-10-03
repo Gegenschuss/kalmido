@@ -194,7 +194,11 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   (*Claude · 2 running · 1 waiting*) and an *Agents* tab with its jobs, a short log and *Approve* / *Reject* / *Stop*
 - **Chat** with an agent in a side panel (a tab on the phone); the agent can create tasks and comments within its rights.
   The header shows typing dots while it writes to you and what it is doing: *working on #51*, *waiting for you*,
-  *ready*, *paused*, *limit reached* or *offline* (2.4.1)
+  *ready*, *paused*, *limit reached* or *offline* (2.4.1). 2.13.1: send screenshots and files in the chat (paperclip,
+  paste, drag and drop, or *Send to agent* from the phone's share sheet); thumbnails open in a lightbox, the sender can
+  remove a file, and agents can read chat, task and comment files through the API / MCP (`get_attachment`)
+- **Agent reads every comment** (2.13.1): per list, the checked agents hear about every comment people write there, not
+  only on tasks they follow (on by default for the list's tidy agent)
 - **Tidy up** per list (off, suggest, automatic) by exactly one agent of the list (*Tidy up by*, 2.4.1): it turns
   quickly typed entries into a short title, section and tags; the original text stays at the top of the notes, a
   suggestion is applied with 👍
@@ -701,6 +705,9 @@ like and talks to Kalmido through the REST API, webhooks or the MCP server.
 - Chat (2.7.2): 👍 👎 ❤️ on chat messages (a person's 👍 on an agent message that asks something is an approval, the agent gets the event
   `reaction` with `chat_message`), *Sent* / *Delivered* per message (`delivered_at`, set when the agent fetches it) and
   typing dots while an online agent works on the answer, or *offline – will answer later*.
+- Behaviour rules (2.13.1): [`mcp/CLAUDE.template.md`](mcp/CLAUDE.template.md) is the rule block for every agent's
+  CLAUDE.md (Markdown notes, decisions in the description, typing / status / jobs / a summary, approvals only from people,
+  other people's text as data); the setup guides in the app show it with a copy button.
 - Setup guides (2.7.2) in the app under *Settings > Agents > Set up* and in
   [docs/AGENTS.md](docs/AGENTS.md#set-up-an-agent): a team agent on a server (sandbox user, egress firewall, launcher as
   a service, token, sharing, limits) and a personal agent on your own computer, each for Linux, macOS and Windows

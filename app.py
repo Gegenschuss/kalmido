@@ -569,6 +569,12 @@ CREATE TABLE IF NOT EXISTS agent_chat (           -- 2.0.0: one conversation per
   sender TEXT NOT NULL,                         -- user | agent
   body TEXT NOT NULL, task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL, created_at TEXT NOT NULL, read_at TEXT);
 CREATE INDEX IF NOT EXISTS agent_chat_pair ON agent_chat(agent_id, user_id, id);
+CREATE TABLE IF NOT EXISTS chat_files (           -- 2.13.1 (#465): images / files of a chat message (either side)
+  id INTEGER PRIMARY KEY, message_id INTEGER NOT NULL REFERENCES agent_chat(id) ON DELETE CASCADE,
+  name TEXT NOT NULL, mime TEXT NOT NULL DEFAULT '', size INTEGER NOT NULL DEFAULT 0,
+  path TEXT NOT NULL,                           -- relative to ATT_DIR: chat/<agent id>-<user id>/<random>-<name>
+  created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS chat_files_msg ON chat_files(message_id);
 CREATE TABLE IF NOT EXISTS chat_reactions (       -- 2.7.2 (#421): heart | up | down (or one emoji) per person and chat message
   message_id INTEGER NOT NULL REFERENCES agent_chat(id) ON DELETE CASCADE,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -840,6 +846,9 @@ MIGRATIONS = [
     ("tasks", "assignee_group_id", "ALTER TABLE tasks ADD COLUMN assignee_group_id INTEGER"),
     # 2.11.0 (#440 follow-up): the day plan's slot "YYYY-MM-DDTHH:MM" (local); planning never touches due / deadline
     ("tasks", "plan_start", "ALTER TABLE tasks ADD COLUMN plan_start TEXT"),
+    # 2.13.1 (#471): "Agent reads every comment": the agents that get a 'comment' event for every comment of a person in
+    # this list (comma separated user ids; '' = none; NULL = the default: the list's tidy agent while tidying is on)
+    ("lists", "agent_listen", "ALTER TABLE lists ADD COLUMN agent_listen TEXT"),
 ]
 INDEXES = """
 CREATE INDEX IF NOT EXISTS lists_owner ON lists(owner_id);
@@ -3697,7 +3706,7 @@ def headers(resp):
     resp.headers.setdefault("Permissions-Policy", PERMISSIONS_POLICY)
     if request.is_secure:  # https (directly or from a trusted proxy): browsers stay on https; a proxy's own header wins
         resp.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
-    if request.path.startswith("/api/") and not request.path.startswith(("/api/attachments/", "/api/avatar/", "/api/list-icon/", "/api/list-files/")):
+    if request.path.startswith("/api/") and not request.path.startswith(("/api/attachments/", "/api/chat-files/", "/api/avatar/", "/api/list-icon/", "/api/list-files/")):
         resp.headers["Cache-Control"] = "no-store"
     return resp
 
@@ -3922,6 +3931,9 @@ def drop_post():
         text = ""
     if not files and not text:
         return Response(tr("nothing received", lg=lg) + "\n", 400, mimetype="text/plain")
+    to = (request.form.get("to") or "").strip()
+    if to:  # 2.13.1 (#465): "Send to agent" (iOS Shortcut / HTTP Shortcuts): the files + text go into an agent chat
+        return drop_to_agent(c, u, lg, to, text, files)
     first, _, rest = text.partition("\n")
     first, rest, url = split_link(first.strip(), rest.strip())
     title = first or (os.path.splitext(safe_name(files[0].filename))[0] if len(files) == 1
@@ -3933,6 +3945,40 @@ def drop_post():
     print("drop: task", tid, "user", u["id"], repr(title), len(files), "files", e or "", flush=True)
     n = trn(", {0} file", ", {0} files", len(files), lg=lg) if files and title != tr("{0} files shared", len(files), lg=lg) else ""
     return Response(f"Kalmido: {title}{n}" + (f" ({tr('error: {0}', e, lg=lg)})" if e else "") + "\n", mimetype="text/plain")
+
+
+def drop_agent(c, uid, to):
+    """The agent a /drop with `to` means: 'agent' = the one uid chatted with last (else the first one uid may chat with),
+    else an agent id or username; only agents uid may chat with."""
+    ok = [r[0] for r in c.execute("SELECT id FROM users WHERE kind='agent' AND disabled=0 ORDER BY id") if agent_shares(c, r[0], uid)]
+    if to.lower() == "agent":
+        last = c.execute(f"SELECT agent_id FROM agent_chat WHERE user_id=? AND agent_id IN ({','.join('?' * len(ok)) or 'NULL'}) "
+                         "ORDER BY id DESC LIMIT 1", (uid, *ok)).fetchone()
+        return last[0] if last else (ok[0] if ok else None)
+    for aid in ok:
+        u = c.execute("SELECT username FROM users WHERE id=?", (aid,)).fetchone()
+        if to == str(aid) or to.casefold() == (u["username"] or "").casefold():
+            return aid
+    return None
+
+
+def drop_to_agent(c, u, lg, to, text, files):
+    aid = drop_agent(c, u["id"], to)
+    a = agent_row(c, aid) if aid else None
+    if not a:
+        return Response(tr("No agent to send this to", lg=lg) + "\n", 404, mimetype="text/plain")
+    if not agent_active(a):
+        return Response(tr("This agent is paused", lg=lg) + "\n", 409, mimetype="text/plain")
+    try:
+        r = chat_post(c, aid, u["id"], "user", {"body": text[:CHAT_MAX]}, files[:CHAT_FILES_MAX])
+    except BadInput as e:
+        return Response(f"Kalmido: {e}\n", 400, mimetype="text/plain")
+    chat_emit(c, aid, r)
+    c.commit()
+    chat_unlink_trimmed()
+    name = user_names(c, [aid]).get(aid, "")
+    print("drop: chat message", r["id"], "user", u["id"], "agent", aid, len(files), "files", flush=True)
+    return Response(tr("Kalmido: sent to {0}", name, lg=lg) + "\n", mimetype="text/plain")
 
 
 @app.get("/manifest.json")
@@ -4258,6 +4304,10 @@ def visible_lists(c, uid):
                        + [m["user_id"] for m in d["members"] if m.get("agent") and m["role"] in WRITE_ROLES])
         d["tidy_agent_id"] = r["tidy_agent"] if r["tidy_agent"] in cands else (cands[0] if cands else None)
         d.pop("tidy_agent", None)
+        # 2.13.1 (#471): the agents that read every comment of a person in this list (same rule as listen_agents_of)
+        lag = ({r["owner_id"]} if r["owner_id"] in ag else set()) | {m["user_id"] for m in d["members"] if m.get("agent")}
+        d["listen_agent_ids"] = listen_ids(r["agent_listen"], r["agent_tidy"], d["tidy_agent_id"], lag)
+        d.pop("agent_listen", None)
         out.append(d)
     out.sort(key=lambda d: (-d["is_inbox"], d["sort"], d["id"]))
     return out
@@ -4544,6 +4594,12 @@ def list_update(lid):
         if e:
             return err(e, 409)
         b = {k: v for k, v in b.items() if k not in ("agent_tidy", "tidy_agent_id")}
+    if "listen_agent_ids" in b:  # 2.13.1 (#471)
+        try:
+            list_listen_update(c, lid, b["listen_agent_ids"])
+        except BadInput as e:
+            return err(str(e))
+        b = {k: v for k, v in b.items() if k != "listen_agent_ids"}
     conflicts = []
     prev = b.get("_prev") if isinstance(b.get("_prev"), dict) else None
     if prev:  # D4 undo / redo: a setting changed elsewhere meanwhile stays (reported in conflicts)
@@ -6150,7 +6206,7 @@ def check_assignee(c, lid, aid):
 WEB_TASK_NEW = frozenset(TASK_FIELDS) | {"tags", "ltags", "fields"}
 WEB_TASK_EDIT = WEB_TASK_NEW | {"add_tags", "_prev", "_act"}
 WEB_LIST_NEW = frozenset({"name", "color", "folder", "view", "kind", "checklist", "done_at_bottom", "dep_shift", "tickets", "ptype"})
-WEB_LIST_EDIT = frozenset(LIST_FIELDS) | {"rate", "agent_tidy", "tidy_agent_id", "_prev", "ticket_tpl", "day_hours", "done_at_bottom"}
+WEB_LIST_EDIT = frozenset(LIST_FIELDS) | {"rate", "agent_tidy", "tidy_agent_id", "listen_agent_ids", "_prev", "ticket_tpl", "day_hours", "done_at_bottom"}
 WEB_COMMENT = frozenset({"body", "suggestion"})
 
 
@@ -7101,7 +7157,12 @@ def need_attachment(c, aid, write):
 
 @app.get("/api/attachments/<int:aid>")
 def attachment_get(aid):
-    a = need_attachment(db(), aid, False)
+    return send_stored(need_attachment(db(), aid, False))
+
+
+def send_stored(a):
+    """A stored file (row with id, path, name, mime, size: task / comment attachments, 2.13.1 chat files) for the browser or an
+    API client: images / pdf / text inline (?dl=1: download) in a sandbox CSP, a damaged file as 410, versioned caching."""
     full = os.path.join(ATT_DIR, a["path"])
     if not os.path.isfile(full) or (a["size"] and os.path.getsize(full) != a["size"]):  # 2.13.0: also empty / cut off
         if os.path.isfile(full):
@@ -15986,6 +16047,7 @@ def watchdog_tick(c):
     _wd_section(c, "usage cleanup", usage_cleanup)  # 2.1.1 (#326)
     _wd_section(c, "audit cleanup", audit_cleanup)  # 2.2.1 (#358)
     _wd_section(c, "proposal cleanup", prop_cleanup)  # 2.3.0
+    _wd_section(c, "chat files cleanup", chat_files_gc)  # 2.13.1 (#465)
     _wd_section(c, "time", time_watchdog, users, S, LG)
     now = local_now()
     _wd_section(c, "reminders", _wd_reminders, users, S, LG, now)
@@ -18572,7 +18634,10 @@ def storage_check():
     for kind, sql in (("attachment", "SELECT a.id, a.task_id AS owner, a.name, a.size, a.path, t.title AS where_ FROM attachments a "
                                      "LEFT JOIN tasks t ON t.id=a.task_id"),
                       ("list_file", "SELECT f.id, f.list_id AS owner, f.name, f.size, f.path, l.name AS where_ FROM list_files f "
-                                    "LEFT JOIN lists l ON l.id=f.list_id")):
+                                    "LEFT JOIN lists l ON l.id=f.list_id"),
+                      # 2.13.1 (#465): files in the agent chats (where = the agent's name)
+                      ("chat_file", "SELECT f.id, m.agent_id AS owner, f.name, f.size, f.path, u.display_name AS where_ FROM chat_files f "
+                                    "JOIN agent_chat m ON m.id=f.message_id LEFT JOIN users u ON u.id=m.agent_id")):
         for r in c.execute(sql):
             n += 1
             full = os.path.join(ATT_DIR, r["path"] or "")
@@ -19109,6 +19174,7 @@ def v1_list(d):
             "owner_id": d["owner_id"], "owner_name": d["owner_name"], "shared": d["shared"],
             "status": d.get("status") or None, "progress": d["progress"], "created_at": d["created_at"],
             "tags": d.get("tags") or [], "agent_tidy": d.get("agent_tidy") or "off", "tidy_agent_id": d.get("tidy_agent_id"),
+            "listen_agent_ids": d.get("listen_agent_ids") or [],  # 2.13.1 (#471)
             "icon": d.get("icon") or "",
             "repos": d.get("repos") or [], "tickets": bool(d.get("tickets")),
             "nag": d.get("nag") or "", "day_hours": d.get("day_hours")}  # 2.7.0 (#413, #407)
@@ -19315,10 +19381,12 @@ def v1_list_create():
 @v1_view
 def v1_list_patch(lid):
     """2.7.0: change a list: name, color, folder (yours), view, kind, nag (default of the list's tasks), day_hours;
-    2.7.2 (#414): done_at_bottom ("Show completed at the bottom"; checklist = deprecated alias)."""
+    2.7.2 (#414): done_at_bottom ("Show completed at the bottom"; checklist = deprecated alias); 2.13.1 (#471):
+    listen_agent_ids (the agents that read every comment; owner / list admins, never an agent token)."""
     v1_args(())
     b = v1_json()
-    unknown = sorted(k for k in b if k not in ("name", "color", "folder", "view", "kind", "nag", "day_hours", "done_at_bottom", "checklist"))
+    unknown = sorted(k for k in b if k not in ("name", "color", "folder", "view", "kind", "nag", "day_hours", "done_at_bottom", "checklist",
+                                               "listen_agent_ids"))
     if unknown:
         raise UnknownFields(unknown)
     for k in ("checklist", "done_at_bottom"):
@@ -20383,7 +20451,7 @@ def openapi_spec():
 
     def errs(*codes):
         text = {"400": "Invalid input", "401": "Missing, invalid or expired token", "403": "Not allowed (scope, role or a switched-off module)",
-                "404": "Not found or not visible to the token's user", "409": "Conflict", "413": "Too large",
+                "404": "Not found or not visible to the token's user", "409": "Conflict", "410": "The file is damaged or missing on the server", "413": "Too large",
                 "429": "Rate limit reached (see Retry-After)"}
         return {c: {"description": text[c], "content": {"application/json": {"schema": ref("Error")}}} for c in ("401", "429") + codes}
 
@@ -20461,6 +20529,10 @@ def openapi_spec():
             "denied": {"type": "boolean", "description": "401, 403 or 429"}}},
         "AuditPage": page("AuditEntry"),
         "Attachment": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "mime": {"type": "string"}, "size": {"type": "integer"}}},
+        "AttachmentInfo": {"type": "object", "properties": {  # 2.13.1 (#465)
+            "id": {"type": "integer"}, "task_id": {"type": "integer"}, "comment_id": nul("integer", description="null = a file of the task itself"),
+            "name": {"type": "string"}, "mime": {"type": "string"}, "size": {"type": "integer"}, "created_at": {"type": "string"},
+            "url": {"type": "string", "description": "/api/v1/attachments/{id}"}}},
         "Progress": {"type": "object", "properties": {"done": {"type": "integer"}, "total": {"type": "integer"}, "overdue": {"type": "integer"},
                                                       "next_due": nul("string", format="date")}},
         "List": {"type": "object", "properties": {
@@ -20495,7 +20567,10 @@ def openapi_spec():
             "done_at_bottom": {"type": "boolean", "description": "2.7.2: show completed tasks at the bottom (owner)"},
             "checklist": {"type": "boolean", "deprecated": True, "description": "Deprecated (2.7.2): same as done_at_bottom"},
             "nag": {"type": "string", "enum": list(NAG_VALUES), "description": "Default nag interval of the list's tasks (owner); off / empty = none"},
-            "day_hours": nul("number", minimum=1, maximum=24, description="Hours per day / shift (owner); null = the server's value")}},
+            "day_hours": nul("number", minimum=1, maximum=24, description="Hours per day / shift (owner); null = the server's value"),
+            "listen_agent_ids": {"type": "array", "items": {"type": "integer"},
+                                 "description": "2.13.1 (#471): agents of the list that get a 'comment' event for EVERY comment of a person "
+                                                "in this list (only on tasks they can see); [] = none. Owner / list admins, never an agent token"}}},
         "ListPage": page("ListDetail"),  # 2.0.8: the list page carries each list's sections too
         "Roadmap": {"type": "object", "properties": {
             "from": {"type": "string", "format": "date"}, "to": {"type": "string", "format": "date"}, "projects_only": {"type": "boolean"},
@@ -20716,6 +20791,20 @@ def openapi_spec():
         "/tasks/{id}/subtasks": {"get": op("Subtasks of a task", T, ok(ref("TaskPage")) | errs("404"), [pid()]),
                                  "post": op("Add a subtask", T, ok(ref("Task"), "Created", "201") | errs("400", "403", "404"), [pid()],
                                             body=ref("TaskInput"), scope="write")},
+        # 2.13.1 (#465): files of a task and its comments, and their binary (agents: only tasks they see with comments)
+        "/tasks/{id}/attachments": {"get": op("Files of a task and of its comments (comment_id); download each with GET /attachments/{id}", C,
+                                              ok({"type": "object", "properties": {"data": {"type": "array", "items": ref("AttachmentInfo")},
+                                                                                   "next_cursor": nul("string")}}) | errs("403", "404"), [pid()])},
+        "/attachments/{id}": {"get": op("The binary of a task / comment file (images, PDF and text inline, everything else as a download; "
+                                        "?dl=1 always a download). 410 = damaged on the server", C,
+                                        {"200": {"description": "The file", "content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}}}}
+                                        | errs("403", "404", "410"), [pid("id", "Attachment id"), q("dl", "1 = download"), q("v", "Cache key (the size)")])},
+        "/chat-attachments/{id}": {
+            "get": op("The binary of a file in an agent chat (2.13.1): the agent of the conversation or the person", C,
+                      {"200": {"description": "The file", "content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}}}}
+                      | errs("403", "404", "410"), [pid("id", "Chat file id"), q("dl", "1 = download"), q("v", "Cache key (the size)")]),
+            "delete": op("Remove a chat file you sent (a message left without text and files goes too)", C,
+                         ok({"type": "object"}) | errs("403", "404"), [pid("id", "Chat file id")], scope="write")},
         "/tasks/{id}/comments": {"get": op("Comments of a task", C, ok(ref("CommentPage")) | errs("403", "404"), [pid()]),
                                  "post": op("Comment on a task (needs the Comments module; @mentions and notifications need collaboration)", C, ok(ref("Comment"), "Created", "201") | errs("400", "403", "404"),
                                             [pid()], body=ref("CommentInput"), scope="write")},
@@ -21422,10 +21511,12 @@ def agent_comment_events(c, t, cid, mentions, new_mentions, created=True):
     k = c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone()
     follow = {t["assignee_id"], t["created_by"]} | {r[0] for r in c.execute(
         "SELECT DISTINCT user_id FROM comments WHERE task_id=? AND deleted_at IS NULL AND id!=?", (t["id"], cid))}
+    # 2.13.1 (#471): agents set to read every comment of a person in this list ("Agent reads every comment")
+    listen = set(listen_agents_of(c, t["list_id"])) if created and k["user_id"] not in ag else set()
     for aid in sorted(ag):
         if aid in new_mentions:
             ev = "mention"
-        elif created and aid in follow and aid not in mentions:
+        elif created and (aid in follow or aid in listen) and aid not in mentions:
             ev = "comment"
         else:
             continue
@@ -21464,6 +21555,40 @@ def agent_task_mentions(c, tid, old_text=""):
 def agent_assign_event(c, tid, kind, uid):
     if uid and uid in agent_ids(c) and (kind == "unassigned" or task_visible(c, tid, uid, full=True)):
         agent_emit(c, uid, kind, agent_task_data(c, tid, uid))
+
+
+def listen_ids(raw, tidy_mode, tidy_agent, agents):
+    """2.13.1 (#471): lists.agent_listen -> the agent ids (sorted) among `agents` (the list's agents). NULL = the default:
+    the tidy agent while tidying is on."""
+    if raw is None:
+        ids = {tidy_agent} if tidy_agent and (tidy_mode or "off") != "off" else set()
+    else:
+        ids = {int(x) for x in str(raw).split(",") if x.strip().isdigit()}
+    return sorted(i for i in ids if i in agents)
+
+
+def listen_agents_of(c, lid):
+    r = c.execute("SELECT agent_listen, agent_tidy FROM lists WHERE id=?", (lid,)).fetchone()
+    if not r:
+        return []
+    ags = set(list_agents(c, lid))
+    return listen_ids(r["agent_listen"], r["agent_tidy"], tidy_agent_of(c, lid) if r["agent_listen"] is None else None, ags)
+
+
+def list_listen_update(c, lid, ids):
+    """2.13.1 (#471): "Agent reads every comment" -- owner / list admins (agent-owned list: its members with edit rights);
+    never an agent. ids: agents of the list ([] = nobody)."""
+    if not isinstance(ids, list) or len(ids) > 50 or not all(isinstance(x, int) and not isinstance(x, bool) for x in ids):
+        raise BadInput(tr("Invalid value: {0}", "listen_agent_ids"))
+    role = need_list(c, lid, write=False)
+    owner = c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0]
+    if is_agent(g.user) or not (role in MANAGE_ROLES or (owner in agent_ids(c) and role in WRITE_ROLES)):
+        raise Denied(403, tr("Only the list owner or a list admin can change this"))
+    ags = set(list_agents(c, lid))
+    bad = [x for x in ids if x not in ags]
+    if bad:
+        raise BadInput(tr("This agent is not in the list"))
+    c.execute("UPDATE lists SET agent_listen=? WHERE id=?", (",".join(str(x) for x in sorted(set(ids))), lid))
 
 
 def tidy_candidates(c, lid):
@@ -22139,12 +22264,176 @@ def agent_job_action(jid):
     return jsonify(job_dict(c, j))
 
 
-def chat_dict(r, rx=None):
+def chat_dict(r, rx=None, files=None, api=False):
     """rx: {message id: reactions} of chat_reactions_of (2.7.2, #421); delivered_at (#422): when the agent fetched a person's
-    message (null = not yet; the agent's own messages: null)."""
+    message (null = not yet; the agent's own messages: null). 2.13.1 (#465): files = chat_files_of (attachments: id, name,
+    mime, size, url; api: the REST address /api/v1/chat-attachments/{id}, else the app's)."""
     return {"id": r["id"], "agent_id": r["agent_id"], "user_id": r["user_id"], "from": r["sender"], "body": r["body"],
             "task_id": r["task_id"], "created_at": r["created_at"], "delivered_at": r["delivered_at"],
-            "reactions": (rx or {}).get(r["id"], []), "asks": r["sender"] == "agent" and chat_asks(r["body"])}
+            "reactions": (rx or {}).get(r["id"], []), "asks": r["sender"] == "agent" and chat_asks(r["body"]),
+            "attachments": [{**f, "url": (f"/api/v1/chat-attachments/{f['id']}" if api else f"/api/chat-files/{f['id']}")}
+                            for f in (files or {}).get(r["id"], [])]}
+
+
+# ---- 2.13.1 (#465): images / files in the chat between a person and an agent. Same limits and checks as task attachments
+# (MAX_FILE_MB per file, safe names, the sandbox CSP when shown); stored under ATT_DIR/chat/<agent>-<person>/. Only the
+# two sides of the conversation can fetch them (the person in the app or with a token, the agent with its token); only
+# the sender removes them. Trimmed messages (CHAT_KEEP) and deleted conversations take their files along.
+CHAT_FILES_MAX = 10   # files per message
+
+
+def chat_files_of(c, mids):
+    out, mids = {}, [x for x in mids if x]
+    if not mids:
+        return out
+    for r in c.execute(f"SELECT id, message_id, name, mime, size FROM chat_files WHERE message_id IN ({','.join('?' * len(mids))}) ORDER BY id", mids):
+        out.setdefault(r["message_id"], []).append({"id": r["id"], "name": r["name"], "mime": r["mime"], "size": r["size"]})
+    return out
+
+
+def chat_one(c, r, api=False):
+    """chat_dict of one row with its reactions and files."""
+    return chat_dict(r, chat_reactions_of(c, [r["id"]]), chat_files_of(c, [r["id"]]), api=api)
+
+
+def chat_upload_files():
+    """The files of a multipart chat message (field `file`, repeatable), else []."""
+    files = [f for f in request.files.getlist("file") if f and f.filename]
+    if len(files) > CHAT_FILES_MAX:
+        raise BadInput(tr("At most {0} files per message", CHAT_FILES_MAX))
+    return files
+
+
+def chat_input(allowed):
+    """(body dict, files) of a chat message: JSON, or a multipart form (body, task_id, file...)."""
+    if request.files or request.form:
+        b = {k: request.form.get(k) for k in request.form}
+        unknown = sorted(k for k in [*request.form, *request.files] if k not in (*allowed, "file"))
+        if unknown:
+            raise UnknownFields(unknown)
+        return b, chat_upload_files()
+    return None, []
+
+
+def chat_save_files(c, m, files, saved):
+    """Stores the uploaded files of chat row m. Returns an error message or None (caller commits / rolls back + unlinks)."""
+    sub = os.path.join("chat", f"{m['agent_id']}-{m['user_id']}")
+    try:
+        os.makedirs(os.path.join(ATT_DIR, sub), exist_ok=True)
+    except OSError as e:
+        aa_count("storage", "attachments", aa_oserr(e))
+        raise
+    ts = iso(now_utc())
+    for f in files:
+        name = safe_name(f.filename)
+        rel = os.path.join(sub, f"{uuid.uuid4().hex[:12]}-{name}")
+        full = os.path.join(ATT_DIR, rel)
+        try:
+            f.save(full)
+        except OSError as e:
+            aa_count("storage", "attachments", aa_oserr(e))
+            raise
+        saved.append(rel)
+        size = os.path.getsize(full)
+        if size > MAX_FILE_MB * 1024 * 1024:
+            return tr("{0}: larger than {1} MB", name, MAX_FILE_MB)
+        if not size:
+            return tr("{0}: the file is empty", name)
+        mime = (f.mimetype if f.mimetype and f.mimetype != "application/octet-stream" else None) \
+            or mimetypes.guess_type(name)[0] or "application/octet-stream"
+        c.execute("INSERT INTO chat_files(message_id,name,mime,size,path,created_at) VALUES(?,?,?,?,?,?)",
+                  (m["id"], name, mime, size, rel, ts))
+    return None
+
+
+def chat_file_paths(c, where, args):
+    return [r[0] for r in c.execute(f"SELECT f.path FROM chat_files f JOIN agent_chat m ON m.id=f.message_id WHERE {where}", args)]
+
+
+def chat_post(c, aid, uid, sender, b, files, allowed_keys=("body", "task_id")):
+    """A chat message with optional files (both sides). b: the fields; returns the new row (caller commits)."""
+    text = b.get("body")
+    if files and (text is None or (isinstance(text, str) and not text.strip())):
+        text = ""
+    else:
+        text = chat_body(text)
+    tid = chat_task(c, b.get("task_id"), uid, aid)
+    r = chat_add(c, aid, uid, sender, text, tid)
+    if files:
+        saved = []
+        try:
+            e = chat_save_files(c, r, files, saved)
+        except OSError:
+            c.rollback()
+            g.chat_unlink = []
+            unlink_files(saved)
+            raise
+        if e:
+            c.rollback()
+            g.chat_unlink = []
+            unlink_files(saved)
+            raise BadInput(e)
+    return r
+
+
+def chat_file_row(c, fid):
+    r = c.execute("""SELECT f.*, m.agent_id, m.user_id, m.sender FROM chat_files f JOIN agent_chat m ON m.id=f.message_id
+                     WHERE f.id=?""", (fid,)).fetchone()
+    if not r:
+        raise Denied(404)
+    return r
+
+
+def chat_file_access(c, fid, write=False):
+    """A chat file the current user may read (a side of its conversation) or, write=True, remove (its sender)."""
+    r = chat_file_row(c, fid)
+    uid = me()
+    if is_agent(g.user):
+        if r["agent_id"] != uid:
+            raise Denied(404)
+        side = "agent"
+    else:
+        if r["user_id"] != uid:
+            raise Denied(404)
+        side = "user"
+    if write and r["sender"] != side:
+        raise Denied(403, tr("Only the sender can remove this file"))
+    return r
+
+
+def chat_file_delete(c, r):
+    """Removes one chat file; a message left without text and files goes as well. Returns the message (or None)."""
+    c.execute("DELETE FROM chat_files WHERE id=?", (r["id"],))
+    m = c.execute("SELECT * FROM agent_chat WHERE id=?", (r["message_id"],)).fetchone()
+    if m and not (m["body"] or "").strip() and not c.execute("SELECT 1 FROM chat_files WHERE message_id=?", (m["id"],)).fetchone():
+        c.execute("DELETE FROM agent_chat WHERE id=?", (m["id"],))
+        m = None
+    c.commit()
+    unlink_files([r["path"]])
+    return m
+
+
+def chat_files_gc(c):
+    """Watchdog: files of chat messages that no longer exist (a deleted person / agent) leave the disk. At most hourly."""
+    if time.time() - _CHAT_GC["at"] < 3600:
+        return 0
+    _CHAT_GC["at"] = time.time()
+    root = os.path.join(ATT_DIR, "chat")
+    if not os.path.isdir(root):
+        return 0
+    known, n = {r[0] for r in c.execute("SELECT path FROM chat_files")}, 0
+    for d in os.listdir(root):
+        for fn in os.listdir(os.path.join(root, d)) if os.path.isdir(os.path.join(root, d)) else []:
+            rel = os.path.join("chat", d, fn)
+            full = os.path.join(ATT_DIR, rel)
+            # a file just being uploaded has no row yet: only older ones count
+            if rel not in known and time.time() - os.path.getmtime(full) > 3600:
+                unlink_files([rel])
+                n += 1
+    return n
+
+
+_CHAT_GC = {"at": 0.0}
 
 
 # 2.13.0 (#453 A2): a 👍 / 👎 of the person counts as an approval / rejection only on an agent message that asks something:
@@ -22220,9 +22509,9 @@ def agent_chat_get(aid):
     if c.execute("UPDATE agent_chat SET read_at=? WHERE agent_id=? AND user_id=? AND sender='agent' AND read_at IS NULL",
                  (iso(now_utc()), aid, me())).rowcount:
         c.commit()
-    rx = chat_reactions_of(c, [r["id"] for r in rows])
+    rx, fs = chat_reactions_of(c, [r["id"] for r in rows]), chat_files_of(c, [r["id"] for r in rows])
     # 2.7.2 (#422): the server's clock, so the app can tell how long ago a message was delivered
-    return jsonify(agent=agent_public(c, a, me()), messages=[chat_dict(r, rx) for r in rows], now=iso_ms(now_utc()), has_more=more)
+    return jsonify(agent=agent_public(c, a, me()), messages=[chat_dict(r, rx, fs) for r in rows], now=iso_ms(now_utc()), has_more=more)
 
 
 def chat_task(c, v, uid_a, uid_b):
@@ -22246,31 +22535,63 @@ def chat_body(v):
 def chat_add(c, aid, uid, sender, text, tid):
     mid = c.execute("INSERT INTO agent_chat(agent_id,user_id,sender,body,task_id,created_at) VALUES(?,?,?,?,?,?)",
                     (aid, uid, sender, text, tid, iso_ms(now_utc()))).lastrowid
-    c.execute("""DELETE FROM agent_chat WHERE agent_id=? AND user_id=? AND id<=(SELECT id FROM agent_chat WHERE agent_id=? AND user_id=?
-                 ORDER BY id DESC LIMIT 1 OFFSET ?)""", (aid, uid, aid, uid, CHAT_KEEP))
+    cut = c.execute("SELECT id FROM agent_chat WHERE agent_id=? AND user_id=? ORDER BY id DESC LIMIT 1 OFFSET ?", (aid, uid, CHAT_KEEP)).fetchone()
+    if cut:  # 2.13.1 (#465): the files of trimmed messages leave the disk
+        g.chat_unlink = getattr(g, "chat_unlink", []) + chat_file_paths(c, "m.agent_id=? AND m.user_id=? AND m.id<=?", (aid, uid, cut[0]))
+        c.execute("DELETE FROM agent_chat WHERE agent_id=? AND user_id=? AND id<=?", (aid, uid, cut[0]))
     return c.execute("SELECT * FROM agent_chat WHERE id=?", (mid,)).fetchone()
 
 
 @app.post("/api/agents/<int:aid>/chat")
 def agent_chat_post(aid):
-    """{body, task_id?} -- a message to the agent (a 'chat' event)."""
+    """{body, task_id?} -- a message to the agent (a 'chat' event). 2.13.1 (#465): or a multipart form (body?, task_id?,
+    file...) with images / files (the body may then be empty)."""
     c = db()
     a = need_chat_agent(c, aid)
     if not agent_active(a):
         return err(tr("This agent is paused"), 409)
-    b = body()
     try:
-        text = chat_body(b.get("body"))
-        tid = chat_task(c, b.get("task_id"), me(), aid)
+        fb, files = chat_input(("body", "task_id"))
+        r = chat_post(c, aid, me(), "user", fb if fb is not None else body(), files)
+    except UnknownFields as e:
+        return err(str(e))
     except BadInput as e:
         return err(str(e))
-    r = chat_add(c, aid, me(), "user", text, tid)
-    data = {"message": chat_dict(r), "user": {"id": me(), "name": user_names(c, [me()]).get(me(), "")}}
+    chat_emit(c, aid, r)
+    c.commit()
+    chat_unlink_trimmed()
+    return jsonify(chat_one(c, r)), 201
+
+
+def chat_emit(c, aid, r):
+    """The 'chat' event for the agent about a person's message r (with its files: REST addresses)."""
+    tid = r["task_id"]
+    data = {"message": chat_one(c, r, api=True), "user": {"id": r["user_id"], "name": user_names(c, [r["user_id"]]).get(r["user_id"], "")}}
     if tid:
         data.update(agent_task_data(c, tid, aid))
     agent_emit(c, aid, "chat", data)
-    c.commit()
-    return jsonify(chat_dict(r)), 201
+
+
+def chat_unlink_trimmed():
+    paths = getattr(g, "chat_unlink", None)
+    if paths:
+        g.chat_unlink = []
+        unlink_files(paths)
+
+
+@app.get("/api/chat-files/<int:fid>")
+def chat_file_get(fid):
+    """2.13.1 (#465): a file of my chat with an agent (inline image / pdf / text, ?dl=1 download)."""
+    return send_stored(chat_file_access(db(), fid))
+
+
+@app.delete("/api/chat-files/<int:fid>")
+def chat_file_del(fid):
+    """2.13.1 (#465): removes a file I sent (a message left without text and files goes too)."""
+    c = db()
+    r = chat_file_access(c, fid, write=True)
+    m = chat_file_delete(c, r)
+    return jsonify(ok=True, message=chat_one(c, m) if m else None, message_id=r["message_id"])
 
 
 # ---- 2.7.2 (#421): reactions on chat messages. Both sides may react (the person on the agent's answers and on their own
@@ -24025,28 +24346,29 @@ def v1_agent_chats():
         c.commit()
         rows = [c.execute("SELECT * FROM agent_chat WHERE id=?", (r["id"],)).fetchone() for r in rows]
     names = user_names(c, [r["user_id"] for r in rows])
-    rx = chat_reactions_of(c, [r["id"] for r in rows])
-    return jsonify(data=[{**chat_dict(r, rx), "user": {"id": r["user_id"], "name": names.get(r["user_id"], "")}} for r in rows],
+    rx, fs = chat_reactions_of(c, [r["id"] for r in rows]), chat_files_of(c, [r["id"] for r in rows])
+    return jsonify(data=[{**chat_dict(r, rx, fs, api=True), "user": {"id": r["user_id"], "name": names.get(r["user_id"], "")}} for r in rows],
                    cursor=rows[-1]["id"] if rows else since, has_more=more)
 
 
 @app.post("/api/v1/agent/chats/<int:uid>")
 @v1_view
 def v1_agent_chat_post(uid):
-    """{body, task_id?} -- the agent answers in its chat with person uid (push to that person)."""
+    """{body, task_id?} -- the agent answers in its chat with person uid (push to that person). 2.13.1 (#465): or multipart
+    (body?, task_id?, file... -- at most CHAT_FILES_MAX files of MAX_FILE_MB each) to send images / files."""
     v1_args(())
     aid = need_agent()
     c = db()
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if not u or is_agent(u) or not agent_shares(c, aid, uid):
         raise Denied(404)
-    b = v1_json()
+    fb, files = chat_input(("body", "task_id"))
+    b = fb if fb is not None else v1_json()
     unknown = sorted(k for k in b if k not in ("body", "task_id"))
     if unknown:
         raise UnknownFields(unknown)
-    text = chat_body(b.get("body"))
-    tid = chat_task(c, b.get("task_id"), uid, aid)
-    r = chat_add(c, aid, uid, "agent", text, tid)
+    r = chat_post(c, aid, uid, "agent", b, files)
+    text = r["body"] or " ".join(f"📎 {f['name']}" for f in chat_files_of(c, [r["id"]]).get(r["id"], []))
     c.execute("UPDATE agents SET typing_user=NULL, typing_until=0 WHERE user_id=? AND typing_user=?", (aid, uid))  # 2.4.1: answered
     s = collab_user(c, uid, None)
     if s:
@@ -24055,7 +24377,55 @@ def v1_agent_chat_post(uid):
         g.pushes.append((uid, name, snippet, f"{PUBLIC_URL}/#agents/{aid}", push_prio(s)))
     bump(c)
     c.commit()
-    return jsonify(chat_dict(r)), 201
+    chat_unlink_trimmed()
+    return jsonify(chat_one(c, r, api=True)), 201
+
+
+@app.get("/api/v1/chat-attachments/<int:fid>")
+@v1_view
+def v1_chat_file_get(fid):
+    """2.13.1 (#465): the binary of a chat file: the agent of its conversation, or the person (own token)."""
+    v1_args(("dl", "v"))
+    return send_stored(chat_file_access(db(), fid))
+
+
+@app.delete("/api/v1/chat-attachments/<int:fid>")
+@v1_view
+def v1_chat_file_del(fid):
+    """2.13.1 (#465): the sender removes one of its chat files."""
+    v1_args(())
+    c = db()
+    r = chat_file_access(c, fid, write=True)
+    m = chat_file_delete(c, r)
+    return jsonify(ok=True, message_id=r["message_id"], message=chat_one(c, m, api=True) if m else None)
+
+
+@app.get("/api/v1/tasks/<int:tid>/attachments")
+@v1_view
+def v1_task_attachments(tid):
+    """2.13.1 (#465): the files of a task and of its comments (comment_id) -- only where the token's user sees the task
+    with its comments; download with GET /api/v1/attachments/{id}."""
+    v1_args(())
+    c = db()
+    _v1_live(c, tid, write=False, full=True)
+    live = {r[0] for r in c.execute("SELECT id FROM comments WHERE task_id=? AND deleted_at IS NULL", (tid,))}
+    rows = c.execute("SELECT id, name, mime, size, comment_id, created_at FROM attachments WHERE task_id=? ORDER BY id", (tid,)).fetchall()
+    return jsonify(data=[{"id": r["id"], "task_id": tid, "comment_id": r["comment_id"], "name": r["name"], "mime": r["mime"],
+                          "size": r["size"], "created_at": r["created_at"], "url": f"/api/v1/attachments/{r['id']}"}
+                         for r in rows if r["comment_id"] is None or r["comment_id"] in live], next_cursor=None)
+
+
+@app.get("/api/v1/attachments/<int:aid>")
+@v1_view
+def v1_attachment_get(aid):
+    """2.13.1 (#465): the binary of a task / comment attachment (same rights as the app: sees the task with its comments)."""
+    v1_args(("dl", "v"))
+    c = db()
+    a = need_attachment(c, aid, False)
+    need_task(c, a["task_id"], write=False, full=True)
+    if c.execute("SELECT deleted_at FROM tasks WHERE id=?", (a["task_id"],)).fetchone()[0]:
+        raise Denied(404)
+    return send_stored(a)
 
 
 @app.post("/api/v1/agent/chats/<int:uid>/messages/<mid>/reactions")
@@ -24869,6 +25239,10 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                             "body": {"type": "string"}, "task_id": nul("integer"), "created_at": {"type": "string"},
                                             "delivered_at": nul("string", description="2.7.2 (#422): when the agent fetched the person's message (event poll, MCP, webhook, chat read); null = not yet / an agent message"),
                                             "asks": {"type": "boolean", "description": "2.13.0: an agent message that asks something (a question mark outside code and links); only there a 👍 / 👎 of the person is an approval / rejection"},
+                                            "attachments": {"type": "array", "description": "2.13.1 (#465): images / files of the message; download with GET /chat-attachments/{id}",
+                                                            "items": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"},
+                                                                                                       "mime": {"type": "string"}, "size": {"type": "integer"},
+                                                                                                       "url": {"type": "string"}}}},
                                             "reactions": {"type": "array", "description": "2.7.2 (#421)", "items": {"type": "object", "properties": {
                                                 "emoji": {"type": "string"}, "count": {"type": "integer"},
                                                 "users": {"type": "array", "items": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}}}}}}}}}
@@ -24913,6 +25287,8 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
     schemas["List"]["properties"]["tags"] = {"type": "array", "items": {"type": "object"}}
     schemas["List"]["properties"]["agent_tidy"] = {"type": "string", "enum": list(TIDY_MODES)}
     schemas["List"]["properties"]["tidy_agent_id"] = nul("integer", description="The one agent that tidies up the list (2.4.1)")
+    schemas["List"]["properties"]["listen_agent_ids"] = {"type": "array", "items": {"type": "integer"}, "description":
+                                                         "2.13.1 (#471): agents that read every comment of a person in this list (default: the tidy agent while tidying is on)"}
     schemas["List"]["properties"]["icon"] = {"type": "string", "description": "URL of the list's own icon (2.0.2), empty = none"}
     schemas["Comment"]["properties"]["reactions"] = {"type": "array", "items": {"type": "object"}}
     schemas["Comment"]["properties"]["suggestion"] = {"oneOf": [{"type": "null"}, {"type": "object"}]}
@@ -24956,9 +25332,15 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                    [q("since", "Message id", {"type": "integer"}), q("user_id", "One person", {"type": "integer"}), q("limit", "At most 500", {"type": "integer"})])},
         "/agent/typing": {"post": op(f"Typing dots in one person's chat for {AGENT_TYPING_S} s (2.4.1)", AG, ok({"type": "object"}) | errs("400", "403", "404"),
                                      scope=W, body={"type": "object", "required": ["chat_user_id"], "properties": {"chat_user_id": {"type": "integer"}}})},
-        "/agent/chats/{id}": {"post": op("Answer in the chat with a person", AG, ok(ref("ChatMessage"), "Created", "201") | errs("400", "403", "404"),
-                                         [pid("id", "User id")], scope=W, body={"type": "object", "required": ["body"], "properties": {
-                                             "body": {"type": "string"}, "task_id": {"type": "integer"}}})},
+        "/agent/chats/{id}": {"post": {**op("Answer in the chat with a person. 2.13.1 (#465): as multipart/form-data with `file` (repeatable, "
+                                            f"at most {CHAT_FILES_MAX} files of {MAX_FILE_MB} MB) to send images / files; body may then be empty", AG,
+                                            ok(ref("ChatMessage"), "Created", "201") | errs("400", "403", "404", "413"), [pid("id", "User id")], scope=W),
+                                         "requestBody": {"required": True, "content": {
+                                             "application/json": {"schema": {"type": "object", "required": ["body"], "properties": {
+                                                 "body": {"type": "string"}, "task_id": {"type": "integer"}}}},
+                                             "multipart/form-data": {"schema": {"type": "object", "properties": {
+                                                 "body": {"type": "string"}, "task_id": {"type": "integer"},
+                                                 "file": {"type": "array", "items": {"type": "string", "format": "binary"}}}}}}}}},
         "/agent/usage": {  # 2.1.1 (#326)
             "post": op("Report model usage (numbers and ids only; allowed also over the hard limit)", AG,
                        ok(ref("UsageReport"), "Created", "201") | errs("400", "403"), scope=W, body={

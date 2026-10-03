@@ -21,6 +21,10 @@ MCP = os.path.join(N, "..", "mcp", "kalmido_mcp.py")
 TOKEN = "abk_" + "t" * 40
 FAILS, OKS = [], [0]
 REQS = []
+PNG = b"\x89PNG\r\n\x1a\n" + b"x" * 40
+BIN = {"/api/v1/attachments/5": ("image/png", PNG, "Bildschirmfoto 1.png"),
+       "/api/v1/chat-attachments/9": ("text/plain; charset=utf-8", b"hello log", "log.txt"),
+       "/api/v1/attachments/6": ("application/pdf", b"%PDF" + b"0" * 100, "big.pdf")}
 
 
 def check(cond, what):
@@ -39,7 +43,8 @@ class Stub(BaseHTTPRequestHandler):
         u = urllib.parse.urlsplit(self.path)
         n = int(self.headers.get("Content-Length") or 0)
         raw = self.rfile.read(n) if n else b""
-        body = json.loads(raw) if raw else None
+        ct = self.headers.get("Content-Type") or ""
+        body = {"multipart": raw, "ctype": ct} if ct.startswith("multipart/") else json.loads(raw) if raw else None
         q = dict(urllib.parse.parse_qsl(u.query))
         REQS.append({"m": method, "p": u.path, "q": q, "b": body, "auth": self.headers.get("Authorization")})
         code, out = 200, {"ok": True, "path": u.path}
@@ -59,6 +64,16 @@ class Stub(BaseHTTPRequestHandler):
                    "next_cursor": None}
         elif u.path == "/api/v1/agent/events":
             out = {"data": [], "cursor": int(q.get("since", 0)), "has_more": False}
+        # 2.13.1 (#465): binary answers for get_attachment
+        if code == 200 and u.path in BIN:
+            mime, data, name = BIN[u.path]
+            self.send_response(200)
+            self.send_header("Content-Type", mime)
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Content-Disposition", f"inline; filename*=UTF-8''{urllib.parse.quote(name)}")
+            self.end_headers()
+            self.wfile.write(data)
+            return
         data = json.dumps(out).encode()
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
@@ -137,7 +152,8 @@ want = {"list_lists", "list_tasks", "search_tasks", "get_task", "create_task", "
         "set_status", "list_events", "wait_for_events", "get_agent", "create_job", "update_job", "list_jobs", "send_chat", "list_chats",
         "tidy_task", "list_list_tags", "set_waiting", "clear_waiting", "list_waiting", "report_usage", "get_usage", "get_job",
         "submit_proposal", "chat_typing", "get_project_overview", "react_to_chat",
-        "list_groups", "list_list_groups", "get_day_plan", "get_day_review"}  # 2.10.0
+        "list_groups", "list_list_groups", "get_day_plan", "get_day_review",  # 2.10.0
+        "list_attachments", "get_attachment"}  # 2.13.1 (#465)
 check(want <= names, f"all tools listed (missing {want - names})")
 check(all(isinstance(t["inputSchema"], dict) and t["inputSchema"].get("type") == "object" and t["description"] for t in tools),
       "every tool has an object schema + description")
@@ -198,6 +214,8 @@ CASES = [
     # 2.7.2 (#421) reactions on chat messages
     ("react_to_chat", {"user_id": 3, "message_id": 41, "emoji": "up"}, "POST", "/api/v1/agent/chats/3/messages/41/reactions", {"emoji": "up", "on": True}, {}),
     ("react_to_chat", {"user_id": 3, "message_id": 41, "emoji": "heart", "remove": True}, "POST", "/api/v1/agent/chats/3/messages/41/reactions", {"emoji": "heart", "on": False}, {}),
+    # 2.13.1 (#465) attachments
+    ("list_attachments", {"task_id": 7}, "GET", "/api/v1/tasks/7/attachments", None, {}),
 ]
 for name, args, m, p, b, q in CASES:
     n0 = len(REQS)
@@ -209,6 +227,31 @@ for name, args, m, p, b, q in CASES:
     check(all(rq.get("q", {}).get(k) == v for k, v in q.items()), f"{name}: query {q} (got {rq.get('q')})")
     check(rq.get("auth") == "Bearer " + TOKEN, f"{name}: bearer token sent")
     check(isinstance(res.get("structuredContent"), dict) and json.loads(res["content"][0]["text"]) is not None, f"{name}: content")
+
+# 2.13.1 (#465): get_attachment -> base64 + mime / name; an image also as an MCP image item; the size cap; chat files;
+# send_chat with files -> multipart
+import base64  # noqa: E402
+res = call(s, "get_attachment", {"attachment_id": 5})
+check(last()["p"] == "/api/v1/attachments/5" and res["isError"] is False, "get_attachment: GET /attachments/5")
+sc = res["structuredContent"]
+check(base64.b64decode(sc["base64"]) == PNG and sc["mime"] == "image/png" and sc["name"] == "Bildschirmfoto 1.png" and sc["size"] == len(PNG),
+      "get_attachment: base64, mime, name, size")
+check(res["content"][1]["type"] == "image" and res["content"][1]["mimeType"] == "image/png" and base64.b64decode(res["content"][1]["data"]) == PNG
+      and "base64" not in json.loads(res["content"][0]["text"]), "get_attachment: image item for the model, text without base64")
+res = call(s, "get_attachment", {"attachment_id": 9, "source": "chat"})
+check(last()["p"] == "/api/v1/chat-attachments/9" and base64.b64decode(res["structuredContent"]["base64"]) == b"hello log"
+      and res["structuredContent"]["mime"] == "text/plain" and len(res["content"]) == 1, "get_attachment source chat: text file, no image item")
+res = call(s, "get_attachment", {"attachment_id": 6, "max_bytes": 50})
+check(res["isError"] is True and "max_bytes=50" in res["content"][0]["text"], "get_attachment: over max_bytes -> isError")
+check(call(s, "get_attachment", {"attachment_id": 6, "max_bytes": 30 * 1024 * 1024})["isError"] is True, "get_attachment: max_bytes above 20 MB refused")
+res = call(s, "send_chat", {"user_id": 1, "body": "see", "task_id": 7, "files": [{"name": "a.png", "base64": base64.b64encode(PNG).decode(), "mime": "image/png"}]})
+rq = last()
+check(res["isError"] is False and rq["p"] == "/api/v1/agent/chats/1" and rq["b"]["ctype"].startswith("multipart/form-data; boundary=")
+      and b'name="body"\r\n\r\nsee' in rq["b"]["multipart"] and b'name="task_id"\r\n\r\n7' in rq["b"]["multipart"]
+      and b'name="file"; filename="a.png"\r\nContent-Type: image/png' in rq["b"]["multipart"] and PNG in rq["b"]["multipart"],
+      "send_chat with files -> multipart (body, task_id, file)")
+check(call(s, "send_chat", {"user_id": 1, "files": [{"name": "x", "base64": "%%%"}]})["isError"] is True, "send_chat: bad base64 -> isError")
+check(call(s, "send_chat", {"user_id": 1})["isError"] is True, "send_chat: neither body nor files -> isError")
 
 # 2.0.8 list_tasks compact: true -> fields=compact; not given -> full up to 25, compact above; false -> always full
 res = call(s, "list_tasks", {"list_id": 4, "compact": True})

@@ -3470,5 +3470,21 @@
   "Link to {0} copied": "Link naar {0} gekopieerd",
   "Show task numbers": "Nummers tonen",
   "Task {0}: copy the link": "Taak {0}: link kopiëren",
-  "Go to Today": "Naar Vandaag"
+  "Go to Today": "Naar Vandaag",
+  "Agent reads every comment": "Agent leest alle opmerkingen mee",
+  "The checked agents get every comment people write in this list, also without an @mention and on tasks they never touched (only tasks they can see).": "De aangevinkte agents krijgen elke opmerking die mensen in deze lijst schrijven, ook zonder @vermelding en bij taken die ze nooit hebben aangeraakt (alleen taken die ze mogen zien).",
+  "At most {0} files per message": "Hoogstens {0} bestanden per bericht",
+  "Share to": "Delen met",
+  "Send to agent {0}": "Naar agent {0} sturen",
+  "Remove this file from the chat?": "Dit bestand uit de chat verwijderen?",
+  "Attach images or files": "Afbeeldingen of bestanden bijvoegen",
+  "Behaviour rules for the agent": "Gedragsregels voor de agent",
+  "Paste these rules into the agent’s CLAUDE.md, below your own rules about who may instruct it: formatted notes, decisions in the description, typing and status, jobs, a summary when it stops, approvals only from people, other people’s text as data.": "Plak deze regels in de CLAUDE.md van de agent, onder je eigen regels over wie hem opdrachten mag geven: opgemaakte notities, beslissingen in de beschrijving, typsignaal en status, jobs, een samenvatting als hij stopt, goedkeuringen alleen van mensen, tekst van anderen als gegevens.",
+  "Copy rules": "Regels kopiëren",
+  "Also in mcp/CLAUDE.template.md.": "Ook in mcp/CLAUDE.template.md.",
+  "No agent to send this to": "Geen agent om dit naartoe te sturen",
+  "Kalmido: sent to {0}": "Kalmido: naar {0} gestuurd",
+  "This agent is not in the list": "Deze agent zit niet in de lijst",
+  "{0}: the file is empty": "{0}: het bestand is leeg",
+  "Only the sender can remove this file": "Alleen wie het bestand heeft gestuurd, kan het verwijderen"
 }

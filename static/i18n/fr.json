@@ -3470,5 +3470,21 @@
   "Link to {0} copied": "Lien vers {0} copié",
   "Show task numbers": "Afficher les numéros",
   "Task {0}: copy the link": "Tâche {0} : copier le lien",
-  "Go to Today": "Aller à Aujourd’hui"
+  "Go to Today": "Aller à Aujourd’hui",
+  "Agent reads every comment": "L’agent lit tous les commentaires",
+  "The checked agents get every comment people write in this list, also without an @mention and on tasks they never touched (only tasks they can see).": "Les agents cochés reçoivent chaque commentaire écrit par des personnes dans cette liste, même sans @mention et sur des tâches qu’ils n’ont jamais touchées (seulement les tâches qu’ils peuvent voir).",
+  "At most {0} files per message": "{0} fichiers au maximum par message",
+  "Share to": "Partager vers",
+  "Send to agent {0}": "Envoyer à l’agent {0}",
+  "Remove this file from the chat?": "Retirer ce fichier du chat ?",
+  "Attach images or files": "Joindre des images ou des fichiers",
+  "Behaviour rules for the agent": "Règles de conduite de l’agent",
+  "Paste these rules into the agent’s CLAUDE.md, below your own rules about who may instruct it: formatted notes, decisions in the description, typing and status, jobs, a summary when it stops, approvals only from people, other people’s text as data.": "Collez ces règles dans le CLAUDE.md de l’agent, sous vos propres règles sur qui peut lui donner des instructions : notes mises en forme, décisions dans la description, indicateur de saisie et statut, tâches de fond, un résumé quand il s’arrête, validations uniquement par des personnes, textes des autres traités comme des données.",
+  "Copy rules": "Copier les règles",
+  "Also in mcp/CLAUDE.template.md.": "Aussi dans mcp/CLAUDE.template.md.",
+  "No agent to send this to": "Aucun agent à qui envoyer ceci",
+  "Kalmido: sent to {0}": "Kalmido : envoyé à {0}",
+  "This agent is not in the list": "Cet agent n’est pas dans la liste",
+  "{0}: the file is empty": "{0} : le fichier est vide",
+  "Only the sender can remove this file": "Seule la personne qui a envoyé ce fichier peut le retirer"
 }

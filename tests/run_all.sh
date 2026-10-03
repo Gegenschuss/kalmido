@@ -294,6 +294,12 @@ shard 4  # ---------------------------------------------------------------- shar
 # day plan, offline in words, selection bar, setup step 2, helper texts behind (i), …) in jsdom and Firefox at 390 touch
 # (light, German), Fold 904 touch (dark, French) and 1440 (light + dark)
        run p2130_ui node p2130_ui.js "$KALMIDO_TEST_DATA"
+# 2.13.1 (#465 #469 #471): files in the agent chat (limits, rights, removal, /drop to an agent), agents read task / comment /
+# chat files (API v1, never lists they do not see), "Agent reads every comment" (events, rights, default = the tidy agent);
+# then the UI: chat thumbnails + lightbox, the box with waiting files (paste, drag and drop, file input, the share sheet's
+# "Send to agent"), the rules block in both setup guides, the list dialog's checkboxes, in jsdom and Firefox at 390 touch / 1280
+       run p2131_api "$PY" p2131_api_test.py "$KALMIDO_TEST_DATA"
+       run p2131_ui node p2131_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

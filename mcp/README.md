@@ -60,7 +60,9 @@ By default the server binds to `127.0.0.1`. It rejects requests with an `Origin`
 | `wait_for_events` | long-poll for events (up to 60 s) | `GET /api/v1/agent/events?since=&wait=` |
 | `list_jobs` / `create_job` / `update_job` | jobs shown in the Agents tab | `/api/v1/agent/jobs` |
 | `get_job` / `submit_proposal` | 2.3.0: one job (a proposal job with its input) / answer a `job_request` with a structured proposal ([Proposals](../docs/AGENTS.md#proposals)) | `/api/v1/agent/jobs/{id}`, `.../proposal` |
-| `list_chats` / `send_chat` | chat with people | `GET /api/v1/agent/chats`, `POST /api/v1/agent/chats/{user_id}` |
+| `list_chats` / `send_chat` | chat with people; 2.13.1: `send_chat` takes `files: [{name, base64, mime?}]` (multipart) | `GET /api/v1/agent/chats`, `POST /api/v1/agent/chats/{user_id}` |
+| `list_attachments` | 2.13.1: files of a task and its comments (`id`, `name`, `mime`, `size`, `comment_id`) | `GET /api/v1/tasks/{id}/attachments` |
+| `get_attachment` | 2.13.1: one file as base64 + `mime` / `name` / `size` (`source`: `task` or `chat`, `max_bytes` default 5 MB, max 20 MB); images also as an MCP image item | `GET /api/v1/attachments/{id}`, `GET /api/v1/chat-attachments/{id}` |
 | `chat_typing` | typing dots in one person's chat for 10 s (2.4.1) | `POST /api/v1/agent/typing` |
 | `react_to_chat` | 2.7.2: 👍 / 👎 / ❤️ on a chat message (`user_id`, `message_id`, `emoji`, `on`, default true); a person's 👍 on your message arrives as a `reaction` event with `approval: "approved"` | `POST /api/v1/agent/chats/{user_id}/messages/{id}/reactions` |
 | `tidy_task` | tidy a task (lists in tidy mode "auto") | `POST /api/v1/tasks/{id}/tidy` |

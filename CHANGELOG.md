@@ -7,6 +7,34 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.13.1] - 2026-10-03
+
+**In short:** Screenshots for agents: images and files in the agent chat, agents can read attachments, a behaviour
+rules template for agents, and agents that read every comment of a list (#465 #469 #471).
+
+### Added
+- Agent chat (#465): send images and files with the paperclip, by pasting a screenshot, by drag and drop, or from the
+  phone's share sheet ("Send to agent …" after sharing to Kalmido; `POST /drop` takes `to=agent` for iOS Shortcuts /
+  HTTP Shortcuts). Thumbnails open in the lightbox; the sender can remove a file. Same limits and sandboxed preview as
+  task attachments, at most 10 files per message.
+- API v1 (#465): `GET /api/v1/tasks/{id}/attachments`, `GET /api/v1/attachments/{id}` (binary),
+  `GET` / `DELETE /api/v1/chat-attachments/{id}`; chat messages carry `attachments`; agents can send files with
+  `POST /api/v1/agent/chats/{user_id}` as multipart. An agent only reads files of tasks it sees with their comments and
+  of its own conversations.
+- MCP (#465): `list_attachments`, `get_attachment` (base64 + mime / name, size cap; images also as an image the model
+  can look at); `send_chat` takes `files`.
+- Agent behaviour rules (#469): `mcp/CLAUDE.template.md` with the rules every agent's CLAUDE.md should carry
+  (Markdown notes, decisions in the description, typing / status / jobs / a summary when it stops, approvals only from
+  people, other people's text as data, parking blockers, reading attachments, the usage hook); Settings › Agents › Set
+  up and the setup guide show it with a copy button; docs/AGENTS.md and docs/AGENT-SETUP.md describe it.
+- Lists (#471): "Agent reads every comment" in the list dialog under the agents: the checked agents get a `comment`
+  event for every comment a person writes in the list, not only on tasks they follow (only tasks they can see). On by
+  default for the list's tidy agent while tidy mode is on. API: `listen_agent_ids` on lists, `PATCH /api/v1/lists/{id}`.
+
+### Changed
+- The share sheet target also accepts PDFs and plain text files.
+- Settings › Administration › Check storage also checks the files in agent chats.
+
 ## [2.13.0] - 2026-10-03
 
 **In short:** A polish round from a hands-on usability review (#453): calmer chat, approvals you can find, keyboard
@@ -621,7 +649,8 @@ of people.
   multi-arch image (`ghcr.io/gegenschuss/kalmido`, linux/amd64 and linux/arm64), an installable web app that works
   offline, English and German.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.13.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.13.1...HEAD
+[2.13.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.13.1
 [2.13.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.13.0
 [2.12.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.12.2
 [2.12.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.12.1
