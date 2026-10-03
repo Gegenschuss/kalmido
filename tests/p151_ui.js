@@ -252,9 +252,10 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   nw.querySelector('#l-name').value = 'Fresh'; click(w, nw.querySelector('[data-m="save"]'));
   check(await until(async () => (await st()).lists.some(l => l.name === 'Fresh')), 'Create works');
 
-  // ================= (i) sidebar footer: search right above the settings
+  // ================= (i) sidebar: 2.13.0: search at the top, right under the command bar (no longer in the footer)
   const rk = [...d.querySelectorAll('#side .sfoot > *')].map(x => x.dataset.go || x.dataset.act || '');
-  check(rk.indexOf('search') === rk.indexOf('settings') - 1, 'sidebar: search right above settings: ' + rk.join(','));
+  const top = d.querySelector('#side .scmd')?.nextElementSibling;
+  check(!rk.includes('search') && top?.dataset.go === 'search' && rk.includes('settings'), 'sidebar: search right under the command bar, settings in the footer: ' + rk.join(','));
 
   // ================= (h) time page: the running timer as a card
   const PRJ = (await call('POST', '/api/lists', {name: 'Client X', kind: 'project', color: '#f59e0b'})).id;
