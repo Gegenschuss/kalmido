@@ -1154,6 +1154,8 @@ Inside an interactive Claude Code session, you can instead call the MCP tool `wa
 - usage (2.1.1): `report_usage`, `get_usage` (see [Usage and limits](#usage-and-limits))
 - code (2.2.0): `list_repos`, `request_merge_approval` (see [Coding agent workflow](#coding-agent-workflow))
 - projects (2.7.1): `get_project_overview` (description, key links, milestones, files, members, status, time; read-only)
+- lists (2.14.0): `set_list_columns` (which columns the rows of a list show and in which order, for every member; only as
+  the list's owner or admin; `list_lists` returns `columns` and the custom `fields`)
 
 Setup is in [mcp/README.md](../mcp/README.md).
 

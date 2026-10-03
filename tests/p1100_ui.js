@@ -75,13 +75,12 @@ const menuItems = d => [...d.querySelectorAll('.menu-list [role="menuitem"]')];
   check((await call('alice', 'GET', `/api/tasks/${T2b}`)).assignee_id === id.bob, 'subtask assigned independently of its parent');
   check((await call('alice', 'GET', `/api/tasks/${T2}`)).assignee_id === id.carol, 'parent keeps its assignee');
   w.eval('closeDetail()'); await sleep(200);
-  // hide the column per list
-  const hideIt = w.eval(`listMenuItems(${L}, document.body)`).find(x => x.label === 'Hide assignee column');
-  check(!!hideIt, 'list "…" offers Hide assignee column');
-  hideIt.fn(); await sleep(300);
-  check(!d.querySelector(`.trow[data-id="${T3}"] .whob`) && d.querySelector(`.trow[data-id="${T3}"] .c-who .who`)?.textContent === 'C', 'hidden: plain avatar as before, no buttons');
-  check(w.eval(`listMenuItems(${L}, document.body)`).some(x => x.label === 'Show assignee column'), 'and back: Show assignee column');
-  w.eval(`listMenuItems(${L}, document.body)`).find(x => x.label === 'Show assignee column').fn(); await sleep(200);
+  // 2.14.0 (#425): the column is part of the list's columns ("Columns…", for every member); without it no assignee in the row
+  check(w.eval(`listMenuItems(${L}, document.body)`).some(x => x.label === 'Columns…'), 'list "…" offers Columns…');
+  await w.eval(`colSave(${L}, ['due'], true)`); await sleep(300);
+  check(!d.querySelector(`.trow[data-id="${T3}"] .whob`) && !d.querySelector(`.trow[data-id="${T3}"] .who`), 'without the assignee column: no assignee in the row');
+  await w.eval(`colSave(${L}, null, true)`); await sleep(300);
+  check(!!d.querySelector(`.trow[data-id="${T3}"] .whob`), 'default columns: the assignee column is back');
   w.close();
 
   // ---- phone: compact cell at the row end
@@ -150,7 +149,7 @@ const menuItems = d => [...d.querySelectorAll('.menu-list [role="menuitem"]')];
   check([...md.querySelector(`[data-mrole="${id.pete}"]`).options].map(o => o.textContent).join() === 'Admin,Mitglied,Teilnehmer,Betrachter', 'German role names');
   check(/Sieht nur die eigenen, zugewiesenen Aufgaben/.test(md.querySelector('.rolehelp').textContent), 'German explanations');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
-  check(w.eval(`listMenuItems(${L}, document.body)`).some(x => x.label === 'Spalte „Zuständig“ ausblenden'), 'German column toggle');
+  check(w.eval(`listMenuItems(${L}, document.body)`).some(x => x.label === 'Spalten…'), 'German: Spalten… (2.14.0, was the assignee column toggle)');
   w.close();
 
   const bad = errs.filter(e => !/Could not parse CSS/.test(e));

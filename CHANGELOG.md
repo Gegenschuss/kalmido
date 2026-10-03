@@ -7,6 +7,39 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.14.0] - 2026-10-03
+
+**In short:** Columns per list (#425): every list decides which columns its rows show and in which order, the same for
+everyone in it, custom fields and the task number included. Quick add can open the new task's details at once or
+attach files (#484). Plus a calm heron in empty states and on the error pages.
+
+### Added
+- *Columns…* (list *…* menu, and the columns button in the list header on desktops): tick the columns of the rows and
+  order them with the arrows, by dragging the handle or with Alt+↑/↓: task number (in front of the title), date,
+  priority, assignee, tags, tracked time, subtasks, waiting on, created and the list's custom fields. Saved for the
+  whole list (everyone sees the same) by the owner or a list admin, with Undo; *Default* goes back to the standard
+  layout; members see the setting read-only. A new custom field joins configured columns at the end.
+- Rows of such a list: the values sit in their columns under a title row; what is not a column is not shown in the row
+  (it stays in the task panel). Where the list column gets narrower (an unfolded Fold with the sidebar, the task panel
+  open) and on phones the first two columns stay in the row and the others move into its second line.
+- API v1: lists carry `columns` (null = default) and `GET /lists`, `GET /lists/{id}` their custom `fields`
+  `[{id, name, type}]`; `PATCH /lists/{id}` takes `columns` (owner / list admins). MCP: `set_list_columns`.
+- Quick add (#484): next to Send, *Add and open details* creates the task and opens it at once (for notes and files),
+  and the paper clip picks files: the task is created with them attached (the first file's name is the title when
+  none is typed) and opens. Phones, Fold and desktop; empty files are refused; offline the paper clip says it needs a
+  connection.
+- A heron (a line drawing in the text colour; its sun is the accent colour and follows theme and accent) in an empty
+  list, on Today (nothing left / all done), for a search without hits, on the welcome tour's first card, on the setup
+  screen, when the server cannot be reached at the start, and on the 404 and expired-link pages.
+
+### Changed
+- *Columns…* replaces the per-device switches *Show task numbers*, *Hide / Show assignee column* and *Show custom fields
+  as columns*; until a list gets its own columns it keeps the layout it had.
+- In a list with its own columns, the field option "show as a chip" is hidden (the columns decide).
+
+### Fixed
+- The start page when the server cannot be reached has a *Try again* button.
+
 ## [2.13.4] - 2026-10-03
 
 **In short:** A phone round (reported on a folded Galaxy Z Fold): dragging by touch scrolls at the edges, moves tasks
@@ -2110,7 +2143,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.13.4...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.14.0...HEAD
+[2.14.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.14.0
 [2.13.4]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.13.4
 [2.13.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.13.3
 [2.13.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.13.2

@@ -153,7 +153,8 @@ want = {"list_lists", "list_tasks", "search_tasks", "get_task", "create_task", "
         "tidy_task", "list_list_tags", "set_waiting", "clear_waiting", "list_waiting", "report_usage", "get_usage", "get_job",
         "submit_proposal", "chat_typing", "get_project_overview", "react_to_chat",
         "list_groups", "list_list_groups", "get_day_plan", "get_day_review",  # 2.10.0
-        "list_attachments", "get_attachment"}  # 2.13.1 (#465)
+        "list_attachments", "get_attachment",  # 2.13.1 (#465)
+        "set_list_columns"}  # 2.14.0 (#425)
 check(want <= names, f"all tools listed (missing {want - names})")
 check(all(isinstance(t["inputSchema"], dict) and t["inputSchema"].get("type") == "object" and t["description"] for t in tools),
       "every tool has an object schema + description")
@@ -203,6 +204,8 @@ CASES = [
     # 2.2.0 (#271 / #339) code
     ("list_repos", {"list_id": 4}, "GET", "/api/v1/lists/4/repos", None, {}),
     ("get_project_overview", {"list_id": 4}, "GET", "/api/v1/lists/4/overview", None, {}),  # 2.7.1 (#410)
+    ("set_list_columns", {"list_id": 4, "columns": ["id", "due", "f:3"]}, "PATCH", "/api/v1/lists/4", {"columns": ["id", "due", "f:3"]}, {}),  # 2.14.0
+    ("set_list_columns", {"list_id": 4, "columns": None}, "PATCH", "/api/v1/lists/4", {"columns": None}, {}),
     ("request_merge_approval", {"task_id": 7, "pr_url": "https://github.com/acme/app/pull/12", "summary": "Adds X"}, "POST", "/api/v1/tasks/7/comments",
      {"body": "Ready to merge: https://github.com/acme/app/pull/12\n\nAdds X",
       "suggestion": {"kind": "merge_request", "pr_url": "https://github.com/acme/app/pull/12", "summary": "Adds X"}}, {}),    # 2.3.0 (#260-#263) proposals

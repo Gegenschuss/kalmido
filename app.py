@@ -849,6 +849,8 @@ MIGRATIONS = [
     # 2.13.1 (#471): "Agent reads every comment": the agents that get a 'comment' event for every comment of a person in
     # this list (comma separated user ids; '' = none; NULL = the default: the list's tidy agent while tidying is on)
     ("lists", "agent_listen", "ALTER TABLE lists ADD COLUMN agent_listen TEXT"),
+    # 2.14.0 (#425): the list's columns (JSON array of column keys in order, the same for every member; NULL = the default)
+    ("lists", "col_cfg", "ALTER TABLE lists ADD COLUMN col_cfg TEXT"),
 ]
 INDEXES = """
 CREATE INDEX IF NOT EXISTS lists_owner ON lists(owner_id);
@@ -4278,6 +4280,10 @@ def visible_lists(c, uid):
     repos = git_repos_of_lists(c, ids)  # 2.2.0 (#271)
     mss = milestones_of_lists(c, [r["id"] for r in rows if r["kind"] == "project"])  # 2.7.1 (#410): timeline markers
     has_groups = collab_all() and bool(c.execute("SELECT 1 FROM group_shares LIMIT 1").fetchone())
+    lfids = {}  # 2.14.0 (#425): custom field ids per list (columns of deleted fields are dropped)
+    if ids:
+        for f in c.execute(f"SELECT id, list_id FROM list_fields WHERE list_id IN ({','.join('?' * len(ids))})", ids):
+            lfids.setdefault(f["list_id"], set()).add(f["id"])
     out = []
     for r in rows:
         d = {k: r[k] for k in r.keys() if not k.startswith("m_")}
@@ -4308,6 +4314,8 @@ def visible_lists(c, uid):
         lag = ({r["owner_id"]} if r["owner_id"] in ag else set()) | {m["user_id"] for m in d["members"] if m.get("agent")}
         d["listen_agent_ids"] = listen_ids(r["agent_listen"], r["agent_tidy"], d["tidy_agent_id"], lag)
         d.pop("agent_listen", None)
+        d["columns"] = columns_out(r["col_cfg"], lfids.get(r["id"], set()))  # 2.14.0 (#425)
+        d.pop("col_cfg", None)
         out.append(d)
     out.sort(key=lambda d: (-d["is_inbox"], d["sort"], d["id"]))
     return out
@@ -4516,6 +4524,48 @@ def folder_path_migration(c):
     return n
 
 
+# 2.14.0 (#425): list columns. One setting per list for every member (owner / list admins change it): which columns the
+# rows show and in which order. Keys: COL_KEYS plus "f:<field id>" for the list's custom fields; "id" is the task number in
+# front of the title. NULL (API null) = the default layout (date, assignee, time; fields as chips).
+COL_KEYS = ("id", "due", "prio", "who", "tags", "time", "progress", "deps", "created")
+COL_MAX = 40
+COL_DOC = ("2.14.0 (#425): the columns of the list's rows in order, the same for every member: id (task number in front of the "
+           "title), due, prio, who (assignee), tags, time (tracked), progress (subtasks), deps (dependencies), created, and "
+           "f:<field id> for custom fields. Not listed = not shown in the rows. null = the default layout.")
+
+
+def clean_columns(c, lid, v):
+    """The columns of list lid from a client -> the JSON text to store (None = default). BadInput on anything odd."""
+    if v is None:
+        return None
+    if not isinstance(v, list) or len(v) > COL_MAX:
+        raise BadInput(tr("Invalid value: {0}", "columns"))
+    fids = {r[0] for r in c.execute("SELECT id FROM list_fields WHERE list_id=?", (lid,))}
+    out = []
+    for k in v:
+        if not isinstance(k, str):
+            raise BadInput(tr("Invalid value: {0}", "columns"))
+        m = re.fullmatch(r"f:(\d{1,12})", k)
+        if not (k in COL_KEYS or (m and int(m.group(1)) in fids)):
+            raise BadInput(tr("Unknown column: {0}", k[:40]))
+        if k not in out:
+            out.append(k)
+    return json.dumps(out)
+
+
+def columns_out(raw, fids):
+    """Stored columns -> the API value: a list of keys (fields that no longer exist dropped) or None (default)."""
+    if raw in (None, ""):
+        return None
+    try:
+        v = json.loads(raw)
+    except ValueError:
+        return None
+    if not isinstance(v, list):
+        return None
+    return [k for k in v if isinstance(k, str) and (k in COL_KEYS or (k.startswith("f:") and k[2:].isdigit() and int(k[2:]) in fids))]
+
+
 def clean_list_value(k, v, member=False):
     """One list column from the client, validated (BadInput)."""
     if k == "name":
@@ -4600,6 +4650,14 @@ def list_update(lid):
         except BadInput as e:
             return err(str(e))
         b = {k: v for k, v in b.items() if k != "listen_agent_ids"}
+    if "columns" in b:  # 2.14.0 (#425): the list's columns, the same for every member (owner / list admins)
+        if role not in MANAGE_ROLES:
+            return err(tr("Only the owner and list admins can change the columns"), 403)
+        try:
+            c.execute("UPDATE lists SET col_cfg=? WHERE id=?", (clean_columns(c, lid, b["columns"]), lid))
+        except BadInput as e:
+            return err(str(e))
+        b = {k: v for k, v in b.items() if k != "columns"}
     conflicts = []
     prev = b.get("_prev") if isinstance(b.get("_prev"), dict) else None
     if prev:  # D4 undo / redo: a setting changed elsewhere meanwhile stays (reported in conflicts)
@@ -6206,7 +6264,7 @@ def check_assignee(c, lid, aid):
 WEB_TASK_NEW = frozenset(TASK_FIELDS) | {"tags", "ltags", "fields"}
 WEB_TASK_EDIT = WEB_TASK_NEW | {"add_tags", "_prev", "_act"}
 WEB_LIST_NEW = frozenset({"name", "color", "folder", "view", "kind", "checklist", "done_at_bottom", "dep_shift", "tickets", "ptype"})
-WEB_LIST_EDIT = frozenset(LIST_FIELDS) | {"rate", "agent_tidy", "tidy_agent_id", "listen_agent_ids", "_prev", "ticket_tpl", "day_hours", "done_at_bottom"}
+WEB_LIST_EDIT = frozenset(LIST_FIELDS) | {"rate", "agent_tidy", "tidy_agent_id", "listen_agent_ids", "_prev", "ticket_tpl", "day_hours", "done_at_bottom", "columns"}
 WEB_COMMENT = frozenset({"body", "suggestion"})
 
 
@@ -12288,6 +12346,11 @@ def field_create(lid):
     srt = c.execute("SELECT COALESCE(MAX(sort),0)+1 FROM list_fields WHERE list_id=?", (lid,)).fetchone()[0]
     fid = c.execute("INSERT INTO list_fields(list_id,name,type,options,pinned,sort,created_at) VALUES(?,?,?,?,?,?,?)",
                     (lid, name, ftype, json.dumps(opts, ensure_ascii=False), pinned, srt, iso(now_utc()))).lastrowid
+    cc = c.execute("SELECT col_cfg FROM lists WHERE id=?", (lid,)).fetchone()[0]
+    if cc:  # 2.14.0 (#425): a list with its own columns shows a new field as its last column
+        cols = columns_out(cc, {r[0] for r in c.execute("SELECT id FROM list_fields WHERE list_id=?", (lid,))})
+        if cols is not None and len(cols) < COL_MAX:
+            c.execute("UPDATE lists SET col_cfg=? WHERE id=?", (json.dumps([*cols, f"f:{fid}"]), lid))
     bump(c)
     c.commit()
     return jsonify(field_dict(c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone()))
@@ -19184,7 +19247,8 @@ def v1_list(d):
             "listen_agent_ids": d.get("listen_agent_ids") or [],  # 2.13.1 (#471)
             "icon": d.get("icon") or "",
             "repos": d.get("repos") or [], "tickets": bool(d.get("tickets")),
-            "nag": d.get("nag") or "", "day_hours": d.get("day_hours")}  # 2.7.0 (#413, #407)
+            "nag": d.get("nag") or "", "day_hours": d.get("day_hours"),  # 2.7.0 (#413, #407)
+            "columns": d.get("columns")}  # 2.14.0 (#425): the list's columns (null = default)
 
 
 # ---- token management (Settings > Account > API tokens; session / proxy login only, a token cannot reach these)
@@ -19350,7 +19414,18 @@ def v1_lists():
     secs = {}
     for r in visible_sections(c, me()):  # 2.0.8 (#333): every list with its sections [{id, name}]
         secs.setdefault(r["list_id"], []).append({"id": r["id"], "name": r["name"]})
-    return jsonify(data=[{**v1_list(d), "sections": secs.get(d["id"], [])} for d in visible_lists(c, me())], next_cursor=None)
+    fl = v1_list_fields(c)
+    return jsonify(data=[{**v1_list(d), "sections": secs.get(d["id"], []), "fields": fl.get(d["id"], [])} for d in visible_lists(c, me())],
+                   next_cursor=None)
+
+
+def v1_list_fields(c, lid=None):
+    """2.14.0 (#425): the custom fields of the visible lists {list_id: [{id, name, type}]} (for columns "f:<id>")."""
+    out = {}
+    q = f"SELECT id, list_id, name, type FROM list_fields WHERE list_id IN {vis_sql()}" + (" AND list_id=?" if lid else "") + " ORDER BY sort, id"
+    for r in c.execute(q, (me(), me(), *((lid,) if lid else ()))):
+        out.setdefault(r["list_id"], []).append({"id": r["id"], "name": r["name"], "type": r["type"]})
+    return out
 
 
 @app.post("/api/v1/lists")
@@ -19389,11 +19464,12 @@ def v1_list_create():
 def v1_list_patch(lid):
     """2.7.0: change a list: name, color, folder (yours), view, kind, nag (default of the list's tasks), day_hours;
     2.7.2 (#414): done_at_bottom ("Show completed at the bottom"; checklist = deprecated alias); 2.13.1 (#471):
-    listen_agent_ids (the agents that read every comment; owner / list admins, never an agent token)."""
+    listen_agent_ids (the agents that read every comment; owner / list admins, never an agent token); 2.14.0 (#425):
+    columns (the list's columns for every member; owner / list admins)."""
     v1_args(())
     b = v1_json()
     unknown = sorted(k for k in b if k not in ("name", "color", "folder", "view", "kind", "nag", "day_hours", "done_at_bottom", "checklist",
-                                               "listen_agent_ids"))
+                                               "listen_agent_ids", "columns"))
     if unknown:
         raise UnknownFields(unknown)
     for k in ("checklist", "done_at_bottom"):
@@ -19418,7 +19494,8 @@ def v1_list_get(lid):
     if not d:
         raise Denied(404)
     return jsonify({**v1_list(d), "sections": [{"id": r["id"], "name": r["name"], "sort": r["sort"]}
-                                               for r in visible_sections(c, me()) if r["list_id"] == lid]})
+                                               for r in visible_sections(c, me()) if r["list_id"] == lid],
+                    "fields": v1_list_fields(c, lid).get(lid, [])})
 
 
 @app.post("/api/v1/lists/<int:lid>/owner")
@@ -19930,6 +20007,12 @@ def not_found(e):
         return v1_err(404, tr("Not found"))
     if request.path.startswith(PUB_PREFIX):
         return pub_gone()
+    if request.method == "GET" and "text/html" in (request.headers.get("Accept") or "") and not request.path.startswith("/static/"):
+        lg = _accept_lang()  # 2.14.0: a page that does not exist: the heron + a way back (no user data, like /s/)
+        r = pub_html(tr("Page not found", lg=lg), f'<div class="msg">{HERON_ERROR}<h1>{html.escape(tr("Page not found", lg=lg))}</h1>'
+                     f'<p>{html.escape(tr("This address does not exist.", lg=lg))}</p><p><a class="btn" href="/">'
+                     f'{html.escape(tr("Open {0}", APP_NAME, lg=lg))}</a></p></div>', lg, 404, foot=False)
+        return r
     return e
 
 
@@ -20554,8 +20637,11 @@ def openapi_spec():
             "owner_id": {"type": "integer"}, "owner_name": {"type": "string"}, "shared": {"type": "boolean"},
             "status": nul("string", enum=[*LIST_STATUSES, None]), "progress": ref("Progress"), "created_at": {"type": "string", "format": "date-time"},
             "nag": {"type": "string", "enum": [x for x in NAG_VALUES if x != "off"], "description": "2.7.0: default nag interval of the list's tasks; empty = none"},
-            "day_hours": nul("number", description="2.7.0: hours of a working day / shift for this list's time sums; null = the server's value")}},
-        "ListDetail": {"allOf": [ref("List"), {"type": "object", "properties": {"sections": {"type": "array", "items": ref("Section")}}}]},
+            "day_hours": nul("number", description="2.7.0: hours of a working day / shift for this list's time sums; null = the server's value"),
+            "columns": {"type": ["array", "null"], "items": {"type": "string"}, "description": COL_DOC}}},
+        "ListDetail": {"allOf": [ref("List"), {"type": "object", "properties": {"sections": {"type": "array", "items": ref("Section")},
+            "fields": {"type": "array", "description": "2.14.0: the list's custom fields (ids for the columns f:<id>)",
+                       "items": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "type": {"type": "string"}}}}}}]},
         "ListInput": {"type": "object", "additionalProperties": False, "required": ["name"], "properties": {
             "name": {"type": "string"}, "color": {"type": "string", "description": "#rgb / #rrggbb or empty"},
             "folder": {"type": "string", "description": "Folder path, at most 2 levels (\"Clients/Company X\"); deeper: 400"},
@@ -20577,7 +20663,9 @@ def openapi_spec():
             "day_hours": nul("number", minimum=1, maximum=24, description="Hours per day / shift (owner); null = the server's value"),
             "listen_agent_ids": {"type": "array", "items": {"type": "integer"},
                                  "description": "2.13.1 (#471): agents of the list that get a 'comment' event for EVERY comment of a person "
-                                                "in this list (only on tasks they can see); [] = none. Owner / list admins, never an agent token"}}},
+                                                "in this list (only on tasks they can see); [] = none. Owner / list admins, never an agent token"},
+            "columns": {"type": ["array", "null"], "items": {"type": "string"}, "maxItems": COL_MAX,
+                        "description": COL_DOC + " Owner / list admins; null = back to the default."}}},
         "ListPage": page("ListDetail"),  # 2.0.8: the list page carries each list's sections too
         "Roadmap": {"type": "object", "properties": {
             "from": {"type": "string", "format": "date"}, "to": {"type": "string", "format": "date"}, "projects_only": {"type": "boolean"},
@@ -20763,7 +20851,8 @@ def openapi_spec():
                         "patch": op("Change a list (2.7.0)", L, ok(ref("List")) | errs("400", "403", "404"), [pid("id", "List id")],
                                     body=ref("ListPatch"), scope="write",
                                     desc="Owner: name, color, kind, nag (default nag interval of its tasks), day_hours (hours per day / "
-                                         "shift for the time sums). Members change only their own folder and view.")},
+                                         "shift for the time sums). Owner and list admins: columns (2.14.0). Members change only their own "
+                                         "folder and view.")},
         "/lists/{id}/shift": {"post": op("Move a whole list (project) in time", L, ok(ref("ShiftResult")) | errs("400", "403", "404", "409"),
                                          [pid("id", "List id")], body=ref("ShiftInput"), scope="write",
                                          desc=f"Every open task with a date (subtasks too) moves by `days`, start and due, in one transaction; "
@@ -25461,20 +25550,28 @@ def pub_headers(resp):
     return resp
 
 
-def pub_html(title, main, lg, code=200):
+def pub_html(title, main, lg, code=200, foot=True):
     e = html.escape
     doc = (f'<!doctype html><html lang="{e(lg)}"><head><meta charset="utf-8">'
            '<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow">'
            f'<meta name="referrer" content="no-referrer"><title>{e(title)}</title><link rel="stylesheet" href="/static/public.css">'
            f'<link rel="icon" href="/static/icon.svg"></head><body><main>{main}</main>'
-           f'<footer>{e(tr("Shared with {0}", APP_NAME, lg=lg))}</footer></body></html>')
+           + (f'<footer>{e(tr("Shared with {0}", APP_NAME, lg=lg))}</footer>' if foot else '') + '</body></html>')
     return pub_headers(Response(doc, status=code, mimetype="text/html"))
+
+
+# 2.14.0: the heron of the error pages (same drawing as in the app: lines in the text colour, the sun = the accent)
+HERON_ERROR = ('<svg class="heron" viewBox="0 0 120 120" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" '
+               'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle class="hr-sun" cx="77" cy="108" r="2.6"/><path d="M34 64L24 70"/>'
+               '<path d="M34 64C46 55 68 57 80 67C72 75 54 77 42 72"/><path d="M72 63C73 53 79 46 85 48C88 49 89 53 87 57"/>'
+               '<circle class="hr-eye" cx="84.5" cy="51.5" r="1.6"/><path d="M87.5 56L95 74"/><path d="M60 76V106"/>'
+               '<path d="M60 88L52 84L57 79"/><path d="M30 108H71M83 108L100 104.5M48 113H66"/></svg>')
 
 
 def pub_gone(lg=None):
     """The same answer for unknown, expired, revoked and switched-off links (no oracle)."""
     lg = lg or _accept_lang()
-    return pub_html(tr("Link not available", lg=lg), f'<div class="msg"><h1>{html.escape(tr("Link not available", lg=lg))}</h1>'
+    return pub_html(tr("Link not available", lg=lg), f'<div class="msg">{HERON_ERROR}<h1>{html.escape(tr("Link not available", lg=lg))}</h1>'
                     f'<p>{html.escape(tr("This link does not exist or is no longer shared.", lg=lg))}</p></div>', lg, 404)
 
 

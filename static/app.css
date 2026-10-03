@@ -3437,3 +3437,114 @@ svg.logo{color:var(--acc-d,var(--accent));flex:none}
 pre.mdpre{margin:.375rem 0;padding:.5rem .625rem;background:var(--bg3);border:1px solid var(--line);border-radius:var(--r-s);overflow-x:auto;font:var(--fs-s)/1.5 var(--mono);white-space:pre;max-width:100%}
 pre.mdpre code{font:inherit;background:none;padding:0;border:0}
 @media (min-width:900px){ @container lrows (max-width:48rem){ .trow.hascols{padding-top:var(--row-py);padding-bottom:var(--row-py)} } }
+/* 2.14.0 (#425): list columns (the same for every member). Wide: a column per key with a title row; the cells a width has
+   no room for move into the second line (.mlc, classes o2…o10 = needs at least that many columns); narrow list columns
+   and phones: two compact cells at the end of the row, the rest in the second line. */
+.lcols{display:flex;align-items:center;gap:.75rem;flex:none;align-self:center;cursor:pointer;font:var(--fs-s)/1.2 var(--sans);color:var(--text2);font-variant-numeric:tabular-nums}
+.lc{display:inline-flex;align-items:center;gap:.25rem;flex:none;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.lc>span,.lc>a{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lc-due{width:7.5rem;justify-content:flex-end}
+.lc-due .dt{display:inline-flex;align-items:center;gap:.25rem}
+.lc-due .rngi{flex:none;width:.75rem;height:.75rem;opacity:.7}
+.lc .over{color:var(--p5)}
+.lc .today{color:var(--accent)}
+.lc-prio{width:5.5rem}
+.lcp{display:inline-flex;align-items:center;gap:.25rem}
+.lcp.flag-5{color:var(--p5)}.lcp.flag-3{color:var(--p3)}.lcp.flag-1{color:var(--p1)}
+.lc-who{width:2.75rem;justify-content:center;overflow:visible}
+.lc-tags{width:9rem}
+.lc-tags .tag{flex:none}
+.lc-time{width:4rem;justify-content:flex-end;font-family:var(--mono)}
+.lc-progress{width:3.75rem;justify-content:flex-end;font-family:var(--mono)}
+.lc-deps{width:5.5rem}
+.lc-created{width:5rem;justify-content:flex-end}
+.lc-f{width:7rem}
+.lc-f.t-number{justify-content:flex-end}
+.lc-f.t-checkbox{width:3rem;justify-content:center}
+.lc .fchip.sel{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
+.lc a.lnk{color:var(--muted);text-decoration:none}
+.lc a.lnk:hover{color:var(--accent)}
+.lcols .tchip,.lcols .subc,.lcols .blk,.lcols .crd{display:inline-flex;align-items:center;gap:.25rem}
+.lchead{display:flex;align-items:center;gap:.75rem;padding:0 .5rem .25rem .75rem;border-bottom:1px solid var(--line);margin-bottom:2px;font:500 var(--fs-xs)/1.2 var(--mono);color:var(--muted)}
+.lchead .spacer{flex:1}
+.mlc,.trow .meta .mlc{display:none;align-items:center;gap:.25rem}
+.lc.o10{display:none}.trow .meta .mlc.o10{display:inline-flex}
+@media (min-width:900px){
+  @container lrows (max-width:96rem){ .lc.o7{display:none} .trow .meta .mlc.o7{display:inline-flex} }
+  @container lrows (max-width:80rem){ .lc.o5{display:none} .trow .meta .mlc.o5{display:inline-flex} }
+  @container lrows (max-width:64rem){ .lc.o3{display:none} .trow .meta .mlc.o3{display:inline-flex} }
+  @container lrows (max-width:48rem){
+    .lc.o2,.lchead{display:none} .trow .meta .mlc.o2{display:inline-flex}
+    .lcols{gap:.5rem}
+    .lcols .lc{width:auto;max-width:6.5rem}
+    .lcols .lc-who{max-width:none}
+    .lcols .lc-prio .lbl,.lcols .lc-deps .lbl{display:none}
+  }
+}
+@media (max-width:899px){
+  .lc.o2,.lchead{display:none}
+  .trow .meta .mlc.o2{display:inline-flex}
+  .lcols{gap:.5rem;font-size:var(--fs-xs)}
+  .lcols .lc{width:auto;max-width:5.5rem}
+  .lcols .lc-who{max-width:none}
+  .lcols .lc-prio .lbl,.lcols .lc-deps .lbl{display:none}
+  .lcols .lc-due .rngi{display:none}
+}
+/* the "Columns…" dialog */
+.colmd .card{width:min(28rem,100%)}
+.colmd h3{display:flex;align-items:center;gap:.5rem}
+.coldesc{margin:.25rem 0 .75rem;font-size:var(--fs-s)}
+.colmd .rohint{margin:0 0 .75rem}
+.colnum{display:flex;align-items:center;gap:.5rem;min-height:2.75rem;padding:0 .75rem;border:1px solid var(--line);border-radius:var(--r-l);margin-bottom:.5rem;cursor:pointer}
+.colls{list-style:none;margin:0 0 .75rem;padding:0;border:1px solid var(--line);border-radius:var(--r-l);max-height:max(10rem,calc(100dvh - 19rem));overflow:auto;outline:none}
+.colmd [data-colact="reset"]:disabled{opacity:.4;cursor:default}
+.colr{display:flex;align-items:center;gap:.25rem;min-height:2.75rem;padding:0 .25rem;border-bottom:1px solid var(--line);background:var(--bg2)}
+.colr:last-child{border-bottom:0}
+.colr .chkl{flex:1;display:flex;align-items:center;gap:.5rem;min-height:2.75rem;cursor:pointer;min-width:0;padding-left:.25rem}
+.colr:not(.on) .coln{color:var(--muted)}
+.coln{display:inline-flex;align-items:center;gap:.5rem;min-width:0}
+.coln>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.colh{display:grid;place-items:center;flex:none;width:2rem;height:2.75rem;cursor:grab;color:var(--muted);touch-action:none}
+.colr.drag{background:var(--bg3);box-shadow:inset 0 0 0 .0625rem var(--accent)}
+.colr.drag .colh{cursor:grabbing;color:var(--accent)}
+.colmv{flex:none;width:2.75rem;height:2.75rem;justify-content:center}
+.colmv:disabled{opacity:.3}
+.colmv .cup{transform:rotate(180deg)}
+.colmd .foot{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+/* 2.14.0: the heron (empty states, welcome, offline, errors): lines in the text colour, the sun = the accent */
+.heron{display:block;width:7.5rem;height:7.5rem;color:var(--text2);overflow:visible;flex:none}
+.heron path{vector-effect:non-scaling-stroke}
+.heron .hr-eye{fill:currentColor;stroke:none}
+.heron .hr-sun{fill:var(--accent);stroke:none}
+.heron .hr-sun.dim{opacity:.3}
+.empty svg.heron{width:7.5rem;height:7.5rem;opacity:1;margin:0 auto .75rem;stroke-width:1.6}
+.empty.hempty{display:flex;flex-direction:column;align-items:center;gap:.25rem;padding:2.5rem 1rem}
+.empty.hempty b{color:var(--text);font-weight:600}
+.empty.hempty span{font-size:var(--fs-s);max-width:24rem}
+.authscreen .alogo.hwelc{flex-direction:column;align-items:center;gap:.25rem}
+.authscreen .heron.hwel{width:5rem;height:5rem}
+.tcard h3 .heron.htour{width:4rem;height:4rem;margin:0 0 .5rem}
+@media (max-width:899px){ .empty svg.heron{width:6rem;height:6rem} .empty.hempty{padding:2rem 1rem} }
+/* 2.14.0 (#425, review): rows of a list with its own columns: title, then a second line with the rest (never squeezed
+   behind a long title); the cells sit level with the title's first line */
+.trow.haslc .lcols{align-self:flex-start;min-height:calc(var(--row-fs) * 1.45)}
+@media (min-width:900px){
+  .trow.hascols.haslc{align-items:flex-start;padding-top:var(--row-py);padding-bottom:var(--row-py)}
+  .trow.hascols.haslc .chk{margin-top:calc((var(--row-fs) * 1.45 - .875rem) / 2)}
+  .trow.hascols.haslc .tgut{margin-top:calc((var(--row-fs) * 1.45 - var(--fs-s) * 1.45) / 2)}
+  .trow.hascols.haslc .tmain{flex-direction:column;align-items:stretch;gap:0}
+  .trow.hascols.haslc .ttl{white-space:normal;overflow:visible}
+  .trow.hascols.haslc .meta{flex-wrap:wrap;overflow:visible;margin-top:1px;flex:none}
+  .trow.hascols.haslc .meta:empty{display:none}
+}
+@media (max-width:899px){
+  .trow.haslc .tmain{flex:1 1 0;min-width:40%}
+  .trow.haslc .lcols{flex:0 1 auto;min-width:0;max-width:48%;overflow:hidden}
+  .trow.haslc .lcols .lc{max-width:4.75rem;flex:0 1 auto;min-width:0}
+  .trow.haslc .lcols .lc-who{max-width:none;flex:none}
+  .trow.haslc .tgut{min-width:2.25rem}
+}
+/* 2.14.0 (#484): quick add: paper clip + "Add and open" next to Send */
+.qadd .qbtn{flex:none;padding:.375rem;border-radius:.4375rem;color:var(--muted)}
+.qadd .qbtn:hover{color:var(--accent);background:var(--bg4)}
+@media (pointer:coarse){ .qadd .qbtn{min-width:2.75rem;min-height:2.75rem;justify-content:center} }

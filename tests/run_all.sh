@@ -313,6 +313,10 @@ shard 4  # ---------------------------------------------------------------- shar
 # drag ghost after a lost touchend / Escape / background / re-render, auto-scroll at the edges, "Move to list" while
 # dragging, the phone chat does not scroll beside the box, Markdown lists keep counting
        run p2134_ui node p2134_ui.js "$KALMIDO_TEST_DATA"
+# 2.14.0 (#425): list columns (the list setting for every member, owner / list admins, API v1 + MCP), the Columns dialog,
+# rows with cells in the list's order (two on narrow widths, the rest in line 2), and the heron in empty states and error
+# pages; jsdom + Firefox at 380 / 390 / 428 touch, Fold 904 (fold / unfold / rotate) + 880 touch, 1100 / 1440 / 1920 mouse
+       run p2140_ui node p2140_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

@@ -288,8 +288,16 @@ TOOLS = [
     ("list_lists", "Lists the agent can see (shared with it), with role, sections [{id, name}], list tags, the agent tidy mode "
                    "(off/suggest/auto) and tidy_agent_id (the one agent that tidies the list up; only that agent gets tidy events). "
                    "listen_agent_ids (2.13.1): agents that get a comment event for EVERY comment a person writes in the list "
-                   "(\"Agent reads every comment\", set by the list owner / admins), not only on tasks they follow.",
+                   "(\"Agent reads every comment\", set by the list owner / admins), not only on tasks they follow. "
+                   "columns (2.14.0): the list's row columns in order (null = default layout), see set_list_columns.",
      _obj({}), lambda api, a: api.call("GET", "/lists")),
+    ("set_list_columns", "2.14.0: set which columns the rows of a list show and in which order, the same for every member "
+                         "(only as the list's owner or admin). Keys: id (task number in front of the title), due, prio, who "
+                         "(assignee), tags, time (tracked), progress (subtasks), deps (dependencies), created, f:<field id> "
+                         "(custom fields; ids in the fields of list_lists). A key that is not listed is not shown. columns: null = the "
+                         "default layout. Phones show the first two as columns, the rest in the second line.",
+     _obj({"list_id": S_ID, "columns": {"type": ["array", "null"], "items": {"type": "string"}, "maxItems": 40}}, ["list_id", "columns"]),
+     lambda api, a: api.call("PATCH", f"/lists/{int(a['list_id'])}", body={"columns": a["columns"]})),
     ("list_repos", "Repositories connected to a list (provider, web_url, owner/repo, default branch, poll status). Never a token: "
                    "clone and push with your own git credentials.",
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/repos")),

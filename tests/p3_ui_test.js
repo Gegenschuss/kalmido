@@ -175,10 +175,11 @@ const ds = n => { const d = new Date(Date.now() + n * 864e5); return `${d.getFul
   lastModal(d).remove();
 
   // ================= columns (desktop) + sort by field
-  d.querySelector('[data-act="field-cols"]').click(); await sleep(200);
-  check(d.querySelector('.fcolhead') && /STAGE|Stage/i.test(d.querySelector('.fcolhead').textContent) && row().querySelector('.fcols'), 'columns view on desktop');
-  check(!row().querySelector('.meta .fchip'), 'columns: no duplicate chips in the meta line');
-  d.querySelector('[data-act="field-cols"]').click(); await sleep(200);
+  // 2.14.0 (#425): custom fields are columns of the list ("Columns…", for every member)
+  await w.eval(`colSave(${WORK}, ['due', ...fieldsOf(${WORK}).map(f => 'f:' + f.id)], true)`); await sleep(300);
+  check(d.querySelector('.lchead') && /STAGE|Stage/i.test(d.querySelector('.lchead').textContent) && row().querySelector('.lcols .lc-f'), 'columns view on desktop');
+  check(!row().querySelector('.meta > .fchip'), 'columns: no field chips in the meta line (only the hidden copies for narrow widths)');
+  await w.eval(`colSave(${WORK}, null, true)`); await sleep(300);
   await call('PATCH', `/api/tasks/${t1}`, {fields: {[FB.id]: '99'}});
   await call('PATCH', `/api/tasks/${t3}`, {fields: {[FB.id]: '5000'}});
   await w.eval('load().then(render)'); await sleep(200);
@@ -299,7 +300,7 @@ const ds = n => { const d = new Date(Date.now() + n * 864e5); return `${d.getFul
 
   // ================= mobile: no columns
   const wm = await boot({user: 'alice', mobile: true, hash: 'l/' + WORK, ls: {['tasks.fcols.' + WORK]: 'true'}});
-  check(!wm.document.querySelector('.fcolhead') && !wm.document.querySelector('[data-act="field-cols"]'), 'mobile: no column view');
+  check(!wm.document.querySelector('.fcolhead') && !wm.document.querySelector('[data-act="cols"]'), 'mobile: no column view, no header button (Columns… is in the list menu)');
   check(wm.document.querySelector('.lhead .lprog'), 'mobile: progress header');
   wm.close();
 

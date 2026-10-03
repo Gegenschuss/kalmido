@@ -41,7 +41,7 @@
     paperless: [], parent_id: null, pinned: 0, plan_start: null, priority: 0, reminders: '', repeat: '', repeat_from: 'due', section_id: null,
     sort: 0, start: null, status: 0, tags: [], tt_id: null, ttype: '', unread: 0, url: null, wait_by: null, wait_fired: '', wait_note: '',
     wait_until: null, waiting_at: null};
-  const LIST_DEF = {agent_tidy: 'off', archived: 0, archived_at: null, bell: 'default', bell_custom: {}, checklist: 0, color: '', day_hours: null,
+  const LIST_DEF = {agent_tidy: 'off', columns: null, archived: 0, archived_at: null, bell: 'default', bell_custom: {}, checklist: 0, color: '', day_hours: null,
     dep_shift: 0, description: '', folder: '', groups: [], icon: '', is_inbox: 0, kind: 'list', milestones: [], nag: '', owner_id: 1, rate: null,
     repos: [], role: 'owner', sort: 0, status: '', status_at: null, status_by: null, status_note: '', tags: [], ticket_tpl: '', tickets: 0,
     tidy_agent_id: null, view: 'list'};
@@ -408,6 +408,7 @@
     for (const k of ['name', 'color', 'folder', 'sort', 'view', 'archived', 'checklist', 'dep_shift', 'kind', 'tickets', 'nag', 'description', 'agent_tidy', 'rate', 'day_hours']) if (k in b) l[k] = typeof b[k] === 'boolean' ? (b[k] ? 1 : 0) : b[k];
     if ('done_at_bottom' in b) l.checklist = b.done_at_bottom ? 1 : 0;
     if ('archived' in b) l.archived_at = b.archived ? iso() : null;
+    if ('columns' in b) l.columns = Array.isArray(b.columns) ? [...new Set(b.columns)] : null;  // 2.14.0 (#425)
     return listOut(l);
   });
   on('DELETE', '/api/lists/(\\d+)', (q, b, id) => { const l = listById(id) || gone(); if (l.is_inbox) bad('The inbox cannot be deleted');

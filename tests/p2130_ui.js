@@ -160,9 +160,9 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   w.eval('closePalette()');
   const shown = () => d.querySelectorAll('#view .trow .tgut').length;
   check(!shown(), 'numbers off by default (no tickets)');
-  w.eval(`listMenuItems(${P}).find(x => x.label === 'Show task numbers').fn()`); await sleep(200);
-  check(shown() > 0, '"Show task numbers" shows them in any list');
-  w.eval(`LS.del('ids.${P}'); render()`);
+  await w.eval(`colSave(${P}, ['id', 'due'], true)`); await sleep(300);
+  check(shown() > 0, '2.14.0: the column "Task number" shows them in any list');
+  await w.eval(`colSave(${P}, null, true)`); await sleep(200);
   w.close();
   await call('PATCH', `/api/lists/${P}`, {view: 'list'});
 

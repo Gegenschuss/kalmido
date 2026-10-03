@@ -18,6 +18,11 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.14.0** (2026-10-03): *Columns…* per list: pick and order the columns of the rows (task number, date, priority,
+  assignee, tags, time, subtasks, dependencies, created, custom fields), the same for everyone in the list; quick add
+  opens the new task's details or attaches files right away; a calm heron in empty lists, on Today and on the error pages.
+- **2.13.4** (2026-10-03): Phone round: touch drags scroll at the edges and move tasks to other lists, the section "+"
+  above the keyboard, the chat and comment box with the keyboard, Markdown lists keep counting.
 - **2.13** (2026-10-03): Images and files in the agent chat, Markdown in comments and chat, the task next to the
   chat on desktops, many phone and Fold polish fixes.
 - **2.12.0** (2026-10-02): Try Kalmido in your browser without an account (the [demo](https://kalmido.com/demo/)); quick
@@ -59,6 +64,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - Subtasks up to three levels, drag and drop between lists and levels
 - Priorities, tags, pinned tasks, Markdown notes, attachments (images, PDFs, documents)
 - A website link per task, shown as a small domain chip (paste a URL in quick add or share a page from Android)
+- Quick add with two extra buttons (2.14): *Add and open details* creates the task and opens it at once, the paper clip creates it with files attached (the file name is the title when none is typed)
 - Natural-language quick add in English and German, whatever the interface language, plus French, Spanish, Italian or Dutch when the app runs in that language: `Dentist tomorrow 3pm !high #private ~Work`, `Zahnarzt morgen 15 Uhr !hoch #privat ~Arbeit`, `Dentiste demain 15h !!! #privé`
 - Recurring tasks (daily, weekdays, weekly, monthly, yearly, every n days / weeks / months with weekdays, or any RRULE for experts) with end date, count and skip
 - **Dates save as you pick them** (2.6.1): in the date popover every tap (day, time, start, duration, reminders,
@@ -160,6 +166,12 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **Project status and progress:** a progress bar per list, a status (*On track*, *At risk*, *Off track*, *On hold*, *Complete*) with a short note, and a *Where is it stuck?* overview of overdue, waiting and unassigned tasks across all lists
 - **Project overview:** every project list has a tab next to List / Kanban / Timeline with its description (Markdown), key links, milestones (also in the timeline), project files plus the files of its tasks, members, status updates and the tracked time
 - **Custom fields** per list: text, number (with unit), selection with colours, date, checkbox, person or link; shown as chips or columns, usable in filters, sorting and search
+- **Columns per list** (2.14): list *…* > *Columns…* (or the columns button in the list header) picks which columns the
+  rows show and in which order: task number, date, priority, assignee, tags, tracked time, subtasks, dependencies,
+  created and the list's custom fields. The setting belongs to the list, so every member sees the same; the owner and
+  list admins change it, *Default* goes back to the standard layout. Desktops show a title row above the columns; where
+  the list column gets narrower (a Fold, the task panel open) and on phones the first two columns stay in the row and the
+  rest moves into its second line. API v1 (`columns` on lists) and the MCP tool `set_list_columns` read and set it
 - Push notifications for new comments, mentions, assignments and completions, bundled so a busy task does not spam you
 - **Public links**: share one list with people who have no account through a secret link, view only or *view and tick off*, with an optional password and expiry
 - One switch (*Collaboration*) turns all of this off for a simple personal task list, per person or (admins) for the whole server;
@@ -434,8 +446,8 @@ own list with the same name is reused) or one existing list you can edit. The im
   items *stays* and says how many stayed). Instance admins also empty the trash of shared lists where they may edit.
 - **Assignment:** in shared lists a task or subtask can be assigned to the owner or any member (task panel >
   *Assignee*, or the **assignee column**: every row of a shared list shows the assignee's picture or a dashed circle
-  for nobody; a click opens the assign menu; on phones a small cell at the end of the row; list *…* > *Hide assignee
-  column* hides it per list). A subtask's assignee is independent of its main task.
+  for nobody; a click opens the assign menu; on phones a small cell at the end of the row; 2.14: list *…* > *Columns…*
+  shows or hides it, and orders it among the other columns, for everyone in the list). A subtask's assignee is independent of its main task.
   Reminders go to the assignee, otherwise to whoever created the task (if they still see it, else to the list owner). The daily digest contains your own
   lists' tasks plus everything assigned to you.
 - **Export** (*Settings > Data > Export*) contains your data and the lists you own (tasks with links, comments and history) and your templates.
