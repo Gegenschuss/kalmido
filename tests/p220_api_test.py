@@ -473,7 +473,9 @@ check(sec not in dbq("SELECT hook_secret FROM git_conns WHERE id=?", (RID,))[0][
 raw = json.dumps({"action": "opened"}).encode()
 sig = "sha256=" + hmac.new(sec.encode(), raw, hashlib.sha256).hexdigest()
 c = sqlite3.connect(os.path.join(DATA, "tasks.db"))
-c.execute("UPDATE git_conns SET next_at=? WHERE id=?", (time.time() + 999, RID))
+# 2.15.1: the hook ignores calls within 10 s of the last poll (debounce); an earlier step may just have polled, so age
+# polled_at too, or the check below races that poll (CI flake "the hook triggers a poll")
+c.execute("UPDATE git_conns SET next_at=?, polled_at=? WHERE id=?", (time.time() + 999, "2000-01-01T00:00:00+00:00", RID))
 c.commit()
 c.close()
 r = requests.post(B + f"/api/hooks/git/{RID}", data=raw, headers={"X-Hub-Signature-256": "sha256=" + "0" * 64, "Content-Type": "application/json"})
