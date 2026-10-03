@@ -321,11 +321,12 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     // F8: offline while a task is open: said in the task's header
     await nav(B + '#l/' + P); await ready(ev);
     await ev(`(() => { openDetail(${T[0]}); return 1; })()`); await sleep(900);
-    await ev(`(() => { OUT.online = false; staleDraw(); return 1; })()`); await sleep(200);
+    // offline for the app (the 4 s change check must not switch it back to online in between)
+    await ev(`(() => { Object.defineProperty(OUT, 'online', {configurable: true, get: () => false, set() {}}); staleDraw(); return 1; })()`); await sleep(200);
     const of = await ev(`(() => { const s = document.querySelector('#stale'); const r = s && s.getBoundingClientRect(); return {inHead: !!s && !!s.closest('#detail .dtop'), vis: !!r && r.width > 0 && r.top >= 0 && r.bottom <= innerHeight, txt: s ? s.textContent : ''}; })()`);
     check(of.inHead && of.vis && /Offline/.test(of.txt), '390 F8: offline with a task open: "Offline" in the task header ' + JSON.stringify(of));
     await shot('p2132-390-detail-offline.png');
-    await ev(`(() => { OUT.online = true; closeDetail(); return 1; })()`);
+    await ev(`(() => { delete OUT.online; OUT.online = true; closeDetail(); return 1; })()`);
     for (let i = 0; i < 30 && await ev(`!!(history.state && history.state.detail)`).catch(() => true); i++) await sleep(100);
     await sleep(300);
     // F11: 44 px for "Set status" and the assignee pictures' hit area
