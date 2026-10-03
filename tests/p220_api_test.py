@@ -386,13 +386,16 @@ def poke_ok():  # 2.4.1: CI flake (a slow runner missed the 12 s window): make t
     c.execute("UPDATE git_conns SET next_at=0 WHERE id=? AND (fails>0 OR last_error!='')", (RID,))
     c.commit()
     c.close()
+    if TRIES[0] % 10 == 0:  # 2.13.3: CI flake (fails stayed at 1 for 120 s, so no poll ran): also wake the poller the way the UI does
+        A.post(B + f"/api/repos/{RID}/refresh")
     # 2.7.2: wait for both (fails and last_error); a slow CI runner once saw fails 0 before last_error was cleared
     return tuple(dbq("SELECT fails, last_error FROM git_conns WHERE id=?", (RID,))[0]) == (0, "")
 
 
 until(poke_ok, 120)  # 2.9.0: 60 s were not always enough on a busy CI runner
 st_ = dbq("SELECT fails, last_error, next_at FROM git_conns WHERE id=?", (RID,))[0]
-check(st_[:2] == (0, ""), f"recovers after the token is fixed: {st_[0]} fails, {st_[1]!r}, next in {round(st_[2] - time.time())} s")
+check(st_[:2] == (0, ""), f"recovers after the token is fixed: {st_[0]} fails, {st_[1]!r}, next in {round(st_[2] - time.time())} s"
+      + ("" if st_[:2] == (0, "") else f"; last requests at the fake server: {git_log()[-4:]}"))
 check(Bo.post(B + f"/api/repos/{RID}/refresh").ok, "a member may ask for a check")
 
 # ================================================================== #339 merge requests + the agent's view
