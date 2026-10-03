@@ -343,7 +343,11 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     await ev(`(() => { openDetail(${T[3]}); return 1; })()`); await sleep(1500);
     const at = await ev(`(() => { const b = document.querySelector('#detail .att.broken'); return {broken: !!b, txt: b ? b.textContent : '', img: document.querySelectorAll('#detail .att.img img').length}; })()`);
     check(at.broken && /fehlt|missing/i.test(at.txt) && !at.img, '390: an attachment whose file is gone shows "missing", not a broken image ' + JSON.stringify(at));
+    // 2.13.2: on a phone closeDetail() goes history.back() (the task's history entry); that navigation lands after the next
+    // nav() and took the page back to the previous document (the flaky A7 / "listModal is not defined"): wait for it first
     await ev(`(() => { closeDetail(); return 1; })()`);
+    for (let i = 0; i < 30 && await ev(`!!(history.state && history.state.detail)`).catch(() => true); i++) await sleep(100);
+    await sleep(300);
     // A7: the view switch; A11 habits; P13 contrast
     await nav(B + '?p=2#l/' + P); await ready(ev);
     const vs = await ev(`(() => { const s = document.querySelector('#view .vsegm'); if (!s) return null; const r = s.getBoundingClientRect(); return {n: s.querySelectorAll('button').length, h: Math.min(...[...s.querySelectorAll('button')].map(b => b.getBoundingClientRect().height)), right: r.right, vw: innerWidth, txt: s.textContent}; })()`);

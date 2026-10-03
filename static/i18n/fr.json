@@ -3485,6 +3485,6 @@
   "No agent to send this to": "Aucun agent à qui envoyer ceci",
   "Kalmido: sent to {0}": "Kalmido : envoyé à {0}",
   "This agent is not in the list": "Cet agent n’est pas dans la liste",
-  "{0}: the file is empty": "{0} : le fichier est vide",
+  "{0}: the file is empty and was not uploaded": "{0} : le fichier est vide et n'a pas été envoyé",
   "Only the sender can remove this file": "Seule la personne qui a envoyé ce fichier peut le retirer"
 }

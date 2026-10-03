@@ -1,6 +1,6 @@
 // 2.0.8 UI tests (jsdom + the service worker in a Node vm), fresh DB:
 // #319 sort "Created" (newest first, picked again: oldest first) per view incl. "All", the creation date on the rows, German
-// #320 the agent chat: a sent message closes the keyboard on a phone (blur), the desktop keeps the focus
+// #320 the agent chat: since 2.13.2 (#478 N9) sending keeps the box focused on a phone too (the keyboard stays), the desktop keeps the focus
 // #321 Settings > AI colleague: every list I manage in one table, "Agent sees it" shares / unshares, "Tidy up" off/suggest/auto
 // #323 phones: a <select> opens an app-style bottom sheet (label, icons, check, search above 10 options, keys); desktop and
 //      selects inside a popover / data-native stay native
@@ -100,12 +100,12 @@ async function swTests() {
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});
 
-  // ================= #320 chat: a phone closes the keyboard after sending, the desktop keeps typing
+  // ================= #320 / 2.13.2 (#478 N9): sending keeps the keyboard on a phone too, the desktop keeps typing
   w = await boot({user: 'alice', mobile: true, hash: 'agents/' + AG}); d = w.document; await sleep(500);
   let ci = d.querySelector('#chat-in');
   ci.focus(); ci.value = 'Hello from the phone'; ci.dispatchEvent(new w.Event('input', {bubbles: true}));
   click(w, d.querySelector('[data-act="chat-send"]')); await sleep(900);
-  check(d.querySelector('#chat-in')?.value === '' && d.activeElement?.id !== 'chat-in', 'phone: sent, the box is empty and blurred (keyboard closes)');
+  check(d.querySelector('#chat-in')?.value === '' && d.activeElement?.id === 'chat-in', 'phone: sent, the box is empty and keeps its focus (the keyboard stays, 2.13.2)');
   check([...d.querySelectorAll('#chat-msgs *')].some(x => /Hello from the phone/.test(x.textContent)), 'phone: the message shows');
   w.close();
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;

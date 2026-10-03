@@ -3834,7 +3834,7 @@ def ntfy_inbox_import(c, m):
                 except (urllib.error.URLError, OSError, ValueError) as e:
                     print("ntfy inbox: attachment download failed:", e, flush=True)
                     data = None
-                if data is not None and len(data) <= MAX_FILE_MB * 1024 * 1024:
+                if data and len(data) <= MAX_FILE_MB * 1024 * 1024:  # 2.13.2: never a 0-byte file
                     save_attachment_bytes(c, tid, str(att.get("name") or "datei"), str(att.get("type") or ""), data)
         print("ntfy inbox: task", tid, "user", uid, repr(title), "attachment" if att else "", flush=True)
     gset(c, "ntfy_inbox_since", mid)
@@ -7126,6 +7126,9 @@ def save_attachments(c, tid, files, comment_id=None, saved=None):
         if size > MAX_FILE_MB * 1024 * 1024:
             os.remove(full)
             return tr("{0}: larger than {1} MB", name, MAX_FILE_MB)
+        if not size:  # 2.13.2 (#478 N6): a 0-byte file is refused (it would only show up as a broken file)
+            os.remove(full)
+            return tr("{0}: the file is empty and was not uploaded", name)
         if saved is not None:
             saved.append(rel)
         mime = (f.mimetype if f.mimetype and f.mimetype != "application/octet-stream" else None) \
@@ -12006,6 +12009,10 @@ def list_file_upload(lid):
             c.rollback()
             unlink_files(saved)
             return err(tr("{0}: larger than {1} MB", name, MAX_FILE_MB))
+        if not size:  # 2.13.2 (#478 N6)
+            c.rollback()
+            unlink_files(saved)
+            return err(tr("{0}: the file is empty and was not uploaded", name))
         mime = (f.mimetype if f.mimetype and f.mimetype != "application/octet-stream" else None) \
             or mimetypes.guess_type(name)[0] or "application/octet-stream"
         c.execute("INSERT INTO list_files(list_id,name,mime,size,path,user_id,created_at) VALUES(?,?,?,?,?,?,?)",
@@ -22338,7 +22345,7 @@ def chat_save_files(c, m, files, saved):
         if size > MAX_FILE_MB * 1024 * 1024:
             return tr("{0}: larger than {1} MB", name, MAX_FILE_MB)
         if not size:
-            return tr("{0}: the file is empty", name)
+            return tr("{0}: the file is empty and was not uploaded", name)
         mime = (f.mimetype if f.mimetype and f.mimetype != "application/octet-stream" else None) \
             or mimetypes.guess_type(name)[0] or "application/octet-stream"
         c.execute("INSERT INTO chat_files(message_id,name,mime,size,path,created_at) VALUES(?,?,?,?,?,?)",
@@ -23192,7 +23199,8 @@ def v1_agent():
 @v1_view
 def v1_agent_status():
     """{status: idle|working|waiting|error, text?, task_id?} -- shown as the dot on the agent's avatar and in the header chip;
-    while "working", the task_id's panel (else every task of its lists) shows "<agent> is writing ..." (2.0.2)."""
+    while "working", the task_id's panel (else every task of its lists) shows "<agent> is working on it" (2.0.2; "is writing
+    ..." only with a typing signal since 2.13.2)."""
     v1_args(())
     aid = need_agent()
     b = v1_json()

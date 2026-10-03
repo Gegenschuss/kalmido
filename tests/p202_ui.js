@@ -175,14 +175,14 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
   check(sm.querySelector('.snav [data-sec="integr"]').classList.contains('on') && sm.querySelector('#s-droptok'), 'the link opens Share from your phone');
   sm.querySelector('[data-m="close"]').click(); await sleep(200);
 
-  // ---- #299 "Claude is writing …"
+  // ---- #299 "Claude is writing …" (2.13.2 #478 F6: "working" on a task without a typing signal = "is working on it")
   await v1('PUT', '/agent/status', {status: 'working', text: 'Reading the brief', task_id: T1});
   w.eval('load().then(render)'); await sleep(700);
   check(d.querySelector('#top .achip.aspin'), 'header chip: spinning ring while working');
   check(/Claude: working · Reading the brief/.test(d.querySelector('#top .achip').title), 'chip tooltip: which agent and what');
   w.eval(`openDetail(${T1})`); await sleep(1000);
   let ty = d.querySelector('#d-typing');
-  check(ty && !ty.classList.contains('hidden') && /Claude is writing …/.test(ty.textContent) && /Reading the brief/.test(ty.textContent), 'task panel: "Claude is writing …" + status text');
+  check(ty && !ty.classList.contains('hidden') && /Claude is working on it/.test(ty.textContent) && /Reading the brief/.test(ty.textContent), 'task panel: "Claude is working on it" + status text (2.13.2: "writing" only with a typing signal)');
   check(ty.closest('#d-tl'), 'in the comment list');
   w.eval(`openDetail(${T2})`); await sleep(900);
   check(d.querySelector('#d-typing').classList.contains('hidden'), 'not on another task (the agent named its task)');
@@ -227,7 +227,7 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
   check(/Kommentare/.test(d.querySelector('#d-tl .cmhead').textContent) && d.querySelector('[data-act="md-more"]').textContent === 'Mehr anzeigen', 'German: comments bar, Mehr anzeigen');
   await v1('PUT', '/agent/status', {status: 'working', task_id: T1});
   w.eval('load().then(render)'); await sleep(800);
-  check(/Claude schreibt …/.test(d.querySelector('#d-typing').textContent), 'German: Claude schreibt …');
+  check(/Claude arbeitet daran/.test(d.querySelector('#d-typing').textContent), 'German: Claude arbeitet daran');
   w.eval('closeDetail(); openPalette()'); await sleep(200);
   check(d.querySelector('.palette .pgroup').textContent === 'Zuletzt angesehen', 'German: Zuletzt angesehen');
   w.close();

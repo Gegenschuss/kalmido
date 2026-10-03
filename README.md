@@ -18,14 +18,14 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.13** (2026-10-03): Images and files in the agent chat, Markdown in comments and chat, the task next to the
+  chat on desktops, many phone and Fold polish fixes.
 - **2.12.0** (2026-10-02): Try Kalmido in your browser without an account (the [demo](https://kalmido.com/demo/)); quick
   add understands French, Spanish, Italian and Dutch words too.
 - **2.11.0** (2026-10-02): French, Spanish, Italian and Dutch (beta), a day plan that never moves due dates, violet as
   the default accent, subagent usage in the Claude Code hook.
 - **2.10.0** (2026-10-02): Groups for sharing and "whoever has time" tasks, *Plan my day* between your appointments
   (built in or by an agent), an evening review, real client addresses behind a proxy.
-- **2.9.0** (2026-10-02): Your lists in Reminders, Thunderbird, Tasks.org and other CalDAV apps, both ways, with app
-  passwords; OIDC sign-in set up in the settings.
 
 ## Why Kalmido
 
@@ -242,7 +242,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - Optional [Paperless-ngx](https://docs.paperless-ngx.com) integration: link documents to tasks, send attachments to Paperless
 - **Import from Todoist, Trello, Asana, Microsoft To Do, TickTick and any ICS / VTODO file** (Apple Reminders exports, Nextcloud Tasks, Thunderbird) with a preview, re-import without duplicates and undo ([Moving from other apps](#moving-from-other-apps)); export everything as JSON (incl. your time entries)
 - **REST API** with personal access tokens (`/api/v1`, OpenAPI 3.1) and signed **webhooks** for Home Assistant, n8n or your own scripts ([docs/API.md](docs/API.md))
-- **Appearance per device**: dark or light theme, compact or comfortable rows, font size from 90 to 125 % (the whole interface scales, not just the text), Geist, your system font or the low-vision friendly [Atkinson Hyperlegible](https://www.brailleinstitute.org/freefont/), and seven accent colors (violet by default) that all meet WCAG AA in both themes
+- **Appearance per device**: dark or light theme, compact or comfortable rows, font size from 75 to 150 % in 5 % steps, also with Ctrl + / − / 0 (the whole interface scales, not just the text), Geist, your system font or the low-vision friendly [Atkinson Hyperlegible](https://www.brailleinstitute.org/freefont/), and seven accent colors (violet by default) that all meet WCAG AA in both themes
 - English and German interface, French, Spanish, Italian and Dutch in beta (translations are plain JSON files, [fix or add yours](CONTRIBUTING.md#translations))
 
 | | | |

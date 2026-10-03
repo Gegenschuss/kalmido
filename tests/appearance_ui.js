@@ -82,14 +82,14 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   const pane = () => md.querySelector('[data-pane="look"]');
   check(['#s-theme', '#s-density', '#s-fsize', '#s-font', '#s-accent'].every(s => pane().querySelector(s)), 'pane: theme, density, font size, font, accent');
   check(pane().querySelector('.devtag'), 'pane tagged "This device"');
-  check(pane().querySelector('#s-fsize').type === 'range' && pane().querySelector('#s-fsize').min === '50' && pane().querySelector('#s-fsize').max === '150' && pane().querySelector('#s-fsize').step === '5' && pane().querySelectorAll('#s-font button').length === 3 && pane().querySelectorAll('#s-accent button').length === 7, 'font size: a slider 50-150 % in 5 % steps (2.13.0, #429); fonts 3, accents 7');
+  check(pane().querySelector('#s-fsize').type === 'range' && pane().querySelector('#s-fsize').min === '75' && pane().querySelector('#s-fsize').max === '150' && pane().querySelector('#s-fsize').step === '5' && pane().querySelectorAll('#s-font button').length === 3 && pane().querySelectorAll('#s-accent button').length === 7, 'font size: a slider 75-150 % in 5 % steps (2.13.0 #429, 2.13.2 #478: from 75); fonts 3, accents 7');
   const pv = pane().querySelector('.lookpv');
   check(pv && pv.hasAttribute('inert') && pv.querySelector('.trow .chk') && pv.querySelector('.trow .meta .dt') && pv.querySelector('.btn.pri') && pv.querySelector('.lpv-link'), 'live preview: sample rows, date, button, link (inert)');
   check(pane().querySelector('#s-fsize').value === '100' && /100 %/.test(pane().querySelector('#s-fsv').textContent) && pane().querySelector('[data-look="accent"][data-v="violet"]').getAttribute('aria-pressed') === 'true', 'current values marked (class + aria-pressed)');
   const pick = async (k, v) => { click(w, pane().querySelector(`[data-look="${k}"][data-v="${v}"]`)); await sleep(40); };
   // font size
   const slide = async v => { const sl = pane().querySelector('#s-fsize'); sl.value = String(v); sl.dispatchEvent(new w.Event('input', {bubbles: true})); sl.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(40); };
-  for (const [v, k] of [[50, 'custom'], [150, 'custom'], [90, 's'], [112, 'l'], [125, 'xl']]) {
+  for (const [v, k] of [[75, 'custom'], [150, 'custom'], [90, 's'], [112, 'l'], [125, 'xl']]) {
     await slide(v);
     check(de.fsize === k && w.__store['tasks.fsize'] === JSON.stringify(v) && Math.abs(w.eval('uiZ()') - v / 100) < 1e-9 && (k !== 'custom' || d.documentElement.style.getPropertyValue('--ui') === String(v / 100)), `font size ${v} %: applied + stored`);
     check(pane().querySelector('#s-fsv').textContent === v + ' %' && d.documentElement.classList.contains('ui-small') === v < 100, `font size ${v} %: shown`);

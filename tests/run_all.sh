@@ -300,6 +300,12 @@ shard 4  # ---------------------------------------------------------------- shar
 # "Send to agent"), the rules block in both setup guides, the list dialog's checkboxes, in jsdom and Firefox at 390 touch / 1280
        run p2131_api "$PY" p2131_api_test.py "$KALMIDO_TEST_DATA"
        run p2131_ui node p2131_ui.js "$KALMIDO_TEST_DATA"
+# 2.13.2 (#478): the fixes of the independent re-review: list | task | chat side by side (the task takes the chat's place
+# where all three do not fit), re-renders keep the keyboard focus (morph), the quick add through fold / unfold, Markdown in
+# comments + chat, font size 75-150 %, 0-byte files refused, one approval in Today, the iOS keyboard pushing the page, the
+# pill / Send keep the keyboard, the chat panel at the bottom on resize, the "Feinschliff" items and fewer inline helper
+# texts; jsdom + Firefox at 390 / 428 touch (iOS keyboard), Fold 904 (fold / unfold), 1100 / 1440 / 1920 mouse + keyboard
+       run p2132_ui node p2132_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

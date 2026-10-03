@@ -3485,6 +3485,6 @@
   "No agent to send this to": "Geen agent om dit naartoe te sturen",
   "Kalmido: sent to {0}": "Kalmido: naar {0} gestuurd",
   "This agent is not in the list": "Deze agent zit niet in de lijst",
-  "{0}: the file is empty": "{0}: het bestand is leeg",
+  "{0}: the file is empty and was not uploaded": "{0}: het bestand is leeg en is niet geüpload",
   "Only the sender can remove this file": "Alleen wie het bestand heeft gestuurd, kan het verwijderen"
 }

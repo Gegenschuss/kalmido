@@ -179,7 +179,8 @@ let iiN = 0;
 function infoize(root) {
   for (const h of (root.querySelectorAll ? root.querySelectorAll('.shint:not([data-ii])') : [])) {
     h.dataset.ii = '0';
-    if (h.matches(II_KEEP) || h.querySelector('a, button, code, input, select, textarea') || !h.textContent.trim()) continue;
+    // 2.13.2 (#478): .iiok = code in the text is fine behind (i) (the tooltip shows it as text)
+    if (h.matches(II_KEEP) || h.querySelector('a, button, input, select, textarea') || (!h.matches('.iiok') && h.querySelector('code')) || !h.textContent.trim()) continue;
     let a = null;
     for (let p = h.previousElementSibling, n = 0; p && n < 3 && !a; p = p.previousElementSibling, n++) {
       if (p.matches('h2, h3, h4, label, legend, .shead')) a = p;
@@ -262,11 +263,14 @@ try { if (localStorage.getItem('tasks.accent') === '"amber"') localStorage.setIt
 try { if (!localStorage.getItem('tasks.accentMig280')) { if (localStorage.getItem('tasks.accent') === '"mint"') localStorage.removeItem('tasks.accent'); localStorage.setItem('tasks.accentMig280', '1'); } } catch { /* private mode */ }
 const lookPref = k => { const v = LS.get(k, null); return (LOOK[k].find(x => x[0] === v) || LOOK[k][0])[0]; };
 const lookRow = k => LOOK[k].find(x => x[0] === lookPref(k));
-// 2.13.0 (#429): the font size is a percentage 50-150 in steps of 5 (per device, LS fsize); the old steps s / m / l / xl
+// 2.13.0 (#429): the font size is a percentage (75-150 since 2.13.2) in steps of 5 (per device, LS fsize); the old steps s / m / l / xl
 // (90 / 100 / 112 / 125) are read as their percentages. Named steps keep data-fsize (the CSS rules), any other value sets
 // --ui inline. Below 100 % touch screens keep 44 px hit areas (app.css: .ui-small), only the text and spacing shrink.
 const FS_OLD = {s: 90, m: 100, l: 112, xl: 125};
-const fsPct = () => { const v = LS.get('fsize', null); if (typeof v === 'string' && v in FS_OLD) return FS_OLD[v]; const n = +v; return n >= 50 && n <= 150 ? Math.round(n) : 100; };
+// 2.13.2 (#478 N5, decision #429): 75-150 %. At 50 % the text was 7.5 px (unreadable) and the 44 px touch rows bent the
+// proportions; a stored value below 75 (2.13.0 / 2.13.1) counts as 75
+const FS_MIN = 75, FS_MAX = 150;
+const fsPct = () => { const v = LS.get('fsize', null); if (typeof v === 'string' && v in FS_OLD) return FS_OLD[v]; const n = +v; return n >= 50 && n <= FS_MAX ? Math.max(FS_MIN, Math.round(n)) : 100; };
 const uiZ = () => fsPct() / 100;  // UI scale factor for sizes drawn in JS (week grid, charts, tour card)
 function applyLook() {
   const r = document.documentElement.dataset, pct = fsPct(), named = Object.keys(FS_OLD).find(k => FS_OLD[k] === pct);
@@ -279,7 +283,7 @@ applyLook();
 // one setter for all device appearance settings (settings pane, palette); v = null -> default
 // 2.13.0 (#429): one step (±5 %) or back to 100 % (0); also Ctrl / ⌘ + / − / 0 on desktops (the app's size, not the
 // browser zoom)
-function fsStep(d) { const v = d ? Math.max(50, Math.min(150, fsPct() + d)) : 100; lookSet('fsize', v === 100 ? null : v); const sl = $('#s-fsize'); if (sl) { sl.value = v; fsLabel(v); } toast(tr('Font size: {0}', v + ' %')); }
+function fsStep(d) { const v = d ? Math.max(FS_MIN, Math.min(FS_MAX, fsPct() + d)) : 100; lookSet('fsize', v === 100 ? null : v); const sl = $('#s-fsize'); if (sl) { sl.value = v; fsLabel(v); } toast(tr('Font size: {0}', v + ' %')); }
 function fsLabel(v) { const o = $('#s-fsv'); if (o) o.textContent = v + ' %'; const sl = $('#s-fsize'); if (sl) sl.setAttribute('aria-valuetext', v + ' %'); const r = $('[data-m="fs-reset"]'); if (r) r.disabled = +v === 100; }
 document.addEventListener('keydown', e => {
   if (!(e.ctrlKey || e.metaKey) || e.altKey || isTouch()) return;
@@ -599,7 +603,8 @@ function addConflicts(tid, list, title) {
   }
   LS.set('conflicts', S.conflicts);
   renderTop();
-  setTimeout(() => toast(list.length === 1 ? tr('A field was changed elsewhere in the meantime, please review') : tr('{0} fields were changed elsewhere in the meantime, please review', list.length)), 300);
+  // 2.13.2 (#478 F7): no toast on top of the calm bar under the field (it said the same and covered "Waiting for …")
+  setTimeout(() => { if (S.sel === tid && list.every(c => $(`#detail .cfbar[data-f="${c.field}"]`))) return; toast(list.length === 1 ? tr('A field was changed elsewhere in the meantime, please review') : tr('{0} fields were changed elsewhere in the meantime, please review', list.length)); }, 300);
 }
 // the calm bar under a field that was changed elsewhere while it was being edited (2.13.0)
 function cfInline(id, field, c, mine) {
@@ -761,6 +766,10 @@ function staleDraw() {
     : trn('{0} change waiting', '{0} changes waiting', q);
   el.innerHTML = `${ic(off ? 'cloudoff' : 'sync', 's')}<span>${esc(txt)}</span>`;
   el.title = tr('Tap to try again');
+  // 2.13.2 (#478 F8): with a task open on a phone it sits in the task's header (the keyboard covers the bottom edge)
+  const dtop = isMobile() && S.sel ? $('#detail .dtop') : null, host = dtop || document.body;
+  if (el.parentElement !== host) { if (dtop) (dtop.querySelector('.spacer') || dtop.lastElementChild).after(el); else host.appendChild(el); }
+  el.classList.toggle('indet', !!dtop);
 }
 document.addEventListener('visibilitychange', async () => {
   if (!document.hidden && !editing()) { try { await load(); render(); } catch { /* offline */ } }
@@ -1678,7 +1687,8 @@ function skipToContent() {
   v.tabIndex = -1; v.focus({preventScroll: true});  // the next Tab goes to the view's first control
 }
 $('#skip')?.addEventListener('click', skipToContent);
-function renderTop() {
+function renderTop() { return keepFocus($('#top'), renderTop0); }
+function renderTop0() {
   const m = S.route.mod, k = S.route.key;
   let title = m === 'tasks' ? titleFor(k) : tr({cal: N_('Calendar'), matrix: N_('Eisenhower matrix'), habits: N_('Habits'), pomo: N_('Focus'), news: N_('News'), stats: N_('Statistics'), time: N_('Time tracking'), overview: N_('Where is it stuck?'), agents: N_('Agents')}[m]);
   if (m === 'matrix' && mxTitle()) title = `${tr('Matrix')} · ${mxTitle()}`;
@@ -1720,7 +1730,7 @@ function renderTop() {
   const kl = m === 'tasks' && k.startsWith('l:') ? listById(+k.slice(2)) : null;
   const badge = kl?.kind === 'project' ? `<span class="kbadge" title="${esc(projectParts().join(', '))}">${tr('Project')}</span>` : '';
   S.bandOn = bandAgents().length > 0;  // 2.8.0 (#434): the band shows the agents' dots, the header pill keeps only the robot
-  $('#top').innerHTML = `<button class="iconbtn menu" data-act="side" aria-label="${tr('Menu')}">${ic('menu')}</button><h1 title="${esc(title)}">${kl?.icon ? licon(kl, 'licon h') : ''}<span class="ht">${esc(title)}</span>${badge}${nOpen ? `<span class="hn" aria-label="${esc(trn('{0} open task', '{0} open tasks', nOpen))}">${nOpen}</span>` : ''}${ms}</h1>${cf}${off}${timerPill()}${pm}${acts}${isMobile() ? '' : histBtns()}${pal}${tnew}${stChip()}${agentChip()}${bellBtn()}`;  // 2.7.2 (#417): the agents' robot + dots directly before the bell  // 2.7.0 (#405): touch tablets / an unfolded Fold have the room for ← →
+  setHtml($('#top'), `<button class="iconbtn menu" data-act="side" aria-label="${tr('Menu')}">${ic('menu')}</button><h1 title="${esc(title)}">${kl?.icon ? licon(kl, 'licon h') : ''}<span class="ht">${esc(title)}</span>${badge}${nOpen ? `<span class="hn" aria-label="${esc(trn('{0} open task', '{0} open tasks', nOpen))}">${nOpen}</span>` : ''}${ms}</h1>${cf}${off}${timerPill()}${pm}${acts}${isMobile() ? '' : histBtns()}${pal}${tnew}${stChip()}${agentChip()}${bellBtn()}`);  // 2.7.2 (#417): the agents' robot + dots directly before the bell  // 2.7.0 (#405): touch tablets / an unfolded Fold have the room for ← →
   fitTop();
 }
 // ---- 2.6.0 (K01 + K02, UX audit 2): the header has a fixed priority on every width. The title comes first: it keeps at
@@ -1880,7 +1890,54 @@ function calFit() {
   wb.style.height = h + 'px';
 }
 window.addEventListener('resize', () => { if (S.route?.mod === 'cal') calFit(); });
-function renderView() {
+// 2.13.2 (#478 N2): a re-render (live updates of agents, comments, jobs) never takes the keyboard focus away: a focused
+// button / link / cell of the rebuilt area gets its focus back on its new copy (same tag + data-* / id, same position
+// among equal ones), so Tab goes on from there instead of falling back to the start (the "tab ping-pong")
+function focusSig(el) {
+  if (el.id) return '#' + CSS.escape(el.id);
+  const a = [...el.attributes].filter(x => /^data-/.test(x.name) && x.name !== 'data-k').map(x => `[${x.name}="${CSS.escape(x.value)}"]`).join('');
+  return el.tagName.toLowerCase() + a + (a ? '' : el.getAttribute('aria-label') ? `[aria-label="${CSS.escape(el.getAttribute('aria-label'))}"]` : '');
+}
+// While such an element has the focus the area is not rebuilt but morphed (setHtml -> morphKids: same nodes where tag and
+// key match, only attributes / text change), so the focused node itself stays in place: browsers keep their Tab position
+// only on the same node (Firefox went back to the previous element after a refocus on a new copy).
+let morphRoot = null;
+function setHtml(el, html) {
+  if (morphRoot !== el) { el.innerHTML = html; return; }
+  const t = document.createElement('template'); t.innerHTML = html; morphKids(el, t.content);
+}
+const mkey = n => n.nodeType !== 1 ? null : ['data-k', 'data-id', 'data-cid', 'data-aid', 'data-jid', 'data-mid', 'data-key', 'data-section'].map(k => n.getAttribute(k)).find(v => v != null) ?? null;
+function morphKids(a, b) {
+  const an = [...a.childNodes], bn = [...b.childNodes];
+  bn.forEach((n, i) => {
+    const o = an[i];
+    if (!o) { a.appendChild(n); return; }
+    if (o.nodeType !== n.nodeType || o.nodeName !== n.nodeName || (o.nodeType === 1 && (o.id !== n.id || mkey(o) !== mkey(n)))) { a.replaceChild(n, o); return; }
+    if (o.nodeType !== 1) { if (o.data !== n.data) o.data = n.data; return; }
+    for (const x of [...o.attributes]) if (!n.hasAttribute(x.name)) o.removeAttribute(x.name);
+    for (const x of [...n.attributes]) if (o.getAttribute(x.name) !== x.value) o.setAttribute(x.name, x.value);
+    if (!o.isEqualNode(n)) morphKids(o, n);
+    if (/^(INPUT|SELECT|TEXTAREA)$/.test(o.nodeName) && o !== document.activeElement) { if (o.type === 'checkbox' || o.type === 'radio') o.checked = n.checked; else if (o.type !== 'file' && o.value !== n.value) o.value = n.value; }
+  });
+  for (let i = an.length - 1; i >= bn.length; i--) an[i].remove();
+}
+function keepFocus(root, fn) {
+  const a = document.activeElement;
+  if (!root || !a || a === document.body || !root.contains(a) || editFocused()) return fn();
+  let sig = null, i = 0;
+  try { sig = focusSig(a); i = [...root.querySelectorAll(sig)].indexOf(a); } catch { sig = null; }
+  // views that wire their DOM after rendering (calendar, timeline, roadmap) are always rebuilt
+  const prev = morphRoot; morphRoot = root.id === 'view' && /^(cal)$/.test(S.route.mod) || $('#tlscroll', root) ? null : root;
+  let r; try { r = fn(); } finally { morphRoot = prev; }
+  if (!sig || (a.isConnected && document.activeElement === a)) return r;
+  const cur = document.activeElement;
+  if (cur && cur !== document.body && cur !== a) return r;  // the render moved the focus on purpose
+  let n = null; try { const all = root.querySelectorAll(sig); n = all[Math.max(0, Math.min(i, all.length - 1))]; } catch { /* odd selector */ }
+  if (n && n.offsetParent !== null && !n.disabled) n.focus({preventScroll: true});
+  return r;
+}
+function renderView() { return keepFocus($('#view'), renderView0); }
+function renderView0() {
   const m = S.route.mod, el = $('#view');
   // 2.12.2 (#451): the open phone chat is never rebuilt (that took the focus, closed the keyboard and jumped to the top):
   // it is patched in place
@@ -1897,23 +1954,23 @@ function renderView() {
   const fv = fk && fa.value, fs = fk && [fa.selectionStart, fa.selectionEnd];
   if (sai && S.secAdd) S.secAdd.v = sai.value;
   if (m !== 'cal') el.classList.remove('calfit');
-  if (m === 'cal') { el.innerHTML = viewCal(); requestAnimationFrame(calFit); }
-  else if (m === 'matrix') el.innerHTML = viewMatrix();
-  else if (m === 'habits') el.innerHTML = viewHabits();
-  else if (m === 'pomo') { el.innerHTML = viewPomo(); loadPomoStats(); }
-  else if (m === 'news') el.innerHTML = viewNews();
-  else if (m === 'stats') el.innerHTML = viewStats();
-  else if (m === 'time') el.innerHTML = viewTime();
-  else if (m === 'overview') el.innerHTML = viewOverview();
-  else if (m === 'agents') el.innerHTML = viewAgents();
-  else if (S.route.key === 'search') el.innerHTML = viewSearch();
-  else if (S.route.key === 'done' || S.route.key === 'trash') el.innerHTML = viewHistory();
-  else if (S.route.key === 'archived') el.innerHTML = viewArchived();
-  else if (isRoadmap()) el.innerHTML = viewRoadmap();
-  else if (isOverview()) el.innerHTML = viewProjOv();  // 2.7.1 (#410)
-  else if (isKanban()) el.innerHTML = viewKanban();
-  else if (isTimeline()) el.innerHTML = vsegHtml(routeList()) + viewTimeline(routeList().id);  // 2.13.0 (#453 A7)
-  else el.innerHTML = viewList();
+  if (m === 'cal') { setHtml(el, viewCal()); requestAnimationFrame(calFit); }
+  else if (m === 'matrix') setHtml(el, viewMatrix());
+  else if (m === 'habits') setHtml(el, viewHabits());
+  else if (m === 'pomo') { setHtml(el, viewPomo()); loadPomoStats(); }
+  else if (m === 'news') setHtml(el, viewNews());
+  else if (m === 'stats') setHtml(el, viewStats());
+  else if (m === 'time') setHtml(el, viewTime());
+  else if (m === 'overview') setHtml(el, viewOverview());
+  else if (m === 'agents') setHtml(el, viewAgents());
+  else if (S.route.key === 'search') setHtml(el, viewSearch());
+  else if (S.route.key === 'done' || S.route.key === 'trash') setHtml(el, viewHistory());
+  else if (S.route.key === 'archived') setHtml(el, viewArchived());
+  else if (isRoadmap()) setHtml(el, viewRoadmap());
+  else if (isOverview()) setHtml(el, viewProjOv());  // 2.7.1 (#410)
+  else if (isKanban()) setHtml(el, viewKanban());
+  else if (isTimeline()) setHtml(el, vsegHtml(routeList()) + viewTimeline(routeList().id));  // 2.13.0 (#453 A7)
+  else setHtml(el, viewList());
   el.scrollTop = scroll;
   if (m === 'agents' && $('#view .chview')) { chatFit(); chatPatch({bottom: true}); } else document.body.classList.remove('kb-open');  // 2.12.2 (#451): a chat opens at its newest message
   if (S.ie) inlineEditMount(tinF);
@@ -2155,7 +2212,7 @@ function viewListBody() {
     lastSub = g.sub || lastSub;
     const closed = S.collapsed.has(g.id);
     const sadd = g.section !== undefined && !ro && v.list && canAddTo(v.list);
-    if (g.name) h += `<div class="group"><div class="ghead ${g.cls || ''} ${closed ? 'closed' : ''}" data-act="collapse" data-key="${g.id}" ${g.section !== undefined ? `data-section="${g.section ?? ''}"` : ''}>${g.section && !ro ? secHandle(g.section) : ''}${ic('chev', 's')}${g.img ? `<img class="gicon" src="${esc(g.img)}" alt="">` : g.color ? `<span class="gsw" style="background:${cssColor(g.color)}"></span>` : ''}${esc(g.name)} <span class="c">${g.tasks.length}</span>${sadd ? `<button class="iconbtn gact gadd" data-act="sec-add" data-sec="${g.section || 0}" title="${esc(tr('Add a task to {0}', g.name))}" aria-label="${esc(tr('Add a task to {0}', g.name))}">${ic('plus', 's')}</button>` : ''}${g.section && !ro ? `<button class="iconbtn gact" data-act="section-menu" data-id="${g.section}">${ic('dots', 's')}</button>` : ''}</div>`;
+    if (g.name) h += `<div class="group"><div class="ghead ${g.cls || ''} ${closed ? 'closed' : ''}" data-act="collapse" data-key="${g.id}" ${g.section !== undefined ? `data-section="${g.section ?? ''}"` : ''}>${g.section && !ro ? secHandle(g.section) : ''}${ic('chev', 's')}${g.img ? `<img class="gicon" src="${esc(g.img)}" alt="">` : g.color ? `<span class="gsw" style="background:${cssColor(g.color)}"></span>` : ''}${esc(g.name)} <span class="c">${g.tasks.length}</span>${sadd ? `<button class="iconbtn gact gadd" data-act="sec-add" data-sec="${g.section || 0}" title="${esc(tr('Add a task to {0}', g.name))}" aria-label="${esc(tr('Add a task to {0}', g.name))}">${ic('plus', 's')}</button>` : ''}${g.section && !ro ? `<button class="iconbtn gact" data-act="section-menu" data-id="${g.section}" title="${esc(tr('More') + ': ' + g.name)}" aria-label="${esc(tr('More') + ': ' + g.name)}">${ic('dots', 's')}</button>` : ''}</div>`;
     if (g.name && !closed && sadd) h += secAddHtml(g);
     // 1.7.0 Flow: the first task of each group that waits on nothing is marked "Next" (2.0.4: "Ready to start", and only
     // when some open task shown here waits on something; without dependencies the badge would say nothing)
@@ -2252,8 +2309,13 @@ function renderSearchRes() {
   return S.searchRes.map(t => taskRow(t, {showList: true, drag: false, tcols: {list: true}})).join('');
 }
 let searchTimer;
+function snavMore(nav) {
+  const b = nav?.parentElement?.querySelector('.snmore'); if (!b) return;
+  const more = isMobile() && nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 4;
+  if (b.classList.contains('hidden') === more) b.classList.toggle('hidden', !more);
+}
 async function doSearch(q) {
-  S.searchQ = q;
+  S.searchQ = q; if (S.searchEnter !== q) S.searchEnter = null;
   clearTimeout(searchTimer);
   searchTimer = setTimeout(async () => {
     if (!q.trim()) { S.searchRes = null; $('#sresults').innerHTML = ''; return; }
@@ -2261,10 +2323,26 @@ async function doSearch(q) {
     // 2.13.0: "#447" / "447" puts that task (one this person sees) first
     const nm = q.trim().match(/^#?(\d{1,9})$/), hit = nm && taskById(+nm[1]);
     if (hit) j.tasks = [hit, ...j.tasks.filter(t => t.id !== hit.id)];
-    S.searchRes = j.tasks; S.extra = j.tasks;
+    S.searchRes = j.tasks; S.extra = j.tasks; S.searchResQ = q;
     $('#sresults').innerHTML = renderSearchRes();
+    if (S.searchEnter === q) { S.searchEnter = null; searchEnterOpen(q); }
   }, 200);
 }
+// 2.13.2 (#478 F4): Enter in the search opens the task of an exact "#id" / "id", or the only hit (the results of what was
+// typed may still be on their way: then it opens once they are there)
+function searchEnterOpen(q) {
+  const nm = q.trim().match(/^#?(\d{1,9})$/), r = S.searchResQ === q ? S.searchRes || [] : [];
+  const t = nm ? (r.find(x => x.id === +nm[1]) || taskById(+nm[1])) : r.length === 1 ? r[0] : null;
+  if (!t) return false;
+  if (isMobile()) $('#searchq')?.blur();
+  openDetail(t.id); return true;
+}
+document.addEventListener('keydown', e => {
+  if (e.target.id !== 'searchq' || e.key !== 'Enter' || e.isComposing) return;
+  const q = e.target.value; e.preventDefault();
+  if (q.trim() && !searchEnterOpen(q)) S.searchEnter = q;
+  if (S.searchQ !== q) doSearch(q);
+});
 
 // ------------------------------------------------------------------ kanban
 function viewKanban() {
@@ -2278,7 +2356,7 @@ function viewKanban() {
   for (const s of secs) cols.push({id: s.id, name: s.name, tasks: tasks.filter(t => t.section_id === s.id)});
   return `${listHead(listById(lid))}<div class="kanban">${cols.map(c => `
     <div class="kcol" data-kcol="${c.id ?? ''}">
-      <div class="khead" ${c.id ? `data-ksec="${c.id}"` : ''}>${c.id && !ro ? secHandle(c.id) : ''}${esc(c.name)} <span class="c">${c.tasks.length}</span>${c.id && !ro ? `<button class="iconbtn" data-act="section-menu" data-id="${c.id}">${ic('dots', 's')}</button>` : ''}</div>
+      <div class="khead" ${c.id ? `data-ksec="${c.id}"` : ''}>${c.id && !ro ? secHandle(c.id) : ''}${esc(c.name)} <span class="c">${c.tasks.length}</span>${c.id && !ro ? `<button class="iconbtn" data-act="section-menu" data-id="${c.id}" title="${esc(tr('More') + ': ' + c.name)}" aria-label="${esc(tr('More') + ': ' + c.name)}">${ic('dots', 's')}</button>` : ''}</div>
       <div class="kcards">${c.tasks.map(t => taskRow(t, {compact: true})).join('')}</div>
       ${ro ? '' : `<div class="kadd"><input placeholder="${tr('+ Task')}" aria-label="${esc(tr('New task in {0}', c.name))}" data-kadd="${c.id ?? ''}" enterkeyhint="done"></div>`}
     </div>`).join('')}
@@ -3950,6 +4028,7 @@ function openDetail(id) {
 function closeDetail(fromPop) {
   flushSaves();
   S.sel = null; S.tl = {id: null}; S.cedit = null; S.editLink = false; mentionClose();
+  if ($('#stale.indet')) staleDraw();  // 2.13.2 (#478 F8): back to the bottom edge
   const d = $('#detail');
   d.classList.remove('open');
   $('#app').classList.remove('detail-open'); fitLayout();
@@ -3965,9 +4044,16 @@ window.addEventListener('popstate', () => { if (S.sel && isMobile()) closeDetail
 const LIST_MIN_PX = 420;
 function fitLayout(quiet) {
   const app = $('#app'); if (!app) return;
-  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, det = app.classList.contains('detail-open');
+  // 2.13.2 (#478 N1): list | task | chat side by side. The panel's room comes off the whole app (#app, not only the list
+  // area: the task panel used to sit under the chat with ~400 px empty next to it). Where list + task + chat do not fit,
+  // the task takes the chat's place (body.chat-yield hides the panel, the task header's chat button / the agent pill /
+  // closing the task bring it back)
+  const chatOn = document.body.classList.contains('chat-open') && !(isMobile() || innerWidth < 1000), chatW = chatOn ? Math.min(26 * rem, innerWidth * .4) : 0;
+  const yieldC = chatOn && det && innerWidth - chatW - 25.5 * rem < LIST_MIN_PX;
+  document.body.classList.toggle('chat-yield', yieldC);
   // 2.13.0: the open chat panel takes its room too: the sidebar folds into the drawer instead of squeezing the list
-  const narrow = innerWidth - (15 + (app.classList.contains('detail-open') ? 25.5 : 0) + (document.body.classList.contains('chat-open') ? Math.min(26, innerWidth * .4 / rem) : 0)) * rem < LIST_MIN_PX;
+  const narrow = innerWidth - (15 + (det ? 25.5 : 0)) * rem - (yieldC ? 0 : chatW) < LIST_MIN_PX;
   // 2.13.0 (#453 A15): below ~1100 px (an unfolded Fold, small windows) the sidebar can be folded away by hand (remembered
   // per device); the header's menu button opens it as a drawer then, like on a phone
   const on = !isMobile() && (narrow || (innerWidth < 1100 && !!LS.get('sideFold', false)));
@@ -3979,13 +4065,45 @@ function fitLayout(quiet) {
 let fitT = null;
 window.addEventListener('resize', () => { clearTimeout(fitT); fitT = setTimeout(() => fitLayout(), 80); });
 function sideFold(on) { LS.set('sideFold', !!on); fitLayout(); closeSide(); render(); }
+// 2.13.2 (#478 N3): the same within the phone layout: the docked "Add task" box of a tablet / an unfolded Fold in portrait
+// (600-899 px) disappears on a narrower screen without crossing 899 px (Fold 880 -> 390): its text moves into the quick
+// sheet; when the box comes back (unfolding) the text goes back into it
+// (only on a width change: a keyboard changes the height alone and must never move what is being typed)
+let qdT = 0, qdW = innerWidth;
+window.addEventListener('resize', () => { clearTimeout(qdT); qdT = setTimeout(() => {
+  const wch = innerWidth !== qdW; qdW = innerWidth;
+  if (!S.booted || !wch) return;
+  const qi = $('#qinput'), qs = $('#qsheet');
+  if (qi && qi.value.trim() && !qi.offsetParent && !qs) {
+    const v = qi.value, sel = [qi.selectionStart, qi.selectionEnd]; qi.value = '';
+    openQuickSheet(v); S.qMoved = true;
+    setTimeout(() => { try { $('#qsheet')?.setSelectionRange(...sel); } catch { /* no caret */ } }, 40);
+  } else if (S.qMoved && qs && qi && qi.offsetParent) {
+    const v = qs.value; closePop(); qi.value = v; updateChips(qi);
+    requestAnimationFrame(() => { qi.focus({preventScroll: true}); try { qi.setSelectionRange(v.length, v.length); } catch { /* no caret */ } });
+  }
+}, 150); });
 // 2.13.0 (#453 A15): folding / unfolding a Fold while typing switches between the phone and the tablet layout; the field
 // that had the focus gets it back (same id), with its text and caret
 try {
   matchMedia('(max-width:899px)').addEventListener('change', () => {
     const a = document.activeElement, id = a && a.id && editFocused() ? a.id : null, v = id ? a.value : null, sel = id ? [a.selectionStart, a.selectionEnd] : null;
     if (!S.booted) return;
+    // 2.13.2 (#478 N3): a half-typed quick add moves along: the tablet's "Add task" box -> the phone's quick sheet (same
+    // text, caret, focus = keyboard) when folding, and back into the box when unfolding
+    const qv = $('#qinput')?.value || '', qsv = $('#qsheet')?.value || '', qf = id === 'qinput' || id === 'qsheet';
     render();
+    if (qv && isMobile() && !$('#qinput')?.offsetParent) {
+      const q0 = $('#qinput'); if (q0) q0.value = '';
+      openQuickSheet(qv); S.qMoved = true;
+      const n = $('#qsheet'); if (n && qf && sel) setTimeout(() => { try { n.setSelectionRange(...sel); } catch { /* no caret */ } }, 40);
+      return;
+    }
+    if (qsv && !isMobile() && $('#qinput')) {
+      closePop(); const n = $('#qinput'); n.value = qsv; updateChips(n);
+      if (qf) requestAnimationFrame(() => { n.focus({preventScroll: true}); try { n.setSelectionRange(...(sel || [qsv.length, qsv.length])); } catch { /* no caret */ } });
+      return;
+    }
     if (!id) return;
     requestAnimationFrame(() => { const n = document.getElementById(id); if (!n || !n.offsetParent) return; if (n.value !== v && v != null) n.value = v; try { n.focus({preventScroll: true}); if (sel) n.setSelectionRange(...sel); } catch { /* not a text field */ } });
   });
@@ -4024,7 +4142,8 @@ function crumbGo(k, id) {
   go(keyToHash(l.is_inbox ? 'inbox' : 'l:' + l.id));
   if (where) setTimeout(() => { const el = $(where); if (el) { if (el.classList.contains('closed')) el.click(); el.scrollIntoView?.({block: 'start'}); } }, 150);
 }
-function renderDetail() {
+function renderDetail() { return keepFocus($('#detail'), renderDetail0); }
+function renderDetail0() {
   const t = taskById(S.sel); if (!t) return;
   const l = listById(t.list_id);
   const kids = children(t.id);
@@ -4074,7 +4193,7 @@ function renderDetail() {
     custom: ck ? '' : `${fieldsOf(t.list_id).length ? `<div class="dsec cfsec"><h5>${tr('Fields')}</h5><div class="fields cf">${fieldsOf(t.list_id).map(f => fieldEditor(f, t, ro)).join('')}</div></div>` : ''}`,
     time: ck ? '' : `${tFor(t) && t.id > 0 && !t.context ? `<div class="dsec tesec" id="d-time">${taskTimeHtml(t)}</div>` : ''}`,
     code: ck ? '' : codeHtml(t)};
-  $('#detail').innerHTML = `
+  setHtml($('#detail'), `
     <div class="dtop">
       <button class="iconbtn back" data-act="close-detail" aria-label="${tr('Back')}">${ic('back')}</button>
       <button class="chk ${t.status === 2 ? 'on' : t.status === -1 ? 'wont' : 'p' + t.priority}" data-act="toggle" data-id="${t.id}" aria-label="${tr('done')}" title="${esc(kt(tr('Complete task'), 'x'))}" ${ro ? 'disabled' : ''}>${t.status === 2 ? ic('check') : ''}</button>
@@ -4085,6 +4204,7 @@ function renderDetail() {
         : `<span class="rotag" title="${esc(tr('View only, shared by {0}', l?.owner_name || ''))}">${ic('eye', 's')}${tr('View only')}</span>`) : `${ck ? '' : `<button class="iconbtn ${t.pinned ? 'on' : ''}" data-act="pin" data-id="${t.id}" title="${t.pinned ? tr('Unpin') : tr('Pin')}" aria-label="${t.pinned ? tr('Unpin') : tr('Pin')}">${ic('pin')}</button>
       <button class="iconbtn ${t.priority ? 'flag-' + t.priority : ''}" data-act="prio" data-id="${t.id}" title="${tr('Priority')}" aria-label="${tr('Priority')}">${ic('flag')}</button>`}
       <button class="iconbtn" data-act="task-menu" data-id="${t.id}" title="${tr('More')}" aria-label="${tr('More')}">${ic('dots')}</button>`}
+      <button class="iconbtn dchatb" data-act="chat-unyield" title="${esc(tr('Chat'))}" aria-label="${esc(tr('Chat'))}">${ic('bot')}</button>
       <button class="iconbtn" data-act="close-detail" title="${tr('Close (Esc)')}" aria-label="${tr('Close (Esc)')}" style="${isMobile() ? 'display:none' : ''}">${ic('x')}</button>
     </div>
     <div class="dbody ${ck ? 'ckbody' : ''} ${dtab === 'comments' ? 'dtab-c' : ''}">
@@ -4103,10 +4223,11 @@ function renderDetail() {
     <div class="dbot">${cmOk && !(cm === 'full' && cmtNew()) ? cmComposer(t) : ''}<div class="dfoot"><span class="dfc">${t.status === 2 && t.completed_at ? tr('Completed {0}', new Date(t.completed_at).toLocaleString(LOCALE(), {dateStyle: 'medium', timeStyle: 'short'})) : tr('Created {0}', new Date(t.created_at).toLocaleString(LOCALE(), {dateStyle: 'medium', timeStyle: 'short'}))}</span>
       <span class="spacer"></span>
       ${ck ? '' : runItems().filter(x => x.tid === t.id).map(x => `<button class="drun k-${x.k}" data-act="run-pop" title="${esc(tr(RUN_KIND[x.k][1]))}">${ic(RUN_KIND[x.k][0], 's')}<span ${x.attr}>${x.txt}</span><span class="drl">${tr(RUN_KIND[x.k][1])}</span></button>`).join('')}
-      </div></div>`;
+      </div></div>`);
   // 2.4.1 (#385): no Delete / Track time in the footer any more (Delete sat right below the comment box's Send on a phone);
   // both are in the task's "…" menu (Delete with undo), a running timer still shows here as its pill
   autosize($('#d-title')); autosize($('#d-content')); autosize($('#c-input'));
+  if (isMobile() && $('#stale')) staleDraw();
 }
 // U17: the open "- [ ]" lines of a description become real subtasks (one undo step); ticked lines stay in the text
 async function mdToSubtasks() {
@@ -4527,9 +4648,10 @@ function actText0(a, U) {
   }
   return tr('{0} changed the task', who);
 }
-// comment text: small markdown (bold, italic, code, links), line breaks, <@id> -> highlighted @name
+// comment text: the same markdown as a description (renderMd: headings, lists, read-only checkboxes, bold, code, links;
+// 2.13.2 #478 N4, before only inline), <@id> -> highlighted @name; compact in comments and chat bubbles (.mdc)
 function commentBody(body, U) {
-  return String(body || '').split('\n').map(mdInline).join('<br>')
+  return `<div class="md mdc">${renderMd(body, true)}</div>`
     .replace(/&lt;@(\d+)&gt;/g, (_, id) => mentionTag(+id, uname(+id, U), !!(U || {})[id] || !!agentById(id)));
 }
 // 2.4.2 (#389): a mention is a button that opens a small card about the person or agent; a name nobody has stays text
@@ -4630,7 +4752,10 @@ function timelineItems(ro = false) {
   if (!items.length) return soc ? `<div class="muted cmempty">${tr('No comments yet.')}</div>` : '';
   const lastC = [...items].reverse().find(it => it.c);
   if (cmtNew()) items.reverse();  // 2.4.2 (#386)
-  return items.map(it => it.c ? commentHtml(it.c, U, it.ro).replace('<div class="cm ', it === lastC ? '<div class="cm last ' : '<div class="cm ') : `<div class="actl"><span>${actText(it.a, U)}</span><time>${fmtWhen(it.a.created_at)}</time></div>`).join('');
+  // 2.13.2 (#478 F5): comments of the same author in a row (within 15 minutes) are one group: only the first shows the
+  // picture, name and badge
+  const grp = (it, i) => { const p = items[i - 1]; return !!(it.c && p?.c && p.c.user_id === it.c.user_id && Math.abs(new Date(it.at) - new Date(p.at)) < 900000); };
+  return items.map((it, i) => it.c ? commentHtml(it.c, U, it.ro).replace('<div class="cm ', `<div class="cm ${it === lastC ? 'last ' : ''}${grp(it, i) ? 'grp ' : ''}`) : `<div class="actl"><span>${actText(it.a, U)}</span><time>${fmtWhen(it.a.created_at)}</time></div>`).join('');
 }
 // 2.0.7: the folded history of a private list (as in 2.0.5): all changes of the task, oldest first
 function histItems() {
@@ -4718,7 +4843,7 @@ async function sendComment() {
   const box = $('#d-tl-items'); if (box) (cmtNew() ? box.firstElementChild : box.lastElementChild)?.scrollIntoView({block: 'nearest'});
 }
 function addCommentFiles(files) {
-  files = [...files].filter(Boolean); if (!files.length || !S.sel) return;
+  files = noEmpty(files); if (!files.length || !S.sel) return;
   (S.cfiles[S.sel] ||= []).push(...files);
   const f = $('#c-files'); if (f) { f.innerHTML = composerFiles(S.sel); f.closest('.ccomp')?.classList.add('used'); }
 }
@@ -4787,6 +4912,7 @@ function attHtml(a) {
     (plOn() ? `<button class="attpl ${sending ? 'busy' : ''}" data-act="att-pl" data-att="${a.id}" title="${sending ? tr('being sent to Paperless') : tr('File in Paperless')}">${ic('archive', 's')}</button>` : '');
   if (isImg(a)) return `<div class="att img"><a href="${attUrl(a)}" data-act="att-view" data-att="${a.id}" title="${esc(a.name)}"><img src="${attUrl(a)}" loading="lazy" alt="${esc(a.name)}"></a>${del}</div>`;
   const pdf = a.mime === 'application/pdf';
+  if (a.size === 0) return `<div class="att file broken"><span class="attx">${ic('file')}<span class="an">${esc(a.name)}</span><span class="as">${esc(tr('File damaged or missing'))}</span></span>${del}</div>`;  // 2.13.2 (#478 N6): an old 0-byte file says so
   return `<div class="att file"><a href="${attUrl(a, !pdf)}" ${pdf ? 'target="_blank" rel="noopener"' : 'download'} title="${esc(a.name)}">${ic(pdf ? 'pdf' : 'file')}<span class="an">${esc(a.name)}</span><span class="as">${fmtSize(a.size)}</span></a>${del}</div>`;
 }
 // 2.1.0 (#180): several Paperless connections (S.paperless.conns: id 0 = the server's legacy one, server ones with my own
@@ -4848,8 +4974,15 @@ function plSearchModal(taskId, o = {}) {  // 2.7.1 (#410): o.pick(doc, conn) + o
   });
   if (!isMobile()) setTimeout(() => $('#pl-q', md).focus(), 50);
 }
-async function uploadFiles(taskId, files) {
+// 2.13.2 (#478 N6): a 0-byte file is never sent (the server refuses it too): a clear message instead of a broken tile
+function noEmpty(files) {
   files = [...files].filter(Boolean);
+  const e = files.find(f => f.size === 0);
+  if (e) toast(tr('{0}: the file is empty and was not uploaded', e.name || tr('Image')));
+  return files.filter(f => f.size !== 0);
+}
+async function uploadFiles(taskId, files) {
+  files = noEmpty(files);
   if (!files.length) return;
   if (taskId < 0) { toast(tr('Task is still syncing, try again in a moment')); return; }
   if (!canEdit(taskById(taskId))) { roToast(); return; }
@@ -4913,7 +5046,7 @@ function mdInline(s) {
   }
   return out + mdFmt(s.slice(last));
 }
-function renderMd(src) {
+function renderMd(src, ro) {
   const lines = String(src || '').split('\n');
   let h = '', list = null, para = [];
   const flushPara = () => { if (para.length) { h += `<p>${para.join('<br>')}</p>`; para = []; } };
@@ -4922,7 +5055,7 @@ function renderMd(src) {
   lines.forEach((ln, i) => {
     let m;
     if ((m = ln.match(/^(#{1,3})\s+(.*)/))) { flushPara(); closeList(); h += `<h${m[1].length + 3}>${mdInline(m[2])}</h${m[1].length + 3}>`; }
-    else if ((m = ln.match(/^\s*[-*]\s+\[( |x|X)\]\s*(.*)/))) { flushPara(); openList('ul'); h += `<li class="cb ${m[1] !== ' ' ? 'on' : ''}"><input type="checkbox" data-mdline="${i}" ${m[1] !== ' ' ? 'checked' : ''}><span>${mdInline(m[2])}</span></li>`; }
+    else if ((m = ln.match(/^\s*[-*]\s+\[( |x|X)\]\s*(.*)/))) { flushPara(); openList('ul'); h += `<li class="cb ${m[1] !== ' ' ? 'on' : ''}"><input type="checkbox" ${ro ? 'disabled' : `data-mdline="${i}"`} ${m[1] !== ' ' ? 'checked' : ''}><span>${mdInline(m[2])}</span></li>`; }
     else if ((m = ln.match(/^\s*[-*•]\s+(.*)/))) { flushPara(); openList('ul'); h += `<li>${mdInline(m[1])}</li>`; }
     else if ((m = ln.match(/^\s*\d+[.)]\s+(.*)/))) { flushPara(); openList('ol'); h += `<li>${mdInline(m[1])}</li>`; }
     else if (!ln.trim()) { flushPara(); closeList(); }
@@ -6581,7 +6714,7 @@ function lookHtml() {
     <div class="row">${seg('density', DENSITIES)}</div>
     <div class="shint">${tr('Compact fits more tasks on the screen; comfortable has larger rows for touch. Default: comfortable on phones, compact on computers.')}</div>
     <h4>${tr('Font size')}</h4>
-    <div class="row lkfs"><span class="lkA" aria-hidden="true">A</span><input type="range" id="s-fsize" min="50" max="150" step="5" value="${fsPct()}" aria-label="${esc(tr('Font size'))}" aria-valuetext="${fsPct()} %"><span class="lkA lkA2" aria-hidden="true">A</span><output id="s-fsv" for="s-fsize">${fsPct()} %</output><button class="btn sm" data-m="fs-reset" ${fsPct() === 100 ? 'disabled' : ''}>${tr('Reset (100 %)')}</button></div>
+    <div class="row lkfs"><span class="lkA" aria-hidden="true">A</span><input type="range" id="s-fsize" min="${FS_MIN}" max="${FS_MAX}" step="5" value="${fsPct()}" aria-label="${esc(tr('Font size'))}" aria-valuetext="${fsPct()} %"><span class="lkA lkA2" aria-hidden="true">A</span><output id="s-fsv" for="s-fsize">${fsPct()} %</output><button class="btn sm" data-m="fs-reset" ${fsPct() === 100 ? 'disabled' : ''}>${tr('Reset (100 %)')}</button></div>
     <div class="shint">${tr('Scales the whole interface: text, rows, icons, spacing and dialogs.')}</div>
     <h4>${tr('Font')}</h4>
     <div class="lkopts lkfont" id="s-font" role="group">${LOOK.font.map(([v, n]) => `<button ${on('font', v)}><span class="lkAa lkf-${v}">Aa</span><span class="lkn">${tr(n)}</span></button>`).join('')}</div>
@@ -7106,6 +7239,10 @@ function settingsModal(focus) {
     <div class="sbody"><nav class="snav" role="tablist" aria-label="${tr('Settings')}">${secs.map(([k, i, n]) => `<button role="tab" id="st-${k}" aria-controls="sp-${k}" aria-selected="${k === cur}" data-sec="${k}" class="${k === cur ? 'on' : ''}">${ic(i, 's')}<span>${tr(n)}</span></button>`).join('')}</nav>
       <div class="spanes">${secs.map(([k]) => `<section class="spane ${k === cur ? '' : 'hidden'}" role="tabpanel" id="sp-${k}" aria-labelledby="st-${k}" data-pane="${k}">${pane[k]}</section>`).join('')}</div></div>`);
   md.classList.add('smodal');
+  // 2.13.2 (#478 F13): phones: a "More ›" at the right end of the cut tab strip while more tabs are hidden to the right
+  { const nav = $('.snav', md); nav.insertAdjacentHTML('afterend', `<button type="button" class="snmore hidden" data-snmore tabindex="-1" aria-hidden="true">${tr('More')} ›</button>`);
+    $('[data-snmore]', md).addEventListener('click', () => nav.scrollBy({left: nav.clientWidth * .7, behavior: 'smooth'}));
+    nav.addEventListener('scroll', () => snavMore(nav), {passive: true}); setTimeout(() => snavMore(nav), 0); }
   // 2.13.0 (#429): the font size slider applies live while it moves; the views drawn in px follow when it is let go
   md.addEventListener('input', e => { if (e.target.id !== 's-fsize') return; const v = +e.target.value; if (v === 100) LS.del('fsize'); else LS.set('fsize', v); applyLook(); fsLabel(v); });
   md.addEventListener('change', e => { if (e.target.id === 's-fsize' && S.settings) render(); });
@@ -7567,11 +7704,11 @@ async function aaDraw(md, j) {
   const rc = j.topic ? tr('Goes to the admin topic {0}.', `<code class="topic">${esc(j.topic)}</code>`)
     : j.admins.length ? tr('Goes to each admin over their own notification channel: {0}.', j.admins.map(a => `${esc(a.username)}: ${via(a)}`).join(', ')) : '';
   const meA = j.admins.find(a => a.me), meNone = !j.topic && meA && !meA.devices && !meA.topic;
-  let h = j.env ? '' : hintK(`<span title="KALMIDO_ADMIN_ALERTS=0">${tr('Admin alerts are switched off by the server operator.')}</span>`);
+  let h = j.env ? '' : hint(tr('Admin alerts are switched off by the server operator.') + ' (KALMIDO_ADMIN_ALERTS=0)');
   h += `<div class="featgrid"><label class="wide"><input type="checkbox" id="aa-on" ${j.on && j.env ? 'checked' : ''} ${j.env ? '' : 'disabled'}><span>${tr('Admin alerts')}<small class="muted">${tr('Warnings about the server go to the admins over their own notification channel (Web Push to their devices, ntfy only if they chose it or an admin topic is set): updates, delivery problems, watchdog errors, integrations, security events, disk space. Only counts, ids, usernames, device labels and error classes, never task contents.')}</small></span></label></div>
     ${meNone && j.on && j.env ? `<div class="shint aanone">${ic('bell', 's')} <span>${tr('No device subscribed for push yet. Until you subscribe one, admin alerts are only listed here.')}</span> <button class="btn sm" data-aa="notify">${tr('Subscribe this device')}</button></div>` : ''}
     <div class="row"><label for="aa-topic">${tr('Admin topic')}</label><input id="aa-topic" value="${esc(j.topic)}" autocapitalize="off" placeholder="${tr('empty = each admin’s own topic')}" ${j.topic_env ? 'readonly' : ''}></div>
-    ${hint((j.topic_env ? `<span title="KALMIDO_ADMIN_TOPIC">${tr('Set by the server operator.')}</span> ` : '') + rc)}
+    ${rc || j.topic_env ? `<div class="shint iiok">${(j.topic_env ? tr('Set by the server operator.') + ' (KALMIDO_ADMIN_TOPIC) ' : '') + rc}</div>` : ''}
     <div class="row"><label for="aa-prio">${tr('How urgent')}</label><select id="aa-prio">${[['3', N_('Normal')], ['4', N_('Loud')], ['5', N_('Urgent')]].map(([v, n]) => `<option value="${v}" ${j.prio === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     <div class="row"><label for="aa-mode">${tr('Delivery')}</label><select id="aa-mode"><option value="instant" ${j.mode === 'instant' ? 'selected' : ''}>${tr('Instantly')}</option><option value="digest" ${j.mode === 'digest' ? 'selected' : ''}>${tr('Daily summary')}</option></select>${timeIn('aa-dtime', j.digest_time, {label: tr('Time of the daily summary'), clear: false, hidden: j.mode !== 'digest'})}</div>
     <div class="featgrid" id="aa-kinds">${j.all_kinds.map(k => `<label><input type="checkbox" data-aakind="${esc(k.kind)}" ${j.kinds.includes(k.kind) ? 'checked' : ''}> ${esc(k.label)}</label>`).join('')}</div>
@@ -7804,7 +7941,7 @@ function caldavHtml(hint) {
     ${hint(tr('Your lists as task lists in Reminders (iPhone, iPad, Mac), Thunderbird, Evolution or on Android with Tasks.org or DAVx⁵: changes go both ways. Every list you see is one task list there; completed tasks stay for {0} days.', d.done_days))}
     ${cp(tr('Server'), d.server, 'dav-srv')}${cp(tr('CalDAV address'), d.url, 'dav-url')}${cp(tr('User name'), d.username, 'dav-user')}
     <div class="row"><label>${tr('Password')}</label><button class="btn sm pri" data-apw="new">${ic('key', 's')} ${tr('New app password')}</button><button class="linkbtn" data-apw="list">${tr('Manage app passwords')}</button></div>
-    ${hintK(tr('Log in with your user name and an app password, never with your Kalmido password.'))}
+    ${hint(tr('Log in with your user name and an app password, never with your Kalmido password.'))}
     <details class="shelp sdet"><summary>${tr('Step by step')}</summary><ul class="slist">
       <li>${tr('<b>iPhone / iPad:</b> Settings > Apps > Calendar > Calendar Accounts > Add Account > Other > Add CalDAV Account. Server {0}, your user name and the app password. Then switch on Reminders in the new account. Not found? Advanced Settings > Account URL {1}.', srv, prin)}</li>
       <li>${tr('<b>Mac:</b> System Settings > Internet Accounts > Add Account > Add Other Account > CalDAV account. Account type Manual, user name, app password, server address {0}; then tick Reminders. Not found? Account type Advanced, server path {1}, port 443, SSL on.', srv, `<code class="topic">${esc(new URL(d.principal).pathname)}</code>`)}</li>
@@ -7817,13 +7954,14 @@ function caldavHtml(hint) {
       <li>${tr('Title, notes, due date and time, start, priority, done / won\'t do, tags, subtasks, repeat rules (daily to yearly), reminders and the link. Assignee, sections, comments, files and custom fields stay in Kalmido; other details a calendar app saves come back to it unchanged.')}</li>
       <li>${tr('Lists you may only view are read-only there. Deleting a task in a calendar app moves it to the trash in Kalmido. New lists are created in Kalmido.')}</li>
       <li>${tr('Reminders on iPhone and Mac keep tags and subtasks to themselves: what you set in Kalmido stays.')}</li></ul></details>
-    ${S.me.is_admin ? hint(tr('Admins: behind a login proxy (forward auth, single sign-on) the paths /dav/ and /.well-known/caldav must bypass the proxy login, because calendar apps cannot log in there. Kalmido checks the app password itself.') + ` <a href="${DAV_DOCS}" target="_blank" rel="noopener noreferrer">${tr('CalDAV guide')}</a>`) : ''}`;
+    ${S.me.is_admin ? hint(tr('Admins: behind a login proxy (forward auth, single sign-on) the paths /dav/ and /.well-known/caldav must bypass the proxy login, because calendar apps cannot log in there. Kalmido checks the app password itself.')) + `<a class="slink" href="${DAV_DOCS}" target="_blank" rel="noopener noreferrer">${tr('CalDAV guide')}</a>` : ''}`;
 }
 // Settings > Integrations > Webhooks
 const WH_EV_NAMES = {'task.created': N_('Task created'), 'task.updated': N_('Task changed'), 'task.completed': N_('Task completed'), 'task.reopened': N_('Task reopened'),
   'task.deleted': N_('Task deleted'), 'comment.created': N_('New comment'), 'list.shared': N_('List shared')};
 const whHtml = () => S.webhooks?.enabled ? `<h4 id="s-wh-h">${tr('Webhooks')}</h4>
-  <div class="shint">${tr('Kalmido sends a signed POST request to your URL when something changes in lists you can see, for example to n8n or Home Assistant. Failed deliveries are retried after 1 min, 5 min, 30 min and 2 h; after that the webhook is turned off.')} <a href="${API_DOCS}#webhooks" target="_blank" rel="noopener noreferrer">${tr('How to verify the signature')}</a></div>
+  <div class="shint">${tr('Kalmido sends a signed POST request to your URL when something changes in lists you can see, for example to n8n or Home Assistant. Failed deliveries are retried after 1 min, 5 min, 30 min and 2 h; after that the webhook is turned off.')}</div>
+  <a class="slink" href="${API_DOCS}#webhooks" target="_blank" rel="noopener noreferrer">${tr('How to verify the signature')}</a>
   <div class="members" id="s-whs"><div class="muted mhint">${tr('Loading…')}</div></div>
   <div class="row"><button class="btn sm" data-wh="new">${ic('plus', 's')} ${tr('Add webhook')}</button></div>` : '';
 function whState(w) {
@@ -8032,9 +8170,9 @@ function shareHtml(hint) {
     <h5 class="ssub">${ic('phone', 's')}iPhone / iPad</h5>
     ${ios ? `<div class="row"><a class="btn sm" href="${esc(ios)}" target="_blank" rel="noopener noreferrer">${ic('plus', 's')} ${tr('Add the Kalmido shortcut')}</a></div>` : ''}
     <div class="row"><label for="s-dropurl">${tr('Server address')}</label><input id="s-dropurl" readonly value="${esc(dropBase(sh))}"><button class="btn sm" data-m="drop-copy-url">${ic('copy', 's')} ${tr('Copy')}</button></div>
-    <div class="shint keep">${tr('Without /drop: the shortcut adds it. (An address ending in /drop works too.)')}</div>
+    <div class="shint">${tr('Without /drop: the shortcut adds it. (An address ending in /drop works too.)')}</div>
     <div class="row"><label for="s-droptok">${tr('Upload token')}</label><input id="s-droptok" readonly type="password" value="••••••••••••" autocomplete="off"><button class="btn sm" data-m="drop-copy-tok">${ic('copy', 's')} ${tr('Copy')}</button><button class="btn sm" data-m="drop-new-tok" title="${esc(tr('The old token stops working'))}">${ic('key', 's')} ${tr('New token')}</button></div>
-    ${hintK(tr('After a new token: paste it into the iPhone shortcut (or set the shortcut up again) and download the HTTP Shortcuts import again.'))}
+    ${hint(tr('After a new token: paste it into the iPhone shortcut (or set the shortcut up again) and download the HTTP Shortcuts import again.'))}
     <details class="shelp sdet"><summary>${tr('Set it up in the Shortcuts app')}</summary><ol class="slist">
       ${ios ? `<li>${tr('Easiest: tap “Add the Kalmido shortcut” above, then Add Shortcut. It asks two questions: paste the server address (without /drop), then the upload token (copy them here first).')}</li>` : ''}
       <li>${tr('By hand: Shortcuts app > + (new shortcut), name it “Kalmido”.')}</li>
@@ -8645,10 +8783,10 @@ function oidcForm(o, hint) {
   }).join('');
   return `<details class="shelp sdet oidcform" ${o.configured ? '' : 'open'}><summary>${o.configured ? tr('Change the provider settings') : tr('Set up the provider')}</summary>
     ${f}
-    ${hintK(tr('Admin e-mail domains: comma-separated. Whoever logs in with a verified e-mail of one of them becomes an admin, like the admin group (and no longer is one otherwise; the last admin always stays).'))}
+    ${hint(tr('Admin e-mail domains: comma-separated. Whoever logs in with a verified e-mail of one of them becomes an admin, like the admin group (and no longer is one otherwise; the last admin always stays).'))}
     ${env.size ? hint(tr('Fields set with KALMIDO_OIDC_* environment variables are locked here: the environment always wins.')) : ''}
     ${o.secret_lost ? `<div class="shint cnote">${tr('The stored client secret cannot be read with the current KALMIDO_SECRET_KEY: enter it again.')}</div>` : ''}
-    ${!o.secret_key && !env.has('client_secret') ? hintK(tr('Without KALMIDO_SECRET_KEY on the server the client secret can only be set as an environment variable.')) : ''}
+    ${!o.secret_key && !env.has('client_secret') ? `<div class="shint iiok">${tr('Without KALMIDO_SECRET_KEY on the server the client secret can only be set as an environment variable.')}</div>` : ''}
     <div class="row"><button class="btn sm pri" data-oidc="save">${tr('Save')}</button>${o.configured ? `<button class="btn sm" data-oidc="check">${ic('check', 's')} ${tr('Check provider')}</button>` : ''}<a class="btn sm" href="${OIDC_DOCS}" target="_blank" rel="noopener noreferrer">${ic('help', 's')} ${tr('Provider guides')}</a></div>
     <div class="shint" id="oi-res" role="status" aria-live="polite"></div></details>`;
 }
@@ -8814,6 +8952,13 @@ async function setupChoices(el, logo) {
   let lang = I18N.code || 'en', preset = 'simple', picked, custOpen = false, start = '';
   const apply = k => { preset = k; picked = new Set(all.filter(x => !SETUP_PRESETS[k].off.includes(x))); };
   apply('simple');
+  // 2.13.2 (#478 F12): step 2 shown again after a reload (setup still pending) starts from what is on now, not from
+  // "Simple list" ("Start" would switch modules off again); a new account (all modules on = the default) keeps "Simple list"
+  const fs0 = st.settings?.features;
+  if (typeof fs0 === 'string' && !all.every(x => fs0.split(',').includes(x))) {  // everything on = the untouched default
+    const on = new Set(fs0.split(',')); picked = new Set(all.filter(x => on.has(x) && (x !== 'collab' || st.collab_all !== false) && (x !== 'time' || st.time_all !== false)));
+    preset = Object.keys(SETUP_PRESETS).find(k => all.every(x => picked.has(x) === !SETUP_PRESETS[k].off.includes(x))) || '';
+  }
   // 2.7.0 (K21): one question "Start with": empty, the sample project, or a project of a built-in type (agency, software, personal)
   const STARTS = [['', N_('Empty'), 'list', N_('Your Inbox and Today, nothing else')], ['sample', N_('Sample project'), 'eye', N_('A small video production with dates and a packing list, to look around; remove it any time under Settings > Data')],
     ...PTYPE_UI.slice(1).map(([k, n, i, d]) => [k, n, i, d])];
@@ -9876,7 +10021,7 @@ function povMsModal(l, m) {
   if (!isMobile()) setTimeout(() => $('#pm-name', md)?.focus(), 30);
 }
 async function povUpload(l, files) {
-  files = [...files].filter(Boolean);
+  files = noEmpty(files);
   if (!files.length) return;
   const max = 50 * 1024 * 1024, big = files.find(f => f.size > max);
   if (big) { toast(tr('{0} is larger than 50 MB', big.name)); return; }
@@ -10182,7 +10327,7 @@ function openQuickSheet(prefill = '', preset = {}) {
   }
   $('#scrim').classList.remove('hidden');
   document.body.classList.add('qsheet-open');  // 2.13.0 (#453 P8): the + button does not peek out behind the sheet
-  popOnClose = () => { q.remove(); S.quickPreset = {}; document.body.classList.remove('qsheet-open'); };
+  popOnClose = () => { q.remove(); S.quickPreset = {}; S.qMoved = false; document.body.classList.remove('qsheet-open'); };
   const nf = preset.files?.length || 0;
   const hint = [preset.due ? dayLabel(preset.due) + (preset.due_time ? ' ' + preset.due_time : '') : '', preset.content ? tr('Link as description') : '', preset.url ? tr('Link: {0}', urlHost(preset.url)) : '',
     nf ? (nf === 1 ? tr('Attachment: {0}', preset.files[0].name) : tr('{0} attachments', nf)) : ''].filter(Boolean).join(' · ');
@@ -10388,6 +10533,7 @@ document.addEventListener('click', async e => {
     case 'arch-restore': listArchive(+a.dataset.id, false); break;
     case 'arch-del': listDeleteForGood(+a.dataset.id); break;
     case 'refresh': refreshNow(); break;
+    case 'chat-unyield': closeDetail(); setTimeout(() => $('#chat-in')?.focus(), 30); break;  // 2.13.2 (#478 N1)
     case 'agband': LS.set('agband', LS.get('agband', true) === false); renderView(); break;
     case 'side-group': sideGroupToggle(a.dataset.g); break;
     case 'copy-id': copyTaskLink(+a.dataset.id); break;  // 2.13.0
@@ -11688,8 +11834,8 @@ function palAll() {
   add('a:density', 'action', dens === 'compact' ? tr('Density: comfortable') : tr('Density: compact'), 'sliders', () => { LS.set('density', dens === 'compact' ? 'comfortable' : 'compact'); applyDensity(); });
   // appearance (per device): only listed when searching, e.g. "font", "accent", "size", "theme"
   for (const [k, n] of THEMES) add('a:theme-' + k, 'action', tr('Color scheme: {0}', tr(n)), 'eye', () => lookSet('theme', k), {qonly: true});
-  if (fsPct() < 150) add('a:fsize-up', 'action', tr('Font size: larger'), 'plus', () => fsStep(5), {qonly: true, keys: 'Mod+='});
-  if (fsPct() > 50) add('a:fsize-down', 'action', tr('Font size: smaller'), 'sliders', () => fsStep(-5), {qonly: true, keys: 'Mod+-'});
+  if (fsPct() < FS_MAX) add('a:fsize-up', 'action', tr('Font size: larger'), 'plus', () => fsStep(5), {qonly: true, keys: 'Mod+='});
+  if (fsPct() > FS_MIN) add('a:fsize-down', 'action', tr('Font size: smaller'), 'sliders', () => fsStep(-5), {qonly: true, keys: 'Mod+-'});
   for (const v of FSIZE_ORDER) { const [, n, z] = LOOK.fsize.find(x => x[0] === v); add('a:fsize-' + v, 'action', tr('Font size: {0}', `${tr(n)} (${zPct(z)})`), 'sliders', () => lookSet('fsize', v), {qonly: true}); }
   for (const [v, n] of LOOK.font) add('a:font-' + v, 'action', tr('Font: {0}', tr(n)), 'edit', () => lookSet('font', v), {qonly: true});
   for (const [v, n, d, l] of LOOK.accent) add('a:accent-' + v, 'action', tr('Accent color: {0}', tr(n)), 'palette', () => lookSet('accent', v), {qonly: true, sw: light ? l : d});
@@ -12151,7 +12297,9 @@ async function waitJobsFresh() {
 const waitJobBtns = j => j.kind ? `<button class="btn sm pri" data-act="prop-open" data-jid="${j.id}">${tr('Review the proposal')}</button>`
   : `<button class="btn sm pri" data-act="job-do" data-jid="${j.id}" data-a="approve">\u{1F44D} ${tr('Approve')}</button><button class="btn sm" data-act="job-do" data-jid="${j.id}" data-a="reject">${ic('x', 's')} ${tr('Reject')}</button>`;
 function waitCard() {
-  if (S.route.key !== 'today' || !feat('agents') || !collab()) return '';
+  // 2.13.2 (#478 F14): like the agent pill and the chat, the card follows "agents share lists with me", not the Agents
+  // module (that is the tab + the band): what waits for my approval never disappears with a switch
+  if (S.route.key !== 'today' || !agentsOn()) return '';
   const js = waitJobs(); if (!js.length) return '';
   return `<section class="waitcard" aria-labelledby="wc-h"><h3 id="wc-h">${hdot('waiting')} ${esc(trn('{0} job waits for you', '{0} jobs wait for you', js.length))}</h3>
     ${js.slice(0, 5).map(j => `<div class="wcrow"><div class="wci"><b>${esc(j.title)}</b><span class="muted">${esc(j.agent_name)}${j.task_id ? ` · #${j.task_id} ${esc(j.task_title || '')}` : ''}</span></div><div class="wcb">${waitJobBtns(j)}</div></div>`).join('')}
@@ -12168,7 +12316,8 @@ function agBandHtml() {
     const what = t ? `<span class="mono">#${t.id}</span> ${esc(t.title)}` : esc(a.status_text || (st === 'offline' ? agentSt(a) : '–'));
     return `<button class="agb-a hs-${st}" data-act="team-agent" data-aid="${a.id}" title="${esc(agentHstLine(a))}"><span class="agb-h">${hdot(st)}<b>${esc(a.name)}</b><span class="muted">${esc(tr(AG_HST[st]))}</span></span><span class="agb-t">${what}</span><span class="agb-p ${st === 'working' && p === null ? 'run' : ''}" aria-hidden="true"><i style="width:${p ?? (st === 'working' ? 40 : 0)}%"></i></span></button>`;
   };
-  const wait = job ? `<div class="agb-w" role="group" aria-label="${esc(tr('{0} waits for you', job.agent_name))}"><div class="agb-wi"><span class="agb-h">${hdot('waiting')}<b>${esc(tr('{0} waits for you', job.agent_name))}</b></span><span class="agb-t">${job.task_id ? `<span class="mono">#${job.task_id}</span> ` : ''}${esc(job.title)}</span></div>${job.kind
+  // 2.13.2 (#478 N7): in Today the card "… waits for you" shows the same jobs: the band leaves its waiting cell out there
+  const wait = job && !(S.route.key === 'today' && waitCard()) ? `<div class="agb-w" role="group" aria-label="${esc(tr('{0} waits for you', job.agent_name))}"><div class="agb-wi"><span class="agb-h">${hdot('waiting')}<b>${esc(tr('{0} waits for you', job.agent_name))}</b></span><span class="agb-t">${job.task_id ? `<span class="mono">#${job.task_id}</span> ` : ''}${esc(job.title)}</span></div>${job.kind
     ? `<button class="btn sm pri" data-act="prop-open" data-jid="${job.id}">${tr('Review the proposal')}</button>`
     : `<button class="btn sm pri agb-ok" data-act="job-do" data-jid="${job.id}" data-a="approve" aria-label="${esc(tr('Approve'))}">\u{1F44D} ${tr('Yes|approve')}</button><button class="iconbtn agb-no" data-act="job-do" data-jid="${job.id}" data-a="reject" title="${esc(tr('Reject'))}" aria-label="${esc(tr('Reject'))}">✕</button>`}</div>` : '';
   const sum = ags.map(a => hdot(agentHst(a))).join('');
@@ -12224,8 +12373,10 @@ function reactHtml(c, ro) {
   const quick = ro ? [] : RX.slice(0, 2).filter(([k]) => !rs.some(r => r.emoji === k)).map(([k, em, name]) =>
     `<button class="rx add" data-act="c-react" data-cid="${c.id}" data-e="${k}" title="${esc(tr(name))}" aria-label="${esc(tr(name))}">${em}</button>`);
   const more = ro ? '' : `<button class="rx add rxplus" data-act="c-react-more" data-cid="${c.id}" title="${esc(tr('React with an emoji'))}" aria-label="${esc(tr('React with an emoji'))}">${ic('plus', 's')}</button>`;
-  const h = rs.map(pill).join('') + quick.join('') + more;
-  return h ? `<div class="rxbar">${h}</div>` : '';
+  // 2.13.2 (#478 F5): like the chat: given reactions stay as pills, the quick 👍 👎 + appear on hover / keyboard focus
+  // (desktop) or a long press (touch) as a small bar over the comment's corner
+  const q = quick.join('') + more;
+  return (rs.length ? `<div class="rxbar">${rs.map(pill).join('')}</div>` : '') + (q ? `<div class="rxbar cmrxq" role="group" aria-label="${esc(tr('React'))}">${q}</div>` : '');
 }
 function reactPicker(anchor, cid) {
   const p = openPop(anchor, `<div class="rxpick"><div class="rxgrid">${[...RX.map(x => [x[0], x[1], tr(x[2])]), ...RX_MORE.map(e => [e, e, e])].map(([k, em, n]) => `<button data-rx="${esc(k)}" title="${esc(n)}" aria-label="${esc(n)}">${em}</button>`).join('')}</div>
@@ -12817,6 +12968,7 @@ window.addEventListener('resize', () => { clearTimeout(chatRelT); chatRelT = set
 try { screen.orientation?.addEventListener('change', () => { clearTimeout(chatRelT); chatRelT = setTimeout(chatRelayout, 150); }); } catch { /* old browsers */ }
 S.chat = {aid: null, msgs: [], err: null};
 function chatOpen(aid) {
+  if (!chatFull() && document.body.classList.contains('chat-yield') && S.sel) closeDetail();  // 2.13.2 (#478 N1): the chat takes its place back
   if (chatFull()) { if (!/^#agents\//.test(location.hash)) S.chatBack = location.hash.slice(1); go('agents/' + aid); return; }
   S.chat = {aid: +aid, msgs: S.chat.aid === +aid ? S.chat.msgs : [], more: S.chat.aid === +aid && S.chat.more, err: null};
   let p = $('#achat');
@@ -12852,7 +13004,7 @@ function chatMsgs() {
   return older + S.chat.msgs.map(m => { const t = m.task_id && taskById(m.task_id), mine = m.from !== 'agent';
     // 2.7.2 (#422): my messages say Sent / Delivered (the agent fetched it); (#421) reactions, quick 👍 👎 ❤️ on the agent's
     const dlv = mine ? `<span class="cdlv ${m.delivered_at ? 'on' : ''}" title="${esc(m.delivered_at ? tr('Delivered') + ' · ' + fmtWhen(m.delivered_at) : tr('Sent'))}">${ic('check', 's')}${m.delivered_at ? ic('check', 's') : ''}<span>${m.delivered_at ? tr('Delivered') : tr('Sent')}</span></span>` : '';
-    return `<div class="cmsg ${mine ? 'me' : 'ag'}" data-k="m${m.id}" data-mid="${m.id}">${m.body ? `<div class="cbub">${!mine ? commentBody(m.body, {}) : esc(m.body).replace(/\n/g, '<br>')}</div>` : ''}${chatAttHtml(m)}${t ? `<button class="runtask" data-act="open-id" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : ''}${chatRxHtml(m, a)}<div class="cmeta"><time>${fmtWhen(m.created_at)}</time>${dlv}</div></div>`; }).join('')
+    return `<div class="cmsg ${mine ? 'me' : 'ag'}" data-k="m${m.id}" data-mid="${m.id}">${m.body ? `<div class="cbub">${commentBody(m.body, {})}</div>` : ''}${chatAttHtml(m)}${t ? `<button class="runtask" data-act="open-id" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : ''}${chatRxHtml(m, a)}<div class="cmeta"><time>${fmtWhen(m.created_at)}</time>${dlv}</div></div>`; }).join('')
     + (off ? `<div class="chpend off" data-k="off" role="status">${ic('clock', 's')}<span>${esc(tr('{0} is offline – will answer later', a.name))}</span></div>` : '');
 }
 // 2.13.1 (#465): the images / files of a chat message: thumbnails (lightbox on click) and file tiles; the sender removes
@@ -12871,7 +13023,7 @@ function chatAttHtml(m) {
 S.chatFiles = {};
 const chatFilesHtml = aid => (S.chatFiles[aid] || []).map((f, i) => `<span class="cfile">${ic(/^image\//.test(f.type) ? 'clip' : 'file', 's')}<span>${esc(f.name || tr('Image'))}</span><button type="button" data-act="chat-stage-rm" data-i="${i}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove') + ': ' + (f.name || tr('Image')))}">${ic('x', 's')}</button></span>`).join('');
 function chatAddFiles(files, aid = S.chat.aid) {
-  files = [...files].filter(Boolean); if (!files.length || !aid) return;
+  files = noEmpty(files); if (!files.length || !aid) return;
   const big = files.find(f => f.size > 50 * 1024 * 1024);
   if (big) { toast(tr('{0} is larger than 50 MB', big.name)); files = files.filter(f => f !== big); }
   const arr = S.chatFiles[aid] ||= [];
@@ -12942,12 +13094,12 @@ function chatRxHtml(m, a) {
 {
   let lp = null;
   document.addEventListener('touchstart', e => {
-    const m = e.target.closest?.('#chat-msgs .cmsg.ag'); if (!m || e.touches.length !== 1 || e.target.closest('button, a')) { lp = null; return; }
-    const p = e.touches[0]; lp = {m, x: p.clientX, y: p.clientY, t: setTimeout(() => { $$('#chat-msgs .cmsg.rxshow').forEach(x => x !== m && x.classList.remove('rxshow')); m.classList.add('rxshow'); if (navigator.vibrate) navigator.vibrate(10); lp = null; }, 450)};
+    const m = e.target.closest?.('#chat-msgs .cmsg.ag, #detail .cm:not(.cedit)'); if (!m || e.touches.length !== 1 || e.target.closest('button, a, textarea, input')) { lp = null; return; }
+    const p = e.touches[0]; lp = {m, x: p.clientX, y: p.clientY, t: setTimeout(() => { $$('.rxshow').forEach(x => x !== m && x.classList.remove('rxshow')); m.classList.add('rxshow'); if (navigator.vibrate) navigator.vibrate(10); lp = null; }, 450)};
   }, {passive: true});
   document.addEventListener('touchmove', e => { if (lp && Math.hypot(e.touches[0].clientX - lp.x, e.touches[0].clientY - lp.y) > 8) { clearTimeout(lp.t); lp = null; } }, {passive: true});
   document.addEventListener('touchend', () => { if (lp) { clearTimeout(lp.t); lp = null; } }, {passive: true});
-  document.addEventListener('click', e => { if (!e.target.closest?.('.cmsg.rxshow .chrxq')) $$('#chat-msgs .cmsg.rxshow').forEach(x => !x.contains(e.target) && x.classList.remove('rxshow')); }, true);
+  document.addEventListener('click', e => { if (!e.target.closest?.('.rxshow .chrxq, .rxshow .cmrxq')) $$('.rxshow').forEach(x => !x.contains(e.target) && x.classList.remove('rxshow')); }, true);
 }
 async function chatReact(mid, emoji) {
   const aid = S.chat.aid, m = S.chat.msgs.find(x => x.id === mid); if (!aid || !m) return;
@@ -13031,6 +13183,7 @@ function chatPatch(o = {}) {
   const box = $('#chat-msgs'); if (!box) return;
   const a = agentById(S.chat.aid), near = chatNear(box), top = box.scrollTop, h = box.scrollHeight, last = +(box.dataset.last || 0);
   patchKids(box, chatMsgs());
+  if (chatRO && !box._ro) { box._ro = 1; chatRO.observe(box); }
   const ms = S.chat.msgs, nl = ms.length ? ms[ms.length - 1].id : 0; box.dataset.last = nl;
   if (o.keep) box.scrollTop = top + box.scrollHeight - h;
   else if (near || o.bottom) { box.scrollTop = box.scrollHeight; chatNewPill(false); S.chat.pin = true; }
@@ -13045,10 +13198,15 @@ const chatNear = box => box.scrollHeight - box.scrollTop - box.clientHeight <= 3
 // bottom stays at the bottom, so the newest message is right above the input
 function chatFit() {
   const v = $('#view .chview');
-  if (!v || !chatFull()) { document.body.classList.remove('kb-open'); if (v) v.style.height = ''; return; }
+  if (!v || !chatFull()) { document.body.classList.remove('kb-open'); if (v) v.style.height = ''; chatKeepBottom(); return; }
   const vv = window.visualViewport, bottom = vv ? vv.offsetTop + vv.height : innerHeight, box = $('#chat-msgs');
   const kb = !!vv && editFocused() && v.contains(document.activeElement) && vv.height < (S.vvMax || innerHeight) - 120;
   document.body.classList.toggle('kb-open', kb);
+  // 2.13.2 (#478 N8): iOS pushes the page up for the keyboard (visual viewport offsetTop > 0, the layout keeps its
+  // height): the chat then sits exactly in the visible part (top: --vvt, height: --vvh), header with Back included
+  const push = kb && vv.offsetTop > 1;
+  if (v.classList.contains('vvfix') !== push) v.classList.toggle('vvfix', push);
+  if (push) { if (box && S.chat.pin !== false) box.scrollTop = box.scrollHeight; return; }
   const tabs = $('#tabs'), tb = tabs && getComputedStyle(tabs).display !== 'none' ? tabs.getBoundingClientRect().height : 0;
   const h = Math.max(160, Math.floor(bottom - v.getBoundingClientRect().top - tb)) + 'px';
   if (v.style.height !== h) v.style.height = h;
@@ -13057,6 +13215,10 @@ function chatFit() {
 window.addEventListener('resize', () => chatFit());
 document.addEventListener('focusin', e => { if (e.target.id === 'chat-in') setTimeout(chatFit, 0); });
 document.addEventListener('focusout', e => { if (e.target.id === 'chat-in') setTimeout(chatFit, 0); });
+// 2.13.2 (#478 N10): the side panel too stays at the bottom when its height changes (a smaller window, an iPad keyboard,
+// the box growing while typing) as long as it was at the bottom
+function chatKeepBottom() { const b = $('#chat-msgs'); if (b && S.chat.pin !== false) b.scrollTop = b.scrollHeight; }
+const chatRO = typeof ResizeObserver === 'function' ? new ResizeObserver(() => chatKeepBottom()) : null;
 function chatNewPill(on) { const b = $('#chat-new'); if (b && b.classList.contains('hidden') === on) b.classList.toggle('hidden', !on); }
 function chatBottom() { const box = $('#chat-msgs'); if (box) box.scrollTop = box.scrollHeight; chatNewPill(false); }
 document.addEventListener('scroll', e => { if (e.target.id !== 'chat-msgs') return; S.chat.pin = chatNear(e.target); if (S.chat.pin) chatNewPill(false); }, true);
@@ -13092,7 +13254,7 @@ function patchKids(box, html) {
   [...box.childNodes].forEach(c => { if (c.nodeType === 3) c.remove(); });
 }
 async function chatSend() {
-  const ta = $('#chat-in'), aid = S.chat.aid; if (!ta || !aid) return;
+  const ta = $('#chat-in'), aid = S.chat.aid, hadF = document.activeElement === ta; if (!ta || !aid) return;
   const body = ta.value.trim(), files = S.chatFiles[aid] || []; if (!body && !files.length) return;
   // 2.13.1 (#465): with files a multipart form (the text may then be empty)
   let payload = {body};
@@ -13104,12 +13266,14 @@ async function chatSend() {
   catch (e) { toast(e instanceof Offline ? tr('You are offline: the message was not sent and stays in the box') : e.message); }
   finally { S.chat.sending = false; if (btn) btn.disabled = false; }
   chatDraw({bottom: sent});
-  // 2.0.8 (#320): on a phone a sent message closes the keyboard (the answer gets the whole screen); the desktop keeps
-  // typing, and a message that was not sent keeps the focus everywhere
+  // 2.13.2 (#478 N9, replaces #320): sending never closes the keyboard (back and forth like a messenger); the box keeps
+  // its focus where it had it (a tap on Send does not take it, see below), a desktop always types on
   const ci = $('#chat-in');
-  if (sent && isMobile()) { ci?.blur(); if (document.activeElement?.id === 'chat-in') document.activeElement.blur(); autosize(ci); }
-  else ci?.focus();
+  if (sent) autosize(ci);
+  if (ci && (hadF || !isTouch())) ci.focus({preventScroll: true});
 }
+// 2.13.2 (#478 N9): "New message ↓" and Send do not take the focus from the chat box (the phone keyboard stays up)
+for (const ev of ['pointerdown', 'mousedown']) document.addEventListener(ev, e => { if (document.activeElement?.id === 'chat-in' && e.target.closest?.('#chat-new, [data-act="chat-send"], .chclip')) e.preventDefault(); });
 document.addEventListener('keydown', e => {
   if (e.target.id !== 'chat-in') return;
   if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); chatSend(); }
@@ -13851,7 +14015,10 @@ function taskTypers(t) {
 }
 function typingHtml(ags, id) {
   if (!ags.length) return `<div class="atyping hidden" id="${id}" role="status" aria-live="polite"></div>`;
-  return `<div class="atyping" id="${id}" role="status" aria-live="polite"><span class="atdots" aria-hidden="true"><i></i><i></i><i></i></span><span class="ttx">${ags.map(a => esc(tr('{0} is writing …', a.name)) + (a.status_text ? ` <span class="muted">· ${esc(a.status_text)}</span>` : '')).join('<br>')}</span></div>`;
+  // 2.13.2 (#478 F6): "is writing …" (dots) only for a real typing signal (or the chat's answer on its way); an agent that
+  // only reports "working" on the task "is working on it"
+  const wr = a => id === 'chat-typing' || (a.typing || 0) - agentAge() > 0, any = ags.some(wr);
+  return `<div class="atyping" id="${id}" role="status" aria-live="polite">${any ? '<span class="atdots" aria-hidden="true"><i></i><i></i><i></i></span>' : hdot('working')}<span class="ttx">${ags.map(a => esc(wr(a) ? tr('{0} is writing …', a.name) : tr('{0} is working on it', a.name)) + (a.status_text ? ` <span class="muted">· ${esc(a.status_text)}</span>` : '')).join('<br>')}</span></div>`;
 }
 const agentBusyState = () => { const ags = (S.agents || []).filter(a => a.enabled && !agentOffline(a)); return ags.some(a => a.status === 'working') ? 'working' : ags.some(a => a.status === 'waiting' || a.waiting) ? 'waiting' : ''; };
 const agentStatusLines = () => (S.agents || []).filter(a => a.enabled && a.status !== 'idle').map(agentHstLine);  // 2.13.0 (#453 P10): no stale status text while not connected

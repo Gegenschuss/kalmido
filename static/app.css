@@ -693,7 +693,7 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 .att{position:relative;border-radius:var(--radius);background:var(--bg3);border:1px solid var(--line)}
 .att.img{width:5.375rem;height:5.375rem;overflow:hidden}
 .att.img img{width:100%;height:100%;object-fit:cover;display:block}
-.att.file a{display:flex;align-items:center;gap:.5rem;padding:.5rem 1.875rem .5rem .625rem;max-width:15rem;color:var(--text);text-decoration:none;height:100%}
+.att.file a,.att.file .attx{display:flex;align-items:center;gap:.5rem;padding:.5rem 1.875rem .5rem .625rem;max-width:15rem;color:var(--text);text-decoration:none;height:100%}
 .att.file svg{color:var(--accent);flex:none}
 .att .an{font-size:.8125rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .att .as{font-size:.6875rem;color:var(--muted);white-space:nowrap}
@@ -2124,7 +2124,12 @@ body.kb-open #tabs,body.kb-open #fab,body.kb-open .chview .chnote{display:none}
 .rxgrid button{font-size:1.125rem;line-height:1;padding:.3125rem 0;border-radius:var(--r-s)}
 .rxgrid button:hover,.rxgrid button:focus-visible{background:var(--bg3)}
 .rxcustom{display:flex;gap:.375rem}.rxcustom input{flex:1;min-width:0}
-@media (min-width:1000px){body.chat-open #main{margin-right:min(26rem,40vw)}}  /* 2.13.0: the main area resizes beside the panel */
+/* 2.13.0: the app resizes beside the panel. 2.13.2 (#478 N1): the whole app (sidebar | list | task), not only the list
+   area: the task panel sat under the chat. Without room for all three the task takes the chat's place (body.chat-yield) */
+@media (min-width:1000px){body.chat-open:not(.chat-yield) #app{margin-right:min(26rem,40vw)}}
+body.chat-yield #achat{display:none}
+.dchatb{display:none!important}
+@media (min-width:1000px){body.chat-yield .dchatb{display:inline-flex!important}}
 /* ---- 2.0.2: comments under the description (#242), inline title edit (#182), section "+" (#283), list icons (#245),
    agent typing / working indicators (#299), iOS home-screen gap (#286) */
 .md.clamp{max-height:calc(8 * 1.45em);overflow:hidden;-webkit-mask-image:linear-gradient(#000 62%,transparent);mask-image:linear-gradient(#000 62%,transparent)}
@@ -3343,3 +3348,66 @@ svg.logo{color:var(--acc-d,var(--accent));flex:none}
 .modal .lsnrow .lbl{min-width:8.75rem;color:var(--muted);font-size:var(--fs-m)}
 .modal .lsnrow .lsnag{min-width:0;color:var(--text)}
 .modal .lsnrow .lsnag input{flex:none}
+/* 2.13.2 (#478 N8): iOS keyboard pushed the page up: the phone chat sits in the visible part (header with Back stays) */
+.chview.vvfix{position:fixed;top:var(--vvt,0);left:0;right:0;height:var(--vvh,100dvh)!important;z-index:40;background:var(--bg)}
+/* 2.13.2 (#478 N4): markdown in comments and chat bubbles, compact */
+.md.mdc{line-height:1.5;cursor:auto;min-height:0}
+.mdc p{margin:0 0 .25rem}.mdc>:last-child{margin-bottom:0}.mdc>:first-child{margin-top:0}
+.mdc h4,.mdc h5,.mdc h6{margin:.375rem 0 .125rem;font-size:.875rem;font-weight:650}
+.mdc h4{font-size:.9375rem}
+.mdc ul,.mdc ol{margin:.125rem 0 .25rem;padding-left:1.125rem}
+.mdc li.cb{margin-left:-1.125rem}
+.md.mdc li.cb input[type=checkbox]{cursor:default}
+/* 2.13.2 (#478 N5): smaller font sizes (75 % and up) never bend the done circles: fixed square, the 44 px hit area comes
+   from ::after; the smallest labels keep at least ~90 % of their normal size */
+.chk{aspect-ratio:1}
+@media (pointer:coarse){
+  :root.ui-small .chk{min-height:0!important;min-width:0!important}
+  :root.ui-small .chk::after{inset:calc((.875rem - 2.75rem / var(--ui)) / 2)}
+}
+:root.ui-small{--fs-xs:max(.6875rem, calc(.6875rem * .9 / var(--ui)));--fs-s:max(.75rem, calc(.75rem * .9 / var(--ui)))}
+/* 2.13.2 (#478 F1): long Kanban columns: the cards never shrink below their content (two-line titles ran into the next
+   card); F2: the task number in cards (Kanban, matrix) is a compact label, no 3rem column; F3: the matrix quadrants share
+   the width (long titles / French headers pushed the right ones out of view) */
+.kcards>*{flex-shrink:0}
+.kcards .tgut,.quad .tgut{min-width:0}
+.kcards .trow,.quad .trow{gap:.5rem}
+.matrix{grid-template-columns:repeat(2,minmax(0,1fr))}
+.quad{min-width:0}
+.quad h3{flex-wrap:wrap}
+.quad .trow .ttl{overflow-wrap:anywhere}
+@media (max-width:899px){ .matrix{grid-template-columns:minmax(0,1fr)} }
+/* 2.13.2 (#478 F5): comments: one head per author group; the quick reactions only on hover / focus / long press */
+.cm{position:relative}
+.cm.grp{padding-top:0}
+.cm.grp>.cmav,.cm.grp>.avatar{visibility:hidden;height:0}
+.cm.grp .chead>b,.cm.grp .chead .abadge{display:none}
+.cm.grp .chead{font-size:var(--fs-xs)}
+.cmrxq{position:absolute;top:-.75rem;right:.25rem;z-index:3;padding:.125rem;margin:0;border-radius:62.5rem;background:var(--bg2);border:1px solid var(--line2);box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .12s}
+@media (hover:hover){ .cm:hover .cmrxq{opacity:1;pointer-events:auto} }
+.cm:focus-within .cmrxq,.cm.rxshow .cmrxq{opacity:1;pointer-events:auto}
+.cmrxq .rx.add{border-color:transparent}
+@media (pointer:coarse){ .cmrxq .rx{min-width:2.75rem;min-height:2.75rem;justify-content:center} }
+/* 2.13.2 (#478 F8): offline / waiting changes in the task header on phones */
+#stale.indet{position:static;transform:none;box-shadow:none;max-width:9.5rem;min-height:2.75rem;padding:0 .5rem;font-size:var(--fs-xs);background:var(--bg3);flex:0 1 auto;min-width:0}
+/* 2.13.2 (#478 F10): avatar initials with more contrast (accent mixed with the text colour, light and dark) */
+.avatar{color:color-mix(in srgb,var(--accent) 55%,var(--text))}
+/* F11: touch targets: "Set status", the assignee pictures (hit area 44 px, the picture stays small) */
+@media (pointer:coarse){
+  .stpill{min-height:2.75rem}
+  .whob{position:relative}
+  .whob::after{content:"";position:absolute;inset:-.625rem}
+}
+.meta .who.me,.tcols .who.me,.whob .who.me{color:color-mix(in srgb,var(--accent) 55%,var(--text))}
+/* 2.13.2 (#478 F13): phones: "More ›" over the right end of the settings tab strip while tabs are hidden to the right */
+.snmore{display:none}
+@media (max-width:899px){
+  .sbody{position:relative}
+  .snmore{display:inline-flex;align-items:center;position:absolute;top:0;right:0;height:2.75rem;padding:0 .75rem 0 2rem;border:0;font:inherit;font-size:var(--fs-s);font-weight:600;color:var(--accent);background:linear-gradient(90deg,transparent,var(--bg2) 45%);z-index:2;cursor:pointer}
+  .snmore.hidden{display:none}
+  .snav{scroll-padding-inline:1rem 5.5rem;padding-right:5.5rem}
+}
+/* 2.13.2 (#478): settings: the link of a helper text that went behind (i) stays as one small line */
+.slink{display:inline-flex;align-items:center;font-size:var(--fs-s);color:var(--accent);margin:.125rem 0 .375rem;text-decoration:none}
+.slink:hover{text-decoration:underline}
+@media (pointer:coarse){ .slink{min-height:2.75rem;margin:0} }

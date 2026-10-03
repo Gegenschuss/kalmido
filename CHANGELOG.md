@@ -7,6 +7,40 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.13.2] - 2026-10-03
+
+**In short:** Polish from the independent re-review of 2.13.0 (#478): on a desktop the task opens next to the chat
+instead of under it, the keyboard focus survives live updates, Markdown in comments and chat, and many smaller fixes on
+phones, the Fold and the desktop.
+
+### Fixed
+- Desktop with the agent chat open (#478 N1, a 2.13.0 regression): list, task and chat sit side by side; where all three
+  do not fit, the task takes the chat's place and a chat button in its header (or the agent pill) brings it back.
+- Keyboard (N2): live updates (agents, comments, jobs) no longer move the Tab position: a focused button or cell keeps
+  its node, the area around it is updated in place.
+- Fold (N3): a half-typed "Add task" text moves into the phone's quick sheet when folding (with focus and caret) and back
+  when unfolding.
+- Comments and the agent chat (N4) render Markdown like task descriptions: headings, lists, read-only checkboxes.
+- Font size (N5): 75-150 % (50 % was unreadable; a stored lower value counts as 75 %); the done circles stay round.
+- Empty files (N6): 0-byte uploads are refused with a clear message (task files, comments, chat, project files, /drop,
+  the ntfy inbox); old empty files say "File damaged or missing".
+- Today on a desktop (N7): a waiting approval shows once (the card), not also in the agent band.
+- iPhone (N8): when the keyboard pushes the page up, the chat stays in the visible part, header with Back included.
+- Phone chat (N9): "New message ↓" and Send keep the keyboard up (replaces #320's close-after-send).
+- Chat panel (N10): stays at the bottom when the window gets lower or the box grows.
+- Kanban cards of long columns no longer overlap; the task number in cards is a compact label; the matrix fits narrow
+  windows without a horizontal scroll bar (F1-F3).
+- Search: "#id" (or the only hit) + Enter opens the task (F4).
+- Agent comments in a row are grouped, their quick reactions show on hover / focus / long press like in the chat (F5);
+  "is writing …" only for a real typing signal, otherwise "is working on it" (F6).
+- A field conflict shows only the calm bar under the field, no extra toast (F7); offline with a task open on a phone
+  shows in the task header (F8).
+- Accessibility: Kanban column menus have a name (F9), avatar initials have more contrast (F10), 44 px touch targets
+  for "Set status" and assignee pictures (F11).
+- Setup step 2 after a reload starts from the modules that are on (F12); the settings tab strip on phones shows
+  "More ›" while tabs are hidden (F13); the "Waiting for you" card in Today follows the agents like the agent pill (F14).
+- Settings › Integrations and Administration: fewer inline helper texts, the rest behind (i).
+
 ## [2.13.1] - 2026-10-03
 
 **In short:** Screenshots for agents: images and files in the agent chat, agents can read attachments, a behaviour
@@ -649,7 +683,8 @@ of people.
   multi-arch image (`ghcr.io/gegenschuss/kalmido`, linux/amd64 and linux/arm64), an installable web app that works
   offline, English and German.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.13.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.13.2...HEAD
+[2.13.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.13.2
 [2.13.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.13.1
 [2.13.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.13.0
 [2.12.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.12.2
