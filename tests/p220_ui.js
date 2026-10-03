@@ -46,7 +46,7 @@ const taskOf = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)
   const BOB = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123'})).id;
   const CKB = await login('bob');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en'}, CKB);
-  const ag = await call('POST', '/api/admin/agents', {username: 'claude', display_name: 'Claude'});
+  const ag = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'claude', display_name: 'Claude'});
   const P = (await call('POST', '/api/lists', {name: 'App', kind: 'project'})).id;
   await call('PUT', `/api/lists/${P}/members`, {user_id: BOB, role: 'edit'});
   await call('PUT', `/api/lists/${P}/members`, {user_id: ag.id, role: 'edit'});

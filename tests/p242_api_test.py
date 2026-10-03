@@ -94,7 +94,7 @@ def kinds(cl, kind, since=0):
 
 
 def new_agent(a, name, **extra):
-    r = a.post(B + "/api/admin/agents", json={"username": name, "display_name": name.title(), **extra})
+    r = a.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": name, "display_name": name.title(), **extra})
     assert r.status_code in (200, 201), r.text
     return r.json()["id"], Api(r.json()["token"])
 

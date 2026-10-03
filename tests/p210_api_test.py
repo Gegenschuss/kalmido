@@ -316,7 +316,7 @@ check(r.ok and r.json()["waiting"]["note"] == "the office" and r.json()["waiting
 check(bv.delete(f"/tasks/{BT}/waiting").json()["waiting"] is None, "v1 DELETE waiting")
 check(bv.put(f"/tasks/{BT}/waiting", json={"note": 5}).status_code == 400, "v1: note must be text")
 # the follow-up day: push + News for the person, followup_due for the following agent, once
-r = A.post(B + "/api/admin/agents", json={"username": "claude", "display_name": "Claude"})
+r = A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "claude", "display_name": "Claude"})
 AG, AGTOK = r.json()["id"], r.json()["token"]
 assert A.put(B + f"/api/lists/{TEAM}/members", json={"user_id": AG, "role": "edit"}).ok
 cl = Api(AGTOK)

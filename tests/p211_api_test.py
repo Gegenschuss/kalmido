@@ -133,9 +133,9 @@ for x in (A, Bo, Ge):
 aphone, bphone = Browser("/push/alice"), Browser("/push/bob")
 check(A.post(B + "/api/push/subs", json=aphone.sub("Phone")).ok and Bo.post(B + "/api/push/subs", json=bphone.sub("Phone")).ok, "subscribed")
 
-r = A.post(B + "/api/admin/agents", json={"username": "claude", "display_name": "Claude"})
+r = A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "claude", "display_name": "Claude"})
 AG, AGTOK = r.json()["id"], r.json()["token"]
-r = A.post(B + "/api/admin/agents", json={"username": "codex", "display_name": "Codex"})
+r = A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "codex", "display_name": "Codex"})
 AG2, AG2TOK = r.json()["id"], r.json()["token"]
 cl, cx = Api(AGTOK), Api(AG2TOK)
 

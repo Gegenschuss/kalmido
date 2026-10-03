@@ -62,7 +62,7 @@ By default the server binds to `127.0.0.1`. It rejects requests with an `Origin`
 | `get_job` / `submit_proposal` | 2.3.0: one job (a proposal job with its input) / answer a `job_request` with a structured proposal ([Proposals](../docs/AGENTS.md#proposals)) | `/api/v1/agent/jobs/{id}`, `.../proposal` |
 | `list_chats` / `send_chat` | chat with people; 2.13.1: `send_chat` takes `files: [{name, base64, mime?}]` (multipart) | `GET /api/v1/agent/chats`, `POST /api/v1/agent/chats/{user_id}` |
 | `list_attachments` | 2.13.1: files of a task and its comments (`id`, `name`, `mime`, `size`, `comment_id`) | `GET /api/v1/tasks/{id}/attachments` |
-| `get_attachment` | 2.13.1: one file as base64 + `mime` / `name` / `size` (`source`: `task` or `chat`, `max_bytes` default 5 MB, max 20 MB); images also as an MCP image item | `GET /api/v1/attachments/{id}`, `GET /api/v1/chat-attachments/{id}` |
+| `get_attachment` | 2.13.1: one file as base64 + `mime` / `name` / `size` (`source`: `task`, `chat` or (2.15.0) `project` with `list_id`, `max_bytes` default 5 MB, max 20 MB); images also as an MCP image item | `GET /api/v1/attachments/{id}`, `GET /api/v1/chat-attachments/{id}` |
 | `chat_typing` | typing dots in one person's chat for 10 s (2.4.1) | `POST /api/v1/agent/typing` |
 | `react_to_chat` | 2.7.2: 👍 / 👎 / ❤️ on a chat message (`user_id`, `message_id`, `emoji`, `on`, default true); a person's 👍 on your message arrives as a `reaction` event with `approval: "approved"` | `POST /api/v1/agent/chats/{user_id}/messages/{id}/reactions` |
 | `tidy_task` | tidy a task (lists in tidy mode "auto") | `POST /api/v1/tasks/{id}/tidy` |
@@ -77,6 +77,25 @@ By default the server binds to `127.0.0.1`. It rejects requests with an `Origin`
 | `get_project_overview` | 2.7.1: the overview of a project list (description, key links, milestones, files, members, status, time), read-only | `GET /api/v1/lists/{id}/overview` |
 | `request_merge_approval` | 2.2.0: a *Ready to merge* comment for your pull request (`task_id`, `pr_url`, `summary`); wait for the `reaction` event with `approval: "approved"` before merging | `POST /api/v1/tasks/{id}/comments` with `suggestion.kind = merge_request` |
 | `get_usage` | 2.1.1: the agent's own usage by day, task, list or model, with its limit | `GET /api/v1/agent/usage` |
+
+2.15.0 (#479): the rest of the REST API as tools. Each needs the permission (scope) of its REST call; `tools/list`
+shows only the tools the token may use (from `GET /api/v1/me`, refreshed every 5 minutes):
+
+| Tools | Scope | REST calls |
+|---|---|---|
+| `get_me`, `get_list`, `list_members`, `list_sections`, `list_folders`, `list_fields`, `list_templates`, `list_filters`, `list_subtasks`, `get_dependencies`, `list_trash`, `list_tags`, `get_roadmap`, `get_group`, `list_project_files`, `get_timer`, `list_time_entries`, `list_habits`, `list_news`, `list_agents` | read | `GET` routes |
+| `move_task` (list / section / parent + `before_id`, `after_id` or `position` top / bottom), `batch_tasks` (update, complete, reopen, wont_do; delete / restore also need *delete*), `reopen_task`, `skip_occurrence`, `take_task`, `add_subtask`, `add_dependency`, `remove_dependency`, `create_habit`, `update_habit`, `check_in_habit`, `shift_list_dates` | tasks:write | `POST /tasks/{id}/move`, `POST /tasks/batch`, … |
+| `update_comment`, `delete_comment`, `mark_news_read`, `delete_chat_attachment` | comments | `PATCH` / `DELETE /comments/{id}`, `POST /news/read` |
+| `create_list`, `update_list`, `share_list`, `unshare_list`, `share_list_with_group`, `unshare_list_from_group`, `create_section`, `rename_section`, `reorder_sections`, `rename_folder`, `delete_folder`, `create_field`, `update_field`, `create_list_tag`, `update_list_tag`, `delete_list_tag`, `create_template`, `update_template`, `apply_template`, `create_filter`, `update_filter`, `set_project_overview`, `set_project_status`, `add_project_link`, `update_project_link`, `delete_project_link`, `reorder_project_links`, `add_milestone`, `update_milestone`, `delete_milestone` | structure | lists, sections, folders, fields, list tags, templates, filters, overview |
+| `delete_task`, `restore_task`, `empty_trash`, `delete_list`, `delete_section`, `delete_field`, `delete_template`, `delete_filter`, `delete_habit` | delete | `DELETE …`, `POST /tasks/{id}/restore` |
+| `get_attachment` (also `source: project` + `list_id`) | attachments:read | `GET /attachments/{id}`, `/lists/{id}/files/{id}` |
+| `upload_attachment` (`files: [{name, base64, mime?}]`), `delete_attachment`, `upload_project_file`, `delete_project_file` | attachments:write | multipart uploads |
+| `start_timer`, `stop_timer`, `add_time_entry`, `update_time_entry`, `delete_time_entry` | time | `/time/timer`, `/time/entries` |
+| `export_data` | export | `GET /export` |
+
+An agent's dangerous requests (deleting a list or a field, emptying the trash, batches of 10+ tasks, moving lists,
+folders, sharing) answer `approval_required` with a waiting job: a person approves it in Kalmido and the agent gets the
+result as a `job` event. `tests/parity_test.py` fails when a REST route has no tool (or no documented reason).
 
 API errors come back as tool results with `isError: true` and the API's message, for example `HTTP 403: No permission (view only)`.
 
@@ -121,7 +140,7 @@ The env file holds `KALMIDO_URL` and `KALMIDO_TOKEN` (optional `KALMIDO_USAGE_PR
 
 ## Security
 
-- The token has exactly the agent's permissions: only the lists shared with it, never admin rights, no Paperless access. An admin can pause the agent at any time. A paused agent's token stops working at once.
+- The token has exactly the agent's permissions: only the lists shared with it, only its scopes (2.15.0), never admin rights, no Paperless access. An admin can pause the agent at any time. A paused agent's token stops working at once.
 - Keep the token out of shared config files. The server never prints or logs it.
 - A person can chat with the agent even if they cannot see every list the agent sees. The agent must not quote content from lists that this person cannot see.
 
@@ -129,6 +148,7 @@ The env file holds `KALMIDO_URL` and `KALMIDO_TOKEN` (optional `KALMIDO_USAGE_PR
 
 ```sh
 python3 tests/mcp_test.py   # stub API server, stdio + HTTP; no Docker needed
+python3 tests/parity_test.py   # app routes -> API routes -> MCP tools (no Docker)
 python3 tests/usage_hook_test.py   # the usage hook against a stub API with a sample transcript
 python3 tests/launcher_ps1_test.py # agent_launcher.ps1 against a stub API (needs pwsh; skipped without it)
 ```

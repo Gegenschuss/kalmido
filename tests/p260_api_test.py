@@ -39,7 +39,7 @@ subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], check=True, stdout=s
 requests.post(B + "/api/auth/setup", headers=H, json={"username": "alice", "display_name": "Alice", "password": "password123"})
 A = sess("alice")
 A.patch(B + "/api/settings", json={"features": "collab,agents", "lang": "en", "tour": "done"})
-ag = A.post(B + "/api/admin/agents", json={"username": "claude", "display_name": "Claude"}).json()
+ag = A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "claude", "display_name": "Claude"}).json()
 AID, TOK = ag["id"], ag["token"]
 V = requests.Session()
 V.headers.update({"Authorization": "Bearer " + TOK})

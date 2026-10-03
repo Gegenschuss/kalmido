@@ -464,7 +464,7 @@ check(r.status_code == 400, "API: unknown query parameter")
 check(requests.post(V + "/import/ics", files={"file": ("x.ics", b"nope")}).status_code == 401, "API: no token")
 spec = requests.get(V + "/openapi.json").json()
 op = spec["paths"]["/import/{source}"]["post"]
-check(op["x-kalmido-scope"] == "write" and "multipart/form-data" in op["requestBody"]["content"] and "/imports/{id}/undo" in spec["paths"],
+check(op["x-kalmido-scope"] == "structure" and "multipart/form-data" in op["requestBody"]["content"] and "/imports/{id}/undo" in spec["paths"],
       "OpenAPI documents the import")
 
 # ================================================================== limits (own container: 1 MB, 30 tasks, 3 imports per 10 min)

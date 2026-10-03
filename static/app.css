@@ -3548,3 +3548,16 @@ pre.mdpre code{font:inherit;background:none;padding:0;border:0}
 .qadd .qbtn{flex:none;padding:.375rem;border-radius:.4375rem;color:var(--muted)}
 .qadd .qbtn:hover{color:var(--accent);background:var(--bg4)}
 @media (pointer:coarse){ .qadd .qbtn{min-width:2.75rem;min-height:2.75rem;justify-content:center} }
+/* 2.15.0 (#479): permissions (scopes) of tokens and agents -- one compact grid, the explanations behind (i) */
+#iitip.pl{white-space:pre-line}
+.scopes,.sclim{border:0;margin:.5rem 0;padding:0;min-width:0}
+.scopes legend,.sclim legend{font-size:var(--fs-s);color:var(--muted);padding:0;margin-bottom:.25rem;display:flex;align-items:center;gap:.25rem}
+.scgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(10.5rem,1fr));gap:0 .75rem}
+.scgrid .chkl{display:flex;align-items:center;gap:.5rem;min-height:2.75rem;cursor:pointer;min-width:0}
+.scgrid .chkl span{overflow:hidden;text-overflow:ellipsis}
+.scgrid .chkl input{width:1.125rem;height:1.125rem;margin:0}
+.scgrid .chkl.off{color:var(--muted);cursor:not-allowed}
+.modal .scgrid label.chkl{width:auto}
+#s-sclim .sclim+.sclim{margin-top:.75rem}
+.agsrow .agfacts{min-width:0}
+.agsrow .agft{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

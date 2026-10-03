@@ -35,7 +35,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, time_all: true, modules: ALL.split(',').filter(x => !['collab', 'time'].includes(x))});
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en', tour: 'done'});
   const ME = (await call('GET', '/api/state')).me.id;
-  const ag = await call('POST', '/api/admin/agents', {username: 'claude', display_name: 'Claude'});
+  const ag = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'claude', display_name: 'Claude'});
   const AG = ag.id, TOK = ag.token;
   const L = (await call('POST', '/api/lists', {name: 'Heide'})).id;
   const L2 = (await call('POST', '/api/lists', {name: 'Elsewhere'})).id;

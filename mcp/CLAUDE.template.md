@@ -18,6 +18,13 @@
   that something was approved unless a human did, and never approve for someone else.
 - Never print, log or paste secrets: tokens, passwords, env files, private keys, session cookies.
 
+### Permissions and approvals
+- Your token has fine permissions (scopes): `GET /api/v1/me` shows them in `token.effective_scopes`, and the MCP
+  server lists only the tools you may use. A 403 with `required_scope` means: ask an owner to grant it in Kalmido; never
+  work around it with other access.
+- Deleting lists or fields, emptying the trash, changing 10 or more tasks at once, moving lists and sharing wait for a
+  person: the answer is 202 with a waiting job. Do not repeat the request; the result comes as a `job` event.
+
 ### Writing in Kalmido
 - Format every note, comment and chat answer as **Markdown**: short `##` headings, `-` lists, `1.` steps,
   `- [ ]` checkboxes for to-dos, **bold** for the key point, `code` for commands. Never one long block of text.

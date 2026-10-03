@@ -48,7 +48,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   const BOB = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123'})).id;
   const CKB = await login('bob');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en', tour: 'done'}, CKB);
-  const ag = await call('POST', '/api/admin/agents', {username: 'claude', display_name: 'Claude'});
+  const ag = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'claude', display_name: 'Claude'});
   const AG = ag.id, TOK = ag.token;
   const P = (await call('POST', '/api/lists', {name: 'Website', kind: 'project', folder: 'Clients'})).id;
   const SH = (await call('POST', '/api/lists', {name: 'Groceries'})).id;

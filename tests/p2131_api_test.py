@@ -97,9 +97,9 @@ for u in ("bob", "carol"):
 Bo, Ca = sess("bob"), sess("carol")
 for x in (A, Bo, Ca):
     x.patch(B + "/api/settings", json={"lang": "en"})
-r = A.post(B + "/api/admin/agents", json={"username": "claude", "display_name": "Claude"})
+r = A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "claude", "display_name": "Claude"})
 AG, cl = r.json()["id"], Api(r.json()["token"])
-r = A.post(B + "/api/admin/agents", json={"username": "otto", "display_name": "Otto"})
+r = A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "otto", "display_name": "Otto"})
 AG2, ot = r.json()["id"], Api(r.json()["token"])
 atok = A.post(B + "/api/me/tokens", json={"name": "t", "scopes": ["read", "write"]}).json()
 alice_api = Api(atok.get("token") or atok.get("value"))

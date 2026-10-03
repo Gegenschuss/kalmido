@@ -49,7 +49,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   const ME = (await call('GET', '/api/state')).me.id;
 
   // data: a project shared with an agent, sections, tasks
-  const ag = await call('POST', '/api/admin/agents', {username: 'claude', display_name: 'Claude'});
+  const ag = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'claude', display_name: 'Claude'});
   const AG = ag.id, TOK = ag.token;
   const P = (await call('POST', '/api/lists', {name: 'Website', kind: 'project'})).id;
   await call('PUT', `/api/lists/${P}/members`, {user_id: AG, role: 'edit'});

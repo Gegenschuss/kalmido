@@ -164,7 +164,7 @@ for u in ("bob", "carol", "dave"):
 Bo, Ca, Da = sess("bob"), sess("carol"), sess("dave")
 for x in (A, Bo, Ca, Da):
     x.patch(B + "/api/settings", json={"lang": "en"})
-r = A.post(B + "/api/admin/agents", json={"username": "claude", "display_name": "Claude"})
+r = A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "claude", "display_name": "Claude"})
 assert r.status_code == 201, r.text
 AG, AGTOK = r.json()["id"], r.json()["token"]
 ag = Api(AGTOK)

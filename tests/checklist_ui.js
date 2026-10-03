@@ -90,14 +90,14 @@ const set = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', 
   check(md.querySelector('#s-api-h') && /No tokens yet/.test(md.querySelector('#s-toks').textContent), 'account: API tokens section');
   click(w, md.querySelector('[data-tok="new"]')); await sleep(200);
   let tm = [...d.querySelectorAll('.modal')].pop();
-  check(tm.querySelector('#tk-admin'), 'admin: admin-read option');
-  set(w, tm.querySelector('#tk-name'), 'Home Assistant'); tm.querySelector('#tk-write').checked = true;
+  check(tm.querySelector('[data-scope="admin-read"]'), 'admin: admin-read option');  // 2.15.0: a grid of permissions
+  set(w, tm.querySelector('#tk-name'), 'Home Assistant'); tm.querySelector('[data-scope="tasks:write"]').checked = true;
   click(w, tm.querySelector('[data-m="ok"]')); await sleep(800);
   const sm = [...d.querySelectorAll('.modal')].pop();
   const token = sm.querySelector('#sec-val')?.value || '';
   check(/^abk_[A-Za-z0-9_-]{43}$/.test(token) && /only this once/.test(sm.textContent), 'token shown once');
   const me = await (await fetch(B + 'api/v1/me', {headers: {Authorization: 'Bearer ' + token}})).json();
-  check(me.username === 'alice' && me.token.scopes.join() === 'read,write', 'the shown token works');
+  check(me.username === 'alice' && me.token.scopes.join() === 'read,tasks:write', 'the shown token works');
   click(w, sm.querySelector('[data-m="close"]')); await sleep(300);
   check(/Home Assistant/.test(md.querySelector('#s-toks').textContent) && !md.querySelector('#s-toks').textContent.includes(token), 'token listed without the secret');
   await fetch(B + 'api/v1/tasks', {method: 'POST', headers: {Authorization: 'Bearer ' + token, 'Content-Type': 'application/json'}, body: JSON.stringify({title: 'From HA'})});

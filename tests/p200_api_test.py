@@ -125,18 +125,18 @@ for s_ in (A, Bo, P, Vi, D):
     s_.patch(B + "/api/settings", json={"lang": "en"})
 
 # ================================================================== agents: create, flags, rules
-r = A.post(B + "/api/admin/agents", json={"username": "claude", "display_name": "Claude", "note": "Dev helper",
+r = A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "claude", "display_name": "Claude", "note": "Dev helper",
                                           "webhook_url": "http://127.0.0.1:8097/agent"})
 check(r.status_code == 201, "admin creates an agent: " + r.text[:200])
 ag = r.json()
 CL, TOK, SECRET = ag["id"], ag["token"], ag["webhook_secret"]
 check(TOK.startswith("abk_") and SECRET.startswith("whsec_") and ag["enabled"] and ag["webhook"]["url"].endswith("/agent"),
       "token + webhook secret shown once")
-r = A.post(B + "/api/admin/agents", json={"username": "robo", "display_name": "Robo"})
+r = A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "robo", "display_name": "Robo"})
 RO, RTOK = r.json()["id"], r.json()["token"]
 check(r.json()["webhook"] is None and r.json()["webhook_secret"] is None, "agent without webhook (polling only)")
-check(Bo.post(B + "/api/admin/agents", json={"username": "x1"}).status_code == 403, "only admins create agents")
-check(A.post(B + "/api/admin/agents", json={"username": "claude"}).status_code == 409, "username taken")
+check(Bo.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "x1"}).status_code == 403, "only admins create agents")
+check(A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "claude"}).status_code == 409, "username taken")
 cl, ro = Api(TOK), Api(RTOK)
 me_ = cl.get("/me").json()
 check(me_["kind"] == "agent" and not me_["is_admin"], "v1 me: kind agent, not admin")

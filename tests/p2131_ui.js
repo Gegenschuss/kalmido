@@ -37,7 +37,7 @@ const form = (fields, files) => { const fd = new FormData(); for (const [k, v] o
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en', tour: 'done'});
   const ME = (await call('GET', '/api/state')).me.id;
-  const ag = await call('POST', '/api/admin/agents', {username: 'claude', display_name: 'Claude'});
+  const ag = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'claude', display_name: 'Claude'});
   const AG = ag.id, TOK = ag.token;
   const L = (await call('POST', '/api/lists', {name: 'Website'})).id;
   await call('PUT', `/api/lists/${L}/members`, {user_id: AG, role: 'edit'});

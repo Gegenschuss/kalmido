@@ -47,13 +47,20 @@ These hold no matter what the model decides:
 
 - **Never admin.** An agent user can never be made an admin; admin endpoints refuse its token.
 - **Only shared lists.** An agent sees exactly the lists shared with it (use the *Participant* role to limit it to tasks
-  assigned to it). It cannot share lists, change members, connect repositories or transfer ownership.
+  assigned to it). It cannot connect repositories or transfer ownership; sharing and member changes wait for a person.
+- **Least privilege (2.15.0).** Every token has permissions (scopes), enforced per route as the OpenAPI document states:
+  new agents only read, write tasks and comment; structure, deleting, files, time and export are switched on per agent
+  by its admin / owner; account settings and admin data never. An admin caps all of them server-wide (Settings > Agents >
+  Set up > Permission limit) and can restrict a token to IP addresses. The MCP server offers only the allowed tools.
+- **Approval for dangerous changes (2.15.0).** Deleting lists or fields, emptying the trash, batches of 10+ tasks,
+  moving lists and sharing by an agent wait as a job until a person approves; the request then runs as the agent with
+  its rights at that moment. See [AGENTS.md](AGENTS.md#requests-that-wait-for-a-person-2150).
 - **Kill switch.** Settings > Agents > *Pause*: from that moment every call with its token gets **403**, no events
   are queued for it and its webhook stops. Resume when you are done.
 - **Usage limits.** A hard limit answers **429** to every call (except reporting usage and status) until the period rolls
   over or an admin raises it.
 - **Audit log (2.2.1).** Every request made with an agent's token is logged: time, method, route template, status, task /
-  list id and duration, never bodies or query values. Settings > Agents > *Log* (admins) filters by agent,
+  list id, duration and (2.15.0) the permission the request needed, never bodies or query values. Settings > Agents > *Log* (admins) filters by agent,
   status class and day and exports CSV; denied calls (401 / 403 / 429) are marked. Retention: `KALMIDO_AUDIT_DAYS`
   (default 90, `0` = off). API: `GET /api/admin/agents/{id}/audit`, `GET /api/v1/admin/agents/{id}/audit` (scope
   *admin-read*).

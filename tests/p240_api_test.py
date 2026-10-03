@@ -235,7 +235,7 @@ spec = requests.get(V + "/openapi.json").json()
 check("type" in spec["components"]["schemas"]["Task"]["properties"] and "project_type" in spec["components"]["schemas"]["ListInput"]["properties"],
       "OpenAPI: Task.type, ListInput.project_type")
 # agent events carry the type
-ra = A.post(B + "/api/admin/agents", json={"username": "claude", "display_name": "Claude"}).json()
+ra = A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "claude", "display_name": "Claude"}).json()
 CL = Api(ra["token"])
 check(A.put(B + f"/api/lists/{T1}/members", json={"user_id": ra["id"], "role": "edit"}).ok, "share with the agent")
 A.post(B + "/api/tasks", json={"title": "Fix login", "list_id": T1, "ttype": "bug", "assignee_id": ra["id"]})

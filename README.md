@@ -18,6 +18,11 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.15.0** (2026-10-03): Permissions for API tokens and agents (read, tasks, comments, structure, delete, files, time,
+  export) with a server-wide limit and address restrictions; an agent's dangerous changes wait for a person's
+  approval; the API and the MCP server now cover everything the app does (sections, moving with position, batches,
+  dependencies, custom fields, templates, trash, file uploads, folders, sharing, filters, habits, timer); a new person's
+  inbox is named in their language.
 - **2.14.0** (2026-10-03): *Columns…* per list: pick and order the columns of the rows (task number, date, priority,
   assignee, tags, time, subtasks, dependencies, created, custom fields), the same for everyone in the list; quick add
   opens the new task's details or attaches files right away; a calm heron in empty lists, on Today and on the error pages.
@@ -201,7 +206,12 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   brings the task's newest comments and the list's sections along, so the agent can act at once; list pages can be
   fetched compact
 - **Approvals**: 👍 / 👎 on an agent's comment from the list owner, a list admin or the assignee counts as approval or
-  rejection; nothing needs to happen without it
+  rejection; nothing needs to happen without it. 2.15.0: deleting lists or fields, emptying the trash, changing 10+
+  tasks at once, moving lists and sharing by an agent always wait for *Approve* (then run as the agent) or *Reject*
+- **Permissions** (2.15.0): each agent and each API token gets only what it needs: *Read*, *Tasks*, *Comments*,
+  *Structure*, *Delete & trash*, *Read / Upload files*, *Time tracking*, *Export* (new agents: read, tasks, comments).
+  Admins set them for team agents, owners for their personal agents (lock button); a server-wide limit and an optional
+  address restriction per token; the MCP server shows only the allowed tools
 - **Status and jobs**: a dot on the agent's avatar (idle, working, waiting for you, error), a chip in the top bar
   (*Claude · 2 running · 1 waiting*) and an *Agents* tab with its jobs, a short log and *Approve* / *Reject* / *Stop*
 - **Chat** with an agent in a side panel (a tab on the phone); the agent can create tasks and comments within its rights.
@@ -217,7 +227,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **Runtime settings** per agent (2.4.1): model, auto-compact threshold, a nightly fresh restart and *Reset now*.
   Kalmido only stores them; the agent's host applies them ([mcp/agent_launcher.sh](mcp/agent_launcher.sh) for Claude Code)
 - **MCP server** ([mcp/](mcp/)) so agents can use Kalmido as a tool, and a protocol description in
-  [docs/AGENTS.md](docs/AGENTS.md)
+  [docs/AGENTS.md](docs/AGENTS.md). 2.15.0: everything the app does is in the API and the MCP server (a test checks it)
 - **Setup guide** ([docs/AGENT-SETUP.md](docs/AGENT-SETUP.md), in the app under *Settings > Agents > Set up*): an agent step by step, either by pasting one prompt into Claude Code or by hand (sandbox user,
   firewall, MCP wrapper, rules, event loop, autostart, test checklist)
 - **Usage and limits** (2.1.1): agents report their model usage (tokens, optionally the cost; numbers only, never
@@ -435,7 +445,7 @@ own list with the same name is reused) or one existing list you can edit. The im
   cannot share, disabled users cannot log in): *Settings > Administration > Lists owned by agents or disabled users >
   Take over* (for themselves or another person), or *Take over…* in the Share dialog when they are in the list. An
   agent that owned the list stays in it as a *Member* (agents are never list admins). API:
-  `POST /api/v1/lists/{id}/owner` with `{"user_id": …}` (scope write; agent tokens get 403).
+  `POST /api/v1/lists/{id}/owner` with `{"user_id": …}` (scope structure; agent tokens get 403).
   Moving a task into a list needs edit rights there, moving it out needs edit rights on its current list. Members
   with edit rights can only move a task out of a shared list into a list that all its current people can see (e.g. between
   two lists shared with the same people); moving it anywhere else is up to the list owner, so a member can never take a
@@ -677,14 +687,17 @@ Kalmido has a small REST API (`/api/v1`) for scripts and integrations, and outgo
 examples for curl, Home Assistant, n8n and a shell script: **[docs/API.md](docs/API.md)**; the OpenAPI 3.1 description
 is served at `/api/v1/openapi.json`.
 
-- **Personal access tokens** (*Settings > Account > Advanced > API tokens*): name, access (*read*, *write*, and *admin read* for
-  admins), optional expiry. Shown once (`abk_...`), stored only as a SHA-256 hash, revocable. A token acts as its user
+- **Personal access tokens** (*Settings > Account > Advanced > API tokens*): name, permissions (2.15.0: *Read* always,
+  *Tasks*, *Comments*, *Structure*, *Delete & trash*, *Read files*, *Upload files*, *Time tracking*, *Export*, *Account
+  settings*, and *Admin read* for admins; changeable later with the lock button), optional address restriction and
+  expiry. Older tokens with *write* keep everything. Shown once (`abk_...`), stored only as a SHA-256 hash, revocable. A token acts as its user
   and never has more rights: the same list roles and switches as in the app apply to every request, and a disabled
   user's tokens stop working. Send it as `Authorization: Bearer abk_...`; the API accepts nothing else (no cookie, no
   proxy header), so it needs no CSRF header. 120 requests per token and minute (`KALMIDO_API_RATE`).
-- **Endpoints:** lists, tasks (filter by list, due range, status, tag, assignee, updated since; create, change,
-  complete, reopen, delete to the trash), subtasks, tags, comments, time entries, habit check-ins, search, and for
-  admins users and server status. JSON, ISO dates, cursor pages, one error format. Changes show up in the task history
+- **Endpoints:** lists (also archive, delete, members, folders), sections, tasks (filter by list, due range, status,
+  tag, assignee, updated since; create, change, complete, reopen, move with position, batch, skip, trash and restore),
+  subtasks, dependencies, custom fields, templates, files, tags, comments, saved filters, News, time entries and the
+  timer, habits, search, export, and for admins users and server status. JSON, ISO dates, cursor pages, one error format. Changes show up in the task history
   *via API* and notify people like changes in the app.
 - **Webhooks** (*Settings > Integrations > Advanced > Webhooks*): up to 10 URLs per user for `task.created`, `task.updated`,
   `task.completed`, `task.reopened`, `task.deleted`, `comment.created` and `list.shared`, only for lists that user can
@@ -714,6 +727,7 @@ like and talks to Kalmido through the REST API, webhooks or the MCP server.
 - Approval semantics, status reporting, jobs, chat, the *tidy up* setting, payloads and an example session:
   **[docs/AGENTS.md](docs/AGENTS.md)**. MCP server (stdio and HTTP): **[mcp/](mcp/)**.
 - Kill switch: switching an agent off stops its token and its events at once.
+- Permissions and approvals (2.15.0): [docs/AGENTS.md](docs/AGENTS.md#permissions-2150).
 - Chat (2.7.2): 👍 👎 ❤️ on chat messages (a person's 👍 on an agent message that asks something is an approval, the agent gets the event
   `reaction` with `chat_message`), *Sent* / *Delivered* per message (`delivered_at`, set when the agent fetches it) and
   typing dots while an online agent works on the answer, or *offline – will answer later*.

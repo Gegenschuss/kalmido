@@ -21,18 +21,40 @@ data and needs no token). Import it into Postman, Bruno, Insomnia or an n8n HTTP
 Create a token under **Settings > Account > API tokens**:
 
 - **Name**: what uses it ("Home Assistant", "backup script").
-- **Access** (scopes):
-  - `read` (always included): lists, tasks, subtasks, tags, comments, time entries, habits, search.
-  - `write`: also create, change, complete, reopen and delete (to the trash) tasks, create lists, comment, add time
-    entries, check in habits.
-  - `admin-read` (admins only): `GET /api/v1/admin/users`, `GET /api/v1/admin/status` and (2.2.1) `GET /api/v1/admin/agents/{id}/audit`. Checked on every request:
-    if the user stops being an admin, the scope stops working.
+- **Permissions** (scopes, 2.15.0). Each request needs exactly one; the OpenAPI document names it per operation
+  (`x-kalmido-scope`) and the server enforces that very table:
+
+  | Scope | What it allows |
+  |---|---|
+  | `read` (always on) | every `GET`: lists, tasks, subtasks, tags, comments, time entries, habits, search, trash, News |
+  | `tasks:write` | create, change, complete, reopen, move and batch-change tasks and subtasks; dependencies, waiting, habits, the day plan |
+  | `comments` | write, edit and delete comments, reactions, mark News read |
+  | `structure` | lists (create, change, archive, share), sections, custom fields, list tags, templates, saved filters, folders, project overview and status, import |
+  | `delete` | move tasks to the trash, restore, empty the trash, undo an import; delete sections, lists, fields, templates, habits, filters (list tags, links and milestones: `structure`) |
+  | `attachments:read` | download files of tasks, comments and projects (their names come with `read`) |
+  | `attachments:write` | upload and remove them |
+  | `time` | the timer and time entries |
+  | `export` | `GET /export` |
+  | `account` | your notification settings and app passwords (never for agents) |
+  | `admin-read` (admins only) | `GET /api/v1/admin/users`, `/admin/status`, `/admin/agents/{id}/audit`; checked on every request: if the user stops being an admin, it stops working (never for agents) |
+
+  A new token starts with `read`. A request without the needed scope gets `403` with `error.required_scope`. Tokens
+  created before 2.15.0 keep what they could do: `write` stands for every scope but `admin-read`, and old read-only
+  tokens got `attachments:read` once. `POST /api/me/tokens` still accepts `write` (scripts).
+- **Only from** (optional): IP addresses or networks (`203.0.113.0/24`); requests from anywhere else get `403`. Behind a
+  reverse proxy the client address comes from `X-Forwarded-For` of the trusted proxies (`KALMIDO_TRUSTED_PROXIES`), so
+  it is only as reliable as that setup: the proxy must replace or append the header, never pass on the client's own.
 - **Expires**: in 30 days, 90 days, a year, or never.
 
 The token looks like `abk_` followed by 43 random characters (256 bits). It is **shown once**; Kalmido only keeps its
 SHA-256 hash, so a lost token cannot be shown again: revoke it and create a new one. The list shows the first
-characters, the access, the expiry and when it was last used. Revoking works immediately. A disabled or deleted user's
+characters, the permissions, the expiry and when it was last used; its lock button changes the permissions and the
+addresses later (`PATCH /api/me/tokens/{id}` `{scopes?, allowed_ips?, name?}`). Revoking works immediately. A disabled or deleted user's
 tokens stop working at once.
+
+An admin can **limit** what personal tokens and agents may get at all (Settings > Agents > Set up > Permission limit,
+`PUT /api/admin/agent-policy` `{scope_limit: {agents?, tokens?}}`); a scope outside the limit stops counting at once for
+every token and comes back when it is allowed again. `GET /api/v1/me` shows `token.effective_scopes` (what counts now).
 
 Send it in every request:
 
@@ -126,65 +148,91 @@ had been made in the app. Webhooks fire too.
 | Method and path | Scope | What it does |
 |---|---|---|
 | `GET /me` | read | The token's user, its scopes and expiry, which modules are on, and (2.1.0) `notifications`: `events` (per event `{news, push}`, `news` null = the event has no News) and `lists` (list id -> bell `all` / `mute` / `custom`; lists on `default` are left out), (2.6.1) `custom` (list id -> the own event choice of lists on `custom`, `{event: {news: 0\|1, push: 0\|1}}`, an event not listed follows `events`) |
-| `PATCH /me/notifications` | write | 2.1.0: change them partially: `{events?: {event: {news?, push?}}, lists?: {list_id: "all" \| "default" \| "mute" \| "custom" \| {mode: "custom", events: {event: {news?, push?}}}}}` (2.6.1: `custom` = your own choice per event for that list, events `newtask`, `comment`, `mention`, `assign`, `complete`, `status`, `unblock`, `approval`; a ticked one comes from every task of the list, an unticked one never; `"custom"` alone brings back the stored choice). Events: `comment`, `reply`, `follow`, `mention`, `assign`, `newtask`, `complete`, `status`, `share`, `unblock`, `approval`, `followup`, `reminder` (push only), `nag` (2.7.0, push only: reminders repeated until done; a muted list bell stops them) |
+| `PATCH /me/notifications` | account | 2.1.0: change them partially: `{events?: {event: {news?, push?}}, lists?: {list_id: "all" \| "default" \| "mute" \| "custom" \| {mode: "custom", events: {event: {news?, push?}}}}}` (2.6.1: `custom` = your own choice per event for that list, events `newtask`, `comment`, `mention`, `assign`, `complete`, `status`, `unblock`, `approval`; a ticked one comes from every task of the list, an unticked one never; `"custom"` alone brings back the stored choice). Events: `comment`, `reply`, `follow`, `mention`, `assign`, `newtask`, `complete`, `status`, `share`, `unblock`, `approval`, `followup`, `reminder` (push only), `nag` (2.7.0, push only: reminders repeated until done; a muted list bell stops them) |
 | `GET /me/app-passwords` | read | 2.9.0: your app passwords for calendar apps (`id`, `name`, `created_at`, `last_used_at`, `last_client`; never the password) and `caldav` (`url`, `server`, `username`, `principal`, `home`, `done_days`). Persons only: an agent's token gets `403` |
-| `POST /me/app-passwords` | write | 2.9.0: `{name}` -> `201` with `password` (shown only in this answer; Kalmido keeps a hash). At most 20. Log in to `/dav/` with your user name and it (see [CALDAV.md](CALDAV.md)) |
-| `DELETE /me/app-passwords/{id}` | write | 2.9.0: revoke it; the calendar app using it stops at once |
+| `POST /me/app-passwords` | account | 2.9.0: `{name}` -> `201` with `password` (shown only in this answer; Kalmido keeps a hash). At most 20. Log in to `/dav/` with your user name and it (see [CALDAV.md](CALDAV.md)) |
+| `DELETE /me/app-passwords/{id}` | account | 2.9.0: revoke it; the calendar app using it stops at once |
 | `GET /lists` | read | Lists the user can see: own and shared, with role (`owner`, `admin`, `edit` = member, `participant`, `view` = viewer), `done_at_bottom` (2.7.2; `checklist` = the same, deprecated), progress, `icon` (URL of the list's own picture, empty = none; set in the app), `agent_tidy`, and (2.0.8) its sections `[{id, name}]` |
-| `POST /lists` | write | Create a list: `{name, color?, folder?, kind?, done_at_bottom?, nag?, day_hours?}` (`kind`: `list` default or `project`; `checklist` (deprecated) = `list` + `done_at_bottom`) |
+| `POST /lists` | structure | Create a list: `{name, color?, folder?, kind?, done_at_bottom?, nag?, day_hours?}` (`kind`: `list` default or `project`; `checklist` (deprecated) = `list` + `done_at_bottom`) |
 | `GET /lists/{id}` | read | One list with its sections and (2.14.0) its custom `fields` `[{id, name, type}]` (also on `GET /lists`) |
-| `PATCH /lists/{id}` | write | 2.14.0: `columns` (owner / list admins; others `403`): the row columns of the list in order, the same for every member: `id` (task number in front of the title), `due`, `prio`, `who`, `tags`, `time`, `progress`, `deps`, `created`, `f:<field id>`; a key that is not listed is not shown; `null` = the default layout; unknown keys or fields of another list `400`. A new custom field joins configured columns at the end. 2.13.1: `listen_agent_ids` (owner / list admins): the agents that read every comment of a person in the list ([AGENTS.md](AGENTS.md#agent-reads-every-comment-2131)). 2.7.0: change a list. The owner: `name`, `color`, `kind`, `done_at_bottom` (2.7.2), `nag` (default nag interval of its tasks: `5`, `10`, `15`, `30`, `60` minutes, `1d`; empty / `off` = none), `day_hours` (hours per day / shift for the time sums, 1 to 24; `null` = the server's value). Members change only their own `folder` and `view` |
+| `PATCH /lists/{id}` | structure | 2.15.0: `archived` (true / false; the owner). 2.14.0: `columns` (owner / list admins; others `403`): the row columns of the list in order, the same for every member: `id` (task number in front of the title), `due`, `prio`, `who`, `tags`, `time`, `progress`, `deps`, `created`, `f:<field id>`; a key that is not listed is not shown; `null` = the default layout; unknown keys or fields of another list `400`. A new custom field joins configured columns at the end. 2.13.1: `listen_agent_ids` (owner / list admins): the agents that read every comment of a person in the list ([AGENTS.md](AGENTS.md#agent-reads-every-comment-2131)). 2.7.0: change a list. The owner: `name`, `color`, `kind`, `done_at_bottom` (2.7.2), `nag` (default nag interval of its tasks: `5`, `10`, `15`, `30`, `60` minutes, `1d`; empty / `off` = none), `day_hours` (hours per day / shift for the time sums, 1 to 24; `null` = the server's value). Members change only their own `folder` and `view` |
 | `GET /lists/{id}/repos` | read | 2.2.0: repositories connected to a (project) list: `provider` (`github` / `gitea`), `base_url`, `web_url`, `owner`, `repo`, `full_name`, `default_branch`, `status` (`new` / `ok` / `error`), `error`, `polled_at`. Never a token; connecting is only in the app (list owner / list admins). Lists also carry `repos` |
-| `POST /lists/{id}/owner` | write | 2.1.2: transfer the ownership `{user_id}` to another active person (never an agent); the old owner stays as a list admin. Admins may take over a list whose owner is an agent or a disabled user. Agent tokens always `403`, inboxes `409` |
+| `POST /lists/{id}/owner` | structure | 2.1.2: transfer the ownership `{user_id}` to another active person (never an agent); the old owner stays as a list admin. Admins may take over a list whose owner is an agent or a disabled user. Agent tokens always `403`, inboxes `409` |
 | `GET /tasks` | read | Tasks (not in the trash), oldest first; filters below |
-| `POST /tasks` | write | Create a task (default list: the user's inbox) |
+| `POST /tasks` | tasks:write | Create a task (default list: the user's inbox) |
 | `GET /tasks/{id}` | read | One task |
-| `PATCH /tasks/{id}` | write | Change the fields you send |
-| `DELETE /tasks/{id}` | write | Move the task with its subtasks to the trash (204); restorable in the app |
-| `POST /tasks/{id}/complete` | write | Complete; recurring tasks move to their next date (`next_due`) |
-| `POST /tasks/{id}/reopen` | write | Reopen a completed task |
-| `PUT /tasks/{id}/waiting` · `DELETE …` | write | 2.1.0: waiting on external: `{note?, until? (YYYY-MM-DD)}` sets / changes it, `DELETE` ends it. Every task has `waiting` (`null` or `{note, until, since, by}`); `GET /tasks?waiting=true` lists them |
+| `PATCH /tasks/{id}` | tasks:write | Change the fields you send |
+| `DELETE /tasks/{id}` | delete | Move the task with its subtasks to the trash (204); restorable in the app |
+| `POST /tasks/{id}/complete` | tasks:write | Complete; recurring tasks move to their next date (`next_due`) |
+| `POST /tasks/{id}/reopen` | tasks:write | Reopen a completed task |
+| `PUT /tasks/{id}/waiting` · `DELETE …` | tasks:write | 2.1.0: waiting on external: `{note?, until? (YYYY-MM-DD)}` sets / changes it, `DELETE` ends it. Every task has `waiting` (`null` or `{note, until, since, by}`); `GET /tasks?waiting=true` lists them |
 | `GET /tasks/{id}/subtasks` | read | Subtasks |
-| `POST /tasks/{id}/subtasks` | write | Add a subtask |
+| `POST /tasks/{id}/subtasks` | tasks:write | Add a subtask |
 | `GET /tasks/{id}/comments` | read | Comments |
-| `POST /tasks/{id}/comments` | write | Comment: `{body}`; mention someone with `<@user_id>`; agents may add a tidy `suggestion` (see [AGENTS.md](AGENTS.md)) |
+| `POST /tasks/{id}/comments` | comments | Comment: `{body}`; mention someone with `<@user_id>`; agents may add a tidy `suggestion` (see [AGENTS.md](AGENTS.md)) |
 | `GET /tasks/{id}/attachments` | read | 2.13.1: the files of a task and of its comments: `id`, `task_id`, `comment_id` (`null` = the task's own), `name`, `mime`, `size`, `created_at`, `url` |
-| `GET /attachments/{id}` | read | 2.13.1: the file itself (images, PDF and text inline, everything else as a download; `?dl=1` always a download; `410` = damaged on the server). Same rights as in the app |
-| `GET /chat-attachments/{id}` · `DELETE …` | read · write | 2.13.1: a file of an agent chat (the person or the agent of that conversation); `DELETE`: only its sender |
-| `POST /comments/{id}/reactions` | write | React: `{emoji}` = `up`, `down`, `heart` or any single emoji |
-| `DELETE /comments/{id}/reactions/{emoji}` | write | Take your reaction back |
+| `GET /attachments/{id}` | attachments:read | 2.13.1: the file itself (images, PDF and text inline, everything else as a download; `?dl=1` always a download; `410` = damaged on the server). Same rights as in the app |
+| `GET /chat-attachments/{id}` · `DELETE …` | read · comments | 2.15.0: chat files need only `read` (the conversation itself is the access). 2.13.1: a file of an agent chat (the person or the agent of that conversation); `DELETE`: only its sender |
+| `POST /comments/{id}/reactions` | comments | React: `{emoji}` = `up`, `down`, `heart` or any single emoji |
+| `DELETE /comments/{id}/reactions/{emoji}` | comments | Take your reaction back |
 | `GET /roadmap` | read | All lists on one timeline: groups with summary spans, progress and dated tasks, see [Roadmap](#roadmap) |
 | `GET /groups` · `GET /groups/{id}` | read | 2.10.0: groups of people (admins create them in the app): `id`, `name`, `members [{user_id, name}]`, `synced` (members follow a sign-in group), `mine` |
 | `GET /lists/{id}/groups` | read | 2.10.0: the groups a list is shared with: `group_id`, `name`, `role`, `via` (`list` = directly, else the owner's folder) |
-| `PUT /lists/{id}/groups/{group_id}` · `DELETE …` | write | 2.10.0: share a list with a group `{role}` (owner / list admin) or stop it. Every member (also later ones) gets access; a person's role is the higher of their own and the group's |
-| `POST /tasks/{id}/take` | write | 2.10.0: take a task assigned to one of your groups (`assignee_group_id`): it becomes yours (also for participants) |
+| `PUT /lists/{id}/groups/{group_id}` · `DELETE …` | structure | 2.10.0: share a list with a group `{role}` (owner / list admin) or stop it. Every member (also later ones) gets access; a person's role is the higher of their own and the group's |
+| `POST /tasks/{id}/take` | tasks:write | 2.10.0: take a task assigned to one of your groups (`assignee_group_id`): it becomes yours (also for participants) |
 | `GET /dayplan?date=&mode=` | read | 2.10.0: the built-in day plan (a preview, nothing changes): working hours, calendar events, fixed timed tasks, `plan [{task_id, start, end, duration, estimated, reason}]`, `nofit [...]` (tasks of the day that do not fit; 2.11.0: listed only), `free_min`; `mode=day` (default) or `fill`. Apply with `PATCH /tasks/{id}` `plan_start` + `duration`: planning never changes due dates |
 | `GET /dayplan/review?date=` | read | 2.10.0: the daily review: `done`, `open`, `moved` (tasks moved away that day) and `tomorrow` (a plan for the next working day) |
-| `POST /lists/{id}/shift` | write | Move every open dated task of a list by `{days}` in one transaction, see [Roadmap](#roadmap) |
+| `POST /lists/{id}/shift` | tasks:write | Move every open dated task of a list by `{days}` in one transaction, see [Roadmap](#roadmap) |
 | `GET /tags` | read | The user's personal tags (`kind: personal`) and the tags of the lists they see (`kind: list`, with `list_id`, `color`), with task counts |
 | `GET /lists/{id}/tags` | read | The list tags of a list (shared by its members) |
-| `POST /lists/{id}/tags` | write | Create a list tag `{name, color?}` (members with edit rights) |
-| `PATCH /lists/{id}/tags/{tag_id}` · `DELETE …` | write | Rename / recolour · delete a list tag (removed from every task) |
+| `POST /lists/{id}/tags` | structure | Create a list tag `{name, color?}` (members with edit rights) |
+| `PATCH /lists/{id}/tags/{tag_id}` · `DELETE …` | structure | Rename / recolour · delete a list tag (removed from every task) |
 | `GET /lists/{id}/overview` | read | 2.7.1: the overview of a project list: description, key links, milestones, project files, Paperless documents, the files of its tasks, members, status history, tracked time (409 for other list types) |
-| `PATCH /lists/{id}/overview` | write | The description `{description}` (Markdown, at most 20000 characters; owner, list admins, members) |
-| `GET` · `POST /lists/{id}/links` | read · write | Key links `{title?, url}` (http / https; at most 50) |
-| `PATCH` · `DELETE /lists/{id}/links/{link_id}`, `PUT /lists/{id}/links/order` | write | Change · remove a link, reorder `{ids}` |
-| `GET` · `POST /lists/{id}/milestones`, `PATCH` · `DELETE /lists/{id}/milestones/{milestone_id}` | read · write | Milestones `{name, day, done?}` (at most 100) |
-| `GET` · `POST /lists/{id}/files`, `GET` · `DELETE /lists/{id}/files/{file_id}` | read · write | Project files (multipart `file`, the attachment size limit; images / PDFs inline, everything else as a download) |
+| `PATCH /lists/{id}/overview` | structure | The description `{description}` (Markdown, at most 20000 characters; owner, list admins, members) |
+| `GET` · `POST /lists/{id}/links` | read · structure | Key links `{title?, url}` (http / https; at most 50) |
+| `PATCH` · `DELETE /lists/{id}/links/{link_id}`, `PUT /lists/{id}/links/order` | structure | Change · remove a link, reorder `{ids}` |
+| `GET` · `POST /lists/{id}/milestones`, `PATCH` · `DELETE /lists/{id}/milestones/{milestone_id}` | read · structure | Milestones `{name, day, done?}` (at most 100) |
+| `GET` · `POST /lists/{id}/files`, `GET` · `DELETE /lists/{id}/files/{file_id}` | read · attachments:write · attachments:read | Project files (multipart `file`, the attachment size limit; images / PDFs inline, everything else as a download) |
 | `GET /agents` | read | Agents you share a list with: status and job counts |
-| `POST /agents/{id}/chat/{message_id}/reactions` | write | 2.7.2: react to a message in your chat with the agent: `{emoji: up \| down \| heart, on?}` (toggles without `on`); your 👍 / 👎 on an agent message that asks something (`asks`, 2.13.0) is sent to it as an approval (`reaction` event, see [AGENTS.md](AGENTS.md#chat-reactions-and-delivery-272)) |
-| `GET /agent` … `/agent/events` … `/agent/jobs` … `/agent/chats` · `PUT /agent/status` · `POST /tasks/{id}/tidy` | read / write | **Agent tokens only**: the agent protocol, see [AGENTS.md](AGENTS.md); the status may name the task it works on (`task_id`, shows "… is writing" there) |
-| `POST /agent/usage` · `GET /agent/usage?from=&to=&group=` | write / read | **Agent tokens only** (2.1.1): report model usage (numbers and ids only), read it grouped by day, task, list or model; over its hard limit an agent gets `429` on every other call, see [AGENTS.md](AGENTS.md#usage-and-limits) |
+| `POST /agents/{id}/chat/{message_id}/reactions` | comments | 2.7.2: react to a message in your chat with the agent: `{emoji: up \| down \| heart, on?}` (toggles without `on`); your 👍 / 👎 on an agent message that asks something (`asks`, 2.13.0) is sent to it as an approval (`reaction` event, see [AGENTS.md](AGENTS.md#chat-reactions-and-delivery-272)) |
+| `GET /agent` … `/agent/events` … `/agent/jobs` … `/agent/chats` · `PUT /agent/status` · `POST /tasks/{id}/tidy` | read | **Agent tokens only**: the agent protocol, see [AGENTS.md](AGENTS.md); the status may name the task it works on (`task_id`, shows "… is writing" there) |
+| `POST /agent/usage` · `GET /agent/usage?from=&to=&group=` | agent | **Agent tokens only** (2.1.1): report model usage (numbers and ids only), read it grouped by day, task, list or model; over its hard limit an agent gets `429` on every other call, see [AGENTS.md](AGENTS.md#usage-and-limits) |
 | `GET /search?q=` | read | Search titles, notes, links and custom field values |
 | `GET /time/entries` | read | Time entries (time tracking), newest first: `from`, `to`, `scope=mine|all`, `list_id`, `task_id` |
-| `POST /time/entries` | write | Add one: `{task_id or list_id, start, end or minutes, note?}` |
+| `POST /time/entries` | time | Add one: `{task_id or list_id, start, end or minutes, note?}` |
 | `GET /habits` | read | The user's habits with today's count and the last 30 days |
-| `POST /habits/{id}/checkin` | write | `{date?, count?, note?}`: without `count` one more for the day |
-| `POST /import/{source}` | write | Import an export file (multipart), see [Import](#import) |
-| `POST /imports/{id}/undo` | write | Undo an import within 24 hours |
+| `POST /habits/{id}/checkin` | tasks:write | `{date?, count?, note?}`: without `count` one more for the day |
+| `POST /import/{source}` | structure | Import an export file (multipart), see [Import](#import) |
+| `POST /imports/{id}/undo` | delete | Undo an import within 24 hours |
 | `GET /admin/users` | admin-read | All users (no secrets) |
 | `GET /admin/status` | admin-read | Version, counts, update available (`latest_version`, `update_checked_at`, `update_error`), last backup, pending webhooks |
 | `GET /admin/agents/{id}/audit` | admin-read | 2.2.1: the agent's audit log, newest first: `{id, at, agent_id, agent_name, method, route, status, task_id, list_id, ms, denied}`; `?status=2xx\|3xx\|4xx\|5xx\|denied`, `?day=YYYY-MM-DD`, cursor pages (see [AGENTS.md](AGENTS.md#audit-log)) |
+| `GET /lists/{id}/sections` · `POST …` | read · structure | 2.15.0: sections in order; create `{name, before_id?}` (at the end or in front of a section) |
+| `PATCH /sections/{id}` · `DELETE …` | structure · delete | 2.15.0: rename `{name}`; delete (its tasks stay in the list without a section) |
+| `PUT /lists/{id}/sections/order` | structure | 2.15.0: `{ids}`: every section of the list exactly once, in the new order |
+| `POST /tasks/{id}/move` | tasks:write | 2.15.0: `{list_id?, section_id?, parent_id?, before_id? \| after_id? \| position?: top \| bottom}`: another list / section / parent and a place among the siblings; subtasks move along; the same rights as in the app (into a list you may edit, out of a shared list only as its owner) |
+| `POST /tasks/batch` | tasks:write (+ delete) | 2.15.0: `{ids (1-500), action: update \| complete \| reopen \| wont_do \| delete \| restore, changes? (update)}`: one transaction; tasks you may not change are skipped (`errors`). `delete` / `restore` also need `delete`. Agents: 10 or more tasks wait for approval (`202`) |
+| `POST /tasks/{id}/skip` | tasks:write | 2.15.0: skip this occurrence of a repeating task (next date, no completed copy) |
+| `GET /trash` · `DELETE /trash` | read · delete | 2.15.0: tasks in the trash (`list_id`, pages); empty it for good (lists you own; admins also shared lists they may edit; agents: approval) |
+| `POST /tasks/{id}/restore` | delete | 2.15.0: restore a task from the trash (`409` if it is not there) |
+| `GET /tasks/{id}/dependencies` · `POST …` · `DELETE …/{blocker_id}` | read · tasks:write | 2.15.0: `blocked_by` / `blocking`; add `{blocked_by}` (project lists, no cycles), remove |
+| `GET /lists/{id}/fields` · `POST …` | read · structure | 2.15.0: custom field definitions; create `{name, type, options?, pinned?}` (project lists, owner). Values: the task's `fields` |
+| `PATCH /fields/{id}` · `DELETE …` | structure · delete | 2.15.0: change `{name?, options?, pinned?, sort?}` (the type stays); delete with its values (agents: approval) |
+| `GET /templates` · `POST …` | read · structure | 2.15.0: your templates; create from `{task_id}`, `{list_id, relative?}` or `{kind, data}`, `name?` |
+| `PATCH /templates/{id}` · `DELETE …` · `POST …/apply` | structure · delete · structure | 2.15.0: rename / replace data; delete; use it (task template: `{list_id?, section_id?}`; list template: `{name?, folder?, start?, end?}`) |
+| `POST /tasks/{id}/attachments` | attachments:write | 2.15.0: upload files (multipart, field `file`, repeatable; the server's size limit, no empty files) |
+| `DELETE /attachments/{id}` | attachments:write | 2.15.0: remove a file of a task (or of your comment) |
+| `PATCH /comments/{id}` · `DELETE …` | comments | 2.15.0: edit your comment `{body}`; delete (author, list owner / admins) |
+| `GET /folders` · `POST /folders/rename` · `POST /folders/delete` | read · structure | 2.15.0: your folders `{path, lists}`; rename / move `{old, new}`; remove `{name}` (its lists move up). Agents: approval |
+| `DELETE /lists/{id}` | delete | 2.15.0: delete an archived list for good (owner; archive it with `PATCH {archived: true}` first, else `409`); its tasks go to the owner's trash. Agents: approval |
+| `GET /lists/{id}/members` · `PUT …/{user_id}` · `DELETE …/{user_id}` | read · structure | 2.15.0: owner and members with roles; share with a person `{role}` (owner / list admins); stop sharing, or leave (your own id). Agents: approval |
+| `PUT /lists/{id}/status` | structure | 2.15.0: a project status update `{status: on_track \| at_risk \| off_track \| on_hold \| complete \| "", note?}`; members are told |
+| `GET /filters` · `POST …` · `PATCH /filters/{id}` · `DELETE …` | read · structure · delete | 2.15.0: saved filters `{name, rules}` |
+| `GET /news?filter=` · `POST /news/read` | read · comments | 2.15.0: your News (`filter=mentions \| me`), `unread`; mark read `{ids}` or `{all: true}` |
+| `POST /habits` · `PATCH /habits/{id}` · `DELETE …` | tasks:write · delete | 2.15.0: habits `{name, color?, goal?, days?, per_week?, remind_at?, archived?}` |
+| `GET /time/timer` · `POST …` · `DELETE …` | read · time | 2.15.0: the running timer; start `{task_id \| list_id, note?}` (a running one stops); stop |
+| `PATCH /time/entries/{id}` · `DELETE …` | time | 2.15.0: change / delete your entry `{start?, end?, minutes?, note?, task_id? \| list_id?}` |
+| `GET /export` | export | 2.15.0: everything you own as JSON (as Settings > Data > Export) |
 | `GET /openapi.json` | none | This API as OpenAPI 3.1 |
 
 **Task filters** (`GET /tasks`): `list_id`, `status` (`open` default, `done`, `wont_do`, `all`), `due_from`, `due_to`,
@@ -224,7 +272,8 @@ list is shared with; setting one clears the other), (2.11.0) `plan_start` (the d
 time or `null`; independent of `due`), `pinned`, `fields`
 (custom field values by field id); `content` is accepted as an alias of `notes` (2.2.1). `tags` are personal: every user has their own tags on a shared task; `list_tags`
 belong to the list and everyone in it sees them. Attachments are
-listed (name, type, size) but not transferred through the API.
+listed (name, type, size) in the task; read them with `GET /tasks/{id}/attachments` + `GET /attachments/{id}` (`attachments:read`) and add
+them with `POST /tasks/{id}/attachments` (`attachments:write`).
 
 **Code** (2.2.0, `GET /tasks/{id}` only): in a list connected to a repository a task also has `code` (the linked pull
 requests `[{repo, n, title, state: open | merged | closed, ci: success | failure | pending | null, author, url, branch}]`,

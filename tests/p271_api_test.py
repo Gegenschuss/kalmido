@@ -187,7 +187,7 @@ check(A.get(B + f"/api/lists/{P}/overview").json()["time"]["day_hours"] == 6, "t
 
 # ================================================================== token API + OpenAPI
 tok = A.post(B + "/api/me/tokens", json={"name": "t", "scopes": ["read", "write"]}).json()["token"]
-rtok = A.post(B + "/api/me/tokens", json={"name": "r", "scopes": ["read"]}).json()["token"]
+rtok = A.post(B + "/api/me/tokens", json={"name": "r", "scopes": ["read", "attachments:read"]}).json()["token"]  # 2.15.0: files need attachments:read
 T = {"Authorization": "Bearer " + tok}
 R = {"Authorization": "Bearer " + rtok}
 j = requests.get(V + f"/lists/{P}/overview", headers=R).json()

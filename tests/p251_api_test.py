@@ -108,10 +108,10 @@ BOB = r.json()["id"]
 Bo = sess("bob")
 for x in (A, Bo):
     x.patch(B + "/api/settings", json={"lang": "en"})
-r = A.post(B + "/api/admin/agents", json={"username": "claude", "display_name": "Claude"})
+r = A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "claude", "display_name": "Claude"})
 assert r.status_code == 201, r.text
 AG, ag = r.json()["id"], Api(r.json()["token"])
-r = A.post(B + "/api/admin/agents", json={"username": "helper", "display_name": "Helper"})
+r = A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "helper", "display_name": "Helper"})
 AG2, ag2 = r.json()["id"], Api(r.json()["token"])
 
 # ================================================================== #393 the activity log

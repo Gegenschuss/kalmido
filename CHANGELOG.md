@@ -7,6 +7,51 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.15.0] - 2026-10-03
+
+**In short:** The complete agent API (#479). API tokens and agents get permissions (scopes) instead of read / write,
+an admin limits them for the whole server, and an agent's dangerous changes wait for a person's approval. Everything
+the app does is now in the REST API and the MCP server, and a test makes sure it stays that way. A new person's inbox is
+named in their language (#632).
+
+### Added
+- **Permissions** for API tokens and agents: *Read* (always), *Tasks*, *Comments*, *Structure*, *Delete & trash*, *Read
+  files*, *Upload files*, *Time tracking*, *Export*, *Account settings* and *Admin read* (admins). Every API operation needs
+  exactly one; the OpenAPI document names it (`x-kalmido-scope`) and the server enforces that very table. A missing one
+  answers `403` with `required_scope`. New tokens start with *Read*, new agents with *Read*, *Tasks* and *Comments*;
+  agents never get *Account settings* or *Admin read*.
+- Settings > Account > API tokens: the permissions as a grid (explanations behind (i)), an optional address restriction
+  (*Only from*: IP addresses / networks), and a lock button on every token to change both later
+  (`PATCH /api/me/tokens/{id}`).
+- Agents: the admin's agent dialog and the owner's lock button on a personal agent set its permissions and addresses; a
+  new agent token can expire. The activity log records the permission each request needed (also in the CSV).
+- Settings > Agents > Set up (admins): *Permission limit*: what agents and personal tokens may get at most on this
+  server; switched off there, a permission stops at once for every token.
+- **Approvals of dangerous changes:** an agent deleting a list or a custom field, emptying the trash, changing 10 or more
+  tasks at once, moving its list into another folder, renaming / removing folders or sharing gets `202` with a waiting
+  job instead (an agent's batches within 10 minutes count together; the agent cannot change such a job). The agent's owner, the list owner or an admin approves it in the Agents tab / Today / News: the request
+  then runs as the agent with its rights at that moment; *Reject* changes nothing. The agent gets the result as a
+  `job` event.
+- REST API: sections (list, create with position, rename, reorder, delete), `POST /tasks/{id}/move` (list, section,
+  parent and place: before / after a task, top / bottom), `POST /tasks/batch`, `POST /tasks/{id}/skip`, the trash
+  (`GET` / `DELETE /trash`, `POST /tasks/{id}/restore`), dependencies, custom field definitions, templates (incl.
+  apply), file uploads to tasks and removing files, editing / deleting comments, folders, list members (share / unshare
+  / leave), archiving and deleting lists, project status updates, saved filters, News (+ mark read), habits (create,
+  change, delete), the timer and changing / deleting time entries, `GET /export`.
+- MCP server: tools for all of these (`move_task`, `batch_tasks`, sections, fields, templates, trash, files, folders,
+  sharing, project overview / status / links / milestones, time, habits, News, list tags …); it lists only the tools
+  the token may use.
+- `POST /api/users` takes `lang` for the new person.
+
+### Changed
+- A new inbox is named in its owner's language ("Inbox", "Eingang", …) instead of always "Eingang"; every default name
+  is still shown in the viewer's language. API v1 shows the inbox name in the token user's language.
+- The setup guides and the agent behaviour rules (`mcp/CLAUDE.template.md`) explain permissions and approvals.
+
+### Compatibility
+- Existing tokens and agents keep what they could do: stored `write` means every permission but *Admin read*, and
+  read-only tokens got *Read files* once. Scripts may still create tokens with `write`.
+
 ## [2.14.0] - 2026-10-03
 
 **In short:** Columns per list (#425): every list decides which columns its rows show and in which order, the same for
@@ -2143,7 +2188,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.14.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.15.0...HEAD
+[2.15.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.15.0
 [2.14.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.14.0
 [2.13.4]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.13.4
 [2.13.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.13.3

@@ -441,7 +441,9 @@ for ln in routes:
 missing = [(p, m) for p, ms in v1r.items() for m in ms if m not in spec["paths"].get(p, {})]
 extra = [(p, m) for p, ms in spec["paths"].items() for m in ms if m not in v1r.get(p, set())]
 check(v1r and not missing and not extra, f"every route documented: missing {missing}, extra {extra}")
-check(all(op.get("x-kalmido-scope") in ("read", "write", "admin-read") for ms in spec["paths"].values() for op in ms.values()), "spec: scope per operation")
+SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "account",
+          "admin-read", "agent")  # 2.15.0 (#479): fine scopes
+check(all(op.get("x-kalmido-scope") in SCOPES for ms in spec["paths"].values() for op in ms.values()), "spec: scope per operation")
 
 # ---- per-token rate limit (KALMIDO_API_RATE=200 in this container)
 TL = tok(A, "limited")["token"]

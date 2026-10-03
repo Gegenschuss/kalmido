@@ -290,7 +290,7 @@ check(r.status_code == 403, f"v1 shift: view-only member refused ({r.status_code
 r = requests.post(B + f"/api/v1/lists/{BRAND}/shift", headers={"Authorization": "Bearer " + TB}, json={"days": 1})
 check(r.status_code == 404, f"v1 shift: invisible list 404 ({r.status_code})")
 spec = requests.get(B + "/api/v1/openapi.json").json()
-check("/roadmap" in spec["paths"] and spec["paths"]["/lists/{id}/shift"]["post"]["x-kalmido-scope"] == "write"
+check("/roadmap" in spec["paths"] and spec["paths"]["/lists/{id}/shift"]["post"]["x-kalmido-scope"] == "tasks:write"
       and spec["paths"]["/roadmap"]["get"]["x-kalmido-scope"] == "read" and "RoadmapGroup" in spec["components"]["schemas"], "OpenAPI: both documented with their scopes")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")

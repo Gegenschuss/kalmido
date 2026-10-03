@@ -205,7 +205,7 @@ r = requests.post(V + "/me/app-passwords", headers=th, json={"name": "x", "bogus
 check(r.status_code == 400 and r.json()["error"]["code"] == "unknown_field", "token API: unknown field 400")
 j = requests.get(V + "/me/app-passwords", headers=th).json()
 check(len(j["data"]) == 2 and j["caldav"]["username"] == "alice", "token API: list + the CalDAV address")
-ag = A.post(B + "/api/admin/agents", json={"username": "robo", "display_name": "Robo"})
+ag = A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "robo", "display_name": "Robo"})
 atok = ag.json().get("token") if ag.status_code == 201 else ""
 check(bool(atok), "test setup: an agent with a token")
 check(requests.post(V + "/me/app-passwords", headers={"Authorization": "Bearer " + str(atok)}, json={"name": "x"}).status_code == 403,

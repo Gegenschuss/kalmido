@@ -97,7 +97,7 @@ def kinds(cl, kind, since=0):
 
 
 def new_agent(a, name, **extra):
-    r = a.post(B + "/api/admin/agents", json={"username": name, "display_name": name.title(), **extra})
+    r = a.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": name, "display_name": name.title(), **extra})
     assert r.status_code in (200, 201), r.text
     return r.json()["id"], Api(r.json()["token"])
 
@@ -165,7 +165,7 @@ check(cl.patch(f"/agent", json={"runtime": {"model": "opus"}}).status_code in (4
 AG4, cl4 = new_agent(A, "nightly", runtime={"model": "haiku", "nightly_reset": "03:30"})
 check(cl4.get("/agent").json()["runtime"]["model"] == "haiku" and cl4.get("/agent").json()["runtime"]["nightly_reset"] == "03:30",
       "created with runtime")
-check(A.post(B + "/api/admin/agents", json={"username": "badrt", "runtime": {"autocompact_pct": 3}}).status_code == 400
+check(A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "badrt", "runtime": {"autocompact_pct": 3}}).status_code == 400
       and not dbx("SELECT 1 FROM users WHERE username='badrt'"), "create with a bad runtime: 400, nothing created")
 # reset now
 cur = cl.get("/agent").json()["events_cursor"]

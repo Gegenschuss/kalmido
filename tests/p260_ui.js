@@ -133,8 +133,8 @@ const TOUCH = `(() => {
   const CAROL = (await call('POST', '/api/users', {username: 'carol', display_name: 'Carol', password: 'password123'})).id;
   const CKB = await login('bob');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en', tour: 'done'}, CKB);
-  const ag = await call('POST', '/api/admin/agents', {username: 'claude', display_name: 'Claude'});
-  const ag2 = await call('POST', '/api/admin/agents', {username: 'helper', display_name: 'Helper'});
+  const ag = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'claude', display_name: 'Claude'});
+  const ag2 = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'helper', display_name: 'Helper'});
   const L = (await call('POST', '/api/lists', {name: 'Website Relaunch Müller GmbH', kind: 'project'})).id;  // a long project name
   for (const id of [BOB, ag.id]) await call('PUT', `/api/lists/${L}/members`, {user_id: id, role: 'edit'});
   const CL = (await call('POST', '/api/lists', {name: 'Shopping', kind: 'checklist'})).id;

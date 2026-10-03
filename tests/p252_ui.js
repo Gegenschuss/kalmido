@@ -65,7 +65,7 @@ async function firefox(fn) {
   const BOB = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123'})).id;
   const CKB = await login('bob');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en', tour: 'done'}, CKB);
-  const ag = await call('POST', '/api/admin/agents', {username: 'claude', display_name: 'Claude'});
+  const ag = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'claude', display_name: 'Claude'});
   const L = (await call('POST', '/api/lists', {name: 'Website', kind: 'project'})).id;  // a project: time tracking
   for (const id of [BOB, ag.id]) await call('PUT', `/api/lists/${L}/members`, {user_id: id, role: 'edit'});
   const T = (await call('POST', '/api/tasks', {title: 'Go live', list_id: L, due: '2031-05-04', start: '2031-05-01', content: '- [ ] check DNS\n- [ ] a rather long checklist line to turn into a subtask'})).id;

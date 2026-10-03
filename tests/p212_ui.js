@@ -32,7 +32,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   for (const u of ['bob', 'carol', 'erin']) ids[u] = (await call('POST', '/api/users', {username: u, display_name: u[0].toUpperCase() + u.slice(1), password: 'password123'})).id;
   const CKB = await login('bob'), CKE = await login('erin');
   for (const ck of [CKB, CKE]) await call('PATCH', '/api/settings', {features: ALL, lang: 'en'}, ck);
-  const ag = await call('POST', '/api/admin/agents', {username: 'claude', display_name: 'Claude'});
+  const ag = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'claude', display_name: 'Claude'});
   const TEAM = (await call('POST', '/api/lists', {name: 'Team'})).id;
   await call('PUT', `/api/lists/${TEAM}/members`, {user_id: ids.bob, role: 'edit'});
   await call('PUT', `/api/lists/${TEAM}/members`, {user_id: ag.id, role: 'edit'});

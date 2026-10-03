@@ -94,7 +94,7 @@ def last_event(cl, kind):
 
 
 def new_agent(a, name):
-    r = a.post(B + "/api/admin/agents", json={"username": name, "display_name": name.title()})
+    r = a.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": name, "display_name": name.title()})
     assert r.status_code in (200, 201), r.text
     return r.json()["id"], Api(r.json()["token"])
 

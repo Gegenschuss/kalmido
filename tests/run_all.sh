@@ -317,6 +317,14 @@ shard 4  # ---------------------------------------------------------------- shar
 # rows with cells in the list's order (two on narrow widths, the rest in line 2), and the heron in empty states and error
 # pages; jsdom + Firefox at 380 / 390 / 428 touch, Fold 904 (fold / unfold / rotate) + 880 touch, 1100 / 1440 / 1920 mouse
        run p2140_ui node p2140_ui.js "$KALMIDO_TEST_DATA"
+# 2.15.0 (#479 #632): fine scopes for tokens and agents (every operation of the OpenAPI document enforced as documented),
+# the admin's limit, address restrictions, approvals of an agent's dangerous requests (replayed as the agent), the new
+# routes (sections, move, batch, trash, dependencies, fields, templates, files, folders, members, filters, News, habits,
+# timer), the inbox in the new person's language, MCP tools by scope; the permission dialogs in jsdom and Firefox at 390
+# touch / 1440 mouse; parity: every app route has an API route and every API route an MCP tool (or a documented reason)
+       run parity "$PY" parity_test.py
+       run p2150_api "$PY" p2150_api_test.py "$KALMIDO_TEST_DATA"
+       run p2150_ui node p2150_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

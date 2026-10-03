@@ -203,7 +203,7 @@ BOB, CAROL, DAVE, ERIN = ids["bob"], ids["carol"], ids["dave"], ids["erin"]
 Bo, Ca, Da, Er = sess("bob"), sess("carol"), sess("dave"), sess("erin")
 for x in (A, Bo, Ca, Da, Er):
     x.patch(B + "/api/settings", json={"lang": "en"})
-ag = A.post(B + "/api/admin/agents", json={"username": "helper", "display_name": "Helper"})
+ag = A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "helper", "display_name": "Helper"})
 AG, agt = ag.json()["id"], ag.json()["token"]
 
 check(Bo.post(B + "/api/admin/groups", json={"name": "Office"}).status_code == 403, "only admins create groups")

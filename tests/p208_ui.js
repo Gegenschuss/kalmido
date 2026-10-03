@@ -58,7 +58,7 @@ async function swTests() {
   const BOB = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123'})).id;
   const CKB = await login('bob');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en'}, CKB);
-  const ag = await call('POST', '/api/admin/agents', {username: 'claude', display_name: 'Claude'});
+  const ag = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'claude', display_name: 'Claude'});
   const AG = ag.id;
   const WEB = (await call('POST', '/api/lists', {name: 'Website', kind: 'project'})).id;
   const HOME = (await call('POST', '/api/lists', {name: '🏠 Home'})).id;

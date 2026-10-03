@@ -69,7 +69,7 @@ async function firefox(fn) {
   await call('POST', '/api/users', {username: 'carol', display_name: 'Carol', password: 'password123'});
   const CKB = await login('bob'), CKC = await login('carol');
   for (const ck of [CKB, CKC]) await call('PATCH', '/api/settings', {features: ALL, lang: 'en'}, ck);
-  const ag = await call('POST', '/api/admin/agents', {username: 'claude', display_name: 'Claude'});
+  const ag = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'claude', display_name: 'Claude'});
   const TEAM = (await call('POST', '/api/lists', {name: 'Team'})).id;
   const OTHER = (await call('POST', '/api/lists', {name: 'Other'})).id;
   for (const id of [bob, ag.id]) await call('PUT', `/api/lists/${TEAM}/members`, {user_id: id, role: 'edit'});

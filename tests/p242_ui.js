@@ -71,7 +71,7 @@ async function firefox(fn) {
   const BOB = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123'})).id;
   const CKB = await login('bob');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en'}, CKB);
-  const ag = await call('POST', '/api/admin/agents', {username: 'claude', display_name: 'Claude'});
+  const ag = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'claude', display_name: 'Claude'});
   const L = (await call('POST', '/api/lists', {name: 'Website'})).id;
   await call('PUT', `/api/lists/${L}/members`, {user_id: BOB, role: 'edit'});
   await call('PUT', `/api/lists/${L}/members`, {user_id: ag.id, role: 'edit'});
@@ -181,7 +181,7 @@ async function firefox(fn) {
   w.close();
 
   // ================= #391 share block
-  const ag2 = await call('POST', '/api/admin/agents', {username: 'helper', display_name: 'Helper'});
+  const ag2 = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'helper', display_name: 'Helper'});
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
   w.eval(`settingsModal('ai')`); await sleep(500);
   click(w, d.querySelector('.modal.smodal [data-aisub="lists"]')); await sleep(1200);  // 2.5.1 (#393): the sub-tab Lists

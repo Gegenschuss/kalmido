@@ -76,8 +76,8 @@ c.commit()`, path.join(DATA, 'tasks.db'), JSON.stringify(ids)]);
   const BOB = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123'})).id;
   const CKB = await login('bob');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en'}, CKB);
-  const ag = await call('POST', '/api/admin/agents', {username: 'claude', display_name: 'Claude'});
-  const ag2 = await call('POST', '/api/admin/agents', {username: 'helper', display_name: 'Helper'});
+  const ag = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'claude', display_name: 'Claude'});
+  const ag2 = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'helper', display_name: 'Helper'});
   // 25 lists: 9 shared with Claude (2 of them with Helper too), Bob in the first one
   const L = [];
   for (let i = 1; i <= 25; i++) L.push((await call('POST', '/api/lists', {name: `List ${String(i).padStart(2, '0')}`})).id);

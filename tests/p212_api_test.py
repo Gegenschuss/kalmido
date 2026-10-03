@@ -104,7 +104,7 @@ for u in ("bob", "carol", "dave", "erin"):
 Bo, Ca, Da, Er = sess("bob"), sess("carol"), sess("dave"), sess("erin")
 for x in (A, Bo, Ca, Da, Er):
     x.patch(B + "/api/settings", json={"lang": "en"})
-r = A.post(B + "/api/admin/agents", json={"username": "claude", "display_name": "Claude"})
+r = A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "claude", "display_name": "Claude"})
 AG, AGTOK = r.json()["id"], r.json()["token"]
 cl = Api(AGTOK)
 
@@ -270,7 +270,7 @@ check(not [f for f in os.listdir(os.path.join(DATA, "attachments", "avatars")) i
 us = A.get(B + "/api/users").json()["users"]
 ag = next((u for u in us if u["id"] == AG), None)
 check(ag and ag["kind"] == "agent" and ag.get("agent") and ag["username"] == "claude-dev", "the admin user list contains the agent")
-check(A.post(B + "/api/admin/agents", json={"username": "noav", "avatar_preset": None}).json().get("avatar") == "", "create without a picture")
+check(A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "noav", "avatar_preset": None}).json().get("avatar") == "", "create without a picture")
 
 print(f"\n{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

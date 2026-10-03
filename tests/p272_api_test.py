@@ -175,18 +175,18 @@ if lid and imp.ok:
 # ================================================================== #420 personal agents
 j = Bo.get(B + "/api/my/agents").json()
 check(j["allowed"] is False and j["agents"] == [], "off by default")
-check(Bo.post(B + "/api/my/agents", json={"username": "bobbot"}).status_code == 403, "refused while off")
+check(Bo.post(B + "/api/my/agents", json={"scopes": ["write"], "username": "bobbot"}).status_code == 403, "refused while off")
 check(Bo.get(B + "/api/admin/agent-policy").status_code == 403 and Bo.put(B + "/api/admin/agent-policy", json={"user_agents": True}).status_code == 403, "only admins set the policy")
 p = A.put(B + "/api/admin/agent-policy", json={"user_agents": True, "max_per_user": 1, "limits": {"period": "day", "metric": "tokens", "hard": 50000}})
 check(p.ok and p.json()["user_agents"] and p.json()["max_per_user"] == 1, f"admin allows personal agents: {p.text[:200]}")
 check(A.put(B + "/api/admin/agent-policy", json={"max_per_user": 0}).status_code == 400 and A.put(B + "/api/admin/agent-policy", json={"max_per_user": 21}).status_code == 400, "limit 1..20")
-r = Bo.post(B + "/api/my/agents", json={"username": "bobbot", "display_name": "Bob's bot", "note": "home"})
+r = Bo.post(B + "/api/my/agents", json={"scopes": ["write"], "username": "bobbot", "display_name": "Bob's bot", "note": "home"})
 check(r.status_code == 201 and r.json()["token"].startswith("abk_") and r.json()["owner"]["id"] == ids["bob"], f"Bob creates his agent: {r.text[:200]}")
 BB = r.json()["id"]
 TB = r.json()["token"]
 check(r.json()["limits"] and r.json()["limits"].get("hard") == 50000, "the default limits apply to it")
-check(Bo.post(B + "/api/my/agents", json={"username": "bobbot2"}).status_code == 409, "over the limit: 409")
-check(Bo.post(B + "/api/my/agents", json={"username": "alice"}).status_code in (409, 400), "taken username")
+check(Bo.post(B + "/api/my/agents", json={"scopes": ["write"], "username": "bobbot2"}).status_code == 409, "over the limit: 409")
+check(Bo.post(B + "/api/my/agents", json={"scopes": ["write"], "username": "alice"}).status_code in (409, 400), "taken username")
 u = db("SELECT is_admin, kind, paperless_access FROM users WHERE id=?", (BB,))[0]
 check(u == (0, "agent", 0), f"never admin, no Paperless: {u}")
 check(requests.get(V + "/agent", headers=tok_h(TB)).ok, "its token works")
@@ -287,7 +287,7 @@ check(not db("SELECT 1 FROM users WHERE id=?", (BB,)), "gone")
 check(db("SELECT owner_id FROM lists WHERE id=?", (OWN,))[0][0] == ids["bob"], "its list went to Bob")
 check(requests.get(V + "/agent", headers=tok_h(TB)).status_code == 401, "its token is gone")
 # admin deletes a personal agent: lists to its owner
-r = Bo.post(B + "/api/my/agents", json={"username": "bobbot3"})
+r = Bo.post(B + "/api/my/agents", json={"scopes": ["write"], "username": "bobbot3"})
 check(r.status_code == 201, "a new one fits the limit again")
 B3, T3 = r.json()["id"], r.json()["token"]
 OWN3 = requests.post(V + "/lists", headers=tok_h(T3), json={"name": "Own 3"}).json()["id"]
@@ -296,7 +296,7 @@ check(A.delete(B + f"/api/admin/agents/{B3}").ok, "admin deletes it")
 check(db("SELECT owner_id FROM lists WHERE id=?", (OWN3,))[0][0] == ids["bob"], "its list went to the owner")
 # switched off again: no new ones, existing ones stay
 A.put(B + "/api/admin/agent-policy", json={"user_agents": False})
-check(Bo.post(B + "/api/my/agents", json={"username": "late"}).status_code == 403, "off again: refused")
+check(Bo.post(B + "/api/my/agents", json={"scopes": ["write"], "username": "late"}).status_code == 403, "off again: refused")
 
 print(f"p272_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

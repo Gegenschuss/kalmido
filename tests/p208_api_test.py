@@ -175,7 +175,7 @@ n = wait_for(phone.notes, 1)
 check(n and not n[0].get("actions"), f"assignment push: no buttons: {n[0] if n else None}")
 
 # ================================================================== #333 agent: events with comments, sections, tidy
-r = A.post(B + "/api/admin/agents", json={"username": "claude", "display_name": "Claude"})
+r = A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "claude", "display_name": "Claude"})
 assert r.status_code == 201, r.text
 CL, TOK = r.json()["id"], r.json()["token"]
 cl = Api(TOK)

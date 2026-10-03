@@ -22,6 +22,7 @@ import json
 import os
 import sys
 import threading
+import time
 import uuid
 import urllib.error
 import urllib.parse
@@ -29,7 +30,7 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 SERVER_NAME = "kalmido"
-SERVER_VERSION = "2.13.1"
+SERVER_VERSION = "2.15.0"
 PROTOCOLS = ("2025-06-18", "2025-03-26", "2024-11-05")
 WAIT_MAX = 60
 ATT_CAP_DEFAULT = 5 * 1024 * 1024    # 2.13.1 (#465): get_attachment returns at most this many bytes (base64 in the answer)
@@ -246,7 +247,12 @@ def t_get_attachment(api, a):
     """2.13.1 (#465): one file as base64 (source task = task / comment attachment, chat = a chat message's file), at most
     max_bytes (default 5 MB). Images also come as an MCP image item, so the model sees them."""
     cap = int(a.get("max_bytes") or ATT_CAP_DEFAULT)
-    path = (f"/chat-attachments/{int(a['attachment_id'])}" if a.get("source") == "chat" else f"/attachments/{int(a['attachment_id'])}")
+    if a.get("source") == "project":  # 2.15.0 (#479): a project file (list_id needed)
+        if not a.get("list_id"):
+            raise ApiError(400, "list_id is required for source project")
+        path = f"/lists/{int(a['list_id'])}/files/{int(a['attachment_id'])}"
+    else:
+        path = (f"/chat-attachments/{int(a['attachment_id'])}" if a.get("source") == "chat" else f"/attachments/{int(a['attachment_id'])}")
     r = api.call("GET", path, binary_cap=cap)
     return {"id": int(a["attachment_id"]), "source": a.get("source") or "task", "name": r["name"], "mime": r["mime"],
             "size": len(r["bytes"]), "base64": base64.b64encode(r["bytes"]).decode()}
@@ -436,10 +442,11 @@ TOOLS = [
                          "comments. Read one with get_attachment.",
      _obj({"task_id": S_ID}, ["task_id"]), lambda api, a: api.call("GET", f"/tasks/{int(a['task_id'])}/attachments")),
     ("get_attachment", "Read one file: a task / comment attachment (source task, ids from list_attachments, get_task or comment "
-                       "events) or a chat file (source chat, ids from a chat message's attachments). Returns name, mime, size and the "
+                       "events), a chat file (source chat, ids from a chat message's attachments) or a project file (source project "
+                       "+ list_id, ids from list_project_files). Returns name, mime, size and the "
                        "content as base64; images are also returned as an image you can look at. Use it when someone asks about a "
                        "screenshot. max_bytes caps the size (default 5 MB, at most 20 MB).",
-     _obj({"attachment_id": S_ID, "source": {"type": "string", "enum": ["task", "chat"]},
+     _obj({"attachment_id": S_ID, "source": {"type": "string", "enum": ["task", "chat", "project"]}, "list_id": S_ID,
            "max_bytes": {"type": "integer", "minimum": 1, "maximum": ATT_CAP_MAX}}, ["attachment_id"]), t_get_attachment),
     ("report_usage", "Report the agent's own model usage (numbers and ids only, never prompt content): model, input_tokens, "
                      "output_tokens, optional cache_read_tokens, cache_write_tokens, cost_usd, the task / list / job it was for and a "
@@ -460,6 +467,348 @@ TOOLS = [
            "list_tags": STRS, "priority": PRIO}, ["task_id"]), t_tidy),
 ]
 TOOL_MAP = {t[0]: t for t in TOOLS}
+
+
+# ---------------------------------------------------------------- 2.15.0 (#479): the rest of the API as tools
+
+def _without(a, *keys):
+    return {k: v for k, v in a.items() if k not in keys}
+
+
+def t_move_task(api, a):
+    return api.call("POST", f"/tasks/{int(a['task_id'])}/move", body=_without(a, "task_id"))
+
+
+def t_upload_attachment(api, a):
+    """files = [{name, base64, mime?}] -> multipart POST /tasks/{id}/attachments."""
+    files = []
+    for f in a["files"]:
+        if not isinstance(f, dict) or not isinstance(f.get("name"), str) or not isinstance(f.get("base64"), str):
+            raise ApiError(400, "files: each entry needs name and base64")
+        try:
+            files.append((f["name"], f.get("mime") or "application/octet-stream", base64.b64decode(f["base64"], validate=True)))
+        except ValueError:
+            raise ApiError(400, f"files: {f['name']} is not valid base64") from None
+    return api.call("POST", f"/tasks/{int(a['task_id'])}/attachments", multipart=({}, files))
+
+
+def t_upload_project_file(api, a):
+    try:
+        data = base64.b64decode(a["base64"], validate=True)
+    except ValueError:
+        raise ApiError(400, "base64: not valid base64") from None
+    return api.call("POST", f"/lists/{int(a['list_id'])}/files", multipart=({}, [(a["name"], a.get("mime") or "application/octet-stream", data)]))
+
+
+def _id(a, k):
+    return int(a[k])
+
+
+def _q(v):
+    return urllib.parse.quote(str(v), safe="")
+
+
+TASK_PLACE = {"list_id": S_ID, "section_id": {"type": ["integer", "null"]}, "parent_id": {"type": ["integer", "null"]},
+              "before_id": S_ID, "after_id": S_ID, "position": {"type": "string", "enum": ["top", "bottom"]}}
+LIST_PROPS = {"name": {"type": "string"}, "color": {"type": "string"}, "folder": {"type": "string", "description": "path, e.g. Clients/Acme"},
+              "view": {"type": "string", "enum": ["list", "kanban", "timeline"]}, "kind": {"type": "string", "enum": ["list", "project"]},
+              "done_at_bottom": {"type": "boolean"}, "nag": {"type": "string"}, "day_hours": {"type": ["number", "null"]}}
+HABIT_PROPS = {"name": {"type": "string"}, "color": {"type": "string"}, "goal": {"type": "integer", "minimum": 1},
+               "days": {"type": "string", "description": "weekdays 1-7 (1 = Monday), e.g. 12345"}, "per_week": {"type": "integer", "minimum": 0},
+               "remind_at": {"type": "string", "description": "HH:MM or empty"}}
+FILES = {"type": "array", "minItems": 1, "maxItems": 10, "items": {"type": "object", "properties": {
+    "name": {"type": "string"}, "base64": {"type": "string"}, "mime": {"type": "string"}}, "required": ["name", "base64"]}}
+APPROVAL_NOTE = (" As an agent this waits for a person's approval: the answer is approval_required with a job; the result comes "
+                 "as a job event.")
+
+TOOLS += [
+    ("get_me", "Your token: user, kind (agent / user), effective_scopes (what this token may do), switched-on modules, notifications.",
+     _obj({}), lambda api, a: api.call("GET", "/me")),
+    # ---- lists
+    ("get_list", "One list with its sections and custom fields.", _obj({"list_id": S_ID}, ["list_id"]),
+     lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}")),
+    ("create_list", "Create a list (you become its owner). kind project = time tracking, dependencies, custom fields, overview.",
+     _obj({**LIST_PROPS, "project_type": {"type": "string"}}, ["name"]), lambda api, a: api.call("POST", "/lists", body=a)),
+    ("update_list", "Change a list: name, color, folder (moving your own list into another folder waits for approval), view, kind, "
+                    "archived (true = archive), done_at_bottom, nag, day_hours.",
+     _obj({"list_id": S_ID, **LIST_PROPS, "archived": {"type": "boolean"}}, ["list_id"]),
+     lambda api, a: api.call("PATCH", f"/lists/{_id(a, 'list_id')}", body=_without(a, "list_id"))),
+    ("delete_list", "Delete an ARCHIVED list for good (owner; archive it first with update_list archived=true); its tasks go to the "
+                    "trash." + APPROVAL_NOTE, _obj({"list_id": S_ID}, ["list_id"]),
+     lambda api, a: api.call("DELETE", f"/lists/{_id(a, 'list_id')}")),
+    ("shift_list_dates", "Move every open date of a list by n days (negative = earlier).",
+     _obj({"list_id": S_ID, "days": {"type": "integer"}}, ["list_id", "days"]),
+     lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/shift", body={"days": a["days"]})),
+    ("list_members", "Owner and members of a list with their roles.", _obj({"list_id": S_ID}, ["list_id"]),
+     lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}/members")),
+    ("share_list", "Share a list with a person (role admin | edit | participant | view); owner / list admins." + APPROVAL_NOTE,
+     _obj({"list_id": S_ID, "user_id": S_ID, "role": {"type": "string", "enum": ["admin", "edit", "participant", "view"]}}, ["list_id", "user_id"]),
+     lambda api, a: api.call("PUT", f"/lists/{_id(a, 'list_id')}/members/{_id(a, 'user_id')}", body=_pick(a, ("role",)))),
+    ("unshare_list", "Stop sharing a list with a person (or leave it: your own user id)." + APPROVAL_NOTE,
+     _obj({"list_id": S_ID, "user_id": S_ID}, ["list_id", "user_id"]),
+     lambda api, a: api.call("DELETE", f"/lists/{_id(a, 'list_id')}/members/{_id(a, 'user_id')}")),
+    ("share_list_with_group", "Share a list with a group of people (role)." + APPROVAL_NOTE,
+     _obj({"list_id": S_ID, "group_id": S_ID, "role": {"type": "string", "enum": ["admin", "edit", "participant", "view"]}}, ["list_id", "group_id"]),
+     lambda api, a: api.call("PUT", f"/lists/{_id(a, 'list_id')}/groups/{_id(a, 'group_id')}", body=_pick(a, ("role",)))),
+    ("unshare_list_from_group", "Stop sharing a list with a group." + APPROVAL_NOTE,
+     _obj({"list_id": S_ID, "group_id": S_ID}, ["list_id", "group_id"]),
+     lambda api, a: api.call("DELETE", f"/lists/{_id(a, 'list_id')}/groups/{_id(a, 'group_id')}")),
+    ("get_group", "One group with its members.", _obj({"group_id": S_ID}, ["group_id"]),
+     lambda api, a: api.call("GET", f"/groups/{_id(a, 'group_id')}")),
+    # ---- sections
+    ("list_sections", "Sections of a list in order.", _obj({"list_id": S_ID}, ["list_id"]),
+     lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}/sections")),
+    ("create_section", "Create a section in a list (at the end, or before section before_id).",
+     _obj({"list_id": S_ID, "name": {"type": "string", "minLength": 1, "maxLength": 200}, "before_id": S_ID}, ["list_id", "name"]),
+     lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/sections", body=_without(a, "list_id"))),
+    ("rename_section", "Rename a section.", _obj({"section_id": S_ID, "name": {"type": "string", "minLength": 1, "maxLength": 200}},
+                                                 ["section_id", "name"]),
+     lambda api, a: api.call("PATCH", f"/sections/{_id(a, 'section_id')}", body={"name": a["name"]})),
+    ("reorder_sections", "Put the sections of a list in a new order (ids: every section of the list exactly once).",
+     _obj({"list_id": S_ID, "ids": {"type": "array", "items": {"type": "integer"}}}, ["list_id", "ids"]),
+     lambda api, a: api.call("PUT", f"/lists/{_id(a, 'list_id')}/sections/order", body={"ids": a["ids"]})),
+    ("delete_section", "Delete a section; its tasks stay in the list without a section.", _obj({"section_id": S_ID}, ["section_id"]),
+     lambda api, a: api.call("DELETE", f"/sections/{_id(a, 'section_id')}")),
+    # ---- folders
+    ("list_folders", "Your folders (paths like Clients/Acme) and how many lists they hold.", _obj({}),
+     lambda api, a: api.call("GET", "/folders")),
+    ("rename_folder", "Rename or move a folder (old -> new path); its lists go along." + APPROVAL_NOTE,
+     _obj({"old": {"type": "string", "minLength": 1}, "new": {"type": "string", "minLength": 1}}, ["old", "new"]),
+     lambda api, a: api.call("POST", "/folders/rename", body=a)),
+    ("delete_folder", "Remove a folder; its lists move up a level." + APPROVAL_NOTE, _obj({"name": {"type": "string", "minLength": 1}}, ["name"]),
+     lambda api, a: api.call("POST", "/folders/delete", body=a)),
+    # ---- tasks
+    ("move_task", "Move a task (with its subtasks): to another list / section / parent and to a place: before_id or after_id (a "
+                  "sibling) or position top | bottom. Moving into another list needs edit rights there.",
+     _obj({"task_id": S_ID, **TASK_PLACE}, ["task_id"]), t_move_task),
+    ("batch_tasks", "Change many tasks at once (1-500 ids): action update (changes = task fields as in update_task) | complete | "
+                    "reopen | wont_do | delete | restore. Tasks you may not change are skipped (errors). An agent's batch with 10 or "
+                    "more tasks waits for a person's approval (approval_required + job).",
+     _obj({"ids": {"type": "array", "items": {"type": "integer"}, "minItems": 1, "maxItems": 500},
+           "action": {"type": "string", "enum": ["update", "complete", "reopen", "wont_do", "delete", "restore"]},
+           "changes": {"type": "object"}}, ["ids", "action"]),
+     lambda api, a: api.call("POST", "/tasks/batch", body=a)),
+    ("reopen_task", "Reopen a completed task.", _obj({"task_id": S_ID}, ["task_id"]),
+     lambda api, a: api.call("POST", f"/tasks/{_id(a, 'task_id')}/reopen")),
+    ("delete_task", "Move a task (with its subtasks) to the trash (restorable with restore_task).", _obj({"task_id": S_ID}, ["task_id"]),
+     lambda api, a: api.call("DELETE", f"/tasks/{_id(a, 'task_id')}")),
+    ("skip_occurrence", "Skip this occurrence of a repeating task: it moves to its next date without a completed copy.",
+     _obj({"task_id": S_ID}, ["task_id"]), lambda api, a: api.call("POST", f"/tasks/{_id(a, 'task_id')}/skip")),
+    ("take_task", "Take a task assigned to one of your groups: it becomes yours.", _obj({"task_id": S_ID}, ["task_id"]),
+     lambda api, a: api.call("POST", f"/tasks/{_id(a, 'task_id')}/take")),
+    ("list_subtasks", "The subtasks of a task.", _obj({"task_id": S_ID}, ["task_id"]),
+     lambda api, a: api.call("GET", f"/tasks/{_id(a, 'task_id')}/subtasks")),
+    ("add_subtask", "Add a subtask (same fields as create_task, without list_id / parent_id).",
+     _obj({"task_id": S_ID, **{k: v for k, v in TASK_FIELDS.items() if k not in ("list_id", "parent_id")}}, ["task_id", "title"]),
+     lambda api, a: api.call("POST", f"/tasks/{_id(a, 'task_id')}/subtasks", body=_without(a, "task_id"))),
+    ("list_trash", "Tasks in the trash (newest first), optionally of one list.",
+     _obj({"list_id": S_ID, "limit": {"type": "integer", "minimum": 1, "maximum": 500}, "cursor": {"type": "string"}}),
+     lambda api, a: api.call("GET", "/trash", _pick(a, ("list_id", "limit", "cursor")))),
+    ("restore_task", "Restore a task from the trash.", _obj({"task_id": S_ID}, ["task_id"]),
+     lambda api, a: api.call("POST", f"/tasks/{_id(a, 'task_id')}/restore")),
+    ("empty_trash", "Delete the trash for good (lists you own)." + APPROVAL_NOTE, _obj({}), lambda api, a: api.call("DELETE", "/trash")),
+    ("list_tags", "Your personal tags and the list tags of the lists you see, with counts.", _obj({}), lambda api, a: api.call("GET", "/tags")),
+    ("get_roadmap", "All projects / lists on one timeline (from, to as YYYY-MM-DD; projects_only, include_done).",
+     _obj({"from": {"type": "string"}, "to": {"type": "string"}, "projects_only": {"type": "boolean"}, "include_done": {"type": "boolean"}}),
+     lambda api, a: api.call("GET", "/roadmap", {k: (str(v).lower() if isinstance(v, bool) else v) for k, v in a.items()})),
+    # ---- dependencies
+    ("get_dependencies", "What a task waits on (blocked_by) and what waits on it (blocking).", _obj({"task_id": S_ID}, ["task_id"]),
+     lambda api, a: api.call("GET", f"/tasks/{_id(a, 'task_id')}/dependencies")),
+    ("add_dependency", "task_id waits on blocked_by (project lists; no cycles).", _obj({"task_id": S_ID, "blocked_by": S_ID}, ["task_id", "blocked_by"]),
+     lambda api, a: api.call("POST", f"/tasks/{_id(a, 'task_id')}/dependencies", body={"blocked_by": a["blocked_by"]})),
+    ("remove_dependency", "task_id no longer waits on blocked_by.", _obj({"task_id": S_ID, "blocked_by": S_ID}, ["task_id", "blocked_by"]),
+     lambda api, a: api.call("DELETE", f"/tasks/{_id(a, 'task_id')}/dependencies/{_id(a, 'blocked_by')}")),
+    # ---- custom fields
+    ("list_fields", "Custom field definitions of a list (id, name, type, options). Values: the task's fields {field id: value}.",
+     _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}/fields")),
+    ("create_field", "Create a custom field in a project list (owner): type text | number | date | select | person | url | checkbox "
+                     "...; options for select: {options: [{id, label, color?}]}.",
+     _obj({"list_id": S_ID, "name": {"type": "string", "minLength": 1}, "type": {"type": "string"}, "options": {"type": "object"},
+           "pinned": {"type": "boolean"}}, ["list_id", "name", "type"]),
+     lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/fields", body=_without(a, "list_id"))),
+    ("update_field", "Change a custom field (name, options, pinned, sort); the type stays.",
+     _obj({"field_id": S_ID, "name": {"type": "string"}, "options": {"type": "object"}, "pinned": {"type": "boolean"}, "sort": {"type": "number"}},
+          ["field_id"]),
+     lambda api, a: api.call("PATCH", f"/fields/{_id(a, 'field_id')}", body=_without(a, "field_id"))),
+    ("delete_field", "Delete a custom field with all its values." + APPROVAL_NOTE, _obj({"field_id": S_ID}, ["field_id"]),
+     lambda api, a: api.call("DELETE", f"/fields/{_id(a, 'field_id')}")),
+    # ---- list tags (shared by the members)
+    ("create_list_tag", "Create a shared tag of a list.", _obj({"list_id": S_ID, "name": {"type": "string", "minLength": 1}, "color": {"type": "string"}},
+                                                              ["list_id", "name"]),
+     lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/tags", body=_without(a, "list_id"))),
+    ("update_list_tag", "Rename / recolor a list tag.", _obj({"list_id": S_ID, "tag_id": S_ID, "name": {"type": "string"}, "color": {"type": "string"}},
+                                                           ["list_id", "tag_id"]),
+     lambda api, a: api.call("PATCH", f"/lists/{_id(a, 'list_id')}/tags/{_id(a, 'tag_id')}", body=_without(a, "list_id", "tag_id"))),
+    ("delete_list_tag", "Delete a list tag (it leaves every task).", _obj({"list_id": S_ID, "tag_id": S_ID}, ["list_id", "tag_id"]),
+     lambda api, a: api.call("DELETE", f"/lists/{_id(a, 'list_id')}/tags/{_id(a, 'tag_id')}")),
+    # ---- templates
+    ("list_templates", "Your templates (task templates and list templates).", _obj({}), lambda api, a: api.call("GET", "/templates")),
+    ("create_template", "Create a template from a task (task_id, with its subtasks), a list (list_id: sections + open tasks; relative "
+                        "= dates from the project start) or data (kind + data); name optional.",
+     _obj({"task_id": S_ID, "list_id": S_ID, "relative": {"type": "boolean"}, "kind": {"type": "string", "enum": ["task", "list"]},
+           "data": {"type": "object"}, "name": {"type": "string"}}), lambda api, a: api.call("POST", "/templates", body=a)),
+    ("update_template", "Rename a template or replace its data.", _obj({"template_id": S_ID, "name": {"type": "string"}, "data": {"type": "object"}},
+                                                                       ["template_id"]),
+     lambda api, a: api.call("PATCH", f"/templates/{_id(a, 'template_id')}", body=_without(a, "template_id"))),
+    ("delete_template", "Delete a template.", _obj({"template_id": S_ID}, ["template_id"]),
+     lambda api, a: api.call("DELETE", f"/templates/{_id(a, 'template_id')}")),
+    ("apply_template", "Use a template: a task template creates the task in list_id / section_id (default the inbox); a list "
+                       "template creates a new list (name, folder; start / end YYYY-MM-DD move its dates).",
+     _obj({"template_id": S_ID, "list_id": S_ID, "section_id": S_ID, "name": {"type": "string"}, "folder": {"type": "string"},
+           "start": {"type": "string"}, "end": {"type": "string"}}, ["template_id"]),
+     lambda api, a: api.call("POST", f"/templates/{_id(a, 'template_id')}/apply", body=_without(a, "template_id"))),
+    # ---- saved filters
+    ("list_filters", "Your saved filters (name + rules).", _obj({}), lambda api, a: api.call("GET", "/filters")),
+    ("create_filter", "Save a filter: rules as the app stores them (see docs/API.md).",
+     _obj({"name": {"type": "string", "minLength": 1}, "rules": {"type": "object"}}, ["name"]), lambda api, a: api.call("POST", "/filters", body=a)),
+    ("update_filter", "Change a saved filter.", _obj({"filter_id": S_ID, "name": {"type": "string"}, "rules": {"type": "object"}, "sort": {"type": "number"}},
+                                                     ["filter_id"]),
+     lambda api, a: api.call("PATCH", f"/filters/{_id(a, 'filter_id')}", body=_without(a, "filter_id"))),
+    ("delete_filter", "Delete a saved filter.", _obj({"filter_id": S_ID}, ["filter_id"]),
+     lambda api, a: api.call("DELETE", f"/filters/{_id(a, 'filter_id')}")),
+    # ---- files + comments
+    ("upload_attachment", "Attach files to a task: files = [{name, base64, mime?}] (at most 10, each within the server's upload limit).",
+     _obj({"task_id": S_ID, "files": FILES}, ["task_id", "files"]), t_upload_attachment),
+    ("delete_attachment", "Remove a file of a task (or of your comment).", _obj({"attachment_id": S_ID}, ["attachment_id"]),
+     lambda api, a: api.call("DELETE", f"/attachments/{_id(a, 'attachment_id')}")),
+    ("delete_chat_attachment", "Remove a file you sent in a chat.", _obj({"attachment_id": S_ID}, ["attachment_id"]),
+     lambda api, a: api.call("DELETE", f"/chat-attachments/{_id(a, 'attachment_id')}")),
+    ("update_comment", "Edit your comment (Markdown).", _obj({"comment_id": S_ID, "body": {"type": "string", "minLength": 1}}, ["comment_id", "body"]),
+     lambda api, a: api.call("PATCH", f"/comments/{_id(a, 'comment_id')}", body={"body": a["body"]})),
+    ("delete_comment", "Delete a comment (yours; list owners / admins any).", _obj({"comment_id": S_ID}, ["comment_id"]),
+     lambda api, a: api.call("DELETE", f"/comments/{_id(a, 'comment_id')}")),
+    # ---- project overview (write)
+    ("set_project_overview", "Set the description (Markdown) of a project's overview.",
+     _obj({"list_id": S_ID, "description": {"type": "string"}}, ["list_id", "description"]),
+     lambda api, a: api.call("PATCH", f"/lists/{_id(a, 'list_id')}/overview", body={"description": a["description"]})),
+    ("add_project_link", "Add a key link to a project's overview.", _obj({"list_id": S_ID, "title": {"type": "string"}, "url": {"type": "string"}},
+                                                                       ["list_id", "url"]),
+     lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/links", body=_without(a, "list_id"))),
+    ("update_project_link", "Change a key link.", _obj({"list_id": S_ID, "link_id": S_ID, "title": {"type": "string"}, "url": {"type": "string"}},
+                                                       ["list_id", "link_id"]),
+     lambda api, a: api.call("PATCH", f"/lists/{_id(a, 'list_id')}/links/{_id(a, 'link_id')}", body=_without(a, "list_id", "link_id"))),
+    ("delete_project_link", "Remove a key link.", _obj({"list_id": S_ID, "link_id": S_ID}, ["list_id", "link_id"]),
+     lambda api, a: api.call("DELETE", f"/lists/{_id(a, 'list_id')}/links/{_id(a, 'link_id')}")),
+    ("reorder_project_links", "Put the key links in a new order (every link id once).",
+     _obj({"list_id": S_ID, "ids": {"type": "array", "items": {"type": "integer"}}}, ["list_id", "ids"]),
+     lambda api, a: api.call("PUT", f"/lists/{_id(a, 'list_id')}/links/order", body={"ids": a["ids"]})),
+    ("add_milestone", "Add a milestone (name, day YYYY-MM-DD) to a project.",
+     _obj({"list_id": S_ID, "name": {"type": "string", "minLength": 1}, "day": {"type": "string"}, "done": {"type": "boolean"}}, ["list_id", "name", "day"]),
+     lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/milestones", body=_without(a, "list_id"))),
+    ("update_milestone", "Change a milestone (name, day, done).",
+     _obj({"list_id": S_ID, "milestone_id": S_ID, "name": {"type": "string"}, "day": {"type": "string"}, "done": {"type": "boolean"}},
+          ["list_id", "milestone_id"]),
+     lambda api, a: api.call("PATCH", f"/lists/{_id(a, 'list_id')}/milestones/{_id(a, 'milestone_id')}", body=_without(a, "list_id", "milestone_id"))),
+    ("delete_milestone", "Remove a milestone.", _obj({"list_id": S_ID, "milestone_id": S_ID}, ["list_id", "milestone_id"]),
+     lambda api, a: api.call("DELETE", f"/lists/{_id(a, 'list_id')}/milestones/{_id(a, 'milestone_id')}")),
+    ("set_project_status", "Post a status update of a project: status on_track | at_risk | off_track | on_hold | complete (empty = none) "
+                           "and a short note; the members are told.",
+     _obj({"list_id": S_ID, "status": {"type": "string", "enum": ["on_track", "at_risk", "off_track", "on_hold", "complete", ""]},
+           "note": {"type": "string", "maxLength": 500}}, ["list_id", "status"]),
+     lambda api, a: api.call("PUT", f"/lists/{_id(a, 'list_id')}/status", body=_without(a, "list_id"))),
+    ("list_project_files", "Project files of a list (read them with get_attachment source project).", _obj({"list_id": S_ID}, ["list_id"]),
+     lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}/files")),
+    ("upload_project_file", "Add a file to a project's overview (name, base64, mime?).",
+     _obj({"list_id": S_ID, "name": {"type": "string", "minLength": 1}, "base64": {"type": "string"}, "mime": {"type": "string"}},
+          ["list_id", "name", "base64"]), t_upload_project_file),
+    ("delete_project_file", "Remove a project file.", _obj({"list_id": S_ID, "file_id": S_ID}, ["list_id", "file_id"]),
+     lambda api, a: api.call("DELETE", f"/lists/{_id(a, 'list_id')}/files/{_id(a, 'file_id')}")),
+    # ---- time tracking
+    ("get_timer", "The running timer (null = none).", _obj({}), lambda api, a: api.call("GET", "/time/timer")),
+    ("start_timer", "Start the timer on a task (or a project list); a running one stops.", _obj({"task_id": S_ID, "list_id": S_ID, "note": {"type": "string"}}),
+     lambda api, a: api.call("POST", "/time/timer", body=a)),
+    ("stop_timer", "Stop the running timer.", _obj({}), lambda api, a: api.call("DELETE", "/time/timer")),
+    ("list_time_entries", "Time entries (from / to YYYY-MM-DD, default the last 7 days; scope mine | all; list_id, task_id).",
+     _obj({"from": {"type": "string"}, "to": {"type": "string"}, "scope": {"type": "string", "enum": ["mine", "all"]}, "list_id": S_ID,
+           "task_id": S_ID, "limit": {"type": "integer", "minimum": 1, "maximum": 500}, "cursor": {"type": "string"}}),
+     lambda api, a: api.call("GET", "/time/entries", a)),
+    ("add_time_entry", "Add a time entry: task_id or list_id, start (YYYY-MM-DDTHH:MM), end or minutes, note.",
+     _obj({"task_id": S_ID, "list_id": S_ID, "start": {"type": "string"}, "end": {"type": "string"}, "minutes": {"type": "number"},
+           "note": {"type": "string"}}, ["start"]), lambda api, a: api.call("POST", "/time/entries", body=a)),
+    ("update_time_entry", "Change your time entry.", _obj({"entry_id": S_ID, "start": {"type": "string"}, "end": {"type": "string"},
+                                                           "minutes": {"type": "number"}, "note": {"type": "string"}, "task_id": S_ID, "list_id": S_ID},
+                                                          ["entry_id"]),
+     lambda api, a: api.call("PATCH", f"/time/entries/{_id(a, 'entry_id')}", body=_without(a, "entry_id"))),
+    ("delete_time_entry", "Delete your time entry.", _obj({"entry_id": S_ID}, ["entry_id"]),
+     lambda api, a: api.call("DELETE", f"/time/entries/{_id(a, 'entry_id')}")),
+    # ---- habits
+    ("list_habits", "Your habits with today's count and the last 30 days.", _obj({}), lambda api, a: api.call("GET", "/habits")),
+    ("create_habit", "Create a habit.", _obj(HABIT_PROPS, ["name"]), lambda api, a: api.call("POST", "/habits", body=a)),
+    ("update_habit", "Change a habit (archived = true to archive).", _obj({"habit_id": S_ID, **HABIT_PROPS, "archived": {"type": "boolean"}}, ["habit_id"]),
+     lambda api, a: api.call("PATCH", f"/habits/{_id(a, 'habit_id')}", body=_without(a, "habit_id"))),
+    ("delete_habit", "Delete a habit with its history.", _obj({"habit_id": S_ID}, ["habit_id"]),
+     lambda api, a: api.call("DELETE", f"/habits/{_id(a, 'habit_id')}")),
+    ("check_in_habit", "Check in a habit (date YYYY-MM-DD, default today; count = absolute count, default one more; note).",
+     _obj({"habit_id": S_ID, "date": {"type": "string"}, "count": {"type": "integer", "minimum": 0}, "note": {"type": "string"}}, ["habit_id"]),
+     lambda api, a: api.call("POST", f"/habits/{_id(a, 'habit_id')}/checkin", body=_without(a, "habit_id"))),
+    # ---- News, agents, export
+    ("list_news", "Your News (mentions, assignments, comments, shares, approvals ...), newest first; filter mentions | me.",
+     _obj({"filter": {"type": "string", "enum": ["mentions", "me"]}}), lambda api, a: api.call("GET", "/news", a)),
+    ("mark_news_read", "Mark News read: ids, or all=true.", _obj({"ids": {"type": "array", "items": {"type": "integer"}}, "all": {"type": "boolean"}}),
+     lambda api, a: api.call("POST", "/news/read", body=a)),
+    ("list_agents", "The agents in your lists with their state and running jobs.", _obj({}), lambda api, a: api.call("GET", "/agents")),
+    ("export_data", "Everything the token's user owns as JSON (lists, tasks, comments, time, habits ...). Large.", _obj({}),
+     lambda api, a: api.call("GET", "/export", timeout=120)),
+]
+TOOL_MAP = {t[0]: t for t in TOOLS}
+
+# 2.15.0 (#479): the scope each tool needs (the same as its REST call, see GET /api/v1/openapi.json x-kalmido-scope);
+# tools/list shows only the tools the token may use (GET /me effective_scopes; agent = agent tokens only).
+TOOL_SCOPES = {
+    "agent": ("get_agent", "react_to_chat", "set_status", "list_events", "wait_for_events", "list_jobs", "create_job", "get_job",
+              "submit_proposal", "update_job", "list_chats", "chat_typing", "send_chat", "report_usage", "get_usage"),
+    "tasks:write": ("create_task", "update_task", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "batch_tasks",
+                    "reopen_task", "skip_occurrence", "take_task", "add_subtask", "add_dependency", "remove_dependency", "create_habit",
+                    "update_habit", "check_in_habit", "shift_list_dates"),
+    "comments": ("add_comment", "react", "request_merge_approval", "update_comment", "delete_comment", "mark_news_read",
+                 "delete_chat_attachment"),
+    "structure": ("set_list_columns", "create_list", "update_list", "share_list", "unshare_list", "share_list_with_group",
+                  "unshare_list_from_group", "create_section", "rename_section", "reorder_sections", "rename_folder", "delete_folder",
+                  "create_field", "update_field", "create_list_tag", "update_list_tag", "delete_list_tag", "create_template",
+                  "update_template", "apply_template", "create_filter", "update_filter", "set_project_overview", "add_project_link",
+                  "update_project_link", "delete_project_link", "reorder_project_links", "set_project_status", "add_milestone", "update_milestone",
+                  "delete_milestone"),
+    "delete": ("delete_list", "delete_section", "delete_task", "restore_task", "empty_trash", "delete_field", "delete_template",
+               "delete_filter", "delete_habit"),
+    "attachments:read": ("get_attachment",),
+    "attachments:write": ("upload_attachment", "delete_attachment", "upload_project_file", "delete_project_file"),
+    "time": ("start_timer", "stop_timer", "add_time_entry", "update_time_entry", "delete_time_entry"),
+    "export": ("export_data",),
+}
+TOOL_SCOPE = {n: s for s, names in TOOL_SCOPES.items() for n in names}   # every other tool: read
+ALL_SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export")
+_ME = {"at": 0.0, "v": None}
+ME_TTL = 300  # s: a changed scope shows in tools/list within 5 minutes (a call is refused by the server at once anyway)
+
+
+def token_scopes(api):
+    """(effective scopes, is agent) of the token, from GET /me, cached for ME_TTL; None when unknown (older server,
+    unreachable): then every tool is listed and the server decides."""
+    now = time.monotonic()
+    if not _ME["at"] or now - _ME["at"] > ME_TTL:
+        try:
+            me = api.call("GET", "/me")
+            t = me.get("token") if isinstance(me, dict) else None
+            sc = (t.get("effective_scopes") or t.get("scopes")) if isinstance(t, dict) else None
+            if not isinstance(sc, list) or not sc:
+                _ME["v"] = None
+            else:
+                if "write" in sc:  # a server before 2.15: read + write = everything
+                    sc = list(ALL_SCOPES)
+                _ME["v"] = (set(sc), me.get("kind") == "agent")
+        except ApiError:
+            _ME["v"] = None
+        _ME["at"] = now
+    return _ME["v"]
+
+
+def tool_allowed(api, name):
+    ts = token_scopes(api)
+    if ts is None:
+        return True
+    sc, agent = ts
+    need = TOOL_SCOPE.get(name, "read")
+    return agent if need == "agent" else need in sc
 
 
 def _check_args(schema, a):
@@ -520,13 +869,17 @@ def handle(api, msg):
         return None
     if m == "ping":
         return None if notif else _result(i, {})
-    if m == "tools/list":
-        return _result(i, {"tools": [{"name": n, "description": d, "inputSchema": s} for n, d, s, _ in TOOLS]})
+    if m == "tools/list":  # 2.15.0 (#479): only the tools this token may use
+        return _result(i, {"tools": [{"name": n, "description": d, "inputSchema": s} for n, d, s, _ in TOOLS if tool_allowed(api, n)]})
     if m == "tools/call":
         name, args = p.get("name"), p.get("arguments") or {}
         t = TOOL_MAP.get(name)
         if not t:
             return _error(i, -32602, f"Unknown tool: {name}")
+        if not tool_allowed(api, name):
+            need = TOOL_SCOPE.get(name, "read")
+            return _result(i, {"content": [{"type": "text", "text": f"not allowed for this token: needs the scope {need}" if need != "agent"
+                                            else "only for agent tokens"}], "isError": True})
         problem = _check_args(t[2], args)
         if problem:
             return _result(i, {"content": [{"type": "text", "text": problem}], "isError": True})

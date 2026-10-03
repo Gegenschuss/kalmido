@@ -185,7 +185,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   w.close();
 
   // agent: online (never polled = cannot tell = offered), its dayplan proposal in the same timeline
-  const ag = await call('POST', '/api/admin/agents', {username: 'planner', display_name: 'Planner'});
+  const ag = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'planner', display_name: 'Planner'});
   await call('PATCH', `/api/admin/agents/${ag.id}`, {proposals: 'all'});
   w = await boot({user: 'alice'}); d = w.document;
   w.dayplanModal('day', TM); await sleep(700);

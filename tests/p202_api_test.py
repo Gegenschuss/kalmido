@@ -117,7 +117,7 @@ r = requests.post(B + "/drop/drop/drop", headers={"Authorization": "Bearer " + d
 check(r.status_code != 200 and "Kalmido:" not in r.text, "no deeper alias")
 
 # ================================================================== agent status task
-ag = A.post(B + "/api/admin/agents", json={"username": "claude", "display_name": "Claude"}).json()
+ag = A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "claude", "display_name": "Claude"}).json()
 AT, CL = ag["token"], ag["id"]
 ah = {"Authorization": "Bearer " + AT}
 A.put(B + f"/api/lists/{L}/members", json={"user_id": CL, "role": "edit"})

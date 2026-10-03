@@ -21,7 +21,7 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
   const carl = (await call('alice', 'POST', '/api/users', {username: 'carl', display_name: 'Carl', password: 'password123'})).id;
   cks.bob = await login('bob');
   for (const u of ['alice', 'bob']) await call(u, 'PATCH', '/api/settings', {features: ALL, lang: 'en'});
-  const ag = await call('alice', 'POST', '/api/admin/agents', {username: 'claude', display_name: 'Claude'});
+  const ag = await call('alice', 'POST', '/api/admin/agents', {scopes: ['write'], username: 'claude', display_name: 'Claude'});
   AT = ag.token; const CL = ag.id;
   const L = (await call('alice', 'POST', '/api/lists', {name: 'Film', kind: 'project'})).id;
   await call('alice', 'PUT', `/api/lists/${L}/members`, {user_id: bob, role: 'edit'});

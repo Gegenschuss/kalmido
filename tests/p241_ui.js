@@ -63,9 +63,9 @@ async function firefox(fn) {
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en'});
   const me = (await call('GET', '/api/state')).me.id;
-  const ag = await call('POST', '/api/admin/agents', {username: 'claude', display_name: 'Claude'});
-  const ag2 = await call('POST', '/api/admin/agents', {username: 'helper', display_name: 'Helper'});
-  const ag3 = await call('POST', '/api/admin/agents', {username: 'robo', display_name: 'Robo'});
+  const ag = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'claude', display_name: 'Claude'});
+  const ag2 = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'helper', display_name: 'Helper'});
+  const ag3 = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'robo', display_name: 'Robo'});
   const L = (await call('POST', '/api/lists', {name: 'Household'})).id;
   for (const [id, role] of [[ag3.id, 'participant'], [ag.id, 'edit'], [ag2.id, 'edit']]) await call('PUT', `/api/lists/${L}/members`, {user_id: id, role});
   const T = (await call('POST', '/api/tasks', {title: 'Fix the dripping tap', list_id: L})).id;

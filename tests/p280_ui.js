@@ -48,7 +48,7 @@ const CONTRAST = `(() => {
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en', tour: 'done'});
   const BOB = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123'})).id;
-  const mkAgent = async (u, n) => { const a = await call('POST', '/api/admin/agents', {username: u, display_name: n}); return {id: a.id, tok: a.token}; };
+  const mkAgent = async (u, n) => { const a = await call('POST', '/api/admin/agents', {scopes: ['write'], username: u, display_name: n}); return {id: a.id, tok: a.token}; };
   const DEV = await mkAgent('claudedev', 'ClaudeDev'), KOL = await mkAgent('kollege', 'Kollege'), ARC = await mkAgent('archivar', 'Archivar');
   const L = (await call('POST', '/api/lists', {name: 'Launch', kind: 'project', tickets: true})).id;
   const W = (await call('POST', '/api/lists', {name: 'Website', kind: 'project'})).id;
