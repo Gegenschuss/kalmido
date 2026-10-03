@@ -303,10 +303,15 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     check(kb.fix && kb.hTop >= kb.visTop - 1 && kb.hBot > kb.visTop + 5 && kb.inBot <= kb.visBot + 1 && kb.atBottom && kb.focus === 'chat-in', `${vw} N8: iOS keyboard pushed the page (offsetTop 260): header with Back, newest message and the box are in view ` + JSON.stringify(kb));
     await shot(`p2132-${vw}-ios-kb-pushed.png`);
     // N9: the pill and Send keep the focus (the keyboard stays)
-    await ev(`(() => { document.querySelector('#chat-new').classList.remove('hidden'); return 1; })()`); await sleep(100);
-    const pl = await rect('#chat-new'); await tap(pl.x, pl.y); await sleep(300);
+    // the pill for real: scrolled up, an answer arrives (a pill shown by hand could be hidden again by the next refresh)
+    await ev(`(() => { const b = document.querySelector('#chat-msgs'); b.scrollTop = 0; b.dispatchEvent(new Event('scroll')); return 1; })()`); await sleep(200);
+    await tcall('POST', `/agent/chats/${ME}`, TOK, {body: 'An answer while you read above (' + vw + ')'});
+    await ev(`chatLoad().then(() => 1)`); await sleep(300);
+    const pv = await ev(`(() => ({pill: !document.querySelector('#chat-new').classList.contains('hidden'), focus: document.activeElement.id}))()`);
+    check(pv.pill && pv.focus === 'chat-in', `${vw} N9: scrolled up + an answer: "New message ↓" shows, the box keeps the focus ` + JSON.stringify(pv));
+    const pl = await rect('#chat-new'); await tap(pl.x, pl.y); await sleep(400);
     check(await ev(`document.activeElement.id`) === 'chat-in', `${vw} N9: a tap on "New message ↓" keeps the keyboard (focus in the box)`);
-    await ev(`(() => { const t = document.querySelector('#chat-in'); t.value = 'Hello'; t.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
+    await ev(`(() => { const t = document.querySelector('#chat-in'); t.focus(); t.value = 'Hello'; t.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
     const sb = await rect('[data-act="chat-send"]'); await tap(sb.x, sb.y); await sleep(1500);
     const af = await ev(`(() => ({focus: document.activeElement.id, val: document.querySelector('#chat-in').value, last: [...document.querySelectorAll('#chat-msgs .cmsg.me')].pop()?.textContent || ''}))()`);
     check(af.focus === 'chat-in' && af.val === '' && /Hello/.test(af.last), `${vw} N9: Send sends and keeps the keyboard ` + JSON.stringify(af));
