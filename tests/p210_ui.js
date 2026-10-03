@@ -66,9 +66,10 @@ const TOKEN = 'bob-ui-server-token-4c2e', PTOKEN = 'bob-ui-personal-token-9d1f';
       // 2.12.2: wait for the note to hold the newest undo entry, then click at once (the note drops its Undo after 6 s; the
       // old wait for "News" in the note never matched, it says "Saved · Undo", so the click came after ~6 s on slow runners)
       const top = () => w.eval(`(() => { const el = [...document.querySelectorAll('.smodal .ssaved')].pop(); return !!(el && el._e && HIST.undo[HIST.undo.length - 1] === el._e); })()`);
-      // 2.13.3: CI flake: also wait until the server has the second change before Undo, longer waits on a busy runner
+      // 2.14.0: the real cause of the CI flake is fixed in the app (a state answer that the save overtook put the old
+      // setting back locally, so Undo saw "changed elsewhere"); the note holds the entry once the save is through
       for (let i = 0; i < 50 && !top(); i++) await sleep(100);
-      for (let i = 0; i < 20 && !(await call('GET', '/api/state', null, CKB)).notify.complete.news; i++) await sleep(150);
+      check(top(), 'the note holds the newest undo step');
       click(w, d.querySelector('.smodal .ssaved [data-m="s-undo"]')); await sleep(900);
       for (let i = 0; i < 40 && (await call('GET', '/api/state', null, CKB)).notify.complete.news !== false; i++) await sleep(300);  // 2.7.2: slow CI runner
       st = await call('GET', '/api/state', null, CKB);

@@ -7,6 +7,37 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.13.4] - 2026-10-03
+
+**In short:** A phone round (reported on a folded Galaxy Z Fold): dragging by touch scrolls at the edges, moves tasks
+to other lists and never leaves a stuck copy behind; the "+" of a section opens the add box above the keyboard; the
+chat no longer scrolls away under its box; numbered lists in Markdown keep counting.
+
+### Fixed
+- Dragging a task by touch: a copy of the row could stay on top of the list for good (a live update during the drag,
+  a second finger, the app going to the background). Every way out of a drag now cleans up, Escape cancels it.
+- Holding a dragged task near the top or bottom edge scrolls the list on its own (also with the finger still); the
+  bottom edge sits above the tab bar. Mouse drags scroll the list at its edges too.
+- While dragging by touch, *Move to list* appears at the top: drop the task there and pick the list (the drawer at the
+  left edge clashed with Android's back gesture).
+- The "+" in a section head on phones opens the quick-add sheet for that section, above the keyboard (the inline field
+  ended up behind it).
+- Phone chat: a swipe beside the message box no longer scrolls the page and leaves an empty gap above the tab bar;
+  only the messages scroll.
+- Markdown (descriptions, comments, chat): bullets indented under a numbered item nest inside it and the numbering
+  goes on; a numbered list that starts at 3 shows 3; ``` code blocks are shown as code (agents send them).
+- iPhone: the comment box of an open task stays above the keyboard.
+- A swipe on a task row that the system cancels snaps back instead of staying half open.
+- Dragging over the drawer or the sidebar scrolls its lists, so lists further down are reachable.
+- Phones: the subtask arrow sits clear of the screen edge (Android's back gesture), the quick-add chips have 44 px
+  touch targets; no keyboard shortcut in toasts on touch screens; two-line rows of a narrow list column keep their
+  spacing on an unfolded Fold.
+- Git integration: a poll that was still running while a corrected token was saved wrote its late "Access denied" over
+  the fresh state, so the connection kept the error and waited out the back-off. A poll now only stores its result
+  while the connection is unchanged.
+- A state refresh that a save overtook could put the old value back on the screen for a few seconds (an Undo right then
+  said "changed elsewhere"). Such a refresh is fetched again.
+
 ## [2.13.3] - 2026-10-03
 
 **In short:** Fold follow-up to 2.13.2: one search field in every layout, no + button next to the add bar after rotating,
@@ -2079,7 +2110,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.13.3...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.13.4...HEAD
+[2.13.4]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.13.4
 [2.13.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.13.3
 [2.13.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.13.2
 [2.13.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.13.1

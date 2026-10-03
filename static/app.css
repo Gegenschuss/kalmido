@@ -3412,3 +3412,28 @@ svg.logo{color:var(--acc-d,var(--accent));flex:none}
 .slink{display:inline-flex;align-items:center;font-size:var(--fs-s);color:var(--accent);margin:.125rem 0 .375rem;text-decoration:none}
 .slink:hover{text-decoration:underline}
 @media (pointer:coarse){ .slink{min-height:2.75rem;margin:0} }
+/* 2.13.4: while dragging a task by touch: "Move to list…" at the top (drop it there to pick the list) */
+.tdmove{position:fixed;left:50%;top:calc(var(--vvt,0px) + 4.5rem);transform:translateX(-50%);z-index:96;display:flex;align-items:center;gap:.5rem;min-height:2.75rem;padding:0 1.125rem;border-radius:1.375rem;background:var(--bg2);border:1px dashed var(--line2);color:var(--text2);font-size:var(--fs-s);box-shadow:var(--shadow);pointer-events:none}
+.tdmove.on{border-style:solid;border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--bg2))}
+/* 2.13.4: the phone chat: only the messages scroll. #view kept its list padding (room for the + button) and scrolled
+   by it, so a swipe beside the box pushed the composer up and left an empty gap above the tab bar */
+@media (max-width:899px){
+  body.in-chat #view{overflow:hidden;padding-bottom:calc(var(--tabs-h) + var(--safe-b));overscroll-behavior:none}
+  body.in-chat.kb-open #view{padding-bottom:0}
+  body.in-chat .chview{height:100%}
+  .chview .chcomp{overscroll-behavior:contain}
+}
+/* 2.13.4 (phone round, independent review) */
+@media (max-width:899px){
+  #detail{bottom:var(--vvb,0px)}  /* iOS keyboard: the task panel (with its comment box) ends above it */
+  .trow:has(> .caret){padding-left:1.75rem}  /* the subtask arrow stays clear of the screen edge (Android back gesture) */
+  .trow .caret{left:.125rem}
+}
+@media (pointer:coarse){
+  .trow .caret::after,.qchip::after,.ib::after{content:'';position:absolute;inset:-.6875rem}
+  .trow .caret::after{inset:-.6875rem -.375rem}
+  .qchip{position:relative}
+}
+pre.mdpre{margin:.375rem 0;padding:.5rem .625rem;background:var(--bg3);border:1px solid var(--line);border-radius:var(--r-s);overflow-x:auto;font:var(--fs-s)/1.5 var(--mono);white-space:pre;max-width:100%}
+pre.mdpre code{font:inherit;background:none;padding:0;border:0}
+@media (min-width:900px){ @container lrows (max-width:48rem){ .trow.hascols{padding-top:var(--row-py);padding-bottom:var(--row-py)} } }

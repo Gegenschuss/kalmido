@@ -446,7 +446,15 @@ function openTasks(ctx = false) { return [...S.tasks.values()].filter(t => t.sta
 class Offline extends Error {}
 const OUT = {q: LS.get('outbox', []), online: true, flushing: false};
 function setOnline(b) { if (OUT.online !== b) { OUT.online = b; renderTop(); if (b) flush(); setTimeout(() => typeof staleDraw === 'function' && staleDraw(), 0); } }
+// 2.13.4 (p210 flake, a real race): every write counts up when it starts and when it ends (S.wseq), so load() can tell that
+// a write finished while its GET /api/state was on the way: that answer may predate the write and would undo it locally
+// (S.settings went back to the old value; an Undo right after then saw "changed elsewhere" and skipped the step)
 async function rawFetch(method, url, body) {
+  if (method === 'GET') return rawFetch0(method, url, body);
+  S.wseq = (S.wseq || 0) + 1;
+  try { return await rawFetch0(method, url, body); } finally { S.wseq++; }
+}
+async function rawFetch0(method, url, body) {
   const opt = {method, headers: {'X-Requested-With': 'kalmido'}, redirect: 'manual'};
   const dev = wpDevHeader(url); if (dev) opt.headers['X-Kalmido-Device'] = dev;
   if (body instanceof FormData) opt.body = body;
@@ -702,7 +710,13 @@ function applyState(j) {
 const plOn = () => S.paperless?.enabled && feat('paperless');
 async function load() {
   let j;
-  try { j = await api('GET', '/api/state'); }
+  try {
+    for (let i = 0; i < 3; i++) {  // 2.13.4: an answer that a write overtook is fetched again (see rawFetch)
+      const w0 = S.wseq || 0;
+      j = await api('GET', '/api/state');
+      if ((S.wseq || 0) === w0) break;
+    }
+  }
   catch (e) {
     if (!(e instanceof Offline)) throw e;
     if (!S.tasks.size) {  // offline start: last cached state + still-queued edits
@@ -5053,20 +5067,36 @@ function mdInline(s) {
   return out + mdFmt(s.slice(last));
 }
 function renderMd(src, ro) {
+  // 2.13.4: nested lists (indented items go into the item above) and numbered lists keep counting across nested bullets;
+  // a numbered list that starts at n (after a paragraph, "2.") shows n (<ol start>)
   const lines = String(src || '').split('\n');
-  let h = '', list = null, para = [];
+  let h = '', para = [];
+  const stack = [];  // open lists: {tag, ind}; the last <li> of each stays open for nested lists
   const flushPara = () => { if (para.length) { h += `<p>${para.join('<br>')}</p>`; para = []; } };
-  const closeList = () => { if (list) { h += `</${list}>`; list = null; } };
-  const openList = tag => { if (list !== tag) { closeList(); h += `<${tag}>`; list = tag; } };
+  const closeList = () => { while (stack.length) h += `</li></${stack.pop().tag}>`; };
+  const item = (tag, ln, html, cls = '', num = 1) => {
+    const ind = ln.replace(/\t/g, '    ').match(/^ */)[0].length;
+    while (stack.length && stack[stack.length - 1].ind > ind) h += `</li></${stack.pop().tag}>`;
+    const top = stack[stack.length - 1];
+    if (top && top.ind === ind && top.tag !== tag) { h += `</li></${stack.pop().tag}>`; }
+    const cur = stack[stack.length - 1];
+    if (cur && cur.ind === ind) h += '</li>';
+    else { h += `<${tag}${tag === 'ol' && num > 1 ? ` start="${num}"` : ''}>`; stack.push({tag, ind}); }
+    h += `<li${cls ? ` class="${cls}"` : ''}>${html}`;
+  };
+  let code = null;  // 2.13.4: ``` fenced code blocks (agents send them): kept as they are, in mono, scrolling sideways
   lines.forEach((ln, i) => {
     let m;
+    if (code !== null) { if (/^\s*```/.test(ln)) { h += `<pre class="mdpre"><code>${code.map(esc).join('\n')}</code></pre>`; code = null; } else code.push(ln); return; }
+    if (/^\s*```/.test(ln)) { flushPara(); closeList(); code = []; return; }
     if ((m = ln.match(/^(#{1,3})\s+(.*)/))) { flushPara(); closeList(); h += `<h${m[1].length + 3}>${mdInline(m[2])}</h${m[1].length + 3}>`; }
-    else if ((m = ln.match(/^\s*[-*]\s+\[( |x|X)\]\s*(.*)/))) { flushPara(); openList('ul'); h += `<li class="cb ${m[1] !== ' ' ? 'on' : ''}"><input type="checkbox" ${ro ? 'disabled' : `data-mdline="${i}"`} ${m[1] !== ' ' ? 'checked' : ''}><span>${mdInline(m[2])}</span></li>`; }
-    else if ((m = ln.match(/^\s*[-*•]\s+(.*)/))) { flushPara(); openList('ul'); h += `<li>${mdInline(m[1])}</li>`; }
-    else if ((m = ln.match(/^\s*\d+[.)]\s+(.*)/))) { flushPara(); openList('ol'); h += `<li>${mdInline(m[1])}</li>`; }
+    else if ((m = ln.match(/^\s*[-*]\s+\[( |x|X)\]\s*(.*)/))) { flushPara(); item('ul', ln, `<input type="checkbox" ${ro ? 'disabled' : `data-mdline="${i}"`} ${m[1] !== ' ' ? 'checked' : ''}><span>${mdInline(m[2])}</span>`, `cb ${m[1] !== ' ' ? 'on' : ''}`); }
+    else if ((m = ln.match(/^\s*[-*•]\s+(.*)/))) { flushPara(); item('ul', ln, mdInline(m[1])); }
+    else if ((m = ln.match(/^\s*(\d+)[.)]\s+(.*)/))) { flushPara(); item('ol', ln, mdInline(m[2]), '', +m[1]); }
     else if (!ln.trim()) { flushPara(); closeList(); }
     else { closeList(); para.push(mdInline(ln)); }
   });
+  if (code !== null) h += `<pre class="mdpre"><code>${code.map(esc).join('\n')}</code></pre>`;
   flushPara(); closeList();
   return h;
 }
@@ -10272,7 +10302,7 @@ function toastPlace(el) {
 function toast(msg, undo, ms, label) {  // label: the button's text instead of "Undo" (2.13.0: "Open")
   const el = $('#toast');
   if (!undo || label) HIST.toastE = null;  // any other message ends the toast's shortcut (the history keeps the step)
-  el.innerHTML = `<span>${esc(msg)}</span>${undo ? `<button>${esc(label || tr('Undo'))}</button>${isMobile() || label ? '' : kb('Mod+Z')}` : ''}`;
+  el.innerHTML = `<span>${esc(msg)}</span>${undo ? `<button>${esc(label || tr('Undo'))}</button>${isMobile() || isTouch() || label ? '' : kb('Mod+Z')}` : ''}`;
   el.classList.remove('hidden');
   toastPlace(el);
   if (undo) el.querySelector('button').onclick = () => { el.classList.add('hidden'); undo(); };
@@ -10347,7 +10377,7 @@ function openQuickSheet(prefill = '', preset = {}) {
   const inp = $('#qsheet'); inp.value = prefill; updateChips(inp);
   q.classList.toggle('capture', !!preset.capture);
   const i0 = $('.box > svg', q); if (i0) i0.outerHTML = ic(preset.capture ? 'zap' : 'plus');
-  inp.placeholder = preset.capture ? tr('Capture to the inbox…') : tr("What's next?");
+  inp.placeholder = preset.capture ? tr('Capture to the inbox…') : preset.section_name ? tr('Add a task to {0}', preset.section_name) : tr("What's next?");
   if (preset.capture && !hint) $('.qhint', q).textContent = tr('Goes to the inbox · ~list · tomorrow · !high · #tag');
   setTimeout(() => inp.focus(), 30);
 }
@@ -11306,7 +11336,7 @@ document.addEventListener('dragstart', e => {
   document.body.classList.add('tdrag');
   requestAnimationFrame(() => r.classList.add('dragging'));
 });
-document.addEventListener('dragend', () => { dragId = null; document.body.classList.remove('tdrag'); $$('.dragging,.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dragging', 'dropbefore', 'dropafter', 'drop')); });
+document.addEventListener('dragend', () => { dragId = null; DSE.v = 0; document.body.classList.remove('tdrag'); $$('.dragging,.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dragging', 'dropbefore', 'dropafter', 'drop')); });
 const DROP_SEL = '.trow, .kcol, .quad, .cal .cell, .srow[data-drop], .wcol, .wad, .wh, #view .ghead[data-section], #view .sdrop';
 // lower half of a row = drop after it (so the end of a block / list is reachable)
 const dropAfter = (row, y) => { const r = row.getBoundingClientRect(); return y != null && r.height > 0 && y > r.top + r.height / 2; };
@@ -11322,7 +11352,19 @@ function markDrop(el, id, y) {
 document.addEventListener('dragover', e => {
   if (!dragId) return;
   if (markDrop(e.target, dragId, e.clientY)) e.preventDefault();
+  dsEdge(e.clientY);
 });
+// 2.13.4: mouse drags scroll the list too, held near its top or bottom edge (the browser only scrolls the page)
+const DSE = {v: 0, raf: 0};
+function dsEdge(y) {
+  const v = $('#view'); if (!v) return;
+  const r = v.getBoundingClientRect(), E = 64, M = 14;
+  DSE.v = y < r.top + E ? -M * Math.min(1, (r.top + E - y) / E) : y > r.bottom - E ? M * Math.min(1, (y - (r.bottom - E)) / E) : 0;
+  if (DSE.v && !DSE.raf) {
+    const step = () => { if (!dragId || !DSE.v) { DSE.raf = 0; return; } v.scrollTop += DSE.v; DSE.raf = requestAnimationFrame(step); };
+    DSE.raf = requestAnimationFrame(step);
+  }
+}
 document.addEventListener('drop', async e => {
   if (!dragId) return;
   e.preventDefault();
@@ -11572,25 +11614,83 @@ document.addEventListener('touchmove', e => {
   swipe.r.style.transform = `translateX(${dx}px)`;
   swipe.r.style.background = dx > 60 ? 'color-mix(in srgb,var(--ok) 25%,var(--bg))' : dx < -60 ? 'color-mix(in srgb,var(--danger) 25%,var(--bg))' : 'var(--bg2)';
 }, {passive: true});
-document.addEventListener('touchend', () => {
+function swipeEnd(e) {
   if (!swipe) return;
   const {r, dx, lock} = swipe; swipe = null;
   r.style.transition = 'transform .18s'; r.style.transform = ''; r.style.background = '';
   setTimeout(() => { r.style.transition = ''; }, 200);
-  if (lock !== 'x') return;
+  if (lock !== 'x' || e?.type === 'touchcancel') return;  // 2.13.4: a cancelled swipe snaps back and does nothing
   swiped = true; setTimeout(() => { swiped = false; }, 350);
   const id = +r.dataset.id;
   if (dx > 90) toggleTask(id);
   else if (dx < -90) snoozeSheet(id, r, ['-', {label: tr('Completed'), icon: 'done', fn: () => toggleTask(id)}, {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => deleteTask(id)}]);
-});
+}
+document.addEventListener('touchend', swipeEnd);
+document.addEventListener('touchcancel', swipeEnd);
 
 // long press (380 ms) on a row / chip, then drag: reorder, other kanban column, quadrant, calendar day
 let lp = null;
+// 2.13.4: a drag that never got its touchend (a second finger, the system taking the gesture, the app going to the
+// background) left its ghost on top of the list for good. Every way out of a drag ends here; a new touch first clears
+// whatever is left of an old one.
+function tdKill() {
+  $$('.ghost-drag:not(.side-ghost)').forEach(g => g.remove());
+  $('#tdmove')?.remove();
+  $$('#view .trow.dragging, #view .ev.dragging, #view .wev.dragging').forEach(x => x.classList.remove('dragging'));
+  $$('.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
+  document.body.classList.remove('tdrag');
+}
+function tdCancel() {
+  if (lp) { clearTimeout(lp.timer); clearTimeout(lp.edge); kbEdgeEnd(lp); tdScrollEnd(lp); if (lp.opened) { closeSide(); $('#detail').style.visibility = ''; } }
+  lp = null; tdKill();
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden && (lp?.active || $('.ghost-drag:not(.side-ghost)'))) tdCancel(); });
+window.addEventListener('blur', () => { if (lp?.active) tdCancel(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && lp?.active) { e.preventDefault(); tdCancel(); } }, true);
+// 2.13.4: held near the top or bottom edge of the list, it scrolls on its own (the deeper in the edge zone, the faster),
+// also while the finger stays still
+const TD_EDGE = 72, TD_MAX = 16;
+function tdScroller(el) {
+  for (let n = el; n && n !== document.body; n = n.parentElement) {
+    const cs = getComputedStyle(n);
+    if (/(auto|scroll)/.test(cs.overflowY) && n.scrollHeight > n.clientHeight + 1) return n;
+  }
+  return document.scrollingElement || document.documentElement;
+}
+function tdScroll(x, y) {
+  if (!lp || !lp.active) return;
+  // over the drawer / sidebar its list scrolls (lists further down are reachable), elsewhere the view
+  const side = document.elementFromPoint(x, y)?.closest('#side');
+  const sc = side ? (lp.ssc || (lp.ssc = tdScroller(document.elementFromPoint(x, y)))) : (lp.sc || (lp.sc = tdScroller(lp.r.isConnected ? lp.r : $('#view'))));
+  if (lp.cur && lp.cur !== sc) { tdScrollEnd(lp); }
+  lp.cur = sc;
+  const r = sc === document.scrollingElement || sc === document.documentElement ? {top: 0, bottom: innerHeight} : sc.getBoundingClientRect();
+  // the tab bar / docked add box cover the list's bottom (fixed: no offsetParent, so measured)
+  const tb = Math.min(innerHeight, ...['#tabs', '#view .qdock', '#fab'].map(q => $(q)).filter(e => e && getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().height > 0 && e.getBoundingClientRect().top > innerHeight / 2).map(e => e.getBoundingClientRect().top));
+  const top = side ? r.top : Math.max(r.top, $('#top')?.getBoundingClientRect().bottom || 0), bot = side ? Math.min(r.bottom, innerHeight) : Math.min(r.bottom, tb, (visualViewport?.height || innerHeight));
+  const v = y < top + TD_EDGE ? -TD_MAX * Math.min(1, (top + TD_EDGE - y) / TD_EDGE) : y > bot - TD_EDGE ? TD_MAX * Math.min(1, (y - (bot - TD_EDGE)) / TD_EDGE) : 0;
+  lp.sv = v; lp.sx = x; lp.sy = y;
+  if (v && !lp.sraf) {
+    const step = () => {
+      if (!lp || !lp.active || !lp.sv) { if (lp) lp.sraf = 0; return; }
+      const b = sc.scrollTop; sc.scrollTop = b + lp.sv;
+      if (sc.scrollTop !== b) markDrop(document.elementFromPoint(lp.sx, lp.sy), lp.id, lp.sy);
+      lp.sraf = requestAnimationFrame(step);
+    };
+    lp.sraf = requestAnimationFrame(step);
+  }
+}
+function tdScrollEnd(st) { if (st && st.sraf) { cancelAnimationFrame(st.sraf); st.sraf = 0; } }
 document.addEventListener('touchstart', e => {
+  if (lp?.active && e.touches.length > 1) return;  // a second finger while dragging: the drag goes on
+  if (lp?.active || $('.ghost-drag:not(.side-ghost)')) tdCancel();  // 2.13.4: a drag whose end got lost: its ghost goes
   const r = e.target.closest('#view .trow, #view .ev, #view .wev, #detail .subs .trow');
   if (!r || !r.dataset.id || e.target.closest('.chk, input, .caret') || S.multiMode || r.classList.contains('ghost')) { lp = null; return; }
   const t0 = e.touches[0];
-  lp = {r, id: +r.dataset.id, x: t0.clientX, y: t0.clientY, active: false};
+  lp = {r, id: +r.dataset.id, x: t0.clientX, y: t0.clientY, active: false, tgt: e.target};
+  e.target.addEventListener('touchmove', tdMove, {passive: false});
+  e.target.addEventListener('touchend', endTouchDrag);
+  e.target.addEventListener('touchcancel', endTouchDrag);
   lp.timer = setTimeout(startTouchDrag, 380);
 }, {passive: true});
 function startTouchDrag() {
@@ -11604,9 +11704,20 @@ function startTouchDrag() {
   lp.ghost = g; lp.dy = lp.y - rect.top; lp.dx0 = lp.x - rect.left;
   lp.r.classList.add('dragging');
   document.body.classList.add('tdrag');
+  // 2.13.4: "Move to list…" at the top while dragging a task row: drop it there and pick the list (the drawer at the
+  // left edge collides with the system's back gesture on Android)
+  const t = S.tasks.get(lp.id);
+  if (lp.r.matches('#view .trow') && t && canEdit(t) && S.lists.filter(l => !l.archived && canEditList(l.id)).length > 1) {
+    const m = document.createElement('div'); m.id = 'tdmove'; m.className = 'tdmove'; m.innerHTML = `${ic('folder', 's')}<span>${esc(tr('Move to list'))}</span>`;
+    document.body.appendChild(m);
+  }
   if (navigator.vibrate) navigator.vibrate(12);
 }
-document.addEventListener('touchmove', e => {
+// 2.13.4: touch events go to the element the finger first touched. A live update that re-renders the list during a drag
+// takes that element out of the page, and its touchmove / touchend no longer reach the document: the drag froze and its
+// ghost stayed. So the drag also listens on that element itself (each event is handled once).
+function tdMove(e) {
+  if (e._td) return; e._td = 1;
   if (!lp) return;
   const t = e.touches[0];
   if (!lp.active) { if (Math.hypot(t.clientX - lp.x, t.clientY - lp.y) > 8) { clearTimeout(lp.timer); lp = null; } return; }
@@ -11614,16 +11725,19 @@ document.addEventListener('touchmove', e => {
   lp.ghost.style.top = (t.clientY - lp.dy) + 'px';
   lp.ghost.style.left = (t.clientX - lp.dx0) + 'px';
   lp.lx = t.clientX; lp.ly = t.clientY;
-  markDrop(document.elementFromPoint(t.clientX, t.clientY), lp.id, t.clientY);
+  const mv = $('#tdmove'), onMv = !!mv && (() => { const b = mv.getBoundingClientRect(); return t.clientX >= b.left - 8 && t.clientX <= b.right + 8 && t.clientY >= b.top - 8 && t.clientY <= b.bottom + 8; })();
+  if (mv) mv.classList.toggle('on', onMv);
+  if (onMv) $$('.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
+  else markDrop(document.elementFromPoint(t.clientX, t.clientY), lp.id, t.clientY);
   // hold at the left edge: open the list drawer so the task can be dropped on another list
   if (isMobile() && t.clientX < 26 && !$('#side').classList.contains('open')) {
     if (!lp.edge) lp.edge = setTimeout(() => { $('#side').classList.add('open'); if (S.sel) $('#detail').style.visibility = 'hidden'; lp && (lp.opened = true); }, 450);
   } else if (lp.edge && t.clientX >= 26) { clearTimeout(lp.edge); lp.edge = null; }
-  const v = $('#view'), vr = v.getBoundingClientRect();
-  if (t.clientY < vr.top + 60) v.scrollBy(0, -14); else if (t.clientY > vr.bottom - 110) v.scrollBy(0, 14);
+  if (!onMv) tdScroll(t.clientX, t.clientY); else lp.sv = 0;
   kbEdge(t.clientX, t.clientY);
   const wb = $('#wbody'); if (wb) { const r = wb.getBoundingClientRect(); if (t.clientY < r.top + 40) wb.scrollBy(0, -12); else if (t.clientY > r.bottom - 40) wb.scrollBy(0, 12); }
-}, {passive: false});
+}
+document.addEventListener('touchmove', tdMove, {passive: false});
 // 2.13.0 (#453 A4): Kanban by touch: near the left / right edge the board scrolls smoothly, the deeper in the edge zone the
 // faster (at most ~1 column per second), with snapping off while dragging; it used to jump a column per touchmove (the
 // mandatory snap turned every 16 px into a whole column: 3 columns in 300 ms)
@@ -11653,13 +11767,19 @@ function kbColAt(x) {
   return best;
 }
 function endTouchDrag(e) {
-  if (!lp) return;
-  clearTimeout(lp.timer); kbEdgeEnd(lp);
+  if (e) { if (e._td) return; e._td = 1; }
+  if (lp && lp.tgt) { lp.tgt.removeEventListener('touchmove', tdMove); lp.tgt.removeEventListener('touchend', endTouchDrag); lp.tgt.removeEventListener('touchcancel', endTouchDrag); }
+  if (!lp) { if ($('.ghost-drag:not(.side-ghost)')) tdKill(); return; }
+  if (e && e.touches && e.touches.length && lp.active) return;  // another finger lifted: the drag goes on
+  clearTimeout(lp.timer); kbEdgeEnd(lp); tdScrollEnd(lp);
   const st = lp; lp = null;
   if (!st.active) return;
   if (e && e.cancelable) e.preventDefault();  // no click after the hold (it would close a menu opened here)
   clearTimeout(st.edge);
-  st.ghost.remove(); st.r.classList.remove('dragging'); document.body.classList.remove('tdrag');
+  const mv = $('#tdmove'), toMove = !!mv && mv.classList.contains('on') && e?.type !== 'touchcancel';
+  st.ghost.remove(); st.r.classList.remove('dragging'); tdKill();
+  if (toMove) { S.kf = st.id; setTimeout(() => openPalette('move'), 0); return; }
+  if (e?.type === 'touchcancel') { if (st.opened) setTimeout(() => { closeSide(); $('#detail').style.visibility = ''; }, 150); return; }
   if (st.opened) setTimeout(() => { closeSide(); $('#detail').style.visibility = ''; }, 150);
   swiped = true; setTimeout(() => { swiped = false; }, 400);
   let el = st.ly != null ? document.elementFromPoint(st.lx, st.ly) : null;
@@ -13899,6 +14019,14 @@ document.addEventListener('dblclick', e => {
 // ---- #283 "+" on a section header: an input right below it, Enter adds the task there and stays open for the next one
 S.secAdd = null;  // {key, sec, v}
 function secAddOpen(sec) {
+  // 2.13.4: phones get the quick sheet (its box sits above the keyboard) with the section set; the inline field under the
+  // section head ended up behind the keyboard (Android: keyboard up, no box to type into)
+  const rl = routeList();
+  if (isMobile() && rl) {
+    const g = S.sections.find(x => x.id === sec);
+    openQuickSheet('', {list_id: rl.id, section_id: sec || null, section_name: g ? g.name : ''});
+    return;
+  }
   S.secAdd = {key: S.route.key, sec: sec || 0, v: ''};
   S.collapsed.delete('s:' + (sec || 0)); LS.set('collapsed', [...S.collapsed]);
   renderView();

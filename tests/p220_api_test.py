@@ -372,30 +372,24 @@ check(r.ok and r.json().get("token") is True, "a new token")
 g["token"] = TOKEN
 put_state()
 check(Bo.patch(B + f"/api/repos/{RID}", json={"token": "x"}).status_code == 403, "a member cannot change the token")
+n0 = len(git_log())
 r = A.patch(B + f"/api/repos/{RID}", json={"token": TOKEN})
 check(r.ok, f"the right token again ({r.status_code})")
-TRIES = [0]
 
 
-def poke_ok():  # 2.4.1: CI flake (a slow runner missed the 12 s window): make the connection due again on every try
-    TRIES[0] += 1
-    if TRIES[0] % 20 == 0 and str((dbq("SELECT last_error FROM git_conns WHERE id=?", (RID,)) or [[""]])[0][0]).startswith("auth"):
-        put_state()  # 2.10.0: CI flake (still 401 after 120 s): the fake server's state and the token are written again
-        A.patch(B + f"/api/repos/{RID}", json={"token": TOKEN})
-    c = sqlite3.connect(os.path.join(DATA, "tasks.db"))
-    c.execute("UPDATE git_conns SET next_at=0 WHERE id=? AND (fails>0 OR last_error!='')", (RID,))
-    c.commit()
-    c.close()
-    if TRIES[0] % 10 == 0:  # 2.13.3: CI flake (fails stayed at 1 for 120 s, so no poll ran): also wake the poller the way the UI does
-        A.post(B + f"/api/repos/{RID}/refresh")
-    # 2.7.2: wait for both (fails and last_error); a slow CI runner once saw fails 0 before last_error was cleared
-    return tuple(dbq("SELECT fails, last_error FROM git_conns WHERE id=?", (RID,))[0]) == (0, "")
+# 2.14.0: the real cause of the old CI flake: a poll that was still running with the "rotated" token when the right one was
+# saved wrote its late 401 over the reset (fixed in git_poll), and this check used to accept the reset itself as the
+# recovery. Now it waits for a real poll with the new token after the save and then for a clean state.
+def recovered():
+    ok = any(x["port"] == 8090 and "/acme/app/" in x["path"] and x["status"] in (200, 304) and x["auth"] == "Bearer " + TOKEN
+             for x in git_log()[n0:])
+    return ok and tuple(dbq("SELECT fails, last_error FROM git_conns WHERE id=?", (RID,))[0]) == (0, "")
 
 
-until(poke_ok, 120)  # 2.9.0: 60 s were not always enough on a busy CI runner
+until(recovered, 30)
 st_ = dbq("SELECT fails, last_error, next_at FROM git_conns WHERE id=?", (RID,))[0]
-check(st_[:2] == (0, ""), f"recovers after the token is fixed: {st_[0]} fails, {st_[1]!r}, next in {round(st_[2] - time.time())} s"
-      + ("" if st_[:2] == (0, "") else f"; last requests at the fake server: {git_log()[-4:]}"))
+check(recovered(), f"recovers after the token is fixed (a poll with the new token went through): {st_[0]} fails, {st_[1]!r}, "
+      f"next in {round(st_[2] - time.time())} s" + ("" if recovered() else f"; last requests at the fake server: {git_log()[-4:]}"))
 check(Bo.post(B + f"/api/repos/{RID}/refresh").ok, "a member may ask for a check")
 
 # ================================================================== #339 merge requests + the agent's view

@@ -309,6 +309,10 @@ shard 4  # ---------------------------------------------------------------- shar
 # 2.13.3 (#478 follow-up, Fold): one search entry per layout (the command-bar field in the sidebar / drawer), no + button in the
 # tablet / Fold-portrait layout after rotating, "No date" removes date + time + reminders + repeat reminder and closes the popover
        run p2133_ui node p2133_ui.js "$KALMIDO_TEST_DATA"
+# 2.13.4 (phone round): real touch gestures in Firefox: the section "+" opens the quick sheet above the keyboard, no
+# drag ghost after a lost touchend / Escape / background / re-render, auto-scroll at the edges, "Move to list" while
+# dragging, the phone chat does not scroll beside the box, Markdown lists keep counting
+       run p2134_ui node p2134_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

@@ -26152,6 +26152,11 @@ def git_poll(c, cid):
     k, gh = git_ctx(c, r), r["provider"] == "github"
     etags = json.loads(r["etags"] or "{}")
     keep = dict(etags)
+    # 2.13.4 (p220 flake, a real bug): a poll still running while someone saves the connection (a new token: git_update
+    # resets etags / fails / next_at) must not write its result over that reset afterwards, or the fixed connection keeps
+    # showing the old 401 and waits out the backoff. Its state is written only while the row still holds the token and
+    # ETags it read (the sealed token has a random nonce: every save changes it).
+    same, same_args = "id=? AND token IS ? AND etags IS ?", (cid, r["token"], r["etags"])
     baseline, changed = r["polled_at"] is None, False
 
     def get(key, path):
@@ -26193,15 +26198,15 @@ def git_poll(c, cid):
             if ci != p["ci"] or p["ci_sha"] != p["head_sha"]:
                 changed |= ci != p["ci"]
                 c.execute("UPDATE git_prs SET ci=?, ci_sha=? WHERE conn_id=? AND number=?", (ci, p["head_sha"], cid, p["number"]))
-        c.execute("UPDATE git_conns SET etags=?, polled_at=?, fails=0, last_error='', next_at=? WHERE id=?",
-                  (json.dumps(keep), iso(now_utc()), time.time() + GIT_POLL_S, cid))
+        c.execute(f"UPDATE git_conns SET etags=?, polled_at=?, fails=0, last_error='', next_at=? WHERE {same}",
+                  (json.dumps(keep), iso(now_utc()), time.time() + GIT_POLL_S, *same_args))
     except GitRate as e:
-        c.execute("UPDATE git_conns SET etags=?, last_error='rate', next_at=? WHERE id=?",
-                  (json.dumps(keep), max(e.until + 5, time.time() + 30), cid))
+        c.execute(f"UPDATE git_conns SET etags=?, last_error='rate', next_at=? WHERE {same}",
+                  (json.dumps(keep), max(e.until + 5, time.time() + 30), *same_args))
     except CalError as e:
         fails = (r["fails"] or 0) + 1
-        c.execute("UPDATE git_conns SET etags=?, fails=?, last_error=?, next_at=? WHERE id=?",
-                  (json.dumps(keep), fails, e.stored(), time.time() + min(GIT_POLL_S * 2 ** min(fails, 5), GIT_BACKOFF_MAX), cid))
+        c.execute(f"UPDATE git_conns SET etags=?, fails=?, last_error=?, next_at=? WHERE {same}",
+                  (json.dumps(keep), fails, e.stored(), time.time() + min(GIT_POLL_S * 2 ** min(fails, 5), GIT_BACKOFF_MAX), *same_args))
     if changed:
         bump(c)
     c.commit()
