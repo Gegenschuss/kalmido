@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # run_all.sh -- every suite, each group against a fresh test container (see start.sh for the settings).
 #   BUILD=1 tests/run_all.sh     build the image from the repo first (docker build -t $KALMIDO_TEST_IMAGE .)
-#   tests/run_all.sh --shard 2/4  only the second of the 4 shards (CI runs the shards as parallel jobs, see ci.yml).
+#   tests/run_all.sh --shard 2/5  only the second of the 5 shards (CI runs the shards as parallel jobs, see ci.yml).
 #                                The `shard N` lines below split the groups; each group (a `fresh` container and the
 #                                suites after it) stays whole. Keep the shards about equal (~14 min each on CI) by moving
-#                                a marker when one grows; new suites go at the end (shard 3).
+#                                a marker when one grows; new suites go at the end (the last shard).
 # Needs: docker, python3 with tests/requirements.txt, node 18+ with `npm ci` done in tests/.
 # Exit code 0 = everything passed.
 set -u
@@ -13,7 +13,7 @@ cd "$HERE"
 export KALMIDO_TEST_IMAGE=${KALMIDO_TEST_IMAGE:-kalmido:test}
 export KALMIDO_TEST_DATA=${KALMIDO_TEST_DATA:-$HERE/.data}
 PY=${PYTHON:-python3}
-SHARDS_DEFINED=4
+SHARDS_DEFINED=5
 SHARD=0; CUR=1
 if [[ "${1:-}" == "--shard" ]]; then
   [[ "${2:-}" =~ ^([0-9]+)/([0-9]+)$ ]] || { echo "usage: run_all.sh [--shard N/$SHARDS_DEFINED]"; exit 2; }
@@ -83,7 +83,7 @@ fresh; run v1 "$PY" v1_test.py "$KALMIDO_TEST_DATA"
 # it was the shortest (15.4 min on CI after 2.8.0)
        run p290_dav "$PY" p290_dav_test.py "$KALMIDO_TEST_DATA"
        run p290_ui node p290_ui.js "$KALMIDO_TEST_DATA"
-shard 2  # ---------------------------------------------------------------- shard 2 of 4
+shard 2  # ---------------------------------------------------------------- shard 2 of 5
 fresh; run twofa "$PY" twofa_test.py "$KALMIDO_TEST_DATA"
        run oidc "$PY" oidc_test.py "$KALMIDO_TEST_DATA"
        run signin_ui node signin_ui.js "$KALMIDO_TEST_DATA"
@@ -139,7 +139,7 @@ fresh; run p181_ui node p181_ui.js
 # header dots), ticket gutter rows, the icon set "Punkt", the raspberry accent + migration; Firefox at 360 / 390 / 904
 # (touch) and 1280 / 1440 / 1920 (mouse): layout, 44 px, contrast
        run p280_ui node p280_ui.js "$KALMIDO_TEST_DATA"
-shard 3  # ---------------------------------------------------------------- shard 3 of 4
+shard 3  # ---------------------------------------------------------------- shard 3 of 5
 fresh; run p190_api "$PY" p190_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p190_ui node p190_ui.js
 # 1.10.0: list roles (admin / member / participant / viewer): leak tests of every read path for a participant against an
@@ -221,7 +221,7 @@ fresh; run p208_ui node p208_ui.js
 # dark). Shard 3: it was the shortest (15.4 min on CI after 2.9.0)
        run p2100_api "$PY" p2100_api_test.py "$KALMIDO_TEST_DATA"
        run p2100_ui node p2100_ui.js "$KALMIDO_TEST_DATA"
-shard 4  # ---------------------------------------------------------------- shard 4 of 4 (2.7.1: shard 3 had reached the 30 min job limit)
+shard 4  # ---------------------------------------------------------------- shard 4 of 5 (2.7.1: shard 3 had reached the 30 min job limit)
 # 2.3.0: agent proposals (#260 project from a briefing, #261 break down, #262 sort the inbox, #263 tasks from notes): who may ask
 # which agent, requests with exactly the sent input, validation per kind, apply as the person with one undo step, inbox
 # consent, discard, retention (own containers); then the entry points, request + review dialogs in jsdom and Firefox
@@ -276,6 +276,7 @@ shard 4  # ---------------------------------------------------------------- shar
 # 44 px targets, the milestone date picker and the timeline markers
        run p271_api "$PY" p271_api_test.py "$KALMIDO_TEST_DATA"
        run p271_ui node p271_ui.js "$KALMIDO_TEST_DATA"
+shard 5  # ---------------------------------------------------------------- shard 5 of 5 (2.15.1: shard 4 had reached the 30 min job limit)
 # 2.7.2: the list option "Show completed at the bottom" instead of the checklist type (#414: aliases, migration), personal
 # agents (#420: policy, owner-only sharing / chat, admin pause / delete), reactions in the agent chat (#421) and delivered_at
 # (#422), project files leave the disk with the sample / an import undo (own container); then the robot before the bell
