@@ -494,8 +494,11 @@ c.execute("UPDATE git_conns SET next_at=?, polled_at=? WHERE id=?", (t0 + 999, d
 c.commit()
 c.close()
 r = requests.post(B + f"/api/hooks/git/{RID}", data=raw, headers={"X-Hub-Signature-256": sig, "Content-Type": "application/json", "X-GitHub-Event": "push"})
-na = dbq("SELECT next_at FROM git_conns WHERE id=?", (RID,))[0][0]
-check(r.status_code == 202 and t0 + 7 <= na <= t0 + 9, f"a hook 2 s after a poll is kept: the next poll 10 s after the last ({na - t0:.1f} s)")
+na, pa = dbq("SELECT next_at, polled_at FROM git_conns WHERE id=?", (RID,))[0]
+# the invariant (a poll of the loop may run in between and write its own, earlier next_at): the next poll is never
+# later than 10 s after the last one, and not at once (the debounce stays)
+last = datetime.fromisoformat(pa).timestamp()
+check(r.status_code == 202 and na <= last + 10.5 and na >= min(last + 9.5, t0 + 1), f"a hook 2 s after a poll is kept: the next poll at most 10 s after the last ({na - last:.1f} s after it)")
 check(A.patch(B + f"/api/repos/{RID}", json={"hook": "off"}).ok and requests.post(B + f"/api/hooks/git/{RID}", data=raw, headers={"X-Hub-Signature-256": sig}).status_code == 404,
       "webhook off: 404")
 
