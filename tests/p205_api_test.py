@@ -208,7 +208,8 @@ check(r.ok, "complete X on the desktop")
 rows = {r[0]: r for r in dbx("SELECT sub_id, tag, handled_at FROM push_tags")}
 check(SUB["Firefox on Linux"] not in rows and rows[SUB["Chrome on Android"]][2] and rows[SUB["Safari on iPhone"]][2], f"origin row dropped, others handled: {rows}")
 d = wait_for(phone.dismisses, 1, 8)
-check(len(d) == 1 and d[0] == {"type": "dismiss", "tags": [f"t-{X}"]}, f"phone: dismiss push {d}")
+check(len(d) == 1 and {k: v for k, v in d[0].items() if k != "badge"} == {"type": "dismiss", "tags": [f"t-{X}"]} and isinstance(d[0].get("badge"), int),
+      f"phone: dismiss push (2.19.0: with the app badge) {d}")
 rec = [x for x, p in phone.got() if p.get("type") == "dismiss"]
 check(rec and rec[0]["headers"].get("urgency") == "normal" and rec[0]["headers"].get("ttl") == "3600" and "topic" not in rec[0]["headers"],
       "dismiss push: Urgency normal, TTL 1 h, no Topic")

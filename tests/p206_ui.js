@@ -71,7 +71,7 @@ const TABLET = {'(min-width:600px) and (min-height:600px)': true};
   check(body.indexOf('d-hist') === body.length - 2, '2.0.7: the folded history of a private list sits right above the comments: ' + body.join('|'));
   check(d.querySelector('#detail > .dbot > .dcomp #c-input') && d.querySelector('#detail > .dbot > .dfoot') && !d.querySelector('#detail .dbody #c-input'), 'the comment box sits with the footer at the bottom edge (outside the scrolling content)');
   check(/Outline/.test(d.querySelector('#detail .subsec')?.textContent || ''), 'subtasks right below the description');
-  check(w.eval('JSON.stringify(DETAIL_ORDER)') === JSON.stringify(['subtasks', 'deps', 'tags', 'attachments', 'paperless', 'fields', 'custom', 'time', 'code', 'history', 'comments']), 'the order lives in one list (DETAIL_ORDER; 2.2.0: code)');
+  check(w.eval('JSON.stringify(DETAIL_ORDER)') === JSON.stringify(['family', 'subtasks', 'deps', 'tags', 'attachments', 'paperless', 'fields', 'custom', 'time', 'code', 'history', 'comments']), 'the order lives in one list (DETAIL_ORDER; 2.2.0: code, 2.19.0: family first)');
   check(/\.dbot\{position:sticky;bottom:0/.test(css0), 'CSS: the box + footer are sticky at the bottom edge');
   w.close();
 
@@ -247,7 +247,8 @@ const TABLET = {'(min-width:600px) and (min-height:600px)': true};
   w = await boot({user: 'alice', hash: 'l/' + PRIV, mobile: true}); d = w.document;
   check(!w.eval('tabletDock()') && !d.querySelector('#fab').classList.contains('gone'), 'phone: the "+" as before');
   w.close();
-  check(/@media \(min-width:600px\) and \(max-width:899px\) and \(min-height:600px\)\{\s*\.qdock\{display:block;bottom:calc\(var\(--tabs-h\) \+ var\(--safe-b\)\)/.test(css), 'CSS: the dock shows on portrait tablets, above the tab bar');
+  // 2.19.0 (#669): the height part is decided in tdockSync() (html.tdock, without the on-screen keyboard), not in CSS
+  check(/@media \(min-width:600px\) and \(max-width:899px\)\{\s*html\.tdock \.qdock\{display:block;bottom:calc\(var\(--tabs-h\) \+ var\(--safe-b\)\)/.test(css), 'CSS: the dock shows on portrait tablets (html.tdock), above the tab bar');
 
   // ================= #318 a menu from inside a dialog goes above it (phone sheet and desktop)
   for (const mobile of [false, true]) {

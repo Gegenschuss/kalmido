@@ -152,6 +152,15 @@ APP_TO_API = {
     "GET /api/team/rooms/{}/messages": ["GET /team/rooms/{}/messages"], "POST /api/team/rooms/{}/messages": ["POST /team/rooms/{}/messages"],
     "POST /api/team/rooms/{}/read": ["POST /team/rooms/{}/read"], "PATCH /api/team/messages/{}": ["PATCH /team/messages/{}"],
     "DELETE /api/team/messages/{}": ["DELETE /team/messages/{}"], "POST /api/team/messages/{}/reactions": ["POST /team/messages/{}/reactions"],
+    # 2.19.0 (#653): the module Family
+    "GET /api/family": ["GET /family"], "POST /api/family/occasions": ["POST /family/occasions"],
+    "GET /api/family/deadline-types": ["GET /family/deadline-types"], "POST /api/family/deadlines": ["POST /family/deadlines"],
+    "POST /api/tasks/{}/to-shopping": ["POST /tasks/{}/to-shopping"], "POST /api/lists/{}/shop-areas": ["POST /lists/{}/shop-areas"],
+    "GET /api/family/packing": ["GET /family/packing"], "POST /api/family/packing": ["POST /family/packing"],
+    "POST /api/me/purpose": ["POST /me/purpose"], "GET /api/family/kids": ["GET /family/kids"],
+    "POST /api/family/kids/{}/stars": ["POST /family/kids/{}/stars"], "POST /api/family/kids/{}/rewards": ["POST /family/kids/{}/rewards"],
+    "PATCH /api/family/rewards/{}": ["PATCH /family/rewards/{}"], "DELETE /api/family/rewards/{}": ["DELETE /family/rewards/{}"],
+    "POST /api/family/rewards/{}/request": ["POST /family/rewards/{}/request"], "POST /api/family/rewards/{}/decide": ["POST /family/rewards/{}/decide"],
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
@@ -176,6 +185,7 @@ APP_ONLY = [
     ("2.18.0: the error-report webhook of a list: its secret URL is shown once to people (owner / list admins); the inbound hook "
      "is called by the error service, not by a client", ("* /api/lists/{}/error-hook", "POST /api/hooks/issues/")),
     ("external calendar subscriptions and the calendar feed link: personal settings", ("* /api/calendars", "* /api/ical")),
+    ("2.19.0: address books (CardDAV) for birthdays: their passwords are entered by people, like calendar subscriptions", ("* /api/family/contacts",)),
     ("the app's personal settings, onboarding and sample data", ("PATCH /api/settings", "POST /api/onboarding", "* /api/sample")),
     ("the focus timer is a personal on-screen timer; time is tracked with /time/timer", ("* /api/pomo/",)),
     ("views computed for the screen (the data is in /tasks, /tasks/{id}/dependencies, /time/entries)", (
@@ -292,6 +302,7 @@ API_ONLY = {  # REST routes on purpose without an MCP tool (reason)
     "GET /lists/{}/error-hook": "2.18.0: the error-report webhook carries a secret URL; agents are refused (403), people manage it",
     "PATCH /lists/{}/error-hook": "2.18.0: the error-report webhook carries a secret URL; agents are refused (403), people manage it",
     "POST /team/dm": "direct messages are between people; agents cannot open them (403), people talk to an agent in its own chat",
+    "POST /me/purpose": "2.19.0: the modules of the account (scope account): never for agents",
 }
 none = sorted(r for r in API if r not in reached and r not in API_ONLY)
 check(not none, f"API routes without an MCP tool or a documented exception: {none}")

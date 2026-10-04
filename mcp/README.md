@@ -92,6 +92,10 @@ shows only the tools the token may use (from `GET /api/v1/me`, refreshed every 5
 | `upload_attachment` (`files: [{name, base64, mime?}]`), `delete_attachment`, `upload_project_file`, `delete_project_file` | attachments:write | multipart uploads |
 | `start_timer`, `stop_timer`, `add_time_entry`, `update_time_entry`, `delete_time_entry` | time | `/time/timer`, `/time/entries` |
 | `export_data` | export | `GET /export` |
+| `get_family`, `list_deadline_types`, `list_packing_templates`, `list_kids` (2.19.0) | read | `GET /family`, `/family/deadline-types`, `/family/packing`, `/family/kids` |
+| `add_occasion`, `add_deadline`, `ingredients_to_shopping`, `give_stars`, `add_reward`, `update_reward`, `request_reward`, `decide_reward` (2.19.0) | tasks:write | `/family/occasions`, `/family/deadlines`, `/tasks/{id}/to-shopping`, stars + rewards |
+| `add_shop_areas`, `create_packing_list` (2.19.0) | structure | `/lists/{id}/shop-areas`, `POST /family/packing` |
+| `delete_reward` (2.19.0) | delete | `DELETE /family/rewards/{id}` |
 
 An agent's dangerous requests (deleting a list or a field, emptying the trash, batches of 10+ tasks, moving lists,
 folders, sharing) answer `approval_required` with a waiting job: a person approves it in Kalmido and the agent gets the

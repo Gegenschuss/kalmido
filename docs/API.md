@@ -300,6 +300,36 @@ Tasks in `GET /tasks` carry `code` when something is linked. See *Git integratio
 | `POST /team/messages/{id}/reactions` | comments | `{emoji: up\|down\|heart or one emoji, on?}` |
 | `POST /team/rooms/{id}/read` | comments | `{last_id?, muted?}` |
 
+## Family (2.19.0)
+
+The module *Family* (the app shows it while the person has it on; the API always works). Birthdays, anniversaries and
+deadlines are ordinary tasks with a `family` object; rotations, people and stars are task fields too.
+
+| Endpoint | Scope | |
+|---|---|---|
+| `GET /family?week=YYYY-MM-DD` | read | upcoming `occasions` (`kind`, `name`, `date`, `days`, `year`, `age`, open `gifts`), `deadlines` (`type`, `who`, `expires`, `due`, `days`), `rotations` (`who`, `current`, `next`, `mode`), the `meals` of the week (with `ingredients`), `shopping` lists, `kids` |
+| `POST /family/occasions` | tasks:write | `{name, date: YYYY-MM-DD or --MM-DD, kind?: birthday\|anniversary, year?, lead_days? (7), list_id?, gifts?: [..]}` -> a yearly task; default list: the first *Birthdays* list (created when missing) |
+| `GET /family/deadline-types` | read | `passport`, `id_card`, `car`, `insurance`, `contract`, `other` with their lead days, repeat and notice period |
+| `POST /family/deadlines` | tasks:write | `{type, expires, who?, notice_months?, lead_days?, title?, list_id?}`: due = `expires` minus the notice period (a passed one moves to the next term), a deadline with reminders |
+| `POST /tasks/{id}/to-shopping` | tasks:write | `{list_id?, items?}`: the ingredients of a meal (the bullet / checklist lines of its notes) onto a shopping list; `{added, skipped}` (open items are not doubled) |
+| `POST /lists/{id}/shop-areas` | structure | the default shop areas as sections; the list becomes a shopping list |
+| `GET /family/packing` · `POST` | read · structure | the packing templates; `{template, name?}` creates a list from one |
+| `GET /family/kids` | read | the kid accounts you look after (or yourself, a kid): `stars`, `rewards`, `history`, `parents` |
+| `POST /family/kids/{id}/stars` | tasks:write | `{delta, note?}` (parents) |
+| `POST /family/kids/{id}/rewards` · `PATCH /family/rewards/{id}` · `DELETE` | tasks:write · tasks:write · delete | `{title, cost, emoji?, once?}` (parents) |
+| `POST /family/rewards/{id}/request` | tasks:write | the kid asks (with enough stars); its parents get a push |
+| `POST /family/rewards/{id}/decide` | tasks:write | `{approve}`: redeem (the stars are taken; `once` rewards are done) or decline (parents) |
+| `POST /me/purpose` | account | `{purpose: me\|family\|team\|software, examples?}`: switches your modules and creates the starter lists once |
+
+Task fields: `family` (`{kind: birthday|anniversary, name, year?, lead?, src?, card?}` (`card`: the vCard UID of a date
+imported from an address book) or `{kind: deadline, type, who, expires, notice,
+lead}`), `rotation` (`{who: [user ids sharing the list, at least 2], mode: done|week, i}`; setting it sets the assignee,
+the turn moves on after each completion or every Monday), `people` (who comes along: they see the task, also as
+participants, and get its reminders), `stars` (what a kid account gets for completing it; `null` = 1). Lists have
+`family`: `shopping`, `meals`, `birthdays`, `household`, `packing` or `null`. A kid account takes part in shared lists
+only as a participant; it can complete / reopen what it sees, ask for rewards and change its own account, every other
+change answers `403`.
+
 ## Roadmap
 
 `GET /roadmap` returns every list the user can see (not archived) as a group, in sidebar order (inbox, lists without

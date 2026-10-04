@@ -1,4 +1,4 @@
-<p align="center"><img src="static/icon.svg" width="112" alt="Kalmido logo: a sloth hanging from a checkmark"></p>
+<p align="center"><img src="static/icon.svg" width="112" alt="Kalmido logo: a heron standing on one leg at the water, a violet sun on the horizon"></p>
 
 <h1 align="center">Kalmido</h1>
 
@@ -18,6 +18,12 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.19.0** (2026-10-04): Family. A module for households, off until you want it: **birthdays and anniversaries** with
+  the age, gift ideas and an import from your **contacts** (CardDAV); household chores that **take turns**; **child
+  accounts** with a simple view, stars and rewards; **who comes along**; **shopping lists** by shop area with a shopping
+  mode; a **meal plan** whose ingredients go to the shopping list in one tap; household **deadlines** (passport, car
+  inspection, insurance); **packing lists** from templates. The setup asks *What do you use Kalmido for?*. Profile
+  pictures are herons, the search button stays in reach with the phone sidebar open, "+" for more reactions in the chats.
 - **2.18.0** (2026-10-04): Software & Planning. **Milestones are tasks** (a diamond in the list, Kanban, calendar and
   timeline) with their tasks, progress, a burndown and release notes; **create tasks right in the timeline** (drag a
   range, double-click, "+") which now shows **sections**; **GitLab** and **Bitbucket Cloud** next to GitHub and Gitea /
@@ -271,7 +277,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   add syntax; Enter when nothing else matches); `#123` jumps to task 123; keyboard shortcuts (`?` shows them all: arrows, Space to complete, E to rename in the list; calendar 1-4 / ← → / `.`; multi-select Ctrl/Cmd+A, Shift+↓ ↑, Shift+X, then Space, M or D for the selection), compact, comfortable or custom density (the sidebar and the task rows each on their own); your account sits as your picture at the right of the *Kalmido* row (Account, Settings, Log out)
 - New accounts start with a "Getting started" list and a short welcome tour
 - A **sample project** to try things out: an image film for a client with phases, dates, dependencies, custom fields and a packing checklist, offered in the setup and the tour, removed again in one click (Settings > Data)
-- When Today is clear or a list is done, the sloth celebrates (with one of 50 dry one-liners). Can be switched off.
+- When Today is clear or a list is done, the heron celebrates (with one of 50 dry one-liners). Can be switched off.
 
 **Everywhere**
 - Installable web app (PWA) for phone and desktop, works offline: changes queue up and sync later, with conflict detection
@@ -280,7 +286,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - Mobile layout with swipe gestures, long-press drag, configurable tab bar per device (on the desktop one sidebar with grouped navigation: Focus, Views, Lists, Filters, Tags and Team); tablets in portrait keep the composer at the bottom
 - Push notifications without an extra app (Web Push: Chrome, Edge, Firefox, Safari, iPhone and iPad from the Home Screen) or via [ntfy](https://ntfy.sh): reminders with *Done* / *Snooze*, focus end, habit reminders, daily digest, comments and assignments; a notification you handled on one device (task completed or opened, News read) closes on your other devices
 - Share from your phone into the inbox: a ready-made import for the Android app HTTP Shortcuts, a guide for the iPhone Shortcuts app (see below); app shortcuts (long-press the icon: new task, today, news, search)
-- Profile pictures: ten sloth presets or your own photo (cropped square, resized, metadata removed), shown wherever the initials were
+- Profile pictures: ten heron presets (2.19.0) or your own photo (cropped square, resized, metadata removed), shown wherever the initials were
 - **Calendar apps (CalDAV), both ways**: every list as a task list in Reminders (iPhone, iPad, Mac), Thunderbird, Evolution, Tasks.org or DAVx⁵ on Android, with an app password per device ([Calendar apps](#calendar-apps-caldav))
 - **Calendar subscription**: your open tasks with a date as an ICS feed for Google Calendar, Apple Calendar, Outlook or Thunderbird
 - Optional [Paperless-ngx](https://docs.paperless-ngx.com) integration: link documents to tasks, send attachments to Paperless
@@ -296,8 +302,8 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 | | |
 |---|---|
-| <img src="docs/palette.png" alt="Command palette with actions for the selected task"> | <img src="docs/celebration.png" alt="The sloth swinging across the screen with checkmark confetti after Today was cleared"> |
-| Command palette | The sloth celebrates |
+| <img src="docs/palette.png" alt="Command palette with actions for the selected task"> | <img src="docs/celebration.png" alt="The heron swinging across the screen on a vine with checkmark confetti after Today was cleared"> |
+| Command palette | The heron celebrates |
 
 | | |
 |---|---|
@@ -439,7 +445,7 @@ own list with the same name is reused) or one existing list you can edit. The im
 
 - **Accounts:** admins manage users under *Settings > Administration* (username, display name, optional password,
   optional SSO login, admin flag, Paperless access, ntfy topic, disable / delete). Everyone can change their own display name and
-  password under *Settings > Account*, and a profile picture there (a sloth preset, an own photo or just the initials;
+  password under *Settings > Account*, and a profile picture there (a heron preset, an own photo or just the initials;
   admins can set a preset for someone else, e.g. the bot user of an API integration). The *Users* block comes first
   under *Settings > Administration*; agents are listed there too (with the *Agent* badge) and open their own dialog
   (*Managed under Agents*). A user who still owns lists cannot be deleted (delete the lists or
@@ -636,12 +642,51 @@ their progress, pinned tasks, recent notes, the agents, a few numbers and a sear
 (↑ ↓, also with the keyboard) and hides the ones you do not need; the choice follows you to every device. It can also be
 a tab (Settings > Appearance > Tab bar).
 
+## Family
+
+*Settings > Modules > At home > Family* (or *What do you use Kalmido for? > Family* in the setup, the welcome tour or
+*Settings > Modules*) switches on everything for a household; while it is off, none of it shows. The **Family** view
+(sidebar, tab bar, command field) brings it together.
+
+- **Birthdays and anniversaries**: *Birthday* in the Family view (or a *Birthdays* list): a yearly task with the age
+  ("turns 80"), reminded 7 days before (or 1, 3, 14, 30, on the day only) and on the day; gift ideas are its checklist
+  and what was given stays ticked when the year rolls on. *From contacts…* reads an **address book** (CardDAV:
+  Nextcloud, iCloud, Radicale, mailbox.org …) once a day: `BDAY`, `ANNIVERSARY` and Apple's anniversary dates become
+  yearly tasks and follow changes; nothing is written back, the address and the password are stored encrypted (like a
+  calendar subscription's), each date keeps the contact's UID so a change updates it instead of adding a second one, and
+  a birthday you deleted is not created again. Internal servers need the admin's allow-list (*Settings > Administration > Advanced*).
+- **Household chores that take turns**: in a repeating task of a shared list, *Take turns* in the task panel: pick who
+  (people of the list, children too) and whether the next person comes after each completion or every week. The next
+  person gets a push; Undo puts the turn back; *Whose turn* in the Family view.
+- **Children**: an admin makes an account a **child account** (*Settings > Users > Edit*) and picks its parents. A child
+  sees a simple view with big buttons: its own tasks only (in shared lists a child always takes part as a participant:
+  only what is assigned to it, or where it comes along), its stars and the rewards. Each task it completes gives 1 star
+  (or what the task says under *Stars for a child*); parents give stars by hand, set rewards (once or again and again),
+  get a push when the child asks for one and approve or decline it in the Family view. A child account can tick its
+  tasks, ask for rewards and change its own account; everything else stays read-only for it.
+- **Who comes along**: *Who comes along* in the task panel of a shared list's task: those people see the task (children
+  too) and get its reminders.
+- **Shopping lists**: *Used for: Shopping list* in the list dialog (or *Add shop areas* on a list): the sections become
+  shop areas (fruit & vegetables, bakery, dairy …, rename or add your own); move an item to its area once and the next
+  one goes there by itself ("2 l milk" and "milk" are the same item); common items (bananas, bread, milk …) find a
+  likely area the first time. *Shopping mode*: the whole screen, big ticks,
+  grouped by area, add items, live for everyone shopping at the same time; ticked items wait at the bottom for next time.
+- **Meal plan**: the next seven days of meals in the Family view (*+* per day); write the ingredients as a list in a meal's notes and
+  the cart button puts them on the shopping list, without doubling what is already on it.
+- **Household deadlines**: *Household deadline* in the Family view: passport, ID card, car inspection (every two years), insurance
+  and contracts (due on the last day to cancel, every year) or anything else, with a lead time that fits; link the
+  Paperless document in the task.
+- **Packing lists** from templates: holiday, swimming pool, daycare, camping, business trip.
+- API v1 and MCP: `/family`, `/family/occasions`, `/family/deadlines`, `/tasks/{id}/to-shopping`, `/lists/{id}/shop-areas`,
+  `/family/packing`, `/family/kids`, rewards; tasks carry `family`, `rotation`, `people` and `stars` (docs/API.md).
+
 ## Team chat
 
 People talk to each other in Kalmido: **direct messages** between two people who work together (they share a list or a
 group) and **one channel per shared list** for everyone who sees the whole list. Agents shared with the list are in its
 channel: they read along and answer when you @mention them. Messages are Markdown, `@Name` mentions a member, a message
-can link a task, shows 👍 👎 ❤️ under every message (one tap adds or removes yours, 2.18.0), and you edit or delete your own (list owners and admins delete
+can link a task, shows 👍 👎 ❤️ under every message (one tap adds or removes yours, 2.18.0; "+" for any other emoji,
+2.19.0), and you edit or delete your own (list owners and admins delete
 any in their channel). *Team chat* in the sidebar shows the unread count; a direct message and a mention push to your
 devices (notification row *Team chat*; muting a conversation leaves only mentions). Find it in the sidebar, the tab bar,
 the list menu (*Team chat*) and a project's overview. The REST API and the MCP server have it too (`/team/...`, see

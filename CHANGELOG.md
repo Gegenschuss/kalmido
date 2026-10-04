@@ -7,6 +7,87 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.19.0] - 2026-10-05
+
+**In short:** Family (#653). A new module *Family*, off until you want it: birthdays and anniversaries with the age, gift
+ideas and an import from your contacts; household chores that take turns; accounts for children with a simple view,
+stars and rewards; who comes along to an event; shopping lists sorted by shop area with a shopping mode; a meal plan whose
+ingredients go to the shopping list in one tap; household deadlines like the passport or the car inspection; packing
+lists from templates. The setup asks *What do you use Kalmido for?* (For me, Family, Team, Software projects). Profile
+pictures are herons now, the search button stays in reach with the sidebar open on a phone, and the chats have "+" for
+more reactions.
+
+### Added
+- **Module Family** (*Settings > Modules > At home*; off by default, nothing of it shows while it is off). A *Family*
+  view brings it together: upcoming birthdays, whose turn it is, the meal plan of the week, the shopping lists, deadlines,
+  the kids and packing templates. A *Family* card on the dashboard, commands in the command field.
+- **Birthdays and anniversaries**: a yearly task with the age ("turns 80"), a reminder 7 days before (adjustable) and on
+  the day, gift ideas as a checklist (what was given stays ticked when the year rolls on). 29 February falls on the 28th
+  in other years.
+- **Birthdays from your contacts**: connect an address book (CardDAV: Nextcloud, iCloud, Radicale, mailbox.org …) in the
+  Family view; birthdays and anniversaries (`BDAY`, `ANNIVERSARY`, Apple's dates) become yearly tasks and follow changes
+  once a day, matched by the contact's UID (kept in the task and, with its address book, in the link), so a contact
+  is never added twice. Nothing is written back; the password is stored encrypted like a calendar subscription's.
+- **Household rotation**: a repeating task in a shared list can *take turns*: after each completion (or every week) the
+  next person gets it, with a push; Undo puts the turn back. *Whose turn* in the Family view.
+- **Child accounts** (*Settings > Users*, admins): a simple view with big buttons and only the child's own tasks (in shared
+  lists a child always takes part as a participant), stars for every completed task (1 by default, more per task) and
+  rewards that the parents set, approve or decline; parents get a push when their child asks for one. A child ticks its
+  tasks, asks for rewards and changes its own account; everything else is read-only for it, in the app and on the server.
+- **Who comes along**: people of a shared list can be added to a task (a trip, an appointment); they see it, children
+  too, and get its reminders.
+- **Shopping lists**: *Used for: Shopping list* (list dialog) gives a list shop areas as sections; a new item goes to the
+  area it had last time ("2 l milk" = "milk"), a common item without a history to a likely area (bananas: fruit &
+  vegetables; six languages). *Shopping mode*: the whole screen, big ticks (also on the name), grouped by area, new
+  items, live for everyone shopping at the same time; Back on Android closes it.
+- **Meal plan**: the next seven days of meals in the Family view; the ingredients in a meal's notes go to the shopping list with one
+  tap, without doubling what is already on it.
+- **Household deadlines**: passport, ID card, car inspection, insurance, contract or anything else, with the right lead
+  time; contracts and insurances are due on the last day to cancel and repeat every year. Link the Paperless document in
+  the task.
+- **Packing lists from templates**: holiday, swimming pool, daycare, camping, business trip (done items stay at the
+  bottom for the next time).
+- **"What do you use Kalmido for?"** in the first-run setup, in the welcome tour of new accounts and in *Settings >
+  Modules*: For me, Family, Team or Software projects switch the matching modules on and create the starter lists once
+  (Family: a shopping list, household chores, birthdays and a meal plan in the folder *Family*).
+- API v1: `GET /family`, `POST /family/occasions`, `GET /family/deadline-types`, `POST /family/deadlines`,
+  `POST /tasks/{id}/to-shopping`, `POST /lists/{id}/shop-areas`, `GET` / `POST /family/packing`, `GET /family/kids`,
+  stars and rewards (`/family/kids/{id}/stars`, `/family/kids/{id}/rewards`, `/family/rewards/{id}` with `/request` and
+  `/decide`), `POST /me/purpose` (scope `account`); tasks have `family`, `rotation`, `people` and `stars`, lists `family`.
+  MCP tools for all of it (`get_family`, `add_occasion`, `add_deadline`, `ingredients_to_shopping`, `add_shop_areas`,
+  `create_packing_list`, `list_kids`, `give_stars`, rewards).
+- Chats: **"+" next to 👍 👎 ❤️** opens more emojis (or any emoji), in the agent chat and the team chat.
+
+### Changed
+- **Profile pictures** are herons: the line drawing of the app icon on a dark disc, each with its prop (coffee,
+  headphones, camera …); pictures chosen before keep their name. `tools/make_avatars.py` draws them.
+- On a phone the **search button** stays in reach while the sidebar is open (next to the drawer).
+- The setup's presets are the answers to *What do you use Kalmido for?*; *For me* is the simple start of before.
+- Shopping lists show only the shop areas that have items (shopping mode lists them all).
+- The **date picker** has a year select in its title: a date years ahead is one choice instead of many taps.
+- **Sections by dragging**: at the end of a list a *+ New section* zone shows while a task is dragged: drop it there,
+  name the section (prefilled), the task lands in it; Undo puts it back and removes the section. *Move to section…*
+  offers *New section…* too (keyboard), also in a list without sections.
+- **Notifications** tidy themselves: opening the app (or bringing it to the front) closes every notification that needs
+  nothing any more (done or deleted tasks, read chats, agents, digest), keeps unread News, due reminders and unread
+  chats; *Mark all as read* closes all of them on every device; reading a chat closes its notifications elsewhere too.
+  The app icon shows the number of unread News and chat messages where the system supports it (Badging API), from
+  the app and from every push.
+
+### Fixed
+- A folder header in the sidebar told screen readers its state with an attribute that is not allowed there; it now says
+  "folded" / "unfolded".
+- In a dialog opened after another one was closed, Tab could bounce between two buttons or leave the dialog (Firefox);
+  dialogs now move the focus themselves.
+- Dragging a task onto *Drop tasks here* of an empty section with a finger did nothing: the zone was hidden before the
+  drop was read (#667).
+- Unfolded Fold / tablets in portrait (600-899 px wide): the on-screen keyboard closed again right after tapping
+  *Add task*. The keyboard made the window lower than 600 px, the layout flipped to the phone one and hid the bar with
+  the focus in it (a regression of the 2.7.2 fix: the docked bar's breakpoint still measured the height). The layout
+  is now chosen on the height without the keyboard. Typing in the docked bar no longer scrolls the list behind it
+  (a line per key on a short visible area) (#669).
+- *Edit user* showed the admin's initials for "No picture"; the setup's start "Empty" was a verb in some languages.
+
 ## [2.18.0] - 2026-10-04
 
 **In short:** Software & Planning (#462). Milestones are tasks with progress, a burndown and release notes; tasks can be
@@ -2430,7 +2511,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.18.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.19.0...HEAD
+[2.19.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.19.0
 [2.18.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.18.0
 [2.17.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.17.2
 [2.17.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.17.1

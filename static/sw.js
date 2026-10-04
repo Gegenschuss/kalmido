@@ -2,7 +2,7 @@
 // API calls always go to the network (data must be live). Language files: de.json is precached,
 // any other static/i18n/<code>.json lands in the cache via the network-first handler on first use
 // (the client also keeps the active one in localStorage as a last offline fallback).
-const CACHE = 'tasks-shell-v94';
+const CACHE = 'tasks-shell-v96';
 const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/static/i18n/de.json', '/static/app.js', '/static/icon-192.png', '/static/icon-512.png',
   '/static/icon.svg', '/static/badge-96.png', '/static/fonts/Geist-Variable.woff2', '/static/fonts/GeistMono-Variable.woff2', '/static/quips.json',
   '/static/favicon.svg', '/static/favicon-32.png', '/static/apple-touch-icon.png', '/static/icon-maskable-512.png',  // 2.18.0 (#394)
@@ -63,16 +63,22 @@ function pushOptions(d) {
 // {type: 'dismiss', tags} only closes them (never sent to iOS), a normal push may carry "dismiss": [tags] as well
 async function closeTags(tags) {
   if (!Array.isArray(tags) || !tags.length) return 0;
-  const want = new Set(tags.map(String));
+  const want = new Set(tags.map(String)), all = want.has('*');  // 2.19.0 (#668): "*" = every Kalmido notification
   let n = 0;
-  for (const x of await self.registration.getNotifications()) if (x.tag && want.has(x.tag)) { x.close(); n++; }
+  for (const x of await self.registration.getNotifications()) if (all || (x.tag && want.has(x.tag))) { x.close(); n++; }
   return n;
+}
+// 2.19.0 (#668): the number on the app icon (unread News + chat) comes with every push; 0 clears it
+async function setBadge(n) {
+  const nav = self.navigator;
+  if (typeof n !== 'number' || !nav || !nav.setAppBadge) return;
+  try { if (n > 0) await nav.setAppBadge(n); else await nav.clearAppBadge(); } catch { /* not supported here */ }
 }
 self.addEventListener('push', e => {
   let d;
   try { d = e.data ? e.data.json() : {}; } catch { d = {body: e.data ? e.data.text() : ''}; }
-  if (d && d.type === 'dismiss') { e.waitUntil(closeTags(d.tags).catch(() => 0)); return; }
-  e.waitUntil(closeTags(d.dismiss).catch(() => 0).then(() => self.registration.showNotification(d.title || 'Kalmido', pushOptions(d))));
+  if (d && d.type === 'dismiss') { e.waitUntil(closeTags(d.tags).catch(() => 0).then(() => setBadge(d.badge))); return; }
+  e.waitUntil(closeTags(d.dismiss).catch(() => 0).then(() => self.registration.showNotification(d.title || 'Kalmido', pushOptions(d))).then(() => setBadge(d.badge)));
 });
 // focus an open Kalmido window and hand it the in-app link, else open a new one
 async function openApp(path) {

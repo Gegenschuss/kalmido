@@ -36,13 +36,13 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   CK = await login('alice');
   let w = await boot({user: 'alice', hash: 'today'}), d = w.document;
   await until(() => d.querySelector('.authscreen .supresets'), 80);
-  check(d.querySelector('.supreset.on[data-su-preset="simple"]'), 'F12: a new account (all modules on = the default) starts with "Simple list"');
+  check(d.querySelector('.supreset.on[data-su-preset="me"]'), 'F12: a new account (all modules on = the default) starts with "For me" (2.19.0, was "Simple list")');
   w.close();
   await call('PATCH', '/api/settings', {features: 'cal,kanban,matrix,collab,comments'});
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
   await until(() => d.querySelector('.authscreen .supresets'), 80);
   const cnt = d.querySelector('.authscreen .sucust summary .muted')?.textContent || '';
-  check(!d.querySelector('.supreset.on[data-su-preset="simple"]') && /^5 /.test(cnt) && d.querySelector('[data-use="kanban"]')?.checked && !d.querySelector('[data-use="habits"]')?.checked, 'F12: after a reload step 2 shows what is on (5 modules), not "Simple list": ' + cnt);
+  check(!d.querySelector('.supreset.on[data-su-preset="me"]') && /^5 /.test(cnt) && d.querySelector('[data-use="kanban"]')?.checked && !d.querySelector('[data-use="habits"]')?.checked, 'F12: after a reload step 2 shows what is on (5 modules), not "Simple list": ' + cnt);
   w.close();
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, time_all: true, modules: ALL.split(',').filter(x => !['collab', 'time'].includes(x))});
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en', tour: 'done'});

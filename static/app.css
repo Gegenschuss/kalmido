@@ -1657,6 +1657,8 @@ div.calerr{font-size:var(--fs-s);padding:.25rem 0}
 .sdrop{display:none;align-items:center;justify-content:center;min-height:2.5rem;margin:.125rem 0 .375rem;border:1px dashed var(--line2);border-radius:var(--radius);font-size:var(--fs-s);color:var(--muted)}
 body.tdrag .sdrop{display:flex}
 .sdrop.drop{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.sdrop.snew{gap:.375rem;margin-top:.5rem;min-height:3rem}
+@media (pointer:coarse){ .sdrop{min-height:2.75rem} }
 /* sidebar touch drag */
 .side-ghost{background:var(--bg3);border-radius:var(--radius);box-shadow:0 .5rem 1.5rem rgba(0,0,0,.45);opacity:.95}
 #side .srow.dragging,#side .fhead.dragging{opacity:.4}
@@ -1800,6 +1802,9 @@ body.tdrag .sdrop{display:flex}
 .dpop{position:fixed;z-index:78;background:var(--bg2);border-radius:var(--r-l);box-shadow:var(--shadow);padding:.625rem;width:min(19rem,calc(100vw - 1.5rem))}
 .dpop.sheet{left:0;right:0;bottom:0;top:auto;width:auto;border-radius:.875rem .875rem 0 0;padding:.875rem .875rem calc(.875rem + var(--safe-b))}
 .dph{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.375rem;font-weight:600;font-size:var(--fs-b)}
+.dph .dpy{font:inherit;color:inherit;background:transparent;border:.0625rem solid transparent;border-radius:var(--radius);padding:.125rem .25rem;cursor:pointer}
+.dph .dpy:hover,.dph .dpy:focus-visible{border-color:var(--line)}
+@media (pointer:coarse){ .dph .dpy{min-height:2.75rem} }
 .dpg{display:flex;flex-direction:column;gap:2px}
 .dpr{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
 .dpwd span{text-align:center;font:var(--fs-xs) var(--mono);color:var(--muted);padding:.25rem 0}
@@ -1974,7 +1979,7 @@ button.tvr-task:hover{color:var(--accent)}
 .lwrap{display:flex;flex-direction:column;min-height:100%}
 /* the dock keeps the bottom free itself; phones hide it (FAB + tab bar), so their #view keeps its bottom padding (1.7.1) */
 @media (min-width:900px){ #view:has(> .lwrap){padding-bottom:0} }
-.qdock{position:sticky;bottom:0;margin-top:auto;padding:1rem 0 1rem;z-index:3;background:linear-gradient(to bottom,transparent,var(--bg) 1.25rem)}
+.qdock{overflow-anchor:none;position:sticky;bottom:0;margin-top:auto;padding:1rem 0 1rem;z-index:3;background:linear-gradient(to bottom,transparent,var(--bg) 1.25rem)}
 .qadd.dock{margin:0;background:var(--bg2);border:1px solid var(--line2);border-radius:1rem;box-shadow:0 .375rem 1.5rem rgba(0,0,0,.12);padding:.375rem .5rem .375rem .5rem;transition:box-shadow .15s,border-color .15s}
 .qadd.dock:focus-within{border-color:var(--accent);box-shadow:0 .5rem 2rem rgba(0,0,0,.18)}
 .qadd.dock .box{border:0;background:transparent;padding:0;gap:.625rem}
@@ -1995,9 +2000,10 @@ button.tvr-task:hover{color:var(--accent)}
 @media (max-width:899px){ .qdock{display:none} }
 /* 2.0.6 (#188): tablets in portrait (< 900 px wide, but at least 600 x 600) keep the docked composer, right above the tab
    bar (the app hides the "+" button there, see tabletDock()); phones and phone landscape keep the "+" */
-@media (min-width:600px) and (max-width:899px) and (min-height:600px){
-  .qdock{display:block;bottom:calc(var(--tabs-h) + var(--safe-b));padding-bottom:.75rem}
-  #view:has(> .lwrap){padding-bottom:calc(var(--tabs-h) + var(--safe-b))}
+/* 2.19.0 (#669): html.tdock (tdockSync) instead of min-height:600px, so the on-screen keyboard never flips this layout */
+@media (min-width:600px) and (max-width:899px){
+  html.tdock .qdock{display:block;bottom:calc(var(--tabs-h) + var(--safe-b));padding-bottom:.75rem}
+  html.tdock #view:has(> .lwrap){padding-bottom:calc(var(--tabs-h) + var(--safe-b))}
 }
 /* 1.5.3 (r): taller bars, handles reaching past the ends, the text clips inside the bar */
 .tl-bar{overflow:visible;font-size:.8125rem}
@@ -4095,3 +4101,130 @@ a.tref:hover{background:var(--accent-soft)}
 .meta .lst{display:inline-block;min-width:0}
 /* 2.18.0 review: touch targets in the Repository area (error-report (i), the repository link) at least 44 px */
 @media (pointer:coarse){ .errhook .ib.ibl{min-height:2.75rem;margin:0} .reporow .n a{display:block;line-height:2.75rem;white-space:nowrap;align-self:flex-start;max-width:100%;min-width:2.75rem} }
+/* 2.19.0 (#653): the module Family. Cards of the Family view (the dashboard's .dcard), the kid view, shopping mode, the
+   family section of the task panel; touch targets 44 px (2.75rem) on coarse pointers */
+.fam .dgrid{grid-template-columns:repeat(auto-fill,minmax(min(100%,21rem),1fr))}
+.fam .dashhead .btn .i{color:var(--accent)}
+.flist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.125rem}
+.frow{display:flex;align-items:center;gap:.625rem;min-height:2.5rem;padding:.25rem .375rem;border-radius:var(--radius);color:var(--text);text-decoration:none;min-width:0}
+a.frow:hover,.frow a:hover{background:var(--bg3)}
+.frow .ft{display:flex;flex-direction:column;min-width:0;flex:1;color:inherit;text-decoration:none}
+.frow .ft b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.frow .ft .muted{font-size:var(--fs-s);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fem{font-size:1.25rem;line-height:1;width:1.5rem;text-align:center;flex:none}
+.fwhen{font:var(--fs-s) var(--mono);color:var(--muted);white-space:nowrap;flex:none}
+.fwhen.soon{color:var(--accent)}.fwhen.over{color:var(--danger)}
+.fweek{display:flex;flex-direction:column;gap:.125rem}
+.fday{display:flex;align-items:center;gap:.5rem;min-height:2.5rem;padding:.125rem .25rem;border-radius:var(--radius)}
+.fday.today{background:var(--accent-soft)}
+.fdl{flex:none;width:5.5rem;font-size:var(--fs-s);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fday.today .fdl{color:var(--accent);font-weight:600}
+.fdm{flex:1;display:flex;flex-wrap:wrap;gap:.25rem;min-width:0}
+.fmeal{display:inline-flex;align-items:center;gap:.125rem;background:var(--bg3);border-radius:1rem;padding:0 .125rem 0 .625rem;max-width:100%;min-width:0}
+.fmeal a{color:var(--text);text-decoration:none;overflow-wrap:anywhere;padding:.25rem 0;line-height:1.3}
+.fmeal.done a{color:var(--muted);text-decoration:line-through}
+.fmeal .iconbtn{width:2rem;height:2rem}
+.fwnav{display:inline-flex;gap:.125rem}
+.fshop{flex-wrap:wrap}
+.fshop .btn .i{color:inherit}
+.fpack{display:flex;flex-wrap:wrap;gap:.375rem}
+.kidc{border-top:1px solid var(--line);padding:.5rem 0}
+.kidc:first-of-type{border-top:0;padding-top:0}
+.kidh{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.kstars{font:600 var(--fs-b) var(--mono);color:var(--p3)}
+.kreq{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap;margin-top:.375rem;padding:.375rem .5rem;border-radius:var(--radius);background:var(--wait-soft);font-size:var(--fs-m)}
+.kreqt{flex:1 1 12rem;min-width:0}
+.kreqb{display:flex;gap:.375rem;margin-left:auto}
+.kgive{display:flex;flex-wrap:wrap;gap:.375rem;margin:.25rem 0 .75rem}
+.ocdate{display:flex;gap:.375rem;flex-wrap:wrap;flex:1;min-width:0}
+.ocdate #oc-day{width:4.5rem}.ocdate #oc-year{width:8rem}.ocdate select{flex:1;min-width:7rem}
+.famdlg .seg{margin-bottom:.5rem}
+.dltypes{margin-bottom:.5rem}
+.fage{font-size:var(--fs-s);color:var(--accent);white-space:nowrap}
+.fpeople{display:flex;flex-wrap:wrap;gap:.375rem;flex:1;min-width:0}
+.fperson{display:inline-flex;align-items:center;gap:.375rem;padding:.125rem .625rem .125rem .1875rem;border-radius:1.25rem;border:1px solid var(--line2);background:var(--bg2);min-height:2rem;max-width:100%}
+.fperson span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fperson .avatar{width:1.5rem;height:1.5rem;font-size:.625rem}
+.fperson.on{border-color:var(--accent);background:var(--accent-soft)}
+.fperson:disabled{opacity:.6;cursor:default}
+.famf .row{flex-wrap:wrap}
+.occm,.rotm{display:inline-flex;align-items:center;gap:.1875rem;color:var(--accent)}
+.fambar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:.25rem 0 .5rem}
+.fambar .muted{font-size:var(--fs-s)}
+.shopgo{font-weight:600}
+.purposes{grid-template-columns:repeat(auto-fill,minmax(12rem,1fr));margin-bottom:.75rem}
+.purposes .ptcard{cursor:pointer}
+.tpurp{margin:.5rem 0}
+.tpurp>b{display:block;font-size:var(--fs-m);margin-bottom:.375rem}
+.tpurp .purposes{grid-template-columns:1fr 1fr;margin:0}
+.tpurp .ptcard small{display:none}
+@media (pointer:coarse){
+  .frow,.fday,.fperson,.purposes .ptcard{min-height:2.75rem}
+  .fmeal .iconbtn{width:2.75rem;height:2.75rem}
+  .fmeal a,.fshop a.ft{min-height:2.75rem;display:flex;align-items:center}
+  .fshop a.ft{flex-direction:column;align-items:flex-start;justify-content:center}
+  .famdlg input:not([type="checkbox"]),.famdlg select,.sucust>summary{min-height:2.75rem}
+  .avpick .avopt{width:2.75rem;height:2.75rem}
+  .rxgrid button{min-height:2.75rem}
+}
+.dltypes .ptcard b{white-space:normal;overflow-wrap:anywhere}
+/* the kid view: big, calm, one column */
+body.kidmode #side,body.kidmode #tabs,body.kidmode #fab,body.kidmode #top .menu,body.kidmode #top .cmdbar,body.kidmode #top .tnew,body.kidmode #top .hist{display:none!important}
+body.kidmode #app{grid-template-columns:1fr}
+.kidv{max-width:40rem;margin:0 auto;padding:.5rem 0 2rem}
+.kidtop{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin:.5rem 0 1rem}
+.kidtop h2{flex:1;margin:0;font-size:var(--fs-xl)}
+.kidbal{display:inline-flex;align-items:center;gap:.375rem;padding:.375rem 1rem;border-radius:2rem;background:var(--bg3);font:700 1.5rem var(--mono);color:var(--p3)}
+.kidsec{font-size:var(--fs-l);margin:1.25rem 0 .5rem}
+.kidtasks,.kidrw{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.5rem}
+.kidtasks li,.kidrw li{display:flex;align-items:center;gap:.875rem;padding:.75rem;border-radius:var(--r-l);background:var(--bg2);border:1px solid var(--line2);min-height:4rem}
+.kidtasks li.done{opacity:.6}.kidtasks li.done .kidt b{text-decoration:line-through}
+.kidchk{flex:none;width:3.25rem;height:3.25rem;border-radius:50%;border:.1875rem solid var(--accent);display:grid;place-items:center;color:var(--accent-ink)}
+.kidchk .i{width:1.75rem;height:1.75rem}
+.kidtasks li.done .kidchk{background:var(--accent)}
+.kidt{flex:1;display:flex;flex-direction:column;min-width:0;font-size:var(--fs-l)}
+.kidt b{overflow-wrap:anywhere}
+.kidst{color:var(--p3);font-size:1.125rem;letter-spacing:.0625rem;flex:none}
+.kre{font-size:2rem;flex:none}
+.kidbtn{min-height:2.75rem;padding:0 1rem}
+.kwait{font-size:var(--fs-m);color:var(--st-wait-t);flex:none}
+.kidyay{font-size:var(--fs-l);color:var(--accent);text-align:center}
+/* shopping mode: the whole screen, big ticks, grouped by shop area */
+.modal.shopmode{padding:0;align-items:stretch;justify-content:stretch}
+.shopmode .shopcard{width:100%;max-width:none;height:100dvh;max-height:none;border-radius:0;display:flex;flex-direction:column;padding:0;overflow:hidden}
+.shophead{display:flex;align-items:center;gap:.75rem;padding:calc(.5rem + var(--safe-t)) .75rem .5rem 1rem;border-bottom:1px solid var(--line)}
+.shophead h2{display:flex;align-items:center;gap:.5rem;margin:0;font-size:var(--fs-xl);min-width:0}
+.shophead h2 span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shophead h2 .i{color:var(--accent);flex:none}
+.shopn{font:var(--fs-m) var(--mono);color:var(--muted);white-space:nowrap}
+.shopx{width:2.75rem;height:2.75rem}
+.shopadd{display:flex;gap:.5rem;padding:.625rem 1rem}
+.shopadd input{flex:1;min-height:2.75rem;font-size:var(--fs-l)}
+.shopadd .btn{min-width:2.75rem;min-height:2.75rem;justify-content:center}
+.shopbody{flex:1;overflow:auto;padding:0 1rem calc(1.5rem + var(--safe-b));-webkit-overflow-scrolling:touch}
+.shopg h3{font-size:var(--fs-m);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:1rem 0 .25rem}
+.shopg ul{list-style:none;margin:0;padding:0}
+.shopi{display:flex;align-items:center;gap:.875rem;min-height:3.5rem;border-bottom:1px solid var(--line)}
+.shopchk{flex:none;width:2.75rem;height:2.75rem;border-radius:50%;border:.1875rem solid var(--accent);display:grid;place-items:center;color:var(--accent-ink)}
+.shopchk .i{width:1.5rem;height:1.5rem}
+.shopi.done .shopchk{background:var(--accent)}
+.shopi.done .shopt{color:var(--muted);text-decoration:line-through}
+.shopt{flex:1;cursor:pointer;align-self:stretch;display:flex;align-items:center;font-size:var(--fs-l);overflow-wrap:anywhere;min-width:0}
+.shoparea{width:2.75rem;height:2.75rem;color:var(--muted)}
+.shopdone h3{margin-top:1.5rem}
+/* 2.19.0 (owner, #655): the search button next to the open drawer (phones) */
+#scrim .sidesearch{display:none}
+@media (max-width:899px){
+  body:has(#side.open) #scrim .sidesearch{display:inline-flex;align-items:center;justify-content:center;position:absolute;top:calc(.625rem + var(--safe-t));right:.5rem;width:2.75rem;height:2.75rem;border-radius:50%;background:var(--bg2);color:var(--text);box-shadow:var(--shadow)}
+}
+.fcard h2{display:flex;align-items:center;gap:.5rem;margin:0 0 .5rem;font-size:var(--fs-b);font-weight:600}
+.fcard h2 .i{color:var(--accent)}
+.fhead{margin-bottom:.75rem}
+.fcfoot{margin-top:.5rem}
+.famf .row{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:.375rem 0;min-width:0}
+.famf .row>label:first-child{width:8.5rem;flex:none;color:var(--muted);font-size:var(--fs-s)}
+.famf .row>input:not([type=checkbox]),.famf .row>.dpf{flex:1;min-width:6rem}
+.famf .row>input.numin{flex:none;width:5rem}
+.kneed{font-size:var(--fs-m);color:var(--muted);flex:none;text-align:right}
+body.kidmode #top{padding-left:1rem}
+@media (max-width:599px){ .famf .row>label:first-child{width:100%} }

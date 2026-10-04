@@ -30,7 +30,7 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 SERVER_NAME = "kalmido"
-SERVER_VERSION = "2.15.0"
+SERVER_VERSION = "2.19.0"
 PROTOCOLS = ("2025-06-18", "2025-03-26", "2024-11-05")
 WAIT_MAX = 60
 ATT_CAP_DEFAULT = 5 * 1024 * 1024    # 2.13.1 (#465): get_attachment returns at most this many bytes (base64 in the answer)
@@ -146,6 +146,14 @@ TASK_FIELDS = {
     # 2.18.0 (#430): milestones are tasks; a task belongs to at most one milestone of its own list (e.g. a release / version)
     "milestone": {"type": "boolean", "description": "2.18.0: the task is a milestone (a diamond with a date, top level, no subtasks)"},
     "milestone_id": {"type": ["integer", "null"], "description": "2.18.0: the milestone task (same list) this task belongs to; null = none"},
+    # 2.19.0 (#653): the module Family
+    "rotation": {"type": ["object", "null"], "description": "2.19.0: household rotation {who: [user ids sharing the list, at least 2], "
+                 "mode: done (next person after each completion) | week (every Monday)}; sets the assignee; null = none"},
+    "people": {"type": "array", "items": {"type": "integer"}, "description": "2.19.0: who comes along (user ids sharing the list): they see the "
+               "task and get its reminders"},
+    "stars": {"type": ["integer", "null"], "minimum": 0, "maximum": 50, "description": "2.19.0: stars a kid account gets for completing it (null = 1)"},
+    "family": {"type": ["object", "null"], "description": "2.19.0: birthday / anniversary {kind, name, year?, lead?} or household deadline "
+               "{kind: deadline, type, who, expires, notice, lead} data; easier: add_occasion / add_deadline"},
 }
 SUGGESTION = {"type": "object", "description": "structured tidy suggestion (lists with agent tidy 'suggest'/'auto'); "
               "a 👍 by someone who may change the task applies it",
@@ -817,21 +825,75 @@ TOOLS += [
 ]
 
 
+# 2.19.0 (#653): the module Family
+KID = {"kid_id": S_ID}
+REWARD_IN = {"title": {"type": "string", "maxLength": 200}, "cost": {"type": "integer", "minimum": 1, "maximum": 1000, "description": "stars"},
+             "emoji": {"type": "string", "maxLength": 16}, "once": {"type": "boolean", "description": "gone after one redemption"}}
+TOOLS += [
+    ("get_family", "2.19.0 (module Family): upcoming birthdays + anniversaries (with the age), household deadlines, whose turn it is in "
+                   "the rotations, the meal plan of a week (week = any day of it, default this week), the shopping lists and the kids "
+                   "you look after (stars, rewards, requests).",
+     _obj({"week": {"type": "string", "description": "YYYY-MM-DD"}}), lambda api, a: api.call("GET", "/family", _pick(a, ("week",)))),
+    ("add_occasion", "2.19.0: a birthday or anniversary as a yearly task (age from the year, reminders lead_days before and on the day, "
+                     "gift ideas as subtasks); date YYYY-MM-DD or --MM-DD; list_id default: the first Birthdays list (created when missing).",
+     _obj({"name": {"type": "string"}, "kind": {"type": "string", "enum": ["birthday", "anniversary"]}, "date": {"type": "string"},
+           "year": {"type": ["integer", "null"]}, "lead_days": {"type": "integer", "minimum": 0, "maximum": 365}, "list_id": S_ID,
+           "gifts": STRS}, ["name", "date"]),
+     lambda api, a: api.call("POST", "/family/occasions", body=_pick(a, ("name", "kind", "date", "year", "lead_days", "list_id", "gifts")))),
+    ("list_deadline_types", "2.19.0: the built-in household deadline types (passport, ID card, car inspection, insurance, contract, other) "
+                            "with their default lead days, repeat and notice period.",
+     _obj({}), lambda api, a: api.call("GET", "/family/deadline-types")),
+    ("add_deadline", "2.19.0: a household deadline task: due = expires minus notice_months, a deadline with reminders lead_days before "
+                     "and on the day; list_id default: the first Household list. Link a Paperless document in the app afterwards.",
+     _obj({"type": {"type": "string", "enum": ["passport", "id_card", "car", "insurance", "contract", "other"]}, "expires": {"type": "string"},
+           "who": {"type": "string"}, "notice_months": {"type": "integer", "minimum": 0, "maximum": 24},
+           "lead_days": {"type": "integer", "minimum": 0, "maximum": 365}, "title": {"type": "string"}, "list_id": S_ID}, ["expires"]),
+     lambda api, a: api.call("POST", "/family/deadlines", body=_pick(a, ("type", "expires", "who", "notice_months", "lead_days", "title", "list_id")))),
+    ("ingredients_to_shopping", "2.19.0: put the ingredients of a meal (the list in its notes, or items) on a shopping list; open items "
+                                "with the same name are not added twice.",
+     _obj({"task_id": S_ID, "list_id": S_ID, "items": STRS}, ["task_id"]),
+     lambda api, a: api.call("POST", f"/tasks/{int(a['task_id'])}/to-shopping", body=_pick(a, ("list_id", "items")))),
+    ("add_shop_areas", "2.19.0: make a list a shopping list and add the default shop areas (sections); a new item goes to the area it "
+                       "had last time.",
+     _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("POST", f"/lists/{int(a['list_id'])}/shop-areas")),
+    ("list_packing_templates", "2.19.0: the built-in packing list templates.", _obj({}), lambda api, a: api.call("GET", "/family/packing")),
+    ("create_packing_list", "2.19.0: a new packing list from a template (done items stay at the bottom, reusable).",
+     _obj({"template": {"type": "string", "enum": ["holiday", "pool", "daycare", "camping", "business"]}, "name": {"type": "string"}}, ["template"]),
+     lambda api, a: api.call("POST", "/family/packing", body=_pick(a, ("template", "name")))),
+    ("list_kids", "2.19.0: the kid accounts you look after (or yourself, a kid) with stars, rewards and the history.",
+     _obj({}), lambda api, a: api.call("GET", "/family/kids")),
+    ("give_stars", "2.19.0: give (or correct) a kid's stars by hand (parents).", _obj({**KID, "delta": {"type": "integer"}, "note": {"type": "string"}}, ["kid_id", "delta"]),
+     lambda api, a: api.call("POST", f"/family/kids/{int(a['kid_id'])}/stars", body=_pick(a, ("delta", "note")))),
+    ("add_reward", "2.19.0: offer a kid a reward for stars (parents).", _obj({**KID, **REWARD_IN}, ["kid_id", "title", "cost"]),
+     lambda api, a: api.call("POST", f"/family/kids/{int(a['kid_id'])}/rewards", body=_pick(a, ("title", "cost", "emoji", "once")))),
+    ("update_reward", "2.19.0: change a reward (parents).", _obj({"reward_id": S_ID, **REWARD_IN}, ["reward_id"]),
+     lambda api, a: api.call("PATCH", f"/family/rewards/{int(a['reward_id'])}", body=_pick(a, ("title", "cost", "emoji", "once")))),
+    ("delete_reward", "2.19.0: delete a reward (parents).", _obj({"reward_id": S_ID}, ["reward_id"]),
+     lambda api, a: api.call("DELETE", f"/family/rewards/{int(a['reward_id'])}")),
+    ("request_reward", "2.19.0: a kid asks for a reward it has the stars for.", _obj({"reward_id": S_ID}, ["reward_id"]),
+     lambda api, a: api.call("POST", f"/family/rewards/{int(a['reward_id'])}/request")),
+    ("decide_reward", "2.19.0: approve (the stars are taken) or decline a reward (parents).", _obj({"reward_id": S_ID, "approve": {"type": "boolean"}}, ["reward_id", "approve"]),
+     lambda api, a: api.call("POST", f"/family/rewards/{int(a['reward_id'])}/decide", body={"approve": a["approve"]})),
+]
+TOOL_MAP = {t[0]: t for t in TOOLS}
+
+
 TOOL_SCOPES = {
     "agent": ("get_agent", "react_to_chat", "set_status", "list_events", "wait_for_events", "list_jobs", "create_job", "get_job",
               "submit_proposal", "update_job", "list_chats", "chat_typing", "send_chat", "report_usage", "get_usage"),
-    "tasks:write": ("create_note", "update_note", "create_task", "update_task", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "batch_tasks",
+    "tasks:write": ("add_occasion", "add_deadline", "ingredients_to_shopping", "give_stars", "add_reward", "update_reward", "request_reward",
+                    "decide_reward", "create_note", "update_note", "create_task", "update_task", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "batch_tasks",
                     "reopen_task", "skip_occurrence", "take_task", "add_subtask", "add_dependency", "remove_dependency", "create_habit",
                     "update_habit", "check_in_habit", "shift_list_dates"),
     "comments": ("post_team_message", "edit_team_message", "delete_team_message", "react_team_message", "mark_team_chat_read", "add_comment", "react", "request_merge_approval", "update_comment", "delete_comment", "mark_news_read",
                  "delete_chat_attachment"),
-    "structure": ("set_list_columns", "create_list", "update_list", "share_list", "unshare_list", "share_list_with_group",
+    "structure": ("add_shop_areas", "create_packing_list", "set_list_columns", "create_list", "update_list", "share_list", "unshare_list", "share_list_with_group",
                   "unshare_list_from_group", "create_section", "rename_section", "reorder_sections", "rename_folder", "delete_folder",
                   "create_field", "update_field", "create_list_tag", "update_list_tag", "delete_list_tag", "create_template",
                   "update_template", "apply_template", "create_filter", "update_filter", "set_project_overview", "add_project_link",
                   "update_project_link", "delete_project_link", "reorder_project_links", "set_project_status", "add_milestone", "update_milestone",
                   "delete_milestone"),
-    "delete": ("delete_note", "delete_list", "delete_section", "delete_task", "restore_task", "empty_trash", "delete_field", "delete_template",
+    "delete": ("delete_reward", "delete_note", "delete_list", "delete_section", "delete_task", "restore_task", "empty_trash", "delete_field", "delete_template",
                "delete_filter", "delete_habit"),
     "attachments:read": ("get_attachment",),
     "attachments:write": ("upload_attachment", "delete_attachment", "upload_project_file", "delete_project_file"),

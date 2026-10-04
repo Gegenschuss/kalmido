@@ -1219,6 +1219,10 @@ with the scope it needs). The tools:
   `delete_time_entry`, `list_habits`, `create_habit`, `update_habit`, `delete_habit`, `check_in_habit`
 - News: `list_news`, `mark_news_read`
 - day plans: `get_day_plan`, `get_day_review`
+- family (2.19.0): `get_family`, `add_occasion`, `list_deadline_types`, `add_deadline`, `ingredients_to_shopping`,
+  `add_shop_areas`, `list_packing_templates`, `create_packing_list`, `list_kids`, `give_stars`, `add_reward`,
+  `update_reward`, `delete_reward`, `request_reward`, `decide_reward` (an agent is never a parent: the kid routes
+  answer 404 for it)
 - waiting on external: `set_waiting`, `clear_waiting`, `list_waiting`
 - agent channel (agent tokens only): `get_agent`, `set_status`, `list_events`, `wait_for_events`, `list_jobs`,
   `create_job`, `get_job`, `update_job`, `submit_proposal`, `list_chats`, `send_chat`, `chat_typing`, `react_to_chat`,

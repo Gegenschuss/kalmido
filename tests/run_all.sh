@@ -362,6 +362,15 @@ shard 7  # ---------------------------------------------------------------- shar
        run p2180_icons "$PY" p2180_icons_test.py
 # 2.18.0 (#651 #652): the search icon on phones, reactions at every chat message, News headings, 44 px view switch, empty edits
        run p2180_ride_ui node p2180_ride_ui.js "$KALMIDO_TEST_DATA"
+# 2.19.0 package "Family" (#653): "What do you use Kalmido for?", birthdays + anniversaries (CardDAV import against the fake
+# server in the container), household rotation, who comes along, kid accounts with stars + rewards, shopping lists with
+# areas, meal plan -> shopping list, deadlines, packing templates, API v1 + OpenAPI; then the UI in jsdom and Firefox (360 /
+# 390 / 412 / Fold touch, 1440 / 1920 mouse, axe) and the ride-alongs (heron profile pictures, the magnifier next to the open
+# drawer, "+" for more reactions in the chats)
+       run p2190_family_api "$PY" p2190_family_api_test.py "$KALMIDO_TEST_DATA"
+       run p2190_family_ui node p2190_family_ui.js "$KALMIDO_TEST_DATA"
+       run p2190_ride_ui node p2190_ride_ui.js "$KALMIDO_TEST_DATA"
+       run p2190_fixes_ui node p2190_fixes_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

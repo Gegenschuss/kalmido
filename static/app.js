@@ -118,6 +118,14 @@ const P = {
   brief: icPath('M3 7H17V16H3ZM7 7V4H13V7') + icDot(10, 11.5, 1.6),
   code: icPath('M13 6L17 10L13 14M7 6L3 10L7 14'),
   home: icPath('M3 9L10 3L17 9M5 7.5V17H15V7.5') + icDot(10, 13, 1.8),
+  // 2.19.0 (#653): the module Family
+  family: icPath('M2.5 17V15.5A3.5 3.5 0 0 1 9.5 15.5V17M11 17V16.5A2.75 2.75 0 0 1 16.5 16.5V17M6 4.5A2.5 2.5 0 1 1 6 9.5A2.5 2.5 0 0 1 6 4.5') + icDot(13.75, 10.5, 1.9),
+  cake: icPath('M4 17V11H16V17M2.5 17H17.5M4 13.5C6 15 8 12 10 13.5C12 15 14 12 16 13.5M10 11V8') + icDot(10, 5, 1.6),
+  star: icPath('M10 3L12.1 7.6L17 8.2L13.4 11.6L14.3 16.5L10 14.1L5.7 16.5L6.6 11.6L3 8.2L7.9 7.6Z'),
+  gift: icPath('M3 8H17V11H3ZM4.5 11V17H15.5V11M10 8V17M10 8C8.5 4.5 5.5 4.5 6 7M10 8C11.5 4.5 14.5 4.5 14 7'),
+  meal: icPath('M4 9.5H16V12A4 4 0 0 1 12 16H8A4 4 0 0 1 4 12ZM2.5 9.5H17.5M7.5 6.5V5M12.5 6.5V5') + icDot(10, 4.5, 1.6),
+  bag: icPath('M3 7H17V16.5H3ZM7.5 7V4.5H12.5V7M7 7V16.5M13 7V16.5'),
+  turns: icPath('M4.5 10A5.5 5.5 0 0 1 14.5 6.5M15.5 10A5.5 5.5 0 0 1 5.5 13.5M12.5 4L14.5 6.5L12 8.5M7.5 16L5.5 13.5L8 11.5') + icDot(10, 10, 1.6),
 };
 const ic = (n, c = '') => `<svg class="i ${c}" viewBox="0 0 20 20" aria-hidden="true">${P[n] || ''}</svg>`;
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
@@ -393,7 +401,7 @@ const S = {
   calMode: LS.get('calMode', 'month'), tlStart: null, quickPreset: {}, editContent: false,
   tl: {id: null}, drafts: {}, cfiles: {}, cedit: null, editLink: false,  // comments timeline of the open task
 };
-const FEATS = [['cal', N_('Calendar')], ['timeline', N_('Timeline')], ['matrix', N_('Eisenhower matrix')], ['habits', N_('Habits')], ['pomo', N_('Focus (Pomodoro)')], ['kanban', N_('Kanban')], ['paperless', N_('Paperless link')], ['collab', N_('Collaboration')], ['stats', N_('Statistics')], ['time', N_('Time tracking')], ['progress', N_('Project progress')], ['deps', N_('Dependencies')], ['fields', N_('Custom fields')], ['agents', N_('Agents')], ['comments', N_('Comments')]];
+const FEATS = [['cal', N_('Calendar')], ['timeline', N_('Timeline')], ['matrix', N_('Eisenhower matrix')], ['habits', N_('Habits')], ['pomo', N_('Focus (Pomodoro)')], ['kanban', N_('Kanban')], ['paperless', N_('Paperless link')], ['collab', N_('Collaboration')], ['stats', N_('Statistics')], ['time', N_('Time tracking')], ['progress', N_('Project progress')], ['deps', N_('Dependencies')], ['fields', N_('Custom fields')], ['agents', N_('Agents')], ['comments', N_('Comments')], ['family', N_('Family')]];
 const FEAT_DESC = {deps: N_('“Waiting on” in the task details, arrows and linking in the timeline, what is stuck in the overview, a notice when a task is unblocked'),
   fields: N_('Own fields per list (text, number, selection, date, person, link), as columns and in the task details'),collab: N_('Comments, activity history, @mentions, News, sharing lists and assigning tasks'), stats: N_('Completed tasks, on-time rate, overdue trend, focus time and habit streaks'),
   time: N_('Timer on tasks, manual entries, reports per list and task, CSV export and a printable timesheet'),
@@ -413,14 +421,40 @@ const tlForeign = t => !!t && collab() && S.tl.id === t.id ? (S.tl.activity || [
 // admins: a newer release was found by the server's daily update check (dot on the settings gear)
 const updDot = () => !!(S.me?.is_admin && S.about?.available);
 // module views: tasks always, News with the collaboration module, the overview with "progress" (see overviewOn), the rest by their own switch
-const modOn = m => m === 'tasks' || m === 'home' || m === 'notes' || (m === 'team' ? teamOn() : m === 'agents' ? agentsOn() : m === 'news' ? collab() : m === 'overview' ? overviewOn() : m === 'time' ? timeOn() : feat(m));
+const modOn = m => m === 'tasks' || m === 'home' || m === 'notes' || (m === 'team' ? teamOn() : m === 'agents' ? agentsOn() : m === 'news' ? collab() : m === 'overview' ? overviewOn() : m === 'time' ? timeOn() : m === 'family' ? feat(m) || !!S.me?.kid : feat(m));
 // no "+" button on views without tasks
 // views of the tasks module that are not a task list (no quick add, no selection, no open-count)
 const NOLIST_KEYS = ['done', 'trash', 'search', 'archived'];
 // 2.0.6 (#188): tablets in portrait (phone layout, but >= 600 x 600 px) get the docked composer of the desktop instead of
 // the "+" button wherever a view has one; phones keep the "+"
-const tabletDock = () => isMobile() && matchMedia('(min-width:600px) and (min-height:600px)').matches;
-const noFab = () => ['habits', 'pomo', 'news', 'stats', 'time', 'overview', 'agents', 'team', 'notes'].includes(S.route.mod) || NOLIST_KEYS.includes(S.route.key) || isOverview();
+// 2.19.0 (#669, a regression of 2.7.2): the tablet layout with the docked "Add task" bar (600-899 px wide, 600 px high) is
+// decided on the height WITHOUT the on-screen keyboard. With interactive-widget=resizes-content the keyboard shrinks the
+// layout height below 600 px (an unfolded Fold in portrait), the bar flipped to the phone layout, was hidden and took
+// the focus (and the keyboard) with it. The height is taken while nothing is being typed, or when the width changes.
+const TD = {on: null, w: -1};
+function tdockSync() {
+  if (TD.on === null || innerWidth !== TD.w || !editFocused()) { TD.on = matchMedia('(min-width:600px) and (min-height:600px)').matches; TD.w = innerWidth; }
+  const on = isMobile() && TD.on;
+  document.documentElement.classList.toggle('tdock', on);
+  return on;
+}
+const tabletDock = () => tdockSync();
+window.addEventListener('resize', tdockSync);
+tdockSync();
+// 2.19.0 (#669): typing in the docked "Add task" bar (it sticks to the bottom of the scrolling list) must not move the
+// list. Chrome reveals the caret of a sticky field by scrolling its scroll container, a line per key on a short visible
+// area (Fold unfolded with the keyboard up). The list's position is taken before each key and put back right after.
+const QS = {top: null, at: 0};
+document.addEventListener('beforeinput', e => {
+  if (e.target?.id !== 'qinput' || !e.target.closest('.qdock')) return;
+  const v = document.getElementById('view'); if (v) { QS.top = v.scrollTop; QS.at = Date.now(); }
+}, true);
+document.addEventListener('scroll', e => {
+  const v = document.getElementById('view');
+  if (e.target !== v || QS.top == null || Date.now() - QS.at > 400 || document.activeElement?.id !== 'qinput') return;
+  if (Math.abs(v.scrollTop - QS.top) > 1) v.scrollTop = QS.top;
+}, true);
+const noFab = () => ['habits', 'pomo', 'news', 'stats', 'time', 'overview', 'agents', 'team', 'notes', 'family'].includes(S.route.mod) || NOLIST_KEYS.includes(S.route.key) || isOverview();
 // package 3: progress bar / overview (switch "progress"), project status (+ collaboration), custom fields, dependencies
 // 2.13.0 (#453, Fold screenshots): the round + only on phones; tablets / an unfolded Fold add with the docked "Add task"
 // bar or, in views without it (calendar, Kanban, timeline), the header's "New task" button
@@ -773,6 +807,7 @@ function applyState(j) {
   S.proposers = j.proposers || [];  // 2.3.0: agents I may ask for a proposal
   S.groups = j.groups || []; S.myGroups = j.my_groups || [];  // 2.10.0 (#441)
   S.dayplan = j.dayplan || {work_start: '09:00', work_end: '17:00', review_time: '', default_duration: 30};  // 2.10.0 (#440)
+  S.kids = j.kids || []; S.kidIds = new Set(j.kid_ids || []);  // 2.19.0 (#653)
   // language changed on another device: switch once its file is loaded (the boot awaits it itself)
   if (S.booted && (j.settings.lang || 'en') !== I18N.code) i18nLoad(j.settings.lang).then(ok => { if (ok) render(); });
 }
@@ -857,6 +892,7 @@ function staleDraw() {
 }
 document.addEventListener('visibilitychange', async () => {
   if (!document.hidden && !editing()) { try { await load(); render(); } catch { /* offline */ } }
+  if (!document.hidden) wpSweep();  // 2.19.0 (#668)
 });
 // 2.12.2 (#451, #453 B2/B3): live updates wait while someone types ANYWHERE: the task panel, the add sheet, dialogs and
 // popovers as before, plus any other focused field (Kanban "+ Task", search, inline editors; only an empty "Add task" box
@@ -942,13 +978,14 @@ function parseHash() {
   if (a === 'today' && b === 'review') return {mod: 'tasks', key: 'today', review: true};  // 2.10.0 (#440): push "Daily review"
   if (a === 'folder' && b) return {mod: 'tasks', key: 'folder:' + h.slice(7)};  // 2.4.0: a path has a slash
   if (a === 'agents') return {mod: 'agents', key: 'agents', agent: +b || null};
-  if (['cal', 'matrix', 'habits', 'pomo', 'news', 'stats', 'time', 'overview'].includes(a)) return {mod: a, key: a};
+  if (['cal', 'matrix', 'habits', 'pomo', 'news', 'stats', 'time', 'overview', 'family'].includes(a)) return {mod: a, key: a};
   if (SMART[a]) return {mod: 'tasks', key: a};
   return {mod: 'tasks', key: START_KEY};
 }
 function go(hash) { if (location.hash !== '#' + hash) location.hash = hash; else route(); }
 async function route() {
   const r = parseHash();
+  if (S.me?.kid && r.mod !== 'family' && !r.complete && !r.snooze) { r.mod = 'family'; r.key = 'family'; }  // 2.19.0 (#653): a kid's home
   if (!modOn(r.mod)) {  // e.g. the "News" app shortcut while collaboration is off
     const off = r.mod;
     if (S.booted && (off === 'news' || off === 'stats' || off === 'time' || off === 'overview')) setTimeout(() => toast(off === 'news' ? tr('News are part of collaboration, which is off (Settings > Modules)') : off === 'time' ? tr('Time tracking is off (Settings > Modules)') : off === 'overview' ? tr('The overview needs “Project progress” (Settings > Modules) and at least two lists') : tr('Statistics are off (Settings > Modules)')), 50);
@@ -1607,6 +1644,9 @@ function render() {
   const sk = $('#skip'); if (sk && sk.textContent !== tr('Skip to content')) sk.textContent = tr('Skip to content');  // 2.13.0 (#453 A9)
   document.body.classList.toggle('in-chat', chatFull() && S.route.mod === 'agents' && !!S.route.agent);  // 2.13.0 (#453 P11)
   document.body.classList.toggle('in-team', S.route.mod === 'team');  // 2.17.0 (#419): the conversation fills the view, only its messages scroll
+  document.body.classList.toggle('kidmode', !!S.me?.kid);  // 2.19.0 (#653): a kid's simple view (no sidebar, tab bar, + button)
+  sideSearchSync(); badgeSync();
+  if (S.shop) shopDraw();  // 2.19.0: shopping mode follows every reload (the app's own poll included)
   fitLayout(true); renderSide(); renderTop(); renderView(); renderTabs();
   $('#fab').innerHTML = ic('plus'); $('#fab').setAttribute('aria-label', tr('New task')); $('#fab').title = kt(tr('New task'), 'n');
   fabSync();
@@ -1618,7 +1658,7 @@ function render() {
 // "New task" is there (tablets, an unfolded Fold in portrait)
 function fabSync() { const f = $('#fab'); if (f) f.classList.toggle('gone', fabOff() || S.multi.size > 0 || (!!$('#view .qdock') && (tabletDock() || !isMobile()))); }
 window.addEventListener('resize', () => { if (S.booted) requestAnimationFrame(fabSync); });
-const MODS = [['tasks', 'done', N_('Tasks')], ['cal', 'cal', N_('Calendar')], ['matrix', 'grid', N_('Matrix')], ['habits', 'habit', N_('Habits')], ['pomo', 'timer', N_('Focus')]];
+const MODS = [['tasks', 'done', N_('Tasks')], ['cal', 'cal', N_('Calendar')], ['matrix', 'grid', N_('Matrix')], ['habits', 'habit', N_('Habits')], ['pomo', 'timer', N_('Focus')], ['family', 'family', N_('Family')]];
 // tab bar / rail order is a server setting (same on every device), editable in the settings
 function navOrder() {
   const keys = MODS.map(m => m[0]);
@@ -1756,7 +1796,7 @@ function renderSide() {
     const n = fl.reduce((a, l) => a + (c.lists[l.id] || 0), 0);
     const active = fl.some(l => onTasks && k === 'l:' + l.id);
     const fon = onTasks && k === 'folder:' + f;  // 1.5.2: the name opens the folder view, the rest of the row folds
-    return {closed, html: `<div class="fhead ${sub ? 'fsub' : ''} ${closed ? 'closed' : ''} ${(active && closed) || fon ? 'on' : ''}" data-act="folder-toggle" data-folder="${esc(f)}" aria-expanded="${!closed}" ${isMobile() || S.listReorder ? '' : 'draggable="true"'}>${ic('chev', 's fcar')}${ic('folder', 's')}<span class="n ${S.listReorder ? '' : 'fgo'}" ${S.listReorder ? '' : `data-go="${esc(keyToHash('folder:' + f))}" title="${esc(tr('Open {0}', fDisp(f)))}"`}>${esc(fName(f))}</span>${S.listReorder
+    return {closed, html: `<div class="fhead ${sub ? 'fsub' : ''} ${closed ? 'closed' : ''} ${(active && closed) || fon ? 'on' : ''}" data-act="folder-toggle" data-folder="${esc(f)}" ${isMobile() || S.listReorder ? '' : 'draggable="true"'}>${ic('chev', 's fcar')}${ic('folder', 's')}<span class="n ${S.listReorder ? '' : 'fgo'}" ${S.listReorder ? '' : `data-go="${esc(keyToHash('folder:' + f))}" title="${esc(tr('Open {0}', fDisp(f)))}"`}>${esc(fName(f))}</span><span class="sr">${esc(closed ? tr('folded') : tr('unfolded'))}</span>${S.listReorder
       ? `<button class="iconbtn" data-fmove="-1" data-folder="${esc(f)}" title="${tr('move up')}">${ic('chev', 's up')}</button><button class="iconbtn" data-fmove="1" data-folder="${esc(f)}" title="${tr('move down')}">${ic('chev', 's')}</button>`
       : `<span class="c">${closed && n ? n : ''}</span><button class="iconbtn fmenu" data-act="folder-menu" data-folder="${esc(f)}" title="${tr('Folder')}" aria-label="${esc(tr('Folder') + ' ' + fDisp(f))}">${ic('dots', 's')}</button>`}</div>`};
   };
@@ -1791,6 +1831,7 @@ function renderSide() {
     feat('pomo') ? mrow('pomo', 'timer', tr('Focus (Pomodoro)'), S.pomo ? '<span class="c"><span class="recdot"></span></span>' : '') : '',
     timeOn() ? mrow('time', 'clock', tr('Time tracking'), S.timer ? '<span class="c"><span class="recdot"></span></span>' : '') : '',
     feat('stats') ? mrow('stats', 'chart', tr('Statistics')) : '',
+    famOn() ? mrow('family', 'family', tr('Family'), (S.kids || []).some(k => (k.requests || 0) > 0) ? `<span class="c nunread">${(S.kids || []).reduce((n, k) => n + (k.requests || 0), 0)}</span>` : '') : '',
     overviewOn() ? mrow('overview', 'pulse', tr('Overview'), `<span class="c ${ovProblems() ? 'over' : ''}">${ovProblems() || ''}</span>`, `title="${esc(tr('Where is it stuck?'))}"`) : '',
     feat('agents') && agentsOn() ? mrow('agents', 'bot', tr('Agents'), `<span class="c ${aw ? 'nunread' : ''}">${aw || ''}</span>`) : ''].join('');
   // Team: the people I share lists with (their tasks) and the agents (status dot; a click opens the chat)
@@ -1853,8 +1894,8 @@ $('#skip')?.addEventListener('click', skipToContent);
 function renderTop() { return keepFocus($('#top'), renderTop0); }
 function renderTop0() {
   const m = S.route.mod, k = S.route.key;
-  const MT = {cal: N_('Calendar'), matrix: N_('Eisenhower matrix'), habits: N_('Habits'), pomo: N_('Focus'), news: N_('News'), stats: N_('Statistics'), time: N_('Time tracking'), overview: N_('Where is it stuck?'), agents: N_('Agents'), team: N_('Team chat'), home: N_('Dashboard')};
-  let title = m === 'tasks' ? titleFor(k) : m === 'notes' ? tr('Notes') + ' · ' + (lname(listById(S.nt.lid)) || '') : MT[m] ? tr(MT[m]) : '';
+  const MT = {cal: N_('Calendar'), matrix: N_('Eisenhower matrix'), habits: N_('Habits'), pomo: N_('Focus'), news: N_('News'), stats: N_('Statistics'), time: N_('Time tracking'), overview: N_('Where is it stuck?'), agents: N_('Agents'), team: N_('Team chat'), home: N_('Dashboard'), family: N_('Family')};
+  let title = m === 'tasks' ? titleFor(k) : m === 'notes' ? tr('Notes') + ' · ' + (lname(listById(S.nt.lid)) || '') : m === 'family' && S.me?.kid ? tr('My day') : MT[m] ? tr(MT[m]) : '';
   if (m === 'matrix' && mxTitle()) title = `${tr('Matrix')} · ${mxTitle()}`;
   let acts = '';
   if (m === 'tasks' && (k.startsWith('l:') || k === 'inbox')) {
@@ -1986,6 +2027,8 @@ function topFolded() {
 // UX1 (U01, owner decision 4): the header's "…" menu. Phones: "Undo: …" / "Redo: …" first (no ← → there), then the rarer
 // view actions (select, sort), then the list's own menu or the filter
 function topMoreItems() {
+  if (S.me?.kid) return [{label: tr('Account'), icon: 'user', fn: () => settingsModal('account')}, {label: tr('Settings'), icon: 'gear', fn: () => settingsModal()},
+    ...(S.me?.auth === 'session' ? ['-', {label: tr('Log out'), icon: 'logout', fn: logout}] : [])];  // 2.19.0: a child's "…": its account only
   const m = S.route.mod, k = S.route.key, fold = topFolded(), out = [], sec = [];
   if (isMobile()) for (const dir of ['undo', 'redo']) { const b = histBtn(dir); out.push({label: b.lab, icon: dir, dis: b.off, cls: 'hmi' + (b.p ? ' pend' : ''), title: b.p ? tr('waiting for the connection') : '', fn: () => histStep(dir)}); }
   if (m === 'tasks' && !NOLIST_KEYS.includes(k) && !isKanban() && !isTimeline() && !isRoadmap() && !isOverview())
@@ -2147,6 +2190,7 @@ function renderView0() {
   else if (m === 'team') { setHtml(el, viewTeam()); if (S.tc.fitUntil > Date.now()) teamFit(true); }  // 2.17.0 (#419); 2.17.2: a room opened by its address ends at the newest message
   else if (m === 'notes') setHtml(el, viewNotes());  // 2.17.0 (#442)
   else if (m === 'home') setHtml(el, viewHome());  // 2.17.0 (#475)
+  else if (m === 'family') setHtml(el, viewFamily());  // 2.19.0 (#653)
   else if (S.route.key === 'search') setHtml(el, viewSearch());
   else if (S.route.key === 'done' || S.route.key === 'trash') setHtml(el, viewHistory());
   else if (S.route.key === 'archived') setHtml(el, viewArchived());
@@ -2188,6 +2232,8 @@ function taskRow(t, opts = {}) {
   if (t.ttype && !opts.trash && ticketsOn(t.list_id)) meta.push(ttChip(t));  // 2.4.0 (#340)
   if (isMs(t)) meta.push(`<span class="msm${t.due ? ' sr' : ''}">${t.due ? esc(tr('Milestone')) : `<i class="msd" aria-hidden="true"></i>${esc(tr('Milestone without a date'))}`}</span>`);  // 2.18.0 (#430)
   else if (t.milestone_id && !opts.trash && !opts.subRow) meta.push(msChip(t));
+  if (isOcc(t) && famOn() && t.status === 0 && occWhat(t)) meta.push(`<span class="occm">${ic('cake', 's')}${esc(occWhat(t))}</span>`);  // 2.19.0 (#653)
+  if (t.rotation?.who?.length > 1 && famOn() && t.status === 0 && !opts.trash) meta.push(`<span class="rotm" title="${esc(tr('Takes turns'))}">${ic('turns', 's')}<span class="sr">${esc(tr('Takes turns'))}</span></span>`);
   if (t.context) meta.push(`<span class="ctxm" title="${esc(tr('The main task of a subtask assigned to you: read-only, without notes, files and comments'))}">${ic('sub', 's')}${tr('Context')}</span>`);
   // 2.0.4 (#308): "Ready to start" only when the view has dependencies at all (see renderList); a button: tap / click
   // explains where it comes from (toast), without opening the task
@@ -2622,6 +2668,7 @@ function viewListBody() {
   for (const g of groups) {
     if (g.sub && g.sub !== lastSub) h += `<div class="fsubhd" data-go="${esc(keyToHash('folder:' + g.sub))}" role="link" tabindex="0">${ic('folder', 's')}<span>${esc(fName(g.sub))}</span></div>`;
     lastSub = g.sub || lastSub;
+    if (rl?.family === 'shopping' && famOn() && g.section && !g.tasks.length) continue;  // 2.19.0 (#653): only areas with items
     const closed = S.collapsed.has(g.id);
     const sadd = g.section !== undefined && !ro && v.list && canAddTo(v.list);
     if (g.name) h += `<div class="group"><div class="ghead ${g.cls || ''} ${closed ? 'closed' : ''}" data-act="collapse" data-key="${g.id}" ${g.section !== undefined ? `data-section="${g.section ?? ''}"` : ''}>${g.section && !ro ? secHandle(g.section) : ''}${ic('chev', 's')}${g.img ? `<img class="gicon" src="${esc(g.img)}" alt="">` : g.color ? `<span class="gsw" style="background:${cssColor(g.color)}"></span>` : ''}${esc(g.name)} <span class="c">${g.tasks.length}</span>${sadd ? `<button class="iconbtn gact gadd" data-act="sec-add" data-sec="${g.section || 0}" title="${esc(tr('Add a task to {0}', g.name))}" aria-label="${esc(tr('Add a task to {0}', g.name))}">${ic('plus', 's')}</button>` : ''}${g.section && !ro ? `<button class="iconbtn gact" data-act="section-menu" data-id="${g.section}" title="${esc(tr('More') + ': ' + g.name)}" aria-label="${esc(tr('More') + ': ' + g.name)}">${ic('dots', 's')}</button>` : ''}</div>`;
@@ -2633,6 +2680,8 @@ function viewListBody() {
     if (!closed && g.section !== undefined && !g.tasks.length && !ro) h += `<div class="sdrop" data-section="${g.section ?? ''}">${tr('Drop tasks here')}</div>`;  // shown while a task is dragged
     if (g.name) h += '</div>';
   }
+  // 2.19.0 (#667): the end of a list takes a dragged task into a new section
+  if (rl && !ro && !rl.is_inbox && total && canEditList(rl.id)) h += `<div class="sdrop snew" data-newsec="1">${ic('plus', 's')}<span>${tr('New section')}</span></div>`;
   if (cut) h += `<div class="rowmore"><button type="button" class="btn" data-act="rows-more">${ic('down', 's')}${esc(trn('Show {0} more task', 'Show {0} more tasks', Math.min(cut, ROW_CAP)))}</button><span class="muted">${esc(trn('{0} task not shown yet', '{0} tasks not shown yet', cut))}</span></div>`;
   if (v.list && !ro) h += `<button class="iconbtn" data-act="section-new" style="margin:.375rem 0 0 -.25rem">${ic('plus', 's')} ${tr('Section')}</button>`;
   if (ck) {  // 2.7.2 (#414) "Show completed at the bottom" (was the checklist type): done items stay below in "Done" (open by
@@ -4676,6 +4725,7 @@ async function pomoStart(taskId) {
 // ------------------------------------------------------------------ detail panel
 let saveTimers = {};
 function openDetail(id) {
+  if (S.me?.kid) return;  // 2.19.0: a child ticks in its own view, no task panel
   const other = S.sel !== id;
   if (other) { S.editLink = false; S.cedit = null; S.mp = null; recentPush('t', id); wpOpened(id); }
   S.sel = id; S.editContent = false;
@@ -4859,7 +4909,7 @@ try {
 function taskById(id) { return S.tasks.get(id) || (S.extra || []).find(t => t.id === id); }
 // 2.0.6 (#316 / #322): the task panel below the title and the description, top to bottom; the comments and
 // the history come last, the comment box stays at the bottom edge of the panel (sticky, see cmComposer())
-const DETAIL_ORDER = ['subtasks', 'deps', 'tags', 'attachments', 'paperless', 'fields', 'custom', 'time', 'code', 'history', 'comments'];  // code: 2.2.0 (#271)  // history: private lists only (2.0.7)
+const DETAIL_ORDER = ['family', 'subtasks', 'deps', 'tags', 'attachments', 'paperless', 'fields', 'custom', 'time', 'code', 'history', 'comments'];  // code: 2.2.0 (#271)  // history: private lists only (2.0.7)
 // 2.7.2 (#424): where a task lives, at the top of its panel: Folder › List › Section › (parent task). Every part jumps
 // there (the list, scrolled to the section / the parent) and closes the bell's dropdown. Only lists the viewer has.
 function crumbsHtml(t, l, parent) {
@@ -4949,8 +4999,8 @@ function renderDetail0() {
   const msTog = !t.context && (msT || (isProject(t.list_id) && !t.parent_id && !kids.length && t.id > 0));
   // 2.0.6 (#316 / #322): the order of the sections below the description, in one place
   const SEC = {
-    subtasks: ck || msT ? '' : `<div class="dsec subsec"><h5>${tr('Subtasks')}</h5><div class="subs">${kids.map(k => taskRow(k, {compact: true, subRow: true})).join('')}
-        ${ro ? '' : depthOf(t) < 2 ? `<div class="subadd">${ic('plus', 's')}<input id="d-sub" placeholder="${tr('Add subtask')}" aria-label="${esc(tr('Add subtask'))}" enterkeyhint="done"></div>` : `<div class="muted" style="font-size:var(--fs-s);padding:.25rem">${tr('At most 3 levels')}</div>`}</div></div>`,
+    subtasks: ck || msT ? '' : `<div class="dsec subsec"><h5>${isOcc(t) && famOn() ? tr('Gift ideas') : tr('Subtasks')}</h5><div class="subs">${kids.map(k => taskRow(k, {compact: true, subRow: true})).join('')}
+        ${ro ? '' : depthOf(t) < 2 ? `<div class="subadd">${ic('plus', 's')}<input id="d-sub" placeholder="${isOcc(t) && famOn() ? tr('Add a gift idea') : tr('Add subtask')}" aria-label="${esc(isOcc(t) && famOn() ? tr('Add a gift idea') : tr('Add subtask'))}" enterkeyhint="done"></div>` : `<div class="muted" style="font-size:var(--fs-s);padding:.25rem">${tr('At most 3 levels')}</div>`}</div></div>`,
     comments: cm === 'full' ? `<div class="dsec cmsec ${cmtNew() ? 'cmnew' : ''}" id="d-tl">${timelineHtml(t)}</div>` : '',
     history: hist ? `<details class="dsec cmsec cmro" id="d-hist"><summary><span>${tr('History')}</span></summary><div class="cms" id="d-hist-items">${S.tl.id === t.id ? histItems() : `<div class="muted cmempty">${tr('Loading…')}</div>`}</div></details>` : '',
     deps: ck ? '' : `${t.id > 0 && dFor(t) && !t.context ? `<div class="dsec depsec" id="d-deps">${depsHtml(t)}</div>` : ''}`,
@@ -4972,7 +5022,8 @@ function renderDetail0() {
       </div>`,
     custom: ck ? '' : `${fieldsOf(t.list_id).length ? `<div class="dsec cfsec"><h5>${tr('Fields')}</h5><div class="fields cf">${fieldsOf(t.list_id).map(f => fieldEditor(f, t, ro)).join('')}</div></div>` : ''}`,
     time: ck ? '' : `${tFor(t) && t.id > 0 && !t.context ? `<div class="dsec tesec" id="d-time">${taskTimeHtml(t)}</div>` : ''}`,
-    code: ck ? '' : codeHtml(t)};
+    code: ck ? '' : codeHtml(t),
+    family: ck ? '' : famDetailHtml(t, l, ro)};  // 2.19.0 (#653)
   setHtml($('#detail'), `
     <div class="dtop">
       <button class="iconbtn back" data-act="close-detail" aria-label="${tr('Back')}">${ic('back')}</button>
@@ -5301,6 +5352,7 @@ async function newsReadAll() {
 }
 async function newsRead(body) {
   wpCloseLocal(body.all ? (S.nf.items || []).map(x => x.task_id) : (S.nf.items || []).filter(x => (x.ids || []).some(i => (body.ids || []).includes(i))).map(x => x.task_id));
+  if (body.all) wpSweep(null, true);  // 2.19.0 (#668): "Mark all as read" closes every notification (here; the server the others)
   try {
     const j = await rawFetch('POST', '/api/news/read', body);
     S.news = {unread: j.unread, sig: j.sig}; S.nf.sig = j.sig;
@@ -6789,6 +6841,12 @@ function dpOpen(anchor, o) {
   dpPlace();
   el.addEventListener('keydown', dpKey);
   el.addEventListener('click', dpClick);
+  el.addEventListener('change', e => {
+    if (!e.target.classList.contains('dpy') || !DP.st) return;
+    let c = `${e.target.value}-${DP.st.cur.slice(5, 7)}-01`;
+    if (DP.st.min && c < DP.st.min.slice(0, 7) + '-01') c = DP.st.min; if (DP.st.max && c > DP.st.max) c = DP.st.max.slice(0, 7) + '-01';
+    DP.st.cur = c; dpDrawDate(); $('.dpy', DP.el)?.focus();
+  });
   el.addEventListener('input', e => { if (e.target.id === 'dp-tin') e.target.classList.toggle('bad', parseHM(e.target.value) === null); });
   setTimeout(() => (o.kind === 'date' ? $('.dpg [tabindex="0"]', el) : $('#dp-tin', el))?.focus(), 20);
   return el;
@@ -6816,9 +6874,14 @@ function dpDrawDate() {
     rows += `<div role="row" class="dpr">${cells}</div>`;
     if (w >= 3 && pd(addDays(start, w * 7 + 7)).getMonth() !== m - 1) break;
   }
-  el.innerHTML = `<div class="dph"><button type="button" class="iconbtn" data-dm="-1" aria-label="${tr('Previous month')}">${ic('left')}</button><span class="dpt" id="dp-t" aria-live="polite">${MON[m - 1]} ${y}</span><button type="button" class="iconbtn" data-dm="1" aria-label="${tr('Next month')}">${ic('right')}</button></div>
+  el.innerHTML = `<div class="dph"><button type="button" class="iconbtn" data-dm="-1" aria-label="${tr('Previous month')}">${ic('left')}</button><span class="dpt"><span id="dp-t" aria-live="polite">${MON[m - 1]}<span class="sr"> ${y}</span></span> <select class="dpy" data-native aria-label="${esc(tr('Year'))}">${dpYears(y).map(n => `<option value="${n}" ${n === y ? 'selected' : ''}>${n}</option>`).join('')}</select></span><button type="button" class="iconbtn" data-dm="1" aria-label="${tr('Next month')}">${ic('right')}</button></div>
     <div class="dpg" role="grid" aria-labelledby="dp-t"><div role="row" class="dpr dpwd">${order.map(i => `<span role="columnheader" aria-label="${esc(WDL[i])}">${esc(WD[i])}</span>`).join('')}</div>${rows}</div>
     <div class="dpf"><button type="button" class="btn sm" data-dq="today" ${ok(t0) ? '' : 'disabled'}>${tr('Today')}</button>${st.clear === false ? '' : `<button type="button" class="btn sm" data-dq="clear">${tr('No date|clear')}</button>`}<span class="spacer"></span><button type="button" class="btn sm" data-dq="close">${tr('Cancel')}</button></div>`;
+}
+// 2.19.0: the year is a select in the title (a passport that runs out in 10 years: one choice, not 120 taps)
+function dpYears(y) {
+  const st = DP.st, t = new Date().getFullYear(), lo = Math.max(st.min ? +st.min.slice(0, 4) : 1900, Math.min(y, t) - 10), hi = Math.min(st.max ? +st.max.slice(0, 4) : 2200, Math.max(y, t) + 12);
+  return [...Array(Math.max(0, hi - lo + 1))].map((_, i) => lo + i);
 }
 function dpDrawTime() {
   const st = DP.st, el = DP.el, cur = st.sel || '', [ch, cm] = cur ? cur.split(':').map(Number) : [-1, -1], h12 = hour12();
@@ -6860,7 +6923,7 @@ function dpKey(e) {
   const st = DP.st; if (!st) return;
   if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); dpClose(true); return; }
   if (e.key === 'Tab') {  // stay inside the popover
-    const f = $$('button:not([disabled]),input', DP.el).filter(x => x.tabIndex >= 0); if (!f.length) return;
+    const f = $$('button:not([disabled]),input,select', DP.el).filter(x => x.tabIndex >= 0); if (!f.length) return;
     if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
     else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
     return;
@@ -6962,7 +7025,7 @@ function taskMenu(anchor, id) {
     {label: t.pinned ? tr('Unpin') : tr('Pin'), icon: 'pin', fn: () => patchTask(id, {pinned: t.pinned ? 0 : 1})},
     // 2.16.0 (#473, WCAG 2.5.7): what dragging does, as menu items (also Alt+↑ / ↓)
     ...(t.status === 0 && t.id > 0 && S.route.mod === 'tasks' && $(`#view .trow[data-id="${id}"]`) ? [{row: [{label: tr('Move up'), icon: 'up', title: kt(tr('Move up'), 'Alt+ArrowUp'), fn: () => taskNudge(id, -1)}, {label: tr('Move down'), icon: 'down', title: kt(tr('Move down'), 'Alt+ArrowDown'), fn: () => taskNudge(id, 1)}]}] : []),
-    ...(t.status === 0 && !t.parent_id && S.sections.some(x => x.list_id === t.list_id) ? [{label: tr('Move to section…'), icon: 'columns', fn: () => sectionPicker(anchor, id)}] : []),
+    ...(t.status === 0 && !t.parent_id && (S.sections.some(x => x.list_id === t.list_id) || canEditList(t.list_id)) ? [{label: tr('Move to section…'), icon: 'columns', fn: () => sectionPicker(anchor, id)}] : []),
     {label: tr('Snooze…'), icon: 'clock', keys: 's', fn: () => snoozeSheet(id, anchor)},
     ...(t.status === 0 ? [t.waiting_at ? {label: tr('No longer waiting'), icon: 'hourglass', fn: () => waitClear(id)}
       : {label: tr('Waiting on external…'), icon: 'hourglass', fn: () => waitDialog(id)}] : []),
@@ -7080,10 +7143,11 @@ function modalA11y(m) {
   const prev = document.activeElement;
   m.addEventListener('keydown', e => {
     if (e.key !== 'Tab' || e.defaultPrevented) return;
-    const f = focusables(m); if (!f.length) { e.preventDefault(); return; }
-    const a = document.activeElement;
-    if (e.shiftKey && (a === f[0] || !m.contains(a))) { e.preventDefault(); f[f.length - 1].focus(); }
-    else if (!e.shiftKey && (a === f[f.length - 1] || !m.contains(a))) { e.preventDefault(); f[0].focus(); }
+    const f = focusables(m).filter(x => x.tabIndex >= 0 || x === document.activeElement); e.preventDefault(); if (!f.length) return;
+    // 2.19.0: the dialog moves the focus itself (DOM order, wraps): after an earlier dialog was removed, Firefox's own
+    // navigation could start from a stale point and bounce between two buttons or leave the dialog
+    const i = f.indexOf(document.activeElement);
+    (i < 0 ? f[e.shiftKey ? f.length - 1 : 0] : f[(i + (e.shiftKey ? -1 : 1) + f.length) % f.length]).focus();
   });
   setTimeout(() => {
     if (!document || !m.isConnected || m.contains(document.activeElement) || $('#pop:not(.hidden)')?.contains(document.activeElement)) return;
@@ -7501,6 +7565,7 @@ function listModal(id, folder = '', o = {}) {
     <div class="row"><label for="l-view">${tr('View')}</label><select id="l-view"><option value="list">${tr('List')}</option>${feat('kanban') ? `<option value="kanban" ${l.view === 'kanban' ? 'selected' : ''}>${tr('Kanban')}</option>` : ''}${feat('timeline') ? `<option value="timeline" ${l.view === 'timeline' ? 'selected' : ''}>${tr('Timeline')}</option>` : ''}</select></div>
     <div class="row"><label for="l-kind">${tr('List or project')}</label><select id="l-kind" ${dis}>${LKINDS.map(([k, n]) => `<option value="${k}" ${(l.kind || 'list') === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     <div class="shint lhint" id="l-khint">${kindHint(l.kind || 'list')}</div>
+    ${famOn() && own && !l.is_inbox ? `<div class="row"><label for="l-fam">${tr('Used for')}</label><select id="l-fam">${FAM_KINDS.map(([k, n]) => `<option value="${k}" ${(l.family || o.family || '') === k ? 'selected' : ''} ${FAM_KIND_ICON[k] ? `data-ico="${FAM_KIND_ICON[k]}"` : ''}>${tr(n)}</option>`).join('')}</select></div>` : ''}
     ${id ? '' : `<div class="lptype" ${(l.kind || 'list') === 'project' ? '' : 'hidden'}><div class="ptlab">${tr('Start from')}</div><div class="ptcards" role="radiogroup" aria-label="${esc(tr('Start from'))}">${PTYPE_UI.map(([k, n, i, dsc]) => `<button type="button" class="ptcard ${k === (o.ptype || '') ? 'on' : ''}" role="radio" aria-checked="${k === (o.ptype || '')}" data-pt="${k}">${ic(i, 's')}<b>${tr(n)}</b><small class="muted">${tr(dsc)}</small></button>`).join('')}${tplOf('list').map(tp => `<button type="button" class="ptcard" role="radio" aria-checked="false" data-pt="tpl:${tp.id}">${ic('copy', 's')}<b>${esc(tp.name)}</b><small class="muted" data-ptd="${tp.id}">${tr('Your template')}</small></button>`).join('')}</div>
       <div class="ptdates" hidden><div class="row"><label>${tr('Project start')}</label>${dateIn('l-pstart', today(), {label: tr('Project start'), clear: false})}</div><div class="row"><label>${tr('End (optional)')}</label>${dateIn('l-pend', '', {label: tr('End (optional)'), empty: tr('none')})}<span class="muted">${tr('stretches or squeezes the dates')}</span></div></div></div>`}
     <div class="kproj" ${(l.kind || 'list') === 'project' ? '' : 'hidden'}>
@@ -7543,7 +7608,8 @@ function listModal(id, folder = '', o = {}) {
   const formBody = () => {
     const nm = $('#l-name', md).value.trim().replace(EMO_RE, '');
     const body = own ? {name: l.is_inbox && !emo && nm === tr('Inbox') ? (inboxDef(l.name) ? l.name : 'Eingang') : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: $('#l-rate', md).value.trim()} : {}), ...($('#l-tickets', md) ? {tickets: $('#l-tickets', md).checked} : {}),
-      ...($('#l-nag', md) ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dayh', md) ? {day_hours: $('#l-dayh', md).value.trim()} : {}), ...($('#l-dab', md) ? {checklist: $('#l-dab', md).checked} : {})}
+      ...($('#l-nag', md) ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dayh', md) ? {day_hours: $('#l-dayh', md).value.trim()} : {}), ...($('#l-dab', md) ? {checklist: $('#l-dab', md).checked} : {}),
+      ...($('#l-fam', md) ? {family: $('#l-fam', md).value} : {})}
       : {folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value};  // members: only their own placement / view
     if (own && !nm) delete body.name;  // an empty name is never saved (leaving the field puts the saved one back)
     return body;
@@ -7572,6 +7638,7 @@ function listModal(id, folder = '', o = {}) {
     if ($('#l-dayh', md) && document.activeElement !== $('#l-dayh', md)) $('#l-dayh', md).value = x.day_hours != null ? String(x.day_hours).replace('.', LOCALE().startsWith('de') ? ',' : '.') : '';
     if ($('#l-nag', md)) $('#l-nag', md).value = x.nag || '';
     if ($('#l-dab', md)) $('#l-dab', md).checked = !!x.checklist;
+    if ($('#l-fam', md)) $('#l-fam', md).value = x.family || '';
   };
   let saving = Promise.resolve();
   const autosave = () => {
@@ -7604,7 +7671,8 @@ function listModal(id, folder = '', o = {}) {
       if (ptKeys) { ptPend = true; $('#l-pthint', md).textContent = ptypeHint(e.target.value); return; }
       ptypeChange(e.target.value); return;
     }
-    if (id && ['l-view', 'l-depshift', 'l-tickets', 'l-nag', 'l-dab'].includes(e.target.id)) { autosave(); return; }
+    if (id && ['l-view', 'l-depshift', 'l-tickets', 'l-nag', 'l-dab', 'l-fam'].includes(e.target.id)) { autosave(); return; }
+    if (!id && e.target.id === 'l-fam' && ['shopping', 'packing'].includes(e.target.value) && $('#l-dab', md)) $('#l-dab', md).checked = true;
     if (id && e.target.id === 'l-showprog') { setProgHidden(id, !e.target.checked).then(() => lsaved(null)); return; }
   });
   // 2.18.0 (#408): the project type of an existing list: saved at once (one history step), then the dialog shows what
@@ -7701,7 +7769,7 @@ function listModal(id, folder = '', o = {}) {
     if (a === 'save' && !id) {  // a new list (an existing one saves itself)
       const nm = $('#l-name', md).value.trim().replace(EMO_RE, '');
       if (!nm) return $('#l-name', md).focus();
-      const body = own ? {name: l.is_inbox && !emo && nm === tr('Inbox') ? (inboxDef(l.name) ? l.name : 'Eingang') : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: $('#l-rate', md).value.trim()} : {}), ...($('#l-nag', md)?.value ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dab', md)?.checked ? {checklist: true} : {})}
+      const body = own ? {name: l.is_inbox && !emo && nm === tr('Inbox') ? (inboxDef(l.name) ? l.name : 'Eingang') : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: $('#l-rate', md).value.trim()} : {}), ...($('#l-nag', md)?.value ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dab', md)?.checked ? {checklist: true} : {}), ...($('#l-fam', md)?.value ? {family: $('#l-fam', md).value} : {})}
         : {folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value};  // members: only their own placement / view
       if (body.folder && !folderNames().includes(body.folder)) await api('PATCH', '/api/settings', {folders: JSON.stringify([...folderNames(), body.folder])});
       const {rate, nag, day_hours: _dh, ...b0} = body;
@@ -7876,10 +7944,40 @@ async function wpSync() {
 }
 // 2.0.5 (#311): a task handled here (opened, completed, its News read) closes its notification (tag t-<id>) on this device
 // right away; the server closes it on the user's other devices. X-Kalmido-Device tells the server which device this is.
-function wpDevHeader(url) { return /\/(complete|seen)$|^\/api\/(news\/read|push\/handled)$/.test(url) && S.me && LS.get('wpUser', null) === S.me.id ? LS.get('wpEp', '') : ''; }
+function wpDevHeader(url) { return /\/(complete|seen)$|^\/api\/(news\/read|push\/handled|team\/rooms\/\d+\/read)$/.test(url) && S.me && LS.get('wpUser', null) === S.me.id ? LS.get('wpEp', '') : ''; }
 async function wpCloseLocal(ids) {
   const tags = new Set(ids.filter(Boolean).map(i => 't-' + i)); if (!tags.size || !('serviceWorker' in navigator)) return;
   try { const reg = await navigator.serviceWorker.getRegistration(); for (const n of reg ? await reg.getNotifications() : []) if (tags.has(n.tag)) n.close(); } catch { /* not supported */ }
+}
+// 2.19.0 (#668): Android counts the notifications still in the shade on the app icon. When the app is seen (start, back in
+// front, News read, a chat opened) every notification that needs nothing any more is closed: tasks that are done / gone,
+// or open but neither unread in News nor due by today; chats without unread messages; everything else (agents, proposals,
+// lists, digest, review, habits) was seen with the app. Kept: unread News, due reminders, unread chats.
+async function wpSweep(only = null, all = false) {
+  if (!('serviceWorker' in navigator) || !S.me) return 0;
+  let n = 0;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration(); if (!reg) return 0;
+    const unreadT = new Set((S.nf.items || []).filter(x => !x.read).map(x => x.task_id));
+    for (const x of await reg.getNotifications()) {
+      const tag = x.tag || '', m = /^t-(\d+)$/.exec(tag), r = /^team-(\d+)$/.exec(tag);
+      if (only && !only(tag)) continue;
+      let keep = false;
+      if (all) keep = false;
+      else if (m) { const t = S.tasks.get(+m[1]); keep = !!t && t.status === 0 && !t.deleted_at && (unreadT.has(t.id) || (S.nf.items === null && (S.news?.unread || 0) > 0) || (!!t.due && t.due <= today())); }
+      else if (r) keep = ((S.tc.rooms || []).find(z => z.id === +r[1])?.unread || 0) > 0 || (S.tc.rooms == null && (S.team?.unread || 0) > 0);
+      if (!keep) { x.close(); n++; }
+    }
+  } catch { /* not supported */ }
+  return n;
+}
+// the number on the app icon: unread News + unread chat messages (Badging API where there is one; 0 clears it)
+let badgeN = -1;
+function badgeSync() {
+  const n = (collab() ? S.news?.unread || 0 : 0) + (teamOn() ? S.team?.unread || 0 : 0);
+  if (n === badgeN || !navigator.setAppBadge) return;
+  badgeN = n;
+  (n > 0 ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(() => {});
 }
 const WP_OPENED = new Map();  // task id -> time the server was told (once a minute at most)
 function wpOpened(id) {
@@ -8044,14 +8142,15 @@ async function setLang(code) {
 }
 // U04: the modules, grouped, each with one sentence; admins also get the switch for the whole server (collaboration, time)
 const MOD_GROUPS = [[N_('Views'), ['cal', 'timeline', 'kanban', 'matrix']], [N_('For you'), ['habits', 'pomo', 'stats', 'comments']],
-  [N_('Projects and team'), ['collab', 'time', 'progress', 'deps', 'fields', 'agents']], [N_('Connections'), ['paperless']]];
+  [N_('Projects and team'), ['collab', 'time', 'progress', 'deps', 'fields', 'agents']], [N_('At home'), ['family']], [N_('Connections'), ['paperless']]];
 const MOD_DESC = {cal: N_('Month, week and day view of your tasks'), timeline: N_('Tasks with start and end as bars over time'), kanban: N_('Lists as boards with columns'),
   matrix: N_('Urgent and important in four quadrants'), habits: N_('Daily and weekly habits with streaks'), pomo: N_('Focus timer and stopwatch'),
   stats: N_('Completions, on-time rate, focus time and streaks'), collab: N_('Share lists, assign tasks, @mentions, activity and News'),
   comments: N_('Timestamped notes on your tasks; in shared lists with collaboration also @mentions and News'),
   time: N_('Timers and manual time entries on tasks, reports and CSV export'), progress: N_('Progress per list and a “Where is it stuck?” overview'),
   deps: N_('Tasks that wait on other tasks, with arrows in the timeline (Gantt)'), fields: N_('Own fields per list, such as budget, client or phase'),
-  paperless: N_('Link documents from Paperless-ngx to tasks')};
+  paperless: N_('Link documents from Paperless-ngx to tasks'),
+  family: N_('Birthdays, household chores taking turns, shopping lists with shop areas, a meal plan, deadlines, packing lists and accounts for children')};
 function modulesHtml(hint) {
   const s = S.settings;
   const opt = (k, body) => k === 'pomo' ? `<details class="mopt"><summary>${tr('Focus settings')}</summary>
@@ -8068,7 +8167,8 @@ function modulesHtml(hint) {
       <div class="row"><label for="s-tstop">${tr('Stop automatically after')}</label><input type="number" id="s-tstop" value="${esc(s.time_autostop_h ?? '12')}" min="0" max="72" step="0.5" class="numin"><span class="muted">${tr('hours, end = start + value, 0 = off')}</span></div>
       <div class="row"><label>${tr('Focus sessions')}</label><label class="chkl"><input type="checkbox" id="s-tfocus" ${s.time_focus !== '0' ? 'checked' : ''}> ${tr('count as time entries (not while a timer runs)')}</label></div></details>` : '';
   const row = k => modRowHtml(k, opt);
-  return `${hint(tr('Switch on only what you need; everything else disappears from the menus. Nothing is deleted: switched back on, everything is there again.'))}
+  return `<h4 id="s-purpose-h">${tr('What do you use Kalmido for?')}</h4>${purposeCards(S.settings.purpose || '')}
+    ${hint(tr('Switch on only what you need; everything else disappears from the menus. Nothing is deleted: switched back on, everything is there again.'))}
     ${MOD_GROUPS.map(([g, ks]) => { const r = ks.filter(k => k !== 'paperless' || S.paperless?.enabled || feat('paperless')); return r.length ? `<h4>${tr(g)}</h4><div class="modlist">${r.map(row).join('')}</div>` : ''; }).join('')}`;
 }
 // one module switch (Settings > Modules; 2.6.0 (K09): the agents switch only there, Settings > Agents links to it)
@@ -9554,14 +9654,29 @@ function userModal(u, done) {
     <div class="row"><label for="u-proxy">${tr('SSO login')}</label><input id="u-proxy" value="${esc(u?.proxy_login || '')}" autocapitalize="off" placeholder="${tr('user name at the login proxy (optional)')}"></div>
     <div class="row"><label for="u-email">${tr('E-mail')}</label><input id="u-email" type="email" value="${esc(u?.email || '')}" autocapitalize="off" placeholder="${tr('optional, links an OIDC login')}"></div>
     <div class="row"><label for="u-topic">${tr('ntfy topic')}</label><input id="u-topic" value="${esc(u?.ntfy_topic || '')}" autocapitalize="off" placeholder="${tr('empty = random')}"></div>
-    ${u ? `<div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="u-avpick" data-cur="${esc(u.avatar || '')}">${avPickHtml(u.avatar || '', false)}</div></div>` : ''}
+    ${u ? `<div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="u-avpick" data-cur="${esc(u.avatar || '')}">${avPickHtml(u.avatar || '', false, u.display_name || u.username)}</div></div>` : ''}
     <div class="row"><label>${tr('Rights')}</label><label class="chkl"><input type="checkbox" id="u-admin" ${u?.is_admin ? 'checked' : ''}> ${tr('Admin')}</label>${S.paperless?.configured ? `<label class="chkl" title="${tr('Search, link and view documents of the Paperless archive')}"><input type="checkbox" id="u-pl" ${u?.paperless_access ? 'checked' : ''}> ${tr('Paperless access')}</label>` : ''}${u ? `<label class="chkl"><input type="checkbox" id="u-dis" ${u.disabled ? 'checked' : ''}> ${tr('disabled')}</label>` : ''}</div>
+    ${!u || (u.kind !== 'agent' && u.id !== S.me.id) ? `<div class="row"><label>${tr('Child account')}</label><label class="chkl"><input type="checkbox" id="u-kid" ${u?.kid ? 'checked' : ''}> ${tr('A simple view with big buttons, stars and rewards; takes part in shared lists only with what is assigned to it')}</label></div>
+    <div class="row" id="u-parrow" ${u?.kid ? '' : 'hidden'}><label>${tr('Parents')}</label><div class="fpeople" id="u-parents" role="group" aria-label="${esc(tr('Parents'))}"><span class="muted">${tr('Loading…')}</span></div></div>` : ''}
     ${u && !u.is_admin && u.id !== S.me.id ? `<div class="row"><label for="u-kind">${tr('Type')}</label><select id="u-kind"><option value="user">${tr('Person')}</option><option value="agent" ${u.kind === 'agent' ? 'selected' : ''}>${tr('Agent (API only, never admin, no Paperless)')}</option></select></div>` : ''}
     ${u?.has_password ? `<div class="row"><label></label><label class="chkl"><input type="checkbox" id="u-nopw"> ${tr('Remove password (single sign-on only)')}</label></div>` : ''}
     ${u?.twofa?.length ? `<div class="row"><label>${tr('Two-factor')}</label><label class="chkl"><input type="checkbox" id="u-2fareset"> ${tr('Reset (lost phone / passkey and recovery codes)')}</label></div>` : ''}
     ${u?.oidc_linked ? `<div class="row"><label>OIDC</label><label class="chkl"><input type="checkbox" id="u-oidcun"> ${tr('Unlink (the next OIDC login links again by user name or e-mail)')}</label></div>` : ''}
     <div class="muted" style="font-size:var(--fs-s);line-height:1.6">${tr('Every user gets an own inbox, habits, filters, tags and settings. Lists are shared from the list’s “…” menu > Share….')}</div>
     <div class="foot">${u && u.id !== S.me.id ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
+  // 2.19.0 (#653): a child account and its parents (people, never agents or other children)
+  const par = new Set(u?.parents || []);
+  const parDraw = async () => {
+    const box = $('#u-parents', md); if (!box) return;
+    let us = []; try { us = (await api('GET', '/api/users')).users; } catch { return; }
+    if (!md.isConnected) return;
+    const cand = us.filter(x => !x.disabled && x.kind !== 'agent' && !x.agent && !x.kid && x.id !== u?.id);
+    if (!u && !par.size) par.add(S.me.id);
+    box.innerHTML = cand.map(x => `<button type="button" class="fperson ${par.has(x.id) ? 'on' : ''}" data-upar="${x.id}" aria-pressed="${par.has(x.id)}">${av(x.id, x.display_name)}<span>${esc(x.display_name)}</span></button>`).join('') || `<span class="muted">${tr('Nobody else yet')}</span>`;
+  };
+  if ($('#u-parents', md)) parDraw();
+  md.addEventListener('change', e => { if (e.target.id === 'u-kid') { $('#u-parrow', md).hidden = !e.target.checked; if (e.target.checked) { $('#u-admin', md).checked = false; } } });
+  md.addEventListener('click', e => { const b = e.target.closest('[data-upar]'); if (!b) return; const id = +b.dataset.upar; par.has(id) ? par.delete(id) : par.add(id); b.classList.toggle('on', par.has(id)); b.setAttribute('aria-pressed', par.has(id)); });
   md.addEventListener('click', e => {  // the picture choice is sent with "Save"
     const p = e.target.closest('#u-avpick [data-av]'); if (!p) return;
     const box = $('#u-avpick', md), k = p.dataset.av;
@@ -9582,6 +9697,7 @@ function userModal(u, done) {
         if ($('#u-2fareset', md)?.checked) { if (!await askConfirm(tr('Reset the two-factor authentication of “{0}”?', u.display_name), tr('They log in with the password alone (or must set it up again if it is required).'), {ok: tr('Reset'), danger: true})) return; body.reset_2fa = true; }
         if ($('#u-oidcun', md)?.checked) body.oidc_unlink = true;
         if ($('#u-pl', md)) body.paperless_access = $('#u-pl', md).checked;
+        if ($('#u-kid', md) && ($('#u-kid', md).checked || u?.kid)) { body.kid = $('#u-kid', md).checked; if (body.kid) { body.parents = [...par]; body.is_admin = false; } }
         const avk = $('#u-avpick', md)?.dataset.pick; if (avk) body.avatar_preset = avk === 'none' ? null : avk;
         const pw = $('#u-pw', md).value;
         if (pw) body.password = pw; else if ($('#u-nopw', md)?.checked) body.password = '';
@@ -10086,6 +10202,13 @@ function bkWire(md) {
     } catch { /* api() showed it */ } finally { b.disabled = false; }
   });
 }
+const PURPOSES = [['me', 'user', N_('For me'), N_('Your own tasks: lists, reminders and the calendar. More views any time under Settings > Modules.')],
+  ['family', 'family', N_('Family'), N_('Shared lists, a shopping list with shop areas, household chores taking turns, birthdays, a meal plan and accounts for children.')],
+  ['team', 'users', N_('Team'), N_('Sharing, assigning, comments, time tracking, a timeline with dependencies, custom fields and project progress.')],
+  ['software', 'code', N_('Software projects'), N_('Everything of Team plus a software project: a board from backlog to done, bug and feature tickets, a repository.')]];
+const PURPOSE_MODS = {me: ['cal'], family: ['cal', 'habits', 'comments', 'collab', 'family'],
+  team: ['cal', 'timeline', 'matrix', 'kanban', 'habits', 'pomo', 'stats', 'comments', 'collab', 'time', 'progress', 'deps', 'fields'],
+  software: ['cal', 'timeline', 'matrix', 'kanban', 'habits', 'pomo', 'stats', 'comments', 'collab', 'time', 'progress', 'deps', 'fields']};
 // First-run setup, step 2 ("What do you want to use?"): only right after the first admin was created, never on
 // existing installs. Three presets (1.2: "Simple list"; "Just me" preselected; "Projects & team" = everything), then
 // the single modules to fine-tune. Collaboration + time tracking are the instance switches; the other modules
@@ -10098,37 +10221,37 @@ const SETUP_MODS = [['cal', N_('Calendar'), N_('Month, week and day view of your
   ['stats', N_('Statistics'), N_('Completions, on-time rate, focus time and streaks')], ['progress', N_('Project progress'), N_('Progress per list and a “Where is it stuck?” overview')],
   ['deps', N_('Dependencies'), N_('Tasks that wait on other tasks, with arrows in the timeline (Gantt)')], ['fields', N_('Custom fields'), N_('Own fields per list, such as budget, client or phase')],
   ['paperless', N_('Paperless link'), N_('Link documents from Paperless-ngx to tasks')],
-  ['comments', N_('Comments'), N_('Timestamped notes on your tasks; in shared lists with collaboration also @mentions and News')]];
-// 2.7.0 (K21, #405): "Simple list" is the start of a new instance (comments off too); one question "Start with" below
-const SETUP_PRESETS = {simple: {name: N_('Simple list'), icon: 'check', desc: N_('A plain task list: lists, subtasks, reminders and the calendar; for shopping or packing, completed items can stay at the bottom'),
-    off: ['timeline', 'kanban', 'matrix', 'habits', 'pomo', 'stats', 'progress', 'deps', 'fields', 'collab', 'time', 'comments']},
-  solo: {name: N_('Just me'), icon: 'user', desc: N_('All views for one person: timeline, kanban, matrix, habits, focus and statistics'), off: ['collab', 'time', 'deps', 'fields']},
-  team: {name: N_('Projects & team'), icon: 'users', desc: N_('Everything: sharing, assigning, comments, time tracking, a timeline with dependencies, custom fields and project progress'), off: []}};
+  ['comments', N_('Comments'), N_('Timestamped notes on your tasks; in shared lists with collaboration also @mentions and News')],
+  ['family', N_('Family'), N_('Birthdays, household chores taking turns, shopping lists with shop areas, a meal plan, deadlines, packing lists and accounts for children')]];
+// 2.7.0 (K21, #405): a simple start for a new instance; one question "Start with" below. 2.19.0 (#653): the presets are the
+// answers to "What do you use Kalmido for?" (For me = the simple start, Family, Team, Software projects)
+const SETUP_PRESETS = Object.fromEntries(PURPOSES.map(([k, i, n, d]) => [k, {name: n, icon: i, desc: d,
+  off: [...SETUP_MAIN, ...SETUP_MODS].map(x => x[0]).filter(x => x !== 'paperless' && !PURPOSE_MODS[k].includes(x))}]));
 async function setupChoices(el, logo) {
   let st = {};
   try { st = await (await fetch('/api/state', {headers: {'X-Requested-With': 'kalmido'}})).json(); } catch { /* offline: defaults */ }
   const langs = st.languages || [{code: 'en', name: 'English'}];
   const pl = !!st.paperless?.configured;
   const all = [...SETUP_MAIN, ...SETUP_MODS].map(x => x[0]);
-  let lang = I18N.code || 'en', preset = 'simple', picked, custOpen = false, start = '';
+  let lang = I18N.code || 'en', preset = 'me', picked, custOpen = false, start = '';
   const apply = k => { preset = k; picked = new Set(all.filter(x => !SETUP_PRESETS[k].off.includes(x))); };
-  apply('simple');
+  apply('me');
   // 2.13.2 (#478 F12): step 2 shown again after a reload (setup still pending) starts from what is on now, not from
   // "Simple list" ("Start" would switch modules off again); a new account (all modules on = the default) keeps "Simple list"
   const fs0 = st.settings?.features;
-  if (typeof fs0 === 'string' && !all.every(x => fs0.split(',').includes(x))) {  // everything on = the untouched default
+  if (typeof fs0 === 'string' && !all.filter(x => x !== 'family').every(x => fs0.split(',').includes(x))) {  // everything on = the untouched default (2.19.0: Family is off by default)
     const on = new Set(fs0.split(',')); picked = new Set(all.filter(x => on.has(x) && (x !== 'collab' || st.collab_all !== false) && (x !== 'time' || st.time_all !== false)));
     preset = Object.keys(SETUP_PRESETS).find(k => all.every(x => picked.has(x) === !SETUP_PRESETS[k].off.includes(x))) || '';
   }
   // 2.7.0 (K21): one question "Start with": empty, the sample project, or a project of a built-in type (agency, software, personal)
-  const STARTS = [['', N_('Empty'), 'list', N_('Your Inbox and Today, nothing else')], ['sample', N_('Sample project'), 'eye', N_('A small video production with dates and a packing list, to look around; remove it any time under Settings > Data')],
+  const STARTS = [['', N_('Empty|start'), 'list', N_('Your Inbox and Today, nothing else')], ['sample', N_('Sample project'), 'eye', N_('A small video production with dates and a packing list, to look around; remove it any time under Settings > Data')],
     ...PTYPE_UI.slice(1).map(([k, n, i, d]) => [k, n, i, d])];
   const row = ([k, n, d]) => `<label class="suse"><input type="checkbox" data-use="${k}" ${picked.has(k) ? 'checked' : ''}><span><b>${tr(n)}</b><small class="muted">${tr(d)}</small></span></label>`;
   const matches = k => all.every(x => picked.has(x) === !SETUP_PRESETS[k].off.includes(x));
   const draw = () => {
     el.innerHTML = `<div class="card setupcard">${logo}
       <div class="seg" id="su-lang">${langs.map(L => `<button type="button" data-su-lang="${esc(L.code)}" class="${L.code === lang ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div>
-      <h3>${tr('What do you want to use?')}</h3>
+      <h3>${tr('What do you use Kalmido for?')}</h3>
       <p class="muted">${tr('Pick a start, untick what you do not need. Everything can be changed later in Settings.')}</p>
       <div class="supresets">${Object.entries(SETUP_PRESETS).map(([k, p]) => `<button type="button" class="supreset ${matches(k) ? 'on' : ''}" data-su-preset="${k}" aria-pressed="${matches(k)}"><b>${ic(p.icon, 's')}${tr(p.name)}</b><small class="muted">${tr(p.desc)}</small></button>`).join('')}</div>
       <details class="sucust" ${custOpen ? 'open' : ''}><summary>${tr('Customize…')} <span class="muted">${tr('{0} of {1} modules on', [...picked].filter(k => k !== 'paperless' || pl).length, SETUP_MAIN.length + SETUP_MODS.filter(([k]) => k !== 'paperless' || pl).length)}</span></summary>
@@ -10151,7 +10274,7 @@ async function setupChoices(el, logo) {
   el.addEventListener('click', async e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.suLang) { lang = b.dataset.suLang; await i18nLoad(lang); LS.set('lang', lang); draw(); return; }
-    if (b.dataset.suPreset) { apply(b.dataset.suPreset); draw(); return; }
+    if (b.dataset.suPreset) { apply(b.dataset.suPreset); if (b.dataset.suPreset === 'software') start = 'software'; else if (start === 'software') start = ''; draw(); return; }
     if (b.dataset.suStart !== undefined) {
       start = b.dataset.suStart;
       // a project type needs its modules (agency: time tracking + custom fields, software: kanban + dependencies)
@@ -10160,7 +10283,7 @@ async function setupChoices(el, logo) {
     }
     const post = async (url, body) => { const r = await fetch(url, {method: url.endsWith('settings') ? 'PATCH' : 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify(body)}); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || tr('Error {0}', r.status)); };
     try {
-      if (b.dataset.su === 'go') await post('/api/admin/setup', {lang, collab_all: picked.has('collab'), time_all: picked.has('time'), modules: SETUP_MODS.map(x => x[0]).filter(k => picked.has(k) || (k === 'paperless' && !pl)), sample: start === 'sample', ...(start && start !== 'sample' ? {project_type: start} : {})});
+      if (b.dataset.su === 'go') await post('/api/admin/setup', {lang, collab_all: picked.has('collab'), time_all: picked.has('time'), modules: SETUP_MODS.map(x => x[0]).filter(k => picked.has(k) || (k === 'paperless' && !pl)), sample: start === 'sample', ...(start && start !== 'sample' ? {project_type: start} : {}), ...(matches(preset) ? {purpose: preset} : {})});
       else return;
       location.replace('/');
     } catch (err) { $('#su-err', el).textContent = err.message || tr('Server not reachable.'); }
@@ -10924,8 +11047,8 @@ function vsegHtml(l) {
 function listHead(l, o = {}) {
   if (!l || l.is_inbox) return vsegHtml(l) + agBandHtml();
   const p = l.progress || {done: 0, total: 0, overdue: 0}, showP = progressFor(l) && p.total > 0 && !progHidden(l.id), pill = o.noPill ? '' : statusPill(l), ts = timeSumHtml([l]);
-  if (!showP && !pill && !ts) return vsegHtml(l) + agBandHtml();
-  return `${vsegHtml(l)}<div class="lhead">${showP ? `<span class="lpg">${progBar(p)}<button class="iconbtn lpx" data-act="prog-hide" data-id="${l.id}" title="${tr('Hide progress')}" aria-label="${tr('Hide progress')}">${ic('x', 's')}</button></span>` + progMeta(p) : ''}<span class="spacer"></span>${ts}${pill}</div>${statusNote(l)}${agBandHtml()}`;
+  if (!showP && !pill && !ts) return vsegHtml(l) + famBar(l) + agBandHtml();
+  return `${vsegHtml(l)}${famBar(l)}<div class="lhead">${showP ? `<span class="lpg">${progBar(p)}<button class="iconbtn lpx" data-act="prog-hide" data-id="${l.id}" title="${tr('Hide progress')}" aria-label="${tr('Hide progress')}">${ic('x', 's')}</button></span>` + progMeta(p) : ''}<span class="spacer"></span>${ts}${pill}</div>${statusNote(l)}${agBandHtml()}`;
 }
 // ---- 2.7.0 (#407): the tracked time of a project list (or of a folder's project lists) in its header, in hours and in
 // working days. Hours per day / shift: the list's own value (list dialog, owner; the same for every member), else the
@@ -12548,7 +12671,8 @@ let dragId = null;
 document.addEventListener('dragstart', e => {
   const r = e.target.closest('.trow[draggable="true"], .cal .ev[draggable="true"], .week .ev[draggable="true"], .wev[draggable="true"]'); if (!r) return;
   dragId = +r.dataset.id; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(dragId));
-  document.body.classList.add('tdrag');
+  // 2.19.0 (#667): the drop zones appear right after the drag began; a layout change inside dragstart can end the drag
+  setTimeout(() => { if (dragId) document.body.classList.add('tdrag'); }, 0);
   requestAnimationFrame(() => r.classList.add('dragging'));
 });
 document.addEventListener('dragend', () => { dragId = null; DSE.v = 0; document.body.classList.remove('tdrag'); $$('.dragging,.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dragging', 'dropbefore', 'dropafter', 'drop')); });
@@ -12601,6 +12725,7 @@ async function dropTask0(id, el, clientY) {
   $$('.dragging,.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dragging', 'dropbefore', 'dropafter', 'drop'));
   document.body.classList.remove('tdrag');
   if (el.closest('#detail')) return;
+  if (sec && sec.dataset.newsec) { taskToNewSection(id); return; }  // (sec is false over a row)
   if (sec) { taskToSection(id, sec.dataset.section ? +sec.dataset.section : null); return; }
   const item = {id};
   if (side) {
@@ -12754,10 +12879,36 @@ async function moveSection(sid, dir) {
 function sectionPicker(anchor, id) {
   const t = S.tasks.get(id); if (!t) return;
   if (!canEdit(t)) { roToast(); return; }
-  const secs = S.sections.filter(x => x.list_id === t.list_id); if (!secs.length) return;
+  const secs = S.sections.filter(x => x.list_id === t.list_id), add = canEditList(t.list_id);
+  if (!secs.length && !add) return;
   const cur = secs.some(x => x.id === t.section_id) ? t.section_id : null;
-  menu(anchor, [{label: tr('Unassigned'), icon: 'list', on: !cur && !t.parent_id, fn: () => taskToSection(id, null)},
-    ...secs.map(x => ({label: x.name, icon: 'folder', on: cur === x.id && !t.parent_id, fn: () => taskToSection(id, x.id)}))]);
+  menu(anchor, [...(secs.length ? [{label: tr('Unassigned'), icon: 'list', on: !cur && !t.parent_id, fn: () => taskToSection(id, null)},
+    ...secs.map(x => ({label: x.name, icon: 'folder', on: cur === x.id && !t.parent_id, fn: () => taskToSection(id, x.id)}))] : []),
+    ...(add ? [...(secs.length ? ['-'] : []), {label: tr('New section…'), icon: 'plus', fn: () => taskToNewSection(id)}] : [])]);
+}
+// 2.19.0 (#667): a task into a section that does not exist yet (the "+ New section" drop zone, "Move to section…"):
+// name it (prefilled), the section is created, the task lands in it; Undo puts the task back and removes the section
+async function taskToNewSection(id) {
+  const t = S.tasks.get(id); if (!t) return;
+  if (!canEdit(t) || !canEditList(t.list_id)) { roToast(); return; }
+  const name = (await askPrompt(tr('New section'), tr('New section'), {ok: tr('Create'), input: {max: 100}}))?.trim();
+  if (!name) return;
+  const before = {section_id: t.section_id ?? null, sort: t.sort, parent_id: t.parent_id ?? null};
+  let s; try { s = await api('POST', '/api/sections', {list_id: t.list_id, name}); } catch { return; }
+  try {
+    if (t.parent_id) await patchTask(id, {parent_id: null});
+    await api('POST', '/api/tasks/reorder', {items: [{id, section_id: s.id, sort: 0}]});
+  } catch { await load().catch(() => {}); render(); return; }
+  if (['date', 'title', 'flow', 'created', 'created_asc'].includes(sortMode())) LS.set('sort2.' + S.route.key, 'prio');
+  await load(); render();
+  toast(tr('New section {0}', qn(name)), async () => {
+    try {
+      if (before.parent_id) await patchTask(id, {parent_id: before.parent_id});
+      else await api('POST', '/api/tasks/reorder', {items: [{id, section_id: before.section_id, sort: before.sort}]});
+      await api('DELETE', `/api/sections/${s.id}`);
+    } catch { /* api() said it */ }
+    await load(); render();
+  }, 8000, tr('Undo'));
 }
 function secHeadMenu(anchor, sid) {
   const s = S.sections.find(x => x.id === sid); if (!s) return;
@@ -12992,12 +13143,15 @@ function endTouchDrag(e) {
   if (e && e.cancelable) e.preventDefault();  // no click after the hold (it would close a menu opened here)
   clearTimeout(st.edge);
   const mv = $('#tdmove'), toMove = !!mv && mv.classList.contains('on') && e?.type !== 'touchcancel';
-  st.ghost.remove(); st.r.classList.remove('dragging'); tdKill();
+  // 2.19.0 (#667): a drop zone under the finger is read while the zones still show (tdKill hides them)
+  st.ghost.remove(); st.r.classList.remove('dragging');
+  const zone = st.ly != null ? document.elementFromPoint(st.lx, st.ly)?.closest?.('#view .sdrop') : null;
+  tdKill();
+  let el = zone || (st.ly != null ? document.elementFromPoint(st.lx, st.ly) : null);
   if (toMove) { S.kf = st.id; setTimeout(() => openPalette('move'), 0); return; }
   if (e?.type === 'touchcancel') { if (st.opened) setTimeout(() => { closeSide(); $('#detail').style.visibility = ''; }, 150); return; }
   if (st.opened) setTimeout(() => { closeSide(); $('#detail').style.visibility = ''; }, 150);
   swiped = true; setTimeout(() => { swiped = false; }, 400);
-  let el = st.ly != null ? document.elementFromPoint(st.lx, st.ly) : null;
   if (el && isKanban() && !el.closest(DROP_SEL) && el.closest('#view')) el = kbColAt(st.lx) || el;  // #453 A4
   $$('.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
   if (el) dropTask(st.id, el, st.ly);
@@ -13205,6 +13359,12 @@ function palAll() {
   add('a:dayplan', 'action', tr('Plan my day'), 'cal', () => dayplanModal('day'));  // 2.10.0 (#440)
   add('a:dayfill', 'action', tr('Fill free time'), 'clock', () => dayplanModal('fill'));
   if (feat('habits')) add('a:newhabit', 'action', tr('New habit'), 'habit', () => { go('habits'); habitModal(); });
+  if (famOn()) {  // 2.19.0 (#653)
+    add('a:occ', 'action', tr('New birthday or anniversary'), 'cake', () => occModal());
+    add('a:dl', 'action', tr('New household deadline'), 'hourglass', () => dlModal());
+    for (const [k, n] of PACK_UI) add('a:pack:' + k, 'action', tr('New packing list: {0}', tr(n)), 'bag', () => famPack(k));
+    for (const l of S.lists.filter(x => x.family === 'shopping' && !x.archived)) add('a:shop:' + l.id, 'action', tr('Shopping mode: {0}', lname(l)), 'cart', () => shopModeOpen(l.id));
+  }
   if (propOn()) {  // 2.3.0 (#260 #262 #263): ask an agent for a proposal
     add('a:propproject', 'action', tr('New project from briefing…'), 'bot', () => propRequest('project'));
     add('a:propinbox', 'action', propWith(N_('Sort the inbox with {0}…'), N_('Sort the inbox with an agent…')), 'bot', () => propRequest('triage', {}));
@@ -13255,7 +13415,7 @@ function palAll() {
   add('v:home', 'view', tr('Dashboard'), 'home', () => go('home'));  // 2.17.0 (#475)
   if (teamOn()) add('v:team', 'view', tr('Team chat'), 'comment', () => go('team'));  // 2.17.0 (#419)
   for (const n of S.notes || []) add('n:' + n.id, 'note', n.title, 'edit', () => go('note/' + n.id), {sub: lname(listById(n.list_id)) || ''});  // 2.17.0 (#442)
-  for (const [m, icon, name] of [['cal', 'cal', N_('Calendar')], ['matrix', 'grid', N_('Eisenhower matrix')], ['habits', 'habit', N_('Habits')], ['pomo', 'timer', N_('Focus')], ['news', 'bell', N_('News')], ['stats', 'chart', N_('Statistics')], ['time', 'clock', N_('Time tracking')], ['overview', 'pulse', N_('Where is it stuck?')]])
+  for (const [m, icon, name] of [['cal', 'cal', N_('Calendar')], ['matrix', 'grid', N_('Eisenhower matrix')], ['habits', 'habit', N_('Habits')], ['pomo', 'timer', N_('Focus')], ['news', 'bell', N_('News')], ['stats', 'chart', N_('Statistics')], ['time', 'clock', N_('Time tracking')], ['overview', 'pulse', N_('Where is it stuck?')], ['family', 'family', N_('Family')]])
     if (modOn(m)) add('v:' + m, 'view', tr(name), icon, () => go(m), {keys: m === 'cal' ? 'g c' : ''});
   // 2.8.0 (#434): the command bar also opens the timeline, the agents and their chats ("ask an agent")
   if (feat('timeline')) add('v:timeline', 'view', tr('Timeline'), 'timeline', () => { S.rmScrollReset = true; rmSet({v: 'timeline'}, 'none'); go('all'); });
@@ -13344,6 +13504,7 @@ function palDraw() {
   $('.plist .pitem.on', el)?.scrollIntoView({block: 'nearest'});
 }
 function openPalette(mode = null) {
+  if (S.me?.kid) return;  // 2.19.0: no commands for a child account
   const ret = document.activeElement && document.activeElement !== document.body && !document.activeElement.closest?.('.palette') ? document.activeElement : PAL.ret;
   closePalette(); closePop(); PAL.ret = ret;
   PAL.q = ''; PAL.i = 0; PAL.mode = mode;
@@ -13441,7 +13602,8 @@ function tourStart() {
     if (a === 'next') tourGo(TOUR.i + 1); else if (a === 'back') tourGo(TOUR.i - 1); else tourEnd(true);
   });
   el.addEventListener('change', e => { if (e.target.id === 't-sample') TOUR.sampleOn = e.target.checked; if (e.target.id === 't-ptype') TOUR.ptype = e.target.value; });
-  TOUR.ptype = '';
+  el.addEventListener('click', e => { const b = e.target.closest('[data-tpurpose]'); if (!b) return; TOUR.purpose = TOUR.purpose === b.dataset.tpurpose ? '' : b.dataset.tpurpose; tourGo(TOUR.i); $(`.tour [data-tpurpose="${b.dataset.tpurpose}"]`)?.focus(); });  // 2.19.0 (#653)
+  TOUR.ptype = ''; TOUR.purpose = '';
   setTimeout(() => tourGo(0), 60);
 }
 // ring around the target + card placement: right of narrow targets on the left (sidebar, rail), else below / above
@@ -13467,6 +13629,7 @@ function tourGo(i) {
   el.dataset.step = st.id; el.dataset.sel = st.sel || '';
   card.innerHTML = `<div class="tstep"><span>${TOUR.i + 1}/${n}</span><span class="tdots">${TOUR.steps.map((_, j) => `<i class="${j === TOUR.i ? 'on' : j < TOUR.i ? 'past' : ''}"></i>`).join('')}</span></div>
     <h3>${TOUR.i === 0 ? heron('stand', 'htour') : ''}${tr(st.t)}</h3><p>${esc(tr(st.d, ...(st.args || []))).replace(/!(\p{L})/gu, '!\u2060$1')}</p>
+    ${TOUR.i === 0 && TOUR.sample && !TOUR.sampleSent ? `<div class="tpurp"><b id="t-purp-h">${tr('What do you use Kalmido for?')}</b>${purposeCards(TOUR.purpose || '', 'data-tpurpose')}</div>` : ''}
     ${TOUR.i === 0 && TOUR.sample && !TOUR.sampleSent ? `<label class="tsample"><input type="checkbox" id="t-sample" ${TOUR.sampleOn ? 'checked' : ''}><span><b>${tr('Create a sample project')}</b><small>${tr('A small video production with dates, dependencies and a packing list. Remove it any time under Settings > Data.')}</small></span></label>
     <label class="tsample tptype"><span><b>${tr('Start with a project')}</b><small>${tr('Sections, fields and settings for your kind of work.')}</small></span><select id="t-ptype">${[['', N_('No project')], ...PTYPE_UI.slice(1)].map(([k, n]) => `<option value="${k}" ${k === (TOUR.ptype || '') ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></label>` : ''}
     <div class="tfoot"><button class="btn sm tskip" data-tour="skip">${tr('Skip tour')}</button><span class="spacer"></span>${TOUR.i ? `<button class="btn sm" data-tour="back">${tr('Back')}</button>` : ''}<button class="btn sm pri" data-tour="next">${last ? tr('Done') : tr('Next')}</button></div>`;
@@ -13485,6 +13648,9 @@ function tourGo(i) {
 async function tourSample() {  // once, when the first card is left (Next, Skip, Esc)
   if (!TOUR.sample || TOUR.sampleSent) return;
   TOUR.sampleSent = true;
+  if (TOUR.purpose) {  // 2.19.0 (#653): "What do you use Kalmido for?" -> the modules + starter lists of that purpose
+    try { await api('POST', '/api/me/purpose', {purpose: TOUR.purpose}); await load(); render(); } catch { /* offline: Settings > Modules */ }
+  }
   if (TOUR.ptype) {  // 2.4.0 (#243): "Start with a project" of a built-in type
     const pt = PTYPE_UI.find(x => x[0] === TOUR.ptype);
     try { const n = await api('POST', '/api/lists', {name: tr(pt[1]), ptype: pt[0]}); await load(); render(); modulesOnToast(n.modules_on); } catch { /* offline: New list > Project */ }
@@ -13808,10 +13974,10 @@ function reactHtml(c, ro) {
   const q = quick.join('') + more;
   return (rs.length || q ? `<div class="rxbar">${rs.map(pill).join('')}${q ? rxTog('k' + c.id) : ''}</div>` : '') + (q ? `<div class="rxbar cmrxq" role="group" aria-label="${esc(tr('React'))}">${q}</div>` : '');
 }
-function reactPicker(anchor, cid) {
-  const p = openPop(anchor, `<div class="rxpick"><div class="rxgrid">${[...RX.map(x => [x[0], x[1], tr(x[2])]), ...RX_MORE.map(e => [e, e, e])].map(([k, em, n]) => `<button data-rx="${esc(k)}" title="${esc(n)}" aria-label="${esc(n)}">${em}</button>`).join('')}</div>
+function reactPicker(anchor, cid, fn = null) {
+  const p = openPop(anchor, `<div class="rxpick" role="dialog" aria-label="${esc(tr('Reactions'))}"><div class="rxgrid">${[...RX.map(x => [x[0], x[1], tr(x[2])]), ...RX_MORE.map(e => [e, e, e])].map(([k, em, n]) => `<button data-rx="${esc(k)}" title="${esc(n)}" aria-label="${esc(n)}">${em}</button>`).join('')}</div>
     <div class="rxcustom"><input id="rx-in" placeholder="${esc(tr('Any emoji'))}" maxlength="16" autocomplete="off" aria-label="${esc(tr('Any emoji'))}"><button class="btn sm" data-rx-ok>${tr('React')}</button></div></div>`);
-  const go = v => { v = String(v || '').trim(); if (!v) return; closePop(); commentReact(cid, v); };
+  const go = v => { v = String(v || '').trim(); if (!v) return; closePop(); if (fn) fn(v); else commentReact(cid, v); };
   p.onclick = e => { const b = e.target.closest('[data-rx]'); if (b) go(b.dataset.rx); else if (e.target.closest('[data-rx-ok]')) go($('#rx-in', p).value); };
   $('#rx-in', p)?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(e.target.value); } });
 }
@@ -14542,7 +14708,9 @@ function rxRow(rs, {mid, act, dis = false, name = null, extra = ''}) {
     const lab = base + (who ? ': ' + who : ''), tip = (x.o ? tr(x.o) : x.n ? tr(x.n) : x.em) + (who ? ' · ' + who : '');
     return `<button type="button" class="rx${c ? '' : ' add'}${me ? ' on' : ''}" data-act="${act}" data-mid="${mid}" data-e="${esc(x.k)}" tabindex="${i === fi ? 0 : -1}" title="${esc(tip)}" aria-label="${esc(lab)}" aria-pressed="${me}" ${dis ? 'disabled' : ''}>${esc(x.em)}${c ? `<span class="rxn" aria-hidden="true">${c}</span>` : ''}</button>`;
   };
-  return `<span class="rxbar chrx rxrow" role="group" aria-label="${esc(tr('Reactions'))}">${items.map(chip).join('')}${extra}</span>`;
+  // 2.19.0: "+" = more emojis (a small grid), one more stop in the row's arrow keys
+  const more = dis ? '' : `<button type="button" class="rx rxplus" data-act="rx-more" data-rxact="${act}" data-mid="${mid}" tabindex="-1" aria-haspopup="dialog" title="${esc(tr('More reactions'))}" aria-label="${esc(tr('More reactions'))}">${ic('plus', 's')}</button>`;
+  return `<span class="rxbar chrx rxrow" role="group" aria-label="${esc(tr('Reactions'))}">${items.map(chip).join('')}${more}${extra}</span>`;
 }
 // the arrow keys inside a reaction row (one Tab stop per message)
 function rxRowKey(e) {
@@ -15576,7 +15744,8 @@ document.addEventListener('drop', dsStop, true);
 (async () => {
   const i18nBoot = i18nLoad(uiLang());  // last used language (localStorage), in parallel with the state
   try { await load(); if (!S.lists.length) throw new Error('no state'); } catch (e) { if (e.message === 'auth') return; await i18nBoot; $('#view').innerHTML = heronEmpty(navigator.onLine === false ? 'offline' : 'error', tr('Server not reachable.'), tr('Reload the page once the server is reachable again.')).replace(/<\/div>$/, `<button type="button" class="btn pri" id="boot-retry">${ic('sync', 's')} ${tr('Try again')}</button></div>`); $('#boot-retry')?.addEventListener('click', () => location.reload()); return; }
-  await i18nBoot; await i18nLoad(uiLang()); S.booted = true;  // render in the server-side language
+  await i18nBoot; await i18nLoad(uiLang()); S.booted = true;
+  setTimeout(() => { if (document && !document.hidden) wpSweep(); }, 2500);  // 2.19.0 (#668): opening the app tidies the shade  // render in the server-side language
   // 2.13.0 (#453 A16): the first-run step 2 ("What do you want to use?") was not finished (tab reloaded / closed after the
   // admin account was created): it comes back until "Start" is pressed
   if (S.setupPending && !$('.authscreen')) { const el = document.createElement('div'); el.className = 'modal authscreen'; document.body.appendChild(el); $('#app')?.setAttribute('inert', ''); setupChoices(el, `<div class="alogo">${logoSvg(40)}<b>${APP_NAME}</b></div>`); }
@@ -15887,6 +16056,7 @@ async function loadRoom(rid, older = false) {
   if (last && (!j.room.last_read || last.id > j.room.last_read) && !document.hidden) {
     try { const r = await rawFetch('POST', `/api/team/rooms/${rid}/read`, {last_id: last.id}); if (S.team) S.team.unread = r.unread; } catch { /* offline */ }
     const rr = (S.tc.rooms || []).find(x => x.id === rid); if (rr) { rr.unread = 0; rr.mention = false; }
+    wpSweep(tag => tag === 'team-' + rid);  // 2.19.0 (#668): the conversation's notifications close here
     renderSide(); renderTabs();
   }
 }
@@ -16289,11 +16459,12 @@ document.addEventListener('keydown', e => { const g = e.target.closest?.('.ngmai
 // few numbers and a search field.
 const DASH = [['wait', N_('Waiting for you'), 'hourglass'], ['today', N_('Today'), 'sun'], ['news', N_('News'), 'bell'], ['chat', N_('Team chat'), 'comment'],
   ['projects', N_('Projects'), 'brief'], ['pinned', N_('Pinned|view'), 'pin'], ['notes', N_('Notes'), 'edit'], ['agents', N_('Agents'), 'bot'],
-  ['stats', N_('Statistics'), 'chart'], ['search', N_('Search'), 'search']];
+  ['stats', N_('Statistics'), 'chart'], ['search', N_('Search'), 'search'], ['family', N_('Family'), 'family']];
 S.dash = {custom: false};
 function dashPref() {
   let o = {}; try { o = JSON.parse(S.settings?.dashboard || '{}') || {}; } catch { o = {}; }
-  const order = [...(o.order || []).filter(k => DASH.some(d => d[0] === k)), ...DASH.map(d => d[0]).filter(k => !(o.order || []).includes(k))];
+  const order = [...(o.order || []).filter(k => DASH.some(d => d[0] === k)), ...DASH.map(d => d[0]).filter(k => !(o.order || []).includes(k))]
+    .filter(k => k !== 'family' || famOn());  // 2.19.0 (#653): only with the module
   return {order, hidden: new Set(o.hidden || [])};
 }
 async function dashSave(order, hidden) {
@@ -16352,6 +16523,14 @@ function dashCard(k) {
     const over = openTasks().filter(t => !t.parent_id && t.due && t.due < t0).length;
     const tile = (n, l, href) => `<a class="dtile" href="${href}"><b>${n}</b><span>${esc(l)}</span></a>`;
     return card(`<div class="dtiles">${tile(doneT, tr('done today'), '#done')}${tile(done7, tr('done in 7 days'), '#stats')}${tile(over, tr('overdue'), '#today')}${tile(openTasks().filter(t => !t.parent_id).length, tr('open'), '#all')}</div>`);
+  }
+  if (k === 'family') {  // 2.19.0 (#653): the next birthdays, whose turn it is, today's meal
+    if (!famOn()) return '';
+    const d = famData(), t0x = today(), rows = [];
+    for (const t of d.occ.filter(x => daysTo(x.due) <= 14).slice(0, 3)) rows.push(`<li><a href="#t/${t.id}"><span aria-hidden="true">${t.fam.kind === 'birthday' ? '🎂' : '💍'}</span><span class="dwt"><b>${esc(t.fam.name || t.title)}</b> ${esc([occWhat(t), daysWord(daysTo(t.due))].filter(Boolean).join(' · '))}</span></a></li>`);
+    for (const t of d.rots.filter(x => x.assignee_id === S.me?.id).slice(0, 3)) rows.push(`<li><a href="#t/${t.id}">${ic('turns', 's')}<span class="dwt">${esc(tr('Your turn: {0}', t.title))}</span></a></li>`);
+    for (const t of d.meals.filter(x => x.due === t0x).slice(0, 2)) rows.push(`<li><a href="#t/${t.id}">${ic('meal', 's')}<span class="dwt">${esc(tr('Today: {0}', t.title))}</span></a></li>`);
+    return card(rows.length ? `<ul class="dwl">${rows.join('')}</ul>` : `<p class="muted">${tr('Nothing coming up.')}</p>`, `<a class="linkbtn" href="#family">${tr('Open')}</a>`);
   }
   if (k === 'search') {
     return card(`<form class="dsearch" data-dsearch role="search"><input id="dash-q" type="search" placeholder="${esc(tr('Jump, create, ask an agent…'))}" aria-label="${esc(tr('Search and commands'))}" autocomplete="off"><button type="submit" class="btn sm">${ic('search', 's')}<span class="sr">${tr('Search')}</span></button></form>`);
@@ -16439,4 +16618,500 @@ async function mailWire(md) {
     if (e.target.id === 's-digmail') { await api('PATCH', '/api/settings', {digest_mail: e.target.checked ? '1' : '0'}).catch(() => {}); S.settings.digest_mail = e.target.checked ? '1' : '0'; }
   });
   reload();
+}
+
+// ------------------------------------------------------------------ 2.19.0 (#653): the module "Family"
+// A module like Habits (Settings > Modules > Family, off by default; the setup question "What do you use Kalmido for?"
+// turns it on for "Family"). Off = no trace: no view, no list kinds, no task-panel section. Made of ordinary tasks and
+// lists (see the server's section): birthdays / anniversaries (yearly tasks, the age, gift ideas = subtasks, import from
+// CardDAV contacts), household rotation (tasks.rotation), kid accounts (simple view, stars, rewards), who comes along
+// (task people), shopping lists (areas = sections, shopping mode), household deadlines, meal plan, packing templates.
+const famOn = () => feat('family');
+const kidMe = () => !!S.me?.kid;
+S.kids = []; S.famWeek = null; S.shop = null;
+const FAM_KINDS = [['', N_('An ordinary list')], ['shopping', N_('Shopping list')], ['meals', N_('Meal plan')], ['birthdays', N_('Birthdays')],
+  ['household', N_('Household')], ['packing', N_('Packing list')]];
+const FAM_KIND_ICON = {shopping: 'cart', meals: 'meal', birthdays: 'cake', household: 'home', packing: 'bag'};
+const famKindOf = lid => listById(lid)?.family || '';
+const isOcc = t => !!t?.fam && (t.fam.kind === 'birthday' || t.fam.kind === 'anniversary');
+const isDl = t => t?.fam?.kind === 'deadline';
+const occAge = t => isOcc(t) && t.fam.year && t.due ? +t.due.slice(0, 4) - t.fam.year : null;
+// "turns 80" / "25 years" (the anniversary), '' without a year
+function occWhat(t) {
+  const a = occAge(t); if (a == null || a < 0) return '';
+  return t.fam.kind === 'birthday' ? tr('turns {0}', a) : trn('{0} year', '{0} years', a);
+}
+const DL_TYPES = [['passport', N_('Passport'), 'key'], ['id_card', N_('ID card'), 'user'], ['car', N_('Car inspection'), 'pulse'],
+  ['insurance', N_('Insurance'), 'lock'], ['contract', N_('Contract'), 'file'], ['other', N_('Other deadline'), 'hourglass']];
+const dlName = k => tr((DL_TYPES.find(x => x[0] === k) || DL_TYPES[5])[1]);
+const daysTo = d => Math.round((pd(d) - pd(today())) / 864e5);
+function daysWord(n) { return n === 0 ? tr('today') : n === 1 ? tr('tomorrow') : n < 0 ? trn('{0} day ago', '{0} days ago', -n) : trn('in {0} day', 'in {0} days', n); }
+
+// ---- what the Family view shows (the same rules as GET /api/family on the server)
+// the whole turn order from whoever is on now: "Alice → Bob → Lina"
+function rotOrder(t) { const r = t.rotation, n = r.who.length, i = (r.i || 0) % n; return r.who.map((_, j) => personName(t.list_id, r.who[(i + j) % n]) || '?').join(' → '); }
+function famData() {
+  const open = [...S.tasks.values()].filter(t => t.status === 0 && !t.deleted_at && !t.context);
+  const occ = open.filter(t => isOcc(t) && t.due).sort((a, b) => a.due.localeCompare(b.due) || a.title.localeCompare(b.title));
+  const dls = open.filter(t => isDl(t) && t.due).sort((a, b) => a.due.localeCompare(b.due));
+  const rots = open.filter(t => t.rotation?.who?.length > 1);
+  const mon = S.famWeek || today(), sun = addDays(mon, 6);  // 2.19.0: the next seven days from today (a Sunday showed only the past week)
+  const mealLists = S.lists.filter(l => l.family === 'meals' && !l.archived);
+  const meals = [...S.tasks.values()].filter(t => !t.deleted_at && !t.parent_id && t.due && t.due >= mon && t.due <= sun && mealLists.some(l => l.id === t.list_id));
+  const shops = S.lists.filter(l => l.family === 'shopping' && !l.archived);
+  return {occ, dls, rots, mon, meals, mealLists, shops, kids: S.kids || []};
+}
+const shopOpen = lid => [...S.tasks.values()].filter(t => t.list_id === lid && t.status === 0 && !t.deleted_at && !t.parent_id).length;
+
+function viewFamily() {
+  if (kidMe()) return viewKid();
+  const d = famData(), t0 = today();
+  const card = (k, icon, title, body, more = '', n = '') => `<section class="dcard fcard fc-${k}" aria-labelledby="fh-${k}"><h2 id="fh-${k}">${ic(icon, 's')}<span>${esc(title)}</span>${n !== '' ? `<span class="dcn">${n}</span>` : ''}<span class="spacer"></span>${more}</h2>${body}</section>`;
+  const open = id => `href="#t/${id}"`;
+  // birthdays + anniversaries: the next 60 days, at least the next three
+  const occ = d.occ.filter((t, i) => daysTo(t.due) <= 60 || i < 3).slice(0, 8);
+  const occH = occ.length ? `<ul class="flist">${occ.map(t => { const n = daysTo(t.due), w = occWhat(t); return `<li><a ${open(t.id)} class="frow"><span class="fem" aria-hidden="true">${t.fam.kind === 'birthday' ? '🎂' : '💍'}</span><span class="ft"><b>${esc(t.fam.name || t.title)}</b>${w ? `<span class="muted">${esc(w)}</span>` : ''}</span><span class="fwhen ${n <= 7 ? 'soon' : ''}">${esc(n <= 14 ? daysWord(n) : fmtDateLoc(t.due))}</span></a></li>`; }).join('')}</ul>`
+    : `<p class="muted">${tr('No birthdays yet.')}</p>`;
+  // whose turn
+  const rotH = d.rots.length ? `<ul class="flist">${d.rots.map(t => { const r = t.rotation, i = (r.i || 0) % r.who.length, nx = r.who[(i + 1) % r.who.length], ln = listById(t.list_id);
+    return `<li><a ${open(t.id)} class="frow">${av(t.assignee_id, personName(t.list_id, t.assignee_id) || '?')}<span class="ft"><b>${esc(t.title)}</b><span class="muted">${esc(rotOrder(t))} · ${esc(r.mode === 'week' ? tr('weekly') : tr('after each time'))}</span></span>${t.due ? `<span class="fwhen ${t.due < t0 ? 'over' : ''}">${esc(dayLabel(t.due))}</span>` : ''}</a></li>`; }).join('')}</ul>`
+    : `<p class="muted">${tr('Nobody takes turns yet: open a repeating task in a shared list and choose “Take turns”.')}</p>`;
+  // meal plan of the week
+  const days = [...Array(7)].map((_, i) => addDays(d.mon, i));
+  const mealH = `<div class="fweek" role="group" aria-label="${esc(tr('Meal plan'))}">${days.map(day => { const ms = d.meals.filter(t => t.due === day);
+    return `<div class="fday ${day === t0 ? 'today' : ''}"><span class="fdl">${esc(dayLabel(day))}</span><span class="fdm">${ms.map(t => `<span class="fmeal ${t.status ? 'done' : ''}"><a ${open(t.id)}>${esc(t.title)}</a><button type="button" class="iconbtn" data-act="fam-ingr" data-id="${t.id}" title="${esc(tr('Ingredients to the shopping list'))}" aria-label="${esc(tr('Ingredients of {0} to the shopping list', t.title))}">${ic('cart', 's')}</button></span>`).join('')}</span><button type="button" class="iconbtn" data-act="fam-meal" data-day="${day}" title="${esc(tr('Add a meal'))}" aria-label="${esc(tr('Add a meal on {0}', fmtDateLoc(day)))}">${ic('plus', 's')}</button></div>`; }).join('')}</div>`;
+  const weekNav = `<span class="fwnav"><button type="button" class="iconbtn" data-act="fam-week" data-d="-7" aria-label="${esc(tr('Previous week'))}" title="${esc(tr('Previous week'))}">${ic('left', 's')}</button><button type="button" class="iconbtn" data-act="fam-week" data-d="7" aria-label="${esc(tr('Next week'))}" title="${esc(tr('Next week'))}">${ic('right', 's')}</button></span>`;
+  // shopping
+  const shopH = d.shops.length ? `<ul class="flist">${d.shops.map(l => `<li class="frow fshop"><a href="#l/${l.id}" class="ft"><b>${esc(lname(l))}</b><span class="muted">${esc(trn('{0} item left', '{0} items left', shopOpen(l.id)))}</span></a><button type="button" class="btn pri" data-act="fam-shop" data-id="${l.id}">${ic('cart', 's')}<span>${tr('Shopping mode')}</span></button></li>`).join('')}</ul>`
+    : `<p class="muted">${tr('No shopping list yet.')}</p><button type="button" class="btn" data-act="fam-newlist" data-k="shopping">${ic('plus', 's')} ${tr('Shopping list')}</button>`;
+  // deadlines: what is due in the next half year, and what is overdue
+  const dls = d.dls.filter(t => daysTo(t.due) <= 183).slice(0, 8);
+  const dlH = dls.length ? `<ul class="flist">${dls.map(t => { const n = daysTo(t.due); return `<li><a ${open(t.id)} class="frow">${ic((DL_TYPES.find(x => x[0] === t.fam.type) || DL_TYPES[5])[2], 's')}<span class="ft"><b>${esc(t.title)}</b><span class="muted">${esc(dlName(t.fam.type))}${t.fam.expires ? ' · ' + esc(tr('expires {0}', fmtDateLoc(t.fam.expires))) : ''}</span></span><span class="fwhen ${n < 0 ? 'over' : n <= 30 ? 'soon' : ''}">${esc(daysWord(n))}</span></a></li>`; }).join('')}</ul>`
+    : `<p class="muted">${d.dls.length ? tr('Nothing due in the next six months.') : tr('Passport, car inspection, insurance: add a deadline and get reminded in time.')}</p>`;
+  // kids
+  const kidsH = d.kids.length ? d.kids.map(k => kidCardHtml(k)).join('') : '';
+  const packH = `<div class="fpack">${PACK_UI.map(([k, n, e]) => `<button type="button" class="btn" data-act="fam-pack" data-k="${k}"><span aria-hidden="true">${e}</span> ${tr(n)}</button>`).join('')}</div>`;
+  return `<div class="dash fam"><div class="dashhead fhead"><span class="spacer"></span>
+    <button type="button" class="btn sm" data-act="fam-occ">${ic('cake', 's')}<span>${tr('Birthday')}</span></button>
+    <button type="button" class="btn sm" data-act="fam-dl">${ic('hourglass', 's')}<span>${tr('Household deadline')}</span></button></div>
+    <div class="dgrid">
+    ${card('occ', 'cake', tr('Birthdays & anniversaries'), occH + `<div class="fcfoot"><button type="button" class="btn sm" data-act="fam-contacts">${ic('users', 's')}<span>${tr('From contacts…')}</span></button></div>`, '', d.occ.filter(t => daysTo(t.due) <= 30).length || '')}
+    ${card('rot', 'turns', tr('Whose turn'), rotH, '', d.rots.length || '')}
+    ${card('meals', 'meal', tr('Meal plan'), mealH, weekNav)}
+    ${card('shop', 'cart', tr('Shopping'), shopH)}
+    ${card('dl', 'hourglass', tr('Deadlines'), dlH, '', d.dls.filter(t => daysTo(t.due) <= 30).length || '')}
+    ${kidsH ? card('kids', 'star', tr('Kids'), kidsH) : ''}
+    ${card('pack', 'bag', tr('Packing lists'), packH)}
+    </div></div>`;
+}
+const PACK_UI = [['holiday', N_('Holiday'), '🏖️'], ['pool', N_('Swimming pool'), '🏊'], ['daycare', N_('Daycare'), '🎒'], ['camping', N_('Camping'), '⛺'], ['business', N_('Business trip'), '💼']];
+
+// ---- kids: a parent's card (stars, requests, give stars, rewards) and the kid's own view
+function kidCardHtml(k) {
+  const req = (k.rewards || []).filter(r => r.state === 'requested');
+  return `<div class="kidc" data-kid="${k.id}"><div class="kidh">${av(k.id, k.display_name)}<b>${esc(k.display_name)}</b><span class="kstars" aria-label="${esc(trn('{0} star', '{0} stars', k.stars))}"><span aria-hidden="true">★</span> ${k.stars}</span><span class="spacer"></span>
+    <button type="button" class="btn sm" data-act="fam-give" data-kid="${k.id}">${ic('plus', 's')}<span>${tr('Stars')}</span></button><button type="button" class="btn sm" data-act="fam-rewards" data-kid="${k.id}">${ic('gift', 's')}<span>${tr('Rewards')}</span></button></div>
+    ${req.map(r => `<div class="kreq"><span class="kreqt">${esc(tr('{0} would like: {1}', k.display_name, (r.emoji ? r.emoji + ' ' : '') + r.title))} · ${r.cost} ★</span><span class="kreqb"><button type="button" class="btn sm" data-act="fam-decide" data-rid="${r.id}" data-ok="0">${tr('Not now')}</button><button type="button" class="btn sm pri" data-act="fam-decide" data-rid="${r.id}" data-ok="1">${ic('check', 's')}<span>${tr('Approve')}</span></button></span></div>`).join('')}</div>`;
+}
+// the kid's view: big buttons, only its own tasks (the server sends no others), its stars and the rewards
+function viewKid() {
+  const k = (S.kids || [])[0] || {stars: 0, rewards: []};
+  const mine = [...S.tasks.values()].filter(t => !t.deleted_at && !t.parent_id && !t.context && (t.status === 0 || (t.completed_at && Date.now() - Date.parse(t.completed_at) < 864e5)))
+    .sort((a, b) => a.status - b.status || (a.due || '9999').localeCompare(b.due || '9999') || a.id - b.id);
+  const todo = mine.filter(t => t.status === 0);
+  const hi = new Date().getHours();
+  return `<div class="kidv"><div class="kidtop"><h2>${esc(hi < 11 ? tr('Good morning, {0}', S.me.display_name) : hi < 18 ? tr('Hello, {0}', S.me.display_name) : tr('Good evening, {0}', S.me.display_name))}</h2>
+    <div class="kidbal" role="status" aria-label="${esc(trn('You have {0} star', 'You have {0} stars', k.stars))}"><span aria-hidden="true">★</span><b>${k.stars}</b></div></div>
+    <h3 class="kidsec">${tr('My tasks')}</h3>
+    ${mine.length ? `<ul class="kidtasks">${mine.map(t => `<li class="${t.status ? 'done' : ''}"><button type="button" class="kidchk" data-act="kid-tick" data-id="${t.id}" role="checkbox" aria-checked="${t.status === 2}" aria-label="${esc(tr('Done: {0}', t.title))}">${t.status ? ic('check') : ''}</button>
+      <span class="kidt"><b>${esc(t.title)}</b>${t.due ? `<span class="muted">${esc(dayLabel(t.due))}${t.due_time ? ' ' + t.due_time : ''}</span>` : ''}</span><span class="kidst" aria-label="${esc(trn('{0} star', '{0} stars', t.stars ?? 1))}">${'★'.repeat(Math.min(5, t.stars ?? 1))}</span></li>`).join('')}</ul>`
+      : heronEmpty('done', tr('Nothing to do right now.'), '')}
+    ${todo.length || !mine.length ? '' : `<p class="kidyay">${tr('All done. Great job!')}</p>`}
+    <h3 class="kidsec">${tr('Rewards')}</h3>
+    ${(k.rewards || []).length ? `<ul class="kidrw">${k.rewards.map(r => `<li><span class="kre" aria-hidden="true">${esc(r.emoji || '🎁')}</span><span class="kidt"><b>${esc(r.title)}</b><span class="muted">${r.cost} ★</span></span>${r.state === 'requested' ? `<span class="kwait">${tr('Asked – waiting')}</span>` : r.state === 'redeemed' ? `<span class="muted">${tr('Redeemed')}</span>` : k.stars < r.cost ? `<span class="kneed">${esc(trn('{0} more star', '{0} more stars', r.cost - k.stars))}</span>` : `<button type="button" class="btn pri kidbtn" data-act="kid-want" data-rid="${r.id}">${tr('I want this')}</button>`}</li>`).join('')}</ul>`
+      : `<p class="muted">${tr('No rewards yet: ask your parents.')}</p>`}</div>`;
+}
+
+// ---- dialogs
+function occModal(o = {}) {
+  const lists = S.lists.filter(l => !l.archived && canEditList(l.id) && !l.is_inbox);
+  const bl = lists.find(l => l.family === 'birthdays');
+  const months = [...Array(12)].map((_, i) => MON[i]);
+  const md = modal(`<h3>${ic('cake', 's')} ${tr('Birthday or anniversary')}</h3>
+    <div class="seg" id="oc-kind" role="radiogroup" aria-label="${esc(tr('Kind'))}"><button type="button" role="radio" aria-checked="true" class="on" data-k="birthday">${tr('Birthday')}</button><button type="button" role="radio" aria-checked="false" data-k="anniversary">${tr('Anniversary')}</button></div>
+    <div class="row"><label for="oc-name">${tr('Who')}</label><input id="oc-name" maxlength="100" autocomplete="off" placeholder="${esc(tr('e.g. Grandma Erika'))}"></div>
+    <div class="row"><label for="oc-day">${tr('Date')}</label><span class="ocdate"><input id="oc-day" type="number" inputmode="numeric" min="1" max="31" placeholder="${esc(tr('Day'))}" aria-label="${esc(tr('Day'))}"><select id="oc-month" aria-label="${esc(tr('Month'))}">${months.map((m, i) => `<option value="${i + 1}" ${i === new Date().getMonth() ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select><input id="oc-year" type="number" inputmode="numeric" min="1900" max="${new Date().getFullYear()}" placeholder="${esc(tr('Year'))}" aria-label="${esc(tr('Year (optional)'))}"></span></div>
+    <div class="row"><label for="oc-lead">${tr('Remind me')}</label><select id="oc-lead">${[0, 1, 3, 7, 14, 30].map(n => `<option value="${n}" ${n === 7 ? 'selected' : ''}>${n ? trn('{0} day before', '{0} days before', n) : tr('on the day')}</option>`).join('')}</select></div>
+    <div class="row"><label for="oc-gifts">${tr('Gift ideas')}</label><input id="oc-gifts" placeholder="${esc(tr('optional, separated by commas'))}"></div>
+    ${lists.length > 1 || !bl ? `<div class="row"><label for="oc-list">${tr('List')}</label><select id="oc-list">${bl ? '' : `<option value="">${tr('New list: Birthdays')}</option>`}${lists.map(l => `<option value="${l.id}" ${l === bl ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>` : ''}
+    <div class="aerr" role="alert" id="oc-err"></div>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Add')}</button></div>`);
+  md.classList.add('famdlg');
+  let kind = 'birthday';
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.k) { kind = b.dataset.k; $$('#oc-kind button', md).forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', x === b); }); return; }
+    if (b.dataset.m === 'close') { md.remove(); return; }
+    if (b.dataset.m !== 'save') return;
+    const name = $('#oc-name', md).value.trim(), dy = +$('#oc-day', md).value, mo = +$('#oc-month', md).value, y = $('#oc-year', md).value.trim();
+    const errEl = $('#oc-err', md);
+    if (!name) { errEl.textContent = tr('Please enter a name'); $('#oc-name', md).focus(); return; }
+    if (!(dy >= 1 && dy <= new Date(2000, mo, 0).getDate())) { errEl.textContent = tr('Please enter the day'); $('#oc-day', md).focus(); return; }  // 29 Feb is fine
+    const body = {name, kind, date: `--${String(mo).padStart(2, '0')}-${String(dy).padStart(2, '0')}`, lead_days: +$('#oc-lead', md).value,
+      gifts: $('#oc-gifts', md).value.split(',').map(x => x.trim()).filter(Boolean), ...(y ? {year: +y} : {}), ...($('#oc-list', md)?.value ? {list_id: +$('#oc-list', md).value} : {})};
+    // rawFetch: the error shows in the dialog, not also as a toast
+    try { const t = await rawFetch('POST', '/api/family/occasions', body); md.remove(); await load(); render(); toast(tr('Added: {0}', t.title), () => openDetail(t.id), 6000, tr('Open')); }
+    catch (er) { errEl.textContent = er.message || ''; }
+  });
+  setTimeout(() => { $('#oc-name', md)?.focus(); if (o.name) $('#oc-name', md).value = o.name; }, 30);
+}
+function dlModal() {
+  const lists = S.lists.filter(l => !l.archived && canEditList(l.id) && !l.is_inbox);
+  const hl = lists.find(l => l.family === 'household');
+  const md = modal(`<h3>${ic('hourglass', 's')} ${tr('Household deadline')}</h3>
+    <div class="ptcards dltypes" role="radiogroup" aria-label="${esc(tr('Kind'))}">${DL_TYPES.map(([k, n, i], j) => `<button type="button" class="ptcard ${j ? '' : 'on'}" role="radio" aria-checked="${!j}" data-dl="${k}">${ic(i, 's')}<b>${tr(n)}</b></button>`).join('')}</div>
+    <div class="row"><label for="dl-who" id="dl-wholab">${tr('For whom / what')}</label><input id="dl-who" maxlength="100" autocomplete="off" placeholder="${esc(tr('e.g. Lina, the family car, household insurance'))}"></div>
+    <div class="row"><label id="dl-explab">${tr('Expires on')}</label>${dateIn('dl-exp', '', {label: tr('Expires on'), empty: tr('choose')})}</div>
+    <div class="row dlnotice" hidden><label for="dl-notice">${tr('Notice period')}</label><select id="dl-notice">${[0, 1, 2, 3, 6, 12].map(n => `<option value="${n}">${n ? trn('{0} month', '{0} months', n) : tr('none')}</option>`).join('')}</select></div>
+    <div class="shint lhint" id="dl-hint"></div>
+    ${lists.length > 1 || !hl ? `<div class="row"><label for="dl-list">${tr('List')}</label><select id="dl-list">${hl ? '' : `<option value="">${tr('New list: Household')}</option>`}${lists.map(l => `<option value="${l.id}" ${l === hl ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>` : ''}
+    <div class="aerr" role="alert" id="dl-err"></div>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Add')}</button></div>`);
+  md.classList.add('famdlg');
+  let type = 'passport';
+  const NOTICE = {insurance: 3, contract: 1};
+  const hint = () => {
+    $('.dlnotice', md).hidden = !(type in NOTICE);
+    const lead = {passport: 90, id_card: 60, car: 30, insurance: 21, contract: 14, other: 14}[type];
+    $('#dl-hint', md).textContent = [type in NOTICE ? tr('Due on the last day to cancel (the end minus the notice period).') : '', type === 'car' ? tr('Repeats every two years.') : type in NOTICE ? tr('Repeats every year.') : '',
+      trn('Reminder {0} day before and on the day.', 'Reminder {0} days before and on the day.', lead), tr('Link the Paperless document in the task afterwards.')].filter(Boolean).join(' ');
+    $('#dl-explab', md).textContent = type in NOTICE ? tr('Ends on') : tr('Expires on');
+  };
+  hint();
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.dl) { type = b.dataset.dl; $$('[data-dl]', md).forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', x === b); }); if (type in NOTICE) $('#dl-notice', md).value = String(NOTICE[type]); hint(); return; }
+    if (b.dataset.m === 'close') { md.remove(); return; }
+    if (b.dataset.m !== 'save') return;
+    const exp = $('#dl-exp', md).value, who = $('#dl-who', md).value.trim(), errEl = $('#dl-err', md);
+    if (!exp) { errEl.textContent = tr('Please enter the date'); return; }
+    if (type === 'other' && !who) { errEl.textContent = tr('Please enter a name'); $('#dl-who', md).focus(); return; }
+    const body = {type, expires: exp, who, ...(type in NOTICE ? {notice_months: +$('#dl-notice', md).value} : {}), ...($('#dl-list', md)?.value ? {list_id: +$('#dl-list', md).value} : {})};
+    try { const t = await rawFetch('POST', '/api/family/deadlines', body); md.remove(); await load(); render(); toast(tr('Added: {0}', t.title), () => openDetail(t.id), 6000, tr('Open')); }
+    catch (er) { errEl.textContent = er.message || ''; }
+  });
+  setTimeout(() => $('[data-dl="passport"]', md)?.focus(), 30);
+}
+async function famPack(k) {
+  const pk = PACK_UI.find(x => x[0] === k);
+  try { const j = await api('POST', '/api/family/packing', {template: k}); await load(); go('l/' + j.list_id); toast(tr('Packing list created: {0}', tr(pk[1]))); } catch { /* api() said it */ }
+}
+async function famNewList(kind) {
+  try { const l = await api('POST', '/api/lists', {name: tr(FAM_KINDS.find(x => x[0] === kind)[1]), family: kind}); await load(); return l.id; } catch { return null; }
+}
+async function famMeal(day) {
+  const name = await askPrompt(tr('What is on {0}?', fmtDateLoc(day)), '', {ok: tr('Add'), input: {placeholder: tr('e.g. Lasagne'), max: 300}});
+  if (!name || !name.trim()) return;
+  let lid = famData().mealLists.find(l => canAddTo(l.id))?.id;
+  if (!lid) lid = await famNewList('meals');
+  if (!lid) return;
+  const t = await createTask({title: name.trim(), list_id: lid, due: day}).catch(() => null);
+  if (t) toast(tr('Added: {0}', t.title), () => openDetail(t.id), 6000, tr('Ingredients…'));
+}
+async function famIngredients(id) {
+  const t = taskById(id); if (!t) return;
+  let j; try { j = await api('POST', `/api/tasks/${id}/to-shopping`, {}); } catch { return; }
+  await load(); render();
+  const msg = [j.added.length ? trn('{0} item on the shopping list', '{0} items on the shopping list', j.added.length) : '', j.skipped.length ? trn('{0} was already there', '{0} were already there', j.skipped.length) : ''].filter(Boolean).join(' · ');
+  toast(msg || tr('Nothing to add'), () => go('l/' + j.list_id), 6000, tr('Open'));
+}
+async function famGive(kid) {
+  const k = (S.kids || []).find(x => x.id === kid); if (!k) return;
+  const md = modal(`<h3>${tr('Stars for {0}', esc(k.display_name))}</h3>
+    <div class="kgive" role="group" aria-label="${esc(tr('How many'))}">${[1, 2, 3, 5, 10].map(n => `<button type="button" class="btn" data-n="${n}">+${n} ★</button>`).join('')}<button type="button" class="btn" data-n="-1">−1 ★</button></div>
+    <div class="row"><label for="kg-note">${tr('What for')}</label><input id="kg-note" maxlength="200" placeholder="${esc(tr('optional, e.g. helped with the dishes'))}"></div>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.m === 'close') { md.remove(); return; }
+    if (!b.dataset.n) return;
+    try { const j = await api('POST', `/api/family/kids/${kid}/stars`, {delta: +b.dataset.n, note: $('#kg-note', md).value.trim()}); famKidSet(j); md.remove(); toast(tr('{0} now has {1} ★', k.display_name, j.stars)); } catch { /* api() said it */ }
+  });
+}
+function famKidSet(k) { S.kids = (S.kids || []).map(x => x.id === k.id ? k : x); render(); }
+function rewardsModal(kid) {
+  let k = (S.kids || []).find(x => x.id === kid); if (!k) return;
+  const md = modal(`<h3>${ic('gift', 's')} ${tr('Rewards for {0}', esc(k.display_name))}</h3><div id="rw-list"></div>
+    <h4>${tr('New reward')}</h4>
+    <div class="row"><label for="rw-title">${tr('Reward')}</label><input id="rw-title" maxlength="200" placeholder="${esc(tr('e.g. 30 minutes of games, a trip to the zoo'))}"></div>
+    <div class="row"><label for="rw-cost">${tr('Stars')}</label><input id="rw-cost" type="number" inputmode="numeric" min="1" max="1000" value="10" class="numin"><label class="chkl"><input type="checkbox" id="rw-once"> ${tr('only once')}</label></div>
+    <div class="row"><label for="rw-emo">${tr('Picture')}</label><input id="rw-emo" maxlength="8" class="numin" placeholder="🎁"></div>
+    <div class="aerr" role="alert" id="rw-err"></div>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button><button class="btn pri" data-m="add">${ic('plus', 's')} ${tr('Add')}</button></div>`);
+  const draw = () => { $('#rw-list', md).innerHTML = (k.rewards || []).length ? `<ul class="flist">${k.rewards.map(r => `<li class="frow"><span class="fem" aria-hidden="true">${esc(r.emoji || '🎁')}</span><span class="ft"><b>${esc(r.title)}</b><span class="muted">${r.cost} ★${r.once ? ' · ' + tr('only once') : ''}${r.state === 'requested' ? ' · ' + tr('asked for') : r.state === 'redeemed' ? ' · ' + tr('redeemed') : ''}</span></span>${r.state === 'redeemed' ? '' : k.stars < r.cost ? `<span class="muted kneed">${esc(trn('{0} more star', '{0} more stars', r.cost - k.stars))}</span>` : `<button type="button" class="btn sm" data-redeem="${r.id}" title="${esc(tr('Redeem now: the stars are taken'))}">${tr('Redeem')}</button>`}<button type="button" class="iconbtn" data-rdel="${r.id}" aria-label="${esc(tr('Delete {0}', r.title))}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button></li>`).join('')}</ul>` : `<p class="muted">${tr('No rewards yet.')}</p>`; };
+  const reload = j => { if (j) { famKidSet(j); k = j; } draw(); };
+  draw();
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    try {
+      if (b.dataset.m === 'close') { md.remove(); return; }
+      if (b.dataset.m === 'add') {
+        const title = $('#rw-title', md).value.trim(); if (!title) { $('#rw-err', md).textContent = tr('Please enter a name'); return; }
+        await api('POST', `/api/family/kids/${kid}/rewards`, {title, cost: +$('#rw-cost', md).value || 1, emoji: $('#rw-emo', md).value.trim(), once: $('#rw-once', md).checked});
+        $('#rw-title', md).value = ''; $('#rw-err', md).textContent = '';
+        reload((await api('GET', '/api/family/kids')).kids.find(x => x.id === kid)); return;
+      }
+      if (b.dataset.redeem) { reload(await api('POST', `/api/family/rewards/${b.dataset.redeem}/decide`, {approve: true})); toast(tr('Redeemed')); return; }
+      if (b.dataset.rdel) { if (!await askConfirm(tr('Delete this reward?'), '', {ok: tr('Delete'), danger: true})) return; await api('DELETE', `/api/family/rewards/${b.dataset.rdel}`); reload((await api('GET', '/api/family/kids')).kids.find(x => x.id === kid)); }
+    } catch (er) { $('#rw-err', md).textContent = er.message || ''; }
+  });
+}
+// address books (CardDAV): birthdays + anniversaries of the contacts become yearly tasks
+async function contactsModal() {
+  const lists = S.lists.filter(l => !l.archived && canEditList(l.id) && !l.is_inbox);
+  const bl = lists.find(l => l.family === 'birthdays');
+  const md = modal(`<h3>${ic('users', 's')} ${tr('Birthdays from your contacts')}</h3>
+    <p class="muted">${tr('Kalmido reads the birthdays and anniversaries of an address book (CardDAV: Nextcloud, iCloud, Radicale, mailbox.org …) once a day and adds them as yearly tasks. Nothing is written back. The password is stored encrypted.')}</p>
+    <div id="ct-list"><div class="muted">${tr('Loading…')}</div></div>
+    <h4>${tr('Add an address book')}</h4>
+    <div class="row"><label for="ct-url">${tr('Server address')}</label><input id="ct-url" type="url" inputmode="url" autocapitalize="off" placeholder="https://…"></div>
+    <div class="row"><label for="ct-user">${tr('Username')}</label><input id="ct-user" autocapitalize="off" autocomplete="off"></div>
+    <div class="row"><label for="ct-pw">${tr('Password')}</label><input id="ct-pw" type="password" autocomplete="new-password" placeholder="${esc(tr('an app password, if the server offers one'))}"></div>
+    <div class="row"><label for="ct-list-sel">${tr('List')}</label><select id="ct-list-sel">${bl ? '' : `<option value="">${tr('New list: Birthdays')}</option>`}${lists.map(l => `<option value="${l.id}" ${l === bl ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>
+    <div class="aerr" role="alert" id="ct-err"></div>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button><button class="btn pri" data-m="add">${ic('plus', 's')} ${tr('Connect')}</button></div>`);
+  md.classList.add('famdlg');
+  const draw = j => { $('#ct-list', md).innerHTML = j.sources.length ? `<ul class="flist">${j.sources.map(s => `<li class="frow"><span class="ft"><b>${esc(s.name)}</b><span class="muted">${esc(s.url_hint)} · ${s.status === 'error' ? esc(s.error_text) : esc(trn('{0} date', '{0} dates', s.count))}${s.synced_at ? ' · ' + esc(tr('read {0}', fmtAgo(s.synced_at))) : ''}</span></span><button type="button" class="btn sm" data-ctsync="${s.id}">${ic('sync', 's')}<span>${tr('Read now')}</span></button><button type="button" class="iconbtn" data-ctdel="${s.id}" aria-label="${esc(tr('Remove {0}', s.name))}" title="${esc(tr('Remove'))}">${ic('trash', 's')}</button></li>`).join('')}</ul>` : `<p class="muted">${tr('No address book connected.')}</p>`; };
+  const reload = async () => { try { draw(await api('GET', '/api/family/contacts')); } catch { /* offline */ } };
+  reload();
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const errEl = $('#ct-err', md);
+    if (b.dataset.m === 'close') { md.remove(); return; }
+    b.disabled = true;
+    try {
+      if (b.dataset.m === 'add') {
+        errEl.textContent = '';
+        const body = {url: $('#ct-url', md).value.trim(), username: $('#ct-user', md).value.trim(), password: $('#ct-pw', md).value, ...($('#ct-list-sel', md).value ? {list_id: +$('#ct-list-sel', md).value} : {})};
+        const s = await api('POST', '/api/family/contacts', body);
+        $('#ct-pw', md).value = ''; toast(trn('{0} date found', '{0} dates found', s.count)); await load(); render();
+      }
+      if (b.dataset.ctsync) { const s = await api('POST', `/api/family/contacts/${b.dataset.ctsync}/sync`, {}); toast(s.status === 'ok' ? trn('{0} date found', '{0} dates found', s.count) : s.error_text); await load(); render(); }
+      if (b.dataset.ctdel) { if (!await askConfirm(tr('Remove this address book?'), tr('The birthdays it added stay as your tasks.'), {ok: tr('Remove'), danger: true})) { b.disabled = false; return; } await api('DELETE', `/api/family/contacts/${b.dataset.ctdel}`); }
+      await reload();
+    } catch (er) { errEl.textContent = er.message || ''; }
+    if (b.isConnected) b.disabled = false;
+  });
+}
+const fmtAgo = iso => { const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return m < 1 ? tr('just now') : m < 60 ? trn('{0} min ago', '{0} min ago', m) : m < 1440 ? trn('{0} h ago', '{0} h ago', Math.round(m / 60)) : fmtDateLoc(iso.slice(0, 10)); };
+
+// ---- the task panel: the family section (birthday / deadline data, taking turns, who comes along, stars, ingredients)
+function famDetailHtml(t, l, ro) {
+  if (!famOn() || !t || t.id <= 0 || t.context) return '';
+  const out = [], ppl = listPeople(l).filter(p => !p.agent && !(l.members || []).find(m => m.user_id === p.user_id && m.agent));
+  const shared = !!l?.shared && collab();
+  if (isOcc(t)) {
+    const w = occWhat(t);
+    out.push(`<div class="row"><label for="d-fname">${t.fam.kind === 'birthday' ? tr('Birthday of') : tr('Anniversary of')}</label><input id="d-fname" value="${esc(t.fam.name || '')}" maxlength="100" ${ro ? 'readonly' : ''}></div>
+      <div class="row"><label for="d-fyear">${t.fam.kind === 'birthday' ? tr('Year of birth') : tr('Since')}</label><input id="d-fyear" class="numin" type="number" inputmode="numeric" min="1900" max="${new Date().getFullYear()}" value="${esc(t.fam.year || '')}" ${ro ? 'readonly' : ''}>${w ? `<span class="fage">${esc(w)}${t.due ? ' · ' + esc(fmtDateLoc(t.due)) : ''}</span>` : ''}</div>`);
+  }
+  if (isDl(t)) {
+    out.push(`<div class="row"><label>${tr('Household deadline')}</label><span class="muted">${esc(dlName(t.fam.type))}${t.fam.who ? ' · ' + esc(t.fam.who) : ''}</span></div>
+      <div class="row"><label>${t.fam.notice ? tr('Ends on') : tr('Expires on')}</label>${ro ? `<span>${esc(fmtDateLoc(t.fam.expires || ''))}</span>` : dateIn('d-fexp', t.fam.expires || '', {label: t.fam.notice ? tr('Ends on') : tr('Expires on'), clear: false})}${t.fam.notice ? `<span class="muted">${esc(trn('notice period {0} month', 'notice period {0} months', t.fam.notice))}</span>` : ''}</div>`);
+  }
+  if (shared && (t.rotation || (t.repeat && !t.fam))) {  // taking turns: only repeating tasks of shared lists (not a birthday / deadline)
+    const r = t.rotation, on = !!r, who = new Set(r?.who || []);
+    out.push(`<div class="row frot"><label>${tr('Take turns')}</label><label class="swc"><input type="checkbox" id="d-rot" ${on ? 'checked' : ''} ${ro || !canEditList(t.list_id) ? 'disabled' : ''}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('Take turns'))}</span></label>${on ? `<span class="muted">${esc(rotOrder(t))}</span>` : ''}</div>
+      ${on ? `<div class="row"><label>${tr('Who')}</label><div class="fpeople" role="group" aria-label="${esc(tr('Who takes turns'))}">${ppl.map(p => `<button type="button" class="fperson ${who.has(p.user_id) ? 'on' : ''}" data-rotp="${p.user_id}" aria-pressed="${who.has(p.user_id)}" ${ro ? 'disabled' : ''}>${av(p.user_id, p.name)}<span>${esc(p.name)}</span></button>`).join('')}</div></div>
+      <div class="row"><label>${tr('Next person')}</label><div class="seg" role="radiogroup" aria-label="${esc(tr('Next person'))}"><button type="button" role="radio" data-rotm="done" class="${r.mode !== 'week' ? 'on' : ''}" aria-checked="${r.mode !== 'week'}" ${ro ? 'disabled' : ''}>${tr('after each time')}</button><button type="button" role="radio" data-rotm="week" class="${r.mode === 'week' ? 'on' : ''}" aria-checked="${r.mode === 'week'}" ${ro ? 'disabled' : ''}>${tr('every week')}</button></div></div>` : ''}`);
+  }
+  if (shared && ppl.length > 1) {  // who comes along (family events)
+    const pp = new Set(t.people || []);
+    out.push(`<div class="row"><label>${tr('Who comes along')}</label><div class="fpeople" role="group" aria-label="${esc(tr('Who comes along'))}">${ppl.map(p => `<button type="button" class="fperson ${pp.has(p.user_id) ? 'on' : ''}" data-famp="${p.user_id}" aria-pressed="${pp.has(p.user_id)}" ${ro || !canEditList(t.list_id) ? 'disabled' : ''}>${av(p.user_id, p.name)}<span>${esc(p.name)}</span></button>`).join('')}</div></div>`);
+  }
+  const kidIn = (l?.members || []).some(m => S.kidIds?.has(m.user_id));
+  if ((kidIn && !t.fam) || t.stars != null) {
+    out.push(`<div class="row"><label for="d-stars">${tr('Stars for a child')}</label><input id="d-stars" class="numin" type="number" inputmode="numeric" min="0" max="50" value="${esc(t.stars ?? '')}" placeholder="1" ${ro || !canEditList(t.list_id) ? 'readonly' : ''}><span class="muted">★</span></div>`);
+  }
+  if (famKindOf(t.list_id) === 'meals' && !t.parent_id) {
+    out.push(`<div class="row"><label>${tr('Ingredients')}</label><button type="button" class="btn sm" data-act="fam-ingr" data-id="${t.id}">${ic('cart', 's')}<span>${tr('To the shopping list')}</span></button><span class="muted">${tr('one per line in the description')}</span></div>`);
+  }
+  return out.length ? `<div class="dsec famsec"><h5>${tr('Family')}</h5><div class="famf">${out.join('')}</div></div>` : '';
+}
+async function famDetailPatch(t, body) { try { await patchUndoable(t.id, body); } catch { renderDetail(); } }
+document.addEventListener('change', e => {
+  const el = e.target; if (!el.closest?.('#detail .famsec')) return;
+  const t = taskById(S.sel); if (!t) return;
+  if (el.id === 'd-fname' || el.id === 'd-fyear') { const v = el.value.trim(); famDetailPatch(t, {fam: {...t.fam, ...(el.id === 'd-fname' ? {name: v} : {year: v ? +v : null})}}); }
+  if (el.id === 'd-fexp' && el.value) famDetailPatch(t, {fam: {...t.fam, expires: el.value}});
+  if (el.id === 'd-stars') famDetailPatch(t, {stars: el.value === '' ? null : +el.value});
+  if (el.id === 'd-rot') {
+    if (!el.checked) { famDetailPatch(t, {rotation: null}); return; }
+    const l = listById(t.list_id), ppl = listPeople(l).filter(p => !(l.members || []).find(m => m.user_id === p.user_id && m.agent)).map(p => p.user_id);
+    const who = [t.assignee_id, ...ppl].filter((x, i, a) => x && a.indexOf(x) === i);
+    if (who.length < 2) { el.checked = false; toast(tr('Taking turns needs at least two people')); return; }
+    famDetailPatch(t, {rotation: {who, mode: 'done'}});
+  }
+});
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('#detail .famsec [data-rotp], #detail .famsec [data-rotm], #detail .famsec [data-famp]'); if (!b || b.disabled) return;
+  const t = taskById(S.sel); if (!t) return;
+  if (b.dataset.famp) { const s = new Set(t.people || []), u = +b.dataset.famp; s.has(u) ? s.delete(u) : s.add(u); famDetailPatch(t, {people: [...s]}); return; }
+  const r = t.rotation; if (!r) return;
+  if (b.dataset.rotm) { if (r.mode !== b.dataset.rotm) famDetailPatch(t, {rotation: {who: r.who, mode: b.dataset.rotm}}); return; }
+  const u = +b.dataset.rotp, who = r.who.includes(u) ? r.who.filter(x => x !== u) : [...r.who, u];
+  if (who.length < 2) { toast(tr('Taking turns needs at least two people')); return; }
+  famDetailPatch(t, {rotation: {who, mode: r.mode}});
+});
+
+// ---- shopping mode: big ticks, grouped by shop area, live for everyone (polls every 2 s while open)
+function shopModeOpen(lid) {
+  const l = listById(lid); if (!l) return;
+  S.shop = {lid};
+  const ov = document.createElement('div');
+  ov.className = 'modal shopmode'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-labelledby', 'shop-h');
+  ov.innerHTML = '<div class="card shopcard"></div>';
+  document.body.appendChild(ov);
+  modalA11y(ov);
+  shopDraw();
+  onRemove(ov, () => {
+    S.shop = null; clearInterval(shopTimer); render();
+    if (history.state?.shop) history.back();  // closed with X / Esc: drop the entry the back button would close it with
+    // render() drew the view anew: the focus goes back to the button that opened shopping mode (WCAG 2.4.3)
+    const a = document.activeElement;
+    if (!a || a === document.body || !a.isConnected) $(`#view [data-act="fam-shop"][data-lid="${lid}"], #view [data-act="fam-shop"][data-id="${lid}"], #view [data-act="shop-start"][data-lid="${lid}"]`)?.focus({preventScroll: true});
+  });
+  clearInterval(shopTimer);
+  shopTimer = setInterval(shopPoll, 2000);
+  if (isMobile() || isTouch()) history.pushState({shop: lid}, '', location.hash);  // Android Back closes shopping mode, not the app
+  // a phone keyboard would cover half the list: the field gets the focus only with a mouse / keyboard
+  if (!isTouch()) setTimeout(() => $('.shopmode .shopadd input')?.focus({preventScroll: true}), 60);
+}
+window.addEventListener('popstate', () => { if (S.shop) $('.shopmode')?.remove(); });
+// a tap on an item's name ticks it too (the whole row is the target; the circle stays the control for screen readers)
+document.addEventListener('click', e => { const n = e.target.closest?.('.shopmode .shopt'); if (n) n.closest('.shopi')?.querySelector('.shopchk:not([disabled])')?.click(); });
+// 2.19.0: the Family dialogs are no forms: Enter in a one-line field (the phone's "Done" key) saves like the main button
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || e.isComposing || e.shiftKey || !e.target.matches?.('.famdlg input:not([type="checkbox"])')) return;
+  const b = e.target.closest('.famdlg').querySelector('.foot .btn.pri'); if (!b) return;
+  e.preventDefault(); b.click();
+});
+document.addEventListener('focusin', e => { if (e.target.matches?.('.famdlg input:not([type="checkbox"])') && !e.target.hasAttribute('enterkeyhint')) e.target.setAttribute('enterkeyhint', 'done'); });
+let shopTimer = 0;
+async function shopPoll() {
+  if (!S.shop || document.hidden || OUT.q.length || imeOn) return;  // the add field keeps its text and focus through a redraw
+  try { const {v} = await api('GET', '/api/version'); if (v !== S.v) { await load(); shopDraw(); } } catch { /* offline: the ticks wait in the queue */ }
+}
+function shopDraw() {
+  const ov = $('.shopmode'); if (!ov || !S.shop) return;
+  const l = listById(S.shop.lid); if (!l) { ov.remove(); return; }
+  const items = [...S.tasks.values()].filter(t => t.list_id === l.id && !t.deleted_at && !t.parent_id);
+  const open = items.filter(t => t.status === 0), done = items.filter(t => t.status !== 0).sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || ''));
+  const secs = S.sections.filter(s => s.list_id === l.id).sort((a, b) => a.sort - b.sort || a.id - b.id);
+  const ro = !canAddTo(l.id);
+  const row = t => `<li class="shopi ${t.status ? 'done' : ''}"><button type="button" class="shopchk" data-act="shop-tick" data-id="${t.id}" role="checkbox" aria-checked="${t.status !== 0}" aria-label="${esc(t.title)}" ${canEdit(t) ? '' : 'disabled'}>${t.status ? ic('check') : ''}</button><span class="shopt">${esc(t.title)}</span>${!t.status && secs.length && canEditList(l.id) ? `<button type="button" class="iconbtn shoparea" data-act="shop-area" data-id="${t.id}" aria-haspopup="menu" title="${esc(tr('Shop area'))}" aria-label="${esc(tr('Shop area of {0}', t.title))}">${ic('columns', 's')}</button>` : ''}</li>`;
+  const groups = [...secs.map(s => [s.name, open.filter(t => t.section_id === s.id)]), [tr('Other'), open.filter(t => !t.section_id || !secs.some(s => s.id === t.section_id))]].filter(g => g[1].length);
+  const focusId = document.activeElement?.closest?.('.shopmode') ? (document.activeElement.dataset.id ? `[data-act="${document.activeElement.dataset.act}"][data-id="${document.activeElement.dataset.id}"]` : document.activeElement.id ? '#' + document.activeElement.id : '') : '';
+  const val = $('#shop-in', ov)?.value || '';
+  $('.shopcard', ov).innerHTML = `<div class="shophead"><h2 id="shop-h">${ic('cart', 's')}<span>${esc(lname(l))}</span></h2><span class="shopn" role="status">${esc(open.length ? trn('{0} left', '{0} left', open.length) : tr('Everything in the cart'))}</span><span class="spacer"></span><button type="button" class="iconbtn shopx" data-act="shop-close" aria-label="${esc(tr('End shopping mode'))}" title="${esc(tr('End shopping mode'))}">${ic('x')}</button></div>
+    ${ro ? '' : `<form class="shopadd" data-shopadd><input id="shop-in" autocomplete="off" enterkeyhint="done" placeholder="${esc(tr('Add an item'))}" aria-label="${esc(tr('Add an item'))}"><button type="submit" class="btn pri" aria-label="${esc(tr('Add'))}">${ic('plus', 's')}</button></form>`}
+    <div class="shopbody">${groups.map(([n, ts]) => `<section class="shopg"><h3>${esc(n)} <span class="c">${ts.length}</span></h3><ul>${ts.map(row).join('')}</ul></section>`).join('') || (items.length ? '' : `<p class="muted">${tr('The list is empty.')}</p>`)}
+    ${done.length ? `<section class="shopg shopdone"><h3>${tr('In the cart')} <span class="c">${done.length}</span></h3><ul>${done.map(row).join('')}</ul></section>` : ''}</div>`;
+  if ($('#shop-in', ov)) $('#shop-in', ov).value = val;
+  if (focusId) { const f = $(focusId, ov); if (f) f.focus({preventScroll: true}); }
+}
+document.addEventListener('submit', async e => {
+  if (!e.target.matches?.('[data-shopadd]')) return;
+  e.preventDefault();
+  const inp = $('#shop-in'), v = inp?.value.trim(); if (!v || !S.shop) return;
+  inp.value = '';
+  try { await createTask({title: v, list_id: S.shop.lid}); await load(); } catch { /* api() said it */ }
+  shopDraw(); $('#shop-in')?.focus({preventScroll: true});
+});
+
+// ---- clicks of the Family view, the kid view, shopping mode and the list bars
+document.addEventListener('click', async e => {
+  const a = e.target.closest?.('[data-act^="fam-"], [data-act^="kid-"], [data-act^="shop-"]'); if (!a || a.disabled) return;
+  e.preventDefault(); e.stopPropagation();
+  const k = a.dataset.act, id = +a.dataset.id || 0;
+  if (k === 'fam-occ') occModal();
+  else if (k === 'fam-dl') dlModal();
+  else if (k === 'fam-contacts') contactsModal();
+  else if (k === 'fam-pack') famPack(a.dataset.k);
+  else if (k === 'fam-newlist') { const lid = await famNewList(a.dataset.k); if (lid) go('l/' + lid); }
+  else if (k === 'fam-meal') famMeal(a.dataset.day);
+  else if (k === 'fam-ingr') famIngredients(id);
+  else if (k === 'fam-week') { S.famWeek = addDays(S.famWeek || today(), +a.dataset.d); renderView(); $(`#view [data-act="fam-week"][data-d="${a.dataset.d}"]`)?.focus(); }
+  else if (k === 'fam-shop' || k === 'shop-start') shopModeOpen(id || +a.dataset.lid);
+  else if (k === 'fam-areas') { try { const j = await api('POST', `/api/lists/${a.dataset.lid}/shop-areas`, {}); await load(); render(); toast(trn('{0} shop area added', '{0} shop areas added', j.added)); } catch { /* api() said it */ } }
+  else if (k === 'fam-give') famGive(+a.dataset.kid);
+  else if (k === 'fam-rewards') rewardsModal(+a.dataset.kid);
+  else if (k === 'fam-decide') { try { famKidSet(await api('POST', `/api/family/rewards/${a.dataset.rid}/decide`, {approve: a.dataset.ok === '1'})); toast(a.dataset.ok === '1' ? tr('Redeemed') : tr('Declined')); } catch { /* api() said it */ } }
+  else if (k === 'kid-tick') {
+    const t = taskById(id); if (!t) return;
+    const was = t.status, before = S.kids?.[0]?.stars ?? 0;
+    await toggleTask(id);
+    const got = (S.kids?.[0]?.stars ?? before) - before;  // ticked again after an untick: no new stars, so no "+N"
+    if (was === 0 && got > 0) toast(trn('+{0} star!', '+{0} stars!', got));
+  }
+  else if (k === 'kid-want') { try { const j = await api('POST', `/api/family/rewards/${a.dataset.rid}/request`, {}); S.kids = [j]; renderView(); toast(tr('Asked. Your parents get a message.')); } catch { /* api() said it */ } }
+  else if (k === 'shop-close') $('.shopmode')?.remove();
+  else if (k === 'shop-tick') { const t = taskById(id); if (!t) return; try { await toggleTask(id); } catch { /* queued offline */ } shopDraw(); $(`.shopmode [data-act="shop-tick"][data-id="${id}"]`)?.focus({preventScroll: true}); }
+  else if (k === 'shop-area') {
+    const t = taskById(id), secs = S.sections.filter(s => s.list_id === t.list_id).sort((x, y) => x.sort - y.sort || x.id - y.id);
+    menu(a, [...secs.map(s => ({label: s.name, on: t.section_id === s.id, fn: async () => { await patchTask(id, {section_id: s.id}, true).catch(() => {}); shopDraw(); }})),
+      '-', {label: tr('Other'), on: !t.section_id, fn: async () => { await patchTask(id, {section_id: null}, true).catch(() => {}); shopDraw(); }}]);
+  }
+});
+// the bar above a family list: shopping mode / shop areas, the meal plan, birthdays
+function famBar(l) {
+  if (!famOn() || !l?.family || l.archived) return '';
+  if (l.family === 'shopping') {
+    const n = shopOpen(l.id), hasSec = S.sections.some(s => s.list_id === l.id);
+    return `<div class="fambar"><button type="button" class="btn pri shopgo" data-act="shop-start" data-lid="${l.id}">${ic('cart', 's')}<span>${tr('Shopping mode')}</span></button><span class="muted">${esc(trn('{0} item left', '{0} items left', n))}</span>${!hasSec && canEditList(l.id) ? `<button type="button" class="btn sm" data-act="fam-areas" data-lid="${l.id}">${ic('columns', 's')}<span>${tr('Add shop areas')}</span></button>` : ''}</div>`;
+  }
+  if (l.family === 'meals') return `<div class="fambar"><a class="btn" href="#family">${ic('meal', 's')}<span>${tr('Week plan')}</span></a><span class="muted">${tr('A meal per day, the ingredients in its description.')}</span></div>`;
+  if (l.family === 'birthdays') return `<div class="fambar"><button type="button" class="btn" data-act="fam-occ">${ic('cake', 's')}<span>${tr('Birthday')}</span></button><button type="button" class="btn" data-act="fam-contacts">${ic('users', 's')}<span>${tr('From contacts…')}</span></button></div>`;
+  if (l.family === 'household') return `<div class="fambar"><button type="button" class="btn" data-act="fam-dl">${ic('hourglass', 's')}<span>${tr('Household deadline')}</span></button><a class="btn" href="#family">${ic('family', 's')}<span>${tr('Family')}</span></a></div>`;
+  return '';
+}
+
+// ---- "What do you use Kalmido for?" (setup, welcome tour, Settings > Modules)
+const purposeCards = (cur, attr = 'data-purpose') => `<div class="ptcards purposes" role="radiogroup" aria-label="${esc(tr('What do you use Kalmido for?'))}">${PURPOSES.map(([k, i, n, d]) => `<button type="button" class="ptcard ${k === cur ? 'on' : ''}" role="radio" aria-checked="${k === cur}" ${attr}="${k}">${ic(i, 's')}<b>${tr(n)}</b><small class="muted">${tr(d)}</small></button>`).join('')}</div>`;
+async function purposeSet(p) {
+  const n = PURPOSES.find(x => x[0] === p);
+  if (!await askConfirm(tr('Switch to “{0}”?', tr(n[2])), tr('Your modules are switched to fit; nothing is deleted and everything can be changed again below.') + (p === 'family' && !S.lists.some(l => l.family) ? ' ' + tr('A shopping list, household chores, birthdays and a meal plan are created once (in the folder Family).') : p === 'software' ? ' ' + tr('A software project is created once.') : p === 'team' ? ' ' + tr('The sample project is created once.') : ''), {ok: tr('Set up')})) return false;
+  let j; try { j = await api('POST', '/api/me/purpose', {purpose: p}); } catch { return false; }
+  S.settings.features = j.features; S.settings.purpose = p;
+  await load(); render();
+  toast(j.created?.length ? trn('Done: {0} list created', 'Done: {0} lists created', j.created.length) : tr('Done'));
+  return true;
+}
+
+// ---- 2.19.0: more reactions in the chats: "+" next to 👍 👎 ❤️ opens the emoji grid of the comments (any emoji too)
+function rxMore(anchor) {
+  const act = anchor.dataset.rxact, mid = +anchor.dataset.mid;
+  reactPicker(anchor, null, v => act === 'chat-react' ? chatReact(mid, v) : act === 'tc-react' ? tcReact(mid, v) : null);
+  setTimeout(() => $('#pop .rxgrid button')?.focus({preventScroll: true}), 0);
+}
+document.addEventListener('click', e => { const b = e.target.closest?.('[data-act="rx-more"]'); if (!b) return; e.preventDefault(); e.stopPropagation(); rxMore(b); });
+// Settings > Modules: "What do you use Kalmido for?"
+document.addEventListener('click', async e => {
+  const b = e.target.closest?.('.smodal [data-purpose]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  if (!await purposeSet(b.dataset.purpose)) return;
+  const md = $('.smodal'); if (md) { md._noflush = true; md.remove(); settingsModal('modules'); setTimeout(() => $(`.smodal [data-purpose="${b.dataset.purpose}"]`)?.focus(), 80); }
+});
+// 2.19.0 (owner, #655): the magnifier stays visible on a phone while the sidebar drawer is open: a round search button on
+// the dimmed area next to the drawer, where the header's search sits (the header itself is under the scrim then)
+function sideSearchSync() {
+  const sc = $('#scrim'); if (!sc) return;
+  let b = $('.sidesearch', sc);
+  if (!b) {
+    b = document.createElement('button'); b.type = 'button'; b.className = 'iconbtn sidesearch';
+    b.addEventListener('click', e => { e.stopPropagation(); closeSide(); openPalette(); });
+    sc.appendChild(b);
+  }
+  const lab = tr('Search and commands');
+  if (b.getAttribute('aria-label') !== lab) { b.setAttribute('aria-label', lab); b.title = lab; b.innerHTML = ic('search'); }
 }

@@ -70,7 +70,7 @@ const LONG = 'Website relaunch 2026 for the client';
   w.eval(`chatOpen(${AG})`); await until(() => d.querySelectorAll('#chat-msgs .cmsg').length >= 3, 60);
   const cm = () => [...d.querySelectorAll('#chat-msgs .cmsg')];
   check(cm().length >= 3 && cm().every(m => m.querySelectorAll('.cmeta .rxrow .rx[data-e]').length === 3 && !m.querySelector('.rxtog, .chrxq')), '#651: 👍 👎 ❤️ visible on every agent-chat message (the agent\'s and mine), no smiley, no hidden bar');
-  check(cm().every(m => m.querySelectorAll('.rxrow .rx[tabindex="0"]').length === 1 && m.querySelectorAll('.rxrow .rx[tabindex="-1"]').length === 2), '#651: one Tab stop per message (roving tabindex)');
+  check(cm().every(m => m.querySelectorAll('.rxrow .rx[tabindex="0"]').length === 1 && m.querySelectorAll('.rxrow .rx[tabindex="-1"]').length === 3), '#651: one Tab stop per message (roving tabindex; 2.19.0: + "More reactions")');
   const R = id => d.querySelector(`#chat-msgs .cmsg[data-mid="${id}"]`);
   const up1 = R(q1.id).querySelector('.rxrow [data-e="up"]');
   check(up1.getAttribute('aria-label') === 'React with thumbs up' && up1.getAttribute('aria-pressed') === 'false' && !up1.querySelector('.rxn'), '#651: names: "React with thumbs up", not pressed, no count ' + up1.getAttribute('aria-label'));
@@ -79,7 +79,7 @@ const LONG = 'Website relaunch 2026 for the client';
   up1.focus(); key(w, up1, 'ArrowRight');
   const dn1 = R(q1.id).querySelector('.rxrow [data-e="down"]');
   check(d.activeElement === dn1 && dn1.tabIndex === 0 && up1.tabIndex === -1, '#651: → moves to 👎 (and takes the Tab stop)');
-  key(w, dn1, 'End'); check(d.activeElement === R(q1.id).querySelector('.rxrow [data-e="heart"]'), 'End: ❤️');
+  key(w, dn1, 'End'); check(d.activeElement === R(q1.id).querySelector('.rxrow [data-act="rx-more"]'), 'End: the last of the row (2.19.0: "+" More reactions after ❤️)');
   key(w, d.activeElement, 'Home'); check(d.activeElement === R(q1.id).querySelector('.rxrow [data-e="up"]'), 'Home: 👍');
   // one tap on a status message: a plain reaction, the count shows
   { const hb = R(q1.id).querySelector('.rxrow [data-e="heart"]'); hb.focus(); click(w, hb); }
@@ -112,7 +112,7 @@ const LONG = 'Website relaunch 2026 for the client';
   w.eval('teamChanged()');
   await until(() => [...d.querySelectorAll('#tc-msgs .cmsg.ag')].some(m => /Looks good/.test(m.textContent)));
   const bm = () => [...d.querySelectorAll('#tc-msgs .cmsg.ag')].pop();
-  check([...d.querySelectorAll('#tc-msgs .cmsg')].every(m => m.querySelectorAll('.cmeta .rxrow .rx').length === 3) && !d.querySelector('#tc-msgs .rxtog[data-act="rx-tog"]'), '#651 team chat: 👍 👎 ❤️ visible on every message, no smiley');
+  check([...d.querySelectorAll('#tc-msgs .cmsg')].every(m => m.querySelectorAll('.cmeta .rxrow .rx:not(.rxplus)').length === 3) && !d.querySelector('#tc-msgs .rxtog[data-act="rx-tog"]'), '#651 team chat: 👍 👎 ❤️ visible on every message, no smiley');
   click(w, bm().querySelector('.rxrow [data-e="up"]'));
   check(await until(() => bm()?.querySelector('.rxrow .rx.on[data-e="up"][aria-pressed="true"] .rxn')?.textContent === '1'), '#651 team chat: one tap, count 1');
   await call('POST', `/api/team/messages/${bm().dataset.mid}/reactions`, {emoji: 'up'}, CB);

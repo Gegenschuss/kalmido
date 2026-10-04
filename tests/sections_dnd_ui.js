@@ -41,7 +41,7 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   check(head(A)?.querySelector('.shandle[draggable="true"]') && head(C)?.querySelector('.shandle') && !head('')?.querySelector('.shandle'), 'a drag handle on every named section header');
   check(d.querySelector(`.sdrop[data-section="${C}"]`) && !d.body.classList.contains('tdrag'), 'empty section: drop zone rendered, hidden until a task is dragged');
   // ---- a task onto a header: top of that section
-  dnd(w, row(t4), 'dragstart');
+  dnd(w, row(t4), 'dragstart'); await sleep(20);  // 2.19.0 (#667): set right after dragstart, not inside it
   check(d.body.classList.contains('tdrag'), 'while dragging: body.tdrag (drop zones show)');
   const ov = dnd(w, head(A), 'dragover');
   check(ov.defaultPrevented && head(A).classList.contains('drop'), 'section header is a drop target with a highlight');

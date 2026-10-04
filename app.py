@@ -751,6 +751,43 @@ CREATE TABLE IF NOT EXISTS mail_tokens (
   token TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   list_id INTEGER REFERENCES lists(id) ON DELETE CASCADE, created_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS mail_tokens_user ON mail_tokens(user_id);
+-- 2.19.0 (#653): the module "Family" (see its section): who comes along to a task, the parents of a kid account, a kid's
+-- stars (ledger: + task / bonus, - reward) and rewards, the shop area an item had last time, address books (CardDAV)
+CREATE TABLE IF NOT EXISTS task_people (
+  task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  PRIMARY KEY (task_id, user_id));
+CREATE INDEX IF NOT EXISTS task_people_user ON task_people(user_id);
+CREATE TABLE IF NOT EXISTS kid_parents (
+  kid_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, parent_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  PRIMARY KEY (kid_id, parent_id));
+CREATE TABLE IF NOT EXISTS kid_stars (
+  id INTEGER PRIMARY KEY, kid_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  delta INTEGER NOT NULL, kind TEXT NOT NULL,   -- task | bonus | reward
+  task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL, reward_id INTEGER, title TEXT NOT NULL DEFAULT '',
+  by_id INTEGER, at TEXT NOT NULL,              -- task: the completion's completed_at (undo takes exactly that one back)
+  created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS kid_stars_kid ON kid_stars(kid_id, id);
+CREATE TABLE IF NOT EXISTS kid_rewards (
+  id INTEGER PRIMARY KEY, kid_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL, emoji TEXT NOT NULL DEFAULT '', cost INTEGER NOT NULL, once INTEGER NOT NULL DEFAULT 0,
+  state TEXT NOT NULL DEFAULT 'open',           -- open | requested | redeemed (once)
+  requested_at TEXT, decided_by INTEGER, decided_at TEXT, created_by INTEGER, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS kid_rewards_kid ON kid_rewards(kid_id);
+CREATE TABLE IF NOT EXISTS shop_memory (
+  list_id INTEGER NOT NULL REFERENCES lists(id) ON DELETE CASCADE, item TEXT NOT NULL,
+  section_id INTEGER NOT NULL REFERENCES sections(id) ON DELETE CASCADE, at TEXT NOT NULL, PRIMARY KEY (list_id, item));
+CREATE TABLE IF NOT EXISTS contact_srcs (         -- private per user, like cal_subs: url + password sealed (cal_seal)
+  id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL DEFAULT '', url TEXT NOT NULL, url_hint TEXT NOT NULL DEFAULT '',
+  username TEXT NOT NULL DEFAULT '', password TEXT NOT NULL DEFAULT '',
+  list_id INTEGER REFERENCES lists(id) ON DELETE SET NULL, lead INTEGER NOT NULL DEFAULT 7,
+  status TEXT NOT NULL DEFAULT 'pending', error TEXT NOT NULL DEFAULT '', fails INTEGER NOT NULL DEFAULT 0,
+  count INTEGER NOT NULL DEFAULT 0, tried_at TEXT, synced_at TEXT, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS contact_links (        -- a contact's birthday / anniversary -> its task (digest = what it was made from)
+  src_id INTEGER NOT NULL REFERENCES contact_srcs(id) ON DELETE CASCADE, uid TEXT NOT NULL, kind TEXT NOT NULL,
+  task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL, digest TEXT NOT NULL DEFAULT '',
+  book TEXT NOT NULL DEFAULT '',                  -- the address book's URL (sealed like the source's), for a later contacts module
+  PRIMARY KEY (src_id, uid, kind));
 """
 # Bumped when the database layout changes (stored in PRAGMA user_version). A backup can be restored when its
 # schema version is not newer than this one (older ones are migrated by init_db).
@@ -915,6 +952,15 @@ MIGRATIONS = [
     # 2.18.0 (#408): when a repository connection took its tag baseline (NULL = not yet: the next poll only records the
     # existing tags; only tags seen after that can complete a milestone)
     ("git_conns", "tags_at", "ALTER TABLE git_conns ADD COLUMN tags_at TEXT"),
+    # 2.19.0 (#653): the module "Family". tasks.fam: json of a birthday / anniversary / household deadline ('' = none);
+    # tasks.rotation: json {who, mode, i, wk} of a household rotation ('' = none); tasks.stars: what a kid gets for it
+    # (NULL = 1); lists.family: '' | shopping | meals | birthdays | household | packing; users.kid: a kid account
+    ("tasks", "fam", "ALTER TABLE tasks ADD COLUMN fam TEXT NOT NULL DEFAULT ''"),
+    ("tasks", "rotation", "ALTER TABLE tasks ADD COLUMN rotation TEXT NOT NULL DEFAULT ''"),
+    ("tasks", "stars", "ALTER TABLE tasks ADD COLUMN stars INTEGER"),
+    ("lists", "family", "ALTER TABLE lists ADD COLUMN family TEXT NOT NULL DEFAULT ''"),
+    ("contact_links", "book", "ALTER TABLE contact_links ADD COLUMN book TEXT NOT NULL DEFAULT ''"),
+    ("users", "kid", "ALTER TABLE users ADD COLUMN kid INTEGER NOT NULL DEFAULT 0"),
 ]
 INDEXES = """
 CREATE INDEX IF NOT EXISTS lists_owner ON lists(owner_id);
@@ -1001,6 +1047,7 @@ USER_DEFAULTS = {
     # nd (2.0.6): "No date" rows in open lists (default on)}
     "roadmap": "",
     # v1.1
+    "purpose": "",              # 2.19.0 (#653): what the person uses Kalmido for (me | family | team | software; server-only)
     "celebrate": "1",           # the heron celebrates an emptied Today / a completed list or project
     "cal_today": "1",           # "Events today" block on Today (external calendar subscriptions)
     "tour": "done",             # welcome tour: pending (new users) | done; existing users never see it
@@ -1888,6 +1935,9 @@ def authenticate():
     if request.method not in ("GET", "HEAD", "OPTIONS") and path.startswith("/api/") \
             and request.headers.get(CSRF_HEADER) != CSRF_VALUE:
         return err(tr("Request blocked: header {0} missing", CSRF_HEADER), 403)
+    if g.user and g.user["kid"] and request.method not in ("GET", "HEAD", "OPTIONS") and path.startswith("/api/") \
+            and not KID_WRITE.match(path):
+        return err(tr("Not possible with a child account"), 403)  # 2.19.0: a child ticks, asks and sets up the account only
     if g.user or _is_open(path, request.method):
         return None
     if path.startswith("/api/"):
@@ -1960,7 +2010,8 @@ def set_cookie(resp, tok, max_age):
 
 def user_public(u):
     return {"id": u["id"], "username": u["username"], "display_name": u["display_name"] or u["username"],
-            "avatar": avatar_url(u), **({"agent": True} if is_agent(u) else {})}
+            "avatar": avatar_url(u), **({"agent": True} if is_agent(u) else {}),
+            **({"kid": True} if "kid" in u.keys() and u["kid"] else {})}  # 2.19.0 (#653): a kid account
 
 
 # ---- 1.9.0: profile pictures. A preset (funny animal pictures, static SVGs) or an own photo: the client crops it square, the
@@ -3525,7 +3576,8 @@ def _pset_sql(uid, pl, write=False):
     assigned to uid + all their subtasks; for reading also the parent chain of those (context)."""
     q, u, depth_cap = ",".join(str(int(x)) for x in pl), int(uid), MAX_DEPTH + 7
     base = f"""WITH RECURSIVE pa(id) AS (SELECT id FROM tasks WHERE (assignee_id={u} OR assignee_group_id IN
-                                            (SELECT group_id FROM group_members WHERE user_id={u})) AND list_id IN ({q})),
+                                            (SELECT group_id FROM group_members WHERE user_id={u})
+                                            OR id IN (SELECT task_id FROM task_people WHERE user_id={u})) AND list_id IN ({q})),
                dn(id, lvl) AS (SELECT id, 0 FROM pa UNION
                                SELECT t.id, dn.lvl + 1 FROM tasks t JOIN dn ON t.parent_id=dn.id
                                WHERE dn.lvl < {depth_cap} AND t.list_id IN ({q}))"""
@@ -3666,6 +3718,7 @@ def task_dict(r, tags):
         d.pop("ms", None)
     if d.get("milestone_id") is None:
         d.pop("milestone_id", None)
+    fam_task_out(d)  # 2.19.0 (#653): fam / rotation as objects, only when set
     d["tags"] = tags.get(r["id"], [])
     return d
 
@@ -3744,6 +3797,7 @@ def load_tasks(c, where, args=()):
                 aiu[r["task_id"]] = {"tokens": r["tok"] or 0, "cost": round(r["cost"], 4) if r["cost"] is not None else None,
                                      "calls": r["n"]}
     gcode = git_code_for(c, ids) if ids else {}  # 2.2.0 (#271): linked pull requests + commits
+    ppl = people_of(c, ids)  # 2.19.0 (#653): who comes along
     out = []
     for r in rows:
         d = task_dict(r, tags)
@@ -3757,6 +3811,8 @@ def load_tasks(c, where, args=()):
         d["blocked"] = len(blk.get(r["id"], []))
         d["blockers"] = [b for b, lid in blk.get(r["id"], []) if lid in vis and (lid not in pl or b in pv)]
         d["blocking"] = bing.get(r["id"], 0)
+        if r["id"] in ppl:
+            d["people"] = ppl[r["id"]]
         if r["id"] in aiu and r["id"] not in ctx:
             d["ai_usage"] = aiu[r["id"]]
         if r["id"] in ctx:
@@ -4295,7 +4351,7 @@ def admin_setup():
     e = _apply_instance(c, {k: b[k] for k in ("collab_all", "time_all") if k in b})
     if e:
         return e
-    fs = ",".join(f for f in USER_DEFAULTS["features"].split(",") if f in ("collab", "time") or f in mods)
+    fs = ",".join(f for f in USER_DEFAULTS["features"].split(",") + ["family"] if f in ("collab", "time") or f in mods)
     gset(c, "default_features", fs)
     uset(c, me(), "features", fs)
     if lang:
@@ -4306,6 +4362,12 @@ def admin_setup():
         return err(tr("Invalid value: {0}", "project_type"))
     if pt:
         ptype_create(c, me(), pt, tr(PTYPE_NAMES[pt], lg=lang or None))
+    if b.get("purpose") not in (None, ""):  # 2.19.0 (#653): "What do you use Kalmido for?" (the modules came above)
+        if b["purpose"] not in PURPOSES:
+            return err(tr("Invalid value: {0}", "purpose"))
+        uset(c, me(), "purpose", b["purpose"])
+        if b["purpose"] == "family":
+            family_examples(c, me())
     if b.get("sample") is True and not sample_state(c, me()):  # 1.8.0: "Create a sample project"
         sample_create(c, me())
     elif "sample" in b:
@@ -4514,6 +4576,8 @@ def state():
         groups=groups_for(c, full=bool(u["is_admin"])) if collab_all() else [],  # 2.10.0 (#441)
         my_groups=grp_of_user(c, uid) if collab_all() else [],
         dayplan=dayplan_state(c, uid),  # 2.10.0 (#440): working hours, review card
+        kids=kids_for(c, uid),  # 2.19.0 (#653): the kids I look after (or me, a kid) with stars + rewards
+        kid_ids=[r[0] for r in c.execute("SELECT id FROM users WHERE kid=1 AND disabled=0")],  # 2.19.0: who gets stars
     )
 
 
@@ -4562,7 +4626,8 @@ def task_get(tid):
 
 # ---------------------------------------------------------------- lists / sections
 
-LIST_FIELDS = ("name", "color", "folder", "sort", "view", "archived", "checklist", "dep_shift", "kind", "tickets", "nag")
+LIST_FIELDS = ("name", "color", "folder", "sort", "view", "archived", "checklist", "dep_shift", "kind", "tickets", "nag",
+               "family")  # 2.19.0 (#653): '' | shopping | meals | birthdays | household | packing
 LIST_KINDS = ("list", "project")
 # 2.7.2 (#414): the type "checklist" (2.7.0 "Shopping & packing list") is gone. Every list has the display option "Show
 # completed at the bottom" instead (column lists.checklist, API field done_at_bottom); kind "checklist" is still accepted
@@ -4710,6 +4775,11 @@ def clean_list_value(k, v, member=False):
         if v not in NAG_VALUES:
             raise BadInput(tr("Invalid value: {0}", tr("Repeat reminder")))
         return v
+    if k == "family":  # 2.19.0 (#653)
+        v = v or ""
+        if v not in FAM_LIST_KINDS:
+            raise BadInput(tr("Invalid value: {0}", "family"))
+        return v
     return v
 
 
@@ -4726,6 +4796,15 @@ def list_create():
         return jsonify({**dict(c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()), "modules_on": on})
     view = clean_list_value("view", b.get("view") or "list")
     kind = clean_list_value("kind", b["kind"]) if b.get("kind") else "list"
+    fam = clean_list_value("family", b.get("family"))  # 2.19.0 (#653)
+    if fam:
+        c = db()
+        lid = fam_list_create(c, me(), fam, name, folder)
+        if color:
+            c.execute("UPDATE lists SET color=? WHERE id=?", (color, lid))
+        bump(c)
+        c.commit()
+        return jsonify(dict(c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()))
     # 2.7.2 (#414): "Show completed at the bottom" (done_at_bottom; the old checklist flag / kind "checklist" are aliases)
     dab = 1 if b.get("done_at_bottom", b.get("checklist")) or b.get("kind") == "checklist" else 0
     c = db()
@@ -4798,9 +4877,13 @@ def list_update(lid):
         if "archived" in vals:  # 1.6.1: archived_at follows the flag (set on the change to archived, cleared on restore)
             c.execute("UPDATE lists SET archived_at=CASE WHEN ?=0 THEN NULL WHEN archived=0 THEN ? ELSE archived_at END "
                       "WHERE id=?", (vals["archived"], iso(now_utc()), lid))
+        was_shop = is_shop(c, lid)
         for k in LIST_FIELDS:
             if k in vals:
                 c.execute(f"UPDATE lists SET {k}=? WHERE id=?", (vals[k], lid))
+        if vals.get("family") == "shopping" and not was_shop and \
+                not c.execute("SELECT 1 FROM sections WHERE list_id=?", (lid,)).fetchone():  # 2.19.0: areas for a new shopping list
+            shop_areas_add(c, lid, lang(c, me()))
         if "rate" in b:  # hourly rate for the time reports (None / '' = none)
             try:
                 rate = None if b["rate"] in (None, "") else round(float(str(b["rate"]).replace(",", ".")), 2)
@@ -4925,6 +5008,8 @@ def member_set(lid):
         return err(tr("unknown user"), 404)
     if uid == c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0]:
         return err(tr("The owner's role cannot be changed"), 403)
+    if is_kid(c, uid):  # 2.19.0 (#653): a kid only ever takes part (sees what is assigned to it / where it comes along)
+        role = "participant"
     lname = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]
     old = c.execute("SELECT role, grole FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone()
     if old:  # 2.10.0 (#441): the personal role; the effective one is the higher of it and the role via groups
@@ -5163,6 +5248,7 @@ def grp_sync(c, lids, actor=None):
     list.unshared; lost access also clears their assignments in that list (as removing a member does)."""
     actor = actor if actor is not None else (me() if has_request_context() and getattr(g, "user", None) else None)
     agents = agent_ids(c)
+    kids = {r[0] for r in c.execute("SELECT id FROM users WHERE kid=1")}
     for lid in sorted({int(x) for x in lids if x}):
         lr = c.execute("SELECT id, owner_id, name, is_inbox FROM lists WHERE id=?", (lid,)).fetchone()
         if not lr:
@@ -5182,6 +5268,8 @@ def grp_sync(c, lids, actor=None):
             if r is not None:
                 own = r["own_role"] if r["own_role"] is not None else (r["role"] if r["grole"] is None else None)
             eff = role_max(own, gr)
+            if eff and uid in kids:  # 2.19.0 (#653)
+                eff, gr = "participant", ("participant" if gr else gr)
             if r is None:
                 c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,grole,sort,added_at) VALUES(?,?,?,?,?,?,?)",
                           (lid, uid, eff, None, gr, my_max_sort(c, uid) + 1, iso(now_utc())))
@@ -5896,7 +5984,8 @@ TASK_FIELDS = ("list_id", "section_id", "parent_id", "title", "content", "priori
                "pinned", "start", "duration", "assignee_id", "url", "ttype", "deadline", "nag",
                "assignee_group_id",  # 2.10.0 (#441): assigned to a group (whoever has time); excludes assignee_id
                "plan_start",  # 2.11.0: planned start "YYYY-MM-DDTHH:MM" (day plan), independent of the due date
-               "ms", "milestone_id")  # 2.18.0 (#430): a milestone (1) / the milestone of the same list a task belongs to
+               "ms", "milestone_id",  # 2.18.0 (#430): a milestone (1) / the milestone of the same list a task belongs to
+               "fam", "rotation", "stars")  # 2.19.0 (#653): family data, household rotation, stars of a kid
 # 2.4.0 (#340): ticket types of a task (API v1 / MCP / events: "type"); '' = none
 TICKET_TYPES = ("bug", "feature", "task")
 
@@ -6208,6 +6297,12 @@ def clean_task(b):
                 v = 1 if v else 0
             if k == "milestone_id":
                 v = None if v in ("", None, 0) else as_int(v, tr("Milestone"), 1)
+            if k == "fam":  # 2.19.0 (#653)
+                v = clean_fam(v)
+            if k == "rotation":
+                v = clean_rotation(v)
+            if k == "stars":
+                v = None if v in ("", None) else as_int(v, tr("Stars"), 0, STARS_MAX)
             if k == "ttype":
                 v = "" if v in (None, "") else v
                 if v and v not in TICKET_TYPES:
@@ -6418,9 +6513,9 @@ def check_assignee(c, lid, aid):
 
 
 # 2.2.1 (#359): the fields the web API's task / list / comment endpoints know (others: warning, see web_fields)
-WEB_TASK_NEW = frozenset(TASK_FIELDS) | {"tags", "ltags", "fields"}
+WEB_TASK_NEW = frozenset(TASK_FIELDS) | {"tags", "ltags", "fields", "people"}
 WEB_TASK_EDIT = WEB_TASK_NEW | {"add_tags", "_prev", "_act"}
-WEB_LIST_NEW = frozenset({"name", "color", "folder", "view", "kind", "checklist", "done_at_bottom", "dep_shift", "tickets", "ptype"})
+WEB_LIST_NEW = frozenset({"name", "color", "folder", "view", "kind", "checklist", "done_at_bottom", "dep_shift", "tickets", "ptype", "family"})
 WEB_LIST_EDIT = frozenset(LIST_FIELDS) | {"rate", "agent_tidy", "tidy_agent_id", "listen_agent_ids", "_prev", "ticket_tpl", "day_hours", "done_at_bottom", "columns", "ptype"}
 WEB_COMMENT = frozenset({"body", "suggestion"})
 
@@ -6453,6 +6548,17 @@ def task_create():
     if f.get("section_id") and not c.execute("SELECT 1 FROM sections WHERE id=? AND list_id=?",
                                               (f["section_id"], f["list_id"])).fetchone():
         f["section_id"] = None
+    shop = not f.get("parent_id") and is_shop(c, f["list_id"])  # 2.19.0 (#653): a new item goes to the area it had last time
+    if shop and not f.get("section_id"):
+        f["section_id"] = shop_area_of(c, f["list_id"], f["title"])
+    elif shop:
+        shop_remember(c, f["list_id"], f["title"], f["section_id"])
+    if f.get("rotation"):
+        if role == "participant":
+            return err(tr("Participants cannot change who a task is assigned to"), 403)
+        e = rot_apply(c, f, None, f["list_id"])
+        if e:
+            return err(e)
     if f.get("assignee_group_id"):  # 2.10.0 (#441): a person or a group, never both
         f["assignee_id"] = None
     if f.get("ms"):  # 2.18.0 (#430): a milestone is a top-level task and belongs to no milestone itself
@@ -6496,6 +6602,11 @@ def task_create():
         set_ltags(c, cur.lastrowid, b["ltags"], log=False)  # BadInput: 400, nothing stored
     if b.get("fields"):
         set_field_values(c, cur.lastrowid, f["list_id"], b["fields"], log=False)  # BadInput: 400, nothing stored
+    if b.get("people"):  # 2.19.0 (#653): who comes along
+        e = people_set(c, cur.lastrowid, f["list_id"], b["people"])
+        if e:
+            c.rollback()
+            return err(e)
     log_act(c, cur.lastrowid, "created")
     agent_task_mentions(c, cur.lastrowid)
     agent_tidy_events(c, cur.lastrowid)
@@ -6828,6 +6939,14 @@ def apply_update(c, tid, b, conflicts=None):
                 continue
             if k == "tags":
                 cur = my_tags(c, tid)
+            elif k in ("fam", "rotation") and k in row.keys():  # 2.19.0 (#653): JSON objects, compared as such
+                js = lambda v: json.dumps(_jparse(v) or None, sort_keys=True)  # noqa: E731
+                cur, old, mine = js(row[k]), js(old), js(b[k])
+                if cur != old and cur != mine:
+                    if conflicts is not None:
+                        conflicts.append({"field": k, "server": _jparse(row[k]), "mine": b[k]})
+                    del b[k]
+                continue
             elif k in row.keys():
                 cur = row[k] or None if k == "ms" else row[k]  # 2.18.0: the client omits ms = 0 (null there)
             else:
@@ -6896,6 +7015,17 @@ def apply_update(c, tid, b, conflicts=None):
             return e
     elif lid != cur["list_id"] and cur["milestone_id"]:
         f["milestone_id"] = None  # moved to another list: the milestone stays behind
+    if "rotation" in f or (cur["rotation"] and lid != cur["list_id"]):  # 2.19.0 (#653): household rotation
+        if "rotation" in f and has_request_context() and getattr(g, "user", None) and list_role(c, cur["list_id"]) == "participant":
+            raise Denied(403, tr("Participants cannot change who a task is assigned to"))
+        e = rot_apply(c, f, cur, lid)
+        if e:
+            return e
+    elif "assignee_id" in f and cur["rotation"]:  # assigned by hand: the turn continues from that person
+        r = _jparse(cur["rotation"]) or {}
+        if f["assignee_id"] in (r.get("who") or []):
+            r["i"] = r["who"].index(f["assignee_id"])
+            f["rotation"] = json.dumps(r, separators=(",", ":"))
     if "assignee_id" in f and (collab_all() or _norm(f["assignee_id"]) != _norm(cur["assignee_id"])):
         e = check_assignee(c, lid, f["assignee_id"])
         if e:
@@ -6964,6 +7094,12 @@ def apply_update(c, tid, b, conflicts=None):
         set_tags(c, tid, my_tags(c, tid) + list(b["add_tags"]))
     if "fields" in b and set_field_values(c, tid, lid, b["fields"]):
         c.execute("UPDATE tasks SET updated_at=? WHERE id=?", (iso(now_utc()), tid))
+    if "people" in b:  # 2.19.0 (#653): who comes along
+        e = people_set(c, tid, lid, b["people"])
+        if e:
+            return e
+    if f and "section_id" in f and not cur["parent_id"] and is_shop(c, lid):  # 2.19.0: the shop area of this item
+        shop_remember(c, lid, f.get("title") or cur["title"], f["section_id"])
     return None
 
 
@@ -7034,13 +7170,17 @@ def do_complete(c, tid, status=2, undo=None):
     if undo is not None:
         undo.update(op="complete", at=ts, status=t["status"], repeat=t["repeat"], due=t["due"], start=t["start"],
                     reminded=t["reminded"], copy_id=None, kids=[], plan_start=t["plan_start"])
+    if status == 2 and t["status"] != 2:
+        stars_earn(c, t, ts)  # 2.19.0 (#653): a kid's stars
+    elif status == 0 and t["status"] == 2:
+        stars_revoke(c, tid, kid=t["completed_by"])
     if status == 2 and t["repeat"] and not nxt:  # last repeat (COUNT used up / past UNTIL): done for good
         c.execute("UPDATE tasks SET repeat='' WHERE id=?", (tid,))
     if nxt:
         # keep a completed copy in the history, move the original forward
         cols = [k for k in t.keys() if k not in ("id", "tt_id")]
         vals = {k: t[k] for k in cols}
-        vals.update(status=2, repeat="", completed_at=ts, updated_at=ts, reminded="[]", completed_by=who)
+        vals.update(status=2, repeat="", completed_at=ts, updated_at=ts, reminded="[]", completed_by=who, rotation="")
         cur = c.execute(f"INSERT INTO tasks({','.join(cols)}) VALUES({','.join('?' * len(cols))})",
                         [vals[k] for k in cols])
         for r in c.execute("SELECT user_id, tag FROM task_tags WHERE task_id=?", (tid,)).fetchall():
@@ -7055,7 +7195,16 @@ def do_complete(c, tid, status=2, undo=None):
         c.execute("UPDATE tasks SET due=?, start=?, plan_start=NULL, reminded='[]', updated_at=? WHERE id=?", (nxt, start, ts, tid))
         if cnt:
             c.execute("UPDATE tasks SET repeat=? WHERE id=?", (rr_with_count(t["repeat"], cnt - 1), tid))
-        for d in descendants(c, tid):
+        rot = rot_next(c, t) if t["rotation"] and (_jparse(t["rotation"]) or {}).get("mode") == "done" else None
+        if rot:  # 2.19.0 (#653): the next person's turn
+            c.execute("UPDATE tasks SET assignee_id=?, assignee_group_id=NULL, rotation=?, assigned_by=? WHERE id=?",
+                      (rot[0], rot[1], who, tid))
+            if undo is not None:
+                undo["rot"] = [t["assignee_id"], t["rotation"]]
+            if rot[0] != t["assignee_id"] and has_request_context():
+                assignment_events(c, tid, t["assignee_id"], rot[0])
+        occ = (_jparse(t["fam"]) or {}).get("kind") in FAM_OCC  # a birthday's gift ideas keep their ticks (what was given)
+        for d in ([] if occ else descendants(c, tid)):
             k = c.execute("SELECT status, completed_at, completed_by FROM tasks WHERE id=?", (d,)).fetchone()
             if undo is not None and k["status"] != 0:
                 undo["kids"].append([d, k["status"], k["completed_at"], k["completed_by"]])
@@ -7114,6 +7263,8 @@ def undo_status(c, tid, u):
             return tr("Changed in the meantime, nothing to undo")
         c.execute("UPDATE tasks SET status=?, completed_at=?, completed_by=?, updated_at=? WHERE id=?",
                   (st, when(u.get("completed_at")), who(u.get("completed_by")), ts, tid))
+        if st == 2:  # 2.19.0 (#653): the kid's stars of that completion come back
+            stars_add(c, who(u.get("completed_by")), t, when(u.get("completed_at")))
         log_act(c, tid, "wont" if st == -1 else "complete")
         return None
     if u.get("op") != "complete" or not u.get("at"):
@@ -7138,6 +7289,9 @@ def undo_status(c, tid, u):
         ps = u.get("plan_start") if valid_plan_start(u.get("plan_start")) else None
         c.execute("UPDATE tasks SET due=?, start=?, plan_start=?, repeat=?, reminded=?, updated_at=? WHERE id=?",
                   (due, start, ps, str(u.get("repeat") or "")[:500], rem, ts, tid))
+        rot = u.get("rot")  # 2.19.0 (#653): whose turn it was (signed with the rest of the undo record)
+        if isinstance(rot, list) and len(rot) == 2 and (rot[0] is None or isinstance(rot[0], int)) and isinstance(rot[1], str):
+            c.execute("UPDATE tasks SET assignee_id=?, rotation=? WHERE id=?", (rot[0] if rot[0] in people else None, rot[1][:2000], tid))
         for k in u.get("kids") or []:
             try:
                 d, st, cat, cby = int(k[0]), int(k[1]), when(k[2]), who(k[3])
@@ -7156,6 +7310,7 @@ def undo_status(c, tid, u):
         for d in descendants(c, tid):  # subtasks completed together with it
             c.execute("UPDATE tasks SET status=0, completed_at=NULL, completed_by=NULL, updated_at=? WHERE id=? AND completed_at=?",
                       (ts, d, at))
+    stars_revoke(c, tid, at=at)  # 2.19.0 (#653): a kid's stars for exactly this completion
     # the "completed" News items this completion created for others
     c.execute("DELETE FROM notifications WHERE task_id=? AND kind='complete' AND actor_id=? AND created_at>=?",
               (tid, me(), at))
@@ -7216,6 +7371,7 @@ def task_reopen(tid):
     old = c.execute("SELECT status, completed_at, completed_by FROM tasks WHERE id=?", (tid,)).fetchone()
     if old["status"] != 0:
         log_act(c, tid, "reopen")
+        stars_revoke(c, tid, at=old["completed_at"], kid=old["completed_by"])  # 2.19.0 (#653)
     c.execute("UPDATE tasks SET status=0, completed_at=NULL, completed_by=NULL, updated_at=? WHERE id=?", (iso(now_utc()), tid))
     bump(c)
     c.commit()
@@ -9158,7 +9314,7 @@ def news_read():
                                              f"AND task_id IS NOT NULL AND id IN ({q})", (uid, *part))}
             c.execute(f"UPDATE notifications SET read_at=? WHERE user_id=? AND read_at IS NULL AND id IN ({q})",
                       (ts, uid, *part))
-    push_handled(c, uid, sorted(tids))
+    push_handled(c, uid, sorted(tids), ("*",) if b.get("all") else ())  # 2.19.0 (#668): "all read" closes them all
     c.commit()
     return jsonify(ok=True, unread=news_unread(c, uid), sig=news_sig(c, uid), **({"marked": marked} if b.get("all") else {}))
 
@@ -10094,8 +10250,9 @@ def _time_watch_one(c, r, users, S, LG, ref):
 
 # ---------------------------------------------------------------- settings / export (per user)
 
-SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "review_sent", "ntfy_topic", "features_rev", "onboard", "sample_ask", "agent_share")
-DASH_WIDGETS = ("wait", "today", "news", "chat", "projects", "pinned", "notes", "agents", "stats", "search")  # 2.17.0 (#475)
+SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "review_sent", "ntfy_topic", "features_rev", "onboard", "sample_ask", "agent_share",
+                        "purpose")
+DASH_WIDGETS = ("wait", "today", "news", "chat", "projects", "pinned", "notes", "agents", "stats", "search", "family")  # 2.17.0 (#475), 2.19.0
 SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "time_focus", "paperless_keep", "celebrate", "cal_today",
                   "date_confirm", "digest_mail", "mail_from_me")
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
@@ -10780,6 +10937,7 @@ def user_admin_dict(c, u):
             "created_at": u["created_at"], "ntfy_topic": usettings(c, u["id"])["ntfy_topic"],
             "paperless_access": bool(u["paperless_access"]), "email": u["email"] or "",
             "twofa": twofa_methods(c, u), "oidc_linked": bool(u["oidc_subject"]),
+            "parents": kid_parents(c, u["id"]) if u["kid"] else [],  # 2.19.0 (#653)
             "lists": c.execute("SELECT COUNT(*) FROM lists WHERE owner_id=? AND is_inbox=0", (u["id"],)).fetchone()[0]}
 
 
@@ -10841,6 +10999,11 @@ def user_create():
         return err(tr("Invalid value: {0}", "lang"))
     uset(c, uid, "lang", lg if lg in LANGS else "en")
     ensure_inbox(c, uid)
+    if b.get("kid") is True:  # 2.19.0 (#653): a kid account (never an admin)
+        e = kid_set(c, uid, True, b.get("parents"))
+        if e:
+            c.rollback()
+            return err(e)
     bump(c)
     c.commit()
     if b.get("is_admin"):
@@ -10919,6 +11082,11 @@ def user_update(uid):
         c.execute("UPDATE users SET email=? WHERE id=?", (email or None, uid))
     if b.get("oidc_unlink") is True:  # the next OIDC login links again (by user name / e-mail)
         c.execute("UPDATE users SET oidc_subject=NULL WHERE id=?", (uid,))
+    if "kid" in b or "parents" in b or (b.get("is_admin") and u["kid"]):  # 2.19.0 (#653): a kid account and who looks after it
+        e = kid_set(c, uid, b["kid"] if "kid" in b else bool(u["kid"]), b.get("parents"))
+        if e:
+            c.rollback()
+            return err(e)
     reset = b.get("reset_2fa") is True and bool(twofa_methods(c, u) or u["totp_secret"])
     if reset:  # lost phone and recovery codes: the user logs in with the password alone (or must enrol again)
         twofa_clear(c, uid)
@@ -16345,7 +16513,7 @@ DISMISS_WAIT = float(os.environ.get("KALMIDO_DISMISS_WAIT", "30"))
 DISMISS_GAP = float(os.environ.get("KALMIDO_DISMISS_GAP", "60"))
 DISMISS_DAY = int(os.environ.get("KALMIDO_DISMISS_DAY", "30"))
 DISMISS_KEEP = 3 * 86400  # a notification older than this is not tracked any more
-DISMISS_TAG = re.compile(r"t-\d{1,12}")
+DISMISS_TAG = re.compile(r"(?:t|team|agents|prop)-\d{1,12}|\*")  # 2.19.0 (#668): chats, agents, proposals; "*" = all
 # endpoint prefixes that behave like Apple's push service (tests: the fake push service)
 WEBPUSH_APPLE = [x.strip() for x in os.environ.get("KALMIDO_WEBPUSH_APPLE", "").split(",") if x.strip()]
 
@@ -16374,13 +16542,20 @@ def push_origin(c, uid):
     return r["id"] if r else None
 
 
-def push_handled(c, uid, task_ids):
-    """The user handled these tasks on one device: their notifications get closed on the other ones (caller commits)."""
+def push_handled(c, uid, task_ids, tags=()):
+    """The user handled these tasks on one device: their notifications get closed on the other ones (caller commits).
+    tags: more notification tags handled (2.19.0 #668: "team-<room>" read; "*" = everything, e.g. "Mark all as read")."""
     if not WEBPUSH_ON:
         return 0
-    tags = list(dict.fromkeys(f"t-{int(t)}" for t in task_ids if t))[:500]
+    tags = list(dict.fromkeys([*(f"t-{int(t)}" for t in task_ids if t), *tags]))[:500]
     if not tags:
         return 0
+    if "*" in tags:  # every notification of the user's other devices: one "*" entry per device
+        here, now = push_origin(c, uid), time.time()
+        for (sid,) in c.execute("SELECT id FROM push_subs WHERE user_id=?", (uid,)).fetchall():
+            if sid != here:
+                c.execute("INSERT INTO push_tags(sub_id,tag,sent_at,handled_at) VALUES(?,?,?,?) ON CONFLICT(sub_id,tag) "
+                          "DO UPDATE SET sent_at=excluded.sent_at, handled_at=excluded.handled_at", (sid, "*", now, now))
     q = ",".join("?" * len(tags))
     here = push_origin(c, uid)
     if here:  # this device closes its own notification (app / service worker)
@@ -16409,10 +16584,22 @@ def push_dismiss_tick(c):
         c.execute(f"DELETE FROM push_tags WHERE sub_id=? AND tag IN ({','.join('?' * len(tags))})", (s["id"], *tags))
         c.execute("UPDATE push_subs SET dismiss_at=?, dismiss_day=?, dismiss_n=? WHERE id=?", (now, day, n + 1, s["id"]))
         c.commit()
-        st, _ = webpush_send(s, {"type": "dismiss", "tags": tags}, "3", ttl=3600)
+        st, _ = webpush_send(s, {"type": "dismiss", "tags": tags, "badge": badge_count(s["user_id"])}, "3", ttl=3600)
         if st in (404, 410):
             c.execute("DELETE FROM push_subs WHERE id=?", (s["id"],))
             c.commit()
+
+
+def badge_count(uid):
+    """2.19.0 (#668): the number on the app icon (Badging API): unread News + unread team chat messages."""
+    c = connect()
+    try:
+        s = usettings(c, uid)
+        return (news_unread(c, uid, s) if collab_on(s) else 0) + tchat_unread(c, uid)
+    except Exception:  # noqa: BLE001 - a badge never stops a push
+        return 0
+    finally:
+        c.close()
 
 
 def webpush_count(c, uid):
@@ -16466,8 +16653,8 @@ def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None
     if WEBPUSH_ON and ch in ("webpush", "both"):
         tag = tag or (urllib.parse.urlsplit(click).fragment.replace("/", "-") if click else None) or None
         st = {}
-        sent = webpush_user(uid, webpush_payload(title, msg, prio, click, actions, tag, task, due), prio, ttl,
-                            topic=tag, stats=st)
+        sent = webpush_user(uid, {**webpush_payload(title, msg, prio, click, actions, tag, task, due), "badge": badge_count(uid)},
+                            prio, ttl, topic=tag, stats=st)
         if not sent and st.get("subs"):  # devices exist but none accepted it (admin alert, counted per window)
             aa_count("webpush", "fallback", uid)
     if ch in ("ntfy", "both") or not sent:
@@ -16523,6 +16710,7 @@ def watchdog_tick(c):
     _wd_section(c, "reminders", _wd_reminders, users, S, LG, now)
     _wd_section(c, "nags", _wd_nags, users, S, LG, now)  # 2.7.0 (#413), after the reminders (a reminder counts as a nag)
     _wd_section(c, "follow-ups", _wd_followups, users, S, LG, now)  # 2.1.0 (#335)
+    _wd_section(c, "rotations", _wd_rotations, users, S, LG, now)  # 2.19.0 (#653)
     _wd_section(c, "focus", _wd_focus, users, S, LG)
     _wd_section(c, "habits", _wd_habits, users, S, LG, now)
     _wd_section(c, "digest", _wd_digest, users, S, LG, now)
@@ -16546,7 +16734,7 @@ def _wd_reminders(c, users, S, LG, now):
 
 def _wd_reminder(c, t, users, S, LG, now):
     rcpt = reminder_recipient(c, t, users)
-    s, lg = S.get(rcpt, USER_DEFAULTS), LG.get(rcpt, "en")
+    s = S.get(rcpt, USER_DEFAULTS)
     allday = s.get("allday_time") if valid_hm(s.get("allday_time")) else "09:00"
     base = datetime.fromisoformat(f"{t['due']}T{t['due_time'] or allday}").replace(tzinfo=TZ)
     fired = json.loads(t["reminded"] or "[]")
@@ -16560,17 +16748,24 @@ def _wd_reminder(c, t, users, S, LG, now):
             continue
         fired.append(key)
         changed = True
-        if now - at > timedelta(hours=6) or not rcpt or not notif_ok(c, rcpt, s, "reminder", "push"):
-            continue  # 2.1.0 (#317): reminders can be switched off in the notification settings
-        when = tr("all day", lg=lg) if not t["due_time"] else tr("at {0}", t["due_time"], lg=lg)
-        day = tr("today", lg=lg) if t["due"] == now.date().isoformat() else \
-            short_day(date.fromisoformat(t["due"]), lg)
-        lname = tr("Inbox", lg=lg) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
-        notify(rcpt, t["title"], tr("Due {0} {1} · {2}", day, when, lname, lg=lg),
-               push_prio(s, 4 if t["priority"] == 5 else None), f"{PUBLIC_URL}/#t/{t['id']}", s=s,
-               actions=[(tr("Snooze", lg=lg), f"{PUBLIC_URL}/#snooze/{t['id']}"),
-                        (tr("Done|action", lg=lg), f"{PUBLIC_URL}/#done/{t['id']}")],
-               task=t["id"], due=t["due"] if t["repeat"] else None)
+        if now - at > timedelta(hours=6):
+            continue
+        # 2.19.0 (#653): everyone who comes along gets it too (in their language, with their settings)
+        for who in ([rcpt] if rcpt else []) + reminder_people(c, t, users, rcpt):
+            sw, lgw = S.get(who, USER_DEFAULTS), LG.get(who, "en")
+            if not notif_ok(c, who, sw, "reminder", "push"):
+                continue  # 2.1.0 (#317): reminders can be switched off in the notification settings
+            when = tr("all day", lg=lgw) if not t["due_time"] else tr("at {0}", t["due_time"], lg=lgw)
+            day = tr("today", lg=lgw) if t["due"] == now.date().isoformat() else \
+                short_day(date.fromisoformat(t["due"]), lgw)
+            lname = tr("Inbox", lg=lgw) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
+            notify(who, t["title"], tr("Due {0} {1} · {2}", day, when, lname, lg=lgw),
+                   push_prio(sw, 4 if t["priority"] == 5 else None), f"{PUBLIC_URL}/#t/{t['id']}", s=sw,
+                   actions=[(tr("Snooze", lg=lgw), f"{PUBLIC_URL}/#snooze/{t['id']}"),
+                            (tr("Done|action", lg=lgw), f"{PUBLIC_URL}/#done/{t['id']}")],
+                   task=t["id"], due=t["due"] if t["repeat"] else None)
+        if not rcpt or not notif_ok(c, rcpt, s, "reminder", "push"):
+            continue
         if nag_minutes(t["nag"], t["list_nag"]):  # 2.7.0 (#413): this reminder counts as a nag (the next one an interval later)
             c.execute("UPDATE tasks SET nag_at=? WHERE id=?", (f"{nag_key(t)}|{now.isoformat()}", t["id"]))
     if changed:
@@ -18102,6 +18297,7 @@ def cal_loop():
                     if cal_due(r, now):
                         with GATE.bg():
                             cal_sync(c, r["id"])
+                contacts_due(c)  # 2.19.0 (#653): address books, once a day
             finally:
                 c.close()
         except Exception as e:  # noqa: BLE001
@@ -19569,7 +19765,12 @@ def task_core(r, tags, fields):
             "plan_start": r["plan_start"] if "plan_start" in r.keys() else None,  # 2.11.0: day plan slot
             # 2.18.0 (#430): a milestone / the milestone (a task of the same list) the task belongs to
             "milestone": bool(r["ms"]) if "ms" in r.keys() and r["ms"] else False,
-            "milestone_id": r["milestone_id"] if "milestone_id" in r.keys() else None}
+            "milestone_id": r["milestone_id"] if "milestone_id" in r.keys() else None,
+            # 2.19.0 (#653): birthday / anniversary / household deadline data, the household rotation, a kid's stars
+            "family": (_jparse(r["fam"]) or None) if "fam" in r.keys() else None,
+            "rotation": (_jparse(r["rotation"]) or None) if "rotation" in r.keys() else None,
+            "stars": r["stars"] if "stars" in r.keys() else None,
+            "people": list(r["people"]) if "people" in r.keys() else []}
 
 
 def waiting_of(r):
@@ -19597,7 +19798,8 @@ def task_for(c, row, uid):
 
 V1_TASK_IN = ("title", "notes", "list_id", "section_id", "parent_id", "priority", "due", "due_time", "start", "duration",
               "reminders", "repeat", "repeat_from", "url", "tags", "assignee_id", "pinned", "fields", "list_tags", "type",
-              "deadline", "deadline_in_today", "nag", "assignee_group_id", "plan_start", "milestone", "milestone_id")
+              "deadline", "deadline_in_today", "nag", "assignee_group_id", "plan_start", "milestone", "milestone_id",
+              "family", "rotation", "stars", "people")
 
 
 def v1_task_in(b, allowed=V1_TASK_IN):
@@ -19645,6 +19847,8 @@ def v1_task_in(b, allowed=V1_TASK_IN):
             if not isinstance(v, bool):
                 raise BadInput(tr("Invalid value: {0}", "milestone"))
             out["ms"] = 1 if v else 0
+        elif k == "family":  # 2.19.0 (#653): the column fam
+            out["fam"] = v
         else:
             out[k] = v
     if "deadline" in b or "deadline_in_today" in b:
@@ -19680,7 +19884,8 @@ def v1_list(d):
             "repos": d.get("repos") or [], "tickets": bool(d.get("tickets")),
             "nag": d.get("nag") or "", "day_hours": d.get("day_hours"),  # 2.7.0 (#413, #407)
             "columns": d.get("columns"),  # 2.14.0 (#425): the list's columns (null = default)
-            "project_type": d.get("ptype") or None}  # 2.18.0 (#408): agency | software | private, null = none
+            "project_type": d.get("ptype") or None,  # 2.18.0 (#408): agency | software | private, null = none
+            "family": d.get("family") or None}  # 2.19.0 (#653): shopping | meals | birthdays | household | packing, null = none
 
 
 # ---- token management (Settings > Account > API tokens; session / proxy login only, a token cannot reach these)
@@ -19894,7 +20099,8 @@ def v1_list_fields(c, lid=None):
 def v1_list_create():
     v1_args(())
     b = v1_json()
-    unknown = sorted(k for k in b if k not in ("name", "color", "folder", "checklist", "done_at_bottom", "kind", "tickets", "project_type", "nag", "day_hours"))
+    unknown = sorted(k for k in b if k not in ("name", "color", "folder", "checklist", "done_at_bottom", "kind", "tickets", "project_type", "nag", "day_hours",
+                                               "family"))
     if unknown:
         raise UnknownFields(unknown)
     later = {k: b.pop(k) for k in ("nag", "day_hours") if k in b}  # 2.7.0: set right after the list exists
@@ -19931,9 +20137,11 @@ def v1_list_patch(lid):
     v1_args(())
     b = v1_json()
     unknown = sorted(k for k in b if k not in ("name", "color", "folder", "view", "kind", "nag", "day_hours", "done_at_bottom", "checklist",
-                                               "listen_agent_ids", "columns", "archived", "project_type"))
+                                               "listen_agent_ids", "columns", "archived", "project_type", "family"))
     if unknown:
         raise UnknownFields(unknown)
+    if "family" in b and b["family"] is None:  # 2.19.0 (#653): null = an ordinary list
+        b = {**b, "family": ""}
     if "project_type" in b:  # 2.18.0 (#408): change the project type (owner / list admins; null / "" = none)
         if b["project_type"] not in (None, "") and b["project_type"] not in PTYPES:
             raise BadInput(tr("Invalid value: {0}", "project_type"))
@@ -21101,7 +21309,17 @@ def openapi_spec():
                       "no subtasks); see GET /tasks/{id}/milestone for its progress, burndown and release notes"},
         "milestone_id": nul("integer", description="2.18.0: the milestone (a task of the same list with milestone true) this task "
                             "belongs to, e.g. the release it ships in; cleared when the task moves to another list or the milestone "
-                            "is deleted / no milestone any more")}
+                            "is deleted / no milestone any more"),
+        # 2.19.0 (#653): the module Family
+        "family": {"type": ["object", "null"], "description": "2.19.0: a birthday / anniversary {kind: birthday | anniversary, name, year?, lead?} "
+                   "(a yearly task; age = due year - year) or a household deadline {kind: deadline, type, who, expires, notice (months), lead}; "
+                   "null = none. Easier: POST /family/occasions and /family/deadlines"},
+        "rotation": {"type": ["object", "null"], "description": "2.19.0: household rotation {who: [user ids of people sharing the list, "
+                     "at least 2], mode: done (the next person after each completion) | week (every Monday), i (whose turn, index; "
+                     "optional)}; sets the assignee; null = none"},
+        "stars": nul("integer", minimum=0, maximum=STARS_MAX, description="2.19.0: stars a kid account gets for completing it (null = 1)"),
+        "people": {"type": "array", "items": {"type": "integer"}, "description": "2.19.0: who comes along (user ids of people sharing "
+                   "the list): they see the task, also as participants, and get its reminders"}}
     task_in = {k: v for k, v in task_props.items() if k in V1_TASK_IN}
     task_in["priority"] = {"oneOf": [prio, {"type": "integer", "enum": list(PRIORITIES)}]}
     task_in["reminders"] = {"oneOf": [{"type": "array", "items": {"type": "integer"}}, {"type": "string"}]}
@@ -21149,7 +21367,10 @@ def openapi_spec():
             "status": nul("string", enum=[*LIST_STATUSES, None]), "progress": ref("Progress"), "created_at": {"type": "string", "format": "date-time"},
             "nag": {"type": "string", "enum": [x for x in NAG_VALUES if x != "off"], "description": "2.7.0: default nag interval of the list's tasks; empty = none"},
             "day_hours": nul("number", description="2.7.0: hours of a working day / shift for this list's time sums; null = the server's value"),
-            "columns": {"type": ["array", "null"], "items": {"type": "string"}, "description": COL_DOC}}},
+            "columns": {"type": ["array", "null"], "items": {"type": "string"}, "description": COL_DOC},
+            "family": nul("string", enum=[*[x for x in FAM_LIST_KINDS if x], None], description="2.19.0: what the list is for in the Family module: "
+                          "shopping (sections = shop areas, a new item goes to its area of last time, a shopping mode in the app), meals "
+                          "(the meal plan: due = the day, notes = ingredients), birthdays, household, packing; null = an ordinary list")}},
         "ListDetail": {"allOf": [ref("List"), {"type": "object", "properties": {"sections": {"type": "array", "items": ref("Section")},
             "fields": {"type": "array", "description": "2.14.0: the list's custom fields (ids for the columns f:<id>)",
                        "items": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "type": {"type": "string"}}}}}}]},
@@ -21162,9 +21383,15 @@ def openapi_spec():
             "tickets": {"type": "boolean", "description": "Ticket types on (2.4.0)"},
             "project_type": {"type": "string", "enum": list(PTYPES), "description": "2.4.0: a project of a built-in type (sections, "
                              "custom fields, view, ticket types; switches the modules it needs on for you); kind / checklist / tickets are ignored"},
+            "family": nul("string", enum=[*[x for x in FAM_LIST_KINDS if x], None], description="2.19.0: what the list is for in the Family module: "
+                          "shopping (sections = shop areas, a new item goes to its area of last time, a shopping mode in the app), meals "
+                          "(the meal plan: due = the day, notes = ingredients), birthdays, household, packing; null = an ordinary list"),
             "nag": {"type": "string", "enum": list(NAG_VALUES), "description": "2.7.0: default nag interval of the list's tasks (owner)"},
             "day_hours": nul("number", minimum=1, maximum=24, description="2.7.0: hours per day / shift (owner); null = the server's value")}},
         "ListPatch": {"type": "object", "additionalProperties": False, "properties": {
+            "family": nul("string", enum=[*[x for x in FAM_LIST_KINDS if x], None], description="2.19.0: what the list is for in the Family module: "
+                          "shopping (sections = shop areas, a new item goes to its area of last time, a shopping mode in the app), meals "
+                          "(the meal plan: due = the day, notes = ingredients), birthdays, household, packing; null = an ordinary list"),
             "name": {"type": "string"}, "color": {"type": "string"}, "folder": {"type": "string"},
             "view": {"type": "string", "enum": list(LIST_VIEWS)},
             "kind": {"type": "string", "enum": [*LIST_KINDS, *LIST_KIND_ALIASES], "description": "list | project; \"checklist\" is a deprecated alias of list + done_at_bottom"},
@@ -21463,6 +21690,7 @@ def openapi_spec():
     dayplan_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.10.0 (#440)
     api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.15.0 (#479)
     notes_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.17.0 (#442)
+    family_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.19.0 (#653)
     team_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.17.0 (#419)
     scope_refine(paths)
     _SPEC["s"] = {
@@ -21475,7 +21703,7 @@ def openapi_spec():
                  "license": {"name": "AGPL-3.0-only", "identifier": "AGPL-3.0-only"}},
         "servers": [{"url": API_PREFIX.rstrip("/")}],
         "security": [{"bearerAuth": []}],
-        "tags": [{"name": n} for n in ("Account", T, L, "Structure", "Roadmap", C, S_, TI, H, "Import", A, "Agents", "Groups", "Day plan", "Notes", "Team chat")],
+        "tags": [{"name": n} for n in ("Account", T, L, "Structure", "Roadmap", C, S_, TI, H, "Import", A, "Agents", "Groups", "Day plan", "Notes", "Team chat", "Family")],
         "paths": paths,
         "components": {"securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "abk_ token"}},
                        "schemas": schemas},
@@ -29931,6 +30159,8 @@ def tchat_read(rid):
         muted = b["muted"]
     c.execute("INSERT INTO tchat_reads(room_id,user_id,last_id,muted) VALUES(?,?,?,?) ON CONFLICT(room_id,user_id) "
               "DO UPDATE SET last_id=excluded.last_id, muted=excluded.muted", (rid, me(), max(lr, lid), int(muted)))
+    if lid and not c.execute("SELECT 1 FROM tchat_msgs WHERE room_id=? AND id>?", (rid, max(lr, lid))).fetchone():
+        push_handled(c, me(), [], (f"team-{rid}",))  # 2.19.0 (#668): read here = its notification closes elsewhere
     c.commit()
     return jsonify(ok=True, last_id=max(lr, lid), muted=muted, unread=tchat_unread(c, me()))
 
@@ -30378,6 +30608,1699 @@ def mail_test():
         return err(tr("Sending failed: {0}", type(e).__name__), 502)
     return jsonify(ok=True, to=u["email"].strip())
 
+
+
+# ---------------------------------------------------------------- 2.19.0 (#653): the module "Family"
+# A module like Habits (features key "family", off by default; the setup question "What do you use Kalmido for?" turns it
+# on for "Family"). Everything is made of the usual objects, so calendar, reminders, pushes, sharing, the API and CalDAV
+# keep working:
+#   birthdays / anniversaries = yearly tasks with tasks.fam {kind, name, year, lead, src?}; the age ("turns 80") is the
+#     due year minus the year; gift ideas are the subtasks (kept ticked when the year rolls on: what was given stays);
+#     optional import from CardDAV contacts (BDAY / ANNIVERSARY, contact_srcs: address + login, password sealed like a
+#     calendar subscription, synced by hand and once a day)
+#   household rotation = tasks.rotation {who: [user ids], mode: done | week, i, wk}: the assignee moves on to the next
+#     person when the task is completed (mode done) or every Monday (mode week)
+#   kids = users.kid: an account that only takes part (participant role in every list, enforced), a simple view in the
+#     app, stars for completed tasks (tasks.stars, default 1; ledger kid_stars) and rewards the parents (kid_parents,
+#     admins) approve; rewards: kid_rewards
+#   family events = task_people: who comes along; they see the task (also as participants) and get its reminders
+#   shopping = a list with lists.family 'shopping': its sections are the shop areas (defaults on creation), a new item
+#     goes to the area it had last time (shop_memory), the app has a shopping mode with big ticks
+#   household deadlines = tasks with fam {kind: deadline, type, who, expires, notice, lead} from built-in types (passport,
+#     ID card, car inspection, insurance, contract, other); a Paperless document is linked like on any task
+#   meal plan = tasks of a list with family 'meals' (due = the day, notes = the ingredients); one tap puts the
+#     ingredients on a shopping list (POST /api/tasks/<id>/to-shopping, open items are not doubled)
+#   packing lists = built-in templates (holiday, pool, daycare, camping, business trip) -> a list with "done at the
+#     bottom" (reusable)
+# Rights: the usual list roles; rewards / stars of a kid only its parents (and admins); a kid requests rewards.
+from dateutil.relativedelta import relativedelta  # noqa: E402
+
+FAM_LIST_KINDS = ("", "shopping", "meals", "birthdays", "household", "packing")
+FAM_OCC = ("birthday", "anniversary")
+FAM_NAME_MAX, FAM_NOTE_MAX = 100, 200
+FAM_LEAD_MAX = 365
+STARS_MAX = 50
+ROT_MAX = 20
+KID_REWARDS_MAX, REWARD_COST_MAX = 50, 1000
+CONTACT_SRCS_MAX, CONTACT_CARDS_MAX = 5, 3000
+CONTACT_EVERY_MIN = 24 * 60  # minutes between automatic syncs of an address book (CAL_TICK seconds per minute)
+SHOP_AREAS = (N_("Fruit & vegetables"), N_("Bread & bakery"), N_("Dairy & eggs"), N_("Meat & fish"), N_("Frozen"),
+              N_("Pantry"), N_("Drinks"), N_("Household & drugstore"))
+# deadline types: name, title template ({0} = who / what), lead days, repeat, notice months (0 = the date itself is due)
+FAM_DL = {
+    "passport": (N_("Passport"), N_("Renew the passport: {0}"), 90, "", 0),
+    "id_card": (N_("ID card"), N_("Renew the ID card: {0}"), 60, "", 0),
+    "car": (N_("Car inspection"), N_("Car inspection: {0}"), 30, "FREQ=YEARLY;INTERVAL=2", 0),
+    "insurance": (N_("Insurance"), N_("Cancel or renew the insurance: {0}"), 21, "FREQ=YEARLY", 3),
+    "contract": (N_("Contract"), N_("Cancel or renew the contract: {0}"), 14, "FREQ=YEARLY", 1),
+    "other": (N_("Other deadline"), "{0}", 14, "", 0),
+}
+# packing list templates: name, [(section, [items])]
+PACKING = {
+    "holiday": (N_("Holiday"), [
+        (N_("Documents"), (N_("Passports or ID cards"), N_("Tickets and bookings"), N_("Health insurance cards"), N_("Cash and cards"))),
+        (N_("Clothes"), (N_("Underwear and socks"), N_("T-shirts"), N_("Trousers"), N_("Jumper"), N_("Rain jacket"), N_("Pyjamas"), N_("Swimwear"))),
+        (N_("Toiletries"), (N_("Toothbrush and toothpaste"), N_("Sun cream"), N_("Medicines"), N_("Plasters"))),
+        (N_("Electronics"), (N_("Phone chargers"), N_("Power bank"), N_("Headphones"), N_("Travel adapter"))),
+        (N_("For the kids"), (N_("Cuddly toy"), N_("Snacks for the journey"), N_("Books and games")))]),
+    "pool": (N_("Swimming pool"), [
+        ("", (N_("Swimwear"), N_("Towels"), N_("Shower gel and shampoo"), N_("Flip-flops"), N_("Swimming goggles"),
+              N_("Sun cream"), N_("Water bottle"), N_("Snacks"), N_("Coin for the locker"), N_("Hairbrush")))]),
+    "daycare": (N_("Daycare"), [
+        ("", (N_("Change of clothes"), N_("Nappies and wipes"), N_("Indoor shoes"), N_("Rain gear"), N_("Sun hat"),
+              N_("Water bottle"), N_("Lunch box"), N_("Cuddly toy"), N_("Sun cream")))]),
+    "camping": (N_("Camping"), [
+        (N_("Sleeping"), (N_("Tent"), N_("Sleeping bags"), N_("Sleeping mats"), N_("Pillows"))),
+        (N_("Kitchen"), (N_("Camping stove and gas"), N_("Lighter"), N_("Pots and cutlery"), N_("Washing-up bowl"), N_("Bin bags"))),
+        (N_("Other"), (N_("Torch or head torch"), N_("First aid kit"), N_("Insect repellent"), N_("Rope and pegs")))]),
+    "business": (N_("Business trip"), [
+        ("", (N_("Laptop and charger"), N_("Phone chargers"), N_("Business clothes"), N_("Documents for the meeting"),
+              N_("Tickets and bookings"), N_("Toiletries"), N_("Headphones")))]),
+}
+# what each answer of "What do you use Kalmido for?" switches on / off (agents and Paperless stay as they are)
+PURPOSES = ("me", "family", "team", "software")
+PURPOSE_MODS = ("cal", "timeline", "matrix", "kanban", "habits", "pomo", "stats", "comments", "collab", "time", "progress",
+                "deps", "fields", "family")
+PURPOSE_ON = {"me": ("cal",),
+              "family": ("cal", "habits", "comments", "collab", "family"),
+              "team": tuple(m for m in PURPOSE_MODS if m != "family"),
+              "software": tuple(m for m in PURPOSE_MODS if m != "family")}
+
+
+# 2.19.0: what a child account may change: tick / untick (and undo) the tasks it sees, ask for a reward, its own
+# account (name, password, picture, sign-in, push, settings), the news it has read. Everything else is read-only.
+KID_WRITE = re.compile(r"^/api/(auth/.+|me|me/(avatar|2fa/.+|passkeys(/.*)?)|push/.+|news/(read|dismiss)|settings"
+                       r"|tasks/\d+/(complete|reopen|undo)|family/rewards/\d+/request)$")
+
+
+def is_kid(c, uid):
+    r = c.execute("SELECT kid FROM users WHERE id=?", (uid,)).fetchone() if uid else None
+    return bool(r and r[0])
+
+
+def kid_parents(c, kid):
+    return [r[0] for r in c.execute("""SELECT p.parent_id FROM kid_parents p JOIN users u ON u.id=p.parent_id
+                                       WHERE p.kid_id=? AND u.disabled=0 ORDER BY p.parent_id""", (kid,))]
+
+
+def parent_of(c, uid, kid):
+    """uid may look after kid: a parent of it, or an admin."""
+    if not is_kid(c, kid) or uid == kid:
+        return False
+    u = c.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone()
+    return bool(u and u[0]) or uid in kid_parents(c, kid)
+
+
+def need_kid(c, kid, parent=True):
+    """404 unless kid is a kid account the current user looks after (parent) or is (parent=False also lets the kid in)."""
+    if not is_kid(c, kid) or not (parent_of(c, me(), kid) or (not parent and kid == me())):
+        raise Denied(404)
+
+
+def kid_set(c, uid, on, parents=None):
+    """Admins: make uid a kid account (or an ordinary one again) and set who looks after it. Error text or None."""
+    u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
+    if on:
+        if u["is_admin"]:
+            return tr("A child account cannot be an admin")
+        if is_agent(u):
+            return tr("An agent cannot be a child account")
+    if parents is not None:
+        if not isinstance(parents, list) or len(parents) > 20 or any(isinstance(x, bool) or not isinstance(x, int) for x in parents):
+            return tr("Invalid value: {0}", "parents")
+        for p in parents:
+            r = c.execute("SELECT kind, kid, disabled FROM users WHERE id=?", (p,)).fetchone()
+            if not r or p == uid or r["kind"] == "agent" or r["kid"] or r["disabled"]:
+                return tr("Parents must be active people without a child account")
+    c.execute("UPDATE users SET kid=? WHERE id=?", (1 if on else 0, uid))
+    if on:
+        kid_force_participant(c, uid)
+        if parents is None and not kid_parents(c, uid) and has_request_context():
+            parents = [me()]
+    if parents is not None:
+        c.execute("DELETE FROM kid_parents WHERE kid_id=?", (uid,))
+        for p in dict.fromkeys(parents):
+            c.execute("INSERT INTO kid_parents(kid_id,parent_id) VALUES(?,?)", (uid, p))
+    return None
+
+
+def kid_balance(c, kid):
+    return c.execute("SELECT COALESCE(SUM(delta),0) FROM kid_stars WHERE kid_id=?", (kid,)).fetchone()[0]
+
+
+def kid_force_participant(c, kid):
+    """A kid takes part in shared lists only as a participant (sees only what is assigned to it or where it comes along)."""
+    c.execute("""UPDATE list_members SET role='participant',
+                 own_role=CASE WHEN own_role IS NULL THEN NULL ELSE 'participant' END,
+                 grole=CASE WHEN grole IS NULL THEN NULL ELSE 'participant' END WHERE user_id=?""", (kid,))
+
+
+def _jparse(v):
+    if isinstance(v, (dict, list)):
+        return v
+    try:
+        return json.loads(v) if v else None
+    except ValueError:
+        return None
+
+
+# ---- tasks: the family fields (fam, rotation, stars, people)
+def clean_fam(v):
+    """tasks.fam from a client: {kind: birthday | anniversary, name, year?, lead?} or {kind: deadline, type, who?, expires?,
+    notice?, lead?}; null / '' / {} = none. Returns the stored JSON text."""
+    if v in (None, "", {}):
+        return ""
+    if isinstance(v, str):
+        v = _jparse(v)
+    bad = BadInput(tr("Invalid value: {0}", "family"))
+    if not isinstance(v, dict):
+        raise bad
+    k = v.get("kind")
+    out = {"kind": k}
+    if k in FAM_OCC:
+        allowed = {"kind", "name", "year", "lead", "src", "card"}
+        name = v.get("name", "")
+        if not isinstance(name, str):
+            raise bad
+        out["name"] = re.sub(r"\s+", " ", name).strip()[:FAM_NAME_MAX]
+        y = v.get("year")
+        if y not in (None, ""):
+            y = as_int(y, "year", DATE_MIN_Y, local_now().year)
+            out["year"] = y
+        if isinstance(v.get("src"), str) and v["src"]:
+            out["src"] = v["src"][:200]
+        if isinstance(v.get("card"), str) and v["card"]:
+            out["card"] = v["card"][:200]  # the vCard UID of an imported contact (kept for a later contacts module)
+    elif k == "deadline":
+        allowed = {"kind", "type", "who", "expires", "notice", "lead"}
+        if v.get("type", "other") not in FAM_DL:
+            raise bad
+        out["type"] = v.get("type", "other")
+        who = v.get("who", "")
+        if not isinstance(who, str):
+            raise bad
+        out["who"] = re.sub(r"\s+", " ", who).strip()[:FAM_NAME_MAX]
+        if v.get("expires") not in (None, ""):
+            if not valid_date(v["expires"]):
+                raise bad
+            out["expires"] = v["expires"]
+        if v.get("notice") not in (None, ""):
+            out["notice"] = as_int(v["notice"], "notice", 0, 24)
+    else:
+        raise bad
+    if set(v) - allowed:
+        raise bad
+    if v.get("lead") not in (None, ""):
+        out["lead"] = as_int(v["lead"], "lead", 0, FAM_LEAD_MAX)
+    return json.dumps(out, ensure_ascii=False, separators=(",", ":"))
+
+
+def clean_rotation(v):
+    """The shape of tasks.rotation from a client ({who: [ids], mode, i?}); the people are checked against the list later
+    (rot_apply). null / '' = no rotation."""
+    if v in (None, "", {}):
+        return ""
+    if isinstance(v, str):
+        v = _jparse(v)
+    bad = BadInput(tr("Invalid value: {0}", "rotation"))
+    if not isinstance(v, dict) or set(v) - {"who", "mode", "i", "wk"}:
+        raise bad
+    who = v.get("who")
+    if not isinstance(who, list) or not 2 <= len(who) <= ROT_MAX or any(isinstance(x, bool) or not isinstance(x, int) or x < 1 for x in who) \
+            or len(set(who)) != len(who):
+        raise BadInput(tr("Taking turns needs at least two people"))
+    mode = v.get("mode", "done")
+    if mode not in ("done", "week"):
+        raise bad
+    i = v.get("i")  # null = keep the turn where it is (or with the current assignee)
+    if i is not None and (isinstance(i, bool) or not isinstance(i, int) or not 0 <= i < len(who)):
+        raise bad
+    return json.dumps({"who": who, "mode": mode, "i": i}, separators=(",", ":"))
+
+
+def iso_week(d=None):
+    d = d or local_now().date()
+    y, w, _ = d.isocalendar()
+    return f"{y}-W{w:02d}"
+
+
+def rot_apply(c, f, cur, lid):
+    """apply_update / task_create: a new rotation (f["rotation"]) is checked against the people of list lid and sets the
+    assignee to the person whose turn it is (the current assignee keeps it when they are in the new order). Error text."""
+    if "rotation" not in f:
+        if cur is not None and cur["rotation"] and lid != cur["list_id"]:  # moved: only people of the new list stay in
+            r = _jparse(cur["rotation"]) or {}
+            ppl = list_people(c, lid)
+            who = [x for x in r.get("who", []) if x in ppl]
+            f["rotation"] = json.dumps({**r, "who": who, "i": 0}, separators=(",", ":")) if len(who) >= 2 else ""
+        return None
+    if not f["rotation"]:
+        return None
+    r = json.loads(f["rotation"])
+    if not collab_all():
+        return tr("Collaboration is turned off on this server (an admin can turn it on)")
+    ppl = list_people(c, lid)
+    agents = agent_ids(c)
+    if any(x not in ppl or x in agents for x in r["who"]):
+        return tr("Only people who share this list can take turns")
+    if any(c.execute("SELECT disabled FROM users WHERE id=?", (x,)).fetchone()[0] for x in r["who"]):
+        return tr("Only people who share this list can take turns")
+    old = _jparse(cur["rotation"]) if cur is not None and cur["rotation"] else None
+    have = f.get("assignee_id", cur["assignee_id"] if cur is not None else None)
+    if r["i"] is None:
+        if old and old.get("who") == r["who"] and 0 <= (old.get("i") or 0) < len(r["who"]):
+            r["i"] = old.get("i") or 0
+        else:
+            r["i"] = r["who"].index(have) if have in r["who"] else 0
+    if r["mode"] == "week":
+        r["wk"] = old.get("wk") if old and old.get("mode") == "week" and old.get("wk") else iso_week()
+    f["rotation"] = json.dumps(r, separators=(",", ":"))
+    f["assignee_id"] = r["who"][r["i"]]
+    f["assignee_group_id"] = None
+    return None
+
+
+def rot_next(c, t):
+    """(next assignee, new rotation JSON) after one turn of task row t, skipping people who lost the list; None = no change."""
+    r = _jparse(t["rotation"])
+    if not r or not r.get("who"):
+        return None
+    ppl = list_people(c, t["list_id"])
+    who, n = r["who"], len(r["who"])
+    for step in range(1, n + 1):
+        j = (r.get("i", 0) + step) % n
+        u = c.execute("SELECT disabled FROM users WHERE id=?", (who[j],)).fetchone()
+        if who[j] in ppl and u and not u[0]:
+            r["i"] = j
+            return who[j], json.dumps(r, separators=(",", ":"))
+    return None
+
+
+def people_set(c, tid, lid, v):
+    """task_people of task tid (list lid): [user ids] of people who share the list (who comes along). Error text or None."""
+    if v in (None, ""):
+        v = []
+    if not isinstance(v, list) or len(v) > 50 or any(isinstance(x, bool) or not isinstance(x, int) for x in v):
+        return tr("Invalid value: {0}", "people")
+    ppl = list_people(c, lid)
+    agents = agent_ids(c)
+    if any(x not in ppl or x in agents for x in v):
+        return tr("Only people who share this list can come along")
+    c.execute("DELETE FROM task_people WHERE task_id=?", (tid,))
+    for x in dict.fromkeys(v):
+        c.execute("INSERT OR IGNORE INTO task_people(task_id,user_id) VALUES(?,?)", (tid, x))
+    return None
+
+
+def people_of(c, ids):
+    out = {}
+    if not ids:
+        return out
+    ids = list(ids)
+    for i in range(0, len(ids), 900):
+        part = ids[i:i + 900]
+        for r in c.execute(f"SELECT task_id, user_id FROM task_people WHERE task_id IN ({','.join('?' * len(part))}) ORDER BY user_id", part):
+            out.setdefault(r[0], []).append(r[1])
+    return out
+
+
+def fam_task_out(d):
+    """load_tasks / task_dict: fam and rotation as objects (absent when empty), stars only when set."""
+    for k in ("fam", "rotation"):
+        if k in d:
+            v = _jparse(d[k]) if d[k] else None
+            if v:
+                d[k] = v
+            else:
+                d.pop(k, None)
+    if d.get("stars") is None:
+        d.pop("stars", None)
+    return d
+
+
+# ---- stars of kids
+def stars_earn(c, t, at):
+    """do_complete: a kid completed task t (row before the change): stars (tasks.stars, default 1) into the ledger."""
+    uid = me() if has_request_context() and getattr(g, "user", None) else None
+    stars_add(c, uid, t, at)
+
+
+def stars_add(c, kid, t, at):
+    """The stars of task t for kid (a kid account) at the completion time at."""
+    if not kid or not is_kid(c, kid):
+        return
+    n = t["stars"] if t["stars"] is not None else 1
+    if n > 0:
+        c.execute("INSERT INTO kid_stars(kid_id,delta,kind,task_id,title,by_id,at,created_at) VALUES(?,?,?,?,?,?,?,?)",
+                  (kid, n, "task", t["id"], (t["title"] or "")[:200], kid, at, iso(now_utc())))
+
+
+def stars_revoke(c, tid, at=None, kid=None):
+    """A completion taken back (reopen / undo): its stars leave the ledger again (the newest row of that task / moment)."""
+    q, a = "SELECT id FROM kid_stars WHERE task_id=? AND kind='task'", [tid]
+    if at:
+        q += " AND at=?"
+        a.append(at)
+    if kid:
+        q += " AND kid_id=?"
+        a.append(kid)
+    r = c.execute(q + " ORDER BY id DESC LIMIT 1", a).fetchone()
+    if r:
+        c.execute("DELETE FROM kid_stars WHERE id=?", (r[0],))
+
+
+# ---- occasions (birthdays, anniversaries)
+def occ_next(month, day, today=None):
+    """The next date (today included) of a yearly day; 29 February falls on the 28th in other years."""
+    today = today or local_now().date()
+    for y in (today.year, today.year + 1, today.year + 2):
+        try:
+            d = date(y, month, day)
+        except ValueError:
+            d = date(y, month, 28)
+        if d >= today:
+            return d
+    return date(today.year + 1, month, min(day, 28))
+
+
+def occ_rule(month, day):
+    return "FREQ=YEARLY;BYMONTH=2;BYMONTHDAY=-1" if (month, day) == (2, 29) else "FREQ=YEARLY"
+
+
+def fam_list(c, uid, kind, create=True):
+    """The first list of family kind `kind` the user may write (own first), created when missing (create)."""
+    r = c.execute(f"""SELECT id FROM lists WHERE family=? AND archived=0 AND id IN {wr_sql()}
+                      ORDER BY owner_id!=?, id LIMIT 1""", (kind, uid, uid, uid)).fetchone()
+    if r:
+        return r[0]
+    if not create:
+        return None
+    return fam_list_create(c, uid, kind)
+
+
+FAM_LIST_NAMES = {"shopping": N_("Shopping list"), "meals": N_("Meal plan"), "birthdays": N_("Birthdays"),
+                  "household": N_("Household"), "packing": N_("Packing list")}
+FAM_LIST_COLORS = {"shopping": "#22c55e", "meals": "#f59e0b", "birthdays": "#ec4899", "household": "#0ea5e9", "packing": "#8b5cf6"}
+
+
+def fam_list_create(c, uid, kind, name=None, folder=""):
+    lg = lang(c, uid)
+    lid = c.execute("""INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind,family)
+                       VALUES(?,?,?,?,?,?,?,?,?,?)""",
+                    (name or tr(FAM_LIST_NAMES[kind], lg=lg), FAM_LIST_COLORS.get(kind, ""), folder, my_max_sort(c, uid) + 1, "list",
+                     iso(now_utc()), uid, 1 if kind in ("shopping", "packing") else 0, "list", kind)).lastrowid
+    if kind == "shopping":
+        shop_areas_add(c, lid, lg)
+    agent_autoshare(c, uid, lid)
+    grp_touch(c, uid)
+    return lid
+
+
+def shop_areas_add(c, lid, lg):
+    """The default shop areas as the sections of a shopping list (the ones it already has by name are skipped)."""
+    have = {r[0].strip().casefold() for r in c.execute("SELECT name FROM sections WHERE list_id=?", (lid,))}
+    n = c.execute("SELECT COALESCE(MAX(sort),0) FROM sections WHERE list_id=?", (lid,)).fetchone()[0]
+    added = 0
+    for a in SHOP_AREAS:
+        t = tr(a, lg=lg)
+        if t.casefold() in have:
+            continue
+        n += 1
+        added += 1
+        c.execute("INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, t, n))
+    return added
+
+
+def occ_create(c, uid, b, check=True):
+    """{name, kind?, date (YYYY-MM-DD or --MM-DD), year?, lead_days?, list_id?, gifts?: [..]} -> the new task id.
+    check=False: the caller checked the list (background sync of an address book, no request)."""
+    name = b.get("name")
+    if not isinstance(name, str) or not name.strip():
+        raise BadInput(tr("Please enter a name"))
+    kind = b.get("kind", "birthday")
+    if kind not in FAM_OCC:
+        raise BadInput(tr("Invalid value: {0}", "kind"))
+    d = b.get("date")
+    m = re.fullmatch(r"(\d{4}|-{2})-?(\d{2})-?(\d{2})", d.strip()) if isinstance(d, str) else None
+    if not m:
+        raise BadInput(tr("Invalid value: {0}", tr("Date")))
+    mo, dy = int(m.group(2)), int(m.group(3))
+    try:
+        date(2000, mo, dy)
+    except ValueError:
+        raise BadInput(tr("Invalid value: {0}", tr("Date"))) from None
+    year = int(m.group(1)) if m.group(1).isdigit() else None
+    if b.get("year") not in (None, ""):
+        year = as_int(b["year"], "year", DATE_MIN_Y, local_now().year)
+    if year is not None and not DATE_MIN_Y <= year <= local_now().year:
+        raise BadInput(tr("Invalid value: {0}", "year"))
+    lead = as_int(b.get("lead_days", 7), "lead_days", 0, FAM_LEAD_MAX)
+    lid = b.get("list_id")
+    if lid not in (None, ""):
+        lid = as_int(lid, "list_id", 1)
+        if check:
+            need_list(c, lid)
+    else:
+        lid = fam_list(c, uid, "birthdays")
+    name = re.sub(r"\s+", " ", name).strip()[:FAM_NAME_MAX]
+    lg = lang(c, uid)
+    fam = {"kind": kind, "name": name, "lead": lead, **({"year": year} if year else {})}
+    if b.get("src"):
+        fam["src"] = str(b["src"])[:200]
+    due = occ_next(mo, dy)
+    ts = iso(now_utc())
+    rem = ",".join(dict.fromkeys(str(x) for x in ([lead * 1440] if lead else []) + [0]))
+    title = tr("Birthday: {0}", name, lg=lg) if kind == "birthday" else tr("Anniversary: {0}", name, lg=lg)
+    tid = c.execute("""INSERT INTO tasks(list_id,title,due,reminders,repeat,sort,created_at,updated_at,created_by,fam)
+                       VALUES(?,?,?,?,?,?,?,?,?,?)""",
+                    (lid, title[:TITLE_MAX], due.isoformat(), rem, occ_rule(mo, dy),
+                     c.execute("SELECT COALESCE(MIN(sort),0)-1 FROM tasks WHERE list_id=? AND parent_id IS NULL", (lid,)).fetchone()[0],
+                     ts, ts, uid, json.dumps(fam, ensure_ascii=False, separators=(",", ":")))).lastrowid
+    log_act(c, tid, "created", uid=uid)
+    gifts = b.get("gifts") or []
+    if not isinstance(gifts, list) or len(gifts) > 50 or not all(isinstance(x, str) for x in gifts):
+        raise BadInput(tr("Invalid value: {0}", "gifts"))
+    for i, gft in enumerate(x.strip()[:TITLE_MAX] for x in gifts if x.strip()):
+        c.execute("INSERT INTO tasks(list_id,parent_id,title,sort,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?,?)",
+                  (lid, tid, gft, i + 1, ts, ts, uid))
+    return tid
+
+
+def deadline_create(c, uid, b):
+    """{type, who?, expires (YYYY-MM-DD), notice_months?, lead_days?, title?, list_id?} -> the new task id."""
+    k = b.get("type", "other")
+    if k not in FAM_DL:
+        raise BadInput(tr("Invalid value: {0}", "type"))
+    name, tpl, lead0, rep, notice0 = FAM_DL[k]
+    exp = b.get("expires")
+    if not valid_date(exp):
+        raise BadInput(tr("Please enter the date"))
+    who = b.get("who") or ""
+    if not isinstance(who, str):
+        raise BadInput(tr("Invalid value: {0}", "who"))
+    who = re.sub(r"\s+", " ", who).strip()[:FAM_NAME_MAX]
+    notice = as_int(b.get("notice_months", notice0), "notice_months", 0, 24)
+    lead = as_int(b.get("lead_days", lead0), "lead_days", 0, FAM_LEAD_MAX)
+    lid = b.get("list_id")
+    if lid not in (None, ""):
+        lid = as_int(lid, "list_id", 1)
+        need_list(c, lid)
+    else:
+        lid = fam_list(c, uid, "household")
+    lg = lang(c, uid)
+    title = b.get("title")
+    if not isinstance(title, str) or not title.strip():
+        if k == "other" and not who:
+            raise BadInput(tr("Please enter a name"))
+        title = tr(tpl, who or tr(name, lg=lg), lg=lg) if tpl != "{0}" else who
+    if rep and rr_problem(rep):
+        rep = ""
+    end = date.fromisoformat(exp)
+    due = end - relativedelta(months=notice)
+    step = {"FREQ=YEARLY": 1, "FREQ=YEARLY;INTERVAL=2": 2}.get(rep, 0)
+    while step and due < local_now().date():  # a recurring contract whose last chance has passed: the next term
+        end += relativedelta(years=step)
+        due = end - relativedelta(months=notice)
+        exp = end.isoformat()
+    ts = iso(now_utc())
+    fam = {"kind": "deadline", "type": k, "who": who, "expires": exp, "notice": notice, "lead": lead}
+    rem = ",".join(dict.fromkeys(str(x) for x in ([lead * 1440] if lead else []) + [0]))
+    tid = c.execute("""INSERT INTO tasks(list_id,title,due,reminders,repeat,deadline,priority,sort,created_at,updated_at,created_by,fam)
+                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (lid, title.strip()[:TITLE_MAX], due.isoformat(), rem, rep, 2, 3,
+                     c.execute("SELECT COALESCE(MIN(sort),0)-1 FROM tasks WHERE list_id=? AND parent_id IS NULL", (lid,)).fetchone()[0],
+                     ts, ts, uid, json.dumps(fam, ensure_ascii=False, separators=(",", ":")))).lastrowid
+    log_act(c, tid, "created", uid=uid)
+    return tid
+
+
+# ---- shopping
+_QTY = re.compile(r"^\s*(?:ca\.?\s*)?[\d½¼¾⅓⅔]+(?:[.,/][\d]+)?\s*(?:x|×|kg|g|gr|mg|l|ml|cl|dl|liter|litre|liters|litres|stk\.?|stück|"
+                  r"pck\.?|pack|packs|packung|packungen|dose|dosen|can|cans|bund|bunch|el|tl|tbsp|tsp|cups?|pcs|pieces?|"
+                  r"becher|glas|gläser|flasche|flaschen|bottles?|scheiben|slices?|zehen|cloves?|prise|pinch)?\b\.?\s*", re.I)
+
+
+def shop_key(title):
+    """An item name without its amount, for the area memory and for not adding an item twice ("2 l Milch" = "milch")."""
+    s = re.sub(r"\s*\([^)]*\)\s*$", "", str(title or "")).strip()
+    s2 = _QTY.sub("", s, count=1)
+    s = s2 if s2.strip() else s
+    return re.sub(r"[\s.,;:!?]+", " ", s).strip().casefold()[:120]
+
+
+def shop_remember(c, lid, title, sid):
+    k = shop_key(title)
+    if not k:
+        return
+    if sid:
+        c.execute("INSERT INTO shop_memory(list_id,item,section_id,at) VALUES(?,?,?,?) ON CONFLICT(list_id,item) "
+                  "DO UPDATE SET section_id=excluded.section_id, at=excluded.at", (lid, k, sid, iso(now_utc())))
+    else:
+        c.execute("DELETE FROM shop_memory WHERE list_id=? AND item=?", (lid, k))
+
+
+# 2.19.0: a first guess for items the list has not seen yet (index into SHOP_AREAS -> word stems in the six languages).
+# Words under 4 letters only count as a whole word; longer ones also as the start or (German compounds) the end of a word.
+SHOP_GUESS = (
+    "apple apfel äpfel pomme manzana mela appel banan plátano platano tomat pomodor onion zwiebel oignon cebolla cipoll "
+    "potato kartoffel patata aardappel carrot karotte möhre carotte zanahoria carot wortel salad salat lettuce cucumber "
+    "gurke concombre pepino cetriol komkommer paprika lemon zitrone citron limón limon limone citroen orange naranja "
+    "arancia sinaasappel grape traube raisin uva druif berry beere fraise strawberr erdbeer fresa fragol aardbei garlic "
+    "knoblauch ail ajo aglio knoflook mushroom pilz champignon avocado broccoli brokkoli spinach spinat épinard espinaca "
+    "spinac spinazie zucchini courgette herbs kräuter basil basilikum parsley petersilie fruit obst frucht fruta frutta "
+    "gemüse vegetable légume verdur groente pear birne poire pera peer kiwi melon ingwer ginger leek lauch porree celery "
+    "sellerie cabbage kohl",
+    "bread brot brötchen pain baguette pan pane brood croissant roll rolls semmel toast bagel cake kuchen gâteau torta "
+    "taart bun buns",
+    "milk milch lait leche latte melk cheese käse fromage queso formaggio kaas parmesan parmigiano mozzarella gouda feta "
+    "butter beurre mantequilla burro boter yogh joghurt yaourt yogur cream sahne crème nata panna quark egg eggs eier ei "
+    "œuf oeuf oeufs huevo uova uovo eieren skyr",
+    "meat fleisch viande carne vlees chicken hähnchen huhn poulet pollo kip beef rind boeuf bœuf ternera manzo pork "
+    "schwein porc cerdo maiale varken ham schinken jambon jamón prosciutto sausage wurst würstchen saucisse salchicha "
+    "salsiccia worst bacon speck mince hack steak fish fisch poisson pescado pesce vis salmon lachs saumon salmón salmone "
+    "zalm tuna thunfisch thon atún tonno tonijn shrimp garnele crevette gamba turkey pute salami",
+    "frozen tiefkühl tk surgelé congelad surgelat diepvries eis glace helado gelato ijs fischstäbchen",
+    "pasta nudel noodle spaghetti penne fusilli rice reis riz arroz riso rijst flour mehl farine harina farina meel sugar "
+    "zucker sucre azúcar zucchero suiker salt salz sel sal sale zout oil öl huile aceite olio olie vinegar essig vinaigre "
+    "vinagre aceto azijn sauce soße sugo saus ketchup mustard senf moutarde mostaza senape mosterd honey honig miel "
+    "miele honing jam marmelade confiture mermelada marmellata cereal müsli muesli oats hafer cornflakes coffee kaffee "
+    "café caffè koffie tea tee thé té tè thee chocolate schokolade chocolat cioccolat chocola beans bohnen lentil linsen "
+    "crackers chips nuts nüsse noix spice gewürz pfeffer poivre pimienta",
+    "water wasser eau agua acqua juice saft jus zumo succo sap beer bier bière cerveza birra wine wein vin vino wijn cola "
+    "soda lemonade limo limonade sprudel tonic mineral",
+    "toilet toiletten klopapier detergent waschmittel lessive detergente wasmiddel soap seife savon jabón sapone zeep "
+    "shampoo shampoing champú toothpaste zahnpasta dentifrice dentífrico dentifricio tandpasta washing spülmittel "
+    "vaisselle müllbeutel sponge schwamm éponge esponja spugna spons tissue taschentücher kitchen küchenrolle nappies "
+    "windeln couches pañales pannolini luiers deo deodorant battery batterie batterien pile pila foil folie cleaner "
+    "reiniger",
+)
+
+
+def shop_guess(title):
+    """The SHOP_AREAS index a new item probably belongs to, or None. Whole words first, then word ends (German
+    compounds: "Vollkornbrot"), then word starts ("tomatoes")."""
+    toks = [t for t in re.split(r"[\s\-/,;&+]+", shop_key(title)) if t]
+    areas = [w.casefold().split() for w in SHOP_GUESS]
+    for test in (lambda t, w: t == w, lambda t, w: len(w) >= 4 and t.endswith(w), lambda t, w: len(w) >= 4 and t.startswith(w)):
+        for t in toks:
+            for i, ws in enumerate(areas):
+                if any(test(t, w) for w in ws):
+                    return i
+    return None
+
+
+def shop_area_of(c, lid, title):
+    r = c.execute("SELECT m.section_id FROM shop_memory m JOIN sections s ON s.id=m.section_id AND s.list_id=m.list_id "
+                  "WHERE m.list_id=? AND m.item=?", (lid, shop_key(title))).fetchone()
+    if r:
+        return r[0]
+    i = shop_guess(title)
+    if i is None:
+        return None
+    names = {tr(SHOP_AREAS[i], lg=lg).casefold() for lg in LANGS} | {SHOP_AREAS[i].casefold()}
+    for sid, name in c.execute("SELECT id, name FROM sections WHERE list_id=? ORDER BY sort, id", (lid,)):
+        if str(name or "").strip().casefold() in names:
+            return sid
+    return None
+
+
+def is_shop(c, lid):
+    r = c.execute("SELECT family FROM lists WHERE id=?", (lid,)).fetchone() if lid else None
+    return bool(r) and r[0] == "shopping"
+
+
+def ingredient_lines(text):
+    """The ingredients in a meal's notes: checklist / bullet / numbered lines (open ones), else every plain line."""
+    lines = [x.rstrip() for x in str(text or "").replace("\r", "").split("\n")]
+    items, bul = [], False
+    for ln in lines:
+        m = re.match(r"^\s*(?:[-*+]|\d+[.)])\s+(\[( |x|X)\]\s*)?(.*\S)\s*$", ln)
+        if m:
+            bul = True
+            if m.group(2) in ("x", "X"):
+                continue
+            items.append(m.group(3))
+    if not bul:
+        items = [x.strip() for x in lines if x.strip() and not x.strip().startswith(("#", ">", "```"))]
+    out = []
+    for x in items:
+        x = re.sub(r"[*_`]+", "", x).strip()[:TITLE_MAX]
+        if x and shop_key(x) not in {shop_key(y) for y in out}:
+            out.append(x)
+    return out[:100]
+
+
+def to_shopping(c, uid, items, lid=None, source=None):
+    """Adds items to a shopping list (lid, else the first one the user may write, created when missing); open items with
+    the same name are not added twice. -> {list_id, added: [{id, title}], skipped: [titles]}"""
+    if lid:
+        need_list(c, lid)
+        if not is_shop(c, lid):
+            raise BadInput(tr("This is not a shopping list"))
+    else:
+        lid = fam_list(c, uid, "shopping")
+    have = {shop_key(r[0]) for r in c.execute("SELECT title FROM tasks WHERE list_id=? AND status=0 AND deleted_at IS NULL AND parent_id IS NULL", (lid,))}
+    srt = c.execute("SELECT COALESCE(MAX(sort),0) FROM tasks WHERE list_id=? AND parent_id IS NULL", (lid,)).fetchone()[0]
+    ts = iso(now_utc())
+    added, skipped = [], []
+    for x in items:
+        k = shop_key(x)
+        if not k or k in have:
+            skipped.append(x)
+            continue
+        have.add(k)
+        srt += 1
+        tid = c.execute("INSERT INTO tasks(list_id,section_id,title,sort,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?,?)",
+                        (lid, shop_area_of(c, lid, x), x, srt, ts, ts, uid)).lastrowid
+        log_act(c, tid, "created", {"from": source} if source else None, uid=uid)
+        added.append({"id": tid, "title": x})
+    return {"list_id": lid, "added": added, "skipped": skipped}
+
+
+# ---- packing lists
+def packing_templates(lg):
+    return [{"key": k, "name": tr(n, lg=lg), "sections": [{"name": tr(s, lg=lg) if s else "", "items": [tr(i, lg=lg) for i in its]}
+                                                         for s, its in secs]} for k, (n, secs) in PACKING.items()]
+
+
+def packing_create(c, uid, key, name=None):
+    if key not in PACKING:
+        raise BadInput(tr("Invalid value: {0}", "template"))
+    lg = lang(c, uid)
+    n, secs = PACKING[key]
+    if name is not None and (not isinstance(name, str) or not name.strip()):
+        raise BadInput(tr("Name missing"))
+    lid = fam_list_create(c, uid, "packing", (name or tr("Packing list: {0}", tr(n, lg=lg), lg=lg)).strip()[:LIST_NAME_MAX])
+    ts, srt = iso(now_utc()), 0
+    for si, (s, its) in enumerate(secs):
+        sid = c.execute("INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, tr(s, lg=lg), si + 1)).lastrowid if s else None
+        for it in its:
+            srt += 1
+            c.execute("INSERT INTO tasks(list_id,section_id,title,sort,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?,?)",
+                      (lid, sid, tr(it, lg=lg), srt, ts, ts, uid))
+    return lid
+
+
+# ---- "What do you use Kalmido for?" (setup, welcome tour, Settings > Modules)
+def purpose_apply(c, uid, purpose, examples=True):
+    """Switches the user's modules to the purpose and (examples) creates its starter lists once. -> {features, created}"""
+    if purpose not in PURPOSES:
+        raise BadInput(tr("Invalid value: {0}", "purpose"))
+    fs = [x for x in (usettings(c, uid).get("features") or "").split(",") if x]
+    on = set(PURPOSE_ON[purpose])
+    fs = [x for x in fs if x not in PURPOSE_MODS or x in on] + [x for x in PURPOSE_MODS if x in on and x not in fs]
+    uset(c, uid, "features", ",".join(fs))
+    uset(c, uid, "purpose", purpose)
+    created = []
+    if examples:
+        if purpose == "family":
+            created = family_examples(c, uid)
+        elif purpose == "software" and not c.execute("SELECT 1 FROM lists WHERE owner_id=? AND ptype='software' AND archived=0", (uid,)).fetchone():
+            lid, _ = ptype_create(c, uid, "software", tr(PTYPE_NAMES["software"], lg=lang(c, uid)))
+            created.append(lid)
+        elif purpose == "team" and not sample_state(c, uid):
+            created.append(sample_create(c, uid))
+    return {"features": ",".join(fs), "created": created}
+
+
+FAM_CHORES = ((N_("Take out the rubbish"), "FREQ=WEEKLY;BYDAY=MO"), (N_("Clean the bathroom"), "FREQ=WEEKLY;BYDAY=SA"),
+              (N_("Water the plants"), "FREQ=DAILY;INTERVAL=3"), (N_("Vacuum"), "FREQ=WEEKLY;BYDAY=FR"))
+FAM_SHOP_EXAMPLES = (N_("Apples"), N_("Bread"), N_("Milk"))
+
+
+def family_examples(c, uid):
+    """The starter lists of the family setup, in the folder "Family": shopping list (with areas), household chores,
+    birthdays, meal plan. A kind the user already has a list of is skipped. Returns the new list ids."""
+    lg = lang(c, uid)
+    folder = clean_folder(tr("Family", lg=lg))
+    made, ts, day = [], iso(now_utc()), local_now().date()
+    for kind in ("shopping", "household", "birthdays", "meals"):
+        if fam_list(c, uid, kind, create=False):
+            continue
+        lid = fam_list_create(c, uid, kind, folder=folder)
+        made.append(lid)
+        if kind == "shopping":
+            secs = {r["name"]: r["id"] for r in c.execute("SELECT id, name FROM sections WHERE list_id=?", (lid,))}
+            for i, (it, area) in enumerate(zip(FAM_SHOP_EXAMPLES, (SHOP_AREAS[0], SHOP_AREAS[1], SHOP_AREAS[2]))):
+                sid = secs.get(tr(area, lg=lg))
+                c.execute("INSERT INTO tasks(list_id,section_id,title,sort,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?,?)",
+                          (lid, sid, tr(it, lg=lg), i + 1, ts, ts, uid))
+                shop_remember(c, lid, tr(it, lg=lg), sid)
+        elif kind == "household":
+            for i, (t, rep) in enumerate(FAM_CHORES):
+                rule = rr_rule(rep, day.isoformat())
+                nxt = rule.after(datetime(day.year, day.month, day.day), inc=True).date() if rule else day
+                c.execute("INSERT INTO tasks(list_id,title,due,repeat,sort,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?,?,?)",
+                          (lid, tr(t, lg=lg), nxt.isoformat(), rep, i + 1, ts, ts, uid))
+        elif kind == "meals":
+            c.execute("INSERT INTO tasks(list_id,title,content,due,sort,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?,?,?)",
+                      (lid, tr("Spaghetti with tomato sauce", lg=lg),
+                       "\n".join("- " + tr(x, lg=lg) for x in (N_("Spaghetti"), N_("Tomatoes"), N_("Onion"), N_("Parmesan"))),
+                       day.isoformat(), 1, ts, ts, uid))
+    if made:
+        fl = json.loads(usettings(c, uid).get("folders") or "[]")
+        if folder and folder not in fl:
+            uset(c, uid, "folders", json.dumps(fl + [folder], ensure_ascii=False))
+    return made
+
+
+# ---- the overview (Family view, dashboard card, API)
+def family_overview(c, uid, start=None):
+    """What the Family view shows, for the API (the app computes the same from its state): upcoming birthdays and
+    anniversaries (with the age), deadlines, who is next in the rotations, the meal plan of the week starting `start`
+    (Monday of this week by default), the shopping lists with their open items and the kids I look after (or me)."""
+    today = local_now().date()
+    mon = start or (today - timedelta(days=today.weekday()))
+    rows = load_tasks(c, f"list_id IN {vis_sql()} AND deleted_at IS NULL AND status=0 AND (fam!='' OR rotation!='' OR "
+                         "list_id IN (SELECT id FROM lists WHERE family IN ('meals','shopping')))", (uid, uid))
+    lists = {d["id"]: d for d in visible_lists(c, uid)}
+    occ, dls, rots, meals = [], [], [], []
+    names = user_names(c, {x for t in rows for x in ((t.get("rotation") or {}).get("who") or [])})
+    for t in rows:
+        f = t.get("fam") or {}
+        if f.get("kind") in FAM_OCC and t["due"]:
+            d = date.fromisoformat(t["due"])
+            occ.append({"task_id": t["id"], "list_id": t["list_id"], "title": t["title"], "kind": f["kind"], "name": f.get("name") or t["title"],
+                        "date": t["due"], "days": (d - today).days, "year": f.get("year"),
+                        "age": d.year - f["year"] if f.get("year") else None,
+                        "gifts": c.execute("SELECT COUNT(*) FROM tasks WHERE parent_id=? AND status=0 AND deleted_at IS NULL", (t["id"],)).fetchone()[0]})
+        elif f.get("kind") == "deadline" and t["due"]:
+            dls.append({"task_id": t["id"], "list_id": t["list_id"], "title": t["title"], "type": f.get("type"), "who": f.get("who") or "",
+                        "expires": f.get("expires"), "due": t["due"], "days": (date.fromisoformat(t["due"]) - today).days})
+        r = t.get("rotation")
+        if r and r.get("who"):
+            n = len(r["who"])
+            i = r.get("i", 0) % n
+            rots.append({"task_id": t["id"], "list_id": t["list_id"], "title": t["title"], "mode": r.get("mode", "done"),
+                         "who": [{"user_id": x, "name": names.get(x, "?")} for x in r["who"]],
+                         "current": t["assignee_id"], "next": r["who"][(i + 1) % n], "due": t["due"]})
+        if lists.get(t["list_id"], {}).get("family") == "meals" and t["due"] and not t["parent_id"] and \
+                mon.isoformat() <= t["due"] <= (mon + timedelta(days=6)).isoformat():
+            meals.append({"task_id": t["id"], "list_id": t["list_id"], "title": t["title"], "day": t["due"], "time": t["due_time"],
+                          "ingredients": ingredient_lines(t["content"])})
+    occ.sort(key=lambda x: (x["days"], x["name"].casefold()))
+    dls.sort(key=lambda x: (x["due"], x["task_id"]))
+    meals.sort(key=lambda x: (x["day"], x["time"] or "", x["task_id"]))
+    shop = [{"list_id": lid, "name": d["name"], "open": sum(1 for t in rows if t["list_id"] == lid and not t["parent_id"]),
+             "role": d["role"]} for lid, d in lists.items() if d.get("family") == "shopping" and not d["archived"]]
+    return {"occasions": occ, "deadlines": dls, "rotations": rots, "week": mon.isoformat(), "meals": meals, "shopping": shop,
+            "kids": kids_for(c, uid), "kid": is_kid(c, uid)}
+
+
+def kid_dict(c, kid, full=True):
+    u = c.execute("SELECT * FROM users WHERE id=?", (kid,)).fetchone()
+    d = {**user_public(u), "stars": kid_balance(c, kid), "parents": kid_parents(c, kid)}
+    if full:
+        d["rewards"] = [reward_dict(r) for r in c.execute("SELECT * FROM kid_rewards WHERE kid_id=? ORDER BY state!='requested', cost, id", (kid,))]
+        d["history"] = [{"id": r["id"], "delta": r["delta"], "kind": r["kind"], "title": r["title"], "task_id": r["task_id"],
+                         "by": r["by_id"], "at": r["created_at"]}
+                        for r in c.execute("SELECT * FROM kid_stars WHERE kid_id=? ORDER BY id DESC LIMIT 30", (kid,))]
+        d["requests"] = sum(1 for x in d["rewards"] if x["state"] == "requested")
+    return d
+
+
+def reward_dict(r):
+    return {"id": r["id"], "kid_id": r["kid_id"], "title": r["title"], "emoji": r["emoji"], "cost": r["cost"], "once": bool(r["once"]),
+            "state": r["state"], "requested_at": r["requested_at"], "decided_at": r["decided_at"], "decided_by": r["decided_by"]}
+
+
+def kids_for(c, uid):
+    """The kids uid looks after (admins: every kid), or [uid itself] for a kid."""
+    if is_kid(c, uid):
+        return [kid_dict(c, uid)]
+    adm = c.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone()
+    q = "SELECT id FROM users WHERE kid=1 AND disabled=0" + ("" if adm and adm[0] else " AND id IN (SELECT kid_id FROM kid_parents WHERE parent_id=?)")
+    return [kid_dict(c, r[0]) for r in c.execute(q + " ORDER BY id", () if adm and adm[0] else (uid,))]
+
+
+def kid_push(c, uid, title_fn, msg_fn, click="#family"):
+    """A family push (rewards) to uid in their language, when they can get pushes."""
+    if not uid or uid in agent_ids(c):
+        return
+    s = usettings(c, uid)
+    if not push_reachable(c, uid, s):
+        return
+    lg = lang_of(s)
+    g.pushes.append((uid, title_fn(lg), msg_fn(lg), f"{PUBLIC_URL}/{click}", push_prio(s)))
+
+
+# ---- web API
+@app.get("/api/family")
+def family_get():
+    """The Family view's data (also GET /api/v1/family). ?week=YYYY-MM-DD: the meal plan of the week of that day."""
+    c, uid = db(), me()
+    wk = request.args.get("week")
+    start = None
+    if wk:
+        if not valid_date(wk):
+            return err(tr("Invalid value: {0}", "week"))
+        d = date.fromisoformat(wk)
+        start = d - timedelta(days=d.weekday())
+    return jsonify(family_overview(c, uid, start))
+
+
+@app.post("/api/family/occasions")
+def family_occasion_new():
+    """{name, kind? (birthday | anniversary), date (YYYY-MM-DD or --MM-DD), year?, lead_days? (7), list_id?, gifts?: [..]}
+    -> a yearly task (in the list, else the first "Birthdays" list, created when missing)."""
+    c, uid = db(), me()
+    tid = occ_create(c, uid, body())
+    bump(c)
+    c.commit()
+    return jsonify(one_task(c, tid)), 201
+
+
+@app.get("/api/family/deadline-types")
+def family_dl_types():
+    lg = lang(db(), me())
+    return jsonify(types=[{"key": k, "name": tr(n, lg=lg), "lead_days": ld, "repeat": rp, "notice_months": nm}
+                          for k, (n, _t, ld, rp, nm) in FAM_DL.items()])
+
+
+@app.post("/api/family/deadlines")
+def family_deadline_new():
+    """{type, expires, who?, notice_months?, lead_days?, title?, list_id?} -> a deadline task (due = expires minus the notice
+    period, reminders lead days before and on the day; in the list, else the first "Household" list)."""
+    c, uid = db(), me()
+    tid = deadline_create(c, uid, body())
+    bump(c)
+    c.commit()
+    return jsonify(one_task(c, tid)), 201
+
+
+@app.post("/api/tasks/<int:tid>/to-shopping")
+def task_to_shopping(tid):
+    """{list_id?, items?: [..]} -- the ingredients of a meal (its notes; or the given items) onto a shopping list."""
+    c, uid = db(), me()
+    need_task(c, tid, write=False, full=True)
+    b = body()
+    items = b.get("items")
+    if items is None:
+        items = ingredient_lines(c.execute("SELECT content FROM tasks WHERE id=?", (tid,)).fetchone()[0])
+    elif not isinstance(items, list) or len(items) > 100 or not all(isinstance(x, str) for x in items):
+        return err(tr("Invalid value: {0}", "items"))
+    items = [x.strip()[:TITLE_MAX] for x in items if x.strip()]
+    if not items:
+        return err(tr("No ingredients found: write them as a list in the notes"))
+    lid = b.get("list_id")
+    out = to_shopping(c, uid, items, as_int(lid, "list_id", 1) if lid not in (None, "") else None, source=tid)
+    bump(c)
+    c.commit()
+    return jsonify(out)
+
+
+@app.post("/api/lists/<int:lid>/shop-areas")
+def list_shop_areas(lid):
+    """The default shop areas as sections (only the missing ones); the list becomes a shopping list."""
+    c = db()
+    need_list(c, lid)
+    c.execute("UPDATE lists SET family='shopping' WHERE id=? AND owner_id=?", (lid, me()))
+    n = shop_areas_add(c, lid, lang(c, me()))
+    bump(c)
+    c.commit()
+    return jsonify(ok=True, added=n)
+
+
+@app.get("/api/family/packing")
+def family_packing_list():
+    return jsonify(templates=packing_templates(lang(db(), me())))
+
+
+@app.post("/api/family/packing")
+def family_packing_new():
+    """{template, name?} -> a new packing list from a built-in template (done items stay at the bottom, reusable)."""
+    c, uid = db(), me()
+    b = body()
+    lid = packing_create(c, uid, b.get("template"), b.get("name"))
+    bump(c)
+    c.commit()
+    return jsonify(ok=True, list_id=lid), 201
+
+
+@app.post("/api/me/purpose")
+def me_purpose():
+    """{purpose: me | family | team | software, examples?: true} -- "What do you use Kalmido for?": switches my modules and
+    creates the starter lists of that purpose once."""
+    c, uid = db(), me()
+    b = body()
+    out = purpose_apply(c, uid, b.get("purpose"), b.get("examples", True) is not False)
+    bump(c)
+    c.commit()
+    return jsonify(out)
+
+
+# kids: stars + rewards
+@app.get("/api/family/kids")
+def family_kids():
+    return jsonify(kids=kids_for(db(), me()))
+
+
+@app.post("/api/family/kids/<int:kid>/stars")
+def family_kid_stars(kid):
+    """{delta (-100..100, not 0), note?} -- a parent gives (or corrects) stars by hand."""
+    c = db()
+    need_kid(c, kid)
+    b = body()
+    d = as_int(b.get("delta"), "delta", -100, 100)
+    if not d:
+        return err(tr("Invalid value: {0}", "delta"))
+    note = b.get("note") or ""
+    if not isinstance(note, str):
+        return err(tr("Invalid value: {0}", "note"))
+    if d < 0 and kid_balance(c, kid) + d < 0:
+        return err(tr("Not that many stars"), 409)
+    ts = iso(now_utc())
+    c.execute("INSERT INTO kid_stars(kid_id,delta,kind,title,by_id,at,created_at) VALUES(?,?,?,?,?,?,?)",
+              (kid, d, "bonus", note.strip()[:FAM_NOTE_MAX], me(), ts, ts))
+    if d > 0:
+        who = user_names(c, [me()]).get(me(), "?")
+        kid_push(c, kid, lambda lg: trn("{0} gave you a star", "{0} gave you {1} stars", d, who, d, lg=lg), lambda lg: note.strip()[:FAM_NOTE_MAX] or "★")
+    bump(c)
+    c.commit()
+    return jsonify(kid_dict(c, kid))
+
+
+def _reward_fields(b, partial=False):
+    out = {}
+    if "title" in b or not partial:
+        t = b.get("title")
+        if not isinstance(t, str) or not t.strip():
+            raise BadInput(tr("Please enter a name"))
+        out["title"] = re.sub(r"\s+", " ", t).strip()[:FAM_NOTE_MAX]
+    if "cost" in b or not partial:
+        out["cost"] = as_int(b.get("cost"), "cost", 1, REWARD_COST_MAX)
+    if "emoji" in b:
+        e = b.get("emoji") or ""
+        if not isinstance(e, str) or len(e) > 16:
+            raise BadInput(tr("Invalid value: {0}", "emoji"))
+        out["emoji"] = e.strip()
+    if "once" in b:
+        if not isinstance(b["once"], bool):
+            raise BadInput(tr("Invalid value: {0}", "once"))
+        out["once"] = 1 if b["once"] else 0
+    return out
+
+
+@app.post("/api/family/kids/<int:kid>/rewards")
+def family_reward_new(kid):
+    """{title, cost (stars), emoji?, once? (false: can be redeemed again and again)} -- a parent offers a reward."""
+    c = db()
+    need_kid(c, kid)
+    f = _reward_fields(body())
+    if c.execute("SELECT COUNT(*) FROM kid_rewards WHERE kid_id=?", (kid,)).fetchone()[0] >= KID_REWARDS_MAX:
+        return err(tr("At most {0} rewards", KID_REWARDS_MAX), 409)
+    rid = c.execute("INSERT INTO kid_rewards(kid_id,title,cost,emoji,once,state,created_by,created_at) VALUES(?,?,?,?,?,?,?,?)",
+                    (kid, f["title"], f["cost"], f.get("emoji", ""), f.get("once", 0), "open", me(), iso(now_utc()))).lastrowid
+    bump(c)
+    c.commit()
+    return jsonify(reward_dict(c.execute("SELECT * FROM kid_rewards WHERE id=?", (rid,)).fetchone())), 201
+
+
+def need_reward(c, rid, parent=True):
+    r = c.execute("SELECT * FROM kid_rewards WHERE id=?", (rid,)).fetchone()
+    if not r:
+        raise Denied(404)
+    need_kid(c, r["kid_id"], parent)
+    return r
+
+
+@app.patch("/api/family/rewards/<int:rid>")
+def family_reward_edit(rid):
+    c = db()
+    r = need_reward(c, rid)
+    f = _reward_fields(body(), partial=True)
+    if f:
+        c.execute(f"UPDATE kid_rewards SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), rid])
+        bump(c)
+        c.commit()
+    return jsonify(reward_dict(c.execute("SELECT * FROM kid_rewards WHERE id=?", (r["id"],)).fetchone()))
+
+
+@app.delete("/api/family/rewards/<int:rid>")
+def family_reward_delete(rid):
+    c = db()
+    need_reward(c, rid)
+    c.execute("DELETE FROM kid_rewards WHERE id=?", (rid,))
+    bump(c)
+    c.commit()
+    return jsonify(ok=True)
+
+
+@app.post("/api/family/rewards/<int:rid>/request")
+def family_reward_request(rid):
+    """The kid asks for a reward it has the stars for; its parents get a push and decide."""
+    c = db()
+    r = need_reward(c, rid, parent=False)
+    if r["kid_id"] != me():
+        return err(tr("Only the child itself can ask for a reward"), 403)
+    if r["state"] != "open":
+        return err(tr("Already asked for"), 409)
+    if kid_balance(c, me()) < r["cost"]:
+        return err(tr("Not enough stars yet"), 409)
+    c.execute("UPDATE kid_rewards SET state='requested', requested_at=? WHERE id=?", (iso(now_utc()), rid))
+    who = user_names(c, [me()]).get(me(), "?")
+    adm = [x[0] for x in c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0")]
+    for p in dict.fromkeys(kid_parents(c, me()) or adm):
+        kid_push(c, p, lambda lg: tr("{0} would like a reward", who, lg=lg), lambda lg: f"{r['emoji'] + ' ' if r['emoji'] else ''}{r['title']} · {r['cost']} ★")
+    bump(c)
+    c.commit()
+    return jsonify(kid_dict(c, me()))
+
+
+@app.post("/api/family/rewards/<int:rid>/decide")
+def family_reward_decide(rid):
+    """{approve: true | false} -- a parent redeems the reward (its stars are taken; a one-off reward is done, the others can
+    be asked for again) or declines the request. Works on an open reward too (redeem right away)."""
+    c = db()
+    r = need_reward(c, rid)
+    b = body()
+    if not isinstance(b.get("approve"), bool):
+        return err(tr("Invalid value: {0}", "approve"))
+    if r["state"] == "redeemed":
+        return err(tr("Already redeemed"), 409)
+    ts = iso(now_utc())
+    if b["approve"]:
+        if kid_balance(c, r["kid_id"]) < r["cost"]:
+            return err(tr("Not enough stars yet"), 409)
+        c.execute("INSERT INTO kid_stars(kid_id,delta,kind,reward_id,title,by_id,at,created_at) VALUES(?,?,?,?,?,?,?,?)",
+                  (r["kid_id"], -r["cost"], "reward", rid, r["title"], me(), ts, ts))
+        c.execute("UPDATE kid_rewards SET state=?, decided_by=?, decided_at=?, requested_at=NULL WHERE id=?",
+                  ("redeemed" if r["once"] else "open", me(), ts, rid))
+        kid_push(c, r["kid_id"], lambda lg: tr("Reward approved: {0}", r["title"], lg=lg), lambda lg: f"−{r['cost']} ★")
+    else:
+        if r["state"] != "requested":
+            return err(tr("Nobody asked for it"), 409)
+        c.execute("UPDATE kid_rewards SET state='open', decided_by=?, decided_at=?, requested_at=NULL WHERE id=?", (me(), ts, rid))
+        kid_push(c, r["kid_id"], lambda lg: tr("Not this time: {0}", r["title"], lg=lg), lambda lg: tr("Ask again later", lg=lg))
+    bump(c)
+    c.commit()
+    return jsonify(kid_dict(c, r["kid_id"]))
+
+
+# ---- CardDAV: birthdays + anniversaries from contacts (private per user, like calendar subscriptions)
+CARDDAV_NS = "urn:ietf:params:xml:ns:carddav"
+
+
+def _card_propfind(url, depth, props, auth, allow):
+    body = ('<?xml version="1.0" encoding="utf-8"?><d:propfind xmlns:d="DAV:" xmlns:card="urn:ietf:params:xml:ns:carddav">'
+            f'<d:prop>{props}</d:prop></d:propfind>')
+    st, _, data, final = cal_http(url, "PROPFIND", body.encode(), {"Depth": str(depth), "Content-Type": "application/xml; charset=utf-8"},
+                                  auth, allow)
+    if st != 207:
+        raise CalError("not_calendar")
+    return final, _dav_responses(_dav_xml(data), final)
+
+
+def _is_book(props):
+    rt = props.get(f"{{{DAV_NS}}}resourcetype")
+    return rt is not None and rt.find(f"{{{CARDDAV_NS}}}addressbook") is not None
+
+
+def carddav_books(url, auth, allow):
+    """The address books of a CardDAV account (the URL may be the server, the principal or one address book)."""
+    o = _origin(url)
+    root = f"{o[0]}://{'[' + o[1] + ']' if ':' in o[1] else o[1]}:{o[2]}" if o else url
+    home = cup = None
+    for cand in dict.fromkeys((url, root + "/.well-known/carddav")):
+        try:
+            final, rs = _card_propfind(cand, 0, "<d:resourcetype/><d:current-user-principal/><card:addressbook-home-set/>", auth, allow)
+        except CalError as e:
+            if e.code in ("auth", "blocked", "tls", "timeout", "too_large"):
+                raise
+            continue
+        if not rs:
+            continue
+        href, props = rs[0]
+        if _is_book(props):
+            return [href]
+        home = _dav_href(props.get(f"{{{CARDDAV_NS}}}addressbook-home-set"), final)
+        cup = _dav_href(props.get(f"{{{DAV_NS}}}current-user-principal"), final)
+        if home or cup:
+            break
+    if not home and cup:
+        if not cal_href_ok(url, cup):
+            raise CalError("redirect")
+        final, rs = _card_propfind(cup, 0, "<card:addressbook-home-set/>", auth, allow)
+        home = _dav_href(rs[0][1].get(f"{{{CARDDAV_NS}}}addressbook-home-set"), final) if rs else None
+    if not home:
+        raise CalError("not_book")
+    if not cal_href_ok(url, home):
+        raise CalError("redirect")
+    final, rs = _card_propfind(home, 1, "<d:resourcetype/>", auth, allow)
+    books = [h for h, p in rs if _is_book(p) and cal_href_ok(url, h)]
+    if not books:
+        raise CalError("not_book")
+    return books[:10]
+
+
+def carddav_cards(book, auth, allow):
+    """address-data of every card of an address book (REPORT addressbook-query)."""
+    body = ('<?xml version="1.0" encoding="utf-8"?><card:addressbook-query xmlns:d="DAV:" xmlns:card="urn:ietf:params:xml:ns:carddav">'
+            '<d:prop><d:getetag/><card:address-data/></d:prop></card:addressbook-query>')
+    st, _, data, _ = cal_http(book, "REPORT", body.encode(), {"Depth": "1", "Content-Type": "application/xml; charset=utf-8"}, auth, allow)
+    if st != 207:
+        raise CalError("not_book")
+    return [el.text for el in _dav_xml(data).iter(f"{{{CARDDAV_NS}}}address-data") if el.text and el.text.strip()][:CONTACT_CARDS_MAX]
+
+
+def _vdate(v, params):
+    """A vCard date -> (month, day, year | None) or None: 19460512, 1946-05-12, --0512, --05-12, 1946-05-12T..., Apple's
+    X-APPLE-OMIT-YEAR / the years 1604 and 0000 mean: no year."""
+    v = (v or "").strip()
+    m = re.match(r"^(\d{4}|--)-?(\d{2})-?(\d{2})", v)
+    if not m:
+        return None
+    mo, dy = int(m.group(2)), int(m.group(3))
+    try:
+        date(2000, mo, dy)
+    except ValueError:
+        return None
+    y = int(m.group(1)) if m.group(1).isdigit() else None
+    if y is not None and ("x-apple-omit-year" in params.lower() or y in (0, 1604) or not DATE_MIN_Y <= y <= local_now().year):
+        y = None
+    return mo, dy, y
+
+
+def vcard_occasions(text):
+    """[(uid, kind, name, month, day, year)] of the vCards in text (BDAY, ANNIVERSARY, X-ANNIVERSARY, Apple's X-ABDATE with
+    the label Anniversary)."""
+    out = []
+    text = re.sub(r"\r?\n[ \t]", "", str(text or "").replace("\r\n", "\n"))
+    for blk in re.findall(r"BEGIN:VCARD(.*?)END:VCARD", text, re.S | re.I):
+        props, labels = [], {}
+        for ln in blk.split("\n"):
+            m = re.match(r"^(?:([\w-]+)\.)?([\w-]+)((?:;[^:]*)?):(.*)$", ln.strip())
+            if not m:
+                continue
+            grp, name, params, val = (m.group(1) or "").lower(), m.group(2).upper(), m.group(3) or "", m.group(4)
+            props.append((grp, name, params, val))
+            if name == "X-ABLABEL":
+                labels[grp] = val
+        get = lambda n: next((v for _g, k, _p, v in props if k == n), "")  # noqa: E731
+        fn = get("FN").replace("\\,", ",").replace("\\;", ";").strip()
+        if not fn:
+            parts = get("N").split(";")
+            fn = " ".join(x for x in (parts[1] if len(parts) > 1 else "", parts[0]) if x).strip()
+        fn = re.sub(r"\s+", " ", fn)[:FAM_NAME_MAX]
+        uid = get("UID").strip()[:200] or "fn:" + hashlib.sha1(fn.encode()).hexdigest()[:16]
+        if not fn:
+            continue
+        seen = set()
+        for grp, name, params, val in props:
+            kind = "birthday" if name == "BDAY" else "anniversary" if name in ("ANNIVERSARY", "X-ANNIVERSARY") else \
+                "anniversary" if name == "X-ABDATE" and "anniversary" in labels.get(grp, "").lower() else None
+            if not kind or kind in seen:
+                continue
+            d = _vdate(val, params)
+            if d:
+                seen.add(kind)
+                out.append((uid, kind, fn, *d))
+    return out
+
+
+CONTACT_ERR = dict(CAL_ERR, not_book=N_("No address book found at this address"),
+                   no_list=N_("The list for the birthdays is gone: choose another one"))
+
+
+def contact_err_text(stored):
+    code, _, detail = (stored or "error").partition(":")
+    if code in ("not_book", "not_calendar"):
+        return tr(CONTACT_ERR["not_book"])
+    if code == "no_list":
+        return tr(CONTACT_ERR["no_list"])
+    return cal_err_text(stored)
+
+
+def contact_public(c, r):
+    return {"id": r["id"], "name": r["name"], "url_hint": r["url_hint"], "username": r["username"], "list_id": r["list_id"],
+            "lead_days": r["lead"], "status": r["status"], "error": r["error"], "error_text": contact_err_text(r["error"]) if r["error"] else "",
+            "synced_at": r["synced_at"], "count": r["count"]}
+
+
+_CONTACT_BUSY = set()
+
+
+def contacts_sync(c, sid):
+    """Reads the address books of source sid; a new birthday / anniversary becomes a yearly task, a changed date or name
+    updates its task (the title only while it is still the generated one). Removed contacts leave their tasks alone."""
+    with _CAL_LOCK:
+        if sid in _CONTACT_BUSY:
+            return False
+        _CONTACT_BUSY.add(sid)
+    try:
+        s = c.execute("SELECT * FROM contact_srcs WHERE id=?", (sid,)).fetchone()
+        if not s:
+            return False
+        c.execute("UPDATE contact_srcs SET tried_at=? WHERE id=?", (iso(now_utc()), sid))
+        c.commit()
+        upd = {}
+        try:
+            allow = cal_allow(c)
+            url = cal_unseal(c, s["user_id"], s["url"])
+            auth = (s["username"], cal_unseal(c, s["user_id"], s["password"]))
+            occs = []
+            for b in carddav_books(url, auth, allow):
+                for card in carddav_cards(b, auth, allow):
+                    occs += [(*o, b) for o in vcard_occasions(card)]
+            lid = s["list_id"]
+            if not lid or list_role(c, lid, s["user_id"]) not in WRITE_ROLES:
+                lid = fam_list(c, s["user_id"], "birthdays", create=False)
+                if not lid:
+                    raise CalError("no_list")
+                c.execute("UPDATE contact_srcs SET list_id=? WHERE id=?", (lid, sid))
+            lg = lang(c, s["user_id"])
+            n = 0
+            for uid_, kind, name, mo, dy, y, book in occs[:CONTACT_CARDS_MAX]:
+                book_s = cal_seal(c, s["user_id"], book)
+                dig = f"{name}|{mo}|{dy}|{y}"
+                ln = c.execute("SELECT * FROM contact_links WHERE src_id=? AND uid=? AND kind=?", (sid, uid_, kind)).fetchone()
+                t = c.execute("SELECT * FROM tasks WHERE id=? AND deleted_at IS NULL", (ln["task_id"],)).fetchone() if ln and ln["task_id"] else None
+                n += 1
+                if t:
+                    if ln["digest"] == dig:
+                        continue
+                    f = _jparse(t["fam"]) or {}
+                    old_title = tr("Birthday: {0}", f.get("name", ""), lg=lg) if kind == "birthday" else tr("Anniversary: {0}", f.get("name", ""), lg=lg)
+                    f.update(name=name, **({"year": y} if y else {}))
+                    if not y:
+                        f.pop("year", None)
+                    sets = {"fam": json.dumps(f, ensure_ascii=False, separators=(",", ":")), "updated_at": iso(now_utc())}
+                    if t["title"] == old_title:
+                        sets["title"] = tr("Birthday: {0}", name, lg=lg) if kind == "birthday" else tr("Anniversary: {0}", name, lg=lg)
+                    if not t["due"] or (date.fromisoformat(t["due"]).month, date.fromisoformat(t["due"]).day) != (mo, dy):
+                        sets.update(due=occ_next(mo, dy).isoformat(), repeat=occ_rule(mo, dy), reminded="[]")
+                    c.execute(f"UPDATE tasks SET {','.join(k + '=?' for k in sets)} WHERE id=?", [*sets.values(), t["id"]])
+                    c.execute("UPDATE contact_links SET digest=?, book=? WHERE src_id=? AND uid=? AND kind=?", (dig, book_s, sid, uid_, kind))
+                    continue
+                if ln:  # its task was deleted by hand: not created again
+                    if not ln["book"]:
+                        c.execute("UPDATE contact_links SET book=? WHERE src_id=? AND uid=? AND kind=?", (book_s, sid, uid_, kind))
+                    continue
+                tid = occ_create(c, s["user_id"], {"name": name, "kind": kind, "date": f"--{mo:02d}-{dy:02d}", "year": y,
+                                                   "lead_days": s["lead"], "list_id": lid, "src": f"carddav:{sid}"}, check=False)
+                # the vCard UID also goes into the task itself (fam.card), so the link survives removing the source
+                f = _jparse(c.execute("SELECT fam FROM tasks WHERE id=?", (tid,)).fetchone()[0]) or {}
+                f["card"] = uid_[:200]
+                c.execute("UPDATE tasks SET fam=? WHERE id=?", (json.dumps(f, ensure_ascii=False, separators=(",", ":")), tid))
+                c.execute("INSERT OR REPLACE INTO contact_links(src_id,uid,kind,task_id,digest,book) VALUES(?,?,?,?,?,?)", (sid, uid_, kind, tid, dig, book_s))
+            upd.update(status="ok", error="", fails=0, count=n, synced_at=iso(now_utc()))
+            bump(c)
+        except Exception as e:  # noqa: BLE001
+            ce = e if isinstance(e, CalError) else CalError("error", type(e).__name__)
+            if not isinstance(e, CalError):
+                print("contacts sync: source", sid, "failed:", type(e).__name__, e, flush=True)
+            upd.update(status="error", error=ce.stored(), fails=s["fails"] + 1)
+        c.execute(f"UPDATE contact_srcs SET {', '.join(k + '=?' for k in upd)} WHERE id=?", (*upd.values(), sid))
+        c.commit()
+        return True
+    finally:
+        with _CAL_LOCK:
+            _CONTACT_BUSY.discard(sid)
+
+
+def contacts_due(c):
+    """cal_loop: the address books whose daily sync is due."""
+    now = now_utc()
+    for r in c.execute("""SELECT s.id, s.tried_at FROM contact_srcs s JOIN users u ON u.id=s.user_id WHERE u.disabled=0""").fetchall():
+        if not r["tried_at"] or (now - parse_iso(r["tried_at"])).total_seconds() >= CONTACT_EVERY_MIN * CAL_TICK:
+            with GATE.bg():
+                contacts_sync(c, r["id"])
+
+
+def need_contact(c, sid):
+    r = c.execute("SELECT * FROM contact_srcs WHERE id=? AND user_id=?", (sid, me())).fetchone()
+    if not r:
+        raise Denied(404)
+    return r
+
+
+@app.get("/api/family/contacts")
+def family_contacts():
+    c, uid = db(), me()
+    return jsonify(enabled=CAL_ON, sources=[contact_public(c, r) for r in c.execute("SELECT * FROM contact_srcs WHERE user_id=? ORDER BY id", (uid,))])
+
+
+@app.post("/api/family/contacts")
+def family_contacts_add():
+    """{url, username, password, name?, list_id?, lead_days? (7)} -- an address book (CardDAV) whose birthdays and
+    anniversaries become yearly tasks; read at once (a source that fails is not kept), then once a day."""
+    need_cal()
+    c, uid, b = db(), me(), body()
+    url = cal_norm_url(b.get("url"))
+    user, pw = b.get("username"), b.get("password")
+    if not url or not isinstance(user, str) or not isinstance(pw, str) or not user.strip() or not pw or len(user) > 200 or len(pw) > 500:
+        return err(tr("Server address, username and password are needed"))
+    if c.execute("SELECT COUNT(*) FROM contact_srcs WHERE user_id=?", (uid,)).fetchone()[0] >= CONTACT_SRCS_MAX:
+        return err(tr("At most {0} address books", CONTACT_SRCS_MAX), 409)
+    lid = b.get("list_id")
+    if lid not in (None, ""):
+        lid = as_int(lid, "list_id", 1)
+        need_list(c, lid)
+    else:
+        lid = fam_list(c, uid, "birthdays")
+    lead = as_int(b.get("lead_days", 7), "lead_days", 0, FAM_LEAD_MAX)
+    name = b.get("name") if isinstance(b.get("name"), str) and b["name"].strip() else (urllib.parse.urlsplit(url).hostname or "CardDAV")
+    if not cal_rate(uid):
+        return _cal_limited()
+    sid = c.execute("""INSERT INTO contact_srcs(user_id,name,url,url_hint,username,password,list_id,lead,created_at)
+                       VALUES(?,?,?,?,?,?,?,?,?)""", (uid, name.strip()[:100], cal_seal(c, uid, url), cal_url_hint(url), user.strip(),
+                                                     cal_seal(c, uid, pw), lid, lead, iso(now_utc()))).lastrowid
+    c.commit()
+    contacts_sync(c, sid)
+    r = c.execute("SELECT * FROM contact_srcs WHERE id=?", (sid,)).fetchone()
+    if r["status"] != "ok":
+        e = contact_err_text(r["error"])
+        c.execute("DELETE FROM contact_srcs WHERE id=?", (sid,))
+        c.commit()
+        return jsonify(error=e, code=r["error"].split(":", 1)[0]), 400
+    return jsonify(contact_public(c, r)), 201
+
+
+@app.patch("/api/family/contacts/<int:sid>")
+def family_contacts_edit(sid):
+    """{name?, list_id?, lead_days?, username?, password?}"""
+    c, b = db(), body()
+    r = need_contact(c, sid)
+    upd = {}
+    if "name" in b:
+        if not isinstance(b["name"], str) or not b["name"].strip():
+            return err(tr("Name missing"))
+        upd["name"] = b["name"].strip()[:100]
+    if "list_id" in b:
+        lid = as_int(b["list_id"], "list_id", 1) if b["list_id"] not in (None, "") else None
+        if lid:
+            need_list(c, lid)
+        upd["list_id"] = lid
+    if "lead_days" in b:
+        upd["lead"] = as_int(b["lead_days"], "lead_days", 0, FAM_LEAD_MAX)
+    if "username" in b:
+        if not isinstance(b["username"], str) or not b["username"].strip() or len(b["username"]) > 200:
+            return err(tr("Invalid value: {0}", "username"))
+        upd["username"] = b["username"].strip()
+    if b.get("password"):
+        if not isinstance(b["password"], str) or len(b["password"]) > 500:
+            return err(tr("Invalid value: {0}", "password"))
+        upd["password"] = cal_seal(c, r["user_id"], b["password"])
+    if upd:
+        c.execute(f"UPDATE contact_srcs SET {', '.join(k + '=?' for k in upd)} WHERE id=?", (*upd.values(), sid))
+        c.commit()
+    return jsonify(contact_public(c, need_contact(c, sid)))
+
+
+@app.delete("/api/family/contacts/<int:sid>")
+def family_contacts_delete(sid):
+    """Removes the address book; the birthdays it created stay (they are your tasks now)."""
+    c = db()
+    need_contact(c, sid)
+    c.execute("DELETE FROM contact_srcs WHERE id=?", (sid,))
+    c.commit()
+    return jsonify(ok=True)
+
+
+@app.post("/api/family/contacts/<int:sid>/sync")
+def family_contacts_sync(sid):
+    need_cal()
+    c = db()
+    need_contact(c, sid)
+    if not cal_rate(me(), ("contacts", sid)):
+        return _cal_limited()
+    contacts_sync(c, sid)
+    return jsonify(contact_public(c, need_contact(c, sid)))
+
+
+# ---- the weekly rotation (watchdog) + reminders for everyone who comes along
+def _wd_rotations(c, users, S, LG, now):
+    """Mode week: the turn moves on every Monday (missed weeks are skipped over); the next person gets a push."""
+    wk = iso_week(now.date())
+    for t in c.execute("""SELECT t.* FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.rotation LIKE '%"week"%' AND t.status=0
+                          AND t.deleted_at IS NULL AND l.archived=0""").fetchall():
+        try:
+            r = _jparse(t["rotation"]) or {}
+            if r.get("mode") != "week" or r.get("wk") == wk or not r.get("who"):
+                continue
+            nxt = rot_next(c, t)
+            r2 = _jparse(nxt[1]) if nxt else r
+            r2["wk"] = wk
+            new = nxt[0] if nxt else t["assignee_id"]
+            c.execute("UPDATE tasks SET rotation=?, assignee_id=?, assignee_group_id=NULL, reminded='[]', updated_at=? WHERE id=?",
+                      (json.dumps(r2, separators=(",", ":")), new, iso(now_utc()), t["id"]))
+            if new != t["assignee_id"]:
+                c.execute("INSERT INTO activity(task_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",
+                          (t["id"], None, "rotation", json.dumps({"to": new}), iso_ms(now_utc())))
+                s = S.get(new)
+                if new in users and s and notif_ok(c, new, s, "assign", "push", t["list_id"]):
+                    lg = LG.get(new, "en")
+                    notify(new, t["title"], tr("Your turn this week", lg=lg), push_prio(s), f"{PUBLIC_URL}/#t/{t['id']}", s=s, task=t["id"])
+            bump(c)
+            c.commit()
+        except Exception as e:  # noqa: BLE001
+            _wd_fail(c, "rotation of task", t["id"], e)
+
+
+def reminder_people(c, t, users, rcpt):
+    """Who else gets the reminder of task t: everyone who comes along (task_people) and can still see it."""
+    return [u for u in (r[0] for r in c.execute("SELECT user_id FROM task_people WHERE task_id=? ORDER BY user_id", (t["id"],)))
+            if u != rcpt and u in users and task_visible(c, t["id"], u)]
+
+
+# ---- REST API v1 (+ MCP)
+@app.get("/api/v1/family")
+@v1_view
+def v1_family():
+    v1_args(("week",))
+    return jsonify(v1_call(family_get))
+
+
+@app.post("/api/v1/family/occasions")
+@v1_view
+def v1_family_occasion():
+    v1_args(())
+    b = v1_json()
+    reject_unknown(b, ("name", "kind", "date", "year", "lead_days", "list_id", "gifts"))
+    c = db()
+    tid = occ_create(c, me(), b)
+    bump(c)
+    c.commit()
+    return jsonify(v1_one(c, tid)), 201
+
+
+@app.get("/api/v1/family/deadline-types")
+@v1_view
+def v1_family_dl_types():
+    v1_args(())
+    return jsonify(v1_call(family_dl_types))
+
+
+@app.post("/api/v1/family/deadlines")
+@v1_view
+def v1_family_deadline():
+    v1_args(())
+    b = v1_json()
+    reject_unknown(b, ("type", "expires", "who", "notice_months", "lead_days", "title", "list_id"))
+    c = db()
+    tid = deadline_create(c, me(), b)
+    bump(c)
+    c.commit()
+    return jsonify(v1_one(c, tid)), 201
+
+
+@app.post("/api/v1/tasks/<int:tid>/to-shopping")
+@v1_view
+def v1_task_to_shopping(tid):
+    v1_args(())
+    b = v1_json()
+    reject_unknown(b, ("list_id", "items"))
+    _v1_live(db(), tid, write=False, full=True)
+    return jsonify(v1_call(task_to_shopping, tid, body=b))
+
+
+@app.post("/api/v1/lists/<int:lid>/shop-areas")
+@v1_view
+def v1_list_shop_areas(lid):
+    v1_args(())
+    reject_unknown(v1_json(), ())
+    return jsonify(v1_call(list_shop_areas, lid, body={}))
+
+
+@app.get("/api/v1/family/packing")
+@v1_view
+def v1_family_packing():
+    v1_args(())
+    return jsonify(v1_call(family_packing_list))
+
+
+@app.post("/api/v1/family/packing")
+@v1_view
+def v1_family_packing_new():
+    v1_args(())
+    b = v1_json()
+    reject_unknown(b, ("template", "name"))
+    return jsonify(v1_call(family_packing_new, body=b)), 201
+
+
+@app.get("/api/v1/family/kids")
+@v1_view
+def v1_family_kids():
+    v1_args(())
+    return jsonify(data=kids_for(db(), me()), next_cursor=None)
+
+
+@app.post("/api/v1/family/kids/<int:kid>/stars")
+@v1_view
+def v1_family_kid_stars(kid):
+    v1_args(())
+    b = v1_json()
+    reject_unknown(b, ("delta", "note"))
+    return jsonify(v1_call(family_kid_stars, kid, body=b))
+
+
+@app.post("/api/v1/family/kids/<int:kid>/rewards")
+@v1_view
+def v1_family_reward_new(kid):
+    v1_args(())
+    b = v1_json()
+    reject_unknown(b, ("title", "cost", "emoji", "once"))
+    return jsonify(v1_call(family_reward_new, kid, body=b)), 201
+
+
+@app.patch("/api/v1/family/rewards/<int:rid>")
+@v1_view
+def v1_family_reward_edit(rid):
+    v1_args(())
+    b = v1_json()
+    reject_unknown(b, ("title", "cost", "emoji", "once"))
+    return jsonify(v1_call(family_reward_edit, rid, body=b))
+
+
+@app.delete("/api/v1/family/rewards/<int:rid>")
+@v1_view
+def v1_family_reward_delete(rid):
+    v1_args(())
+    v1_call(family_reward_delete, rid, body={})
+    return Response(status=204)
+
+
+@app.post("/api/v1/family/rewards/<int:rid>/request")
+@v1_view
+def v1_family_reward_request(rid):
+    v1_args(())
+    reject_unknown(v1_json(), ())
+    return jsonify(v1_call(family_reward_request, rid, body={}))
+
+
+@app.post("/api/v1/family/rewards/<int:rid>/decide")
+@v1_view
+def v1_family_reward_decide(rid):
+    v1_args(())
+    b = v1_json()
+    reject_unknown(b, ("approve",))
+    return jsonify(v1_call(family_reward_decide, rid, body=b))
+
+
+@app.post("/api/v1/me/purpose")
+@v1_view
+def v1_me_purpose():
+    v1_args(())
+    b = v1_json()
+    reject_unknown(b, ("purpose", "examples"))
+    return jsonify(v1_call(me_purpose, body=b))
+
+
+def family_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
+    F = "Family"
+    schemas["FamilyOccasion"] = {"type": "object", "properties": {
+        "task_id": {"type": "integer"}, "list_id": {"type": "integer"}, "title": {"type": "string"}, "kind": {"type": "string", "enum": list(FAM_OCC)},
+        "name": {"type": "string"}, "date": {"type": "string", "format": "date", "description": "The next date"},
+        "days": {"type": "integer", "description": "Days from today"}, "year": nul("integer", description="Year of birth / of the wedding"),
+        "age": nul("integer", description="Age on that date (birthday) / years (anniversary)"), "gifts": {"type": "integer", "description": "Gift ideas (subtasks)"}}}
+    schemas["FamilyDeadline"] = {"type": "object", "properties": {
+        "task_id": {"type": "integer"}, "list_id": {"type": "integer"}, "title": {"type": "string"}, "type": {"type": "string", "enum": list(FAM_DL)},
+        "who": {"type": "string"}, "expires": nul("string", format="date"), "due": {"type": "string", "format": "date",
+                                                                                    "description": "expires minus the notice period"},
+        "days": {"type": "integer"}}}
+    schemas["FamilyRotation"] = {"type": "object", "properties": {
+        "task_id": {"type": "integer"}, "list_id": {"type": "integer"}, "title": {"type": "string"}, "mode": {"type": "string", "enum": ["done", "week"]},
+        "who": {"type": "array", "items": {"type": "object", "properties": {"user_id": {"type": "integer"}, "name": {"type": "string"}}}},
+        "current": nul("integer"), "next": {"type": "integer"}, "due": nul("string", format="date")}}
+    schemas["Reward"] = {"type": "object", "properties": {
+        "id": {"type": "integer"}, "kid_id": {"type": "integer"}, "title": {"type": "string"}, "emoji": {"type": "string"},
+        "cost": {"type": "integer", "description": "Stars"}, "once": {"type": "boolean", "description": "Gone after it was redeemed once"},
+        "state": {"type": "string", "enum": ["open", "requested", "redeemed"]}, "requested_at": nul("string"), "decided_at": nul("string"),
+        "decided_by": nul("integer")}}
+    schemas["Kid"] = {"type": "object", "properties": {
+        "id": {"type": "integer"}, "username": {"type": "string"}, "display_name": {"type": "string"}, "kid": {"type": "boolean"},
+        "stars": {"type": "integer", "description": "The balance"}, "parents": {"type": "array", "items": {"type": "integer"}},
+        "rewards": {"type": "array", "items": ref("Reward")}, "requests": {"type": "integer"},
+        "history": {"type": "array", "items": {"type": "object", "properties": {
+            "id": {"type": "integer"}, "delta": {"type": "integer"}, "kind": {"type": "string", "enum": ["task", "bonus", "reward"]},
+            "title": {"type": "string"}, "task_id": nul("integer"), "by": nul("integer"), "at": {"type": "string"}}}}}}
+    schemas["KidPage"] = page("Kid")
+    schemas["Family"] = {"type": "object", "properties": {
+        "occasions": {"type": "array", "items": ref("FamilyOccasion")}, "deadlines": {"type": "array", "items": ref("FamilyDeadline")},
+        "rotations": {"type": "array", "items": ref("FamilyRotation")}, "week": {"type": "string", "format": "date", "description": "Monday of the meal plan"},
+        "meals": {"type": "array", "items": {"type": "object", "properties": {
+            "task_id": {"type": "integer"}, "list_id": {"type": "integer"}, "title": {"type": "string"}, "day": {"type": "string", "format": "date"},
+            "time": nul("string"), "ingredients": {"type": "array", "items": {"type": "string"}}}}},
+        "shopping": {"type": "array", "items": {"type": "object", "properties": {
+            "list_id": {"type": "integer"}, "name": {"type": "string"}, "open": {"type": "integer"}, "role": {"type": "string"}}}},
+        "kids": {"type": "array", "items": ref("Kid")}, "kid": {"type": "boolean", "description": "The token's user is a kid account"}}}
+    kid_p, rid_p = pid("id", "Kid (user) id"), pid("id", "Reward id")
+    paths["/family"] = {"get": op("2.19.0 (module Family): upcoming birthdays + anniversaries, deadlines, rotations, the week's meal plan, "
+                                  "shopping lists, kids", F, ok(ref("Family")) | errs("400"),
+                                  [q("week", "A day of the week whose meal plan to show (default: this week)", {"type": "string", "format": "date"})])}
+    paths["/family/occasions"] = {"post": op("A birthday or anniversary: a yearly task with the age, reminders lead_days before and on the day, "
+                                             "gift ideas as subtasks", F, ok(ref("Task"), "Created", "201") | errs("400", "403", "404"),
+                                             body={"type": "object", "required": ["name", "date"], "properties": {
+                                                 "name": {"type": "string"}, "kind": {"type": "string", "enum": list(FAM_OCC)},
+                                                 "date": {"type": "string", "description": "YYYY-MM-DD (with the year) or --MM-DD"},
+                                                 "year": nul("integer"), "lead_days": {"type": "integer", "minimum": 0, "maximum": FAM_LEAD_MAX},
+                                                 "list_id": nul("integer", description="Default: the first Birthdays list (created when missing)"),
+                                                 "gifts": {"type": "array", "items": {"type": "string"}}}}, scope="tasks:write")}
+    paths["/family/deadline-types"] = {"get": op("The built-in household deadline types (passport, ID card, car inspection, insurance, contract, other)",
+                                                 F, ok({"type": "object", "properties": {"types": {"type": "array", "items": {"type": "object"}}}}))}
+    paths["/family/deadlines"] = {"post": op("A household deadline (due = expires minus the notice period, a deadline with reminders)", F,
+                                             ok(ref("Task"), "Created", "201") | errs("400", "403", "404"),
+                                             body={"type": "object", "required": ["expires"], "properties": {
+                                                 "type": {"type": "string", "enum": list(FAM_DL)}, "expires": {"type": "string", "format": "date"},
+                                                 "who": {"type": "string"}, "notice_months": {"type": "integer", "minimum": 0, "maximum": 24},
+                                                 "lead_days": {"type": "integer", "minimum": 0, "maximum": FAM_LEAD_MAX}, "title": {"type": "string"},
+                                                 "list_id": nul("integer", description="Default: the first Household list (created when missing)")}},
+                                             scope="tasks:write")}
+    paths["/tasks/{id}/to-shopping"] = {"post": op("Put the ingredients of a meal (the lists in its notes, or items) on a shopping list; open "
+                                                   "items with the same name are not added twice", F,
+                                                   ok({"type": "object", "properties": {"list_id": {"type": "integer"}, "added": {"type": "array", "items": {"type": "object"}},
+                                                                                        "skipped": {"type": "array", "items": {"type": "string"}}}}) | errs("400", "403", "404"),
+                                                   [pid()], body={"type": "object", "properties": {"list_id": nul("integer"),
+                                                                                                    "items": {"type": "array", "items": {"type": "string"}}}},
+                                                   scope="tasks:write")}
+    paths["/lists/{id}/shop-areas"] = {"post": op("Make a list a shopping list and add the default shop areas as sections", F,
+                                                  ok({"type": "object", "properties": {"added": {"type": "integer"}}}) | errs("403", "404"),
+                                                  [pid(desc="List id")], scope="structure")}
+    paths["/family/packing"] = {
+        "get": op("The built-in packing list templates", F, ok({"type": "object", "properties": {"templates": {"type": "array", "items": {"type": "object"}}}})),
+        "post": op("A new packing list from a template", F, ok({"type": "object", "properties": {"list_id": {"type": "integer"}}}, "Created", "201") | errs("400"),
+                   body={"type": "object", "required": ["template"], "properties": {"template": {"type": "string", "enum": list(PACKING)},
+                                                                                     "name": {"type": "string"}}}, scope="structure")}
+    paths["/family/kids"] = {"get": op("The kids the token's user looks after (or the kid itself) with stars, rewards and history", F, ok(ref("KidPage")))}
+    paths["/family/kids/{id}/stars"] = {"post": op("Give (or correct) stars by hand (parents)", F, ok(ref("Kid")) | errs("400", "404", "409"), [kid_p],
+                                                   body={"type": "object", "required": ["delta"], "properties": {"delta": {"type": "integer"}, "note": {"type": "string"}}},
+                                                   scope="tasks:write")}
+    rin = {"type": "object", "properties": {"title": {"type": "string"}, "cost": {"type": "integer", "minimum": 1, "maximum": REWARD_COST_MAX},
+                                            "emoji": {"type": "string"}, "once": {"type": "boolean"}}}
+    paths["/family/kids/{id}/rewards"] = {"post": op("Offer a reward (parents)", F, ok(ref("Reward"), "Created", "201") | errs("400", "404", "409"), [kid_p],
+                                                     body={**rin, "required": ["title", "cost"]}, scope="tasks:write")}
+    paths["/family/rewards/{id}"] = {
+        "patch": op("Change a reward (parents)", F, ok(ref("Reward")) | errs("400", "404"), [rid_p], body=rin, scope="tasks:write"),
+        "delete": op("Delete a reward (parents)", F, {"204": {"description": "Deleted"}} | errs("404"), [rid_p], scope="delete")}
+    paths["/family/rewards/{id}/request"] = {"post": op("Ask for a reward (the kid itself, with enough stars)", F, ok(ref("Kid")) | errs("403", "404", "409"),
+                                                        [rid_p], scope="tasks:write")}
+    paths["/family/rewards/{id}/decide"] = {"post": op("Approve (stars are taken) or decline a reward (parents)", F, ok(ref("Kid")) | errs("400", "404", "409"),
+                                                       [rid_p], body={"type": "object", "required": ["approve"], "properties": {"approve": {"type": "boolean"}}},
+                                                       scope="tasks:write")}
+    paths["/me/purpose"] = {"post": op("What the token's user uses Kalmido for: switches the modules and creates the starter lists once", F,
+                                       ok({"type": "object", "properties": {"features": {"type": "string"}, "created": {"type": "array", "items": {"type": "integer"}}}}) | errs("400"),
+                                       body={"type": "object", "required": ["purpose"], "properties": {"purpose": {"type": "string", "enum": list(PURPOSES)},
+                                                                                                       "examples": {"type": "boolean"}}}, scope="account")}
 
 init_db()
 if os.environ.get("TASKS_WATCHDOG", "1") == "1":

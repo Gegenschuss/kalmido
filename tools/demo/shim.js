@@ -44,7 +44,7 @@
   const LIST_DEF = {agent_tidy: 'off', columns: null, archived: 0, archived_at: null, bell: 'default', bell_custom: {}, checklist: 0, color: '', day_hours: null,
     dep_shift: 0, description: '', folder: '', groups: [], icon: '', is_inbox: 0, kind: 'list', milestones: [], nag: '', owner_id: 1, rate: null,
     repos: [], role: 'owner', sort: 0, status: '', status_at: null, status_by: null, status_note: '', tags: [], ticket_tpl: '', tickets: 0,
-    tidy_agent_id: null, view: 'list'};
+    tidy_agent_id: null, view: 'list', family: ''};
   const SETTINGS_DEF = {agent_share: '{}', agents_hidden: '', allday_time: '09:00', cal_today: '1', celebrate: '1', comment_order: 'old',
     date_confirm: '0', default_reminder: '0', digest_time: '', features: 'cal,timeline,matrix,habits,kanban,collab,stats,time,progress,deps,fields,comments,agents',
     features_rev: '9', folders: '[]', folders_closed: '[]', hide_blocked_today: '0', hide_progress: '', ical_alarms: '1', ical_scope: 'all',
@@ -183,6 +183,7 @@
       calendars: {enabled: false, subs: 0}, api: {enabled: false}, webhooks: {enabled: false}, caldav: {enabled: false}, public_links: false,
       share: {drop_url: '', ios_shortcut: ''}, sample: null, agents: [agentOut()], proposers: [], groups: [], my_groups: [],
       dayplan: {default_duration: 30, review_time: '', work_end: DB.settings.work_end, work_start: DB.settings.work_start},
+      kids: [], kid_ids: [],  // 2.19.0 (#653): no other accounts in the demo
     };
   }
 
@@ -192,7 +193,7 @@
   const gone = () => { throw new Http(404, {error: 'Not found'}); };
   const needTask = id => { const t = taskById(id); if (!t) gone(); return t; };
   const TASK_FIELDS = ['title', 'content', 'priority', 'due', 'due_time', 'start', 'duration', 'reminders', 'repeat', 'repeat_from', 'url', 'list_id',
-    'section_id', 'parent_id', 'sort', 'pinned', 'tags', 'ttype', 'deadline', 'nag', 'plan_start', 'assignee_id', 'status'];
+    'section_id', 'parent_id', 'sort', 'pinned', 'tags', 'ttype', 'deadline', 'nag', 'plan_start', 'assignee_id', 'status', 'fam', 'stars'];
   function applyFields(t, b) {
     for (const k of TASK_FIELDS) if (k in b) t[k] = b[k];
     if ('title' in b && !String(b.title || '').trim()) bad('Title missing');
@@ -315,7 +316,7 @@
   }
 
   // ---------------------------------------------------------------- routes
-  const GATED = /^\/api\/(push|ical|calendars(?!\/events)|paperless|admin|import|imports|repos|me\/(webhooks|tokens|app-passwords|2fa|passkeys|drop-token)|my\/agents|users$|users\/|backups|public|oidc|attachments|list-files|templates|news\/|pomo|ntfy|sample|onboarding|proposals|folders\/groups|agents\/usage)|\/(members|groups|owner|public-link|repos|paperless|files|icon|git-undo|attachments|take|wake|waiting)(\/|$|\?)/;
+  const GATED = /^\/api\/(push|ical|calendars(?!\/events)|paperless|admin|import|imports|repos|me\/(webhooks|tokens|app-passwords|2fa|passkeys|drop-token)|my\/agents|users$|users\/|backups|public|oidc|attachments|list-files|templates|news\/|pomo|ntfy|sample|onboarding|proposals|folders\/groups|agents\/usage|family\/contacts)|\/(members|groups|owner|public-link|repos|paperless|files|icon|git-undo|attachments|take|wake|waiting)(\/|$|\?)/;
   // automatic background calls of the app: answered quietly (no notice)
   const QUIET = {
     'GET /api/push/subs': () => ({subs: []}), 'GET /api/push/vapid': () => ({key: ''}), 'GET /api/my/agents': () => ({allowed: false, max: 0, count: 0, agents: [], api: false}),
@@ -399,13 +400,16 @@
   on('POST', '/api/lists', (q, b) => {
     if (!String(b.name || '').trim()) bad('Name missing');
     const l = {...clone(LIST_DEF), id: nid('list'), created_at: iso(), sort: Math.max(0, ...DB.lists.map(x => x.sort)) + 1};
-    for (const k of ['name', 'color', 'folder', 'view', 'kind', 'checklist', 'tickets', 'nag']) if (k in b) l[k] = b[k];
+    for (const k of ['name', 'color', 'folder', 'view', 'kind', 'checklist', 'tickets', 'nag', 'family']) if (k in b) l[k] = b[k];
     if (b.kind === 'checklist') { l.kind = 'list'; l.checklist = 1; }
-    DB.lists.push(l); return listOut(l);
+    DB.lists.push(l);
+    if (l.family === 'shopping' || l.family === 'packing') l.checklist = 1;
+    if (l.family === 'shopping') shopAreas(l);
+    return listOut(l);
   });
   on('PATCH', '/api/lists/(\\d+)', (q, b, id) => {
     const l = listById(id) || gone();
-    for (const k of ['name', 'color', 'folder', 'sort', 'view', 'archived', 'checklist', 'dep_shift', 'kind', 'tickets', 'nag', 'description', 'agent_tidy', 'rate', 'day_hours']) if (k in b) l[k] = typeof b[k] === 'boolean' ? (b[k] ? 1 : 0) : b[k];
+    for (const k of ['name', 'color', 'folder', 'sort', 'view', 'archived', 'checklist', 'dep_shift', 'kind', 'tickets', 'nag', 'description', 'agent_tidy', 'rate', 'day_hours', 'family']) if (k in b) l[k] = typeof b[k] === 'boolean' ? (b[k] ? 1 : 0) : b[k];
     if ('done_at_bottom' in b) l.checklist = b.done_at_bottom ? 1 : 0;
     if ('archived' in b) l.archived_at = b.archived ? iso() : null;
     if ('columns' in b) l.columns = Array.isArray(b.columns) ? [...new Set(b.columns)] : null;  // 2.14.0 (#425)
@@ -520,6 +524,71 @@
     return {...m};
   });
   on('PUT', '/api/agents/(\\d+)/autoshare', () => ({ok: true}));
+  // 2.19.0 (#653): the module Family (one person: no kids, no taking turns); the texts come from the app's translations (tr)
+  const tx = k => (typeof tr === 'function' ? tr(k) : k);
+  const SHOP_AREAS = ['Fruit & vegetables', 'Bread & bakery', 'Dairy & eggs', 'Meat & fish', 'Frozen', 'Pantry', 'Drinks', 'Household & drugstore'];
+  function shopAreas(l) {
+    const have = new Set(DB.sections.filter(x => x.list_id === l.id).map(x => x.name.toLowerCase())); let n = 0;
+    for (const a of SHOP_AREAS) { if (have.has(tx(a).toLowerCase())) continue; DB.sections.push({id: nid('section'), list_id: l.id, name: tx(a), sort: DB.sections.length + 1}); n++; }
+    return n;
+  }
+  const famList = (kind, name) => DB.lists.find(l => l.family === kind && !l.archived) || (() => { const l = {...clone(LIST_DEF), id: nid('list'), created_at: iso(), sort: Math.max(0, ...DB.lists.map(x => x.sort)) + 1, name: tx(name), family: kind, checklist: kind === 'shopping' || kind === 'packing' ? 1 : 0}; DB.lists.push(l); if (kind === 'shopping') shopAreas(l); return l; })();
+  const nextYearly = (m, d) => { const t0 = today(); for (const y of [0, 1]) { const x = `${new Date().getFullYear() + y}-${pad(m)}-${pad(d)}`; if (x >= t0) return x; } return `${new Date().getFullYear() + 1}-${pad(m)}-${pad(d)}`; };
+  on('POST', '/api/family/occasions', (q, b) => {
+    const name = String(b.name || '').trim(); if (!name) bad('Name missing');
+    const m = String(b.date || '').match(/^(\d{4}|--)-?(\d{2})-?(\d{2})/); if (!m) bad('Invalid date');
+    const year = b.year || (/^\d{4}$/.test(m[1]) ? +m[1] : null), kind = b.kind === 'anniversary' ? 'anniversary' : 'birthday', lead = b.lead_days ?? 7;
+    const l = b.list_id ? listById(b.list_id) || gone() : famList('birthdays', 'Birthdays');
+    const t = newTask({title: tx(kind === 'birthday' ? 'Birthday: {0}' : 'Anniversary: {0}').replace('{0}', name), list_id: l.id, due: nextYearly(+m[2], +m[3]), repeat: 'FREQ=YEARLY',
+      reminders: [lead ? lead * 1440 : null, 0].filter(x => x !== null).join(','), fam: {kind, name, lead, ...(year ? {year} : {})}});
+    for (const g of b.gifts || []) newTask({title: g, parent_id: t.id});
+    return taskOut(taskById(t.id));
+  });
+  const DL = {passport: ['Renew the passport: {0}', 90, '', 0, 'Passport'], id_card: ['Renew the ID card: {0}', 60, '', 0, 'ID card'], car: ['Car inspection: {0}', 30, 'FREQ=YEARLY;INTERVAL=2', 0, 'Car inspection'],
+    insurance: ['Cancel or renew the insurance: {0}', 21, 'FREQ=YEARLY', 3, 'Insurance'], contract: ['Cancel or renew the contract: {0}', 14, 'FREQ=YEARLY', 1, 'Contract'], other: ['{0}', 14, '', 0, 'Other deadline']};
+  on('POST', '/api/family/deadlines', (q, b) => {
+    const d = DL[b.type || 'other'] || bad('Invalid type'); if (!b.expires) bad('Date missing');
+    const notice = b.notice_months ?? d[3], due = new Date(b.expires + 'T12:00:00'); due.setMonth(due.getMonth() - notice);
+    const l = b.list_id ? listById(b.list_id) || gone() : famList('household', 'Household');
+    const who = String(b.who || '').trim(), title = d[0] === '{0}' ? (who || bad('Name missing')) : tx(d[0]).replace('{0}', who || tx(d[4]));
+    return newTask({title, list_id: l.id, due: ds(due), repeat: d[2], deadline: 2, priority: 3, reminders: `${d[1] * 1440},0`,
+      fam: {kind: 'deadline', type: b.type || 'other', who, expires: b.expires, notice, lead: d[1]}});
+  });
+  const PACK = {holiday: ['Holiday', ['Passports or ID cards', 'Tickets and bookings', 'Health insurance cards', 'Cash and cards', 'Underwear and socks', 'T-shirts', 'Trousers', 'Jumper', 'Rain jacket', 'Pyjamas', 'Swimwear', 'Toothbrush and toothpaste', 'Sun cream', 'Medicines', 'Phone chargers', 'Power bank']],
+    pool: ['Swimming pool', ['Swimwear', 'Towels', 'Shower gel and shampoo', 'Flip-flops', 'Swimming goggles', 'Sun cream', 'Water bottle', 'Snacks', 'Coin for the locker', 'Hairbrush']],
+    daycare: ['Daycare', ['Change of clothes', 'Nappies and wipes', 'Indoor shoes', 'Rain gear', 'Sun hat', 'Water bottle', 'Lunch box', 'Cuddly toy', 'Sun cream']],
+    camping: ['Camping', ['Tent', 'Sleeping bags', 'Sleeping mats', 'Pillows', 'Camping stove and gas', 'Lighter', 'Pots and cutlery', 'Torch or head torch', 'First aid kit', 'Insect repellent']],
+    business: ['Business trip', ['Laptop and charger', 'Phone chargers', 'Business clothes', 'Documents for the meeting', 'Tickets and bookings', 'Toiletries', 'Headphones']]};
+  on('POST', '/api/family/packing', (q, b) => {
+    const p = PACK[b.template] || bad('Invalid template');
+    const l = {...clone(LIST_DEF), id: nid('list'), created_at: iso(), sort: Math.max(0, ...DB.lists.map(x => x.sort)) + 1, name: b.name || tx('Packing list: {0}').replace('{0}', tx(p[0])), family: 'packing', checklist: 1};
+    DB.lists.push(l); p[1].forEach((it, i) => newTask({title: tx(it), list_id: l.id, sort: i + 1}));
+    return {ok: true, list_id: l.id};
+  });
+  const shopKey = s => String(s).replace(/^\s*[\d½¼¾.,/]+\s*(x|kg|g|l|ml|stk|pck|el|tl)?\.?\s+/i, '').trim().toLowerCase();
+  on('POST', '/api/tasks/(\\d+)/to-shopping', (q, b, id) => {
+    const t = needTask(id), lines = String(t.content || '').split('\n');
+    let items = lines.map(x => x.match(/^\s*(?:[-*+]|\d+[.)])\s+(?:\[( |x|X)\]\s*)?(.*\S)/)).filter(x => x && !/x/i.test(x[1] || '')).map(x => x[2]);
+    if (!items.length) items = lines.map(x => x.trim()).filter(x => x && !x.startsWith('#'));
+    if (!items.length) bad(tx('No ingredients found: write them as a list in the notes'));
+    const l = b.list_id ? listById(b.list_id) || gone() : famList('shopping', 'Shopping list');
+    const have = new Set(live().filter(x => x.list_id === l.id && x.status === 0).map(x => shopKey(x.title))), added = [], skipped = [];
+    for (const it of items) { if (have.has(shopKey(it))) { skipped.push(it); continue; } have.add(shopKey(it)); const n = newTask({title: it, list_id: l.id, sort: 1e6 + added.length}); added.push({id: n.id, title: it}); }
+    return {list_id: l.id, added, skipped};
+  });
+  on('POST', '/api/lists/(\\d+)/shop-areas', (q, b, id) => { const l = listById(id) || gone(); l.family = 'shopping'; return {ok: true, added: shopAreas(l)}; });
+  on('GET', '/api/family/kids', () => ({kids: []}));
+  const PURPOSE = {me: ['cal'], family: ['cal', 'habits', 'comments', 'collab', 'family'], team: ['cal', 'timeline', 'matrix', 'kanban', 'habits', 'pomo', 'stats', 'comments', 'collab', 'time', 'progress', 'deps', 'fields'],
+    software: ['cal', 'timeline', 'matrix', 'kanban', 'habits', 'pomo', 'stats', 'comments', 'collab', 'time', 'progress', 'deps', 'fields']};
+  on('POST', '/api/me/purpose', (q, b) => {
+    const on = PURPOSE[b.purpose] || bad('Invalid purpose'), all = Object.values(PURPOSE).flat(), fs = DB.settings.features.split(',').filter(Boolean);
+    DB.settings.features = [...fs.filter(x => !all.includes(x) || on.includes(x)), ...on.filter(x => !fs.includes(x))].join(',');
+    DB.settings.purpose = b.purpose;
+    const created = [];
+    if (b.purpose === 'family' && b.examples !== false) for (const [k, n] of [['shopping', 'Shopping list'], ['household', 'Household'], ['birthdays', 'Birthdays'], ['meals', 'Meal plan']])
+      if (!DB.lists.some(l => l.family === k)) { created.push(famList(k, n).id); }
+    return {features: DB.settings.features, created};
+  });
 
   // ---------------------------------------------------------------- the notice for server features
   function notice() {

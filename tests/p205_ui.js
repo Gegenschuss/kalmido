@@ -154,6 +154,7 @@ async function swTests() {
     const f = win.fetch; win.fetch = (u, o = {}) => { sent.push([String(u), o]); return f(u, o); };
   }}); d = w.document;
   w.eval('S.webpush.enabled = true; S.webpush.devices = 2');
+  await sleep(3000); closed.length = 0;  // 2.19.0 (#668): the start already tidied the shade (wpSweep); here only what opening a task does
   w.eval(`openDetail(${T})`); await sleep(500);
   check(JSON.stringify(closed) === `["t-${T}"]`, 'open: this device closes its notification of the task: ' + closed);
   const h = sent.find(([u]) => /\/api\/push\/handled$/.test(u));
