@@ -31802,7 +31802,7 @@ def vcard_occasions(text):
             parts = get("N").split(";")
             fn = " ".join(x for x in (parts[1] if len(parts) > 1 else "", parts[0]) if x).strip()
         fn = re.sub(r"\s+", " ", fn)[:FAM_NAME_MAX]
-        uid = get("UID").strip()[:200] or "fn:" + hashlib.sha1(fn.encode()).hexdigest()[:16]
+        uid = get("UID").strip()[:200] or "fn:" + hashlib.sha1(fn.encode(), usedforsecurity=False).hexdigest()[:16]
         if not fn:
             continue
         seen = set()

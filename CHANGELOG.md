@@ -7,6 +7,10 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.19.1] - 2026-10-05
+
+- 2.19.1: the contacts import marks its fallback ID hash as non-security (security scanner)
+
 ## [2.19.0] - 2026-10-05
 
 **In short:** Family (#653). A new module *Family*, off until you want it: birthdays and anniversaries with the age, gift
@@ -2511,7 +2515,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.19.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.19.1...HEAD
+[2.19.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.19.1
 [2.19.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.19.0
 [2.18.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.18.0
 [2.17.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.17.2
