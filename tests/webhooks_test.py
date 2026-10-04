@@ -56,8 +56,10 @@ def dbx(sql, args=()):
 
 
 def start(extra):
+    # the container of the previous suite still writes into DATA: stop it first, or rm races it (CI: "Directory not empty")
+    subprocess.run(["docker", "rm", "-f", os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")], capture_output=True)
     subprocess.run(["rm", "-rf", DATA])
-    os.makedirs(DATA)
+    os.makedirs(DATA, exist_ok=True)
     subprocess.run(["cp", os.path.join(N, "stub_webhook.py"), DATA])
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=dict(os.environ, KEEP="1", EXTRA=" ".join(extra)),
                        capture_output=True, text=True)
