@@ -7,6 +7,104 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.18.0] - 2026-10-04
+
+**In short:** Software & Planning (#462). Milestones are tasks with progress, a burndown and release notes; tasks can be
+created right in the timeline, which now shows sections; GitLab and Bitbucket join GitHub and Gitea / Forgejo, a release
+tag reaches its milestone and error reports become tickets; the project type of a list can be changed; code in Markdown
+is highlighted and `file:line` links into the repository. Reactions sit visibly at every chat message, the search icon
+stays in the phone header, and a new app icon.
+
+### Added
+- **Milestones are tasks** (#430): a diamond instead of the round status glyph, a date (optional), checked off like a
+  task, no assignee needed; in the list, Kanban and the calendar (month, week, day, agenda). Create one with `!milestone`
+  in the quick add, *This task is a milestone* in the task panel or *Make it a milestone* in the task menu.
+- **Tasks of a milestone** (the release or version they ship in): a *Milestone* field in the task panel and *Set
+  milestone* in the multi-select. The milestone's panel shows its progress, its tasks, a burndown (with a table) and
+  release notes from its completed tasks (Features / Fixes / Other) with *Copy*.
+- API v1: `milestone` and `milestone_id` on tasks (read, create, change, filters `?milestone=` / `?milestone_id=`),
+  `GET /tasks/{id}/milestone`; MCP tool `get_milestone`.
+- **Sections in the timeline** (#462): inside each list the tasks are grouped by section with foldable section rows
+  (remembered per device), in the list timeline, the calendar's timeline and the *All* timeline.
+- **Create tasks right in the timeline** (#431): drag across days on a list or section row, or double-click a day; on
+  touch, hold and drag. Type the name, Enter: the task gets exactly that range. *+ Add task* ends every list and each
+  section has its own "+". Works offline and with Undo; viewers cannot create.
+- **GitLab** (gitlab.com and self-hosted, nested groups) and **Bitbucket Cloud** as repository providers next to GitHub
+  and Gitea / Forgejo: merge / pull requests, commits, branch commits and CI at the tickets, `fixes #id`, agents' merge
+  approvals, inbound webhooks (GitLab *Secret token*, Bitbucket *Secret*); the web address picks the provider.
+  Bitbucket Server / Data Center is not supported.
+- **A release tag reaches its milestone**: a new tag like `v2.18.0` in a connected repository completes the open
+  milestone "2.18.0" / "Release 2.18.0" once, with Undo; tags from before the connection never do.
+- **Error reports become tickets**: a secret webhook per project list (*Edit list > Repository > Error reports*; Sentry
+  or any JSON `{title, body, url, fingerprint, level}`) creates bug tickets with the details and the link; the same error
+  again counts up at its open ticket. A NEW error sends exactly one News item and push (new notification row *New error
+  reports*, on by default); repeats, an error coming back and reports over the limit stay quiet. At most `KALMIDO_ERROR_REPORTS_PER_HOUR` (default 30) new tickets per list and hour,
+  a new URL, off. API: `GET` / `PATCH /api/v1/lists/{id}/error-hook` (people only).
+- **Project type of an existing list** (#408): the list dialog shows and changes it (None, Agency, Software / AI dev,
+  Personal) for the owner and list admins; switching turns on what the type needs and offers its sections, with Undo;
+  nothing is deleted. API: `ptype` (web), `project_type` on v1 `GET` / `PATCH` lists, MCP `update_list`.
+- **Code in Markdown**: code blocks are highlighted by language (```` ```js ````, ```` ```py ````, ```` ```diff ```` …) and
+  have a *Copy* button; `src/app.py:42` in notes and comments links to that file and line in the list's repository.
+- Ticket panel: *Copy* `fixes #id` with one tap next to the branch name; a new bug shows *Similar open ticket: #id* when
+  an open ticket in the list has a very similar title.
+- A maskable app icon of its own, an Apple touch icon and SVG / PNG favicons with a simplified drawing that stays
+  readable at 16 px (#394); all icons come from `tools/make_icons.py` and are byte-identical when rebuilt (`--check`).
+
+### Changed
+- The milestones of the project overview (2.7.1) are migrated into milestone tasks once (on start and when an older
+  backup is restored). The overview, the timeline markers, the next milestone in the header and the
+  `/lists/{id}/milestones` routes keep working; their ids are task ids since 2.18.0.
+- Moving a task to another list, deleting a milestone for good or turning it back into a task removes the link to it; a
+  milestone in the trash keeps its tasks and gets them back when it is restored.
+- The *Repository* area of the list dialog shows for software projects and lists that already have a repository.
+- Bug template: *Version / found in*; feature template: acceptance criteria as a checklist.
+- **Reactions** 👍 👎 ❤️ sit visibly under every message in the agent chat and the team chat, your own included: one tap
+  adds or removes yours and shows the count, no smiley button first (#651). On an agent's question 👍 / 👎 still count as
+  approval / rejection.
+- **The search icon always stays in the phone header** (#651); a crowded header shortens the title with "…" instead.
+- **Timeline milestones** are diamonds in their own row at their date (drag, long-press or keyboard to move them); the
+  thin vertical line stays, the list row shows no second marker.
+- **New app icon** (#394): a heron standing on one leg in the water, the violet sun half on the horizon, on the home
+  screen, in the browser tab, the sidebar, the sign-in page, push notifications and the shortcuts. The celebration is
+  the heron swinging by on the vine (setting *Celebrations*).
+- **Density "Custom"** (#642): two sliders, *Sidebar row spacing* and *Task row spacing* (0–100 %, live while dragging,
+  per device) instead of compact / comfortable per area; touch rows stay 44 px, with a mouse rows may get as tight as 24 px.
+- Git polling also respects GitLab's `RateLimit-*` headers and `Retry-After`.
+- Tests: a seventh CI shard; service worker cache v94.
+
+### Fixed
+- News: the section headings follow the page heading (h1 → h2) for screen readers (#652).
+- The view switch (List / Kanban / Timeline …) on a touch foldable is a full 44 × 44 px target (#652).
+- Saving a team chat message you emptied offers to delete it instead of doing nothing (#652).
+- Input bars with a field inside (quick add, the comment box, search fields, the command palette) show the keyboard focus
+  once, on the bar, instead of a second box around the field.
+- Timeline on phones: the new-task field is no longer hidden behind the tab bar and the "+" button while the keyboard is
+  up; holding and dragging from the first visible day no longer creates a range one day short, and the field shows the
+  range; section names stay readable; the current month name stays at the left of the header while scrolling.
+- Timeline: the footer explains how to add a task; bars and milestones get *Pick a date…* / *Move to date…* in their menu
+  (Shift+F10) and the key D.
+- List dialog: walking the project type with the arrow keys no longer saves every option; the type is saved once (Enter or
+  leaving the field) as one undo step and the sections offered match it. The row *Type* is now *List or project*, the
+  list's "…" menu says *As a list* / *As a project*.
+- Error-report tickets escape only what Markdown would read (no stray backslashes); backslash escapes in notes show the
+  plain character.
+- The task panel opens a different task at its top; a new milestone's burndown says *Not enough history yet*.
+- Repository: a self-hosted address with GitHub selected gets a hint to pick the provider; connect errors show next to
+  the fields.
+- Accessibility: roadmap list rows no longer nest the *Open list* button in the toggle; completed calendar chips and the
+  Bug chip on a selected row reach 4.5:1; *Copy release notes*; 44 px error-report info and repository link on touch.
+- *Set milestone* shows dates in the app's format; long list names in Trash and search end with "…"; the bulk bar no longer
+  covers an open task panel.
+- The header keeps everyday one-tap actions (view switch, undo / redo, Share) visible and shortens the list name with "…"
+  instead; they only move into "…" when they really do not fit (foldables, also desktops with long names).
+- Density *Custom* starts exactly at the spacing shown before (no jump), steps of 1 %; task rows are at least 44 px on
+  every touch screen.
+- Unused chat reactions are one calm grey symbol with enough contrast; *Sent* in the agent chat has enough contrast; the
+  team chat's message box keeps a long list name on one line; conversation previews show no Markdown marks.
+- The working ring of the tab bar sits centred on the tab's icon at every height (phones, foldables, larger text).
+- The chat reaction "👍 1" is a compact pill again, not a big circle, on touch screens.
+- Tests: `p151_ui` read the undo history before the step was recorded under load (#652).
+
 ## [2.17.2] - 2026-10-04
 
 ### Fixed
@@ -2332,7 +2430,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.17.2...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.18.0...HEAD
+[2.18.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.18.0
 [2.17.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.17.2
 [2.17.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.17.1
 [2.17.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.17.0

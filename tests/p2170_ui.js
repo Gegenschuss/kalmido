@@ -139,8 +139,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   check(d.querySelector('#tc-msgs .cmsg.ag .tcwho')?.textContent.includes('Bob'), 'with his name');
   // react, edit, delete
   const bm = [...d.querySelectorAll('#tc-msgs .cmsg.ag')].pop();
-  click(w, bm.querySelector('.rxtog')); await sleep(50);
-  click(w, bm.querySelector('.chrxq [data-e="heart"]'));
+  click(w, bm.querySelector('.rxrow [data-e="heart"]'));  // 2.18.0 (#651): visible, one tap
   check(await until(() => d.querySelector('#tc-msgs .cmsg.ag .chrx .rx.on[data-e="heart"]')), '#419: a reaction');
   const mine = d.querySelector('#tc-msgs .cmsg.me');
   click(w, mine.querySelector('[data-act="tc-msg-menu"]')); await sleep(80);
@@ -290,18 +289,15 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     await shot(`p2170-${th}-390-team-room.png`);
     p = await ev(center('[data-act="tc-back"]')); await tap(p.x, p.y); await sleep(500);
     check(await ev(`getComputedStyle(document.querySelector('.tclist')).display !== 'none'`), `${tag}: Back shows the conversations again`);
-    // review of 2.16.1: the reaction bar of an OWN message opens inside the screen; the header keeps the search icon;
-    // an unfolded Fold (904) has a close X on the task panel
+    // review of 2.16.1 / 2.18.0 (#651, intended change): the reactions of an OWN message sit visibly inside the screen,
+    // one Tab stop per message (roving tabindex); the header keeps the search icon; an unfolded Fold (904) has a close X
     p = await ev(center('.tclist .tcrow')); await tap(p.x, p.y); await sleep(800);
-    check(await ev(`[...document.querySelectorAll('#tc-msgs .cmsg.me:not(.rxshow) .chrxq')].every(q => getComputedStyle(q).display === 'none')`), `${tag}: closed quick reactions of own messages are no Tab stops (display none)`);
-    p = await ev(center('#tc-msgs .cmsg.me .rxtog')); if (p) { await tap(p.x, p.y); await sleep(400); }
-    const rq = await ev(`(() => { const q = document.querySelector('#tc-msgs .cmsg.me.rxshow .chrxq'); if (!q) return null; const r = q.getBoundingClientRect(); return {t: Math.round(r.top), b: Math.round(r.bottom), l: Math.round(r.left), r: Math.round(r.right), o: getComputedStyle(q).opacity}; })()`);
-    check(rq && rq.t >= 0 && rq.l >= 0 && rq.r <= 390 && rq.o === '1', `${tag}: own message: the reaction bar opens on screen ` + JSON.stringify(rq));
-    p = await ev(`(() => { const t = [...document.querySelectorAll('#tc-msgs .cmsg.me [data-act="rx-tog"]')].pop(); if (!t) return null; t.scrollIntoView({block: 'center'}); const q = t.getBoundingClientRect(); return {x: q.left + q.width / 2, y: q.top + q.height / 2}; })()`);
-    const hit = p && await ev(`(() => { const e = document.elementFromPoint(${p?.x || 0}, ${p?.y || 0}); return (e?.closest('[data-act]')?.dataset.act || e?.tagName) + ' ' + (e?.closest('.cmsg')?.textContent || '').slice(0, 40); })()`);
-    if (p) { await tap(p.x, p.y); await sleep(500); }
-    const lq = await ev(`(() => { const ms = [...document.querySelectorAll('#tc-msgs .cmsg.me')], last = ms.pop(), q = last?.querySelector('.chrxq'), b = document.querySelector('#tc-msgs'); if (!q || !b) return {n: ms.length + (last ? 1 : 0), open: document.querySelectorAll('.rxshow').length, html: (last?.outerHTML || '').slice(0, 300)}; return {on: last.classList.contains('rxshow'), qb: Math.round(q.getBoundingClientRect().bottom), bb: Math.round(b.getBoundingClientRect().bottom)}; })()`);
-    check(lq && lq.on && lq.qb <= lq.bb + 1, `${tag}: the last own message: its reaction bar is not hidden behind the box ` + JSON.stringify(lq) + ' hit=' + hit + ' p=' + JSON.stringify(p));
+    check(await ev(`[...document.querySelectorAll('#tc-msgs .cmsg .rxrow')].every(q => q.querySelectorAll('.rx[tabindex="0"]').length === 1)`), `${tag}: one Tab stop per reaction row`);
+    const rq = await ev(`(() => { const q = [...document.querySelectorAll('#tc-msgs .cmsg.me .rxrow')].pop(); if (!q) return null; q.scrollIntoView({block: 'center'}); const r = q.getBoundingClientRect(); return {t: Math.round(r.top), b: Math.round(r.bottom), l: Math.round(r.left), r: Math.round(r.right), n: q.querySelectorAll('.rx').length}; })()`);
+    check(rq && rq.t >= 0 && rq.l >= 0 && rq.r <= 390 && rq.n >= 3, `${tag}: own message: the reactions sit on screen ` + JSON.stringify(rq));
+    await ev(`(() => { const b = document.querySelector('#tc-msgs'); b.scrollTop = b.scrollHeight; return 1; })()`); await sleep(200);
+    const lq = await ev(`(() => { const last = [...document.querySelectorAll('#tc-msgs .cmsg.me')].pop(), q = last?.querySelector('.rxrow'), b = document.querySelector('#tc-msgs'); if (!q || !b) return null; return {qb: Math.round(q.getBoundingClientRect().bottom), bb: Math.round(b.getBoundingClientRect().bottom)}; })()`);
+    check(lq && lq.qb <= lq.bb + 1, `${tag}: the last own message: its reactions are not hidden behind the box ` + JSON.stringify(lq));
     await o.nav(B + '#today'); await ready(ev);
     const sb = await ev(`(() => { const b = document.querySelector('#top [data-act="palette"]'); const r = b?.getBoundingClientRect(); return r && r.width >= 30 && r.right <= innerWidth ? Math.round(r.width) : 0; })()`);
     check(sb > 0, `${tag}: the header has the search icon on the phone (${sb})`);

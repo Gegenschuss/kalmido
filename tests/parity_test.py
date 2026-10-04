@@ -55,6 +55,7 @@ APP_TO_API = {
     "POST /api/tasks/{}/comments": ["POST /tasks/{}/comments"],
     "GET /api/tasks/{}/timeline": ["GET /tasks/{}/comments"],
     "GET /api/tasks/{}/deps": ["GET /tasks/{}/dependencies"],
+    "GET /api/tasks/{}/milestone": ["GET /tasks/{}/milestone"],  # 2.18.0 (#430)
     "POST /api/tasks/reorder": ["POST /tasks/{}/move"],
     "POST /api/tasks/batch": ["POST /tasks/batch"],
     "POST /api/tasks/purge-done": ["POST /tasks/batch"],
@@ -172,6 +173,8 @@ APP_ONLY = [
     ("public links: sharing outside the instance, people only", ("* /api/lists/{}/public-link",)),
     ("repositories: their secrets are entered by people; the API reads them (GET /lists/{id}/repos)", (
         "POST /api/lists/{}/repos", "* /api/repos/", "POST /api/hooks/git/", "POST /api/tasks/{}/git-undo")),
+    ("2.18.0: the error-report webhook of a list: its secret URL is shown once to people (owner / list admins); the inbound hook "
+     "is called by the error service, not by a client", ("* /api/lists/{}/error-hook", "POST /api/hooks/issues/")),
     ("external calendar subscriptions and the calendar feed link: personal settings", ("* /api/calendars", "* /api/ical")),
     ("the app's personal settings, onboarding and sample data", ("PATCH /api/settings", "POST /api/onboarding", "* /api/sample")),
     ("the focus timer is a personal on-screen timer; time is tracked with /time/timer", ("* /api/pomo/",)),
@@ -286,6 +289,8 @@ API_ONLY = {  # REST routes on purpose without an MCP tool (reason)
     "POST /agents/{}/chat/{}/reactions": "a person's reaction in an agent chat (the agent: react_to_chat)",
     "GET /lists/{}/links": "in get_project_overview",
     "GET /lists/{}/milestones": "in get_project_overview",
+    "GET /lists/{}/error-hook": "2.18.0: the error-report webhook carries a secret URL; agents are refused (403), people manage it",
+    "PATCH /lists/{}/error-hook": "2.18.0: the error-report webhook carries a secret URL; agents are refused (403), people manage it",
     "POST /team/dm": "direct messages are between people; agents cannot open them (403), people talk to an agent in its own chat",
 }
 none = sorted(r for r in API if r not in reached and r not in API_ONLY)

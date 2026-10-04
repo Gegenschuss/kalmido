@@ -43,7 +43,8 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   check(await until(async () => (await get(t1.id)).status === 0), 'Ctrl+Z undoes while the toast is visible');
   // Ctrl+Z in a text field does nothing
   await w.eval(`toggleTask(${t1.id})`); await sleep(300);
-  await until(async () => (await get(t1.id)).status === 2 && !w.eval('HIST.busy'));
+  // 2.18.0: the precondition gets more time (the full run on a loaded host was slower than 4 s; the check below failed then)
+  check(await until(async () => (await get(t1.id)).status === 2 && !w.eval('HIST.busy'), 12000), 'completed again before the Ctrl+Z check');
   const inp = d.querySelector('#qinput'); inp.focus();
   inp.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'z', ctrlKey: true, bubbles: true}));
   await sleep(400);
@@ -136,7 +137,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   await w.eval(`patchUndoable(${t4.id}, {list_id: ${HOME}}, 'moved')`);
   await until(() => toastBtn() && /moved/.test(d.querySelector('#toast').textContent));
   await toastClick();
-  await until(() => w.eval('OUT.q.length') === 0 && w.eval(`S.tasks.get(${t4.id}).list_id`) === WORK && !w.eval('HIST.busy'), 3000);
+  await until(() => w.eval('OUT.q.length') === 0 && w.eval(`S.tasks.get(${t4.id}).list_id`) === WORK && !w.eval('HIST.busy'), 10000);  // 2.18.0: 3 s were too short on a loaded host
   check(w.eval('OUT.q.length') === 0 && w.eval(`S.tasks.get(${t4.id}).list_id`) === WORK, 'queued move cancelled');
   w.__offline = false; await sleep(200);
 

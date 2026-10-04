@@ -137,7 +137,8 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   click(w, d.querySelector('#top [data-act="view-timeline"]'));
   await until(() => d.querySelector('#view .tl'));
   check(!w.eval('isOverview()') && (await call('GET', '/api/state')).lists.find(l => l.id === P).view === 'timeline', 'Timeline: overview off, the list\'s view changes');
-  check(d.querySelectorAll('.tl-grp .tl-ms').length === 2 && d.querySelectorAll('.tl-msl').length === 2, 'milestones as markers in the timeline: ' + d.querySelectorAll('.tl-ms').length);
+  // 2.18.0: an open milestone (a task now) is a diamond in its own row, the list row marks only the others
+  check(d.querySelectorAll('.tl-grp .tl-ms, .tl-dia').length === 2 && d.querySelectorAll('.tl-msl').length === 2, 'milestones as markers / diamonds in the timeline: ' + d.querySelectorAll('.tl-ms, .tl-dia').length);
   check(d.querySelector('.tl-ms.done') && /Beta/.test(d.querySelector('.tl-ms.done').title), 'a reached milestone looks done');
   await call('PATCH', `/api/lists/${P}`, {view: 'list'});
   w.close();
@@ -217,7 +218,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
         await ev(`(() => { dpClose(false); document.querySelectorAll('.modal').forEach(m => m.remove()); return 1; })()`);
         // the timeline with its markers
         await ev(`(async () => { await setListView(listById(${P}), 'timeline'); return 1; })()`); await sleep(800);
-        const tl = await ev(`(() => { const m = document.querySelector('.tl-grp .tl-ms'); if (!m) return null; const r = m.getBoundingClientRect(), n = document.querySelector('.tl-row:not(.tl-headrow) .tl-name').getBoundingClientRect(); return {w: r.width, l: r.left, nr: n.right, n: document.querySelectorAll('.tl-ms').length}; })()`);
+        const tl = await ev(`(() => { const m = document.querySelector('.tl-grp .tl-ms'); if (!m) return null; const r = m.getBoundingClientRect(), n = document.querySelector('.tl-row:not(.tl-headrow) .tl-name').getBoundingClientRect(); return {w: r.width, l: r.left, nr: n.right, n: document.querySelectorAll('.tl-ms, .tl-dia').length}; })()`);
         check(tl && tl.n === 2 && tl.w > 4, `${vw}px: milestone markers in the timeline ${JSON.stringify(tl)}`);
         await shot(`p271-timeline-${vw}.png`);
         await ev(`(async () => { await setListView(listById(${P}), 'overview'); return 1; })()`);

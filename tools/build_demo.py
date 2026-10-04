@@ -67,11 +67,12 @@ def main(argv):
     write(os.path.join(st, "i18n.js"), replace(i18n, "/static/i18n/", "static/i18n/", "i18n.js"))
     css = read(os.path.join(STATIC, "app.css"))
     write(os.path.join(st, "app.css"), replace(css, 'url("/static/', 'url("', "app.css", count=2, at_least=True))
-    for f in ("icon.svg", "icon-192.png"):
+    # 2.18.0 (#394): + the favicons and the Apple touch icon that index.html links
+    for f in ("icon.svg", "icon-192.png", "favicon.svg", "favicon-16.png", "favicon-32.png", "apple-touch-icon.png"):
         shutil.copy2(os.path.join(STATIC, f), st)
     for d in ("fonts", "avatars"):
         shutil.copytree(os.path.join(STATIC, d), os.path.join(st, d))
-    # translations + sloth lines as scripts (the page may not fetch anything; the shim loads them as <script>)
+    # translations + celebration one-liners as scripts (the page may not fetch anything; the shim loads them as <script>)
     langs = []
     for f in sorted(os.listdir(os.path.join(STATIC, "i18n"))):
         if f.endswith(".json"):
@@ -80,7 +81,7 @@ def main(argv):
             write(os.path.join(st, "i18n", code + ".js"),
                   f"(window.KDEMO_I18N = window.KDEMO_I18N || {{}})[{json.dumps(code)}] = {json.dumps(data, ensure_ascii=False, separators=(',', ':'))};\n")
             langs.append(code)
-    quips = json.load(open(os.path.join(STATIC, "sloth-quips.json"), encoding="utf-8"))
+    quips = json.load(open(os.path.join(STATIC, "quips.json"), encoding="utf-8"))
     write(os.path.join(st, "demo-quips.js"), "window.KDEMO_QUIPS = " + json.dumps(quips, ensure_ascii=False, separators=(",", ":")) + ";\n")
     write(os.path.join(st, "demo-site.js"), "window.KDEMO_SITE = " + json.dumps(site) + ";\n")
     for f in ("shim.js", "texts.js", "demo.css"):

@@ -99,12 +99,18 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   check(d.documentElement.dataset.density === 'compact' && d.documentElement.dataset.sdensity === 'compact', 'desktop default: compact rows and sidebar');
   w.eval(`settingsModal('appearance')`); await sleep(500);
   click(w, d.querySelector('[data-look="density"][data-v="custom"]')); await sleep(200);
-  check(d.querySelector('#s-densitySide') && d.querySelector('#s-densityRows') && d.querySelector('#s-densitySide [data-v="compact"]').getAttribute('aria-pressed') === 'true', '#642: Custom shows Sidebar and Task rows, starting from what was set');
-  check(d.querySelector('#s-densitySide').getAttribute('aria-labelledby') === 's-dside-l' && d.getElementById('s-dside-l').textContent === 'Sidebar', 'the two groups are named');
-  click(w, d.querySelector('#s-densitySide [data-v="comfortable"]')); await sleep(150);
-  check(d.documentElement.dataset.sdensity === 'comfortable' && d.documentElement.dataset.density === 'compact', '#642: the sidebar comfortable, the task rows stay compact');
+  // 2.18.0 (#642): Custom = two sliders (sidebar / task rows spacing), starting from what was shown (compact)
+  const dS = d.querySelector('#s-dens-side'), dR = d.querySelector('#s-dens-rows');
+  check(dS && dR && dS.type === 'range' && +dS.value === 20 && +dR.value === 33 && d.documentElement.dataset.density === 'custom', '#642: Custom shows two sliders, starting from compact');
+  check(d.querySelector('label[for="s-dens-side"]')?.textContent === 'Sidebar row spacing' && d.querySelector('label[for="s-dens-rows"]')?.textContent === 'Task row spacing', 'the two sliders are labelled');
+  dS.value = 80; dS.dispatchEvent(new w.Event('input', {bubbles: true})); await sleep(100);
+  const sh = parseFloat(d.documentElement.style.getPropertyValue('--srow-h'));
+  check(sh > 2.4 && w.__store['tasks.densSideV'] === '80' || sh > 2.4 && JSON.parse(w.__store['tasks.densSideV'] || 'null') === 80, `#642: the sidebar slider applies live and is stored per device (${sh}rem)`);
+  check(d.getElementById('s-dens-side-v').textContent === '80 %' && dS.getAttribute('aria-valuetext') === '80 %', 'the value is shown and read out');
+  dR.value = 0; dR.dispatchEvent(new w.Event('input', {bubbles: true})); await sleep(100);
+  check(parseFloat(d.documentElement.style.getPropertyValue('--row-h')) >= 1.5, '#642: with a mouse the task rows may get tight, never below 24 px');
   click(w, d.querySelector('[data-look="density"][data-v="compact"]')); await sleep(150);
-  check(d.documentElement.dataset.sdensity === 'compact' && !d.querySelector('#s-densitySide'), '#642: Compact sets both again');
+  check(d.documentElement.dataset.sdensity === 'compact' && !d.querySelector('#s-dens-side') && !d.documentElement.style.getPropertyValue('--srow-h'), '#642: Compact sets both again');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove()); w.close();
 
   // #643: reactions on every chat message
@@ -112,18 +118,13 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
   w.eval(`chatOpen(${AG})`); await until(() => d.querySelectorAll('#chat-msgs .cmsg').length >= 2, 60);
   const msgs = [...d.querySelectorAll('#chat-msgs .cmsg')];
-  check(msgs.length >= 2 && msgs.every(m => m.querySelector('.rxtog[aria-expanded="false"]')), '#643: a reaction button on every message (agent + mine)');
+  // 2.18.0 (#651, intended change): 👍 👎 ❤️ sit visibly on every message, no smiley button / hidden bar any more
+  check(msgs.length >= 2 && msgs.every(m => m.querySelectorAll('.rxrow .rx[data-e]').length === 3 && !m.querySelector('.rxtog')), '#643 / #651: 👍 👎 ❤️ on every message (agent + mine), no smiley');
   const mine = msgs.find(m => m.classList.contains('me'));
-  click(w, mine.querySelector('.rxtog')); await sleep(80);
-  check(mine.classList.contains('rxshow') && mine.querySelector('.rxtog').getAttribute('aria-expanded') === 'true' && d.activeElement?.closest?.('.chrxq') === mine.querySelector('.chrxq'), '#643: it opens the quick bar, the focus on 👍');
-  click(w, mine.querySelector('.chrxq [data-e="heart"]'));
+  click(w, mine.querySelector('.rxrow [data-e="heart"]'));
   check(await until(() => d.querySelector(`#chat-msgs .cmsg.me .chrx .rx.on[data-e="heart"]`)), '#643: ❤️ on my own message');
-  const AGM = () => d.querySelector('#chat-msgs .cmsg.ag'), MINE = () => d.querySelector('#chat-msgs .cmsg.me');
-  click(w, MINE().querySelector('.rxtog')); await sleep(50);
-  click(w, AGM().querySelector('.rxtog')); await sleep(50);
-  check(AGM().classList.contains('rxshow') && !MINE().classList.contains('rxshow'), 'one bar open at a time');
-  click(w, AGM().querySelector('.rxtog')); await sleep(50);
-  check(!AGM().classList.contains('rxshow') && AGM().querySelector('.rxtog').getAttribute('aria-expanded') === 'false', 'a second tap closes it');
+  click(w, d.querySelector('#chat-msgs .cmsg.me .rxrow [data-e="heart"]'));
+  check(await until(() => d.querySelector(`#chat-msgs .cmsg.me .rxrow .rx.add[data-e="heart"][aria-pressed="false"]`)), '#651: a second tap takes it back');
   w.eval('chatClose()'); w.close();
 
   // #644: the command field
@@ -269,15 +270,12 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     };
     const comf = await drawerH('comfortable'), comp = await drawerH('compact');
     check(comp.h < comf.h && comp.min >= 44 && comf.min >= 44, `${tag}: compact makes the drawer shorter (${comf.h} -> ${comp.h} px), rows stay 44 px (${comp.min})`);
-    // the chat: the smiley on an agent message and on mine, real taps
+    // the chat: the reactions on an agent message and on mine, visible, real taps (2.18.0 #651: no smiley step any more)
     await o.nav(B + '#agents/' + AG); await ready(ev); await sleep(900);
-    const rx = await ev(`[...document.querySelectorAll('#chat-msgs .cmsg')].map(m => { const b = m.querySelector('.rxtog'); if (!b) return null; const r = b.getBoundingClientRect(); return {me: m.classList.contains('me'), w: Math.round(r.width), h: Math.round(r.height), op: +getComputedStyle(b).opacity}; })`);
-    check(rx.length >= 2 && rx.every(x => x && x.w >= 44 && x.h >= 44 && x.op >= .6), `${tag}: every message shows its reaction button (44 px, visible without a long press) ` + JSON.stringify(rx));
-    p = await ev(center('#chat-msgs .cmsg.ag .rxtog')); await tap(p.x, p.y); await sleep(400);
-    const bar = await ev(`(() => { const q = document.querySelector('#chat-msgs .cmsg.ag .chrxq'); const r = q.getBoundingClientRect(); return {op: +getComputedStyle(q).opacity, l: Math.round(r.left), r: Math.round(r.right), t: Math.round(r.top), iw: innerWidth}; })()`);
-    check(bar.op === 1 && bar.l >= 0 && bar.r <= bar.iw, `${tag}: a tap shows the quick reactions, inside the screen ` + JSON.stringify(bar));
-    const em = await ev(`document.querySelector('#chat-msgs .cmsg.ag .chrxq .rx[data-e]')?.dataset.e`);
-    p = await ev(center(`#chat-msgs .cmsg.ag .chrxq [data-e="${em}"]`)); await tap(p.x, p.y);
+    const rx = await ev(`[...document.querySelectorAll('#chat-msgs .cmsg')].map(m => { const bs = [...m.querySelectorAll('.rxrow .rx')]; if (bs.length < 3) return null; const r = bs.map(b => b.getBoundingClientRect()); return {me: m.classList.contains('me'), w: Math.round(Math.min(...r.map(x => x.width))), h: Math.round(Math.min(...r.map(x => x.height))), l: Math.round(Math.min(...r.map(x => x.left))), r: Math.round(Math.max(...r.map(x => x.right))), op: Math.min(...bs.map(b => +getComputedStyle(b).opacity))}; })`);
+    check(rx.length >= 2 && rx.every(x => x && x.w >= 44 && x.h >= 44 && x.op >= .6 && x.l >= 0 && x.r <= vw), `${tag}: every message shows 👍 👎 ❤️ (44 px, inside the screen, no long press) ` + JSON.stringify(rx));
+    const em = await ev(`[...document.querySelectorAll('#chat-msgs .cmsg.ag .rxrow .rx.add[data-e]')].pop()?.dataset.e`);
+    p = await ev(`(() => { const e = [...document.querySelectorAll('#chat-msgs .cmsg.ag .rxrow [data-e="${em}"]')].pop(); e.scrollIntoView({block: 'center'}); const q = e.getBoundingClientRect(); return {x: q.left + q.width / 2, y: q.top + q.height / 2}; })()`); await tap(p.x, p.y);
     check(await until(() => ev(`!!document.querySelector('#chat-msgs .cmsg.ag .chrx .rx.on[data-e="${em}"]')`)), `${tag}: a tap on ${em} reacts`);
     await shot(`p2160-${tag}-chat-reactions.png`);
     await ev(`(() => { localStorage.removeItem('tasks.density'); return 1; })()`);

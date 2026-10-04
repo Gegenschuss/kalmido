@@ -137,13 +137,13 @@ async function api(cookie, method, url, body) {
   for (const t of t0.slice(1)) await api(ck, 'POST', `/api/tasks/${t.id}/complete`);
   await w.eval('load()'); w.eval('render()'); await sleep(100);
   check(w.eval('counts().today') === 1, 'one task left for today');
-  const quips = await (await fetch(B + 'static/sloth-quips.json')).json();
+  const quips = await (await fetch(B + 'static/quips.json')).json();
   await w.eval('quipsLoad()');
   await w.eval(`toggleTask(${t0[0].id})`); await sleep(100);
   let ce = d.querySelector('.cele');
-  check(ce && ce.dataset.kind === 'today' && ce.querySelector('.csloth') && ce.querySelectorAll('.cconf').length > 10, 'Today emptied: sloth + checkmark confetti');
+  check(ce && ce.dataset.kind === 'today' && ce.querySelector('.cheron') && ce.querySelectorAll('.cconf').length > 10, 'Today emptied: heron + checkmark confetti');
   const q1 = d.querySelector('.cele-quip span')?.textContent;
-  check(quips.en.includes(q1), 'quip from sloth-quips.json (en): ' + q1);
+  check(quips.en.includes(q1), 'quip from quips.json (en): ' + q1);
   // list completed (not Today): a list with one open task
   const L = await api(ck, 'POST', '/api/lists', {name: 'Errands', kind: 'project'});
   const T = await api(ck, 'POST', '/api/tasks', {title: 'Post office', list_id: L.id});
@@ -173,12 +173,12 @@ async function api(cookie, method, url, body) {
   w.eval(`S.multi = new Set([${T3.id}])`); await w.eval(`batch('complete', {}, true)`); await sleep(100);
   check(d.querySelector('.cele')?.dataset.kind === 'list', 'batch complete of the last task: celebration');
   w.close();
-  // reduced motion: calm variant (small sloth + line, no swing, no confetti)
+  // reduced motion: calm variant (small heron + line, no swing, no confetti)
   w = await boot({user: 'alice', media: {'(prefers-reduced-motion: reduce)': true}}); d = w.document;
   const T4 = await api(ck, 'POST', '/api/tasks', {title: 'Only one', list_id: L.id});
   await w.eval('load()'); w.eval('render()'); await w.eval('quipsLoad()');
   await w.eval(`toggleTask(${T4.id})`); await sleep(100);
-  check(!d.querySelector('.cele') && d.querySelector('.cele-quip.calm .csloth'), 'reduced motion: calm variant only');
+  check(!d.querySelector('.cele') && d.querySelector('.cele-quip.calm .cheron'), 'reduced motion: calm variant only');
   w.close();
   // setting off: nothing; German quips
   await api(ck, 'PATCH', '/api/settings', {celebrate: '0', lang: 'de'});

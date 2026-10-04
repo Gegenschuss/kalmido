@@ -147,8 +147,8 @@ check(state(sess("bob"))["settings"]["onboard"] == "done", "KALMIDO_ONBOARDING=0
 # static files of 1.1: fonts with the right type, quips
 r = requests.get(B + "/static/fonts/Geist-Variable.woff2")
 check(r.ok and r.headers.get("Content-Type") == "font/woff2", "Geist font served as font/woff2")
-q = requests.get(B + "/static/sloth-quips.json").json()
-check(len(q.get("en", [])) >= 50 and len(q.get("de", [])) >= 50, "sloth quips: 50 en + 50 de")
+q = requests.get(B + "/static/quips.json").json()
+check(len(q.get("en", [])) >= 50 and len(q.get("de", [])) >= 50, "quips: 50 en + 50 de (2.18.0: quips.json)")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

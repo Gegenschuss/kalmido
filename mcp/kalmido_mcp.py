@@ -143,6 +143,9 @@ TASK_FIELDS = {
     "parent_id": S_ID,
     "type": {"type": ["string", "null"], "enum": ["bug", "feature", "task", None],
              "description": "ticket type (lists with ticket types on); a new bug / feature with empty notes gets the list's template"},
+    # 2.18.0 (#430): milestones are tasks; a task belongs to at most one milestone of its own list (e.g. a release / version)
+    "milestone": {"type": "boolean", "description": "2.18.0: the task is a milestone (a diamond with a date, top level, no subtasks)"},
+    "milestone_id": {"type": ["integer", "null"], "description": "2.18.0: the milestone task (same list) this task belongs to; null = none"},
 }
 SUGGESTION = {"type": "object", "description": "structured tidy suggestion (lists with agent tidy 'suggest'/'auto'); "
               "a 👍 by someone who may change the task applies it",
@@ -171,6 +174,10 @@ def t_list_tasks(api, a):
         q["waiting"] = "true" if a["waiting"] else "false"
     if "pinned" in a:  # 2.16.0 (#648)
         q["pinned"] = "true" if a["pinned"] else "false"
+    if "milestone" in a:  # 2.18.0 (#430)
+        q["milestone"] = "true" if a["milestone"] else "false"
+    if a.get("milestone_id"):
+        q["milestone_id"] = a["milestone_id"]
     if a.get("compact") is True:
         q["fields"] = "compact"
     r = api.call("GET", "/tasks", q)
@@ -297,7 +304,8 @@ TOOLS = [
                    "(off/suggest/auto) and tidy_agent_id (the one agent that tidies the list up; only that agent gets tidy events). "
                    "listen_agent_ids (2.13.1): agents that get a comment event for EVERY comment a person writes in the list "
                    "(\"Agent reads every comment\", set by the list owner / admins), not only on tasks they follow. "
-                   "columns (2.14.0): the list's row columns in order (null = default layout), see set_list_columns.",
+                   "columns (2.14.0): the list's row columns in order (null = default layout), see set_list_columns. "
+                   "project_type (2.18.0): agency | software | private, null = none.",
      _obj({}), lambda api, a: api.call("GET", "/lists")),
     ("set_list_columns", "2.14.0: set which columns the rows of a list show and in which order, the same for every member "
                          "(only as the list's owner or admin). Keys: id (task number in front of the title), due, prio, who "
@@ -306,11 +314,12 @@ TOOLS = [
                          "default layout. Phones show the first two as columns, the rest in the second line.",
      _obj({"list_id": S_ID, "columns": {"type": ["array", "null"], "items": {"type": "string"}, "maxItems": 40}}, ["list_id", "columns"]),
      lambda api, a: api.call("PATCH", f"/lists/{int(a['list_id'])}", body={"columns": a["columns"]})),
-    ("list_repos", "Repositories connected to a list (provider, web_url, owner/repo, default branch, poll status). Never a token: "
+    ("list_repos", "Repositories connected to a list (provider github | gitlab | gitea (also Forgejo) | bitbucket (Bitbucket Cloud), "
+                   "web_url, owner/repo (GitLab owners can be nested groups: group/sub), default branch, poll status). Never a token: "
                    "clone and push with your own git credentials.",
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/repos")),
     ("get_project_overview", "The overview of a project list (read-only): description (Markdown), key links (title + url, in "
-                             "order), milestones (name, day, done), project files and Paperless documents of the list, the files "
+                             "order), milestones (name, day, done; since 2.18.0 their ids are task ids), project files and Paperless documents of the list, the files "
                              "of its tasks (with task_id), members with roles, the project status with its history and the tracked "
                              "time. 409 for lists that are not projects.",
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/overview")),
@@ -325,7 +334,13 @@ TOOLS = [
            "waiting": {"type": "boolean", "description": "true = only tasks waiting on external, false = only the others"},
            "pinned": {"type": "boolean", "description": "2.16.0: true = only pinned tasks (the 'Pinned' view), false = only the others"},
            "type": {"type": "string", "enum": ["bug", "feature", "task", "none"], "description": "only tickets of this type"},
-           "assignee_group": {"type": "string", "description": "2.10.0: mine (assigned to one of your groups) or a group id"}}), t_list_tasks),
+           "assignee_group": {"type": "string", "description": "2.10.0: mine (assigned to one of your groups) or a group id"},
+           "milestone": {"type": "boolean", "description": "2.18.0: true = only milestones, false = only the other tasks"},
+           "milestone_id": {**S_ID, "description": "2.18.0: only the tasks of this milestone"}}), t_list_tasks),
+    ("get_milestone", "2.18.0: a milestone task (read-only): progress (done / total of its tasks), its tasks (open first), a burndown "
+                      "(open tasks per day + the ideal line to the due date) and release notes (Markdown of its completed tasks by "
+                      "ticket type). Milestones are tasks with milestone: true (list_tasks milestone=true).",
+     _obj({"task_id": S_ID}, ["task_id"]), lambda api, a: api.call("GET", f"/tasks/{int(a['task_id'])}/milestone")),
     # 2.10.0 (#441): groups (read) and the groups a list is shared with
     ("list_groups", "Groups of people (an admin creates them): id, name, members [{user_id, name}], synced (members follow a "
                     "sign-in group), mine. Lists and folders can be shared with a group; a task can be assigned to a group "
@@ -369,7 +384,7 @@ TOOLS = [
      _obj({"task_id": S_ID, "body": {"type": "string", "minLength": 1}, "suggestion": SUGGESTION}, ["task_id", "body"]), t_add_comment),
     ("request_merge_approval", "Ask for approval to merge your pull request: posts a 'ready to merge' comment on the task "
                                "(structured field kind merge_request). pr_url must be a pull request of a repository connected to "
-                               "the task's list. Wait for the reaction event with approval 'approved' (👍 by the list owner / a list "
+                               "the task's list (GitLab: .../-/merge_requests/<n>, Bitbucket: .../pull-requests/<n>). Wait for the reaction event with approval 'approved' (👍 by the list owner / a list "
                                "admin / the assignee / an admin) before you merge; 'rejected' = do not merge.",
      _obj({"task_id": S_ID, "pr_url": {"type": "string", "minLength": 8, "maxLength": 500},
            "summary": {"type": "string", "maxLength": 2000}}, ["task_id", "pr_url"]), t_request_merge),
@@ -530,11 +545,15 @@ TOOLS += [
     # ---- lists
     ("get_list", "One list with its sections and custom fields.", _obj({"list_id": S_ID}, ["list_id"]),
      lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}")),
-    ("create_list", "Create a list (you become its owner). kind project = time tracking, dependencies, custom fields, overview.",
-     _obj({**LIST_PROPS, "project_type": {"type": "string"}}, ["name"]), lambda api, a: api.call("POST", "/lists", body=a)),
+    ("create_list", "Create a list (you become its owner). kind project = time tracking, dependencies, custom fields, overview. "
+                    "project_type agency | software | private = a project of that built-in type (sections, fields, ticket types).",
+     _obj({**LIST_PROPS, "project_type": {"type": "string", "enum": ["agency", "software", "private"]}}, ["name"]),
+     lambda api, a: api.call("POST", "/lists", body=a)),
     ("update_list", "Change a list: name, color, folder (moving your own list into another folder waits for approval), view, kind, "
-                    "archived (true = archive), done_at_bottom, nag, day_hours.",
-     _obj({"list_id": S_ID, **LIST_PROPS, "archived": {"type": "boolean"}}, ["list_id"]),
+                    "archived (true = archive), done_at_bottom, nag, day_hours, project_type (2.18.0, owner / list admins: "
+                    "agency | software | private, null = none; switches on what the type needs, never deletes anything).",
+     _obj({"list_id": S_ID, **LIST_PROPS, "archived": {"type": "boolean"},
+           "project_type": {"type": ["string", "null"], "enum": ["agency", "software", "private", "", None]}}, ["list_id"]),
      lambda api, a: api.call("PATCH", f"/lists/{_id(a, 'list_id')}", body=_without(a, "list_id"))),
     ("delete_list", "Delete an ARCHIVED list for good (owner; archive it first with update_list archived=true); its tasks go to the "
                     "trash." + APPROVAL_NOTE, _obj({"list_id": S_ID}, ["list_id"]),

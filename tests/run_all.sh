@@ -13,7 +13,7 @@ cd "$HERE"
 export KALMIDO_TEST_IMAGE=${KALMIDO_TEST_IMAGE:-kalmido:test}
 export KALMIDO_TEST_DATA=${KALMIDO_TEST_DATA:-$HERE/.data}
 PY=${PYTHON:-python3}
-SHARDS_DEFINED=6
+SHARDS_DEFINED=7
 SHARD=0; CUR=1
 if [[ "${1:-}" == "--shard" ]]; then
   [[ "${2:-}" =~ ^([0-9]+)/([0-9]+)$ ]] || { echo "usage: run_all.sh [--shard N/$SHARDS_DEFINED]"; exit 2; }
@@ -347,6 +347,21 @@ shard 6  # ---------------------------------------------------------------- shar
 # 2.17.0 (#649): 5000 generated tasks: /api/state, search, the API, and in Firefox start, views, "All" with "Show more",
 # re-render, the command field, keyboard (generous limits; PERF_BIG=1 adds 20000)
        run perf_ui node perf_ui.js "$KALMIDO_TEST_DATA"
+shard 7  # ---------------------------------------------------------------- shard 7 of 7 (2.18.0: shard 6 with a11y + perf was near 25 min on CI)
+# 2.18.0 package A "Software & Planning" (#462): GitLab + Bitbucket, tags, error reports -> tickets (fake providers in the container)
+       run p2180_git_api "$PY" p2180_git_api_test.py "$KALMIDO_TEST_DATA"
+# 2.18.0 (#408): the project type of a list, the software section of the list dialog, code highlighting, file:line links
+       run p2180_soft_ui node p2180_soft_ui.js "$KALMIDO_TEST_DATA"
+# 2.18.0 (#430): milestones as tasks (migration, API, MCP), tasks of a milestone, progress, burndown, release notes
+       run p2180_ms_api "$PY" p2180_ms_api_test.py "$KALMIDO_TEST_DATA"
+       run p2180_ms_ui node p2180_ms_ui.js "$KALMIDO_TEST_DATA"
+# 2.18.0 (#431): the timeline: sections, creating tasks right in it (drag / double-click / +, touch long-press), milestones
+       run p2180_tl_ui node p2180_tl_ui.js "$KALMIDO_TEST_DATA"
+# 2.18.0 (#394): the new icon set (manifest, sizes, maskable safe zone, one-colour badge, favicons, no old mascot wording,
+# tools/make_icons.py reproducible); no container
+       run p2180_icons "$PY" p2180_icons_test.py
+# 2.18.0 (#651 #652): the search icon on phones, reactions at every chat message, News headings, 44 px view switch, empty edits
+       run p2180_ride_ui node p2180_ride_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

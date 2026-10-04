@@ -173,7 +173,10 @@ const LS = {
 // 1.5.3: helper lines are tooltips now; where there is no hover (touch) a hint shows once, until it is dismissed (×) or
 // used. Settings > Appearance > "Show tips again" brings them back on this device.
 // 2.13.0 (#453 P16): the logo inside the app follows the accent colour (the installed app icon keeps its own colours)
-const logoSvg = (sz = 20) => `<svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="${sz}" height="${sz}" aria-hidden="true" focusable="false"><rect width="512" height="512" rx="112" fill="#161a21"/><g transform="translate(96 80) scale(1.25)" fill="none" stroke="currentColor" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"> <path d="M22 112 L78 168 L234 40"/>  <path d="M146 170 C138 152 134 138 134 126"/> <path d="M190 164 C198 134 198 104 192 80"/>  <path d="M124 124 C124 108 136 106 142 114" stroke-width="8"/> <path d="M182 78 C182 62 194 60 200 68" stroke-width="8"/>  <path d="M146 180 C132 214 148 242 168 242 C190 242 206 214 190 178"/>  <circle cx="168" cy="160" r="28"/>  <path d="M158 154 L147 164 M178 154 L189 164" stroke-width="9"/> <circle cx="168" cy="163" r="3" fill="currentColor" stroke="none"/> <path d="M161 175 q7 5 14 0" stroke-width="5"/></g></svg>`;
+// 2.18.0 (#394): the app icon "on one leg" (tools/make_icons.py draws the same paths): light lines on the dark plate,
+// the sun on the water line in the accent (svg.logo color in app.css), so the mark follows the chosen accent colour;
+// the half sun is a path (no clipPath id, the logo can be on the page more than once)
+const logoSvg = (sz = 20) => `<svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${sz}" height="${sz}" aria-hidden="true" focusable="false"><rect width="100" height="100" rx="22" fill="#161a21"/><path d="M65 74A11 11 0 0 1 87 74Z" fill="currentColor"/><path d="M18 74H86" stroke="#e9e6f2" stroke-width="3" stroke-linecap="round" opacity=".55"/><g fill="none" stroke="#e9e6f2" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path d="M24 50C34 42 52 43 62 51C55 58 40 60 30 55"/><path d="M54 48C51 39 49 32 51 25C53 20 58 19 61 22"/><path d="M61 22L77 26"/><path d="M44 58V84"/><path d="M44 68L37 64L41 60" stroke-width="4"/></g></svg>`;
 const hintSeen = k => (LS.get('hintsSeen', []) || []).includes(k);
 function hintDone(k) { if (!hintSeen(k)) LS.set('hintsSeen', [...(LS.get('hintsSeen', []) || []), k]); }
 const hintOnce = (k, text, cls = '') => isTouch() && !hintSeen(k) ? `<div class="muted mhint once ${cls}" data-hint="${k}"><span>${esc(text)}</span><button type="button" class="iconbtn hx" data-act="hint-x" data-k="${k}" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>` : '';
@@ -231,7 +234,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#iitip:
 document.addEventListener('scroll', () => iiHide(true), true);
 const hintK = t => `<div class="shint keep">${t}</div>`;  // 2.13.0: a helper line that stays inline (security, data loss, a state)
 const kt = (label, keys) => isTouch() ? label : `${label} (${kbText(keys)})`;  // a label with its keyboard shortcut
-const LS_KEEP = new Set(['tasks.theme', 'tasks.i18n', 'tasks.density', 'tasks.densitySide', 'tasks.densityRows', 'tasks.fsize', 'tasks.font', 'tasks.accent', 'tasks.accentMig280', 'tasks.pw.det', 'tasks.pw.chat', 'tasks.sideGroups', 'tasks.agband', 'tasks.sideFold']);
+const LS_KEEP = new Set(['tasks.theme', 'tasks.i18n', 'tasks.density', 'tasks.densitySide', 'tasks.densityRows', 'tasks.densSideV', 'tasks.densRowsV', 'tasks.fsize', 'tasks.font', 'tasks.accent', 'tasks.accentMig280', 'tasks.pw.det', 'tasks.pw.chat', 'tasks.sideGroups', 'tasks.agband', 'tasks.sideFold']);
 function clearLocal() {
   try {
     const ks = [];
@@ -257,12 +260,41 @@ const DENS_OK = v => v === 'compact' || v === 'comfortable';
 const densityMode = () => { const v = LS.get('density', null); return v === 'custom' || DENS_OK(v) ? v : (isTouch() ? 'comfortable' : 'compact'); };
 const densityPref = () => { const m = densityMode(); if (m !== 'custom') return m; const v = LS.get('densityRows', null); return DENS_OK(v) ? v : (isTouch() ? 'comfortable' : 'compact'); };
 const sideDensityPref = () => { const m = densityMode(); if (m !== 'custom') return m; const v = LS.get('densitySide', null); return DENS_OK(v) ? v : (isTouch() ? 'comfortable' : 'compact'); };
-function applyDensity() { const r = document.documentElement.dataset; r.density = densityPref(); r.sdensity = sideDensityPref(); }
+// 2.18.0 (#642): "Custom" = two sliders, the row spacing of the sidebar and of the task rows, 0-100 % each
+// (LS densSideV / densRowsV per device). They only change the spacing: on touch screens rows never go below 44 px,
+// with a mouse they may get as tight as 24 px (WCAG 2.5.8). Without a stored value a slider starts at the step the
+// device showed before (compact / comfortable of 2.16.0).
+// 2.18.0 (review R8): starting "Custom" must not make the layout jump, so the sliders map piecewise-linearly through
+// anchors: at the start value of Compact / Comfortable (per device: mouse and touch differ) they give exactly the CSS
+// values of that preset (app.css :root / data-density / data-sdensity); between the anchors linear, 0 = tight, 100 = airy.
+// On touch the sidebar rows are 44 px in both presets (only the gaps differ), so there Compact starts at 0, Comfortable at 20.
+const DENS_A = {side: {mouse: {at: [0, 20, 60, 100], h: [1.5, 1.75, 2.25, 2.75]}, touch: {at: [0, 20, 100], h: [2.75, 2.75, 3.25]}},
+  rows: {at: [0, 33, 67, 100], py: [.125, .375, .625, .875], mouse: [1.5, 2.5, 2.75, 3.25], touch: [2.75, 2.75, 2.75, 3.5]}};
+const DENS_V = k => k === 'side' ? (isTouch() ? {compact: 0, comfortable: 20} : {compact: 20, comfortable: 60}) : {compact: 33, comfortable: 67};
+const densV = k => { const n = +LS.get(k === 'side' ? 'densSideV' : 'densRowsV', NaN); if (n >= 0 && n <= 100) return Math.round(n);
+  return DENS_V(k)[k === 'side' ? sideDensityPref() : densityPref()] ?? 50; };
+function densLerp(at, ys, v) {
+  for (let i = 1; i < at.length; i++) if (v <= at[i]) return ys[i - 1] + (ys[i] - ys[i - 1]) * (v - at[i - 1]) / (at[i] - at[i - 1]);
+  return ys[ys.length - 1];
+}
+function densVars(side, rows) {  // the CSS variables of the custom density (rem)
+  const t = isTouch(), A = DENS_A, f = x => +x.toFixed(4) + 'rem', sa = A.side[t ? 'touch' : 'mouse'];
+  return {'--srow-h': f(densLerp(sa.at, sa.h, side)), '--row-py': f(densLerp(A.rows.at, A.rows.py, rows)), '--row-h': f(densLerp(A.rows.at, A.rows[t ? 'touch' : 'mouse'], rows)),
+    '--row-fs': rows < 50 ? '.875rem' : '.9375rem', '--meta-fs': rows < 50 ? '.75rem' : '.78125rem'};
+}
+function applyDensity() {
+  const el = document.documentElement, r = el.dataset, custom = densityMode() === 'custom', vars = densVars(densV('side'), densV('rows'));
+  r.density = custom ? 'custom' : densityPref(); r.sdensity = custom ? 'custom' : sideDensityPref();
+  // 2.18.0 (review R8): the sidebar's gaps (group margins, search field, footer) of Compact up to halfway to Comfortable
+  const sv = DENS_V('side');
+  if (custom && densV('side') < (sv.compact + sv.comfortable) / 2) r.sbase = 'compact'; else delete r.sbase;
+  for (const [k, v] of Object.entries(vars)) { if (custom) el.style.setProperty(k, v); else el.style.removeProperty(k); }
+}
 applyDensity();
 // Appearance per device (settings > Appearance, command palette): font size (rem scale, see app.css), font, accent.
 // Values are checked against these tables; anything else in localStorage falls back to the default (first entry).
 // The accent drives everything that is mint by default (buttons, links, focus, selection, tab bar, timer pill,
-// charts, confetti and the in-app sloth); the app icon / manifest keep the mint brand colour.
+// charts, confetti, the heron's sun and the in-app logo's sun); the installed app icon keeps its own colours.
 const LOOK = {
   fsize: [['m', N_('Normal'), 1], ['s', N_('Small'), .9], ['l', N_('Large'), 1.12], ['xl', N_('Extra large'), 1.25]],
   font: [['geist', 'Geist'], ['system', N_('System font')], ['atkinson', 'Atkinson Hyperlegible']],
@@ -306,8 +338,9 @@ document.addEventListener('keydown', e => {
 });
 function lookSet(k, v) {
   const prev = [sideDensityPref(), densityPref()];  // 2.16.0 (#642): "Custom" starts from what is shown now
+  const prev0 = densityMode();
   if (v == null) LS.del(k); else LS.set(k, v);
-  if (k === 'density' && v === 'custom') { LS.set('densitySide', prev[0]); LS.set('densityRows', prev[1]); }
+  if (k === 'density' && v === 'custom' && prev0 !== 'custom') { LS.set('densitySide', prev[0]); LS.set('densityRows', prev[1]); LS.del('densSideV'); LS.del('densRowsV'); }  // 2.18.0 (review R8): the sliders start at what is shown now, not at an old custom value
   if ((k === 'densitySide' || k === 'densityRows') && v != null && LS.get('density', null) !== 'custom') { LS.set(k === 'densitySide' ? 'densityRows' : 'densitySide', k === 'densitySide' ? prev[1] : prev[0]); LS.set('density', 'custom'); }
   if (k === 'theme') applyTheme(); else if (/^density/.test(k)) applyDensity(); else applyLook();
   if (k === 'fsize' && typeof render === 'function' && S.settings) render();  // week grid, timeline and charts are drawn in px
@@ -549,10 +582,11 @@ function applyLocal(e) {
   if (method === 'POST' && url === '/api/tasks') {
     const par = body.parent_id && S.tasks.get(body.parent_id);
     const t = {id: e.tmp, list_id: body.list_id || (par ? par.list_id : inbox().id), section_id: body.section_id ?? null, parent_id: body.parent_id ?? null,
-      title: body.title, content: body.content || '', priority: body.priority || 0, status: 0, due: body.due || null, due_time: body.due_time || null,
+      title: body.title, content: body.content || '', priority: body.priority || 0, status: 0, due: body.due || null, due_time: body.due_time || null, start: body.start || null,  // 2.18.0 (#431): a range drawn in the timeline offline
       reminders: body.reminders || '', repeat: body.repeat || '', repeat_from: body.repeat_from || 'due', url: body.url || null,
       sort: par ? 1e9 : Math.min(0, ...[...S.tasks.values()].map(x => x.sort)) - 1,
-      created_at: nowIso, updated_at: nowIso, completed_at: null, deleted_at: null, tags: body.tags || [], fields: body.fields || {}, blocked: 0, blockers: [], blocking: 0};
+      created_at: nowIso, updated_at: nowIso, completed_at: null, deleted_at: null, tags: body.tags || [], fields: body.fields || {}, blocked: 0, blockers: [], blocking: 0,
+      ...(body.ms ? {ms: 1} : {}), ...(body.milestone_id ? {milestone_id: body.milestone_id} : {})};  // 2.18.0 (#430)
     S.tasks.set(t.id, t); return t;
   }
   if (url === '/api/tasks/batch') {
@@ -637,7 +671,7 @@ window.addEventListener('online', () => flush());
 
 // ------------------------------------------------------------------ conflicts (edited here and elsewhere)
 S.conflicts = LS.get('conflicts', []);
-const FIELD_NAMES = {ttype: N_('Type'), title: N_('Title'), content: N_('Description'), due: N_('Date'), due_time: N_('Time'), priority: N_('Priority'), list_id: N_('List'), tags: N_('Tags'), reminders: N_('Reminder'), repeat: N_('Repeat'), repeat_from: N_('Repeat from'), start: N_('Start|date'), section_id: N_('Section'), parent_id: N_('Parent task'), pinned: N_('Pinned'), duration: N_('Duration'), url: N_('Link'), deadline: N_('Deadline'), nag: N_('Repeat reminder')};
+const FIELD_NAMES = {ttype: N_('Type'), title: N_('Title'), content: N_('Description'), due: N_('Date'), due_time: N_('Time'), priority: N_('Priority'), list_id: N_('List'), tags: N_('Tags'), reminders: N_('Reminder'), repeat: N_('Repeat'), repeat_from: N_('Repeat from'), start: N_('Start|date'), section_id: N_('Section'), parent_id: N_('Parent task'), pinned: N_('Pinned'), duration: N_('Duration'), url: N_('Link'), deadline: N_('Deadline'), nag: N_('Repeat reminder'), ms: N_('Milestone'), milestone_id: N_('Milestone')};
 function addConflicts(tid, list, title) {
   for (const c of list) {
     S.conflicts = S.conflicts.filter(x => !(x.tid === tid && x.field === c.field));
@@ -978,6 +1012,60 @@ const idsOn = lid => !!LS.get('ids.' + lid, false);
 const ticketsAny = () => S.lists.some(l => l.tickets && !l.archived);
 const ttName = k => tr((TTYPES.find(x => x[0] === k) || [0, ''])[1]);
 const ttChip = t => { const x = TTYPES.find(y => y[0] === t.ttype); return x ? `<span class="ttchip tt-${x[0]}" title="${esc(tr('Type: {0}', tr(x[1])))}">${ic(x[2], 's')}${esc(tr(x[1]))}</span>` : ''; };
+// ---- 2.18.0 (#430): milestones are tasks (t.ms = 1): a diamond instead of the round status glyph, top level, no subtasks.
+// A task can belong to one milestone of its own list (t.milestone_id): the release / version it ships in.
+const isMs = t => !!t?.ms;
+const msOfList = lid => [...S.tasks.values()].filter(x => x.ms && x.list_id === lid && !x.deleted_at).sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999') || a.id - b.id);
+const msGlyph = t => isMs(t) ? `<i class="msd" aria-hidden="true"></i><span class="sr">${esc(tr('Milestone'))}: </span>` : '';
+function msChip(t) {  // the milestone a task belongs to, small (hidden on phones: rows stay calm)
+  const m = t.milestone_id && S.tasks.get(t.milestone_id);
+  if (m?.deleted_at) return '';  // 2.18.0: a milestone in the trash keeps its link (back on restore) but shows nowhere
+  return m ? `<span class="mschip" title="${esc(tr('Milestone') + ': ' + m.title)}"><i class="msd" aria-hidden="true"></i><span class="sr">${esc(tr('Milestone'))}: </span>${esc(m.title)}</span>` : '';
+}
+// the one list of the multi-selection when "Set milestone" applies (all in one list with an open milestone, none a milestone)
+function msBulkList() {
+  const ts = [...S.multi].map(i => S.tasks.get(i)).filter(Boolean);
+  if (!ts.length || ts.some(isMs) || new Set(ts.map(x => x.list_id)).size !== 1 || !canEditList(ts[0].list_id)) return 0;
+  return msOfList(ts[0].list_id).some(m => m.status === 0) ? ts[0].list_id : 0;
+}
+async function msToggle(id, on) {
+  const t = taskById(id); if (!t) return;
+  on = on ?? !isMs(t);
+  try { await patchUndoable(id, {ms: on ? 1 : 0}, on ? tr('Now a milestone') : tr('Now a normal task')); } catch { renderDetail(); }
+}
+// the milestone section of a milestone's task panel: GET /api/tasks/<id>/milestone (online), again whenever its tasks change
+function msReportHtml(t) {
+  const loc = [...S.tasks.values()].filter(x => x.milestone_id === t.id && !x.deleted_at);
+  const sig = t.id + '|' + t.title + '|' + t.due + '|' + loc.map(x => x.id + ':' + x.status + ':' + x.ttype + ':' + x.title).join(',');
+  if (S.msr?.id !== t.id || (S.msr.sig !== sig && !S.msr.busy)) {
+    const keep = S.msr?.id === t.id ? S.msr.j : null;
+    S.msr = {id: t.id, sig, busy: true, j: keep, err: false};
+    api('GET', `/api/tasks/${t.id}/milestone`).then(j => { if (S.msr?.id === t.id) { S.msr.j = j; S.msr.busy = false; if (S.sel === t.id) renderDetail(); } })
+      .catch(() => { if (S.msr?.id === t.id) { S.msr.busy = false; S.msr.err = true; if (S.sel === t.id) renderDetail(); } });
+  }
+  const j = S.msr.j;
+  const tasks = j ? j.tasks : loc.map(x => ({id: x.id, title: x.title, status: x.status === 2 ? 'done' : x.status === -1 ? 'wont_do' : 'open'})).sort((a, b) => (a.status !== 'open') - (b.status !== 'open'));
+  const total = tasks.length, done = tasks.filter(x => x.status !== 'open').length, pct = total ? Math.round(100 * done / total) : 0;
+  const prog = `<div class="msprog"><div class="msbar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" aria-label="${esc(tr('Progress'))}"><i style="width:${pct}%"></i></div><span class="msnum">${esc(tr('{0} of {1} done', done, total))}</span></div>`;
+  const list = total ? `<ul class="mstasks">${tasks.map(x => `<li class="${x.status !== 'open' ? 'done' : ''}"><span class="mst-st" aria-hidden="true">${x.status === 'done' ? ic('check', 's') : x.status === 'wont_do' ? ic('x', 's') : ''}</span><button type="button" class="linkbtn" data-act="ms-open" data-id="${x.id}">${esc(x.title)}${x.status !== 'open' ? `<span class="sr"> (${esc(x.status === 'done' ? tr('done') : tr("Won't do"))})</span>` : ''}</button></li>`).join('')}</ul>`
+    : `<div class="muted msempty">${tr('No tasks yet. Choose this milestone in a task of the list, or select several tasks and use “Set milestone”.')}</div>`;
+  const off = !j ? `<div class="muted msempty">${S.msr.err ? tr('Burndown and release notes are available online.') : tr('Loading…')}</div>` : '';
+  const bd = j && total ? `<h6>${tr('Burndown')}</h6>${msBurnSvg(j.burndown, total)}<details class="msbtab"><summary>${tr('Show as table')}</summary><table><thead><tr><th scope="col">${tr('Day')}</th><th scope="col">${tr('Open tasks')}</th></tr></thead><tbody>${j.burndown.days.map(d => `<tr><td>${esc(fmtDate(d.day))}</td><td>${d.open}</td></tr>`).join('')}</tbody></table></details>` : '';
+  const rn = j ? `<div class="msrnh"><h6>${tr('Release notes')}</h6><button type="button" class="btn sm" data-act="ms-copy" aria-label="${esc(tr('Copy release notes'))}">${ic('copy', 's')}<span>${tr('Copy')}</span></button></div><div class="md msrn">${renderMd(j.release_notes, true)}</div>` : '';
+  return `<h5>${tr('Milestone')}</h5>${t.due ? '' : `<div class="muted msnodate"><i class="msd" aria-hidden="true"></i>${tr('No date yet: set one with the date button above.')}</div>`}${prog}${list}${off}${bd}${rn}`;
+}
+function msBurnSvg(b, total) {
+  const days = b.days || []; if (!days.length) return '';
+  // 2.18.0 review (R9): one day of history is only a dot at the start of the ideal line: a note says why
+  const few = days.length < 2 ? `<div class="muted msempty msbnone">${esc(tr('Not enough history yet: the line grows from tomorrow on.'))}</div>` : '';
+  const end = b.due && b.due > b.end ? b.due : b.end, n = Math.max(1, diffDays(b.start, end)), W = 300, H = 100, P = 4;
+  const max = Math.max(1, total, ...days.map(d => d.open));
+  const X = d => (P + Math.max(0, diffDays(b.start, d)) / n * (W - 2 * P)).toFixed(1), Y = v => (H - P - v / max * (H - 2 * P)).toFixed(1);
+  const pts = days.length > 1 ? days.map(d => `${X(d.day)},${Y(d.open)}`).join(' ') : `${X(days[0].day)},${Y(days[0].open)} ${(+X(days[0].day) + 2).toFixed(1)},${Y(days[0].open)}`;
+  const id = b.ideal || [], last = days[days.length - 1].open;
+  const lab = tr('Burndown: {0} of {1} tasks open on {2}', last, total, fmtDate(b.end)) + (b.due ? ' · ' + tr('Due: {0}', fmtDate(b.due)) : '');
+  return `<svg class="msburn" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(lab)}"><line class="msb-ax" x1="${P}" y1="${H - P}" x2="${W - P}" y2="${H - P}"/>${id.length === 2 ? `<line class="msb-ideal" x1="${X(id[0].day)}" y1="${Y(id[0].open)}" x2="${X(id[1].day)}" y2="${Y(id[1].open)}"/>` : ''}<polyline class="msb-act" points="${pts}"/></svg><div class="msblg" aria-hidden="true"><span class="lg-act">${tr('Open tasks')}</span>${id.length === 2 ? `<span class="lg-ideal">${tr('Ideal')}</span>` : ''}</div>${few}`;
+}
 const PRIO_WORDS = {'!!!': 5, '!3': 5, '!hoch': 5, '!high': 5, '!!': 3, '!2': 3, '!mittel': 3, '!medium': 3, '!': 1, '!1': 1, '!niedrig': 1, '!low': 1};
 const WDAY = {sonntag: 0, montag: 1, dienstag: 2, mittwoch: 3, donnerstag: 4, freitag: 5, samstag: 6,
   sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6};
@@ -1112,6 +1200,8 @@ function parseQuick(text, ignore = new Set()) {
   });
   // 2.4.0 (#340): ticket type, only while some list has ticket types on
   if (ticketsAny() || ignore.has('ttype')) take(/\s!(bug|feature|task|fehler|funktion|aufgabe)(?=\s)/i, 'ttype', m => { out.ttype = TT_WORDS[m[1].toLowerCase()]; return ttName(out.ttype); });
+  // 2.18.0 (#430): !milestone / !meilenstein / !ms makes the new task a milestone
+  take(/\s!(milestone|meilenstein|ms)(?=\s)/i, 'ms', () => { out.ms = 1; return tr('Milestone'); });
   // priority: standalone token
   take(/\s(!!!|!!|!hoch|!mittel|!niedrig|!high|!medium|!low|![123]|!)(?=\s)/i, 'prio', m => { out.priority = PRIO_WORDS[m[1].toLowerCase()]; return tr(['', N_('Low'), '', N_('Medium'), '', N_('High')][out.priority]); });
   // tags
@@ -1585,7 +1675,7 @@ const GO_KEY = {today: 'g t', tomorrow: 'g m', week: 'g w', doable: 'g d', inbox
 function tabBtn(t, on, cls = '') {
   const tgt = t.go != null ? `data-go="${esc(t.go)}"` : `data-act="${t.act}"`;
   const nb = t.id === 'news' && S.news?.unread ? `<span class="nbadge">${S.news.unread > 99 ? '99+' : S.news.unread}</span>` : t.id === 'team' && t.n ? `<span class="nbadge">${t.n > 99 ? '99+' : t.n}</span>` : '';
-  return `<button class="${cls} ${on ? 'on' : ''}" ${tgt} title="${esc(GO_KEY[t.mod || t.key || t.id] ? kt(t.label, GO_KEY[t.mod || t.key || t.id]) : t.label)}">${t.icon}<span>${esc(t.label)}</span>${t.mod === 'pomo' && S.pomo ? '<span class="dot"></span>' : ''}${t.mod === 'time' && S.timer ? '<span class="dot rec"></span>' : ''}${t.upd ? `<span class="dot" title="${esc(tr('Update available'))}"></span>` : ''}${nb}</button>`;
+  return `<button class="${cls} ${on ? 'on' : ''}" ${tgt} title="${esc(GO_KEY[t.mod || t.key || t.id] ? kt(t.label, GO_KEY[t.mod || t.key || t.id]) : t.label)}"><span class="tico">${t.icon}</span><span>${esc(t.label)}</span>${t.mod === 'pomo' && S.pomo ? '<span class="dot"></span>' : ''}${t.mod === 'time' && S.timer ? '<span class="dot rec"></span>' : ''}${t.upd ? `<span class="dot" title="${esc(tr('Update available'))}"></span>` : ''}${nb}</button>`;
 }
 // 2.8.0 (#434): no icon rail any more. The desktop has one sidebar with grouped text navigation (renderSide) and the
 // command bar in the header; the tab bar setting is for phones only.
@@ -1603,7 +1693,7 @@ function renderTabs() {
   // highlight "Mehr" when the current view is only reachable through it (overflow tab, unpinned module, search)
   const moreOn = more.length > 0 && (on ? !shown.some(t => t.id === on) : (S.route.mod !== 'tasks' && S.route.mod !== 'news') || S.route.key === 'search');
   $('#tabs').innerHTML = shown.map(t => tabBtn(t, t.id === on)).join('') +
-    (more.length ? `<button class="${moreOn ? 'on' : ''}" data-act="tabs-more">${ic('dots', 'l')}<span>${tr('More')}</span></button>` : '');
+    (more.length ? `<button class="${moreOn ? 'on' : ''}" data-act="tabs-more"><span class="tico">${ic('dots', 'l')}</span><span>${tr('More')}</span></button>` : '');
 }
 function tabsMore(anchor) {
   const {more} = tabOverflow();
@@ -1795,7 +1885,8 @@ function renderTop0() {
   // open tasks of the view next to the title (Geist Mono), task views only
   const nOpen = m === 'tasks' && !NOLIST_KEYS.includes(k) ? viewTasks().open.length : 0;
   // 2.8.0 (#434): the command bar (search + commands + the agents' chat) and "New task" (mouse screens; touch has the + button)
-  const pal = `<button class="kbtn cmdbar tf4" data-act="palette" data-ico="search" title="${esc(tr('Search and commands'))} (${kbText('Mod+K')})" aria-label="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span>${kb('Mod+K')}</button>`;
+  // 2.18.0 (#651, owner decision: the magnifier is always visible): Search never folds into "…" (no .tf4); the title gets cut instead (fitTop)
+  const pal = `<button class="kbtn cmdbar" data-act="palette" data-ico="search" title="${esc(tr('Search and commands'))} (${kbText('Mod+K')})" aria-label="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span>${kb('Mod+K')}</button>`;
   const tnew = (!isTouch() || ((!isMobile() || tabletDock()) && !dockView())) && (m === 'tasks' || (m === 'cal' && isTouch())) && !noFab() && !S.multiMode ? `<button class="btn pri tnew tf4" data-act="new-task" data-ico="plus" title="${esc(kt(tr('New task'), 'n'))}" aria-label="${esc(tr('New task'))}">${ic('plus', 's')}<span>${tr('New task')}</span></button>` : '';
   const ms = (() => {  // the next open milestone of a project list
     const l = m === 'tasks' && k.startsWith('l:') ? listById(+k.slice(2)) : null;
@@ -1815,18 +1906,20 @@ function renderTop0() {
 //   tl1  the agent pill = bot + number, the timer pill = icon + time (no task name), Search = icon, no offline label
 //   tl2  the agent pill and the timer pill merge into one status chip (.stchip: bot + number, dot + time)
 //   tl3  the view switch, field columns, refresh and undo / redo move into "…" (.tf, as menu items)
-//   tl4  Search moves into "…" too (.tf4), the open count goes, the status chip is only its dot + number
+//   tl4  New task moves into "…" too (.tf4), the open count goes, the status chip is only its dot + number; Search stays
+//        (2.18.0, #651), and when even tl4 does not fit, the title is cut below its 12 characters (ellipsis; the h1 keeps
+//        the whole title as its tooltip and for screen readers)
 // jsdom has no layout (every width is 0), so there everything fits at level 0.
 const TOP_LVLS = 4;
 let topW = 0;
 function topLevel() { const t = $('#top'); const m = t && /\btl(\d)\b/.exec(t.className); return m ? +m[1] : 0; }
 // width the first 12 characters of the title need (with "…"), measured on its text
-function topNeed(ht) {
+function topNeed(ht, k = 12) {  // 2.18.0 (#651): k = fewer characters when even the last level does not fit
   const n = ht && ht.firstChild; if (!n || n.nodeType !== 3) return 0;
   const len = n.textContent.length, r = document.createRange();
-  r.setStart(n, 0); r.setEnd(n, Math.min(len, 12));
-  const w = r.getBoundingClientRect().width, all = len > 12 ? (r.setEnd(n, len), r.getBoundingClientRect().width) : w;
-  return {need: w + (len > 12 ? parseFloat(getComputedStyle(ht).fontSize) * .7 : 0), full: all};
+  r.setStart(n, 0); r.setEnd(n, Math.min(len, k));
+  const w = r.getBoundingClientRect().width, all = len > k ? (r.setEnd(n, len), r.getBoundingClientRect().width) : w;
+  return {need: w + (len > k ? parseFloat(getComputedStyle(ht).fontSize) * .7 : 0), full: all};
 }
 function topFits(t, ht, nd) {
   const cr = t.getBoundingClientRect(), right = cr.right - parseFloat(getComputedStyle(t).paddingRight || 0) + .5;
@@ -1843,25 +1936,37 @@ function fitTop() {
   topW = t.clientWidth;
   const ht = $('h1 .ht', t), h1 = $('h1', t), more = $('[data-act="top-more"]', t);
   const nd = t.clientWidth ? topNeed(ht) : 0;
+  // 2.18.0 (#651): nothing fits even at the last level (Search no longer folds away): the title keeps fewer characters
+  // (6, 4, 2 + "…"), never none
+  let cut = null;
   const set = l => {
     for (let i = 1; i <= TOP_LVLS; i++) t.classList.toggle('tl' + i, i === l);
     if (more) more.hidden = !topMoreItems().length;
     // the title never gets less than its first 12 characters (plus its icon / badge / count): the rest has to make room
     if (h1 && nd) {
       const kids = [...h1.children].filter(e => e !== ht && e.offsetWidth), gap = parseFloat(getComputedStyle(h1).columnGap) || 0;
-      h1.style.minWidth = Math.ceil(kids.reduce((n, e) => n + e.getBoundingClientRect().width, 0) + gap * kids.length + Math.min(nd.need, nd.full) + 1) + 'px';
+      const nn = cut || nd;
+      h1.style.minWidth = Math.ceil(kids.reduce((n, e) => n + e.getBoundingClientRect().width, 0) + gap * kids.length + Math.min(nn.need, nn.full) + 1) + 'px';
     }
   };
   set(0);
   if (!t.clientWidth) return;  // no layout (hidden, jsdom)
   // the lowest level that shows the whole title; otherwise the one that gives the title the most room
+  // 2.18.0 (review R3, owner rule: frequently used one-tap actions stay visible, the title shortens instead): the folding
+  // levels (tl3 / tl4: view switch, undo / redo, Share, New task into "…") are only taken when nothing fits with the title
+  // cut to its minimum at a non-folding level (tl0 - tl2 only make the pills more compact)
   let best = -1, wide = -1, ww = -1;
   for (let l = 0; l <= TOP_LVLS; l++) {
+    if (l >= 3 && wide >= 0) break;  // the title is already cut to >= 12 characters without folding anything
     if (l) set(l);
     const f = topFits(t, ht, nd);
     if (f === 2) { best = l; break; }
     const w = f ? ht.getBoundingClientRect().width : -1;
+    if (f && l >= 3) { wide = l; break; }  // the first folding level that fits wins (fold as little as possible)
     if (f && w > ww + 4) { wide = l; ww = w; }
+  }
+  if (best < 0 && wide < 0 && nd) {
+    for (const k of [6, 4, 2]) { cut = topNeed(ht, k); set(TOP_LVLS); if (topFits(t, null, null)) return; }
   }
   set(best >= 0 ? best : wide >= 0 ? wide : TOP_LVLS);
 }
@@ -2081,6 +2186,8 @@ function taskRow(t, opts = {}) {
   const lst = opts.showList && listById(t.list_id) ? lname(listById(t.list_id)) : '';
   let time = null, who = '';
   if (t.ttype && !opts.trash && ticketsOn(t.list_id)) meta.push(ttChip(t));  // 2.4.0 (#340)
+  if (isMs(t)) meta.push(`<span class="msm${t.due ? ' sr' : ''}">${t.due ? esc(tr('Milestone')) : `<i class="msd" aria-hidden="true"></i>${esc(tr('Milestone without a date'))}`}</span>`);  // 2.18.0 (#430)
+  else if (t.milestone_id && !opts.trash && !opts.subRow) meta.push(msChip(t));
   if (t.context) meta.push(`<span class="ctxm" title="${esc(tr('The main task of a subtask assigned to you: read-only, without notes, files and comments'))}">${ic('sub', 's')}${tr('Context')}</span>`);
   // 2.0.4 (#308): "Ready to start" only when the view has dependencies at all (see renderList); a button: tap / click
   // explains where it comes from (toast), without opening the task
@@ -2088,7 +2195,7 @@ function taskRow(t, opts = {}) {
   if (!lc && t.blocked && t.status === 0 && !opts.trash && dFor(t)) meta.push(`<span class="blk" title="${esc(blockedTitle(t))}">${ic('lock', 's')}${tr('waiting')}</span>`);
   if (t.waiting_at && t.status === 0 && !opts.trash) meta.push(waitChip(t));  // 2.1.0 (#335)
   if (t.pinned && !opts.trash) meta.push(`<span class="pinm">${ic('pin', 's')}</span>`);
-  if (lst) meta.push(`<span class="lst${mc}">${esc(lst)}</span>`);
+  if (lst) meta.push(`<span class="lst${mc}" title="${esc(lst)}">${esc(lst)}</span>`);
   // 2.16.0 (#473): overdue is not only red: the alert icon + a word for screen readers
   if (t.due && !opts.checklist && !lc) meta.push(`<span class="dt ${dueClass(t)}${mc}">${dueClass(t) === 'over' ? ic('alert', 's') + `<span class="sr">${tr('Overdue')}: </span>` : ic('cal', 's')}${due}</span>`);
   if (t.repeat && !opts.checklist) meta.push(`<span>${ic('repeat', 's')}</span>`);
@@ -2133,7 +2240,7 @@ function taskRow(t, opts = {}) {
   // 2.8.0 (#434): the status glyph (circle; priority = its colour; an agent working on it = an open arc + dot) and, in
   // lists with tickets, the ticket number in a mono gutter
   const work = t.status === 0 && t.id > 0 && (S.agents || []).some(a => a.enabled && a.status === 'working' && a.status_task === t.id);
-  const chk = (t.status === 2 ? 'on' : t.status === -1 ? 'wont' : 'p' + (opts.checklist ? 0 : t.priority)) + (work ? ' work' : '');
+  const chk = (t.status === 2 ? 'on' : t.status === -1 ? 'wont' : 'p' + (opts.checklist ? 0 : t.priority)) + (work ? ' work' : '') + (isMs(t) ? ' ms' : '');
   let lcH = '';
   if (lc) {  // 2.14.0 (#425): the cells in the list's order; a cell the width has no room for shows in the second line
     const cells = lc.filter(k => k !== 'id').map(k => [k, lcCell(k, t, {kids, openKids, time, checklist: opts.checklist})]);
@@ -2147,7 +2254,7 @@ function taskRow(t, opts = {}) {
   const cols = tc ? `<div class="tcols" data-act="open">${timeOn() && (opts.tcols.list || isProject(t.list_id)) ? `<span class="c-time ${time?.live ? 'live' : ''}" title="${time ? time.tip : ''}">${time ? time.txt : ''}</span>` : ''}${collab() ? `<span class="c-who">${who}</span>` : ''}${opts.tcols.list ? `<span class="c-list" title="${esc(lst)}"><span>${esc(lst)}</span></span>` : ''}<span class="c-date ${dueClass(t)}" title="${esc(due)}">${t.start && t.start < t.due ? ic('timeline', 's rngi') : ''}<span class="cdt">${esc(dueLabel(t, false))}</span></span></div>` : '';
   let h = `<div class="trow ${t.priority && !opts.checklist ? 'pr' + t.priority : ''} ${opts.checklist ? 'ck' : ''} ${tc || lc ? 'hascols' : ''} ${lc ? 'haslc' : ''} ${t.status ? 'done' : ''} ${opts.depth ? 'sub d' + opts.depth : ''} ${opts.subRow ? 'subrow' : ''} ${S.sel === t.id ? 'sel' : ''} ${gut ? 'hasgut' : ''} ${S.kf === t.id && !opts.subRow ? 'kfocus' : ''} ${S.multi.has(t.id) ? 'msel' : ''} ${ro ? 'ro' : ''} ${opts.next && !opts.depth ? 'flownext' : ''}" data-id="${t.id}" ${opts.drag !== false && !opts.trash && !ro && !isMobile() ? 'draggable="true"' : ''}>
     ${caret}
-    ${opts.trash ? `<span class="chk ${chk}">${t.status === 2 ? ic('check') : ''}</span>` : `<button class="chk ${chk}" data-act="toggle" role="checkbox" aria-checked="${t.status === 2}" aria-label="${esc(tr('Complete: {0}', t.title))}" ${ro ? 'disabled' : ''}>${t.status === 2 ? ic('check') : t.status === -1 ? ic('x') : ''}</button>`}${gut}
+    ${opts.trash ? `<span class="chk ${chk}">${t.status === 2 ? ic('check') : ''}</span>` : `<button class="chk ${chk}" data-act="toggle" role="checkbox" aria-checked="${t.status === 2}" aria-label="${esc(isMs(t) ? tr('Complete milestone: {0}', t.title) : tr('Complete: {0}', t.title))}" ${ro ? 'disabled' : ''}>${t.status === 2 ? ic('check') : t.status === -1 ? ic('x') : ''}</button>`}${gut}
     <div class="tmain" data-act="${opts.trash ? '' : 'open'}"><div class="ttl"${opts.trash ? '' : ` data-kt role="button" tabindex="-1" aria-describedby="${lc ? `tc-${t.id} ` : ''}tm-${t.id}"`}>${esc(t.title)}${t.priority && !opts.checklist && !opts.trash && t.status === 0 && !(lc && lc.includes('prio')) ? prioMark(t.priority) : ''}</div><div class="meta" id="tm-${t.id}">${meta.join('')}</div></div>
     ${opts.cols ? `<div class="fcols" data-act="open">${opts.cols.map(f => `<span class="fcell t-${esc(f.type)}">${fieldCell(f, t.fields?.[f.id], t.list_id)}</span>`).join('')}</div>` : ''}
     ${cols}${lcH}
@@ -3029,12 +3136,12 @@ function viewCal() {
     const ts = byDay.get(d) || [];
     const out = pd(d).getMonth() !== m - 1;
     const evs = evOn ? cevOn(d).sort(cevSort) : [];
-    const chips = [...evs.map(e => cevChip(e, d)), ...ts.map(t => `<div class="ev p${t.priority} ${t.status ? 'done' : ''} ${t.ghost ? 'ghost' : ''}" data-id="${t.id}" draggable="${t.status || t.ghost || isMobile() || !canEdit(t) ? 'false' : 'true'}">${t.due_time ? `<span class="muted">${t.due_time}</span> ` : ''}${esc(t.title)}</div>`)];
+    const chips = [...evs.map(e => cevChip(e, d)), ...ts.map(t => `<div class="ev p${t.priority} ${t.status ? 'done' : ''} ${t.ghost ? 'ghost' : ''} ${isMs(t) ? 'ms' : ''}" data-id="${t.id}" draggable="${t.status || t.ghost || isMobile() || !canEdit(t) ? 'false' : 'true'}">${msGlyph(t)}${t.due_time ? `<span class="muted">${t.due_time}</span> ` : ''}${esc(t.title)}</div>`)];
     cells += `<div class="cell ${out ? 'out' : ''} ${d === t0 ? 'today' : ''} ${d === S.calSel ? 'sel' : ''}" data-day="${d}">
       <span class="dn">${pd(d).getDate()}</span>
       ${chips.slice(0, 3).join('')}
       ${chips.length > 3 ? `<div class="more">+${chips.length - 3}</div>` : ''}
-      <div class="dots">${evs.slice(0, 2).map(e => `<i class="ce" style="--cc:${cevColor(e)}"></i>`).join('')}${ts.filter(t => !t.status).slice(0, 4 - Math.min(2, evs.length)).map(t => `<i class="p${t.priority}"></i>`).join('')}</div>
+      <div class="dots">${evs.slice(0, 2).map(e => `<i class="ce" style="--cc:${cevColor(e)}"></i>`).join('')}${ts.filter(t => !t.status).slice(0, 4 - Math.min(2, evs.length)).map(t => `<i class="p${t.priority}${isMs(t) ? ' ms' : ''}"></i>`).join('')}</div>
     </div>`;
   }
   const sel = (byDay.get(S.calSel) || []).filter(t => !t.ghost);
@@ -3056,13 +3163,13 @@ function viewWeek() {
   if (evOn) ensureCalEv(days[0], days[days.length - 1]);
   const evsOf = d => evOn ? cevOn(d).sort(cevSort) : [];
   const t0 = today(), H = weekH();
-  const chip = t => `<div class="ev p${t.priority} ${t.status ? 'done' : ''} ${t.ghost ? 'ghost' : ''}" data-id="${t.id}" draggable="${t.status || t.ghost || isMobile() || !canEdit(t) ? 'false' : 'true'}">${esc(t.title)}</div>`;
+  const chip = t => `<div class="ev p${t.priority} ${t.status ? 'done' : ''} ${t.ghost ? 'ghost' : ''} ${isMs(t) ? 'ms' : ''}" data-id="${t.id}" draggable="${t.status || t.ghost || isMobile() || !canEdit(t) ? 'false' : 'true'}">${msGlyph(t)}${esc(t.title)}</div>`;
   const now = new Date(), nowTop = (now.getHours() * 60 + now.getMinutes()) / 60 * H;
   const cols = days.map(d => {
     const blocks = layoutDay((map.get(d) || []).filter(t => t.due_time), evsOf(d).filter(e => cevTimed(e, d)).map(e => ({c: e, ...cevMin(e, d)}))).map(it => {
       const t = it.t, top = it.s / 60 * H, h = Math.max((it.e - it.s) / 60 * H, 20);
       if (it.c) return `<div class="wcev" data-cev="${it.c.id}" style="--cc:${cevColor(it.c)};top:${top}px;height:${h}px;left:calc(${it.lane} * 100% / ${it.n});width:calc(100% / ${it.n} - 2px)"><b>${it.c.d0 === d ? fmtHM(it.c.s) : '…'}</b> ${esc(cevTitle(it.c))}</div>`;
-      return `<div class="wev p${t.priority} ${t.status ? 'done' : ''} ${t.ghost ? 'ghost' : ''}" data-id="${t.id}" draggable="${t.status || t.ghost || isMobile() || !canEdit(t) ? 'false' : 'true'}" style="top:${top}px;height:${h}px;left:calc(${it.lane} * 100% / ${it.n});width:calc(100% / ${it.n} - 2px)"><b>${t.due_time}</b> ${esc(t.title)}</div>`;
+      return `<div class="wev p${t.priority} ${t.status ? 'done' : ''} ${t.ghost ? 'ghost' : ''} ${isMs(t) ? 'ms' : ''}" data-id="${t.id}" draggable="${t.status || t.ghost || isMobile() || !canEdit(t) ? 'false' : 'true'}" style="top:${top}px;height:${h}px;left:calc(${it.lane} * 100% / ${it.n});width:calc(100% / ${it.n} - 2px)">${msGlyph(t)}<b>${t.due_time}</b> ${esc(t.title)}</div>`;
     }).join('');
     return `<div class="wcol ${d === t0 ? 'today' : ''}" data-day="${d}">${blocks}${d === t0 ? `<i class="nowline" style="top:${nowTop}px"></i>` : ''}</div>`;
   }).join('');
@@ -3142,6 +3249,67 @@ function tlNdRows(l, ts) {
     (closed ? '' : ord.map(t => `<div class="tl-row tl-nd"><div class="tl-name" data-act="open" data-id="${t.id}">${t.parent_id && ids.has(t.parent_id) ? '<span class="muted">↳ </span>' : ''}<span class="tln">${esc(t.title)}</span>${tlWaiting(t) ? `<span class="tl-wf" title="${esc(blockedTitle(t))}">${ic('lock', 's')}${esc(tr('waits for {0}', blockedNames(t)))}</span>` : ''}</div><div class="tl-track ndt${ed && canEdit(t) ? ' ed' : ''}" data-nd="${t.id}" title="${ed && canEdit(t) ? esc(isTouch() ? tr('Tap a day to set the date; hold and drag for a range') : tr('Click a day to set the date, drag across days for a range')) : ''}"></div></div>`).join(''));
 }
 const tlNdBtn = (on, n, act = 'tl-nd') => `<button class="btn sm chip ${on ? 'on' : ''}" data-act="${act}" aria-pressed="${on}" title="${esc(tr('Show tasks without a date as rows to draw into'))}">${ic('cal', 's')} ${tr('No date')}${n ? ` <span class="c">${n}</span>` : ''}</button>`;
+// ---- 2.18.0 (#462): sections in the timeline / roadmap, (#431) new tasks drawn right into it, milestone diamonds
+// a subtask sits in its root task's section (the list view shows it under its parent)
+const tlSecOf = t => { let x = t; for (let i = 0; i < 20 && x?.parent_id; i++) { const p = S.tasks.get(x.parent_id); if (!p) break; x = p; } return x?.section_id || null; };
+// [{sid, name, key, ts}] in the list's section order; tasks without a (known) section first as "Unassigned", like the
+// list view; a list without sections = one group without a header (key ''). empty: show sections without tasks too
+function tlSecs(lid, ts, empty) {
+  const secs = S.sections.filter(s => s.list_id === lid);
+  if (!secs.length) return [{sid: null, name: '', key: '', ts}];
+  const ids = new Set(secs.map(s => s.id)), by = new Map();
+  for (const t of ts) { const s = tlSecOf(t), k = ids.has(s) ? s : null; if (!by.has(k)) by.set(k, []); by.get(k).push(t); }
+  const out = by.get(null)?.length ? [{sid: null, name: tr('Unassigned'), key: `tlsec:${lid}:0`, ts: by.get(null)}] : [];
+  for (const s of secs) if (empty || by.get(s.id)?.length) out.push({sid: s.id, name: s.name, key: 'tlsec:' + s.id, ts: by.get(s.id) || []});
+  return out;
+}
+// the track of a list / section / "+" row: with write access a place to draw a new task into (data-* = its geometry)
+function tlCrTrack(lid, sid, key, geo, cr, inner) {
+  if (!cr) return `<div class="tl-track">${inner}</div>`;
+  const hint = isTouch() ? tr('Hold, then drag to add a task here') : tr('Drag across days to add a task, or double-click a day');
+  return `<div class="tl-track tl-cr" data-cl="${lid}" data-cs="${sid || ''}" data-k="${esc(key)}" data-s0="${geo.s0}" data-dw="${geo.dw}" data-days="${geo.days}" title="${esc(hint)}">${inner}${tlNewHtml(key, geo)}</div>`;
+}
+// section header: fold button (per device, like the other folds) + "+" (new task in this section); top = roadmap row
+function tlSecRow(l, sg, open, cr, geo, top, n) {
+  return `<div class="tl-row tl-sec${top != null ? ' rm-row rm-s' : ''}" data-l="${l.id}"${top != null ? ` style="top:${top}px"` : ''}><div class="tl-name tl-secn"><button type="button" class="tl-secb" data-act="tl-secfold" data-key="${esc(sg.key)}" aria-expanded="${open}" title="${esc(sg.name)}">${ic('chev', 's fcar' + (open ? '' : ' shut'))}<span class="tln">${esc(sg.name)}</span><span class="c">${n ?? sg.ts.length}</span></button>` +
+    `${cr ? `<button type="button" class="iconbtn tl-secadd" data-act="tl-add" data-k="${esc(sg.key)}" data-l="${l.id}" data-s="${sg.sid || ''}" title="${esc(tr('Add task to {0}', sg.name))}" aria-label="${esc(tr('Add task to {0}', sg.name))}">${ic('plus', 's')}</button>` : ''}</div>${tlCrTrack(l.id, sg.sid, sg.key, geo, cr, '')}</div>`;
+}
+// "+ Add task" at the end of every list group (only with write access)
+function tlAddRow(l, geo, top) {
+  const k = 'add:' + l.id;
+  return `<div class="tl-row tl-add${top != null ? ' rm-row rm-a' : ''}" data-l="${l.id}"${top != null ? ` style="top:${top}px"` : ''}><div class="tl-name"><button type="button" class="tl-addb" data-act="tl-add" data-k="${k}" data-l="${l.id}" data-s="" aria-label="${esc(tr('Add task to {0}', lname(l)))}">${ic('plus', 's')}<span>${tr('Add task')}</span></button></div>${tlCrTrack(l.id, null, k, geo, true, '')}</div>`;
+}
+// a milestone task (t.ms, lane 2a) = a diamond at its date; it is a .tl-bar, so moving it (mouse, long-press), the
+// keyboard (Enter, arrows, menu) and the arrows work as for bars; no ends to resize
+function tlMsHtml(t, start, DW) {
+  const x = diffDays(start, t.due) * DW + DW / 2, w = isTouch() ? 44 : 24, ed = canEdit(t) && t.status === 0;
+  const lbl = tr('Milestone: {0}, {1}', t.title, fmtDateLoc(t.due));
+  return `<div class="tl-bar tl-dia short${ed ? '' : ' ro'}${t.status ? ' done' : t.due < today() ? ' over' : ''}" data-id="${t.id}" data-ms="1" style="left:${x - w / 2}px;width:${w}px" title="${esc(lbl)}" tabindex="0" role="button" aria-label="${esc(lbl)}"><span>${esc(t.title)}</span></div>`;
+}
+// 2.18.0 review (R10): a month / quarter label used to sit only at the month's first day, so scrolled a few days in it was
+// cut ("er 2026") or gone. Each label now spans its whole period (width up to the next label) and its text is sticky
+// right of the sticky names, so the current month always shows at the left of the visible range.
+function tlStickyMonths(html, W) {
+  const re = /<div class="tl-m" style="left:([\d.]+)px">([^<]*)<\/div>/g, m = [...html.matchAll(re)];
+  if (!m.length) return html;
+  return m.map((x, i) => { const l = +x[1], r = i + 1 < m.length ? +m[i + 1][1] : W; return `<div class="tl-m" style="left:${l}px;width:${Math.max(0, r - l)}px"><span>${x[2]}</span></div>`; }).join('');
+}
+// is the milestone marker m (l.milestones) already drawn as a diamond row of one of the tasks ts?
+const tlMsDrawn = (m, ts) => ts.some(t => t.ms && (m.id === t.id || (t.title === m.name && t.due === m.day)));  // lane 2a: m.id = the task's id
+// the open inline "new task" field (S.tlNew = {at: row key, lid, sid, d0, d1, v, r: route}) in the row it was started in
+const tlRouteSig = () => S.route.mod + '|' + S.route.key + '|' + (S.route.mod === 'cal' ? S.calMode : '');
+function tlNewHtml(key, geo) {
+  const N = S.tlNew; if (!N || N.at !== key || N.r !== tlRouteSig()) return '';
+  const a = N.d0 < N.d1 ? N.d0 : N.d1, b = N.d0 < N.d1 ? N.d1 : N.d0;
+  const x = Math.max(0, diffDays(geo.s0, a)) * geo.dw, w = (diffDays(a < geo.s0 ? geo.s0 : a, b) + 1) * geo.dw;
+  const when = a < b ? `${fmtDayAbs(a)} – ${fmtDayAbs(b)}` : fmtDayAbs(b);
+  // 2.18.0 review (R4): narrow screens show the range in short form (5.10.–8.10.), the long one does not fit there
+  const sd = x => { try { return pd(x).toLocaleDateString(dpLocale(), {day: 'numeric', month: 'numeric'}); } catch { return x.slice(5); } };
+  const whenS = a < b ? `${sd(a)}–${sd(b)}` : sd(b);
+  return `<div class="tl-ghost" style="left:${x + 2}px;width:${Math.max(TL_MINW, w - 4)}px" aria-hidden="true"></div>` +
+    `<div class="tl-new" style="--x:${x}px"><label class="sr" for="tl-new-in">${esc(tr('New task, {0}', when))}</label><input id="tl-new-in" type="text" maxlength="500" autocomplete="off" enterkeyhint="done" value="${esc(N.v || '')}" placeholder="${esc(tr('Task name'))}"><span class="tl-nwhen" aria-hidden="true"><span class="tl-nwl">${esc(when)}</span><span class="tl-nws">${esc(whenS)}</span></span>` +
+    `<button type="button" class="iconbtn" data-act="tl-new-ok" title="${esc(tr('Add'))}" aria-label="${esc(tr('Add'))}">${ic('check', 's')}</button><button type="button" class="iconbtn" data-act="tl-new-x" title="${esc(tr('Cancel'))}" aria-label="${esc(tr('Cancel'))}">${ic('x', 's')}</button></div>`;
+}
 function viewTimeline(listId, inCal) {
   const DW = tlDW();
   if (!S.tlStart) S.tlStart = addDays(weekStartOf(today()), -7);
@@ -3152,25 +3320,41 @@ function viewTimeline(listId, inCal) {
   const ndOn = tlNdOn(listId), und = ndOn ? all.filter(t => !t.due) : [];
   // 2.7.1 (#410): milestones of project lists as markers in the list's row (a list with only milestones in range shows too)
   const msIn = l => l.kind === 'project' && (!listId || l.id === listId) ? (l.milestones || []).filter(m => m.day >= start && m.day <= end) : [];
-  const groups = S.lists.filter(l => dated.some(t => t.list_id === l.id) || und.some(t => t.list_id === l.id) || (listId === l.id && msIn(l).length)).map(l => ({l, ts: dated.filter(t => t.list_id === l.id).sort((a, b) => (a.start || a.due).localeCompare(b.start || b.due) || bySort(a, b)), nd: und.filter(t => t.list_id === l.id)}));
+  // 2.18.0 (#431): the list of a list timeline always has its group (an empty project can be planned right here)
+  const groups = S.lists.filter(l => dated.some(t => t.list_id === l.id) || und.some(t => t.list_id === l.id) || listId === l.id).map(l => ({l, ts: dated.filter(t => t.list_id === l.id).sort((a, b) => (a.start || a.due).localeCompare(b.start || b.due) || bySort(a, b)), nd: und.filter(t => t.list_id === l.id)}));
   let head = '', months = '', lastM = '';
   for (let i = 0; i < TL_DAYS; i++) {
     const d = addDays(start, i), dd = pd(d), wk = dd.getDay() === 0 || dd.getDay() === 6;
     head += `<div class="tl-d ${d === t0 ? 'today' : ''} ${wk ? 'we' : ''}"><span>${WD[dd.getDay()].slice(0, 1)}</span>${dd.getDate()}</div>`;
     if (d.slice(0, 7) !== lastM) { months += `<div class="tl-m" style="left:${i * DW}px">${MON[dd.getMonth()]} ${dd.getFullYear()}</div>`; lastM = d.slice(0, 7); }
   }
+  months = tlStickyMonths(months, TL_DAYS * DW);
   const todayX = diffDays(start, t0) * DW;
   const deps = depsOn(), pick = S.tlPick && deps ? S.tlPick : null;
   const bars = new Map();
-  const bar = t => { bars.set(t.id, 1); return tlBarHtml(t, start, end, DW, pick, deps); };
+  const bar = t => { bars.set(t.id, 1); return t.ms ? tlMsHtml(t, start, DW) : tlBarHtml(t, start, end, DW, pick, deps); };
   // 2.7.0 (K14): names cut with "…" (full name in the tooltip)
-  const msMark = l => msIn(l).map(m => `<i class="tl-ms ${m.done ? 'done' : m.day < t0 ? 'over' : ''}" style="left:${diffDays(start, m.day) * DW + DW / 2}px" title="${esc(m.name + ' · ' + fmtDateLoc(m.day))}" role="img" aria-label="${esc(tr('Milestone') + ': ' + m.name + ', ' + fmtDateLoc(m.day))}"></i>`).join('');
-  const rows = groups.map(g => `<div class="tl-row tl-grp"><div class="tl-name" title="${esc(lname(g.l))}"><span class="tln">${esc(lname(g.l))}</span></div><div class="tl-track">${msMark(g.l)}</div></div>` +
-    g.ts.map(t => `<div class="tl-row"><div class="tl-name" data-act="open" data-id="${t.id}" title="${esc(t.title)}">${t.parent_id ? '<span class="muted">↳ </span>' : ''}<span class="tln">${esc(t.title)}</span></div><div class="tl-track">${bar(t)}</div></div>`).join('') + (g.nd.length ? tlNdRows(g.l, g.nd) : '')).join('');
+  // 2.18.0 (#462 / #431): a milestone task is a diamond in its own row, so the list row only marks the ones not drawn there
+  const msMark = (l, ts) => msIn(l).filter(m => !tlMsDrawn(m, ts)).map(m => `<i class="tl-ms ${m.done ? 'done' : m.day < t0 ? 'over' : ''}" style="left:${diffDays(start, m.day) * DW + DW / 2}px" title="${esc(m.name + ' · ' + fmtDateLoc(m.day))}" role="img" aria-label="${esc(tr('Milestone') + ': ' + m.name + ', ' + fmtDateLoc(m.day))}"></i>`).join('');
+  const geo = {s0: start, dw: DW, days: TL_DAYS};
+  // 2.18.0 (#462): inside a list the tasks are grouped by section (the list's order, "Unassigned" first as in the list
+  // view); every list / section row is a place to draw a new task into (#431), "+ Add task" ends every list group
+  const rows = groups.map(g => {
+    const cr = canAddTo(g.l.id) && !pick;
+    let h = `<div class="tl-row tl-grp" data-l="${g.l.id}"><div class="tl-name" title="${esc(lname(g.l))}"><span class="tln">${esc(lname(g.l))}</span></div>${tlCrTrack(g.l.id, null, 'g:' + g.l.id, geo, cr, msMark(g.l, g.ts))}</div>`;
+    for (const sg of tlSecs(g.l.id, g.ts, !!listId)) {
+      const shut = !!sg.key && S.collapsed.has(sg.key);
+      if (sg.key) h += tlSecRow(g.l, sg, !shut, cr, geo, null);  // 2.18.0 review (R10): no roadmap top here (was an invalid style="top:px")
+      if (!shut) h += sg.ts.map(t => `<div class="tl-row${t.ms ? ' tl-msrow' : ''}${sg.key ? ' tl-insec' : ''}"><div class="tl-name" data-act="open" data-id="${t.id}" title="${esc(t.title)}">${t.parent_id ? '<span class="muted">↳ </span>' : ''}<span class="tln">${esc(t.title)}</span></div><div class="tl-track">${bar(t)}</div></div>`).join('');
+    }
+    return h + (g.nd.length ? tlNdRows(g.l, g.nd) : '') + (cr ? tlAddRow(g.l, geo, null) : '');
+  }).join('');
   S.tlL = {bars};
   const from = pick && S.tasks.get(pick.from);
   const hint = isMobile() ? tr('Long-press and drag a bar: the middle moves it, the ends change start / due date.') : tr('Drag a bar to move it, drag its ends to change start / due date.');
   const dhint = !deps || ![...bars.keys()].some(i => dFor(S.tasks.get(i))) ? '' : isTouch() ? tr('Long-press a bar and let go for more: connect it to the task that waits on it, remove a dependency.') : tr('Drag the dot at the end of a bar onto another bar: that task then waits on it. Click an arrow to remove it.');
+  // 2.18.0 review: the footer also tells how to draw a new task (only where the user may add one)
+  const chint = !pick && groups.some(g => canAddTo(g.l.id)) ? (isTouch() ? tr('Hold an empty spot in a list or section row, then drag to add a task, or tap “+”.') : tr('Drag across empty days in a list or section row to add a task, double-click a day or use “+”.')) : '';
   const ndBtn = tlNdBtn(ndOn, undated);
   return `${inCal ? '' : `<div class="calbar"><h2>${tr('Timeline')}</h2>${ndBtn}<div class="calnav"><button class="iconbtn" data-act="tl-prev" title="${esc(tr('Previous period'))}" aria-label="${esc(tr('Previous period'))}">${ic('left')}</button><button class="btn sm" data-act="tl-today">${tr('Today')}</button><button class="iconbtn" data-act="tl-next" title="${esc(tr('Next period'))}" aria-label="${esc(tr('Next period'))}">${ic('right')}</button></div></div>`}
     ${from ? `<div class="tl-pick" role="status">${ic('deps', 's')}<span>${tr('Tap the task that waits on “{0}”', esc(from.title))}</span><span class="spacer"></span><button class="btn sm" data-act="tl-pick-list">${ic('search', 's')} ${tr('Pick from a list…')}</button><button class="btn sm" data-act="tl-pick-cancel">${tr('Cancel')}</button></div>` : ''}
@@ -3183,7 +3367,7 @@ function viewTimeline(listId, inCal) {
       ${listId ? msIn(listById(listId) || {}).map(m => `<i class="tl-msl" style="left:calc(var(--tl-name) + ${diffDays(start, m.day) * DW + DW / 2}px)"></i>`).join('') : ''}
       ${deps ? '<svg class="tl-deps" id="tl-deps" aria-hidden="true"></svg>' : ''}
     </div></div>
-    ${hintOnce('tlrange', tr('Set a date range via “Start” in the date dialog.'))}<div class="muted tl-foot">${hint} ${dhint ? dhint + ' ' : ''}${undated && !ndOn ? ' ' + trn('{0} task without a date is not shown.', '{0} tasks without a date are not shown.', undated) : ''}</div></div>`;
+    ${hintOnce('tlrange', tr('Set a date range via “Start” in the date dialog.'))}<div class="muted tl-foot">${chint ? chint + ' ' : ''}${hint} ${dhint ? dhint + ' ' : ''}${undated && !ndOn ? ' ' + trn('{0} task without a date is not shown.', '{0} tasks without a date are not shown.', undated) : ''}</div></div>`;
 }
 
 // ---- dependency arrows (SVG overlay in .tl-inner, same coordinates as the tracks)
@@ -3262,7 +3446,15 @@ function tlArrows() {
 // re-layout when the timeline's box changes (window, font size, sidebar); scrolling moves the overlay with the bars
 const tlRO = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => tlArrowsSoon()) : null;
 if (!tlRO) addEventListener('resize', () => tlArrowsSoon());
+// 2.18.0 (#431): the bar just created keeps the focus through re-renders shortly after (it would fall back to the page)
+function tlFocKeep() {
+  const f = S.tlFoc; if (!f) return;
+  if (Date.now() > f.until) { S.tlFoc = null; return; }
+  const a = document.activeElement;
+  if (!a || a === document.body || !a.isConnected) $(`.tl-bar[data-id="${f.id}"]`)?.focus({preventScroll: true});
+}
 function tlAfterRender(el) {  // renderView: a new timeline is in the DOM
+  tlFocKeep();
   if (tlRO && !el.__ro) { el.__ro = 1; tlRO.observe(el.firstElementChild || el); }
   tlArrows();
 }
@@ -3302,6 +3494,8 @@ function tlDepPop(g) {
 function tlBarMenu(el) {
   const id = +el.dataset.id, t = S.tasks.get(id); if (!t) return;
   const items = [{label: tr('Open'), icon: 'edit', fn: () => openDetail(id)}];
+  // 2.18.0 review: a keyboard way to move a bar / milestone diamond to another day (D, or this menu: Shift+F10)
+  if (canEdit(t) && t.status === 0) items.push({label: t.ms ? tr('Move to date…') : tr('Pick a date…'), icon: 'cal', keys: 'D', fn: () => datePop(el, id)});
   if (canEdit(t) && t.due) items.push({label: tr('Remove date'), icon: 'ban', fn: () => tlUndate(id)});
   if (dFor(t)) {
     if (canEdit(t)) items.push({label: tr('Connect to…'), icon: 'deps', keys: 'C', fn: () => tlPickStart(id)}, {label: tr('Pick from a list…'), icon: 'search', fn: () => depPicker(id, 'blocking')});
@@ -3353,6 +3547,157 @@ document.addEventListener('touchend', e => {
   clearTimeout(tlNd.timer); const d = tlNd; tlNd = null;
   if (e.cancelable) e.preventDefault();
   tlDraw(d.id, d.d0, d.d1);  // a tap (or a hold without moving): that day
+});
+// ---- 2.18.0 (#431): a new task drawn into a list / section row of the timeline or the roadmap. Mouse / pen: drag
+// across empty days (a ghost bar shows the range), or double-click a day; touch: hold ~0.45 s on an empty spot, then
+// drag (a plain swipe still scrolls, a quick tap does nothing); "+" buttons for the keyboard and for everyone. Then a
+// title field at that range: Enter creates the task with exactly that start..due in that list + section (the normal
+// create path: offline outbox, history / undo), Escape cancels.
+const tlCrFree = e => !e.target.closest?.('.tl-bar, .tl-ms, .rm-sum, .rm-off, .tl-new, button, a, input');
+function tlNewOpen(tr_, d0, d1) {
+  const lid = +tr_.dataset.cl, sid = +tr_.dataset.cs || null;
+  if (!canAddTo(lid)) { roToast(); return; }
+  S.tlNew = {at: tr_.dataset.k, lid, sid, d0, d1, v: '', r: tlRouteSig()};
+  const k = tr_.dataset.k; if (k?.startsWith('tlsec:') && S.collapsed.has(k)) { S.collapsed.delete(k); LS.set('collapsed', [...S.collapsed]); }
+  renderView(); tlNewFocus();
+}
+// the "+" buttons: the field at today (or the first day in view when today is not in the window)
+function tlAddAt(btn) {
+  const row = btn.closest('.tl-row'), tr_ = row && $('.tl-track.tl-cr', row); if (!tr_) return;
+  const g = ndGeo(tr_), t0 = today(), last = addDays(g.s0, g.days - 1), sc = $('#tlscroll');
+  let d = t0;
+  if (sc) {  // the day under the left edge of the visible track, when today is scrolled out of view
+    const nameW = $('.tl-name', row)?.offsetWidth || 0, first = addDays(g.s0, Math.max(0, Math.floor(sc.scrollLeft / g.dw) + 1)), lastV = addDays(g.s0, Math.max(0, Math.floor((sc.scrollLeft + Math.max(0, sc.clientWidth - nameW)) / g.dw) - 1));
+    if (sc.clientWidth && (t0 < first || t0 > lastV)) d = first;
+  }
+  if (d < g.s0 || d > last) d = g.s0;
+  tlNewOpen(tr_, d, d);
+}
+function tlNewFocus() {
+  const i = $('#tl-new-in'); if (!i) return;
+  const sc = $('#tlscroll'), box = i.closest('.tl-new');
+  if (sc && box) {  // the field next to the sticky names, not under them
+    const nameW = $('.tl-row:not(.tl-headrow) .tl-name', sc)?.offsetWidth || 0, x = box.offsetLeft, w = box.offsetWidth;
+    if (x < sc.scrollLeft) sc.scrollLeft = Math.max(0, x - 8);
+    else if (sc.clientWidth && x + w > sc.scrollLeft + sc.clientWidth - nameW) sc.scrollLeft = x + w - (sc.clientWidth - nameW) + 8;
+  }
+  i.focus({preventScroll: true}); tlKbSync();  // focus events may lag (window not focused yet): sync right away
+  try { i.setSelectionRange(i.value.length, i.value.length); } catch { /* no caret */ }
+  // phones: the field stays above the on-screen keyboard (vvSync does the same for every focused field later)
+  setTimeout(() => { const vv = window.visualViewport, j = $('#tl-new-in'); if (j && vv && j.getBoundingClientRect().bottom > vv.offsetTop + vv.height - 4) j.scrollIntoView?.({block: 'nearest'}); }, 350);
+}
+function tlNewEnd(back) {
+  const N = S.tlNew; if (!N) return;
+  S.tlNew = null; renderView(); tlKbSync();  // a re-render may drop the focused field without a focusout
+  if (back) { const b = $(`[data-act="tl-add"][data-k="${rmEsc(N.at)}"]`) || $(`.tl-track.tl-cr[data-k="${rmEsc(N.at)}"]`)?.closest('.tl-row')?.querySelector('button'); b?.focus({preventScroll: true}); }
+}
+async function tlNewSave() {
+  const N = S.tlNew, i = $('#tl-new-in'); if (!N) return;
+  const v = (i ? i.value : N.v || '').trim();
+  if (!v) { i?.focus(); return; }
+  if (!canAddTo(N.lid)) { roToast(); tlNewEnd(); return; }
+  const a = N.d0 < N.d1 ? N.d0 : N.d1, b = N.d0 < N.d1 ? N.d1 : N.d0;
+  S.tlNew = null;
+  let t;
+  try { t = await createTask({title: v.slice(0, 500), list_id: N.lid, section_id: N.sid, due: b, ...(a < b ? {start: a} : {})}); }
+  catch { S.tlNew = {...N, v}; renderView(); tlNewFocus(); return; }  // api() told why; the text stays for another try
+  if (t?.id != null) tlFocusBar(t.id, t.list_id);
+  tlKbSync();
+}
+// after creating: the new bar in view and focused (roadmap: its list opened, its row drawn)
+function tlFocusBar(id, lid, n = 0) {
+  if (isRoadmap()) {
+    const V = S.rmV, r = V?.M.taskRow.get(id);
+    if (!r && n === 0 && lid != null && V?.M.listNode.get(lid)?.type === 'g' && !V.M.listNode.get(lid).open) { rmSet({t: {...(rmP().t || {}), ['l' + lid]: 1}}); }
+    const r2 = S.rmV?.M.taskRow.get(id), sc = $('#tlscroll');
+    if (r2 && sc) { const G = S.rmV.G, y = G.hh + r2.i * G.rh; if (y < sc.scrollTop + G.hh || y + G.rh > sc.scrollTop + sc.clientHeight) sc.scrollTop = Math.max(0, y - sc.clientHeight / 2); rmRows(true); }
+  }
+  const b = $(`.tl-bar[data-id="${id}"]`);
+  if (!b) { if (n < 3) requestAnimationFrame(() => tlFocusBar(id, lid, n + 1)); return; }
+  b.focus({preventScroll: true});
+  S.tlFoc = {id, until: Date.now() + 2500};  // a re-render right after (sync, the server's answer) keeps it there
+  const sc = $('#tlscroll');
+  if (sc) { const x = parseFloat(b.style.left) || 0, nameW = $('.tl-row:not(.tl-headrow) .tl-name', sc)?.offsetWidth || 0; if (sc.clientWidth && (x < sc.scrollLeft || x > sc.scrollLeft + sc.clientWidth - nameW - 40)) sc.scrollLeft = Math.max(0, x - 40); }
+  b.classList.add('flash'); setTimeout(() => b.classList.remove('flash'), 1200);
+}
+let tlCr = null;  // drawing a new task: {tr, d0, d1, el, touch, timer, active, x, y}
+function crShow(d) {
+  if (!d.el) { d.el = document.createElement('div'); d.el.className = 'tl-ghost'; d.el.setAttribute('aria-hidden', 'true'); d.tr.appendChild(d.el); }
+  const a = d.d0 < d.d1 ? d.d0 : d.d1, b = d.d0 < d.d1 ? d.d1 : d.d0, g = ndGeo(d.tr);
+  d.el.style.left = diffDays(g.s0, a) * g.dw + 2 + 'px'; d.el.style.width = Math.max(TL_MINW, (diffDays(a, b) + 1) * g.dw - 4) + 'px';
+  d.el.textContent = a < b ? `${fmtDayAbs(a)} – ${fmtDayAbs(b)}` : fmtDayAbs(b);
+}
+document.addEventListener('pointerdown', e => {
+  const tr_ = e.target.closest?.('.tl-track.tl-cr'); if (!tr_ || e.button !== 0 || e.pointerType === 'touch' || S.tlPick || !tlCrFree(e)) return;
+  const d0 = ndDay(tr_, e.clientX);
+  tlCr = {tr: tr_, d0, d1: d0, el: null, x: e.clientX};
+  e.preventDefault();  // no text selection while drawing
+});
+document.addEventListener('pointermove', e => {
+  if (!tlCr || tlCr.touch) return;
+  if (!tlCr.el && Math.abs(e.clientX - tlCr.x) < 4) return;
+  tlCr.d1 = ndDay(tlCr.tr, e.clientX); crShow(tlCr);
+});
+document.addEventListener('pointerup', () => {
+  if (!tlCr || tlCr.touch) return;
+  const d = tlCr; tlCr = null; d.el?.remove();
+  if (d.el && d.d0 !== d.d1) tlNewOpen(d.tr, d.d0, d.d1);  // a plain click does nothing (double-click = one day)
+});
+document.addEventListener('dblclick', e => {
+  const tr_ = e.target.closest?.('.tl-track.tl-cr'); if (!tr_ || S.tlPick || !tlCrFree(e)) return;
+  e.preventDefault(); const d = ndDay(tr_, e.clientX); tlNewOpen(tr_, d, d);
+});
+document.addEventListener('touchstart', e => {
+  const tr_ = e.target.closest?.('.tl-track.tl-cr'); if (!tr_ || S.tlPick || e.touches.length !== 1 || !tlCrFree(e)) { if (tlCr?.touch) { clearTimeout(tlCr.timer); tlCr = null; } return; }
+  const p = e.touches[0], d0 = ndDay(tr_, p.clientX);
+  tlCr = {tr: tr_, d0, d1: d0, el: null, touch: true, x: p.clientX, y: p.clientY, active: false};
+  tlCr.timer = setTimeout(() => { if (tlCr?.touch) { tlCr.active = true; crShow(tlCr); if (navigator.vibrate) navigator.vibrate(12); } }, 450);
+}, {passive: true});
+document.addEventListener('touchmove', e => {
+  if (!tlCr?.touch) return;
+  const p = e.touches[0];
+  if (!tlCr.active) { if (Math.hypot(p.clientX - tlCr.x, p.clientY - tlCr.y) > 8) { clearTimeout(tlCr.timer); tlCr = null; } return; }  // a swipe: the timeline scrolls
+  e.preventDefault();
+  const sc = $('#tlscroll');
+  if (sc) {  // scroll along at the edges (left: right of the sticky names, phones have only ~30 px per day)
+    // 2.18.0 review (R4): only once the finger has really moved towards that edge; a press on the first visible day
+    // sits inside the left edge zone, and scrolling there during the hold shifted the days under the finger (one short)
+    const r = sc.getBoundingClientRect(), nw = tlCr.tr.previousElementSibling?.offsetWidth || 0, mv = p.clientX - tlCr.x;
+    if (mv > 16 && p.clientX > r.right - 28) sc.scrollLeft += 10; else if (mv < -16 && p.clientX < r.left + nw + 28) sc.scrollLeft -= 10;
+  }
+  tlCr.d1 = ndDay(tlCr.tr, p.clientX); crShow(tlCr);
+}, {passive: false});
+function tlCrTouchEnd(e) {
+  if (!tlCr?.touch) return;
+  clearTimeout(tlCr.timer); const d = tlCr; tlCr = null; d.el?.remove();
+  if (!d.active) return;  // a quick tap or a swipe
+  if (e.cancelable) e.preventDefault();  // no click / context menu after the hold
+  if (e.type === 'touchend') tlNewOpen(d.tr, d.d0, d.d1);
+}
+document.addEventListener('touchend', tlCrTouchEnd);
+document.addEventListener('touchcancel', tlCrTouchEnd);
+document.addEventListener('contextmenu', e => { if (tlCr?.touch && tlCr.active) e.preventDefault(); });
+document.addEventListener('input', e => { if (e.target.id === 'tl-new-in' && S.tlNew) S.tlNew.v = e.target.value; });
+document.addEventListener('keydown', e => {
+  if (e.target.id !== 'tl-new-in' || e.isComposing) return;
+  if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); tlNewSave(); }
+  else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); tlNewEnd(true); }
+}, true);
+// 2.18.0 review (R2): on touch screens the keyboard comes up with the field; the fixed tab bar and the "+" button would
+// then cover it (the visible area shrinks to ~470 px on a phone), so they step aside while it has the focus (like the
+// chat's kb-open; a separate class, chatFit() owns kb-open)
+function tlKbSync() {
+  const on = document.activeElement?.id === 'tl-new-in' && isTouch();
+  if (document.body.classList.contains('tl-typing') === on) return;
+  document.body.classList.toggle('tl-typing', on);
+  if (on) setTimeout(() => { const vv = window.visualViewport, j = $('#tl-new-in'); if (j && vv && j.getBoundingClientRect().bottom > vv.offsetTop + vv.height - 4) j.scrollIntoView?.({block: 'nearest'}); }, 60);
+}
+document.addEventListener('focusin', e => { if (e.target.id === 'tl-new-in' || document.body.classList.contains('tl-typing')) tlKbSync(); });
+document.addEventListener('focusout', e => { if (e.target.id === 'tl-new-in') setTimeout(tlKbSync, 0); });
+// leaving an empty field (tap / click elsewhere) closes it; with text it stays until Enter / Escape / ✕
+document.addEventListener('focusout', e => {
+  if (e.target.id !== 'tl-new-in') return;
+  setTimeout(() => { const a = document.activeElement, i = $('#tl-new-in'); if (S.tlNew && i && !i.value.trim() && !(a && a.closest?.('.tl-new'))) tlNewEnd(); }, 200);
 });
 function tlPickStart(id) {
   S.tlPick = {from: id};
@@ -3516,6 +3861,7 @@ document.addEventListener('keydown', e => {
   if (k === 'Enter' || k === ' ') { if (S.tlPick) tlPickDo(id); else openDetail(id); }
   else if (k === 'ContextMenu' || (k === 'F10' && e.shiftKey)) tlBarMenu(b);
   else if ((k === 'c' || k === 'C') && dFor(S.tasks.get(id)) && canEdit(S.tasks.get(id)) && !S.tlPick) tlPickStart(id);
+  else if ((k === 'd' || k === 'D') && !e.shiftKey && !S.tlPick && S.tasks.get(id)?.status === 0 && canEdit(S.tasks.get(id))) datePop(b, id);  // 2.18.0 review: move by keyboard
   else if (k === 'ArrowDown' || k === 'ArrowUp') { const all = $$('.tl-bar[data-id]'), i = all.indexOf(b); all[i + (k === 'ArrowDown' ? 1 : -1)]?.focus(); }
   else return;
   e.preventDefault(); e.stopPropagation();
@@ -3574,6 +3920,7 @@ function rmGeo() {
   return {z, dw: rmDW(), start: S.rmStart, end: addDays(S.rmStart, days - 1), days, rh: Math.round((isTouch() ? 52 : 44) * uiZ()), hh: Math.round(52 * uiZ())};
 }
 const rmX = (G, d) => diffDays(G.start, d) * G.dw;
+const rmCrGeo = G => ({s0: G.start, dw: G.dw, days: G.days});  // 2.18.0 (#431): the geometry a new task is drawn in
 // rows: f = folder, g = list (header row with the summary bar), t = task (only in an expanded list)
 function rmModel() {
   const P = rmP(), po = rmPO(), hd = rmHD(), who = rmWho(), sel = (P.ls || []).length ? new Set(P.ls) : null;
@@ -3599,7 +3946,13 @@ function rmModel() {
     if (fr) { listNode.set(l.id, fr); return span; }
     const r = push({type: 'g', l, key: 'l' + l.id, open, span, n: g.open.length, undated: g.undated, ts});
     listNode.set(l.id, r);
-    if (open) for (const t of ts) taskRow.set(t.id, push({type: 't', t, l}));
+    // 2.18.0 (#462): inside an open list its sections (header rows, foldable per device), "+ Add task" after them (#431)
+    if (open) for (const sg of tlSecs(l.id, ts, l.kind === 'project')) {
+      const shut = !!sg.key && S.collapsed.has(sg.key);
+      if (sg.key) push({type: 's', l, sg, key: sg.key, open: !shut, n: sg.ts.length});
+      if (!shut) for (const t of sg.ts) taskRow.set(t.id, push({type: 't', t, l, insec: !!sg.key}));
+    }
+    if (open && canAddTo(l.id)) push({type: 'a', l});
     if (open && g.und.length && rmNdOn()) {  // 2.0.6 (#189): "No date (n)" at the end of an open list, like the timeline
       const nk = 'rmnd:' + l.id, shut = S.collapsed.has(nk);
       push({type: 'nh', l, key: nk, open: !shut, n: g.und.length});
@@ -3629,7 +3982,7 @@ function rmHead(G) {
       bot += `<div class="tl-d ${d === t0 ? 'today' : ''} ${we ? 'we' : ''}"><span>${WD[dd.getDay()].slice(0, 1)}</span>${dd.getDate()}</div>`;
       if (d.slice(0, 7) !== lastM) { top += `<div class="tl-m" style="left:${i * G.dw}px">${MON[dd.getMonth()]} ${dd.getFullYear()}</div>`; lastM = d.slice(0, 7); }
     }
-    return [top, bot];
+    return [tlStickyMonths(top, G.days * G.dw), bot];
   }
   for (let i = 0; i < G.days; i += 7) {  // week columns (month: the first weekday's date, quarter: empty ticks)
     const d = addDays(G.start, i), cur = d <= t0 && t0 < addDays(d, 7);
@@ -3645,7 +3998,7 @@ function rmHead(G) {
       if (q !== lastQ) { top += `<div class="tl-m" style="left:${i * G.dw}px">${tr('Q{0} {1}', Math.floor(dd.getMonth() / 3) + 1, dd.getFullYear())}</div>`; lastQ = q; }
     }
   }
-  return [top, bot];
+  return [tlStickyMonths(top, G.days * G.dw), bot];
 }
 // the span bar of a list (or a folder: thin, no drag) clipped to the window; caps only at real ends
 function rmBarBox(G, sp) {
@@ -3665,10 +4018,11 @@ function rmSumHtml(G, r) {
     `<span class="rm-lbl" style="left:${b.R + 6}px">${em ? `<span class="rm-em">${em}</span>` : ''}${pct != null ? `<b>${pct}%</b>` : ''}<span class="rm-dt">${esc(when)}</span></span>`;
 }
 // 2.7.2: the milestones of a project (2.7.1, #410) as markers in its summary row of the "All" timeline too
-function rmMsHtml(G, l) {
+function rmMsHtml(G, l, r) {
   if (l.kind !== 'project') return '';
   const t0 = today();
-  return (l.milestones || []).filter(m => m.day >= G.start && m.day <= G.end).map(m => `<i class="tl-ms rm-ms ${m.done ? 'done' : m.day < t0 ? 'over' : ''}" style="left:${rmX(G, m.day) + G.dw / 2}px" title="${esc(m.name + ' · ' + fmtDateLoc(m.day))}" role="img" aria-label="${esc(tr('Milestone') + ': ' + m.name + ', ' + fmtDateLoc(m.day))}"></i>`).join('');
+  // 2.18.0: an open list shows its milestone tasks as diamonds in their rows: no second marker for them here
+  return (l.milestones || []).filter(m => m.day >= G.start && m.day <= G.end && !(r?.open && tlMsDrawn(m, r.ts))).map(m => `<i class="tl-ms rm-ms ${m.done ? 'done' : m.day < t0 ? 'over' : ''}" style="left:${rmX(G, m.day) + G.dw / 2}px" title="${esc(m.name + ' · ' + fmtDateLoc(m.day))}" role="img" aria-label="${esc(tr('Milestone') + ': ' + m.name + ', ' + fmtDateLoc(m.day))}"></i>`).join('');
 }
 function rmRowHtml(G, M, r) {
   const y = G.hh + r.i * G.rh;
@@ -3679,8 +4033,11 @@ function rmRowHtml(G, M, r) {
   if (r.type === 'g') {
     const l = r.l, col = cssColor(l.color), em = leadEmoji(l.name);
     const sw = em ? '' : `<span class="sw" style="${col ? 'background:' + col : ''}"></span>`;
-    return `<div class="tl-row rm-row rm-g${r.open ? ' open' : ''}" data-l="${l.id}" style="top:${y}px"><div class="tl-name rm-gname" data-act="rm-toggle" data-key="${esc(r.key)}" role="button" tabindex="0" aria-expanded="${r.open}" title="${esc(lname(l))}">${ic('chev', 's rm-car' + (r.open ? '' : ' closed'))}${sw}<span class="n">${esc(lname(l))}</span>${l.role === 'view' ? `<span class="rm-ro" title="${esc(tr('View only'))}">${ic('eye', 's')}</span>` : ''}<button type="button" class="iconbtn rm-go" data-go="l/${l.id}" title="${esc(tr('Open list'))}" aria-label="${esc(tr('Open list'))}">${ic('arrow', 's')}</button></div><div class="tl-track">${rmSumHtml(G, r)}${rmMsHtml(G, l)}</div></div>`;
+    // 2.18.0 review (R13): the fold toggle and "Open list" are siblings (a button inside role=button was nested-interactive)
+    return `<div class="tl-row rm-row rm-g${r.open ? ' open' : ''}" data-l="${l.id}" style="top:${y}px"><div class="tl-name rm-gwrap" title="${esc(lname(l))}"><div class="rm-gname" data-act="rm-toggle" data-key="${esc(r.key)}" role="button" tabindex="0" aria-expanded="${r.open}">${ic('chev', 's rm-car' + (r.open ? '' : ' closed'))}${sw}<span class="n">${esc(lname(l))}</span>${l.role === 'view' ? `<span class="rm-ro" title="${esc(tr('View only'))}">${ic('eye', 's')}</span>` : ''}</div><button type="button" class="iconbtn rm-go" data-go="l/${l.id}" title="${esc(tr('Open list'))}" aria-label="${esc(tr('Open list'))}">${ic('arrow', 's')}</button></div>${tlCrTrack(l.id, null, 'g:' + l.id, rmCrGeo(G), canAddTo(l.id) && !S.tlPick, rmSumHtml(G, r) + rmMsHtml(G, l, r))}</div>`;
   }
+  if (r.type === 's') return tlSecRow(r.l, r.sg, r.open, canAddTo(r.l.id) && !S.tlPick, rmCrGeo(G), y, r.n);
+  if (r.type === 'a') return tlAddRow(r.l, rmCrGeo(G), y);
   if (r.type === 'nh') return `<div class="tl-row rm-row rm-nh" data-l="${r.l.id}" style="top:${y}px"><div class="tl-name rm-gname" data-act="rm-ndfold" data-key="${esc(r.key)}" role="button" tabindex="0" aria-expanded="${r.open}">${ic('chev', 's rm-car' + (r.open ? '' : ' closed'))}<span class="n">${tr('No date')}</span><span class="c">${r.n}</span></div><div class="tl-track"></div></div>`;
   if (r.type === 'u') {
     const t = r.t, ed = canEditList(r.l.id) && canEdit(t);
@@ -3689,9 +4046,9 @@ function rmRowHtml(G, M, r) {
   const t = r.t, s0 = tlStart0(t), inWin = t.due >= G.start && s0 <= G.end;
   const name = `<div class="tl-name rm-tname" data-act="open" data-id="${t.id}">${t.parent_id ? '<span class="muted">↳ </span>' : ''}${esc(t.title)}</div>`;
   let bar = '';
-  if (inWin) { bar = tlBarHtml(t, G.start, G.end, G.dw, S.tlPick && depsOn() ? S.tlPick : null, depsOn()); S.tlL.bars.set(t.id, 1); }
+  if (inWin) { bar = t.ms ? tlMsHtml(t, G.start, G.dw) : tlBarHtml(t, G.start, G.end, G.dw, S.tlPick && depsOn() ? S.tlPick : null, depsOn()); S.tlL.bars.set(t.id, 1); }
   else bar = `<button type="button" class="rm-off ${t.due < G.start ? 'l' : 'r'}" data-act="rm-jump" data-d="${s0}" title="${esc(tr('Show {0}', fmtDayAbs(s0)))}">${ic(t.due < G.start ? 'left' : 'right', 's')}<span>${esc(fmtDayAbs(t.due < G.start ? t.due : s0))}</span></button>`;
-  return `<div class="tl-row rm-row rm-t" data-l="${r.l.id}" style="top:${y}px">${name}<div class="tl-track">${bar}</div></div>`;
+  return `<div class="tl-row rm-row rm-t${t.ms ? ' tl-msrow' : ''}${r.insec ? ' rm-insec' : ''}" data-l="${r.l.id}" style="top:${y}px">${name}<div class="tl-track">${bar}</div></div>`;
 }
 function rmChips(M) {
   const P = rmP(), n = (P.ls || []).length, who = rmWho();
@@ -3744,13 +4101,14 @@ function rmRows(force) {
   a = Math.floor(a / CH) * CH; b = Math.min(n, Math.ceil(b / CH) * CH);
   if (!force && a === V.a && b === V.b) return;
   const had = document.activeElement && box.contains(document.activeElement) ? document.activeElement : null;
-  const focusSel = had?.dataset.id ? `.tl-bar[data-id="${had.dataset.id}"]` : had?.dataset.lid ? `.rm-sum[data-lid="${had.dataset.lid}"]` : had?.dataset.key ? `.rm-gname[data-key="${rmEsc(had.dataset.key)}"]` : '';
+  const focusSel = had?.id === 'tl-new-in' ? '#tl-new-in' : had?.dataset.id ? `.tl-bar[data-id="${had.dataset.id}"]` : had?.dataset.lid ? `.rm-sum[data-lid="${had.dataset.lid}"]` : had?.dataset.key ? `[data-key="${rmEsc(had.dataset.key)}"]` : had?.dataset.k ? `[data-act="tl-add"][data-k="${rmEsc(had.dataset.k)}"]` : '';  // 2.18.0: + the section folds, "+" and the new-task field
   V.a = a; V.b = b;
   S.tlL = {bars: new Map()};
   let html = '';
   for (let i = a; i < b; i++) html += rmRowHtml(G, M, M.rows[i]);
   box.innerHTML = html;
-  if (focusSel) $(focusSel, box)?.focus();
+  if (focusSel) $(focusSel, box)?.focus({preventScroll: true});
+  tlFocKeep();
 }
 function rmAfterRender(el, left, top) {
   const V = S.rmV; if (!V) return;
@@ -4318,12 +4676,14 @@ async function pomoStart(taskId) {
 // ------------------------------------------------------------------ detail panel
 let saveTimers = {};
 function openDetail(id) {
-  if (S.sel !== id) { S.editLink = false; S.cedit = null; S.mp = null; recentPush('t', id); wpOpened(id); }
+  const other = S.sel !== id;
+  if (other) { S.editLink = false; S.cedit = null; S.mp = null; recentPush('t', id); wpOpened(id); }
   S.sel = id; S.editContent = false;
   const d = $('#detail');
   d.classList.remove('hidden');
   $('#app').classList.add('detail-open'); fitLayout();
   renderDetail();
+  if (other) d.scrollTop = 0;  // 2.18.0 review (R7): a different task starts at its top, not at the previous one's scroll position
   requestAnimationFrame(() => d.classList.add('open'));
   // 2.16.0 (#473): the panel is a named region; opened with the keyboard (Enter / o on a row) or on a phone (it covers the
   // list) it takes the focus, closing it gives the focus back to the row (closeDetail)
@@ -4530,6 +4890,32 @@ function crumbGo(k, id) {
   go(keyToHash(l.is_inbox ? 'inbox' : 'l:' + l.id));
   if (where) setTimeout(() => { const el = $(where); if (el) { if (el.classList.contains('closed')) el.click(); el.scrollIntoView?.({block: 'start'}); } }, 150);
 }
+// 2.18.0 (#408 F): a NEW bug ticket (open, created in the last 30 minutes) whose title shares at least 70 % of its words
+// with an open ticket of the same list gets a small hint "Similar open ticket: #id title" (client only, one pass over
+// the loaded tasks, only for such tickets). Dismissed per ticket, remembered on this device.
+const DUP_MIN = 0.7, DUP_NEW_MS = 30 * 60000;
+let DUP_OFF = null;
+const dupWords = s => new Set(String(s || '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(w => w.length > 1));
+function dupOf(t) {
+  if (t.ttype !== 'bug' || t.status !== 0 || !(t.id > 0) || t.deleted_at || !ticketsOn(t.list_id)) return null;
+  if (!t.created_at || Date.now() - Date.parse(t.created_at) > DUP_NEW_MS) return null;
+  DUP_OFF ||= new Set(LS.get('dupOff', []));
+  if (DUP_OFF.has(t.id)) return null;
+  const w = dupWords(t.title); if (!w.size) return null;
+  let best = null, bs = 0;
+  for (const x of S.tasks.values()) {
+    if (x.id === t.id || x.id <= 0 || x.list_id !== t.list_id || x.status !== 0 || x.deleted_at || !x.ttype) continue;
+    const v = dupWords(x.title); if (!v.size) continue;
+    let n = 0; for (const a of w) if (v.has(a)) n++;
+    const sc = n / Math.max(w.size, v.size);
+    if (sc >= DUP_MIN && (sc > bs || (sc === bs && x.id < best.id))) { bs = sc; best = x; }
+  }
+  return best;
+}
+function dupHintHtml(t) {
+  const d = dupOf(t); if (!d) return '';
+  return `<div class="ddup" role="note">${ic('copy', 's')}<span class="ddupt">${tr('Similar open ticket:')} <button type="button" class="linkbtn" data-act="open-id" data-id="${d.id}">#${d.id} ${esc(d.title.slice(0, 120))}</button></span><button type="button" class="iconbtn" data-act="dup-x" data-id="${t.id}" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;
+}
 function renderDetail() { return keepFocus($('#detail'), renderDetail0); }
 function renderDetail0() {
   const t = taskById(S.sel); if (!t) return;
@@ -4557,9 +4943,13 @@ function renderDetail0() {
   // fold after ~8 lines; phones get "Details | Comments" on top
   const mdLong = mdMode && mdIsLong(t.content), mdClamp = mdLong && !(S.mdMore || new Set()).has(t.id);
   const dtab = cm === 'full' && isMobile() ? LS.get('dTab', 'details') : 'details';
+  // 2.18.0 (#430): a milestone (no subtasks; its own section with progress, burndown, release notes) / the milestone a task
+  // of a list with milestones belongs to (open ones + the current one)
+  const msT = isMs(t), msSel = !msT && !t.context ? msOfList(t.list_id).filter(m => m.status === 0 || m.id === t.milestone_id) : [];
+  const msTog = !t.context && (msT || (isProject(t.list_id) && !t.parent_id && !kids.length && t.id > 0));
   // 2.0.6 (#316 / #322): the order of the sections below the description, in one place
   const SEC = {
-    subtasks: ck ? '' : `<div class="dsec subsec"><h5>${tr('Subtasks')}</h5><div class="subs">${kids.map(k => taskRow(k, {compact: true, subRow: true})).join('')}
+    subtasks: ck || msT ? '' : `<div class="dsec subsec"><h5>${tr('Subtasks')}</h5><div class="subs">${kids.map(k => taskRow(k, {compact: true, subRow: true})).join('')}
         ${ro ? '' : depthOf(t) < 2 ? `<div class="subadd">${ic('plus', 's')}<input id="d-sub" placeholder="${tr('Add subtask')}" aria-label="${esc(tr('Add subtask'))}" enterkeyhint="done"></div>` : `<div class="muted" style="font-size:var(--fs-s);padding:.25rem">${tr('At most 3 levels')}</div>`}</div></div>`,
     comments: cm === 'full' ? `<div class="dsec cmsec ${cmtNew() ? 'cmnew' : ''}" id="d-tl">${timelineHtml(t)}</div>` : '',
     history: hist ? `<details class="dsec cmsec cmro" id="d-hist"><summary><span>${tr('History')}</span></summary><div class="cms" id="d-hist-items">${S.tl.id === t.id ? histItems() : `<div class="muted cmempty">${tr('Loading…')}</div>`}</div></details>` : '',
@@ -4573,6 +4963,8 @@ function renderDetail0() {
     fields: ck ? (collab() && shared ? `<div class="dsec fields"><label for="d-assignee">${tr('Assignee')}</label><select id="d-assignee" data-sheet-av ${ro || !canAssign(t) ? 'disabled' : ''}><option value="">${tr('Nobody')}</option>${assigneeOpts(t, l)}</select>${myGroup(t.assignee_group_id) ? `<button class="btn sm dtake" data-act="take" type="button">${ic('check', 's')} ${tr('Take it')}</button>` : ''}</div>` : '') : `<div class="dsec fields">
         <label for="d-list">${tr('List')}</label><select id="d-list" data-sheet-ico="list" ${ro || !canEditList(t.list_id) ? 'disabled' : ''}>${S.lists.filter(x => (!x.archived && canEditList(x.id)) || x.id === t.list_id).map(x => `<option value="${x.id}" ${x.is_inbox ? 'data-ico="inbox"' : ''} ${x.id === t.list_id ? 'selected' : ''}>${esc(lname(x))}</option>`).join('')}</select>
         ${ticketsOn(t.list_id) ? `<label for="d-ttype">${tr('Type')}</label><select id="d-ttype" data-sheet-ico="bug" ${ro ? 'disabled' : ''}><option value="">${tr('None')}</option>${TTYPES.map(([k, n, i]) => `<option value="${k}" data-ico="${i}" ${t.ttype === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>` : ''}
+        ${msTog ? `<label for="d-ms">${tr('Milestone')}</label><label class="chkl dmsl"><input type="checkbox" id="d-ms" ${msT ? 'checked' : ''} ${ro ? 'disabled' : ''}><i class="msd" aria-hidden="true"></i>${tr('This task is a milestone')}</label>` : ''}
+        ${msSel.length ? `<label for="d-msel">${msTog ? tr('Belongs to') : tr('Milestone')}</label><select id="d-msel" data-sheet-ico="flag" ${ro ? 'disabled' : ''}><option value="">${tr('None')}</option>${msSel.map(m => `<option value="${m.id}" ${m.id === t.milestone_id ? 'selected' : ''}>${esc(m.title + (m.due ? ' · ' + fmtDateLoc(m.due) : ''))}</option>`).join('')}</select>` : ''}
         ${secs.length ? `<label for="d-sec">${tr('Section')}</label><select id="d-sec" data-sheet-ico="columns" ${ro ? 'disabled' : ''}><option value="">${tr('Unassigned')}</option>${secs.map(s => `<option value="${s.id}" ${s.id === t.section_id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>` : ''}
         <label>${tr('Link')}</label>${linkField(t, ro)}
         ${collab() && (shared || t.assignee_id) ? `<label for="d-assignee">${tr('Assignee')}</label><select id="d-assignee" data-sheet-av ${ro || !canAssign(t) ? 'disabled' : ''}><option value="">${tr('Nobody')}</option>${assigneeOpts(t, l)}</select>${myGroup(t.assignee_group_id) ? `<button class="btn sm dtake" data-act="take" type="button">${ic('check', 's')} ${tr('Take it')}</button>` : ''}` : ''}
@@ -4584,7 +4976,7 @@ function renderDetail0() {
   setHtml($('#detail'), `
     <div class="dtop">
       <button class="iconbtn back" data-act="close-detail" aria-label="${tr('Back')}">${ic('back')}</button>
-      <button class="chk ${t.status === 2 ? 'on' : t.status === -1 ? 'wont' : 'p' + t.priority}" data-act="toggle" data-id="${t.id}" role="checkbox" aria-checked="${t.status === 2}" aria-label="${esc(tr('Complete: {0}', t.title))}" title="${esc(kt(tr('Complete task'), 'x'))}" ${ro ? 'disabled' : ''}>${t.status === 2 ? ic('check') : ''}</button>
+      <button class="chk ${t.status === 2 ? 'on' : t.status === -1 ? 'wont' : 'p' + t.priority}${msT ? ' ms' : ''}" data-act="toggle" data-id="${t.id}" role="checkbox" aria-checked="${t.status === 2}" aria-label="${esc(msT ? tr('Complete milestone: {0}', t.title) : tr('Complete: {0}', t.title))}" title="${esc(kt(msT ? tr('Complete milestone') : tr('Complete task'), 'x'))}" ${ro ? 'disabled' : ''}>${t.status === 2 ? ic('check') : ''}</button>
       ${ck ? '' : `<button class="dchip ${t.due ? 'set ' + dueClass(t) : ''}" data-act="date" data-id="${t.id}" title="${esc((t.due ? dueTxt + ' · ' : '') + kt(tr('Change date'), 'd'))}" ${ro ? 'disabled' : ''}>${ic('cal', 's')}<span class="dct">${dueTxt}</span>${t.repeat ? ' ' + ic('repeat', 's') : ''}${t.reminders && t.due ? ' ' + ic('bell', 's') : ''}</button>`}
       ${ck || ro ? '' : [[0, 'sun', tr('Today')], [1, 'sunrise', tr('Tomorrow')]].map(([n, i, lab]) => `<button class="iconbtn dq ${t.due === addDays(today(), n) ? 'on' : ''}" data-act="due-q" data-d="${n}" data-id="${t.id}" title="${esc(kt(tr('Due: {0}', lab), n ? 'Shift+T' : 't'))}" aria-label="${esc(tr('Due: {0}', lab))}">${ic(i, 's')}<span class="dql">${esc(lab)}</span></button>`).join('')}
       ${ck ? '' : '<span class="dbr" aria-hidden="true"></span>'}<span class="spacer"></span>
@@ -4602,10 +4994,12 @@ function renderDetail0() {
       ${!ck && t.due && (t.deadline || nagOf(t)) && t.status === 0 ? `<div class="ddl">${dlChip(t, 'big')}${nagOf(t) ? `<button type="button" class="dnag" data-act="date" data-id="${t.id}" title="${esc(tr('Change'))}">${ic('repeat', 's')}${esc(tr('Repeat reminder') + ': ' + nagLabel(nagOf(t)))}</button>` : ''}</div>` : ''}
       ${!ck && planOf(t) ? `<div class="dplan">${ic('clock', 's')}<span class="dplt">${esc(tr('Planned: {0}', planLabel(t)))}</span>${ro ? '' : `<button type="button" class="linkbtn" data-act="unplan" data-id="${t.id}">${tr('Unplan')}</button>`}</div>` : ''}
       ${t.waiting_at && !ck ? waitBar(t, ro) : ''}
-      <div class="md ${mdMode ? '' : 'hidden'} ${mdClamp ? 'clamp' : ''}" id="d-md" title="${tr('Click to edit')}">${mdMode ? mdMentions(renderMd(t.content), t) : ''}</div>
+      ${ck || ro ? '' : dupHintHtml(t)}
+      <div class="md ${mdMode ? '' : 'hidden'} ${mdClamp ? 'clamp' : ''}" id="d-md" title="${tr('Click to edit')}">${mdMode ? mdMentions(renderMd(t.content, false, {lid: t.list_id}), t) : ''}</div>
       ${mdLong ? `<button class="linkbtn mdmore" data-act="md-more" aria-expanded="${!mdClamp}">${mdClamp ? tr('Show more') : tr('Show less')}</button>` : ''}
       ${mdOpen && mdMode ? `<button class="btn sm mdsub" data-act="md-subtasks">${ic('sub', 's')} ${tr('Turn the open checklist items into subtasks')}</button>` : ''}
       <textarea id="d-content" class="dcontent ${mdMode ? 'hidden' : ''}" placeholder="${ck ? tr('Note') : tr('Description')}" aria-label="${ck ? tr('Note') : tr('Description')}" ${ro ? 'readonly' : ''}>${esc(t.content)}</textarea>
+      ${msT && t.id > 0 ? `<div class="dsec mssec" id="d-ms">${msReportHtml(t)}</div>` : ''}
       ${DETAIL_ORDER.map(k => SEC[k]).join('\n      ')}
     </div>
     <div class="dbot">${cmOk && !(cm === 'full' && cmtNew()) ? cmComposer(t) : ''}<div class="dfoot"><span class="dfc">${t.status === 2 && t.completed_at ? tr('Completed {0}', new Date(t.completed_at).toLocaleString(LOCALE(), {dateStyle: 'medium', timeStyle: 'short'})) : tr('Created {0}', new Date(t.created_at).toLocaleString(LOCALE(), {dateStyle: 'medium', timeStyle: 'short'}))}</span>
@@ -4659,7 +5053,7 @@ function bellBtn() {
 }
 // 2.6.1 (#404): filter chips (view only, per device): which kinds of News show, in the News view and under the bell
 const NEWS_CHIPS = [['mention', 'at', N_('Mentions'), ['mention']], ['comment', 'comment', N_('Comments'), ['comment']],
-  ['assign', 'user', N_('Assignments'), ['assign', 'unassign', 'take']], ['newtask', 'plus', N_('New tasks'), ['newtask']],
+  ['assign', 'user', N_('Assignments'), ['assign', 'unassign', 'take']], ['newtask', 'plus', N_('New tasks'), ['newtask', 'errreport']],
   ['complete', 'check', N_('Completed'), ['complete', 'unblock']], ['status', 'pulse', N_('Status'), ['status']],
   ['agents', 'bot', N_('Agents'), ['approval', 'proposal', 'usage']], ['share', 'users', N_('Sharing'), ['share', 'role', 'unshare', 'owner']],
   ['followup', 'hourglass', N_('Follow-ups'), ['followup']]];
@@ -4832,6 +5226,7 @@ function newsText(it, U) {
     case 'owner': return tr('{0} made you the owner of the list {1}', who, q(newsListName(it)));  // 2.1.2 (#349)
     case 'unblock': return d.hidden ? tr('{0} completed a task you cannot see: your task is unblocked', who) : tr('{0} completed {1}: your task is unblocked', who, q(d.title || ''));
     case 'newtask': return tr('{0} added a task', who);
+    case 'errreport': return d.title ? tr('New error reported: {0}', q(d.title)) : tr('A new error was reported');  // 2.18.0
     case 'approval': return tr('{0} is waiting for your approval', who);
     case 'followup': return d.note ? tr('Follow up today: waiting on {0}', q(d.note)) : tr('Follow up today: the task is waiting on external');
     case 'usage': return aiuNewsText(d);  // 2.1.1 (#326)
@@ -4840,7 +5235,7 @@ function newsText(it, U) {
   }
   return tr('{0} changed something', who);
 }
-const NEWS_ICON = {mention: 'at', comment: 'comment', assign: 'user', unassign: 'user', take: 'check', complete: 'check', share: 'users', role: 'users', unshare: 'users', unblock: 'deps', status: 'pulse', newtask: 'plus', approval: 'bot', followup: 'hourglass', usage: 'chart', proposal: 'bot'};
+const NEWS_ICON = {mention: 'at', comment: 'comment', assign: 'user', unassign: 'user', take: 'check', complete: 'check', share: 'users', role: 'users', unshare: 'users', unblock: 'deps', status: 'pulse', newtask: 'plus', approval: 'bot', followup: 'hourglass', usage: 'chart', proposal: 'bot', errreport: 'bug'};
 function newsItemHtml(it, i, pop) {
   const U = S.nf.users;
   const many = (it.tasks || []).length > 1;  // 2.13.0 (#453 A5): an agent's comments on several tasks
@@ -4990,7 +5385,8 @@ function actText0(a, U) {
   const d = a.data || {}, who = `<b>${esc(viaName(d, a.user_id, U))}</b>`, q = x => `<b>${esc(x)}</b>`;
   const due = () => q((d.start && d.start < d.due ? fmtDayAbs(d.start) + ' – ' : '') + fmtDayAbs(d.due) + (d.time ? ', ' + d.time : ''));
   switch (a.kind) {
-    case 'created': return d.proposal ? tr('{0} created the task from a proposal by {1}', who, q(uname(d.agent, U))) : tr('{0} created the task', who);
+    case 'created': if (d.report) return tr('Created from an error report ({0})', q(d.report === 'sentry' ? 'Sentry' : tr('webhook')));  // 2.18.0 (#408)
+      return d.proposal ? tr('{0} created the task from a proposal by {1}', who, q(uname(d.agent, U))) : tr('{0} created the task', who);
     case 'proposal': return tr('{0} applied a proposal by {1}', who, q(uname(d.agent, U)));  // 2.3.0 (#262)
     case 'title': return tr('{0} renamed the task to “{1}”', who, esc(d.to || ''));
     case 'content': return tr('{0} edited the description', who);
@@ -5005,6 +5401,8 @@ function actText0(a, U) {
     case 'section': return d.name ? tr('{0} moved the task to the section {1}', who, q(d.name)) : tr('{0} removed the task from its section', who);
     case 'parent': return d.title ? tr('{0} made the task a subtask of {1}', who, q(d.title)) : tr('{0} made the task a main task', who);
     case 'ttype': return d.to ? tr('{0} set the type to {1}', who, q(ttName(d.to))) : tr('{0} removed the type', who);  // 2.4.0 (#340)
+    case 'ms': return d.on ? tr('{0} made the task a milestone', who) : tr('{0} made the milestone a normal task', who);  // 2.18.0 (#430)
+    case 'milestone': return d.title ? tr('{0} added the task to the milestone {1}', who, q(d.title)) : tr('{0} removed the task from its milestone', who);
     case 'repeat': return d.rule ? tr('{0} set the repetition to {1}', who, q(repeatLabel(d.rule))) : tr('{0} stopped the repetition', who);
     case 'link': return d.url ? tr('{0} set the link to {1}', who, q(urlHost(d.url))) : tr('{0} removed the link', who);
     case 'complete': return d.next ? tr('{0} completed the task, next occurrence {1}', who, q(fmtDayAbs(d.next))) : tr('{0} completed the task', who);
@@ -5034,13 +5432,14 @@ function actText0(a, U) {
     case 'restore': return tr('{0} restored the task', who);
     case 'import': return tr('{0} imported the task from {1}', who, q(d.source || ''));
     case 'git_pr': case 'git_done': return gitActText(a, d, q);  // 2.2.0 (#271)
+    case 'err_again': return tr('The error happened again ({0}×)', d.n || 2) + (d.level ? ` <span class="muted">· ${esc(d.level)}</span>` : '');  // 2.18.0 (#408)
   }
   return tr('{0} changed the task', who);
 }
 // comment text: the same markdown as a description (renderMd: headings, lists, read-only checkboxes, bold, code, links;
 // 2.13.2 #478 N4, before only inline), <@id> -> highlighted @name; compact in comments and chat bubbles (.mdc)
-function commentBody(body, U) {
-  return `<div class="md mdc">${renderMd(body, true)}</div>`
+function commentBody(body, U, lid) {  // 2.18.0 (#408 G): lid = the list (file:line links into its repository)
+  return `<div class="md mdc">${renderMd(body, true, {lid})}</div>`
     .replace(/&lt;@(\d+)&gt;/g, (_, id) => mentionTag(+id, uname(+id, U), !!(U || {})[id] || !!agentById(id)));
 }
 // 2.4.2 (#389): a mention is a button that opens a small card about the person or agent; a name nobody has stays text
@@ -5126,7 +5525,7 @@ function commentHtml(c, U, ro = false) {
   const acts = ro ? '' : mine || S.tl.moderator ? `<span class="cacts">${mine ? `<button class="iconbtn" data-act="c-edit" data-cid="${c.id}" title="${tr('Edit')}">${ic('edit', 's')}</button>` : ''}<button class="iconbtn" data-act="c-del" data-cid="${c.id}" title="${tr('Delete')}">${ic('trash', 's')}</button></span>` : '';
   const files = c.attachments?.length ? `<div class="atts catts">${c.attachments.map(a => cattHtml(a, c.id, editing)).join('')}</div>` : '';
   const main = editing ? `<div class="cedit"><textarea class="c-edit-input" data-cid="${c.id}" rows="2">${esc(decodeMentions(c.body, U))}</textarea><div class="mpick hidden"></div>${files}<div class="cbar"><span class="spacer"></span><button class="btn sm" data-act="c-edit-cancel">${tr('Cancel')}</button><button class="btn sm pri" data-act="c-edit-save" data-cid="${c.id}">${tr('Save')}</button></div></div>`
-    : `${c.body ? `<div class="cbody">${commentBody(c.body, U)}</div>` : ''}${files}${sugHtml(c, ro)}${reactHtml(c, ro)}`;
+    : `${c.body ? `<div class="cbody">${commentBody(c.body, U, taskById(c.task_id || S.sel)?.list_id)}</div>` : ''}${files}${sugHtml(c, ro)}${reactHtml(c, ro)}`;
   // 2.5.1 (#395): the author's avatar opens the same card as an @mention (only in the comment list, not read-only copies)
   const cav = ro ? av(c.user_id, uname(c.user_id, U)) : `<button type="button" class="cmav" data-mcard="${c.user_id}" data-mname="${esc(uname(c.user_id, U))}" aria-haspopup="dialog" title="${esc(tr('Show {0}', uname(c.user_id, U)))}">${av(c.user_id, uname(c.user_id, U))}</button>`;
   return `<div class="cm ${isNew ? 'new' : ''}${rxShow('k' + c.id)}" data-cid="${c.id}">${cav}<div class="cmain"><div class="chead"><b>${esc(uname(c.user_id, U))}</b>${isAgentUser(c.user_id) ? agentBadge() : ''}<span class="muted">${fmtWhen(c.created_at)}${c.edited_at ? ' · ' + tr('edited') : ''}</span>${acts}</div>${main}</div></div>`;
@@ -5425,13 +5824,22 @@ function mdFmt(t) {  // escaped text only (no attributes are produced here)
     .replace(/(^|[^*\w])\*([^*\s][^*]*?)\*(?!\w)/g, '$1<i>$2</i>')
     .replace(/~~([^~]+)~~/g, '<s>$1</s>');
 }
+// 2.18.0 review (R6): backslash escapes as in standard Markdown ("\*" = a literal *, e.g. in error-report tickets): the
+// escaped character becomes a private-use placeholder before any rule runs and is put back (escaped) at the end; inside
+// code spans the backslash stays, as in standard Markdown
+const MD_ESC_RE = /\\([!-\/:-@\[-`{-~])/g, MD_PH_RE = /[\uE000-\uE07F]/g;
+const mdPhBack = s => s.replace(MD_PH_RE, c => '\\' + String.fromCharCode(c.charCodeAt(0) - 0xE000));
 function mdInline(s) {
-  s = String(s ?? '');
+  s = String(s ?? '').replace(MD_PH_RE, '').replace(MD_ESC_RE, (_, c) => String.fromCharCode(0xE000 + c.charCodeAt(0)));
+  return mdInline1(s).replace(MD_PH_RE, c => esc(String.fromCharCode(c.charCodeAt(0) - 0xE000)));
+}
+function mdInline1(s) {
   let out = '', last = 0, m;
+  const fmt = MD_REPO ? mdFileLinks : mdFmt;  // 2.18.0 (#408 G): src/app.py:42 -> the file in the list's repository
   MD_TOK.lastIndex = 0;
   while ((m = MD_TOK.exec(s))) {
     let rep;
-    if (m[1] !== undefined) rep = `<code>${esc(m[1])}</code>`;
+    if (m[1] !== undefined) { m[1] = mdPhBack(m[1]); const fu = MD_REPO && mdFileUrl(m[1].trim()); rep = fu ? mdLink(fu, `<code>${esc(m[1])}</code>`) : `<code>${esc(m[1])}</code>`; }
     else if (m[2] !== undefined) { const u = mdSafeUrl(m[3]); rep = u ? mdLink(u, mdFmt(m[2])) : mdFmt(m[0]); }
     else {
       let u = m[5], tail = '';
@@ -5439,13 +5847,107 @@ function mdInline(s) {
       if (tp) { tail = tp[0]; u = u.slice(0, -tail.length); }
       rep = esc(m[4]) + (mdSafeUrl(u) ? mdLink(u, esc(u)) : esc(u)) + esc(tail);
     }
-    out += mdFmt(s.slice(last, m.index)) + rep;
+    out += fmt(s.slice(last, m.index)) + rep;
     last = MD_TOK.lastIndex;
     if (m[0] === '') MD_TOK.lastIndex++;
   }
-  return out + mdFmt(s.slice(last));
+  return out + fmt(s.slice(last));
 }
-function renderMd(src, ro) {
+// ---- 2.18.0 (#408 G): file:line references -> links into the list's repository (its first one, default branch).
+// Conservative: a path of word characters with a known source file extension, optionally :line or :from-to, never right
+// after a letter / slash / colon (so no URLs, no absolute paths, no times like 12:30, no "e.g.").
+let MD_REPO = null;  // set by renderMd while it renders the text of a list that has a repository
+const MD_FILE_EXT = 'py|pyi|js|mjs|cjs|jsx|ts|tsx|go|rs|java|kt|kts|c|h|cc|cpp|cxx|hpp|cs|rb|php|swift|scala|sh|bash|zsh|ps1|sql|html|htm|css|scss|sass|less|vue|svelte|json|jsonc|yaml|yml|toml|ini|cfg|conf|xml|md|txt|rst|lock|gradle|proto|graphql|tf|lua|pl|r|dart|ex|exs|erl|hs|ml|clj|el|vim|env|mk|cmake|dockerfile';
+const MD_FILE_PATH = String.raw`((?:\.\/)?(?:[\w.-]+\/)*[\w-][\w.-]*\.(?:${MD_FILE_EXT}))(?::(\d{1,6})(?:-(\d{1,6}))?)?`;
+const MD_FILE_RE = new RegExp(String.raw`(^|[\s(\[{,;"'])${MD_FILE_PATH}(?=$|[\s)\]},;:.!?"'])`, 'gi');
+const MD_FILE_ONE = new RegExp(`^${MD_FILE_PATH}$`, 'i');
+function mdFileUrl(ref) {  // "src/app.py:42" (the whole string, e.g. inline code) -> the URL in MD_REPO, or null
+  const m = MD_FILE_ONE.exec(ref);
+  return m ? mdRepoFileUrl(MD_REPO, m[1], m[2], m[3]) : null;
+}
+function mdRepoFileUrl(r, path, a, b) {
+  const web = httpUrl(r?.web_url).replace(/\/+$/, ''); if (!web || path.split('/').includes('..')) return null;
+  const br = (r.default_branch || 'main').split('/').map(encodeURIComponent).join('/');
+  const p = path.replace(/^\.\//, '').split('/').map(encodeURIComponent).join('/');
+  const pv = String(r.provider || 'github').toLowerCase();
+  const ln = !a ? '' : pv === 'bitbucket' ? `#lines-${a}${b ? ':' + b : ''}` : pv === 'gitlab' ? `#L${a}${b ? '-' + b : ''}` : `#L${a}${b ? '-L' + b : ''}`;
+  return pv === 'gitlab' ? `${web}/-/blob/${br}/${p}${ln}` : pv === 'bitbucket' ? `${web}/src/${br}/${p}${ln}`
+    : pv === 'gitea' || pv === 'forgejo' ? `${web}/src/branch/${br}/${p}${ln}` : `${web}/blob/${br}/${p}${ln}`;
+}
+function mdFileLinks(t) {  // like mdFmt, with the file references as links (every part escaped)
+  let out = '', last = 0, m;
+  MD_FILE_RE.lastIndex = 0;
+  while ((m = MD_FILE_RE.exec(t))) {
+    // plain text: a bare file name only with a line (app.js:10, not "Node.js"); never a domain-like first part (site.com/a.html)
+    if ((!m[2].includes('/') && !m[3]) || /^[\w-]+\.[a-z]{2,}\//i.test(m[2])) continue;
+    const u = mdRepoFileUrl(MD_REPO, m[2], m[3], m[4]), at = m.index + m[1].length;
+    if (!u) continue;
+    out += mdFmt(t.slice(last, at)) + mdLink(u, esc(t.slice(at, MD_FILE_RE.lastIndex)));
+    last = MD_FILE_RE.lastIndex;
+  }
+  return out + mdFmt(t.slice(last));
+}
+// ---- 2.18.0 (#408 G): syntax highlighting of fenced code blocks: a small tokenizer per language family (comments,
+// strings, numbers, keywords; diff lines). Safe: every token is escaped, only fixed <span class> wrappers are added.
+const HL_JS = 'async await break case catch class const continue debugger default delete do else export extends finally for from function get if import in instanceof let new of return set static super switch this throw try typeof var void while with yield true false null undefined';
+const HL_KW = {
+  js: HL_JS, ts: HL_JS + ' interface type enum implements private public protected readonly declare namespace abstract as keyof never unknown any string number boolean',
+  py: 'and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield match case True False None self',
+  sh: 'if then else elif fi for while until do done case esac function in return local export exit set unset readonly source echo cd',
+  go: 'break case chan const continue default defer else fallthrough for func go goto if import interface map package range return select struct switch type var true false nil',
+  rust: 'as async await break const continue crate dyn else enum extern false fn for if impl in let loop match mod move mut pub ref return self Self static struct super trait true type unsafe use where while',
+  java: 'abstract boolean break byte case catch char class const continue default do double else enum extends final finally float for fun if implements import instanceof int interface long new null package private protected public return short static super switch this throw throws try val var void volatile when while true false',
+  c: 'auto bool break case char class const constexpr continue default delete do double else enum extern false float for goto if inline int long namespace new nullptr NULL private protected public register return short signed sizeof static struct switch template this true typedef typename union unsigned using virtual void volatile while',
+  sql: 'select from where and or not insert into values update set delete create table alter drop index view join left right inner outer full cross on as group by order having limit offset null is in like between distinct union all primary key foreign references default exists case when then else end returning with asc desc count sum avg min max',
+  yaml: 'true false null yes no on off', json: 'true false null', css: 'important',
+};
+const HL_ALIAS = {javascript: 'js', jsx: 'js', mjs: 'js', cjs: 'js', node: 'js', typescript: 'ts', tsx: 'ts', python: 'py', py3: 'py',
+  bash: 'sh', shell: 'sh', zsh: 'sh', console: 'sh', shellsession: 'sh', golang: 'go', rs: 'rust', kotlin: 'java', kt: 'java',
+  cpp: 'c', 'c++': 'c', h: 'c', hpp: 'c', cc: 'c', cs: 'c', csharp: 'c', objc: 'c', yml: 'yaml', toml: 'yaml', ini: 'yaml',
+  xml: 'html', svg: 'html', htm: 'html', vue: 'html', scss: 'css', less: 'css', patch: 'diff', postgres: 'sql', sqlite: 'sql', mysql: 'sql', jsonc: 'json'};
+const HL_MAX = 20000;  // longer blocks stay plain (fast on phones)
+const HL_RE = {};
+function hlRe(k) {
+  if (HL_RE[k]) return HL_RE[k];
+  const cm = ['js', 'ts', 'go', 'rust', 'java', 'c'].includes(k) ? String.raw`\/\/[^\n]*|\/\*[\s\S]*?\*\/` : k === 'css' ? String.raw`\/\*[\s\S]*?\*\/`
+    : k === 'sql' ? String.raw`--[^\n]*|\/\*[\s\S]*?\*\/` : ['py', 'sh', 'yaml'].includes(k) ? String.raw`#[^\n]*` : '(?!)';
+  const st = (k === 'py' ? String.raw`"""[\s\S]*?"""|'''[\s\S]*?'''|` : '') + (['js', 'ts', 'go'].includes(k) ? String.raw`\x60(?:\\[\s\S]|[^\x60\\])*\x60|` : '')
+    + String.raw`"(?:\\.|[^"\\\n])*"` + (['json', 'rust'].includes(k) ? '' : String.raw`|'(?:\\.|[^'\\\n])*'`);
+  const num = String.raw`\b(?:0[xX][\da-fA-F_]+|\d[\d_]*(?:\.\d+)?(?:[eE][+-]?\d+)?)\b`;
+  return (HL_RE[k] = new RegExp(`(${cm})|(${st})|(${num})|([A-Za-z_$][\\w$]*)`, 'g'));
+}
+const hlSpan = (c, t) => `<span class="hl-${c}">${esc(t)}</span>`;
+function hlCode(code, lang) {
+  const k = HL_ALIAS[lang] || lang;
+  if (!k || code.length > HL_MAX) return esc(code);
+  if (k === 'diff') return code.split('\n').map(l => /^(\+\+\+|---) /.test(l) || /^@@/.test(l) ? hlSpan('m', l) : l[0] === '+' ? hlSpan('add', l) : l[0] === '-' ? hlSpan('del', l) : esc(l)).join('\n');
+  if (k === 'html') {
+    return code.replace(/(<!--[\s\S]*?-->)|(<\/?[A-Za-z][\w:.-]*|\/?>)|("[^"\n]*"|'[^'\n]*')|([\w:-]+)(?==)|([^<"'\w]+|[\s\S])/g,
+      (m, c, t, s2, a) => c ? hlSpan('c', c) : t ? hlSpan('t', t) : s2 ? hlSpan('s', s2) : a ? hlSpan('a', a) : esc(m));
+  }
+  if (!HL_KW[k]) return esc(code);
+  const kw = new Set(HL_KW[k].split(' ')), ci = k === 'sql', re = hlRe(k);
+  let out = '', last = 0, m;
+  re.lastIndex = 0;
+  while ((m = re.exec(code))) {
+    if (m[0] === '') { re.lastIndex++; continue; }
+    const cls = m[1] ? 'c' : m[2] ? 's' : m[3] ? 'n' : kw.has(ci ? m[4].toLowerCase() : m[4]) ? 'k' : '';
+    out += esc(code.slice(last, m.index)) + (cls ? hlSpan(cls, m[0]) : esc(m[0]));
+    last = re.lastIndex;
+  }
+  return out + esc(code.slice(last));
+}
+function mdCodeBlock(lines, lang) {
+  const l = String(lang || '').toLowerCase().replace(/[^\w+#.-]/g, '').slice(0, 20);
+  return `<div class="mdcode"><pre class="mdpre"${l ? ` data-lang="${esc(l)}"` : ''}><code>${hlCode(lines.join('\n'), l)}</code></pre><button type="button" class="iconbtn mdcopy" data-mdcopy aria-label="${esc(tr('Copy code'))}" title="${esc(tr('Copy code'))}">${ic('copy', 's')}</button></div>`;
+}
+function renderMd(src, ro, o = {}) {
+  // 2.18.0 (#408 G): o.lid = the list the text belongs to (file:line links into its repository)
+  const keep = MD_REPO;
+  MD_REPO = o.lid ? listRepos(o.lid).find(r => httpUrl(r.web_url)) || null : null;
+  try { return renderMd0(src, ro); } finally { MD_REPO = keep; }
+}
+function renderMd0(src, ro) {
   // 2.13.4: nested lists (indented items go into the item above) and numbered lists keep counting across nested bullets;
   // a numbered list that starts at n (after a paragraph, "2.") shows n (<ol start>)
   const lines = String(src || '').split('\n');
@@ -5463,11 +5965,12 @@ function renderMd(src, ro) {
     else { h += `<${tag}${tag === 'ol' && num > 1 ? ` start="${num}"` : ''}>`; stack.push({tag, ind}); }
     h += `<li${cls ? ` class="${cls}"` : ''}>${html}`;
   };
-  let code = null;  // 2.13.4: ``` fenced code blocks (agents send them): kept as they are, in mono, scrolling sideways
+  let code = null, lang = '';  // 2.13.4: ``` fenced code blocks (agents send them): kept as they are, in mono, scrolling
+  // sideways; 2.18.0 (#408 G): highlighted by their language (```js), with a Copy button
   lines.forEach((ln, i) => {
     let m;
-    if (code !== null) { if (/^\s*```/.test(ln)) { h += `<pre class="mdpre"><code>${code.map(esc).join('\n')}</code></pre>`; code = null; } else code.push(ln); return; }
-    if (/^\s*```/.test(ln)) { flushPara(); closeList(); code = []; return; }
+    if (code !== null) { if (/^\s*```\s*$/.test(ln)) { h += mdCodeBlock(code, lang); code = null; } else code.push(ln); return; }
+    if ((m = ln.match(/^\s*```\s*([^\s`]*)/))) { flushPara(); closeList(); code = []; lang = m[1]; return; }
     if ((m = ln.match(/^(#{1,3})\s+(.*)/))) { flushPara(); closeList(); h += `<h${m[1].length + 3}>${mdInline(m[2])}</h${m[1].length + 3}>`; }
     else if ((m = ln.match(/^\s*[-*]\s+\[( |x|X)\]\s*(.*)/))) { flushPara(); item('ul', ln, `<input type="checkbox" ${ro ? 'disabled' : `data-mdline="${i}"`} ${m[1] !== ' ' ? 'checked' : ''}><span>${mdInline(m[2])}</span>`, `cb ${m[1] !== ' ' ? 'on' : ''}`); }
     else if ((m = ln.match(/^\s*[-*•]\s+(.*)/))) { flushPara(); item('ul', ln, mdInline(m[1])); }
@@ -5475,7 +5978,7 @@ function renderMd(src, ro) {
     else if (!ln.trim()) { flushPara(); closeList(); }
     else { closeList(); para.push(mdInline(ln)); }
   });
-  if (code !== null) h += `<pre class="mdpre"><code>${code.map(esc).join('\n')}</code></pre>`;
+  if (code !== null) h += mdCodeBlock(code, lang);
   flushPara(); closeList();
   return h;
 }
@@ -5581,7 +6084,7 @@ function shiftUndo(before, t, msg) {
 // /api/tasks/batch, one transaction however many tasks it touches. Offline: a step whose operation still waits in the
 // outbox is taken out of the queue and the local state restored (never sent); otherwise task steps are queued like
 // any other change (the buttons show the pending state). Steps on lists that became view-only refuse.
-const UNDO_FIELDS = ['list_id', 'section_id', 'parent_id', 'due', 'due_time', 'start', 'duration', 'reminders', 'repeat', 'repeat_from', 'priority', 'pinned', 'assignee_id', 'ttype', 'deadline', 'nag', 'assignee_group_id', 'plan_start'];  // 2.11.0: plan_start  // 2.10.0: assignee_group_id  // 2.4.0: ttype (#340), 2.7.0: deadline, nag
+const UNDO_FIELDS = ['list_id', 'section_id', 'parent_id', 'due', 'due_time', 'start', 'duration', 'reminders', 'repeat', 'repeat_from', 'priority', 'pinned', 'assignee_id', 'ttype', 'deadline', 'nag', 'assignee_group_id', 'plan_start', 'ms', 'milestone_id'];  // 2.18.0: ms, milestone_id (#430)  // 2.11.0: plan_start  // 2.10.0: assignee_group_id  // 2.4.0: ttype (#340), 2.7.0: deadline, nag
 const HIST_FIELDS = [...UNDO_FIELDS, 'title', 'content', 'url', 'tags', 'fields'];
 const HIST_MAX = 30, HIST_MENU = 10;
 const HIST = {undo: [], redo: [], busy: false, group: null, gToast: null, toastE: null, sess: 0, ids: {}, secmap: new Map()};
@@ -6470,7 +6973,9 @@ function taskMenu(anchor, id) {
       if (j.next_due) histFields(tr('Skipped an occurrence of {0}', qn(t.title.slice(0, 40))), [[b0, snapTask(S.tasks.get(id)), ['due', 'start', 'repeat']]], {res: j});
       toast(j.next_due ? tr('Skipped, next occurrence: {0}', dayLabel(j.next_due)) : tr('Will be sent as soon as the server is reachable'));
     }}] : []),
-    ...(i > 0 && depthOf(sib[i - 1]) < 2 ? [{label: tr('Indent (under “{0}”)', sib[i - 1].title.slice(0, 24)), icon: 'indent', fn: () => patchTask(id, {parent_id: sib[i - 1].id})}] : []),
+    // 2.18.0 (#430): a top-level task without subtasks can become a milestone (and back)
+    ...(isMs(t) || (!t.parent_id && !children(t.id).length && t.id > 0) ? [{label: isMs(t) ? tr('Make it a normal task') : tr('Make it a milestone'), icon: 'flag', fn: () => msToggle(id)}] : []),
+    ...(i > 0 && depthOf(sib[i - 1]) < 2 && !isMs(t) && !isMs(sib[i - 1]) ? [{label: tr('Indent (under “{0}”)', sib[i - 1].title.slice(0, 24)), icon: 'indent', fn: () => patchTask(id, {parent_id: sib[i - 1].id})}] : []),
     ...(t.parent_id ? [{label: tr('Outdent'), icon: 'outdent', fn: () => patchTask(id, {parent_id: S.tasks.get(t.parent_id)?.parent_id || null})}] : []),
     ...(feat('pomo') ? [{label: tr('Start focus session'), icon: 'timer', fn: () => { pomoStart(id); go('pomo'); }}] : []),
     ...(tFor(t) ? [S.timer && S.timer.task_id === id ? {label: tr('Stop timer'), icon: 'stop', fn: timerStop} : {label: tr('Start time tracking'), icon: 'clock', fn: () => timerStart({task_id: id})},
@@ -6479,7 +6984,7 @@ function taskMenu(anchor, id) {
     ...(propBreakOk(t) ? [{label: propWith(N_('Break down with {0}…'), N_('Break down with an agent…')), icon: 'bot', fn: () => propRequest('subtasks', {tid: id})}] : []),  // 2.3.0 (#261)
     ...(t.id > 0 && !t.context && listRepos(t.list_id).length && !codeShown(t) ? [{label: tr('Link code…'), icon: 'git', title: tr('Copies a branch name for this task; commits and pull requests that name #{0} are linked too', t.id), fn: () => gitCopyBranch(t)}] : []),  // 2.4.2 (#387)
     {label: tr('Save as template'), icon: 'copy', fn: () => saveTemplate({task_id: id}, t.title)},
-    {label: tr('Duplicate'), icon: 'sub', fn: () => createTask({title: t.title, content: t.content, list_id: t.list_id, section_id: t.section_id, priority: t.priority, due: t.due, due_time: t.due_time, reminders: t.reminders, repeat: t.repeat, repeat_from: t.repeat_from, tags: t.tags, parent_id: t.parent_id, url: t.url || null, ...(t.fields && Object.keys(t.fields).length ? {fields: t.fields} : {})})},
+    {label: tr('Duplicate'), icon: 'sub', fn: () => createTask({title: t.title, content: t.content, list_id: t.list_id, section_id: t.section_id, priority: t.priority, due: t.due, due_time: t.due_time, reminders: t.reminders, repeat: t.repeat, repeat_from: t.repeat_from, tags: t.tags, parent_id: t.parent_id, url: t.url || null, ...(t.ms ? {ms: 1} : {}), ...(t.milestone_id ? {milestone_id: t.milestone_id} : {}), ...(t.fields && Object.keys(t.fields).length ? {fields: t.fields} : {})})},
     ...(t.parent_id && S.tasks.get(t.parent_id)?.parent_id ? [{label: tr('Make it a main task'), icon: 'arrow', fn: () => patchTask(id, {parent_id: null})}] : []),
     '-',
     ...(canDelete(t) ? [{label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => deleteTask(id)}] : []),
@@ -6539,7 +7044,7 @@ function vvSync() {
   st.setProperty('--vvb', Math.max(0, Math.round(window.innerHeight - vv.offsetTop - vv.height)) + 'px');  // hidden below (keyboard)
   if (vv.height >= window.innerHeight - 2 && (window.scrollY || document.documentElement.scrollTop)) window.scrollTo(0, 0);
   if (!editFocused() || !(S.vvMax > 0)) S.vvMax = vv.height;  // the height without a keyboard
-  chatFit();
+  chatFit(); tlKbSync();
   // the focused field of a sheet / the docked composer stays above the keyboard (iOS does not resize the layout)
   const a = document.activeElement;
   if (editFocused() && a && a.getBoundingClientRect && !a.closest('#view .chview')) { const r = a.getBoundingClientRect(), lim = vv.offsetTop + vv.height; if (r.bottom > lim - 4) a.scrollIntoView?.({block: 'nearest'}); }
@@ -6643,7 +7148,7 @@ async function projectNextSteps(lid) {
   let ags = [];
   if (collab()) { try { ags = (await api('GET', '/api/users')).users.filter(u => u.agent && !u.disabled); } catch { /* offline */ } }
   const md = modal(`<h3>${ic('code', 's')} ${tr('Next steps for {0}', esc(lname(listById(lid))))}</h3>
-    <div class="nsteps"><div class="nstep"><b>${tr('Connect a repository')}</b><span class="muted">${tr('GitHub, Gitea or Forgejo: pull requests, commits and CI show up at the tickets, “fixes #id” completes them.')}</span><button class="btn sm" data-m="repo">${ic('git', 's')} ${tr('Repository…')}</button></div>
+    <div class="nsteps"><div class="nstep"><b>${tr('Connect a repository')}</b><span class="muted">${tr('GitHub, GitLab, Gitea / Forgejo or Bitbucket: pull requests, commits and CI show up at the tickets, “fixes #id” completes them.')}</span><button class="btn sm" data-m="repo">${ic('git', 's')} ${tr('Repository…')}</button></div>
     ${ags.length ? `<div class="nstep"><b>${tr('Share with a coding agent')}</b><span class="muted">${tr('Optional: the agent gets the tickets of this list as events, works in the repository and asks for approval before merging.')}</span><div class="row"><select id="ns-agent" aria-label="${esc(tr('Agent'))}">${ags.map(a => `<option value="${a.id}">${esc(a.display_name)}</option>`).join('')}</select><button class="btn sm" data-m="share">${ic('bot', 's')} ${tr('Share')}</button></div></div>` : ''}</div>
     <div class="foot"><span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);
   md.classList.add('nsmodal');
@@ -6661,7 +7166,7 @@ async function projectNextSteps(lid) {
 function ticketTplModal(lid) {
   const l = listById(lid); if (!l) return;
   let cur = {}; try { cur = JSON.parse(l.ticket_tpl || '{}') || {}; } catch { /* bad json */ }
-  const def = {bug: tr('**Steps to reproduce**\n1. \n\n**Expected**\n\n**Actual**\n\n**Environment**\n'), feature: tr('**Goal**\n\n**Acceptance criteria**\n- \n')};
+  const def = {bug: tr('**Steps to reproduce**\n1. \n\n**Expected**\n\n**Actual**\n\n**Environment**\n\n**Version / found in**\n'), feature: tr('**Goal**\n\n**Acceptance criteria**\n- [ ] \n')};
   const md = modal(`<h3>${tr('Ticket templates')}</h3><div class="shint">${tr('New tickets of this type start with these notes (Markdown) when their notes are empty. Empty = the built-in text.')}</div>
     ${['bug', 'feature'].map(k => `<div class="row ppcol"><label for="tt-${k}">${ic(k === 'bug' ? 'bug' : 'bulb', 's')} ${ttName(k)}</label><textarea id="tt-${k}" rows="6" maxlength="5000" placeholder="${esc(def[k])}">${esc(cur[k] || '')}</textarea></div>`).join('')}
     <div class="foot"><button class="btn" data-m="reset">${tr('Built-in texts')}</button><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
@@ -6688,6 +7193,65 @@ async function setListKind(id, kind) {
   const l = listById(id); if (!l || (l.kind || 'list') === kind) return;
   const e = await listPatch(id, {kind}, tr('Type of {0}: {1}', qn(lname(l)), tr(LKINDS.find(x => x[0] === kind)[1])));
   if (e !== false) offerUndo(tr('Type: {0}', tr(LKINDS.find(x => x[0] === kind)[1])), e);
+}
+// 2.18.0 (#408): the project type of an existing list ('' = none), shown and changed in the list dialog (owner / list
+// admins). The server switches on what the type needs (type Project, ticket types for software, the type's view while
+// the list is empty, its modules for this person) and never deletes anything; one history step takes all of it back.
+const ptypeName = k => k ? tr(PTYPE_UI.find(x => x[0] === k)?.[1] || k) : tr('None|project type');
+const ptypeHint = k => tr(PTYPE_UI.find(x => x[0] === (k || ''))?.[3] || PTYPE_UI[0][3]);
+// the Repository area of a project: for software projects and for every list that already has a repository
+const repoShown = l => (l.ptype === 'software' && (l.kind || 'list') === 'project') || !!(l.repos || []).length;
+function ptypeRowHtml(l) {
+  const may = canManage(l), why = may ? '' : tr('Only the owner and list admins can change the project type');
+  return `<div class="row lptrow"><label for="l-ptype">${tr('Project type')}</label><select id="l-ptype" ${may ? '' : `disabled title="${esc(why)}"`}>${PTYPE_UI.map(([k, n]) => `<option value="${k}" ${(l.ptype || '') === k ? 'selected' : ''}>${k ? tr(n) : tr('None|project type')}</option>`).join('')}</select></div>
+    <div class="shint lhint" id="l-pthint">${esc(ptypeHint(l.ptype || ''))}</div><div id="l-ptoffer" aria-live="polite"></div>`;
+}
+async function setListPtype(id, pt, o = {}) {  // o.post: runs after an undo / redo (the open dialog follows)
+  const l = listById(id); if (!l) return false;
+  const old = l.ptype || '';
+  if (old === pt) return false;
+  let r; try { r = await api('PATCH', '/api/lists/' + id, {ptype: pt}); } catch { return false; }
+  await load(); render();
+  modulesOnToast(r.modules_on);
+  const prev = r.ptype_prev || {}, x = listById(id) || l;
+  const before = {ptype: old, ...prev}, after = {ptype: pt};
+  for (const k in prev) after[k] = lv(k, x[k]);  // 0 / 1 for the ticket types, as stored (the server's _prev check)
+  // list admins: only the type itself (kind / ticket types / view are the owner's settings; they stay switched on)
+  const go = (to, from) => async () => {
+    const own = isOwner(listById(id) || l), pick = o => own ? o : {ptype: o.ptype};
+    const res = await api('PATCH', '/api/lists/' + id, {...pick(to), _prev: pick(from)});
+    return {skipped: (res.conflicts || []).length ? [`${qn(lname(listById(id)) || '')}: ${tr('Project type')}`] : []};
+  };
+  const e = histAdd({label: tr('Project type of {0}: {1}', qn(lname(x)), ptypeName(pt)), undo: go(before, after), redo: go(after, before), lids: [id], post: o.post});
+  return {e, missing: r.ptype_missing || {sections: [], fields: []}};
+}
+// after a type change: offer (never force) the type's sections the list does not have yet; added = one undo step
+function ptypeOfferDraw(box, id, k, names) {
+  if (!names.length || !canEditList(id)) { box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="shint keep lhint ptoffer"><span>${esc(tr('Add the sections of {0}: {1}?', ptypeName(k), names.join(', ')))}</span>
+    <span class="ptobtns"><button type="button" class="btn sm pri" data-pto="add">${ic('plus', 's')} ${tr('Add sections')}</button><button type="button" class="btn sm" data-pto="no">${tr('No thanks')}</button></span></div>`;
+  box.onclick = async e => {
+    const b = e.target.closest('[data-pto]'); if (!b) return;
+    if (b.dataset.pto === 'no') { box.innerHTML = ''; return; }
+    b.disabled = true;
+    const made = await ptypeAddSections(id, names);
+    box.innerHTML = '';
+    if (made) $('#l-ptype', box.closest('.modal') || document)?.focus();
+  };
+}
+async function ptypeAddSections(id, names) {
+  const made = [];
+  for (const n of names) { try { made.push({id: (await api('POST', '/api/sections', {list_id: id, name: n})).id, name: n}); } catch { break; } }
+  if (!made.length) return null;
+  await load(); render();
+  const del = async () => {
+    let skip = 0;
+    for (const s of made) { const r = await api('DELETE', '/api/sections/' + s.id, {_prev: {name: s.name, tasks: []}}); if (r && r.ok === false) skip++; }
+    return {skipped: skip ? [tr('Sections of {0}', qn(lname(listById(id)) || ''))] : []};
+  };
+  const add = async () => { for (const s of made) s.id = (await api('POST', '/api/sections', {list_id: id, name: s.name})).id; return {}; };
+  offerUndo(trn('{0} section added', '{0} sections added', made.length), histAdd({label: tr('Sections of {0}', qn(lname(listById(id)) || '')), undo: del, redo: add, lids: [id]}));
+  return made;
 }
 // list settings (type, name, colour, folder, view, "move dependent tasks along", hourly rate, archived) as one history
 // step; _prev = the values after, so a setting changed elsewhere meanwhile stays. false = the request failed
@@ -6731,7 +7295,8 @@ function listMenuItems(id, anchor) {
     if (l.is_inbox && own) items.push({label: propWith(N_('Sort the inbox with {0}…'), N_('Sort the inbox with an agent…')), icon: 'bot', fn: () => propRequest('triage', {})});
     else if (!l.is_inbox && canEditList(id)) items.push({label: tr('Tasks from notes…'), icon: 'bot', fn: () => propRequest('extract', {lid: id})});
   }
-  if (own) items.push('-', ...LKINDS.map(([v, n]) => ({label: tr('Type: {0}', tr(n)), icon: LKIND_ICON[v], on: k === v, fn: () => setListKind(id, v)})));  // 2.13.0 (#453 A7): "Type: List", not a second "List"
+  // 2.13.0 (#453 A7): not a second "List"; 2.18.0 review: "As a list / As a project", "Type: Project" read like the project type
+  if (own) items.push('-', ...LKINDS.map(([v]) => ({label: v === 'project' ? tr('As a project') : tr('As a list'), icon: LKIND_ICON[v], on: k === v, fn: () => setListKind(id, v)})));
   if (collab() && l.shared) items.push({label: tr('Notifications: {0}', bellLabel(l.bell)), icon: BELL_ICON[l.bell || 'default'], fn: () => bellMenu(at(), id)});
   if (progressFor(l) && !l.is_inbox) items.push('-', progHidden(id) ? {label: tr('Show progress'), icon: 'eye', fn: () => setProgHidden(id, false)} : {label: tr('Hide progress'), icon: 'x', fn: () => setProgHidden(id, true)});
   // U12: archive (with undo) instead of delete; deleting for good only from the archive
@@ -6934,11 +7499,12 @@ function listModal(id, folder = '', o = {}) {
       ${id && own ? `<div class="lipickw"><span class="muted lipl">${tr('Or a picture')}</span>${liconPickHtml(l)}</div>` : ''}</div>
     <div class="row"><label for="l-folder">${tr('Folder')}</label><input id="l-folder" value="${esc(fDisp(l.folder))}" list="l-folders" placeholder="${esc(tr('optional · Folder / Subfolder'))}"><datalist id="l-folders">${folderNames().map(f => `<option value="${esc(fDisp(f))}">`).join('')}</datalist></div>
     <div class="row"><label for="l-view">${tr('View')}</label><select id="l-view"><option value="list">${tr('List')}</option>${feat('kanban') ? `<option value="kanban" ${l.view === 'kanban' ? 'selected' : ''}>${tr('Kanban')}</option>` : ''}${feat('timeline') ? `<option value="timeline" ${l.view === 'timeline' ? 'selected' : ''}>${tr('Timeline')}</option>` : ''}</select></div>
-    <div class="row"><label for="l-kind">${tr('Type')}</label><select id="l-kind" ${dis}>${LKINDS.map(([k, n]) => `<option value="${k}" ${(l.kind || 'list') === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
+    <div class="row"><label for="l-kind">${tr('List or project')}</label><select id="l-kind" ${dis}>${LKINDS.map(([k, n]) => `<option value="${k}" ${(l.kind || 'list') === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     <div class="shint lhint" id="l-khint">${kindHint(l.kind || 'list')}</div>
     ${id ? '' : `<div class="lptype" ${(l.kind || 'list') === 'project' ? '' : 'hidden'}><div class="ptlab">${tr('Start from')}</div><div class="ptcards" role="radiogroup" aria-label="${esc(tr('Start from'))}">${PTYPE_UI.map(([k, n, i, dsc]) => `<button type="button" class="ptcard ${k === (o.ptype || '') ? 'on' : ''}" role="radio" aria-checked="${k === (o.ptype || '')}" data-pt="${k}">${ic(i, 's')}<b>${tr(n)}</b><small class="muted">${tr(dsc)}</small></button>`).join('')}${tplOf('list').map(tp => `<button type="button" class="ptcard" role="radio" aria-checked="false" data-pt="tpl:${tp.id}">${ic('copy', 's')}<b>${esc(tp.name)}</b><small class="muted" data-ptd="${tp.id}">${tr('Your template')}</small></button>`).join('')}</div>
       <div class="ptdates" hidden><div class="row"><label>${tr('Project start')}</label>${dateIn('l-pstart', today(), {label: tr('Project start'), clear: false})}</div><div class="row"><label>${tr('End (optional)')}</label>${dateIn('l-pend', '', {label: tr('End (optional)'), empty: tr('none')})}<span class="muted">${tr('stretches or squeezes the dates')}</span></div></div></div>`}
     <div class="kproj" ${(l.kind || 'list') === 'project' ? '' : 'hidden'}>
+    ${id && !l.is_inbox ? ptypeRowHtml(l) : ''}
     ${own && !l.is_inbox ? `<div class="row"><label>${tr('Ticket types')}</label><label class="chkl"><input type="checkbox" id="l-tickets" ${l.tickets ? 'checked' : ''}> ${tr('Bug, feature, task')}</label>${id ? `<button class="btn sm" data-m="tt-tpl" type="button">${tr('Templates…')}</button>` : ''}</div>
     <div class="shint lhint">${tr('Tasks get a type with an icon, a filter and quick add !bug / !feature; new bugs and features start with a note template.')}</div>` : ''}
     ${id && progressOn() ? `<div class="row"><label>${tr('Progress')}</label><label class="chkl"><input type="checkbox" id="l-showprog" ${progHidden(id) ? '' : 'checked'}> ${tr('Show the progress bar')}</label><span class="muted">${tr('only for you')}</span></div>` : ''}
@@ -6949,7 +7515,7 @@ function listModal(id, folder = '', o = {}) {
     ${id && own && depsOn() ? `<div class="row"><label>${tr('Dependencies')}</label><label class="chkl"><input type="checkbox" id="l-depshift" ${l.dep_shift ? 'checked' : ''}> ${tr('Move dependent tasks along')}</label></div>
     <div class="shint lhint">${tr('When a task is postponed, the tasks of this list that wait on it and would now start too early move by the same number of days (also in the timeline). One undo takes the whole chain back.')}</div>` : ''}
     ${id && own && fieldsOn() ? `<h4 title="${esc(tr('Own columns for this list: budget, stage, client, …'))}">${tr('Custom fields')}</h4><div class="members" id="l-fields">${fieldsBox(id)}</div>` : id && fieldsOf(id).length ? `<h4>${tr('Custom fields')}</h4><div class="muted mhint">${esc(fieldsOf(id).map(f => f.name).join(', '))} · ${tr('only the owner can change them')}</div>` : ''}
-    ${id && !l.is_inbox && (l.kind || 'list') === 'project' ? repoBoxHtml(l) : ''}
+    ${id && !l.is_inbox && (l.kind || 'list') === 'project' ? `<div class="lrepo" ${repoShown(l) ? '' : 'hidden'}><div class="shint keep lhint lrepohint" hidden>${ic('git', 's')} ${tr('Connect a repository (optional)')}</div>${repoBoxHtml(l)}</div>` : ''}
     </div>
     ${id && !l.is_inbox && (l.kind || 'list') !== 'project' && (l.repos || []).length ? repoBoxHtml(l) : ''}
     ${own ? `<div class="row ldabrow"><label>${tr('Completed')}</label><label class="chkl"><input type="checkbox" id="l-dab" ${l.checklist ? 'checked' : ''}> ${tr('Show completed at the bottom')}</label></div>
@@ -6988,6 +7554,7 @@ function listModal(id, folder = '', o = {}) {
     el.classList.add('on'); el._e = e;
     clearTimeout(el._t); el._t = setTimeout(() => { el.classList.remove('on'); el._e = null; }, 6000);
   };
+  let ptKeys = false, ptPend = false, ptRun = Promise.resolve();  // 2.18.0 review (R1): project type select, see ptCommit
   const lsync = (force = false) => {  // after an undo / redo or a failed save: the dialog shows what is saved
     if (!md.isConnected) return;
     const x = listById(id); if (!x) return;
@@ -6999,6 +7566,8 @@ function listModal(id, folder = '', o = {}) {
     $$('#l-col button', md).forEach(b => { b.classList.toggle('on', (x.color || '') === b.dataset.c); b.setAttribute('aria-pressed', String((x.color || '') === b.dataset.c)); });
     if ($('#l-depshift', md)) $('#l-depshift', md).checked = !!x.dep_shift;
     if ($('#l-tickets', md)) $('#l-tickets', md).checked = !!x.tickets;
+    if ($('#l-ptype', md) && !ptPend) { $('#l-ptype', md).value = x.ptype || ''; $('#l-pthint', md).textContent = ptypeHint(x.ptype || ''); }
+    if ($('.lrepo', md)) $('.lrepo', md).hidden = !repoShown(x);
     if ($('#l-rate', md) && document.activeElement !== $('#l-rate', md)) $('#l-rate', md).value = x.rate != null ? String(x.rate).replace('.', LOCALE().startsWith('de') ? ',' : '.') : '';
     if ($('#l-dayh', md) && document.activeElement !== $('#l-dayh', md)) $('#l-dayh', md).value = x.day_hours != null ? String(x.day_hours).replace('.', LOCALE().startsWith('de') ? ',' : '.') : '';
     if ($('#l-nag', md)) $('#l-nag', md).value = x.nag || '';
@@ -7029,9 +7598,43 @@ function listModal(id, folder = '', o = {}) {
   }
   md.addEventListener('change', e => {
     if (e.target.id === 'l-kind') { const k = e.target.value; $('#l-khint', md).innerHTML = kindHint(k); $('.kproj', md).hidden = k !== 'project'; if ($('.lptype', md)) $('.lptype', md).hidden = k !== 'project'; if (id) autosave(); return; }
+    if (id && e.target.id === 'l-ptype') {
+      // 2.18.0 review (R1): arrow keys on a closed select fire "change" for every value passed; while the keyboard
+      // walks the options only the hint follows, the type is saved once on Enter / leaving the field
+      if (ptKeys) { ptPend = true; $('#l-pthint', md).textContent = ptypeHint(e.target.value); return; }
+      ptypeChange(e.target.value); return;
+    }
     if (id && ['l-view', 'l-depshift', 'l-tickets', 'l-nag', 'l-dab'].includes(e.target.id)) { autosave(); return; }
     if (id && e.target.id === 'l-showprog') { setProgHidden(id, !e.target.checked).then(() => lsaved(null)); return; }
   });
+  // 2.18.0 (#408): the project type of an existing list: saved at once (one history step), then the dialog shows what
+  // the server switched on, offers the type's missing sections and, for Software, the repository area
+  const ptCommit = () => { const sel = $('#l-ptype', md); ptKeys = false; if (!ptPend || !sel) return; ptPend = false; ptypeChange(sel.value); };
+  md.addEventListener('keydown', e => {
+    if (e.target.id !== 'l-ptype') return;
+    if (e.key === 'Enter') { if (ptPend) { e.preventDefault(); ptCommit(); } return; }
+    // walking a CLOSED select (Alt+arrows / Space open the option list: its choice comes as one change)
+    ptKeys = !e.altKey && (/^(Arrow(Up|Down|Left|Right)|Home|End|Page(Up|Down))$/.test(e.key) || (e.key.length === 1 && e.key !== ' '));
+  });
+  md.addEventListener('pointerdown', e => { if (e.target.id === 'l-ptype') ptKeys = false; });
+  md.addEventListener('focusout', e => { if (e.target.id === 'l-ptype') ptCommit(); });
+  if (id) onRemove(md, () => { const sel = $('#l-ptype', md); if (ptPend && sel) { ptPend = false; setListPtype(id, sel.value); } });  // closed while walking the options: still saved once
+  // changes run one after the other; a change superseded meanwhile is skipped, so the offer always matches the type shown
+  const ptypeChange = v => (ptRun = ptRun.then(() => { const sel = $('#l-ptype', md); if (md.isConnected && sel && sel.value === v) return ptypeChange1(v); }).catch(() => {}));
+  const ptypeChange1 = async v => {
+    await autosave();
+    const sel = $('#l-ptype', md), r = await setListPtype(id, v, {post: () => lsync()});
+    if (!md.isConnected) return;
+    if (!r) { lsync(); return; }
+    lsaved(r.e); lsync(); drawFields();
+    const off = $('#l-ptoffer', md);
+    if (off) ptypeOfferDraw(off, id, v, r.missing?.sections || []);
+    if (v === 'software' && $('.lrepo', md)) {
+      $('.lrepohint', md).hidden = false;
+      $('.lrepo', md).scrollIntoView?.({block: 'nearest'});
+    }
+    sel?.focus();
+  };
   const drawFields = () => { const box = $('#l-fields', md); if (box) box.innerHTML = fieldsBox(id); };
   md.addEventListener('click', async e => {
     const b = e.target.closest('button'); if (!b) return;
@@ -7171,10 +7774,9 @@ function orphWire(md) {
   });
 }
 // Settings > Appearance: all per-device visual settings, applied instantly (no Save), with a live preview
-const LOOK_KEYS = ['theme', 'density', 'densitySide', 'densityRows', 'fsize', 'font', 'accent'];
+const LOOK_KEYS = ['theme', 'density', 'densitySide', 'densityRows', 'densSideV', 'densRowsV', 'fsize', 'font', 'accent'];  // 2.18.0: densSideV / densRowsV
 const THEMES = [['auto', N_('Automatic')], ['dark', N_('Dark')], ['light', N_('Light')]];
 const DENSITIES = [['compact', N_('Compact')], ['comfortable', N_('Comfortable')], ['custom', N_('Custom|density')]];
-const DENS2 = [['compact', N_('Compact')], ['comfortable', N_('Comfortable')]];
 const FSIZE_ORDER = ['s', 'm', 'l', 'xl'];
 const zPct = z => `${Math.round(z * 100)} %`;
 function lookHtml() {
@@ -7190,9 +7792,8 @@ function lookHtml() {
     <div class="row">${seg('theme', THEMES)}</div>
     <h4>${tr('Density')}</h4>
     <div class="row">${seg('density', DENSITIES)}</div>
-    ${densityMode() === 'custom' ? `<div class="row lkdens"><span class="lkdl" id="s-dside-l">${tr('Sidebar')}</span>${seg('densitySide', DENS2).replace('role="group"', 'role="group" aria-labelledby="s-dside-l"')}</div>
-    <div class="row lkdens"><span class="lkdl" id="s-drows-l">${tr('Task rows')}</span>${seg('densityRows', DENS2).replace('role="group"', 'role="group" aria-labelledby="s-drows-l"')}</div>` : ''}
-    <div class="shint">${tr('Compact fits more lists and tasks on the screen; comfortable has more room. Custom: the sidebar and the task rows each on their own. Touch targets stay 44 px. Default: comfortable on phones, compact on computers.')}</div>
+    ${densityMode() === 'custom' ? ['side', 'rows'].map(k => `<div class="row lkdens"><label class="lkdl" for="s-dens-${k}">${k === 'side' ? tr('Sidebar row spacing') : tr('Task row spacing')}</label><span class="lkA" aria-hidden="true">${tr('tight|spacing')}</span><input type="range" id="s-dens-${k}" data-dens="${k}" min="0" max="100" step="1" value="${densV(k)}" aria-valuetext="${densV(k)} %"><span class="lkA" aria-hidden="true">${tr('airy|spacing')}</span><output id="s-dens-${k}-v" for="s-dens-${k}">${densV(k)} %</output></div>`).join('') : ''}
+    <div class="shint">${tr('Compact fits more lists and tasks on the screen; comfortable has more room. Custom: a slider each for the spacing of the sidebar and of the task rows. Touch targets stay 44 px. Default: comfortable on phones, compact on computers.')}</div>
     <h4>${tr('Font size')}</h4>
     <div class="row lkfs"><span class="lkA" aria-hidden="true">A</span><input type="range" id="s-fsize" min="${FS_MIN}" max="${FS_MAX}" step="5" value="${fsPct()}" aria-label="${esc(tr('Font size'))}" aria-valuetext="${fsPct()} %"><span class="lkA lkA2" aria-hidden="true">A</span><output id="s-fsv" for="s-fsize">${fsPct()} %</output><button class="btn sm" data-m="fs-reset" ${fsPct() === 100 ? 'disabled' : ''}>${tr('Reset (100 %)')}</button></div>
     <div class="shint">${tr('Scales the whole interface: text, rows, icons, spacing and dialogs.')}</div>
@@ -7639,8 +8240,8 @@ function settingsModal(focus) {
       <div class="row"><div class="seg" id="s-lang" role="group" aria-labelledby="s-lang-h">${(S.languages || []).map(L => `<button data-lang-set="${esc(L.code)}" class="${(s.lang || 'en') === L.code ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div></div>
       ${hint(tr('Applies to all devices and to the notifications. Quick add understands English, German and the language chosen here.'))}
       <h4>${tr('Celebrations')}</h4>
-      <div class="row"><label>${tr('Sloth')}</label>${chk('s-celebrate', s.celebrate !== '0', tr('Celebrate completions'))}</div>
-      ${hint(tr('When Today is cleared or a list or project is complete, the sloth swings by with a one-liner. With reduced motion (system setting) it just says hello.'))}
+      <div class="row"><label>${tr('Celebrations')}</label>${chk('s-celebrate', s.celebrate !== '0', tr('Celebrate completions'))}</div>
+      ${hint(tr('When Today is cleared or a list or project is complete, the heron swings by with a one-liner. With reduced motion (system setting) it just says hello.'))}
       <h4 id="s-dates-h">${tr('Date and reminders')}</h4>
       <div class="row"><label>${tr('Changes')}</label>${chk('s-dateok', s.date_confirm === '1', tr('Confirm changes with OK'))}</div>
       ${hint(tr('Off: a new day, time, start, repeat or reminder is saved as soon as you pick it; “Undo” in the message takes the whole change back. On: changes wait for OK.'))}
@@ -7742,6 +8343,9 @@ function settingsModal(focus) {
     $('[data-snmore]', md).addEventListener('click', () => nav.scrollBy({left: nav.clientWidth * .7, behavior: reducedMotion() ? 'auto' : 'smooth'}));
     nav.addEventListener('scroll', () => snavMore(nav), {passive: true}); setTimeout(() => snavMore(nav), 0); }
   // 2.13.0 (#429): the font size slider applies live while it moves; the views drawn in px follow when it is let go
+  // 2.18.0 (#642): the two spacing sliders of "Custom" apply live while dragging (per device)
+  md.addEventListener('input', e => { const k = e.target.dataset?.dens; if (!k) return; const v = +e.target.value;
+    LS.set(k === 'side' ? 'densSideV' : 'densRowsV', v); applyDensity(); e.target.setAttribute('aria-valuetext', v + ' %'); const o = $(`#s-dens-${k}-v`, md); if (o) o.textContent = v + ' %'; });
   md.addEventListener('input', e => { if (e.target.id !== 's-fsize') return; const v = +e.target.value; if (v === 100) LS.del('fsize'); else LS.set('fsize', v); applyLook(); fsLabel(v); });
   md.addEventListener('change', e => { if (e.target.id === 's-fsize' && S.settings) render(); });
   if (focus === 'tabbar') setTimeout(() => $('#s-tabbar-h', md)?.scrollIntoView({block: 'start'}), 0);
@@ -8637,7 +9241,7 @@ function pubWire(md, lid) {
 
 // ------------------------------------------------------------------ account, users (admin), login
 // settings sections: own account (name, password, upload token, log out) + user admin for admins
-// 1.9.0: profile picture in Settings > Account: a preset sloth, an own photo (cropped square here, resized on the server)
+// 1.9.0: profile picture in Settings > Account: a preset picture, an own photo (cropped square here, resized on the server)
 // or none (initials). Shown wherever the initials were: sidebar, assignees, comments, News, members.
 const AV_PRESETS = [['coffee', N_('Coffee')], ['headphones', N_('Headphones')], ['camera', N_('Camera')], ['sleepy', N_('Sleepy')], ['laptop', N_('Laptop')],
   ['plant', N_('Plant')], ['robot', N_('Robot')], ['shades', N_('Sunglasses')], ['party', N_('Party')], ['glasses', N_('Reading')]];
@@ -8757,12 +9361,13 @@ const NOTIF_ROWS = [
   ['nag', N_('Repeated reminders'), N_('until the task is done; not during your quiet hours')],  // 2.7.0 (#413)
   ['usage', N_('An agent reached a usage limit'), N_('admins: 80 % and 100 % of a limit'), 'admin'],  // 2.1.1 (#326)
   ['proposal', N_('A proposal I asked an agent for is ready'), '', 'propose'],  // 2.3.0: only with an agent I may ask
-  ['chat', N_('Team chat'), N_('direct messages; in channels only when you are mentioned (or the list bell is “All”)')]];  // 2.17.0 (#419)
+  ['chat', N_('Team chat'), N_('direct messages; in channels only when you are mentioned (or the list bell is “All”)')],  // 2.17.0 (#419)
+  ['errreport', N_('New error reports'), N_('a new error from a project list’s error-report webhook became a ticket (repeats stay quiet)')]];  // 2.18.0
 const NM_GROUP = {comment: 'comment', reply: 'comment', follow: 'comment', mention: 'mention', assign: 'assign', complete: 'complete', status: 'status', share: 'share', unblock: 'unblock'};
 const NM_PRIMARY = ['comment', 'mention', 'assign', 'complete', 'status', 'share', 'unblock'];
-const NM_NEWS_NEW = {newtask: 0, approval: 0, followup: 1, usage: 1, proposal: 1};
-const NM_PUSH = {comment: 1, reply: 1, follow: 1, mention: 1, assign: 1, newtask: 0, complete: 1, status: 0, share: 0, unblock: 1, approval: 1, followup: 1, reminder: 1, usage: 1, proposal: 1, nag: 1, chat: 1};
-const NM_SOCIAL = ['comment', 'reply', 'follow', 'mention', 'assign', 'newtask', 'complete', 'status', 'share', 'unblock', 'approval', 'proposal', 'chat'];
+const NM_NEWS_NEW = {newtask: 0, approval: 0, followup: 1, usage: 1, proposal: 1, errreport: 1};
+const NM_PUSH = {comment: 1, reply: 1, follow: 1, mention: 1, assign: 1, newtask: 0, complete: 1, status: 0, share: 0, unblock: 1, approval: 1, followup: 1, reminder: 1, usage: 1, proposal: 1, nag: 1, chat: 1, errreport: 1};
+const NM_SOCIAL = ['comment', 'reply', 'follow', 'mention', 'assign', 'newtask', 'complete', 'status', 'share', 'unblock', 'approval', 'proposal', 'chat', 'errreport'];
 const nmStored = s => { try { const o = JSON.parse(s.notify || '{}'); return o && typeof o === 'object' ? o : {}; } catch { return {}; } };
 function notifMatrix(s) {
   const nk = new Set(String(s.news_kinds ?? 'mention,assign,comment,unblock,share,status').split(',')), o = nmStored(s), out = {};
@@ -10494,7 +11099,7 @@ function viewProjOv() {
   const ed = S.povEdit === l.id;
   const desc = ed ? `<textarea id="pov-desc-in" rows="8" maxlength="20000" placeholder="${esc(tr('Goal, scope, contacts, where things are…'))}">${esc(S.drafts['pov:' + l.id] ?? j.description)}</textarea>
       <div class="povbar"><span class="muted">${tr('Markdown')}</span><span class="spacer"></span><button class="btn" data-pov="desc-cancel">${tr('Cancel')}</button><button class="btn pri" data-pov="desc-save">${tr('Save')}</button></div>`
-    : j.description ? `<div class="md povmd">${renderMd(j.description).replace(/<input type="checkbox"/g, '<input type="checkbox" disabled')}</div>`
+    : j.description ? `<div class="md povmd">${renderMd(j.description, false, {lid: l.id}).replace(/<input type="checkbox"/g, '<input type="checkbox" disabled')}</div>`
       : `<div class="muted povempty">${can ? tr('No description yet. What is this project about, what is the goal?') : tr('No description yet.')}</div>`;
   let h = povSec('desc', tr('Description'), desc, can && !ed ? `<button class="btn sm" data-pov="desc-edit">${ic('edit', 's')}<span>${tr('Edit')}</span></button>` : '');
   // status updates (with collaboration: the existing project status + its history)
@@ -10505,8 +11110,8 @@ function viewProjOv() {
   }
   // milestones
   const ms = j.milestones.map(m => `<div class="povm ${m.done ? 'done' : m.day < t0 ? 'over' : ''}">
-      <button class="chk ${m.done ? 'on' : ''}" data-pov="ms-done" data-id="${m.id}" role="checkbox" aria-checked="${m.done}" aria-label="${esc(tr('Reached: {0}', m.name))}" ${can ? '' : 'disabled'}>${m.done ? ic('check') : ''}</button>
-      <span class="pmn">${ic('flag', 's')}<span>${esc(m.name)}</span></span><span class="pmd">${esc(fmtDateLoc(m.day))}</span>
+      <button class="chk ms ${m.done ? 'on' : ''}" data-pov="ms-done" data-id="${m.id}" role="checkbox" aria-checked="${m.done}" aria-label="${esc(tr('Reached: {0}', m.name))}" ${can ? '' : 'disabled'}>${m.done ? ic('check') : ''}</button>
+      <span class="pmn">${S.tasks.has(m.id) ? `<button type="button" class="linkbtn" data-pov="ms-open" data-id="${m.id}" title="${esc(tr('Open the milestone'))}"><span>${esc(m.name)}</span></button>` : `<span>${esc(m.name)}</span>`}</span><span class="pmd">${esc(m.day ? fmtDateLoc(m.day) : tr('No date'))}</span>
       ${can ? `<button class="iconbtn" data-pov="ms-edit" data-id="${m.id}" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit'))}">${ic('edit', 's')}</button>` : ''}</div>`).join('');
   const msMain = povSec('ms', tr('Milestones'), ms || `<div class="muted povempty">${tr('No milestones yet. They also show in the timeline.')}</div>`, can ? `<button class="btn sm" data-pov="ms-add">${ic('plus', 's')}<span>${tr('Add milestone')}</span></button>` : '');
   // files
@@ -10604,6 +11209,7 @@ document.addEventListener('click', async e => {
     case 'link-up': { const ids = j.links.map(x => x.id), i = ids.indexOf(id); if (i > 0) { [ids[i - 1], ids[i]] = [ids[i], ids[i - 1]]; try { await povApi('PUT', `/api/lists/${l.id}/links/order`, {ids}); } catch { /* shown */ } } break; }
     case 'ms-add': povMsModal(l, null); break;
     case 'ms-edit': povMsModal(l, j.milestones.find(x => x.id === id)); break;
+    case 'ms-open': openDetail(id); break;  // 2.18.0 (#430): milestones are tasks (progress, burndown, release notes there)
     case 'ms-done': { const m = j.milestones.find(x => x.id === id); if (!m) break; try { await povApi('PATCH', `/api/lists/${l.id}/milestones/${id}`, {done: !m.done}); } catch { return; } await load(); render(); break; }
     case 'file-del': { const f = j.files.find(x => x.id === id); if (!f || !await askConfirm(tr('Delete “{0}”?', f.name), tr('The file is removed for everyone in this project.'), {ok: tr('Delete'), danger: true})) break; try { await povApi('DELETE', `/api/list-files/${id}`); } catch { /* shown */ } break; }
     case 'pl-add': plSearchModal(0, {linked: new Set(j.paperless.filter(p => !p.hidden).map(p => `${p.conn || 0}:${p.doc_id}`)), pick: async (doc, conn) => { await povApi('POST', `/api/lists/${l.id}/paperless`, {doc_id: doc, conn}); }}); break;
@@ -10904,6 +11510,7 @@ async function submitQuick(input, extra = {}) {
     tags: [...(d.tags || []), ...(r.tags || [])], repeat: r.repeat || '', section_id: d.section_id, content: d.content || ''};
   if (url) body.url = url;
   if (r.ttype) body.ttype = r.ttype;  // 2.4.0 (#340): !bug / !feature / !task
+  if (r.ms || d.ms) body.ms = 1;  // 2.18.0 (#430): !milestone
   if (d.assignee_id && !r.list_id) body.assignee_id = d.assignee_id;
   if (body.due_time && S.settings.default_reminder !== '') body.reminders = S.settings.default_reminder;
   input.value = ''; S.quick.ignore = new Set(); updateChips(input);
@@ -11013,6 +11620,8 @@ document.addEventListener('click', async e => {
   if (cb) { e.stopPropagation(); if (canEdit(taskById(S.sel))) toggleMdCheckbox(+cb.dataset.mdline); else { e.preventDefault(); roToast(); } return; }
   const mcd = e.target.closest('[data-mcard]');  // 2.4.2 (#389): a mention opens its card (also inside the description)
   if (mcd) { e.preventDefault(); e.stopPropagation(); mentionCard(mcd); return; }
+  const mcp = e.target.closest('.md [data-mdcopy]');  // 2.18.0 (#408 G): "Copy" of a code block (never opens the editor)
+  if (mcp) { e.preventDefault(); e.stopPropagation(); copyText(mcp.closest('.mdcode')?.querySelector('pre')?.textContent || ''); return; }
   if (e.target.closest('#d-md') && !e.target.closest('a')) { if (canEdit(taskById(S.sel))) editContent(); return; }
   const cev = e.target.closest('#view [data-cev]');
   if (cev) { cevPop(cev, +cev.dataset.cev); return; }
@@ -11079,10 +11688,12 @@ document.addEventListener('click', async e => {
     case 'git-undo': gitUndo(+a.dataset.id); break;
     case 'git-refresh': gitRefresh(+a.dataset.lid); break;
     case 'git-branch': { const t = taskById(+a.dataset.id); if (t) gitCopyBranch(t); break; }
+    case 'git-ref': { const t = taskById(+a.dataset.id); if (t) copyText(gitRef(t)); break; }
     case 'ltag-rm': { const t = taskById(S.sel); patchTask(t.id, {ltags: (t.ltags || []).filter(g => g !== a.dataset.tag)}); break; }
     case 'tag-promote': tagPromote(taskById(S.sel), a.dataset.tag); break;
     case 'open': if (!swiped) openDetail(id); break;
     case 'open-id': openDetail(id); break;
+    case 'dup-x': { DUP_OFF ||= new Set(LS.get('dupOff', [])); DUP_OFF.add(id); LS.set('dupOff', [...DUP_OFF].slice(-100)); a.closest('.ddup')?.remove(); $('#d-title')?.focus(); break; }
     case 'crumb': crumbGo(a.dataset.k, a.dataset.id); break;  // 2.7.2 (#424)
     case 'chat-react': e.stopPropagation(); chatReact(+a.dataset.mid, a.dataset.e); break;  // 2.7.2 (#421)
     case 'tv-stop': timerStop(); break;
@@ -11199,6 +11810,8 @@ document.addEventListener('click', async e => {
     case 'tl-order': cmtOrderToggle(); break;  // 2.4.2 (#386)
     case 'tl-act': LS.set('showActivity', !showAct()); a.classList.toggle('on', showAct()); a.setAttribute('aria-pressed', showAct()); $('span', a).textContent = showAct() ? tr('With activity') : tr('Comments only'); drawTimeline(); break;
     case 'md-subtasks': mdToSubtasks(); break;
+    case 'ms-open': openDetail(+a.dataset.id); break;  // 2.18.0 (#430): a task of the milestone
+    case 'ms-copy': { const md = S.msr?.j?.release_notes; if (!md) break; try { await navigator.clipboard.writeText(md); toast(tr('Copied')); } catch { toast(tr('Copy failed')); } break; }
     case 'md-more': { (S.mdMore ||= new Set()); S.mdMore.has(S.sel) ? S.mdMore.delete(S.sel) : S.mdMore.add(S.sel); const m = $('#d-md'), open = S.mdMore.has(S.sel); if (m) m.classList.toggle('clamp', !open); a.textContent = open ? tr('Show less') : tr('Show more'); a.setAttribute('aria-expanded', open); break; }
     case 'd-tab': { LS.set('dTab', a.dataset.tab); const b = $('#detail .dbody'); if (b) b.classList.toggle('dtab-c', a.dataset.tab === 'comments'); $$('#detail .dtabs button').forEach(x => { x.classList.toggle('on', x === a); x.setAttribute('aria-selected', x === a); }); if (a.dataset.tab === 'comments') $('#d-tl-items')?.lastElementChild?.scrollIntoView({block: 'nearest'}); break; }
     case 'sec-add': e.stopPropagation(); secAddOpen(+a.dataset.sec || 0); break;
@@ -11264,6 +11877,11 @@ document.addEventListener('click', async e => {
     case 'rm-lists': rmListsPop(a); break;
     case 'tl-pick-list': { const f = S.tlPick?.from; S.tlPick = null; renderView(); if (f) depPicker(f, 'blocking'); break; }
     case 'tl-nd': { const lid = routeList()?.id || null, o = LS.get('tlnd', {}) || {}; o[tlNdKey(lid)] = !tlNdOn(lid); LS.set('tlnd', o); renderView(); break; }
+    // 2.18.0 (#462 / #431): section folds of the timeline / roadmap, "+" (new task in that row), the inline field's buttons
+    case 'tl-secfold': { const k = a.dataset.key; S.collapsed.has(k) ? S.collapsed.delete(k) : S.collapsed.add(k); LS.set('collapsed', [...S.collapsed]); renderView(); $(`.tl-secb[data-key="${rmEsc(k)}"]`)?.focus({preventScroll: true}); break; }
+    case 'tl-add': tlAddAt(a); break;
+    case 'tl-new-ok': tlNewSave(); break;
+    case 'tl-new-x': tlNewEnd(true); break;
     case 'collapse-tl': { const k = a.dataset.key; S.collapsed.has(k) ? S.collapsed.delete(k) : S.collapsed.add(k); LS.set('collapsed', [...S.collapsed]); renderView(); break; }
     case 'tl-prev': case 'tl-next': S.tlStart = addDays(S.tlStart, act === 'tl-next' ? 14 : -14); renderView(); break;
     case 'tl-today': S.tlStart = addDays(weekStartOf(today()), -7); { const tl = $('#tlscroll'); renderView(); const n = $('#tlscroll'); if (n) n.scrollLeft = 5 * tlDW(); } break;
@@ -11330,6 +11948,12 @@ document.addEventListener('click', async e => {
     case 'mb-tomorrow': batch('patch', {due: addDays(today(), 1)}); break;
     case 'mb-prio': menu(a, [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', cls: p ? 'flag-' + p : '', fn: () => batch('patch', {priority: p})}))); break;
     case 'mb-list': menu(a, S.lists.filter(l => !l.archived && canEditList(l.id)).map(l => ({label: lname(l), fn: () => batch('patch', {list_id: l.id, section_id: null})}))); break;
+    case 'mb-ms': {  // 2.18.0 (#430): the selected tasks (one list) into one of its open milestones, or out
+      const lid = msBulkList(); if (!lid) break;
+      menu(a, [...msOfList(lid).filter(m => m.status === 0).map(m => ({label: m.title + (m.due ? ' · ' + fmtDateLoc(m.due) : ''), icon: 'flag', fn: () => batch('patch', {milestone_id: m.id}, false, undefined, tr('Milestone: {0}', m.title))})),
+        '-', {label: tr('No milestone'), icon: 'x', fn: () => batch('patch', {milestone_id: null}, false, undefined, tr('Milestone removed'))}]);
+      break;
+    }
     case 'mb-tag': { const g = await askPrompt(tr('Add tag'), '', {ok: tr('Add')}); if (g && g.trim()) batch('patch', {add_tags: [g.trim().replace(/^#/, '')]}); break; }
     case 'mb-pin': batch('patch', {pinned: [...S.multi].every(i => S.tasks.get(i)?.pinned) ? 0 : 1}); break;
     case 'mb-done': {
@@ -11393,6 +12017,8 @@ document.addEventListener('change', async e => {
   if (t.id === 'd-url') { saveLink(t.value); return; }
   if (t.id === 'd-list') patchUndoable(S.sel, {list_id: +t.value}, tr('Moved to {0}', lname(listById(+t.value))));
   if (t.id === 'd-sec') patchTask(S.sel, {section_id: t.value ? +t.value : null});
+  if (t.id === 'd-ms') { msToggle(S.sel, t.checked); return; }  // 2.18.0 (#430)
+  if (t.id === 'd-msel') { const m = t.value ? S.tasks.get(+t.value) : null; patchUndoable(S.sel, {milestone_id: m ? m.id : null}, m ? tr('Milestone: {0}', m.title) : tr('Milestone removed')); return; }
   if (t.id === 'd-ttype') patchUndoable(S.sel, {ttype: t.value}, t.value ? tr('Type: {0}', ttName(t.value)) : tr('Type removed'));  // 2.4.0 (#340)
   if (t.id === 'd-assignee') patchTask(S.sel, t.value.startsWith('g:') ? {assignee_group_id: +t.value.slice(2), assignee_id: null}
     : {assignee_id: t.value ? +t.value : null, ...(taskById(S.sel)?.assignee_group_id ? {assignee_group_id: null} : {})});  // 2.10.0 (#441)
@@ -11457,7 +12083,7 @@ document.addEventListener('focusout', e => {
   if (e.target.id === 'd-content' && e.target.value.trim()) {  // back to the rendered markdown
     const t = taskById(S.sel); if (t) t.content = e.target.value;
     S.editContent = false;
-    const md = $('#d-md'); if (md) { md.innerHTML = mdMentions(renderMd(e.target.value), taskById(S.sel)); md.classList.remove('hidden'); e.target.classList.add('hidden'); }
+    const md = $('#d-md'); if (md) { md.innerHTML = mdMentions(renderMd(e.target.value, false, {lid: taskById(S.sel)?.list_id}), taskById(S.sel)); md.classList.remove('hidden'); e.target.classList.add('hidden'); }
   }
 });
 function editContent() {
@@ -11471,7 +12097,7 @@ function toggleMdCheckbox(i) {
   lines[i] = lines[i].replace(/\[( |x|X)\]/, m => m === '[ ]' ? '[x]' : '[ ]');
   const was = t.content;
   t.content = lines.join('\n');
-  $('#d-content').value = t.content; $('#d-md').innerHTML = mdMentions(renderMd(t.content), t);
+  $('#d-content').value = t.content; $('#d-md').innerHTML = mdMentions(renderMd(t.content, false, {lid: t.list_id}), t);
   HIST.sess++;
   queueSave(t.id, 'content', t.content, was);
 }
@@ -11492,7 +12118,7 @@ function renderMultiBar() {
   // 2.13.0 (#453 A14): every action has its label; a phone shows the four common ones and "More" (the bar used to be 11
   // bare icons, the last one cut off)
   const A = [['mb-today', 'sun', tr('Today')], ['mb-tomorrow', 'sunrise', tr('Tomorrow')], ['mb-date', 'cal', tr('Date')], ['mb-prio', 'flag', tr('Priority')], ['mb-list', 'folder', tr('List')],
-    ['mb-tag', 'tag', tr('Add tag')], ['mb-pin', 'pin', tr('Pin')], ['mb-done', 'done', tr('Completed')], ['mb-del', 'trash', tr('Delete'), 'danger'],
+    ['mb-tag', 'tag', tr('Add tag')], ...(msBulkList() ? [['mb-ms', 'flag', tr('Set milestone')]] : []), ['mb-pin', 'pin', tr('Pin')], ['mb-done', 'done', tr('Completed')], ['mb-del', 'trash', tr('Delete'), 'danger'],
     ...(propInboxSel() ? [['mb-sort', 'bot', propWith(N_('Sort with {0}…'), N_('Sort with an agent…'))]] : [])];
   const MAIN = ['mb-today', 'mb-date', 'mb-list', 'mb-done'], mob = isMobile();
   const btn = ([act, i, lab, cls], hid) => `<button class="mbb ${cls || ''} ${hid ? 'mbh' : ''}" data-act="${act}" data-ico="${i}" title="${esc(lab)}" aria-label="${esc(lab)}" ${hid ? 'hidden' : ''}>${ic(i, 's')}<span class="mbl">${esc(lab)}</span></button>`;
@@ -12394,7 +13020,7 @@ const SHORTCUTS_ALL = [
   [N_('Multi-select'), [['Mod+A', N_('Select all tasks of the view')], ['Shift+↓', N_('Extend the selection down (or Shift+J)')], ['Shift+↑', N_('Extend the selection up (or Shift+K)')], ['Shift+X', N_('Select or unselect the task')],
     ['Space', N_('Complete the selected tasks (or X)')], ['m', N_('Move the selected tasks to a list')], ['d', N_('Change the date of the selected tasks')], ['Esc', N_('Clear the selection')]]],
   [N_('Calendar'), [['1', N_('Month')], ['2', N_('Week')], ['3', N_('Day')], ['4', N_('Timeline')], ['←', N_('Previous period')], ['→', N_('Next period')], ['.', N_('Jump to today')]]],
-  [N_('Timeline'), [['Tab', N_('Focus a bar')], ['c', N_('Connect to the task that waits on it')], ['Shift+F10', N_('Bar menu')], ['Esc', N_('Cancel connecting')]]],
+  [N_('Timeline'), [['Tab', N_('Focus a bar')], ['c', N_('Connect to the task that waits on it')], ['Shift+F10', N_('Bar menu')], ['d', N_('Pick a date…')], ['Esc', N_('Cancel connecting')]]],
   [N_('Go to'), [['g t', N_('Today')], ['g m', N_('Tomorrow')], ['g w', N_('Next 7 days')], ['g d', N_('Now doable')], ['g i', N_('Inbox')], ['g a', N_('All')], ['g c', N_('Calendar')], ['g h', N_('Habits')], ['g f', N_('Focus')], ['g s', N_('Settings')]]],
 ];
 // only what the switched-on modules offer (the Timeline group needs the timeline with dependencies)
@@ -12874,11 +13500,11 @@ async function tourEnd(skipped) {
 }
 window.addEventListener('resize', () => { if (TOUR.on) tourGo(TOUR.i); });
 
-// ---- completion celebration: the sloth swings across on a vine, mint checkmark confetti, a dry one-liner
+// ---- completion celebration: the heron swings across on a vine, checkmark confetti in the accent, a dry one-liner
 const QUIPS = {data: null, last: -1};
 async function quipsLoad() {
   if (QUIPS.data) return QUIPS.data;
-  try { const r = await fetch('/static/sloth-quips.json'); if (r.ok) QUIPS.data = await r.json(); } catch { /* offline, no cache: no line */ }
+  try { const r = await fetch('/static/quips.json'); if (r.ok) QUIPS.data = await r.json(); } catch { /* offline, no cache: no line */ }
   return QUIPS.data;
 }
 function nextQuip() {
@@ -12890,13 +13516,11 @@ function nextQuip() {
   return arr[i];
 }
 QUIPS.last = LS.get('quipLast', -1);
-// sloth from the app icon (arms up, holding the vine), drawn around its hands at (0,0)
-const SLOTH_SVG = `<svg class="csloth" viewBox="-90 -10 150 200" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M-80 63 L-60 83 L48 -3" stroke-width="11"/>
-  <path d="M-22 110 C-30 92 -34 78 -34 66"/><path d="M22 104 C30 74 30 44 24 20"/>
-  <path d="M-44 64 C-44 48 -32 46 -26 54" stroke-width="6"/><path d="M14 18 C14 2 26 0 32 8" stroke-width="6"/>
-  <path d="M-22 120 C-36 154 -20 182 0 182 C22 182 38 154 22 118"/><circle cx="0" cy="100" r="28"/>
-  <path d="M-10 94 L-21 104 M10 94 L21 104" stroke-width="7"/><circle cx="0" cy="103" r="3" fill="currentColor" stroke="none"/><path d="M-7 115 q7 5 14 0" stroke-width="4"/></g></svg>`;
+// 2.18.0 (#394): the heron of the app icon holds the vine in its beak; the vine hangs at (48,-3) of this viewBox (the .cfig
+// transform origin), so the beak tip is placed there and the body swings below it
+const HERON_SWING_SVG = `<svg class="cheron" viewBox="-90 -10 150 200" aria-hidden="true"><g transform="translate(48 -3) scale(2.2) translate(-77 -26)" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M24 50C34 42 52 43 62 51C55 58 40 60 30 55"/><path d="M54 48C51 39 49 32 51 25C53 20 58 19 61 22"/><path d="M61 22L77 26"/>
+  <path d="M44 58V84"/><path d="M44 68L37 64L41 60" stroke-width="3.6"/></g></svg>`;
 const CHECK_SVG = '<svg viewBox="0 0 16 16" fill="none" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8.5 6 12.5 14 3.5"/></svg>';
 const reducedMotion = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } };
 const CELE_MS = 1900;
@@ -12909,8 +13533,8 @@ function celebrate(kind, {name = '', frame = null, force = false} = {}) {
   const title = kind === 'today' ? tr('Today is clear') : kind === 'project' ? tr('Project complete: {0}', name) : tr('List complete: {0}', name);
   const q = document.createElement('div');
   q.className = 'cele-quip'; q.setAttribute('role', 'status');
-  q.innerHTML = `${reducedMotion() ? SLOTH_SVG : ''}<div><b>${esc(title)}</b><span>${esc(quip)}</span></div>`;
-  if (reducedMotion()) {  // calm variant: small sloth + line, no motion
+  q.innerHTML = `${reducedMotion() ? HERON_SWING_SVG : ''}<div><b>${esc(title)}</b><span>${esc(quip)}</span></div>`;
+  if (reducedMotion()) {  // calm variant: small heron + line, no motion
     q.classList.add('calm'); q.dataset.kind = kind;
     document.body.appendChild(q);
     if (frame === null) setTimeout(() => q.remove(), 4200);
@@ -12920,7 +13544,7 @@ function celebrate(kind, {name = '', frame = null, force = false} = {}) {
   const L = Math.max(260, Math.min(vh * 0.62, 560)), A = Math.min(64, Math.atan((vw / 2 - 70) / L) * 180 / Math.PI + 8);
   const el = document.createElement('div');
   el.className = 'cele'; el.dataset.kind = kind; el.setAttribute('aria-hidden', 'true');
-  el.innerHTML = `<div class="carm" style="height:${L}px"><i class="cvine"></i><div class="cfig">${SLOTH_SVG}</div></div>`;
+  el.innerHTML = `<div class="carm" style="height:${L}px"><i class="cvine"></i><div class="cfig">${HERON_SWING_SVG}</div></div>`;
   document.body.appendChild(el); document.body.appendChild(q);
   const arm = $('.carm', el), body = $('.cfig', el);
   // confetti: burst at the bottom of the swing (p = .5), thrown in the direction of travel, falls with gravity
@@ -12933,7 +13557,7 @@ function celebrate(kind, {name = '', frame = null, force = false} = {}) {
     const a = -Math.PI / 2 + (Math.random() - 0.35) * Math.PI * 1.1, v = 180 + Math.random() * 260;
     pieces.push({c, vx: Math.cos(a) * v + 120, vy: Math.sin(a) * v, spin: (Math.random() - 0.5) * 900, s: 0.7 + Math.random() * 0.8, life: 0.8 + Math.random() * 0.35});
   }
-  const ox = vw / 2 - 40, oy = L + 60;  // the sloth at the bottom of the arc
+  const ox = vw / 2 - 40, oy = L + 60;  // the heron at the bottom of the arc
   const confAt = (pc, tt) => {  // tt: seconds since the burst
     const x = ox + pc.vx * tt, y = oy + pc.vy * tt + 620 * tt * tt;
     return {transform: `translate(${x}px,${y}px) rotate(${pc.spin * tt}deg) scale(${pc.s})`, opacity: tt <= 0 ? 0 : Math.max(0, 1 - Math.max(0, tt - pc.life * 0.55) / (pc.life * 0.45))};
@@ -13810,7 +14434,7 @@ function chatMsgs() {
   return older + S.chat.msgs.map(m => { const t = m.task_id && taskById(m.task_id), mine = m.from !== 'agent';
     // 2.7.2 (#422): my messages say Sent / Delivered (the agent fetched it); (#421) reactions, quick 👍 👎 ❤️ on the agent's
     const dlv = mine ? `<span class="cdlv ${m.delivered_at ? 'on' : ''}" title="${esc(m.delivered_at ? tr('Delivered') + ' · ' + fmtWhen(m.delivered_at) : tr('Sent'))}">${ic('check', 's')}${m.delivered_at ? ic('check', 's') : ''}<span>${m.delivered_at ? tr('Delivered') : tr('Sent')}</span></span>` : '';
-    return `<div class="cmsg ${mine ? 'me' : 'ag'}${rxShow('c' + m.id)}" data-k="m${m.id}" data-mid="${m.id}">${m.body ? `<div class="cbub">${commentBody(m.body, {})}</div>` : ''}${chatAttHtml(m)}${t ? `<button class="runtask" data-act="open-id" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : ''}${chatRxHtml(m, a)}<div class="cmeta"><time>${fmtWhen(m.created_at)}</time>${dlv}${a?.enabled && !(m.from === 'agent' && m.asks && chatRxOpen(m)) ? rxTog('c' + m.id) : ''}</div></div>`; }).join('')
+    return `<div class="cmsg ${mine ? 'me' : 'ag'}" data-k="m${m.id}" data-mid="${m.id}">${m.body ? `<div class="cbub">${commentBody(m.body, {})}</div>` : ''}${chatAttHtml(m)}${t ? `<button class="runtask" data-act="open-id" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : ''}<div class="cmeta"><time>${fmtWhen(m.created_at)}</time>${dlv}${chatRxHtml(m, a)}</div></div>`; }).join('')
     + (off ? `<div class="chpend off" data-k="off" role="status">${ic('clock', 's')}<span>${esc(tr('{0} is offline – will answer later', a.name))}</span></div>` : '');
 }
 // 2.13.1 (#465): the images / files of a chat message: thumbnails (lightbox on click) and file tiles; the sender removes
@@ -13889,28 +14513,57 @@ S.rxOpen = null;
 const rxTog = (key = null) => `<button type="button" class="rx rxtog" data-act="rx-tog" aria-expanded="${!!key && S.rxOpen === key}" title="${esc(tr('React'))}" aria-label="${esc(tr('React'))}">${ic('smile', 's')}</button>`;
 const rxShow = key => S.rxOpen === key ? ' rxshow' : '';
 const rxKey = host => host.classList.contains('cm') ? 'k' + host.dataset.cid : (host.closest('#tc-msgs') ? 't' : 'c') + host.dataset.mid;
-// the newest agent question nobody answered: its quick bar is open anyway (no smiley needed)
-const chatRxOpen = m => { const rs = m.reactions || [], meR = e => rs.some(r => r.emoji === e && r.users.some(u => S.me && u.id === S.me.id)); return !!m.asks && !meR('up') && !meR('down') && S.chat.msgs.length && S.chat.msgs[S.chat.msgs.length - 1].id === m.id; };
 function chatRxHtml(m, a) {
   const rs = m.reactions || [], ag = m.from === 'agent', on = !!a?.enabled, ask = ag && !!m.asks;
   const meR = e => rs.some(r => r.emoji === e && r.users.some(u => S.me && u.id === S.me.id));
-  const pill = r => { const me = r.users.some(u => S.me && u.id === S.me.id); return `<button type="button" class="rx ${me ? 'on' : ''}" data-act="chat-react" data-mid="${m.id}" data-e="${esc(r.emoji)}" title="${esc(r.users.map(u => u.name).join(', ') + ' · ' + rxName(r.emoji))}" aria-label="${esc(rxName(r.emoji) + ': ' + r.users.map(u => u.name).join(', '))}" aria-pressed="${me}" ${on ? '' : 'disabled'}>${esc(rxEmoji(r.emoji))}<span class="rxn">${r.count}</span></button>`; };
   const qn = (k, n) => ask && k === 'up' ? N_('Approve (counts as approval)') : ask && k === 'down' ? N_('Reject (counts as rejection)') : n;
-  // 2.16.0 (#643): every message (the agent's and mine) can get a reaction; a visible smiley button opens the quick bar
-  // (touch: always there; desktop: hover / keyboard focus as before), no long press needed
-  const quick = on ? RX.filter(([k]) => !rs.some(r => r.emoji === k)).map(([k, em, n]) => `<button type="button" class="rx add" data-act="chat-react" data-mid="${m.id}" data-e="${k}" title="${esc(tr(qn(k, n)))}" aria-label="${esc(tr(qn(k, n)))}">${em}</button>`) : [];
   const voted = ask && (meR('up') ? tr('Counted as approval') : meR('down') ? tr('Counted as rejection') : '');
-  // the newest agent message, a question nobody answered yet: its bar is open
+  // the newest agent message, a question nobody answered yet, says what a 👍 means
   const open = ask && !voted && S.chat.msgs.length && S.chat.msgs[S.chat.msgs.length - 1].id === m.id;
-  const pills = rs.length || voted ? `<div class="rxbar chrx">${rs.map(pill).join('')}${voted ? `<span class="rxok">${ic('check', 's')}${esc(voted)}</span>` : ''}</div>` : '';
-  const q = quick.length ? `<div class="chrxq ${open ? 'open' : ''}" role="group" aria-label="${esc(tr('React'))}">${quick.join('')}${open ? `<span class="rxhint">${esc(tr('👍 = approval'))}</span>` : ''}</div>` : '';
-  return pills + q;
+  const extra = voted ? `<span class="rxok">${ic('check', 's')}${esc(voted)}</span>` : open ? `<span class="rxhint">${esc(tr('👍 = approval'))}</span>` : '';
+  return rxRow(rs, {mid: m.id, act: 'chat-react', dis: !on, name: ask ? qn : null, extra});
+}
+// 2.18.0 (#651, owner decision: reactions not hidden behind a smiley, too many taps): the quick reactions 👍 👎 ❤️ sit visibly in the
+// meta line of every chat message (agent chat and team chat, my own messages too); one tap toggles mine, the number says
+// how many reacted. Calm: an unused chip is only its muted emoji. Touch: 44 px targets through negative margins (the line
+// stays low). One Tab stop per message: a roving tabindex, ← → Home End move inside the row (rxRowKey).
+// dis = read-only (a paused agent, a deleted message): only the reactions that exist, as disabled chips.
+// name(k, meaning) = the label of a quick chip (the agent chat names 👍 / 👎 on a question as approval / rejection)
+const RXN = {up: N_('thumbs up'), down: N_('thumbs down'), heart: N_('heart')};
+function rxRow(rs, {mid, act, dis = false, name = null, extra = ''}) {
+  const meIn = r => !!r && (r.users || []).some(u => S.me && u.id === S.me.id), cnt = r => r ? r.count ?? (r.users || []).length : 0;
+  const items = RX.map(([k, em, n]) => { const o = name ? name(k, n) : n; return {k, em, n, o: o !== n ? o : '', r: rs.find(r => r.emoji === k)}; }).filter(x => !dis || cnt(x.r));
+  for (const r of rs) if (!RX.some(x => x[0] === r.emoji) && cnt(r)) items.push({k: r.emoji, em: rxEmoji(r.emoji), n: '', r});
+  if (!items.length && !extra) return '';
+  const fi = Math.max(0, items.findIndex(x => meIn(x.r)));
+  const chip = (x, i) => {
+    const me = meIn(x.r), c = cnt(x.r), who = c ? x.r.users.map(u => u.name).join(', ') : '';
+    const base = x.o ? tr(x.o) : RXN[x.k] ? tr('React with {0}', tr(RXN[x.k])) : x.em;
+    const lab = base + (who ? ': ' + who : ''), tip = (x.o ? tr(x.o) : x.n ? tr(x.n) : x.em) + (who ? ' · ' + who : '');
+    return `<button type="button" class="rx${c ? '' : ' add'}${me ? ' on' : ''}" data-act="${act}" data-mid="${mid}" data-e="${esc(x.k)}" tabindex="${i === fi ? 0 : -1}" title="${esc(tip)}" aria-label="${esc(lab)}" aria-pressed="${me}" ${dis ? 'disabled' : ''}>${esc(x.em)}${c ? `<span class="rxn" aria-hidden="true">${c}</span>` : ''}</button>`;
+  };
+  return `<span class="rxbar chrx rxrow" role="group" aria-label="${esc(tr('Reactions'))}">${items.map(chip).join('')}${extra}</span>`;
+}
+// the arrow keys inside a reaction row (one Tab stop per message)
+function rxRowKey(e) {
+  const b = e.target.closest?.('.rxrow .rx'); if (!b || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return false;
+  const all = $$('.rx:not(:disabled)', b.closest('.rxrow')), i = all.indexOf(b); if (i < 0) return false;
+  const j = e.key === 'Home' ? 0 : e.key === 'End' ? all.length - 1 : (i + (e.key === 'ArrowRight' ? 1 : -1) + all.length) % all.length;
+  all.forEach((x, k) => x.tabIndex = k === j ? 0 : -1); all[j].focus(); e.preventDefault(); return true;
+}
+document.addEventListener('keydown', e => { if (rxRowKey(e)) e.stopPropagation(); }, true);
+// after a reaction the row is drawn anew: the focus goes back to the same chip (it was on it, now it is detached)
+function rxRefocus(sel, mid, emoji) {
+  const ae = document.activeElement; if (ae && ae !== document.body && ae.isConnected) return;
+  const b = $$(`${sel} .rxrow .rx[data-mid="${mid}"]`).find(x => x.dataset.e === emoji); if (!b) return;
+  $$('.rx', b.closest('.rxrow')).forEach(x => x.tabIndex = x === b ? 0 : -1); b.focus({preventScroll: true});
 }
 // touch: a long press on an agent message opens its reaction bar (another tap elsewhere closes it)
 {
   let lp = null;
   document.addEventListener('touchstart', e => {
-    const m = e.target.closest?.('#chat-msgs .cmsg.ag, #detail .cm:not(.cedit)'); if (!m || e.touches.length !== 1 || e.target.closest('button, a, textarea, input')) { lp = null; return; }
+    // 2.18.0 (#651): chat messages show their reactions anyway; the long press stays for comments in the task panel
+    const m = e.target.closest?.('#detail .cm:not(.cedit)'); if (!m || e.touches.length !== 1 || e.target.closest('button, a, textarea, input')) { lp = null; return; }
     const p = e.touches[0]; lp = {m, x: p.clientX, y: p.clientY, t: setTimeout(() => { $$('.rxshow').forEach(x => x !== m && x.classList.remove('rxshow')); m.classList.add('rxshow'); S.rxOpen = rxKey(m); if (navigator.vibrate) navigator.vibrate(10); lp = null; }, 450)};
   }, {passive: true});
   document.addEventListener('touchmove', e => { if (lp && Math.hypot(e.touches[0].clientX - lp.x, e.touches[0].clientY - lp.y) > 8) { clearTimeout(lp.t); lp = null; } }, {passive: true});
@@ -13921,7 +14574,7 @@ async function chatReact(mid, emoji) {
   const aid = S.chat.aid, m = S.chat.msgs.find(x => x.id === mid); if (!aid || !m) return;
   try { const r = await api('POST', `/api/agents/${aid}/chat/${mid}/reactions`, {emoji}); for (const x of [m, S.chat.msgs.find(y => y.id === mid)]) if (x) x.reactions = r.reactions; S.chat.mutAt = (S.chat.seq || 0) + 1; if (r.approval === 'approved') toast(tr('Approved')); else if (r.approval === 'rejected') toast(tr('Rejected')); }
   catch { return; }
-  chatDraw();
+  chatDraw(); rxRefocus('#chat-msgs', mid, emoji);
 }
 // 2.7.2 (#422): my last message the agent has not answered yet (null = none); the dots come by themselves while the agent
 // is online (event poll in the last 2 minutes or a webhook) for 90 s after it fetched the message, longer while it reports
@@ -14791,7 +15444,7 @@ function palViewed() {
   }).filter(Boolean);
 }
 
-// ---- #245 own list icons: a picture instead of the emoji (presets: the app icon + the sloths, or an own picture, cropped
+// ---- #245 own list icons: a picture instead of the emoji (presets: the app icon + the profile pictures, or an own picture, cropped
 // square like the profile picture). Shown wherever the emoji / colour dot of the list shows. An emoji still works; picking
 // one removes the picture and the other way round.
 const LICON_PRESETS = [['kalmido', 'Kalmido'], ...AV_PRESETS];
@@ -15002,7 +15655,11 @@ document.addEventListener('drop', dsStop, true);
 // comments), rows a chip with the newest pull request; #339: an agent's "ready to merge" comment with Approve / Reject
 const PR_ST = {open: N_('open|pr'), merged: N_('merged'), closed: N_('closed|pr')};
 const CI_ST = {success: [N_('CI passed'), 'check'], failure: [N_('CI failed'), 'x'], pending: [N_('CI running'), 'clock']};
-const GIT_PROV = [['github', 'GitHub'], ['gitea', 'Gitea / Forgejo']];
+const GIT_PROV = [['github', 'GitHub'], ['gitlab', 'GitLab'], ['gitea', 'Gitea / Forgejo'], ['bitbucket', 'Bitbucket Cloud']];  // 2.18.0 (#408): + GitLab, Bitbucket
+// 2.18.0: the provider of an address on a cloud host is unambiguous (other hosts: the select)
+const gitHostProv = u => { const m = /^https?:\/\/(?:www\.)?(github\.com|gitlab\.com|bitbucket\.org)\//i.exec(String(u || '').trim()); return m ? {'github.com': 'github', 'gitlab.com': 'gitlab', 'bitbucket.org': 'bitbucket'}[m[1].toLowerCase()] : ''; };
+const GIT_BASE_PH = {github: N_('empty = github.com'), gitlab: N_('empty = gitlab.com'), bitbucket: N_('empty = bitbucket.org')};
+const GIT_TOK_PH = {gitlab: N_('read_api is enough; empty for a public project'), bitbucket: N_('access token, or user:app password; empty for a public repository')};
 const listRepos = lid => listById(lid)?.repos || [];
 const httpUrl = u => /^https?:\/\//i.test(String(u || '')) ? String(u) : '';
 function ciIcon(ci) {
@@ -15042,9 +15699,13 @@ function codeHtml(t) {
   const prs = c.prs.map(prRow).join(''), cms = c.commits.map(commitRow).join('');
   const hint = !prs && !cms ? `<div class="muted ghint">${esc(tr('Nothing linked yet: mention #{0} in a commit or pull request, or name the branch {1}.', t.id, `kalmido-${t.id}`))}</div>` : '';
   return `<div class="dsec gitsec" id="d-code"><h5>${tr('Code')}${repos.length ? ` <span class="muted h5note">${esc(repos.map(r => r.full_name).join(', '))}</span>` : ''}${repos.length ? `<button class="iconbtn gref" data-act="git-refresh" data-lid="${t.list_id}" title="${esc(tr('Check the repository now'))}" aria-label="${esc(tr('Check the repository now'))}">${ic('sync', 's')}</button>` : ''}</h5>
-    ${a ? `<div class="gitagent" role="status">${ic('bot', 's')}<span>${esc(tr('{0} is working on it', a.name))}</span>${a.status_text ? `<span class="muted">· ${esc(a.status_text)}</span>` : ''}</div>` : ''}${prs ? `<div class="gitl">${prs}</div>` : ''}${cms ? `<div class="gitl">${cms}</div>` : ''}${hint}${repos.length ? `<button class="linkbtn gbranch" data-act="git-branch" data-id="${t.id}" title="${esc(tr('Copy a branch name for this task'))}">${ic('copy', 's')}<code>${esc(gitBranch(t))}</code></button>` : ''}</div>`;
+    ${a ? `<div class="gitagent" role="status">${ic('bot', 's')}<span>${esc(tr('{0} is working on it', a.name))}</span>${a.status_text ? `<span class="muted">· ${esc(a.status_text)}</span>` : ''}</div>` : ''}${prs ? `<div class="gitl">${prs}</div>` : ''}${cms ? `<div class="gitl">${cms}</div>` : ''}${hint}${repos.length ? `<div class="gcopy"><button class="linkbtn gbranch" data-act="git-branch" data-id="${t.id}" title="${esc(tr('Copy a branch name for this task'))}" aria-label="${esc(tr('Copy the branch name {0}', gitBranch(t)))}">${ic('copy', 's')}<code>${esc(gitBranch(t))}</code></button><button class="linkbtn gbranch" data-act="git-ref" data-id="${t.id}" title="${esc(tr('Copy a commit reference: “fixes #{0}” completes the task when the pull request is merged', t.id))}" aria-label="${esc(tr('Copy the commit reference {0}', gitRef(t)))}">${ic('copy', 's')}<code>${esc(gitRef(t))}</code></button></div>` : ''}</div>`;
 }
+const gitRef = t => `fixes #${t.id}`;  // 2.18.0 (#408): the commit / pull request reference that completes the ticket on merge
 const gitBranch = t => `kalmido-${t.id}`;  // 2.5.1 (#396): the id only, no title part (old <prefix>-<id>-slug branches still match)
+async function copyText(x) {  // 2.18.0: clipboard + "Copied" toast (shows the text when the clipboard is blocked)
+  try { await navigator.clipboard.writeText(x); toast(tr('Copied: {0}', x)); } catch { toast(x); }
+}
 async function gitCopyBranch(t) {
   try { await navigator.clipboard.writeText(gitBranch(t)); toast(tr('Copied: {0}', gitBranch(t))); } catch { toast(gitBranch(t)); }
 }
@@ -15064,7 +15725,9 @@ function gitActText(a, d, q) {
     : d.state === 'closed' ? tr('Pull request {0} was closed in {1}', pr, repo) : tr('Pull request {0} was opened in {1}', pr, repo);
   const t = taskById(S.tl.id), undo = t && t.status !== 0 && canEdit(t) && a.id === Math.max(...(S.tl.activity || []).filter(x => x.kind === 'git_done').map(x => x.id))
     ? ` <button class="linkbtn" data-act="git-undo" data-id="${t.id}">${tr('Undo')}</button>` : '';
-  return (d.kind === 'pr' ? tr('Completed by the pull request {0} in {1}', q(d.title || ''), repo) : tr('Completed by the commit {0} in {1}', q(d.title || ''), repo)) + undo;
+  return (d.kind === 'pr' ? tr('Completed by the pull request {0} in {1}', q(d.title || ''), repo)
+    : d.kind === 'tag' ? tr('Milestone reached: tag {0} in {1}', q(d.ref || ''), repo)  // 2.18.0 (#408)
+      : tr('Completed by the commit {0} in {1}', q(d.title || ''), repo)) + undo;
 }
 // #339: an agent's "ready to merge" comment: the pull request with state + CI, the summary, Approve / Reject (approvers)
 function mrHtml(c, s, ro) {
@@ -15081,7 +15744,7 @@ function repoBoxHtml(l) {
 }
 function repoWire(md, lid) {
   const box = $('#l-repos', md); if (!box) return;
-  let j = null, edit = null, secret = null;
+  let j = null, edit = null, secret = null, errUrl = null;
   const provSel = `<select id="rp-prov" aria-label="${esc(tr('Provider'))}">${GIT_PROV.map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select>`;
   const draw = () => {
     if (!md.isConnected) return;
@@ -15095,13 +15758,41 @@ function repoWire(md, lid) {
       ${secret && secret.id === r.id ? `<div class="shint lhint rpsec">${esc(tr('Webhook: payload URL {0}, content type JSON, secret (shown only now):', r.hook_url))} <code>${esc(secret.s)}</code></div>` : ''}`).join('');
     const add = j.may && j.repos.length < j.max ? `<div class="repoadd">
         <div class="row"><label for="rp-prov">${tr('Provider')}</label>${provSel}</div>
+        <div class="shint lhint" id="rp-phint" hidden></div>
         <div class="row"><label for="rp-base">${tr('Server')}</label><input id="rp-base" type="url" inputmode="url" autocomplete="off" placeholder="${esc(tr('empty = github.com'))}"></div>
-        <div class="row"><label for="rp-name">${tr('Repository')}</label><input id="rp-name" autocomplete="off" placeholder="owner/name"></div>
+        <div class="row"><label for="rp-name">${tr('Repository')}</label><input id="rp-name" autocomplete="off" aria-describedby="rp-cerr" placeholder="${esc(tr('owner/name or its web address'))}"></div>
+        <div class="shint keep lhint rpself" id="rp-self" hidden>${esc(tr('This looks like a self-hosted server: pick its provider (GitLab, Gitea / Forgejo or Bitbucket) above.'))}</div>
         <div class="row"><label for="rp-tok">${tr('Access token')}</label><input id="rp-tok" type="password" autocomplete="off" placeholder="${esc(tr('read-only is enough; empty for a public repository'))}" ${j.key ? '' : 'disabled'}></div>
         ${j.key ? '' : `<div class="shint keep lhint">${esc(tr('Set KALMIDO_SECRET_KEY on the server to store repository tokens (32 random bytes, base64)'))}</div>`}
+        <div class="rpcerr" id="rp-cerr" role="alert"></div>
         <div class="row rprow"><span class="spacer"></span><button class="btn sm pri" data-rp="add">${ic('plus', 's')} ${tr('Connect')}</button></div></div>` : '';
     box.innerHTML = rows + (listById(lid)?.kind === 'project' ? add : `<div class="muted mhint">${tr('Make this list a project to connect a repository')}</div>`)
-      + (!j.may && !j.repos.length && listById(lid)?.kind === 'project' ? `<div class="muted mhint">${tr('The list owner and list admins connect repositories.')}</div>` : '');
+      + (!j.may && !j.repos.length && listById(lid)?.kind === 'project' ? `<div class="muted mhint">${tr('The list owner and list admins connect repositories.')}</div>` : '')
+      + errHookHtml();
+  };
+  // 2.18.0 (#408 "Software 2" F): error reports -> bug tickets (a secret webhook URL, shown once; owner / list admins)
+  const errHookHtml = () => {
+    const eh = j.errors; if (!eh || listById(lid)?.kind !== 'project' || (!eh.may && !eh.on)) return '';
+    const st = eh.on ? [tr('On'), tr('{0} received', eh.received || 0), eh.open ? trn('{0} open ticket', '{0} open tickets', eh.open) : '', eh.last_at ? tr('last {0}', relTime(eh.last_at)) : ''].filter(Boolean).join(' · ') : tr('Off');
+    const ctl = !eh.may ? '' : eh.on ? `<button class="iconbtn" data-rp="err-menu" title="${esc(tr('Error reports'))}: ${esc(tr('More'))}" aria-label="${esc(tr('Error reports'))}: ${esc(tr('More'))}">${ic('dots', 's')}</button>`
+      : `<button class="btn sm" data-rp="err-on">${tr('Turn on')}</button>`;
+    return `<div class="errhook" id="rp-err"><div class="mrow reporow errrow">${ic('bug', 's')}<span class="n"><b>${tr('Error reports')}</b><span class="muted rpm">${esc(st)}</span></span>${ctl}</div>
+      <div class="shint lhint">${tr('Sentry or any service that sends JSON: a new error becomes a bug ticket, the same error again only counts up at its open ticket.')}</div>
+      ${errUrl ? `<div class="shint lhint rpsec" role="status">${esc(tr('Webhook URL (shown only now, keep it secret):'))} <code>${esc(errUrl)}</code> <button class="linkbtn" data-rp="err-copy">${ic('copy', 's')} ${tr('Copy')}</button></div>` : ''}</div>`;
+  };
+  const errSet = async state => {
+    let x; try { x = await api('PATCH', `/api/lists/${lid}/error-hook`, {state}); } catch { return; }
+    errUrl = x.url || null; j.errors = x; draw();
+    (errUrl ? $('#rp-err [data-rp="err-copy"]', box) : $('#rp-err [data-rp="err-on"]', box))?.focus();
+  };
+  const provHint = () => {
+    const pv = $('#rp-prov', box)?.value || 'github', h = $('#rp-phint', box);
+    const base = $('#rp-base', box), tok = $('#rp-tok', box);
+    if (base) base.placeholder = GIT_BASE_PH[pv] ? tr(GIT_BASE_PH[pv]) : 'https://git.example.com';
+    if (tok && j?.key) tok.placeholder = tr(GIT_TOK_PH[pv] || N_('read-only is enough; empty for a public repository'));
+    const txt = pv === 'bitbucket' ? tr('Bitbucket Cloud only: Bitbucket Server / Data Center is not supported.')
+      : pv === 'gitlab' ? tr('gitlab.com or your own GitLab server; groups with subgroups work (group/sub/project).') : '';
+    if (h) { h.textContent = txt; h.hidden = !txt; }
   };
   const reload = async () => { try { j = await api('GET', `/api/lists/${lid}/repos`); } catch { j = {repos: [], may: false, key: true, project: false, max: 0}; } draw(); };
   box.addEventListener('click', async e => {
@@ -15112,8 +15803,24 @@ function repoWire(md, lid) {
       const body = {provider: $('#rp-prov', box).value, base_url: $('#rp-base', box).value.trim(), repo: $('#rp-name', box).value.trim(), token: $('#rp-tok', box).value.trim()};
       if (!body.repo) { need($('#rp-name', box)); return; }
       b.disabled = true;
-      try { await api('POST', `/api/lists/${lid}/repos`, body); toast(tr('Repository connected')); } catch { b.disabled = false; return; }
+      // 2.18.0 review (R11): a failed connect says why next to the fields (not only in a toast that is gone in seconds)
+      const ce = $('#rp-cerr', box), nm = $('#rp-name', box);
+      ce.textContent = ''; nm.removeAttribute('aria-invalid');
+      try { await rawFetch('POST', `/api/lists/${lid}/repos`, body); toast(tr('Repository connected')); }
+      catch (er) {
+        b.disabled = false; if (!md.isConnected) return;
+        ce.textContent = er instanceof Offline ? tr('Offline: only works again with a connection') : er.message === 'auth' ? '' : er.message;
+        nm.setAttribute('aria-invalid', 'true'); nm.focus();
+        return;
+      }
       await reload(); await load(); render();
+    } else if (k === 'err-on') {
+      await errSet('on');
+    } else if (k === 'err-copy') {
+      try { await navigator.clipboard.writeText(errUrl || ''); toast(tr('Copied')); } catch { toast(errUrl || ''); }
+    } else if (k === 'err-menu') {
+      menu(b, [{label: tr('New URL (the old one stops working)'), icon: 'sync', fn: () => errSet('rotate')},
+        '-', {label: tr('Turn error reports off'), icon: 'x', cls: 'flag-5', fn: () => errSet('off')}]);
     } else if (k === 'refresh') {
       try { await api('POST', `/api/repos/${rid}/refresh`); toast(tr('Checking the repository …')); } catch { /* shown */ }
       setTimeout(reload, 4000);
@@ -15131,7 +15838,23 @@ function repoWire(md, lid) {
           await reload(); await load(); render(); }}]);
     }
   });
-  box.addEventListener('change', e => { if (e.target.id === 'rp-prov') $('#rp-base', box).placeholder = e.target.value === 'github' ? tr('empty = github.com') : 'https://git.example.com'; });
+  // 2.18.0 review (R11): an address on another server while the provider is still GitHub (the default) -> a hint to pick
+  // the provider of the self-hosted server (GitHub Enterprise keeps working: the hint never blocks)
+  const selfHint = () => {
+    const h = $('#rp-self', box); if (!h) return;
+    const host = v => { const m = /^https?:\/\/([^/\s]+)/i.exec(String(v || '').trim()); return m ? m[1].toLowerCase().replace(/^www\./, '') : ''; };
+    const hs = [host($('#rp-name', box)?.value), host($('#rp-base', box)?.value)].filter(Boolean);
+    h.hidden = !(($('#rp-prov', box)?.value || 'github') === 'github' && hs.some(x => !/^(github\.com|gitlab\.com|bitbucket\.org)$/.test(x)));
+  };
+  box.addEventListener('change', e => { if (e.target.id === 'rp-prov') { provHint(); selfHint(); } });
+  box.addEventListener('input', e => {  // 2.18.0: a cloud address picks its provider
+    if (e.target.id === 'rp-name' || e.target.id === 'rp-base') { const ce = $('#rp-cerr', box); if (ce?.textContent) { ce.textContent = ''; $('#rp-name', box)?.removeAttribute('aria-invalid'); } }
+    if (e.target.id === 'rp-base') { selfHint(); return; }
+    if (e.target.id !== 'rp-name') return;
+    const pv = gitHostProv(e.target.value), sel = $('#rp-prov', box);
+    if (pv && sel && sel.value !== pv) { sel.value = pv; provHint(); }
+    selfHint();
+  });
   reload();
 }
 
@@ -15176,6 +15899,13 @@ async function teamChanged() {
   else if (S.route.mod === 'team') tcPatch();
   renderSide(); renderTabs(); renderTop();
 }
+// 2.18.0 (review): a one-line preview without Markdown markers ("```js", `code`, **bold**, headings, list markers, links ->
+// their text); the server does the same in md_brief() (app.py), this cleans the preview of a message sent from here
+function mdBrief(t) {
+  t = String(t || '').split('\n').map(l => l.replace(/^\s*(```|~~~)[\w+#.-]*\s*/, '').replace(/^\s{0,3}(#{1,6}\s+|>\s?|[-*+]\s+\[[ xX]\]\s+|[-*+]\s+|\d+[.)]\s+)/, '')).join('\n');
+  t = t.replace(/!?\[([^\]]*)\]\([^)\s]*\)/g, '$1').replace(/\*\*|__|~~|`/g, '');
+  return t.replace(/(^|[^\w*])\*(?=\S)([^*\n]+?)\*(?!\w)/g, '$1$2').replace(/\s+/g, ' ').trim();
+}
 const editingTeam = () => document.activeElement?.id === 'tc-in' || document.activeElement?.classList?.contains('tc-edit');
 const roomName = r => r ? (r.kind === 'dm' ? (r.name || '?') : lname(listById(r.list_id)) || r.name || '?') : '';
 const roomIcon = r => r.kind === 'dm' ? av(r.user_id, r.name, 'avatar') : `<span class="tcico">${licon(listById(r.list_id), 'licon') || ic('users', 's')}</span>`;
@@ -15187,7 +15917,7 @@ function viewTeam() {
     <div class="tchead"><b>${tr('Conversations')}</b><span class="spacer"></span>${S.tc.people.length ? `<button type="button" class="btn sm" data-act="tc-new" aria-haspopup="menu">${ic('plus', 's')}${tr('Message…')}</button>` : ''}</div>
     ${S.tc.rooms === null ? `<div class="muted mhint">${tr('Loading…')}</div>` : rooms.length ? rooms.map(r => `<button type="button" class="tcrow ${r.id === rid ? 'on' : ''} ${r.unread ? 'unread' : ''}" data-act="tc-open" data-rid="${r.id}" ${r.id === rid ? 'aria-current="true"' : ''}>
       ${roomIcon(r)}<span class="tcmain"><span class="tcn">${esc(roomName(r))}${r.kind === 'list' ? `<span class="tck">${ic('users', 's')}${r.members}</span>` : ''}</span>
-      <span class="tclast">${r.last ? esc((r.last.user_id === S.me?.id ? tr('You') + ': ' : r.kind === 'list' ? uname(r.last.user_id, S.tc.users) + ': ' : '') + r.last.text) : `<span class="muted">${tr('No messages yet')}</span>`}</span></span>
+      <span class="tclast">${r.last ? esc((r.last.user_id === S.me?.id ? tr('You') + ': ' : r.kind === 'list' ? uname(r.last.user_id, S.tc.users) + ': ' : '') + mdBrief(r.last.text)) : `<span class="muted">${tr('No messages yet')}</span>`}</span></span>
       <span class="tcside">${r.last_at ? `<time>${esc(relTime(r.last_at))}</time>` : ''}${r.unread ? `<span class="nbadge ${r.mention ? 'ment' : ''}" aria-label="${esc(trn('{0} unread', '{0} unread', r.unread))}">${r.mention ? '@' : ''}${r.unread}</span>` : ''}${r.muted ? `<span class="tcmute" title="${esc(tr('Muted'))}">${ic('belloff', 's')}</span>` : ''}</span></button>`).join('')
     : `<div class="empty tcempty">${heron('empty')}<b>${tr('No conversations yet')}</b><span>${S.tc.people.length ? tr('Write to someone you work with, or share a list: every shared list gets its own chat.') : tr('Share a list with someone: every shared list gets its own chat.')}</span></div>`}
   </nav>`;
@@ -15201,7 +15931,7 @@ function tcRoomHtml() {
     <span class="spacer"></span>${room && room.kind === 'list' ? `<button type="button" class="iconbtn" data-act="tc-list" data-id="${room.list_id}" title="${esc(tr('Open the list'))}" aria-label="${esc(tr('Open the list'))}">${ic('list')}</button>` : ''}
     <button type="button" class="iconbtn ${room?.muted ? 'on' : ''}" data-act="tc-mute" aria-pressed="${!!room?.muted}" title="${esc(room?.muted ? tr('Muted: only mentions notify you') : tr('Mute (only mentions notify you)'))}" aria-label="${esc(tr('Mute'))}">${ic(room?.muted ? 'belloff' : 'bell')}</button></div>`;
   return `${head}<div class="chmsgs tcmsgs" id="tc-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${tcMsgsHtml()}</div>
-    <div class="chcomp tccomp"><div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea id="tc-in" rows="1" placeholder="${esc(tr('Message to {0}…', name))}" aria-label="${esc(tr('Message to {0}…', name))}" enterkeyhint="send" maxlength="8000">${esc(S.drafts['team:' + rid] || '')}</textarea>
+    <div class="chcomp tccomp"><div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea id="tc-in" rows="1" placeholder="${esc(tr('Message to {0}…', name.length > 18 ? name.slice(0, 17).trimEnd() + '…' : name))}" aria-label="${esc(tr('Message to {0}…', name))}" enterkeyhint="send" maxlength="8000">${esc(S.drafts['team:' + rid] || '')}</textarea>
     <button type="button" class="btn pri" data-act="tc-send">${ic('send', 's')}<span>${tr('Send')}</span></button></div>`;
 }
 function tcMsgsHtml() {
@@ -15213,17 +15943,14 @@ function tcMsgsHtml() {
   for (const m of S.tc.msgs) {
     const mine = m.user_id === S.me?.id, first = !prev || prev.user_id !== m.user_id || Date.parse(m.created_at) - Date.parse(prev.created_at) > 10 * 60000;
     prev = m;
-    const rs = m.reactions || [];
-    const pill = r => { const me = r.users.some(u => u.id === S.me?.id); return `<button type="button" class="rx ${me ? 'on' : ''}" data-act="tc-react" data-mid="${m.id}" data-e="${esc(r.emoji)}" aria-pressed="${me}" title="${esc(r.users.map(u => u.name).join(', ') + ' · ' + rxName(r.emoji))}" aria-label="${esc(rxName(r.emoji) + ': ' + r.users.map(u => u.name).join(', '))}">${esc(rxEmoji(r.emoji))}<span class="rxn">${r.users.length}</span></button>`; };
-    const quick = m.deleted ? '' : RX.filter(([k]) => !rs.some(r => r.emoji === k && r.users.some(u => u.id === S.me?.id))).map(([k, em, n]) => `<button type="button" class="rx add" data-act="tc-react" data-mid="${m.id}" data-e="${k}" title="${esc(tr(n))}" aria-label="${esc(tr(n))}">${em}</button>`).join('');
+    const rxr = rxRow(m.reactions || [], {mid: m.id, act: 'tc-react', dis: !!m.deleted || S.tc.edit === m.id});  // 2.18.0 (#651)
     const body = m.deleted ? `<div class="cbub del"><span class="muted">${tr('Message deleted')}</span></div>`
       : S.tc.edit === m.id ? `<div class="cbub tcedit"><div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea class="tc-edit" aria-label="${esc(tr('Edit message'))}" rows="2">${esc(m.body.replace(/<@(\d+)>/g, (_, id) => '@' + uname(+id, U)))}</textarea><div class="tcebtn"><button type="button" class="btn sm" data-act="tc-edit-cancel">${tr('Cancel')}</button><button type="button" class="btn sm pri" data-act="tc-edit-save" data-mid="${m.id}">${tr('Save')}</button></div></div>`
         : `<div class="cbub">${commentBody(m.body, U)}</div>`;
-    h += `<div class="cmsg ${mine ? 'me' : 'ag'} ${first ? 'first' : ''}${rxShow('t' + m.id)}" data-k="m${m.id}" data-mid="${m.id}">
+    h += `<div class="cmsg ${mine ? 'me' : 'ag'} ${first ? 'first' : ''}" data-k="m${m.id}" data-mid="${m.id}">
       ${first && !mine ? `<div class="tcwho">${av(m.user_id, uname(m.user_id, U), 'avatar sm')}<b>${esc(uname(m.user_id, U))}</b>${ags.has(m.user_id) ? agentBadge() : ''}</div>` : ''}
       ${body}${m.task ? `<button class="runtask" data-act="open-id" data-id="${m.task.id}">${ic('arrow', 's')}<span>${esc(m.task.title)}</span></button>` : ''}
-      ${rs.length ? `<div class="rxbar chrx">${rs.map(pill).join('')}</div>` : ''}${quick ? `<div class="chrxq" role="group" aria-label="${esc(tr('React'))}">${quick}</div>` : ''}
-      <div class="cmeta"><time title="${esc(fmtWhen(m.created_at))}">${fmtWhen(m.created_at)}</time>${m.edited_at && !m.deleted ? `<span class="muted">${tr('edited')}</span>` : ''}${quick ? rxTog('t' + m.id) : ''}${mine && !m.deleted ? `<button type="button" class="rx rxtog" data-act="tc-msg-menu" data-mid="${m.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button>` : ''}</div></div>`;
+      <div class="cmeta"><time title="${esc(fmtWhen(m.created_at))}">${fmtWhen(m.created_at)}</time>${m.edited_at && !m.deleted ? `<span class="muted">${tr('edited')}</span>` : ''}${rxr}${mine && !m.deleted ? `<button type="button" class="rx rxtog" data-act="tc-msg-menu" data-mid="${m.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button>` : ''}</div></div>`;
   }
   return h;
 }
@@ -15265,20 +15992,27 @@ async function tcSend() {
 async function tcReact(mid, emoji) {
   let r; try { r = await rawFetch('POST', `/api/team/messages/${mid}/reactions`, {emoji}); } catch (e) { toast(e.message); return; }
   const m = S.tc.msgs.find(x => x.id === mid); if (m) m.reactions = r.reactions;
-  tcPatch();
+  tcPatch(); rxRefocus('#tc-msgs', mid, emoji);
 }
 function tcMsgMenu(anchor, mid) {
   const m = S.tc.msgs.find(x => x.id === mid); if (!m) return;
   menu(anchor, [{label: tr('Edit'), icon: 'edit', fn: () => { S.tc.edit = mid; tcPatch(); setTimeout(() => { const t = $('#tc-msgs .tc-edit'); if (t) { t.focus(); autosize(t); } }, 0); }},
-    {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: async () => {
-      if (!await askConfirm(tr('Delete this message?'), '', {ok: tr('Delete'), danger: true})) return;
-      try { await rawFetch('DELETE', `/api/team/messages/${mid}`); } catch (e) { toast(e.message); return; }
-      Object.assign(m, {deleted: true, body: '', reactions: []}); tcPatch(); announce(tr('Message deleted'));
-    }}]);
+    {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => tcMsgDelete(mid)}]);
+}
+async function tcMsgDelete(mid) {
+  const m = S.tc.msgs.find(x => x.id === mid); if (!m) return false;
+  if (!await askConfirm(tr('Delete this message?'), '', {ok: tr('Delete'), danger: true})) return false;
+  try { await rawFetch('DELETE', `/api/team/messages/${mid}`); } catch (e) { toast(e.message); return false; }
+  if (S.tc.edit === mid) S.tc.edit = null;
+  Object.assign(m, {deleted: true, body: '', reactions: []}); tcPatch(); announce(tr('Message deleted'));
+  return true;
 }
 async function tcEditSave(mid) {
   const t = $('#tc-msgs .tc-edit'), m = S.tc.msgs.find(x => x.id === mid); if (!t || !m) return;
-  const v = t.value.trim(); if (!v) return;
+  const v = t.value.trim();
+  // 2.18.0 (#652): saving an emptied message did nothing; it offers to delete the message instead (Cancel: back to the
+  // text box, Delete: the focus goes to the message box)
+  if (!v) { if (await tcMsgDelete(mid)) $('#tc-in')?.focus(); else $('#tc-msgs .tc-edit')?.focus(); return; }
   let r; try { r = await rawFetch('PATCH', `/api/team/messages/${mid}`, {body: tcMentions(v)}); } catch (e) { toast(e.message); return; }
   Object.assign(m, r); S.tc.edit = null; tcPatch();
 }
@@ -15391,7 +16125,7 @@ function noteEditHtml(n) {
     <div class="nttags"><label for="nt-tags">${ic('tag', 's')}<span class="sr">${tr('Tags')}</span></label><input id="nt-tags" value="${esc(n.tags.join(', '))}" placeholder="${esc(tr('Tags, separated by commas'))}" ${ro ? 'readonly' : ''}></div>
     ${ro ? '' : `<div class="seg ntmode" role="group" aria-label="${esc(tr('Mode'))}"><button type="button" data-act="nt-mode" data-m="read" class="${edit ? '' : 'on'}" aria-pressed="${!edit}">${tr('Read')}</button><button type="button" data-act="nt-mode" data-m="edit" class="${edit ? 'on' : ''}" aria-pressed="${edit}">${tr('Edit')}</button></div>`}
     ${edit ? `<textarea id="nt-body" class="ntbody" aria-label="${esc(tr('Text'))}" placeholder="${esc(tr('Markdown: # heading, - list, **bold**, #123 links a task'))}">${esc(n.body)}</textarea>`
-      : `<div class="md ntmd" id="nt-md">${n.body.trim() ? mdTaskRefs(renderMd(n.body)) : `<p class="muted">${ro ? tr('Empty note.') : tr('Empty note. Switch to Edit to write.')}</p>`}</div>`}
+      : `<div class="md ntmd" id="nt-md">${n.body.trim() ? mdTaskRefs(renderMd(n.body, false, {lid: S.nt.lid})) : `<p class="muted">${ro ? tr('Empty note.') : tr('Empty note. Switch to Edit to write.')}</p>`}</div>`}
     <div class="ntfoot muted"><span id="nt-saved" role="status" aria-live="polite"></span><span class="spacer"></span><span>${esc(tr('Changed {0}', fmtWhen(n.updated_at)))}${n.updated_by_name ? ' · ' + esc(n.updated_by_name) : ''}</span></div>`;
 }
 const noteCur = () => S.nt.notes && S.nt.notes.find(n => n.id === S.nt.id);
@@ -15493,7 +16227,7 @@ function newsSummaryLine(g) {
     unassign: () => tr('unassigned'), complete: () => tr('completed'), newtask: n => trn('{0} new task', '{0} new tasks', n), status: () => tr('status changed'),
     share: () => tr('shared with you'), approval: n => trn('{0} approval waits', '{0} approvals wait', n), proposal: () => tr('a proposal is ready'),
     followup: () => tr('follow up today'), unblock: () => tr('unblocked'), take: () => tr('taken'), role: () => tr('your role changed'), owner: () => tr('you own it now'),
-    unshare: () => tr('removed'), usage: () => tr('usage limit')};
+    unshare: () => tr('removed'), usage: () => tr('usage limit'), errreport: () => tr('new error')};
   return Object.entries(c).map(([k, n]) => (L[k] || (() => k))(n)).join(' · ');
 }
 function newsGroupHtml(g, pop) {
@@ -15510,9 +16244,10 @@ function newsGroupHtml(g, pop) {
     ${exp && g.items.length > 1 ? `<div class="nlist ngitems">${g.items.map(([it, i]) => newsItemHtml(it, i, pop)).join('')}</div>` : ''}</div>`;
 }
 function newsBundledHtml(vis, pop) {
+  // 2.18.0 (#652): the two sections are h2 (the page's h1 is the header title; the bell's panel has no heading above them)
   const gs = newsGroups(vis), needs = gs.filter(g => g.needs), info = gs.filter(g => !g.needs);
-  return (needs.length ? `<section class="nsect" aria-labelledby="ns-need"><h3 id="ns-need" class="nsh">${tr('Needs you')}<span class="c">${needs.length}</span></h3>${needs.map(g => newsGroupHtml(g, pop)).join('')}</section>` : '')
-    + (info.length ? `<section class="nsect" aria-labelledby="ns-info"><h3 id="ns-info" class="nsh">${tr('For your information')}<span class="c">${info.length}</span></h3>${info.map(g => newsGroupHtml(g, pop)).join('')}</section>` : '');
+  return (needs.length ? `<section class="nsect" aria-labelledby="ns-need"><h2 id="ns-need" class="nsh">${tr('Needs you')}<span class="c">${needs.length}</span></h2>${needs.map(g => newsGroupHtml(g, pop)).join('')}</section>` : '')
+    + (info.length ? `<section class="nsect" aria-labelledby="ns-info"><h2 id="ns-info" class="nsh">${tr('For your information')}<span class="c">${info.length}</span></h2>${info.map(g => newsGroupHtml(g, pop)).join('')}</section>` : '');
 }
 async function newsGroupRead(ids) {
   try { await rawFetch('POST', '/api/news/read', {ids}); } catch (e) { toast(e.message); return; }

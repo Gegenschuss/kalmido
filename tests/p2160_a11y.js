@@ -281,7 +281,10 @@ const ACCENTS = ['violet', 'raspberry', 'mint', 'sky', 'rose', 'orange', 'lime']
       const st = document.createElement('style'); st.textContent = txt + '\\n*,*::before,*::after{transition:none!important;animation:none!important}'; document.head.appendChild(st); sheets.forEach(x => { x.disabled = true; });
       a.classList.add('__fv'); const anc = []; for (let e = a; e && e.classList; e = e.parentElement) { e.classList.add('__fw'); anc.push(e); }
       const s = getComputedStyle(a), r = a.getBoundingClientRect();
-      const ring = (parseFloat(s.outlineWidth) >= 2 && s.outlineStyle !== 'none') || (s.boxShadow && s.boxShadow !== 'none') || a.matches('.card,#detail,#view,section[tabindex="-1"]');
+      // 2.18.0: a field inside a composite input bar (quick add, comment box, search fields, the palette) has its ring on the bar
+      const bars = ['.qadd .box', '.qadd.dock', '.ccomp', '.ssearch', '.sssearch', '.pqbar'].map(x => a.matches('input,textarea') && a.closest(x)).filter(Boolean);
+      const ring = (parseFloat(s.outlineWidth) >= 2 && s.outlineStyle !== 'none') || (s.boxShadow && s.boxShadow !== 'none') || a.matches('.card,#detail,#view,section[tabindex="-1"]')
+        || bars.some(b => { const bs = getComputedStyle(b); return bs.boxShadow && bs.boxShadow !== 'none'; });
       const cx = Math.min(innerWidth - 1, Math.max(0, r.left + Math.min(r.width / 2, 20))), cy = Math.min(innerHeight - 1, Math.max(0, r.top + r.height / 2)), top = document.elementFromPoint(cx, cy);
       const out = {tag: a.tagName, id: a.id, cls: String(a.className?.baseVal ?? a.className).replace(/\\s*__f[vw]/g, '').slice(0, 40), act: a.dataset?.act || '', ring: !!ring, vis: r.width > 0 && r.height > 0,
         covered: !!top && !a.contains(top) && !top.contains(a), inView: r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth,

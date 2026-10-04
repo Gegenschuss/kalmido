@@ -184,7 +184,7 @@ check(Ca.post(B + f"/api/lists/{P}/repos", json=body).status_code == 403, "a vie
 check(ag.post(f"/lists/{P}/repos", json=body).status_code in (404, 405), "no API route to connect (agents never connect)")
 check(requests.post(B + f"/api/lists/{P}/repos", json=body, headers={"Authorization": "Bearer " + AGTOK, **H}).status_code in (401, 403),
       "an agent token cannot reach the web endpoint")
-for bad in ({**body, "repo": "no-slash"}, {**body, "repo": "a/b c"}, {**body, "provider": "gitlab"}, {**body, "token": "has space"},
+for bad in ({**body, "repo": "no-slash"}, {**body, "repo": "a/b c"}, {**body, "provider": "svn"}, {**body, "token": "has space"},
             {"provider": "gitea", "repo": "team/tool"}):
     r = A.post(B + f"/api/lists/{P}/repos", json=bad)
     check(r.status_code == 400, f"invalid input refused: {bad.get('repo')} {bad.get('provider')} -> {r.status_code}")

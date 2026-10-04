@@ -216,8 +216,8 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
   const srow = d.querySelector(`#side .srow[data-list="${PL}"]`);
   srow.dispatchEvent(new w.MouseEvent('contextmenu', {bubbles: true, cancelable: true})); await sleep(100);
   pop = d.querySelector('#pop:not(.hidden)');
-  check(pop && /List/.test(pop.textContent) && /Project/.test(pop.textContent) && !/Shopping & packing list/.test(pop.textContent) && /Edit list…/.test(pop.textContent), 'sidebar context menu: the types');
-  [...pop.querySelectorAll('button')].find(b => b.textContent.trim() === 'Type: Project').click();
+  check(pop && /As a list/.test(pop.textContent) && /As a project/.test(pop.textContent) && !/Shopping & packing list/.test(pop.textContent) && /Edit list…/.test(pop.textContent), 'sidebar context menu: the types');
+  [...pop.querySelectorAll('button')].find(b => b.textContent.trim() === 'As a project').click();
   check(await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === PL).kind === 'project'), 'context menu: type changed on the server');
   check(await until(() => d.querySelector('#top .kbadge') && /Project/.test(d.querySelector('#top .kbadge').textContent)), 'Project badge in the header');
   w.eval(`openDetail(${pt})`); await sleep(300);

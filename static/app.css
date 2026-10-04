@@ -551,6 +551,8 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 .tl-headtrack{background:none;display:flex;flex-direction:column}
 .tl-months{position:relative;height:1.25rem}
 .tl-m{position:absolute;top:.1875rem;font-size:.6875rem;font-weight:600;color:var(--muted);white-space:nowrap;padding-left:.25rem}
+/* 2.18.0 review (R10): the label spans its month (width set inline) and sticks right of the sticky names */
+.tl-m span{position:sticky;left:calc(var(--tl-name) + .25rem);display:inline-block}
 .tl-days{display:flex;height:2rem}
 .tl-d{flex:0 0 var(--dw);text-align:center;font-size:.6875rem;line-height:1.15;color:var(--muted);padding-top:2px}
 .tl-d span{display:block;font-size:.5625rem;opacity:.7}
@@ -791,7 +793,7 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 #rail .rbtn svg.i.l{width:1.125rem;height:1.125rem}
 #rail .rbtn>span:not(.dot):not(.temoji):not(.tsw){display:none}
 #rail .rbtn .temoji{font-size:1.0625rem}
-#tabs button>span:not(.dot):not(.temoji):not(.tsw){max-width:100%;padding:0 .1875rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#tabs button>span:not(.dot):not(.temoji):not(.tsw):not(.tico){max-width:100%;padding:0 .1875rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .navrow .temoji{font-size:.9375rem;height:1.125rem;line-height:1.125rem}
 .navrow .tsw{width:.625rem;height:.625rem;margin:.1875rem}
 .navrow svg.i.l{width:1rem;height:1rem;color:var(--muted)}
@@ -1360,14 +1362,14 @@ svg.chart{display:block;max-width:100%;overflow:visible}
 .tfoot .tskip{background:transparent;border-color:transparent;color:var(--muted)}
 .tfoot .tskip:hover{color:var(--text)}
 :root[data-theme="light"] .tring{box-shadow:0 0 0 2px var(--accent),0 0 0 9999px rgba(20,26,32,.42)}
-/* celebration: the sloth swings across on a vine from the top edge; checkmark confetti at the bottom of the arc */
+/* celebration: the heron swings across on a vine from the top edge; checkmark confetti at the bottom of the arc */
 .cele{position:fixed;inset:0;z-index:96;pointer-events:none;overflow:hidden;color:var(--accent)}
 .carm{position:absolute;left:50%;top:-1.875rem;width:2px;margin-left:-1px;transform-origin:50% 0;will-change:transform}
 .cvine{position:absolute;left:0;top:0;bottom:0;width:2px;background:linear-gradient(var(--accent),color-mix(in srgb,var(--accent) 55%,transparent));border-radius:1px}
 .cvine::before,.cvine::after{content:'';position:absolute;left:-.25rem;width:.5rem;height:.3125rem;border:1.5px solid color-mix(in srgb,var(--accent) 70%,transparent);border-radius:0 .5rem 0 .5rem}
 .cvine::before{top:38%}.cvine::after{top:66%;transform:scaleX(-1)}
 .cfig{position:absolute;left:-7.5625rem;top:calc(100% - .375rem);width:8.25rem;height:11rem;transform-origin:7.5625rem .375rem;will-change:transform}
-.csloth{width:100%;height:100%;overflow:visible;filter:drop-shadow(0 .375rem 1rem rgba(0,0,0,.35))}
+.cheron{width:100%;height:100%;overflow:visible;filter:drop-shadow(0 .375rem 1rem rgba(0,0,0,.35))}
 .cconf{position:absolute;left:-.625rem;top:-.625rem;width:1.25rem;height:1.25rem;opacity:0;will-change:transform,opacity}
 .cconf svg{width:100%;height:100%;stroke:var(--accent)}
 .cconf.alt svg{stroke:var(--text)}
@@ -1377,7 +1379,7 @@ svg.chart{display:block;max-width:100%;overflow:visible}
 .cele-quip div{display:flex;flex-direction:column;gap:2px;min-width:0}
 .cele-quip b{font-size:var(--fs-s);font-weight:500;color:var(--accent);font-family:var(--mono)}
 .cele-quip span{font-size:var(--fs-b);color:var(--text)}
-.cele-quip .csloth{width:2.25rem;height:3rem;flex:none;color:var(--accent);filter:none}
+.cele-quip .cheron{width:2.25rem;height:3rem;flex:none;color:var(--accent);filter:none}
 .cele-quip.calm{transition:none}
 @media (prefers-reduced-motion: reduce){.tring{transition:none}.cele-quip{transition:none}.flash{animation:none}}
 
@@ -1866,7 +1868,7 @@ body.tdrag .sdrop{display:flex}
 /* U13: touch targets at least 44 x 44 px on touch screens (a hit area where the look must stay small) */
 @media (pointer:coarse){
   #top .iconbtn,#top .kbtn,#top .tmini,#top .offline,#top .cfpill{min-width:2.75rem;min-height:2.75rem;justify-content:center}
-  #top .seg button{min-height:2.5rem;min-width:2.75rem;justify-content:center}
+  #top .seg button{min-height:2.75rem;min-width:2.75rem;justify-content:center}  /* 2.18.0 (#652): was 2.5rem (47 x 40 on a Fold) */
   #top .btn.sm{min-height:2.75rem}
   .chk::after{inset:-.875rem}
   .shead button,.fhead .iconbtn,.srow.reorder .iconbtn{position:relative}
@@ -2018,6 +2020,64 @@ button.tvr-task:hover{color:var(--accent)}
 .tl-track.ndt.ed{cursor:crosshair}
 .tl-track.ndt.ed:hover{background-color:color-mix(in srgb,var(--accent) 5%,transparent)}
 .tl-bar.ndraw{pointer-events:none;opacity:.8;border-style:dashed}
+/* 2.18.0 (#462): sections inside a list of the timeline / roadmap; (#431) drawing a new task into a list / section row */
+.tl-sec .tl-name{padding:0 .25rem 0 .375rem;gap:.125rem;cursor:default;font-size:.75rem}
+.tl-sec .tl-name:hover{color:inherit}
+.tl-secb{display:flex;align-items:center;gap:.3125rem;flex:1;min-width:0;min-height:1.75rem;padding:0 .25rem;border:0;background:none;color:var(--text2);font:inherit;font-weight:600;border-radius:var(--r-s);cursor:pointer;text-align:left}
+.tl-secb:hover{color:var(--accent)}
+.tl-secb .tln{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.tl-secb .c,.tl-sec .c{font-size:.6875rem;color:var(--faint);font-family:var(--mono);font-weight:400;flex:none}
+.tl-secb .fcar{width:.75rem;height:.75rem;flex:none;transition:transform .15s}
+.tl-secb .fcar.shut{transform:rotate(-90deg)}
+.tl-secb:focus-visible,.tl-secadd:focus-visible,.tl-addb:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.tl-secadd{flex:none;padding:.25rem;min-width:1.75rem;min-height:1.75rem;justify-content:center;color:var(--muted)}
+.tl-row.tl-insec>.tl-name,.rm-t.rm-insec>.tl-name{padding-left:1.25rem}
+.rm-t.rm-insec>.tl-name.rm-tname{padding-left:2.25rem}
+.tl-add{border-bottom-style:dashed}
+.tl-add .tl-name{padding:0 .25rem;cursor:default}
+.tl-add .tl-name:hover{color:inherit}
+.tl-addb{display:inline-flex;align-items:center;gap:.3125rem;min-height:1.75rem;padding:0 .375rem;border:0;background:none;color:var(--muted);font:inherit;font-size:.75rem;border-radius:var(--r-s);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.tl-addb:hover{color:var(--accent)}
+.tl-track.tl-cr{cursor:crosshair;-webkit-touch-callout:none;user-select:none}
+.tl-track.tl-cr:hover{background-color:color-mix(in srgb,var(--accent) 4%,transparent)}
+.tl-ghost{position:absolute;top:.3125rem;height:2.125rem;border-radius:.4375rem;border:1px dashed var(--accent);background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--text2);font-size:.6875rem;display:flex;align-items:center;padding:0 .375rem;white-space:nowrap;overflow:hidden;pointer-events:none;z-index:2;font-variant-numeric:tabular-nums}
+.tl-new{position:absolute;top:.25rem;left:max(0rem,min(var(--x),calc(100% - 21rem)));width:21rem;max-width:100%;height:2.25rem;display:flex;align-items:center;gap:.25rem;padding:0 .25rem 0 .125rem;border:1px solid var(--accent);border-radius:.4375rem;background:var(--bg2);box-shadow:0 .25rem .875rem rgba(0,0,0,.25);z-index:5;cursor:default}
+.tl-new input{flex:1;min-width:0;height:100%;border:0;background:none;color:var(--text);font:inherit;font-size:.8125rem;padding:0 .375rem;outline:none}
+.tl-new:focus-within{box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 35%,transparent),0 .25rem .875rem rgba(0,0,0,.25)}
+.tl-nwhen{flex:none;font-size:.6875rem;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.tl-nws{display:none}
+/* 2.18.0 review (R2): touch: tab bar and "+" step aside while the new-task field has the focus (keyboard up) */
+body.tl-typing #tabs,body.tl-typing #fab{display:none}
+.tl-new .iconbtn{flex:none;padding:.25rem;min-width:1.75rem;min-height:1.75rem;justify-content:center}
+/* milestone tasks: a diamond at the date (like the markers), the name next to it */
+.tl-bar.tl-dia{background:none;border:0;padding:0;overflow:visible;box-shadow:none}
+.tl-bar.tl-dia::before{content:"";position:absolute;left:50%;top:50%;width:.875rem;height:.875rem;margin:-.4375rem 0 0 -.4375rem;background:var(--accent);transform:rotate(45deg);border-radius:2px;box-shadow:0 0 0 2px var(--bg2)}
+.tl-bar.tl-dia.over::before{background:var(--p5)}
+.tl-bar.tl-dia.done::before{background:var(--faint)}
+.tl-bar.tl-dia.done span{text-decoration:none;color:var(--muted)}
+.tl-bar.tl-dia.drag{box-shadow:none}
+.tl-bar.tl-dia.drag::before{box-shadow:0 0 0 2px var(--bg2),0 .25rem .75rem rgba(0,0,0,.35)}
+.tl-bar.tl-dia span{font-weight:500}
+.tl-bar.flash{animation:tlflash 1.2s ease-out}
+@keyframes tlflash{0%,40%{box-shadow:0 0 0 .1875rem color-mix(in srgb,var(--accent) 45%,transparent)}100%{box-shadow:none}}
+@media (prefers-reduced-motion: reduce){.tl-bar.flash{animation:none}.tl-secb .fcar{transition:none}}
+@media (pointer:coarse){
+  .tl-secb,.tl-addb,.tl-secadd,.tl-new .iconbtn{min-height:2.75rem}
+  .tl-secadd,.tl-new .iconbtn{min-width:2.75rem}
+  .tl-new{height:2.75rem;top:.25rem}
+  .tl-ghost{top:.25rem;height:2.75rem}
+}
+@media (max-width:899px){
+  .tl-new{width:min(17rem,calc(100vw - 9rem));left:max(0rem,min(var(--x),calc(100% - min(17rem,calc(100vw - 9rem)))))}
+  /* 2.18.0 review (R4): the range in short form (5.10.–8.10.) instead of none */
+  .tl-nwl{display:none}
+  .tl-nws{display:inline}
+  .tl-new{gap:.125rem}
+  .tl-sec .c{display:none}
+  /* 2.18.0 review (R5): section names were cut to two letters next to the fold arrow and "+": a section row's name
+     reaches 4.5rem into its own track (only a drawing area there, no bars), the track itself stays where it is */
+  .tl-sec>.tl-name{flex-basis:calc(var(--tl-name) + 4.5rem);width:calc(var(--tl-name) + 4.5rem);margin-right:-4.5rem}
+}
 .calbar .chip.on{border-color:var(--accent);color:var(--accent)}
 
 /* 1.7.0: Flow "next" marker, cycle hint, overdue banner on Today */
@@ -2121,6 +2181,11 @@ button.tvr-task:hover{color:var(--accent)}
 .chcomp{display:flex;gap:.5rem;align-items:flex-end;padding:.625rem .75rem;border-top:1px solid var(--line)}
 .chcomp textarea{flex:1;resize:none;max-height:10rem;min-height:2.375rem;padding:.5rem .625rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg);color:var(--text);font:inherit;font-size:.875rem;line-height:1.4;text-align:left;box-sizing:border-box}
 .chcomp textarea:focus{outline:none;border-color:var(--accent)}
+/* 2.18.0 (review R14): a long placeholder ("Message to <long list name>…") stays on one line with an ellipsis instead of
+   wrapping into the one-row field (the field's aria-label keeps the whole text); the team chat cuts the list name in it
+   to 18 characters + "…", as Firefox draws no ellipsis in a textarea's placeholder */
+.chcomp textarea:placeholder-shown{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chcomp textarea::placeholder{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cmsg .runtask{display:inline-flex;align-items:center;gap:.25rem;padding:.125rem .25rem;color:var(--muted);font-size:.8125rem;max-width:100%}
 .chnote{padding:0 .75rem .75rem;margin:0}
 /* 2.12.2 (#451): "Load older messages" above the newest 30, "New message ↓" over the bottom edge of the list while scrolled up */
@@ -2163,11 +2228,13 @@ body.chat-yield #achat{display:none}
 #achat .atyping,.chview .atyping{padding:.25rem .875rem .5rem}
 /* global: spinning ring on the agent chip / agents button while an agent works, an accent dot while it waits */
 .achip{position:relative}
-.achip.aspin::before,#rail .aspin::before,#tabs .aspin::before{content:'';position:absolute;border-radius:50%;border:2px solid color-mix(in srgb,var(--accent) 22%,transparent);border-top-color:var(--accent);pointer-events:none}
+.achip.aspin::before,#rail .aspin::before,#tabs .aspin .tico::before{content:'';position:absolute;border-radius:50%;border:2px solid color-mix(in srgb,var(--accent) 22%,transparent);border-top-color:var(--accent);pointer-events:none}
 .achip.aspin::before{left:.125rem;top:50%;width:1.5rem;height:1.5rem;margin-top:-.75rem}
 .rbtn.aspin::before{inset:.125rem}
-#tabs .aspin::before{top:.1875rem;left:50%;width:1.875rem;height:1.875rem;margin-left:-.9375rem}
-@media (prefers-reduced-motion:no-preference){ .aspin::before{animation:aspin .9s linear infinite} }
+/* 2.18.0: the ring sits on the icon itself (concentric at every tab height: phone, foldable, larger fonts), not at a fixed top */
+#tabs .tico{position:relative;display:inline-grid;place-items:center;line-height:0}
+#tabs .aspin .tico::before{top:50%;left:50%;width:1.875rem;height:1.875rem;margin:-.9375rem 0 0 -.9375rem;transform-origin:center}
+@media (prefers-reduced-motion:no-preference){ .aspin::before,.aspin .tico::before{animation:aspin .9s linear infinite} }
 @keyframes aspin{to{transform:rotate(360deg)}}
 .achip.await::after,#rail .await::after,#tabs .await::after{content:'';position:absolute;width:.5rem;height:.5rem;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--bg2);pointer-events:none}
 .achip.await::after{left:1.125rem;top:.125rem}
@@ -2338,6 +2405,9 @@ a.gitrow:hover{background:var(--bg3)}
 .rpsec code{font-family:var(--mono);word-break:break-all;user-select:all}
 .repoadd{display:flex;flex-direction:column;gap:.25rem;margin-top:.5rem;padding-top:.5rem;border-top:1px solid var(--line)}
 .repoadd .row input,.repoadd .row select{flex:1;min-width:0}
+/* 2.18.0 (#408): error reports -> tickets, below the repositories */
+.errhook{margin-top:.5rem;padding-top:.5rem;border-top:1px solid var(--line)}
+.errhook .errrow .n b{font-weight:600}
 .sug.mr .mrsum{font-size:var(--fs-s);color:var(--text2);margin:.25rem 0}
 .sug.mr.approved{border-color:color-mix(in srgb,var(--ok) 45%,var(--line))}
 .sug.mr.rejected{opacity:.75}
@@ -2955,7 +3025,7 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 @media (pointer:coarse){ .dcb{min-height:2.75rem;min-width:2.75rem;justify-content:center} }
 /* #421 #422: chat reactions, Sent / Delivered, "answers later" */
 .cmsg .cmeta{display:flex;align-items:center;gap:.375rem}
-.cdlv{display:inline-flex;align-items:center;font-size:var(--fs-xs);color:var(--faint);gap:0}
+.cdlv{display:inline-flex;align-items:center;font-size:var(--fs-xs);color:var(--muted);gap:0}  /* 2.18.0 (review R13): muted, not faint: "Sent" >= 4.5:1 */
 .cdlv .i{width:.75rem;height:.75rem}
 .cdlv .i+.i{margin-left:-.375rem}
 .cdlv span{margin-left:.25rem}
@@ -3117,11 +3187,13 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
   #top{padding:calc(.625rem + var(--safe-t)) .5rem .375rem .25rem}
   #top h1{font-size:1.1875rem;gap:.5rem}
   #top{gap:.25rem}
-  .trow{min-height:2.75rem}
+  .trow{min-height:max(2.75rem,var(--row-h))}  /* 2.18.0 (review R8): 44 px at least, taller with "Custom" */
 }
 /* touch: 44 px targets in the sidebar / drawer and the header's new buttons */
 @media (pointer:coarse){
   #side .srow,#side .fhead,.scmd{min-height:2.75rem}
+  #side .srow,#side .fhead{min-height:max(2.75rem,var(--srow-h))}  /* 2.18.0 (review R8): the "Custom" sidebar slider may make them taller */
+  .trow{min-height:max(2.75rem,var(--row-h))}  /* 2.18.0 (review R8): task rows 44 px on every touch screen (Compact on a tablet was 40 px), so Custom starts without a jump */
   #side .shead button,.sgh .sgt{min-height:2.75rem;min-width:2.75rem}
   #top .cmdbar,#top .tnew{min-height:2.75rem}
   .ttabs button{min-height:2.75rem}
@@ -3627,6 +3699,13 @@ pre.mdpre code{font:inherit;background:none;padding:0;border:0}
 .trow:has(.ttl[data-kt]:focus-visible){background:var(--accent-soft)}
 /* fields: a 2 px ring on keyboard focus (a coloured 1 px border alone was faint), dialogs focused as a whole: no ring */
 input:focus-visible,select:focus-visible,textarea:focus-visible{box-shadow:0 0 0 1px var(--accent)}
+/* 2.18.0: composite input bars (quick add inline / sheet / dock, comment box, search fields, the palette) show the focus
+   ONCE, on the bar (2 px: border + 1 px ring, 3:1 against the background), never a second box around the inner field */
+:is(.qadd .box,.qadd.dock,.ccomp,.ssearch,.sssearch,.pqbar) :is(input,textarea):focus-visible{box-shadow:none;outline:0}
+.qadd .box:focus-within,.ccomp:focus-within,.ssearch:focus-within,.selsheet .sssearch:focus-within{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.qadd.dock:focus-within{box-shadow:0 0 0 1px var(--accent),0 .5rem 2rem rgba(0,0,0,.18)}
+.qadd.dock .box:focus-within{box-shadow:none}
+.pqbar:focus-within{box-shadow:inset 0 -2px 0 var(--accent)}
 .modal>.card:focus{outline:none}
 /* the focused element is never hidden under the sticky group headers / the docked composer (2.4.11) */
 #view{scroll-padding:2.75rem 0 6.5rem}
@@ -3685,24 +3764,32 @@ body.pgdrag,body.pgdrag *{cursor:col-resize!important;user-select:none!important
 .lchead .lcg:hover::after,.lchead .lcg:focus-visible::after{background:var(--accent)}
 .lchead .lcg:focus{outline:none}.lchead .lcg:focus-visible{outline:2px solid var(--accent)}
 /* 2.16.0 (#642): the sidebar's own density (Compact / Comfortable / Custom). Compact: less room between groups and rows,
-   shorter group headings; on touch the rows stay 44 px (only the gaps shrink) */
-:root[data-sdensity="compact"] #side{--srow-h:1.75rem;padding-top:.875rem}
+   shorter group headings; on touch the rows stay 44 px (only the gaps shrink). 2.18.0 (review R8): the gaps also apply to
+   "Custom" while its sidebar slider is in the compact half (data-sbase), so starting Custom does not move anything */
+:root[data-sdensity="compact"] #side{--srow-h:1.75rem}
+:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side{padding-top:.875rem}
 :root[data-sdensity="comfortable"] #side{--srow-h:2.25rem}
-:root[data-sdensity="compact"] #side .sgroup{margin-top:.5rem}
-:root[data-sdensity="compact"] #side .sbrand{padding-bottom:.5rem}
-:root[data-sdensity="compact"] #side .scmd{height:2rem;margin-bottom:.25rem}
-:root[data-sdensity="compact"] #side .shead{min-height:1.375rem}
-:root[data-sdensity="compact"] #side .sfoot{margin-top:.625rem;padding-top:.375rem}
+:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .sgroup{margin-top:.5rem}
+:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .sbrand{padding-bottom:.5rem}
+:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .scmd{height:2rem;margin-bottom:.25rem}
+:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .shead{min-height:1.375rem}
+:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .sfoot{margin-top:.625rem;padding-top:.375rem}
 @media (pointer:coarse){
-  :root[data-sdensity="compact"] #side .sgroup{margin-top:.125rem}
+  :root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .sgroup{margin-top:.125rem}
   :root[data-sdensity="compact"] #side .srow,:root[data-sdensity="compact"] #side .fhead{min-height:2.75rem}
-  :root[data-sdensity="compact"] #side .scmd{height:2.75rem}
-  :root[data-sdensity="compact"] #side .shead button,:root[data-sdensity="compact"] .sgh .sgt{min-height:2.25rem}
-  :root[data-sdensity="compact"] #side .shead{min-height:2.25rem}
-  :root[data-sdensity="compact"] #side .sfoot{margin-top:.25rem;padding-top:.125rem}
+  :root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .scmd{height:2.75rem}
+  :root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .shead button,:root:is([data-sdensity="compact"],[data-sbase="compact"]) .sgh .sgt{min-height:2.25rem}
+  :root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .shead{min-height:2.25rem}
+  :root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .sfoot{margin-top:.25rem;padding-top:.125rem}
 }
 .lkdens{align-items:center;gap:.75rem}
 .lkdens .lkdl{min-width:7rem;color:var(--text2);font-size:var(--fs-m)}
+/* 2.18.0 (#642): the two spacing sliders of "Custom" (label on its own line on narrow screens) */
+.lkdens{display:flex;flex-wrap:wrap}
+.lkdens .lkdl{flex:1 0 100%;min-width:0}
+.lkdens input[type=range]{flex:1 1 8rem;min-width:6rem;accent-color:var(--accent);min-height:2.75rem}
+.lkdens .lkA{font-size:var(--fs-xs);color:var(--muted)}
+.lkdens output{font:600 var(--fs-m) var(--mono);min-width:3.5rem;text-align:right}
 /* 2.16.0 (#643): the smiley that opens the quick reactions: in the message's time line (chat) / after the reactions
    (comments); always visible on touch (a 44 px target that does not make the line taller), quiet on desktop until hover */
 .rx.rxtog{border:0;background:none;color:var(--muted);padding:0 .25rem;min-height:1.5rem;display:inline-flex;align-items:center;justify-content:center}
@@ -3897,3 +3984,114 @@ a.tref:hover{background:var(--accent-soft)}
 /* a row title without a control of its own (looks like the row labels) */
 .modal .row .rlab{min-width:8.75rem;color:var(--muted);font-size:var(--fs-m)}
 @media (max-width:899px){ .modal .row .rlab{min-width:100%} }
+/* 2.18.0 (#651): the quick reactions of a chat message stay visible in its meta line (agent chat + team chat, own messages
+   too): an unused one is only its muted emoji, a used one a pill with its number; touch: 44 px targets whose pill is drawn
+   smaller (::before) and negative margins keep the line low */
+.cmeta .rxrow{display:inline-flex;flex-wrap:wrap;align-items:center;gap:.125rem;margin:0}
+.rxrow .rx{height:1.5rem;padding:0 .375rem}
+/* 2.18.0 (review R12): an unused reaction is a flat grey silhouette of its emoji (brightness(0) + invert = one grey for
+   👍 👎 ❤️ alike, >= 3:1 on the page in both themes; a grey filter kept yellow 👍 at ~2:1), colour on hover / focus */
+.rxrow .rx.add{opacity:1;border-style:solid;border-color:transparent;filter:var(--rx-idle,brightness(0) invert(.6))}
+:root[data-theme="light"] .rxrow .rx.add{--rx-idle:brightness(0) invert(.42)}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"] .rxrow .rx.add{--rx-idle:brightness(0) invert(.42)} }
+.rxrow .rx.add:not(:disabled):is(:hover,:focus-visible){opacity:1;filter:none;border-color:var(--line2)}
+.rxrow .rxok,.rxrow .rxhint{margin-left:.125rem}
+@media (pointer:coarse){
+  .cmeta .rxrow{gap:0}
+  .rxrow .rx{position:relative;z-index:0;height:auto;min-width:2.75rem;min-height:2.75rem;margin-block:-.625rem;justify-content:center}
+  .rxrow .rx,.rxrow .rx.on,.rxrow .rx.add:is(:hover,:focus-visible){border-color:transparent;background:transparent}
+  .rxrow .rx::before{content:"";position:absolute;z-index:-1;inset:.5625rem .125rem;border-radius:99rem;border:1px solid transparent;pointer-events:none}
+  .rxrow .rx:not(.add)::before{border-color:var(--line2)}
+  .rxrow .rx.on::before{border-color:color-mix(in srgb,var(--accent) 70%,transparent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+}
+/* 2.18.0 (#408): list dialog > Project type: the offer to add the type's sections */
+.ptoffer{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem .5rem;color:var(--text);background:var(--bg3);border-radius:var(--radius);padding:.5rem .625rem;margin:0 0 .625rem}
+.ptoffer>span:first-child{flex:1 1 12rem;min-width:0}
+.ptobtns{display:flex;flex-wrap:wrap;gap:.375rem}
+.lrepohint{color:var(--text)}
+/* 2.18.0 (#408): Code section: branch name + commit reference side by side (wrap on phones), one tap each */
+.gcopy{display:flex;flex-wrap:wrap;gap:0 .25rem;min-width:0}
+@media (pointer:coarse){ .gcopy .gbranch{min-height:2.75rem} }
+/* 2.18.0 (#408 G): code blocks: syntax colours (AA >= 4.5:1 on --bg3 in both themes, independent of the accent) + Copy */
+:root{--hl-k:#c4a7ff;--hl-s:#8fd694;--hl-c:#9497a0;--hl-n:#f0b46b;--hl-t:#79b8ff;--hl-a:#e6c07b;--hl-add:#7ee2a8;--hl-del:#ff9a94;--hl-m:#79b8ff}
+:root[data-theme="light"]{--hl-k:#7a3eb8;--hl-s:#1d6b33;--hl-c:#5f636b;--hl-n:#9a4a00;--hl-t:#1958a8;--hl-a:#7d5200;--hl-add:#17663a;--hl-del:#b42318;--hl-m:#1958a8}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"]{--hl-k:#7a3eb8;--hl-s:#1d6b33;--hl-c:#5f636b;--hl-n:#9a4a00;--hl-t:#1958a8;--hl-a:#7d5200;--hl-add:#17663a;--hl-del:#b42318;--hl-m:#1958a8} }
+.hl-k{color:var(--hl-k);font-weight:600}.hl-s{color:var(--hl-s)}.hl-c{color:var(--hl-c);font-style:italic}.hl-n{color:var(--hl-n)}
+.hl-t{color:var(--hl-t)}.hl-a{color:var(--hl-a)}.hl-m{color:var(--hl-m)}
+.hl-add{color:var(--hl-add);background:color-mix(in srgb,var(--hl-add) 10%,transparent)}
+.hl-del{color:var(--hl-del);background:color-mix(in srgb,var(--hl-del) 10%,transparent)}
+.mdcode{position:relative;max-width:100%}
+.mdcode pre.mdpre{padding-right:2.25rem}
+.mdcode .mdcopy{position:absolute;top:.25rem;right:.25rem;opacity:.75;background:var(--bg3)}
+.mdcode .mdcopy:hover,.mdcode .mdcopy:focus-visible{opacity:1}
+@media (pointer:coarse){ .mdcode pre.mdpre{padding-right:3.25rem} .mdcode .mdcopy{min-width:2.75rem;min-height:2.75rem;opacity:1} }
+/* 2.18.0 (#408 F): "Similar open ticket" hint in the task panel of a new bug */
+.ddup{display:flex;align-items:center;gap:.375rem;margin:.25rem 0 .5rem;padding:.25rem .25rem .25rem .625rem;background:var(--bg3);border-radius:var(--radius);font-size:var(--fs-s);color:var(--text2);min-width:0}
+.ddup>.i{color:var(--p3);flex:none}
+.ddupt{flex:1;min-width:0;overflow-wrap:anywhere}
+.ddupt .linkbtn{color:var(--accent);text-align:left}
+@media (pointer:coarse){ .ddup .iconbtn{min-width:2.75rem;min-height:2.75rem;justify-content:center} .ddupt .linkbtn{min-height:2.75rem} }
+/* 2.18.0 (#430): milestones = tasks with a diamond instead of the round status glyph; milestone section in the task panel */
+.msd{display:inline-block;flex:none;width:.5625rem;height:.5625rem;border:1.5px solid currentColor;border-radius:1px;transform:rotate(45deg);margin:0 .3125rem 0 .125rem;vertical-align:.0625rem}
+.chk.ms{border-radius:2px;transform:rotate(45deg) scale(.88)}
+.chk.ms svg{transform:rotate(-45deg)}
+.chk.ms.work{border-left-color:var(--st-work)}
+.povm .chk.ms{border-radius:2px}
+.meta .msm{display:inline-flex;align-items:center;font-size:var(--fs-xs);color:var(--muted)}
+.meta .mschip{display:inline-flex;align-items:center;max-width:12rem;font-size:var(--fs-xs);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta .mschip .msd{width:.4375rem;height:.4375rem}
+@media (max-width:640px){ .meta .mschip{display:none} }
+.ev.ms .msd,.wev.ms .msd{width:.4375rem;height:.4375rem;margin-left:0;color:var(--accent)}
+.cal .dots i.ms{border-radius:1px;transform:rotate(45deg)}
+.fields .dmsl{display:flex;align-items:center;gap:.375rem;min-width:0}
+.fields .dmsl .msd{margin:0 .125rem}
+.mssec h6{margin:.75rem 0 .25rem;font-size:var(--fs-s);font-weight:600;color:var(--text2)}
+.msprog{display:flex;align-items:center;gap:.625rem;margin:.25rem 0 .5rem}
+.msbar{flex:1;height:.375rem;border-radius:1rem;background:var(--bg3);overflow:hidden}
+.msbar i{display:block;height:100%;background:var(--accent);border-radius:1rem}
+.msnum{font-size:var(--fs-s);color:var(--text2);white-space:nowrap}
+.mstasks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.125rem}
+.mstasks li{display:flex;align-items:center;gap:.375rem;min-width:0;font-size:var(--fs-s)}
+.mstasks li.done .linkbtn{color:var(--muted);text-decoration:line-through}
+.mstasks .mst-st{width:1rem;flex:none;display:inline-grid;place-items:center;color:var(--muted)}
+.mstasks .linkbtn{text-align:left;min-width:1.5rem;min-height:1.5rem;overflow-wrap:anywhere;color:var(--text)}
+.msempty,.msnodate{font-size:var(--fs-s);margin:.25rem 0}
+.msnodate{display:flex;align-items:center}
+.msburn{display:block;width:100%;height:6.25rem;background:var(--bg2);border-radius:var(--r-s)}
+.msburn line,.msburn polyline{fill:none;vector-effect:non-scaling-stroke}
+.msb-ax{stroke:var(--faint);stroke-width:1}
+.msb-ideal{stroke:var(--muted);stroke-width:1.5;stroke-dasharray:4 3}
+.msb-act{stroke:var(--accent);stroke-width:2;stroke-linejoin:round}
+.msblg{display:flex;gap:.75rem;font-size:var(--fs-xs);color:var(--text2);margin:.25rem 0}
+.msblg span::before{content:'';display:inline-block;width:.75rem;height:0;border-top:.125rem solid var(--accent);vertical-align:middle;margin-right:.25rem}
+.msblg .lg-ideal::before{border-top:.125rem dashed var(--muted)}
+.msbtab summary{font-size:var(--fs-s);color:var(--text2);cursor:pointer;padding:.25rem 0}
+.msbtab table{border-collapse:collapse;font-size:var(--fs-s);margin:.25rem 0}
+.msbtab th,.msbtab td{text-align:left;padding:.125rem .75rem .125rem 0;border-bottom:1px solid var(--line)}
+.msrnh{display:flex;align-items:center;gap:.5rem;justify-content:space-between}
+.msrnh h6{margin-bottom:.25rem}
+.msrn{font-size:var(--fs-s);background:var(--bg2);border-radius:var(--r-s);padding:.375rem .625rem;overflow-wrap:anywhere}
+@media (pointer:coarse){ .mstasks .linkbtn,.msbtab summary{min-height:2.75rem;min-width:2.75rem;display:flex;align-items:center} .msrnh .btn{min-height:2.75rem} .fields .dmsl{min-height:2.75rem} }
+@media (forced-colors:active){ .chk.ms{border-color:CanvasText!important} .msbar i{background:Highlight} }
+.povm .pmn .linkbtn{min-width:0;max-width:100%;min-height:1.5rem;text-align:left;color:var(--text);display:flex;align-items:center}
+@media (pointer:coarse){ .povm .pmn .linkbtn{min-height:2.75rem;min-width:2.75rem} }
+/* 2.18.0 review (R13): completed calendar chips readable (opacity .5 gave 3.2:1): muted text + strike-through instead */
+.cal .ev.done,.week .ev.done{opacity:1;color:var(--muted)}
+.wev.done{opacity:1;color:var(--text2)}
+/* 2.18.0 review (R13): the Bug chip on a selected row (accent tint under the red tint) kept 4.3:1 in light: a bit deeper */
+.meta .ttchip.tt-bug{color:color-mix(in srgb,var(--p5) 85%,var(--text))}
+/* 2.18.0 review (R11): a failed repository connect, next to the fields */
+.repoadd .rpcerr{color:var(--danger);font-size:var(--fs-s);overflow-wrap:anywhere}
+.repoadd .rpcerr:empty{display:none}
+.msbnone{margin-top:.25rem}
+/* 2.18.0 review (R13): roadmap list rows: the toggle fills the name cell, "Open list" sits next to it (not inside) */
+.rm-gwrap{gap:.25rem}
+.rm-gwrap .rm-gname{display:flex;align-items:center;flex:1;min-width:0;align-self:stretch}
+.rm-gwrap:hover .rm-go{opacity:1}
+/* 2.18.0 review: with "Set milestone" the bulk bar is wider; next to an open task panel it stays left of it (it covered the
+   panel's comment field at 1440) */
+@media (min-width:900px){ body:has(#app.detail-open) #mbar{left:calc((100vw - var(--detW,25.5rem)) / 2);max-width:calc(100vw - var(--detW,25.5rem) - 1.25rem)} }
+/* 2.18.0 review: the list name in rows (Trash, search, …) cut with "…" (a flex span cannot show the ellipsis) */
+.meta .lst{display:inline-block;min-width:0}
+/* 2.18.0 review: touch targets in the Repository area (error-report (i), the repository link) at least 44 px */
+@media (pointer:coarse){ .errhook .ib.ibl{min-height:2.75rem;margin:0} .reporow .n a{display:block;line-height:2.75rem;white-space:nowrap;align-self:flex-start;max-width:100%;min-width:2.75rem} }

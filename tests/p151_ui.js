@@ -172,7 +172,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   check(await until(async () => (await task(a)).due === T1), 'Tomorrow: due tomorrow');
   let t = await task(a);
   check(t.due_time === '14:30' && t.repeat === 'FREQ=WEEKLY', 'time and repeat stay');
-  check(/Date of/.test(w.eval('HIST.undo[HIST.undo.length - 1].label')), 'one history step: ' + w.eval('HIST.undo[HIST.undo.length - 1]?.label'));
+  check(await until(() => /Date of/.test(w.eval('HIST.undo[HIST.undo.length - 1]?.label || ""'))), 'one history step: ' + w.eval('HIST.undo[HIST.undo.length - 1]?.label'));
   await w.eval(`histStep('undo')`);
   check(await until(async () => (await task(a)).due === addD(T0, 3)), 'undo puts the old day back');
   // detail panel
@@ -228,7 +228,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   click(w, col);
   check(await until(async () => (await st()).lists.find(l => l.id === WORK).color === col.dataset.c), 'colour saves at once');
   check(await until(() => md().querySelector('.ssaved.on [data-m="l-undo"]')), '"Saved · Undo" in the header');
-  check(/Settings of/.test(w.eval('HIST.undo[HIST.undo.length - 1].label')), 'history step: ' + w.eval('HIST.undo[HIST.undo.length - 1]?.label'));
+  check(await until(() => /Settings of/.test(w.eval('HIST.undo[HIST.undo.length - 1]?.label || ""'))), 'history step: ' + w.eval('HIST.undo[HIST.undo.length - 1]?.label'));
   click(w, md().querySelector('[data-m="l-undo"]'));
   check(await until(async () => (await st()).lists.find(l => l.id === WORK).color === ''), 'Undo in the dialog');
   check(await until(() => !md().querySelector('#l-col button.on') || md().querySelector('#l-col button.on').dataset.c === ''), 'the dialog shows the old colour again');
@@ -397,7 +397,9 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   const left = (await call('GET', '/api/tasks?scope=done')).tasks.map(t => t.title).sort().join(',');
   check(left === 'Bob done,Butter', 'view-only and checklist items stay: ' + left);
   check((await call('GET', '/api/tasks?scope=trash')).tasks.some(t => t.id === dn), 'in the trash');
-  check(/Deleted \d+ completed tasks?/.test(w.eval('HIST.undo[HIST.undo.length - 1].label')), 'one history step: ' + w.eval('HIST.undo[HIST.undo.length - 1]?.label'));
+  // 2.18.0 (#652, the flake): the server is done before the app records the step (it reloads its state first), so wait
+  // for the step itself instead of reading it right after the server check
+  check(await until(() => /Deleted \d+ completed tasks?/.test(w.eval('HIST.undo[HIST.undo.length - 1]?.label || ""'))), 'one history step: ' + w.eval('HIST.undo[HIST.undo.length - 1]?.label'));
   const ser = (await call('GET', '/api/state')).tasks.find(t => t.id === a);
   check(ser && ser.status === 0 && ser.repeat === 'FREQ=WEEKLY', 'the recurring series stays open');
   await w.eval(`histStep('undo')`);

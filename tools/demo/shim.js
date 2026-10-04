@@ -544,14 +544,14 @@
     return {ok: status >= 200 && status < 300, status, type: 'basic', redirected: false, url: '', headers: {get: k => /content-type/i.test(k) ? 'application/json' : null, has: k => /content-type/i.test(k)},
       json: async () => JSON.parse(txt), text: async () => txt, clone() { return json(status, body); }}; };
   async function staticFile(path) {
-    // i18n and the sloth lines come as small scripts (CSP: no connect), loaded on demand
+    // i18n and the celebration one-liners come as small scripts (CSP: no connect), loaded on demand
     const m = path.match(/i18n\/([a-z]{2,3})\.json$/);
     if (m) {
       window.KDEMO_I18N = window.KDEMO_I18N || {};
       if (!window.KDEMO_I18N[m[1]]) await new Promise(res => { const s = document.createElement('script'); s.src = `static/i18n/${m[1]}.js`; s.onload = s.onerror = res; document.head.appendChild(s); });
       return window.KDEMO_I18N[m[1]] ? json(200, window.KDEMO_I18N[m[1]]) : json(404, {});
     }
-    if (/sloth-quips\.json$/.test(path)) return window.KDEMO_QUIPS ? json(200, window.KDEMO_QUIPS) : json(404, {});
+    if (/\/quips\.json$/.test(path)) return window.KDEMO_QUIPS ? json(200, window.KDEMO_QUIPS) : json(404, {});
     return json(404, {});
   }
   function handle(method, url, body) {

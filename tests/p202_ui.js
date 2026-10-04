@@ -148,7 +148,7 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
   w.eval(`listModal(${L})`); await sleep(400);
   const lm = d.querySelector('.modal');
   check(lm.querySelector('#l-emo img.licon'), 'list dialog: the icon button shows the picture');
-  check(lm.querySelectorAll('.lipick [data-licon]').length >= 12 && lm.querySelector('.lipick [data-licon="kalmido"].on'), 'picture presets (app icon + sloths) + upload, the current one marked');
+  check(lm.querySelectorAll('.lipick [data-licon]').length >= 12 && lm.querySelector('.lipick [data-licon="kalmido"].on'), 'picture presets (app icon + profile pictures) + upload, the current one marked');
   lm.querySelector('.lipick [data-licon="robot"]').click(); await sleep(900);
   check(w.eval(`listById(${L}).icon`) === '/static/avatars/robot.svg' && lm.querySelector('#l-emo img')?.getAttribute('src') === '/static/avatars/robot.svg', 'pick a preset: saved, shown at once');
   lm.querySelector('#l-emo').click(); lm.querySelector('#l-emogrid [data-emo="🎬"]').click(); await sleep(1200);

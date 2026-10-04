@@ -142,6 +142,49 @@ const taskOf = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)
   check(!d.querySelector('.lmodal #rp-name') && !d.querySelector('.lmodal [data-rp="menu"]') && d.querySelector('.lmodal [data-rp="refresh"]'), 'bob: rows + refresh, no form, no menu');
   w.close();
 
+  // ================= 2.18.0 (#408 "Software 2" A + F): provider select (GitLab / Bitbucket, auto-detect) + error reports
+  {
+    w = await boot({user: 'alice', hash: 'l/' + P}); d = w.document;
+    w.eval(`listModal(${P})`);
+    await until(() => d.querySelector('.lmodal #l-repos .reporow'));
+    const sel = d.querySelector('#rp-prov');
+    check(sel && ['github', 'gitlab', 'gitea', 'bitbucket'].every(v => [...sel.options].some(o => o.value === v)), '2.18.0: the provider select has GitHub, GitLab, Gitea, Bitbucket');
+    const nm = d.querySelector('#rp-name');
+    nm.value = 'https://gitlab.com/grp/sub/app'; nm.dispatchEvent(new w.Event('input', {bubbles: true}));
+    const hint = d.querySelector('#rp-phint');
+    check(sel.value === 'gitlab' && hint && !hint.hidden && /subgroups/.test(hint.textContent) && d.querySelector('#rp-base').placeholder === 'empty = gitlab.com',
+      `2.18.0: a gitlab.com address picks GitLab: ${sel.value} ${hint?.hidden} ${d.querySelector('#rp-base').placeholder}`);
+    nm.value = 'https://bitbucket.org/ws/web'; nm.dispatchEvent(new w.Event('input', {bubbles: true}));
+    check(sel.value === 'bitbucket' && /Bitbucket Cloud only/.test(hint.textContent) && /app password/.test(d.querySelector('#rp-tok').placeholder), '2.18.0: bitbucket.org -> Bitbucket Cloud + hint');
+    nm.value = 'https://git.example.com/a/b'; nm.dispatchEvent(new w.Event('input', {bubbles: true}));
+    check(sel.value === 'bitbucket', '2.18.0: another host keeps the chosen provider');
+    sel.value = 'github'; sel.dispatchEvent(new w.Event('change', {bubbles: true}));
+    check(hint.hidden, '2.18.0: GitHub: no extra hint');
+    const eh = d.querySelector('#rp-err');
+    check(eh && /Error reports/.test(eh.textContent) && /Off/.test(eh.textContent) && eh.querySelector('[data-rp="err-on"]'), '2.18.0: error reports row, off, Turn on');
+    click(w, eh.querySelector('[data-rp="err-on"]'));
+    const code = await until(() => d.querySelector('#rp-err .rpsec code'));
+    const url = code?.textContent || '';
+    check(new RegExp(`/api/hooks/issues/${P}/[\\w-]{20,}$`).test(url) && d.querySelector('#rp-err [data-rp="err-copy"]') && d.querySelector('#rp-err [data-rp="err-menu"]')
+      && /On/.test(d.querySelector('#rp-err .rpm').textContent), '2.18.0: on: the URL once, Copy, the menu: ' + url);
+    check(d.activeElement === d.querySelector('#rp-err [data-rp="err-copy"]'), '2.18.0: focus moves to Copy');
+    w.close();
+    const ep = B + 'api/hooks/issues/' + url.split('/api/hooks/issues/')[1];
+    const rr = await (await fetch(ep, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({title: 'UI crash', fingerprint: 'ui-1'})})).json();
+    check(rr.task_id, '2.18.0: a report made a ticket');
+    await fetch(ep, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({title: 'UI crash', fingerprint: 'ui-1'})});
+    w = await boot({user: 'bob', hash: 'l/' + P}); d = w.document;
+    w.eval(`listModal(${P})`);
+    const ebob = await until(() => d.querySelector('.lmodal #rp-err'));
+    check(ebob && /On/.test(ebob.textContent) && /2 received/.test(ebob.textContent) && !ebob.querySelector('[data-rp]') && !/hooks\/issues/.test(ebob.innerHTML),
+      '2.18.0: bob sees the state, no buttons, no URL: ' + (ebob?.textContent.replace(/\s+/g, ' ') || ''));
+    w.close();
+    w = await boot({user: 'alice', hash: 't/' + rr.task_id}); d = w.document; await sleep(700);
+    const lines = await until(() => { const x = [...d.querySelectorAll('.actl')].map(e => e.textContent).join(' | '); return /happened again/.test(x) && x; }, 20);
+    check(/Created from an error report \(webhook\)/.test(lines || '') && /The error happened again \(2×\)/.test(lines || ''), '2.18.0: history lines: ' + lines);
+    w.close();
+  }
+
   // ================= German
   await call('PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', hash: 't/' + T9}); d = w.document; await sleep(900);

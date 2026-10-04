@@ -18,6 +18,12 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.18.0** (2026-10-04): Software & Planning. **Milestones are tasks** (a diamond in the list, Kanban, calendar and
+  timeline) with their tasks, progress, a burndown and release notes; **create tasks right in the timeline** (drag a
+  range, double-click, "+") which now shows **sections**; **GitLab** and **Bitbucket Cloud** next to GitHub and Gitea /
+  Forgejo, a release tag reaches its milestone, **error reports** (Sentry or any JSON) become tickets; the **project type**
+  of a list can be changed; **code highlighting** and `file:line` links into the repository; reactions sit visibly at
+  every chat message; the search icon always stays in the phone header; a new app icon.
 - **2.17.0** (2026-10-04): Communication. A **team chat** (direct messages between people who work together and one
   channel per shared list, agents included), **notes** per list or project (Markdown, `#123` links tasks, search),
   **tasks by e-mail** (a secret address per person and list) and the daily summary by e-mail, **News bundled** per task
@@ -249,7 +255,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **Activity log** (2.2.1): every API request an agent makes (route, status, task / list, duration; never content) in
   *Settings > Agents > Log* for admins, filtered by agent, status and day, event polling hidden by default, denied calls marked, CSV export;
   kept `KALMIDO_AUDIT_DAYS` days (default 90)
-- **Git integration** (2.2.0): connect a project list to GitHub or Gitea / Forgejo; pull requests (state, CI), commits
+- **Git integration** (2.2.0, 2.18.0): connect a project list to GitHub, GitLab, Gitea / Forgejo or Bitbucket Cloud; pull requests (state, CI), commits
   and branches show up at their tasks (`#123`, `kalmido-123`), `fixes #123` in a merged pull request completes the
   task. Works by polling, so the server needs no public address. **Hand a ticket to a coding agent**: it gets the
   repository and a branch name with the assignment and merges only after your 👍 on its *Ready to merge* comment
@@ -635,7 +641,7 @@ a tab (Settings > Appearance > Tab bar).
 People talk to each other in Kalmido: **direct messages** between two people who work together (they share a list or a
 group) and **one channel per shared list** for everyone who sees the whole list. Agents shared with the list are in its
 channel: they read along and answer when you @mention them. Messages are Markdown, `@Name` mentions a member, a message
-can link a task, gets reactions (the smiley next to it), and you edit or delete your own (list owners and admins delete
+can link a task, shows 👍 👎 ❤️ under every message (one tap adds or removes yours, 2.18.0), and you edit or delete your own (list owners and admins delete
 any in their channel). *Team chat* in the sidebar shows the unread count; a direct message and a mention push to your
 devices (notification row *Team chat*; muting a conversation leaves only mentions). Find it in the sidebar, the tab bar,
 the list menu (*Team chat*) and a project's overview. The REST API and the MCP server have it too (`/team/...`, see
@@ -839,12 +845,16 @@ with.
 
 ## Git integration
 
-A **project list** can be connected to one or more repositories (*Edit list > Repository*, up to five): **GitHub**
-(github.com or a GitHub Enterprise server) and **Gitea / Forgejo** (the server's address). Only the list owner and list
+A **project list** can be connected to one or more repositories (*Edit list > Repository*, up to five; the area shows
+for projects of the type *Software / AI dev* and for lists that already have a repository): **GitHub** (github.com or a
+GitHub Enterprise server), **GitLab** (gitlab.com or your own server, also nested groups like `group/sub/repo`),
+**Gitea / Forgejo** (the server's address) and **Bitbucket Cloud** (2.18.0; Bitbucket Server / Data Center is not
+supported). Pasting a github.com, gitlab.com or bitbucket.org address picks the provider. Only the list owner and list
 admins connect, change or remove them; everyone in the list sees the results.
 
 - **Token:** a fine-grained token with *read-only* access to the repository (contents, pull requests, commit statuses /
-  checks) is enough; a public repository works without one (with GitHub's much lower limit for anonymous requests).
+  checks) is enough (GitLab: `read_api`; Bitbucket: a read-only repository or workspace access token, or
+  `user:app-password`); a public repository works without one (with GitHub's much lower limit for anonymous requests).
   Like the Paperless tokens it is write-only (the page only says *Token set*) and encrypted with `KALMIDO_SECRET_KEY`;
   without the key no token can be stored. Kalmido never gets write access: it only reads.
 - **Polling, not webhooks:** the server asks the Git server itself, every 3 minutes per repository
@@ -864,9 +874,21 @@ admins connect, change or remove them; everyone in the list sees the results.
   only for changes after the repository was connected. The history names the pull request or commit and has *Undo*.
 - **Optional webhook** (off by default, for a Gitea / Forgejo next door or a public server): *Turn the webhook on* shows
   the payload URL `/api/hooks/git/<id>` and a secret once; a push, pull request or status event with a valid signature
-  (`X-Hub-Signature-256`, `X-Gitea-Signature`, `X-Forgejo-Signature`) triggers the next check at once. The body is
+  (`X-Hub-Signature-256`, `X-Gitea-Signature`, `X-Forgejo-Signature`, GitLab's *Secret token* `X-Gitlab-Token`,
+  Bitbucket's *Secret* `X-Hub-Signature`) triggers the next check at once. The body is
   never trusted, polling stays the source of truth.
-- **API / MCP:** `GET /api/v1/lists/{id}/repos` (never a token), `get_task` includes `code` and `repo`.
+- **Releases** (2.18.0): a new tag like `v2.18.0` completes the open milestone "2.18.0" or "Release 2.18.0" of the list
+  once, with *Undo*; tags that existed before the connection never do.
+- **Error reports** (2.18.0): *Error reports > Turn on* gives the list a secret URL (shown once; *New URL*, *Turn off*).
+  Point a Sentry webhook (an internal integration with issue / alert webhooks) or any service that sends JSON
+  `{title, body, url, fingerprint, level}` at it: a new error becomes a bug ticket with the details and the link, the same
+  error again only counts up at its open ticket. A new error sends one News item and push (*Settings > Notifications >
+  New error reports*); repeats stay quiet. At most `KALMIDO_ERROR_REPORTS_PER_HOUR` (default 30) new tickets per
+  list and hour. Tasks by e-mail (see [Tasks by e-mail](#tasks-by-e-mail)) are another way in.
+- **Code in Markdown** (2.18.0): code blocks are highlighted by language and have *Copy*; `src/app.py:42` (or
+  `app.js:10-20`) in notes and comments links to that file and line at the default branch.
+- **API / MCP:** `GET /api/v1/lists/{id}/repos` (never a token), `get_task` includes `code` and `repo`;
+  `GET` / `PATCH /api/v1/lists/{id}/error-hook` for people.
 
 ### Hand a ticket to a coding agent
 
@@ -1070,7 +1092,7 @@ small **×** next to it (*Show progress* in the list's … menu or the list dial
 - **Project overview** (2.7.1, project lists only; a tab next to List / Kanban / Timeline, on phones in "…"): the place
   for what belongs to the project as a whole. *Description* in Markdown; *Key links* (title + address, in your order,
   an icon from the address such as a repository or a design file, nothing is fetched from the linked site);
-  *Milestones* (name, date, reached; they also show as diamonds in the timeline); *Project files* uploaded on the
+  *Milestones* (milestone tasks of the list, see below); *Project files* uploaded on the
   project itself (same size limit and download rules as task files: images and PDFs open, everything else downloads),
   Paperless documents linked to the project (with the Paperless module) and, read-only, *Attachments from tasks* with
   a link to each task; *Members* with their roles (with collaboration); *Status updates* with *Set status*; the
@@ -1078,6 +1100,17 @@ small **×** next to it (*Show progress* in the list's … menu or the list dial
   (participants only see the files of their own tasks). The choice of the tab is remembered per device; the list's own
   view stays. Token API: `/api/v1/lists/{id}/overview`, `/links`, `/milestones`, `/files`; MCP tool
   `get_project_overview`.
+- **Milestones** (2.18.0): a task can be a milestone (quick add `!milestone`, *This task is a milestone* in the task
+  panel, or the task menu): a diamond instead of the round glyph, a date, checked off like a task, no assignee needed;
+  in the list, Kanban, calendar and timeline. Tasks belong to a milestone (the release or version they ship in) via
+  the *Milestone* field or *Set milestone* in the multi-select; the milestone's panel shows the progress, its tasks, a
+  burndown (also as a table) and **release notes** from its completed tasks (Features / Fixes / Other) to copy.
+  Token API: `milestone`, `milestone_id` on tasks, `GET /api/v1/tasks/{id}/milestone`; MCP `get_milestone`. The
+  older overview milestones were migrated into milestone tasks; `/lists/{id}/milestones` stays as a compatibility
+  route (ids are task ids).
+- **Project type of an existing list** (2.18.0): *Edit list > Project type* (None, Agency, Software / AI dev,
+  Personal), for the owner and list admins. Switching turns on what the type needs (Software: ticket types and the
+  *Repository* area) and offers the type's missing sections, with Undo; nothing is deleted.
 - **Custom fields:** the list owner adds fields in the list dialog: text, number (optional unit such as € or h),
   selection (options with colours), date, checkbox, person (owner or member of the list) or link. Values are the
   same for everyone in the list; view-only members see them but cannot change them. Up to two fields show as chips

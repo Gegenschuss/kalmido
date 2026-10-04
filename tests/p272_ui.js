@@ -210,7 +210,10 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   w = await boot({user: 'alice', hash: 'all'}); d = w.document;
   const seg = [...d.querySelectorAll('#top [data-act="rm-view"]')];
   if (seg[1]) click(w, seg[1]);
-  check(await until(() => d.querySelector('.tl.rm .rm-ms')), 'milestone markers in the "All" timeline');
+  // 2.18.0: a milestone is a task now: in an open project its diamond row, in a collapsed one the marker on the project
+  // row (never both)
+  const msShown = () => { const dia = d.querySelectorAll('.tl.rm .tl-dia').length, mk = d.querySelectorAll('.tl.rm .rm-ms').length; return dia + mk >= 1 && ![...d.querySelectorAll('.tl.rm .tl-dia')].some(x => d.querySelector(`.tl.rm .rm-g[data-l="${x.closest('.rm-row')?.dataset.l}"] .rm-ms`)); };
+  check(await until(msShown), 'milestones in the "All" timeline: diamond row or marker, never both');
   w.close();
   w = await boot({user: 'alice', hash: 'l/' + P, ls: {'tasks.pov': JSON.stringify([P])}}); d = w.document;
   await until(() => d.querySelector('#pov-files'));

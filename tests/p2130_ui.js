@@ -65,8 +65,9 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   w = await boot({user: 'alice', hash: 'l/' + P}); d = w.document;
   w.eval(`chatOpen(${AG})`); await until(() => d.querySelectorAll('#chat-msgs .cmsg.ag').length >= 3);
   const r1 = d.querySelector(`#chat-msgs .cmsg[data-mid="${q1.id}"]`), r2 = d.querySelector(`#chat-msgs .cmsg[data-mid="${q2.id}"]`);
-  check(r1 && r1.querySelector('.chrxq:not(.open)') && !r1.querySelector('.rxbar'), 'A2: a status message: the quick reactions are a hidden bar (no circles under it)');
-  check(r2 && r2.querySelector('.chrxq:not(.open)'), 'A2: an older question is not open either (only the newest message)');
+  // 2.18.0 (#651, intended change): the quick reactions are visible in the meta line of every message (no hidden bar)
+  check(r1 && r1.querySelectorAll('.cmeta .rxrow .rx.add').length === 3 && !r1.querySelector('.rxhint') && !/counts as/.test(r1.querySelector('[data-e="up"]').getAttribute('aria-label')), 'A2 / #651: a status message: 👍 👎 ❤️ visible, plain reactions');
+  check(r2 && !r2.querySelector('.rxhint'), 'A2: an older question has no "👍 = approval" hint (only the newest message)');
   check(d.querySelector('#achat .chath .ib[data-ii="chat-info"]') && !d.querySelector('#achat .chnote'), 'helper texts: the chat note is behind (i) in the header, not under the input');
   check(!d.querySelector('#chat-st .atdots'), 'P11: no typing dots in the header (only the line under the messages)');
   const rp1 = await call('POST', `/api/agents/${AG}/chat/${q1.id}/reactions`, {emoji: 'up'});
@@ -74,10 +75,10 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   const q3 = await tcall('POST', `/agent/chats/${ME}`, TOK, {body: 'May I merge the branch?'});
   await w.eval('chatLoad()'); await sleep(300);
   const r3 = () => d.querySelector(`#chat-msgs .cmsg[data-mid="${q3.id}"]`);
-  check(r3()?.querySelector('.chrxq.open .rxhint')?.textContent === '👍 = approval', 'A2: the newest question shows its bar with "👍 = approval"');
-  check(/counts as approval/.test(r3()?.querySelector('.chrxq [data-e="up"]')?.getAttribute('aria-label') || ''), 'A2: its 👍 says it counts as approval');
-  click(w, r3().querySelector('.chrxq [data-e="up"]')); await until(() => r3()?.querySelector('.rxok'), 100);
-  check(/Counted as approval/.test(r3()?.querySelector('.rxok')?.textContent || '') && !r3()?.querySelector('.chrxq.open'), 'A2: after 👍: "Counted as approval", the bar closes ' + (r3()?.innerHTML || '-').replace(/<svg.*?<\/svg>/g, '').slice(0, 400));
+  check(r3()?.querySelector('.rxrow .rxhint')?.textContent === '👍 = approval', 'A2: the newest question shows its bar with "👍 = approval"');
+  check(/counts as approval/.test(r3()?.querySelector('.rxrow [data-e="up"]')?.getAttribute('aria-label') || ''), 'A2: its 👍 says it counts as approval');
+  click(w, r3().querySelector('.rxrow [data-e="up"]')); await until(() => r3()?.querySelector('.rxok'), 100);
+  check(/Counted as approval/.test(r3()?.querySelector('.rxok')?.textContent || '') && !r3()?.querySelector('.rxhint') && r3()?.querySelector('.rxrow .rx.on[data-e="up"][aria-pressed="true"]'), 'A2: after 👍: "Counted as approval", 👍 pressed ' + (r3()?.innerHTML || '-').replace(/<svg.*?<\/svg>/g, '').slice(0, 400));
   check(/Approved/.test(d.querySelector('#toast')?.textContent || ''), 'A2: toast "Approved"');
   w.close();
 
@@ -139,7 +140,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   const seg = d.querySelector('#view .vsegm');
   check(seg && [...seg.querySelectorAll('button')].map(b => b.textContent.trim()).join('|') === 'Overview|List|Kanban|Timeline' && seg.querySelector('button.on[aria-pressed="true"]')?.textContent.trim() === 'List', 'A7: phone: Overview (first in projects) / List / Kanban / Timeline under the title, the active one marked');
   const more = w.eval('topMoreItems().filter(x => x !== "-").map(x => x.label || "")');
-  check(!more.includes('List') && !more.includes('Kanban') && more.includes('Type: List') && more.includes('Type: Project') && new Set(more).size === more.length, 'A7: "…" without the views, "Type: List / Project", no duplicates: ' + more.join(' | '));
+  check(!more.includes('List') && !more.includes('Kanban') && more.includes('As a list') && more.includes('As a project') && new Set(more).size === more.length, 'A7: "…" without the views, "As a list / As a project", no duplicates: ' + more.join(' | '));
   click(w, seg.querySelector('[data-act="view-kanban"]')); await until(() => d.querySelector('#view .kanban'));
   check(d.querySelector('#view .kanban') && d.querySelector('#view .vsegm button.on')?.textContent.trim() === 'Kanban', 'A7: a tap switches to Kanban');
   check(d.querySelector('#view .kadd input')?.getAttribute('aria-label') === 'New task in Backlog', 'P6: Kanban "+ Task" has a name');
@@ -325,13 +326,11 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     const tap = (x, y, hold = 60) => cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 't1', parameters: {pointerType: 'touch'}, actions: [{type: 'pointerMove', x: Math.round(x), y: Math.round(y)}, {type: 'pointerDown', button: 0}, {type: 'pause', duration: hold}, {type: 'pointerUp', button: 0}]}]}).then(() => cmd('input.releaseActions', {context: ctx}));
     // P11: the chat: its header replaces the page header, back on the left; A2: the hidden bar opens with a long press
     await nav(B + '?p=1#agents/' + AG); await sleep(2200);
-    const ch = await ev(`(() => { const h = document.querySelector('.chview .chath'); const m = [...document.querySelectorAll('#chat-msgs .cmsg.ag')].find(x => /build is green/.test(x.textContent)); const q = m && m.querySelector('.chrxq'); return {inChat: document.body.classList.contains('in-chat'), top: getComputedStyle(document.querySelector('#top')).display, first: h && h.firstElementChild.classList.contains('chback'), hidden: q ? getComputedStyle(q).opacity : null, mh: m ? Math.round(m.getBoundingClientRect().height) : 0, note: !!document.querySelector('.chnote')}; })()`);
-    check(ch.inChat && ch.top === 'none' && ch.first && ch.hidden === '0' && !ch.note, '390 P11 / A2: chat header replaces the page header, back on the left, quick reactions hidden, no note under the input ' + JSON.stringify(ch));
+    const ch = await ev(`(() => { const h = document.querySelector('.chview .chath'); const m = [...document.querySelectorAll('#chat-msgs .cmsg.ag')].find(x => /build is green/.test(x.textContent)); const q = m && m.querySelector('.rxrow .rx.add'); return {inChat: document.body.classList.contains('in-chat'), top: getComputedStyle(document.querySelector('#top')).display, first: h && h.firstElementChild.classList.contains('chback'), shown: q ? +getComputedStyle(q).opacity : null, mh: m ? Math.round(m.getBoundingClientRect().height) : 0, note: !!document.querySelector('.chnote')}; })()`);
+    check(ch.inChat && ch.top === 'none' && ch.first && ch.shown >= .6 && !ch.note, '390 P11 / #651: chat header replaces the page header, back on the left, quick reactions visible (2.18.0), no note under the input ' + JSON.stringify(ch));
     await shot('p2130-chat-390.png');
-    const mr = await ev(`(() => { const m = [...document.querySelectorAll('#chat-msgs .cmsg.ag')].find(x => /build is green/.test(x.textContent)); m.scrollIntoView({block: 'center'}); const r = m.querySelector('.cbub').getBoundingClientRect(); return {x: r.left + 20, y: r.top + r.height / 2}; })()`);
-    await tap(mr.x, mr.y, 650); await sleep(300);
-    const op = await ev(`(() => { const m = [...document.querySelectorAll('#chat-msgs .cmsg.ag')].find(x => /build is green/.test(x.textContent)); const b = m.querySelector('.chrxq .rx.add'); const r = b ? b.getBoundingClientRect() : {width: 0, height: 0}; return {show: m.classList.contains('rxshow'), op: getComputedStyle(m.querySelector('.chrxq')).opacity, w: r.width, h: r.height}; })()`);
-    check(op.show && op.op === '1' && op.w >= 43.5 && op.h >= 43.5, '390 A2: a long press opens the reaction bar, 44 px targets ' + JSON.stringify(op));
+    const op = await ev(`(() => { const m = [...document.querySelectorAll('#chat-msgs .cmsg.ag')].find(x => /build is green/.test(x.textContent)); const b = m.querySelector('.rxrow .rx.add'); const r = b ? b.getBoundingClientRect() : {width: 0, height: 0}; return {w: r.width, h: r.height}; })()`);
+    check(op.w >= 43.5 && op.h >= 43.5, '390 #651: the visible reactions are 44 px targets ' + JSON.stringify(op));
     // the (i) next to the agent's name
     const ir = await ev(`(() => { const b = document.querySelector('.chath .ib'); const r = b.getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2}; })()`);
     await tap(ir.x, ir.y); await sleep(200);
@@ -558,10 +557,10 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     // A2: hover shows the quick reactions; helper text tooltip on hover
     await nav(B + '?d=2#l/' + P); await ready(ev);
     await ev(`(() => { chatOpen(${AG}); return 1; })()`); await sleep(1500);
-    const m = await ev(`(() => { const m = [...document.querySelectorAll('#chat-msgs .cmsg.ag')].find(x => /build is green/.test(x.textContent)); m.scrollIntoView({block: 'center'}); const r = m.querySelector('.cbub').getBoundingClientRect(); return {x: r.left + 20, y: r.top + r.height / 2, op: getComputedStyle(m.querySelector('.chrxq')).opacity}; })()`);
+    const m = await ev(`(() => { const m = [...document.querySelectorAll('#chat-msgs .cmsg.ag')].find(x => /build is green/.test(x.textContent)); m.scrollIntoView({block: 'center'}); const r = m.querySelector('.cbub').getBoundingClientRect(); return {x: r.left + 20, y: r.top + r.height / 2, op: getComputedStyle(m.querySelector('.rxrow .rx.add')).opacity}; })()`);
     await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'm', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x: Math.round(m.x), y: Math.round(m.y)}, {type: 'pause', duration: 250}]}]});
-    const op2 = await ev(`getComputedStyle([...document.querySelectorAll('#chat-msgs .cmsg.ag')].find(x => /build is green/.test(x.textContent)).querySelector('.chrxq')).opacity`);
-    check(m.op === '0' && op2 === '1', `1440 ${theme} A2: the quick reactions show on hover only (${m.op} -> ${op2})`);
+    const op2 = await ev(`getComputedStyle([...document.querySelectorAll('#chat-msgs .cmsg.ag')].find(x => /build is green/.test(x.textContent)).querySelector('.rxrow .rx.add')).opacity`);
+    check(+m.op >= .6 && +op2 >= .6, `1440 ${theme} #651: the quick reactions are visible without hover (${m.op} / ${op2})`);
     const ib = await ev(`(() => { const r = document.querySelector('#achat .chath .ib').getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2}; })()`);
     await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'm', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x: Math.round(ib.x), y: Math.round(ib.y)}, {type: 'pause', duration: 250}]}]});
     const tp = await ev(`(() => { const t = document.querySelector('#iitip'); return t && !t.classList.contains('hidden') ? t.textContent.slice(0, 30) : null; })()`);

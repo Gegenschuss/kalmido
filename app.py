@@ -658,6 +658,18 @@ CREATE INDEX IF NOT EXISTS git_links_conn ON git_links(conn_id, kind, ref);
 CREATE TABLE IF NOT EXISTS git_closes (           -- completions by "fixes #id": once per task; undo = what do_complete filled
   task_id INTEGER PRIMARY KEY REFERENCES tasks(id) ON DELETE CASCADE, conn_id INTEGER NOT NULL, kind TEXT NOT NULL,
   ref TEXT NOT NULL, undo TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL, undone_at TEXT);
+CREATE TABLE IF NOT EXISTS git_tags (             -- 2.18.0 (#408): tag names a connection has seen (a NEW one can reach a milestone)
+  conn_id INTEGER NOT NULL REFERENCES git_conns(id) ON DELETE CASCADE, name TEXT NOT NULL, seen_at TEXT NOT NULL,
+  PRIMARY KEY (conn_id, name));
+CREATE TABLE IF NOT EXISTS issue_hooks (          -- 2.18.0 (#408): inbound error-report webhook of a list (one per list)
+  list_id INTEGER PRIMARY KEY REFERENCES lists(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL,                     -- SHA-256 of the secret in the URL (never stored plain)
+  created_by INTEGER, created_at TEXT NOT NULL, last_at TEXT, received INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS issue_reports (        -- fingerprints of error reports: one open ticket per error, repeats counted
+  list_id INTEGER NOT NULL REFERENCES lists(id) ON DELETE CASCADE, fp TEXT NOT NULL,
+  task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL,   -- NULL = only counted (rate limit), no ticket yet
+  count INTEGER NOT NULL DEFAULT 1, first_at TEXT NOT NULL, last_at TEXT NOT NULL, PRIMARY KEY (list_id, fp));
+CREATE INDEX IF NOT EXISTS issue_reports_task ON issue_reports(task_id);
 CREATE TABLE IF NOT EXISTS list_links (           -- 2.7.1 (#410): key links of a project list (overview), ordered
   id INTEGER PRIMARY KEY, list_id INTEGER NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
   title TEXT NOT NULL, url TEXT NOT NULL, sort REAL NOT NULL DEFAULT 0, created_by INTEGER, created_at TEXT NOT NULL);
@@ -891,6 +903,18 @@ MIGRATIONS = [
     ("api_tokens", "allowed_ips", "ALTER TABLE api_tokens ADD COLUMN allowed_ips TEXT NOT NULL DEFAULT ''"),
     ("agent_jobs", "approval", "ALTER TABLE agent_jobs ADD COLUMN approval TEXT"),
     ("agent_audit", "scope", "ALTER TABLE agent_audit ADD COLUMN scope TEXT NOT NULL DEFAULT ''"),
+    # 2.18.0 (#430): a task can be a MILESTONE (ms = 1: a diamond with a date, checkable, no assignee needed; shown in the
+    # list, Kanban, calendar and timeline). The milestones of the project overview (list_milestones, 2.7.1) are migrated
+    # into such tasks once. milestone_id: the milestone (a task of the same list with ms = 1) a task belongs to, e.g.
+    # the release / version it ships in ("Software 2": progress, burndown, release notes per milestone).
+    ("tasks", "ms", "ALTER TABLE tasks ADD COLUMN ms INTEGER NOT NULL DEFAULT 0"),
+    ("tasks", "milestone_id", "ALTER TABLE tasks ADD COLUMN milestone_id INTEGER"),
+    # 2.18.0 (#408): the project type of a list ('' = none / a plain project, else a key of PTYPES: agency | software |
+    # private), stored when a project is created from a type and changeable later in the list dialog
+    ("lists", "ptype", "ALTER TABLE lists ADD COLUMN ptype TEXT NOT NULL DEFAULT ''"),
+    # 2.18.0 (#408): when a repository connection took its tag baseline (NULL = not yet: the next poll only records the
+    # existing tags; only tags seen after that can complete a milestone)
+    ("git_conns", "tags_at", "ALTER TABLE git_conns ADD COLUMN tags_at TEXT"),
 ]
 INDEXES = """
 CREATE INDEX IF NOT EXISTS lists_owner ON lists(owner_id);
@@ -977,7 +1001,7 @@ USER_DEFAULTS = {
     # nd (2.0.6): "No date" rows in open lists (default on)}
     "roadmap": "",
     # v1.1
-    "celebrate": "1",           # the sloth celebrates an emptied Today / a completed list or project
+    "celebrate": "1",           # the heron celebrates an emptied Today / a completed list or project
     "cal_today": "1",           # "Events today" block on Today (external calendar subscriptions)
     "tour": "done",             # welcome tour: pending (new users) | done; existing users never see it
     "onboard": "done",          # "Getting started" list: pending (new users, created on first start) | done
@@ -1498,6 +1522,12 @@ def init_db(guard=True):
             gset(c, "migr_tidy_agent", "1")
             if n:
                 print("tidy: assigned the tidy agent of", n, "list(s)", flush=True)
+        # 2.18.0 (#430): the milestones of the project overview (list_milestones, 2.7.1) become milestone tasks. Runs whenever
+        # rows exist (no flag): a restored backup from before 2.18.0 brings them back and is migrated again
+        c.execute("CREATE INDEX IF NOT EXISTS tasks_msid ON tasks(milestone_id) WHERE milestone_id IS NOT NULL")
+        n = ms_migrate(c)
+        if n:
+            print("milestones:", n, "milestones of project overviews became milestone tasks", flush=True)
         if gsetting(c, "migr_auditfix") != "1":  # security audit 2026-09-28, one-shot
             n = c.execute("UPDATE users SET paperless_access=1 WHERE is_admin=1 AND paperless_access=0").rowcount
             counts = repair_data(c)
@@ -1833,8 +1863,9 @@ def authenticate():
         return api_authenticate()  # bearer token only (package B)
     if request.path.startswith(("/dav/", "/.well-known/")) or request.path == "/dav":
         return None  # 2.9.0 (#435): CalDAV: HTTP Basic with an app password (dav_login), never a cookie or the proxy header
-    if request.path.startswith("/api/hooks/git/") and request.method == "POST":
+    if request.path.startswith(("/api/hooks/git/", "/api/hooks/issues/")) and request.method == "POST":
         return None  # 2.2.0: inbound Git webhook: no user, no proxy header, the HMAC signature is the credential
+        # (2.18.0: also the error-report webhook: the secret token in its URL is the credential)
     if request.path.startswith(PUB_PREFIX):
         return None  # public list link: no user; the token in the path is the credential (see "public links")
     c = db()
@@ -1932,7 +1963,7 @@ def user_public(u):
             "avatar": avatar_url(u), **({"agent": True} if is_agent(u) else {})}
 
 
-# ---- 1.9.0: profile pictures. A preset (funny sloths, static SVGs) or an own photo: the client crops it square, the
+# ---- 1.9.0: profile pictures. A preset (funny animal pictures, static SVGs) or an own photo: the client crops it square, the
 # server decodes it (Pillow, pixel limit), turns it upright, resizes it to AVATAR_PX and stores a fresh JPEG (no EXIF /
 # GPS or other metadata survives) below ATT_DIR/avatars (so backups include it). Served with login to the user
 # themselves, admins and the people who share a list with them; the file name carries a random token (new picture =
@@ -2007,7 +2038,7 @@ def avatar_process(raw):
         raise BadInput(tr("This picture cannot be read"))
 
 
-# ---- 2.0.2: own list icons (same technique as the profile pictures): a preset (the sloth pictures or the app icon) or an
+# ---- 2.0.2: own list icons (same technique as the profile pictures): a preset (the profile pictures or the app icon) or an
 # own picture, cropped square in the browser, re-encoded here (PNG, LIST_ICON_PX, transparency kept, no metadata) below
 # ATT_DIR/listicons (in backups). Served to everybody who sees the list; new picture = new token = new URL.
 LIST_ICON_PRESETS = ("kalmido",) + AVATAR_PRESETS
@@ -3630,6 +3661,11 @@ def task_dict(r, tags):
     d = dict(r)
     d.pop("reminded", None)
     d.pop("nag_at", None)
+    # 2.18.0 (#430): ms only on milestones, milestone_id only when set (keeps every other task's dict as it was)
+    if not d.get("ms"):
+        d.pop("ms", None)
+    if d.get("milestone_id") is None:
+        d.pop("milestone_id", None)
     d["tags"] = tags.get(r["id"], [])
     return d
 
@@ -4741,9 +4777,18 @@ def list_update(lid):
                 cur.update(folder=m["folder"], sort=m["sort"], view=m["view"] or cur["view"])
         b = dict(b)
         for k, old in prev.items():
-            if k in b and k in (*LIST_FIELDS, "rate") and _norm(cur.get(k)) != _norm(old) and _norm(cur.get(k)) != _norm(b[k]):
+            if k in b and k in (*LIST_FIELDS, "rate", "ptype") and _norm(cur.get(k)) != _norm(old) and _norm(cur.get(k)) != _norm(b[k]):
                 conflicts.append({"field": k, "server": cur.get(k), "mine": b[k]})
                 del b[k]
+    pt_out = {}
+    if "ptype" in b:  # 2.18.0 (#408): the project type of an existing list (owner / list admins), see list_ptype_set
+        try:
+            pt_out = list_ptype_set(c, lid, role, b["ptype"], skip=set(b))
+        except BadInput as e:
+            return err(str(e))
+        except Denied as e:
+            return err(tr("Only the owner and list admins can change the project type"), e.code)
+        b = {k: v for k, v in b.items() if k != "ptype"}
     if "done_at_bottom" in b:  # 2.7.2 (#414): the API name of the display option (column checklist)
         b = {**{k: v for k, v in b.items() if k != "done_at_bottom"}, "checklist": b["done_at_bottom"]}
     vals = {k: clean_list_value(k, b[k], member=role != "owner") for k in LIST_FIELDS if k in b}  # BadInput: 400
@@ -4781,7 +4826,7 @@ def list_update(lid):
                 c.execute(f"UPDATE list_members SET {k}=? WHERE list_id=? AND user_id=?", (vals[k], lid, me()))
     bump(c)
     c.commit()
-    return jsonify(ok=True, conflicts=conflicts)
+    return jsonify(ok=True, conflicts=conflicts, **pt_out)
 
 
 @app.post("/api/lists/reorder")
@@ -5850,7 +5895,8 @@ TASK_FIELDS = ("list_id", "section_id", "parent_id", "title", "content", "priori
                "due", "due_time", "reminders", "repeat", "repeat_from", "sort",
                "pinned", "start", "duration", "assignee_id", "url", "ttype", "deadline", "nag",
                "assignee_group_id",  # 2.10.0 (#441): assigned to a group (whoever has time); excludes assignee_id
-               "plan_start")  # 2.11.0: planned start "YYYY-MM-DDTHH:MM" (day plan), independent of the due date
+               "plan_start",  # 2.11.0: planned start "YYYY-MM-DDTHH:MM" (day plan), independent of the due date
+               "ms", "milestone_id")  # 2.18.0 (#430): a milestone (1) / the milestone of the same list a task belongs to
 # 2.4.0 (#340): ticket types of a task (API v1 / MCP / events: "type"); '' = none
 TICKET_TYPES = ("bug", "feature", "task")
 
@@ -5917,6 +5963,11 @@ def log_changes(c, tid, old, act=None):
         log_act(c, tid, "link", {"url": new["url"]})
     if ch("ttype"):  # 2.4.0 (#340)
         log_act(c, tid, "ttype", {"to": new["ttype"] or None})
+    if ch("ms"):  # 2.18.0 (#430): turned into a milestone / back into a task
+        log_act(c, tid, "ms", {"on": bool(new["ms"])})
+    if ch("milestone_id"):  # 2.18.0 (#430): the milestone the task belongs to (title kept: it may be renamed later)
+        m = c.execute("SELECT title FROM tasks WHERE id=?", (new["milestone_id"],)).fetchone() if new["milestone_id"] else None
+        log_act(c, tid, "milestone", {"id": new["milestone_id"], "title": m["title"][:200] if m else None})
 
 
 def check_url(f):
@@ -6070,8 +6121,8 @@ def clean_repeat(v):
 
 # 2.4.0 (#340): the built-in note templates of new tickets (in the language of the person creating the ticket); a list
 # can have its own (lists.ticket_tpl, json {bug, feature}; Markdown, at most TICKET_TPL_MAX characters each)
-TICKET_TPL = {"bug": N_("**Steps to reproduce**\n1. \n\n**Expected**\n\n**Actual**\n\n**Environment**\n"),
-              "feature": N_("**Goal**\n\n**Acceptance criteria**\n- \n")}
+TICKET_TPL = {"bug": N_("**Steps to reproduce**\n1. \n\n**Expected**\n\n**Actual**\n\n**Environment**\n\n**Version / found in**\n"),
+              "feature": N_("**Goal**\n\n**Acceptance criteria**\n- [ ] \n")}
 TICKET_TPL_MAX = 5000
 
 
@@ -6151,6 +6202,12 @@ def clean_task(b):
                 v = "" if v is None else v
                 if v not in NAG_VALUES:
                     raise BadInput(tr("Invalid value: {0}", tr("Repeat reminder")))
+            if k == "ms":  # 2.18.0 (#430): true / false / 0 / 1
+                if v not in (True, False, 0, 1, None):
+                    raise BadInput(tr("Invalid value: {0}", tr("Milestone")))
+                v = 1 if v else 0
+            if k == "milestone_id":
+                v = None if v in ("", None, 0) else as_int(v, tr("Milestone"), 1)
             if k == "ttype":
                 v = "" if v in (None, "") else v
                 if v and v not in TICKET_TYPES:
@@ -6225,9 +6282,35 @@ def check_parent(c, tid, parent):
         return tr("unknown")
     if tid is not None and (parent == tid or parent in descendants(c, tid) or tid in ancestors(c, parent)):
         return tr("A task cannot be nested under itself")
+    # 2.18.0 (#430): milestones are top-level tasks without subtasks
+    if (c.execute("SELECT ms FROM tasks WHERE id=?", (parent,)).fetchone() or [0])[0]:
+        return tr("A milestone cannot have subtasks")
+    if tid is not None and (c.execute("SELECT ms FROM tasks WHERE id=?", (tid,)).fetchone() or [0])[0]:
+        return tr("A milestone cannot be a subtask")
     if depth(c, parent) + 1 + (subtree_height(c, tid) if tid else 0) >= MAX_DEPTH:
         return tr("At most {0} levels", MAX_DEPTH)
     return None
+
+
+# ---- 2.18.0 (#430): milestones. A milestone is a task with ms = 1 (top level, no subtasks, a date is optional); a task
+# belongs to at most one milestone of its OWN list (milestone_id). Moving a task to another list, trashing / deleting the
+# milestone or turning it into a normal task clears the link (ms_cleanup), so milestone_id never points anywhere else.
+def ms_target(c, mid, lid, tid=None):
+    """None when a task (tid, in list lid) may belong to milestone mid, else an error text."""
+    if mid is None:
+        return None
+    r = c.execute("SELECT list_id, ms, deleted_at FROM tasks WHERE id=?", (mid,)).fetchone()
+    if not r or r["deleted_at"] or not r["ms"] or mid == tid or r["list_id"] != lid:
+        return tr("Not a milestone of this list")
+    return None
+
+
+def ms_cleanup(c):
+    """Drops every milestone link whose milestone is gone (deleted for good, no milestone any more, another list).
+    2.18.0 (owner decision): a milestone in the TRASH keeps its links, so restoring it brings its tasks back with it; while it
+    is in the trash the link is inert (clients only show milestones they can see, new links need an open milestone)."""
+    c.execute("""UPDATE tasks SET milestone_id=NULL WHERE milestone_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM tasks m
+                 WHERE m.id=tasks.milestone_id AND m.ms=1 AND m.list_id=tasks.list_id)""")
 
 
 def can_move(c, src, dst):
@@ -6287,6 +6370,7 @@ def hard_delete(c, ids, lists=None):
     files = attachment_files(c, ids)
     for tid in ids:
         c.execute("DELETE FROM tasks WHERE id=?", (tid,))
+    ms_cleanup(c)  # 2.18.0 (#430)
     return files
 
 
@@ -6337,7 +6421,7 @@ def check_assignee(c, lid, aid):
 WEB_TASK_NEW = frozenset(TASK_FIELDS) | {"tags", "ltags", "fields"}
 WEB_TASK_EDIT = WEB_TASK_NEW | {"add_tags", "_prev", "_act"}
 WEB_LIST_NEW = frozenset({"name", "color", "folder", "view", "kind", "checklist", "done_at_bottom", "dep_shift", "tickets", "ptype"})
-WEB_LIST_EDIT = frozenset(LIST_FIELDS) | {"rate", "agent_tidy", "tidy_agent_id", "listen_agent_ids", "_prev", "ticket_tpl", "day_hours", "done_at_bottom", "columns"}
+WEB_LIST_EDIT = frozenset(LIST_FIELDS) | {"rate", "agent_tidy", "tidy_agent_id", "listen_agent_ids", "_prev", "ticket_tpl", "day_hours", "done_at_bottom", "columns", "ptype"}
 WEB_COMMENT = frozenset({"body", "suggestion"})
 
 
@@ -6371,6 +6455,13 @@ def task_create():
         f["section_id"] = None
     if f.get("assignee_group_id"):  # 2.10.0 (#441): a person or a group, never both
         f["assignee_id"] = None
+    if f.get("ms"):  # 2.18.0 (#430): a milestone is a top-level task and belongs to no milestone itself
+        if f.get("parent_id"):
+            return err(tr("A milestone cannot be a subtask"))
+        f["milestone_id"] = None
+    e = ms_target(c, f.get("milestone_id"), f["list_id"])
+    if e:
+        return err(e)
     e = check_assignee(c, f["list_id"], f.get("assignee_id")) or check_group_assignee(c, f["list_id"], f.get("assignee_group_id")) \
         or check_url(f) or repeat_problem(f.get("repeat"), f.get("due"))
     if e:
@@ -6738,7 +6829,7 @@ def apply_update(c, tid, b, conflicts=None):
             if k == "tags":
                 cur = my_tags(c, tid)
             elif k in row.keys():
-                cur = row[k]
+                cur = row[k] or None if k == "ms" else row[k]  # 2.18.0: the client omits ms = 0 (null there)
             else:
                 continue
             if _norm(cur) != _norm(old) and _norm(cur) != _norm(b[k]):
@@ -6790,6 +6881,21 @@ def apply_update(c, tid, b, conflicts=None):
     lid = f.get("list_id", cur["list_id"])
     if f.get("section_id") and not c.execute("SELECT 1 FROM sections WHERE id=? AND list_id=?", (f["section_id"], lid)).fetchone():
         f["section_id"] = None
+    # 2.18.0 (#430): a milestone stays top level without subtasks; a task's milestone is one of its own list
+    if f.get("ms") and not cur["ms"]:
+        if f.get("parent_id", cur["parent_id"]):
+            return tr("A milestone cannot be a subtask")
+        if c.execute("SELECT 1 FROM tasks WHERE parent_id=? AND deleted_at IS NULL", (tid,)).fetchone():
+            return tr("A milestone cannot have subtasks")
+    if f.get("ms", cur["ms"]):
+        if cur["milestone_id"] or f.get("milestone_id"):
+            f["milestone_id"] = None
+    elif "milestone_id" in f and (f["milestone_id"] != cur["milestone_id"] or lid != cur["list_id"]):
+        e = ms_target(c, f["milestone_id"], lid, tid)
+        if e:
+            return e
+    elif lid != cur["list_id"] and cur["milestone_id"]:
+        f["milestone_id"] = None  # moved to another list: the milestone stays behind
     if "assignee_id" in f and (collab_all() or _norm(f["assignee_id"]) != _norm(cur["assignee_id"])):
         e = check_assignee(c, lid, f["assignee_id"])
         if e:
@@ -6833,6 +6939,8 @@ def apply_update(c, tid, b, conflicts=None):
             move_subtree(c, tid, f["list_id"])
             if "section_id" not in f:
                 c.execute("UPDATE tasks SET section_id=NULL WHERE id=?", (tid,))
+        if ("list_id" in f and f["list_id"] != cur["list_id"]) or ("ms" in f and f["ms"] != cur["ms"]):
+            ms_cleanup(c)  # 2.18.0 (#430): moved / no milestone any more: its tasks (and moved subtasks) let go
     if f:
         log_changes(c, tid, cur, b.get("_act"))
         new_a, new_g = c.execute("SELECT assignee_id, assignee_group_id FROM tasks WHERE id=?", (tid,)).fetchone()
@@ -7145,6 +7253,8 @@ def do_delete(c, tid):
     ts = iso(now_utc())
     for i in [tid, *descendants(c, tid)]:
         c.execute("UPDATE tasks SET deleted_at=COALESCE(deleted_at, ?) WHERE id=?", (ts, i))
+    if (c.execute("SELECT ms FROM tasks WHERE id=?", (tid,)).fetchone() or [0])[0]:
+        ms_cleanup(c)  # 2.18.0 (#430): a trashed milestone keeps its links (restored with it), see ms_cleanup
 
 
 @app.post("/api/tasks/<int:tid>/restore")
@@ -8028,12 +8138,15 @@ def task_reorder():
                 f["section_id"] = None
             if lid != cur["list_id"] and cur["assignee_id"] and cur["assignee_id"] not in list_people(c, lid):
                 f["assignee_id"] = None
+            if lid != cur["list_id"]:
+                f["milestone_id"] = None  # 2.18.0 (#430): the milestone stays in its list
             f["updated_at"] = ts
             before = c.execute("SELECT * FROM tasks WHERE id=?", (it["id"],)).fetchone()
             c.execute(f"UPDATE tasks SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), it["id"]])
             log_changes(c, it["id"], before)
             if "list_id" in f:
                 move_subtree(c, int(it["id"]), f["list_id"])
+                ms_cleanup(c)  # 2.18.0 (#430): a moved milestone lets its tasks go, moved subtasks leave theirs
             if "due" in f and before["status"] == 0 and not before["deleted_at"]:  # dropped on a later day
                 shifted += dep_shift(c, int(it["id"]), before["due"], f["due"])
     bump(c)
@@ -8648,7 +8761,8 @@ NEWS_KEEP_MAX = int(os.environ.get("TASKS_NEWS_MAX", "500"))
 NEWS_KINDS = ("mention", "comment", "assign", "unassign", "take", "complete", "share", "role", "unshare", "unblock", "status",
               "newtask", "approval", "followup",  # 2.1.0
               "usage",  # 2.1.1 (#326): an agent reached 80 % / 100 % of a usage limit (admins)
-              "owner")  # 2.1.2 (#349): I am the new owner of a list
+              "owner",  # 2.1.2 (#349): I am the new owner of a list
+              "errreport")  # 2.18.0: a NEW error (new fingerprint) of the list's error-report webhook became a ticket
 NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner")  # about a list, not a task
 NEWS_EXCERPT = 300
 # 1.9.0: per user (setting news_kinds) which groups of events create a News item; pushes are not affected
@@ -8686,14 +8800,15 @@ NOTIF_ROWS = ("comment", "reply", "follow", "mention", "assign", "newtask", "com
               "approval", "followup", "reminder", "usage",  # 2.1.1 (#326): usage = an agent's usage limit (admins only)
               "proposal",  # 2.3.0: an agent's proposal I asked for is ready
               "nag",  # 2.7.0 (#413): a reminder that repeats until the task is done (push only; a muted list bell stops it)
-              "chat")  # 2.17.0 (#419): a direct message / a team chat message (push only; mentions follow "mention")
+              "chat",  # 2.17.0 (#419): a direct message / a team chat message (push only; mentions follow "mention")
+              "errreport")  # 2.18.0 (owner decision): exactly one News item + push when a NEW error first becomes a ticket
 NOTIF_NEWS_GROUP = {"comment": "comment", "reply": "comment", "follow": "comment", "mention": "mention", "assign": "assign",
                     "complete": "complete", "status": "status", "share": "share", "unblock": "unblock"}
 NOTIF_NEWS_PRIMARY = ("comment", "mention", "assign", "complete", "status", "share", "unblock")  # News = news_kinds
-NOTIF_NEWS_NEW = {"newtask": 0, "approval": 0, "followup": 1, "usage": 1, "proposal": 1}
+NOTIF_NEWS_NEW = {"newtask": 0, "approval": 0, "followup": 1, "usage": 1, "proposal": 1, "errreport": 1}
 NOTIF_PUSH_DEFAULT = {"comment": 1, "reply": 1, "follow": 1, "mention": 1, "assign": 1, "newtask": 0, "complete": 1,
                       "status": 0, "share": 0, "unblock": 1, "approval": 1, "followup": 1, "reminder": 1, "usage": 1,
-                      "proposal": 1, "nag": 1, "chat": 1}
+                      "proposal": 1, "nag": 1, "chat": 1, "errreport": 1}
 NOTIF_NO_NEWS = ("reminder", "nag", "chat")
 NOTIF_UNMUTED = ("mention", "assign")        # still come through a muted list
 NOTIF_NO_BELL = ("reminder", "followup", "usage", "proposal")  # never changed by a list bell
@@ -8706,7 +8821,7 @@ BELL_CUSTOM_KEY = {"reply": "comment", "follow": "comment"}
 KIND_ROW = {"mention": "mention", "comment": "comment", "assign": "assign", "unassign": "assign", "complete": "complete",
             "share": "share", "role": "share", "unshare": "share", "unblock": "unblock", "status": "status",
             "newtask": "newtask", "approval": "approval", "followup": "followup", "usage": "usage", "owner": "share",
-            "proposal": "proposal", "take": "assign"}
+            "proposal": "proposal", "take": "assign", "errreport": "errreport"}
 
 
 def notif_stored(s):
@@ -11124,10 +11239,12 @@ def tpl_node_from_task(c, t, base, uid, depth=0, fidx=None, order=None):
          "url": t["url"], "due_offset": off(t["due"]), "start_offset": off(t["start"]) if t["due"] else None,
          "due_time": t["due_time"] if t["due"] else None, "duration": t["duration"] if t["due_time"] else None,
          "reminders": t["reminders"] or "", "repeat": t["repeat"] or "", "repeat_from": t["repeat_from"] or "due",
-         **({"ttype": t["ttype"]} if t["ttype"] else {}), "children": []}
+         **({"ttype": t["ttype"]} if t["ttype"] else {}), **({"ms": 1} if t["ms"] and depth == 0 else {}), "children": []}
     if order is not None:
         n["k"] = f"n{len(order) + 1}"
         order.append((t["id"], n["k"]))
+        if t["milestone_id"]:  # 2.18.0 (#430): resolved to the milestone's node key once the whole list is read
+            n["mid"] = t["milestone_id"]
     n["children"] = [tpl_node_from_task(c, k, base, uid, depth + 1, fidx, order) for k in kids]
     if fidx:
         fv = {}
@@ -11197,6 +11314,9 @@ def tpl_clean_node(n, depth, count):
             "reminders": rems if due_off is not None else "", "repeat": rep if due_off is not None else "",
             "repeat_from": "done" if n.get("repeat_from") == "done" else "due",
             **({"ttype": n["ttype"]} if n.get("ttype") in TICKET_TYPES else {}),
+            # 2.18.0 (#430): a milestone (top level, without subtasks) / the node key of the milestone a task belongs to
+            **({"ms": 1} if n.get("ms") and depth == 0 and not kids else {}),
+            **({"mk": n["mk"]} if isinstance(n.get("mk"), str) and re.fullmatch(r"n\d{1,5}", n["mk"]) else {}),
             "children": [tpl_clean_node(k, depth + 1, count) for k in kids] if depth < MAX_DEPTH - 1 and isinstance(kids, list) else []}
 
 
@@ -11316,6 +11436,14 @@ def template_create():
                 n["section"] = sidx.get(t["section_id"])
                 tasks.append(n)
             keys = dict(order)
+
+            def mkeys(nodes):  # 2.18.0 (#430): milestone task ids -> node keys (a milestone not in the template: dropped)
+                for x in nodes:
+                    mid = x.pop("mid", None)
+                    if mid in keys:
+                        x["mk"] = keys[mid]
+                    mkeys(x.get("children") or [])
+            mkeys(tasks)
             deps = [[keys[r[0]], keys[r[1]]] for r in c.execute("""SELECT d.task_id, d.blocker_id FROM task_deps d JOIN tasks t ON t.id=d.task_id
                                                                            WHERE t.list_id=? ORDER BY d.rowid""", (lid,)).fetchall()
                     if r[0] in keys and r[1] in keys] if keys else []
@@ -11396,7 +11524,8 @@ def tpl_insert(c, n, lid, sec, parent, base, sort, uid, fmap=None, scale=1.0, ma
          "priority": n.get("priority") or 0, "due": due, "due_time": tm, "start": start,
          "duration": n.get("duration") if tm else None, "reminders": n.get("reminders") or "" if due else "",
          "repeat": n.get("repeat") or "" if due else "", "repeat_from": n.get("repeat_from") or "due",
-         "url": n.get("url"), "sort": sort, "created_by": uid, "ttype": n.get("ttype") if n.get("ttype") in TICKET_TYPES else ""}
+         "url": n.get("url"), "sort": sort, "created_by": uid, "ttype": n.get("ttype") if n.get("ttype") in TICKET_TYPES else "",
+         "ms": 1 if n.get("ms") and parent is None else 0}
     if f["repeat"] and (rr_problem(rr_norm(f["repeat"])) or not rr_feasible(rr_norm(f["repeat"]), due)):
         f["repeat"] = ""
     ts = iso(now_utc())
@@ -11495,6 +11624,17 @@ def tpl_apply_list(c, uid, d, name, folder, start, end=None, color=None):
         si = n.get("section")
         tpl_insert(c, n, lid, secs[si] if isinstance(si, int) and 0 <= si < len(secs) else None, None, start, i, uid, fmap,
                    scale, made)
+    links = []  # 2.18.0 (#430): the tasks of a milestone of the template belong to the new milestone
+
+    def walk(nodes):
+        for x in nodes:
+            if x.get("mk") and x.get("k") in made and x["mk"] in made:
+                links.append((made[x["mk"]], made[x["k"]]))
+            walk(x.get("children") or [])
+    walk(d.get("tasks") or [])
+    for mid, tid_ in links:
+        if ms_target(c, mid, lid, tid_) is None and not (c.execute("SELECT ms FROM tasks WHERE id=?", (tid_,)).fetchone() or [0])[0]:
+            c.execute("UPDATE tasks SET milestone_id=? WHERE id=?", (mid, tid_))
     for a, b_ in d.get("deps") or []:
         if a in made and b_ in made:
             c.execute("INSERT OR IGNORE INTO task_deps(task_id,blocker_id,created_by,created_at) VALUES(?,?,?,?)",
@@ -11533,11 +11673,67 @@ def ptype_create(c, uid, k, name, folder="", color="", start=None):
     if k not in PTYPES:
         raise BadInput(tr("Invalid value: {0}", tr("Project type")))
     lid = tpl_apply_list(c, uid, ptype_template(k, lang(c, uid)), name, folder, start or local_now().date(), color=color)
+    c.execute("UPDATE lists SET ptype=? WHERE id=?", (k, lid))  # 2.18.0 (#408): the type is kept (list dialog, API)
     fs = [x for x in (usettings(c, uid).get("features") or "").split(",") if x]
     on = [m for m in PTYPES[k]["modules"] if m not in fs]
     if on:
         uset(c, uid, "features", ",".join(fs + on))
     return lid, on
+
+
+def ptype_missing(c, lid, k, lg):
+    """2.18.0 (#408): the sections / custom fields of project type k that list lid does not have yet (by name, ignoring
+    case; in the language lg and in English). The client offers to add them; switching a type never adds or deletes them."""
+    if k not in PTYPES:
+        return {"sections": [], "fields": []}
+    have_s = {r[0].strip().casefold() for r in c.execute("SELECT name FROM sections WHERE list_id=?", (lid,))}
+    have_f = {r[0].strip().casefold() for r in c.execute("SELECT name FROM list_fields WHERE list_id=?", (lid,))}
+
+    def lacks(x, have):
+        return tr(x, lg=lg).strip().casefold() not in have and x.split("|")[0].strip().casefold() not in have
+    return {"sections": [tr(x, lg=lg) for x in PTYPES[k]["sections"] if lacks(x, have_s)],
+            "fields": [{"name": tr(n, lg=lg), "type": t} for n, t in PTYPES[k]["fields"] if lacks(n, have_f)]}
+
+
+def list_ptype_set(c, lid, role, k, skip=()):
+    """2.18.0 (#408): set the project type of list lid ('' = none). Owner / list admins (Denied 403), never the inbox.
+    Switching never deletes anything: it switches on what the type needs -- type Project, ticket types (software), the
+    type's view only while the list has no tasks, the type's modules for the person switching -- unless the request sets
+    that field itself (skip). Returns {ptype_prev: the previous values of what it changed (for the undo), modules_on,
+    ptype_missing: the type's sections / fields the list lacks (offered, not added)}."""
+    k = "" if k is None else k
+    if not isinstance(k, str) or (k and k not in PTYPES):
+        raise BadInput(tr("Invalid value: {0}", tr("Project type")))
+    if role not in MANAGE_ROLES:
+        raise Denied(403)
+    cur = c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()
+    if cur["is_inbox"]:
+        raise BadInput(tr("The inbox cannot be a project"))
+    out = {"ptype_prev": {}, "modules_on": [], "ptype_missing": {"sections": [], "fields": []}}
+    if (cur["ptype"] or "") == k:
+        if k:
+            out["ptype_missing"] = ptype_missing(c, lid, k, lang(c, me()))
+        return out
+    c.execute("UPDATE lists SET ptype=? WHERE id=?", (k, lid))
+    if not k:
+        return out
+    p, prev = PTYPES[k], out["ptype_prev"]
+    if cur["kind"] != "project" and "kind" not in skip:
+        prev["kind"] = cur["kind"]
+        c.execute("UPDATE lists SET kind='project' WHERE id=?", (lid,))
+    if p["tickets"] and not cur["tickets"] and "tickets" not in skip:
+        prev["tickets"] = 0  # 0 / 1 like the column: an undo sending it back passes the _prev check (_norm compares strings)
+        c.execute("UPDATE lists SET tickets=1 WHERE id=?", (lid,))
+    if cur["view"] != p["view"] and "view" not in skip and \
+            not c.execute("SELECT 1 FROM tasks WHERE list_id=? AND deleted_at IS NULL LIMIT 1", (lid,)).fetchone():
+        prev["view"] = cur["view"]
+        c.execute("UPDATE lists SET view=? WHERE id=?", (p["view"], lid))
+    fs = [x for x in (usettings(c, me()).get("features") or "").split(",") if x]
+    out["modules_on"] = [m for m in p["modules"] if m not in fs]
+    if out["modules_on"]:
+        uset(c, me(), "features", ",".join(fs + out["modules_on"]))
+    out["ptype_missing"] = ptype_missing(c, lid, k, lang(c, me()))
+    return out
 
 
 # ---------------------------------------------------------------- dependencies ("waiting on"), package 3
@@ -11889,23 +12085,53 @@ def ov_link_dict(r):
     return {"id": r["id"], "title": r["title"], "url": r["url"], "sort": r["sort"]}
 
 
-def ov_ms_dict(r):
-    return {"id": r["id"], "name": r["name"], "day": r["day"], "done": bool(r["done"])}
-
-
 def ov_file_dict(r, names=None):
     return {"id": r["id"], "name": r["name"], "mime": r["mime"], "size": r["size"], "created_at": r["created_at"],
             "user_id": r["user_id"], "user_name": (names or {}).get(r["user_id"], "")}
 
 
-def milestones_of_lists(c, ids):
-    """{list id: [milestones by day]} of the given (project) lists, for /api/state (timeline markers, offline)."""
-    out = {}
+def ms_migrate(c):
+    """2.18.0 (#430): every list_milestones row -> a milestone task in its list (title = name, due = day, done -> status 2,
+    created_by = its creator or the list owner, at the end of the list, no section), then the row goes. The table itself
+    stays (old backups restore into it). Returns the number migrated; the caller commits."""
+    rows = c.execute("""SELECT m.*, l.owner_id FROM list_milestones m JOIN lists l ON l.id=m.list_id ORDER BY m.list_id, m.day, m.id""").fetchall()
+    for r in rows:
+        srt = c.execute("SELECT COALESCE(MAX(sort), 0) + 1 FROM tasks WHERE list_id=? AND parent_id IS NULL", (r["list_id"],)).fetchone()[0]
+        who = r["created_by"] if r["created_by"] and c.execute("SELECT 1 FROM users WHERE id=?", (r["created_by"],)).fetchone() \
+            else r["owner_id"]
+        ts, done = r["created_at"] or iso(now_utc()), 2 if r["done"] else 0
+        day = r["day"] if valid_date(r["day"]) else None
+        tid = c.execute("""INSERT INTO tasks(list_id,title,due,status,ms,sort,created_by,completed_by,completed_at,created_at,updated_at)
+                           VALUES(?,?,?,?,1,?,?,?,?,?,?)""",
+                        (r["list_id"], (r["name"] or "?")[:TITLE_MAX], day, done, srt, who, who if done else None,
+                         iso(now_utc()) if done else None, ts, iso(now_utc()))).lastrowid
+        c.execute("INSERT INTO activity(task_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",
+                  (tid, who, "created", "{}", ts))
+    c.execute("DELETE FROM list_milestones")  # also orphan rows of lists that no longer exist
+    return len(rows)
+
+
+def ms_rows(c, ids):
+    """The milestone tasks (not in the trash) of the given lists, by date (undated last), then id."""
     if not ids:
-        return out
+        return []
     q = ",".join("?" * len(ids))
-    for r in c.execute(f"SELECT * FROM list_milestones WHERE list_id IN ({q}) ORDER BY day, id", list(ids)):
-        out.setdefault(r["list_id"], []).append(ov_ms_dict(r))
+    return c.execute(f"""SELECT id, list_id, title, due, status FROM tasks WHERE ms=1 AND deleted_at IS NULL AND list_id IN ({q})
+                         ORDER BY due IS NULL, due, id""", list(ids)).fetchall()
+
+
+def ms_compat(r):
+    """2.18.0 (#430): a milestone task in the shape of the 2.7.1 overview milestones (ids are task ids now)."""
+    return {"id": r["id"], "name": r["title"], "day": r["due"], "done": r["status"] != 0}
+
+
+def milestones_of_lists(c, ids):
+    """{list id: [milestones by day]} of the given (project) lists, for /api/state (timeline markers, offline). 2.18.0: from
+    the milestone tasks; only dated ones (the markers and "next milestone" need a day)."""
+    out = {}
+    for r in ms_rows(c, ids):
+        if r["due"]:
+            out.setdefault(r["list_id"], []).append(ms_compat(r))
     return out
 
 
@@ -11926,7 +12152,7 @@ def overview_build(c, lid, uid):
     role = list_role(c, lid, uid)
     lst = c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()
     links = [ov_link_dict(r) for r in c.execute("SELECT * FROM list_links WHERE list_id=? ORDER BY sort, id", (lid,))]
-    ms = [ov_ms_dict(r) for r in c.execute("SELECT * FROM list_milestones WHERE list_id=? ORDER BY day, id", (lid,))]
+    ms = [ms_compat(r) for r in ms_rows(c, [lid])]  # 2.18.0 (#430): milestone tasks (undated ones too, day null)
     frows = c.execute("SELECT * FROM list_files WHERE list_id=? ORDER BY id DESC", (lid,)).fetchall()
     names = user_names(c, [r["user_id"] for r in frows] + [lst["owner_id"]])
     # the files of the list's tasks (not in the trash; not files of comments): a participant only those of the tasks they
@@ -12083,12 +12309,22 @@ def ov_ms_clean(b, old=None):
     if not name:
         raise BadInput(tr("Name missing"))
     day = ov_day(b.get("day", old["day"] if old else None))
-    if not day:
+    if not day and (old is None or old["day"] or "day" in b):  # 2.18.0: an undated milestone task may stay undated
         raise BadInput(tr("Date: YYYY-MM-DD"))
     done = b.get("done", bool(old["done"]) if old else False)
     if not isinstance(done, bool):
         raise BadInput(tr("Invalid value: {0}", "done"))
     return name, day, int(done)
+
+
+# 2.18.0 (#430): the overview's milestone routes (web + API v1) stay as a compatibility layer on top of the milestone tasks:
+# the ids are task ids since 2.18.0, POST creates a milestone task at the end of the list, PATCH changes its title / due date
+# / done state through the normal task endpoints (history, events, webhooks), DELETE moves it to the trash.
+def need_ms_task(c, lid, rid):
+    r = c.execute("SELECT * FROM tasks WHERE id=? AND list_id=? AND ms=1 AND deleted_at IS NULL", (rid, lid)).fetchone()
+    if not r:
+        raise Denied(404)
+    return r
 
 
 @app.post("/api/lists/<int:lid>/milestones")
@@ -12098,13 +12334,13 @@ def ov_ms_add(lid):
     c = db()
     need_overview(c, lid, write=True)
     name, day, done = ov_ms_clean(b)
-    if c.execute("SELECT COUNT(*) FROM list_milestones WHERE list_id=?", (lid,)).fetchone()[0] >= OV_MS_MAX:
+    if c.execute("SELECT COUNT(*) FROM tasks WHERE list_id=? AND ms=1 AND deleted_at IS NULL", (lid,)).fetchone()[0] >= OV_MS_MAX:
         return err(tr("At most {0} milestones", OV_MS_MAX), 409)
-    nid = c.execute("INSERT INTO list_milestones(list_id,name,day,done,created_by,created_at) VALUES(?,?,?,?,?,?)",
-                    (lid, name, day, done, me(), iso(now_utc()))).lastrowid
-    bump(c)
-    c.commit()
-    return jsonify(ov_ms_dict(c.execute("SELECT * FROM list_milestones WHERE id=?", (nid,)).fetchone()))
+    srt = c.execute("SELECT COALESCE(MAX(sort), 0) + 1 FROM tasks WHERE list_id=? AND parent_id IS NULL", (lid,)).fetchone()[0]
+    nid = v1_call(task_create, body={"title": name, "due": day, "list_id": lid, "ms": 1, "sort": srt})["id"]
+    if done:
+        v1_call(task_complete, nid, body={})
+    return jsonify(ms_compat(db().execute("SELECT * FROM tasks WHERE id=?", (nid,)).fetchone()))
 
 
 @app.patch("/api/lists/<int:lid>/milestones/<int:rid>")
@@ -12112,23 +12348,90 @@ def ov_ms_update(lid, rid):
     b = web_fields(body(), {"name", "day", "done"}, "PATCH /api/lists/{lid}/milestones/{id}")
     c = db()
     need_overview(c, lid, write=True)
-    old = need_ov_row(c, "list_milestones", lid, rid)
+    old = ms_compat(need_ms_task(c, lid, rid))
     name, day, done = ov_ms_clean(b, old)
-    c.execute("UPDATE list_milestones SET name=?, day=?, done=? WHERE id=?", (name, day, done, rid))
-    bump(c)
-    c.commit()
-    return jsonify(ov_ms_dict(c.execute("SELECT * FROM list_milestones WHERE id=?", (rid,)).fetchone()))
+    ch = {k: v for k, v in (("title", name), ("due", day)) if v != old["name" if k == "title" else "day"]}
+    if ch:
+        v1_call(task_update, rid, body=ch)
+    if bool(done) != old["done"]:
+        v1_call(task_complete if done else task_reopen, rid, body={})
+    return jsonify(ms_compat(db().execute("SELECT * FROM tasks WHERE id=?", (rid,)).fetchone()))
 
 
 @app.delete("/api/lists/<int:lid>/milestones/<int:rid>")
 def ov_ms_delete(lid, rid):
     c = db()
     need_overview(c, lid, write=True)
-    need_ov_row(c, "list_milestones", lid, rid)
-    c.execute("DELETE FROM list_milestones WHERE id=?", (rid,))
-    bump(c)
-    c.commit()
+    need_ms_task(c, lid, rid)
+    v1_call(task_delete, rid, body={})
     return jsonify(ok=True)
+
+
+# ---- 2.18.0 (#430, "Software 2" B + D): what a milestone holds. Progress (closed / all of its tasks), its tasks (open first),
+# a burndown (open tasks per day from the first task's creation, or 14 days before the due date, up to today; the ideal
+# line from all tasks on the first day to 0 on the due date) and release notes (Markdown from its completed tasks, grouped by
+# ticket type). Participants only count and see the tasks they fully see.
+MS_BURN_MAX = 180  # days in a burndown (the newest ones)
+
+
+def _local_day(v):
+    try:
+        return parse_iso(v).astimezone(TZ).date() if v else None
+    except (ValueError, TypeError):
+        return None
+
+
+def ms_report(c, tid, uid, lg=None):
+    m = c.execute("SELECT * FROM tasks WHERE id=? AND deleted_at IS NULL", (tid,)).fetchone()
+    if not m or not m["ms"]:
+        raise Denied(404, tr("Not a milestone"))
+    rows = c.execute("SELECT * FROM tasks WHERE milestone_id=? AND deleted_at IS NULL ORDER BY status!=0, sort, id", (tid,)).fetchall()
+    if list_role(c, m["list_id"], uid) == "participant":
+        _, wr, _ = pvis(c, uid, m["list_id"])
+        rows = [r for r in rows if r["id"] in wr]
+    total, closed = len(rows), sum(1 for r in rows if r["status"] != 0)
+    today_ = local_now().date()
+    due = date.fromisoformat(m["due"]) if m["due"] and valid_date(m["due"]) else None
+    made = [d for d in (_local_day(r["created_at"]) for r in rows) if d]
+    start = min(made) if made else (due - timedelta(days=14) if due else today_ - timedelta(days=14))
+    if due and not made:
+        start = min(start, due - timedelta(days=14))
+    end = today_  # the actual line ends today; the ideal line runs on to the due date
+    start = max(min(start, end), end - timedelta(days=MS_BURN_MAX - 1))
+    spans = [(_local_day(r["created_at"]) or start, _local_day(r["completed_at"]) if r["status"] != 0 else None) for r in rows]
+    days, d = [], start
+    while d <= end:
+        days.append({"day": d.isoformat(), "open": sum(1 for a, z in spans if a <= d and not (z and z <= d))})
+        d += timedelta(days=1)
+    ideal = [{"day": start.isoformat(), "open": total}, {"day": due.isoformat(), "open": 0}] if total and due and due >= start else []
+    # release notes: completed tasks only (not "won't do"), by ticket type; without any types one plain list
+    done = [r for r in rows if r["status"] == 2]
+    head = f"## {m['title']}" + (f" ({m['due']})" if m["due"] else "")
+    lines = [head, ""]
+    if not done:
+        lines.append(tr("No completed tasks yet.", lg=lg))
+    elif not any(r["ttype"] for r in done):
+        lines += [f"- #{r['id']} {r['title']}" for r in done]
+    else:
+        for name, keys in ((N_("Features"), ("feature",)), (N_("Fixes"), ("bug",)), (N_("Other|release notes"), ("task", ""))):
+            part = [r for r in done if (r["ttype"] or "") in keys]
+            if part:
+                lines += [f"### {tr(name, lg=lg)}", "", *[f"- #{r['id']} {r['title']}" for r in part], ""]
+    return {"milestone": {"id": m["id"], "title": m["title"], "list_id": m["list_id"], "due": m["due"],
+                          "status": STATUS_NAMES.get(m["status"], "open")},
+            "progress": {"done": closed, "total": total, "percent": round(100 * closed / total) if total else 0},
+            "tasks": [{"id": r["id"], "title": r["title"], "status": STATUS_NAMES.get(r["status"], "open"),
+                       "type": r["ttype"] or None, "due": r["due"], "assignee_id": r["assignee_id"],
+                       "completed_at": r["completed_at"]} for r in rows],
+            "burndown": {"start": start.isoformat(), "end": end.isoformat(), "due": m["due"], "days": days, "ideal": ideal},
+            "release_notes": "\n".join(lines).rstrip() + "\n"}
+
+
+@app.get("/api/tasks/<int:tid>/milestone")
+def task_milestone(tid):
+    c = db()
+    need_task(c, tid, write=False, full=True)
+    return jsonify(ms_report(c, tid, me()))
 
 
 # ---- project files: same rules as task files (size limit, safe file names, download unless a harmless type)
@@ -19263,7 +19566,10 @@ def task_core(r, tags, fields):
             "deadline": bool(r["deadline"]) if "deadline" in r.keys() else False,
             "deadline_in_today": (r["deadline"] == 2) if "deadline" in r.keys() else False,
             "nag": (r["nag"] if "nag" in r.keys() else "") or "",
-            "plan_start": r["plan_start"] if "plan_start" in r.keys() else None}  # 2.11.0: day plan slot
+            "plan_start": r["plan_start"] if "plan_start" in r.keys() else None,  # 2.11.0: day plan slot
+            # 2.18.0 (#430): a milestone / the milestone (a task of the same list) the task belongs to
+            "milestone": bool(r["ms"]) if "ms" in r.keys() and r["ms"] else False,
+            "milestone_id": r["milestone_id"] if "milestone_id" in r.keys() else None}
 
 
 def waiting_of(r):
@@ -19291,7 +19597,7 @@ def task_for(c, row, uid):
 
 V1_TASK_IN = ("title", "notes", "list_id", "section_id", "parent_id", "priority", "due", "due_time", "start", "duration",
               "reminders", "repeat", "repeat_from", "url", "tags", "assignee_id", "pinned", "fields", "list_tags", "type",
-              "deadline", "deadline_in_today", "nag", "assignee_group_id", "plan_start")
+              "deadline", "deadline_in_today", "nag", "assignee_group_id", "plan_start", "milestone", "milestone_id")
 
 
 def v1_task_in(b, allowed=V1_TASK_IN):
@@ -19335,6 +19641,10 @@ def v1_task_in(b, allowed=V1_TASK_IN):
             if v not in NAG_VALUES:
                 raise BadInput(tr("Invalid value: {0}", "nag"))
             out["nag"] = v
+        elif k == "milestone":  # 2.18.0 (#430): boolean -> the internal ms 0 / 1
+            if not isinstance(v, bool):
+                raise BadInput(tr("Invalid value: {0}", "milestone"))
+            out["ms"] = 1 if v else 0
         else:
             out[k] = v
     if "deadline" in b or "deadline_in_today" in b:
@@ -19369,7 +19679,8 @@ def v1_list(d):
             "icon": d.get("icon") or "",
             "repos": d.get("repos") or [], "tickets": bool(d.get("tickets")),
             "nag": d.get("nag") or "", "day_hours": d.get("day_hours"),  # 2.7.0 (#413, #407)
-            "columns": d.get("columns")}  # 2.14.0 (#425): the list's columns (null = default)
+            "columns": d.get("columns"),  # 2.14.0 (#425): the list's columns (null = default)
+            "project_type": d.get("ptype") or None}  # 2.18.0 (#408): agency | software | private, null = none
 
 
 # ---- token management (Settings > Account > API tokens; session / proxy login only, a token cannot reach these)
@@ -19615,13 +19926,18 @@ def v1_list_patch(lid):
     """2.7.0: change a list: name, color, folder (yours), view, kind, nag (default of the list's tasks), day_hours;
     2.7.2 (#414): done_at_bottom ("Show completed at the bottom"; checklist = deprecated alias); 2.13.1 (#471):
     listen_agent_ids (the agents that read every comment; owner / list admins, never an agent token); 2.14.0 (#425):
-    columns (the list's columns for every member; owner / list admins)."""
+    columns (the list's columns for every member; owner / list admins); 2.18.0 (#408): project_type (owner / list admins:
+    switches on what the type needs -- type Project, ticket types, its modules -- and never deletes anything)."""
     v1_args(())
     b = v1_json()
     unknown = sorted(k for k in b if k not in ("name", "color", "folder", "view", "kind", "nag", "day_hours", "done_at_bottom", "checklist",
-                                               "listen_agent_ids", "columns", "archived"))
+                                               "listen_agent_ids", "columns", "archived", "project_type"))
     if unknown:
         raise UnknownFields(unknown)
+    if "project_type" in b:  # 2.18.0 (#408): change the project type (owner / list admins; null / "" = none)
+        if b["project_type"] not in (None, "") and b["project_type"] not in PTYPES:
+            raise BadInput(tr("Invalid value: {0}", "project_type"))
+        b = {**{k: v for k, v in b.items() if k != "project_type"}, "ptype": b["project_type"] or ""}
     for k in ("checklist", "done_at_bottom", "archived"):
         if k in b and not isinstance(b[k], bool):
             raise BadInput(tr("Invalid value: {0}", k))
@@ -19699,7 +20015,7 @@ def v1_tasks():
     """Visible tasks (not in the trash), oldest id first, cursor pages. Filters: list_id, status, due_from, due_to,
     tag, assignee (me | none | id), updated_since, parent_id, top_level."""
     a = v1_args(("list_id", "status", "due_from", "due_to", "tag", "list_tag", "assignee", "updated_since", "parent_id", "top_level",
-                 "limit", "cursor", "fields", "waiting", "type", "assignee_group", "pinned"))
+                 "limit", "cursor", "fields", "waiting", "type", "assignee_group", "pinned", "milestone", "milestone_id"))
     if a.get("fields") not in (None, "", "full", "compact"):
         raise BadInput(tr("Invalid value: {0}", "fields"))
     c, uid = db(), me()
@@ -19758,6 +20074,13 @@ def v1_tasks():
         if a["pinned"] not in ("1", "true", "0", "false"):
             raise BadInput(tr("Invalid value: {0}", "pinned"))
         where.append("pinned=1" if a["pinned"] in ("1", "true") else "pinned=0")
+    if a.get("milestone") not in (None, ""):  # 2.18.0 (#430): only milestones (true) / only the other tasks (false)
+        if a["milestone"] not in ("1", "true", "0", "false"):
+            raise BadInput(tr("Invalid value: {0}", "milestone"))
+        where.append("ms=1" if a["milestone"] in ("1", "true") else "ms=0")
+    if a.get("milestone_id") not in (None, ""):  # 2.18.0 (#430): the tasks of one milestone
+        where.append("milestone_id=?")
+        args.append(as_int(a["milestone_id"], "milestone_id", 1))
     if a.get("type") not in (None, ""):  # 2.4.0 (#340): bug | feature | task | none
         if a["type"] not in (*TICKET_TYPES, "none"):
             raise BadInput(tr("Invalid value: {0}", "type"))
@@ -19880,6 +20203,16 @@ def v1_task_reopen(tid):
     _v1_live(c, tid)
     v1_call(task_reopen, tid, body={})
     return jsonify(v1_one(c, tid))
+
+
+@app.get("/api/v1/tasks/<int:tid>/milestone")
+@v1_view
+def v1_task_milestone(tid):
+    """2.18.0 (#430): progress, tasks, burndown and release notes of a milestone task."""
+    v1_args(())
+    c = db()
+    _v1_live(c, tid, write=False, full=True)
+    return jsonify(ms_report(c, tid, me()))
 
 
 @app.get("/api/v1/tasks/<int:tid>/subtasks")
@@ -20763,7 +21096,12 @@ def openapi_spec():
                 "minutes or 1d (daily), from the first reminder on; off = never; empty = the list's default"},
         "plan_start": nul("string", pattern="^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-2][0-9]:[0-5][0-9]$",
                           description="2.11.0: planned start YYYY-MM-DDTHH:MM (local; set by the day plan, see /dayplan); "
-                                      "independent of due / deadline, which planning never changes; null = not planned")}
+                                      "independent of due / deadline, which planning never changes; null = not planned"),
+        "milestone": {"type": "boolean", "description": "2.18.0: the task is a milestone (a diamond with a date, checkable, top level, "
+                      "no subtasks); see GET /tasks/{id}/milestone for its progress, burndown and release notes"},
+        "milestone_id": nul("integer", description="2.18.0: the milestone (a task of the same list with milestone true) this task "
+                            "belongs to, e.g. the release it ships in; cleared when the task moves to another list or the milestone "
+                            "is deleted / no milestone any more")}
     task_in = {k: v for k, v in task_props.items() if k in V1_TASK_IN}
     task_in["priority"] = {"oneOf": [prio, {"type": "integer", "enum": list(PRIORITIES)}]}
     task_in["reminders"] = {"oneOf": [{"type": "array", "items": {"type": "integer"}}, {"type": "string"}]}
@@ -20838,7 +21176,11 @@ def openapi_spec():
                                  "description": "2.13.1 (#471): agents of the list that get a 'comment' event for EVERY comment of a person "
                                                 "in this list (only on tasks they can see); [] = none. Owner / list admins, never an agent token"},
             "columns": {"type": ["array", "null"], "items": {"type": "string"}, "maxItems": COL_MAX,
-                        "description": COL_DOC + " Owner / list admins; null = back to the default."}}},
+                        "description": COL_DOC + " Owner / list admins; null = back to the default."},
+            "project_type": {"type": ["string", "null"], "enum": [*PTYPES, "", None],
+                             "description": "2.18.0 (#408): the project type (owner / list admins); null / \"\" = none. Switches on what the "
+                                            "type needs (type project, ticket types for software, the type's view while the list has no "
+                                            "tasks, its modules for you) and never deletes anything; sections are not added"}}},
         "ListPage": page("ListDetail"),  # 2.0.8: the list page carries each list's sections too
         "Roadmap": {"type": "object", "properties": {
             "from": {"type": "string", "format": "date"}, "to": {"type": "string", "format": "date"}, "projects_only": {"type": "boolean"},
@@ -20995,6 +21337,8 @@ def openapi_spec():
                                  "list_tags, assignee_id (default full)", {"type": "string", "enum": ["full", "compact"]}),
                      q("waiting", "true = only tasks waiting on external, false = only the others", {"type": "boolean"}),
                      q("pinned", "2.16.0: true = only pinned tasks, false = only the others", {"type": "boolean"}),
+                     q("milestone", "2.18.0: true = only milestones, false = only the other tasks", {"type": "boolean"}),
+                     q("milestone_id", "2.18.0: only the tasks of this milestone", {"type": "integer"}),
                      q("type", "Ticket type: bug, feature, task or none (2.4.0)", {"type": "string", "enum": [*TICKET_TYPES, "none"]}),
                      limit, cursor]
     paths = {
@@ -21058,6 +21402,12 @@ def openapi_spec():
                                           desc="On the follow-up day the person it is for gets a reminder + News, following agents the event followup_due."),
                                 "delete": op("Clear the waiting state", T, ok(ref("Task")) | errs("403", "404"), [pid()], scope="write")},
         "/tasks/{id}/reopen": {"post": op("Reopen a completed task", T, ok(ref("Task")) | errs("403", "404"), [pid()], scope="write")},
+        # 2.18.0 (#430): a milestone's progress, tasks, burndown and release notes
+        "/tasks/{id}/milestone": {"get": op("A milestone: progress, its tasks, burndown, release notes", T, ok(ref("MilestoneReport")) | errs("403", "404"),
+                                            [pid()], desc="Only for milestone tasks (milestone: true), else 404. Progress counts closed "
+                                            "(done or won't do) tasks of the milestone (milestone_id); burndown.days = open tasks per local day "
+                                            "from the first task's creation (at most 180 days) to today, burndown.ideal = a line from all tasks "
+                                            "to 0 on the due date; release_notes = Markdown of its completed tasks grouped by ticket type.")},
         "/tasks/{id}/subtasks": {"get": op("Subtasks of a task", T, ok(ref("TaskPage")) | errs("404"), [pid()]),
                                  "post": op("Add a subtask", T, ok(ref("Task"), "Created", "201") | errs("400", "403", "404"), [pid()],
                                             body=ref("TaskInput"), scope="write")},
@@ -25622,6 +25972,8 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
     schemas["List"]["properties"]["listen_agent_ids"] = {"type": "array", "items": {"type": "integer"}, "description":
                                                          "2.13.1 (#471): agents that read every comment of a person in this list (default: the tidy agent while tidying is on)"}
     schemas["List"]["properties"]["icon"] = {"type": "string", "description": "URL of the list's own icon (2.0.2), empty = none"}
+    schemas["List"]["properties"]["project_type"] = nul("string", enum=[*PTYPES, None],
+                                                        description="2.18.0 (#408): agency | software | private; null = none (a plain list or project)")
     schemas["Comment"]["properties"]["reactions"] = {"type": "array", "items": {"type": "object"}}
     schemas["Comment"]["properties"]["suggestion"] = {"oneOf": [{"type": "null"}, {"type": "object"}]}
     schemas["CommentInput"]["properties"]["suggestion"] = ref("TidyInput")
@@ -25790,7 +26142,7 @@ def pub_html(title, main, lg, code=200, foot=True):
     doc = (f'<!doctype html><html lang="{e(lg)}"><head><meta charset="utf-8">'
            '<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow">'
            f'<meta name="referrer" content="no-referrer"><title>{e(title)}</title><link rel="stylesheet" href="/static/public.css">'
-           f'<link rel="icon" href="/static/icon.svg"></head><body><main>{main}</main>'
+           f'<link rel="icon" href="/static/favicon.svg" type="image/svg+xml"></head><body><main>{main}</main>'
            + (f'<footer>{e(tr("Shared with {0}", APP_NAME, lg=lg))}</footer>' if foot else '') + '</body></html>')
     return pub_headers(Response(doc, status=code, mimetype="text/html"))
 
@@ -26169,7 +26521,16 @@ GIT_BACKOFF_MAX = 3600                                  # s
 GIT_MAX_BYTES = 4 * 1024 * 1024
 GIT_MAX_CONNS = 5                                       # per list
 GIT_TASK_PRS, GIT_TASK_COMMITS = 5, 5                   # shown per task
-GIT_PROVIDERS = ("github", "gitea")
+GIT_PROVIDERS = ("github", "gitea", "gitlab", "bitbucket")
+# 2.18.0 (#408 "Software 2" A): GitLab (gitlab.com or self-hosted, API v4; nested groups: the owner may be "group/sub",
+# the project path is URL-encoded in the API) and Bitbucket CLOUD (api.bitbucket.org/2.0; Bitbucket Server / Data Center
+# has another API and is not supported) next to GitHub and Gitea / Forgejo. Their answers are mapped onto the GitHub shape
+# the poller reads (git_pr_norm / git_commit_norm), so matching, keywords, CI and the merge requests work the same.
+# Hosts whose provider is unambiguous (the address of a repository on github.com / gitlab.com / bitbucket.org):
+GIT_HOSTS = {"github.com": "github", "www.github.com": "github", "api.github.com": "github", "gitlab.com": "gitlab",
+             "www.gitlab.com": "gitlab", "bitbucket.org": "bitbucket", "www.bitbucket.org": "bitbucket", "api.bitbucket.org": "bitbucket"}
+GIT_API_SUFFIX = ("/api/v3", "/api/v1", "/api/v4", "/2.0")
+GIT_TAGS_KEEP = 500                                     # tag names remembered per connection
 GIT_ERR = {"auth": N_("Access denied: check the token (it needs read access to the repository)"),
            "not_found": N_("Repository not found, or the token cannot see it"),
            "rate": N_("Rate limit of the Git server reached, polling pauses until it resets"),
@@ -26217,7 +26578,60 @@ def git_urls(provider, base):
     """(API base, web base) of a connection."""
     if provider == "github":
         return ("https://api.github.com", "https://github.com") if not base else (base + "/api/v3", base)
+    if provider == "gitlab":  # 2.18.0
+        return ("https://gitlab.com/api/v4", "https://gitlab.com") if not base else (base + "/api/v4", base)
+    if provider == "bitbucket":  # 2.18.0: Bitbucket Cloud (a base only for a compatible API under <base>/2.0, e.g. tests)
+        return ("https://api.bitbucket.org/2.0", "https://bitbucket.org") if not base else (base + "/2.0", base)
     return base + "/api/v1", base
+
+
+def git_repo_path(provider, owner, repo):
+    """2.18.0: the API path of a repository (GitLab: the URL-encoded project path, nested groups included)."""
+    q = urllib.parse.quote
+    if provider == "gitlab":
+        return "/projects/" + q(f"{owner}/{repo}", safe="")
+    if provider == "bitbucket":
+        return f"/repositories/{q(owner, safe='')}/{q(repo, safe='')}"
+    return f"/repos/{q(owner)}/{q(repo)}"
+
+
+def git_auth(provider, token):
+    """2.18.0: the auth header of a provider. GitHub: Bearer; Gitea: token; GitLab: PRIVATE-TOKEN for its own tokens
+    (glpat-... and other gl* prefixes), Bearer otherwise (OAuth tokens; also accepted for older personal tokens);
+    Bitbucket: "user:app-password" as Basic, an access token (repository / workspace) as Bearer."""
+    if not token:
+        return {}
+    if provider == "github":
+        return {"Authorization": "Bearer " + token}
+    if provider == "gitlab":
+        return {"PRIVATE-TOKEN": token} if token.startswith("gl") else {"Authorization": "Bearer " + token}
+    if provider == "bitbucket":
+        return {"Authorization": ("Basic " + base64.b64encode(token.encode()).decode()) if ":" in token else "Bearer " + token}
+    return {"Authorization": "token " + token}
+
+
+def git_owner_ok(provider, owner):
+    """owner = one name; on GitLab a group path with sub groups (group/sub/...)."""
+    parts = str(owner or "").split("/")
+    return len(parts) <= (20 if provider == "gitlab" else 1) and \
+        all(GIT_NAME_RE.fullmatch(x) and x not in (".", "..") for x in parts)
+
+
+def git_items(j):
+    """A list answer: GitHub / Gitea / GitLab send a JSON array, Bitbucket a page {values: [...]}; None otherwise."""
+    if isinstance(j, list):
+        return j
+    if isinstance(j, dict) and isinstance(j.get("values"), list):
+        return j["values"]
+    return None
+
+
+def git_default_of(j):
+    """The default branch in a repository answer (Bitbucket: mainbranch.name)."""
+    if not isinstance(j, dict):
+        return None
+    d = j.get("default_branch") or _gd(j, "mainbranch", "name")
+    return d if isinstance(d, str) else None
 
 
 def git_ids(text):
@@ -26256,7 +26670,7 @@ def git_public(c, r, manage=False):
 def git_ctx(c, r):
     api = git_urls(r["provider"], r["base_url"])[0]
     return {"api": api, "provider": r["provider"], "token": git_unseal(r["id"], "token", r["token"]), "allow": cal_allow(c),
-            "path": f"/repos/{urllib.parse.quote(r['owner'])}/{urllib.parse.quote(r['repo'])}", "low": None}
+            "path": git_repo_path(r["provider"], r["owner"], r["repo"]), "low": None}
 
 
 def git_http(k, path, etag=None):
@@ -26266,8 +26680,7 @@ def git_http(k, path, etag=None):
           "Accept": "application/vnd.github+json" if gh else "application/json"}
     if gh:
         hd["X-GitHub-Api-Version"] = "2022-11-28"
-    if k["token"]:
-        hd["Authorization"] = ("Bearer " if gh else "token ") + k["token"]
+    hd.update(git_auth(k["provider"], k["token"]))  # 2.18.0: per provider (GitLab PRIVATE-TOKEN, Bitbucket Basic / Bearer)
     if etag:
         hd["If-None-Match"] = etag
     req = urllib.request.Request(k["api"] + path, headers=hd, method="GET")
@@ -26275,7 +26688,9 @@ def git_http(k, path, etag=None):
     def rate(h):
         if not h:
             return
-        rem, reset = h.get("X-RateLimit-Remaining"), h.get("X-RateLimit-Reset")
+        # 2.18.0: GitLab sends RateLimit-Remaining / RateLimit-Reset (no X- prefix)
+        rem = h.get("X-RateLimit-Remaining") or h.get("RateLimit-Remaining")
+        reset = h.get("X-RateLimit-Reset") or h.get("RateLimit-Reset")
         if rem is not None and str(rem).isdigit() and int(rem) < GIT_RATE_FLOOR:
             k["low"] = float(reset) if reset and str(reset).isdigit() else time.time() + 900
     try:
@@ -26287,8 +26702,8 @@ def git_http(k, path, etag=None):
         if code == 304:
             return 304, h, None
         ra = (h.get("Retry-After") if h else None) or ""
-        if code == 429 or (code == 403 and h and (h.get("X-RateLimit-Remaining") == "0" or ra)):
-            reset = h.get("X-RateLimit-Reset") if h else None
+        if code == 429 or (code == 403 and h and ("0" in (h.get("X-RateLimit-Remaining"), h.get("RateLimit-Remaining")) or ra)):
+            reset = (h.get("X-RateLimit-Reset") or h.get("RateLimit-Reset")) if h else None
             raise GitRate(time.time() + int(ra) if ra.isdigit() else float(reset) if reset and reset.isdigit() else time.time() + 900) from None
         if code in (401, 403):
             raise CalError("auth", code) from None
@@ -26363,6 +26778,121 @@ def git_commit_of(x):
     login = x.get("author").get("login") if isinstance(x.get("author"), dict) else None
     return {"sha": x["sha"][:64], "message": str(cm.get("message") or "")[:4000], "author": _gs(login or au.get("name"), 100),
             "url": _git_web(x.get("html_url")), "at": _gs(co.get("date") or au.get("date"), 40) or None}
+
+
+def _gd(x, *keys):
+    """Nested dict lookup of a provider answer that never trusts the shape."""
+    for k_ in keys:
+        x = x.get(k_) if isinstance(x, dict) else None
+    return x
+
+
+def git_pr_norm(p, prov):
+    """2.18.0: a GitLab merge request / Bitbucket pull request in the GitHub shape git_pr_of reads (None: not one).
+    GitLab: opened / locked (being merged) = open, merged, closed. Bitbucket: OPEN, MERGED, DECLINED / SUPERSEDED = closed
+    (it has no merge time in the list: the last update of a merged one counts)."""
+    if prov not in ("gitlab", "bitbucket") or not isinstance(p, dict):
+        return p
+    if prov == "gitlab":
+        if not isinstance(p.get("iid"), int):
+            return None
+        st = p.get("state")
+        return {"number": p["iid"], "title": p.get("title"), "body": p.get("description"), "merged": st == "merged",
+                "state": "open" if st in ("opened", "locked") else "closed",
+                "merged_at": (p.get("merged_at") or p.get("updated_at")) if st == "merged" else None,
+                "user": {"login": _gd(p, "author", "username")}, "html_url": p.get("web_url"),
+                "head": {"ref": p.get("source_branch"), "sha": p.get("sha")}, "updated_at": p.get("updated_at")}
+    if not isinstance(p.get("id"), int):
+        return None
+    st = str(p.get("state") or "").upper()
+    return {"number": p["id"], "title": p.get("title"), "body": p.get("description"), "merged": st == "MERGED",
+            "state": "open" if st == "OPEN" else "closed",
+            "merged_at": (p.get("closed_on") or p.get("updated_on")) if st == "MERGED" else None,
+            "user": {"login": _gd(p, "author", "nickname") or _gd(p, "author", "display_name")},
+            "html_url": _gd(p, "links", "html", "href"),
+            "head": {"ref": _gd(p, "source", "branch", "name"), "sha": _gd(p, "source", "commit", "hash")},
+            "updated_at": p.get("updated_on")}
+
+
+def git_commit_norm(x, prov):
+    """2.18.0: a GitLab / Bitbucket commit in the GitHub shape git_commit_of reads."""
+    if prov not in ("gitlab", "bitbucket") or not isinstance(x, dict):
+        return x
+    if prov == "gitlab":
+        return {"sha": x.get("id"), "html_url": x.get("web_url"),
+                "commit": {"message": x.get("message"), "author": {"name": x.get("author_name"), "date": x.get("authored_date")},
+                           "committer": {"date": x.get("committed_date")}}}
+    who = _gd(x, "author", "user", "display_name") or re.sub(r"\s*<[^>]*>", "", str(_gd(x, "author", "raw") or ""))
+    return {"sha": x.get("hash"), "html_url": _gd(x, "links", "html", "href"),
+            "commit": {"message": x.get("message"), "author": {"name": who, "date": x.get("date")}, "committer": {"date": x.get("date")}}}
+
+
+def git_api(prov, k, what, default="", ref=""):
+    """2.18.0: the API path of one poll request per provider (what: pulls | commits | compare | tags)."""
+    p, e = k["path"], (lambda s: urllib.parse.quote(s, safe=""))
+    gh = prov == "github"
+    if what == "pulls":
+        return {"gitlab": f"{p}/merge_requests?state=all&order_by=updated_at&sort=desc&per_page={GIT_ITEMS}",
+                "bitbucket": f"{p}/pullrequests?state=OPEN&state=MERGED&state=DECLINED&state=SUPERSEDED&sort=-updated_on&pagelen={GIT_ITEMS}"
+                }.get(prov) or f"{p}/pulls?state=all&" + (f"sort=updated&direction=desc&per_page={GIT_ITEMS}" if gh else f"sort=recentupdate&limit={GIT_ITEMS}")
+    if what == "commits":
+        return {"gitlab": f"{p}/repository/commits?ref_name={e(default)}&per_page={GIT_ITEMS}",
+                "bitbucket": f"{p}/commits/{e(default)}?pagelen={GIT_ITEMS}"}.get(prov) or \
+            f"{p}/commits?sha={urllib.parse.quote(default)}&" + (f"per_page={GIT_ITEMS}" if gh else f"limit={GIT_ITEMS}&stat=false&verification=false&files=false")
+    if what == "compare":
+        return {"gitlab": f"{p}/repository/compare?from={e(default)}&to={e(ref)}",
+                "bitbucket": f"{p}/commits/{e(ref)}?exclude={e(default)}&pagelen={GIT_ITEMS}"}.get(prov) or f"{p}/compare/{e(default)}...{e(ref)}"
+    return {"gitlab": f"{p}/repository/tags?order_by=updated&sort=desc&per_page={GIT_ITEMS}",
+            "bitbucket": f"{p}/refs/tags?sort=-target.date&pagelen={GIT_ITEMS}"}.get(prov) or \
+        f"{p}/tags?" + (f"per_page={GIT_ITEMS}" if gh else f"limit={GIT_ITEMS}")
+
+
+def git_tag_url(r, name):
+    web = f"{git_urls(r['provider'], r['base_url'])[1]}/{r['owner']}/{r['repo']}"
+    q = urllib.parse.quote(name, safe="")
+    return {"gitlab": f"{web}/-/tags/{q}", "bitbucket": f"{web}/src/{q}"}.get(r["provider"]) or f"{web}/releases/tag/{q}"
+
+
+GIT_TOK_RE = re.compile(r"[^\s,;:()\[\]{}\"'“”„«»<>]+")
+
+
+def git_version(s):
+    """A version token without a leading v / V, case-folded; '' unless it starts with a digit (never fuzzy)."""
+    s = str(s or "").strip().rstrip(".!?")
+    s = s[1:] if s[:1] in ("v", "V") else s
+    return s.casefold() if s[:1].isdigit() else ""
+
+
+def git_take_tags(c, r, items):
+    """2.18.0 (#408 "Software 2" B): the newest tags. The first read after connecting (tags_at NULL) only records them
+    (baseline); a tag seen later whose name (without a leading v) equals a version token in the title of an OPEN milestone
+    task (ms = 1) of the connected list completes that milestone once (git_closes, activity names repo + tag, Undo)."""
+    names = []
+    for x in items[:GIT_ITEMS]:
+        n = _gs(x.get("name"), 200).strip() if isinstance(x, dict) else ""
+        if n and n not in names:
+            names.append(n)
+    ts = iso(now_utc())
+    if not r["tags_at"]:
+        c.executemany("INSERT OR IGNORE INTO git_tags(conn_id,name,seen_at) VALUES(?,?,?)", [(r["id"], n, ts) for n in names])
+        c.execute("UPDATE git_conns SET tags_at=? WHERE id=?", (ts, r["id"]))
+        return False
+    new = [n for n in names if c.execute("INSERT OR IGNORE INTO git_tags(conn_id,name,seen_at) VALUES(?,?,?)", (r["id"], n, ts)).rowcount]
+    if not new:
+        return False
+    c.execute("""DELETE FROM git_tags WHERE conn_id=? AND rowid NOT IN
+                 (SELECT rowid FROM git_tags WHERE conn_id=? ORDER BY seen_at DESC, rowid DESC LIMIT ?)""", (r["id"], r["id"], GIT_TAGS_KEEP))
+    changed = False
+    ms = c.execute("SELECT id, title FROM tasks WHERE list_id=? AND ms=1 AND status=0 AND deleted_at IS NULL ORDER BY id",
+                   (r["list_id"],)).fetchall()
+    for n in new:
+        v = git_version(n)
+        if not v:
+            continue
+        for t in ms:
+            if v in {git_version(x) for x in GIT_TOK_RE.findall(t["title"] or "")}:
+                changed |= git_close(c, r, t["id"], "tag", n, n, git_tag_url(r, n))
+    return changed
 
 
 def _git_after(ts, since):
@@ -26454,6 +26984,21 @@ def git_take_commits(c, r, items, branch, default):
 def git_ci_of(k, sha, gh):
     """Combined status (+ check runs on GitHub) of a commit -> success | failure | pending | ''."""
     states = []
+    if k["provider"] == "gitlab":  # 2.18.0: the latest commit statuses (pipeline jobs and external ones)
+        _, _, j = git_http(k, f"{k['path']}/repository/commits/{urllib.parse.quote(sha, safe='')}/statuses?per_page=100")
+        for s in j if isinstance(j, list) else []:
+            st = s.get("status") if isinstance(s, dict) else None
+            states.append("success" if st == "success" else "failure" if st in ("failed", "canceled") else
+                          "pending" if st in ("running", "pending", "created", "preparing", "waiting_for_resource", "scheduled") else "")
+        states = [s for s in states if s]
+        return "failure" if "failure" in states else "pending" if "pending" in states else "success" if states else ""
+    if k["provider"] == "bitbucket":  # 2.18.0: commit statuses SUCCESSFUL / FAILED / STOPPED / INPROGRESS
+        _, _, j = git_http(k, f"{k['path']}/commit/{urllib.parse.quote(sha, safe='')}/statuses?pagelen=100")
+        for s in git_items(j) or []:
+            st = str(s.get("state") or "").upper() if isinstance(s, dict) else ""
+            states.append("success" if st == "SUCCESSFUL" else "failure" if st in ("FAILED", "STOPPED") else "pending" if st == "INPROGRESS" else "")
+        states = [s for s in states if s]
+        return "failure" if "failure" in states else "pending" if "pending" in states else "success" if states else ""
     _, _, j = git_http(k, f"{k['path']}/commits/{urllib.parse.quote(sha)}/status")
     if isinstance(j, dict) and (j.get("total_count") or (j.get("statuses") or [])):
         s = str(j.get("state") or "")
@@ -26503,23 +27048,34 @@ def git_poll(c, cid):
         default = r["default_branch"]
         if not default:
             j = get("repo", k["path"])
-            default = (j or {}).get("default_branch") if isinstance(j, dict) else None
+            default = git_default_of(j)
             default = _gs(default, 250) or "main"
             c.execute("UPDATE git_conns SET default_branch=? WHERE id=?", (default, cid))
             r = c.execute("SELECT k.*, l.archived FROM git_conns k JOIN lists l ON l.id=k.list_id WHERE k.id=?", (cid,)).fetchone()
-        j = get("pulls", f"{k['path']}/pulls?state=all&" + (f"sort=updated&direction=desc&per_page={GIT_ITEMS}" if gh else f"sort=recentupdate&limit={GIT_ITEMS}"))
-        if isinstance(j, list):
-            changed |= git_take_prs(c, r, j, baseline)
-        j = get("commits", f"{k['path']}/commits?sha={urllib.parse.quote(default)}&" + (f"per_page={GIT_ITEMS}" if gh else f"limit={GIT_ITEMS}&stat=false&verification=false&files=false"))
-        if isinstance(j, list):
-            changed |= git_take_commits(c, r, j, default, True)
+        prov = r["provider"]  # 2.18.0: paths + answers per provider (git_api, git_items, git_*_norm)
+        j = git_items(get("pulls", git_api(prov, k, "pulls")))
+        if j is not None:
+            changed |= git_take_prs(c, r, [git_pr_norm(x, prov) for x in j], baseline)
+        j = git_items(get("commits", git_api(prov, k, "commits", default)))
+        if j is not None:
+            changed |= git_take_commits(c, r, [git_commit_norm(x, prov) for x in j], default, True)
+        # 2.18.0 (#408): the newest tags (one request, ETag): a new one can reach a milestone
+        try:  # optional: a server without the tags endpoint (or a token without access to it) never breaks the poll
+            j = git_items(get("tags", git_api(prov, k, "tags")))
+        except CalError:
+            j = None
+        if j is not None:
+            changed |= git_take_tags(c, r, j)
         # branches of open pull requests that name a task: their own commits (compare with the default branch)
         refs = [x[0] for x in c.execute("""SELECT DISTINCT p.head_ref FROM git_prs p WHERE p.conn_id=? AND p.state='open' AND p.head_ref!=''
                                            AND p.head_ref!=? ORDER BY p.updated_at DESC""", (cid, default))][:GIT_BRANCHES]
         for ref in refs:
-            j = get("cmp:" + ref, f"{k['path']}/compare/{urllib.parse.quote(default, safe='')}...{urllib.parse.quote(ref, safe='')}")
-            if isinstance(j, dict) and isinstance(j.get("commits"), list):
-                changed |= git_take_commits(c, r, j["commits"][-GIT_ITEMS:], ref, False)
+            j = get("cmp:" + ref, git_api(prov, k, "compare", default, ref))
+            # GitHub / Gitea / GitLab: {commits: [oldest .. newest]}; Bitbucket: a page of the branch's own commits, newest first
+            lst = j["commits"] if isinstance(j, dict) and isinstance(j.get("commits"), list) else \
+                list(reversed(git_items(j))) if prov == "bitbucket" and git_items(j) is not None else None
+            if lst is not None:
+                changed |= git_take_commits(c, r, [git_commit_norm(x, prov) for x in lst[-GIT_ITEMS:]], ref, False)
         keep = {x: v for x, v in keep.items() if not x.startswith("cmp:") or x[4:] in refs}
         # CI of open pull requests (unknown, pending or a new head)
         for p in c.execute("""SELECT number, head_sha, ci, ci_sha FROM git_prs WHERE conn_id=? AND state='open' AND head_sha!=''
@@ -26627,7 +27183,9 @@ def git_parse_pr_url(c, lid, url):
         return None
     for r in c.execute("SELECT * FROM git_conns WHERE list_id=? ORDER BY id", (lid,)):
         web = git_urls(r["provider"], r["base_url"])[1]
-        m = re.fullmatch(re.escape(f"{web}/{r['owner']}/{r['repo']}") + r"/pulls?/(\d{1,9})/?(?:[#?].*)?", u, re.I)
+        # 2.18.0: GitLab .../-/merge_requests/<n>, Bitbucket .../pull-requests/<n>
+        tail = {"gitlab": r"/-/merge_requests/(\d{1,9})", "bitbucket": r"/pull-requests/(\d{1,9})"}.get(r["provider"], r"/pulls?/(\d{1,9})")
+        m = re.fullmatch(re.escape(f"{web}/{r['owner']}/{r['repo']}") + tail + r"(?:/[A-Za-z]*)?/?(?:[#?].*)?", u, re.I)
         if m:
             return r, int(m.group(1))
     return None
@@ -26671,37 +27229,54 @@ def git_list(lid):
     manage = role in MANAGE_ROLES and not is_agent(g.user)
     rows = c.execute("SELECT * FROM git_conns WHERE list_id=? ORDER BY id", (lid,)).fetchall()
     return jsonify(repos=[git_public(c, r, manage) for r in rows], may=manage, key=bool(SECRET_KEY),
-                   project=is_project(c, lid), max=GIT_MAX_CONNS)
+                   project=is_project(c, lid), max=GIT_MAX_CONNS, errors=errhook_public(c, lid, manage))  # 2.18.0: error reports
 
 
 def git_clean_input(b):
-    provider = str(b.get("provider") or "github").strip().lower()
-    if provider not in GIT_PROVIDERS:
+    # 2.18.0 (#408): GitLab + Bitbucket Cloud; the provider of an address on github.com / gitlab.com / bitbucket.org is
+    # detected when the client sends none (other hosts: the provider select, default github as before); GitLab owners
+    # may be nested groups (group/sub/repo; a web address may end in /-/...)
+    provider = str(b.get("provider") or "").strip().lower()
+    if provider and provider not in GIT_PROVIDERS:
         raise BadInput(tr("Invalid value: {0}", "provider"))
     base = str(b.get("base_url") or "").strip()
     name = str(b.get("repo") or "").strip()
     owner = str(b.get("owner") or "").strip()
     if "://" in name:  # a whole address: https://github.com/owner/repo(.git)
         p = urllib.parse.urlsplit(name)
+        cloud = GIT_HOSTS.get((p.hostname or "").lower())
+        provider = provider or cloud or "github"
         parts = [x for x in p.path.split("/") if x]
-        if len(parts) < 2:
+        if provider == "bitbucket" and "projects" in parts and "repos" in parts:
+            raise BadInput(tr("Bitbucket Server / Data Center is not supported: connect a Bitbucket Cloud repository"))
+        if provider == "gitlab" and "-" in parts:
+            parts = parts[:parts.index("-")]
+        if cloud == provider:  # github.com/o/r/tree/..., bitbucket.org/ws/r/src/...: the first two; gitlab.com: the path
+            rel = parts if provider == "gitlab" else parts[:2]
+        elif base:
+            bp = [x for x in urllib.parse.urlsplit(base).path.split("/") if x]
+            rel = parts[len(bp):] if bp and parts[:len(bp)] == bp else parts
+        elif provider == "gitlab":
+            base, rel = f"{p.scheme}://{p.netloc}", parts
+        else:
+            base = f"{p.scheme}://{p.netloc}" + ("/" + "/".join(parts[:-2]) if len(parts) > 2 else "")
+            rel = parts[-2:]
+        if len(rel) < 2:
             raise BadInput(tr("Invalid value: {0}", "repo"))
-        host = f"{p.scheme}://{p.netloc}"
-        if not base and not (provider == "github" and p.netloc.lower() in ("github.com", "www.github.com")):
-            base = host + ("/" + "/".join(parts[:-2]) if len(parts) > 2 else "")
-        owner, name = parts[-2], parts[-1]
+        owner, name = ("/".join(rel[:-1]), rel[-1]) if provider == "gitlab" else (rel[-2], rel[-1])
     elif "/" in name and not owner:
-        owner, name = name.split("/", 1)
+        owner, name = name.rsplit("/", 1) if provider == "gitlab" else name.split("/", 1)
+    provider = provider or "github"
     if name.endswith(".git"):
         name = name[:-4]
-    if not GIT_NAME_RE.fullmatch(owner or "") or not GIT_NAME_RE.fullmatch(name or "") or name in (".", ".."):
+    if not git_owner_ok(provider, owner) or not GIT_NAME_RE.fullmatch(name or "") or name in (".", ".."):
         raise BadInput(tr("Enter the repository as owner/name"))
     if base:
         base = pl_norm_url(base)
-        if not base or urllib.parse.urlsplit(base).path.rstrip("/").endswith(("/api/v3", "/api/v1")):
+        if not base or urllib.parse.urlsplit(base).path.rstrip("/").endswith(GIT_API_SUFFIX):
             raise BadInput(tr("Invalid value: {0}", "base_url"))
-        if provider == "github" and urllib.parse.urlsplit(base).hostname in ("github.com", "www.github.com", "api.github.com"):
-            base = ""
+        if GIT_HOSTS.get((urllib.parse.urlsplit(base).hostname or "").lower()) == provider:
+            base = ""  # the cloud service itself
     elif provider == "gitea":
         raise BadInput(tr("Enter the address of the Gitea / Forgejo server"))
     token = b.get("token")
@@ -26710,9 +27285,25 @@ def git_clean_input(b):
     return provider, base, owner, name, (token or "").strip()
 
 
+def git_repo_name_of(provider, j, owner, name):
+    """(owner, name, default branch) as the provider spells them in its repository answer."""
+    if provider == "gitlab":
+        pwn = j.get("path_with_namespace")
+        if isinstance(pwn, str) and "/" in pwn:
+            owner, name = pwn.rsplit("/", 1)
+    elif provider == "bitbucket":
+        fn = j.get("full_name")
+        if isinstance(fn, str) and "/" in fn:
+            owner, name = fn.split("/", 1)
+    else:
+        owner = _gs(_gd(j, "owner", "login"), 100) or owner
+        name = _gs(j.get("name"), 100) or name
+    return _gs(owner, 300), _gs(name, 100), _gs(git_default_of(j), 250)
+
+
 @app.post("/api/lists/<int:lid>/repos")
 def git_add(lid):
-    """{provider: github|gitea, base_url?, repo: "owner/name" or its address, token?} -- the list owner / a list admin."""
+    """{provider: github|gitea|gitlab|bitbucket, base_url?, repo: "owner/name" or its address, token?} -- the list owner / a list admin."""
     c = db()
     git_need_manage(c, lid)
     if not is_project(c, lid):
@@ -26733,7 +27324,7 @@ def git_add(lid):
         return err(tr("Too many attempts, please wait a few minutes"), 429)
     # check it at once (read the repository with the token): errors show in the dialog, nothing is stored
     k = {"api": git_urls(provider, base)[0], "provider": provider, "token": token, "allow": cal_allow(c), "low": None,
-         "path": f"/repos/{urllib.parse.quote(owner)}/{urllib.parse.quote(name)}"}
+         "path": git_repo_path(provider, owner, name)}
     try:
         _, _, j = git_http(k, k["path"])
     except GitRate:
@@ -26742,12 +27333,11 @@ def git_add(lid):
         return err(git_err_text(e.stored()), 409 if e.code in ("auth", "not_found") else 502)
     if not isinstance(j, dict):
         return err(tr(GIT_ERR["parse"]), 502)
-    owner = _gs(((j.get("owner") or {}) if isinstance(j.get("owner"), dict) else {}).get("login"), 100) or owner
-    name = _gs(j.get("name"), 100) or name
-    if not GIT_NAME_RE.fullmatch(owner) or not GIT_NAME_RE.fullmatch(name):
+    owner, name, dflt = git_repo_name_of(provider, j, owner, name)
+    if not git_owner_ok(provider, owner) or not GIT_NAME_RE.fullmatch(name):
         return err(tr(GIT_ERR["parse"]), 502)
     cid = c.execute("""INSERT INTO git_conns(list_id,provider,base_url,owner,repo,default_branch,created_by,created_at,next_at)
-                       VALUES(?,?,?,?,?,?,?,?,0)""", (lid, provider, base, owner, name, _gs(j.get("default_branch"), 250),
+                       VALUES(?,?,?,?,?,?,?,?,0)""", (lid, provider, base, owner, name, dflt,
                                                        me(), iso(now_utc()))).lastrowid
     if token:
         c.execute("UPDATE git_conns SET token=? WHERE id=?", (git_seal(cid, "token", token), cid))
@@ -26811,6 +27401,7 @@ def git_delete(cid):
     c.execute("DELETE FROM git_links WHERE conn_id=?", (cid,))
     c.execute("DELETE FROM git_prs WHERE conn_id=?", (cid,))
     c.execute("DELETE FROM git_commits WHERE conn_id=?", (cid,))
+    c.execute("DELETE FROM git_tags WHERE conn_id=?", (cid,))
     c.execute("DELETE FROM git_conns WHERE id=?", (cid,))
     bump(c)
     c.commit()
@@ -26831,7 +27422,7 @@ def git_refresh(cid):
 
 @app.post("/api/hooks/git/<int:cid>")
 def git_hook(cid):
-    """Inbound webhook (GitHub / Gitea / Forgejo): a valid signature only triggers the next poll at once."""
+    """Inbound webhook (GitHub / Gitea / Forgejo / GitLab / Bitbucket): a valid signature only triggers the next poll at once."""
     c = db()
     r = c.execute("SELECT * FROM git_conns WHERE id=?", (cid,)).fetchone()
     sec = git_unseal(cid, "hook", r["hook_secret"]) if r and r["hook_secret"] else ""
@@ -26841,7 +27432,13 @@ def git_hook(cid):
     mac = hmac.new(sec.encode(), raw, hashlib.sha256).hexdigest()
     gh = request.headers.get("X-Hub-Signature-256", "")
     gt = request.headers.get("X-Gitea-Signature", "") or request.headers.get("X-Forgejo-Signature", "")
-    if not ((gh.startswith("sha256=") and hmac.compare_digest(gh[7:].lower(), mac)) or (gt and hmac.compare_digest(gt.lower(), mac))):
+    # 2.18.0: GitLab sends the secret itself (X-Gitlab-Token, compared in constant time), Bitbucket Cloud an HMAC-SHA256
+    # in X-Hub-Signature ("sha256=...")
+    gl = request.headers.get("X-Gitlab-Token", "")
+    bb = request.headers.get("X-Hub-Signature", "")
+    if not ((gh.startswith("sha256=") and hmac.compare_digest(gh[7:].lower(), mac)) or (gt and hmac.compare_digest(gt.lower(), mac))
+            or (gl and hmac.compare_digest(gl.encode(), sec.encode()))
+            or (bb.startswith("sha256=") and hmac.compare_digest(bb[7:].lower(), mac))):
         return err(tr("Invalid signature"), 401)
     if request.headers.get("X-GitHub-Event") == "ping":
         return jsonify(ok=True, ping=True)
@@ -26877,6 +27474,264 @@ def git_undo(tid):
     return jsonify(one_task(c, tid))
 
 
+# ---------------------------------------------------------------- 2.18.0 (#408 "Software 2" F): error reports -> tickets
+# A project list can take error reports (list dialog > Repository > "Error reports"; owner / list admins, never agents):
+# POST /api/hooks/issues/<list id>/<token>. The token is shown once (on / rotate), stored only as its SHA-256; off deletes it.
+# Body: a Sentry webhook (issue alert data.issue, event alert data.event, or the legacy plugin's flat payload) or generic
+# JSON {title, body?, url?, fingerprint?, level?}. A report creates a bug ticket (ttype bug when the list has ticket types,
+# the bug note template below the report details) in the list's first section, created by nobody (like Git activity).
+# The same error again (fingerprint: the Sentry issue id, the given fingerprint, else a hash of title + culprit) while its
+# ticket is still OPEN only counts: an activity line "happened again (N x)" (one line, updated) instead of a duplicate.
+# At most ERR_NEW_PER_HOUR new tickets per list and hour (after that reports are only counted), ERR_REQ_PER_MIN requests
+# per list and minute, ERR_MAX_BYTES per body. Report text is never trusted: plain text, Markdown-escaped, the body in a
+# code block, links only http(s). New tickets go through the usual paths (outgoing webhooks, the tidy agent's event).
+# Tasks by e-mail (2.17.0, #443) are the other inbound way for tickets.
+ERR_MAX_BYTES = 256 * 1024
+ERR_NEW_PER_HOUR = _env_int("KALMIDO_ERROR_REPORTS_PER_HOUR", 30)
+ERR_REQ_PER_MIN = 120
+ERR_BODY_MAX = 8000
+ERR_LEVELS = ("fatal", "critical", "error", "warning", "warn", "info", "debug")
+_ERR_RATE, _ERR_LOCK = {}, threading.Lock()
+
+
+def err_md(s):
+    """One line of report text as Markdown that shows exactly that text (no links, emphasis, HTML)."""
+    s = re.sub(r"[\x00-\x1f\x7f]+", " ", str(s or "")).strip()
+    # 2.18.0 review (R6): only what Markdown interprets in the middle of a line (the line starts with "**Error:**"), so
+    # the text stays readable in the editor too ("\(reading ...\)" was noise); "http://" gets "\:" so it is no link
+    s = re.sub(r"([\\`*_\[\]<>~&])", r"\\\1", s)
+    return re.sub(r"(?i)\b(https?|mailto):", r"\1\\:", s)
+
+
+def err_block(s):
+    """A longer text (stack trace, message) as a fenced code block: never rendered as Markdown / HTML."""
+    s = str(s or "").replace("\r\n", "\n").replace("\x00", "")[:ERR_BODY_MAX].strip("\n")
+    if not s.strip():
+        return ""
+    fence = "`" * max(3, max((len(x) for x in re.findall(r"`+", s)), default=0) + 1)
+    return f"{fence}text\n{s}\n{fence}"
+
+
+def _es(v, n=300):
+    return re.sub(r"\s+", " ", str(v)).strip()[:n] if isinstance(v, (str, int, float)) and not isinstance(v, bool) else ""
+
+
+def err_parse(j):
+    """A report body -> {source, title, culprit, url, level, fid, body} or None (nothing we understand)."""
+    if not isinstance(j, dict):
+        return None
+    d = j.get("data") if isinstance(j.get("data"), dict) else {}
+    if isinstance(d.get("issue"), dict):  # Sentry issue alert / issue webhook
+        x = d["issue"]
+        out = {"source": "sentry", "title": _es(x.get("title")), "culprit": _es(x.get("culprit")),
+               "url": _es(x.get("permalink") or x.get("web_url"), 2000), "level": _es(x.get("level"), 20), "fid": _es(x.get("id"), 100),
+               "body": "\n".join(v for v in (_es(_gd(x, "metadata", "type"), 200), _es(_gd(x, "metadata", "value"), 2000)) if v)}
+    elif isinstance(d.get("event"), dict):  # Sentry event alert
+        x = d["event"]
+        out = {"source": "sentry", "title": _es(x.get("title") or x.get("message")), "culprit": _es(x.get("culprit")),
+               "url": _es(x.get("web_url"), 2000), "level": _es(x.get("level"), 20), "fid": _es(x.get("issue_id"), 100),
+               "body": str(x.get("message") or "") if isinstance(x.get("message"), str) else ""}
+    elif "project_name" in j or ("culprit" in j and "level" in j and "url" in j):  # Sentry's legacy webhook plugin
+        out = {"source": "sentry", "title": _es(j.get("message") or _gd(j, "event", "title")), "culprit": _es(j.get("culprit")),
+               "url": _es(j.get("url"), 2000), "level": _es(j.get("level"), 20), "fid": _es(j.get("id"), 100),
+               "body": str(j.get("message") or "") if isinstance(j.get("message"), str) else ""}
+    elif isinstance(j.get("title"), str) and j["title"].strip():  # generic
+        out = {"source": "generic", "title": _es(j["title"]), "culprit": _es(j.get("culprit")), "url": _es(j.get("url"), 2000),
+               "level": _es(j.get("level"), 20), "fid": _es(j.get("fingerprint"), 200),
+               "body": j.get("body") if isinstance(j.get("body"), str) else ""}
+    else:
+        return None
+    if not out["title"]:
+        return None
+    out["level"] = out["level"].lower() if out["level"].lower() in ERR_LEVELS else ""
+    out["url"] = out["url"] if valid_url(out["url"]) else ""
+    out["fp"] = (("sentry:" if out["source"] == "sentry" else "fp:") + out["fid"]) if out["fid"] else \
+        "h:" + hashlib.sha256((out["title"] + "\n" + out["culprit"]).encode()).hexdigest()[:32]
+    return out
+
+
+def err_content(c, lid, rep, lg):
+    lines = [f"**{err_md(tr('Error report', lg=lg))}** · {'Sentry' if rep['source'] == 'sentry' else err_md(tr('webhook', lg=lg))}"
+             + (f" · {rep['level']}" if rep["level"] else ""), "",
+             f"**{err_md(tr('Error', lg=lg))}:** {err_md(rep['title'])}"]
+    if rep["culprit"]:
+        lines.append(f"**{err_md(tr('Where', lg=lg))}:** {err_md(rep['culprit'])}")
+    if rep["url"]:
+        lines.append(f"**{err_md(tr('Link', lg=lg))}:** {rep['url']}")
+    blk = err_block(rep["body"])
+    tpl = ticket_template(c, lid, "bug")
+    return "\n".join(lines) + (f"\n\n{blk}" if blk else "") + (f"\n\n{tpl}" if tpl else "")
+
+
+def err_rate_ok(lid):
+    now = time.time()
+    with _ERR_LOCK:
+        lst = [t for t in _ERR_RATE.get(lid, []) if t > now - 60]
+        if len(lst) >= ERR_REQ_PER_MIN:
+            _ERR_RATE[lid] = lst
+            return False
+        lst.append(now)
+        _ERR_RATE[lid] = lst
+        if len(_ERR_RATE) > 5000:
+            _ERR_RATE.clear()
+    return True
+
+
+@app.post("/api/hooks/issues/<int:lid>/<token>")
+def errhook_in(lid, token):
+    """Inbound error report (Sentry or generic JSON) -> a bug ticket, or a count on the open one of the same error."""
+    c = db()
+    r = c.execute("SELECT h.*, l.owner_id, l.tickets, l.archived FROM issue_hooks h JOIN lists l ON l.id=h.list_id WHERE h.list_id=?",
+                  (lid,)).fetchone()
+    if not r or len(token) > 200 or not hmac.compare_digest(r["token_hash"], hashlib.sha256(token.encode()).hexdigest()):
+        return err(tr("unknown"), 404)
+    if (request.content_length or 0) > ERR_MAX_BYTES:
+        return err(tr("The report is too large (at most {0} KB)", ERR_MAX_BYTES // 1024), 413)
+    raw = request.get_data(cache=False) or b""
+    if len(raw) > ERR_MAX_BYTES:
+        return err(tr("The report is too large (at most {0} KB)", ERR_MAX_BYTES // 1024), 413)
+    if not err_rate_ok(lid):
+        return err(tr("Too many attempts, please wait a few minutes"), 429)
+    try:
+        rep = err_parse(json.loads(raw.decode("utf-8") or "null"))
+    except (ValueError, UnicodeDecodeError):
+        rep = None
+    if not rep:
+        return err(tr("Invalid value: {0}", "body"))
+    now = iso(now_utc())
+    c.execute("UPDATE issue_hooks SET last_at=?, received=received+1 WHERE list_id=?", (now, lid))
+    old = c.execute("SELECT * FROM issue_reports WHERE list_id=? AND fp=?", (lid, rep["fp"])).fetchone()
+    t = c.execute("SELECT id, status, deleted_at, list_id FROM tasks WHERE id=?", (old["task_id"],)).fetchone() \
+        if old and old["task_id"] else None
+    if t and t["status"] == 0 and not t["deleted_at"] and t["list_id"] == lid:  # the same error, its ticket still open
+        n = old["count"] + 1
+        c.execute("UPDATE issue_reports SET count=?, last_at=? WHERE list_id=? AND fp=?", (n, now, lid, rep["fp"]))
+        data = json.dumps({"n": n, "level": rep["level"], "url": rep["url"]}, ensure_ascii=False)
+        last = c.execute("SELECT id, kind FROM activity WHERE task_id=? ORDER BY id DESC LIMIT 1", (t["id"],)).fetchone()
+        if last and last["kind"] == "err_again":  # one line that counts up, never a flood of lines
+            c.execute("UPDATE activity SET data=?, created_at=? WHERE id=?", (data, iso_ms(now_utc()), last["id"]))
+        else:
+            c.execute("INSERT INTO activity(task_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",
+                      (t["id"], None, "err_again", data, iso_ms(now_utc())))
+        c.execute("UPDATE tasks SET updated_at=? WHERE id=?", (now, t["id"]))
+        bump(c)
+        c.commit()
+        return jsonify(ok=True, task_id=t["id"], duplicate=True, count=n)
+    hour = iso(now_utc() - timedelta(hours=1))
+    # tickets made from reports in the last hour (a fingerprint can have made several, one after the other was closed)
+    made = c.execute("""SELECT COUNT(*) FROM tasks t WHERE t.list_id=? AND t.created_at>? AND t.created_by IS NULL AND EXISTS
+                        (SELECT 1 FROM activity a WHERE a.task_id=t.id AND a.kind='created' AND a.data LIKE '%"report":%')""",
+                     (lid, hour)).fetchone()[0]
+    if made >= ERR_NEW_PER_HOUR or r["archived"]:  # only counted
+        c.execute("""INSERT INTO issue_reports(list_id,fp,task_id,count,first_at,last_at) VALUES(?,?,NULL,1,?,?)
+                     ON CONFLICT(list_id,fp) DO UPDATE SET count=count+1, last_at=excluded.last_at""", (lid, rep["fp"], now, now))
+        c.commit()
+        return jsonify(ok=True, limited=True), 202
+    lg = lang(c, r["owner_id"])
+    sec = c.execute("SELECT id FROM sections WHERE list_id=? ORDER BY sort, id LIMIT 1", (lid,)).fetchone()
+    srt = c.execute("SELECT COALESCE(MIN(sort),0)-1 FROM tasks WHERE list_id=? AND parent_id IS NULL", (lid,)).fetchone()[0]
+    content = err_content(c, lid, rep, lg)[:CONTENT_MAX]
+    tid = c.execute("""INSERT INTO tasks(list_id,section_id,title,content,sort,created_at,updated_at,created_by,url,ttype)
+                       VALUES(?,?,?,?,?,?,?,NULL,?,?)""",
+                    (lid, sec[0] if sec else None, rep["title"][:300], content, srt, now, now, rep["url"] or None,
+                     "bug" if r["tickets"] else "")).lastrowid
+    c.execute("""INSERT INTO issue_reports(list_id,fp,task_id,count,first_at,last_at) VALUES(?,?,?,1,?,?)
+                 ON CONFLICT(list_id,fp) DO UPDATE SET task_id=excluded.task_id, count=1, first_at=excluded.first_at,
+                 last_at=excluded.last_at""", (lid, rep["fp"], tid, now, now))
+    g.user = {"id": None, "kind": "user", "username": "", "display_name": ""}  # nobody (system), like Git activity
+    try:
+        log_act(c, tid, "created", {"report": rep["source"]}, uid=None)
+        agent_tidy_events(c, tid)
+        if not old:  # 2.18.0 (owner decision): a NEW error -> exactly one News item + push; repeats, re-opened errors, counts stay quiet
+            errreport_events(c, tid, lid, rep)
+    finally:
+        g.user = None
+    bump(c)
+    c.commit()
+    return jsonify(ok=True, task_id=tid, created=True), 201
+
+
+def errreport_events(c, tid, lid, rep):
+    """2.18.0: a new error (first ticket of its fingerprint) -> event "errreport" for everyone who sees the whole list
+    (people only): one News item and one push per the notification settings (row errreport, on by default; a muted list
+    bell stops it). Reports after the hourly limit never get here (only counted), so they never push."""
+    lst = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()
+    ag = agent_ids(c)
+    for uid in sorted(list_people(c, lid)):
+        if uid in ag:
+            continue
+        s = collab_user(c, uid, lid)
+        if not s or not task_visible(c, tid, uid, full=True):
+            continue
+        news_add(c, uid, "errreport", task_id=tid, data={"title": rep["title"][:200], "level": rep["level"]}, actor=None, s=s)
+        if not notif_ok(c, uid, s, "errreport", "push", lid) or not push_reachable(c, uid, s):
+            continue
+        lg = lang_of(s)
+        g.pushes.append((uid, tr("New error: {0}", rep["title"][:120], lg=lg), lst["name"] if lst else "", f"{PUBLIC_URL}/#t/{tid}",
+                         push_prio(s)))
+
+
+def errhook_public(c, lid, manage):
+    r = c.execute("SELECT * FROM issue_hooks WHERE list_id=?", (lid,)).fetchone()
+    d = {"on": bool(r), "last_at": r["last_at"] if r else None, "received": r["received"] if r else 0,
+         "open": c.execute("""SELECT COUNT(*) FROM issue_reports e JOIN tasks t ON t.id=e.task_id WHERE e.list_id=?
+                              AND t.status=0 AND t.deleted_at IS NULL""", (lid,)).fetchone()[0] if r else 0,
+         "may": bool(manage), "per_hour": ERR_NEW_PER_HOUR}
+    if r and manage:
+        d["created_at"] = r["created_at"]
+    return d
+
+
+@app.get("/api/lists/<int:lid>/error-hook")
+def errhook_get(lid):
+    """Is the error-report webhook of a list on (never its URL: that is shown once)? Everyone who sees the list."""
+    c = db()
+    role = need_list(c, lid, write=False)
+    return jsonify(errhook_public(c, lid, role in MANAGE_ROLES and not is_agent(g.user)))
+
+
+@app.patch("/api/lists/<int:lid>/error-hook")
+def errhook_set(lid):
+    """{state: on | rotate | off} -- the list owner / a list admin (never an agent). on / rotate answer the URL once."""
+    c = db()
+    git_need_manage(c, lid)
+    b = body()
+    unknown = sorted(k for k in b if k != "state")
+    if unknown:
+        raise UnknownFields(unknown)
+    st = b.get("state")
+    if st not in ("on", "rotate", "off"):
+        return err(tr("Invalid value: {0}", "state"))
+    out = {}
+    if st == "off":
+        c.execute("DELETE FROM issue_hooks WHERE list_id=?", (lid,))
+    else:
+        if not is_project(c, lid):
+            return err(tr("Make this list a project to connect a repository"), 409)
+        tok = secrets.token_urlsafe(32)
+        c.execute("""INSERT INTO issue_hooks(list_id,token_hash,created_by,created_at) VALUES(?,?,?,?)
+                     ON CONFLICT(list_id) DO UPDATE SET token_hash=excluded.token_hash, created_by=excluded.created_by,
+                     created_at=excluded.created_at""", (lid, hashlib.sha256(tok.encode()).hexdigest(), me(), iso(now_utc())))
+        out["url"] = f"{PUBLIC_URL.rstrip('/')}/api/hooks/issues/{lid}/{tok}"  # the only time it is shown
+    bump(c)
+    c.commit()
+    return jsonify({**errhook_public(c, lid, True), **out})
+
+
+@app.get("/api/v1/lists/<int:lid>/error-hook")
+@v1_view
+def v1_errhook_get(lid):
+    v1_args(())
+    return jsonify(v1_call(errhook_get, lid))
+
+
+@app.patch("/api/v1/lists/<int:lid>/error-hook")
+@v1_view
+def v1_errhook_set(lid):
+    v1_args(())
+    return jsonify(v1_call(errhook_set, lid, body=v1_json()))
+
+
 def git_spec(paths, schemas, op, ok, errs, ref, pid, nul, page):
     """2.2.0 (#271 / #339) additions to the OpenAPI document."""
     repo = {"type": "object", "properties": {"id": {"type": "integer"}, "list_id": {"type": "integer"},
@@ -26898,6 +27753,20 @@ def git_spec(paths, schemas, op, ok, errs, ref, pid, nul, page):
     schemas["CommentInput"]["properties"]["suggestion"] = {"oneOf": [ref("TidyInput"), ref("MergeRequestInput")]}
     paths["/lists/{id}/repos"] = {"get": op("Repositories connected to a list (never a token)", "Lists", ok(ref("RepoPage")) | errs("404"),
                                             [pid("id", "List id")])}
+    # 2.18.0 (#408): the error-report webhook of a list (people with the owner / list admin role change it, never agents)
+    hook = {"type": "object", "properties": {
+        "on": {"type": "boolean"}, "last_at": nul("string"), "received": {"type": "integer"},
+        "open": {"type": "integer", "description": "Open tickets created from reports"}, "may": {"type": "boolean"},
+        "per_hour": {"type": "integer", "description": "New tickets per hour at most; later reports are only counted"},
+        "url": {"type": "string", "description": "Only in the answer of state on / rotate: POST Sentry webhooks or "
+                                                 "{title, body?, url?, fingerprint?, level?} to it"}}}
+    schemas["ErrorHook"] = hook
+    paths["/lists/{id}/error-hook"] = {
+        "get": op("Is the error-report webhook of a list on (never its URL)", "Lists", ok(ref("ErrorHook")) | errs("404"), [pid("id", "List id")]),
+        "patch": op("Turn the error-report webhook on, rotate its URL or turn it off (list owner / list admin, not agents)", "Lists",
+                    ok(ref("ErrorHook")) | errs("400", "403", "404", "409"), [pid("id", "List id")], scope="write",
+                    body={"type": "object", "required": ["state"], "additionalProperties": False,
+                          "properties": {"state": {"type": "string", "enum": ["on", "rotate", "off"]}}})}
 
 
 # ---- REST API
@@ -26991,8 +27860,7 @@ def v1_ov_milestones(lid):
     v1_args(())
     c = db()
     need_overview(c, lid)
-    return jsonify(data=[ov_ms_dict(r) for r in c.execute("SELECT * FROM list_milestones WHERE list_id=? ORDER BY day, id", (lid,))],
-                   next_cursor=None)
+    return jsonify(data=[ms_compat(r) for r in ms_rows(c, [lid])], next_cursor=None)  # 2.18.0 (#430): ids = task ids
 
 
 @app.post("/api/v1/lists/<int:lid>/milestones")
@@ -27078,13 +27946,27 @@ def overview_spec(paths, schemas, op, ok, errs, ref, pid, nul, page):
     sub = lambda n, d: {"name": n, "in": "path", "required": True, "description": d, "schema": {"type": "integer"}}  # noqa: E731
     link = {"type": "object", "properties": {"id": {"type": "integer"}, "title": {"type": "string"}, "url": {"type": "string", "format": "uri"},
                                              "sort": {"type": "number"}}}
-    ms = {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "day": {"type": "string", "format": "date"},
-                                           "done": {"type": "boolean"}}}
+    ms = {"type": "object", "description": "A milestone in the overview's shape. Since 2.18.0 milestones are tasks (milestone: true): "
+                                          "id is the task id, name its title, day its due date (null when it has none), done = not open.",
+          "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "day": {"type": "string", "format": "date", "nullable": True},
+                         "done": {"type": "boolean"}}}
     lfile = {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "mime": {"type": "string"},
                                               "size": {"type": "integer"}, "created_at": {"type": "string", "format": "date-time"},
                                               "user_id": nul("integer"), "user_name": {"type": "string"}}}
     schemas.update({
         "KeyLink": link, "KeyLinkPage": page("KeyLink"), "Milestone": ms, "MilestonePage": page("Milestone"),
+        "MilestoneReport": {"type": "object", "properties": {  # 2.18.0 (#430)
+            "milestone": {"type": "object", "properties": {"id": {"type": "integer"}, "title": {"type": "string"}, "list_id": {"type": "integer"},
+                                                           "due": {"type": ["string", "null"], "format": "date"}, "status": {"type": "string"}}},
+            "progress": {"type": "object", "properties": {"done": {"type": "integer"}, "total": {"type": "integer"}, "percent": {"type": "integer"}}},
+            "tasks": {"type": "array", "items": {"type": "object", "properties": {
+                "id": {"type": "integer"}, "title": {"type": "string"}, "status": {"type": "string"}, "type": {"type": ["string", "null"]},
+                "due": {"type": ["string", "null"]}, "assignee_id": {"type": ["integer", "null"]}, "completed_at": {"type": ["string", "null"]}}}},
+            "burndown": {"type": "object", "properties": {
+                "start": {"type": "string", "format": "date"}, "end": {"type": "string", "format": "date"}, "due": {"type": ["string", "null"]},
+                "days": {"type": "array", "items": {"type": "object", "properties": {"day": {"type": "string"}, "open": {"type": "integer"}}}},
+                "ideal": {"type": "array", "items": {"type": "object", "properties": {"day": {"type": "string"}, "open": {"type": "integer"}}}}}},
+            "release_notes": {"type": "string", "description": "Markdown"}}},
         "ProjectFile": lfile, "ProjectFilePage": page("ProjectFile"),
         "ProjectOverview": {"type": "object", "description": "The overview of a project list (2.7.1). Task files and Paperless "
                                                              "documents of tasks are read-only here (change them on the task).",
@@ -27130,13 +28012,13 @@ def overview_spec(paths, schemas, op, ok, errs, ref, pid, nul, page):
             "delete": op("Remove a key link", L, {"204": {"description": "Deleted"}} | errs("403", "404", "409"),
                          [lp, sub("link_id", "Link id")], scope=W)},
         "/lists/{id}/milestones": {
-            "get": op("Milestones of a project list (by day)", L, ok(ref("MilestonePage")) | errs("404", "409"), [lp]),
-            "post": op("Add a milestone", L, ok(ref("Milestone"), "Created", "201") | errs("400", "403", "404", "409"), [lp],
+            "get": op("Milestones of a project list (by day; the milestone tasks of the list, ids are task ids since 2.18.0)", L, ok(ref("MilestonePage")) | errs("404", "409"), [lp]),
+            "post": op("Add a milestone (creates a milestone task at the end of the list)", L, ok(ref("Milestone"), "Created", "201") | errs("400", "403", "404", "409"), [lp],
                        scope=W, body=body_ms)},
         "/lists/{id}/milestones/{milestone_id}": {
-            "patch": op("Change a milestone (name, day, done)", L, ok(ref("Milestone")) | errs("400", "403", "404", "409"),
+            "patch": op("Change a milestone (name, day, done; milestone_id = its task id)", L, ok(ref("Milestone")) | errs("400", "403", "404", "409"),
                         [lp, sub("milestone_id", "Milestone id")], scope=W, body={**body_ms, "required": []}),
-            "delete": op("Remove a milestone", L, {"204": {"description": "Deleted"}} | errs("403", "404", "409"),
+            "delete": op("Remove a milestone (moves its task to the trash)", L, {"204": {"description": "Deleted"}} | errs("403", "404", "409"),
                          [lp, sub("milestone_id", "Milestone id")], scope=W)},
         "/lists/{id}/files": {
             "get": op("Project files of a list (uploaded on the list itself, newest first)", L, ok(ref("ProjectFilePage")) | errs("404", "409"), [lp]),
@@ -28789,9 +29671,23 @@ def tchat_unread(c, uid):
     return sum(x["unread"] for x in tchat_rooms(c, uid) if not x["muted"] or x["mention"])
 
 
+def md_brief(text):
+    """2.18.0 (review): the Markdown markers out of a one-line preview (team chat list): code fences ("```js"), `code`,
+    **bold**, ~~strike~~, *italic*, headings, quotes, list / checkbox markers, links -> their text. Keep in sync with
+    mdBrief() in app.js (it cleans the preview of a message sent from this device)."""
+    out = []
+    for ln in (text or "").split("\n"):
+        ln = re.sub(r"^\s*(```|~~~)[\w+#.-]*\s*", "", ln)
+        ln = re.sub(r"^\s{0,3}(#{1,6}\s+|>\s?|[-*+]\s+\[[ xX]\]\s+|[-*+]\s+|\d+[.)]\s+)", "", ln)
+        out.append(ln)
+    t = re.sub(r"!?\[([^\]]*)\]\([^)\s]*\)", r"\1", "\n".join(out))
+    t = re.sub(r"\*\*|__|~~|`", "", t)
+    return re.sub(r"(?<![\w*])\*(?=\S)([^*\n]+?)(?<=\S)\*(?!\w)", r"\1", t)
+
+
 def tchat_msg_brief(c, m):
     names = user_names(c, [int(x) for x in MENTION_RE.findall(m["body"])])
-    return {"id": m["id"], "user_id": m["user_id"], "text": comment_plain(c, m["body"], names)[:140], "created_at": m["created_at"]}
+    return {"id": m["id"], "user_id": m["user_id"], "text": comment_plain(c, md_brief(m["body"]), names)[:140], "created_at": m["created_at"]}
 
 
 def tchat_rx(c, ids):

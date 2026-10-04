@@ -76,11 +76,11 @@ const HEAD = `(() => {
   const t = document.querySelector('#top'); if (!t || !t.querySelector('h1')) return {none: location.href + ' ' + (document.body ? document.body.textContent.slice(0, 120) : document.documentElement.tagName)};
   const ht = t.querySelector('h1 .ht'), vw = document.documentElement.clientWidth;
   const R = e => { if (!e || !e.offsetWidth) return null; const b = e.getBoundingClientRect(); return [b.left, b.right, b.top, b.bottom]; };
-  let full = true, w12 = 0, txt = ht ? ht.textContent : '';
+  let full = true, w12 = 0, w6 = 0, txt = ht ? ht.textContent : '';
   if (ht && ht.firstChild) { const n = ht.firstChild, rg = document.createRange(); rg.setStart(n, 0); rg.setEnd(n, n.length); const all = rg.getBoundingClientRect().width;
-    rg.setEnd(n, Math.min(12, n.length)); w12 = rg.getBoundingClientRect().width; full = ht.getBoundingClientRect().width + 0.1 >= all; }
+    rg.setEnd(n, Math.min(6, n.length)); w6 = rg.getBoundingClientRect().width; rg.setEnd(n, Math.min(12, n.length)); w12 = rg.getBoundingClientRect().width; full = ht.getBoundingClientRect().width + 0.1 >= all; }
   const out = [...t.children].filter(e => e.offsetWidth && e.getBoundingClientRect().right > vw + 0.5).map(e => e.className || e.tagName);
-  return {lvl: (t.className.match(/tl\\d/) || [''])[0], txt, full, w12, htw: ht ? ht.getBoundingClientRect().width : 0, vw, more: R(t.querySelector('[data-act="top-more"]')), bell: R(t.querySelector('.bell')), out,
+  return {lvl: (t.className.match(/tl\\d/) || [''])[0], txt, full, w12, w6, htw: ht ? ht.getBoundingClientRect().width : 0, vw, more: R(t.querySelector('[data-act="top-more"]')), bell: R(t.querySelector('.bell')), out,
     st: R(t.querySelector('.stchip')), ach: R(t.querySelector('.achip')), tm: R(t.querySelector('.tmini.run'))};
 })()`;
 // contrast of every visible text (only inside the top dialog when one is open)
@@ -170,12 +170,12 @@ const TOUCH = `(() => {
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
   const top = d.querySelector('#top');
   check(top.querySelector('.achip') && top.querySelector('.tmini.run') && top.querySelector('.stchip [data-timer-mini]') && top.querySelector('.stchip .sta'), 'agent pill + timer pill + the merged status chip (hidden until tl2)');
-  check(top.querySelector('[data-act="top-more"]') && top.querySelector('.bell') && top.querySelector('.vseg.tf') && top.querySelector('.hist.tf') && top.querySelector('.kbtn.tf4') && top.querySelector('.shbtn.tf'), '"…", the bell and the foldable items');
+  check(top.querySelector('[data-act="top-more"]') && top.querySelector('.bell') && top.querySelector('.vseg.tf') && top.querySelector('.hist.tf') && top.querySelector('.kbtn.cmdbar:not(.tf4)') && top.querySelector('.shbtn.tf'), '"…", the bell and the foldable items');
   top.classList.add('tl3');
   const labs = w.eval('topMoreItems()').filter(x => x !== '-').map(x => x.label);
   check(['List', 'Kanban', 'Timeline', 'Share…', 'Nothing to undo'].every(x => labs.includes(x)) && !labs.some(x => /^Search/.test(x)), 'tl3: view, Share and undo in "…": ' + labs.slice(0, 8).join(' | '));
   top.classList.replace('tl3', 'tl4');
-  check(w.eval('topMoreItems()').some(x => x.label === 'Search and commands'), 'tl4: Search too');
+  check(!w.eval('topFolded()').some(x => x.icon === 'search'), 'tl4: Search stays in the header (2.18.0 #651, the title is cut instead)');
   top.classList.remove('tl4');
   const l0 = w.eval('topMoreItems()').filter(x => x !== '-').map(x => x.label);
   check(!l0.includes('Kanban') && !l0.includes('Timeline') && !l0.includes('Nothing to undo'), 'tl0: nothing folded: ' + l0.join(' | '));
@@ -316,8 +316,12 @@ const TOUCH = `(() => {
               const h = await ev(HEAD);
               const tag = `${Wd}px ${theme} ${name}${panel ? ' + panel' : ''}`;
               if (h.none) { check(false, `${tag}: no header: ${h.none}`); continue; }
-              const readable = h.full || h.htw + 0.5 >= h.w12;
-              check(readable && (Wd < 1280 || h.full), `${tag}: title readable (${h.full ? 'all' : Math.round(h.htw) + ' px of ' + Math.round(h.w12) + ' for 12 characters'}) "${h.txt}" ${h.lvl}`);
+              // 2.18.0 (#651, intended change): on a phone the search icon stays in the header, the title gets cut instead:
+              // 12 characters where they fit, at least 6 (+ "…") on the narrowest phones
+              const readable = h.full || h.htw + 0.5 >= h.w12 || (Wd < 600 && h.htw + 0.5 >= h.w6);
+              // 2.18.0 (review R3, owner rule, intended change): one-tap actions stay in the header on every width and the
+              // title is cut (>= 12 characters) instead; before, wide screens folded them into "…" to show the whole title
+              check(readable, `${tag}: title readable (${h.full ? 'all' : Math.round(h.htw) + ' px of ' + Math.round(h.w12) + ' for 12 / ' + Math.round(h.w6) + ' for 6 characters'}) "${h.txt}" ${h.lvl}`);
               check(h.more && h.bell && h.more[0] >= 0 && h.more[1] <= h.vw + 0.5 && h.bell[1] <= h.vw + 0.5 && h.more[1] <= h.bell[0] + 0.5 && !h.out.length, `${tag}: "…" and the bell inside, nothing sticking out ${JSON.stringify({more: h.more, bell: h.bell, vw: h.vw, out: h.out})}`);
               check(h.st || h.ach, `${tag}: the agent shows (pill or status chip)`);
               if (theme === 'dark') await shot(`p260-head-${name}${panel ? '-panel' : ''}-${Wd}.png`);

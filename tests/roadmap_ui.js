@@ -64,7 +64,7 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   const gname = lid => d.querySelector(`.rm-g[data-l="${lid}"] .rm-gname`);
   const sum = lid => d.querySelector(`.rm-sum[data-lid="${lid}"]`);
   // 2.0.6 (#189): the "No date" rows (rm-nh / rm-u) are not groups
-  const order = rows().filter(r => !r.classList.contains('rm-t') && !r.classList.contains('rm-u') && !r.classList.contains('rm-nh')).map(r => r.classList.contains('rm-f') ? 'F:' + r.textContent.trim().replace(/\d+$/, '') : +r.dataset.l);
+  const order = rows().filter(r => !r.classList.contains('rm-t') && !r.classList.contains('rm-u') && !r.classList.contains('rm-nh') && !r.classList.contains('rm-s') && !r.classList.contains('rm-a')).map(r => r.classList.contains('rm-f') ? 'F:' + r.textContent.trim().replace(/\d+$/, '') : +r.dataset.l);
   check(JSON.stringify(order) === JSON.stringify([FILM, 'F:Clients', WEB, BRAND]), `groups: lists without folder, then the folder with its lists: ${JSON.stringify(order)}`);
   check(d.querySelector('[data-act="rm-po"]').classList.contains('on') && !d.querySelector(`.rm-g[data-l="${SHOP}"]`), 'Projects only: on by default (a project exists), plain lists hidden');
   check(!d.querySelector('.rm-hint'), 'no hint while projects exist');

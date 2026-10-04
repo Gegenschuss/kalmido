@@ -54,7 +54,8 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
   check(/<ol start="2"><li>B/.test(md2), 'Markdown: an unindented bullet in between does not restart at 1: ' + md2);
   check(/class="cb on"/.test(w.eval(`renderMd('- [x] done\\n- [ ] open')`)), 'Markdown: checkboxes still work');
   const md3 = w.eval(`renderMd('Run:\\n\\x60\\x60\\x60\\nconst a = <b>1</b>;\\n  - not a list\\n\\x60\\x60\\x60\\nafter')`);
-  check(/<pre class="mdpre"><code>const a = &lt;b&gt;1&lt;\/b&gt;;\n  - not a list<\/code><\/pre><p>after<\/p>/.test(md3), 'Markdown: fenced code blocks stay as they are (escaped, no list): ' + md3);
+  // 2.18.0 (#408 G): the block sits in a .mdcode wrapper with a Copy button after the <pre>
+  check(/<pre class="mdpre"><code>const a = &lt;b&gt;1&lt;\/b&gt;;\n  - not a list<\/code><\/pre>(?:<button[^]*?<\/button><\/div>)?<p>after<\/p>/.test(md3), 'Markdown: fenced code blocks stay as they are (escaped, no list): ' + md3);
   w.close();
   // ================= jsdom phone: the section "+" opens the quick sheet with the section
   w = await boot({user: 'alice', mobile: true, hash: 'l/' + L}); d = w.document;
