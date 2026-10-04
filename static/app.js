@@ -5073,7 +5073,7 @@ function commentHtml(c, U, ro = false) {
     : `${c.body ? `<div class="cbody">${commentBody(c.body, U)}</div>` : ''}${files}${sugHtml(c, ro)}${reactHtml(c, ro)}`;
   // 2.5.1 (#395): the author's avatar opens the same card as an @mention (only in the comment list, not read-only copies)
   const cav = ro ? av(c.user_id, uname(c.user_id, U)) : `<button type="button" class="cmav" data-mcard="${c.user_id}" data-mname="${esc(uname(c.user_id, U))}" aria-haspopup="dialog" title="${esc(tr('Show {0}', uname(c.user_id, U)))}">${av(c.user_id, uname(c.user_id, U))}</button>`;
-  return `<div class="cm ${isNew ? 'new' : ''}" data-cid="${c.id}">${cav}<div class="cmain"><div class="chead"><b>${esc(uname(c.user_id, U))}</b>${isAgentUser(c.user_id) ? agentBadge() : ''}<span class="muted">${fmtWhen(c.created_at)}${c.edited_at ? ' · ' + tr('edited') : ''}</span>${acts}</div>${main}</div></div>`;
+  return `<div class="cm ${isNew ? 'new' : ''}${rxShow('k' + c.id)}" data-cid="${c.id}">${cav}<div class="cmain"><div class="chead"><b>${esc(uname(c.user_id, U))}</b>${isAgentUser(c.user_id) ? agentBadge() : ''}<span class="muted">${fmtWhen(c.created_at)}${c.edited_at ? ' · ' + tr('edited') : ''}</span>${acts}</div>${main}</div></div>`;
 }
 function timelineItems(ro = false) {
   const T = S.tl, soc = cmSocial(taskById(T.id));
@@ -11053,7 +11053,7 @@ document.addEventListener('click', async e => {
       const host = a.closest('.cmsg, .cm'); if (!host) break;
       const on = !host.classList.contains('rxshow');
       $$('.rxshow').forEach(x => { x.classList.remove('rxshow'); x.querySelector('.rxtog')?.setAttribute('aria-expanded', 'false'); });
-      host.classList.toggle('rxshow', on); a.setAttribute('aria-expanded', String(on));
+      host.classList.toggle('rxshow', on); a.setAttribute('aria-expanded', String(on)); S.rxOpen = on ? rxKey(host) : null;
       if (on) setTimeout(() => host.querySelector('.chrxq .rx, .cmrxq .rx')?.focus({preventScroll: true}), 0);
       break;
     }
@@ -13087,7 +13087,7 @@ function reactHtml(c, ro) {
   // 2.13.2 (#478 F5): like the chat: given reactions stay as pills, the quick 👍 👎 + appear on hover / keyboard focus
   // (desktop) or a long press (touch) as a small bar over the comment's corner
   const q = quick.join('') + more;
-  return (rs.length || q ? `<div class="rxbar">${rs.map(pill).join('')}${q ? rxTog() : ''}</div>` : '') + (q ? `<div class="rxbar cmrxq" role="group" aria-label="${esc(tr('React'))}">${q}</div>` : '');
+  return (rs.length || q ? `<div class="rxbar">${rs.map(pill).join('')}${q ? rxTog('k' + c.id) : ''}</div>` : '') + (q ? `<div class="rxbar cmrxq" role="group" aria-label="${esc(tr('React'))}">${q}</div>` : '');
 }
 function reactPicker(anchor, cid) {
   const p = openPop(anchor, `<div class="rxpick"><div class="rxgrid">${[...RX.map(x => [x[0], x[1], tr(x[2])]), ...RX_MORE.map(e => [e, e, e])].map(([k, em, n]) => `<button data-rx="${esc(k)}" title="${esc(n)}" aria-label="${esc(n)}">${em}</button>`).join('')}</div>
@@ -13715,7 +13715,7 @@ function chatMsgs() {
   return older + S.chat.msgs.map(m => { const t = m.task_id && taskById(m.task_id), mine = m.from !== 'agent';
     // 2.7.2 (#422): my messages say Sent / Delivered (the agent fetched it); (#421) reactions, quick 👍 👎 ❤️ on the agent's
     const dlv = mine ? `<span class="cdlv ${m.delivered_at ? 'on' : ''}" title="${esc(m.delivered_at ? tr('Delivered') + ' · ' + fmtWhen(m.delivered_at) : tr('Sent'))}">${ic('check', 's')}${m.delivered_at ? ic('check', 's') : ''}<span>${m.delivered_at ? tr('Delivered') : tr('Sent')}</span></span>` : '';
-    return `<div class="cmsg ${mine ? 'me' : 'ag'}" data-k="m${m.id}" data-mid="${m.id}">${m.body ? `<div class="cbub">${commentBody(m.body, {})}</div>` : ''}${chatAttHtml(m)}${t ? `<button class="runtask" data-act="open-id" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : ''}${chatRxHtml(m, a)}<div class="cmeta"><time>${fmtWhen(m.created_at)}</time>${dlv}${a?.enabled && !(m.from === 'agent' && m.asks && chatRxOpen(m)) ? rxTog() : ''}</div></div>`; }).join('')
+    return `<div class="cmsg ${mine ? 'me' : 'ag'}${rxShow('c' + m.id)}" data-k="m${m.id}" data-mid="${m.id}">${m.body ? `<div class="cbub">${commentBody(m.body, {})}</div>` : ''}${chatAttHtml(m)}${t ? `<button class="runtask" data-act="open-id" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : ''}${chatRxHtml(m, a)}<div class="cmeta"><time>${fmtWhen(m.created_at)}</time>${dlv}${a?.enabled && !(m.from === 'agent' && m.asks && chatRxOpen(m)) ? rxTog('c' + m.id) : ''}</div></div>`; }).join('')
     + (off ? `<div class="chpend off" data-k="off" role="status">${ic('clock', 's')}<span>${esc(tr('{0} is offline – will answer later', a.name))}</span></div>` : '');
 }
 // 2.13.1 (#465): the images / files of a chat message: thumbnails (lightbox on click) and file tiles; the sender removes
@@ -13788,7 +13788,12 @@ document.addEventListener('drop', e => {
 // bubble's corner. Only an agent message that asks something (m.asks, server: chat_asks) counts a 👍 / 👎 as approval /
 // rejection: there the newest unanswered question shows the bar right away with the hint "👍 = approval", and a given 👍 / 👎
 // says "Counted as approval / rejection". Existing reactions always show as pills; on mine only what the agent reacted with.
-const rxTog = () => `<button type="button" class="rx rxtog" data-act="rx-tog" aria-expanded="false" title="${esc(tr('React'))}" aria-label="${esc(tr('React'))}">${ic('smile', 's')}</button>`;
+// the open quick bar is state (S.rxOpen = 'c<chat msg id>' | 'k<comment id>' | 't<team msg id>'), so a re-render (the chat
+// polls, a reaction arrives) keeps it open instead of closing it under the finger
+S.rxOpen = null;
+const rxTog = (key = null) => `<button type="button" class="rx rxtog" data-act="rx-tog" aria-expanded="${!!key && S.rxOpen === key}" title="${esc(tr('React'))}" aria-label="${esc(tr('React'))}">${ic('smile', 's')}</button>`;
+const rxShow = key => S.rxOpen === key ? ' rxshow' : '';
+const rxKey = host => host.classList.contains('cm') ? 'k' + host.dataset.cid : (host.closest('#tc-msgs') ? 't' : 'c') + host.dataset.mid;
 // the newest agent question nobody answered: its quick bar is open anyway (no smiley needed)
 const chatRxOpen = m => { const rs = m.reactions || [], meR = e => rs.some(r => r.emoji === e && r.users.some(u => S.me && u.id === S.me.id)); return !!m.asks && !meR('up') && !meR('down') && S.chat.msgs.length && S.chat.msgs[S.chat.msgs.length - 1].id === m.id; };
 function chatRxHtml(m, a) {
@@ -13811,11 +13816,11 @@ function chatRxHtml(m, a) {
   let lp = null;
   document.addEventListener('touchstart', e => {
     const m = e.target.closest?.('#chat-msgs .cmsg.ag, #detail .cm:not(.cedit)'); if (!m || e.touches.length !== 1 || e.target.closest('button, a, textarea, input')) { lp = null; return; }
-    const p = e.touches[0]; lp = {m, x: p.clientX, y: p.clientY, t: setTimeout(() => { $$('.rxshow').forEach(x => x !== m && x.classList.remove('rxshow')); m.classList.add('rxshow'); if (navigator.vibrate) navigator.vibrate(10); lp = null; }, 450)};
+    const p = e.touches[0]; lp = {m, x: p.clientX, y: p.clientY, t: setTimeout(() => { $$('.rxshow').forEach(x => x !== m && x.classList.remove('rxshow')); m.classList.add('rxshow'); S.rxOpen = rxKey(m); if (navigator.vibrate) navigator.vibrate(10); lp = null; }, 450)};
   }, {passive: true});
   document.addEventListener('touchmove', e => { if (lp && Math.hypot(e.touches[0].clientX - lp.x, e.touches[0].clientY - lp.y) > 8) { clearTimeout(lp.t); lp = null; } }, {passive: true});
   document.addEventListener('touchend', () => { if (lp) { clearTimeout(lp.t); lp = null; } }, {passive: true});
-  document.addEventListener('click', e => { if (!e.target.closest?.('.rxshow .chrxq, .rxshow .cmrxq')) $$('.rxshow').forEach(x => !x.contains(e.target) && x.classList.remove('rxshow')); }, true);
+  document.addEventListener('click', e => { if (!e.target.closest?.('.rxshow .chrxq, .rxshow .cmrxq')) $$('.rxshow').forEach(x => { if (!x.contains(e.target)) { x.classList.remove('rxshow'); if (S.rxOpen === rxKey(x)) S.rxOpen = null; } }); }, true);
 }
 async function chatReact(mid, emoji) {
   const aid = S.chat.aid, m = S.chat.msgs.find(x => x.id === mid); if (!aid || !m) return;

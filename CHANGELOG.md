@@ -7,6 +7,12 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.16.1] - 2026-10-04
+
+### Fixed
+- The quick reactions of a chat message or a comment stayed open only until the next refresh of the chat (it checks for
+  answers every few seconds): the open bar is now kept across refreshes, so a tap on 👍 is not lost.
+
 ## [2.16.0] - 2026-10-04
 
 **In short:** Accessibility to WCAG 2.2 AA (#473): the whole app works with the keyboard and a screen reader, messages
@@ -2260,7 +2266,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.16.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.16.1...HEAD
+[2.16.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.16.1
 [2.16.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.16.0
 [2.15.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.15.1
 [2.15.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.15.0
