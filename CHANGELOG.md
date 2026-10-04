@@ -7,9 +7,28 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.17.2] - 2026-10-04
+
+### Fixed
+- Notes: typing in the search field lost the focus after the first letter; the card preview keeps `#123`.
+- The dashboard no longer scrolls sideways on phones when a task or message has a long name or word.
+- Team chat: a room opened by its address (reload, a push) shows the newest message; the reaction bar of the last
+  message is not hidden behind the input box; closed quick reactions of your own messages are no hidden Tab stops.
+- Team chat and notes on an unfolded foldable or a narrow window: one thing at a time (with *Back*), so the note and
+  the message box get the whole width.
+- The *Undo* button in messages at the bottom is 44 px on touch screens.
+- After *Mark read* of a News group, *Done* in the dashboard settings, Escape while editing a message and deleting a
+  note, the keyboard focus stays in a sensible place; Escape closes the dashboard settings.
+- Screen readers: the @mention list reads its options while you move with the arrow keys, the logo is named
+  "Kalmido: Dashboard", the unread count of the team chat says "unread", a News group of one item is not announced as
+  collapsed; contrast of a mention of you and of "Message deleted" in chat bubbles.
+
 ## [2.17.1] - 2026-10-04
 
-- 2.17.1: the tab bar's More menu opened no more with Dashboard or Team chat in it; the phone header folds the search icon into ... when space is short and hides it while the sidebar is open; older test suites pin the plain News list
+### Fixed
+- The tab bar's *More* menu did not open when Dashboard or Team chat were in it.
+- Phones show the search icon in the header whenever there is room (it moves into "…" only on crowded headers) and
+  hide it while the sidebar with its own search field is open.
 
 ## [2.17.0] - 2026-10-04
 
@@ -2313,7 +2332,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.17.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.17.2...HEAD
+[2.17.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.17.2
 [2.17.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.17.1
 [2.17.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.17.0
 [2.16.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.16.1

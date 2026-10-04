@@ -3720,5 +3720,7 @@
   "Wider": "Breder",
   "Already the first task with this priority": "Al de eerste taak met deze prioriteit",
   "Already the last task with this priority": "Al de laatste taak met deze prioriteit",
-  "{0} subtask": ["{0} subtaak", "{0} subtaken"]
+  "{0} subtask": ["{0} subtaak", "{0} subtaken"],
+  "unread": "ongelezen",
+  "{0} note": ["{0} notitie", "{0} notities"]
 }

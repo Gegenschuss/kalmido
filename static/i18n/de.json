@@ -3720,5 +3720,7 @@
   "Wider": "Breiter",
   "Already the first task with this priority": "Schon die erste Aufgabe mit dieser Priorität",
   "Already the last task with this priority": "Schon die letzte Aufgabe mit dieser Priorität",
-  "{0} subtask": ["{0} Unteraufgabe", "{0} Unteraufgaben"]
+  "{0} subtask": ["{0} Unteraufgabe", "{0} Unteraufgaben"],
+  "unread": "ungelesen",
+  "{0} note": ["{0} Notiz", "{0} Notizen"]
 }

@@ -56,7 +56,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   // ================= jsdom: #475 the dashboard
   let w = await boot({user: 'alice', hash: 'today', ls: {'tasks.newsBundle': null}}), d = w.document;
   const logo = d.querySelector('#side .sbrand .sbhome');
-  check(logo && logo.dataset.go === 'home' && logo.getAttribute('aria-label') === 'Dashboard', '#475: the logo opens the dashboard');
+  check(logo && logo.dataset.go === 'home' && /^Kalmido: Dashboard$/.test(logo.getAttribute('aria-label')), '#475: the logo opens the dashboard (its name starts with the visible "Kalmido")');
   click(w, logo); await sleep(600);
   check(w.location.hash === '#home' && d.querySelector('#top h1')?.textContent.includes('Dashboard'), '#475: #home, titled Dashboard');
   await until(() => d.querySelector('.dcard.dc-news .ngroup'));
@@ -188,6 +188,13 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   const md = d.querySelector('#nt-md');
   check(md.querySelector('h4, h3, h5')?.textContent === 'Decisions' && md.querySelector(`a.tref[href="#t/${T[0]}"]`)?.textContent.includes('Write the homepage text'), '#442: Markdown with #123 as a task link');
   check(d.querySelector('.ntcard.on')?.textContent.includes('Kick-off'), 'the list of notes shows it');
+  // 2.17.2 (review): typing in the search keeps the focus in the field (only the cards re-render); the preview keeps "#123"
+  check(/#\d+/.test(d.querySelector('.ntcard.on .ntx')?.textContent || ''), 'the card preview keeps "#123" ' + d.querySelector('.ntcard.on .ntx')?.textContent);
+  { const q = d.querySelector('#nt-q'); q.focus(); type(w, q, 'k'); await sleep(50); type(w, d.querySelector('#nt-q'), 'kick'); await sleep(50);
+    check(d.activeElement === q && q.isConnected && q.value === 'kick' && d.querySelectorAll('.ntcard').length === 1, 'notes search: the field keeps the focus while typing');
+    type(w, q, 'zzzz'); await sleep(50);
+    check(d.activeElement === q && /No notes match/.test(d.querySelector('#nt-res')?.textContent || ''), 'notes search: no match, the field still focused');
+    type(w, q, ''); await sleep(50); }
   // the overview, the palette
   w.eval(`go('l/${L}')`); await sleep(200);
   w.eval(`S.pov.add(${L}); render()`); await sleep(600);
@@ -200,6 +207,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   click(w, d.querySelector('[data-act="nt-menu"]')); await sleep(80);
   click(w, [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => /Delete/.test(b.textContent)));
   check(await until(async () => (await call('GET', `/api/notes/${NID}`)).status === 404), '#442: delete');
+  await sleep(150); check(d.activeElement?.id === 'nt-q', 'after Delete the focus is in the notes (search field)');
   click(w, d.querySelector('#toast button'));
   check(await until(async () => (await call('GET', `/api/lists/${L}/notes`)).notes?.some(n => n.title === 'Kick-off' && n.body.includes('go live'))), '#442: Undo brings it back');
   w.close();
@@ -238,6 +246,9 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   w.close();
 
   // ================= Firefox
+  // 2.17.2 (review): a long unbroken word on the dashboard (Today card) and in the team chat must not push the page sideways
+  await call('POST', '/api/tasks', {title: 'Unbrokenwordwithoutanyspace'.repeat(5), list_id: L, due: day(0)});
+  for (let i = 0; i < 24; i++) await call('POST', `/api/team/rooms/${RID}/messages`, {body: i === 5 ? 'Longword'.repeat(14) : `Update ${i}`}, i % 2 ? CB : CK);
   const ffLogin = async ({ev, nav}, theme = 'light', user = 'alice') => {
     await nav(B + 'static/icon.svg');
     await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
@@ -282,9 +293,15 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     // review of 2.16.1: the reaction bar of an OWN message opens inside the screen; the header keeps the search icon;
     // an unfolded Fold (904) has a close X on the task panel
     p = await ev(center('.tclist .tcrow')); await tap(p.x, p.y); await sleep(800);
+    check(await ev(`[...document.querySelectorAll('#tc-msgs .cmsg.me:not(.rxshow) .chrxq')].every(q => getComputedStyle(q).display === 'none')`), `${tag}: closed quick reactions of own messages are no Tab stops (display none)`);
     p = await ev(center('#tc-msgs .cmsg.me .rxtog')); if (p) { await tap(p.x, p.y); await sleep(400); }
     const rq = await ev(`(() => { const q = document.querySelector('#tc-msgs .cmsg.me.rxshow .chrxq'); if (!q) return null; const r = q.getBoundingClientRect(); return {t: Math.round(r.top), b: Math.round(r.bottom), l: Math.round(r.left), r: Math.round(r.right), o: getComputedStyle(q).opacity}; })()`);
     check(rq && rq.t >= 0 && rq.l >= 0 && rq.r <= 390 && rq.o === '1', `${tag}: own message: the reaction bar opens on screen ` + JSON.stringify(rq));
+    p = await ev(`(() => { const t = [...document.querySelectorAll('#tc-msgs .cmsg.me [data-act="rx-tog"]')].pop(); if (!t) return null; t.scrollIntoView({block: 'center'}); const q = t.getBoundingClientRect(); return {x: q.left + q.width / 2, y: q.top + q.height / 2}; })()`);
+    const hit = p && await ev(`(() => { const e = document.elementFromPoint(${p?.x || 0}, ${p?.y || 0}); return (e?.closest('[data-act]')?.dataset.act || e?.tagName) + ' ' + (e?.closest('.cmsg')?.textContent || '').slice(0, 40); })()`);
+    if (p) { await tap(p.x, p.y); await sleep(500); }
+    const lq = await ev(`(() => { const ms = [...document.querySelectorAll('#tc-msgs .cmsg.me')], last = ms.pop(), q = last?.querySelector('.chrxq'), b = document.querySelector('#tc-msgs'); if (!q || !b) return {n: ms.length + (last ? 1 : 0), open: document.querySelectorAll('.rxshow').length, html: (last?.outerHTML || '').slice(0, 300)}; return {on: last.classList.contains('rxshow'), qb: Math.round(q.getBoundingClientRect().bottom), bb: Math.round(b.getBoundingClientRect().bottom)}; })()`);
+    check(lq && lq.on && lq.qb <= lq.bb + 1, `${tag}: the last own message: its reaction bar is not hidden behind the box ` + JSON.stringify(lq) + ' hit=' + hit + ' p=' + JSON.stringify(p));
     await o.nav(B + '#today'); await ready(ev);
     const sb = await ev(`(() => { const b = document.querySelector('#top [data-act="palette"]'); const r = b?.getBoundingClientRect(); return r && r.width >= 30 && r.right <= innerWidth ? Math.round(r.width) : 0; })()`);
     check(sb > 0, `${tag}: the header has the search icon on the phone (${sb})`);
@@ -312,6 +329,23 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     await o.nav(B + '#home'); await ready(ev);
     const cols = await ev(`(() => { const cs = [...document.querySelectorAll('.dgrid .dcard')].map(c => Math.round(c.getBoundingClientRect().left)); return new Set(cs).size; })()`);
     check(cols >= 3, `${tag}: the dashboard uses the width (${cols} columns)`);
+    // 2.17.2 (review): a room opened by its address (reload, a push) shows the newest message
+    await o.nav(B + '#team'); await ready(ev);
+    await ev(`(() => { document.querySelector('.tclist .tcrow')?.click(); return 1; })()`); await sleep(1000);
+    const rh = await ev('location.hash');
+    await o.nav(B + 'static/icon.svg'); await o.nav(B + rh); await ready(ev); await sleep(1500);
+    const sc = await ev(`(() => { const b = document.querySelector('#tc-msgs'); return b ? {top: Math.round(b.scrollTop), max: b.scrollHeight - b.clientHeight} : null; })()`);
+    check(sc && sc.max > 0 && sc.top >= sc.max - 4, `${tag}: ${rh} opened by its address ends at the newest message ` + JSON.stringify(sc));
+    if (th === 'light') {  // the unfolded Fold: a note and a room get the whole width (one thing at a time)
+      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 904, height: 1080}});
+      await o.nav(B + 'static/icon.svg'); await o.nav(B + '#note/' + NN); await ready(ev); await sleep(800);
+      const nw = await ev(`(() => { const t = document.querySelector('#nt-title'), l = document.querySelector('.ntlist'); return {t: Math.round(t?.getBoundingClientRect().width || 0), list: l ? getComputedStyle(l).display : ''}; })()`);
+      check(nw.t >= 300, `${tag} 904: the note title has room ` + JSON.stringify(nw));
+      await o.nav(B + 'static/icon.svg'); await o.nav(B + rh); await ready(ev); await sleep(1000);
+      const tw = await ev(`(() => { const i = document.querySelector('#tc-in'), b = document.querySelector('.tcroom .tcback'); return {i: Math.round(i?.getBoundingClientRect().width || 0), back: !!b && b.getBoundingClientRect().width > 0}; })()`);
+      check(tw.i >= 300, `${tag} 904: the message box has room ` + JSON.stringify(tw));
+      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1440, height: 900}});
+    }
   }, false);
 
   console.log(`${ok} ok, ${F.length} failed`);

@@ -3720,5 +3720,7 @@
   "Wider": "Más ancho",
   "Already the first task with this priority": "Ya es la primera tarea con esta prioridad",
   "Already the last task with this priority": "Ya es la última tarea con esta prioridad",
-  "{0} subtask": ["{0} subtarea", "{0} subtareas"]
+  "{0} subtask": ["{0} subtarea", "{0} subtareas"],
+  "unread": "sin leer",
+  "{0} note": ["{0} nota", "{0} notas"]
 }

@@ -3869,3 +3869,31 @@ a.tref:hover{background:var(--accent-soft)}
   #top .cmdbar>span,#top .cmdbar .kbs{display:none}
   body:has(#side.open) #top .cmdbar{display:none}  /* the open drawer has its own search field */
 }
+/* 2.17.2 (review of 2.17.1): dashboard rows shrink with their card (long names / words no longer push the page sideways);
+   the quick reactions of people's messages exist only while opened (no invisible Tab stops); toast buttons 44 px on touch */
+.dtl,.dwl,.dpl{grid-template-columns:minmax(0,1fr)}
+.dtl>*,.dwl>*,.dpl>*{min-width:0}
+.cmsg:not(.ag):not(.rxshow) .chrxq:not(.open){display:none}
+@media (pointer:coarse){ #toast button{min-height:2.75rem;min-width:2.75rem;padding:0 .75rem} }
+/* 2.17.2: team chat and notes measure their own width (a Fold, a narrow window, the sidebar + task panel open): below
+   ~40rem they show one thing at a time like on a phone, with "Back" in the room */
+.tcwrap,.ntwrap{container-type:inline-size}
+.tcback{display:none}
+@media (max-width:899px){
+  .tcwrap{display:flex;flex-direction:column;flex:1;min-height:0}
+  .tcback{display:inline-flex}
+}
+@container (max-width:40rem){
+  .tcview{grid-template-columns:minmax(0,1fr)}
+  .tcview.inroom .tclist{display:none}
+  .tcview:not(.inroom) .tcroom{display:none}
+  .tcback{display:inline-flex}
+  .ntview.open{grid-template-columns:minmax(0,1fr)}
+  .ntview.open .ntlist{display:none}
+}
+/* 2.17.2: contrast inside chat bubbles: a mention of me reads in the text colour on its tint, "Message deleted" in text2 */
+.cbub .mention.me{color:var(--text)}
+.cbub.del .muted{color:var(--text2)}
+/* a row title without a control of its own (looks like the row labels) */
+.modal .row .rlab{min-width:8.75rem;color:var(--muted);font-size:var(--fs-m)}
+@media (max-width:899px){ .modal .row .rlab{min-width:100%} }

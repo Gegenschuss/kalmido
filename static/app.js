@@ -1691,7 +1691,7 @@ function renderSide() {
     c.pinned || (onTasks && k === 'pinned') ? row('pinned', ic('pin'), tr('Pinned|view'), c.pinned) : '',  // 2.16.0 (#648): only while something is pinned
     c.waiting || (onTasks && k === 'waiting') ? row('waiting', ic('hourglass'), tr('Waiting on external'), c.waiting) : '',
     collab() && (hasSharing() || c.assigned) ? row('assigned', ic('user'), tr('Assigned to me'), c.assigned) : '',
-    teamOn() && (hasSharing() || S.team?.unread) ? `<button class="srow ${S.route.mod === 'team' ? 'on' : ''}" data-go="team">${ic('comment')}<span class="n">${tr('Team chat')}</span><span class="c ${S.team?.unread ? 'nunread' : ''}">${S.team?.unread || ''}</span></button>` : '',  // 2.17.0 (#419)
+    teamOn() && (hasSharing() || S.team?.unread) ? `<button class="srow ${S.route.mod === 'team' ? 'on' : ''}" data-go="team">${ic('comment')}<span class="n">${tr('Team chat')}</span><span class="c ${S.team?.unread ? 'nunread' : ''}">${S.team?.unread ? `${S.team.unread}<span class="sr"> ${esc(tr('unread'))}</span>` : ''}</span></button>` : '',  // 2.17.0 (#419)
     collab() && (hasSharing() || S.news?.unread) ? `<button class="srow ${S.route.mod === 'news' ? 'on' : ''}" data-go="news">${ic('bell')}<span class="n">${tr('News')}</span><span class="c ${S.news?.unread ? 'nunread' : ''}">${S.news?.unread || ''}</span></button>` : ''].join('');
   // Views: every switched-on module (the rail's old job)
   const aw = (S.agents || []).reduce((n, x) => n + x.waiting + x.chat_unread, 0);
@@ -1716,7 +1716,7 @@ function renderSide() {
   // "Search" view inside); no separate "Search" row any more (it doubled the field in the drawer, the field was missing on
   // an unfolded Fold)
   $('#side').innerHTML = `
-    <div class="sbrand"><button type="button" class="sbhome ${S.route.mod === 'home' ? 'on' : ''}" data-go="home" title="${esc(tr('Dashboard'))}" aria-label="${esc(tr('Dashboard'))}" ${S.route.mod === 'home' ? 'aria-current="page"' : ''}>${logoSvg(20)}<span>${esc(APP_NAME)}</span></button><span class="spacer"></span>${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(tr('Account') + ': ' + S.me.display_name)}" aria-label="${esc(tr('Account') + ': ' + S.me.display_name)}">${av(S.me.id, S.me.display_name)}${updDot() ? `<span class="dot" title="${esc(tr('Update available'))}"></span>` : ''}</button>` : ''}</div>
+    <div class="sbrand"><button type="button" class="sbhome ${S.route.mod === 'home' ? 'on' : ''}" data-go="home" title="${esc(tr('Dashboard'))}" aria-label="${esc(APP_NAME + ': ' + tr('Dashboard'))}" ${S.route.mod === 'home' ? 'aria-current="page"' : ''}>${logoSvg(20)}<span>${esc(APP_NAME)}</span></button><span class="spacer"></span>${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(tr('Account') + ': ' + S.me.display_name)}" aria-label="${esc(tr('Account') + ': ' + S.me.display_name)}">${av(S.me.id, S.me.display_name)}${updDot() ? `<span class="dot" title="${esc(tr('Update available'))}"></span>` : ''}</button>` : ''}</div>
     <button class="scmd" data-act="palette" title="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span></button>
     ${grp('focus', tr('Focus|nav'), focus)}
     ${views ? grp('views', tr('Views'), views) : ''}
@@ -2039,7 +2039,7 @@ function renderView0() {
   else if (m === 'time') setHtml(el, viewTime());
   else if (m === 'overview') setHtml(el, viewOverview());
   else if (m === 'agents') setHtml(el, viewAgents());
-  else if (m === 'team') setHtml(el, viewTeam());  // 2.17.0 (#419)
+  else if (m === 'team') { setHtml(el, viewTeam()); if (S.tc.fitUntil > Date.now()) teamFit(true); }  // 2.17.0 (#419); 2.17.2: a room opened by its address ends at the newest message
   else if (m === 'notes') setHtml(el, viewNotes());  // 2.17.0 (#442)
   else if (m === 'home') setHtml(el, viewHome());  // 2.17.0 (#475)
   else if (S.route.key === 'search') setHtml(el, viewSearch());
@@ -5251,7 +5251,16 @@ function mentionUpdate(ta) {
   const st = mentionState(ta); if (!st) return;
   S.mp = st.items.length ? {ta, ...st, i: 0} : null;
   st.pick.classList.toggle('hidden', !st.items.length);
-  st.pick.innerHTML = st.items.map((p, i) => `<button class="${i === 0 ? 'on' : ''}" data-act="mention-pick" data-i="${i}">${av(p.user_id ?? p.id, p.name)}${esc(p.name)}</button>`).join('');
+  // 2.17.2 (review): a listbox of options; the box points at the highlighted one (screen readers follow the arrow keys)
+  const pid = st.pick.id || (st.pick.id = 'mp' + (++mpSeq));
+  st.pick.setAttribute('role', 'listbox'); if (!st.pick.hasAttribute('aria-label')) st.pick.setAttribute('aria-label', tr('Mention someone'));
+  st.pick.innerHTML = st.items.map((p, i) => `<button type="button" role="option" id="${pid}-o${i}" tabindex="-1" aria-selected="${i === 0}" class="${i === 0 ? 'on' : ''}" data-act="mention-pick" data-i="${i}">${av(p.user_id ?? p.id, p.name)}${esc(p.name)}</button>`).join('');
+  mentionAria(ta, st.items.length ? pid + '-o0' : '', pid);
+}
+let mpSeq = 0;
+function mentionAria(ta, act, pid) {
+  if (pid) ta.setAttribute('aria-controls', pid);
+  if (act) ta.setAttribute('aria-activedescendant', act); else ta.removeAttribute('aria-activedescendant');
 }
 function mentionPick(i) {
   const mp = S.mp; if (!mp) return;
@@ -5259,18 +5268,19 @@ function mentionPick(i) {
   ta.value = ta.value.slice(0, mp.start) + '@' + p.name + ' ' + ta.value.slice(caret);
   const pos = mp.start + p.name.length + 2;
   ta.focus(); ta.setSelectionRange(pos, pos);
-  mp.pick.classList.add('hidden'); S.mp = null;
+  mp.pick.classList.add('hidden'); S.mp = null; mentionAria(ta, '');
   if (ta.id === 'c-input') S.drafts[S.sel] = ta.value;
   autosize(ta);
 }
-function mentionClose() { if (S.mp) { S.mp.pick.classList.add('hidden'); S.mp = null; } }
+function mentionClose() { if (S.mp) { S.mp.pick.classList.add('hidden'); mentionAria(S.mp.ta, ''); S.mp = null; } }
 document.addEventListener('keydown', e => {
   const t = e.target;
   if (!(t.id === 'c-input' || t.classList?.contains('c-edit-input') || t.id === 'tc-in' || t.classList?.contains('tc-edit'))) return;
   if (S.mp && S.mp.ta === t) {
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault(); S.mp.i = (S.mp.i + (e.key === 'ArrowDown' ? 1 : -1) + S.mp.items.length) % S.mp.items.length;
-      $$('button', S.mp.pick).forEach((b, i) => b.classList.toggle('on', i === S.mp.i)); return;
+      $$('button', S.mp.pick).forEach((b, i) => { b.classList.toggle('on', i === S.mp.i); b.setAttribute('aria-selected', i === S.mp.i); });
+      mentionAria(t, S.mp.pick.id + '-o' + S.mp.i); return;
     }
     if ((e.key === 'Enter' || e.key === 'Tab') && !e.isComposing) { e.preventDefault(); e.stopImmediatePropagation(); mentionPick(S.mp.i); return; }
     if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); mentionClose(); return; }
@@ -11124,7 +11134,7 @@ document.addEventListener('click', async e => {
       const on = !host.classList.contains('rxshow');
       $$('.rxshow').forEach(x => { x.classList.remove('rxshow'); x.querySelector('.rxtog')?.setAttribute('aria-expanded', 'false'); });
       host.classList.toggle('rxshow', on); a.setAttribute('aria-expanded', String(on)); S.rxOpen = on ? rxKey(host) : null;
-      if (on) setTimeout(() => host.querySelector('.chrxq .rx, .cmrxq .rx')?.focus({preventScroll: true}), 0);
+      if (on) setTimeout(() => { const q = host.querySelector('.chrxq, .cmrxq'); q?.querySelector('.rx')?.focus({preventScroll: true}); try { q?.scrollIntoView({block: 'nearest'}); } catch { /* old browsers */ } }, 0);  // 2.17.2: the last message's bar is not hidden behind the box
       break;
     }
     case 'list-new': menu(a, [{label: tr('New list'), icon: 'list', fn: () => { closeSide(); listModal(); }}, {label: tr('New project…'), icon: 'brief', fn: () => { closeSide(); listModal(null, '', {kind: 'project'}); }}, {label: tr('New folder…'), icon: 'folder', fn: () => { closeSide(); newFolder(); }}, ...(tplOf('list').length ? [{label: tr('New list from template'), icon: 'copy', fn: () => { closeSide(); templateMenu($('#top h1'), 'list'); }}] : []), ...(propOn() ? [{label: tr('New project from briefing…'), icon: 'bot', fn: () => { closeSide(); propRequest('project'); }}] : [])]); break;
@@ -15181,12 +15191,12 @@ function viewTeam() {
       <span class="tcside">${r.last_at ? `<time>${esc(relTime(r.last_at))}</time>` : ''}${r.unread ? `<span class="nbadge ${r.mention ? 'ment' : ''}" aria-label="${esc(trn('{0} unread', '{0} unread', r.unread))}">${r.mention ? '@' : ''}${r.unread}</span>` : ''}${r.muted ? `<span class="tcmute" title="${esc(tr('Muted'))}">${ic('belloff', 's')}</span>` : ''}</span></button>`).join('')
     : `<div class="empty tcempty">${heron('empty')}<b>${tr('No conversations yet')}</b><span>${S.tc.people.length ? tr('Write to someone you work with, or share a list: every shared list gets its own chat.') : tr('Share a list with someone: every shared list gets its own chat.')}</span></div>`}
   </nav>`;
-  return `<div class="tcview ${rid ? 'inroom' : ''}">${list}${rid ? `<section class="tcroom" aria-label="${esc(roomName(S.tc.room ? {...S.tc.room, name: (rooms.find(x => x.id === rid) || {}).name} : rooms.find(x => x.id === rid)))}">${tcRoomHtml()}</section>` : (isMobile() ? '' : `<section class="tcroom tcnone"><div class="empty">${ic('comment')}<span>${tr('Pick a conversation.')}</span></div></section>`)}</div>`;
+  return `<div class="tcwrap"><div class="tcview ${rid ? 'inroom' : ''}">${list}${rid ? `<section class="tcroom" aria-label="${esc(roomName(S.tc.room ? {...S.tc.room, name: (rooms.find(x => x.id === rid) || {}).name} : rooms.find(x => x.id === rid)))}">${tcRoomHtml()}</section>` : (isMobile() ? '' : `<section class="tcroom tcnone"><div class="empty">${ic('comment')}<span>${tr('Pick a conversation.')}</span></div></section>`)}</div></div>`;
 }
 function tcRoomHtml() {
   const rid = S.tc.rid, r = (S.tc.rooms || []).find(x => x.id === rid), room = S.tc.room;
   const name = roomName(r || room);
-  const head = `<div class="tcrhead">${isMobile() ? `<button type="button" class="iconbtn" data-act="tc-back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : ''}
+  const head = `<div class="tcrhead"><button type="button" class="iconbtn tcback" data-act="tc-back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>
     ${r ? roomIcon(r) : ''}<div class="tcrt"><b>${esc(name)}</b>${room && room.kind === 'list' ? `<span class="muted">${esc(room.members.map(m => m.name).slice(0, 6).join(', '))}${room.members.length > 6 ? ' +' + (room.members.length - 6) : ''}</span>` : ''}</div>
     <span class="spacer"></span>${room && room.kind === 'list' ? `<button type="button" class="iconbtn" data-act="tc-list" data-id="${room.list_id}" title="${esc(tr('Open the list'))}" aria-label="${esc(tr('Open the list'))}">${ic('list')}</button>` : ''}
     <button type="button" class="iconbtn ${room?.muted ? 'on' : ''}" data-act="tc-mute" aria-pressed="${!!room?.muted}" title="${esc(room?.muted ? tr('Muted: only mentions notify you') : tr('Mute (only mentions notify you)'))}" aria-label="${esc(tr('Mute'))}">${ic(room?.muted ? 'belloff' : 'bell')}</button></div>`;
@@ -15224,7 +15234,15 @@ function tcPatch(bottom) {
   setHtml(box, tcMsgsHtml());
   if (near) box.scrollTop = box.scrollHeight;
 }
-function teamFit() { const box = $('#tc-msgs'); if (box) box.scrollTop = box.scrollHeight; }
+// a tap, the wheel or a key in the log ends the "stay at the newest message" phase (the person reads / reacts)
+for (const ev of ['pointerdown', 'wheel', 'touchstart', 'keydown']) document.addEventListener(ev, e => { if (S.tc?.fitUntil && e.target.closest?.('#tc-msgs')) S.tc.fitUntil = 0; }, {capture: true, passive: true});
+function teamFit(again) {
+  const box = $('#tc-msgs'); if (box) box.scrollTop = box.scrollHeight;
+  if (again) return;
+  // the first load of a page (state, fonts, avatars) re-renders and grows the log after this: stay at the end for a moment
+  S.tc.fitUntil = Date.now() + 2000;
+  for (const ms of [60, 300, 900]) setTimeout(() => { if (document && S.route.mod === 'team' && S.tc.fitUntil > Date.now()) teamFit(true); }, ms);
+}
 // "@Name" of a member -> <@id> (longest names first), so the server can tell the person
 function tcMentions(text) {
   const mem = (S.tc.room?.members || []).filter(m => m.id !== S.me?.id).sort((a, b) => b.name.length - a.name.length);
@@ -15283,9 +15301,10 @@ function teamRoute(rid) {
 }
 document.addEventListener('keydown', e => {
   if (e.target.id === 'tc-in' && e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); tcSend(); }
+  if (e.key === 'Escape' && S.dash?.custom && e.target.closest?.('.dash')) { e.preventDefault(); e.stopPropagation(); $('#view [data-act="dash-done"]')?.click(); return; }  // 2.17.2
   if (e.target.classList?.contains('tc-edit')) {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); tcEditSave(S.tc.edit); }
-    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); S.tc.edit = null; tcPatch(); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); S.tc.edit = null; tcPatch(); setTimeout(() => { if (document) $('#tc-in')?.focus(); }, 0); }
   }
 }, true);
 document.addEventListener('input', e => { if (e.target.id === 'tc-in' || e.target.classList?.contains('tc-edit')) { if (e.target.id === 'tc-in') S.drafts['team:' + S.tc.rid] = e.target.value; autosize(e.target); mentionUpdate(e.target); } });
@@ -15350,13 +15369,17 @@ function viewNotes() {
   const list = `<div class="ntlist ${cur ? 'hasnote' : ''}">
     <div class="ntbar"><div class="ssearch">${ic('search', 's')}<input id="nt-q" type="search" value="${esc(S.nt.q)}" placeholder="${esc(tr('Search notes'))}" aria-label="${esc(tr('Search notes'))}" autocomplete="off"></div>
       ${S.nt.mayWrite ? `<button type="button" class="btn sm pri" data-act="nt-new">${ic('plus', 's')}${tr('New note')}</button>` : ''}</div>
-    ${vis.length ? `<ul class="ntcards" aria-label="${esc(tr('Notes'))}">${vis.map(n => `<li><a href="#note/${n.id}" class="ntcard ${cur && cur.id === n.id ? 'on' : ''}" ${cur && cur.id === n.id ? 'aria-current="true"' : ''}>
-        <span class="ntt">${n.pinned ? `<span class="ntpin" title="${esc(tr('Pinned'))}">${ic('pin', 's')}</span>` : ''}${esc(n.title)}</span>
-        <span class="ntx">${esc(n.body.replace(/[#*_`>\[\]]/g, '').replace(/\s+/g, ' ').trim().slice(0, 140))}</span>
-        <span class="ntm">${n.tags.map(t => `<span class="tag">#${esc(t)}</span>`).join('')}<time title="${esc(fmtWhen(n.updated_at))}">${esc(relTime(n.updated_at))}</time>${n.updated_by_name ? `<span class="muted">· ${esc(n.updated_by_name)}</span>` : ''}</span></a></li>`).join('')}</ul>`
-      : q ? `<div class="empty">${tr('No notes match.')}</div>` : heronEmpty('empty', tr('No notes yet.'), S.nt.mayWrite ? tr('Meeting notes, briefings, decisions: write them next to the tasks.') : '')}
+    <div id="nt-res">${ntCardsHtml(vis, q, cur)}</div>
   </div>`;
-  return `<div class="ntview ${cur ? 'open' : ''}">${list}${cur ? `<article class="ntedit" aria-label="${esc(cur.title)}">${noteEditHtml(cur)}</article>` : ''}</div>`;
+  return `<div class="ntwrap"><div class="ntview ${cur ? 'open' : ''}">${list}${cur ? `<article class="ntedit" aria-label="${esc(cur.title)}">${noteEditHtml(cur)}</article>` : ''}</div></div>`;
+}
+// the cards alone: typing in the search field re-renders only these (the field keeps the focus)
+function ntCardsHtml(vis, q, cur) {
+  return `${vis.length ? `<ul class="ntcards" aria-label="${esc(tr('Notes'))}">${vis.map(n => `<li><a href="#note/${n.id}" class="ntcard ${cur && cur.id === n.id ? 'on' : ''}" ${cur && cur.id === n.id ? 'aria-current="true"' : ''}>
+        <span class="ntt">${n.pinned ? `<span class="ntpin" title="${esc(tr('Pinned'))}">${ic('pin', 's')}</span>` : ''}${esc(n.title)}</span>
+        <span class="ntx">${esc(n.body.replace(/^#{1,6}\s+/gm, '').replace(/[*_`>\[\]]/g, '').replace(/\s+/g, ' ').trim().slice(0, 140))}</span>
+        <span class="ntm">${n.tags.map(t => `<span class="tag">#${esc(t)}</span>`).join('')}<time title="${esc(fmtWhen(n.updated_at))}">${esc(relTime(n.updated_at))}</time>${n.updated_by_name ? `<span class="muted">· ${esc(n.updated_by_name)}</span>` : ''}</span></a></li>`).join('')}</ul>`
+      : q ? `<div class="empty">${tr('No notes match.')}</div>` : heronEmpty('empty', tr('No notes yet.'), S.nt.mayWrite ? tr('Meeting notes, briefings, decisions: write them next to the tasks.') : '')}`;
 }
 function noteEditHtml(n) {
   const ro = !S.nt.mayWrite, edit = S.nt.edit && !ro;
@@ -15416,14 +15439,21 @@ function noteMenu(anchor) {
     '-', {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: async () => {
       let r; try { r = await rawFetch('DELETE', `/api/notes/${n.id}`); } catch (e) { toast(e.message); return; }
       S.nt.notes = S.nt.notes.filter(x => x.id !== n.id); S.notes = (S.notes || []).filter(x => x.id !== n.id);
-      go('notes/' + n.list_id);
+      go('notes/' + n.list_id); setTimeout(() => { if (document) $('#nt-q')?.focus(); }, 80);  // 2.17.2: the focus stays in the notes
       toast(tr('Note deleted'), async () => {  // undo: the same note again (a new id)
-        try { const x = await rawFetch('POST', `/api/lists/${r.note.list_id}/notes`, {title: r.note.title, body: r.note.body, tags: r.note.tags, pinned: r.note.pinned}); S.nt.notes = [x, ...S.nt.notes]; await load(); go('note/' + x.id); } catch (e) { toast(e.message); }
+        try { const x = await rawFetch('POST', `/api/lists/${r.note.list_id}/notes`, {title: r.note.title, body: r.note.body, tags: r.note.tags, pinned: r.note.pinned}); S.nt.notes = [x, ...S.nt.notes]; await load(); go('note/' + x.id); setTimeout(() => { if (document) $('#nt-title')?.focus(); }, 120); } catch (e) { toast(e.message); }
       });
     }}]);
 }
 document.addEventListener('input', e => {
-  if (e.target.id === 'nt-q') { S.nt.q = e.target.value; const v = $('#view'); if (v) { setHtml(v, viewNotes()); } return; }
+  if (e.target.id === 'nt-q') {
+    S.nt.q = e.target.value; const r = $('#nt-res'), ns = S.nt.notes || [], q = S.nt.q.trim().toLowerCase();
+    if (!r) return;
+    const vis = q ? ns.filter(n => (n.title + ' ' + n.body + ' ' + n.tags.join(' ')).toLowerCase().includes(q)) : ns;
+    setHtml(r, ntCardsHtml(vis, q, S.nt.id && ns.find(n => n.id === S.nt.id)));
+    clearTimeout(S.nt.qT); S.nt.qT = setTimeout(() => { if (document && q) announce(trn('{0} note', '{0} notes', vis.length)); }, 600);
+    return;
+  }
   if (['nt-title', 'nt-body', 'nt-tags'].includes(e.target.id)) { if (e.target.id === 'nt-body') autosize(e.target); noteQueue(); }
 });
 document.addEventListener('focusout', e => { if (['nt-title', 'nt-body', 'nt-tags'].includes(e.target.id)) noteFlush(); });
@@ -15475,7 +15505,7 @@ function newsGroupHtml(g, pop) {
   const exp = S.nf.openG === g.key;
   return `<div class="ngroup ${g.unread ? 'unread' : ''} ${g.needs ? 'needs' : ''}" data-gk="${esc(g.key)}">
     <div class="nghead"><div class="ngav">${actors.map(a => av(a, uname(a, U), 'avatar sm')).join('')}</div>
-      <div class="ngmain" role="button" tabindex="0" ${open} aria-expanded="${g.items.length > 1 ? exp : 'false'}"><div class="ngt">${title}${g.items.length > 1 ? `<span class="ngn">${g.items.length}</span>` : ''}</div><div class="ngs muted">${esc(newsSummaryLine(g))} · <time>${esc(relTime(g.at))}</time></div></div>
+      <div class="ngmain" role="button" tabindex="0" ${open} ${g.items.length > 1 ? `aria-expanded="${exp}"` : ''}><div class="ngt">${title}${g.items.length > 1 ? `<span class="ngn">${g.items.length}</span>` : ''}</div><div class="ngs muted">${esc(newsSummaryLine(g))} · <time>${esc(relTime(g.at))}</time></div></div>
       ${g.unread ? `<button type="button" class="iconbtn" data-act="news-gread" data-ids="${ids.join(',')}" title="${esc(tr('Mark read'))}" aria-label="${esc(tr('Mark read') + ': ' + title.replace(/<[^>]+>/g, ''))}">${ic('check', 's')}</button>` : ''}</div>
     ${exp && g.items.length > 1 ? `<div class="nlist ngitems">${g.items.map(([it, i]) => newsItemHtml(it, i, pop)).join('')}</div>` : ''}</div>`;
 }
@@ -15508,7 +15538,10 @@ function newsSummarize(anchor) {
 document.addEventListener('click', e => {
   const a = e.target.closest?.('[data-act="news-gread"],[data-act="news-group"],[data-act="news-bundle"],[data-act="news-sum"]'); if (!a) return;
   e.preventDefault(); e.stopPropagation();
-  if (a.dataset.act === 'news-gread') newsGroupRead(a.dataset.ids.split(',').map(Number));
+  if (a.dataset.act === 'news-gread') {  // 2.17.2: the focus moves on to the group in the same place (or the last one)
+    const gs = $$('#view .ngroup, .bplist .ngroup'), gi = gs.indexOf(a.closest('.ngroup')), inPop = !!a.closest('.bplist');
+    newsGroupRead(a.dataset.ids.split(',').map(Number)).then(() => { if (!document) return; const n = $$((inPop ? '.bplist' : '#view') + ' .ngroup .ngmain'); (n[Math.min(gi, n.length - 1)] || $('#view h1, #top h1'))?.focus?.(); });
+  }
   else if (a.dataset.act === 'news-group') { S.nf.openG = S.nf.openG === a.dataset.g ? null : a.dataset.g; render(); if ($('#pop .bpop')) { const p = $('#pop'); p.innerHTML = bellPopHtml(); } }
   else if (a.dataset.act === 'news-bundle') { LS.set('newsBundle', !newsBundled()); render(); if ($('#pop .bpop')) $('#pop').innerHTML = bellPopHtml(); }
   else if (a.dataset.act === 'news-sum') newsSummarize(a);
@@ -15610,7 +15643,7 @@ document.addEventListener('click', e => {
   e.preventDefault(); e.stopPropagation();
   const {order, hidden} = dashPref();
   if (a.dataset.act === 'dash-custom') { S.dash.custom = true; renderView(); setTimeout(() => $('#view .dcust button:not([disabled])')?.focus(), 0); }
-  else if (a.dataset.act === 'dash-done') { S.dash.custom = false; renderView(); }
+  else if (a.dataset.act === 'dash-done') { S.dash.custom = false; renderView(); setTimeout(() => { if (document) $('#view [data-act="dash-custom"]')?.focus(); }, 0); }
   else if (a.dataset.act === 'dash-reset') dashSave(DASH.map(d => d[0]), new Set());
   else if (a.dataset.act === 'dash-mv') {
     const i = order.indexOf(a.dataset.k), j = i + +a.dataset.d; if (j < 0 || j >= order.length) return;
@@ -15647,7 +15680,7 @@ function mailHtml(j) {
 }
 function mailDigestHtml(j) {
   if (!j) return '';
-  return `<div class="row"><label>${tr('Summary by e-mail')}</label>${j.digest.enabled ? mchk('s-digmail', j.digest.on, tr('Also send the daily summary by e-mail (at the time above, to {0})', j.email || tr('your e-mail address'))) : `<span class="muted">${tr('E-mail sending is not set up on this server')}</span>`}${j.digest.enabled && j.email ? `<button type="button" class="btn sm" data-mail="test">${ic('send', 's')} ${tr('Send now')}</button>` : ''}</div>`;
+  return `<div class="row"><span class="rlab">${tr('Summary by e-mail')}</span>${j.digest.enabled ? mchk('s-digmail', j.digest.on, tr('Also send the daily summary by e-mail (at the time above, to {0})', j.email || tr('your e-mail address'))) : `<span class="muted">${tr('E-mail sending is not set up on this server')}</span>`}${j.digest.enabled && j.email ? `<button type="button" class="btn sm" data-mail="test">${ic('send', 's')} ${tr('Send now')}</button>` : ''}</div>`;
 }
 async function mailWire(md) {
   const box = $('#s-mail', md), dbx = $('#s-digmail-w', md); if (!box && !dbx) return;

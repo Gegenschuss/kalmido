@@ -3720,5 +3720,7 @@
   "Wider": "Più largo",
   "Already the first task with this priority": "È già la prima attività con questa priorità",
   "Already the last task with this priority": "È già l'ultima attività con questa priorità",
-  "{0} subtask": ["{0} sottoattività", "{0} sottoattività"]
+  "{0} subtask": ["{0} sottoattività", "{0} sottoattività"],
+  "unread": "non letti",
+  "{0} note": ["{0} nota", "{0} note"]
 }
