@@ -107,6 +107,12 @@ const srv = http.createServer((req, res) => {
   await w.eval(`api('POST', '/api/time/start', {task_id: ${tid}})`);
   check(!!JSON.parse(await w.eval(`api('GET', '/api/state').then(j => JSON.stringify(j.timer))`)), 'timer runs');
   await w.eval(`api('POST', '/api/time/stop', {})`);
+  // 2.17.0 (#442): notes of a list (in memory) and the Notes view loads instead of "Loading…"
+  const lid0 = w.eval('S.lists.find(l => !l.is_inbox)?.id');
+  const nn = JSON.parse(await w.eval(`api('POST', '/api/lists/${lid0}/notes', {title: 'Demo-Notiz', body: '# Hallo'}).then(j => api('GET', '/api/lists/${lid0}/notes')).then(j => JSON.stringify(j))`));
+  check(nn.notes?.length === 1 && nn.notes[0].title === 'Demo-Notiz' && nn.may_write, 'notes: create + list ' + JSON.stringify(nn).slice(0, 120));
+  w.eval(`go('notes/${lid0}')`); await sleep(500);
+  check(/Demo-Notiz/.test(d.querySelector('#view')?.textContent || ''), 'notes: the view shows the note');
   w.close();
 
   // 6. reload: the task is still there (same browser storage)

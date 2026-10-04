@@ -442,6 +442,19 @@
   on('PATCH', '/api/lists/(\\d+)/milestones/(\\d+)', (q, b, id, mid) => { const l = listById(id) || gone(), m = (l.milestones || []).find(x => x.id === +mid) || gone();
     for (const k of ['name', 'day']) if (k in b) m[k] = b[k]; if ('done' in b) m.done = b.done ? 1 : 0; return {...m}; });
   on('DELETE', '/api/lists/(\\d+)/milestones/(\\d+)', (q, b, id, mid) => { const l = listById(id) || gone(); l.milestones = (l.milestones || []).filter(x => x.id !== +mid); return {ok: true}; });
+  // 2.17.0 (#442): notes per list, in memory like the rest of the demo
+  const NT = () => DB.notes || (DB.notes = []);
+  const noteOut = n => ({...n, tags: [...n.tags], created_name: DB.me.display_name, updated_name: DB.me.display_name});
+  on('GET', '/api/lists/(\\d+)/notes', (q, b, id) => { listById(id) || gone(); return {notes: NT().filter(n => n.list_id === +id).sort((x, y) => (y.pinned - x.pinned) || y.updated_at.localeCompare(x.updated_at)).map(noteOut), may_write: true}; });
+  on('POST', '/api/lists/(\\d+)/notes', (q, b, id) => { listById(id) || gone(); const t = iso();
+    const n = {id: nid('note'), list_id: +id, title: String(b.title || '').trim(), body: String(b.body || ''), tags: (b.tags || []).map(String), pinned: !!b.pinned, created_by: 1, updated_by: 1, created_at: t, updated_at: t};
+    NT().push(n); return noteOut(n); });
+  on('GET', '/api/notes/(\\d+)', (q, b, nid_) => noteOut(NT().find(n => n.id === +nid_) || gone()));
+  on('PATCH', '/api/notes/(\\d+)', (q, b, nid_) => { const n = NT().find(x => x.id === +nid_) || gone();
+    for (const k of ['title', 'body']) if (k in b) n[k] = String(b[k] ?? ''); if ('tags' in b) n.tags = (b.tags || []).map(String); if ('pinned' in b) n.pinned = !!b.pinned;
+    if ('list_id' in b) { listById(b.list_id) || gone(); n.list_id = +b.list_id; } n.updated_at = iso(); return noteOut(n); });
+  on('DELETE', '/api/notes/(\\d+)', (q, b, nid_) => { DB.notes = NT().filter(n => n.id !== +nid_); return {ok: true}; });
+  on('GET', '/api/notes', q => { const s = String(q.get?.('q') || q.q || '').toLowerCase(); return {notes: NT().filter(n => !s || (n.title + ' ' + n.body).toLowerCase().includes(s)).map(noteOut)}; });
   on('GET', '/api/lists/(\\d+)/status', (q, b, id) => ({items: DB.status.filter(s => s.list_id === +id).map(s => ({...s, name: DB.me.display_name})).reverse()}));
   on('POST', '/api/lists/(\\d+)/status', (q, b, id) => { const l = listById(id) || gone(); l.status = b.status || ''; l.status_note = b.note || ''; l.status_at = iso(); l.status_by = 1;
     DB.status.push({id: nid('status'), list_id: l.id, user_id: 1, status: l.status, note: l.status_note, created_at: iso()}); return {ok: true}; });
