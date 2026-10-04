@@ -7,6 +7,10 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.17.1] - 2026-10-04
+
+- 2.17.1: the tab bar's More menu opened no more with Dashboard or Team chat in it; the phone header folds the search icon into ... when space is short and hides it while the sidebar is open; older test suites pin the plain News list
+
 ## [2.17.0] - 2026-10-04
 
 **In short:** Communication. A team chat for people (direct messages and a channel per shared list, agents included,
@@ -2309,7 +2313,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.17.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.17.1...HEAD
+[2.17.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.17.1
 [2.17.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.17.0
 [2.16.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.16.1
 [2.16.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.16.0

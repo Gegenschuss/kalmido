@@ -43,7 +43,9 @@ exports.boot = async function boot({user = 'alice', mobile = false, hash = '', l
   const cookie = proxy ? '' : await exports.login(user);
   // 1.8.1: the start view is the Inbox; the suites written before start on Today as a device that was there last
   // (pass ls: {'tasks.lastKey': null} for a real first start, p181_ui.js)
-  const store = {...(hash || 'tasks.lastKey' in ls ? {} : {'tasks.lastKey': '"today"'}), ...ls};
+  // 2.17.0 (#452): News are bundled per task by default; the suites written before test the plain list (that device
+  // setting), p2170_ui passes ls: {'tasks.newsBundle': null} for the bundled default
+  const store = {'tasks.newsBundle': 'false', ...(hash || 'tasks.lastKey' in ls ? {} : {'tasks.lastKey': '"today"'}), ...ls};
   for (const k of Object.keys(store)) if (store[k] === null) delete store[k];
   const vc = new VirtualConsole(); vc.on('jsdomError', e => { if (!/navigation|Not implemented/.test(e.message)) exports.errs.push(e.message); });
   const dom = await JSDOM.fromURL(B + path + (hash ? '#' + hash : ''), {runScripts: 'dangerously', resources: 'usable', pretendToBeVisual: true, virtualConsole: vc,

@@ -3867,4 +3867,5 @@ a.tref:hover{background:var(--accent-soft)}
 @media (max-width:899px){
   #top .cmdbar{display:inline-flex;flex:none;align-items:center;justify-content:center;width:2.75rem;min-width:2.75rem;height:2.75rem;padding:0;background:transparent}
   #top .cmdbar>span,#top .cmdbar .kbs{display:none}
+  body:has(#side.open) #top .cmdbar{display:none}  /* the open drawer has its own search field */
 }

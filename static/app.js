@@ -1607,7 +1607,7 @@ function renderTabs() {
 }
 function tabsMore(anchor) {
   const {more} = tabOverflow();
-  menu(anchor, [...more.map(t => ({label: t.id === 'news' && S.news?.unread ? `${t.label} (${S.news.unread})` : t.label, icon: t.id === 'settings' ? 'gear' : t.id === 'search' ? 'search' : t.id === 'news' ? 'bell' : t.id === 'stats' ? 'chart' : t.id === 'time' ? 'clock' : t.id === 'overview' ? 'pulse' : t.id === 'agents' ? 'bot' : t.mod ? MODS.find(x => x[0] === t.mod)[1] : t.id.startsWith('f:') ? 'filter' : t.id.startsWith('tag:') ? 'tag' : t.id.startsWith('s:') ? SMART[t.key].icon : 'list',
+  menu(anchor, [...more.map(t => ({label: t.id === 'news' && S.news?.unread ? `${t.label} (${S.news.unread})` : t.label, icon: t.id === 'settings' ? 'gear' : t.id === 'search' ? 'search' : t.id === 'news' ? 'bell' : t.id === 'stats' ? 'chart' : t.id === 'time' ? 'clock' : t.id === 'overview' ? 'pulse' : t.id === 'agents' ? 'bot' : t.mod ? MODS.find(x => x[0] === t.mod)?.[1] || ({team: 'comment', home: 'home', notes: 'file'}[t.mod]) || 'dots' : t.id.startsWith('f:') ? 'filter' : t.id.startsWith('tag:') ? 'tag' : t.id.startsWith('s:') ? SMART[t.key].icon : 'list',
     fn: () => t.act ? settingsModal() : go(t.go)})), '-', {label: tr('Customize tab bar'), icon: 'edit', fn: () => settingsModal('tabbar')}]);
 }
 function counts() {
@@ -1795,7 +1795,7 @@ function renderTop0() {
   // open tasks of the view next to the title (Geist Mono), task views only
   const nOpen = m === 'tasks' && !NOLIST_KEYS.includes(k) ? viewTasks().open.length : 0;
   // 2.8.0 (#434): the command bar (search + commands + the agents' chat) and "New task" (mouse screens; touch has the + button)
-  const pal = `<button class="kbtn cmdbar${isMobile() ? '' : ' tf4'}" data-act="palette" data-ico="search" title="${esc(tr('Search and commands'))} (${kbText('Mod+K')})" aria-label="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span>${kb('Mod+K')}</button>`;
+  const pal = `<button class="kbtn cmdbar tf4" data-act="palette" data-ico="search" title="${esc(tr('Search and commands'))} (${kbText('Mod+K')})" aria-label="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span>${kb('Mod+K')}</button>`;
   const tnew = (!isTouch() || ((!isMobile() || tabletDock()) && !dockView())) && (m === 'tasks' || (m === 'cal' && isTouch())) && !noFab() && !S.multiMode ? `<button class="btn pri tnew tf4" data-act="new-task" data-ico="plus" title="${esc(kt(tr('New task'), 'n'))}" aria-label="${esc(tr('New task'))}">${ic('plus', 's')}<span>${tr('New task')}</span></button>` : '';
   const ms = (() => {  // the next open milestone of a project list
     const l = m === 'tasks' && k.startsWith('l:') ? listById(+k.slice(2)) : null;

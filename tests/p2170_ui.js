@@ -54,7 +54,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   const T4 = (await call('POST', '/api/tasks', {title: 'Review the logo', list_id: L, assignee_id: 1}, CB)).id;
 
   // ================= jsdom: #475 the dashboard
-  let w = await boot({user: 'alice', hash: 'today'}), d = w.document;
+  let w = await boot({user: 'alice', hash: 'today', ls: {'tasks.newsBundle': null}}), d = w.document;
   const logo = d.querySelector('#side .sbrand .sbhome');
   check(logo && logo.dataset.go === 'home' && logo.getAttribute('aria-label') === 'Dashboard', '#475: the logo opens the dashboard');
   click(w, logo); await sleep(600);
@@ -83,13 +83,18 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   click(w, d.querySelector('[data-act="dash-done"]')); await sleep(300);
   check(d.querySelector('.dgrid .dcard').classList.contains('dc-today') && !d.querySelector('.dc-stats'), 'Today first now, Statistics hidden');
   w.close();
-  w = await boot({user: 'alice', hash: 'home', mobile: true}); d = w.document; await sleep(400);
+  w = await boot({user: 'alice', hash: 'home', mobile: true, ls: {'tasks.newsBundle': null}}); d = w.document; await sleep(400);
   check(d.querySelector('.dgrid .dcard.dc-today'), '#475: the same order on another device (phone)');
+  // the tab bar's "More" menu with the new views in it (Dashboard / Team chat / Notes are no module of MODS)
+  w.eval(`LS.set('tabbar', ['m:tasks', 'm:cal', 'm:habits', 'm:pomo', 'home', 'team', 'news', 'settings']); render()`); await sleep(300);
+  let tmErr = null; try { w.eval(`tabsMore(document.querySelector('[data-act="tabs-more"]') || document.body)`); } catch (e) { tmErr = String(e); }
+  await sleep(200);
+  check(!tmErr && [...d.querySelectorAll('.menu-list button, .menu-list [role=menuitem]')].some(b => /Team chat|Dashboard/.test(b.textContent)), '"More" of the tab bar opens with Dashboard / Team chat in it ' + (tmErr || ''));
   w.close();
   await call('PATCH', '/api/settings', {dashboard: ''});
 
   // ================= jsdom: #452 News bundled
-  w = await boot({user: 'alice', hash: 'news'}); d = w.document;
+  w = await boot({user: 'alice', hash: 'news', ls: {'tasks.newsBundle': null}}); d = w.document;
   await until(() => d.querySelector('.nbund .ngroup'));
   const needs = d.querySelector('#ns-need')?.closest('.nsect'), info = d.querySelector('#ns-info')?.closest('.nsect');
   check(needs && needs.textContent.includes('Call the printer') && needs.textContent.includes('Review the logo'), '#452: "Needs you": the mention and the assignment');
