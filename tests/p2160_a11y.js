@@ -51,6 +51,12 @@ const ACCENTS = ['violet', 'raspberry', 'mint', 'sky', 'rose', 'orange', 'lime']
   await call('PATCH', `/api/lists/${PT}`, {view: 'timeline'});
   for (let i = 0; i < 3; i++) await call('POST', '/api/tasks', {title: 'Phase ' + i, list_id: PT, start: day(i * 3), due: day(i * 3 + 2)});
   await call('PATCH', `/api/lists/${P}`, {view: 'kanban'});
+  // 2.17.0: a note, a team chat channel with messages
+  const NOTE = (await call('POST', `/api/lists/${P}/notes`, {title: 'Kick-off', body: `## Decisions\n- go live\n- see #${T[0]}`, tags: ['client']})).id;
+  const BOBID = (await call('GET', '/api/users')).users?.find(u => u.username === 'bob')?.id;
+  if (BOBID) await call('PUT', `/api/lists/${P}/members`, {user_id: BOBID, role: 'edit'});
+  const ROOM = (await call('GET', '/api/team')).rooms?.find(r => r.list_id === P)?.id;
+  if (ROOM) for (const b of ['Hello team, the **draft** is ready', 'Thanks!']) await call('POST', `/api/team/rooms/${ROOM}/messages`, {body: b});
 
   // ================= jsdom: names, roles, states, live region, dialogs, menus, moving without dragging, errors
   const N = [];
@@ -189,7 +195,8 @@ const ACCENTS = ['violet', 'raspberry', 'mint', 'sky', 'rose', 'orange', 'lime']
     return bad; })()`;
   const VIEWS = [['inbox', 'inbox'], ['today', 'today'], ['list', 'l/' + L], ['kanban', 'l/' + P], ['timeline', 'l/' + PT], ['overview', 'overview'],
     ['calendar', 'cal'], ['matrix', 'matrix'], ['habits', 'habits'], ['focus', 'pomo'], ['news', 'news'], ['stats', 'stats'], ['time', 'time'],
-    ['agents', 'agents'], ['search', 'search'], ['completed', 'done']];
+    ['agents', 'agents'], ['search', 'search'], ['completed', 'done'],
+    ['dashboard', 'home'], ['team chat', 'team'], ['notes', 'notes/' + P]];  // 2.17.0
 
   const pass = async (o, tag, phone) => {
     const {ev, nav} = o;
@@ -198,6 +205,10 @@ const ACCENTS = ['violet', 'raspberry', 'mint', 'sky', 'rose', 'orange', 'lime']
       await axe(ev, `${tag} ${name}`);
       if (name === 'list') await o.shot(`p2160-${tag.replace(/\W+/g, '-')}-list.png`);
     }
+    // 2.17.0: a team chat conversation, a note (read and edit)
+    if (ROOM) { await nav(B + '#team/' + ROOM); await ready(ev); await sleep(900); await axe(ev, `${tag} team chat room`); }
+    await nav(B + '#note/' + NOTE); await ready(ev); await sleep(900); await axe(ev, `${tag} note`);
+    await ev(`(() => { document.querySelector('[data-act="nt-mode"][data-m="edit"]')?.click(); return 1; })()`); await sleep(500); await axe(ev, `${tag} note editing`);
     // calendar week
     await ev(`(() => { S.calMode = 'week'; LS.set('calMode', 'week'); render(); return 1; })()`); await sleep(500);
     await nav(B + '#cal'); await ready(ev); await axe(ev, `${tag} calendar week`);

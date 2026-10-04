@@ -18,6 +18,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.17.0** (2026-10-04): Communication. A **team chat** (direct messages between people who work together and one
+  channel per shared list, agents included), **notes** per list or project (Markdown, `#123` links tasks, search),
+  **tasks by e-mail** (a secret address per person and list) and the daily summary by e-mail, **News bundled** per task
+  with "Needs you" first and *Summarize* by an agent, a **dashboard** behind the logo, and fast very long lists.
 - **2.16.0** (2026-10-04): Accessibility (WCAG 2.2 AA, see [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md)): the whole app
   by keyboard with a visible focus, names and states for screen readers, messages read out, errors in words, priorities
   and overdue dates not only in colour, moving tasks without dragging, high contrast and reduced motion. Also: drag the
@@ -579,6 +583,11 @@ boolean `checklist` are still accepted as deprecated aliases.
 
 <p align="center"><img src="docs/news.png" alt="News inbox with mentions, grouped comments, an assignment, a completion and a shared list"></p>
 
+**Bundled (2.17.0):** News are grouped per task (or list) with one line of what happened ("2 comments · completed"),
+*Needs you* (approvals, proposals, mentions, assignments, follow-ups) above *For your information*, *Mark read* per group;
+*Bundled* in the bar switches to the plain list (per device). *Summarize* sends your unread News to an agent's chat,
+which answers with a short summary.
+
 - **News** (bell icon in the top bar, also as a sidebar entry and a pinnable tab) lists what concerns you,
   newest first: *@mentions*, new comments on tasks you take part in (creator, assignee, earlier commenter),
   *assigned you* / *unassigned you*, completions by others (same rule as the push; off by default, see below), and lists someone shared
@@ -612,6 +621,45 @@ boolean `checklist` are still accepted as deprecated aliases.
   tasks*, *Completed*, *Status*, *Agents*, …, only the kinds that are there) narrow the dropdown and the News view;
   they only change what you see, per device.
 - Items are kept for 90 days, at most 500 per person (`TASKS_NEWS_DAYS`, `TASKS_NEWS_MAX`).
+
+## Dashboard
+
+A tap on the logo (*Kalmido* at the top of the sidebar) opens the **dashboard**: what waits for you (approvals,
+mentions, assignments), today's tasks (complete them right there), News bundled, the team chat, your projects with
+their progress, pinned tasks, recent notes, the agents, a few numbers and a search field. *Customize* orders the cards
+(↑ ↓, also with the keyboard) and hides the ones you do not need; the choice follows you to every device. It can also be
+a tab (Settings > Appearance > Tab bar).
+
+## Team chat
+
+People talk to each other in Kalmido: **direct messages** between two people who work together (they share a list or a
+group) and **one channel per shared list** for everyone who sees the whole list. Agents shared with the list are in its
+channel: they read along and answer when you @mention them. Messages are Markdown, `@Name` mentions a member, a message
+can link a task, gets reactions (the smiley next to it), and you edit or delete your own (list owners and admins delete
+any in their channel). *Team chat* in the sidebar shows the unread count; a direct message and a mention push to your
+devices (notification row *Team chat*; muting a conversation leaves only mentions). Find it in the sidebar, the tab bar,
+the list menu (*Team chat*) and a project's overview. The REST API and the MCP server have it too (`/team/...`, see
+docs/API.md); agents cannot open direct messages.
+
+## Notes
+
+Every list and project has **notes**: Markdown documents next to the tasks for meeting notes, briefings and decisions
+(list menu > *Notes*, the project overview). Title, tags, pinned notes first, a search field; typing saves by itself,
+*Read* shows the rendered text where `#123` links that task. Each note has its own address (`#note/<id>`, *Copy link*),
+moves to another list, and is found by the command field. Everyone who sees the whole list reads its notes (participants
+do not), owner, list admins and members write them; when someone else changed a note while you were typing, Kalmido shows
+both versions. API: `/lists/{id}/notes`, `/notes` (docs/API.md), MCP tools `list_notes`, `search_notes`, `create_note` ….
+
+## Tasks by e-mail
+
+With one mailbox set up (`KALMIDO_MAIL_ADDRESS` + `KALMIDO_IMAP_*`, see *Configuration*), everyone gets a **secret
+address** for new tasks: Settings > Integrations > *Tasks by e-mail* (`tasks+<token>@example.com` lands in your inbox,
+an address per list lands in that list while you may change it). The subject becomes the title, the text the
+description, attachments become files, "Fwd:" / "WG:" are dropped, the same message never twice. *New address* makes the
+old one stop working. Optionally, mails from your own address (an admin stores it under Settings > Users) to the plain address go to your inbox
+too (off by default: sender addresses can be forged). The mailbox must deliver plus addresses (`+…`) to it, which most
+providers do. With `KALMIDO_SMTP_*` the **daily summary** (Settings > Notifications, *Daily digest at*) also comes by
+e-mail: overdue, today, tomorrow, what waits for you and what is unread; *Send now* tries it.
 
 ## Calendar subscriptions (other calendars in Kalmido)
 
@@ -1253,6 +1301,9 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `TASKS_NEWS_DAYS` | `90` | Days a News item is kept |
 | `TASKS_NEWS_MAX` | `500` | News items kept per user (newest) |
 | `KALMIDO_UPDATE_CHECK` | `1` | `0` turns the update check off completely (see *Updating*) |
+| `KALMIDO_MAIL_ADDRESS` | | 2.17.0: the address new tasks are sent to (plus addresses `local+token@domain` are the personal / list addresses) |
+| `KALMIDO_IMAP_HOST`, `KALMIDO_IMAP_PORT`, `KALMIDO_IMAP_SSL`, `KALMIDO_IMAP_USER`, `KALMIDO_IMAP_PASSWORD`, `KALMIDO_IMAP_FOLDER`, `KALMIDO_IMAP_INTERVAL` | `993`, `1`, `INBOX`, `60` | The mailbox Kalmido polls for new tasks (unread mails; marked read afterwards) |
+| `KALMIDO_SMTP_HOST`, `KALMIDO_SMTP_PORT`, `KALMIDO_SMTP_TLS`, `KALMIDO_SMTP_USER`, `KALMIDO_SMTP_PASSWORD`, `KALMIDO_MAIL_FROM` | `587`, `starttls` | Sending the daily summary by e-mail (`TLS`: `starttls`, `ssl` or `none`) |
 | `KALMIDO_IOS_SHORTCUT_URL` | empty | Link to a signed generic iOS shortcut for *Share from your phone* (asks for address and token on import); empty = the button is hidden |
 | `KALMIDO_ONBOARDING` | `1` | `0`: new accounts start empty (no "Getting started" list, no welcome tour) |
 | `KALMIDO_WEBPUSH` | `1` | `0` turns Web Push off (no key handed out, no new devices, everything goes to ntfy) |

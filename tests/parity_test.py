@@ -142,6 +142,15 @@ APP_TO_API = {
     "DELETE /api/chat-files/{}": ["DELETE /chat-attachments/{}"],
     "POST /api/agents/{}/chat/{}/reactions": ["POST /agents/{}/chat/{}/reactions"],
     "GET /api/agents": ["GET /agents"],
+    # 2.17.0 (#442): notes
+    "GET /api/lists/{}/notes": ["GET /lists/{}/notes"], "POST /api/lists/{}/notes": ["POST /lists/{}/notes"],
+    "GET /api/notes": ["GET /notes"], "GET /api/notes/{}": ["GET /notes/{}"], "PATCH /api/notes/{}": ["PATCH /notes/{}"],
+    "DELETE /api/notes/{}": ["DELETE /notes/{}"],
+    # 2.17.0 (#419): team chat
+    "GET /api/team": ["GET /team/rooms"], "POST /api/team/dm": ["POST /team/dm"],
+    "GET /api/team/rooms/{}/messages": ["GET /team/rooms/{}/messages"], "POST /api/team/rooms/{}/messages": ["POST /team/rooms/{}/messages"],
+    "POST /api/team/rooms/{}/read": ["POST /team/rooms/{}/read"], "PATCH /api/team/messages/{}": ["PATCH /team/messages/{}"],
+    "DELETE /api/team/messages/{}": ["DELETE /team/messages/{}"], "POST /api/team/messages/{}/reactions": ["POST /team/messages/{}/reactions"],
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
@@ -157,6 +166,7 @@ APP_ONLY = [
         "=GET /api/agents/{}/chat", "=POST /api/agents/{}/chat", "POST /api/agents/{}/wake", "POST /api/tasks/{}/wake", "* /api/agents/{}/share",
         "* /api/agents/{}/autoshare", "GET /api/agents/usage")),
     ("devices and pushes of a person", ("* /api/push/", "POST /api/ntfy/test")),
+    ("2.17.0 (#443): a person's e-mail addresses for new tasks and the summary by mail (secrets of the account)", ("* /api/me/mail",)),
     ("Paperless: never for tokens or agents", ("* /api/paperless", "* /api/tasks/{}/paperless", "POST /api/attachments/{}/to-paperless",
                                              "* /api/lists/{}/paperless")),
     ("public links: sharing outside the instance, people only", ("* /api/lists/{}/public-link",)),
@@ -276,6 +286,7 @@ API_ONLY = {  # REST routes on purpose without an MCP tool (reason)
     "POST /agents/{}/chat/{}/reactions": "a person's reaction in an agent chat (the agent: react_to_chat)",
     "GET /lists/{}/links": "in get_project_overview",
     "GET /lists/{}/milestones": "in get_project_overview",
+    "POST /team/dm": "direct messages are between people; agents cannot open them (403), people talk to an agent in its own chat",
 }
 none = sorted(r for r in API if r not in reached and r not in API_ONLY)
 check(not none, f"API routes without an MCP tool or a documented exception: {none}")

@@ -22,6 +22,8 @@ allowed). Session cookies are HttpOnly + SameSite=Lax."""
 import base64
 import contextlib
 import csv
+import email.message
+import email.policy
 import email.utils
 import errno
 import functools
@@ -30,6 +32,7 @@ import hashlib
 import hmac
 import html
 import http.client
+import imaplib
 import io
 import ipaddress
 import json
@@ -41,6 +44,7 @@ import re
 import uuid
 import secrets
 import shutil
+import smtplib
 import socket
 import sqlite3
 import ssl
@@ -706,6 +710,35 @@ CREATE TABLE IF NOT EXISTS dav_sync (
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   list_id INTEGER NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
   token TEXT NOT NULL, state BLOB NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (user_id, list_id, token));
+-- 2.17.0 (#442): notes of a list / project (Markdown), tags comma separated
+CREATE TABLE IF NOT EXISTS notes (
+  id INTEGER PRIMARY KEY, list_id INTEGER NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
+  title TEXT NOT NULL, body TEXT NOT NULL DEFAULT '', tags TEXT NOT NULL DEFAULT '', pinned INTEGER NOT NULL DEFAULT 0,
+  created_by INTEGER, updated_by INTEGER, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS notes_list ON notes(list_id, updated_at);
+-- 2.17.0 (#419): team chat: direct messages (a < b, user ids) and one channel per shared list
+CREATE TABLE IF NOT EXISTS tchat_rooms (
+  id INTEGER PRIMARY KEY, kind TEXT NOT NULL, list_id INTEGER REFERENCES lists(id) ON DELETE CASCADE,
+  a INTEGER REFERENCES users(id) ON DELETE CASCADE, b INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL, last_at TEXT);
+CREATE UNIQUE INDEX IF NOT EXISTS tchat_dm ON tchat_rooms(a, b) WHERE kind='dm';
+CREATE UNIQUE INDEX IF NOT EXISTS tchat_list ON tchat_rooms(list_id) WHERE kind='list';
+CREATE TABLE IF NOT EXISTS tchat_msgs (
+  id INTEGER PRIMARY KEY, room_id INTEGER NOT NULL REFERENCES tchat_rooms(id) ON DELETE CASCADE,
+  user_id INTEGER REFERENCES users(id) ON DELETE SET NULL, body TEXT NOT NULL,
+  task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL, created_at TEXT NOT NULL, edited_at TEXT, deleted_at TEXT);
+CREATE INDEX IF NOT EXISTS tchat_msgs_room ON tchat_msgs(room_id, id);
+CREATE TABLE IF NOT EXISTS tchat_reads (
+  room_id INTEGER NOT NULL REFERENCES tchat_rooms(id) ON DELETE CASCADE, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  last_id INTEGER NOT NULL DEFAULT 0, muted INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (room_id, user_id));
+CREATE TABLE IF NOT EXISTS tchat_rx (
+  message_id INTEGER NOT NULL REFERENCES tchat_msgs(id) ON DELETE CASCADE, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  emoji TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (message_id, user_id, emoji));
+-- 2.17.0 (#443): secret tokens of the e-mail addresses for new tasks (list_id NULL = the person's inbox)
+CREATE TABLE IF NOT EXISTS mail_tokens (
+  token TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  list_id INTEGER REFERENCES lists(id) ON DELETE CASCADE, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS mail_tokens_user ON mail_tokens(user_id);
 """
 # Bumped when the database layout changes (stored in PRAGMA user_version). A backup can be restored when its
 # schema version is not newer than this one (older ones are migrated by init_db).
@@ -885,6 +918,11 @@ USER_DEFAULTS = {
     "default_reminder": "0",    # reminder preset for new timed tasks ('' = none)
     "digest_time": "",          # daily "due today" push (HH:MM, '' = off)
     "digest_sent": "",
+    "digest_mail": "0",         # 2.17.0 (#443): the daily summary also by e-mail (at digest_time; needs SMTP + an address)
+    "digest_mail_sent": "",
+    "mail_from_me": "0",        # 2.17.0 (#443): mails from my own address to the plain task address land in my inbox
+    # 2.17.0 (#475): the dashboard behind the logo, json {"order": [widget keys], "hidden": [widget keys]} ('' = default)
+    "dashboard": "",
     "work_start": "09:00", "work_end": "17:00",  # 2.10.0 (#440): working hours of the day planner
     "review_time": "",          # 2.10.0 (#440): evening review push (HH:MM, '' = off)
     "review_sent": "",
@@ -4047,7 +4085,7 @@ def health():
 @app.get("/api/version")
 def version():
     c = db()
-    return jsonify(v=int(gsetting(c, "version")), n=news_sig(c, me()), c=cal_sig(c, me()))
+    return jsonify(v=int(gsetting(c, "version")), n=news_sig(c, me()), c=cal_sig(c, me()), t=tchat_sig(c, me()))  # t: 2.17.0 (#419)
 
 
 # ---------------------------------------------------------------- version, update check, instance settings
@@ -4411,7 +4449,7 @@ def state():
                            f"AND {tvis(c, uid)}", (uid, uid)).fetchone()[0],
             trash=c.execute(f"SELECT COUNT(*) FROM tasks WHERE list_id IN {wr_sql()} AND deleted_at IS NOT NULL",
                             (uid, uid)).fetchone()[0]),
-        settings={k: v for k, v in s.items() if k not in ("digest_sent", "review_sent")},
+        settings={k: v for k, v in s.items() if k not in ("digest_sent", "digest_mail_sent", "review_sent")},
         notify=notif_matrix(s),  # 2.1.0 (#317)
         paperless=pl_state(c, u),
         ntfy_inbox={"enabled": bool(NTFY_IN["token"]), "server": NTFY_IN["public"], "topic": NTFY_IN["topic"]},
@@ -4433,6 +4471,8 @@ def state():
         api={"enabled": API_ON}, webhooks={"enabled": WH_ON}, caldav=dav_info(u), public_links=public_links_on(c),
         share={"drop_url": PUBLIC_URL.rstrip("/") + "/drop", "ios_shortcut": IOS_SHORTCUT_URL},
         sample=sample_state(c, uid),
+        notes=notes_brief(c, uid),  # 2.17.0 (#442)
+        team={"enabled": tchat_on(c, uid), "unread": tchat_unread(c, uid)},  # 2.17.0 (#419)
         agents=agents_for(c, uid),
         proposers=prop_agents(c, uid),  # 2.3.0: agents I may ask for a proposal
         groups=groups_for(c, full=bool(u["is_admin"])) if collab_all() else [],  # 2.10.0 (#441)
@@ -8645,15 +8685,16 @@ def news_wanted(s, kind):
 NOTIF_ROWS = ("comment", "reply", "follow", "mention", "assign", "newtask", "complete", "status", "share", "unblock",
               "approval", "followup", "reminder", "usage",  # 2.1.1 (#326): usage = an agent's usage limit (admins only)
               "proposal",  # 2.3.0: an agent's proposal I asked for is ready
-              "nag")  # 2.7.0 (#413): a reminder that repeats until the task is done (push only; a muted list bell stops it)
+              "nag",  # 2.7.0 (#413): a reminder that repeats until the task is done (push only; a muted list bell stops it)
+              "chat")  # 2.17.0 (#419): a direct message / a team chat message (push only; mentions follow "mention")
 NOTIF_NEWS_GROUP = {"comment": "comment", "reply": "comment", "follow": "comment", "mention": "mention", "assign": "assign",
                     "complete": "complete", "status": "status", "share": "share", "unblock": "unblock"}
 NOTIF_NEWS_PRIMARY = ("comment", "mention", "assign", "complete", "status", "share", "unblock")  # News = news_kinds
 NOTIF_NEWS_NEW = {"newtask": 0, "approval": 0, "followup": 1, "usage": 1, "proposal": 1}
 NOTIF_PUSH_DEFAULT = {"comment": 1, "reply": 1, "follow": 1, "mention": 1, "assign": 1, "newtask": 0, "complete": 1,
                       "status": 0, "share": 0, "unblock": 1, "approval": 1, "followup": 1, "reminder": 1, "usage": 1,
-                      "proposal": 1, "nag": 1}
-NOTIF_NO_NEWS = ("reminder", "nag")
+                      "proposal": 1, "nag": 1, "chat": 1}
+NOTIF_NO_NEWS = ("reminder", "nag", "chat")
 NOTIF_UNMUTED = ("mention", "assign")        # still come through a muted list
 NOTIF_NO_BELL = ("reminder", "followup", "usage", "proposal")  # never changed by a list bell
 BELL_MODES = ("all", "default", "mute", "custom")
@@ -9938,9 +9979,10 @@ def _time_watch_one(c, r, users, S, LG, ref):
 
 # ---------------------------------------------------------------- settings / export (per user)
 
-SETTINGS_SERVER_ONLY = ("digest_sent", "review_sent", "ntfy_topic", "features_rev", "onboard", "sample_ask", "agent_share")
+SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "review_sent", "ntfy_topic", "features_rev", "onboard", "sample_ask", "agent_share")
+DASH_WIDGETS = ("wait", "today", "news", "chat", "projects", "pinned", "notes", "agents", "stats", "search")  # 2.17.0 (#475)
 SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "time_focus", "paperless_keep", "celebrate", "cal_today",
-                  "date_confirm")
+                  "date_confirm", "digest_mail", "mail_from_me")
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24)}
 
@@ -9977,6 +10019,22 @@ def clean_setting(k, v):
         return ",".join(dict.fromkeys(ids))
     if k == "roadmap":
         return clean_roadmap_pref(v)
+    if k == "dashboard":  # 2.17.0 (#475)
+        if sv == "":
+            return ""
+        try:
+            o = json.loads(v) if isinstance(v, str) else None
+        except ValueError:
+            raise bad from None
+        if not isinstance(o, dict) or set(o) - {"order", "hidden"}:
+            raise bad
+        out = {}
+        for key in ("order", "hidden"):
+            xs = o.get(key, [])
+            if not isinstance(xs, list) or not all(isinstance(x, str) and x in DASH_WIDGETS for x in xs):
+                raise bad
+            out[key] = list(dict.fromkeys(xs))
+        return json.dumps(out)
     if k in SETTINGS_FLAGS:
         if sv in ("true", "True"):
             return "1"
@@ -16394,6 +16452,8 @@ def _wd_digest_user(c, uid, S, LG, now):
     today = now.date().isoformat()
     s, lg = S[uid], LG[uid]
     dt = s.get("digest_time") or ""
+    if valid_hm(dt) and now.strftime("%H:%M") >= dt:  # 2.17.0 (#443): the summary by e-mail too (its own "sent" day)
+        digest_mail_user(c, uid, s, today)
     if not valid_hm(dt) or s.get("digest_sent") == today or now.strftime("%H:%M") < dt:
         return
     uset(c, uid, "digest_sent", today)
@@ -21052,6 +21112,8 @@ def openapi_spec():
     groups_spec(paths, schemas, op, ok, errs, ref, pid, nul, page)  # 2.10.0 (#441)
     dayplan_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.10.0 (#440)
     api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.15.0 (#479)
+    notes_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.17.0 (#442)
+    team_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.17.0 (#419)
     scope_refine(paths)
     _SPEC["s"] = {
         "openapi": "3.1.0",
@@ -21063,7 +21125,7 @@ def openapi_spec():
                  "license": {"name": "AGPL-3.0-only", "identifier": "AGPL-3.0-only"}},
         "servers": [{"url": API_PREFIX.rstrip("/")}],
         "security": [{"bearerAuth": []}],
-        "tags": [{"name": n} for n in ("Account", T, L, "Structure", "Roadmap", C, S_, TI, H, "Import", A, "Agents", "Groups", "Day plan")],
+        "tags": [{"name": n} for n in ("Account", T, L, "Structure", "Roadmap", C, S_, TI, H, "Import", A, "Agents", "Groups", "Day plan", "Notes", "Team chat")],
         "paths": paths,
         "components": {"securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "abk_ token"}},
                        "schemas": schemas},
@@ -21539,7 +21601,8 @@ AGENT_STATUSES = ("idle", "working", "waiting", "error")
 AGENT_EVENTS = ("mention", "comment", "assigned", "unassigned", "chat", "reaction", "job", "tidy", "wake", "ping",
                 "followup_due",  # 2.1.0 (#335): the follow-up day of a task waiting on external
                 "job_request",   # 2.3.0 (#260-#263): a person asks for a proposal
-                "runtime_changed", "reset")  # 2.4.1 (#377): an admin changed its runtime settings / pressed "Reset now"
+                "runtime_changed", "reset",  # 2.4.1 (#377): an admin changed its runtime settings / pressed "Reset now"
+                "team_message")  # 2.17.0 (#419): someone @mentioned the agent in a list's team chat
 JOB_STATES = ("running", "waiting", "done", "failed", "stopped")
 JOB_ACTIONS = ("approve", "reject", "stop")
 REACTIONS = ("up", "down", "heart")   # the fixed set; any other single emoji is stored as itself
@@ -28302,6 +28365,1124 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                                              "Agents: waits for approval (202).")
 
 
+# ---------------------------------------------------------------- 2.17.0 (#442): notes of a list / project
+# Markdown documents next to the tasks of a list (meeting notes, briefings, decisions). Who sees the list (not as a
+# participant, who only sees the tasks assigned to them) reads its notes; owner, admins and members write them. #123 in a
+# note links that task (in the app), a note has its own address (#note/<id>), tags, can be pinned (first in the list) and
+# is found by the search and the command field. The REST API + MCP tools do the same (scope tasks:write to write,
+# delete to delete).
+NOTE_TITLE_MAX, NOTE_BODY_MAX, NOTE_TAGS_MAX = 300, 200_000, 20
+
+
+def note_role(c, lid, write=False):
+    """The role of the current user in list lid for its notes; 404 = cannot see them (participants neither)."""
+    role = list_role(c, lid) if lid else None
+    if not role or role == "participant":
+        raise Denied(404)
+    if write and role not in WRITE_ROLES:
+        raise Denied(403)
+    return role
+
+
+def need_note(c, nid, write=False):
+    r = c.execute("SELECT * FROM notes WHERE id=?", (nid,)).fetchone()
+    if not r:
+        raise Denied(404)
+    note_role(c, r["list_id"], write)
+    return r
+
+
+def clean_note_tags(v):
+    if v in (None, ""):
+        return []
+    if isinstance(v, str):
+        v = v.split(",")
+    if not isinstance(v, list):
+        raise BadInput(tr("Invalid value: {0}", "tags"))
+    out = []
+    for x in v:
+        if not isinstance(x, str):
+            raise BadInput(tr("Invalid value: {0}", "tags"))
+        x = x.strip().lstrip("#").strip()[:40]
+        if x and x.casefold() not in (y.casefold() for y in out):
+            out.append(x)
+    return out[:NOTE_TAGS_MAX]
+
+
+def note_fields(b, partial=False):
+    out = {}
+    if "title" in b or not partial:
+        t = b.get("title")
+        if not isinstance(t, str) or not t.strip():
+            raise BadInput(tr("Please give the note a title"))
+        out["title"] = re.sub(r"\s+", " ", t).strip()[:NOTE_TITLE_MAX]
+    if "body" in b:
+        if not isinstance(b["body"], str):
+            raise BadInput(tr("Invalid value: {0}", "body"))
+        if len(b["body"]) > NOTE_BODY_MAX:
+            raise BadInput(tr("The note is too long (at most {0} characters)", NOTE_BODY_MAX))
+        out["body"] = b["body"]
+    if "tags" in b:
+        out["tags"] = ",".join(clean_note_tags(b["tags"]))
+    if "pinned" in b:
+        if not isinstance(b["pinned"], (bool, int)) or b["pinned"] not in (0, 1, True, False):
+            raise BadInput(tr("Invalid value: {0}", "pinned"))
+        out["pinned"] = int(bool(b["pinned"]))
+    return out
+
+
+def note_dict(r, full=True, names=None):
+    d = {"id": r["id"], "list_id": r["list_id"], "title": r["title"], "tags": [x for x in (r["tags"] or "").split(",") if x],
+         "pinned": bool(r["pinned"]), "created_by": r["created_by"], "updated_by": r["updated_by"],
+         "created_at": r["created_at"], "updated_at": r["updated_at"]}
+    if full:
+        d["body"] = r["body"]
+    else:
+        d["excerpt"] = re.sub(r"\s+", " ", re.sub(r"[#*_`>\[\]]", "", r["body"] or "")).strip()[:160]
+    if names is not None:
+        d["updated_by_name"] = names.get(r["updated_by"], "")
+    return d
+
+
+def notes_visible_sql(c, uid):
+    """(where, args) for the notes the user may read: lists they see, without the lists where they are a participant."""
+    pl = plists(c, uid)
+    w = f"list_id IN {vis_sql()}" + (f" AND list_id NOT IN ({','.join(str(int(x)) for x in pl)})" if pl else "")
+    return w, [uid, uid]
+
+
+def notes_brief(c, uid):
+    """For /api/state: every readable note without its text (the sidebar count, the command field, links)."""
+    w, a = notes_visible_sql(c, uid)
+    return [{"id": r["id"], "list_id": r["list_id"], "title": r["title"], "tags": [x for x in (r["tags"] or "").split(",") if x],
+             "pinned": bool(r["pinned"]), "updated_at": r["updated_at"]}
+            for r in c.execute(f"SELECT id, list_id, title, tags, pinned, updated_at FROM notes WHERE {w} ORDER BY updated_at DESC LIMIT 2000", a)]
+
+
+@app.get("/api/lists/<int:lid>/notes")
+def notes_of_list(lid):
+    """The notes of a list, pinned first, then the newest change first (with their text)."""
+    c = db()
+    role = note_role(c, lid)
+    rows = c.execute("SELECT * FROM notes WHERE list_id=? ORDER BY pinned DESC, updated_at DESC, id DESC", (lid,)).fetchall()
+    names = user_names(c, {r["updated_by"] for r in rows if r["updated_by"]})
+    return jsonify(notes=[note_dict(r, names=names) for r in rows], may_write=role in WRITE_ROLES)
+
+
+@app.post("/api/lists/<int:lid>/notes")
+def note_create(lid):
+    """{title, body?, tags?, pinned?} -- a new note in the list (owner, admins, members)."""
+    c = db()
+    note_role(c, lid, write=True)
+    f = note_fields(body())
+    ts, uid = iso(now_utc()), me()
+    nid = c.execute("INSERT INTO notes(list_id,title,body,tags,pinned,created_by,updated_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                    (lid, f["title"], f.get("body", ""), f.get("tags", ""), f.get("pinned", 0), uid, uid, ts, ts)).lastrowid
+    bump(c)
+    c.commit()
+    r = c.execute("SELECT * FROM notes WHERE id=?", (nid,)).fetchone()
+    return jsonify(note_dict(r)), 201
+
+
+@app.get("/api/notes/<int:nid>")
+def note_get(nid):
+    c = db()
+    r = need_note(c, nid)
+    return jsonify(note_dict(r, names=user_names(c, [r["updated_by"]] if r["updated_by"] else [])))
+
+
+@app.patch("/api/notes/<int:nid>")
+def note_update(nid):
+    """{title?, body?, tags?, pinned?, list_id? (move to another list I may write), expect_updated_at? (409 when someone
+    else changed it in between: the client shows both versions)}"""
+    c = db()
+    r = need_note(c, nid, write=True)
+    b = body()
+    f = note_fields(b, partial=True)
+    if "list_id" in b:
+        lid = b["list_id"]
+        if isinstance(lid, bool) or not isinstance(lid, int):
+            raise BadInput(tr("Invalid value: {0}", "list_id"))
+        note_role(c, lid, write=True)
+        f["list_id"] = lid
+    exp = b.get("expect_updated_at")
+    if exp and exp != r["updated_at"] and ("body" in f or "title" in f):
+        cur = note_dict(r, names=user_names(c, [r["updated_by"]] if r["updated_by"] else []))
+        return jsonify(error=tr("Changed in the meantime by {0}", cur.get("updated_by_name") or "?"), note=cur), 409
+    if f:
+        f["updated_by"], f["updated_at"] = me(), iso_ms(now_utc())
+        c.execute(f"UPDATE notes SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), nid])
+        bump(c)
+        c.commit()
+    r = c.execute("SELECT * FROM notes WHERE id=?", (nid,)).fetchone()
+    return jsonify(note_dict(r, names=user_names(c, [r["updated_by"]] if r["updated_by"] else [])))
+
+
+@app.delete("/api/notes/<int:nid>")
+def note_delete(nid):
+    """Deletes the note; answers it in full (the app's Undo creates it again)."""
+    c = db()
+    r = need_note(c, nid, write=True)
+    c.execute("DELETE FROM notes WHERE id=?", (nid,))
+    bump(c)
+    c.commit()
+    return jsonify(ok=True, note=note_dict(r))
+
+
+def notes_search(c, uid, q, lid=None, limit=50):
+    w, a = notes_visible_sql(c, uid)
+    if lid:
+        w += " AND list_id=?"
+        a.append(lid)
+    if q:
+        for word in q.split()[:6]:
+            like = "%" + word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+            w += " AND (title LIKE ? ESCAPE '\\' OR body LIKE ? ESCAPE '\\' OR tags LIKE ? ESCAPE '\\')"
+            a += [like, like, like]
+    return c.execute(f"SELECT * FROM notes WHERE {w} ORDER BY pinned DESC, updated_at DESC LIMIT ?", (*a, limit)).fetchall()
+
+
+@app.get("/api/notes")
+def notes_find():
+    """?q=words (title, text, tags; all words), ?list_id= -- notes I may read, without their full text."""
+    c = db()
+    uid = me()
+    lid = request.args.get("list_id")
+    lid = as_int(lid, "list_id", 1) if lid else None
+    rows = notes_search(c, uid, (request.args.get("q") or "").strip()[:200], lid)
+    return jsonify(notes=[note_dict(r, full=False) for r in rows])
+
+
+# ---- REST API v1
+@app.get("/api/v1/lists/<int:lid>/notes")
+@v1_view
+def v1_list_notes(lid):
+    v1_args(("limit", "cursor"))
+    a = request.args
+    c = db()
+    note_role(c, lid)
+    after, limit = cursor_dec("n", a.get("cursor")), v1_limit(a)
+    rows = c.execute("SELECT * FROM notes WHERE list_id=? AND id>? ORDER BY id LIMIT ?", (lid, after, limit + 1)).fetchall()
+    more = len(rows) > limit
+    rows = rows[:limit]
+    return jsonify(data=[note_dict(r) for r in rows], next_cursor=cursor_enc("n", rows[-1]["id"]) if more else None)
+
+
+@app.post("/api/v1/lists/<int:lid>/notes")
+@v1_view
+def v1_note_create(lid):
+    v1_args(())
+    b = v1_json()
+    reject_unknown(b, ("title", "body", "tags", "pinned"))
+    j = v1_call(note_create, lid, body=b)
+    return jsonify({k: v for k, v in j.items() if k != "updated_by_name"}), 201
+
+
+@app.get("/api/v1/notes")
+@v1_view
+def v1_notes_search():
+    a = v1_args(("q", "list_id", "limit"))
+    c = db()
+    lid = as_int(a["list_id"], "list_id", 1) if a.get("list_id") else None
+    rows = notes_search(c, me(), (a.get("q") or "").strip()[:200], lid, v1_limit(a))
+    return jsonify(data=[note_dict(r, full=False) for r in rows], next_cursor=None)
+
+
+@app.get("/api/v1/notes/<int:nid>")
+@v1_view
+def v1_note_get(nid):
+    v1_args(())
+    return jsonify(note_dict(need_note(db(), nid)))
+
+
+@app.patch("/api/v1/notes/<int:nid>")
+@v1_view
+def v1_note_update(nid):
+    v1_args(())
+    b = v1_json()
+    reject_unknown(b, ("title", "body", "tags", "pinned", "list_id", "expect_updated_at"))
+    j = v1_call(note_update, nid, body=b)
+    return jsonify({k: v for k, v in j.items() if k != "updated_by_name"})
+
+
+@app.delete("/api/v1/notes/<int:nid>")
+@v1_view
+def v1_note_delete(nid):
+    v1_args(())
+    v1_call(note_delete, nid, body={})
+    return Response(status=204)
+
+
+def notes_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
+    N = "Notes"
+    props = {"id": {"type": "integer"}, "list_id": {"type": "integer"}, "title": {"type": "string", "maxLength": NOTE_TITLE_MAX},
+             "body": {"type": "string", "description": "Markdown; #123 links task 123 in the app"},
+             "tags": {"type": "array", "items": {"type": "string"}}, "pinned": {"type": "boolean", "description": "Shown first in the list's notes"},
+             "created_by": nul("integer"), "updated_by": nul("integer"), "created_at": {"type": "string", "format": "date-time"},
+             "updated_at": {"type": "string", "format": "date-time"}}
+    schemas["Note"] = {"type": "object", "properties": props}
+    schemas["NotePage"] = page("Note")
+    schemas["NoteHit"] = {"type": "object", "properties": {k: v for k, v in props.items() if k != "body"} | {"excerpt": {"type": "string"}}}
+    schemas["NoteHitPage"] = page("NoteHit")
+    inb = {"type": "object", "properties": {k: props[k] for k in ("title", "body", "tags", "pinned")}}
+    lp = pid(desc="List id")
+    np = pid(desc="Note id")
+    paths["/lists/{id}/notes"] = {
+        "get": op("The notes of a list (2.17.0; not for participants)", N, ok(ref("NotePage")) | errs("404"), [lp,
+                  q("limit", "Page size", {"type": "integer", "minimum": 1, "maximum": API_PAGE_MAX}), q("cursor", "next_cursor of the previous page")]),
+        "post": op("Write a note in a list (owner, list admins, members)", N, ok(ref("Note"), "Created", "201") | errs("400", "403", "404"),
+                   [lp], body={**inb, "required": ["title"]}, scope="tasks:write")}
+    paths["/notes"] = {"get": op("Find notes: all words in title, text or tags", N, ok(ref("NoteHitPage")) | errs("400"),
+                                 [q("q", "Words to look for"), q("list_id", "Only this list", {"type": "integer"}),
+                                  q("limit", "At most this many", {"type": "integer", "minimum": 1, "maximum": API_PAGE_MAX})])}
+    paths["/notes/{id}"] = {
+        "get": op("One note with its text", N, ok(ref("Note")) | errs("404"), [np]),
+        "patch": op("Change a note (or move it with list_id)", N, ok(ref("Note")) | errs("400", "403", "404", "409"), [np],
+                    body={"type": "object", "properties": {**inb["properties"], "list_id": {"type": "integer"},
+                                                           "expect_updated_at": {"type": "string", "description": "409 with the current note when it changed since"}}},
+                    scope="tasks:write"),
+        "delete": op("Delete a note", N, {"204": {"description": "Deleted"}} | errs("403", "404"), [np], scope="delete")}
+
+
+# ---------------------------------------------------------------- 2.17.0 (#419): team chat
+# People talk to each other: direct messages between two people (who work together: they share a list or a group) and
+# one channel per shared list (everyone who sees the whole list; participants, who only see their own tasks, are not in
+# it). Agents shared with a list are members of its channel: they read it through the API and get the event
+# "team_message" when someone @mentions them there. Messages are Markdown with <@id> mentions, can name a task, get
+# reactions; the sender edits / deletes their own (list owners / admins delete any in their channel). Read state per
+# person; pushes: every DM and every @mention (notification row "chat"; a muted list bell keeps a channel quiet except
+# mentions). Needs collaboration on (instance switch); the person's module "collab" off = no team chat.
+TCHAT_MAX, TCHAT_PAGE = 8000, 50
+
+
+def tchat_on(c, uid=None):
+    if not collab_all():
+        return False
+    s = usettings(c, uid or me())
+    return collab_on(s)
+
+
+def need_tchat(c):
+    if is_agent(g.user):
+        if not collab_all():
+            raise Denied(404)
+        return
+    if not tchat_on(c):
+        raise Denied(404)
+
+
+def tchat_coworkers(c, uid):
+    """Ids of the people uid works with: a common list (any role) or a common group; never agents, never disabled."""
+    rows = c.execute("""SELECT DISTINCT x.u FROM (
+          SELECT m2.user_id AS u FROM list_members m1 JOIN list_members m2 ON m2.list_id=m1.list_id WHERE m1.user_id=?
+          UNION SELECT l.owner_id FROM list_members m JOIN lists l ON l.id=m.list_id WHERE m.user_id=?
+          UNION SELECT m.user_id FROM list_members m JOIN lists l ON l.id=m.list_id WHERE l.owner_id=?
+          UNION SELECT g2.user_id FROM group_members g1 JOIN group_members g2 ON g2.group_id=g1.group_id WHERE g1.user_id=?) x
+        JOIN users u ON u.id=x.u WHERE x.u!=? AND u.disabled=0 AND COALESCE(u.kind,'')!='agent'""", (uid, uid, uid, uid, uid)).fetchall()
+    return {r[0] for r in rows}
+
+
+def tchat_list_members(c, lid):
+    """Who is in a list's channel: everyone who sees the whole list (owner, admin, member, viewer), agents included."""
+    l = c.execute("SELECT owner_id FROM lists WHERE id=? AND archived=0", (lid,)).fetchone()
+    if not l:
+        return set()
+    out = {l["owner_id"]} | {r[0] for r in c.execute("SELECT user_id FROM list_members WHERE list_id=? AND role!='participant'", (lid,))}
+    for r in c.execute("""SELECT gm.user_id FROM group_shares s JOIN group_members gm ON gm.group_id=s.group_id
+                          WHERE s.list_id=? AND s.role!='participant'""", (lid,)):
+        out.add(r[0])
+    return {u for u in out if list_role(c, lid, u) in FULL_ROLES}
+
+
+def tchat_room_members(c, r):
+    if r["kind"] == "dm":
+        return {r["a"], r["b"]}
+    return tchat_list_members(c, r["list_id"])
+
+
+def tchat_room_ok(c, r, uid):
+    if not r:
+        return False
+    if r["kind"] == "dm":
+        return uid in (r["a"], r["b"])
+    return list_role(c, r["list_id"], uid) in FULL_ROLES and c.execute(
+        "SELECT 1 FROM lists WHERE id=? AND archived=0", (r["list_id"],)).fetchone() is not None
+
+
+def need_room(c, rid):
+    r = c.execute("SELECT * FROM tchat_rooms WHERE id=?", (rid,)).fetchone()
+    if not tchat_room_ok(c, r, me()):
+        raise Denied(404)
+    return r
+
+
+def tchat_list_room(c, lid, create=True):
+    r = c.execute("SELECT * FROM tchat_rooms WHERE kind='list' AND list_id=?", (lid,)).fetchone()
+    if r or not create:
+        return r
+    c.execute("INSERT OR IGNORE INTO tchat_rooms(kind,list_id,created_at) VALUES('list',?,?)", (lid, iso(now_utc())))
+    return c.execute("SELECT * FROM tchat_rooms WHERE kind='list' AND list_id=?", (lid,)).fetchone()
+
+
+def tchat_shared_lists(c, uid):
+    """The lists of uid that have a channel: shared (another person or an agent sees the whole list), not archived."""
+    out = []
+    for l in c.execute(f"SELECT id, name, is_inbox FROM lists WHERE id IN {vis_sql()} AND archived=0 ORDER BY name COLLATE NOCASE", (uid, uid)):
+        if list_role(c, l["id"], uid) not in FULL_ROLES:
+            continue
+        if len(tchat_list_members(c, l["id"])) >= 2:
+            out.append(l)
+    return out
+
+
+def tchat_last_read(c, rid, uid):
+    r = c.execute("SELECT last_id, muted FROM tchat_reads WHERE room_id=? AND user_id=?", (rid, uid)).fetchone()
+    return (r["last_id"], bool(r["muted"])) if r else (0, False)
+
+
+def tchat_rooms(c, uid):
+    """Every conversation of uid: the channels of the shared lists + the DMs that have messages (newest first)."""
+    rooms = []
+    for l in tchat_shared_lists(c, uid):
+        r = tchat_list_room(c, l["id"])
+        rooms.append(r)
+    for r in c.execute("SELECT * FROM tchat_rooms WHERE kind='dm' AND (a=? OR b=?) AND last_at IS NOT NULL", (uid, uid)):
+        rooms.append(r)
+    names = user_names(c, {x for r in rooms if r["kind"] == "dm" for x in (r["a"], r["b"])})
+    out = []
+    for r in rooms:
+        last = c.execute("SELECT * FROM tchat_msgs WHERE room_id=? AND deleted_at IS NULL ORDER BY id DESC LIMIT 1", (r["id"],)).fetchone()
+        lr, muted = tchat_last_read(c, r["id"], uid)
+        unread = c.execute("SELECT COUNT(*) FROM tchat_msgs WHERE room_id=? AND id>? AND deleted_at IS NULL AND COALESCE(user_id,0)!=?",
+                           (r["id"], lr, uid)).fetchone()[0]
+        mention = bool(unread) and c.execute("SELECT 1 FROM tchat_msgs WHERE room_id=? AND id>? AND deleted_at IS NULL AND body LIKE ?",
+                                             (r["id"], lr, f"%<@{uid}>%")).fetchone() is not None
+        d = {"id": r["id"], "kind": r["kind"], "unread": unread, "mention": mention, "muted": muted,
+             "last": tchat_msg_brief(c, last) if last else None, "last_at": last["created_at"] if last else None}
+        if r["kind"] == "dm":
+            other = r["b"] if r["a"] == uid else r["a"]
+            d.update(user_id=other, name=names.get(other, "?"))
+        else:
+            l = c.execute("SELECT name, is_inbox, owner_id FROM lists WHERE id=?", (r["list_id"],)).fetchone()
+            d.update(list_id=r["list_id"], name=l["name"], members=len(tchat_list_members(c, r["list_id"])))
+        out.append(d)
+    out.sort(key=lambda d: (d["last_at"] or ""), reverse=True)
+    return out
+
+
+def tchat_sig(c, uid):
+    """Change marker for /api/version: the newest message id of my conversations + my read marks."""
+    if not collab_all():
+        return ""
+    r = c.execute("""SELECT COALESCE(MAX(m.id),0), COUNT(m.id) FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id
+                     WHERE (r.kind='dm' AND (r.a=? OR r.b=?)) OR (r.kind='list' AND r.list_id IN """ + vis_sql() + ")",
+                  (uid, uid, uid, uid)).fetchone()
+    e = c.execute("SELECT COALESCE(MAX(edited_at),'') FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id WHERE "
+                  "(r.kind='dm' AND (r.a=? OR r.b=?)) OR (r.kind='list' AND r.list_id IN " + vis_sql() + ")", (uid, uid, uid, uid)).fetchone()[0]
+    rd = c.execute("SELECT COALESCE(SUM(last_id),0) FROM tchat_reads WHERE user_id=?", (uid,)).fetchone()[0]
+    return f"{r[0]}.{r[1]}.{rd}.{e[-6:] if e else ''}"
+
+
+def tchat_unread(c, uid):
+    if not tchat_on(c, uid):
+        return 0
+    return sum(x["unread"] for x in tchat_rooms(c, uid) if not x["muted"] or x["mention"])
+
+
+def tchat_msg_brief(c, m):
+    names = user_names(c, [int(x) for x in MENTION_RE.findall(m["body"])])
+    return {"id": m["id"], "user_id": m["user_id"], "text": comment_plain(c, m["body"], names)[:140], "created_at": m["created_at"]}
+
+
+def tchat_rx(c, ids):
+    out = {}
+    if not ids:
+        return out
+    names = {}
+    rows = c.execute(f"SELECT message_id, user_id, emoji FROM tchat_rx WHERE message_id IN ({','.join('?' * len(ids))}) ORDER BY created_at",
+                     list(ids)).fetchall()
+    names = user_names(c, {r["user_id"] for r in rows})
+    for r in rows:
+        lst = out.setdefault(r["message_id"], [])
+        e = next((x for x in lst if x["emoji"] == r["emoji"]), None)
+        if not e:
+            e = {"emoji": r["emoji"], "users": []}
+            lst.append(e)
+        e["users"].append({"id": r["user_id"], "name": names.get(r["user_id"], "?")})
+    return out
+
+
+def tchat_msg_dict(c, m, rx=None):
+    t = c.execute("SELECT id, title FROM tasks WHERE id=? AND deleted_at IS NULL", (m["task_id"],)).fetchone() if m["task_id"] else None
+    return {"id": m["id"], "room_id": m["room_id"], "user_id": m["user_id"], "body": "" if m["deleted_at"] else m["body"],
+            "task": {"id": t["id"], "title": t["title"]} if t and task_visible(c, t["id"], me()) else None,
+            "created_at": m["created_at"], "edited_at": m["edited_at"], "deleted": bool(m["deleted_at"]),
+            "reactions": (rx or {}).get(m["id"], [])}
+
+
+def tchat_clean_mentions(c, r, text):
+    allowed = tchat_room_members(c, r)
+    names = user_names(c, [int(x) for x in MENTION_RE.findall(text)])
+    found = []
+
+    def sub(m):
+        uid = int(m.group(1))
+        if uid in allowed:
+            found.append(uid)
+            return m.group(0)
+        return "@" + names.get(uid, "?")
+    return MENTION_RE.sub(sub, text), list(dict.fromkeys(found))
+
+
+@app.get("/api/team")
+def tchat_overview():
+    """My conversations (channels of shared lists, DMs), the people I may start a DM with, the unread count."""
+    c = db()
+    need_tchat(c)
+    uid = me()
+    rooms = tchat_rooms(c, uid)
+    c.commit()  # channels are created on first sight
+    ppl = sorted(tchat_coworkers(c, uid))
+    names = user_names(c, ppl)
+    return jsonify(rooms=rooms, people=[{"id": p, "name": names.get(p, "?")} for p in ppl], users={str(k): v for k, v in names.items()},
+                   unread=sum(x["unread"] for x in rooms if not x["muted"] or x["mention"]), avatars=avatar_map(c, uid))
+
+
+@app.post("/api/team/dm")
+def tchat_dm():
+    """{user_id} -- the direct conversation with a person I work with (created on first use)."""
+    c = db()
+    need_tchat(c)
+    if is_agent(g.user):
+        raise Denied(403, tr("Agents talk to people in their own chat"))
+    other = body().get("user_id")
+    if isinstance(other, bool) or not isinstance(other, int) or other not in tchat_coworkers(c, me()):
+        raise Denied(404)
+    a, b = sorted((me(), other))
+    c.execute("INSERT OR IGNORE INTO tchat_rooms(kind,a,b,created_at) VALUES('dm',?,?,?)", (a, b, iso(now_utc())))
+    r = c.execute("SELECT * FROM tchat_rooms WHERE kind='dm' AND a=? AND b=?", (a, b)).fetchone()
+    c.commit()
+    return jsonify(id=r["id"], kind="dm", user_id=other, name=user_names(c, [other]).get(other, "?"))
+
+
+@app.get("/api/team/rooms/<int:rid>/messages")
+def tchat_messages(rid):
+    """?before=<id> (older page), ?limit (max 100) -- messages oldest first, with reactions; members of the room."""
+    c = db()
+    need_tchat(c)
+    r = need_room(c, rid)
+    before = request.args.get("before")
+    before = as_int(before, "before", 1) if before else None
+    lim = as_int(request.args.get("limit", TCHAT_PAGE), "limit", 1, 100)
+    rows = c.execute("SELECT * FROM tchat_msgs WHERE room_id=?" + (" AND id<?" if before else "") + " ORDER BY id DESC LIMIT ?",
+                     (rid, before, lim + 1) if before else (rid, lim + 1)).fetchall()
+    more = len(rows) > lim
+    rows = list(reversed(rows[:lim]))
+    rx = tchat_rx(c, [m["id"] for m in rows])
+    mem = tchat_room_members(c, r)
+    names = user_names(c, mem | {m["user_id"] for m in rows if m["user_id"]})
+    lr, muted = tchat_last_read(c, rid, me())
+    return jsonify(room={"id": r["id"], "kind": r["kind"], "list_id": r["list_id"], "muted": muted, "last_read": lr,
+                         "members": [{"id": u, "name": names.get(u, "?"), "agent": u in agent_ids(c)} for u in sorted(mem)]},
+                   messages=[tchat_msg_dict(c, m, rx) for m in rows], has_more=more, users={str(k): v for k, v in names.items()})
+
+
+@app.post("/api/team/rooms/<int:rid>/messages")
+def tchat_post(rid):
+    """{body, task_id?} -- a message; @mentions as <@id> (members of the room only)."""
+    c = db()
+    need_tchat(c)
+    r = need_room(c, rid)
+    b = body()
+    text = b.get("body")
+    if not isinstance(text, str) or not text.strip():
+        return err(tr("The message is empty"))
+    if len(text) > TCHAT_MAX:
+        return err(tr("The message is too long (max. {0} characters)", TCHAT_MAX))
+    tid = b.get("task_id")
+    if tid is not None and (isinstance(tid, bool) or not isinstance(tid, int) or not task_visible(c, tid, me())):
+        return err(tr("Invalid value: {0}", "task_id"))
+    text, mentions = tchat_clean_mentions(c, r, text.strip())
+    ts = iso_ms(now_utc())
+    mid = c.execute("INSERT INTO tchat_msgs(room_id,user_id,body,task_id,created_at) VALUES(?,?,?,?,?)", (rid, me(), text, tid, ts)).lastrowid
+    c.execute("UPDATE tchat_rooms SET last_at=? WHERE id=?", (ts, rid))
+    c.execute("INSERT INTO tchat_reads(room_id,user_id,last_id) VALUES(?,?,?) ON CONFLICT(room_id,user_id) DO UPDATE SET last_id=excluded.last_id",
+              (rid, me(), mid))
+    m = c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone()
+    tchat_notify(c, r, m, mentions)
+    c.commit()
+    return jsonify(tchat_msg_dict(c, m)), 201
+
+
+def tchat_notify(c, r, m, mentions):
+    """Pushes (DM: always; channel: @mentions, and every message for whoever set the list bell to "all") + agent events."""
+    sender = m["user_id"]
+    names = user_names(c, [sender] + mentions)
+    who = names.get(sender, "?")
+    ags = agent_ids(c)
+    members = tchat_room_members(c, r)
+    text = comment_plain(c, m["body"])
+    for uid in sorted(members - {sender}):
+        if uid in ags:
+            if uid in mentions:
+                agent_emit(c, uid, "team_message", {"room": {"id": r["id"], "kind": r["kind"], "list_id": r["list_id"]},
+                                                     "message": {"id": m["id"], "text": text[:AGENT_EVENT_COMMENT_CHARS], "user_id": sender,
+                                                                 "task_id": m["task_id"], "created_at": m["created_at"]},
+                                                     "user": {"id": sender, "name": who}})
+            continue
+        s = collab_user(c, uid, r["list_id"])
+        if not s:
+            continue
+        _lr, muted = tchat_last_read(c, r["id"], uid)
+        dm, ment = r["kind"] == "dm", uid in mentions
+        if r["kind"] == "list" and not ment and not (list_bell(c, uid, r["list_id"])[0] == "all"):
+            continue
+        if muted and not ment:
+            continue
+        if not notif_ok(c, uid, s, "mention" if ment else "chat", "push", r["list_id"]) or not push_reachable(c, uid, s):
+            continue
+        lg = lang_of(s)
+        if dm:
+            title = who
+        else:
+            ln = c.execute("SELECT name FROM lists WHERE id=?", (r["list_id"],)).fetchone()
+            title = tr("{0} in {1}", who, ln["name"] if ln else "?", lg=lg)
+        g.pushes.append((uid, title, text[:300], f"{PUBLIC_URL}/#team/{r['id']}", push_prio(s)))
+
+
+def need_tmsg(c, mid, edit=False):
+    m = c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone()
+    if not m:
+        raise Denied(404)
+    r = need_room(c, m["room_id"])
+    if edit and m["user_id"] != me():
+        if edit == "delete" and r["kind"] == "list" and list_role(c, r["list_id"]) in MANAGE_ROLES:
+            return m, r
+        raise Denied(403)
+    return m, r
+
+
+@app.patch("/api/team/messages/<int:mid>")
+def tchat_edit(mid):
+    """{body} -- change my own message."""
+    c = db()
+    need_tchat(c)
+    m, r = need_tmsg(c, mid, edit=True)
+    if m["deleted_at"]:
+        return err(tr("The message was deleted"), 409)
+    text = body().get("body")
+    if not isinstance(text, str) or not text.strip():
+        return err(tr("The message is empty"))
+    if len(text) > TCHAT_MAX:
+        return err(tr("The message is too long (max. {0} characters)", TCHAT_MAX))
+    text, _ = tchat_clean_mentions(c, r, text.strip())
+    c.execute("UPDATE tchat_msgs SET body=?, edited_at=? WHERE id=?", (text, iso_ms(now_utc()), mid))
+    c.commit()
+    m = c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone()
+    return jsonify(tchat_msg_dict(c, m, tchat_rx(c, [mid])))
+
+
+@app.delete("/api/team/messages/<int:mid>")
+def tchat_delete(mid):
+    """My own message (list owners / admins: any in their channel). It stays as "deleted" in the conversation."""
+    c = db()
+    need_tchat(c)
+    m, _r = need_tmsg(c, mid, edit="delete")
+    c.execute("UPDATE tchat_msgs SET deleted_at=?, edited_at=?, body='' WHERE id=?", (iso_ms(now_utc()), iso_ms(now_utc()), mid))
+    c.execute("DELETE FROM tchat_rx WHERE message_id=?", (mid,))
+    c.commit()
+    return jsonify(ok=True, id=mid)
+
+
+@app.post("/api/team/messages/<int:mid>/reactions")
+def tchat_react(mid):
+    """{emoji: up|down|heart or one emoji, on?: bool} -- toggles my reaction."""
+    c = db()
+    need_tchat(c)
+    m, _r = need_tmsg(c, mid)
+    if m["deleted_at"]:
+        return err(tr("The message was deleted"), 409)
+    b = body()
+    emoji = clean_emoji(b.get("emoji"))
+    have = c.execute("SELECT 1 FROM tchat_rx WHERE message_id=? AND user_id=? AND emoji=?", (mid, me(), emoji)).fetchone() is not None
+    on = b["on"] if isinstance(b.get("on"), bool) else not have
+    if on:
+        c.execute("INSERT OR IGNORE INTO tchat_rx(message_id,user_id,emoji,created_at) VALUES(?,?,?,?)", (mid, me(), emoji, iso_ms(now_utc())))
+    else:
+        c.execute("DELETE FROM tchat_rx WHERE message_id=? AND user_id=? AND emoji=?", (mid, me(), emoji))
+    c.commit()
+    return jsonify(ok=True, message_id=mid, reactions=tchat_rx(c, [mid]).get(mid, []))
+
+
+@app.post("/api/team/rooms/<int:rid>/read")
+def tchat_read(rid):
+    """{last_id?, muted?} -- everything up to last_id (default: the newest) is read; muted = no pushes except mentions."""
+    c = db()
+    need_tchat(c)
+    need_room(c, rid)
+    b = body()
+    lid = b.get("last_id")
+    if lid is None and "muted" in b:  # only (un)muting: the read mark stays
+        lid = 0
+    elif lid is None:
+        lid = c.execute("SELECT COALESCE(MAX(id),0) FROM tchat_msgs WHERE room_id=?", (rid,)).fetchone()[0]
+    elif isinstance(lid, bool) or not isinstance(lid, int):
+        return err(tr("Invalid value: {0}", "last_id"))
+    lr, muted = tchat_last_read(c, rid, me())
+    if "muted" in b:
+        if not isinstance(b["muted"], bool):
+            return err(tr("Invalid value: {0}", "muted"))
+        muted = b["muted"]
+    c.execute("INSERT INTO tchat_reads(room_id,user_id,last_id,muted) VALUES(?,?,?,?) ON CONFLICT(room_id,user_id) "
+              "DO UPDATE SET last_id=excluded.last_id, muted=excluded.muted", (rid, me(), max(lr, lid), int(muted)))
+    c.commit()
+    return jsonify(ok=True, last_id=max(lr, lid), muted=muted, unread=tchat_unread(c, me()))
+
+
+# ---- REST API v1 (people and agents; agents cannot open DMs)
+@app.get("/api/v1/team/rooms")
+@v1_view
+def v1_tchat_rooms():
+    v1_args(())
+    c = db()
+    need_tchat(c)
+    rooms = tchat_rooms(c, me())
+    c.commit()
+    return jsonify(data=rooms, next_cursor=None)
+
+
+@app.post("/api/v1/team/dm")
+@v1_view
+def v1_tchat_dm():
+    v1_args(())
+    b = v1_json()
+    reject_unknown(b, ("user_id",))
+    return jsonify(v1_call(tchat_dm, body=b))
+
+
+@app.get("/api/v1/team/rooms/<int:rid>/messages")
+@v1_view
+def v1_tchat_messages(rid):
+    v1_args(("before", "limit"))
+    j = v1_call(tchat_messages, rid)
+    return jsonify(data=j["messages"], room=j["room"], has_more=j["has_more"], next_cursor=None)
+
+
+@app.post("/api/v1/team/rooms/<int:rid>/messages")
+@v1_view
+def v1_tchat_post(rid):
+    v1_args(())
+    b = v1_json()
+    reject_unknown(b, ("body", "task_id"))
+    return jsonify(v1_call(tchat_post, rid, body=b)), 201
+
+
+@app.patch("/api/v1/team/messages/<int:mid>")
+@v1_view
+def v1_tchat_edit(mid):
+    v1_args(())
+    b = v1_json()
+    reject_unknown(b, ("body",))
+    return jsonify(v1_call(tchat_edit, mid, body=b))
+
+
+@app.delete("/api/v1/team/messages/<int:mid>")
+@v1_view
+def v1_tchat_delete(mid):
+    v1_args(())
+    v1_call(tchat_delete, mid, body={})
+    return Response(status=204)
+
+
+@app.post("/api/v1/team/messages/<int:mid>/reactions")
+@v1_view
+def v1_tchat_react(mid):
+    v1_args(())
+    b = v1_json()
+    reject_unknown(b, ("emoji", "on"))
+    return jsonify(v1_call(tchat_react, mid, body=b))
+
+
+@app.post("/api/v1/team/rooms/<int:rid>/read")
+@v1_view
+def v1_tchat_read(rid):
+    v1_args(())
+    b = v1_json()
+    reject_unknown(b, ("last_id", "muted"))
+    return jsonify(v1_call(tchat_read, rid, body=b))
+
+
+def team_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
+    TC = "Team chat"
+    schemas["TeamRoom"] = {"type": "object", "properties": {
+        "id": {"type": "integer"}, "kind": {"type": "string", "enum": ["dm", "list"]}, "name": {"type": "string"},
+        "list_id": {"type": "integer"}, "user_id": {"type": "integer", "description": "dm: the other person"},
+        "unread": {"type": "integer"}, "mention": {"type": "boolean", "description": "An unread message mentions you"},
+        "muted": {"type": "boolean"}, "last": nul("object"), "last_at": nul("string", format="date-time")}}
+    schemas["TeamRoomPage"] = page("TeamRoom")
+    schemas["TeamMessage"] = {"type": "object", "properties": {
+        "id": {"type": "integer"}, "room_id": {"type": "integer"}, "user_id": nul("integer"),
+        "body": {"type": "string", "description": "Markdown, mentions as <@user id>"}, "task": nul("object"),
+        "created_at": {"type": "string", "format": "date-time"}, "edited_at": nul("string", format="date-time"),
+        "deleted": {"type": "boolean"}, "reactions": {"type": "array", "items": {"type": "object"}}}}
+    schemas["TeamMessagePage"] = page("TeamMessage")
+    rp, mp = pid(desc="Conversation (room) id"), pid(desc="Message id")
+    paths["/team/rooms"] = {"get": op("2.17.0: your team chat conversations (channels of shared lists, direct messages) with unread counts",
+                                      TC, ok(ref("TeamRoomPage")) | errs("404"))}
+    paths["/team/dm"] = {"post": op("Open the direct conversation with a person you work with (people only, not agents)", TC,
+                                    ok({"type": "object"}) | errs("403", "404"), body={"type": "object", "properties": {"user_id": {"type": "integer"}},
+                                                                                     "required": ["user_id"]}, scope="comments")}
+    paths["/team/rooms/{id}/messages"] = {
+        "get": op("Messages of a conversation, oldest first (?before=<id> for older ones)", TC, ok(ref("TeamMessagePage")) | errs("400", "404"),
+                  [rp, q("before", "Only messages older than this id", {"type": "integer"}), q("limit", "At most this many (1-100)", {"type": "integer"})]),
+        "post": op("Write in a conversation; mention people as <@id>", TC, ok(ref("TeamMessage"), "Created", "201") | errs("400", "404"), [rp],
+                   body={"type": "object", "properties": {"body": {"type": "string"}, "task_id": {"type": "integer"}}, "required": ["body"]}, scope="comments")}
+    paths["/team/rooms/{id}/read"] = {"post": op("Mark a conversation read (up to last_id) and / or mute it", TC, ok({"type": "object"}) | errs("400", "404"),
+                                                 [rp], body={"type": "object", "properties": {"last_id": {"type": "integer"}, "muted": {"type": "boolean"}}}, scope="comments")}
+    paths["/team/messages/{id}"] = {
+        "patch": op("Change your own message", TC, ok(ref("TeamMessage")) | errs("400", "403", "404", "409"), [mp],
+                    body={"type": "object", "properties": {"body": {"type": "string"}}, "required": ["body"]}, scope="comments"),
+        "delete": op("Delete your own message (list owners / admins: any in their channel)", TC, {"204": {"description": "Deleted"}} | errs("403", "404"), [mp], scope="comments")}
+    paths["/team/messages/{id}/reactions"] = {"post": op("Toggle your reaction on a message", TC, ok({"type": "object"}) | errs("400", "404", "409"), [mp],
+                                                         body={"type": "object", "properties": {"emoji": {"type": "string"}, "on": {"type": "boolean"}}, "required": ["emoji"]},
+                                                         scope="comments")}
+
+
+# ---------------------------------------------------------------- 2.17.0 (#443): tasks by e-mail + the daily summary by e-mail
+# In: one mailbox the admin sets up (KALMIDO_IMAP_*), polled every KALMIDO_IMAP_INTERVAL seconds. Every person gets a
+# personal address with a secret token (plus addressing: tasks+<token>@example.com -> their inbox) and may make one per
+# list (-> that list, while they may change it). Subject = title, the text = the description, attachments = files (the
+# usual size limit), "Fwd:" / "WG:" prefixes are dropped. Optionally (setting mail_from_me) mails FROM the person's own
+# e-mail address to the plain address land in their inbox too (sender addresses can be forged: off by default).
+# Read mails are marked \Seen and never imported twice (Message-ID). Out: KALMIDO_SMTP_* sends the daily summary (digest
+# time of the push, setting digest_mail) to the person's e-mail address.
+MAIL_ADDRESS = os.environ.get("KALMIDO_MAIL_ADDRESS", "").strip()
+IMAP = {"host": os.environ.get("KALMIDO_IMAP_HOST", "").strip(), "port": int(os.environ.get("KALMIDO_IMAP_PORT", "0") or 0),
+        "user": os.environ.get("KALMIDO_IMAP_USER", "").strip(), "password": os.environ.get("KALMIDO_IMAP_PASSWORD", ""),
+        "folder": os.environ.get("KALMIDO_IMAP_FOLDER", "INBOX").strip() or "INBOX",
+        "ssl": os.environ.get("KALMIDO_IMAP_SSL", "1").strip().lower() not in ("0", "false", "no", "off"),
+        "interval": max(10, int(os.environ.get("KALMIDO_IMAP_INTERVAL", "60") or 60))}
+SMTP = {"host": os.environ.get("KALMIDO_SMTP_HOST", "").strip(), "port": int(os.environ.get("KALMIDO_SMTP_PORT", "0") or 0),
+        "user": os.environ.get("KALMIDO_SMTP_USER", "").strip(), "password": os.environ.get("KALMIDO_SMTP_PASSWORD", ""),
+        "tls": (os.environ.get("KALMIDO_SMTP_TLS", "starttls").strip().lower() or "starttls"),
+        "from": os.environ.get("KALMIDO_MAIL_FROM", "").strip() or MAIL_ADDRESS}
+MAIL_IN_ON = bool(MAIL_ADDRESS and IMAP["host"] and IMAP["user"])
+MAIL_OUT_ON = bool(SMTP["host"] and SMTP["from"])
+MAIL_TOKEN_RE = re.compile(r"\+([A-Za-z0-9_-]{10,40})@")
+MAIL_BODY_MAX, MAIL_PREFIX_RE = 20000, re.compile(r"^\s*((fwd?|wg|aw|re|tr|rv|fw|doorst|antw)\s*:\s*)+", re.I)
+
+
+def mail_addr(token):
+    local, _, dom = MAIL_ADDRESS.partition("@")
+    return f"{local}+{token}@{dom}" if token and dom else ""
+
+
+def mail_tokens(c, uid):
+    return {r["list_id"]: r["token"] for r in c.execute("SELECT * FROM mail_tokens WHERE user_id=?", (uid,))}
+
+
+@app.get("/api/me/mail")
+def mail_info():
+    """My e-mail addresses for new tasks (personal = inbox, per list), the daily summary by mail."""
+    c = db()
+    uid = me()
+    s = usettings(c, uid)
+    toks = mail_tokens(c, uid)
+    lists = []
+    for lid, t in toks.items():
+        if lid is None:
+            continue
+        l = c.execute("SELECT id, name FROM lists WHERE id=?", (lid,)).fetchone()
+        if l and list_role(c, lid) in WRITE_ROLES:
+            lists.append({"list_id": lid, "name": l["name"], "address": mail_addr(t)})
+    u = c.execute("SELECT email FROM users WHERE id=?", (uid,)).fetchone()
+    return jsonify(enabled=MAIL_IN_ON, address=mail_addr(toks.get(None)) if MAIL_IN_ON else "", plain=MAIL_ADDRESS if MAIL_IN_ON else "",
+                   lists=lists if MAIL_IN_ON else [], from_me=s.get("mail_from_me") == "1", email=(u["email"] if u else "") or "",
+                   digest={"enabled": MAIL_OUT_ON, "on": s.get("digest_mail") == "1", "time": s.get("digest_time") or ""})
+
+
+@app.post("/api/me/mail/token")
+def mail_token_new():
+    """{list_id?} -- a new address (the old one stops working): personal (inbox) or for a list I may change."""
+    c = db()
+    if not MAIL_IN_ON:
+        return err(tr("E-mail to tasks is not set up on this server"), 409)
+    if is_agent(g.user):
+        raise Denied(403)
+    lid = body().get("list_id")
+    if lid is not None:
+        if isinstance(lid, bool) or not isinstance(lid, int):
+            return err(tr("Invalid value: {0}", "list_id"))
+        need_list(c, lid)
+    tok = secrets.token_urlsafe(12).replace("-", "x").replace("_", "y")
+    c.execute("DELETE FROM mail_tokens WHERE user_id=? AND list_id IS ?", (me(), lid))
+    c.execute("INSERT INTO mail_tokens(token,user_id,list_id,created_at) VALUES(?,?,?,?)", (tok, me(), lid, iso(now_utc())))
+    c.commit()
+    return jsonify(address=mail_addr(tok), list_id=lid)
+
+
+@app.delete("/api/me/mail/token")
+def mail_token_del():
+    """?list_id= (none = the personal address) -- the address stops working."""
+    c = db()
+    lid = request.args.get("list_id")
+    lid = as_int(lid, "list_id", 1) if lid else None
+    c.execute("DELETE FROM mail_tokens WHERE user_id=? AND list_id IS ?", (me(), lid))
+    c.commit()
+    return jsonify(ok=True)
+
+
+def mail_text(msg):
+    """(text, [(name, mime, bytes)]) of an email.message.EmailMessage: text/plain preferred, else HTML without tags."""
+    plain = html_ = None
+    files = []
+    for part in msg.walk():
+        if part.is_multipart():
+            continue
+        disp = (part.get_content_disposition() or "").lower()
+        ctype = part.get_content_type()
+        name = part.get_filename()
+        if disp == "attachment" or (name and disp != "inline") or (name and not ctype.startswith("text/")):
+            try:
+                data = part.get_payload(decode=True) or b""
+            except Exception:  # noqa: BLE001
+                data = b""
+            if data:
+                files.append((name or "file", ctype, data))
+            continue
+        try:
+            txt = part.get_content()
+        except Exception:  # noqa: BLE001
+            continue
+        if ctype == "text/plain" and plain is None:
+            plain = txt
+        elif ctype == "text/html" and html_ is None:
+            html_ = txt
+    if plain is None and html_:
+        t = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", "", html_)
+        t = re.sub(r"(?i)<br\s*/?>|</p>|</div>|</li>|</h\d>", "\n", t)
+        t = re.sub(r"<[^>]+>", "", t)
+        plain = html.unescape(t)
+    text = re.sub(r"\n{3,}", "\n\n", (plain or "").replace("\r\n", "\n")).strip()
+    return text[:MAIL_BODY_MAX], files
+
+
+def mail_target(c, msg):
+    """(user id, list id or None) the mail is for, or (None, None): a token in To / Cc / Delivered-To / X-Original-To, else
+    (mail_from_me) the sender's address of a person who allowed that."""
+    hdrs = " ".join(str(msg.get_all(h, [])) for h in ("To", "Cc", "Delivered-To", "X-Original-To", "Envelope-To"))
+    for tok in MAIL_TOKEN_RE.findall(hdrs):
+        r = c.execute("SELECT * FROM mail_tokens WHERE token=?", (tok,)).fetchone()
+        if r:
+            u = c.execute("SELECT disabled FROM users WHERE id=?", (r["user_id"],)).fetchone()
+            if not u or u["disabled"]:
+                return None, None
+            if r["list_id"] and list_role(c, r["list_id"], r["user_id"]) not in WRITE_ROLES:
+                return r["user_id"], None  # no longer allowed in that list: the inbox
+            return r["user_id"], r["list_id"]
+    sender = email.utils.parseaddr(str(msg.get("From", "")))[1].strip().lower()
+    if sender:
+        for r in c.execute("SELECT u.id FROM users u JOIN user_settings s ON s.user_id=u.id AND s.key='mail_from_me' AND s.value='1' "
+                           "WHERE lower(u.email)=? AND u.disabled=0", (sender,)):
+            return r[0], None
+    return None, None
+
+
+def mail_import(c, raw):
+    """One message (bytes) -> one task. Returns the task id, None when it is for nobody or already imported."""
+    msg = email.message_from_bytes(raw, policy=email.policy.default)
+    mid = str(msg.get("Message-ID", "")).strip()[:300] or ("sha:" + hashlib.sha256(raw).hexdigest())
+    if c.execute("SELECT 1 FROM tasks WHERE tt_id=?", ("mail:" + mid,)).fetchone():
+        return None
+    uid, lid = mail_target(c, msg)
+    if not uid:
+        return None
+    subj = MAIL_PREFIX_RE.sub("", str(msg.get("Subject", "")).replace("\n", " ")).strip()
+    text, files = mail_text(msg)
+    lg = lang(c, uid)
+    sender = str(msg.get("From", "")).strip()
+    title = subj or (text.split("\n", 1)[0][:120] if text else tr("E-mail", lg=lg))
+    content = (text + "\n\n" if text else "") + f"— {tr('E-mail from {0}', sender, lg=lg)}" if sender else text
+    title, content, url = split_link(title, content)
+    if lid:
+        ts = iso(now_utc())
+        srt = c.execute("SELECT COALESCE(MIN(sort),0)-1 FROM tasks WHERE list_id=? AND parent_id IS NULL", (lid,)).fetchone()[0]
+        tid = c.execute("INSERT INTO tasks(list_id,title,content,sort,created_at,updated_at,tt_id,created_by,url) VALUES(?,?,?,?,?,?,?,?,?)",
+                        (lid, title[:300], content, srt, ts, ts, "mail:" + mid, uid, url if valid_url(url) else None)).lastrowid
+        log_act(c, tid, "created", uid=uid)
+    else:
+        tid = new_inbox_task(c, uid, title, content, "mail:" + mid, url)
+    for name, mime, data in files[:20]:
+        if 0 < len(data) <= MAX_FILE_MB * 1024 * 1024:
+            try:
+                save_attachment_bytes(c, tid, name, mime, data)
+            except OSError:
+                break
+    bump(c)
+    c.commit()
+    return tid
+
+
+def mail_poll_once():
+    """One round: the unseen mails of the folder -> tasks; each one is marked \\Seen afterwards (also when it was for
+    nobody: it is never looked at again)."""
+    port = IMAP["port"] or (993 if IMAP["ssl"] else 143)
+    M = imaplib.IMAP4_SSL(IMAP["host"], port, timeout=60) if IMAP["ssl"] else imaplib.IMAP4(IMAP["host"], port, timeout=60)
+    n = 0
+    try:
+        M.login(IMAP["user"], IMAP["password"])
+        M.select(IMAP["folder"])
+        typ, data = M.uid("SEARCH", None, "UNSEEN")
+        for u in (data[0] or b"").split()[:200]:
+            typ, parts = M.uid("FETCH", u, "(RFC822)")
+            raw = next((p[1] for p in parts if isinstance(p, tuple) and len(p) > 1), None)
+            if raw:
+                with GATE.bg():
+                    c = connect()
+                    try:
+                        if mail_import(c, raw):
+                            n += 1
+                    finally:
+                        c.close()
+            M.uid("STORE", u, "+FLAGS", "(\\Seen)")
+    finally:
+        try:
+            M.logout()
+        except Exception:  # noqa: BLE001
+            pass
+    return n
+
+
+_MAIL_WAKE = threading.Event()
+
+
+def mail_loop():
+    while True:
+        try:
+            n = mail_poll_once()
+            aa_ok("mail")
+            if n:
+                print("mail: imported", n, "task(s)", flush=True)
+        except Exception as e:  # noqa: BLE001
+            print("mail:", type(e).__name__, e, flush=True)
+            aa_fail("mail", aa_err(e))
+        _MAIL_WAKE.wait(IMAP["interval"])
+        _MAIL_WAKE.clear()
+
+
+@app.post("/api/admin/mail/poll")
+def mail_poll_now():
+    """Admins: look into the mailbox now (instead of waiting for the next round)."""
+    need_admin()
+    if not MAIL_IN_ON:
+        return err(tr("E-mail to tasks is not set up on this server"), 409)
+    _MAIL_WAKE.set()
+    return jsonify(ok=True)
+
+
+def mail_send(to, subject, text, html_body=None):
+    """Sends one mail with KALMIDO_SMTP_*; raises on failure."""
+    m = email.message.EmailMessage()
+    m["From"], m["To"], m["Subject"] = SMTP["from"], to, subject
+    m["Date"] = email.utils.formatdate(localtime=True)
+    m["Message-ID"] = email.utils.make_msgid(domain=(SMTP["from"].rpartition("@")[2] or "kalmido.local"))
+    m.set_content(text)
+    if html_body:
+        m.add_alternative(html_body, subtype="html")
+    tls = SMTP["tls"]
+    port = SMTP["port"] or (465 if tls == "ssl" else 587 if tls == "starttls" else 25)
+    S_ = smtplib.SMTP_SSL(SMTP["host"], port, timeout=30) if tls == "ssl" else smtplib.SMTP(SMTP["host"], port, timeout=30)
+    try:
+        if tls == "starttls":
+            S_.starttls()
+        if SMTP["user"]:
+            S_.login(SMTP["user"], SMTP["password"])
+        S_.send_message(m)
+    finally:
+        try:
+            S_.quit()
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def digest_mail_content(c, uid, today):
+    """(subject, text, html) of a person's daily summary: due today / overdue, tomorrow, what waits for them, unread."""
+    lg = lang(c, uid)
+    rows = c.execute(f"""SELECT t.id, t.title, t.due, t.due_time, t.priority, l.name AS lname FROM tasks t JOIN lists l ON l.id=t.list_id
+                         WHERE t.status=0 AND t.deleted_at IS NULL AND t.parent_id IS NULL AND t.due IS NOT NULL AND t.due<=? AND l.archived=0
+                           AND ((l.owner_id=? AND (t.assignee_id IS NULL OR t.assignee_id=?)) OR (t.assignee_id=? AND t.list_id IN {vis_sql()}))
+                         ORDER BY t.due, t.due_time IS NULL, t.due_time, t.priority DESC LIMIT 60""",
+                     ((date.fromisoformat(today) + timedelta(days=1)).isoformat(), uid, uid, uid, uid, uid)).fetchall()
+    tom = (date.fromisoformat(today) + timedelta(days=1)).isoformat()
+    over = [r for r in rows if r["due"] < today]
+    tod = [r for r in rows if r["due"] == today]
+    tmr = [r for r in rows if r["due"] == tom]
+    waits = c.execute("SELECT COUNT(*) FROM agent_jobs WHERE state='waiting' AND (user_id=? OR user_id IS NULL)", (uid,)).fetchone()[0] \
+        if c.execute("SELECT 1 FROM sqlite_master WHERE name='agent_jobs'").fetchone() else 0
+    unread = news_unread(c, uid)
+    chat = tchat_unread(c, uid)
+    line = lambda r: f"- {r['title']}" + (f" ({r['due_time']})" if r["due_time"] else "") + f" · {r['lname']}"  # noqa: E731
+    parts = []
+    for head, xs in ((tr("Overdue", lg=lg), over), (tr("Today", lg=lg), tod), (tr("Tomorrow", lg=lg), tmr)):
+        if xs:
+            parts.append(f"{head} ({len(xs)})\n" + "\n".join(line(r) for r in xs[:25]))
+    extra = []
+    if waits:
+        extra.append(trn("{0} approval waits for you", "{0} approvals wait for you", waits, lg=lg))
+    if unread:
+        extra.append(trn("{0} unread news item", "{0} unread news items", unread, lg=lg))
+    if chat:
+        extra.append(trn("{0} unread chat message", "{0} unread chat messages", chat, lg=lg))
+    if extra:
+        parts.append(" · ".join(extra))
+    if not parts:
+        return None
+    subj = f"{APP_NAME}: " + (trn("{0} task today", "{0} tasks today", len(tod) + len(over), lg=lg) if tod or over else tr("Your day", lg=lg))
+    text = "\n\n".join(parts) + f"\n\n{PUBLIC_URL}/#today\n"
+    hb = "".join(f"<p>{html.escape(p).replace(chr(10), '<br>')}</p>" for p in parts)
+    hb += f'<p><a href="{html.escape(PUBLIC_URL)}/#today">{html.escape(tr("Open {0}", APP_NAME, lg=lg))}</a></p>'
+    return subj, text, f"<!doctype html><html><body style=\"font-family:sans-serif\">{hb}</body></html>"
+
+
+def digest_mail_user(c, uid, s, today):
+    if not MAIL_OUT_ON or s.get("digest_mail") != "1" or s.get("digest_mail_sent") == today:
+        return False
+    u = c.execute("SELECT email, disabled FROM users WHERE id=?", (uid,)).fetchone()
+    if not u or u["disabled"] or not (u["email"] or "").strip():
+        return False
+    uset(c, uid, "digest_mail_sent", today)
+    c.commit()
+    m = digest_mail_content(c, uid, today)
+    if not m:
+        return False
+    try:
+        mail_send(u["email"].strip(), *m)
+        aa_ok("smtp")
+        return True
+    except Exception as e:  # noqa: BLE001
+        print("mail: summary for user", uid, "failed:", type(e).__name__, e, flush=True)
+        aa_fail("smtp", aa_err(e))
+        return False
+
+
+@app.post("/api/me/mail/test")
+def mail_test():
+    """Sends the daily summary (or a short test text) to my e-mail address now."""
+    c = db()
+    if not MAIL_OUT_ON:
+        return err(tr("E-mail sending is not set up on this server"), 409)
+    u = c.execute("SELECT email FROM users WHERE id=?", (me(),)).fetchone()
+    if not u or not (u["email"] or "").strip():
+        return err(tr("No e-mail address is stored for you: an admin adds it (Settings > Users)"), 409)
+    lg = lang(c, me())
+    m = digest_mail_content(c, me(), local_now().date().isoformat()) or (f"{APP_NAME}: " + tr("Test", lg=lg), tr("E-mails from {0} are arriving.", APP_NAME, lg=lg), None)
+    try:
+        mail_send(u["email"].strip(), *m)
+    except Exception as e:  # noqa: BLE001
+        return err(tr("Sending failed: {0}", type(e).__name__), 502)
+    return jsonify(ok=True, to=u["email"].strip())
+
+
 init_db()
 if os.environ.get("TASKS_WATCHDOG", "1") == "1":
     threading.Thread(target=watchdog, daemon=True).start()
@@ -28313,6 +29494,8 @@ if os.environ.get("TASKS_WATCHDOG", "1") == "1":
         threading.Thread(target=backup_loop, daemon=True).start()
     if WH_ON:  # webhook deliveries (queue + retries)
         threading.Thread(target=wh_loop, daemon=True).start()
+    if MAIL_IN_ON:  # 2.17.0 (#443): new tasks by e-mail (one mailbox, polled)
+        threading.Thread(target=mail_loop, daemon=True).start()
     threading.Thread(target=git_loop, daemon=True).start()  # 2.2.0 (#271): repositories of project lists (idle without any)
     if NTFY_IN["token"] and NTFY_IN["url"]:
         if ntfy_inbox_allowed():

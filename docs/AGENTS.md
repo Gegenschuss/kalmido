@@ -502,6 +502,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `runtime_changed` | 2.4.1: an admin changed the agent's [runtime settings](#runtime-settings) | `runtime` |
 | `reset` | 2.4.1: an admin pressed *Reset now*: the host should restart the agent with a fresh session | `reset_seq`, `runtime`, `user` |
 | `ping` | the "Send test" button in the admin settings | `message` |
+| `team_message` | 2.17.0: someone @mentions the agent in a list's team chat (the agent is a member of the channel of every list shared with it) | `room` `{id, kind, list_id}`, `message` `{id, text, user_id, task_id, created_at}`, `user` `{id, name}`; answer with `POST /team/rooms/{id}/messages` (MCP `post_team_message`) |
 | `job_request` | 2.3.0: a person asks the agent for a proposal ([Proposals](#proposals)) | `job` (kind, `proposal_state`), `kind`, `input` (exactly what the person sent), `limits`, `requested_by` `{id, name}` |
 | `followup_due` | 2.1.0: the follow-up day of a task *waiting on external* (at the all-day reminder time of the person it is for), once per date, to every agent that follows the task (assigned, creator, commented) | `task` (with `task.waiting`), `list`, `waiting` `{note, until, since, by}` |
 
@@ -738,6 +739,7 @@ the setup guide show the same block with a *Copy rules* button. In short:
   (`202`) are not repeated, the result comes as a `job` event;
 - usage hook as Stop and SubagentStop hook;
 - park blockers with a note instead of stalling;
+- team chat (2.17): answer in a list's channel when @mentioned (`team_message`), short, Markdown;
 - read attachments through the API when someone asks about a screenshot.
 
 ## Runtime settings
@@ -1240,3 +1242,32 @@ with our results.
 - Every call of the agent is in the [audit log](#audit-log) (2.2.1).
 - Repositories (2.2.0): agents cannot connect repositories or read their tokens; Kalmido only reads with a read-only token and never merges. A merge request needs 👍 from an approver, never from another agent.
 - A hard usage limit is a brake, not a kill switch: the agent can still report usage and its status. Usage reports carry no prompt content.
+
+
+## Notes and the team chat (2.17.0)
+
+**Notes** are Markdown documents of a list (meeting notes, briefings, decisions); everyone who sees the whole list reads
+them (participants do not), owner, list admins and members write them. `#123` in a note links task 123 in the app.
+
+| Call | MCP tool | Scope |
+|---|---|---|
+| `GET /lists/{id}/notes` | `list_notes` | read |
+| `GET /notes?q=&list_id=` | `search_notes` | read |
+| `GET /notes/{id}` | `get_note` | read |
+| `POST /lists/{id}/notes` `{title, body?, tags?, pinned?}` | `create_note` | tasks:write |
+| `PATCH /notes/{id}` `{…, list_id?, expect_updated_at?}` (409 + the current note when it changed since) | `update_note` | tasks:write |
+| `DELETE /notes/{id}` | `delete_note` | delete |
+
+**Team chat**: people write to each other directly and in one channel per shared list. An agent is a member of the
+channel of every list shared with it (role member / admin / viewer), reads it and writes there; it gets the event
+`team_message` only when someone @mentions it. Agents cannot open direct messages (403): people talk to an agent in its
+own chat.
+
+| Call | MCP tool | Scope |
+|---|---|---|
+| `GET /team/rooms` | `list_team_chats` | read |
+| `GET /team/rooms/{id}/messages?before=&limit=` | `read_team_chat` | read |
+| `POST /team/rooms/{id}/messages` `{body, task_id?}` (mentions as `<@user id>`) | `post_team_message` | comments |
+| `PATCH /team/messages/{id}` · `DELETE …` (own messages) | `edit_team_message` · `delete_team_message` | comments |
+| `POST /team/messages/{id}/reactions` `{emoji, on?}` | `react_team_message` | comments |
+| `POST /team/rooms/{id}/read` `{last_id?}` | `mark_team_chat_read` | comments |

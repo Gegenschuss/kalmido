@@ -339,6 +339,14 @@ shard 6  # ---------------------------------------------------------------- shar
 # message, the command field (hints, "Ask <agent>", "Create as task"), the sun icons, the heron's sun; jsdom + Firefox at
 # 1440 (mouse drags), 2560 / 1920 (four columns), 390 / 412 (touch taps)
        run p2160_ui node p2160_ui.js "$KALMIDO_TEST_DATA"
+# 2.17.0 package B "Communication" (#452 #419 #442 #443 #475): notes (roles, search, conflicts, API + scopes), team chat (channels,
+# DMs, mentions, rights, reactions, read state, pushes, the agent), tasks by e-mail and the summary (own container with the
+# IMAP / SMTP stubs of stub_mail.py), the dashboard setting; then the UI in jsdom and Firefox (390 touch / 1440 mouse)
+       run p2170_api "$PY" p2170_api_test.py "$KALMIDO_TEST_DATA"
+       run p2170_ui node p2170_ui.js "$KALMIDO_TEST_DATA"
+# 2.17.0 (#649): 5000 generated tasks: /api/state, search, the API, and in Firefox start, views, "All" with "Show more",
+# re-render, the command field, keyboard (generous limits; PERF_BIG=1 adds 20000)
+       run perf_ui node perf_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

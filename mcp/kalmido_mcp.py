@@ -757,13 +757,54 @@ TOOL_MAP = {t[0]: t for t in TOOLS}
 
 # 2.15.0 (#479): the scope each tool needs (the same as its REST call, see GET /api/v1/openapi.json x-kalmido-scope);
 # tools/list shows only the tools the token may use (GET /me effective_scopes; agent = agent tokens only).
+# 2.17.0 (#442 #419): notes of lists and the team chat
+NOTE_IN = {"title": {"type": "string", "maxLength": 300}, "body": {"type": "string", "description": "Markdown; #123 links task 123"},
+           "tags": {"type": "array", "items": {"type": "string"}}, "pinned": {"type": "boolean"}}
+TOOLS += [
+    ("list_notes", "2.17.0: the notes of a list (Markdown documents next to its tasks: meeting notes, briefings, decisions), "
+                   "with their text. Participants of a list see none.",
+     _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/notes")),
+    ("search_notes", "2.17.0: find notes (all words in title, text or tags), optionally in one list; results without the full text "
+                     "(get_note for it).",
+     _obj({"q": {"type": "string"}, "list_id": S_ID}), lambda api, a: api.call("GET", "/notes", _pick(a, ("q", "list_id")))),
+    ("get_note", "2.17.0: one note with its text.", _obj({"note_id": S_ID}, ["note_id"]), lambda api, a: api.call("GET", f"/notes/{int(a['note_id'])}")),
+    ("create_note", "2.17.0: write a note in a list (owner, list admins, members).", _obj({"list_id": S_ID, **NOTE_IN}, ["list_id", "title"]),
+     lambda api, a: api.call("POST", f"/lists/{int(a['list_id'])}/notes", body=_pick(a, ("title", "body", "tags", "pinned")))),
+    ("update_note", "2.17.0: change a note; list_id moves it; expect_updated_at (from get_note) refuses with 409 when someone changed it "
+                    "in between (the answer carries the current note).",
+     _obj({"note_id": S_ID, **NOTE_IN, "list_id": S_ID, "expect_updated_at": {"type": "string"}}, ["note_id"]),
+     lambda api, a: api.call("PATCH", f"/notes/{int(a['note_id'])}", body=_pick(a, ("title", "body", "tags", "pinned", "list_id", "expect_updated_at")))),
+    ("delete_note", "2.17.0: delete a note.", _obj({"note_id": S_ID}, ["note_id"]), lambda api, a: api.call("DELETE", f"/notes/{int(a['note_id'])}")),
+    ("list_team_chats", "2.17.0: the team chat conversations you take part in: one channel per shared list you are a member of "
+                        "(people + agents), with unread counts. Agents cannot open direct messages; people talk to you in your own "
+                        "chat (send_chat). You get the event team_message when someone @mentions you in a channel.",
+     _obj({}), lambda api, a: api.call("GET", "/team/rooms")),
+    ("read_team_chat", "2.17.0: messages of a team chat conversation, oldest first; before = a message id for older ones. Mentions "
+                       "are <@user id>.",
+     _obj({"room_id": S_ID, "before": S_ID, "limit": {"type": "integer", "minimum": 1, "maximum": 100}}, ["room_id"]),
+     lambda api, a: api.call("GET", f"/team/rooms/{int(a['room_id'])}/messages", _pick(a, ("before", "limit")))),
+    ("post_team_message", "2.17.0: write in a team chat channel (Markdown; mention people as <@user id>; task_id links a task).",
+     _obj({"room_id": S_ID, "body": {"type": "string", "maxLength": 8000}, "task_id": S_ID}, ["room_id", "body"]),
+     lambda api, a: api.call("POST", f"/team/rooms/{int(a['room_id'])}/messages", body=_pick(a, ("body", "task_id")))),
+    ("edit_team_message", "2.17.0: change your own team chat message.", _obj({"message_id": S_ID, "body": {"type": "string"}}, ["message_id", "body"]),
+     lambda api, a: api.call("PATCH", f"/team/messages/{int(a['message_id'])}", body={"body": a["body"]})),
+    ("delete_team_message", "2.17.0: delete your own team chat message.", _obj({"message_id": S_ID}, ["message_id"]),
+     lambda api, a: api.call("DELETE", f"/team/messages/{int(a['message_id'])}")),
+    ("react_team_message", "2.17.0: toggle a reaction (up, down, heart or one emoji) on a team chat message; on=true/false sets it.",
+     _obj({"message_id": S_ID, "emoji": {"type": "string"}, "on": {"type": "boolean"}}, ["message_id", "emoji"]),
+     lambda api, a: api.call("POST", f"/team/messages/{int(a['message_id'])}/reactions", body=_pick(a, ("emoji", "on")))),
+    ("mark_team_chat_read", "2.17.0: mark a team chat conversation read (up to last_id, default the newest).",
+     _obj({"room_id": S_ID, "last_id": S_ID}, ["room_id"]), lambda api, a: api.call("POST", f"/team/rooms/{int(a['room_id'])}/read", body=_pick(a, ("last_id",)))),
+]
+
+
 TOOL_SCOPES = {
     "agent": ("get_agent", "react_to_chat", "set_status", "list_events", "wait_for_events", "list_jobs", "create_job", "get_job",
               "submit_proposal", "update_job", "list_chats", "chat_typing", "send_chat", "report_usage", "get_usage"),
-    "tasks:write": ("create_task", "update_task", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "batch_tasks",
+    "tasks:write": ("create_note", "update_note", "create_task", "update_task", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "batch_tasks",
                     "reopen_task", "skip_occurrence", "take_task", "add_subtask", "add_dependency", "remove_dependency", "create_habit",
                     "update_habit", "check_in_habit", "shift_list_dates"),
-    "comments": ("add_comment", "react", "request_merge_approval", "update_comment", "delete_comment", "mark_news_read",
+    "comments": ("post_team_message", "edit_team_message", "delete_team_message", "react_team_message", "mark_team_chat_read", "add_comment", "react", "request_merge_approval", "update_comment", "delete_comment", "mark_news_read",
                  "delete_chat_attachment"),
     "structure": ("set_list_columns", "create_list", "update_list", "share_list", "unshare_list", "share_list_with_group",
                   "unshare_list_from_group", "create_section", "rename_section", "reorder_sections", "rename_folder", "delete_folder",
@@ -771,7 +812,7 @@ TOOL_SCOPES = {
                   "update_template", "apply_template", "create_filter", "update_filter", "set_project_overview", "add_project_link",
                   "update_project_link", "delete_project_link", "reorder_project_links", "set_project_status", "add_milestone", "update_milestone",
                   "delete_milestone"),
-    "delete": ("delete_list", "delete_section", "delete_task", "restore_task", "empty_trash", "delete_field", "delete_template",
+    "delete": ("delete_note", "delete_list", "delete_section", "delete_task", "restore_task", "empty_trash", "delete_field", "delete_template",
                "delete_filter", "delete_habit"),
     "attachments:read": ("get_attachment",),
     "attachments:write": ("upload_attachment", "delete_attachment", "upload_project_file", "delete_project_file"),

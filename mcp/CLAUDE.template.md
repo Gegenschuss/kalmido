@@ -41,6 +41,10 @@
 - When you stop working (queue done, blocked, end of the session), post **one summary in the chat** to the person who
   asked: what is done, what is open, what they should test or decide.
 
+### Team chat
+- In a list's team chat you get the event `team_message` only when someone @mentions you: answer there
+  (`post_team_message`), short and in Markdown. Do not post there on your own unless someone asked you to report there.
+
 ### When you are stuck
 - Never stall silently. **Park a blocker** with a short note on the task (what is missing, who has to act) and a chat
   message or job state waiting, then continue with the next item.

@@ -117,6 +117,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
 
   // ================= News + notification row
   w = await boot({user: 'alice', hash: 'news'}); d = w.document; await sleep(1200);
+  w.eval(`LS.set('newsBundle', false); render()`); await sleep(400);  // 2.17.0: the plain list (bundled News: p2170_ui)
   const it = [...d.querySelectorAll('.nitem.k-usage')];
   check(it.length >= 1 && /Claude reached its usage limit/.test(it[0].textContent) && /calls are blocked/.test(it[0].textContent), 'News: the hard limit item: ' + it[0]?.textContent.replace(/\s+/g, ' ').slice(0, 160));
   check(/used 80 %/.test(w.eval(`newsText({kind: 'usage', data: {name: 'X', level: 'soft80', used: 8, limit: 10, metric: 'cost', period: 'month'}}, {})`)), 'News text 80 %');
@@ -127,7 +128,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   w.close();
   w = await boot({user: 'bob', hash: 'today'}); d = w.document;
   w.eval(`settingsModal('notify')`); await sleep(700);
-  check(!d.querySelector('[data-nm="usage"]') && [...d.querySelectorAll('#sp-notify .nmr')].filter(r => !r.querySelector('[data-nm="proposal"]')).length === 14, 'bob: no usage row (14 rows; 2.3.0: + the proposal row, 2.7.0: + repeated reminders)');
+  check(!d.querySelector('[data-nm="usage"]') && [...d.querySelectorAll('#sp-notify .nmr')].filter(r => !r.querySelector('[data-nm="proposal"]')).length === 15, 'bob: no usage row (15 rows; 2.3.0: + the proposal row, 2.7.0: + repeated reminders, 2.17.0: + team chat)');
   w.close();
 
   // ================= German

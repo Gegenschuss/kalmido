@@ -48,7 +48,7 @@ const TOKEN = 'bob-ui-server-token-4c2e', PTOKEN = 'bob-ui-personal-token-9d1f';
     w.eval(`settingsModal('notify')`); await sleep(700);
     const mx = d.querySelector('#sp-notify .nmx');
     const rows = [...(mx?.querySelectorAll('.nmr') || [])];
-    check(mx && rows.length === 14 && /Event.*News.*Push/.test(mx.querySelector('.nmh').textContent), `${lab}: matrix with every event (${rows.length})`);
+    check(mx && rows.length === 15 && /Event.*News.*Push/.test(mx.querySelector('.nmh').textContent), `${lab}: matrix with every event (${rows.length}: ${rows.map(r => r.querySelector('[data-nm]')?.dataset.nm || '-').join(',')})`);
     const rem = rows.find(r => /Reminders/.test(r.textContent));
     check(rem && !rem.querySelector('[data-ch="news"]') && rem.querySelector('.nmna') && rem.querySelector('[data-nm="reminder"][data-ch="push"]').checked, `${lab}: reminders push only`);
     check(d.querySelector('[data-nm="reply"][data-ch="push"]').checked && d.querySelector('[data-nm="newtask"][data-ch="push"]').checked === mobile  // the desktop run switched it on

@@ -7,6 +7,49 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.17.0] - 2026-10-04
+
+**In short:** Communication. A team chat for people (direct messages and a channel per shared list, agents included,
+#419), notes per list and project (#442), tasks by e-mail and the daily summary by e-mail (#443), News bundled per task
+with "Needs you" first and a summary by an agent (#452), a dashboard behind the logo (#475), and very long lists that
+stay fast (#649).
+
+### Added
+- **Team chat** (#419): direct messages between two people who share a list or a group, and one channel per shared list
+  for everyone who sees the whole list (agents shared with it read along and get the event `team_message` when
+  @mentioned). Markdown, `@Name` mentions, a linked task, reactions, editing / deleting your own messages (list owners and
+  admins delete any in their channel), unread counts in the sidebar and the tab bar, mute (only mentions then), pushes
+  for direct messages and mentions (notification row *Team chat*). Desktop: conversations next to the open one; phones:
+  one after the other. REST API `/team/...` and MCP tools (`list_team_chats`, `read_team_chat`, `post_team_message` …).
+- **Notes** per list and project (#442): Markdown documents with title, tags and pinned notes first, saved while typing,
+  `#123` links a task, an own address (`#note/<id>`), moving to another list, search in the list and in the command
+  field, both versions shown when someone else changed the note in between; in the list menu and the project overview.
+  Readers: everyone who sees the whole list; writers: owner, list admins, members. REST API `/lists/{id}/notes`,
+  `/notes` and MCP tools.
+- **Tasks by e-mail** (#443): with one mailbox set up (`KALMIDO_MAIL_ADDRESS`, `KALMIDO_IMAP_*`) everyone gets a secret
+  address for their inbox and one per list (Settings > Integrations); subject = title, text = description, attachments
+  = files. Optionally mails from your own stored address. The **daily summary by e-mail** (`KALMIDO_SMTP_*`, Settings >
+  Notifications) at the digest time, *Send now* to try.
+- **News bundled** (#452): grouped per task with a summary line, *Needs you* first, *Mark read* per group, *Bundled* /
+  plain list per device; *Summarize* sends the unread News to an agent's chat.
+- **Dashboard** (#475): the logo opens cards for what waits for you, today, News, the team chat, projects, pinned tasks,
+  notes, agents, numbers and a search field; *Customize* orders and hides them (saved for all your devices).
+- A performance test with 5000 generated tasks (`tests/perf_ui.js`, `PERF_BIG=1` for 20000) (#649).
+
+### Changed
+- Very long views render their first 400 tasks and *Show more* (also by itself when you scroll there) (#649).
+- The agent behaviour rules ask agents to answer in a list's team chat when they are @mentioned.
+
+### Fixed
+- Views with thousands of tasks were slow (finding the subtasks of every row searched all tasks): *Today* with 20000
+  tasks went from 28 s to 0.3 s, *All* from minutes to 0.4 s (#649).
+- Accessibility follow-ups from a review of 2.16: the reaction bar of your own chat messages opened above the screen;
+  the task panel had no close button on an unfolded foldable (900 px and wider); phones show the search icon in the header
+  on every view; the subtask arrow, the header checkbox, the priority button and the column separators tell a screen
+  reader their state; overdue tasks are marked with an icon in the columns view too; only one task row is a Tab stop;
+  Escape on the command field or a panel grip returns the focus; a tap on a panel grip offers *Wider* / *Narrower* /
+  *Standard width*; the panel grip follows when the chat opens; fields without a visible label have a name.
+
 ## [2.16.1] - 2026-10-04
 
 ### Fixed
@@ -2266,7 +2309,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.16.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.17.0...HEAD
+[2.17.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.17.0
 [2.16.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.16.1
 [2.16.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.16.0
 [2.15.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.15.1

@@ -282,6 +282,22 @@ open first, and the latest commits `[{repo, sha, short, message, author, url, br
 `default_branch`, a suggested `branch` `kalmido-<id>`, `prs`, `commits`, and `others` when the list has more).
 Tasks in `GET /tasks` carry `code` when something is linked. See *Git integration* in the README.
 
+## Notes and team chat (2.17.0)
+
+| Endpoint | Scope | |
+|---|---|---|
+| `GET /lists/{id}/notes` | read | the notes of a list (with text), paged (`limit`, `cursor`); not for participants |
+| `POST /lists/{id}/notes` | tasks:write | `{title, body?, tags?, pinned?}` (owner, list admins, members) |
+| `GET /notes?q=&list_id=&limit=` | read | find notes: all words in title, text or tags; without the full text (`excerpt`) |
+| `GET /notes/{id}` · `PATCH` · `DELETE` | read · tasks:write · delete | `PATCH` takes `list_id` (move) and `expect_updated_at` (409 with the current note when someone changed it since) |
+| `GET /team/rooms` | read | your conversations: one channel per shared list you see whole, direct messages; `unread`, `mention`, `muted`, `last` |
+| `POST /team/dm` | comments | `{user_id}`: the direct conversation with a person you share a list or a group with (people only) |
+| `GET /team/rooms/{id}/messages` | read | oldest first; `before=<id>` for older ones, `limit` (1-100); `has_more` |
+| `POST /team/rooms/{id}/messages` | comments | `{body, task_id?}`; mention members as `<@user id>` (others become plain text) |
+| `PATCH /team/messages/{id}` · `DELETE` | comments | your own messages (list owners / admins may delete any in their channel) |
+| `POST /team/messages/{id}/reactions` | comments | `{emoji: up\|down\|heart or one emoji, on?}` |
+| `POST /team/rooms/{id}/read` | comments | `{last_id?, muted?}` |
+
 ## Roadmap
 
 `GET /roadmap` returns every list the user can see (not archived) as a group, in sidebar order (inbox, lists without
