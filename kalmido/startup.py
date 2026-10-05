@@ -4,7 +4,7 @@ import threading
 
 from .core.config import NTFY_IN, ntfy_inbox_allowed, UPDATE_CHECK_ENV
 from .core.i18n import N_
-from .core.db import init_db
+from .core.db import connect, init_db
 from .core.pages import ntfy_inbox_loop
 from .core.instance import update_loop
 from .notify.push import watchdog
@@ -15,9 +15,15 @@ from .api.v1 import WH_ON
 from .integrations.webhooks import wh_loop
 from .integrations.git import git_loop
 from .integrations.mail import MAIL_IN_ON, mail_loop
+from .events.model import migrate_family_events
 
 
 init_db()
+_c = connect()
+try:
+    migrate_family_events(_c)  # 2.21.0 (#659), once: the family events of 2.19 (tasks with people) become events
+finally:
+    _c.close()
 if os.environ.get("TASKS_WATCHDOG", "1") == "1":
     threading.Thread(target=watchdog, daemon=True).start()
     if UPDATE_CHECK_ENV:

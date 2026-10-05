@@ -14,7 +14,7 @@ development workflow see [CONTRIBUTING.md](../CONTRIBUTING.md).
  static/i18n/*.json                     background threads (watchdog ...)           webhooks, OIDC provider
                                               ^
  agents / scripts / MCP clients  ---------->  |  /api/v1 (tokens, scopes; mcp/kalmido_mcp.py is a thin bridge)
- calendar apps (CalDAV), ICS feed  -------->  |  /dav/, /ical/
+ calendar + contacts apps          ------->  |  /dav/ (CalDAV, CardDAV), /ical/
 ```
 
 - **Server**: Python with Flask behind waitress, SQLite as the only storage (plus files below the attachments folder).
@@ -127,7 +127,7 @@ The most used helpers:
 | `lists/fields.py` | Custom fields of a list. |
 | `personal/stats.py` | Statistics (module "stats"). |
 | `calendars/icalfeed.py` | The subscribable ICS calendar feed of a user's tasks. |
-| `calendars/caldav.py` | CalDAV server for tasks (VTODO) with app passwords. |
+| `calendars/caldav.py` | CalDAV server for tasks (VTODO) with app passwords; the /dav/ entry point for event calendars and CardDAV too. |
 | `integrations/importers.py` | Importers: TickTick, Todoist, Trello, Asana, Microsoft To Do, ICS / VTODO (preview, dry run, undo). |
 | `notify/push.py` | Notifications: ntfy, Web Push (RFC 8030 / 8291 / 8292), reminders and nags, the watchdog tick and loop. |
 | `notify/alerts.py` | Admin alerts via ntfy (recording, sending, settings). |
@@ -156,6 +156,15 @@ The most used helpers:
 | `family/web.py` | Family: the web API. |
 | `family/carddav.py` | Family: birthdays and anniversaries from CardDAV contacts. |
 | `family/v1.py` | Family: the weekly rotation and the REST API v1 (+ MCP). |
+| `events/model.py` | Events (module "events"): calendars, rights, validation, repeat expansion, attendees, reminders, the family migration. |
+| `events/ics.py` | Events as iCalendar (VEVENT): rendering for CalDAV + export, reading what clients send, importing an ICS file. |
+| `events/web.py` | Events: the web API (calendars, sharing, events, single occurrences, replies, preparation tasks, export). |
+| `events/dav.py` | Events over CalDAV: every event calendar (and the invitations) as a VEVENT collection next to the task lists. |
+| `events/v1.py` | Events: the REST API v1 (+ MCP) and its OpenAPI part (scope "calendar"). |
+| `contacts/model.py` | Contacts (module "contacts"): address books, rights, vCard 3 / 4 reading + writing, search, links to tasks, birthdays. |
+| `contacts/carddav.py` | CardDAV server: every address book a person sees as a collection of vCards. |
+| `contacts/web.py` | Contacts: the web API (address books, sharing, contacts, search, vCard import / export, links to tasks). |
+| `contacts/v1.py` | Contacts: the REST API v1 (+ MCP) and its OpenAPI part (scope "contacts"). |
 | `startup.py` | Start-up: init_db() and the background threads (watchdog, update check, calendars, backups, webhooks, mail, git). |
 
 ### Adding a route
@@ -237,6 +246,8 @@ registering the ones of its area.
 | `chat.js` | Team chat and notes of a list / project. |
 | `dashboard.js` | News bundled per task, the dashboard and Settings > Tasks by e-mail. |
 | `family.js` | The module "Family". |
+| `calevents.js` | Events (module "events"): the editor and popover, the agenda, creating in the week grid, calendars, the phone setup. |
+| `contacts.js` | Contacts (module "contacts"): the view, the editor, the card, links between contacts and tasks, import / export. |
 | `main.js` | Start-up: loading the state, polling, the service worker. Loaded last. |
 
 ### Adding a client file

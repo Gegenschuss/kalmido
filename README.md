@@ -18,6 +18,13 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.21.0** (2026-10-05): Events & contacts. Kalmido keeps your **events** and **contacts** itself, next to the tasks,
+  and your phone's own **calendar and contacts apps sync directly** (CalDAV and CardDAV: iPhone, Android with DAVx⁵,
+  Thunderbird). Events with time zones, repeats (also *only this date*), reminders, **invitations** with answers and a
+  linked **preparation task**; several calendars, shared like lists; an **agenda**; drag over free time in the week to
+  create one; **ICS import** (e.g. a Google export). Contacts with search, groups, photos, birthdays as tasks, linked to
+  tasks (*waiting on*, *responsible*) and events; vCard import. API + MCP with the new permissions *calendar* and
+  *contacts*. The family events of 2.19 became real events. Starting while the server is down shows your tasks.
 - **2.19.0** (2026-10-04): Family. A module for households, off until you want it: **birthdays and anniversaries** with
   the age, gift ideas and an import from your **contacts** (CardDAV); household chores that **take turns**; **child
   accounts** with a simple view, stars and rewards; **who comes along**; **shopping lists** by shop area with a shopping
@@ -287,6 +294,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - Push notifications without an extra app (Web Push: Chrome, Edge, Firefox, Safari, iPhone and iPad from the Home Screen) or via [ntfy](https://ntfy.sh): reminders with *Done* / *Snooze*, focus end, habit reminders, daily digest, comments and assignments; a notification you handled on one device (task completed or opened, News read) closes on your other devices
 - Share from your phone into the inbox: a ready-made import for the Android app HTTP Shortcuts, a guide for the iPhone Shortcuts app (see below); app shortcuts (long-press the icon: new task, today, news, search)
 - Profile pictures: ten heron presets (2.19.0) or your own photo (cropped square, resized, metadata removed), shown wherever the initials were
+- **Events and contacts** (2.21.0): your own calendars and address books in Kalmido, synced with the phone's calendar and contacts apps ([Events](#events), [Contacts](#contacts))
 - **Calendar apps (CalDAV), both ways**: every list as a task list in Reminders (iPhone, iPad, Mac), Thunderbird, Evolution, Tasks.org or DAVx⁵ on Android, with an app password per device ([Calendar apps](#calendar-apps-caldav))
 - **Calendar subscription**: your open tasks with a date as an ICS feed for Google Calendar, Apple Calendar, Outlook or Thunderbird
 - Optional [Paperless-ngx](https://docs.paperless-ngx.com) integration: link documents to tasks, send attachments to Paperless
@@ -679,6 +687,44 @@ a tab (Settings > Appearance > Tab bar).
 - **Packing lists** from templates: holiday, swimming pool, daycare, camping, business trip.
 - API v1 and MCP: `/family`, `/family/occasions`, `/family/deadlines`, `/tasks/{id}/to-shopping`, `/lists/{id}/shop-areas`,
   `/family/packing`, `/family/kids`, rewards; tasks carry `family`, `rotation`, `people` and `stars` (docs/API.md).
+
+## Events
+
+Kalmido keeps your appointments itself (module *Events*, on by default; *Settings > Modules*). They show next to your
+tasks in the month, week and day view, in the **agenda** (the coming two weeks, events and tasks by day) and in *Events
+today*. **+ Event** in the calendar bar, the quick sheet of a free slot (*Event*) or a **drag over free time** in the
+week create one; a click opens it (details, your answer, *Edit*, *Delete*, *Preparation task*).
+
+- An event: title, from – to (all day or with times, over several days, in any **time zone**), place, notes, a link,
+  **repeat** (daily, weekdays, weekly, every two weeks, monthly, yearly; until a date or a number of times),
+  **reminders** (a push before the start), status and *busy*. A repeating event changes as a whole or **only this
+  date**; a single date can be left out.
+- **Calendars**: as many as you like, each with a colour; *Calendars* in the calendar bar shows, hides, renames,
+  shares (*can view* / *can edit*, like lists), imports an **ICS file** (an export of Google Calendar or any other app;
+  importing it again changes the events instead of doubling them) and exports one.
+- **People**: invite people of this server (they see this one event, not your calendar, get News and a push and
+  answer *Accept* / *Maybe* / *Decline*), your contacts or any e-mail address.
+- **Preparation**: a task linked to the event, due before it (*Preparation task*), or the other way round *Schedule as
+  an event* in a task's panel.
+- **On the phone**: each calendar is a calendar in the phone's own app (CalDAV), changes go both ways; invitations come
+  in a read-only calendar *Invitations*. See [Calendar and contacts on the phone](docs/CALDAV.md#calendar-and-contacts-on-the-phone).
+- The family events of 2.19 (tasks with people who come along) became events once, with those people invited; the
+  task stays, marked done and linked to its event.
+
+## Contacts
+
+Your address books live in Kalmido too (module *Contacts*, on by default): **Contacts** in the sidebar lists them with
+a search (name, company, e-mail, phone, address, group), a group filter and a card per person (phones and e-mails as
+links, addresses, birthday, notes, linked tasks and events). *New contact* / *Edit*: name, company, job title, phones,
+e-mails, addresses, web links, birthday and anniversary (also without the year), groups, a photo, notes.
+
+- **Address books**: as many as you like, shared like lists (*can view* / *can edit*); contacts are personal data, so
+  they only show to people who see their address book, also in a task.
+- **Tasks**: *People and dates* in a task's panel links a contact (*Waiting on*, *Responsible*, *About*).
+- **Birthdays** (module Family): an address book's birthdays and anniversaries become yearly tasks of a list you pick.
+  An address book connected under *Family > From contacts…* is also copied into an address book of its own.
+- **Import / export**: vCard files (3.0 and 4.0); **on the phone** each address book is an address book in the phone's
+  contacts app (CardDAV), both ways.
 
 ## Team chat
 

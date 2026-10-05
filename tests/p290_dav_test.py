@@ -191,8 +191,8 @@ check(req(dav("alice", PW.replace("-", "").upper()), "PROPFIND", "/dav/", "", 0)
 check(req(dav("alice", "password123"), "PROPFIND", "/dav/", "", 0).status_code == 401, "the account password is refused")
 r = req(requests.Session(), "PROPFIND", "/dav/", "", 0)
 check(r.status_code == 401 and r.headers.get("WWW-Authenticate", "").startswith("Basic realm="), "no credentials: 401 + Basic challenge")
-check(req(requests.Session(), "OPTIONS", "/dav/").headers.get("DAV", "").replace(" ", "") == "1,3,calendar-access",
-      "OPTIONS without login: DAV: 1, 3, calendar-access")
+check(req(requests.Session(), "OPTIONS", "/dav/").headers.get("DAV", "").replace(" ", "") == "1,3,calendar-access,addressbook",
+      "OPTIONS without login: DAV: 1, 3, calendar-access, addressbook (2.21.0: CardDAV)")
 time.sleep(1.1)
 check(db("SELECT last_used_at IS NOT NULL FROM app_passwords WHERE id=?", (PWID,))[0][0] == 1, "last use is recorded")
 # token API: persons only, write scope

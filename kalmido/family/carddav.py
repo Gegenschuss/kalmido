@@ -185,10 +185,11 @@ def contacts_sync(c, sid):
             allow = cal_allow(c)
             url = cal_unseal(c, s["user_id"], s["url"])
             auth = (s["username"], cal_unseal(c, s["user_id"], s["password"]))
-            occs = []
+            occs, cards = [], []
             for b in carddav_books(url, auth, allow):
                 for card in carddav_cards(b, auth, allow):
                     occs += [(*o, b) for o in vcard_occasions(card)]
+                    cards.append(card)
             lid = s["list_id"]
             if not lid or list_role(c, lid, s["user_id"]) not in WRITE_ROLES:
                 lid = fam_list(c, s["user_id"], "birthdays", create=False)
@@ -230,6 +231,11 @@ def contacts_sync(c, sid):
                 f["card"] = uid_[:200]
                 c.execute("UPDATE tasks SET fam=? WHERE id=?", (json.dumps(f, ensure_ascii=False, separators=(",", ":")), tid))
                 c.execute("INSERT OR REPLACE INTO contact_links(src_id,uid,kind,task_id,digest,book) VALUES(?,?,?,?,?,?)", (sid, uid_, kind, tid, dig, book_s))
+            try:  # 2.21.0 (#658): the cards also land in an address book of their own (module Contacts on)
+                from ..contacts.model import mirror_source
+                mirror_source(c, sid, cards[:CONTACT_CARDS_MAX])
+            except Exception as e:  # noqa: BLE001  (the birthdays above stay, whatever happens here)
+                print("contacts sync: mirroring source", sid, "failed:", type(e).__name__, e, flush=True)
             upd.update(status="ok", error="", fails=0, count=n, synced_at=iso(now_utc()))
             bump(c)
         except Exception as e:  # noqa: BLE001

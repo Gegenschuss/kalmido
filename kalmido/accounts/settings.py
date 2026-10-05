@@ -23,7 +23,7 @@ from ..personal.timetrack import BadInput
 # ---------------------------------------------------------------- settings / export (per user)
 
 SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "review_sent", "ntfy_topic", "features_rev", "onboard", "sample_ask", "agent_share",
-                        "purpose")
+                        "purpose", "evcals_hidden")
 DASH_WIDGETS = ("wait", "today", "news", "chat", "projects", "pinned", "notes", "agents", "stats", "search", "family")  # 2.17.0 (#475), 2.19.0
 SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "time_focus", "paperless_keep", "celebrate", "cal_today",
                   "date_confirm", "digest_mail", "mail_from_me")
@@ -397,6 +397,13 @@ def export_json():
         "list_milestones": (f"SELECT * FROM list_milestones WHERE list_id IN {own}", (uid,)),
         "list_files": (f"SELECT * FROM list_files WHERE list_id IN {own}", (uid,)),
         "list_paperless": (f"SELECT * FROM list_paperless WHERE list_id IN {own}", (uid,)),
+        # 2.21.0 (#659 / #658): my event calendars with their events + attendees, my address books with their contacts
+        "event_calendars": ("SELECT * FROM ev_cals WHERE owner_id=?", (uid,)),
+        "events": ("SELECT * FROM events WHERE cal_id IN (SELECT id FROM ev_cals WHERE owner_id=?)", (uid,)),
+        "event_attendees": ("SELECT * FROM event_attendees WHERE event_id IN (SELECT e.id FROM events e JOIN ev_cals k ON k.id=e.cal_id "
+                            "WHERE k.owner_id=?)", (uid,)),
+        "address_books": ("SELECT id, name, color, created_at FROM books WHERE owner_id=?", (uid,)),
+        "contacts": ("SELECT * FROM contacts WHERE book_id IN (SELECT id FROM books WHERE owner_id=?)", (uid,)),
         # calendar subscriptions without the (encrypted) link / password
         "calendar_subscriptions": ("SELECT id, kind, name, color, visible, interval, url_hint, username, created_at FROM cal_subs "
                                    "WHERE user_id=?", (uid,)),

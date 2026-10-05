@@ -74,6 +74,15 @@ ORDER = (
     "family.web",
     "family.carddav",
     "family.v1",
+    "events.model",
+    "events.ics",
+    "events.web",
+    "events.dav",
+    "events.v1",
+    "contacts.model",
+    "contacts.carddav",
+    "contacts.web",
+    "contacts.v1",
     "startup",
 )
 MODULES = [importlib.import_module(f"{__name__}.{m}") for m in ORDER]

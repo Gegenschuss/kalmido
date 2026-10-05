@@ -111,7 +111,7 @@ check(st["calendars"] == {"enabled": False, "subs": 0}, "feature off: state says
 r = A.post(B + "/api/calendars", json={"kind": "ics", "url": STUB + "/good.ics"})
 check(r.status_code == 409, f"feature off: adding refused ({r.status_code})")
 check(A.get(B + "/api/calendars").json()["enabled"] is False, "feature off: list says disabled")
-check(A.get(B + f"/api/calendars/events?from={T}&to={T}").json() == {"events": [], "subs": {}}, "feature off: no events")
+check(A.get(B + f"/api/calendars/events?from={T}&to={T}").json() in ({"events": [], "subs": {}, "evcals": {}},), "feature off: no events")
 check(not [x for x in stub_log()], "feature off: nothing fetched")
 
 # ================================================================== 2. main container
@@ -374,7 +374,7 @@ check(Ca.get(B + "/api/calendars").json()["subs"] == [], "carol sees no subscrip
 for method, path in (("PATCH", f"/api/calendars/{good}"), ("DELETE", f"/api/calendars/{good}"), ("POST", f"/api/calendars/{good}/refresh")):
     r = Ca.request(method, B + path, json={"name": "hijack"})
     check(r.status_code == 404, f"IDOR: carol {method} {path} -> {r.status_code}")
-check(Ca.get(B + f"/api/calendars/events?from={T - timedelta(days=60)}&to={T + timedelta(days=300)}").json() == {"events": [], "subs": {}},
+check(Ca.get(B + f"/api/calendars/events?from={T - timedelta(days=60)}&to={T + timedelta(days=300)}").json() == {"events": [], "subs": {}, "evcals": {}},
       "carol gets none of alice's events")
 check(dbx("SELECT name FROM cal_subs WHERE id=?", (good,))[0][0] == "Team", "alice's subscription untouched")
 check(sess().get(B + "/api/calendars").status_code == 401, "not logged in: 401")

@@ -1,4 +1,4 @@
-"""CalDAV server for tasks (VTODO) with app passwords."""
+"""CalDAV server for tasks (VTODO) with app passwords; the /dav/ entry point for event calendars and CardDAV too."""
 import email.message
 import email.policy
 import email.utils
@@ -83,8 +83,9 @@ APPPW_MAX = 20                    # per person
 APPPW_USED_EVERY = 60             # s between two last_used_at updates
 APPPW_CACHE_S = 900               # s a verified app password skips the KDF (revoking it still stops it at once)
 DAVS_PFX = {"DAV:": "D", "urn:ietf:params:xml:ns:caldav": "C", "http://calendarserver.org/ns/": "CS",
-          "http://apple.com/ns/ical/": "A"}
+          "http://apple.com/ns/ical/": "A", "urn:ietf:params:xml:ns:carddav": "CR"}
 D_, C_, CS_, A_ = "{DAV:}", "{urn:ietf:params:xml:ns:caldav}", "{http://calendarserver.org/ns/}", "{http://apple.com/ns/ical/}"
+CR_ = "{urn:ietf:params:xml:ns:carddav}"  # 2.21.0 (#658): CardDAV (contacts/carddav.py)
 DAV_METHODS = ["OPTIONS", "PROPFIND", "PROPPATCH", "REPORT", "GET", "HEAD", "PUT", "DELETE", "MKCALENDAR", "MKCOL",
                "MOVE", "COPY", "POST", "LOCK", "UNLOCK", "ACL"]
 DAV_ALLOW = "OPTIONS, PROPFIND, PROPPATCH, REPORT, GET, HEAD, PUT, DELETE"
@@ -132,7 +133,7 @@ def _el(clark, inner=""):
 
 
 MS_HEAD = ('<?xml version="1.0" encoding="utf-8"?>\n<D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav" '
-           'xmlns:CS="http://calendarserver.org/ns/" xmlns:A="http://apple.com/ns/ical/">')
+           'xmlns:CS="http://calendarserver.org/ns/" xmlns:A="http://apple.com/ns/ical/" xmlns:CR="urn:ietf:params:xml:ns:carddav">')
 
 
 def dav_response(href, want, avail):
@@ -638,16 +639,20 @@ def dav_common(u):
 
 
 def dav_props_root(u):
+    from ..contacts.carddav import ab_home_href
     return {**dav_common(u), D_ + "resourcetype": "<D:collection/>", D_ + "displayname": _xe(APP_NAME),
             C_ + "calendar-home-set": f"<D:href>{_xe(dav_home_href(u))}</D:href>",
+            CR_ + "addressbook-home-set": f"<D:href>{_xe(ab_home_href(u))}</D:href>",
             D_ + "current-user-privilege-set": _privs(["read"])}
 
 
 def dav_props_principal(u):
-    addr = [f"<D:href>{_xe(dav_principal_href(u))}</D:href>"]
+    from ..contacts.carddav import ab_home_href
+    addr = [f"<D:href>{_xe(dav_principal_href(u))}</D:href>", f"<D:href>urn:kalmido:user:{u['id']}</D:href>"]
     if u["email"]:
         addr.insert(0, f"<D:href>mailto:{_xe(u['email'])}</D:href>")
     return {**dav_common(u), D_ + "resourcetype": "<D:collection/><D:principal/>",
+            CR_ + "addressbook-home-set": f"<D:href>{_xe(ab_home_href(u))}</D:href>",
             D_ + "displayname": _xe(u["display_name"] or u["username"]),
             D_ + "principal-URL": f"<D:href>{_xe(dav_principal_href(u))}</D:href>",
             C_ + "calendar-home-set": f"<D:href>{_xe(dav_home_href(u))}</D:href>",
@@ -731,6 +736,8 @@ def dav_path(p, u):
             raise DavError(404, "Not found")
         if len(parts) == 2:
             return "home", None, None
+        if re.fullmatch(r"e\d{1,12}|inv", parts[2]):  # 2.21.0 (#659): an event calendar / the invitations (events/dav.py)
+            return ("evcoll", parts[2], None) if len(parts) == 3 else ("evmember", parts[2], parts[3])
         if not parts[2].isdigit():
             raise DavError(404, "Not found")
         if len(parts) == 3:
@@ -1274,8 +1281,8 @@ def dav_report(c, u, kind, lid, lst, raw):
 # ---- the handler
 def dav_err_resp(e):
     if e.cond:
-        r = Response(f'<?xml version="1.0" encoding="utf-8"?>\n<D:error xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">'
-                     f'{e.cond}</D:error>\n', e.code, content_type="application/xml; charset=utf-8")
+        r = Response(f'<?xml version="1.0" encoding="utf-8"?>\n<D:error xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav" '
+                     f'xmlns:CR="urn:ietf:params:xml:ns:carddav">{e.cond}</D:error>\n', e.code, content_type="application/xml; charset=utf-8")
     else:
         r = Response((e.text or "Error") + "\n", e.code, content_type="text/plain; charset=utf-8")
     if e.code == 429:
@@ -1285,7 +1292,7 @@ def dav_err_resp(e):
 
 def dav_options():
     r = Response(status=200)
-    r.headers["DAV"] = "1, 3, calendar-access"
+    r.headers["DAV"] = "1, 3, calendar-access, addressbook"
     r.headers["Allow"] = DAV_ALLOW
     r.headers["Content-Length"] = "0"
     return r
@@ -1294,6 +1301,8 @@ def dav_options():
 @app.route("/", methods=["PROPFIND", "REPORT"], endpoint="dav_root_probe")  # clients given only the server's address
 @app.route("/.well-known/caldav", methods=DAV_METHODS, provide_automatic_options=False)
 @app.route("/.well-known/caldav/", methods=DAV_METHODS, provide_automatic_options=False)
+@app.route("/.well-known/carddav", methods=DAV_METHODS, provide_automatic_options=False, endpoint="dav_wellknown_card")
+@app.route("/.well-known/carddav/", methods=DAV_METHODS, provide_automatic_options=False, endpoint="dav_wellknown_card2")
 def dav_wellknown():
     if not DAV_ON:
         return Response("Not found\n", 404, content_type="text/plain; charset=utf-8")
@@ -1319,8 +1328,14 @@ def dav(p):
         c = db()
         dav_inst(c)
         if m in ("MKCALENDAR", "MKCOL"):
-            raise DavError(403, "Create lists in the app", "<D:resource-must-be-null/>")
+            raise DavError(403, "Create lists and calendars in the app", "<D:resource-must-be-null/>")
+        if p.split("/", 1)[0] == "addressbooks":  # 2.21.0 (#658): CardDAV
+            from ..contacts.carddav import abdav
+            return abdav(m, c, u, p)
         kind, lid, name = dav_path(p, u)
+        if kind in ("evcoll", "evmember"):
+            from ..events.dav import evdav
+            return evdav(m, c, u, pw_row, kind, lid, name)
         lst = None
         if lid is not None:
             lst = dav_lists(c, u).get(lid)
@@ -1400,9 +1415,11 @@ def davs_propfind(c, u, kind, lst, name):
         # the responses are built here: the database and the person's language are gone once the body streams
         out.append(dav_response(dav_home_href(u), want, dav_props_home(u)))
         if deep:
+            from ..events.dav import home_responses
             for i, L in enumerate(dav_lists(c, u).values()):
                 out.append(dav_response(dav_href("calendars", u["username"], L["id"], coll=True), want,
                                         dav_props_cal(c, u, L, i, functools.partial(dav_coll, c, u, L))))
+            out += home_responses(c, u, want, 1000)
         return dav_multistatus(out)
     order = list(dav_lists(c, u)).index(lst["id"])
     if kind == "cal":

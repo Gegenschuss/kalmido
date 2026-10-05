@@ -4228,3 +4228,116 @@ body.kidmode #app{grid-template-columns:1fr}
 .kneed{font-size:var(--fs-m);color:var(--muted);flex:none;text-align:right}
 body.kidmode #top{padding-left:1rem}
 @media (max-width:599px){ .famf .row>label:first-child{width:100%} }
+/* ---------- 2.21.0 (#659 / #658): events and contacts ---------- */
+.calbar .evnew .i{color:inherit}
+.evpop .evst{margin-left:auto;font-size:var(--fs-s);color:var(--muted);border:1px solid var(--line2);border-radius:var(--r-s);padding:0 .375rem}
+.evpop .evatt span{line-height:1.5}
+.evap.ps-accepted{color:var(--ok)}.evap.ps-declined{text-decoration:line-through;color:var(--muted)}.evap.ps-tentative{font-style:italic}
+.evrsvp{display:flex;gap:.375rem;flex-wrap:wrap}
+.evrsvp .btn.on{border-color:var(--accent);color:var(--accent)}
+.evpop .evtask{justify-content:flex-start;text-align:left}
+.cevact{display:flex;gap:.375rem;flex-wrap:wrap}
+.evmodal .card,.ctmodal .card{width:min(40rem,100%)}
+.evdt .dpw,.evdt .evtm{flex:0 1 auto}
+.evrep select{flex:0 1 auto}
+.evrep .numin{flex:0 0 5rem;width:5rem}
+.evchips{display:flex;flex-wrap:wrap;gap:.375rem;flex:1;min-width:0}
+.evchip{display:inline-flex;align-items:center;min-height:2rem;padding:0 .625rem;border-radius:1rem;border:1px solid var(--line2);background:var(--bg2);font-size:var(--fs-s);color:var(--text2)}
+.evchip.on{border-color:var(--accent);background:var(--accent-soft);color:var(--text)}
+.evatt-w{display:flex;flex-direction:column;gap:.375rem;flex:1;min-width:0}
+.evattadd{display:flex;gap:.375rem;align-items:center}
+.evattadd input{flex:1}
+.evatp{display:inline-flex;align-items:center;gap:.375rem;padding:.125rem .125rem .125rem .25rem;border-radius:1.25rem;border:1px solid var(--line2);background:var(--bg2);max-width:100%;font-size:var(--fs-m)}
+.evatp .avatar{width:1.5rem;height:1.5rem;font-size:.625rem}
+.evatp .evps{font-size:var(--fs-xs)}
+.evatp.ps-accepted{border-color:color-mix(in srgb,var(--ok) 55%,transparent)}
+.evatp.ps-declined>span:not(.evps){text-decoration:line-through}
+.evmore{margin:.25rem 0 .5rem}.evmore>summary{cursor:pointer;color:var(--muted);font-size:var(--fs-m);min-height:2rem;display:flex;align-items:center}
+.evghost{position:absolute;left:2px;right:2px;background:var(--accent-soft);border:1px dashed var(--accent);border-radius:.3125rem;font:var(--fs-xs) var(--mono);padding:1px .25rem;z-index:2;pointer-events:none}
+.qevbtn{flex:none}
+.agview{display:flex;flex-direction:column;gap:.75rem;padding-bottom:2rem}
+.agday h3{font-size:var(--fs-b);margin:.25rem 0}
+.agday.today h3{color:var(--accent)}
+.agrange{font-size:var(--fs-m);font-weight:400}
+.evclist{list-style:none;margin:.25rem 0 .5rem;padding:0;display:flex;flex-direction:column;gap:2px}
+.evcrow{display:flex;align-items:center;gap:.5rem;padding:.25rem .375rem;border-radius:var(--radius);min-height:2.75rem}
+.evcrow:hover{background:var(--bg2)}
+.evcn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.evcrow .cevdot,.ctrow .cevdot{width:.625rem;height:.625rem;border-radius:50%;background:var(--cc);flex:none;display:inline-block}
+.dgaddr{display:flex;flex-direction:column;gap:.375rem;margin:.5rem 0 .75rem}
+.dgaddr>div{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.dgaddr .muted{min-width:7rem;font-size:var(--fs-m)}
+.dgaddr code{font:var(--fs-m) var(--mono);background:var(--bg3);padding:.125rem .375rem;border-radius:var(--r-s);word-break:break-all}
+.dgstep{border-top:1px solid var(--line);padding:.375rem 0}
+.dgstep>summary{cursor:pointer;font-weight:600;min-height:2.75rem;display:flex;align-items:center}
+.dgstep ol{margin:.25rem 0 .5rem 1.25rem;padding:0;display:flex;flex-direction:column;gap:.375rem}
+.lksec .lkgrp{display:flex;gap:.5rem;align-items:flex-start;margin:.25rem 0;flex-wrap:wrap}
+.lksec .lklab{min-width:5.5rem;color:var(--muted);font-size:var(--fs-m);padding-top:.5rem}
+.lksec .lkitems{display:flex;flex-wrap:wrap;gap:.375rem;flex:1;min-width:0;align-items:center}
+.lkchip{display:inline-flex;align-items:center;gap:.375rem;padding:.25rem .5rem;border-radius:var(--radius);border:1px solid var(--line2);background:var(--bg2);font-size:var(--fs-m);max-width:100%;min-height:2.25rem}
+.lkchip .muted{font-size:var(--fs-s)}
+button.lkchip:hover{border-color:var(--accent)}
+.ctlk .iconbtn{padding:.125rem}
+/* contacts view */
+.ctview{display:flex;flex-direction:column;gap:.5rem;min-height:0;height:100%}
+.ctbar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.ctsearch{display:flex;align-items:center;gap:.375rem;flex:1 1 14rem;background:var(--bg3);border:1px solid var(--line2);border-radius:var(--radius);padding:0 .5rem}
+.ctsearch:focus-within{border-color:var(--accent)}
+.ctsearch input{border:0;background:transparent;flex:1;padding:.375rem 0;min-height:2.25rem}
+.ctcols{display:grid;grid-template-columns:minmax(16rem,22rem) 1fr;gap:1rem;min-height:0;flex:1}
+.ctlistw{overflow:auto;min-height:0}
+.ctlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
+.ctrow{display:flex;align-items:center;gap:.625rem;width:100%;text-align:left;padding:.375rem .5rem;border-radius:var(--radius);min-height:2.75rem}
+.ctrow:hover{background:var(--bg2)}
+.ctrow.on{background:var(--bg3)}
+.ctn{display:flex;flex-direction:column;min-width:0;flex:1}
+.ctn b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ctn small{font-size:var(--fs-s);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ctav{width:2rem;height:2rem;font-size:.75rem;flex:none}
+.ctav.big{width:3.5rem;height:3.5rem;font-size:1.125rem}
+.ctav img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.ctcard{overflow:auto;min-height:0;padding:.25rem .25rem 2rem;display:flex;flex-direction:column;gap:.75rem}
+.ctcard.ctnone{align-items:center;justify-content:center;gap:.5rem}
+.cthead{display:flex;align-items:center;gap:.75rem}
+.cthn{min-width:0;flex:1}
+.cthn h3{margin:0;font-size:var(--fs-l);overflow-wrap:anywhere}
+.cthead .ctacts{display:flex;gap:.375rem;flex:none;align-items:center}
+.ctfields{display:flex;flex-direction:column;gap:.25rem}
+.ctf{display:flex;align-items:center;gap:.5rem;min-height:2.25rem;flex-wrap:wrap}
+.ctf .ctfl{min-width:5.5rem;font-size:var(--fs-s)}
+.ctf a{color:var(--text);text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:.2em;word-break:break-word}
+.ctf a:hover{text-decoration-color:var(--accent)}
+.ctsec h4{margin:.25rem 0;font-size:var(--fs-m);color:var(--muted)}
+.ctlinks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.25rem}
+.ctlinks .linkbtn.done{text-decoration:line-through;color:var(--muted)}
+.ctmore,.ctempty{padding:.5rem;font-size:var(--fs-s)}
+.ctphoto{display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem}
+.ctmulti{border:0;margin:0 0 .625rem;padding:0;display:flex;flex-direction:column;gap:.375rem}
+.ctmulti legend{color:var(--muted);font-size:var(--fs-m);margin-bottom:.25rem;padding:0}
+.ctmi,.ctadr{display:flex;gap:.375rem;align-items:center;flex-wrap:wrap}
+.ctmi input{flex:1;min-width:10rem}
+.ctadr input{flex:1 1 8rem;min-width:6rem}
+.ctadr .ctzip{flex:0 1 6rem}
+.ctty{flex:0 0 auto;max-width:8rem}
+.ctdate .chkl{min-width:0;color:var(--text);font-size:var(--fs-m);display:flex;align-items:center;gap:.375rem}
+.ctpick{display:flex;flex-direction:column;gap:.5rem;width:min(22rem,100%)}
+.ctpick .row input{width:100%}
+.ctpk{align-self:flex-start}
+.ctpl{display:flex;flex-direction:column;max-height:16rem;overflow:auto}
+@media (max-width:899px){
+  .ctcols{grid-template-columns:1fr}
+  .ctview.withcard .ctcard{padding-top:0}
+  .lksec .lklab{min-width:100%;padding-top:0}
+}
+@media (pointer:coarse){
+  .evchip,.lkchip,.evatp,.ctsearch input{min-height:2.75rem}
+  .evchip{min-width:2.75rem;justify-content:center}
+  .ctf a,.ctf .tagchip,.ctlinks .linkbtn{min-height:2.75rem;display:inline-flex;align-items:center}
+  .ctlk .iconbtn,.evatp .iconbtn{min-width:2.75rem;min-height:2.75rem}
+  .evmore>summary{min-height:2.75rem}
+}
+.ctf .tagchip{border:1px solid var(--line2);border-radius:1rem;padding:0 .5rem;font-size:var(--fs-s);background:var(--bg2);color:var(--text2)}
+.ctf .tagchip:hover{border-color:var(--accent)}
+.evmodal .row label.swc{min-width:0;flex:none}
+.evmodal .row textarea,.ctmodal .row textarea{flex:1;width:100%}
+.ctmulti .linkbtn{align-self:flex-start}

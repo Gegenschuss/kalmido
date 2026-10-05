@@ -59,7 +59,8 @@ def need_time():
 # the user's own module switches (Settings > Layout): the action endpoints of a switched-off module refuse like the
 # list-type gating (409 with the reason); reading, stopping and the data stay. deps / fields keep their API (D2 rule).
 FEAT_OFF = {"pomo": N_("Focus (Pomodoro) is turned off in your settings"), "habits": N_("Habits are turned off in your settings"),
-            "time": N_("Time tracking is turned off in your settings"), "comments": N_("Comments are turned off in your settings")}
+            "time": N_("Time tracking is turned off in your settings"), "comments": N_("Comments are turned off in your settings"),
+            "events": N_("Events are turned off in your settings"), "contacts": N_("Contacts are turned off in your settings")}
 
 
 def need_feat(f):

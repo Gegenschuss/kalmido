@@ -7,6 +7,48 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.21.0] - 2026-10-05
+
+**In short:** events and contacts in Kalmido (#659 #658). Your appointments and your address books live in the same
+database as your tasks, and your phone's own calendar and contacts apps sync with them directly.
+
+### Added
+- **Events** (module *Events*): calendars of your own (colours, shared like lists: view / edit, hidden per person),
+  events with time zones, all day or over several days, repeat rules with *only this date* (changed or left out),
+  reminders, status, busy, attendees (people of this server, contacts, addresses) with their answers, a linked
+  preparation task. Month, week and day views show them next to the tasks; a new **Agenda** mode; *+ Event*, the quick
+  sheet's *Event* and a drag over free time in the week create them; an editor and a popover with *Edit*, *Delete*,
+  *Accept / Maybe / Decline*.
+- **CalDAV for events**: every calendar is a VEVENT collection next to the task lists (`/dav/calendars/<user>/e<id>/`),
+  invitations in a read-only *Invitations* calendar; sync-token, ETags, `If-Match`, calendar-query with time ranges,
+  multiget; what a client writes beyond Kalmido's fields comes back unchanged. Tested with the requests of iOS Calendar,
+  DAVx⁵ and Thunderbird.
+- **ICS import** into a calendar (the same UID is updated: no doubles) and an ICS export.
+- **Contacts** (module *Contacts*): address books (shared like lists), contacts with name parts, company, job title,
+  phones, e-mails, addresses, web links, birthday and anniversary (also without the year), groups, a photo and notes;
+  the Contacts view with search, a group filter and a card; links to tasks (*waiting on*, *responsible*, *about*) and
+  to events; birthdays as yearly tasks (module Family); vCard import and export.
+- **CardDAV server** (`/dav/addressbooks/<user>/b<id>/`, `/.well-known/carddav`): vCard 3.0 and 4.0 (each contact in its
+  own version, the other one on request), Apple's labels and groups kept, sync-token, multiget, addressbook-query.
+- **API v1 + MCP**: `/event-calendars`, `/events`, `/address-books`, `/contacts`, `/tasks/{id}/events`,
+  `/tasks/{id}/contacts`; the new permissions `calendar` and `contacts` (contacts are never part of an old `write`
+  token and never an agent's default).
+- Setup: *What do you use Kalmido for?* switches events and contacts on; *Settings > Modules* has both.
+- *Calendar and contacts on the phone*: a guide in the app and in [docs/CALDAV.md](docs/CALDAV.md).
+
+### Changed
+- The family events of 2.19 (tasks with people who come along) become events once, on the first start: the people are
+  invited (accepted), the task stays, linked and marked done.
+- Admins: calendar and contacts apps also look for `/.well-known/carddav`; it must bypass a login proxy like `/dav`.
+- The service worker cache is version 98.
+
+### Fixed
+- Starting the app while the server is down (the device online) shows your tasks from the device with a quiet
+  *Server not reachable – changes are sent later* instead of an error page (#673).
+- Statistics and the milestone report use one tolerant way to read a day from a timestamp (#671).
+- Timeline on touch screens: a long-press drag for a new task no longer ends silently when the view refreshes during
+  the hold (sync, a server answer).
+
 ## [2.20.0] - 2026-10-05
 
 **In short:** the code in modules (#646). Nothing changes for you: the same app, the same API, the same start command.
@@ -2534,7 +2576,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.20.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.21.0...HEAD
+[2.21.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.21.0
 [2.20.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.20.0
 [2.19.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.19.1
 [2.19.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.19.0

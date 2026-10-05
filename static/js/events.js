@@ -219,7 +219,7 @@ document.addEventListener('click', async e => {
   if (mcp) { e.preventDefault(); e.stopPropagation(); copyText(mcp.closest('.mdcode')?.querySelector('pre')?.textContent || ''); return; }
   if (e.target.closest('#d-md') && !e.target.closest('a')) { if (canEdit(taskById(S.sel))) editContent(); return; }
   const cev = e.target.closest('#view [data-cev]');
-  if (cev) { cevPop(cev, +cev.dataset.cev); return; }
+  if (cev) { const v = cev.dataset.cev; cevPop(cev, /^\d+$/.test(v) ? +v : v); return; }  // 2.21.0: own events have ids k<n>
   const rg = e.target.closest('#tl-deps [data-rmdep]');
   if (rg) { rmDepPop(rg); return; }
   const sb = e.target.closest('.rm-sum');
@@ -231,7 +231,7 @@ document.addEventListener('click', async e => {
   const wev = e.target.closest('.wev');
   if (wev) { openDetail(+wev.dataset.id); return; }
   const wc = e.target.closest('.wcol');
-  if (wc) { const y = e.clientY - wc.getBoundingClientRect().top, m = Math.max(0, Math.min(23 * 60 + 30, Math.floor(y / weekH() * 2) * 30)); openQuickSheet('', {due: wc.dataset.day, due_time: `${pad(Math.floor(m / 60))}:${pad(m % 60)}`}); return; }
+  if (wc) { const y = e.clientY - wc.getBoundingClientRect().top, m = Math.max(0, Math.min(23 * 60 + 30, Math.floor(y / weekH() * 2) * 30)), pre = {due: wc.dataset.day, due_time: `${pad(Math.floor(m / 60))}:${pad(m % 60)}`}; openQuickSheet('', pre); evSheetBtn(pre); return; }
   const wh = e.target.closest('.wh, .wad');
   if (wh && !e.target.closest('.ev')) { S.calSel = wh.dataset.day; S.calMode = 'day'; LS.set('calMode', 'day'); renderView(); return; }
   // multi-select: ctrl/cmd/shift-click, or tap while in select mode
@@ -520,6 +520,7 @@ document.addEventListener('click', async e => {
       const dir = act === 'cal-next' ? 1 : -1;
       if (S.calMode === 'week') S.calSel = addDays(S.calSel, 7 * dir);
       else if (S.calMode === 'day') S.calSel = addDays(S.calSel, dir);
+      else if (S.calMode === 'agenda') S.calSel = addDays(S.calSel, 14 * dir);  // 2.21.0 (#659)
       else if (S.calMode === 'timeline') S.tlStart = addDays(S.tlStart, 14 * dir);
       else { const [y, m] = S.calMonth.split('-').map(Number); S.calMonth = ds(new Date(y, m - 1 + dir, 1)).slice(0, 7); }
       renderView(); break;

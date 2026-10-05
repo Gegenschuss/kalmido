@@ -174,6 +174,7 @@ function caldavHtml(hint) {
     ${cp(tr('Server'), d.server, 'dav-srv')}${cp(tr('CalDAV address'), d.url, 'dav-url')}${cp(tr('User name'), d.username, 'dav-user')}
     <div class="row"><label>${tr('Password')}</label><button class="btn sm pri" data-apw="new">${ic('key', 's')} ${tr('New app password')}</button><button class="linkbtn" data-apw="list">${tr('Manage app passwords')}</button></div>
     ${hint(tr('Log in with your user name and an app password, never with your Kalmido password.'))}
+    ${feat('events') || feat('contacts') ? `${hint(tr('Your events and address books come along in the same account: calendars next to the task lists, contacts over CardDAV.'))}<div class="row"><button class="btn sm" data-act="dav-guide">${ic('phone', 's')} ${tr('Calendar and contacts on the phone')}</button></div>` : ''}
     <details class="shelp sdet"><summary>${tr('Step by step')}</summary><ul class="slist">
       <li>${tr('<b>iPhone / iPad:</b> Settings > Apps > Calendar > Calendar Accounts > Add Account > Other > Add CalDAV Account. Server {0}, your user name and the app password. Then switch on Reminders in the new account. Not found? Advanced Settings > Account URL {1}.', srv, prin)}</li>
       <li>${tr('<b>Mac:</b> System Settings > Internet Accounts > Add Account > Add Other Account > CalDAV account. Account type Manual, user name, app password, server address {0}; then tick Reminders. Not found? Account type Advanced, server path {1}, port 443, SSL on.', srv, `<code class="topic">${esc(new URL(d.principal).pathname)}</code>`)}</li>
@@ -186,6 +187,7 @@ function caldavHtml(hint) {
       <li>${tr('Title, notes, due date and time, start, priority, done / won\'t do, tags, subtasks, repeat rules (daily to yearly), reminders and the link. Assignee, sections, comments, files and custom fields stay in Kalmido; other details a calendar app saves come back to it unchanged.')}</li>
       <li>${tr('Lists you may only view are read-only there. Deleting a task in a calendar app moves it to the trash in Kalmido. New lists are created in Kalmido.')}</li>
       <li>${tr('Reminders on iPhone and Mac keep tags and subtasks to themselves: what you set in Kalmido stays.')}</li></ul></details>
+    ${S.me.is_admin && feat('contacts') ? hint(tr('Admins: contacts apps look for /.well-known/carddav; it must bypass a login proxy like /dav/.')) : ''}
     ${S.me.is_admin ? hint(tr('Admins: behind a login proxy (forward auth, single sign-on) the paths /dav/ and /.well-known/caldav must bypass the proxy login, because calendar apps cannot log in there. Kalmido checks the app password itself.')) + `<a class="slink" href="${DAV_DOCS}" target="_blank" rel="noopener noreferrer">${tr('CalDAV guide')}</a>` : ''}`;
 }
 // Settings > Integrations > Webhooks

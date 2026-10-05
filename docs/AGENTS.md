@@ -65,6 +65,8 @@ Every agent has **permissions** (scopes) on top of its lists and roles. New agen
 | Read files / upload files | `attachments:read` / `attachments:write` | off |
 | Time tracking | `time` | off |
 | Export | `export` | off |
+| Calendar: events and event calendars (2.21.0) | `calendar` | off |
+| Contacts: address books and contacts, personal data of other people (2.21.0) | `contacts` | off |
 
 Account settings (`account`) and admin data (`admin-read`) are never given to an agent. Team agents get theirs from an
 admin (the agent's dialog), personal agents from their owner (the lock button in *Settings > Agents > Set up*). An

@@ -457,6 +457,7 @@ def watchdog_tick(c):
     from ..agents.proposals import prop_cleanup
     from ..agents.usage import audit_cleanup, usage_cleanup
     from ..family.v1 import _wd_rotations
+    from ..events.model import _wd_events
     _wd_section(c, "paperless", paperless_poll)  # 2.1.0: every connection (cheap without pending uploads)
     users = {r["id"]: r for r in c.execute("SELECT * FROM users WHERE disabled=0")}
     S, LG = {}, {}
@@ -480,6 +481,7 @@ def watchdog_tick(c):
     _wd_section(c, "nags", _wd_nags, users, S, LG, now)  # 2.7.0 (#413), after the reminders (a reminder counts as a nag)
     _wd_section(c, "follow-ups", _wd_followups, users, S, LG, now)  # 2.1.0 (#335)
     _wd_section(c, "rotations", _wd_rotations, users, S, LG, now)  # 2.19.0 (#653)
+    _wd_section(c, "events", _wd_events, users, S, LG, now)  # 2.21.0 (#659): event reminders, purge of deleted events
     _wd_section(c, "focus", _wd_focus, users, S, LG)
     _wd_section(c, "habits", _wd_habits, users, S, LG, now)
     _wd_section(c, "digest", _wd_digest, users, S, LG, now)

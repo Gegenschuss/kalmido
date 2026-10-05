@@ -869,9 +869,9 @@ const PURPOSES = [['me', 'user', N_('For me'), N_('Your own tasks: lists, remind
   ['family', 'family', N_('Family'), N_('Shared lists, a shopping list with shop areas, household chores taking turns, birthdays, a meal plan and accounts for children.')],
   ['team', 'users', N_('Team'), N_('Sharing, assigning, comments, time tracking, a timeline with dependencies, custom fields and project progress.')],
   ['software', 'code', N_('Software projects'), N_('Everything of Team plus a software project: a board from backlog to done, bug and feature tickets, a repository.')]];
-const PURPOSE_MODS = {me: ['cal'], family: ['cal', 'habits', 'comments', 'collab', 'family'],
-  team: ['cal', 'timeline', 'matrix', 'kanban', 'habits', 'pomo', 'stats', 'comments', 'collab', 'time', 'progress', 'deps', 'fields'],
-  software: ['cal', 'timeline', 'matrix', 'kanban', 'habits', 'pomo', 'stats', 'comments', 'collab', 'time', 'progress', 'deps', 'fields']};
+const PURPOSE_MODS = {me: ['cal', 'events', 'contacts'], family: ['cal', 'habits', 'comments', 'collab', 'family', 'events', 'contacts'],
+  team: ['cal', 'timeline', 'matrix', 'kanban', 'habits', 'pomo', 'stats', 'comments', 'collab', 'time', 'progress', 'deps', 'fields', 'events', 'contacts'],
+  software: ['cal', 'timeline', 'matrix', 'kanban', 'habits', 'pomo', 'stats', 'comments', 'collab', 'time', 'progress', 'deps', 'fields', 'events', 'contacts']};
 // First-run setup, step 2 ("What do you want to use?"): only right after the first admin was created, never on
 // existing installs. Three presets (1.2: "Simple list"; "Just me" preselected; "Projects & team" = everything), then
 // the single modules to fine-tune. Collaboration + time tracking are the instance switches; the other modules
@@ -879,6 +879,8 @@ const PURPOSE_MODS = {me: ['cal'], family: ['cal', 'habits', 'comments', 'collab
 const SETUP_MAIN = [['collab', N_('Collaboration'), N_('Share lists, assign tasks, @mentions, activity and News')],
   ['time', N_('Time tracking'), N_('Timers and manual time entries on tasks, reports and CSV export')]];
 const SETUP_MODS = [['cal', N_('Calendar'), N_('Month, week and day view of your tasks')], ['timeline', N_('Timeline'), N_('Tasks with start and end as bars over time')],
+  ['events', N_('Events'), N_('Appointments in your own calendars next to the tasks, shared calendars, invitations, synced with the phone’s calendar')],
+  ['contacts', N_('Contacts'), N_('Your address books: contacts linked to tasks and events, birthdays, synced with the phone’s contacts')],
   ['matrix', N_('Eisenhower matrix'), N_('Urgent and important in four quadrants')], ['kanban', N_('Kanban'), N_('Lists as boards with columns')],
   ['habits', N_('Habits'), N_('Daily and weekly habits with streaks')], ['pomo', N_('Focus (Pomodoro)'), N_('Focus timer and stopwatch')],
   ['stats', N_('Statistics'), N_('Completions, on-time rate, focus time and streaks')], ['progress', N_('Project progress'), N_('Progress per list and a “Where is it stuck?” overview')],

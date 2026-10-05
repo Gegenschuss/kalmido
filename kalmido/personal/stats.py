@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from flask import jsonify, request
 
 from ..core.config import app, TZ
-from ..core.db import db, iso, local_now, now_utc, parse_iso
+from ..core.db import db, iso, local_day as _local_day, local_now, now_utc
 from ..accounts.session import me
 from ..core.access import PROJ_SQL, time_all
 from ..core.state import visible_lists
@@ -20,10 +20,6 @@ from ..personal.timetrack import entry_secs
 # (assigned to me, or unassigned in my own lists) whose due date had passed and that were still open,
 # based on today's due dates. On time: completed on or before the due day.
 STATS_WEEKS = 12
-
-
-def _local_day(ts):
-    return parse_iso(ts).astimezone(TZ).date() if ts else None
 
 
 @app.get("/api/stats")

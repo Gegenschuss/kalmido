@@ -96,6 +96,8 @@ shows only the tools the token may use (from `GET /api/v1/me`, refreshed every 5
 | `add_occasion`, `add_deadline`, `ingredients_to_shopping`, `give_stars`, `add_reward`, `update_reward`, `request_reward`, `decide_reward` (2.19.0) | tasks:write | `/family/occasions`, `/family/deadlines`, `/tasks/{id}/to-shopping`, stars + rewards |
 | `add_shop_areas`, `create_packing_list` (2.19.0) | structure | `/lists/{id}/shop-areas`, `POST /family/packing` |
 | `delete_reward` (2.19.0) | delete | `DELETE /family/rewards/{id}` |
+| `list_event_calendars`, `create_event_calendar`, `update_event_calendar`, `delete_event_calendar`, `share_event_calendar`, `unshare_event_calendar`, `import_ics`, `export_ics`, `list_calendar_events`, `get_event`, `create_event`, `update_event`, `delete_event`, `restore_event`, `reply_to_event`, `add_preparation_task` (also tasks:write), `get_task_events` (2.21.0) | calendar | `/event-calendars…`, `/events…`, `/tasks/{id}/events` |
+| `list_address_books`, `create_address_book`, `update_address_book`, `delete_address_book`, `share_address_book`, `unshare_address_book`, `import_vcards`, `export_vcards`, `search_contacts`, `get_contact`, `create_contact`, `update_contact`, `delete_contact`, `link_contact` / `unlink_contact` (also tasks:write) (2.21.0) | contacts | `/address-books…`, `/contacts…`, `/tasks/{id}/contacts` |
 
 An agent's dangerous requests (deleting a list or a field, emptying the trash, batches of 10+ tasks, moving lists,
 folders, sharing) answer `approval_required` with a waiting job: a person approves it in Kalmido and the agent gets the

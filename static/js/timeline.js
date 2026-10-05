@@ -454,15 +454,29 @@ document.addEventListener('dblclick', e => {
   e.preventDefault(); const d = ndDay(tr_, e.clientX); tlNewOpen(tr_, d, d);
 });
 document.addEventListener('touchstart', e => {
-  const tr_ = e.target.closest?.('.tl-track.tl-cr'); if (!tr_ || S.tlPick || e.touches.length !== 1 || !tlCrFree(e)) { if (tlCr?.touch) { clearTimeout(tlCr.timer); tlCr = null; } return; }
+  const tr_ = e.target.closest?.('.tl-track.tl-cr'); if (tlCr?.touch) { clearTimeout(tlCr.timer); tlCr.off?.(); tlCr = null; }
+  if (!tr_ || S.tlPick || e.touches.length !== 1 || !tlCrFree(e)) return;
   const p = e.touches[0], d0 = ndDay(tr_, p.clientX);
   tlCr = {tr: tr_, d0, d1: d0, el: null, touch: true, x: p.clientX, y: p.clientY, active: false};
-  tlCr.timer = setTimeout(() => { if (tlCr?.touch) { tlCr.active = true; crShow(tlCr); if (navigator.vibrate) navigator.vibrate(12); } }, 450);
+  tlCr.timer = setTimeout(() => { if (tlCr?.touch) { tlCr.active = true; tlCrLive(); crShow(tlCr); if (navigator.vibrate) navigator.vibrate(12); } }, 450);
+  // 2.21.0: a re-render during the hold (sync, a server answer) replaces the track; the touch events then go to the old,
+  // detached node and never reach document, so the gesture would end silently. They are also caught at their target.
+  const t = e.target, off = () => { t.removeEventListener('touchmove', tlCrTouchMove); t.removeEventListener('touchend', tlCrTouchEnd); t.removeEventListener('touchcancel', tlCrTouchEnd); };
+  t.addEventListener('touchmove', tlCrTouchMove, {passive: false}); t.addEventListener('touchend', tlCrTouchEnd); t.addEventListener('touchcancel', tlCrTouchEnd);
+  tlCr.off = off;
 }, {passive: true});
-document.addEventListener('touchmove', e => {
-  if (!tlCr?.touch) return;
+// the track of the gesture after a re-render (same row key); the ghost is drawn anew there
+function tlCrLive() {
+  if (!tlCr || tlCr.tr.isConnected) return;
+  const n = $(`.tl-track.tl-cr[data-k="${rmEsc(tlCr.tr.dataset.k || '')}"]`);
+  if (n) { tlCr.tr = n; tlCr.el = null; }
+}
+document.addEventListener('touchmove', tlCrTouchMove, {passive: false});
+function tlCrTouchMove(e) {
+  if (!tlCr?.touch || e.tlSeen) return;
+  e.tlSeen = true;  // caught at the target and again at document
   const p = e.touches[0];
-  if (!tlCr.active) { if (Math.hypot(p.clientX - tlCr.x, p.clientY - tlCr.y) > 8) { clearTimeout(tlCr.timer); tlCr = null; } return; }  // a swipe: the timeline scrolls
+  if (!tlCr.active) { if (Math.hypot(p.clientX - tlCr.x, p.clientY - tlCr.y) > 8) { clearTimeout(tlCr.timer); tlCr.off?.(); tlCr = null; } return; }  // a swipe: the timeline scrolls
   e.preventDefault();
   const sc = $('#tlscroll');
   if (sc) {  // scroll along at the edges (left: right of the sticky names, phones have only ~30 px per day)
@@ -471,11 +485,11 @@ document.addEventListener('touchmove', e => {
     const r = sc.getBoundingClientRect(), nw = tlCr.tr.previousElementSibling?.offsetWidth || 0, mv = p.clientX - tlCr.x;
     if (mv > 16 && p.clientX > r.right - 28) sc.scrollLeft += 10; else if (mv < -16 && p.clientX < r.left + nw + 28) sc.scrollLeft -= 10;
   }
-  tlCr.d1 = ndDay(tlCr.tr, p.clientX); crShow(tlCr);
-}, {passive: false});
+  tlCrLive(); tlCr.d1 = ndDay(tlCr.tr, p.clientX); crShow(tlCr);
+}
 function tlCrTouchEnd(e) {
   if (!tlCr?.touch) return;
-  clearTimeout(tlCr.timer); const d = tlCr; tlCr = null; d.el?.remove();
+  clearTimeout(tlCr.timer); tlCr.off?.(); tlCrLive(); const d = tlCr; tlCr = null; d.el?.remove();
   if (!d.active) return;  // a quick tap or a swipe
   if (e.cancelable) e.preventDefault();  // no click / context menu after the hold
   if (e.type === 'touchend') tlNewOpen(d.tr, d.d0, d.d1);

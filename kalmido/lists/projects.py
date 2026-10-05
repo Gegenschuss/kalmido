@@ -456,7 +456,7 @@ MS_BURN_MAX = 180  # days in a burndown (the newest ones)
 
 
 def ms_report(c, tid, uid, lg=None):
-    from ..personal.stats import _local_day
+    from ..core.db import local_day as _local_day  # 2.21.0 (#671): the one tolerant version
     from ..api.v1 import STATUS_NAMES
     m = c.execute("SELECT * FROM tasks WHERE id=? AND deleted_at IS NULL", (tid,)).fetchone()
     if not m or not m["ms"]:

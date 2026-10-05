@@ -70,9 +70,11 @@ API_TOKEN_MAX = 20                            # per user
 API_TOKEN_RE = re.compile(r"abk_[A-Za-z0-9_-]{20,100}")
 # 2.15.0 (#479): fine scopes. "write" (the only write scope before 2.15) stays valid: stored on a token it means every
 # scope but admin-read (old tokens and scripts keep working unchanged); new tokens / agents get the fine ones.
+# 2.21.0 (#659 / #658): "calendar" (events and event calendars, reading included) and "contacts" (address books and
+# contacts, reading included: sensitive, so never part of the legacy "write"); a new agent gets neither by default
 SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export",
-          "account", "admin-read")
-SCOPES_WRITE = tuple(s for s in SCOPES if s not in ("read", "admin-read"))   # what the legacy "write" stands for
+          "calendar", "contacts", "account", "admin-read")
+SCOPES_WRITE = tuple(s for s in SCOPES if s not in ("read", "admin-read", "contacts"))   # what the legacy "write" stands for
 SCOPES_AGENT_NEVER = ("account", "admin-read")   # never for an agent: credentials / settings of the account, admin data
 SCOPES_AGENT_DEFAULT = ("read", "tasks:write", "comments")
 API_SCOPES = SCOPES + ("write",)

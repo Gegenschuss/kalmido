@@ -66,14 +66,14 @@ async function ensureOcc(lo, hi) {
 // Events of the user's calendar subscriptions (Settings > Integrations > Calendars), synced by the server. Fetched
 // per visible range (not part of /api/state), kept in S.cal; the last few ranges stay in localStorage for offline
 // use. Events never behave like tasks: no drag, no checkbox; a click opens a small popover (cevPop).
-const calEvOn = () => !!(S.calendars?.enabled && S.calendars.subs > 0);
+const calEvOn = () => !!((S.calendars?.enabled && S.calendars.subs > 0) || (feat('events') && ((S.evcals || []).length || S.cal.items.some(e => e.own))));  // 2.21.0 (#659): own events too
 const fmtHM = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 function cevPrep(e) {  // local first / last day (+ Date objects for timed events)
   if (e.all_day) { e.d0 = e.start; e.d1 = e.end > e.start ? addDays(e.end, -1) : e.start; }
   else { e.s = new Date(e.start); e.e = new Date(e.end); if (!(e.e >= e.s)) e.e = e.s; e.d0 = ds(e.s); e.d1 = ds(new Date(Math.max(+e.s, +e.e - 1))); }
   return e;
 }
-function cevApply(j, key) { S.cal = {key, loading: '', items: (j.events || []).map(cevPrep), subs: j.subs || {}}; }
+function cevApply(j, key) { S.cal = {key, loading: '', items: (j.events || []).map(cevPrep), subs: j.subs || {}, evcals: j.evcals || {}}; }
 function cevCached(lo, hi) {
   const c = LS.get('calev', {});
   if (c[lo + '|' + hi]) return c[lo + '|' + hi];
@@ -81,7 +81,7 @@ function cevCached(lo, hi) {
   return k ? c[k] : null;
 }
 async function ensureCalEv(lo, hi) {
-  if (!calEvOn()) { if (S.cal.items.length) S.cal = {key: '', loading: '', items: [], subs: {}}; return; }
+  if (!calEvOn() && !feat('events')) { if (S.cal.items.length) S.cal = {key: '', loading: '', items: [], subs: {}, evcals: {}}; return; }
   const key = `${lo}|${hi}`;
   if (S.cal.key === key || S.cal.loading === key) return;
   S.cal.loading = key;
@@ -90,7 +90,7 @@ async function ensureCalEv(lo, hi) {
     if (S.cal.loading !== key) return;
     cevApply(j, key);
     const c = LS.get('calev', {});
-    c[lo + '|' + hi] = {at: Date.now(), events: j.events, subs: j.subs};
+    c[lo + '|' + hi] = {at: Date.now(), events: j.events, subs: j.subs, evcals: j.evcals};
     Object.keys(c).sort((a, b) => c[b].at - c[a].at).slice(6).forEach(k => delete c[k]);
     LS.set('calev', c);
   } catch {
@@ -103,8 +103,8 @@ async function ensureCalEv(lo, hi) {
 function calInvalidate() { S.cal.key = ''; S.cal.loading = ''; }
 const cevOn = d => S.cal.items.filter(e => e.d0 <= d && e.d1 >= d);
 const cevSort = (a, b) => (b.all_day - a.all_day) || a.start.localeCompare(b.start) || a.title.localeCompare(b.title);
-const cevColor = e => cssColor(S.cal.subs[e.sub]?.color) || '#94a3b8';
-const cevCal = e => S.cal.subs[e.sub]?.name || tr('Calendar');
+const cevColor = e => e.own ? evCalColor(e) : cssColor(S.cal.subs[e.sub]?.color) || '#94a3b8';
+const cevCal = e => e.own ? evCalName(e) : S.cal.subs[e.sub]?.name || tr('Calendar');
 const cevTitle = e => e.title || tr('(no title)');
 // a timed event on day d is a block in the week grid, except on the middle days of a multi-day event (all-day row)
 const cevTimed = (e, d) => !e.all_day && !(e.d0 < d && e.d1 > d);
@@ -146,6 +146,7 @@ function cevWhen(e) {
 }
 function cevPop(anchor, id) {
   const e = S.cal.items.find(x => x.id === id); if (!e) return;
+  if (e.own) { evPop(anchor, e); return; }  // 2.21.0 (#659): an own event (calevents.js)
   const desc = (e.description || '').slice(0, 2000);
   const p = openPop(anchor, `<div class="cevpop" style="--cc:${cevColor(e)}">
     <div class="cevh"><i class="cevdot"></i><b>${esc(cevTitle(e))}</b></div>
@@ -358,12 +359,15 @@ function calEditModal(x, colors, done) {
 function calBar(title, done = true, extra = '') {
   // 1.8.1: completed tasks in the calendar, per user (show_done_views entry "cal", shown unless hidden here)
   const on = showDoneCal(), dn = done ? `<button class="btn sm chip ${on ? 'on' : ''}" data-act="cal-done" aria-pressed="${on}" aria-label="${esc(tr('Completed'))}" title="${esc(on ? tr('Hide completed') : tr('Show completed'))}">${ic('eye', 's')}<span class="cdl">${tr('Completed')}</span></button>` : '';
-  const modes = [['month', N_('Month')], ['week', N_('Week')], ['day', N_('Day')], ...(feat('timeline') ? [['timeline', N_('Timeline')]] : [])].map(([k, n]) => [k, tr(n)]);
-  return `<div class="calbar"><h2>${title}</h2><div class="seg">${modes.map(([k, n]) => `<button class="${S.calMode === k ? 'on' : ''}" data-act="cal-mode" data-k="${k}">${n}</button>`).join('')}</div>${dn}${extra}
+  const modes = [['month', N_('Month')], ['week', N_('Week')], ['day', N_('Day')], ...(feat('events') ? [['agenda', N_('Agenda')]] : []), ...(feat('timeline') ? [['timeline', N_('Timeline')]] : [])].map(([k, n]) => [k, tr(n)]);
+  // 2.21.0 (#659): "+ Event" and the calendars (own, shared: show, share, import, the phone)
+  const evb = feat('events') ? `<button class="btn sm pri evnew" data-act="ev-new" title="${esc(tr('New event'))}" aria-label="${esc(tr('New event'))}">${ic('plus', 's')}<span class="cdl">${tr('Event')}</span></button><button class="btn sm" data-act="ev-cals" title="${esc(tr('Calendars'))}" aria-label="${esc(tr('Calendars'))}">${ic('cal', 's')}<span class="cdl">${tr('Calendars')}</span></button>` : '';
+  return `<div class="calbar"><h2>${title}</h2><div class="seg">${modes.map(([k, n]) => `<button class="${S.calMode === k ? 'on' : ''}" data-act="cal-mode" data-k="${k}">${n}</button>`).join('')}</div>${dn}${evb}${extra}
     <div class="calnav"><button class="iconbtn" data-act="cal-prev" title="${esc(tr('Previous period'))}" aria-label="${esc(tr('Previous period'))}">${ic('left')}</button><button class="btn sm" data-act="cal-today">${tr('Today')}</button><button class="iconbtn" data-act="cal-next" title="${esc(tr('Next period'))}" aria-label="${esc(tr('Next period'))}">${ic('right')}</button></div></div>`;
 }
 function viewCal() {
   if (S.calMode === 'timeline' && !feat('timeline')) S.calMode = 'month';
+  if (S.calMode === 'agenda') { if (feat('events')) return viewAgenda(); S.calMode = 'month'; }
   if (S.calMode === 'week' || S.calMode === 'day') return viewWeek();
   if (S.calMode === 'timeline') return calBar(tr('Timeline'), false, tlNdBtn(tlNdOn(null), openTasks().filter(t => !t.due).length)) + viewTimeline(null, true);
   const t0 = today();

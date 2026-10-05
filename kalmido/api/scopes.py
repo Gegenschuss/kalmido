@@ -61,6 +61,8 @@ from ..agents.api import job_notify
 #   attachments:write  upload and remove them
 #   time               time tracking (timer, entries)
 #   export             the data export
+#   calendar           2.21.0: events + event calendars (also reading them)
+#   contacts           2.21.0: contacts + address books (also reading them; never in the legacy "write" or an agent's default)
 #   account            the token user's own settings (notifications, app passwords) -- never for agents
 #   admin-read         admin data (admins only) -- never for agents
 #   agent              (implicit) an agent's own channel: status, events, jobs, chat, usage
@@ -74,7 +76,8 @@ from ..agents.api import job_notify
 # as the agent with its rights at that moment (approval_run), Reject stops it; the agent gets a "job" event either way.
 SCOPE_LABELS = {"read": N_("Read"), "tasks:write": N_("Tasks"), "comments": N_("Comments"), "structure": N_("Structure"),
                 "delete": N_("Delete & trash"), "attachments:read": N_("Read files"), "attachments:write": N_("Upload files"),
-                "time": N_("Time tracking"), "export": N_("Export"), "account": N_("Account settings"), "admin-read": N_("Admin read"),
+                "time": N_("Time tracking"), "export": N_("Export"), "calendar": N_("Calendar"), "contacts": N_("Contacts"),
+                "account": N_("Account settings"), "admin-read": N_("Admin read"),
                 "write": N_("Everything (old token)")}
 SCOPE_HELP = {"read": N_("Lists, tasks, comments, time entries, habits, search"),
               "tasks:write": N_("Create, change, complete and move tasks; dependencies, habits"),
@@ -83,6 +86,8 @@ SCOPE_HELP = {"read": N_("Lists, tasks, comments, time entries, habits, search")
               "delete": N_("Move to the trash, restore, empty the trash; delete sections, lists, fields, templates, habits, filters"),
               "attachments:read": N_("Download files"), "attachments:write": N_("Upload and remove files"),
               "time": N_("Timer and time entries"), "export": N_("Download all data"),
+              "calendar": N_("Read and change events and calendars"),
+              "contacts": N_("Read and change contacts and address books (personal data of other people)"),
               "account": N_("Notification settings and app passwords (an app password gives calendar apps full access to your tasks)"), "admin-read": N_("Users and server status (admins only)")}
 ROLE_WORD = {"admin": N_("Admin"), "edit": N_("Member"), "participant": N_("Participant"), "view": N_("Viewer")}
 BATCH_TITLE = {"update": N_("Change {0} tasks at once"), "complete": N_("Complete {0} tasks at once"), "reopen": N_("Reopen {0} tasks at once"),

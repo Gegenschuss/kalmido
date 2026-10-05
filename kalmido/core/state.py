@@ -135,6 +135,8 @@ def state():
     from ..collab.notes import notes_brief
     from ..collab.teamchat import tchat_on, tchat_unread
     from ..family.family import kids_for
+    from ..events.model import cals_for, events_on
+    from ..contacts.model import books_for, contacts_on, task_contacts
     c = db()
     uid = me()
     s = usettings(c, uid)
@@ -207,7 +209,39 @@ def state():
         dayplan=dayplan_state(c, uid),  # 2.10.0 (#440): working hours, review card
         kids=kids_for(c, uid),  # 2.19.0 (#653): the kids I look after (or me, a kid) with stars + rewards
         kid_ids=[r[0] for r in c.execute("SELECT id FROM users WHERE kid=1 AND disabled=0")],  # 2.19.0: who gets stars
+        # 2.21.0 (#659 / #658): event calendars, a change marker of the events I see (the views refetch their range), the
+        # events that tasks prepare; address books and the contacts linked to tasks
+        evcals=cals_for(c, uid) if events_on(c, uid) else [],
+        evsig=ev_sig(c, uid),
+        evlinks=ev_links(c, uid, [t["id"] for t in tasks]) if events_on(c, uid) else {},
+        books=books_for(c, uid) if contacts_on(c, uid) else [],
+        tcontacts=task_contacts(c, uid, {t["id"] for t in tasks}),
     )
+
+
+def ev_sig(c, uid):
+    """Changes as soon as an event or calendar I see (or am invited to) changes."""
+    from ..events.model import my_cal_ids
+    ids = my_cal_ids(c, uid)
+    q = ",".join("?" * len(ids)) or "NULL"
+    a = c.execute(f"SELECT COUNT(*), MAX(changed_at) FROM ev_cals WHERE id IN ({q})", list(ids)).fetchone()
+    b = c.execute("SELECT COUNT(*), MAX(e.updated_at) FROM events e JOIN event_attendees x ON x.event_id=e.id WHERE x.user_id=?", (uid,)).fetchone()
+    return f"{a[0]}.{a[1] or ''}.{b[0]}.{b[1] or ''}"
+
+
+def ev_links(c, uid, task_ids):
+    """{task id: [{id, title, start, all_day}]}: the events (I see) that my visible tasks prepare."""
+    from ..events.model import my_cal_ids
+    ids = my_cal_ids(c, uid)
+    if not ids or not task_ids:
+        return {}
+    q = ",".join("?" * len(ids))
+    tset, out = set(task_ids), {}
+    for r in c.execute(f"SELECT id, task_id, title, start, all_day FROM events WHERE cal_id IN ({q}) AND task_id IS NOT NULL "
+                       "AND deleted_at IS NULL", list(ids)):
+        if r["task_id"] in tset:
+            out.setdefault(r["task_id"], []).append({"id": r["id"], "title": r["title"], "start": r["start"], "all_day": bool(r["all_day"])})
+    return out
 
 
 @app.get("/api/tasks")

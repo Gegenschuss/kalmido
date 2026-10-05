@@ -66,7 +66,7 @@ Bb, C = sess("bob"), sess("carol")
 Bb.patch(B + "/api/settings", json={"lang": "de"})
 st = A.get(B + "/api/state").json()
 check(st["timer"] is None and st["time_totals"] == {}, "state: no timer, no totals")
-check("time" in st["settings"]["features"].split(",") and st["settings"]["features_rev"] == "9", "new user: module time on, features_rev 9 (2.0.6)")
+check("time" in st["settings"]["features"].split(",") and st["settings"]["features_rev"] == "10", "new user: module time on, features_rev 10 (2.21.0)")
 check(st["settings"]["time_rounding"] == "0" and st["settings"]["time_focus"] == "1", "time settings defaults")
 WORK = A.post(B + "/api/lists", json={"name": "Work", "kind": "project"}).json()["id"]
 HOME = A.post(B + "/api/lists", json={"name": "Home", "kind": "project"}).json()["id"]

@@ -30,7 +30,7 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 SERVER_NAME = "kalmido"
-SERVER_VERSION = "2.19.0"
+SERVER_VERSION = "2.21.0"
 PROTOCOLS = ("2025-06-18", "2025-03-26", "2024-11-05")
 WAIT_MAX = 60
 ATT_CAP_DEFAULT = 5 * 1024 * 1024    # 2.13.1 (#465): get_attachment returns at most this many bytes (base64 in the answer)
@@ -492,6 +492,108 @@ TOOLS = [
      _obj({"task_id": S_ID, "title": {"type": "string"}, "notes": {"type": "string"}, "section_id": {"type": ["integer", "null"]},
            "list_tags": STRS, "priority": PRIO}, ["task_id"]), t_tidy),
 ]
+
+
+# 2.21.0 (#659): events (scope calendar) and (#658) contacts (scope contacts: personal data, never in an agent's default)
+EV_IN = {"cal_id": S_ID, "title": {"type": "string"}, "location": {"type": "string"}, "description": {"type": "string"},
+         "all_day": {"type": "boolean"}, "start": {"type": "string", "description": "YYYY-MM-DDTHH:MM (local time of tz) or YYYY-MM-DD (all day)"},
+         "end": {"type": "string", "description": "All day: the day AFTER the last day"}, "tz": {"type": "string", "description": "IANA zone, default the server's"},
+         "rrule": {"type": "string", "description": "RRULE body, e.g. FREQ=WEEKLY;BYDAY=MO"}, "exdates": STRS,
+         "reminders": {"type": "array", "items": {"type": "integer"}, "description": "minutes before the start"},
+         "status": {"type": "string", "enum": ["confirmed", "tentative", "cancelled"]}, "busy": {"type": "boolean"},
+         "url": {"type": ["string", "null"]}, "task_id": {"type": ["integer", "null"]},
+         "attendees": {"type": "array", "items": {"type": "object", "properties": {"user_id": S_ID, "contact_id": S_ID, "email": {"type": "string"},
+                                                                                 "name": {"type": "string"}}}}}
+EV_KEYS = tuple(EV_IN)
+OCC = {"occurrence": {"type": "string", "description": "only this date of a repeating event (its original start, Occurrence.occ)"}}
+CT_IN = {"book_id": S_ID, "kind": {"type": "string", "enum": ["individual", "org", "group"]},
+         **{k: {"type": "string"} for k in ("fn", "given", "family", "middle", "prefix", "suffix", "nickname", "org", "dept", "title", "note")},
+         "emails": {"type": "array", "items": {"type": "object"}, "description": "[{value, type: [home|work|other]}]"},
+         "phones": {"type": "array", "items": {"type": "object"}, "description": "[{value, type: [cell|home|work|other]}]"},
+         "addresses": {"type": "array", "items": {"type": "object"}, "description": "[{street, city, code, region, country, type}]"},
+         "urls": {"type": "array", "items": {"type": "object"}}, "bday": {"type": "string", "description": "YYYY-MM-DD or --MM-DD"},
+         "anniversary": {"type": "string"}, "groups": STRS}
+CT_KEYS = tuple(CT_IN)
+TOOLS += [
+    ("list_event_calendars", "2.21.0 (module Events): the event calendars you see (own + shared) with your role.", _obj({}),
+     lambda api, a: api.call("GET", "/event-calendars")),
+    ("create_event_calendar", "2.21.0: a new own calendar.", _obj({"name": {"type": "string"}, "color": {"type": "string"}, "description": {"type": "string"}}, ["name"]),
+     lambda api, a: api.call("POST", "/event-calendars", body=_pick(a, ("name", "color", "description")))),
+    ("update_event_calendar", "2.21.0: rename / recolour a calendar (owner) or hide it from your own views (hidden).",
+     _obj({"calendar_id": S_ID, "name": {"type": "string"}, "color": {"type": "string"}, "description": {"type": "string"}, "hidden": {"type": "boolean"}}, ["calendar_id"]),
+     lambda api, a: api.call("PATCH", f"/event-calendars/{int(a['calendar_id'])}", body=_pick(a, ("name", "color", "description", "hidden")))),
+    ("delete_event_calendar", "2.21.0: delete a calendar with all its events (owner).", _obj({"calendar_id": S_ID}, ["calendar_id"]),
+     lambda api, a: api.call("DELETE", f"/event-calendars/{int(a['calendar_id'])}")),
+    ("share_event_calendar", "2.21.0: share a calendar with a person: view or edit (owner).",
+     _obj({"calendar_id": S_ID, "user_id": S_ID, "role": {"type": "string", "enum": ["view", "edit"]}}, ["calendar_id", "user_id"]),
+     lambda api, a: api.call("PUT", f"/event-calendars/{int(a['calendar_id'])}/members/{int(a['user_id'])}", body=_pick(a, ("role",)))),
+    ("unshare_event_calendar", "2.21.0: stop sharing a calendar (owner) or leave one shared with you.", _obj({"calendar_id": S_ID, "user_id": S_ID}, ["calendar_id", "user_id"]),
+     lambda api, a: api.call("DELETE", f"/event-calendars/{int(a['calendar_id'])}/members/{int(a['user_id'])}")),
+    ("import_ics", "2.21.0: import the text of an .ics file into a calendar (the same UID is updated: no doubles); dry_run only counts.",
+     _obj({"calendar_id": S_ID, "ics": {"type": "string"}, "dry_run": {"type": "boolean"}}, ["calendar_id", "ics"]),
+     lambda api, a: api.call("POST", f"/event-calendars/{int(a['calendar_id'])}/import", body=_pick(a, ("ics", "dry_run")))),
+    ("export_ics", "2.21.0: a calendar as ICS text.", _obj({"calendar_id": S_ID}, ["calendar_id"]),
+     lambda api, a: api.call("GET", f"/event-calendars/{int(a['calendar_id'])}/export")),
+    ("list_calendar_events", "2.21.0: the events in a date range (repeating ones expanded, at most 400 days): own + shared calendars and invitations.",
+     _obj({"from": {"type": "string"}, "to": {"type": "string"}, "calendar_id": S_ID}, ["from", "to"]),
+     lambda api, a: api.call("GET", "/events", {"from": a["from"], "to": a["to"], "calendar_id": a.get("calendar_id")})),
+    ("get_event", "2.21.0: one event with its rule, changed / left-out dates and attendees.", _obj({"event_id": S_ID}, ["event_id"]),
+     lambda api, a: api.call("GET", f"/events/{int(a['event_id'])}")),
+    ("create_event", "2.21.0: create an event (all day or with times; repeat, reminders, attendees: people of this server, contacts, addresses).",
+     _obj(EV_IN, ["title", "start"]), lambda api, a: api.call("POST", "/events", body=_pick(a, EV_KEYS))),
+    ("update_event", "2.21.0: change an event; with occurrence only that date (title, location, description, all_day, start, end, status).",
+     _obj({"event_id": S_ID, **OCC, **EV_IN}, ["event_id"]),
+     lambda api, a: api.call("PATCH", f"/events/{int(a['event_id'])}", {"occurrence": a.get("occurrence")}, body=_pick(a, EV_KEYS))),
+    ("delete_event", "2.21.0: delete an event (restorable for 30 days) or, with occurrence, leave out that date.",
+     _obj({"event_id": S_ID, **OCC}, ["event_id"]),
+     lambda api, a: api.call("DELETE", f"/events/{int(a['event_id'])}", {"occurrence": a.get("occurrence")})),
+    ("restore_event", "2.21.0: restore a deleted event.", _obj({"event_id": S_ID}, ["event_id"]),
+     lambda api, a: api.call("POST", f"/events/{int(a['event_id'])}/restore")),
+    ("reply_to_event", "2.21.0: answer an invitation: accepted, tentative or declined.",
+     _obj({"event_id": S_ID, "partstat": {"type": "string", "enum": ["accepted", "tentative", "declined", "needs-action"]}}, ["event_id", "partstat"]),
+     lambda api, a: api.call("POST", f"/events/{int(a['event_id'])}/rsvp", body={"partstat": a["partstat"]})),
+    ("add_preparation_task", "2.21.0: a task to prepare an event, due days_before its start, linked to it (needs tasks:write too).",
+     _obj({"event_id": S_ID, "title": {"type": "string"}, "list_id": S_ID, "days_before": {"type": "integer", "minimum": 0, "maximum": 365}}, ["event_id"]),
+     lambda api, a: api.call("POST", f"/events/{int(a['event_id'])}/prep-task", body=_pick(a, ("title", "list_id", "days_before")))),
+    ("get_task_events", "2.21.0: the events a task prepares.", _obj({"task_id": S_ID}, ["task_id"]),
+     lambda api, a: api.call("GET", f"/tasks/{int(a['task_id'])}/events")),
+    ("list_address_books", "2.21.0 (module Contacts, scope contacts): the address books you see.", _obj({}),
+     lambda api, a: api.call("GET", "/address-books")),
+    ("create_address_book", "2.21.0: a new own address book.", _obj({"name": {"type": "string"}, "color": {"type": "string"}}, ["name"]),
+     lambda api, a: api.call("POST", "/address-books", body=_pick(a, ("name", "color")))),
+    ("update_address_book", "2.21.0: rename / recolour an address book, or choose the list for its birthdays (owner).",
+     _obj({"book_id": S_ID, "name": {"type": "string"}, "color": {"type": "string"}, "birthdays_list_id": {"type": ["integer", "null"]}}, ["book_id"]),
+     lambda api, a: api.call("PATCH", f"/address-books/{int(a['book_id'])}", body=_pick(a, ("name", "color", "birthdays_list_id")))),
+    ("delete_address_book", "2.21.0: delete an address book with its contacts (owner).", _obj({"book_id": S_ID}, ["book_id"]),
+     lambda api, a: api.call("DELETE", f"/address-books/{int(a['book_id'])}")),
+    ("share_address_book", "2.21.0: share an address book: view or edit (owner). Contacts are personal data.",
+     _obj({"book_id": S_ID, "user_id": S_ID, "role": {"type": "string", "enum": ["view", "edit"]}}, ["book_id", "user_id"]),
+     lambda api, a: api.call("PUT", f"/address-books/{int(a['book_id'])}/members/{int(a['user_id'])}", body=_pick(a, ("role",)))),
+    ("unshare_address_book", "2.21.0: stop sharing an address book (owner) or leave one.", _obj({"book_id": S_ID, "user_id": S_ID}, ["book_id", "user_id"]),
+     lambda api, a: api.call("DELETE", f"/address-books/{int(a['book_id'])}/members/{int(a['user_id'])}")),
+    ("import_vcards", "2.21.0: import the text of a .vcf file into an address book (the same UID is updated).",
+     _obj({"book_id": S_ID, "vcf": {"type": "string"}}, ["book_id", "vcf"]),
+     lambda api, a: api.call("POST", f"/address-books/{int(a['book_id'])}/import", body={"vcf": a["vcf"]})),
+    ("export_vcards", "2.21.0: an address book as vCard text.", _obj({"book_id": S_ID}, ["book_id"]),
+     lambda api, a: api.call("GET", f"/address-books/{int(a['book_id'])}/export")),
+    ("search_contacts", "2.21.0: search contacts by name, company, e-mail, phone, address or group (q), optionally in one address book / group.",
+     _obj({"q": {"type": "string"}, "book_id": S_ID, "group": {"type": "string"}, "limit": {"type": "integer", "minimum": 1, "maximum": 500},
+           "cursor": {"type": "string"}}),
+     lambda api, a: api.call("GET", "/contacts", _pick(a, ("q", "book_id", "group", "limit", "cursor")))),
+    ("get_contact", "2.21.0: one contact with its linked tasks and events.", _obj({"contact_id": S_ID}, ["contact_id"]),
+     lambda api, a: api.call("GET", f"/contacts/{int(a['contact_id'])}")),
+    ("create_contact", "2.21.0: create a contact (a name or a company).", _obj(CT_IN), lambda api, a: api.call("POST", "/contacts", body=_pick(a, CT_KEYS))),
+    ("update_contact", "2.21.0: change a contact (only the fields given).", _obj({"contact_id": S_ID, **CT_IN}, ["contact_id"]),
+     lambda api, a: api.call("PATCH", f"/contacts/{int(a['contact_id'])}", body=_pick(a, CT_KEYS))),
+    ("delete_contact", "2.21.0: delete a contact.", _obj({"contact_id": S_ID}, ["contact_id"]),
+     lambda api, a: api.call("DELETE", f"/contacts/{int(a['contact_id'])}")),
+    ("link_contact", "2.21.0: link a contact to a task: waiting (the task waits on them), responsible (they do it outside Kalmido) or about "
+                     "(needs tasks:write too).",
+     _obj({"task_id": S_ID, "contact_id": S_ID, "kind": {"type": "string", "enum": ["waiting", "responsible", "about"]}}, ["task_id", "contact_id"]),
+     lambda api, a: api.call("POST", f"/tasks/{int(a['task_id'])}/contacts", body=_pick(a, ("contact_id", "kind")))),
+    ("unlink_contact", "2.21.0: remove a contact's link to a task (needs tasks:write too).", _obj({"task_id": S_ID, "contact_id": S_ID}, ["task_id", "contact_id"]),
+     lambda api, a: api.call("DELETE", f"/tasks/{int(a['task_id'])}/contacts/{int(a['contact_id'])}")),
+]
 TOOL_MAP = {t[0]: t for t in TOOLS}
 
 
@@ -899,9 +1001,15 @@ TOOL_SCOPES = {
     "attachments:write": ("upload_attachment", "delete_attachment", "upload_project_file", "delete_project_file"),
     "time": ("start_timer", "stop_timer", "add_time_entry", "update_time_entry", "delete_time_entry"),
     "export": ("export_data",),
+    "calendar": ("list_event_calendars", "create_event_calendar", "update_event_calendar", "delete_event_calendar", "share_event_calendar",
+                 "unshare_event_calendar", "import_ics", "export_ics", "list_calendar_events", "get_event", "create_event", "update_event", "delete_event",
+                 "restore_event", "reply_to_event", "add_preparation_task", "get_task_events"),
+    "contacts": ("list_address_books", "create_address_book", "update_address_book", "delete_address_book", "share_address_book",
+                 "unshare_address_book", "import_vcards", "export_vcards", "search_contacts", "get_contact", "create_contact", "update_contact",
+                 "delete_contact", "link_contact", "unlink_contact"),
 }
 TOOL_SCOPE = {n: s for s, names in TOOL_SCOPES.items() for n in names}   # every other tool: read
-ALL_SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export")
+ALL_SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "calendar", "contacts")
 _ME = {"at": 0.0, "v": None}
 ME_TTL = 300  # s: a changed scope shows in tools/list within 5 minutes (a call is refused by the server at once anyway)
 

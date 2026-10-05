@@ -35,6 +35,8 @@ Create a token under **Settings > Account > API tokens**:
   | `attachments:write` | upload and remove them |
   | `time` | the timer and time entries |
   | `export` | `GET /export` |
+  | `calendar` (2.21.0) | events and event calendars, reading included: `/event-calendars…`, `/events…`, `/tasks/{id}/events` |
+  | `contacts` (2.21.0) | address books and contacts, reading included (personal data of other people: never part of the old `write`, never an agent's default) |
   | `account` | your notification settings and app passwords (never for agents) |
   | `admin-read` (admins only) | `GET /api/v1/admin/users`, `/admin/status`, `/admin/agents/{id}/audit`; checked on every request: if the user stops being an admin, it stops working (never for agents) |
 
@@ -329,6 +331,49 @@ participants, and get its reminders), `stars` (what a kid account gets for compl
 `family`: `shopping`, `meals`, `birthdays`, `household`, `packing` or `null`. A kid account takes part in shared lists
 only as a participant; it can complete / reopen what it sees, ask for rewards and change its own account, every other
 change answers `403`.
+
+## Events (2.21.0)
+
+Events live in your own calendars (module *Events*). Times are the local wall time of the event's time zone
+(`YYYY-MM-DDTHH:MM`, `tz` an IANA name, default the server's); all-day events use dates and an exclusive `end` (the day
+after the last day), like iCalendar. Scope `calendar` for every operation.
+
+| Endpoint | |
+|---|---|
+| `GET /event-calendars` · `POST` | the calendars you see (`role`: owner, edit, view; `hidden`); `{name, color?, description?}` |
+| `PATCH /event-calendars/{id}` · `DELETE` | rename / recolour (owner), `hidden` (your own views and reminders); delete with all events (owner) |
+| `PUT /event-calendars/{id}/members/{user_id}` · `DELETE` | share `{role: view\|edit}` (owner); stop sharing, or leave it yourself |
+| `POST /event-calendars/{id}/import` · `GET …/export` | `{ics, dry_run?}`: an .ics text (the same UID is updated, so importing twice adds nothing) -> `{created, updated, skipped, errors}`; the calendar as `{ics}` |
+| `GET /events?from=&to=&calendar_id=` | the occurrences in a range (at most 400 days): repeating events expanded, changed dates applied; `start` / `end` are UTC date-times (all day: dates); `occ` = the original start of a date |
+| `POST /events` · `GET /events/{id}` | `{title, start, end?, all_day?, tz?, location?, description?, rrule?, exdates?, reminders?, status?, busy?, url?, task_id?, cal_id?, attendees?}`; the event with `overrides` (changed dates) and `attendees` |
+| `PATCH /events/{id}` | change the series (`expect`: the `updated_at` you based it on -> `409` when it changed meanwhile); with `?occurrence=<occ>` only that date: `{title?, location?, description?, all_day?, start?, end?, status?}` |
+| `DELETE /events/{id}` · `POST …/restore` | to the trash for 30 days, then gone; with `?occurrence=<occ>` that date is left out |
+| `POST /events/{id}/rsvp` | `{partstat: accepted\|tentative\|declined\|needs-action}`: your answer to an invitation |
+| `POST /events/{id}/prep-task` | `{title?, list_id?, days_before? (1)}`: a task due before the event, linked to it (needs `tasks:write` too) |
+| `GET /tasks/{id}/events` | the events a task prepares |
+
+`attendees`: `[{user_id}]` (a person of this server: sees that event, and only that one, gets News + a push and
+answers), `[{contact_id}]` (a contact you see), `[{email, name?}]`; each with `partstat` and `role` (`req`, `opt`).
+Reminders are minutes before the start (all day: before midnight, so `-540` = 9:00 on the day).
+
+## Contacts (2.21.0)
+
+Contacts live in your own address books (module *Contacts*). Scope `contacts` for every operation; linking a contact to
+a task needs `tasks:write` too. A contact is only visible to people who see its address book.
+
+| Endpoint | |
+|---|---|
+| `GET /address-books` · `POST` | the address books you see (`count`, `role`, `imported`, `birthdays_list_id`); `{name, color?}` |
+| `PATCH /address-books/{id}` · `DELETE` | rename, recolour, `birthdays_list_id` (birthdays + anniversaries of its contacts become yearly tasks of that list; owner); delete with its contacts |
+| `PUT /address-books/{id}/members/{user_id}` · `DELETE` | share `{role: view\|edit}` (owner); stop sharing, or leave it |
+| `POST /address-books/{id}/import` · `GET …/export` | `{vcf}`: vCard 3 / 4 text (the same UID is updated); the book as `{vcf}` |
+| `GET /contacts?q=&book_id=&group=&limit=&cursor=` | search name, company, e-mail, phone (also without spaces), address, group; `{data, next_cursor, total, groups}` |
+| `POST /contacts` · `GET /contacts/{id}` · `PATCH` · `DELETE` | `{book_id?, kind?, fn?, given?, family?, middle?, prefix?, suffix?, nickname?, org?, dept?, title?, emails?, phones?, addresses?, urls?, bday?, anniversary?, note?, groups?, photo?}`; `GET` adds the linked `tasks` and `events` |
+| `POST /tasks/{id}/contacts` · `DELETE /tasks/{id}/contacts/{contact_id}` | `{contact_id, kind: waiting\|responsible\|about}` |
+
+`emails` / `phones` / `urls`: `[{value, type: [home|work|cell|other], pref?, label?}]`; `addresses`: `[{street, code,
+city, region, country, pobox?, ext?, type?}]`; `bday` / `anniversary`: `YYYY-MM-DD`, or `--MM-DD` without the year;
+`photo`: `data:image/jpeg;base64,...` (JPEG, PNG, GIF, WebP).
 
 ## Roadmap
 

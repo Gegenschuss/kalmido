@@ -265,7 +265,7 @@ async function setLang(code) {
   setSaved(e);
 }
 // U04: the modules, grouped, each with one sentence; admins also get the switch for the whole server (collaboration, time)
-const MOD_GROUPS = [[N_('Views'), ['cal', 'timeline', 'kanban', 'matrix']], [N_('For you'), ['habits', 'pomo', 'stats', 'comments']],
+const MOD_GROUPS = [[N_('Views'), ['cal', 'timeline', 'kanban', 'matrix']], [N_('Calendar and people'), ['events', 'contacts']], [N_('For you'), ['habits', 'pomo', 'stats', 'comments']],
   [N_('Projects and team'), ['collab', 'time', 'progress', 'deps', 'fields', 'agents']], [N_('At home'), ['family']], [N_('Connections'), ['paperless']]];
 const MOD_DESC = {cal: N_('Month, week and day view of your tasks'), timeline: N_('Tasks with start and end as bars over time'), kanban: N_('Lists as boards with columns'),
   matrix: N_('Urgent and important in four quadrants'), habits: N_('Daily and weekly habits with streaks'), pomo: N_('Focus timer and stopwatch'),
@@ -274,6 +274,8 @@ const MOD_DESC = {cal: N_('Month, week and day view of your tasks'), timeline: N
   time: N_('Timers and manual time entries on tasks, reports and CSV export'), progress: N_('Progress per list and a “Where is it stuck?” overview'),
   deps: N_('Tasks that wait on other tasks, with arrows in the timeline (Gantt)'), fields: N_('Own fields per list, such as budget, client or phase'),
   paperless: N_('Link documents from Paperless-ngx to tasks'),
+  events: N_('Appointments in your own calendars next to the tasks, shared calendars, invitations, synced with the phone’s calendar'),
+  contacts: N_('Your address books: contacts linked to tasks and events, birthdays, synced with the phone’s contacts'),
   family: N_('Birthdays, household chores taking turns, shopping lists with shop areas, a meal plan, deadlines, packing lists and accounts for children')};
 function modulesHtml(hint) {
   const s = S.settings;

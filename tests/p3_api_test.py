@@ -66,7 +66,7 @@ BOB, CAROL, DAVE = ids["bob"], ids["carol"], ids["dave"]
 Bb, C, Dv = sess("bob"), sess("carol"), sess("dave")
 Bb.patch(B + "/api/settings", json={"lang": "de"})
 st = state(A)
-check("progress" in st["settings"]["features"].split(",") and st["settings"]["features_rev"] == "9", "new user: progress module on, features_rev 9 (2.0.6)")
+check("progress" in st["settings"]["features"].split(",") and st["settings"]["features_rev"] == "10", "new user: progress module on, features_rev 10 (2.21.0)")
 check(st["settings"]["hide_blocked_today"] == "0" and st["settings"]["progress_subtasks"] == "0", "new settings defaults")
 check(st["fields"] == [], "state: fields []")
 

@@ -45,11 +45,11 @@ const S = {
   route: {mod: 'tasks', key: 'inbox'}, sel: null, extra: null,
   collapsed: new Set(LS.get('collapsed', []).filter(x => x !== 'side:arch-open')),  // 1.6.1: the archive fold is gone
   calMonth: null, calSel: today(), quick: {ignore: new Set()},
-  filters: [], multi: new Set(), multiMode: false, occ: {key: '', items: []}, cal: {key: '', loading: '', items: [], subs: {}}, calendars: {enabled: false, subs: 0},
+  filters: [], multi: new Set(), multiMode: false, occ: {key: '', items: []}, cal: {key: '', loading: '', items: [], subs: {}, evcals: {}}, calendars: {enabled: false, subs: 0},
   calMode: LS.get('calMode', 'month'), tlStart: null, quickPreset: {}, editContent: false,
   tl: {id: null}, drafts: {}, cfiles: {}, cedit: null, editLink: false,  // comments timeline of the open task
 };
-const FEATS = [['cal', N_('Calendar')], ['timeline', N_('Timeline')], ['matrix', N_('Eisenhower matrix')], ['habits', N_('Habits')], ['pomo', N_('Focus (Pomodoro)')], ['kanban', N_('Kanban')], ['paperless', N_('Paperless link')], ['collab', N_('Collaboration')], ['stats', N_('Statistics')], ['time', N_('Time tracking')], ['progress', N_('Project progress')], ['deps', N_('Dependencies')], ['fields', N_('Custom fields')], ['agents', N_('Agents')], ['comments', N_('Comments')], ['family', N_('Family')]];
+const FEATS = [['cal', N_('Calendar')], ['timeline', N_('Timeline')], ['matrix', N_('Eisenhower matrix')], ['habits', N_('Habits')], ['pomo', N_('Focus (Pomodoro)')], ['kanban', N_('Kanban')], ['paperless', N_('Paperless link')], ['collab', N_('Collaboration')], ['stats', N_('Statistics')], ['time', N_('Time tracking')], ['progress', N_('Project progress')], ['deps', N_('Dependencies')], ['fields', N_('Custom fields')], ['agents', N_('Agents')], ['comments', N_('Comments')], ['family', N_('Family')], ['events', N_('Events')], ['contacts', N_('Contacts')]];
 const FEAT_DESC = {deps: N_('“Waiting on” in the task details, arrows and linking in the timeline, what is stuck in the overview, a notice when a task is unblocked'),
   fields: N_('Own fields per list (text, number, selection, date, person, link), as columns and in the task details'),collab: N_('Comments, activity history, @mentions, News, sharing lists and assigning tasks'), stats: N_('Completed tasks, on-time rate, overdue trend, focus time and habit streaks'),
   time: N_('Timer on tasks, manual entries, reports per list and task, CSV export and a printable timesheet'),
@@ -102,7 +102,7 @@ document.addEventListener('scroll', e => {
   if (e.target !== v || QS.top == null || Date.now() - QS.at > 400 || document.activeElement?.id !== 'qinput') return;
   if (Math.abs(v.scrollTop - QS.top) > 1) v.scrollTop = QS.top;
 }, true);
-const noFab = () => ['habits', 'pomo', 'news', 'stats', 'time', 'overview', 'agents', 'team', 'notes', 'family'].includes(S.route.mod) || NOLIST_KEYS.includes(S.route.key) || isOverview();
+const noFab = () => ['habits', 'pomo', 'news', 'stats', 'time', 'overview', 'agents', 'team', 'notes', 'family', 'contacts'].includes(S.route.mod) || NOLIST_KEYS.includes(S.route.key) || isOverview();
 // package 3: progress bar / overview (switch "progress"), project status (+ collaboration), custom fields, dependencies
 // 2.13.0 (#453, Fold screenshots): the round + only on phones; tablets / an unfolded Fold add with the docked "Add task"
 // bar or, in views without it (calendar, Kanban, timeline), the header's "New task" button
@@ -194,7 +194,9 @@ function openTasks(ctx = false) { return [...S.tasks.values()].filter(t => t.sta
 // cached for offline start. Every queued op carries the user id: ops of another user are never replayed.
 class Offline extends Error {}
 const OUT = {q: LS.get('outbox', []), online: true, flushing: false};
-function setOnline(b) { if (OUT.online !== b) { OUT.online = b; renderTop(); if (b) flush(); setTimeout(() => typeof staleDraw === 'function' && staleDraw(), 0); } }
+// 2.21.0 (#673): before the first render there is no top bar to update (renderTop on an empty state threw, so a start while
+// the server was down showed the error page instead of the cached data); the boot's render shows the state
+function setOnline(b) { if (OUT.online !== b) { OUT.online = b; if (S.booted) renderTop(); if (b) flush(); setTimeout(() => typeof staleDraw === 'function' && staleDraw(), 0); } }
 // 2.13.4 (p210 flake, a real race): every write counts up when it starts and when it ends (S.wseq), so load() can tell that
 // a write finished while its GET /api/state was on the way: that answer may predate the write and would undo it locally
 // (S.settings went back to the old value; an Undo right after then saw "changed elsewhere" and skipped the step)
@@ -209,7 +211,11 @@ async function rawFetch0(method, url, body) {
   if (body instanceof FormData) opt.body = body;
   else if (body !== undefined) { opt.body = JSON.stringify(body); opt.headers['Content-Type'] = 'application/json'; }
   let r;
-  try { r = await fetch(url, opt); } catch { setOnline(false); throw new Offline('offline'); }
+  try { r = await fetch(url, opt); } catch { const ch = OUT.down; OUT.down = false; setOnline(false); if (ch && S.booted) renderTop(); throw new Offline('offline'); }
+  // 2.21.0 (#673): the device is online but the server is not (a proxy answers 502 / 503 / 504 without Kalmido's JSON): the
+  // same as offline (cached data, changes wait), the hint says "server not reachable"; never a reload loop on a proxy page
+  if ([502, 503, 504].includes(r.status) && !(r.headers.get('content-type') || '').includes('application/json')) { const ch = !OUT.down; OUT.down = true; setOnline(false); if (ch && S.booted) renderTop(); throw new Offline('down'); }
+  if (OUT.down) { OUT.down = false; if (S.booted && !OUT.online) renderTop(); }
   setOnline(true);
   if (r.type === 'opaqueredirect' || (r.headers.get('content-type') || '').includes('text/html')) {
     location.reload();  // login session expired -> login page
@@ -456,6 +462,9 @@ function applyState(j) {
   S.groups = j.groups || []; S.myGroups = j.my_groups || [];  // 2.10.0 (#441)
   S.dayplan = j.dayplan || {work_start: '09:00', work_end: '17:00', review_time: '', default_duration: 30};  // 2.10.0 (#440)
   S.kids = j.kids || []; S.kidIds = new Set(j.kid_ids || []);  // 2.19.0 (#653)
+  // 2.21.0 (#659 / #658): event calendars (a changed event refetches the calendar range), address books, links of tasks
+  S.evcals = j.evcals || []; S.evlinks = j.evlinks || {}; S.books = j.books || []; S.tcontacts = j.tcontacts || {};
+  if (j.evsig !== undefined && j.evsig !== S.evsig) { S.evsig = j.evsig; if (S.booted) calInvalidate(); }
   // language changed on another device: switch once its file is loaded (the boot awaits it itself)
   if (S.booted && (j.settings.lang || 'en') !== I18N.code) i18nLoad(j.settings.lang).then(ok => { if (ok) render(); });
 }
@@ -529,7 +538,8 @@ function staleDraw() {
   if (!on) { if (el) el.remove(); return; }
   if (!el) { el = document.createElement('button'); el.id = 'stale'; el.type = 'button'; el.setAttribute('role', 'status'); el.addEventListener('click', () => { if (OUT.q.length || !OUT.online) toast(tr('Changes are sent as soon as the server is reachable'), null, 4000); refreshNow().then(staleDraw).catch(() => {}); }); document.body.appendChild(el); }
   const min = Math.floor(age / 60000);
-  const txt = (off || age > 30000) ? (q ? tr('Offline') + ' · ' + trn('{0} change waiting', '{0} changes waiting', q) : min < 1 ? tr('Offline – last update less than a minute ago') : trn('Offline – last update {0} min ago', 'Offline – last update {0} min ago', min))
+  const txt = off && OUT.down ? (q ? tr('Server not reachable') + ' · ' + trn('{0} change waiting', '{0} changes waiting', q) : tr('Server not reachable – changes are sent later'))
+    : (off || age > 30000) ? (q ? tr('Offline') + ' · ' + trn('{0} change waiting', '{0} changes waiting', q) : min < 1 ? tr('Offline – last update less than a minute ago') : trn('Offline – last update {0} min ago', 'Offline – last update {0} min ago', min))
     : trn('{0} change waiting', '{0} changes waiting', q);
   el.innerHTML = `${ic(off ? 'cloudoff' : 'sync', 's')}<span>${esc(txt)}</span>`;
   el.title = tr('Tap to try again');
@@ -626,6 +636,8 @@ function parseHash() {
   if (a === 'today' && b === 'review') return {mod: 'tasks', key: 'today', review: true};  // 2.10.0 (#440): push "Daily review"
   if (a === 'folder' && b) return {mod: 'tasks', key: 'folder:' + h.slice(7)};  // 2.4.0: a path has a slash
   if (a === 'agents') return {mod: 'agents', key: 'agents', agent: +b || null};
+  if (a === 'ev' && +b) return {mod: 'cal', key: 'cal', ev: +b};  // 2.21.0 (#659): a push / News about an event
+  if (a === 'contacts') return {mod: 'contacts', key: 'contacts', contact: +b || null};  // 2.21.0 (#658)
   if (['cal', 'matrix', 'habits', 'pomo', 'news', 'stats', 'time', 'overview', 'family'].includes(a)) return {mod: a, key: a};
   if (SMART[a]) return {mod: 'tasks', key: a};
   return {mod: 'tasks', key: START_KEY};
@@ -667,6 +679,8 @@ async function route() {
     return;
   }
   render();
+  if (r.ev) evOpen(r.ev);  // 2.21.0
+  if (r.mod === 'contacts') ctRoute(r.contact);
   // 2.13.0 (#453 A10): #agents/<id> (the push "… answered") opens the chat right away on Fold / desktop too
   if (r.mod === 'agents' && r.agent && !chatFull() && !$('#achat:not(.hidden)') && agentById(r.agent)) chatOpen(r.agent);
 }

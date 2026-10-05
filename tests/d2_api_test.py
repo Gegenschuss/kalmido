@@ -86,7 +86,7 @@ for u, n in (("bob", "Bob"), ("carol", "Carol")):
 BOB, CAROL = ids["bob"], ids["carol"]
 Bb, C = sess("bob"), sess("carol")
 check({"deps", "fields"} <= set(feats(Bb)), "a new user follows the chosen default (deps + fields on)")
-check(state(Bb)["settings"]["features_rev"] == "9", "new user: features_rev 9 (2.0.6: comments)")
+check(state(Bb)["settings"]["features_rev"] == "10", "new user: features_rev 10 (2.21.0: events + contacts)")
 
 # ---- per-user module switch: the API keeps working, no unblock News / push when "deps" is off
 W = A.post(B + "/api/lists", json={"name": "Work", "kind": "project"}).json()["id"]
@@ -329,10 +329,10 @@ with db() as c:
     u = {r2["user_id"]: r2["value"] for r2 in c.execute("SELECT user_id, value FROM user_settings WHERE key='features'")}
     rev = {r2["user_id"]: r2["value"] for r2 in c.execute("SELECT user_id, value FROM user_settings WHERE key='features_rev'")}
     dflt = c.execute("SELECT value FROM settings WHERE key='default_features'").fetchone()[0]
-check(u[1] == "cal,timeline,matrix,collab,time,deps,fields,comments", f"migration: timeline user gets deps + fields, nothing else changes: {u[1]}")
-check(u[BOB] == "cal,habits,collab,deps,fields,comments", f"migration: member of a list with dependencies + a custom field gets both: {u[BOB]}")
-check(u[CAROL] == "cal,habits,collab,fields,comments", f"migration: user with a custom field gets fields; deps = instance default (off): {u[CAROL]}")
-check(all(v == "9" for v in rev.values()), f"migration: features_rev 9 for everyone (8 + comments): {rev}")
+check(u[1] == "cal,timeline,matrix,collab,time,deps,fields,comments,events,contacts", f"migration: timeline user gets deps + fields, nothing else changes: {u[1]}")
+check(u[BOB] == "cal,habits,collab,deps,fields,comments,events,contacts", f"migration: member of a list with dependencies + a custom field gets both: {u[BOB]}")
+check(u[CAROL] == "cal,habits,collab,fields,comments,events,contacts", f"migration: user with a custom field gets fields; deps = instance default (off): {u[CAROL]}")
+check(all(v == "10" for v in rev.values()), f"migration: features_rev 10 for everyone (8 + comments + 2.21 events / contacts): {rev}")
 check(dflt == "cal,habits,collab,time", f"migration: setup default without timeline / progress stays as chosen: {dflt}")
 with db() as c:
     kinds = {r2["id"]: r2["kind"] for r2 in c.execute("SELECT id, kind FROM lists")}
@@ -354,8 +354,8 @@ with db() as c:
     uc = c.execute("SELECT value FROM user_settings WHERE key='features' AND user_id=?", (CAROL,)).fetchone()[0]
     u1 = c.execute("SELECT value FROM user_settings WHERE key='features' AND user_id=1").fetchone()[0]
 check(dflt == "cal,timeline,progress,collab,time,deps,fields", f"migration: an old setup default with the timeline gets deps + fields: {dflt}")
-check(uc == "cal,deps,fields,comments", f"migration: no data, no timeline -> the (migrated) instance default: {uc}")
-check(u1 == "cal,timeline,matrix,collab,time,deps,fields", f"migration runs once (rev 9 users untouched, comments stay off): {u1}")
+check(uc == "cal,deps,fields,comments,events,contacts", f"migration: no data, no timeline -> the (migrated) instance default: {uc}")
+check(u1 == "cal,timeline,matrix,collab,time,deps,fields", f"migration runs once (rev 10 users untouched, comments stay off): {u1}")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

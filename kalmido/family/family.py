@@ -92,9 +92,9 @@ PACKING = {
 # what each answer of "What do you use Kalmido for?" switches on / off (agents and Paperless stay as they are)
 PURPOSES = ("me", "family", "team", "software")
 PURPOSE_MODS = ("cal", "timeline", "matrix", "kanban", "habits", "pomo", "stats", "comments", "collab", "time", "progress",
-                "deps", "fields", "family")
-PURPOSE_ON = {"me": ("cal",),
-              "family": ("cal", "habits", "comments", "collab", "family"),
+                "deps", "fields", "family", "events", "contacts")
+PURPOSE_ON = {"me": ("cal", "events", "contacts"),
+              "family": ("cal", "habits", "comments", "collab", "family", "events", "contacts"),
               "team": tuple(m for m in PURPOSE_MODS if m != "family"),
               "software": tuple(m for m in PURPOSE_MODS if m != "family")}
 

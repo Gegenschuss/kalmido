@@ -515,6 +515,78 @@ CREATE TABLE IF NOT EXISTS contact_links (        -- a contact's birthday / anni
   task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL, digest TEXT NOT NULL DEFAULT '',
   book TEXT NOT NULL DEFAULT '',                  -- the address book's URL (sealed like the source's), for a later contacts module
   PRIMARY KEY (src_id, uid, kind));
+-- 2.21.0 (#659): events. Own calendars (shared like lists: view | edit), events in local wall time of their zone (all day:
+-- dates, end exclusive), repeat rule + left-out occurrences + changed occurrences (overrides: json, as clients sent them),
+-- attendees (a person of this server, a contact or an address), the reminders already sent
+CREATE TABLE IF NOT EXISTS ev_cals (
+  id INTEGER PRIMARY KEY, owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL, color TEXT NOT NULL DEFAULT '', description TEXT NOT NULL DEFAULT '', sort INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL, changed_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS ev_cals_owner ON ev_cals(owner_id);
+CREATE TABLE IF NOT EXISTS ev_cal_members (
+  cal_id INTEGER NOT NULL REFERENCES ev_cals(id) ON DELETE CASCADE, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role TEXT NOT NULL DEFAULT 'view', hidden INTEGER NOT NULL DEFAULT 0, added_at TEXT NOT NULL, PRIMARY KEY (cal_id, user_id));
+CREATE INDEX IF NOT EXISTS ev_cal_members_user ON ev_cal_members(user_id);
+CREATE TABLE IF NOT EXISTS events (
+  id INTEGER PRIMARY KEY, cal_id INTEGER NOT NULL REFERENCES ev_cals(id) ON DELETE CASCADE,
+  uid TEXT NOT NULL, href TEXT NOT NULL, title TEXT NOT NULL, location TEXT NOT NULL DEFAULT '', description TEXT NOT NULL DEFAULT '',
+  all_day INTEGER NOT NULL DEFAULT 0, start TEXT NOT NULL, end TEXT NOT NULL, tz TEXT NOT NULL DEFAULT '',
+  rrule TEXT NOT NULL DEFAULT '', exdates TEXT NOT NULL DEFAULT '', overrides TEXT NOT NULL DEFAULT '',
+  reminders TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'confirmed', busy INTEGER NOT NULL DEFAULT 1,
+  url TEXT, task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL, extra TEXT NOT NULL DEFAULT '',
+  seq INTEGER NOT NULL DEFAULT 0, created_by INTEGER, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT,
+  first_day TEXT NOT NULL DEFAULT '', last_day TEXT NOT NULL DEFAULT '');  -- local days the series spans ('' last = open end)
+CREATE INDEX IF NOT EXISTS events_cal ON events(cal_id, deleted_at);
+CREATE INDEX IF NOT EXISTS events_uid ON events(uid);
+CREATE INDEX IF NOT EXISTS events_task ON events(task_id) WHERE task_id IS NOT NULL;
+CREATE TABLE IF NOT EXISTS event_attendees (
+  id INTEGER PRIMARY KEY, event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
+  email TEXT NOT NULL DEFAULT '', name TEXT NOT NULL DEFAULT '', partstat TEXT NOT NULL DEFAULT 'needs-action',
+  role TEXT NOT NULL DEFAULT 'req');
+CREATE INDEX IF NOT EXISTS event_attendees_event ON event_attendees(event_id);
+CREATE INDEX IF NOT EXISTS event_attendees_user ON event_attendees(user_id) WHERE user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS event_attendees_contact ON event_attendees(contact_id) WHERE contact_id IS NOT NULL;
+CREATE TABLE IF NOT EXISTS ev_reminded (
+  event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE, user_id INTEGER NOT NULL, k TEXT NOT NULL,
+  at TEXT NOT NULL, PRIMARY KEY (event_id, user_id, k));
+-- 2.21.0 (#658): contacts. Address books (shared like lists: view | edit), one row per vCard (the mapped fields + the
+-- properties Kalmido has no field for, sent back as they came), links to tasks (waiting on / responsible outside / about)
+CREATE TABLE IF NOT EXISTS books (
+  id INTEGER PRIMARY KEY, owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL, color TEXT NOT NULL DEFAULT '', src_id INTEGER REFERENCES contact_srcs(id) ON DELETE SET NULL,
+  occ_list_id INTEGER REFERENCES lists(id) ON DELETE SET NULL,   -- birthdays + anniversaries become tasks of this list
+  created_at TEXT NOT NULL, changed_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS books_owner ON books(owner_id);
+CREATE TABLE IF NOT EXISTS book_members (
+  book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role TEXT NOT NULL DEFAULT 'view', added_at TEXT NOT NULL, PRIMARY KEY (book_id, user_id));
+CREATE INDEX IF NOT EXISTS book_members_user ON book_members(user_id);
+CREATE TABLE IF NOT EXISTS contacts (
+  id INTEGER PRIMARY KEY, book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+  uid TEXT NOT NULL, href TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'individual',  -- individual | org | group
+  fn TEXT NOT NULL DEFAULT '', given TEXT NOT NULL DEFAULT '', family TEXT NOT NULL DEFAULT '', middle TEXT NOT NULL DEFAULT '',
+  prefix TEXT NOT NULL DEFAULT '', suffix TEXT NOT NULL DEFAULT '', nickname TEXT NOT NULL DEFAULT '',
+  org TEXT NOT NULL DEFAULT '', dept TEXT NOT NULL DEFAULT '', title TEXT NOT NULL DEFAULT '',
+  emails TEXT NOT NULL DEFAULT '[]', phones TEXT NOT NULL DEFAULT '[]', addresses TEXT NOT NULL DEFAULT '[]', urls TEXT NOT NULL DEFAULT '[]',
+  bday TEXT NOT NULL DEFAULT '', anniversary TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
+  groups TEXT NOT NULL DEFAULT '[]', photo TEXT NOT NULL DEFAULT '', version TEXT NOT NULL DEFAULT '3.0',
+  extra TEXT NOT NULL DEFAULT '', src_digest TEXT NOT NULL DEFAULT '', search TEXT NOT NULL DEFAULT '',
+  created_by INTEGER, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS contacts_book ON contacts(book_id);
+CREATE INDEX IF NOT EXISTS contacts_uid ON contacts(uid);
+CREATE TABLE IF NOT EXISTS contact_tasks (
+  contact_id INTEGER NOT NULL REFERENCES contacts(id) ON DELETE CASCADE, task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL DEFAULT 'about',   -- waiting | responsible | about
+  added_by INTEGER, added_at TEXT NOT NULL, PRIMARY KEY (contact_id, task_id));
+CREATE INDEX IF NOT EXISTS contact_tasks_task ON contact_tasks(task_id);
+CREATE TABLE IF NOT EXISTS contact_occ (   -- a contact's birthday / anniversary -> its task (like contact_links for own contacts)
+  contact_id INTEGER NOT NULL REFERENCES contacts(id) ON DELETE CASCADE, kind TEXT NOT NULL,
+  task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL, digest TEXT NOT NULL DEFAULT '', PRIMARY KEY (contact_id, kind));
+-- sync-collection of event calendars + address books (coll: e<id> | inv | b<id>), like dav_sync
+CREATE TABLE IF NOT EXISTS dav_sync2 (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, coll TEXT NOT NULL,
+  token TEXT NOT NULL, state BLOB NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (user_id, coll, token));
 """
 # Bumped when the database layout changes (stored in PRAGMA user_version). A backup can be restored when its
 # schema version is not newer than this one (older ones are migrated by init_db).
@@ -738,7 +810,7 @@ USER_DEFAULTS = {
     #            @mentions, pushes and News
     # progress = progress bar in the list header + the "Where is it stuck?" overview
     # deps = dependencies ("waiting on", timeline arrows + linking, unblock notifications); fields = custom fields
-    "features": "cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,progress,deps,fields,comments",
+    "features": "cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,progress,deps,fields,comments,events,contacts",
     "nav_order": "tasks,cal,matrix,habits,pomo",   # order of the mobile tab bar / desktop rail
     "folders": "[]",            # json list: folder order in the sidebar (also keeps empty folders); 2.4.0: paths "A/b"
     "folders_closed": "[]",     # 2.4.0 (#361): json list of the folder paths folded in the sidebar (all devices)
@@ -747,7 +819,7 @@ USER_DEFAULTS = {
     # "skip": {"<agent id>": [list ids I stopped sharing with it]}}; written only by /api/agents/<aid>/share-all + /autoshare
     # and the member routes (server-only)
     "agent_share": "{}",
-    "features_rev": "9",        # one-shot migrations of the features list
+    "features_rev": "10",       # one-shot migrations of the features list
     "paperless_keep": "0",      # 1 = keep the local attachment after it was consumed by Paperless
     "lang": "en",               # UI + push language: en or a static/i18n/<code>.json
     "ical_scope": "all",        # calendar feed: all = every visible open task with a date, mine = mine / assigned to me
@@ -774,6 +846,7 @@ USER_DEFAULTS = {
     # nd (2.0.6): "No date" rows in open lists (default on)}
     "roadmap": "",
     # v1.1
+    "evcals_hidden": "[]",      # 2.21.0 (#659): json list of the event calendars I hid from my views (server-only)
     "purpose": "",              # 2.19.0 (#653): what the person uses Kalmido for (me | family | team | software; server-only)
     "celebrate": "1",           # the heron celebrates an emptied Today / a completed list or project
     "cal_today": "1",           # "Events today" block on Today (external calendar subscriptions)

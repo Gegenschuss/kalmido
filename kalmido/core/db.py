@@ -36,6 +36,18 @@ def local_now():
     return datetime.now(TZ)
 
 
+def local_day(ts):
+    """The local day (server time zone) of a stored UTC timestamp; None for an empty or unreadable one. 2.21.0 (#671):
+    the one tolerant version for statistics and the milestone report (a damaged row is left out instead of failing)."""
+    if not ts:
+        return None
+    try:
+        d = parse_iso(ts)
+        return (d if d.tzinfo else d.replace(tzinfo=timezone.utc)).astimezone(TZ).date()
+    except (ValueError, TypeError, OverflowError):
+        return None
+
+
 def db():
     if "db" not in g:
         g.db = connect()
@@ -304,6 +316,11 @@ def init_db(guard=True):
             if "comments" not in d:
                 gset(c, "default_features", ",".join(d + ["comments"]))
         gset(c, "migr_feat9", "1")
+        # features_rev 10 (2.21.0, #659 / #658): events and contacts are modules of their own, on by default
+        if dfs and gsetting(c, "migr_feat10") != "1":
+            d = [x for x in (gsetting(c, "default_features") or "").split(",") if x]
+            gset(c, "default_features", ",".join(d + [f for f in ("events", "contacts") if f not in d]))
+        gset(c, "migr_feat10", "1")
         for (uid,) in c.execute("SELECT id FROM users").fetchall():
             ensure_inbox(c, uid)
             for k, v in USER_DEFAULTS.items():
@@ -334,6 +351,12 @@ def init_db(guard=True):
                     fs.append("comments")
                 uset(c, uid, "features", ",".join(fs))
                 uset(c, uid, "features_rev", "9")
+            # features_rev 10 (2.21.0, #659 / #658): events + contacts -> on for everyone (data of their own, nothing changes
+            # for tasks; switched off in Settings > Modules)
+            if rev < 10:
+                fs += [f for f in ("events", "contacts") if f not in fs]
+                uset(c, uid, "features", ",".join(fs))
+                uset(c, uid, "features_rev", "10")
         # 2.15.0 (#479), once: fine scopes. Old read tokens could download files (now attachments:read), old agents had
         # read + write (stored "write" = every scope but admin-read, so they keep what they could do)
         if gsetting(c, "migr_scopes215") != "1":

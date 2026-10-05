@@ -1070,9 +1070,18 @@ def cal_events():
         return err(tr("from/to missing"))
     if hi < lo or (hi - lo).days > 400:
         return err(tr("Date range too large"))
+    if not (1900 <= lo.year and hi.year <= 2999):
+        return err(tr("from/to missing"))
     c, uid = db(), me()
+    from ..events.model import cals_for, ev_range, events_on
+    own, evcals = [], {}
+    if events_on(c, uid):  # 2.21.0 (#659): own events (+ shared calendars, invitations) in the same answer
+        own = ev_range(c, uid, lo, hi)
+        for i, e in enumerate(own):
+            e["id"], e["own"] = f"k{i}", True
+        evcals = {x["id"]: {"name": x["name"], "color": x["color"], "role": x["role"]} for x in cals_for(c, uid)}
     if not CAL_ON:
-        return jsonify(events=[], subs={})
+        return jsonify(events=own, subs={}, evcals=evcals)
     subs = {r["id"]: {"name": r["name"], "color": r["color"]}
             for r in c.execute("SELECT id, name, color FROM cal_subs WHERE user_id=? AND visible=1", (uid,))}
     rows = c.execute("""SELECT e.* FROM cal_events e JOIN cal_subs s ON s.id=e.sub_id
@@ -1080,4 +1089,4 @@ def cal_events():
                      (uid, lo.isoformat(), hi.isoformat())).fetchall()
     return jsonify(events=[{"id": r["id"], "sub": r["sub_id"], "title": r["title"], "location": r["location"],
                             "description": r["description"], "all_day": bool(r["all_day"]), "start": r["start"], "end": r["end"]}
-                           for r in rows], subs=subs)
+                           for r in rows] + own, subs=subs, evcals=evcals)

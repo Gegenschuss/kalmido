@@ -164,6 +164,21 @@ APP_TO_API = {
     "POST /api/family/kids/{}/stars": ["POST /family/kids/{}/stars"], "POST /api/family/kids/{}/rewards": ["POST /family/kids/{}/rewards"],
     "PATCH /api/family/rewards/{}": ["PATCH /family/rewards/{}"], "DELETE /api/family/rewards/{}": ["DELETE /family/rewards/{}"],
     "POST /api/family/rewards/{}/request": ["POST /family/rewards/{}/request"], "POST /api/family/rewards/{}/decide": ["POST /family/rewards/{}/decide"],
+    # 2.21.0 (#659): events
+    "GET /api/evcals": ["GET /event-calendars"], "POST /api/evcals": ["POST /event-calendars"], "PATCH /api/evcals/{}": ["PATCH /event-calendars/{}"],
+    "DELETE /api/evcals/{}": ["DELETE /event-calendars/{}"], "PUT /api/evcals/{}/members": ["PUT /event-calendars/{}/members/{}"],
+    "DELETE /api/evcals/{}/members/{}": ["DELETE /event-calendars/{}/members/{}"], "POST /api/evcals/{}/import": ["POST /event-calendars/{}/import"],
+    "GET /api/evcals/{}/export.ics": ["GET /event-calendars/{}/export"], "GET /api/events": ["GET /events"], "POST /api/events": ["POST /events"],
+    "GET /api/events/{}": ["GET /events/{}"], "PATCH /api/events/{}": ["PATCH /events/{}"], "DELETE /api/events/{}": ["DELETE /events/{}"],
+    "POST /api/events/{}/restore": ["POST /events/{}/restore"], "POST /api/events/{}/rsvp": ["POST /events/{}/rsvp"],
+    "POST /api/events/{}/prep-task": ["POST /events/{}/prep-task"], "GET /api/tasks/{}/events": ["GET /tasks/{}/events"],
+    # 2.21.0 (#658): contacts
+    "GET /api/books": ["GET /address-books"], "POST /api/books": ["POST /address-books"], "PATCH /api/books/{}": ["PATCH /address-books/{}"],
+    "DELETE /api/books/{}": ["DELETE /address-books/{}"], "PUT /api/books/{}/members": ["PUT /address-books/{}/members/{}"],
+    "DELETE /api/books/{}/members/{}": ["DELETE /address-books/{}/members/{}"], "POST /api/books/{}/import": ["POST /address-books/{}/import"],
+    "GET /api/books/{}/export.vcf": ["GET /address-books/{}/export"], "GET /api/contacts": ["GET /contacts"], "POST /api/contacts": ["POST /contacts"],
+    "GET /api/contacts/{}": ["GET /contacts/{}"], "PATCH /api/contacts/{}": ["PATCH /contacts/{}"], "DELETE /api/contacts/{}": ["DELETE /contacts/{}"],
+    "POST /api/tasks/{}/contacts": ["POST /tasks/{}/contacts"], "DELETE /api/tasks/{}/contacts/{}": ["DELETE /tasks/{}/contacts/{}"],
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [

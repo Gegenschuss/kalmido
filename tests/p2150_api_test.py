@@ -193,7 +193,7 @@ A.patch(B + f"/api/me/tokens/{R['id']}", json={"allowed_ips": ""})
 # ================================================================== the OpenAPI document = the enforcement
 spec = requests.get(V + "/openapi.json").json()
 ALLOWED = {"read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "account",
-           "admin-read", "agent"}
+           "admin-read", "agent", "calendar", "contacts"}  # 2.21.0: calendar, contacts
 ops = [(m.upper(), p, op["x-kalmido-scope"]) for p, ms in spec["paths"].items() for m, op in ms.items()]
 check(all(sc in ALLOWED for _, _, sc in ops), "every operation: a known scope")
 for pth in ("/lists/{id}/sections", "/sections/{id}", "/lists/{id}/sections/order", "/tasks/{id}/move", "/tasks/batch", "/tasks/{id}/skip",
@@ -204,7 +204,7 @@ for pth in ("/lists/{id}/sections", "/sections/{id}", "/lists/{id}/sections/orde
     check(pth in spec["paths"], f"OpenAPI: {pth}")
 check("delete" in spec["paths"]["/lists/{id}"] and "post" in spec["paths"]["/tasks/{id}/attachments"]
       and "get" in spec["paths"]["/tasks/{id}/attachments"] and "get" in spec["paths"]["/habits"], "OpenAPI: added methods kept the existing ones")
-full = Api(tok(A, ["read", "write"])["token"])
+full = Api(tok(A, ["read", "write", "contacts"])["token"])  # 2.21.0: contacts is never part of the legacy "write"
 bad_ro, bad_full = [], []
 for m, p, sc in ops:
     if sc in ("read", "agent") or p.startswith("/admin"):

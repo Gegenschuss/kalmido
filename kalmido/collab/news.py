@@ -32,7 +32,7 @@ NEWS_KINDS = ("mention", "comment", "assign", "unassign", "take", "complete", "s
               "usage",  # 2.1.1 (#326): an agent reached 80 % / 100 % of a usage limit (admins)
               "owner",  # 2.1.2 (#349): I am the new owner of a list
               "errreport")  # 2.18.0: a NEW error (new fingerprint) of the list's error-report webhook became a ticket
-NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner")  # about a list, not a task
+NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evshare", "abshare")  # about a list (2.21: an event / calendar / address book), not a task
 NEWS_EXCERPT = 300
 # 1.9.0: per user (setting news_kinds) which groups of events create a News item; pushes are not affected
 NEWS_GROUPS = {"mention": ("mention",), "assign": ("assign", "unassign", "take"), "comment": ("comment",), "complete": ("complete",),
@@ -303,6 +303,17 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             except (ValueError, TypeError, AttributeError):
                 pj = 0
             if not c.execute("SELECT 1 FROM agent_jobs WHERE id=? AND user_id=? AND kind IS NOT NULL", (pj, uid)).fetchone():
+                continue
+        elif kind in ("evinvite", "evshare", "abshare"):  # 2.21.0 (#659 / #658): while I am still invited / a member
+            try:
+                dd = json.loads(r["data"] or "{}")
+            except ValueError:
+                dd = {}
+            q = {"evinvite": "SELECT 1 FROM event_attendees a JOIN events e ON e.id=a.event_id WHERE a.event_id=? AND a.user_id=? AND e.deleted_at IS NULL",
+                 "evshare": "SELECT 1 FROM ev_cal_members WHERE cal_id=? AND user_id=?",
+                 "abshare": "SELECT 1 FROM book_members WHERE book_id=? AND user_id=?"}[kind]
+            key = {"evinvite": "event_id", "evshare": "cal_id", "abshare": "book_id"}[kind]
+            if not c.execute(q, (dd.get(key), uid)).fetchone():
                 continue
         elif kind != "unshare":
             if r["t_title"] is None or r["t_del"] or not sees(r["t_list"]) or not sees_task(r["task_id"], True):

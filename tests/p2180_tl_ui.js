@@ -326,11 +326,11 @@ const byTitle = async (t, ck = CK) => (await state(ck)).find(x => x.title === t)
     // then a drag 2 days to the right: exactly the days under the finger, no edge auto-scroll during the press
     const eg = await ev(`(() => { const tr = document.querySelector('.tl-track.tl-cr[data-k="g:${P}"]'), row = tr.closest('.tl-row'); row.scrollIntoView({block: 'center'}); const sc = document.querySelector('#tlscroll'); if (sc.scrollLeft < 200) sc.scrollLeft = 200;
       const nr = row.querySelector('.tl-name').getBoundingClientRect().right, r = tr.getBoundingClientRect(), rr = row.getBoundingClientRect(), dw = +tr.dataset.dw, x0 = nr + 6, i0 = Math.floor((x0 - r.left) / dw);
-      return {x0, x1: x0 + 2 * dw, y: rr.top + rr.height / 2, d0: addDays(tr.dataset.s0, i0), d1: addDays(tr.dataset.s0, i0 + 2), sl: sc.scrollLeft}; })()`);
+      const hit = document.elementFromPoint(x0, rr.top + rr.height / 2); return {x0, x1: x0 + 2 * dw, y: rr.top + rr.height / 2, d0: addDays(tr.dataset.s0, i0), d1: addDays(tr.dataset.s0, i0 + 2), sl: sc.scrollLeft, hit: hit && (hit.className + '|' + (hit.closest('.tl-bar')?.dataset.id || ''))}; })()`);
     await T([{type: 'pointerMove', x: Math.round(eg.x0), y: Math.round(eg.y)}, {type: 'pointerDown', button: 0}, {type: 'pause', duration: 700}, {type: 'pointerMove', x: Math.round(eg.x0 - 4), y: Math.round(eg.y), duration: 60},
       {type: 'pointerMove', x: Math.round((eg.x0 + eg.x1) / 2), y: Math.round(eg.y), duration: 150}, {type: 'pointerMove', x: Math.round(eg.x1), y: Math.round(eg.y), duration: 150}, {type: 'pointerUp', button: 0}]); await sleep(700);
     const eN = await ev(`(() => ({n: S.tlNew && [S.tlNew.d0, S.tlNew.d1], sl: document.querySelector('#tlscroll').scrollLeft}))()`);
-    check(eN.n && eN.n[0] === eg.d0 && eN.n[1] === eg.d1, `${tag}: review R4: long-press at the left edge: range ${eN.n} (want ${eg.d0},${eg.d1}; scrollLeft ${eg.sl} -> ${eN.sl})`);
+    check(eN.n && eN.n[0] === eg.d0 && eN.n[1] === eg.d1, `${tag}: review R4: long-press at the left edge: range ${eN.n} (want ${eg.d0},${eg.d1}; scrollLeft ${eg.sl} -> ${eN.sl}; under the finger: ${eg.hit})`);
     await ev(`(() => { const i = document.querySelector('#tl-new-in'); i?.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true})); return 1; })()`); await sleep(300);
     // review R10: scrolled into the month, its name still shows at the left of the visible range (sticky)
     const mo = await ev(`(() => { const sc = document.querySelector('#tlscroll'), nr = document.querySelector('.tl-headrow .tl-name').getBoundingClientRect().right, dw = tlDW();

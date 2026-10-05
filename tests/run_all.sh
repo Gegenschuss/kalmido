@@ -371,6 +371,12 @@ shard 7  # ---------------------------------------------------------------- shar
        run p2190_family_ui node p2190_family_ui.js "$KALMIDO_TEST_DATA"
        run p2190_ride_ui node p2190_ride_ui.js "$KALMIDO_TEST_DATA"
        run p2190_fixes_ui node p2190_fixes_ui.js "$KALMIDO_TEST_DATA"
+# 2.21.0 package "Events & contacts" (#659 #658, #671 #673): calendars, events (time zones, repeat rules with changed / left-out
+# dates, invitations, reminders, the migration of the family events), ICS import, CalDAV for events with iOS / DAVx5 /
+# Thunderbird requests, contacts, CardDAV (vCard 3 / 4), links to tasks, scopes calendar / contacts; then the UI in jsdom and
+# Firefox (390 touch, the Fold 690 x 829 upright + across, 1440 mouse, axe, a drag over free time) and a server that is down
+       run p2210_api "$PY" p2210_api_test.py "$KALMIDO_TEST_DATA"
+       run p2210_ui node p2210_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
