@@ -89,6 +89,12 @@ ORDER = (
     "life.karakeep",
     "life.web",
     "life.v1",
+    "team.clients",
+    "team.workload",
+    "team.approvals",
+    "team.forms",
+    "team.v1",
+    "accounts.signup",
     "startup",
 )
 MODULES = [importlib.import_module(f"{__name__}.{m}") for m in ORDER]

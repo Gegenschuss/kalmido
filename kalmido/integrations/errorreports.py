@@ -194,6 +194,8 @@ def errhook_in(lid, token):
     try:
         log_act(c, tid, "created", {"report": rep["source"]}, uid=None)
         agent_tidy_events(c, tid)
+        from ..agents.core import agent_added_events
+        agent_added_events(c, tid, source="errors")  # 2.23.0 (#795)
         if not old:  # 2.18.0 (owner decision): a NEW error -> exactly one News item + push; repeats, re-opened errors, counts stay quiet
             errreport_events(c, tid, lid, rep)
     finally:

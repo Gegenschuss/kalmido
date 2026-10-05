@@ -243,7 +243,8 @@ OPEN_PATHS = {"/", "/sw.js", "/manifest.json", "/api/health", "/drop", "/drop/dr
               "/api/auth/2fa", "/api/auth/2fa/passkey/options", "/api/auth/2fa/passkey",
               "/api/auth/enrol/totp", "/api/auth/enrol/totp/confirm", "/api/auth/enrol/passkey/options", "/api/auth/enrol/passkey",
               "/api/auth/passkey/options", "/api/auth/passkey", "/api/auth/oidc/start", "/api/auth/oidc/callback",
-              "/api/auth/invite/check", "/api/auth/invite/accept"}  # 2.22.0 (#697): the "Set up your account" page
+              "/api/auth/invite/check", "/api/auth/invite/accept",  # 2.22.0 (#697): the "Set up your account" page
+              "/api/auth/signup", "/api/auth/link"}  # 2.23.0 (#711 / #444): self-registration, a sign-in link (QR)
 PROXY_IGNORE = {"/drop", "/drop/drop", "/manifest.json", "/sw.js", "/api/health"}
 ICAL_PREFIX = "/ical/"  # calendar feed: the secret token in the path is the only credential (never the proxy header)
 # package B: the REST API authenticates ONLY with a personal access token (Authorization: Bearer abk_...), never with

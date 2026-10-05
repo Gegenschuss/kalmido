@@ -23,6 +23,11 @@ def _vis_mode(c):  # 2.22.0 (#752)
     return vis_mode(c)
 
 
+def _inst_mode(c):  # 2.23.0 (#799)
+    from ..accounts.orgs import instance_mode
+    return instance_mode(c)
+
+
 def _org_names(c, uid):  # 2.22.0 (#752)
     from ..accounts.orgs import org_names
     return org_names(c, uid)
@@ -158,6 +163,7 @@ def state():
     from ..family.family import kids_for
     from ..events.model import cals_for, events_on
     from ..contacts.model import books_for, contacts_on, task_contacts
+    from ..team.clients import clients_brief
     c = db()
     uid = me()
     s = usettings(c, uid)
@@ -231,6 +237,7 @@ def state():
         kids=kids_for(c, uid),  # 2.19.0 (#653): the kids I look after (or me, a kid) with stars + rewards
         kid_ids=[r[0] for r in c.execute("SELECT id FROM users WHERE kid=1 AND disabled=0")],  # 2.19.0: who gets stars
         people_visibility=_vis_mode(c),  # 2.22.0 (#752): all | org | contacts
+        instance_mode=_inst_mode(c),  # 2.23.0 (#799): organisation | shared | multi
         # 2.21.0 (#659 / #658): event calendars, a change marker of the events I see (the views refetch their range), the
         # events that tasks prepare; address books and the contacts linked to tasks
         evcals=cals_for(c, uid) if events_on(c, uid) else [],
@@ -238,6 +245,7 @@ def state():
         evlinks=ev_links(c, uid, [t["id"] for t in tasks]) if events_on(c, uid) else {},
         books=books_for(c, uid) if contacts_on(c, uid) else [],
         tcontacts=task_contacts(c, uid, {t["id"] for t in tasks}),
+        clients=clients_brief(c, uid),  # 2.23.0 (#463): the clients I see (module clients) with their lists
     )
 
 

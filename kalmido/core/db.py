@@ -143,7 +143,8 @@ def create_user(c, username, display_name="", password=None, proxy_login=None, i
         c.execute("INSERT OR REPLACE INTO user_settings(user_id,key,value) VALUES(?,?,?)", (uid, k, v))
     # 2.22.0 (#752): every new account belongs to an organisation: the instance's first one (the caller may change it)
     first = c.execute("SELECT id FROM orgs ORDER BY id LIMIT 1").fetchone()
-    if first:
+    from ..accounts.orgs import instance_mode
+    if first and instance_mode(c) != "shared":
         c.execute("INSERT OR IGNORE INTO org_members(org_id,user_id) VALUES(?,?)", (first[0], uid))
     return uid
 
@@ -328,7 +329,8 @@ def init_db(guard=True):
         # 2.22.0 (#752), once: one organisation (named after the instance's domain, e.g. kalmido.example.com -> "Example")
         # with every account (agents too); people see only people of their organisations
         if gsetting(c, "migr_orgs2220") != "1":
-            if not c.execute("SELECT 1 FROM orgs").fetchone():
+            from ..accounts.orgs import INSTANCE_ENV
+            if not c.execute("SELECT 1 FROM orgs").fetchone() and INSTANCE_ENV != "shared":
                 from ..core.config import PUBLIC_URL
                 host = PUBLIC_URL.split("://", 1)[-1].split("/")[0].split(":")[0]
                 parts = [p for p in host.split(".") if p and not p.isdigit()]
@@ -339,6 +341,8 @@ def init_db(guard=True):
                     gset(c, "people_visibility", "org")
                 print("organisations:", name, "with every account", flush=True)
             gset(c, "migr_orgs2220", "1")
+        from ..accounts.orgs import instance_sync
+        instance_sync(c)  # 2.23.0 (#799): the organisation mode's one organisation with every account
         # 2.22.0 (#740), once: lists shared before go into the folder of the same name as with their owner (created when
         # missing) -- only where the person has not put the list into a folder of their own
         if gsetting(c, "migr_folders2220") != "1":

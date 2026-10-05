@@ -258,6 +258,13 @@ def list_update(lid):
         except BadInput as e:
             return err(str(e))
         b = {k: v for k, v in b.items() if k != "listen_agent_ids"}
+    if "client_id" in b:  # 2.23.0 (#463): the client of the list (owner / list admins, a client they see)
+        from ..team.clients import list_client_set
+        try:
+            list_client_set(c, lid, b["client_id"])
+        except BadInput as e:
+            return err(str(e))
+        b = {k: v for k, v in b.items() if k != "client_id"}
     if "columns" in b:  # 2.14.0 (#425): the list's columns, the same for every member (owner / list admins)
         if role not in MANAGE_ROLES:
             return err(tr("Only the owner and list admins can change the columns"), 403)

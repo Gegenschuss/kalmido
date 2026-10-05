@@ -209,7 +209,10 @@ TP = mk(A, title="Private thing", list_id=PRIV)
 def events(api, since=0, **k):
     r = api.get("/agent/events", params={"since": since, **k})
     assert r.ok, r.text
-    return r.json()
+    j = r.json()
+    # 2.23.0 (#795): task_added comes with every new task in a list shared with the agent; this suite checks the other events
+    j["data"] = [x for x in j["data"] if x["event"] != "task_added"]
+    return j
 
 
 cur0 = cl.get("/agent").json()["cursor"]

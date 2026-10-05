@@ -345,7 +345,7 @@ document.addEventListener('click', async e => {
       const on = !host.classList.contains('rxshow');
       $$('.rxshow').forEach(x => { x.classList.remove('rxshow'); x.querySelector('.rxtog')?.setAttribute('aria-expanded', 'false'); });
       host.classList.toggle('rxshow', on); a.setAttribute('aria-expanded', String(on)); S.rxOpen = on ? rxKey(host) : null;
-      if (on) setTimeout(() => { const q = host.querySelector('.chrxq, .cmrxq'); q?.querySelector('.rx')?.focus({preventScroll: true}); try { q?.scrollIntoView({block: 'nearest'}); } catch { /* old browsers */ } }, 0);  // 2.17.2: the last message's bar is not hidden behind the box
+      if (on) setTimeout(() => { const q = host.querySelector('.chrxq, .cmrxq, .rxrow'); (q?.querySelector('.rxq') || q?.querySelector('.rx'))?.focus({preventScroll: true}); try { q?.scrollIntoView({block: 'nearest'}); } catch { /* old browsers */ } }, 0);  // 2.17.2: the last message's bar is not hidden behind the box
       break;
     }
     case 'list-new': menu(a, [{label: tr('New list'), icon: 'list', fn: () => { closeSide(); listModal(); }}, {label: tr('New project…'), icon: 'brief', fn: () => { closeSide(); listModal(null, '', {kind: 'project'}); }}, {label: tr('New folder…'), icon: 'folder', fn: () => { closeSide(); newFolder(); }}, ...(tplOf('list').length ? [{label: tr('New list from template'), icon: 'copy', fn: () => { closeSide(); templateMenu($('#top h1'), 'list'); }}] : []), ...(propOn() ? [{label: tr('New project from briefing…'), icon: 'bot', fn: () => { closeSide(); propRequest('project'); }}] : [])]); break;

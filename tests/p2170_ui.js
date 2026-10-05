@@ -293,10 +293,11 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     // one Tab stop per message (roving tabindex); the header keeps the search icon; an unfolded Fold (904) has a close X
     p = await ev(center('.tclist .tcrow')); await tap(p.x, p.y); await sleep(800);
     check(await ev(`[...document.querySelectorAll('#tc-msgs .cmsg .rxrow')].every(q => q.querySelectorAll('.rx[tabindex="0"]').length === 1)`), `${tag}: one Tab stop per reaction row`);
-    const rq = await ev(`(() => { const q = [...document.querySelectorAll('#tc-msgs .cmsg.me .rxrow')].pop(); if (!q) return null; q.scrollIntoView({block: 'center'}); const r = q.getBoundingClientRect(); return {t: Math.round(r.top), b: Math.round(r.bottom), l: Math.round(r.left), r: Math.round(r.right), n: q.querySelectorAll('.rx').length}; })()`);
-    check(rq && rq.t >= 0 && rq.l >= 0 && rq.r <= 390 && rq.n >= 3, `${tag}: own message: the reactions sit on screen ` + JSON.stringify(rq));
+    // 2.23.0 (#823): no reactions of one's own on one's own message; its line (time, the menu) sits on screen
+    const rq = await ev(`(() => { const m = [...document.querySelectorAll('#tc-msgs .cmsg.me')].pop(), q = m?.querySelector('.cmeta'); if (!q) return null; q.scrollIntoView({block: 'center'}); const r = q.getBoundingClientRect(); return {t: Math.round(r.top), l: Math.round(r.left), r: Math.round(r.right), own: m.querySelectorAll('.rx:not([disabled]):not([data-act="tc-msg-menu"])').length}; })()`);
+    check(rq && rq.t >= 0 && rq.l >= 0 && rq.r <= 390 && rq.own === 0, `${tag}: own message: on screen, no reactions of mine ` + JSON.stringify(rq));
     await ev(`(() => { const b = document.querySelector('#tc-msgs'); b.scrollTop = b.scrollHeight; return 1; })()`); await sleep(200);
-    const lq = await ev(`(() => { const last = [...document.querySelectorAll('#tc-msgs .cmsg.me')].pop(), q = last?.querySelector('.rxrow'), b = document.querySelector('#tc-msgs'); if (!q || !b) return null; return {qb: Math.round(q.getBoundingClientRect().bottom), bb: Math.round(b.getBoundingClientRect().bottom)}; })()`);
+    const lq = await ev(`(() => { const last = [...document.querySelectorAll('#tc-msgs .cmsg.me')].pop(), q = last?.querySelector('.cmeta'), b = document.querySelector('#tc-msgs'); if (!q || !b) return null; return {qb: Math.round(q.getBoundingClientRect().bottom), bb: Math.round(b.getBoundingClientRect().bottom)}; })()`);
     check(lq && lq.qb <= lq.bb + 1, `${tag}: the last own message: its reactions are not hidden behind the box ` + JSON.stringify(lq));
     await o.nav(B + '#today'); await ready(ev);
     const sb = await ev(`(() => { const b = document.querySelector('#top [data-act="palette"]'); const r = b?.getBoundingClientRect(); return r && r.width >= 30 && r.right <= innerWidth ? Math.round(r.width) : 0; })()`);

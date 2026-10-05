@@ -118,7 +118,7 @@ def timeline(tid):
                 a["data"] = {"hidden": True}
     comments = with_reactions(c, [comment_dict(r, atts) for r in rows])
     ids = {x["user_id"] for x in comments + acts} | {m for x in comments for m in x["mentions"]} \
-        | {a["data"].get("to") for a in acts if a["kind"] == "assign"} | {a["data"].get("agent") for a in acts} \
+        | {a["data"].get("to") for a in acts if a["kind"] == "assign"} | {a["data"].get("agent") for a in acts} | {a["data"].get("approver") for a in acts} \
         | {a["data"].get("by") for a in acts} | {u["id"] for x in comments for e in x["reactions"] for u in e["users"]}
     seen = c.execute("SELECT seen_id FROM task_seen WHERE user_id=? AND task_id=?", (me(), tid)).fetchone()
     ag = agent_ids(c)

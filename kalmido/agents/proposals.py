@@ -538,6 +538,8 @@ def prop_insert(c, aid, lid, ts, title, notes="", section_id=None, parent_id=Non
     if assignee_id:
         task_event(c, tid, "assign")
     newtask_events(c, tid)
+    from ..agents.core import agent_added_events
+    agent_added_events(c, tid, source="proposal")  # 2.23.0 (#795): the other agents of the list (never the proposing one's own)
     return tid
 
 

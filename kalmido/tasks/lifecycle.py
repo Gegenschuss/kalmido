@@ -206,6 +206,8 @@ def apply_update(c, tid, b, conflicts=None):
                 grp_assign_events(c, tid, new_g)
     if f and "list_id" in f and f["list_id"] != cur["list_id"]:
         ltags_follow(c, tid, f["list_id"])
+        from ..agents.core import agent_added_events
+        agent_added_events(c, tid, cur["list_id"])  # 2.23.0 (#795): moved into a list shared with an agent
     if "ltags" in b:
         try:
             set_ltags(c, tid, b["ltags"])

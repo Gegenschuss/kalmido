@@ -7,6 +7,54 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.23.0] - 2026-10-06
+
+**In short:** Team, family, clients (#463). Clients above your lists with hours, budget and a timesheet per month; the
+workload of everyone in your organisation; approvals as a step of a task; forms that turn requests into tasks.
+Registration on the login page, sign-in links with a QR code for family members without e-mail, the kind of server
+set in the configuration, an agent event for tasks that arrive in its lists, and a tidier sidebar.
+
+### Added
+- **Clients** (module *Clients*): contact person, e-mail, phone, address, a note, an hourly rate for lists without their
+  own and a budget in hours and / or money (amber at 80 %, red over 100 %). Lists belong to a client (list dialog); the
+  sidebar shows the clients above the lists. A client's page: hours this month and in total, the amount, the estimate
+  (the tasks' durations) next to the tracked time per list, and the **timesheet of a month** (print / PDF, CSV) with the
+  client's name on top. Only people of the client's organisation see it; everyone sees only the lists and hours they
+  may see.
+- **Workload** (module *Workload*): open tasks per person and week (by their planned start, else the due date; overdue
+  ones in this week), weighed with their duration, against their hours per week (set by each person, admins for
+  everyone); a tap on a cell lists the tasks. Only the people of your organisation and only what you can see.
+- **Approvals**: *Ask for approval…* in a task's menu assigns it to a person of the list. They **approve** it (done),
+  **ask for changes** (back to you, with a note) or **reject** it (won't do); the history keeps every step, the person
+  who asked gets a News item and a push. The row shows *Approval* while it waits. Agents can ask, never decide.
+- **Forms** (module *Forms*): a list's form is a link with a small page (subject, description, name, e-mail) that
+  creates a task in the list (a chosen section), for signed-in people of your organisation or, with public links on,
+  for anyone with the link. No scripts on the page, a honeypot and limits against spam, a new link any time.
+- **Registration on the login page** (#711, off by default): for certain e-mail domains, for anyone after an admin
+  approves it, or (shared servers) for anyone with a confirmed address. The address is confirmed with a one-time link;
+  new accounts start without access to lists and never learn whether an address already has an account. Admins get a
+  News item and approve under *Users*.
+- **Sign-in link with a QR code** (#444): for family members without e-mail (children, grandparents): an admin, or a
+  parent for their child, creates a one-time link that signs the person in on their own device.
+- **The kind of server** (#799): `KALMIDO_INSTANCE_MODE=organisation` (one organisation, everyone in it, the name from
+  `KALMIDO_ORG_NAME` or asked once in the setup) or `shared` (no organisations, people see only their own contacts).
+  Organisations are no longer created or deleted in the app; servers that made several in 2.22 keep them.
+- **Agent event `task_added`** (#795): a task created in, or moved into, a list shared with the agent, with where it came
+  from when the agent may see that list and the source (form, e-mail, error report).
+- API v1 + MCP: `/clients`, `/workload`, `/tasks/{id}/approval`, `/lists/{id}/forms`, `/forms/{id}`; tasks carry
+  `approval` / `approver_id`, lists `client_id`.
+
+### Changed
+- **Reactions** (#823): nobody reacts to their own message or comment any more (the reactions of others stay visible);
+  the quick 👍 👎 ❤️ of a chat message sit behind a smiley button again; on an agent's open question 👍 / 👎 stay one tap
+  away as the approval.
+- **An agent at work** (#824): a small pulsing dot at the Agents icon (tab bar, sidebar, the header chip) instead of the
+  spinning ring that looked like a stuck loader; the label and the top of the *More* menu say who is working and on what.
+- The copyright holder is now Gegenschuss Doberenz Enders Grund eGbR (LICENSE, README, *Settings > Help > About*); the
+  license itself is unchanged.
+- **Sidebar** (#794): a folder sits right on its lists (no gap after its head; the room is before it), has the height of
+  a list row and a folder icon; emoji, pictures and dots of the lists share one icon column, so the names line up.
+
 ## [2.22.0] - 2026-10-05
 
 **In short:** Home & life (#663 #662). Kalmido reminds you of what keeps a household and a life running: contracts and
@@ -2657,7 +2705,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.22.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.23.0...HEAD
+[2.23.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.23.0
 [2.22.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.22.0
 [2.21.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.21.0
 [2.20.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.20.0

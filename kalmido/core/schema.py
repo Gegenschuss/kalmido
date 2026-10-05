@@ -618,6 +618,22 @@ CREATE TABLE IF NOT EXISTS kk_conns (
   user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, url TEXT NOT NULL, token TEXT NOT NULL DEFAULT '',
   list_id INTEGER, source TEXT NOT NULL DEFAULT '', archive INTEGER NOT NULL DEFAULT 1, synced_at TEXT, error TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL);
+-- 2.23.0 (#463): clients (customers) of an organisation: lists belong to one (lists.client_id); hours, budget and the
+-- timesheet per client. Only the people of the client's organisation see it (org_id NULL: its creator and the admins)
+CREATE TABLE IF NOT EXISTS clients (
+  id INTEGER PRIMARY KEY, org_id INTEGER REFERENCES orgs(id) ON DELETE SET NULL, name TEXT NOT NULL, icon TEXT NOT NULL DEFAULT '',
+  color TEXT NOT NULL DEFAULT '', contact TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '', phone TEXT NOT NULL DEFAULT '',
+  address TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', rate REAL, budget_h REAL, budget_amount REAL,
+  archived INTEGER NOT NULL DEFAULT 0, created_by INTEGER, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS clients_org ON clients(org_id);
+-- 2.23.0 (#463): forms -> tasks: a link (/f/<token>, the token sealed, looked up by its SHA-256) that creates a task in the
+-- list; access 'org' = signed-in people of the list owner's organisations, 'public' = anyone with the link
+CREATE TABLE IF NOT EXISTS forms (
+  id INTEGER PRIMARY KEY, list_id INTEGER NOT NULL REFERENCES lists(id) ON DELETE CASCADE, token TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE,
+  title TEXT NOT NULL, intro TEXT NOT NULL DEFAULT '', access TEXT NOT NULL DEFAULT 'org', section_id INTEGER,
+  ask_email INTEGER NOT NULL DEFAULT 1, enabled INTEGER NOT NULL DEFAULT 1, count INTEGER NOT NULL DEFAULT 0, last_at TEXT,
+  created_by INTEGER, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS forms_list ON forms(list_id);
 """
 # Bumped when the database layout changes (stored in PRAGMA user_version). A backup can be restored when its
 # schema version is not newer than this one (older ones are migrated by init_db).
@@ -796,6 +812,15 @@ MIGRATIONS = [
     # bookmark (see kalmido/life/model.py)
     ("lists", "life", "ALTER TABLE lists ADD COLUMN life TEXT NOT NULL DEFAULT ''"),
     ("lists", "trip", "ALTER TABLE lists ADD COLUMN trip TEXT NOT NULL DEFAULT ''"),
+    # 2.23.0 (#463): package "Team, family, clients". lists.client_id: the client a list belongs to; tasks.approval: ''
+    # (no approval) | pending | approved | changes | rejected, tasks.approver_id: who decides; orgs.domains: e-mail domains
+    # of an organisation (self-registration, #711); users.signup: '' | confirm (e-mail not confirmed yet) | pending (waits
+    # for an admin)
+    ("lists", "client_id", "ALTER TABLE lists ADD COLUMN client_id INTEGER"),
+    ("tasks", "approval", "ALTER TABLE tasks ADD COLUMN approval TEXT NOT NULL DEFAULT ''"),
+    ("tasks", "approver_id", "ALTER TABLE tasks ADD COLUMN approver_id INTEGER"),
+    ("orgs", "domains", "ALTER TABLE orgs ADD COLUMN domains TEXT NOT NULL DEFAULT ''"),
+    ("users", "signup", "ALTER TABLE users ADD COLUMN signup TEXT NOT NULL DEFAULT ''"),
 ]
 INDEXES = """
 CREATE INDEX IF NOT EXISTS lists_owner ON lists(owner_id);
@@ -869,6 +894,7 @@ USER_DEFAULTS = {
     "time_focus": "1",          # finished focus / stopwatch sessions on a task become time entries
     "time_currency": "€",       # amounts (hourly rate of a list)
     "time_target": "0",         # daily target in hours (0 = none)
+    "capacity_h": "",           # 2.23.0 (#463): working hours per week for the workload view ('' = 5 x the hours per day)
     # package 3
     "hide_blocked_today": "0",  # 1 = tasks waiting on an open blocker are left out of "Today"
     "progress_subtasks": "0",   # 1 = the list progress counts subtasks too (else only main tasks)
@@ -923,6 +949,8 @@ GLOBAL_DEFAULTS = {
     # sign-in (package A): 2FA policy for built-in logins, passwordless passkey login, OIDC auto-create
     "twofa_required": "0",      # admin: users with a password must use a second factor (enrol at the next login)
     "passkey_login": "1",       # admin: passkeys may log in without the password (user verification required)
+    "signup_mode": "off",       # 2.23.0 (#711): self-registration on the login page: off | domain | approval | open
+    "signup_domains": "",       # ... the e-mail domains allowed in the mode "domain" (comma separated)
     "oidc_autocreate": "0",     # admin: first OIDC login without a matching user creates one (off: admin creates users)
     # automatic backups (see "backups"; KALMIDO_BACKUPS=0 turns the feature off)
     "bk_on": "0", "bk_time": "03:30", "bk_keep_daily": "14", "bk_keep_weekly": "8",

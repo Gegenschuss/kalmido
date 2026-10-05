@@ -40,25 +40,26 @@ def invite_state(c, uid):
     return "invited" if parse_iso(r["expires_at"]) > now_utc() else "expired"
 
 
-def invite_new(c, uid, by, send=True):
+def invite_new(c, uid, by, send=True, kind=None):
     """A new link for uid (replaces an older one) -> {link, expires_at, sent, kind, error?}. send: by e-mail when SMTP is
-    set up and the person has an address."""
+    set up and the person has an address. kind: invite / reset (by the password), 2.23.0: signup (#711, a registration
+    to confirm), login (#444, a sign-in link without a password: never sent by mail, shown as a link + QR code)."""
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if not u or (u["kind"] or "user") == "agent":
         raise Denied(404)
-    if u["disabled"]:
+    if u["disabled"] and not (kind == "signup" and u["signup"] == "confirm"):
         raise Denied(409, tr("The account is disabled"))
     tok = secrets.token_urlsafe(32)
-    kind = "reset" if u["password_hash"] else "invite"
+    kind = kind or ("reset" if u["password_hash"] else "invite")
     now = now_utc()
     exp = iso(now + timedelta(days=INVITE_DAYS))
     c.execute("""INSERT INTO user_invites(user_id,token_hash,kind,created_by,created_at,expires_at) VALUES(?,?,?,?,?,?)
                  ON CONFLICT(user_id) DO UPDATE SET token_hash=excluded.token_hash, kind=excluded.kind, created_by=excluded.created_by,
                  created_at=excluded.created_at, expires_at=excluded.expires_at, sent_at=NULL, used_at=NULL""",
               (uid, _hash(tok), kind, by, iso(now), exp))
-    link = f"{PUBLIC_URL}/#invite/{tok}"
+    link = f"{PUBLIC_URL}/#{'signin' if kind == 'login' else 'invite'}/{tok}"
     out = {"link": link, "expires_at": exp, "sent": False, "kind": kind, "email": u["email"] or ""}
-    if send and MAIL_OUT_ON and u["email"]:
+    if send and MAIL_OUT_ON and u["email"] and kind != "login":
         try:
             inviter = c.execute("SELECT display_name, username FROM users WHERE id=?", (by,)).fetchone()
             subject, text, body_html = invite_mail(c, u, link, kind, (inviter["display_name"] or inviter["username"]) if inviter else "")
@@ -86,7 +87,11 @@ def invite_mail(c, u, link, kind, inviter):
     from ..accounts.orgs import org_names  # 2.22.0 (#752): "Example · Kalmido"
     org = (org_names(c, u["id"]) or [""])[0]
     brand = f"{org} · {APP_NAME}" if org else APP_NAME
-    if kind == "reset":
+    if kind == "signup":  # 2.23.0 (#711): confirm the address of a registration
+        subject = t(N_("Confirm your registration at {0}"), APP_NAME)
+        head, intro = t(N_("Hello {0},"), name), t(N_("please confirm your e-mail address and choose your password to finish your registration at {0}."), APP_NAME)
+        button = t(N_("Confirm and choose a password"))
+    elif kind == "reset":
         subject = t(N_("Set a new password for {0}"), APP_NAME)
         head, intro, button = t(N_("Hello {0},"), name), t(N_("{0} sent you a link to set a new password for {1}."), inviter or t(N_("An admin")), APP_NAME), t(N_("Set a new password"))
     else:
@@ -122,27 +127,30 @@ def invite_mail(c, u, link, kind, inviter):
  <a href="{e(link)}" style="display:inline-block;background:{acc};color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;padding:13px 26px;border-radius:12px">{e(button)}</a>
  <p style="margin:12px 0 0;font-size:13px;line-height:1.5;color:{muted}">{e(valid)}</p>
 </td></tr>
-{"" if kind == "reset" else f'''<tr><td style="padding:16px 32px 8px">
+{"" if kind in ("reset", "signup") else f'''<tr><td style="padding:16px 32px 8px">
  <h2 style="margin:0 0 8px;font-size:16px">{e(t(N_("Getting started")))}</h2>
  <ol style="margin:0;padding-left:20px;font-size:15px;line-height:1.6">{"".join(f"<li>{e(x)}</li>" for x in steps)}</ol>
 </td></tr>'''}
 <tr><td style="border-top:1px solid #ece9f5;padding:18px 32px;font-size:12px;color:{muted}">{e(t(N_("This e-mail was sent by {0}. If you did not expect it, you can ignore it."), APP_NAME))}</td></tr>
 </table></td></tr></table></body></html>"""
     text = "\n".join([head, "", intro, "", f"{t('Address')}: {PUBLIC_URL}", f"{t('Username')}: {u['username']}", "", f"{button}: {link}", valid, ""]
-                     + ([] if kind == "reset" else [t(N_("Getting started")) + ":"] + [f"{i + 1}. {x}" for i, x in enumerate(steps)]))
+                     + ([] if kind in ("reset", "signup") else [t(N_("Getting started")) + ":"] + [f"{i + 1}. {x}" for i, x in enumerate(steps)]))
     return subject, text, body_html
 
 
-def _lookup(c, tok):
-    """The invitation row of a token (valid, unused) or None; the comparison is on the hash, again in constant time."""
+def _lookup(c, tok, kinds=("invite", "reset", "signup")):
+    """The invitation row of a token (valid, unused, one of kinds) or None; the comparison is on the hash, again in
+    constant time."""
     if not isinstance(tok, str) or not 20 <= len(tok) <= 100:
         return None
     h = _hash(tok)
     r = c.execute("SELECT * FROM user_invites WHERE token_hash=?", (h,)).fetchone()
-    if not r or not hmac.compare_digest(r["token_hash"], h) or r["used_at"] or parse_iso(r["expires_at"]) <= now_utc():
+    if not r or not hmac.compare_digest(r["token_hash"], h) or r["used_at"] or parse_iso(r["expires_at"]) <= now_utc() \
+            or (r["kind"] or "invite") not in kinds:
         return None
     u = c.execute("SELECT * FROM users WHERE id=?", (r["user_id"],)).fetchone()
-    return (r, u) if u and not u["disabled"] else None
+    ok = u and (not u["disabled"] or (r["kind"] == "signup" and u["signup"] == "confirm"))
+    return (r, u) if ok else None
 
 
 def _limited():
@@ -191,6 +199,12 @@ def invite_accept():
     c.execute("UPDATE users SET password_hash=? WHERE id=?", (generate_password_hash(pw), u["id"]))
     c.execute("UPDATE user_invites SET used_at=? WHERE user_id=?", (iso(now_utc()), u["id"]))
     c.execute("DELETE FROM sessions WHERE user_id=?", (u["id"],))
+    if r["kind"] == "signup":  # 2.23.0 (#711): the address is confirmed; with "admin approval" the account waits now
+        from ..accounts.signup import signup_confirmed
+        if signup_confirmed(c, u):
+            bump(c)
+            c.commit()
+            return jsonify(ok=False, pending=True)
     bump(c)
     c.commit()
     u = c.execute("SELECT * FROM users WHERE id=?", (u["id"],)).fetchone()

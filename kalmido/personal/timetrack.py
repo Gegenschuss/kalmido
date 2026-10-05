@@ -576,6 +576,7 @@ def time_report(c, uid, a):
     s = usettings(c, uid)
     rm, ref, vis = time_rounding(s), now_utc(), vis_ids(c, uid)
     lists = {l["id"]: l for l in visible_lists(c, uid)}
+    crates = {r[0]: r[1] for r in c.execute("SELECT id, rate FROM clients WHERE rate IS NOT NULL")}  # 2.23.0 (#463)
     rows, f, t, wanted = time_rows(c, uid, a)
     L, D, U, entries = {}, {}, {}, []
     tot = {"seconds": 0, "rounded": 0, "amount": 0.0, "count": 0}
@@ -590,7 +591,7 @@ def time_report(c, uid, a):
         if wanted is not None and lid not in wanted:
             continue
         l = lists.get(lid)
-        rate = l["rate"] if l and l.get("rate") else None
+        rate = l["rate"] if l and l.get("rate") else (crates.get(l.get("client_id")) if l else None) or None  # else the client's rate
         amt = e["rounded"] / 3600 * rate if rate else 0.0
         e["amount"] = round(amt, 2) if rate else None
         e["day"] = parse_iso(e["start"]).astimezone(TZ).date().isoformat()

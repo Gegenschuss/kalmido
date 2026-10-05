@@ -20,6 +20,9 @@ def task_dict(r, tags):
         d.pop("ms", None)
     if d.get("milestone_id") is None:
         d.pop("milestone_id", None)
+    if not d.get("approval"):  # 2.23.0 (#463): only on tasks that wait for / had an approval
+        d.pop("approval", None)
+        d.pop("approver_id", None)
     fam_task_out(d)  # 2.19.0 (#653): fam / rotation as objects, only when set
     d["tags"] = tags.get(r["id"], [])
     return d

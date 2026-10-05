@@ -255,7 +255,8 @@ function timeRange() {
   }
 }
 const timeScope = () => hasSharing() && S.tv.scope === 'all' ? 'all' : 'mine';
-const tvLists = () => S.tv.lists.filter(id => id === 0 || listById(id));
+const tvClient = () => S.tv.client && clientById(S.tv.client);  // 2.23.0 (#463): the time of one client (its lists)
+const tvLists = () => tvClient() ? (tvClient().lists.length ? tvClient().lists : [-1]) : S.tv.lists.filter(id => id === 0 || listById(id));
 function timeQuery() {
   const [f, t] = timeRange(), q = new URLSearchParams({from: f, to: t, scope: timeScope()});
   if (tvLists().length) q.set('lists', tvLists().join(','));
@@ -269,6 +270,7 @@ async function loadTime() {
   catch (e) { if (e.message !== 'auth') S.tv.err = e instanceof Offline ? 'offline' : e.message; }
   finally { S.tv.loading = false; S.tv.key = key; }
   if (S.route.mod === 'time') renderView();
+  if (S.tv.sheetNext && S.tv.data && S.route.mod === 'time') { S.tv.sheetNext = false; timesheet(); }  // 2.23.0: from a client's page
 }
 const tvListName = l => l.id === 0 ? tr('No list') : l.is_inbox && inboxDef(l.name) ? tr('Inbox') : l.name;
 const rangeLabel = (f, t) => f === t ? fmtDate(f) : `${fmtDate(f)} – ${fmtDate(t)}`;
@@ -315,7 +317,7 @@ function viewTime() {
   let h = `<div class="stats timev">${tvRunCard()}<div class="tvbar"><div class="seg tvseg">${TPERIODS.map(([k, n]) => `<button class="${tv.period === k ? 'on' : ''}" data-act="tv-period" data-k="${k}">${tr(n)}</button>`).join('')}</div>
       ${tv.period === 'custom' ? `<span class="tvrange">${dateIn('tv-from', f, {label: tr('From'), clear: false})}<span class="muted">–</span>${dateIn('tv-to', t, {label: tr('To'), clear: false})}</span>` : `<span class="muted tvlabel">${esc(rangeLabel(f, t))}</span>`}</div>
     <div class="tvbar">${hasSharing() ? `<div class="seg"><button class="${timeScope() === 'mine' ? 'on' : ''}" data-act="tv-scope" data-k="mine">${tr('Only mine')}</button><button class="${timeScope() === 'all' ? 'on' : ''}" data-act="tv-scope" data-k="all">${tr('All members')}</button></div>` : ''}
-      <button class="btn sm" data-act="tv-lists">${ic('filter', 's')} ${esc(tvListsLabel())}</button><span class="spacer"></span>
+      ${tvClient() ? `<span class="tvclient">${ic('brief', 's')}<a href="#client/${tvClient().id}">${esc(tvClient().name)}</a><button class="iconbtn" data-act="client-tvx" title="${esc(tr('All lists'))}" aria-label="${esc(tr('Show all lists again'))}">${ic('x', 's')}</button></span>` : `<button class="btn sm" data-act="tv-lists">${ic('filter', 's')} ${esc(tvListsLabel())}</button>`}<span class="spacer"></span>
       <button class="btn sm" data-act="te-add">${ic('plus', 's')} ${tr('Entry')}</button>
       <a class="btn sm" href="/api/time/export.csv?${esc(q)}" download>${ic('download', 's')} CSV</a>
       <button class="btn sm" data-act="tv-sheet" ${j ? '' : 'disabled'}>${ic('file', 's')} ${tr('Timesheet')}</button></div>`;
@@ -372,12 +374,14 @@ function timesheet() {
   const j = S.tv.data; if (!j) return;
   const rm = j.rounding, hasAmt = j.lists.some(l => l.rate), cur = j.currency, all = j.scope === 'all';
   const who = all ? tr('All members') : j.me.display_name;
-  const filt = tvLists().length ? ' · ' + tvListsLabel() : '';
+  const cl = tvClient();
+  const filt = cl ? '' : tvLists().length ? ' · ' + tvListsLabel() : '';
   const ustr = us => esc(us.map(([n, s]) => `${n} ${hmm(s)}`).join(', '));
   const cols = (x, rate, amt) => `<td class="n">${hmm(x.rounded)}</td><td class="n">${hoursDec(x.rounded)}</td>${hasAmt ? `<td class="n">${rate}</td><td class="n">${amt}</td>` : ''}`;
   const byList = {}; for (const e of j.entries) (byList[e.list_id || 0] ||= []).push(e);
   const lname2 = id => { const l = j.lists.find(x => x.id === id); return l ? tvListName(l) : tr('No list'); };
-  const doc = `<h1>${tr('Timesheet')}</h1><div class="tssub">${esc(rangeLabel(j.from, j.to))} · ${esc(who)}${esc(filt)}${rm ? ' · ' + esc(tr('rounded up to {0} min per entry', rm)) : ''} · ${esc(tr('created {0}', fmtDate(today())))}</div>
+  const cbox = cl ? `<div class="tsclient"><b>${esc(cl.name)}</b>${(() => { const d = CLV.data && CLV.data.id === cl.id ? CLV.data : null; return d ? [d.contact, d.email, d.address].filter(Boolean).map(x => `<span>${esc(x)}</span>`).join('') : ''; })()}</div>` : '';
+  const doc = `<h1>${tr('Timesheet')}</h1>${cbox}<div class="tssub">${esc(rangeLabel(j.from, j.to))} · ${esc(who)}${esc(filt)}${rm ? ' · ' + esc(tr('rounded up to {0} min per entry', rm)) : ''} · ${esc(tr('created {0}', fmtDate(today())))}</div>
     <div class="tskpi"><div><b>${hoursDec(j.total.rounded)} h</b><span>${rm ? tr('hours (rounded)') : tr('hours')}</span></div><div><b>${hmm(j.total.rounded)}</b><span>h:mm</span></div>${hasAmt ? `<div><b>${money(j.total.amount, cur)}</b><span>${tr('amount')}</span></div>` : ''}<div><b>${j.total.count}</b><span>${trn('entry', 'entries', j.total.count)}</span></div></div>
     <table><thead><tr><th>${tr('List / task')}</th><th>${tr('People')}</th><th class="n">h:mm</th><th class="n">${tr('Hours')}</th>${hasAmt ? `<th class="n">${tr('Rate')}</th><th class="n">${tr('Amount')}</th>` : ''}</tr></thead><tbody>
     ${j.lists.map(l => `<tr class="p"><td>${esc(tvListName(l))}</td><td class="muted">${ustr(l.users)}</td>${cols(l, l.rate ? money(l.rate, cur) : '', l.rate ? money(l.amount, cur) : '')}</tr>${l.tasks.map(x => `<tr class="t"><td>${esc(x.title || tr('No task'))}</td><td class="muted">${ustr(x.users)}</td>${cols(x, '', l.rate ? money(x.amount, cur) : '')}</tr>`).join('')}`).join('')}
@@ -395,5 +399,5 @@ function timesheet() {
   el.addEventListener('click', ev => { const b = ev.target.closest('[data-ts]'); if (!b) return; if (b.dataset.ts === 'close') close(); else window.print(); });
   el.addEventListener('change', ev => { if (ev.target.id === 'ts-entries') { LS.set('tsEntries', ev.target.checked); $('.tspage', el).classList.toggle('noentries', !ev.target.checked); } });
   el.addEventListener('keydown', ev => { if (ev.key === 'Escape') close(); });
-  document.title = `${tr('Timesheet')} ${rangeLabel(j.from, j.to)}${all ? '' : ' ' + j.me.display_name}`;
+  document.title = `${tr('Timesheet')} ${cl ? cl.name + ' ' : ''}${rangeLabel(j.from, j.to)}${all || cl ? '' : ' ' + j.me.display_name}`;
 }

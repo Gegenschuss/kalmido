@@ -1026,6 +1026,47 @@ TOOLS += [
     ("sync_read_later", "2.22.0: fetch new bookmarks from the user's own Karakeep connection now (and archive the ticked ones).",
      _obj({}), lambda api, a: api.call("POST", "/life/karakeep/sync")),
 ]
+# 2.23.0 (#463): package "Team, family, clients": clients, workload, approvals, forms
+_CLIENT = {"name": {"type": "string"}, "icon": {"type": "string"}, "color": {"type": "string"}, "contact": {"type": "string"},
+           "email": {"type": "string"}, "phone": {"type": "string"}, "address": {"type": "string"}, "note": {"type": "string"},
+           "rate": {"type": "number"}, "budget_h": {"type": "number"}, "budget_amount": {"type": "number"}, "org_id": {"type": "integer"},
+           "archived": {"type": "boolean"}}
+_FORM = {"title": {"type": "string"}, "intro": {"type": "string"}, "access": {"type": "string", "enum": ["org", "public"]},
+         "section_id": {"type": "integer"}, "ask_email": {"type": "boolean"}}
+TOOLS += [
+    ("list_clients", "2.23.0 (module clients): the clients of the user's organisation with their lists, hours (this month / in total), "
+                     "amounts and budget level (ok / warn at 80 % / over).", _obj({"month": {"type": "string", "description": "YYYY-MM"},
+                                                                                   "archived": {"type": "boolean"}}),
+     lambda api, a: api.call("GET", "/clients", {**_pick(a, ("month",)), **({"archived": "1"} if a.get("archived") else {})})),
+    ("get_client", "2.23.0: one client with estimate vs. actual per list (the tasks' durations next to the tracked time).",
+     _obj({"client_id": S_ID, "month": {"type": "string"}}, ["client_id"]),
+     lambda api, a: api.call("GET", f"/clients/{int(a['client_id'])}", _pick(a, ("month",)))),
+    ("create_client", "2.23.0: add a client (contact, hourly rate for lists without one, budget in hours and / or money).",
+     _obj(_CLIENT, ["name"]), lambda api, a: api.call("POST", "/clients", body=_pick(a, tuple(_CLIENT)))),
+    ("update_client", "2.23.0: change a client.", _obj({"client_id": S_ID, **_CLIENT}, ["client_id"]),
+     lambda api, a: api.call("PATCH", f"/clients/{int(a['client_id'])}", body=_pick(a, tuple(_CLIENT)))),
+    ("delete_client", "2.23.0: delete a client (its creator or an admin); its lists stay.", _obj({"client_id": S_ID}, ["client_id"]),
+     lambda api, a: api.call("DELETE", f"/clients/{int(a['client_id'])}")),
+    ("get_workload", "2.23.0 (module workload): planned hours per person and week against their capacity (open assigned tasks, "
+                     "their duration as the estimate).", _obj({"start": D, "weeks": {"type": "integer", "minimum": 1, "maximum": 12},
+                                                               "org": {"type": "integer"}}),
+     lambda api, a: api.call("GET", "/workload", _pick(a, ("start", "weeks", "org")))),
+    ("request_approval", "2.23.0: ask a person of the task's list to approve it (action request + approver_id; the task is assigned to "
+                         "them) or withdraw the request (action cancel). Only people decide; agents never approve.",
+     _obj({"task_id": S_ID, "action": {"type": "string", "enum": ["request", "cancel"]}, "approver_id": {"type": "integer"},
+           "note": {"type": "string"}}, ["task_id", "action"]),
+     lambda api, a: api.call("POST", f"/tasks/{int(a['task_id'])}/approval", body=_pick(a, ("action", "approver_id", "note")))),
+    ("list_forms", "2.23.0 (module forms): the forms of a list (owner / list admins) with their links.", _obj({"list_id": S_ID}, ["list_id"]),
+     lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/forms")),
+    ("create_form", "2.23.0: a form for a list: a link whose page creates a task (subject, description, name, e-mail); access org = "
+                    "signed-in people of the organisation, public = anyone with the link.", _obj({"list_id": S_ID, **_FORM}, ["list_id", "title"]),
+     lambda api, a: api.call("POST", f"/lists/{int(a['list_id'])}/forms", body=_pick(a, tuple(_FORM)))),
+    ("update_form", "2.23.0: change a form (enabled false = closed; regenerate true = a new link).",
+     _obj({"form_id": S_ID, **_FORM, "enabled": {"type": "boolean"}, "regenerate": {"type": "boolean"}}, ["form_id"]),
+     lambda api, a: api.call("PATCH", f"/forms/{int(a['form_id'])}", body=_pick(a, (*_FORM, "enabled", "regenerate")))),
+    ("delete_form", "2.23.0: delete a form (tasks it created stay).", _obj({"form_id": S_ID}, ["form_id"]),
+     lambda api, a: api.call("DELETE", f"/forms/{int(a['form_id'])}")),
+]
 TOOL_MAP = {t[0]: t for t in TOOLS}
 
 
@@ -1035,7 +1076,7 @@ TOOL_SCOPES = {
     "tasks:write": ("add_contract", "add_device", "add_upkeep", "sync_read_later", "add_occasion", "add_deadline", "ingredients_to_shopping", "give_stars", "add_reward", "update_reward", "request_reward",
                     "decide_reward", "create_note", "update_note", "create_task", "update_task", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "batch_tasks",
                     "reopen_task", "skip_occurrence", "take_task", "add_subtask", "add_dependency", "remove_dependency", "create_habit",
-                    "update_habit", "check_in_habit", "shift_list_dates"),
+                    "update_habit", "check_in_habit", "shift_list_dates", "request_approval"),
     "comments": ("comment_typing", "post_team_message", "edit_team_message", "delete_team_message", "react_team_message", "mark_team_chat_read", "add_comment", "react", "request_merge_approval", "update_comment", "delete_comment", "mark_news_read",
                  "delete_chat_attachment"),
     "structure": ("create_trip", "add_shop_areas", "create_packing_list", "set_list_columns", "create_list", "update_list", "share_list", "unshare_list", "share_list_with_group",
@@ -1043,7 +1084,7 @@ TOOL_SCOPES = {
                   "create_field", "update_field", "create_list_tag", "update_list_tag", "delete_list_tag", "create_template",
                   "update_template", "apply_template", "create_filter", "update_filter", "set_project_overview", "add_project_link",
                   "update_project_link", "delete_project_link", "reorder_project_links", "set_project_status", "add_milestone", "update_milestone",
-                  "delete_milestone"),
+                  "delete_milestone", "create_client", "update_client", "delete_client", "create_form", "update_form", "delete_form"),
     "delete": ("delete_reward", "delete_note", "delete_list", "delete_section", "delete_task", "restore_task", "empty_trash", "delete_field", "delete_template",
                "delete_filter", "delete_habit"),
     "attachments:read": ("get_attachment",),

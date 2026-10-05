@@ -559,6 +559,8 @@ function taskMenu(anchor, id) {
     {label: tr('Snooze…'), icon: 'clock', keys: 's', fn: () => snoozeSheet(id, anchor)},
     ...(t.status === 0 ? [t.waiting_at ? {label: tr('No longer waiting'), icon: 'hourglass', fn: () => waitClear(id)}
       : {label: tr('Waiting on external…'), icon: 'hourglass', fn: () => waitDialog(id)}] : []),
+    // 2.23.0 (#463): an approval (a person of the shared list decides)
+    ...(t.status === 0 && t.id > 0 && collab() && l?.shared && t.approval !== 'pending' ? [{label: tr('Ask for approval…'), icon: 'eye', fn: () => approvalRequest(id)}] : []),
     ...(t.repeat && t.due && t.status === 0 ? [{label: tr('Skip this occurrence'), icon: 'skip', fn: async () => {
       const b0 = snapTask(t);
       const j = await api('POST', `/api/tasks/${id}/skip`);

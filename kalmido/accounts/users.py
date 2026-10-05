@@ -46,6 +46,8 @@ def user_admin_dict(c, u):
             "twofa": twofa_methods(c, u), "oidc_linked": bool(u["oidc_subject"]),
             "parents": kid_parents(c, u["id"]) if u["kid"] else [],  # 2.19.0 (#653)
             "invite": _invite_state(c, u["id"]),  # 2.22.0 (#697): invited | expired | null
+            "signup": u["signup"] or "",  # 2.23.0 (#711): confirm (e-mail not confirmed) | pending (waits for approval) | ''
+            "kid": bool(u["kid"]),
             "orgs": [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=? ORDER BY org_id", (u["id"],))],  # 2.22.0 (#752)
             "lists": c.execute("SELECT COUNT(*) FROM lists WHERE owner_id=? AND is_inbox=0", (u["id"],)).fetchone()[0]}
 
@@ -126,6 +128,9 @@ def user_create():
             return err(e)
     # 2.22.0 (#752): the organisations of the new person: given, else the creating admin's (else the instance's first)
     orgs = b.get("orgs")
+    from ..accounts.orgs import instance_mode
+    if instance_mode(c) != "multi":  # 2.23.0 (#799): organisation = the one (create_user), shared = none
+        orgs = []
     if orgs is None:
         orgs = [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=?", (me(),))]
     if not isinstance(orgs, list) or not all(isinstance(x, int) for x in orgs):
@@ -161,7 +166,8 @@ def user_update(uid):
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if not u:
         return err(tr("unknown user"), 404)
-    if "orgs" in b:  # 2.22.0 (#752): the person's organisations (replaces them)
+    from ..accounts.orgs import instance_mode
+    if "orgs" in b and instance_mode(c) == "multi":  # 2.22.0 (#752): the person's organisations (replaces them); 2.23.0: multi only
         if not isinstance(b["orgs"], list) or not all(isinstance(x, int) for x in b["orgs"]):
             return err(tr("Invalid value: {0}", "orgs"))
         c.execute("DELETE FROM org_members WHERE user_id=?", (uid,))

@@ -14,6 +14,8 @@ if (window.visualViewport) {
 (async () => {
   const inv = location.hash.match(/^#invite\/([A-Za-z0-9_-]{20,100})$/);  // 2.22.0 (#697): an invitation / reset link
   if (inv) { await inviteScreen(inv[1]); return; }
+  const sil = location.hash.match(/^#signin\/([A-Za-z0-9_-]{20,100})$/);  // 2.23.0 (#444): a sign-in link (QR code)
+  if (sil) { await i18nLoad(uiLang()); await signinScreen(sil[1]); return; }
   const i18nBoot = i18nLoad(uiLang());  // last used language (localStorage), in parallel with the state
   try { await load(); if (!S.lists.length) throw new Error('no state'); } catch (e) { if (e.message === 'auth') return; await i18nBoot; $('#view').innerHTML = heronEmpty(navigator.onLine === false ? 'offline' : 'error', tr('Server not reachable.'), tr('Reload the page once the server is reachable again.')).replace(/<\/div>$/, `<button type="button" class="btn pri" id="boot-retry">${ic('sync', 's')} ${tr('Try again')}</button></div>`); $('#boot-retry')?.addEventListener('click', () => location.reload()); return; }
   await i18nBoot; await i18nLoad(uiLang()); S.booted = true;

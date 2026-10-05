@@ -18,6 +18,12 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.23.0** (2026-10-05): Team, family, clients. **Clients** above your lists with hours, budget (hours or money),
+  estimate vs. actual and a **timesheet per client and month**; **workload** per person and week against their hours;
+  **approvals** as a step of a task (approve, ask for changes, reject); **forms** whose link creates a task (requests,
+  bug reports); **registration on the login page** (by e-mail domain, with an admin's approval or open); **sign-in links
+  with a QR code** for family members without e-mail; the kind of server (one organisation or a shared server) is set in
+  the configuration; agents hear about tasks that are added to their lists; a tidier sidebar.
 - **2.22.0** (2026-10-05): Home & life. Seven small modules, each off until you want it: **contracts** with the last day
   to cancel and the cost per month, **devices** with their warranty and **upkeep** that comes back, **staying in touch**
   with the people who matter, **health** (appointments, check-ups, medication) in a private list agents never see, the
@@ -696,15 +702,48 @@ a tab (Settings > Appearance > Tab bar).
 
 ## Organisations and invitations
 
-*Settings > Administration > Organisations*: people belong to one or more organisations (name, emoji, members). **People
-see** decides whom people see in the share dialog, as attendees and in the user list: everyone, only people of their own
-organisations (the default), or only people they are connected with (for a shared server of several households or
-companies: no directory, lists are shared by e-mail address). Admins always see everyone. The organisation's name shows on
-the login page, in the sidebar and in the invitation mail.
+2.23.0: the kind of server is set when it is set up, not in the app (`KALMIDO_INSTANCE_MODE`):
+
+- **`organisation`** (the default): one company or family. Everyone is a member and sees the others; the name comes from
+  `KALMIDO_ORG_NAME` or is asked once in the first-run setup, and shows on the login page, in the sidebar and in the
+  invitation mail. Admins see it under *Settings > Administration*, but nobody creates or deletes organisations in the app.
+- **`shared`**: a shared server of many households or companies: no organisations and no directory; people see only the
+  people they are connected with and share lists by e-mail address.
+- Without the variable, a server with at most one organisation runs as `organisation`; a server that made several
+  organisations in 2.22.0 keeps them (members, e-mail domains and *People see* stay editable, new ones cannot be made).
+
+**Registration** (*Settings > Administration > Sign-in*, off by default): *Create account* on the login page for addresses
+of certain e-mail domains, for anyone after an admin approves it, or (shared servers) for anyone with a confirmed
+address. With e-mail (SMTP) people confirm their address with a link and choose their password; without it only
+"after an admin approves" works. New accounts start without access to lists, never as admins or child accounts; the
+answer never says whether an address already has an account. Admins approve waiting accounts under *Users*.
+
+**Sign-in link / QR code** (user dialog; parents for their children in the family): for family members without an
+e-mail address. Opened on their device it signs them in there, once, within 7 days.
 
 **Invitations**: create a person without a password and Kalmido e-mails them a link (valid 7 days, once) to *Set up
 your account*: they choose their own password and are signed in. *Send the invitation again* / *Send a link to set a
 new password* in the user dialog; without SMTP you copy the link.
+
+## Clients, workload, approvals, forms
+
+Three modules under *Settings > Modules > Projects and team*, each off until you switch it on, all within your
+organisation:
+
+- **Clients**: name, contact, address, an hourly rate for lists without their own, a budget in hours and / or money
+  (the bar turns amber at 80 %, red over 100 %). A list belongs to a client (list dialog). The client's page shows the
+  hours of the month and in total, the amount, the estimate (the tasks' durations) next to the tracked time per list,
+  and the **timesheet** of a month (printable / PDF, CSV). The sidebar lists the clients above the lists.
+- **Workload**: open tasks assigned to each person, week by week (by their planned start, else the due date; overdue
+  ones count this week), weighed with their duration, against their hours per week (each person sets their own; admins
+  for everyone). Only what you can see is counted.
+- **Forms**: a list's form is a link with a small page (subject, description, name, e-mail). What someone sends becomes
+  a task in the list, the list's agents get it to sort in. For signed-in people of your organisation or, with public
+  links on, for anyone with the link (a honeypot and limits against spam).
+
+**Approvals** (with collaboration): *Ask for approval…* in a task's menu assigns it to a person of the list; they
+**approve** it (done), **ask for changes** (back to you, with a note) or **reject** it (won't do). Agents can ask, never
+decide.
 
 ## Home & life
 
@@ -1471,6 +1510,8 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `KALMIDO_IMAP_HOST`, `KALMIDO_IMAP_PORT`, `KALMIDO_IMAP_SSL`, `KALMIDO_IMAP_USER`, `KALMIDO_IMAP_PASSWORD`, `KALMIDO_IMAP_FOLDER`, `KALMIDO_IMAP_INTERVAL` | `993`, `1`, `INBOX`, `60` | The mailbox Kalmido polls for new tasks (unread mails; marked read afterwards) |
 | `KALMIDO_SMTP_HOST`, `KALMIDO_SMTP_PORT`, `KALMIDO_SMTP_TLS`, `KALMIDO_SMTP_USER`, `KALMIDO_SMTP_PASSWORD`, `KALMIDO_MAIL_FROM` | `587`, `starttls` | Sending the daily summary by e-mail (`TLS`: `starttls`, `ssl` or `none`) |
 | `KALMIDO_IOS_SHORTCUT_URL` | empty | Link to a signed generic iOS shortcut for *Share from your phone* (asks for address and token on import); empty = the button is hidden |
+| `KALMIDO_INSTANCE_MODE` | *(empty)* | 2.23.0: `organisation` (one organisation, everyone in it) or `shared` (no organisations, people see only their own contacts); empty: `organisation` unless the server kept several organisations from 2.22 |
+| `KALMIDO_ORG_NAME` | *(empty)* | 2.23.0: the organisation's name in the mode `organisation` (else asked once in the first-run setup) |
 | `KALMIDO_ONBOARDING` | `1` | `0`: new accounts start empty (no "Getting started" list, no welcome tour) |
 | `KALMIDO_WEBPUSH` | `1` | `0` turns Web Push off (no key handed out, no new devices, everything goes to ntfy) |
 | `KALMIDO_VAPID_SUBJECT` | `PUBLIC_URL` | Contact the push services see in the VAPID signature: `mailto:you@example.com` or an https URL (Apple needs one of the two; without an https `PUBLIC_URL` the default is `mailto:admin@example.com`) |
@@ -1768,3 +1809,5 @@ Contact: hello@kalmido.com.
 your company or clients. If you offer a modified version to others over a network, you must make the source code of
 your changes available to those users under the same license.
 Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+© 2026 Gegenschuss Doberenz Enders Grund eGbR · Product owner: Moritz Grund

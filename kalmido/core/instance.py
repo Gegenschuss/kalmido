@@ -62,6 +62,8 @@ def about_info(c, u):
                  twofa_required=gsetting(c, "twofa_required") == "1", passkey_login=gsetting(c, "passkey_login") != "0",
                  oidc=oidc_public(c), backups_env=BK_ON_ENV,
                  public_links=gsetting(c, "public_links") != "0", public_links_env=PUB_ENV)
+        from ..accounts.signup import signup_admin
+        d.update(signup_admin(c))  # 2.23.0 (#711)
     return d
 
 
@@ -209,6 +211,12 @@ def admin_setup():
     if lang:
         gset(c, "default_lang", lang)
         uset(c, me(), "lang", lang)
+    if b.get("org_name"):  # 2.23.0 (#799): the first-run setup asks once for the organisation's name (unless configured)
+        from ..accounts.orgs import instance_mode, main_org, ORG_NAME_ENV
+        import re as _re
+        nm = _re.sub(r"\s+", " ", str(b["org_name"])).strip()[:60]
+        if nm and instance_mode(c) == "organisation" and not ORG_NAME_ENV and main_org(c):
+            c.execute("UPDATE orgs SET name=? WHERE id=?", (nm, main_org(c)))
     pt = b.get("project_type")  # 2.4.0 (#243): "Start with a project" of a built-in type
     if pt not in (None, "") and pt not in PTYPES:
         return err(tr("Invalid value: {0}", "project_type"))
@@ -243,6 +251,10 @@ def _apply_instance(c, b):
     keys = ("collab_all", "time_all", "update_check") + AUTH_SWITCHES
     if any(k in b and not isinstance(b[k], bool) for k in keys):
         return err(tr("Invalid value: {0}", next(k for k in keys if k in b and not isinstance(b[k], bool))))
+    from ..accounts.signup import signup_settings
+    e = signup_settings(c, b)  # 2.23.0 (#711): registration mode + domains
+    if e:
+        return e
     for k in keys:
         if k in b:
             gset(c, k, "1" if b[k] else "0")

@@ -59,6 +59,7 @@ def openapi_spec():
     from ..events.v1 import events_spec
     from ..contacts.v1 import contacts_spec
     from ..life.v1 import life_spec
+    from ..team.v1 import pkgc_spec
     if "s" in _SPEC:
         return _SPEC["s"]
 
@@ -141,7 +142,10 @@ def openapi_spec():
                      "optional)}; sets the assignee; null = none"},
         "stars": nul("integer", minimum=0, maximum=STARS_MAX, description="2.19.0: stars a kid account gets for completing it (null = 1)"),
         "people": {"type": "array", "items": {"type": "integer"}, "description": "2.19.0: who comes along (user ids of people sharing "
-                   "the list): they see the task, also as participants, and get its reminders"}}
+                   "the list): they see the task, also as participants, and get its reminders"},
+        "approval": nul("string", enum=["pending", "approved", "changes", "rejected", None], description="2.23.0: the task waits for / "
+                        "had an approval (POST /tasks/{id}/approval); null = no approval"),
+        "approver_id": nul("integer", description="2.23.0: who decides on the approval (a person of the list)")}
     task_in = {k: v for k, v in task_props.items() if k in V1_TASK_IN}
     task_in["priority"] = {"oneOf": [prio, {"type": "integer", "enum": list(PRIORITIES)}]}
     task_in["reminders"] = {"oneOf": [{"type": "array", "items": {"type": "integer"}}, {"type": "string"}]}
@@ -196,7 +200,8 @@ def openapi_spec():
             "life": nul("string", enum=["contracts", "home", "health", "travel", "reading", None], description="2.22.0: what the list is for in "
                         "Home & life (health lists are private: never visible to agents, tokens need the scope private); null = none"),
             "trip": {"type": ["object", "null"], "description": "2.22.0: a trip list's {from, to, where?}", "properties": {
-                "from": {"type": "string", "format": "date"}, "to": {"type": "string", "format": "date"}, "where": {"type": "string"}}}}},
+                "from": {"type": "string", "format": "date"}, "to": {"type": "string", "format": "date"}, "where": {"type": "string"}}},
+            "client_id": nul("integer", description="2.23.0: the client the list belongs to (GET /clients); null = none")}},
         "ListDetail": {"allOf": [ref("List"), {"type": "object", "properties": {"sections": {"type": "array", "items": ref("Section")},
             "fields": {"type": "array", "description": "2.14.0: the list's custom fields (ids for the columns f:<id>)",
                        "items": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "type": {"type": "string"}}}}}}]},
@@ -215,6 +220,7 @@ def openapi_spec():
             "nag": {"type": "string", "enum": list(NAG_VALUES), "description": "2.7.0: default nag interval of the list's tasks (owner)"},
             "day_hours": nul("number", minimum=1, maximum=24, description="2.7.0: hours per day / shift (owner); null = the server's value")}},
         "ListPatch": {"type": "object", "additionalProperties": False, "properties": {
+            "client_id": nul("integer", description="2.23.0: the client of the list (owner / list admins; a client you see); null = none"),
             "life": nul("string", enum=["contracts", "home", "health", "travel", "reading", None], description="2.22.0: what the list is for in "
                         "Home & life (health lists are private: never visible to agents, tokens need the scope private); null = none"),
             "trip": {"type": ["object", "null"], "description": "2.22.0: a trip list's {from, to, where?}", "properties": {
@@ -525,6 +531,7 @@ def openapi_spec():
     contacts_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.21.0 (#658)
     life_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.22.0 (#663)
     team_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.17.0 (#419)
+    pkgc_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.23.0 (#463)
     scope_refine(paths)
     _SPEC["s"] = {
         "openapi": "3.1.0",
@@ -536,7 +543,7 @@ def openapi_spec():
                  "license": {"name": "AGPL-3.0-only", "identifier": "AGPL-3.0-only"}},
         "servers": [{"url": API_PREFIX.rstrip("/")}],
         "security": [{"bearerAuth": []}],
-        "tags": [{"name": n} for n in ("Account", T, L, "Structure", "Roadmap", C, S_, TI, H, "Import", A, "Agents", "Groups", "Day plan", "Notes", "Team chat", "Family", "Events", "Contacts", "Home & life")],
+        "tags": [{"name": n} for n in ("Account", T, L, "Structure", "Roadmap", C, S_, TI, H, "Import", A, "Agents", "Groups", "Day plan", "Notes", "Team chat", "Family", "Events", "Contacts", "Home & life", "Clients", "Workload", "Forms")],
         "paths": paths,
         "components": {"securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "abk_ token"}},
                        "schemas": schemas},

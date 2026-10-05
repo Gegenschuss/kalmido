@@ -127,6 +127,8 @@ def comment_react(cid):
     emoji = clean_emoji(b.get("emoji"))
     have = bool(c.execute("SELECT 1 FROM comment_reactions WHERE comment_id=? AND user_id=? AND emoji=?", (cid, me(), emoji)).fetchone())
     on = bool(b["on"]) if isinstance(b.get("on"), bool) else not have
+    if on and k["user_id"] == me():  # 2.23.0 (#823): not on one's own comment (taking an old one back still works)
+        return err(tr("You cannot react to your own message"))
     res = react(c, k, me(), emoji, on)
     bump(c)
     c.commit()

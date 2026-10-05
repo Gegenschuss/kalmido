@@ -31,7 +31,9 @@ NEWS_KINDS = ("mention", "comment", "assign", "unassign", "take", "complete", "s
               "newtask", "approval", "followup",  # 2.1.0
               "usage",  # 2.1.1 (#326): an agent reached 80 % / 100 % of a usage limit (admins)
               "owner",  # 2.1.2 (#349): I am the new owner of a list
-              "errreport")  # 2.18.0: a NEW error (new fingerprint) of the list's error-report webhook became a ticket
+              "errreport",  # 2.18.0: a NEW error (new fingerprint) of the list's error-report webhook became a ticket
+              "apdecide",  # 2.23.0 (#463): the approver decided on my approval request (row "assign")
+              "signup")  # 2.23.0 (#711): a registration waits for approval (admins; row "usage", the admins' row)
 NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evshare", "abshare")  # about a list (2.21: an event / calendar / address book), not a task
 NEWS_EXCERPT = 300
 # 1.9.0: per user (setting news_kinds) which groups of events create a News item; pushes are not affected
@@ -90,7 +92,7 @@ BELL_CUSTOM_KEY = {"reply": "comment", "follow": "comment"}
 KIND_ROW = {"mention": "mention", "comment": "comment", "assign": "assign", "unassign": "assign", "complete": "complete",
             "share": "share", "role": "share", "unshare": "share", "unblock": "unblock", "status": "status",
             "newtask": "newtask", "approval": "approval", "followup": "followup", "usage": "usage", "owner": "share",
-            "proposal": "proposal", "take": "assign", "errreport": "errreport"}
+            "proposal": "proposal", "take": "assign", "errreport": "errreport", "apdecide": "assign", "signup": "usage"}
 
 
 def notif_stored(s):
@@ -296,6 +298,13 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
                 continue
         elif kind == "usage":  # 2.1.1 (#326): an agent's usage limit, for admins (no task, no list)
             if not is_admin_id(c, uid):
+                continue
+        elif kind == "signup":  # 2.23.0 (#711): for admins, while the registration still waits
+            try:
+                su = int(json.loads(r["data"] or "{}").get("user_id") or 0)
+            except (ValueError, TypeError, AttributeError):
+                su = 0
+            if not is_admin_id(c, uid) or not c.execute("SELECT 1 FROM users WHERE id=? AND signup='pending'", (su,)).fetchone():
                 continue
         elif kind == "proposal":  # 2.3.0: while the proposal job (mine) exists
             try:

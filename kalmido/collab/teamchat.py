@@ -394,6 +394,8 @@ def tchat_react(mid):
     emoji = clean_emoji(b.get("emoji"))
     have = c.execute("SELECT 1 FROM tchat_rx WHERE message_id=? AND user_id=? AND emoji=?", (mid, me(), emoji)).fetchone() is not None
     on = b["on"] if isinstance(b.get("on"), bool) else not have
+    if on and m["user_id"] == me():  # 2.23.0 (#823): not on one's own message
+        return err(tr("You cannot react to your own message"))
     if on:
         c.execute("INSERT OR IGNORE INTO tchat_rx(message_id,user_id,emoji,created_at) VALUES(?,?,?,?)", (mid, me(), emoji, iso_ms(now_utc())))
     else:

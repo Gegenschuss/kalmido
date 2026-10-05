@@ -3800,7 +3800,7 @@ body.pgdrag,body.pgdrag *{cursor:col-resize!important;user-select:none!important
 .rx.rxtog .i{width:1rem;height:1rem}
 .rx.rxtog:hover,.rx.rxtog:focus-visible,.rx.rxtog[aria-expanded="true"]{color:var(--text)}
 .cmeta .rx.rxtog{margin-left:.25rem}
-@media (hover:hover) and (pointer:fine){ .cmsg:not(:hover):not(:focus-within) .rx.rxtog:not([aria-expanded="true"]),.cm:not(:hover):not(:focus-within) .rx.rxtog:not([aria-expanded="true"]){opacity:0} }
+@media (hover:hover) and (pointer:fine){ .cm:not(:hover):not(:focus-within) .rx.rxtog:not([aria-expanded="true"]){opacity:0} }  /* 2.23.0 (#823): the chat's smiley always shows */
 @media (pointer:coarse){ .rx.rxtog{min-width:2.75rem;min-height:2.75rem;margin-top:-.625rem;margin-bottom:-.625rem} .cmeta .rx.rxtog{margin-right:-.5rem} }
 .cmsg.me .chrx{justify-content:flex-end}
 /* 2.16.0 (#644): what the command field can do (empty field), "Ask …" / "Create as task" entries */
@@ -4217,7 +4217,7 @@ body.kidmode #app{grid-template-columns:1fr}
 }
 .fcard h2{display:flex;align-items:center;gap:.5rem;margin:0 0 .5rem;font-size:var(--fs-b);font-weight:600}
 .fcard h2 .i{color:var(--accent)}
-.fhead{margin-bottom:.75rem}
+.dashhead.fhead{margin-bottom:.75rem}  /* 2.23.0 (#794): only the family dashboard head (it pushed the sidebar folders apart) */
 .fcfoot{margin-top:.5rem}
 .famf .row{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:.375rem 0;min-width:0}
 .famf .row>label:first-child{width:8.5rem;flex:none;color:var(--muted);font-size:var(--fs-s)}
@@ -4474,3 +4474,107 @@ button.lkchip:hover{border-color:var(--accent)}
 .alogo .aorg{display:block;font-size:var(--fs-s);font-weight:400;color:var(--muted);margin-top:.125rem}
 .shmail{display:flex;gap:.375rem;margin:.5rem 0}
 .shmail input{flex:1;min-width:0}
+
+/* 2.23.0 (#794): the sidebar: ONE fixed icon column for every row (smart lists, lists with a picture, an emoji or the dot,
+   folder heads with the folder icon), so the names line up; a folder head has the height of a list row, sits right on its
+   lists (no gap after it) and the room separates the groups BEFORE a folder; its arrow sits at the end */
+#side .sic{width:1rem;height:1.25rem;flex:none;overflow:visible;display:inline-flex;align-items:center;justify-content:center;font-size:1rem;line-height:1}
+#side .sic .sw{margin:0}
+#side .sic .licon{width:1rem;height:1rem;margin:0}
+
+#side .fhead{min-height:var(--srow-h);margin:0;padding:0 .5rem}
+#side .fhead:not(.fsub){margin-top:.75rem}
+#side .fhead.fsub{margin-top:.25rem}
+#side .fhead .sic svg{color:var(--muted)}
+#side .fhead .fcar{order:3;width:.875rem;height:.875rem;margin-left:.125rem}
+#side .fhead .fmenu{order:4}
+#side .fhead .c{order:2}
+#side .fbody{margin-top:0}
+#side .srow .semo,#side .scl .semo{font-size:.9375rem}
+/* 2.23.0 (#463): clients */
+.clients .clhead{display:flex;align-items:center;gap:.5rem;margin:0 0 .75rem;flex-wrap:wrap}
+.clients .clhead h2,.wload .clhead h2{margin:0;font-size:var(--fs-l);font-weight:600}
+.clients .clhead .sic,.clcard h2 .sic{width:1.5rem;display:inline-flex;justify-content:center;font-size:1.125rem}
+.clients .sic .sw,.clcard .sic .sw{width:.625rem;height:.625rem;border-radius:50%;background:var(--muted);display:inline-block}
+.clcard h2 a{color:inherit;text-decoration:none;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.clcard h2 a:hover,.clcard h2 a:focus-visible{text-decoration:underline}
+.clsub{margin:.25rem 0 .75rem;font-size:var(--fs-s);overflow-wrap:anywhere}
+.cladr{white-space:pre-line}
+.clnums{display:flex;gap:1.25rem;flex-wrap:wrap;margin:.25rem 0 .5rem}
+.clnums span{display:flex;flex-direction:column}
+.clnums b{font:600 var(--fs-l)/1.2 var(--mono)}
+.clnums small{color:var(--muted);font-size:var(--fs-xs)}
+.clbud{margin:.5rem 0 .75rem}
+.clbar{height:.5rem;border-radius:62.5rem;background:var(--bg3);overflow:hidden}
+.clbar i{display:block;height:100%;background:var(--ok);border-radius:inherit}
+.clbud.lv-warn .clbar i{background:var(--p3)}
+.clbud.lv-over .clbar i{background:var(--danger)}
+.clbt{display:block;margin-top:.25rem;font-size:var(--fs-s);color:var(--text2)}
+.clbud.lv-over .clbt b{color:var(--danger)}
+.clmon{display:flex;align-items:center;gap:.25rem;margin:.25rem 0 .75rem}
+.clmon b{min-width:9rem;text-align:center}
+.clacts{display:flex;gap:.5rem;flex-wrap:wrap;margin:.75rem 0}
+.cltable td.n .over{color:var(--danger);font-weight:600}
+.cldetail .stcard{margin-top:.75rem}
+.cldlg .lacts{display:inline-flex;align-items:center;gap:.375rem;flex-wrap:wrap}
+.tvclient{display:inline-flex;align-items:center;gap:.375rem;padding:0 .25rem 0 .625rem;border-radius:62.5rem;background:var(--bg3);font-size:var(--fs-s)}
+.tvclient a{color:inherit}
+.tsclient{display:flex;flex-direction:column;margin:.25rem 0 .5rem;font-size:.875rem}
+.tsclient span{white-space:pre-line;color:#444}
+/* 2.23.0 (#463): workload */
+.wlwrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:.5rem 0}
+.wltable{border-collapse:collapse;width:100%;min-width:36rem}
+.wltable th,.wltable td{padding:.375rem .5rem;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle;font-weight:400}
+.wltable thead th{font-size:var(--fs-s);color:var(--muted);white-space:nowrap}
+.wlp{display:flex;align-items:center;gap:.5rem;min-width:9rem}
+.wln{display:flex;flex-direction:column;min-width:0}
+.wlcap{font-size:var(--fs-xs);color:var(--muted);text-align:left;padding:0;min-height:1.5rem}
+.wlb{display:flex;flex-direction:column;gap:.25rem;width:100%;min-height:2.75rem;justify-content:center;text-align:left;border-radius:var(--r-s);padding:0 .25rem}
+.wlb:not(:disabled):hover{background:var(--bg3)}
+.wlbar{display:block;height:.375rem;border-radius:62.5rem;background:var(--bg3);overflow:hidden}
+.wlbar i{display:block;height:100%;background:var(--ok)}
+.wlc.lv-warn .wlbar i,.wlk.lv-warn{background:var(--p3)}
+.wlc.lv-over .wlbar i,.wlk.lv-over{background:var(--danger)}
+.wlk.lv-ok{background:var(--ok)}
+.wlt{font:var(--fs-s)/1.2 var(--mono)}
+.wlc.lv-over .wlt b{color:var(--danger)}
+.wllegend{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap;font-size:var(--fs-s)}
+.wlk{display:inline-block;width:.75rem;height:.375rem;border-radius:62.5rem;margin-left:.5rem}
+/* 2.23.0 (#463): approvals */
+.apbar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:.5rem 0;padding:.5rem .75rem;border-radius:var(--radius);background:color-mix(in srgb,var(--accent) 12%,transparent);font-size:var(--fs-s)}
+.apbar.ap-approved{background:color-mix(in srgb,var(--ok) 14%,transparent)}
+.apbar.ap-rejected{background:color-mix(in srgb,var(--danger) 12%,transparent)}
+.apbar .apt{flex:1;min-width:10rem}
+.apacts{display:flex;gap:.375rem;flex-wrap:wrap}
+.apchip{display:inline-flex;align-items:center;gap:.25rem;color:var(--accent);font-size:var(--fs-xs)}
+/* 2.23.0 (#711 / #444 / #799): registration link on the login page, the QR code, the organisation in the setup */
+.aulink{margin:.75rem 0 0;text-align:center;font-size:var(--fs-s);color:var(--muted)}
+.aulink .linkbtn{min-height:2.75rem}
+#su-form .linkbtn{display:block;margin:.5rem auto 0;min-height:2.75rem}
+.qrbox{display:flex;justify-content:center;margin:.5rem 0 1rem}
+.qrbox img{width:15rem;height:15rem;max-width:100%;height:auto;border-radius:.5rem;background:#fff;padding:.5rem}
+.suorg{width:100%;margin:0 0 .25rem}
+.fmrow.off .n b{color:var(--muted)}
+@media (pointer:coarse){ .wlcap{min-height:2.75rem} .tvclient .iconbtn{width:2.75rem;height:2.75rem} }
+.cltable a,.clcard h2 a,.tvclient a{color:var(--text)}
+/* 2.23.0 (#823): the quick reactions of a chat message behind the smiley again (open: .rxshow); 👍 / 👎 of an open
+   agent question stay */
+.cmsg:not(.rxshow) .rxrow .rxq{display:none}
+.cmsg .rxrow .rxtog[aria-expanded="true"]{color:var(--accent)}
+/* 2.23.0 (#824): while an agent works: a small pulsing dot in the working colour at the icon (no spinning ring) */
+.achip.aspin::before,#rail .aspin::before,#tabs .aspin .tico::before{border:0;border-radius:50%;width:.5rem;height:.5rem;margin:0;background:var(--st-work);box-shadow:0 0 0 2px var(--bg2)}
+.achip.aspin::before{left:1.125rem;top:.125rem}
+#tabs .aspin .tico::before{top:-.125rem;left:auto;right:-.25rem}
+.rbtn.aspin::before{inset:auto .25rem auto auto;top:.25rem}
+@media (prefers-reduced-motion:no-preference){ .aspin::before,.aspin .tico::before{animation:apulse 1.6s ease-in-out infinite} }
+@keyframes apulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.7)}}
+/* 2.23.0 review: the workload head centred, even week columns; the client name flush left; the opened reactions evenly
+   spaced, the open smiley a soft tint instead of a frame */
+.wload .clhead{display:flex;align-items:center;gap:.5rem;margin:0 0 .5rem;flex-wrap:wrap}
+.wltable{table-layout:fixed}
+.wltable th:first-child{width:13rem}
+.wlbar{max-width:8rem}
+.clients .clhead .sic{justify-content:flex-start;width:auto}
+.clsub{color:var(--text2)}
+.cmsg.rxshow .rxrow{gap:.375rem}
+.cmsg .rxrow .rxtog[aria-expanded="true"]{background:color-mix(in srgb,var(--accent) 14%,transparent);border-radius:62.5rem;box-shadow:none;outline:0}

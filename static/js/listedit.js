@@ -223,8 +223,11 @@ function agentLive() {
   if (pin && box.isConnected && !chatNear(box)) box.scrollTop = box.scrollHeight;
   const st = agentBusyState();
   const more = $('#tabs [data-act="tabs-more"]'), inMore = !!more && tabOverflow().more.some(x => x.id === 'agents');
-  $$('#side [data-go="agents"], #tabs [data-go="agents"]').forEach(b => { b.classList.toggle('aspin', st === 'working'); b.classList.toggle('await', st === 'waiting'); });
-  if (more) { more.classList.toggle('aspin', st === 'working' && inMore); more.classList.toggle('await', st === 'waiting' && inMore); }
+  // 2.23.0 (#824): a small pulsing dot at the icon instead of a spinning ring (looked like a stuck loader), and the label says who
+  const wk = (S.agents || []).find(a => a.enabled && !agentOffline(a) && a.status === 'working'), lab = wk ? tr('{0} is working', wk.name) : '';
+  const mark = (b, on, w) => { b.classList.toggle('aspin', on); b.classList.toggle('await', w); if (!('alab' in b.dataset)) b.dataset.alab = b.getAttribute('aria-label') || ''; const base = b.dataset.alab || b.textContent.trim(); if (on) b.setAttribute('aria-label', base + ' · ' + lab); else if (b.dataset.alab) b.setAttribute('aria-label', b.dataset.alab); else b.removeAttribute('aria-label'); };
+  $$('#side [data-go="agents"], #tabs [data-go="agents"]').forEach(b => mark(b, st === 'working', st === 'waiting'));
+  if (more) mark(more, st === 'working' && inMore, st === 'waiting' && inMore);
 }
 // 2.4.1 (#375): an open chat's header follows the clock too (a typing signal runs out after 10 s, "offline" after 5 minutes
 // without a poll), without asking the server

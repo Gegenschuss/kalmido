@@ -118,13 +118,14 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
   w.eval(`chatOpen(${AG})`); await until(() => d.querySelectorAll('#chat-msgs .cmsg').length >= 2, 60);
   const msgs = [...d.querySelectorAll('#chat-msgs .cmsg')];
-  // 2.18.0 (#651, intended change): 👍 👎 ❤️ sit visibly on every message, no smiley button / hidden bar any more
-  check(msgs.length >= 2 && msgs.every(m => m.querySelectorAll('.rxrow .rx[data-e]').length === 3 && !m.querySelector('.rxtog')), '#643 / #651: 👍 👎 ❤️ on every message (agent + mine), no smiley');
-  const mine = msgs.find(m => m.classList.contains('me'));
-  click(w, mine.querySelector('.rxrow [data-e="heart"]'));
-  check(await until(() => d.querySelector(`#chat-msgs .cmsg.me .chrx .rx.on[data-e="heart"]`)), '#643: ❤️ on my own message');
-  click(w, d.querySelector('#chat-msgs .cmsg.me .rxrow [data-e="heart"]'));
-  check(await until(() => d.querySelector(`#chat-msgs .cmsg.me .rxrow .rx.add[data-e="heart"][aria-pressed="false"]`)), '#651: a second tap takes it back');
+  // 2.23.0 (#823, owner decision): the agent's message: 👍 👎 ❤️ behind a smiley; my own message: no reactions of mine
+  const agm = msgs.find(m => m.classList.contains('ag')), mine = msgs.find(m => m.classList.contains('me'));
+  check(agm && agm.querySelectorAll('.rxrow .rx.rxq[data-e]').length === 3 && agm.querySelector('.rxtog') && mine && !mine.querySelector('.rxrow .rx:not([disabled])'), '#823: the agent\'s message: the smiley + three hidden quick reactions; mine: none');
+  click(w, agm.querySelector('.rxtog')); await sleep(150);
+  click(w, d.querySelector('#chat-msgs .cmsg.ag.rxshow .rxrow [data-e="heart"]'));
+  check(await until(() => d.querySelector(`#chat-msgs .cmsg.ag .chrx .rx.on[data-e="heart"]`)), '#643: ❤️ on the agent\'s message');
+  click(w, d.querySelector('#chat-msgs .cmsg.ag .rxrow .rx.on[data-e="heart"]'));
+  check(await until(() => d.querySelector(`#chat-msgs .cmsg.ag .rxrow .rx.add[data-e="heart"][aria-pressed="false"]`)), '#651: a second tap takes it back');
   w.eval('chatClose()'); w.close();
 
   // #644: the command field
@@ -272,9 +273,11 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     check(comp.h < comf.h && comp.min >= 44 && comf.min >= 44, `${tag}: compact makes the drawer shorter (${comf.h} -> ${comp.h} px), rows stay 44 px (${comp.min})`);
     // the chat: the reactions on an agent message and on mine, visible, real taps (2.18.0 #651: no smiley step any more)
     await o.nav(B + '#agents/' + AG); await ready(ev); await sleep(900);
-    const rx = await ev(`[...document.querySelectorAll('#chat-msgs .cmsg')].map(m => { const bs = [...m.querySelectorAll('.rxrow .rx')]; if (bs.length < 3) return null; const r = bs.map(b => b.getBoundingClientRect()); return {me: m.classList.contains('me'), w: Math.round(Math.min(...r.map(x => x.width))), h: Math.round(Math.min(...r.map(x => x.height))), l: Math.round(Math.min(...r.map(x => x.left))), r: Math.round(Math.max(...r.map(x => x.right))), op: Math.min(...bs.map(b => +getComputedStyle(b).opacity))}; })`);
-    check(rx.length >= 2 && rx.every(x => x && x.w >= 44 && x.h >= 44 && x.op >= .6 && x.l >= 0 && x.r <= vw), `${tag}: every message shows 👍 👎 ❤️ (44 px, inside the screen, no long press) ` + JSON.stringify(rx));
-    const em = await ev(`[...document.querySelectorAll('#chat-msgs .cmsg.ag .rxrow .rx.add[data-e]')].pop()?.dataset.e`);
+    // 2.23.0 (#823): the agent's messages: the smiley (and the reactions given), one tap opens 👍 👎 ❤️; mine: none of mine
+    const rx = await ev(`[...document.querySelectorAll('#chat-msgs .cmsg.ag')].map(m => { const bs = [...m.querySelectorAll('.rxrow .rx')].filter(b => b.offsetWidth); if (!bs.length) return null; const r = bs.map(b => b.getBoundingClientRect()); return {me: m.classList.contains('me'), w: Math.round(Math.min(...r.map(x => x.width))), h: Math.round(Math.min(...r.map(x => x.height))), l: Math.round(Math.min(...r.map(x => x.left))), r: Math.round(Math.max(...r.map(x => x.right))), op: Math.min(...bs.map(b => +getComputedStyle(b).opacity))}; })`);
+    check(rx.length >= 1 && rx.every(x => x && x.w >= 44 && x.h >= 44 && x.op >= .6 && x.l >= 0 && x.r <= vw), `${tag}: every agent message shows its smiley (44 px, inside the screen, no long press) ` + JSON.stringify(rx));
+    await ev(`(() => { const t = [...document.querySelectorAll('#chat-msgs .cmsg.ag .rxrow .rxtog')].pop(); t && t.click(); return 1; })()`); await sleep(300);
+    const em = await ev(`[...document.querySelectorAll('#chat-msgs .cmsg.ag.rxshow .rxrow .rx.add[data-e]')].pop()?.dataset.e`);
     p = await ev(`(() => { const e = [...document.querySelectorAll('#chat-msgs .cmsg.ag .rxrow [data-e="${em}"]')].pop(); e.scrollIntoView({block: 'center'}); const q = e.getBoundingClientRect(); return {x: q.left + q.width / 2, y: q.top + q.height / 2}; })()`); await tap(p.x, p.y);
     check(await until(() => ev(`!!document.querySelector('#chat-msgs .cmsg.ag .chrx .rx.on[data-e="${em}"]')`)), `${tag}: a tap on ${em} reacts`);
     await shot(`p2160-${tag}-chat-reactions.png`);

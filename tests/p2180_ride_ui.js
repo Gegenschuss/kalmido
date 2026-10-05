@@ -69,9 +69,13 @@ const LONG = 'Website relaunch 2026 for the client';
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
   w.eval(`chatOpen(${AG})`); await until(() => d.querySelectorAll('#chat-msgs .cmsg').length >= 3, 60);
   const cm = () => [...d.querySelectorAll('#chat-msgs .cmsg')];
-  check(cm().length >= 3 && cm().every(m => m.querySelectorAll('.cmeta .rxrow .rx[data-e]').length === 3 && !m.querySelector('.rxtog, .chrxq')), '#651: 👍 👎 ❤️ visible on every agent-chat message (the agent\'s and mine), no smiley, no hidden bar');
-  check(cm().every(m => m.querySelectorAll('.rxrow .rx[tabindex="0"]').length === 1 && m.querySelectorAll('.rxrow .rx[tabindex="-1"]').length === 3), '#651: one Tab stop per message (roving tabindex; 2.19.0: + "More reactions")');
+  // 2.23.0 (#823, owner decision): the agent's messages: 👍 👎 ❤️ behind a smiley (an open question keeps 👍 / 👎); my own: none
+  const agm = () => cm().filter(m => m.classList.contains('ag'));
+  check(cm().length >= 3 && agm().every(m => m.querySelectorAll('.cmeta .rxrow .rx[data-e]').length === 3 && m.querySelector('.rxrow .rxtog')) && cm().filter(m => m.classList.contains('me')).every(m => !m.querySelector('.rxrow .rx:not([disabled])')),
+    '#823: the agent\'s messages: a smiley with 👍 👎 ❤️ behind it; my own: no reactions');
+  check(agm().every(m => m.querySelectorAll('.rxrow .rx[tabindex="0"]').length === 1 && m.querySelectorAll('.rxrow .rx[tabindex="-1"]').length === 3), '#651: one Tab stop per message (roving tabindex; 2.19.0: + "More reactions")');
   const R = id => d.querySelector(`#chat-msgs .cmsg[data-mid="${id}"]`);
+  click(w, R(q1.id).querySelector('.rxrow .rxtog'));  // 2.23.0 (#823): open the quick reactions
   const up1 = R(q1.id).querySelector('.rxrow [data-e="up"]');
   check(up1.getAttribute('aria-label') === 'React with thumbs up' && up1.getAttribute('aria-pressed') === 'false' && !up1.querySelector('.rxn'), '#651: names: "React with thumbs up", not pressed, no count ' + up1.getAttribute('aria-label'));
   check(R(q1.id).querySelector('.rxrow').getAttribute('role') === 'group' && R(q1.id).querySelector('.rxrow').getAttribute('aria-label') === 'Reactions', 'the row is a named group');
@@ -90,8 +94,7 @@ const LONG = 'Website relaunch 2026 for the client';
   check(await until(() => R(q1.id)?.querySelector('.rxrow .rx.add[data-e="heart"][aria-pressed="false"]') && !R(q1.id).querySelector('.rxrow [data-e="heart"] .rxn')), '#651: a second tap takes it back');
   // my own message
   const mineM = () => d.querySelector('#chat-msgs .cmsg.me');
-  click(w, mineM().querySelector('.rxrow [data-e="up"]'));
-  check(await until(() => mineM()?.querySelector('.rxrow .rx.on[data-e="up"]')), '#651: 👍 on my own message, one tap');
+  check(mineM() && !mineM().querySelector('.rxrow [data-e="up"]:not([disabled])'), '#823: no 👍 on my own message');
   // the question: 👍 counts as approval
   check(R(q2.id).querySelector('.rxrow .rxhint')?.textContent === '👍 = approval' && /counts as approval/.test(R(q2.id).querySelector('.rxrow [data-e="up"]').getAttribute('aria-label')) && /counts as rejection/.test(R(q2.id).querySelector('.rxrow [data-e="down"]').getAttribute('aria-label')), '2.7.2 kept: the newest question says 👍 = approval, 👍 / 👎 are named as approval / rejection');
   click(w, R(q2.id).querySelector('.rxrow [data-e="up"]'));
@@ -112,14 +115,15 @@ const LONG = 'Website relaunch 2026 for the client';
   w.eval('teamChanged()');
   await until(() => [...d.querySelectorAll('#tc-msgs .cmsg.ag')].some(m => /Looks good/.test(m.textContent)));
   const bm = () => [...d.querySelectorAll('#tc-msgs .cmsg.ag')].pop();
-  check([...d.querySelectorAll('#tc-msgs .cmsg')].every(m => m.querySelectorAll('.cmeta .rxrow .rx:not(.rxplus)').length === 3) && !d.querySelector('#tc-msgs .rxtog[data-act="rx-tog"]'), '#651 team chat: 👍 👎 ❤️ visible on every message, no smiley');
+  // 2.23.0 (#823): Bob's message: the smiley opens 👍 👎 ❤️; my own messages: none of mine; Bob cannot react to his own
+  check([...d.querySelectorAll('#tc-msgs .cmsg.ag')].every(m => m.querySelectorAll('.cmeta .rxrow .rx.rxq[data-e]').length === 3 && m.querySelector('.rxtog[data-act="rx-tog"]'))
+    && [...d.querySelectorAll('#tc-msgs .cmsg.me')].every(m => !m.querySelector('.rxrow .rx[data-e]:not([disabled])')), '#823 team chat: the smiley on others\' messages, none on mine');
+  click(w, bm().querySelector('.rxrow .rxtog'));
   click(w, bm().querySelector('.rxrow [data-e="up"]'));
   check(await until(() => bm()?.querySelector('.rxrow .rx.on[data-e="up"][aria-pressed="true"] .rxn')?.textContent === '1'), '#651 team chat: one tap, count 1');
-  await call('POST', `/api/team/messages/${bm().dataset.mid}/reactions`, {emoji: 'up'}, CB);
-  await w.eval('loadRoom(S.tc.rid)'); w.eval('tcPatch()');
-  check(await until(() => bm()?.querySelector('.rxrow [data-e="up"] .rxn')?.textContent === '2'), 'Bob too: count 2 ' + bm()?.querySelector('.rxrow [data-e="up"]')?.outerHTML);
+  check((await call('POST', `/api/team/messages/${bm().dataset.mid}/reactions`, {emoji: 'up'}, CB)).status === 400, '#823: Bob cannot react to his own message');
   click(w, bm().querySelector('.rxrow [data-e="up"]'));
-  check(await until(() => bm()?.querySelector('.rxrow .rx:not(.on)[data-e="up"] .rxn')?.textContent === '1'), 'a second tap takes mine back, Bob\'s stays');
+  check(await until(() => !bm()?.querySelector('.rxrow [data-e="up"] .rxn')), 'a second tap takes mine back');
   // edit to empty + Save -> "Delete this message?"
   const myM = () => d.querySelector(`#tc-msgs .cmsg[data-mid="${mA.id}"]`);
   await until(() => myM());
@@ -250,9 +254,11 @@ const LONG = 'Website relaunch 2026 for the client';
     }
     // the agent chat: visible reactions, one tap toggles (real taps)
     await o.nav(B + '#agents/' + AG); await ready(ev); await sleep(800);
-    const rr = await ev(`(() => { const out = []; for (const m of document.querySelectorAll('#chat-msgs .cmsg')) { const bs = [...m.querySelectorAll('.rxrow .rx')]; const r = bs.map(b => b.getBoundingClientRect()); out.push({n: bs.length, w: Math.round(Math.min(...r.map(x => x.width))), h: Math.round(Math.min(...r.map(x => x.height))), l: Math.round(Math.min(...r.map(x => x.left))), r: Math.round(Math.max(...r.map(x => x.right))), op: Math.min(...bs.map(b => +getComputedStyle(b).opacity))}); } return out; })()`);
-    check(rr.length >= 3 && rr.every(x => x.n >= 3 && x.w >= 43.5 && x.h >= 43.5 && x.l >= 0 && x.r <= vw && x.op >= .6), `${tag}: every chat message shows its reactions (44 px, on screen, visible) ` + JSON.stringify(rr));
+    // 2.23.0 (#823): the agent's messages show the smiley (and an open question 👍 / 👎), the rest one tap away
+    const rr = await ev(`(() => { const out = []; for (const m of document.querySelectorAll('#chat-msgs .cmsg.ag')) { const bs = [...m.querySelectorAll('.rxrow .rx')].filter(b => b.offsetWidth); const r = bs.map(b => b.getBoundingClientRect()); out.push({n: bs.length, w: Math.round(Math.min(...r.map(x => x.width))), h: Math.round(Math.min(...r.map(x => x.height))), l: Math.round(Math.min(...r.map(x => x.left))), r: Math.round(Math.max(...r.map(x => x.right))), op: Math.min(...bs.map(b => +getComputedStyle(b).opacity))}); } return out; })()`);
+    check(rr.length >= 2 && rr.every(x => x.n >= 1 && x.w >= 43.5 && x.h >= 43.5 && x.l >= 0 && x.r <= vw && x.op >= .6), `${tag}: every chat message shows its reactions (44 px, on screen, visible) ` + JSON.stringify(rr));
     const P = `(() => { const e = document.querySelector('#chat-msgs .cmsg[data-mid="${q1.id}"] .rxrow [data-e="down"]'); e.scrollIntoView({block: 'center'}); const q = e.getBoundingClientRect(); return {x: q.left + q.width / 2, y: q.top + q.height / 2}; })()`;
+    await ev(`(() => { document.querySelector('#chat-msgs .cmsg[data-mid="${q1.id}"] .rxrow .rxtog')?.click(); return 1; })()`); await sleep(300);
     let p = await ev(P); await tap(p.x, p.y);
     check(await until(() => ev(`document.querySelector('#chat-msgs .cmsg[data-mid="${q1.id}"] .rxrow [data-e="down"]')?.getAttribute('aria-pressed') === 'true'`), 30), `${tag}: one tap on 👎 reacts`);
     await shot(`p2180r-${vw}x${vh}-${th}-chat.png`);
@@ -267,12 +273,13 @@ const LONG = 'Website relaunch 2026 for the client';
     { const c = await ev(CONTRAST);
       check(c.n >= 3 && c.same && c.min >= 3 && c.op === 1, `${tag}: R12: unused reactions are one grey silhouette, >= 3:1 ` + JSON.stringify(c));
       check(c.dlc === null || c.dlc >= 4.5, `${tag}: R13: the chat's "Sent" >= 4.5:1 ` + JSON.stringify(c)); }
-    // 2.18.0 (owner feedback, screenshot): the working ring of the tab bar is concentric with the tab's icon
+    // 2.18.0 (owner feedback, screenshot): the working mark of the tab bar belongs to the tab's icon (2.23.0: a dot, #824)
     if (vw < 900) {
       const ring = await ev(`(() => { const t = document.querySelector('#tabs .tico'); if (!t) return null; t.closest('button').classList.add('aspin'); const i = t.querySelector('svg').getBoundingClientRect(), cs = getComputedStyle(t, '::before'), tr = t.getBoundingClientRect();
         const cx = tr.left + parseFloat(cs.left) + parseFloat(cs.marginLeft) + parseFloat(cs.width) / 2, cy = tr.top + parseFloat(cs.top) + parseFloat(cs.marginTop) + parseFloat(cs.height) / 2;
-        return {dx: Math.round(Math.abs(cx - (i.left + i.width / 2))), dy: Math.round(Math.abs(cy - (i.top + i.height / 2))), c: cs.content}; })()`);
-      check(ring && ring.c !== 'none' && ring.dx <= 1 && ring.dy <= 1, `${tag}: the tab's working ring is centred on its icon ` + JSON.stringify(ring));
+        return {dx: Math.round(cx - (i.left + i.width / 2)), dy: Math.round(cy - (i.top + i.height / 2)), w: Math.round(parseFloat(cs.width)), c: cs.content}; })()`);
+      // 2.23.0 (#824): a small dot at the icon's upper right corner instead of a ring around it
+      check(ring && ring.c !== 'none' && ring.dx > 0 && ring.dx <= 16 && ring.dy < 0 && ring.dy >= -16 && ring.w <= 10, `${tag}: the tab's working dot sits at its icon's corner ` + JSON.stringify(ring));
     }
     if (vw === 390 || vw === 904 && vh === 1080) {
       await o.nav(B + '#l/' + L); await ready(ev); await densNoJump(ev, tag);
@@ -301,8 +308,8 @@ const LONG = 'Website relaunch 2026 for the client';
     const h = await ev(HDR);
     check(!h.over.length && h.o <= 0 && !h.small.length && !h.folded.some(x => /^Search/.test(x)), `${tag}: the header fits ` + JSON.stringify({over: h.over, small: h.small, folded: h.folded}));
     await ev(`(() => { chatOpen(${AG}); return 1; })()`); await sleep(1500);
-    const rr = await ev(`[...document.querySelectorAll('#chat-msgs .cmsg')].map(m => { const bs = [...m.querySelectorAll('.rxrow .rx')]; return {n: bs.length, h: Math.round(Math.min(...bs.map(b => b.getBoundingClientRect().height))), op: Math.min(...bs.map(b => +getComputedStyle(b).opacity))}; })`);
-    check(rr.length >= 3 && rr.every(x => x.n >= 3 && x.h >= 23.5 && x.op >= .6), `${tag}: the reactions are visible without hover (24 px) ` + JSON.stringify(rr));
+    const rr = await ev(`[...document.querySelectorAll('#chat-msgs .cmsg.ag')].map(m => { const bs = [...m.querySelectorAll('.rxrow .rx')].filter(b => b.offsetWidth); return {n: bs.length, h: Math.round(Math.min(...bs.map(b => b.getBoundingClientRect().height))), op: Math.min(...bs.map(b => +getComputedStyle(b).opacity))}; })`);
+    check(rr.length >= 2 && rr.every(x => x.n >= 1 && x.h >= 23.5 && x.op >= .6), `${tag}: the reactions are visible without hover (24 px) ` + JSON.stringify(rr));
     // 2.18.0 (owner feedback, screenshot): composite input bars show the focus once, on the bar (no box inside the box)
     await o.nav(B + '#l/' + L); await ready(ev);
     const fr = await ev(`(() => { const i = document.querySelector('.qadd input, .qadd.dock input'); if (!i) return null; i.focus(); const bar = i.closest('.box').closest('.qadd.dock') || i.closest('.box');

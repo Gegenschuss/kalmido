@@ -464,6 +464,9 @@ def chat_react_req(c, m, uid):
         raise BadInput(tr("Invalid value: {0}", "on"))
     have = bool(c.execute("SELECT 1 FROM chat_reactions WHERE message_id=? AND user_id=? AND emoji=?", (m["id"], uid, emoji)).fetchone())
     on = b["on"] if isinstance(b.get("on"), bool) else not have
+    own = (m["sender"] == "agent" and uid == m["agent_id"]) or (m["sender"] != "agent" and uid == m["user_id"])
+    if on and own:  # 2.23.0 (#823): not on one's own message
+        raise BadInput(tr("You cannot react to your own message"))
     res = chat_react(c, m, uid, emoji, on)
     c.commit()
     return {"ok": True, "message_id": m["id"], "reactions": chat_reactions_of(c, [m["id"]]).get(m["id"], []), **res}

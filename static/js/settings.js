@@ -266,7 +266,7 @@ async function setLang(code) {
 }
 // U04: the modules, grouped, each with one sentence; admins also get the switch for the whole server (collaboration, time)
 const MOD_GROUPS = [[N_('Views'), ['cal', 'timeline', 'kanban', 'matrix']], [N_('Calendar and people'), ['events', 'contacts']], [N_('For you'), ['habits', 'pomo', 'stats', 'comments']],
-  [N_('Projects and team'), ['collab', 'time', 'progress', 'deps', 'fields', 'agents']], [N_('At home'), ['family', 'contracts', 'home', 'care', 'health', 'review', 'travel', 'reading']], [N_('Connections'), ['paperless']]];
+  [N_('Projects and team'), ['collab', 'time', 'progress', 'deps', 'fields', 'agents', 'clients', 'workload', 'forms']], [N_('At home'), ['family', 'contracts', 'home', 'care', 'health', 'review', 'travel', 'reading']], [N_('Connections'), ['paperless']]];
 const MOD_DESC = {cal: N_('Month, week and day view of your tasks'), timeline: N_('Tasks with start and end as bars over time'), kanban: N_('Lists as boards with columns'),
   matrix: N_('Urgent and important in four quadrants'), habits: N_('Daily and weekly habits with streaks'), pomo: N_('Focus timer and stopwatch'),
   stats: N_('Completions, on-time rate, focus time and streaks'), collab: N_('Share lists, assign tasks, @mentions, activity and News'),
@@ -1104,6 +1104,7 @@ const openExt = u => { const w = window.open(u, '_blank', 'noopener,noreferrer')
 function aboutHtml(chk, hint) {
   const a = S.about || {};
   let h = `<h4 id="s-about-h">${tr('About')}</h4><div class="row"><label>${tr('Version')}</label><span>Kalmido v${esc(a.version || '?')}</span></div>
+    <div class="row aboutcopy"><label>©</label><span class="muted">2026 Gegenschuss Doberenz Enders Grund eGbR · AGPL-3.0</span></div>
     <div class="row aboutlinks"><label></label>${ABOUT_LINKS.map(([u, n, i]) => `<a class="btn sm" href="${u}" target="_blank" rel="noopener noreferrer">${ic(i, 's')} ${tr(n)}</a>`).join('')}</div>`;
   if (!S.me?.is_admin) return h;
   if (a.available) {

@@ -654,6 +654,8 @@ def v1_comment_react(cid):
     b = v1_json()
     if set(b) - {"emoji"}:
         raise BadInput(tr("Expected {0}", '{"emoji": "up"}'))
+    if k["user_id"] == me():  # 2.23.0 (#823)
+        raise BadInput(tr("You cannot react to your own message"))
     react(c, k, me(), clean_emoji(b.get("emoji")), True)
     bump(c)
     c.commit()

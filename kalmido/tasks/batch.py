@@ -74,6 +74,9 @@ def task_reorder():
             log_changes(c, it["id"], before)
             if "list_id" in f:
                 move_subtree(c, int(it["id"]), f["list_id"])
+                if f["list_id"] != before["list_id"]:  # 2.23.0 (#795)
+                    from ..agents.core import agent_added_events
+                    agent_added_events(c, int(it["id"]), before["list_id"])
                 ms_cleanup(c)  # 2.18.0 (#430): a moved milestone lets its tasks go, moved subtasks leave theirs
             if "due" in f and before["status"] == 0 and not before["deleted_at"]:  # dropped on a later day
                 shifted += dep_shift(c, int(it["id"]), before["due"], f["due"])

@@ -148,7 +148,7 @@ def check_assignee(c, lid, aid):
 WEB_TASK_NEW = frozenset(TASK_FIELDS) | {"tags", "ltags", "fields", "people"}
 WEB_TASK_EDIT = WEB_TASK_NEW | {"add_tags", "_prev", "_act"}
 WEB_LIST_NEW = frozenset({"name", "color", "folder", "view", "kind", "checklist", "done_at_bottom", "dep_shift", "tickets", "ptype", "family"})
-WEB_LIST_EDIT = frozenset(LIST_FIELDS) | {"rate", "agent_tidy", "tidy_agent_id", "listen_agent_ids", "_prev", "ticket_tpl", "day_hours", "done_at_bottom", "columns", "ptype"}
+WEB_LIST_EDIT = frozenset(LIST_FIELDS) | {"client_id", "rate", "agent_tidy", "tidy_agent_id", "listen_agent_ids", "_prev", "ticket_tpl", "day_hours", "done_at_bottom", "columns", "ptype"}
 WEB_COMMENT = frozenset({"body", "suggestion"})
 
 
@@ -159,7 +159,7 @@ def task_create():
     from ..personal.timetrack import field_alias, web_fields
     from ..tasks.dependencies import newtask_events
     from ..lists.fields import set_field_values
-    from ..agents.core import agent_task_mentions, agent_tidy_events
+    from ..agents.core import agent_added_events, agent_task_mentions, agent_tidy_events
     from ..collab.reactions import set_ltags
     from ..family.family import is_shop, people_set, rot_apply, shop_area_of, shop_remember
     b = web_fields(field_alias(body(), "content", "notes"), WEB_TASK_NEW, "POST /api/tasks")
@@ -250,6 +250,7 @@ def task_create():
     log_act(c, cur.lastrowid, "created")
     agent_task_mentions(c, cur.lastrowid)
     agent_tidy_events(c, cur.lastrowid)
+    agent_added_events(c, cur.lastrowid)  # 2.23.0 (#795)
     if f.get("assignee_id"):
         task_event(c, cur.lastrowid, "assign")
     if f.get("assignee_group_id"):

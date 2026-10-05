@@ -269,15 +269,18 @@ async function folderGroupsModal(f) {
 }
 // 2.22.0 (#752): organisations (admins): name, emoji, members; whom people see (everyone / own organisation / own contacts)
 const VIS_UI = [['all', N_('Everyone on this server')], ['org', N_('Only people of their own organisations')], ['contacts', N_('Only people they are connected with (no directory, share by e-mail address)')]];
-const orgsHtml = () => `<h4 id="a-orgs-h">${tr('Organisations')}</h4><div class="members" id="a-orgs"><div class="muted mhint">${tr('Loading…')}</div></div>
-  <div class="row"><label for="a-vis">${tr('People see')}</label><select id="a-vis"></select></div>
-  <div class="shint">${tr('Whom people see in the share dialog, as attendees and in the user list. Admins always see everyone. With several companies or households on one server: own organisation or own contacts.')}</div>
-  <div class="row" style="margin-top:.5rem"><button class="btn sm" data-acc="org-new">${ic('plus', 's')} ${tr('New organisation')}</button></div>`;
+// 2.23.0 (#799): the kind of instance comes from the configuration (KALMIDO_INSTANCE_MODE): an organisation shows its name
+// only, a shared server says so; only an instance that kept several organisations from 2.22 still edits them here
+const orgsHtml = () => S.instanceMode === 'shared' ? `<h4 id="a-orgs-h">${tr('Organisation')}</h4><div class="shint">${tr('A shared server: no organisations; people see only the people they are connected with and share by e-mail address (set by the server configuration).')}</div>`
+  : `<h4 id="a-orgs-h">${S.instanceMode === 'multi' ? tr('Organisations') : tr('Organisation')}</h4><div class="members" id="a-orgs"><div class="muted mhint">${tr('Loading…')}</div></div>
+  ${S.instanceMode === 'multi' ? `<div class="row"><label for="a-vis">${tr('People see')}</label><select id="a-vis"></select></div>
+  <div class="shint">${tr('Whom people see in the share dialog, as attendees and in the user list. Admins always see everyone. With several companies or households on one server: own organisation or own contacts.')}</div>`
+    : `<div class="shint">${tr('Everyone on this server belongs to it and sees the others. The name comes from the setup or the server configuration (KALMIDO_ORG_NAME).')}</div>`}`;
 async function orgsDraw(md) {
   const box = $('#a-orgs', md); if (!box) return;
   let j; try { j = await api('GET', '/api/admin/orgs'); } catch { return; }
   S.orgs = j.orgs;
-  box.innerHTML = j.orgs.length ? j.orgs.map(o => `<div class="mrow"><span class="fem" aria-hidden="true">${esc(o.icon || '🏢')}</span><span class="n">${esc(o.name)} <span class="muted">${esc(trn('{0} member', '{0} members', o.members.length))}</span></span><button class="iconbtn" data-acc="org-edit" data-oid="${o.id}" title="${esc(tr('Edit organisation'))}" aria-label="${esc(tr('Edit {0}', o.name))}">${ic('edit', 's')}</button></div>`).join('') : `<div class="muted mhint">${tr('No organisation yet.')}</div>`;
+  box.innerHTML = j.orgs.length ? j.orgs.map(o => `<div class="mrow"><span class="fem" aria-hidden="true">${esc(o.icon || '🏢')}</span><span class="n">${esc(o.name)} <span class="muted">${esc(trn('{0} member', '{0} members', o.members.length))}${o.domains ? ' · ' + esc(o.domains) : ''}</span></span>${j.editable ? `<button class="iconbtn" data-acc="org-edit" data-oid="${o.id}" title="${esc(tr('Edit organisation'))}" aria-label="${esc(tr('Edit {0}', o.name))}">${ic('edit', 's')}</button>` : ''}</div>`).join('') : `<div class="muted mhint">${tr('No organisation yet.')}</div>`;
   const vs = $('#a-vis', md); if (vs) vs.innerHTML = VIS_UI.map(([k, n]) => `<option value="${k}" ${k === j.visibility ? 'selected' : ''}>${esc(tr(n))}</option>`).join('');
 }
 async function orgModal(o, done) {
@@ -286,16 +289,16 @@ async function orgModal(o, done) {
   const md = modal(`<h3>${o ? tr('Edit organisation') : tr('New organisation')}</h3>
     <div class="row"><label for="og-name">${tr('Name')}</label><input id="og-name" maxlength="60" value="${esc(o?.name || '')}"></div>
     <div class="row"><label for="og-icon">${tr('Symbol')}</label><input id="og-icon" maxlength="8" class="numin" value="${esc(o?.icon || '')}" placeholder="🏢"></div>
+    <div class="row"><label for="og-dom">${tr('E-mail domains')}</label><input id="og-dom" maxlength="500" value="${esc(o?.domains || '')}" placeholder="example.com" autocapitalize="off"><span class="muted">${tr('registrations with these addresses join it')}</span></div>
     <div class="row"><label>${tr('Members')}</label><div class="fpeople" role="group" aria-label="${esc(tr('Members'))}">${us.map(u => `<button type="button" class="fperson ${mem.has(u.id) ? 'on' : ''}" data-ogm="${u.id}" aria-pressed="${mem.has(u.id)}">${av(u.id, u.display_name)}<span>${esc(u.display_name)}</span></button>`).join('')}</div></div>
-    <div class="foot">${o ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   md.addEventListener('click', async e => {
     const p = e.target.closest('[data-ogm]');
     if (p) { const id = +p.dataset.ogm; mem.has(id) ? mem.delete(id) : mem.add(id); p.classList.toggle('on', mem.has(id)); p.setAttribute('aria-pressed', mem.has(id)); return; }
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
     try {
-      if (b.dataset.m === 'del') { if (!await askConfirm(tr('Delete the organisation “{0}”?', o.name), tr('Its people stay; they are only no longer members.'), {ok: tr('Delete'), danger: true})) return; await api('DELETE', `/api/admin/orgs/${o.id}`); }
-      if (b.dataset.m === 'save') { const body = {name: $('#og-name', md).value.trim(), icon: $('#og-icon', md).value.trim(), members: [...mem]}; if (o) await api('PATCH', `/api/admin/orgs/${o.id}`, body); else await api('POST', '/api/admin/orgs', body); }
+      if (b.dataset.m === 'save') { const body = {name: $('#og-name', md).value.trim(), icon: $('#og-icon', md).value.trim(), domains: $('#og-dom', md).value, members: [...mem]}; await api('PATCH', `/api/admin/orgs/${o.id}`, body); }
       md.remove(); done && done(); await load(); render();
     } catch { /* api() said it */ }
   });
@@ -306,7 +309,7 @@ function accountWire(md) {
     const box = $('#a-users', md); if (!box) return;
     try { const j = await api('GET', '/api/users'); users = j.users; S.mailOut = !!j.mail_out; } catch { return; }
     // 2.1.2 (#346): agents are rows too (badge); they are edited in their own dialog (Settings > Agents)
-    box.innerHTML = users.map(u => `<div class="mrow ${u.disabled ? 'off' : ''}" data-urow="${u.id}">${u.avatar ? `<span class="avatar pic"><img src="${esc(u.avatar)}" alt="" loading="lazy"></span>` : av(0, u.display_name)}<span class="n">${esc(u.display_name)}${u.kind === 'agent' ? ' ' + agentBadge() : ''} <span class="muted">${esc(u.username)}${u.is_admin ? ' · ' + tr('Admin') : ''}${u.disabled ? ' · ' + tr('disabled') : ''}${u.proxy_login ? ' · ' + tr('SSO: {0}', u.proxy_login) : ''}${u.paperless_access && S.paperless?.configured ? ' · Paperless' : ''}${u.twofa?.length ? ' · ' + tr('2FA') : ''}${u.oidc_linked ? ' · OIDC' : ''}${u.invite === 'invited' ? ' · ' + tr('Invited') : u.invite === 'expired' ? ' · ' + tr('Invitation expired') : ''}</span></span>${u.kind === 'agent'
+    box.innerHTML = users.map(u => `<div class="mrow ${u.disabled ? 'off' : ''}" data-urow="${u.id}">${u.avatar ? `<span class="avatar pic"><img src="${esc(u.avatar)}" alt="" loading="lazy"></span>` : av(0, u.display_name)}<span class="n">${esc(u.display_name)}${u.kind === 'agent' ? ' ' + agentBadge() : ''} <span class="muted">${esc(u.username)}${u.is_admin ? ' · ' + tr('Admin') : ''}${u.disabled ? ' · ' + tr('disabled') : ''}${u.proxy_login ? ' · ' + tr('SSO: {0}', u.proxy_login) : ''}${u.paperless_access && S.paperless?.configured ? ' · Paperless' : ''}${u.twofa?.length ? ' · ' + tr('2FA') : ''}${u.oidc_linked ? ' · OIDC' : ''}${u.invite === 'invited' ? ' · ' + tr('Invited') : u.invite === 'expired' ? ' · ' + tr('Invitation expired') : ''}${u.signup === 'pending' ? ' · ' + tr('waits for approval') : u.signup === 'confirm' ? ' · ' + tr('registration not confirmed') : ''}</span></span>${u.signup === 'pending' ? `<button class="btn sm pri" data-acc="user-approve" data-uid="${u.id}">${ic('check', 's')} ${tr('Approve')}</button>` : ''}${u.kind === 'agent'
       ? `<button class="linkbtn agmng" data-acc="agent-edit" data-uid="${u.id}" title="${esc(tr('Open the agent dialog'))}">${tr('Managed under Agents')}</button>`
       : `<button class="iconbtn" data-acc="user-edit" data-uid="${u.id}" title="${tr('Edit user')}">${ic('edit', 's')}</button>`}</div>`).join('');
   };
@@ -338,7 +341,7 @@ function accountWire(md) {
       }
       if (a === 'logout') logout();
       if (a === 'user-new') userModal(null, drawUsers);
-      if (a === 'org-new') orgModal(null, () => orgsDraw(md));  // 2.22.0 (#752)
+      if (a === 'user-approve') { await api('POST', `/api/users/${b.dataset.uid}/approve`, {}); toast(tr('Approved: the person can log in now')); drawUsers(); }  // 2.23.0 (#711)
       if (a === 'org-edit') orgModal((S.orgs || []).find(o => o.id === +b.dataset.oid), () => orgsDraw(md));
       if (a === 'user-edit') userModal(users.find(u => u.id === +b.dataset.uid), drawUsers);
       if (a === 'agent-edit') {
@@ -356,7 +359,7 @@ function userModal(u, done) {
     <div class="row"><label for="u-pw">${tr('Password')}</label><input type="password" id="u-pw" autocomplete="new-password" placeholder="${u ? (u.has_password ? tr('unchanged') : tr('none (single sign-on only)')) : tr('optional, min. 8 characters')}"></div>
     <div class="row"><label for="u-proxy">${tr('SSO login')}</label><input id="u-proxy" value="${esc(u?.proxy_login || '')}" autocapitalize="off" placeholder="${tr('user name at the login proxy (optional)')}"></div>
     <div class="row"><label for="u-email">${tr('E-mail')}</label><input id="u-email" type="email" value="${esc(u?.email || '')}" autocapitalize="off" placeholder="${tr('optional, links an OIDC login')}"></div>
-    ${(S.orgs || []).length > 1 || (u && (S.orgs || []).length) ? `<div class="row"><label>${tr('Organisations')}</label><div class="fpeople" role="group" aria-label="${esc(tr('Organisations'))}">${S.orgs.map(o => { const on = u ? (u.orgs || []).includes(o.id) : o.members.includes(S.me.id); return `<button type="button" class="fperson ${on ? 'on' : ''}" data-uorg="${o.id}" aria-pressed="${on}"><span aria-hidden="true">${esc(o.icon || '🏢')}</span><span>${esc(o.name)}</span></button>`; }).join('')}</div></div>` : ''}
+    ${S.instanceMode === 'multi' && ((S.orgs || []).length > 1 || (u && (S.orgs || []).length)) ? `<div class="row"><label>${tr('Organisations')}</label><div class="fpeople" role="group" aria-label="${esc(tr('Organisations'))}">${S.orgs.map(o => { const on = u ? (u.orgs || []).includes(o.id) : o.members.includes(S.me.id); return `<button type="button" class="fperson ${on ? 'on' : ''}" data-uorg="${o.id}" aria-pressed="${on}"><span aria-hidden="true">${esc(o.icon || '🏢')}</span><span>${esc(o.name)}</span></button>`; }).join('')}</div></div>` : ''}
     <div class="row"><label for="u-topic">${tr('ntfy topic')}</label><input id="u-topic" value="${esc(u?.ntfy_topic || '')}" autocapitalize="off" placeholder="${tr('empty = random')}"></div>
     ${u ? `<div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="u-avpick" data-cur="${esc(u.avatar || '')}">${avPickHtml(u.avatar || '', false, u.display_name || u.username)}</div></div>` : ''}
     <div class="row"><label>${tr('Rights')}</label><label class="chkl"><input type="checkbox" id="u-admin" ${u?.is_admin ? 'checked' : ''}> ${tr('Admin')}</label>${S.paperless?.configured ? `<label class="chkl" title="${tr('Search, link and view documents of the Paperless archive')}"><input type="checkbox" id="u-pl" ${u?.paperless_access ? 'checked' : ''}> ${tr('Paperless access')}</label>` : ''}${u ? `<label class="chkl"><input type="checkbox" id="u-dis" ${u.disabled ? 'checked' : ''}> ${tr('disabled')}</label>` : ''}</div>
@@ -366,6 +369,7 @@ function userModal(u, done) {
     ${u?.has_password ? `<div class="row"><label></label><label class="chkl"><input type="checkbox" id="u-nopw"> ${tr('Remove password (single sign-on only)')}</label></div>` : ''}
     ${!u ? `<div class="row"><label>${tr('Invitation')}</label><label class="chkl"><input type="checkbox" id="u-inv" checked> ${S.mailOut ? tr('Send an invitation by e-mail: the person sets their own password') : tr('Create an invitation link: the person sets their own password')}</label></div>`
       : u.kind !== 'agent' && !u.disabled ? `<div class="row"><label>${u.has_password ? tr('Password') : tr('Invitation')}</label><button type="button" class="btn sm" data-m="invite">${ic(u.has_password ? 'key' : 'send', 's')} ${u.has_password ? tr('Send a link to set a new password') : u.invite ? tr('Send the invitation again') : tr('Send an invitation')}</button></div>` : ''}
+    ${u && u.kind !== 'agent' && !u.is_admin && !u.disabled && u.id !== S.me.id ? `<div class="row"><label>${tr('Sign-in link')}</label><button type="button" class="btn sm" data-m="signin">${ic('key', 's')} ${tr('Sign-in link / QR code…')}</button><span class="muted">${tr('for family members without e-mail')}</span></div>` : ''}
     ${u?.twofa?.length ? `<div class="row"><label>${tr('Two-factor')}</label><label class="chkl"><input type="checkbox" id="u-2fareset"> ${tr('Reset (lost phone / passkey and recovery codes)')}</label></div>` : ''}
     ${u?.oidc_linked ? `<div class="row"><label>OIDC</label><label class="chkl"><input type="checkbox" id="u-oidcun"> ${tr('Unlink (the next OIDC login links again by user name or e-mail)')}</label></div>` : ''}
     <div class="muted" style="font-size:var(--fs-s);line-height:1.6">${tr('Every user gets an own inbox, habits, filters, tags and settings. Lists are shared from the list’s “…” menu > Share….')}</div>
@@ -393,6 +397,7 @@ function userModal(u, done) {
   md.addEventListener('click', async e => {
     const b = e.target.closest('button[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
+    if (b.dataset.m === 'signin') { signinLink(u.id, u.display_name); return; }  // 2.23.0 (#444)
     if (b.dataset.m === 'invite') {  // 2.22.0 (#697): a new one-time link (invitation / password reset)
       try { const j = await api('POST', `/api/users/${u.id}/invite`, {send: true}); inviteResult(j, u.display_name); done && done(); } catch { /* api() said it */ }
       return;
@@ -458,7 +463,7 @@ async function inviteScreen(tok) {
     el.innerHTML = `<div class="card">${logo}<p role="alert">${esc(info.error)}</p><button class="btn pri" type="button" data-au="login">${tr('To the login')}</button></div>`;
   } else {
     el.innerHTML = `<div class="card">${logo}
-      <h2 class="invh">${esc(info.kind === 'reset' ? tr('Set a new password') : tr('Welcome, {0}!', info.display_name))}</h2>
+      <h2 class="invh">${esc(info.kind === 'reset' ? tr('Set a new password') : info.kind === 'signup' ? tr('Confirm your registration') : tr('Welcome, {0}!', info.display_name))}</h2>
       <p class="muted">${esc(info.kind === 'reset' ? tr('Choose a new password for “{0}”.', info.username) : tr('Choose your own password to finish your account.'))}</p>
       <form id="inv-form" autocomplete="on">
         <label class="aulab" for="inv-user">${tr('Username')}</label><input id="inv-user" name="username" autocomplete="username" readonly value="${esc(info.username)}">
@@ -478,6 +483,7 @@ async function inviteScreen(tok) {
         const res = await r.json().catch(() => ({}));
         if (!r.ok) { errEl.textContent = res.error || tr('Error {0}', r.status); return; }
         if (res.enrol) { await authEnrol(el, logo); return; }
+        if (res.pending) { $('.card', el).innerHTML = `${logo}<h2 class="invh">${tr('Thank you!')}</h2><p role="status">${tr('Your account waits for an admin to approve it. You can log in once it is approved.')}</p><button class="btn pri" type="button" data-au="login">${tr('To the login')}</button>`; return; }  // 2.23.0 (#711)
         if ($('#inv-2fa', el).checked) LS.set('after2fa', true);
         location.replace('/');
       } catch { errEl.textContent = tr('Server not reachable.'); }
@@ -522,6 +528,7 @@ async function authScreen(j) {
         ${!setup && (info.oidc || (info.passkey_login && pkSupported())) ? `<div class="aor"><span>${tr('or')}</span></div>` : ''}
         ${!setup && info.oidc ? `<button type="button" class="btn" data-au="oidc">${ic('link', 's')} ${esc(tr('Log in with {0}', info.oidc.label))}</button>` : ''}
         ${!setup && info.passkey_login && pkSupported() ? `<button type="button" class="btn" data-au="passkey">${ic('key', 's')} ${tr('Log in with a passkey')}</button>` : ''}
+        ${!setup && info.signup ? `<p class="aulink">${tr('New here?')} <button type="button" class="linkbtn" data-au="signup">${tr('Create account')}</button></p>` : ''}
       </form></div>`;
     const le = (location.hash.match(/login-error=([a-z_]+)/) || [])[1];
     if (le) { $('#au-err', el).textContent = (info.login_errors || {})[le] || (info.login_errors || {}).failed || le; history.replaceState(null, '', location.pathname); }
@@ -530,6 +537,8 @@ async function authScreen(j) {
       const rem = $('#au-rem', el)?.checked !== false;
       if (b.dataset.au === 'oidc') location.href = '/api/auth/oidc/start?remember=' + (rem ? 1 : 0);
       if (b.dataset.au === 'passkey') authPasskey($('#au-err', el), rem);
+      if (b.dataset.au === 'signup') signupScreen(el, logo, info);  // 2.23.0 (#711)
+      if (b.dataset.au === 'back') { el.remove(); $('#app')?.removeAttribute('inert'); authScreen(j); }
       if (b.dataset.au === 'pwshow') { const i = $('#au-pw', el), on = i.type === 'password'; i.type = on ? 'text' : 'password'; b.setAttribute('aria-pressed', String(on)); i.focus(); }  // 2.13.0 (#453 P7)
     });
     el.querySelector('#auth-form').addEventListener('submit', async e => {
@@ -796,6 +805,54 @@ async function authPasskey(errEl, remember) {
     location.replace('/');
   } catch (x) { errEl.textContent = x instanceof Error && x.j ? x.message : pkErr(x); }
 }
+// ---- 2.23.0 (#711): registration on the login page (admins): the mode and the e-mail domains
+const SIGNUP_UI = [['off', N_('Off: only admins add people')], ['domain', N_('Only addresses of certain e-mail domains')], ['approval', N_('Anyone, after an admin approves')], ['open', N_('Anyone with a confirmed e-mail address')]];
+function signupAdminHtml(a) {
+  const mode = a.signup_mode || 'off', org = a.instance_mode === 'organisation';
+  const dis = k => (k === 'domain' || k === 'open') && !a.mail_out ? 'disabled' : k === 'open' && org ? 'disabled' : '';
+  return `<h4 id="s-signup-h">${tr('Registration on the login page')}</h4>
+    <div class="row"><label for="s-signup">${tr('Who can register')}</label><select id="s-signup">${SIGNUP_UI.map(([k, n]) => `<option value="${k}" ${k === mode ? 'selected' : ''} ${dis(k)}>${esc(tr(n))}</option>`).join('')}</select></div>
+    <div class="row" id="s-sdomrow" ${mode === 'domain' ? '' : 'hidden'}><label for="s-sdom">${tr('E-mail domains')}</label><input id="s-sdom" value="${esc(a.signup_domains || '')}" placeholder="example.com, example.org" autocapitalize="off"></div>
+    <div class="shint">${esc([tr('New people confirm their address with a link (or wait for an admin), choose their password and start without access to lists: share lists with them. Never an admin or a child account.'),
+      a.mail_out ? '' : tr('Without e-mail sending (SMTP) only “after an admin approves” works.'), org ? tr('This server is one organisation: open registration is not possible.') : ''].filter(Boolean).join(' '))}</div>`;
+}
+document.addEventListener('change', async e => {
+  const id = e.target.id; if (id !== 's-signup' && id !== 's-sdom') return;
+  try {
+    const j = await api('PATCH', '/api/admin/settings', id === 's-signup' ? {signup_mode: e.target.value} : {signup_domains: e.target.value});
+    if (j && j.version) S.about = j;
+    const r = $('#s-sdomrow'); if (r) r.hidden = (S.about?.signup_mode || 'off') !== 'domain';
+    if (id === 's-sdom') e.target.value = S.about?.signup_domains || '';
+    toast(tr('Saved'));
+  } catch { if (id === 's-signup') e.target.value = S.about?.signup_mode || 'off'; }
+});
+// the form "Create account" on the login page (#711)
+function signupScreen(el, logo, info) {
+  const pw = !!info.signup?.password;
+  el.innerHTML = `<div class="card">${logo}
+    <h2 class="invh">${tr('Create account')}</h2>
+    <p class="muted">${esc(info.signup?.mode === 'approval' ? tr('An admin approves new accounts before the first login.') : tr('You get an e-mail with a link to confirm your address and choose your password.'))}</p>
+    <form id="su-form" autocomplete="on">
+      <label class="aulab" for="su-name">${tr('Your name')}</label><input id="su-name" name="name" autocomplete="name" maxlength="60" required>
+      <label class="aulab" for="su-mail">${tr('E-mail')}</label><input id="su-mail" name="email" type="email" autocomplete="email" autocapitalize="off" required>
+      ${pw ? `<label class="aulab" for="su-pw">${tr('Password')}</label><input id="su-pw" type="password" autocomplete="new-password" minlength="${info.signup.min_password || 8}" required placeholder="${esc(tr('at least {0} characters', info.signup.min_password || 8))}">` : ''}
+      <div class="aerr" role="alert" id="su-err"></div>
+      <button class="btn pri" type="submit">${tr('Create account')}</button>
+      <button class="linkbtn" type="button" data-au="back">${tr('Back to the login')}</button>
+    </form></div>`;
+  el.querySelector('#su-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const errEl = $('#su-err', el);
+    try {
+      const r = await fetch('/api/auth/signup', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'},
+        body: JSON.stringify({name: $('#su-name', el).value.trim(), email: $('#su-mail', el).value.trim(), lang: I18N.code || 'en', ...(pw ? {password: $('#su-pw', el).value} : {})})});
+      const res = await r.json().catch(() => ({}));
+      if (!r.ok) { errEl.textContent = res.error || tr('Error {0}', r.status); return; }
+      $('.card', el).innerHTML = `${logo}<h2 class="invh">${tr('Almost done')}</h2><p role="status">${esc(res.mail ? tr('If the address can be used, an e-mail with a link is on its way. Open it to choose your password.') : tr('Your account waits for an admin to approve it. You can log in once it is approved.'))}</p><button class="btn" type="button" data-au="back">${tr('Back to the login')}</button>`;
+    } catch { errEl.textContent = tr('Server not reachable.'); }
+  });
+  setTimeout(() => $('#su-name', el)?.focus(), 50);
+}
 // ---- Settings > Users > Whole server: sign-in (2FA policy, passkey login, OIDC)
 function signinHtml(hint) {
   const a = S.about || {}, o = a.oidc || {};
@@ -804,6 +861,7 @@ function signinHtml(hint) {
       <label class="wide"><input type="checkbox" id="s-2fareq" ${a.twofa_required ? 'checked' : ''}><span>${tr('Require two-factor authentication for built-in logins')}<small class="muted">${tr('Everyone who logs in with a password must set up an authenticator app or a passkey at the next login. Single sign-on logins (login proxy, OIDC) are not affected: there the login provider is responsible.')}</small></span></label>
       <label class="wide"><input type="checkbox" id="s-pklogin" ${a.passkey_login !== false ? 'checked' : ''}><span>${tr('Allow logging in with a passkey without the password')}<small class="muted">${tr('A passkey someone added in Settings > Account then also works on its own (the device asks for the fingerprint, face or PIN).')}</small></span></label>
     </div>
+    ${signupAdminHtml(a)}
     <h4 id="s-oidc-h">${tr('Login with an OIDC provider')}</h4>`;
   if (!o.configured) return h + hint(tr('Not configured yet. Log in with Authentik, Keycloak, Authelia, PocketID, Google, Microsoft Entra or any other OpenID Connect provider: fill in the provider below (or set the KALMIDO_OIDC_* variables) and register this redirect URI at the provider: {0}', `<code class="topic">${esc(o.redirect_uri || '')}</code>`)) + oidcForm(o, hint);
   const row = (l, v) => v ? `<div class="row"><label>${l}</label><code class="topic">${esc(v)}</code></div>` : '';
@@ -1013,6 +1071,8 @@ async function setupChoices(el, logo) {
   const pl = !!st.paperless?.configured;
   const all = [...SETUP_MAIN, ...SETUP_MODS].map(x => x[0]);
   let lang = I18N.code || 'en', preset = 'me', picked, custOpen = false, start = '';
+  const askOrg = st.about?.instance_mode === 'organisation' && !st.about?.org_name_env;  // 2.23.0 (#799): asked once
+  let orgName = st.me?.orgs?.[0] || '';
   const apply = k => { preset = k; picked = new Set(all.filter(x => !SETUP_PRESETS[k].off.includes(x))); };
   apply('me');
   // 2.13.2 (#478 F12): step 2 shown again after a reload (setup still pending) starts from what is on now, not from
@@ -1030,6 +1090,7 @@ async function setupChoices(el, logo) {
   const draw = () => {
     el.innerHTML = `<div class="card setupcard">${logo}
       <div class="seg" id="su-lang">${langs.map(L => `<button type="button" data-su-lang="${esc(L.code)}" class="${L.code === lang ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div>
+      ${askOrg ? `<h3><label for="su-org">${tr('Name of your organisation')}</label></h3><input id="su-org" class="suorg" maxlength="60" value="${esc(orgName)}" placeholder="${esc(tr('e.g. your company or family name'))}"><p class="muted">${tr('Shown next to the app name and in invitations; set once here (later only in the server configuration).')}</p>` : ''}
       <h3>${tr('What do you use Kalmido for?')}</h3>
       <p class="muted">${tr('Pick a start, untick what you do not need. Everything can be changed later in Settings.')}</p>
       <div class="supresets">${Object.entries(SETUP_PRESETS).map(([k, p]) => `<button type="button" class="supreset ${matches(k) ? 'on' : ''}" data-su-preset="${k}" aria-pressed="${matches(k)}"><b>${ic(p.icon, 's')}${tr(p.name)}</b><small class="muted">${tr(p.desc)}</small></button>`).join('')}</div>
@@ -1044,6 +1105,7 @@ async function setupChoices(el, logo) {
     $('.sucust', el)?.addEventListener('toggle', e => { custOpen = e.target.open; });
   };
   draw();
+  el.addEventListener('input', e => { if (e.target.id === 'su-org') orgName = e.target.value; });
   el.addEventListener('change', e => {
     const c = e.target.closest('[data-use]'); if (!c) return;
     c.checked ? picked.add(c.dataset.use) : picked.delete(c.dataset.use);
@@ -1062,7 +1124,7 @@ async function setupChoices(el, logo) {
     }
     const post = async (url, body) => { const r = await fetch(url, {method: url.endsWith('settings') ? 'PATCH' : 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify(body)}); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || tr('Error {0}', r.status)); };
     try {
-      if (b.dataset.su === 'go') await post('/api/admin/setup', {lang, collab_all: picked.has('collab'), time_all: picked.has('time'), modules: SETUP_MODS.map(x => x[0]).filter(k => picked.has(k) || (k === 'paperless' && !pl)), sample: start === 'sample', ...(start && start !== 'sample' ? {project_type: start} : {}), ...(matches(preset) ? {purpose: preset} : {})});
+      if (b.dataset.su === 'go') await post('/api/admin/setup', {lang, collab_all: picked.has('collab'), time_all: picked.has('time'), modules: SETUP_MODS.map(x => x[0]).filter(k => picked.has(k) || (k === 'paperless' && !pl)), sample: start === 'sample', ...(start && start !== 'sample' ? {project_type: start} : {}), ...(matches(preset) ? {purpose: preset} : {}), ...(askOrg && orgName.trim() ? {org_name: orgName.trim()} : {})});
       else return;
       location.replace('/');
     } catch (err) { $('#su-err', el).textContent = err.message || tr('Server not reachable.'); }

@@ -199,6 +199,7 @@ const rxName = k => { const x = RX.find(y => y[0] === k); return x ? tr(x[2]) : 
 function reactHtml(c, ro) {
   if (!cmSocial(taskById(S.tl.id))) return '';  // #315: reactions are for people working together
   const rs = c.reactions || [];
+  if (S.me && c.user_id === S.me.id) ro = true;  // 2.23.0 (#823): no reactions on my own comment (the others' stay visible)
   const pill = r => {
     const mine = r.users.some(u => S.me && u.id === S.me.id), names = r.users.map(u => u.name).join(', ');
     return `<button class="rx ${mine ? 'on' : ''}" data-act="c-react" data-cid="${c.id}" data-e="${esc(r.emoji)}" title="${esc(`${names} · ${rxName(r.emoji)}`)}" aria-label="${esc(rxName(r.emoji) + ': ' + names)}" aria-pressed="${mine}" ${ro ? 'disabled' : ''}>${esc(rxEmoji(r.emoji))}<span class="rxn" data-act="c-react-who" data-cid="${c.id}" data-e="${esc(r.emoji)}">${r.count}</span></button>`;

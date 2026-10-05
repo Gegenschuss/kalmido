@@ -298,7 +298,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
         await ev(`(() => { chatOpen(${AG}); return 1; })()`); await sleep(1200);
         if (touch) await open('agents/' + AG);
         const rx = await ev(`(() => { const b = [...document.querySelectorAll('#chat-msgs .chrx .rx, #chat-msgs .chrxq .rx')].filter(e => e.offsetWidth); return b.length; })()`);
-        check(rx >= 3, `${vw}px: chat reactions shown (${rx})`);
+        check(rx >= 1, `${vw}px: chat reactions shown (2.23.0: the smiley of the agent's message; ${rx})`);
         if (touch) {
           const small = await ev(SMALL('#chat-msgs .chrx .rx, #chat-msgs .chrxq .rx'));
           check(!small.length, `${vw}px: chat reactions >= 44 px: ${JSON.stringify(small)}`);

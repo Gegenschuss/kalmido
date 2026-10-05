@@ -191,6 +191,9 @@ function newsText(it, U) {
     case 'newtask': return tr('{0} added a task', who);
     case 'errreport': return d.title ? tr('New error reported: {0}', q(d.title)) : tr('A new error was reported');  // 2.18.0
     case 'approval': return tr('{0} is waiting for your approval', who);
+    case 'apdecide': return {approved: tr('{0} approved {1}', who, q(it.task_title || '')), changes: tr('{0} asks for changes to {1}', who, q(it.task_title || '')),
+      rejected: tr('{0} rejected {1}', who, q(it.task_title || ''))}[d.state] || tr('{0} decided on your approval request', who);  // 2.23.0 (#463)
+    case 'signup': return tr('{0} registered and waits for your approval', q(d.name || d.username || ''));  // 2.23.0 (#711)
     case 'followup': return d.note ? tr('Follow up today: waiting on {0}', q(d.note)) : tr('Follow up today: the task is waiting on external');
     case 'usage': return aiuNewsText(d);  // 2.1.1 (#326)
     case 'proposal': return tr('{0} has a proposal for you: {1}', who, q(d.title || ''));  // 2.3.0
@@ -200,7 +203,7 @@ function newsText(it, U) {
   }
   return tr('{0} changed something', who);
 }
-const NEWS_ICON = {mention: 'at', comment: 'comment', assign: 'user', unassign: 'user', take: 'check', complete: 'check', share: 'users', role: 'users', unshare: 'users', unblock: 'deps', status: 'pulse', newtask: 'plus', approval: 'bot', followup: 'hourglass', usage: 'chart', proposal: 'bot', errreport: 'bug'};
+const NEWS_ICON = {mention: 'at', comment: 'comment', assign: 'user', unassign: 'user', take: 'check', complete: 'check', share: 'users', role: 'users', unshare: 'users', unblock: 'deps', status: 'pulse', newtask: 'plus', approval: 'bot', followup: 'hourglass', usage: 'chart', proposal: 'bot', errreport: 'bug', apdecide: 'eye', signup: 'user'};
 function newsItemHtml(it, i, pop) {
   const U = S.nf.users;
   const many = (it.tasks || []).length > 1;  // 2.13.0 (#453 A5): an agent's comments on several tasks
@@ -317,7 +320,8 @@ async function newsOpen(i) {
   if (it.kind === 'evshare') { go('cal'); setTimeout(evCalsModal, 150); return; }
   if (it.kind === 'abshare') { go('contacts'); return; }
   if (it.kind === 'usage') { if (feat('agents') && agentsOn()) go('agents'); else settingsModal('usage'); return; }  // 2.1.1 (#326)
-  if (it.kind === 'approval' && !it.task_id && feat('agents') && agentsOn()) { go('agents'); return; }  // 2.15.0 (#479): an agent's request
+  if (it.kind === 'approval' && !it.task_id && feat('agents') && agentsOn()) { go('agents'); return; }
+  if (it.kind === 'signup') { settingsModal('users'); return; }  // 2.23.0 (#711): approve it under Users  // 2.15.0 (#479): an agent's request
   if (!it.task_id) { if (it.list_id && listById(it.list_id)) go('l/' + it.list_id); return; }
   if (!taskById(it.task_id)) {  // e.g. completed long ago: not in the state
     try { (S.extra ||= []).push(await rawFetch('GET', `/api/tasks/${it.task_id}`)); }
@@ -393,6 +397,8 @@ function actText0(a, U) {
     case 'blocks_rm': return d.hidden ? tr('{0} removed the task as a blocker of a task you cannot see', who) : tr('{0} removed the task as a blocker of {1}', who, q(d.title || ''));
     case 'unblocked': return d.hidden ? tr('{0} completed the last task this one was waiting on', who) : tr('{0} completed {1}, the task is no longer waiting', who, q(d.title || ''));
     case 'field': return d.v == null ? tr('{0} cleared the field {1}', who, q(d.name || '')) : tr('{0} set {1} to {2}', who, q(d.name || ''), q(actField(d)));
+    case 'apstate': return {pending: tr('{0} asked {1} for approval', who, q(uname(d.approver, U))), approved: tr('{0} approved the task', who), changes: tr('{0} asked for changes', who),
+      rejected: tr('{0} rejected the task', who), cancelled: tr('{0} withdrew the approval request', who)}[d.state] + (d.note ? ': ' + q(d.note) : '');  // 2.23.0 (#463)
     case 'approval': return d.ok ? tr('{0} approved the comment of {1}', who, q(uname(d.agent, U))) : tr('{0} rejected the comment of {1}', who, q(uname(d.agent, U)));
     case 'agent_job': return d.action === 'approve' ? tr('{0} approved the job {2} of {1}', who, q(uname(d.agent, U)), q(d.title || ''))
       : d.action === 'reject' ? tr('{0} rejected the job {2} of {1}', who, q(uname(d.agent, U)), q(d.title || '')) : tr('{0} stopped the job {2} of {1}', who, q(uname(d.agent, U)), q(d.title || ''));

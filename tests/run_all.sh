@@ -382,6 +382,12 @@ shard 7  # ---------------------------------------------------------------- shar
 # API v1 + OpenAPI; then the UI in jsdom and Firefox (390 / Fold 690 touch, 1440 mouse, axe) and the ride-alongs #678-#692
        run p2220_api "$PY" p2220_api_test.py "$KALMIDO_TEST_DATA"
        run p2220_ui node p2220_ui.js "$KALMIDO_TEST_DATA"
+# 2.23.0 package "Team, family, clients" (#463) + #711 #444 #794 #795 #799: clients (organisation only, rates, budget, estimate
+# vs. actual, timesheet), workload, approvals, forms -> tasks, sign-in links, self-registration, the agent event task_added,
+# the kind of instance (restarts of the container with KALMIDO_INSTANCE_MODE); then the UI in jsdom and Firefox (390 / Fold 690
+# touch, 1440 mouse, axe, the sidebar folder gaps of #794)
+       run p2230_api "$PY" p2230_api_test.py "$KALMIDO_TEST_DATA"
+       run p2230_ui node p2230_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

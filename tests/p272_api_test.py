@@ -260,7 +260,7 @@ check(Ca.post(B + f"/api/agents/{BB}/chat/{am['id']}/reactions", json={"emoji": 
 # Bob reacting on his own message: no event, no approval
 n0 = len(requests.get(V + "/agent/events", headers=tok_h(TB), params={"since": seq}).json()["data"])
 r = Bo.post(B + f"/api/agents/{BB}/chat/{mid}/reactions", json={"emoji": "up"})
-check(r.ok and r.json()["approval"] is None, "a reaction on my own message is no approval")
+check(r.status_code == 400, "a reaction on my own message is no approval (2.23.0, #823: refused)")
 # the agent reacts: stored, never an approval, no event
 r = requests.post(V + f"/agent/chats/{ids['bob']}/messages/{mid}/reactions", headers=tok_h(TB), json={"emoji": "up"})
 check(r.ok and r.json()["approval"] is None and any(u["id"] == BB for x in r.json()["reactions"] for u in x["users"]), f"the agent reacts: {r.text[:200]}")

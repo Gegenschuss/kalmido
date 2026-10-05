@@ -765,6 +765,25 @@ priority than the router with the forward-auth middleware, pointing at the app p
 
 Requests to `/api/v1/` without a token then still get the login page of your proxy.
 
+## Clients, workload, approvals, forms (2.23.0)
+
+Modules `clients`, `workload`, `forms` (per person, 409 while off); everything within the token user's organisation.
+`GET /clients` (`?month=YYYY-MM`, `?archived=1`) returns the clients with `lists`, `stats` (`seconds`, `amount`,
+`month_seconds`, `month_amount`, `estimate_min`) and `budget` (`pct_h`, `pct_amount`, `level`: ok / warn / over);
+`GET /clients/{id}` adds `per_list` (estimate vs. actual). `POST /clients`, `PATCH|DELETE /clients/{id}` (`structure`).
+A list's client: `PATCH /lists/{id}` `{client_id}`. The timesheet of a client is the time report of its lists:
+`GET /time/entries?lists=1,2&from=&to=` (web) or `/api/time/export.csv`.
+
+`GET /workload?start=&weeks=&org=`: per person and week `minutes` (sum of the tasks' `duration`), `tasks`,
+`unestimated`, `pct` of `capacity_h`, `level`; `nodate` for tasks without a date.
+
+`POST /tasks/{id}/approval` (`tasks:write`): `{action: request, approver_id, note?}` / `{action: cancel}`; the approver
+(a person in the app) decides with `approve`, `changes` or `reject`. Tasks carry `approval` (`pending | approved |
+changes | rejected | null`) and `approver_id`.
+
+`GET|POST /lists/{id}/forms`, `PATCH|DELETE /forms/{id}` (`structure`; owner / list admins): a form's `url`, `access`
+(`org` | `public`), `enabled`, `count`; `regenerate: true` makes a new link.
+
 ## Home & life (2.22.0)
 
 The seven modules of *Home & life* (contracts, home, care, health, review, travel, reading) are switched on per person;

@@ -189,6 +189,8 @@ def mail_import(c, raw):
         tid = c.execute("INSERT INTO tasks(list_id,title,content,sort,created_at,updated_at,tt_id,created_by,url) VALUES(?,?,?,?,?,?,?,?,?)",
                         (lid, title[:300], content, srt, ts, ts, "mail:" + mid, uid, url if valid_url(url) else None)).lastrowid
         log_act(c, tid, "created", uid=uid)
+        from ..agents.core import agent_added_events
+        agent_added_events(c, tid, source="mail")  # 2.23.0 (#795)
     else:
         tid = new_inbox_task(c, uid, title, content, "mail:" + mid, url)
     for name, mime, data in files[:20]:

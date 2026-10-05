@@ -126,6 +126,7 @@ const key = (w, el, k) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: 
     await ev(`(() => { closePalette(); return 1; })()`);
     // the chat "+" with a real tap
     await o.nav(B + '#agents/' + AG); await ready(ev); await sleep(800);
+    await ev(`(() => { document.querySelector('#chat-msgs .cmsg[data-mid="${q1.id}"] .rxrow .rxtog')?.click(); return 1; })()`); await sleep(300);  // 2.23.0 (#823): behind the smiley
     const pb = await ev(`(() => { const e = document.querySelector('#chat-msgs .cmsg[data-mid="${q1.id}"] .rxrow [data-act="rx-more"]'); e.scrollIntoView({block: 'center'}); const r = e.getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height}; })()`);
     check(pb.w >= 43.5 && pb.h >= 43.5, `${tag}: "+" is a 44 px target ` + JSON.stringify(pb));
     await tap(pb.x, pb.y);

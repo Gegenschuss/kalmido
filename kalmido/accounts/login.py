@@ -44,7 +44,13 @@ def auth_info():
                    auth_error=g.auth_error, login=g.proxy_login or proxy_login_value(),
                    oidc={"label": oidc_cfg(c)["label"]} if oidc_cfg(c)["on"] else None, passkey_login=gsetting(c, "passkey_login") != "0",
                    login_errors={k: tr(v) for k, v in OIDC_ERRORS.items()} if oidc_cfg(c)["on"] else {},
-                   org=_org_label(c))  # 2.22.0 (#752): the instance's organisation (only when there is exactly one)
+                   org=_org_label(c),  # 2.22.0 (#752): the instance's organisation (only when there is exactly one)
+                   signup=_signup_info(c))  # 2.23.0 (#711): registration on the login page (None = off)
+
+
+def _signup_info(c):
+    from ..accounts.signup import signup_info
+    return signup_info(c)
 
 
 def _org_label(c):
@@ -81,6 +87,9 @@ def auth_login():
     # exactly one hash check on every path (unknown user / no password: a real hash of the same kind)
     pw_ok = check_password_hash(u["password_hash"] if u and u["password_hash"] else _DUMMY_HASH, pw)
     ok = bool(u and u["password_hash"] and not u["disabled"] and pw_ok and not is_agent(u))
+    if not ok and u and pw_ok and u["password_hash"] and u["disabled"] and u["signup"] == "pending":
+        # 2.23.0 (#711): the right password of a registration that waits for an admin (says nothing to anyone else)
+        return err(tr("Your account waits for an admin to approve it.", lg=_accept_lang(lang())), 403)
     if not ok:
         # admin alerts: only real usernames are named (a typo in the name field could be a password)
         for k in _rate_fail(keys):

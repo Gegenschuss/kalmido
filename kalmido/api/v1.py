@@ -332,7 +332,10 @@ def task_core(r, tags, fields):
             "family": (_jparse(r["fam"]) or None) if "fam" in r.keys() else None,
             "rotation": (_jparse(r["rotation"]) or None) if "rotation" in r.keys() else None,
             "stars": r["stars"] if "stars" in r.keys() else None,
-            "people": list(r["people"]) if "people" in r.keys() else []}
+            "people": list(r["people"]) if "people" in r.keys() else [],
+            # 2.23.0 (#463): an approval: pending | approved | changes | rejected (null = none) and who decides
+            "approval": (r["approval"] or None) if "approval" in r.keys() else None,
+            "approver_id": r["approver_id"] if "approval" in r.keys() and r["approval"] else None}
 
 
 def waiting_of(r):
@@ -451,7 +454,8 @@ def v1_list(d):
             "columns": d.get("columns"),  # 2.14.0 (#425): the list's columns (null = default)
             "project_type": d.get("ptype") or None,  # 2.18.0 (#408): agency | software | private, null = none
             "family": d.get("family") or None,  # 2.19.0 (#653): shopping | meals | birthdays | household | packing, null = none
-            "life": d.get("life") or None, "trip": d.get("trip") or None}  # 2.22.0 (#663): contracts | home | health | travel | reading
+            "life": d.get("life") or None, "trip": d.get("trip") or None,
+            "client_id": d.get("client_id")}  # 2.22.0 (#663): contracts | home | health | travel | reading
 
 
 # ---- token management (Settings > Account > API tokens; session / proxy login only, a token cannot reach these)
@@ -711,7 +715,8 @@ def v1_list_patch(lid):
     v1_args(())
     b = v1_json()
     unknown = sorted(k for k in b if k not in ("name", "color", "folder", "view", "kind", "nag", "day_hours", "done_at_bottom", "checklist",
-                                               "listen_agent_ids", "columns", "archived", "project_type", "family", "life", "trip"))
+                                               "listen_agent_ids", "columns", "archived", "project_type", "family", "life", "trip",
+                                               "client_id"))
     if unknown:
         raise UnknownFields(unknown)
     if "family" in b and b["family"] is None:  # 2.19.0 (#653): null = an ordinary list

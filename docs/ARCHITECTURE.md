@@ -171,6 +171,12 @@ The most used helpers:
 | `life/karakeep.py` | Home & life: "Read later" from Karakeep (a person's own connection, sealed API key, bookmarks -> tasks, archive back). |
 | `life/web.py` | Home & life: the web API (overview, contracts, devices, upkeep, health, trips, review + journal, staying in touch, Karakeep). |
 | `life/v1.py` | Home & life: the REST API v1 (+ MCP) and its OpenAPI part (health + journal: scope "private"). |
+| `team/clients.py` | Clients (module "clients"): clients of an organisation above the lists, hours, budget, estimate vs. actual. |
+| `team/workload.py` | Workload (module "workload"): planned hours per person and week against their capacity. |
+| `team/approvals.py` | Approvals as a step of a task: request, approve / changes / reject, withdraw. |
+| `team/forms.py` | Forms (module "forms"): a link whose page (/f/<token>) creates a task in a list. |
+| `team/v1.py` | Clients, workload, approvals, forms: the REST API v1 (+ MCP) and its OpenAPI part. |
+| `accounts/signup.py` | Self-registration on the login page and sign-in links (QR) for people without e-mail. |
 | `startup.py` | Start-up: init_db() and the background threads (watchdog, update check, calendars, backups, webhooks, mail, git). |
 
 ### Adding a route
@@ -254,6 +260,7 @@ registering the ones of its area.
 | `family.js` | The module "Family". |
 | `calevents.js` | Events (module "events"): the editor and popover, the agenda, creating in the week grid, calendars, the phone setup. |
 | `contacts.js` | Contacts (module "contacts"): the view, the editor, the card, links between contacts and tasks, import / export. |
+| `clients.js` | Clients, the workload view, approvals in the task panel, forms of a list, sign-in links with a QR code. |
 | `life.js` | Home & life: the view, its dialogs (contract, device, upkeep, health, trip, Karakeep), the review + journal, staying in touch on a contact's card. |
 | `main.js` | Start-up: loading the state, polling, the service worker. Loaded last. |
 
@@ -286,3 +293,8 @@ everyone. The modes match the two ways Kalmido is run:
 A new account joins the instance's first organisation (or the ones the admin picks); on the update to 2.22 one
 organisation named after the instance's domain was created with every existing account.
 
+
+2.23.0 (#799): the kind of instance is configuration (`KALMIDO_INSTANCE_MODE`, `instance_mode()` in `accounts/orgs.py`):
+`organisation` (one organisation, every account in it, synced at start by `instance_sync`), `shared` (no organisations,
+visibility fixed to "own contacts") or, without the variable on an instance that kept several organisations, `multi`.
+The app never creates or deletes organisations; `user_orgs()` / `vis_mode()` answer by the mode.

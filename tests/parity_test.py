@@ -185,6 +185,11 @@ APP_TO_API = {
     "POST /api/life/trips": ["POST /life/trips"], "GET /api/life/review": ["GET /life/review"], "PUT /api/life/journal/{}": ["PUT /life/journal/{}"],
     "PUT /api/contacts/{}/care": ["PUT /contacts/{}/care"], "POST /api/life/karakeep/sync": ["POST /life/karakeep/sync"],
     "POST /api/tasks/{}/typing": ["POST /tasks/{}/typing"],  # 2.22.0 (#693)
+    # 2.23.0 (#463): clients, workload, approvals, forms
+    "GET /api/clients": ["GET /clients"], "POST /api/clients": ["POST /clients"], "GET /api/clients/{}": ["GET /clients/{}"],
+    "PATCH /api/clients/{}": ["PATCH /clients/{}"], "DELETE /api/clients/{}": ["DELETE /clients/{}"], "GET /api/workload": ["GET /workload"],
+    "POST /api/tasks/{}/approval": ["POST /tasks/{}/approval"], "GET /api/lists/{}/forms": ["GET /lists/{}/forms"],
+    "POST /api/lists/{}/forms": ["POST /lists/{}/forms"], "PATCH /api/forms/{}": ["PATCH /forms/{}"], "DELETE /api/forms/{}": ["DELETE /forms/{}"],
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
@@ -224,6 +229,8 @@ APP_ONLY = [
      ("* /api/folders/people",)),
     ("2.22.0 (#663): the Karakeep connection: its API key is entered by the person (like Paperless); the sync is in the API",
      ("=GET /api/life/karakeep", "=PUT /api/life/karakeep", "=DELETE /api/life/karakeep", "GET /api/life/karakeep/lists")),
+    ("2.23.0 (#463): a person's hours per week (their own setting / an admin's) and a QR code image for the screen",
+     ("PUT /api/workload/capacity/", "POST /api/qr")),
 ]
 
 

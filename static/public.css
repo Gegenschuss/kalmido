@@ -53,3 +53,14 @@ footer{max-width:40rem;margin:0 auto;padding:0 1rem 2rem;color:var(--muted);font
 .heron .hr-sun{fill:var(--accent);stroke:none}
 .msg .btn{display:inline-flex;align-items:center;min-height:2.75rem;padding:0 1.25rem;border-radius:.5rem;background:var(--accent);color:var(--ink);font-weight:600;text-decoration:none}
 .msg .btn:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+/* 2.23.0 (#463): forms (/f/<token>): label + field per line, the honeypot hidden, the send button */
+.intro{color:var(--text2);margin:0 0 1rem}
+.intro p{margin:.25rem 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.fform{display:flex;flex-direction:column;gap:.375rem}
+.fform label{font-size:.8125rem;color:var(--muted);margin-top:.5rem}
+.fform input,.fform textarea{background:var(--bg3);border:1px solid var(--line2);border-radius:.375rem;padding:.625rem .75rem;color:var(--text);font:inherit;width:100%;min-height:2.75rem}
+.fform textarea{resize:vertical}
+.fform input:focus-visible,.fform textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.fform button{margin-top:1rem;align-self:flex-start;background:var(--accent);color:var(--ink);border:0;border-radius:.5rem;padding:0 1.25rem;min-height:2.75rem;font:inherit;font-weight:600;cursor:pointer}
+.fform button:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+.hp{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}

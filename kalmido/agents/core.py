@@ -53,7 +53,8 @@ AGENT_EVENTS = ("mention", "comment", "assigned", "unassigned", "chat", "reactio
                 "followup_due",  # 2.1.0 (#335): the follow-up day of a task waiting on external
                 "job_request",   # 2.3.0 (#260-#263): a person asks for a proposal
                 "runtime_changed", "reset",  # 2.4.1 (#377): an admin changed its runtime settings / pressed "Reset now"
-                "team_message")  # 2.17.0 (#419): someone @mentioned the agent in a list's team chat
+                "team_message",  # 2.17.0 (#419): someone @mentioned the agent in a list's team chat
+                "task_added")  # 2.23.0 (#795): a task was created in / moved into a list shared with the agent
 JOB_STATES = ("running", "waiting", "done", "failed", "stopped")
 JOB_ACTIONS = ("approve", "reject", "stop")
 REACTIONS = ("up", "down", "heart")   # the fixed set; any other single emoji is stored as itself
@@ -336,6 +337,27 @@ def tidy_agent_of(c, lid, cands=None):
     if r and r[0] in cands:
         return r[0]
     return cands[0] if cands else None
+
+
+def agent_added_events(c, tid, from_lid=None, source=None):
+    """2.23.0 (#795): a top-level task was created in (from_lid None) or moved into (from_lid = the list it came from) a list:
+    'task_added' to every agent of that list that sees the task (the agent's own actions excluded by agent_emit). moved_from
+    {id, name} only when the agent may see the list it came from; source: 'form' / 'mail' / 'errors' / 'capture' ..."""
+    ag = agent_ids(c)
+    if not ag:
+        return
+    t = c.execute("SELECT id, list_id, parent_id, deleted_at FROM tasks WHERE id=?", (tid,)).fetchone()
+    if not t or t["parent_id"] or t["deleted_at"] or t["list_id"] == from_lid:
+        return
+    for aid in list_agents(c, t["list_id"]):
+        if not task_visible(c, tid, aid, full=True):
+            continue
+        extra = {"how": "moved" if from_lid else "created"}
+        if from_lid and list_role(c, from_lid, aid):
+            extra["moved_from"] = {"id": from_lid, "name": lst_brief(c, from_lid)["name"]}
+        if source:
+            extra["source"] = source
+        agent_emit(c, aid, "task_added", agent_task_data(c, tid, aid, **extra))
 
 
 def agent_tidy_events(c, tid):

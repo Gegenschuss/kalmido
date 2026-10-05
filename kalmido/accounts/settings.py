@@ -53,6 +53,16 @@ def clean_setting(k, v):
         return sv
     if k == "default_reminder":
         return clean_reminders(sv)
+    if k == "capacity_h":  # 2.23.0 (#463): working hours per week ('' = the default: 5 x the hours per day)
+        if sv == "":
+            return ""
+        try:
+            x = float(sv.replace(",", "."))
+        except ValueError:
+            raise bad from None
+        if not math.isfinite(x) or not 0 <= x <= 168:
+            raise bad
+        return str(round(x, 2))
     if k in ("quiet_from", "quiet_to"):  # 2.7.0 (#413)
         if sv and not valid_hm(sv):
             raise bad

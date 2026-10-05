@@ -512,8 +512,10 @@ check(len(j["orgs"]) == 1 and j["orgs"][0]["name"] == "Kalmido" and j["visibilit
       "#752: one organisation from the start (named after the domain), everyone in it, visibility org " + json.dumps(j)[:200])
 O1 = j["orgs"][0]["id"]
 check(A.get(B + "/api/auth/info").json()["org"] == "Kalmido" and A.get(B + "/api/state").json()["me"]["orgs"] == ["Kalmido"], "#752: the name on the login page and in the state")
-r = A.post(B + "/api/admin/orgs", json={"name": "Other Co", "icon": "🏭"})
-O2 = r.json()["id"]
+# 2.23.0 (#799): organisations are no longer created in the app: a second one is set up in the database (an instance that
+# kept several from 2.22 = "multi", where members and visibility stay editable)
+check(A.post(B + "/api/admin/orgs", json={"name": "Other Co", "icon": "🏭"}).status_code == 403, "#799: no new organisation in the app")
+O2 = dbx("INSERT INTO orgs(name,icon,created_at) VALUES('Other Co','🏭','2026-10-05T00:00:00Z') RETURNING id")[0][0]
 ZOE = A.post(B + "/api/users", json={"username": "zoe", "display_name": "Zoe", "password": "password123", "orgs": [O2], "email": "zoe@other.test"}).json()["id"]
 Zo = sess("zoe")
 check(set(next(u for u in A.get(B + "/api/users").json()["users"] if u["id"] == ZOE)["orgs"]) == {O2}, "#752: a new person in the chosen organisation")

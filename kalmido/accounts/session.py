@@ -56,7 +56,7 @@ def client_ip():
 
 
 def _is_open(path, method):
-    return path in OPEN_PATHS or path.startswith(("/static/", ICAL_PREFIX, PUB_PREFIX)) or (path in ("/share", "/capture") and method == "GET")  # 2.4.0: /capture (#187)
+    return path in OPEN_PATHS or path.startswith(("/static/", ICAL_PREFIX, PUB_PREFIX, "/f/")) or (path in ("/share", "/capture") and method == "GET")  # 2.4.0: /capture (#187)
 
 
 def rate_ip():
