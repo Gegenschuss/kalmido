@@ -106,6 +106,8 @@ def grp_sync(c, lids, actor=None):
             if r is None:
                 c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,grole,sort,added_at) VALUES(?,?,?,?,?,?,?)",
                           (lid, uid, eff, None, gr, my_max_sort(c, uid) + 1, iso(now_utc())))
+                from ..lists.lists import member_folder_adopt  # 2.22.0 (#740)
+                member_folder_adopt(c, lid, uid)
                 news_add(c, uid, "share", list_id=lid, actor=actor,
                          data={"role": eff, "name": lr["name"], "group": grp_name(c, gname.get(uid))})
                 wh_note_list(lid, "list.shared", {"member_id": uid, "role": eff, "group_id": gname.get(uid)})

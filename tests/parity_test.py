@@ -179,6 +179,12 @@ APP_TO_API = {
     "GET /api/books/{}/export.vcf": ["GET /address-books/{}/export"], "GET /api/contacts": ["GET /contacts"], "POST /api/contacts": ["POST /contacts"],
     "GET /api/contacts/{}": ["GET /contacts/{}"], "PATCH /api/contacts/{}": ["PATCH /contacts/{}"], "DELETE /api/contacts/{}": ["DELETE /contacts/{}"],
     "POST /api/tasks/{}/contacts": ["POST /tasks/{}/contacts"], "DELETE /api/tasks/{}/contacts/{}": ["DELETE /tasks/{}/contacts/{}"],
+    # 2.22.0 (#663): Home & life
+    "GET /api/life": ["GET /life"], "GET /api/life/upkeep-presets": ["GET /life/upkeep-presets"], "POST /api/life/contracts": ["POST /life/contracts"],
+    "POST /api/life/devices": ["POST /life/devices"], "POST /api/life/upkeep": ["POST /life/upkeep"], "POST /api/life/health": ["POST /life/health"],
+    "POST /api/life/trips": ["POST /life/trips"], "GET /api/life/review": ["GET /life/review"], "PUT /api/life/journal/{}": ["PUT /life/journal/{}"],
+    "PUT /api/contacts/{}/care": ["PUT /contacts/{}/care"], "POST /api/life/karakeep/sync": ["POST /life/karakeep/sync"],
+    "POST /api/tasks/{}/typing": ["POST /tasks/{}/typing"],  # 2.22.0 (#693)
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
@@ -214,6 +220,10 @@ APP_ONLY = [
         "POST /api/lists/{}/tags/promote", "GET /api/lists/{}/owner", "* /api/lists/{}/icon", "GET /api/list-icon/", "GET /api/avatar/",
         "GET /api/admin/lists/orphaned", "GET /api/lists/{}/owner")),
     ("folder shares with groups: people only (sharing of a list with a group: /lists/{id}/groups)", ("* /api/folders/groups",)),
+    ("2.22.0 (#740): sharing a whole folder with a person (and its future lists): people only; single lists: /lists/{id}/members",
+     ("* /api/folders/people",)),
+    ("2.22.0 (#663): the Karakeep connection: its API key is entered by the person (like Paperless); the sync is in the API",
+     ("=GET /api/life/karakeep", "=PUT /api/life/karakeep", "=DELETE /api/life/karakeep", "GET /api/life/karakeep/lists")),
 ]
 
 

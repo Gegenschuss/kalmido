@@ -162,7 +162,7 @@ const SET_SECS = [['account', 'user', N_('Account')], ['general', 'sliders', N_(
 // dialog header and each change is one step in the undo history ("Changed setting: …"). Text, number and time fields save
 // on blur or Enter (and after a short pause while typing); closing the dialog saves whatever is still pending.
 const SETS = {  // control id -> [setting key, label, kind]
-  's-celebrate': ['celebrate', N_('Celebrate completions'), 'chk'],
+  's-celebrate': ['celebrate', N_('Celebrate completions'), 'chk'], 's-tinbox': ['today_inbox', N_('Show the inbox in Today'), 'chk'],  // 2.22.0 (#681)
   's-hideblk': ['hide_blocked_today', N_('Hide tasks that are still waiting on another task'), 'chk'], 's-progsub': ['progress_subtasks', N_('Count subtasks too'), 'chk'],
   's-pushch': ['push_channel', N_('Channel'), 'sel'], 's-pushprio': ['push_priority', N_('How urgent'), 'sel'],
   's-allday': ['allday_time', N_('All-day reminder at'), 'time'], 's-defrem': ['default_reminder', N_('Default reminder'), 'sel'], 's-digest': ['digest_time', N_('Daily digest at'), 'time'],
@@ -176,7 +176,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-wfrom': ['work_start', N_('Working hours from'), 'time'], 's-wto': ['work_end', N_('Working hours until'), 'time'],  // 2.10.0 (#440)
   's-review': ['review_time', N_('Daily review at'), 'time'],
 };
-const SET_RENDER = ['features', 'nav_order', 'show_done_views', 'hide_blocked_today', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden'];
+const SET_RENDER = ['features', 'nav_order', 'show_done_views', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden'];
 function setVal(el, kind) {  // the value a control stands for; undefined = not valid (nothing is saved)
   const v = el.value;
   if (kind === 'chk') return el.checked ? '1' : '0';
@@ -266,7 +266,7 @@ async function setLang(code) {
 }
 // U04: the modules, grouped, each with one sentence; admins also get the switch for the whole server (collaboration, time)
 const MOD_GROUPS = [[N_('Views'), ['cal', 'timeline', 'kanban', 'matrix']], [N_('Calendar and people'), ['events', 'contacts']], [N_('For you'), ['habits', 'pomo', 'stats', 'comments']],
-  [N_('Projects and team'), ['collab', 'time', 'progress', 'deps', 'fields', 'agents']], [N_('At home'), ['family']], [N_('Connections'), ['paperless']]];
+  [N_('Projects and team'), ['collab', 'time', 'progress', 'deps', 'fields', 'agents']], [N_('At home'), ['family', 'contracts', 'home', 'care', 'health', 'review', 'travel', 'reading']], [N_('Connections'), ['paperless']]];
 const MOD_DESC = {cal: N_('Month, week and day view of your tasks'), timeline: N_('Tasks with start and end as bars over time'), kanban: N_('Lists as boards with columns'),
   matrix: N_('Urgent and important in four quadrants'), habits: N_('Daily and weekly habits with streaks'), pomo: N_('Focus timer and stopwatch'),
   stats: N_('Completions, on-time rate, focus time and streaks'), collab: N_('Share lists, assign tasks, @mentions, activity and News'),
@@ -276,7 +276,15 @@ const MOD_DESC = {cal: N_('Month, week and day view of your tasks'), timeline: N
   paperless: N_('Link documents from Paperless-ngx to tasks'),
   events: N_('Appointments in your own calendars next to the tasks, shared calendars, invitations, synced with the phone’s calendar'),
   contacts: N_('Your address books: contacts linked to tasks and events, birthdays, synced with the phone’s contacts'),
-  family: N_('Birthdays, household chores taking turns, shopping lists with shop areas, a meal plan, deadlines, packing lists and accounts for children')};
+  family: N_('Birthdays, household chores taking turns, shopping lists with shop areas, a meal plan, deadlines, packing lists and accounts for children'),
+  // 2.22.0 (#663): Home & life
+  contracts: N_('Contracts and subscriptions with their cost, notice period and a reminder before the last day to cancel'),
+  home: N_('Devices with their warranty and receipt, and upkeep that comes back: heating, smoke detectors, tyres'),
+  care: N_('Stay in touch with the people who matter: how often, the last time, a nudge when it has been too long (needs Contacts)'),
+  health: N_('Appointments, check-ups, vaccinations and medication reminders in a private list, never visible to agents'),
+  review: N_('Your day and week in review (done, still open, coming up) with a private journal'),
+  travel: N_('Trips as lists with dates, bookings, things to do before you leave and a packing list'),
+  reading: N_('A “Read later” list, filled from Karakeep if you like (bookmarks become tasks)')};
 function modulesHtml(hint) {
   const s = S.settings;
   const opt = (k, body) => k === 'pomo' ? `<details class="mopt"><summary>${tr('Focus settings')}</summary>
@@ -467,7 +475,10 @@ function settingsModal(focus) {
       ${hint(tr('Applies to all devices and to the notifications. Quick add understands English, German and the language chosen here.'))}
       <h4>${tr('Celebrations')}</h4>
       <div class="row"><label>${tr('Celebrations')}</label>${chk('s-celebrate', s.celebrate !== '0', tr('Celebrate completions'))}</div>
-      ${hint(tr('When Today is cleared or a list or project is complete, the heron swings by with a one-liner. With reduced motion (system setting) it just says hello.'))}
+      ${hint(tr('When Today is cleared or a list or project is complete, the heron flies by with a one-liner. With reduced motion (system setting) it just says hello.'))}
+      <h4 id="s-today-h">${tr('Today')}</h4>
+      <div class="row"><label>${tr('Inbox')}</label>${chk('s-tinbox', s.today_inbox === '1', tr('Show the inbox in Today'))}</div>
+      ${hint(tr('Tasks without a date that are still in the inbox get their own section under today’s tasks, with quick buttons to sort them; they count in Today’s number.'))}
       <h4 id="s-dates-h">${tr('Date and reminders')}</h4>
       <div class="row"><label>${tr('Changes')}</label>${chk('s-dateok', s.date_confirm === '1', tr('Confirm changes with OK'))}</div>
       ${hint(tr('Off: a new day, time, start, repeat or reminder is saved as soon as you pick it; “Undo” in the message takes the whole change back. On: changes wait for OK.'))}
@@ -535,7 +546,7 @@ function settingsModal(focus) {
       <div class="members" id="s-tpls"><div class="muted mhint">${tr('Loading…')}</div></div>
       ${sampleHtml(hint)}`,
     ai: aiPaneOn() ? aiHtml(hint, {agents: 'agents', agentdots: 'agents', usage: 'usage', activity: 'log'}[focus]) : '',  // 2.7.0 (#405 S2)
-    users: S.me?.is_admin ? usersHtml() + grpHtml() + orphHtml() + instanceHtml(chk, hint) + `<div id="s-signin">${signinHtml(hint)}</div>` + plaHtml() + bkHtml() + stoHtml() + aaHtml() : '',  // 1.9.0: users first
+    users: S.me?.is_admin ? usersHtml() + orgsHtml() + grpHtml() + orphHtml() + instanceHtml(chk, hint) + `<div id="s-signin">${signinHtml(hint)}</div>` + plaHtml() + bkHtml() + stoHtml() + aaHtml() : '',  // 1.9.0: users first
     help: `<h4>${tr('Getting started')}</h4>
       <div class="row"><button class="btn sm" data-m="tour">${ic('arrow', 's')} ${tr('Restart the welcome tour')}</button>${isMobile() ? '' : `<button class="btn sm" data-m="keys">${ic('help', 's')} ${tr('Keyboard shortcuts')} ${kb('?')}</button>`}<button class="btn sm" data-m="cele-try">${ic('check', 's')} ${tr('Show the celebration')}</button></div>
       ${isMobile() ? '' : `<div class="shelp">${tr('{0}: search and commands for everything (tasks, lists, views, settings). j / k move through the tasks, x completes, s snoozes, g t goes to Today.', kbText('Mod+K'))}</div>`}

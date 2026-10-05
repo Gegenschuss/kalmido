@@ -844,6 +844,9 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                  f"note?}}]}} (2.11.0: applying sets plan_start + duration, never due dates; task ids from input.tasks). At most {PROP_MAX_ITEMS} entries, {PROP_MAX_BYTES // 1024} KB."})},
         "/agent/chats": {"get": op("Chat messages after a cursor", AG, ok(ref("ChatPage")) | errs("400", "403"),
                                    [q("since", "Message id", {"type": "integer"}), q("user_id", "One person", {"type": "integer"}), q("limit", "At most 500", {"type": "integer"})])},
+        "/tasks/{id}/typing": {"post": op("2.22.0 (#693): \"<name> is writing …\" in the task's comments for 8 s (send it again while writing; "
+                                          "people and agents alike, before a comment answer)", AG, ok({"type": "object"}) | errs("404"),
+                                          [pid()], scope="comments")},
         "/agent/typing": {"post": op(f"Typing dots in one person's chat for {AGENT_TYPING_S} s (2.4.1)", AG, ok({"type": "object"}) | errs("400", "403", "404"),
                                      scope=W, body={"type": "object", "required": ["chat_user_id"], "properties": {"chat_user_id": {"type": "integer"}}})},
         "/agent/chats/{id}": {"post": {**op("Answer in the chat with a person. 2.13.1 (#465): as multipart/form-data with `file` (repeatable, "

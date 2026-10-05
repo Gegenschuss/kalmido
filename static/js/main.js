@@ -12,9 +12,12 @@ if (window.visualViewport) {
 }
 
 (async () => {
+  const inv = location.hash.match(/^#invite\/([A-Za-z0-9_-]{20,100})$/);  // 2.22.0 (#697): an invitation / reset link
+  if (inv) { await inviteScreen(inv[1]); return; }
   const i18nBoot = i18nLoad(uiLang());  // last used language (localStorage), in parallel with the state
   try { await load(); if (!S.lists.length) throw new Error('no state'); } catch (e) { if (e.message === 'auth') return; await i18nBoot; $('#view').innerHTML = heronEmpty(navigator.onLine === false ? 'offline' : 'error', tr('Server not reachable.'), tr('Reload the page once the server is reachable again.')).replace(/<\/div>$/, `<button type="button" class="btn pri" id="boot-retry">${ic('sync', 's')} ${tr('Try again')}</button></div>`); $('#boot-retry')?.addEventListener('click', () => location.reload()); return; }
   await i18nBoot; await i18nLoad(uiLang()); S.booted = true;
+  if (LS.get('after2fa', false)) { LS.set('after2fa', false); setTimeout(() => settingsModal('account'), 400); }  // 2.22.0 (#697)
   setTimeout(() => { if (document && !document.hidden) wpSweep(); }, 2500);  // 2.19.0 (#668): opening the app tidies the shade  // render in the server-side language
   // 2.13.0 (#453 A16): the first-run step 2 ("What do you want to use?") was not finished (tab reloaded / closed after the
   // admin account was created): it comes back until "Start" is pressed

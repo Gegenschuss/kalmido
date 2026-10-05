@@ -399,7 +399,7 @@ refused(make_zip({"tasks.db": src_db}, manifest={"format": "kalmido-backup", "fo
                                                   "files": [["tasks.db", len(src_db), "0" * 64]]}), "hash", "checksum mismatch")
 refused(make_zip({"tasks.db": src_db}, manifest={"format": "kalmido-backup", "format_version": 1, "app_version": "9.9.9", "schema_version": 2,
                                                   "files": [["tasks.db", len(src_db) - 1, hashlib.sha256(src_db).hexdigest()]]}), None, "size mismatch")
-refused(make_zip({"tasks.db": src_db, "attachments/1/zeros.bin": b"\0" * (4 * 1024 * 1024)}), "bomb", "zip bomb (ratio)")
+refused(make_zip({"tasks.db": src_db, "attachments/1/zeros.bin": b"\0" * (3 * 1024 * 1024)}), "bomb", "zip bomb (ratio)")  # 2.22.0: 3 MB (the bigger schema + 4 MB passed the 5 MB size limit first)
 refused(make_zip({"tasks.db": src_db, "attachments/1/big.bin": os.urandom(6 * 1024 * 1024)}), None, "larger than KALMIDO_BACKUP_MAX_MB")
 refused(make_zip({"tasks.db": src_db}, schema=99), "schema", "newer schema (manifest)")
 tmpdb = os.path.join(DATA, "t.db")

@@ -30,7 +30,7 @@ const form = (fields, files) => { const fd = new FormData(); for (const [k, v] o
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v(?:8[4-9]|9[0-9])'/.test(SW), 'service worker cache v84');
+  check(/const CACHE = 'tasks-shell-v(?:8[4-9]|9[0-9]|[1-9][0-9]{2})'/.test(SW), 'service worker cache v84');
   const MAN = await (await fetch(B + 'manifest.json')).json();
   check(MAN.share_target.params.files[0].accept.includes('application/pdf'), 'share target also accepts PDFs');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});

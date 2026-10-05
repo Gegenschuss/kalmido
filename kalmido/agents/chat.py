@@ -4,6 +4,7 @@ import mimetypes
 import os
 import re
 import uuid
+import threading
 import time
 from flask import g, jsonify, request
 
@@ -18,7 +19,7 @@ from ..tasks.attachments import safe_name, send_stored
 from ..collab.comments import user_names
 from ..personal.timetrack import BadInput, UnknownFields
 from ..notify.alerts import aa_count, aa_oserr
-from ..api.v1 import hit_limit, task_for
+from ..api.v1 import hit_limit, task_for, v1_args, v1_view
 from ..agents.core import (
     agent_active, agent_emit, AGENT_EVENT_COMMENT_CHARS, agent_public, agent_row, agent_task_data, agents_for,
     CHAT_KEEP, CHAT_MAX, is_agent, JOB_ACTIONS, job_dict, job_may_act, job_visible, list_agents, lst_brief,
@@ -532,3 +533,47 @@ def agent_wake(aid):
     seq = agent_emit(c, aid, "wake", data)
     c.commit()
     return jsonify(ok=bool(seq), agent_id=aid)
+
+
+# ---- 2.22.0 (#693): "<name> is writing …" in a task's comments, for people and agents alike (like the chat's typing). A
+# signal lasts TASK_TYPING_S seconds (send it again while writing); kept in memory only (one process, nothing to store).
+# Everyone who sees the task's comments learns it with their next GET /api/version (field ty), never their own signal.
+TASK_TYPING_S = 8
+_TTYPE, _TTYPE_LOCK = {}, threading.Lock()
+
+
+def task_typing_set(c, tid, uid):
+    need_task(c, tid, write=False, full=True)
+    now = time.time()
+    with _TTYPE_LOCK:
+        for k in [k for k, v in _TTYPE.items() if v <= now]:
+            _TTYPE.pop(k, None)
+        if len(_TTYPE) < 5000:
+            _TTYPE[(tid, uid)] = now + TASK_TYPING_S
+    return {"ok": True, "seconds": TASK_TYPING_S}
+
+
+def task_typing_for(c, uid):
+    """[{task_id, user_id, name}] of the signals in tasks uid may see fully (comments), without uid's own."""
+    now = time.time()
+    with _TTYPE_LOCK:
+        live = [(t, u) for (t, u), v in _TTYPE.items() if v > now and u != uid]
+    if not live:
+        return []
+    names = user_names(c, {u for _, u in live})
+    return [{"task_id": t, "user_id": u, "name": names.get(u, "?")} for t, u in live if task_visible(c, t, uid, full=True)][:50]
+
+
+@app.post("/api/tasks/<int:tid>/typing")
+def task_typing(tid):
+    """Says "I am writing a comment on this task" for TASK_TYPING_S seconds (also POST /api/v1/tasks/{id}/typing)."""
+    c = db()
+    return jsonify(task_typing_set(c, tid, me()))
+
+
+@app.post("/api/v1/tasks/<int:tid>/typing")
+@v1_view
+def v1_task_typing(tid):
+    v1_args(())
+    c = db()
+    return jsonify(task_typing_set(c, tid, me()))

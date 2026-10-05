@@ -9,7 +9,7 @@ from ..core.db import db, gsetting, inbox_names, iso, local_now, now_utc, usetti
 from ..accounts.session import me, user_public
 from ..accounts.pictures import avatar_map, list_icon_url
 from ..core.access import (
-    _members_on, collab_all, Denied, need_task, plists, time_all, tvis, vis_sql, wr_sql, WRITE_ROLES,
+    _members_on, collab_all, Denied, health_hidden, need_task, plists, time_all, tvis, vis_sql, wr_sql, WRITE_ROLES,
 )
 from ..core.serializers import load_tasks, running_pomo
 from ..core.pages import inbox_user
@@ -17,6 +17,24 @@ from ..core.instance import about_info
 
 
 # ---------------------------------------------------------------- state
+
+def _vis_mode(c):  # 2.22.0 (#752)
+    from ..accounts.orgs import vis_mode
+    return vis_mode(c)
+
+
+def _org_names(c, uid):  # 2.22.0 (#752)
+    from ..accounts.orgs import org_names
+    return org_names(c, uid)
+
+
+def _jtrip(v):
+    try:
+        t = json.loads(v) if v else None
+    except ValueError:
+        return None
+    return t if isinstance(t, dict) else None
+
 
 def visible_lists(c, uid):
     """Lists the user sees, with role, sharing info and the user's own folder / sort / view."""
@@ -31,6 +49,8 @@ def visible_lists(c, uid):
     rows = c.execute(f"""SELECT l.*, m.role AS m_role, m.folder AS m_folder, m.sort AS m_sort, m.view AS m_view
                         FROM lists l LEFT JOIN list_members m ON m.list_id=l.id AND m.user_id=?
                         WHERE l.owner_id=? OR (m.user_id IS NOT NULL{_members_on()})""", (uid, uid)).fetchall()
+    if health_hidden(c, uid):  # 2.22.0 (#663): health lists stay private (agents, tokens without the scope "private")
+        rows = [r for r in rows if r["life"] != "health"]
     ids = [r["id"] for r in rows]
     members, names = {}, {}
     if ids and collab_all():
@@ -94,6 +114,7 @@ def visible_lists(c, uid):
         d["listen_agent_ids"] = listen_ids(r["agent_listen"], r["agent_tidy"], d["tidy_agent_id"], lag)
         d.pop("agent_listen", None)
         d["columns"] = columns_out(r["col_cfg"], lfids.get(r["id"], set()))  # 2.14.0 (#425)
+        d["trip"] = _jtrip(r["trip"])  # 2.22.0 (#663): {from, to, where} of a trip list, else null
         d.pop("col_cfg", None)
         out.append(d)
     out.sort(key=lambda d: (-d["is_inbox"], d["sort"], d["id"]))
@@ -159,7 +180,7 @@ def state():
     u = g.user
     return jsonify(
         v=int(gsetting(c, "version")),
-        me={**user_public(u), "is_admin": bool(u["is_admin"]), "auth": g.auth_via, "has_password": bool(u["password_hash"]),
+        me={**user_public(u), "orgs": _org_names(c, u["id"]), "is_admin": bool(u["is_admin"]), "auth": g.auth_via, "has_password": bool(u["password_hash"]),
             "ntfy_inbox": bool(NTFY_IN["token"]) and inbox_user(c) == uid},
         setup_pending=bool(u["is_admin"]) and gsetting(c, "setup_step2") == "pending",  # 2.13.0 (#453 A16)
         lists=visible_lists(c, uid),
@@ -209,6 +230,7 @@ def state():
         dayplan=dayplan_state(c, uid),  # 2.10.0 (#440): working hours, review card
         kids=kids_for(c, uid),  # 2.19.0 (#653): the kids I look after (or me, a kid) with stars + rewards
         kid_ids=[r[0] for r in c.execute("SELECT id FROM users WHERE kid=1 AND disabled=0")],  # 2.19.0: who gets stars
+        people_visibility=_vis_mode(c),  # 2.22.0 (#752): all | org | contacts
         # 2.21.0 (#659 / #658): event calendars, a change marker of the events I see (the views refetch their range), the
         # events that tasks prepare; address books and the contacts linked to tasks
         evcals=cals_for(c, uid) if events_on(c, uid) else [],

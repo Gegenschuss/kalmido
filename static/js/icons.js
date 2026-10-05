@@ -125,6 +125,12 @@ const P = {
   gift: icPath('M3 8H17V11H3ZM4.5 11V17H15.5V11M10 8V17M10 8C8.5 4.5 5.5 4.5 6 7M10 8C11.5 4.5 14.5 4.5 14 7'),
   meal: icPath('M4 9.5H16V12A4 4 0 0 1 12 16H8A4 4 0 0 1 4 12ZM2.5 9.5H17.5M7.5 6.5V5M12.5 6.5V5') + icDot(10, 4.5, 1.6),
   bag: icPath('M3 7H17V16.5H3ZM7.5 7V4.5H12.5V7M7 7V16.5M13 7V16.5'),
+  // 2.22.0 (#663): Home & life
+  heart: icPath('M10 16.5C5 13 2.5 10.5 2.5 7.5A3.5 3.5 0 0 1 10 5.5A3.5 3.5 0 0 1 17.5 7.5C17.5 10.5 15 13 10 16.5Z') + icDot(13.5, 7.5, 1.4),
+  plane: icPath('M2.5 11.5L17.5 5.5L14 16L10.5 12.5L7.5 15.5V11.5ZM10.5 12.5L17.5 5.5') + icDot(4.5, 5, 1.4),
+  book: icPath('M10 5.5C8 4 5.5 3.5 3 4V15.5C5.5 15 8 15.5 10 17C12 15.5 14.5 15 17 15.5V4C14.5 3.5 12 4 10 5.5ZM10 5.5V17') + icDot(13.5, 8, 1.4),
+  tool: icPath('M12.5 3A4 4 0 0 0 9 8.5L3 14.5A1.8 1.8 0 0 0 5.5 17L11.5 11A4 4 0 0 0 17 7.5L14.5 10L11.5 9.5L10.5 6.5L13 4Z') + icDot(4.6, 15.4, 1.1),
+  journal: icPath('M5 3H14A2 2 0 0 1 16 5V17H6A2 2 0 0 1 4 15V4A1 1 0 0 1 5 3ZM4 15A2 2 0 0 1 6 13H16M8 7H12') + icDot(10, 10, 1.3),
   turns: icPath('M4.5 10A5.5 5.5 0 0 1 14.5 6.5M15.5 10A5.5 5.5 0 0 1 5.5 13.5M12.5 4L14.5 6.5L12 8.5M7.5 16L5.5 13.5L8 11.5') + icDot(10, 10, 1.6),
 };
 const ic = (n, c = '') => `<svg class="i ${c}" viewBox="0 0 20 20" aria-hidden="true">${P[n] || ''}</svg>`;
@@ -203,7 +209,7 @@ function infoize(root) {
     let a = null;
     for (let p = h.previousElementSibling, n = 0; p && n < 3 && !a; p = p.previousElementSibling, n++) {
       if (p.matches('h2, h3, h4, label, legend, .shead')) a = p;
-      else if (p.matches('.row, .srow, .lrow')) a = p.querySelector(':scope > label, :scope > b, :scope > span:first-child');
+      else if (p.matches('.row, .srow, .lrow')) a = p.querySelector(':scope > label, :scope > b, :scope > span:first-child:not([aria-hidden="true"])');  // 2.22.0 (#679): never a decorative letter
       else if (p.querySelector?.(':scope > label, :scope > h4')) a = p.querySelector(':scope > label, :scope > h4');
       if (p.matches('.shint')) break;
     }

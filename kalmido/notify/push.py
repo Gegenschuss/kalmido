@@ -458,6 +458,8 @@ def watchdog_tick(c):
     from ..agents.usage import audit_cleanup, usage_cleanup
     from ..family.v1 import _wd_rotations
     from ..events.model import _wd_events
+    from ..life.model import _wd_care
+    from ..life.karakeep import _wd_reading
     _wd_section(c, "paperless", paperless_poll)  # 2.1.0: every connection (cheap without pending uploads)
     users = {r["id"]: r for r in c.execute("SELECT * FROM users WHERE disabled=0")}
     S, LG = {}, {}
@@ -486,6 +488,8 @@ def watchdog_tick(c):
     _wd_section(c, "habits", _wd_habits, users, S, LG, now)
     _wd_section(c, "digest", _wd_digest, users, S, LG, now)
     _wd_section(c, "review", _wd_review, users, S, LG, now)  # 2.10.0 (#440)
+    _wd_section(c, "staying in touch", _wd_care, users, S, LG, now)  # 2.22.0 (#663)
+    _wd_section(c, "read later", _wd_reading, users, S, LG, now)  # 2.22.0 (#663)
     _wd_section(c, "admin alerts", aa_tick)
 
 

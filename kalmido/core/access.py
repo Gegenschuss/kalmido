@@ -1,5 +1,7 @@
 """Access control: who sees / changes which list and task, module switches, list roles."""
 
+from flask import g, has_request_context
+
 from ..core.config import app
 from ..core.schema import MAX_DEPTH
 from ..core.i18n import N_, tr
@@ -60,7 +62,34 @@ def need_time():
 # list-type gating (409 with the reason); reading, stopping and the data stay. deps / fields keep their API (D2 rule).
 FEAT_OFF = {"pomo": N_("Focus (Pomodoro) is turned off in your settings"), "habits": N_("Habits are turned off in your settings"),
             "time": N_("Time tracking is turned off in your settings"), "comments": N_("Comments are turned off in your settings"),
-            "events": N_("Events are turned off in your settings"), "contacts": N_("Contacts are turned off in your settings")}
+            "events": N_("Events are turned off in your settings"), "contacts": N_("Contacts are turned off in your settings"),
+            # 2.22.0 (#663): the modules of "Home & life"
+            "contracts": N_("Contracts are turned off in your settings"), "home": N_("Home & devices are turned off in your settings"),
+            "care": N_("Staying in touch is turned off in your settings"), "health": N_("Health is turned off in your settings"),
+            "review": N_("The review is turned off in your settings"), "travel": N_("Travel is turned off in your settings"),
+            "reading": N_("Read later is turned off in your settings")}
+
+
+# 2.22.0 (#663): health lists (lists.life 'health') are private. An agent never sees them (whatever list it is a member
+# of), an API token only with the scope "private"; the web app, calendar apps (app passwords) and the owner's family
+# members they share the list with see them as usual. Background work (reminders) is not affected.
+def health_hidden(c=None, uid=None):
+    """True when the current request (or user uid) must not see health lists."""
+    if has_request_context() and getattr(g, "user", None) is not None and (uid is None or uid == g.user["id"]):
+        u = g.user
+        if (u["kind"] if "kind" in u.keys() else "user") == "agent":
+            return True
+        if g.get("auth_via") == "token" and "private" not in (g.get("scopes") or set()):
+            return True
+        return False
+    if uid is not None and c is not None:
+        r = c.execute("SELECT kind FROM users WHERE id=?", (uid,)).fetchone()
+        return bool(r and r[0] == "agent")
+    return False
+
+
+def _health_sql():
+    return " EXCEPT SELECT id FROM lists WHERE life='health'" if health_hidden() else ""
 
 
 def need_feat(f):
@@ -74,13 +103,13 @@ def _members_on():
 
 def vis_sql():
     """Subquery of the list ids the current user may see (two ? = user id)."""
-    return f"(SELECT id FROM lists WHERE owner_id=? UNION SELECT list_id FROM list_members WHERE user_id=?{_members_on()})"
+    return f"(SELECT id FROM lists WHERE owner_id=? UNION SELECT list_id FROM list_members WHERE user_id=?{_members_on()}{_health_sql()})"
 
 
 def wr_sql():
     """Subquery of the list ids the current user may change as a whole (two ? = user id). Participants are not in it:
     what they may change is decided per task (tvis(..., write=True))."""
-    return f"(SELECT id FROM lists WHERE owner_id=? UNION SELECT list_id FROM list_members WHERE user_id=? AND role IN ('edit', 'admin'){_members_on()})"
+    return f"(SELECT id FROM lists WHERE owner_id=? UNION SELECT list_id FROM list_members WHERE user_id=? AND role IN ('edit', 'admin'){_members_on()}{_health_sql()})"
 
 
 # ---------------------------------------------------------------- list roles (1.10.0)
@@ -163,8 +192,10 @@ def task_visible(c, tid, uid, write=False, full=False):
 
 def list_role(c, lid, uid=None):
     uid = uid or me()
-    r = c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()
+    r = c.execute("SELECT owner_id, life FROM lists WHERE id=?", (lid,)).fetchone()
     if not r:
+        return None
+    if r[1] == "health" and health_hidden(c, uid):  # 2.22.0 (#663)
         return None
     if r[0] == uid:
         return "owner"

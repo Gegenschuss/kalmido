@@ -705,7 +705,9 @@ def att_clean(c, items, eid=None):
             if not collab_all():
                 raise Denied(409, tr("Collaboration is turned off on this server"))
             u = as_int(a["user_id"], "user_id", 1)
-            if not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (u,)).fetchone() or (me_ and personal_agent_foreign(c, u, me_)):
+            from ..accounts.orgs import may_see
+            if not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (u,)).fetchone() or (me_ and personal_agent_foreign(c, u, me_)) \
+                    or (me_ and eid is None and not may_see(c, me_, u)):  # 2.22.0 (#752): only people one may see (new events)
                 raise BadInput(tr("unknown user"))
             row["user_id"], key = u, ("u", u)
             if u != me_:

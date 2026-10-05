@@ -27,7 +27,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v(?:8[2-9]|9[0-9])'/.test(SW), 'service worker cache v82');
+  check(/const CACHE = 'tasks-shell-v(?:8[2-9]|9[0-9]|[1-9][0-9]{2})'/.test(SW), 'service worker cache v82');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en', tour: 'done'});

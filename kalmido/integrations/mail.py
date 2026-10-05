@@ -259,15 +259,18 @@ def mail_poll_now():
     return jsonify(ok=True)
 
 
-def mail_send(to, subject, text, html_body=None):
-    """Sends one mail with KALMIDO_SMTP_*; raises on failure."""
+def mail_send(to, subject, text, html_body=None, images=None, from_name=None):
+    """Sends one mail with KALMIDO_SMTP_*; raises on failure. images: {cid: (bytes, subtype)} shown in the HTML part
+    (2.22.0: the logo of the invitation); from_name: a display name for the sender."""
     m = email.message.EmailMessage()
-    m["From"], m["To"], m["Subject"] = SMTP["from"], to, subject
+    m["From"], m["To"], m["Subject"] = (email.utils.formataddr((from_name, SMTP["from"])) if from_name else SMTP["from"]), to, subject
     m["Date"] = email.utils.formatdate(localtime=True)
     m["Message-ID"] = email.utils.make_msgid(domain=(SMTP["from"].rpartition("@")[2] or "kalmido.local"))
     m.set_content(text)
     if html_body:
         m.add_alternative(html_body, subtype="html")
+        for cid, (data, sub) in (images or {}).items():
+            m.get_payload()[1].add_related(data, "image", sub, cid=f"<{cid}>")
     tls = SMTP["tls"]
     port = SMTP["port"] or (465 if tls == "ssl" else 587 if tls == "starttls" else 25)
     S_ = smtplib.SMTP_SSL(SMTP["host"], port, timeout=30) if tls == "ssl" else smtplib.SMTP(SMTP["host"], port, timeout=30)

@@ -39,6 +39,7 @@ ORDER = (
     "accounts.settings",
     "accounts.onboarding",
     "accounts.users",
+    "accounts.orgs",
     "lists.templates",
     "tasks.dependencies",
     "lists.projects",
@@ -70,6 +71,7 @@ ORDER = (
     "collab.notes",
     "collab.teamchat",
     "integrations.mail",
+    "accounts.invite",
     "family.family",
     "family.web",
     "family.carddav",
@@ -83,6 +85,10 @@ ORDER = (
     "contacts.carddav",
     "contacts.web",
     "contacts.v1",
+    "life.model",
+    "life.karakeep",
+    "life.web",
+    "life.v1",
     "startup",
 )
 MODULES = [importlib.import_module(f"{__name__}.{m}") for m in ORDER]

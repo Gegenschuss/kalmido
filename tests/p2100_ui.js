@@ -32,7 +32,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v(?:79|8[0-9]|9[0-9])'/.test(SW), 'service worker cache v79');
+  check(/const CACHE = 'tasks-shell-v(?:79|8[0-9]|9[0-9]|[1-9][0-9]{2})'/.test(SW), 'service worker cache v79');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', work_start: '08:00', work_end: '18:00'});

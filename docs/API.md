@@ -37,6 +37,7 @@ Create a token under **Settings > Account > API tokens**:
   | `export` | `GET /export` |
   | `calendar` (2.21.0) | events and event calendars, reading included: `/event-calendars…`, `/events…`, `/tasks/{id}/events` |
   | `contacts` (2.21.0) | address books and contacts, reading included (personal data of other people: never part of the old `write`, never an agent's default) |
+  | `private` (2.22.0) | health lists and the journal, reading included (never part of the old `write`; an agent never gets it and never sees a health list) |
   | `account` | your notification settings and app passwords (never for agents) |
   | `admin-read` (admins only) | `GET /api/v1/admin/users`, `/admin/status`, `/admin/agents/{id}/audit`; checked on every request: if the user stops being an admin, it stops working (never for agents) |
 
@@ -763,3 +764,16 @@ Traefik: a router with ``PathPrefix(`/api/v1/`) && HeaderRegexp(`Authorization`,
 priority than the router with the forward-auth middleware, pointing at the app port.
 
 Requests to `/api/v1/` without a token then still get the login page of your proxy.
+
+## Home & life (2.22.0)
+
+The seven modules of *Home & life* (contracts, home, care, health, review, travel, reading) are switched on per person;
+while one is off its routes answer 409. `GET /life` returns the switched-on parts (contracts with `monthly` / `yearly`
+sums and `due` = the last day to cancel, devices + upkeep, contacts to get in touch with, health with the scope
+`private`, trips, the reading list). Create: `POST /life/contracts`, `/life/devices`, `/life/upkeep`, `/life/health`
+(`private`), `/life/trips` (`structure`); `GET /life/review?period=day|week&date=` (the journal only with `private`),
+`PUT /life/journal/{day}` (`private`), `PUT /contacts/{id}/care` (`contacts`), `POST /life/karakeep/sync`. Lists carry
+`life` (`contracts | home | health | travel | reading`) and `trip` (`{from, to, where}`). The Karakeep connection itself
+(its API key) is set up in the app only.
+
+`POST /tasks/{id}/typing` (scope `comments`, 2.22.0): "<name> is writing …" in the task's comments for 8 seconds.

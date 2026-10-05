@@ -1,6 +1,6 @@
 """Transferring the ownership of a list; orphaned lists (owner disabled or an agent)."""
 import json
-from flask import g, jsonify
+from flask import g, has_request_context, jsonify
 
 from ..core.config import app
 from ..core.i18n import tr
@@ -27,7 +27,10 @@ def owner_candidates(c, lid, owner):
     roles = {r[0]: r[1] for r in c.execute("SELECT user_id, role FROM list_members WHERE list_id=?", (lid,))}
     rows = c.execute("SELECT id, username, display_name FROM users WHERE disabled=0 AND COALESCE(kind,'user')!='agent' AND id!=? "
                      "ORDER BY id", (owner,)).fetchall()
-    out = [{"id": r["id"], "name": r["display_name"] or r["username"], "role": roles.get(r["id"])} for r in rows]
+    from ..accounts.orgs import visible_people
+    vis = visible_people(c, me()) if has_request_context() else None  # 2.22.0 (#752): only people one may see (members always)
+    out = [{"id": r["id"], "name": r["display_name"] or r["username"], "role": roles.get(r["id"])} for r in rows
+           if vis is None or r["id"] in vis or r["id"] in roles]
     out.sort(key=lambda x: (x["role"] is None, x["name"].lower()))
     return out
 

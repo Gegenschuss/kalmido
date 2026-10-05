@@ -267,17 +267,55 @@ async function folderGroupsModal(f) {
   });
   draw();
 }
+// 2.22.0 (#752): organisations (admins): name, emoji, members; whom people see (everyone / own organisation / own contacts)
+const VIS_UI = [['all', N_('Everyone on this server')], ['org', N_('Only people of their own organisations')], ['contacts', N_('Only people they are connected with (no directory, share by e-mail address)')]];
+const orgsHtml = () => `<h4 id="a-orgs-h">${tr('Organisations')}</h4><div class="members" id="a-orgs"><div class="muted mhint">${tr('Loading…')}</div></div>
+  <div class="row"><label for="a-vis">${tr('People see')}</label><select id="a-vis"></select></div>
+  <div class="shint">${tr('Whom people see in the share dialog, as attendees and in the user list. Admins always see everyone. With several companies or households on one server: own organisation or own contacts.')}</div>
+  <div class="row" style="margin-top:.5rem"><button class="btn sm" data-acc="org-new">${ic('plus', 's')} ${tr('New organisation')}</button></div>`;
+async function orgsDraw(md) {
+  const box = $('#a-orgs', md); if (!box) return;
+  let j; try { j = await api('GET', '/api/admin/orgs'); } catch { return; }
+  S.orgs = j.orgs;
+  box.innerHTML = j.orgs.length ? j.orgs.map(o => `<div class="mrow"><span class="fem" aria-hidden="true">${esc(o.icon || '🏢')}</span><span class="n">${esc(o.name)} <span class="muted">${esc(trn('{0} member', '{0} members', o.members.length))}</span></span><button class="iconbtn" data-acc="org-edit" data-oid="${o.id}" title="${esc(tr('Edit organisation'))}" aria-label="${esc(tr('Edit {0}', o.name))}">${ic('edit', 's')}</button></div>`).join('') : `<div class="muted mhint">${tr('No organisation yet.')}</div>`;
+  const vs = $('#a-vis', md); if (vs) vs.innerHTML = VIS_UI.map(([k, n]) => `<option value="${k}" ${k === j.visibility ? 'selected' : ''}>${esc(tr(n))}</option>`).join('');
+}
+async function orgModal(o, done) {
+  let us = []; try { us = (await api('GET', '/api/users')).users.filter(u => !u.disabled); } catch { return; }
+  const mem = new Set(o?.members || []);
+  const md = modal(`<h3>${o ? tr('Edit organisation') : tr('New organisation')}</h3>
+    <div class="row"><label for="og-name">${tr('Name')}</label><input id="og-name" maxlength="60" value="${esc(o?.name || '')}"></div>
+    <div class="row"><label for="og-icon">${tr('Symbol')}</label><input id="og-icon" maxlength="8" class="numin" value="${esc(o?.icon || '')}" placeholder="🏢"></div>
+    <div class="row"><label>${tr('Members')}</label><div class="fpeople" role="group" aria-label="${esc(tr('Members'))}">${us.map(u => `<button type="button" class="fperson ${mem.has(u.id) ? 'on' : ''}" data-ogm="${u.id}" aria-pressed="${mem.has(u.id)}">${av(u.id, u.display_name)}<span>${esc(u.display_name)}</span></button>`).join('')}</div></div>
+    <div class="foot">${o ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
+  md.addEventListener('click', async e => {
+    const p = e.target.closest('[data-ogm]');
+    if (p) { const id = +p.dataset.ogm; mem.has(id) ? mem.delete(id) : mem.add(id); p.classList.toggle('on', mem.has(id)); p.setAttribute('aria-pressed', mem.has(id)); return; }
+    const b = e.target.closest('[data-m]'); if (!b) return;
+    if (b.dataset.m === 'close') { md.remove(); return; }
+    try {
+      if (b.dataset.m === 'del') { if (!await askConfirm(tr('Delete the organisation “{0}”?', o.name), tr('Its people stay; they are only no longer members.'), {ok: tr('Delete'), danger: true})) return; await api('DELETE', `/api/admin/orgs/${o.id}`); }
+      if (b.dataset.m === 'save') { const body = {name: $('#og-name', md).value.trim(), icon: $('#og-icon', md).value.trim(), members: [...mem]}; if (o) await api('PATCH', `/api/admin/orgs/${o.id}`, body); else await api('POST', '/api/admin/orgs', body); }
+      md.remove(); done && done(); await load(); render();
+    } catch { /* api() said it */ }
+  });
+}
 function accountWire(md) {
   let users = [];
   const drawUsers = async () => {
     const box = $('#a-users', md); if (!box) return;
-    try { users = (await api('GET', '/api/users')).users; } catch { return; }
+    try { const j = await api('GET', '/api/users'); users = j.users; S.mailOut = !!j.mail_out; } catch { return; }
     // 2.1.2 (#346): agents are rows too (badge); they are edited in their own dialog (Settings > Agents)
-    box.innerHTML = users.map(u => `<div class="mrow ${u.disabled ? 'off' : ''}" data-urow="${u.id}">${u.avatar ? `<span class="avatar pic"><img src="${esc(u.avatar)}" alt="" loading="lazy"></span>` : av(0, u.display_name)}<span class="n">${esc(u.display_name)}${u.kind === 'agent' ? ' ' + agentBadge() : ''} <span class="muted">${esc(u.username)}${u.is_admin ? ' · ' + tr('Admin') : ''}${u.disabled ? ' · ' + tr('disabled') : ''}${u.proxy_login ? ' · ' + tr('SSO: {0}', u.proxy_login) : ''}${u.paperless_access && S.paperless?.configured ? ' · Paperless' : ''}${u.twofa?.length ? ' · ' + tr('2FA') : ''}${u.oidc_linked ? ' · OIDC' : ''}</span></span>${u.kind === 'agent'
+    box.innerHTML = users.map(u => `<div class="mrow ${u.disabled ? 'off' : ''}" data-urow="${u.id}">${u.avatar ? `<span class="avatar pic"><img src="${esc(u.avatar)}" alt="" loading="lazy"></span>` : av(0, u.display_name)}<span class="n">${esc(u.display_name)}${u.kind === 'agent' ? ' ' + agentBadge() : ''} <span class="muted">${esc(u.username)}${u.is_admin ? ' · ' + tr('Admin') : ''}${u.disabled ? ' · ' + tr('disabled') : ''}${u.proxy_login ? ' · ' + tr('SSO: {0}', u.proxy_login) : ''}${u.paperless_access && S.paperless?.configured ? ' · Paperless' : ''}${u.twofa?.length ? ' · ' + tr('2FA') : ''}${u.oidc_linked ? ' · OIDC' : ''}${u.invite === 'invited' ? ' · ' + tr('Invited') : u.invite === 'expired' ? ' · ' + tr('Invitation expired') : ''}</span></span>${u.kind === 'agent'
       ? `<button class="linkbtn agmng" data-acc="agent-edit" data-uid="${u.id}" title="${esc(tr('Open the agent dialog'))}">${tr('Managed under Agents')}</button>`
       : `<button class="iconbtn" data-acc="user-edit" data-uid="${u.id}" title="${tr('Edit user')}">${ic('edit', 's')}</button>`}</div>`).join('');
   };
   drawUsers();
+  orgsDraw(md);
+  md.addEventListener('change', async e => {  // 2.22.0 (#752): whom people see
+    if (e.target.id !== 'a-vis') return;
+    try { await api('PUT', '/api/admin/orgs/visibility', {mode: e.target.value}); toast(tr('Saved')); await load(); } catch { /* api() said it */ }
+  });
   md.addEventListener('click', async e => {
     const p = e.target.closest('#a-avpick [data-av]');
     if (p) {
@@ -300,6 +338,8 @@ function accountWire(md) {
       }
       if (a === 'logout') logout();
       if (a === 'user-new') userModal(null, drawUsers);
+      if (a === 'org-new') orgModal(null, () => orgsDraw(md));  // 2.22.0 (#752)
+      if (a === 'org-edit') orgModal((S.orgs || []).find(o => o.id === +b.dataset.oid), () => orgsDraw(md));
       if (a === 'user-edit') userModal(users.find(u => u.id === +b.dataset.uid), drawUsers);
       if (a === 'agent-edit') {
         const aj = await calReq('GET', '/api/admin/agents'), ag = aj.agents.find(x => x.id === +b.dataset.uid);
@@ -316,13 +356,16 @@ function userModal(u, done) {
     <div class="row"><label for="u-pw">${tr('Password')}</label><input type="password" id="u-pw" autocomplete="new-password" placeholder="${u ? (u.has_password ? tr('unchanged') : tr('none (single sign-on only)')) : tr('optional, min. 8 characters')}"></div>
     <div class="row"><label for="u-proxy">${tr('SSO login')}</label><input id="u-proxy" value="${esc(u?.proxy_login || '')}" autocapitalize="off" placeholder="${tr('user name at the login proxy (optional)')}"></div>
     <div class="row"><label for="u-email">${tr('E-mail')}</label><input id="u-email" type="email" value="${esc(u?.email || '')}" autocapitalize="off" placeholder="${tr('optional, links an OIDC login')}"></div>
+    ${(S.orgs || []).length > 1 || (u && (S.orgs || []).length) ? `<div class="row"><label>${tr('Organisations')}</label><div class="fpeople" role="group" aria-label="${esc(tr('Organisations'))}">${S.orgs.map(o => { const on = u ? (u.orgs || []).includes(o.id) : o.members.includes(S.me.id); return `<button type="button" class="fperson ${on ? 'on' : ''}" data-uorg="${o.id}" aria-pressed="${on}"><span aria-hidden="true">${esc(o.icon || '🏢')}</span><span>${esc(o.name)}</span></button>`; }).join('')}</div></div>` : ''}
     <div class="row"><label for="u-topic">${tr('ntfy topic')}</label><input id="u-topic" value="${esc(u?.ntfy_topic || '')}" autocapitalize="off" placeholder="${tr('empty = random')}"></div>
     ${u ? `<div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="u-avpick" data-cur="${esc(u.avatar || '')}">${avPickHtml(u.avatar || '', false, u.display_name || u.username)}</div></div>` : ''}
     <div class="row"><label>${tr('Rights')}</label><label class="chkl"><input type="checkbox" id="u-admin" ${u?.is_admin ? 'checked' : ''}> ${tr('Admin')}</label>${S.paperless?.configured ? `<label class="chkl" title="${tr('Search, link and view documents of the Paperless archive')}"><input type="checkbox" id="u-pl" ${u?.paperless_access ? 'checked' : ''}> ${tr('Paperless access')}</label>` : ''}${u ? `<label class="chkl"><input type="checkbox" id="u-dis" ${u.disabled ? 'checked' : ''}> ${tr('disabled')}</label>` : ''}</div>
-    ${!u || (u.kind !== 'agent' && u.id !== S.me.id) ? `<div class="row"><label>${tr('Child account')}</label><label class="chkl"><input type="checkbox" id="u-kid" ${u?.kid ? 'checked' : ''}> ${tr('A simple view with big buttons, stars and rewards; takes part in shared lists only with what is assigned to it')}</label></div>
-    <div class="row" id="u-parrow" ${u?.kid ? '' : 'hidden'}><label>${tr('Parents')}</label><div class="fpeople" id="u-parents" role="group" aria-label="${esc(tr('Parents'))}"><span class="muted">${tr('Loading…')}</span></div></div>` : ''}
+    ${!u || (u.kind !== 'agent' && u.id !== S.me.id) ? `<div class="row"><label>${tr('Child account')}</label><label class="chkl"><input type="checkbox" id="u-kid" aria-controls="u-parrow" aria-expanded="${!!u?.kid}" ${u?.kid ? 'checked' : ''}> ${tr('A simple view with big buttons, stars and rewards; takes part in shared lists only with what is assigned to it')}</label></div>
+    <div class="row kidopts" id="u-parrow" ${u?.kid ? '' : 'hidden'}><label>${tr('Parents')}</label><div class="fpeople" id="u-parents" role="group" aria-label="${esc(tr('Parents'))}"><span class="muted">${tr('Loading…')}</span></div></div>` : ''}
     ${u && !u.is_admin && u.id !== S.me.id ? `<div class="row"><label for="u-kind">${tr('Type')}</label><select id="u-kind"><option value="user">${tr('Person')}</option><option value="agent" ${u.kind === 'agent' ? 'selected' : ''}>${tr('Agent (API only, never admin, no Paperless)')}</option></select></div>` : ''}
     ${u?.has_password ? `<div class="row"><label></label><label class="chkl"><input type="checkbox" id="u-nopw"> ${tr('Remove password (single sign-on only)')}</label></div>` : ''}
+    ${!u ? `<div class="row"><label>${tr('Invitation')}</label><label class="chkl"><input type="checkbox" id="u-inv" checked> ${S.mailOut ? tr('Send an invitation by e-mail: the person sets their own password') : tr('Create an invitation link: the person sets their own password')}</label></div>`
+      : u.kind !== 'agent' && !u.disabled ? `<div class="row"><label>${u.has_password ? tr('Password') : tr('Invitation')}</label><button type="button" class="btn sm" data-m="invite">${ic(u.has_password ? 'key' : 'send', 's')} ${u.has_password ? tr('Send a link to set a new password') : u.invite ? tr('Send the invitation again') : tr('Send an invitation')}</button></div>` : ''}
     ${u?.twofa?.length ? `<div class="row"><label>${tr('Two-factor')}</label><label class="chkl"><input type="checkbox" id="u-2fareset"> ${tr('Reset (lost phone / passkey and recovery codes)')}</label></div>` : ''}
     ${u?.oidc_linked ? `<div class="row"><label>OIDC</label><label class="chkl"><input type="checkbox" id="u-oidcun"> ${tr('Unlink (the next OIDC login links again by user name or e-mail)')}</label></div>` : ''}
     <div class="muted" style="font-size:var(--fs-s);line-height:1.6">${tr('Every user gets an own inbox, habits, filters, tags and settings. Lists are shared from the list’s “…” menu > Share….')}</div>
@@ -338,7 +381,8 @@ function userModal(u, done) {
     box.innerHTML = cand.map(x => `<button type="button" class="fperson ${par.has(x.id) ? 'on' : ''}" data-upar="${x.id}" aria-pressed="${par.has(x.id)}">${av(x.id, x.display_name)}<span>${esc(x.display_name)}</span></button>`).join('') || `<span class="muted">${tr('Nobody else yet')}</span>`;
   };
   if ($('#u-parents', md)) parDraw();
-  md.addEventListener('change', e => { if (e.target.id === 'u-kid') { $('#u-parrow', md).hidden = !e.target.checked; if (e.target.checked) { $('#u-admin', md).checked = false; } } });
+  md.addEventListener('change', e => { if (e.target.id === 'u-kid') { $('#u-parrow', md).hidden = !e.target.checked; e.target.setAttribute('aria-expanded', e.target.checked);  /* 2.22.0: the child options only once ticked */ if (e.target.checked) { $('#u-admin', md).checked = false; } } });
+  md.addEventListener('click', e => { const b = e.target.closest('[data-uorg]'); if (!b) return; const on = b.getAttribute('aria-pressed') !== 'true'; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });  // 2.22.0 (#752)
   md.addEventListener('click', e => { const b = e.target.closest('[data-upar]'); if (!b) return; const id = +b.dataset.upar; par.has(id) ? par.delete(id) : par.add(id); b.classList.toggle('on', par.has(id)); b.setAttribute('aria-pressed', par.has(id)); });
   md.addEventListener('click', e => {  // the picture choice is sent with "Save"
     const p = e.target.closest('#u-avpick [data-av]'); if (!p) return;
@@ -349,6 +393,10 @@ function userModal(u, done) {
   md.addEventListener('click', async e => {
     const b = e.target.closest('button[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
+    if (b.dataset.m === 'invite') {  // 2.22.0 (#697): a new one-time link (invitation / password reset)
+      try { const j = await api('POST', `/api/users/${u.id}/invite`, {send: true}); inviteResult(j, u.display_name); done && done(); } catch { /* api() said it */ }
+      return;
+    }
     let created = false;
     try {
       if (b.dataset.m === 'del') {
@@ -362,6 +410,7 @@ function userModal(u, done) {
         if ($('#u-pl', md)) body.paperless_access = $('#u-pl', md).checked;
         if ($('#u-kid', md) && ($('#u-kid', md).checked || u?.kid)) { body.kid = $('#u-kid', md).checked; if (body.kid) { body.parents = [...par]; body.is_admin = false; } }
         const avk = $('#u-avpick', md)?.dataset.pick; if (avk) body.avatar_preset = avk === 'none' ? null : avk;
+        if ($('[data-uorg]', md)) body.orgs = $$('[data-uorg][aria-pressed="true"]', md).map(x => +x.dataset.uorg);  // 2.22.0 (#752)
         const pw = $('#u-pw', md).value;
         if (pw) body.password = pw; else if ($('#u-nopw', md)?.checked) body.password = '';
         if ($('#u-kind', md) && $('#u-kind', md).value !== (u.kind || 'user')) {
@@ -369,7 +418,12 @@ function userModal(u, done) {
           body.kind = $('#u-kind', md).value;
         }
         if (u) { body.disabled = $('#u-dis', md).checked; await api('PATCH', '/api/users/' + u.id, body); }
-        else { body.username = $('#u-user', md).value.trim().toLowerCase(); if (!body.ntfy_topic) delete body.ntfy_topic; await api('POST', '/api/users', body); created = true; }
+        else {
+          body.username = $('#u-user', md).value.trim().toLowerCase(); if (!body.ntfy_topic) delete body.ntfy_topic;
+          if (!pw && $('#u-inv', md)?.checked) { body.invite = true; if (S.mailOut && !body.email) { toast(tr('Please enter the e-mail address for the invitation')); $('#u-email', md).focus(); return; } }
+          const nu = await api('POST', '/api/users', body); created = true;
+          if (nu.invitation) { md.remove(); done && done(); inviteResult(nu.invitation, nu.display_name); await offerCollab(); await load(); render(); return; }
+        }
       }
       md.remove(); toast(tr('Saved')); done && done();
       if (created) await offerCollab();
@@ -377,6 +431,62 @@ function userModal(u, done) {
     } catch { /* api() showed it */ }
   });
   if (!isTouch() && (!u))  setTimeout(() => $('#u-user', md).focus(), 50);
+}
+// 2.22.0 (#697): what happened to an invitation / reset link: sent by e-mail, or the link to copy (no SMTP, no address)
+function inviteResult(j, name) {
+  if (j.sent) { toast(tr('Sent to {0}: the link works once and for 7 days', j.email)); return; }
+  const md = modal(`<h3>${ic('send', 's')} ${j.kind === 'reset' ? tr('Link to set a new password') : tr('Invitation link')}</h3>
+    <p>${esc(j.error || tr('Send this link to {0} yourself (it works once and for 7 days):', name))}</p>
+    <div class="row"><input id="inv-link" readonly value="${esc(j.link)}" aria-label="${esc(tr('Link'))}"><button type="button" class="btn" data-m="copy">${ic('copy', 's')} ${tr('Copy')}</button></div>
+    <div class="foot"><span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('[data-m]'); if (!b) return;
+    if (b.dataset.m === 'close') md.remove();
+    if (b.dataset.m === 'copy') { try { await navigator.clipboard.writeText(j.link); toast(tr('Copied')); } catch { $('#inv-link', md).select(); } }
+  });
+}
+// 2.22.0 (#697): the page "Set up your account" (the link of an invitation or a password reset: /#invite/<token>)
+async function inviteScreen(tok) {
+  history.replaceState(null, '', location.pathname);  // the token leaves the address bar (and the history) at once
+  let info = null;
+  try { const r = await fetch('/api/auth/invite/check', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({token: tok})}); info = await r.json(); if (!r.ok) info = {error: info.error || tr('Error {0}', r.status)}; } catch { info = {error: tr('Server not reachable.')}; }
+  await i18nLoad(info.lang || uiLang());
+  const el = document.createElement('div');
+  el.className = 'modal authscreen';
+  const logo = `<div class="alogo">${logoSvg(40)}<b>${APP_NAME}</b></div>`;
+  if (info.error) {
+    el.innerHTML = `<div class="card">${logo}<p role="alert">${esc(info.error)}</p><button class="btn pri" type="button" data-au="login">${tr('To the login')}</button></div>`;
+  } else {
+    el.innerHTML = `<div class="card">${logo}
+      <h2 class="invh">${esc(info.kind === 'reset' ? tr('Set a new password') : tr('Welcome, {0}!', info.display_name))}</h2>
+      <p class="muted">${esc(info.kind === 'reset' ? tr('Choose a new password for “{0}”.', info.username) : tr('Choose your own password to finish your account.'))}</p>
+      <form id="inv-form" autocomplete="on">
+        <label class="aulab" for="inv-user">${tr('Username')}</label><input id="inv-user" name="username" autocomplete="username" readonly value="${esc(info.username)}">
+        <label class="aulab" for="inv-pw">${tr('New password')}</label><input id="inv-pw" type="password" autocomplete="new-password" required minlength="${info.min_password || 8}" placeholder="${esc(tr('at least {0} characters', info.min_password || 8))}">
+        <label class="aulab" for="inv-pw2">${tr('Repeat the password')}</label><input id="inv-pw2" type="password" autocomplete="new-password" required>
+        <label class="chkl"><input type="checkbox" id="inv-2fa"> ${tr('Set up two-factor sign-in right after (recommended)')}</label>
+        <div class="aerr" role="alert" id="inv-err"></div>
+        <button class="btn pri" type="submit">${info.kind === 'reset' ? tr('Save and log in') : tr('Set up my account')}</button>
+      </form></div>`;
+    el.querySelector('#inv-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const errEl = $('#inv-err', el), pw = $('#inv-pw', el).value;
+      if (pw.length < (info.min_password || 8)) { errEl.textContent = tr('Password: at least {0} characters', info.min_password || 8); return; }
+      if (pw !== $('#inv-pw2', el).value) { errEl.textContent = tr('The two passwords are not the same'); return; }
+      try {
+        const r = await fetch('/api/auth/invite/accept', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({token: tok, password: pw})});
+        const res = await r.json().catch(() => ({}));
+        if (!r.ok) { errEl.textContent = res.error || tr('Error {0}', r.status); return; }
+        if (res.enrol) { await authEnrol(el, logo); return; }
+        if ($('#inv-2fa', el).checked) LS.set('after2fa', true);
+        location.replace('/');
+      } catch { errEl.textContent = tr('Server not reachable.'); }
+    });
+  }
+  el.addEventListener('click', e => { if (e.target.closest('[data-au="login"]')) location.replace('/'); });
+  document.body.appendChild(el);
+  $('#app')?.setAttribute('inert', '');
+  setTimeout(() => $('#inv-pw', el)?.focus(), 50);
 }
 async function logout() {
   if (OUT.q.length && !await askConfirm(trn('{0} change is not synced yet and will be lost. Log out anyway?', '{0} changes are not synced yet and will be lost. Log out anyway?', OUT.q.length), '', {ok: tr('Log out'), danger: true})) return;
@@ -395,7 +505,7 @@ async function authScreen(j) {
   const el = document.createElement('div');
   el.className = 'modal authscreen';
   // 2.14.0: the first account (welcome) shows the heron instead of the small mark
-  const logo = kind === 'setup' ? `<div class="alogo hwelc">${heron('welcome', 'hwel')}<b>${APP_NAME}</b></div>` : `<div class="alogo">${logoSvg(40)}<b>${APP_NAME}</b></div>`;
+  const logo = kind === 'setup' ? `<div class="alogo hwelc">${heron('welcome', 'hwel')}<b>${APP_NAME}</b></div>` : `<div class="alogo">${logoSvg(40)}<b>${APP_NAME}</b>${info.org ? `<small class="aorg">${esc(info.org)}</small>` : ''}</div>`;  // 2.22.0 (#752): the organisation
   if (kind === 'no_account' || kind === 'disabled') {
     el.innerHTML = `<div class="card">${logo}<p>${kind === 'disabled' ? esc(tr('The account “{0}” is disabled.', j.login || '')) : esc(tr('There is no {0} account for “{1}” yet.', APP_NAME, j.login || ''))}</p><p class="muted">${tr('Please ask the admin to create one (or to enable it).')}</p></div>`;
   } else {
@@ -866,10 +976,14 @@ function bkWire(md) {
   });
 }
 const PURPOSES = [['me', 'user', N_('For me'), N_('Your own tasks: lists, reminders and the calendar. More views any time under Settings > Modules.')],
+  // 2.22.0 (#741): "Home" for one person or a couple: Home & life with contracts, devices, staying in touch, health, journal
+  ['home', 'home', N_('Home'), N_('Your household and life: contracts, warranties and upkeep, staying in touch, health, a journal, trips and read later.')],
   ['family', 'family', N_('Family'), N_('Shared lists, a shopping list with shop areas, household chores taking turns, birthdays, a meal plan and accounts for children.')],
   ['team', 'users', N_('Team'), N_('Sharing, assigning, comments, time tracking, a timeline with dependencies, custom fields and project progress.')],
   ['software', 'code', N_('Software projects'), N_('Everything of Team plus a software project: a board from backlog to done, bug and feature tickets, a repository.')]];
-const PURPOSE_MODS = {me: ['cal', 'events', 'contacts'], family: ['cal', 'habits', 'comments', 'collab', 'family', 'events', 'contacts'],
+const PURPOSE_MODS = {me: ['cal', 'events', 'contacts'],
+  home: ['cal', 'events', 'contacts', 'habits', 'contracts', 'home', 'care', 'health', 'review', 'travel', 'reading'],
+  family: ['cal', 'habits', 'comments', 'collab', 'family', 'events', 'contacts', 'contracts', 'home', 'travel'],
   team: ['cal', 'timeline', 'matrix', 'kanban', 'habits', 'pomo', 'stats', 'comments', 'collab', 'time', 'progress', 'deps', 'fields', 'events', 'contacts'],
   software: ['cal', 'timeline', 'matrix', 'kanban', 'habits', 'pomo', 'stats', 'comments', 'collab', 'time', 'progress', 'deps', 'fields', 'events', 'contacts']};
 // First-run setup, step 2 ("What do you want to use?"): only right after the first admin was created, never on

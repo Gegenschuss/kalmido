@@ -73,9 +73,11 @@ API_TOKEN_RE = re.compile(r"abk_[A-Za-z0-9_-]{20,100}")
 # 2.21.0 (#659 / #658): "calendar" (events and event calendars, reading included) and "contacts" (address books and
 # contacts, reading included: sensitive, so never part of the legacy "write"); a new agent gets neither by default
 SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export",
-          "calendar", "contacts", "account", "admin-read")
-SCOPES_WRITE = tuple(s for s in SCOPES if s not in ("read", "admin-read", "contacts"))   # what the legacy "write" stands for
-SCOPES_AGENT_NEVER = ("account", "admin-read")   # never for an agent: credentials / settings of the account, admin data
+          "calendar", "contacts", "private", "account", "admin-read")
+# 2.22.0 (#663): "private" = health lists and the journal (reading included); like "contacts" never part of the legacy
+# "write" and never in an agent's default (agents never see health lists at all, see core/access.py)
+SCOPES_WRITE = tuple(s for s in SCOPES if s not in ("read", "admin-read", "contacts", "private"))   # what the legacy "write" stands for
+SCOPES_AGENT_NEVER = ("account", "admin-read", "private")   # never for an agent: credentials / settings of the account, admin data, health + journal (2.22.0)
 SCOPES_AGENT_DEFAULT = ("read", "tasks:write", "comments")
 API_SCOPES = SCOPES + ("write",)
 API_PAGE_MAX, API_PAGE_DEFAULT = 500, 100
@@ -448,7 +450,8 @@ def v1_list(d):
             "nag": d.get("nag") or "", "day_hours": d.get("day_hours"),  # 2.7.0 (#413, #407)
             "columns": d.get("columns"),  # 2.14.0 (#425): the list's columns (null = default)
             "project_type": d.get("ptype") or None,  # 2.18.0 (#408): agency | software | private, null = none
-            "family": d.get("family") or None}  # 2.19.0 (#653): shopping | meals | birthdays | household | packing, null = none
+            "family": d.get("family") or None,  # 2.19.0 (#653): shopping | meals | birthdays | household | packing, null = none
+            "life": d.get("life") or None, "trip": d.get("trip") or None}  # 2.22.0 (#663): contracts | home | health | travel | reading
 
 
 # ---- token management (Settings > Account > API tokens; session / proxy login only, a token cannot reach these)
@@ -708,11 +711,13 @@ def v1_list_patch(lid):
     v1_args(())
     b = v1_json()
     unknown = sorted(k for k in b if k not in ("name", "color", "folder", "view", "kind", "nag", "day_hours", "done_at_bottom", "checklist",
-                                               "listen_agent_ids", "columns", "archived", "project_type", "family"))
+                                               "listen_agent_ids", "columns", "archived", "project_type", "family", "life", "trip"))
     if unknown:
         raise UnknownFields(unknown)
     if "family" in b and b["family"] is None:  # 2.19.0 (#653): null = an ordinary list
         b = {**b, "family": ""}
+    if "life" in b and b["life"] is None:  # 2.22.0 (#663)
+        b = {**b, "life": ""}
     if "project_type" in b:  # 2.18.0 (#408): change the project type (owner / list admins; null / "" = none)
         if b["project_type"] not in (None, "") and b["project_type"] not in PTYPES:
             raise BadInput(tr("Invalid value: {0}", "project_type"))

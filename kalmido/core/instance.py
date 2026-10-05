@@ -218,6 +218,10 @@ def admin_setup():
         if b["purpose"] not in PURPOSES:
             return err(tr("Invalid value: {0}", "purpose"))
         uset(c, me(), "purpose", b["purpose"])
+        from ..family.family import _LIFE, PURPOSE_ON  # 2.22.0 (#741): the Home & life modules of the purpose (the admin's own)
+        on = [m for m in PURPOSE_ON[b["purpose"]] if m in _LIFE]
+        if on:
+            uset(c, me(), "features", ",".join([x for x in fs.split(",") if x] + on))
         if b["purpose"] == "family":
             family_examples(c, me())
     if b.get("sample") is True and not sample_state(c, me()):  # 1.8.0: "Create a sample project"

@@ -63,7 +63,7 @@ async function firefox(fn) {
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v(?:(6[6-9]|7[0-9])|8[0-9]|9[0-9])'/.test(SW), 'service worker cache v66 (2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70, 2.5.2: v71, 2.6.0: v72, 2.6.1: v73, 2.7.0: v74, 2.7.1: v75, 2.7.2: v76, 2.8.0: v77, 2.9.0: v78, 2.10.0: v79, 2.11.0: v80)');
+  check(/const CACHE = 'tasks-shell-v(?:(6[6-9]|7[0-9])|8[0-9]|9[0-9]|[1-9][0-9]{2})'/.test(SW), 'service worker cache v66 (2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70, 2.5.2: v71, 2.6.0: v72, 2.6.1: v73, 2.7.0: v74, 2.7.1: v75, 2.7.2: v76, 2.8.0: v77, 2.9.0: v78, 2.10.0: v79, 2.11.0: v80)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en'});
@@ -147,11 +147,11 @@ async function firefox(fn) {
   check(md.querySelector('.lptype').hidden, 'type List: no picker');
   md.querySelector('#l-kind').value = 'project'; change(w, md.querySelector('#l-kind'));
   click(w, md.querySelector('.ptcard[data-pt="software"]'));
-  check(md.querySelector('.ptcard.on')?.dataset.pt === 'software' && md.querySelector('#l-name').value === 'Software / AI dev' && md.querySelector('#l-view').value === 'kanban', 'software picked: name + kanban');
+  check(md.querySelector('.ptcard.on')?.dataset.pt === 'software' && md.querySelector('#l-name').value === 'Software / AI dev' && md.querySelector('#l-view').value === 'list', 'software picked: name + (2.22.0 #749) the list view');
   md.querySelector('#l-name').value = 'Kalmido'; md.querySelector('#l-folder').value = 'Dev / Tools';
   click(w, md.querySelector('[data-m="save"]'));
   const SWL = await until(async () => (await st()).lists.find(l => l.name === 'Kalmido'));
-  check(SWL && SWL.kind === 'project' && SWL.tickets === 1 && SWL.view === 'kanban' && SWL.folder === 'Dev/Tools', 'software project created');
+  check(SWL && SWL.kind === 'project' && SWL.tickets === 1 && SWL.view === 'list' && SWL.folder === 'Dev/Tools', 'software project created');
   check(await until(() => d.querySelector('.modal.nsmodal')), 'next steps dialog');
   check(/Connect a repository/.test(d.querySelector('.nsmodal').textContent), 'next steps: repository');
   click(w, d.querySelector('.nsmodal [data-m="close"]'));

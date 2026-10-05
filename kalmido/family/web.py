@@ -91,9 +91,18 @@ def list_shop_areas(lid):
     need_list(c, lid)
     c.execute("UPDATE lists SET family='shopping' WHERE id=? AND owner_id=?", (lid, me()))
     n = shop_areas_add(c, lid, lang(c, me()))
+    # 2.22.0 (#747): areas are switched on by hand now ("Sort by shop area"): the open items without an area go to theirs
+    from ..family.family import shop_area_of
+    k = 0
+    for t in c.execute("SELECT id, title FROM tasks WHERE list_id=? AND parent_id IS NULL AND section_id IS NULL AND status=0 AND deleted_at IS NULL",
+                       (lid,)).fetchall():
+        sid = shop_area_of(c, lid, t["title"])
+        if sid:
+            c.execute("UPDATE tasks SET section_id=? WHERE id=?", (sid, t["id"]))
+            k += 1
     bump(c)
     c.commit()
-    return jsonify(ok=True, added=n)
+    return jsonify(ok=True, added=n, sorted=k)
 
 
 @app.get("/api/family/packing")

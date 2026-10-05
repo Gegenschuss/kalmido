@@ -94,6 +94,8 @@ function qMismatch(r) {
 async function submitQuick(input, extra = {}) {
   const cap = input.id === 'qsheet' && S.quickPreset.capture;  // 2.4.0 (#187): a capture ignores the view (inbox unless ~list)
   const d = {...(cap ? {} : quickDefaults()), ...(input.id === 'qsheet' ? S.quickPreset : {}), ...extra};
+  const pasted = S.qfiles?.[input.id] || [];  // 2.22.0 (#678): images pasted into the box
+  if (pasted.length) d.files = [...(d.files || []), ...pasted];
   const txt = input.value.trim(); if (!txt && !d.files?.length) return;
   const r = parseQuick(txt, S.quick.ignore);
   const url = r.url || d.url || null;
@@ -109,9 +111,11 @@ async function submitQuick(input, extra = {}) {
   if (d.assignee_id && !r.list_id) body.assignee_id = d.assignee_id;
   if (body.due_time && S.settings.default_reminder !== '') body.reminders = S.settings.default_reminder;
   input.value = ''; S.quick.ignore = new Set(); updateChips(input);
+  if (pasted.length) { S.qfiles[input.id] = []; qFilesDraw(input); }
   if (input.id === 'qsheet' && (cap || S.quickPreset.content || S.quickPreset.url || S.quickPreset.due_time || S.quickPreset.files?.length)) { S.quickPreset = {}; closePop(); }
   if (d.open && input.id === 'qsheet') closePop();  // 2.14.0 (#484): the details take the screen
   const created = await createTask(body);
+  if (r.wait && created?.id) { try { putTask(await api('PUT', `/api/tasks/${created.id}/waiting`, {note: r.wait, until: addDays(today(), 7)})); render(); } catch { /* api() said it */ } }  // 2.22.0 (#686)
   if (cap) { captureDone(created, body); return; }
   if (d.open && created?.id) { openDetail(created.id); return; }  // 2.14.0 (#484): "Add and open"
   if (d.files?.length && input.id === 'qsheet') closePop();
@@ -273,6 +277,7 @@ document.addEventListener('click', async e => {
     case 'job-do': jobDo(+a.dataset.jid, a.dataset.a); break;
     case 'prop-open': propOpen(+a.dataset.jid); break;  // 2.3.0
     case 'aiu-more': settingsModal('usage'); break;
+    case 'ag-setup': settingsModal('agents'); break;  // 2.22.0 (#739)
     case 'jobs-f': S.jobs.f = a.dataset.f; LS.set('jobsFilter', a.dataset.f); S.jobs.items = null; renderView(); break;
     case 'c-react': e.stopPropagation(); commentReact(+a.dataset.cid, a.dataset.e); break;
     case 'c-react-who': e.stopPropagation(); commentReactWho(+a.dataset.cid, a.dataset.e); break;
@@ -552,6 +557,7 @@ document.addEventListener('click', async e => {
     }
     case 'mb-tag': { const g = await askPrompt(tr('Add tag'), '', {ok: tr('Add')}); if (g && g.trim()) batch('patch', {add_tags: [g.trim().replace(/^#/, '')]}); break; }
     case 'mb-pin': batch('patch', {pinned: [...S.multi].every(i => S.tasks.get(i)?.pinned) ? 0 : 1}); break;
+    case 'mb-wait': { const wid = [...S.multi][0]; if (wid) { const tt = taskById(wid); if (tt?.waiting_at) waitClear(wid); else waitDialog(wid); } break; }  // 2.22.0 (#686)
     case 'mb-done': {
       const nb = [...S.multi].filter(i => S.tasks.get(i)?.blocked && S.tasks.get(i).status === 0 && dFor(S.tasks.get(i))).length;
       if (nb && !await askConfirm(trn('{0} of the selected tasks is still waiting on another task. Complete anyway?', '{0} of the selected tasks are still waiting on other tasks. Complete anyway?', nb), '', {ok: tr('Complete anyway')})) break;
@@ -601,6 +607,7 @@ document.addEventListener('input', e => {
   const t = e.target;
   if (t.id === 'qinput' || t.id === 'qsheet') updateChips(t);
   if (t.id === 'd-title') { autosize(t); queueSave(S.sel, 'title', t.value.replace(/\n/g, ' ')); }
+  if (t.id === 'c-input' && t.value) commentTyping();  // 2.22.0 (#693)
   if (t.id === 'c-input') { autosize(t); S.drafts[S.sel] = t.value; mentionUpdate(t); t.closest('.ccomp')?.classList.toggle('used', !!t.value || !!(S.cfiles[S.sel] || []).length); }
   if (t.classList?.contains('c-edit-input')) { autosize(t); mentionUpdate(t); }
   if (t.id === 'd-content') { autosize(t); queueSave(S.sel, 'content', t.value); }
@@ -697,3 +704,79 @@ function toggleMdCheckbox(i) {
   HIST.sess++;
   queueSave(t.id, 'content', t.content, was);
 }
+
+// ---- 2.22.0 (#678): the quick add box (docked composer, inline box, the sheet) gets the @ picker of the comment box
+// (the people and agents of the list the task goes to) and takes pasted images / files: they become the new task's files
+S.qfiles = {};  // input id -> [File]
+function qTargetList(input) {
+  const r = parseQuick(input.value, S.quick.ignore), o = input.id === 'qinput' && S.qov?.key === S.route.key ? S.qov : {};
+  const d = input.id === 'qsheet' && S.quickPreset.capture ? {} : {...quickDefaults(), ...(input.id === 'qsheet' ? S.quickPreset : {})};
+  return listById(o.list_id || r.list_id || d.list_id || inbox()?.id);
+}
+function qPeople(input) {
+  const l = qTargetList(input);
+  if (!l || !collab() || !l.shared) return [];
+  return listPeople(l).filter(p => !S.me || p.user_id !== S.me.id).map(p => ({id: p.user_id, user_id: p.user_id, name: p.name}));
+}
+function qMentionUpdate(input) {
+  const box = input.closest('.qadd'); if (!box) return;
+  let pick = box.querySelector('.mpick.qmpick');
+  const pre = input.value.slice(0, input.selectionStart ?? input.value.length), m = pre.match(/(?:^|\s)@([^\s@<>~#!]{0,30})$/u);
+  const people = m ? qPeople(input) : [];
+  const q = m ? m[1].toLowerCase() : '';
+  const items = people.filter(p => { const n = p.name.toLowerCase(); return n.startsWith(q) || n.split(/\s+/).some(w => w.startsWith(q)); }).slice(0, 6);
+  if (!items.length) { if (pick) pick.classList.add('hidden'); if (S.qmp) { input.removeAttribute('aria-activedescendant'); S.qmp = null; } return; }
+  if (!pick) { pick = document.createElement('div'); pick.className = 'mpick qmpick'; pick.id = 'qmp-' + input.id; pick.setAttribute('role', 'listbox'); pick.setAttribute('aria-label', tr('Mention someone')); box.appendChild(pick); }
+  S.qmp = {input, items, i: 0, start: pre.length - m[1].length - 1, pick};
+  pick.classList.remove('hidden');
+  pick.innerHTML = items.map((p, i) => `<button type="button" role="option" id="${pick.id}-o${i}" tabindex="-1" aria-selected="${i === 0}" class="${i === 0 ? 'on' : ''}" data-act="qmention-pick" data-i="${i}">${av(p.user_id, p.name)}${esc(p.name)}</button>`).join('');
+  input.setAttribute('aria-controls', pick.id); input.setAttribute('aria-activedescendant', pick.id + '-o0');
+}
+function qMentionPick(i) {
+  const mp = S.qmp; if (!mp) return;
+  const p = mp.items[i], inp = mp.input, caret = inp.selectionStart ?? inp.value.length;
+  inp.value = inp.value.slice(0, mp.start) + '@' + p.name + ' ' + inp.value.slice(caret);
+  const pos = mp.start + p.name.length + 2;
+  inp.focus(); inp.setSelectionRange(pos, pos);
+  mp.pick.classList.add('hidden'); inp.removeAttribute('aria-activedescendant'); S.qmp = null;
+  updateChips(inp);
+}
+function qMentionClose() { if (S.qmp) { S.qmp.pick.classList.add('hidden'); S.qmp.input.removeAttribute('aria-activedescendant'); S.qmp = null; } }
+document.addEventListener('input', e => { if (e.target.id === 'qinput' || e.target.id === 'qsheet') qMentionUpdate(e.target); });
+document.addEventListener('focusout', e => { if ((e.target.id === 'qinput' || e.target.id === 'qsheet') && S.qmp?.input === e.target) setTimeout(qMentionClose, 150); });
+document.addEventListener('keydown', e => {
+  const t = e.target; if (!S.qmp || S.qmp.input !== t) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault(); e.stopImmediatePropagation(); S.qmp.i = (S.qmp.i + (e.key === 'ArrowDown' ? 1 : -1) + S.qmp.items.length) % S.qmp.items.length;
+    $$('button', S.qmp.pick).forEach((b, i) => { b.classList.toggle('on', i === S.qmp.i); b.setAttribute('aria-selected', i === S.qmp.i); });
+    t.setAttribute('aria-activedescendant', S.qmp.pick.id + '-o' + S.qmp.i); return;
+  }
+  if ((e.key === 'Enter' || e.key === 'Tab') && !e.isComposing) { e.preventDefault(); e.stopImmediatePropagation(); qMentionPick(S.qmp.i); return; }
+  if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); qMentionClose(); }
+}, true);
+document.addEventListener('click', e => { const b = e.target.closest('[data-act="qmention-pick"]'); if (b) { e.preventDefault(); e.stopPropagation(); qMentionPick(+b.dataset.i); } }, true);
+// pasted files: chips under the box, uploaded after the task was created (then its panel opens)
+function qFilesDraw(input) {
+  const box = input.closest('.qadd'); if (!box) return;
+  let el = box.querySelector('.qfiles');
+  const fs = S.qfiles[input.id] || [];
+  if (!fs.length) { el?.remove(); return; }
+  if (!el) { el = document.createElement('div'); el.className = 'qfiles'; box.appendChild(el); }
+  el.innerHTML = fs.map((f, i) => `<span class="qfile">${ic('clip', 's')}<span class="qfn">${esc(f.name || tr('Image'))}</span><button type="button" class="iconbtn" data-act="qfile-x" data-in="${input.id}" data-i="${i}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove {0}', f.name || tr('Image')))}">${ic('x', 's')}</button></span>`).join('');
+}
+document.addEventListener('paste', e => {
+  const t = document.activeElement; if (!t || (t.id !== 'qinput' && t.id !== 'qsheet')) return;
+  const files = [...(e.clipboardData?.files || [])].filter(f => f.size > 0);
+  if (!files.length) return;  // plain text paste stays normal
+  e.preventDefault(); e.stopImmediatePropagation();
+  const named = files.map((f, i) => f.name && f.name !== 'image.png' ? f : new File([f], `${tr('Image')} ${new Date().toISOString().slice(0, 16).replace('T', ' ').replace(':', '-')}${files.length > 1 ? ' ' + (i + 1) : ''}.${(f.type.split('/')[1] || 'png').replace('jpeg', 'jpg')}`, {type: f.type}));
+  (S.qfiles[t.id] ||= []).push(...named);
+  qFilesDraw(t);
+  toast(trn('{0} file added: it is attached when you add the task', '{0} files added: they are attached when you add the task', named.length));
+}, true);
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act="qfile-x"]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  const fs = S.qfiles[b.dataset.in] || []; fs.splice(+b.dataset.i, 1);
+  const inp = document.getElementById(b.dataset.in); if (inp) { qFilesDraw(inp); inp.focus(); }
+}, true);

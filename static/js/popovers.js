@@ -642,3 +642,12 @@ function vvSync() {
   const a = document.activeElement;
   if (editFocused() && a && a.getBoundingClientRect && !a.closest('#view .chview')) { const r = a.getBoundingClientRect(), lim = vv.offsetTop + vv.height; if (r.bottom > lim - 4) a.scrollIntoView?.({block: 'nearest'}); }
 }
+// 2.22.0 (#686): a right-click on a task row (list, Kanban, Today …) opens the task's menu ("Waiting on external…", snooze,
+// pin, section …) at the row; touch: long press selects the row, the selection bar has "Waiting on external…"
+document.addEventListener('contextmenu', e => {
+  const r = e.target.closest?.('#view .trow[data-id]');
+  if (!r || isTouch() || S.multiMode || e.target.closest('input,textarea,a[href],.ttlin') || e.shiftKey) return;
+  const t = taskById(+r.dataset.id); if (!t || !(t.id > 0) || !canEdit(t)) return;
+  e.preventDefault();
+  taskMenu(r.querySelector('.ttl') || r, t.id);
+});

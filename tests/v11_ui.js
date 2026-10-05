@@ -164,10 +164,11 @@ async function api(cookie, method, url, body) {
   click(w, d.querySelector('.stmodal [data-m="save"]')); await sleep(900);
   ce = d.querySelector('.cele');
   check(ce && ce.dataset.kind === 'project', 'project status complete: celebration');
-  // still frame (screenshots): progress 0.5 puts the arm vertical
+  // still frame (screenshots): 2.22.0 (#688) the heron flies (no vine): at progress 0.5 it is in the middle of the screen
   d.querySelectorAll('.cele,.cele-quip').forEach(x => x.remove());
   w.eval(`celebrate('today', {frame: 0.5, force: true})`);
-  check(Math.abs(parseFloat((d.querySelector('.cele .carm').style.transform.match(/rotate\(([-\d.]+)deg/) || [])[1])) < 0.5, 'frame 0.5: vine straight down');
+  const fx = parseFloat((d.querySelector('.cele .cbird').style.transform.match(/translate\(([-\d.]+)px/) || [])[1]);
+  check(Math.abs(fx - w.innerWidth / 2) < 2 && !d.querySelector('.cele .cvine') && d.querySelector('.cele .cwing'), 'frame 0.5: the heron flies across, in the middle (no vine) ' + fx);
   // multi-select batch completing the rest of a list
   d.querySelectorAll('.cele,.cele-quip').forEach(x => x.remove());
   w.eval(`S.multi = new Set([${T3.id}])`); await w.eval(`batch('complete', {}, true)`); await sleep(100);

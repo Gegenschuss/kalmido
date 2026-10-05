@@ -58,6 +58,7 @@ def openapi_spec():
     from ..family.v1 import family_spec
     from ..events.v1 import events_spec
     from ..contacts.v1 import contacts_spec
+    from ..life.v1 import life_spec
     if "s" in _SPEC:
         return _SPEC["s"]
 
@@ -191,7 +192,11 @@ def openapi_spec():
             "columns": {"type": ["array", "null"], "items": {"type": "string"}, "description": COL_DOC},
             "family": nul("string", enum=[*[x for x in FAM_LIST_KINDS if x], None], description="2.19.0: what the list is for in the Family module: "
                           "shopping (sections = shop areas, a new item goes to its area of last time, a shopping mode in the app), meals "
-                          "(the meal plan: due = the day, notes = ingredients), birthdays, household, packing; null = an ordinary list")}},
+                          "(the meal plan: due = the day, notes = ingredients), birthdays, household, packing; null = an ordinary list"),
+            "life": nul("string", enum=["contracts", "home", "health", "travel", "reading", None], description="2.22.0: what the list is for in "
+                        "Home & life (health lists are private: never visible to agents, tokens need the scope private); null = none"),
+            "trip": {"type": ["object", "null"], "description": "2.22.0: a trip list's {from, to, where?}", "properties": {
+                "from": {"type": "string", "format": "date"}, "to": {"type": "string", "format": "date"}, "where": {"type": "string"}}}}},
         "ListDetail": {"allOf": [ref("List"), {"type": "object", "properties": {"sections": {"type": "array", "items": ref("Section")},
             "fields": {"type": "array", "description": "2.14.0: the list's custom fields (ids for the columns f:<id>)",
                        "items": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "type": {"type": "string"}}}}}}]},
@@ -210,6 +215,10 @@ def openapi_spec():
             "nag": {"type": "string", "enum": list(NAG_VALUES), "description": "2.7.0: default nag interval of the list's tasks (owner)"},
             "day_hours": nul("number", minimum=1, maximum=24, description="2.7.0: hours per day / shift (owner); null = the server's value")}},
         "ListPatch": {"type": "object", "additionalProperties": False, "properties": {
+            "life": nul("string", enum=["contracts", "home", "health", "travel", "reading", None], description="2.22.0: what the list is for in "
+                        "Home & life (health lists are private: never visible to agents, tokens need the scope private); null = none"),
+            "trip": {"type": ["object", "null"], "description": "2.22.0: a trip list's {from, to, where?}", "properties": {
+                "from": {"type": "string", "format": "date"}, "to": {"type": "string", "format": "date"}, "where": {"type": "string"}}},
             "family": nul("string", enum=[*[x for x in FAM_LIST_KINDS if x], None], description="2.19.0: what the list is for in the Family module: "
                           "shopping (sections = shop areas, a new item goes to its area of last time, a shopping mode in the app), meals "
                           "(the meal plan: due = the day, notes = ingredients), birthdays, household, packing; null = an ordinary list"),
@@ -514,6 +523,7 @@ def openapi_spec():
     family_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.19.0 (#653)
     events_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.21.0 (#659)
     contacts_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.21.0 (#658)
+    life_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.22.0 (#663)
     team_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.17.0 (#419)
     scope_refine(paths)
     _SPEC["s"] = {
@@ -526,7 +536,7 @@ def openapi_spec():
                  "license": {"name": "AGPL-3.0-only", "identifier": "AGPL-3.0-only"}},
         "servers": [{"url": API_PREFIX.rstrip("/")}],
         "security": [{"bearerAuth": []}],
-        "tags": [{"name": n} for n in ("Account", T, L, "Structure", "Roadmap", C, S_, TI, H, "Import", A, "Agents", "Groups", "Day plan", "Notes", "Team chat", "Family", "Events", "Contacts")],
+        "tags": [{"name": n} for n in ("Account", T, L, "Structure", "Roadmap", C, S_, TI, H, "Import", A, "Agents", "Groups", "Day plan", "Notes", "Team chat", "Family", "Events", "Contacts", "Home & life")],
         "paths": paths,
         "components": {"securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "abk_ token"}},
                        "schemas": schemas},

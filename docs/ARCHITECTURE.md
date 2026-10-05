@@ -9,7 +9,7 @@ development workflow see [CONTRIBUTING.md](../CONTRIBUTING.md).
  browser (PWA)                          server (one container)                      outside (optional)
  ---------------------------            -------------------------------------       ------------------------
  static/index.html                      app.py  (entry point)                       ntfy / Web Push services
- static/js/*.js   (web client)  --->    kalmido/  (Flask app, ~65 modules)  --->    Paperless-ngx, Git hosts,
+ static/js/*.js   (web client)  --->    kalmido/  (Flask app, ~80 modules)  --->    Paperless-ngx, Git hosts,
  static/sw.js     (offline)     <---    SQLite database (one file)                  calendars, IMAP / SMTP,
  static/i18n/*.json                     background threads (watchdog ...)           webhooks, OIDC provider
                                               ^
@@ -152,6 +152,8 @@ The most used helpers:
 | `collab/notes.py` | Notes of a list / project. |
 | `collab/teamchat.py` | Team chat (rooms and direct messages). |
 | `integrations/mail.py` | Tasks by e-mail (IMAP) and the daily summary by e-mail (SMTP). |
+| `accounts/orgs.py` | Organisations (#752): people in 1..n organisations and whom a person may see (all / own organisation / own contacts). |
+| `accounts/invite.py` | Invitations and reset links (#697): a one-time link by e-mail with which a person sets their own password. |
 | `family/family.py` | The module "Family": family fields of tasks, kid stars, occasions, shopping, packing lists, setup purpose, overview. |
 | `family/web.py` | Family: the web API. |
 | `family/carddav.py` | Family: birthdays and anniversaries from CardDAV contacts. |
@@ -165,6 +167,10 @@ The most used helpers:
 | `contacts/carddav.py` | CardDAV server: every address book a person sees as a collection of vCards. |
 | `contacts/web.py` | Contacts: the web API (address books, sharing, contacts, search, vCard import / export, links to tasks). |
 | `contacts/v1.py` | Contacts: the REST API v1 (+ MCP) and its OpenAPI part (scope "contacts"). |
+| `life/model.py` | Home & life (modules contracts, home, care, health, review, travel, reading): contracts, devices + upkeep, staying in touch, the private health list, review + journal, trips. |
+| `life/karakeep.py` | Home & life: "Read later" from Karakeep (a person's own connection, sealed API key, bookmarks -> tasks, archive back). |
+| `life/web.py` | Home & life: the web API (overview, contracts, devices, upkeep, health, trips, review + journal, staying in touch, Karakeep). |
+| `life/v1.py` | Home & life: the REST API v1 (+ MCP) and its OpenAPI part (health + journal: scope "private"). |
 | `startup.py` | Start-up: init_db() and the background threads (watchdog, update check, calendars, backups, webhooks, mail, git). |
 
 ### Adding a route
@@ -248,6 +254,7 @@ registering the ones of its area.
 | `family.js` | The module "Family". |
 | `calevents.js` | Events (module "events"): the editor and popover, the agenda, creating in the week grid, calendars, the phone setup. |
 | `contacts.js` | Contacts (module "contacts"): the view, the editor, the card, links between contacts and tasks, import / export. |
+| `life.js` | Home & life: the view, its dialogs (contract, device, upkeep, health, trip, Karakeep), the review + journal, staying in touch on a contact's card. |
 | `main.js` | Start-up: loading the state, polling, the service worker. Loaded last. |
 
 ### Adding a client file
@@ -263,3 +270,19 @@ registering the ones of its area.
   (see [tests/README.md](../tests/README.md)).
 - CI (`.github/workflows/ci.yml`): Python and JavaScript syntax of every file, `tools/check_layout.py`, translations,
   the MCP bridge, bandit (high severity), pip-audit, the browser demo, semgrep and the test shards.
+
+## Organisations and who sees whom (2.22.0)
+
+People belong to one or more **organisations** (`accounts/orgs.py`; tables `orgs`, `org_members`). The instance setting
+`people_visibility` decides whom a person sees at all; `visible_people(c, uid)` is the one place that answers it and every
+place that lists or picks people uses it (GET /api/users, sharing a list or a folder, attendees, new owners); admins see
+everyone. The modes match the two ways Kalmido is run:
+
+- **own organisation** (`org`, the default): one company or family per instance, as on a self-hosted server.
+- **own contacts** (`contacts`): a shared, hosted instance of many households and companies: no directory; a person sees
+  only the people they are connected with (a list or group in common, their kids / parents, their own agents) and shares
+  by e-mail address (the answer never says whether the address has an account); new people come by invitation (#697).
+
+A new account joins the instance's first organisation (or the ones the admin picks); on the update to 2.22 one
+organisation named after the instance's domain was created with every existing account.
+

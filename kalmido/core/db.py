@@ -141,6 +141,10 @@ def create_user(c, username, display_name="", password=None, proxy_login=None, i
         vals["ntfy_topic"] = random_topic()
     for k, v in vals.items():
         c.execute("INSERT OR REPLACE INTO user_settings(user_id,key,value) VALUES(?,?,?)", (uid, k, v))
+    # 2.22.0 (#752): every new account belongs to an organisation: the instance's first one (the caller may change it)
+    first = c.execute("SELECT id FROM orgs ORDER BY id LIMIT 1").fetchone()
+    if first:
+        c.execute("INSERT OR IGNORE INTO org_members(org_id,user_id) VALUES(?,?)", (first[0], uid))
     return uid
 
 
@@ -321,6 +325,29 @@ def init_db(guard=True):
             d = [x for x in (gsetting(c, "default_features") or "").split(",") if x]
             gset(c, "default_features", ",".join(d + [f for f in ("events", "contacts") if f not in d]))
         gset(c, "migr_feat10", "1")
+        # 2.22.0 (#752), once: one organisation (named after the instance's domain, e.g. kalmido.example.com -> "Example")
+        # with every account (agents too); people see only people of their organisations
+        if gsetting(c, "migr_orgs2220") != "1":
+            if not c.execute("SELECT 1 FROM orgs").fetchone():
+                from ..core.config import PUBLIC_URL
+                host = PUBLIC_URL.split("://", 1)[-1].split("/")[0].split(":")[0]
+                parts = [p for p in host.split(".") if p and not p.isdigit()]
+                name = (parts[-2] if len(parts) >= 2 else (parts[0] if parts else "Kalmido")).capitalize()
+                oid = c.execute("INSERT INTO orgs(name,icon,created_at) VALUES(?,?,?)", (name, "", iso(now_utc()))).lastrowid
+                c.execute("INSERT OR IGNORE INTO org_members(org_id,user_id) SELECT ?, id FROM users", (oid,))
+                if gsetting(c, "people_visibility") in (None, ""):
+                    gset(c, "people_visibility", "org")
+                print("organisations:", name, "with every account", flush=True)
+            gset(c, "migr_orgs2220", "1")
+        # 2.22.0 (#740), once: lists shared before go into the folder of the same name as with their owner (created when
+        # missing) -- only where the person has not put the list into a folder of their own
+        if gsetting(c, "migr_folders2220") != "1":
+            from ..lists.lists import member_folder_adopt
+            n = sum(1 for r in c.execute("""SELECT m.list_id, m.user_id FROM list_members m JOIN lists l ON l.id=m.list_id
+                                            WHERE COALESCE(m.folder,'')='' AND l.folder!=''""").fetchall() if member_folder_adopt(c, r[0], r[1]))
+            gset(c, "migr_folders2220", "1")
+            if n:
+                print("shared lists:", n, "sorted into the folders of their owners", flush=True)
         for (uid,) in c.execute("SELECT id FROM users").fetchall():
             ensure_inbox(c, uid)
             for k, v in USER_DEFAULTS.items():

@@ -23,10 +23,10 @@ from ..personal.timetrack import BadInput
 # ---------------------------------------------------------------- settings / export (per user)
 
 SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "review_sent", "ntfy_topic", "features_rev", "onboard", "sample_ask", "agent_share",
-                        "purpose", "evcals_hidden")
+                        "purpose", "evcals_hidden", "care_sent")
 DASH_WIDGETS = ("wait", "today", "news", "chat", "projects", "pinned", "notes", "agents", "stats", "search", "family")  # 2.17.0 (#475), 2.19.0
 SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "time_focus", "paperless_keep", "celebrate", "cal_today",
-                  "date_confirm", "digest_mail", "mail_from_me")
+                  "date_confirm", "digest_mail", "mail_from_me", "today_inbox")
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24)}
 
@@ -404,6 +404,10 @@ def export_json():
                             "WHERE k.owner_id=?)", (uid,)),
         "address_books": ("SELECT id, name, color, created_at FROM books WHERE owner_id=?", (uid,)),
         "contacts": ("SELECT * FROM contacts WHERE book_id IN (SELECT id FROM books WHERE owner_id=?)", (uid,)),
+        # 2.22.0 (#663): my journal, whom I stay in touch with, my Karakeep connection (without the API key)
+        "journal": ("SELECT day, text, mood, updated_at FROM journal WHERE user_id=? ORDER BY day", (uid,)),
+        "contact_care": ("SELECT contact_id, every_days, last, note, updated_at FROM contact_care WHERE user_id=?", (uid,)),
+        "karakeep": ("SELECT url, list_id, source, archive, synced_at, created_at FROM kk_conns WHERE user_id=?", (uid,)),
         # calendar subscriptions without the (encrypted) link / password
         "calendar_subscriptions": ("SELECT id, kind, name, color, visible, interval, url_hint, username, created_at FROM cal_subs "
                                    "WHERE user_id=?", (uid,)),

@@ -149,6 +149,10 @@ const ptypeName = k => k ? tr(PTYPE_UI.find(x => x[0] === k)?.[1] || k) : tr('No
 const ptypeHint = k => tr(PTYPE_UI.find(x => x[0] === (k || ''))?.[3] || PTYPE_UI[0][3]);
 // the Repository area of a project: for software projects and for every list that already has a repository
 const repoShown = l => (l.ptype === 'software' && (l.kind || 'list') === 'project') || !!(l.repos || []).length;
+// 2.22.0 (#746): the software parts of a list's properties (ticket types, repository) only for a software project or a list
+// that has a repository; never for family / household lists, kids or people who set Kalmido up for home or family
+const swArea = l => repoShown(l);
+const swOffer = l => !!l && !l.is_inbox && !l.family && !l.life && !S.me?.kid && !['family', 'home'].includes(S.settings.purpose || '') && !swArea(l);
 function ptypeRowHtml(l) {
   const may = canManage(l), why = may ? '' : tr('Only the owner and list admins can change the project type');
   return `<div class="row lptrow"><label for="l-ptype">${tr('Project type')}</label><select id="l-ptype" ${may ? '' : `disabled title="${esc(why)}"`}>${PTYPE_UI.map(([k, n]) => `<option value="${k}" ${(l.ptype || '') === k ? 'selected' : ''}>${k ? tr(n) : tr('None|project type')}</option>`).join('')}</select></div>
@@ -346,6 +350,7 @@ function shareModal(id) {
   const own = isOwner(l0), hint = t => `<div class="shint lhint">${t}</div>`;
   const md = modal(`<div class="lhdr"><h3>${esc(tr(collab() ? N_('Share “{0}”') : N_('Owner of “{0}”'), lname(l0)))}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
     ${collab() ? `<h4 id="sh-people-h">${tr('People')}</h4><div class="members" id="l-members" aria-labelledby="sh-people-h"></div>` : ''}
+    ${collab() && S.peopleVis === 'contacts' && canManage(l0) ? `<div class="row shmail"><input id="sh-email" type="email" autocomplete="off" placeholder="${esc(tr('Share by e-mail address'))}" aria-label="${esc(tr('Share by e-mail address'))}"><button type="button" class="btn sm" data-m="share-mail">${ic('send', 's')} ${tr('Share')}</button></div>` : ''}
     ${collab() ? `<div id="sh-grpwrap"></div>` : ''}
     ${collab() && agentsOn() ? `<div id="sh-agwrap"></div>` : ''}
     ${own && S.publicLinks ? `<h4 id="l-pub-h">${tr('Public link')}</h4><div id="l-pub"><div class="muted mhint">${tr('Loading…')}</div></div>` : ''}
@@ -412,6 +417,11 @@ function shareModal(id) {
     const m = b.dataset.m;
     if (m === 'close') { md.remove(); return; }
     if (m === 'list-edit') { md.remove(); listModal(id); return; }
+    if (m === 'share-mail') {  // 2.22.0 (#752): mode "own contacts": share by address; the answer never says whether it has an account
+      const em = $('#sh-email', md).value.trim(); if (!em) { $('#sh-email', md).focus(); return; }
+      try { await api('PUT', `/api/lists/${id}/members`, {email: em, role: 'edit'}); } catch { return; }
+      $('#sh-email', md).value = ''; toast(tr('If there is an account with this address, the list is now shared with it.')); await load(); render(); return;
+    }
     if (m === 'share' || m === 'share-ag') {
       const [us, rs] = m === 'share' ? ['#l-adduser', '#l-addrole'] : ['#sh-addagent', '#sh-agrole'];
       const u = +$(us, md).value; if (!u) return;
@@ -432,6 +442,42 @@ function shareModal(id) {
     if (m === 'own-xfer') { const j = $('#l-owner', md)?._j; if (j) ownerModal(id, lname(listById(id) || l0), j, () => md.remove()); return; }
   });
   return md;
+}
+// 2.22.0 (#682): a new list / project gets a fitting emoji from its name (a local word list in the six languages, no AI):
+// suggested in the dialog as soon as a word matches, one tap on it changes or removes it; existing lists stay as they are
+const AUTO_EMO = [
+  ['🛒', 'einkauf shopping grocer groceries supermarkt supermarket courses épicerie compra compras spesa boodschappen'],
+  ['💼', 'arbeit work job büro office travail trabajo oficina lavoro ufficio werk kantoor business'],
+  ['👨‍👩‍👧', 'familie family famille familia famiglia gezin kinder kids enfants niños bambini'],
+  ['🏖️', 'urlaub holiday vacation ferien vacances vacaciones vacanze vakantie strand beach plage playa spiaggia'],
+  ['✈️', 'reise trip travel flug flight voyage viaje viaggio reis'],
+  ['🏠', 'haus house home zuhause haushalt household maison casa hogar huis wohnung apartment appartement'],
+  ['🌱', 'garten garden jardin jardín giardino tuin pflanzen plants'],
+  ['🚗', 'auto car voiture coche macchina wagen kfz'],
+  ['💰', 'geld money finanzen finance finances dinero soldi geld budget steuer tax taxes impôts impuestos tasse belasting bank'],
+  ['🩺', 'gesundheit health arzt doctor santé médecin salud médico salute medico gezondheid dokter'],
+  ['🏃', 'sport fitness training laufen running gym deporte allenamento hardlopen'],
+  ['📚', 'lesen reading bücher books lecture livres lectura libros lettura libri lezen boeken studium study school schule uni université universidad università'],
+  ['🎁', 'geschenk geschenke gift gifts cadeau cadeaux regalo regali'],
+  ['🎂', 'geburtstag birthday anniversaire cumpleaños compleanno verjaardag party feier fête fiesta festa feest'],
+  ['🍳', 'kochen cooking rezepte recipes essen meals cuisine recettes cocina recetas cucina ricette koken recepten'],
+  ['🐾', 'haustier pet pets hund dog katze cat chien chat perro gato cane gatto hond kat'],
+  ['🔧', 'reparatur repair renovierung renovation werkzeug diy bricolage reparación riparazione klussen'],
+  ['💻', 'software code coding dev entwicklung development app website web it programmierung'],
+  ['📝', 'notizen notes ideen ideas idées ideas idee ideeën'],
+  ['🎵', 'musik music musique música musica muziek'],
+  ['📦', 'umzug moving déménagement mudanza trasloco verhuizing'],
+  ['💍', 'hochzeit wedding mariage boda matrimonio bruiloft'],
+  ['🎄', 'weihnachten christmas noël navidad natale kerst'],
+  ['📄', 'verträge contracts vertrag contract contrats contratos contratti contracten versicherung insurance assurance seguro assicurazione verzekering'],
+  ['👶', 'baby bébé bebé neonato'],
+  ['🧹', 'putzen cleaning ménage limpieza pulizie schoonmaken'],
+];
+function autoEmoji(name) {
+  const words = String(name || '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(w => w.length > 2);
+  if (!words.length) return '';
+  const hit = f => AUTO_EMO.find(([, ks]) => ks.split(' ').some(k => words.some(w => f(w, k))));  // the beginning of a word first
+  return (hit((w, k) => w === k || (k.length > 3 && w.startsWith(k))) || hit((w, k) => k.length > 4 && w.endsWith(k)) || [''])[0];
 }
 function listModal(id, folder = '', o = {}) {
   const l = id ? listById(id) : {name: '', color: '', folder, view: 'list', kind: o.kind || 'list', tickets: 0};
@@ -454,8 +500,8 @@ function listModal(id, folder = '', o = {}) {
       <div class="ptdates" hidden><div class="row"><label>${tr('Project start')}</label>${dateIn('l-pstart', today(), {label: tr('Project start'), clear: false})}</div><div class="row"><label>${tr('End (optional)')}</label>${dateIn('l-pend', '', {label: tr('End (optional)'), empty: tr('none')})}<span class="muted">${tr('stretches or squeezes the dates')}</span></div></div></div>`}
     <div class="kproj" ${(l.kind || 'list') === 'project' ? '' : 'hidden'}>
     ${id && !l.is_inbox ? ptypeRowHtml(l) : ''}
-    ${own && !l.is_inbox ? `<div class="row"><label>${tr('Ticket types')}</label><label class="chkl"><input type="checkbox" id="l-tickets" ${l.tickets ? 'checked' : ''}> ${tr('Bug, feature, task')}</label>${id ? `<button class="btn sm" data-m="tt-tpl" type="button">${tr('Templates…')}</button>` : ''}</div>
-    <div class="shint lhint">${tr('Tasks get a type with an icon, a filter and quick add !bug / !feature; new bugs and features start with a note template.')}</div>` : ''}
+    ${own && !l.is_inbox ? `<div class="row ltkrow" ${swArea(l) || l.tickets ? '' : 'hidden'}><label>${tr('Ticket types')}</label><label class="chkl"><input type="checkbox" id="l-tickets" ${l.tickets ? 'checked' : ''}> ${tr('Bug, feature, task')}</label>${id ? `<button class="btn sm" data-m="tt-tpl" type="button">${tr('Templates…')}</button>` : ''}</div>
+    <div class="shint lhint ltkhint" ${swArea(l) || l.tickets ? '' : 'hidden'}>${tr('Tasks get a type with an icon, a filter and quick add !bug / !feature; new bugs and features start with a note template.')}</div>` : ''}
     ${id && progressOn() ? `<div class="row"><label>${tr('Progress')}</label><label class="chkl"><input type="checkbox" id="l-showprog" ${progHidden(id) ? '' : 'checked'}> ${tr('Show the progress bar')}</label><span class="muted">${tr('only for you')}</span></div>` : ''}
     ${id && timeOn() && (own || l.day_hours) ? `<div class="row"><label for="l-dayh">${tr('Hours per day')}</label><input id="l-dayh" inputmode="decimal" value="${l.day_hours != null ? esc(String(l.day_hours).replace('.', LOCALE().startsWith('de') ? ',' : '.')) : ''}" placeholder="${esc(fmtNum(S.timeDayH || 8))}" style="max-width:5rem" ${dis}><span class="muted">${tr('h per day / shift, for the time sum in the header · empty = {0} h (server)', fmtNum(S.timeDayH || 8))}</span></div>` : ''}
     ${timeOn() && (own || l.rate) ? `<div class="row"><label for="l-rate">${tr('Hourly rate')}</label><input id="l-rate" inputmode="decimal" value="${l.rate != null ? esc(String(l.rate).replace('.', LOCALE().startsWith('de') ? ',' : '.')) : ''}" placeholder="${tr('optional')}" style="max-width:6.875rem" ${dis}><span class="muted">${esc(S.settings.time_currency || '')} · ${tr('time reports')}</span></div>` : ''}
@@ -467,6 +513,7 @@ function listModal(id, folder = '', o = {}) {
     ${id && !l.is_inbox && (l.kind || 'list') === 'project' ? `<div class="lrepo" ${repoShown(l) ? '' : 'hidden'}><div class="shint keep lhint lrepohint" hidden>${ic('git', 's')} ${tr('Connect a repository (optional)')}</div>${repoBoxHtml(l)}</div>` : ''}
     </div>
     ${id && !l.is_inbox && (l.kind || 'list') !== 'project' && (l.repos || []).length ? repoBoxHtml(l) : ''}
+    ${id && own && swOffer(l) ? `<div class="row lswoffer"><span></span><button type="button" class="linkbtn" data-m="sw-setup">${ic('code', 's')} ${tr('Set up as a software project…')}</button></div>` : ''}
     ${own ? `<div class="row ldabrow"><label>${tr('Completed')}</label><label class="chkl"><input type="checkbox" id="l-dab" ${l.checklist ? 'checked' : ''}> ${tr('Show completed at the bottom')}</label></div>
     <div class="shint lhint">${ic('cart', 's')} ${tr('What you tick off stays visible at the bottom and comes back with one tap: handy for shopping and packing lists.')}</div>` : ''}
     <div class="row lnagrow"><label for="l-nag">${tr('Repeat reminders')}</label><select id="l-nag" ${dis}><option value="">${tr('Off|nag')}</option>${NAG_OPTS.slice(1).map(([v, n]) => `<option value="${v}" ${(l.nag || '') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
@@ -518,6 +565,8 @@ function listModal(id, folder = '', o = {}) {
     if ($('#l-tickets', md)) $('#l-tickets', md).checked = !!x.tickets;
     if ($('#l-ptype', md) && !ptPend) { $('#l-ptype', md).value = x.ptype || ''; $('#l-pthint', md).textContent = ptypeHint(x.ptype || ''); }
     if ($('.lrepo', md)) $('.lrepo', md).hidden = !repoShown(x);
+    $$('.ltkrow, .ltkhint', md).forEach(r => { r.hidden = !(swArea(x) || x.tickets); });  // 2.22.0 (#746)
+    if ($('#l-tickets', md)) $('#l-tickets', md).checked = !!x.tickets;
     if ($('#l-rate', md) && document.activeElement !== $('#l-rate', md)) $('#l-rate', md).value = x.rate != null ? String(x.rate).replace('.', LOCALE().startsWith('de') ? ',' : '.') : '';
     if ($('#l-dayh', md) && document.activeElement !== $('#l-dayh', md)) $('#l-dayh', md).value = x.day_hours != null ? String(x.day_hours).replace('.', LOCALE().startsWith('de') ? ',' : '.') : '';
     if ($('#l-nag', md)) $('#l-nag', md).value = x.nag || '';
@@ -612,7 +661,7 @@ function listModal(id, folder = '', o = {}) {
       const tp = b.dataset.pt.startsWith('tpl:');
       $('.ptdates', md).hidden = !tp;
       const pt = PTYPE_UI.find(x => x[0] === b.dataset.pt);
-      if (pt && pt[0] === 'software' && $('#l-view', md)?.querySelector('option[value="kanban"]')) $('#l-view', md).value = 'kanban';
+      // 2.22.0 (#749): every new list opens as a list (the board is one tap away)
       if ($('#l-tickets', md)) { $('#l-tickets', md).checked = b.dataset.pt === 'software'; $('#l-tickets', md).closest('.row').hidden = !!b.dataset.pt; }
       if (!$('#l-name', md).value.trim() && (tp || (pt && pt[0]))) $('#l-name', md).value = tp ? $('b', b).textContent : tr(pt[1]);
       return;
@@ -671,12 +720,25 @@ function listModal(id, folder = '', o = {}) {
       return;
     }
     if (a === 'arch') { await autosave(); md.remove(); await listArchive(id, !l.archived); }
+    if (a === 'sw-setup') { await autosave(); md.remove(); if (await setListPtype(id, 'software')) listModal(id); }  // 2.22.0 (#746)
     if (a === 'del') { if (await listDeleteForGood(id)) md.remove(); }
   });
   md.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.id !== 'l-emocustom' && !e.target.id.startsWith('lp-')) { if (id) { e.preventDefault(); autosave(); } else $('[data-m="save"]', md).click(); } });
   if (!own) { if (!isTouch()) setTimeout(() => $('#l-folder', md).focus(), 50); return; }
+  let emoTouched = !!id;  // 2.22.0 (#682): the suggestion follows the name until the person picks something themselves
+  md.addEventListener('click', e => { if (e.target.closest('#l-emogrid [data-emo]')) emoTouched = true; }, true);
+  md.addEventListener('input', e => {
+    if (e.target.id !== 'l-name' || emoTouched) return;
+    const s = autoEmoji(e.target.value);
+    if (s === emo) return;
+    emo = s;
+    const b = $('#l-emo', md); b.innerHTML = emo || ic('list'); b.title = emo ? tr('Suggested icon: tap to change or remove it') : tr('Choose icon');
+    b.classList.toggle('sugg', !!emo);
+    $$('#l-emogrid button', md).forEach(x => x.classList.toggle('on', !!emo && x.dataset.emo === emo));
+  });
   md.addEventListener('input', e => {  // any emoji typed (or picked from the OS keyboard) into the custom field
     if (e.target.id !== 'l-emocustom') return;
+    emoTouched = true;
     const m = e.target.value.match(EMO_RE);
     if (m) { emo = m[1]; $('#l-emo', md).innerHTML = emo; $$('#l-emogrid button', md).forEach(x => x.classList.remove('on')); if (id) later(e.target); }
   });
@@ -738,7 +800,7 @@ function lookHtml() {
       <div class="lpv-head"><b>${tr('Today')}</b><span class="lpv-n">2</span></div>
       <div class="trow pr5"><span class="chk p5"></span><div class="tmain"><div class="ttl">${tr('Call the plumber about the kitchen tap')}</div><div class="meta"><span class="dt today">${ic('cal', 's')}${tr('Today')} 09:30</span><span class="tag">#${tr('home')}</span></div></div></div>
       <div class="trow pr1"><span class="chk p1"></span><div class="tmain"><div class="ttl">${tr('Renew the library books')}</div><div class="meta"><span class="dt">${ic('cal', 's')}${dayLabel(addDays(today(), 3))}</span><span class="subc">${ic('sub', 's')}1/3</span></div></div></div>
-      <div class="lpv-foot"><span class="btn sm pri">${ic('plus', 's')} ${tr('Add task')}</span><span class="lpv-link">${tr('Show completed')}</span><span class="qchip">!${tr('high')}</span></div>
+      <div class="lpv-foot"><span class="btn sm pri">${ic('plus', 's')} ${tr('Add task')}</span><span class="lpv-link">${tr('Show completed')}</span><span class="lpv-prio flag-5">${ic('flag', 's')}${tr('high')}</span></div>
     </div>
     <h4>${tr('Color scheme')}<span class="devtag">${tr('This device')}</span></h4>
     <div class="row">${seg('theme', THEMES)}</div>

@@ -76,7 +76,7 @@ from ..agents.api import job_notify
 # as the agent with its rights at that moment (approval_run), Reject stops it; the agent gets a "job" event either way.
 SCOPE_LABELS = {"read": N_("Read"), "tasks:write": N_("Tasks"), "comments": N_("Comments"), "structure": N_("Structure"),
                 "delete": N_("Delete & trash"), "attachments:read": N_("Read files"), "attachments:write": N_("Upload files"),
-                "time": N_("Time tracking"), "export": N_("Export"), "calendar": N_("Calendar"), "contacts": N_("Contacts"),
+                "time": N_("Time tracking"), "export": N_("Export"), "calendar": N_("Calendar"), "contacts": N_("Contacts"), "private": N_("Health & journal"),
                 "account": N_("Account settings"), "admin-read": N_("Admin read"),
                 "write": N_("Everything (old token)")}
 SCOPE_HELP = {"read": N_("Lists, tasks, comments, time entries, habits, search"),
@@ -88,6 +88,7 @@ SCOPE_HELP = {"read": N_("Lists, tasks, comments, time entries, habits, search")
               "time": N_("Timer and time entries"), "export": N_("Download all data"),
               "calendar": N_("Read and change events and calendars"),
               "contacts": N_("Read and change contacts and address books (personal data of other people)"),
+              "private": N_("Health lists and the journal (sensitive personal data; never for agents)"),
               "account": N_("Notification settings and app passwords (an app password gives calendar apps full access to your tasks)"), "admin-read": N_("Users and server status (admins only)")}
 ROLE_WORD = {"admin": N_("Admin"), "edit": N_("Member"), "participant": N_("Participant"), "view": N_("Viewer")}
 BATCH_TITLE = {"update": N_("Change {0} tasks at once"), "complete": N_("Complete {0} tasks at once"), "reopen": N_("Reopen {0} tasks at once"),

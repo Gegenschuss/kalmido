@@ -106,21 +106,21 @@ const ds = n => { const d = new Date(Date.now() + n * 864e5); return `${d.getFul
   check(/Dependencies/.test(d.querySelector('#d-deps').textContent), 'detail: Dependencies section');
   d.querySelector('#d-deps [data-act="dep-add"][data-dir="by"]').click(); await sleep(150);
   let pk = lastModal(d);
-  check(pk.querySelectorAll('.dprow').length >= 3, 'picker lists open tasks');
+  check(pk.querySelectorAll('.tpkrow').length >= 3, 'picker lists open tasks');
   input(w, pk.querySelector('#dp-q'), 'desi');
-  check(pk.querySelectorAll('.dprow').length === 1 && /Design/.test(pk.querySelector('.dprow').textContent), 'picker search');
-  pk.querySelector('.dprow').click();
+  check(pk.querySelectorAll('.tpkrow').length === 1 && /Design/.test(pk.querySelector('.tpkrow').textContent), 'picker search');
+  pk.querySelector('.tpkrow').click();
   check(await until(() => /Design/.test(d.querySelector('#d-deps')?.textContent || '')), 'detail lists the blocker');
   check(row().querySelector('.blk') && /Waiting on: “Design”/.test(row().querySelector('.blk').title), 'row: waiting indicator with the blocker name');
   // blocking direction from Ship's panel: Ship waits on Build
   w.eval(`openDetail(${t2})`); await sleep(600);
   d.querySelector('#d-deps [data-act="dep-add"][data-dir="blocking"]').click(); await sleep(150);
-  pk = lastModal(d); input(w, pk.querySelector('#dp-q'), 'ship'); pk.querySelector('.dprow').click();
+  pk = lastModal(d); input(w, pk.querySelector('#dp-q'), 'ship'); pk.querySelector('.tpkrow').click();
   check(await until(async () => (await call('GET', `/api/tasks/${t3}/deps`)).blocked_by.some(x => x.id === t2)), 'blocking: Ship now waits on Build');
   // cycle refused with a message: Design waits on Ship
   w.eval(`openDetail(${t1})`); await sleep(600);
   d.querySelector('#d-deps [data-act="dep-add"][data-dir="by"]').click(); await sleep(150);
-  pk = lastModal(d); input(w, pk.querySelector('#dp-q'), 'ship'); pk.querySelector('.dprow').click(); await sleep(600);
+  pk = lastModal(d); input(w, pk.querySelector('#dp-q'), 'ship'); pk.querySelector('.tpkrow').click(); await sleep(600);
   check(/circular/.test(d.querySelector('#toast').textContent), 'cycle: message');
   pk.remove();
   // complete a waiting task: confirm

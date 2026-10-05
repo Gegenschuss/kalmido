@@ -116,6 +116,9 @@ def folder_rename():
     if subs and new.count(FOLDER_SEP) + 1 >= FOLDER_DEPTH:
         return err(tr("Folders nest at most {0} levels deep", FOLDER_DEPTH))
     _folder_move(c, uid, lambda p: new + p[len(old):] if folder_under(p, old) else p)
+    for fp in c.execute("SELECT folder, user_id FROM folder_people WHERE owner_id=?", (uid,)).fetchall():  # 2.22.0 (#740)
+        if folder_under(fp[0], old):
+            c.execute("UPDATE OR REPLACE folder_people SET folder=? WHERE owner_id=? AND folder=? AND user_id=?", (new + fp[0][len(old):], uid, fp[0], fp[1]))
     bump(c)
     c.commit()
     return jsonify(ok=True)
@@ -140,6 +143,7 @@ def folder_delete():
             return (parent + FOLDER_SEP + rest) if parent else rest
         return p
     _folder_move(c, uid, lambda p: "" if up(p) == "\0" else up(p))
+    c.execute("DELETE FROM folder_people WHERE owner_id=? AND folder=?", (uid, name))  # 2.22.0 (#740): the folder is gone
     bump(c)
     c.commit()
     return jsonify(ok=True)

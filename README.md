@@ -18,6 +18,12 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.22.0** (2026-10-05): Home & life. Seven small modules, each off until you want it: **contracts** with the last day
+  to cancel and the cost per month, **devices** with their warranty and **upkeep** that comes back, **staying in touch**
+  with the people who matter, **health** (appointments, check-ups, medication) in a private list agents never see, the
+  **day and week in review** with a private **journal**, **trips** with bookings and packing lists, and **read later**
+  (also from Karakeep). Quick add knows `@` and pasted images, *Waiting on external* is one tap away, Today can show the
+  inbox, new lists get an emoji, the heron flies, and the sidebar folders read as a tree.
 - **2.21.0** (2026-10-05): Events & contacts. Kalmido keeps your **events** and **contacts** itself, next to the tasks,
   and your phone's own **calendar and contacts apps sync directly** (CalDAV and CardDAV: iPhone, Android with DAVx⁵,
   Thunderbird). Events with time zones, repeats (also *only this date*), reminders, **invitations** with answers and a
@@ -687,6 +693,42 @@ a tab (Settings > Appearance > Tab bar).
 - **Packing lists** from templates: holiday, swimming pool, daycare, camping, business trip.
 - API v1 and MCP: `/family`, `/family/occasions`, `/family/deadlines`, `/tasks/{id}/to-shopping`, `/lists/{id}/shop-areas`,
   `/family/packing`, `/family/kids`, rewards; tasks carry `family`, `rotation`, `people` and `stars` (docs/API.md).
+
+## Organisations and invitations
+
+*Settings > Administration > Organisations*: people belong to one or more organisations (name, emoji, members). **People
+see** decides whom people see in the share dialog, as attendees and in the user list: everyone, only people of their own
+organisations (the default), or only people they are connected with (for a shared server of several households or
+companies: no directory, lists are shared by e-mail address). Admins always see everyone. The organisation's name shows on
+the login page, in the sidebar and in the invitation mail.
+
+**Invitations**: create a person without a password and Kalmido e-mails them a link (valid 7 days, once) to *Set up
+your account*: they choose their own password and are signed in. *Send the invitation again* / *Send a link to set a
+new password* in the user dialog; without SMTP you copy the link.
+
+## Home & life
+
+Seven modules under *Settings > Modules > At home*, each off until you switch it on; the view **Home & life** shows a
+card per module (sidebar, command field). They are made of ordinary tasks, lists and contacts, so reminders, the
+calendar, CalDAV, sharing and the API work as everywhere.
+
+- **Contracts & subscriptions**: provider, cost (per month, quarter or year), the end of the current term, the notice
+  period and the renewal. The task is due on the **last day to cancel** and reminds you before it; ticking it off means
+  you keep it (it moves on to the next term), *Cancelled* in the task panel ends it. The card sums the cost per month and
+  per year. Link the contract from Paperless in the task.
+- **Home & devices**: devices with their warranty end (a reminder before it; link the receipt) and **upkeep** that comes
+  back every few months, with suggestions (heating, smoke detectors, tyres, descaling …).
+- **Staying in touch** (needs Contacts): on a contact's card choose *every 2 weeks … every year*; *In touch today* notes
+  it. The card lists who is due, a push once a day names them. Your choices are yours only.
+- **Health**: appointments, check-ups and vaccinations (repeating) and medication (a daily reminder per time), in a
+  **private** list: agents never see it, API tokens only with the permission *Health & journal*, no webhooks.
+- **Review & journal**: your day or week (done, still open, moved, coming up) and a private journal with a mood.
+- **Travel**: *Trip* creates a list with the dates, sections for bookings and things to do before you leave, a packing
+  list from a template and, with Events on, an all-day event.
+- **Read later**: a reading list; *Connect Karakeep…* with your own address and API key (stored encrypted) turns
+  bookmarks into tasks with their link and archives the ticked ones in Karakeep.
+- API v1 and MCP: `/life`, `/life/contracts`, `/life/devices`, `/life/upkeep`, `/life/health` (permission `private`),
+  `/life/trips`, `/life/review`, `/life/journal/{day}` (`private`), `/contacts/{id}/care`, `/life/karakeep/sync`.
 
 ## Events
 

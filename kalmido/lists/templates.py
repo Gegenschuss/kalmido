@@ -459,7 +459,7 @@ PTYPES = {
     "agency": {"view": "list", "tickets": 0, "dep_shift": 0, "modules": ("time", "fields"),
                "sections": (N_("Request"), N_("Concept"), N_("Production"), N_("Approval"), N_("Billing")),
                "fields": ((N_("Client"), "text"), (N_("Budget h"), "number"))},
-    "software": {"view": "kanban", "tickets": 1, "dep_shift": 1, "modules": ("kanban", "deps"),
+    "software": {"view": "list", "tickets": 1, "dep_shift": 1, "modules": ("kanban", "deps"),
                  "sections": (N_("Backlog"), N_("Next|section"), N_("In progress"), N_("Review"), N_("Done|section")), "fields": ()},
     "private": {"view": "list", "tickets": 0, "dep_shift": 0, "modules": (),
                 "sections": (N_("Ideas"), N_("Planning"), N_("To do|section")), "fields": ()},

@@ -55,7 +55,7 @@ const feats = st => st.settings.features.split(',');
   let jar = {}, w = await open(jar), d = w.document;
   check(await step1(w), 'setup: step 2 appears after the admin was created');
   check(/What do you use Kalmido for\?/.test(d.querySelector('.setupcard').textContent), 'step 2 title');
-  check([...d.querySelectorAll('[data-su-preset]')].map(b => b.dataset.suPreset).join() === 'me,family,team,software', '2.19.0: four purposes: For me, Family, Team, Software projects');
+  check([...d.querySelectorAll('[data-su-preset]')].map(b => b.dataset.suPreset).join() === 'me,home,family,team,software', '2.19.0: the purposes: For me, (2.22.0) Home, Family, Team, Software projects');
   check(d.querySelector('[data-su-preset="me"]').classList.contains('on') && d.querySelector('[data-su-preset="me"]').getAttribute('aria-pressed') === 'true' && !d.querySelector('[data-su-preset="team"]').classList.contains('on'), '"For me" preselected');
   check(!d.querySelector('[data-use="comments"]').checked && !d.querySelector('[data-use="collab"]').checked && !d.querySelector('[data-use="family"]').checked, 'For me: comments, collaboration + Family off');
   check([...d.querySelectorAll('[data-su-start]')].map(b => b.dataset.suStart).join() === ',sample,agency,software,private' && d.querySelector('[data-su-start=""]').classList.contains('on'), 'K21: "Start with": Empty (preselected), Sample, Agency, Software, Personal');
@@ -143,7 +143,7 @@ const feats = st => st.settings.features.split(',');
   check(d.querySelector('[data-use="cal"]').checked && ['timeline', 'kanban', 'matrix', 'habits', 'pomo', 'stats', 'progress', 'deps', 'fields', 'collab', 'time', 'family'].every(k => !d.querySelector(`[data-use="${k}"]`).checked), 'For me: only the calendar ticked');
   check(d.querySelector('[data-su-preset="me"]').classList.contains('on') && d.querySelector('[data-su-preset="me"] .i'), 'For me highlighted (with its icon)');
   // fine-tuning back to a preset highlights it again
-  const hb = d.querySelector('[data-use="habits"]'); hb.checked = true; hb.dispatchEvent(new w.Event('change', {bubbles: true}));
+  const hb = d.querySelector('[data-use="pomo"]'); hb.checked = true; hb.dispatchEvent(new w.Event('change', {bubbles: true}));  // 2.22.0: habits = Home
   check(!d.querySelector('.supreset.on'), 'one extra module: no preset matches');
   hb.checked = false; hb.dispatchEvent(new w.Event('change', {bubbles: true}));
   check(d.querySelector('[data-su-preset="me"]').classList.contains('on'), 'back to the preset: highlighted again');

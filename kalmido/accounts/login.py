@@ -43,7 +43,13 @@ def auth_info():
                    languages=languages(), user=user_public(g.user) if g.user else None,
                    auth_error=g.auth_error, login=g.proxy_login or proxy_login_value(),
                    oidc={"label": oidc_cfg(c)["label"]} if oidc_cfg(c)["on"] else None, passkey_login=gsetting(c, "passkey_login") != "0",
-                   login_errors={k: tr(v) for k, v in OIDC_ERRORS.items()} if oidc_cfg(c)["on"] else {})
+                   login_errors={k: tr(v) for k, v in OIDC_ERRORS.items()} if oidc_cfg(c)["on"] else {},
+                   org=_org_label(c))  # 2.22.0 (#752): the instance's organisation (only when there is exactly one)
+
+
+def _org_label(c):
+    from ..accounts.orgs import org_label
+    return org_label(c)
 
 
 def finish_login(c, u, remember, via, extra=None):

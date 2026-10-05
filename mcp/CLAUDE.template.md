@@ -34,6 +34,8 @@
 
 ### Showing that you are alive
 - Before you answer in the chat, send the **typing signal** (`chat_typing`), then answer.
+- Before you answer a comment on a task, send the **comment typing signal** (`comment_typing`, again every few seconds
+  while you write), then post the comment.
 - While you work, set your status to **working** with a short text (`set_status`, e.g. "Building 2.4.0"); set it back
   to **idle** only when nothing is running any more.
 - Every larger piece of work gets **one job** (`create_job`) with short progress lines (`update_job` with `append_log`);

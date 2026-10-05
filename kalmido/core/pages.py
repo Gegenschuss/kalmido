@@ -361,5 +361,7 @@ def version():
     from ..collab.news import news_sig
     from ..calendars.subscriptions import cal_sig
     from ..collab.teamchat import tchat_sig
+    from ..agents.chat import task_typing_for
     c = db()
-    return jsonify(v=int(gsetting(c, "version")), n=news_sig(c, me()), c=cal_sig(c, me()), t=tchat_sig(c, me()))  # t: 2.17.0 (#419)
+    return jsonify(v=int(gsetting(c, "version")), n=news_sig(c, me()), c=cal_sig(c, me()), t=tchat_sig(c, me()),  # t: 2.17.0 (#419)
+                   ty=task_typing_for(c, me()))  # ty: 2.22.0 (#693) who is writing a comment where

@@ -187,7 +187,19 @@ const workingAgents = () => (S.agents || []).filter(a => a.enabled && a.status =
 function taskTypers(t) {
   if (!t || !(t.id > 0) || t.context) return [];
   const mine = new Set(taskAgents(t).map(a => a.id));
-  return workingAgents().filter(a => a.status_task === t.id || (a.job_tasks || []).includes(t.id) || (!a.status_task && mine.has(a.id)));
+  const ags = workingAgents().filter(a => a.status_task === t.id || (a.job_tasks || []).includes(t.id) || (!a.status_task && mine.has(a.id)));
+  // 2.22.0 (#693): people and agents that sent the typing signal for this task's comments (GET /api/version, ty)
+  const ty = (S.ctyping || []).filter(x => x.task_id === t.id);
+  return [...ags.map(a => ty.some(x => x.user_id === a.id) ? {...a, typing: Infinity} : a),
+    ...ty.filter(x => !ags.some(a => a.id === x.user_id)).map(x => ({id: x.user_id, name: x.name, typing: Infinity}))];
+}
+// 2.22.0 (#693): while I write a comment in a shared list, the others see "<name> is writing …" (a signal every 5 s at most)
+const CTY = {tid: 0, at: 0};
+function commentTyping() {
+  const t = taskById(S.sel); if (!t || !(t.id > 0) || !cmSocial(t) || !OUT.online) return;
+  if (CTY.tid === t.id && Date.now() - CTY.at < 5000) return;
+  CTY.tid = t.id; CTY.at = Date.now();
+  fetch(`/api/tasks/${t.id}/typing`, {method: 'POST', headers: {'X-Requested-With': 'kalmido'}}).catch(() => {});
 }
 function typingHtml(ags, id) {
   if (!ags.length) return `<div class="atyping hidden" id="${id}" role="status" aria-live="polite"></div>`;

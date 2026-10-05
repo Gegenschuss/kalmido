@@ -5,7 +5,7 @@ import re
 from flask import jsonify
 
 from ..core.config import app
-from ..core.i18n import lang, tr
+from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
 from ..accounts.session import me
 from ..accounts.pictures import list_icon_drop_file
@@ -16,7 +16,8 @@ from ..core.state import visible_lists
 # ---------------------------------------------------------------- lists / sections
 
 LIST_FIELDS = ("name", "color", "folder", "sort", "view", "archived", "checklist", "dep_shift", "kind", "tickets", "nag",
-               "family")  # 2.19.0 (#653): '' | shopping | meals | birthdays | household | packing
+               "family",  # 2.19.0 (#653): '' | shopping | meals | birthdays | household | packing
+               "life", "trip")  # 2.22.0 (#663): '' | contracts | home | health | travel | reading; {from, to, where} of a trip
 LIST_KINDS = ("list", "project")
 # 2.7.2 (#414): the type "checklist" (2.7.0 "Shopping & packing list") is gone. Every list has the display option "Show
 # completed at the bottom" instead (column lists.checklist, API field done_at_bottom); kind "checklist" is still accepted
@@ -175,6 +176,16 @@ def clean_list_value(k, v, member=False):
         if v not in FAM_LIST_KINDS:
             raise BadInput(tr("Invalid value: {0}", "family"))
         return v
+    if k == "life":  # 2.22.0 (#663)
+        from ..life.model import LIFE_LIST_KINDS
+        v = v or ""
+        if v not in LIFE_LIST_KINDS:
+            raise BadInput(tr("Invalid value: {0}", "life"))
+        return v
+    if k == "trip":
+        from ..life.model import _dump, clean_trip
+        t = clean_trip(v)
+        return _dump(t) if t else ""
     return v
 
 
@@ -216,6 +227,7 @@ def list_create():
                      clean_list_value("dep_shift", b.get("dep_shift")), clean_list_value("tickets", b.get("tickets"))))
     agent_autoshare(c, uid, cur.lastrowid)  # 2.4.2 (#391)
     grp_touch(c, uid)  # 2.10.0 (#441): created inside a folder shared with a group
+    folder_autoshare(c, cur.lastrowid)  # 2.22.0 (#740): created inside a folder shared with people
     bump(c)
     c.commit()
     return jsonify(dict(c.execute("SELECT * FROM lists WHERE id=?", (cur.lastrowid,)).fetchone()))
@@ -231,7 +243,6 @@ def list_update(lid):
     from ..lists.templates import list_ptype_set
     from ..agents.core import list_listen_update
     from ..collab.reactions import list_tidy_update
-    from ..family.family import is_shop, shop_areas_add
     b = web_fields(body(), WEB_LIST_EDIT, "PATCH /api/lists/{lid}")
     c = db()
     role = need_list(c, lid, write=False)
@@ -286,13 +297,12 @@ def list_update(lid):
         if "archived" in vals:  # 1.6.1: archived_at follows the flag (set on the change to archived, cleared on restore)
             c.execute("UPDATE lists SET archived_at=CASE WHEN ?=0 THEN NULL WHEN archived=0 THEN ? ELSE archived_at END "
                       "WHERE id=?", (vals["archived"], iso(now_utc()), lid))
-        was_shop = is_shop(c, lid)
         for k in LIST_FIELDS:
             if k in vals:
                 c.execute(f"UPDATE lists SET {k}=? WHERE id=?", (vals[k], lid))
-        if vals.get("family") == "shopping" and not was_shop and \
-                not c.execute("SELECT 1 FROM sections WHERE list_id=?", (lid,)).fetchone():  # 2.19.0: areas for a new shopping list
-            shop_areas_add(c, lid, lang(c, me()))
+        if vals.get("life") == "health":  # 2.22.0 (#663): a health list is never shared with an agent
+            c.execute("DELETE FROM list_members WHERE list_id=? AND user_id IN (SELECT id FROM users WHERE kind='agent')", (lid,))
+        # 2.22.0 (#747): a list that becomes a shopping list gets no shop areas by itself any more ("Add shop areas")
         if "rate" in b:  # hourly rate for the time reports (None / '' = none)
             try:
                 rate = None if b["rate"] in (None, "") else round(float(str(b["rate"]).replace(",", ".")), 2)
@@ -310,6 +320,7 @@ def list_update(lid):
             c.execute("UPDATE lists SET day_hours=? WHERE id=?", (dh, lid))
         if "folder" in vals:
             grp_touch(c, me())  # 2.10.0 (#441): moved into / out of a folder shared with a group
+            folder_autoshare(c, lid)  # 2.22.0 (#740): moved into a folder shared with people
     else:
         if "rate" in b or "ticket_tpl" in b or "day_hours" in b or any(k in b for k in LIST_FIELDS if k not in MEMBER_LIST_FIELDS):
             return err(tr("Only the owner can change this list"), 403)
@@ -416,10 +427,24 @@ def member_set(lid):
         return err(tr("Role must be admin, edit, participant or view"))
     if role == "admin" and c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent'", (b.get("user_id"),)).fetchone():
         return err(tr("An agent cannot be a list admin"))
+    if c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent'", (b.get("user_id"),)).fetchone() and \
+            c.execute("SELECT 1 FROM lists WHERE id=? AND life='health'", (lid,)).fetchone():  # 2.22.0 (#663)
+        return err(tr("A health list is private: it cannot be shared with an agent"), 409)
     try:
         uid = int(b.get("user_id") or 0)
     except (TypeError, ValueError):
         uid = 0
+    from ..accounts.orgs import may_see
+    if b.get("email") and not uid:  # 2.22.0 (#752): share by e-mail address (mode "own contacts": no directory). The answer
+        # never says whether the address has an account
+        em = str(b["email"]).strip().lower()[:200]
+        r = c.execute("SELECT id FROM users WHERE lower(email)=? AND disabled=0 AND COALESCE(kind,'user')!='agent'", (em,)).fetchone()
+        if not r or r[0] == me() or r[0] == c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0] or \
+                c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, r[0])).fetchone():
+            return jsonify(ok=True, by_email=True)
+        uid = r[0]
+    elif not may_see(c, me(), uid):
+        return err(tr("unknown user"), 404)
     u = c.execute("SELECT id FROM users WHERE id=? AND disabled=0", (uid,)).fetchone()
     if not u or uid == me() or personal_agent_foreign(c, uid, me()):  # 2.7.2 (#420): only the owner shares with a personal agent
         return err(tr("unknown user"), 404)
@@ -437,11 +462,111 @@ def member_set(lid):
     else:
         c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?)",
                   (lid, uid, role, role, my_max_sort(c, uid) + 1, iso(now_utc())))
+        member_folder_adopt(c, lid, uid)  # 2.22.0 (#740)
         news_add(c, uid, "share", list_id=lid, data={"role": role, "name": lname})
         agent_share_skip(c, lid, uid, False)  # 2.4.2 (#391): shared again by hand -> "Share all" includes it again
         who = user_names(c, [me()]).get(me(), "?")
         list_push(c, uid, "share", lid, lambda lg: tr("{0} shared a list with you", who, lg=lg), lambda lg: lname)
         wh_note_list(lid, "list.shared", {"member_id": uid, "role": role})
+    bump(c)
+    c.commit()
+    return jsonify(ok=True, **({"by_email": True} if b.get("email") and not b.get("user_id") else {}))
+
+
+# ---- 2.22.0 (#740): a shared list lands with the other person in a folder of the same name as with its owner (created
+# in their folder order when missing); they can move it freely afterwards (their placement is never overwritten again).
+# A list without a folder stays without one.
+def member_folder_adopt(c, lid, uid, force=False):
+    r = c.execute("SELECT folder FROM lists WHERE id=?", (lid,)).fetchone()
+    f = clean_folder(r[0], strict=False) if r and r[0] else ""
+    if not f:
+        return False
+    only_empty = "" if force else " AND COALESCE(folder, '')=''"
+    n = c.execute("UPDATE list_members SET folder=? WHERE list_id=? AND user_id=?" + only_empty, (f, lid, uid)).rowcount
+    if n:
+        fl = json.loads(usettings(c, uid).get("folders") or "[]")
+        want = [x for x in ([f.split(FOLDER_SEP)[0]] if FOLDER_SEP in f else []) + [f] if x not in fl]
+        if want:
+            uset(c, uid, "folders", json.dumps(fl + want, ensure_ascii=False))
+    return bool(n)
+
+
+def _folder_member_add(c, lid, uid, role, actor):
+    """A share made by "Share folder" (no push per list, one News item each, the folder of the owner)."""
+    from ..collab.news import news_add
+    from ..family.family import is_kid
+    from ..agents.core import is_agent
+    u = c.execute("SELECT * FROM users WHERE id=? AND disabled=0", (uid,)).fetchone()
+    l = c.execute("SELECT name, life, is_inbox, owner_id FROM lists WHERE id=?", (lid,)).fetchone()
+    if not u or not l or l["is_inbox"] or l["owner_id"] == uid or (is_agent(u) and l["life"] == "health"):
+        return False
+    if c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone():
+        return False
+    role = "participant" if is_kid(c, uid) else role
+    c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?)",
+              (lid, uid, role, role, my_max_sort(c, uid) + 1, iso(now_utc())))
+    member_folder_adopt(c, lid, uid)
+    news_add(c, uid, "share", list_id=lid, data={"role": role, "name": l["name"]}, actor=actor)
+    return True
+
+
+def _in_folder(path, f):
+    return bool(f) and (path == f or path.startswith(f + FOLDER_SEP))
+
+
+def folder_autoshare(c, lid):
+    """A list of an owner came into one of their shared folders (created there, moved there): the folder's people get it."""
+    r = c.execute("SELECT owner_id, folder FROM lists WHERE id=?", (lid,)).fetchone()
+    if not r or not r["folder"] or not collab_all():
+        return 0
+    return sum(1 for fp in c.execute("SELECT * FROM folder_people WHERE owner_id=?", (r["owner_id"],)).fetchall()
+               if _in_folder(r["folder"], fp["folder"]) and _folder_member_add(c, lid, fp["user_id"], fp["role"], r["owner_id"]))
+
+
+@app.get("/api/folders/people")
+def folder_people_get():
+    """?folder=: the people my folder is shared with."""
+    from flask import request
+    c = db()
+    f = clean_folder(request.args.get("folder") or "", strict=False)
+    return jsonify(people=[{"user_id": r[0], "role": r[1]} for r in
+                           c.execute("SELECT user_id, role FROM folder_people WHERE owner_id=? AND folder=? ORDER BY created_at", (me(), f))])
+
+
+@app.put("/api/folders/people")
+def folder_people_put():
+    """{folder, user_id, role?}: share my folder with a person: every list in it (and its subfolders) now, and every list
+    that comes into it later (DELETE stops that; the lists stay shared)."""
+    from ..agents.admin import personal_agent_foreign
+    need_collab()
+    c, b = db(), body()
+    f = clean_folder(b.get("folder") or "")
+    role = b.get("role", "edit")
+    if not f or role not in ROLES or role == "admin":
+        return err(tr("Invalid value: {0}", "folder" if not f else "role"))
+    try:
+        uid = int(b.get("user_id") or 0)
+    except (TypeError, ValueError):
+        uid = 0
+    from ..accounts.orgs import may_see
+    if not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (uid,)).fetchone() or uid == me() or personal_agent_foreign(c, uid, me()) \
+            or not may_see(c, me(), uid):  # 2.22.0 (#752)
+        return err(tr("unknown user"), 404)
+    c.execute("INSERT INTO folder_people(owner_id,folder,user_id,role,created_at) VALUES(?,?,?,?,?) ON CONFLICT(owner_id,folder,user_id) "
+              "DO UPDATE SET role=excluded.role", (me(), f, uid, role, iso(now_utc())))
+    n = sum(1 for r in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND archived=0 AND is_inbox=0", (me(),)).fetchall()
+            if _in_folder(r["folder"], f) and _folder_member_add(c, r["id"], uid, role, me()))
+    bump(c)
+    c.commit()
+    return jsonify(shared=n)
+
+
+@app.delete("/api/folders/people")
+def folder_people_delete():
+    """{folder, user_id}: new lists of the folder are no longer shared with that person (the shared ones stay)."""
+    c, b = db(), body()
+    c.execute("DELETE FROM folder_people WHERE owner_id=? AND folder=? AND user_id=?", (me(), clean_folder(b.get("folder") or "", strict=False),
+                                                                                       int(b.get("user_id") or 0)))
     bump(c)
     c.commit()
     return jsonify(ok=True)
@@ -487,7 +612,8 @@ def agent_share_add(c, lid, aid, actor):
     """Share list lid with agent aid (role edit) like PUT /api/lists/<lid>/members; False if it was a member already."""
     from ..collab.news import news_add
     from ..integrations.webhooks import wh_note_list
-    if c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, aid)).fetchone():
+    if c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, aid)).fetchone() or \
+            c.execute("SELECT 1 FROM lists WHERE id=? AND life='health'", (lid,)).fetchone():  # 2.22.0 (#663)
         return False
     lname = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]
     c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?)",

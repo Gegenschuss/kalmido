@@ -47,8 +47,8 @@ const FAM = 'cal,habits,comments,collab,family';
   check(w.eval('S.route.mod') === 'tasks' && !d.querySelector('#side [data-go="family"]') && !d.querySelector('#tabs [data-k="m:family"], #tabs [data-mod="family"]'), 'off: #family goes to the tasks, no sidebar row, no tab');
   check(!w.eval(`PURPOSES.length && feat('family')`), 'off: feat(family) false');
   w.eval(`settingsModal('modules')`); await sleep(400);
-  check(d.querySelector('.smodal [data-feat="family"]') && !d.querySelector('.smodal [data-feat="family"]').checked && d.querySelectorAll('.smodal .purposes [data-purpose]').length === 4,
-    'Settings > Modules: the Family switch (off) and the four purposes');
+  check(d.querySelector('.smodal [data-feat="family"]') && !d.querySelector('.smodal [data-feat="family"]').checked && d.querySelectorAll('.smodal .purposes [data-purpose]').length === 5,
+    'Settings > Modules: the Family switch (off) and the five purposes (2.22.0: Home)');
   // "What do you use Kalmido for?" -> Family (confirm), the starter lists come
   click(w, d.querySelector('.smodal [data-purpose="family"]'));
   check(await until(() => w.eval(`feat('family')`) && (w.eval('S.lists') || []).filter(l => l.family).length === 4, 60), 'purpose Family: the module on, four starter lists');
@@ -181,7 +181,7 @@ const FAM = 'cal,habits,comments,collab,family';
   check(md.querySelector('#l-dab').checked, 'a shopping list: done at the bottom ticked');
   click(w, md.querySelector('[data-m="save"]'));
   const WS = await until(async () => (await call('GET', '/api/state')).lists.find(l => l.name === 'Weekend shop' && l.family === 'shopping'));
-  check(WS && WS.checklist === 1 && (await call('GET', '/api/state')).sections.filter(s => s.list_id === WS.id).length === 8, 'created as a shopping list with the 8 areas');
+  check(WS && WS.checklist === 1 && (await call('GET', '/api/state')).sections.filter(s => s.list_id === WS.id).length === 0, 'created as a shopping list (2.22.0 #747: no shop areas by itself)');
   await until(() => w.eval('S.route.key') === 'l:' + WS.id);
   check(d.querySelector('#view .fambar [data-act="shop-start"]'), 'the bar: Shopping mode');
   check(!d.querySelector('#view .ghead[data-section]'), 'empty shop areas are not listed in the list view');
@@ -191,6 +191,7 @@ const FAM = 'cal,habits,comments,collab,family';
   md.remove(); w.close();
 
   // ================= jsdom: shopping mode
+  check((await call('POST', `/api/lists/${L.shopping}/shop-areas`, {})).added === 8, '2.22.0 (#747): the shop areas switched on by hand, the items sorted in');
   await call('POST', '/api/tasks', {title: 'Birthday candles', list_id: L.shopping});  // nothing to guess from: "Other"
   w = await boot({user: 'alice', hash: 'l/' + L.shopping}); d = w.document;
   await until(() => d.querySelector('#view [data-act="shop-start"]'));

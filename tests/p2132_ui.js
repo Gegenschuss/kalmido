@@ -28,7 +28,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v(?:8[5-9]|9[0-9])'/.test(SW), 'service worker cache v85');
+  check(/const CACHE = 'tasks-shell-v(?:8[5-9]|9[0-9]|[1-9][0-9]{2})'/.test(SW), 'service worker cache v85');
 
   // ================= F12: setup step 2 after a reload starts from the modules that are on now
   const su = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true})});

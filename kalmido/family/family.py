@@ -90,13 +90,15 @@ PACKING = {
               N_("Tickets and bookings"), N_("Toiletries"), N_("Headphones")))]),
 }
 # what each answer of "What do you use Kalmido for?" switches on / off (agents and Paperless stay as they are)
-PURPOSES = ("me", "family", "team", "software")
+PURPOSES = ("me", "home", "family", "team", "software")  # 2.22.0 (#741): "home"
+_LIFE = ("contracts", "home", "care", "health", "review", "travel", "reading")  # 2.22.0 (#663): Home & life
 PURPOSE_MODS = ("cal", "timeline", "matrix", "kanban", "habits", "pomo", "stats", "comments", "collab", "time", "progress",
-                "deps", "fields", "family", "events", "contacts")
+                "deps", "fields", "family", "events", "contacts") + _LIFE
 PURPOSE_ON = {"me": ("cal", "events", "contacts"),
-              "family": ("cal", "habits", "comments", "collab", "family", "events", "contacts"),
-              "team": tuple(m for m in PURPOSE_MODS if m != "family"),
-              "software": tuple(m for m in PURPOSE_MODS if m != "family")}
+              "home": ("cal", "events", "contacts", "habits") + _LIFE,
+              "family": ("cal", "habits", "comments", "collab", "family", "events", "contacts", "contracts", "home", "travel"),
+              "team": tuple(m for m in PURPOSE_MODS if m != "family" and m not in _LIFE),
+              "software": tuple(m for m in PURPOSE_MODS if m != "family" and m not in _LIFE)}
 
 
 # 2.19.0: what a child account may change: tick / untick (and undo) the tasks it sees, ask for a reward, its own
@@ -189,6 +191,9 @@ def clean_fam(v):
         raise bad
     k = v.get("kind")
     out = {"kind": k}
+    from ..life.model import LIFE_FAM, life_clean_fam  # 2.22.0 (#663): the kinds of "Home & life"
+    if k in LIFE_FAM:
+        return life_clean_fam(v)
     if k in FAM_OCC:
         allowed = {"kind", "name", "year", "lead", "src", "card"}
         name = v.get("name", "")
@@ -421,9 +426,7 @@ def fam_list_create(c, uid, kind, name=None, folder=""):
                        VALUES(?,?,?,?,?,?,?,?,?,?)""",
                     (name or tr(FAM_LIST_NAMES[kind], lg=lg), FAM_LIST_COLORS.get(kind, ""), folder, my_max_sort(c, uid) + 1, "list",
                      iso(now_utc()), uid, 1 if kind in ("shopping", "packing") else 0, "list", kind)).lastrowid
-    if kind == "shopping":
-        shop_areas_add(c, lid, lg)
-    agent_autoshare(c, uid, lid)
+    agent_autoshare(c, uid, lid)  # 2.22.0 (#747): no shop areas by itself (the list bar's "Add shop areas" adds them)
     grp_touch(c, uid)
     return lid
 

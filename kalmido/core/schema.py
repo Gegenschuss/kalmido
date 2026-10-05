@@ -587,6 +587,37 @@ CREATE TABLE IF NOT EXISTS contact_occ (   -- a contact's birthday / anniversary
 CREATE TABLE IF NOT EXISTS dav_sync2 (
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, coll TEXT NOT NULL,
   token TEXT NOT NULL, state BLOB NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (user_id, coll, token));
+-- 2.22.0 (#663): "Home & life". journal: one private entry per person and day (module "review");
+-- contact_care: "stay in touch" per person and contact (module "care": every N days, the last time, a note);
+-- kk_conns: the read-later connection of a person to Karakeep (module "reading"; the API key sealed like a Paperless token)
+CREATE TABLE IF NOT EXISTS journal (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, day TEXT NOT NULL, text TEXT NOT NULL DEFAULT '',
+  mood INTEGER, updated_at TEXT NOT NULL, PRIMARY KEY (user_id, day));
+CREATE TABLE IF NOT EXISTS contact_care (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, contact_id INTEGER NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+  every_days INTEGER NOT NULL DEFAULT 0, last TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, contact_id));
+-- 2.22.0 (#697): a one-time link to set one's own password (an invitation of a new person, or a reset by an admin):
+-- only the SHA-256 of the token is stored, 7 days, used once; one per person (a new one replaces it)
+CREATE TABLE IF NOT EXISTS user_invites (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, token_hash TEXT NOT NULL UNIQUE, kind TEXT NOT NULL DEFAULT 'invite',
+  created_by INTEGER, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, sent_at TEXT, used_at TEXT);
+-- 2.22.0 (#740): "Share folder": the owner's folder is shared with a person: its lists now and every list that comes into it later
+CREATE TABLE IF NOT EXISTS folder_people (
+  owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, folder TEXT NOT NULL,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, role TEXT NOT NULL DEFAULT 'edit', created_at TEXT NOT NULL,
+  PRIMARY KEY (owner_id, folder, user_id));
+-- 2.22.0 (#752): organisations. People belong to 1..n of them; the instance setting people_visibility decides whom a
+-- person sees at all: all | org (only people of their organisations) | contacts (only people they are connected with)
+CREATE TABLE IF NOT EXISTS orgs (id INTEGER PRIMARY KEY, name TEXT NOT NULL, icon TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS org_members (
+  org_id INTEGER NOT NULL REFERENCES orgs(id) ON DELETE CASCADE, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  PRIMARY KEY (org_id, user_id));
+CREATE INDEX IF NOT EXISTS org_members_user ON org_members(user_id);
+CREATE TABLE IF NOT EXISTS kk_conns (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, url TEXT NOT NULL, token TEXT NOT NULL DEFAULT '',
+  list_id INTEGER, source TEXT NOT NULL DEFAULT '', archive INTEGER NOT NULL DEFAULT 1, synced_at TEXT, error TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL);
 """
 # Bumped when the database layout changes (stored in PRAGMA user_version). A backup can be restored when its
 # schema version is not newer than this one (older ones are migrated by init_db).
@@ -760,6 +791,11 @@ MIGRATIONS = [
     ("lists", "family", "ALTER TABLE lists ADD COLUMN family TEXT NOT NULL DEFAULT ''"),
     ("contact_links", "book", "ALTER TABLE contact_links ADD COLUMN book TEXT NOT NULL DEFAULT ''"),
     ("users", "kid", "ALTER TABLE users ADD COLUMN kid INTEGER NOT NULL DEFAULT 0"),
+    # 2.22.0 (#663): "Home & life". lists.life: '' | contracts | home | health | travel | reading (what the list is for);
+    # lists.trip: json {from, to, where} of a trip list; tasks.fam also holds the kinds contract / device / upkeep / health /
+    # bookmark (see kalmido/life/model.py)
+    ("lists", "life", "ALTER TABLE lists ADD COLUMN life TEXT NOT NULL DEFAULT ''"),
+    ("lists", "trip", "ALTER TABLE lists ADD COLUMN trip TEXT NOT NULL DEFAULT ''"),
 ]
 INDEXES = """
 CREATE INDEX IF NOT EXISTS lists_owner ON lists(owner_id);
@@ -795,6 +831,8 @@ USER_DEFAULTS = {
     "work_start": "09:00", "work_end": "17:00",  # 2.10.0 (#440): working hours of the day planner
     "review_time": "",          # 2.10.0 (#440): evening review push (HH:MM, '' = off)
     "review_sent": "",
+    "care_sent": "",            # 2.22.0 (#663): the day of the last "Time to get in touch" push
+    "today_inbox": "0",         # 2.22.0 (#681): Today also shows the inbox (own section, counted in Today's number)
     "pomo_focus": "25", "pomo_short": "5", "pomo_long": "15", "pomo_long_every": "4",
     "ntfy_topic": "",           # set by an admin (a user could otherwise push into someone else's topic)
     "push_priority": "4",       # priority of every push to this user: 3 normal, 4 high, 5 urgent (ntfy + Web Push)

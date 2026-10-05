@@ -254,8 +254,8 @@ SW = j["id"]
 check(sorted(j["modules_on"]) == ["deps", "kanban"], f"modules switched on: {j['modules_on']}")
 check(all(f in settings(A)["features"].split(",") for f in ("kanban", "deps")), "features now on")
 L = lst(A, SW)
-check(L["kind"] == "project" and L["view"] == "kanban" and L["tickets"] == 1 and L["dep_shift"] == 1 and L["folder"] == "Dev/Tools",
-      "software: project, kanban, tickets, move along, folder")
+check(L["kind"] == "project" and L["view"] == "list" and L["tickets"] == 1 and L["dep_shift"] == 1 and L["folder"] == "Dev/Tools",
+      "software: project, (2.22.0 #749) the list view, tickets, move along, folder")
 secs = [x["name"] for x in st(A)["sections"] if x["list_id"] == SW]
 check(secs == ["Backlog", "Next", "In progress", "Review", "Done"], f"software sections: {secs}")
 A.patch(B + "/api/settings", json={"lang": "de"})

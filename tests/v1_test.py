@@ -328,7 +328,7 @@ r = A.post(B + "/api/admin/setup", json={"modules": ["cal", "kanban"], "collab_a
 st = A.get(B + "/api/state").json()
 check(r.ok and st["time_all"] is False and st["settings"]["features"] == "cal,kanban,collab,time", f"setup choices applied: {st['settings']['features']}")
 nu = A.post(B + "/api/users", json={"username": "dora", "password": "password123"}).json()
-check(sess("dora").get(B + "/api/state").json()["settings"]["features"] == "cal,kanban,collab,time", "new users get the default modules")
+check(sess("dora").get(B + "/api/state").json()["settings"]["features"] == "cal,kanban,collab,time,agents", "new users get the default modules (2.22.0 #739: + agents)")
 A.post(B + "/api/admin/setup", json={"modules": list("x"), "collab_all": True, "time_all": True})
 # "Turn on collaboration now?" also switches the personal switches on
 A.patch(B + "/api/settings", json={"features": "cal"})

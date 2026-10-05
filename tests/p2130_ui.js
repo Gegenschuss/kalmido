@@ -29,7 +29,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v(?:8[3-9]|9[0-9])'/.test(SW), 'service worker cache v83');
+  check(/const CACHE = 'tasks-shell-v(?:8[3-9]|9[0-9]|[1-9][0-9]{2})'/.test(SW), 'service worker cache v83');
 
   // ================= A16: the setup page's step 2 comes back after a reload until "Start"
   const su = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true})});

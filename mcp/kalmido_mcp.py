@@ -977,19 +977,68 @@ TOOLS += [
     ("decide_reward", "2.19.0: approve (the stars are taken) or decline a reward (parents).", _obj({"reward_id": S_ID, "approve": {"type": "boolean"}}, ["reward_id", "approve"]),
      lambda api, a: api.call("POST", f"/family/rewards/{int(a['reward_id'])}/decide", body={"approve": a["approve"]})),
 ]
+# 2.22.0 (#663): Home & life (each module switched on by the token's user; health + journal need the scope "private")
+D = {"type": "string", "description": "YYYY-MM-DD"}
+LEAD = {"type": "integer", "minimum": 0, "maximum": 365}
+TOOLS += [
+    ("get_life", "2.22.0 (Home & life): the switched-on modules with the contracts (cost per month / year, the last day to cancel), "
+                 "devices + upkeep, contacts to get in touch with, health entries (scope private), trips and the reading list.",
+     _obj({}), lambda api, a: api.call("GET", "/life")),
+    ("list_upkeep_presets", "2.22.0: suggested upkeep tasks (heating, smoke detectors, tyres ...) with their interval.",
+     _obj({}), lambda api, a: api.call("GET", "/life/upkeep-presets")),
+    ("add_contract", "2.22.0: a contract / subscription: a task due on the last day to cancel (ends minus the notice period), repeating with "
+                     "the renewal (renew_months, 0 = it ends), reminders lead_days before and on the day. Link the document from Paperless in the app.",
+     _obj({"name": {"type": "string"}, "ends": {**D, "description": "End of the current term, YYYY-MM-DD"}, "provider": {"type": "string"},
+           "cost": {"type": "number"}, "per": {"type": "string", "enum": ["month", "quarter", "year"]}, "notice": {"type": "integer", "minimum": 0, "maximum": 365},
+           "notice_unit": {"type": "string", "enum": ["d", "w", "m"]}, "renew_months": {"type": "integer", "minimum": 0, "maximum": 120},
+           "lead_days": LEAD, "start": D, "account": {"type": "string"}, "list_id": S_ID}, ["name", "ends"]),
+     lambda api, a: api.call("POST", "/life/contracts", body=_pick(a, ("name", "ends", "provider", "cost", "per", "notice", "notice_unit", "renew_months",
+                                                                       "lead_days", "start", "account", "list_id")))),
+    ("add_device", "2.22.0: a device with its warranty (a task due when the warranty ends).",
+     _obj({"name": {"type": "string"}, "model": {"type": "string"}, "bought": D, "warranty": D, "lead_days": LEAD, "list_id": S_ID}, ["name"]),
+     lambda api, a: api.call("POST", "/life/devices", body=_pick(a, ("name", "model", "bought", "warranty", "lead_days", "list_id")))),
+    ("add_upkeep", "2.22.0: a repeating upkeep task (every n months, next = the first time).",
+     _obj({"title": {"type": "string"}, "every_months": {"type": "integer", "minimum": 1, "maximum": 120}, "next": D, "item": {"type": "string"},
+           "lead_days": LEAD, "list_id": S_ID}, ["title", "every_months"]),
+     lambda api, a: api.call("POST", "/life/upkeep", body=_pick(a, ("title", "every_months", "next", "item", "lead_days", "list_id")))),
+    ("add_health_entry", "2.22.0 (scope private): an appointment, a check-up / vaccination (repeating every_months) or medication (times: "
+                         "a daily task per HH:MM) in a private health list.",
+     _obj({"type": {"type": "string", "enum": ["appointment", "checkup", "vaccination", "medication"]}, "title": {"type": "string"},
+           "who": {"type": "string"}, "date": D, "time": {"type": "string", "description": "HH:MM"},
+           "every_months": {"type": "integer", "minimum": 0, "maximum": 240}, "times": STRS, "lead_days": LEAD, "list_id": S_ID}, ["type", "title"]),
+     lambda api, a: api.call("POST", "/life/health", body=_pick(a, ("type", "title", "who", "date", "time", "every_months", "times", "lead_days", "list_id")))),
+    ("create_trip", "2.22.0: a trip: a list with bookings, things to do before leaving and a packing list (packing = a template key, '' = "
+                    "none); event = also an all-day event (module Events).",
+     _obj({"name": {"type": "string"}, "from": D, "to": D, "where": {"type": "string"}, "packing": {"type": "string"},
+           "event": {"type": "boolean"}, "folder": {"type": "string"}}, ["name", "from", "to"]),
+     lambda api, a: api.call("POST", "/life/trips", body=_pick(a, ("name", "from", "to", "where", "packing", "event", "folder")))),
+    ("get_review", "2.22.0: the day or week in review: done, still open, moved, the next seven days (the journal only with the scope private).",
+     _obj({"period": {"type": "string", "enum": ["day", "week"]}, "date": D}), lambda api, a: api.call("GET", "/life/review", _pick(a, ("period", "date")))),
+    ("write_journal", "2.22.0 (scope private): write the journal entry of a day (text, mood 1-5; empty = deleted).",
+     _obj({"day": D, "text": {"type": "string"}, "mood": {"type": ["integer", "null"], "minimum": 1, "maximum": 5}}, ["day"]),
+     lambda api, a: api.call("PUT", f"/life/journal/{a['day']}", body=_pick(a, ("text", "mood")))),
+    ("set_contact_care", "2.22.0 (scope contacts): stay in touch with a contact: every_days (0 = off), last (YYYY-MM-DD or \"today\"), a note.",
+     _obj({"contact_id": S_ID, "every_days": {"type": "integer", "minimum": 0}, "last": {"type": "string"}, "note": {"type": "string"}}, ["contact_id"]),
+     lambda api, a: api.call("PUT", f"/contacts/{int(a['contact_id'])}/care", body=_pick(a, ("every_days", "last", "note")))),
+    ("comment_typing", "2.22.0 (#693): \"<name> is writing …\" in a task's comments for 8 s: send it before answering a comment (again while "
+                       "writing), then post the comment.", _obj({"task_id": S_ID}, ["task_id"]),
+     lambda api, a: api.call("POST", f"/tasks/{int(a['task_id'])}/typing")),
+    ("sync_read_later", "2.22.0: fetch new bookmarks from the user's own Karakeep connection now (and archive the ticked ones).",
+     _obj({}), lambda api, a: api.call("POST", "/life/karakeep/sync")),
+]
 TOOL_MAP = {t[0]: t for t in TOOLS}
 
 
 TOOL_SCOPES = {
     "agent": ("get_agent", "react_to_chat", "set_status", "list_events", "wait_for_events", "list_jobs", "create_job", "get_job",
               "submit_proposal", "update_job", "list_chats", "chat_typing", "send_chat", "report_usage", "get_usage"),
-    "tasks:write": ("add_occasion", "add_deadline", "ingredients_to_shopping", "give_stars", "add_reward", "update_reward", "request_reward",
+    "tasks:write": ("add_contract", "add_device", "add_upkeep", "sync_read_later", "add_occasion", "add_deadline", "ingredients_to_shopping", "give_stars", "add_reward", "update_reward", "request_reward",
                     "decide_reward", "create_note", "update_note", "create_task", "update_task", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "batch_tasks",
                     "reopen_task", "skip_occurrence", "take_task", "add_subtask", "add_dependency", "remove_dependency", "create_habit",
                     "update_habit", "check_in_habit", "shift_list_dates"),
-    "comments": ("post_team_message", "edit_team_message", "delete_team_message", "react_team_message", "mark_team_chat_read", "add_comment", "react", "request_merge_approval", "update_comment", "delete_comment", "mark_news_read",
+    "comments": ("comment_typing", "post_team_message", "edit_team_message", "delete_team_message", "react_team_message", "mark_team_chat_read", "add_comment", "react", "request_merge_approval", "update_comment", "delete_comment", "mark_news_read",
                  "delete_chat_attachment"),
-    "structure": ("add_shop_areas", "create_packing_list", "set_list_columns", "create_list", "update_list", "share_list", "unshare_list", "share_list_with_group",
+    "structure": ("create_trip", "add_shop_areas", "create_packing_list", "set_list_columns", "create_list", "update_list", "share_list", "unshare_list", "share_list_with_group",
                   "unshare_list_from_group", "create_section", "rename_section", "reorder_sections", "rename_folder", "delete_folder",
                   "create_field", "update_field", "create_list_tag", "update_list_tag", "delete_list_tag", "create_template",
                   "update_template", "apply_template", "create_filter", "update_filter", "set_project_overview", "add_project_link",
@@ -1006,10 +1055,12 @@ TOOL_SCOPES = {
                  "restore_event", "reply_to_event", "add_preparation_task", "get_task_events"),
     "contacts": ("list_address_books", "create_address_book", "update_address_book", "delete_address_book", "share_address_book",
                  "unshare_address_book", "import_vcards", "export_vcards", "search_contacts", "get_contact", "create_contact", "update_contact",
-                 "delete_contact", "link_contact", "unlink_contact"),
+                 "delete_contact", "link_contact", "unlink_contact", "set_contact_care"),
+    "private": ("add_health_entry", "write_journal"),
 }
 TOOL_SCOPE = {n: s for s, names in TOOL_SCOPES.items() for n in names}   # every other tool: read
-ALL_SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "calendar", "contacts")
+ALL_SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "calendar", "contacts",
+              "private")
 _ME = {"at": 0.0, "v": None}
 ME_TTL = 300  # s: a changed scope shows in tools/list within 5 minutes (a call is refused by the server at once anyway)
 

@@ -12,7 +12,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from ..core.config import app, COOKIE, EMAIL_RE, MIN_PASSWORD, PUBLIC_URL, USERNAME_RE
 from ..core.i18n import lang, LANGS, N_, tr, trn
-from ..core.db import body, bump, create_user, db, ensure_inbox, err, now_utc, uset, usettings
+from ..core.db import body, bump, create_user, db, ensure_inbox, err, gsetting, now_utc, uset, usettings
 from ..accounts.session import _rate_blocked, _rate_fail, _rate_keys, _token_hash, me, user_public
 from ..accounts.pictures import (
     AVATAR_DIR, avatar_drop_file, AVATAR_MAX_MB, avatar_path, AVATAR_PRESETS, avatar_process, avatar_url, LIST_ICON_DIR,
@@ -32,6 +32,11 @@ def need_admin():
         raise Denied(403)
 
 
+def _invite_state(c, uid):
+    from ..accounts.invite import invite_state
+    return invite_state(c, uid)
+
+
 def user_admin_dict(c, u):
     from ..family.family import kid_parents
     return {**user_public(u), "kind": u["kind"] or "user", "is_admin": bool(u["is_admin"]), "disabled": bool(u["disabled"]),
@@ -40,6 +45,8 @@ def user_admin_dict(c, u):
             "paperless_access": bool(u["paperless_access"]), "email": u["email"] or "",
             "twofa": twofa_methods(c, u), "oidc_linked": bool(u["oidc_subject"]),
             "parents": kid_parents(c, u["id"]) if u["kid"] else [],  # 2.19.0 (#653)
+            "invite": _invite_state(c, u["id"]),  # 2.22.0 (#697): invited | expired | null
+            "orgs": [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=? ORDER BY org_id", (u["id"],))],  # 2.22.0 (#752)
             "lists": c.execute("SELECT COUNT(*) FROM lists WHERE owner_id=? AND is_inbox=0", (u["id"],)).fetchone()[0]}
 
 
@@ -48,12 +55,16 @@ def users_list():
     """Everyone: enabled users (for sharing). Admins: all users with account details."""
     c = db()
     if g.user["is_admin"]:
-        return jsonify(users=[user_admin_dict(c, u) for u in c.execute("SELECT * FROM users ORDER BY id")])
+        from ..integrations.mail import MAIL_OUT_ON
+        return jsonify(users=[user_admin_dict(c, u) for u in c.execute("SELECT * FROM users ORDER BY id")], mail_out=MAIL_OUT_ON)
     if not collab_all():  # nobody to share with
         return jsonify(users=[user_public(g.user)])
     mine = me()  # 2.7.2 (#420): somebody else's personal agent is not in the list
+    from ..accounts.orgs import visible_people
+    vis = visible_people(c, mine)  # 2.22.0 (#752): only the people this person may see (organisation / contacts)
     return jsonify(users=[user_public(u) for u in c.execute("""SELECT * FROM users WHERE disabled=0 AND id NOT IN
-                                                                 (SELECT user_id FROM agents WHERE owner_id IS NOT NULL AND owner_id!=?) ORDER BY id""", (mine,))])
+                                                                 (SELECT user_id FROM agents WHERE owner_id IS NOT NULL AND owner_id!=?) ORDER BY id""", (mine,))
+                          if vis is None or u["id"] in vis])
 
 
 def _proxy_taken(c, login, uid=None):
@@ -103,17 +114,38 @@ def user_create():
         c.rollback()
         return err(tr("Invalid value: {0}", "lang"))
     uset(c, uid, "lang", lg if lg in LANGS else "en")
+    if b.get("kid") is not True:  # 2.22.0 (#739): new people start with the module Agents on (kids not; existing users unchanged)
+        from ..core.schema import USER_DEFAULTS
+        fs = [x for x in (gsetting(c, "default_features") or USER_DEFAULTS["features"]).split(",") if x]
+        uset(c, uid, "features", ",".join(fs + ([] if "agents" in fs else ["agents"])))
     ensure_inbox(c, uid)
     if b.get("kid") is True:  # 2.19.0 (#653): a kid account (never an admin)
         e = kid_set(c, uid, True, b.get("parents"))
         if e:
             c.rollback()
             return err(e)
+    # 2.22.0 (#752): the organisations of the new person: given, else the creating admin's (else the instance's first)
+    orgs = b.get("orgs")
+    if orgs is None:
+        orgs = [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=?", (me(),))]
+    if not isinstance(orgs, list) or not all(isinstance(x, int) for x in orgs):
+        c.rollback()
+        return err(tr("Invalid value: {0}", "orgs"))
+    known = [x for x in orgs if c.execute("SELECT 1 FROM orgs WHERE id=?", (x,)).fetchone()]
+    if known:
+        c.execute("DELETE FROM org_members WHERE user_id=?", (uid,))
+        for o in known:
+            c.execute("INSERT OR IGNORE INTO org_members(org_id,user_id) VALUES(?,?)", (o, uid))
+    inv = None
+    if b.get("invite") is True and not pw:  # 2.22.0 (#697): no password: a one-time link to set it (by e-mail when possible)
+        from ..accounts.invite import invite_new
+        inv = invite_new(c, uid, me(), send=b.get("send", True) is not False)
     bump(c)
     c.commit()
     if b.get("is_admin"):
         aa_now("security", f"admin:{username}", N_("{0} is now an admin (set by {1})."), [username, g.user["username"]])
-    return jsonify(user_admin_dict(c, c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()))
+    out = user_admin_dict(c, c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone())
+    return jsonify({**out, **({"invitation": inv} if inv else {})})
 
 
 @app.patch("/api/users/<int:uid>")
@@ -129,6 +161,12 @@ def user_update(uid):
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if not u:
         return err(tr("unknown user"), 404)
+    if "orgs" in b:  # 2.22.0 (#752): the person's organisations (replaces them)
+        if not isinstance(b["orgs"], list) or not all(isinstance(x, int) for x in b["orgs"]):
+            return err(tr("Invalid value: {0}", "orgs"))
+        c.execute("DELETE FROM org_members WHERE user_id=?", (uid,))
+        for o in b["orgs"]:
+            c.execute("INSERT OR IGNORE INTO org_members(org_id,user_id) SELECT id, ? FROM orgs WHERE id=?", (uid, o))
     if uid == me() and (("is_admin" in b and not b["is_admin"]) or b.get("disabled") or b.get("kind") == "agent"):
         return err(tr("You cannot remove your own admin rights or disable yourself"))
     if "kind" in b:  # 2.0.0: person <-> agent

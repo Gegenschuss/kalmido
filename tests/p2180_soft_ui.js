@@ -62,9 +62,9 @@ const lst = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)).l
   check((await call('GET', `/api/tasks/${T1}`)).title === 'Write the login page', 'switching keeps the tasks');
   r = await call('PATCH', `/api/lists/${PL}`, {ptype: 'software'});
   x = await lst(PL);
-  check(x.kind === 'project' && x.tickets && x.view === 'kanban' && x.ptype === 'software', 'a plain empty list -> Software: type Project, ticket types, the kanban view ' + JSON.stringify([x.kind, x.tickets, x.view]));
-  check(r.ptype_prev.kind === 'list' && r.ptype_prev.view === 'list' && r.ptype_prev.tickets === 0, 'ptype_prev for the undo ' + JSON.stringify(r.ptype_prev));
-  r = await call('PATCH', `/api/lists/${PL}`, {ptype: '', kind: 'list', tickets: 0, view: 'list', _prev: {ptype: 'software', kind: 'project', tickets: 1, view: 'kanban'}});
+  check(x.kind === 'project' && x.tickets && x.view === 'list' && x.ptype === 'software', 'a plain empty list -> Software: type Project, ticket types, (2.22.0 #749) the list view ' + JSON.stringify([x.kind, x.tickets, x.view]));
+  check(r.ptype_prev.kind === 'list' && (r.ptype_prev.view ?? 'list') === 'list' && r.ptype_prev.tickets === 0, 'ptype_prev for the undo ' + JSON.stringify(r.ptype_prev));
+  r = await call('PATCH', `/api/lists/${PL}`, {ptype: '', kind: 'list', tickets: 0, view: 'list', _prev: {ptype: 'software', kind: 'project', tickets: 1, view: 'list'}});
   x = await lst(PL);
   check(r.status === 200 && x.ptype === '' && x.kind === 'list' && !x.tickets && x.view === 'list', 'the undo request restores type, kind, ticket types and view');
   await call('POST', '/api/sections', {list_id: EM, name: 'backlog'});

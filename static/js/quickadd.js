@@ -203,6 +203,10 @@ function parseQuick(text, ignore = new Set()) {
   if (ticketsAny() || ignore.has('ttype')) take(/\s!(bug|feature|task|fehler|funktion|aufgabe)(?=\s)/i, 'ttype', m => { out.ttype = TT_WORDS[m[1].toLowerCase()]; return ttName(out.ttype); });
   // 2.18.0 (#430): !milestone / !meilenstein / !ms makes the new task a milestone
   take(/\s!(milestone|meilenstein|ms)(?=\s)/i, 'ms', () => { out.ms = 1; return tr('Milestone'); });
+  // 2.22.0 (#686): waiting on external right away: wartet:Kunde / waiting:client (a word, "in quotes" or with_underscores)
+  take(/\s(?:wartet|waiting|attend|espera|attesa|wacht):(?:"([^"]+)"|“([^”]+)”|„([^“”]+)[“”]|([^\s"“„]+))(?=\s)/i, 'wait', m => {
+    out.wait = (m[1] || m[2] || m[3] || m[4] || '').replace(/_/g, ' ').trim().slice(0, 300); return out.wait ? '⏳ ' + out.wait : false;
+  });
   // priority: standalone token
   take(/\s(!!!|!!|!hoch|!mittel|!niedrig|!high|!medium|!low|![123]|!)(?=\s)/i, 'prio', m => { out.priority = PRIO_WORDS[m[1].toLowerCase()]; return tr(['', N_('Low'), '', N_('Medium'), '', N_('High')][out.priority]); });
   // tags

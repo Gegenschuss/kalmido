@@ -10,6 +10,8 @@
 // Since 2.4.1 (#376) there is no "Wake" button (POST …/wake stays in the API for agents without an event loop).
 const agentById = id => (S.agents || []).find(a => a.id === +id);
 const agentsOn = () => collab() && (S.agents || []).length > 0;
+// 2.22.0 (#739): the Agents tab shows with the module on even before any list is shared with an agent (then it explains how)
+const agentsTab = () => feat('agents') && collab();
 const isAgentUser = id => !!agentById(id) || (S.tl.agents || []).includes(+id);
 const AGENT_ST = {idle: N_('ready'), working: N_('working'), waiting: N_('waiting for you'), error: N_('error')};
 const JOB_ST = {running: N_('running'), waiting: N_('waiting for approval'), done: N_('done'), failed: N_('failed'), stopped: N_('stopped')};
@@ -375,7 +377,7 @@ function viewAgents() {
       <div class="agb"><button class="btn sm" data-act="chat-open" data-aid="${a.id}" ${a.enabled ? '' : 'disabled'}>${ic('comment', 's')} ${tr('Chat')}${a.chat_unread ? ` <span class="nbadge">${a.chat_unread}</span>` : ''}</button></div></div>`;
   const items = S.jobs.items || [];
   return `<div class="agview">
-    ${ags.length ? `<div class="agcards">${ags.map(card).join('')}</div>` : `<div class="empty hempty">${heron('agent')}<span>${tr('No agents yet. An admin adds them under Settings > Agents and shares lists with them.')}</span></div>`}
+    ${ags.length ? `<div class="agcards">${ags.map(card).join('')}</div>` : `<div class="empty hempty">${heron('agent')}<span>${tr('No agent works with you yet. An agent is an AI assistant (or a script) with its own account: set up your own under Settings > Agents, or ask an admin to add one, then share a list with it.')}</span><button type="button" class="btn" data-act="ag-setup">${ic('bot', 's')} ${tr('Set up an agent…')}</button></div>`}
     ${ags.length ? aiuCardHtml() : ''}
     <div class="agjh"><h2>${tr('Jobs')}</h2><span class="spacer"></span><div class="seg" role="group"><button class="${S.jobs.f === 'open' ? 'on' : ''}" data-act="jobs-f" data-f="open">${tr('Open|jobs')}</button><button class="${S.jobs.f === 'all' ? 'on' : ''}" data-act="jobs-f" data-f="all">${tr('All')}</button></div></div>
     ${S.jobs.err ? `<div class="muted mhint">${esc(S.jobs.err)}</div>` : ''}

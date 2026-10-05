@@ -30,7 +30,7 @@ const lst = async id => (await call('GET', '/api/state')).lists.find(l => l.id =
 (async () => {
   await sleep(600);
   const SW = await (await fetch(B + 'sw.js')).text();
-  check(/const CACHE = 'tasks-shell-v(?:8[7-9]|9[0-9])'/.test(SW), 'service worker cache v87');
+  check(/const CACHE = 'tasks-shell-v(?:8[7-9]|9[0-9]|[1-9][0-9]{2})'/.test(SW), 'service worker cache v87');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, time_all: true, modules: ALL.split(',').filter(x => !['collab', 'time'].includes(x))});

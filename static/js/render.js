@@ -56,7 +56,7 @@ function tabItem(id) {
   if (kind === 'tag' && v) return {id, go: 'tag/' + encodeURIComponent(v), icon: ic('tag', 'l'), label: v, key: 'tag:' + v};
   if (kind === 'folder' && v) return {id, go: 'folder/' + encodeURIComponent(v), icon: ic('folder', 'l'), label: fName(v), key: 'folder:' + v};
   if (id === 'news') return collab() ? {id, go: 'news', icon: ic('bell', 'l'), label: tr('News'), mod: 'news'} : null;
-  if (id === 'agents') return feat('agents') && agentsOn() ? {id, go: 'agents', icon: ic('bot', 'l'), label: tr('Agents'), mod: 'agents'} : null;
+  if (id === 'agents') return agentsTab() ? {id, go: 'agents', icon: ic('bot', 'l'), label: tr('Agents'), mod: 'agents'} : null;
   if (id === 'stats') return feat('stats') ? {id, go: 'stats', icon: ic('chart', 'l'), label: tr('Statistics'), mod: 'stats'} : null;
   if (id === 'time') return timeOn() ? {id, go: 'time', icon: ic('clock', 'l'), label: tr('Time tracking'), mod: 'time'} : null;  // 2.7.0 (#405 S5): one name
   if (id === 'overview') return overviewOn() ? {id, go: 'overview', icon: ic('pulse', 'l'), label: tr('Overview'), mod: 'overview'} : null;
@@ -118,6 +118,7 @@ function counts() {
     c.lists[t.list_id] = (c.lists[t.list_id] || 0) + 1;
     for (const g of new Set([...t.tags, ...(t.ltags || [])])) c.tags[g] = (c.tags[g] || 0) + 1;
     if ((t.due && t.due <= t0 || dlToday(t) || planToday(t, t0)) && !(t.blocked && hideBlockedToday())) c.today++;  // 2.11.0: + planned for today
+    else if (todayInbox() && isTodayInbox(t, t0)) c.today++;  // 2.22.0 (#681): the inbox counts in Today when it is shown there
     if (!t.due) continue;
     if (t.due < t0) c.over++;
     if (t.due === addDays(t0, 1)) c.tomorrow++;
@@ -150,7 +151,8 @@ function renderSide() {
     const shr = (l.status && statusFor(l) ? `<span class="stdot st-${esc(l.status)}" title="${esc(statusLabel(l.status))}"></span>` : '') +
       (l.shared && collab() && l.bell === 'mute' ? `<span class="shr bellm" title="${esc(tr('Notifications: {0}', bellLabel('mute')))}">${ic('belloff', 's')}</span>` : '') +
       (l.shared && collab() ? `<span class="shr" title="${esc(isOwner(l) ? tr('Shared by you') : tr('Shared by {0}', l.owner_name))}">${ic('users', 's')}</span>` : '');
-    if (S.listReorder) return `<div class="srow reorder" data-list="${l.id}">${sw}<span class="n">${esc(listName(l.name))}</span>${shr}<button class="iconbtn" data-lfolder="${l.id}" title="${tr('Move to folder')}">${ic('folder', 's')}</button><button class="iconbtn" data-lmove="-1" data-id="${l.id}" title="${tr('move up')}">${ic('chev', 's up')}</button><button class="iconbtn" data-lmove="1" data-id="${l.id}" title="${tr('move down')}">${ic('chev', 's')}</button></div>`;
+    // 2.22.0 (#692): sort mode: a grip on the left, the name shortens with …, the buttons in a fixed column on the right
+    if (S.listReorder) { const nm = listName(l.name); return `<div class="srow reorder" data-list="${l.id}"><span class="sgrip" aria-hidden="true">${ic('grip', 's')}</span>${sw}<span class="n" title="${esc(nm)}">${esc(nm)}</span>${shr}<span class="rctl"><button class="iconbtn" data-lfolder="${l.id}" aria-haspopup="menu" title="${tr('Move to…')}" aria-label="${esc(tr('Move {0} to…', nm))}">${ic('folder', 's')}</button><button class="iconbtn" data-lmove="-1" data-id="${l.id}" title="${tr('move up')}" aria-label="${esc(tr('Move {0} up', nm))}">${ic('chev', 's up')}</button><button class="iconbtn" data-lmove="1" data-id="${l.id}" title="${tr('move down')}" aria-label="${esc(tr('Move {0} down', nm))}">${ic('chev', 's')}</button></span></div>`; }
     return row('l:' + l.id, sw, listName(l.name), c.lists[l.id], `data-list="${l.id}" ${isMobile() ? '' : 'draggable="true"'}`, shr + pg);
   };
   let lh = lists.filter(l => !l.folder).map(listRow).join('');
@@ -162,7 +164,7 @@ function renderSide() {
     const fon = onTasks && k === 'folder:' + f;  // 1.5.2: the name opens the folder view, the rest of the row folds
     return {closed, html: `<div class="fhead ${sub ? 'fsub' : ''} ${closed ? 'closed' : ''} ${(active && closed) || fon ? 'on' : ''}" data-act="folder-toggle" data-folder="${esc(f)}" ${isMobile() || S.listReorder ? '' : 'draggable="true"'}>${ic('chev', 's fcar')}${ic('folder', 's')}<span class="n ${S.listReorder ? '' : 'fgo'}" ${S.listReorder ? '' : `data-go="${esc(keyToHash('folder:' + f))}" title="${esc(tr('Open {0}', fDisp(f)))}"`}>${esc(fName(f))}</span><span class="sr">${esc(closed ? tr('folded') : tr('unfolded'))}</span>${S.listReorder
       ? `<button class="iconbtn" data-fmove="-1" data-folder="${esc(f)}" title="${tr('move up')}">${ic('chev', 's up')}</button><button class="iconbtn" data-fmove="1" data-folder="${esc(f)}" title="${tr('move down')}">${ic('chev', 's')}</button>`
-      : `<span class="c">${closed && n ? n : ''}</span><button class="iconbtn fmenu" data-act="folder-menu" data-folder="${esc(f)}" title="${tr('Folder')}" aria-label="${esc(tr('Folder') + ' ' + fDisp(f))}">${ic('dots', 's')}</button>`}</div>`};
+      : `<span class="c" ${n ? `aria-label="${esc(trn('{0} open task', '{0} open tasks', n))}"` : ''}>${n || ''}</span><button class="iconbtn fmenu" data-act="folder-menu" data-folder="${esc(f)}" title="${tr('Folder')}" aria-label="${esc(tr('Folder') + ' ' + fDisp(f))}">${ic('dots', 's')}</button>`}</div>`};
   };
   const fempty = () => `<div class="fempty">${isMobile() ? tr('empty: assign lists in sort mode') : tr('empty: drag a list here')}</div>`;
   for (const f of folderNames().filter(x => !fParent(x))) {
@@ -196,9 +198,11 @@ function renderSide() {
     timeOn() ? mrow('time', 'clock', tr('Time tracking'), S.timer ? '<span class="c"><span class="recdot"></span></span>' : '') : '',
     feat('stats') ? mrow('stats', 'chart', tr('Statistics')) : '',
     feat('contacts') ? mrow('contacts', 'users', tr('Contacts')) : '',  // 2.21.0 (#658)
+    lifeOn() ? mrow('life', 'home', tr('Home & life')) : '',  // 2.22.0 (#663)
+    feat('review') ? mrow('review', 'journal', tr('Review & journal')) : '',
     famOn() ? mrow('family', 'family', tr('Family'), (S.kids || []).some(k => (k.requests || 0) > 0) ? `<span class="c nunread">${(S.kids || []).reduce((n, k) => n + (k.requests || 0), 0)}</span>` : '') : '',
     overviewOn() ? mrow('overview', 'pulse', tr('Overview'), `<span class="c ${ovProblems() ? 'over' : ''}">${ovProblems() || ''}</span>`, `title="${esc(tr('Where is it stuck?'))}"`) : '',
-    feat('agents') && agentsOn() ? mrow('agents', 'bot', tr('Agents'), `<span class="c ${aw ? 'nunread' : ''}">${aw || ''}</span>`) : ''].join('');
+    agentsTab() ? mrow('agents', 'bot', tr('Agents'), `<span class="c ${aw ? 'nunread' : ''}">${aw || ''}</span>`) : ''].join('');
   // Team: the people I share lists with (their tasks) and the agents (status dot; a click opens the chat)
   const ags = shownAgents(), ppl = teamPeople().slice(0, 12);
   // 2.10.0 (#441): my groups (admins: every group with a task); a click shows the tasks assigned to the group
@@ -212,7 +216,7 @@ function renderSide() {
   // "Search" view inside); no separate "Search" row any more (it doubled the field in the drawer, the field was missing on
   // an unfolded Fold)
   $('#side').innerHTML = `
-    <div class="sbrand"><button type="button" class="sbhome ${S.route.mod === 'home' ? 'on' : ''}" data-go="home" title="${esc(tr('Dashboard'))}" aria-label="${esc(APP_NAME + ': ' + tr('Dashboard'))}" ${S.route.mod === 'home' ? 'aria-current="page"' : ''}>${logoSvg(20)}<span>${esc(APP_NAME)}</span></button><span class="spacer"></span>${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(tr('Account') + ': ' + S.me.display_name)}" aria-label="${esc(tr('Account') + ': ' + S.me.display_name)}">${av(S.me.id, S.me.display_name)}${updDot() ? `<span class="dot" title="${esc(tr('Update available'))}"></span>` : ''}</button>` : ''}</div>
+    <div class="sbrand"><button type="button" class="sbhome ${S.route.mod === 'home' ? 'on' : ''}" data-go="home" title="${esc(tr('Dashboard'))}" aria-label="${esc(APP_NAME + ': ' + tr('Dashboard'))}" ${S.route.mod === 'home' ? 'aria-current="page"' : ''}>${logoSvg(20)}<span>${esc(APP_NAME)}</span>${S.me?.orgs?.[0] ? `<small class="sborg">${esc(S.me.orgs[0])}</small>` : ''}</button><span class="spacer"></span>${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(tr('Account') + ': ' + S.me.display_name)}" aria-label="${esc(tr('Account') + ': ' + S.me.display_name)}">${av(S.me.id, S.me.display_name)}${updDot() ? `<span class="dot" title="${esc(tr('Update available'))}"></span>` : ''}</button>` : ''}</div>
     <button class="scmd" data-act="palette" title="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span></button>
     ${grp('focus', tr('Focus|nav'), focus)}
     ${views ? grp('views', tr('Views'), views) : ''}
@@ -259,7 +263,7 @@ $('#skip')?.addEventListener('click', skipToContent);
 function renderTop() { return keepFocus($('#top'), renderTop0); }
 function renderTop0() {
   const m = S.route.mod, k = S.route.key;
-  const MT = {cal: N_('Calendar'), matrix: N_('Eisenhower matrix'), habits: N_('Habits'), pomo: N_('Focus'), news: N_('News'), stats: N_('Statistics'), time: N_('Time tracking'), overview: N_('Where is it stuck?'), agents: N_('Agents'), team: N_('Team chat'), home: N_('Dashboard'), family: N_('Family'), contacts: N_('Contacts')};
+  const MT = {cal: N_('Calendar'), matrix: N_('Eisenhower matrix'), habits: N_('Habits'), pomo: N_('Focus'), news: N_('News'), stats: N_('Statistics'), time: N_('Time tracking'), overview: N_('Where is it stuck?'), agents: N_('Agents'), team: N_('Team chat'), home: N_('Dashboard'), family: N_('Family'), contacts: N_('Contacts'), life: N_('Home & life'), review: N_('Review & journal')};
   let title = m === 'tasks' ? titleFor(k) : m === 'notes' ? tr('Notes') + ' · ' + (lname(listById(S.nt.lid)) || '') : m === 'family' && S.me?.kid ? tr('My day') : MT[m] ? tr(MT[m]) : '';
   if (m === 'matrix' && mxTitle()) title = `${tr('Matrix')} · ${mxTitle()}`;
   let acts = '';
@@ -557,6 +561,8 @@ function renderView0() {
   else if (m === 'home') setHtml(el, viewHome());  // 2.17.0 (#475)
   else if (m === 'family') setHtml(el, viewFamily());  // 2.19.0 (#653)
   else if (m === 'contacts') setHtml(el, viewContacts());  // 2.21.0 (#658)
+  else if (m === 'life') setHtml(el, viewLife());  // 2.22.0 (#663)
+  else if (m === 'review') setHtml(el, viewReview());
   else if (S.route.key === 'search') setHtml(el, viewSearch());
   else if (S.route.key === 'done' || S.route.key === 'trash') setHtml(el, viewHistory());
   else if (S.route.key === 'archived') setHtml(el, viewArchived());
@@ -942,6 +948,24 @@ function blockedTitle(t) {
   return tr('Waiting on: {0}', [...names.map(n => tr('“{0}”|quoted', n)), ...(hidden ? [trn('{0} task you cannot see', '{0} tasks you cannot see', hidden)] : [])].join(', '));
 }
 const hideBlockedToday = () => depsOn() && S.settings.hide_blocked_today === '1';
+// 2.22.0 (#681): Today can show the inbox too (Settings > General > Today, off by default): the inbox's tasks without a
+// date in their own foldable section under today's tasks, with quick buttons to sort them; they count in Today's number
+const todayInbox = () => S.settings.today_inbox === '1';
+const isTodayInbox = (t, t0 = today()) => !t.parent_id && !t.context && !t.due && t.status === 0 && !t.deleted_at && t.list_id === inbox()?.id && !planToday(t, t0) && !dlToday(t);
+const todayInboxTasks = () => openTasks().filter(t => isTodayInbox(t)).sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0) || a.id - b.id);
+function todayInboxHtml(ts) {
+  const k = 'today-inbox', closed = S.collapsed.has(k);
+  const acts = t => `<span class="tinacts"><button type="button" class="iconbtn" data-act="tin-due" data-d="0" data-id="${t.id}" title="${esc(tr('Today'))}" aria-label="${esc(tr('{0}: today', t.title))}">${ic('sun', 's')}</button><button type="button" class="iconbtn" data-act="tin-due" data-d="1" data-id="${t.id}" title="${esc(tr('Tomorrow'))}" aria-label="${esc(tr('{0}: tomorrow', t.title))}">${ic('sunrise', 's')}</button><button type="button" class="iconbtn" data-act="tin-move" data-id="${t.id}" aria-haspopup="menu" title="${esc(tr('Move to list'))}" aria-label="${esc(tr('Move {0} to a list', t.title))}">${ic('list', 's')}</button></span>`;
+  return `<div class="group tinbox"><div class="ghead ${closed ? 'closed' : ''}" data-act="collapse" data-key="${k}">${ic('chev', 's')}${ic('inbox', 's')}${tr('Inbox')} <span class="c">${ts.length}</span></div>
+    ${closed ? '' : ts.map(t => `<div class="tinrow">${taskRow(t, {drag: false, tree: false})}${acts(t)}</div>`).join('')}</div>`;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('[data-act="tin-due"], [data-act="tin-move"]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  const id = +b.dataset.id, t = taskById(id); if (!t) return;
+  if (b.dataset.act === 'tin-due') { const d = addDays(today(), +b.dataset.d); patchUndoable(id, {due: d}, tr('Due: {0}', dayLabel(d))); return; }
+  menu(b, S.lists.filter(l => !l.archived && !l.is_inbox && canAddTo(l.id)).map(l => ({label: lname(l), icon: 'list', fn: () => patchUndoable(id, {list_id: l.id}, tr('Moved to {0}', lname(l)))})));
+});
 function qaddBox(extraCls = '') {
   return `<div class="qadd inline ${extraCls}"><div class="box">${ic('plus')}<input id="qinput" aria-label="${esc(tr('Add task…'))}" placeholder="${tr('Add task: “Dentist tomorrow 3pm !high #private ~list”')}" autocomplete="off" enterkeyhint="done">${tplBtn()}${qExtraBtns('qinput')}</div><div class="chips" id="qchips"></div></div>`;
 }
@@ -1022,7 +1046,8 @@ function viewListBody() {
     const shown = groups.flatMap(g => g.tasks), ids = new Set(shown.map(t => t.id));
     return shown.some(t => t.status === 0 && dFor(t) && (t.blocked || (t.blockers || []).some(b => ids.has(b))));
   })();
-  if (!total) {
+  const tin = S.route.key === 'today' && todayInbox() ? todayInboxTasks() : [];  // 2.22.0 (#681)
+  if (!total && !tin.length) {
     // 2.14.0: the heron: Today with something done = the sun sets ("all done"), otherwise it looks into the water
     h += S.route.key === 'today' ? (v.done.length ? heronEmpty('done', tr('All done for today.'), tr('Enjoy the rest of the day.')) : heronEmpty('empty', tr('Nothing left for today.')))
       : heronEmpty('empty', tr('No tasks.'), rl && !ro ? tr('Add the first one with the field below.') : '');
@@ -1046,6 +1071,7 @@ function viewListBody() {
     if (!closed && g.section !== undefined && !g.tasks.length && !ro) h += `<div class="sdrop" data-section="${g.section ?? ''}">${tr('Drop tasks here')}</div>`;  // shown while a task is dragged
     if (g.name) h += '</div>';
   }
+  if (tin.length) h += todayInboxHtml(tin);
   // 2.19.0 (#667): the end of a list takes a dragged task into a new section
   if (rl && !ro && !rl.is_inbox && total && canEditList(rl.id)) h += `<div class="sdrop snew" data-newsec="1">${ic('plus', 's')}<span>${tr('New section')}</span></div>`;
   if (cut) h += `<div class="rowmore"><button type="button" class="btn" data-act="rows-more">${ic('down', 's')}${esc(trn('Show {0} more task', 'Show {0} more tasks', Math.min(cut, ROW_CAP)))}</button><span class="muted">${esc(trn('{0} task not shown yet', '{0} tasks not shown yet', cut))}</span></div>`;

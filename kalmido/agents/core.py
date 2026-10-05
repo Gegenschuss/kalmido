@@ -151,6 +151,10 @@ def agent_emit(c, aid, event, data, actor="auto"):
     a = agent_row(c, aid)
     if not agent_active(a):
         return None
+    if isinstance(data, dict):  # 2.22.0 (#663): nothing of a health list ever reaches an agent
+        lid = data.get("list_id") or (data.get("task") or {}).get("list_id") or (data.get("list") or {}).get("id")
+        if lid and c.execute("SELECT 1 FROM lists WHERE id=? AND life='health'", (lid,)).fetchone():
+            return None
     if actor == "auto":
         actor = wh_actor(c) if has_request_context() and getattr(g, "user", None) else None
     if actor and actor.get("id") == aid:

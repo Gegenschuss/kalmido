@@ -377,6 +377,11 @@ shard 7  # ---------------------------------------------------------------- shar
 # Firefox (390 touch, the Fold 690 x 829 upright + across, 1440 mouse, axe, a drag over free time) and a server that is down
        run p2210_api "$PY" p2210_api_test.py "$KALMIDO_TEST_DATA"
        run p2210_ui node p2210_ui.js "$KALMIDO_TEST_DATA"
+# 2.22.0 package "Home & life" (#663 #662): contracts, devices + upkeep, staying in touch, health (private: agents, tokens
+# without the scope "private", webhooks), review + journal, trips, read later from Karakeep (fake server in the container),
+# API v1 + OpenAPI; then the UI in jsdom and Firefox (390 / Fold 690 touch, 1440 mouse, axe) and the ride-alongs #678-#692
+       run p2220_api "$PY" p2220_api_test.py "$KALMIDO_TEST_DATA"
+       run p2220_ui node p2220_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

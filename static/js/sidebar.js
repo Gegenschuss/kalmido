@@ -18,7 +18,7 @@ function renderMultiBar() {
   // 2.13.0 (#453 A14): every action has its label; a phone shows the four common ones and "More" (the bar used to be 11
   // bare icons, the last one cut off)
   const A = [['mb-today', 'sun', tr('Today')], ['mb-tomorrow', 'sunrise', tr('Tomorrow')], ['mb-date', 'cal', tr('Date')], ['mb-prio', 'flag', tr('Priority')], ['mb-list', 'folder', tr('List')],
-    ['mb-tag', 'tag', tr('Add tag')], ...(msBulkList() ? [['mb-ms', 'flag', tr('Set milestone')]] : []), ['mb-pin', 'pin', tr('Pin')], ['mb-done', 'done', tr('Completed')], ['mb-del', 'trash', tr('Delete'), 'danger'],
+    ['mb-tag', 'tag', tr('Add tag')], ...(msBulkList() ? [['mb-ms', 'flag', tr('Set milestone')]] : []), ['mb-pin', 'pin', tr('Pin')], ...(n === 1 ? [['mb-wait', 'hourglass', tr('Waiting on external…')]] : []), ['mb-done', 'done', tr('Completed')], ['mb-del', 'trash', tr('Delete'), 'danger'],
     ...(propInboxSel() ? [['mb-sort', 'bot', propWith(N_('Sort with {0}…'), N_('Sort with an agent…'))]] : [])];
   const MAIN = ['mb-today', 'mb-date', 'mb-list', 'mb-done'], mob = isMobile();
   const btn = ([act, i, lab, cls], hid) => `<button class="mbb ${cls || ''} ${hid ? 'mbh' : ''}" data-act="${act}" data-ico="${i}" title="${esc(lab)}" aria-label="${esc(lab)}" ${hid ? 'hidden' : ''}>${ic(i, 's')}<span class="mbl">${esc(lab)}</span></button>`;
@@ -173,6 +173,7 @@ document.addEventListener('drop', e => {
 }, true);
 document.addEventListener('paste', e => {
   if (!S.sel || $('.modal') || !$('#detail').classList.contains('open') && !$('#app').classList.contains('detail-open')) return;
+  if (['qinput', 'qsheet'].includes(document.activeElement?.id)) return;  // 2.22.0 (#678): the quick add box takes it itself
   const files = [...(e.clipboardData?.files || [])];
   if (!files.length) return;  // plain text paste stays normal
   e.preventDefault();
@@ -265,6 +266,7 @@ function folderMenu(anchor, f) {
   const into = folderNames().filter(t => !fParent(t) && t !== f && t !== fParent(f));
   menu(anchor, [
     {label: tr('New list in this folder'), icon: 'plus', fn: () => listModal(null, f)},
+    ...(collab() && folderLists(f).some(l => isOwner(l)) ? [{label: tr('Share folder…'), icon: 'users', fn: () => folderPeopleModal(f)}] : []),  // 2.22.0 (#740)
     ...(collab() && (S.groups || []).length && folderLists(f).some(l => isOwner(l)) ? [{label: tr('Share with a group…'), icon: 'users', fn: () => folderGroupsModal(f)}] : []),  // 2.10.0 (#441)
     ...(sub ? [] : [{label: tr('New subfolder…'), icon: 'folder', fn: () => newFolder(null, f)}]),
     {label: tr('Rename'), icon: 'edit', fn: async () => {
@@ -280,6 +282,28 @@ function folderMenu(anchor, f) {
       await api('POST', '/api/folders/delete', {name: f}); await load(); render();
     }},
   ]);
+}
+// 2.22.0 (#740): share a whole folder with people: its lists now and every list that comes into it later (switchable off
+// per person); the lists land with them in a folder of the same name
+async function folderPeopleModal(f) {
+  let users = [], have = [];
+  try { users = (await api('GET', '/api/users')).users.filter(u => !u.disabled && S.me && u.id !== S.me.id && u.kind !== 'agent' && !u.agent); have = (await api('GET', '/api/folders/people?folder=' + encodeURIComponent(f))).people; } catch { return; }
+  const md = modal(`<h3>${ic('users', 's')} ${esc(tr('Share folder “{0}”', fDisp(f)))}</h3>
+    <p class="muted">${tr('Every list in this folder is shared now, and every list you add to it later. With them the lists land in a folder of the same name; they can move them freely.')}</p>
+    <div class="fpl" id="fp-list"></div>
+    <div class="row"><label for="fp-user">${tr('Person')}</label><select id="fp-user">${users.map(u => `<option value="${u.id}">${esc(u.display_name)}</option>`).join('')}</select><select id="fp-role" aria-label="${esc(tr('Role'))}"><option value="edit">${tr('Member')}</option><option value="view">${tr('Viewer')}</option></select><button type="button" class="btn pri" data-m="add">${tr('Share')}</button></div>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Done')}</button></div>`);
+  const draw = () => { $('#fp-list', md).innerHTML = have.length ? have.map(p => { const u = users.find(x => x.id === p.user_id); return `<div class="mrow">${av(p.user_id, u?.display_name || '?')}<span class="n">${esc(u?.display_name || '?')} <span class="muted">${esc(p.role === 'view' ? tr('Viewer') : tr('Member'))} · ${tr('new lists too')}</span></span><button class="iconbtn" data-rm="${p.user_id}" title="${esc(tr('Stop sharing new lists'))}" aria-label="${esc(tr('Stop sharing new lists with {0}', u?.display_name || '?'))}">${ic('x', 's')}</button></div>`; }).join('') : `<p class="muted">${tr('Not shared yet.')}</p>`; };
+  draw();
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.m === 'close') { md.remove(); await load(); render(); return; }
+    if (b.dataset.m === 'add') {
+      const uid = +$('#fp-user', md).value, role = $('#fp-role', md).value; if (!uid) return;
+      try { const j = await api('PUT', '/api/folders/people', {folder: f, user_id: uid, role}); have = [...have.filter(x => x.user_id !== uid), {user_id: uid, role}]; draw(); toast(trn('{0} list shared', '{0} lists shared', j.shared)); } catch { /* api() said it */ }
+    }
+    if (b.dataset.rm) { try { await api('DELETE', '/api/folders/people', {folder: f, user_id: +b.dataset.rm}); have = have.filter(x => x.user_id !== +b.dataset.rm); draw(); } catch { /* api() said it */ } }
+  });
 }
 // the sidebar order (+ folder moves) in one request, as one history step (label: what it was)
 const listOrderNow = () => S.lists.filter(l => !l.is_inbox).sort((a, b) => (a.sort || 0) - (b.sort || 0) || a.id - b.id).map(l => l.id);

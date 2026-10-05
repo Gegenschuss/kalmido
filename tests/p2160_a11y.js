@@ -352,6 +352,8 @@ const ACCENTS = ['violet', 'raspberry', 'mint', 'sky', 'rose', 'orange', 'lime']
     for (let i = 0; i < 5; i++) { await press(K.Tab, true); const x = await ev(FOC); if (!x || !x.inModal) out++; }
     check(out === 0, tag + ': Shift+Tab too');
     await press(K.Esc); await sleep(300);
+    // 2.22.0: when the walk ends on an (i) button its tooltip shows: the first Esc hides the tooltip (WCAG 1.4.13), the second closes
+    if (await ev(`!!document.querySelector('.modal') && document.activeElement?.matches?.('.ib')`)) { await press(K.Esc); await sleep(300); }
     f = await ev(FOC);
     check(!(await ev(`!!document.querySelector('.modal')`)) && f && f.row, tag + ': Esc closes Settings, the focus is back where it was ' + JSON.stringify(f));
   }, false);

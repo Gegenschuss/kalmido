@@ -664,6 +664,9 @@ def contact_dict(c, r, uid=None, links=True):
             except Denied:
                 continue
             d["events"].append({"event_id": er["id"], "title": er["title"], "start": er["start"], "all_day": bool(er["all_day"])})
+        if "care" in (usettings(c, uid).get("features") or "").split(","):  # 2.22.0 (#663): my "stay in touch" for this contact
+            from ..life.model import care_get
+            d["care"] = care_get(c, uid, r["id"])
     return d
 
 

@@ -101,8 +101,12 @@ check(fl["shopping"]["name"] == "Einkaufsliste" and fl["meals"]["name"] == "Esse
       "… named in German, in the folder Familie " + str([(l["name"], l["folder"]) for l in fl.values()]))
 SHOP, HOUSE, BDAYS, MEALS = (fl[k]["id"] for k in ("shopping", "household", "birthdays", "meals"))
 secs = [s["name"] for s in st["sections"] if s["list_id"] == SHOP]
-check(secs[:3] == ["Obst & Gemüse", "Brot & Backwaren", "Milchprodukte & Eier"] and len(secs) == 8 and fl["shopping"]["checklist"] == 1,
-      f"the shopping list: 8 shop areas, done items at the bottom {secs}")
+check(secs == [] and fl["shopping"]["checklist"] == 1, f"the shopping list: (2.22.0 #747) no shop areas by itself, done items at the bottom {secs}")
+r = A.post(B + f"/api/lists/{SHOP}/shop-areas")
+check(r.ok and r.json()["added"] == 8 and r.json()["sorted"] == 3, "switched on by hand: 8 areas, the three example items sorted in " + r.text)
+st = A.get(B + "/api/state").json()
+secs = [s["name"] for s in st["sections"] if s["list_id"] == SHOP]
+check(secs[:3] == ["Obst & Gemüse", "Brot & Backwaren", "Milchprodukte & Eier"] and len(secs) == 8, f"the 8 shop areas {secs}")
 ex = [t for t in st["tasks"] if t["list_id"] == SHOP]
 check({t["title"] for t in ex} == {"Äpfel", "Brot", "Milch"} and all(t["section_id"] for t in ex), "three example items, each in its area")
 chores = [t for t in st["tasks"] if t["list_id"] == HOUSE]
@@ -353,13 +357,13 @@ check(nut2["section_id"] == area["Vorrat"], "moved once to Pantry: the next Nute
 r = A.post(B + "/api/lists", json={"name": "Weekend shop", "family": "shopping"})
 check(r.ok and r.json()["family"] == "shopping" and r.json()["checklist"] == 1, "a new shopping list")
 WS = r.json()["id"]
-check(len([s for s in A.get(B + "/api/state").json()["sections"] if s["list_id"] == WS]) == 8, "… with the 8 areas (English)")
+check(len([s for s in A.get(B + "/api/state").json()["sections"] if s["list_id"] == WS]) == 0, "… (2.22.0 #747) without shop areas until they are switched on")
 L2 = A.post(B + "/api/lists", json={"name": "Plain"}).json()["id"]
 r = A.post(B + f"/api/lists/{L2}/shop-areas")
 check(r.ok and r.json()["added"] == 8 and A.post(B + f"/api/lists/{L2}/shop-areas").json()["added"] == 0, "shop areas for an existing list, once")
 L3 = A.post(B + "/api/lists", json={"name": "Drugstore"}).json()["id"]
-check(A.patch(B + f"/api/lists/{L3}", json={"family": "shopping"}).ok and len([s for s in A.get(B + "/api/state").json()["sections"] if s["list_id"] == L3]) == 8,
-      "a list switched to 'Used for: Shopping list' gets the areas too (the list dialog's way)")
+check(A.patch(B + f"/api/lists/{L3}", json={"family": "shopping"}).ok and len([s for s in A.get(B + "/api/state").json()["sections"] if s["list_id"] == L3]) == 0,
+      "a list switched to 'Used for: Shopping list': (2.22.0 #747) no areas by itself")
 check(next(l for l in A.get(B + "/api/state").json()["lists"] if l["id"] == L2)["family"] == "shopping", "… which becomes a shopping list")
 check(A.patch(B + f"/api/lists/{L2}", json={"family": "rocket"}).status_code == 400, "an unknown list kind: 400")
 check(Bo.patch(B + f"/api/lists/{SHOP}", json={"family": ""}).status_code == 403, "only the owner changes what a list is for")

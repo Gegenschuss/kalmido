@@ -189,7 +189,7 @@ try {
 function taskById(id) { return S.tasks.get(id) || (S.extra || []).find(t => t.id === id); }
 // 2.0.6 (#316 / #322): the task panel below the title and the description, top to bottom; the comments and
 // the history come last, the comment box stays at the bottom edge of the panel (sticky, see cmComposer())
-const DETAIL_ORDER = ['family', 'subtasks', 'deps', 'links', 'tags', 'attachments', 'paperless', 'fields', 'custom', 'time', 'code', 'history', 'comments'];  // code: 2.2.0 (#271)  // history: private lists only (2.0.7)
+const DETAIL_ORDER = ['family', 'life', 'subtasks', 'deps', 'links', 'tags', 'attachments', 'paperless', 'fields', 'custom', 'time', 'code', 'history', 'comments'];  // code: 2.2.0 (#271)  // history: private lists only (2.0.7)
 // 2.7.2 (#424): where a task lives, at the top of its panel: Folder › List › Section › (parent task). Every part jumps
 // there (the list, scrolled to the section / the parent) and closes the bell's dropdown. Only lists the viewer has.
 function crumbsHtml(t, l, parent) {
@@ -283,7 +283,7 @@ function renderDetail0() {
         ${ro ? '' : depthOf(t) < 2 ? `<div class="subadd">${ic('plus', 's')}<input id="d-sub" placeholder="${isOcc(t) && famOn() ? tr('Add a gift idea') : tr('Add subtask')}" aria-label="${esc(isOcc(t) && famOn() ? tr('Add a gift idea') : tr('Add subtask'))}" enterkeyhint="done"></div>` : `<div class="muted" style="font-size:var(--fs-s);padding:.25rem">${tr('At most 3 levels')}</div>`}</div></div>`,
     comments: cm === 'full' ? `<div class="dsec cmsec ${cmtNew() ? 'cmnew' : ''}" id="d-tl">${timelineHtml(t)}</div>` : '',
     history: hist ? `<details class="dsec cmsec cmro" id="d-hist"><summary><span>${tr('History')}</span></summary><div class="cms" id="d-hist-items">${S.tl.id === t.id ? histItems() : `<div class="muted cmempty">${tr('Loading…')}</div>`}</div></details>` : '',
-    deps: ck ? '' : `${t.id > 0 && dFor(t) && !t.context ? `<div class="dsec depsec" id="d-deps">${depsHtml(t)}</div>` : ''}`,
+    deps: ck ? '' : `${t.id > 0 && dFor(t) && !t.context ? `<div class="dsec depsec" id="d-deps">${depsHtml(t)}</div>` : waitExtHtml(t, ro, true)}`,  // 2.22.0 (#686)
     tags: ck ? '' : `<div class="dsec"><h5>${tr('Tags')}${shared && collab() && t.tags.length ? ` <span class="muted h5note">${ic('user', 's')} ${tr('= only visible to you')}</span>` : ''}</h5>${tagEditHtml(t, ro)}</div>`,
     attachments: ck ? '' : `<div class="dsec attsec"><h5>${tr('Attachments')}</h5><div class="atts">${(t.attachments || []).map(attHtml).join('')}
         ${t.id > 0 && !ro ? `<label class="attadd" title="${esc(isTouch() ? tr('Images, PDFs, documents') : tr('Images, PDFs, documents') + ' · ' + tr('or drop files here / paste an image with Ctrl+V'))}">${ic('clip', 's')}<span>${tr('Add file')}</span><input type="file" id="d-file" multiple hidden></label>` : ''}</div>
@@ -304,6 +304,7 @@ function renderDetail0() {
     time: ck ? '' : `${tFor(t) && t.id > 0 && !t.context ? `<div class="dsec tesec" id="d-time">${taskTimeHtml(t)}</div>` : ''}`,
     code: ck ? '' : codeHtml(t),
     family: ck ? '' : famDetailHtml(t, l, ro),  // 2.19.0 (#653)
+    life: ck ? '' : lifeDetailHtml(t, l, ro),  // 2.22.0 (#663)
     links: ck ? '' : linksDetailHtml(t, ro)};  // 2.21.0 (#659 / #658): events + contacts of the task
   setHtml($('#detail'), `
     <div class="dtop">

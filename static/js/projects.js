@@ -36,8 +36,8 @@ function vsegHtml(l) {
 function listHead(l, o = {}) {
   if (!l || l.is_inbox) return vsegHtml(l) + agBandHtml();
   const p = l.progress || {done: 0, total: 0, overdue: 0}, showP = progressFor(l) && p.total > 0 && !progHidden(l.id), pill = o.noPill ? '' : statusPill(l), ts = timeSumHtml([l]);
-  if (!showP && !pill && !ts) return vsegHtml(l) + famBar(l) + agBandHtml();
-  return `${vsegHtml(l)}${famBar(l)}<div class="lhead">${showP ? `<span class="lpg">${progBar(p)}<button class="iconbtn lpx" data-act="prog-hide" data-id="${l.id}" title="${tr('Hide progress')}" aria-label="${tr('Hide progress')}">${ic('x', 's')}</button></span>` + progMeta(p) : ''}<span class="spacer"></span>${ts}${pill}</div>${statusNote(l)}${agBandHtml()}`;
+  if (!showP && !pill && !ts) return vsegHtml(l) + famBar(l) + lifeBar(l) + agBandHtml();
+  return `${vsegHtml(l)}${famBar(l) + lifeBar(l)}<div class="lhead">${showP ? `<span class="lpg">${progBar(p)}<button class="iconbtn lpx" data-act="prog-hide" data-id="${l.id}" title="${tr('Hide progress')}" aria-label="${tr('Hide progress')}">${ic('x', 's')}</button></span>` + progMeta(p) : ''}<span class="spacer"></span>${ts}${pill}</div>${statusNote(l)}${agBandHtml()}`;
 }
 // ---- 2.7.0 (#407): the tracked time of a project list (or of a folder's project lists) in its header, in hours and in
 // working days. Hours per day / shift: the list's own value (list dialog, owner; the same for every member), else the
@@ -365,8 +365,16 @@ function depsHtml(t) {
   if (D.err) return head + `<div class="muted mhint">${D.err === 'offline' ? tr('Dependencies are only available online.') : esc(D.err)}</div>`;
   const add = dir => ro ? '' : `<button class="btn sm dadd" data-act="dep-add" data-dir="${dir}" data-id="${t.id}">${ic('plus', 's')} ${dir === 'by' ? tr('Waiting on…') : tr('Blocking…')}</button>`;
   if (ro && !D.blocked_by.length && !D.blocking.length) return head + `<div class="muted mhint">${tr('No dependencies.')}</div>`;
-  return head + `<div class="dgrp"><div class="dlab">${tr('Waiting on')}</div>${D.blocked_by.map(x => depItem(x, 'by', t, ro)).join('')}${add('by')}</div>
+  return head + `<div class="dgrp"><div class="dlab">${tr('Waiting on')}</div>${D.blocked_by.map(x => depItem(x, 'by', t, ro)).join('')}${add('by')}${waitExtHtml(t, ro)}</div>
     <div class="dgrp"><div class="dlab">${tr('Blocking')}</div>${D.blocking.map(x => depItem(x, 'blocking', t, ro)).join('')}${add('blocking')}</div>`;
+}
+// 2.22.0 (#686): "Waiting on external" (a client's approval, an offer, a delivery) as a visible button in the task panel:
+// in the dependencies under "Waiting on…" (the tasks), else in its own small section; hidden while the task already
+// waits (the waiting bar at the top shows it then)
+function waitExtHtml(t, ro, own) {
+  if (ro || !t || t.id <= 0 || t.context || t.status !== 0 || t.waiting_at) return '';
+  const b = `<button class="btn sm dadd dwait" data-act="wait-edit" data-id="${t.id}">${ic('hourglass', 's')} ${tr('Waiting on external…')}</button>`;
+  return own ? `<div class="dsec waitsec"><h5>${tr('Waiting')}</h5>${b}</div>` : b;
 }
 function depPicker(tid, dir) {
   const D = S.dp.id === tid ? S.dp : {blocked_by: [], blocking: []};
@@ -375,14 +383,21 @@ function depPicker(tid, dir) {
   const md = modal(`<h3>${dir === 'by' ? tr('Waiting on…') : tr('Blocking…')}</h3>
     <div class="shint keep">${dir === 'by' ? tr('“{0}” can only really start once the chosen task is done.', esc(self?.title || '')) : tr('The chosen task waits on “{0}”.', esc(self?.title || ''))}</div>
     <input id="dp-q" placeholder="${tr('Search open tasks')}" autocomplete="off" style="width:100%;margin-top:.5rem">
-    <div class="dplist" id="dp-list"></div>
+    <div class="dplist tpk" id="dp-list" role="listbox" aria-label="${esc(tr('Open tasks'))}"></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button></div>`);
   md.classList.add('dpmodal');
   const draw = () => {
     const q = norm($('#dp-q', md).value || '');
     const arr = openTasks().filter(x => x.id > 0 && x.id !== tid && !have.has(x.id) && isProject(x.list_id) && (dir === 'by' || canEdit(x)) && (!q || norm(x.title).includes(q)))
       .sort((a, b) => (b.list_id === self?.list_id) - (a.list_id === self?.list_id) || (a.due || '9999').localeCompare(b.due || '9999') || bySort(a, b)).slice(0, 60);
-    $('#dp-list', md).innerHTML = arr.map(x => `<button class="dprow" data-pick="${x.id}"><span class="n">${esc(x.title)}</span><span class="muted">${esc(lname(listById(x.list_id)))}${x.due ? ' · ' + esc(dayLabel(x.due)) : ''}</span></button>`).join('') || `<div class="muted mhint">${tr('No matching open task.')}</div>`;
+    // 2.22.0 (#685): rows grow with their text (title at most two lines, the list small below), grouped: this list first,
+    // then the other lists under their name; the same look as every task picker (.tpk)
+    const row = x => `<button type="button" class="tpkrow" role="option" data-pick="${x.id}"><span class="tpkt">${esc(x.title)}</span><span class="tpkm">${esc(lname(listById(x.list_id)))}${x.due ? ' · ' + esc(dayLabel(x.due)) : ''}</span></button>`;
+    const same = arr.filter(x => x.list_id === self?.list_id), others = arr.filter(x => x.list_id !== self?.list_id);
+    const byList = [...new Set(others.map(x => x.list_id))];
+    $('#dp-list', md).innerHTML = !arr.length ? `<div class="muted mhint">${tr('No matching open task.')}</div>`
+      : (same.length ? `<div class="tpkg" role="group" aria-label="${esc(tr('This list'))}"><div class="tpkh">${esc(tr('This list'))}</div>${same.map(row).join('')}</div>` : '')
+        + byList.map(lid => `<div class="tpkg" role="group" aria-label="${esc(lname(listById(lid)))}"><div class="tpkh">${esc(lname(listById(lid)))}</div>${others.filter(x => x.list_id === lid).map(row).join('')}</div>`).join('');
   };
   draw();
   md.addEventListener('input', e => { if (e.target.id === 'dp-q') draw(); });

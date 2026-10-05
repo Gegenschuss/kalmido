@@ -206,6 +206,11 @@ function palAll() {
     for (const [k, n] of PACK_UI) add('a:pack:' + k, 'action', tr('New packing list: {0}', tr(n)), 'bag', () => famPack(k));
     for (const l of S.lists.filter(x => x.family === 'shopping' && !x.archived)) add('a:shop:' + l.id, 'action', tr('Shopping mode: {0}', lname(l)), 'cart', () => shopModeOpen(l.id));
   }
+  // 2.22.0 (#663): Home & life
+  if (feat('contracts')) add('a:contract', 'action', tr('New contract'), 'file', () => contractModal());
+  if (feat('home')) { add('a:device', 'action', tr('New device'), 'tool', () => deviceModal()); add('a:upkeep', 'action', tr('New upkeep task'), 'repeat', () => upkeepModal()); }
+  if (feat('health')) add('a:health', 'action', tr('New health entry'), 'heart', () => healthModal());
+  if (feat('travel')) add('a:trip', 'action', tr('New trip'), 'plane', () => tripModal());
   if (propOn()) {  // 2.3.0 (#260 #262 #263): ask an agent for a proposal
     add('a:propproject', 'action', tr('New project from briefing…'), 'bot', () => propRequest('project'));
     add('a:propinbox', 'action', propWith(N_('Sort the inbox with {0}…'), N_('Sort the inbox with an agent…')), 'bot', () => propRequest('triage', {}));
@@ -221,6 +226,7 @@ function palAll() {
     add('a:today', 'task', tr('Move {0} to today', n), 'sun', () => patchUndoable(t.id, {due: today()}, tr('Date: {0}', dayLabel(today()))));
     add('a:tomorrow', 'task', tr('Move {0} to tomorrow', n), 'sunrise', () => patchUndoable(t.id, {due: addDays(today(), 1)}, tr('Date: {0}', dayLabel(addDays(today(), 1)))));
     add('a:move', 'task', tr('Move {0} to another list…', n), 'folder', () => openPalette('move'), {keep: true, keys: 'm'});
+    if (t.status === 0) add('a:wait', 'task', t.waiting_at ? tr('{0}: no longer waiting', n) : tr('{0}: waiting on external…', n), 'hourglass', () => t.waiting_at ? waitClear(t.id) : waitDialog(t.id));  // 2.22.0 (#686)
     for (const [p, nm] of [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]]) add('a:prio' + p, 'task', tr('Priority of {0}: {1}', n, tr(nm)), 'flag', () => patchTask(t.id, {priority: p}), {cls: p ? 'pf' + p : '', qonly: true});
     if (feat('pomo') && t.status === 0) add('a:focus', 'task', tr('Start focus on {0}', n), 'timer', () => { pomoStart(t.id); go('pomo'); });
     if (propBreakOk(t)) add('a:propbreak', 'task', tr('Break down {0} with an agent…', n), 'bot', () => propRequest('subtasks', {tid: t.id}));  // 2.3.0 (#261)
@@ -256,11 +262,11 @@ function palAll() {
   add('v:home', 'view', tr('Dashboard'), 'home', () => go('home'));  // 2.17.0 (#475)
   if (teamOn()) add('v:team', 'view', tr('Team chat'), 'comment', () => go('team'));  // 2.17.0 (#419)
   for (const n of S.notes || []) add('n:' + n.id, 'note', n.title, 'edit', () => go('note/' + n.id), {sub: lname(listById(n.list_id)) || ''});  // 2.17.0 (#442)
-  for (const [m, icon, name] of [['cal', 'cal', N_('Calendar')], ['matrix', 'grid', N_('Eisenhower matrix')], ['habits', 'habit', N_('Habits')], ['pomo', 'timer', N_('Focus')], ['news', 'bell', N_('News')], ['stats', 'chart', N_('Statistics')], ['time', 'clock', N_('Time tracking')], ['overview', 'pulse', N_('Where is it stuck?')], ['family', 'family', N_('Family')], ['contacts', 'users', N_('Contacts')]])
+  for (const [m, icon, name] of [['cal', 'cal', N_('Calendar')], ['matrix', 'grid', N_('Eisenhower matrix')], ['habits', 'habit', N_('Habits')], ['pomo', 'timer', N_('Focus')], ['news', 'bell', N_('News')], ['stats', 'chart', N_('Statistics')], ['time', 'clock', N_('Time tracking')], ['overview', 'pulse', N_('Where is it stuck?')], ['family', 'family', N_('Family')], ['contacts', 'users', N_('Contacts')], ['life', 'home', N_('Home & life')], ['review', 'journal', N_('Review & journal')]])
     if (modOn(m)) add('v:' + m, 'view', tr(name), icon, () => go(m), {keys: m === 'cal' ? 'g c' : ''});
   // 2.8.0 (#434): the command bar also opens the timeline, the agents and their chats ("ask an agent")
   if (feat('timeline')) add('v:timeline', 'view', tr('Timeline'), 'timeline', () => { S.rmScrollReset = true; rmSet({v: 'timeline'}, 'none'); go('all'); });
-  if (feat('agents') && agentsOn()) {
+  if (agentsTab()) {
     add('v:agents', 'view', tr('Agents'), 'bot', () => go('agents'));
     for (const a of (S.agents || []).filter(x => x.enabled)) add('a:chat-' + a.id, 'action', tr('Chat with {0}', a.name), 'comment', () => chatOpen(a.id));
   }
@@ -507,7 +513,7 @@ async function tourEnd(skipped) {
 }
 window.addEventListener('resize', () => { if (TOUR.on) tourGo(TOUR.i); });
 
-// ---- completion celebration: the heron swings across on a vine, checkmark confetti in the accent, a dry one-liner
+// ---- completion celebration: the heron flies across the screen, checkmark confetti falls behind it, a dry one-liner
 const QUIPS = {data: null, last: -1};
 async function quipsLoad() {
   if (QUIPS.data) return QUIPS.data;
@@ -523,16 +529,29 @@ function nextQuip() {
   return arr[i];
 }
 QUIPS.last = LS.get('quipLast', -1);
-// 2.18.0 (#394): the heron of the app icon holds the vine in its beak; the vine hangs at (48,-3) of this viewBox (the .cfig
-// transform origin), so the beak tip is placed there and the body swings below it
+// the small standing heron of the app icon: the calm variant (reduced motion) next to its line
 const HERON_SWING_SVG = `<svg class="cheron" viewBox="-90 -10 150 200" aria-hidden="true"><g transform="translate(48 -3) scale(2.2) translate(-77 -26)" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
   <path d="M24 50C34 42 52 43 62 51C55 58 40 60 30 55"/><path d="M54 48C51 39 49 32 51 25C53 20 58 19 61 22"/><path d="M61 22L77 26"/>
   <path d="M44 58V84"/><path d="M44 68L37 64L41 60" stroke-width="3.6"/></g></svg>`;
+// 2.22.0 (#688): the heron in flight, in the line style of the icon: neck tucked in (an S onto the shoulders), the long beak
+// ahead, the legs straight out behind, one broad wing that beats slowly (the wing group scales around the shoulder)
+const HERON_FLY_SVG = `<svg class="cheron cfly" viewBox="0 0 140 80" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M44 48C55 41 77 39 92 43C84 50 62 54 47 52Z"/><path d="M91 43C97 42 100 38 98 34C96 30 99 27 104 28"/><path d="M104 28L127 33"/>
+  <path d="M47 50L13 55M49 52L15 59" stroke-width="2.2"/><path d="M13 55L8 53M15 59L10 60" stroke-width="1.8"/>
+  <g class="cwing"><path d="M58 45C55 27 70 11 99 3C92 15 88 29 83 45"/><path d="M66 41C66 29 74 19 89 11" stroke-width="1.8"/></g></g>
+  <circle class="d" cx="103" cy="30" r="1.6" fill="currentColor"/></svg>`;
 const CHECK_SVG = '<svg viewBox="0 0 16 16" fill="none" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8.5 6 12.5 14 3.5"/></svg>';
 const reducedMotion = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } };
-const CELE_MS = 1900;
-// swing angle (deg) at progress p (0..1): a pendulum from far left to far right, fastest at the bottom
-const swingAt = (p, A) => A * Math.cos(Math.PI * p);  // CSS rotate(+) swings the lower end to the left: enters left, leaves right
+const CELE_MS = 2600;
+// the flight at progress p (0..1): from beyond the left edge to beyond the right edge on a shallow arc, a slight bob per
+// wing beat; WINGS beats over the whole flight (calm: about one beat every 0.65 s)
+const WINGS = 4;
+function flyAt(p, vw, vh) {
+  const x = -140 + (vw + 280) * p, y = vh * 0.34 - Math.sin(Math.PI * p) * vh * 0.1 + Math.sin(Math.PI * 2 * WINGS * p) * 5;
+  const tilt = -Math.cos(Math.PI * p) * 6;  // climbs a little at first, glides down at the end
+  return {transform: `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) rotate(${tilt.toFixed(2)}deg)`};
+}
+const wingAt = p => ({transform: `scaleY(${(0.2 + 0.8 * Math.cos(Math.PI * 2 * WINGS * p)).toFixed(3)})`});
 function celebrate(kind, {name = '', frame = null, force = false} = {}) {
   if (!force && S.settings.celebrate === '0') return;
   $$('.cele,.cele-quip').forEach(x => x.remove());
@@ -548,48 +567,49 @@ function celebrate(kind, {name = '', frame = null, force = false} = {}) {
     return q;
   }
   const vw = innerWidth || 1440, vh = innerHeight || 900;
-  const L = Math.max(260, Math.min(vh * 0.62, 560)), A = Math.min(64, Math.atan((vw / 2 - 70) / L) * 180 / Math.PI + 8);
   const el = document.createElement('div');
   el.className = 'cele'; el.dataset.kind = kind; el.setAttribute('aria-hidden', 'true');
-  el.innerHTML = `<div class="carm" style="height:${L}px"><i class="cvine"></i><div class="cfig">${HERON_SWING_SVG}</div></div>`;
+  el.innerHTML = `<div class="cbird">${HERON_FLY_SVG}</div>`;
   document.body.appendChild(el); document.body.appendChild(q);
-  const arm = $('.carm', el), body = $('.cfig', el);
-  // confetti: burst at the bottom of the swing (p = .5), thrown in the direction of travel, falls with gravity
-  const N = 26, pieces = [];
+  const bird = $('.cbird', el), wing = $('.cwing', el);
+  // confetti: checkmarks let go behind the heron along its way (start p0), they drift back a little and fall
+  const N = 28, pieces = [];
   for (let i = 0; i < N; i++) {
     const c = document.createElement('span');
     c.className = 'cconf' + (i % 5 === 0 ? ' alt' : '');
     c.innerHTML = CHECK_SVG;
     el.appendChild(c);
-    const a = -Math.PI / 2 + (Math.random() - 0.35) * Math.PI * 1.1, v = 180 + Math.random() * 260;
-    pieces.push({c, vx: Math.cos(a) * v + 120, vy: Math.sin(a) * v, spin: (Math.random() - 0.5) * 900, s: 0.7 + Math.random() * 0.8, life: 0.8 + Math.random() * 0.35});
+    const p0 = 0.12 + 0.72 * (i / (N - 1)) + (Math.random() - 0.5) * 0.04;
+    pieces.push({c, p0, vx: -40 - Math.random() * 90, vy: -30 + Math.random() * 60, spin: (Math.random() - 0.5) * 720, s: 0.65 + Math.random() * 0.7, life: 0.9 + Math.random() * 0.5});
   }
-  const ox = vw / 2 - 40, oy = L + 60;  // the heron at the bottom of the arc
-  const confAt = (pc, tt) => {  // tt: seconds since the burst
-    const x = ox + pc.vx * tt, y = oy + pc.vy * tt + 620 * tt * tt;
-    return {transform: `translate(${x}px,${y}px) rotate(${pc.spin * tt}deg) scale(${pc.s})`, opacity: tt <= 0 ? 0 : Math.max(0, 1 - Math.max(0, tt - pc.life * 0.55) / (pc.life * 0.45))};
+  const birdW = Math.min(150, Math.max(104, vw * 0.12));
+  bird.style.width = birdW + 'px';
+  const confAt = (pc, tt) => {  // tt: seconds since the piece was let go (behind the tail)
+    const f = flyAt(pc.p0, vw, vh).transform.match(/translate\(([-\d.]+)px,([-\d.]+)px/);
+    const x0 = +f[1] + birdW * 0.12, y0 = +f[2] + birdW * 0.32;
+    const x = x0 + pc.vx * tt, y = y0 + pc.vy * tt + 520 * tt * tt;
+    return {transform: `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) rotate(${(pc.spin * tt).toFixed(1)}deg) scale(${pc.s})`,
+      opacity: tt <= 0 ? 0 : Math.max(0, 1 - Math.max(0, tt - pc.life * 0.55) / (pc.life * 0.45))};
   };
-  const armAt = p => ({transform: `rotate(${swingAt(p, A).toFixed(2)}deg)`, opacity: p < 0.06 ? p / 0.06 : p > 0.9 ? (1 - p) / 0.1 : 1});
-  const bodyAt = p => ({transform: `rotate(${(-swingAt(p, A) * 0.35 + Math.sin(Math.PI * 2 * p) * 6).toFixed(2)}deg)`});
   if (frame !== null || !el.animate) {  // a still frame (screenshots, tests, browsers without Web Animations)
-    const p = frame ?? 0.55;
-    Object.assign(arm.style, armAt(p)); Object.assign(body.style, bodyAt(p));
-    for (const pc of pieces) Object.assign(pc.c.style, confAt(pc, (p - 0.5) * CELE_MS / 1000));
+    const p = frame ?? 0.5;
+    Object.assign(bird.style, flyAt(p, vw, vh)); Object.assign(wing.style, wingAt(p));
+    for (const pc of pieces) Object.assign(pc.c.style, confAt(pc, (p - pc.p0) * CELE_MS / 1000));
     q.classList.add('on');
     if (frame === null) setTimeout(() => { el.remove(); q.remove(); }, 3200);
     return el;
   }
-  const K = 24, steps = [...Array(K + 1)].map((_, i) => i / K);
-  arm.animate(steps.map(p => ({...armAt(p), offset: p})), {duration: CELE_MS, easing: 'linear', fill: 'both'});
-  body.animate(steps.map(p => ({...bodyAt(p), offset: p})), {duration: CELE_MS, easing: 'linear', fill: 'both'});
+  const K = 48, steps = [...Array(K + 1)].map((_, i) => i / K);
+  bird.animate(steps.map(p => ({...flyAt(p, vw, vh), offset: p})), {duration: CELE_MS, easing: 'linear', fill: 'both'});
+  wing.animate(steps.map(p => ({...wingAt(p), offset: p})), {duration: CELE_MS, easing: 'linear', fill: 'both'});
   for (const pc of pieces) {
     const dur = pc.life * 1000, ks = [...Array(13)].map((_, i) => i / 12);
-    pc.c.animate(ks.map(f => ({...confAt(pc, f * pc.life), offset: f})), {duration: dur, delay: CELE_MS * 0.5, easing: 'linear', fill: 'both'});
+    pc.c.animate(ks.map(f => ({...confAt(pc, f * pc.life), offset: f})), {duration: dur, delay: CELE_MS * pc.p0, easing: 'linear', fill: 'both'});
   }
-  setTimeout(() => q.classList.add('on'), CELE_MS * 0.35);
-  setTimeout(() => el.remove(), CELE_MS + 400);
-  setTimeout(() => q.classList.remove('on'), 3000);
-  setTimeout(() => q.remove(), 3400);
+  setTimeout(() => q.classList.add('on'), CELE_MS * 0.3);
+  setTimeout(() => el.remove(), CELE_MS + 1600);
+  setTimeout(() => q.classList.remove('on'), 3600);
+  setTimeout(() => q.remove(), 4000);
   return el;
 }
 // trigger check around a completion: snapshot before, compare after the state reload

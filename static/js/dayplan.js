@@ -143,5 +143,5 @@ function reviewCard() {
     <div class="rvnums"><span><b>${r.done.length}</b> ${tr('done|review')}</span><span><b>${r.open.length}</b> ${tr('still open')}</span><span><b>${r.moved.length}</b> ${tr('moved')}</span></div>
     ${r.done.length ? `<ul class="rvl">${li(r.done, 'ok')}</ul>` : ''}
     <div class="rvtm"><span class="muted">${esc(tm.count ? tr('Suggestion for {0}: {1}', fmtDayAbs(tm.date), tm.plan.slice(0, 3).map(x => x.start + ' ' + x.title).join(', ')) : tr('Nothing planned for {0} yet.', fmtDayAbs(tm.date)))}</span>
-      <button class="btn sm" data-act="dayplan" data-mode="day" data-day="${esc(tm.date)}">${ic('cal', 's')} ${tm.date === addDays(today(), 1) ? tr('Plan tomorrow') : esc(tr('Plan {0}', fmtDayAbs(tm.date)))}</button></div></section>`;
+      <button class="btn sm" data-act="dayplan" data-mode="day" data-day="${esc(tm.date)}">${ic('cal', 's')} ${tm.date === addDays(today(), 1) ? tr('Plan tomorrow') : esc(tr('Plan {0}', fmtDayAbs(tm.date)))}</button>${feat('review') ? `<a class="btn sm" href="#review">${ic('journal', 's')} ${tr('Journal')}</a>` : ''}</div></section>`;
 }

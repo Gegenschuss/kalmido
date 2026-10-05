@@ -7,6 +7,87 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.22.0] - 2026-10-05
+
+**In short:** Home & life (#663 #662). Kalmido reminds you of what keeps a household and a life running: contracts and
+their notice periods, warranties and upkeep, the people you want to stay in touch with, health appointments and
+medication, a look back at your day and week with a private journal, trips, and what you want to read later. Seven
+modules, each off until you switch it on; everything is made of tasks, lists and contacts you already know.
+
+### Added
+- **Contracts & subscriptions** (module *Contracts*): provider, cost per month / quarter / year, the end of the term,
+  the notice period (days, weeks or months), the renewal and where it is paid from. The task is due on the **last day to
+  cancel** with a reminder before it; ticking it off keeps the contract and moves it to the next term, *Cancelled* ends
+  it. The overview sums the cost per month and per year. Link the contract from Paperless in the task.
+- **Home & devices** (module *Home & devices*): devices with model, purchase date and **warranty end** (a reminder before
+  it, the receipt from Paperless in the task) and **upkeep** that comes back (heating, smoke detectors, tyres, descaling,
+  suggestions included).
+- **Staying in touch** (module *Staying in touch*, needs Contacts): on a contact's card choose how often you want to be
+  in touch; *In touch today* notes the last time, a note says what you talked about. The overview lists who is due, the
+  most overdue first, and one push a day names them. Per person: nobody else sees your choices.
+- **Health** (module *Health*): appointments, check-ups and vaccinations (repeating every few months or years) and
+  **medication** (a daily reminder per time) for you and your family, in a **private** list: an agent never sees it (not
+  even as a member, no events, no webhooks), an API token only with the new permission **Health & journal** (`private`).
+- **Review & journal** (module *Review & journal*): the day or the week (Monday to Sunday) in review: done, still open,
+  moved, coming up; a **private journal** per day with a mood, saved as you type. The daily review card links to it.
+- **Travel** (module *Travel*): a trip is a list with its dates and destination, sections for bookings, things to do
+  before you leave (dated from the start) and the packing list from the Family templates; optionally an all-day event.
+- **Read later** (module *Read later*): a reading list; connect your own **Karakeep** (address + API key, stored
+  encrypted, only ever sent to that server): bookmarks become tasks with their link (all, or one Karakeep list), ticked
+  ones are archived in Karakeep; about every hour by itself or *Fetch now*.
+- A view **Home & life** with a card per module, palette commands, list bars for trips and health lists, a section in
+  the task panel.
+- API v1 + MCP: `/life`, `/life/contracts`, `/life/devices`, `/life/upkeep`, `/life/upkeep-presets`, `/life/health`,
+  `/life/trips`, `/life/review`, `/life/journal/{day}`, `/contacts/{id}/care`, `/life/karakeep/sync`; lists carry `life`
+  and `trip`.
+- **Organisations** (#752): people in one or more organisations (*Settings > Administration*); whom people see (share
+  dialog, attendees, user list, new owners) is *everyone*, *their own organisation* (the default) or *only people they
+  are connected with* (a shared server: no directory, lists shared by e-mail address, the answer never tells whether an
+  address has an account). Filtered on the server; admins see everyone. On the update one organisation (named after the
+  server's domain) is created with every account. Its name shows on the login page, in the sidebar and in the
+  invitation mail.
+- **Invitations by e-mail** (#697): an admin creates a person without a password and Kalmido sends an invitation (HTML
+  mail in the person's language with the logo): a one-time link (valid 7 days, only its hash is stored) to *Set up your
+  account*, where the person chooses their own password (and two-factor sign-in) and is signed in. The users list shows
+  *Invited* / *Invitation expired*, *Send the invitation again*; the same link resets a forgotten password. Without SMTP
+  the admin copies the link.
+- **Share folder** (#740): shares every list of a folder now and every list that comes into it later; a shared list
+  lands with the other person in a folder of the same name (created when missing). Lists shared before are sorted in
+  once on the update, unless the person already put them into a folder.
+- A setup and purpose **Home** (#741): contracts, devices, staying in touch, health, the journal, trips and read later;
+  **Family** now also switches on contracts, devices and trips.
+- **Typing in comments** (#693): *"Bob is writing …"* in a task's comments, for people and agents (`POST
+  /api/v1/tasks/{id}/typing`, MCP `comment_typing`); the agent rules ask agents to send it before a comment answer.
+
+### Changed
+- **Quick add**: `@` suggests the people and agents of the list the task goes to; a **pasted image** (Ctrl+V) becomes a
+  file of the new task (#678). `wartet:Kunde` / `waiting:client` sets *Waiting on external* right away (#686).
+- **Waiting on external** is a visible button in the task panel (under *Waiting on…*), in the row's right-click menu,
+  the selection bar and the command palette (#686).
+- **Today** can show the inbox: *Settings > General > Today*; inbox tasks without a date get their own section with
+  buttons for today, tomorrow and a list, and count in Today's number (#681, off by default).
+- A **new list or project** gets a fitting emoji from its name (a local word list in six languages; a tap changes or
+  removes it) (#682).
+- The **celebration**: the heron now flies across the screen with slow wing beats, checkmarks fall behind it; reduced
+  motion keeps the small heron with its line (#688).
+- **Settings on a computer**: a taller and wider dialog, a darker backdrop with an edge, links without an underline,
+  the preview's *high* as a priority flag, the (i) of the font size at its heading, monospace only for numbers (#679).
+- The **"Waiting on…" picker**: rows grow with their text, the list name in its own line, grouped (this list first) (#685).
+
+- New people start with the module **Agents** on (not children); the Agents tab shows even before a list is shared with
+  an agent, with a short how-to (#739).
+- New lists and projects open as a **list** (also software projects) (#749) and start **without preset sections**; a
+  new shopping list gets its shop areas only with *Add shop areas* (#747). Existing lists are unchanged.
+- The **software parts** of a list's properties (ticket types, repository) show only for a software project or a list
+  with a repository, else a quiet *Set up as a software project…*; never for family or household lists (#746).
+- The **child account** options of the user dialog appear only once *Child account* is ticked (#696).
+
+### Fixed
+- **Sidebar folders** read as a tree again: the folder starts where the lists start, its lists are indented with a guide
+  line, the folder shows its sum (#680). The **sort mode** keeps its buttons in one column on the right, with a grip,
+  names shorten with … (#692).
+- Editing a title in the list showed **two focus rings**; now only the field's (also "add to section", "add subtask") (#683).
+
 ## [2.21.0] - 2026-10-05
 
 **In short:** events and contacts in Kalmido (#659 #658). Your appointments and your address books live in the same
@@ -2576,7 +2657,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.21.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.22.0...HEAD
+[2.22.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.22.0
 [2.21.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.21.0
 [2.20.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.20.0
 [2.19.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.19.1
