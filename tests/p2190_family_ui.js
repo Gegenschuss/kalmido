@@ -136,6 +136,7 @@ const FAM = 'cal,habits,comments,collab,family';
   md = [...d.querySelectorAll('.modal')].pop();
   click(w, md.querySelector('[data-n="3"]'));
   check(await until(async () => (await call('GET', '/api/family/kids')).kids[0].stars === 3), '+3 stars for Lina');
+  await w.eval('load()'); await until(() => (w.eval('S.kids') || []).find(k => k.id === LINA)?.stars === 3, 60);  // 2.23.0: CI flake: the dialog read the old count
   click(w, d.querySelector(`#view [data-act="fam-rewards"][data-kid="${LINA}"]`)); await sleep(150);
   md = [...d.querySelectorAll('.modal')].pop();
   check(md.querySelectorAll('#rw-list .frow').length === 2 && md.querySelector(`[data-redeem="${ICE.id}"]`) && !md.querySelector(`[data-redeem="${ICE.id}"]`).disabled, 'rewards dialog: two, Ice cream redeemable');
