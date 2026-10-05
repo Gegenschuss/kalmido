@@ -140,11 +140,14 @@ check('href="/static/favicon-32.png" sizes="32x32"' in html and 'href="/static/f
 check('<link rel="apple-touch-icon" href="/static/apple-touch-icon.png" sizes="180x180">' in html, "index.html: Apple touch icon")
 for m in re.findall(r'href="/static/([^"]+\.(?:png|svg))"', html):
     check(os.path.exists(os.path.join(ST, m)), f"index.html links an existing file: {m}")
-app = read("app.py")
+# 2.20.0 (#646): the server = app.py + kalmido/, the client = static/js/*.js
+SERVER = ["app.py"] + sorted(os.path.relpath(p, ROOT) for p in glob.glob(os.path.join(ROOT, "kalmido", "**", "*.py"), recursive=True))
+CLIENT = sorted(os.path.relpath(p, ROOT) for p in glob.glob(os.path.join(ST, "js", "*.js")))
+app = "\n".join(read(p) for p in SERVER)
 check('<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">' in app, "public pages (pub_html): SVG favicon")
 
 # ---- in-app logo (sidebar, sign-in): the new mark, the sun in the accent (currentColor), no clipPath ids
-js = read("static", "app.js")
+js = "\n".join(read(p) for p in CLIENT)
 m = re.search(r"const logoSvg = \(sz = 20\) => `(.*?)`;", js)
 check(m and 'viewBox="0 0 100 100"' in m.group(1) and "M61 22L77 26" in m.group(1) and 'fill="currentColor"' in m.group(1)
       and " id=" not in m.group(1), "logoSvg: heron on the 100 grid, sun = currentColor, no ids")
@@ -154,7 +157,7 @@ check("HERON_SWING_SVG" in js and 'class="cheron"' in js and "fetch('/static/qui
 
 # ---- no sloth in public files
 WORDS = re.compile(r"sloth|faultier|paresseux|perezoso|bradipo|luiaard", re.I)
-pub = ["app.py", "static/app.js", "static/app.css", "static/public.css", "static/index.html", "static/quips.json",
+pub = SERVER + CLIENT + ["static/app.css", "static/public.css", "static/index.html", "static/quips.json",
        "static/manifest.json"] + [os.path.relpath(p, ROOT) for p in glob.glob(os.path.join(ST, "i18n", "*.json"))
                                   + glob.glob(os.path.join(ST, "avatars", "*.svg"))]
 for p in pub:

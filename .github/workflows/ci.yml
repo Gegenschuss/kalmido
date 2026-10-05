@@ -27,9 +27,11 @@ jobs:
         with:
           node-version: "20"
       - name: Python syntax
-        run: python -m py_compile app.py tools/*.py tests/*.py mcp/*.py
+        run: python -m py_compile app.py $(find kalmido -name '*.py') tools/*.py tests/*.py mcp/*.py
       - name: JavaScript syntax
-        run: for f in static/*.js tests/*.js tools/demo/*.js; do node --check "$f"; done
+        run: for f in static/*.js static/js/*.js tests/*.js tools/demo/*.js; do node --check "$f"; done
+      - name: Module lists agree (index.html / sw.js / static/js, kalmido/__init__.py / the package)
+        run: python tools/check_layout.py
       - name: Translations complete
         run: |
           python tools/i18n_check.py
@@ -41,7 +43,7 @@ jobs:
       - name: Install scanners
         run: pip install bandit pip-audit
       - name: bandit (fails on high severity only)
-        run: bandit -q --severity-level high -r app.py tools
+        run: bandit -q --severity-level high -r app.py kalmido tools
       - name: pip-audit (pinned dependencies of the image)
         run: |
           grep -oE '[A-Za-z0-9_.-]+==[0-9][0-9A-Za-z.]*' Dockerfile > /tmp/requirements.txt
@@ -91,7 +93,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install semgrep
-      - run: semgrep scan --config p/python --config p/flask --config p/javascript --metrics=off --exclude tests app.py static tools
+      - run: semgrep scan --config p/python --config p/flask --config p/javascript --metrics=off --exclude tests app.py kalmido static tools
 
   tests:
     # 2.2.1: the suites run as parallel shards (2.7.1: 4, 2.15.1: 5, 2.16.0: 6, 2.18.0: 7, tests/run_all.sh --shard N/7, ~15 min each instead of ~60 min in one

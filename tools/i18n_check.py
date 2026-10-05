@@ -2,7 +2,7 @@
 """Checks the translation files in static/i18n/ against the strings used in the code.
 
 English is the source language: every tr("..."), trn("one", "other", n), N_("...") and Nn_("one", "other") call in
-static/app.js and app.py uses its literal English text as the key. For every static/i18n/<code>.json
+the web client (static/js/*.js) and the server (app.py + kalmido/) uses its literal English text as the key. For every static/i18n/<code>.json
 this reports
   - missing keys            (used in the code, not translated)          -> error
   - placeholder mismatches  ({0} in the key but not in the translation) -> error
@@ -22,7 +22,9 @@ import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SOURCES = ["static/app.js", "app.py"]
+# 2.20.0 (#646): the client in static/js/, the server in the package kalmido/
+SOURCES = (sorted(os.path.relpath(p, ROOT) for p in glob.glob(os.path.join(ROOT, "static", "js", "*.js"))) + ["app.py"]
+           + sorted(os.path.relpath(p, ROOT) for p in glob.glob(os.path.join(ROOT, "kalmido", "**", "*.py"), recursive=True)))
 I18N_DIR = os.path.join(ROOT, "static", "i18n")
 CALL = re.compile(r"(?<![\w.$])(trn|tr|Nn_|N_)\(")
 PH = re.compile(r"\{(\d+)\}")
@@ -128,7 +130,7 @@ def check_meta(d):
 def main(argv):
     keys, dynamic, errors = extract()
     ok = not errors
-    print(f"code: {len(keys)} keys ({sum(1 for v in keys.values() if v[0] == 'p')} plural) in {', '.join(SOURCES)}")
+    print(f"code: {len(keys)} keys ({sum(1 for v in keys.values() if v[0] == 'p')} plural) in {len(SOURCES)} files (static/js/, app.py, kalmido/)")
     for e in errors:
         print("  ERROR", e)
     if dynamic:

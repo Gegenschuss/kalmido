@@ -25,7 +25,7 @@ const until = async (fn, ms = 5000) => { const t0 = Date.now(); while (Date.now(
 
 async function openSetup(jar) {  // the app with a cookie jar of its own (the setup response logs the admin in), as in setup_ui.js
   const vc = new VirtualConsole(); vc.on('jsdomError', e => { if (!/navigation|Not implemented/.test(e.message)) errs.push(e.message); });
-  const dom = await JSDOM.fromURL(B, {runScripts: 'dangerously', resources: 'usable', pretendToBeVisual: true, virtualConsole: vc,
+  const dom = await JSDOM.fromURL(B, {runScripts: 'dangerously', resources: new (require('./boot').PooledLoader)(),  /* 2.20.0: browser-like connections (boot.js) */ pretendToBeVisual: true, virtualConsole: vc,
     beforeParse(w) {
       const store = {};
       w.matchMedia = () => ({matches: false, addEventListener() {}, addListener() {}});

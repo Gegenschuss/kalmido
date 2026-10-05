@@ -2,12 +2,20 @@
 // API calls always go to the network (data must be live). Language files: de.json is precached,
 // any other static/i18n/<code>.json lands in the cache via the network-first handler on first use
 // (the client also keeps the active one in localStorage as a last offline fallback).
-const CACHE = 'tasks-shell-v96';
-const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/static/i18n/de.json', '/static/app.js', '/static/icon-192.png', '/static/icon-512.png',
+const CACHE = 'tasks-shell-v97';
+const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/static/i18n/de.json', '/static/icon-192.png', '/static/icon-512.png',
   '/static/icon.svg', '/static/badge-96.png', '/static/fonts/Geist-Variable.woff2', '/static/fonts/GeistMono-Variable.woff2', '/static/quips.json',
   '/static/favicon.svg', '/static/favicon-32.png', '/static/apple-touch-icon.png', '/static/icon-maskable-512.png',  // 2.18.0 (#394)
   // Atkinson Hyperlegible (Appearance > Font): regular + bold precached (35 KB), the italics are cached on first use
-  '/static/fonts/AtkinsonHyperlegible-Regular.woff2', '/static/fonts/AtkinsonHyperlegible-Bold.woff2'];
+  '/static/fonts/AtkinsonHyperlegible-Regular.woff2', '/static/fonts/AtkinsonHyperlegible-Bold.woff2',
+  // 2.20.0 (#646): the web client in modules, the same list and order as the script tags in index.html
+  // (tools/check_layout.py compares them)
+  '/static/js/icons.js', '/static/js/core.js', '/static/js/quickadd.js', '/static/js/views.js', '/static/js/render.js', '/static/js/calendar.js',
+  '/static/js/timeline.js', '/static/js/roadmap.js', '/static/js/habits.js', '/static/js/detail.js', '/static/js/collab.js', '/static/js/attachments.js',
+  '/static/js/undo.js', '/static/js/popovers.js', '/static/js/dialogs.js', '/static/js/settings.js', '/static/js/integrations.js', '/static/js/account.js',
+  '/static/js/templates.js', '/static/js/time.js', '/static/js/projects.js', '/static/js/events.js', '/static/js/sidebar.js', '/static/js/dnd.js',
+  '/static/js/palette.js', '/static/js/agents.js', '/static/js/dayplan.js', '/static/js/agentchat.js', '/static/js/listedit.js', '/static/js/git.js',
+  '/static/js/chat.js', '/static/js/dashboard.js', '/static/js/family.js', '/static/js/main.js'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 // Android share sheet (share_target POST): keep the shared files in a cache and open the app,
@@ -42,7 +50,7 @@ self.addEventListener('fetch', e => {
 });
 
 // ---- Web Push: the server sends {title, body, url ('/#t/12'), tag, prio, task, due, actions: [{action, title, url}]}
-// (end-to-end encrypted, see app.py "Web Push"). Priority 5 stays on screen until dismissed. A push with the
+// (end-to-end encrypted, see kalmido/notify/push.py "Web Push"). Priority 5 stays on screen until dismissed. A push with the
 // same tag (same task, the focus timer, the digest) replaces the previous notification.
 const SAME = u => { try { const x = new URL(u, self.location.origin); return x.origin === self.location.origin ? x.pathname + x.search + x.hash : '/'; } catch { return '/'; } };
 function pushOptions(d) {

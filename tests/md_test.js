@@ -1,7 +1,11 @@
-// markdown renderer (static/app.js mdInline) against the audit payloads: no attribute breakout, only safe hrefs
+// markdown renderer (static/js/attachments.js mdInline) against the audit payloads: no attribute breakout, only safe hrefs
 const fs = require('fs');
 const {JSDOM} = require('jsdom');
-const src = fs.readFileSync(process.env.APPJS || require('path').join(__dirname, '..', 'static', 'app.js'), 'utf8');
+// 2.20.0 (#646): the client modules in the order of index.html (APPJS: one file instead)
+const ST = require('path').join(__dirname, '..', 'static');
+const src = process.env.APPJS ? fs.readFileSync(process.env.APPJS, 'utf8')
+  : [...fs.readFileSync(require('path').join(ST, 'index.html'), 'utf8').matchAll(/<script src="\/static\/js\/([\w-]+\.js)"/g)]
+    .map(m => fs.readFileSync(require('path').join(ST, 'js', m[1]), 'utf8')).join('\n');
 const pick = (a, b) => { const i = src.indexOf(a), j = src.indexOf(b, i); if (i < 0 || j < 0) throw new Error('marker ' + a); return src.slice(i, j); };
 const code = pick('const esc = s =>', '\n', 0) + '\n' + pick('const MD_URL', 'function renderMd(');
 const mdInline = new Function(code + '\nreturn mdInline;')();

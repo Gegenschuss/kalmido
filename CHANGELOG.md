@@ -7,6 +7,25 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.20.0] - 2026-10-05
+
+**In short:** the code in modules (#646). Nothing changes for you: the same app, the same API, the same start command.
+The server and the web app were each one very large file; they are now split by area, so the code is much easier to
+find your way around in, and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains the layout.
+
+### Changed
+- **Server**: `app.py` is now only the entry point; the code lives in the package `kalmido/` (one module per area:
+  core, accounts, lists, tasks, collaboration, personal, calendars, integrations, notifications, admin, API, agents,
+  family). Same routes, answers, settings and environment variables; `python app.py` and `app.py set-password` work as
+  before.
+- **Web app**: `static/app.js` is now split into files in `static/js/`, loaded in a fixed order (still plain JavaScript,
+  no build step, the same Content-Security-Policy). The service worker caches all of them (cache version 97): after the
+  update the app loads the new files once, then works offline as before.
+- **Docs**: new [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): the big picture, the data flow, which module holds what,
+  how to add a route, a module or a client file. CONTRIBUTING, TRANSLATING and the tests point to the new places.
+- **Checks**: `tools/check_layout.py` (CI) keeps the module lists in step (script tags, service worker, package order);
+  bandit, semgrep and the syntax checks cover the new folders.
+
 ## [2.19.1] - 2026-10-05
 
 - 2.19.1: the contacts import marks its fallback ID hash as non-security (security scanner)
@@ -2515,7 +2534,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.19.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.20.0...HEAD
+[2.20.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.20.0
 [2.19.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.19.1
 [2.19.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.19.0
 [2.18.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.18.0

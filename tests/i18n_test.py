@@ -86,20 +86,20 @@ for code in files:
 cp = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "i18n_check.py")], capture_output=True, text=True, timeout=120)
 check(cp.returncode == 0 and " 0 unused" in cp.stdout and "MISSING" not in cp.stdout, f"tools/i18n_check.py exit 0: {cp.stdout[-300:]}")
 
-# server helpers: the functions are taken from app.py itself (ast) and run with the language files, without the app's
+# server helpers: the functions are taken from the server code itself (kalmido/core/i18n.py, ast) and run with the language files, without the app's
 # packages or a database
 import ast  # noqa: E402
 from datetime import date  # noqa: E402
-src = open(os.path.join(ROOT, "app.py"), encoding="utf-8").read()
+src = open(os.path.join(ROOT, "kalmido", "core", "i18n.py"), encoding="utf-8").read()  # 2.20.0: the package
 want = {"lg_base", "dec_comma", "fmt_int", "short_day", "plural_one", "languages", "COMMA_LANGS"}
 nodes = [n for n in ast.parse(src).body if (isinstance(n, ast.FunctionDef) and n.name in want)
          or (isinstance(n, ast.Assign) and any(getattr(t, "id", None) in want for t in n.targets))]
-check(len(nodes) == len(want), f"helpers found in app.py: {[getattr(n, 'name', None) for n in nodes]}")
+check(len(nodes) == len(want), f"helpers found in kalmido/core/i18n.py: {[getattr(n, 'name', None) for n in nodes]}")
 LANGS = {"en": {"_meta": {"name": "English", "locale": "en-GB"}}}
 for code in files:
     LANGS[code] = json.load(open(os.path.join(I18N, code + ".json"), encoding="utf-8"))
 ns = {"LANGS": LANGS, "lang": lambda: "en"}
-exec(compile(ast.Module(body=nodes, type_ignores=[]), "app.py", "exec"), ns)  # noqa: S102 (our own source)
+exec(compile(ast.Module(body=nodes, type_ignores=[]), "kalmido/core/i18n.py", "exec"), ns)  # noqa: S102 (our own source)
 langs = ns["languages"]()
 check({x["code"] for x in langs if x["beta"]} == BETA and {x["code"] for x in langs} >= {"en", "de"} | BETA, f"languages(): beta flags ({langs})")
 check(ns["plural_one"](0, "fr") and not ns["plural_one"](0, "de") and not ns["plural_one"](0, "en") and ns["plural_one"](1, "nl")

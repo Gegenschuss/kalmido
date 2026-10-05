@@ -53,7 +53,9 @@ check("d.title || 'Kalmido'" in sw, "service worker: notification fallback title
 check(len(re.findall(r"const CACHE = '[a-z-]+-v\d+';", sw)) == 1, "service worker: one versioned shell cache")
 check("ks.filter(k => k !== CACHE).map(k => caches.delete(k))" in sw, "service worker: activate deletes every other (older) cache")
 check("'X-Requested-With': 'kalmido'" in sw, "service worker: CSRF header value kalmido")
-js = requests.get(B + "/static/app.js").text
+# 2.20.0 (#646): the client = static/js/*.js in the order of the script tags in index.html
+js = "\n".join(requests.get(B + "/static/js/" + f).text
+                for f in re.findall(r'<script src="/static/js/([\w-]+\.js)"></script>', requests.get(B + "/").text))
 check("const APP_NAME = 'Kalmido';" in js, "app.js: APP_NAME")
 check("github.com/Gegenschuss/kalmido" in js, "app.js: repository links")
 de = requests.get(B + "/static/i18n/de.json").json()

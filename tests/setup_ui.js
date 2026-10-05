@@ -16,7 +16,7 @@ const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 
 async function open(jar) {  // the app with a cookie jar of its own (the setup response logs the admin in)
   const vc = new VirtualConsole(); vc.on('jsdomError', e => { if (!/navigation|Not implemented/.test(e.message)) errs.push(e.message); });
-  const dom = await JSDOM.fromURL(B, {runScripts: 'dangerously', resources: 'usable', pretendToBeVisual: true, virtualConsole: vc,
+  const dom = await JSDOM.fromURL(B, {runScripts: 'dangerously', resources: new (require('./boot').PooledLoader)(),  /* 2.20.0: browser-like connections (boot.js) */ pretendToBeVisual: true, virtualConsole: vc,
     beforeParse(w) {
       const store = {};
       w.matchMedia = q => ({matches: false, addEventListener() {}, addListener() {}});

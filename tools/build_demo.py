@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Builds the browser demo of Kalmido ("Try it without an account") from the current sources: a static folder that runs
-the real app (static/app.js, app.css, i18n) without any server. tools/demo/shim.js stands in for the API and keeps the
+the real app (static/js/*.js, app.css, i18n) without any server. tools/demo/shim.js stands in for the API and keeps the
 data in the visitor's browser (localStorage); tools/demo/texts.js holds the demo's own texts and the sample data in the
 six app languages. The page forbids every network connection (CSP connect-src 'none'), has no analytics and no service
 worker, and is marked noindex.
@@ -56,7 +56,12 @@ def main(argv):
     write = lambda p, s: open(p, "w", encoding="utf-8").write(s)  # noqa: E731
 
     # the app, with absolute /static/ paths made relative (the demo lives in a subfolder) and without the service worker
-    app = read(os.path.join(STATIC, "app.js"))
+    # 2.20.0 (#646): the client's modules (static/js, order of the script tags in index.html) become ONE app.js here
+    src_html = read(os.path.join(STATIC, "index.html"))
+    mods = re.findall(r'<script src="/static/js/([\w-]+\.js)"></script>', src_html)
+    if not mods:
+        fail("index.html loads no static/js/ modules")
+    app = "\n".join(read(os.path.join(STATIC, "js", m)) for m in mods)
     app = replace(app, "navigator.serviceWorker.register('/sw.js').catch(() => {});",
                   "Promise.resolve().catch(() => {});  /* demo build: no service worker */", "app.js")
     app = replace(app, "/static/", "static/", "app.js", count=5, at_least=True)
@@ -92,7 +97,8 @@ def main(argv):
             fail(f"tools/demo/texts.js has no texts for {code}")
 
     # the page: the app's index.html, relative paths, no manifest, CSP + noindex, the demo scripts before the app
-    html = read(os.path.join(STATIC, "index.html"))
+    html = src_html
+    html = replace(html, "".join(f'<script src="/static/js/{m}"></script>\n' for m in mods), '<script src="/static/app.js"></script>\n', "index.html")
     html = replace(html, '<link rel="manifest" href="/manifest.json" crossorigin="use-credentials">\n', "", "index.html")
     html = replace(html, "<title>Kalmido</title>",
                    f'<title>Kalmido Demo</title>\n<meta http-equiv="Content-Security-Policy" content="{CSP}">\n'

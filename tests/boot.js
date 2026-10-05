@@ -1,7 +1,39 @@
 // jsdom boot with the built-in login (cookie) against the test container (proxy port, see start.sh).
-const {JSDOM, VirtualConsole} = require('jsdom');
+const {JSDOM, VirtualConsole, ResourceLoader} = require('jsdom');
+// 2.20.0 (#646): the web client is ~30 script files. jsdom's own loader opens a NEW keep-alive connection for every
+// resource and never closes it, so a few windows reach the server's connection limit (waitress: 100) and the scripts of
+// the next window stall. Browsers share a few connections per host; this loader does the same for the page's scripts and
+// stylesheets: Node's fetch (one pooled agent, idle connections are reused), at most 6 requests at a time.
+class PooledLoader extends ResourceLoader {
+  fetch(url, opts = {}) {
+    if (!opts.element || !/^https?:\/\//.test(url)) return super.fetch(url, opts);
+    const ac = new AbortController();
+    const p = PooledLoader.slot().then(async done => {
+      try {
+        const r = await fetch(url, {signal: ac.signal, headers: {'Accept-Language': 'en'}});
+        p.response = {statusCode: r.status, headers: Object.fromEntries(r.headers)};
+        if (r.status < 200 || r.status > 299) throw new Error(`Resource was not loaded. Status: ${r.status}`);
+        return Buffer.from(await r.arrayBuffer());
+      } finally { done(); }
+    });
+    p.abort = () => ac.abort(); p.href = url; p.getHeader = () => undefined;
+    return p;
+  }
+  static slot() {  // a tiny semaphore: resolves with a release function
+    return new Promise(res => { const go = () => { PooledLoader.busy++; res(() => { PooledLoader.busy--; const n = PooledLoader.wait.shift(); if (n) n(); }); }; if (PooledLoader.busy < 6) go(); else PooledLoader.wait.push(go); });
+  }
+}
+PooledLoader.busy = 0; PooledLoader.wait = [];
+exports.PooledLoader = PooledLoader;
 const B = process.env.BASE || `http://127.0.0.1:${process.env.KALMIDO_TEST_PROXY_PORT || 3041}/`;
 exports.B = B; exports.errs = [];
+// 2.20.0 (#646): the web client is static/js/*.js (the order of the script tags in index.html); this is all of it as one text
+exports.clientSource = async () => {
+  const html = await (await fetch(B)).text();
+  const mods = [...html.matchAll(/<script src="\/static\/js\/([\w-]+\.js)"><\/script>/g)].map(m => m[1]);
+  if (!mods.length) throw new Error('index.html loads no static/js/ modules');
+  return (await Promise.all(mods.map(async f => (await fetch(B + 'static/js/' + f)).text()))).join('\n');
+};
 // 2.0.5 / 2.0.6: app code that is still running when a suite closes its window (an awaited fetch returning after
 // w.close(), e.g. loadJobs() -> renderView() in p200_ui.js on CI: "Cannot read properties of undefined (reading
 // 'querySelector')" at $() because the closed window has no document) rejects; that is the harness, not the app.
@@ -9,7 +41,7 @@ exports.B = B; exports.errs = [];
 // object, thrown in the app's own scripts. Anything else (open windows, the suite's own code) still fails the run.
 const closedRealms = [];
 const lateAppError = e => !!e && closedRealms.some(T => e instanceof T) && /Cannot read propert(y|ies) of (undefined|null)/.test(e.message || '')
-  && /\/static\/[\w.-]+\.js/.test(String(e.stack || '').split('\n').slice(0, 2).join('\n'));
+  && /\/static\/(js\/)?[\w.-]+\.js/.test(String(e.stack || '').split('\n').slice(0, 2).join('\n'));
 process.on('unhandledRejection', e => {
   if (lateAppError(e)) { console.log('late app rejection after a window was closed (ignored):', String(e.stack).split('\n').slice(0, 2).join(' | ')); return; }
   console.error(e); process.exit(1);
@@ -48,7 +80,7 @@ exports.boot = async function boot({user = 'alice', mobile = false, hash = '', l
   const store = {'tasks.newsBundle': 'false', ...(hash || 'tasks.lastKey' in ls ? {} : {'tasks.lastKey': '"today"'}), ...ls};
   for (const k of Object.keys(store)) if (store[k] === null) delete store[k];
   const vc = new VirtualConsole(); vc.on('jsdomError', e => { if (!/navigation|Not implemented/.test(e.message)) exports.errs.push(e.message); });
-  const dom = await JSDOM.fromURL(B + path + (hash ? '#' + hash : ''), {runScripts: 'dangerously', resources: 'usable', pretendToBeVisual: true, virtualConsole: vc,
+  const dom = await JSDOM.fromURL(B + path + (hash ? '#' + hash : ''), {runScripts: 'dangerously', resources: new PooledLoader(), pretendToBeVisual: true, virtualConsole: vc,
     beforeParse(w) {
       w.matchMedia = q => ({matches: q in media ? media[q] : /max-width/.test(q) ? mobile : false, addEventListener() {}, addListener() {}});  // media: {'(prefers-reduced-motion: reduce)': true}
       Object.defineProperty(w, 'localStorage', {value: {getItem: k => k in store ? store[k] : null, setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; }, key: i => Object.keys(store)[i], get length() { return Object.keys(store).length; }}});

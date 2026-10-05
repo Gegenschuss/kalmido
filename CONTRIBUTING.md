@@ -13,19 +13,20 @@ cp .env.example .env
 docker compose up -d --build        # http://127.0.0.1:3040
 ```
 
-After changing `app.py` or anything in `static/`, rebuild: `docker compose up -d --build`. The browser
+After changing the server (`app.py`, `kalmido/`) or anything in `static/`, rebuild: `docker compose up -d --build`. The browser
 caches the app shell through the service worker; bump `CACHE` in `static/sw.js` when you change static files,
 or use a private window.
 
-Layout:
+Layout (the full map, the data flow and how to add a route or a file: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)):
 
 | Path | |
 |---|---|
-| `app.py` | the whole server: Flask routes, SQLite schema + migrations, watchdog thread (reminders, pushes) |
-| `static/app.js` | the whole web app (vanilla JavaScript, no framework) |
+| `app.py` | the entry point (`python app.py`, `set-password`, `import`) |
+| `kalmido/` | the server: one module per area (Flask routes, SQLite schema + migrations, background threads), loaded in the order of `kalmido/__init__.py` |
+| `static/js/*.js` | the web app (vanilla JavaScript, no framework, no build step): classic scripts loaded in the order of `static/index.html` |
 | `static/i18n.js`, `static/i18n/*.json` | translation helpers and translations (English is the source language in the code) |
 | `static/app.css`, `static/sw.js` | styles, service worker (offline app shell) |
-| `tools/i18n_check.py` | translation checker |
+| `tools/i18n_check.py`, `tools/check_layout.py` | translation checker, module lists checker |
 | `tests/` | test suites, see [tests/README.md](tests/README.md) |
 | `VERSION` | the released version (semantic versioning) |
 
@@ -48,7 +49,7 @@ speakers are very welcome**, from a single wrong word to a full review.
 How it works:
 
 - Every user-facing string in the code is English and is its own key: `tr('English text')` / `trn(one, other, n)` in
-  `static/app.js`, `tr()` / `trn()` in `app.py` (push notifications, e-mails, error messages, setup).
+  `static/js/`, `tr()` / `trn()` in `kalmido/` (push notifications, e-mails, error messages, setup).
 - Every other language is one file `static/i18n/<code>.json` (`de.json`, `fr.json`, `es.json`, `it.json`, `nl.json`):
   the English key on the left, the translation on the right. `_meta` holds the name shown in the picker, the locale
   for dates and numbers and `"beta": true` for machine-translated files; `_weekdays`, `_months` and `_date_formats` set
@@ -79,7 +80,7 @@ and issues are the way.
 - Python: standard library style, 120 columns, parameters for every SQL value, `tr()` for messages.
 - JavaScript: plain ES2020, `esc()` for everything that goes into HTML, no inline event handlers (the CSP
   forbids them).
-- Migrations are additive and run on start (see `MIGRATIONS` / `init_db` in `app.py`); never break an
+- Migrations are additive and run on start (see `MIGRATIONS` in `kalmido/core/schema.py`, `init_db` in `kalmido/core/db.py`); never break an
   existing database.
 - Comments explain *why*; the user-facing behaviour belongs in the README.
 

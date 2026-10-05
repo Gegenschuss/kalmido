@@ -1,0 +1,601 @@
+"""Lists: create, change, share (people + agents), members, sidebar order."""
+import json
+import math
+import re
+from flask import jsonify
+
+from ..core.config import app
+from ..core.i18n import lang, tr
+from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
+from ..accounts.session import me
+from ..accounts.pictures import list_icon_drop_file
+from ..core.access import collab_all, Denied, MANAGE_ROLES, my_inbox, my_max_sort, need_collab, need_list, ROLES
+from ..core.state import visible_lists
+
+
+# ---------------------------------------------------------------- lists / sections
+
+LIST_FIELDS = ("name", "color", "folder", "sort", "view", "archived", "checklist", "dep_shift", "kind", "tickets", "nag",
+               "family")  # 2.19.0 (#653): '' | shopping | meals | birthdays | household | packing
+LIST_KINDS = ("list", "project")
+# 2.7.2 (#414): the type "checklist" (2.7.0 "Shopping & packing list") is gone. Every list has the display option "Show
+# completed at the bottom" instead (column lists.checklist, API field done_at_bottom); kind "checklist" is still accepted
+# as a deprecated alias (= kind list + the option on), the boolean "checklist" as an alias of done_at_bottom.
+LIST_KIND_ALIASES = {"checklist": "list"}
+MEMBER_LIST_FIELDS = ("folder", "sort", "view")  # a member's own sidebar placement / view
+LIST_VIEWS = ("list", "kanban", "timeline")
+LIST_COLOR_RE = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})")
+LIST_NAME_MAX, FOLDER_MAX = 200, 100
+
+
+def clean_color(v):
+    from ..personal.timetrack import BadInput
+    v = v.strip() if isinstance(v, str) else v
+    if v in ("", None):
+        return ""
+    if not isinstance(v, str) or not LIST_COLOR_RE.fullmatch(v):
+        raise BadInput(tr("Invalid value: {0}", tr("Color")))
+    return v
+
+
+# 2.4.0 (#361): a folder is a path of at most FOLDER_DEPTH names joined by FOLDER_SEP ("Clients/Company X"), per user as
+# before (lists.folder for the owner, list_members.folder for a member; the order in the user setting "folders"). A name
+# itself can never hold the separator (folder_seg turns it into the look-alike U+2215).
+FOLDER_SEP, FOLDER_DEPTH = "/", 2
+
+
+def folder_seg(v):
+    """One folder name (imports, legacy names): control characters out, a "/" becomes U+2215 (it would nest)."""
+    return re.sub(r"[\x00-\x1f]", "", str(v or "")).replace(FOLDER_SEP, "\u2215").strip()[:FOLDER_MAX]
+
+
+def clean_folder(v, strict=True):
+    """A folder path from a client: every name trimmed (at most FOLDER_MAX characters), empty names dropped. Deeper than
+    FOLDER_DEPTH: BadInput (strict) or cut to FOLDER_DEPTH (repairs, stored data)."""
+    from ..personal.timetrack import BadInput
+    if v is None:
+        return ""
+    if not isinstance(v, str):
+        raise BadInput(tr("Invalid value: {0}", tr("Folder")))
+    parts = [x for x in (re.sub(r"[\x00-\x1f]", "", p).strip()[:FOLDER_MAX] for p in v.split(FOLDER_SEP)) if x]
+    if len(parts) > FOLDER_DEPTH:
+        if strict:
+            raise BadInput(tr("Folders nest at most {0} levels deep", FOLDER_DEPTH))
+        parts = parts[:FOLDER_DEPTH]
+    return FOLDER_SEP.join(parts)
+
+
+def folder_under(p, top):
+    """True if the path p is the folder top or inside it."""
+    return bool(top) and (p == top or p.startswith(top + FOLDER_SEP))
+
+
+def folder_path_migration(c):
+    """2.4.0, once: a "/" in a stored folder name becomes U+2215 (lists, member rows, every user's folder order)."""
+    n = 0
+    for tbl, key in (("lists", "id"), ("list_members", "rowid")):
+        for r in c.execute(f"SELECT {key} AS k, folder FROM {tbl} WHERE folder LIKE '%/%'").fetchall():
+            c.execute(f"UPDATE {tbl} SET folder=? WHERE {key}=?", (folder_seg(r["folder"]), r["k"]))
+            n += 1
+    for r in c.execute("SELECT user_id, value FROM user_settings WHERE key='folders' AND value LIKE '%/%'").fetchall():
+        try:
+            arr = json.loads(r["value"] or "[]")
+        except ValueError:
+            continue
+        if isinstance(arr, list):
+            arr = list(dict.fromkeys(folder_seg(x) for x in arr if isinstance(x, str) and folder_seg(x)))
+            c.execute("UPDATE user_settings SET value=? WHERE user_id=? AND key='folders'",
+                      (json.dumps(arr, ensure_ascii=False), r["user_id"]))
+    return n
+
+
+# 2.14.0 (#425): list columns. One setting per list for every member (owner / list admins change it): which columns the
+# rows show and in which order. Keys: COL_KEYS plus "f:<field id>" for the list's custom fields; "id" is the task number in
+# front of the title. NULL (API null) = the default layout (date, assignee, time; fields as chips).
+COL_KEYS = ("id", "due", "prio", "who", "tags", "time", "progress", "deps", "created")
+COL_MAX = 40
+COL_DOC = ("2.14.0 (#425): the columns of the list's rows in order, the same for every member: id (task number in front of the "
+           "title), due, prio, who (assignee), tags, time (tracked), progress (subtasks), deps (dependencies), created, and "
+           "f:<field id> for custom fields. Not listed = not shown in the rows. null = the default layout.")
+
+
+def clean_columns(c, lid, v):
+    """The columns of list lid from a client -> the JSON text to store (None = default). BadInput on anything odd."""
+    from ..personal.timetrack import BadInput
+    if v is None:
+        return None
+    if not isinstance(v, list) or len(v) > COL_MAX:
+        raise BadInput(tr("Invalid value: {0}", "columns"))
+    fids = {r[0] for r in c.execute("SELECT id FROM list_fields WHERE list_id=?", (lid,))}
+    out = []
+    for k in v:
+        if not isinstance(k, str):
+            raise BadInput(tr("Invalid value: {0}", "columns"))
+        m = re.fullmatch(r"f:(\d{1,12})", k)
+        if not (k in COL_KEYS or (m and int(m.group(1)) in fids)):
+            raise BadInput(tr("Unknown column: {0}", k[:40]))
+        if k not in out:
+            out.append(k)
+    return json.dumps(out)
+
+
+def columns_out(raw, fids):
+    """Stored columns -> the API value: a list of keys (fields that no longer exist dropped) or None (default)."""
+    if raw in (None, ""):
+        return None
+    try:
+        v = json.loads(raw)
+    except ValueError:
+        return None
+    if not isinstance(v, list):
+        return None
+    return [k for k in v if isinstance(k, str) and (k in COL_KEYS or (k.startswith("f:") and k[2:].isdigit() and int(k[2:]) in fids))]
+
+
+def clean_list_value(k, v, member=False):
+    """One list column from the client, validated (BadInput)."""
+    from ..tasks.validation import NAG_VALUES
+    from ..personal.timetrack import BadInput
+    from ..family.family import FAM_LIST_KINDS
+    if k == "name":
+        if not isinstance(v, str) or not v.strip():
+            raise BadInput(tr("Name missing"))
+        return v.strip()[:LIST_NAME_MAX]
+    if k == "color":
+        return clean_color(v)
+    if k == "folder":
+        return clean_folder(v)
+    if k == "view":
+        if member and v in (None, ""):
+            return None  # member: back to the owner's view
+        if v not in LIST_VIEWS:
+            raise BadInput(tr("Invalid value: {0}", tr("View")))
+        return v
+    if k == "sort":
+        try:
+            v = float(v)
+        except (TypeError, ValueError):
+            raise BadInput(tr("Invalid value: {0}", "sort")) from None
+        if not math.isfinite(v):
+            raise BadInput(tr("Invalid value: {0}", "sort"))
+        return v
+    if k in ("archived", "checklist", "dep_shift", "tickets"):
+        return 1 if v else 0
+    if k == "kind":
+        if v not in LIST_KINDS and v not in LIST_KIND_ALIASES:
+            raise BadInput(tr("Invalid value: {0}", "kind"))
+        return LIST_KIND_ALIASES.get(v, v)
+    if k == "nag":  # 2.7.0 (#413): the list's default for nags ('' / 'off' = none)
+        v = "" if v in (None, "off") else v
+        if v not in NAG_VALUES:
+            raise BadInput(tr("Invalid value: {0}", tr("Repeat reminder")))
+        return v
+    if k == "family":  # 2.19.0 (#653)
+        v = v or ""
+        if v not in FAM_LIST_KINDS:
+            raise BadInput(tr("Invalid value: {0}", "family"))
+        return v
+    return v
+
+
+@app.post("/api/lists")
+def list_create():
+    from ..lists.groups import grp_touch
+    from ..tasks.tasks import WEB_LIST_NEW
+    from ..personal.timetrack import web_fields
+    from ..lists.templates import ptype_create
+    from ..family.family import fam_list_create
+    b = web_fields(body(), WEB_LIST_NEW, "POST /api/lists")
+    name = clean_list_value("name", b.get("name"))
+    color, folder = clean_color(b.get("color", "")), clean_folder(b.get("folder", ""))
+    if b.get("ptype"):  # 2.4.0 (#243): a project of a built-in type (sections, fields, view, ticket types, modules)
+        c = db()
+        lid, on = ptype_create(c, me(), b["ptype"], name, folder, color)
+        bump(c)
+        c.commit()
+        return jsonify({**dict(c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()), "modules_on": on})
+    view = clean_list_value("view", b.get("view") or "list")
+    kind = clean_list_value("kind", b["kind"]) if b.get("kind") else "list"
+    fam = clean_list_value("family", b.get("family"))  # 2.19.0 (#653)
+    if fam:
+        c = db()
+        lid = fam_list_create(c, me(), fam, name, folder)
+        if color:
+            c.execute("UPDATE lists SET color=? WHERE id=?", (color, lid))
+        bump(c)
+        c.commit()
+        return jsonify(dict(c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()))
+    # 2.7.2 (#414): "Show completed at the bottom" (done_at_bottom; the old checklist flag / kind "checklist" are aliases)
+    dab = 1 if b.get("done_at_bottom", b.get("checklist")) or b.get("kind") == "checklist" else 0
+    c = db()
+    uid = me()
+    srt = my_max_sort(c, uid) + 1
+    # 2.2.1 (#359): dep_shift ("Move dependent tasks along") is taken at creation too (before, only PATCH set it)
+    cur = c.execute("INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind,dep_shift,tickets) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                    (name, color, folder, srt, view, iso(now_utc()), uid, dab, kind,
+                     clean_list_value("dep_shift", b.get("dep_shift")), clean_list_value("tickets", b.get("tickets"))))
+    agent_autoshare(c, uid, cur.lastrowid)  # 2.4.2 (#391)
+    grp_touch(c, uid)  # 2.10.0 (#441): created inside a folder shared with a group
+    bump(c)
+    c.commit()
+    return jsonify(dict(c.execute("SELECT * FROM lists WHERE id=?", (cur.lastrowid,)).fetchone()))
+
+
+@app.patch("/api/lists/<int:lid>")
+def list_update(lid):
+    from ..lists.groups import grp_touch
+    from ..tasks.validation import clean_ticket_tpl
+    from ..tasks.tasks import WEB_LIST_EDIT
+    from ..tasks.lifecycle import _norm
+    from ..personal.timetrack import BadInput, clean_day_hours, web_fields
+    from ..lists.templates import list_ptype_set
+    from ..agents.core import list_listen_update
+    from ..collab.reactions import list_tidy_update
+    from ..family.family import is_shop, shop_areas_add
+    b = web_fields(body(), WEB_LIST_EDIT, "PATCH /api/lists/{lid}")
+    c = db()
+    role = need_list(c, lid, write=False)
+    if "agent_tidy" in b or "tidy_agent_id" in b:  # 2.0.0: "Agent may tidy up entries" (own permission rule, see
+        # list_tidy_update); 2.4.1 (#379): "Tidy up by" (the one agent)
+        e = list_tidy_update(c, lid, b.get("agent_tidy"), b.get("tidy_agent_id"), "tidy_agent_id" in b)
+        if e:
+            return err(e, 409)
+        b = {k: v for k, v in b.items() if k not in ("agent_tidy", "tidy_agent_id")}
+    if "listen_agent_ids" in b:  # 2.13.1 (#471)
+        try:
+            list_listen_update(c, lid, b["listen_agent_ids"])
+        except BadInput as e:
+            return err(str(e))
+        b = {k: v for k, v in b.items() if k != "listen_agent_ids"}
+    if "columns" in b:  # 2.14.0 (#425): the list's columns, the same for every member (owner / list admins)
+        if role not in MANAGE_ROLES:
+            return err(tr("Only the owner and list admins can change the columns"), 403)
+        try:
+            c.execute("UPDATE lists SET col_cfg=? WHERE id=?", (clean_columns(c, lid, b["columns"]), lid))
+        except BadInput as e:
+            return err(str(e))
+        b = {k: v for k, v in b.items() if k != "columns"}
+    conflicts = []
+    prev = b.get("_prev") if isinstance(b.get("_prev"), dict) else None
+    if prev:  # D4 undo / redo: a setting changed elsewhere meanwhile stays (reported in conflicts)
+        cur = dict(c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone())
+        if role != "owner":
+            m = c.execute("SELECT folder, sort, view FROM list_members WHERE list_id=? AND user_id=?", (lid, me())).fetchone()
+            if m:
+                cur.update(folder=m["folder"], sort=m["sort"], view=m["view"] or cur["view"])
+        b = dict(b)
+        for k, old in prev.items():
+            if k in b and k in (*LIST_FIELDS, "rate", "ptype") and _norm(cur.get(k)) != _norm(old) and _norm(cur.get(k)) != _norm(b[k]):
+                conflicts.append({"field": k, "server": cur.get(k), "mine": b[k]})
+                del b[k]
+    pt_out = {}
+    if "ptype" in b:  # 2.18.0 (#408): the project type of an existing list (owner / list admins), see list_ptype_set
+        try:
+            pt_out = list_ptype_set(c, lid, role, b["ptype"], skip=set(b))
+        except BadInput as e:
+            return err(str(e))
+        except Denied as e:
+            return err(tr("Only the owner and list admins can change the project type"), e.code)
+        b = {k: v for k, v in b.items() if k != "ptype"}
+    if "done_at_bottom" in b:  # 2.7.2 (#414): the API name of the display option (column checklist)
+        b = {**{k: v for k, v in b.items() if k != "done_at_bottom"}, "checklist": b["done_at_bottom"]}
+    vals = {k: clean_list_value(k, b[k], member=role != "owner") for k in LIST_FIELDS if k in b}  # BadInput: 400
+    if b.get("kind") == "checklist" and "checklist" not in vals:  # deprecated alias: a plain list with the option on
+        vals["checklist"] = 1
+    if role == "owner":
+        if "archived" in vals:  # 1.6.1: archived_at follows the flag (set on the change to archived, cleared on restore)
+            c.execute("UPDATE lists SET archived_at=CASE WHEN ?=0 THEN NULL WHEN archived=0 THEN ? ELSE archived_at END "
+                      "WHERE id=?", (vals["archived"], iso(now_utc()), lid))
+        was_shop = is_shop(c, lid)
+        for k in LIST_FIELDS:
+            if k in vals:
+                c.execute(f"UPDATE lists SET {k}=? WHERE id=?", (vals[k], lid))
+        if vals.get("family") == "shopping" and not was_shop and \
+                not c.execute("SELECT 1 FROM sections WHERE list_id=?", (lid,)).fetchone():  # 2.19.0: areas for a new shopping list
+            shop_areas_add(c, lid, lang(c, me()))
+        if "rate" in b:  # hourly rate for the time reports (None / '' = none)
+            try:
+                rate = None if b["rate"] in (None, "") else round(float(str(b["rate"]).replace(",", ".")), 2)
+            except ValueError:
+                return err(tr("Hourly rate: number expected"))
+            if rate is not None and not 0 <= rate <= 1e6:
+                return err(tr("Hourly rate: number expected"))
+            c.execute("UPDATE lists SET rate=? WHERE id=?", (rate, lid))
+        if "ticket_tpl" in b:  # 2.4.0 (#340): {bug?, feature?} note templates of new tickets ('' / missing = built-in)
+            c.execute("UPDATE lists SET ticket_tpl=? WHERE id=?", (clean_ticket_tpl(b["ticket_tpl"]), lid))
+        if "day_hours" in b:  # 2.7.0 (#407): hours per day / shift of this list (None / '' = the instance's value)
+            dh = clean_day_hours(b["day_hours"])
+            if dh is False:
+                return err(tr("Hours per day: a number from 1 to 24"))
+            c.execute("UPDATE lists SET day_hours=? WHERE id=?", (dh, lid))
+        if "folder" in vals:
+            grp_touch(c, me())  # 2.10.0 (#441): moved into / out of a folder shared with a group
+    else:
+        if "rate" in b or "ticket_tpl" in b or "day_hours" in b or any(k in b for k in LIST_FIELDS if k not in MEMBER_LIST_FIELDS):
+            return err(tr("Only the owner can change this list"), 403)
+        for k in MEMBER_LIST_FIELDS:
+            if k in vals:
+                c.execute(f"UPDATE list_members SET {k}=? WHERE list_id=? AND user_id=?", (vals[k], lid, me()))
+    bump(c)
+    c.commit()
+    return jsonify(ok=True, conflicts=conflicts, **pt_out)
+
+
+@app.post("/api/lists/reorder")
+def list_reorder():
+    """{ids: [...], folder?: {id: name}, _prev?: {ids, folder}} -- sidebar order after a drag / arrow move (per user).
+    D4 undo / redo: with _prev the order is only applied while it is still _prev.ids, and a list's folder only while it is
+    still _prev.folder[id]; what changed elsewhere meanwhile stays and is reported in conflicts."""
+    from ..lists.groups import grp_touch
+    b = body()
+    c = db()
+    uid = me()
+    conflicts = []
+    prev = b.get("_prev") if isinstance(b.get("_prev"), dict) else None
+    if prev:
+        mine = sorted((d for d in visible_lists(c, uid) if not d["is_inbox"]), key=lambda d: (d["sort"] or 0, d["id"]))
+        folders = {str(d["id"]): d["folder"] or "" for d in mine}
+        try:
+            want = [int(x) for x in prev.get("ids") or []]
+            order = [int(x) for x in b.get("ids") or []]
+        except (TypeError, ValueError):
+            return err(tr("Invalid data"))
+        now_ids = [d["id"] for d in mine if d["id"] in set(want)]
+        if "ids" in prev and (now_ids != want or sorted(order) != sorted(want)):
+            conflicts.append({"field": "order", "server": now_ids, "mine": order})
+            b = {k: v for k, v in b.items() if k != "ids"}
+        pf = prev.get("folder") if isinstance(prev.get("folder"), dict) else {}
+        fm = dict(b.get("folder") or {}) if isinstance(b.get("folder"), dict) else b.get("folder")
+        if isinstance(fm, dict):
+            for k in list(fm):
+                if str(k) in pf and folders.get(str(k)) != (pf[str(k)] or "") and folders.get(str(k)) != (fm[k] or ""):
+                    conflicts.append({"field": "folder", "id": int(k), "server": folders.get(str(k)), "mine": fm[k]})
+                    del fm[k]
+            b = {**b, "folder": fm}
+    for i, lid in enumerate(b.get("ids", [])):
+        c.execute("UPDATE lists SET sort=? WHERE id=? AND is_inbox=0 AND owner_id=?", (i, int(lid), uid))
+        c.execute("UPDATE list_members SET sort=? WHERE list_id=? AND user_id=?", (i, int(lid), uid))
+    fmap = b.get("folder") or {}
+    if not isinstance(fmap, dict):
+        return err(tr("Invalid value: {0}", tr("Folder")))
+    for lid, folder in fmap.items():
+        folder = clean_folder(folder)
+        c.execute("UPDATE lists SET folder=? WHERE id=? AND owner_id=?", (folder, int(lid), uid))
+        c.execute("UPDATE list_members SET folder=? WHERE list_id=? AND user_id=?", (folder, int(lid), uid))
+    if fmap:
+        grp_touch(c, uid)  # 2.10.0 (#441)
+    bump(c)
+    c.commit()
+    return jsonify(ok=True, conflicts=conflicts)
+
+
+@app.delete("/api/lists/<int:lid>")
+def list_delete(lid):
+    from ..lists.projects import list_files_drop
+    c = db()
+    need_list(c, lid, owner=True)
+    r = c.execute("SELECT is_inbox, archived FROM lists WHERE id=?", (lid,)).fetchone()
+    if r["is_inbox"]:
+        return err(tr("The inbox cannot be deleted"))
+    # 1.5 (UX1): deleting for good only from the archive; "Delete" in the app archives (undoable) first
+    if not r["archived"]:
+        return err(tr("Archive the list first: only archived lists can be deleted for good"), 409)
+    # tasks go to the trash inside the owner's inbox so they stay restorable
+    inbox = my_inbox(c)
+    ts = iso(now_utc())
+    c.execute("UPDATE tasks SET deleted_at=COALESCE(deleted_at,?), list_id=?, section_id=NULL, assignee_id=NULL WHERE list_id=?",
+              (ts, inbox, lid))
+    icon = c.execute("SELECT icon FROM lists WHERE id=?", (lid,)).fetchone()[0]
+    lfiles = [r[0] for r in c.execute("SELECT path FROM list_files WHERE list_id=?", (lid,))]  # 2.7.1 (#410)
+    c.execute("DELETE FROM lists WHERE id=?", (lid,))
+    bump(c)
+    c.commit()
+    list_icon_drop_file(lid, icon)
+    list_files_drop(lfiles)
+    return jsonify(ok=True)
+
+
+@app.put("/api/lists/<int:lid>/members")
+def member_set(lid):
+    """{user_id, role: admin|edit|participant|view} -- the owner or a list admin shares the list (or changes a member's
+    role). The owner is no member row: nobody can change or remove the owner."""
+    from ..lists.groups import role_max
+    from ..collab.comments import user_names
+    from ..collab.news import list_push, news_add
+    from ..integrations.webhooks import wh_note_list
+    from ..agents.admin import personal_agent_foreign
+    from ..family.family import is_kid
+    need_collab()
+    b = body()
+    c = db()
+    need_list(c, lid, write=False, manage=True)
+    if c.execute("SELECT is_inbox FROM lists WHERE id=?", (lid,)).fetchone()[0]:
+        return err(tr("The inbox cannot be shared"))
+    role = b.get("role", "edit")
+    if role not in ROLES:
+        return err(tr("Role must be admin, edit, participant or view"))
+    if role == "admin" and c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent'", (b.get("user_id"),)).fetchone():
+        return err(tr("An agent cannot be a list admin"))
+    try:
+        uid = int(b.get("user_id") or 0)
+    except (TypeError, ValueError):
+        uid = 0
+    u = c.execute("SELECT id FROM users WHERE id=? AND disabled=0", (uid,)).fetchone()
+    if not u or uid == me() or personal_agent_foreign(c, uid, me()):  # 2.7.2 (#420): only the owner shares with a personal agent
+        return err(tr("unknown user"), 404)
+    if uid == c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0]:
+        return err(tr("The owner's role cannot be changed"), 403)
+    if is_kid(c, uid):  # 2.19.0 (#653): a kid only ever takes part (sees what is assigned to it / where it comes along)
+        role = "participant"
+    lname = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]
+    old = c.execute("SELECT role, grole FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone()
+    if old:  # 2.10.0 (#441): the personal role; the effective one is the higher of it and the role via groups
+        eff = role_max(role, old["grole"])
+        c.execute("UPDATE list_members SET role=?, own_role=? WHERE list_id=? AND user_id=?", (eff, role, lid, uid))
+        if old[0] != eff:
+            news_add(c, uid, "role", list_id=lid, data={"role": eff, "old": old[0], "name": lname})
+    else:
+        c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?)",
+                  (lid, uid, role, role, my_max_sort(c, uid) + 1, iso(now_utc())))
+        news_add(c, uid, "share", list_id=lid, data={"role": role, "name": lname})
+        agent_share_skip(c, lid, uid, False)  # 2.4.2 (#391): shared again by hand -> "Share all" includes it again
+        who = user_names(c, [me()]).get(me(), "?")
+        list_push(c, uid, "share", lid, lambda lg: tr("{0} shared a list with you", who, lg=lg), lambda lg: lname)
+        wh_note_list(lid, "list.shared", {"member_id": uid, "role": role})
+    bump(c)
+    c.commit()
+    return jsonify(ok=True)
+
+
+# ---- 2.4.2 (#391): sharing with an agent in bulk. Per person and agent (user setting agent_share, server-only):
+# "Share all existing lists" (POST /api/agents/<aid>/share-all) shares every list the person OWNS (never the inbox,
+# archived lists or lists they only manage) with role edit, except the lists they stopped sharing with that agent in
+# the table (skip); "Share new lists automatically" (PUT /api/agents/<aid>/autoshare {on}) adds the agent (role edit)
+# to every list the person creates from then on. The web app asks first (the agent then sees private lists too).
+def agent_share_get(c, uid):
+    try:
+        d = json.loads(usettings(c, uid).get("agent_share") or "{}")
+    except ValueError:
+        d = {}
+    if not isinstance(d, dict):
+        d = {}
+    auto = [int(x) for x in d.get("auto", []) if isinstance(x, int) or (isinstance(x, str) and x.isdigit())]
+    skip = {str(k): [int(x) for x in v if isinstance(x, int)] for k, v in (d.get("skip") or {}).items()
+            if str(k).isdigit() and isinstance(v, list)}
+    return {"auto": sorted(set(auto)), "skip": skip}
+
+
+def agent_share_put(c, uid, d):
+    d = {"auto": sorted(set(d.get("auto", []))), "skip": {k: sorted(set(v))[-2000:] for k, v in d.get("skip", {}).items() if v}}
+    uset(c, uid, "agent_share", json.dumps(d, separators=(",", ":")))
+
+
+def agent_share_skip(c, lid, uid, on):
+    """The list owner shared (on=False) or stopped sharing (on=True) list lid with agent uid by hand."""
+    r = c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()
+    if not r or not c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent'", (uid,)).fetchone():
+        return
+    d = agent_share_get(c, r[0])
+    cur = set(d["skip"].get(str(uid), []))
+    new = cur | {lid} if on else cur - {lid}
+    if new != cur:
+        d["skip"][str(uid)] = sorted(new)
+        agent_share_put(c, r[0], d)
+
+
+def agent_share_add(c, lid, aid, actor):
+    """Share list lid with agent aid (role edit) like PUT /api/lists/<lid>/members; False if it was a member already."""
+    from ..collab.news import news_add
+    from ..integrations.webhooks import wh_note_list
+    if c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, aid)).fetchone():
+        return False
+    lname = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]
+    c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?)",
+              (lid, aid, "edit", "edit", my_max_sort(c, aid) + 1, iso(now_utc())))
+    news_add(c, aid, "share", list_id=lid, data={"role": "edit", "name": lname}, actor=actor)
+    wh_note_list(lid, "list.shared", {"member_id": aid, "role": "edit"})
+    return True
+
+
+def agent_autoshare(c, uid, lid):
+    """A list uid just created: share it with the agents uid chose for "Share new lists automatically" (#391)."""
+    if not collab_all():
+        return
+    r = c.execute("SELECT owner_id, is_inbox FROM lists WHERE id=?", (lid,)).fetchone()
+    if not r or r["is_inbox"] or r["owner_id"] != uid:
+        return
+    auto = agent_share_get(c, uid)["auto"]
+    for aid in auto:
+        if aid != uid and c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent' AND disabled=0", (aid,)).fetchone():
+            agent_share_add(c, lid, aid, uid)
+
+
+def agent_share_target(c, aid):
+    from ..agents.admin import personal_agent_foreign
+    need_collab()
+    u = c.execute("SELECT kind FROM users WHERE id=?", (me(),)).fetchone()
+    if not u or u["kind"] == "agent":
+        raise Denied(403)
+    if not c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent' AND disabled=0", (aid,)).fetchone() or personal_agent_foreign(c, aid, me()):
+        raise Denied(404, tr("unknown user"))
+
+
+@app.get("/api/agents/<int:aid>/share")
+def agent_share_state(aid):
+    """How I share with agent aid: auto (new lists) + how many of my own lists it does not see yet (share-all would add)."""
+    c = db()
+    agent_share_target(c, aid)
+    d = agent_share_get(c, me())
+    return jsonify(auto=aid in d["auto"], **agent_share_counts(c, aid, d))
+
+
+def agent_share_counts(c, aid, d):
+    skip = set(d["skip"].get(str(aid), []))
+    rows = c.execute("""SELECT l.id, EXISTS(SELECT 1 FROM list_members m WHERE m.list_id=l.id AND m.user_id=?) AS has
+                        FROM lists l WHERE l.owner_id=? AND l.is_inbox=0 AND COALESCE(l.archived,0)=0""", (aid, me())).fetchall()
+    return {"own": len(rows), "shared": sum(1 for r in rows if r["has"]),
+            "missing": sum(1 for r in rows if not r["has"] and r["id"] not in skip),
+            "skipped": sum(1 for r in rows if not r["has"] and r["id"] in skip)}
+
+
+@app.post("/api/agents/<int:aid>/share-all")
+def agent_share_all(aid):
+    """Share every own list (not the inbox, not archived, not the ones unshared by hand) with agent aid, role edit."""
+    c = db()
+    agent_share_target(c, aid)
+    d = agent_share_get(c, me())
+    skip = set(d["skip"].get(str(aid), []))
+    n = 0
+    for (lid,) in c.execute("SELECT id FROM lists WHERE owner_id=? AND is_inbox=0 AND COALESCE(archived,0)=0 ORDER BY id",
+                            (me(),)).fetchall():
+        if lid not in skip and agent_share_add(c, lid, aid, me()):
+            n += 1
+    bump(c)
+    c.commit()
+    return jsonify(added=n, **agent_share_counts(c, aid, d))
+
+
+@app.put("/api/agents/<int:aid>/autoshare")
+def agent_autoshare_set(aid):
+    """{on: bool}: share my new lists with agent aid automatically (role edit)."""
+    b = body()
+    if not isinstance(b.get("on"), bool):
+        return err(tr("Invalid value: {0}", "on"))
+    c = db()
+    agent_share_target(c, aid)
+    d = agent_share_get(c, me())
+    d["auto"] = sorted(set(d["auto"]) | {aid}) if b["on"] else [x for x in d["auto"] if x != aid]
+    agent_share_put(c, me(), d)
+    bump(c)
+    c.commit()
+    return jsonify(auto=b["on"])
+
+
+@app.delete("/api/lists/<int:lid>/members/<int:uid>")
+def member_remove(lid, uid):
+    """The owner or a list admin removes a member, or a member leaves (uid = self)."""
+    from ..collab.news import news_add
+    need_collab()
+    c = db()
+    role = need_list(c, lid, write=False)
+    if uid != me() and role not in MANAGE_ROLES:
+        raise Denied(403)
+    mr = c.execute("SELECT grole FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone()
+    if not mr:
+        return err(tr("unknown"), 404)
+    if mr["grole"]:  # 2.10.0 (#441): access via a group stays; only the personal share goes
+        c.execute("UPDATE list_members SET own_role=NULL, role=grole WHERE list_id=? AND user_id=?", (lid, uid))
+        bump(c)
+        c.commit()
+        return jsonify(ok=True, via_group=True)
+    c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, uid))
+    c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, uid))
+    c.execute("DELETE FROM task_field_values WHERE value=? AND field_id IN (SELECT id FROM list_fields WHERE list_id=? AND type='person')",
+              (str(uid), lid))
+    agent_share_skip(c, lid, uid, True)  # 2.4.2 (#391): unshared by hand -> "Share all" leaves it out
+    if uid != me():  # removed by the owner (leaving on your own is no news for you)
+        news_add(c, uid, "unshare", list_id=lid,
+                 data={"name": c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]})
+    bump(c)
+    c.commit()
+    return jsonify(ok=True)

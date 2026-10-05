@@ -326,7 +326,7 @@ check(r["data"]["rel"] is False and len(r["data"]["deps"]) == 3, "list template:
 
 # ================================================================== #187 quick capture
 r = requests.get(B + "/capture?title=Hi&url=https://example.org")
-check(r.ok and "<html" in r.text.lower() and "app.js" in r.text, "GET /capture: the app")
+check(r.ok and "<html" in r.text.lower() and "/static/js/main.js" in r.text, "GET /capture: the app")
 m = A.get(B + "/manifest.json").json()
 cap = [x for x in m["shortcuts"] if x["url"] == "/?action=capture"]
 check(cap and cap[0]["name"] == "Quick add", "manifest: Quick add shortcut")

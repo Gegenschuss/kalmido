@@ -70,7 +70,7 @@ async function page({cookie = '', hash = '', lang = null, wait = 2000, passkeys 
   const jar = new Map(cookie ? [cookie.split('=')] : []);
   const store = lang ? {lang: JSON.stringify(lang)} : {};
   const vc = new VirtualConsole(); vc.on('jsdomError', e => { if (!/navigation|Not implemented/.test(e.message)) errs.push(e.message); });
-  const dom = await JSDOM.fromURL(B + (hash ? '#' + hash : ''), {runScripts: 'dangerously', resources: 'usable', pretendToBeVisual: true, virtualConsole: vc,
+  const dom = await JSDOM.fromURL(B + (hash ? '#' + hash : ''), {runScripts: 'dangerously', resources: new (require('./boot').PooledLoader)(),  /* 2.20.0: browser-like connections (boot.js) */ pretendToBeVisual: true, virtualConsole: vc,
     beforeParse(w) {
       w.matchMedia = () => ({matches: false, addEventListener() {}, addListener() {}});
       Object.defineProperty(w, 'localStorage', {value: {getItem: k => k in store ? store[k] : null, setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; }, key: i => Object.keys(store)[i], get length() { return Object.keys(store).length; }}});

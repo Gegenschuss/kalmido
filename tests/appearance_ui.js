@@ -5,7 +5,7 @@
 // and is not part of this suite.
 const {execFileSync} = require('child_process');
 const path = require('path');
-const {boot, errs, sleep, B} = require('./boot');
+const {boot, errs, sleep, B, clientSource} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
@@ -22,7 +22,7 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   // ---- static checks on the shipped files
   // the files the container serves (= the image under test)
   const get = async f => (await fetch(B + f)).text();
-  const css = await get('static/app.css'), js = await get('static/app.js'), sw = await get('sw.js');
+  const css = await get('static/app.css'), js = await clientSource(), sw = await get('sw.js');
   const vars = sel => { const m = css.match(new RegExp(sel.replace(/[[\]()"=]/g, '\\$&') + '\\{([^}]*)\\}')); const o = {}; if (m) for (const [, k, v] of m[1].matchAll(/--([\w-]+):([^;]+)/g)) o[k] = v.trim(); return o; };
   const root = vars(':root'), light = vars(':root[data-theme="light"]');
   check(light.accent === 'var(--acc-l)' && light['accent-ink'] === 'var(--acc-ink-l)', 'light theme takes the light accent variables');

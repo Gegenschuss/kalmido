@@ -116,7 +116,7 @@ column, keep it short).
 ## The checker
 
 `python3 tools/i18n_check.py [code ...]` reads every `tr("...")`, `trn("one", "other", n)` and `N_("...")` in
-`static/app.js` and `app.py` and compares them with each file in `static/i18n/`:
+the web client (`static/js/*.js`) and the server (`app.py`, `kalmido/`) and compares them with each file in `static/i18n/`:
 
 - **missing**: used by the code, not translated (the app then shows English) -> error
 - **placeholder mismatch**: `{0}` in the key but not in the translation, or the other way round -> error
@@ -129,7 +129,7 @@ missing, removed ones as unused.
 
 ## For developers
 
-- Wrap every user-visible text in `tr('English text', ...args)` (client: `static/i18n.js`, server: `app.py`),
+- Wrap every user-visible text in `tr('English text', ...args)` (client: `static/i18n.js`, server: `kalmido/core/i18n.py`),
   plurals in `trn('{0} item', '{0} items', n, ...args)`. Keys must be string literals, otherwise the checker
   cannot see them.
 - Tables that are translated later (`tr(label)` on a variable) mark their texts with `N_('Text')`; the checker
@@ -139,7 +139,7 @@ missing, removed ones as unused.
 - English needs no file: the keys are the English texts, English weekday / month names and date formats live
   in `static/i18n.js`.
 - Server-side number and date formats (pushes, CSV, public pages) use `short_day()`, `fmt_int()` and `dec_comma()` in
-  `app.py`; a new language with a decimal comma goes into `COMMA_LANGS` there.
+  `kalmido/core/i18n.py`; a new language with a decimal comma goes into `COMMA_LANGS` there.
 - The service worker precaches `de.json`; any other language file is cached on first use, and the app keeps
   the active one in `localStorage`, so the chosen language also works offline.
 
@@ -147,7 +147,7 @@ missing, removed ones as unused.
 
 The natural-language quick add (`tomorrow 3pm !!! #tag ~list`) always understands English and German keywords, and
 since 2.12.0 also the words of the interface language for French, Spanish, Italian and Dutch. Those words are not
-translations but parser patterns in `static/app.js`: the table `QL` (one entry per language: today / tomorrow / day after
+translations but parser patterns in `static/js/quickadd.js`: the table `QL` (one entry per language: today / tomorrow / day after
 tomorrow, next week / month, weekend, weekday names, "next <weekday>", "in N days", time words, repeat words; regular
 expression parts, matched case-insensitively between spaces). To teach quick add a new language, add its entry to `QL`
 and cases to `tests/quick_lang_test.js`. Priority, tags and the list stay symbols (`!!!` / `!!` / `!`, `#tag`, `~list`).

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """2.15.0 (#479) parity: what people can do in the app, agents can do through the API and the MCP server.
-No container needed. Reads app.py and mcp/kalmido_mcp.py:
+No container needed. Reads the server (app.py + kalmido/) and mcp/kalmido_mcp.py:
  1. every route the web client has (/api/..., not /api/v1) is either mapped to the REST API route(s) that do the same
     (APP_TO_API) or listed with a reason in APP_ONLY (sign-in, credentials, admin, devices, people's side of approvals ...)
  2. every mapped REST route exists
@@ -9,6 +9,7 @@ No container needed. Reads app.py and mcp/kalmido_mcp.py:
  4. nothing in the tables is stale (a mapped / listed route that no longer exists, a variant of an unknown tool)
 A new app feature without an API route, or a new API route without an MCP tool, fails here until it gets one (or a
 documented exception). usage: python3 tests/parity_test.py"""
+import glob
 import importlib.util
 import os
 import re
@@ -31,7 +32,9 @@ def norm(p):
     return re.sub(r"<[^>]+>", "{}", p)
 
 
-src = open(os.path.join(ROOT, "app.py"), encoding="utf-8").read()
+# 2.20.0 (#646): the server is app.py + the package kalmido/ (one text, the routes are found the same way)
+src = "\n".join(open(p, encoding="utf-8").read() for p in [os.path.join(ROOT, "app.py")]
+                + sorted(glob.glob(os.path.join(ROOT, "kalmido", "**", "*.py"), recursive=True)))
 routes = re.findall(r'^@app\.(get|post|put|patch|delete)\("(/api/[^"]*)"', src, re.M)
 APP = {f"{m.upper()} {norm(p)}" for m, p in routes if not p.startswith("/api/v1/")}
 API = {f"{m.upper()} {norm(p)[len('/api/v1'):]}" for m, p in routes if p.startswith("/api/v1/")}

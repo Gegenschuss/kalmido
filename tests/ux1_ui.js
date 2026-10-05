@@ -7,7 +7,7 @@
 // undoable things ask nothing); the own date and time pickers (keyboard and touch, German and English: month names,
 // first weekday, 12 / 24 h, typing a time); phones: undo / redo in the header "…" menu, no ← →; the Fold layout (sidebar
 // folds into the rail while the task panel is open, the rail opens it as an overlay); the touch-target rules in the CSS.
-const {boot, errs, sleep, B, login} = require('./boot');
+const {boot, errs, sleep, B, login, clientSource} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -211,7 +211,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   check(cd && cd.querySelector('#cdlg-in') && d.activeElement === cd.querySelector('#cdlg-in'), 'prompt: own dialog with the field focused');
   cd.querySelector('#cdlg-in').value = 'Later'; click(w, cd.querySelector('[data-cd="yes"]'));
   check(await until(async () => (await st()).sections.some(s => s.list_id === S1 && s.name === 'Later')), 'prompt answer used (section created)');
-  const src = await (await fetch(B + 'static/app.js')).text();
+  const src = await clientSource();
   check(!/[^.\w$]confirm\(/.test(src) && !/[^.\w$]prompt\(/.test(src), 'no window.confirm / window.prompt left in the app');
   check(!errs.some(e => /native/.test(e)), 'native dialogs never called');
   await closeW(w);
