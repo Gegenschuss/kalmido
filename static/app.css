@@ -814,7 +814,14 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 .avopt.on{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 30%,transparent)}
 .avopt:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .avcrop{display:grid;place-items:center;margin:.25rem 0 1rem}
-.avcrop canvas{width:min(16rem,70vw);height:min(16rem,70vw);border-radius:50%;touch-action:none;cursor:grab;background:var(--bg3)}
+.avcrop canvas#av-cv{width:min(16rem,70vw);height:min(16rem,70vw);border-radius:.75rem;touch-action:none;cursor:grab;background:var(--bg3)}
+.avcrop canvas#av-cv:focus-visible{outline:2px solid var(--accent);outline-offset:.1875rem}
+.avcrop{grid-template-columns:auto auto;gap:1rem;align-items:end}
+.avprev{display:flex;flex-direction:column;align-items:center;gap:.625rem}
+.avprev canvas{border-radius:50%;background:var(--bg3)}
+.avcropmd.sq .avprev canvas{border-radius:22%}
+.avprev #av-pv{width:3rem;height:3rem}.avprev #av-pv2{width:1.75rem;height:1.75rem}
+@media (max-width:479px){ .avcrop{grid-template-columns:1fr} .avprev{flex-direction:row;justify-content:center} }
 .avatar.pic,.who.pic{background:none;padding:0;overflow:hidden;position:relative}
 .avatar.pic>img,.who.pic>img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:block}
 .nitem .avatar.pic{overflow:visible}
@@ -903,7 +910,7 @@ button.whob:hover .who.none{opacity:1;border-color:var(--accent);color:var(--acc
 .actl{display:flex;align-items:baseline;gap:.5rem;padding:.1875rem .375rem .1875rem 2.625rem;font-size:.75rem;color:var(--muted);line-height:1.45}
 .actl span{flex:1;min-width:0;overflow-wrap:anywhere}
 .actl b{font-weight:600;color:color-mix(in srgb,var(--text) 70%,var(--muted))}
-.actl time{flex:none;font-size:.6875rem;opacity:.8}
+.actl time{flex:none;font-size:.6875rem}  /* 2.24.0: no opacity (WCAG AA contrast) */
 .ccomp,.cedit{position:relative;display:flex;flex-direction:column;gap:.375rem}
 .ccomp{background:var(--bg3);border:1px solid var(--line);border-radius:var(--radius);padding:.5rem .625rem}
 .ccomp:focus-within{border-color:var(--accent)}
@@ -1987,7 +1994,7 @@ button.tvr-task:hover{color:var(--accent)}
 .qadd.dock input{font-size:var(--fs-l);padding:.5rem 0}
 .qadd.dock .qkey{color:var(--faint)}
 .qadd.dock .qdmore{display:none;padding:.25rem .125rem .25rem 2.375rem}
-.qadd.dock:focus-within .qdmore{display:block}
+.qadd.dock:focus-within .qdmore,.qadd.dock.has-text .qdmore{display:block}  /* 2.24.0 (UX-30): typed text keeps the recognition visible */
 .qdchips{display:flex;flex-wrap:wrap;gap:.375rem}
 .qdc{display:inline-flex;align-items:center;gap:.375rem;padding:.25rem .625rem;border:1px solid var(--line2);border-radius:99rem;font-size:var(--fs-s);color:var(--muted);background:var(--bg)}
 .qdc.set{color:var(--text)}
@@ -4578,3 +4585,56 @@ button.lkchip:hover{border-color:var(--accent)}
 .clsub{color:var(--text2)}
 .cmsg.rxshow .rxrow{gap:.375rem}
 .cmsg .rxrow .rxtog[aria-expanded="true"]{background:color-mix(in srgb,var(--accent) 14%,transparent);border-radius:62.5rem;box-shadow:none;outline:0}
+/* ---- 2.24.0 "Usability" */
+/* #907: the server's notice above the header */
+.annbar{display:flex;align-items:center;gap:.5rem;margin:.5rem 1.75rem 0;padding:.375rem .375rem .375rem .75rem;border-radius:.75rem;background:color-mix(in srgb,var(--accent) 12%,var(--bg2));border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);font-size:var(--fs-s);line-height:1.35}
+.annbar.maint{background:color-mix(in srgb,var(--p3) 16%,var(--bg2));border-color:color-mix(in srgb,var(--p3) 45%,transparent)}
+.annbar .annt{flex:1;min-width:0;overflow-wrap:anywhere}
+.annbar > svg{flex:none;color:var(--accent)}
+.annbar.maint > svg{color:var(--p3)}
+.annbar .iconbtn{flex:none}
+@media (max-width:899px){ .annbar{margin:calc(.375rem + var(--safe-t)) .5rem 0} .annbar + #top{padding-top:.375rem} }
+/* #910: storage meter in Settings > Account */
+.stoq{display:flex;align-items:center;gap:.625rem;flex-wrap:wrap;min-width:0}
+.stobar{display:inline-block;width:9rem;height:.5rem;border-radius:99rem;background:var(--bg3);overflow:hidden;flex:none}
+.stobar i{display:block;height:100%;background:var(--accent);border-radius:inherit}
+.stoq.warn .stobar i{background:var(--p3)}
+.stoq.high .stobar i,.stoq.full .stobar i{background:var(--p5)}
+/* UX-21: "Log out" at the end of the Account tab, set apart */
+.alogout{margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--line)}
+/* #906: the person card's "Message" is the first, full-width action */
+.mcacts .mcdm{flex-basis:100%;justify-content:center}
+/* #826: the sub-tabs of Administration use the strip of Agents (.aisub) */
+.admsub{margin-bottom:1rem}
+/* UX-16: nothing found in the settings search: the panes step back behind the one line in the results */
+.sbody.snores .spanes{visibility:hidden}
+/* UX-41: the assignee next to the date in the task header; the rest of the panel folds into "More details" */
+.dchip.dwho .avatar{width:1.25rem;height:1.25rem;font-size:.625rem}
+.dchip.dwho .dct{font-family:var(--sans)}
+.dmore{margin-top:.75rem;border-top:1px solid var(--line);padding-top:.25rem}
+.dmore > summary{display:flex;align-items:center;gap:.375rem;min-height:2.75rem;cursor:pointer;color:var(--muted);font-size:var(--fs-s);font-weight:600;list-style:none}
+.dmore > summary::-webkit-details-marker{display:none}
+.dmore > summary .fcar{transform:rotate(-90deg);transition:transform .15s}
+.dmore[open] > summary .fcar{transform:none}
+@media (prefers-reduced-motion:reduce){ .dmore > summary .fcar{transition:none} }
+/* UX-14: the short task menu names its task */
+.menu-list .mhead{font-weight:600;color:var(--text);opacity:1;cursor:default;white-space:normal;text-align:left}
+.dmeta{display:flex;flex-wrap:wrap;gap:.375rem;margin:-.25rem 0 .5rem}
+.dmeta .dchip{border:1px solid var(--line);font-family:var(--sans)}
+.dmeta .dchip.set{color:var(--text)}
+#s-ann-text{width:100%;flex:1;min-height:4.5rem}
+/* #826: on a phone the five sub-tabs of Administration wrap into two rows instead of squeezing */
+@media (max-width:599px){ .admsub{flex-wrap:wrap;overflow:visible;gap:.25rem} .admsub button{flex:1 1 30%;min-width:0} }
+#pop:has(> .menu-list){max-height:calc(100dvh - 1rem)}  /* 2.24.0: the task menu fits */
+/* 2.24.0 (UX-04, review): nothing in the sidebar runs out sideways: the brand row shortens the organisation, rows cut long names */
+#side{overflow-x:hidden}
+.sbrand{min-width:0}
+.sbrand .sbhome{min-width:0;flex:0 1 auto;overflow:hidden}
+.sbrand .sbhome > span{flex:none}
+.sbrand .sbhome > svg{flex:none}
+.sbrand .sborg{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sbrand .sbacct{flex:none}
+/* UX-16: nothing found: one clear line in the middle of the dialog */
+.sbody.snores{position:relative}
+.sbody.snores::after{content:attr(data-nores);position:absolute;inset:3rem 1rem auto;text-align:center;color:var(--muted);font-size:var(--fs-l)}
+@media (pointer:coarse){ .cmhead .cmtoggle{min-height:2.75rem} }  /* 2.24.0: the comments sit high in the panel now: 44 px targets */

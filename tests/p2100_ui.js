@@ -140,7 +140,8 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   const A2 = await mk('Call supplier', {due: TM});
   const A3 = await mk('Huge migration', {due: TM, duration: 900});
   w = await boot({user: 'alice'}); d = w.document;
-  check(d.querySelector('.dpbar [data-act="dayplan"][data-mode="day"]') && d.querySelector('.dpbar [data-mode="fill"]'), 'Today: "Plan my day" + "Fill free time"');
+  // 2.24.0 (UX-35): the planners are in Today's "…" menu
+  check(w.eval(`topMoreItems().slice(0, 2).map(x => x.label).join('|')`) === 'Plan my day|Fill free time', 'Today: "Plan my day" + "Fill free time" in "…"');
   w.dayplanModal('day', TM); await sleep(700);
   md = d.querySelector('.dpm');
   const rows = [...md.querySelectorAll('.dprow')];
@@ -222,7 +223,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   // German
   await call('PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice'}); d = w.document;
-  check(/Tag planen/.test(d.querySelector('.dpbar')?.textContent || '') && /Freie Zeit füllen/.test(d.querySelector('.dpbar').textContent), 'German: Tag planen / Freie Zeit füllen');
+  check(w.eval(`topMoreItems().slice(0, 2).map(x => x.label).join('|')`) === 'Tag planen|Freie Zeit füllen', 'German: Tag planen / Freie Zeit füllen');
   w.settingsModal('groups'); await sleep(400);
   check(/Gruppen/.test(d.querySelector('#s-groups-h')?.textContent || ''), 'German: Gruppen');
   w.close();
@@ -243,11 +244,11 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
           await nav(B + '?v=' + (++nr) + '#today/review');
           for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300);
           await sleep(1200);
-          const lay = await ev(`(() => { const c = document.querySelector('.rvcard'), b = document.querySelector('.dpbar');
-            return {card: !!(c && c.offsetWidth), bar: !!(b && b.offsetWidth), doc: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1}; })()`);
-          check(lay.card && lay.bar && lay.doc, `${vw}px ${theme}: Today with the review card + planner buttons, no horizontal overflow ${JSON.stringify(lay)}`);
+          const lay = await ev(`(() => { const c = document.querySelector('.rvcard');
+            return {card: !!(c && c.offsetWidth), doc: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1}; })()`);
+          check(lay.card && lay.doc, `${vw}px ${theme}: Today with the review card, no horizontal overflow ${JSON.stringify(lay)}`);
           if (touch) {
-            const small = await ev(SMALL('.dpbar .btn, .rvcard .btn, .rvhd .iconbtn'));
+            const small = await ev(SMALL('.rvcard .btn, .rvhd .iconbtn'));
             check(!small.length, `${vw}px ${theme}: Today buttons >= 44 px ${JSON.stringify(small)}`);
           }
           if (vw === 390 || vw === 1280) await shot(`p2100-today-${vw}-${theme}.png`);

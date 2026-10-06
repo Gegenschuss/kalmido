@@ -122,7 +122,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   const rws = [...d.querySelectorAll('.tclist .tcrow')];
   check(rws.length === 1 && rws[0].textContent.includes('Website') && !d.querySelector('.tclist').textContent.includes('Garden'), '#419: the shared project has a channel, the private one not');
   check(d.querySelector('[data-act="tc-new"]')?.getAttribute('aria-haspopup') === 'menu', 'a "Message…" button for direct messages');
-  click(w, rws[0]); await until(() => d.querySelector('#tc-in'));
+  click(w, rws[0]); await until(() => d.querySelector('#tc-in') && w.eval('!!S.tc.room'));  // 2.24.0: the room's members are loaded (mentions)
   check(d.querySelector('#tc-msgs[role="log"]') && d.querySelector('.tcrhead').textContent.includes('Website'), 'the channel opens with a log and its name');
   const box = d.querySelector('#tc-in');
   type(w, box, 'Hi @Bob, the text is ready');

@@ -21,33 +21,66 @@ async function avSet(j) {
   render();
 }
 // photo: square crop (drag to move, slider to zoom), sent as a 512 px JPEG; the server re-encodes it anyway
+// 2.24.0 (#825): with a round mask (the corners outside the circle are dimmed, a thin ring shows the edge), a big and a
+// small preview (the size of the sidebar), two-finger pinch, the mouse wheel and the keyboard (arrows move, + / - zoom).
+// The browser applies the photo's EXIF rotation when it draws it; the server strips EXIF / GPS on the re-encode.
 function avCropModal(file, opt = {}) {
   return new Promise(res => {
-    const url = URL.createObjectURL(file), img = new Image();
-    img.onerror = () => { URL.revokeObjectURL(url); toast(tr('This picture cannot be read')); res(null); };
+    // 2.24.0 (#825): a data: URL, not blob: (the Content-Security-Policy allows img-src 'self' data: only; a blob: URL made
+    // every photo "cannot be read", so the crop dialog never opened)
+    const img = new Image(), fr = new FileReader();
+    let url = '';
+    img.onerror = () => { toast(tr('This picture cannot be read')); res(null); };
     img.onload = () => {
-      const md = modal(`<h3>${esc(opt.title || tr('Profile picture'))}</h3><div class="avcrop"><canvas width="256" height="256" id="av-cv" aria-label="${esc(tr('Drag to move the picture'))}"></canvas></div>
+      const md = modal(`<h3>${esc(opt.title || tr('Profile picture'))}</h3><div class="avcrop"><canvas width="512" height="512" id="av-cv" tabindex="0" role="img" aria-label="${esc(tr('Drag to move the picture, pinch or use + and − to zoom'))}"></canvas>
+        <div class="avprev" aria-hidden="true"><canvas width="96" height="96" id="av-pv"></canvas><canvas width="40" height="40" id="av-pv2"></canvas></div></div>
         <div class="row"><label for="av-zoom">${tr('Zoom')}</label><input type="range" id="av-zoom" min="1" max="4" step="0.01" value="1"></div>
+        <div class="shint keep">${esc(tr('Move the picture with a finger or the mouse; the circle is what others see.'))}</div>
         <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Use picture')}</button></div>`);
-      const cv = $('#av-cv', md), cx = cv.getContext('2d'), side = Math.min(img.width, img.height);
-      let z = 1, ox = (img.width - side) / 2, oy = (img.height - side) / 2, drag = null;
+      md.classList.add('avcropmd'); if (opt.square) md.classList.add('sq');
+      const cv = $('#av-cv', md), cx = cv.getContext('2d'), side = Math.min(img.width, img.height), zin = $('#av-zoom', md);
+      let z = 1, ox = (img.width - side) / 2, oy = (img.height - side) / 2;
       const clamp = () => { const s = side / z; ox = Math.max(0, Math.min(img.width - s, ox)); oy = Math.max(0, Math.min(img.height - s, oy)); };
-      const draw = (c = cx, px = 256) => { const s = side / z; clamp(); if (opt.png) c.clearRect(0, 0, px, px); else { c.fillStyle = '#fff'; c.fillRect(0, 0, px, px); } c.drawImage(img, ox, oy, s, s, 0, 0, px, px); };
+      const paint = (c, px) => { const s = side / z; clamp(); if (opt.png) c.clearRect(0, 0, px, px); else { c.fillStyle = '#fff'; c.fillRect(0, 0, px, px); } c.drawImage(img, ox, oy, s, s, 0, 0, px, px); };
+      const round = (c, px) => { c.save(); c.beginPath(); c.arc(px / 2, px / 2, px / 2, 0, Math.PI * 2); c.clip(); paint(c, px); c.restore(); };
+      const draw = () => {
+        paint(cx, 512);
+        if (!opt.square) {  // the mask: dim outside the circle, a light ring on its edge
+          cx.save(); cx.beginPath(); cx.rect(0, 0, 512, 512); cx.arc(256, 256, 252, 0, Math.PI * 2, true); cx.fillStyle = 'rgba(10,12,16,.58)'; cx.fill('evenodd');
+          cx.beginPath(); cx.arc(256, 256, 252, 0, Math.PI * 2); cx.lineWidth = 3; cx.strokeStyle = 'rgba(255,255,255,.9)'; cx.stroke(); cx.restore();
+        }
+        for (const [id, px] of [['#av-pv', 96], ['#av-pv2', 40]]) { const c = $(id, md)?.getContext('2d'); if (c) { c.clearRect(0, 0, px, px); (opt.square ? paint : round)(c, px); } }
+      };
+      const zoomTo = (nz, fx = .5, fy = .5) => { nz = Math.max(1, Math.min(4, nz)); const s0 = side / z, px = ox + s0 * fx, py = oy + s0 * fy; z = nz; const s1 = side / z; ox = px - s1 * fx; oy = py - s1 * fy; zin.value = z; draw(); };
       draw();
-      cv.addEventListener('pointerdown', e => { drag = {x: e.clientX, y: e.clientY, ox, oy}; cv.setPointerCapture?.(e.pointerId); });
-      cv.addEventListener('pointermove', e => { if (!drag) return; const k = side / z / cv.getBoundingClientRect().width; ox = drag.ox - (e.clientX - drag.x) * k; oy = drag.oy - (e.clientY - drag.y) * k; draw(); });
-      cv.addEventListener('pointerup', () => { drag = null; });
-      $('#av-zoom', md).addEventListener('input', e => { const s0 = side / z, cxm = ox + s0 / 2, cym = oy + s0 / 2; z = +e.target.value; const s1 = side / z; ox = cxm - s1 / 2; oy = cym - s1 / 2; draw(); });
-      const done = v => { URL.revokeObjectURL(url); if (md.isConnected) md.remove(); res(v); };
+      const pts = new Map(); let drag = null, pinch = null;
+      const k = () => side / z / cv.getBoundingClientRect().width;
+      cv.addEventListener('pointerdown', e => { pts.set(e.pointerId, {x: e.clientX, y: e.clientY}); cv.setPointerCapture?.(e.pointerId);
+        if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = {d: Math.hypot(a.x - b.x, a.y - b.y) || 1, z}; drag = null; } else drag = {x: e.clientX, y: e.clientY, ox, oy}; });
+      cv.addEventListener('pointermove', e => { if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, {x: e.clientX, y: e.clientY});
+        if (pinch && pts.size === 2) { const [a, b] = [...pts.values()]; zoomTo(pinch.z * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d); return; }
+        if (drag) { ox = drag.ox - (e.clientX - drag.x) * k(); oy = drag.oy - (e.clientY - drag.y) * k(); draw(); } });
+      const up = e => { pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (!pts.size) drag = null; else { const p = [...pts.values()][0]; drag = {x: p.x, y: p.y, ox, oy}; } };
+      cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+      cv.addEventListener('wheel', e => { e.preventDefault(); const r = cv.getBoundingClientRect(); zoomTo(z * (e.deltaY < 0 ? 1.08 : 1 / 1.08), (e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height); }, {passive: false});
+      cv.addEventListener('keydown', e => {
+        const st = side / z * (e.shiftKey ? .1 : .03), mv = {ArrowLeft: [-st, 0], ArrowRight: [st, 0], ArrowUp: [0, -st], ArrowDown: [0, st]}[e.key];
+        if (mv) { e.preventDefault(); ox += mv[0]; oy += mv[1]; draw(); return; }
+        if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomTo(z * 1.1); } else if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomTo(z / 1.1); }
+      });
+      zin.addEventListener('input', e => zoomTo(+e.target.value));
+      const done = v => { url = ''; if (md.isConnected) md.remove(); res(v); };
       onRemove(md, () => done(null));
       md.addEventListener('click', e => {
         const b = e.target.closest('button[data-m]'); if (!b) return;
         if (b.dataset.m === 'close') { done(null); return; }
-        const out = document.createElement('canvas'); out.width = out.height = 512; draw(out.getContext('2d'), 512);
+        const out = document.createElement('canvas'); out.width = out.height = 512; paint(out.getContext('2d'), 512);
         out.toBlob(bl => done(bl), opt.png ? 'image/png' : 'image/jpeg', 0.9);
       });
     };
-    img.src = url;
+    fr.onload = () => { url = String(fr.result || ''); img.src = url; };
+    fr.onerror = img.onerror;
+    fr.readAsDataURL(file);
   });
 }
 async function avUpload(url = '/api/me/avatar', done = avSet) {  // 2.1.2 (#346): also an agent's picture (admins)
@@ -160,6 +193,15 @@ function notifMatrixHtml(s, hint) {
     <div class="nmx" role="table" aria-labelledby="s-news-h"><div class="nmh" role="row"><span role="columnheader">${tr('Event')}</span><span role="columnheader">${tr('News')}</span><span role="columnheader">${tr('Push')}</span></div>
     ${rows.map(([r, n, d]) => `<div class="nmr" role="row"><span class="nml" role="cell">${tr(n)}${d ? `<small>${tr(d)}</small>` : ''}</span><span role="cell">${social ? box(r, 'news', n) : '<span class="nmna">–</span>'}</span><span role="cell">${box(r, 'push', n)}</span></div>`).join('')}</div>`;
 }
+// 2.24.0 (#910): what my files take (the storage quota of the server)
+function storageHtml() {
+  const q = S.storage; if (!q) return '';
+  const pct = q.limit ? Math.min(100, q.pct) : 0;
+  return `<h4 id="s-storage-h">${tr('Storage')}</h4>
+    <div class="row"><label>${tr('Your files')}</label><span class="stoq ${esc(q.level)}">${q.limit ? `<span class="stobar" role="meter" aria-labelledby="s-storage-h" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><i style="width:${pct}%"></i></span>` : ''}<span>${esc(q.limit ? tr('{0} of {1} used', fmtSize(q.used), fmtSize(q.limit)) + (q.pool === 'org' ? ' · ' + tr('shared by the organisation') : '') : tr('{0} used · no limit', fmtSize(q.used)))}</span></span></div>
+    ${q.level === 'warn' || q.level === 'high' ? `<div class="shint keep">${ic('alert', 's')} ${esc(tr('Almost full: from 100 % new files cannot be uploaded.'))}</div>` : ''}
+    ${q.level === 'full' ? `<div class="row"><span class="shint keep">${ic('alert', 's')} ${esc(tr('Your storage is full: new files cannot be uploaded.'))}</span>${q.support ? `<a class="btn sm pri" href="${esc(quotaMail(q))}">${ic('send', 's')} ${tr('Contact support')}</a>` : ''}</div>` : ''}`;
+}
 function accountHtml() {
   const m = S.me, pw = m.auth === 'session' || m.has_password;
   return `<h4 id="s-account-h">${tr('Account')}</h4>
@@ -167,12 +209,13 @@ function accountHtml() {
     <div class="row"><label for="a-name">${tr('Display name')}</label><input id="a-name" value="${esc(m.display_name)}" maxlength="60" autocomplete="name" enterkeyhint="done"></div>
     <div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="a-avpick">${avPickHtml()}</div></div>
     ${pw ? `<div class="row"><label for="a-cur">${tr('Password')}</label><input type="password" id="a-cur" placeholder="${tr('current password')}" autocomplete="current-password"><input type="password" id="a-new" placeholder="${tr('new password')}" autocomplete="new-password"><button class="btn sm" data-acc="pw">${tr('Change')}</button></div>` : ''}
-    ${m.auth === 'session' ? `<div class="row"><label></label><button class="btn sm" data-acc="logout">${ic('logout', 's')} ${tr('Log out')}</button></div>` : ''}
+    ${storageHtml()}
     ${tfaHtml()}
     ${apwHtml()}
     <details class="sdev"><summary>${ic('key', 's')}${tr('Advanced · for developers')}</summary>
     <div class="row"><label>${tr('Upload token')}</label><button class="btn sm" data-m="go-share">${ic('phone', 's')} ${tr('Share from your phone')}</button><span class="muted" style="font-size:var(--fs-s)">${tr('shown and renewed there')}</span></div>
-    ${apiHtml()}</details>`;
+    ${apiHtml()}</details>
+    ${m.auth === 'session' ? `<div class="row alogout"><button class="btn sm" data-acc="logout">${ic('logout', 's')} ${tr('Log out')}</button></div>` : ''}`;  // 2.24.0 (UX-21): at the very end, set apart
 }
 const usersHtml = () => `<h4>${tr('Users')}</h4><div class="members" id="a-users"><div class="muted mhint">${tr('Loading…')}</div></div>
   <div class="row" style="margin-top:.5rem"><button class="btn sm" data-acc="user-new">${ic('plus', 's')} ${tr('New user')}</button></div>`;
@@ -281,6 +324,8 @@ async function orgsDraw(md) {
   let j; try { j = await api('GET', '/api/admin/orgs'); } catch { return; }
   S.orgs = j.orgs;
   box.innerHTML = j.orgs.length ? j.orgs.map(o => `<div class="mrow"><span class="fem" aria-hidden="true">${esc(o.icon || '🏢')}</span><span class="n">${esc(o.name)} <span class="muted">${esc(trn('{0} member', '{0} members', o.members.length))}${o.domains ? ' · ' + esc(o.domains) : ''}</span></span>${j.editable ? `<button class="iconbtn" data-acc="org-edit" data-oid="${o.id}" title="${esc(tr('Edit organisation'))}" aria-label="${esc(tr('Edit {0}', o.name))}">${ic('edit', 's')}</button>` : ''}</div>`).join('') : `<div class="muted mhint">${tr('No organisation yet.')}</div>`;
+  // 2.24.0 (UX-23): the one organisation of an "organisation" server: rename it here (unless the configuration fixes it)
+  if (!j.editable && S.instanceMode === 'organisation' && !S.about?.org_name_env && j.orgs.length === 1) box.firstElementChild?.insertAdjacentHTML('beforeend', `<button class="iconbtn" data-acc="org-rename" title="${esc(tr('Rename'))}" aria-label="${esc(tr('Rename {0}', j.orgs[0].name))}">${ic('edit', 's')}</button>`);
   const vs = $('#a-vis', md); if (vs) vs.innerHTML = VIS_UI.map(([k, n]) => `<option value="${k}" ${k === j.visibility ? 'selected' : ''}>${esc(tr(n))}</option>`).join('');
 }
 async function orgModal(o, done) {
@@ -343,6 +388,7 @@ function accountWire(md) {
       if (a === 'user-new') userModal(null, drawUsers);
       if (a === 'user-approve') { await api('POST', `/api/users/${b.dataset.uid}/approve`, {}); toast(tr('Approved: the person can log in now')); drawUsers(); }  // 2.23.0 (#711)
       if (a === 'org-edit') orgModal((S.orgs || []).find(o => o.id === +b.dataset.oid), () => orgsDraw(md));
+      if (a === 'org-rename') { const o = (S.orgs || [])[0]; const v = await askPrompt(tr('Name of your organisation'), o?.name || '', {ok: tr('Save'), input: {max: 60}}); if (v && v.trim() && v.trim() !== o?.name) { try { await api('PATCH', '/api/admin/settings', {org_name: v.trim()}); await load(); render(); orgsDraw(md); toast(tr('Saved')); } catch { /* shown */ } } }
       if (a === 'user-edit') userModal(users.find(u => u.id === +b.dataset.uid), drawUsers);
       if (a === 'agent-edit') {
         const aj = await calReq('GET', '/api/admin/agents'), ag = aj.agents.find(x => x.id === +b.dataset.uid);
@@ -544,7 +590,7 @@ async function authScreen(j) {
     el.querySelector('#auth-form').addEventListener('submit', async e => {
       e.preventDefault();
       const errEl = $('#au-err', el);
-      const body = setup ? {username: $('#au-user', el).value.trim(), display_name: $('#au-name', el).value.trim(), password: $('#au-pw', el).value, wizard: true}
+      const body = setup ? {username: $('#au-user', el).value.trim(), display_name: $('#au-name', el).value.trim(), password: $('#au-pw', el).value, wizard: true, lang: I18N.code || 'en'}  // 2.24.0 (UX-22): the language seen here sticks
         : {username: $('#au-user', el).value.trim(), password: $('#au-pw', el).value, remember: $('#au-rem', el).checked};
       try {
         const r = await fetch(setup ? '/api/auth/setup' : '/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify(body)});
@@ -1072,7 +1118,9 @@ async function setupChoices(el, logo) {
   const all = [...SETUP_MAIN, ...SETUP_MODS].map(x => x[0]);
   let lang = I18N.code || 'en', preset = 'me', picked, custOpen = false, start = '';
   const askOrg = st.about?.instance_mode === 'organisation' && !st.about?.org_name_env;  // 2.23.0 (#799): asked once
-  let orgName = st.me?.orgs?.[0] || '';
+  // 2.24.0 (UX-23): the purpose first; the name of the organisation only for a team / company, empty allowed (the
+  // instance's default name is not offered as a value), changeable later under Administration > Organisation
+  let orgName = (st.me?.orgs?.[0] || '').toLowerCase() === APP_NAME.toLowerCase() ? '' : st.me?.orgs?.[0] || '';
   const apply = k => { preset = k; picked = new Set(all.filter(x => !SETUP_PRESETS[k].off.includes(x))); };
   apply('me');
   // 2.13.2 (#478 F12): step 2 shown again after a reload (setup still pending) starts from what is on now, not from
@@ -1090,10 +1138,10 @@ async function setupChoices(el, logo) {
   const draw = () => {
     el.innerHTML = `<div class="card setupcard">${logo}
       <div class="seg" id="su-lang">${langs.map(L => `<button type="button" data-su-lang="${esc(L.code)}" class="${L.code === lang ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div>
-      ${askOrg ? `<h3><label for="su-org">${tr('Name of your organisation')}</label></h3><input id="su-org" class="suorg" maxlength="60" value="${esc(orgName)}" placeholder="${esc(tr('e.g. your company or family name'))}"><p class="muted">${tr('Shown next to the app name and in invitations; set once here (later only in the server configuration).')}</p>` : ''}
       <h3>${tr('What do you use Kalmido for?')}</h3>
       <p class="muted">${tr('Pick a start, untick what you do not need. Everything can be changed later in Settings.')}</p>
       <div class="supresets">${Object.entries(SETUP_PRESETS).map(([k, p]) => `<button type="button" class="supreset ${matches(k) ? 'on' : ''}" data-su-preset="${k}" aria-pressed="${matches(k)}"><b>${ic(p.icon, 's')}${tr(p.name)}</b><small class="muted">${tr(p.desc)}</small></button>`).join('')}</div>
+      ${askOrg && ['team', 'software'].includes(preset) ? `<h3><label for="su-org">${tr('Name of your team or company')} <span class="muted">${tr('(optional)')}</span></label></h3><input id="su-org" class="suorg" maxlength="60" value="${esc(orgName)}" placeholder="${esc(tr('e.g. your company'))}"><p class="muted">${tr('Shown next to the app name and in invitations. You can change it later in Settings > Administration > Organisation.')}</p>` : ''}
       <details class="sucust" ${custOpen ? 'open' : ''}><summary>${tr('Customize…')} <span class="muted">${tr('{0} of {1} modules on', [...picked].filter(k => k !== 'paperless' || pl).length, SETUP_MAIN.length + SETUP_MODS.filter(([k]) => k !== 'paperless' || pl).length)}</span></summary>
       <div class="suse-main">${SETUP_MAIN.map(row).join('')}</div>
       <div class="suse-list">${SETUP_MODS.filter(([k]) => k !== 'paperless' || pl).map(row).join('')}</div></details>
@@ -1124,7 +1172,7 @@ async function setupChoices(el, logo) {
     }
     const post = async (url, body) => { const r = await fetch(url, {method: url.endsWith('settings') ? 'PATCH' : 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify(body)}); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || tr('Error {0}', r.status)); };
     try {
-      if (b.dataset.su === 'go') await post('/api/admin/setup', {lang, collab_all: picked.has('collab'), time_all: picked.has('time'), modules: SETUP_MODS.map(x => x[0]).filter(k => picked.has(k) || (k === 'paperless' && !pl)), sample: start === 'sample', ...(start && start !== 'sample' ? {project_type: start} : {}), ...(matches(preset) ? {purpose: preset} : {}), ...(askOrg && orgName.trim() ? {org_name: orgName.trim()} : {})});
+      if (b.dataset.su === 'go') await post('/api/admin/setup', {lang, collab_all: picked.has('collab'), time_all: picked.has('time'), modules: SETUP_MODS.map(x => x[0]).filter(k => picked.has(k) || (k === 'paperless' && !pl)), sample: start === 'sample', ...(start && start !== 'sample' ? {project_type: start} : {}), ...(matches(preset) ? {purpose: preset} : {}), ...(askOrg && ['team', 'software'].includes(preset) && orgName.trim() ? {org_name: orgName.trim()} : {})});
       else return;
       location.replace('/');
     } catch (err) { $('#su-err', el).textContent = err.message || tr('Server not reachable.'); }

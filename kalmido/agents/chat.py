@@ -151,6 +151,9 @@ def chat_input(allowed):
 
 def chat_save_files(c, m, files, saved):
     """Stores the uploaded files of chat row m. Returns an error message or None (caller commits / rolls back + unlinks)."""
+    if m["sender"] == "user":  # 2.24.0 (#910): a person's files count towards their storage
+        from ..admin.hosting import quota_guard
+        quota_guard(c, m["user_id"])
     sub = os.path.join("chat", f"{m['agent_id']}-{m['user_id']}")
     try:
         os.makedirs(os.path.join(ATT_DIR, sub), exist_ok=True)

@@ -84,6 +84,13 @@ needs no permission. Agents created before 2.15.0 keep everything they could do 
 Besides the **team agents** an admin creates, people can run their **own personal agent** (for example Claude Code on
 their laptop), if an admin allows it.
 
+**Who is responsible (2.24.0):** a personal agent is connected by the person themselves, with their own AI provider, key
+and computer. What it reads in the lists shared with it goes to that provider, and the person who connects it is
+responsible for that data flow (Kalmido only offers the API / MCP; a hosted Kalmido runs no third-party AI). Give the agent
+a short *Where it runs* (`provider`, e.g. "Claude (Anthropic, USA)" or "local model"); when an agent joins a list, everyone
+in the list gets a News item naming the agent, who added it and where it runs. The organisation's switch *Members may
+connect agents* (Settings > Administration > Organisation; the same policy as below) is off by default.
+
 - **Admin policy**, *Settings > Agents > Set up* (admins): *Users may create their own agents* (off by default), the
   limit per person (default 2, at most 20) and optional usage limits that every new personal agent gets.
 

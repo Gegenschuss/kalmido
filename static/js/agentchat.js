@@ -737,6 +737,7 @@ function agModal(a, done) {
     <div class="row"><label for="ag-name">${tr('Display name')}</label><input id="ag-name" value="${esc(a?.name || '')}" maxlength="60" placeholder="Claude"></div>
     <div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="ag-avpick">${avPickHtml(a ? a.avatar || '' : '/static/avatars/robot.svg', !!a, a?.name || 'AI')}</div></div>
     <div class="row"><label for="ag-note">${tr('Note')}</label><input id="ag-note" value="${esc(a?.note || '')}" maxlength="2000" placeholder="${tr('What it is for (only admins see this)')}"></div>
+    <div class="row"><label for="ag-prov">${tr('Where it runs')}</label><input id="ag-prov" value="${esc(a?.provider || '')}" maxlength="80" placeholder="${esc(tr('e.g. Claude (Anthropic, USA)'))}"></div>
     <div class="row"><label for="ag-prop">${tr('Proposals for')}</label><select id="ag-prop">${[['shared', N_('People who share a list with it')], ['all', N_('Everyone')], ['off', N_('Nobody')]].map(([k, n]) => `<option value="${k}" ${(a?.proposals || 'shared') === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     <div class="shint">${tr('Who may ask it for a proposal (project from a briefing, break down a task, sort the inbox, tasks from notes). It only gets what the person sends; instance admins count as sharing a list.')}</div>
     ${scopesHtml(S.agOffer || [], a ? a.scopes : (S.agDefScopes || ['read', 'tasks:write', 'comments']))}
@@ -791,7 +792,7 @@ function agModal(a, done) {
         md.remove(); done && done(); load().then(render).catch(() => {}); return;
       }
       const rt = agRtBody(md); if (!rt) return;
-      const body = {display_name: $('#ag-name', md).value.trim(), note: $('#ag-note', md).value.trim(), proposals: $('#ag-prop', md).value, webhook_url: $('#ag-url', md).value.trim(), ...aiuLimBody(md), runtime: rt,
+      const body = {display_name: $('#ag-name', md).value.trim(), note: $('#ag-note', md).value.trim(), provider: $('#ag-prov', md)?.value.trim() || '', proposals: $('#ag-prop', md).value, webhook_url: $('#ag-url', md).value.trim(), ...aiuLimBody(md), runtime: rt,
         ...(S.agOffer ? {scopes: scopesVal(md)} : {}), allowed_ips: $('#ag-ips', md).value.trim()};  // 2.15.0 (#479)
       const un = $('#ag-user', md).value.trim().toLowerCase();
       if (!un) { need($('#ag-user', md)); return; }

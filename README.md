@@ -18,6 +18,13 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.24.0** (2026-10-06): Usability. A **direct message** one tap away (person card, *Tasks of …*, team chat); your
+  **own lists right below Inbox and Today**; **one task menu** in a fixed order; a calmer **Today**; the **assignee and
+  the comments at the top** of a task; a **settings search** that finds buttons and helper texts; **Administration in
+  sub-tabs**; a profile picture **cropped with a round mask**. The unfolded **Fold held sideways** gets the desktop
+  layout, **DeX** stops sliding when typing. For running Kalmido for others: **storage per person** with *Contact
+  support*, a **notice to everyone** before maintenance (also from scripts), **e-mail limits** per day and a **note to
+  everyone in a list when an agent joins** (and where it runs).
 - **2.23.0** (2026-10-05): Team, family, clients. **Clients** above your lists with hours, budget (hours or money),
   estimate vs. actual and a **timesheet per client and month**; **workload** per person and week against their hours;
   **approvals** as a step of a task (approve, ask for changes, reject); **forms** whose link creates a task (requests,
@@ -1512,6 +1519,9 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `KALMIDO_IOS_SHORTCUT_URL` | empty | Link to a signed generic iOS shortcut for *Share from your phone* (asks for address and token on import); empty = the button is hidden |
 | `KALMIDO_INSTANCE_MODE` | *(empty)* | 2.23.0: `organisation` (one organisation, everyone in it) or `shared` (no organisations, people see only their own contacts); empty: `organisation` unless the server kept several organisations from 2.22 |
 | `KALMIDO_ORG_NAME` | *(empty)* | 2.23.0: the organisation's name in the mode `organisation` (else asked once in the first-run setup) |
+| `KALMIDO_STORAGE_QUOTA_MB` | `0` | 2.24.0: storage per person in MB (0 = unlimited); admins can change it in *Administration > Server* |
+| `KALMIDO_SUPPORT_EMAIL` | *(empty)* | 2.24.0: where *Contact support* writes to when storage is full (else the admin setting, else the first admin's address) |
+| `KALMIDO_HOSTED` | `0` | 2.24.0: `1` = a server run as a service for others: Paperless only reaches public HTTPS addresses and is off for new accounts |
 | `KALMIDO_ONBOARDING` | `1` | `0`: new accounts start empty (no "Getting started" list, no welcome tour) |
 | `KALMIDO_WEBPUSH` | `1` | `0` turns Web Push off (no key handed out, no new devices, everything goes to ntfy) |
 | `KALMIDO_VAPID_SUBJECT` | `PUBLIC_URL` | Contact the push services see in the VAPID signature: `mailto:you@example.com` or an https URL (Apple needs one of the two; without an https `PUBLIC_URL` the default is `mailto:admin@example.com`) |

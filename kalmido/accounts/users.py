@@ -49,7 +49,13 @@ def user_admin_dict(c, u):
             "signup": u["signup"] or "",  # 2.23.0 (#711): confirm (e-mail not confirmed) | pending (waits for approval) | ''
             "kid": bool(u["kid"]),
             "orgs": [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=? ORDER BY org_id", (u["id"],))],  # 2.22.0 (#752)
-            "lists": c.execute("SELECT COUNT(*) FROM lists WHERE owner_id=? AND is_inbox=0", (u["id"],)).fetchone()[0]}
+            "lists": c.execute("SELECT COUNT(*) FROM lists WHERE owner_id=? AND is_inbox=0", (u["id"],)).fetchone()[0],
+            "storage": _storage(c, u["id"])}  # 2.24.0 (#910): {used, quota_mb}
+
+
+def _storage(c, uid):
+    from ..admin.hosting import user_storage
+    return user_storage(c, uid)
 
 
 @app.get("/api/users")
@@ -234,6 +240,12 @@ def user_update(uid):
             c.rollback()
             return err(tr("Invalid value: {0}", "email"))
         c.execute("UPDATE users SET email=? WHERE id=?", (email or None, uid))
+    if "storage_quota_mb" in b:  # 2.24.0 (#910): the person's own storage quota in MB (null = the server's default, 0 = unlimited)
+        q = b["storage_quota_mb"]
+        if q is not None and (isinstance(q, bool) or not isinstance(q, int) or not 0 <= q <= 10_000_000):
+            c.rollback()
+            return err(tr("Invalid value: {0}", "storage_quota_mb"))
+        c.execute("UPDATE users SET storage_quota_mb=? WHERE id=?", (q, uid))
     if b.get("oidc_unlink") is True:  # the next OIDC login links again (by user name / e-mail)
         c.execute("UPDATE users SET oidc_subject=NULL WHERE id=?", (uid,))
     if "kid" in b or "parents" in b or (b.get("is_admin") and u["kid"]):  # 2.19.0 (#653): a kid account and who looks after it

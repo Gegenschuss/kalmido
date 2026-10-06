@@ -46,8 +46,8 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   click(w, md.querySelector('[data-look="theme"][data-v="light"]')); await sleep(50);
   check(w.__store['tasks.theme'] === '"light"' && d.documentElement.dataset.theme === 'light', 'theme applies immediately');
   click(w, md.querySelector('[data-look="theme"][data-v="dark"]'));
-  const sel = md.querySelector('#s-tabadd'); sel.value = 's:today'; sel.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(50);
-  check(JSON.stringify(w.eval(`LS.get('tabbar')`)).includes('s:today'), 'tab bar applies immediately');
+  const sel = md.querySelector('#s-tabadd'); sel.value = 's:tomorrow'; sel.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(50);
+  check(JSON.stringify(w.eval(`LS.get('tabbar')`)).includes('s:tomorrow'), 'tab bar applies immediately');
   click(w, md.querySelector('[data-m="tab-reset"]')); await sleep(50);
   check(w.eval(`LS.get('tabbar', null)`) === null, 'tab bar back to default');
   md.remove();

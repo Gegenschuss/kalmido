@@ -58,7 +58,7 @@ function viewTeam() {
   if (S.tc.rooms === null && !S.tc.loading) { S.tc.loading = true; loadTeam().then(() => { S.tc.loading = false; if (S.route.mod === 'team') renderView(); }); }
   const rid = S.tc.rid, rooms = S.tc.rooms || [];
   const list = `<nav class="tclist" aria-label="${esc(tr('Conversations'))}">
-    <div class="tchead"><b>${tr('Conversations')}</b><span class="spacer"></span>${S.tc.people.length ? `<button type="button" class="btn sm" data-act="tc-new" aria-haspopup="menu">${ic('plus', 's')}${tr('Message…')}</button>` : ''}</div>
+    <div class="tchead"><b>${tr('Conversations')}</b><span class="spacer"></span><button type="button" class="btn sm pri" data-act="tc-new" aria-haspopup="${S.tc.people.length ? 'menu' : 'dialog'}">${ic('plus', 's')}${tr('New message')}</button></div>
     ${S.tc.rooms === null ? `<div class="muted mhint">${tr('Loading…')}</div>` : rooms.length ? rooms.map(r => `<button type="button" class="tcrow ${r.id === rid ? 'on' : ''} ${r.unread ? 'unread' : ''}" data-act="tc-open" data-rid="${r.id}" ${r.id === rid ? 'aria-current="true"' : ''}>
       ${roomIcon(r)}<span class="tcmain"><span class="tcn">${esc(roomName(r))}${r.kind === 'list' ? `<span class="tck">${ic('users', 's')}${r.members}</span>` : ''}</span>
       <span class="tclast">${r.last ? esc((r.last.user_id === S.me?.id ? tr('You') + ': ' : r.kind === 'list' ? uname(r.last.user_id, S.tc.users) + ': ' : '') + mdBrief(r.last.text)) : `<span class="muted">${tr('No messages yet')}</span>`}</span></span>
@@ -124,6 +124,7 @@ async function tcSend() {
   const ta = $('#tc-in'), rid = S.tc.rid; if (!ta || !rid) return;
   const text = ta.value.trim(); if (!text) return;
   const hadF = document.activeElement === ta;
+  if (!S.tc.room) { try { await loadRoom(rid); } catch { /* sent without the mention lookup */ } }  // 2.24.0: @names need the members
   let m;
   try { m = await rawFetch('POST', `/api/team/rooms/${rid}/messages`, {body: tcMentions(text)}); }
   catch (e) { toast(e instanceof Offline ? tr('You are offline: the message was not sent and stays in the box') : e.message); return; }
@@ -167,11 +168,24 @@ async function tcMute() {
   toast(on ? tr('Muted: only mentions notify you') : tr('Notifications on')); renderView();
 }
 function tcNewMenu(anchor) {
-  menu(anchor, S.tc.people.map(p => ({label: p.name, fn: async () => {
-    let r; try { r = await rawFetch('POST', '/api/team/dm', {user_id: p.id}); } catch (e) { toast(e.message); return; }
-    if (!(S.tc.rooms || []).some(x => x.id === r.id)) S.tc.rooms = [{...r, unread: 0, mention: false, muted: false, last: null, last_at: null}, ...(S.tc.rooms || [])];
-    go('team/' + r.id);
-  }})));
+  if (!S.tc.people.length) { dmWhy(); return; }  // 2.24.0 (#906): the button is always there and explains why not yet
+  menu(anchor, S.tc.people.map(p => ({label: p.name, fn: () => dmOpen(p.id, p.name)})));
+}
+// 2.24.0 (#906): a direct message from anywhere (the person card, "Tasks of …", the team chat). When it cannot work yet the
+// button still shows and says why (team chat off, nobody to write to, or the server's reason).
+async function dmOpen(uid, name) {
+  if (!teamOn()) { dmWhy('off'); return; }
+  let r; try { r = await rawFetch('POST', '/api/team/dm', {user_id: uid}); } catch (e) { dmWhy('err', e.message, name); return; }
+  if (!(S.tc.rooms || []).some(x => x.id === r.id)) S.tc.rooms = [{...r, unread: 0, mention: false, muted: false, last: null, last_at: null}, ...(S.tc.rooms || [])];
+  go('team/' + r.id);
+}
+async function dmWhy(kind, msg, name) {
+  const off = kind === 'off' || !teamOn();
+  const html = `<p>${off ? tr('Direct messages are part of the team chat. Switch on collaboration in Settings > Modules > Collaboration.')
+      : kind === 'err' ? esc(tr('You cannot write to {0} yet.', name || tr('this person'))) + (msg ? ' <span class="muted">' + esc(msg) + '</span>' : '')
+      : tr('Nobody to write to yet.')}</p>${off ? '' : `<p class="muted">${tr('You can write to people you share a list with (or who are in your organisation). Share a list with someone, or ask an admin to set up their account.')}</p>`}`;
+  const ok = await askDialog({title: tr('Direct messages'), html, ok: off ? tr('Open Modules') : tr('OK'), cancel: tr('Close')});
+  if (ok && off) settingsModal('collab');
 }
 // the open conversation follows the route; switching rooms loads it
 function teamRoute(rid) {

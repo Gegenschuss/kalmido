@@ -33,12 +33,13 @@ NEWS_KINDS = ("mention", "comment", "assign", "unassign", "take", "complete", "s
               "owner",  # 2.1.2 (#349): I am the new owner of a list
               "errreport",  # 2.18.0: a NEW error (new fingerprint) of the list's error-report webhook became a ticket
               "apdecide",  # 2.23.0 (#463): the approver decided on my approval request (row "assign")
-              "signup")  # 2.23.0 (#711): a registration waits for approval (admins; row "usage", the admins' row)
-NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evshare", "abshare")  # about a list (2.21: an event / calendar / address book), not a task
+              "signup",  # 2.23.0 (#711): a registration waits for approval (admins; row "usage", the admins' row)
+              "agentjoin")  # 2.24.0 (#896): an agent joined a list I am in (row "share"), with where it runs
+NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evshare", "abshare", "agentjoin")  # about a list (2.21: an event / calendar / address book), not a task
 NEWS_EXCERPT = 300
 # 1.9.0: per user (setting news_kinds) which groups of events create a News item; pushes are not affected
 NEWS_GROUPS = {"mention": ("mention",), "assign": ("assign", "unassign", "take"), "comment": ("comment",), "complete": ("complete",),
-               "unblock": ("unblock",), "share": ("share", "role", "unshare", "owner"), "status": ("status",)}
+               "unblock": ("unblock",), "share": ("share", "role", "unshare", "owner", "agentjoin"), "status": ("status",)}
 NEWS_TO_ME = ("mention", "assign", "unassign", "take")  # filter "Mentions & assigned to me"
 
 
@@ -293,7 +294,7 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
         kind = r["kind"]
         if (mentions_only and kind != "mention") or (to_me and kind not in NEWS_TO_ME):
             continue
-        if kind in ("share", "role", "status", "owner"):
+        if kind in ("share", "role", "status", "owner", "agentjoin"):
             if not sees(r["list_id"]):
                 continue
         elif kind == "usage":  # 2.1.1 (#326): an agent's usage limit, for admins (no task, no list)

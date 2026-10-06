@@ -66,9 +66,13 @@ const TABLET = {'(min-width:600px) and (min-height:600px)': true};
   w = await boot({user: 'alice', hash: 'l/' + WEB}); d = w.document;
   w.eval(`openDetail(${copy})`); await sleep(1000);
   const body = [...d.querySelector('#detail .dbody').children].map(x => x.id || ['subsec', 'attsec', 'plsec', 'fields', 'cfsec', 'tesec'].find(c => x.classList.contains(c)) || (/^Tags/.test(x.querySelector('h5')?.textContent || '') ? 'tags' : x.className));
-  const order = ['d-content', 'subsec', 'd-deps', 'tags', 'attsec', 'fields', 'd-tl'].map(k => body.indexOf(k));
-  check(order.every((v, i) => v >= 0 && (!i || v > order[i - 1])) && body[body.length - 1] === 'd-tl', 'detail order: description, subtasks, dependencies, tags, attachments, fields, comments last: ' + body.join('|'));
-  check(body.indexOf('d-hist') === body.length - 2, '2.0.7: the folded history of a private list sits right above the comments: ' + body.join('|'));
+  // 2.24.0 (UX-41): description, subtasks, comments first; a set dependency stays outside the fold; tags, attachments (none
+  // yet), fields and the history fold into "More details" at the end
+  const order = ['d-content', 'subsec', 'd-tl', 'd-deps', 'd-more'].map(k => body.indexOf(k));
+  check(order.every((v, i) => v >= 0 && (!i || v > order[i - 1])) && body[body.length - 1] === 'd-more', 'detail order: description, subtasks, comments, the dependency, then "More details": ' + body.join('|'));
+  const more = d.querySelector('#detail #d-more');
+  check(more && more.querySelector('.attsec') && more.querySelector('.fields') && [...more.querySelectorAll('.dsec h5')].some(h => /^Tags/.test(h.textContent)), '"More details" holds tags, attachments, fields');
+  check(!d.querySelector('#detail #d-hist') || more.contains(d.querySelector('#detail #d-hist')), '2.0.7: the folded history of a private list is under "More details"');
   check(d.querySelector('#detail > .dbot > .dcomp #c-input') && d.querySelector('#detail > .dbot > .dfoot') && !d.querySelector('#detail .dbody #c-input'), 'the comment box sits with the footer at the bottom edge (outside the scrolling content)');
   check(/Outline/.test(d.querySelector('#detail .subsec')?.textContent || ''), 'subtasks right below the description');
   check(w.eval('JSON.stringify(DETAIL_ORDER)') === JSON.stringify(['family', 'life', 'subtasks', 'deps', 'links', 'tags', 'attachments', 'paperless', 'fields', 'custom', 'time', 'code', 'history', 'comments']), 'the order lives in one list (DETAIL_ORDER; 2.2.0: code, 2.19.0: family first, 2.21.0: links, 2.22.0: life)');

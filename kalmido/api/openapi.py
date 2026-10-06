@@ -60,6 +60,7 @@ def openapi_spec():
     from ..contacts.v1 import contacts_spec
     from ..life.v1 import life_spec
     from ..team.v1 import pkgc_spec
+    from ..admin.hosting import hosting_spec
     if "s" in _SPEC:
         return _SPEC["s"]
 
@@ -532,6 +533,7 @@ def openapi_spec():
     life_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.22.0 (#663)
     team_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.17.0 (#419)
     pkgc_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.23.0 (#463)
+    hosting_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.24.0 (#907 #910)
     scope_refine(paths)
     _SPEC["s"] = {
         "openapi": "3.1.0",

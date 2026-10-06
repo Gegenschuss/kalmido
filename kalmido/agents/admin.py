@@ -35,6 +35,7 @@ def agent_admin_dict(c, a):
     last = c.execute("SELECT MAX(created_at) FROM agent_events WHERE agent_id=?", (a["user_id"],)).fetchone()[0]
     w = c.execute("SELECT * FROM webhooks WHERE id=?", (a["webhook_id"],)).fetchone() if a["webhook_id"] else None
     return {**agent_public(c, a), "enabled": bool(a["enabled"]), "disabled": bool(a["disabled"]), "note": a["note"] or "",
+            "provider": a["provider"] if "provider" in a.keys() else "",  # 2.24.0 (#896): where it runs (shown when it joins a list)
             "created_at": a["created_at"], "last_event_at": last,
             "tokens": [token_public(r) for r in c.execute("SELECT * FROM api_tokens WHERE user_id=? ORDER BY id DESC", (a["user_id"],))],
             "webhook": wh_public(c, w) if w else None,
@@ -138,7 +139,7 @@ def admin_agent_create():
         return err(tr("Username already exists"), 409)
     uid = create_user(c, username, (b.get("display_name") or "").strip()[:60] or username, None, None, False, paperless_access=False)
     make_agent(c, uid)
-    c.execute("UPDATE agents SET note=? WHERE user_id=?", (str(b.get("note") or "")[:AGENT_NOTE_MAX], uid))
+    c.execute("UPDATE agents SET note=?, provider=? WHERE user_id=?", (str(b.get("note") or "")[:AGENT_NOTE_MAX], str(b.get("provider") or "").strip()[:80], uid))
     try:  # 2.15.0 (#479): scopes (default read + tasks:write + comments) and the address restriction
         agent_scopes_set(c, uid, {"scopes": b.get("scopes") or list(SCOPES_AGENT_DEFAULT), **({"allowed_ips": b["allowed_ips"]} if "allowed_ips" in b else {})})
     except BadInput:
@@ -206,6 +207,8 @@ def admin_agent_update(aid):
                                                                 agent_row(c, aid)["username"], aid))
     if "note" in b:
         c.execute("UPDATE agents SET note=? WHERE user_id=?", (str(b["note"] or "")[:AGENT_NOTE_MAX], aid))
+    if "provider" in b:  # 2.24.0 (#896)
+        c.execute("UPDATE agents SET provider=? WHERE user_id=?", (str(b["provider"] or "").strip()[:80], aid))
     if "proposals" in b:  # 2.3.0: who may ask it for proposals
         if b["proposals"] not in PROP_MODES:
             c.rollback()
@@ -453,8 +456,8 @@ def my_agent_create():
         return err(tr("Username already exists"), 409)
     uid = create_user(c, username, (b.get("display_name") or "").strip()[:60] or username, None, None, False, paperless_access=False)
     make_agent(c, uid)
-    c.execute("UPDATE agents SET note=?, owner_id=?, usage_limits=? WHERE user_id=?",
-              (str(b.get("note") or "")[:AGENT_NOTE_MAX], me(), gsetting(c, "user_agents_limits") or "", uid))
+    c.execute("UPDATE agents SET note=?, owner_id=?, usage_limits=?, provider=? WHERE user_id=?",
+              (str(b.get("note") or "")[:AGENT_NOTE_MAX], me(), gsetting(c, "user_agents_limits") or "", str(b.get("provider") or "").strip()[:80], uid))
     c.execute("UPDATE users SET avatar=? WHERE id=?", ("p:robot", uid))
     try:  # 2.15.0 (#479)
         agent_scopes_set(c, uid, {"scopes": b.get("scopes") or list(SCOPES_AGENT_DEFAULT), **({"allowed_ips": b["allowed_ips"]} if "allowed_ips" in b else {})})
@@ -477,7 +480,7 @@ def my_agent_update(aid):
     c = db()
     a = need_own_agent(c, aid)
     b = body()
-    unknown = sorted(k for k in b if k not in ("display_name", "note", "enabled", "scopes", "allowed_ips"))
+    unknown = sorted(k for k in b if k not in ("display_name", "note", "enabled", "scopes", "allowed_ips", "provider"))
     if unknown:
         return err(tr("Invalid value: {0}", ", ".join(unknown)))
     if "scopes" in b or "allowed_ips" in b:  # 2.15.0 (#479): the owner decides what the agent may do (within the admin's limit)
@@ -492,6 +495,8 @@ def my_agent_update(aid):
         c.execute("UPDATE users SET display_name=? WHERE id=?", ((str(b["display_name"] or "")).strip()[:60] or a["username"], aid))
     if "note" in b:
         c.execute("UPDATE agents SET note=? WHERE user_id=?", (str(b["note"] or "")[:AGENT_NOTE_MAX], aid))
+    if "provider" in b:  # 2.24.0 (#896)
+        c.execute("UPDATE agents SET provider=? WHERE user_id=?", (str(b["provider"] or "").strip()[:80], aid))
     if "enabled" in b:
         if b["enabled"] and a["admin_paused"]:
             c.rollback()

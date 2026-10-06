@@ -189,7 +189,12 @@ try {
 function taskById(id) { return S.tasks.get(id) || (S.extra || []).find(t => t.id === id); }
 // 2.0.6 (#316 / #322): the task panel below the title and the description, top to bottom; the comments and
 // the history come last, the comment box stays at the bottom edge of the panel (sticky, see cmComposer())
-const DETAIL_ORDER = ['family', 'life', 'subtasks', 'deps', 'links', 'tags', 'attachments', 'paperless', 'fields', 'custom', 'time', 'code', 'history', 'comments'];  // code: 2.2.0 (#271)  // history: private lists only (2.0.7)
+const DETAIL_ORDER = ['family', 'life', 'subtasks', 'deps', 'links', 'tags', 'attachments', 'paperless', 'fields', 'custom', 'time', 'code', 'history', 'comments'];
+// 2.24.0 (UX-41): what a task needs first comes first: description, subtasks, comments (the assignee sits in the header).
+// The rest folds into "More details" (open state per device); a section that holds something worth seeing at once
+// (files, a waiting-on, events / contacts) stays outside the fold.
+const DETAIL_TOP = ['family', 'life', 'subtasks', 'comments'];
+const DETAIL_MORE = ['deps', 'links', 'attachments', 'tags', 'paperless', 'fields', 'custom', 'time', 'code', 'history'];  // code: 2.2.0 (#271)  // history: private lists only (2.0.7)
 // 2.7.2 (#424): where a task lives, at the top of its panel: Folder › List › Section › (parent task). Every part jumps
 // there (the list, scrolled to the section / the parent) and closes the bell's dropdown. Only lists the viewer has.
 function crumbsHtml(t, l, parent) {
@@ -246,6 +251,15 @@ function dupHintHtml(t) {
   const d = dupOf(t); if (!d) return '';
   return `<div class="ddup" role="note">${ic('copy', 's')}<span class="ddupt">${tr('Similar open ticket:')} <button type="button" class="linkbtn" data-act="open-id" data-id="${d.id}">#${d.id} ${esc(d.title.slice(0, 120))}</button></span><button type="button" class="iconbtn" data-act="dup-x" data-id="${t.id}" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;
 }
+// 2.24.0 (UX-41): who does it, right under the title (the header has no room left on a phone / in the side panel): the
+// picture + the name, a tap = the assign menu
+function dWhoChip(t, ro) {
+  const name = t.assignee_group_id ? (S.groups || []).find(g => g.id === t.assignee_group_id)?.name || tr('Group') : t.assignee_id ? personName(t.list_id, t.assignee_id) || personNameAny(t.assignee_id) || '?' : '';
+  const inner = t.assignee_id ? av(t.assignee_id, name, 'avatar who') : ic(t.assignee_group_id ? 'users' : 'user', 's');
+  const lab = name ? tr('Assigned to {0}', name) : tr('Nobody assigned');
+  return `<button type="button" class="dchip dwho ${name ? 'set' : ''}" data-act="assign" data-id="${t.id}" aria-haspopup="menu" title="${esc(lab + (ro || !canAssign(t) ? '' : ' · ' + tr('Assign…')))}" aria-label="${esc(lab + ' · ' + tr('Assign…'))}">${inner}<span class="dct">${esc(name || tr('Assign'))}</span></button>`;
+}
+document.addEventListener('toggle', e => { if (e.target.id === 'd-more') LS.set('dMore', e.target.open); }, true);
 function renderDetail() { return keepFocus($('#detail'), renderDetail0); }
 function renderDetail0() {
   const t = taskById(S.sel); if (!t) return;
@@ -324,6 +338,7 @@ function renderDetail0() {
       ${cm === 'full' && isMobile() ? `<div class="seg dtabs" role="tablist" aria-label="${esc(tr('Task'))}"><button role="tab" data-act="d-tab" data-tab="details" class="${dtab === 'details' ? 'on' : ''}" aria-selected="${dtab === 'details'}">${tr('Details')}</button><button role="tab" data-act="d-tab" data-tab="comments" class="${dtab === 'comments' ? 'on' : ''}" aria-selected="${dtab === 'comments'}">${tr('Comments')}<span class="c" id="d-tab-count">${ncm || ''}</span></button></div>` : ''}
       ${crumbsHtml(t, l, parent)}
       <div class="dtitle"><textarea id="d-title" rows="1" placeholder="${tr('Title')}" aria-label="${tr('Title')}" ${ro ? 'readonly' : ''}>${esc(t.title)}</textarea></div>
+      ${!ck && t.id > 0 && !t.context && collab() && (shared || t.assignee_id) ? `<div class="dmeta">${dWhoChip(t, ro)}</div>` : ''}
       ${!ck && t.due && (t.deadline || nagOf(t)) && t.status === 0 ? `<div class="ddl">${dlChip(t, 'big')}${nagOf(t) ? `<button type="button" class="dnag" data-act="date" data-id="${t.id}" title="${esc(tr('Change'))}">${ic('repeat', 's')}${esc(tr('Repeat reminder') + ': ' + nagLabel(nagOf(t)))}</button>` : ''}</div>` : ''}
       ${!ck && planOf(t) ? `<div class="dplan">${ic('clock', 's')}<span class="dplt">${esc(tr('Planned: {0}', planLabel(t)))}</span>${ro ? '' : `<button type="button" class="linkbtn" data-act="unplan" data-id="${t.id}">${tr('Unplan')}</button>`}</div>` : ''}
       ${t.waiting_at && !ck ? waitBar(t, ro) : ''}
@@ -334,7 +349,12 @@ function renderDetail0() {
       ${mdOpen && mdMode ? `<button class="btn sm mdsub" data-act="md-subtasks">${ic('sub', 's')} ${tr('Turn the open checklist items into subtasks')}</button>` : ''}
       <textarea id="d-content" class="dcontent ${mdMode ? 'hidden' : ''}" placeholder="${ck ? tr('Note') : tr('Description')}" aria-label="${ck ? tr('Note') : tr('Description')}" ${ro ? 'readonly' : ''}>${esc(t.content)}</textarea>
       ${msT && t.id > 0 ? `<div class="dsec mssec" id="d-ms">${msReportHtml(t)}</div>` : ''}
-      ${DETAIL_ORDER.map(k => SEC[k]).join('\n      ')}
+      ${(() => {  // 2.24.0 (UX-41)
+        const keep = k => (k === 'attachments' && (t.attachments || []).length) || (k === 'deps' && (t.waiting_at || (t.blockers || []).length)) || (k === 'links' && (((S.tcontacts || {})[t.id] || []).length || ((S.evlinks || {})[t.id] || []).length));
+        const top = DETAIL_TOP.map(k => SEC[k]).concat(DETAIL_MORE.filter(keep).map(k => SEC[k]));
+        const rest = DETAIL_MORE.filter(k => !keep(k)).map(k => SEC[k]).filter(x => x && x.trim());
+        return top.join('\n      ') + (rest.length ? `<details class="dmore" id="d-more" ${LS.get('dMore', false) ? 'open' : ''}><summary>${ic('chev', 's fcar')}<span>${tr('More details')}</span></summary>${rest.join('\n')}</details>` : '');
+      })()}
     </div>
     <div class="dbot">${cmOk && !(cm === 'full' && cmtNew()) ? cmComposer(t) : ''}<div class="dfoot"><span class="dfc">${t.status === 2 && t.completed_at ? tr('Completed {0}', new Date(t.completed_at).toLocaleString(LOCALE(), {dateStyle: 'medium', timeStyle: 'short'})) : tr('Created {0}', new Date(t.created_at).toLocaleString(LOCALE(), {dateStyle: 'medium', timeStyle: 'short'}))}</span>
       <span class="spacer"></span>

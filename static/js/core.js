@@ -221,7 +221,8 @@ async function rawFetch0(method, url, body) {
   try { r = await fetch(url, opt); } catch { const ch = OUT.down; OUT.down = false; setOnline(false); if (ch && S.booted) renderTop(); throw new Offline('offline'); }
   // 2.21.0 (#673): the device is online but the server is not (a proxy answers 502 / 503 / 504 without Kalmido's JSON): the
   // same as offline (cached data, changes wait), the hint says "server not reachable"; never a reload loop on a proxy page
-  if ([502, 503, 504].includes(r.status) && !(r.headers.get('content-type') || '').includes('application/json')) { const ch = !OUT.down; OUT.down = true; setOnline(false); if (ch && S.booted) renderTop(); throw new Offline('down'); }
+  // 2.24.0 (#907): 503 (the proxy's maintenance page) or a notice of the kind "maintenance": "server in maintenance"
+  if ([502, 503, 504].includes(r.status) && !(r.headers.get('content-type') || '').includes('application/json')) { const ch = !OUT.down; OUT.down = true; OUT.maint = r.status === 503 || S.announce?.level === 'maintenance'; setOnline(false); if (ch && S.booted) renderTop(); throw new Offline('down'); }
   if (OUT.down) { OUT.down = false; if (S.booted && !OUT.online) renderTop(); }
   setOnline(true);
   if (r.type === 'opaqueredirect' || (r.headers.get('content-type') || '').includes('text/html')) {
@@ -231,7 +232,9 @@ async function rawFetch0(method, url, body) {
   const j = await r.json().catch(() => ({}));
   if ((r.status === 401 || r.status === 403) && j.auth) { authScreen(j); throw new Error('auth'); }  // built-in login
   if (r.status === 401) { location.reload(); throw new Error('auth'); }
-  if (!r.ok) { const e = new Error(j.error || tr('Error {0}', r.status)); e.status = r.status; e.data = j; throw e; }
+  if (!r.ok) { const e = new Error(j.error || tr('Error {0}', r.status)); e.status = r.status; e.data = j;
+    if (j.code === 'quota_exceeded') { e.shown = true; setTimeout(() => quotaDialog(j), 0); }  // 2.24.0 (#910): storage full
+    throw e; }
   return j;
 }
 const queueable = (method, url) => method !== 'GET' && /^\/api\/(tasks|habits\/\d+\/log|time\/(start|stop|entries))/.test(url) && !/\/(comments|seen|timeline)$/.test(url);
@@ -242,7 +245,7 @@ async function api(method, url, body) {
     if (e instanceof Offline) {
       if (queueable(method, url) && !(body instanceof FormData)) return enqueue(method, url, body);
       if (method !== 'GET') toast(tr('Offline: only works again with a connection'));
-    } else if (e.message !== 'auth') toast(e.message);
+    } else if (e.message !== 'auth' && !e.shown) toast(e.message);
     throw e;
   }
 }
@@ -470,7 +473,8 @@ function applyState(j) {
   S.dayplan = j.dayplan || {work_start: '09:00', work_end: '17:00', review_time: '', default_duration: 30};  // 2.10.0 (#440)
   S.kids = j.kids || []; S.kidIds = new Set(j.kid_ids || []);  // 2.19.0 (#653)
   S.peopleVis = j.people_visibility || 'all';  // 2.22.0 (#752)
-  S.instanceMode = j.instance_mode || 'organisation';  // 2.23.0 (#799): organisation | shared | multi
+  S.instanceMode = j.instance_mode || 'organisation';
+  S.storage = j.storage || null; S.announce = j.announce || null;  // 2.24.0 (#910 / #907)  // 2.23.0 (#799): organisation | shared | multi
   S.clients = j.clients || [];  // 2.23.0 (#463): the clients I see, with their lists
   if (S.booted && S.route?.mod === 'clients') clReload();  // a change elsewhere: the client's sums again
   if (S.booted && S.route?.mod === 'workload') { WLV.data = null; }

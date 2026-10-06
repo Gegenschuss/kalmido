@@ -133,7 +133,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   check(m0.tags.includes('dairy') && m0.url === 'https://example.org/milk' && m0.content === 'the good one', 'the data stays (tags, link, note)');
   click(w, det.querySelector('[data-act="task-menu"]')); await sleep(80);
   const ckm = [...d.querySelectorAll('#pop .menu-list button')].map(b => b.textContent);
-  check(ckm.some(x => /Snooze/i.test(x)), 'the full task menu (2.7.2): ' + ckm);
+  check(ckm.some(x => /New date/i.test(x)), 'the full task menu (2.7.2; 2.24.0: "New date…" was "Snooze…"): ' + ckm);
   w.eval('closePop()');
   await call('PUT', `/api/lists/${SHOP}/members`, {user_id: BOB, role: 'edit'});
   await w.eval('load()'); w.eval('render(); renderDetail()'); await sleep(200);

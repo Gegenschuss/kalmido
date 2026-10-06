@@ -57,14 +57,19 @@ const overdueTasks = () => { const t0 = today(); return viewTasks().open.flatMap
 function overdueBanner() {
   if (LS.get('odHide', '') === today()) return '';
   const od = overdueTasks(); if (!od.length) return '';
-  return `<div class="odban" role="region" aria-label="${esc(tr('Overdue'))}">${ic('alert', 's')}<span class="odn">${esc(trn('{0} overdue', '{0} overdue', od.length))}</span><span class="odto">${ic('arrow', 's')}</span>
-    <button class="btn sm" data-act="od-move" data-d="0">${tr('Today')}</button><button class="btn sm" data-act="od-move" data-d="1">${tr('Tomorrow')}</button><button class="btn sm" data-act="od-move" data-d="w">${tr('Next week (Mon)')}</button><button class="btn sm" data-act="od-move" data-d="pick">${tr('Pick a date…')}</button>
+  // 2.24.0 (UX-35): one slim line: "4 overdue · All to today · Another day…" (Tomorrow, Next week, Pick a date in its menu)
+  return `<div class="odban" role="region" aria-label="${esc(tr('Overdue'))}">${ic('alert', 's')}<span class="odn">${esc(trn('{0} overdue', '{0} overdue', od.length))}</span>
+    <button class="btn sm" data-act="od-move" data-d="0">${tr('All to today')}</button><button class="btn sm" data-act="od-other" aria-haspopup="menu">${tr('Another day…')}</button>
     <span class="spacer"></span><button class="iconbtn" data-act="od-hide" title="${esc(tr('Hide until tomorrow'))}" aria-label="${esc(tr('Hide until tomorrow'))}">${ic('x', 's')}</button></div>`;
 }
 async function overdueMove(due) {
   const od = overdueTasks(), may = od.filter(canEdit), ro = od.length - may.length;
   if (!may.length) { toast(trn('{0} overdue task is in a list you may only view', '{0} overdue tasks are in lists you may only view', ro)); return; }
   await batch('patch', {due}, false, may.map(t => t.id), ro ? trn('{0} task skipped (view only)', '{0} tasks skipped (view only)', ro) : '');
+}
+function overdueOther(a) {
+  menu(a, [{label: tr('Tomorrow'), icon: 'sunrise', fn: () => overdueMove(addDays(today(), 1))}, {label: tr('Next week (Mon)'), icon: 'week', fn: () => overdueMove(nextWeekday(1))},
+    {label: tr('Pick a date…'), icon: 'cal', fn: () => dpOpen(a, {kind: 'date', value: today(), min: today(), clear: false, label: tr('Pick a date…'), onPick: v => { if (v) overdueMove(v); }})}]);
 }
 function overdueAct(a) {
   const d = a.dataset.d;

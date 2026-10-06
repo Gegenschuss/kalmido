@@ -545,57 +545,72 @@ async function waitClear(id) {
   render(); if (S.sel === id) renderDetail();
   toast(tr('No longer waiting'), async () => { putTask(await api('PUT', `/api/tasks/${id}/waiting`, before)); render(); if (S.sel === id) renderDetail(); });
 }
+// 2.24.0 (UX-09): ONE task menu in a fixed order (right-click, "…" in the row / the task panel, "All…" of the short
+// menus): date · priority · assignee · list / section · waiting · pin · time · template · structure · delete. The short
+// menus (swipe, selection) keep the same order and end with "All…".
+const PRIO_ROW = id => { const t = taskById(id); return {row: [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', cls: p ? 'flag-' + p : '', on: t?.priority === p, title: tr('Priority') + ': ' + tr(n), fn: () => patchTask(id, {priority: p})}))}; };
+const moveListItem = (anchor, id) => ({label: tr('Move to list…'), icon: 'list', keys: 'm', fn: () => { const t = taskById(id); menu(anchor, S.lists.filter(l => !l.archived && l.id !== t?.list_id && canAddTo(l.id)).map(l => ({label: lname(l), icon: l.is_inbox ? 'inbox' : 'list', fn: () => patchUndoable(id, {list_id: l.id}, tr('Moved to {0}', lname(l)))}))); }});
 function taskMenu(anchor, id) {
   const t = taskById(id);
   if (!canEdit(t)) { roToast(); return; }
   const sib = siblings(t), i = sib.findIndex(x => x.id === t.id);
-  const l = listById(t.list_id);
+  const l = listById(t.list_id), open = t.status === 0;
   menu(anchor, [
-    quickDueRow(id), '-',
-    {label: t.pinned ? tr('Unpin') : tr('Pin'), icon: 'pin', fn: () => patchTask(id, {pinned: t.pinned ? 0 : 1})},
-    // 2.16.0 (#473, WCAG 2.5.7): what dragging does, as menu items (also Alt+↑ / ↓)
-    ...(t.status === 0 && t.id > 0 && S.route.mod === 'tasks' && $(`#view .trow[data-id="${id}"]`) ? [{row: [{label: tr('Move up'), icon: 'up', title: kt(tr('Move up'), 'Alt+ArrowUp'), fn: () => taskNudge(id, -1)}, {label: tr('Move down'), icon: 'down', title: kt(tr('Move down'), 'Alt+ArrowDown'), fn: () => taskNudge(id, 1)}]}] : []),
-    ...(t.status === 0 && !t.parent_id && (S.sections.some(x => x.list_id === t.list_id) || canEditList(t.list_id)) ? [{label: tr('Move to section…'), icon: 'columns', fn: () => sectionPicker(anchor, id)}] : []),
-    {label: tr('Snooze…'), icon: 'clock', keys: 's', fn: () => snoozeSheet(id, anchor)},
-    ...(t.status === 0 ? [t.waiting_at ? {label: tr('No longer waiting'), icon: 'hourglass', fn: () => waitClear(id)}
-      : {label: tr('Waiting on external…'), icon: 'hourglass', fn: () => waitDialog(id)}] : []),
-    // 2.23.0 (#463): an approval (a person of the shared list decides)
-    ...(t.status === 0 && t.id > 0 && collab() && l?.shared && t.approval !== 'pending' ? [{label: tr('Ask for approval…'), icon: 'eye', fn: () => approvalRequest(id)}] : []),
-    ...(t.repeat && t.due && t.status === 0 ? [{label: tr('Skip this occurrence'), icon: 'skip', fn: async () => {
+    // date
+    quickDueRow(id), {label: tr('New date…'), icon: 'clock', keys: 's', fn: () => snoozeSheet(id, anchor)},
+    ...(t.repeat && t.due && open ? [{label: tr('Skip this occurrence'), icon: 'skip', fn: async () => {
       const b0 = snapTask(t);
       const j = await api('POST', `/api/tasks/${id}/skip`);
       putTask(j); render(); if (S.sel === id) renderDetail();
       if (j.next_due) histFields(tr('Skipped an occurrence of {0}', qn(t.title.slice(0, 40))), [[b0, snapTask(S.tasks.get(id)), ['due', 'start', 'repeat']]], {res: j});
       toast(j.next_due ? tr('Skipped, next occurrence: {0}', dayLabel(j.next_due)) : tr('Will be sent as soon as the server is reachable'));
-    }}] : []),
-    // 2.18.0 (#430): a top-level task without subtasks can become a milestone (and back)
-    ...(isMs(t) || (!t.parent_id && !children(t.id).length && t.id > 0) ? [{label: isMs(t) ? tr('Make it a normal task') : tr('Make it a milestone'), icon: 'flag', fn: () => msToggle(id)}] : []),
-    ...(i > 0 && depthOf(sib[i - 1]) < 2 && !isMs(t) && !isMs(sib[i - 1]) ? [{label: tr('Indent (under “{0}”)', sib[i - 1].title.slice(0, 24)), icon: 'indent', fn: () => patchTask(id, {parent_id: sib[i - 1].id})}] : []),
-    ...(t.parent_id ? [{label: tr('Outdent'), icon: 'outdent', fn: () => patchTask(id, {parent_id: S.tasks.get(t.parent_id)?.parent_id || null})}] : []),
+    }}] : []), '-',
+    // priority, assignee
+    PRIO_ROW(id),
+    ...(collab() && l?.shared && t.id > 0 && !t.context && canAssign(t) ? [{label: tr('Assign…'), icon: 'user', fn: () => assignMenu(anchor, id)}] : []), '-',
+    // where it lives
+    ...(open ? [moveListItem(anchor, id)] : []),
+    ...(open && !t.parent_id && (S.sections.some(x => x.list_id === t.list_id) || canEditList(t.list_id)) ? [{label: tr('Move to section…'), icon: 'columns', fn: () => sectionPicker(anchor, id)}] : []),
+    // 2.16.0 (#473, WCAG 2.5.7): what dragging does, as menu items (also Alt+↑ / ↓)
+    ...(open && t.id > 0 && S.route.mod === 'tasks' && $(`#view .trow[data-id="${id}"]`) ? [{row: [{label: tr('Move up'), icon: 'up', title: kt(tr('Move up'), 'Alt+ArrowUp'), fn: () => taskNudge(id, -1)}, {label: tr('Move down'), icon: 'down', title: kt(tr('Move down'), 'Alt+ArrowDown'), fn: () => taskNudge(id, 1)}]}] : []), '-',
+    // waiting
+    ...(open ? [t.waiting_at ? {label: tr('No longer waiting'), icon: 'hourglass', fn: () => waitClear(id)}
+      : {label: tr('Waiting on external…'), icon: 'hourglass', fn: () => waitDialog(id)}] : []),
+    // 2.23.0 (#463): an approval (a person of the shared list decides)
+    ...(open && t.id > 0 && collab() && l?.shared && t.approval !== 'pending' ? [{label: tr('Ask for approval…'), icon: 'eye', fn: () => approvalRequest(id)}] : []),
+    // pin
+    {label: t.pinned ? tr('Unpin') : tr('Pin'), icon: 'pin', fn: () => patchTask(id, {pinned: t.pinned ? 0 : 1})}, '-',
+    // time
     ...(feat('pomo') ? [{label: tr('Start focus session'), icon: 'timer', fn: () => { pomoStart(id); go('pomo'); }}] : []),
     ...(tFor(t) ? [S.timer && S.timer.task_id === id ? {label: tr('Stop timer'), icon: 'stop', fn: timerStop} : {label: tr('Start time tracking'), icon: 'clock', fn: () => timerStart({task_id: id})},
-      {label: tr('Add time…'), icon: 'plus', fn: () => entryModal(null, {task_id: id})}] : []),
-    {label: t.status === -1 ? tr('Reopen') : tr("Won't do (discard)"), icon: 'ban', fn: () => t.status === -1 ? toggleTask(id) : wontDo(id)},
+      {label: tr('Add time…'), icon: 'plus', fn: () => entryModal(null, {task_id: id})}] : []), '-',
+    // template
+    {label: tr('Save as template'), icon: 'copy', fn: () => saveTemplate({task_id: id}, t.title)},
+    {label: tr('Duplicate'), icon: 'sub', fn: () => createTask({title: t.title, content: t.content, list_id: t.list_id, section_id: t.section_id, priority: t.priority, due: t.due, due_time: t.due_time, reminders: t.reminders, repeat: t.repeat, repeat_from: t.repeat_from, tags: t.tags, parent_id: t.parent_id, url: t.url || null, ...(t.ms ? {ms: 1} : {}), ...(t.milestone_id ? {milestone_id: t.milestone_id} : {}), ...(t.fields && Object.keys(t.fields).length ? {fields: t.fields} : {})})}, '-',
+    // structure + more
+    ...(isMs(t) || (!t.parent_id && !children(t.id).length && t.id > 0) ? [{label: isMs(t) ? tr('Make it a normal task') : tr('Make it a milestone'), icon: 'flag', fn: () => msToggle(id)}] : []),  // 2.18.0 (#430)
+    ...(i > 0 && depthOf(sib[i - 1]) < 2 && !isMs(t) && !isMs(sib[i - 1]) ? [{label: tr('Indent (under “{0}”)', sib[i - 1].title.slice(0, 24)), icon: 'indent', fn: () => patchTask(id, {parent_id: sib[i - 1].id})}] : []),
+    ...(t.parent_id ? [{label: tr('Outdent'), icon: 'outdent', fn: () => patchTask(id, {parent_id: S.tasks.get(t.parent_id)?.parent_id || null})}] : []),
+    ...(t.parent_id && S.tasks.get(t.parent_id)?.parent_id ? [{label: tr('Make it a main task'), icon: 'arrow', fn: () => patchTask(id, {parent_id: null})}] : []),
     ...(propBreakOk(t) ? [{label: propWith(N_('Break down with {0}…'), N_('Break down with an agent…')), icon: 'bot', fn: () => propRequest('subtasks', {tid: id})}] : []),  // 2.3.0 (#261)
     ...(t.id > 0 && !t.context && listRepos(t.list_id).length && !codeShown(t) ? [{label: tr('Link code…'), icon: 'git', title: tr('Copies a branch name for this task; commits and pull requests that name #{0} are linked too', t.id), fn: () => gitCopyBranch(t)}] : []),  // 2.4.2 (#387)
-    {label: tr('Save as template'), icon: 'copy', fn: () => saveTemplate({task_id: id}, t.title)},
-    {label: tr('Duplicate'), icon: 'sub', fn: () => createTask({title: t.title, content: t.content, list_id: t.list_id, section_id: t.section_id, priority: t.priority, due: t.due, due_time: t.due_time, reminders: t.reminders, repeat: t.repeat, repeat_from: t.repeat_from, tags: t.tags, parent_id: t.parent_id, url: t.url || null, ...(t.ms ? {ms: 1} : {}), ...(t.milestone_id ? {milestone_id: t.milestone_id} : {}), ...(t.fields && Object.keys(t.fields).length ? {fields: t.fields} : {})})},
-    ...(t.parent_id && S.tasks.get(t.parent_id)?.parent_id ? [{label: tr('Make it a main task'), icon: 'arrow', fn: () => patchTask(id, {parent_id: null})}] : []),
+    {label: t.status === -1 ? tr('Reopen') : tr("Won't do (discard)"), icon: 'ban', fn: () => t.status === -1 ? toggleTask(id) : wontDo(id)},
     '-',
     ...(canDelete(t) ? [{label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => deleteTask(id)}] : []),
-  ].filter((x, i, a) => x !== '-' || (i < a.length - 1 && a[i + 1] !== '-')));
+  ].reduce((o, x) => x === '-' && (!o.length || o[o.length - 1] === '-') ? o : [...o, x], []).filter((x, k, a) => x !== '-' || k < a.length - 1));
 }
 const propBreakOk = t => propOn() && t && t.id > 0 && t.status === 0 && depthOf(t) < 2 && canEditList(t.list_id);
 function siblings(t) {  // same parent (or same list at top level), in custom order
   return [...S.tasks.values()].filter(x => x.status === 0 && x.parent_id === t.parent_id && (t.parent_id || x.list_id === t.list_id)).sort(bySort);
 }
-function snoozeSheet(id, anchor, extra = []) {
+function snoozeSheet(id, anchor, extra = [], head = false) {
   const t = taskById(id); if (!t) return;
   if (!canEdit(t)) { roToast(); return; }
   const now = new Date();
   const inH = h => { const d = new Date(now.getTime() + h * 36e5); d.setMinutes(Math.ceil(d.getMinutes() / 5) * 5, 0, 0); return {due: ds(d), due_time: `${pad(d.getHours())}:${pad(d.getMinutes())}`}; };
   const go2 = (body, label) => patchUndoable(id, body, tr('Snoozed: {0}', label));
   menu(anchor || $('#top h1'), [
+    ...(head ? [{label: t.title.length > 60 ? t.title.slice(0, 59) + '…' : t.title, dis: true, cls: 'mhead'}, '-'] : []),  // 2.24.0 (UX-14)
     {label: tr('In 1 hour'), icon: 'clock', fn: () => go2(inH(1), tr('in 1 h'))},
     {label: tr('In 3 hours'), icon: 'clock', fn: () => go2(inH(3), tr('in 3 h'))},
     ...(now.getHours() < 18 ? [{label: tr('Tonight (7 pm)'), icon: 'sun', fn: () => go2({due: today(), due_time: '19:00'}, tr('today 7 pm'))}] : []),
@@ -631,19 +646,31 @@ async function setDab(id, on) {
 // viewport scrolled (offsetTop > 0) or the page scrolled after it hides, and a fixed dialog then sat too far down.
 // --vvt / --vvh / --vvb (hidden above, visible height, hidden below) keep the dialog in what is visible; after the keyboard
 // is gone a leftover page scroll is undone, so every dialog is centred again.
+// 2.24.0 (#832, DeX): the keyboard compensation only acts for a REAL on-screen keyboard: a touch screen whose primary
+// pointer is not fine (a mouse / trackpad in DeX or a desktop window never counts) and a visible height that shrank by more
+// than 120 px (Samsung's autofill bar, ~50 px, does not). Without one the page as a whole never scrolls (only the content
+// areas do), so focusing the quick add can no longer slide the whole app up.
+function kbReal() {
+  const vv = window.visualViewport; if (!vv) return false;
+  let fine = false; try { fine = matchMedia('(pointer:fine)').matches; } catch { /* old browser */ }
+  return !fine && vv.height < Math.max(S.vvMax || 0, innerHeight) - 120;
+}
 function vvSync() {
   const vv = window.visualViewport; if (!vv) return;
   const st = document.documentElement.style;
+  if (!editFocused() || !(S.vvMax > 0)) S.vvMax = vv.height;  // the height without a keyboard
+  const kb = kbReal();
   st.setProperty('--vvt', Math.max(0, Math.round(vv.offsetTop)) + 'px');
   st.setProperty('--vvh', Math.round(vv.height) + 'px');
-  st.setProperty('--vvb', Math.max(0, Math.round(window.innerHeight - vv.offsetTop - vv.height)) + 'px');  // hidden below (keyboard)
-  if (vv.height >= window.innerHeight - 2 && (window.scrollY || document.documentElement.scrollTop)) window.scrollTo(0, 0);
-  if (!editFocused() || !(S.vvMax > 0)) S.vvMax = vv.height;  // the height without a keyboard
+  st.setProperty('--vvb', kb ? Math.max(0, Math.round(window.innerHeight - vv.offsetTop - vv.height)) + 'px' : '0px');  // hidden below (keyboard)
+  if ((vv.height >= window.innerHeight - 2 || !kb) && (window.scrollY || document.documentElement.scrollTop)) window.scrollTo(0, 0);
   chatFit(); tlKbSync();
-  // the focused field of a sheet / the docked composer stays above the keyboard (iOS does not resize the layout)
+  // the focused field of a sheet / the docked composer stays above a real keyboard (iOS does not resize the layout)
   const a = document.activeElement;
-  if (editFocused() && a && a.getBoundingClientRect && !a.closest('#view .chview')) { const r = a.getBoundingClientRect(), lim = vv.offsetTop + vv.height; if (r.bottom > lim - 4) a.scrollIntoView?.({block: 'nearest'}); }
+  if (kb && a && a.getBoundingClientRect && !a.closest('#view .chview')) { const r = a.getBoundingClientRect(), lim = vv.offsetTop + vv.height; if (r.bottom > lim - 4) a.scrollIntoView?.({block: 'nearest'}); }
 }
+// the document itself never stays scrolled without a keyboard (a focus / caret reveal moved it): back to the top at once
+window.addEventListener('scroll', () => { if ((window.scrollY || document.documentElement.scrollTop) && !kbReal()) window.scrollTo(0, 0); }, {passive: true});
 // 2.22.0 (#686): a right-click on a task row (list, Kanban, Today …) opens the task's menu ("Waiting on external…", snooze,
 // pin, section …) at the row; touch: long press selects the row, the selection bar has "Waiting on external…"
 document.addEventListener('contextmenu', e => {

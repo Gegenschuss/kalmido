@@ -73,7 +73,9 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     await nav(B + '#today'); await ready(ev);
     if (drawer) { await ev(`(() => { document.querySelector('#top .menu').click(); return 1; })()`); await sleep(700); }
     const s = await ev(SRCH);
-    check(s.n === 1 && s.where[0] === 'side:scmd', `${vw}x${vh}${drawer ? ' (drawer open)' : ''}: exactly one search entry, the command-bar field in the sidebar ` + JSON.stringify(s));
+    // 2.24.0 (UX-36): the phone's tab bar has its own "Search" tab by default; the drawer itself still has exactly one entry
+    const sw = s.where.filter(x => !x.startsWith('tabs:'));
+    check(sw.length === 1 && sw[0] === 'side:scmd', `${vw}x${vh}${drawer ? ' (drawer open)' : ''}: exactly one search entry, the command-bar field in the sidebar (+ the Search tab) ` + JSON.stringify(s));
     await shot(`p2133-${vw}x${vh}-search.png`);
     if (drawer) { await ev(`(() => { closeSide(); return 1; })()`); await sleep(400); }
     if (vw === 680) {

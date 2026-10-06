@@ -64,6 +64,8 @@ def about_info(c, u):
                  public_links=gsetting(c, "public_links") != "0", public_links_env=PUB_ENV)
         from ..accounts.signup import signup_admin
         d.update(signup_admin(c))  # 2.23.0 (#711)
+        from ..admin.hosting import hosting_admin
+        d.update(hosting_admin(c))  # 2.24.0 (#905 #907 #910 #899); people see "hosted" in the Paperless state only
     return d
 
 
@@ -167,6 +169,11 @@ def admin_settings():
         gset(c, "time_day_h", "" if dh is None else str(dh))
     e = _apply_instance(c, b)
     if e:
+        return e
+    from ..admin.hosting import hosting_settings
+    e = hosting_settings(c, b)  # 2.24.0: storage quota, support address, mail limit, the notice
+    if e:
+        c.rollback()
         return e
     bump(c)
     c.commit()

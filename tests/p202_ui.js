@@ -40,7 +40,8 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
   w.eval(`openDetail(${T1})`); await sleep(1300);
   const tl = d.querySelector('#d-tl');
   const body = [...d.querySelector('#detail .dbody').children].map(x => x.id || x.className);
-  check(body.indexOf('d-tl') === body.length - 1 && body.indexOf('d-content') < body.indexOf('d-tl'), 'comments at the end of the panel: ' + body.join('|').slice(0, 160));
+  // 2.24.0 (UX-41): the comments follow the subtasks; only "More details" (folded) may come after them
+  check(body.filter(x => x !== 'd-more' && x !== 'dmore').indexOf('d-tl') === body.filter(x => x !== 'd-more' && x !== 'dmore').length - 1 && body.indexOf('d-content') < body.indexOf('d-tl'), 'comments at the end of the panel (before "More details"): ' + body.join('|').slice(0, 160));
   const cms = [...tl.querySelectorAll('.cm')];
   check(cms.length === 3 && cms[2].classList.contains('last') && /Newest note/.test(cms[2].textContent) && !tl.classList.contains('fold') && !tl.querySelector('.cmfold'), 'all three comments, no folding');
   check(/Comments/.test(tl.querySelector('.cmhead').textContent) && tl.querySelector('#d-tl-count').textContent === '3', 'bar "Comments (3)"');

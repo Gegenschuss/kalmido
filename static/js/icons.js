@@ -165,9 +165,13 @@ function stableViewport() {
   let want = VIEWPORT;
   try {
     const a = screen.width, b = screen.height, lo = Math.min(a, b), hi = Math.max(a, b);
-    const square = matchMedia('(pointer:coarse)').matches && lo >= 760 && hi >= 900 && hi / lo < 1.3;
-    const w = screenLandscape() ? hi : lo;
+    const coarse = matchMedia('(pointer:coarse)').matches, square = coarse && lo >= 760 && hi >= 900 && hi / lo < 1.3;
+    const land = screenLandscape(), w = land ? hi : lo;
     if (square && w < 900) want = 'width=900, viewport-fit=cover, interactive-widget=resizes-content';
+    // 2.24.0 (#908): an unfolded foldable held sideways (landscape, 860-899 px wide, e.g. a Fold at ~880 px) gets the desktop
+    // layout (sidebar + list + task panel): the page is laid out 900 px wide and scaled down by at most 4.5 %. Portrait
+    // (unfolded ~690 px) stays the tablet layout, phones in landscape (< 860 px) stay as they are.
+    else if (coarse && land && w >= 860 && w < 900) want = 'width=900, viewport-fit=cover, interactive-widget=resizes-content';
   } catch { /* no screen info: keep the default */ }
   if (m.getAttribute('content') === want) { vpPending = false; return; }
   if (editFocused()) { vpPending = true; return; }  // typing (the keyboard is up): later, when the focus leaves

@@ -173,7 +173,7 @@ function liconUpload(lid) {
     inp.addEventListener('change', async () => {
       const f = inp.files?.[0]; if (!f) { res(null); return; }
       if (f.size > 8 * 1024 * 1024) { toast(tr('The picture is too large (at most {0} MB)', 8)); res(null); return; }
-      const bl = await avCropModal(f, {title: tr('List icon'), png: true}); if (!bl) { res(null); return; }
+      const bl = await avCropModal(f, {title: tr('List icon'), png: true, square: true}); if (!bl) { res(null); return; }
       res(await liconSet(lid, bl));
     });
     inp.click();

@@ -388,6 +388,12 @@ shard 7  # ---------------------------------------------------------------- shar
 # touch, 1440 mouse, axe, the sidebar folder gaps of #794)
        run p2230_api "$PY" p2230_api_test.py "$KALMIDO_TEST_DATA"
        run p2230_ui node p2230_ui.js "$KALMIDO_TEST_DATA"
+# 2.24.0 "Usability": storage quota (#910), the notice / maintenance banner + API + command (#907), mail limits (#899), agents'
+# provider + the News when one joins (#896), a hosted server (#905, a restart with KALMIDO_HOSTED); then the UI in jsdom:
+# Fold / DeX layout + keyboard (#908 #832), direct messages (#906), Administration sub-tabs (#826), the settings search, the
+# crop dialog (#825), the sidebar, Today, the task menu and panel, the tab bar and the setup (UX-01 ... UX-41)
+       run p2240_api "$PY" p2240_api_test.py "$KALMIDO_TEST_DATA"
+       run p2240_ui node p2240_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

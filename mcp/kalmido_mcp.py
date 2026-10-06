@@ -652,6 +652,10 @@ APPROVAL_NOTE = (" As an agent this waits for a person's approval: the answer is
 TOOLS += [
     ("get_me", "Your token: user, kind (agent / user), effective_scopes (what this token may do), switched-on modules, notifications.",
      _obj({}), lambda api, a: api.call("GET", "/me")),
+    ("get_storage", "2.24.0: your storage quota: bytes used, the limit (null = unlimited), level ok | warn | high | full (uploads refused).",
+     _obj({}), lambda api, a: api.call("GET", "/me/storage")),
+    ("get_announcement", "2.24.0: the server's current notice (planned maintenance, announcements); {} when there is none.",
+     _obj({}), lambda api, a: api.call("GET", "/announcement")),
     # ---- lists
     ("get_list", "One list with its sections and custom fields.", _obj({"list_id": S_ID}, ["list_id"]),
      lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}")),

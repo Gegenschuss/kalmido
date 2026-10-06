@@ -6,7 +6,7 @@
 // 2.13.0: versioned by its size, so a repaired / replaced file gets a new address (no stale cached broken answer)
 // 2.13.1 (#465): chat files bring their own address (a.url, /api/chat-files/<id>)
 const attUrl = (a, dl) => `${a.url || '/api/attachments/' + encodeURIComponent(a.id)}?v=${encodeURIComponent(a.size ?? 0)}${dl ? '&dl=1' : ''}`;
-const fmtSize = b => b < 1024 ? b + ' B' : b < 1048576 ? Math.round(b / 1024) + ' KB' : (b / 1048576).toFixed(1).replace('.', ',') + ' MB';
+const fmtSize = b => b < 1024 ? b + ' B' : b < 1048576 ? Math.round(b / 1024) + ' KB' : b < 1073741824 ? (b / 1048576).toFixed(1).replace('.', ',') + ' MB' : (b / 1073741824).toFixed(1).replace('.', ',').replace(/,0$/, '') + ' GB';
 const isImg = a => /^image\/(png|jpeg|gif|webp|avif|bmp)$/.test(a.mime);
 // 2.13.0: an image that cannot be loaded (the file is missing / empty on the server) becomes a file tile that says so,
 // not a broken-image icon

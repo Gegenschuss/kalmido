@@ -24,7 +24,7 @@ from werkzeug.security import check_password_hash
 
 from ..core.config import app, APP_NAME, COOKIE, MIN_PASSWORD, NTFY_TOPIC, PUBLIC_URL, USERNAME_RE
 from ..core.i18n import lang, languages, N_, tr
-from ..core.db import adopt_orphans, body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, now_utc
+from ..core.db import adopt_orphans, body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, now_utc, uset
 from ..accounts.session import (
     _accept_lang, _DUMMY_HASH, _peer_trusted, _rate_blocked, _rate_fail, _rate_keys, _rate_reset, _token_hash,
     client_ip, FAIL_WINDOW, proxy_login_value, set_cookie, start_session, user_public,
@@ -141,6 +141,10 @@ def auth_setup():
                       onboard=not c.execute("SELECT 1 FROM tasks LIMIT 1").fetchone())
     adopt_orphans(c, uid)
     ensure_inbox(c, uid)
+    from ..core.i18n import LANGS
+    if b.get("lang") in LANGS:  # 2.24.0 (UX-22): the language of the setup page (a reload in step 2 keeps it, the sample too)
+        uset(c, uid, "lang", b["lang"])
+        gset(c, "default_lang", b["lang"])
     if b.get("wizard") is True:  # 2.13.0 (#453 A16): the setup page's step 2 comes back after a reload until it is finished
         gset(c, "setup_step2", "pending")
     bump(c)

@@ -11,12 +11,47 @@ function render() {
   document.body.classList.toggle('kidmode', !!S.me?.kid);  // 2.19.0 (#653): a kid's simple view (no sidebar, tab bar, + button)
   sideSearchSync(); badgeSync();
   if (S.shop) shopDraw();  // 2.19.0: shopping mode follows every reload (the app's own poll included)
-  fitLayout(true); renderSide(); renderTop(); renderView(); renderTabs();
+  fitLayout(true); renderSide(); annSync(); renderTop(); renderView(); renderTabs(); quotaNudge();
   $('#fab').innerHTML = ic('plus'); $('#fab').setAttribute('aria-label', tr('New task')); $('#fab').title = kt(tr('New task'), 'n');
   fabSync();
   if (S.sel && S.tasks.has(S.sel) && !$('#detail').contains(document.activeElement)) renderDetail();
   if (S.sel && !S.tasks.has(S.sel) && !(S.extra || []).some(t => t.id === S.sel)) closeDetail();
   agentLive();
+}
+// ---- 2.24.0 (#907): the server's notice (maintenance / announcement) as a slim bar above the header. Hidden per device until
+// the notice changes (its id); a notice that starts later is not shown yet.
+function annSync() {
+  const a = S.announce, main = $('#main'); if (!main) return;
+  let bar = $('#annbar');
+  const on = !!a && a.active !== false && !(LS.get('annHidden', '') === a.id) && !S.me?.kid;
+  if (!on) { bar?.remove(); return; }
+  if (!bar) { bar = document.createElement('div'); bar.id = 'annbar'; bar.setAttribute('role', 'status'); main.prepend(bar); }
+  const until = a.ends_at ? tr('until {0}', new Date(a.ends_at).toLocaleString(I18N.code || 'en', {weekday: 'short', hour: '2-digit', minute: '2-digit'})) : '';
+  const html = `${ic(a.level === 'maintenance' ? 'alert' : 'bell', 's')}<span class="annt"><b>${esc(a.level === 'maintenance' ? tr('Maintenance') : tr('Notice'))}:</b> ${esc(a.text)}${until ? ` <span class="muted">· ${esc(until)}</span>` : ''}</span><button type="button" class="iconbtn" data-act="ann-hide" aria-label="${esc(tr('Hide this notice'))}" title="${esc(tr('Hide this notice'))}">${ic('x', 's')}</button>`;
+  bar.className = 'annbar ' + (a.level === 'maintenance' ? 'maint' : '');
+  if (bar.innerHTML !== html) bar.innerHTML = html;
+}
+document.addEventListener('click', e => { if (e.target.closest?.('[data-act="ann-hide"]') && S.announce) { LS.set('annHidden', S.announce.id); annSync(); } });
+// ---- 2.24.0 (#910): storage. From 80 % (and again from 95 %) a one-time hint per level and day; full: the dialog with
+// "Contact support" (also when an upload is refused).
+function quotaNudge() {
+  const q = S.storage; if (!q || !q.limit || q.level === 'ok' || !S.booted) return;
+  const k = q.level + ':' + today(); if (LS.get('quotaSeen', '') === k) return;
+  LS.set('quotaSeen', k);
+  if (q.level === 'full') { setTimeout(() => quotaDialog(q), 600); return; }
+  setTimeout(() => toast(tr('Your storage is {0} % full ({1} of {2}).', Math.floor(q.pct), fmtSize(q.used), fmtSize(q.limit)), () => settingsModal('account'), 8000, tr('Details')), 800);
+}
+function quotaMail(q) {
+  const sub = tr('{0}: more storage', APP_NAME), body = [tr('Hello,'), '', tr('my storage at {0} is full. Could I get more space?', location.host), '',
+    tr('Account: {0}', `${S.me?.display_name || ''} (${S.me?.username || ''})`), tr('Used: {0} of {1}', fmtSize(q.used || 0), fmtSize(q.limit || 0)) + (q.pool === 'org' ? ' · ' + tr('shared by the organisation') : ''), tr('Server: {0}', location.host)].join('\n');
+  return `mailto:${encodeURIComponent(q.support || '')}?subject=${encodeURIComponent(sub)}&body=${encodeURIComponent(body)}`;
+}
+async function quotaDialog(j) {
+  const q = {...(S.storage || {}), ...(j || {})};
+  const html = `<p>${esc(tr('Your storage is full: {0} of {1}. New files cannot be uploaded until there is space again. Nothing has been deleted.', fmtSize(q.used || 0), fmtSize(q.limit || 0)))}</p>
+    <p class="muted">${esc(tr('Delete files you no longer need (attachments in tasks, comments and projects) or ask for more space.'))}</p>`;
+  const ok = await askDialog({title: tr('Storage full'), html, ok: tr('Contact support'), cancel: tr('Close')});
+  if (ok) { if (q.support) location.href = quotaMail(q); else toast(tr('No support address is set on this server: ask your admin.')); }
 }
 // 2.13.3: the + button follows rotations / folding too (not only a full render): hidden where the add bar or the header's
 // "New task" is there (tablets, an unfolded Fold in portrait)
@@ -36,7 +71,9 @@ function modHash(m) { return m === 'tasks' ? keyToHash(LS.get('lastKey', START_K
 const TAB_MAX = 5;  // phone: more than this -> first TAB_MAX-1 + "Mehr"
 const SMART_TABS = ['inbox', 'today', 'tomorrow', 'week', 'doable', 'pinned', 'waiting', 'assigned', 'all', 'done', 'trash'];
 const leadEmoji = n => (String(n ?? '').match(/^((?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|\uFE0F|\u200D)+)/u) || [])[1];
-const tabDefault = () => mods().map(([m]) => 'm:' + m);
+// 2.24.0 (UX-36): the default bar is what one hand needs every day: Inbox, Today, Search and the lists (the drawer); modules
+// come in only when someone pins them (Settings > Appearance > Tab bar, or "Customize tab bar" under "More")
+const tabDefault = () => ['s:inbox', 's:today', 'search', 'lists'];
 const tabIds = () => LS.get('tabbar', null) || tabDefault();
 function tabItem(id) {
   const [kind, ...rest] = id.split(':'), v = rest.join(':');
@@ -63,6 +100,7 @@ function tabItem(id) {
   if (id === 'team') return teamOn() ? {id, go: 'team', icon: ic('comment', 'l'), label: tr('Team chat'), mod: 'team', n: S.team?.unread || 0} : null;  // 2.17.0 (#419)
   if (id === 'home') return {id, go: 'home', icon: ic('home', 'l'), label: tr('Dashboard'), mod: 'home'};  // 2.17.0 (#475)
   if (id === 'search') return {id, go: 'search', icon: ic('search', 'l'), label: tr('Search'), key: 'search'};
+  if (id === 'lists') return {id, act: 'side', icon: ic('list', 'l'), label: tr('Lists')};  // 2.24.0 (UX-36): opens the drawer
   if (id === 'settings') return {id, act: 'settings', icon: ic('gear', 'l'), label: tr('Settings'), upd: updDot()};
   return null;
 }
@@ -99,12 +137,13 @@ function renderTabs() {
   $('#tabs').innerHTML = shown.map(t => tabBtn(t, t.id === on)).join('') +
     (more.length ? `<button class="${moreOn ? 'on' : ''}" data-act="tabs-more"><span class="tico">${ic('dots', 'l')}</span><span>${tr('More')}</span></button>` : '');
 }
+const sideOpenDrawer = () => $('#top [data-act="side"]')?.click();  // 2.24.0 (UX-36): "Lists" in "More"
 function tabsMore(anchor) {
   const {more} = tabOverflow();
   // 2.23.0 (#824): who is working, on top of the "More" menu (when the agents are in it)
   const wk = more.some(t => t.id === 'agents') ? (S.agents || []).filter(a => a.enabled && !agentOffline(a) && a.status === 'working') : [];
   menu(anchor, [...wk.map(a => ({label: tr('{0} is working', a.name) + (a.status_text ? ' · ' + a.status_text : ''), dot: 'working', fn: () => go('agents')})), ...(wk.length ? ['-'] : []), ...more.map(t => ({label: t.id === 'news' && S.news?.unread ? `${t.label} (${S.news.unread})` : t.label, icon: t.id === 'settings' ? 'gear' : t.id === 'search' ? 'search' : t.id === 'news' ? 'bell' : t.id === 'stats' ? 'chart' : t.id === 'time' ? 'clock' : t.id === 'overview' ? 'pulse' : t.id === 'agents' ? 'bot' : t.mod ? MODS.find(x => x[0] === t.mod)?.[1] || ({team: 'comment', home: 'home', notes: 'file'}[t.mod]) || 'dots' : t.id.startsWith('f:') ? 'filter' : t.id.startsWith('tag:') ? 'tag' : t.id.startsWith('s:') ? SMART[t.key].icon : 'list',
-    fn: () => t.act ? settingsModal() : go(t.go)})), '-', {label: tr('Customize tab bar'), icon: 'edit', fn: () => settingsModal('tabbar')}]);
+    fn: () => t.act === 'side' ? sideOpenDrawer() : t.act ? settingsModal() : go(t.go)})), '-', {label: tr('Customize tab bar'), icon: 'edit', fn: () => settingsModal('tabbar')}]);
 }
 function counts() {
   const t0 = today(), c = {today: 0, tomorrow: 0, week: 0, doable: 0, over: 0, all: 0, assigned: 0, waiting: 0, pinned: 0, lists: {}, tags: {}, filters: {}};
@@ -132,8 +171,11 @@ function counts() {
 // Lists (folders + lists: a dot, the label, the count right after it, the progress of a project on the right), Filters,
 // Tags, Team (people + agents with their status dot), then All / Completed / Trash / Archived, Search, Settings and the
 // account. Switched-off modules are left out. Each group folds (per device, LS sideGroups).
-const sideOpen = g => !(LS.get('sideGroups', []) || []).includes(g);
-function sideGroupToggle(g) { const x = new Set(LS.get('sideGroups', []) || []); x.has(g) ? x.delete(g) : x.add(g); LS.set('sideGroups', [...x]); renderSide(); }
+// 2.24.0 (UX-01): "Views" starts folded and sits below the lists, so a person's own lists come right after Focus; groups
+// folded by default remember being opened (LS sideOpenG), the others being folded (LS sideGroups)
+const SIDE_FOLDED = ['views'];
+const sideOpen = g => SIDE_FOLDED.includes(g) ? (LS.get('sideOpenG', []) || []).includes(g) : !(LS.get('sideGroups', []) || []).includes(g);
+function sideGroupToggle(g) { const key = SIDE_FOLDED.includes(g) ? 'sideOpenG' : 'sideGroups', x = new Set(LS.get(key, []) || []); x.has(g) ? x.delete(g) : x.add(g); LS.set(key, [...x]); renderSide(); }
 function teamPeople() {
   if (!collab()) return [];
   const seen = new Map();
@@ -215,21 +257,23 @@ function renderSide() {
   const grps = collab() ? (S.groups || []).filter(gr => myGroup(gr.id) || [...S.tasks.values()].some(t => t.status === 0 && t.assignee_group_id === gr.id)) : [];
   const gcount = gid => [...S.tasks.values()].filter(t => t.status === 0 && !t.deleted_at && t.assignee_group_id === gid).length;
   const team = [...grps.map(gr => `<button class="srow steam sgrp ${onTasks && k === 'grp:' + gr.id ? 'on' : ''}" data-go="grp/${gr.id}" title="${esc(tr('Tasks of the group {0}', gr.name))}">${ic('users')}<span class="n">${esc(gr.name)}</span><span class="sk">${tr('Group')}</span>${gcount(gr.id) ? `<span class="c">${gcount(gr.id)}</span>` : ''}</button>`),
-    ...ppl.map(p => `<button class="srow steam ${onTasks && k === 'who:' + p.id ? 'on' : ''}" data-go="who/${p.id}" title="${esc(tr('Tasks of {0}', p.name))}"><span class="sdot"><i class="pdot"></i></span><span class="n">${esc(p.name)}</span><span class="sk">${tr('Person')}</span></button>`),
+    ...ppl.map(p => `<button class="srow steam ${onTasks && k === 'who:' + p.id ? 'on' : ''}" data-go="who/${p.id}" title="${esc(tr('Tasks of {0}', p.name))}"><span class="sdot"><i class="pdot"></i></span><span class="n">${esc(p.name)}</span></button>`),  // 2.24.0 (UX-08): no "Person" under every name
     ...ags.map(a => `<button class="srow steam" data-act="team-agent" data-aid="${a.id}" title="${esc(agentHstLine(a))}"><span class="sdot">${hdot(agentHst(a))}</span><span class="n">${esc(a.name)}</span><span class="sk">${tr('Agent')}</span>${a.waiting || a.chat_unread ? `<span class="c nunread">${a.waiting + a.chat_unread}</span>` : ''}</button>`)].join('');
-  const grp = (g, label, body, acts = '', n = '', tip = '') => `<div class="sgroup sg-${g}">${head(g, label, acts, n, tip)}${sideOpen(g) ? body : ''}</div>`;
+  // a group folded by default (Views) keeps its rows in the page, hidden: what they show (a running timer's dot, a count)
+  // stays current and the keyboard / screen readers skip them until it is opened
+  const grp = (g, label, body, acts = '', n = '', tip = '') => `<div class="sgroup sg-${g}">${head(g, label, acts, n, tip)}${sideOpen(g) ? body : SIDE_FOLDED.includes(g) ? `<div class="sgfold" hidden>${body}</div>` : ''}</div>`;
   // 2.13.3 (#478 follow-up, Fold): one search entry in the sidebar / drawer: the command-bar field (search, commands and the
   // "Search" view inside); no separate "Search" row any more (it doubled the field in the drawer, the field was missing on
   // an unfolded Fold)
   $('#side').innerHTML = `
-    <div class="sbrand"><button type="button" class="sbhome ${S.route.mod === 'home' ? 'on' : ''}" data-go="home" title="${esc(tr('Dashboard'))}" aria-label="${esc(APP_NAME + ': ' + tr('Dashboard'))}" ${S.route.mod === 'home' ? 'aria-current="page"' : ''}>${logoSvg(20)}<span>${esc(APP_NAME)}</span>${S.me?.orgs?.[0] ? `<small class="sborg">${esc(S.me.orgs[0])}</small>` : ''}</button><span class="spacer"></span>${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(tr('Account') + ': ' + S.me.display_name)}" aria-label="${esc(tr('Account') + ': ' + S.me.display_name)}">${av(S.me.id, S.me.display_name)}${updDot() ? `<span class="dot" title="${esc(tr('Update available'))}"></span>` : ''}</button>` : ''}</div>
+    <div class="sbrand"><button type="button" class="sbhome ${S.route.mod === 'home' ? 'on' : ''}" data-go="home" title="${esc(tr('Dashboard'))}" aria-label="${esc(APP_NAME + ': ' + tr('Dashboard'))}" ${S.route.mod === 'home' ? 'aria-current="page"' : ''}>${logoSvg(20)}<span>${esc(APP_NAME)}</span>${S.me?.orgs?.[0] && S.me.orgs[0].trim().toLowerCase() !== APP_NAME.toLowerCase() ? `<small class="sborg">${esc(S.me.orgs[0])}</small>` : ''}</button><span class="spacer"></span>${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(tr('Account') + ': ' + S.me.display_name)}" aria-label="${esc(tr('Account') + ': ' + S.me.display_name)}">${av(S.me.id, S.me.display_name)}${updDot() ? `<span class="dot" title="${esc(tr('Update available'))}"></span>` : ''}</button>` : ''}</div>
     <button class="scmd" data-act="palette" title="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span></button>
     ${grp('focus', tr('Focus|nav'), focus)}
-    ${views ? grp('views', tr('Views'), views) : ''}
     ${clientsSideHtml(onTasks)}
     <div class="sgroup sg-lists">${head('lists', tr('Lists'), `<button data-act="lists-reorder" class="${S.listReorder ? 'on' : ''}" title="${tr('Sort lists')}">${ic('sort', 's')}</button><button data-act="list-new" title="${tr('New list')}">${ic('plus', 's')}</button>`, lists.length)}${sideOpen('lists') ? lh || `<div class="folder">${tr('No lists yet')}</div>` : ''}</div>
     ${grp('filters', tr('Filters'), S.filters.map(f => row('f:' + f.id, ic('filter'), f.name, c.filters[f.id])).join(''), `<button data-act="filter-new" title="${esc(tr('New filter') + ' · ' + tr('Combine lists, dates, priorities, tags'))}" aria-label="${tr('New filter')}">${ic('plus', 's')}</button>`, S.filters.length, tr('Combine lists, dates, priorities, tags'))}
     ${tags.length ? `<div class="sgroup"><button class="shead stoggle ${tagsOpen ? '' : 'closed'}" data-act="side-tags" aria-expanded="${tagsOpen}">${ic('chev', 's fcar')}<span class="spacer">${tr('Tags')}</span><span class="c">${tagsOpen ? '' : tags.length}</span></button>${tagsOpen ? tags.map(t => row('tag:' + t, ic('tag'), t, c.tags[t])).join('') : ''}</div>` : ''}
+    ${views ? grp('views', tr('Views'), views, '', (views.match(/class="srow smod/g) || []).length) : ''}
     ${team ? grp('team', tr('Team'), team, '', ppl.length + ags.length + grps.length) : ''}
     <div class="sgroup sfoot">
       ${row('all', ic('all'), tr('All'), c.all)}
@@ -246,7 +290,7 @@ function renderSide() {
 // 2.13.0 (#453 A9): the sidebar is ONE tab stop (roving tabindex): Tab lands on the open view's row (or the first one),
 // ↑ / ↓ / Home / End walk through every row, folder and group header, Enter / Space open it, Tab goes on to the content.
 // Before, 30+ stops stood between the top of the page and the content.
-const sideItems = () => $$('#side button, #side [data-act="folder-toggle"], #side a[href]').filter(b => !b.disabled && b.offsetParent !== null && !b.closest('.hidden'));
+const sideItems = () => $$('#side button, #side [data-act="folder-toggle"], #side a[href]').filter(b => !b.disabled && b.offsetParent !== null && !b.closest('.hidden') && !b.closest('[hidden]'));
 function sideRove(cur) {
   const it = sideItems(); if (!it.length) return;
   const keep = cur || it.find(b => b === document.activeElement) || it.find(b => b.classList.contains('srow') && b.classList.contains('on')) || it.find(b => b.classList.contains('srow')) || it[0];
@@ -292,11 +336,13 @@ function renderTop0() {
   if (m === 'tasks' && k === 'all' && feat('timeline')) { const v = isRoadmap() ? 'timeline' : 'list'; acts += `<div class="seg tf" role="group" aria-label="${tr('View')}"><button class="${v === 'list' ? 'on' : ''}" data-act="rm-view" data-k="list" data-ico="list" title="${tr('List')}" aria-pressed="${v === 'list'}">${ic('list', 's')}</button><button class="${v === 'timeline' ? 'on' : ''}" data-act="rm-view" data-k="timeline" data-ico="timeline" title="${tr('Timeline')}" aria-pressed="${v === 'timeline'}">${ic('timeline', 's')}</button></div>`; }
   if (m === 'tasks' && k === 'trash' && (S.extra || []).some(t => !t.keep)) acts += `<button class="btn sm danger" data-act="trash-empty">${tr('Empty')}</button>`;
   if (m === 'tasks' && k === 'done' && (S.extra || []).length) acts += `<button class="btn sm" data-act="done-clean" title="${esc(tr('Move completed tasks to the trash'))}">${ic('trash', 's')}<span class="bl">${tr('Delete completed…')}</span></button>`;
+  // 2.24.0 (#906): "Tasks of …" of another person: write to them
+  if (m === 'tasks' && k.startsWith('who:') && S.me && +k.slice(4) !== S.me.id && !agentById(+k.slice(4))) acts += `<button class="btn sm tf" data-act="dm" data-uid="${+k.slice(4)}" data-ico="comment" title="${esc(tr('Message'))}">${ic('comment', 's')}<span class="bl">${tr('Message')}</span></button>`;
   if (m === 'tasks' && S.multiMode) acts += `<button class="iconbtn on" data-act="multi" title="${tr('End selection')}" aria-label="${tr('End selection')}">${ic('select')}</button>`;
   // everything rarer sits in "…" (phones: undo / redo there too); the title keeps its room
   acts += `<button class="iconbtn tmore" data-act="top-more" aria-haspopup="menu" title="${tr('More actions')}" aria-label="${tr('More actions')}">${ic('dots')}${isMobile() && HIST.undo.length && histPending(HIST.undo[HIST.undo.length - 1]) ? '<span class="pdot"></span>' : ''}</button>`;
   const pm = '';  // focus / stopwatch are part of the running indicator (timerPill) now
-  const oflab = OUT.online ? tr('sync|pending changes') : OUT.down ? tr('server not reachable') : tr('offline'), ofn = OUT.q.length ? trn('{0} change waiting', '{0} changes waiting', OUT.q.length) : '';
+  const oflab = OUT.online ? tr('sync|pending changes') : OUT.down ? (OUT.maint ? tr('server in maintenance') : tr('server not reachable')) : tr('offline'), ofn = OUT.q.length ? trn('{0} change waiting', '{0} changes waiting', OUT.q.length) : '';
   const off = !OUT.online || OUT.q.length ? `<span class="offline" role="status" title="${esc([oflab, ofn, tr('Changes are sent as soon as the server is reachable')].filter(Boolean).join(' · '))}" aria-label="${esc([oflab, ofn].filter(Boolean).join(' · '))}">${ic(OUT.online ? 'sync' : 'cloudoff', 's')}<span class="ofl">${oflab}</span>${OUT.q.length ? `<span class="ofn">${OUT.q.length}</span>` : ''}</span>` : '';
   const cf = S.conflicts?.length ? `<button class="cfpill" data-act="conflicts" title="${tr('Review conflicts')}">${ic('alert', 's')}${S.conflicts.length}</button>` : '';
   // open tasks of the view next to the title (Geist Mono), task views only
@@ -407,6 +453,8 @@ function topMoreItems() {
     ...(S.me?.auth === 'session' ? ['-', {label: tr('Log out'), icon: 'logout', fn: logout}] : [])];  // 2.19.0: a child's "…": its account only
   const m = S.route.mod, k = S.route.key, fold = topFolded(), out = [], sec = [];
   if (isMobile()) for (const dir of ['undo', 'redo']) { const b = histBtn(dir); out.push({label: b.lab, icon: dir, dis: b.off, cls: 'hmi' + (b.p ? ' pend' : ''), title: b.p ? tr('waiting for the connection') : '', fn: () => histStep(dir)}); }
+  // 2.24.0 (UX-35): Today's planners live here now (the header keeps its room for the tasks)
+  if (m === 'tasks' && k === 'today') out.push({label: tr('Plan my day'), icon: 'cal', fn: () => dayplanModal('day')}, {label: tr('Fill free time'), icon: 'clock', fn: () => dayplanModal('fill')});
   if (m === 'tasks' && !NOLIST_KEYS.includes(k) && !isKanban() && !isTimeline() && !isRoadmap() && !isOverview())
     sec.push({label: S.multiMode ? tr('End selection') : tr('Select multiple'), icon: 'select', on: S.multiMode, fn: () => { S.multiMode = !S.multiMode; if (!S.multiMode) S.multi.clear(); render(); }},
       {label: tr('Sort…'), icon: 'sort', fn: () => sortMenu($('#top [data-act="top-more"]') || $('#top h1'))});
@@ -977,7 +1025,7 @@ document.addEventListener('click', e => {
   menu(b, S.lists.filter(l => !l.archived && !l.is_inbox && canAddTo(l.id)).map(l => ({label: lname(l), icon: 'list', fn: () => patchUndoable(id, {list_id: l.id}, tr('Moved to {0}', lname(l)))})));
 });
 function qaddBox(extraCls = '') {
-  return `<div class="qadd inline ${extraCls}"><div class="box">${ic('plus')}<input id="qinput" aria-label="${esc(tr('Add task…'))}" placeholder="${tr('Add task: “Dentist tomorrow 3pm !high #private ~list”')}" autocomplete="off" enterkeyhint="done">${tplBtn()}${qExtraBtns('qinput')}</div><div class="chips" id="qchips"></div></div>`;
+  return `<div class="qadd inline ${extraCls}"><div class="box">${ic('plus')}<input id="qinput" type="text" name="kalmido-quick-add" aria-label="${esc(tr('Add task…'))}" placeholder="${tr('Add task: “Dentist tomorrow 3pm !high #private ~list”')}" autocomplete="off" data-form-type="other" data-lpignore="true" aria-autocomplete="none" enterkeyhint="done">${tplBtn()}${qExtraBtns('qinput')}</div><div class="chips" id="qchips"></div></div>`;
 }
 // 2.14.0 (#484): next to Send: "Add and open" (creates the task and opens its details at once, for notes and files) and the
 // paper clip (pick files: the task is created with them as attachments, the first file's name is the title when none
@@ -1007,7 +1055,7 @@ function tplBtn() {
 // adds and keeps the focus, Esc leaves it. Phones keep the + button (FAB).
 const QEX = N_('Type the way you think: “Dentist tomorrow 3pm !high #private ~list”');
 function qdockHtml() {
-  return `<div class="qdock"><div class="qadd dock"><div class="box"><span class="qplus" aria-hidden="true">${ic('plus', 's')}</span><input id="qinput" aria-label="${esc(tr('Add task…'))}" placeholder="${tr('Add task…')}" title="${esc(tr(QEX))}" autocomplete="off" enterkeyhint="done">${tplBtn()}${qExtraBtns('qinput')}${isTouch() ? '' : `<span class="qkey" title="${esc(kt(tr('New task'), 'n'))}">${kb('n')}</span>`}</div>
+  return `<div class="qdock"><div class="qadd dock"><div class="box"><span class="qplus" aria-hidden="true">${ic('plus', 's')}</span><input id="qinput" type="text" name="kalmido-quick-add" aria-label="${esc(tr('Add task…'))}" placeholder="${tr('Add task…')}" title="${esc(tr(QEX))}" autocomplete="off" data-form-type="other" data-lpignore="true" aria-autocomplete="none" enterkeyhint="done">${tplBtn()}${qExtraBtns('qinput')}${isTouch() ? '' : `<span class="qkey" title="${esc(kt(tr('New task'), 'n'))}">${kb('n')}</span>`}</div>
     <div class="qdmore"><div class="qdchips" id="qdchips"></div><div class="chips" id="qchips"></div>${hintSeen('qsyntax') ? '' : `<div class="qhint">${tr(QEX)}</div>`}</div></div></div>`;
 }
 // the chips of the docked composer: what the task will get (a chip set here wins over the text)
@@ -1047,7 +1095,7 @@ function viewListBody() {
   const lc = rl ? listCols(rl) : null;  // 2.14.0 (#425)
   const cols = rl && !lc && fieldCols(rl.id) ? fieldsOf(rl.id).slice(0, 6) : null;
   let h = (rl ? listHead(rl) : v.folder ? folderHead(v.folder) : agBandHtml()) + (ro ? `<div class="rohint">${ic(isPart(rl.id) ? 'user' : 'eye', 's')}${esc(isPart(rl.id) ? tr('Participant: you see only the tasks assigned to you, shared by {0}', rl.owner_name) : tr('View only, shared by {0}', rl.owner_name))}</div>` : '');
-  if (S.route.key === 'today') h += waitCard() + reviewCard() + dayplanBar() + overdueBanner() + cevTodayBlock();  // 2.10.0 (#440): review + planner
+  if (S.route.key === 'today') h += waitCard() + reviewCard() + overdueBanner() + cevTodayBlock();  // 2.24.0 (UX-35): the planners in "…"  // 2.10.0 (#440): review + planner
   if (flow && FLOW.cyc) h += `<div class="flowhint">${ic('deps', 's')}${esc(tr('Some tasks wait on each other in a circle; they are ordered by date.'))}</div>`;
   if (lc && total0(groups)) h += lcHead(rl, lc);
   if (cols) h += `<div class="fcolhead"><span class="spacer"></span>${cols.map(f => `<span class="fcell t-${esc(f.type)}" title="${esc(f.name)}">${esc(f.name)}</span>`).join('')}</div>`;

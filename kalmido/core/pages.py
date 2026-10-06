@@ -117,7 +117,13 @@ def split_link(title, content=""):
 def save_attachment_bytes(c, tid, name, mime, data):
     from ..tasks.attachments import safe_name
     from ..notify.alerts import aa_count, aa_oserr
+    from ..admin.hosting import quota_fits
     name = safe_name(name)
+    who = c.execute("SELECT created_by FROM tasks WHERE id=?", (tid,)).fetchone()
+    who = who[0] if who else None
+    if not quota_fits(c, who, len(data)):  # 2.24.0 (#910): storage full -> the task comes without the file (never an error)
+        print("share / mail file skipped: storage quota of user", who, "reached", flush=True)
+        return
     rel = os.path.join(str(tid), f"{uuid.uuid4().hex[:12]}-{name}")
     try:
         os.makedirs(os.path.join(ATT_DIR, str(tid)), exist_ok=True)
@@ -127,8 +133,8 @@ def save_attachment_bytes(c, tid, name, mime, data):
         aa_count("storage", "attachments", aa_oserr(e))
         raise
     mime = mime if mime and mime != "application/octet-stream" else (mimetypes.guess_type(name)[0] or "application/octet-stream")
-    c.execute("INSERT INTO attachments(task_id,name,mime,size,path,created_at) VALUES(?,?,?,?,?,?)",
-              (tid, name, mime, len(data), rel, iso(now_utc())))
+    c.execute("INSERT INTO attachments(task_id,name,mime,size,path,created_at,user_id) VALUES(?,?,?,?,?,?,?)",
+              (tid, name, mime, len(data), rel, iso(now_utc()), who))
 
 
 def inbox_user(c):
@@ -280,7 +286,7 @@ def drop_post():
     title = first or (os.path.splitext(safe_name(files[0].filename))[0] if len(files) == 1
                       else tr("{0} files shared", len(files), lg=lg))
     tid = new_inbox_task(c, u["id"], title, rest, url=url)
-    e = save_attachments(c, tid, files) if files else None
+    e = save_attachments(c, tid, files, uid=u["id"]) if files else None
     bump(c)
     c.commit()
     print("drop: task", tid, "user", u["id"], repr(title), len(files), "files", e or "", flush=True)

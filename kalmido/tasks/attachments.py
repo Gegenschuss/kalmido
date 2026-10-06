@@ -3,7 +3,7 @@ import mimetypes
 import os
 import re
 import uuid
-from flask import jsonify, request, send_file
+from flask import g, has_request_context, jsonify, request, send_file
 
 from ..core.config import app, ATT_DIR, INLINE_TYPES, MAX_FILE_MB
 from ..core.i18n import tr
@@ -42,10 +42,14 @@ def attachment_upload(tid):
     return jsonify(one_task(c, tid))
 
 
-def save_attachments(c, tid, files, comment_id=None, saved=None):
+def save_attachments(c, tid, files, comment_id=None, saved=None, uid=None):
     """Store uploaded werkzeug files for a task (or one of its comments). Returns an error message or
     None (caller commits; on an error the caller rolls back and unlinks `saved`)."""
     from ..notify.alerts import aa_count, aa_oserr
+    from ..admin.hosting import quota_guard
+    if uid is None:  # the uploader: the signed-in person (/drop passes the token's owner)
+        uid = g.user["id"] if has_request_context() and g.get("user") else None
+    quota_guard(c, uid)  # 2.24.0 (#910): refused before anything is written (413 quota_exceeded)
     try:
         os.makedirs(os.path.join(ATT_DIR, str(tid)), exist_ok=True)
     except OSError as e:
@@ -72,8 +76,8 @@ def save_attachments(c, tid, files, comment_id=None, saved=None):
             saved.append(rel)
         mime = (f.mimetype if f.mimetype and f.mimetype != "application/octet-stream" else None) \
             or mimetypes.guess_type(name)[0] or "application/octet-stream"
-        c.execute("INSERT INTO attachments(task_id,name,mime,size,path,created_at,comment_id) VALUES(?,?,?,?,?,?,?)",
-                  (tid, name, mime, size, rel, ts, comment_id))
+        c.execute("INSERT INTO attachments(task_id,name,mime,size,path,created_at,comment_id,user_id) VALUES(?,?,?,?,?,?,?,?)",
+                  (tid, name, mime, size, rel, ts, comment_id, uid))
     if comment_id is None:
         c.execute("UPDATE tasks SET updated_at=? WHERE id=?", (ts, tid))
     return None

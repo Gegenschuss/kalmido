@@ -405,6 +405,8 @@ CREATE TABLE IF NOT EXISTS list_milestones (      -- 2.7.1 (#410): milestones of
   id INTEGER PRIMARY KEY, list_id INTEGER NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
   name TEXT NOT NULL, day TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0, created_by INTEGER, created_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS list_milestones_list ON list_milestones(list_id, day);
+CREATE TABLE IF NOT EXISTS mail_counts (         -- 2.24.0 (#899): mails per sender / receiving address and day (admin/hosting.py)
+  k TEXT PRIMARY KEY, day TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS list_files (           -- 2.7.1 (#410): project files uploaded on the list itself (ATT_DIR/lists/<id>/)
   id INTEGER PRIMARY KEY, list_id INTEGER NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
   name TEXT NOT NULL, mime TEXT NOT NULL DEFAULT '', size INTEGER NOT NULL DEFAULT 0,
@@ -821,6 +823,12 @@ MIGRATIONS = [
     ("tasks", "approver_id", "ALTER TABLE tasks ADD COLUMN approver_id INTEGER"),
     ("orgs", "domains", "ALTER TABLE orgs ADD COLUMN domains TEXT NOT NULL DEFAULT ''"),
     ("users", "signup", "ALTER TABLE users ADD COLUMN signup TEXT NOT NULL DEFAULT ''"),
+    # 2.24.0: attachments.user_id = who uploaded the file (storage quota #910; older rows: admin/hosting.quota_backfill),
+    # users.storage_quota_mb = the person's own quota (NULL = the instance default), agents.provider = where a connected
+    # agent runs (shown to the list's members when it joins, #896)
+    ("attachments", "user_id", "ALTER TABLE attachments ADD COLUMN user_id INTEGER"),
+    ("users", "storage_quota_mb", "ALTER TABLE users ADD COLUMN storage_quota_mb INTEGER"),
+    ("agents", "provider", "ALTER TABLE agents ADD COLUMN provider TEXT NOT NULL DEFAULT ''"),
 ]
 INDEXES = """
 CREATE INDEX IF NOT EXISTS lists_owner ON lists(owner_id);
@@ -949,6 +957,11 @@ GLOBAL_DEFAULTS = {
     # sign-in (package A): 2FA policy for built-in logins, passwordless passkey login, OIDC auto-create
     "twofa_required": "0",      # admin: users with a password must use a second factor (enrol at the next login)
     "passkey_login": "1",       # admin: passkeys may log in without the password (user verification required)
+    "storage_quota_mb": "",     # 2.24.0 (#910): storage per person in MB ('' = KALMIDO_STORAGE_QUOTA_MB, 0 = unlimited)
+    "storage_pool": "user",     # 2.24.0 (#910): user | org (the members of an organisation share quota x members)
+    "support_email": "",        # 2.24.0 (#910): "Contact support" ('' = KALMIDO_SUPPORT_EMAIL, else the first admin's address)
+    "mail_day_limit": "",       # 2.24.0 (#899): mails per account and day ('' = 30)
+    "announce": "",             # 2.24.0 (#907): the notice above the app (JSON, admin/hosting.py)
     "signup_mode": "off",       # 2.23.0 (#711): self-registration on the login page: off | domain | approval | open
     "signup_domains": "",       # ... the e-mail domains allowed in the mode "domain" (comma separated)
     "oidc_autocreate": "0",     # admin: first OIDC login without a matching user creates one (off: admin creates users)

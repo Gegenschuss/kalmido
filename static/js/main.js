@@ -87,6 +87,9 @@ if (window.visualViewport) {
   }
   setTimeout(wpSync, 3000);
   // v1.1: first start of a new account: "Getting started" list (server side, in the user's language), then the tour
+  // 2.24.0 (UX-22): not while the first-run setup is still open (its "Start" reloads; then the list, in the chosen language,
+  // and the tour follow, one after the other)
+  if (S.setupPending) return;
   if (S.settings.onboard === 'pending') {
     try { const j = await api('POST', '/api/onboarding', {touch: isTouch(), mac: IS_MAC}); if (j?.created) { await load(); render(); } } catch { /* offline: next start */ }
   }

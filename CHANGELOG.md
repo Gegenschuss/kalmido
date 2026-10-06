@@ -7,6 +7,63 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.24.0] - 2026-10-06
+
+**In short:** Usability (#827). The things people use every day come first: a direct message one tap away, the own
+lists right below Inbox and Today, one task menu in a fixed order, a calmer Today, the assignee and the comments at the
+top of a task, a settings search that finds what it says, Administration in sub-tabs. The unfolded Fold held sideways
+and Samsung DeX get the desktop layout and stop sliding when typing. For running Kalmido for others: storage per person,
+a notice to everyone before maintenance, e-mail limits per day, and a note to everyone in a list when an agent joins.
+
+### Added
+- **Direct messages that can be found** (#906): *Message* as the first button on a person's card and on *Tasks of …*,
+  *New message* always in the team chat; when it cannot work yet, the button says why (team chat off, nobody to write to,
+  or the server's reason).
+- **Storage per person** (#910): every file a person uploads counts (task and comment files, project files, files in an
+  agent chat). Admins set the amount per person, per organisation (shared: amount × members) or for one person (0 =
+  unlimited; self-hosted servers stay unlimited by default, `KALMIDO_STORAGE_QUOTA_MB`). From 80 % a hint, at 100 %
+  uploads are refused before anything is written (nothing is ever deleted) with *Contact support* (an e-mail with the
+  account, the usage and the server filled in; `KALMIDO_SUPPORT_EMAIL` or the admin setting). *Settings > Account >
+  Storage* shows the meter. API: `GET /me/storage`, `413 quota_exceeded`.
+- **A notice to everyone** (#907): admins publish a notice or a maintenance warning (from / until, optionally a push to
+  everyone once); it shows as a slim bar above the app, can be hidden and comes back when it changes. A proxy's
+  maintenance page (503) reads *server in maintenance*. Scripts: `GET /announcement`, `PUT /admin/announcement`,
+  `python app.py announce "text" --minutes 30 --maintenance`; the update script announces its restart.
+- **E-mail limits** (#899): invitations and new sign-in links per account and day (default 30, admin setting) and at most
+  5 a day to one address; over the limit the link is shown to copy instead.
+- **Agents: who is responsible** (#896): *Members may connect agents* in *Administration > Organisation* (off by default);
+  a personal agent gets *Where it runs* (e.g. "Claude (Anthropic, USA)"), and when an agent joins a list everyone in it
+  gets a News item naming the agent, who added it and where it runs.
+- **Profile picture with a round mask** (#825): choosing a photo opens the crop dialog again (the photo could not be read: the
+  Content-Security-Policy does not allow blob: images); it dims what lies outside the circle, shows a big and a small preview, zooms
+  with two fingers, the wheel or + / −, and moves with the arrow keys; list icons keep a square crop.
+- **Administration in sub-tabs** (#826): People, Sign-in, Organisation, Server, Log & errors (the last one remembered);
+  the organisation's name can be changed there.
+
+### Changed
+- **Unfolded Fold held sideways** (#908): from 860 px in landscape the desktop layout (sidebar, list, task panel); upright
+  stays the tablet layout.
+- **DeX and desktop windows** (#832): the keyboard handling only reacts to a real on-screen keyboard (touch and more than
+  120 px less height), never to a mouse / physical keyboard or Samsung's autofill bar; the page as a whole never stays
+  scrolled; the quick add is no longer mistaken for a login field. Typed text keeps the recognition chips of the docked
+  add bar visible (Fold, DeX, desktop).
+- **Sidebar**: your own lists come right after Focus; *Views* starts folded below them. No "Person" under every name, and
+  the organisation only next to the app name when it is a different name.
+- **One task menu** in a fixed order: date (Today / Tomorrow, *New date…*), priority, assignee, list and section, waiting,
+  pin, time, template, then the rest and *Delete*; the swipe menu names its task, offers *Move to list…* and ends with
+  *All…*.
+- **Today**: one slim line *4 overdue · All to today · Another day…*; *Plan my day* and *Fill free time* moved into "…".
+- **Tab bar** (phones, until you change it): Inbox, Today, Search, Lists.
+- **Task panel**: the assignee sits right under the title; description, subtasks and comments come first, the rest folds into
+  *More details* (files, a waiting-on and linked events stay outside); a task with an unread comment opens at the
+  comments.
+- **Settings search**: finds buttons, helper texts and switches too (and words like "log out" or "storage"), opens the
+  sub-tab of its hit and steps the panes back when nothing is found. *Log out* is at the end of *Account*.
+- **First start**: the language of the setup page sticks (also after a reload), the tour waits until the setup is done,
+  and the name of an organisation is asked only for a team or company, optional and changeable later.
+- **Hosted servers** (`KALMIDO_HOSTED=1`, #905): Paperless only reaches public HTTPS addresses (no internal hosts) and
+  starts switched off for new accounts, with a hint in the settings.
+
 ## [2.23.0] - 2026-10-06
 
 **In short:** Team, family, clients (#463). Clients above your lists with hours, budget and a timesheet per month; the
@@ -2705,7 +2762,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.23.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.24.0...HEAD
+[2.24.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.24.0
 [2.23.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.23.0
 [2.22.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.22.0
 [2.21.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.21.0

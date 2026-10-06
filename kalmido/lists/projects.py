@@ -521,6 +521,8 @@ def list_file_upload(lid):
         return err(tr("File missing"))
     if c.execute("SELECT COUNT(*) FROM list_files WHERE list_id=?", (lid,)).fetchone()[0] + len(files) > OV_FILES_MAX:
         return err(tr("At most {0} files per project", OV_FILES_MAX), 409)
+    from ..admin.hosting import quota_guard
+    quota_guard(c, me())  # 2.24.0 (#910)
     try:
         os.makedirs(os.path.join(ATT_DIR, LIST_FILES_SUB, str(lid)), exist_ok=True)
     except OSError as e:

@@ -42,6 +42,7 @@ API = {f"{m.upper()} {norm(p)[len('/api/v1'):]}" for m, p in routes if p.startsw
 # ---- 1. the web client's routes -> the REST API
 APP_TO_API = {
     "GET /api/state": ["GET /lists", "GET /tasks", "GET /habits", "GET /filters", "GET /me"],
+    "GET /api/me/storage": ["GET /me/storage"],  # 2.24.0 (#910)
     "GET /api/tasks": ["GET /tasks", "GET /search", "GET /trash"],
     "GET /api/tasks/{}": ["GET /tasks/{}"],
     "POST /api/tasks": ["POST /tasks", "POST /tasks/{}/subtasks"],
@@ -326,6 +327,7 @@ API_ONLY = {  # REST routes on purpose without an MCP tool (reason)
     "POST /lists/{}/owner": "transferring a list: never agents (403)",
     "GET /admin/users": "admin-read: never for agents",
     "GET /admin/status": "admin-read: never for agents",
+    "PUT /admin/announcement": "2.24.0: the server's notice: admins and operator scripts (account + admin-read, never agents)",
     "GET /admin/agents/{}/audit": "admin-read: never for agents",
     "GET /me/app-passwords": "account: never for agents",
     "POST /me/app-passwords": "account: never for agents",

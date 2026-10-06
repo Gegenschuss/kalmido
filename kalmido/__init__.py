@@ -95,6 +95,7 @@ ORDER = (
     "team.forms",
     "team.v1",
     "accounts.signup",
+    "admin.hosting",
     "startup",
 )
 MODULES = [importlib.import_module(f"{__name__}.{m}") for m in ORDER]

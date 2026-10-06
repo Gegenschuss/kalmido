@@ -325,7 +325,9 @@ function swipeEnd(e) {
   swiped = true; setTimeout(() => { swiped = false; }, 350);
   const id = +r.dataset.id;
   if (dx > 90) toggleTask(id);
-  else if (dx < -90) snoozeSheet(id, r, ['-', {label: tr('Completed'), icon: 'done', fn: () => toggleTask(id)}, {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => deleteTask(id)}]);
+  // 2.24.0 (UX-09 / UX-14 / UX-37): the short menu names its task, keeps the order of the task menu (date, list, …) and ends
+  // with "All…"; "Move to list…" sorts the inbox
+  else if (dx < -90) snoozeSheet(id, r, ['-', moveListItem(r, id), {label: tr('Completed'), icon: 'done', fn: () => toggleTask(id)}, {label: tr('All…'), icon: 'dots', fn: () => taskMenu(r, id)}, '-', {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => deleteTask(id)}], true);
 }
 document.addEventListener('touchend', swipeEnd);
 document.addEventListener('touchcancel', swipeEnd);

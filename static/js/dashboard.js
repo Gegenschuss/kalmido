@@ -26,7 +26,7 @@ function newsSummaryLine(g) {
     unassign: () => tr('unassigned'), complete: () => tr('completed'), newtask: n => trn('{0} new task', '{0} new tasks', n), status: () => tr('status changed'),
     share: () => tr('shared with you'), approval: n => trn('{0} approval waits', '{0} approvals wait', n), proposal: () => tr('a proposal is ready'),
     followup: () => tr('follow up today'), unblock: () => tr('unblocked'), take: () => tr('taken'), role: () => tr('your role changed'), owner: () => tr('you own it now'),
-    unshare: () => tr('removed'), usage: () => tr('usage limit'), errreport: () => tr('new error')};
+    unshare: () => tr('removed'), usage: () => tr('usage limit'), errreport: () => tr('new error'), agentjoin: () => tr('an agent joined')};
   return Object.entries(c).map(([k, n]) => (L[k] || (() => k))(n)).join(' · ');
 }
 function newsGroupHtml(g, pop) {

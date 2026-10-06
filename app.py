@@ -51,6 +51,8 @@ if __name__ == "__main__":
         c.commit()
         c.close()
         sys.exit(0 if n else f"no user {sys.argv[2]!r}")
+    if len(sys.argv) >= 3 and sys.argv[1] == "announce":  # 2.24.0 (#907): docker exec <container> python app.py announce "text" --minutes 30
+        sys.exit(announce_cli(sys.argv[2:]))
     from waitress import serve
     port = int(os.environ.get("PORT", 3040))
     listen = f"0.0.0.0:{port}" + (f" 0.0.0.0:{AUTH_PROXY_PORT}" if AUTH_PROXY_PORT and AUTH_PROXY_PORT != str(port) else "")

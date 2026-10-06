@@ -194,6 +194,8 @@ function newsText(it, U) {
     case 'apdecide': return {approved: tr('{0} approved {1}', who, q(it.task_title || '')), changes: tr('{0} asks for changes to {1}', who, q(it.task_title || '')),
       rejected: tr('{0} rejected {1}', who, q(it.task_title || ''))}[d.state] || tr('{0} decided on your approval request', who);  // 2.23.0 (#463)
     case 'signup': return tr('{0} registered and waits for your approval', q(d.name || d.username || ''));  // 2.23.0 (#711)
+    case 'agentjoin': return d.provider ? tr('{0} added the agent {1} to {2}. It runs at {3}. What it reads in the list goes there.', who, q(d.agent || ''), q(newsListName(it)), q(d.provider))
+      : tr('{0} added the agent {1} to {2}. What it reads in the list goes to its AI provider.', who, q(d.agent || ''), q(newsListName(it)));  // 2.24.0 (#896)
     case 'followup': return d.note ? tr('Follow up today: waiting on {0}', q(d.note)) : tr('Follow up today: the task is waiting on external');
     case 'usage': return aiuNewsText(d);  // 2.1.1 (#326)
     case 'proposal': return tr('{0} has a proposal for you: {1}', who, q(d.title || ''));  // 2.3.0
@@ -203,7 +205,7 @@ function newsText(it, U) {
   }
   return tr('{0} changed something', who);
 }
-const NEWS_ICON = {mention: 'at', comment: 'comment', assign: 'user', unassign: 'user', take: 'check', complete: 'check', share: 'users', role: 'users', unshare: 'users', unblock: 'deps', status: 'pulse', newtask: 'plus', approval: 'bot', followup: 'hourglass', usage: 'chart', proposal: 'bot', errreport: 'bug', apdecide: 'eye', signup: 'user'};
+const NEWS_ICON = {mention: 'at', comment: 'comment', assign: 'user', unassign: 'user', take: 'check', complete: 'check', share: 'users', role: 'users', unshare: 'users', unblock: 'deps', status: 'pulse', newtask: 'plus', approval: 'bot', followup: 'hourglass', usage: 'chart', proposal: 'bot', errreport: 'bug', apdecide: 'eye', signup: 'user', agentjoin: 'bot'};
 function newsItemHtml(it, i, pop) {
   const U = S.nf.users;
   const many = (it.tasks || []).length > 1;  // 2.13.0 (#453 A5): an agent's comments on several tasks
@@ -457,6 +459,7 @@ function personCard(anchor, id) {
   const acts = [];
   if (a && a.enabled && typeof chatOpen === 'function') acts.push(['chat', 'comment', tr('Open chat')]);
   if (a && feat('agents')) acts.push(['jobs', 'bot', tr('Jobs')]);
+  if (!a && id !== meId) acts.push(['dm', 'comment', tr('Message')]);  // 2.24.0 (#906): a direct message, first and big
   if (!a) acts.push(['who', 'list', id === meId ? tr('My tasks') : tr('Tasks of {0}', name)]);  // 2.7.2 (#418)
   if (t && !t.context && id !== t.assignee_id && canAssign(t) && p) acts.push(['assign', 'user', tr('Assign this task')]);
   if (t && $('#c-input') && cmSocial(t) && id !== meId && p) acts.push(['mention', 'at', tr('Mention')]);
@@ -467,12 +470,13 @@ function personCard(anchor, id) {
       <span class="muted">${esc(role || (U[id] ? '' : tr('Not a member of this list')))}</span>${st}</div></div>
     ${l && p ? `<div class="mcsec"><div class="mch">${esc(tr('Assigned in {0}', lname(l)))} <span class="c">${mine.length}</span></div>${mine.slice(0, 5).map(x => `<button type="button" class="mctask" data-mc="task" data-id="${x.id}">${ic('check', 's')}<span>${esc(x.title)}</span></button>`).join('') || `<div class="muted mhint">${esc(tr('No other open tasks'))}</div>`}${mine.length > 5 ? `<div class="muted mhint">${esc(trn('and {0} more', 'and {0} more', mine.length - 5))}</div>` : ''}</div>` : ''}
     ${curHtml}
-    ${acts.length ? `<div class="mcacts">${acts.map(([k, i, lab]) => `<button type="button" class="btn sm" data-mc="${k}">${ic(i, 's')} ${esc(lab)}</button>`).join('')}</div>` : ''}</div>`);
+    ${acts.length ? `<div class="mcacts">${acts.map(([k, i, lab]) => `<button type="button" class="btn sm ${k === 'dm' ? 'pri mcdm' : ''}" data-mc="${k}">${ic(i, 's')} ${esc(lab)}</button>`).join('')}</div>` : ''}</div>`);
   pop.onclick = async e => {
     const b = e.target.closest('[data-mc]'); if (!b) return;
     const k = b.dataset.mc; closePop();
     if (k === 'task') { const x = +b.dataset.id; if (S.tasks.get(x)) openDetail(x); else go('t/' + x); }
     else if (k === 'who') { if (S.sel && isMobile()) closeDetail(); go('who/' + id); }
+    else if (k === 'dm') { if (S.sel && isMobile()) closeDetail(); dmOpen(id, name); }
     else if (k === 'chat') chatOpen(id);
     else if (k === 'jobs') go('agents');
     else if (k === 'assign') patchTask(t.id, {assignee_id: id});
@@ -571,6 +575,7 @@ async function loadTimeline(id) {
     drawTimeline(); return;
   }
   if (my !== S.tlSeq || S.sel !== id) return;
+  const first = S.tl.id !== id;
   const seen = S.tl.id === id ? S.tl.seen : j.seen;  // "new" marks stay while the panel is open
   S.tl = {...j, id, v, seen};
   if (S.cedit && !j.comments.some(c => c.id === S.cedit)) S.cedit = null;
@@ -578,6 +583,8 @@ async function loadTimeline(id) {
   const t = S.tasks.get(id), top = Math.max(0, ...j.comments.map(c => c.id));
   if (t && (t.unread || t.comment_count !== j.comments.length)) { t.unread = 0; t.comment_count = j.comments.length; viewSafeRender(); }
   if (top > (j.seen || 0)) rawFetch('POST', `/api/tasks/${id}/seen`).catch(() => {});
+  // 2.24.0 (UX-41): opened with an unread comment of someone else: straight to the comments
+  if (first && j.comments.some(c => c.id > (j.seen || 0) && c.user_id !== S.me?.id)) setTimeout(() => { if (S.sel === id) $('#d-tl')?.scrollIntoView?.({block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth'}); }, 60);
 }
 async function capi(method, url, body) {  // comments: never queued, clear message when offline
   try { return await rawFetch(method, url, body); }

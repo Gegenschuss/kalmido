@@ -264,6 +264,8 @@ def init_db(guard=True):
                 c.execute(stmt)
         for k, v in GLOBAL_DEFAULTS.items():
             c.execute("INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)", (k, v))
+        from ..admin.hosting import quota_backfill
+        quota_backfill(c)  # 2.24.0 (#910): who uploaded the files from before
         _COLLAB_ALL["on"] = gsetting(c, "collab_all") != "0"
         _TIME_ALL["on"] = gsetting(c, "time_all") != "0"
         # migration of a single-user install: its data belongs to the bootstrap admin

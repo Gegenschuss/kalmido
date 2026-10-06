@@ -139,7 +139,7 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
     await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 't1', parameters: {pointerType: 'touch'}, actions: [{type: 'pointerMove', x: Math.round(x), y: Math.round(y)}, {type: 'pointerDown', button: 0}, {type: 'pause', duration: 60}, {type: 'pointerUp', button: 0}]}]});
     await cmd('input.releaseActions', {context: ctx});
   };
-  const center = sel => `(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); if (r.top < 0 || r.bottom > innerHeight) { e.scrollIntoView({block: 'center'}); } const q = e.getBoundingClientRect(); return {x: q.left + q.width / 2, y: q.top + q.height / 2}; })()`;
+  const center = sel => `(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); if (r.top < 0 || r.bottom > innerHeight - (document.querySelector('#tabs')?.offsetHeight || 0)) { e.scrollIntoView({block: 'center'}); } const q = e.getBoundingClientRect(); return {x: q.left + q.width / 2, y: q.top + q.height / 2}; })()`;
   // the task header: rows, sizes, the date in full, nothing outside
   const HEAD = `(() => { const d = document.querySelector('#detail .dtop'); if (!d) return null; const R = d.getBoundingClientRect(), vis = e => e && getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 0;
     const r = s => { const e = d.querySelector(s); if (!vis(e)) return null; const b = e.getBoundingClientRect(); return {l: Math.round(b.left), r: Math.round(b.right), t: Math.round(b.top), b: Math.round(b.bottom), w: Math.round(b.width), h: Math.round(b.height)}; };
@@ -183,6 +183,8 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
     await call('PATCH', `/api/tasks/${T}`, {due: day(9)});
     // the matrix: a tap folds a quadrant
     await o.nav(B + '#matrix'); await ready(ev);
+    // 2.24.0: centred first (the tab bar over the bottom edge holds Search now, a tap there would leave the matrix)
+    await ev(`(() => { document.querySelector('.quad[data-quad="3"] .qfold').scrollIntoView({block: 'center'}); return 1; })()`); await sleep(200);
     const qh = await ev(`(() => { const b = document.querySelector('.quad[data-quad="3"] .qfold').getBoundingClientRect(); return {x: b.left + b.width / 2, y: b.top + b.height / 2, h: b.height}; })()`);
     check(qh.h >= 44, '390 matrix: the heading is a 44 px target ' + qh.h);
     const before = await ev(`Math.round(document.querySelector('.quad[data-quad="3"]').getBoundingClientRect().height)`);

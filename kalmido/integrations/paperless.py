@@ -78,7 +78,8 @@ def pl_norm_url(u):
     """The base URL of a Paperless server (http(s), no credentials / query / fragment; a trailing /api is dropped)."""
     from ..calendars.subscriptions import cal_norm_url
     u = cal_norm_url(u)
-    if not u or not u.lower().startswith(("http://", "https://")):
+    from ..admin.hosting import hosted
+    if not u or not u.lower().startswith(("https://",) if hosted() else ("http://", "https://")):  # 2.24.0 (#905): hosted = HTTPS only
         return None
     p = urllib.parse.urlsplit(u)
     if p.query or p.fragment:
@@ -122,9 +123,11 @@ def pl_conn(c, cid, uid):
     token = pl_unseal(cid, uid, tk["token"]) if tk else ""
     if not token:
         return None
-    guard = r["kind"] == "personal"
+    from ..admin.hosting import hosted
+    # 2.24.0 (#905): on a hosted server every connection goes through the guard and only public addresses count (no allow-list)
+    guard = r["kind"] == "personal" or hosted()
     return {"id": r["id"], "kind": r["kind"], "name": r["name"], "url": r["url"], "api": r["url"], "token": token,
-            "guard": guard, "allow": cal_allow(c) if guard else frozenset()}
+            "guard": guard, "allow": cal_allow(c) if guard and not hosted() else frozenset()}
 
 
 def pl_conns_for(c, uid):
@@ -153,7 +156,12 @@ def pl_state(c, u):
     conns = pl_conns_for(c, u["id"])
     use = [x for x in conns if x["usable"]]
     return {"enabled": bool(use), "configured": bool(PL_TOKEN), "url": use[0]["url"] if use else "", "conns": conns,
-            "key": bool(SECRET_KEY), "personal": not is_agent(u)}
+            "key": bool(SECRET_KEY), "personal": not is_agent(u), "hosted": _hosted()}
+
+
+def _hosted():
+    from ..admin.hosting import hosted
+    return hosted()
 
 
 def pl_usable_ids(c, uid):

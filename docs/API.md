@@ -784,6 +784,22 @@ changes | rejected | null`) and `approver_id`.
 `GET|POST /lists/{id}/forms`, `PATCH|DELETE /forms/{id}` (`structure`; owner / list admins): a form's `url`, `access`
 (`org` | `public`), `enabled`, `count`; `regenerate: true` makes a new link.
 
+## Storage and the server's notice (2.24.0)
+
+`GET /me/storage` (any token): `used` and `limit` in bytes (`limit: null` = unlimited), `pct`, `level` (`ok`, `warn` from
+80 %, `high` from 95 %, `full`), `pool` (`user` | `org`: an organisation shares quota × members) and `support` (where to
+ask for more). An upload that does not fit any more is refused before anything is written:
+
+```
+413 {"error": {"code": "quota_exceeded", "message": "Your storage is full (…)", "used": 1048000, "limit": 1048576}}
+```
+
+`GET /announcement` (any token): the server's current notice, `{}` when there is none, else `text`, `level`
+(`info` | `maintenance`), `id`, `starts_at` / `ends_at` (UTC, optional) and `active` (a notice that starts later is
+announced with `active: false`). Admins set it with `PUT /admin/announcement` (scopes `account` + `admin-read`, never
+agents): `{text, level?, starts_at?, ends_at?, minutes?, push?}`; `{"text": ""}` clears it. On the server itself:
+`docker exec <container> python app.py announce "text" --minutes 30 --maintenance` / `announce --clear`.
+
 ## Home & life (2.22.0)
 
 The seven modules of *Home & life* (contracts, home, care, health, review, travel, reading) are switched on per person;

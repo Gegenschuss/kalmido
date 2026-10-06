@@ -376,9 +376,9 @@ async function agSetupDraw(md) {
     <span class="agacts"><button class="iconbtn" data-myag-act="perm" title="${esc(tr('Permissions'))}" aria-label="${esc(tr('Permissions of {0}', a.name))}">${ic('lock', 's')}</button><button class="iconbtn" data-myag-act="token" title="${esc(tr('New API token'))}" aria-label="${esc(tr('New API token'))}">${ic('key', 's')}</button>
       <button class="iconbtn ${a.enabled ? 'danger' : ''}" data-myag-act="pause" title="${esc(a.enabled ? tr('Pause') : tr('Resume'))}" aria-label="${esc(a.enabled ? tr('Pause') : tr('Resume'))}" ${!a.enabled && a.admin_paused ? 'disabled' : ''}>${ic(a.enabled ? 'pause' : 'play', 's')}</button>
       <button class="iconbtn danger" data-myag-act="del" title="${esc(tr('Delete'))}" aria-label="${esc(tr('Delete'))}">${ic('trash', 's')}</button></span></div>`;
-  const add = j.allowed && j.count < j.max ? `<div class="row myagnew"><input id="myag-user" placeholder="${esc(tr('Username, e.g. my-claude'))}" aria-label="${esc(tr('Username'))}" maxlength="32" autocapitalize="off" autocomplete="off" spellcheck="false"><input id="myag-name" placeholder="${esc(tr('Display name'))}" aria-label="${esc(tr('Display name'))}" maxlength="60"><button class="btn sm pri" data-myag-act="new">${ic('plus', 's')} ${tr('Create agent')}</button></div>
-    <div class="shint keep">${esc(trn('You can have {0} personal agent.', 'You can have {0} personal agents.', j.max))}</div>` : '';
-  box.innerHTML = (j.agents.map(row).join('') || (j.allowed ? '' : `<div class="muted mhint">${tr('Your admin has not allowed personal agents on this server.')}</div>`)) + add;
+  const add = j.allowed && j.count < j.max ? `<div class="row myagnew"><input id="myag-user" placeholder="${esc(tr('Username, e.g. my-claude'))}" aria-label="${esc(tr('Username'))}" maxlength="32" autocapitalize="off" autocomplete="off" spellcheck="false"><input id="myag-name" placeholder="${esc(tr('Display name'))}" aria-label="${esc(tr('Display name'))}" maxlength="60"><input id="myag-prov" placeholder="${esc(tr('Where it runs, e.g. Claude (Anthropic, USA)'))}" aria-label="${esc(tr('Where it runs'))}" maxlength="80"><button class="btn sm pri" data-myag-act="new">${ic('plus', 's')} ${tr('Create agent')}</button></div>
+    <div class="shint keep">${esc(trn('You can have {0} personal agent.', 'You can have {0} personal agents.', j.max))} ${esc(tr('You connect it yourself (your own provider and key): what it reads in your lists goes to that provider, and you are responsible for it. Everyone in a list you share with it is told where it runs.'))}</div>` : '';
+  box.innerHTML = (j.agents.map(row).join('') || (j.allowed ? '' : `<div class="muted mhint">${tr('Your organisation does not let members connect agents (an admin can allow it: Administration > Organisation).')}</div>`)) + add;
   if (S.me?.is_admin) {
     try {
       const p = await api('GET', '/api/admin/agent-policy'); const sw = $('#s-uag', md), mx = $('#s-uagmax', md); if (sw) sw.checked = p.user_agents; if (mx) { mx.value = p.max_per_user; mx.disabled = !p.user_agents; }
@@ -403,7 +403,7 @@ function agSetupWire(md) {
       if (k === 'new') {
         const un = $('#myag-user', md).value.trim().toLowerCase(); if (!un) { need($('#myag-user', md)); return; }
         b.disabled = true;
-        const r = await api('POST', '/api/my/agents', {username: un, display_name: $('#myag-name', md).value.trim()});
+        const r = await api('POST', '/api/my/agents', {username: un, display_name: $('#myag-name', md).value.trim(), provider: $('#myag-prov', md)?.value.trim() || ''});
         secretModal(tr('API token of {0}', r.name), r.token, tr('Copy it now into the agent’s configuration: it is shown only this once.') + ' ' + tr('Then share lists with the agent (list dialog > Sharing).'));
         await load(); render();
       }
@@ -452,6 +452,75 @@ function aiSubShow(md, want, save) {
   if (k === 'usage') return aiuDraw(md);
   if (k === 'log') return audDraw(md);
   if (k === 'setup') return agSetupDraw(md);
+}
+// ---- 2.24.0 (#826): Settings > Administration in five sub-tabs (the pattern of Agents): People, Sign-in, Organisation,
+// Server, Log & errors. The last one is remembered per device; the settings search opens the sub-tab of its hit.
+const ADM_SUBS = [['users', 'users', N_('People|admin')], ['signin', 'key', N_('Sign-in')], ['org', 'home', N_('Organisation')], ['server', 'grid', N_('Server')], ['log', 'alert', N_('Log & errors')]];
+function admSubCur(want) { const k = want || LS.get('admSub', 'users'); return ADM_SUBS.some(x => x[0] === k) ? k : 'users'; }
+function admSubsHtml(parts, want) {
+  const cur = admSubCur(want);
+  return `<div class="seg aisub admsub" role="tablist" aria-label="${esc(tr('Administration'))}">${ADM_SUBS.map(([k, i, n]) => `<button type="button" role="tab" id="adms-${k}" data-admsub="${k}" aria-controls="admp-${k}" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}">${ic(i, 's')}<span>${tr(n)}</span></button>`).join('')}</div>
+    ${ADM_SUBS.map(([k]) => `<div class="aisp admp" data-admp="${k}" id="admp-${k}" role="tabpanel" aria-labelledby="adms-${k}" ${k === cur ? '' : 'hidden'}>${parts[k] || ''}</div>`).join('')}`;
+}
+function admSubShow(md, want, save) {
+  const k = admSubCur(want); if (save) LS.set('admSub', k);
+  $$('[data-admsub]', md).forEach(b => { const on = b.dataset.admsub === k; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
+  $$('[data-admp]', md).forEach(p => { p.hidden = p.dataset.admp !== k; });
+}
+// Organisation: whether members may connect their own agents (#896, the policy user_agents of #420, off by default)
+function orgAgentsHtml(hint) {
+  if (!S.api?.enabled) return '';
+  return `<h4 id="s-orgag-h">${tr('Agents')}</h4>
+    <div class="featgrid"><label class="wide"><input type="checkbox" id="s-orgagents" ${S.about?.user_agents ? 'checked' : ''}><span>${tr('Members may connect agents')}<small class="muted">${tr('People can then connect their own AI agent (their own provider, key and computer) and share lists with it. They are responsible for what that provider receives; everyone in a list is told when an agent joins it and where it runs. Off by default.')}</small></span></label></div>`;
+}
+// Server: storage per person (#910), the support address, the daily e-mail limit (#899) and the notice above the app (#907)
+function hostHtml(hint) {
+  const a = S.about || {}, ann = a.announce_all || {};
+  const gb = mb => mb ? (mb >= 1024 ? fmtNum(mb / 1024, 1) + ' GB' : mb + ' MB') : tr('unlimited');
+  const toLoc = x => { if (!x) return ''; const d = new Date(x); return isNaN(d) ? '' : new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16); };
+  return `<h4 id="s-ann-h">${tr('Notice to everyone')}</h4>
+    ${hint(tr('Shown above the app for everyone, e.g. before planned maintenance. People can hide it; a changed notice shows again. Scripts can set it too (API or the command “python app.py announce”).'))}
+    <div class="row"><textarea id="s-ann-text" rows="2" maxlength="500" aria-labelledby="s-ann-h" placeholder="${esc(tr('e.g. Maintenance tonight from 22:00, Kalmido is unavailable for about 10 minutes.'))}">${esc(ann.text || '')}</textarea></div>
+    <div class="row"><label for="s-ann-level">${tr('Kind')}</label><select id="s-ann-level"><option value="info">${tr('Notice')}</option><option value="maintenance" ${ann.level === 'maintenance' ? 'selected' : ''}>${tr('Maintenance')}</option></select></div>
+    <div class="row"><label for="s-ann-from">${tr('From')}</label><input type="datetime-local" id="s-ann-from" value="${esc(toLoc(ann.starts_at))}"><label for="s-ann-to" class="qtol">${tr('until|time')}</label><input type="datetime-local" id="s-ann-to" value="${esc(toLoc(ann.ends_at))}"></div>
+    <div class="row"><label>${tr('Push')}</label><label class="chkl"><input type="checkbox" id="s-ann-push"> ${tr('Also send it as a push to everyone (once)')}</label></div>
+    <div class="row"><span class="spacer"></span>${ann.text ? `<button class="btn sm" data-m="ann-clear">${ic('x', 's')} ${tr('Remove')}</button>` : ''}<button class="btn sm pri" data-m="ann-save">${ic('check', 's')} ${tr('Publish')}</button></div>
+    <h4 id="s-quota-h">${tr('Storage per person')}</h4>
+    ${hint(tr('Counts every file a person uploaded. From 80 % they see a warning, at 100 % new uploads are refused (nothing is deleted) and they can contact support. Empty = the server default ({0}).', gb(a.storage_quota_env)))}
+    <div class="row"><label for="s-quota">${tr('Storage per person')}</label><input id="s-quota" inputmode="numeric" class="numin" value="${a.storage_quota_mb == null ? '' : esc(String(a.storage_quota_mb))}" placeholder="${esc(String(a.storage_quota_env || 0))}"><span class="muted">${tr('MB (0 = unlimited)')}</span></div>
+    <div class="row"><label for="s-qpool">${tr('Shared by')}</label><select id="s-qpool"><option value="user">${tr('each person on their own')}</option><option value="org" ${a.storage_pool === 'org' ? 'selected' : ''}>${tr('the organisation (amount × members)')}</option></select></div>
+    <div class="row"><label for="s-support">${tr('Support address')}</label><input id="s-support" type="email" value="${esc(a.support_email || '')}" placeholder="${esc(a.support_email_env || tr('the first admin’s address'))}" autocomplete="off"></div>
+    <h4 id="s-maillim-h">${tr('E-mails per day')}</h4>
+    ${hint(tr('Invitations and new sign-in links a person can have sent per day (at most 5 a day go to one address). Over the limit the link is shown to copy instead.'))}
+    <div class="row"><label for="s-maillim">${tr('Per account and day')}</label><input id="s-maillim" inputmode="numeric" class="numin" value="${esc(String(a.mail_day_limit || 30))}"></div>
+    ${a.hosted ? `<div class="shint keep">${ic('alert', 's')} ${tr('Hosted server (KALMIDO_HOSTED): integrations only reach public HTTPS addresses.')}</div>` : ''}`;
+}
+async function hostSave(md, patch, label) {
+  try { const j = await api('PATCH', '/api/admin/settings', patch); S.about = {...S.about, ...j}; toast(label); return true; }
+  catch { return false; }
+}
+function hostWire(md) {
+  md.addEventListener('change', async e => {
+    const id = e.target.id;
+    if (id === 's-orgagents') {
+      try { const j = await api('PUT', '/api/admin/agent-policy', {user_agents: e.target.checked}); S.about = {...S.about, user_agents: j.user_agents}; toast(e.target.checked ? tr('Members may connect agents') : tr('Only admins connect agents')); } catch { e.target.checked = !e.target.checked; }
+      return;
+    }
+    if (id === 's-quota') { const v = e.target.value.trim(); if (v !== '' && !/^\d+$/.test(v)) { toast(tr('Invalid value: {0}', tr('Storage per person'))); return; } hostSave(md, {storage_quota_mb: v === '' ? null : +v}, tr('Saved')); return; }
+    if (id === 's-qpool') { hostSave(md, {storage_pool: e.target.value}, tr('Saved')); return; }
+    if (id === 's-support') { hostSave(md, {support_email: e.target.value.trim()}, tr('Saved')); return; }
+    if (id === 's-maillim') { const v = +e.target.value; if (!(v >= 1 && v <= 1000)) { toast(tr('Invalid value: {0}', tr('E-mails per day'))); e.target.value = S.about?.mail_day_limit || 30; return; } hostSave(md, {mail_day_limit: v}, tr('Saved')); }
+  });
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('[data-m="ann-save"], [data-m="ann-clear"]'); if (!b) return;
+    const iso = id => { const v = $(id, md)?.value; return v ? new Date(v).toISOString() : ''; };
+    const body = b.dataset.m === 'ann-clear' ? {text: ''} : {text: $('#s-ann-text', md).value.trim(), level: $('#s-ann-level', md).value, starts_at: iso('#s-ann-from'), ends_at: iso('#s-ann-to'), push: $('#s-ann-push', md).checked};
+    if (b.dataset.m === 'ann-save' && !body.text) { toast(tr('Write the notice first')); return; }
+    try { await api('PUT', '/api/admin/announcement', body); } catch { return; }
+    try { const j = await api('GET', '/api/about'); S.about = {...S.about, ...j}; } catch { /* keep */ }
+    await load(); render(); toast(body.text ? tr('Notice published') : tr('Notice removed'));
+    const p = $('[data-admp="server"]', md); if (p) { p.innerHTML = instanceHtml((id, on, label) => `<label class="chkl"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}> ${label}</label>`, t => `<div class="shint">${t}</div>`) + hostHtml(t => `<div class="shint">${t}</div>`) + plaHtml() + bkHtml() + stoHtml(); plaDraw(md); bkDraw(md); }
+  });
 }
 function settingsModal(focus) {
   const s = S.settings;
@@ -525,6 +594,7 @@ function settingsModal(focus) {
       ${caldavHtml(hint)}
       ${S.paperless?.personal || S.paperless?.enabled ? `<h4 id="s-pl-h">Paperless</h4>
       ${hint(tr('Link documents from Paperless-ngx to tasks. Your connections: the ones an admin set up for you (you enter your own API token, so Paperless shows you exactly what you may see there) and your own, which only you see and use.'))}
+      ${S.paperless?.hosted ? `<div class="shint keep">${ic('alert', 's')} ${tr('On this hosted server only Paperless servers that are reachable over the internet with HTTPS can be connected, none in your own network.')} <a href="https://github.com/Gegenschuss/kalmido#readme" target="_blank" rel="noopener noreferrer">${tr('Self-hosting Kalmido reaches servers in your own network too.')}</a></div>` : ''}
       <div class="members" id="s-plc"><div class="muted mhint">${tr('Loading…')}</div></div>
       ${S.paperless?.enabled ? `<div class="row"><label>${tr('After upload')}</label>${chk('s-plkeep', s.paperless_keep === '1', tr('Also keep the attachment in Kalmido'))}</div>` : ''}` : ''}
       <h4 id="s-mail-h">${tr('Tasks by e-mail')}</h4><div id="s-mail"></div>
@@ -546,7 +616,12 @@ function settingsModal(focus) {
       <div class="members" id="s-tpls"><div class="muted mhint">${tr('Loading…')}</div></div>
       ${sampleHtml(hint)}`,
     ai: aiPaneOn() ? aiHtml(hint, {agents: 'agents', agentdots: 'agents', usage: 'usage', activity: 'log'}[focus]) : '',  // 2.7.0 (#405 S2)
-    users: S.me?.is_admin ? usersHtml() + orgsHtml() + grpHtml() + orphHtml() + instanceHtml(chk, hint) + `<div id="s-signin">${signinHtml(hint)}</div>` + plaHtml() + bkHtml() + stoHtml() + aaHtml() : '',  // 1.9.0: users first
+    users: S.me?.is_admin ? admSubsHtml({  // 2.24.0 (#826): Administration in sub-tabs like Agents
+      users: usersHtml() + grpHtml() + orphHtml(),
+      signin: `<div id="s-signin">${signinHtml(hint)}</div>`,
+      org: orgsHtml() + orgAgentsHtml(hint),
+      server: instanceHtml(chk, hint) + hostHtml(hint) + plaHtml() + bkHtml() + stoHtml(),
+      log: aaHtml()}, {users: 'users', groups: 'users'}[focus]) : '',  // 1.9.0: users first
     help: `<h4>${tr('Getting started')}</h4>
       <div class="row"><button class="btn sm" data-m="tour">${ic('arrow', 's')} ${tr('Restart the welcome tour')}</button>${isMobile() ? '' : `<button class="btn sm" data-m="keys">${ic('help', 's')} ${tr('Keyboard shortcuts')} ${kb('?')}</button>`}<button class="btn sm" data-m="cele-try">${ic('check', 's')} ${tr('Show the celebration')}</button></div>
       ${isMobile() ? '' : `<div class="shelp">${tr('{0}: search and commands for everything (tasks, lists, views, settings). j / k move through the tasks, x completes, s snoozes, g t goes to Today.', kbText('Mod+K'))}</div>`}
@@ -603,6 +678,7 @@ function settingsModal(focus) {
     if (k === 'notify') wpDraw(md);
     if (k === 'users') { aaDraw(md); bkDraw(md); orphDraw(md); grpDraw(md); }
     if (k === 'ai') aiSubShow(md);  // 2.5.1 (#393): only the shown sub-tab loads
+    if (k === 'users') admSubShow(md);
     if (k === 'account') { tfaDraw(md); tokDraw(md); apwDraw(md); }
     $(`.snav [data-sec="${k}"]`, md)?.scrollIntoView({block: 'nearest', inline: 'nearest'});
   };
@@ -675,22 +751,40 @@ function settingsModal(focus) {
   onRemove(md, () => { if (!md._noflush) flush(); });
   $('.snav', md).addEventListener('click', e => { const b = e.target.closest('[data-sec]'); if (b) show(b.dataset.sec); });
   // 2.13.0 (#453 P20): search every tab's headings, labels and options; a hit opens its tab and scrolls to it
-  const sres = $('#s-sres', md);
+  // 2.24.0 (UX-16): full text: also buttons, helper lines, the small texts of switches, select options and table heads,
+  // plus a few synonyms (words people search for that the labels do not use); a hit inside a sub-tab (Administration,
+  // Agents) or a folded section opens it; nothing found hides the panes behind one clear line
+  const sres = $('#s-search', md) && $('#s-sres', md);
+  const SYN = [[['logout', 'log out', 'sign out', 'abmelden', 'ausloggen'], '[data-acc="logout"]'], [['push', 'benachrichtigung', 'notification', 'glocke', 'bell'], '[data-pane="notify"] h4'],
+    [['sidebar', 'seitenleiste', 'menü', 'menu'], '#s-tabbar-h'], [['wartet', 'waiting', 'warten', 'extern'], '[data-modrow="deps"]'], [['passwort', 'password', 'kennwort'], '#a-cur'],
+    [['speicher', 'storage', 'quota', 'kontingent'], '#s-storage-h'], [['dunkel', 'dark', 'hell', 'light', 'theme'], '#s-lookin h4'], [['sprache', 'language'], '#s-lang-h']];
+  const shown = el => !el.closest('[hidden]') || el.closest('[data-admp], [data-aisp]');
   $('#s-search', md).addEventListener('input', e => {
-    const q = e.target.value.trim().toLowerCase(); if (!q) { sres.classList.add('hidden'); sres.innerHTML = ''; return; }
-    const hits = [];
-    for (const p of $$('.spane', md)) for (const el of $$('h4, .row > label, label.chkl, .modrow b, summary', p)) {
-      const t = el.textContent.trim(); if (t && t.toLowerCase().includes(q) && !hits.some(h => h.el === el)) hits.push({el, t, k: p.dataset.pane});
-      if (hits.length >= 12) break;
+    const q = e.target.value.trim().toLowerCase(), sb = $('.sbody', md);
+    if (!q) { sres.classList.add('hidden'); sres.innerHTML = ''; sb.classList.remove('snores'); return; }
+    const hits = [], seen = new Set();
+    const add = (el, k) => { if (!el || seen.has(el) || hits.length >= 14) return; const t = (el.matches('input,textarea') ? el.getAttribute('placeholder') || el.getAttribute('aria-label') || '' : el.textContent).replace(/\s+/g, ' ').trim(); if (!t) return; seen.add(el); hits.push({el, t, k}); };
+    for (const [ws, sel] of SYN) if (ws.some(w => w.startsWith(q) || (q.length > 3 && q.includes(w)))) { const el = $(sel, md); if (el) add(el, el.closest('.spane')?.dataset.pane); }
+    for (const p of $$('.spane', md)) for (const el of $$('h4, .row > label, label.chkl, .featgrid label > span, .modrow b, .modrow small, summary, button:not(.iconbtn), .shint, option, th', p)) {
+      if (!shown(el) || el.closest('.ssres')) continue;
+      const own = el.matches('.featgrid label > span') ? (el.firstChild?.textContent || '') + ' ' + (el.querySelector('small')?.textContent || '') : el.textContent;
+      if (own.toLowerCase().includes(q)) add(el.matches('option') ? el.closest('select') : el, p.dataset.pane);
+      if (hits.length >= 14) break;
     }
     const tab = k => $(`.snav [data-sec="${k}"] span`, md)?.textContent || k;
-    sres.innerHTML = hits.length ? hits.map((h, i) => `<button type="button" role="option" data-hit="${i}"><span class="muted">${esc(tab(h.k))} ›</span> ${esc(h.t.slice(0, 80))}</button>`).join('') : `<div class="muted mhint">${tr('Nothing found')}</div>`;
+    const lab = h => (h.el.matches('select') ? (h.el.closest('.row')?.querySelector('label')?.textContent || h.t) : h.t).slice(0, 80);
+    sres.innerHTML = hits.length ? hits.map((h, i) => `<button type="button" role="option" data-hit="${i}"><span class="muted">${esc(tab(h.k))} ›</span> ${esc(lab(h))}</button>`).join('') : `<div class="muted mhint">${esc(tr('Nothing found for “{0}”', e.target.value.trim()))}</div>`;
+    sb.classList.toggle('snores', !hits.length); sb.dataset.nores = hits.length ? '' : tr('Nothing found for “{0}”', e.target.value.trim());
     sres._hits = hits; sres.classList.remove('hidden');
   });
   sres.addEventListener('click', e => {
     const b = e.target.closest('[data-hit]'); if (!b) return;
-    const h = sres._hits[+b.dataset.hit]; sres.classList.add('hidden'); $('#s-search', md).value = '';
-    show(h.k); const r = h.el.closest('.row, .modrow, details, h4') || h.el;
+    const h = sres._hits[+b.dataset.hit]; sres.classList.add('hidden'); $('#s-search', md).value = ''; $('.sbody', md).classList.remove('snores');
+    show(h.k);
+    const ap = h.el.closest('[data-admp]'); if (ap) admSubShow(md, ap.dataset.admp, true);
+    const ai = h.el.closest('[data-aisp]'); if (ai) aiSubShow(md, ai.dataset.aisp, true);
+    const det = h.el.closest('details'); if (det && !h.el.matches('summary')) det.open = true;
+    const r = h.el.closest('.row, .modrow, details, h4, label') || h.el;
     setTimeout(() => { r.scrollIntoView?.({block: 'center'}); r.classList.add('flash'); setTimeout(() => r.classList.remove('flash'), 1600); }, 30);
   });
   setTimeout(() => $(`.snav [data-sec="${cur}"]`, md)?.scrollIntoView({block: 'nearest', inline: 'nearest'}), 0);
@@ -706,6 +800,8 @@ function settingsModal(focus) {
   aiTblWire(md);
   if (cur === 'ai') aiSubShow(md, {agents: 'agents', usage: 'usage', activity: 'log'}[focus]);  // 2.5.1 (#393)
   md.addEventListener('click', e => { const b = e.target.closest('[data-aisub]'); if (b) aiSubShow(md, b.dataset.aisub, true); });
+  md.addEventListener('click', e => { const b = e.target.closest('[data-admsub]'); if (b) admSubShow(md, b.dataset.admsub, true); });  // 2.24.0 (#826)
+  if (S.me?.is_admin) hostWire(md);
   aiuWire(md, only => { const box = $('#s-aiu', md); if (only && box && S.aiu.data) box.innerHTML = aiuHtml(S.aiu.data, Math.max(240, Math.min(720, (box.clientWidth || 560) - 8))); else aiuDraw(md); });  // 2.1.1 (#326)
   if (cur === 'account' && S.me) { tfaDraw(md); tokDraw(md); apwDraw(md); }
   if (S.me) { tfaWire(md); tokWire(md); apwWire(md); }
@@ -730,7 +826,7 @@ function settingsModal(focus) {
       grp(N_('Filters'), S.filters.map(f => opt('f:' + f.id, f.name)).join('')) +
       grp(N_('Folders'), folderNames().map(f => opt('folder:' + f, fDisp(f))).join('')) +
       grp(N_('Tags'), Object.keys(counts().tags).sort((a, b) => a.localeCompare(b, 'de')).map(t => opt('tag:' + t, '#' + t)).join('')) +
-      grp(N_('Other'), opt('home', tr('Dashboard')) + (teamOn() ? opt('team', tr('Team chat')) : '') + (collab() ? opt('news', tr('News')) : '') + (feat('agents') && agentsOn() ? opt('agents', tr('Agents')) : '') + (overviewOn() ? opt('overview', tr('Overview')) : '') + (feat('stats') ? opt('stats', tr('Statistics')) : '') + (timeOn() ? opt('time', tr('Time tracking')) : '') + opt('search', tr('Search')) + opt('settings', tr('Settings')));
+      grp(N_('Other'), opt('home', tr('Dashboard')) + (teamOn() ? opt('team', tr('Team chat')) : '') + (collab() ? opt('news', tr('News')) : '') + (feat('agents') && agentsOn() ? opt('agents', tr('Agents')) : '') + (overviewOn() ? opt('overview', tr('Overview')) : '') + (feat('stats') ? opt('stats', tr('Statistics')) : '') + (timeOn() ? opt('time', tr('Time tracking')) : '') + opt('search', tr('Search')) + opt('lists', tr('Lists')) + opt('settings', tr('Settings')));
   };
   md._tabDraw = tabDraw;
   const tabApply = ids => { if (ids) LS.set('tabbar', ids); else LS.set('tabbar', null); tabDraw(); renderTabs(); };

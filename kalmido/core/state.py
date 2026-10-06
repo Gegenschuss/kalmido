@@ -246,7 +246,19 @@ def state():
         books=books_for(c, uid) if contacts_on(c, uid) else [],
         tcontacts=task_contacts(c, uid, {t["id"] for t in tasks}),
         clients=clients_brief(c, uid),  # 2.23.0 (#463): the clients I see (module clients) with their lists
+        storage=_quota(c, uid),  # 2.24.0 (#910): used / limit / level
+        announce=_announce(c),  # 2.24.0 (#907): the notice above the app (or null)
     )
+
+
+def _quota(c, uid):
+    from ..admin.hosting import quota_info
+    return quota_info(c, uid)
+
+
+def _announce(c):
+    from ..admin.hosting import announce_get
+    return announce_get(c)
 
 
 def ev_sig(c, uid):

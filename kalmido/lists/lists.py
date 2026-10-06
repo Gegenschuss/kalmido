@@ -475,6 +475,9 @@ def member_set(lid):
         who = user_names(c, [me()]).get(me(), "?")
         list_push(c, uid, "share", lid, lambda lg: tr("{0} shared a list with you", who, lg=lg), lambda lg: lname)
         wh_note_list(lid, "list.shared", {"member_id": uid, "role": role})
+        if c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent'", (uid,)).fetchone():
+            from ..admin.hosting import agent_joined_notice
+            agent_joined_notice(c, lid, uid, me())  # 2.24.0 (#896)
     bump(c)
     c.commit()
     return jsonify(ok=True, **({"by_email": True} if b.get("email") and not b.get("user_id") else {}))
@@ -514,6 +517,9 @@ def _folder_member_add(c, lid, uid, role, actor):
               (lid, uid, role, role, my_max_sort(c, uid) + 1, iso(now_utc())))
     member_folder_adopt(c, lid, uid)
     news_add(c, uid, "share", list_id=lid, data={"role": role, "name": l["name"]}, actor=actor)
+    if is_agent(u):
+        from ..admin.hosting import agent_joined_notice
+        agent_joined_notice(c, lid, uid, actor)  # 2.24.0 (#896)
     return True
 
 
@@ -627,6 +633,8 @@ def agent_share_add(c, lid, aid, actor):
               (lid, aid, "edit", "edit", my_max_sort(c, aid) + 1, iso(now_utc())))
     news_add(c, aid, "share", list_id=lid, data={"role": "edit", "name": lname}, actor=actor)
     wh_note_list(lid, "list.shared", {"member_id": aid, "role": "edit"})
+    from ..admin.hosting import agent_joined_notice
+    agent_joined_notice(c, lid, aid, actor)  # 2.24.0 (#896)
     return True
 
 

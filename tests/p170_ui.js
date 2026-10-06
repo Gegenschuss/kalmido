@@ -126,9 +126,11 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   const odN = w.eval('overdueTasks().length');
   check(ban() && new RegExp(`${odN} overdue`).test(ban().textContent), `banner on Today: "${ban()?.textContent.replace(/\s+/g, ' ').trim()}"`);
   check(odN === 4, 'overdue counted: Test, two own tasks, one view-only: ' + odN);
-  check([...ban().querySelectorAll('[data-act="od-move"]')].map(b => b.textContent.trim()).join('|') === 'Today|Tomorrow|Next week (Mon)|Pick a date…', 'banner: Today / Tomorrow / Next week (Mon) / Pick a date…');
+  // 2.24.0 (UX-35): "All to today" + "Another day…" (Tomorrow / Next week (Mon) / Pick a date… in its menu)
+  check([...ban().querySelectorAll('.btn')].map(b => b.textContent.trim()).join('|') === 'All to today|Another day…', 'banner: All to today / Another day…');
+  const other = lab => { click(w, ban().querySelector('[data-act="od-other"]')); const b = [...d.querySelectorAll('#pop .menu-list button')].find(x => x.textContent.trim() === lab); click(w, b); };
   const h0 = w.eval('HIST.undo.length');
-  click(w, ban().querySelector('[data-d="1"]'));
+  other('Tomorrow');
   check(await until(async () => (await st()).tasks.find(t => t.id === o1)?.due === T1), 'Tomorrow: overdue task moved');
   let s = await st(); const g = id => s.tasks.find(t => t.id === id);
   check(g(o1).due_time === '08:15' && g(o1).repeat === 'FREQ=WEEKLY', 'time and repeat kept');
@@ -147,14 +149,14 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   check(g(o1).due_time === '08:15', 'undo keeps the time');
   // next week
   await sleep(300);
-  click(w, ban().querySelector('[data-d="w"]'));
+  other('Next week (Mon)');
   check(await until(async () => (await st()).tasks.find(t => t.id === o2)?.due === w.eval('nextWeekday(1)')), 'Next week (Mon)');
   await until(() => !w.eval('HIST.busy'));
   d.querySelector('#top [data-act="hist-undo"]')?.click();
   await until(async () => (await st()).tasks.find(t => t.id === o2)?.due === addD(T0, -1));
   await sleep(300);
   // pick a date opens the picker
-  click(w, ban().querySelector('[data-d="pick"]')); await sleep(100);
+  other('Pick a date…'); await sleep(100);
   check(w.eval('!!DP.el'), 'Pick a date… opens the date picker');
   w.eval('dpClose(false)');
   // only on Today
@@ -233,7 +235,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   w.eval(`sortMenu(document.querySelector('#top h1'))`); await sleep(100);
   check(menuLabels(d).includes('Ablauf'), 'German: "Ablauf" in the sort menu: ' + menuLabels(d));
   w.eval(`go('today')`); await sleep(300);
-  check(/überfällig/.test(d.querySelector('#view .odban')?.textContent || '') && /Nächste Woche \(Mo\)/.test(d.querySelector('#view .odban')?.textContent || ''), 'German banner');
+  check(/überfällig/.test(d.querySelector('#view .odban')?.textContent || '') && /Alle auf heute/.test(d.querySelector('#view .odban')?.textContent || ''), 'German banner');
   w.close();
 
   const bad = errs.filter(e => !/Could not parse CSS/.test(e));

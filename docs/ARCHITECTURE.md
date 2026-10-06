@@ -177,6 +177,7 @@ The most used helpers:
 | `team/forms.py` | Forms (module "forms"): a link whose page (/f/<token>) creates a task in a list. |
 | `team/v1.py` | Clients, workload, approvals, forms: the REST API v1 (+ MCP) and its OpenAPI part. |
 | `accounts/signup.py` | Self-registration on the login page and sign-in links (QR) for people without e-mail. |
+| `admin/hosting.py` | Running Kalmido for others (2.24.0): storage quota per person, the notice / maintenance banner, daily e-mail limits, the "agent joined" notice, `KALMIDO_HOSTED`. |
 | `startup.py` | Start-up: init_db() and the background threads (watchdog, update check, calendars, backups, webhooks, mail, git). |
 
 ### Adding a route

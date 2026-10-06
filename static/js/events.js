@@ -78,6 +78,7 @@ function toast(msg, undo, ms, label) {  // label: the button's text instead of "
 function currentQuickInput() { return $('#qinput'); }
 function updateChips(input) {
   if (input.id === 'qinput') qdockChips();
+  input.closest('.qadd.dock')?.classList.toggle('has-text', !!input.value.trim());  // 2.24.0 (UX-30)
   const chips = input.closest('.qadd').querySelector('.chips');
   if (!chips) return;
   const r = parseQuick(input.value, S.quick.ignore);
@@ -265,6 +266,7 @@ document.addEventListener('click', async e => {
     case 'agent-chip': agentChipMenu(a); break;
     case 'st-chip': stChipMenu(a); break;
     case 'share-list': shareModal(+a.dataset.id); break;
+    case 'dm': dmOpen(+a.dataset.uid, personNameAny(+a.dataset.uid)); break;  // 2.24.0 (#906)
     case 'chat-open': chatOpen(+a.dataset.aid); break;
     case 'chat-close': chatClose(); break;
     case 'chat-send': chatSend(); break;
@@ -487,6 +489,7 @@ document.addEventListener('click', async e => {
     case 'tl-today': S.tlStart = addDays(weekStartOf(today()), -7); { const tl = $('#tlscroll'); renderView(); const n = $('#tlscroll'); if (n) n.scrollLeft = 5 * tlDW(); } break;
     case 'sort': sortMenu(a); break;
     case 'od-move': overdueAct(a); break;
+    case 'od-other': overdueOther(a); break;  // 2.24.0 (UX-35)
     case 'od-hide': LS.set('odHide', today()); renderView(); break;
     case 'section-new': {
       const n = await askPrompt(tr('Name of the section / column'), '', {ok: tr('Add')}); if (!n || !n.trim()) break;

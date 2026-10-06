@@ -60,6 +60,11 @@ def invite_new(c, uid, by, send=True, kind=None):
     link = f"{PUBLIC_URL}/#{'signin' if kind == 'login' else 'invite'}/{tok}"
     out = {"link": link, "expires_at": exp, "sent": False, "kind": kind, "email": u["email"] or ""}
     if send and MAIL_OUT_ON and u["email"] and kind != "login":
+        from ..admin.hosting import mail_budget
+        if not mail_budget(c, by, u["email"]):  # 2.24.0 (#899): mails per account / address and day
+            print("invitation mail not sent: daily limit (sender", by, ")", flush=True)
+            out["error"] = tr("Today's e-mail limit is reached: copy the link instead")
+            return out
         try:
             inviter = c.execute("SELECT display_name, username FROM users WHERE id=?", (by,)).fetchone()
             subject, text, body_html = invite_mail(c, u, link, kind, (inviter["display_name"] or inviter["username"]) if inviter else "")
