@@ -7,6 +7,10 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.24.1] - 2026-10-06
+
+- werkzeug 3.1.9 (security fix CVE-2026-102598)
+
 ## [2.24.0] - 2026-10-06
 
 **In short:** Usability (#827). The things people use every day come first: a direct message one tap away, the own
@@ -2762,7 +2766,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.24.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.24.1...HEAD
+[2.24.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.24.1
 [2.24.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.24.0
 [2.23.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.23.0
 [2.22.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.22.0
