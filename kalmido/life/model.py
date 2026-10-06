@@ -11,7 +11,7 @@ from ..core.db import iso, local_now, now_utc, usettings
 from ..core.access import Denied, health_hidden, my_max_sort, need_list, vis_sql, wr_sql
 from ..core.serializers import load_tasks
 from ..core.state import visible_lists
-from ..lists.lists import agent_autoshare, clean_folder, LIST_NAME_MAX
+from ..lists.lists import list_created, clean_folder, LIST_NAME_MAX
 from ..lists.groups import grp_touch
 from ..tasks.validation import as_int, log_act, rr_problem, TITLE_MAX, valid_date
 from ..personal.timetrack import BadInput
@@ -200,9 +200,8 @@ def life_list_create(c, uid, kind, name=None, folder="", trip=None):
                     ((name or tr(LIFE_LIST_NAMES[kind], lg=lg))[:LIST_NAME_MAX], LIFE_LIST_COLORS.get(kind, ""), folder,
                      my_max_sort(c, uid) + 1, "list", iso(now_utc()), uid, 1 if kind == "travel" else 0, "list", kind,
                      _dump(trip) if trip else "")).lastrowid
-    if kind != "health":  # health lists are never shared with an agent automatically
-        agent_autoshare(c, uid, lid)
-    grp_touch(c, uid)
+    # health lists never go to an agent automatically; the people of a shared folder get them like any list (#931)
+    list_created(c, uid, lid, agents=kind != "health")
     return lid
 
 

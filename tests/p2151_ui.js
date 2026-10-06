@@ -173,7 +173,8 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
     await openTask(o, T);
     const x = await ev(HEAD);
-    headChecks(tag, x, {rows: 2, words: vw >= 390, pin: true});
+    headChecks(tag, x, {rows: 2, words: vw >= 360, // 2.25.0 (UX-42): the words from 20rem (360 px phones too)
+                   pin: true});
     await shot(`p2151-${tag}-header.png`);
     if (vw !== 390) return;
     // a real tap on Tomorrow

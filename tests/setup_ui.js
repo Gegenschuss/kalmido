@@ -129,10 +129,10 @@ const feats = st => st.settings.features.split(',');
   jar = {}; w = await open(jar); d = w.document;
   await step1(w);
   click(w, d.querySelector('[data-su-preset="team"]')); await sleep(100);
-  check([...d.querySelectorAll('[data-use]')].every(c => c.checked === (c.dataset.use !== 'family')) && d.querySelector('[data-su-preset="team"]').classList.contains('on') && !d.querySelector('[data-su-preset="me"]').classList.contains('on'), 'Team: all ticked but Family');
+  check([...d.querySelectorAll('[data-use]')].every(c => c.checked === !['family', 'habits', 'pomo', 'matrix', 'stats'].includes(c.dataset.use)) && d.querySelector('[data-su-preset="team"]').classList.contains('on') && !d.querySelector('[data-su-preset="me"]').classList.contains('on'), 'Team: all ticked but Family, habits, focus timer, matrix, statistics (2.25.0)');
   click(w, d.querySelector('[data-su="go"]')); await sleep(800);
   st = await api(jar, 'GET', '/api/state');
-  check(st.collab_all === true && st.time_all === true && ['collab', 'time', 'habits', 'kanban', 'timeline', 'deps', 'fields', 'progress'].every(f => feats(st).includes(f)), 'Team: switches + modules on');
+  check(st.collab_all === true && st.time_all === true && ['collab', 'time', 'kanban', 'timeline', 'deps', 'fields', 'progress'].every(f => feats(st).includes(f)) && !['habits', 'pomo', 'matrix', 'stats'].some(f => feats(st).includes(f)), 'Team: switches + modules on, only what the name promises (2.25.0, UX-25)');
   w.close();
 
   // ---- 3b: preset "For me": lists, subtasks, reminders, calendar; everything else off

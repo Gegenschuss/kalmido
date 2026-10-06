@@ -91,7 +91,7 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   check(dep_(`${b1}:${w3}`)?.classList.contains('agg'), 'a single arrow from a collapsed list starts at its summary bar');
   agg().querySelector('.hit').dispatchEvent(new w.MouseEvent('click', {bubbles: true})); await sleep(100);
   let pop = d.querySelector('#pop:not(.hidden)');
-  check(pop && /“Shoot” waits on “Kickoff”/.test(pop.textContent) && /“Shoot” waits on “Design”/.test(pop.textContent), 'merged arrow: popover lists both');
+  check(pop && /“Shoot” is blocked by “Kickoff”/.test(pop.textContent) && /“Shoot” is blocked by “Design”/.test(pop.textContent), 'merged arrow: popover lists both');
   w.eval('closePop()');
   // ---- collapse all / expand all
   d.querySelector('[data-act="rm-collapse"]').click();

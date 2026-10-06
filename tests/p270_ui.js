@@ -127,7 +127,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check((await call('GET', '/api/state')).lists.find(l => l.id === L).nag === '1d', 'list default saved: daily');
   // #414 (2.7.2): the type is gone; "Show completed at the bottom" with the cart hint instead
   const ks = md.querySelector('#l-kind');
-  check([...ks.options].map(o => o.textContent).join('|') === 'List|Project', 'types: List|Project (2.7.2): ' + [...ks.options].map(o => o.textContent).join('|'));
+  check(ks && ks.type === 'hidden' && md.querySelector('#l-kindp'), 'the kind: the switch Project features (2.25.0)');
   const dab = md.querySelector('#l-dab');
   dab.checked = true; change(w, dab); await sleep(900);
   check(/comes back with one tap/.test(md.textContent) && md.querySelector('.ldabrow'), 'the option with its hint');
@@ -229,7 +229,10 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(d.querySelector('#top [data-act="hist-undo"]') && !w.eval('topMoreItems()').some(x => x.icon === 'undo'), 'touch tablet: ← → in the header, not in "…"');
   w.close();
   w = await boot({user: 'alice', hash: 'l/' + L, mobile: true}); d = w.document;
-  check(!d.querySelector('#top [data-act="hist-undo"]') && w.eval('topMoreItems()').some(x => x.icon === 'undo'), 'phone: ← → in "…"');
+  // 2.25.0 (UX-12): on a phone "…" lists Undo / Redo only when there is something to undo / redo
+  check(!d.querySelector('#top [data-act="hist-undo"]') && !w.eval('topMoreItems()').some(x => x.icon === 'undo'), 'phone: nothing to undo: no dead "Undo" row in "…"');
+  await w.eval(`patchUndoable(S.lists[0] && [...S.tasks.values()][0]?.id, {priority: 5}, 'p')`).catch?.(() => {}); await sleep(300);
+  check(!w.eval('HIST.undo.length') || w.eval('topMoreItems()').some(x => x.icon === 'undo'), 'phone: ← in "…" once there is something to undo');
   w.close();
   if (errs.length) { check(false, 'JS errors: ' + [...new Set(errs)].join(' | ')); }
 

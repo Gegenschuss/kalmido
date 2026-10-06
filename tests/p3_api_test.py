@@ -165,7 +165,7 @@ check(C.post(B + f"/api/tasks/{t1}/complete").status_code == 403, "view member c
 res = A.post(B + f"/api/tasks/{t1}/complete").json()
 time.sleep(0.6)
 ps = [p for p in pushes() if p["topic"] == "t-bob"]
-check(len(ps) == 1 and ps[0]["title"] == "Wartet nicht mehr: Build" and "Alice hat Design erledigt" in ps[0]["msg"] and ps[0]["click"].endswith(f"/#t/{t2}"),
+check(len(ps) == 1 and ps[0]["title"] == "Nicht mehr blockiert: Build" and "Alice hat Design erledigt" in ps[0]["msg"] and ps[0]["click"].endswith(f"/#t/{t2}"),
       f"push to the assignee bob, German: {ps}")
 check(not [p for p in pushes() if p["topic"] in ("t-alice", "t-carol")], "nobody else gets a push")
 nb = [x for x in news(Bb) if x["kind"] == "unblock"]

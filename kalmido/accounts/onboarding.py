@@ -31,19 +31,19 @@ def onboarding_tasks(feats, touch, mac):
         (N_("Try quick add: Dentist tomorrow 3pm !high #private"),
          N_("Type it into the add bar (the + button on a phone): dates, times, !priority, #tags and ~list are recognized while you type."), 3, True, []),
         (N_("Swipe me left to reschedule") if touch else N_("Drag me onto Tomorrow in the sidebar"),
-         N_("Swipe left for snooze, other dates and delete; long-press and drag to reorder.") if touch
+         N_("Swipe left for snooze, other dates and delete; long-press for the task’s menu, long-press and drag to reorder.") if touch
          else N_("Drag tasks onto a day, a list or another place in the list. Right-click is not needed: the … menu has the rest."), 1, True, []),
     ]
     if not touch:
         tt.append((N_("Press {0} to search and run commands"), N_("Lists, tasks, views and actions in one box. Press ? for all keyboard shortcuts."), 0, False, []))
     mods = [("habits", N_("Create a habit under Habits"), N_("Daily or a few times a week, with streaks.")),
-            ("pomo", N_("Start a focus timer on a task"), N_("Task menu (…) > Start focus, or the Focus module.")),
+            ("pomo", N_("Start a focus timer on a task"), N_("Task menu (…) > Start focus, or the Focus timer module.")),
             ("collab", N_("Share this list with someone"), N_("List menu (…) > Sharing. Tasks in shared lists can be assigned and commented.")),
             ("time", N_("Start a timer on a task"), N_("Task menu (…) > Start timer; reports under Time tracking.")),
             ("timeline+deps", N_("Plan a project in the timeline"),
-             N_("Edit list > Type: Project, View: Timeline. Drag the dot at the end of one bar onto another: the second task then waits on the first.")
+             N_("Edit list > Type: Project, View: Timeline. Drag the dot at the end of one bar onto another: the second task is then blocked by the first.")
              if not touch else
-             N_("Edit list > Type: Project, View: Timeline. Long-press a bar and choose “Connect to…”, then tap the task that waits on it."))]
+             N_("Edit list > Type: Project, View: Timeline. Long-press a bar and choose “Connect to…”, then tap the task it blocks."))]
     for k, t, d in mods:
         if all(x in feats for x in k.split("+")):
             tt.append((t, d, 0, False, []))

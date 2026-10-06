@@ -57,7 +57,7 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
   check(/^M[\d.]+,[\d.]+(L|Q)/.test(g(`${Cc}:${Bt}`).querySelector('path.ln').getAttribute('d')), 'orthogonal path with elbows');
   const bar = id => d.querySelector(`.tl-bar[data-id="${id}"]`);
   check(bar(Bt).classList.contains('wait') && bar(Bt).classList.contains('conf') && bar(Bt).querySelector('.tl-lk'), 'waiting + conflicting bar: hatch class, lock mark, conflict edge');
-  check(/Starts before “Design” is due/.test(bar(Bt).title) && /Waiting on/.test(bar(Bt).title), 'bar tooltip names the conflict and what it waits on');
+  check(/Starts before “Design” is due/.test(bar(Bt).title) && /Blocked by/.test(bar(Bt).title), 'bar tooltip names the conflict and what it waits on');
   check(bar(Cc).classList.contains('wait') && !bar(Cc).classList.contains('conf'), 'waiting without conflict: no conflict mark');
   check(!bar(A).classList.contains('wait') && bar(A).getAttribute('tabindex') === '0' && bar(A).getAttribute('role') === 'button', 'free bar: focusable, no waiting mark');
   check(d.querySelectorAll('.tl-knob').length === 4, 'a link dot per bar I can change');
@@ -72,7 +72,7 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
   check(bar(Cc).classList.contains('hot') && /^M[\d.]+,[\d.]+L/.test(d.querySelector('#tl-deps .rubber').getAttribute('d')), 'rubber band to the hovered target');
   ptr(w, bar(Cc), 'pointerup', 60);
   check(await until(async () => (await blockers(Cc)).includes(E)), 'drop: Launch now waits on Copy (server)');
-  check(await until(() => /“Launch” now waits on “Copy”/.test(toastText(d))), 'toast after linking');
+  check(await until(() => /“Launch” is now blocked by “Copy”/.test(toastText(d))), 'toast after linking');
   check(await until(() => g(`${Cc}:${E}`)), 'new arrow drawn');
   check(!d.querySelector('.tl.linking') && !d.querySelector('.tl-bar.tl-ok'), 'link marks cleared');
   // invalid: Launch -> Design would be a loop (Launch waits on Build waits on Design)
@@ -85,7 +85,7 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
   check(!(await blockers(A)).includes(Cc), 'no loop created');
   // already linked
   ptr(w, knob(A), 'pointerdown', 0); ptr(w, bar(Bt), 'pointermove', 40); ptr(w, bar(Bt), 'pointerup', 40);
-  check(await until(() => /already waits on/.test(toastText(d))), 'already linked: toast');
+  check(await until(() => /already blocked by/.test(toastText(d))), 'already linked: toast');
   // a click on the dot (no movement) starts "Connect to…"
   ptr(w, knob(A), 'pointerdown', 0); ptr(w, knob(A), 'pointerup', 0);
   check(await until(() => d.querySelector('.tl-pick')), 'click on the dot: "Connect to…" mode');
@@ -103,18 +103,18 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
 
   // ---- keyboard: focus a bar, C, then Enter on the target; context menu key
   bar(E).focus(); key(w, bar(E), 'c');
-  check(d.querySelector('.tl-pick') && /Tap the task that waits on “Copy”/.test(d.querySelector('.tl-pick').textContent) && d.activeElement === bar(E), 'C: "Connect to…" mode, focus stays on the bar');
+  check(d.querySelector('.tl-pick') && /Tap the task that “Copy” blocks/.test(d.querySelector('.tl-pick').textContent) && d.activeElement === bar(E), 'C: "Connect to…" mode, focus stays on the bar');
   check(bar(Cc).classList.contains('tl-ok') && !d.querySelector('.tl-knob'), 'mode: targets marked, no dots');
   key(w, bar(E), 'ArrowDown');
   check(d.activeElement && d.activeElement.classList.contains('tl-bar'), 'arrow keys move between bars');
   key(w, bar(Cc), 'Enter');
   check(await until(async () => (await blockers(Cc)).includes(E)), 'Enter on the target links it');
   check(await until(() => !d.querySelector('.tl-pick')), 'mode ends after linking');
-  await until(() => /“Launch” now waits on “Copy”/.test(toastText(d)));  // the state is reloaded before the toast
+  await until(() => /“Launch” is now blocked by “Copy”/.test(toastText(d)));  // the state is reloaded before the toast
   bar(Cc).focus(); key(w, bar(Cc), 'F10', {shiftKey: true}); await sleep(100);
   pop = d.querySelector('#pop:not(.hidden)');
-  check(pop && /Connect to…/.test(pop.textContent) && /Pick from a list…/.test(pop.textContent) && /Stop waiting on “Copy”/.test(pop.textContent), 'Shift+F10: bar menu with connect, list picker and remove');
-  [...pop.querySelectorAll('button')].find(b => /Stop waiting on “Copy”/.test(b.textContent)).click();
+  check(pop && /Connect to…/.test(pop.textContent) && /Pick from a list…/.test(pop.textContent) && /No longer blocked by “Copy”/.test(pop.textContent), 'Shift+F10: bar menu with connect, list picker and remove');
+  [...pop.querySelectorAll('button')].find(b => /No longer blocked by “Copy”/.test(b.textContent)).click();
   check(await until(async () => !(await blockers(Cc)).includes(E)), 'bar menu: remove');
   bar(A).focus(); key(w, bar(A), 'Enter'); await sleep(300);
   check(w.eval('S.sel') === A, 'Enter opens the task');
@@ -133,10 +133,10 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
   pop = d.querySelector('#pop:not(.hidden)');
   check(pop && /Verbinden mit…/.test(pop.textContent) && /Aus einer Liste wählen…/.test(pop.textContent), 'long-press: action sheet (German)');
   [...pop.querySelectorAll('button')].find(b => /Verbinden mit/.test(b.textContent)).click(); await sleep(100);
-  check(d.querySelector('.tl-pick') && /Tippe auf die Aufgabe, die auf „Copy“ wartet/.test(d.querySelector('.tl-pick').textContent), 'connect mode banner (German)');
+  check(d.querySelector('.tl-pick') && /Tippe auf die Aufgabe, die „Copy“ blockiert/.test(d.querySelector('.tl-pick').textContent), 'connect mode banner (German)');
   bar(A).dispatchEvent(new w.MouseEvent('click', {bubbles: true}));
   check(await until(async () => (await blockers(A, BK)).includes(E)), 'tap on the target links it (Design waits on Copy)');
-  check(await until(() => /„Design“ wartet jetzt auf „Copy“/.test(toastText(d))), 'German toast');
+  check(await until(() => /„Design“ ist jetzt blockiert durch „Copy“/.test(toastText(d))), 'German toast');
   // "Pick from a list…": the searchable picker
   touch(w, bar(E), 'touchstart'); await sleep(380); touch(w, bar(E), 'touchend'); await sleep(100);
   [...d.querySelectorAll('#pop button')].find(b => /Aus einer Liste/.test(b.textContent)).click(); await sleep(200);
@@ -207,17 +207,18 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
   w.eval('closeDetail()');
   w.eval('listModal()'); await sleep(200);
   md = lastModal(d);
-  check(md.querySelector('#l-kind').value === 'list' && [...md.querySelectorAll('#l-kind option')].map(o => o.value).join() === 'list,project', 'new list dialog: type selector, default List');
+  check(md.querySelector('#l-kind').value === 'list' && md.querySelector('#l-kindp') && !md.querySelector('#l-kindp').checked, 'new list dialog: the switch Project features, off (2.25.0)');
   check(md.querySelector('.kproj').hidden, 'type List: project settings hidden');
-  change(w, md.querySelector('#l-kind'), 'project');
+  { const kp = md.querySelector('#l-kindp'); kp.checked = true; kp.dispatchEvent(new w.Event('change', {bubbles: true})); }
   check(!md.querySelector('.kproj').hidden && /time tracking, dependencies with the Gantt timeline, custom fields, progress and status/.test(md.querySelector('#l-khint').textContent), 'type Project: hint names the features that are on');
   check(md.querySelector('#l-dab') && /shopping and packing/i.test(md.textContent), '2.7.2: "Show completed at the bottom" instead of a type');
   md.remove();
   const srow = d.querySelector(`#side .srow[data-list="${PL}"]`);
   srow.dispatchEvent(new w.MouseEvent('contextmenu', {bubbles: true, cancelable: true})); await sleep(100);
   pop = d.querySelector('#pop:not(.hidden)');
-  check(pop && /As a list/.test(pop.textContent) && /As a project/.test(pop.textContent) && !/Shopping & packing list/.test(pop.textContent) && /Edit list…/.test(pop.textContent), 'sidebar context menu: the types');
-  [...pop.querySelectorAll('button')].find(b => b.textContent.trim() === 'As a project').click();
+  check(pop && !/As a project/.test(pop.textContent) && !/Shopping & packing list/.test(pop.textContent) && /Edit list…/.test(pop.textContent), 'sidebar context menu: no type entries (2.25.0, UX-52: Edit list > Project features)');
+  [...pop.querySelectorAll('button')].find(b => b.textContent.trim() === 'Edit list…').click(); await sleep(300);
+  { const kp = lastModal(d).querySelector('#l-kindp'); kp.checked = true; kp.dispatchEvent(new w.Event('change', {bubbles: true})); }
   check(await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === PL).kind === 'project'), 'context menu: type changed on the server');
   check(await until(() => d.querySelector('#top .kbadge') && /Project/.test(d.querySelector('#top .kbadge').textContent)), 'Project badge in the header');
   w.eval(`openDetail(${pt})`); await sleep(300);

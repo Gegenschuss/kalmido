@@ -232,11 +232,12 @@ async function setProgHidden(id, hide) {
   try { await api('PATCH', '/api/settings', {hide_progress: S.settings.hide_progress}); } catch { await load(); render(); }
 }
 // the list's "…" menu (header) and the sidebar's context menu
-const colItem = id => ({label: tr('Columns…'), icon: 'columns', cls: 'mcols', fn: () => colModal(id)});
+const colItem = id => ({label: tr('Shown fields…'), icon: 'columns', cls: 'mcols', fn: () => colModal(id)});
 function listMenuItems(id, anchor) {
   const l = listById(id); if (!l) return [];
   const own = isOwner(l), k = l.kind || 'list', at = () => typeof anchor === 'function' ? anchor() : anchor;
-  const items = [{label: tr('Edit list…'), icon: 'edit', fn: () => listModal(id)}, ...(shareOk(l) && !l.archived ? [{label: tr(collab() ? N_('Share…') : N_('Ownership…')), icon: 'users', fn: () => shareModal(id)}] : [])];
+  // 2.25.0 (UX-12): only what works here: the inbox has no "Edit list…" and no list / project switch
+  const items = [...(l.is_inbox ? [] : [{label: tr('Edit list…'), icon: 'edit', fn: () => listModal(id)}]), ...(shareOk(l) && !l.archived ? [{label: tr(collab() ? N_('Share…') : N_('Ownership…')), icon: 'users', fn: () => shareModal(id)}] : [])];
   // 2.14.0 (#425): "Columns…" replaces "Show task numbers" and "Hide / Show assignee column" (per device until then); high up
   if (!l.archived) items.push(colItem(id));
   // 2.17.0 (#442 #419): the list's notes and (shared) its team chat
@@ -248,12 +249,13 @@ function listMenuItems(id, anchor) {
     else if (!l.is_inbox && canEditList(id)) items.push({label: tr('Tasks from notes…'), icon: 'bot', fn: () => propRequest('extract', {lid: id})});
   }
   // 2.13.0 (#453 A7): not a second "List"; 2.18.0 review: "As a list / As a project", "Type: Project" read like the project type
-  if (own) items.push('-', ...LKINDS.map(([v]) => ({label: v === 'project' ? tr('As a project') : tr('As a list'), icon: LKIND_ICON[v], on: k === v, fn: () => setListKind(id, v)})));
+  // 2.25.0 (UX-52): list or project is the switch "Project features" in "Edit list…" (no "As a list / As a project" here)
+  void k;
   if (collab() && l.shared) items.push({label: tr('Notifications: {0}', bellLabel(l.bell)), icon: BELL_ICON[l.bell || 'default'], fn: () => bellMenu(at(), id)});
   if (progressFor(l) && !l.is_inbox) items.push('-', progHidden(id) ? {label: tr('Show progress'), icon: 'eye', fn: () => setProgHidden(id, false)} : {label: tr('Hide progress'), icon: 'x', fn: () => setProgHidden(id, true)});
   // U12: archive (with undo) instead of delete; deleting for good only from the archive
   if (own && !l.is_inbox) items.push('-', l.archived ? {label: tr('Restore from the archive'), icon: 'undo', fn: () => listArchive(id, false)} : {label: tr('Archive'), icon: 'archive', fn: () => listArchive(id, true)},
-    ...(l.archived ? [{label: tr('Delete permanently…'), icon: 'trash', cls: 'flag-5', fn: () => listDeleteForGood(id)}] : []));
+    {label: l.archived ? tr('Delete permanently…') : tr('Delete…'), icon: 'trash', cls: 'flag-5', fn: () => listDeleteForGood(id)});  // 2.25.0 (UX-13): delete from every list menu
   return items;
 }
 // 2.1.0 (#317): the bell of a list (mine only): all / default (the matrix in Settings > Notifications) / mute
@@ -265,7 +267,7 @@ const bellLabel = m => tr(BELLS.find(b => b[0] === (m || 'default'))[1]).replace
 // the events of the custom bell (server: BELL_CUSTOM_ROWS); a ticked one comes from every task of the list
 const BELL_ROWS = [['newtask', N_('New tasks'), N_('created by someone else')], ['comment', N_('Comments'), N_('every comment in this list, replies included')],
   ['mention', N_('Mentions of me')], ['assign', N_('Tasks assigned to me (or taken away)')], ['complete', N_('Completed tasks'), N_('completed by someone else')],
-  ['status', N_('Project status changes')], ['unblock', N_('A task I wait on was completed'), '', 'deps'], ['approval', N_('An agent waits for my approval'), N_('proposals and approvals of agents'), 'agents']];
+  ['status', N_('Project status changes')], ['unblock', N_('A task blocking mine was completed'), '', 'deps'], ['approval', N_('An agent waits for my approval'), N_('proposals and approvals of agents'), 'agents']];
 // what a custom bell starts with: the stored choice, else what the matrix (Settings > Notifications) says today
 function bellCustomOf(l) {
   const m = notifMatrix(S.settings), c = l?.bell_custom || {}, out = {};
@@ -324,13 +326,14 @@ async function listArchive(id, on) {
 }
 // deleting for good: only archived lists; the dialog names what is lost
 async function listDeleteForGood(id) {
-  const l = listById(id); if (!l || !l.archived) return false;
+  const l = listById(id); if (!l || l.is_inbox || !isOwner(l)) return false;  // 2.25.0 (UX-13): also an active list (archived first)
   const all = [...S.tasks.values()].filter(t => t.list_id === id), open = all.filter(t => t.status === 0).length;
   const lost = [tr('the list itself, its sections, colour, folder and type'), fieldsOf(id).length && trn('{0} custom field and its values', '{0} custom fields and their values', fieldsOf(id).length),
     l.shared && tr('the sharing: members lose access at once'), l.status && tr('the project status'), tr('its public link, if there is one')].filter(Boolean);
   const ok = await askConfirm(tr('Delete “{0}” permanently?', lname(l)), '', {danger: true, ok: tr('Delete permanently'),
     html: `<p>${tr('This cannot be undone. Lost for good:')}</p><ul class="cdlg-l">${lost.map(x => `<li>${esc(x)}</li>`).join('')}</ul><p class="muted">${all.length ? trn('Its {0} task goes to the trash of your inbox ({1} open) and can be restored from there.', 'Its {0} tasks go to the trash of your inbox ({1} open) and can be restored from there.', all.length, open) : tr('The list has no tasks.')}</p>`});
   if (!ok) return false;
+  if (!l.archived) { try { await api('PATCH', '/api/lists/' + id, {archived: 1}); } catch { return false; } }
   try { await api('DELETE', '/api/lists/' + id); } catch { return false; }
   if (S.route.key === 'l:' + id) go(START_KEY);
   await load(); render(); toast(tr('“{0}” deleted', lname(l)));
@@ -494,8 +497,9 @@ function listModal(id, folder = '', o = {}) {
     <div class="row"><label for="l-folder">${tr('Folder')}</label><input id="l-folder" value="${esc(fDisp(l.folder))}" list="l-folders" placeholder="${esc(tr('optional · Folder / Subfolder'))}"><datalist id="l-folders">${folderNames().map(f => `<option value="${esc(fDisp(f))}">`).join('')}</datalist></div>
     ${listDlgTeamHtml(l, id)}
     <div class="row"><label for="l-view">${tr('View')}</label><select id="l-view"><option value="list">${tr('List')}</option>${feat('kanban') ? `<option value="kanban" ${l.view === 'kanban' ? 'selected' : ''}>${tr('Kanban')}</option>` : ''}${feat('timeline') ? `<option value="timeline" ${l.view === 'timeline' ? 'selected' : ''}>${tr('Timeline')}</option>` : ''}</select></div>
-    <div class="row"><label for="l-kind">${tr('List or project')}</label><select id="l-kind" ${dis}>${LKINDS.map(([k, n]) => `<option value="${k}" ${(l.kind || 'list') === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
-    <div class="shint lhint" id="l-khint">${kindHint(l.kind || 'list')}</div>
+    <input type="hidden" id="l-kind" value="${(l.kind || 'list') === 'project' ? 'project' : 'list'}">
+    <div class="row lkrow" ${l.is_inbox ? 'hidden' : ''}><label class="chkl"><input type="checkbox" id="l-kindp" ${(l.kind || 'list') === 'project' ? 'checked' : ''} ${dis}> ${tr('Project features')}</label></div>
+    <div class="shint lhint" id="l-khint" ${l.is_inbox ? 'hidden' : ''}>${kindHint(l.kind || 'list')}</div>
     ${famOn() && own && !l.is_inbox ? `<div class="row"><label for="l-fam">${tr('Used for')}</label><select id="l-fam">${FAM_KINDS.map(([k, n]) => `<option value="${k}" ${(l.family || o.family || '') === k ? 'selected' : ''} ${FAM_KIND_ICON[k] ? `data-ico="${FAM_KIND_ICON[k]}"` : ''}>${tr(n)}</option>`).join('')}</select></div>` : ''}
     ${id ? '' : `<div class="lptype" ${(l.kind || 'list') === 'project' ? '' : 'hidden'}><div class="ptlab">${tr('Start from')}</div><div class="ptcards" role="radiogroup" aria-label="${esc(tr('Start from'))}">${PTYPE_UI.map(([k, n, i, dsc]) => `<button type="button" class="ptcard ${k === (o.ptype || '') ? 'on' : ''}" role="radio" aria-checked="${k === (o.ptype || '')}" data-pt="${k}">${ic(i, 's')}<b>${tr(n)}</b><small class="muted">${tr(dsc)}</small></button>`).join('')}${tplOf('list').map(tp => `<button type="button" class="ptcard" role="radio" aria-checked="false" data-pt="tpl:${tp.id}">${ic('copy', 's')}<b>${esc(tp.name)}</b><small class="muted" data-ptd="${tp.id}">${tr('Your template')}</small></button>`).join('')}</div>
       <div class="ptdates" hidden><div class="row"><label>${tr('Project start')}</label>${dateIn('l-pstart', today(), {label: tr('Project start'), clear: false})}</div><div class="row"><label>${tr('End (optional)')}</label>${dateIn('l-pend', '', {label: tr('End (optional)'), empty: tr('none')})}<span class="muted">${tr('stretches or squeezes the dates')}</span></div></div></div>`}
@@ -509,7 +513,7 @@ function listModal(id, folder = '', o = {}) {
     <div class="row"><label>${tr('Color')}</label><div class="colors" id="l-col" role="group" aria-label="${esc(tr('Color'))}">${LCOLORS.map((c, i) => `<button type="button" style="background:${c || 'var(--bg4)'}" class="${(l.color || '') === c ? 'on' : ''}" aria-pressed="${(l.color || '') === c}" aria-label="${esc(c ? tr('Color {0}', i) : tr('No color'))}" data-c="${c}" ${dis}></button>`).join('')}</div></div>
     ${id && !l.is_inbox && statusOn() && l.kind === 'project' ? `<div class="row"><label>${tr('Project status')}</label>${statusPill(l, true, true)}</div>` : ''}
     ${id && own && depsOn() ? `<div class="row"><label>${tr('Dependencies')}</label><label class="chkl"><input type="checkbox" id="l-depshift" ${l.dep_shift ? 'checked' : ''}> ${tr('Move dependent tasks along')}</label></div>
-    <div class="shint lhint">${tr('When a task is postponed, the tasks of this list that wait on it and would now start too early move by the same number of days (also in the timeline). One undo takes the whole chain back.')}</div>` : ''}
+    <div class="shint lhint">${tr('When a task is postponed, the tasks of this list it blocks that would now start too early move by the same number of days (also in the timeline). One undo takes the whole chain back.')}</div>` : ''}
     ${id && own && fieldsOn() ? `<h4 title="${esc(tr('Own columns for this list: budget, stage, client, …'))}">${tr('Custom fields')}</h4><div class="members" id="l-fields">${fieldsBox(id)}</div>` : id && fieldsOf(id).length ? `<h4>${tr('Custom fields')}</h4><div class="muted mhint">${esc(fieldsOf(id).map(f => f.name).join(', '))} · ${tr('only the owner can change them')}</div>` : ''}
     ${id && !l.is_inbox && (l.kind || 'list') === 'project' ? `<div class="lrepo" ${repoShown(l) ? '' : 'hidden'}><div class="shint keep lhint lrepohint" hidden>${ic('git', 's')} ${tr('Connect a repository (optional)')}</div>${repoBoxHtml(l)}</div>` : ''}
     </div>
@@ -559,7 +563,7 @@ function listModal(id, folder = '', o = {}) {
     const m1 = x.name.match(EMO_RE);
     if (force || document.activeElement !== $('#l-name', md)) { emo = m1 ? m1[1] : ''; $('#l-name', md).value = x.is_inbox && inboxDef(x.name) ? tr('Inbox') : m1 ? x.name.slice(m1[0].length) : x.name; $('#l-emo', md).innerHTML = emo || ic('list'); }
     if (document.activeElement !== $('#l-folder', md)) $('#l-folder', md).value = fDisp(x.folder || '');
-    $('#l-view', md).value = listView(x); $('#l-kind', md).value = x.kind || 'list';
+    $('#l-view', md).value = listView(x); $('#l-kind', md).value = x.kind || 'list'; if ($('#l-kindp', md)) $('#l-kindp', md).checked = (x.kind || 'list') === 'project';
     $('#l-khint', md).innerHTML = kindHint(x.kind || 'list'); $('.kproj', md).hidden = (x.kind || 'list') !== 'project';
     $$('#l-col button', md).forEach(b => { b.classList.toggle('on', (x.color || '') === b.dataset.c); b.setAttribute('aria-pressed', String((x.color || '') === b.dataset.c)); });
     if ($('#l-depshift', md)) $('#l-depshift', md).checked = !!x.dep_shift;
@@ -598,7 +602,8 @@ function listModal(id, folder = '', o = {}) {
     onRemove(md, () => { if (pend.size) autosave(); });
   }
   md.addEventListener('change', e => {
-    if (e.target.id === 'l-kind') { const k = e.target.value; $('#l-khint', md).innerHTML = kindHint(k); $('.kproj', md).hidden = k !== 'project'; if ($('.lptype', md)) $('.lptype', md).hidden = k !== 'project'; if (id) autosave(); return; }
+    if (e.target.id === 'l-kindp') { $('#l-kind', md).value = e.target.checked ? 'project' : 'list'; }  // 2.25.0 (UX-52)
+    if (e.target.id === 'l-kind' || e.target.id === 'l-kindp') { const k = $('#l-kind', md).value; $('#l-khint', md).innerHTML = kindHint(k); $('.kproj', md).hidden = k !== 'project'; if ($('.lptype', md)) $('.lptype', md).hidden = k !== 'project'; if (id) autosave(); return; }
     if (id && e.target.id === 'l-ptype') {
       // 2.18.0 review (R1): arrow keys on a closed select fire "change" for every value passed; while the keyboard
       // walks the options only the hint follows, the type is saved once on Enter / leaving the field

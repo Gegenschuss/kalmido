@@ -514,7 +514,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `team_message` | 2.17.0: someone @mentions the agent in a list's team chat (the agent is a member of the channel of every list shared with it) | `room` `{id, kind, list_id}`, `message` `{id, text, user_id, task_id, created_at}`, `user` `{id, name}`; answer with `POST /team/rooms/{id}/messages` (MCP `post_team_message`) |
 | `job_request` | 2.3.0: a person asks the agent for a proposal ([Proposals](#proposals)) | `job` (kind, `proposal_state`), `kind`, `input` (exactly what the person sent), `limits`, `requested_by` `{id, name}` |
 | `task_added` | 2.23.0 (#795): a top-level task was created in, or moved into, a list shared with the agent (not for its own tasks) | `task`, `list`, `how`: `created` or `moved`, `moved_from` `{id, name}` (only when the agent sees that list), `source`: `form`, `mail`, `errors`, `proposal` (when not made in the app) |
-| `followup_due` | 2.1.0: the follow-up day of a task *waiting on external* (at the all-day reminder time of the person it is for), once per date, to every agent that follows the task (assigned, creator, commented) | `task` (with `task.waiting`), `list`, `waiting` `{note, until, since, by}` |
+| `followup_due` | 2.1.0: the follow-up day of a task *waiting on someone* (at the all-day reminder time of the person it is for), once per date, to every agent that follows the task (assigned, creator, commented) | `task` (with `task.waiting`), `list`, `waiting` `{note, until, since, by}` |
 
 Example `comment` (in `mention` it looks the same):
 
@@ -558,9 +558,10 @@ the API has `"type": "bug" | "feature" | "task" | null`. Set it with `POST` / `P
 reproduce / expected / actual / environment, or goal / acceptance criteria), so fill in those headings rather than
 replacing them. `GET /api/v1/tasks?type=bug` (MCP `list_tasks` `type`) lists the open bugs.
 
-### Waiting on external (2.1.0)
+### Waiting on someone (2.1.0)
 
-A task can wait for someone outside Kalmido: `PUT /api/v1/tasks/{id}/waiting` with `{"note": "who / what", "until":
+(Called *waiting on external* before 2.25.0; the API and the MCP tools kept their names.) A task can wait for someone
+outside Kalmido: `PUT /api/v1/tasks/{id}/waiting` with `{"note": "who / what", "until":
 "YYYY-MM-DD"}` (both optional, `until` = the follow-up day) sets or changes it, `DELETE` ends it, and
 `GET /api/v1/tasks?waiting=true` lists such tasks. Every task has `waiting` (`null` or `{note, until, since, by}`).
 The task stays open. MCP: `set_waiting`, `clear_waiting`, `list_waiting`.
@@ -878,11 +879,11 @@ explanation, Markdown, at most 2,000 characters) and `kind` (must match the job)
  "sections": ["Pre-production", "Shoot", "Post"],               // at most 30
  "tasks": [{"title": "Write treatment", "notes": "…", "section": "Pre-production", "start": "2026-11-02", "due": "2026-11-06",
             "priority": "high", "subtasks": [{"title": "Research", "notes": "…", "due": null}],   // at most 50 per task
-            "depends_on": []},                                  // indices of tasks this one waits on (no cycles)
+            "depends_on": []},                                  // indices of tasks that block this one (no cycles)
            {"title": "Shoot day", "section": "Shoot", "due": "2026-11-20", "depends_on": [0]}]}
 // subtasks
 {"items": [{"title": "Book the venue", "notes": "…", "due": "2026-10-10", "estimate": 60}],   // estimate in minutes
- "dependencies": [[1, 0]]}                                      // item 1 waits on item 0
+ "dependencies": [[1, 0]]}                                      // item 1 is blocked by item 0
 // triage: only task_ids / list_ids / section_ids from the input
 {"items": [{"task_id": 81, "list_id": 12, "section_id": 40, "tags": ["print"], "priority": "medium", "due": "2026-10-03",
             "rewrite_title": "Call the printer about the flyer"}]}
@@ -1237,7 +1238,7 @@ with the scope it needs). The tools:
   `add_shop_areas`, `list_packing_templates`, `create_packing_list`, `list_kids`, `give_stars`, `add_reward`,
   `update_reward`, `delete_reward`, `request_reward`, `decide_reward` (an agent is never a parent: the kid routes
   answer 404 for it)
-- waiting on external: `set_waiting`, `clear_waiting`, `list_waiting`
+- waiting on someone: `set_waiting`, `clear_waiting`, `list_waiting`
 - agent channel (agent tokens only): `get_agent`, `set_status`, `list_events`, `wait_for_events`, `list_jobs`,
   `create_job`, `get_job`, `update_job`, `submit_proposal`, `list_chats`, `send_chat`, `chat_typing`, `react_to_chat`,
   `report_usage`, `get_usage`, `tidy_task`, `request_merge_approval`

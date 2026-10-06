@@ -11,8 +11,7 @@ from ..accounts.session import me, user_public
 from ..core.access import collab_all, Denied, list_people, my_max_sort, need_list, vis_sql, wr_sql
 from ..core.serializers import load_tasks
 from ..core.state import visible_lists
-from ..lists.lists import agent_autoshare, clean_folder, LIST_NAME_MAX
-from ..lists.groups import grp_touch
+from ..lists.lists import list_created, clean_folder, LIST_NAME_MAX
 from ..tasks.validation import as_int, DATE_MIN_Y, log_act, rr_problem, rr_rule, TITLE_MAX, valid_date
 from ..collab.comments import lang_of, user_names
 from ..personal.timetrack import BadInput
@@ -97,8 +96,9 @@ PURPOSE_MODS = ("cal", "timeline", "matrix", "kanban", "habits", "pomo", "stats"
 PURPOSE_ON = {"me": ("cal", "events", "contacts"),
               "home": ("cal", "events", "contacts", "habits") + _LIFE,
               "family": ("cal", "habits", "comments", "collab", "family", "events", "contacts", "contracts", "home", "travel"),
-              "team": tuple(m for m in PURPOSE_MODS if m != "family" and m not in _LIFE),
-              "software": tuple(m for m in PURPOSE_MODS if m != "family" and m not in _LIFE)}
+              # 2.25.0 (UX-25): a package holds only what its name promises (no habits, focus timer, matrix, statistics)
+              "team": ("cal", "timeline", "kanban", "comments", "collab", "time", "progress", "deps", "fields", "events", "contacts"),
+              "software": ("cal", "timeline", "kanban", "comments", "collab", "time", "progress", "deps", "fields", "events", "contacts")}
 
 
 # 2.19.0: what a child account may change: tick / untick (and undo) the tasks it sees, ask for a reward, its own
@@ -426,8 +426,7 @@ def fam_list_create(c, uid, kind, name=None, folder=""):
                        VALUES(?,?,?,?,?,?,?,?,?,?)""",
                     (name or tr(FAM_LIST_NAMES[kind], lg=lg), FAM_LIST_COLORS.get(kind, ""), folder, my_max_sort(c, uid) + 1, "list",
                      iso(now_utc()), uid, 1 if kind in ("shopping", "packing") else 0, "list", kind)).lastrowid
-    agent_autoshare(c, uid, lid)  # 2.22.0 (#747): no shop areas by itself (the list bar's "Add shop areas" adds them)
-    grp_touch(c, uid)
+    list_created(c, uid, lid)  # 2.22.0 (#747): no shop areas by itself (the list bar's "Add shop areas" adds them); 2.25.0 (#931)
     return lid
 
 

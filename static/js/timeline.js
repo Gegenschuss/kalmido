@@ -39,7 +39,7 @@ function tlBarHtml(t, start, end, DW, pick, deps) {
   const span = TL_DAYS * DW, room = span - (x + w) - 24, lroom = x - 16, left = sh && room < 120 && lroom > room;
   const lmax = sh ? Math.max(40, Math.min(220, left ? lroom : room)) : 0;
   return `<div class="tl-bar p${t.priority} ${sh ? 'short' : ''}${left ? ' lbl-l' : ''}${wait ? ' wait' : ''}${conf ? ' conf' : ''}${ed ? '' : ' ro'}${t.status ? ' done' : ''}${mark}" data-id="${t.id}" style="left:${x + pad}px;width:${Math.max(TL_MINW, w - 2 * pad)}px" title="${esc(tip)}" tabindex="0" role="button" aria-label="${esc(tip)}">${wait ? ic('lock', 's tl-lk') : ''}<span${lmax ? ` style="max-width:${Math.round(lmax)}px"` : ''}>${esc(t.title)}</span><i class="h l"></i><i class="h r"></i></div>` +
-    (deps && ed && !pick && dFor(t) ? `<button type="button" class="tl-knob" data-knob="${t.id}" style="left:${x + Math.max(w, TL_MINW + 2 * pad) + 9}px" tabindex="-1" aria-hidden="true" title="${tr('Drag onto the task that waits on this one')}"></button>` : '');
+    (deps && ed && !pick && dFor(t) ? `<button type="button" class="tl-knob" data-knob="${t.id}" style="left:${x + Math.max(w, TL_MINW + 2 * pad) + 9}px" tabindex="-1" aria-hidden="true" title="${tr('Drag onto the task this one blocks')}"></button>` : '');
 }
 // 1.5.3 (q): undated tasks in the timeline: per list a folding group "No date (n)" at the end, one row per task with an
 // empty dashed track. Click a day = due that day, drag across days = start + due (touch: hold, then drag); the bar then
@@ -52,7 +52,7 @@ function tlNdRows(l, ts) {
   for (const t of ts.filter(x => !x.parent_id || !ids.has(x.parent_id)).sort(bySort)) add(t);
   const k = 'tlnd:' + l.id, closed = S.collapsed.has(k), ed = canEditList(l.id);
   return `<div class="tl-row tl-grp tl-ndhead" data-ndl="${l.id}"><div class="tl-name" data-act="collapse-tl" data-key="${k}" role="button" aria-expanded="${!closed}">${ic('chev', 's fcar' + (closed ? ' shut' : ''))}${tr('No date')} <span class="c">${ts.length}</span></div><div class="tl-track"></div></div>` +
-    (closed ? '' : ord.map(t => `<div class="tl-row tl-nd"><div class="tl-name" data-act="open" data-id="${t.id}">${t.parent_id && ids.has(t.parent_id) ? '<span class="muted">↳ </span>' : ''}<span class="tln">${esc(t.title)}</span>${tlWaiting(t) ? `<span class="tl-wf" title="${esc(blockedTitle(t))}">${ic('lock', 's')}${esc(tr('waits for {0}', blockedNames(t)))}</span>` : ''}</div><div class="tl-track ndt${ed && canEdit(t) ? ' ed' : ''}" data-nd="${t.id}" title="${ed && canEdit(t) ? esc(isTouch() ? tr('Tap a day to set the date; hold and drag for a range') : tr('Click a day to set the date, drag across days for a range')) : ''}"></div></div>`).join(''));
+    (closed ? '' : ord.map(t => `<div class="tl-row tl-nd"><div class="tl-name" data-act="open" data-id="${t.id}">${t.parent_id && ids.has(t.parent_id) ? '<span class="muted">↳ </span>' : ''}<span class="tln">${esc(t.title)}</span>${tlWaiting(t) ? `<span class="tl-wf" title="${esc(blockedTitle(t))}">${ic('lock', 's')}${esc(tr('blocked by {0}', blockedNames(t)))}</span>` : ''}</div><div class="tl-track ndt${ed && canEdit(t) ? ' ed' : ''}" data-nd="${t.id}" title="${ed && canEdit(t) ? esc(isTouch() ? tr('Tap a day to set the date; hold and drag for a range') : tr('Click a day to set the date, drag across days for a range')) : ''}"></div></div>`).join(''));
 }
 const tlNdBtn = (on, n, act = 'tl-nd') => `<button class="btn sm chip ${on ? 'on' : ''}" data-act="${act}" aria-pressed="${on}" title="${esc(tr('Show tasks without a date as rows to draw into'))}">${ic('cal', 's')} ${tr('No date')}${n ? ` <span class="c">${n}</span>` : ''}</button>`;
 // ---- 2.18.0 (#462): sections in the timeline / roadmap, (#431) new tasks drawn right into it, milestone diamonds
@@ -158,12 +158,12 @@ function viewTimeline(listId, inCal) {
   S.tlL = {bars};
   const from = pick && S.tasks.get(pick.from);
   const hint = isMobile() ? tr('Long-press and drag a bar: the middle moves it, the ends change start / due date.') : tr('Drag a bar to move it, drag its ends to change start / due date.');
-  const dhint = !deps || ![...bars.keys()].some(i => dFor(S.tasks.get(i))) ? '' : isTouch() ? tr('Long-press a bar and let go for more: connect it to the task that waits on it, remove a dependency.') : tr('Drag the dot at the end of a bar onto another bar: that task then waits on it. Click an arrow to remove it.');
+  const dhint = !deps || ![...bars.keys()].some(i => dFor(S.tasks.get(i))) ? '' : isTouch() ? tr('Long-press a bar and let go for more: connect it to the task it blocks, remove a dependency.') : tr('Drag the dot at the end of a bar onto another bar: that task is then blocked by it. Click an arrow to remove it.');
   // 2.18.0 review: the footer also tells how to draw a new task (only where the user may add one)
   const chint = !pick && groups.some(g => canAddTo(g.l.id)) ? (isTouch() ? tr('Hold an empty spot in a list or section row, then drag to add a task, or tap “+”.') : tr('Drag across empty days in a list or section row to add a task, double-click a day or use “+”.')) : '';
   const ndBtn = tlNdBtn(ndOn, undated);
   return `${inCal ? '' : `<div class="calbar"><h2>${tr('Timeline')}</h2>${ndBtn}<div class="calnav"><button class="iconbtn" data-act="tl-prev" title="${esc(tr('Previous period'))}" aria-label="${esc(tr('Previous period'))}">${ic('left')}</button><button class="btn sm" data-act="tl-today">${tr('Today')}</button><button class="iconbtn" data-act="tl-next" title="${esc(tr('Next period'))}" aria-label="${esc(tr('Next period'))}">${ic('right')}</button></div></div>`}
-    ${from ? `<div class="tl-pick" role="status">${ic('deps', 's')}<span>${tr('Tap the task that waits on “{0}”', esc(from.title))}</span><span class="spacer"></span><button class="btn sm" data-act="tl-pick-list">${ic('search', 's')} ${tr('Pick from a list…')}</button><button class="btn sm" data-act="tl-pick-cancel">${tr('Cancel')}</button></div>` : ''}
+    ${from ? `<div class="tl-pick" role="status">${ic('deps', 's')}<span>${tr('Tap the task that “{0}” blocks', esc(from.title))}</span><span class="spacer"></span><button class="btn sm" data-act="tl-pick-list">${ic('search', 's')} ${tr('Pick from a list…')}</button><button class="btn sm" data-act="tl-pick-cancel">${tr('Cancel')}</button></div>` : ''}
     <div class="tl${pick ? ' picking' : ''}" style="--dw:${DW}px;--days:${TL_DAYS}">
     <div class="tl-scroll" id="tlscroll"><div class="tl-inner">
       <div class="tl-row tl-headrow" title="${esc(tr('Set a date range via “Start” in the date dialog.'))}"><div class="tl-name"></div><div class="tl-track tl-headtrack"><div class="tl-months">${months}</div><div class="tl-days">${head}</div></div></div>
@@ -240,9 +240,9 @@ function tlArrows() {
     if (W && B) d = tlRoute(B.x + B.w, B.y, W.x - 1, W.y, W.h);
     else if (W) d = `M${Math.max(0, W.x - 20)},${W.y}H${W.x - 1}`;
     else d = `M${B.x + B.w},${B.y}H${B.x + B.w + 20}`;
-    if (closed) tip = tr('“{0}” waits on “{1}” (done)', title(w), title(b));
+    if (closed) tip = tr('“{0}” is blocked by “{1}” (done)', title(w), title(b));
     else if (conf) tip = tr('“{0}” starts before “{1}” is due', title(w), title(b));
-    else tip = tr('“{0}” waits on “{1}”', title(w), title(b));
+    else tip = tr('“{0}” is blocked by “{1}”', title(w), title(b));
     if (!(W && B)) tip += ' · ' + tr('outside this view');
     out += `<g class="dep ${kind}${W && B ? '' : ' stub'}" data-dep="${w}:${b}"><title>${esc(tip)}</title><path class="hit" d="${d}"/><path class="ln" d="${d}" marker-end="url(#tl-ah-${kind})"/>${W && B ? '' : `<circle class="st" cx="${W ? Math.max(0, W.x - 20) : B.x + B.w + 20}" cy="${W ? W.y : B.y}" r="2.5"/>`}</g>`;
   }
@@ -278,11 +278,11 @@ function tlCanLink(b, w) {
 async function tlConnect(b, w) {
   const wt = S.tasks.get(w), bt = S.tasks.get(b);
   if (!wt || !bt) return;
-  if ((wt.blockers || []).includes(b)) { toast(tr('“{0}” already waits on “{1}”', wt.title, bt.title)); return; }
+  if ((wt.blockers || []).includes(b)) { toast(tr('“{0}” is already blocked by “{1}”', wt.title, bt.title)); return; }
   try { await api('POST', '/api/deps', {task_id: w, blocker_id: b}); } catch { return; }  // api() showed the server's reason
   await load(); render();
   if (S.sel === w || S.sel === b) loadDeps(S.sel);
-  toast(tr('“{0}” now waits on “{1}”', wt.title, bt.title));
+  toast(tr('“{0}” is now blocked by “{1}”', wt.title, bt.title));
 }
 async function tlUnlink(w, b) {
   try { await api('DELETE', `/api/deps/${w}/${b}`); } catch { return; }
@@ -306,8 +306,8 @@ function tlBarMenu(el) {
   if (dFor(t)) {
     if (canEdit(t)) items.push({label: tr('Connect to…'), icon: 'deps', keys: 'C', fn: () => tlPickStart(id)}, {label: tr('Pick from a list…'), icon: 'search', fn: () => depPicker(id, 'blocking')});
     const nm = x => x.length > 32 ? x.slice(0, 31) + '…' : x;
-    const rm = [...(canEdit(t) ? (t.blockers || []).map(b => S.tasks.get(b)).filter(Boolean).map(b => ({label: tr('Stop waiting on “{0}”', nm(b.title)), icon: 'x', fn: () => tlUnlink(id, b.id)})) : []),
-      ...openTasks().filter(x => (x.blockers || []).includes(id) && canEdit(x)).map(x => ({label: tr('“{0}” no longer waits', nm(x.title)), icon: 'x', fn: () => tlUnlink(x.id, id)}))];
+    const rm = [...(canEdit(t) ? (t.blockers || []).map(b => S.tasks.get(b)).filter(Boolean).map(b => ({label: tr('No longer blocked by “{0}”', nm(b.title)), icon: 'x', fn: () => tlUnlink(id, b.id)})) : []),
+      ...openTasks().filter(x => (x.blockers || []).includes(id) && canEdit(x)).map(x => ({label: tr('“{0}” is no longer blocked', nm(x.title)), icon: 'x', fn: () => tlUnlink(x.id, id)}))];
     if (rm.length) items.push('-', ...rm);
   }
   menu(el, items);

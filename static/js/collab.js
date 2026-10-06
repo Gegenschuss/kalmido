@@ -12,7 +12,7 @@ S.nf = {items: null, users: {}, sig: null, filter: LS.get('newsFilter', '') ? 'm
 function bellBtn() {
   if (!collab()) return '';
   const n = S.news?.unread || 0;
-  return `<button class="iconbtn bell ${S.route.mod === 'news' ? 'on' : ''}" data-act="bell-pop" aria-haspopup="dialog" title="${esc(tr('News'))}" aria-label="${esc(n ? trn('{0} unread news item', '{0} unread news items', n) : tr('News'))}">${ic('bell')}${n ? `<span class="nbadge">${n > 99 ? '99+' : n}</span>` : ''}</button>`;
+  return `<button class="iconbtn bell ${S.route.mod === 'news' ? 'on' : ''}" data-act="bell-pop" aria-haspopup="dialog" title="${esc(tr('News') + ' · ' + newsWhat())}" aria-label="${esc(n ? trn('{0} unread news item', '{0} unread news items', n) : tr('News'))}">${ic('bell')}${n ? `<span class="nbadge">${n > 99 ? '99+' : n}</span>` : ''}</button>`;
 }
 // 2.6.1 (#404): filter chips (view only, per device): which kinds of News show, in the News view and under the bell
 const NEWS_CHIPS = [['mention', 'at', N_('Mentions'), ['mention']], ['comment', 'comment', N_('Comments'), ['comment']],
@@ -33,10 +33,10 @@ function bellPopHtml() {
   const mine = S.nf.items && S.nf.f === S.nf.filter ? S.nf.items : null, n = S.news?.unread || 0;
   const all = (mine || []).map((it, i) => [it, i]).filter(([it]) => !S.nf.unread || !it.read || it.keep);
   const shown = all.filter(([it]) => newsKindOk(it)).slice(0, BELL_N);
-  const head = `<div class="bphead"><button type="button" class="bphl" data-bp="news" title="${esc(tr('Show all'))}"><b id="bp-h">${tr('News')}</b><span class="bpchev" aria-hidden="true">›</span></button>${n ? `<span class="muted">${esc(trn('{0} unread', '{0} unread', n))}</span>` : ''}<span class="spacer"></span>${n ? `<button type="button" class="btn sm" data-bp="readall">${ic('check', 's')}<span>${tr('Mark all as read')}</span></button>` : ''}<button type="button" class="iconbtn" data-bp="settings" title="${esc(tr('What shows up here'))}" aria-label="${esc(tr('What shows up here'))}">${ic('gear', 's')}</button></div>`;
+  const head = `<div class="bphead"><button type="button" class="bphl" data-bp="news" title="${esc(tr('Show all'))}"><b id="bp-h">${tr('News')}</b><span class="bpchev" aria-hidden="true">›</span></button>${n ? `<span class="bpnew">${esc(trn('{0} new', '{0} new', n))}</span>` : ''}<span class="spacer"></span>${n ? `<button type="button" class="btn sm bpread" data-bp="readall" title="${esc(tr('Mark all as read'))}" aria-label="${esc(tr('Mark all as read'))}">${ic('check', 's')}<span>${tr('All read')}</span></button>` : ''}<button type="button" class="iconbtn" data-bp="settings" title="${esc(tr('What shows up here'))}" aria-label="${esc(tr('What shows up here'))}">${ic('gear', 's')}</button></div>`;
   let body;
   if (!mine) body = `<div class="empty bpempty">${S.nf.err === 'offline' ? tr('News are only available online.') : S.nf.err ? esc(S.nf.err) : tr('Loading…')}</div>`;
-  else if (!shown.length) body = `<div class="empty bpempty">${ic('bell')}<span>${all.length ? tr('Nothing of this kind.') : S.nf.unread && mine.length ? tr('No unread news') : tr('No news')}</span></div>`;
+  else if (!shown.length) body = `<div class="empty bpempty">${ic('bell')}<span>${all.length ? tr('Nothing of this kind.') : S.nf.unread && mine.length ? tr('No unread news') : tr('No news')}</span>${all.length ? '' : `<small class="muted">${esc(newsWhat())}</small>`}</div>`;
   else body = newsBundled() ? `<div class="nlist bplist nbund">${newsBundledHtml(all.filter(([it]) => newsKindOk(it)).slice(0, 40), true)}</div>` : `<div class="nlist bplist">${shown.map(([it, i]) => newsItemHtml(it, i, true)).join('')}</div>`;  // 2.17.0 (#452)
   const grab = isMobile() ? `<div class="bpgrab" data-bpgrab role="button" tabindex="0" aria-label="${esc(tr('Drag up for more room, tap for full height'))}" title="${esc(tr('Drag up for more room, tap for full height'))}"><i></i></div>`
     : `<button type="button" class="bpgrip" data-bpgrip aria-label="${esc(tr('Resize (arrow keys; double-click: default size)'))}" title="${esc(tr('Drag to resize · double-click: default size'))}"></button>`;
@@ -196,7 +196,7 @@ function newsText(it, U) {
     case 'signup': return tr('{0} registered and waits for your approval', q(d.name || d.username || ''));  // 2.23.0 (#711)
     case 'agentjoin': return d.provider ? tr('{0} added the agent {1} to {2}. It runs at {3}. What it reads in the list goes there.', who, q(d.agent || ''), q(newsListName(it)), q(d.provider))
       : tr('{0} added the agent {1} to {2}. What it reads in the list goes to its AI provider.', who, q(d.agent || ''), q(newsListName(it)));  // 2.24.0 (#896)
-    case 'followup': return d.note ? tr('Follow up today: waiting on {0}', q(d.note)) : tr('Follow up today: the task is waiting on external');
+    case 'followup': return d.note ? tr('Follow up today: waiting on {0}', q(d.note)) : tr('Follow up today: the task is waiting on someone');
     case 'usage': return aiuNewsText(d);  // 2.1.1 (#326)
     case 'proposal': return tr('{0} has a proposal for you: {1}', who, q(d.title || ''));  // 2.3.0
     case 'evinvite': case 'evshare': return evNewsText(it, who, q);  // 2.21.0 (#659)
@@ -217,6 +217,8 @@ function newsItemHtml(it, i, pop) {
     <div class="nmain"><div class="ntext">${newsText(it, U)}</div>${task}${ex}</div>
     <time title="${esc(fmtWhen(it.created_at))}">${relTime(it.created_at)}</time>${isTouch() ? '' : `<button class="iconbtn ndel" ${pop ? 'data-bp="dismiss"' : 'data-act="news-dismiss"'} data-i="${i}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button>`}</div>`;
 }
+// 2.25.0 (UX-47): what lands in News (the bell) and what does not
+const newsWhat = () => teamOn() ? tr('Assignments, @mentions, comments on your tasks and follow-ups land here. Messages are in the team chat.') : tr('Assignments, @mentions, comments on your tasks and follow-ups land here.');
 function viewNews() {
   const f = S.nf.filter, fresh = S.nf.sig === (S.news?.sig ?? '') && S.nf.f === f && !!S.nf.items;
   // 1.9.0 (#246): "Loading…" only while a request really runs; an empty feed says so instead of loading forever
@@ -235,7 +237,7 @@ function viewNews() {
   const chips = '';  // 2.13.0: in the one filter row of the bar
   const shown = vis.filter(([it]) => newsKindOk(it));
   if (mine && mine.length && !vis.length) return bar + `<div class="empty nempty">${ic('bell')}<b>${tr('No unread news')}</b><span>${tr('Everything is read. Switch off “Unread only” to see older news.')}</span></div>`;
-  if (!mine || !mine.length) return bar + `<div class="empty nempty">${ic('bell')}<b>${tr('No news')}</b><span>${f ? tr('No mentions or assignments.') : tr('Mentions, comments on your tasks, assignments and shared lists show up here.')}</span></div>`;
+  if (!mine || !mine.length) return bar + `<div class="empty nempty">${ic('bell')}<b>${tr('No news')}</b><span>${f ? tr('No mentions or assignments.') : esc(newsWhat())}</span></div>`;
   if (!shown.length) return bar + chips + `<div class="empty nempty">${ic('bell')}<b>${tr('Nothing of this kind.')}</b></div>`;
   return bar + chips + (newsBundled() ? `<div class="nbund">${newsBundledHtml(shown, false)}</div>` : `<div class="nlist">${shown.map(([it, i]) => newsItemHtml(it, i)).join('')}</div>`) + `${isTouch() && !newsBundled() ? `<div class="muted nswipe">${tr('Swipe an item sideways to remove it.')}</div>` : ''}`;
 }
@@ -368,7 +370,7 @@ function actText0(a, U) {
     case 'content': return tr('{0} edited the description', who);
     case 'due': return d.due ? tr('{0} set the due date to {1}', who, due()) : tr('{0} removed the due date', who);
     case 'snooze': return tr('{0} snoozed the task to {1}', who, due());
-    case 'dep_shift': return tr('{0} moved a task this one waits on, so it moved along to {1}', who, due());
+    case 'dep_shift': return tr('{0} moved a task that blocks this one, so it moved along to {1}', who, due());
     case 'priority': return tr('{0} changed the priority to {1}', who, q(tr([N_('None'), N_('Low'), '', N_('Medium'), '', N_('High')][+d.p] || N_('None'))));
     case 'assign': return d.to ? tr('{0} assigned the task to {1}', who, q(uname(d.to, U))) : tr('{0} removed the assignee', who);
     case 'assign_group': return d.group ? tr('{0} assigned the task to the group {1}', who, q(d.group)) : tr('{0} removed the group', who);  // 2.10.0 (#441)
@@ -388,16 +390,16 @@ function actText0(a, U) {
     case 'attach': return (d.n || 1) === 1 ? tr('{0} added the attachment {1}', who, q((d.names || [])[0] || '')) : trn('{1} added {0} attachment', '{1} added {0} attachments', d.n, who);
     case 'attach_rm': return tr('{0} removed the attachment {1}', who, q(d.name || ''));
     case 'paperless': return tr('{0} linked the Paperless document {1}', who, q(d.title || ''));
-    case 'waiting': return d.until ? tr('{0} set the task to waiting on external ({1}), follow up {2}', who, q(d.note || '–'), q(dayLabel(d.until))) : tr('{0} set the task to waiting on external ({1})', who, q(d.note || '–'));
-    case 'waiting_rm': return tr('{0} ended the waiting on external', who);
+    case 'waiting': return d.until ? tr('{0} set the task to waiting on someone ({1}), follow up on {2}', who, q(d.note || '–'), q(dayLabel(d.until))) : tr('{0} set the task to waiting on someone ({1})', who, q(d.note || '–'));
+    case 'waiting_rm': return tr('{0} ended the waiting on someone', who);
     case 'paperless_rm': return tr('{0} removed the Paperless document {1}', who, q(d.title || ''));
     case 'paperless_send': return tr('{0} sent {1} to Paperless', who, q(d.name || ''));
     case 'subtask': return tr('{0} added the subtask {1}', who, q(d.title || ''));
-    case 'dep_add': return d.hidden ? tr('{0} made the task wait on a task you cannot see', who) : tr('{0} made the task wait on {1}', who, q(d.title || ''));
+    case 'dep_add': return d.hidden ? tr('{0} marked the task as blocked by a task you cannot see', who) : tr('{0} marked the task as blocked by {1}', who, q(d.title || ''));
     case 'dep_rm': return d.hidden ? tr('{0} removed a dependency on a task you cannot see', who) : tr('{0} removed the dependency on {1}', who, q(d.title || ''));
     case 'blocks_add': return d.hidden ? tr('{0} marked the task as blocking a task you cannot see', who) : tr('{0} marked the task as blocking {1}', who, q(d.title || ''));
     case 'blocks_rm': return d.hidden ? tr('{0} removed the task as a blocker of a task you cannot see', who) : tr('{0} removed the task as a blocker of {1}', who, q(d.title || ''));
-    case 'unblocked': return d.hidden ? tr('{0} completed the last task this one was waiting on', who) : tr('{0} completed {1}, the task is no longer waiting', who, q(d.title || ''));
+    case 'unblocked': return d.hidden ? tr('{0} completed the last task blocking this one', who) : tr('{0} completed {1}, the task is no longer blocked', who, q(d.title || ''));
     case 'field': return d.v == null ? tr('{0} cleared the field {1}', who, q(d.name || '')) : tr('{0} set {1} to {2}', who, q(d.name || ''), q(actField(d)));
     case 'apstate': return {pending: tr('{0} asked {1} for approval', who, q(uname(d.approver, U))), approved: tr('{0} approved the task', who), changes: tr('{0} asked for changes', who),
       rejected: tr('{0} rejected the task', who), cancelled: tr('{0} withdrew the approval request', who)}[d.state] + (d.note ? ': ' + q(d.note) : '');  // 2.23.0 (#463)

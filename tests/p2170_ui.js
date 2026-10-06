@@ -56,9 +56,9 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   // ================= jsdom: #475 the dashboard
   let w = await boot({user: 'alice', hash: 'today', ls: {'tasks.newsBundle': null}}), d = w.document;
   const logo = d.querySelector('#side .sbrand .sbhome');
-  check(logo && logo.dataset.go === 'home' && /^Kalmido: Dashboard$/.test(logo.getAttribute('aria-label')), '#475: the logo opens the dashboard (its name starts with the visible "Kalmido")');
+  check(logo && logo.dataset.go === 'home' && /^Kalmido: Start$/.test(logo.getAttribute('aria-label')), '#475: the logo opens the dashboard (its name starts with the visible "Kalmido")');
   click(w, logo); await sleep(600);
-  check(w.location.hash === '#home' && d.querySelector('#top h1')?.textContent.includes('Dashboard'), '#475: #home, titled Dashboard');
+  check(w.location.hash === '#home' && d.querySelector('#top h1')?.textContent.includes('Start'), '#475: #home, titled Start (2.25.0)');
   await until(() => d.querySelector('.dcard.dc-news .ngroup'));
   const cards = [...d.querySelectorAll('.dgrid .dcard')].map(c => [...c.classList].find(x => x.startsWith('dc-')));
   check(['dc-wait', 'dc-today', 'dc-news', 'dc-chat', 'dc-projects', 'dc-pinned', 'dc-agents', 'dc-stats', 'dc-search'].every(c => cards.includes(c)), '#475: the cards ' + cards.join());
@@ -89,7 +89,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   w.eval(`LS.set('tabbar', ['m:tasks', 'm:cal', 'm:habits', 'm:pomo', 'home', 'team', 'news', 'settings']); render()`); await sleep(300);
   let tmErr = null; try { w.eval(`tabsMore(document.querySelector('[data-act="tabs-more"]') || document.body)`); } catch (e) { tmErr = String(e); }
   await sleep(200);
-  check(!tmErr && [...d.querySelectorAll('.menu-list button, .menu-list [role=menuitem]')].some(b => /Team chat|Dashboard/.test(b.textContent)), '"More" of the tab bar opens with Dashboard / Team chat in it ' + (tmErr || ''));
+  check(!tmErr && [...d.querySelectorAll('.menu-list button, .menu-list [role=menuitem]')].some(b => /Team chat|Start/.test(b.textContent)), '"More" of the tab bar opens with Dashboard / Team chat in it ' + (tmErr || ''));
   w.close();
   await call('PATCH', '/api/settings', {dashboard: ''});
 
@@ -240,7 +240,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
 
   // ================= German
   w = await boot({user: 'carol', hash: 'home'}); d = w.document; await sleep(400);
-  check(d.querySelector('#top h1')?.textContent.includes('Übersicht') || d.querySelector('#top h1')?.textContent.includes('Dashboard'), 'German: the dashboard title');
+  check(d.querySelector('#top h1')?.textContent.includes('Start'), 'German: the dashboard title');
   check(d.querySelector('[data-act="dash-custom"]')?.textContent.includes('Anpassen'), 'German: Anpassen');
   w.close();
 

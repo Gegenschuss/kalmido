@@ -166,7 +166,11 @@ async function swTests() {
   for (let i = 0; i < 10; i++) await call('POST', '/api/lists', {name: 'Extra ' + i});
   w = await boot({user: 'alice', mobile: true, hash: 'l/' + WEB}); d = w.document;
   w.eval(`openDetail(${plan})`); await sleep(900);
-  const sel = d.querySelector('#detail #d-list');
+  // 2.25.0 (UX-44): the task panel has no list / section selects any more (the path on top moves a task); the sheet is
+  // tested on selects of the same kind placed in the panel, wired like the old ones
+  const mkSel = (id, label, opts, val, onCh) => { const box = d.createElement('div'); box.className = 'dsec fields'; box.innerHTML = `<label for="${id}">${label}</label><select id="${id}" data-sheet-ico="list">${opts.map(([v, t]) => `<option value="${v}" ${v === val ? 'selected' : ''}>${t}</option>`).join('')}</select>`; d.querySelector('#detail').appendChild(box); const el = box.querySelector('select'); el.addEventListener('change', () => onCh(el.value)); return el; };
+  const lsOpts = () => w.eval(`JSON.stringify(S.lists.filter(l => !l.archived).map(l => [String(l.id), lname(l)]))`);
+  const sel = mkSel('t-list', 'List', JSON.parse(lsOpts()), String(WEB), v => w.eval('patchTask(' + plan + ', {list_id: ' + (+v) + '})'));
   const ev = mdown(w, sel);
   const pop = d.querySelector('#pop');
   check(!ev && !pop.classList.contains('hidden') && pop.classList.contains('sheet') && pop.classList.contains('selpop'), 'phone: a tap on the list select opens the bottom sheet (system picker prevented)');
@@ -184,7 +188,8 @@ async function swTests() {
   await call('PATCH', `/api/tasks/${plan}`, {list_id: WEB});
   w.eval(`load().then(render)`); await sleep(500);
   w.eval(`openDetail(${plan})`); await sleep(900);
-  const ssel = d.querySelector('#detail #d-sec');
+  const secs = JSON.parse(w.eval(`JSON.stringify(S.sections.filter(x => x.list_id === ${WEB}).map(x => [String(x.id), x.name]))`));
+  const ssel = mkSel('t-sec', 'Section', [['', 'Unassigned'], ...secs], '', v => w.eval('patchTask(' + plan + ', {section_id: ' + (v ? +v : 'null') + '})'));
   key(w, ssel, 'Enter'); await sleep(100);
   const p2 = d.querySelector('#pop');
   check(!p2.classList.contains('hidden') && !p2.querySelector('#ss-q') && p2.querySelectorAll('[role="option"]').length === 2, 'keyboard Enter opens it too; 2 options: no search');
@@ -208,7 +213,7 @@ async function swTests() {
   w.close();
   w = await boot({user: 'alice', hash: 'l/' + WEB}); d = w.document;
   w.eval(`openDetail(${plan})`); await sleep(800);
-  check(mdown(w, d.querySelector('#detail #d-list')) && d.querySelector('#pop').classList.contains('hidden'), 'desktop: native select');
+  check(mdown(w, d.querySelector('#detail #d-assignee') || mkSel('t-list2', 'List', [['1', 'a'], ['2', 'b']], '1', () => {})) && d.querySelector('#pop').classList.contains('hidden'), 'desktop: native select');
   w.close();
   w = await boot({user: 'alice', mobile: true, hash: 'today'}); d = w.document;
   w.eval(`settingsModal('look')`); await sleep(600);

@@ -118,7 +118,7 @@ def openapi_spec():
         "created_at": {"type": "string", "format": "date-time"}, "updated_at": {"type": "string", "format": "date-time"},
         "completed_at": nul("string", format="date-time"), "deleted": {"type": "boolean"},
         "fields": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Custom field values by field id"},
-        "waiting": {"oneOf": [{"type": "null"}, ref("Waiting")], "description": "Waiting on external (2.1.0); null = not waiting"},
+        "waiting": {"oneOf": [{"type": "null"}, ref("Waiting")], "description": "Waiting on someone outside (a client, an office, a delivery) with a follow-up day (2.1.0; called waiting on external before 2.25.0); null = not waiting"},
         "type": nul("string", enum=[*TICKET_TYPES, None], description="Ticket type (2.4.0); a new bug / feature in a list with ticket "
                     "types on gets the list's note template when its notes are empty"),
         "deadline": {"type": "boolean", "description": "2.7.0: the due date is a deadline (countdown, highlighted from the first reminder on)"},
@@ -158,7 +158,7 @@ def openapi_spec():
             "code": {"type": "string", "enum": sorted(set(V1_CODES.values()) | {"unknown_field"})}, "message": {"type": "string"},
             "fields": {"type": "array", "items": {"type": "string"},
                        "description": "code unknown_field (2.2.1): the body fields this endpoint does not know (nothing was changed)"}}}}},
-        "Task": {"type": "object", "properties": {**task_props, "blocked": {"type": "boolean", "description": "Waiting on an open task"},
+        "Task": {"type": "object", "properties": {**task_props, "blocked": {"type": "boolean", "description": "Blocked by an open task (dependencies, shown as Blocked by)"},
                                                   "comment_count": {"type": "integer"},
                                                   "context": {"type": "boolean", "description": "Participant view: the parent of one of your "
                                                               "subtasks, read-only, without notes, link, files and comments"},
@@ -399,7 +399,7 @@ def openapi_spec():
                      q("parent_id", "Subtasks of this task", {"type": "integer"}), q("top_level", "true = no subtasks", {"type": "boolean"}),
                      q("fields", "compact = only id, title, list_id, section_id, parent_id, status, due, due_time, priority, tags, "
                                  "list_tags, assignee_id (default full)", {"type": "string", "enum": ["full", "compact"]}),
-                     q("waiting", "true = only tasks waiting on external, false = only the others", {"type": "boolean"}),
+                     q("waiting", "true = only tasks waiting on someone, false = only the others", {"type": "boolean"}),
                      q("pinned", "2.16.0: true = only pinned tasks, false = only the others", {"type": "boolean"}),
                      q("milestone", "2.18.0: true = only milestones, false = only the other tasks", {"type": "boolean"}),
                      q("milestone_id", "2.18.0: only the tasks of this milestone", {"type": "integer"}),
@@ -461,7 +461,7 @@ def openapi_spec():
         "/tasks/{id}/complete": {"post": op("Complete a task", T, ok(ref("TaskCompleted")) | errs("403", "404"), [pid()], scope="write",
                                             desc="Recurring tasks move to their next date (next_due) and a completed copy stays in the history. "
                                                  "Completing a done task changes nothing.")},
-        "/tasks/{id}/waiting": {"put": op("Mark a task as waiting on external (or change note / follow-up day)", T, ok(ref("Task")) | errs("400", "403", "404"),
+        "/tasks/{id}/waiting": {"put": op("Mark a task as waiting on someone outside (or change note / follow-up day)", T, ok(ref("Task")) | errs("400", "403", "404"),
                                           [pid()], body=ref("WaitingInput"), scope="write",
                                           desc="On the follow-up day the person it is for gets a reminder + News, following agents the event followup_due."),
                                 "delete": op("Clear the waiting state", T, ok(ref("Task")) | errs("403", "404"), [pid()], scope="write")},

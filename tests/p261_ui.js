@@ -98,7 +98,7 @@ const HEAD = `(() => {
   w.eval(`settingsModal('general')`); await sleep(500);
   let md = d.querySelector('.smodal');
   const cb = md.querySelector('#s-dateok');
-  check(cb && !cb.checked && /Confirm changes with OK/.test(cb.closest('label').textContent), 'Settings > General: "Confirm changes with OK" (off)');
+  check(cb && !cb.checked && /Confirm changes of the date with OK/.test(cb.closest('label').textContent), 'Settings > General: "Confirm changes with OK" (off)');
   cb.checked = true; change(w, cb); await sleep(700);
   check((await call('GET', '/api/state')).settings.date_confirm === '1' && w.eval('dateInstant()') === false, 'switched on (server)');
   md.remove();
@@ -164,7 +164,7 @@ const HEAD = `(() => {
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
   check(/Agenten: Claude bereit, Helper bereit/.test(d.querySelector('#top .achip')?.getAttribute('aria-label') || ''), 'German label: ' + d.querySelector('#top .achip')?.getAttribute('aria-label'));
   w.eval(`settingsModal('general')`); await sleep(500);
-  check(/Änderungen mit OK bestätigen/.test(d.querySelector('.smodal #s-dateok')?.closest('label')?.textContent || ''), 'German: "Änderungen mit OK bestätigen"');
+  check(/Änderungen am Datum mit OK bestätigen/.test(d.querySelector('.smodal #s-dateok')?.closest('label')?.textContent || ''), 'German: "Änderungen mit OK bestätigen"');
   d.querySelector('.smodal').remove();
   w.eval(`bellMenu(document.querySelector('#top h1'), ${L})`); await sleep(200);
   check(/Eigene Auswahl…/.test(d.querySelector('#pop').textContent), 'German: "Eigene Auswahl…"');

@@ -276,7 +276,7 @@ def t_get_attachment(api, a):
 
 
 def t_set_waiting(api, a):
-    """2.1.0 (#335): waiting on external (note = who / what, until = follow-up day YYYY-MM-DD or null)."""
+    """2.1.0 (#335): waiting on someone outside (note = who / what, until = follow-up day YYYY-MM-DD or null)."""
     return api.call("PUT", f"/tasks/{int(a['task_id'])}/waiting", body=_pick(a, ("note", "until")))
 
 
@@ -339,7 +339,7 @@ TOOLS = [
      _obj({"list_id": S_ID, "status": {"type": "string", "enum": ["open", "done", "wont_do", "all"]}, "tag": {"type": "string"},
            "list_tag": {"type": "string"}, "assignee": {"type": "string"}, "limit": {"type": "integer", "minimum": 1, "maximum": 500},
            "cursor": {"type": "string"}, "compact": {"type": "boolean"},
-           "waiting": {"type": "boolean", "description": "true = only tasks waiting on external, false = only the others"},
+           "waiting": {"type": "boolean", "description": "true = only tasks waiting on someone, false = only the others"},
            "pinned": {"type": "boolean", "description": "2.16.0: true = only pinned tasks (the 'Pinned' view), false = only the others"},
            "type": {"type": "string", "enum": ["bug", "feature", "task", "none"], "description": "only tickets of this type"},
            "assignee_group": {"type": "string", "description": "2.10.0: mine (assigned to one of your groups) or a group id"},
@@ -380,13 +380,13 @@ TOOLS = [
      _obj({"task_id": S_ID, **{k: v for k, v in TASK_FIELDS.items() if k != "parent_id"}}, ["task_id"]), t_update_task),
     ("complete_task", "Mark a task done (repeating tasks move to their next date).",
      _obj({"task_id": S_ID}, ["task_id"]), lambda api, a: api.call("POST", f"/tasks/{int(a['task_id'])}/complete")),
-    ("set_waiting", "Mark a task as waiting on external (someone outside: a client, an office, a delivery), or change it. note: who / "
+    ("set_waiting", "Mark a task as waiting on someone (outside: a client, an office, a delivery), or change it. note: who / "
                     "what it waits for; until: the follow-up day (YYYY-MM-DD) -- on that day the person gets a reminder and agents that "
                     "follow the task the event followup_due.",
      _obj({"task_id": S_ID, "note": {"type": "string", "maxLength": 300}, "until": {"type": ["string", "null"]}}, ["task_id"]), t_set_waiting),
     ("clear_waiting", "The task no longer waits on external.",
      _obj({"task_id": S_ID}, ["task_id"]), lambda api, a: api.call("DELETE", f"/tasks/{int(a['task_id'])}/waiting")),
-    ("list_waiting", "Open tasks waiting on external (task.waiting = {note, until, since, by}).",
+    ("list_waiting", "Open tasks waiting on someone (task.waiting = {note, until, since, by}).",
      _obj({"list_id": S_ID, "limit": {"type": "integer", "minimum": 1, "maximum": 500}, "cursor": {"type": "string"}}), t_list_waiting),
     ("add_comment", "Comment on a task (Markdown; mention people as <@user_id>). Optional structured tidy suggestion.",
      _obj({"task_id": S_ID, "body": {"type": "string", "minLength": 1}, "suggestion": SUGGESTION}, ["task_id", "body"]), t_add_comment),
@@ -439,7 +439,7 @@ TOOLS = [
     ("submit_proposal", "Answer a job_request with ONE structured proposal; the person reviews, edits and applies it. Never create "
                         "the lists / tasks yourself. proposal by kind -- project: {name, folder?, sections: [names], tasks: [{title, "
                         "notes?, section?, due?, start?, priority?, subtasks: [{title, notes?, due?}], depends_on: [task indices]}]}; "
-                        "subtasks: {items: [{title, notes?, due?, estimate? (minutes)}], dependencies?: [[a, b]] (item a waits on b)}; "
+                        "subtasks: {items: [{title, notes?, due?, estimate? (minutes)}], dependencies?: [[a, b]] (item a is blocked by b)}; "
                         "triage: {items: [{task_id, list_id?, section_id?, tags?, priority?, due?, rewrite_title?}]} (only ids from "
                         "the input); extract: {tasks: [{title, notes?, assignee_id? (a member id from the input), due?, section?}]}; "
                         "dayplan (2.10.0): {items: [{task_id, start (HH:MM), duration? (minutes, default the task's or input."
@@ -748,11 +748,11 @@ TOOLS += [
      _obj({"from": {"type": "string"}, "to": {"type": "string"}, "projects_only": {"type": "boolean"}, "include_done": {"type": "boolean"}}),
      lambda api, a: api.call("GET", "/roadmap", {k: (str(v).lower() if isinstance(v, bool) else v) for k, v in a.items()})),
     # ---- dependencies
-    ("get_dependencies", "What a task waits on (blocked_by) and what waits on it (blocking).", _obj({"task_id": S_ID}, ["task_id"]),
+    ("get_dependencies", "What blocks a task (blocked_by: tasks to finish first) and what it blocks (blocking).", _obj({"task_id": S_ID}, ["task_id"]),
      lambda api, a: api.call("GET", f"/tasks/{_id(a, 'task_id')}/dependencies")),
-    ("add_dependency", "task_id waits on blocked_by (project lists; no cycles).", _obj({"task_id": S_ID, "blocked_by": S_ID}, ["task_id", "blocked_by"]),
+    ("add_dependency", "task_id is blocked by blocked_by until that one is done (project lists; no cycles).", _obj({"task_id": S_ID, "blocked_by": S_ID}, ["task_id", "blocked_by"]),
      lambda api, a: api.call("POST", f"/tasks/{_id(a, 'task_id')}/dependencies", body={"blocked_by": a["blocked_by"]})),
-    ("remove_dependency", "task_id no longer waits on blocked_by.", _obj({"task_id": S_ID, "blocked_by": S_ID}, ["task_id", "blocked_by"]),
+    ("remove_dependency", "task_id is no longer blocked by blocked_by.", _obj({"task_id": S_ID, "blocked_by": S_ID}, ["task_id", "blocked_by"]),
      lambda api, a: api.call("DELETE", f"/tasks/{_id(a, 'task_id')}/dependencies/{_id(a, 'blocked_by')}")),
     # ---- custom fields
     ("list_fields", "Custom field definitions of a list (id, name, type, options). Values: the task's fields {field id: value}.",

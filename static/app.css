@@ -2007,7 +2007,9 @@ button.tvr-task:hover{color:var(--accent)}
    bar (the app hides the "+" button there, see tabletDock()); phones and phone landscape keep the "+" */
 /* 2.19.0 (#669): html.tdock (tdockSync) instead of min-height:600px, so the on-screen keyboard never flips this layout */
 @media (min-width:600px) and (max-width:899px){
-  html.tdock .qdock{display:block;bottom:calc(var(--tabs-h) + var(--safe-b));padding-bottom:.75rem}
+  /* 2.25.0 (UX-39): #view already keeps the tab bar's height as padding, and a sticky box stops at that padding: bottom 0
+     puts the bar right on top of the tab bar (with the tab bar's height again it floated mid-screen on the Fold) */
+  html.tdock .qdock{display:block;bottom:0;padding-bottom:.75rem}
   html.tdock #view:has(> .lwrap){padding-bottom:calc(var(--tabs-h) + var(--safe-b))}
 }
 /* 1.5.3 (r): taller bars, handles reaching past the ends, the text clips inside the bar */
@@ -4638,3 +4640,114 @@ button.lkchip:hover{border-color:var(--accent)}
 .sbody.snores{position:relative}
 .sbody.snores::after{content:attr(data-nores);position:absolute;inset:3rem 1rem auto;text-align:center;color:var(--muted);font-size:var(--fs-l)}
 @media (pointer:coarse){ .cmhead .cmtoggle{min-height:2.75rem} }  /* 2.24.0: the comments sit high in the panel now: 44 px targets */
+/* ---- 2.25.0 "Usability part 2" ---- */
+/* UX-43: a menu item may carry a second, smaller line (what the choice does) */
+.menu-list .msub{display:block;font-size:var(--fs-s);color:var(--muted);font-weight:400;white-space:normal}
+.dgrp .dnone{font-size:var(--fs-s);padding:.25rem 0}
+/* UX-02: sort mode: a bar with "Done" on top, full names that wrap, the grip as a 44 px handle */
+.sreobar{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:.5rem;margin:.25rem 0 .375rem;padding:.5rem .625rem;border-radius:var(--radius);background:var(--bg3);border:1px solid var(--line2)}
+.sreobar .sreot{display:flex;flex-direction:column;min-width:0;flex:1}
+.sreobar .sreot small{color:var(--muted);font-size:var(--fs-s);line-height:1.3}
+.sreobar .btn{min-height:2.75rem;flex:none}
+#side .srow.reorder{align-items:center;height:auto;min-height:2.75rem}
+#side .srow.reorder .n{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;line-height:1.3;padding:.25rem 0}
+#side .srow.reorder .sgrip,#side .fhead .sgrip{display:inline-flex;align-items:center;justify-content:center;flex:none;min-width:2.75rem;min-height:2.75rem;margin:-.5rem -.5rem -.5rem -.75rem;color:var(--muted);cursor:grab;touch-action:none}
+#side .fhead .sgrip{margin-right:-.25rem}
+/* UX-05: the small buttons of a group head (sort, +) sit on the line of its title: their icon centred in the 44 px target */
+#side .shead button{align-items:center;justify-content:center}
+/* UX-07: a project's progress as a thin line under its name instead of "0 %" */
+#side .srow[data-list]{position:relative}
+#side .srow .sprog{position:absolute;left:2.25rem;right:.5rem;bottom:.25rem;height:.125rem;border-radius:.0625rem;background:var(--line2);pointer-events:none}
+#side .srow .sprog::after{content:"";position:absolute;left:0;top:0;bottom:0;width:var(--p);border-radius:inherit;background:var(--accent)}
+@media (forced-colors:active){ #side .srow .sprog{background:GrayText} #side .srow .sprog::after{background:Highlight} }
+/* UX-03: Settings > Appearance > Sidebar */
+.sidecfg .sidegrp.off > span{color:var(--muted);text-decoration:line-through}
+.sidecfg .sideye{color:var(--muted)}
+.sidecfg .sidegrp:not(.off) .sideye{color:var(--accent)}
+.sidecfg .sideents{display:flex;flex-wrap:wrap;gap:.125rem 1rem;padding:.125rem .5rem .5rem 2.75rem}
+.sidecfg .sideents .chkl{min-height:2.75rem}
+#side .srow.smore{color:var(--muted)}
+/* UX-45: the comment text under a bundled News item, one line */
+.ngroup .ngex{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:var(--fs-m);color:var(--text2);margin-top:.125rem}
+/* UX-48: the head of the bell's panel stays on one line: "4 new" and a small "All read" */
+.bphead .bpnew{white-space:nowrap;color:var(--muted);font-size:var(--fs-m)}
+.bphead .bpread{flex:none;white-space:nowrap}
+.bpempty small{display:block;margin-top:.375rem;max-width:22rem;text-align:center}
+/* UX-17: settings on a phone start with an overview of the areas; inside one, ‹ goes back to it */
+.smodal .sndesc{display:none}
+.smodal .sback{display:none}
+
+@media (max-width:899px){
+  .smodal:not(.sidx) .sback{display:inline-flex}
+  .smodal.sidx .spanes,.smodal.sidx .snmore{display:none}
+  .smodal.sidx .snav{flex-direction:column;flex:1;gap:.125rem;padding:.25rem .75rem 1rem;overflow-y:auto;overflow-x:hidden;border-bottom:0;-webkit-mask-image:none;mask-image:none}
+  .smodal.sidx .snav button{display:grid;grid-template-columns:1.5rem 1fr;align-items:center;column-gap:.75rem;min-height:3.5rem;padding:.5rem .75rem;background:none;white-space:normal;font-size:var(--fs-l);color:var(--text)}
+  .smodal.sidx .snav button.on{background:none;box-shadow:none}
+  .smodal.sidx .snav button svg{grid-row:1 / span 2;color:var(--accent)}
+  .smodal.sidx .snav .sndesc{display:block;grid-column:2;font-size:var(--fs-m);color:var(--muted);line-height:1.3}
+}
+/* UX-19: Settings > Modules: groups fold, with "3 of 4 on" */
+.modtot{font-size:var(--fs-m);margin:.25rem 0 .5rem}
+.modgrp{border-top:1px solid var(--line)}
+.modgrp > summary{display:flex;align-items:center;gap:.5rem;min-height:2.75rem;cursor:pointer;list-style:none;font-weight:600;color:var(--text);font-size:var(--fs-b)}
+.modgrp > summary::-webkit-details-marker{display:none}
+.modgrp > summary .mgn{flex:1}
+.modgrp > summary .mgc{font-weight:400;font-size:var(--fs-m)}
+.modgrp > summary .fcar{transform:rotate(-90deg);transition:transform .15s}
+.modgrp[open] > summary .fcar{transform:none}
+@media (prefers-reduced-motion:reduce){ .modgrp > summary .fcar{transition:none} }
+.modgrp .modlist{padding-bottom:.5rem}
+/* UX-20: Integrations open with three plain tasks */
+.icards{display:grid;gap:.5rem;margin:.25rem 0 1rem}
+.icard{display:flex;align-items:center;gap:.75rem;width:100%;min-height:3.5rem;padding:.625rem .75rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2);text-align:left;color:var(--text)}
+.icard:hover{background:var(--bg3)}
+.icard > span{display:flex;flex-direction:column;flex:1;min-width:0}
+.icard small{color:var(--muted);font-size:var(--fs-m)}
+.icard > svg:first-child{color:var(--accent);flex:none}
+.icard .fcar{transform:rotate(-90deg);color:var(--muted);flex:none}
+@media (min-width:900px){ .icards{grid-template-columns:repeat(3,1fr)} }
+/* UX-46: does this device ring? one clear line on top of Notifications */
+.pushnow{display:flex;align-items:center;gap:.75rem;padding:.75rem .875rem;margin:.25rem 0 1rem;border-radius:var(--radius);border:1px solid var(--line2);background:var(--bg2)}
+.pushnow > span{display:flex;flex-direction:column;flex:1;min-width:0}
+.pushnow small{color:var(--muted);font-size:var(--fs-m)}
+.pushnow.on > svg{color:var(--ok)}
+.pushnow.off > svg{color:var(--muted)}
+.pushnow .btn{flex:none;min-height:2.75rem}
+/* UX-28: a one-time tip above a list, with its action */
+.onehint{display:flex;align-items:center;gap:.5rem;margin:.25rem 0 .75rem;padding:.5rem .5rem .5rem .75rem;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--line2);font-size:var(--fs-m);color:var(--text2)}
+.onehint > span{flex:1;min-width:0}
+.onehint > svg{flex:none;color:var(--accent)}
+.onehint .btn{flex:none;min-height:2.75rem}
+.onehint .hx{flex:none;min-width:2.75rem;min-height:2.75rem}
+/* UX-42: the task header says what its buttons are: the priority's word always, "Pin" where there is room, and
+   Today / Tomorrow with their words from 20rem (a 360 px phone) */
+.dtop .iconbtn[data-act="prio"],.dtop .iconbtn[data-act="pin"]{width:auto;gap:.25rem;padding:0 .5rem}
+.dtop .dpw{font-size:var(--fs-s);white-space:nowrap;color:var(--text2)}
+.dtop .dpin{display:none}
+@container dtop (min-width:30rem){ .dtop .dpin{display:inline} }
+@media (pointer:coarse){
+  @container dtop (min-width:20rem) and (max-width:27.99rem){
+    .dtop .dq{padding:0 .625rem}
+    .dtop .dq .dql{display:inline;font-size:var(--fs-s);white-space:nowrap}
+  }
+}
+/* UX-56: "Saved" in the task header for a moment after a change reached the server */
+.dtop .dsaved{position:absolute;right:.75rem;bottom:-.625rem;z-index:2;display:inline-flex;align-items:center;gap:.25rem;padding:0 .375rem;border-radius:.5rem;background:var(--bg);font-size:var(--fs-s);color:var(--ok);opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}  /* out of the row (the sticky header is its frame): it never makes the header wider */
+.dtop .dsaved.on{opacity:1}
+@media (prefers-reduced-motion:reduce){ .dtop .dsaved{transition:none} }
+/* UX-55: "All saved" for a moment where the "changes waiting" chip was */
+#savedok{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 1rem);z-index:55;display:inline-flex;align-items:center;gap:.375rem;padding:.375rem .75rem;border-radius:2rem;border:1px solid var(--line2);background:var(--bg3);color:var(--ok);font-size:var(--fs-s);opacity:0;pointer-events:none;transition:opacity .2s}
+#savedok.on{opacity:1}
+@media (prefers-reduced-motion:reduce){ #savedok{transition:none} }
+@media (max-width:899px){ #savedok{bottom:calc(env(safe-area-inset-bottom,0px) + 4.75rem)} }
+/* 2.25.0 review: the task's title on top of a menu stays readable (it is a disabled button only for the keyboard) */
+.menu-list button.mhead:disabled{opacity:1;color:var(--text)}
+/* review: Settings > Appearance > Sidebar: every row the same shape; 44 px targets on touch screens */
+.sidecfg .sidegrp .sideye{flex:none;display:inline-flex;align-items:center;justify-content:center;min-width:2rem}
+.sidecfg .sidegrp > span:not(.sideye){flex:1;text-align:left}
+@media (pointer:coarse){ .sidecfg .iconbtn{min-width:2.75rem;min-height:2.75rem} }
+/* review: in sort mode the folder's "…" stands in the same right-hand column as the lists' */
+#side .fhead [data-fsort]{margin-left:auto}
+/* UX-42 review: wide task panels show Today / Tomorrow with their words too */
+@media (pointer:fine){ @container dtop (min-width:27rem){ .dtop .dq{padding:0 .5rem;width:auto} .dtop .dq .dql{display:inline;font-size:var(--fs-s);white-space:nowrap} } }
+@media (pointer:fine){ @container dtop (max-width:25.99rem){ .dtop .dpw{display:none} .dtop .iconbtn[data-act="prio"]{width:auto;padding:0 .375rem} } }  /* narrow panels with a mouse (chat beside it): the flag alone, its word is the tooltip */

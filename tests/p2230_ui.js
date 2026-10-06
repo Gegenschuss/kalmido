@@ -87,7 +87,7 @@ const BASE = 'cal,comments,collab,time,progress,agents';
   await until(() => /2h 0m/.test(d.querySelector('#view .cltable')?.textContent || ''), 80);
   check(/Website relaunch/.test(d.querySelector('#view .cltable').textContent) && /2h 0m/.test(d.querySelector('#view .cltable').textContent) && d.querySelector('#view .clbud .clbar'),
     'estimate vs. actual per list, the budget bar ' + d.querySelector('#view .cltable')?.textContent);
-  check(/1:30/.test(d.querySelector('#view .sttiles').textContent), 'the tiles: 1:30 this month');
+  check(await until(() => /1:30/.test(d.querySelector('#view .sttiles')?.textContent || ''), 60), 'the tiles: 1:30 this month');  // 2.25.0: waits for the tiles too (CI flake)
   click(w, d.querySelector('#view [data-act="client-sheet"]'));
   await until(() => d.querySelector('.tsheet .tspage'), 60);
   check(w.eval('S.route.mod') === 'time' && /Café Aurora/.test(d.querySelector('.tsheet .tsclient')?.textContent || '') && /Website relaunch/.test(d.querySelector('.tsheet').textContent),

@@ -105,7 +105,14 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   // ---- reorder mode buttons stay as the accessible alternative
   d.querySelector('[data-act="side"]').click(); await sleep(50);
   d.querySelector('[data-act="lists-reorder"]').click(); await sleep(50);
-  check(d.querySelector('#side .srow.reorder [data-lmove]') && d.querySelector('#side [data-lfolder]'), 'reorder mode: up / down and "Move to folder" buttons');
+  // 2.25.0 (UX-02): a bar "Sort lists – Done", full names, a grip, ONE "…" per list with up / down / folder
+  check(d.querySelector('#side .sreobar [data-act="lists-reorder"]') && d.querySelector('#side .srow.reorder .sgrip') && !d.querySelector('#side .srow.reorder [data-lmove]'), 'reorder mode: bar with Done, grip, no arrow buttons');
+  d.querySelector(`#side .srow.reorder[data-list="${L3}"] [data-lsort]`).click(); await sleep(50);
+  const ml = [...d.querySelectorAll('#pop [role="menuitem"]')].map(b => b.textContent.trim());
+  check(ml.some(x => /Move up/.test(x)) && ml.some(x => /Move down/.test(x)) && ml.some(x => /Move to folder/.test(x)), 'reorder mode: "…" = up / down / folder: ' + ml.join(' | '));
+  w.eval('closePop()');
+  d.querySelector('#side .sreobar [data-act="lists-reorder"]').click(); await sleep(50);
+  check(!d.querySelector('#side .srow.reorder') && !w.eval('S.listReorder'), 'Done ends the sort mode');
   check(errs.length === 0, 'no script errors: ' + errs.join(' | '));
   w.close();
   console.log(`${ok} ok, ${F.length} failed`);

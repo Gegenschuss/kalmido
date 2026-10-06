@@ -119,36 +119,37 @@ async function openSetup(jar) {  // the app with a cookie jar of its own (the se
   w = await boot({user: 'alice'}); d = w.document;
   check(await tourOpen(w), 'tour opens on the first start');
   const tb = () => d.querySelector('.tour #t-sample');
-  check(tb() && tb().checked && /Create a sample project/.test(tb().closest('label').textContent), 'tour: first card offers the sample, preticked with the project modules');
+  // 2.25.0 (UX-24): the tour only explains; the sample project is offered on its LAST card
+  const toLast = async () => { for (let i = 0; i < 8 && /Next|Weiter/.test(d.querySelector('[data-tour="next"]')?.textContent || ''); i++) { click(w, d.querySelector('[data-tour="next"]')); await sleep(80); } };
+  check(!tb(), 'tour: no question on the first card');
+  await toLast();
+  check(tb() && tb().checked && /Create a sample project/.test(tb().closest('label').textContent), 'tour: the last card offers the sample, preticked with the project modules');
   click(w, d.querySelector('[data-tour="next"]'));
-  check(await until(() => w.eval('S.sample')), 'tour: Next created it');
-  check(!tb(), 'tour: no checkbox on the second card');
-  click(w, d.querySelector('[data-tour="back"]')); await sleep(80);
-  check(!tb(), 'tour: back on the first card: not offered again');
+  check(await until(() => w.eval('S.sample')), 'tour: Done created it');
   check(w.eval('S.lists').some(l => l.name === 'Getting started') && w.eval('S.sample.lists').length === 2, 'Getting started list + the sample');
-  w.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true})); await sleep(300);
   w.close();
-  // bob: German, no project modules -> unticked, Skip creates nothing
+  // bob: German, no project modules -> unticked, Done creates nothing
   const BK = await login('bob');
   await call('PATCH', '/api/settings', {features: 'cal,timeline,matrix', lang: 'de'}, BK);
   w = await boot({user: 'bob'}); d = w.document;
   check(await tourOpen(w), 'bob: tour');
+  await toLast();
   check(tb() && !tb().checked && /Beispielprojekt anlegen/.test(tb().closest('label').textContent), 'bob: German, unticked without project modules');
-  click(w, d.querySelector('[data-tour="skip"]')); await sleep(800);
-  check((await call('GET', '/api/state', null, BK)).sample === null, 'bob: Skip unticked -> nothing created');
+  click(w, d.querySelector('[data-tour="next"]')); await sleep(800);
+  check((await call('GET', '/api/state', null, BK)).sample === null, 'bob: unticked -> nothing created');
   w.close();
-  // carol: preticked, untick, Next -> nothing
+  // carol: preticked, untick, Done -> nothing
   w = await boot({user: 'carol'}); d = w.document;
-  await tourOpen(w);
+  await tourOpen(w); await toLast();
   change(w, tb(), false);
   click(w, d.querySelector('[data-tour="next"]')); await sleep(800);
-  check((await call('GET', '/api/state', null, await login('carol'))).sample === null, 'carol: unticked + Next -> nothing');
+  check((await call('GET', '/api/state', null, await login('carol'))).sample === null, 'carol: unticked + Done -> nothing');
   w.close();
-  // dave: preticked, Esc on the first card -> created
+  // dave: Skip on the first card -> nothing (the offer was never shown)
   w = await boot({user: 'dave'}); d = w.document;
   await tourOpen(w);
-  w.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true}));
-  check(await until(async () => (await call('GET', '/api/state', null, await login('dave'))).sample), 'dave: Esc on the first card still creates the ticked sample');
+  click(w, d.querySelector('[data-tour="skip"]')); await sleep(800);
+  check((await call('GET', '/api/state', null, await login('dave'))).sample === null, 'dave: Skip on the first card creates nothing');
   w.close();
   // restarting the tour later never offers it
   w = await boot({user: 'dave'}); d = w.document;

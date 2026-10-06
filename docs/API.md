@@ -29,7 +29,7 @@ Create a token under **Settings > Account > API tokens**:
   | `read` (always on) | every `GET`: lists, tasks, subtasks, tags, comments, time entries, habits, search, trash, News |
   | `tasks:write` | create, change, complete, reopen, move and batch-change tasks and subtasks; dependencies, waiting, habits, the day plan |
   | `comments` | write, edit and delete comments, reactions, mark News read |
-  | `structure` | lists (create, change, archive, share), sections, custom fields, list tags, templates, saved filters, folders, project overview and status, import |
+  | `structure` | lists (create, change, archive, share), sections, custom fields, list tags, templates, saved filters, folders, project pages and status, import |
   | `delete` | move tasks to the trash, restore, empty the trash, undo an import; delete sections, lists, fields, templates, habits, filters (list tags, links and milestones: `structure`) |
   | `attachments:read` | download files of tasks, comments and projects (their names come with `read`) |
   | `attachments:write` | upload and remove them |
@@ -168,7 +168,7 @@ had been made in the app. Webhooks fire too.
 | `DELETE /tasks/{id}` | delete | Move the task with its subtasks to the trash (204); restorable in the app |
 | `POST /tasks/{id}/complete` | tasks:write | Complete; recurring tasks move to their next date (`next_due`) |
 | `POST /tasks/{id}/reopen` | tasks:write | Reopen a completed task |
-| `PUT /tasks/{id}/waiting` · `DELETE …` | tasks:write | 2.1.0: waiting on external: `{note?, until? (YYYY-MM-DD)}` sets / changes it, `DELETE` ends it. Every task has `waiting` (`null` or `{note, until, since, by}`); `GET /tasks?waiting=true` lists them |
+| `PUT /tasks/{id}/waiting` · `DELETE …` | tasks:write | 2.1.0: waiting on someone (outside; *waiting on external* before 2.25.0): `{note?, until? (YYYY-MM-DD)}` sets / changes it, `DELETE` ends it. Every task has `waiting` (`null` or `{note, until, since, by}`); `GET /tasks?waiting=true` lists them |
 | `GET /tasks/{id}/subtasks` | read | Subtasks |
 | `POST /tasks/{id}/subtasks` | tasks:write | Add a subtask |
 | `GET /tasks/{id}/comments` | read | Comments |

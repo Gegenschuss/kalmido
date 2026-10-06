@@ -150,7 +150,7 @@ const set = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', 
   w = await boot({user: 'bob', hash: 'l/' + L.id}); d = w.document;
   w.eval(`listModal(${L.id})`); await sleep(400);
   md = d.querySelector('.modal');
-  check(md.querySelector('#l-kind')?.disabled && !md.querySelector('#l-pub'), 'member: type selector disabled, no public link section');
+  check(md.querySelector('#l-kindp')?.disabled && !md.querySelector('#l-pub'), 'member: type selector disabled, no public link section');
   md.remove(); w.close();
   // ---- German
   await call(ca, 'PATCH', '/api/lists/' + L.id, {checklist: true});
@@ -159,7 +159,7 @@ const set = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', 
   w = await boot({user: 'alice', hash: 'l/' + L.id}); d = w.document;
   check(/Erledigt/.test(d.querySelector('#view .ckdone .ghead')?.textContent || '') && d.querySelector('[data-act="ck-uncheck"]')?.textContent.includes('Alle zurücksetzen'), 'German: Done section');
   w.eval(`listModal(${L.id})`); await sleep(400);
-  check(/Liste/.test(d.querySelector('.modal #l-kind').textContent) && /Projekt/.test(d.querySelector('.modal #l-kind').textContent) && /Erledigte unten zeigen/.test(d.querySelector('.modal').textContent) && /Teilen…/.test(d.querySelector('.modal').textContent), 'German: list dialog');
+  check(/Projekt-Funktionen/.test(d.querySelector('.modal .lkrow').textContent) && /Erledigte unten zeigen/.test(d.querySelector('.modal').textContent) && /Teilen…/.test(d.querySelector('.modal').textContent), 'German: list dialog');
   d.querySelector('.modal').remove();
   w.eval(`shareModal(${L.id})`); await sleep(400);
   check(/Öffentlicher Link/.test(d.querySelector('.modal.shmodal')?.textContent || ''), 'German: Share dialog');

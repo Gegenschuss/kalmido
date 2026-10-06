@@ -68,7 +68,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   // the server: action endpoints of a switched-off module refuse (409, with the reason); the data stays
   await call('PATCH', '/api/settings', {features: ALL.split(',').filter(f => !['pomo', 'habits', 'time'].includes(f)).join(',')});
   let r = await call('POST', '/api/pomo/start', {kind: 'focus', minutes: 25});
-  check(r.status === 409 && /Focus \(Pomodoro\) is turned off/.test(r.error), `pomo off: start refused (${r.status} ${r.error})`);
+  check(r.status === 409 && /focus timer is turned off/.test(r.error), `pomo off: start refused (${r.status} ${r.error})`);
   r = await call('POST', '/api/habits', {name: 'Read'});
   check(r.status === 409 && /Habits are turned off/.test(r.error), `habits off: create refused (${r.status})`);
   r = await call('POST', `/api/habits/${HB}/log`, {});

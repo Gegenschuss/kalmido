@@ -15,8 +15,8 @@ const SHORTCUTS_ALL = [
   [N_('Multi-select'), [['Mod+A', N_('Select all tasks of the view')], ['Shift+↓', N_('Extend the selection down (or Shift+J)')], ['Shift+↑', N_('Extend the selection up (or Shift+K)')], ['Shift+X', N_('Select or unselect the task')],
     ['Space', N_('Complete the selected tasks (or X)')], ['m', N_('Move the selected tasks to a list')], ['d', N_('Change the date of the selected tasks')], ['Esc', N_('Clear the selection')]]],
   [N_('Calendar'), [['1', N_('Month')], ['2', N_('Week')], ['3', N_('Day')], ['4', N_('Timeline')], ['←', N_('Previous period')], ['→', N_('Next period')], ['.', N_('Jump to today')]]],
-  [N_('Timeline'), [['Tab', N_('Focus a bar')], ['c', N_('Connect to the task that waits on it')], ['Shift+F10', N_('Bar menu')], ['d', N_('Pick a date…')], ['Esc', N_('Cancel connecting')]]],
-  [N_('Go to'), [['g t', N_('Today')], ['g m', N_('Tomorrow')], ['g w', N_('Next 7 days')], ['g d', N_('Now doable')], ['g i', N_('Inbox')], ['g a', N_('All')], ['g c', N_('Calendar')], ['g h', N_('Habits')], ['g f', N_('Focus')], ['g s', N_('Settings')]]],
+  [N_('Timeline'), [['Tab', N_('Focus a bar')], ['c', N_('Connect to the task it blocks')], ['Shift+F10', N_('Bar menu')], ['d', N_('Pick a date…')], ['Esc', N_('Cancel connecting')]]],
+  [N_('Go to'), [['g t', N_('Today')], ['g m', N_('Tomorrow')], ['g w', N_('Next 7 days')], ['g d', N_('Now doable')], ['g i', N_('Inbox')], ['g a', N_('All')], ['g c', N_('Calendar')], ['g h', N_('Habits')], ['g f', N_('Focus timer')], ['g s', N_('Settings')]]],
 ];
 // only what the switched-on modules offer (the Timeline group needs the timeline with dependencies)
 const SC_MOD = {'g c': 'cal', 'g h': 'habits', 'g f': 'pomo'};
@@ -193,7 +193,7 @@ function palAll() {
   const add = (id, kind, label, icon, fn, extra = {}) => it.push({id, kind, label, icon, fn, ...extra});
   // actions
   add('a:new', 'action', tr('New task'), 'plus', () => { const q = currentQuickInput(); if (q && (!isMobile() || tabletDock())) q.focus(); else openQuickSheet(); }, {keys: 'n'});
-  add('a:capture', 'action', tr('Quick capture'), 'zap', () => quickCapture(), {keys: 'q'});  // 2.4.0 (#187)
+  add('a:capture', 'action', tr('Capture to the inbox'), 'zap', () => quickCapture(), {keys: 'q', sub: tr('Lands in the inbox, wherever you are')});  // 2.4.0 (#187); 2.25.0 (UX-32): one name that says where it goes
   add('a:newlist', 'action', tr('New list'), 'list', () => listModal());
   add('a:newproject', 'action', tr('New project…'), 'brief', () => listModal(null, '', {kind: 'project'}));  // 2.4.0 (#243)
   add('a:newfilter', 'action', tr('New filter'), 'filter', () => filterModal());
@@ -226,7 +226,7 @@ function palAll() {
     add('a:today', 'task', tr('Move {0} to today', n), 'sun', () => patchUndoable(t.id, {due: today()}, tr('Date: {0}', dayLabel(today()))));
     add('a:tomorrow', 'task', tr('Move {0} to tomorrow', n), 'sunrise', () => patchUndoable(t.id, {due: addDays(today(), 1)}, tr('Date: {0}', dayLabel(addDays(today(), 1)))));
     add('a:move', 'task', tr('Move {0} to another list…', n), 'folder', () => openPalette('move'), {keep: true, keys: 'm'});
-    if (t.status === 0) add('a:wait', 'task', t.waiting_at ? tr('{0}: no longer waiting', n) : tr('{0}: waiting on external…', n), 'hourglass', () => t.waiting_at ? waitClear(t.id) : waitDialog(t.id));  // 2.22.0 (#686)
+    if (t.status === 0) add('a:wait', 'task', t.waiting_at ? tr('{0}: no longer waiting', n) : tr('{0}: waiting on someone…', n), 'hourglass', () => t.waiting_at ? waitClear(t.id) : waitDialog(t.id));  // 2.22.0 (#686)
     for (const [p, nm] of [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]]) add('a:prio' + p, 'task', tr('Priority of {0}: {1}', n, tr(nm)), 'flag', () => patchTask(t.id, {priority: p}), {cls: p ? 'pf' + p : '', qonly: true});
     if (feat('pomo') && t.status === 0) add('a:focus', 'task', tr('Start focus on {0}', n), 'timer', () => { pomoStart(t.id); go('pomo'); });
     if (propBreakOk(t)) add('a:propbreak', 'task', tr('Break down {0} with an agent…', n), 'bot', () => propRequest('subtasks', {tid: t.id}));  // 2.3.0 (#261)
@@ -255,14 +255,19 @@ function palAll() {
   if (doneToggleView()) add('a:showdone', 'action', `${showDone() ? tr('Hide completed') : tr('Show completed')}: ${titleFor(S.route.key)}`, 'eye', () => setShowDone(!showDone()));
   else if (S.route.mod === 'cal' && S.calMode !== 'timeline') add('a:showdone', 'action', `${showDoneCal() ? tr('Hide completed') : tr('Show completed')}: ${tr('Calendar')}`, 'eye', () => setShowDone(!showDoneCal(), 'cal'));
   // views
+  // 2.25.0 (UX-15): Pinned and Waiting on someone only while they hold something, like in the sidebar
+  const cn = counts();
   for (const k of ['inbox', 'today', 'tomorrow', 'week', 'doable', 'pinned', 'waiting', 'all', 'done', 'trash', 'search']) {
+    if ((k === 'pinned' && !cn.pinned) || (k === 'waiting' && !cn.waiting)) continue;
     add('v:' + k, 'view', tr(SMART[k].name), SMART[k].icon, () => go(k), {keys: {today: 'g t', tomorrow: 'g m', week: 'g w', doable: 'g d', inbox: 'g i', all: 'g a'}[k]});
   }
   if (collab()) add('v:assigned', 'view', tr('Assigned to me'), 'user', () => go('assigned'));
-  add('v:home', 'view', tr('Dashboard'), 'home', () => go('home'));  // 2.17.0 (#475)
+  // 2.25.0 (UX-47): "Message to …" for everyone one can write to (when typing)
+  if (teamOn()) for (const p of teamPeople()) add('dm:' + p.id, 'action', tr('Message to {0}', p.name), 'comment', () => dmOpen(p.id, p.name), {qonly: true});
+  add('v:home', 'view', tr('Start|home'), 'home', () => go('home'));  // 2.17.0 (#475)
   if (teamOn()) add('v:team', 'view', tr('Team chat'), 'comment', () => go('team'));  // 2.17.0 (#419)
   for (const n of S.notes || []) add('n:' + n.id, 'note', n.title, 'edit', () => go('note/' + n.id), {sub: lname(listById(n.list_id)) || ''});  // 2.17.0 (#442)
-  for (const [m, icon, name] of [['cal', 'cal', N_('Calendar')], ['matrix', 'grid', N_('Eisenhower matrix')], ['habits', 'habit', N_('Habits')], ['pomo', 'timer', N_('Focus')], ['news', 'bell', N_('News')], ['stats', 'chart', N_('Statistics')], ['time', 'clock', N_('Time tracking')], ['overview', 'pulse', N_('Where is it stuck?')], ['family', 'family', N_('Family')], ['contacts', 'users', N_('Contacts')], ['life', 'home', N_('Home & life')], ['review', 'journal', N_('Review & journal')], ['clients', 'brief', N_('Clients')], ['workload', 'chart', N_('Workload')]])
+  for (const [m, icon, name] of [['cal', 'cal', N_('Calendar')], ['matrix', 'grid', N_('Eisenhower matrix')], ['habits', 'habit', N_('Habits')], ['pomo', 'timer', N_('Focus timer')], ['news', 'bell', N_('News')], ['stats', 'chart', N_('Statistics')], ['time', 'clock', N_('Time tracking')], ['overview', 'pulse', N_('Project status')], ['family', 'family', N_('Family')], ['contacts', 'users', N_('Contacts')], ['life', 'home', N_('Home & life')], ['review', 'journal', N_('Review & journal')], ['clients', 'brief', N_('Clients')], ['workload', 'chart', N_('Workload')]])
     if (modOn(m)) add('v:' + m, 'view', tr(name), icon, () => go(m), {keys: m === 'cal' ? 'g c' : ''});
   // 2.8.0 (#434): the command bar also opens the timeline, the agents and their chats ("ask an agent")
   if (feat('timeline')) add('v:timeline', 'view', tr('Timeline'), 'timeline', () => { S.rmScrollReset = true; rmSet({v: 'timeline'}, 'none'); go('all'); });
@@ -429,7 +434,7 @@ function tourSteps() {
   if (m) s.push({id: 'tabs', sel: '#tabs', t: N_('Tab bar'), d: feat('habits') || feat('pomo') ? N_('Your modules: calendar, habits, focus and more. Pin lists or filters here under Settings > Appearance.') : N_('Your lists and views. Pin lists or filters here under Settings > Appearance.'), r: rect('#tabs')});
   else if (!touch) s.push({id: 'keys', sel: '#top .kbtn', t: N_('Keyboard first'), d: N_('{0} opens search and commands for everything, {1} lists all shortcuts. j and k move through tasks, x completes.'), args: [kbText('Mod+K'), '?'], r: rect('#top .kbtn')});
   const pp = S.me?.is_admin || collab() ? projectParts() : [];  // "Make a list a project": admins and teams, when a project module is on
-  s.push({id: 'settings', sel: m ? '#tabs [data-act="tabs-more"]' : '#side .sset', t: N_('Settings and modules'), d: pp.length ? N_('Switch modules on or off, pick the language and the appearance. Make a list a project (list menu … > Project) to get {0}; for shopping or packing: … > Show completed at the bottom. This tour can be restarted under Settings > Help.') : N_('Switch modules on or off, pick the language and the appearance (theme, font size, font, accent color). Shopping or packing? List menu … > Show completed at the bottom. This tour can be restarted under Settings > Help.'), args: pp.length ? [pp.join(', ')] : [],
+  s.push({id: 'settings', sel: m ? '#tabs [data-act="tabs-more"]' : '#side .sset', t: N_('Settings and modules'), d: pp.length ? N_('Switch modules on or off, pick the language and the appearance. A list becomes a project (Edit list > Project features) to get {0}. This tour can be restarted under Settings > Help.') : N_('Switch modules on or off, pick the language and the appearance (theme, font size, font, accent color). This tour can be restarted under Settings > Help.'), args: pp.length ? [pp.join(', ')] : [],
     r: rect(m ? () => $('#tabs [data-act="tabs-more"]') || $('#tabs [data-act="settings"]') || $('#top .menu') : '#side .sset')});
   if (collab()) s.push({id: 'news', sel: '#top .bell', t: N_('News'), d: N_('Mentions, assignments and comments on your tasks arrive here.'), r: rect('#top .bell')});
   return s.slice(0, 6);
@@ -440,7 +445,7 @@ function tourStart() {
   if (!inList || !$('#view .trow')) go('today');  // the tour points at a task (a fresh account's Inbox is empty)
   TOUR.on = true; TOUR.steps = tourSteps(); TOUR.i = 0;
   // 1.8.0: first start of an account: "Create a sample project" on the first card (preticked for project setups)
-  TOUR.sample = S.settings.tour === 'pending' && !S.sample && S.settings.sample_ask !== '0'; TOUR.sampleOn = TOUR.sample && sampleDefault(); TOUR.sampleSent = false;
+  TOUR.sample = S.settings.tour === 'pending' && !S.sample && S.settings.sample_ask !== '0'; TOUR.sampleOn = TOUR.sample && sampleDefault(); TOUR.sampleSent = false; TOUR.sampleShown = false;
   let el = $('.tour');
   if (!el) { el = document.createElement('div'); el.className = 'tour'; el.innerHTML = '<div class="tring"></div><div class="tcard" role="dialog" aria-live="polite"></div>'; document.body.appendChild(el); }
   el.addEventListener('click', e => {
@@ -468,7 +473,6 @@ function tourPlace(r, vw, vh, mh) {  // mh: the card's measured height (2.5.2, K
 function tourGo(i) {
   if (!TOUR.on) return;
   if (i >= TOUR.steps.length) { tourEnd(false); return; }
-  if (TOUR.i === 0 && i > 0) tourSample();
   TOUR.i = Math.max(0, i);
   const st = TOUR.steps[TOUR.i], el = $('.tour'); if (!el) return;
   const n = TOUR.steps.length, last = TOUR.i === n - 1;
@@ -476,9 +480,7 @@ function tourGo(i) {
   el.dataset.step = st.id; el.dataset.sel = st.sel || '';
   card.innerHTML = `<div class="tstep"><span>${TOUR.i + 1}/${n}</span><span class="tdots">${TOUR.steps.map((_, j) => `<i class="${j === TOUR.i ? 'on' : j < TOUR.i ? 'past' : ''}"></i>`).join('')}</span></div>
     <h3>${TOUR.i === 0 ? heron('stand', 'htour') : ''}${tr(st.t)}</h3><p>${esc(tr(st.d, ...(st.args || []))).replace(/!(\p{L})/gu, '!\u2060$1')}</p>
-    ${TOUR.i === 0 && TOUR.sample && !TOUR.sampleSent ? `<div class="tpurp"><b id="t-purp-h">${tr('What do you use Kalmido for?')}</b>${purposeCards(TOUR.purpose || '', 'data-tpurpose')}</div>` : ''}
-    ${TOUR.i === 0 && TOUR.sample && !TOUR.sampleSent ? `<label class="tsample"><input type="checkbox" id="t-sample" ${TOUR.sampleOn ? 'checked' : ''}><span><b>${tr('Create a sample project')}</b><small>${tr('A small video production with dates, dependencies and a packing list. Remove it any time under Settings > Data.')}</small></span></label>
-    <label class="tsample tptype"><span><b>${tr('Start with a project')}</b><small>${tr('Sections, fields and settings for your kind of work.')}</small></span><select id="t-ptype">${[['', N_('No project')], ...PTYPE_UI.slice(1)].map(([k, n]) => `<option value="${k}" ${k === (TOUR.ptype || '') ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></label>` : ''}
+    ${last && TOUR.sample && !TOUR.sampleSent ? `<label class="tsample"><input type="checkbox" id="t-sample" ${TOUR.sampleOn ? 'checked' : ''}><span><b>${tr('Create a sample project')}</b><small>${tr('A small video production with dates, dependencies and a packing list. Remove it any time under Settings > Data.')}</small></span></label>` : ''}
     <div class="tfoot"><button class="btn sm tskip" data-tour="skip">${tr('Skip tour')}</button><span class="spacer"></span>${TOUR.i ? `<button class="btn sm" data-tour="back">${tr('Back')}</button>` : ''}<button class="btn sm pri" data-tour="next">${last ? tr('Done') : tr('Next')}</button></div>`;
   const r = st.r && st.r();
   let pl = tourPlace(r, innerWidth, innerHeight);
@@ -490,10 +492,11 @@ function tourGo(i) {
     const cr = card.getBoundingClientRect();
     if (cr.height && pl.ring && (cr.bottom > innerHeight - 12 || cr.top < 12)) { card.style.bottom = 'auto'; card.style.top = Math.max(12, Math.min(innerHeight - cr.height - 12, cr.top)) + 'px'; }
   }
+  if (last && TOUR.sample) TOUR.sampleShown = true;  // 2.25.0 (UX-24)
   $('[data-tour="next"]', card)?.focus();
 }
-async function tourSample() {  // once, when the first card is left (Next, Skip, Esc)
-  if (!TOUR.sample || TOUR.sampleSent) return;
+async function tourSample() {  // 2.25.0 (UX-24): once, when the tour ends and its last card offered the sample project
+  if (!TOUR.sample || TOUR.sampleSent || !TOUR.sampleShown) return;
   TOUR.sampleSent = true;
   if (TOUR.purpose) {  // 2.19.0 (#653): "What do you use Kalmido for?" -> the modules + starter lists of that purpose
     try { await api('POST', '/api/me/purpose', {purpose: TOUR.purpose}); await load(); render(); } catch { /* offline: Settings > Modules */ }
@@ -506,7 +509,7 @@ async function tourSample() {  // once, when the first card is left (Next, Skip,
   try { const j = await api('POST', '/api/sample', {}); await load(); render(); if (TOUR.on) tourGo(TOUR.i); if (j?.created) toast(tr('Sample project created. Remove it any time under Settings > Data.')); } catch { /* offline: Settings > Data */ }
 }
 async function tourEnd(skipped) {
-  if (TOUR.i === 0) tourSample();
+  tourSample();
   TOUR.on = false; $('.tour')?.remove();
   if (S.settings.tour === 'pending') { S.settings.tour = 'done'; try { await api('PATCH', '/api/settings', {tour: 'done'}); } catch { /* offline: shows again next start */ } }
   if (!skipped) toast(tr('Tour finished. Restart it any time under Settings > Help.'));

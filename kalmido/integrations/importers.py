@@ -19,6 +19,7 @@ from ..core.schema import MAX_DEPTH, USER_DEFAULTS
 from ..core.i18n import lang, N_, tr
 from ..core.db import bump, db, err, iso, iso_ms, local_now, now_utc, parse_iso, usettings
 from ..accounts.session import me
+from ..lists.lists import list_created
 from ..core.access import collab_all, Denied, list_people, list_role, my_inbox, my_max_sort, need_list, WRITE_ROLES
 from ..core.serializers import unlink_files
 from ..core.pages import valid_url
@@ -93,6 +94,7 @@ def import_ticktick(c, text, uid):
             lid = c.execute("INSERT INTO lists(name,folder,sort,view,created_at,owner_id) VALUES(?,?,?,?,?,?)",
                             (name[:LIST_NAME_MAX], folder_seg(r.get("Folder Name") or ""), srt,
                              "kanban" if r.get("View Mode") == "kanban" else "list", ts, uid)).lastrowid
+            list_created(c, uid, lid)  # 2.25.0 (#931): agents, groups and people of a shared folder
             lists[name] = lid
             stats["lists"] += 1
         tt = r.get("taskId") or None
@@ -1343,6 +1345,7 @@ def imp_run(c, uid, plan, opts, dry):
                 sort_l += 1
                 lid = c.execute("INSERT INTO lists(name,folder,sort,view,created_at,owner_id) VALUES(?,?,?,?,?,?)",
                                 (L["name"] or tr("Import", lg=lg), L["folder"], sort_l, L["view"], ts, uid)).lastrowid
+                list_created(c, uid, lid)  # 2.25.0 (#931)
                 own[L["name"]] = lid
                 created["lists"].append(lid)
                 stats["lists"] += 1

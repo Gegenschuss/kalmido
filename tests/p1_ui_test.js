@@ -31,7 +31,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   // the toast can show up a moment later on a slow runner (CI): wait for its button before clicking
   const toastClick = async () => { await until(() => toastBtn(), 8000); const b = toastBtn(); if (b) b.click(); else check(false, 'undo toast did not show up'); };
   await w.eval(`toggleTask(${t1.id})`); await sleep(300);
-  check(toastBtn() && /Completed/.test(d.querySelector('#toast').textContent), 'complete shows an undo toast');
+  check(toastBtn() && /completed/i.test(d.querySelector('#toast').textContent), 'complete shows an undo toast');
   check((await get(t1.id)).status === 2, 'task completed on the server');
   await toastClick();
   check(await until(async () => (await get(t1.id)).status === 0), 'Undo button reopens it on the server');
@@ -59,7 +59,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   await w.eval('load().then(render)'); await sleep(200);
   await w.eval(`toggleTask(${t2.id})`); await sleep(300);
   check((await get(t2.id)).due === addD(today(), 7), 'recurring advanced');
-  check(/Next occurrence/.test(d.querySelector('#toast').textContent) && toastBtn(), 'recurring: undo offered');
+  check(/next occurrence/i.test(d.querySelector('#toast').textContent) && toastBtn(), 'recurring: undo offered');
   await toastClick();
   check(await until(async () => (await get(t2.id)).due === today()), 'undo recurring: back to today');
   check(!(await call('GET', '/api/tasks?scope=done')).tasks.some(t => t.title === 'Weekly review'), 'undo recurring: no done copy left');
@@ -68,10 +68,12 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   check(/deleted/.test(d.querySelector('#toast').textContent), 'delete toast');
   await toastClick();
   check(await until(async () => !(await get(t3.id)).error && (await get(t3.id)).deleted_at === null), 'undo delete restores');
-  // move to another list (detail select)
+  // move to another list (2.25.0, UX-44: the path on top of the task panel: list > "Move to list…" > the list)
   w.eval(`openDetail(${t4.id})`); await sleep(500);
-  const sel = d.querySelector('#d-list'); sel.value = String(HOME); sel.dispatchEvent(new w.Event('change', {bubbles: true}));
-  check(await until(async () => (await get(t4.id)).list_id === HOME), 'moved via the detail list select');
+  d.querySelector('#detail [data-act="crumb-menu"][data-k="list"]').click(); await sleep(100);
+  const mi = re => [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => re.test(b.textContent));
+  mi(/Move to list/).click(); await sleep(100); mi(/^\s*Home\s*$/).click();
+  check(await until(async () => (await get(t4.id)).list_id === HOME), 'moved via the path of the task panel');
   await sleep(200);
   check(/Moved to Home/.test(d.querySelector('#toast').textContent), 'move toast names the list');
   await toastClick();

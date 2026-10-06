@@ -14,7 +14,7 @@ from ..core.access import (
     collab_all, Denied, list_people, list_role, my_inbox, my_max_sort, need_collab, need_list, need_task, WRITE_ROLES,
 )
 from ..core.state import visible_lists, visible_sections
-from ..lists.lists import agent_autoshare, clean_folder, FOLDER_MAX
+from ..lists.lists import list_created, clean_folder, FOLDER_MAX
 from ..tasks.validation import as_int, check_parent, DURATION_MAX, log_act, PRIORITIES, TITLE_MAX, valid_date, valid_hm
 from ..tasks.tasks import my_tags
 from ..tasks.lifecycle import apply_update, do_delete, restore_task
@@ -570,7 +570,7 @@ def prop_run(c, j, sel, ed, extra):
         lid = c.execute("INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind) VALUES(?,?,?,?,?,?,?,?,?)",
                         (name, "", folder, my_max_sort(c, uid) + 1, "list", ts, uid, 0, "project")).lastrowid
         rec["list"] = lid
-        agent_autoshare(c, uid, lid)  # 2.4.2 (#391)
+        list_created(c, uid, lid)  # 2.4.2 (#391); 2.25.0 (#931): + groups and people of a shared folder
         secs = {}
         for i, s in enumerate(prop["sections"]):
             secs[s.casefold()] = c.execute("INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, s, i + 1)).lastrowid

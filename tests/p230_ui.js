@@ -181,7 +181,7 @@ async function firefox(fn) {
   let rows = [...md.querySelectorAll('.ppi')];
   check(rows.length === 5 && rows.filter(r => r.classList.contains('sub')).length === 2 && rows.every(r => r.querySelector('.ppc').checked), 'five rows, subtasks indented, all ticked');
   check(/5 of 5 selected/.test(md.querySelector('.ppcount').textContent) && /Apply 5 entries/.test(md.querySelector('[data-pp="apply"]').textContent), 'count + Apply button');
-  check(/waits on “Treatment”/.test(rows[3].textContent) && rows[0].querySelector('.flag-5'), 'dependency + priority chips');
+  check(/blocked by “Treatment”/.test(rows[3].textContent) && rows[0].querySelector('.flag-5'), 'dependency + priority chips');
   check(rows[0].querySelector('[data-dpfor="ppd-0"]') && rows[0].querySelector('select[data-f="section"]').value === 'Pre', 'own date picker + section select');
   const c0 = rows[0].querySelector('.ppc'); c0.checked = false; change(w, c0);
   rows = [...md.querySelectorAll('.ppi')];

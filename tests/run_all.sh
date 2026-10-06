@@ -394,6 +394,9 @@ shard 7  # ---------------------------------------------------------------- shar
 # crop dialog (#825), the sidebar, Today, the task menu and panel, the tab bar and the setup (UX-01 ... UX-41)
        run p2240_api "$PY" p2240_api_test.py "$KALMIDO_TEST_DATA"
        run p2240_ui node p2240_ui.js "$KALMIDO_TEST_DATA"
+# 2.25.0 "Usability, part 2": lists in a shared folder on every path + the one-time repair (#931, restarts its container),
+# the sidebar setting (UX-03), the lean start of added accounts (UX-26), the Team package (UX-25)
+       run p2250_api "$PY" p2250_api_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

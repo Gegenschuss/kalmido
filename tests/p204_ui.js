@@ -36,13 +36,13 @@ const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbl
   const btn = nx[0];
   check(btn.tagName === 'BUTTON' && btn.type === 'button' && btn.dataset.act === 'flow-why', 'the badge is a button (keyboard, tap)');
   check(btn.textContent.trim() === 'Ready to start', 'label "Ready to start": ' + btn.textContent.trim());
-  check(/Waits on nothing open/.test(btn.getAttribute('aria-label') || '') && /Waits on nothing open/.test(btn.title), 'aria-label / title explain it');
+  check(/Blocked by nothing open/.test(btn.getAttribute('aria-label') || '') && /Blocked by nothing open/.test(btn.title), 'aria-label / title explain it');
   check(d.querySelector(`#view .trow[data-id="${first}"]`).classList.contains('flownext'), 'row keeps the flow marker line');
   // tap / click: explanation, nothing else happens
   const selBefore = w.eval('S.sel');
   click(w, btn); await sleep(300);
   const toast = d.querySelector('#toast');
-  check(toast && !toast.classList.contains('hidden') && /Waits on nothing open: the first task in the flow order \(dependencies, then date, then priority\)\./.test(toast.textContent), 'click shows the explanation: ' + (toast?.textContent || ''));
+  check(toast && !toast.classList.contains('hidden') && /Blocked by nothing open: the first task in the flow order \(dependencies, then date, then priority\)\./.test(toast.textContent), 'click shows the explanation: ' + (toast?.textContent || ''));
   check(w.eval('S.sel') === selBefore && d.querySelector('#detail').classList.contains('hidden'), 'click does not open the task');
   check(w.eval(`S.tasks.get(${plan}).status`) === 0, 'click does not tick the task');
   w.close();
@@ -74,7 +74,7 @@ const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbl
   const de = d.querySelector('#view .nxt');
   check(de?.textContent.trim() === 'Startklar', 'German: Startklar: ' + de?.textContent.trim());
   click(w, de); await sleep(300);
-  check(/Wartet auf nichts Offenes/.test(d.querySelector('#toast')?.textContent || ''), 'German explanation');
+  check(/Durch nichts Offenes blockiert/.test(d.querySelector('#toast')?.textContent || ''), 'German explanation');
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});
 
@@ -82,7 +82,7 @@ const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbl
   w = await boot({user: 'alice', mobile: true, hash: 'l/' + PRJ}); d = w.document;
   const mb = d.querySelector('#view .nxt');
   click(w, mb); await sleep(300);
-  check(/Waits on nothing open/.test(d.querySelector('#toast')?.textContent || '') && !w.eval('S.sel'), 'phone: tap explains, task stays closed');
+  check(/Blocked by nothing open/.test(d.querySelector('#toast')?.textContent || '') && !w.eval('S.sel'), 'phone: tap explains, task stays closed');
   w.close();
 
   // ---- #307 status picker: colour dots like the pills

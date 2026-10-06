@@ -1,4 +1,5 @@
 """Time helpers, the database connection, start-up checks and migrations (init_db, repair_data), settings storage."""
+import json
 import os
 import re
 import secrets
@@ -137,6 +138,8 @@ def create_user(c, username, display_name="", password=None, proxy_login=None, i
         vals["ntfy_topic"] = ntfy_topic
     if onboard and ONBOARDING_ENV:  # new account (setup / user admin): sample list + welcome tour on first start
         vals["tour"] = vals["onboard"] = "pending"
+    if onboard and not seed_global and not is_admin:  # 2.25.0 (UX-26): people who are added start with a lean sidebar
+        vals["sidebar"] = json.dumps({"order": [], "hidden": ["e:tomorrow", "e:week", "e:doable"]})
     if not vals["ntfy_topic"]:
         vals["ntfy_topic"] = random_topic()
     for k, v in vals.items():
@@ -354,6 +357,21 @@ def init_db(guard=True):
             gset(c, "migr_folders2220", "1")
             if n:
                 print("shared lists:", n, "sorted into the folders of their owners", flush=True)
+        # 2.25.0 (#931), once: lists created in a shared folder by a project type / template, an agent's briefing, an import,
+        # family or life were not shared with the folder's people. Only lists created AFTER the folder was shared and
+        # without that person get it now (one shared before and missing now was taken away on purpose); idempotent.
+        if gsetting(c, "migr_folder931") != "1":
+            from ..lists.lists import _folder_member_add, _in_folder, collab_all as _ca
+            n = 0
+            if _ca():
+                for fp in c.execute("SELECT * FROM folder_people").fetchall():
+                    for l in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND is_inbox=0 AND COALESCE(folder,'')!='' AND created_at>?",
+                                       (fp["owner_id"], fp["created_at"])).fetchall():
+                        if _in_folder(l["folder"], fp["folder"]) and _folder_member_add(c, l["id"], fp["user_id"], fp["role"], fp["owner_id"]):
+                            n += 1
+            gset(c, "migr_folder931", "1")
+            if n:
+                print("lists in shared folders shared afterwards (#931):", n, flush=True)
         for (uid,) in c.execute("SELECT id FROM users").fetchall():
             ensure_inbox(c, uid)
             for k, v in USER_DEFAULTS.items():

@@ -62,7 +62,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   let w = await boot({user: 'alice', hash: 'l/' + P}), d = w.document;
   const seg = () => [...d.querySelectorAll('#top .vseg button')].map(b => b.dataset.act);
   check(seg().join() === 'view-overview,view-list,view-kanban,view-timeline', 'project (2.13.0: the overview first): Project overview / List / Kanban / Timeline: ' + seg());
-  check(d.querySelector('#top [data-act="view-overview"]').title === 'Project overview', 'tab title "Project overview"');
+  check(d.querySelector('#top [data-act="view-overview"]').title === 'Project page', 'tab title "Project page" (2.25.0)');
   w.eval(`go('l/${PL}')`); await sleep(300);
   check(!seg().includes('view-overview'), 'a plain list has no overview tab: ' + seg());
   w.eval(`go('l/${P}')`); await sleep(300);
@@ -147,7 +147,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   await call('PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', hash: 'l/' + P, ls: {'tasks.pov': JSON.stringify([P])}}); d = w.document;
   await until(() => d.querySelector('#view .pov .povs'));
-  check(d.querySelector('#top [data-act="view-overview"]').title === 'Projektübersicht', 'de: Projektübersicht');
+  check(d.querySelector('#top [data-act="view-overview"]').title === 'Projektseite', 'de: Projektseite (2.25.0)');
   check(/Projektablage/.test(d.querySelector('#pov-files h3').textContent) && /Anhänge aus Aufgaben/.test(d.querySelector('.povtf summary').textContent)
     && /Wichtige Links/.test(d.querySelector('#pov-links h3').textContent) && /Meilensteine/.test(d.querySelector('#pov-ms h3').textContent), 'de: section names');
   check(w.eval(`tr('Where is it stuck?')`) !== 'Projektübersicht', 'the global overview keeps its own name');
@@ -157,7 +157,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   // phones: the view switch (2.13.0, #453 A7: a segmented control under the title instead of entries in "…")
   w = await boot({user: 'alice', hash: 'l/' + P, mobile: true}); d = w.document;
   const vsg = d.querySelector('#view .vsegm [data-act="view-overview"]');
-  check(vsg && !w.eval('topMoreItems()').some(x => x.label === 'Project overview'), 'phone: "Overview" in the view switch under the title, not in "…"');
+  check(vsg && !w.eval('topMoreItems()').some(x => x.label === 'Project page'), 'phone: "Overview" in the view switch under the title, not in "…"');
   vsg.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
   await until(() => d.querySelector('#view .pov'));
   check(w.eval('isOverview()'), 'phone: the overview opens from the view switch');

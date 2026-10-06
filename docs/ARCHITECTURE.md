@@ -108,7 +108,7 @@ The most used helpers:
 | `lists/ownership.py` | Transferring the ownership of a list; orphaned lists (owner disabled or an agent). |
 | `lists/sections.py` | Saved filters, folders and sections (kanban columns). |
 | `tasks/validation.py` | Task activity log, input validation, repeat rules (RRULE) and task tree helpers. |
-| `tasks/tasks.py` | Creating and changing tasks: milestones, moving subtrees, tags, assignees, waiting on external. |
+| `tasks/tasks.py` | Creating and changing tasks: milestones, moving subtrees, tags, assignees, waiting on someone (outside). |
 | `tasks/roadmap.py` | The roadmap and shifting a list's dates (dependent tasks move along). |
 | `tasks/lifecycle.py` | Applying changes, completing (repeats), undo, skip, reopen, delete, trash and restore. |
 | `tasks/attachments.py` | Files of tasks (upload, download, delete). |
@@ -122,7 +122,7 @@ The most used helpers:
 | `accounts/onboarding.py` | Onboarding and the sample project. |
 | `accounts/users.py` | Users and the own account (admin user management, passwords, deletion). |
 | `lists/templates.py` | Task and list templates, built-in project types. |
-| `tasks/dependencies.py` | Dependencies between tasks ("waiting on"). |
+| `tasks/dependencies.py` | Dependencies between tasks ("blocked by"). |
 | `lists/projects.py` | Project lists: status, progress, the overview (description, links, files, Paperless), milestone reports. |
 | `lists/fields.py` | Custom fields of a list. |
 | `personal/stats.py` | Statistics (module "stats"). |
@@ -147,7 +147,7 @@ The most used helpers:
 | `lists/public.py` | Public links of lists and checklist mode. |
 | `integrations/git.py` | Git integration of project lists (GitHub, GitLab, Gitea / Forgejo, Bitbucket) and tickets for agents. |
 | `integrations/errorreports.py` | Error reports (Sentry, GlitchTip ...) -> tickets. |
-| `api/projects.py` | The project overview in the token API. |
+| `api/projects.py` | The project page in the token API. |
 | `api/scopes.py` | Token scopes, approvals and the complete agent API (the routes the web client has). |
 | `collab/notes.py` | Notes of a list / project. |
 | `collab/teamchat.py` | Team chat (rooms and direct messages). |
@@ -257,7 +257,7 @@ registering the ones of its area.
 | `listedit.js` | List editing, keyboard reordering, recent lists. |
 | `git.js` | Git integration of project lists: repositories, pull requests + CI, agents' merge requests. |
 | `chat.js` | Team chat and notes of a list / project. |
-| `dashboard.js` | News bundled per task, the dashboard and Settings > Tasks by e-mail. |
+| `dashboard.js` | News bundled per task, the start page (dashboard) and Settings > Tasks by e-mail. |
 | `family.js` | The module "Family". |
 | `calevents.js` | Events (module "events"): the editor and popover, the agenda, creating in the week grid, calendars, the phone setup. |
 | `contacts.js` | Contacts (module "contacts"): the view, the editor, the card, links between contacts and tasks, import / export. |

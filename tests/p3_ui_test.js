@@ -104,14 +104,16 @@ const ds = n => { const d = new Date(Date.now() + n * 864e5); return `${d.getFul
   // ================= dependencies: picker, rows, confirm
   w.eval(`openDetail(${t2})`); await sleep(800);
   check(/Dependencies/.test(d.querySelector('#d-deps').textContent), 'detail: Dependencies section');
-  d.querySelector('#d-deps [data-act="dep-add"][data-dir="by"]').click(); await sleep(150);
+  // 2.25.0 (UX-43): one button "Waiting on…" with the choice "Another task…" / "Someone outside…"
+  const waitOn = async () => { d.querySelector('#d-deps [data-act="wait-on"]').click(); await sleep(100); const it = [...d.querySelectorAll('#pop [role="menuitem"]')]; check(it.some(b => /Someone outside/.test(b.textContent)), 'Waiting on…: someone outside offered'); it.find(b => /Another task/.test(b.textContent)).click(); await sleep(150); };
+  await waitOn();
   let pk = lastModal(d);
   check(pk.querySelectorAll('.tpkrow').length >= 3, 'picker lists open tasks');
   input(w, pk.querySelector('#dp-q'), 'desi');
   check(pk.querySelectorAll('.tpkrow').length === 1 && /Design/.test(pk.querySelector('.tpkrow').textContent), 'picker search');
   pk.querySelector('.tpkrow').click();
   check(await until(() => /Design/.test(d.querySelector('#d-deps')?.textContent || '')), 'detail lists the blocker');
-  check(row().querySelector('.blk') && /Waiting on: “Design”/.test(row().querySelector('.blk').title), 'row: waiting indicator with the blocker name');
+  check(row().querySelector('.blk') && /Blocked by: “Design”/.test(row().querySelector('.blk').title), 'row: waiting indicator with the blocker name');
   // blocking direction from Ship's panel: Ship waits on Build
   w.eval(`openDetail(${t2})`); await sleep(600);
   d.querySelector('#d-deps [data-act="dep-add"][data-dir="blocking"]').click(); await sleep(150);
@@ -119,7 +121,7 @@ const ds = n => { const d = new Date(Date.now() + n * 864e5); return `${d.getFul
   check(await until(async () => (await call('GET', `/api/tasks/${t3}/deps`)).blocked_by.some(x => x.id === t2)), 'blocking: Ship now waits on Build');
   // cycle refused with a message: Design waits on Ship
   w.eval(`openDetail(${t1})`); await sleep(600);
-  d.querySelector('#d-deps [data-act="dep-add"][data-dir="by"]').click(); await sleep(150);
+  await waitOn();
   pk = lastModal(d); input(w, pk.querySelector('#dp-q'), 'ship'); pk.querySelector('.tpkrow').click(); await sleep(600);
   check(/circular/.test(d.querySelector('#toast').textContent), 'cycle: message');
   pk.remove();
@@ -130,7 +132,7 @@ const ds = n => { const d = new Date(Date.now() + n * 864e5); return `${d.getFul
   let asked = '';
   w.confirm = m => { asked = m; return true; };
   await w.eval(`toggleTask(${t2})`); await sleep(500);
-  check(/still waiting on “Design”/.test(asked) && (await call('GET', '/api/state')).tasks.find(t => t.id === t2).status === 2, 'confirm accepted: completed (' + asked + ')');
+  check(/still blocked by “Design”/.test(asked) && (await call('GET', '/api/state')).tasks.find(t => t.id === t2).status === 2, 'confirm accepted: completed (' + asked + ')');
   await call('POST', `/api/tasks/${t2}/reopen`);
   await w.eval('load().then(render)'); await sleep(300);
   // batch confirm
@@ -138,7 +140,7 @@ const ds = n => { const d = new Date(Date.now() + n * 864e5); return `${d.getFul
   w.eval(`S.multi = new Set([${t2}, ${th}]); render()`);
   w.confirm = m => { asked = m; return false; };
   d.querySelector('#mbar [data-act="mb-done"]').click(); await sleep(300);
-  check(/1 of the selected tasks is still waiting/.test(asked) && (await call('GET', '/api/state')).tasks.find(t => t.id === th).status === 0, 'batch: confirm, declined -> nothing done');
+  check(/1 of the selected tasks is still blocked/.test(asked) && (await call('GET', '/api/state')).tasks.find(t => t.id === th).status === 0, 'batch: confirm, declined -> nothing done');
   w.eval('S.multi.clear(); S.multiMode = false; render()');
   w.confirm = () => true;
   // remove the dependency via x
@@ -232,11 +234,11 @@ const ds = n => { const d = new Date(Date.now() + n * 864e5); return `${d.getFul
   await w.eval('load().then(render)');
   check(d.querySelector('#side [data-go="overview"]'), 'overview in the sidebar');
   w.location.hash = 'overview'; await sleep(400);
-  check(d.querySelector('#top h1').textContent === 'Where is it stuck?', 'overview title');
+  check(d.querySelector('#top h1').textContent === 'Project status', 'overview title: Project status (2.25.0)');
   const cards = [...d.querySelectorAll('.ovcard')];
   check(cards.length === 2 && /Work/.test(cards[0].querySelector('.ovname').textContent) && cards[0].classList.contains('risk'), 'overview: 2 lists, Work (at risk) first');
   const wc = cards[0].textContent;
-  check(/Overdue\s*1/.test(wc) && /Design/.test(wc) && /Waiting\s*1/.test(wc) && /Waiting on: “Design”/.test(wc) && /Without assignee/.test(wc), 'Work card: overdue, waiting, without assignee');
+  check(/Overdue\s*1/.test(wc) && /Design/.test(wc) && /Blocked\s*1/.test(wc) && /Blocked by: “Design”/.test(wc) && /Without assignee/.test(wc), 'Work card: overdue, waiting, without assignee');
   check(/Nobody/.test(wc), 'overdue grouped by assignee (Nobody)');
   const tiles = [...d.querySelectorAll('.ovw .sttiles b')].map(b => b.textContent);
   check(tiles[0] === '1' && tiles[1] === '1' && tiles[2] === '1', 'tiles: 1 overdue, 1 waiting, 1 at risk: ' + tiles);
@@ -264,7 +266,7 @@ const ds = n => { const d = new Date(Date.now() + n * 864e5); return `${d.getFul
   let wc2 = await boot({user: 'carol', hash: 'l/' + WORK}); let dc = wc2.document;
   wc2.eval(`openDetail(${t2})`); await sleep(800);
   check([...dc.querySelectorAll('#detail [data-cf]')].every(e => e.disabled || e.readOnly), 'view only: field editors read-only');
-  check(!dc.querySelector('#d-deps [data-act="dep-add"]') && !dc.querySelector('#d-deps [data-act="dep-rm"]'), 'view only: no dependency add / remove');
+  check(!dc.querySelector('#d-deps [data-act="dep-add"], #d-deps [data-act="wait-on"]') && !dc.querySelector('#d-deps [data-act="dep-rm"]'), 'view only: no dependency add / remove');
   check(/Design/.test(dc.querySelector('#d-deps').textContent), 'view only: sees the blocker');
   check(!dc.querySelector('.lhead [data-act="status"]:not([disabled])') || /At risk/.test(dc.querySelector('.lhead .stpill').textContent), 'view only: pill shown');
   dc.querySelector('.lhead .stpill').click(); await sleep(500);
@@ -282,7 +284,7 @@ const ds = n => { const d = new Date(Date.now() + n * 864e5); return `${d.getFul
   await call('POST', `/api/tasks/${t1}/complete`);
   let wb = await boot({user: 'bob', hash: 'news'}); let db = wb.document; await sleep(900);
   const nt = db.querySelector('#view').textContent;
-  check(/Alice hat Design erledigt: Deine Aufgabe wartet nicht mehr/.test(nt), 'bob News: unblock (German)');
+  check(/Alice hat Design erledigt: Deine Aufgabe ist nicht mehr blockiert/.test(nt), 'bob News: unblock (German)');
   check(/Alice hat Work auf\s*Gefährdet gesetzt/.test(nt) && /Vendor is late/.test(nt), 'bob News: status update with note (German)');
   wb.location.hash = 'l/' + WORK; await sleep(400);
   check(/erledigt/.test(db.querySelector('.lhead').textContent) || /\d+ %?|\//.test(db.querySelector('.lhead .lprog').textContent), 'bob: header');
@@ -292,7 +294,7 @@ const ds = n => { const d = new Date(Date.now() + n * 864e5); return `${d.getFul
   const EN = /\b(Waiting|Blocking|Dependencies|Fields|Custom fields|On track|At risk|Set status|Overview|stuck)\b/;
   check(!EN.test(db.querySelector('#detail').textContent + db.querySelector('#view').textContent + db.querySelector('#side').textContent), 'bob: no English leftovers');
   wb.location.hash = 'overview'; await sleep(400);
-  check(db.querySelector('#top h1').textContent === 'Wo hakt es?' && !EN.test(db.querySelector('#view').textContent), 'bob: German overview');
+  check(db.querySelector('#top h1').textContent === 'Projektstatus' && !EN.test(db.querySelector('#view').textContent), 'bob: German overview');
   // bob's private list: no status/fields editor for alice's fields; bob owns BOBL -> fields section in his dialog
   wb.eval(`listModal(${BOBL})`); await sleep(100);
   check(lastModal(db).querySelector('#l-fields') && /Eigene Felder/.test(lastModal(db).textContent), 'bob: fields section in his own list dialog (German)');

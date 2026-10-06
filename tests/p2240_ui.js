@@ -145,7 +145,7 @@ const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
   const ml = [...d.querySelectorAll('#pop .menu-list > button, #pop .menu-list > .mquick')].map(b => b.classList.contains('mquick') ? '[' + [...b.querySelectorAll('button')].map(x => x.textContent.trim()).join('/') + ']' : b.textContent.trim().replace(/\s*\S$/, x => x));
   const pos = re => ml.findIndex(x => re.test(x));
   check(pos(/^\[Today\/Tomorrow\]/) === 0 && pos(/New date/) === 1, 'UX-09 / UX-10: the date first, "New date…" ' + ml.slice(0, 3).join(' | '));
-  check(pos(/\[High\/Medium\/Low\/None\]/) > 1 && pos(/\[High/) < pos(/Assign/) && pos(/Assign/) < pos(/Move to list/) && pos(/Move to list/) < pos(/Waiting on external/) && pos(/Waiting/) < pos(/^Pin/) && pos(/^Pin/) < pos(/Save as template/) && pos(/Save as template/) < pos(/^Delete/),
+  check(pos(/\[High\/Medium\/Low\/None\]/) > 1 && pos(/\[High/) < pos(/Assign/) && pos(/Assign/) < pos(/Move to list/) && pos(/Move to list/) < pos(/Waiting on someone/) && pos(/Waiting/) < pos(/^Pin/) && pos(/^Pin/) < pos(/Save as template/) && pos(/Save as template/) < pos(/^Delete/),
     'UX-09: date · priority · assignee · list · waiting · pin · template · delete ' + ml.join(' | '));
   w.eval('closePop()');
   w.eval(`snoozeSheet(${T1}, document.querySelector('#top h1'), ['-', moveListItem(document.querySelector('#top h1'), ${T1}), {label: tr('All…'), icon: 'dots', fn() {}}], true)`); await sleep(150);

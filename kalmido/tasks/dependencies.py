@@ -106,7 +106,7 @@ def dep_add():
     need_task(c, t)                 # the waiting task changes: write access
     need_task(c, bl, write=False)   # the blocker must be visible
     if t == bl:
-        return err(tr("A task cannot wait on itself"))
+        return err(tr("A task cannot block itself"))
     rows = {r["id"]: r for r in c.execute("SELECT id, title, deleted_at FROM tasks WHERE id IN (?,?)", (t, bl))}
     if rows[t]["deleted_at"] or rows[bl]["deleted_at"]:
         return err(tr("The task is in the trash"), 409)

@@ -138,9 +138,9 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   // ================= A7: the view switch under the title on phones; the "…" menu without duplicates
   w = await boot({user: 'alice', mobile: true, hash: 'l/' + P}); d = w.document;
   const seg = d.querySelector('#view .vsegm');
-  check(seg && [...seg.querySelectorAll('button')].map(b => b.textContent.trim()).join('|') === 'Overview|List|Kanban|Timeline' && seg.querySelector('button.on[aria-pressed="true"]')?.textContent.trim() === 'List', 'A7: phone: Overview (first in projects) / List / Kanban / Timeline under the title, the active one marked');
+  check(seg && [...seg.querySelectorAll('button')].map(b => b.textContent.trim()).join('|') === 'Project|List|Kanban|Timeline' && seg.querySelector('button.on[aria-pressed="true"]')?.textContent.trim() === 'List', 'A7: phone: Overview (first in projects) / List / Kanban / Timeline under the title, the active one marked');
   const more = w.eval('topMoreItems().filter(x => x !== "-").map(x => x.label || "")');
-  check(!more.includes('List') && !more.includes('Kanban') && more.includes('As a list') && more.includes('As a project') && new Set(more).size === more.length, 'A7: "…" without the views, "As a list / As a project", no duplicates: ' + more.join(' | '));
+  check(!more.includes('List') && !more.includes('Kanban') && !more.includes('As a project') && more.includes('Edit list…') && new Set(more).size === more.length, 'A7: "…" without the views, no type entries (2.25.0), no duplicates: ' + more.join(' | '));
   click(w, seg.querySelector('[data-act="view-kanban"]')); await until(() => d.querySelector('#view .kanban'));
   check(d.querySelector('#view .kanban') && d.querySelector('#view .vsegm button.on')?.textContent.trim() === 'Kanban', 'A7: a tap switches to Kanban');
   check(d.querySelector('#view .kadd input')?.getAttribute('aria-label') === 'New task in Backlog', 'P6: Kanban "+ Task" has a name');
@@ -350,7 +350,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     // A7: the view switch; A11 habits; P13 contrast
     await nav(B + '?p=2#l/' + P); await ready(ev);
     const vs = await ev(`(() => { const s = document.querySelector('#view .vsegm'); if (!s) return null; const r = s.getBoundingClientRect(); return {n: s.querySelectorAll('button').length, h: Math.min(...[...s.querySelectorAll('button')].map(b => b.getBoundingClientRect().height)), right: r.right, vw: innerWidth, txt: s.textContent}; })()`);
-    check(vs && vs.n === 4 && vs.h >= 43.5 && vs.right <= vs.vw + .5 && /Liste/.test(vs.txt) && /Übersicht/.test(vs.txt), '390 A7: the view switch under the title (German), 44 px, inside the screen ' + JSON.stringify(vs));
+    check(vs && vs.n === 4 && vs.h >= 43.5 && vs.right <= vs.vw + .5 && /Liste/.test(vs.txt) && /Projekt/.test(vs.txt), '390 A7: the view switch under the title (German), 44 px, inside the screen ' + JSON.stringify(vs));
     const ctr = await ev(`(() => { const C = ${CTR}, bg = ${bgOf}; const sp = [...document.querySelectorAll('#tabs button:not(.on) > span')].filter(s => s.offsetWidth)[0]; return sp ? C(getComputedStyle(sp).color, bg(sp)) : 0; })()`);
     check(ctr >= 4.5, '390 P13: inactive tab label contrast ' + ctr.toFixed(2));
     await shot('p2130-list-390.png');
@@ -373,6 +373,9 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     // A14: long press on a row = select
     const rw = await ev(`(() => { const r = document.querySelector('#view .trow .tmain').getBoundingClientRect(); return {x: r.left + 30, y: r.top + r.height / 2}; })()`);
     await tap(rw.x, rw.y, 700); await sleep(400);
+    // 2.25.0 (UX-11): the long press opens the task's menu; its "Auswählen" selects the row
+    const lpm = await ev(`(() => { const b = [...document.querySelectorAll('#pop [role="menuitem"]')].find(x => /Auswählen/.test(x.textContent)); if (b) b.click(); return !!b; })()`); await sleep(300);
+    check(lpm, '390 UX-11: the long press opens the task menu with "Auswählen"');
     const sel = await ev(`(() => { const b = document.querySelector('#mbar'), r = b.getBoundingClientRect(); return {mode: S.multiMode, n: S.multi.size, vis: !b.classList.contains('hidden'), in: r.left >= 0 && r.right <= innerWidth + .5, lab: [...b.querySelectorAll('.mbb:not([hidden]) .mbl')].map(x => x.textContent).join('|')}; })()`);
     check(sel.mode && sel.n === 1 && sel.vis && sel.in && /Heute/.test(sel.lab), '390 A14: long press selects the row, the bar fits with labels ' + JSON.stringify(sel));
     await shot('p2130-select-390.png');

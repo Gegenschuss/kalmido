@@ -861,6 +861,8 @@ USER_DEFAULTS = {
     "mail_from_me": "0",        # 2.17.0 (#443): mails from my own address to the plain task address land in my inbox
     # 2.17.0 (#475): the dashboard behind the logo, json {"order": [widget keys], "hidden": [widget keys]} ('' = default)
     "dashboard": "",
+    # 2.25.0 (UX-03): the sidebar: json {"order": [groups], "hidden": ["g:<group>" | "e:<entry>"]} ('' = default)
+    "sidebar": "",
     "work_start": "09:00", "work_end": "17:00",  # 2.10.0 (#440): working hours of the day planner
     "review_time": "",          # 2.10.0 (#440): evening review push (HH:MM, '' = off)
     "review_sent": "",

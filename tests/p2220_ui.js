@@ -181,22 +181,23 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
   w = await boot({user: 'alice', hash: 'l/' + P}); d = w.document;
   await sleep(300);
   w.eval(`openDetail(${a1.id})`); await sleep(500);
-  check(d.querySelector('#detail .depsec .dwait'), '#686: "Waiting on external…" as a button under "Waiting on…"');
+  check(d.querySelector('#detail .depsec [data-act="wait-on"]'), '#686 / 2.25.0 (UX-43): ONE button "Waiting on…" in the dependencies');
   w.eval(`depPicker(${a1.id}, 'by')`); await sleep(200);
   const grp = [...d.querySelectorAll('.dpmodal .tpkg')];
   check(grp.length === 2 && /This list/.test(grp[0].querySelector('.tpkh').textContent) && /Shop/.test(grp[1].querySelector('.tpkh').textContent)
     && grp[0].querySelector('.tpkrow .tpkt') && grp[0].querySelector('.tpkrow .tpkm'), '#685: grouped (this list first, then the others under their name), title + list in their own lines');
   d.querySelector('.dpmodal').remove();
-  click(w, d.querySelector('#detail .dwait')); await sleep(200);
+  click(w, d.querySelector('#detail [data-act="wait-on"]')); await sleep(150);
+  [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => /Someone outside/.test(b.textContent)).click(); await sleep(200);
   md = d.querySelector('.waitmodal');
   md.querySelector('#w-note').value = 'Client approval'; click(w, md.querySelector('[data-m="ok"]'));
-  check(await until(async () => (await call('GET', `/api/tasks/${a1.id}`)).wait_note === 'Client approval'), '#686: the button sets "Waiting on external"');
+  check(await until(async () => (await call('GET', `/api/tasks/${a1.id}`)).wait_note === 'Client approval'), '#686: "Waiting on…" > "Someone outside…" sets it');
   w.eval('closeDetail()'); await sleep(200);
   // the row's right-click menu
   const row = d.querySelector(`#view .trow[data-id="${a2.id}"]`);
   row.dispatchEvent(new w.MouseEvent('contextmenu', {bubbles: true, cancelable: true}));
   await sleep(200);
-  check(/Waiting on external…/.test(d.querySelector('#pop')?.textContent || ''), '#686: right-click on a row: the task menu with "Waiting on external…"');
+  check(/Waiting on someone…/.test(d.querySelector('#pop')?.textContent || ''), '#686: right-click on a row: the task menu with "Waiting on someone…"');
   w.eval('closePop()');
   // quick add wartet:Kunde
   const qi = d.querySelector('#qinput');
@@ -206,7 +207,7 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
   check(await until(async () => (await call('GET', '/api/state')).tasks.some(t => t.title === 'Send the offer' && t.wait_note === 'Kunde')), '#686: wartet:Kunde = waiting on external "Kunde"');
   // the palette offers it for the current task
   w.eval(`openDetail(${a2.id})`); await sleep(300);
-  check(w.eval(`palAll().some(x => x.id === 'a:wait' && /waiting on external/i.test(x.label))`), '#686: the palette offers "waiting on external" for the open task');
+  check(w.eval(`palAll().some(x => x.id === 'a:wait' && /waiting on someone/i.test(x.label))`), '#686: the palette offers "waiting on external" for the open task');
   w.close();
 
   // ================= #678 the quick add @ picker and a pasted image

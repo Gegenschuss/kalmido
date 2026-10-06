@@ -57,7 +57,7 @@ async function quotaDialog(j) {
 // "New task" is there (tablets, an unfolded Fold in portrait)
 function fabSync() { const f = $('#fab'); if (f) f.classList.toggle('gone', fabOff() || S.multi.size > 0 || (!!$('#view .qdock') && (tabletDock() || !isMobile()))); }
 window.addEventListener('resize', () => { if (S.booted) requestAnimationFrame(fabSync); });
-const MODS = [['tasks', 'done', N_('Tasks')], ['cal', 'cal', N_('Calendar')], ['matrix', 'grid', N_('Matrix')], ['habits', 'habit', N_('Habits')], ['pomo', 'timer', N_('Focus')], ['family', 'family', N_('Family')]];
+const MODS = [['tasks', 'done', N_('Tasks')], ['cal', 'cal', N_('Calendar')], ['matrix', 'grid', N_('Matrix')], ['habits', 'habit', N_('Habits')], ['pomo', 'timer', N_('Focus timer')], ['family', 'family', N_('Family')]];
 // tab bar / rail order is a server setting (same on every device), editable in the settings
 function navOrder() {
   const keys = MODS.map(m => m[0]);
@@ -96,9 +96,9 @@ function tabItem(id) {
   if (id === 'agents') return agentsTab() ? {id, go: 'agents', icon: ic('bot', 'l'), label: tr('Agents'), mod: 'agents'} : null;
   if (id === 'stats') return feat('stats') ? {id, go: 'stats', icon: ic('chart', 'l'), label: tr('Statistics'), mod: 'stats'} : null;
   if (id === 'time') return timeOn() ? {id, go: 'time', icon: ic('clock', 'l'), label: tr('Time tracking'), mod: 'time'} : null;  // 2.7.0 (#405 S5): one name
-  if (id === 'overview') return overviewOn() ? {id, go: 'overview', icon: ic('pulse', 'l'), label: tr('Overview'), mod: 'overview'} : null;
+  if (id === 'overview') return overviewOn() ? {id, go: 'overview', icon: ic('pulse', 'l'), label: tr('Project status'), mod: 'overview'} : null;
   if (id === 'team') return teamOn() ? {id, go: 'team', icon: ic('comment', 'l'), label: tr('Team chat'), mod: 'team', n: S.team?.unread || 0} : null;  // 2.17.0 (#419)
-  if (id === 'home') return {id, go: 'home', icon: ic('home', 'l'), label: tr('Dashboard'), mod: 'home'};  // 2.17.0 (#475)
+  if (id === 'home') return {id, go: 'home', icon: ic('home', 'l'), label: tr('Start|home'), mod: 'home'};  // 2.17.0 (#475)
   if (id === 'search') return {id, go: 'search', icon: ic('search', 'l'), label: tr('Search'), key: 'search'};
   if (id === 'lists') return {id, act: 'side', icon: ic('list', 'l'), label: tr('Lists')};  // 2.24.0 (UX-36): opens the drawer
   if (id === 'settings') return {id, act: 'settings', icon: ic('gear', 'l'), label: tr('Settings'), upd: updDot()};
@@ -174,6 +174,20 @@ function counts() {
 // 2.24.0 (UX-01): "Views" starts folded and sits below the lists, so a person's own lists come right after Focus; groups
 // folded by default remember being opened (LS sideOpenG), the others being folded (LS sideGroups)
 const SIDE_FOLDED = ['views'];
+// 2.25.0 (UX-03): the order of the groups and what is hidden is the person's (user setting "sidebar": json {order, hidden};
+// hidden: "g:<group>" or "e:<entry>"; the same on every device). "Lists" can be moved but not hidden.
+const SIDE_GROUPS = ['focus', 'clients', 'lists', 'filters', 'tags', 'views', 'team'];
+const SIDE_NAMES = {focus: N_('Plan|nav'), clients: N_('Clients'), lists: N_('Lists'), filters: N_('Filters'), tags: N_('Tags'), views: N_('Views'), team: N_('Conversations|nav')};
+const SIDE_PLAN = [['tomorrow', N_('Tomorrow')], ['week', N_('Next 7 days')], ['doable', N_('Now doable')], ['pinned', N_('Pinned|view')], ['waiting', N_('Waiting on someone')], ['assigned', N_('Assigned to me')]];
+const sideViewEntries = () => [['cal', N_('Calendar'), feat('cal')], ['timeline', N_('Timeline'), feat('timeline')], ['matrix', N_('Matrix'), feat('matrix')], ['habits', N_('Habits'), feat('habits')],
+  ['pomo', N_('Focus timer'), feat('pomo')], ['time', N_('Time tracking'), timeOn()], ['stats', N_('Statistics'), feat('stats')], ['contacts', N_('Contacts'), feat('contacts')], ['life', N_('Home & life'), lifeOn()],
+  ['workload', N_('Workload'), workloadOn()], ['review', N_('Review & journal'), feat('review')], ['family', N_('Family'), famOn()], ['overview', N_('Project status'), overviewOn()], ['agents', N_('Agents'), agentsTab()]].filter(x => x[2]);
+function sidePref() {
+  let o = {}; try { o = JSON.parse(S.settings?.sidebar || '{}') || {}; } catch { o = {}; }
+  return {order: Array.isArray(o.order) ? o.order : [], hidden: Array.isArray(o.hidden) ? o.hidden : []};
+}
+const sideHidden = x => sidePref().hidden.includes(x);
+const sideGroupOrder = () => [...new Set([...sidePref().order.filter(g => SIDE_GROUPS.includes(g)), ...SIDE_GROUPS])];
 const sideOpen = g => SIDE_FOLDED.includes(g) ? (LS.get('sideOpenG', []) || []).includes(g) : !(LS.get('sideGroups', []) || []).includes(g);
 function sideGroupToggle(g) { const key = SIDE_FOLDED.includes(g) ? 'sideOpenG' : 'sideGroups', x = new Set(LS.get(key, []) || []); x.has(g) ? x.delete(g) : x.add(g); LS.set(key, [...x]); renderSide(); }
 function teamPeople() {
@@ -194,12 +208,15 @@ function renderSide() {
     const em = !l.icon && leadEmoji(l.name);
     const sw = `<span class="sic${em ? ' semo' : ''}" aria-hidden="true">${l.icon ? licon(l, 'licon') : em ? esc(em) : `<span class="sw" style="${cssColor(l.color) ? 'background:' + cssColor(l.color) : ''}"></span>`}</span>`;
     const nmOf = x => em ? listName(x.name).slice(em.length).trim() : listName(x.name);
-    const pg = progressFor(l) && l.progress?.total ? `<span class="spct" title="${esc(tr('{0} of {1} done ({2}%)', l.progress.done, l.progress.total, pct(l.progress)))}">${pct(l.progress)} %</span>` : '';
+    // 2.25.0 (UX-07): one number per row (the open tasks); a project's progress is a thin bar along the row's bottom
+    const pg = progressFor(l) && l.progress?.total ? `<span class="sprog" role="img" style="--p:${pct(l.progress)}%" aria-label="${esc(tr('{0} of {1} done ({2}%)', l.progress.done, l.progress.total, pct(l.progress)))}" title="${esc(tr('{0} of {1} done ({2}%)', l.progress.done, l.progress.total, pct(l.progress)))}"></span>` : '';
     const shr = (l.status && statusFor(l) ? `<span class="stdot st-${esc(l.status)}" title="${esc(statusLabel(l.status))}"></span>` : '') +
       (l.shared && collab() && l.bell === 'mute' ? `<span class="shr bellm" title="${esc(tr('Notifications: {0}', bellLabel('mute')))}">${ic('belloff', 's')}</span>` : '') +
       (l.shared && collab() ? `<span class="shr" title="${esc(isOwner(l) ? tr('Shared by you') : tr('Shared by {0}', l.owner_name))}">${ic('users', 's')}</span>` : '');
     // 2.22.0 (#692): sort mode: a grip on the left, the name shortens with …, the buttons in a fixed column on the right
-    if (S.listReorder) { const nm = nmOf(l); return `<div class="srow reorder" data-list="${l.id}"><span class="sgrip" aria-hidden="true">${ic('grip', 's')}</span>${sw}<span class="n" title="${esc(nm)}">${esc(nm)}</span>${shr}<span class="rctl"><button class="iconbtn" data-lfolder="${l.id}" aria-haspopup="menu" title="${tr('Move to…')}" aria-label="${esc(tr('Move {0} to…', nm))}">${ic('folder', 's')}</button><button class="iconbtn" data-lmove="-1" data-id="${l.id}" title="${tr('move up')}" aria-label="${esc(tr('Move {0} up', nm))}">${ic('chev', 's up')}</button><button class="iconbtn" data-lmove="1" data-id="${l.id}" title="${tr('move down')}" aria-label="${esc(tr('Move {0} down', nm))}">${ic('chev', 's')}</button></span></div>`; }
+    // 2.25.0 (UX-02): the full name (it wraps), a grip to drag by (touch: at once, no long press) and ONE "…" button with
+    // up / down / folder for keyboards and anyone who does not drag (WCAG 2.5.7)
+    if (S.listReorder) { const nm = nmOf(l); return `<div class="srow reorder" data-list="${l.id}" ${isMobile() ? '' : 'draggable="true"'}><span class="sgrip" title="${esc(tr('Drag to reorder'))}" aria-hidden="true">${ic('grip', 's')}</span>${sw}<span class="n">${esc(nm)}</span>${shr}<span class="rctl"><button class="iconbtn" data-lsort="${l.id}" aria-haspopup="menu" title="${esc(tr('Move…'))}" aria-label="${esc(tr('Move {0}…', nm))}">${ic('dots', 's')}</button></span></div>`; }
     return row('l:' + l.id, sw, nmOf(l), c.lists[l.id], `data-list="${l.id}" ${isMobile() ? '' : 'draggable="true"'}`, shr + pg);
   };
   let lh = lists.filter(l => !l.folder).map(listRow).join('');
@@ -209,8 +226,8 @@ function renderSide() {
     const n = fl.reduce((a, l) => a + (c.lists[l.id] || 0), 0);
     const active = fl.some(l => onTasks && k === 'l:' + l.id);
     const fon = onTasks && k === 'folder:' + f;  // 1.5.2: the name opens the folder view, the rest of the row folds
-    return {closed, html: `<div class="fhead ${sub ? 'fsub' : ''} ${closed ? 'closed' : ''} ${(active && closed) || fon ? 'on' : ''}" data-act="folder-toggle" data-folder="${esc(f)}" ${isMobile() || S.listReorder ? '' : 'draggable="true"'}><span class="sic" aria-hidden="true">${ic('folder', 's')}</span><span class="n ${S.listReorder ? '' : 'fgo'}" ${S.listReorder ? '' : `data-go="${esc(keyToHash('folder:' + f))}" title="${esc(tr('Open {0}', fDisp(f)))}"`}>${esc(fName(f))}</span><span class="sr">${esc(closed ? tr('folded') : tr('unfolded'))}</span>${S.listReorder
-      ? `<button class="iconbtn" data-fmove="-1" data-folder="${esc(f)}" title="${tr('move up')}">${ic('chev', 's up')}</button><button class="iconbtn" data-fmove="1" data-folder="${esc(f)}" title="${tr('move down')}">${ic('chev', 's')}</button>`
+    return {closed, html: `<div class="fhead ${sub ? 'fsub' : ''} ${closed ? 'closed' : ''} ${(active && closed) || fon ? 'on' : ''}" data-act="folder-toggle" data-folder="${esc(f)}" ${isMobile() ? '' : 'draggable="true"'}>${S.listReorder ? `<span class="sgrip" aria-hidden="true">${ic('grip', 's')}</span>` : ''}<span class="sic" aria-hidden="true">${ic('folder', 's')}</span><span class="n ${S.listReorder ? '' : 'fgo'}" ${S.listReorder ? '' : `data-go="${esc(keyToHash('folder:' + f))}" title="${esc(tr('Open {0}', fDisp(f)))}"`}>${esc(fName(f))}</span><span class="sr">${esc(closed ? tr('folded') : tr('unfolded'))}</span>${S.listReorder
+      ? `<button class="iconbtn" data-fsort="${esc(f)}" aria-haspopup="menu" title="${esc(tr('Move…'))}" aria-label="${esc(tr('Move {0}…', fName(f)))}">${ic('dots', 's')}</button>`
       : `<span class="c" ${n ? `aria-label="${esc(trn('{0} open task', '{0} open tasks', n))}"` : ''}>${n || ''}</span>${ic('chev', 's fcar')}<button class="iconbtn fmenu" data-act="folder-menu" data-folder="${esc(f)}" title="${tr('Folder')}" aria-label="${esc(tr('Folder') + ' ' + fDisp(f))}">${ic('dots', 's')}</button>`}</div>`};
   };
   const fempty = () => `<div class="fempty">${isMobile() ? tr('empty: assign lists in sort mode') : tr('empty: drag a list here')}</div>`;
@@ -229,19 +246,25 @@ function renderSide() {
   const tags = Object.keys(c.tags).sort((a, b) => a.localeCompare(b, 'de'));
   const tagsOpen = S.collapsed.has('side:tags-open') || tags.some(t => onTasks && k === 'tag:' + t);
   // Focus: the smart lists
-  const focus = [row('inbox', ic('inbox'), tr('Inbox'), c.lists[inbox()?.id]), row('today', ic('sun'), tr('Today'), c.today), row('tomorrow', ic('sunrise'), tr('Tomorrow'), c.tomorrow),
-    row('week', ic('week'), tr('Next 7 days'), c.week), row('doable', ic('zap'), tr('Now doable'), c.doable),
-    c.pinned || (onTasks && k === 'pinned') ? row('pinned', ic('pin'), tr('Pinned|view'), c.pinned) : '',  // 2.16.0 (#648): only while something is pinned
-    c.waiting || (onTasks && k === 'waiting') ? row('waiting', ic('hourglass'), tr('Waiting on external'), c.waiting) : '',
-    collab() && (hasSharing() || c.assigned) ? row('assigned', ic('user'), tr('Assigned to me'), c.assigned) : '',
-    teamOn() && (hasSharing() || S.team?.unread) ? `<button class="srow ${S.route.mod === 'team' ? 'on' : ''}" data-go="team">${ic('comment')}<span class="n">${tr('Team chat')}</span><span class="c ${S.team?.unread ? 'nunread' : ''}">${S.team?.unread ? `${S.team.unread}<span class="sr"> ${esc(tr('unread'))}</span>` : ''}</span></button>` : '',  // 2.17.0 (#419)
-    collab() && (hasSharing() || S.news?.unread) ? `<button class="srow ${S.route.mod === 'news' ? 'on' : ''}" data-go="news">${ic('bell')}<span class="n">${tr('News')}</span><span class="c ${S.news?.unread ? 'nunread' : ''}">${S.news?.unread || ''}</span></button>` : ''].join('');
+  // 2.25.0 (UX-03 / UX-49): Plan (the smart lists) as [key, html]: each entry can be hidden in Settings > Appearance > Sidebar;
+  // (UX-47) the team chat and News moved to the group "Conversations" with the people and agents
+  const hid = x => sideHidden(x);
+  const plan = [['inbox', row('inbox', ic('inbox'), tr('Inbox'), c.lists[inbox()?.id])], ['today', row('today', ic('sun'), tr('Today'), c.today)], ['tomorrow', row('tomorrow', ic('sunrise'), tr('Tomorrow'), c.tomorrow)],
+    ['week', row('week', ic('week'), tr('Next 7 days'), c.week)], ['doable', row('doable', ic('zap'), tr('Now doable'), c.doable)],
+    ['pinned', c.pinned || (onTasks && k === 'pinned') ? row('pinned', ic('pin'), tr('Pinned|view'), c.pinned) : ''],  // 2.16.0 (#648): only while something is pinned
+    ['waiting', c.waiting || (onTasks && k === 'waiting') ? row('waiting', ic('hourglass'), tr('Waiting on someone'), c.waiting) : ''],
+    ['assigned', collab() && (hasSharing() || c.assigned) ? row('assigned', ic('user'), tr('Assigned to me'), c.assigned) : '']];
+  const planHidden = plan.filter(([x, h]) => h && hid('e:' + x) && !(onTasks && k === x)).length;
+  const focus = plan.filter(([x, h]) => h && (!hid('e:' + x) || (onTasks && k === x))).map(([, h]) => h).join('')
+    + (planHidden ? `<button class="srow smore" data-act="side-more" title="${esc(tr('Settings > Appearance > Sidebar'))}">${ic('plus')}<span class="n">${esc(trn('{0} more view', '{0} more views', planHidden))}</span></button>` : '');
+  const convo = [teamOn() && (hasSharing() || S.team?.unread) ? `<button class="srow ${S.route.mod === 'team' ? 'on' : ''}" data-go="team">${ic('comment')}<span class="n">${tr('Team chat')}</span><span class="c ${S.team?.unread ? 'nunread' : ''}">${S.team?.unread ? `${S.team.unread}<span class="sr"> ${esc(tr('unread'))}</span>` : ''}</span></button>` : '',  // 2.17.0 (#419)
+    collab() && (hasSharing() || S.news?.unread) ? `<button class="srow ${S.route.mod === 'news' ? 'on' : ''}" data-go="news" title="${esc(tr('Assignments, @mentions, comments and follow-ups for you'))}">${ic('bell')}<span class="n">${tr('News')}</span><span class="c ${S.news?.unread ? 'nunread' : ''}">${S.news?.unread || ''}</span></button>` : ''].join('');
   // Views: every switched-on module (the rail's old job)
   const aw = (S.agents || []).reduce((n, x) => n + x.waiting + x.chat_unread, 0);
   const views = [feat('cal') ? mrow('cal', 'cal', tr('Calendar')) : '',
     feat('timeline') ? `<button class="srow smod ${isRoadmap() ? 'on' : ''}" data-act="side-timeline">${ic('timeline')}<span class="n">${tr('Timeline')}</span></button>` : '',
     feat('matrix') ? mrow('matrix', 'grid', tr('Matrix')) : '', feat('habits') ? mrow('habits', 'habit', tr('Habits')) : '',
-    feat('pomo') ? mrow('pomo', 'timer', tr('Focus (Pomodoro)'), S.pomo ? '<span class="c"><span class="recdot"></span></span>' : '') : '',
+    feat('pomo') ? mrow('pomo', 'timer', tr('Focus timer'), S.pomo ? '<span class="c"><span class="recdot"></span></span>' : '') : '',
     timeOn() ? mrow('time', 'clock', tr('Time tracking'), S.timer ? '<span class="c"><span class="recdot"></span></span>' : '') : '',
     feat('stats') ? mrow('stats', 'chart', tr('Statistics')) : '',
     feat('contacts') ? mrow('contacts', 'users', tr('Contacts')) : '',  // 2.21.0 (#658)
@@ -249,14 +272,14 @@ function renderSide() {
     workloadOn() ? mrow('workload', 'chart', tr('Workload')) : '',  // 2.23.0 (#463)
     feat('review') ? mrow('review', 'journal', tr('Review & journal')) : '',
     famOn() ? mrow('family', 'family', tr('Family'), (S.kids || []).some(k => (k.requests || 0) > 0) ? `<span class="c nunread">${(S.kids || []).reduce((n, k) => n + (k.requests || 0), 0)}</span>` : '') : '',
-    overviewOn() ? mrow('overview', 'pulse', tr('Overview'), `<span class="c ${ovProblems() ? 'over' : ''}">${ovProblems() || ''}</span>`, `title="${esc(tr('Where is it stuck?'))}"`) : '',
-    agentsTab() ? mrow('agents', 'bot', tr('Agents'), `<span class="c ${aw ? 'nunread' : ''}">${aw || ''}</span>`) : ''].join('');
+    overviewOn() ? mrow('overview', 'pulse', tr('Project status'), `<span class="c ${ovProblems() ? 'over' : ''}">${ovProblems() || ''}</span>`, `title="${esc(tr('Where is it stuck?'))}"`) : '',
+    agentsTab() ? mrow('agents', 'bot', tr('Agents'), `<span class="c ${aw ? 'nunread' : ''}">${aw || ''}</span>`) : ''].filter(h => { const m = /data-go="(\w+)"|data-act="side-(timeline)"/.exec(h); return !m || !hid('e:' + (m[1] || m[2])) || S.route.mod === m[1]; }).join('');
   // Team: the people I share lists with (their tasks) and the agents (status dot; a click opens the chat)
   const ags = shownAgents(), ppl = teamPeople().slice(0, 12);
   // 2.10.0 (#441): my groups (admins: every group with a task); a click shows the tasks assigned to the group
   const grps = collab() ? (S.groups || []).filter(gr => myGroup(gr.id) || [...S.tasks.values()].some(t => t.status === 0 && t.assignee_group_id === gr.id)) : [];
   const gcount = gid => [...S.tasks.values()].filter(t => t.status === 0 && !t.deleted_at && t.assignee_group_id === gid).length;
-  const team = [...grps.map(gr => `<button class="srow steam sgrp ${onTasks && k === 'grp:' + gr.id ? 'on' : ''}" data-go="grp/${gr.id}" title="${esc(tr('Tasks of the group {0}', gr.name))}">${ic('users')}<span class="n">${esc(gr.name)}</span><span class="sk">${tr('Group')}</span>${gcount(gr.id) ? `<span class="c">${gcount(gr.id)}</span>` : ''}</button>`),
+  const team = convo + [...grps.map(gr => `<button class="srow steam sgrp ${onTasks && k === 'grp:' + gr.id ? 'on' : ''}" data-go="grp/${gr.id}" title="${esc(tr('Tasks of the group {0}', gr.name))}">${ic('users')}<span class="n">${esc(gr.name)}</span><span class="sk">${tr('Group')}</span>${gcount(gr.id) ? `<span class="c">${gcount(gr.id)}</span>` : ''}</button>`),
     ...ppl.map(p => `<button class="srow steam ${onTasks && k === 'who:' + p.id ? 'on' : ''}" data-go="who/${p.id}" title="${esc(tr('Tasks of {0}', p.name))}"><span class="sdot"><i class="pdot"></i></span><span class="n">${esc(p.name)}</span></button>`),  // 2.24.0 (UX-08): no "Person" under every name
     ...ags.map(a => `<button class="srow steam" data-act="team-agent" data-aid="${a.id}" title="${esc(agentHstLine(a))}"><span class="sdot">${hdot(agentHst(a))}</span><span class="n">${esc(a.name)}</span><span class="sk">${tr('Agent')}</span>${a.waiting || a.chat_unread ? `<span class="c nunread">${a.waiting + a.chat_unread}</span>` : ''}</button>`)].join('');
   // a group folded by default (Views) keeps its rows in the page, hidden: what they show (a running timer's dot, a count)
@@ -265,16 +288,18 @@ function renderSide() {
   // 2.13.3 (#478 follow-up, Fold): one search entry in the sidebar / drawer: the command-bar field (search, commands and the
   // "Search" view inside); no separate "Search" row any more (it doubled the field in the drawer, the field was missing on
   // an unfolded Fold)
+  const SB = {
+    focus: `${grp('focus', tr('Plan|nav'), focus)}`,
+    clients: `${clientsSideHtml(onTasks)}`,
+    lists: `<div class="sgroup sg-lists">${head('lists', tr('Lists'), `<button data-act="lists-reorder" class="${S.listReorder ? 'on' : ''}" title="${tr('Sort lists')}">${ic('sort', 's')}</button><button data-act="list-new" title="${tr('New list')}">${ic('plus', 's')}</button>`, lists.length)}${S.listReorder ? `<div class="sreobar" role="group" aria-label="${esc(tr('Sort lists'))}"><span class="sreot"><b>${tr('Sort lists')}</b><small>${esc(tr('Drag by the handle on the left, or use “…”'))}</small></span><button type="button" class="btn sm pri" data-act="lists-reorder">${tr('Done')}</button></div>` : ''}${sideOpen('lists') || S.listReorder ? lh || `<div class="folder">${tr('No lists yet')}</div>` : ''}</div>`,
+    filters: `${grp('filters', tr('Filters'), S.filters.map(f => row('f:' + f.id, ic('filter'), f.name, c.filters[f.id])).join(''), `<button data-act="filter-new" title="${esc(tr('New filter') + ' · ' + tr('Combine lists, dates, priorities, tags'))}" aria-label="${tr('New filter')}">${ic('plus', 's')}</button>`, S.filters.length, tr('Combine lists, dates, priorities, tags'))}`,
+    tags: `${tags.length ? `<div class="sgroup"><button class="shead stoggle ${tagsOpen ? '' : 'closed'}" data-act="side-tags" aria-expanded="${tagsOpen}">${ic('chev', 's fcar')}<span class="spacer">${tr('Tags')}</span><span class="c">${tagsOpen ? '' : tags.length}</span></button>${tagsOpen ? tags.map(t => row('tag:' + t, ic('tag'), t, c.tags[t])).join('') : ''}</div>` : ''}`,
+    views: `${views ? grp('views', tr('Views'), views, '', (views.match(/class="srow smod/g) || []).length) : ''}`,
+    team: `${team ? grp('team', tr('Conversations|nav'), team, '', ppl.length + ags.length + grps.length + (convo.match(/class="srow/g) || []).length) : ''}`};
   $('#side').innerHTML = `
-    <div class="sbrand"><button type="button" class="sbhome ${S.route.mod === 'home' ? 'on' : ''}" data-go="home" title="${esc(tr('Dashboard'))}" aria-label="${esc(APP_NAME + ': ' + tr('Dashboard'))}" ${S.route.mod === 'home' ? 'aria-current="page"' : ''}>${logoSvg(20)}<span>${esc(APP_NAME)}</span>${S.me?.orgs?.[0] && S.me.orgs[0].trim().toLowerCase() !== APP_NAME.toLowerCase() ? `<small class="sborg">${esc(S.me.orgs[0])}</small>` : ''}</button><span class="spacer"></span>${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(tr('Account') + ': ' + S.me.display_name)}" aria-label="${esc(tr('Account') + ': ' + S.me.display_name)}">${av(S.me.id, S.me.display_name)}${updDot() ? `<span class="dot" title="${esc(tr('Update available'))}"></span>` : ''}</button>` : ''}</div>
+    <div class="sbrand"><button type="button" class="sbhome ${S.route.mod === 'home' ? 'on' : ''}" data-go="home" title="${esc(tr('Start|home'))}" aria-label="${esc(APP_NAME + ': ' + tr('Start|home'))}" ${S.route.mod === 'home' ? 'aria-current="page"' : ''}>${logoSvg(20)}<span>${esc(APP_NAME)}</span>${S.me?.orgs?.[0] && S.me.orgs[0].trim().toLowerCase() !== APP_NAME.toLowerCase() ? `<small class="sborg">${esc(S.me.orgs[0])}</small>` : ''}</button><span class="spacer"></span>${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(tr('Account') + ': ' + S.me.display_name)}" aria-label="${esc(tr('Account') + ': ' + S.me.display_name)}">${av(S.me.id, S.me.display_name)}${updDot() ? `<span class="dot" title="${esc(tr('Update available'))}"></span>` : ''}</button>` : ''}</div>
     <button class="scmd" data-act="palette" title="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span></button>
-    ${grp('focus', tr('Focus|nav'), focus)}
-    ${clientsSideHtml(onTasks)}
-    <div class="sgroup sg-lists">${head('lists', tr('Lists'), `<button data-act="lists-reorder" class="${S.listReorder ? 'on' : ''}" title="${tr('Sort lists')}">${ic('sort', 's')}</button><button data-act="list-new" title="${tr('New list')}">${ic('plus', 's')}</button>`, lists.length)}${sideOpen('lists') ? lh || `<div class="folder">${tr('No lists yet')}</div>` : ''}</div>
-    ${grp('filters', tr('Filters'), S.filters.map(f => row('f:' + f.id, ic('filter'), f.name, c.filters[f.id])).join(''), `<button data-act="filter-new" title="${esc(tr('New filter') + ' · ' + tr('Combine lists, dates, priorities, tags'))}" aria-label="${tr('New filter')}">${ic('plus', 's')}</button>`, S.filters.length, tr('Combine lists, dates, priorities, tags'))}
-    ${tags.length ? `<div class="sgroup"><button class="shead stoggle ${tagsOpen ? '' : 'closed'}" data-act="side-tags" aria-expanded="${tagsOpen}">${ic('chev', 's fcar')}<span class="spacer">${tr('Tags')}</span><span class="c">${tagsOpen ? '' : tags.length}</span></button>${tagsOpen ? tags.map(t => row('tag:' + t, ic('tag'), t, c.tags[t])).join('') : ''}</div>` : ''}
-    ${views ? grp('views', tr('Views'), views, '', (views.match(/class="srow smod/g) || []).length) : ''}
-    ${team ? grp('team', tr('Team'), team, '', ppl.length + ags.length + grps.length) : ''}
+    ${sideGroupOrder().filter(g => !hid('g:' + g) || g === 'lists').map(g => SB[g] || '').join('')}
     <div class="sgroup sfoot">
       ${row('all', ic('all'), tr('All'), c.all)}
       ${row('done', ic('done'), tr('Completed'), '')}
@@ -314,7 +339,7 @@ $('#skip')?.addEventListener('click', skipToContent);
 function renderTop() { return keepFocus($('#top'), renderTop0); }
 function renderTop0() {
   const m = S.route.mod, k = S.route.key;
-  const MT = {cal: N_('Calendar'), matrix: N_('Eisenhower matrix'), habits: N_('Habits'), pomo: N_('Focus'), news: N_('News'), stats: N_('Statistics'), time: N_('Time tracking'), overview: N_('Where is it stuck?'), agents: N_('Agents'), team: N_('Team chat'), home: N_('Dashboard'), family: N_('Family'), contacts: N_('Contacts'), life: N_('Home & life'), review: N_('Review & journal'), clients: N_('Clients'), workload: N_('Workload')};
+  const MT = {cal: N_('Calendar'), matrix: N_('Eisenhower matrix'), habits: N_('Habits'), pomo: N_('Focus timer'), news: N_('News'), stats: N_('Statistics'), time: N_('Time tracking'), overview: N_('Project status'), agents: N_('Agents'), team: N_('Team chat'), home: N_('Start|home'), family: N_('Family'), contacts: N_('Contacts'), life: N_('Home & life'), review: N_('Review & journal'), clients: N_('Clients'), workload: N_('Workload')};
   let title = m === 'tasks' ? titleFor(k) : m === 'notes' ? tr('Notes') + ' · ' + (lname(listById(S.nt.lid)) || '') : m === 'family' && S.me?.kid ? tr('My day') : MT[m] ? tr(MT[m]) : '';
   if (m === 'matrix' && mxTitle()) title = `${tr('Matrix')} · ${mxTitle()}`;
   let acts = '';
@@ -325,7 +350,7 @@ function renderTop0() {
       // 2.8.0 (#434): the view switch as text tabs (List / Kanban / Timeline / Project overview)
       if (vc.length > 1 && !isMobile()) acts += `<div class="seg vseg ttabs tf" role="group" aria-label="${esc(tr('View'))}">${vc.map(([k, n, i]) => `<button class="${v === k ? 'on' : ''}" data-act="view-${k}" data-ico="${i}" title="${esc(tr(n))}" aria-pressed="${v === k}">${esc(tr(n))}</button>`).join('')}</div>`;
       // 2.14.0 (#425): "Columns…" (the list's columns for every member) replaces the per-device field-column switch
-      if (!isMobile() && v === 'list' && !l.archived) acts += `<button class="iconbtn tf ${listCols(l) ? 'on' : ''}" data-act="cols" data-ico="columns" data-id="${l.id}" title="${esc(tr('Columns…'))}" aria-label="${esc(tr('Columns…'))}" aria-haspopup="dialog">${ic('columns')}</button>`;
+      if (!isMobile() && v === 'list' && !l.archived) acts += `<button class="iconbtn tf ${listCols(l) ? 'on' : ''}" data-act="cols" data-ico="columns" data-id="${l.id}" title="${esc(tr('Shown fields…'))}" aria-label="${esc(tr('Shown fields…'))}" aria-haspopup="dialog">${ic('columns')}</button>`;
       // 2.6.0 (K12): Share next to the title (desktop / tablets; phones: in "…")
       if (!l.is_inbox && !l.archived && collab() && !isMobile()) acts += `<button class="iconbtn tf shbtn" data-act="share-list" data-ico="users" data-id="${l.id}" title="${esc(tr('Share…'))}" aria-label="${esc(tr('Share…'))}">${ic('users', 's')}<span class="bl">${tr('Share')}</span></button>`;
     }
@@ -350,7 +375,8 @@ function renderTop0() {
   // 2.8.0 (#434): the command bar (search + commands + the agents' chat) and "New task" (mouse screens; touch has the + button)
   // 2.18.0 (#651, owner decision: the magnifier is always visible): Search never folds into "…" (no .tf4); the title gets cut instead (fitTop)
   const pal = `<button class="kbtn cmdbar" data-act="palette" data-ico="search" title="${esc(tr('Search and commands'))} (${kbText('Mod+K')})" aria-label="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span>${kb('Mod+K')}</button>`;
-  const tnew = (!isTouch() || ((!isMobile() || tabletDock()) && !dockView())) && (m === 'tasks' || (m === 'cal' && isTouch())) && !noFab() && !S.multiMode ? `<button class="btn pri tnew tf4" data-act="new-task" data-ico="plus" title="${esc(kt(tr('New task'), 'n'))}" aria-label="${esc(tr('New task'))}">${ic('plus', 's')}<span>${tr('New task')}</span></button>` : '';
+  // 2.25.0 (UX-32): ONE way to add per view: where the add bar sits at the bottom, no second "New task" up here
+  const tnew = (!isMobile() || tabletDock()) && !dockView() && (m === 'tasks' || (m === 'cal' && isTouch())) && !noFab() && !S.multiMode ? `<button class="btn pri tnew tf4" data-act="new-task" data-ico="plus" title="${esc(kt(tr('New task'), 'n'))}" aria-label="${esc(tr('New task'))}">${ic('plus', 's')}<span>${tr('New task')}</span></button>` : '';
   const ms = (() => {  // the next open milestone of a project list
     const l = m === 'tasks' && k.startsWith('l:') ? listById(+k.slice(2)) : null;
     const x = l?.kind === 'project' ? (l.milestones || []).filter(y => !y.done).sort((a, b) => a.day.localeCompare(b.day))[0] : null;
@@ -452,7 +478,7 @@ function topMoreItems() {
   if (S.me?.kid) return [{label: tr('Account'), icon: 'user', fn: () => settingsModal('account')}, {label: tr('Settings'), icon: 'gear', fn: () => settingsModal()},
     ...(S.me?.auth === 'session' ? ['-', {label: tr('Log out'), icon: 'logout', fn: logout}] : [])];  // 2.19.0: a child's "…": its account only
   const m = S.route.mod, k = S.route.key, fold = topFolded(), out = [], sec = [];
-  if (isMobile()) for (const dir of ['undo', 'redo']) { const b = histBtn(dir); out.push({label: b.lab, icon: dir, dis: b.off, cls: 'hmi' + (b.p ? ' pend' : ''), title: b.p ? tr('waiting for the connection') : '', fn: () => histStep(dir)}); }
+  if (isMobile()) for (const dir of ['undo', 'redo']) { const b = histBtn(dir); if (b.off && !b.p) continue; out.push({label: b.lab, icon: dir, dis: b.off, cls: 'hmi' + (b.p ? ' pend' : ''), title: b.p ? tr('waiting for the connection') : '', fn: () => histStep(dir)}); }
   // 2.24.0 (UX-35): Today's planners live here now (the header keeps its room for the tasks)
   if (m === 'tasks' && k === 'today') out.push({label: tr('Plan my day'), icon: 'cal', fn: () => dayplanModal('day')}, {label: tr('Fill free time'), icon: 'clock', fn: () => dayplanModal('fill')});
   if (m === 'tasks' && !NOLIST_KEYS.includes(k) && !isKanban() && !isTimeline() && !isRoadmap() && !isOverview())
@@ -524,7 +550,7 @@ function routeList() {
   if (S.route.mod !== 'tasks') return null;
   return k === 'inbox' ? inbox() : k.startsWith('l:') ? listById(+k.slice(2)) : null;
 }
-const listView = l => ((l.view === 'kanban' && feat('kanban')) || (l.view === 'timeline' && feat('timeline'))) ? l.view : 'list';
+const listView = l => !l.is_inbox && ((l.view === 'kanban' && feat('kanban')) || (l.view === 'timeline' && feat('timeline'))) ? l.view : 'list';  // 2.25.0 (UX-38): the inbox is always a list
 function isKanban() { const l = routeList(); return !!l && !povOn(l) && listView(l) === 'kanban'; }
 function isTimeline() { const l = routeList(); return !!l && !povOn(l) && listView(l) === 'timeline'; }
 // 2.13.0 (#453 P15): week / day view: the hour grid fills exactly the room below its header, so only the grid scrolls
@@ -667,7 +693,7 @@ function taskRow(t, opts = {}) {
   // 2.0.4 (#308): "Ready to start" only when the view has dependencies at all (see renderList); a button: tap / click
   // explains where it comes from (toast), without opening the task
   if (opts.next && !opts.depth) meta.push(`<button type="button" class="nxt" data-act="flow-why" title="${esc(tr(FLOW_WHY))}" aria-label="${esc(tr('Ready to start|flow') + ': ' + tr(FLOW_WHY))}">${ic('arrow', 's')}<span class="nxl">${tr('Ready to start|flow')}</span></button>`);
-  if (!lc && t.blocked && t.status === 0 && !opts.trash && dFor(t)) meta.push(`<span class="blk" title="${esc(blockedTitle(t))}">${ic('lock', 's')}${tr('waiting')}</span>`);
+  if (!lc && t.blocked && t.status === 0 && !opts.trash && dFor(t)) meta.push(`<span class="blk" title="${esc(blockedTitle(t))}">${ic('lock', 's')}${tr('blocked')}</span>`);
   if (t.waiting_at && t.status === 0 && !opts.trash) meta.push(waitChip(t));  // 2.1.0 (#335)
   if (t.approval === 'pending' && t.status === 0 && !opts.trash) meta.push(approvalChip(t));  // 2.23.0 (#463)
   if (t.pinned && !opts.trash) meta.push(`<span class="pinm">${ic('pin', 's')}</span>`);
@@ -845,7 +871,7 @@ const fieldCols = lid => !isMobile() && !!LS.get('fcols.' + lid, false) && field
 // moves into the second line (classes o2 … o10: the cell's index needs at least that many columns of room).
 const PRIO_NAMES = {1: N_('Low'), 3: N_('Medium'), 5: N_('High')};
 const COLS = [['due', N_('Date')], ['prio', N_('Priority')], ['who', N_('Assignee')], ['tags', N_('Tags')], ['time', N_('Tracked time')],
-  ['progress', N_('Subtasks')], ['deps', N_('Waiting on')], ['created', N_('Created')]];
+  ['progress', N_('Subtasks')], ['deps', N_('Blocked by')], ['created', N_('Created')]];
 const COL_ICON = {due: 'cal', prio: 'flag', who: 'user', tags: 'tag', time: 'clock', progress: 'sub', deps: 'deps', created: 'plus'};
 function colChoices(l) {  // [key, name] of the columns this list can show (the task number separately)
   const ok = k => k === 'who' ? collab() && !!l.shared : k === 'time' ? timeOn() && isProject(l.id) : k === 'deps' ? depsOn() && isProject(l.id) : true;
@@ -874,7 +900,7 @@ function lcCell(k, t, x) {
     case 'tags': return [...(t.ltags || []).map(g => ltagChip(g, t.list_id)), ...t.tags.map(g => ptagChip(g, t.list_id))].join('');
     case 'time': return x.time ? `<span class="tchip ${x.time.live ? 'live' : ''}" data-tt="${t.id}" title="${x.time.tip}">${ic('clock', 's')}<b>${x.time.txt}</b></span>` : '';
     case 'progress': return x.kids.length ? `<span class="subc" title="${esc(tr('{0} of {1} subtasks done', x.kids.length - x.openKids, x.kids.length))}">${ic('sub', 's')}${x.kids.length - x.openKids}/${x.kids.length}</span>` : '';
-    case 'deps': return t.blocked && t.status === 0 && dFor(t) ? `<span class="blk" title="${esc(blockedTitle(t))}">${ic('lock', 's')}<span class="lbl">${tr('waiting')}</span></span>` : '';
+    case 'deps': return t.blocked && t.status === 0 && dFor(t) ? `<span class="blk" title="${esc(blockedTitle(t))}">${ic('lock', 's')}<span class="lbl">${tr('blocked')}</span></span>` : '';
     case 'created': return t.created_at ? `<span class="crd" title="${esc(tr('Created {0}', fmtWhen(t.created_at)))}">${ic('plus', 's')}${dayLabel(ds(new Date(t.created_at)))}</span>` : '';
   }
   if (k.startsWith('f:')) { const f = fieldsOf(t.list_id).find(y => y.id === +k.slice(2)); return f ? fieldCell(f, t.fields?.[f.id], t.list_id) : ''; }
@@ -891,9 +917,9 @@ function colModal(id) {
   let order = [...start.filter(k => k !== 'id'), ...ch.map(x => x[0]).filter(k => !on.has(k))];
   const dis = may ? '' : 'disabled';
   const rowH = (k, i) => `<li class="colr ${on.has(k) ? 'on' : ''}" data-k="${esc(k)}">${may ? `<span class="colh" data-colh title="${esc(tr('Drag to reorder'))}" aria-hidden="true">${ic('grip', 's')}</span>` : ''}<label class="chkl"><input type="checkbox" data-colk="${esc(k)}" ${on.has(k) ? 'checked' : ''} ${dis}><span class="coln">${k.startsWith('f:') ? ic('sliders', 's') : ic(COL_ICON[k], 's')}<span>${esc(names[k])}</span></span></label>${may ? `<button type="button" class="iconbtn colmv" data-colmv="-1" ${i ? '' : 'disabled'} title="${esc(tr('Move up'))}" aria-label="${esc(tr('Move up') + ': ' + names[k])}">${ic('chev', 's cup')}</button><button type="button" class="iconbtn colmv" data-colmv="1" ${i < order.length - 1 ? '' : 'disabled'} title="${esc(tr('Move down'))}" aria-label="${esc(tr('Move down') + ': ' + names[k])}">${ic('chev', 's')}</button>` : ''}</li>`;
-  const md = modal(`<h3 id="col-t">${ic('columns', 's')}${tr('Columns')}</h3>
-    <p class="muted coldesc">${esc(tr('The same for everyone in this list. Phones show the first two columns, the rest in the second line.'))}</p>
-    ${may ? '' : `<p class="rohint">${ic('lock', 's')}${esc(tr('Only the owner and list admins can change the columns.'))}</p>`}
+  const md = modal(`<h3 id="col-t">${ic('columns', 's')}${tr('Shown fields')}</h3>
+    <p class="muted coldesc">${esc(tr('The same for everyone in this list. Phones show the first two fields, the rest in the second line.'))}</p>
+    ${may ? '' : `<p class="rohint">${ic('lock', 's')}${esc(tr('Only the owner and list admins can change the shown fields.'))}</p>`}
     <label class="chkl colnum"><input type="checkbox" id="col-num" ${num ? 'checked' : ''} ${dis}><span class="coln">${ic('hash', 's')}<span>${tr('Task number in front of the title')}</span></span></label>
     <ul class="colls" id="col-ls" aria-labelledby="col-t" tabindex="-1">${order.map(rowH).join('')}</ul>
     <div class="foot">${may ? `<button type="button" class="btn" data-colact="reset" ${l.columns ? '' : 'disabled'} title="${esc(tr('Back to the default columns'))}">${tr('Default')}</button>` : ''}<span class="spacer"></span><button type="button" class="btn" data-colact="close">${may ? tr('Cancel') : tr('Close')}</button>${may ? `<button type="button" class="btn pri" data-colact="save">${tr('Save')}</button>` : ''}</div>`);
@@ -956,8 +982,8 @@ async function colSave(id, next, quiet) {
   l.columns = next; render();
   if (quiet) return;
   const go = v => async () => { await colSave(id, v, true); return {}; };
-  const e = histAdd({label: tr('Columns of {0}', qn(lname(l))), undo: go(prev), redo: go(next), lids: [id]});
-  histToast(next ? tr('Columns saved for everyone in the list') : tr('Default columns'), e);
+  const e = histAdd({label: tr('Shown fields of {0}', qn(lname(l))), undo: go(prev), redo: go(next), lids: [id]});
+  histToast(next ? tr('Shown fields saved for everyone in the list') : tr('Default columns'), e);
 }
 function lcHead(l, lc) {  // the column titles above the rows (wide layouts)
   const ks = lc.filter(k => k !== 'id');
@@ -1003,7 +1029,7 @@ document.addEventListener('keydown', e => {
 // ---- dependencies: "waiting on" (blocked by open tasks)
 function blockedTitle(t) {
   const names = (t.blockers || []).map(id => S.tasks.get(id)?.title).filter(Boolean), hidden = Math.max(0, (t.blocked || 0) - names.length);
-  return tr('Waiting on: {0}', [...names.map(n => tr('“{0}”|quoted', n)), ...(hidden ? [trn('{0} task you cannot see', '{0} tasks you cannot see', hidden)] : [])].join(', '));
+  return tr('Blocked by: {0}', [...names.map(n => tr('“{0}”|quoted', n)), ...(hidden ? [trn('{0} task you cannot see', '{0} tasks you cannot see', hidden)] : [])].join(', '));
 }
 const hideBlockedToday = () => depsOn() && S.settings.hide_blocked_today === '1';
 // 2.22.0 (#681): Today can show the inbox too (Settings > General > Today, off by default): the inbox's tasks without a
@@ -1095,8 +1121,12 @@ function viewListBody() {
   const lc = rl ? listCols(rl) : null;  // 2.14.0 (#425)
   const cols = rl && !lc && fieldCols(rl.id) ? fieldsOf(rl.id).slice(0, 6) : null;
   let h = (rl ? listHead(rl) : v.folder ? folderHead(v.folder) : agBandHtml()) + (ro ? `<div class="rohint">${ic(isPart(rl.id) ? 'user' : 'eye', 's')}${esc(isPart(rl.id) ? tr('Participant: you see only the tasks assigned to you, shared by {0}', rl.owner_name) : tr('View only, shared by {0}', rl.owner_name))}</div>` : '');
+  // 2.25.0 (UX-54): "Now doable" explains itself once
+  if (S.route.key === 'doable' && !hintSeen('doable')) h += `<div class="onehint" data-hint="doable">${ic('zap', 's')}<span>${esc(tr('Now doable: your open tasks you can start right away. Nothing blocks them, their start has come, and they are due today, overdue or without a date.'))}</span><button type="button" class="iconbtn hx" data-act="hint-x" data-k="doable" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;
+  // 2.25.0 (UX-28): a shopping or packing list gets the tip "Show completed at the bottom" once (was in the tour)
+  if (rl && !ro && isOwner(rl) && !ck && (['shopping', 'packing'].includes(rl.family) || /einkauf|shopping|groceries|pack(liste|ing)|courses|compra|spesa|boodschap|paklijst/i.test(rl.name)) && !hintSeen('dab')) h += `<div class="onehint" data-hint="dab">${ic('cart', 's')}<span>${esc(tr('Shopping or packing? With “Show completed at the bottom” what you tick off stays visible at the bottom and comes back with one tap.'))}</span><button type="button" class="btn sm" data-act="dab-on" data-id="${rl.id}">${tr('Turn on')}</button><button type="button" class="iconbtn hx" data-act="hint-x" data-k="dab" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;
   if (S.route.key === 'today') h += waitCard() + reviewCard() + overdueBanner() + cevTodayBlock();  // 2.24.0 (UX-35): the planners in "…"  // 2.10.0 (#440): review + planner
-  if (flow && FLOW.cyc) h += `<div class="flowhint">${ic('deps', 's')}${esc(tr('Some tasks wait on each other in a circle; they are ordered by date.'))}</div>`;
+  if (flow && FLOW.cyc) h += `<div class="flowhint">${ic('deps', 's')}${esc(tr('Some tasks block each other in a circle; they are ordered by date.'))}</div>`;
   if (lc && total0(groups)) h += lcHead(rl, lc);
   if (cols) h += `<div class="fcolhead"><span class="spacer"></span>${cols.map(f => `<span class="fcell t-${esc(f.type)}" title="${esc(f.name)}">${esc(f.name)}</span>`).join('')}</div>`;
   const total = groups.reduce((n, g) => n + g.tasks.length, 0);
@@ -1108,7 +1138,7 @@ function viewListBody() {
   if (!total && !tin.length) {
     // 2.14.0: the heron: Today with something done = the sun sets ("all done"), otherwise it looks into the water
     h += S.route.key === 'today' ? (v.done.length ? heronEmpty('done', tr('All done for today.'), tr('Enjoy the rest of the day.')) : heronEmpty('empty', tr('Nothing left for today.')))
-      : heronEmpty('empty', tr('No tasks.'), rl && !ro ? tr('Add the first one with the field below.') : '');
+      : heronEmpty('empty', tr('No tasks.'), rl && !ro ? (isMobile() && !tabletDock() ? tr('Add the first one with the + button.') : tr('Add the first one with the field below.')) : '');  // 2.25.0 (UX-27): what this device shows
   }
   let lastSub = '';
   // 2.17.0 (#649): a very long view renders its first ROW_CAP rows, then "Show more" (also by itself when it scrolls into
@@ -1133,7 +1163,7 @@ function viewListBody() {
   // 2.19.0 (#667): the end of a list takes a dragged task into a new section
   if (rl && !ro && !rl.is_inbox && total && canEditList(rl.id)) h += `<div class="sdrop snew" data-newsec="1">${ic('plus', 's')}<span>${tr('New section')}</span></div>`;
   if (cut) h += `<div class="rowmore"><button type="button" class="btn" data-act="rows-more">${ic('down', 's')}${esc(trn('Show {0} more task', 'Show {0} more tasks', Math.min(cut, ROW_CAP)))}</button><span class="muted">${esc(trn('{0} task not shown yet', '{0} tasks not shown yet', cut))}</span></div>`;
-  if (v.list && !ro) h += `<button class="iconbtn" data-act="section-new" style="margin:.375rem 0 0 -.25rem">${ic('plus', 's')} ${tr('Section')}</button>`;
+  if (v.list && !ro && total && !rl?.is_inbox) h += `<button class="iconbtn" data-act="section-new" style="margin:.375rem 0 0 -.25rem">${ic('plus', 's')} ${tr('Section')}</button>`;  // 2.25.0 (UX-27 / UX-38): once there are tasks, never in the inbox
   if (ck) {  // 2.7.2 (#414) "Show completed at the bottom" (was the checklist type): done items stay below in "Done" (open by
     // default), one tap puts them back on the list
     const k = 'ckdone:' + rl.id, closed = S.collapsed.has(k), done = v.done.slice().sort((a, b) => a.title.localeCompare(b.title, LOCALE()));

@@ -225,9 +225,7 @@ def list_create():
     cur = c.execute("INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind,dep_shift,tickets) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                     (name, color, folder, srt, view, iso(now_utc()), uid, dab, kind,
                      clean_list_value("dep_shift", b.get("dep_shift")), clean_list_value("tickets", b.get("tickets"))))
-    agent_autoshare(c, uid, cur.lastrowid)  # 2.4.2 (#391)
-    grp_touch(c, uid)  # 2.10.0 (#441): created inside a folder shared with a group
-    folder_autoshare(c, cur.lastrowid)  # 2.22.0 (#740): created inside a folder shared with people
+    list_created(c, uid, cur.lastrowid)  # 2.4.2 (#391) agents, 2.10.0 (#441) groups, 2.22.0 (#740) / 2.25.0 (#931) folder people
     bump(c)
     c.commit()
     return jsonify(dict(c.execute("SELECT * FROM lists WHERE id=?", (cur.lastrowid,)).fetchone()))
@@ -267,7 +265,7 @@ def list_update(lid):
         b = {k: v for k, v in b.items() if k != "client_id"}
     if "columns" in b:  # 2.14.0 (#425): the list's columns, the same for every member (owner / list admins)
         if role not in MANAGE_ROLES:
-            return err(tr("Only the owner and list admins can change the columns"), 403)
+            return err(tr("Only the owner and list admins can change the shown fields"), 403)
         try:
             c.execute("UPDATE lists SET col_cfg=? WHERE id=?", (clean_columns(c, lid, b["columns"]), lid))
         except BadInput as e:
@@ -694,6 +692,17 @@ def agent_share_all(aid):
     bump(c)
     c.commit()
     return jsonify(added=n, **agent_share_counts(c, aid, d))
+
+
+def list_created(c, uid, lid, agents=True):
+    """2.25.0 (#931): everything a NEW list of uid gets, on every path that creates one (the list dialog, project types and
+    templates, an agent's briefing, imports, family and life lists): the agents of "Share new lists automatically",
+    the groups of a shared folder and the people of a shared folder (before, only the list dialog did all three)."""
+    from ..lists.groups import grp_touch
+    if agents:
+        agent_autoshare(c, uid, lid)
+    grp_touch(c, uid)
+    folder_autoshare(c, lid)
 
 
 @app.put("/api/agents/<int:aid>/autoshare")

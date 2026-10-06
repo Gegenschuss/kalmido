@@ -104,7 +104,7 @@ const lst = async id => (await call('GET', '/api/state')).lists.find(l => l.id =
   check(!!d.querySelector('#top [data-act="cols"]'), 'desktop header: the Columns button');
   check(!d.querySelector('#top [data-act="field-cols"]'), 'the old per-device field-columns switch is gone');
   const items = w.eval(`listMenuItems(${P}, document.body)`).map(x => x.label);
-  check(items.includes('Columns…') && !items.includes('Show task numbers') && !items.some(x => /assignee column/.test(x || '')), 'list "…": "Columns…" replaces "Show task numbers" / "Hide assignee column" ' + items.join(' | '));
+  check(items.includes('Shown fields…') && !items.includes('Show task numbers') && !items.some(x => /assignee column/.test(x || '')), 'list "…": "Columns…" replaces "Show task numbers" / "Hide assignee column" ' + items.join(' | '));
   check(row(T1).querySelector('.tcols') && !row(T1).querySelector('.lcols'), 'default layout: the old date / assignee columns');
   click(w, d.querySelector('#top [data-act="cols"]')); await sleep(200);
   let md = d.querySelector('.modal.colmd');
@@ -127,7 +127,7 @@ const lst = async id => (await call('GET', '/api/state')).lists.find(l => l.id =
   const want = ['id', ...order().filter(k => ticked().includes(k))];
   const saved = (await lst(P)).columns;
   check(JSON.stringify(saved) === JSON.stringify(want) && saved[1] === 'prio' && saved.includes('f:' + FS.id) && !saved.includes('time'), 'Save stores the list\'s columns in the dialog\'s order ' + JSON.stringify(saved) + ' ' + JSON.stringify(want));
-  check(/Columns saved for everyone/.test(d.querySelector('#toast')?.textContent || ''), 'toast: saved for everyone, with Undo');
+  check(/Shown fields saved for everyone/.test(d.querySelector('#toast')?.textContent || ''), 'toast: saved for everyone, with Undo');
   const r = row(T1);
   const cells = [...r.querySelectorAll('.lcols .lc')].map(x => x.className.split(' ')[1]);
   check(cells.join() === saved.filter(k => k !== 'id').map(k => k.startsWith('f:') ? 'lc-f' : 'lc-' + k).join(), 'the row\'s cells follow the list\'s order ' + cells.join());
@@ -181,7 +181,7 @@ const lst = async id => (await call('GET', '/api/state')).lists.find(l => l.id =
   w.close();
   await call('PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', hash: 'l/' + P}); d = w.document;
-  check(/Spalten/.test(d.querySelector('#top [data-act="cols"]')?.getAttribute('title') || ''), 'German: "Spalten…"');
+  check(/Angezeigte Felder/.test(d.querySelector('#top [data-act="cols"]')?.getAttribute('title') || ''), 'German: "Spalten…"');
   w.eval(`colModal(${P})`); await sleep(200);
   check(/Für alle in dieser Liste gleich/.test(d.querySelector('.colmd .coldesc')?.textContent || ''), 'German dialog text: ' + (d.querySelector('.colmd .coldesc')?.textContent || ''));
   w.close();
@@ -295,7 +295,7 @@ const lst = async id => (await call('GET', '/api/state')).lists.find(l => l.id =
     check(x.titleW >= 80, `${tag}: the title keeps room ` + JSON.stringify(x));
     await shot(`p2140-${tag}-list.png`);
     if (phone) {  // "Columns…" high up in "…" (the view group, after Sort…)
-      const pos = await ev(`topMoreItems().filter(x => x !== '-').findIndex(x => x.label === 'Columns…')`);
+      const pos = await ev(`topMoreItems().filter(x => x !== '-').findIndex(x => x.label === 'Shown fields…')`);
       check(pos >= 0 && pos <= 6, `${tag}: "Columns…" is among the first entries of "…" (position ${pos + 1})`);
     }
     await ev(`(() => { colModal(${P}); return 1; })()`); await sleep(400);

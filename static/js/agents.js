@@ -561,12 +561,12 @@ function propItemsHtml() {
     const secOpts = cur => `<option value="">${tr('No section')}</option>${p.sections.map(s => `<option ${s === cur ? 'selected' : ''}>${esc(s)}</option>`).join('')}`;
     return p.tasks.map((t, i) => propItemHtml(String(i), t, {
       fields: p.sections.length ? `<select data-f="section" aria-label="${esc(tr('Section'))}">${secOpts(t.section)}</select>` : '',
-      chips: propPrio(t.priority) + (t.depends_on.length ? `<span class="ppchip">${ic('deps', 's')}${esc(tr('waits on {0}', t.depends_on.map(d => '“' + p.tasks[d].title.slice(0, 24) + '”').join(', ')))}</span>` : '')})
+      chips: propPrio(t.priority) + (t.depends_on.length ? `<span class="ppchip">${ic('deps', 's')}${esc(tr('blocked by {0}', t.depends_on.map(d => '“' + p.tasks[d].title.slice(0, 24) + '”').join(', ')))}</span>` : '')})
       + t.subtasks.map((s, k) => propItemHtml(`${i}.${k}`, s, {sub: true})).join('')).join('');
   }
   if (v.kind === 'subtasks') return p.items.map((t, i) => propItemHtml(String(i), t, {
     chips: (t.estimate ? `<span class="ppchip">${ic('clock', 's')}${esc(fmtDur(t.estimate * 60))}</span>` : '')
-      + p.dependencies.filter(d => d[0] === i).map(d => `<span class="ppchip">${ic('deps', 's')}${esc(tr('waits on {0}', '“' + p.items[d[1]].title.slice(0, 24) + '”'))}</span>`).join('')})).join('');  // 2.5.2 (K03): no stray commas
+      + p.dependencies.filter(d => d[0] === i).map(d => `<span class="ppchip">${ic('deps', 's')}${esc(tr('blocked by {0}', '“' + p.items[d[1]].title.slice(0, 24) + '”'))}</span>`).join('')})).join('');  // 2.5.2 (K03): no stray commas
   if (v.kind === 'extract') {
     const secs = [...new Set([...(inp.list?.sections || []), ...p.tasks.map(t => t.section).filter(Boolean)])];
     return p.tasks.map((t, i) => propItemHtml(String(i), t, {

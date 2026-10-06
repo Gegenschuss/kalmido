@@ -27,7 +27,7 @@ function openPop(anchor, html, onClose) {
 }
 function menu(anchor, items) {
   items = items.filter(Boolean);
-  const btn = (it, i, j) => `<button role="menuitem" data-i="${i}" ${j != null ? `data-j="${j}"` : ''} class="${it.on ? 'on' : ''} ${it.cls || ''}" ${it.dis ? 'disabled aria-disabled="true"' : ''} ${it.title ? `title="${esc(it.title)}"` : ''}>${it.dot ? `<span class="mdot">${hdot(it.dot)}</span>` : it.icon ? ic(it.icon, 's') : ''}<span class="ml">${esc(it.label)}</span>${it.keys && !isMobile() ? kb(it.keys) : ''}${it.on ? `<span class="mchk" aria-hidden="true">${ic('check', 's')}</span>` : ''}</button>`;
+  const btn = (it, i, j) => `<button role="menuitem" data-i="${i}" ${j != null ? `data-j="${j}"` : ''} class="${it.on ? 'on' : ''} ${it.cls || ''}" ${it.dis ? 'disabled aria-disabled="true"' : ''} ${it.title ? `title="${esc(it.title)}"` : ''}>${it.dot ? `<span class="mdot">${hdot(it.dot)}</span>` : it.icon ? ic(it.icon, 's') : ''}<span class="ml">${esc(it.label)}${it.sub ? `<small class="msub">${esc(it.sub)}</small>` : ''}</span>${it.keys && !isMobile() ? kb(it.keys) : ''}${it.on ? `<span class="mchk" aria-hidden="true">${ic('check', 's')}</span>` : ''}</button>`;
   // {row: [item, item]} = one line of equal buttons (1.5.1: "Today" / "Tomorrow" on top of the task menu)
   const p = openPop(anchor, `<div class="menu-list" role="menu">${items.map((it, i) => it === '-' ? '<hr>' : it.row ? `<div class="mquick" role="group">${it.row.map((x, j) => btn(x, i, j)).join('')}</div>` : btn(it, i)).join('')}</div>`);
   p.onclick = e => { const b = e.target.closest('[data-i]'); if (!b || b.disabled) return; let it = items[+b.dataset.i]; if (it.row) it = it.row[+b.dataset.j]; closePop(); it.fn(); };
@@ -509,16 +509,16 @@ function waitLabel(t) {
 }
 function waitChip(t) {
   const due = t.wait_until && t.wait_until <= today();
-  return `<span class="waitm ${due ? 'due' : ''}" title="${esc(tr('Waiting on external') + (waitLabel(t) ? ': ' + waitLabel(t) : ''))}">${ic('hourglass', 's')}${esc(t.wait_until ? dayLabel(t.wait_until) : tr('waiting|external'))}</span>`;
+  return `<span class="waitm ${due ? 'due' : ''}" title="${esc(tr('Waiting on someone') + (waitLabel(t) ? ': ' + waitLabel(t) : ''))}">${ic('hourglass', 's')}${esc(t.wait_until ? dayLabel(t.wait_until) : tr('waiting|external'))}</span>`;
 }
 function waitBar(t, ro) {
   const due = t.wait_until && t.wait_until <= today();
-  return `<div class="waitbar ${due ? 'due' : ''}">${ic('hourglass', 's')}<button type="button" class="wtxt" data-act="wait-edit" data-id="${t.id}" ${ro ? 'disabled' : ''}><b>${tr('Waiting on external')}</b>${waitLabel(t) ? `<span>${esc(waitLabel(t))}</span>` : ''}</button>${ro ? '' : `<button type="button" class="iconbtn" data-act="wait-clear" data-id="${t.id}" title="${esc(tr('No longer waiting'))}" aria-label="${esc(tr('No longer waiting'))}">${ic('x', 's')}</button>`}</div>`;
+  return `<div class="waitbar ${due ? 'due' : ''}">${ic('hourglass', 's')}<button type="button" class="wtxt" data-act="wait-edit" data-id="${t.id}" ${ro ? 'disabled' : ''}><b>${tr('Waiting on someone')}</b>${waitLabel(t) ? `<span>${esc(waitLabel(t))}</span>` : ''}</button>${ro ? '' : `<button type="button" class="iconbtn" data-act="wait-clear" data-id="${t.id}" title="${esc(tr('No longer waiting'))}" aria-label="${esc(tr('No longer waiting'))}">${ic('x', 's')}</button>`}</div>`;
 }
 function waitDialog(id) {
   const t = taskById(id); if (!t) return;
   if (!canEdit(t)) { roToast(); return; }
-  const md = modal(`<h3>${tr('Waiting on external')}</h3>
+  const md = modal(`<h3>${tr('Waiting on someone')}</h3>
     <div class="shint">${tr('The task waits for someone outside (a client, an office, a delivery). On the follow-up day you get a reminder and a News item; agents that follow the task are told too.')}</div>
     <div class="row"><label for="w-note">${tr('Waiting on')}</label><input id="w-note" maxlength="300" value="${esc(t.wait_note || '')}" placeholder="${esc(tr('who or what, e.g. offer from the carpenter'))}" enterkeyhint="done"></div>
     <div class="row"><label for="w-until">${tr('Follow up on')}</label>${dateIn('w-until', t.wait_until || addDays(today(), 7), {min: today(), label: tr('Follow up on'), empty: tr('none')})}</div>
@@ -527,7 +527,7 @@ function waitDialog(id) {
   const save = async () => {
     const body = {note: $('#w-note', md).value.trim(), until: $('#w-until', md).value || null};
     try { putTask(await api('PUT', `/api/tasks/${id}/waiting`, body)); } catch { return; }
-    md.remove(); render(); if (S.sel === id) renderDetail(); toast(tr('Waiting on external'));
+    md.remove(); render(); if (S.sel === id) renderDetail(); toast(tr('Waiting on someone'));
   };
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-m]'); if (!b) return;
@@ -550,12 +550,14 @@ async function waitClear(id) {
 // menus (swipe, selection) keep the same order and end with "All…".
 const PRIO_ROW = id => { const t = taskById(id); return {row: [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', cls: p ? 'flag-' + p : '', on: t?.priority === p, title: tr('Priority') + ': ' + tr(n), fn: () => patchTask(id, {priority: p})}))}; };
 const moveListItem = (anchor, id) => ({label: tr('Move to list…'), icon: 'list', keys: 'm', fn: () => { const t = taskById(id); menu(anchor, S.lists.filter(l => !l.archived && l.id !== t?.list_id && canAddTo(l.id)).map(l => ({label: lname(l), icon: l.is_inbox ? 'inbox' : 'list', fn: () => patchUndoable(id, {list_id: l.id}, tr('Moved to {0}', lname(l)))}))); }});
-function taskMenu(anchor, id) {
+function taskMenu(anchor, id, o = {}) {
   const t = taskById(id);
   if (!canEdit(t)) { roToast(); return; }
   const sib = siblings(t), i = sib.findIndex(x => x.id === t.id);
   const l = listById(t.list_id), open = t.status === 0;
   menu(anchor, [
+    // 2.25.0 (UX-11): opened by a long press: the title on top, then "Select" (more tasks follow with a tap)
+    ...(o.select ? [{label: t.title.length > 60 ? t.title.slice(0, 59) + '…' : t.title, cls: 'mhead', dis: true, fn: () => {}}, {label: tr('Select'), icon: 'select', fn: () => { S.multiMode = true; S.multi.add(id); S.multiLast = id; render(); }}, '-'] : []),
     // date
     quickDueRow(id), {label: tr('New date…'), icon: 'clock', keys: 's', fn: () => snoozeSheet(id, anchor)},
     ...(t.repeat && t.due && open ? [{label: tr('Skip this occurrence'), icon: 'skip', fn: async () => {
@@ -575,7 +577,7 @@ function taskMenu(anchor, id) {
     ...(open && t.id > 0 && S.route.mod === 'tasks' && $(`#view .trow[data-id="${id}"]`) ? [{row: [{label: tr('Move up'), icon: 'up', title: kt(tr('Move up'), 'Alt+ArrowUp'), fn: () => taskNudge(id, -1)}, {label: tr('Move down'), icon: 'down', title: kt(tr('Move down'), 'Alt+ArrowDown'), fn: () => taskNudge(id, 1)}]}] : []), '-',
     // waiting
     ...(open ? [t.waiting_at ? {label: tr('No longer waiting'), icon: 'hourglass', fn: () => waitClear(id)}
-      : {label: tr('Waiting on external…'), icon: 'hourglass', fn: () => waitDialog(id)}] : []),
+      : {label: tr('Waiting on someone…'), icon: 'hourglass', fn: () => waitDialog(id)}] : []),
     // 2.23.0 (#463): an approval (a person of the shared list decides)
     ...(open && t.id > 0 && collab() && l?.shared && t.approval !== 'pending' ? [{label: tr('Ask for approval…'), icon: 'eye', fn: () => approvalRequest(id)}] : []),
     // pin
@@ -603,7 +605,7 @@ const propBreakOk = t => propOn() && t && t.id > 0 && t.status === 0 && depthOf(
 function siblings(t) {  // same parent (or same list at top level), in custom order
   return [...S.tasks.values()].filter(x => x.status === 0 && x.parent_id === t.parent_id && (t.parent_id || x.list_id === t.list_id)).sort(bySort);
 }
-function snoozeSheet(id, anchor, extra = [], head = false) {
+function snoozeSheet(id, anchor, extra = [], head = false, pre = []) {
   const t = taskById(id); if (!t) return;
   if (!canEdit(t)) { roToast(); return; }
   const now = new Date();
@@ -611,6 +613,7 @@ function snoozeSheet(id, anchor, extra = [], head = false) {
   const go2 = (body, label) => patchUndoable(id, body, tr('Snoozed: {0}', label));
   menu(anchor || $('#top h1'), [
     ...(head ? [{label: t.title.length > 60 ? t.title.slice(0, 59) + '…' : t.title, dis: true, cls: 'mhead'}, '-'] : []),  // 2.24.0 (UX-14)
+    ...pre,  // 2.25.0 (UX-37): in the inbox "Move to list…" comes first
     {label: tr('In 1 hour'), icon: 'clock', fn: () => go2(inH(1), tr('in 1 h'))},
     {label: tr('In 3 hours'), icon: 'clock', fn: () => go2(inH(3), tr('in 3 h'))},
     ...(now.getHours() < 18 ? [{label: tr('Tonight (7 pm)'), icon: 'sun', fn: () => go2({due: today(), due_time: '19:00'}, tr('today 7 pm'))}] : []),

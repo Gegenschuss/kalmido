@@ -18,7 +18,7 @@ function renderMultiBar() {
   // 2.13.0 (#453 A14): every action has its label; a phone shows the four common ones and "More" (the bar used to be 11
   // bare icons, the last one cut off)
   const A = [['mb-today', 'sun', tr('Today')], ['mb-tomorrow', 'sunrise', tr('Tomorrow')], ['mb-date', 'cal', tr('Date')], ['mb-prio', 'flag', tr('Priority')], ['mb-list', 'folder', tr('List')],
-    ['mb-tag', 'tag', tr('Add tag')], ...(msBulkList() ? [['mb-ms', 'flag', tr('Set milestone')]] : []), ['mb-pin', 'pin', tr('Pin')], ...(n === 1 ? [['mb-wait', 'hourglass', tr('Waiting on external…')]] : []), ['mb-done', 'done', tr('Completed')], ['mb-del', 'trash', tr('Delete'), 'danger'],
+    ['mb-tag', 'tag', tr('Add tag')], ...(msBulkList() ? [['mb-ms', 'flag', tr('Set milestone')]] : []), ['mb-pin', 'pin', tr('Pin')], ...(n === 1 ? [['mb-wait', 'hourglass', tr('Waiting on someone…')]] : []), ['mb-done', 'done', tr('Completed')], ['mb-del', 'trash', tr('Delete'), 'danger'],
     ...(propInboxSel() ? [['mb-sort', 'bot', propWith(N_('Sort with {0}…'), N_('Sort with an agent…'))]] : [])];
   const MAIN = ['mb-today', 'mb-date', 'mb-list', 'mb-done'], mob = isMobile();
   const btn = ([act, i, lab, cls], hid) => `<button class="mbb ${cls || ''} ${hid ? 'mbh' : ''}" data-act="${act}" data-ico="${i}" title="${esc(lab)}" aria-label="${esc(lab)}" ${hid ? 'hidden' : ''}>${ic(i, 's')}<span class="mbl">${esc(lab)}</span></button>`;
@@ -424,10 +424,12 @@ function folderPick(anchor, id) {
 let sd = null, sdHeld = false;
 document.addEventListener('touchstart', e => {
   const r = e.target.closest?.('#side .srow[data-list]'), fh = !r && e.target.closest?.('#side .fhead');
-  if (S.listReorder || !(r || fh) || e.target.closest('.iconbtn') || (r && listById(+r.dataset.list)?.archived)) { sd = null; return; }
+  // 2.25.0 (UX-02): in sort mode the grip drags at once; elsewhere in sort mode a touch scrolls
+  const grip = S.listReorder && e.target.closest('.sgrip');
+  if ((S.listReorder && !grip) || !(r || fh) || e.target.closest('.iconbtn') || (r && listById(+r.dataset.list)?.archived)) { sd = null; return; }
   const p = e.touches[0];
-  sd = {el: r || fh, list: r ? +r.dataset.list : null, folder: fh ? fh.dataset.folder : null, x: p.clientX, y: p.clientY, active: false};
-  sd.timer = setTimeout(sdStart, 380);
+  sd = {el: r || fh, list: r ? +r.dataset.list : null, folder: fh ? fh.dataset.folder : null, x: p.clientX, y: p.clientY, active: false, reorder: !!grip};
+  if (grip) sdStart(); else sd.timer = setTimeout(sdStart, 380);
 }, {passive: true});
 function sdStart() {
   if (!sd) return;
@@ -465,6 +467,7 @@ function sdEnd(e) {
   st.ghost.remove(); st.el.classList.remove('dragging');
   const t = st.moved ? sideDropTarget(document.elementFromPoint(st.lx, st.ly), st.folder != null) : null;
   $$('#side .dropbefore, #side .drop').forEach(x => x.classList.remove('dropbefore', 'drop'));
+  if (!st.moved && st.reorder) return;  // a tap on the grip
   if (!st.moved) { const el = st.list ? $(`#side .srow[data-list="${st.list}"]`) : $(`#side .fhead[data-folder="${rmEsc(st.folder)}"]`); if (el) st.list ? listMenu(el, st.list) : folderMenu(el, st.folder); return; }
   if (t && e?.type === 'touchend') sideDrop({list: st.list, folder: st.folder}, t);
 }

@@ -91,7 +91,7 @@ function runPop(a) {
       : `${x.paused ? `<button data-run="pomo-resume">${ic('play', 's')}${tr('Resume')}</button>` : `<button data-run="pomo-pause">${ic('pause', 's')}${tr('Pause')}</button>`}<button data-run="pomo-stop">${ic('stop', 's')}${x.k === 'stopwatch' ? tr('Stop stopwatch') : x.k === 'focus' ? tr('Stop focus session') : tr('End break')}</button>`;
     return `<div class="runrow k-${x.k}"><div class="runh">${ic(icn, 's rk')}<b>${tr(name)}</b><span class="runt" ${x.attr}>${x.txt}</span>${x.paused ? `<span class="muted">${tr('paused')}</span>` : ''}</div>
       ${t ? `<button class="runtask" data-run="open" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : `<div class="muted runtask">${esc(x.title)}</div>`}
-      ${acts}${x.k === 'time' ? `<button data-run="time-page">${ic('clock', 's')}${tr('Time tracking')}</button>` : `<button data-run="pomo-page">${ic('timer', 's')}${tr('Focus')}</button>`}</div>`;
+      ${acts}${x.k === 'time' ? `<button data-run="time-page">${ic('clock', 's')}${tr('Time tracking')}</button>` : `<button data-run="pomo-page">${ic('timer', 's')}${tr('Focus timer')}</button>`}</div>`;
   };
   const p = openPop(a, `<div class="menu-list runlist">${it.map(row).join('<hr>')}</div>`);
   p.onclick = async e => {

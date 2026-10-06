@@ -304,10 +304,10 @@ async function toggleTask(id) {
     const {undo, ...rt} = r; putTask(rt);
     if (S.extra) S.extra = S.extra.filter(x => x.id !== id);
     render();
-    offerUndo(tr('Reopened'), histReopen(tr('Reopened {0}', n), id, snaps, r));
+    offerUndo(tr('Reopened {0}', n), histReopen(tr('Reopened {0}', n), id, snaps, r));
     return;
   }
-  if (t.blocked && dFor(t) && !await askConfirm(tr('“{0}” is still waiting on {1}. Complete it anyway?', t.title, blockedNames(t)), '', {ok: tr('Complete anyway')})) return;
+  if (t.blocked && dFor(t) && !await askConfirm(tr('“{0}” is still blocked by {1}. Complete it anyway?', t.title, blockedNames(t)), '', {ok: tr('Complete anyway')})) return;
   // optimistic: fade the row, then sync
   $$(`.trow[data-id="${id}"] .chk`).forEach(c => { c.classList.add('on'); c.innerHTML = ic('check'); });
   const cs = celeSnap([id]);
@@ -317,13 +317,14 @@ async function toggleTask(id) {
   render();
   if (!j.skipped) celeCheck(cs);
   if (j.skipped) toast(tr('Already checked off (other device), not advanced twice'));
-  else offerUndo(j.next_due ? tr('Next occurrence: {0}', dayLabel(j.next_due)) : tr('Completed'), histDone(tr('Completed {0}', n), [id], snaps, j));
+  // 2.25.0 (UX-40): the message names the task ("“Take out the bins” completed · Undo")
+  else offerUndo(j.next_due ? tr('{0}: next occurrence {1}', n, dayLabel(j.next_due)) : tr('{0} completed|task', n), histDone(tr('Completed {0}', n), [id], snaps, j));
 }
 async function wontDo(id) {
   const snaps = withKids(id), t = taskById(id);
   const j = await api('POST', `/api/tasks/${id}/complete`, {status: -1});
   await load(); render();
-  offerUndo(tr("Won't do"), histDone(tr("Won't do: {0}", qn((t?.title || '').slice(0, 40))), [id], snaps, j, -1));
+  offerUndo(tr("Won't do: {0}", qn((t?.title || '').slice(0, 40))), histDone(tr("Won't do: {0}", qn((t?.title || '').slice(0, 40))), [id], snaps, j, -1));
 }
 const canDelete = t => !!t && canEditList(t.list_id);  // 1.10.0: participants complete or discard, they never delete
 async function deleteTask(id) {

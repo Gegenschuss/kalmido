@@ -82,7 +82,7 @@ SCOPE_LABELS = {"read": N_("Read"), "tasks:write": N_("Tasks"), "comments": N_("
 SCOPE_HELP = {"read": N_("Lists, tasks, comments, time entries, habits, search"),
               "tasks:write": N_("Create, change, complete and move tasks; dependencies, habits"),
               "comments": N_("Write, edit and delete comments, reactions, mark News read"),
-              "structure": N_("Lists, sections, custom fields, list tags, templates, filters, folders, project overview"),
+              "structure": N_("Lists, sections, custom fields, list tags, templates, filters, folders, project pages"),
               "delete": N_("Move to the trash, restore, empty the trash; delete sections, lists, fields, templates, habits, filters"),
               "attachments:read": N_("Download files"), "attachments:write": N_("Upload and remove files"),
               "time": N_("Timer and time entries"), "export": N_("Download all data"),

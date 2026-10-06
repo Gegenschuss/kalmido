@@ -203,8 +203,12 @@ function crumbsHtml(t, l, parent) {
   const b = (k, id, icon, label, title) => `<button type="button" class="dcb" data-act="crumb" data-k="${k}" data-id="${esc(String(id))}" title="${esc(title || label)}">${icon ? ic(icon, 's') : ''}<span>${esc(label)}</span></button>`;
   const parts = [];
   if (l.folder && !l.is_inbox) parts.push(b('folder', l.folder, 'folder', fDisp(l.folder)));
-  parts.push(b('list', l.id, l.is_inbox ? 'inbox' : 'list', lname(l)));
-  if (sec) parts.push(b('sec', sec.id, '', sec.name));
+  // 2.25.0 (UX-44): the path is where the task's place is changed: list and section open a menu (open / move)
+  const mv = canEdit(t) && canEditList(t.list_id) && t.status === 0 && !t.context;
+  const bm = (k, id, icon, label) => mv ? `<button type="button" class="dcb" data-act="crumb-menu" data-k="${k}" data-id="${esc(String(id))}" aria-haspopup="menu" title="${esc(tr('Open or move: {0}', label))}">${icon ? ic(icon, 's') : ''}<span>${esc(label)}</span></button>` : b(k, id, icon, label);
+  parts.push(bm('list', l.id, l.is_inbox ? 'inbox' : 'list', lname(l)));
+  if (sec) parts.push(bm('sec', sec.id, '', sec.name));
+  else if (mv && !t.parent_id && (S.sections.some(x => x.list_id === l.id) || canEditList(l.id)) && !l.is_inbox) parts.push(`<button type="button" class="dcb dcadd" data-act="crumb-menu" data-k="sec" data-id="" aria-haspopup="menu" title="${esc(tr('Move to section…'))}">${ic('plus', 's')}<span class="sr">${esc(tr('Move to section…'))}</span></button>`);
   if (parent) parts.push(b('parent', parent.id, 'sub', parent.title));
   // 2.13.0: the task number, always: a tap copies the link to the task (#t/<id>)
   const num = `<button type="button" class="dcid" data-act="copy-id" data-id="${t.id}" title="${esc(tr('Copy the link to this task'))}" aria-label="${esc(tr('Task {0}: copy the link', '#' + t.id))}">#${t.id}</button>`;
@@ -214,6 +218,12 @@ async function copyTaskLink(id) {
   const url = `${location.origin}/#t/${id}`;
   try { if (isTouch() && navigator.share) { await navigator.share({url, title: '#' + id + ' ' + (taskById(id)?.title || '')}); return; } await navigator.clipboard.writeText(url); toast(tr('Link to {0} copied', '#' + id)); }
   catch { toast(url, null, 6000); }
+}
+function crumbMenu(anchor, k, id) {  // 2.25.0 (UX-44)
+  const t = taskById(S.sel), l = t && listById(t.list_id); if (!l) return;
+  const sec = k === 'sec' && id ? S.sections.find(x => x.id === +id) : null;
+  menu(anchor, [...(k === 'list' ? [{label: tr('Open {0}', lname(l)), icon: l.is_inbox ? 'inbox' : 'list', fn: () => crumbGo('list', l.id)}] : sec ? [{label: tr('Open {0}', sec.name), icon: 'columns', fn: () => crumbGo('sec', sec.id)}] : []), '-',
+    moveListItem(anchor, t.id), ...(!t.parent_id && (S.sections.some(x => x.list_id === t.list_id) || canEditList(t.list_id)) ? [{label: tr('Move to section…'), icon: 'columns', fn: () => sectionPicker(anchor, t.id)}] : [])].filter((x, i, a) => x !== '-' || i > 0));
 }
 function crumbGo(k, id) {
   closePop();
@@ -305,11 +315,10 @@ function renderDetail0() {
     paperless: ck ? '' : `${plOn() || (t.paperless?.length && feat('paperless')) ? `<div class="dsec plsec"><h5>Paperless</h5><div class="plinks">${(t.paperless || []).map(plHtml).join('')}</div>
         ${t.id > 0 && !ro && plOn() ? `<button class="attadd" data-act="pl-search">${ic('archive', 's')}<span>${tr('Link document')}</span></button>` : ''}</div>` : ''}`,
     fields: ck ? (collab() && shared ? `<div class="dsec fields"><label for="d-assignee">${tr('Assignee')}</label><select id="d-assignee" data-sheet-av ${ro || !canAssign(t) ? 'disabled' : ''}><option value="">${tr('Nobody')}</option>${assigneeOpts(t, l)}</select>${myGroup(t.assignee_group_id) ? `<button class="btn sm dtake" data-act="take" type="button">${ic('check', 's')} ${tr('Take it')}</button>` : ''}</div>` : '') : `<div class="dsec fields">
-        <label for="d-list">${tr('List')}</label><select id="d-list" data-sheet-ico="list" ${ro || !canEditList(t.list_id) ? 'disabled' : ''}>${S.lists.filter(x => (!x.archived && canEditList(x.id)) || x.id === t.list_id).map(x => `<option value="${x.id}" ${x.is_inbox ? 'data-ico="inbox"' : ''} ${x.id === t.list_id ? 'selected' : ''}>${esc(lname(x))}</option>`).join('')}</select>
+        ${''/* 2.25.0 (UX-44): list and section are changed in the path on top (a tap on it), no fields here any more */}
         ${ticketsOn(t.list_id) ? `<label for="d-ttype">${tr('Type')}</label><select id="d-ttype" data-sheet-ico="bug" ${ro ? 'disabled' : ''}><option value="">${tr('None')}</option>${TTYPES.map(([k, n, i]) => `<option value="${k}" data-ico="${i}" ${t.ttype === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>` : ''}
         ${msTog ? `<label for="d-ms">${tr('Milestone')}</label><label class="chkl dmsl"><input type="checkbox" id="d-ms" ${msT ? 'checked' : ''} ${ro ? 'disabled' : ''}><i class="msd" aria-hidden="true"></i>${tr('This task is a milestone')}</label>` : ''}
         ${msSel.length ? `<label for="d-msel">${msTog ? tr('Belongs to') : tr('Milestone')}</label><select id="d-msel" data-sheet-ico="flag" ${ro ? 'disabled' : ''}><option value="">${tr('None')}</option>${msSel.map(m => `<option value="${m.id}" ${m.id === t.milestone_id ? 'selected' : ''}>${esc(m.title + (m.due ? ' · ' + fmtDateLoc(m.due) : ''))}</option>`).join('')}</select>` : ''}
-        ${secs.length ? `<label for="d-sec">${tr('Section')}</label><select id="d-sec" data-sheet-ico="columns" ${ro ? 'disabled' : ''}><option value="">${tr('Unassigned')}</option>${secs.map(s => `<option value="${s.id}" ${s.id === t.section_id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>` : ''}
         <label>${tr('Link')}</label>${linkField(t, ro)}
         ${collab() && (shared || t.assignee_id) ? `<label for="d-assignee">${tr('Assignee')}</label><select id="d-assignee" data-sheet-av ${ro || !canAssign(t) ? 'disabled' : ''}><option value="">${tr('Nobody')}</option>${assigneeOpts(t, l)}</select>${myGroup(t.assignee_group_id) ? `<button class="btn sm dtake" data-act="take" type="button">${ic('check', 's')} ${tr('Take it')}</button>` : ''}` : ''}
         ${t.id > 0 && !t.context ? aiuTaskLine(t) : ''}
@@ -328,8 +337,8 @@ function renderDetail0() {
       ${ck || ro ? '' : [[0, 'sun', tr('Today')], [1, 'sunrise', tr('Tomorrow')]].map(([n, i, lab]) => `<button class="iconbtn dq ${t.due === addDays(today(), n) ? 'on' : ''}" data-act="due-q" data-d="${n}" data-id="${t.id}" title="${esc(kt(tr('Due: {0}', lab), n ? 'Shift+T' : 't'))}" aria-label="${esc(tr('Due: {0}', lab))}">${ic(i, 's')}<span class="dql">${esc(lab)}</span></button>`).join('')}
       ${ck ? '' : '<span class="dbr" aria-hidden="true"></span>'}<span class="spacer"></span>
       ${ro ? (t.context ? `<span class="rotag" title="${esc(tr('The main task of a subtask assigned to you: read-only, without notes, files and comments'))}">${ic('sub', 's')}${tr('Context')}</span>`
-        : `<span class="rotag" title="${esc(tr('View only, shared by {0}', l?.owner_name || ''))}">${ic('eye', 's')}${tr('View only')}</span>`) : `${ck ? '' : `<button class="iconbtn ${t.pinned ? 'on' : ''}" data-act="pin" data-id="${t.id}" title="${t.pinned ? tr('Unpin') : tr('Pin')}" aria-label="${tr('Pin')}" aria-pressed="${!!t.pinned}">${ic('pin')}</button>
-      <button class="iconbtn ${t.priority ? 'flag-' + t.priority : ''}" data-act="prio" data-id="${t.id}" aria-haspopup="menu" title="${esc(tr('Priority') + ': ' + prioWord(t.priority))}" aria-label="${esc(tr('Priority') + ': ' + prioWord(t.priority))}">${ic('flag')}</button>`}
+        : `<span class="rotag" title="${esc(tr('View only, shared by {0}', l?.owner_name || ''))}">${ic('eye', 's')}${tr('View only')}</span>`) : `${ck ? '' : `<button class="iconbtn ${t.pinned ? 'on' : ''}" data-act="pin" data-id="${t.id}" title="${t.pinned ? tr('Unpin') : tr('Pin')}" aria-label="${tr('Pin')}" aria-pressed="${!!t.pinned}">${ic('pin')}<span class="dpw dpin">${esc(t.pinned ? tr('Pinned') : tr('Pin'))}</span></button>
+      <button class="iconbtn ${t.priority ? 'flag-' + t.priority : ''}" data-act="prio" data-id="${t.id}" aria-haspopup="menu" title="${esc(tr('Priority') + ': ' + prioWord(t.priority))}" aria-label="${esc(tr('Priority') + ': ' + prioWord(t.priority))}">${ic('flag')}<span class="dpw">${esc(t.priority ? prioWord(t.priority) : tr('Priority'))}</span></button>`}
       <button class="iconbtn" data-act="task-menu" data-id="${t.id}" title="${tr('More')}" aria-label="${tr('More')}">${ic('dots')}</button>`}
       <button class="iconbtn dchatb" data-act="chat-unyield" title="${esc(tr('Chat'))}" aria-label="${esc(tr('Chat'))}">${ic('bot')}</button>
       <button class="iconbtn dclose" data-act="close-detail" title="${tr('Close (Esc)')}" aria-label="${tr('Close (Esc)')}">${ic('x')}</button>

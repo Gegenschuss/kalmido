@@ -139,7 +139,7 @@ function shareHtml(hint) {
 // the same rules; this mirrors them for the checkboxes. News of the events older than 2.1.0 lives in news_kinds, the rest
 // (every push, News of reply / follow / new tasks / approvals / follow-ups) in the setting "notify" (json).
 const NEWS_KINDS = [['mention', N_('Mentions of me')], ['assign', N_('Tasks assigned to me (or taken away)')], ['comment', N_('Comments on my tasks')],
-  ['unblock', N_('A task I wait on was completed')], ['share', N_('Lists shared with me')], ['status', N_('Project status changes')], ['complete', N_('Others completed my tasks')]];
+  ['unblock', N_('A task blocking mine was completed')], ['share', N_('Lists shared with me')], ['status', N_('Project status changes')], ['complete', N_('Others completed my tasks')]];
 const NOTIF_ROWS = [
   ['comment', N_('Comments on my tasks'), N_('tasks I created or am assigned to')],
   ['reply', N_('Replies to my comment'), N_('someone comments right after me')],
@@ -150,9 +150,9 @@ const NOTIF_ROWS = [
   ['complete', N_('Others completed my tasks')],
   ['status', N_('Project status changes')],
   ['share', N_('Lists shared with me')],
-  ['unblock', N_('A task I wait on was completed'), '', 'deps'],
+  ['unblock', N_('A task blocking mine was completed'), '', 'deps'],
   ['approval', N_('An agent waits for my approval'), '', 'agents'],
-  ['followup', N_('Follow-up day of a task waiting on external')],
+  ['followup', N_('Follow-up day of a task waiting on someone')],
   ['reminder', N_('Reminders'), N_('due dates of my tasks')],
   ['nag', N_('Repeated reminders'), N_('until the task is done; not during your quiet hours')],  // 2.7.0 (#413)
   ['usage', N_('An agent reached a usage limit'), N_('admins: 80 % and 100 % of a limit'), 'admin'],  // 2.1.1 (#326)
@@ -194,13 +194,16 @@ function notifMatrixHtml(s, hint) {
     ${rows.map(([r, n, d]) => `<div class="nmr" role="row"><span class="nml" role="cell">${tr(n)}${d ? `<small>${tr(d)}</small>` : ''}</span><span role="cell">${social ? box(r, 'news', n) : '<span class="nmna">–</span>'}</span><span role="cell">${box(r, 'push', n)}</span></div>`).join('')}</div>`;
 }
 // 2.24.0 (#910): what my files take (the storage quota of the server)
+// 2.25.0 (UX-56): when this device last matched the server, with "Sync now"
+const syncedTxt = () => OUT.q.length ? trn('{0} change waiting', '{0} changes waiting', OUT.q.length) : tr('Last synced: {0}', relTime(new Date(S.syncOk || Date.now()).toISOString()));
+const syncHtml = () => `<h4 id="s-sync-h">${tr('Sync')}</h4><div class="row"><label>${tr('This device')}</label><span id="s-synced" class="muted" role="status">${esc(syncedTxt())}</span><button type="button" class="btn sm" data-m="sync-now">${ic('sync', 's')} ${tr('Sync now')}</button></div>`;
 function storageHtml() {
-  const q = S.storage; if (!q) return '';
+  const q = S.storage; if (!q) return syncHtml();
   const pct = q.limit ? Math.min(100, q.pct) : 0;
   return `<h4 id="s-storage-h">${tr('Storage')}</h4>
     <div class="row"><label>${tr('Your files')}</label><span class="stoq ${esc(q.level)}">${q.limit ? `<span class="stobar" role="meter" aria-labelledby="s-storage-h" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><i style="width:${pct}%"></i></span>` : ''}<span>${esc(q.limit ? tr('{0} of {1} used', fmtSize(q.used), fmtSize(q.limit)) + (q.pool === 'org' ? ' · ' + tr('shared by the organisation') : '') : tr('{0} used · no limit', fmtSize(q.used)))}</span></span></div>
     ${q.level === 'warn' || q.level === 'high' ? `<div class="shint keep">${ic('alert', 's')} ${esc(tr('Almost full: from 100 % new files cannot be uploaded.'))}</div>` : ''}
-    ${q.level === 'full' ? `<div class="row"><span class="shint keep">${ic('alert', 's')} ${esc(tr('Your storage is full: new files cannot be uploaded.'))}</span>${q.support ? `<a class="btn sm pri" href="${esc(quotaMail(q))}">${ic('send', 's')} ${tr('Contact support')}</a>` : ''}</div>` : ''}`;
+    ${q.level === 'full' ? `<div class="row"><span class="shint keep">${ic('alert', 's')} ${esc(tr('Your storage is full: new files cannot be uploaded.'))}</span>${q.support ? `<a class="btn sm pri" href="${esc(quotaMail(q))}">${ic('send', 's')} ${tr('Contact support')}</a>` : ''}</div>` : ''}${syncHtml()}`;
 }
 function accountHtml() {
   const m = S.me, pw = m.auth === 'session' || m.has_password;
@@ -1088,8 +1091,11 @@ const PURPOSES = [['me', 'user', N_('For me'), N_('Your own tasks: lists, remind
 const PURPOSE_MODS = {me: ['cal', 'events', 'contacts'],
   home: ['cal', 'events', 'contacts', 'habits', 'contracts', 'home', 'care', 'health', 'review', 'travel', 'reading'],
   family: ['cal', 'habits', 'comments', 'collab', 'family', 'events', 'contacts', 'contracts', 'home', 'travel'],
-  team: ['cal', 'timeline', 'matrix', 'kanban', 'habits', 'pomo', 'stats', 'comments', 'collab', 'time', 'progress', 'deps', 'fields', 'events', 'contacts'],
-  software: ['cal', 'timeline', 'matrix', 'kanban', 'habits', 'pomo', 'stats', 'comments', 'collab', 'time', 'progress', 'deps', 'fields', 'events', 'contacts']};
+  // 2.25.0 (UX-25): Team / Software hold only what the name promises (no habits, focus timer, matrix, statistics)
+  team: ['cal', 'timeline', 'kanban', 'comments', 'collab', 'time', 'progress', 'deps', 'fields', 'events', 'contacts'],
+  software: ['cal', 'timeline', 'kanban', 'comments', 'collab', 'time', 'progress', 'deps', 'fields', 'events', 'contacts']};
+// every module a purpose switches (on or off); the rest (agents, Paperless, clients …) stays as it is (server: PURPOSE_MODS)
+const PURPOSE_ALL = ['cal', 'timeline', 'matrix', 'kanban', 'habits', 'pomo', 'stats', 'comments', 'collab', 'time', 'progress', 'deps', 'fields', 'family', 'events', 'contacts', 'contracts', 'home', 'care', 'health', 'review', 'travel', 'reading'];
 // First-run setup, step 2 ("What do you want to use?"): only right after the first admin was created, never on
 // existing installs. Three presets (1.2: "Simple list"; "Just me" preselected; "Projects & team" = everything), then
 // the single modules to fine-tune. Collaboration + time tracking are the instance switches; the other modules
@@ -1100,9 +1106,9 @@ const SETUP_MODS = [['cal', N_('Calendar'), N_('Month, week and day view of your
   ['events', N_('Events'), N_('Appointments in your own calendars next to the tasks, shared calendars, invitations, synced with the phone’s calendar')],
   ['contacts', N_('Contacts'), N_('Your address books: contacts linked to tasks and events, birthdays, synced with the phone’s contacts')],
   ['matrix', N_('Eisenhower matrix'), N_('Urgent and important in four quadrants')], ['kanban', N_('Kanban'), N_('Lists as boards with columns')],
-  ['habits', N_('Habits'), N_('Daily and weekly habits with streaks')], ['pomo', N_('Focus (Pomodoro)'), N_('Focus timer and stopwatch')],
-  ['stats', N_('Statistics'), N_('Completions, on-time rate, focus time and streaks')], ['progress', N_('Project progress'), N_('Progress per list and a “Where is it stuck?” overview')],
-  ['deps', N_('Dependencies'), N_('Tasks that wait on other tasks, with arrows in the timeline (Gantt)')], ['fields', N_('Custom fields'), N_('Own fields per list, such as budget, client or phase')],
+  ['habits', N_('Habits'), N_('Daily and weekly habits with streaks')], ['pomo', N_('Focus timer'), N_('Pomodoro timer and stopwatch')],
+  ['stats', N_('Statistics'), N_('Completions, on-time rate, focus time and streaks')], ['progress', N_('Project progress'), N_('Progress per list and the project status (“Where is it stuck?”)')],
+  ['deps', N_('Dependencies'), N_('Tasks blocked by other tasks, with arrows in the timeline (Gantt)')], ['fields', N_('Custom fields'), N_('Own fields per list, such as budget, client or phase')],
   ['paperless', N_('Paperless link'), N_('Link documents from Paperless-ngx to tasks')],
   ['comments', N_('Comments'), N_('Timestamped notes on your tasks; in shared lists with collaboration also @mentions and News')],
   ['family', N_('Family'), N_('Birthdays, household chores taking turns, shopping lists with shop areas, a meal plan, deadlines, packing lists and accounts for children')]];
@@ -1110,6 +1116,13 @@ const SETUP_MODS = [['cal', N_('Calendar'), N_('Month, week and day view of your
 // answers to "What do you use Kalmido for?" (For me = the simple start, Family, Team, Software projects)
 const SETUP_PRESETS = Object.fromEntries(PURPOSES.map(([k, i, n, d]) => [k, {name: n, icon: i, desc: d,
   off: [...SETUP_MAIN, ...SETUP_MODS].map(x => x[0]).filter(x => x !== 'paperless' && !PURPOSE_MODS[k].includes(x))}]));
+// 2.25.0 (UX-19): the same count as Settings > Modules: what is picked here against every module (the ones not offered
+// here, such as Home & life or Clients, start off and are switched on later in Settings > Modules)
+function setupCount(picked, pl) {
+  const here = SETUP_MAIN.length + SETUP_MODS.filter(([k]) => k !== 'paperless' || pl).length, all = MOD_GROUPS.flatMap(([, ks]) => ks).filter(k => k !== 'paperless' || pl).length;
+  const on = [...picked].filter(k => k !== 'paperless' || pl).length;
+  return all > here ? tr('{0} of {1} modules on · {2} more in Settings > Modules', on, all, all - here) : tr('{0} of {1} modules on', on, all);
+}
 async function setupChoices(el, logo) {
   let st = {};
   try { st = await (await fetch('/api/state', {headers: {'X-Requested-With': 'kalmido'}})).json(); } catch { /* offline: defaults */ }
@@ -1142,7 +1155,7 @@ async function setupChoices(el, logo) {
       <p class="muted">${tr('Pick a start, untick what you do not need. Everything can be changed later in Settings.')}</p>
       <div class="supresets">${Object.entries(SETUP_PRESETS).map(([k, p]) => `<button type="button" class="supreset ${matches(k) ? 'on' : ''}" data-su-preset="${k}" aria-pressed="${matches(k)}"><b>${ic(p.icon, 's')}${tr(p.name)}</b><small class="muted">${tr(p.desc)}</small></button>`).join('')}</div>
       ${askOrg && ['team', 'software'].includes(preset) ? `<h3><label for="su-org">${tr('Name of your team or company')} <span class="muted">${tr('(optional)')}</span></label></h3><input id="su-org" class="suorg" maxlength="60" value="${esc(orgName)}" placeholder="${esc(tr('e.g. your company'))}"><p class="muted">${tr('Shown next to the app name and in invitations. You can change it later in Settings > Administration > Organisation.')}</p>` : ''}
-      <details class="sucust" ${custOpen ? 'open' : ''}><summary>${tr('Customize…')} <span class="muted">${tr('{0} of {1} modules on', [...picked].filter(k => k !== 'paperless' || pl).length, SETUP_MAIN.length + SETUP_MODS.filter(([k]) => k !== 'paperless' || pl).length)}</span></summary>
+      <details class="sucust" ${custOpen ? 'open' : ''}><summary>${tr('Customize…')} <span class="muted">${esc(setupCount(picked, pl))}</span></summary>
       <div class="suse-main">${SETUP_MAIN.map(row).join('')}</div>
       <div class="suse-list">${SETUP_MODS.filter(([k]) => k !== 'paperless' || pl).map(row).join('')}</div></details>
       <h3 id="su-start-h">${tr('Start with')}</h3>
@@ -1158,7 +1171,7 @@ async function setupChoices(el, logo) {
     const c = e.target.closest('[data-use]'); if (!c) return;
     c.checked ? picked.add(c.dataset.use) : picked.delete(c.dataset.use);
     $$('[data-su-preset]', el).forEach(b => { b.classList.toggle('on', matches(b.dataset.suPreset)); b.setAttribute('aria-pressed', matches(b.dataset.suPreset)); });
-    const sm = $('.sucust summary .muted', el); if (sm) sm.textContent = tr('{0} of {1} modules on', [...picked].filter(k => k !== 'paperless' || pl).length, SETUP_MAIN.length + SETUP_MODS.filter(([k]) => k !== 'paperless' || pl).length);
+    const sm = $('.sucust summary .muted', el); if (sm) sm.textContent = setupCount(picked, pl);
   });
   el.addEventListener('click', async e => {
     const b = e.target.closest('button'); if (!b) return;

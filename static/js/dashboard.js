@@ -15,7 +15,9 @@ function newsGroups(items) {
     const key = it.task_id && !(it.tasks || []).length ? 't' + it.task_id : it.list_id && ['share', 'role', 'unshare', 'owner', 'status'].includes(it.kind) ? 'l' + it.list_id : 'k' + it.kind + (it.kind === 'comment' ? it.actor_id : '');
     if (!groups.has(key)) groups.set(key, {key, items: [], needs: false, unread: 0, at: it.created_at});
     const g = groups.get(key);
-    g.items.push([it, i]); if (NEWS_NEEDS.includes(it.kind)) g.needs = true; if (!it.read) g.unread++;
+    // 2.25.0 (UX-45): a comment that names me (@me) needs me too, like a mention
+    const toMe = it.kind === 'comment' && S.me && (it.excerpt || '').includes(`<@${S.me.id}>`);
+    g.items.push([it, i]); if (NEWS_NEEDS.includes(it.kind) || toMe) g.needs = true; if (!it.read) g.unread++;
   }
   return [...groups.values()];
 }
@@ -38,7 +40,9 @@ function newsGroupHtml(g, pop) {
   const exp = S.nf.openG === g.key;
   return `<div class="ngroup ${g.unread ? 'unread' : ''} ${g.needs ? 'needs' : ''}" data-gk="${esc(g.key)}">
     <div class="nghead"><div class="ngav">${actors.map(a => av(a, uname(a, U), 'avatar sm')).join('')}</div>
-      <div class="ngmain" role="button" tabindex="0" ${open} ${g.items.length > 1 ? `aria-expanded="${exp}"` : ''}><div class="ngt">${title}${g.items.length > 1 ? `<span class="ngn">${g.items.length}</span>` : ''}</div><div class="ngs muted">${esc(newsSummaryLine(g))} · <time>${esc(relTime(g.at))}</time></div></div>
+      <div class="ngmain" role="button" tabindex="0" ${open} ${g.items.length > 1 ? `aria-expanded="${exp}"` : ''}><div class="ngt">${title}${g.items.length > 1 ? `<span class="ngn">${g.items.length}</span>` : ''}</div><div class="ngs muted">${esc(newsSummaryLine(g))} · <time>${esc(relTime(g.at))}</time></div>${(() => {  // 2.25.0 (UX-45): what was written, one line
+        const ex = g.items.map(([it]) => it).find(it => (it.kind === 'mention' || it.kind === 'comment') && it.excerpt);
+        return ex ? `<div class="nexc ngex">${newsExcerpt(ex.excerpt, U)}</div>` : ''; })()}</div>
       ${g.unread ? `<button type="button" class="iconbtn" data-act="news-gread" data-ids="${ids.join(',')}" title="${esc(tr('Mark read'))}" aria-label="${esc(tr('Mark read') + ': ' + title.replace(/<[^>]+>/g, ''))}">${ic('check', 's')}</button>` : ''}</div>
     ${exp && g.items.length > 1 ? `<div class="nlist ngitems">${g.items.map(([it, i]) => newsItemHtml(it, i, pop)).join('')}</div>` : ''}</div>`;
 }
@@ -170,7 +174,7 @@ function viewHome() {
   const {order, hidden} = dashPref();
   const greet = (() => { const h = new Date().getHours(); return h < 11 ? tr('Good morning, {0}', S.me?.display_name || '') : h < 18 ? tr('Hello, {0}', S.me?.display_name || '') : tr('Good evening, {0}', S.me?.display_name || ''); })();
   if (S.dash.custom) {
-    return `<div class="dash"><div class="dashhead"><h2>${tr('Customize the dashboard')}</h2><span class="spacer"></span><button type="button" class="btn sm pri" data-act="dash-done">${tr('Done')}</button></div>
+    return `<div class="dash"><div class="dashhead"><h2>${tr('Customize the start page')}</h2><span class="spacer"></span><button type="button" class="btn sm pri" data-act="dash-done">${tr('Done')}</button></div>
       <ol class="dcust" aria-label="${esc(tr('Cards'))}">${order.map((k, i) => { const [_, n, icon] = DASH.find(d => d[0] === k); return `<li data-k="${k}">${ic(icon, 's')}<span class="dcl">${tr(n)}</span>
         <button type="button" class="iconbtn" data-act="dash-mv" data-k="${k}" data-d="-1" ${i ? '' : 'disabled'} aria-label="${esc(tr('Move up') + ': ' + tr(n))}">${ic('up', 's')}</button>
         <button type="button" class="iconbtn" data-act="dash-mv" data-k="${k}" data-d="1" ${i < order.length - 1 ? '' : 'disabled'} aria-label="${esc(tr('Move down') + ': ' + tr(n))}">${ic('down', 's')}</button>
@@ -219,7 +223,7 @@ function mailHtml(j) {
     ${own.length ? `<div class="row"><label for="mail-list">${tr('For a list')}</label><select id="mail-list" data-native>${own.map(l => `<option value="${l.id}">${esc(lname(l))}</option>`).join('')}</select><button type="button" class="btn sm" data-mail="newlist">${ic('plus', 's')} ${tr('Create')}</button></div>` : ''}
     <div class="shint">${tr('Subject = title, the text = description, attachments become files. Keep the address secret: whoever knows it can add tasks.')}</div>
     <div class="row"><label></label>${mchk('s-mailme', j.from_me, tr('Mails from my own address ({0}) to {1} go to my inbox', j.email || tr('none set'), j.plain))}</div>`
-    : `<div class="shint">${tr('Not set up on this server: an admin sets KALMIDO_MAIL_ADDRESS and KALMIDO_IMAP_* (see the README).')}</div>`;
+    : `<div class="shint">${S.me?.is_admin ? tr('Not set up on this server: an admin sets KALMIDO_MAIL_ADDRESS and KALMIDO_IMAP_* (see the README).') : tr('Not set up on this server yet. Ask your admin.')}</div>`;  // 2.25.0 (UX-20): server details only for admins
 }
 function mailDigestHtml(j) {
   if (!j) return '';

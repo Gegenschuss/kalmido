@@ -327,7 +327,10 @@ function swipeEnd(e) {
   if (dx > 90) toggleTask(id);
   // 2.24.0 (UX-09 / UX-14 / UX-37): the short menu names its task, keeps the order of the task menu (date, list, …) and ends
   // with "All…"; "Move to list…" sorts the inbox
-  else if (dx < -90) snoozeSheet(id, r, ['-', moveListItem(r, id), {label: tr('Completed'), icon: 'done', fn: () => toggleTask(id)}, {label: tr('All…'), icon: 'dots', fn: () => taskMenu(r, id)}, '-', {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => deleteTask(id)}], true);
+  else if (dx < -90) {  // 2.25.0 (UX-37): emptying the inbox = putting tasks into lists: there "Move to list…" leads the menu
+    const inb = S.tasks.get(id)?.list_id === inbox()?.id;
+    snoozeSheet(id, r, ['-', ...(inb ? [] : [moveListItem(r, id)]), {label: tr('Completed'), icon: 'done', fn: () => toggleTask(id)}, {label: tr('All…'), icon: 'dots', fn: () => taskMenu(r, id)}, '-', {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => deleteTask(id)}], true, inb ? [moveListItem(r, id), '-'] : []);
+  }
 }
 document.addEventListener('touchend', swipeEnd);
 document.addEventListener('touchcancel', swipeEnd);
@@ -494,7 +497,11 @@ function endTouchDrag(e) {
   $$('.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
   if (el) dropTask(st.id, el, st.ly);
   else if (st.ly == null && st.r.closest('#view') && isKanban() && S.sections.some(x => x.list_id === S.tasks.get(st.id)?.list_id)) sectionPicker(st.r, st.id);  // held without moving: "Move to column…"
-  else if (st.ly == null && st.r.matches('#view .trow') && !isKanban()) { S.multiMode = true; S.multi.add(st.id); S.multiLast = st.id; render(); }  // 2.13.0 (#453 A14): long press = select
+  else if (st.ly == null && st.r.matches('#view .trow') && !isKanban()) {  // 2.25.0 (UX-11): long press = the task's menu, "Select" first
+    const t = taskById(st.id);
+    if (!S.multiMode && t && t.id > 0 && canEdit(t)) taskMenu(st.r.querySelector('.ttl') || st.r, st.id, {select: true});
+    else { S.multiMode = true; S.multi.add(st.id); S.multiLast = st.id; render(); }  // in a selection: one more
+  }
 }
 document.addEventListener('touchend', endTouchDrag);
 document.addEventListener('touchcancel', endTouchDrag);

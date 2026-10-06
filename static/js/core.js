@@ -49,19 +49,19 @@ const S = {
   calMode: LS.get('calMode', 'month'), tlStart: null, quickPreset: {}, editContent: false,
   tl: {id: null}, drafts: {}, cfiles: {}, cedit: null, editLink: false,  // comments timeline of the open task
 };
-const FEATS = [['cal', N_('Calendar')], ['timeline', N_('Timeline')], ['matrix', N_('Eisenhower matrix')], ['habits', N_('Habits')], ['pomo', N_('Focus (Pomodoro)')], ['kanban', N_('Kanban')], ['paperless', N_('Paperless link')], ['collab', N_('Collaboration')], ['stats', N_('Statistics')], ['time', N_('Time tracking')], ['progress', N_('Project progress')], ['deps', N_('Dependencies')], ['fields', N_('Custom fields')], ['agents', N_('Agents')], ['comments', N_('Comments')], ['family', N_('Family')], ['events', N_('Events')], ['contacts', N_('Contacts')],
+const FEATS = [['cal', N_('Calendar')], ['timeline', N_('Timeline')], ['matrix', N_('Eisenhower matrix')], ['habits', N_('Habits')], ['pomo', N_('Focus timer')], ['kanban', N_('Kanban')], ['paperless', N_('Paperless link')], ['collab', N_('Collaboration')], ['stats', N_('Statistics')], ['time', N_('Time tracking')], ['progress', N_('Project progress')], ['deps', N_('Dependencies')], ['fields', N_('Custom fields')], ['agents', N_('Agents')], ['comments', N_('Comments')], ['family', N_('Family')], ['events', N_('Events')], ['contacts', N_('Contacts')],
   // 2.22.0 (#663): Home & life, each off by default
   ['contracts', N_('Contracts')], ['home', N_('Home & devices')], ['care', N_('Staying in touch')], ['health', N_('Health')], ['review', N_('Review & journal')], ['travel', N_('Travel')], ['reading', N_('Read later')],
   // 2.23.0 (#463): package "Team, family, clients", each off by default
   ['clients', N_('Clients')], ['workload', N_('Workload')], ['forms', N_('Forms')]];
-const FEAT_DESC = {deps: N_('“Waiting on” in the task details, arrows and linking in the timeline, what is stuck in the overview, a notice when a task is unblocked'),
+const FEAT_DESC = {deps: N_('“Blocked by” in the task details, arrows and linking in the timeline, what is stuck in the project status, a notice when a task is unblocked'),
   fields: N_('Own fields per list (text, number, selection, date, person, link), as columns and in the task details'),collab: N_('Comments, activity history, @mentions, News, sharing lists and assigning tasks'), stats: N_('Completed tasks, on-time rate, overdue trend, focus time and habit streaks'),
   time: N_('Timer on tasks, manual entries, reports per list and task, CSV export and a printable timesheet'),
   clients: N_('Clients above the lists: contact, hourly rate, budget in hours or money, estimate vs. actual and the timesheet per client and month (only within your organisation)'),
   workload: N_('How much each person of your organisation has on their plate per week, against their hours per week'),
   forms: N_('A link with a small form (requests, bug reports) that creates a task in a list; agents can sort it in'),
   agents: N_('A tab with the agents (AI assistants, bots) you share lists with: their status, jobs to approve and the chat'),
-  progress: N_('Progress bar in the list header and the “Where is it stuck?” overview; with collaboration also a project status per list')};
+  progress: N_('Progress bar in the list header and the project status (“Where is it stuck?”); with collaboration also a status per list')};
 const feat = f => (S.settings.features ?? FEATS.map(x => x[0]).join(',')).split(',').includes(f);
 // collaboration off (own switch, or the admin's switch for the whole server): no comments / activity / mentions /
 // sharing / assigning in the UI (data stays; with the server switch off the API refuses them too)
@@ -238,9 +238,17 @@ async function rawFetch0(method, url, body) {
   return j;
 }
 const queueable = (method, url) => method !== 'GET' && /^\/api\/(tasks|habits\/\d+\/log|time\/(start|stop|entries))/.test(url) && !/\/(comments|seen|timeline)$/.test(url);
+// 2.25.0 (UX-56): a write of the open task that reached the server shows "Saved" in its header for a moment
+function savedPing() {
+  const top = S.sel && $('#detail .dtop'); if (!top) return;
+  let el = $('.dsaved', top);
+  if (!el) { el = document.createElement('span'); el.className = 'dsaved'; el.setAttribute('role', 'status'); (top.querySelector('.spacer') || top.lastElementChild).after(el); }
+  el.innerHTML = `${ic('check', 's')}<span>${esc(tr('Saved'))}</span>`; el.classList.add('on');
+  clearTimeout(savedPing.t); savedPing.t = setTimeout(() => el.classList.remove('on'), 1600);
+}
 async function api(method, url, body) {
   if (queueable(method, url) && !(body instanceof FormData) && OUT.q.length) return enqueue(method, url, body);
-  try { return await rawFetch(method, url, body); }
+  try { const j = await rawFetch(method, url, body); if (method !== 'GET' && S.sel && new RegExp(`^/api/tasks/${S.sel}(/|$)`).test(url)) savedPing(); return j; }
   catch (e) {
     if (e instanceof Offline) {
       if (queueable(method, url) && !(body instanceof FormData)) return enqueue(method, url, body);
@@ -321,7 +329,7 @@ async function flush() {
   OUT.flushing = true;
   const fix = v => (typeof v === 'number' && v < 0 && idmap[v]) ? idmap[v] : v;
   const idmap = LS.get('idmap', {});
-  let dropped = 0, skipped = 0;
+  let dropped = 0, skipped = 0, sent = 0;
   try {
     while (OUT.q.length) {
       const e = OUT.q[0];
@@ -339,6 +347,7 @@ async function flush() {
       }
       try {
         const j = await rawFetch(e.method, url, body);
+        sent++;
         if (e.tmp) { idmap[e.tmp] = j.id; HIST.ids[e.tmp] = j.id; LS.set('idmap', idmap); if (S.sel === e.tmp) S.sel = j.id; }
         if (j && j.conflicts?.length) {
           // 2.13.0: a "conflict" with a text this device sent itself (its answer got lost) is replayed on top of it
@@ -349,7 +358,7 @@ async function flush() {
         if (j && j.skipped) skipped++;
         e.res = j;
       } catch (err) {
-        if (err instanceof Offline || err.message === 'auth') return;
+        if (err instanceof Offline || err.message === 'auth') { if (err instanceof Offline) flushSoon(); return; }  // 2.25.0 (UX-55): try again in 2 s
         console.warn('outbox: dropped', e, err);  // e.g. 404: deleted on another device
         dropped++; e.res = null;
       }
@@ -359,13 +368,25 @@ async function flush() {
     LS.set('idmap', {});
   } finally {
     OUT.flushing = false;
+    if (sent && !OUT.q.length && globalThis.document) { S.syncOk = Date.now(); staleDraw(); }  // 2.25.0 (UX-55): the "waiting" chip goes at once
     renderTop();
+    if (sent && !OUT.q.length && !dropped && !skipped) savedChip();
     if (dropped) setTimeout(() => toast(trn('{0} offline change not applied (task deleted or invalid)', '{0} offline changes not applied (task deleted or invalid)', dropped)), 400);
     else if (skipped) setTimeout(() => toast(tr('Recurring task was already checked off, not advanced twice')), 400);
   }
   await load(); render();
 }
 window.addEventListener('online', () => flush());
+// 2.25.0 (UX-55): after waiting changes went out: "All saved ✓" for a moment where the "waiting" chip was (not as a toast,
+// which would push away an Undo that is still on screen)
+function savedChip() {
+  let el = $('#savedok');
+  if (!el) { el = document.createElement('div'); el.id = 'savedok'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
+  el.innerHTML = `${ic('check', 's')}<span>${esc(tr('All saved'))}</span>`; el.classList.add('on');
+  clearTimeout(savedChip.t); savedChip.t = setTimeout(() => el.classList.remove('on'), 2500);
+}
+// 2.25.0 (UX-55): while changes wait, the server is asked again every 2 s (not only on the 4 s poll)
+function flushSoon() { if (flushSoon.t) return; flushSoon.t = setTimeout(() => { flushSoon.t = null; if (globalThis.document && OUT.q.length && !document.hidden) flush(); }, 2000); }
 
 // ------------------------------------------------------------------ conflicts (edited here and elsewhere)
 S.conflicts = LS.get('conflicts', []);
@@ -622,7 +643,7 @@ const SMART = {
   tomorrow: {name: N_('Tomorrow'), icon: 'sunrise'},
   week: {name: N_('Next 7 days'), icon: 'week'},
   doable: {name: N_('Now doable'), icon: 'zap'},  // 1.7.0
-  waiting: {name: N_('Waiting on external'), icon: 'hourglass'},  // 2.1.0 (#335)
+  waiting: {name: N_('Waiting on someone'), icon: 'hourglass'},  // 2.1.0 (#335)
   pinned: {name: N_('Pinned|view'), icon: 'pin'},  // 2.16.0 (#648): every pinned task of every list
   assigned: {name: N_('Assigned to me'), icon: 'user'},
   all: {name: N_('All'), icon: 'all'},
@@ -666,7 +687,7 @@ async function route() {
   if (S.me?.kid && r.mod !== 'family' && !r.complete && !r.snooze) { r.mod = 'family'; r.key = 'family'; }  // 2.19.0 (#653): a kid's home
   if (!modOn(r.mod)) {  // e.g. the "News" app shortcut while collaboration is off
     const off = r.mod;
-    if (S.booted && (off === 'news' || off === 'stats' || off === 'time' || off === 'overview')) setTimeout(() => toast(off === 'news' ? tr('News are part of collaboration, which is off (Settings > Modules)') : off === 'time' ? tr('Time tracking is off (Settings > Modules)') : off === 'overview' ? tr('The overview needs “Project progress” (Settings > Modules) and at least two lists') : tr('Statistics are off (Settings > Modules)')), 50);
+    if (S.booted && (off === 'news' || off === 'stats' || off === 'time' || off === 'overview')) setTimeout(() => toast(off === 'news' ? tr('News are part of collaboration, which is off (Settings > Modules)') : off === 'time' ? tr('Time tracking is off (Settings > Modules)') : off === 'overview' ? tr('The project status needs “Project progress” (Settings > Modules) and at least two lists') : tr('Statistics are off (Settings > Modules)')), 50);
     r.mod = 'tasks'; r.key = LS.get('lastKey', START_KEY);
   }
   if (r.key.startsWith('f:') && !S.filters.some(f => f.id === +r.key.slice(2))) r.key = START_KEY;

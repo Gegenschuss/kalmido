@@ -7,6 +7,58 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.25.0] - 2026-10-06
+
+**In short:** Usability, part 2 (#827). One word per thing across the app, the help, the tour, the API texts and all six
+languages; a sidebar you arrange yourself; settings that start with an overview on phones; menus that only offer what
+works; a calmer first start for people who are invited; and the app says when your changes are saved.
+
+### Changed
+- **Words** (in every language): the sidebar group with Inbox and Today is *Plan*, the module is the *Focus timer*; the
+  dashboard is *Start*, the cross-project view *Project status* and a project's own tab the *Project page*; a task waits
+  on **someone** (with a day to *follow up on*) or is **blocked by** another task (dependencies); *Columns…* is *Shown
+  fields…*. API and MCP names stay the same, their descriptions follow.
+- **One button "Waiting on…"** in the task panel: another task (blocked by) or someone outside (with a follow-up day).
+- **The path on top of a task** is where you move it: a tap on its list or section opens *Open*, *Move to list…* and
+  *Move to section…*; the list and section fields below are gone.
+- **Long press** on a task opens its menu with *Select* first (it started a selection before); swiping left in the inbox
+  starts with *Move to list…*.
+- **Sort mode** of the lists: full names, a grip to drag by (touch: right away), one *…* per list (up, down, folder) and a
+  bar *Sort lists – Done* on top. A project's progress is a thin line under its name instead of "0 %".
+- **List menu**: the same in the sidebar and the header, only what works there (no *Edit list* or project switch in the
+  inbox, undo / redo only when there is something to undo), *Delete…* for every list (it is archived first, then
+  deleted, after a confirmation that names what is lost). List or project is the switch *Project features* in *Edit list*.
+- **Settings**: on a phone they open with an overview of the areas and what is in each; *General* is grouped by what the
+  switches do (one label each); *Modules* fold into groups that say "3 of 4 on", and the setup counts the same way;
+  *Integrations* start with three plain tasks (calendar on your phone, share from your phone, send by e-mail) and keep
+  server details for admins; *Notifications* say on top whether this device rings, with *Turn on* / *Send test*.
+- **First start**: the tour only explains (the sample project is offered on its last card, no purpose or project type
+  questions); people who are added start with a lean sidebar (*more views* one tap away); the packages *Team* and
+  *Software* hold only what their names promise, and changing the purpose lists what goes on, off and out of the tab bar;
+  the empty inbox names the + button on phones; *Skip to content* is translated before signing in.
+- **Quick add**: one way to add per view (no second *New task* button above the add bar), *Capture to the inbox* is
+  named so, the message after adding names the task and sits above the sheet, the two small buttons explain themselves once.
+- **Inbox** is always a plain list (no Kanban / Timeline switch, no *+ Section* while it is empty).
+- **Task panel**: the priority says its word next to the flag, *Pin* where there is room, Today / Tomorrow with words
+  from 360 px.
+- **News**: comments that name you count as *Needs you*, each item shows what was written, the bell's head reads
+  "4 new" with a small *All read*, and the bell explains what lands there; the team chat and News moved to the group
+  *Conversations* with the people; the command palette has *Message to …*.
+- **Saving**: "“Take out the bins” completed" names the task; changes that waited for the server are sent again every
+  2 seconds and end with *All saved*; the task header shows *Saved* after a change; *Settings > Account* shows when this
+  device last synced, with *Sync now*. *Now doable* and *Show completed at the bottom* (shopping and packing lists)
+  explain themselves once.
+
+### Fixed
+- **Lists in a shared folder** (#931): a list created inside a folder you share with people is now shared with them on
+  every path (a project of a built-in type or from a template, an agent's briefing, imports, family and home lists),
+  not only from the list dialog. Once at the start of 2.25.0, lists that came into a shared folder after it was shared
+  and missed it are shared afterwards; a list someone was taken off on purpose stays as it is.
+
+### Added
+- **Settings > Appearance > Sidebar**: move the groups up and down, hide a group with the eye, untick single entries of
+  *Plan* and *Views*; the same on every device (user setting `sidebar`).
+
 ## [2.24.1] - 2026-10-06
 
 - werkzeug 3.1.9 (security fix CVE-2026-102598)
@@ -2766,7 +2818,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.24.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.25.0...HEAD
+[2.25.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.25.0
 [2.24.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.24.1
 [2.24.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.24.0
 [2.23.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.23.0

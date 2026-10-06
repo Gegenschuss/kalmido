@@ -135,7 +135,7 @@ const lst = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)).l
   check(!d.querySelector('.lmodal .lrepo').hidden, 'a list that already has a repository keeps showing it');
   // 2.18.0 review (R1): arrow keys through the select save ONCE (on Enter / leaving it), one history step, the offer fits
   md = d.querySelector('.lmodal'); sel = md.querySelector('#l-ptype');
-  check(md.querySelector('label[for="l-kind"]')?.textContent === 'List or project', 'the kind row is "List or project" (not "Type" next to "Project type")');
+  check(/Project features/.test(md.querySelector('.lkrow')?.textContent || ''), 'the kind is the switch "Project features" (2.25.0; not "Type" next to "Project type")');
   const kd = (el, key) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key, bubbles: true, cancelable: true}));
   const h0 = w.eval('HIST.undo.length');
   sel.focus(); kd(sel, 'ArrowDown'); change(w, sel, 'agency'); kd(sel, 'ArrowDown'); change(w, sel, 'software'); await sleep(700);
@@ -167,7 +167,7 @@ const lst = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)).l
   // "…" menu: "As a list / As a project"
   w.eval(`[...document.querySelectorAll('.modal')].forEach(m => m.remove())`);
   const lmi = w.eval(`listMenuItems(${EM}).filter(x => x && x.label).map(x => x.label)`);
-  check(lmi.includes('As a list') && lmi.includes('As a project') && !lmi.some(x => /^Type:/.test(x)), 'list menu: "As a list / As a project" ' + lmi.join(' | '));
+  check(!lmi.includes('As a list') && !lmi.includes('As a project') && !lmi.some(x => /^Type:/.test(x)) && lmi.includes('Edit list…'), 'list menu: no type entries (2.25.0, UX-52) ' + lmi.join(' | '));
   w.close();
   for (const [u, may] of [['bob', true], ['carol', false], ['dave', false]]) {
     w = await boot({user: u, hash: 'l/' + L}); d = w.document;

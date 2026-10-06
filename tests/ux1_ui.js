@@ -100,7 +100,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   const mp = md.querySelector('[data-pane="modules"]');
   const rows = [...mp.querySelectorAll('[data-modrow]')];
   check(rows.length >= 12 && rows.every(r => r.querySelector('small')?.textContent.trim().length > 10), `every module with one sentence (${rows.length})`);
-  check([...mp.querySelectorAll('h4')].map(h => h.textContent).join('|') === 'Views|For you|Projects and team' || mp.querySelectorAll('h4').length >= 3, 'modules grouped');
+  check(mp.querySelectorAll('details.modgrp').length >= 3 && [...mp.querySelectorAll('details.modgrp')].every(g => /\d+ of \d+ on/.test(g.querySelector('summary').textContent)), 'modules grouped, folded, with "x of y on" (2.25.0)');
   check(mp.querySelector('#s-collaball') && mp.querySelector('#s-timeall'), 'admin: "for everyone" next to collaboration and time tracking');
   check(!md.querySelector('[data-pane="users"] #s-collaball'), 'no second copy under Administration');
   check(mp.querySelector('[data-modrow="pomo"] details #s-pf') && mp.querySelector('[data-modrow="time"] details #s-trnd'), 'focus and time options folded under their module');
@@ -126,7 +126,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   w.eval(`openDetail(${milk})`); await sleep(300);
   const det = d.querySelector('#detail');
   check(det.querySelector('#d-title') && det.querySelector('#d-content')?.getAttribute('placeholder') === 'Description', 'item: title and description (2.7.2)');
-  check(det.querySelector('#d-sub') && det.querySelector('#d-list') && det.querySelector('[data-act="date"]') && det.querySelector('[data-act="prio"]'),
+  check(det.querySelector('#d-sub') && det.querySelector('[data-act="crumb-menu"][data-k="list"]') && det.querySelector('[data-act="date"]') && det.querySelector('[data-act="prio"]'),
     'full task: subtasks, list, date, priority (2.7.2)');
   check(!det.querySelector('#d-assignee'), 'not shared: no assignee');
   const m0 = (await st()).tasks.find(t => t.id === milk);
@@ -290,14 +290,14 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   await w.eval(`patchTask(${plan}, {priority: 5})`); await sleep(100);
   click(w, d.querySelector('#top [data-act="top-more"]')); await sleep(80);
   let items = [...d.querySelectorAll('#pop .menu-list button')];
-  check(items[0]?.textContent.startsWith('Undo: ') && items[1]?.textContent === 'Nothing to redo' && items[1].disabled, 'menu starts with "Undo: …", "Redo" disabled: ' + items.slice(0, 2).map(b => b.textContent));
+  check(items[0]?.textContent.startsWith('Undo: ') && !/redo/i.test(items[1]?.textContent || ''), 'menu starts with "Undo: …", no dead "Redo" row (2.25.0, UX-12): ' + items.slice(0, 2).map(b => b.textContent));
   check(items.some(b => /Select multiple/.test(b.textContent)) && items.some(b => /Sort/.test(b.textContent)) && items.some(b => /Edit list/.test(b.textContent)), 'then select, sort and the list menu');
   click(w, items[0]);
   check(await until(async () => (await st()).tasks.find(t => t.id === plan).priority === 0), 'undo from the menu');
   await until(() => !w.eval('HIST.busy') && w.eval('HIST.redo.length') === 1);
   click(w, d.querySelector('#top [data-act="top-more"]')); await sleep(80);
   items = [...d.querySelectorAll('#pop .menu-list button')];
-  check(items[1]?.textContent.startsWith('Redo: ') && !items[1].disabled, '"Redo: …" offered');
+  check(items.some(b => b.textContent.startsWith('Redo: ') && !b.disabled) && !items.some(b => /^Undo: |Nothing to undo/.test(b.textContent)), '"Redo: …" offered, no dead "Undo" row');
   w.eval('closePop()');
   await closeW(w);
   // desktop keeps the arrows

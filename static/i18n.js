@@ -26,10 +26,12 @@ function uiLang() {
 }
 // load (or switch to) a language; resolves true when it is active. Offline: service worker cache,
 // then the copy of the last loaded language in localStorage.
+// 2.25.0 (UX-29): texts of the page shell outside the app's renders (the skip link on the setup / invitation pages)
+function i18nStatic() { const sk = document.getElementById('skip'); if (sk) sk.textContent = tr('Skip to content'); }
 function i18nLoad(code) {
   code = code || 'en';
-  if (code === I18N.code) return Promise.resolve(true);
-  if (code === 'en') { I18N = {code: 'en', dict: {}}; return Promise.resolve(true); }
+  if (code === I18N.code) { i18nStatic(); return Promise.resolve(true); }
+  if (code === 'en') { I18N = {code: 'en', dict: {}}; i18nStatic(); return Promise.resolve(true); }
   if (!/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(code)) return Promise.resolve(false);
   return I18N_PENDING[code] || (I18N_PENDING[code] = (async () => {
     try {
@@ -37,9 +39,10 @@ function i18nLoad(code) {
       if (!r.ok) throw new Error(r.status);
       I18N = {code, dict: await r.json()};
       try { localStorage.setItem(I18N_CACHE_KEY, JSON.stringify(I18N)); } catch { /* private mode */ }
+      i18nStatic();
       return true;
     } catch {
-      try { const c = JSON.parse(localStorage.getItem(I18N_CACHE_KEY)); if (c && c.code === code && c.dict) { I18N = c; return true; } } catch { /* none */ }
+      try { const c = JSON.parse(localStorage.getItem(I18N_CACHE_KEY)); if (c && c.code === code && c.dict) { I18N = c; i18nStatic(); return true; } } catch { /* none */ }
       return false;
     } finally { delete I18N_PENDING[code]; }
   })());

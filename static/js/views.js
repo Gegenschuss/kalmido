@@ -139,7 +139,7 @@ const flowTie = (a, b) => (a.start || a.due || '9999').localeCompare(b.start || 
 // inside the given set count (the lock of a task waiting on something outside stays). Kahn's algorithm, the ready task
 // with the smallest tie key first; a cycle falls back to the tie order for what is left (FLOW.cyc -> hint in the view)
 const FLOW = {cyc: false};
-const FLOW_WHY = N_('Waits on nothing open: the first task in the flow order (dependencies, then date, then priority).');
+const FLOW_WHY = N_('Blocked by nothing open: the first task in the flow order (dependencies, then date, then priority).');
 function flowSort(arr) {
   const ids = new Set(arr.map(t => t.id)), need = new Map(), after = new Map();
   for (const t of arr) {

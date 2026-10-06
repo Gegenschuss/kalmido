@@ -76,7 +76,7 @@ const menuItems = d => [...d.querySelectorAll('.menu-list [role="menuitem"]')];
   check((await call('alice', 'GET', `/api/tasks/${T2}`)).assignee_id === id.carol, 'parent keeps its assignee');
   w.eval('closeDetail()'); await sleep(200);
   // 2.14.0 (#425): the column is part of the list's columns ("Columns…", for every member); without it no assignee in the row
-  check(w.eval(`listMenuItems(${L}, document.body)`).some(x => x.label === 'Columns…'), 'list "…" offers Columns…');
+  check(w.eval(`listMenuItems(${L}, document.body)`).some(x => x.label === 'Shown fields…'), 'list "…" offers Columns…');
   await w.eval(`colSave(${L}, ['due'], true)`); await sleep(300);
   check(!d.querySelector(`.trow[data-id="${T3}"] .whob`) && !d.querySelector(`.trow[data-id="${T3}"] .who`), 'without the assignee column: no assignee in the row');
   await w.eval(`colSave(${L}, null, true)`); await sleep(300);
@@ -128,7 +128,7 @@ const menuItems = d => [...d.querySelectorAll('.menu-list [role="menuitem"]')];
   w.eval('closeDetail()');
   // own task detail: editable, but no delete / list change / assignee change
   w.eval(`openDetail(${T1})`); await sleep(900);
-  check(!d.querySelector('#d-title').readOnly && d.querySelector('#d-list').disabled && d.querySelector('#d-assignee').disabled, 'own task: editable, list + assignee locked');
+  check(!d.querySelector('#d-title').readOnly && !d.querySelector('#detail [data-act="crumb-menu"]') && d.querySelector('#d-assignee').disabled, 'own task: editable, list (path without a move menu, 2.25.0) + assignee locked');
   check(d.querySelector('#d-tl'), 'own task: comments');
   d.querySelector('#detail [data-act="task-menu"]').click(); await sleep(300);
   check(!menuItems(d).some(b => /^Delete$/.test(b.textContent.trim())), 'no Delete in the task menu');
@@ -149,7 +149,7 @@ const menuItems = d => [...d.querySelectorAll('.menu-list [role="menuitem"]')];
   check([...md.querySelector(`[data-mrole="${id.pete}"]`).options].map(o => o.textContent).join() === 'Admin,Mitglied,Teilnehmer,Betrachter', 'German role names');
   check(/Sieht nur die eigenen, zugewiesenen Aufgaben/.test(md.querySelector('.rolehelp').textContent), 'German explanations');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
-  check(w.eval(`listMenuItems(${L}, document.body)`).some(x => x.label === 'Spalten…'), 'German: Spalten… (2.14.0, was the assignee column toggle)');
+  check(w.eval(`listMenuItems(${L}, document.body)`).some(x => x.label === 'Angezeigte Felder…'), 'German: Spalten… (2.14.0, was the assignee column toggle)');
   w.close();
 
   const bad = errs.filter(e => !/Could not parse CSS/.test(e));

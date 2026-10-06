@@ -11,7 +11,7 @@ from ..core.db import body, bump, db, err, inbox_default, iso, local_now, now_ut
 from ..accounts.session import me
 from ..core.access import Denied, list_role, MANAGE_ROLES, my_inbox, my_max_sort, need_list, need_task
 from ..core.pages import valid_url
-from ..lists.lists import agent_autoshare, clean_color, clean_folder, LIST_KINDS
+from ..lists.lists import list_created, clean_color, clean_folder, LIST_KINDS
 from ..tasks.validation import (
     clean_reminders, clean_ticket_tpl, log_act, rr_feasible, rr_norm, rr_problem, TICKET_TPL, TICKET_TYPES, valid_date,
 )
@@ -447,7 +447,7 @@ def tpl_apply_list(c, uid, d, name, folder, start, end=None, color=None):
         if a in made and b_ in made:
             c.execute("INSERT OR IGNORE INTO task_deps(task_id,blocker_id,created_by,created_at) VALUES(?,?,?,?)",
                       (made[a], made[b_], uid, iso(now_utc())))
-    agent_autoshare(c, uid, lid)  # 2.4.2 (#391): project types + templates are new lists too
+    list_created(c, uid, lid)  # 2.4.2 (#391): project types + templates are new lists too; 2.25.0 (#931): + a shared folder's people
     return lid
 
 

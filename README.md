@@ -18,6 +18,12 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.25.0** (2026-10-06): Usability, part 2. **One word per thing** in every language (*Plan*, *Focus timer*, *Start*,
+  *Project status*, *Project page*, *Waiting on someone* vs. *Blocked by*, *Shown fields*); **a sidebar you arrange**
+  (groups up / down, hide groups and entries); **settings that start with an overview** on phones, modules in folded
+  groups, Integrations in plain words and a clear *does this device ring?*; **menus that only offer what works** (a long
+  press opens the task's menu, the path of a task moves it, *Delete…* in every list menu); a **calm first start** for
+  people who are invited; and the app says when your changes are **saved**.
 - **2.24.0** (2026-10-06): Usability. A **direct message** one tap away (person card, *Tasks of …*, team chat); your
   **own lists right below Inbox and Today**; **one task menu** in a fixed order; a calmer **Today**; the **assignee and
   the comments at the top** of a task; a **settings search** that finds buttons and helper texts; **Administration in
@@ -214,12 +220,12 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - Assign tasks and subtasks in shared lists, with an assignee column (pictures, one click to assign): reminders go to the assignee, plus an *Assigned to me* list
 - Comments on every task with @mentions and files, at the end of the task panel with the comment box always at the bottom edge (2.0.6: also as personal notes in private lists, own *Comments* module), an activity history (who changed what, when) and unread markers
 - A *News* inbox (bell icon with an unread badge): mentions, comments on your tasks, assignments, completions, unblocked tasks, status updates and lists shared with you, newest first; filter *Mentions & assigned to me* and *Unread only*
-- **Dependencies:** a task can wait on other tasks (also in other lists); it shows *waiting* until they are done, and its assignee gets a message when the last one is finished
-- **Waiting on external** (2.1.0): mark a task as waiting for someone outside (a client, an office, a delivery) with a note and a follow-up day (task menu > *Waiting on external…*). It shows an hourglass chip, sits in the smart view *Waiting on external*, and on the follow-up day you get a reminder and a News item, while agents that follow the task get the event `followup_due`. One click (the × on the bar in the task panel) ends it. API: `PUT` / `DELETE /api/v1/tasks/{id}/waiting`, `GET /api/v1/tasks?waiting=true`; MCP `set_waiting`, `clear_waiting`, `list_waiting`
-- **Project status and progress:** a progress bar per list, a status (*On track*, *At risk*, *Off track*, *On hold*, *Complete*) with a short note, and a *Where is it stuck?* overview of overdue, waiting and unassigned tasks across all lists
-- **Project overview:** every project list has a tab next to List / Kanban / Timeline with its description (Markdown), key links, milestones (also in the timeline), project files plus the files of its tasks, members, status updates and the tracked time
+- **Dependencies:** a task can be *blocked by* other tasks (also in other lists); it shows *blocked* until they are done, and its assignee gets a message when the last one is finished
+- **Waiting on someone** (2.1.0): mark a task as waiting for someone outside (a client, an office, a delivery) with a note and a follow-up day (task menu > *Waiting on someone…*, or *Waiting on…* in the task panel, which also offers *Another task*). It shows an hourglass chip, sits in the smart view *Waiting on someone*, and on the follow-up day you get a reminder and a News item, while agents that follow the task get the event `followup_due`. One click (the × on the bar in the task panel) ends it. API: `PUT` / `DELETE /api/v1/tasks/{id}/waiting`, `GET /api/v1/tasks?waiting=true`; MCP `set_waiting`, `clear_waiting`, `list_waiting`
+- **Project status and progress:** a progress bar per list, a status (*On track*, *At risk*, *Off track*, *On hold*, *Complete*) with a short note, and the **project status** (*Where is it stuck?*) with the overdue, blocked and unassigned tasks across all lists
+- **Project page:** every project list has a tab next to List / Kanban / Timeline with its description (Markdown), key links, milestones (also in the timeline), project files plus the files of its tasks, members, status updates and the tracked time
 - **Custom fields** per list: text, number (with unit), selection with colours, date, checkbox, person or link; shown as chips or columns, usable in filters, sorting and search
-- **Columns per list** (2.14): list *…* > *Columns…* (or the columns button in the list header) picks which columns the
+- **Shown fields per list** (2.14): list *…* > *Shown fields…* (or the button in the list header) picks which columns the
   rows show and in which order: task number, date, priority, assignee, tags, tracked time, subtasks, dependencies,
   created and the list's custom fields. The setting belongs to the list, so every member sees the same; the owner and
   list admins change it, *Default* goes back to the standard layout. Desktops show a title row above the columns; where
@@ -661,9 +667,9 @@ which answers with a short summary.
   they only change what you see, per device.
 - Items are kept for 90 days, at most 500 per person (`TASKS_NEWS_DAYS`, `TASKS_NEWS_MAX`).
 
-## Dashboard
+## Start page
 
-A tap on the logo (*Kalmido* at the top of the sidebar) opens the **dashboard**: what waits for you (approvals,
+A tap on the logo (*Kalmido* at the top of the sidebar) opens the **start page** (the dashboard): what waits for you (approvals,
 mentions, assignments), today's tasks (complete them right there), News bundled, the team chat, your projects with
 their progress, pinned tasks, recent notes, the agents, a few numbers and a search field. *Customize* orders the cards
 (↑ ↓, also with the keyboard) and hides the ones you do not need; the choice follows you to every device. It can also be
@@ -829,7 +835,7 @@ docs/API.md); agents cannot open direct messages.
 ## Notes
 
 Every list and project has **notes**: Markdown documents next to the tasks for meeting notes, briefings and decisions
-(list menu > *Notes*, the project overview). Title, tags, pinned notes first, a search field; typing saves by itself,
+(list menu > *Notes*, the project page). Title, tags, pinned notes first, a search field; typing saves by itself,
 *Read* shows the rendered text where `#123` links that task. Each note has its own address (`#note/<id>`, *Copy link*),
 moves to another list, and is found by the command field. Everyone who sees the whole list reads its notes (participants
 do not), owner, list admins and members write them; when someone else changed a note while you were typing, Kalmido shows
@@ -1252,23 +1258,23 @@ small **×** next to it (*Show progress* in the list's … menu or the list dial
 - **Phone:** the list names stay put while you scroll sideways, rows are taller, the filters scroll in one line.
 - Only the rows in view are drawn, so 50 projects with 1000 tasks stay smooth.
 
-- **Dependencies ("waiting on"):** in a task's panel, *Waiting on…* picks the tasks that have to be done first
-  (search over all your open tasks, also in other lists and shared lists), *Blocking…* the other way round.
-  Cycles and self-dependencies are refused. The task row shows *waiting* with the names of the open blockers;
-  completing a waiting task asks first. When the last blocker is done (or marked *won't do*), the waiting task
+- **Dependencies ("blocked by"):** in a task's panel, *Waiting on…* > *Another task* picks the tasks that have to be done
+  first (search over all your open tasks, also in other lists and shared lists), *Blocking…* the other way round.
+  Cycles and self-dependencies are refused. The task row shows *blocked* with the names of the open blockers;
+  completing a blocked task asks first. When the last blocker is done (or marked *won't do*), the waiting task
   gets an activity line and its assignee (or creator) a News item and a push: *Unblocked: Send invoice*. A blocker
   in the trash is ignored until it is restored; a recurring blocker stays open until its repetition ends.
-  *Settings > General > Projects* can hide waiting tasks from *Today*. If you lose access to a blocker, you see
+  *Settings > General > Today* can hide blocked tasks. If you lose access to a blocker, you see
   *a task you cannot see* (never its title) and can remove it.
 - **Progress:** the list header shows done vs. all main tasks (optionally subtasks too), overdue tasks and the next
   due date. It counts all time, leaves out *won't do* and the trash, and counts a recurring task once.
 - **Status** (with *Collaboration* on): the owner and editors set *On track*, *At risk*, *Off track*, *On hold* or
   *Complete* with a short note. It shows as a coloured pill in the list header, a dot in the sidebar and in the
   overview; everyone else in the list gets it in their News. Each list keeps a status history.
-- **Where is it stuck?** (sidebar, command bar or a pinned tab; shown once you have two lists or a shared one): per list
-  the status, the progress, overdue tasks grouped by assignee, waiting tasks and, in shared lists, tasks without an
+- **Project status** (*Where is it stuck?*; sidebar, command bar or a pinned tab; shown once you have two lists or a shared
+  one): per list the status, the progress, overdue tasks grouped by assignee, blocked tasks and, in shared lists, tasks without an
   assignee, with *Needs attention* to hide the calm ones. Everything is clickable.
-- **Project overview** (2.7.1, project lists only; a tab next to List / Kanban / Timeline, on phones in "…"): the place
+- **Project page** (2.7.1, project lists only; a tab next to List / Kanban / Timeline, on phones in "…"): the place
   for what belongs to the project as a whole. *Description* in Markdown; *Key links* (title + address, in your order,
   an icon from the address such as a repository or a design file, nothing is fetched from the linked site);
   *Milestones* (milestone tasks of the list, see below); *Project files* uploaded on the

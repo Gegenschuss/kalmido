@@ -81,19 +81,19 @@ const CONTRAST = `(() => {
   const today = d.querySelector('#side .srow[data-go="today"]');
   check(today && today.querySelector('.n').nextElementSibling?.classList.contains('c') && today.querySelector('.c').textContent.trim() === '2', 'counter right after the label (Today 2)');
   const lrow = d.querySelector(`#side .srow[data-list="${L}"]`);
-  check(lrow && lrow.classList.contains('on') && lrow.querySelector('.sw') && /\d+ %/.test(lrow.querySelector('.spct')?.textContent || ''), 'list row: dot, on, progress % of the project');
+  check(lrow && lrow.classList.contains('on') && lrow.querySelector('.sw') && /--p:\s*\d+%/.test(lrow.querySelector('.sprog')?.getAttribute('style') || '') && /done/.test(lrow.querySelector('.sprog')?.getAttribute('aria-label') || ''), 'list row: dot, on, the project\'s progress as a thin line (2.25.0, UX-07)');
   const team = d.querySelector('#side .sg-team');
   check(team && /Bob/.test(team.textContent) && /ClaudeDev/.test(team.textContent) && team.querySelector('.hdot.hs-working') && team.querySelector('.hdot.hs-offline'), 'team: people + agents with status dots');
   check(d.querySelector('#top .hms') && /Beta/.test(d.querySelector('#top .hms').textContent), 'milestone in the header');
-  check(d.querySelector('#top .cmdbar[data-act="palette"]') && d.querySelector('#top .tnew[data-act="new-task"]'), 'command bar + New task in the header');
+  check(d.querySelector('#top .cmdbar[data-act="palette"]') && !d.querySelector('#top .tnew[data-act="new-task"]') && d.querySelector('#view .qdock #qinput'), 'command bar; no second "New task" above the add bar (2.25.0, UX-32)');
   click(w, d.querySelector('#top .cmdbar')); await sleep(200);
   check(d.querySelector('.palette'), 'the command bar opens the palette');
   w.eval('closePalette()');
   click(w, d.querySelector('#side .scmd')); await sleep(200);
   check(d.querySelector('.palette'), 'the sidebar command bar opens it too');
   w.eval('closePalette()');
-  click(w, d.querySelector('#top .tnew')); await sleep(100);
-  check(d.activeElement && d.activeElement.id === 'qinput', 'New task focuses the add box');
+  w.eval("document.dispatchEvent(new KeyboardEvent('keydown', {key: 'n', bubbles: true}))"); await sleep(100);
+  check(d.activeElement && d.activeElement.id === 'qinput', 'n focuses the add box');
   // agent band
   const band = await until(() => d.querySelector('#view .agband .agb-w'));
   check(band, 'agent band with the waiting job');

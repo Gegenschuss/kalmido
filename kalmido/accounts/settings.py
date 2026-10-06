@@ -24,6 +24,7 @@ from ..personal.timetrack import BadInput
 
 SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "review_sent", "ntfy_topic", "features_rev", "onboard", "sample_ask", "agent_share",
                         "purpose", "evcals_hidden", "care_sent")
+SIDE_GROUPS = ("focus", "clients", "lists", "filters", "tags", "views", "team")  # 2.25.0 (UX-03)
 DASH_WIDGETS = ("wait", "today", "news", "chat", "projects", "pinned", "notes", "agents", "stats", "search", "family")  # 2.17.0 (#475), 2.19.0
 SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "time_focus", "paperless_keep", "celebrate", "cal_today",
                   "date_confirm", "digest_mail", "mail_from_me", "today_inbox")
@@ -74,6 +75,21 @@ def clean_setting(k, v):
         return ",".join(dict.fromkeys(ids))
     if k == "roadmap":
         return clean_roadmap_pref(v)
+    if k == "sidebar":  # 2.25.0 (UX-03): {"order": [groups], "hidden": ["g:<group>" | "e:<entry>"]} ('' = default)
+        if sv == "":
+            return ""
+        try:
+            o = json.loads(v) if isinstance(v, str) else None
+        except ValueError:
+            raise bad from None
+        if not isinstance(o, dict) or set(o) - {"order", "hidden"}:
+            raise bad
+        order, hidden = o.get("order", []), o.get("hidden", [])
+        if not isinstance(order, list) or not all(isinstance(x, str) and x in SIDE_GROUPS for x in order) \
+                or not isinstance(hidden, list) or len(hidden) > 60 \
+                or not all(isinstance(x, str) and re.fullmatch(r"[ge]:[a-z_]{1,24}", x) for x in hidden):
+            raise bad
+        return json.dumps({"order": list(dict.fromkeys(order)), "hidden": list(dict.fromkeys(hidden))})
     if k == "dashboard":  # 2.17.0 (#475)
         if sv == "":
             return ""

@@ -150,6 +150,14 @@ async function wpDraw(md) {
   }
   box.innerHTML = h;
   wpState(md, j);
+  // 2.25.0 (UX-46): on top of Notifications, in one line: does THIS device ring? With "Turn on" / "Send test"
+  const now = $('#s-pushnow', md);
+  if (now) {
+    const can = wpSupported() && !(isIOS() && !isStandalone()) && Notification.permission !== 'denied';
+    now.className = 'pushnow ' + (mine ? 'on' : 'off');
+    now.innerHTML = `${ic(mine ? 'bellring' : 'belloff', 's')}<span><b>${mine ? tr('This device gets notifications') : tr('This device gets no notifications')}</b>${mine ? '' : `<small>${esc(!wpSupported() ? tr('This browser does not support Web Push') : isIOS() && !isStandalone() ? tr('Add Kalmido to the Home Screen first') : Notification.permission === 'denied' ? tr('Blocked in the browser or system settings') : j.subs.length ? trn('{0} other device does', '{0} other devices do', j.subs.length) : tr('No device is turned on yet'))}</small>`}</span>`
+      + (mine ? `<button class="btn sm" data-m="wp-test" data-sub="${mine.id}">${ic('bell', 's')} ${tr('Send test')}</button>` : can ? `<button class="btn sm pri" data-m="wp-on">${tr('Turn on')}</button>` : '');
+  }
 }
 // Settings: tabbed dialog (vertical tab list on the left on desktop, a horizontally scrollable tab strip on phones).
 // Every pane stays in the DOM, so one "Save" stores the server settings of all sections at once;
@@ -158,12 +166,16 @@ async function wpDraw(md) {
 // U05: 9 sections (8 without admin rights); Layout, Collaboration, Focus and Time tracking live in Modules now
 const SET_SECS = [['account', 'user', N_('Account')], ['general', 'sliders', N_('General')], ['look', 'palette', N_('Appearance')], ['modules', 'grid', N_('Modules')],
   ['notify', 'bell', N_('Notifications')], ['integr', 'link', N_('Integrations')], ['ai', 'bot', N_('Agents')], ['data', 'download', N_('Data')], ['users', 'users', N_('Administration')], ['help', 'help', N_('Help')]];
+// 2.25.0 (UX-17): what each area holds, shown in the overview a phone opens with
+const SET_DESC = {account: N_('Name, password, sign-in, storage'), general: N_('Language, Today, dates and reminders'), look: N_('Theme, font size, tab bar and sidebar'),
+  modules: N_('What Kalmido shows'), notify: N_('Push, News and quiet hours'), integr: N_('Calendar on the phone, sharing, e-mail'), ai: N_('Agents and what they do'),
+  data: N_('Import, export, templates, backups'), users: N_('People, sign-in, server'), help: N_('How things work, about Kalmido')};
 // ---- UX1 (U03, owner decision 2): settings save themselves. Every control applies at once, "Saved · Undo" shows in the
 // dialog header and each change is one step in the undo history ("Changed setting: …"). Text, number and time fields save
 // on blur or Enter (and after a short pause while typing); closing the dialog saves whatever is still pending.
 const SETS = {  // control id -> [setting key, label, kind]
   's-celebrate': ['celebrate', N_('Celebrate completions'), 'chk'], 's-tinbox': ['today_inbox', N_('Show the inbox in Today'), 'chk'],  // 2.22.0 (#681)
-  's-hideblk': ['hide_blocked_today', N_('Hide tasks that are still waiting on another task'), 'chk'], 's-progsub': ['progress_subtasks', N_('Count subtasks too'), 'chk'],
+  's-hideblk': ['hide_blocked_today', N_('Hide tasks that are still blocked by another task'), 'chk'], 's-progsub': ['progress_subtasks', N_('Count subtasks in the progress of a list'), 'chk'],
   's-pushch': ['push_channel', N_('Channel'), 'sel'], 's-pushprio': ['push_priority', N_('How urgent'), 'sel'],
   's-allday': ['allday_time', N_('All-day reminder at'), 'time'], 's-defrem': ['default_reminder', N_('Default reminder'), 'sel'], 's-digest': ['digest_time', N_('Daily digest at'), 'time'],
   's-pf': ['pomo_focus', N_('Focus session'), 'pos'], 's-ps': ['pomo_short', N_('Short break'), 'pos'], 's-pl': ['pomo_long', N_('Long break'), 'pos'], 's-pe': ['pomo_long_every', N_('Long break after'), 'pos'],
@@ -171,12 +183,12 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-trem': ['time_remind_h', N_('Reminder after'), 'num'], 's-tstop': ['time_autostop_h', N_('Stop automatically after'), 'num'], 's-tfocus': ['time_focus', N_('Focus sessions'), 'chk'],
   's-icalscope': ['ical_scope', N_('Calendar subscription'), 'sel'], 's-icalalarm': ['ical_alarms', N_('as calendar alarms'), 'chk'],
   's-plkeep': ['paperless_keep', N_('Also keep the attachment in Kalmido'), 'chk'], 's-caltoday': ['cal_today', N_('Events on Today'), 'chk'],
-  's-dateok': ['date_confirm', N_('Confirm changes with OK'), 'chk'],  // 2.6.1 (#401)
+  's-dateok': ['date_confirm', N_('Confirm changes of the date with OK'), 'chk'],  // 2.6.1 (#401)
   's-qfrom': ['quiet_from', N_('Quiet from'), 'time'], 's-qto': ['quiet_to', N_('Quiet until'), 'time'],  // 2.7.0 (#413)
   's-wfrom': ['work_start', N_('Working hours from'), 'time'], 's-wto': ['work_end', N_('Working hours until'), 'time'],  // 2.10.0 (#440)
   's-review': ['review_time', N_('Daily review at'), 'time'],
 };
-const SET_RENDER = ['features', 'nav_order', 'show_done_views', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden'];
+const SET_RENDER = ['sidebar', 'features', 'nav_order', 'show_done_views', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden'];
 function setVal(el, kind) {  // the value a control stands for; undefined = not valid (nothing is saved)
   const v = el.value;
   if (kind === 'chk') return el.checked ? '1' : '0';
@@ -242,11 +254,13 @@ function settingsSync() {
   for (const el of $$('[data-feat]', md)) el.checked = feat(el.dataset.feat);
   for (const el of $$('[data-agvis]', md)) el.checked = !agentHidden().has(+el.dataset.agvis);
   $$('[data-modrow]', md).forEach(r => r.classList.toggle('off', !feat(r.dataset.modrow)));
+  modCountsSync(md);  // 2.25.0 (UX-19)
   const nm = $('#a-name', md); if (nm && nm !== document.activeElement && S.me) nm.value = S.me.display_name;
   $$('#s-lang [data-lang-set]', md).forEach(b => b.classList.toggle('on', b.dataset.langSet === (s.lang || 'en')));
   ntfyShow(md);
   const lk = $('#s-lookin', md); if (lk) lk.innerHTML = lookHtml();
   md._tabDraw?.();
+  md._sideDraw?.();
 }
 function ntfyShow(md) {  // U06: the ntfy details only when ntfy is (also) the channel
   const ch = $('#s-pushch', md)?.value || S.settings.push_channel || 'webpush';
@@ -268,11 +282,11 @@ async function setLang(code) {
 const MOD_GROUPS = [[N_('Views'), ['cal', 'timeline', 'kanban', 'matrix']], [N_('Calendar and people'), ['events', 'contacts']], [N_('For you'), ['habits', 'pomo', 'stats', 'comments']],
   [N_('Projects and team'), ['collab', 'time', 'progress', 'deps', 'fields', 'agents', 'clients', 'workload', 'forms']], [N_('At home'), ['family', 'contracts', 'home', 'care', 'health', 'review', 'travel', 'reading']], [N_('Connections'), ['paperless']]];
 const MOD_DESC = {cal: N_('Month, week and day view of your tasks'), timeline: N_('Tasks with start and end as bars over time'), kanban: N_('Lists as boards with columns'),
-  matrix: N_('Urgent and important in four quadrants'), habits: N_('Daily and weekly habits with streaks'), pomo: N_('Focus timer and stopwatch'),
+  matrix: N_('Urgent and important in four quadrants'), habits: N_('Daily and weekly habits with streaks'), pomo: N_('Pomodoro timer and stopwatch'),
   stats: N_('Completions, on-time rate, focus time and streaks'), collab: N_('Share lists, assign tasks, @mentions, activity and News'),
   comments: N_('Timestamped notes on your tasks; in shared lists with collaboration also @mentions and News'),
-  time: N_('Timers and manual time entries on tasks, reports and CSV export'), progress: N_('Progress per list and a “Where is it stuck?” overview'),
-  deps: N_('Tasks that wait on other tasks, with arrows in the timeline (Gantt)'), fields: N_('Own fields per list, such as budget, client or phase'),
+  time: N_('Timers and manual time entries on tasks, reports and CSV export'), progress: N_('Progress per list and the project status (“Where is it stuck?”)'),
+  deps: N_('Tasks blocked by other tasks, with arrows in the timeline (Gantt)'), fields: N_('Own fields per list, such as budget, client or phase'),
   paperless: N_('Link documents from Paperless-ngx to tasks'),
   events: N_('Appointments in your own calendars next to the tasks, shared calendars, invitations, synced with the phone’s calendar'),
   contacts: N_('Your address books: contacts linked to tasks and events, birthdays, synced with the phone’s contacts'),
@@ -285,6 +299,14 @@ const MOD_DESC = {cal: N_('Month, week and day view of your tasks'), timeline: N
   review: N_('Your day and week in review (done, still open, coming up) with a private journal'),
   travel: N_('Trips as lists with dates, bookings, things to do before you leave and a packing list'),
   reading: N_('A “Read later” list, filled from Karakeep if you like (bookmarks become tasks)')};
+// 2.25.0 (UX-20): Integrations start with what people want to do, in plain words; a tap jumps to the part that does it
+// (the technical parts below stay for those who need them)
+function integrCardsHtml() {
+  const C = [['cal', N_('Calendar on your phone'), N_('Your tasks with a date in the phone’s calendar app'), S.caldav?.enabled && S.me ? '#s-dav-h' : '#s-ical-h'],
+    ['phone', N_('Share from your phone'), N_('Text, links and pictures from other apps into Kalmido'), '#s-share-h'],
+    ['send', N_('Send by e-mail'), N_('Forward an e-mail and it becomes a task'), '#s-mail-h']];
+  return `<div class="icards">${C.map(([i, n, d, to]) => `<button type="button" class="icard" data-jump="${to}">${ic(i, 's')}<span><b>${tr(n)}</b><small>${tr(d)}</small></span>${ic('chev', 's fcar')}</button>`).join('')}</div>`;
+}
 function modulesHtml(hint) {
   const s = S.settings;
   const opt = (k, body) => k === 'pomo' ? `<details class="mopt"><summary>${tr('Focus settings')}</summary>
@@ -303,7 +325,18 @@ function modulesHtml(hint) {
   const row = k => modRowHtml(k, opt);
   return `<h4 id="s-purpose-h">${tr('What do you use Kalmido for?')}</h4>${purposeCards(S.settings.purpose || '')}
     ${hint(tr('Switch on only what you need; everything else disappears from the menus. Nothing is deleted: switched back on, everything is there again.'))}
-    ${MOD_GROUPS.map(([g, ks]) => { const r = ks.filter(k => k !== 'paperless' || S.paperless?.enabled || feat('paperless')); return r.length ? `<h4>${tr(g)}</h4><div class="modlist">${r.map(row).join('')}</div>` : ''; }).join('')}`;
+    <div class="modtot muted" id="s-modtot">${esc(modCount())}</div>
+    ${MOD_GROUPS.map(([g, ks], gi) => { const r = modGroupKeys(ks); return r.length ? `<details class="modgrp" data-modgrp="${gi}"><summary><span class="mgn">${tr(g)}</span><span class="mgc muted">${esc(modGroupCount(r))}</span>${ic('chev', 's fcar')}</summary><div class="modlist">${r.map(row).join('')}</div></details>` : ''; }).join('')}`;
+}
+// 2.25.0 (UX-19): the module groups start folded and say how many are on ("3 of 4 on"); the total on top counts the same
+// switches (every module shown here), and the setup counts against it too
+const modGroupKeys = ks => ks.filter(k => k !== 'paperless' || S.paperless?.enabled || feat('paperless'));
+const modGroupCount = r => tr('{0} of {1} on', r.filter(k => feat(k)).length, r.length);
+const modAll = () => MOD_GROUPS.flatMap(([, ks]) => modGroupKeys(ks));
+const modCount = () => { const a = modAll(); return tr('{0} of {1} modules on', a.filter(k => feat(k)).length, a.length); };
+function modCountsSync(md) {
+  const t = $('#s-modtot', md); if (t) t.textContent = modCount();
+  for (const d of $$('[data-modgrp]', md)) { const r = modGroupKeys(MOD_GROUPS[+d.dataset.modgrp][1]), c = $('.mgc', d); if (c) c.textContent = modGroupCount(r); }
 }
 // one module switch (Settings > Modules; 2.6.0 (K09): the agents switch only there, Settings > Agents links to it)
 function modRowHtml(k, opt = () => '') {
@@ -538,28 +571,30 @@ function settingsModal(focus) {
       <h4 id="s-tabbar-h">${tr('Tab bar')}${dev}</h4>
       ${hint(tr('At the bottom on a phone (the desktop shows every module in the sidebar). A phone fits {0} tabs, the rest goes under “More”.', TAB_MAX))}
       <div class="navlist" id="s-tabbar"></div>
-      <div class="row" style="margin-top:.5rem"><select id="s-tabadd" style="flex:1" aria-label="${tr('+ Add tab …')}"></select><button class="btn sm" data-m="tab-reset">${tr('Default')}</button></div>`,
+      <div class="row" style="margin-top:.5rem"><select id="s-tabadd" style="flex:1" aria-label="${tr('+ Add tab …')}"></select><button class="btn sm" data-m="tab-reset">${tr('Default')}</button></div>
+      <h4 id="s-side-h">${tr('Sidebar')}</h4>
+      ${hint(tr('The order of the groups and what they show; the same on every device. The eye hides a group, the boxes single entries.'))}
+      <div class="navlist sidecfg" id="s-sidebar"></div>
+      <div class="row" style="margin-top:.5rem"><span class="spacer"></span><button class="btn sm" data-m="side-reset">${tr('Default')}</button></div>`,
     general: `<h4 id="s-lang-h">${tr('Language')}</h4>
       <div class="row"><div class="seg" id="s-lang" role="group" aria-labelledby="s-lang-h">${(S.languages || []).map(L => `<button data-lang-set="${esc(L.code)}" class="${(s.lang || 'en') === L.code ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div></div>
       ${hint(tr('Applies to all devices and to the notifications. Quick add understands English, German and the language chosen here.'))}
-      <h4>${tr('Celebrations')}</h4>
-      <div class="row"><label>${tr('Celebrations')}</label>${chk('s-celebrate', s.celebrate !== '0', tr('Celebrate completions'))}</div>
-      ${hint(tr('When Today is cleared or a list or project is complete, the heron flies by with a one-liner. With reduced motion (system setting) it just says hello.'))}
       <h4 id="s-today-h">${tr('Today')}</h4>
-      <div class="row"><label>${tr('Inbox')}</label>${chk('s-tinbox', s.today_inbox === '1', tr('Show the inbox in Today'))}</div>
+      <div class="row">${chk('s-tinbox', s.today_inbox === '1', tr('Show the inbox in Today'))}</div>
       ${hint(tr('Tasks without a date that are still in the inbox get their own section under today’s tasks, with quick buttons to sort them; they count in Today’s number.'))}
-      <h4 id="s-dates-h">${tr('Date and reminders')}</h4>
-      <div class="row"><label>${tr('Changes')}</label>${chk('s-dateok', s.date_confirm === '1', tr('Confirm changes with OK'))}</div>
+      ${depsOn() ? `<div class="row">${chk('s-hideblk', s.hide_blocked_today === '1', tr('Hide tasks that are still blocked by another task'))}</div>` : ''}
+      <h4 id="s-dates-h">${tr('Changing and completing tasks')}</h4>
+      <div class="row">${chk('s-dateok', s.date_confirm === '1', tr('Confirm changes of the date with OK'))}</div>
       ${hint(tr('Off: a new day, time, start, repeat or reminder is saved as soon as you pick it; “Undo” in the message takes the whole change back. On: changes wait for OK.'))}
-      <h4>${tr('Projects')}</h4>
-      ${depsOn() ? `<div class="row"><label>${tr('Today')}</label>${chk('s-hideblk', s.hide_blocked_today === '1', tr('Hide tasks that are still waiting on another task'))}</div>` : ''}
-      <div class="row"><label>${tr('List progress')}</label>${chk('s-progsub', s.progress_subtasks === '1', tr('Count subtasks too'))}</div>
+      <div class="row">${chk('s-celebrate', s.celebrate !== '0', tr('Celebrate completions'))}</div>
+      ${hint(tr('When Today is cleared or a list or project is complete, the heron flies by with a one-liner. With reduced motion (system setting) it just says hello.'))}
+      <div class="row">${chk('s-progsub', s.progress_subtasks === '1', tr('Count subtasks in the progress of a list'))}</div>
       <h4 id="s-plan-h">${tr('Day planning')}</h4>
       <div class="row"><label for="s-wfrom">${tr('Working hours')}</label>${timeIn('s-wfrom', s.work_start || '09:00', {label: tr('Working hours from'), clear: false})}<label for="s-wto" class="qtol">${tr('until|time')}</label>${timeIn('s-wto', s.work_end || '17:00', {label: tr('Working hours until'), clear: false})}</div>
       <div class="row"><label for="s-review">${tr('Daily review at')}</label>${timeIn('s-review', s.review_time || '', {label: tr('Daily review at'), empty: tr('off')})}</div>
       ${hint(tr('“Plan my day” in Today fills the free time between your calendar events within these hours with your open tasks (a task without a duration counts 30 minutes). The daily review shows in Today after the end of your working hours; with a time set it also comes as a push.'))}`,
     modules: modulesHtml(hint),
-    notify: `${S.webpush?.enabled ? `<h4>${tr('Delivery')}</h4>
+    notify: `${S.webpush?.enabled ? `<div class="pushnow" id="s-pushnow" role="status" aria-live="polite"></div>` : ''}${S.webpush?.enabled ? `<h4>${tr('Delivery')}</h4>
       <div class="row"><label for="s-pushch">${tr('Channel')}</label><select id="s-pushch">${[['webpush', N_('Web Push')], ['ntfy', 'ntfy'], ['both', N_('Both')]].map(([v, n]) => `<option value="${v}" ${(s.push_channel || 'webpush') === v ? 'selected' : ''}>${v === 'ntfy' ? n : tr(n)}</option>`).join('')}</select><button class="btn sm" data-m="ptest">${ic('bell', 's')} ${tr('Send test')}</button></div>
       ${prio}
       <div class="shint wpstate" id="s-wpstate"></div>
@@ -579,7 +614,7 @@ function settingsModal(focus) {
       <h4 id="s-quiet-h">${tr('Repeated reminders')}</h4>
       <div class="row"><label for="s-qfrom">${tr('Quiet from')}</label>${timeIn('s-qfrom', s.quiet_from ?? '22:00', {label: tr('Quiet from'), empty: tr('none')})}<label for="s-qto" class="qtol">${tr('until|time')}</label>${timeIn('s-qto', s.quiet_to ?? '07:00', {label: tr('Quiet until'), empty: tr('none')})}</div>
       ${hint(tr('A task or a list can repeat its reminder until the task is done (date dialog > Repeat reminder; list dialog for all its tasks). During the quiet hours nothing repeats; the next one comes when they end.'))}`,
-    integr: calsHtml(chk, hint) + `<h4 id="s-ical-h">${tr('Calendar subscription')}</h4>
+    integr: integrCardsHtml() + calsHtml(chk, hint) + `<h4 id="s-ical-h">${tr('Calendar subscription')}</h4>
       ${hint(tr('Your open tasks with a date as a calendar for Google Calendar, Apple Calendar, Outlook or Thunderbird: read-only, the calendar app refreshes it by itself (usually every few hours, some apps every 15 minutes). Timed tasks appear with their duration, all-day tasks as all-day events, recurring tasks with all future dates.'))}
       <div id="s-ical"><div class="muted mhint">${tr('Loading…')}</div></div>
       <div class="row"><label for="s-icalscope">${tr('Tasks')}</label><select id="s-icalscope"><option value="all">${tr('All visible tasks (incl. shared lists)')}</option><option value="mine" ${s.ical_scope === 'mine' ? 'selected' : ''}>${tr('Only mine and assigned to me')}</option></select></div>
@@ -636,20 +671,24 @@ function settingsModal(focus) {
       <h4>${tr('Templates')}</h4>
       <div class="shelp">${tr('Task menu (…) or list dialog > Save as template. The template button in the add bar creates the task in the current list, Lists > + > New list from template a whole list. Manage them under Settings > Data.')}</div>
       ${timeOn() ? `<h4>${tr('Time tracking')}</h4><div class="shelp">${tr('Start a timer from a task (detail panel, task menu …) or add time by hand; the running timer shows in the top bar on every device. Sidebar > Time tracking: hours per list and task for a week, month or any range, CSV export and a printable timesheet. In shared lists everyone sees the time of all members, but only changes their own entries. Finished focus sessions on a task count as time unless a timer ran at the same time.')}</div>` : ''}
-      ${depsOn() || fieldsOn() || progressOn() ? `<h4>${tr('Projects')}</h4><div class="shelp">${tr('<b>Dependencies:</b> in a task, “Waiting on…” picks the tasks that have to be done first; the task shows “waiting” until they are, and whoever it is assigned to gets a message once the last one is done. <b>Custom fields</b> (list dialog, owner): text, number, selection, date, checkbox, person or link per task; pin up to two as chips on the rows, sort and filter by them. <b>Status and progress</b> (Project progress module): the list header shows the progress; with collaboration, owner and editors set a status with a short note, and “Where is it stuck?” lists overdue, waiting and unassigned tasks of all lists.')}</div>` : ''}
+      ${depsOn() || fieldsOn() || progressOn() ? `<h4>${tr('Projects')}</h4><div class="shelp">${tr('<b>Dependencies:</b> in a task, “Waiting on…” > “Another task” picks the tasks that have to be done first; the task shows “blocked” until they are, and whoever it is assigned to gets a message once the last one is done. “Waiting on…” > “Someone outside” marks a task that waits on a person (a client, an office, a delivery) with a follow-up day. <b>Custom fields</b> (list dialog, owner): text, number, selection, date, checkbox, person or link per task; pin up to two as chips on the rows, sort and filter by them. <b>Status and progress</b> (Project progress module): the list header shows the progress; with collaboration, owner and editors set a status with a short note, and the project status (“Where is it stuck?”) lists overdue, blocked and unassigned tasks of all lists.')}</div>` : ''}
       ${feat('stats') ? `<h4>${tr('Statistics')}</h4><div class="shelp">${tr('Sidebar > Statistics (or pin it as a tab): completions per week / day and per list, on-time rate, overdue trend, focus time and habit streaks of the last 12 weeks.')}</div>` : ''}
       <h4>${tr('Gestures (phone)')}</h4>
-      <div class="shelp">${tr('Swipe right: complete · swipe left: snooze / delete · long-press and drag: reorder, move to another column, quadrant or onto a day; drag to the left edge and hold briefly to open the lists (dropping a subtask there = standalone task in that list).')}</div>`,
+      <div class="shelp">${tr('Swipe right: complete · swipe left: snooze / delete · long-press: the task’s menu (with “Select” for several) · long-press and drag: reorder, move to another column, quadrant or onto a day; drag to the left edge and hold briefly to open the lists (dropping a subtask there = standalone task in that list).')}</div>`,
   };
   pane.help += aboutHtml(chk, hint);
   const secs = SET_SECS.filter(([k]) => pane[k]);
-  let cur = {tabbar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'integr', caldav: 'integr', tokens: 'account', apppw: 'account', about: 'help', groups: 'users', dayplan: 'general'}[focus] || focus;
+  let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'integr', caldav: 'integr', tokens: 'account', apppw: 'account', about: 'help', groups: 'users', dayplan: 'general'}[focus] || focus;
   if (!secs.some(([k]) => k === cur)) cur = LS.get('settingsSec', 'general');
   if (!secs.some(([k]) => k === cur)) cur = 'general';
-  const md = modal(`<div class="shdr"><h3>${tr('Settings')}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><span class="ssearch">${ic('search', 's')}<input type="search" id="s-search" placeholder="${esc(tr('Search settings'))}" aria-label="${esc(tr('Search settings'))}" autocomplete="off" aria-controls="s-sres"></span><div class="ssres hidden" id="s-sres" role="listbox" aria-label="${esc(tr('Search settings'))}"></div><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
-    <div class="sbody"><nav class="snav" role="tablist" aria-label="${tr('Settings')}">${secs.map(([k, i, n]) => `<button role="tab" id="st-${k}" aria-controls="sp-${k}" aria-selected="${k === cur}" data-sec="${k}" class="${k === cur ? 'on' : ''}">${ic(i, 's')}<span>${tr(n)}</span></button>`).join('')}</nav>
+  const md = modal(`<div class="shdr"><button type="button" class="iconbtn sback" data-m="s-index" title="${esc(tr('All settings'))}" aria-label="${esc(tr('All settings'))}">${ic('back', 's')}</button><h3>${tr('Settings')}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><span class="ssearch">${ic('search', 's')}<input type="search" id="s-search" placeholder="${esc(tr('Search settings'))}" aria-label="${esc(tr('Search settings'))}" autocomplete="off" aria-controls="s-sres"></span><div class="ssres hidden" id="s-sres" role="listbox" aria-label="${esc(tr('Search settings'))}"></div><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
+    <div class="sbody"><nav class="snav" role="tablist" aria-label="${tr('Settings')}">${secs.map(([k, i, n]) => `<button role="tab" id="st-${k}" aria-controls="sp-${k}" aria-selected="${k === cur}" data-sec="${k}" class="${k === cur ? 'on' : ''}">${ic(i, 's')}<span>${tr(n)}</span>${SET_DESC[k] ? `<small class="sndesc">${esc(tr(SET_DESC[k]))}</small>` : ''}</button>`).join('')}</nav>
       <div class="spanes">${secs.map(([k]) => `<section class="spane ${k === cur ? '' : 'hidden'}" role="tabpanel" id="sp-${k}" aria-labelledby="st-${k}" data-pane="${k}">${pane[k]}</section>`).join('')}</div></div>`);
   md.classList.add('smodal');
+  // 2.25.0 (UX-17): a phone opens on an overview of the areas (name + what is in it); a tap opens one, ‹ goes back
+  const idx = on => { md.classList.toggle('sidx', on); if (on) $('.snav [data-sec].on', md)?.setAttribute('aria-selected', 'false'); };
+  if (isMobile() && !focus) idx(true);
+  md._idx = idx;
   // 2.13.2 (#478 F13): phones: a "More ›" at the right end of the cut tab strip while more tabs are hidden to the right
   { const nav = $('.snav', md); nav.insertAdjacentHTML('afterend', `<button type="button" class="snmore hidden" data-snmore tabindex="-1" aria-hidden="true">${tr('More')} ›</button>`);
     $('[data-snmore]', md).addEventListener('click', () => nav.scrollBy({left: nav.clientWidth * .7, behavior: reducedMotion() ? 'auto' : 'smooth'}));
@@ -661,13 +700,14 @@ function settingsModal(focus) {
   md.addEventListener('input', e => { if (e.target.id !== 's-fsize') return; const v = +e.target.value; if (v === 100) LS.del('fsize'); else LS.set('fsize', v); applyLook(); fsLabel(v); });
   md.addEventListener('change', e => { if (e.target.id === 's-fsize' && S.settings) render(); });
   if (focus === 'tabbar') setTimeout(() => $('#s-tabbar-h', md)?.scrollIntoView({block: 'start'}), 0);
+  if (focus === 'sidebar') setTimeout(() => $('#s-side-h', md)?.scrollIntoView({block: 'start'}), 0);  // 2.25.0 (UX-03)
   if (focus === 'newskinds' || focus === 'share') setTimeout(() => $(focus === 'share' ? '#s-share-h' : '#s-news-h', md)?.scrollIntoView({block: 'start'}), 0);
   if (focus === 'agentdots') setTimeout(() => $('#s-agdots-h', md)?.scrollIntoView({block: 'start'}), 0);
   if (focus === 'groups' || focus === 'dayplan') setTimeout(() => $(focus === 'groups' ? '#s-groups-h' : '#s-plan-h', md)?.scrollIntoView({block: 'start'}), 0);  // 2.10.0
   if (focus === 'caldav' || focus === 'apppw') setTimeout(() => $(focus === 'caldav' ? '#s-dav-h' : '#s-apw-h', md)?.scrollIntoView({block: 'start'}), 0);
   // 2.7.0 (#405 S8): the module keys land on their row (and open its options), not just on top of Modules
   const modFocus = {layout: 'cal', collab: 'collab', focus: 'pomo', time: 'time'}[focus];
-  if (modFocus) setTimeout(() => { const r = $(`[data-pane="modules"] [data-modrow="${modFocus}"]`, md); if (!r) return; const o = $('details.mopt', r); if (o) o.open = true; r.scrollIntoView?.({block: 'start'}); r.classList.add('flash'); }, 0);
+  if (modFocus) setTimeout(() => { const r = $(`[data-pane="modules"] [data-modrow="${modFocus}"]`, md); if (!r) return; const gd = r.closest('details.modgrp'); if (gd) gd.open = true; const o = $('details.mopt', r); if (o) o.open = true; r.scrollIntoView?.({block: 'start'}); r.classList.add('flash'); }, 0);
   const show = k => {
     cur = k; LS.set('settingsSec', k);
     $$('.snav button', md).forEach(b => { b.classList.toggle('on', b.dataset.sec === k); b.setAttribute('aria-selected', b.dataset.sec === k); });
@@ -749,14 +789,15 @@ function settingsModal(focus) {
     setSaved(histAdd({label: tr('Changed setting: {0}', tr('Hours per day')), sett: true, undo: () => put(from), redo: () => put(to)}));
   });
   onRemove(md, () => { if (!md._noflush) flush(); });
-  $('.snav', md).addEventListener('click', e => { const b = e.target.closest('[data-sec]'); if (b) show(b.dataset.sec); });
+  $('.snav', md).addEventListener('click', e => { const b = e.target.closest('[data-sec]'); if (b) { show(b.dataset.sec); if (md.classList.contains('sidx')) { idx(false); setTimeout(() => $('.spane:not(.hidden) h4, .spane:not(.hidden) button, .spane:not(.hidden) input', md)?.focus?.({preventScroll: true}), 0); } } });
+  md.addEventListener('click', e => { if (e.target.closest('[data-m="s-index"]')) { idx(true); $('.snav [data-sec]', md)?.focus(); } });
   // 2.13.0 (#453 P20): search every tab's headings, labels and options; a hit opens its tab and scrolls to it
   // 2.24.0 (UX-16): full text: also buttons, helper lines, the small texts of switches, select options and table heads,
   // plus a few synonyms (words people search for that the labels do not use); a hit inside a sub-tab (Administration,
   // Agents) or a folded section opens it; nothing found hides the panes behind one clear line
   const sres = $('#s-search', md) && $('#s-sres', md);
   const SYN = [[['logout', 'log out', 'sign out', 'abmelden', 'ausloggen'], '[data-acc="logout"]'], [['push', 'benachrichtigung', 'notification', 'glocke', 'bell'], '[data-pane="notify"] h4'],
-    [['sidebar', 'seitenleiste', 'menü', 'menu'], '#s-tabbar-h'], [['wartet', 'waiting', 'warten', 'extern'], '[data-modrow="deps"]'], [['passwort', 'password', 'kennwort'], '#a-cur'],
+    [['sidebar', 'seitenleiste'], '#s-side-h'], [['menü', 'menu', 'tab bar', 'tab-leiste'], '#s-tabbar-h'], [['wartet', 'waiting', 'warten', 'extern'], '[data-modrow="deps"]'], [['passwort', 'password', 'kennwort'], '#a-cur'],
     [['speicher', 'storage', 'quota', 'kontingent'], '#s-storage-h'], [['dunkel', 'dark', 'hell', 'light', 'theme'], '#s-lookin h4'], [['sprache', 'language'], '#s-lang-h']];
   const shown = el => !el.closest('[hidden]') || el.closest('[data-admp], [data-aisp]');
   $('#s-search', md).addEventListener('input', e => {
@@ -780,10 +821,10 @@ function settingsModal(focus) {
   sres.addEventListener('click', e => {
     const b = e.target.closest('[data-hit]'); if (!b) return;
     const h = sres._hits[+b.dataset.hit]; sres.classList.add('hidden'); $('#s-search', md).value = ''; $('.sbody', md).classList.remove('snores');
-    show(h.k);
+    show(h.k); idx(false);
     const ap = h.el.closest('[data-admp]'); if (ap) admSubShow(md, ap.dataset.admp, true);
     const ai = h.el.closest('[data-aisp]'); if (ai) aiSubShow(md, ai.dataset.aisp, true);
-    const det = h.el.closest('details'); if (det && !h.el.matches('summary')) det.open = true;
+    for (let det = h.el.closest('details'); det; det = det.parentElement?.closest('details')) if (!(det === h.el.closest('details') && h.el.matches('summary'))) det.open = true;  // 2.25.0: also the folded module group around it
     const r = h.el.closest('.row, .modrow, details, h4, label') || h.el;
     setTimeout(() => { r.scrollIntoView?.({block: 'center'}); r.classList.add('flash'); setTimeout(() => r.classList.remove('flash'), 1600); }, 30);
   });
@@ -826,9 +867,25 @@ function settingsModal(focus) {
       grp(N_('Filters'), S.filters.map(f => opt('f:' + f.id, f.name)).join('')) +
       grp(N_('Folders'), folderNames().map(f => opt('folder:' + f, fDisp(f))).join('')) +
       grp(N_('Tags'), Object.keys(counts().tags).sort((a, b) => a.localeCompare(b, 'de')).map(t => opt('tag:' + t, '#' + t)).join('')) +
-      grp(N_('Other'), opt('home', tr('Dashboard')) + (teamOn() ? opt('team', tr('Team chat')) : '') + (collab() ? opt('news', tr('News')) : '') + (feat('agents') && agentsOn() ? opt('agents', tr('Agents')) : '') + (overviewOn() ? opt('overview', tr('Overview')) : '') + (feat('stats') ? opt('stats', tr('Statistics')) : '') + (timeOn() ? opt('time', tr('Time tracking')) : '') + opt('search', tr('Search')) + opt('lists', tr('Lists')) + opt('settings', tr('Settings')));
+      grp(N_('Other'), opt('home', tr('Start|home')) + (teamOn() ? opt('team', tr('Team chat')) : '') + (collab() ? opt('news', tr('News')) : '') + (feat('agents') && agentsOn() ? opt('agents', tr('Agents')) : '') + (overviewOn() ? opt('overview', tr('Project status')) : '') + (feat('stats') ? opt('stats', tr('Statistics')) : '') + (timeOn() ? opt('time', tr('Time tracking')) : '') + opt('search', tr('Search')) + opt('lists', tr('Lists')) + opt('settings', tr('Settings')));
   };
   md._tabDraw = tabDraw;
+  // 2.25.0 (UX-03): the sidebar: groups up / down, an eye per group, check boxes for the entries of Plan and Views
+  const sideDraw = () => {
+    const box = $('#s-sidebar', md); if (!box) return;
+    const p = sidePref(), ord = sideGroupOrder();
+    const ent = g => (g === 'focus' ? SIDE_PLAN : g === 'views' ? sideViewEntries() : []).map(([x, n]) => `<label class="chkl sidee"><input type="checkbox" data-side-e="${x}" ${p.hidden.includes('e:' + x) ? '' : 'checked'}> ${esc(tr(n))}</label>`).join('');
+    box.innerHTML = ord.map((g, i) => { const n = tr(SIDE_NAMES[g]), shown = !p.hidden.includes('g:' + g), e = shown ? ent(g) : '';
+      return `<div class="navrow sidegrp ${shown ? '' : 'off'}" data-sideg="${g}">${g === 'lists' ? `<span class="iconbtn sideye" aria-hidden="true">${ic('list', 's')}</span>` : `<button class="iconbtn sideye" data-side-eye aria-pressed="${shown}" title="${esc(shown ? tr('Hide {0}', n) : tr('Show {0}', n))}" aria-label="${esc(tr('Show {0}', n))}">${ic(shown ? 'eye' : 'eyeoff', 's')}</button>`}<span>${esc(n)}</span><button class="iconbtn" data-smove="-1" ${i ? '' : 'disabled'} title="${tr('move up')}" aria-label="${esc(tr('Move {0} up', n))}">${ic('chev', 's up')}</button><button class="iconbtn" data-smove="1" ${i < ord.length - 1 ? '' : 'disabled'} title="${tr('move down')}" aria-label="${esc(tr('Move {0} down', n))}">${ic('chev', 's')}</button></div>${e ? `<div class="sideents">${e}</div>` : ''}`; }).join('');
+  };
+  md._sideDraw = sideDraw;
+  const sideSave = o => setApply({sidebar: o ? JSON.stringify(o) : ''}, tr('Sidebar')).then(() => { sideDraw(); renderSide(); });
+  sideDraw();
+  md.addEventListener('change', e => {
+    const x = e.target.dataset?.sideE; if (!x) return;
+    const p = sidePref(), h = new Set(p.hidden); e.target.checked ? h.delete('e:' + x) : h.add('e:' + x);
+    sideSave({order: p.order, hidden: [...h]});
+  });
   const tabApply = ids => { if (ids) LS.set('tabbar', ids); else LS.set('tabbar', null); tabDraw(); renderTabs(); };
   const tabSet = ids => setLocal(tr('Tab bar'), () => LS.get('tabbar', null), tabApply, ids);
   tabDraw();
@@ -846,6 +903,17 @@ function settingsModal(focus) {
     }
     if (b.dataset.m === 's-undo') { const el = $('.ssaved', md); if (el?._e && HIST.undo[HIST.undo.length - 1] === el._e) { el.classList.remove('on'); histStep('undo'); } return; }
     if (b.dataset.m === 'tab-reset') { tabSet(null); return; }
+    if (b.dataset.m === 'sync-now') { b.disabled = true; try { if (OUT.q.length) await flush(); await refreshNow(); } finally { b.disabled = false; const st = $('#s-synced', md); if (st) st.textContent = syncedTxt(); } return; }  // 2.25.0 (UX-56)
+    if (b.dataset.m === 'wp-on') { const c = $('#s-wpdev', md); if (c && !c.checked) c.click(); return; }  // 2.25.0 (UX-46)
+    if (b.dataset.jump) { const t = $(b.dataset.jump, md); if (t) { t.scrollIntoView?.({block: 'start'}); t.classList.add('flash'); setTimeout(() => t.classList.remove('flash'), 1600); } return; }  // 2.25.0 (UX-20)
+    const sg = b.closest('[data-sideg]');
+    if (sg && (b.dataset.smove || 'sideEye' in b.dataset)) {  // 2.25.0 (UX-03)
+      const p = sidePref(), g = sg.dataset.sideg;
+      if ('sideEye' in b.dataset) { const h = new Set(p.hidden); h.has('g:' + g) ? h.delete('g:' + g) : h.add('g:' + g); await sideSave({order: p.order, hidden: [...h]}); }
+      else { const o = sideGroupOrder(), i = o.indexOf(g), j = i + +b.dataset.smove; if (j < 0 || j >= o.length) return; [o[i], o[j]] = [o[j], o[i]]; await sideSave({order: o, hidden: p.hidden}); }
+      $(`[data-sideg="${g}"] [data-${'sideEye' in b.dataset ? 'side-eye' : `smove="${b.dataset.smove}"`}]`, md)?.focus(); return;
+    }
+    if (b.dataset.m === 'side-reset') { await sideSave(null); return; }
     if (b.dataset.langSet) { setLang(b.dataset.langSet); return; }
     if (b.dataset.m === 'fs-reset') { fsStep(0); return; }  // 2.13.0 (#429)
     if (b.dataset.m === 'sto-check') { stoCheck(md); return; }  // 2.13.0

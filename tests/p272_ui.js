@@ -67,7 +67,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(w.eval('LKINDS.map(x => x[0]).join()') === 'list,project', 'two list types');
   w.eval(`listModal(${SH})`); await sleep(200);
   let md = d.querySelector('.modal.lmodal');
-  check(md && [...md.querySelectorAll('#l-kind option')].map(o => o.value).join() === 'list,project' && md.querySelector('#l-dab') && !md.querySelector('#l-dab').checked, 'list dialog: List / Project + "Show completed at the bottom" (off)');
+  check(md && md.querySelector('#l-kindp') && md.querySelector('#l-dab') && !md.querySelector('#l-dab').checked, 'list dialog: List / Project + "Show completed at the bottom" (off)');
   md.querySelector('#l-dab').checked = true; md.querySelector('#l-dab').dispatchEvent(new w.Event('change', {bubbles: true}));
   await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === SH).checklist === 1);
   check((await call('GET', '/api/state')).lists.find(l => l.id === SH).checklist === 1, 'the dialog saves the option');
@@ -102,8 +102,12 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(cr.map(b => b.dataset.k).join() === 'folder,list,sec,parent' && cr.map(b => b.textContent).join('|') === 'Clients|Website|Design|Wireframes', 'breadcrumbs: ' + cr.map(b => b.textContent).join('|'));
   w.eval(`go('today')`); await sleep(300);
   w.eval(`openDetail(${T1})`); await sleep(300);
-  click(w, [...d.querySelectorAll('#detail .dcb')].find(b => b.dataset.k === 'sec')); await sleep(500);
-  check(w.eval('S.route.key') === 'l:' + P, 'the section crumb opens the list');
+  // 2.25.0 (UX-44): list / section crumbs open a menu: Open … / Move to list… / Move to section…
+  click(w, [...d.querySelectorAll('#detail .dcb')].find(b => b.dataset.k === 'sec')); await sleep(150);
+  const cm = [...d.querySelectorAll('#pop [role="menuitem"]')];
+  check(cm.some(b => /Move to list/.test(b.textContent)) && cm.some(b => /Move to section/.test(b.textContent)), 'the section crumb: a menu with Move to list / section: ' + cm.map(b => b.textContent).join('|'));
+  cm.find(b => /^\s*Open /.test(b.textContent))?.click(); await sleep(500);
+  check(w.eval('S.route.key') === 'l:' + P, 'its "Open" opens the list');
   w.eval(`openDetail(${T2})`); await sleep(300);
   click(w, [...d.querySelectorAll('#detail .dcb')].find(b => b.dataset.k === 'folder')); await sleep(400);
   check(w.eval('S.route.key') === 'folder:Clients', 'the folder crumb opens the folder');

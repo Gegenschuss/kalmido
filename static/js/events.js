@@ -14,7 +14,8 @@ function toastPlace(el) {
   }
   // 2.13.0 (#453 A12): an open bottom sheet (snooze, date, menus) is never covered: the toast sits above its top edge,
   // or at the top of the screen when the sheet is that tall
-  const sh = $('#pop.sheet:not(.hidden)'), sr = sh && sh.offsetHeight ? sh.getBoundingClientRect() : null;
+  // 2.25.0 (UX-31): the phone's quick-add sheet too: the message sits above it, never over the field
+  const sh = $('#pop.sheet:not(.hidden)') || $('.qadd.sheet'), sr = sh && sh.offsetHeight ? sh.getBoundingClientRect() : null;
   el.classList.toggle('totop', !!sr && sr.top < innerHeight * .3);
   if (sr && sr.top >= innerHeight * .3) top = Math.min(top, sr.top);
   el.style.bottom = el.classList.contains('totop') ? '' : top < innerHeight ? Math.round(innerHeight - top + 12) + 'px' : '';
@@ -126,7 +127,8 @@ async function submitQuick(input, extra = {}) {
   if (created?.id && !d.files?.length && !d.open) setTimeout(() => {
     if ($(`#view .trow[data-id="${created.id}"]`)) return;
     const t = taskById(created.id) || created, l = listById(t.list_id);
-    toast([l ? lname(l) : '', t.due ? dayLabel(t.due) + (t.due_time ? ' ' + t.due_time : '') : ''].filter(Boolean).join(' · ') || tr('Added'), () => openDetail(created.id), 5000, tr('Open'));
+    const tt = t.title || '', tq = tr('“{0}”|quoted', tt.length > 40 ? tt.slice(0, 39) + '…' : tt);  // 2.25.0 (UX-31): which task, where it went
+    toast([tt ? tq : '', l ? lname(l) : '', t.due ? dayLabel(t.due) + (t.due_time ? ' ' + t.due_time : '') : ''].filter(Boolean).join(' · ') || tr('Added'), () => openDetail(created.id), 5000, tr('Open'));
   }, 350);
   if (d.files?.length && created?.id) { await uploadFiles(created.id, d.files); openDetail(created.id); return; }
   const again = document.body.contains(input) ? input : $('#' + input.id); if (again) again.focus();
@@ -137,7 +139,7 @@ function openQuickSheet(prefill = '', preset = {}) {
   if (!q) {
     q = document.createElement('div');
     q.className = 'qadd sheet';
-    q.innerHTML = `<div class="box">${ic('plus')}<input id="qsheet" placeholder="${tr("What's next?")}" autocomplete="off" enterkeyhint="send">${tplBtn()}${qExtraBtns('qsheet')}<button class="iconbtn" data-act="qsheet-send" aria-label="${tr('Add')}">${ic('arrow')}</button></div><div class="chips"></div><div class="qhint">${tr('tomorrow 3pm · !high · #tag · ~list · every monday')}</div>`;
+    q.innerHTML = `<div class="box">${ic('plus')}<input id="qsheet" placeholder="${tr("What's next?")}" autocomplete="off" enterkeyhint="send">${tplBtn()}${qExtraBtns('qsheet')}<button class="iconbtn" data-act="qsheet-send" aria-label="${tr('Add')}">${ic('arrow')}</button></div><div class="chips"></div><div class="qhint">${tr('tomorrow 3pm · !high · #tag · ~list · every monday')}</div>${hintOnce('qbtns', tr('Next to the arrow: the clip adds the task with a file, the square adds it and opens its details.'), 'qbhint')}`;  // 2.25.0 (UX-34)
     document.body.appendChild(q);
   }
   $('#scrim').classList.remove('hidden');
@@ -175,7 +177,7 @@ function captureDone(created, body) {
 }
 const bookmarklet = () => `javascript:(()=>{window.open(${JSON.stringify(location.origin + '/capture')}+'?title='+encodeURIComponent(document.title)+'&url='+encodeURIComponent(location.href),'kalmido_capture','popup,width=560,height=420')})()`;
 function captureHelp() {  // /capture without a page: the bookmarklet + the keyboard shortcuts
-  const md = modal(`<div class="lhdr"><h3>${ic('zap', 's')} ${tr('Quick capture')}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}">${ic('x')}</button></div>
+  const md = modal(`<div class="lhdr"><h3>${ic('zap', 's')} ${tr('Capture to the inbox')}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}">${ic('x')}</button></div>
     <p class="muted">${tr('Capture a thought or the page you are reading into the inbox, from anywhere. The quick add syntax works: tomorrow, !high, #tag, ~list.')}</p>
     <h4>${tr('Bookmarklet')}</h4>
     <div class="row caprow"><a class="btn pri capbm" href="${esc(bookmarklet())}" data-act="bm-hint" draggable="true">${ic('zap', 's')} ${tr('Add to Kalmido')}</a></div>
@@ -204,6 +206,24 @@ document.addEventListener('click', async e => {
     e.preventDefault(); e.stopPropagation();
     const f = fm.dataset.folder, sib = folderNames().filter(x => fParent(x) === fParent(f)), i = sib.indexOf(f), j = i + +fm.dataset.fmove;
     if (j >= 0 && j < sib.length) { [sib[i], sib[j]] = [sib[j], sib[i]]; saveFolders(fParent(f) ? folderNames().filter(x => fParent(x) !== fParent(f)).concat(sib) : sib.flatMap(t => [t, ...folderSubs(t)])); }
+    return;
+  }
+  // 2.25.0 (UX-02): the "…" of a list / folder in sort mode: up, down, folder
+  const ls = e.target.closest('[data-lsort]');
+  if (ls) {
+    e.preventDefault(); e.stopPropagation();
+    const id = +ls.dataset.lsort, order = sideOrder(), i = order.findIndex(l => l.id === id);
+    const can = d => i >= 0 && order[i + d] && order[i + d].folder === order[i].folder;
+    menu(ls, [{label: tr('Move up'), icon: 'chev', cls: 'mup', dis: !can(-1), fn: () => moveList(id, -1)}, {label: tr('Move down'), icon: 'chev', dis: !can(1), fn: () => moveList(id, 1)},
+      {label: tr('Move to folder…'), icon: 'folder', fn: () => folderPick(ls, id)}]);
+    return;
+  }
+  const fs = e.target.closest('[data-fsort]');
+  if (fs) {
+    e.preventDefault(); e.stopPropagation();
+    const f = fs.dataset.fsort, sib = folderNames().filter(x => fParent(x) === fParent(f)), i = sib.indexOf(f);
+    const mv = d => () => { const s2 = [...sib]; [s2[i], s2[i + d]] = [s2[i + d], s2[i]]; saveFolders(fParent(f) ? folderNames().filter(x => fParent(x) !== fParent(f)).concat(s2) : s2.flatMap(t => [t, ...folderSubs(t)])); };
+    menu(fs, [{label: tr('Move up'), icon: 'chev', cls: 'mup', dis: i <= 0, fn: mv(-1)}, {label: tr('Move down'), icon: 'chev', dis: i < 0 || i >= sib.length - 1, fn: mv(1)}]);
     return;
   }
   const lf = e.target.closest('[data-lfolder]');
@@ -297,6 +317,7 @@ document.addEventListener('click', async e => {
     case 'open-id': openDetail(id); break;
     case 'dup-x': { DUP_OFF ||= new Set(LS.get('dupOff', [])); DUP_OFF.add(id); LS.set('dupOff', [...DUP_OFF].slice(-100)); a.closest('.ddup')?.remove(); $('#d-title')?.focus(); break; }
     case 'crumb': crumbGo(a.dataset.k, a.dataset.id); break;  // 2.7.2 (#424)
+    case 'crumb-menu': crumbMenu(a, a.dataset.k, a.dataset.id); break;  // 2.25.0 (UX-44)
     case 'chat-react': e.stopPropagation(); chatReact(+a.dataset.mid, a.dataset.e); break;  // 2.7.2 (#421)
     case 'tv-stop': timerStop(); break;
     case 'news-open': newsOpen(+a.dataset.i); break;
@@ -357,6 +378,8 @@ document.addEventListener('click', async e => {
     case 'ov-only': S.ov.only = !!a.dataset.k; LS.set('ovOnly', S.ov.only); renderView(); break;
     case 'cols': colModal(id); break;  // 2.14.0 (#425)
     case 'dep-add': depPicker(id, a.dataset.dir); break;
+    case 'wait-on': waitOnMenu(a, id); break;  // 2.25.0 (UX-43)
+    case 'dab-on': hintDone('dab'); setDab(id, true); break;  // 2.25.0 (UX-28)
     case 'dep-rm': {
       const b = +a.dataset.b;
       try { await api('DELETE', `/api/deps/${id}/${b}`); } catch { break; }
@@ -378,6 +401,7 @@ document.addEventListener('click', async e => {
     case 'team-agent': { closeSide(); const ag = agentById(a.dataset.aid); if (ag && ag.enabled) chatOpen(ag.id); else go('agents'); break; }
     case 'side-tags': S.collapsed.has('side:tags-open') ? S.collapsed.delete('side:tags-open') : S.collapsed.add('side:tags-open'); LS.set('collapsed', [...S.collapsed]); renderSide(); break;
     case 'lists-reorder': S.listReorder = !S.listReorder; renderSide(); break;
+    case 'side-more': closeSide(); settingsModal('sidebar'); break;  // 2.25.0 (UX-03 / UX-26)
     case 'list-menu': listMenu(a, id); break;
     case 'top-more': menu(a, topMoreItems()); break;
     case 'fview': if (a.classList.contains('on')) break; if (a.dataset.k === 'matrix') { mxSet({scope: 'folder:' + a.dataset.f}); go('matrix'); } else go('folder/' + encodeURIComponent(a.dataset.f)); break;  // 2.4.2 (#390)
@@ -563,7 +587,7 @@ document.addEventListener('click', async e => {
     case 'mb-wait': { const wid = [...S.multi][0]; if (wid) { const tt = taskById(wid); if (tt?.waiting_at) waitClear(wid); else waitDialog(wid); } break; }  // 2.22.0 (#686)
     case 'mb-done': {
       const nb = [...S.multi].filter(i => S.tasks.get(i)?.blocked && S.tasks.get(i).status === 0 && dFor(S.tasks.get(i))).length;
-      if (nb && !await askConfirm(trn('{0} of the selected tasks is still waiting on another task. Complete anyway?', '{0} of the selected tasks are still waiting on other tasks. Complete anyway?', nb), '', {ok: tr('Complete anyway')})) break;
+      if (nb && !await askConfirm(trn('{0} of the selected tasks is still blocked by another task. Complete anyway?', '{0} of the selected tasks are still waiting on other tasks. Complete anyway?', nb), '', {ok: tr('Complete anyway')})) break;
       batch('complete', {}, true); break;
     }
     case 'mb-del': batch('delete', {}, true); break;

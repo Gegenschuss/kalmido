@@ -213,7 +213,7 @@ function viewRoadmap() {
     <div class="calnav"><button class="iconbtn" data-act="rm-prev" title="${tr('Earlier')}" aria-label="${tr('Earlier')}">${ic('left')}</button><button class="btn sm" data-act="rm-today">${tr('Today')}</button><button class="iconbtn" data-act="rm-next" title="${tr('Later')}" aria-label="${tr('Later')}">${ic('right')}</button></div>
     </div>`;
   const from = S.tlPick && S.tasks.get(S.tlPick.from);
-  const pick = from ? `<div class="tl-pick" role="status">${ic('deps', 's')}<span>${tr('Tap the task that waits on “{0}”', esc(from.title))}</span><span class="spacer"></span><button class="btn sm" data-act="tl-pick-list">${ic('search', 's')} ${tr('Pick from a list…')}</button><button class="btn sm" data-act="tl-pick-cancel">${tr('Cancel')}</button></div>` : '';
+  const pick = from ? `<div class="tl-pick" role="status">${ic('deps', 's')}<span>${tr('Tap the task that “{0}” blocks', esc(from.title))}</span><span class="spacer"></span><button class="btn sm" data-act="tl-pick-list">${ic('search', 's')} ${tr('Pick from a list…')}</button><button class="btn sm" data-act="tl-pick-cancel">${tr('Cancel')}</button></div>` : '';
   if (!M.rows.length) return `${bar}${rmChips(M)}<div class="rm-empty muted">${M.po && !rmProjects().length ? tr('Make a list a project to plan it here') : tr('Nothing to show with these filters')}</div>`;
   const hint = isTouch() ? tr('Long-press a project bar to move the whole project. Tap a name to open or close it.') : tr('Drag a project bar to move all its open tasks with a date. Click a name to open or close it.');
   return `${bar}${rmChips(M)}${pick}
@@ -303,8 +303,8 @@ function rmArrows() {
     else if (Wn) d = `M${Math.max(-8, Wn.x - 20)},${Wn.y}H${Wn.x - 1}`;
     else d = `M${Bn.x + Bn.w},${Bn.y}H${Math.min(W + 8, Bn.x + Bn.w + 20)}`;
     let tip;
-    if (list.length > 1) tip = trn('{0} dependency', '{0} dependencies', list.length) + ': ' + list.slice(0, 4).map(e => tr('“{0}” waits on “{1}”', title(e.w), title(e.b))).join(' · ') + (list.length > 4 ? ' …' : '');
-    else { const e = list[0]; tip = e.closed ? tr('“{0}” waits on “{1}” (done)', title(e.w), title(e.b)) : conf ? tr('“{0}” starts before “{1}” is due', title(e.w), title(e.b)) : tr('“{0}” waits on “{1}”', title(e.w), title(e.b)); }
+    if (list.length > 1) tip = trn('{0} dependency', '{0} dependencies', list.length) + ': ' + list.slice(0, 4).map(e => tr('“{0}” is blocked by “{1}”', title(e.w), title(e.b))).join(' · ') + (list.length > 4 ? ' …' : '');
+    else { const e = list[0]; tip = e.closed ? tr('“{0}” is blocked by “{1}” (done)', title(e.w), title(e.b)) : conf ? tr('“{0}” starts before “{1}” is due', title(e.w), title(e.b)) : tr('“{0}” is blocked by “{1}”', title(e.w), title(e.b)); }
     if (!both) tip += ' · ' + tr('outside this view');
     const attr = list.length > 1 ? `data-rmdep="${list.map(e => e.w + ':' + e.b).join(',')}"` : `data-dep="${list[0].w}:${list[0].b}"`;
     const bx = both ? Wn.x - 12 : Wn ? Math.max(-8, Wn.x - 20) : Math.min(W + 8, Bn.x + Bn.w + 20), by = both ? Wn.y : (Wn || Bn).y;
@@ -317,7 +317,7 @@ function rmArrows() {
 function rmDepPop(g) {
   const pairs = g.dataset.rmdep.split(',').map(p => p.split(':').map(Number));
   const nm = id => { const x = S.tasks.get(id)?.title || S.depAll.closed.get(id)?.title || '?'; return x.length > 28 ? x.slice(0, 27) + '…' : x; };
-  menu(g, pairs.slice(0, 12).map(([w, b]) => ({label: tr('“{0}” waits on “{1}”', nm(w), nm(b)), icon: 'deps', fn: () => openTaskById(w)})));
+  menu(g, pairs.slice(0, 12).map(([w, b]) => ({label: tr('“{0}” is blocked by “{1}”', nm(w), nm(b)), icon: 'deps', fn: () => openTaskById(w)})));
 }
 function rmToggle(key) {
   const V = S.rmV; if (!V) return;

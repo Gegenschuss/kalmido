@@ -30,7 +30,7 @@ function statusNote(l) {
 function vsegHtml(l) {
   if (!l || !isMobile()) return '';
   const ch = viewChoices(l); if (ch.length < 2) return '';
-  const v = curView(l), short = {overview: N_('Overview')};
+  const v = curView(l), short = {overview: N_('Project|view')};
   return `<div class="vsegm" role="group" aria-label="${esc(tr('View'))}">${ch.map(([k, n, i]) => `<button type="button" class="${v === k ? 'on' : ''}" data-act="view-${k}" aria-pressed="${v === k}" title="${esc(tr(n))}">${ic(i, 's')}<span>${esc(tr(short[k] || n))}</span></button>`).join('')}</div>`;
 }
 function listHead(l, o = {}) {
@@ -70,7 +70,7 @@ async function statusModal(lid) {
   const md = modal(`<h3>${tr('Project status')} · ${esc(lname(l))}</h3>
     ${can ? `<div class="stchoice">${STATUSES.map(([k, n]) => `<button class="stopt st-${k} ${sel === k ? 'on' : ''}" data-st="${k}"><i></i>${tr(n)}</button>`).join('')}<button class="stopt st-none ${sel ? '' : 'on'}" data-st=""><i></i>${tr('No status')}</button></div>
       <textarea id="st-note" rows="3" maxlength="500" placeholder="${tr('Short update: what is going on, what is needed?')}">${esc(l.status_note || '')}</textarea>
-      <div class="shint keep">${collab() && l.shared ? tr('Everyone in this list sees the status and gets it in their News.') : tr('Shown in the list header, the sidebar and the overview.')}</div>`
+      <div class="shint keep">${collab() && l.shared ? tr('Everyone in this list sees the status and gets it in their News.') : tr('Shown in the list header, the sidebar and the project status.')}</div>`
     : `<div class="rohint">${ic('eye', 's')}${tr('View only')}</div>`}
     <h4>${tr('History')}</h4><div class="sthist" id="st-hist"><div class="muted mhint">${tr('Loading…')}</div></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button>${can ? `<button class="btn pri" data-m="save">${tr('Update status')}</button>` : ''}</div>`);
@@ -117,12 +117,12 @@ function ovMore(arr, fn) {
 function viewOverview() {
   const rows = ovRows(), shown = S.ov.only ? rows.filter(r => r.bad) : rows;
   const sum = k => rows.reduce((n, r) => n + r[k].length, 0);
-  const tiles = [[sum('overdue'), tr('overdue'), tr('open tasks past their date')], [sum('blocked'), tr('waiting'), tr('tasks waiting on another task')],
+  const tiles = [[sum('overdue'), tr('overdue'), tr('open tasks past their date')], [sum('blocked'), tr('blocked'), tr('tasks blocked by another task')],
     ...(statusOn() ? [[riskLists().length, tr('at risk'), tr('lists at risk or off track')]] : []),
     ...(collab() && S.lists.some(l => l.shared) ? [[sum('unassigned'), tr('without assignee'), tr('open tasks in shared lists')]] : [])];
   let h = `<div class="stats ovw"><div class="sttiles">${tiles.map(([v, l, s]) => `<div class="${v ? 'hot' : ''}"><b>${v}</b><span>${esc(l)}</span><small>${esc(s)}</small></div>`).join('')}</div>
     <div class="nbar"><div class="seg"><button class="${S.ov.only ? '' : 'on'}" data-act="ov-only" data-k="">${tr('All lists')}</button><button class="${S.ov.only ? 'on' : ''}" data-act="ov-only" data-k="1">${tr('Needs attention')}</button></div></div>`;
-  if (!shown.length) return h + `<div class="empty">${ic('done')}${tr('Nothing stuck. No overdue or waiting tasks.')}</div></div>`;
+  if (!shown.length) return h + `<div class="empty">${ic('done')}${tr('Nothing stuck. No overdue or blocked tasks.')}</div></div>`;
   for (const r of shown) {
     const l = r.l, p = l.progress || {done: 0, total: 0};
     const who = t => t.assignee_id ? personName(l.id, t.assignee_id) || '?' : '';
@@ -134,13 +134,13 @@ function viewOverview() {
         (collab() && l.shared ? `<div class="ovwho"><span class="avatar">${esc(initials(k || '–'))}</span>${esc(k || tr('Nobody'))} <span class="muted">${ts.length}</span></div>` : '') +
         ovMore(ts, t => ovTask(t, `<span class="over">${esc(dayLabel(t.due))}</span>`))).join('');
     }
-    if (r.blocked.length) body += `<h4>${ic('lock', 's')}${tr('Waiting')} <span class="c">${r.blocked.length}</span></h4>` + ovMore(r.blocked, t => ovTask(t, `<span class="muted ovw-on">${esc(blockedTitle(t))}</span>`));
+    if (r.blocked.length) body += `<h4>${ic('lock', 's')}${tr('Blocked')} <span class="c">${r.blocked.length}</span></h4>` + ovMore(r.blocked, t => ovTask(t, `<span class="muted ovw-on">${esc(blockedTitle(t))}</span>`));
     if (r.unassigned.length) body += `<h4>${ic('user', 's')}${tr('Without assignee')} <span class="c">${r.unassigned.length}</span></h4>` + ovMore(r.unassigned, t => ovTask(t, t.due ? `<span class="muted">${esc(dayLabel(t.due))}</span>` : ''));
     h += `<section class="stcard ovcard ${r.risk < 2 ? 'risk st-' + esc(l.status) : ''}"><div class="ovhead"><button class="ovname" data-go="l/${l.id}"><span class="sw" style="${cssColor(l.color) ? 'background:' + cssColor(l.color) : ''}"></span>${esc(lname(l))}${l.shared && collab() ? ic('users', 's') : ''}</button><span class="spacer"></span>${statusPill(l)}</div>
       ${p.total ? `<div class="ovprog">${progBar(p)}${progMeta(p)}</div>` : ''}${statusNote(l)}
       ${body || `<div class="muted ovok">${ic('check', 's')}${tr('Nothing stuck')}</div>`}</section>`;
   }
-  return h + `<p class="muted stnote">${tr('Progress: completed vs. all main tasks of the list (subtasks too if set in Settings > General), won’t do and the trash left out, recurring tasks count once. Waiting = at least one task it waits on is still open.')}</p></div>`;
+  return h + `<p class="muted stnote">${tr('Progress: completed vs. all main tasks of the list (subtasks too if set in Settings > General), won’t do and the trash left out, recurring tasks count once. Blocked = at least one task blocking it is still open.')}</p></div>`;
 }
 
 // ---- 2.7.1 (#410): the overview of a project list (tab next to List / Kanban / Timeline, project lists only; not the
@@ -164,7 +164,7 @@ async function setListView(l, v) {  // List / Kanban / Timeline (stored on the s
   if (was || v !== listView(l)) render(); else render();
 }
 // 2.13.0: in projects the overview comes first
-const viewChoices = l => [...(l.kind === 'project' && !l.is_inbox ? [['overview', N_('Project overview'), 'brief']] : []), ['list', N_('List'), 'list'], ...(feat('kanban') ? [['kanban', N_('Kanban'), 'kanban']] : []), ...(feat('timeline') ? [['timeline', N_('Timeline'), 'timeline']] : [])];
+const viewChoices = l => l.is_inbox ? [['list', N_('List'), 'list']] : [...(l.kind === 'project' && !l.is_inbox ? [['overview', N_('Project page'), 'brief']] : []), ['list', N_('List'), 'list'], ...(feat('kanban') ? [['kanban', N_('Kanban'), 'kanban']] : []), ...(feat('timeline') ? [['timeline', N_('Timeline'), 'timeline']] : [])];
 const curView = l => povOn(l) ? 'overview' : listView(l);
 async function povLoad(lid, force) {
   const d = S.povD[lid] || (S.povD[lid] = {});
@@ -360,12 +360,15 @@ function depItem(x, dir, t, ro) {
 }
 function depsHtml(t) {
   const D = S.dp.id === t.id ? S.dp : null, ro = !canEdit(t);
-  const head = `<h5>${tr('Dependencies')}${t.blocked && !t.status ? ` <span class="blk">${ic('lock', 's')}${tr('waiting')}</span>` : ''}</h5>`;
+  const head = `<h5>${tr('Dependencies')}${t.blocked && !t.status ? ` <span class="blk">${ic('lock', 's')}${tr('blocked')}</span>` : ''}</h5>`;
   if (!D) return head + `<div class="muted mhint">${tr('Loading…')}</div>`;
   if (D.err) return head + `<div class="muted mhint">${D.err === 'offline' ? tr('Dependencies are only available online.') : esc(D.err)}</div>`;
-  const add = dir => ro ? '' : `<button class="btn sm dadd" data-act="dep-add" data-dir="${dir}" data-id="${t.id}">${ic('plus', 's')} ${dir === 'by' ? tr('Waiting on…') : tr('Blocking…')}</button>`;
+  // 2.25.0 (UX-43): ONE button "Waiting on…" picks what the task waits on: another task (it is then blocked by it) or
+  // someone outside (with a follow-up day); "Blocking…" stays for the other direction
+  const add = dir => ro ? '' : dir === 'by' ? `<button class="btn sm dadd" data-act="wait-on" data-id="${t.id}" aria-haspopup="menu">${ic('hourglass', 's')} ${tr('Waiting on…|choose')}</button>`
+    : `<button class="btn sm dadd" data-act="dep-add" data-dir="${dir}" data-id="${t.id}">${ic('plus', 's')} ${tr('Blocking…')}</button>`;
   if (ro && !D.blocked_by.length && !D.blocking.length) return head + `<div class="muted mhint">${tr('No dependencies.')}</div>`;
-  return head + `<div class="dgrp"><div class="dlab">${tr('Waiting on')}</div>${D.blocked_by.map(x => depItem(x, 'by', t, ro)).join('')}${add('by')}${waitExtHtml(t, ro)}</div>
+  return head + `<div class="dgrp"><div class="dlab">${tr('Blocked by')}</div>${D.blocked_by.map(x => depItem(x, 'by', t, ro)).join('') || (ro ? '' : `<div class="muted dnone">${tr('nothing')}</div>`)}${add('by')}</div>
     <div class="dgrp"><div class="dlab">${tr('Blocking')}</div>${D.blocking.map(x => depItem(x, 'blocking', t, ro)).join('')}${add('blocking')}</div>`;
 }
 // 2.22.0 (#686): "Waiting on external" (a client's approval, an offer, a delivery) as a visible button in the task panel:
@@ -373,15 +376,22 @@ function depsHtml(t) {
 // waits (the waiting bar at the top shows it then)
 function waitExtHtml(t, ro, own) {
   if (ro || !t || t.id <= 0 || t.context || t.status !== 0 || t.waiting_at) return '';
-  const b = `<button class="btn sm dadd dwait" data-act="wait-edit" data-id="${t.id}">${ic('hourglass', 's')} ${tr('Waiting on external…')}</button>`;
+  const b = `<button class="btn sm dadd dwait" data-act="wait-edit" data-id="${t.id}">${ic('hourglass', 's')} ${tr('Waiting on someone…')}</button>`;
   return own ? `<div class="dsec waitsec"><h5>${tr('Waiting')}</h5>${b}</div>` : b;
+}
+// 2.25.0 (UX-43): the choice behind "Waiting on…": another task (blocked by) or someone outside (follow-up day)
+function waitOnMenu(anchor, id) {
+  const t = taskById(id); if (!t) return;
+  menu(anchor, [{label: tr('Another task…'), icon: 'lock', sub: tr('blocked until it is done'), fn: () => depPicker(id, 'by')},
+    t.waiting_at ? {label: tr('Waiting on someone'), icon: 'hourglass', sub: waitLabel(t) || tr('Change'), fn: () => waitDialog(id)}
+      : {label: tr('Someone outside…'), icon: 'hourglass', sub: tr('with a day to follow up'), fn: () => waitDialog(id)}]);
 }
 function depPicker(tid, dir) {
   const D = S.dp.id === tid ? S.dp : {blocked_by: [], blocking: []};
   const have = new Set((dir === 'by' ? D.blocked_by : D.blocking).filter(x => x.id).map(x => x.id));
   const self = taskById(tid);
-  const md = modal(`<h3>${dir === 'by' ? tr('Waiting on…') : tr('Blocking…')}</h3>
-    <div class="shint keep">${dir === 'by' ? tr('“{0}” can only really start once the chosen task is done.', esc(self?.title || '')) : tr('The chosen task waits on “{0}”.', esc(self?.title || ''))}</div>
+  const md = modal(`<h3>${dir === 'by' ? tr('Blocked by…') : tr('Blocking…')}</h3>
+    <div class="shint keep">${dir === 'by' ? tr('“{0}” can only really start once the chosen task is done.', esc(self?.title || '')) : tr('The chosen task is then blocked by “{0}”.', esc(self?.title || ''))}</div>
     <input id="dp-q" placeholder="${tr('Search open tasks')}" autocomplete="off" style="width:100%;margin-top:.5rem">
     <div class="dplist tpk" id="dp-list" role="listbox" aria-label="${esc(tr('Open tasks'))}"></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button></div>`);

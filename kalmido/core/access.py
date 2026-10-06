@@ -60,7 +60,7 @@ def need_time():
 
 # the user's own module switches (Settings > Layout): the action endpoints of a switched-off module refuse like the
 # list-type gating (409 with the reason); reading, stopping and the data stay. deps / fields keep their API (D2 rule).
-FEAT_OFF = {"pomo": N_("Focus (Pomodoro) is turned off in your settings"), "habits": N_("Habits are turned off in your settings"),
+FEAT_OFF = {"pomo": N_("The focus timer is turned off in your settings"), "habits": N_("Habits are turned off in your settings"),
             "time": N_("Time tracking is turned off in your settings"), "comments": N_("Comments are turned off in your settings"),
             "events": N_("Events are turned off in your settings"), "contacts": N_("Contacts are turned off in your settings"),
             # 2.22.0 (#663): the modules of "Home & life"
@@ -222,7 +222,7 @@ PROJECT_ONLY = {"time": N_("Make this list a project to track time"),
                 "deps": N_("Make both lists projects to link their tasks"),
                 "fields": N_("Make this list a project to use custom fields"),
                 "status": N_("Make this list a project to set a status"),
-                "overview": N_("Make this list a project to use its overview")}
+                "overview": N_("Make this list a project to use its project page")}
 PROJ_SQL = "(SELECT id FROM lists WHERE kind='project')"
 
 
