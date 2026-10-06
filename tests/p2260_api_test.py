@@ -17,6 +17,7 @@
 usage: p2260_api_test.py <datadir>"""
 import os
 import sqlite3
+import subprocess
 import sys
 
 import requests
@@ -72,6 +73,7 @@ def events(hdr, key):
     return j["data"]
 
 
+subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], check=True, stdout=subprocess.DEVNULL)  # a fresh container (shares a group)
 s0 = requests.Session()
 s0.headers.update(H)
 r = s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"})
