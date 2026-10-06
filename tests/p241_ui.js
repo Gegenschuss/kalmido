@@ -16,6 +16,7 @@ const WS = globalThis.WebSocket || require('ws');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
+const {shareAny} = require('./legacy');  // 2.26.0: one agent per list
 const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
@@ -67,7 +68,7 @@ async function firefox(fn) {
   const ag2 = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'helper', display_name: 'Helper'});
   const ag3 = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'robo', display_name: 'Robo'});
   const L = (await call('POST', '/api/lists', {name: 'Household'})).id;
-  for (const [id, role] of [[ag3.id, 'participant'], [ag.id, 'edit'], [ag2.id, 'edit']]) await call('PUT', `/api/lists/${L}/members`, {user_id: id, role});
+  for (const [id, role] of [[ag3.id, 'participant'], [ag.id, 'edit'], [ag2.id, 'edit']]) await shareAny(call, DATA, L, id, role);
   const T = (await call('POST', '/api/tasks', {title: 'Fix the dripping tap', list_id: L})).id;
   const adm = async id => (await call('GET', '/api/admin/agents')).agents.find(a => a.id === id);
 
@@ -132,7 +133,7 @@ async function firefox(fn) {
 
   // ================= #375 the chat header, #376 no Wake button
   const L2 = (await call('POST', '/api/lists', {name: 'Chat'})).id;
-  await call('PUT', `/api/lists/${L2}/members`, {user_id: ag.id, role: 'edit'});
+  await shareAny(call, DATA, L2, ag.id, 'edit');
   const T2 = (await call('POST', '/api/tasks', {title: 'Write the offer', list_id: L2})).id;
   await v1(ag.token, 'GET', '/agent/events?since=0');  // online
   w = await boot({user: 'alice', hash: 'agents'}); d = w.document;

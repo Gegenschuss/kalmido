@@ -50,6 +50,7 @@ const taskOf = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)
   const P = (await call('POST', '/api/lists', {name: 'App', kind: 'project'})).id;
   await call('PUT', `/api/lists/${P}/members`, {user_id: BOB, role: 'edit'});
   await call('PUT', `/api/lists/${P}/members`, {user_id: ag.id, role: 'edit'});
+  await call('PATCH', `/api/lists/${P}`, {agent_members: true});  // 2.26.0: members may use the agent (default off)
   const T1 = (await call('POST', '/api/tasks', {title: 'Login broken', list_id: P})).id;
   const T4 = (await call('POST', '/api/tasks', {title: 'Closed by a commit', list_id: P})).id;
   const T9 = (await call('POST', '/api/tasks', {title: 'CSV export', list_id: P, assignee_id: ag.id})).id;

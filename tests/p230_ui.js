@@ -144,7 +144,7 @@ async function firefox(fn) {
   // ================= the inbox selection
   w = await boot({user: 'alice', hash: 'inbox'}); d = w.document;
   w.eval(`S.multi.add(${I1}); S.multi.add(${I2}); renderMultiBar()`);
-  const mb = d.querySelector('#mbar [data-act="mb-sort"]');
+  const mb = d.querySelector('#detail.multi [data-act="mb-sort"]');  // 2.26.0 (#936): in the multi panel's header
   check(mb && /Sort with Claude/.test(mb.getAttribute('title')), 'selection bar: Sort with Claude…');
   click(w, mb);
   md = await until(() => d.querySelector('.modal.ppreq'));
@@ -156,8 +156,8 @@ async function firefox(fn) {
   click(w, md.querySelector('[data-m="ok"]'));
   await until(() => !d.querySelector('.modal.ppreq'));
   check(w.eval('S.multi.size') === 0, 'selection cleared after sending');
-  w.eval(`S.multi.add(${T}); renderMultiBar()`);
-  check(!d.querySelector('#mbar [data-act="mb-sort"]'), 'not for a task outside the inbox');
+  w.eval(`S.multi.add(${T}); S.multi.add(${I1}); renderMultiBar()`);
+  check(d.querySelector('#detail.multi') && !d.querySelector('[data-act="mb-sort"]'), 'not for a task outside the inbox');
   w.close();
   const JT = (await jobs()).find(j => j.kind === 'triage');
   const tin = (await v1(ag.token, 'GET', `/agent/jobs/${JT.id}`)).input;

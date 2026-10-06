@@ -27,6 +27,22 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
+
+
+def put_member(s, lid, uid, role):
+    """2.26.0: shares like PUT /lists/{id}/members; a second agent (one agent per list) joins as in a list from before the
+    update, and the list's members may use its agents (the list switch, default off since 2.26.0). Returns a truthy object."""
+    r = s.put(B + f"/api/lists/{lid}/members", json={"user_id": uid, "role": role})
+    if r.status_code == 409 and "one agent" in r.text.lower():
+        c_ = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+        c_.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,0,'2026-01-01T00:00:00+00:00')",
+                   (lid, uid, role, role))
+        c_.commit()
+        c_.close()
+    s.patch(B + f"/api/lists/{lid}", json={"agent_members": True, "agent_peers": True})
+    return r.status_code == 409 or r.ok
+
+
 V = B + "/api/v1"
 H = {"X-Requested-With": "kalmido"}
 FAILS, OKS = [], [0]
@@ -189,7 +205,7 @@ check(cl4.get("/agent").json()["runtime"]["model"] == "opus" and not kinds(cl4, 
 # ================================================================== #379 one tidy agent per list
 L = A.post(B + "/api/lists", json={"name": "Inbox cleanup"}).json()["id"]
 for uid, role in ((BOB, "edit"), (AG3, "participant"), (AG, "edit"), (AG2, "edit")):
-    assert A.put(B + f"/api/lists/{L}/members", json={"user_id": uid, "role": role}).ok
+    assert put_member(A, L, uid, role)
 check(lst(A, L)["tidy_agent_id"] == AG, f"default: the first agent with edit rights (robo is a participant): {lst(A, L)['tidy_agent_id']}")
 check(A.patch(B + f"/api/lists/{L}", json={"agent_tidy": "suggest"}).ok, "tidy on")
 curs = {k: c.get("/agent").json()["events_cursor"] for k, c in (("cl", cl), ("cl2", cl2), ("ro", ro))}
@@ -220,7 +236,7 @@ check(cl2.post(f"/tasks/{T2}/tidy", json={"title": "Filters: vacuum + hood"}).ok
 # the tidy agent leaves the list -> the first remaining candidate; comes back -> still the chosen one
 assert A.delete(B + f"/api/lists/{L}/members/{AG2}").ok
 check(lst(A, L)["tidy_agent_id"] == AG, "helper left: claude tidies up")
-assert A.put(B + f"/api/lists/{L}/members", json={"user_id": AG2, "role": "edit"}).ok
+assert put_member(A, L, AG2, "edit")
 check(lst(A, L)["tidy_agent_id"] == AG2, "helper back: the stored choice counts again")
 check(A.patch(B + f"/api/lists/{L}", json={"agent_tidy": "suggest", "tidy_agent_id": AG}).ok and lst(A, L)["tidy_agent_id"] == AG
       and lst(A, L)["agent_tidy"] == "suggest", "mode + agent in one PATCH")
@@ -239,7 +255,7 @@ check({"runtime_changed", "reset"} <= set(spec["components"]["schemas"]["AgentEv
 AG5, cl5 = new_agent(A, "chatty")
 C = A.post(B + "/api/lists", json={"name": "Chat list"}).json()["id"]
 for uid in (BOB, AG5):
-    A.put(B + f"/api/lists/{C}/members", json={"user_id": uid, "role": "edit"})
+    put_member(A, C, uid, "edit")
 a4 = agent_seen(A, AG5)
 check(a4 and a4["online"] is None and a4["last_poll_at"] is None and a4["poll_age"] is None and a4["typing"] == 0,
       f"never polled: online null ({a4 and {k: a4.get(k) for k in ('online', 'last_poll_at', 'poll_age')}})")

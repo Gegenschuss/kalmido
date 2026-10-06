@@ -810,7 +810,7 @@ function assignMenu(anchor, id) {
   const gs = listGroups(t.list_id);
   menu(anchor, [...take, ...(take.length ? ['-'] : []), ...(t.assignee_id ? [{label: tr('Show {0}', cur || '?'), icon: 'user', cls: 'mshow', fn: () => personCard(anchor, t.assignee_id)}, '-'] : []),  // 2.7.2 (#418)
     {label: tr('Nobody'), icon: 'x', on: !t.assignee_id && !t.assignee_group_id, fn: () => set(null)}, '-',
-    ...listPeople(listById(t.list_id)).map(p => ({label: p.name + (S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : '') + (p.role === 'participant' ? ' · ' + tr('Participant') : p.role === 'view' ? ' · ' + tr('Viewer') : ''),
+    ...listPeople(listById(t.list_id)).filter(p => listById(t.list_id)?.agents_open !== false || !(p.agent || agentById(p.user_id)) || p.user_id === t.assignee_id).map(p => ({label: p.name + (S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : '') + (p.role === 'participant' ? ' · ' + tr('Participant') : p.role === 'view' ? ' · ' + tr('Viewer') : ''),
       icon: 'user', on: p.user_id === t.assignee_id, fn: () => set(p.user_id)})),
     ...(gs.length ? ['-', ...gs.map(g => ({label: g.name + ' · ' + tr('Group'), icon: 'users', on: g.group_id === t.assignee_group_id, fn: () => setG(g.group_id)}))] : [])]);
 }

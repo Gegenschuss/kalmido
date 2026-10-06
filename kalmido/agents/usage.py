@@ -808,7 +808,11 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                                         description="2.18.0 (#408): agency | software | private; null = none (a plain list or project)")
     schemas["Comment"]["properties"]["reactions"] = {"type": "array", "items": {"type": "object"}}
     schemas["Comment"]["properties"]["suggestion"] = {"oneOf": [{"type": "null"}, {"type": "object"}]}
-    schemas["CommentInput"]["properties"]["suggestion"] = ref("TidyInput")
+    schemas["CommentInput"]["properties"]["suggestion"] = {"oneOf": [ref("TidyInput"), {"type": "object", "description":
+        "2.2.0 merge request {kind: merge_request, pr_url, summary?}; 2.26.0 (#949) approval requests without a pull request: "
+        "{kind: integrate, source, target? (main), summary?, evidence} / {kind: deploy, summary?, evidence, integrations?: "
+        "[comment ids of approved integrate requests]} -- deploy also carries the checklist (open tasks with the list tag deploy). "
+        "An approver decides with 👍 / 👎 (POST /comments/{id}/decide in the app); the result arrives as a reaction event with data.gate"}]}
     schemas["Tag"]["properties"].update(kind={"type": "string", "enum": ["personal", "list"]}, list_id={"type": "integer"},
                                          id={"type": "integer"}, color={"type": "string"})
     AG, W = "Agents", "write"
@@ -833,6 +837,16 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                              # 2.3.0: one job; a proposal job also with input (what the person sent), proposal and limits
                              "get": op("One job of the agent (proposal jobs: kind, input, proposal, limits)", AG, ok(ref("Job")) | errs("403", "404"),
                                        [pid("id", "Job id")])},
+        # 2.26.0 (#949): a proposal to another topic (a list the agent cannot see)
+        "/agent/proposals": {"post": op(
+            "Propose tasks for a list you cannot see (another topic). Lands as a proposal with the list's owner (no event for the "
+            "agents there); only when a person applies it do tasks exist. Allowed: lists owned by a person you already work with; "
+            "others answer 404", AG, ok(ref("Job"), "Created", "201") | errs("400", "403", "404", "429"), scope=W,
+            body={"type": "object", "required": ["list_id", "title", "reason", "tasks"], "properties": {
+                "list_id": {"type": "integer"}, "title": {"type": "string", "maxLength": 300}, "reason": {"type": "string", "maxLength": 5000},
+                "summary": {"type": "string"},
+                "tasks": {"type": "array", "items": {"type": "object", "required": ["title"], "properties": {
+                    "title": {"type": "string"}, "notes": {"type": "string"}, "due": {"type": "string", "format": "date"}}}}}})},
         "/agent/jobs/{id}/proposal": {"post": op(
             "Submit the structured proposal for a job_request (kind project | subtasks | triage | extract | dayplan; see docs/AGENTS.md). "
             "Validated; replaces an earlier one until the person applied or discarded it", AG,

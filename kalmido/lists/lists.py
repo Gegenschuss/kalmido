@@ -208,6 +208,8 @@ def list_create():
     view = clean_list_value("view", b.get("view") or "list")
     kind = clean_list_value("kind", b["kind"]) if b.get("kind") else "list"
     fam = clean_list_value("family", b.get("family"))  # 2.19.0 (#653)
+    if fam and kind == "project":  # 2.26.0: a project is never a family list
+        return err(tr("A project cannot be a family list"))
     if fam:
         c = db()
         lid = fam_list_create(c, me(), fam, name, folder)
@@ -256,6 +258,17 @@ def list_update(lid):
         except BadInput as e:
             return err(str(e))
         b = {k: v for k, v in b.items() if k != "listen_agent_ids"}
+    if b.get("family"):  # 2.26.0: a project is never a family list (an existing value stays untouched)
+        knd = b.get("kind") or c.execute("SELECT kind FROM lists WHERE id=?", (lid,)).fetchone()[0]
+        if knd == "project":
+            return err(tr("A project cannot be a family list"))
+    if "agent_members" in b or "agent_peers" in b:  # 2.26.0 (#928)
+        from ..agents.core import list_agent_access_update
+        try:
+            list_agent_access_update(c, lid, b)
+        except BadInput as e:
+            return err(str(e))
+        b = {k: v for k, v in b.items() if k not in ("agent_members", "agent_peers")}
     if "client_id" in b:  # 2.23.0 (#463): the client of the list (owner / list admins, a client they see)
         from ..team.clients import list_client_set
         try:
@@ -465,6 +478,9 @@ def member_set(lid):
         if old[0] != eff:
             news_add(c, uid, "role", list_id=lid, data={"role": eff, "old": old[0], "name": lname})
     else:
+        from ..core.access import ONE_AGENT_MSG, list_other_agent
+        if list_other_agent(c, lid, uid):  # 2.26.0: one agent per list
+            return err(tr(ONE_AGENT_MSG), 409)
         c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?)",
                   (lid, uid, role, role, my_max_sort(c, uid) + 1, iso(now_utc())))
         member_folder_adopt(c, lid, uid)  # 2.22.0 (#740)
@@ -509,6 +525,9 @@ def _folder_member_add(c, lid, uid, role, actor):
     if not u or not l or l["is_inbox"] or l["owner_id"] == uid or (is_agent(u) and l["life"] == "health"):
         return False
     if c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone():
+        return False
+    from ..core.access import list_other_agent
+    if list_other_agent(c, lid, uid):  # 2.26.0: one agent per list (the list is skipped)
         return False
     role = "participant" if is_kid(c, uid) else role
     c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?)",
@@ -565,11 +584,16 @@ def folder_people_put():
         return err(tr("unknown user"), 404)
     c.execute("INSERT INTO folder_people(owner_id,folder,user_id,role,created_at) VALUES(?,?,?,?,?) ON CONFLICT(owner_id,folder,user_id) "
               "DO UPDATE SET role=excluded.role", (me(), f, uid, role, iso(now_utc())))
-    n = sum(1 for r in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND archived=0 AND is_inbox=0", (me(),)).fetchall()
-            if _in_folder(r["folder"], f) and _folder_member_add(c, r["id"], uid, role, me()))
+    from ..core.access import ONE_AGENT_MSG, list_other_agent
+    rows = [r for r in c.execute("SELECT id, name, folder FROM lists WHERE owner_id=? AND archived=0 AND is_inbox=0", (me(),)).fetchall()
+            if _in_folder(r["folder"], f)]
+    # 2.26.0: one agent per list -- lists that already have another agent are skipped and named in the answer
+    skipped = [{"id": r["id"], "name": r["name"]} for r in rows if list_other_agent(c, r["id"], uid)
+               and not c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (r["id"], uid)).fetchone()]
+    n = sum(1 for r in rows if _folder_member_add(c, r["id"], uid, role, me()))
     bump(c)
     c.commit()
-    return jsonify(shared=n)
+    return jsonify(shared=n, **({"skipped": skipped, "skipped_reason": tr(ONE_AGENT_MSG)} if skipped else {}))
 
 
 @app.delete("/api/folders/people")
@@ -623,8 +647,10 @@ def agent_share_add(c, lid, aid, actor):
     """Share list lid with agent aid (role edit) like PUT /api/lists/<lid>/members; False if it was a member already."""
     from ..collab.news import news_add
     from ..integrations.webhooks import wh_note_list
+    from ..core.access import list_other_agent
     if c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, aid)).fetchone() or \
-            c.execute("SELECT 1 FROM lists WHERE id=? AND life='health'", (lid,)).fetchone():  # 2.22.0 (#663)
+            c.execute("SELECT 1 FROM lists WHERE id=? AND life='health'", (lid,)).fetchone() or \
+            list_other_agent(c, lid, aid):  # 2.22.0 (#663) health; 2.26.0: one agent per list
         return False
     lname = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]
     c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?)",
@@ -670,11 +696,43 @@ def agent_share_state(aid):
 
 def agent_share_counts(c, aid, d):
     skip = set(d["skip"].get(str(aid), []))
-    rows = c.execute("""SELECT l.id, EXISTS(SELECT 1 FROM list_members m WHERE m.list_id=l.id AND m.user_id=?) AS has
-                        FROM lists l WHERE l.owner_id=? AND l.is_inbox=0 AND COALESCE(l.archived,0)=0""", (aid, me())).fetchall()
+    # 2.26.0: a list that already has another agent is not "missing" (one agent per list)
+    rows = c.execute("""SELECT l.id, EXISTS(SELECT 1 FROM list_members m WHERE m.list_id=l.id AND m.user_id=?) AS has,
+                        EXISTS(SELECT 1 FROM list_members m JOIN users u ON u.id=m.user_id WHERE m.list_id=l.id AND u.kind='agent'
+                               AND m.user_id!=?) AS other
+                        FROM lists l WHERE l.owner_id=? AND l.is_inbox=0 AND COALESCE(l.archived,0)=0""", (aid, aid, me())).fetchall()
     return {"own": len(rows), "shared": sum(1 for r in rows if r["has"]),
-            "missing": sum(1 for r in rows if not r["has"] and r["id"] not in skip),
+            "missing": sum(1 for r in rows if not r["has"] and not r["other"] and r["id"] not in skip),
             "skipped": sum(1 for r in rows if not r["has"] and r["id"] in skip)}
+
+
+@app.put("/api/lists/<int:lid>/agent")
+def list_agent_set(lid):
+    """2.26.0: {agent_id: int | null, role?} -- THE agent of list lid (one agent per list): removes the current agent
+    member (if another) and shares the list with the new one in one step; null = no agent. Owner / list admins.
+    Answers {previous: id | null, agent_id} so the client can offer Undo."""
+    from ..api.v1 import v1_call
+    from ..agents.core import agent_ids
+    need_collab()
+    c, b = db(), body()
+    role = need_list(c, lid, write=False)
+    if role not in MANAGE_ROLES:
+        raise Denied(403)
+    new = b.get("agent_id")
+    if new is not None and (isinstance(new, bool) or not isinstance(new, int) or new not in agent_ids(c)):
+        return err(tr("Invalid value: {0}", "agent_id"))
+    lr = c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()
+    if lr["owner_id"] in agent_ids(c):
+        return err(tr("The list belongs to an agent"), 409)
+    cur = [r[0] for r in c.execute("SELECT m.user_id FROM list_members m JOIN users u ON u.id=m.user_id WHERE m.list_id=? AND u.kind='agent' "
+                                   "ORDER BY m.user_id", (lid,))]
+    if new is not None and new in cur:
+        return jsonify(previous=new, agent_id=new)
+    for old in cur:
+        v1_call(member_remove, lid, old)
+    if new is not None:
+        v1_call(member_set, lid, body={"user_id": new, "role": b.get("role") or "edit"})
+    return jsonify(previous=cur[0] if cur else None, agent_id=new)
 
 
 @app.post("/api/agents/<int:aid>/share-all")
@@ -684,14 +742,19 @@ def agent_share_all(aid):
     agent_share_target(c, aid)
     d = agent_share_get(c, me())
     skip = set(d["skip"].get(str(aid), []))
-    n = 0
-    for (lid,) in c.execute("SELECT id FROM lists WHERE owner_id=? AND is_inbox=0 AND COALESCE(archived,0)=0 ORDER BY id",
-                            (me(),)).fetchall():
-        if lid not in skip and agent_share_add(c, lid, aid, me()):
+    from ..core.access import ONE_AGENT_MSG, list_other_agent
+    n, other = 0, []
+    for (lid, name) in c.execute("SELECT id, name FROM lists WHERE owner_id=? AND is_inbox=0 AND COALESCE(archived,0)=0 ORDER BY id",
+                                 (me(),)).fetchall():
+        if lid in skip:
+            continue
+        if agent_share_add(c, lid, aid, me()):
             n += 1
+        elif list_other_agent(c, lid, aid) and not c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, aid)).fetchone():
+            other.append({"id": lid, "name": name})  # 2.26.0: one agent per list
     bump(c)
     c.commit()
-    return jsonify(added=n, **agent_share_counts(c, aid, d))
+    return jsonify(added=n, **agent_share_counts(c, aid, d), **({"other_agent": other, "other_agent_reason": tr(ONE_AGENT_MSG)} if other else {}))
 
 
 def list_created(c, uid, lid, agents=True):

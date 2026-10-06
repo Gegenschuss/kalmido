@@ -75,6 +75,7 @@ def visible_lists(c, uid):
     prog = list_progress(c, ids, subs, uid)
     ltags = ltags_of_lists(c, ids)
     ag = agent_ids(c)
+    viewer_admin = bool((c.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone() or [0])[0])
     for ms in members.values():
         for m in ms:
             if m["user_id"] in ag:
@@ -118,6 +119,9 @@ def visible_lists(c, uid):
         lag = ({r["owner_id"]} if r["owner_id"] in ag else set()) | {m["user_id"] for m in d["members"] if m.get("agent")}
         d["listen_agent_ids"] = listen_ids(r["agent_listen"], r["agent_tidy"], d["tidy_agent_id"], lag)
         d.pop("agent_listen", None)
+        # 2.26.0 (#928): may the viewer address this list's agents (mention, assign, chat)? owner / list admin / instance
+        # admin, a list of an agent, or "Members may see and use the agent" on
+        d["agents_open"] = d["role"] in ("owner", "admin") or bool(r["agent_members"]) or r["owner_id"] in ag or viewer_admin
         d["columns"] = columns_out(r["col_cfg"], lfids.get(r["id"], set()))  # 2.14.0 (#425)
         d["trip"] = _jtrip(r["trip"])  # 2.22.0 (#663): {from, to, where} of a trip list, else null
         d.pop("col_cfg", None)

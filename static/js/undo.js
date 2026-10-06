@@ -37,8 +37,9 @@ function reverseOf(before, after, fields = UNDO_FIELDS) {
       continue;
     }
     if (!(k in before) && !(k in after)) continue;
-    const a = k === 'tags' ? [...(before.tags || [])].sort().join('\u0001') : nv(before[k]), b = k === 'tags' ? [...(after.tags || [])].sort().join('\u0001') : nv(after[k]);
-    if (a !== b) { back[k] = k === 'tags' ? [...(before.tags || [])] : nv(before[k]); prev[k] = k === 'tags' ? [...(after.tags || [])] : nv(after[k]); }
+    const arr = k === 'tags' || k === 'ltags';  // 2.26.0 (#936): list tags too (the multi panel adds / removes them)
+    const a = arr ? [...(before[k] || [])].sort().join('\u0001') : nv(before[k]), b = arr ? [...(after[k] || [])].sort().join('\u0001') : nv(after[k]);
+    if (a !== b) { back[k] = arr ? [...(before[k] || [])] : nv(before[k]); prev[k] = arr ? [...(after[k] || [])] : nv(after[k]); }
   }
   return Object.keys(back).length ? {...back, _prev: prev} : null;
 }

@@ -33,6 +33,22 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
+
+
+def put_member(s, lid, uid, role):
+    """2.26.0: shares like PUT /lists/{id}/members; a second agent (one agent per list) joins as in a list from before the
+    update, and the list's members may use its agents (the list switch, default off since 2.26.0). Returns a truthy object."""
+    r = s.put(B + f"/api/lists/{lid}/members", json={"user_id": uid, "role": role})
+    if r.status_code == 409 and "one agent" in r.text.lower():
+        c_ = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+        c_.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,0,'2026-01-01T00:00:00+00:00')",
+                   (lid, uid, role, role))
+        c_.commit()
+        c_.close()
+    s.patch(B + f"/api/lists/{lid}", json={"agent_members": True, "agent_peers": True})
+    return r.status_code == 409 or r.ok
+
+
 V = B + "/api/v1"
 H = {"X-Requested-With": "kalmido"}
 CONTAINER = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
@@ -135,7 +151,7 @@ AG, cl = new_agent(A, "claude")
 AG2, cl2 = new_agent(A, "helper")
 L = A.post(B + "/api/lists", json={"name": "Team"}).json()["id"]
 for x in (AG, AG2):
-    assert A.put(B + f"/api/lists/{L}/members", json={"user_id": x, "role": "edit"}).ok
+    assert put_member(A, L, x, "edit")
 T = A.post(B + "/api/tasks", json={"title": "Shared", "list_id": L}).json()["id"]
 SECRET = "TOPSECRET-TITLE-4711"
 

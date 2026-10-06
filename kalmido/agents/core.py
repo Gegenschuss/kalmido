@@ -48,7 +48,9 @@ from ..integrations.webhooks import wh_actor, wh_log, WH_QUEUE_MAX
 # comments with a structured suggestion (comments.suggestion); 👍 by someone who may change the task (or "Apply") applies
 # it. auto = the agent applies it itself (POST /api/v1/tasks/<id>/tidy). Either way the original text stays verbatim at
 # the top of the notes as "**Original (Name):** ...".
-AGENT_STATUSES = ("idle", "working", "waiting", "error")
+# 2.26.0 (#949): paused = the agent does not handle its events for now (text = the reason, shown to people: chip, chat,
+# list); events keep queueing and are handled after it reports another status. Not the kill switch (enabled = 0).
+AGENT_STATUSES = ("idle", "working", "waiting", "error", "paused")
 AGENT_EVENTS = ("mention", "comment", "assigned", "unassigned", "chat", "reaction", "job", "tidy", "wake", "ping",
                 "followup_due",  # 2.1.0 (#335): the follow-up day of a task waiting on external
                 "job_request",   # 2.3.0 (#260-#263): a person asks for a proposal
@@ -152,14 +154,23 @@ def agent_emit(c, aid, event, data, actor="auto"):
     a = agent_row(c, aid)
     if not agent_active(a):
         return None
+    lid = None
     if isinstance(data, dict):  # 2.22.0 (#663): nothing of a health list ever reaches an agent
-        lid = data.get("list_id") or (data.get("task") or {}).get("list_id") or (data.get("list") or {}).get("id")
+        lid = data.get("list_id") or (data.get("task") or {}).get("list_id") or (data.get("list") or {}).get("id") \
+            or (data.get("room") or {}).get("list_id")
         if lid and c.execute("SELECT 1 FROM lists WHERE id=? AND life='health'", (lid,)).fetchone():
             return None
     if actor == "auto":
         actor = wh_actor(c) if has_request_context() and getattr(g, "user", None) else None
     if actor and actor.get("id") == aid:
         return None
+    # 2.26.0 (#928): who may address the agent. Another agent's actions reach it only in lists with "Agents may address
+    # each other" on (any event); a person's mention / comment / assignment / reaction / team chat / nudge only where the
+    # agent is open to them (agent_usable: the list's owner / admins, everyone with "Members may see and use the agent").
+    if actor and lid and event not in AGENT_UNGATED:
+        if actor.get("kind") == "agent" or event in AGENT_GATED:
+            if not agent_usable(c, aid, actor["id"], lid):
+                return None
     ev, ts = str(uuid.uuid4()), iso(now_utc())
     via = (act_via() or "web") if has_request_context() else "web"
     seq = c.execute("INSERT INTO agent_events(agent_id,uuid,event,payload,created_at) VALUES(?,?,?,'{}',?)", (aid, ev, event, ts)).lastrowid
@@ -323,6 +334,20 @@ def list_listen_update(c, lid, ids):
     c.execute("UPDATE lists SET agent_listen=? WHERE id=?", (",".join(str(x) for x in sorted(set(ids))), lid))
 
 
+def list_agent_access_update(c, lid, b):
+    """2.26.0 (#928): "Members may see and use the agent" (agent_members) / "Agents may address each other" (agent_peers):
+    the list's owner or a list admin (a list that belongs to an agent: its members with edit rights); never an agent."""
+    role = need_list(c, lid, write=False)
+    owner = c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0]
+    if is_agent(g.user) or not (role in MANAGE_ROLES or (owner in agent_ids(c) and role in WRITE_ROLES)):
+        raise Denied(403, tr("Only the list owner or a list admin can change this"))
+    for k in ("agent_members", "agent_peers"):
+        if k in b:
+            if not isinstance(b[k], bool) and b[k] not in (0, 1):
+                raise BadInput(tr("Invalid value: {0}", k))
+            c.execute(f"UPDATE lists SET {k}=? WHERE id=?", (int(bool(b[k])), lid))
+
+
 def tidy_candidates(c, lid):
     """2.4.1 (#379): agents of list lid that may tidy it up (owner / list admin / edit rights; participants and viewers
     cannot change other people's tasks)."""
@@ -437,6 +462,20 @@ def agent_contact_age(c, a):
     return round((now_utc() - parse_iso(last)).total_seconds()) if last else None
 
 
+AGENT_NO_SERVICE_S = 600
+
+
+def _no_service(c, a):
+    """2.26.0 (#933): True when the agent made an API call in the last AGENT_NO_SERVICE_S but polled no events for that long
+    (or never) -- "connected, but no service running". Webhook agents: never."""
+    if a["webhook_id"]:
+        return False
+    age = agent_contact_age(c, a)
+    if age is None or age > AGENT_NO_SERVICE_S:
+        return False
+    return not a["last_poll_at"] or (now_utc() - parse_iso(a["last_poll_at"])).total_seconds() > AGENT_NO_SERVICE_S
+
+
 def agent_typing_to(a, uid):
     """Seconds left of the agent's typing signal to person uid in the chat (0 = none)."""
     if not uid or a["typing_user"] != uid:
@@ -452,8 +491,42 @@ def is_approver(c, t, uid):
     return list_role(c, t["list_id"], uid) in MANAGE_ROLES or t["assignee_id"] == uid or bool(u["is_admin"])
 
 
+# 2.26.0 (#928): the events a person can only send to an agent where the agent is open to them (agent_usable); the
+# others are list automations the list's owner switched on (tidy, task_added) or checked where they start (job_request:
+# POST /api/proposals, chat: agent_shares, job: job_may_act). An agent's actions never reach another agent unless the list
+# has agent_peers on (every event).
+AGENT_GATED = ("mention", "comment", "assigned", "unassigned", "reaction", "team_message", "wake")
+AGENT_UNGATED = ("job", "ping", "runtime_changed", "reset", "followup_due")
+# 2.26.0 (#928): the SQL condition "list l is open to person ? for agent ?": owner, list admin (own role), the list
+# belongs to that agent (it shared the list itself); parameters (person, agent, person) or the owner switched on "Members may see and use the agent"
+_OPEN_SQL = """(l.owner_id=? OR l.owner_id=? OR EXISTS(SELECT 1 FROM list_members m
+               WHERE m.list_id=l.id AND m.user_id=? AND (l.agent_members=1 OR m.role IN ('owner','admin'))))"""
+
+
+def agent_usable(c, aid, uid, lid):
+    """2.26.0 (#928): may uid (a person or another agent) address agent aid in list lid (mention, assign, comment to it,
+    chat about it)? A personal agent: only its owner. Another agent: only with lists.agent_peers on. A person: an instance
+    admin, the list's owner / admins, or every member while lists.agent_members is on. Both must be in the list."""
+    from ..agents.admin import agent_owner
+    if uid == aid:
+        return True
+    u = c.execute("SELECT kind, is_admin FROM users WHERE id=?", (uid,)).fetchone()
+    lst = c.execute("SELECT agent_members, agent_peers FROM lists WHERE id=?", (lid,)).fetchone()
+    if not u or not lst or not list_role(c, lid, uid) or not list_role(c, lid, aid):
+        return False
+    if u["kind"] == "agent":
+        return bool(lst["agent_peers"])
+    o = agent_owner(c, aid)
+    if o is not None:
+        return o == uid
+    if u["is_admin"]:
+        return True
+    return bool(c.execute(f"SELECT 1 FROM lists l WHERE l.id=? AND {_OPEN_SQL}", (lid, uid, aid, uid)).fetchone())
+
+
 def agent_shares(c, aid, uid):
-    """Does uid share a list with agent aid (or is uid an admin)? 2.7.2 (#420): a personal agent only with its owner."""
+    """Does uid share a list with agent aid (or is uid an admin)? 2.7.2 (#420): a personal agent only with its owner.
+    2.26.0 (#928): only lists open to uid for their agents count (see _OPEN_SQL; default: owner and list admins)."""
     from ..agents.admin import agent_owner
     o = agent_owner(c, aid)
     if o is not None:
@@ -461,8 +534,8 @@ def agent_shares(c, aid, uid):
     u = c.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone()
     if u and u["is_admin"]:
         return True
-    return bool(c.execute(f"""SELECT 1 FROM lists WHERE id IN {vis_sql()} AND (owner_id=? OR id IN
-                              (SELECT list_id FROM list_members WHERE user_id=?)) LIMIT 1""", (uid, uid, aid, aid)).fetchone())
+    return bool(c.execute(f"""SELECT 1 FROM lists l WHERE l.id IN {vis_sql()} AND {_OPEN_SQL} AND (l.owner_id=? OR l.id IN
+                              (SELECT list_id FROM list_members WHERE user_id=?)) LIMIT 1""", (aid, aid, uid, aid, uid, uid, uid)).fetchone())
 
 
 def need_chat_agent(c, aid):
@@ -522,6 +595,8 @@ def agent_public(c, a, uid=None):
             "display_name": a["display_name"] or a["username"],
             "avatar": avatar_url(c.execute("SELECT * FROM users WHERE id=?", (a["user_id"],)).fetchone()),
             "enabled": agent_active(a), "status": a["status"] or "idle", "status_text": a["status_text"] or "", "status_at": a["status_at"],
+            # 2.26.0 (#949): paused with a reason (the agent itself, its owner or an admin)
+            "paused": a["status"] == "paused", "pause_reason": (a["status_text"] or "") if a["status"] == "paused" else "",
             # 2.0.2: the task it says it works on (only when the viewer may see it) + the tasks of its running jobs
             "status_task": a["status_task"] if a["status_task"] and (uid is None or task_visible(c, a["status_task"], uid, full=True)) else None,
             "job_tasks": sorted({j["task_id"] for j in jobs if j["state"] == "running" and j["task_id"]}),
@@ -535,6 +610,9 @@ def agent_public(c, a, uid=None):
             # "online": false counts
             "webhook": bool(a["webhook_id"]), "contact_age": agent_contact_age(c, a),
             "poll_age": round((now_utc() - parse_iso(a["last_poll_at"])).total_seconds()) if a["last_poll_at"] else None,
+            # 2.26.0 (#933): its token is in use (an interactive session) but nothing collects its events -- the setup is not
+            # finished until a service (launcher / LaunchAgent / task) keeps polling
+            "no_service": _no_service(c, a),
             "my_job": bool(uid) and any(j["state"] == "running" and j["user_id"] == uid for j in jobs)}
 
 

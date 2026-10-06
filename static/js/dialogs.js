@@ -382,7 +382,7 @@ function shareModal(id) {
     if (aw) {
       const ags = people.filter(isAg), acand = users ? users.filter(u => u.agent && !people.some(p => p.user_id === u.id)) : [];
       aw.innerHTML = ags.length || (mng && acand.length) ? `<h4 id="sh-ag-h">${tr('Agents')}</h4>${hint(tr('An agent sees exactly the lists shared with it, nothing else. Stopping the sharing ends its access at once.'))}
-        <div class="members" id="sh-agents">${ags.map(p => row(cur, p, mng)).join('')}${mng && acand.length ? `<div class="mrow madd"><select id="sh-addagent" aria-label="${esc(tr('Share with an agent'))}"><option value="">${tr('Share with an agent …')}</option>${acand.map(u => `<option value="${u.id}">${esc(u.display_name)}</option>`).join('')}</select>${roleSel('id="sh-agrole"', 'edit')}<button class="btn sm" data-m="share-ag">${ic('plus', 's')} ${tr('Add')}</button></div>` : ''}</div>
+        <div class="members" id="sh-agents">${mng && !agentById(cur.owner_id) && (users || []).some(u => u.agent) ? '' : ags.map(p => row(cur, p, mng)).join('')}${mng && !agentById(cur.owner_id) && (users || []).some(u => u.agent) ? `<div class="row"><label for="sh-agsel">${tr('Agent')}</label><select id="sh-agsel"><option value="">${tr('No agent')}</option>${users.filter(u => u.agent).map(u => `<option value="${u.id}" ${ags[0]?.user_id === u.id ? 'selected' : ''}>${esc(u.display_name)}</option>`).join('')}</select></div>` : ''}</div>
         <div id="l-tidyrow">${tidyRowHtml(cur)}</div>` : '';
     }
     const gw = $('#sh-grpwrap', md);  // 2.10.0 (#441)
@@ -406,6 +406,11 @@ function shareModal(id) {
   if (own && S.publicLinks) pubWire(md, id);
   if (collab()) {
     tidyWire(md, id);
+    md.addEventListener('change', async e => {  // 2.26.0: the list's one agent (switching = old out, new in, with Undo)
+      if (e.target.id !== 'sh-agsel') return;
+      await setListAgent(id, e.target.value ? +e.target.value : null, (users || []).filter(u => u.agent).map(u => ({id: u.id, name: u.display_name})), draw);
+      draw();
+    });
     if (canManage(l0)) api('GET', '/api/users').then(j => { users = j.users.filter(u => !u.disabled).map(u => ({id: u.id, display_name: u.display_name, agent: !!u.agent})); draw(); }).catch(() => { users = []; draw(); });
   }
   const act = async (fn, msg) => { try { await fn(); await load(); render(); draw(); if (msg) toast(msg); } catch { /* api() showed it */ } };
@@ -500,7 +505,7 @@ function listModal(id, folder = '', o = {}) {
     <input type="hidden" id="l-kind" value="${(l.kind || 'list') === 'project' ? 'project' : 'list'}">
     <div class="row lkrow" ${l.is_inbox ? 'hidden' : ''}><label class="chkl"><input type="checkbox" id="l-kindp" ${(l.kind || 'list') === 'project' ? 'checked' : ''} ${dis}> ${tr('Project features')}</label></div>
     <div class="shint lhint" id="l-khint" ${l.is_inbox ? 'hidden' : ''}>${kindHint(l.kind || 'list')}</div>
-    ${famOn() && own && !l.is_inbox ? `<div class="row"><label for="l-fam">${tr('Used for')}</label><select id="l-fam">${FAM_KINDS.map(([k, n]) => `<option value="${k}" ${(l.family || o.family || '') === k ? 'selected' : ''} ${FAM_KIND_ICON[k] ? `data-ico="${FAM_KIND_ICON[k]}"` : ''}>${tr(n)}</option>`).join('')}</select></div>` : ''}
+    ${famOn() && own && !l.is_inbox ? `<div class="row lfamrow" ${(l.kind || 'list') === 'project' ? 'hidden' : ''}><label for="l-fam">${tr('Used for')}</label><select id="l-fam">${FAM_KINDS.map(([k, n]) => `<option value="${k}" ${(l.family || o.family || '') === k ? 'selected' : ''} ${FAM_KIND_ICON[k] ? `data-ico="${FAM_KIND_ICON[k]}"` : ''}>${tr(n)}</option>`).join('')}</select></div>` : ''}
     ${id ? '' : `<div class="lptype" ${(l.kind || 'list') === 'project' ? '' : 'hidden'}><div class="ptlab">${tr('Start from')}</div><div class="ptcards" role="radiogroup" aria-label="${esc(tr('Start from'))}">${PTYPE_UI.map(([k, n, i, dsc]) => `<button type="button" class="ptcard ${k === (o.ptype || '') ? 'on' : ''}" role="radio" aria-checked="${k === (o.ptype || '')}" data-pt="${k}">${ic(i, 's')}<b>${tr(n)}</b><small class="muted">${tr(dsc)}</small></button>`).join('')}${tplOf('list').map(tp => `<button type="button" class="ptcard" role="radio" aria-checked="false" data-pt="tpl:${tp.id}">${ic('copy', 's')}<b>${esc(tp.name)}</b><small class="muted" data-ptd="${tp.id}">${tr('Your template')}</small></button>`).join('')}</div>
       <div class="ptdates" hidden><div class="row"><label>${tr('Project start')}</label>${dateIn('l-pstart', today(), {label: tr('Project start'), clear: false})}</div><div class="row"><label>${tr('End (optional)')}</label>${dateIn('l-pend', '', {label: tr('End (optional)'), empty: tr('none')})}<span class="muted">${tr('stretches or squeezes the dates')}</span></div></div></div>`}
     <div class="kproj" ${(l.kind || 'list') === 'project' ? '' : 'hidden'}>
@@ -545,7 +550,7 @@ function listModal(id, folder = '', o = {}) {
     const nm = $('#l-name', md).value.trim().replace(EMO_RE, '');
     const body = own ? {name: l.is_inbox && !emo && nm === tr('Inbox') ? (inboxDef(l.name) ? l.name : 'Eingang') : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: $('#l-rate', md).value.trim()} : {}), ...($('#l-tickets', md) ? {tickets: $('#l-tickets', md).checked} : {}),
       ...($('#l-nag', md) ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dayh', md) ? {day_hours: $('#l-dayh', md).value.trim()} : {}), ...($('#l-dab', md) ? {checklist: $('#l-dab', md).checked} : {}),
-      ...($('#l-fam', md) ? {family: $('#l-fam', md).value} : {})}
+      ...($('#l-fam', md) && !$('.lfamrow', md)?.hidden ? {family: $('#l-fam', md).value} : {})}
       : {folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value};  // members: only their own placement / view
     if (own && !nm) delete body.name;  // an empty name is never saved (leaving the field puts the saved one back)
     return body;
@@ -603,7 +608,7 @@ function listModal(id, folder = '', o = {}) {
   }
   md.addEventListener('change', e => {
     if (e.target.id === 'l-kindp') { $('#l-kind', md).value = e.target.checked ? 'project' : 'list'; }  // 2.25.0 (UX-52)
-    if (e.target.id === 'l-kind' || e.target.id === 'l-kindp') { const k = $('#l-kind', md).value; $('#l-khint', md).innerHTML = kindHint(k); $('.kproj', md).hidden = k !== 'project'; if ($('.lptype', md)) $('.lptype', md).hidden = k !== 'project'; if (id) autosave(); return; }
+    if (e.target.id === 'l-kind' || e.target.id === 'l-kindp') { const k = $('#l-kind', md).value; $('#l-khint', md).innerHTML = kindHint(k); $('.kproj', md).hidden = k !== 'project'; if ($('.lfamrow', md)) $('.lfamrow', md).hidden = k === 'project'; if ($('.lptype', md)) $('.lptype', md).hidden = k !== 'project'; if (id) autosave(); return; }
     if (id && e.target.id === 'l-ptype') {
       // 2.18.0 review (R1): arrow keys on a closed select fire "change" for every value passed; while the keyboard
       // walks the options only the hint follows, the type is saved once on Enter / leaving the field
@@ -708,7 +713,7 @@ function listModal(id, folder = '', o = {}) {
     if (a === 'save' && !id) {  // a new list (an existing one saves itself)
       const nm = $('#l-name', md).value.trim().replace(EMO_RE, '');
       if (!nm) return $('#l-name', md).focus();
-      const body = own ? {name: l.is_inbox && !emo && nm === tr('Inbox') ? (inboxDef(l.name) ? l.name : 'Eingang') : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: $('#l-rate', md).value.trim()} : {}), ...($('#l-nag', md)?.value ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dab', md)?.checked ? {checklist: true} : {}), ...($('#l-fam', md)?.value ? {family: $('#l-fam', md).value} : {})}
+      const body = own ? {name: l.is_inbox && !emo && nm === tr('Inbox') ? (inboxDef(l.name) ? l.name : 'Eingang') : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: $('#l-rate', md).value.trim()} : {}), ...($('#l-nag', md)?.value ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dab', md)?.checked ? {checklist: true} : {}), ...($('#l-fam', md)?.value && !$('.lfamrow', md)?.hidden ? {family: $('#l-fam', md).value} : {})}
         : {folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value};  // members: only their own placement / view
       if (body.folder && !folderNames().includes(body.folder)) await api('PATCH', '/api/settings', {folders: JSON.stringify([...folderNames(), body.folder])});
       const {rate, nag, day_hours: _dh, ...b0} = body;

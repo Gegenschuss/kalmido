@@ -88,7 +88,8 @@ window.addEventListener('keydown', e => {
   // 2.0.6 (#191): Ctrl/Cmd+A selects every task row of the view (outside text fields and dialogs)
   if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && k.toLowerCase() === 'a' && !typing(e.target) && !$('.modal') && !$('.palette') && $('#view .trow')) {
     e.preventDefault(); e.stopPropagation();
-    S.multiMode = true; kbSelect($$('#view .trow').map(r => +r.dataset.id).filter(Boolean)); render(); return;
+    if (isTouch()) S.multiMode = true;  // 2.26.0 (#936): with a mouse a plain click still opens a task (and ends the selection)
+    kbSelect($$('#view .trow').map(r => +r.dataset.id).filter(Boolean)); render(); return;
   }
   if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && k.toLowerCase() === 'k') {  // anywhere, also while typing
     if ($('.authscreen')) return;
@@ -126,8 +127,11 @@ window.addEventListener('keydown', e => {
     if (b) { e.preventDefault(); b.click(); return; }
   }
   if (S.multi.size && !e.shiftKey && (k === 'x' || k === ' ' || k === 'm' || k === 'd')) {  // bulk actions on the selection
-    const b = $(`#mbar [data-act="${k === 'm' ? 'mb-list' : k === 'd' ? 'mb-date' : 'mb-done'}"]`);
+    // 2.26.0 (#936): x / space = Complete of the bar; m / d = List / Date of the multi panel (one task selected: their menus)
+    const b = k === 'x' || k === ' ' ? $('#mbar [data-act="mb-done"]') : $(`#detail.multi [data-act="me-f"][data-f="${k === 'm' ? 'list' : 'date'}"]:not([disabled])`);
     if (b) { e.preventDefault(); b.click(); }
+    else if (k === 'd') { e.preventDefault(); multiDateMenu($('#mbar .mcount') || document.body); }
+    else if (k === 'm') { e.preventDefault(); menu($('#mbar .mcount') || document.body, S.lists.filter(l => !l.archived && canEditList(l.id)).map(l => ({label: lname(l), fn: () => batch('patch', {list_id: l.id, section_id: null})}))); }
     return;
   }
   if (e.shiftKey && (k === 'X' || k === 'J' || k === 'K' || k === 'ArrowDown' || k === 'ArrowUp')) {  // select / extend

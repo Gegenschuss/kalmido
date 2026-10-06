@@ -195,6 +195,8 @@ def openapi_spec():
             "nag": {"type": "string", "enum": [x for x in NAG_VALUES if x != "off"], "description": "2.7.0: default nag interval of the list's tasks; empty = none"},
             "day_hours": nul("number", description="2.7.0: hours of a working day / shift for this list's time sums; null = the server's value"),
             "columns": {"type": ["array", "null"], "items": {"type": "string"}, "description": COL_DOC},
+            "agent_members": {"type": "boolean", "description": "2.26.0 (#928): members may see and use the list's agents (default false)"},
+            "agent_peers": {"type": "boolean", "description": "2.26.0 (#928): agents may address each other in this list (default false)"},
             "family": nul("string", enum=[*[x for x in FAM_LIST_KINDS if x], None], description="2.19.0: what the list is for in the Family module: "
                           "shopping (sections = shop areas, a new item goes to its area of last time, a shopping mode in the app), meals "
                           "(the meal plan: due = the day, notes = ingredients), birthdays, household, packing; null = an ordinary list"),
@@ -239,6 +241,12 @@ def openapi_spec():
             "listen_agent_ids": {"type": "array", "items": {"type": "integer"},
                                  "description": "2.13.1 (#471): agents of the list that get a 'comment' event for EVERY comment of a person "
                                                 "in this list (only on tasks they can see); [] = none. Owner / list admins, never an agent token"},
+            "agent_members": {"type": "boolean", "description": "2.26.0 (#928): members may see and use the list's agents (chat, "
+                              "mention, assign, comment to them). Off (default): only the owner, list admins and instance admins can; "
+                              "members still see what the agents do. Owner / list admins, never an agent token"},
+            "agent_peers": {"type": "boolean", "description": "2.26.0 (#928): agents may address each other in this list (an agent's "
+                            "mention / assignment / comment reaches another agent as an event). Off (default): no events between agents. "
+                            "Owner / list admins, never an agent token"},
             "columns": {"type": ["array", "null"], "items": {"type": "string"}, "maxItems": COL_MAX,
                         "description": COL_DOC + " Owner / list admins; null = back to the default."},
             "project_type": {"type": ["string", "null"], "enum": [*PTYPES, "", None],

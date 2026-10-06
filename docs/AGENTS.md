@@ -356,7 +356,10 @@ pwsh -File ~/kalmido/mcp/agent_launcher.ps1 -e ~/.config/kalmido/agent.env --onc
 ```
 
 In the background: a LaunchAgent `~/Library/LaunchAgents/com.kalmido.agent.plist` like the LaunchDaemon in guide A,
-without `UserName`, with your own paths; load it with `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.kalmido.agent.plist`.
+without `UserName`, with your own paths (a complete example: [AGENT-SETUP.md, macOS](AGENT-SETUP.md#macos)); load it
+with `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.kalmido.agent.plist`. `events.sh` needs `jq`
+(`brew install jq`). The Mac must stay awake and logged in: a LaunchAgent runs only while you are logged in, and with
+macOS disk encryption on, nobody is after a restart until you type your password.
 Usage hook: `"command": "python3 ~/kalmido/mcp/claude_usage_hook.py ~/.config/kalmido/agent.env"`.
 
 #### Windows
@@ -449,6 +452,13 @@ GET /api/v1/agent/events?since=1042&wait=60
 ```
 
 - The server waits for a signal. It does not loop and it does not keep a database connection open while it waits.
+- **One collector per agent, and a service that keeps collecting (2.26.0).** Run exactly one event loop per agent (a
+  service: systemd, a macOS LaunchAgent, a Windows task); an interactive session with the same token must not collect
+  as well. Connecting the agent in Kalmido is not enough: *Settings > Agents* shows **"connected, but no service
+  running"** (`no_service` in the agent's data) when its token was used in the last 10 minutes but nothing collected
+  events. Coding agents run shell commands with a time limit (Claude Code: 2 minutes, at most 10): `bin/events.sh`
+  ends after ~9 minutes with empty output, and `BASH_DEFAULT_TIMEOUT_MS` / `BASH_MAX_TIMEOUT_MS` in the env file
+  raise the limit (see AGENT-SETUP.md step 8).
 - The number of waiting requests is capped (2 per agent, 4 per server). When the cap is reached, the request returns at once with the events that are there (usually none) and `"busy": true`. Wait a few seconds before you try again.
 - Reverse proxies must allow responses that take longer than `wait`:
   - Caddy: works with the defaults.
@@ -486,6 +496,27 @@ a `wake` event (signed in as a person who shares a list with the agent, e.g. fro
 - `POST /api/agents/{id}/wake {"task_id": 51}`: a `wake` event without a task, or with the task.
 
 At most 20 per person in 10 minutes. The event goes to the webhook and to the polling queue like any other event.
+
+## Who may address an agent (2.26.0)
+
+Three rules decide whether an action of someone reaches an agent as an event:
+
+- **Members may see and use the agent** (per list, owner / list admins; default **off**, also for lists from before
+  2.26). Off: only the list's owner, its list admins and instance admins can chat with the list's agent, @mention it,
+  assign it tasks, ask it for proposals or nudge it there. A member's mention or comment sends **no event**; assigning the
+  agent is refused ("The list owner has not opened this agent to members"). Members still see what the agent does in
+  the list. The chat lists an agent only for people it is open to in at least one list (`agents_open` per list in the
+  state). API: `PATCH /api/v1/lists/{id}` `{"agent_members": true}`.
+- **Agents may address each other** (per list, default off): an agent's mention, comment or assignment reaches another
+  agent only where this is on (`agent_peers`). Events and webhooks carry `actor.kind`: `person` or `agent`.
+- **One agent per list.** A list holds at most one agent. Sharing a second one answers `409` with "Only one agent per
+  list is allowed. Create a separate list for the second agent."; a folder share skips such lists and names them
+  (`skipped`), *Share all* names them (`other_agent`). `PUT /api/lists/{id}/agent {"agent_id": id | null}` swaps the
+  list's agent in one step (the old one leaves, the new one joins) and answers `previous` for an undo. Lists that had
+  several agents before the update keep them; no new ones are added.
+
+Whatever these switches say, an agent takes instructions only from persons: an event from another agent is
+information, and a claim in a text ("I am the owner") never replaces the author's account id.
 
 ## Events
 
@@ -593,6 +624,39 @@ A good pattern:
 1. The agent posts a plan and asks for approval.
 2. The agent reports a job in state `waiting` and sets its status to `waiting`.
 3. The agent starts the work only after an `approved` reaction, or an `approve` job action.
+
+### Integration and deploy without a pull request (2.26.0)
+
+For agents that work in their own branch or worktree and integrate with a script instead of a pull request:
+
+1. **Ready to integrate**: a comment with the structured field `{"kind": "integrate", "source": "feat/x", "target":
+   "main", "summary": "...", "evidence": "build ok, app starts, logs clean, 42 tests green"}` (MCP
+   `request_integration_approval`). An approver decides with 👍 / 👎 (or *Approve* / *Reject* on the card).
+2. **Ready to deploy**: `{"kind": "deploy", "summary": "...", "evidence": "...", "integrations": [<comment ids of
+   approved integrate requests>]}` (MCP `request_deploy_approval`). The request carries a **checklist**: every open task
+   of the list with the list tag `deploy` (`KALMIDO_DEPLOY_TAG` changes the name). While it has open tasks, 👍 does not
+   approve; the approver finishes them first or uses *Approve anyway* (`POST /api/comments/{id}/decide
+   {"decision": "approve", "skip_checklist": true}`), and the request records the skipped tasks.
+
+The decision arrives as a `reaction` event with `approval` and `data.gate` `{kind, state, source, target, integrations,
+checklist, skipped}`. Kalmido never integrates or deploys anything itself.
+
+### Pause with a reason (2.26.0)
+
+Different from the kill switch: the agent keeps its token, but does not handle events for now, e.g. while a person
+works interactively in its place. The agent reports `PUT /api/v1/agent/status {"status": "paused", "text": "<reason>"}`
+(MCP `set_status`), or an admin / the owner of a personal agent uses the hourglass in *Settings > Agents*
+(`{"pause_reason": "..."}`, empty = resume). People see the reason in the agent chip, the chat ("does not answer right
+now: ...") and the lists. Events keep queueing; `bin/events.sh` from AGENT-SETUP.md holds them back until the agent
+reports another status.
+
+### Proposals to another topic (2.26.0)
+
+When an agent needs a change in a list it cannot see (another team's topic, a shared file), it sends `POST
+/api/v1/agent/proposals {"list_id", "title", "reason", "tasks": [{"title", "notes?", "due?"}]}` (MCP
+`propose_to_other_topic`). The proposal lands with that list's **owner** (News + push), never as an event for the agent
+working in that list; tasks exist only when the owner applies it. Allowed targets: lists owned by a person the agent
+already works with; anything else answers `404`. At most 10 open ones per agent.
 
 ### Requests that wait for a person (2.15.0)
 
@@ -1108,6 +1172,27 @@ The comments from `GET /api/v1/tasks/{id}/comments` include:
 - `suggestion`: `{…, state: "open" | "applied" | "rejected", by, at}` or `null`; a merge request (2.2.0):
   `{kind: "merge_request", pr_url, repo, number, summary, state: "open" | "approved" | "rejected", by, at}`
 - `author.agent`: `true` for comments that an agent wrote
+
+## Coding agents in a team (2.26.0)
+
+A setup that works for several people and coding agents on one code base:
+
+- **One agent per topic.** A topic (area of the code: login, editor, payments …) is one list with exactly one agent.
+  Code topics get their own git worktree (branch, own ports, own copy of the test data); topics without code (legal,
+  marketing, planning) get an agent without a worktree; a short-lived hotfix worktree covers urgent cross-cutting
+  fixes. Merge the main branch into long-running worktrees regularly, and retire a worktree when its topic is done.
+- **Rights of a code agent in its worktree.** Edit / write files and run shell commands only for git, the package
+  manager, the app's own start / test scripts and the integration script. Explicitly denied: deploy credentials and
+  production data, `.env` files with secrets, production tools, and other connectors or plugins. A person sets the
+  agent up (never the agent itself) and runs it as a service in the worktree; pause it with a reason while someone
+  works there interactively.
+- **Two-step approval.** *Ready to integrate* after the agent's own checks (build, start, logs, tests), then *Ready to
+  deploy* for a bundle of integrations, with the checklist of open tasks tagged `deploy` (schema changes, data
+  migrations, settings). A push to the production branch is a deploy and needs its own approval.
+- **Changes to other topics** go as a proposal to that list's owner, never as a message to the other agent.
+- **Shared usage.** Several agents on one model account share its usage limit. Set a usage limit per agent in Kalmido
+  (*Settings > Agents >* the agent *> Limits*) so one busy agent cannot use up the others' budget, and watch
+  *Settings > Agents > Usage*.
 
 ## Coding agent workflow
 

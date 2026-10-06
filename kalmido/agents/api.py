@@ -61,7 +61,7 @@ def v1_agent_status():
     if b.get("status") not in AGENT_STATUSES:
         raise BadInput(tr("Invalid value: {0}", "status"))
     text = b.get("text") or ""
-    if not isinstance(text, str):
+    if not isinstance(text, str) or (b["status"] == "paused" and not text.strip()):  # 2.26.0 (#949): a pause needs its reason
         raise BadInput(tr("Invalid value: {0}", "text"))
     c = db()
     tid = b.get("task_id")

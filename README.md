@@ -155,7 +155,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **Overdue in one click**: on top of Today, *3 overdue → Today / Tomorrow / Next week (Mon) / Pick a date…* moves
   every overdue task you may change at once (time and repeat stay, view-only ones are skipped and counted), one undo
   step; the × hides it until tomorrow on that device
-- Multi-select with batch actions, snooze, trash with restore, search in titles, notes and links
+- Multi-select (Shift-click a range, Ctrl/Cmd-click single tasks) and multi-edit in the task panel (2.26.0: the shared fields of all selected tasks, *Mixed* where they differ, one undo step), snooze, trash with restore, search in titles, notes and links
 - **Undo and redo history**: ← / → in the top bar step back and forward through your last 30 changes (edits,
   completing, deleting, moves, sections, list settings, batch actions, moving projects); right-click or long-press ←
   to jump back several steps. Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, Ctrl+Y; on phones *Undo* / *Redo* sit at the top of the header's “…” menu (touch tablets and an unfolded foldable keep the arrows in the header while there is room).
@@ -300,13 +300,13 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   ([Git integration](#git-integration))
 
 **Fast and friendly**
-- **Resize the panels** (2.16): drag the edge between the list and the task, or between the task and the chat, to
+- **Resize the panels** (2.16; the sidebar too since 2.26.0): drag the edge between the list and the task, or between the task and the chat, to
   make them wider or narrower (desktops, an unfolded Fold; each device remembers it, a double-click goes back to the
   standard width; with the keyboard: focus the grip, ← →, Enter). **Column widths** work the same way: the grip at the
   right of a column title (per device and list)
 - Command palette (Ctrl/Cmd+K, the field at the top of the sidebar) for tasks, lists, views and actions, the recently
   viewed ones on top; type text and pick *Ask <agent>: …* (sends it to the agent's chat) or *Create as task: …* (quick
-  add syntax; Enter when nothing else matches); `#123` jumps to task 123; keyboard shortcuts (`?` shows them all: arrows, Space to complete, E to rename in the list; calendar 1-4 / ← → / `.`; multi-select Ctrl/Cmd+A, Shift+↓ ↑, Shift+X, then Space, M or D for the selection), compact, comfortable or custom density (the sidebar and the task rows each on their own); your account sits as your picture at the right of the *Kalmido* row (Account, Settings, Log out)
+  add syntax; Enter when nothing else matches); `#123` jumps to task 123; keyboard shortcuts (`?` shows them all: arrows, Space to complete, E to rename in the list; calendar 1-4 / ← → / `.`; multi-select Ctrl/Cmd+A, Shift+↓ ↑, Shift+X, then Space, M or D for the selection; D / M open the date / list field of the multi-edit panel), compact, comfortable or custom density (the sidebar and the task rows each on their own); your account sits as your picture at the right of the *Kalmido* row (Account, Settings, Log out)
 - New accounts start with a "Getting started" list and a short welcome tour
 - A **sample project** to try things out: an image film for a client with phases, dates, dependencies, custom fields and a packing checklist, offered in the setup and the tour, removed again in one click (Settings > Data)
 - When Today is clear or a list is done, the heron celebrates (with one of 50 dry one-liners). Can be switched off.
@@ -488,8 +488,10 @@ own list with the same name is reused) or one existing list you can edit. The im
   *Delete tag…* removes it from all your tasks after showing how many, the tasks stay, undo brings it back), settings (language, notifications, digest, ...), ntfy topic, upload token.
 - **The Share dialog** (2.6.0): *Share…* in a list's "…" menu, the *Share* button next to the list title (desktop), or
   *Sharing > Share…* in the list dialog. One place for everything about who sees a list: **People** (members with their
-  role, *Share with …* + role + *Add* to invite, remove), **Agents** (the agents of the list, *Share with an agent …*,
-  *Stop sharing*, which agent may tidy up entries), the **Public link** (owner) and the **Owner** (*Transfer
+  role, *Share with …* + role + *Add* to invite, remove), **Agents** (the list's agent: one select *Agent: No agent / …*
+  -- **one agent per list** (2.26.0), switching swaps it in one step with Undo; *Members may see and use the agent*
+  (default off: only the owner and list admins can chat with it, @mention it or assign it tasks here), *Agents may
+  address each other* (default off), which agent may tidy up entries), the **Public link** (owner) and the **Owner** (*Transfer
   ownership…* / *Take over…* with the history). Members see who is in the list, read-only. The list dialog keeps the
   list's own settings and shows a one-line summary ("Shared with 2 people · 1 agent").
 - **Sharing and roles:** in the Share dialog add people with a role (*What the roles may do* explains each one):
@@ -986,7 +988,16 @@ like and talks to Kalmido through the REST API, webhooks or the MCP server.
   something happens (long-polling), so an agent without a public address reacts within seconds.
 - Approval semantics, status reporting, jobs, chat, the *tidy up* setting, payloads and an example session:
   **[docs/AGENTS.md](docs/AGENTS.md)**. MCP server (stdio and HTTP): **[mcp/](mcp/)**.
-- Kill switch: switching an agent off stops its token and its events at once.
+- Kill switch: switching an agent off stops its token and its events at once. Pause with a reason (2.26.0): the agent
+  keeps its token, people see why it does not answer, events wait.
+- Who may address an agent (2.26.0): per list, *Members may see and use the agent* (default off) and *Agents may address
+  each other* (default off); **at most one agent per list** (each list is its own sandbox); events carry `actor.kind`
+  person / agent. Coding agents ask for approval to integrate a branch and to deploy (with a checklist of tasks tagged
+  `deploy`) without a pull request, and can propose tasks to a list they cannot see (its owner decides):
+  [docs/AGENTS.md](docs/AGENTS.md#who-may-address-an-agent-2260).
+- Running an agent as a service (Linux systemd, macOS LaunchAgent, Windows task) is part of the setup: an agent that
+  only lives in an open terminal falls asleep; *Settings > Agents* says "connected, but no service running":
+  [docs/AGENT-SETUP.md](docs/AGENT-SETUP.md).
 - Permissions and approvals (2.15.0): [docs/AGENTS.md](docs/AGENTS.md#permissions-2150).
 - Chat (2.7.2): 👍 👎 ❤️ on chat messages (a person's 👍 on an agent message that asks something is an approval, the agent gets the event
   `reaction` with `chat_message`), *Sent* / *Delivered* per message (`delivered_at`, set when the agent fetches it) and

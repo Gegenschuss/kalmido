@@ -62,6 +62,7 @@ ORDER = (
     "agents.admin",
     "agents.api",
     "agents.proposals",
+    "agents.gates",  # 2.26.0 (#949)
     "agents.usage",
     "lists.public",
     "integrations.git",

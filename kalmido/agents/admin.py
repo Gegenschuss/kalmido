@@ -209,6 +209,17 @@ def admin_agent_update(aid):
         c.execute("UPDATE agents SET note=? WHERE user_id=?", (str(b["note"] or "")[:AGENT_NOTE_MAX], aid))
     if "provider" in b:  # 2.24.0 (#896)
         c.execute("UPDATE agents SET provider=? WHERE user_id=?", (str(b["provider"] or "").strip()[:80], aid))
+    if "pause_reason" in b:  # 2.26.0 (#949): pause with a reason (text) / resume (null or ""): status paused <-> idle
+        pr = b["pause_reason"]
+        if pr is not None and not isinstance(pr, str):
+            c.rollback()
+            return err(tr("Invalid value: {0}", "pause_reason"))
+        pr = (pr or "").strip()[:200]
+        cur = agent_row(c, aid)
+        if pr:
+            c.execute("UPDATE agents SET status='paused', status_text=?, status_at=?, status_task=NULL WHERE user_id=?", (pr, iso(now_utc()), aid))
+        elif cur["status"] == "paused":
+            c.execute("UPDATE agents SET status='idle', status_text='', status_at=? WHERE user_id=?", (iso(now_utc()), aid))
     if "proposals" in b:  # 2.3.0: who may ask it for proposals
         if b["proposals"] not in PROP_MODES:
             c.rollback()
@@ -480,7 +491,7 @@ def my_agent_update(aid):
     c = db()
     a = need_own_agent(c, aid)
     b = body()
-    unknown = sorted(k for k in b if k not in ("display_name", "note", "enabled", "scopes", "allowed_ips", "provider"))
+    unknown = sorted(k for k in b if k not in ("display_name", "note", "enabled", "scopes", "allowed_ips", "provider", "pause_reason"))
     if unknown:
         return err(tr("Invalid value: {0}", ", ".join(unknown)))
     if "scopes" in b or "allowed_ips" in b:  # 2.15.0 (#479): the owner decides what the agent may do (within the admin's limit)
@@ -497,6 +508,17 @@ def my_agent_update(aid):
         c.execute("UPDATE agents SET note=? WHERE user_id=?", (str(b["note"] or "")[:AGENT_NOTE_MAX], aid))
     if "provider" in b:  # 2.24.0 (#896)
         c.execute("UPDATE agents SET provider=? WHERE user_id=?", (str(b["provider"] or "").strip()[:80], aid))
+    if "pause_reason" in b:  # 2.26.0 (#949): pause with a reason (text) / resume (null or ""): status paused <-> idle
+        pr = b["pause_reason"]
+        if pr is not None and not isinstance(pr, str):
+            c.rollback()
+            return err(tr("Invalid value: {0}", "pause_reason"))
+        pr = (pr or "").strip()[:200]
+        cur = agent_row(c, aid)
+        if pr:
+            c.execute("UPDATE agents SET status='paused', status_text=?, status_at=?, status_task=NULL WHERE user_id=?", (pr, iso(now_utc()), aid))
+        elif cur["status"] == "paused":
+            c.execute("UPDATE agents SET status='idle', status_text='', status_at=? WHERE user_id=?", (iso(now_utc()), aid))
     if "enabled" in b:
         if b["enabled"] and a["admin_paused"]:
             c.rollback()

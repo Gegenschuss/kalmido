@@ -254,6 +254,21 @@ def need_task(c, tid, write=True, full=False):
     return need_list(c, r[0], write)
 
 
+# 2.26.0: at most ONE agent per list (owner or member), enforced on every way into a list -- each list is its own sandbox,
+# agents cannot hand each other text through a shared list. An agent's own sub-agents run under its account (not affected).
+# Lists that had several agents before stay as they are (nothing removed automatically); their owner sees a hint.
+ONE_AGENT_MSG = N_("Only one agent per list is allowed. Create a separate list for the second agent.")
+
+
+def list_other_agent(c, lid, uid):
+    """2.26.0: the id of another agent already in list lid (owner or member) when uid is an agent, else None."""
+    if not c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent'", (uid,)).fetchone():
+        return None
+    r = c.execute("""SELECT id FROM users WHERE kind='agent' AND id!=? AND (id=(SELECT owner_id FROM lists WHERE id=?)
+                     OR id IN (SELECT user_id FROM list_members WHERE list_id=?)) ORDER BY id LIMIT 1""", (uid, lid, lid)).fetchone()
+    return r[0] if r else None
+
+
 def list_people(c, lid):
     """Owner + member ids of a list."""
     r = c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()

@@ -397,6 +397,11 @@ shard 7  # ---------------------------------------------------------------- shar
 # 2.25.0 "Usability, part 2": lists in a shared folder on every path + the one-time repair (#931, restarts its container),
 # the sidebar setting (UX-03), the lean start of added accounts (UX-26), the Team package (UX-25)
        run p2250_api "$PY" p2250_api_test.py "$KALMIDO_TEST_DATA"
+# 2.26.0 "Agents in a team & usability": who may address a list's agent (#928, agent -> agent, actor.kind), one agent per list, approval
+# requests without a pull request + pause with a reason + a proposal to another topic (#949), "no service" (#933); then the
+# UI: resizable sidebar (#932), multi-select + multi-edit in the task panel (#936), the iOS keyboard (#937)
+       run p2260_api "$PY" p2260_api_test.py "$KALMIDO_TEST_DATA"
+       run p2260_ui node p2260_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

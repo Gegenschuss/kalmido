@@ -143,6 +143,7 @@ The most used helpers:
 | `agents/admin.py` | Agent administration and personal agents. |
 | `agents/api.py` | The REST API of an agent itself (token of an agent account). |
 | `agents/proposals.py` | Agent proposals, validation helpers, requests from people to agents. |
+| `agents/gates.py` | 2.26.0: approval requests without a pull request (ready to integrate / ready to deploy with its checklist). |
 | `agents/usage.py` | Model usage of agents, limits and the agents' audit log. |
 | `lists/public.py` | Public links of lists and checklist mode. |
 | `integrations/git.py` | Git integration of project lists (GitHub, GitLab, Gitea / Forgejo, Bitbucket) and tickets for agents. |
@@ -236,6 +237,7 @@ registering the ones of its area.
 | `roadmap.js` | The roadmap. |
 | `habits.js` | The Eisenhower matrix, habits and the pomodoro timer. |
 | `detail.js` | The detail panel of a task. |
+| `multiedit.js` | 2.26.0: several selected tasks edited at once in the task panel (common values, "Mixed", one undo step). |
 | `collab.js` | News and comments + activity (module "collab"). |
 | `attachments.js` | Attachments, Paperless documents and the share target. |
 | `undo.js` | Undo / redo history. |

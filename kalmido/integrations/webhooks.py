@@ -191,7 +191,8 @@ def wh_actor(c):
     if g.get("auth_via") == "public" or not g.get("user"):
         return None
     u = g.user
-    return {"id": u["id"], "name": u["display_name"] or u["username"]}
+    # 2.26.0 (#928): kind person | agent -- an agent never gives instructions to another agent
+    return {"id": u["id"], "name": u["display_name"] or u["username"], "kind": "agent" if u["kind"] == "agent" else "person"}
 
 
 def wh_enqueue(c, n):

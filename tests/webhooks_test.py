@@ -173,7 +173,7 @@ if r:
     h = req["headers"]
     check(h.get("Content-Type") == "application/json" and h.get("X-Kalmido-Event") == "task.created" and h.get("X-Kalmido-Attempt") == "1"
           and h.get("X-Kalmido-Delivery") == p["id"] and h.get("User-Agent", "").startswith("Kalmido/"), "headers " + str({k: v for k, v in h.items() if k.startswith("X-")}))
-    check(p["event"] == "task.created" and p["webhook_id"] == w1["id"] and p["actor"] == {"id": 1, "name": "Alice"} and p["via"] == "web"
+    check(p["event"] == "task.created" and p["webhook_id"] == w1["id"] and p["actor"] == {"id": 1, "name": "Alice", "kind": "person"} and p["via"] == "web"
           and p["data"]["task"]["title"] == "Water roses" and p["data"]["task"]["tags"] == ["garden"] and p["data"]["task"]["priority"] == "high"
           and p["data"]["list"] == {"id": lid, "name": "Garden"}, "payload " + json.dumps(p)[:400])
     check("secret" not in req["body"] and "token" not in req["body"] and "password" not in req["body"], "no secrets in the payload")

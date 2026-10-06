@@ -6,6 +6,7 @@
 let saveTimers = {};
 function openDetail(id) {
   if (S.me?.kid) return;  // 2.19.0: a child ticks in its own view, no task panel
+  meEnd();  // 2.26.0 (#936): one task opened (a plain click, a title of the multi panel): the selection ends
   const other = S.sel !== id;
   if (other) { S.editLink = false; S.cedit = null; S.mp = null; recentPush('t', id); wpOpened(id); }
   S.sel = id; S.editContent = false;
@@ -61,7 +62,7 @@ function fitLayout(quiet) {
   const yieldC = chatOn && det && innerWidth - chatW - detR * rem < LIST_MIN_PX;
   document.body.classList.toggle('chat-yield', yieldC);
   // 2.13.0: the open chat panel takes its room too: the sidebar folds into the drawer instead of squeezing the list
-  const narrow = innerWidth - (15 + (det ? detR : 0)) * rem - (yieldC ? 0 : chatW) < LIST_MIN_PX;
+  const narrow = innerWidth - (panelRem('side') + (det ? detR : 0)) * rem - (yieldC ? 0 : chatW) < LIST_MIN_PX;  // 2.26.0 (#932): the sidebar's own width
   // 2.13.0 (#453 A15): below ~1100 px (an unfolded Fold, small windows) the sidebar can be folded away by hand (remembered
   // per device); the header's menu button opens it as a drawer then, like on a phone
   const on = !isMobile() && (narrow || (innerWidth < 1100 && !!LS.get('sideFold', false)));
@@ -76,14 +77,17 @@ window.addEventListener('resize', () => { clearTimeout(fitT); fitT = setTimeout(
 // wider / narrower, remembered per device (localStorage), a double-click = the standard width. The grip is a separator
 // for the keyboard and screen readers: ← → change the width by 1 rem (Shift: 4 rem), Home / End = narrowest / widest,
 // Enter = the standard width. The list never gets narrower than LIST_MIN_PX; phones keep the full-screen panels.
-const PW = {det: [25.5, 20, 48], chat: [26, 20, 44]};  // rem: standard, min, max
+// 2.26.0 (#932): the sidebar too (grip on its right edge; ← → reversed there: → = wider). Only next to the list: the drawer
+// (side-rail) and phones keep their fixed widths.
+const PW = {det: [25.5, 20, 48], chat: [26, 20, 44], side: [15, 12, 26]};  // rem: standard, min, max
 const panelRem = k => { const v = +LS.get('pw.' + k, 0); return v ? Math.max(PW[k][1], Math.min(PW[k][2], v)) : PW[k][0]; };
-function panelVars() { const r = document.documentElement.style; r.setProperty('--detW', panelRem('det') + 'rem'); r.setProperty('--chatW', panelRem('chat') + 'rem'); }
+function panelVars() { const r = document.documentElement.style; r.setProperty('--detW', panelRem('det') + 'rem'); r.setProperty('--chatW', panelRem('chat') + 'rem'); r.setProperty('--sideW', panelRem('side') + 'rem'); }
 function panelMax(k) {  // the widest the panel may get now, in rem (the list keeps LIST_MIN_PX)
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, app = $('#app');
-  const side = app.classList.contains('side-rail') || isMobile() ? 0 : 15 * rem;
-  const other = k === 'det' ? (document.body.classList.contains('chat-open') && !document.body.classList.contains('chat-yield') && innerWidth >= 1000 ? Math.min(panelRem('chat') * rem, innerWidth * .4) : 0)
-    : (app.classList.contains('detail-open') ? panelRem('det') * rem : 0);
+  const side = k === 'side' || app.classList.contains('side-rail') || isMobile() ? 0 : panelRem('side') * rem;
+  const chatW = document.body.classList.contains('chat-open') && !document.body.classList.contains('chat-yield') && innerWidth >= 1000 ? Math.min(panelRem('chat') * rem, innerWidth * .4) : 0;
+  const detW = app.classList.contains('detail-open') ? panelRem('det') * rem : 0;
+  const other = k === 'det' ? chatW : k === 'side' ? detW + chatW : detW;
   const room = (innerWidth - side - other - LIST_MIN_PX) / rem;
   return Math.max(PW[k][1], Math.min(PW[k][2], k === 'chat' ? Math.min(room, innerWidth * .4 / rem) : room));
 }
@@ -95,8 +99,10 @@ function panelSet(k, v, quiet) {
 function placeGrips() {
   if (typeof gripWatch === 'function') gripWatch();
   const want = {det: !isMobile() && $('#app')?.classList.contains('detail-open') && !$('#detail').classList.contains('hidden'),
-    chat: !isMobile() && innerWidth >= 1000 && document.body.classList.contains('chat-open') && !document.body.classList.contains('chat-yield') && !!$('#achat:not(.hidden)')};
-  for (const k of ['det', 'chat']) {
+    chat: !isMobile() && innerWidth >= 1000 && document.body.classList.contains('chat-open') && !document.body.classList.contains('chat-yield') && !!$('#achat:not(.hidden)'),
+    side: !isMobile() && !!$('#app') && !$('#app').classList.contains('side-rail') && !document.body.classList.contains('kidmode') && !!$('#side')};  // 2.26.0 (#932)
+  const GRIP_LAB = {det: N_('Width of the task panel'), chat: N_('Width of the chat'), side: N_('Width of the sidebar')};
+  for (const k of ['det', 'chat', 'side']) {
     let g = $('#pgrip-' + k);
     if (!want[k]) { if (g) g.hidden = true; continue; }
     if (!g) {
@@ -104,21 +110,22 @@ function placeGrips() {
       g.setAttribute('role', 'separator'); g.setAttribute('aria-orientation', 'vertical');
       document.body.appendChild(g); gripWire(g);
     }
-    const el = k === 'det' ? $('#detail') : $('#achat'), r = el.getBoundingClientRect();
+    const el = gripEl(k), r = el.getBoundingClientRect();
     g.hidden = !r.width;
-    g.style.left = Math.round(r.left - 5) + 'px'; g.style.top = Math.round(r.top) + 'px'; g.style.height = Math.round(r.height) + 'px';
+    g.style.left = Math.round((k === 'side' ? r.right : r.left) - 5) + 'px'; g.style.top = Math.round(r.top) + 'px'; g.style.height = Math.round(r.height) + 'px';
     const v = panelRem(k);
-    g.setAttribute('aria-label', k === 'det' ? tr('Width of the task panel') : tr('Width of the chat'));
+    g.setAttribute('aria-label', tr(GRIP_LAB[k]));
     g.setAttribute('aria-valuenow', String(v)); g.setAttribute('aria-valuemin', String(PW[k][1])); g.setAttribute('aria-valuemax', String(Math.round(panelMax(k) * 4) / 4));
     g.setAttribute('aria-valuetext', tr('{0} rem', String(v)));
-    g.title = (k === 'det' ? tr('Width of the task panel') : tr('Width of the chat')) + ' · ' + tr('drag; double-click = standard width');
+    g.title = tr(GRIP_LAB[k]) + ' · ' + tr('drag; double-click = standard width');
   }
 }
+const gripEl = k => k === 'det' ? $('#detail') : k === 'side' ? $('#side') : $('#achat');
 function gripWire(g) {
   const k = g.dataset.k;
   g.addEventListener('dblclick', () => { g._dbl = Date.now(); clearTimeout(g._mt); panelSet(k, null); });
   g.addEventListener('keydown', e => {
-    const step = e.shiftKey ? 4 : 1, v = panelRem(k);
+    const step = (e.shiftKey ? 4 : 1) * (k === 'side' ? -1 : 1), v = panelRem(k);  // the sidebar grows to the right
     const to = {ArrowLeft: v + step, ArrowRight: v - step, Home: PW[k][1], End: panelMax(k)}[e.key];
     if (to != null) { e.preventDefault(); e.stopPropagation(); panelSet(k, to); announce(tr('{0} rem', String(panelRem(k)))); }
     else if (e.key === 'Enter') { e.preventDefault(); panelSet(k, null); announce(tr('Standard width')); }
@@ -127,21 +134,21 @@ function gripWire(g) {
     if (e.button !== 0) return;
     e.preventDefault(); g.setPointerCapture?.(e.pointerId); g.classList.add('drag'); document.body.classList.add('pgdrag');
     const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-    const right = (k === 'det' ? $('#detail') : $('#achat')).getBoundingClientRect().right;
-    const mv = ev => { panelSet(k, (right - ev.clientX) / rem, true); };
+    const box = gripEl(k).getBoundingClientRect(), right = box.right, left = box.left;
+    const mv = ev => { panelSet(k, (k === 'side' ? ev.clientX - left : right - ev.clientX) / rem, true); };
     let moved = false; const x0 = e.clientX;
     const mv2 = ev => { if (Math.abs(ev.clientX - x0) > 3) moved = true; if (moved) mv(ev); };
     const up = () => { g.removeEventListener('pointermove', mv2); g.classList.remove('drag'); document.body.classList.remove('pgdrag'); fitLayout(); placeGrips();
       // a tap without dragging: a small menu (the way without dragging, WCAG 2.5.7); a double-click resets instead
-      if (!moved) { clearTimeout(g._mt); g._mt = setTimeout(() => { if (Date.now() - (g._dbl || 0) < 400) return; menu(g, [{label: tr('Wider'), icon: 'left', fn: () => panelSet(k, panelRem(k) + 4)}, {label: tr('Narrower'), icon: 'right', fn: () => panelSet(k, panelRem(k) - 4)}, {label: tr('Standard width'), icon: 'undo', fn: () => panelSet(k, null)}]); }, 320); } };
+      if (!moved) { clearTimeout(g._mt); g._mt = setTimeout(() => { if (Date.now() - (g._dbl || 0) < 400) return; menu(g, [{label: tr('Wider'), icon: k === 'side' ? 'right' : 'left', fn: () => panelSet(k, panelRem(k) + 4)}, {label: tr('Narrower'), icon: k === 'side' ? 'left' : 'right', fn: () => panelSet(k, panelRem(k) - 4)}, {label: tr('Standard width'), icon: 'undo', fn: () => panelSet(k, null)}]); }, 320); } };
     g.addEventListener('pointermove', mv2); g.addEventListener('pointerup', up, {once: true}); g.addEventListener('pointercancel', up, {once: true});
   });
 }
 let gripRO = null;
 try { gripRO = new ResizeObserver(() => placeGrips()); gripRO.observe(document.documentElement); } catch { /* old engine */ }
 // 2.16.2: the panels change size without the page doing so (the chat opens next to the task): watch them too
-const gripWatch = () => { if (!gripRO) return; for (const id of ['detail', 'achat']) { const el = document.getElementById(id); if (el && !el.dataset.gripRo) { el.dataset.gripRo = '1'; gripRO.observe(el); } } };
-['transitionend'].forEach(t => document.addEventListener(t, e => { if (e.target?.id === 'detail' || e.target?.id === 'achat') placeGrips(); }));
+const gripWatch = () => { if (!gripRO) return; for (const id of ['detail', 'achat', 'side']) { const el = document.getElementById(id); if (el && !el.dataset.gripRo) { el.dataset.gripRo = '1'; gripRO.observe(el); } } };
+['transitionend'].forEach(t => document.addEventListener(t, e => { if (e.target?.id === 'detail' || e.target?.id === 'achat' || e.target?.id === 'side') placeGrips(); }));
 function sideFold(on) { LS.set('sideFold', !!on); fitLayout(); closeSide(); render(); }
 // 2.13.2 (#478 N3): the same within the phone layout: the docked "Add task" box of a tablet / an unfolded Fold in portrait
 // (600-899 px) disappears on a narrower screen without crossing 899 px (Fold 880 -> 390): its text moves into the quick

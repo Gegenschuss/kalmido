@@ -91,7 +91,13 @@ def react(c, k, uid, emoji, on):
         res["approval"] = "approved" if emoji == "up" else "rejected"
         log_act(c, t["id"], "approval", {"agent": author["id"], "comment": k["id"], "ok": emoji == "up"})
     sug = json.loads(k["suggestion"]) if k["suggestion"] else None
-    if sug and sug.get("kind") == "merge_request":  # 2.2.0 (#339): only an approver decides; the agent merges itself
+    if sug and sug.get("kind") in ("integrate", "deploy"):  # 2.26.0 (#949): only an approver decides (see agents/gates.py)
+        from ..agents.gates import gate_decide
+        if sug.get("state") == "open" and res["approval"]:
+            res["gate"] = gate_decide(c, k, t, uid, emoji == "up")
+            if res["gate"] == "blocked":  # open checklist: 👍 alone does not approve a deploy
+                res["approval"] = None
+    elif sug and sug.get("kind") == "merge_request":  # 2.2.0 (#339): only an approver decides; the agent merges itself
         if sug.get("state") == "open" and res["approval"]:
             st = "approved" if emoji == "up" else "rejected"
             c.execute("UPDATE comments SET suggestion=? WHERE id=?",
@@ -113,8 +119,14 @@ def react(c, k, uid, emoji, on):
             reaction={"emoji": emoji, "user": {"id": uid, "name": user_names(c, [uid]).get(uid, "")}}, approval=res["approval"],
             applied=res["applied"], **({"merge_request": {"pr_url": sug["pr_url"], "number": sug.get("number"), "repo": sug.get("repo"),
                                                           "state": json.loads(k2["suggestion"])["state"]}}
-                                       if sug and sug.get("kind") == "merge_request" else {})))
+                                       if sug and sug.get("kind") == "merge_request" else {}),
+            **({"gate": _gate_ev(json.loads(k2["suggestion"]))} if sug and sug.get("kind") in ("integrate", "deploy") else {})))
     return res
+
+
+def _gate_ev(sug):
+    from ..agents.gates import gate_event
+    return gate_event(sug)
 
 
 @app.post("/api/comments/<int:cid>/reactions")
@@ -216,7 +228,7 @@ def comment_apply(cid):
     sug = json.loads(k["suggestion"]) if k["suggestion"] else None
     if not sug:
         raise Denied(404)
-    if sug.get("kind") == "merge_request":
+    if sug.get("kind") in ("merge_request", "integrate", "deploy"):
         return err(tr("A merge request is approved with 👍 (or rejected with 👎)"), 409)
     if sug.get("state") != "open" or t["deleted_at"]:
         return err(tr("This suggestion was already handled"), 409)

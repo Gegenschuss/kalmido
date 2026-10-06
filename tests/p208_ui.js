@@ -128,9 +128,10 @@ async function swTests() {
     const rows = [...(tb?.querySelectorAll('.airow:not(.aihead)') || [])];
     check(tb && rows.length === 2 && rows.some(r => +r.dataset.lid === WEB) && rows.some(r => +r.dataset.lid === HOME) && !rows.some(r => +r.dataset.lid === BOBS),
       `${lab}: every list I manage (not Bob's, not the inbox): ${rows.map(r => r.textContent.trim().slice(0, 20))}`);
-    check(/List.*Agent sees it.*Tidy up/.test(tb?.querySelector('.aihead')?.textContent || ''), `${lab}: the column heads`);
+    check(/List.*Agent.*Tidy up/.test(tb?.querySelector('.aihead')?.textContent || ''), `${lab}: the column heads`);
     const wr = tb.querySelector(`.airow[data-lid="${WEB}"]`), hr = tb.querySelector(`.airow[data-lid="${HOME}"]`);
-    check(wr.querySelector(`[data-aid="${AG}"]`)?.getAttribute('aria-pressed') === 'true' && hr.querySelector(`[data-aid="${AG}"]`)?.getAttribute('aria-pressed') === 'false', `${lab}: chips show who sees what`);
+    // 2.26.0: one agent per list -- one select per list instead of chips
+    check(wr.querySelector('select[data-aisel]')?.value === String(AG) && hr.querySelector('select[data-aisel]')?.value === '', `${lab}: the select shows the list's agent`);
     check(wr.querySelector('select[data-aitidy]') && !hr.querySelector('select[data-aitidy]') && hr.querySelector('.aitd .muted'), `${lab}: tidy only where an agent is`);
     w.close();
   }
@@ -141,24 +142,27 @@ async function swTests() {
   w.eval(`settingsModal('ai')`); await sleep(900);
   check(d.querySelector('.modal.smodal [data-aisub="lists"]').getAttribute('aria-selected') === 'true' && !d.querySelector('#aisp-lists').hidden, 'reopened: the sub-tab Lists is remembered on this device');
   click(w, d.querySelector('#s-ai-tbl [data-aiall="1"]')); await sleep(300);
-  click(w, d.querySelector(`#s-ai-tbl .airow[data-lid="${HOME}"] [data-aid="${AG}"]`)); await sleep(1200);
+  const agSel = () => d.querySelector(`#s-ai-tbl .airow[data-lid="${HOME}"] select[data-aisel]`);
+  agSel().value = String(AG); agSel().dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(1400);
   let st = await call('GET', '/api/state');
   check((st.lists.find(l => l.id === HOME).members || []).some(m => m.user_id === AG && m.role === 'edit'), 'click: shared with the agent (Member)');
   const hsel = d.querySelector(`#s-ai-tbl .airow[data-lid="${HOME}"] select[data-aitidy]`);
-  check(hsel && d.querySelector(`#s-ai-tbl .airow[data-lid="${HOME}"] [data-aid="${AG}"]`).getAttribute('aria-pressed') === 'true', 'redrawn: pressed, tidy select appears');
+  check(hsel && agSel().value === String(AG) && /now works in/.test(d.querySelector('#toast')?.textContent || ''), 'redrawn: the agent selected, tidy select appears, toast with Undo');
   hsel.value = 'suggest'; hsel.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(900);
   st = await call('GET', '/api/state');
   check(st.lists.find(l => l.id === HOME).agent_tidy === 'suggest', 'tidy: saved as suggest');
-  let asked = ''; w.confirm = m => { asked = m; return true; };
-  click(w, d.querySelector(`#s-ai-tbl .airow[data-lid="${HOME}"] [data-aid="${AG}"]`)); await sleep(1400);
+  agSel().value = ''; agSel().dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(1400);
   st = await call('GET', '/api/state');
-  check(/Stop sharing/.test(asked) && !(st.lists.find(l => l.id === HOME).members || []).some(m => m.user_id === AG), 'unshare after a confirm: ' + asked.slice(0, 60));
+  check(!(st.lists.find(l => l.id === HOME).members || []).some(m => m.user_id === AG) && /Undo/.test(d.querySelector('#toast')?.textContent || ''), 'No agent: unshared, with Undo');
+  d.querySelector('#toast button')?.click(); await sleep(1400);
+  st = await call('GET', '/api/state');
+  check((st.lists.find(l => l.id === HOME).members || []).some(m => m.user_id === AG), 'Undo: the agent is back');
   w.close();
   await call('PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
   w.eval(`settingsModal('ai')`); await sleep(500);
   click(w, d.querySelector('.modal.smodal [data-aisub="lists"]')); await sleep(900);
-  check(/Agent sieht sie/.test(d.querySelector('#s-ai-tbl .aihead')?.textContent || '') && /Welche Listen er sieht/.test(d.querySelector('#s-ai-lists-h')?.textContent || '') && /Listen/.test(d.querySelector('[data-aisub="lists"]')?.textContent || ''), 'German heads');
+  check(/Agent/.test(d.querySelector('#s-ai-tbl .aihead')?.textContent || '') && /Welche Listen er sieht/.test(d.querySelector('#s-ai-lists-h')?.textContent || '') && /Listen/.test(d.querySelector('[data-aisub="lists"]')?.textContent || ''), 'German heads');
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});
 

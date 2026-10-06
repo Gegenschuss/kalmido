@@ -33,6 +33,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   const TEAM = (await call('POST', '/api/lists', {name: 'Team'})).id;
   const SECRET = (await call('POST', '/api/lists', {name: 'Secret'})).id;
   for (const [lid, uid] of [[TEAM, BOB], [TEAM, ag.id], [SECRET, ag2.id]]) await call('PUT', `/api/lists/${lid}/members`, {user_id: uid, role: 'edit'});
+  await call('PATCH', `/api/lists/${TEAM}`, {agent_members: true});  // 2.26.0: members may use the agent (default off)
   const T1 = (await call('POST', '/api/tasks', {title: 'Write the release notes', list_id: TEAM})).id;
   const T2 = (await call('POST', '/api/tasks', {title: 'Plan the sprint', list_id: TEAM})).id;
   const TS = (await call('POST', '/api/tasks', {title: 'Secret plan', list_id: SECRET})).id;

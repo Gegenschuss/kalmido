@@ -33,6 +33,15 @@ from PIL import Image
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
+
+
+def legacy_agent(lid, aid, role):  # 2.26.0: one agent per list -- a second agent as in a list from before the update
+    c_ = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c_.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,0,'2026-01-01T00:00:00+00:00')", (lid, aid, role, role))
+    c_.commit()
+    c_.close()
+
+
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 V = B + "/api/v1"
 H = {"X-Requested-With": "kalmido"}
@@ -109,9 +118,11 @@ L2 = A.post(B + "/api/lists", json={"name": "Private"}).json()["id"]       # ali
 L3 = A.post(B + "/api/lists", json={"name": "Shop"}).json()["id"]          # claude as participant
 assert A.put(B + f"/api/lists/{L1}/members", json={"user_id": ids["bob"], "role": "edit"}).ok
 assert A.put(B + f"/api/lists/{L1}/members", json={"user_id": AG, "role": "edit"}).ok
-assert A.put(B + f"/api/lists/{L1}/members", json={"user_id": AG2, "role": "view"}).ok
+legacy_agent(L1, AG2, "view")
 assert A.put(B + f"/api/lists/{L3}/members", json={"user_id": AG, "role": "participant"}).ok
 assert A.put(B + f"/api/lists/{L3}/members", json={"user_id": ids["carol"], "role": "edit"}).ok
+for lid in (L1, L3):  # 2.26.0: members may use the agents (list switch, default off)
+    assert A.patch(B + f"/api/lists/{lid}", json={"agent_members": True, "agent_peers": True}).ok
 
 # ================================================================== #465 chat files: person -> agent
 _, cur = events(cl, 0)

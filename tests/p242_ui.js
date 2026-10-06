@@ -20,6 +20,7 @@ const WS = globalThis.WebSocket || require('ws');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
+const {shareAny} = require('./legacy');  // 2.26.0: one agent per list
 const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
@@ -73,8 +74,8 @@ async function firefox(fn) {
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en'}, CKB);
   const ag = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'claude', display_name: 'Claude'});
   const L = (await call('POST', '/api/lists', {name: 'Website'})).id;
-  await call('PUT', `/api/lists/${L}/members`, {user_id: BOB, role: 'edit'});
-  await call('PUT', `/api/lists/${L}/members`, {user_id: ag.id, role: 'edit'});
+  await shareAny(call, DATA, L, BOB, 'edit');
+  await shareAny(call, DATA, L, ag.id, 'edit');
   const T = (await call('POST', '/api/tasks', {title: 'Launch page', list_id: L, content: 'Ask @Bob and @claude about it, not `@Bob` in code, @Nobody stays text.'})).id;
   const TB = (await call('POST', '/api/tasks', {title: 'Bob\'s other task', list_id: L, assignee_id: BOB})).id;
   for (const [b, ck] of [['First from Alice', CK], [`Second from Bob, ping <@${me}>`, CKB], [`Third from Alice for <@${BOB}> and <@${ag.id}>`, CK]]) {
@@ -198,8 +199,10 @@ async function firefox(fn) {
   w.confirm = m => { asked.push(m); return true; };
   click(w, hr().querySelector('[data-aisall]')); await sleep(1500);
   const st = await call('GET', '/api/state');
-  check([L, F1, F2].every(id => st.lists.find(l => l.id === id).members.some(m => m.user_id === ag2.id && m.role === 'edit')), 'accepted: all own lists shared (role edit)');
-  check(/sees 3 of your 3 lists/.test(hr()?.textContent || '') && hr().querySelector('[data-aisall]').disabled, 'row: sees all, button off');
+  // 2.26.0: one agent per list -- L already has the other agent and stays without this one
+  check([F1, F2].every(id => st.lists.find(l => l.id === id).members.some(m => m.user_id === ag2.id && m.role === 'edit'))
+        && !st.lists.find(l => l.id === L).members.some(m => m.user_id === ag2.id), 'accepted: every own list without another agent shared (role edit)');
+  check(/sees 2 of your 3 lists/.test(hr()?.textContent || '') && hr().querySelector('[data-aisall]').disabled, 'row: sees all it can, button off');
   const sw = hr().querySelector('[data-aisauto]');
   w.confirm = m => { asked.push(m); return false; };
   sw.checked = true; sw.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(600);

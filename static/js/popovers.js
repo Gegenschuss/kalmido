@@ -667,11 +667,36 @@ function vvSync() {
   st.setProperty('--vvh', Math.round(vv.height) + 'px');
   st.setProperty('--vvb', kb ? Math.max(0, Math.round(window.innerHeight - vv.offsetTop - vv.height)) + 'px' : '0px');  // hidden below (keyboard)
   if ((vv.height >= window.innerHeight - 2 || !kb) && (window.scrollY || document.documentElement.scrollTop)) window.scrollTo(0, 0);
-  chatFit(); tlKbSync();
+  chatFit(); tlKbSync(); vvPin(kb);
   // the focused field of a sheet / the docked composer stays above a real keyboard (iOS does not resize the layout)
   const a = document.activeElement;
-  if (kb && a && a.getBoundingClientRect && !a.closest('#view .chview')) { const r = a.getBoundingClientRect(), lim = vv.offsetTop + vv.height; if (r.bottom > lim - 4) a.scrollIntoView?.({block: 'nearest'}); }
+  if (kb && a && a.getBoundingClientRect && !a.closest('#view .chview, .vvpin')) { const r = a.getBoundingClientRect(), lim = vv.offsetTop + vv.height; if (r.bottom > lim - 4 || r.top < vv.offsetTop) a.scrollIntoView?.({block: 'nearest'}); }
 }
+// 2.26.0 (#937): iOS ignores interactive-widget=resizes-content, so a box docked at the bottom of a scrolling area (the
+// docked quick add, the comment box of the task panel, the team chat's composer) stays at the bottom of the LAYOUT
+// viewport, under the keyboard. While a real keyboard is up and the focus is in such a box that is not fully visible, the
+// box is pinned (position: fixed) right above the keyboard: bottom = --vvb, its own left / width kept, a placeholder of
+// its height keeps the layout behind it still. It follows every visual viewport resize / scroll (vvSync) and is let go
+// when the keyboard or the focus leaves. Android (the layout shrinks) finds the box visible and never pins it.
+const VV_PIN = '#view .qdock, #detail .dbot, #view .tccomp';
+function vvPin(kb) {
+  const vv = window.visualViewport, a = document.activeElement;
+  const box = kb && vv && editFocused() && a?.closest ? a.closest(VV_PIN) : null;
+  for (const x of $$('.vvpin')) if (x !== box) vvUnpin(x);
+  if (!box || box.classList.contains('vvpin')) return;
+  const r = box.getBoundingClientRect(), top = vv.offsetTop, lim = top + vv.height;
+  if (!r.height || (r.bottom <= lim + 1 && r.top >= top - 1)) return;  // fully visible already
+  const ph = document.createElement('div'); ph.className = 'vvph'; ph.style.height = Math.round(r.height) + 'px'; ph.setAttribute('aria-hidden', 'true');
+  box.before(ph); box._vvph = ph;
+  box.style.transition = 'none';  // jumps, never slides (and is measured where it really is)
+  box.style.left = Math.round(r.left) + 'px'; box.style.width = Math.round(r.width) + 'px';
+  box.classList.add('vvpin');
+}
+function vvUnpin(x) { x.style.transition = 'none'; x.classList.remove('vvpin'); x.style.left = ''; x.style.width = ''; x._vvph?.remove(); x._vvph = null; }
+// another field took the focus with the keyboard still up (no viewport event follows): decided again a moment later (a
+// tap on a button of the pinned box must land before it moves)
+let vvPinT = 0;
+for (const t of ['focusin', 'focusout']) document.addEventListener(t, () => { clearTimeout(vvPinT); vvPinT = setTimeout(() => { if ($('.vvpin') || kbReal()) vvPin(kbReal()); }, 350); });
 // the document itself never stays scrolled without a keyboard (a focus / caret reveal moved it): back to the top at once
 window.addEventListener('scroll', () => { if ((window.scrollY || document.documentElement.scrollTop) && !kbReal()) window.scrollTo(0, 0); }, {passive: true});
 // 2.22.0 (#686): a right-click on a task row (list, Kanban, Today …) opens the task's menu ("Waiting on external…", snooze,

@@ -2,7 +2,7 @@
 // API calls always go to the network (data must be live). Language files: de.json is precached,
 // any other static/i18n/<code>.json lands in the cache via the network-first handler on first use
 // (the client also keeps the active one in localStorage as a last offline fallback).
-const CACHE = 'tasks-shell-v102';
+const CACHE = 'tasks-shell-v103';
 const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/static/i18n/de.json', '/static/icon-192.png', '/static/icon-512.png',
   '/static/icon.svg', '/static/badge-96.png', '/static/fonts/Geist-Variable.woff2', '/static/fonts/GeistMono-Variable.woff2', '/static/quips.json',
   '/static/favicon.svg', '/static/favicon-32.png', '/static/apple-touch-icon.png', '/static/icon-maskable-512.png',  // 2.18.0 (#394)
@@ -15,7 +15,7 @@ const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/st
   '/static/js/undo.js', '/static/js/popovers.js', '/static/js/dialogs.js', '/static/js/settings.js', '/static/js/integrations.js', '/static/js/account.js',
   '/static/js/templates.js', '/static/js/time.js', '/static/js/projects.js', '/static/js/events.js', '/static/js/sidebar.js', '/static/js/dnd.js',
   '/static/js/palette.js', '/static/js/agents.js', '/static/js/dayplan.js', '/static/js/agentchat.js', '/static/js/listedit.js', '/static/js/git.js',
-  '/static/js/chat.js', '/static/js/dashboard.js', '/static/js/family.js', '/static/js/calevents.js', '/static/js/contacts.js', '/static/js/life.js', '/static/js/clients.js', '/static/js/main.js'];
+  '/static/js/chat.js', '/static/js/dashboard.js', '/static/js/family.js', '/static/js/calevents.js', '/static/js/contacts.js', '/static/js/life.js', '/static/js/clients.js', '/static/js/multiedit.js', '/static/js/main.js'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 // Android share sheet (share_target POST): keep the shared files in a cache and open the app,

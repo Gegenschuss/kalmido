@@ -121,6 +121,7 @@ ag = A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "cla
 AT, CL = ag["token"], ag["id"]
 ah = {"Authorization": "Bearer " + AT}
 A.put(B + f"/api/lists/{L}/members", json={"user_id": CL, "role": "edit"})
+A.patch(B + f"/api/lists/{L}", json={"agent_members": True})  # 2.26.0: members may use the agent (default off)
 T1 = A.post(B + "/api/tasks", json={"title": "Cut trailer", "list_id": L}).json()["id"]
 LP = A.post(B + "/api/lists", json={"name": "Private"}).json()["id"]
 TP = A.post(B + "/api/tasks", json={"title": "Private", "list_id": LP}).json()["id"]

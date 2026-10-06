@@ -829,6 +829,11 @@ MIGRATIONS = [
     ("attachments", "user_id", "ALTER TABLE attachments ADD COLUMN user_id INTEGER"),
     ("users", "storage_quota_mb", "ALTER TABLE users ADD COLUMN storage_quota_mb INTEGER"),
     ("agents", "provider", "ALTER TABLE agents ADD COLUMN provider TEXT NOT NULL DEFAULT ''"),
+    # 2.26.0 (#928): lists.agent_members = "Members may see and use the agent" (0: only the owner / list admins can address
+    # the list's agents), lists.agent_peers = "Agents may address each other" (0: an agent's actions trigger no events at
+    # other agents); both off for existing lists too
+    ("lists", "agent_members", "ALTER TABLE lists ADD COLUMN agent_members INTEGER NOT NULL DEFAULT 0"),
+    ("lists", "agent_peers", "ALTER TABLE lists ADD COLUMN agent_peers INTEGER NOT NULL DEFAULT 0"),
 ]
 INDEXES = """
 CREATE INDEX IF NOT EXISTS lists_owner ON lists(owner_id);

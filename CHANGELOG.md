@@ -7,6 +7,66 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.26.0] - 2026-10-06
+
+**In short:** Agents in a team, safely (#928 #949) and easier handling (#932 #936 #937). The owner of a list decides who
+may address its agent, agents no longer instruct each other, and a list holds one agent; coding agents ask for approval
+to integrate and to deploy without a pull request, pause with a reason and propose changes to other topics. Several
+tasks are edited at once in the task panel, the sidebar can be dragged wider, and the iOS keyboard no longer covers
+the input fields.
+
+### Added
+- **Edit several tasks at once** (#936): Shift-click selects a range, Ctrl/Cmd-click adds or removes single tasks. From
+  two selected tasks the task panel shows "N tasks" with the fields they share (date, deadline, priority, assignee,
+  list, section, milestone, repeat, reminder, waiting on, pinned, custom fields, tags): equal values as usual, different
+  ones grey as *Mixed*; a change applies to all at once, the field is marked as changed, one undo step takes it back.
+  Tags are added or removed (a tag only some have is half filled); dates move by −1 day / +1 day / +1 week, each task
+  from its own date. Below, the selected titles (open one alone, take one out). Fields you may not change for some of
+  the tasks are locked with a hint. On phones *Edit* opens the panel as a sheet.
+- **Resizable sidebar** (#932): drag its right edge (or use the arrow keys on the grip, double-click = default width),
+  stored per device like the task panel and the chat. Phones and the collapsed sidebar are unchanged.
+- **Who may address a list's agent** (#928): per list, the owner (or a list admin) switches on *Members may see and use
+  the agent*. Off (the default, also for existing lists): only the owner, list admins and instance admins can chat with
+  the list's agent, @mention it, assign it tasks, ask it for proposals or nudge it there; mentions and comments of other
+  members send it no event, assigning it is refused. Members still see what the agent does. The chat and the
+  @mention / assignee pickers offer an agent only where it is open to you. API: `agent_members` on lists.
+- **Agents do not instruct each other** (#928): an agent's mention, comment or assignment reaches another agent only in
+  lists with *Agents may address each other* on (default off). Every agent event and webhook names `actor.kind`
+  (`person` / `agent`). The behaviour rules template: instructions only from people, only the account id counts.
+- **One agent per list**: a list holds at most one agent. Sharing a second agent is refused with a clear message on every
+  path (sharing, folder shares, *Share all*, proposals); folder shares skip such lists and name them. The Share dialog and
+  *Settings > Agents > Lists* show one select *Agent: No agent / …*; switching swaps the agent in one step with Undo
+  (`PUT /api/lists/{id}/agent`).
+- **Approval without a pull request** (#949): an agent asks *Ready to integrate* (branch → target, with its evidence:
+  build, start, logs, tests) and *Ready to deploy* (approved integrations + a checklist of the list's open tasks tagged
+  `deploy`; 👍 does not approve while it is open, *Approve anyway* does and records what was skipped). Only approvers
+  decide; the agent gets the decision as a reaction event with `data.gate`. MCP: `request_integration_approval`,
+  `request_deploy_approval`.
+- **Pause with a reason** (#949): an agent (status `paused` with a text), its owner or an admin (hourglass in *Settings >
+  Agents*) pauses it without the kill switch; people see the reason in the chip, the chat ("does not answer right now:
+  …") and the lists, events wait.
+- **Proposals to another topic** (#949): an agent proposes tasks for a list it cannot see (`POST
+  /api/v1/agent/proposals`, MCP `propose_to_other_topic`); the proposal lands with that list's owner, never with the
+  agent working there, and becomes tasks only when a person applies it.
+- **"Connected, but no service running"** (#933): *Settings > Agents* says so when an agent's token is used but nothing
+  has collected its events for 10 minutes (`no_service`).
+
+### Changed
+- Lists that had several agents before this update keep them; no new ones are added.
+- **Agent setup**: `bin/events.sh` ends after about 9 minutes without an event (shell time limits of coding agents) and
+  holds events back while the agent is paused; the guide names `BASH_DEFAULT_TIMEOUT_MS` / `BASH_MAX_TIMEOUT_MS`. New
+  macOS section (PowerShell launcher, `jq`, a complete LaunchAgent, sleep and disk encryption). The setup is finished only when
+  the agent stays connected without an open session (prompt, guide and in-app steps); one event collector per agent.
+  More test cases: an ownership claim in a comment, a member without the switch, another agent.
+- **Selection bar**: only the count, *Complete*, *Delete* and *Clear selection* (everything else is in the task panel).
+  With a mouse, Ctrl/Cmd+A no longer switches on tap-select mode.
+
+### Fixed
+- **Projects are not family lists**: the list dialog no longer offers *Used for* (shopping, meals, …) for a project, also
+  not while you switch it to a project; the server refuses a family kind for projects (an existing value stays).
+- **iOS keyboard** (#937): the docked quick add, the comment box and the team chat input stay above the keyboard (they
+  follow the visible area, also while the page scrolls); Android was fine already.
+
 ## [2.25.0] - 2026-10-06
 
 **In short:** Usability, part 2 (#827). One word per thing across the app, the help, the tour, the API texts and all six
@@ -2818,7 +2878,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.25.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.26.0...HEAD
+[2.26.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.26.0
 [2.25.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.25.0
 [2.24.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.24.1
 [2.24.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.24.0

@@ -185,7 +185,11 @@ for u_, role in (("bob", "edit"), ("pete", "participant"), ("vic", "view")):
     check(A.put(B + f"/api/lists/{L}/members", json={"user_id": ids[u_], "role": role}).ok, f"share {u_}")
 check(A.put(B + f"/api/lists/{L}/members", json={"user_id": CL, "role": "admin"}).status_code == 400, "agent cannot be list admin")
 check(A.put(B + f"/api/lists/{L}/members", json={"user_id": CL, "role": "edit"}).ok, "share with agent (member)")
+# 2.26.0: one agent per list -- the second agent joins like a list from before the update (kept), and the members may use
+# the agents (the list switch, default off since 2.26.0)
+dbx("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,0,'2026-01-01T00:00:00+00:00')", (L, RO, "participant", "participant"))
 check(A.put(B + f"/api/lists/{L}/members", json={"user_id": RO, "role": "participant"}).ok, "share with agent 2 (participant)")
+check(A.patch(B + f"/api/lists/{L}", json={"agent_members": True, "agent_peers": True}).ok, "2.26.0: members may use the agents")
 st = A.get(B + "/api/state").json()
 lm = next(x for x in st["lists"] if x["id"] == L)["members"]
 check(any(m["user_id"] == CL and m.get("agent") for m in lm), "members: agent flag")
@@ -391,7 +395,8 @@ e = events(cl, cur)["data"]
 check(e and e[-1]["event"] == "wake" and e[-1]["data"]["task"]["id"] == T2 and e[-1]["data"]["source"] == "task", "wake event")
 cur = e[-1]["seq"] if e else cur
 check(A.post(B + f"/api/tasks/{T1}/wake", json={}).json().get("agent_id") == CL, "only agent that sees the task (robo is a participant)")
-A.put(B + f"/api/lists/{L}/members", json={"user_id": ids["conv"], "role": "edit"})
+dbx("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,0,'2026-01-01T00:00:00+00:00')",
+    (L, ids["conv"], "edit", "edit"))  # 2.26.0: a second agent as in a list from before the update (one agent per list)
 check(A.post(B + f"/api/tasks/{T1}/wake", json={}).status_code == 409, "two agents see it, none assigned: choose")
 A.delete(B + f"/api/lists/{L}/members/{ids['conv']}")
 check(A.post(B + f"/api/tasks/{T1}/wake", json={"agent_id": CL}).ok, "wake with agent_id")

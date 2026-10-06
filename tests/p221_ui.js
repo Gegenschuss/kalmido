@@ -41,7 +41,13 @@ const firefox = require('./ff')({tag: 'p221_ui', check, shots: 'P221_SHOTS'});  
   const ag = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'claude', display_name: 'Claude'});
   const ag2 = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'helper', display_name: 'Helper'});
   const TEAM = (await call('POST', '/api/lists', {name: 'Team'})).id;
-  for (const id of [bob, ag.id, ag2.id]) await call('PUT', `/api/lists/${TEAM}/members`, {user_id: id, role: 'edit'});
+  for (const id of [bob, ag.id]) await call('PUT', `/api/lists/${TEAM}/members`, {user_id: id, role: 'edit'});
+  // 2.26.0: one agent per list -- the second agent joins as in a list from before the update; members may use the agents
+  require('child_process').execFileSync('python3', ['-c', `import sqlite3, sys
+c = sqlite3.connect(sys.argv[1], timeout=10)
+c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,'edit','edit',0,'2026-01-01T00:00:00+00:00')", (int(sys.argv[2]), int(sys.argv[3])))
+c.commit()`, require('path').join(DATA, 'tasks.db'), String(TEAM), String(ag2.id)]);
+  await call('PATCH', `/api/lists/${TEAM}`, {agent_members: true, agent_peers: true});
   const T = (await call('POST', '/api/tasks', {title: 'Shared task', list_id: TEAM})).id;
   // traffic: successes, a 404, then paused -> 403 (denied)
   check(await v1(ag.token, 'GET', `/tasks/${T}`) === 200, 'agent reads a task');

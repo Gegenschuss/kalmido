@@ -193,9 +193,12 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   check(/Due today/.test(d.querySelector('.modal').textContent) && /Due tomorrow/.test(d.querySelector('.modal').textContent), 'shortcut help lists t / Shift+T');
   d.querySelector('.modal').remove();
   // selection bar
-  w.eval(`S.multiMode = true; S.multi.add(${a}); S.multi.add(${b}); render()`); await sleep(100);
-  check(!!d.querySelector('#mbar [data-act="mb-today"]') && !!d.querySelector('#mbar [data-act="mb-tomorrow"]'), 'selection bar: Today + Tomorrow');
-  click(w, d.querySelector('#mbar [data-act="mb-tomorrow"]'));
+  // 2.26.0 (#936): the date of a selection is set in the multi panel (the bar keeps Complete / Delete)
+  w.eval(`S.multi.add(${a}); S.multi.add(${b}); render()`); await sleep(100);
+  click(w, d.querySelector('#detail.multi [data-act="me-f"][data-f="date"]')); await sleep(100);
+  const tmw = [...d.querySelectorAll('#pop .menu-list button')].find(x => x.textContent.trim() === 'Tomorrow');
+  check(!!tmw && !!d.querySelector('#detail.multi [data-act="me-shift"]'), 'selection: Today / Tomorrow / shift in the multi panel');
+  click(w, tmw);
   check(await until(async () => (await task(a)).due === T1 && (await task(b)).due === T1), 'selection: both tomorrow');
   check((await task(a)).due_time === '14:30', 'selection: time kept');
   await w.eval(`histStep('undo')`);

@@ -13,7 +13,7 @@ const agentsOn = () => collab() && (S.agents || []).length > 0;
 // 2.22.0 (#739): the Agents tab shows with the module on even before any list is shared with an agent (then it explains how)
 const agentsTab = () => feat('agents') && collab();
 const isAgentUser = id => !!agentById(id) || (S.tl.agents || []).includes(+id);
-const AGENT_ST = {idle: N_('ready'), working: N_('working'), waiting: N_('waiting for you'), error: N_('error')};
+const AGENT_ST = {idle: N_('ready'), working: N_('working'), waiting: N_('waiting for you'), error: N_('error'), paused: N_('paused')};
 const JOB_ST = {running: N_('running'), waiting: N_('waiting for approval'), done: N_('done'), failed: N_('failed'), stopped: N_('stopped')};
 // 2.4.1 (#375): offline = no event poll for 5 minutes (online null: a webhook agent / never polled, so nobody can tell);
 // the age counts on from the last state load, so the header turns "offline" without a reload
@@ -21,8 +21,10 @@ const agentAge = () => (Date.now() - (S.agentsAt || Date.now())) / 1000;
 // 2.6.0 (K08): "not connected" (grey) instead of a green "ready" for an agent that never got in touch (no event poll, no API
 // call) or has not for 5 minutes; a webhook agent is told about events, so only its explicit "offline" counts
 const agentOffline = a => !!a && (a.online === false || (!a.webhook && (a.contact_age === null || a.contact_age === undefined || a.contact_age + agentAge() > 300)));
-const agentSt = a => !a.enabled ? tr('paused') : agentOffline(a) ? tr('not connected') : a.limit_reached ? tr('limit reached') : tr(AGENT_ST[a.status] || AGENT_ST.idle);  // 2.1.1 (#326)
-const agentDot = id => { const a = agentById(id); return a ? `<i class="adot st-${!a.enabled ? 'paused' : agentOffline(a) ? 'offline' : esc(a.status)}" title="${esc(agentHstLine(a))}"></i>` : ''; };
+// 2.26.0 (#949): paused with a reason ("does not answer right now: …"); (#933) "connected, but no service running": its
+// token is used (an interactive session) but nothing has collected its events for 10 minutes
+const agentSt = a => !a.enabled ? tr('paused') : a.status === 'paused' ? tr('paused: {0}', a.pause_reason || a.status_text || '') : agentOffline(a) ? tr('not connected') : a.limit_reached ? tr('limit reached') : a.no_service && (a.status || 'idle') === 'idle' ? tr('connected, but no service running') : tr(AGENT_ST[a.status] || AGENT_ST.idle);  // 2.1.1 (#326)
+const agentDot = id => { const a = agentById(id); return a ? `<i class="adot st-${!a.enabled || a.status === 'paused' ? 'paused' : agentOffline(a) ? 'offline' : esc(a.status)}" title="${esc(agentHstLine(a))}"></i>` : ''; };
 const agentBadge = () => `<span class="abadge" title="${esc(tr('Agent: an AI assistant or bot that works through the API'))}">${ic('bot', 's')}${tr('Agent')}</span>`;
 // agents of a list that can pick up this task (participant agents only their own tasks)
 function taskAgents(t) {
@@ -46,12 +48,13 @@ function agentBusy() {
 // agent pill (with "Claude · 2 running …" next to them while something runs) and, from header level tl2 on with a timer
 // running, in the merged status chip; hover = names + states, a tap = the menu with every agent. Settings > Agents >
 // Overview > "In the header" picks the agents (setting agents_hidden, default: all shown).
-const AG_HST = {ready: N_('ready'), working: N_('working'), waiting: N_('waiting for you'), offline: N_('offline'), error: N_('error')};
+const AG_HST = {ready: N_('ready'), working: N_('working'), waiting: N_('waiting for you'), offline: N_('offline'), error: N_('error'), paused: N_('paused')};
 const HDOT_MAX = 5;
 const agentHidden = () => new Set(String(S.settings?.agents_hidden || '').split(',').filter(Boolean).map(Number));
 const shownAgents = () => { if (!agentsOn()) return []; const h = agentHidden(); return (S.agents || []).filter(a => !h.has(a.id)); };
 function agentHst(a) {
   if (!a.enabled || agentOffline(a)) return 'offline';
+  if (a.status === 'paused') return 'paused';  // 2.26.0 (#949): paused with a reason
   if (a.status === 'error' || a.limit_reached) return 'error';
   if (a.status === 'working' || a.running) return 'working';
   if (a.status === 'waiting' || a.waiting) return 'waiting';
@@ -222,6 +225,7 @@ function reactPicker(anchor, cid, fn = null) {
 function sugHtml(c, ro) {
   const s = c.suggestion; if (!s) return '';
   if (s.kind === 'merge_request') return mrHtml(c, s, ro);  // 2.2.0 (#339)
+  if (s.kind === 'integrate' || s.kind === 'deploy') return gateHtml(c, s, ro);  // 2.26.0 (#949)
   const t = taskById(S.sel), sec = s.section_id && S.sections.find(x => x.id === s.section_id);
   const pr = {none: N_('None'), low: N_('Low'), medium: N_('Medium'), high: N_('High')};
   const rows = [s.title && [tr('Title'), esc(s.title)], s.notes && [tr('Notes'), esc(s.notes).replace(/\n/g, '<br>')], sec && [tr('Section'), esc(sec.name)],
@@ -310,6 +314,17 @@ function ltagsWire(md, lid) {
   });
   md.addEventListener('keydown', e => { if (e.target.id === 'l-ltnew' && e.key === 'Enter') { e.preventDefault(); $('[data-lt="new"]', md)?.click(); } });
 }
+// 2.26.0: one agent per list. Sets THE agent of list lid (null = none) in one step (PUT /api/lists/<id>/agent: the old one
+// leaves, the new one joins) and offers Undo (back to the previous agent). ags: [{id, name}] for the message.
+async function setListAgent(lid, aid, ags = [], after = null) {
+  const nm = id => ags.find(a => a.id === id)?.name || agentById(id)?.name || '';
+  let j; try { j = await api('PUT', `/api/lists/${lid}/agent`, {agent_id: aid}); } catch { await load(); render(); return false; }
+  await load(); render();
+  const prev = j.previous ?? null; if (prev === aid) return true;
+  const back = async () => { try { await api('PUT', `/api/lists/${lid}/agent`, {agent_id: prev}); } catch { /* shown */ } await load(); render(); after?.(); };
+  toast(aid ? tr('{0} now works in “{1}”', nm(aid), lname(listById(lid) || {name: ''})) : tr('No agent in “{0}” any more', lname(listById(lid) || {name: ''})), back);
+  return true;
+}
 const TIDY = [['off', N_('Off')], ['suggest', N_('Suggest (apply with 👍)')], ['auto', N_('Automatically')]];
 // 2.4.1 (#379): exactly one agent tidies up a list: one of its agents with edit rights (participants / viewers cannot change
 // other people's tasks); tidy_agent_id from the server is the chosen one or the first candidate
@@ -319,7 +334,12 @@ function tidyRowHtml(l) {
   const ags = listAgents(l); if (!ags.length) return '';
   const agentOwned = !!agentById(l.owner_id), may = ['owner', 'admin'].includes(l.role || 'owner') || (agentOwned && canEditList(l.id));
   const cands = tidyCands(l), who = cands.find(a => a.id === l.tidy_agent_id) || cands[0];
-  return `<div class="row"><label for="l-tidy">${tr('Agent may tidy up entries')}</label><select id="l-tidy" ${may && cands.length ? '' : 'disabled'}>${TIDY.map(([k, n]) => `<option value="${k}" ${(l.agent_tidy || 'off') === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
+  // 2.26.0 (#928): who may address the list's agents (owner / list admins switch; default off)
+  const sw = (id, k, label, hint) => `<label class="chkl swl agacc"><span class="swc"><input type="checkbox" role="switch" id="${id}" data-agacc="${k}" ${l[k] ? 'checked' : ''} ${may ? '' : 'disabled'}><span class="swt" aria-hidden="true"></span></span><span>${label}</span></label>
+    <div class="shint keep aghint">${hint}</div>`;
+  const acc = sw('l-agm', 'agent_members', tr('Members may see and use the agent'), tr('Off: only you and list admins can chat with the agent, @mention it or assign it tasks here. Members still see what it does.'))
+    + sw('l-agp', 'agent_peers', tr('Agents may address each other'), tr('Off: what an agent writes or assigns here never reaches another agent. Instructions only ever come from people.'));
+  return `${acc}<div class="row"><label for="l-tidy">${tr('Agent may tidy up entries')}</label><select id="l-tidy" ${may && cands.length ? '' : 'disabled'}>${TIDY.map(([k, n]) => `<option value="${k}" ${(l.agent_tidy || 'off') === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     ${cands.length ? `<div class="row"><label for="l-tidyag">${tr('Tidy up by')}</label>${tidyAgentSel(l, 'l-tidyag', may ? '' : 'disabled')}</div>` : ''}
     <div class="shint lhint">${cands.length ? tr('{0} turns long, quickly typed entries into a short title and suggests section, tags and priority. The original text always stays at the top of the notes; every change is in the history.', esc(who.name))
       : tr('Give an agent of this list edit rights first')}</div>${listenRowHtml(l, ags, may)}`;
@@ -334,6 +354,12 @@ function listenRowHtml(l, ags, may) {
 }
 function tidyWire(md, lid) {
   md.addEventListener('change', async e => {
+    const acc = e.target.dataset?.agacc;  // 2.26.0 (#928)
+    if (acc) {
+      try { await api('PATCH', `/api/lists/${lid}`, {[acc]: e.target.checked}); toast(tr('Saved')); await load(); render(); }
+      catch { e.target.checked = !!listById(lid)?.[acc]; }
+      return;
+    }
     if (e.target.dataset?.lsn) {  // 2.13.1 (#471)
       const ids = $$('[data-lsn]', md).filter(x => x.checked).map(x => +x.dataset.lsn);
       try { await api('PATCH', `/api/lists/${lid}`, {listen_agent_ids: ids}); toast(tr('Saved')); await load(); render(); }

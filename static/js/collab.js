@@ -627,7 +627,10 @@ function mentionState(ta) {
   const people = (ta.id === 'tc-in' || ta.classList.contains('tc-edit') ? (S.tc.room?.members || []).map(m => ({id: m.id, user_id: m.id, name: m.name})) : (S.tl.people || [])).filter(p => !S.me || p.id !== S.me.id);  // 2.17.0: the team chat's members
   if (!m || !people.length) return {pick, items: []};
   const q = m[1].toLowerCase();
-  const items = people.filter(p => { const n = p.name.toLowerCase(); return n.startsWith(q) || n.split(/\s+/).some(w => w.startsWith(q)); }).slice(0, 6);
+  // 2.26.0 (#928): agents only where the list owner opened them to members (else the server ignores the mention)
+  const tc = ta.id === 'tc-in' || ta.classList.contains('tc-edit'), ll = listById(tc ? S.tc.room?.list_id : taskById(S.sel)?.list_id);
+  const agOk = !ll || ll.agents_open !== false;
+  const items = people.filter(p => agOk || !(p.agent || agentById(p.user_id ?? p.id))).filter(p => { const n = p.name.toLowerCase(); return n.startsWith(q) || n.split(/\s+/).some(w => w.startsWith(q)); }).slice(0, 6);
   return {pick, items, start: pre.length - m[1].length - 1};
 }
 function mentionUpdate(ta) {

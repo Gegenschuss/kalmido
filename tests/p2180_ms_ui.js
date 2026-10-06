@@ -82,17 +82,18 @@ const task = async id => (await state()).tasks.find(t => t.id === id);
   check(await until(async () => !(await task(T4))?.ms), '… and back to a normal task');
   w.eval('closeDetail()');
   // bulk action: Set milestone
-  w.eval(`S.multi = new Set([${T4}]); S.multiMode = true; renderMultiBar()`); await sleep(200);
-  const mb = d.querySelector('#mbar [data-act="mb-ms"]');
-  check(mb && mb.getAttribute('aria-label') === 'Set milestone', 'multi-select: "Set milestone"');
+  // 2.26.0 (#936): the milestone of a selection is set in the multi panel
+  w.eval(`S.multi = new Set([${T4}, ${T3}]); renderMultiBar()`); await sleep(200);
+  const mb = d.querySelector('#detail.multi [data-act="me-f"][data-f="milestone"]');
+  check(mb && /Milestone/.test(mb.getAttribute('aria-label')), 'multi-select: the milestone field in the multi panel');
   click(w, mb); await sleep(300);
   const item = [...d.querySelectorAll('#pop button, #pop [role=menuitem]')].find(b => b.textContent.includes('Release 1.0'));
   check(item, 'its menu lists the open milestones');
   check(item && item.textContent.includes(w.eval(`fmtDateLoc('${day(3)}')`)) && !item.textContent.includes(w.eval(`fmtDate('${day(3)}')`)), 'review: the menu shows the date in the app\'s format ' + item?.textContent);
   if (item) click(w, item);
   check(await until(async () => (await task(T4))?.milestone_id === MS), 'bulk: the task joins the milestone');
-  w.eval(`S.multi = new Set([${MS}]); renderMultiBar()`); await sleep(100);
-  check(!d.querySelector('#mbar [data-act="mb-ms"]'), 'no "Set milestone" when a milestone itself is selected');
+  w.eval(`S.multi = new Set([${MS}, ${T3}]); renderMultiBar()`); await sleep(100);
+  check(d.querySelector('#detail.multi') && !d.querySelector('#detail.multi [data-f="milestone"]'), 'no milestone field when a milestone itself is selected');
   w.eval(`S.multi.clear(); S.multiMode = false; renderMultiBar()`);
   // the milestone's panel
   w.eval(`openDetail(${MS})`);

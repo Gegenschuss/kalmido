@@ -31,6 +31,15 @@ from cryptography.hazmat.primitives.asymmetric import ec
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
+
+
+def legacy_agent(lid, aid, role):  # 2.26.0: one agent per list -- a second agent as in a list from before the update
+    c_ = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c_.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,0,'2026-01-01T00:00:00+00:00')", (lid, aid, role, role))
+    c_.commit()
+    c_.close()
+
+
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 V = B + "/api/v1"
 H = {"X-Requested-With": "kalmido"}
@@ -146,7 +155,9 @@ for lid, s, who, role in ((TEAM, A, "bob", "edit"), (TEAM, A, "gert", "participa
     assert s.put(B + f"/api/lists/{lid}/members", json={"user_id": ids[who], "role": role}).ok
 for lid, s in ((TEAM, A), (SECRET, A), (BOBL, Bo)):
     assert s.put(B + f"/api/lists/{lid}/members", json={"user_id": AG, "role": "edit"}).ok
-assert A.put(B + f"/api/lists/{TEAM}/members", json={"user_id": AG2, "role": "edit"}).ok
+legacy_agent(TEAM, AG2, "edit")
+for lid, s in ((TEAM, A), (SECRET, A), (BOBL, Bo)):  # 2.26.0: members may use the agents (list switch, default off)
+    assert s.patch(B + f"/api/lists/{lid}", json={"agent_members": True, "agent_peers": True}).ok
 T1 = A.post(B + "/api/tasks", json={"title": "Write the release notes", "list_id": TEAM}).json()["id"]
 T2 = A.post(B + "/api/tasks", json={"title": "Gert's task", "list_id": TEAM, "assignee_id": ids["gert"]}).json()["id"]
 TS = A.post(B + "/api/tasks", json={"title": "Secret plan", "list_id": SECRET}).json()["id"]

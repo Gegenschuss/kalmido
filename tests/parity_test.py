@@ -201,9 +201,9 @@ APP_ONLY = [
         "* /api/admin/", "* /api/users", "GET /api/version", "GET /api/about", "GET /api/health")),
     ("agents are managed by people (admins / owners), not by tokens", ("* /api/my/agents",)),
     ("approvals and proposals come only from people (the agent's side: /agent/jobs, POST /agent/jobs/{id}/proposal)", (
-        "* /api/agents/jobs", "* /api/proposals", "POST /api/comments/{}/apply")),
+        "* /api/agents/jobs", "* /api/proposals", "POST /api/comments/{}/apply", "POST /api/comments/{}/decide")),
     ("people's side of the agent chat, waking and sharing with agents (the agent uses /agent/*)", (
-        "=GET /api/agents/{}/chat", "=POST /api/agents/{}/chat", "POST /api/agents/{}/wake", "POST /api/tasks/{}/wake", "* /api/agents/{}/share",
+        "=GET /api/agents/{}/chat", "=POST /api/agents/{}/chat", "POST /api/agents/{}/wake", "POST /api/tasks/{}/wake", "* /api/agents/{}/share", "PUT /api/lists/{}/agent",
         "* /api/agents/{}/autoshare", "GET /api/agents/usage")),
     ("devices and pushes of a person", ("* /api/push/", "POST /api/ntfy/test")),
     ("2.17.0 (#443): a person's e-mail addresses for new tasks and the summary by mail (secrets of the account)", ("* /api/me/mail",)),

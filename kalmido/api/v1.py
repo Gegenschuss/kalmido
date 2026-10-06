@@ -448,6 +448,8 @@ def v1_list(d):
             "status": d.get("status") or None, "progress": d["progress"], "created_at": d["created_at"],
             "tags": d.get("tags") or [], "agent_tidy": d.get("agent_tidy") or "off", "tidy_agent_id": d.get("tidy_agent_id"),
             "listen_agent_ids": d.get("listen_agent_ids") or [],  # 2.13.1 (#471)
+            # 2.26.0 (#928): members may see and use the list's agents / agents may address each other
+            "agent_members": bool(d.get("agent_members")), "agent_peers": bool(d.get("agent_peers")),
             "icon": d.get("icon") or "",
             "repos": d.get("repos") or [], "tickets": bool(d.get("tickets")),
             "nag": d.get("nag") or "", "day_hours": d.get("day_hours"),  # 2.7.0 (#413, #407)
@@ -716,7 +718,7 @@ def v1_list_patch(lid):
     b = v1_json()
     unknown = sorted(k for k in b if k not in ("name", "color", "folder", "view", "kind", "nag", "day_hours", "done_at_bottom", "checklist",
                                                "listen_agent_ids", "columns", "archived", "project_type", "family", "life", "trip",
-                                               "client_id"))
+                                               "client_id", "agent_members", "agent_peers"))
     if unknown:
         raise UnknownFields(unknown)
     if "family" in b and b["family"] is None:  # 2.19.0 (#653): null = an ordinary list
@@ -727,7 +729,7 @@ def v1_list_patch(lid):
         if b["project_type"] not in (None, "") and b["project_type"] not in PTYPES:
             raise BadInput(tr("Invalid value: {0}", "project_type"))
         b = {**{k: v for k, v in b.items() if k != "project_type"}, "ptype": b["project_type"] or ""}
-    for k in ("checklist", "done_at_bottom", "archived"):
+    for k in ("checklist", "done_at_bottom", "archived", "agent_members", "agent_peers"):
         if k in b and not isinstance(b[k], bool):
             raise BadInput(tr("Invalid value: {0}", k))
     if "archived" in b:  # 2.15.0 (#479): archive / restore (the owner); deleting for good: DELETE /lists/{id}

@@ -285,6 +285,17 @@ def t_list_waiting(api, a):
     return api.call("GET", "/tasks", q)
 
 
+def t_request_gate(kind):
+    """2.26.0 (#949): "ready to integrate" / "ready to deploy" without a pull request (comment with a structured field).
+    The approver's decision arrives as a reaction event (approval approved / rejected, data.gate {kind, state, ...})."""
+    def run(api, a):
+        sug = {"kind": kind, **_pick(a, ("summary", "evidence") + (("source", "target") if kind == "integrate" else ("integrations",)))}
+        head = (f"Ready to integrate: {a.get('source')} -> {a.get('target') or 'main'}" if kind == "integrate" else "Ready to deploy")
+        summary = (a.get("summary") or "").strip()
+        return api.call("POST", f"/tasks/{int(a['task_id'])}/comments", body={"body": head + (f"\n\n{summary}" if summary else ""), "suggestion": sug})
+    return run
+
+
 def t_request_merge(api, a):
     """2.2.0 (#339): a "ready to merge" comment with the structured field {kind: merge_request, pr_url, summary}. An approver's
     👍 / 👎 on it arrives as a reaction event (approval approved / rejected, merge_request {pr_url, state})."""
@@ -396,6 +407,27 @@ TOOLS = [
                                "admin / the assignee / an admin) before you merge; 'rejected' = do not merge.",
      _obj({"task_id": S_ID, "pr_url": {"type": "string", "minLength": 8, "maxLength": 500},
            "summary": {"type": "string", "maxLength": 2000}}, ["task_id", "pr_url"]), t_request_merge),
+    ("request_integration_approval", "Ask a person to approve integrating your branch WITHOUT a pull request (e.g. feat/x into main): "
+                                     "posts a 'ready to integrate' comment on the task with your evidence (build, start, logs, tests). Integrate "
+                                     "only after the reaction event with approval 'approved'; 'rejected' = do not.",
+     _obj({"task_id": S_ID, "source": {"type": "string", "minLength": 1, "maxLength": 200}, "target": {"type": "string", "maxLength": 200},
+           "summary": {"type": "string", "maxLength": 4000}, "evidence": {"type": "string", "minLength": 1, "maxLength": 4000}},
+          ["task_id", "source", "evidence"]), t_request_gate("integrate")),
+    ("request_deploy_approval", "Ask a person to approve a deploy: bundles approved integrations (comment ids of your "
+                                "request_integration_approval comments) and the checklist of open tasks tagged 'deploy' in the list. "
+                                "A thumbs-up does not approve while that checklist has open tasks (the person may approve anyway). Deploy "
+                                "only after the reaction event with approval 'approved'.",
+     _obj({"task_id": S_ID, "integrations": {"type": "array", "items": {"type": "integer"}, "maxItems": 50},
+           "summary": {"type": "string", "maxLength": 4000}, "evidence": {"type": "string", "minLength": 1, "maxLength": 4000}},
+          ["task_id", "evidence"]), t_request_gate("deploy")),
+    ("propose_to_other_topic", "Propose tasks for a list you cannot see (another topic, e.g. a change to a shared file). It lands "
+                               "as a proposal with that list's owner -- never with the agent working there; only when a person applies "
+                               "it do tasks exist. You learn the outcome as a job event.",
+     _obj({"list_id": S_ID, "title": {"type": "string", "minLength": 1, "maxLength": 300}, "reason": {"type": "string", "minLength": 1, "maxLength": 5000},
+           "tasks": {"type": "array", "minItems": 1, "maxItems": 50, "items": _obj({"title": {"type": "string", "minLength": 1, "maxLength": 300},
+                                                                                     "notes": {"type": "string", "maxLength": 5000},
+                                                                                     "due": {"type": "string", "format": "date"}}, ["title"])}},
+          ["list_id", "title", "reason", "tasks"]), lambda api, a: api.call("POST", "/agent/proposals", body=_pick(a, ("list_id", "title", "reason", "tasks")))),
     ("react", "Add (or with remove=true take back) a reaction on a comment: up (👍), down (👎), heart (❤️) or any single emoji.",
      _obj({"comment_id": S_ID, "emoji": {"type": "string", "minLength": 1, "maxLength": 16,
                                          "description": "up, down, heart or one emoji character"}, "remove": {"type": "boolean"}},
@@ -407,9 +439,11 @@ TOOLS = [
      _obj({"user_id": S_ID, "message_id": S_ID, "emoji": {"type": "string", "minLength": 1, "maxLength": 16,
                                                          "description": "up, down, heart or one emoji character"}, "remove": {"type": "boolean"}},
           ["user_id", "message_id", "emoji"]), t_react_chat),
-    ("set_status", "Report the agent's status, shown on its avatar: idle | working | waiting (for approval) | error, plus a short text. "
+    ("set_status", "Report the agent's status, shown on its avatar: idle | working | waiting (for approval) | error | paused, plus a short text "
+                   "(paused needs the reason, e.g. 'a person works interactively here': people see it in the chip and the chat; "
+                   "events keep queueing until you report another status). "
                    "task_id (optional): the task you are working on; while working, its comment area shows '<agent> is writing ...'.",
-     _obj({"status": {"type": "string", "enum": ["idle", "working", "waiting", "error"]}, "text": {"type": "string", "maxLength": 200},
+     _obj({"status": {"type": "string", "enum": ["idle", "working", "waiting", "error", "paused"]}, "text": {"type": "string", "maxLength": 200},
            "task_id": S_ID},
           ["status"]), lambda api, a: api.call("PUT", "/agent/status", body=_pick(a, ("status", "text", "task_id")))),
     ("list_events", "Events for the agent (mention, comment, assigned, unassigned, chat, reaction, job, tidy, wake, ping, followup_due, "
@@ -1076,12 +1110,12 @@ TOOL_MAP = {t[0]: t for t in TOOLS}
 
 TOOL_SCOPES = {
     "agent": ("get_agent", "react_to_chat", "set_status", "list_events", "wait_for_events", "list_jobs", "create_job", "get_job",
-              "submit_proposal", "update_job", "list_chats", "chat_typing", "send_chat", "report_usage", "get_usage"),
+              "submit_proposal", "propose_to_other_topic", "update_job", "list_chats", "chat_typing", "send_chat", "report_usage", "get_usage"),
     "tasks:write": ("add_contract", "add_device", "add_upkeep", "sync_read_later", "add_occasion", "add_deadline", "ingredients_to_shopping", "give_stars", "add_reward", "update_reward", "request_reward",
                     "decide_reward", "create_note", "update_note", "create_task", "update_task", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "batch_tasks",
                     "reopen_task", "skip_occurrence", "take_task", "add_subtask", "add_dependency", "remove_dependency", "create_habit",
                     "update_habit", "check_in_habit", "shift_list_dates", "request_approval"),
-    "comments": ("comment_typing", "post_team_message", "edit_team_message", "delete_team_message", "react_team_message", "mark_team_chat_read", "add_comment", "react", "request_merge_approval", "update_comment", "delete_comment", "mark_news_read",
+    "comments": ("comment_typing", "post_team_message", "edit_team_message", "delete_team_message", "react_team_message", "mark_team_chat_read", "add_comment", "react", "request_merge_approval", "request_integration_approval", "request_deploy_approval", "update_comment", "delete_comment", "mark_news_read",
                  "delete_chat_attachment"),
     "structure": ("create_trip", "add_shop_areas", "create_packing_list", "set_list_columns", "create_list", "update_list", "share_list", "unshare_list", "share_list_with_group",
                   "unshare_list_from_group", "create_section", "rename_section", "reorder_sections", "rename_folder", "delete_folder",

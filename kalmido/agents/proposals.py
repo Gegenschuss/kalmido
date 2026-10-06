@@ -437,6 +437,9 @@ def proposal_request():
                  (uid,)).fetchone()[0] >= PROP_OPEN_MAX:
         return err(tr("You have {0} open proposal requests: apply or discard some first", PROP_OPEN_MAX), 429)
     inp, title, tid, lid = prop_input(c, uid, kind, b)
+    from ..agents.core import agent_usable
+    if lid and prop_mode(a) != "all" and list_role(c, lid, aid) and not agent_usable(c, aid, uid, lid):  # 2.26.0 (#928)
+        return err(tr("The list owner has not opened this agent to members"), 403)
     ts = iso(now_utc())
     jid = c.execute("""INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at,kind,input,prop_state,list_id)
                        VALUES(?,?,?,?,'running','',?,?,?,?,'requested',?)""",
@@ -595,7 +598,8 @@ def prop_run(c, j, sel, ed, extra):
             for d in t["depends_on"]:
                 if i in ids and d in ids:
                     c.execute("INSERT OR IGNORE INTO task_deps(task_id,blocker_id,created_by,created_at) VALUES(?,?,?,?)", (ids[i], ids[d], uid, ts))
-        if extra.get("share_agent") and agent_active(agent_row(c, aid)):
+        from ..core.access import list_other_agent
+        if extra.get("share_agent") and agent_active(agent_row(c, aid)) and not list_other_agent(c, lid, aid):  # 2.26.0
             c.execute("INSERT OR IGNORE INTO list_members(list_id,user_id,role,sort,added_at) VALUES(?,?,?,?,?)",
                       (lid, aid, "edit", my_max_sort(c, aid) + 1, ts))
             rec["shared"] = True
@@ -1128,3 +1132,50 @@ def v1_agents():
     v1_args(())
     c = db()
     return jsonify(data=agents_for(c, me()) if not is_agent(g.user) else [agent_public(c, agent_row(c, me()))], next_cursor=None)
+
+
+# ---- 2.26.0 (#949): a proposal to ANOTHER topic. An agent may suggest tasks for a list it does not see (e.g. a change to a
+# shared file that belongs to another team's topic). It lands as a ready proposal (kind extract) with the list's owner --
+# never as an event for that list's agent; only when a person applies it do tasks exist. Allowed targets: lists owned by a
+# person the agent already works with (agent_shares); everything else answers 404 (no probing of list ids).
+XPROP_OPEN_MAX = 10   # open cross-topic proposals per agent
+
+
+@app.post("/api/v1/agent/proposals")
+@v1_view
+def v1_agent_cross_proposal():
+    """{list_id, title, reason, tasks: [{title, notes?, due?}]} -- the agent proposes tasks for a list it cannot see."""
+    from ..agents.core import agent_shares
+    v1_args(())
+    aid = need_agent()
+    b = v1_json()
+    _p_keys(b, "", ("list_id", "title", "reason", "tasks", "summary"))
+    lid = _p_int(b.get("list_id"), "list_id")
+    title = _p_str(b.get("title"), "title", PROP_TITLE_MAX, True)
+    reason = _p_str(b.get("reason"), "reason", PROP_NOTES_MAX, True, line=False)
+    c = db()
+    lst = c.execute("SELECT l.*, u.kind AS okind, u.disabled AS odis FROM lists l JOIN users u ON u.id=l.owner_id WHERE l.id=?", (lid,)).fetchone()
+    if not lst or lst["okind"] == "agent" or lst["odis"] or lst["is_inbox"] or lst["archived"] or lst["life"] == "health" \
+            or not agent_shares(c, aid, lst["owner_id"]):
+        raise Denied(404)
+    if list_role(c, lid, aid):
+        raise BadInput(tr("You can see this list: create the tasks there directly"))
+    if c.execute("SELECT COUNT(*) FROM agent_jobs WHERE agent_id=? AND kind='extract' AND prop_state='ready' AND input LIKE '%\"cross\": true%'",
+                 (aid,)).fetchone()[0] >= XPROP_OPEN_MAX:
+        return v1_err(429, tr("You have {0} open proposals for other topics: wait until people decided on them", XPROP_OPEN_MAX))
+    tasks = [{**{k: v for k, v in t.items() if k in ("title", "notes", "due")}} if isinstance(t, dict) else t
+             for t in (b.get("tasks") or [])] if isinstance(b.get("tasks"), list) else b.get("tasks")
+    inp = {"list": {"id": lid, "name": lst["name"], "sections": []}, "members": [], "text": reason, "cross": True}
+    p = prop_validate("extract", {"tasks": tasks, **({"summary": b["summary"]} if "summary" in b else {})}, inp)
+    ts = iso(now_utc())
+    aname = user_names(c, [aid]).get(aid, "?")
+    jid = c.execute("""INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at,kind,input,prop_state,list_id,proposal)
+                       VALUES(?,NULL,?,?,'waiting','',?,?,'extract',?,'ready',?,?)""",
+                    (aid, lst["owner_id"], tr("Proposal from {0}: {1}", aname, title)[:JOB_TITLE_MAX], ts, ts,
+                     json.dumps(inp, ensure_ascii=False), lid, json.dumps(p, ensure_ascii=False))).lastrowid
+    j = c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone()
+    prop_ready_notify(c, j)
+    bump(c)
+    c.commit()
+    print("cross-topic proposal", jid, "agent", aid, "list", lid, flush=True)
+    return jsonify({**job_dict(c, j), "proposal": p}), 201

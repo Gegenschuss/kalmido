@@ -190,6 +190,16 @@ def comment_create(tid):
             sug = git_merge_request(c, t, sug)
         except BadInput as e:
             return err(str(e))
+    elif isinstance(sug, dict) and sug.get("kind") in ("integrate", "deploy"):  # 2.26.0 (#949): ready to integrate / deploy
+        from ..agents.gates import gate_clean
+        if not is_agent(g.user):
+            return err(tr("Only agents can post suggestions"), 403)
+        if not task_visible(c, tid, me(), write=True):
+            raise Denied(403)
+        try:
+            sug = gate_clean(c, t, sug)
+        except BadInput as e:
+            return err(str(e))
     elif sug is not None:  # 2.0.0: a tidy suggestion (agents, in lists with tidying on)
         if not is_agent(g.user):
             return err(tr("Only agents can post suggestions"), 403)

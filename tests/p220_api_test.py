@@ -174,6 +174,7 @@ OTHER = A.post(B + "/api/lists", json={"name": "Other", "kind": "project"}).json
 for u, role in (("bob", "edit"), ("carol", "view"), ("dave", "admin")):
     assert A.put(B + f"/api/lists/{P}/members", json={"user_id": ids[u], "role": role}).ok
 assert A.put(B + f"/api/lists/{P}/members", json={"user_id": AG, "role": "edit"}).ok
+assert A.patch(B + f"/api/lists/{P}", json={"agent_members": True}).ok  # 2.26.0: members may use the agent (default off)
 assert A.put(B + f"/api/lists/{OTHER}/members", json={"user_id": ids["bob"], "role": "edit"}).ok
 
 # ================================================================== connecting

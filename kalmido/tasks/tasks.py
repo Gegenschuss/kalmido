@@ -141,14 +141,21 @@ def check_assignee(c, lid, aid):
         aid = int(aid)
     except (TypeError, ValueError):
         return tr("unknown user")
-    return None if aid in list_people(c, lid) else tr("Only the owner or a member of the list can be assigned")
+    if aid not in list_people(c, lid):
+        return tr("Only the owner or a member of the list can be assigned")
+    # 2.26.0 (#928): an agent only by someone it is open to in this list (owner / list admins, or everyone with "Members
+    # may see and use the agent")
+    from ..agents.core import agent_ids, agent_usable
+    if aid in agent_ids(c) and aid != me() and not agent_usable(c, aid, me(), lid):
+        return tr("The list owner has not opened this agent to members")
+    return None
 
 
 # 2.2.1 (#359): the fields the web API's task / list / comment endpoints know (others: warning, see web_fields)
 WEB_TASK_NEW = frozenset(TASK_FIELDS) | {"tags", "ltags", "fields", "people"}
 WEB_TASK_EDIT = WEB_TASK_NEW | {"add_tags", "_prev", "_act"}
 WEB_LIST_NEW = frozenset({"name", "color", "folder", "view", "kind", "checklist", "done_at_bottom", "dep_shift", "tickets", "ptype", "family"})
-WEB_LIST_EDIT = frozenset(LIST_FIELDS) | {"client_id", "rate", "agent_tidy", "tidy_agent_id", "listen_agent_ids", "_prev", "ticket_tpl", "day_hours", "done_at_bottom", "columns", "ptype"}
+WEB_LIST_EDIT = frozenset(LIST_FIELDS) | {"client_id", "rate", "agent_tidy", "tidy_agent_id", "listen_agent_ids", "agent_members", "agent_peers", "_prev", "ticket_tpl", "day_hours", "done_at_bottom", "columns", "ptype"}
 WEB_COMMENT = frozenset({"body", "suggestion"})
 
 

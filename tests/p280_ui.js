@@ -53,7 +53,13 @@ const CONTRAST = `(() => {
   const L = (await call('POST', '/api/lists', {name: 'Launch', kind: 'project', tickets: true})).id;
   const W = (await call('POST', '/api/lists', {name: 'Website', kind: 'project'})).id;
   const PLAIN = (await call('POST', '/api/lists', {name: 'Groceries'})).id;
-  for (const u of [BOB, DEV.id, KOL.id, ARC.id]) await call('PUT', `/api/lists/${L}/members`, {user_id: u, role: 'edit'});
+  for (const u of [BOB, DEV.id]) await call('PUT', `/api/lists/${L}/members`, {user_id: u, role: 'edit'});
+  // 2.26.0: one agent per list -- the other two join as in a list from before the update (kept)
+  execFileSync('python3', ['-c', `import sqlite3, sys
+c = sqlite3.connect(sys.argv[1], timeout=10)
+for a in sys.argv[3:]:
+    c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,'edit','edit',0,'2026-01-01T00:00:00+00:00')", (int(sys.argv[2]), int(a)))
+c.commit()`, path.join(DATA, 'tasks.db'), String(L), String(KOL.id), String(ARC.id)]);
   await call('POST', `/api/lists/${L}/milestones`, {name: 'Beta', day: day(12)});
   const S1 = (await call('POST', '/api/sections', {list_id: L, name: 'In progress'})).id;
   const S2 = (await call('POST', '/api/sections', {list_id: L, name: 'Review'})).id;

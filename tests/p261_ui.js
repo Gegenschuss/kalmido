@@ -17,6 +17,7 @@ const WS = globalThis.WebSocket || require('ws');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
+const {shareAny} = require('./legacy');  // 2.26.0: one agent per list
 const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
@@ -54,7 +55,7 @@ const HEAD = `(() => {
   const ag = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'claude', display_name: 'Claude'});
   const ag2 = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'helper', display_name: 'Helper'});
   const L = (await call('POST', '/api/lists', {name: 'Launch', kind: 'project'})).id;
-  for (const id of [BOB, ag.id, ag2.id]) await call('PUT', `/api/lists/${L}/members`, {user_id: id, role: 'edit'});
+  for (const id of [BOB, ag.id, ag2.id]) await shareAny(call, DATA, L, id, 'edit');
   const T = (await call('POST', '/api/tasks', {title: 'Go live', list_id: L, due: day(5)})).id;
   for (let i = 0; i < 3; i++) await call('POST', '/api/tasks', {title: `Task ${i + 1}`, list_id: L, due: day(i)});
   const getT = id => call('GET', `/api/tasks/${id}`);

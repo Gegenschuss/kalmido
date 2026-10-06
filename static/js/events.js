@@ -260,15 +260,23 @@ document.addEventListener('click', async e => {
   const wh = e.target.closest('.wh, .wad');
   if (wh && !e.target.closest('.ev')) { S.calSel = wh.dataset.day; S.calMode = 'day'; LS.set('calMode', 'day'); renderView(); return; }
   // multi-select: ctrl/cmd/shift-click, or tap while in select mode
+  // 2.26.0 (#936): Shift-click selects the range from the anchor (the last clicked / selected row, else the open or the
+  // keyboard-focused task) in the visible order; Ctrl/Cmd-click toggles one task, starting from the open task (it joins
+  // the selection). A plain click opens the task and ends the selection (openDetail -> meEnd).
   const mrow = e.target.closest('#view .trow');
-  if (mrow && !e.target.closest('.caret') && (S.multiMode || e.ctrlKey || e.metaKey || (e.shiftKey && S.multi.size))) {
+  const anchor0 = S.multi.size ? S.multiLast : S.sel || S.kf;
+  if (mrow && !e.target.closest('.caret') && (S.multiMode || e.ctrlKey || e.metaKey || (e.shiftKey && anchor0))) {
     e.preventDefault(); e.stopPropagation();
-    const id = +mrow.dataset.id;
-    if (e.shiftKey && S.multiLast) {
-      const ids = $$('#view .trow').map(r => +r.dataset.id), a = ids.indexOf(S.multiLast), b = ids.indexOf(id);
+    const id = +mrow.dataset.id, ids = $$('#view .trow').map(r => +r.dataset.id);
+    if (e.shiftKey && !e.ctrlKey && !e.metaKey && anchor0 && ids.includes(anchor0)) {
+      const a = ids.indexOf(anchor0), b = ids.indexOf(id);
       if (a >= 0 && b >= 0) ids.slice(Math.min(a, b), Math.max(a, b) + 1).forEach(x => S.multi.add(x));
-    } else S.multi.has(id) ? S.multi.delete(id) : S.multi.add(id);
-    S.multiLast = id;
+      if (!S.multiLast || !S.multi.has(S.multiLast)) S.multiLast = anchor0;
+    } else {
+      if (!S.multi.size && !S.multiMode && S.sel && S.sel !== id && ids.includes(S.sel)) S.multi.add(S.sel);
+      S.multi.has(id) ? S.multi.delete(id) : S.multi.add(id);
+      S.multiLast = id;
+    }
     $$('#view .trow').forEach(r => r.classList.toggle('msel', S.multi.has(+r.dataset.id)));
     renderMultiBar();
     return;
@@ -306,6 +314,8 @@ document.addEventListener('click', async e => {
     case 'c-react-more': e.stopPropagation(); reactPicker(a, +a.dataset.cid); break;
     case 'c-apply': commentApply(+a.dataset.cid); break;
     case 'mr-ok': commentReact(+a.dataset.cid, 'up'); break;  // 2.2.0 (#339)
+    case 'gate-ok': gateDecide(+a.dataset.cid, false); break;  // 2.26.0 (#949)
+    case 'gate-skip': gateDecide(+a.dataset.cid, true); break;
     case 'mr-no': commentReact(+a.dataset.cid, 'down'); break;
     case 'git-undo': gitUndo(+a.dataset.id); break;
     case 'git-refresh': gitRefresh(+a.dataset.lid); break;

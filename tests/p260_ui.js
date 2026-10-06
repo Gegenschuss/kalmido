@@ -20,6 +20,7 @@ const WS = globalThis.WebSocket || require('ws');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
+const {shareAny} = require('./legacy');  // 2.26.0: one agent per list
 const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
@@ -138,9 +139,9 @@ const TOUCH = `(() => {
   const ag = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'claude', display_name: 'Claude'});
   const ag2 = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'helper', display_name: 'Helper'});
   const L = (await call('POST', '/api/lists', {name: 'Website Relaunch Müller GmbH', kind: 'project'})).id;  // a long project name
-  for (const id of [BOB, ag.id]) await call('PUT', `/api/lists/${L}/members`, {user_id: id, role: 'edit'});
+  for (const id of [BOB, ag.id]) await shareAny(call, DATA, L, id, 'edit');
   const CL = (await call('POST', '/api/lists', {name: 'Shopping', kind: 'checklist'})).id;
-  await call('PUT', `/api/lists/${CL}/members`, {user_id: BOB, role: 'edit'});
+  await shareAny(call, DATA, CL, BOB, 'edit');
   const T = (await call('POST', '/api/tasks', {title: 'Go live', list_id: L, due: day(6), start: day(3)})).id;
   const T2 = (await call('POST', '/api/tasks', {title: 'Write the texts', list_id: L, due: day(2), due_time: '10:00', assignee_id: BOB})).id;
   const T3 = (await call('POST', '/api/tasks', {title: 'Nobody yet', list_id: L, due: day(4)})).id;
@@ -262,7 +263,9 @@ const TOUCH = `(() => {
   const inv = [...md.querySelectorAll('#l-adduser option')].map(o => o.textContent);
   check(inv.includes('Carol') && !inv.includes('Helper') && !inv.includes('Claude'), 'invite: people only: ' + inv.join(','));
   const ags = md.querySelector('#sh-agents');
-  check(ags && ags.querySelector(`.mrow[data-uid="${ag.id}"] [data-mrm="${ag.id}"]`) && [...ags.querySelectorAll('#sh-addagent option')].map(o => o.textContent).includes('Helper') && md.querySelector('#l-tidyrow #l-tidy'), 'agents: Claude (stop sharing), Helper to add, the tidy agent');
+  // 2.26.0: one agent per list -- one select "Agent", the switches who may address it, then the tidy row
+  check(ags && ags.querySelector('#sh-agsel')?.value === String(ag.id) && [...ags.querySelectorAll('#sh-agsel option')].map(o => o.textContent).includes('Helper')
+        && !ags.querySelector(`.mrow[data-uid="${ag.id}"]`) && md.querySelector('#l-tidyrow #l-tidy') && md.querySelector('#l-agm') && md.querySelector('#l-agp'), 'agents: one select (Claude, Helper to pick), the switches, the tidy agent');
   check(md.querySelector('#l-pub') && md.querySelector('#l-owner') !== null, 'public link + ownership sections');
   await until(() => md.querySelector('#l-owner [data-m="own-xfer"]'));
   check(md.querySelector('#l-owner [data-m="own-xfer"]') && /Transfer ownership/.test(md.querySelector('#l-owner').textContent), 'Transfer ownership…');
@@ -271,13 +274,16 @@ const TOUCH = `(() => {
   click(w, md.querySelector('[data-m="share"]')); await sleep(900);
   const members = async () => ((await call('GET', '/api/state')).lists.find(x => x.id === L)?.members || []);
   check((await members()).some(p => p.user_id === CAROL && p.role === 'view') && md.querySelector(`#l-members .mrow[data-uid="${CAROL}"]`), 'Carol invited as a viewer');
-  // share with Helper, then stop sharing with Claude
-  md.querySelector('#sh-addagent').value = String(ag2.id);
-  click(w, md.querySelector('[data-m="share-ag"]')); await sleep(900);
-  check(md.querySelector(`#sh-agents .mrow[data-uid="${ag2.id}"]`), 'Helper shared');
-  w.confirm = () => true;
-  click(w, md.querySelector(`#sh-agents [data-mrm="${ag.id}"]`)); await sleep(1200);
-  check(!(await members()).some(p => p.user_id === ag.id) && !md.querySelector(`#sh-agents .mrow[data-uid="${ag.id}"]`), 'stop sharing with Claude');
+  // switch to Helper (Claude leaves in the same step), Undo brings Claude back, then no agent
+  const agsel = () => md.querySelector('#sh-agsel');
+  agsel().value = String(ag2.id); agsel().dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(1400);
+  let mm = await members();
+  check(mm.some(p => p.user_id === ag2.id) && !mm.some(p => p.user_id === ag.id) && /Undo/.test(d.querySelector('#toast')?.textContent || ''), 'switched to Helper in one step, with Undo');
+  d.querySelector('#toast button')?.click(); await sleep(1400);
+  mm = await members();
+  check(mm.some(p => p.user_id === ag.id) && !mm.some(p => p.user_id === ag2.id), 'Undo: Claude is back');
+  agsel().value = ''; agsel().dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(1400);
+  check(!(await members()).some(p => p.user_id === ag.id), 'No agent: Claude no longer sees the list');
   click(w, md.querySelector('[data-m="list-edit"]')); await sleep(400);
   check(d.querySelector('.modal.lmodal') && !d.querySelector('.modal.shmodal'), '"List settings…" goes back to the list dialog');
   d.querySelector('.modal.lmodal').remove();
@@ -289,7 +295,7 @@ const TOUCH = `(() => {
   check(md && !md.querySelector('[data-mrole]') && !md.querySelector('#l-adduser') && !md.querySelector('#l-pub') && md.querySelector('.olock'), 'member: read-only people, no public link');
   md.remove(); w.close();
   // put Claude back for the header checks below
-  await call('PUT', `/api/lists/${L}/members`, {user_id: ag.id, role: 'edit'});
+  await shareAny(call, DATA, L, ag.id, 'edit');
 
   // ================= Firefox
   const W5 = [[360, 780, 1], [390, 844, 1], [904, 1080, 1], [1280, 800, 0], [1920, 1080, 0]];

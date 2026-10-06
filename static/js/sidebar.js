@@ -14,18 +14,19 @@ function renderMultiBar() {
   if (!b) { b = document.createElement('div'); b.id = 'mbar'; document.body.appendChild(b); }
   const n = S.multi.size;
   b.classList.toggle('hidden', !(S.multiMode || n));
+  document.body.classList.toggle('msel', !!(S.multiMode || n));  // 2.26.0: the docked quick add steps back while selecting
   $('#fab').classList.toggle('gone', fabOff() || S.multiMode || n > 0 || (!!$('#view .qdock') && (tabletDock() || !isMobile())));
-  // 2.13.0 (#453 A14): every action has its label; a phone shows the four common ones and "More" (the bar used to be 11
-  // bare icons, the last one cut off)
-  const A = [['mb-today', 'sun', tr('Today')], ['mb-tomorrow', 'sunrise', tr('Tomorrow')], ['mb-date', 'cal', tr('Date')], ['mb-prio', 'flag', tr('Priority')], ['mb-list', 'folder', tr('List')],
-    ['mb-tag', 'tag', tr('Add tag')], ...(msBulkList() ? [['mb-ms', 'flag', tr('Set milestone')]] : []), ['mb-pin', 'pin', tr('Pin')], ...(n === 1 ? [['mb-wait', 'hourglass', tr('Waiting on someone…')]] : []), ['mb-done', 'done', tr('Completed')], ['mb-del', 'trash', tr('Delete'), 'danger'],
-    ...(propInboxSel() ? [['mb-sort', 'bot', propWith(N_('Sort with {0}…'), N_('Sort with an agent…'))]] : [])];
-  const MAIN = ['mb-today', 'mb-date', 'mb-list', 'mb-done'], mob = isMobile();
-  const btn = ([act, i, lab, cls], hid) => `<button class="mbb ${cls || ''} ${hid ? 'mbh' : ''}" data-act="${act}" data-ico="${i}" title="${esc(lab)}" aria-label="${esc(lab)}" ${hid ? 'hidden' : ''}>${ic(i, 's')}<span class="mbl">${esc(lab)}</span></button>`;
-  b.innerHTML = `<span class="mcount">${n ? tr('{0} selected', n) : tr('Tap tasks')}</span>
-    <button class="mbb" data-act="mb-all" title="${tr('All')}" aria-label="${esc(tr('Select all'))}">${ic('all', 's')}<span class="mbl">${tr('All')}</span></button>
-    ${n ? (mob ? A.filter(x => MAIN.includes(x[0])).map(x => btn(x)).join('') + A.filter(x => !MAIN.includes(x[0])).map(x => btn(x, true)).join('') + `<button class="mbb" data-act="mb-more" aria-haspopup="menu" title="${esc(tr('More'))}">${ic('dots', 's')}<span class="mbl">${tr('More')}</span></button>` : A.map(x => btn(x)).join('')) : ''}
-    <button class="iconbtn" data-act="mb-close" title="${tr('Done')}" aria-label="${tr('Done')}">${ic('x')}</button>`;
+  // 2.26.0 (#936): the selection is edited in the task panel (from two tasks: their common fields, see multiedit.js); the
+  // bar keeps only what the panel does not have: the count, Complete, Delete and Clear selection. A phone opens the panel
+  // as a sheet with "Edit"; with nothing selected yet (select mode) it offers "All".
+  const mob = isMobile();
+  const btn = ([act, i, lab, cls]) => `<button class="mbb ${cls || ''}" data-act="${act}" data-ico="${i}" title="${esc(lab)}" aria-label="${esc(lab)}">${ic(i, 's')}<span class="mbl">${esc(lab)}</span></button>`;
+  b.setAttribute('role', 'toolbar'); b.setAttribute('aria-label', tr('Selection'));
+  b.innerHTML = `<span class="mcount" role="status">${n ? tr('{0} selected', n) : tr('Tap tasks')}</span>
+    ${n ? '' : btn(['mb-all', 'all', tr('All')])}${n >= 2 && mob ? btn(['me-sheet', 'edit', tr('Edit'), 'pri']) : ''}
+    ${n ? btn(['mb-done', 'done', tr('Complete')]) + btn(['mb-del', 'trash', tr('Delete'), 'danger']) : ''}
+    <button class="iconbtn mbx" data-act="mb-close" title="${esc(tr('Clear selection') + ' (Esc)')}" aria-label="${esc(tr('Clear selection'))}">${ic('x')}</button>`;
+  meSync();
 }
 async function batch(action, data, clear, ids = [...S.multi], note = '') {
   if (!ids.length) return;

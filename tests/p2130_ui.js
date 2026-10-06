@@ -173,11 +173,13 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   check(/Offline · 1 change waiting/.test(d.querySelector('#stale')?.textContent || ''), 'A13: "Offline · 1 change waiting": ' + (d.querySelector('#stale')?.textContent || '-'));
   w.__offline = false; w.eval('setOnline(true)'); await until(() => !w.eval('OUT.q.length'), 40); w.eval('S.syncOk = Date.now(); staleDraw()');
   check(!d.querySelector('#stale'), 'A13: back online: the chip goes');
+  // 2.26.0 (#936): the bar keeps count, Complete, Delete, Clear selection; from two tasks "Edit" opens the multi panel
   w.eval(`S.multiMode = true; S.multi.add(${T[0]}); renderMultiBar()`);
-  const mb = [...d.querySelectorAll('#mbar .mbb:not([hidden])')].map(b => b.querySelector('.mbl')?.textContent);
-  check(mb.join('|') === 'All|Today|Date|List|Completed|More' && d.querySelectorAll('#mbar .mbb[hidden]').length >= 5, 'A14: phone selection bar: labels, four actions + More: ' + mb.join('|'));
-  click(w, d.querySelector('#mbar [data-act="mb-more"]')); await sleep(200);
-  check(/Priority/.test(d.querySelector('#pop').textContent) && /Delete/.test(d.querySelector('#pop').textContent), 'A14: More holds the rest');
+  let mb = [...d.querySelectorAll('#mbar .mbb:not([hidden])')].map(b => b.querySelector('.mbl')?.textContent);
+  check(mb.join('|') === 'Complete|Delete' && d.querySelector('#mbar [data-act="mb-close"]'), 'A14: phone selection bar: labels, Complete + Delete: ' + mb.join('|'));
+  w.eval(`S.multi.add(${T[1]}); renderMultiBar()`);
+  mb = [...d.querySelectorAll('#mbar .mbb:not([hidden])')].map(b => b.querySelector('.mbl')?.textContent);
+  check(mb.join('|') === 'Edit|Complete|Delete', 'A14 (2.26.0): from two tasks "Edit" (the panel as a sheet): ' + mb.join('|'));
   closeAll(w); w.eval('S.multi.clear(); S.multiMode = false; render()');
   w.eval(`openQuickSheet('Call Bob tomorrow 10:00')`); await sleep(100);
   check(d.body.classList.contains('qsheet-open'), 'P8: the + button hides behind the add sheet');
@@ -377,7 +379,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     const lpm = await ev(`(() => { const b = [...document.querySelectorAll('#pop [role="menuitem"]')].find(x => /Auswählen/.test(x.textContent)); if (b) b.click(); return !!b; })()`); await sleep(300);
     check(lpm, '390 UX-11: the long press opens the task menu with "Auswählen"');
     const sel = await ev(`(() => { const b = document.querySelector('#mbar'), r = b.getBoundingClientRect(); return {mode: S.multiMode, n: S.multi.size, vis: !b.classList.contains('hidden'), in: r.left >= 0 && r.right <= innerWidth + .5, lab: [...b.querySelectorAll('.mbb:not([hidden]) .mbl')].map(x => x.textContent).join('|')}; })()`);
-    check(sel.mode && sel.n === 1 && sel.vis && sel.in && /Heute/.test(sel.lab), '390 A14: long press selects the row, the bar fits with labels ' + JSON.stringify(sel));
+    check(sel.mode && sel.n === 1 && sel.vis && sel.in && /Löschen/.test(sel.lab), '390 A14: long press selects the row, the bar fits with labels ' + JSON.stringify(sel));
     await shot('p2130-select-390.png');
     await ev(`(() => { S.multi.clear(); S.multiMode = false; render(); return 1; })()`);
     // the keyboard: the chat with a keyboard-sized viewport keeps the newest message in view (#453 N4 still holds)
