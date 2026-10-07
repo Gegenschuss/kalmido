@@ -23,7 +23,10 @@ function openDetail(id) {
   if (kb || isMobile()) setTimeout(() => { if (document && S.sel === id && !d.contains(document.activeElement)) { d.tabIndex = -1; try { d.focus({preventScroll: true}); } catch { d.focus(); } } }, 60);
   $$('.trow.sel').forEach(r => r.classList.remove('sel'));
   $$(`.trow[data-id="${id}"]`).forEach(r => r.classList.add('sel'));
+  // 2.26.x (#953): touch tablets / the unfolded Fold too: the open task is its own history entry, so Back (Android's key /
+  // gesture) closes only the task and keeps the view + sidebar; phones as before (one entry per opened task)
   if (isMobile()) history.pushState({detail: id}, '', location.hash);
+  else if (isTouch() && !history.state?.detail) history.pushState({detail: id}, '', location.hash);
   if (cmtOn() && id > 0 && S.tl.id !== id) S.tl = {id};
   loadTimeline(id);
   loadTaskTime(id);
@@ -41,14 +44,23 @@ function closeDetail(fromPop) {
   $('#app').classList.remove('detail-open'); fitLayout();
   $$('.trow.sel').forEach(r => r.classList.remove('sel'));
   setTimeout(() => { if (!S.sel) d.classList.add('hidden'); }, isMobile() ? 230 : 0);
-  if (isMobile() && !fromPop && history.state && history.state.detail) history.back();
+  if ((isMobile() || isTouch()) && !fromPop && history.state && history.state.detail) history.back();  // closed by X / Back button: the entry goes
   if (S.bellBack) { S.bellBack = false; setTimeout(() => { const b = $('#top .bell'); if (b && !S.sel && $('#pop').classList.contains('hidden')) bellPop(b); }, isMobile() ? 260 : 0); }  // 2.13.0 (#453 A5)
 }
-window.addEventListener('popstate', () => { if (S.sel && isMobile()) closeDetail(true); });
+window.addEventListener('popstate', () => { if (S.sel && (isMobile() || isTouch())) closeDetail(true); });
 // U02 (owner decision 1), 2.8.0 (#434): sidebar + list + task panel side by side only while the list keeps ~420 px (Fold
 // unfolded, small laptop windows, large font sizes). Otherwise the sidebar becomes a drawer: the header's menu button opens
 // it as an overlay (like the phone drawer). An unfolded Fold (~904 px) keeps the sidebar next to the list.
 const LIST_MIN_PX = 420;
+// 2.26.x: the fixed line at the bottom of the task panel: "Created by <name> on <date>" (agents by their name; no known
+// creator: the date only), plus "Completed <date>" once done
+function createdLine(t) {
+  const f = v => new Date(v).toLocaleString(LOCALE(), {dateStyle: 'medium', timeStyle: 'short'});
+  const who = t.created_by ? personNameAny(t.created_by) : '';
+  const c = !t.created_at ? '' : who ? tr('Created by {0} on {1}', who, f(t.created_at)) : tr('Created {0}', f(t.created_at));
+  const d = t.status === 2 && t.completed_at ? tr('Completed {0}', f(t.completed_at)) : '';
+  return [c, d].filter(Boolean).join(' · ');
+}
 function fitLayout(quiet) {
   const app = $('#app'); if (!app) return;
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, det = app.classList.contains('detail-open');
@@ -372,7 +384,7 @@ function renderDetail0() {
         return top.join('\n      ') + (rest.length ? `<details class="dmore" id="d-more" ${LS.get('dMore', false) ? 'open' : ''}><summary>${ic('chev', 's fcar')}<span>${tr('More details')}</span></summary>${rest.join('\n')}</details>` : '');
       })()}
     </div>
-    <div class="dbot">${cmOk && !(cm === 'full' && cmtNew()) ? cmComposer(t) : ''}<div class="dfoot"><span class="dfc">${t.status === 2 && t.completed_at ? tr('Completed {0}', new Date(t.completed_at).toLocaleString(LOCALE(), {dateStyle: 'medium', timeStyle: 'short'})) : tr('Created {0}', new Date(t.created_at).toLocaleString(LOCALE(), {dateStyle: 'medium', timeStyle: 'short'}))}</span>
+    <div class="dbot">${cmOk && !(cm === 'full' && cmtNew()) ? cmComposer(t) : ''}<div class="dfoot"><span class="dfc" title="${esc(createdLine(t))}">${esc(createdLine(t))}</span>
       <span class="spacer"></span>
       ${ck ? '' : runItems().filter(x => x.tid === t.id).map(x => `<button class="drun k-${x.k}" data-act="run-pop" title="${esc(tr(RUN_KIND[x.k][1]))}">${ic(RUN_KIND[x.k][0], 's')}<span ${x.attr}>${x.txt}</span><span class="drl">${tr(RUN_KIND[x.k][1])}</span></button>`).join('')}
       </div></div>`);

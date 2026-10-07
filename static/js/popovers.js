@@ -631,7 +631,7 @@ function sortMenu(anchor) {
   // 1.7.0: "Flow" = in the order the dependencies allow (only with the dependencies module)
   // 2.0.8 (#319): "Created" newest first; picking it again while it is on flips to oldest first (and back)
   const crOn = cur === 'created' || cur === 'created_asc';
-  menu(anchor, [...[['prio', N_('Priority, then manual')], ['custom', N_('Manual only')], ['date', N_('Date')], ['title', N_('Title')], ...(depsOn() ? [['flow', N_('Flow|sort')]] : [])].map(([m, n]) => ({label: tr(n), on: cur === m, fn: () => set(m)})),
+  menu(anchor, [...[['prio', N_('Priority, then manual')], ['custom', N_('Manual only')], ['date', N_('Date')], ['title', N_('Title')], ['creator', N_('Creator|sort')], ...(depsOn() ? [['flow', N_('Flow|sort')]] : [])].map(([m, n]) => ({label: tr(n), on: cur === m, fn: () => set(m)})),
     {label: !crOn ? tr('Created|sort') : cur === 'created' ? tr('Created: newest first') : tr('Created: oldest first'), on: crOn, cls: 'sortcr', title: crOn ? tr('Click again to reverse the direction') : '', fn: () => set(cur === 'created' ? 'created_asc' : 'created')},
     ...(cfs.length ? ['-', ...cfs.map(f => ({label: tr('Field: {0}', f.name), icon: FT_ICON[f.type], on: cur === 'cf:' + f.id, fn: () => set('cf:' + f.id)}))] : []),
     ...(doneToggleView() ? ['-', doneItem()] : []),
@@ -666,8 +666,9 @@ function vvSync() {
   st.setProperty('--vvt', Math.max(0, Math.round(vv.offsetTop)) + 'px');
   st.setProperty('--vvh', Math.round(vv.height) + 'px');
   st.setProperty('--vvb', kb ? Math.max(0, Math.round(window.innerHeight - vv.offsetTop - vv.height)) + 'px' : '0px');  // hidden below (keyboard)
-  if ((vv.height >= window.innerHeight - 2 || !kb) && (window.scrollY || document.documentElement.scrollTop)) window.scrollTo(0, 0);
+  if ((vv.height >= window.innerHeight - 2 || !kb) && !kbBlind() && (window.scrollY || document.documentElement.scrollTop)) { window.scrollTo(0, 0); vvSoon(); }
   chatFit(); tlKbSync(); vvPin(kb);
+  vvDebugUpd();
   // the focused field of a sheet / the docked composer stays above a real keyboard (iOS does not resize the layout)
   const a = document.activeElement;
   if (kb && a && a.getBoundingClientRect && !a.closest('#view .chview, .vvpin')) { const r = a.getBoundingClientRect(), lim = vv.offsetTop + vv.height; if (r.bottom > lim - 4 || r.top < vv.offsetTop) a.scrollIntoView?.({block: 'nearest'}); }
@@ -698,7 +699,92 @@ function vvUnpin(x) { x.style.transition = 'none'; x.classList.remove('vvpin'); 
 let vvPinT = 0;
 for (const t of ['focusin', 'focusout']) document.addEventListener(t, () => { clearTimeout(vvPinT); vvPinT = setTimeout(() => { if ($('.vvpin') || kbReal()) vvPin(kbReal()); }, 350); });
 // the document itself never stays scrolled without a keyboard (a focus / caret reveal moved it): back to the top at once
-window.addEventListener('scroll', () => { if ((window.scrollY || document.documentElement.scrollTop) && !kbReal()) window.scrollTo(0, 0); }, {passive: true});
+// 2.26.x (#952, iPhone): --vvb = innerHeight - offsetTop - height is only right for the scroll position it was measured at.
+// iOS fires ONE visual viewport resize when the keyboard comes up, with the page scrolled up (offsetTop 415), and then
+// scrolls it back without a visual viewport event: --vvb stayed 0 and the sheet sat under the keyboard. So vvSync runs
+// again (once per frame) on every page scroll and after each own scrollTo(0, 0), and a few times after a resize.
+let vvSoonF = 0;
+function vvSoon() { if (vvSoonF || !window.visualViewport) return; vvSoonF = requestAnimationFrame(() => { vvSoonF = 0; vvSync(); }); }
+if (window.visualViewport) visualViewport.addEventListener('resize', () => { for (const ms of [120, 350, 700]) setTimeout(vvSoon, ms); });
+window.addEventListener('scroll', () => { if ((window.scrollY || document.documentElement.scrollTop) && !kbReal() && !kbBlind()) window.scrollTo(0, 0); vvSoon(); }, {passive: true});
+// 2.26.x (#952): on an iPhone / iPad touch screen (no fine pointer) a focused field of the add sheet or a docked box whose
+// keyboard is not reported (yet) may leave the page scrolled: iOS's own reveal is not undone. (A top-anchored sheet
+// fallback was tried and dropped: iOS does report the keyboard once it is up; the sheet only has to get the focus in the
+// tap itself, see openQuickSheet.) Android / Fold / desktop (a fine pointer, or not iOS) never get here.
+const IOS_DEV = /iPad|iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+const coarseOnly = () => { try { return !matchMedia('(pointer:fine)').matches && matchMedia('(pointer:coarse)').matches; } catch { return false; } };
+const kbBlind = () => IOS_DEV && coarseOnly() && editFocused() && !kbReal() && !!document.activeElement?.closest?.('.qadd.sheet, ' + VV_PIN);
+document.addEventListener('focusin', () => { vvRec('focusin'); setTimeout(vvDebugUpd, 0); });
+document.addEventListener('focusout', () => { setTimeout(() => {
+  if (editFocused()) return;
+  if (!kbReal() && (window.scrollY || document.documentElement.scrollTop)) { window.scrollTo(0, 0); vvSoon(); }
+  vvDebugUpd();
+}, 0); });
+// 2.26.x (#952): a hidden read-only diagnostics box for the keyboard / viewport numbers (no data): opens with #vvdebug in
+// the address or five taps on the version number (Settings > Help); a tap on the numbers moves the box to the middle and
+// back (so the sheet above the keyboard stays visible for a screenshot)
+function vvDebug(on = true) {
+  let el = document.getElementById('vvdbg');
+  if (!on) { el?.remove(); clearInterval(vvDebug.t); return; }
+  if (el || !document.body) return;
+  el = document.createElement('div'); el.id = 'vvdbg'; el.setAttribute('aria-live', 'off');
+  el.innerHTML = '<button type="button" class="vvdx" aria-label="Close">\u00d7</button><pre></pre>';
+  document.body.appendChild(el);
+  el.addEventListener('mousedown', e => e.preventDefault());  // a tap on the box keeps the focus (and the keyboard)
+  el.querySelector('.vvdx').addEventListener('click', e => { e.stopPropagation(); vvDebug(false); });
+  el.querySelector('pre').addEventListener('click', () => { el.classList.toggle('mid'); vvDebugUpd(); });
+  clearInterval(vvDebug.t); vvDebug.t = setInterval(vvDebugUpd, 500); vvDebugUpd();
+}
+// the moment the keyboard came up, recorded from the last focus on (only while the box is open): the lowest visible
+// height, the highest offsetTop / scrollY, whether visualViewport fired resize at all and how long after the focus, and
+// kbReal() over the last 3 s
+const VVR = {t0: 0, n: 0, first: null, minH: null, maxOT: 0, maxSY: 0, kb: []};
+function vvRec(type) {
+  if (!document.getElementById('vvdbg')) return;
+  const vv = window.visualViewport, now = Math.round(performance.now()), kb = kbReal() ? 1 : 0;
+  if (type === 'focusin') Object.assign(VVR, {t0: now, n: 0, first: null, minH: vv ? vv.height : null, maxOT: 0, maxSY: 0});
+  if (type === 'resize') { VVR.n++; if (VVR.first == null && VVR.t0) VVR.first = now - VVR.t0; }
+  if (vv) { VVR.minH = VVR.minH == null ? vv.height : Math.min(VVR.minH, vv.height); VVR.maxOT = Math.max(VVR.maxOT, vv.offsetTop); }
+  VVR.maxSY = Math.max(VVR.maxSY, window.scrollY || 0);
+  const last = VVR.kb[VVR.kb.length - 1];
+  if (!last || last[1] !== kb) VVR.kb.push([now, kb]);
+  VVR.kb = VVR.kb.filter(x => now - x[0] <= 3000).slice(-12);
+}
+function vvDebugUpd() {
+  const el = document.getElementById('vvdbg'); if (!el) return;
+  const vv = window.visualViewport, de = document.documentElement, st = de.style;
+  vvRec('tick');
+  // always in the visible part, also when iOS scrolled the visual viewport (the keyboard is up)
+  const ot = Math.max(0, Math.round(vv?.offsetTop || 0));
+  el.style.top = el.classList.contains('mid') ? Math.round(ot + (vv?.height || innerHeight) * .3) + 'px' : `calc(${ot}px + env(safe-area-inset-top, 0px) + .25rem)`;
+  const mm = q => { try { return matchMedia(q).matches ? 1 : 0; } catch { return '?'; } };
+  const n = v => v == null || Number.isNaN(+v) ? '-' : Math.round(v * 10) / 10;
+  const a = document.activeElement, ua = navigator.userAgent;
+  const uam = ua.match(/(iPhone|iPad|Android)[^;)]*|OS [\d_]+|Version\/[\d.]+|Chrome\/\d+|Firefox\/\d+|Safari\/[\d.]+/g) || [];
+  el.querySelector('pre').textContent = [
+    `inner ${innerWidth}x${innerHeight}  outer ${outerWidth}x${outerHeight}`,
+    `vv h ${n(vv?.height)} w ${n(vv?.width)} offTop ${n(vv?.offsetTop)} pageTop ${n(vv?.pageTop)} scale ${n(vv?.scale)}`,
+    `scrollY ${n(window.scrollY)}  docEl.clientH ${de.clientHeight}  S.vvMax ${n(S.vvMax)}`,
+    `kbReal ${kbReal() ? 1 : 0}  kbBlind ${kbBlind() ? 1 : 0}  editFocused ${editFocused() ? 1 : 0}  vvpin ${$('.vvpin') ? 1 : 0}`,
+    `--vvb ${st.getPropertyValue('--vvb') || '-'}  --vvh ${st.getPropertyValue('--vvh') || '-'}  --vvt ${st.getPropertyValue('--vvt') || '-'}`,
+    `standalone ${mm('(display-mode: standalone)')}/${navigator.standalone ? 1 : 0}  coarse ${mm('(pointer:coarse)')}  fine ${mm('(pointer:fine)')}  hover:none ${mm('(hover:none)')}`,
+    `since focus: vv resize ${VVR.n}x, first after ${VVR.first == null ? '-' : VVR.first + ' ms'}, min vv h ${n(VVR.minH)}, max offTop ${n(VVR.maxOT)}, max scrollY ${n(VVR.maxSY)}`,
+    `kbReal 3s: ${VVR.kb.map(x => Math.round(performance.now() - x[0]) + 'ms ago=' + x[1]).join(', ') || '-'}`,
+    `focus ${a ? a.tagName + (a.id ? '#' + a.id : '') : '-'}  ${new Date().toLocaleTimeString()}`,
+    `UA ${uam.join(' ') || ua.slice(0, 80)}`].join('\n');
+}
+{
+  const open = () => { if (/vvdebug/.test(location.hash)) vvDebug(); };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', open); else setTimeout(open, 0);
+  window.addEventListener('hashchange', open);
+  if (window.visualViewport) for (const t of ['resize', 'scroll']) visualViewport.addEventListener(t, () => { vvRec(t); vvDebugUpd(); });
+  let taps = [];
+  document.addEventListener('click', e => {
+    if (!e.target.closest?.('.aboutver')) return;
+    const now = Date.now(); taps = taps.filter(t => now - t < 3000); taps.push(now);
+    if (taps.length >= 5) { taps = []; vvDebug(); }
+  });
+}
 // 2.22.0 (#686): a right-click on a task row (list, Kanban, Today …) opens the task's menu ("Waiting on external…", snooze,
 // pin, section …) at the row; touch: long press selects the row, the selection bar has "Waiting on external…"
 document.addEventListener('contextmenu', e => {

@@ -139,7 +139,7 @@ function openQuickSheet(prefill = '', preset = {}) {
   if (!q) {
     q = document.createElement('div');
     q.className = 'qadd sheet';
-    q.innerHTML = `<div class="box">${ic('plus')}<input id="qsheet" placeholder="${tr("What's next?")}" autocomplete="off" enterkeyhint="send">${tplBtn()}${qExtraBtns('qsheet')}<button class="iconbtn" data-act="qsheet-send" aria-label="${tr('Add')}">${ic('arrow')}</button></div><div class="chips"></div><div class="qhint">${tr('tomorrow 3pm · !high · #tag · ~list · every monday')}</div>${hintOnce('qbtns', tr('Next to the arrow: the clip adds the task with a file, the square adds it and opens its details.'), 'qbhint')}`;  // 2.25.0 (UX-34)
+    q.innerHTML = `<div class="box">${ic('plus')}<input id="qsheet" name="kalmido-quick-add-sheet" type="text" data-form-type="other" data-lpignore="true" placeholder="${tr("What's next?")}" autocomplete="off" enterkeyhint="send">${tplBtn()}${qExtraBtns('qsheet')}<button class="iconbtn" data-act="qsheet-send" aria-label="${tr('Add')}">${ic('arrow')}</button></div><div class="chips"></div><div class="qhint">${tr('tomorrow 3pm · !high · #tag · ~list · every monday')}</div>${hintOnce('qbtns', tr('Next to the arrow: the clip adds the task with a file, the square adds it and opens its details.'), 'qbhint')}`;  // 2.25.0 (UX-34)
     document.body.appendChild(q);
   }
   $('#scrim').classList.remove('hidden');
@@ -154,7 +154,10 @@ function openQuickSheet(prefill = '', preset = {}) {
   const i0 = $('.box > svg', q); if (i0) i0.outerHTML = ic(preset.capture ? 'zap' : 'plus');
   inp.placeholder = preset.capture ? tr('Capture to the inbox…') : preset.section_name ? tr('Add a task to {0}', preset.section_name) : tr("What's next?");
   if (preset.capture && !hint) $('.qhint', q).textContent = tr('Goes to the inbox · ~list · tomorrow · !high · #tag');
-  setTimeout(() => inp.focus(), 30);
+  // 2.26.x (#952): the focus in the same tap (no timer first): iOS opens the keyboard only for a focus inside the user's
+  // gesture, so the sheet and the keyboard come up together; a second try a moment later if something took it back
+  inp.focus();
+  setTimeout(() => { if (document.activeElement !== inp && inp.isConnected) inp.focus(); }, 30);
 }
 // ---- 2.4.0 (#187): quick capture. A small box from anywhere: q / Ctrl+Space, the command palette, the app shortcut
 // "Quick add" (/?action=capture) and the bookmarklet page /capture (a popup with ?title&url of the page you are on). The
@@ -233,7 +236,13 @@ document.addEventListener('click', async e => {
     return;
   }
   const g = e.target.closest('[data-go]');
-  if (g) { e.preventDefault(); if (S.sel && isMobile()) closeDetail(); go(g.dataset.go); return; }
+  if (g) {
+    e.preventDefault(); if (S.sel && isMobile()) closeDetail();
+    // 2.26.x (#953): left from the open drawer: the entry remembers it, so Back to it shows the drawer open again (Android's
+    // back preview already shows it; route() used to close it right away = a short flash)
+    if ($('#side.open') && g.closest('#side') && !history.state?.detail) try { history.replaceState({...(history.state || {}), side: 1}, '', location.href); } catch { /* old browser */ }
+    go(g.dataset.go); return;
+  }
   const qc = e.target.closest('.qchip');
   if (qc) { const t = qc.dataset.qtype; S.quick.ignore.has(t) ? S.quick.ignore.delete(t) : S.quick.ignore.add(t); const inp = qc.closest('.qadd').querySelector('input'); updateChips(inp); inp.focus(); return; }
   const cb = e.target.closest('.md input[data-mdline]');
@@ -632,6 +641,8 @@ document.addEventListener('click', async e => {
   }
 });
 let sideRet = null;
+// 2.26.x (#953): the drawer opened again by Back (no focus move, no button to return to)
+function sideDrawerOpen() { $('#side').classList.add('open'); $('#scrim').classList.remove('hidden'); popOnClose = closeSide; sideRet = null; }
 function closeSide() {
   // 2.16.0 (#473): the focus goes back to the menu button when it was in the drawer
   if ($('#side.open') && sideRet && sideRet.isConnected && ($('#side').contains(document.activeElement) || document.activeElement === document.body)) { const r = sideRet; setTimeout(() => { if (!document) return; if (!$('#side.open') && (document.activeElement === document.body || !document.activeElement || $('#side').contains(document.activeElement)) && r.isConnected && r.offsetParent) r.focus({preventScroll: true}); }, 0); }

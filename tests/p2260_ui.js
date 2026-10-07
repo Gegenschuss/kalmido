@@ -202,6 +202,45 @@ const getT = async id => (await call('GET', '/api/tasks/' + id));
   check(!d.querySelector('#detail.multi') && w.eval('S.multi.size') === 2, '#936 phone: "Done" closes the sheet, the selection stays');
   click(w, d.querySelector(`#view .trow[data-id="${T[2]}"] .ttl`)); await sleep(150);
   check(w.eval('S.multi.size') === 1, '#936 phone: another tap takes it out again');
+  // 2.26.x: sort "Creator" (display only: the manual order / sort values never change) + "Created by <name> on <date>"
+  { const X = (await call('POST', '/api/lists', {name: 'Creators'})).id;
+    await call('PUT', `/api/lists/${X}/members`, {user_id: BOB, role: 'edit'});
+    const c1 = (await call('POST', '/api/tasks', {title: 'Zulu by Bob', list_id: X}, BCK)).id;
+    const c2 = (await call('POST', '/api/tasks', {title: 'Yankee by Alice', list_id: X})).id;
+    const c3 = (await call('POST', '/api/tasks', {title: 'Xray by Bob', list_id: X}, BCK)).id;
+    const c4 = (await call('POST', '/api/tasks', {title: 'Whiskey by Alice', list_id: X})).id;
+    const sorts = async () => JSON.stringify(await Promise.all([c1, c2, c3, c4].map(async id => (await getT(id)).sort)));
+    const s0 = await sorts();
+    w.location.hash = 'l/' + X; await sleep(300); await w.eval('load()'); await sleep(300);
+    const order = () => w.eval(`sortTasks([...S.tasks.values()].filter(t => t.list_id === ${X} && !t.parent_id && t.status !== 2)).map(t => t.id)`);
+    w.eval(`LS.set('sort2.' + S.route.key, 'custom'); render()`); await sleep(150);
+    const man = JSON.stringify(order());
+    w.eval(`LS.set('sort2.' + S.route.key, 'creator'); render()`); await sleep(150);
+    const cr = order(), nm = cr.map(id => w.eval(`crName(taskById(${id}))`));
+    check(nm.join('|') === 'Alice|Alice|Bob Baker|Bob Baker', '2.26.x: sort "Creator" groups by the creator name ' + JSON.stringify(nm));
+    check(JSON.stringify(cr.filter(id => [c2, c4].includes(id))) === JSON.stringify(JSON.parse(man).filter(id => [c2, c4].includes(id))), '2.26.x: within one creator the manual order');
+    w.eval(`LS.set('sort2.' + S.route.key, 'custom'); render()`); await sleep(150);
+    check(JSON.stringify(order()) === man && await sorts() === s0, '2.26.x: back to "Manual": the same order, no sort value changed ' + man);
+    check(w.eval(`sortMenu.toString()`).includes("'creator'"), '2.26.x: "Creator" is in the sort menu');
+    const line = w.eval(`createdLine(taskById(${c1}))`), line2 = w.eval(`createdLine({created_at: '2026-01-02T10:00:00', created_by: null})`);
+    check(/^Created by Bob Baker on /.test(line) && /^Created /.test(line2) && !/by/.test(line2), '2.26.x: "Created by <name> on <date>", without a creator the date only ' + JSON.stringify([line, line2]));
+    w.location.hash = 'l/' + L; await sleep(200); }
+
+  // #952: the hidden keyboard diagnostics (5 taps on the version number, or #vvdebug), read-only, closes; not iOS = no fallback
+  { const v = d.createElement('span'); v.className = 'aboutver'; v.textContent = 'Kalmido v0'; d.body.appendChild(v);
+    for (let i = 0; i < 4; i++) click(w, v);
+    check(!d.getElementById('vvdbg'), '#952: four taps do not open the diagnostics');
+    click(w, v); await sleep(100);
+    const box = d.getElementById('vvdbg'), txt = box?.textContent || '';
+    check(box && /kbReal \d/.test(txt) && /S\.vvMax/.test(txt) && /--vvb/.test(txt) && /standalone/.test(txt) && /editFocused/.test(txt), '#952: five taps open the diagnostics ' + txt.slice(0, 120));
+    click(w, box.querySelector('.vvdx')); await sleep(50);
+    check(!d.getElementById('vvdbg'), '#952: the close button removes it');
+    w.location.hash = 'vvdebug'; w.dispatchEvent(new w.HashChangeEvent('hashchange')); await sleep(100);
+    check(!!d.getElementById('vvdbg'), '#952: #vvdebug opens it');
+    click(w, d.querySelector('#vvdbg .vvdx')); v.remove(); w.location.hash = 'l/' + L;
+    check(w.eval('kbBlind()') === false, '#952: no iOS = no fallback');
+    // the add sheet has the focus within the same call (the tap): iOS opens the keyboard only then
+    check(w.eval(`(() => { openQuickSheet(); const f = document.activeElement?.id; closePop(); return f; })()`) === 'qsheet', '#952: openQuickSheet focuses its field at once (no timer)'); }
   w.close();
 
   // ================= Firefox
@@ -304,6 +343,14 @@ const getT = async id => (await call('GET', '/api/tasks/' + id));
     k = await ev(KB('#qsheet', 330, 120));
     check(inside(k), `${tag}: ... also with the visual viewport scrolled ` + JSON.stringify(k));
     await shot('p2260-light-390-quickadd-keyboard.png');
+    // #952 (iPhone seen): ONE resize with the page scrolled up (offsetTop > 0), then iOS scrolls back without a visual
+    // viewport event: --vvb follows the page scroll (the sheet stays right above the keyboard)
+    const vb2 = await ev(`(async () => { document.querySelector('#qsheet').focus(); ${FAKEVV(330, 200)} vvSync(); const a = getComputedStyle(document.documentElement).getPropertyValue('--vvb').trim();
+      ${FAKEVV(330, 0)} window.dispatchEvent(new Event('scroll')); await new Promise(r => setTimeout(r, 120));
+      const r = document.querySelector('.qadd.sheet').getBoundingClientRect();
+      return {a, b: getComputedStyle(document.documentElement).getPropertyValue('--vvb').trim(), bottom: Math.round(r.bottom), lim: innerHeight - 330}; })()`);
+    check(vb2.b === '330px' && Math.abs(vb2.bottom - vb2.lim) <= 2, `${tag}: #952 --vvb is measured again after the page scrolled back ` + JSON.stringify(vb2));
+    check(await ev(`['qsheet', 'qinput'].every(id => !document.getElementById(id) || document.getElementById(id).getAttribute('autocomplete') === 'off')`), `${tag}: #952 no autofill offer on the quick add`);
     await ev(KBOFF); await ev('closePop(); 1'); await sleep(300);
     // the comment box of the task panel
     await ev(`(() => { openDetail(${T[0]}); return 1; })()`); await sleep(900);
@@ -342,6 +389,60 @@ const getT = async id => (await call('GET', '/api/tasks/' + id));
     await shot('p2260-light-820-quickadd-keyboard.png');
     await ev(KBOFF); await sleep(500);
     check(await ev(`!document.querySelector('.vvpin, .vvph') && !!document.querySelector('#view .qdock #qinput')`), `${tag}: let go when the keyboard is gone`);
+  }, true);
+
+  // #953: tablet widths with touch: a task opened (the sidebar folds into the drawer), closed again (the panel's back /
+  // close button and the Android back) = exactly the layout before: sidebar back next to the list, full width, no gap
+  for (const [vw, vh] of [[904, 1000], [1180, 820]]) await firefox(async o => {
+    const {cmd, ev, ctx} = o, tag = `#953 ${vw} touch`;
+    check(await ffLogin(o, 'light') === 200, tag + ': login');
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
+    await o.nav(B + '#l/' + L); await ready(ev);
+    const LAY = `(() => { const app = document.querySelector('#app'); if (!app) return {noapp: true, hash: location.hash}; const side = document.querySelector('#side'), v = document.querySelector('#main') || document.querySelector('#view'), det = document.querySelector('#detail');
+      const r = e => e ? e.getBoundingClientRect() : null, sr = r(side), vr = r(v), dr = r(det);
+      return {rail: app.classList.contains('side-rail'), det: app.classList.contains('detail-open'), sideW: Math.round(sr && getComputedStyle(side).display !== 'none' && sr.right > 0 ? sr.width : 0),
+        vL: Math.round(vr.left), vR: Math.round(vr.right), detVis: !!(dr && dr.width && det.offsetParent && !det.classList.contains('hidden') && dr.left < innerWidth), hash: location.hash, hst: !!history.state?.detail, iw: innerWidth}; })()`;
+    const before = await ev(LAY);
+    for (const how of ['button', 'back']) {
+      await ev(`(() => { document.querySelector('#view .trow[data-id="${T[1]}"] .ttl')?.click() || openDetail(${T[1]}); return 1; })()`); await sleep(900);
+      const open = await ev(LAY);
+      check(open.det, `${tag}: the task panel opens ` + JSON.stringify(open));
+      if (how === 'button') await ev(`(() => { const b = document.querySelector('#detail [data-act="close-detail"], #detail [data-act="detail-close"], #detail .dclose'); if (b) b.click(); else closeDetail(); return 1; })()`);
+      else await ev(`(() => { history.back(); return 1; })()`);
+      await sleep(900);
+      const after = await ev(LAY);
+      check(!after.noapp && after.hash === before.hash && !after.hst && !after.det && !after.detVis && after.rail === before.rail && Math.abs(after.sideW - before.sideW) <= 2 && Math.abs(after.vL - before.vL) <= 2 && Math.abs(after.vR - before.vR) <= 2,
+        `${tag}: ${how}: the layout of before (sidebar, full width, no gap) ` + JSON.stringify({before, open, after}));
+      if (after.hash !== before.hash) { await o.nav(B + '#l/' + L); await ready(ev); }
+    }
+  }, true);
+
+  // #953 portrait (the sidebar is a drawer: a phone-wide Fold, the Fold upright with the sidebar folded away): a list left
+  // from the open drawer -> task -> Back closes the task -> Back = the list before with the drawer OPEN and it stays -> Back
+  // goes on as before (drawer closed)
+  for (const [vw, vh] of [[690, 900], [904, 1100]]) await firefox(async o => {
+    const {cmd, ev, ctx} = o, tag = `#953 ${vw}x${vh} touch upright`;
+    check(await ffLogin(o, 'light', {'tasks.sideFold': 'true'}) === 200, tag + ': login');
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
+    await o.nav(B + '#l/' + QP); await ready(ev);
+    await o.nav(B + '#l/' + L); await ready(ev);
+    const ST = `(() => ({hash: location.hash, side: !!document.querySelector('#side.open'), det: !!S.sel, rail: document.querySelector('#app').classList.contains('side-rail') || isMobile()}))()`;
+    check((await ev(ST)).rail, tag + ': the sidebar is a drawer here');
+    await ev(`(() => { document.querySelector('#top [data-act="side"]').click(); return 1; })()`); await sleep(500);
+    check((await ev(ST)).side, tag + ': the drawer opens');
+    await ev(`(() => { document.querySelector('#side [data-go="l/${QP}"]').click(); return 1; })()`); await sleep(900);
+    let st = await ev(ST);
+    check(st.hash === '#l/' + QP && !st.side, tag + ': a list from the drawer, the drawer closes ' + JSON.stringify(st));
+    await ev(`(() => { openDetail(${P1}); return 1; })()`); await sleep(900);
+    await ev(`(() => { history.back(); return 1; })()`); await sleep(900);
+    st = await ev(ST);
+    check(st.hash === '#l/' + QP && !st.det && !st.side, tag + ': Back closes only the task ' + JSON.stringify(st));
+    await ev(`(() => { history.back(); return 1; })()`); await sleep(400);
+    const s1 = await ev(ST); await sleep(1200); const s2 = await ev(ST);
+    check(s1.hash === '#l/' + L && s1.side && s2.side, tag + ': Back = the list before, the drawer open as it was left, and it stays ' + JSON.stringify([s1, s2]));
+    await ev(`(() => { history.back(); return 1; })()`); await sleep(900);
+    st = await ev(ST);
+    check(!st.side, tag + ': the next Back goes on, the drawer closed ' + JSON.stringify(st));
   }, true);
 
   console.log(`p2260_ui: ${ok} ok, ${F.length} failed`);

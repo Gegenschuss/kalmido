@@ -4807,6 +4807,10 @@ button.lkchip:hover{border-color:var(--accent)}
 .vvpin{position:fixed!important;top:auto!important;bottom:var(--vvb,0px)!important;margin:0!important;z-index:62;box-sizing:border-box}
 .qdock.vvpin{padding:.5rem 0;background:var(--bg)}
 .dbot.vvpin,.tccomp.vvpin{background:var(--bg2)}
+#vvdbg{position:fixed;top:calc(var(--safe-t) + .25rem);left:.25rem;right:.25rem;z-index:2147483647;background:rgba(0,0,0,.86);color:#fff;border-radius:.5rem;padding:.375rem 2.25rem .375rem .5rem;font:.6875rem/1.35 var(--mono,monospace);max-height:45vh;overflow:auto}
+#vvdbg.mid{top:45%}
+#vvdbg pre{margin:0;white-space:pre-wrap;word-break:break-all;font:inherit}
+#vvdbg .vvdx{position:absolute;top:0;right:0;width:2.25rem;height:2.25rem;border:0;background:none;color:#fff;font-size:1.25rem;line-height:1}
 
 /* 2.26.0 (#928 #949): the list's agent, who may address it, pause with a reason, integrate / deploy requests */
 .agacc{display:flex;align-items:center;gap:.625rem;min-height:2.75rem;margin-top:.25rem;cursor:pointer}
@@ -4827,3 +4831,18 @@ button.lkchip:hover{border-color:var(--accent)}
 .gate .gchk ul{margin:.25rem 0 0;padding-left:1.25rem}
 .gate .gref code,.gate .gint code{word-break:break-all}
 body.msel #view .qdock{visibility:hidden}
+/* 2.26.x: phones / touch: the two agent stops are told apart by words (hourglass "Pause with a reason" vs. the red
+   "Emergency stop" = token and webhook off) */
+.agacts .aglbl{display:none}
+@media (max-width:899px),(pointer:coarse){
+  .aglist .agsrow{flex-wrap:wrap}
+  .aglist .agsrow .agacts{display:flex;flex:1 0 100%;flex-wrap:wrap;justify-content:flex-end;gap:.375rem}
+  .agacts [data-ag="hold"],.agacts [data-ag="pause"]{width:auto;padding:0 .625rem;gap:.375rem;font-size:var(--fs-s)}
+  .agacts .aglbl{display:inline;white-space:nowrap}
+}
+/* 2.26.x (DeX): a long list name in the agents' list table wraps (two lines) instead of being cut */
+.airow .ailn{white-space:normal;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2}
+/* 2.26.x: "More ›" of the settings tab strip on a solid ground (no tab shows through it), a short fade before it */
+@media (max-width:899px){
+  .snmore{background:var(--bg2);padding-left:.5rem;box-shadow:-1.25rem 0 .75rem -.25rem var(--bg2)}
+}

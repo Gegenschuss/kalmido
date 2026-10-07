@@ -447,6 +447,9 @@ function fitTop() {
   let best = -1, wide = -1, ww = -1;
   for (let l = 0; l <= TOP_LVLS; l++) {
     if (l >= 3 && wide >= 0) break;  // the title is already cut to >= 12 characters without folding anything
+    // 2.26.x (1280 px, wide sidebar + task panel): before the view switch folds into "…", the title shortens further
+    // (6 characters + "…") at the last non-folding level
+    if (l === 3 && nd) { cut = topNeed(ht, 6); set(2); if (topFits(t, ht, cut)) return; cut = null; }
     if (l) set(l);
     const f = topFits(t, ht, nd);
     if (f === 2) { best = l; break; }

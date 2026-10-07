@@ -1267,7 +1267,7 @@ const openExt = u => { const w = window.open(u, '_blank', 'noopener,noreferrer')
 // Settings > Help: version, and for admins the result of the daily update check (server side, never automatic)
 function aboutHtml(chk, hint) {
   const a = S.about || {};
-  let h = `<h4 id="s-about-h">${tr('About')}</h4><div class="row"><label>${tr('Version')}</label><span>Kalmido v${esc(a.version || '?')}</span></div>
+  let h = `<h4 id="s-about-h">${tr('About')}</h4><div class="row"><label>${tr('Version')}</label><span class="aboutver">Kalmido v${esc(a.version || '?')}</span></div>
     <div class="row aboutcopy"><label>©</label><span class="muted">2026 Gegenschuss Doberenz Enders Grund eGbR · AGPL-3.0</span></div>
     <div class="row aboutlinks"><label></label>${ABOUT_LINKS.map(([u, n, i]) => `<a class="btn sm" href="${u}" target="_blank" rel="noopener noreferrer">${ic(i, 's')} ${tr(n)}</a>`).join('')}</div>`;
   if (!S.me?.is_admin) return h;

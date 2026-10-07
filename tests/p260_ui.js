@@ -324,7 +324,9 @@ const TOUCH = `(() => {
               if (h.none) { check(false, `${tag}: no header: ${h.none}`); continue; }
               // 2.18.0 (#651, intended change): on a phone the search icon stays in the header, the title gets cut instead:
               // 12 characters where they fit, at least 6 (+ "…") on the narrowest phones
-              const readable = h.full || h.htw + 0.5 >= h.w12 || (Wd < 600 && h.htw + 0.5 >= h.w6);
+              // 2.26.1 (owner request, intended change): before the view switch folds into "…" the title may shrink to 6
+              // characters (+ "…") on wider screens too, as long as nothing folds (level below tl3)
+              const readable = h.full || h.htw + 0.5 >= h.w12 || ((Wd < 600 || !/tl[34]/.test(h.lvl)) && h.htw + 0.5 >= h.w6);
               // 2.18.0 (review R3, owner rule, intended change): one-tap actions stay in the header on every width and the
               // title is cut (>= 12 characters) instead; before, wide screens folded them into "…" to show the whole title
               check(readable, `${tag}: title readable (${h.full ? 'all' : Math.round(h.htw) + ' px of ' + Math.round(h.w12) + ' for 12 / ' + Math.round(h.w6) + ' for 6 characters'}) "${h.txt}" ${h.lvl}`);

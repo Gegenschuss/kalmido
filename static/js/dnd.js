@@ -114,7 +114,7 @@ async function dropTask0(id, el, clientY) {
         if (!target.parent_id) toast(tr('Subtask is now standalone'));
       }
       if (!kcol) { const g = row.closest('.group')?.querySelector('.ghead[data-section]'); if (g) item.section_id = g.dataset.section ? +g.dataset.section : null; }
-      if (((mode === 'date' || mode === 'title' || mode.startsWith('created')) && !kcol) || mode === 'flow') LS.set('sort2.' + S.route.key, 'prio');  // a manual drop switches to prio + manual
+      if (((mode === 'date' || mode === 'title' || mode === 'creator' || mode.startsWith('created')) && !kcol) || mode === 'flow') LS.set('sort2.' + S.route.key, 'prio');  // a manual drop switches to prio + manual
     } else if (!kcol) return;
   }
   if (item.list_id && !canEditList(item.list_id)) { roToast(); return; }
@@ -144,7 +144,7 @@ async function taskToSection0(id, sid) {
   const before = snapTask(t);
   const inSec = [...S.tasks.values()].filter(x => x.list_id === t.list_id && !x.parent_id && x.status === 0 && x.id !== id && (sid ? x.section_id === sid : !S.sections.some(z => z.id === x.section_id)));
   const item = {id, section_id: sid, sort: inSec.length ? Math.min(...inSec.map(x => x.sort)) - 1 : 0};
-  if (['date', 'title', 'flow', 'created', 'created_asc'].includes(sortMode())) LS.set('sort2.' + S.route.key, 'prio');  // a manual drop switches to prio + manual
+  if (['date', 'title', 'creator', 'flow', 'created', 'created_asc'].includes(sortMode())) LS.set('sort2.' + S.route.key, 'prio');  // a manual drop switches to prio + manual
   if (t.parent_id) { try { await patchTask(id, {parent_id: null}); } catch { return; } }
   Object.assign(t, item); render();
   let res;
@@ -235,7 +235,7 @@ async function taskToNewSection(id) {
     if (t.parent_id) await patchTask(id, {parent_id: null});
     await api('POST', '/api/tasks/reorder', {items: [{id, section_id: s.id, sort: 0}]});
   } catch { await load().catch(() => {}); render(); return; }
-  if (['date', 'title', 'flow', 'created', 'created_asc'].includes(sortMode())) LS.set('sort2.' + S.route.key, 'prio');
+  if (['date', 'title', 'creator', 'flow', 'created', 'created_asc'].includes(sortMode())) LS.set('sort2.' + S.route.key, 'prio');
   await load(); render();
   toast(tr('New section {0}', qn(name)), async () => {
     try {

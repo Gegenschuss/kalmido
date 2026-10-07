@@ -414,7 +414,7 @@ async function aiTblDraw(md) {
         + (agSel ? tidyAgentSel(l, '', `data-aitidyag="${l.id}" aria-label="${esc(tr('Tidy up by') + ': ' + lname(l))}"`) : '')
       : has.length ? `<span class="muted" title="${esc(tr('Give an agent of this list edit rights first'))}">–</span>`
         : `<span class="muted" title="${esc(tr('Share the list with an agent first'))}">–</span>`;  // 2.26.0
-    return `<div class="airow" role="row" data-lid="${l.id}"><span class="ailn" role="cell">${esc(lname(l))}</span><span class="aiag" role="cell">${chips}</span><span class="aitd" role="cell"><span class="aimlbl" aria-hidden="true">${tr('Tidy up')}</span>${tidy}</span></div>`;
+    return `<div class="airow" role="row" data-lid="${l.id}"><span class="ailn" role="cell" title="${esc(lname(l))}">${esc(lname(l))}</span><span class="aiag" role="cell">${chips}</span><span class="aitd" role="cell"><span class="aimlbl" aria-hidden="true">${tr('Tidy up')}</span>${tidy}</span></div>`;
   };
   const rows = shown.map(row).join('');
   const more = !q && !all ? `<div class="aimore"><button type="button" class="btn sm" data-aiall="1">${tr('Show all ({0})', lists.length)}</button></div>`
@@ -688,8 +688,8 @@ function agCardHtml(a, adm) {
       <small class="muted agfacts"><i class="adot st-${esc(st)}" aria-hidden="true"></i>${esc(facts.join(' · '))}</small>${lim}${wh}</span>${use}
     ${adm ? `<span class="agacts"><button class="iconbtn" data-ag="test" title="${tr('Send test')}" aria-label="${tr('Send test')}" ${a.enabled ? '' : 'disabled'}>${ic('send', 's')}</button>
       <button class="iconbtn" data-ag="edit" title="${tr('Edit')}" aria-label="${tr('Edit')}">${ic('edit', 's')}</button>
-      <button class="iconbtn ${a.status === 'paused' ? 'on' : ''}" data-ag="hold" title="${esc(a.status === 'paused' ? tr('Paused: {0}. Click to let it answer again', a.pause_reason || '') : tr('Pause with a reason (it stops answering; events wait)'))}" aria-label="${esc(a.status === 'paused' ? tr('Let it answer again') : tr('Pause with a reason'))}" aria-pressed="${a.status === 'paused'}" ${a.enabled ? '' : 'disabled'}>${ic('hourglass', 's')}</button>
-      <button class="iconbtn ${a.enabled ? 'danger' : ''}" data-ag="pause" title="${a.enabled ? tr('Pause (kill switch): its token and webhook stop at once') : tr('Resume')}" aria-label="${a.enabled ? tr('Pause') : tr('Resume')}">${ic(a.enabled ? 'pause' : 'play', 's')}</button></span>` : ''}</div>`;
+      <button class="iconbtn ${a.status === 'paused' ? 'on' : ''}" data-ag="hold" title="${esc(a.status === 'paused' ? tr('Paused: {0}. Click to let it answer again', a.pause_reason || '') : tr('Pause with a reason (it stops answering; events wait)'))}" aria-label="${esc(a.status === 'paused' ? tr('Let it answer again') : tr('Pause with a reason'))}" aria-pressed="${a.status === 'paused'}" ${a.enabled ? '' : 'disabled'}>${ic('hourglass', 's')}<span class="aglbl">${esc(a.status === 'paused' ? tr('Let it answer again') : tr('Pause with a reason'))}</span></button>
+      <button class="iconbtn ${a.enabled ? 'danger' : ''}" data-ag="pause" title="${a.enabled ? tr('Pause (kill switch): its token and webhook stop at once') : tr('Resume')}" aria-label="${a.enabled ? tr('Emergency stop') : tr('Resume')}">${ic(a.enabled ? 'stop' : 'play', 's')}<span class="aglbl">${a.enabled ? tr('Emergency stop') : tr('Resume')}</span></button></span>` : ''}</div>`;
 }
 async function agDraw(md) {
   const adm = !!S.me?.is_admin, box = $(adm ? '#s-ags' : '#s-myags', md); if (!box) return;

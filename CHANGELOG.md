@@ -7,6 +7,37 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.26.1] - 2026-10-07
+
+**In short:** The iPhone keyboard no longer covers the quick add sheet (#952), Back on tablets closes only the open
+task (#953), plus a sort by creator, a "Created by" line in the task panel and smaller layout fixes.
+
+### Fixed
+- **iPhone keyboard over the quick add sheet** (#952): iOS reports the keyboard with a single visual viewport resize
+  while the page is still scrolled up, then scrolls back without another event, so the sheet was placed for the wrong
+  scroll position and sat under the keyboard. The keyboard position is now measured again on every page scroll and
+  shortly after a resize. The + button also focuses the field within the same tap, so the keyboard opens at once and
+  the sheet sits right above it.
+- **Back on tablets and the unfolded Fold** (#953): with a task open, Back (the Android key or gesture) closes only the
+  task and keeps the view and the sidebar; the next Back goes to the previous view. Closing the task with its own
+  button removes that step again. Upright, where the sidebar is a drawer, Back to a view that was left from the open
+  drawer shows the drawer open again, and it stays open.
+- No contact autofill offer from iOS on the quick add sheet, the comment box and the team chat input.
+- At 1280 px with a wide sidebar and the task panel open, the title is shortened further before the view switch moves
+  into "…".
+- Settings tabs on phones: "More ›" sits on a solid background and no longer overlaps a tab.
+- Long list names in the agents' list table wrap to two lines instead of being cut (full name as a tooltip).
+
+### Changed
+- **Sort by "Creator"**: by the creator's display name, then the manual order. It only changes what you see; the
+  manual order is kept, and dragging behaves as with the other non-manual sorts.
+- The task panel shows a fixed line "Created by <name> on <date>" at the bottom (agents by their name; without a known
+  creator the date only; completed tasks add the completion date).
+- Settings > Agents on phones and touch screens: the two stop buttons carry labels, "Pause with a reason" (hourglass)
+  and "Emergency stop" (stop icon: token and webhook stop at once).
+- A hidden, read-only viewport diagnostics box for keyboard problems on phones: open it with `#vvdebug` in the address
+  or five taps on the version number (Settings > Help). It shows only screen and keyboard measurements.
+
 ## [2.26.0] - 2026-10-06
 
 **In short:** Agents in a team, safely (#928 #949) and easier handling (#932 #936 #937). The owner of a list decides who
@@ -2878,7 +2909,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.26.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.26.1...HEAD
+[2.26.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.26.1
 [2.26.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.26.0
 [2.25.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.25.0
 [2.24.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.24.1

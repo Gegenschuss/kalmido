@@ -160,8 +160,12 @@ function flowSort(arr) {
   arr.splice(0, arr.length, ...out);
   return arr;
 }
+// the creator's display name for "Sort: Creator" (cached per sort call)
+let CRN = null;
+const crName = t => { if (!t.created_by) return ''; if (CRN.has(t.created_by)) return CRN.get(t.created_by); const n = personNameAny(t.created_by) || ''; CRN.set(t.created_by, n); return n; };
 function sortTasks(arr, m = sortMode()) {
   if (m === 'flow') return flowSort(arr);
+  CRN = new Map();
   const f = {
     custom: bySort,
     date: (a, b) => dueKey(a).localeCompare(dueKey(b)) || b.priority - a.priority || bySort(a, b),
@@ -170,6 +174,8 @@ function sortTasks(arr, m = sortMode()) {
     // 2.0.8 (#319): by creation, newest first / oldest first (ties: id, i.e. creation order)
     created: (a, b) => (b.created_at || '').localeCompare(a.created_at || '') || b.id - a.id,
     created_asc: (a, b) => (a.created_at || '').localeCompare(b.created_at || '') || a.id - b.id,
+    // 2.26.x: by the creator's display name (A-Z, unknown last), then the manual order; display only, positions untouched
+    creator: (a, b) => { const x = crName(a), y = crName(b); return (!x - !y) || x.localeCompare(y, LOCALE()) || bySort(a, b); },
   }[m] || (m.startsWith('cf:') ? cfSortCmp(+m.slice(3)) : bySort);
   return arr.sort(f);
 }

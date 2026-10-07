@@ -4965,5 +4965,8 @@
   "Long polling of the agent events; after an error it waits longer and longer (up to 5 minutes). It ends after about 9 minutes without an event (shell time limit of coding agents) and holds events back while the agent is paused.": "Long polling degli eventi dell'agente; dopo un errore attende sempre di più (fino a 5 minuti). Termina dopo circa 9 minuti senza eventi (limite di tempo della shell degli agenti di codice) e trattiene gli eventi mentre l'agente è in pausa.",
   "Required: a systemd user unit runs mcp/agent_launcher.sh (macOS: a LaunchAgent with agent_launcher.ps1). Without a service the agent falls asleep when the terminal is idle. It applies the runtime settings from Kalmido (model, auto-compact, nightly fresh restart, Reset now).": "Obbligatorio: un'unità utente systemd esegue mcp/agent_launcher.sh (macOS: un LaunchAgent con agent_launcher.ps1). Senza servizio l'agente si addormenta quando il terminale è inattivo. Applica le impostazioni di esecuzione di Kalmido (modello, auto-compact, riavvio notturno, Reimposta ora).",
   "Close every session with its token and wait 5 minutes: it must still show as connected (not “connected, but no service running”). Then mention it, write to it in the chat, pause it (it has to stop) and try the prompt-injection cases from the guide: it has to refuse every one.": "Chiudi ogni sessione con il suo token e attendi 5 minuti: deve risultare ancora connesso (non «connesso, ma nessun servizio attivo»). Poi menzionalo, scrivigli in chat, mettilo in pausa (deve fermarsi) e prova i casi di prompt injection della guida: deve rifiutarli tutti.",
-  "A project cannot be a family list": "Un progetto non può essere una lista di famiglia"
+  "A project cannot be a family list": "Un progetto non può essere una lista di famiglia",
+  "Creator|sort": "Creatore",
+  "Created by {0} on {1}": "Creata da {0} il {1}",
+  "Emergency stop": "Arresto di emergenza"
 }
