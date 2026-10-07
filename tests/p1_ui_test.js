@@ -134,7 +134,9 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   check(await until(async () => (await get(t1.id)).status === 2), 'queued completion synced');
   await toastClick();
   check(await until(async () => (await get(t1.id)).status === 0), 'undo after sync reverses on the server');
-  // queued move + undo
+  // queued move + undo (2.26.1: the undo before must be finished first, on a slow CI host it can still be busy and the
+  // next undo click would be ignored)
+  await until(() => !w.eval('HIST.busy'), 10000);
   w.__offline = true;
   await w.eval(`patchUndoable(${t4.id}, {list_id: ${HOME}}, 'moved')`);
   await until(() => toastBtn() && /moved/.test(d.querySelector('#toast').textContent));
