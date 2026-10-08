@@ -190,7 +190,8 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
   check(d.querySelector('#d-typing').classList.contains('hidden'), 'not on another task (the agent named its task)');
   await v1('PUT', '/agent/status', {status: 'working', text: 'Tidying up'});
   w.eval('load().then(render)'); await sleep(800);
-  check(!d.querySelector('#d-typing').classList.contains('hidden'), 'without a task: every task of its lists');
+  // 2.30.0 (#1039, intended change): "working" without a task shows in the chat only, never in a task
+  check(d.querySelector('#d-typing').classList.contains('hidden'), 'without a task: not in the tasks of its lists (2.30)');
   // typing in the comment box: no full reload, the indicator still follows
   const ci = d.querySelector('#c-input'); ci.focus();
   await v1('PUT', '/agent/status', {status: 'idle'});
@@ -204,7 +205,8 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
   w.eval('load().then(render)'); await sleep(700);
   w.eval(`chatOpen(${CL})`); await sleep(800);
   ty = d.querySelector('#chat-typing');
-  check(ty && ty.classList.contains('hidden'), 'chat: "working" alone is no typing (2.13.0: the dots only for a typing signal or right after it fetched my message)');
+  // 2.30.0 (#1039): "working" without a task shows under the chat's last message, as "is working on it" without typing dots
+  check(ty && !ty.querySelector('.atdots') && /Claude is working on it/.test(ty.textContent), 'chat: "working" alone is no typing (no dots), but "is working on it" under the messages');
   check(d.querySelector('#side [data-go="agents"].aspin'), 'sidebar agents row: spinning ring');
   w.eval('chatClose()');
   w.close();

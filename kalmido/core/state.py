@@ -1,7 +1,7 @@
 """GET /api/state: everything the web client loads at start and after a change."""
 import json
 from datetime import timedelta
-from flask import g, jsonify, request
+from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app, IOS_SHORTCUT_URL, NTFY_IN, NTFY_URL, PUBLIC_URL
 from ..core.i18n import languages
@@ -69,7 +69,7 @@ def visible_lists(c, uid):
     from ..collab.comments import user_names
     from ..collab.news import bell_custom_of
     from ..lists.projects import list_progress, milestones_of_lists
-    from ..agents.core import agent_ids, listen_ids
+    from ..agents.core import agent_ids, listen_default, listen_ids
     from ..collab.reactions import ltags_of_lists
     from ..integrations.git import git_repos_of_lists
     rows = c.execute(f"""SELECT l.*, m.role AS m_role, m.folder AS m_folder, m.sort AS m_sort, m.view AS m_view
@@ -77,6 +77,11 @@ def visible_lists(c, uid):
                         WHERE l.owner_id=? OR (m.user_id IS NOT NULL{_members_on()})""", (uid, uid)).fetchall()
     if health_hidden(c, uid):  # 2.22.0 (#663): health lists stay private (agents, tokens without the scope "private")
         rows = [r for r in rows if r["life"] != "health"]
+    if has_request_context() and getattr(g, "user", None) is not None and uid == g.user["id"]:
+        from ..core.access import token_lists
+        tl = token_lists()  # 2.30.0 (#919): a token limited to selected lists
+        if tl is not None:
+            rows = [r for r in rows if r["id"] in tl]
     ids = [r["id"] for r in rows]
     members, names = {}, {}
     if ids and collab_all():
@@ -138,9 +143,11 @@ def visible_lists(c, uid):
                        + [m["user_id"] for m in d["members"] if m.get("agent") and m["role"] in WRITE_ROLES])
         d["tidy_agent_id"] = r["tidy_agent"] if r["tidy_agent"] in cands else (cands[0] if cands else None)
         d.pop("tidy_agent", None)
-        # 2.13.1 (#471): the agents that read every comment of a person in this list (same rule as listen_agents_of)
+        # 2.13.1 (#471): the agents that read every comment of a person in this list (same rule as listen_agents_of);
+        # 2.30.0 (#1034): they "listen in" (new / moved tasks too), by default in software lists (listen_default)
         lag = ({r["owner_id"]} if r["owner_id"] in ag else set()) | {m["user_id"] for m in d["members"] if m.get("agent")}
-        d["listen_agent_ids"] = listen_ids(r["agent_listen"], r["agent_tidy"], d["tidy_agent_id"], lag)
+        d["listen_agent_ids"] = listen_ids(r["agent_listen"], r["ptype"], lag)
+        d["listen_default"] = listen_default(r["ptype"])
         d.pop("agent_listen", None)
         # 2.26.0 (#928): may the viewer address this list's agents (mention, assign, chat)? owner / list admin / instance
         # admin, a list of an agent, or "Members may see and use the agent" on

@@ -4,7 +4,12 @@
 
 // ------------------------------------------------------------------ popovers
 let popRet = null;  // 2.16.0 (#473): where the focus goes back to when a popover / menu closes
-function closePop() { popFocusBack(); document.body.classList.remove('pop-open'); /* 2.28.0 (#976) */ const t = $('#toast'); if (t && !t.classList.contains('hidden') && $('#pop.sheet:not(.hidden)')) requestAnimationFrame(() => toastPlace(t)); $('#pop').classList.add('hidden'); $('#pop').classList.remove('sheet', 'overmodal'); $('#scrim').classList.add('hidden'); $('#scrim').classList.remove('clear', 'overmodal'); popOnClose && popOnClose(); popOnClose = null; }
+function closePop() { popFocusBack(); document.body.classList.remove('pop-open'); /* 2.28.0 (#976) */ const t = $('#toast'); if (t && !t.classList.contains('hidden') && $('#pop.sheet:not(.hidden)')) requestAnimationFrame(() => toastPlace(t)); $('#pop').classList.add('hidden'); $('#pop').classList.remove('sheet', 'overmodal'); $('#scrim').classList.add('hidden'); $('#scrim').classList.remove('clear', 'overmodal'); popOnClose && popOnClose(); popOnClose = null; sideRearm(); }
+// 2.30.0 (#1043): a menu / popover opened from the open drawer (phone, folded sidebar) took over the drawer's close hook and
+// hid its scrim; a dialog opened from it (Folder settings…, People and roles…, Edit list…) then left the drawer open without
+// dimming, and a tap next to it went to the task behind. When the popover closes and the drawer is still open, the drawer gets
+// its scrim and close hook back: a tap next to it closes only the drawer, like before the menu.
+function sideRearm() { if ($('#side.open') && $('#pop').classList.contains('hidden') && !popOnClose) { $('#scrim').classList.remove('hidden'); popOnClose = closeSide; } }
 let popOnClose = null;
 function openPop(anchor, html, onClose) {
   const p = $('#pop');

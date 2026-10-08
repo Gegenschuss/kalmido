@@ -183,6 +183,8 @@ def v1_agent_events():
     more = len(rows) > limit
     rows = rows[:limit]
     data = [json.loads(r["payload"]) for r in rows]
+    from ..agents.safety import access_events
+    access_events(data)  # 2.30.0 (#919): the lists these events come from count as read in the access log
     mids = chat_event_mids(data)
     if mids:  # 2.7.2 (#422): these chat messages reached the agent
         c2 = db()

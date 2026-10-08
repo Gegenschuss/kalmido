@@ -2,7 +2,9 @@
 // private); the sidebar's switch (setting "workspace": all | private | org:<id>, followed on every device) shows the lists,
 // tasks, News, agents and team chats of ONE workspace, "All" shows everything. The inbox is always there. The server keeps
 // the boundary between people (an organisation's list is shared only inside it, agents join only lists of their workspace);
-// this module only decides what the app shows.
+// this module only decides what the app shows. 2.30.0 (#1036): calendars and address books have a workspace too (org_id):
+// the switch shows only their events and contacts (wsObjIn); their dialogs choose it like the list dialog (wsAskNew,
+// wsMoveMenu).
 // 2.28.0 (#985): the bot badge on an agent's picture (botBadge), (#987) what counts as "For you" at the bell (bellCount).
 const wsOn = () => !!S.workspaces && !!(S.me?.workspaces || []).length;
 const wsCur = () => { const v = S.settings?.workspace || 'all'; return wsOn() && (v === 'private' || (v.startsWith('org:') && (S.me.workspaces || []).some(w => 'org:' + w.id === v))) ? v : 'all'; };
@@ -14,6 +16,7 @@ const wsOrg = id => (S.me?.workspaces || []).find(w => w.id === +id);
 const wsName = ws => ws === 'all' ? tr('All workspaces') : ws === 'private' ? tr('Private|workspace') : (wsOrg(ws.slice(4))?.name || tr('Organisation'));
 const wsIcon = ws => ws === 'private' ? ic('home', 's') : ws === 'all' ? ic('grid', 's') : (wsOrg(ws.slice(4))?.icon ? `<span class="wsemo" aria-hidden="true">${esc(wsOrg(ws.slice(4)).icon)}</span>` : ic('brief', 's'));
 const wsOptions = () => ['private', ...(S.me?.workspaces || []).map(w => 'org:' + w.id), 'all'];
+const wsObjIn = (o, ws = wsCur()) => ws === 'all' || !o || wsOf(o) === ws;
 const wsAgentIn = (a, ws = wsCur()) => ws === 'all' || !a || (ws === 'private' ? !a.org_id : 'org:' + a.org_id === ws);
 const wsLabel = (org_id) => org_id ? (wsOrg(org_id)?.name || tr('Organisation')) : tr('Private|workspace');
 async function wsSet(ws) {
@@ -55,6 +58,21 @@ function wsDefaultOrg(folder = '') {
 function wsSelectHtml(id, cur, dis = '') {
   if (!wsOn()) return '';
   return `<select id="${id}" ${dis}>${wsOptions().filter(w => w !== 'all').map(ws => `<option value="${ws === 'private' ? '' : ws.slice(4)}" ${(cur ? 'org:' + cur : 'private') === ws ? 'selected' : ''}>${esc(wsName(ws))}</option>`).join('')}</select>`;
+}
+// 2.30.0 (#1036): "New calendar / address book": the name and (with an organisation) its workspace -> {name, org_id} or null
+async function wsAskNew(title) {
+  let org = wsDefaultOrg();
+  const p = askPrompt(title, '', {input: {max: 100, placeholder: tr('Name')}, ok: tr('Create'),
+    html: wsOn() ? `<label class="wsnew"><span>${esc(tr('Workspace'))}</span>${wsSelectHtml('ws-new', org)}</label>` : ''});
+  const sel = $('#ws-new');
+  if (sel) sel.addEventListener('change', () => { org = sel.value ? +sel.value : null; });
+  const n = await p;
+  return n && n.trim() ? {name: n.trim(), org_id: org} : null;
+}
+// the menu "Workspace" of an own calendar / address book: Private | <organisations>, the current one ticked; fn(org_id)
+function wsMoveMenu(anchor, cur, fn) {
+  menu(anchor, wsOptions().filter(w => w !== 'all').map(ws => ({label: wsName(ws), icon: ws === 'private' ? 'home' : 'brief',
+    on: (cur ? 'org:' + cur : 'private') === ws, fn: () => fn(ws === 'private' ? null : +ws.slice(4))})));
 }
 // 2.28.0 (#985): a small robot on an agent's picture wherever people appear; a tooltip for everyone, the text for screen readers
 const botBadge = () => `<i class="abot-b" title="${esc(tr('Agent'))}" role="img" aria-label="${esc(tr('Agent'))}">${ic('bot', 's')}</i>`;

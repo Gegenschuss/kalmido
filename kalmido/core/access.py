@@ -92,7 +92,39 @@ def health_hidden(c=None, uid=None):
 
 
 def _health_sql():
-    return " EXCEPT SELECT id FROM lists WHERE life='health'" if health_hidden() else ""
+    return (" EXCEPT SELECT id FROM lists WHERE life='health'" if health_hidden() else "") + _token_lists_sql()
+
+
+# 2.30.0 (#919): least privilege. An API token (an agent's tokens carry the agent's choice) may be limited to selected lists
+# (api_tokens.list_ids, csv; '' = all): on every /api/v1 request the other lists do not exist for it -- list_role answers
+# None (404), vis_sql / wr_sql leave them out. Only the token's own user is limited (other people's roles stay).
+def token_lists():
+    """frozenset of the list ids the current request's token is limited to, or None (no limit / not a token request)."""
+    if not has_request_context() or g.get("auth_via") != "token":
+        return None
+    if "token_lists" in g:
+        return g.token_lists
+    t, out = g.get("token"), None
+    raw = (t["list_ids"] if t is not None and "list_ids" in t.keys() else "") or ""
+    if raw.strip():
+        out = frozenset(int(x) for x in raw.split(",") if x.strip().isdigit())
+    g.token_lists = out
+    return out
+
+
+def _token_lists_sql():
+    tl = token_lists()
+    return "" if tl is None else f" INTERSECT SELECT id FROM lists WHERE id IN ({','.join(str(int(x)) for x in sorted(tl)) or '0'})"
+
+
+def access_note(lid, write=False):
+    """2.30.0 (#919): an agent's request touched list lid (the access log counts it once per request: read or write)."""
+    if not lid or not has_request_context() or not g.get("audit_aid"):
+        return
+    d = g.get("agent_access")
+    if d is None:
+        d = g.agent_access = {}
+    d[lid] = d.get(lid, False) or bool(write)
 
 
 def need_feat(f):
@@ -187,6 +219,8 @@ def task_visible(c, tid, uid, write=False, full=False):
     if not r:
         return False
     role = list_role(c, r[0], uid)
+    if write and role and has_request_context() and g.get("audit_aid") == uid:
+        access_note(r[0], True)
     if role == "participant":
         vis, wr, _ = pvis(c, uid, r[0])
         return tid in (wr if write or full else vis)
@@ -200,10 +234,18 @@ def list_role(c, lid, uid=None):
         return None
     if r[1] == "health" and health_hidden(c, uid):  # 2.22.0 (#663)
         return None
+    if has_request_context() and g.get("auth_via") == "token" and getattr(g, "user", None) is not None and uid == g.user["id"]:
+        tl = token_lists()  # 2.30.0 (#919): a token limited to selected lists
+        if tl is not None and lid not in tl:
+            return None
     if r[0] == uid:
-        return "owner"
-    m = c.execute("SELECT role FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone()
-    return m[0] if m and collab_all() else None
+        role = "owner"
+    else:
+        m = c.execute("SELECT role FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone()
+        role = m[0] if m and collab_all() else None
+    if role and has_request_context() and g.get("audit_aid") == uid:
+        access_note(lid)  # 2.30.0 (#919): the agents' list access log
+    return role
 
 
 def need_list(c, lid, write=True, owner=False, manage=False):
@@ -212,6 +254,8 @@ def need_list(c, lid, write=True, owner=False, manage=False):
     role = list_role(c, lid) if lid else None
     if not role:
         raise Denied(404)
+    if write:
+        access_note(lid, True)
     if (owner and role != "owner") or (manage and role not in MANAGE_ROLES) or (write and role not in WRITE_ROLES):
         raise Denied(403)
     return role
@@ -244,6 +288,8 @@ def need_task(c, tid, write=True, full=False):
     if not r:
         raise Denied(404)
     role = list_role(c, r[0])
+    if write and role:
+        access_note(r[0], True)
     if role == "participant":
         vis, wr, ctx = pvis(c, me(), r[0])
         if tid not in vis or (full and tid in ctx):

@@ -495,7 +495,9 @@ def avatar_get(uid, tok):
     u = c.execute("SELECT id, avatar FROM users WHERE id=?", (uid,)).fetchone()
     if not u or u["avatar"] != "u:" + tok or not re.fullmatch(r"[A-Za-z0-9_-]{8,40}", tok):
         raise Denied(404)
-    if uid != me() and not g.user["is_admin"] and not c.execute(
+    from .orgs import instance_mode
+    admin_ok = g.user["is_admin"] and instance_mode(c) != "workspaces"  # 2.30.0 (#1036): workspaces -> admins no exception
+    if uid != me() and not admin_ok and not c.execute(
             f"""SELECT 1 FROM lists WHERE id IN {vis_sql()} AND (owner_id=? OR id IN (SELECT list_id FROM list_members WHERE user_id=?))
                 LIMIT 1""", (me(), me(), uid, uid)).fetchone():
         raise Denied(404)

@@ -40,6 +40,15 @@ CI runs the same suites on every push and pull request, plus `python -m py_compi
 `tools/i18n_check.py`, `bandit`, `pip-audit`, `semgrep` and a ZAP baseline scan. Please add or extend a
 test for what you change; security fixes need a regression test in `tests/security_test.py`.
 
+- **Only some suites:** `ONLY="api security" ./run_all.sh` runs just the named suites (the names after `run` in
+  `run_all.sh`; the test containers of their groups are still started). Run the suites you touched while you work and
+  the full run once before the pull request.
+- **bandit locally**, as CI does: `pip install bandit && bandit -q --severity-level high -r app.py kalmido tools`.
+- **Push tests** (`webpush`, `webpush_ui`) decrypt the payloads with `http-ece` from `tests/requirements.txt`;
+  install that file, not only `requests`.
+- **Close headless browsers.** UI tests and your own checks with a headless browser must close it at the end (also on
+  errors, e.g. in a `finally`); left-over browser processes slowly fill memory and swap.
+
 ## Translations
 
 Kalmido ships in English (the source), German (maintained by the author) and, since 2.11.0, French, Spanish, Italian

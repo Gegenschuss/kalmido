@@ -16,7 +16,7 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_now, now_utc, parse_iso, uset, usettings
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, FAIL_WINDOW, me, rate_ip
 from ..accounts.login import twofa_methods
-from ..core.access import collab_all, Denied, list_role, need_list, need_task, need_time, time_all, tvis, vis_sql
+from ..core.access import collab_all, Denied, list_role, need_list, need_task, need_time, time_all, token_lists, tvis, vis_sql
 from ..core.serializers import load_tasks
 from ..core.instance import semver, update_state
 from ..core.state import search_tasks, visible_lists, visible_sections
@@ -449,6 +449,7 @@ def v1_list(d):
             "status": d.get("status") or None, "progress": d["progress"], "created_at": d["created_at"],
             "tags": d.get("tags") or [], "agent_tidy": d.get("agent_tidy") or "off", "tidy_agent_id": d.get("tidy_agent_id"),
             "listen_agent_ids": d.get("listen_agent_ids") or [],  # 2.13.1 (#471)
+            "listen_default": bool(d.get("listen_default")),  # 2.30.0 (#1034): the project type lets agents listen in by default
             # 2.26.0 (#928): members may see and use the list's agents / agents may address each other
             "agent_members": bool(d.get("agent_members")), "agent_peers": bool(d.get("agent_peers")),
             "icon": d.get("icon") or "",
@@ -476,8 +477,15 @@ def token_public(r):
     return {"id": r["id"], "name": r["name"], "prefix": r["prefix"], "scopes": sorted(api_scopes(r["scopes"])),
             "effective_scopes": [x for x in SCOPES if x in scopes_effective(c, r, u)] if u else [],
             "allowed_ips": [x for x in (r["allowed_ips"] or "").split(",") if x],
+            "list_ids": sorted(int(x) for x in (r["list_ids"] if "list_ids" in r.keys() else "").split(",") if x.strip().isdigit()),  # 2.30.0 (#919)
             "expires_at": r["expires_at"], "created_at": r["created_at"], "last_used_at": r["last_used_at"],
             "expired": bool(r["expires_at"] and parse_iso(r["expires_at"]) <= now_utc())}
+
+
+def token_lists_clean(c, v):
+    """2.30.0 (#919): the lists a personal token is limited to: lists I see ([] / None = all)."""
+    from ..agents.safety import list_ids_clean
+    return list_ids_clean(c, v, lambda n: bool(list_role(c, n, me())))
 
 
 @app.get("/api/me/tokens")
@@ -500,6 +508,7 @@ def token_create():
         return err(tr("Name missing"))
     scopes = scopes_clean(b.get("scopes") or ["read"], g.user)
     ips = ips_clean(b.get("allowed_ips"))
+    lids = token_lists_clean(c, b.get("list_ids"))  # 2.30.0 (#919)
     days = b.get("expires_days")
     exp = None
     if days not in (None, "", 0):
@@ -507,8 +516,8 @@ def token_create():
     if c.execute("SELECT COUNT(*) FROM api_tokens WHERE user_id=?", (me(),)).fetchone()[0] >= API_TOKEN_MAX:
         return err(tr("At most {0} tokens", API_TOKEN_MAX), 409)
     tok = "abk_" + secrets.token_urlsafe(32)
-    tid = c.execute("INSERT INTO api_tokens(user_id,name,token_hash,prefix,scopes,expires_at,created_at,allowed_ips) VALUES(?,?,?,?,?,?,?,?)",
-                    (me(), name, _token_hash(tok), tok[:12], ",".join(scopes), exp, iso(now_utc()), ips)).lastrowid
+    tid = c.execute("INSERT INTO api_tokens(user_id,name,token_hash,prefix,scopes,expires_at,created_at,allowed_ips,list_ids) VALUES(?,?,?,?,?,?,?,?,?)",
+                    (me(), name, _token_hash(tok), tok[:12], ",".join(scopes), exp, iso(now_utc()), ips, lids)).lastrowid
     c.commit()
     print("api token", tid, "created for user", me(), "scopes", ",".join(scopes), flush=True)
     return jsonify({**token_public(c.execute("SELECT * FROM api_tokens WHERE id=?", (tid,)).fetchone()), "token": tok}), 201
@@ -523,13 +532,15 @@ def token_update(tid):
     r = c.execute("SELECT * FROM api_tokens WHERE id=? AND user_id=?", (tid, me())).fetchone()
     if not r:
         raise Denied(404)
-    unknown = sorted(k for k in b if k not in ("scopes", "allowed_ips", "name"))
+    unknown = sorted(k for k in b if k not in ("scopes", "allowed_ips", "name", "list_ids"))
     if unknown:
         return err(tr("Invalid value: {0}", ", ".join(unknown)))
     if "scopes" in b:
         c.execute("UPDATE api_tokens SET scopes=? WHERE id=?", (",".join(scopes_clean(b["scopes"], g.user)), tid))
     if "allowed_ips" in b:
         c.execute("UPDATE api_tokens SET allowed_ips=? WHERE id=?", (ips_clean(b["allowed_ips"]), tid))
+    if "list_ids" in b:  # 2.30.0 (#919): limited to selected lists ([] = all)
+        c.execute("UPDATE api_tokens SET list_ids=? WHERE id=?", (token_lists_clean(c, b["list_ids"]), tid))
     if "name" in b:
         name = str(b["name"] or "").strip()[:60]
         if not name:
@@ -567,7 +578,8 @@ def v1_me():
     return jsonify(id=u["id"], username=u["username"], display_name=u["display_name"] or u["username"], is_admin=bool(u["is_admin"]),
                    kind="agent" if is_agent(u) else "user",
                    token={"id": t["id"], "name": t["name"], "scopes": sorted(api_scopes(t["scopes"])), "expires_at": t["expires_at"],
-                          "effective_scopes": [s for s in SCOPES if s in g.get("scopes", set())]},  # 2.15.0 (#479)
+                          "effective_scopes": [s for s in SCOPES if s in g.get("scopes", set())],  # 2.15.0 (#479)
+                          "list_ids": sorted(token_lists() or [])},  # 2.30.0 (#919): [] = all lists
                    features={"collaboration": collab_all() and "collab" in fs, "time_tracking": time_all() and "time" in fs,
                              "dependencies": "deps" in fs, "custom_fields": "fields" in fs, "comments": "comments" in fs},
                    api_version=API_VERSION, rate_limit_per_minute=API_RATE, notifications=v1_notif(c, u["id"]))
@@ -702,6 +714,9 @@ def v1_list_create():
     if "kind" in b and b["kind"] not in LIST_KINDS and b["kind"] not in LIST_KIND_ALIASES:
         raise BadInput(tr("Invalid value: {0}", "kind"))
     j = v1_call(list_create, body=b)
+    from ..agents.safety import token_list_add
+    token_list_add(db(), j["id"])  # 2.30.0 (#919): a token limited to selected lists keeps the list it created
+    db().commit()
     if later:
         v1_call(list_update, j["id"], body=later)
     d = next(x for x in visible_lists(db(), me()) if x["id"] == j["id"])
@@ -933,6 +948,9 @@ def v1_task_update(tid):
     b = v1_task_in(v1_json())
     if not b:
         raise BadInput(tr("Nothing to change"))
+    if b.get("list_id"):
+        from ..agents.safety import move_gate
+        move_gate(c, [(tid, b["list_id"])])  # 2.30.0 (#919): an agent moving it to other people waits for approval
     v1_call(task_update, tid, body=b)
     return jsonify(v1_one(c, tid))
 
@@ -1339,6 +1357,10 @@ def v1_group_get(gid):
     v1_args(())
     c = db()
     d = grp_dict(c, need_group(c, gid), full=False)
+    from ..accounts.orgs import instance_mode, visible_people
+    vis = visible_people(c, me()) if instance_mode(c) == "workspaces" else None
+    if vis is not None:  # 2.30.0 (#1036): only the members one may see (as GET /groups)
+        d["members"] = [m for m in d["members"] if m["user_id"] in vis]
     return jsonify({**v1_group(d), "mine": gid in grp_of_user(c, me())})
 
 

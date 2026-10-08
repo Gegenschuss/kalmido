@@ -139,7 +139,7 @@ function openQuickSheet(prefill = '', preset = {}) {
   if (!q) {
     q = document.createElement('div');
     q.className = 'qadd sheet';
-    q.innerHTML = `<div class="box">${ic('plus')}<input id="qsheet" name="kalmido-quick-add-sheet" type="text" data-form-type="other" data-lpignore="true" placeholder="${tr("What's next?")}" autocomplete="off" enterkeyhint="send">${tplBtn()}${qExtraBtns('qsheet')}<button class="iconbtn" data-act="qsheet-send" aria-label="${tr('Add')}">${ic('arrow')}</button></div><div class="chips"></div><div class="qhint">${tr('tomorrow 3pm · !high · #tag · ~list · every monday')}</div>${hintOnce('qbtns', tr('Next to the arrow: the clip adds the task with a file, the square adds it and opens its details.'), 'qbhint')}`;  // 2.25.0 (UX-34)
+    q.innerHTML = `<div class="box">${ic('plus')}<input id="qsheet" name="kalmido-quick-add-sheet" type="text" data-form-type="other" data-lpignore="true" placeholder="${tr("What's next?")}" autocomplete="off" enterkeyhint="send">${tplBtn()}${qExtraBtns('qsheet')}<button class="iconbtn" data-act="qsheet-send" aria-label="${tr('Add')}">${ic('arrow')}</button></div><div class="chips"></div><div class="qhint">${tr('tomorrow 3pm · !high · #tag · ~list · every monday')}</div>`;  // 2.25.0 (UX-34); 2.30.0 (#1033): the clip/square hint is gone, both buttons carry title + aria-label
     document.body.appendChild(q);
   }
   $('#scrim').classList.remove('hidden');

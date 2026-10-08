@@ -864,6 +864,10 @@ button.whob:hover .who.none{opacity:1;border-color:var(--accent);color:var(--acc
 .aalimits{margin:.25rem 0 .5rem}.aalimits summary{cursor:pointer;font-size:.8125rem;padding:.25rem 0}
 .aalist .aarow .n{white-space:normal;font-size:.8125rem;line-height:1.45}
 .mhint{font-size:.75rem;padding:.25rem 2px}
+/* 2.30.0 (#1044 e): one-time hints with their dismiss X as a flex row, so the 44 px touch button no longer stretches the text's line height */
+.mhint.once{display:flex;align-items:center;gap:.25rem;line-height:1.35}
+.mhint.once > span{flex:1;min-width:0}
+.mhint.once .hx{flex:none}
 .acct{display:inline-flex;align-items:center;gap:.5rem;min-width:0}
 .chkl{display:inline-flex;gap:.5rem;align-items:center;color:var(--text);font-size:.875rem}
 .chkl input{flex:none}
@@ -3514,6 +3518,10 @@ svg.logo{color:var(--acc-d,var(--accent));flex:none}
 .modal .lsnrow .lsnag input{flex:none}
 /* 2.13.2 (#478 N8): iOS keyboard pushed the page up: the phone chat sits in the visible part (header with Back stays) */
 .chview.vvfix{position:fixed;top:var(--vvt,0);left:0;right:0;height:var(--vvh,100dvh)!important;z-index:40;background:var(--bg)}
+/* 2.30.0 (#1044): fixed to the viewport the chat lost #view's side padding and jumped ~12 px to the left when the keyboard
+   came up: it keeps the same side margin */
+.chview.vvfix{padding-left:1.75rem;padding-right:1.75rem}
+@media (max-width:899px){ .chview.vvfix{padding-left:.75rem;padding-right:.75rem} }
 /* 2.13.2 (#478 N4): markdown in comments and chat bubbles, compact */
 .md.mdc{line-height:1.5;cursor:auto;min-height:0}
 .mdc p{margin:0 0 .25rem}.mdc>:last-child{margin-bottom:0}.mdc>:first-child{margin-top:0}
@@ -4076,14 +4084,16 @@ a.tref:hover{background:var(--accent-soft)}
 .hl-t{color:var(--hl-t)}.hl-a{color:var(--hl-a)}.hl-m{color:var(--hl-m)}
 .hl-add{color:var(--hl-add);background:color-mix(in srgb,var(--hl-add) 10%,transparent)}
 .hl-del{color:var(--hl-del);background:color-mix(in srgb,var(--hl-del) 10%,transparent)}
-.mdcode{position:relative;max-width:100%}
-.mdcode pre.mdpre{padding-right:2.25rem}
-.mdcode .mdcopy{position:absolute;top:.25rem;right:.25rem;opacity:.75;background:var(--bg3)}
+/* 2.30.0 (#1042): the copy button sits in its own column of the code box instead of over the text: the box (background,
+   border) is the wrapper, the pre scrolls / wraps next to the button, so no line (also not while scrolling sideways) runs under it */
+.mdcode{position:relative;max-width:100%;min-width:0;display:flex;align-items:flex-start;margin:.375rem 0;background:var(--bg3);border:1px solid var(--line);border-radius:var(--r-s)}
+.mdcode pre.mdpre{flex:1;min-width:0;margin:0;border:0;border-radius:var(--r-s);background:var(--bg3);padding-right:.25rem}  /* same background as the box: the code colours are measured against it */
+.mdcode .mdcopy{flex:none;margin:.25rem .25rem .25rem 0;opacity:.8;background:var(--bg2);border:1px solid var(--line)}
 .mdcode .mdcopy:hover,.mdcode .mdcopy:focus-visible{opacity:1}
-@media (pointer:coarse){ .mdcode pre.mdpre{padding-right:3.25rem} .mdcode .mdcopy{min-width:2.75rem;min-height:2.75rem;opacity:1} }
+@media (pointer:coarse){ .mdcode .mdcopy{min-width:2.75rem;min-height:2.75rem;justify-content:center;opacity:1} }
 /* 2.29.0 (#1028): in chat bubbles a code block wraps instead of scrolling sideways: no scrollbar that could sit over the next
    line (Mac "always show scrollbars"), the whole command visible, the copy button stays in its corner */
-.cbub .mdcode{display:block;margin:.375rem 0}.cbub .mdcode:last-child{margin-bottom:0}
+.cbub .mdcode{margin:.375rem 0}.cbub .mdcode:last-child{margin-bottom:0}
 .cbub pre.mdpre{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;overflow-x:hidden;margin:0}
 /* 2.18.0 (#408 F): "Similar open ticket" hint in the task panel of a new bug */
 .ddup{display:flex;align-items:center;gap:.375rem;margin:.25rem 0 .5rem;padding:.25rem .25rem .25rem .625rem;background:var(--bg3);border-radius:var(--radius);font-size:var(--fs-s);color:var(--text2);min-width:0}
@@ -4525,6 +4535,10 @@ button.lkchip:hover{border-color:var(--accent)}
 @keyframes kidin{from{opacity:0;transform:translateY(-.25rem)}to{opacity:1;transform:none}}
 .kidopts[hidden]{display:none!important}
 .fpl{margin:.5rem 0}
+/* 2.30.0 (#1044): the person's name and "new lists too" on two lines, so neither gets cut on a phone */
+.fpl .mrow .n{white-space:normal}
+.fpl .mrow .n > *{display:block;overflow-wrap:anywhere}
+.fpl .mrow .n small{font-size:var(--fs-s)}
 /* 2.22.0 (#752): the organisation next to the app name (sidebar, login) */
 .sbhome .sborg{font-size:var(--fs-xs);font-weight:400;color:var(--muted);margin-left:.375rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:8rem}
 .alogo .aorg{display:block;font-size:var(--fs-s);font-weight:400;color:var(--muted);margin-top:.125rem}
@@ -4989,6 +5003,11 @@ a.nitem.ndm{text-decoration:none;color:inherit}
 .cchb:disabled{cursor:default}
 .cchans{width:100%;font-size:var(--fs-xs)}
 @media (pointer:coarse){ .cchb{min-height:2.5rem} }
+/* 2.30.0 (#1041): a permission question -- Allow (accent) / Deny (calm), afterwards one quiet line with the outcome */
+.cperm .cchb{min-width:6.5rem;justify-content:center}
+.cperm .cchb:not(.st-primary){border-color:var(--line2);color:var(--text2)}
+.cpermst{display:inline-flex;align-items:center;gap:.3rem;margin:.375rem 0 .125rem;font-size:var(--fs-xs);color:var(--muted)}
+.cpermst.ok svg{color:var(--accent)}
 /* 2.29.0 (#1030 / #929): folder settings dialog, "from the folder" in the list dialog */
 .fsapply{border:1px solid var(--line);border-radius:var(--r-s);padding:.375rem .75rem .5rem;margin:.5rem 0;display:flex;flex-direction:column;gap:.25rem}
 .fsapply legend{font-size:var(--fs-s);color:var(--text2);padding:0 .25rem}
@@ -4999,3 +5018,52 @@ a.nitem.ndm{text-decoration:none;color:inherit}
 .lfolderhint{font-size:var(--fs-s);color:var(--text2);line-height:1.5;margin:-.125rem 0 .625rem;padding:.375rem .625rem;background:var(--bg3);border-radius:var(--r-s)}
 .lfolderhint[hidden]{display:none}.lfolderhint svg.i.s{vertical-align:-2px}
 @media (pointer:coarse){ button.chmode{min-height:2.75rem;min-width:2.75rem;padding:0 .75rem} }
+
+/* ---------- 2.30.0 (#1035 #380): text file viewer (Markdown / source), Markdown tables, quotes, rules ---------- */
+.lightbox.tview{padding:2rem}
+.tvbox{display:flex;flex-direction:column;width:min(56rem,100%);max-height:100%;background:var(--bg2);color:var(--text);border-radius:var(--r-l);box-shadow:var(--shadow);overflow:hidden}
+.tvbar{display:flex;align-items:center;gap:.375rem;padding:.5rem .5rem .5rem 1rem;border-bottom:1px solid var(--line);flex:none}
+.tvname{display:flex;flex-direction:column;min-width:0;flex:0 1 auto}
+.tvname b{font-size:var(--fs-b);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tvname span{font-size:var(--fs-s);color:var(--muted)}
+.tvseg{margin-left:.5rem;flex:none}
+.tvnote{display:flex;gap:.5rem;align-items:center;padding:.5rem 1rem;background:var(--wait-soft);color:var(--st-wait-t);font-size:var(--fs-s);border-bottom:1px solid var(--line);flex:none}
+.tvnote svg{flex:none}
+.tvbody{flex:1;overflow:auto;padding:1rem 1.25rem;min-height:6rem;overscroll-behavior:contain}
+.tvbody pre.tvsrc{margin:0;border:0;background:none;padding:0;white-space:pre;tab-size:4;font-size:var(--fs-m)}
+.md.tvmd{font-size:var(--fs-b);max-width:46rem}
+.tvmsg{padding:1rem 0;color:var(--text2)}
+.attag{color:var(--accent)}
+@media (max-width:899px){
+  .lightbox.tview{padding:0}
+  .tvbox{width:100%;max-height:none;height:100%;border-radius:0;padding-top:var(--safe-t)}
+  .tvbar{flex-wrap:wrap;padding:.375rem .375rem .375rem .875rem}
+  .tvbar .iconbtn{padding:.625rem}
+  .tvseg{order:9;margin:0 0 .25rem}
+  .tvbody{padding:.75rem .875rem calc(.75rem + var(--safe-b))}
+}
+.md .mdtbl{overflow-x:auto;margin:.375rem 0 .625rem;max-width:100%}
+.md table{border-collapse:collapse;font-size:var(--fs-m)}
+.md th,.md td{border:1px solid var(--line2);padding:.3125rem .625rem;text-align:left;vertical-align:top}
+.md th{background:var(--bg3);font-weight:600}
+.md th.ta-c,.md td.ta-c{text-align:center}
+.md th.ta-r,.md td.ta-r{text-align:right}
+.md blockquote{margin:0 0 .5rem;padding:.125rem 0 .125rem .75rem;border-left:.1875rem solid var(--line2);color:var(--text2)}
+.md hr{border:0;border-top:1px solid var(--line2);margin:.75rem 0}
+/* 2.30.0 (#919 / #920): Settings > Agents > Use safely, the list restriction of agents / tokens, bridges, the access log */
+.agsafe-lead{margin:.25rem 0 .75rem}
+.agsafe-rules{margin:0 0 1rem;padding-left:1.4rem;display:grid;gap:.6rem}
+.agsafe-rules li b{display:block}
+.agsafe-rules li span{color:var(--text2)}
+.agsafe-admin{margin:.25rem 0 .75rem;padding-left:1.2rem;display:grid;gap:.35rem}
+.lcap{flex:1;min-width:0}
+.lcap summary{min-height:2.75rem;display:flex;align-items:center;cursor:pointer}
+.lcapgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(10.5rem,1fr));gap:0 .75rem;max-height:14rem;overflow:auto}
+.lcapgrid .chkl{display:flex;align-items:center;gap:.5rem;min-height:2.75rem;cursor:pointer;min-width:0}
+.lcapgrid .chkl span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.agbridges ul{margin:.35rem 0;padding-left:1.2rem}
+
+/* 2.30.0 (#1036): the workspace of a new calendar / address book (askDialog) */
+.cdlg .wsnew{display:flex;gap:.625rem;align-items:center;margin:2px 0 .625rem}
+.cdlg .wsnew select{flex:1;min-width:0}
+.lcaphint{margin:.25rem 0 .5rem;font-size:.85rem}

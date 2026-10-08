@@ -234,6 +234,7 @@ async function rawFetch0(method, url, body) {
   if (r.status === 401) { location.reload(); throw new Error('auth'); }
   if (!r.ok) { const e = new Error(j.error || tr('Error {0}', r.status)); e.status = r.status; e.data = j;
     if (j.code === 'quota_exceeded') { e.shown = true; setTimeout(() => quotaDialog(j), 0); }  // 2.24.0 (#910): storage full
+    if (j.code === 'agent_bridge') e.shown = true;  // 2.30.0 (#919): bridgeTry asks and repeats it
     throw e; }
   return j;
 }

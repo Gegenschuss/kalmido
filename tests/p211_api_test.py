@@ -153,8 +153,12 @@ SECRET = A.post(B + "/api/lists", json={"name": "Secret"}).json()["id"]
 BOBL = Bo.post(B + "/api/lists", json={"name": "Bobs"}).json()["id"]
 for lid, s, who, role in ((TEAM, A, "bob", "edit"), (TEAM, A, "gert", "participant")):
     assert s.put(B + f"/api/lists/{lid}/members", json={"user_id": ids[who], "role": role}).ok
-for lid, s in ((TEAM, A), (SECRET, A), (BOBL, Bo)):
+for lid, s in ((TEAM, A), (SECRET, A)):
     assert s.put(B + f"/api/lists/{lid}/members", json={"user_id": AG, "role": "edit"}).ok
+# 2.30.0 (#919): Bob's list + Alice's lists through one agent is a bridge (409 unless both owners approve); this suite tests
+# what the agent itself does in such a setup, so it is written like a membership from before 2.30
+check(Bo.put(B + f"/api/lists/{BOBL}/members", json={"user_id": AG, "role": "edit"}).status_code == 409, "2.30.0: the bridge to Bob's list is refused")
+legacy_agent(BOBL, AG, "edit")
 legacy_agent(TEAM, AG2, "edit")
 for lid, s in ((TEAM, A), (SECRET, A), (BOBL, Bo)):  # 2.26.0: members may use the agents (list switch, default off)
     assert s.patch(B + f"/api/lists/{lid}", json={"agent_members": True, "agent_peers": True}).ok

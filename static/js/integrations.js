@@ -36,9 +36,9 @@ function tokWire(md) {
     if (b.dataset.tok === 'new') { tokModal(() => tokDraw(md), $('#s-toks', md)._j?.scopes); return; }
     const row = b.closest('[data-tokid]'), t = ($('#s-toks', md)._t || []).find(x => x.id === +row?.dataset.tokid); if (!t) return;
     if (b.dataset.tok === 'edit') {  // 2.15.0 (#479): what the token may do + from where
-      permModal(tr('Permissions of {0}', t.name), $('#s-toks', md)._j?.scopes || [], t.scopes, t.allowed_ips, async (scopes, ips) => {
-        await calReq('PATCH', `/api/me/tokens/${t.id}`, {scopes, allowed_ips: ips}); toast(tr('Saved')); tokDraw(md);
-      });
+      permModal(tr('Permissions of {0}', t.name), $('#s-toks', md)._j?.scopes || [], t.scopes, t.allowed_ips, async (scopes, ips, pm) => {
+        await calReq('PATCH', `/api/me/tokens/${t.id}`, {scopes, allowed_ips: ips, list_ids: listCapVal(pm, 'pm-lcap')}); toast(tr('Saved')); tokDraw(md);  // 2.30.0 (#919)
+      }, `<div class="row"><label>${tr('Lists')}</label>${listCapHtml(t.list_ids, tokLists(t.list_ids), 'pm-lcap')}</div>`);
       return;
     }
     if (!await askConfirm(tr('Revoke the token “{0}”?', t.name), tr('Scripts that use it stop working at once.'), {ok: tr('Revoke'), danger: true})) return;
@@ -95,11 +95,14 @@ async function agTokenModal(a, url) {
     } catch (x) { const er = $('#agt-err', md); er.textContent = x.message; er.hidden = false; } finally { b.disabled = false; }
   });
 }
+// 2.30.0 (#919): the lists a personal token may be limited to (mine and shared with me, the inbox first)
+const tokLists = sel => S.lists.filter(l => !l.archived || (sel || []).includes(l.id)).map(l => ({id: l.id, name: lname(l)}));
 function tokModal(done, offer) {
   const md = modal(`<h3>${tr('New API token')}</h3>
     <div class="row"><label for="tk-name">${tr('Name')}</label><input id="tk-name" maxlength="60" placeholder="${tr('e.g. Home Assistant')}"></div>
     ${scopesHtml(offer || [], ['read'])}
     ${ipsRow('', 'tk-ips')}
+    <div class="row"><label>${tr('Lists')}</label>${listCapHtml([], tokLists([]), 'tk-lcap')}</div>
     <div class="foot stfoot"><div class="calerr" role="alert" id="tk-err" hidden></div>
       <span class="sfexp"><label for="tk-exp">${tr('Expires')}</label><select id="tk-exp"><option value="30">${tr('in 30 days')}</option><option value="90" selected>${tr('in 90 days')}</option><option value="365">${tr('in a year')}</option><option value="">${tr('never')}</option></select></span>
       <button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Create')}</button></div>`);
@@ -111,7 +114,7 @@ function tokModal(done, offer) {
     const scopes = scopesVal(md);
     b.disabled = true;
     try {
-      const j = await calReq('POST', '/api/me/tokens', {name, scopes, allowed_ips: $('#tk-ips', md).value.trim(), expires_days: $('#tk-exp', md).value ? +$('#tk-exp', md).value : null});
+      const j = await calReq('POST', '/api/me/tokens', {name, scopes, allowed_ips: $('#tk-ips', md).value.trim(), list_ids: listCapVal(md, 'tk-lcap'), expires_days: $('#tk-exp', md).value ? +$('#tk-exp', md).value : null});
       md.remove(); done && done();
       secretModal(tr('Your new API token'), j.token, tr('Copy it now: it is shown only this once. Anyone with this token can act as you within its access rights. Example:') + ` <code class="topic">curl -H "Authorization: Bearer ${esc(j.prefix)}…" ${esc(location.origin)}/api/v1/me</code>`);
     } catch (x) { err.textContent = x.message; err.hidden = false; } finally { b.disabled = false; }

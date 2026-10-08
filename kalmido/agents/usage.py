@@ -755,6 +755,10 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                             "asks": {"type": "boolean", "description": "2.13.0: an agent message that asks something (a question mark outside code and links); only there a 👍 / 👎 of the person is an approval / rejection"},
                                             "choices": nul("object", description="2.28.0 (#1005): answer buttons of an agent message: {choices: [{id, label, style?: primary | danger}], multi}"),
                                             "choice": nul("object", description="2.28.0 (#1005): the person's answer {ids, at, user_id}; null while open. The agent gets the event chat_choice"),
+                                            "choice_state": nul("string", enum=["open", "answered", "expired", "withdrawn", None],
+                                                                description="2.30.0 (#1037): open = the buttons can be pressed; expired = a newer message came (a permission "
+                                                                            "question: its expires_at passed); withdrawn = the agent took them back. choices.permission: a "
+                                                                            "permission question (#1041), choices.expires_at, choices.outcome"),
                                             "attachments": {"type": "array", "description": "2.13.1 (#465): images / files of the message; download with GET /chat-attachments/{id}",
                                                             "items": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"},
                                                                                                        "mime": {"type": "string"}, "size": {"type": "integer"},
@@ -806,7 +810,10 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
     schemas["List"]["properties"]["agent_tidy"] = {"type": "string", "enum": list(TIDY_MODES)}
     schemas["List"]["properties"]["tidy_agent_id"] = nul("integer", description="The one agent that tidies up the list (2.4.1)")
     schemas["List"]["properties"]["listen_agent_ids"] = {"type": "array", "items": {"type": "integer"}, "description":
-                                                         "2.13.1 (#471): agents that read every comment of a person in this list (default: the tidy agent while tidying is on)"}
+                                                         "2.13.1 (#471) / 2.30.0 (#1034): agents that listen in: every comment of a person and every task "
+                                                         "created in / moved into this list (task_added, tasks_added). Default: every agent in software lists, none elsewhere"}
+    schemas["List"]["properties"]["listen_default"] = {"type": "boolean", "description": "2.30.0 (#1034): agents listen in here by default "
+                                                       "(project type software); the owner can switch it per list"}
     schemas["List"]["properties"]["icon"] = {"type": "string", "description": "URL of the list's own icon (2.0.2), empty = none"}
     schemas["List"]["properties"]["project_type"] = nul("string", enum=[*PTYPES, None],
                                                         description="2.18.0 (#408): agency | software | private; null = none (a plain list or project)")
@@ -878,7 +885,11 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                                  "choices": {"type": "array", "maxItems": 8, "description": "2.28.0 (#1005): answer buttons; the person's answer comes as the event chat_choice (message_id, choice_ids, labels)",
                                                              "items": {"type": "object", "required": ["id", "label"], "properties": {"id": {"type": "string", "maxLength": 40}, "label": {"type": "string", "maxLength": 80},
                                                                                                                                     "style": {"type": "string", "enum": ["default", "primary", "danger"]}}}},
-                                                 "multi": {"type": "boolean", "description": "several buttons may be chosen"}}}},
+                                                 "multi": {"type": "boolean", "description": "several buttons may be chosen"},
+                                                 "permission": {"type": "boolean", "description": "2.30.0 (#1041): a permission question: buttons Allow / Deny "
+                                                                "(ids allow / deny, added when missing); the answer comes as chat_choice (approval) and as reaction (via button)"},
+                                                 "expires_in": {"type": "integer", "minimum": 10, "maximum": 604800, "description": "2.30.0 (#1041): seconds a permission "
+                                                                "question stays open; then it shows as not answered (denied)"}}}},
                                              "multipart/form-data": {"schema": {"type": "object", "properties": {
                                                  "body": {"type": "string"}, "task_id": {"type": "integer"},
                                                  "file": {"type": "array", "items": {"type": "string", "format": "binary"}}}}}}}}},
@@ -898,9 +909,14 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
         "/agent/chats/{id}/messages/{mid}/reactions": {"post": op("React to a message of the chat with a person (2.7.2; never an approval)", AG,
                                                                   ok(chat_rx_out) | errs("400", "403", "404"), [pid("id", "User id"), pid("mid", "Message id")],
                                                                   scope=W, body=chat_rx_in)},
+        "/agent/chats/{id}/messages/{mid}/withdraw": {"post": op("2.30.0 (#1037): withdraw the open answer buttons of one of your chat messages (they disappear, "
+                                                                 "a press answers 409). outcome (permission questions only): allowed | denied | expired -- the host "
+                                                                 "decided another way (an answer in words, its time limit)", AG, ok(ref("ChatMessage")) | errs("400", "403", "404", "409"),
+                                                                 [pid("id", "User id"), pid("mid", "Message id")], scope=W,
+                                                                 body={"type": "object", "properties": {"outcome": {"type": "string", "enum": ["allowed", "denied", "expired"]}}})},
         "/agents": {"get": op("Agents you share lists with (an agent: itself)", AG, ok(ref("AgentPage")) | errs())},
         "/agents/{id}/chat/{mid}/choice": {"post": op("2.28.0 (#1005): answer an agent's question with one of its buttons ({choice_ids}); once per message; "
-                                                      "the agent gets the event chat_choice", AG, ok(ref("ChatMessage")) | errs("400", "403", "404", "409"),
+                                                      "the agent gets the event chat_choice. 2.30.0 (#1037): 409 when the buttons are no longer current", AG, ok(ref("ChatMessage")) | errs("400", "403", "404", "409"),
                                                       [pid("id", "Agent id"), pid("mid", "Message id")], scope=W,
                                                       body={"type": "object", "required": ["choice_ids"], "properties": {"choice_ids": {"type": "array", "items": {"type": "string"}}}})},
         "/agents/{id}/chat/{mid}/reactions": {"post": op("React to a message of your chat with an agent (2.7.2): 👍 / 👎 on an agent's message "

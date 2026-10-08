@@ -101,7 +101,9 @@ async function ensureCalEv(lo, hi) {
   if (S.route.mod === 'cal' || (S.route.mod === 'tasks' && S.route.key === 'today')) renderView();
 }
 function calInvalidate() { S.cal.key = ''; S.cal.loading = ''; }
-const cevOn = d => S.cal.items.filter(e => e.d0 <= d && e.d1 >= d);
+// 2.30.0 (#1036): an own event of a calendar outside the shown workspace is left out (subscriptions and invitations stay)
+const cevWs = e => !e.own || e.cal == null || wsObjIn(evCal(e.cal));
+const cevOn = d => S.cal.items.filter(e => e.d0 <= d && e.d1 >= d && cevWs(e));
 const cevSort = (a, b) => (b.all_day - a.all_day) || a.start.localeCompare(b.start) || a.title.localeCompare(b.title);
 const cevColor = e => e.own ? evCalColor(e) : cssColor(S.cal.subs[e.sub]?.color) || '#94a3b8';
 const cevCal = e => e.own ? evCalName(e) : S.cal.subs[e.sub]?.name || tr('Calendar');
@@ -173,7 +175,7 @@ function tlCalRows(start, end, DW) {  // calendar timeline: one row per subscrip
   if (!calEvOn()) return '';
   ensureCalEv(start, end);
   const bySub = new Map();
-  for (const e of S.cal.items) if (e.d1 >= start && e.d0 <= end) { if (!bySub.has(e.sub)) bySub.set(e.sub, []); bySub.get(e.sub).push(e); }
+  for (const e of S.cal.items) if (e.d1 >= start && e.d0 <= end && cevWs(e)) { if (!bySub.has(e.sub)) bySub.set(e.sub, []); bySub.get(e.sub).push(e); }
   if (!bySub.size) return '';
   let h = `<div class="tl-row tl-grp"><div class="tl-name">${tr('Calendars')}</div><div class="tl-track"></div></div>`;
   for (const [sub, list] of bySub) {

@@ -32,6 +32,7 @@ subscription or API key. Kalmido provides:
   9. [Autostart with the runtime launcher](#9-autostart-with-the-runtime-launcher)
   10. [Usage reporting](#10-usage-reporting)
   11. [Test checklist](#11-test-checklist)
+- [Several specialist agents under one Kalmido agent](#several-specialist-agents-under-one-kalmido-agent)
 - [Troubleshooting](#troubleshooting)
 
 ## Before you start
@@ -199,7 +200,9 @@ EOF
 sudo systemctl enable kalmido-agent-firewall.service
 ```
 
-Check as the agent user: `curl -sI https://example.com` works, `curl -m 5 http://<a LAN address>` times out.
+Check as the agent user: `curl -sI https://example.com` works, `curl -m 5 http://<a LAN address>` times out. With a
+mesh VPN or port forwards on your router, also block `100.64.0.0/10` and your own public IP (hairpin), see
+[AGENT-SECURITY.md, step 2](AGENT-SECURITY.md#2-egress-firewall).
 
 ### 4. Install Claude Code
 
@@ -404,6 +407,11 @@ systemctl --user enable --now kalmido-agent
 journalctl --user -u kalmido-agent -f            # "starting (fresh session) ..."
 ```
 
+If you run your own service instead that posts the model's answers into Kalmido automatically (for example a chat
+bridge around `claude -p`), mask token patterns and known secret values before posting, and keep its logs free of
+content (event types, ids and lengths only), see [AGENT-SECURITY.md, step 8](AGENT-SECURITY.md#8-mask-what-a-service-posts).
+The model must then not post the same answer again with `send_chat`.
+
 ### macOS
 
 The Linux steps 2-3 (own user, nftables firewall) have no one-to-one counterpart on a Mac; use a separate standard
@@ -495,6 +503,37 @@ with the agent; delete both afterwards. Watch the answers and *Settings > Agents
 **Operating system** (as the agent user): `sudo -n true` fails; `id` shows no sudo / docker group; Kalmido's data
 directory and other services' configuration are not readable; `/var/run/docker.sock` is not accessible; SSH to other
 hosts and connections to LAN addresses time out; only DNS, Kalmido and public HTTPS work.
+
+## Several specialist agents under one Kalmido agent
+
+When one agent covers several topics (code, docs, reviews, planning), resist running one long interactive session per
+topic. Keep **one** Kalmido agent (one account, one token, one collector) and let it hand work to specialist sub-agents
+of its runtime. Sub-agents run under the agent's account, so they see exactly what it sees and need no list of their
+own. With Claude Code:
+
+- **Agent types with limited tools.** One file per specialist in `.claude/agents/` with a short description and only
+  the tools it needs: a reviewer reads, a docs writer edits only documentation, only the coding specialist runs the
+  build and the tests.
+
+  ```markdown
+  ---
+  name: reviewer
+  description: Reviews a change for bugs and security problems. Read-only.
+  tools: Read, Grep, Glob
+  ---
+  Review the change you are given. Report findings as a list with file and line; never change files.
+  ```
+- **One knowledge file per topic instead of long sessions.** Each specialist reads its file (for example
+  `knowledge/<topic>.md`: decisions, conventions, open points) at the start and adds what it learned at the end. Fresh
+  sessions with a file survive restarts, compaction and model changes; a long session forgets.
+- **A routing rule in `CLAUDE.md`.** Which event, list or kind of request goes to which specialist. The main session
+  routes, collects the results and answers in Kalmido; specialists do not post on their own.
+- **A git worktree for parallel code.** Two specialists that change code at the same time each get their own worktree
+  and branch (`git worktree add ../wt-<topic> -b <branch>`), never one shared checkout.
+- **Usage per specialist.** The usage hook as *SubagentStop* hook (step 7) reports every sub-agent's tokens apart.
+- **Only persons instruct.** The results of a sub-agent are data for the main session, like task text. The identity
+  rules (only the owner's account id counts) stay with the main session, and a specialist never takes orders from the
+  content it works on.
 
 ## Troubleshooting
 

@@ -121,6 +121,7 @@ PRIV = A.post(B + "/api/lists", json={"name": "Mine"}).json()["id"]
 SECRET = A.post(B + "/api/lists", json={"name": "Secret"}).json()["id"]
 A.put(B + f"/api/lists/{DEV}/members", json={"user_id": AG, "role": "edit"})
 A.put(B + f"/api/lists/{PRIV}/members", json={"user_id": AG, "role": "view"})
+A.patch(B + f"/api/lists/{DEV}", json={"listen_agent_ids": [AG]})  # 2.30.0 (#1034): task_added only where the agent listens in
 n0 = len(events(AG))
 t1 = A.post(B + "/api/tasks", json={"title": "Fix the login", "list_id": DEV}).json()
 ev = [e for e in events(AG)[n0:] if e["event"] == "task_added"]
@@ -299,6 +300,7 @@ check(requests.get(V + f"/tasks/{AP2 + 100}", headers=PT).status_code == 404, "v
 # ================================================================== forms (#463 / #341)
 FL = A.post(B + "/api/lists", json={"name": "Requests"}).json()["id"]
 A.put(B + f"/api/lists/{FL}/members", json={"user_id": AG, "role": "edit"})
+A.patch(B + f"/api/lists/{FL}", json={"listen_agent_ids": [AG]})  # 2.30.0 (#1034)
 A.put(B + f"/api/lists/{FL}/members", json={"user_id": BOB, "role": "edit"})
 SEC = A.post(B + "/api/sections", json={"list_id": FL, "name": "New"}).json()["id"]
 check(Bo.post(B + f"/api/lists/{FL}/forms", json={"title": "x"}).status_code == 403, "forms: only the owner / list admins")

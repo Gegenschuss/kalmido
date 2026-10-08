@@ -529,8 +529,13 @@ def list_file_upload(lid):
         aa_count("storage", "attachments", aa_oserr(e))
         raise
     ts, saved = iso(now_utc()), []
+    from ..tasks.attachments import unexec_name, uploader_is_agent
+    agent = uploader_is_agent(c, me())  # 2.30.0 (#380): an agent's project file never keeps an executable ending either
     for f in files:
         name = safe_name(f.filename)
+        unexec = agent and unexec_name(name) != name
+        if unexec:
+            name = unexec_name(name)
         rel = os.path.join(LIST_FILES_SUB, str(lid), f"{uuid.uuid4().hex[:12]}-{name}")
         full = os.path.join(ATT_DIR, rel)
         try:
@@ -550,7 +555,7 @@ def list_file_upload(lid):
             c.rollback()
             unlink_files(saved)
             return err(tr("{0}: the file is empty and was not uploaded", name))
-        mime = (f.mimetype if f.mimetype and f.mimetype != "application/octet-stream" else None) \
+        mime = "text/plain" if unexec else (f.mimetype if f.mimetype and f.mimetype != "application/octet-stream" else None) \
             or mimetypes.guess_type(name)[0] or "application/octet-stream"
         c.execute("INSERT INTO list_files(list_id,name,mime,size,path,user_id,created_at) VALUES(?,?,?,?,?,?,?)",
                   (lid, name, mime, size, rel, me(), ts))

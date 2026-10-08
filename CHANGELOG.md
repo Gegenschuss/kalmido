@@ -7,6 +7,107 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.30.0] - 2026-10-08
+
+**In short:** Clear boundaries, calmer agents. **Calendars and address books belong to a workspace** like lists, and a
+**nightly boundary check** counts anything that crosses one; a new guard test fails for every route that is neither in
+the cross-tenant matrix nor listed with a reason (#1036). An agent **never bridges lists with different people** unasked,
+agents and tokens can be **limited to chosen lists**, and every list shows its **agent access log**; *Settings > Agents >
+Use safely* has ten rules (#919, #920). In the agent chat, **permission questions get Allow / Deny buttons**, answer
+buttons of older messages **expire**, and "working" shows only where the agent really writes (#1041, #1037, #1039).
+Agents **listen in by project type**: in software lists without an @mention, elsewhere only when addressed; tidy-up is a
+separate switch (#1034). **Markdown, text and code files open in a viewer**, and agents can write text files onto tasks
+(#1035, #380). Plus phone fixes from the device test and many additions to the self-hosting and agent docs (#933).
+
+### Added
+- **Workspaces for calendars and address books** (#1036): `ev_cals.org_id` / `books.org_id` (NULL = private) with the
+  rules of lists -- an organisation's calendar or address book only for its members and agents, a private one never for
+  an organisation's agent, a share only with people you may see (B2). *New calendar…* / *New address book…* ask for the
+  workspace, *Workspace…* in their menu moves one (owner only, `409` while a member does not fit), web + API v1
+  (`org_id` on create / PATCH) + MCP. The sidebar switch filters events, calendars, contacts and address books. Leaving
+  or deleting an organisation takes its calendars and address books along like its lists. One-time migration on start:
+  into the owner's organisation unless named like a private one, mirrored from an outside account, or a member does not
+  fit (then private; no share is removed).
+- **Nightly boundary check** (#1036): once a day (`KALMIDO_TENANT_CHECK_HOUR`, default 3) the watchdog counts memberships
+  across the workspace boundary (list members and groups, owners, calendar and address book members, agents); an admin
+  alert (ids and counts only) when the result changes, `boundary` in `GET /api/admin/orgs` and a line under
+  *Administration > Organisations*.
+- **Guards for the boundary** (#1036): `tests/tenant_coverage_test.py` fails for any route of the web app, CalDAV /
+  CardDAV or `/api/v1` that is neither covered by the cross-tenant matrix nor listed with the reason the boundary does
+  not apply; `tools/check_layout.py` requires `org_id` or `list_id` (or a stated reason) on every table that refers to a
+  person. New matrix suite for calendars, events, address books, contacts, groups, templates, DAV, feeds, webhooks,
+  export, attachments, chat files, forms, statistics.
+- **Agent bridges** (#919): sharing a list with an agent (or adding a person to a list with an agent) that would connect
+  two lists with different people (neither the same nor nested) is refused with `409 agent_bridge` and the conflicting
+  lists; *Connect anyway* (`bridge_ok: true`, only for someone who manages all lists involved or the owner of the
+  personal agent) records it. Automatic ways (share all, new lists automatically, shared folders, folder settings,
+  proposals, group sync, sharing by e-mail address) skip such lists without a word; existing bridges stay and are flagged
+  (`GET /api/agents/<id>/bridges`). `PUT /api/v1/lists/{id}/members/{user_id}` takes `bridge_ok` for people's tokens.
+- **Approval for moves into a wider circle** (#919): an agent moving a task into a list whose people are not a subset of
+  the source list's waits for a person (`202`, PATCH `list_id`, `/move`, batch).
+- **Only these lists** (#919): agents and API tokens can be limited to chosen lists (`list_ids`; token dialog, agent
+  dialog, `PATCH /api/admin/agents/{id}`, `/api/my/agents/{id}`, `/api/me/tokens`); other lists answer 404 and send no
+  events, News only from those lists, and the full export is refused. Widening the limit so that it would switch on an
+  unapproved bridge asks first. `GET /api/v1/me` shows `token.list_ids`.
+- **Agent access log** (#919): *Agent access* in a list's menu shows per agent how often it read or changed the list per
+  day, last 30 days, for every member (`GET /api/lists/<id>/agent-access`).
+- **Use agents safely** (#920): *Settings > Agents > Use safely* (ten rules + a part for admins), a short step in every
+  setup guide, a hint before the first share with an agent.
+- **Allow / Deny** (#1041): a permission question in the agent chat (`permission: true`, optional `expires_in`; buttons
+  with the ids `allow` / `deny` count as one) shows two buttons, then *Allowed 14:47* / *Denied 14:47* or *Not answered,
+  denied* after the time limit. A button sends `chat_choice` (`permission`, `approval`, `via`) and the familiar
+  `reaction` event; 👍 / 👎 still answer an open question (a `reaction` on a closed one carries `approval: null` and
+  `stale: true`).
+- **Withdraw answer buttons** (#1037): `POST /api/v1/agent/chats/{uid}/messages/{mid}/withdraw` (optional `outcome`),
+  MCP `withdraw_chat_choices`.
+- **Agent listens in** (#1034): a switch per list and per folder (`agent_listen`); default on in *Software / AI
+  development* lists, off elsewhere. `listen_default` in state and v1, `project_type` and `listen_agent_ids` in every
+  task event.
+- **File viewer** (#1035): Markdown files attached to tasks, comments or chat messages open formatted (switch to the
+  source), text and code files as highlighted source, with *Copy* and *Download*; full screen on phones, dark mode,
+  nothing in a file is ever run (files above 1 MB download). Markdown now also renders tables, quotes, rules and
+  headings down to level 6.
+- **Text files from agents** (#380): `POST /api/v1/tasks/{id}/attachments/text` (`name`, `content`, max 1 MB, scope
+  `attachments:write`), MCP `create_text_file`; the same name creates a new version next to the old one
+  (`report (v2).md`). Files an agent stores never keep an executable ending (`deploy.sh` becomes `deploy.sh.txt`, also
+  for uploads to tasks, comments, chats and projects) and show *Created by agent*.
+- **Docs** (#933): new [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md) (proxy, VPN-only, PWA and push, backups and
+  encryption, server hardening, mail, moving, production updates); AGENT-SECURITY.md: server-enforced boundaries, *Use
+  agents safely*, egress and redaction steps, new test cases; AGENT-SETUP.md: several specialist agents under one
+  Kalmido agent; API.md: bulk changes with pause and `Retry-After`, closing tasks from git, lists, people and agents;
+  many new rules in the CLAUDE.md template (binding decisions, privacy, coding agents, jobs, usage limit, denied
+  permissions, one suggestion per answer, status only with the task you write in).
+
+### Changed
+- **Answer buttons expire** (#1037): only the newest message keeps open buttons; a newer message (from the agent or the
+  person) hides older open ones, pressed ones stay as *Answered*; a click on an expired button gets `409` "This
+  suggestion is no longer current". Permission questions do not expire by newer messages.
+- **"Working" only where the agent writes** (#1039): a status without `task_id` shows only under the last chat message
+  and in the header chip, never in tasks; with `task_id` only in that task; the status text never appears in a task.
+- **`task_added` / `tasks_added` only for listening agents** (#1034), for created and moved-in tasks; tidy-up no longer
+  makes an agent listen and now also covers tasks moved into the list (at most five per bulk). Existing lists keep who
+  listened before (one-time migration).
+- The "👍 = approval" hint under chat questions is gone (#1041, #1044).
+- Groups are only shown to people who may see one of their members across organisations (B1, #1036); a form of an
+  organisation's list is only for that organisation's members; people newly invited to an existing event must be
+  visible; folder sharing no longer brings someone else's personal agent into a member's list.
+- **Sharing with agents may ask first** (#919): scripts that add a person or an agent to a list with
+  `PUT /api/lists/<id>/members` now get `409 agent_bridge` when that would connect lists with different people (repeat
+  with `bridge_ok: true`); only someone who manages all lists involved, or the owner of a personal agent, may confirm (a
+  list admin who is neither gets `403`). Folder sharing and *share all* leave such lists out. Existing bridges stay.
+- The test suites run as 8 parallel shards.
+
+### Fixed
+- Phones: after a dialog opened from the sidebar drawer (*Folder settings…*, *People and roles…*, *Edit list…*) the
+  drawer is dimmed again and a tap next to it closes only the drawer instead of opening the task behind it (#1043).
+- Share folder on phones: names and *new lists too* wrap instead of being cut, people who already have the folder are no
+  longer offered again (#1044).
+- The agent chat keeps its side margin when the iOS keyboard opens; one-time hints no longer have stretched line
+  spacing (#1044).
+- The copy button of code blocks sits in its own column with a subtle background and never covers the code (#1042).
+- The quick-add sheet no longer shows the paper-clip / square explanation under the field (#1033).
+- In the workspaces mode instance admins see a profile photo only where everyone would (#1036).
+
 ## [2.29.0] - 2026-10-08
 
 **In short:** Folders like lists, calm agents. A folder now carries **settings for every list in it** -- workspace,
@@ -3108,7 +3209,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.29.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.30.0...HEAD
+[2.30.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.30.0
 [2.29.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.29.0
 [2.28.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.28.0
 [2.27.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.27.0

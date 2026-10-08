@@ -13,7 +13,7 @@ cd "$HERE"
 export KALMIDO_TEST_IMAGE=${KALMIDO_TEST_IMAGE:-kalmido:test}
 export KALMIDO_TEST_DATA=${KALMIDO_TEST_DATA:-$HERE/.data}
 PY=${PYTHON:-python3}
-SHARDS_DEFINED=7
+SHARDS_DEFINED=8
 SHARD=0; CUR=1
 if [[ "${1:-}" == "--shard" ]]; then
   [[ "${2:-}" =~ ^([0-9]+)/([0-9]+)$ ]] || { echo "usage: run_all.sh [--shard N/$SHARDS_DEFINED]"; exit 2; }
@@ -422,6 +422,22 @@ shard 7  # ---------------------------------------------------------------- shar
 # the code block in a chat bubble (#1028) in Firefox
        run p2290_api "$PY" p2290_api_test.py "$KALMIDO_TEST_DATA"
        run p2290_ui node p2290_ui.js "$KALMIDO_TEST_DATA"
+shard 8  # ---------------------------------------------------------------- shard 8 of 8 (2.30.0: the 2.30 suites)
+# 2.30.0 "Clear boundaries, calmer agents": the tenant guard (every route in the cross-tenant matrix or listed with a
+# reason, static), the cross-tenant matrix for calendars, address books, groups, forms and the rest (#1036, the suite
+# restarts its container in the modes it needs), agent chat (#1037 expiring answer buttons, #1041 Allow / Deny, #1039
+# status only where the agent writes, #1034 listening by project type), the file viewer and agents' text files
+# (#1035 / #380), agent hardening (#919 bridges, list limits, access log, #920 Use safely) and the phone fixes
+# (#1033 #1042 #1043 #1044)
+       run tenant_coverage "$PY" tenant_coverage_test.py
+fresh; run p2300_tenant "$PY" p2300_tenant_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2300_chat_api "$PY" p2300_chat_api_test.py "$KALMIDO_TEST_DATA"
+       run p2300_chat_ui node p2300_chat_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2300_files_api "$PY" p2300_files_api_test.py "$KALMIDO_TEST_DATA"
+       run p2300_files_ui node p2300_files_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2300_agentsafe_api "$PY" p2300_agentsafe_api_test.py "$KALMIDO_TEST_DATA"
+       run p2300_agentsafe_ui node p2300_agentsafe_ui.js "$KALMIDO_TEST_DATA"
+       run p2300_ui_fixes node p2300_ui_fixes.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

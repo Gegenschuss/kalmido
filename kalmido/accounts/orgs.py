@@ -60,6 +60,9 @@ PRIVATE_FOLDER_RE = re.compile(r"^(privat|private|pers[öo]nlich|personal|famili
 WS_MSG_PERSON = N_("{0} is not a member of the organisation {1}: share this list privately instead, or let an organisation admin add the person")
 WS_MSG_AGENT = N_("{0} works in another workspace ({1}): an agent joins only lists of its own workspace")
 WS_MSG_OWNER = N_("You are not a member of this organisation")
+# 2.30.0 (#1036): calendars and address books follow the same rule
+WS_MSG_PERSON_OBJ = N_("{0} is not a member of the organisation {1}: only its members can be in its calendars and address books")
+WS_MSG_AGENT_OBJ = N_("{0} works in another workspace ({1}): an agent joins only calendars and address books of its own workspace")
 WS_MSG_PRIVATE_ONLY = N_("Family, household and Home & life lists are private: they cannot belong to an organisation")
 
 
@@ -251,7 +254,17 @@ def ws_member_problem(c, lid, uid, org_id=None):
     own workspace (agents.org_id == lists.org_id)."""
     if not has_workspaces(c):
         return None
-    oid = list_org(c, lid) if org_id is None else (org_id or None)
+    return ws_fit_problem(c, list_org(c, lid) if org_id is None else (org_id or None), uid)
+
+
+def ws_fit_problem(c, oid, uid, kind="list"):
+    """2.30.0 (#1036): THE workspace rule for every shared object (lists, calendars, address books): the reason (translated)
+    why uid cannot be in an object of workspace oid (None = private), or None. A person: an organisation's object only for
+    its members. An agent: only objects of its own workspace (agents.org_id == the object's org_id; so a private object
+    never reaches an organisation's agent). kind: list | cal | book (the wording of the answer)."""
+    if not has_workspaces(c):
+        return None
+    oid = oid or None
     u = c.execute("SELECT kind, display_name, username FROM users WHERE id=?", (uid,)).fetchone()
     if not u:
         return None
@@ -259,10 +272,10 @@ def ws_member_problem(c, lid, uid, org_id=None):
     if (u["kind"] or "user") == "agent":
         a_oid = agent_org(c, uid)
         if (a_oid or None) != (oid or None):
-            return tr(WS_MSG_AGENT, name, _org_name(c, a_oid))
+            return tr(WS_MSG_AGENT if kind == "list" else WS_MSG_AGENT_OBJ, name, _org_name(c, a_oid))
         return None
     if oid and oid not in user_orgs(c, uid):
-        return tr(WS_MSG_PERSON, name, _org_name(c, oid))
+        return tr(WS_MSG_PERSON if kind == "list" else WS_MSG_PERSON_OBJ, name, _org_name(c, oid))
     return None
 
 
@@ -271,6 +284,38 @@ def ws_check_member(c, lid, uid, org_id=None):
     p = ws_member_problem(c, lid, uid, org_id)
     if p:
         raise Denied(409, p)
+
+
+def ws_obj_default(c, uid):
+    """2.30.0 (#1036): the workspace of a new calendar / address book when the client names none: an agent's own workspace,
+    else the person's first organisation (as for a new list), else private."""
+    if not has_workspaces(c):
+        return None
+    u = c.execute("SELECT kind FROM users WHERE id=?", (uid,)).fetchone()
+    if u and (u["kind"] or "user") == "agent":
+        return agent_org(c, uid)
+    mine = user_orgs(c, uid)
+    return mine[0] if mine else None
+
+
+def obj_org_set(c, table, oid_col, members, obj_id, v, kind):
+    """2.30.0 (#1036): the owner moves calendar / address book obj_id (table ev_cals | books, its member table + key column)
+    into workspace v (clean_org_id). Refused (409) while a member (person or agent) does not fit the new workspace (named).
+    Returns True when it changed. The caller commits."""
+    r = c.execute(f"SELECT owner_id, org_id FROM {table} WHERE id=?", (obj_id,)).fetchone()
+    if not r or r["owner_id"] != me():
+        raise Denied(403, tr("Only the owner can change the workspace"))
+    if (None if v in (None, "", 0, "0", "private") else v) == r["org_id"]:
+        return False
+    oid = clean_org_id(c, v, me())
+    if (oid or None) == (r["org_id"] or None):
+        return False
+    for (uid,) in c.execute(f"SELECT user_id FROM {members} WHERE {oid_col}=? ORDER BY user_id", (obj_id,)).fetchall():
+        p = ws_fit_problem(c, oid, uid, kind)
+        if p:
+            raise Denied(409, p)
+    c.execute(f"UPDATE {table} SET org_id=? WHERE id=?", (oid, obj_id))
+    return True
 
 
 def clean_org_id(c, v, uid):
@@ -449,8 +494,10 @@ def orgs_get():
     m = instance_mode(c)
     rows = [] if m == "shared" else c.execute("SELECT * FROM orgs" + (" WHERE id=?" if m == "organisation" else "") + " ORDER BY name COLLATE NOCASE, id",
                                               (main_org(c),) if m == "organisation" else ()).fetchall()
+    from ..accounts.tenancy import boundary_summary
     return jsonify(orgs=[org_public(c, r) for r in rows], visibility=vis_mode(c), mode=m, editable=m in ("multi", "workspaces"),
-                   creatable=m == "workspaces", name_env=bool(ORG_NAME_ENV))
+                   creatable=m == "workspaces", name_env=bool(ORG_NAME_ENV),
+                   boundary=boundary_summary(c))  # 2.30.0 (#1036): memberships across the workspace boundary (0 = clean)
 
 
 def _no_change():
@@ -529,6 +576,8 @@ def org_delete(oid):
     if n:
         return err(tr("This organisation still has {0} lists: their owners move or delete them first", n), 409)
     c.execute("UPDATE agents SET org_id=NULL WHERE org_id=?", (oid,))
+    c.execute("UPDATE ev_cals SET org_id=NULL WHERE org_id=?", (oid,))  # 2.30.0 (#1036): they stay with their owners, private
+    c.execute("UPDATE books SET org_id=NULL WHERE org_id=?", (oid,))
     c.execute("DELETE FROM orgs WHERE id=?", (oid,))
     bump(c)
     c.commit()
@@ -662,6 +711,16 @@ def org_leave(c, oid, uid, heir):
     for (lid,) in c.execute("SELECT m.list_id FROM list_members m JOIN lists l ON l.id=m.list_id WHERE m.user_id=? AND l.org_id=?", (uid, oid)).fetchall():
         c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, uid))
         c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, uid))
+    # 2.30.0 (#1036): the organisation's calendars and address books follow the same way: the leaver's go to heir (else
+    # they become private), the leaver leaves the ones of others
+    for table, mt, key in (("ev_cals", "ev_cal_members", "cal_id"), ("books", "book_members", "book_id")):
+        for (xid,) in c.execute(f"SELECT id FROM {table} WHERE owner_id=? AND org_id=?", (uid, oid)).fetchall():
+            if heir and heir != uid:
+                c.execute(f"DELETE FROM {mt} WHERE {key}=? AND user_id=?", (xid, heir))
+                c.execute(f"UPDATE {table} SET owner_id=? WHERE id=?", (heir, xid))
+            else:
+                c.execute(f"UPDATE {table} SET org_id=NULL WHERE id=?", (xid,))
+        c.execute(f"DELETE FROM {mt} WHERE user_id=? AND {key} IN (SELECT id FROM {table} WHERE org_id=?)", (uid, oid))
     c.execute("UPDATE agents SET org_id=NULL WHERE owner_id=? AND org_id=?", (uid, oid))
     c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, uid))
     return n

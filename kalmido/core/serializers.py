@@ -57,9 +57,14 @@ def load_tasks(c, where, args=()):
     tags = tags_for(c, ids)
     ltags = ltags_for(c, ids) if ids else {}
     atts = {}  # the task's own files; files of comments are shown inside their comment (timeline)
-    for a in c.execute("SELECT id, task_id, name, mime, size, created_at FROM attachments WHERE comment_id IS NULL ORDER BY id"):
+    # 2.30.0 (#380): agent = the name of the agent that stored the file ("Created by agent" in the app), else absent
+    for a in c.execute("""SELECT a.id, a.task_id, a.name, a.mime, a.size, a.created_at, u.kind, u.display_name, u.username
+                          FROM attachments a LEFT JOIN users u ON u.id=a.user_id WHERE a.comment_id IS NULL ORDER BY a.id"""):
         if a["task_id"] in ids:
-            atts.setdefault(a["task_id"], []).append({k: a[k] for k in ("id", "name", "mime", "size", "created_at")})
+            d = {k: a[k] for k in ("id", "name", "mime", "size", "created_at")}
+            if a["kind"] == "agent":
+                d["agent"] = a["display_name"] or a["username"]
+            atts.setdefault(a["task_id"], []).append(d)
     pls = {}
     pl_ok = pl_usable_ids(c, viewer) if ids else set()  # 2.1.0: per connection (0 = the legacy one)
     for p in c.execute("SELECT id, task_id, doc_id, title, correspondent, created, status, message, att_id, conn_id "

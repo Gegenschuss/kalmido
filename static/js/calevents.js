@@ -10,7 +10,7 @@
 const evOn = () => feat('events');
 const evCal = id => (S.evcals || []).find(c => c.id === id);
 const evWrite = c => !!c && (c.role === 'owner' || c.role === 'edit');
-const evWritable = () => (S.evcals || []).filter(c => evWrite(c) && !c.hidden);
+const evWritable = () => (S.evcals || []).filter(c => evWrite(c) && !c.hidden && wsObjIn(c));  // 2.30.0 (#1036): of the shown workspace
 const EV_PS = [['accepted', N_('Accept'), 'check'], ['tentative', N_('Maybe'), 'help'], ['declined', N_('Decline'), 'x']];
 const EV_PS_WORD = {accepted: N_('Accepted'), tentative: N_('Maybe'), declined: N_('Declined'), 'needs-action': N_('No answer yet')};
 // all-day reminders: minutes before the day's midnight (-540 = 9:00 on the day)
@@ -120,7 +120,7 @@ function evRepKey(rule, start) {
 }
 async function evEditor(o = {}) {
   const ev = o.ev || null, cals = evWritable().concat(ev && !evWritable().some(c => c.id === ev.cal_id) && evCal(ev.cal_id) ? [evCal(ev.cal_id)] : []);
-  if (!cals.length) { try { const c = await api('POST', '/api/evcals', {name: tr('Calendar')}); await load(); cals.push(c); } catch { return; } }
+  if (!cals.length) { try { const c = await api('POST', '/api/evcals', {name: tr('Calendar'), org_id: wsDefaultOrg()}); await load(); cals.push(c); } catch { return; } }
   const t0 = today();
   const st = ev ? {...ev} : {title: o.title || '', all_day: !!o.all_day, start: o.start || `${S.calSel || t0}T09:00`, end: o.end || '', location: '',
     description: o.description || '', rrule: '', reminders: o.all_day ? [-540] : [15], attendees: [], cal_id: o.cal_id || +LS.get('evCal', 0) || cals[0].id,
@@ -340,7 +340,7 @@ async function evCalsModal() {
     const cs = S.evcals || [];
     $('#evc-body', md).innerHTML = cs.length ? `<ul class="evclist">${cs.map(c => `<li class="evcrow" style="--cc:${cssColor(c.color) || 'var(--accent)'}">
       <label class="swc" title="${esc(tr('Show in my calendar'))}"><input type="checkbox" data-evcshow="${c.id}" ${c.hidden ? '' : 'checked'}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('Show {0} in my calendar', c.name))}</span></label>
-      <i class="cevdot"></i><span class="evcn">${esc(c.name)}${c.role !== 'owner' ? `<span class="muted"> · ${esc(c.owner_name || '')} · ${esc(c.role === 'edit' ? tr('can edit') : tr('can view'))}</span>` : c.members?.length ? `<span class="muted"> · ${esc(trn('shared with {0} person', 'shared with {0} people', c.members.length))}</span>` : ''}</span>
+      <i class="cevdot"></i><span class="evcn">${esc(c.name)}${wsOn() && c.role === 'owner' ? `<span class="muted wslbl"> · ${esc(wsLabel(c.org_id))}</span>` : ''}${c.role !== 'owner' ? `<span class="muted"> · ${esc(c.owner_name || '')} · ${esc(c.role === 'edit' ? tr('can edit') : tr('can view'))}</span>` : c.members?.length ? `<span class="muted"> · ${esc(trn('shared with {0} person', 'shared with {0} people', c.members.length))}</span>` : ''}</span>
       <button class="iconbtn" data-evcmenu="${c.id}" aria-haspopup="menu" aria-label="${esc(tr('More for {0}', c.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></li>`).join('')}</ul>`
       : `<p class="muted">${tr('No calendar yet. A new event creates one.')}</p>`;
   };
@@ -358,6 +358,7 @@ async function evCalsModal() {
       const own = c.role === 'owner';
       menu(m, [own && {label: tr('Rename…'), icon: 'edit', fn: async () => { const n = await askPrompt(tr('Rename the calendar'), c.name, {input: {max: 100}}); if (n && n.trim()) { try { await api('PATCH', `/api/evcals/${c.id}`, {name: n.trim()}); } catch { return; } refresh(); } }},
         own && {label: tr('Colour…'), icon: 'palette', fn: () => calColorPop(m, LCOLORS.filter(Boolean), c.color, async col => { try { await api('PATCH', `/api/evcals/${c.id}`, {color: col}); } catch { return; } refresh(); })},
+        own && wsOn() && {label: tr('Workspace…'), icon: 'brief', fn: () => wsMoveMenu(m, c.org_id, async org => { try { await api('PATCH', `/api/evcals/${c.id}`, {org_id: org}); } catch { return; } refresh(); })},
         own && collab() && {label: tr('Share…'), icon: 'users', fn: () => evShareModal(c, users, refresh)},
         evWrite(c) && {label: tr('Import a calendar file (ICS)…'), icon: 'upload', fn: () => evImport(c, refresh)},
         {label: tr('Export (ICS)'), icon: 'download', fn: () => { location.href = `/api/evcals/${c.id}/export.ics`; }},
@@ -369,9 +370,9 @@ async function evCalsModal() {
     if (b.dataset.evc === 'close') md.remove();
     if (b.dataset.evc === 'phone') { md.remove(); davGuide(); }
     if (b.dataset.evc === 'new') {
-      const n = await askPrompt(tr('New calendar'), '', {input: {max: 100, placeholder: tr('Name')}, ok: tr('Create')});
-      if (!n || !n.trim()) return;
-      try { await api('POST', '/api/evcals', {name: n.trim()}); } catch { return; }
+      const n = await wsAskNew(tr('New calendar'));  // 2.30.0 (#1036): with its workspace
+      if (!n) return;
+      try { await api('POST', '/api/evcals', n); } catch { return; }
       refresh();
     }
   });

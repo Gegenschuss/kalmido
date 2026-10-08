@@ -96,7 +96,8 @@ const LONG = 'Website relaunch 2026 for the client';
   const mineM = () => d.querySelector('#chat-msgs .cmsg.me');
   check(mineM() && !mineM().querySelector('.rxrow [data-e="up"]:not([disabled])'), '#823: no 👍 on my own message');
   // the question: 👍 counts as approval
-  check(R(q2.id).querySelector('.rxrow .rxhint')?.textContent === '👍 = approval' && /counts as approval/.test(R(q2.id).querySelector('.rxrow [data-e="up"]').getAttribute('aria-label')) && /counts as rejection/.test(R(q2.id).querySelector('.rxrow [data-e="down"]').getAttribute('aria-label')), '2.7.2 kept: the newest question says 👍 = approval, 👍 / 👎 are named as approval / rejection');
+  // 2.30.0 (#1041, intended change): no "👍 = approval" hint any more; the names of 👍 / 👎 stay
+  check(!R(q2.id).querySelector('.rxrow .rxhint') && /counts as approval/.test(R(q2.id).querySelector('.rxrow [data-e="up"]').getAttribute('aria-label')) && /counts as rejection/.test(R(q2.id).querySelector('.rxrow [data-e="down"]').getAttribute('aria-label')), '2.7.2 kept: on the newest question 👍 / 👎 are named as approval / rejection (no hint since 2.30)');
   click(w, R(q2.id).querySelector('.rxrow [data-e="up"]'));
   check(await until(() => /Counted as approval/.test(R(q2.id)?.querySelector('.rxok')?.textContent || '')), 'one tap on 👍: "Counted as approval"');
   check(/Approved/.test(d.querySelector('#toast')?.textContent || ''), 'and the toast "Approved"');

@@ -50,17 +50,18 @@ async function ctOpen(id) {
 function ctDraw() { if (S.route.mod === 'contacts') { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, viewContacts())); } }
 function viewContacts() {
   if (CT.items === null && !CT.loading) setTimeout(ctLoad, 0);
-  const books = S.books || [];
+  const books = (S.books || []).filter(b => wsObjIn(b));  // 2.30.0 (#1036): the address books of the shown workspace
+  const items = CT.items === null ? null : CT.items.filter(c => !ctBook(c.book_id) || wsObjIn(ctBook(c.book_id)));
   const mob = isMobile(), showCard = CT.card && (!mob || CT.sel);
   const bar = `<div class="ctbar"><div class="ctsearch">${ic('search', 's')}<input id="ct-q" type="search" value="${esc(CT.q)}" placeholder="${esc(tr('Search contacts'))}" aria-label="${esc(tr('Search contacts'))}" autocomplete="off" enterkeyhint="search"></div>
     ${CT.groups.length ? `<select id="ct-group" aria-label="${esc(tr('Group'))}"><option value="">${tr('All groups')}</option>${CT.groups.map(g => `<option value="${esc(g)}" ${g === CT.group ? 'selected' : ''}>${esc(g)}</option>`).join('')}</select>` : ''}
     ${books.length > 1 ? `<select id="ct-book" aria-label="${esc(tr('Address book'))}"><option value="">${tr('All address books')}</option>${books.map(b => `<option value="${b.id}" ${String(b.id) === String(CT.book) ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>` : ''}
     <span class="spacer"></span><button class="btn sm pri" data-ct="new">${ic('plus', 's')}<span class="cdl">${tr('New contact')}</span></button>
     <button class="iconbtn" data-ct="menu" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>`;
-  const list = CT.items === null ? `<div class="muted ctempty">${tr('Loading…')}</div>` : !CT.items.length
+  const list = items === null ? `<div class="muted ctempty">${tr('Loading…')}</div>` : !items.length
     ? `<div class="empty">${ic('users')}${CT.q || CT.group ? tr('No contact matches.') : tr('No contacts yet. Add one, import a vCard file, or connect the phone.')}</div>`
-    : `<ul class="ctlist" role="list" aria-label="${esc(tr('Contacts'))}">${CT.items.map(c => `<li><button type="button" class="ctrow ${c.id === CT.sel ? 'on' : ''}" data-ctopen="${c.id}" aria-current="${c.id === CT.sel}">${ctAv(c)}<span class="ctn"><b>${esc(c.fn || c.org || '?')}</b><small class="muted">${esc([c.org !== c.fn ? c.org : '', c.email || c.phone].filter(Boolean).join(' · '))}</small></span>${(books.length > 1 && ctBook(c.book_id)) ? `<i class="cevdot" style="--cc:${cssColor(ctBook(c.book_id).color) || 'var(--accent)'}" title="${esc(ctBook(c.book_id).name)}"></i>` : ''}</button></li>`).join('')}</ul>
-      ${CT.total > CT.items.length ? `<div class="muted ctmore">${tr('{0} of {1} shown: search to narrow it down', CT.items.length, CT.total)}</div>` : ''}`;
+    : `<ul class="ctlist" role="list" aria-label="${esc(tr('Contacts'))}">${items.map(c => `<li><button type="button" class="ctrow ${c.id === CT.sel ? 'on' : ''}" data-ctopen="${c.id}" aria-current="${c.id === CT.sel}">${ctAv(c)}<span class="ctn"><b>${esc(c.fn || c.org || '?')}</b><small class="muted">${esc([c.org !== c.fn ? c.org : '', c.email || c.phone].filter(Boolean).join(' · '))}</small></span>${(books.length > 1 && ctBook(c.book_id)) ? `<i class="cevdot" style="--cc:${cssColor(ctBook(c.book_id).color) || 'var(--accent)'}" title="${esc(ctBook(c.book_id).name)}"></i>` : ''}</button></li>`).join('')}</ul>
+      ${CT.total > CT.items.length ? `<div class="muted ctmore">${tr('{0} of {1} shown: search to narrow it down', items.length, CT.total)}</div>` : ''}`;
   return `<div class="ctview ${showCard ? 'withcard' : ''}"><h2 class="sr">${tr('Contacts')}</h2>${mob && showCard ? '' : bar}<div class="ctcols">${mob && showCard ? '' : `<div class="ctlistw">${list}</div>`}${showCard ? ctCardHtml(CT.card) : mob ? '' : `<div class="ctcard ctnone muted">${ic('user')}${tr('Choose a contact')}</div>`}</div></div>`;
 }
 function ctCardHtml(c) {
@@ -127,8 +128,8 @@ document.addEventListener('click', async e => {
 
 // ---- the editor
 async function ctEditor(c) {
-  const books = (S.books || []).filter(ctWrite);
-  if (!books.length) { try { const bk = await api('POST', '/api/books', {name: tr('Contacts')}); await load(); books.push(bk); } catch { return; } }
+  const books = (S.books || []).filter(b => ctWrite(b) && (wsObjIn(b) || (c && b.id === c.book_id)));  // 2.30.0 (#1036): of the shown workspace (+ the contact's own)
+  if (!books.length) { try { const bk = await api('POST', '/api/books', {name: tr('Contacts'), org_id: wsDefaultOrg()}); await load(); books.push(bk); } catch { return; } }
   const st = c ? JSON.parse(JSON.stringify(c)) : {book_id: +(CT.book || LS.get('ctBook', 0)) || books[0].id, given: '', family: '', fn: '', org: '', title: '', dept: '', nickname: '',
     emails: [{value: '', type: ['home']}], phones: [{value: '', type: ['cell']}], addresses: [], urls: [], bday: '', anniversary: '', note: '', groups: [], photo: ''};
   if (!books.some(b => b.id === st.book_id)) st.book_id = books[0].id;
@@ -227,7 +228,7 @@ function ctPhoto(file) {  // a square JPEG of at most 256 px (small enough for e
   });
 }
 function ctImport(bookId) {
-  const books = (S.books || []).filter(ctWrite);
+  const books = (S.books || []).filter(b => ctWrite(b) && wsObjIn(b));
   const run = async bid => {
     const inp = document.createElement('input');
     inp.type = 'file'; inp.accept = '.vcf,text/vcard,text/x-vcard';
@@ -246,7 +247,7 @@ function ctImport(bookId) {
   };
   if (bookId) { run(bookId); return; }
   if (books.length === 1) { run(books[0].id); return; }
-  if (!books.length) { api('POST', '/api/books', {name: tr('Contacts')}).then(async b => { await load(); run(b.id); }).catch(() => {}); return; }
+  if (!books.length) { api('POST', '/api/books', {name: tr('Contacts'), org_id: wsDefaultOrg()}).then(async b => { await load(); run(b.id); }).catch(() => {}); return; }
   menu($('#view [data-ct="menu"]') || $('#view'), books.map(b => ({label: tr('Into {0}', b.name), icon: 'folder', fn: () => run(b.id)})));
 }
 async function ctBooksModal() {
@@ -257,7 +258,7 @@ async function ctBooksModal() {
     <div class="foot"><button class="btn" data-cb="phone">${ic('phone', 's')} ${tr('On the phone…')}</button><span class="spacer"></span><button class="btn pri" data-cb="new">${ic('plus', 's')} ${tr('New address book')}</button></div>`);
   const draw = () => {
     const bs = S.books || [];
-    $('#cb-body', md).innerHTML = bs.length ? `<ul class="evclist">${bs.map(b => `<li class="evcrow" style="--cc:${cssColor(b.color) || 'var(--accent)'}"><i class="cevdot"></i><span class="evcn">${esc(b.name)} <span class="muted">· ${esc(trn('{0} contact', '{0} contacts', b.count))}${b.role !== 'owner' ? ' · ' + esc(b.owner_name || '') + ' · ' + esc(b.role === 'edit' ? tr('can edit') : tr('can view')) : b.members?.length ? ' · ' + esc(trn('shared with {0} person', 'shared with {0} people', b.members.length)) : ''}${b.imported ? ' · ' + esc(tr('imported')) : ''}</span></span>
+    $('#cb-body', md).innerHTML = bs.length ? `<ul class="evclist">${bs.map(b => `<li class="evcrow" style="--cc:${cssColor(b.color) || 'var(--accent)'}"><i class="cevdot"></i><span class="evcn">${esc(b.name)} <span class="muted">· ${esc(trn('{0} contact', '{0} contacts', b.count))}${wsOn() && b.role === 'owner' ? ' · ' + esc(wsLabel(b.org_id)) : ''}${b.role !== 'owner' ? ' · ' + esc(b.owner_name || '') + ' · ' + esc(b.role === 'edit' ? tr('can edit') : tr('can view')) : b.members?.length ? ' · ' + esc(trn('shared with {0} person', 'shared with {0} people', b.members.length)) : ''}${b.imported ? ' · ' + esc(tr('imported')) : ''}</span></span>
       <button class="iconbtn" data-cbmenu="${b.id}" aria-haspopup="menu" aria-label="${esc(tr('More for {0}', b.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></li>`).join('')}</ul>` : `<p class="muted">${tr('No address book yet. A new contact creates one.')}</p>`;
   };
   draw();
@@ -268,6 +269,7 @@ async function ctBooksModal() {
       const b = ctBook(+m.dataset.cbmenu); if (!b) return;
       const own = b.role === 'owner';
       menu(m, [own && {label: tr('Rename…'), icon: 'edit', fn: async () => { const n = await askPrompt(tr('Rename the address book'), b.name, {input: {max: 100}}); if (n && n.trim()) { try { await api('PATCH', `/api/books/${b.id}`, {name: n.trim()}); } catch { return; } refresh(); } }},
+        own && wsOn() && {label: tr('Workspace…'), icon: 'brief', fn: () => wsMoveMenu(m, b.org_id, async org => { try { await api('PATCH', `/api/books/${b.id}`, {org_id: org}); } catch { return; } refresh(); })},
         own && collab() && {label: tr('Share…'), icon: 'users', fn: () => ctShareModal(b, users, names, refresh)},
         own && famOn() && !b.imported && {label: tr('Birthdays as tasks…'), icon: 'cake', fn: () => ctBdayModal(b, refresh)},
         ctWrite(b) && {label: tr('Import a vCard file…'), icon: 'upload', fn: () => ctImport(b.id)},
@@ -280,9 +282,9 @@ async function ctBooksModal() {
     if (k === 'close') md.remove();
     if (k === 'phone') { md.remove(); davGuide(); }
     if (k === 'new') {
-      const n = await askPrompt(tr('New address book'), '', {input: {max: 100, placeholder: tr('Name')}, ok: tr('Create')});
-      if (!n || !n.trim()) return;
-      try { await api('POST', '/api/books', {name: n.trim()}); } catch { return; }
+      const n = await wsAskNew(tr('New address book'));  // 2.30.0 (#1036): with its workspace
+      if (!n) return;
+      try { await api('POST', '/api/books', n); } catch { return; }
       refresh();
     }
   });

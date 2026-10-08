@@ -6,6 +6,7 @@ import re
 import uuid
 import threading
 import time
+from datetime import timedelta
 from flask import g, jsonify, request
 
 from ..core.config import app, ATT_DIR, MAX_FILE_MB
@@ -15,11 +16,11 @@ from ..accounts.session import me
 from ..core.access import Denied, need_task, task_visible
 from ..core.serializers import unlink_files
 from ..tasks.validation import as_int, log_act
-from ..tasks.attachments import safe_name, send_stored
+from ..tasks.attachments import safe_name, send_stored, unexec_name
 from ..collab.comments import user_names
 from ..personal.timetrack import BadInput, UnknownFields
 from ..notify.alerts import aa_count, aa_oserr
-from ..api.v1 import hit_limit, task_for, v1_args, v1_view
+from ..api.v1 import hit_limit, task_for, v1_args, v1_json, v1_view
 from ..agents.core import (
     agent_active, agent_emit, AGENT_EVENT_COMMENT_CHARS, agent_public, agent_row, agent_task_data, agents_for,
     CHAT_KEEP, CHAT_MAX, is_agent, JOB_ACTIONS, job_dict, job_may_act, job_visible, list_agents, lst_brief,
@@ -98,18 +99,46 @@ def agent_job_action(jid):
     return jsonify(job_dict(c, j))
 
 
-def chat_dict(r, rx=None, files=None, api=False):
+def chat_dict(r, rx=None, files=None, api=False, newest=None):
     """rx: {message id: reactions} of chat_reactions_of (2.7.2, #421); delivered_at (#422): when the agent fetched a person's
     message (null = not yet; the agent's own messages: null). 2.13.1 (#465): files = chat_files_of (attachments: id, name,
-    mime, size, url; api: the REST address /api/v1/chat-attachments/{id}, else the app's)."""
+    mime, size, url; api: the REST address /api/v1/chat-attachments/{id}, else the app's). 2.30.0 (#1037): newest = the id
+    of the conversation's newest message that is not a permission question (chat_newest), for choice_state."""
+    ch = _jload(r["choices"]) if "choices" in r.keys() else None
+    ans = _jload(r["choice"]) if "choice" in r.keys() else None
     return {"id": r["id"], "agent_id": r["agent_id"], "user_id": r["user_id"], "from": r["sender"], "body": r["body"],
             "task_id": r["task_id"], "created_at": r["created_at"], "delivered_at": r["delivered_at"],
-            "reactions": (rx or {}).get(r["id"], []), "asks": r["sender"] == "agent" and chat_asks(r["body"]),
+            "reactions": (rx or {}).get(r["id"], []), "asks": r["sender"] == "agent" and (chat_asks(r["body"]) or bool(ch and ch.get("permission"))),
             # 2.28.0 (#1005): answer buttons of an agent's message ({choices: [{id, label, style?}], multi}) and the person's
-            # answer ({ids, at}); null without
-            "choices": _jload(r["choices"]) if "choices" in r.keys() else None, "choice": _jload(r["choice"]) if "choice" in r.keys() else None,
+            # answer ({ids, at}); null without. 2.30.0 (#1037 / #1041): choices.permission (a permission question),
+            # choices.expires_at; choice_state open | answered | expired (a newer message came, the time ran out) | withdrawn
+            "choices": ch, "choice": ans, "choice_state": choice_state(r, ch, ans, newest),
             "attachments": [{**f, "url": (f"/api/v1/chat-attachments/{f['id']}" if api else f"/api/chat-files/{f['id']}")}
                             for f in (files or {}).get(r["id"], [])]}
+
+
+# ---- 2.30.0 (#1037): only the newest question's buttons are live. An agent message's buttons expire as soon as a newer
+# message comes into the conversation (from the agent or from the person) -- except a permission question (#1041): it stays
+# answerable while its host waits (until it is answered, its expires_at passed, or the agent withdraws it), and it does not
+# make older buttons expire either. A press on expired buttons answers 409. The agent may withdraw a message's buttons.
+def chat_newest(c, aid, uid):
+    """Id of the newest message of the conversation that is not a permission question (0 = none)."""
+    r = c.execute("""SELECT MAX(id) FROM agent_chat WHERE agent_id=? AND user_id=?
+                     AND (choices IS NULL OR COALESCE(json_extract(choices, '$.permission'), 0) = 0)""", (aid, uid)).fetchone()
+    return (r[0] or 0) if r else 0
+
+
+def choice_state(r, ch, ans, newest=None):
+    """open | answered | expired | withdrawn of an agent message with buttons (None without)."""
+    if not ch or r["sender"] != "agent":
+        return None
+    if ans:
+        return "answered"
+    if ch.get("withdrawn_at"):
+        return "withdrawn" if not ch.get("outcome") else ("answered" if ch["outcome"] in ("allowed", "denied") else "expired")
+    if ch.get("permission"):
+        return "expired" if ch.get("expires_at") and ch["expires_at"] <= iso_ms(now_utc()) else "open"
+    return "expired" if newest and newest > r["id"] else "open"
 
 
 # ---- 2.13.1 (#465): images / files in the chat between a person and an agent. Same limits and checks as task attachments
@@ -130,7 +159,8 @@ def chat_files_of(c, mids):
 
 def chat_one(c, r, api=False):
     """chat_dict of one row with its reactions and files."""
-    return chat_dict(r, chat_reactions_of(c, [r["id"]]), chat_files_of(c, [r["id"]]), api=api)
+    return chat_dict(r, chat_reactions_of(c, [r["id"]]), chat_files_of(c, [r["id"]]), api=api,
+                     newest=chat_newest(c, r["agent_id"], r["user_id"]))
 
 
 def chat_upload_files():
@@ -166,6 +196,9 @@ def chat_save_files(c, m, files, saved):
     ts = iso(now_utc())
     for f in files:
         name = safe_name(f.filename)
+        unexec = m["sender"] == "agent" and unexec_name(name) != name  # 2.30.0 (#380): no executable endings from agents
+        if unexec:
+            name = unexec_name(name)
         rel = os.path.join(sub, f"{uuid.uuid4().hex[:12]}-{name}")
         full = os.path.join(ATT_DIR, rel)
         try:
@@ -179,7 +212,7 @@ def chat_save_files(c, m, files, saved):
             return tr("{0}: larger than {1} MB", name, MAX_FILE_MB)
         if not size:
             return tr("{0}: the file is empty and was not uploaded", name)
-        mime = (f.mimetype if f.mimetype and f.mimetype != "application/octet-stream" else None) \
+        mime = "text/plain" if unexec else (f.mimetype if f.mimetype and f.mimetype != "application/octet-stream" else None) \
             or mimetypes.guess_type(name)[0] or "application/octet-stream"
         c.execute("INSERT INTO chat_files(message_id,name,mime,size,path,created_at) VALUES(?,?,?,?,?,?)",
                   (m["id"], name, mime, size, rel, ts))
@@ -199,11 +232,32 @@ def _jload(v):
 
 CHOICES_MAX, CHOICE_LABEL_MAX, CHOICE_ID_RE = 8, 80, re.compile(r"[A-Za-z0-9_.:-]{1,40}")
 CHOICE_STYLES = ("default", "primary", "danger")
+# 2.30.0 (#1041): a permission question = buttons allow / deny (given, or added by permission: true); expires_in: seconds
+PERM_IDS, PERM_EXPIRES_MAX = ("allow", "deny"), 7 * 86400
+PERM_CHOICES = [{"id": "allow", "label": "Allow", "style": "primary"}, {"id": "deny", "label": "Deny"}]
 
 
-def chat_choices_clean(v, multi):
+def chat_choices_clean(v, multi, permission=None, expires_in=None):
     """2.28.0 (#1005): choices from the agent -> the stored json, or None. [{id, label, style?}] (at most CHOICES_MAX, ids
-    unique); multi: the person may pick several. Also accepted: a list of strings (id = label)."""
+    unique); multi: the person may pick several. Also accepted: a list of strings (id = label). 2.30.0 (#1041): permission
+    true = a permission question (buttons allow / deny, added when missing); buttons with exactly the ids allow and deny
+    count as one too (hosts from 2.28 / 2.29). expires_in: seconds the question stays open (permission questions)."""
+    if permission not in (None, True, False, 0, 1, "1", "0", "true", "false"):
+        raise BadInput(tr("Invalid value: {0}", "permission"))
+    permission = permission in (True, 1, "1", "true")
+    if expires_in not in (None, ""):
+        try:
+            expires_in = int(expires_in)
+        except (TypeError, ValueError):
+            raise BadInput(tr("Invalid value: {0}", "expires_in")) from None
+        if isinstance(expires_in, bool) or not 10 <= expires_in <= PERM_EXPIRES_MAX:
+            raise BadInput(tr("Invalid value: {0}", "expires_in"))
+    else:
+        expires_in = None
+    if permission and v in (None, "", []):
+        v = PERM_CHOICES
+    if expires_in and not permission and v in (None, "", []):
+        raise BadInput(tr("Invalid value: {0}", "expires_in"))
     if v in (None, "", []):
         return None
     if isinstance(v, str):
@@ -227,7 +281,44 @@ def chat_choices_clean(v, multi):
         out.append({"id": x["id"], "label": str(x.get("label", x["id"])).strip()[:CHOICE_LABEL_MAX], **({"style": st} if st != "default" else {})})
     if multi not in (None, True, False, 0, 1):
         raise BadInput(tr("Invalid value: {0}", "multi"))
-    return json.dumps({"choices": out, "multi": bool(multi)}, ensure_ascii=False)
+    d = {"choices": out, "multi": bool(multi)}
+    if permission or (sorted(ids) == sorted(PERM_IDS) and not multi):
+        if sorted(ids) != sorted(PERM_IDS) or multi:
+            raise BadInput(tr("Invalid value: {0}", "choices"))
+        d["permission"] = True
+    if expires_in:
+        if not d.get("permission"):
+            raise BadInput(tr("Invalid value: {0}", "expires_in"))
+        d["expires_at"] = iso_ms(now_utc() + timedelta(seconds=expires_in))
+    return json.dumps(d, ensure_ascii=False)
+
+
+def _approval_of(ids):
+    return "approved" if ids == ["allow"] else "rejected" if ids == ["deny"] else None
+
+
+def chat_choice_answer(c, m, ch, ids, uid, via):
+    """Stores the person's answer on agent message m (open buttons) and sends the agent 'chat_choice'. 2.30.0 (#1041): on a
+    permission question also the 'reaction' event a 👍 / 👎 sends (approval approved / rejected, via button), so hosts
+    that listen for reactions keep working; a 👍 / 👎 answers it the other way round (via reaction). One answer per message:
+    act once per message_id."""
+    ans = {"ids": ids, "at": iso_ms(now_utc()), "user_id": uid, **({"via": via} if ch.get("permission") else {})}
+    c.execute("UPDATE agent_chat SET choice=? WHERE id=?", (json.dumps(ans), m["id"]))
+    m2 = c.execute("SELECT * FROM agent_chat WHERE id=?", (m["id"],)).fetchone()
+    labels = [x["label"] for x in ch["choices"] if x["id"] in ids]
+    who = {"id": uid, "name": user_names(c, [uid]).get(uid, "")}
+    data = {"message_id": m["id"], "choice_ids": ids, "labels": labels, "message": chat_one(c, m2, api=True), "user": who}
+    if ch.get("permission"):
+        data.update(permission=True, approval=_approval_of(ids), via=via)
+    tdata = agent_task_data(c, m["task_id"], m["agent_id"]) if m["task_id"] and task_visible(c, m["task_id"], m["agent_id"], full=True) else {}
+    agent_emit(c, m["agent_id"], "chat_choice", {**data, **tdata})
+    if ch.get("permission") and via == "button":
+        agent_emit(c, m["agent_id"], "reaction", {
+            "chat_message": {"id": m["id"], "text": m["body"][:AGENT_EVENT_COMMENT_CHARS], "from": m["sender"], "created_at": m["created_at"],
+                             "task_id": m["task_id"]},
+            "reaction": {"emoji": "up" if ids == ["allow"] else "down", "user": who}, "approval": _approval_of(ids), "user": who,
+            "via": "button", **tdata})
+    return m2
 
 
 def chat_choice_set(c, m, uid, ids):
@@ -238,21 +329,56 @@ def chat_choice_set(c, m, uid, ids):
         raise Denied(404)
     if m["choice"]:
         raise Denied(409, tr("This question was answered already"))
+    if choice_state(m, ch, None, chat_newest(c, m["agent_id"], m["user_id"])) != "open":  # 2.30.0 (#1037): an old tab, an offline outbox
+        raise Denied(409, tr("This suggestion is no longer current"))
     valid = [x["id"] for x in ch["choices"]]
     if not isinstance(ids, list) or not ids or not all(isinstance(x, str) and x in valid for x in ids) or len(set(ids)) != len(ids) \
             or (len(ids) > 1 and not ch.get("multi")):
         raise BadInput(tr("Invalid value: {0}", "choice_ids"))
-    ans = {"ids": [x for x in valid if x in ids], "at": iso_ms(now_utc()), "user_id": uid}
-    c.execute("UPDATE agent_chat SET choice=? WHERE id=?", (json.dumps(ans), m["id"]))
-    m2 = c.execute("SELECT * FROM agent_chat WHERE id=?", (m["id"],)).fetchone()
-    labels = [x["label"] for x in ch["choices"] if x["id"] in ans["ids"]]
-    data = {"message_id": m["id"], "choice_ids": ans["ids"], "labels": labels, "message": chat_one(c, m2, api=True),
-            "user": {"id": uid, "name": user_names(c, [uid]).get(uid, "")}}
-    if m["task_id"] and task_visible(c, m["task_id"], m["agent_id"], full=True):
-        data.update(agent_task_data(c, m["task_id"], m["agent_id"]))
-    agent_emit(c, m["agent_id"], "chat_choice", data)
+    m2 = chat_choice_answer(c, m, ch, [x for x in valid if x in ids], uid, "button")
     bump(c)
     return m2
+
+
+CHAT_OUTCOMES = ("allowed", "denied", "expired")
+
+
+def chat_choices_withdraw(c, m, outcome=None):
+    """2.30.0 (#1037): the agent takes back the open buttons of its message m (they disappear; a press answers 409).
+    outcome (a permission question its host decided otherwise -- an answer in words, the host's time limit): allowed |
+    denied | expired, shown instead of the buttons. Sends no event. Returns the row."""
+    ch = _jload(m["choices"])
+    if m["sender"] != "agent" or not ch:
+        raise Denied(404)
+    if outcome not in (None, "", *CHAT_OUTCOMES) or (outcome and not ch.get("permission")):
+        raise BadInput(tr("Invalid value: {0}", "outcome"))
+    if m["choice"]:
+        raise Denied(409, tr("This question was answered already"))
+    ch = {**ch, "withdrawn_at": iso_ms(now_utc()), **({"outcome": outcome} if outcome else {})}
+    c.execute("UPDATE agent_chat SET choices=? WHERE id=?", (json.dumps(ch, ensure_ascii=False), m["id"]))
+    bump(c)
+    return c.execute("SELECT * FROM agent_chat WHERE id=?", (m["id"],)).fetchone()
+
+
+@app.post("/api/v1/agent/chats/<int:uid>/messages/<mid>/withdraw")
+@v1_view
+def v1_agent_chat_withdraw(uid, mid):
+    """2.30.0 (#1037): {outcome?} -- the agent withdraws the open answer buttons of its message (MCP withdraw_chat_choices)."""
+    from ..agents.core import agent_shares, need_agent
+    v1_args(())
+    aid = need_agent()
+    c = db()
+    mid = as_int(mid, "mid", 1)
+    b = v1_json()
+    unknown = sorted(k for k in b if k != "outcome")
+    if unknown:
+        raise UnknownFields(unknown)
+    m = c.execute("SELECT * FROM agent_chat WHERE id=? AND agent_id=? AND user_id=?", (mid, aid, uid)).fetchone()
+    if not m or not agent_shares(c, aid, uid):
+        raise Denied(404)
+    m2 = chat_choices_withdraw(c, m, b.get("outcome"))
+    c.commit()
+    return jsonify(chat_one(c, m2, api=True))
 
 
 @app.post("/api/agents/<int:aid>/chat/<int:mid>/choice")
@@ -280,7 +406,7 @@ def chat_post(c, aid, uid, sender, b, files, allowed_keys=("body", "task_id")):
     else:
         text = chat_body(text)
     tid = chat_task(c, b.get("task_id"), uid, aid)
-    choices = chat_choices_clean(b.get("choices"), b.get("multi")) if sender == "agent" else None
+    choices = chat_choices_clean(b.get("choices"), b.get("multi"), b.get("permission"), b.get("expires_in")) if sender == "agent" else None
     r = chat_add(c, aid, uid, sender, text, tid, choices)
     if files:
         saved = []
@@ -450,8 +576,9 @@ def agent_chat_get(aid):
                  (iso(now_utc()), aid, me())).rowcount:
         c.commit()
     rx, fs = chat_reactions_of(c, [r["id"] for r in rows]), chat_files_of(c, [r["id"] for r in rows])
+    nw = chat_newest(c, aid, me())
     # 2.7.2 (#422): the server's clock, so the app can tell how long ago a message was delivered
-    return jsonify(agent=agent_public(c, a, me()), messages=[chat_dict(r, rx, fs) for r in rows], now=iso_ms(now_utc()), has_more=more)
+    return jsonify(agent=agent_public(c, a, me()), messages=[chat_dict(r, rx, fs, newest=nw) for r in rows], now=iso_ms(now_utc()), has_more=more)
 
 
 def chat_task(c, v, uid_a, uid_b):
@@ -551,12 +678,22 @@ def chat_react(c, m, uid, emoji, on):
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if is_agent(u) or m["sender"] != "agent" or uid != m["user_id"]:
         return res  # only the person of the conversation reacting to the agent's message counts
-    if emoji in ("up", "down") and chat_asks(m["body"]):  # 2.13.0 (#453 A2): only on a question
+    ch = _jload(m["choices"])
+    perm = bool(ch and ch.get("permission"))
+    if emoji in ("up", "down") and (chat_asks(m["body"]) or perm):  # 2.13.0 (#453 A2): only on a question
         res["approval"] = "approved" if emoji == "up" else "rejected"
+    stale = False
+    if perm and res["approval"] and choice_state(m, ch, _jload(m["choice"])) != "open":
+        res["approval"] = None  # 2.30.0 (#1041): an answered / expired permission question takes no go-ahead any more
+        stale = True
+    elif perm and res["approval"]:  # 👍 / 👎 = the buttons Allow / Deny (the answer shows the same way; chat_choice too)
+        chat_choice_answer(c, m, ch, ["allow" if emoji == "up" else "deny"], uid, "reaction")
     who = {"id": uid, "name": user_names(c, [uid]).get(uid, "")}
     data = {"chat_message": {"id": m["id"], "text": m["body"][:AGENT_EVENT_COMMENT_CHARS], "from": m["sender"], "created_at": m["created_at"],
                              "task_id": m["task_id"]},
             "reaction": {"emoji": emoji, "user": who}, "approval": res["approval"], "user": who}
+    if stale:
+        data["stale"] = True  # a 👍 on a closed permission question: hosts must read "approval", never the emoji
     if m["task_id"] and task_visible(c, m["task_id"], m["agent_id"], full=True):
         data.update(agent_task_data(c, m["task_id"], m["agent_id"]))
     agent_emit(c, m["agent_id"], "reaction", data)

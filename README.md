@@ -18,6 +18,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.30.0** (2026-10-08): Clear boundaries, calmer agents. **Calendars and address books belong to a workspace** like
+  lists, a **nightly boundary check**; agents never **bridge lists with different people** unasked, can be **limited to
+  chosen lists** and leave an **access log**; **Allow / Deny** buttons and answer buttons that expire; agents **listen in
+  by project type**; **.md, text and code files open in a viewer**; agents write text files; *Use agents safely*.
 - **2.29.0** (2026-10-08): Folders like lists, calm agents. **Folder settings** (workspace, agent, tidy-up) apply to every
   list in a folder, a folder is **shared with roles** like a list, and a list someone adds to a shared folder is shared
   at once; the agent **chat as a pop-up window** (button, key `A`); a visible **permission mode** per agent; agents get
@@ -768,6 +772,17 @@ was one company), except family / household and Home & life lists, lists in a to
 workspace most of its lists are in; an agent that already sits in a list of another workspace is kept and pointed out --
 the owner decides.
 
+**Calendars and address books** (2.30.0, #1036) belong to a workspace too, with the same rules: an organisation's
+calendar or address book is shared only with its members and agents, a private one never with an organisation's agent,
+and a share always needs a person you may see. *New calendar…* / *New address book…* ask for the workspace, *Workspace…*
+in their menu moves one (the owner; refused while a member does not fit). The sidebar switch filters events, calendars,
+contacts and address books as well. Groups of another organisation stay unknown. On the update every calendar and
+address book of a server with an organisation goes into its owner's organisation, except the ones named like *Private* /
+*Family* / *Home*, address books mirrored from an outside account and those with a member who does not fit (they stay
+private; nobody loses access). A **nightly boundary check** counts every membership across the workspace boundary
+(lists, calendars, address books, groups, agents), raises an admin alert when the count changes and shows it under
+*Administration > Organisations*.
+
 ## Organisations and invitations
 
 2.23.0: the kind of server is set when it is set up, not in the app (`KALMIDO_INSTANCE_MODE`):
@@ -1047,6 +1062,15 @@ agent into a person's personal agent. Every agent works in **one workspace** (pr
 itself never starts an AI or any other process; the agent runs wherever you like and talks to Kalmido through the REST
 API, webhooks or the MCP server.
 
+- **Safe by default** (2.30.0, #919 / #920): an agent never connects two lists with **different people** unasked --
+  sharing such a list with it (or adding a person to a list with an agent) asks the owner first (*Connect anyway*), and
+  existing bridges are flagged in the agent's settings; an agent that moves a task into a list more people see waits for
+  approval. Agents and API tokens can be **limited to chosen lists**; *Agent access* in a list's menu shows which agents
+  read or changed it in the last 30 days. *Settings > Agents > Use safely* has ten rules (one agent per context, minimal
+  rights, ...); more in [docs/AGENT-SECURITY.md](docs/AGENT-SECURITY.md#use-agents-safely).
+- **Listening in by project type** (2.30.0, #1034): in a *Software / AI development* list the agent gets every new or
+  moved task and every comment without an @mention; elsewhere only @mentions, assignments and wakes. *Agent listens in*
+  is a switch in every list and folder; tidying up is a separate switch.
 - Events (mention, assignment, comment, chat, reaction, job action, tidy request, wake (API), runtime change / reset
   (2.4.1), and from 2.1.0
   `followup_due`: the follow-up day of a task *waiting on external* the agent follows) arrive as signed
@@ -1523,6 +1547,9 @@ client secret, codes and tokens are never logged or shown. Two-factor for OIDC l
 
 ## Reverse proxy
 
+More from running Kalmido (proxy pitfalls, VPN-only setups, PWA and push, backups and encryption at rest, server
+hardening, mail, moving to a new server, production updates): [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md).
+
 Terminate HTTPS in your proxy. If the proxy has its own login (single sign-on), put it in front of everything
 except these paths:
 
@@ -1620,6 +1647,7 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `KALMIDO_ADMIN_ALERT_WINDOW` | `3600` | Seconds over which counted events (failed logins, skipped watchdog rows, removed devices) are summed up into one alert |
 | `KALMIDO_CALENDARS` | `1` | `0` turns calendar subscriptions off (no fetching, no events, the settings say so) |
 | `KALMIDO_GIT_POLL` | `180` | 2.2.0: seconds between two checks of a connected repository (see *Git integration*) |
+| `KALMIDO_TENANT_CHECK_HOUR` | `3` | 2.30.0 (#1036): hour of the nightly workspace boundary check (memberships across organisations / private; admin alert when the count changes) |
 | `KALMIDO_TIDY_QUIET_S` | `120` | 2.27.0: seconds a new task must be left alone before its agent gets the `tidy` event (and nobody may have it open in a field); `0` = at once |
 | `KALMIDO_AUDIT_DAYS` | `90` | 2.2.1: days the agents' activity log is kept (see *AI agents*); `0` = no log |
 | `KALMIDO_CALENDAR_ALLOW_HOSTS` | | Internal hosts calendar subscriptions may reach, comma list of `host` or `host:port` (in addition to the list under *Settings > Administration > Advanced*) |

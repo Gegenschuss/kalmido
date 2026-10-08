@@ -152,7 +152,8 @@ async function firefox(fn) {
   await v1(ag.token, 'PUT', '/agent/status', {status: 'working', task_id: T2, text: 'Drafting'});
   w.eval('load().then(render)'); await sleep(800);
   const lk = st().querySelector(`button[data-act="open-id"][data-id="${T2}"]`);
-  check(lk && lk.textContent === '#' + T2 && /working on #\d+ · Drafting/.test(st().textContent), 'working on #id (a link) + status text: ' + st().textContent);
+  // 2.30.0 (#1039, intended change): the header links the task; its status text shows only in that task, not in the chat
+  check(lk && lk.textContent === '#' + T2 && /working on #\d+/.test(st().textContent) && !/Drafting/.test(st().textContent), 'working on #id (a link), the status text stays in the task: ' + st().textContent);
   check(!st().querySelector('.atdots'), 'working on a task this chat is not about: no dots');
   await v1(ag.token, 'POST', `/agent/chats/${me}`, {body: 'About this one', task_id: T2});
   w.eval('load().then(render)'); await sleep(1000);

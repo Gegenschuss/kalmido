@@ -493,6 +493,8 @@ def watchdog_tick(c):
     _wd_section(c, "review", _wd_review, users, S, LG, now)  # 2.10.0 (#440)
     _wd_section(c, "staying in touch", _wd_care, users, S, LG, now)  # 2.22.0 (#663)
     _wd_section(c, "read later", _wd_reading, users, S, LG, now)  # 2.22.0 (#663)
+    from ..accounts.tenancy import boundary_tick
+    _wd_section(c, "boundary check", boundary_tick)  # 2.30.0 (#1036): once a night, before the alerts go out
     _wd_section(c, "admin alerts", aa_tick)
 
 

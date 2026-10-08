@@ -11,6 +11,7 @@ whatever that user can see and change in the app, and nothing more.
 - [Examples](#examples): curl, Home Assistant, n8n, a shell script
 - [Webhooks](#webhooks): events, payload, signature, retries
 - [Behind a reverse proxy](#behind-a-reverse-proxy)
+- [Folders: sharing and settings](#folders-sharing-and-settings-2290), [Lists, people and agents](#lists-people-and-agents-2300)
 - AI agents and bots (events, long-polling, jobs, chat, approvals) and the MCP server: [AGENTS.md](AGENTS.md), [mcp/](../mcp/)
 
 The machine-readable description is an OpenAPI 3.1 document at **`/api/v1/openapi.json`** on your server (it contains no
@@ -58,6 +59,12 @@ tokens stop working at once.
 An admin can **limit** what personal tokens and agents may get at all (Settings > Agents > Set up > Permission limit,
 `PUT /api/admin/agent-policy` `{scope_limit: {agents?, tokens?}}`); a scope outside the limit stops counting at once for
 every token and comes back when it is allowed again. `GET /api/v1/me` shows `token.effective_scopes` (what counts now).
+
+**Only these lists (2.30.0).** A token can be limited to selected lists (the token dialog, `list_ids` on
+`POST /api/me/tokens` and `PATCH /api/me/tokens/{id}`; empty = every list its user sees). Every `/api/v1` request checks
+it: other lists and their tasks answer `404` as if they did not exist and are left out of every query. `GET /api/v1/me`
+shows it as `token.list_ids`. Agents get the same restriction in their dialog, see
+[Lists, people and agents](#lists-people-and-agents-2300).
 
 Send it in every request:
 
@@ -227,6 +234,7 @@ had been made in the app. Webhooks fire too.
 | `GET /templates` · `POST …` | read · structure | 2.15.0: your templates; create from `{task_id}`, `{list_id, relative?}` or `{kind, data}`, `name?` |
 | `PATCH /templates/{id}` · `DELETE …` · `POST …/apply` | structure · delete · structure | 2.15.0: rename / replace data; delete; use it (task template: `{list_id?, section_id?}`; list template: `{name?, folder?, start?, end?}`) |
 | `POST /tasks/{id}/attachments` | attachments:write | 2.15.0: upload files (multipart, field `file`, repeatable; the server's size limit, no empty files) |
+| `POST /tasks/{id}/attachments/text` | attachments:write | 2.30.0: a text file from JSON `{name, content}` (Markdown, plain text, HTML / CSS / JS, JSON / CSV, code; UTF-8, at most 1 MB). An ending that is not a text type (`.sh`, `.ps1`, `.bat`, `.exe` …) gets `.txt` appended; a name the task already has becomes a new version next to it (`report (v2).md`, the old file stays). Answer `201` `{id, task_id, name, mime, size, created_at, version, replaces, url}` |
 | `DELETE /attachments/{id}` | attachments:write | 2.15.0: remove a file of a task (or of your comment) |
 | `PATCH /comments/{id}` · `DELETE …` | comments | 2.15.0: edit your comment `{body}`; delete (author, list owner / admins) |
 | `GET /folders` · `POST /folders/rename` · `POST /folders/delete` | read · structure | 2.15.0: your folders `{path, lists}`; rename / move `{old, new}`; remove `{name}` (its lists move up). Agents: approval |
@@ -288,6 +296,12 @@ open first, and the latest commits `[{repo, sha, short, message, author, url, br
 `default_branch`, a suggested `branch` `kalmido-<id>`, `prs`, `commits`, and `others` when the list has more).
 Tasks in `GET /tasks` carry `code` when something is linked. See *Git integration* in the README.
 
+**Closing tasks from git.** `fixes #<id>` (also `closes`, `resolves` and their forms) in a merged pull request or a
+commit on the default branch completes the task once, and **only tasks of the list the repository is connected to**:
+`#<id>` of a task in another list is neither linked nor completed. Use the keyword only for work that is fully done;
+for a partial delivery write just `#<id>` (the commit is linked, the task stays open). *Undo* in the task history
+reopens a task that was closed by mistake.
+
 ## Notes and team chat (2.17.0)
 
 | Endpoint | Scope | |
@@ -342,9 +356,9 @@ after the last day), like iCalendar. Scope `calendar` for every operation.
 
 | Endpoint | |
 |---|---|
-| `GET /event-calendars` · `POST` | the calendars you see (`role`: owner, edit, view; `hidden`); `{name, color?, description?}` |
-| `PATCH /event-calendars/{id}` · `DELETE` | rename / recolour (owner), `hidden` (your own views and reminders); delete with all events (owner) |
-| `PUT /event-calendars/{id}/members/{user_id}` · `DELETE` | share `{role: view\|edit}` (owner); stop sharing, or leave it yourself |
+| `GET /event-calendars` · `POST` | the calendars you see (`role`: owner, edit, view; `hidden`; 2.30.0: `org_id`, its workspace, `null` = private); `{name, color?, description?, org_id?}` (default: an agent's workspace, else your first organisation) |
+| `PATCH /event-calendars/{id}` · `DELETE` | rename / recolour (owner), `hidden` (your own views and reminders), 2.30.0: `org_id` (owner; `409` while a member does not fit the workspace); delete with all events (owner) |
+| `PUT /event-calendars/{id}/members/{user_id}` · `DELETE` | share `{role: view\|edit}` (owner; 2.30.0: only people you may see, else `404`; an organisation's calendar only with its members and agents, a private one never with an organisation's agent, else `409`); stop sharing, or leave it yourself |
 | `POST /event-calendars/{id}/import` · `GET …/export` | `{ics, dry_run?}`: an .ics text (the same UID is updated, so importing twice adds nothing) -> `{created, updated, skipped, errors}`; the calendar as `{ics}` |
 | `GET /events?from=&to=&calendar_id=` | the occurrences in a range (at most 400 days): repeating events expanded, changed dates applied; `start` / `end` are UTC date-times (all day: dates); `occ` = the original start of a date |
 | `POST /events` · `GET /events/{id}` | `{title, start, end?, all_day?, tz?, location?, description?, rrule?, exdates?, reminders?, status?, busy?, url?, task_id?, cal_id?, attendees?}`; the event with `overrides` (changed dates) and `attendees` |
@@ -365,9 +379,9 @@ a task needs `tasks:write` too. A contact is only visible to people who see its 
 
 | Endpoint | |
 |---|---|
-| `GET /address-books` · `POST` | the address books you see (`count`, `role`, `imported`, `birthdays_list_id`); `{name, color?}` |
-| `PATCH /address-books/{id}` · `DELETE` | rename, recolour, `birthdays_list_id` (birthdays + anniversaries of its contacts become yearly tasks of that list; owner); delete with its contacts |
-| `PUT /address-books/{id}/members/{user_id}` · `DELETE` | share `{role: view\|edit}` (owner); stop sharing, or leave it |
+| `GET /address-books` · `POST` | the address books you see (`count`, `role`, `imported`, `birthdays_list_id`, 2.30.0: `org_id`); `{name, color?, org_id?}` |
+| `PATCH /address-books/{id}` · `DELETE` | rename, recolour, `birthdays_list_id` (birthdays + anniversaries of its contacts become yearly tasks of that list; owner), 2.30.0: `org_id` (owner; `409` while a member does not fit); delete with its contacts |
+| `PUT /address-books/{id}/members/{user_id}` · `DELETE` | share `{role: view\|edit}` (owner; 2.30.0: the same workspace rule as calendars); stop sharing, or leave it |
 | `POST /address-books/{id}/import` · `GET …/export` | `{vcf}`: vCard 3 / 4 text (the same UID is updated); the book as `{vcf}` |
 | `GET /contacts?q=&book_id=&group=&limit=&cursor=` | search name, company, e-mail, phone (also without spaces), address, group; `{data, next_cursor, total, groups}` |
 | `POST /contacts` · `GET /contacts/{id}` · `PATCH` · `DELETE` | `{book_id?, kind?, fn?, given?, family?, middle?, prefix?, suffix?, nickname?, org?, dept?, title?, emails?, phones?, addresses?, urls?, bday?, anniversary?, note?, groups?, photo?}`; `GET` adds the linked `tasks` and `events` |
@@ -513,6 +527,36 @@ while :; do
   [ -z "$cursor" ] && break
 done
 ```
+
+**A bulk change, gently: dry run, pause, back-off on 429**
+
+The limit is 120 requests per token and minute, shared by everything that uses the token (a service, jobs, other
+scripts). A bulk change should therefore pause between requests and, on `429`, wait (`Retry-After`, else 5, 15, 30
+and 60 seconds) instead of failing. Task changes have no server-side dry run (only the [importers](#import) have
+`dry_run`), so do it on the client: first print what would change, check it, then run it with `DRY=0`.
+
+```sh
+# set every open task tagged "later" in list 7 to low priority; DRY=0 to really do it
+DRY=${DRY:-1}
+ids=$(curl -s -H "Authorization: Bearer $TOKEN" \
+  "$KALMIDO/api/v1/tasks?list_id=7&tag=later&fields=compact&limit=500" | jq -r '.data[] | "\(.id)\t\(.title)"')
+echo "$ids" | while IFS="$(printf '\t')" read -r id title; do
+  [ -z "$id" ] && continue
+  if [ "$DRY" = 1 ]; then echo "would change #$id $title"; continue; fi
+  for wait in 5 15 30 60 0; do
+    code=$(curl -s -o /dev/null -D /tmp/kalmido-h.txt -w '%{http_code}' -X PATCH "$KALMIDO/api/v1/tasks/$id" \
+      -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"priority": "low"}')
+    [ "$code" != 429 ] || [ "$wait" = 0 ] && break
+    ra=$(grep -i '^retry-after:' /tmp/kalmido-h.txt | tr -dc '0-9')
+    sleep "${ra:-$wait}"
+  done
+  echo "#$id $code"
+  sleep 0.6                                   # about 100 requests a minute at most
+done
+```
+
+For many tasks with the same change, `POST /tasks/batch` (up to 500 ids, one transaction) needs one request instead
+of hundreds; for an agent token, 10 or more tasks wait for a person's approval (`202`).
 
 **Log 45 minutes on a task, check in a habit**
 
@@ -813,3 +857,53 @@ sums and `due` = the last day to cancel, devices + upkeep, contacts to get in to
 (its API key) is set up in the app only.
 
 `POST /tasks/{id}/typing` (scope `comments`, 2.22.0): "<name> is writing …" in the task's comments for 8 seconds.
+
+## Folders: sharing and settings (2.29.0)
+
+Folders are paths of their owner (`"folder": "Clients/Company X"`). How they behave today:
+
+- **Where a shared list sits.** A list in its owner's folder sits for every member in that folder and place (2.27.0);
+  a shared list outside a folder of its owner can be filed by each member in a folder of their own.
+- **Sharing a folder** (*Share folder*, owner): a person gets every list in the folder and its subfolders with the
+  folder's role, now and for every list that comes into it later. A changed folder role reaches the folder's lists
+  (2.29.0). Stopping the share stops new lists; with *also remove* the person leaves the folder's lists too (a share
+  through a group stays). A list that someone creates in a folder shared with them stays theirs and is shared at once
+  with the folder's owner (as list admin) and the folder's other people.
+- **Folder settings** (2.29.0, owner): the workspace, the agent (with *Members may see and use the agent* / *Agents may
+  address each other*) and tidying are defaults for every list in the folder and its subfolders. A new or moved list
+  takes them; changing them asks whether the existing lists follow. A list changed on its own keeps its value
+  ("differs from the folder") until *Back to the folder*. What cannot be applied (for example an agent that would
+  create a [bridge](#lists-people-and-agents-2300)) is skipped and named.
+- **Rename, move, dissolve** act on the folders of the person who does it. The owner's rename or move takes the
+  folder's lists (and so their place for every member) and the folder's shares along; dissolving moves the lists one
+  level up and ends the folder's share for new lists. A member who renames or dissolves a folder changes only their own
+  sidebar.
+
+Web API (signed in as a person): `GET /api/folders/people?folder=` · `PUT /api/folders/people`
+`{folder, user_id, role?}` · `DELETE /api/folders/people` `{folder, user_id, remove?}`; `GET /api/folders/props?folder=`
+· `PUT /api/folders/props` `{folder, props: {org_id?, agent_id?, agent_members?, agent_peers?, agent_tidy?, …}
+(null removes a default), apply?: all | new, force?, dry_run?}` (`dry_run: true` only reports what would change);
+`POST /api/lists/{id}/folder-reset` `{keys?}` (*Back to the folder*). `/api/v1`: `GET /folders`,
+`POST /folders/rename`, `POST /folders/delete` (see [Endpoints](#endpoints)).
+
+## Lists, people and agents (2.30.0)
+
+The **people circle** of a list is its owner plus its members that are persons (any role; agents do not count). An
+agent in two lists whose circles are neither equal nor nested is a **bridge**. A list with exactly the people of another list of the agent adds no new one. Background and rules:
+[AGENT-SECURITY.md](AGENT-SECURITY.md#server-enforced-boundaries-230).
+
+| Call | What changes in 2.30.0 |
+|---|---|
+| `PUT /api/lists/{id}/members` · `PUT /api/lists/{id}/agent` (web) · `PUT /lists/{id}/members/{user_id}` (`/api/v1`) | Sharing a list with an agent, or adding a person to a list that has an agent, that creates a bridge: `409` with the code `agent_bridge`, `bridges: [{list_id, name}]` (the lists the asking person sees) and `hidden` (how many others); in `/api/v1` inside `error`, in the web API next to `error`. Also `GET /api/agents/{id}/bridges` lists the pairs. Again with `"bridge_ok": true` from a person who manages every list involved (owner or list admin) or owns the personal agent: allowed and stored. Never from an agent. |
+| `PATCH /tasks/{id}` with `list_id` · `POST /tasks/{id}/move` · `POST /tasks/batch` with `changes.list_id` | An **agent** moving tasks into a list whose people circle is not a subset of the source list's circle: `202` with a waiting job until a person approves (see [AGENTS.md](AGENTS.md#requests-that-wait-for-a-person-2150)). |
+| `POST /api/me/tokens` · `PATCH /api/me/tokens/{id}` | `list_ids`: limit a personal token to these lists (`[]` = all). |
+| `PATCH /api/admin/agents/{id}` · `PATCH /api/my/agents/{id}` | `list_ids`: limit an agent to these of its lists (`[]` = all). |
+| `GET /me` (`/api/v1`) | `token.list_ids`: the restriction of the token in use. |
+| `GET /api/lists/{id}/agent-access` | Every member of the list: `{days: 30, data: [{agent_id, name, day, read, write}]}`, one counter per agent, day and kind (read / write), kept 30 days. In the app: list menu *Agent access*. |
+
+*Share all existing lists* skips lists that would create a bridge and names them (`bridge`, `bridge_reason`); *Share new
+lists automatically*, shared folders, a folder's agent setting, groups and sharing by e-mail address skip them silently
+(an address share never reveals whether an account exists). `PATCH /api/admin/agents/{id}` / `PATCH /api/my/agents/{id}`
+with `list_ids` that would switch on an unapproved bridge: `409 agent_bridge`, `bridge_ok: true` confirms it. A limited
+token gets `403` on `GET /export` and only the News of its lists. Bridges from before 2.30 stay, flagged in the agent's
+settings ("connects lists with different people").

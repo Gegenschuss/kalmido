@@ -23,6 +23,29 @@ def safe_name(n):
     return n or "datei"
 
 
+# 2.30.0 (#380): files an agent stores never carry an executable / script ending (a downloaded "fix.sh" an injected agent
+# wrote must not be one double click away from running): the name gets ".txt" appended and the file is plain text.
+EXEC_EXT = {"sh", "bash", "zsh", "fish", "ksh", "csh", "command", "tool", "ps1", "psm1", "psd1", "bat", "cmd", "exe", "com", "msi",
+            "msp", "msix", "appx", "vbs", "vbe", "jse", "wsf", "wsh", "scr", "pif", "cpl", "hta", "lnk", "reg", "jar", "app",
+            "dmg", "pkg", "deb", "rpm", "apk", "run", "bin", "elf", "out", "desktop", "scpt", "applescript", "workflow", "inf",
+            "gadget", "dll", "so", "dylib", "action", "url", "website", "library-ms", "settingcontent-ms", "appimage", "xll", "xlam"}
+
+
+def file_ext(name):
+    name = name.rstrip(". ")  # "evil.bat." / "evil.bat " end up as evil.bat once saved on Windows
+    return name.rsplit(".", 1)[1].lower() if "." in name.strip(".") else ""
+
+
+def unexec_name(name):
+    """The stored name of an agent's file: an executable ending gets ".txt" appended (deploy.sh -> deploy.sh.txt)."""
+    return name[:146] + ".txt" if file_ext(name) in EXEC_EXT else name
+
+
+def uploader_is_agent(c, uid):
+    r = c.execute("SELECT kind FROM users WHERE id=?", (uid,)).fetchone() if uid else None
+    return bool(r) and (r["kind"] or "user") == "agent"
+
+
 @app.post("/api/tasks/<int:tid>/attachments")
 def attachment_upload(tid):
     c = db()
@@ -36,7 +59,8 @@ def attachment_upload(tid):
         c.rollback()
         unlink_files(saved)
         return err(e)
-    log_act(c, tid, "attach", {"names": [safe_name(f.filename) for f in files][:20], "n": len(files)})
+    ag = uploader_is_agent(c, me())  # 2.30.0 (#380): the names as stored (an agent's deploy.sh became deploy.sh.txt)
+    log_act(c, tid, "attach", {"names": [unexec_name(safe_name(f.filename)) if ag else safe_name(f.filename) for f in files][:20], "n": len(files)})
     bump(c)
     c.commit()
     return jsonify(one_task(c, tid))
@@ -56,8 +80,12 @@ def save_attachments(c, tid, files, comment_id=None, saved=None, uid=None):
         aa_count("storage", "attachments", aa_oserr(e))
         raise
     ts = iso(now_utc())
+    agent = uploader_is_agent(c, uid)  # 2.30.0 (#380)
     for f in files:
         name = safe_name(f.filename)
+        unexec = agent and unexec_name(name) != name
+        if unexec:
+            name = unexec_name(name)
         rel = os.path.join(str(tid), f"{uuid.uuid4().hex[:12]}-{name}")
         full = os.path.join(ATT_DIR, rel)
         try:
@@ -74,13 +102,83 @@ def save_attachments(c, tid, files, comment_id=None, saved=None, uid=None):
             return tr("{0}: the file is empty and was not uploaded", name)
         if saved is not None:
             saved.append(rel)
-        mime = (f.mimetype if f.mimetype and f.mimetype != "application/octet-stream" else None) \
+        mime = "text/plain" if unexec else (f.mimetype if f.mimetype and f.mimetype != "application/octet-stream" else None) \
             or mimetypes.guess_type(name)[0] or "application/octet-stream"
         c.execute("INSERT INTO attachments(task_id,name,mime,size,path,created_at,comment_id,user_id) VALUES(?,?,?,?,?,?,?,?)",
                   (tid, name, mime, size, rel, ts, comment_id, uid))
     if comment_id is None:
         c.execute("UPDATE tasks SET updated_at=? WHERE id=?", (ts, tid))
     return None
+
+
+# 2.30.0 (#380): text files written by agents / scripts through the API (name + UTF-8 content, no upload form): Markdown,
+# plain text, HTML / CSS / JS sources, data and code. The app shows them as a preview (Markdown formatted, the rest as
+# source); they are never served for the browser to run (send_stored: a download, octet-stream, sandbox CSP).
+TEXT_MAX = 1024 * 1024  # bytes (UTF-8): larger texts belong into an upload
+TEXT_EXT = {"md", "markdown", "txt", "text", "log", "html", "htm", "css", "scss", "sass", "less", "js", "mjs", "cjs", "jsx", "ts", "tsx",
+            "json", "jsonl", "ndjson", "csv", "tsv", "xml", "yml", "yaml", "toml", "ini", "cfg", "conf", "env", "properties", "py", "pyi",
+            "rb", "go", "rs", "java", "kt", "kts", "scala", "swift", "c", "h", "cc", "cpp", "cxx", "hpp", "cs", "php", "pl", "lua", "r",
+            "dart", "ex", "exs", "erl", "hs", "ml", "clj", "sql", "graphql", "proto", "tf", "diff", "patch", "vue", "svelte", "rst",
+            "adoc", "tex", "bib", "srt", "vtt", "ics", "vcf", "mk", "cmake", "gradle", "lock"}
+TEXT_MIME = {"md": "text/markdown", "markdown": "text/markdown", "csv": "text/csv", "tsv": "text/tab-separated-values", "json": "application/json",
+             "html": "text/html", "htm": "text/html", "css": "text/css", "js": "text/javascript", "mjs": "text/javascript", "xml": "application/xml",
+             "yml": "application/yaml", "yaml": "application/yaml"}
+_VER_RE = re.compile(r"^(.*?)(?: \(v(\d{1,6})\))?$")
+
+
+def text_file_name(name):
+    """The stored name of a text file: safe, a known text ending (anything else, executables included, gets ".txt")."""
+    name = safe_name(name)
+    return name if file_ext(name) in TEXT_EXT else name[:146] + ".txt"
+
+
+def text_version_name(c, tid, name):
+    """Same name as a file of the task = a new version next to it, the old one stays: "report.md" -> "report (v2).md"
+    (v3, ... after the highest one). Returns (name, version, the id of the newest earlier version or None)."""
+    stem, dot, ext = name.rpartition(".") if "." in name.strip(".") else (name, "", "")
+    base = _VER_RE.match(stem).group(1)
+    best, prev = 0, None
+    for r in c.execute("SELECT id, name FROM attachments WHERE task_id=? AND comment_id IS NULL ORDER BY id", (tid,)):
+        st, d2, ex = r["name"].rpartition(".") if "." in r["name"].strip(".") else (r["name"], "", "")
+        if ex.lower() != ext.lower() or d2 != dot:
+            continue
+        m = _VER_RE.match(st)
+        if m.group(1) == base:
+            v = int(m.group(2) or 1)
+            if v >= best:
+                best, prev = v, r["id"]
+    if not best:
+        return name, 1, None
+    return f"{base[:140]} (v{best + 1}){dot}{ext}", best + 1, prev
+
+
+def text_attachment_create(c, tid, name, content):
+    """Stores `content` (str) as a text file of task tid (caller checked the rights; commits). Returns the new row as a dict
+    (+ version, replaces) or raises ValueError with the message."""
+    import io
+    from werkzeug.datastructures import FileStorage
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError(tr("Name missing"))
+    if not isinstance(content, str):
+        raise ValueError(tr("Expected {0}", '{"name": "...", "content": "..."}'))
+    data = content.encode("utf-8")
+    if not data:
+        raise ValueError(tr("{0}: the file is empty and was not uploaded", safe_name(name)))
+    if len(data) > TEXT_MAX:
+        raise ValueError(tr("{0}: larger than {1} MB", safe_name(name), TEXT_MAX // (1024 * 1024)))
+    fname, ver, prev = text_version_name(c, tid, text_file_name(name))
+    mime = TEXT_MIME.get(file_ext(fname), "text/plain")
+    saved = []
+    e = save_attachments(c, tid, [FileStorage(stream=io.BytesIO(data), filename=fname, content_type=mime)], saved=saved)
+    if e:
+        c.rollback()
+        unlink_files(saved)
+        raise ValueError(e)
+    row = c.execute("SELECT id, task_id, name, mime, size, created_at FROM attachments WHERE task_id=? ORDER BY id DESC LIMIT 1", (tid,)).fetchone()
+    log_act(c, tid, "attach", {"names": [row["name"]], "n": 1, **({"version": ver} if ver > 1 else {})})
+    bump(c)
+    c.commit()
+    return {**dict(row), "comment_id": None, "version": ver, "replaces": prev}
 
 
 def need_attachment(c, aid, write):

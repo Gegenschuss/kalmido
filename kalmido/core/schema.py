@@ -612,6 +612,14 @@ CREATE TABLE IF NOT EXISTS user_invites (
 CREATE TABLE IF NOT EXISTS folder_props (
   owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, folder TEXT NOT NULL, props TEXT NOT NULL DEFAULT '{}',
   updated_at TEXT NOT NULL, PRIMARY KEY (owner_id, folder));
+-- 2.30.0 (#919): an owner's approval that agent_id may connect two lists with different people (list_a < list_b), and the
+-- agents' list access log: one counter per agent, list, day and kind (read | write), kept AGENT_ACCESS_DAYS days
+CREATE TABLE IF NOT EXISTS agent_bridges (
+  agent_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, list_a INTEGER NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
+  list_b INTEGER NOT NULL REFERENCES lists(id) ON DELETE CASCADE, by_id INTEGER, at TEXT NOT NULL, PRIMARY KEY (agent_id, list_a, list_b));
+CREATE TABLE IF NOT EXISTS agent_list_access (
+  agent_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, list_id INTEGER NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
+  day TEXT NOT NULL, kind TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (list_id, day, agent_id, kind));
 -- 2.22.0 (#740): "Share folder": the owner's folder is shared with a person: its lists now and every list that comes into it later
 CREATE TABLE IF NOT EXISTS folder_people (
   owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, folder TEXT NOT NULL,
@@ -858,6 +866,14 @@ MIGRATIONS = [
     ("agent_chat", "choice", "ALTER TABLE agent_chat ADD COLUMN choice TEXT"),
     # 2.29.0 (#1030 / #929): the folder defaults a list keeps on its own (json list of keys, "differs from the folder")
     ("lists", "folder_own", "ALTER TABLE lists ADD COLUMN folder_own TEXT NOT NULL DEFAULT '[]'"),
+    # 2.30.0 (#1036): calendars and address books belong to a workspace like lists (NULL = the owner's private space; an
+    # organisation's one only for its members and agents, a private one never for an organisation's agent). Only new
+    # columns with the default NULL: an older version keeps working with the database (it ignores them)
+    ("ev_cals", "org_id", "ALTER TABLE ev_cals ADD COLUMN org_id INTEGER REFERENCES orgs(id) ON DELETE SET NULL"),
+    ("books", "org_id", "ALTER TABLE books ADD COLUMN org_id INTEGER REFERENCES orgs(id) ON DELETE SET NULL"),
+    # 2.30.0 (#919): least privilege: an agent / a token limited to these lists (csv of ids, '' = all its lists)
+    ("agents", "list_ids", "ALTER TABLE agents ADD COLUMN list_ids TEXT NOT NULL DEFAULT ''"),
+    ("api_tokens", "list_ids", "ALTER TABLE api_tokens ADD COLUMN list_ids TEXT NOT NULL DEFAULT ''"),
 ]
 INDEXES = """
 CREATE INDEX IF NOT EXISTS lists_owner ON lists(owner_id);

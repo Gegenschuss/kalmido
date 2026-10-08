@@ -96,6 +96,10 @@ def grp_sync(c, lids, actor=None):
                     if role_max(want.get(uid), role) != want.get(uid):
                         want[uid], gname[uid] = role_max(want.get(uid), role), gid
         rows = {r["user_id"]: r for r in c.execute("SELECT * FROM list_members WHERE list_id=?", (lid,))}
+        if want and not lr["is_inbox"]:  # 2.30.0 (#919): a group never adds a person who would connect lists with different
+            from ..agents.safety import bridge_blocks  # people through the list's agent (skipped like another workspace)
+            for uid in [u for u in want if u not in rows and bridge_blocks(c, lid, u)]:
+                want.pop(uid, None)
         for uid in sorted(set(rows) | set(want)):
             r, gr = rows.get(uid), want.get(uid)
             own = None
@@ -162,6 +166,10 @@ def groups_for(c, uid=None, full=False):
     if instance_mode(c) == "workspaces" and has_request_context() and getattr(g, "user", None) is not None:
         vis = visible_people(c, me())
         if vis is not None:
+            # 2.30.0 (#1036, B1): a group is known only to its creator, its members and the people of an organisation one of
+            # its members is in (its name stays inside the organisation; a private connection to one member is not enough)
+            ok = {d["id"] for d in out if grp_visible(c, d)}
+            out = [d for d in out if d["id"] in ok]
             for d in out:
                 d["members"] = [m for m in d["members"] if m["user_id"] in vis]
     return out
@@ -210,9 +218,28 @@ def grp_oidc_sync(c, uid, claim_groups):
             grp_set_members(c, r["id"], sorted(mem | {uid} if want else mem - {uid}), actor=uid)
 
 
+def grp_visible(c, r):
+    """2.30.0 (#1036, B1): in the mode workspaces a group is visible to its creator, its members and the members of the
+    organisations its members belong to -- not to somebody who only knows one member privately."""
+    from ..accounts.orgs import instance_mode, user_orgs
+    if instance_mode(c) != "workspaces" or not has_request_context() or getattr(g, "user", None) is None:
+        return True
+    uid = me()
+    if c.execute("SELECT created_by FROM groups WHERE id=?", (r["id"],)).fetchone()[0] == uid:
+        return True
+    mem = grp_members(c, r["id"])
+    if uid in mem:
+        return True
+    mine = user_orgs(c, uid)
+    if not mine or not mem:
+        return False
+    return bool(c.execute(f"SELECT 1 FROM org_members WHERE org_id IN ({','.join('?' * len(mine))}) AND user_id IN ({','.join('?' * len(mem))}) LIMIT 1",
+                          [*mine, *mem]).fetchone())
+
+
 def need_group(c, gid):
     r = c.execute("SELECT * FROM groups WHERE id=?", (gid,)).fetchone()
-    if not r:
+    if not r or not grp_visible(c, r):
         raise Denied(404, tr("unknown group"))
     return r
 

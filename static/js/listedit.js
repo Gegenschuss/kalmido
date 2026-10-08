@@ -181,13 +181,14 @@ function liconUpload(lid) {
 }
 
 // ---- #299 "Claude is writing …": while an agent reports "working", under the last chat message and in the comment area of
-// the task it works on (status task_id, a running job on the task, else every task of its lists); a spinning ring on the
-// header chip / the agents button everywhere; "waiting" = an accent dot instead
+// the task it works on; a spinning ring on the header chip / the agents button everywhere; "waiting" = an accent dot instead.
+// 2.30.0 (#1039): only where it really writes -- "working" with a task_id (or a running job on a task) shows in exactly that
+// task, never in other tasks of its lists; "working" without a task only in the chat (under the last message) and the
+// header chip. The status text shows in a task only when the agent named that task (never chat content in a shared task).
 const workingAgents = () => (S.agents || []).filter(a => a.enabled && a.status === 'working');
 function taskTypers(t) {
   if (!t || !(t.id > 0) || t.context) return [];
-  const mine = new Set(taskAgents(t).map(a => a.id));
-  const ags = workingAgents().filter(a => a.status_task === t.id || (a.job_tasks || []).includes(t.id) || (!a.status_task && mine.has(a.id)));
+  const ags = workingAgents().filter(a => a.status_task === t.id || (a.job_tasks || []).includes(t.id)).map(a => a.status_task === t.id ? a : {...a, status_text: ''});
   // 2.22.0 (#693): people and agents that sent the typing signal for this task's comments (GET /api/version, ty)
   const ty = (S.ctyping || []).filter(x => x.task_id === t.id);
   return [...ags.map(a => ty.some(x => x.user_id === a.id) ? {...a, typing: Infinity} : a),
@@ -205,7 +206,7 @@ function typingHtml(ags, id) {
   if (!ags.length) return `<div class="atyping hidden" id="${id}" role="status" aria-live="polite"></div>`;
   // 2.13.2 (#478 F6): "is writing …" (dots) only for a real typing signal (or the chat's answer on its way); an agent that
   // only reports "working" on the task "is working on it"
-  const wr = a => id === 'chat-typing' || (a.typing || 0) - agentAge() > 0, any = ags.some(wr);
+  const wr = a => (id === 'chat-typing' && !a.busy) || (a.typing || 0) - agentAge() > 0, any = ags.some(wr);
   return `<div class="atyping" id="${id}" role="status" aria-live="polite">${any ? '<span class="atdots" aria-hidden="true"><i></i><i></i><i></i></span>' : hdot('working')}<span class="ttx">${ags.map(a => esc(wr(a) ? tr('{0} is writing …', a.name) : tr('{0} is working on it', a.name)) + (a.status_text ? ` <span class="muted">· ${esc(a.status_text)}</span>` : '')).join('<br>')}</span></div>`;
 }
 const agentBusyState = () => { const ags = (S.agents || []).filter(a => a.enabled && !agentOffline(a)); return ags.some(a => a.status === 'working') ? 'working' : ags.some(a => a.status === 'waiting' || a.waiting) ? 'waiting' : ''; };
@@ -219,7 +220,7 @@ function agentLive() {
   // shorter, so a list that was at the bottom is put back to the bottom
   const c = $('#chat-typing'), a = S.chat.aid && agentById(S.chat.aid), box = $('#chat-msgs'), pin = !!box && chatNear(box);
   const swap = (el, h) => { if (el && el._h !== h && el.outerHTML !== h) { el.outerHTML = h; const n = $('#' + el.id); if (n) n._h = h; } };
-  if (c) swap(c, typingHtml(chatTyping(a) ? [a] : [], 'chat-typing'));
+  if (c) swap(c, typingHtml(chatTypers(a), 'chat-typing'));
   if (a) swap($('#chat-st'), chatStHtml(a));
   if (pin && box.isConnected && !chatNear(box)) box.scrollTop = box.scrollHeight;
   const st = agentBusyState();

@@ -75,7 +75,8 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   const q3 = await tcall('POST', `/agent/chats/${ME}`, TOK, {body: 'May I merge the branch?'});
   await w.eval('chatLoad()'); await sleep(300);
   const r3 = () => d.querySelector(`#chat-msgs .cmsg[data-mid="${q3.id}"]`);
-  check(r3()?.querySelector('.rxrow .rxhint')?.textContent === '👍 = approval', 'A2: the newest question shows its bar with "👍 = approval"');
+  // 2.30.0 (#1041, intended change): no "👍 = approval" hint any more; 👍 / 👎 stay one tap away on the newest question
+  check(!r3()?.querySelector('.rxhint') && r3()?.querySelector('.rxrow [data-e="up"]:not(.rxq)') && r3()?.querySelector('.rxrow [data-e="down"]:not(.rxq)'), 'A2: the newest question keeps 👍 / 👎 at hand, without the hint');
   check(/counts as approval/.test(r3()?.querySelector('.rxrow [data-e="up"]')?.getAttribute('aria-label') || ''), 'A2: its 👍 says it counts as approval');
   click(w, r3().querySelector('.rxrow [data-e="up"]')); await until(() => r3()?.querySelector('.rxok'), 100);
   check(/Counted as approval/.test(r3()?.querySelector('.rxok')?.textContent || '') && !r3()?.querySelector('.rxhint') && r3()?.querySelector('.rxrow .rx.on[data-e="up"][aria-pressed="true"]'), 'A2: after 👍: "Counted as approval", 👍 pressed ' + (r3()?.innerHTML || '-').replace(/<svg.*?<\/svg>/g, '').slice(0, 400));

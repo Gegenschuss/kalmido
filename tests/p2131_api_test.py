@@ -120,7 +120,7 @@ assert A.put(B + f"/api/lists/{L1}/members", json={"user_id": ids["bob"], "role"
 assert A.put(B + f"/api/lists/{L1}/members", json={"user_id": AG, "role": "edit"}).ok
 legacy_agent(L1, AG2, "view")
 assert A.put(B + f"/api/lists/{L3}/members", json={"user_id": AG, "role": "participant"}).ok
-assert A.put(B + f"/api/lists/{L3}/members", json={"user_id": ids["carol"], "role": "edit"}).ok
+assert A.put(B + f"/api/lists/{L3}/members", json={"user_id": ids["carol"], "role": "edit", "bridge_ok": True}).ok  # 2.30.0 (#919): Team + Shop differ
 for lid in (L1, L3):  # 2.26.0: members may use the agents (list switch, default off)
     assert A.patch(B + f"/api/lists/{lid}", json={"agent_members": True, "agent_peers": True}).ok
 
@@ -287,7 +287,9 @@ check("listen_agent_ids" in spec["components"]["schemas"]["List"]["properties"]
 st = lambda s, lid: next(x for x in s.get(B + "/api/state").json()["lists"] if x["id"] == lid)  # noqa: E731
 check(st(A, L1)["listen_agent_ids"] == [], "default without tidy: nobody")
 assert A.patch(B + f"/api/lists/{L1}", json={"agent_tidy": "suggest", "tidy_agent_id": AG}).ok
-check(st(A, L1)["listen_agent_ids"] == [AG], "default with tidy on: the tidy agent")
+# 2.30.0 (#1034, intended change): tidying is its own switch, it no longer makes the tidy agent listen in
+check(st(A, L1)["listen_agent_ids"] == [], "default with tidy on: still nobody (tidying is separate since 2.30)")
+assert A.patch(B + f"/api/lists/{L1}", json={"listen_agent_ids": [AG]}).ok
 check(alice_api.req("GET", f"/lists/{L1}").json().get("listen_agent_ids") == [AG], "API v1 list: listen_agent_ids")
 T5 = A.post(B + "/api/tasks", json={"title": "Never touched by claude", "list_id": L1}).json()["id"]
 _, cur = events(cl, 0)

@@ -103,7 +103,9 @@ const form = (fields, files) => { const fd = new FormData(); for (const [k, v] o
     w.eval(`shareModal(${L})`); await sleep(900);
     const box = d.querySelector('#l-tidyrow .lsnrow');
     const cb = box?.querySelector(`input[data-lsn="${AG}"]`);
-    check(box && /Agent reads every comment/.test(box.textContent) && cb?.checked, 'list dialog: "Agent reads every comment", Claude checked by default (tidy agent)');
+    // 2.30.0 (#1034, intended change): "Agent listens in"; tidying no longer switches it on (the suite's list has it set below)
+    check(box && /Agent listens in/.test(box.textContent) && cb, 'list dialog: "Agent listens in"');
+    if (!cb.checked) { cb.checked = true; cb.dispatchEvent(new w.Event('change', {bubbles: true})); await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === L).listen_agent_ids[0] === AG); }
     cb.checked = false; cb.dispatchEvent(new w.Event('change', {bubbles: true}));
     await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === L).listen_agent_ids.length === 0);
     check((await call('GET', '/api/state')).lists.find(l => l.id === L).listen_agent_ids.length === 0, 'unchecking saves []');

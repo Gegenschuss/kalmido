@@ -15,7 +15,7 @@ from ..accounts.session import me
 from ..core.access import Denied, need_collab
 from ..personal.timetrack import BadInput
 
-FOLDER_PROPS = ("org_id", "agent_id", "agent_members", "agent_peers", "agent_tidy")
+FOLDER_PROPS = ("org_id", "agent_id", "agent_members", "agent_peers", "agent_tidy", "agent_listen")  # 2.30.0 (#1034): agent_listen
 FOLDER_APPLY = ("all", "new")
 
 
@@ -135,6 +135,10 @@ def folder_apply(c, lid, keys=None, force=False, dry=False):
                 if v and ws_member_problem(c, lid, v, org_id=(eff.get("org_id") or 0) if "org_id" in eff and "org_id" not in own else None):
                     skipped.append({"key": k, "reason": tr("The agent works in another workspace")})
                     continue
+                from ..agents.safety import bridge_blocks
+                if v and bridge_blocks(c, lid, v):  # 2.30.0 (#919): would connect lists with different people
+                    skipped.append({"key": k, "reason": tr("Other people than in the agent’s other lists: choose the agent in this list to confirm it")})
+                    continue
                 if not dry:
                     g.folder_applying = True  # list_agent_set must not mark it as the list's own
                     try:
@@ -148,6 +152,14 @@ def folder_apply(c, lid, keys=None, force=False, dry=False):
                     continue
                 if not dry:
                     c.execute(f"UPDATE lists SET {k}=? WHERE id=?", (int(bool(v)), lid))
+                changed += 1
+            elif k == "agent_listen":  # 2.30.0 (#1034): every agent of the list listens in / only per @mention
+                from ..agents.core import listen_set_all
+                cur = c.execute("SELECT agent_listen FROM lists WHERE id=?", (lid,)).fetchone()[0]
+                if cur == ("*" if v else "-*"):
+                    continue
+                if not dry:
+                    listen_set_all(c, lid, bool(v))
                 changed += 1
             elif k == "agent_tidy":
                 cur = c.execute("SELECT agent_tidy FROM lists WHERE id=?", (lid,)).fetchone()[0] or "off"
@@ -206,7 +218,7 @@ def _clean_props(c, b):
                 if (o is not None and o != me()) or (o is None and not agent_shares(c, v, me()) and not g.user["is_admin"]):
                     raise BadInput(tr("Invalid value: {0}", k))
                 out[k] = v
-        elif k in ("agent_members", "agent_peers"):
+        elif k in ("agent_members", "agent_peers", "agent_listen"):
             if not isinstance(v, bool) and v not in (0, 1):
                 raise BadInput(tr("Invalid value: {0}", k))
             out[k] = bool(v)
@@ -244,7 +256,7 @@ def folder_props_get():
 
 @app.put("/api/folders/props")
 def folder_props_put():
-    """{folder, props: {org_id?, agent_id?, agent_members?, agent_peers?, agent_tidy?} (null removes a default),
+    """{folder, props: {org_id?, agent_id?, agent_members?, agent_peers?, agent_tidy?, agent_listen?} (null removes a default),
     apply: all (default: the existing lists follow) | new (only lists that come later), force?: also the lists that differ on
     purpose, dry_run?: only say what would happen}. -> {props, changed, lists: [{id, name, skipped: [{key, reason}]}]}"""
     from ..lists.lists import clean_folder
@@ -349,7 +361,12 @@ def folder_member_created(c, uid, lid):
             continue
         if _folder_member_add(c, lid, fp["owner_id"], "admin", uid):
             n += 1
+        from ..agents.admin import personal_agent_foreign
         for p in c.execute("SELECT user_id, role FROM folder_people WHERE owner_id=? AND folder=? AND user_id!=?", (fp["owner_id"], fp["folder"], uid)).fetchall():
+            # 2.30.0 (#1036): only people uid may see and no personal agent of somebody else (as when uid shares by hand);
+            # the workspace rule itself is checked by _folder_member_add
+            if not may_see(c, uid, p["user_id"]) or personal_agent_foreign(c, p["user_id"], uid):
+                continue
             if _folder_member_add(c, lid, p["user_id"], p["role"], uid):
                 n += 1
     return n

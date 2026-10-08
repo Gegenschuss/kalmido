@@ -34,7 +34,7 @@ from ..agents.core import (
 )
 from ..collab.reactions import clean_suggestion, tidy_apply
 from ..agents.chat import (
-    chat_delivered, chat_dict, chat_file_access, chat_file_delete, chat_files_of, chat_input, chat_one, chat_post,
+    chat_delivered, chat_dict, chat_file_access, chat_newest, chat_file_delete, chat_files_of, chat_input, chat_one, chat_post,
     chat_react_req, chat_reactions_of, chat_unlink_trimmed,
 )
 
@@ -602,7 +602,9 @@ def prop_run(c, j, sel, ed, extra):
                     c.execute("INSERT OR IGNORE INTO task_deps(task_id,blocker_id,created_by,created_at) VALUES(?,?,?,?)", (ids[i], ids[d], uid, ts))
         from ..core.access import list_other_agent
         from ..accounts.orgs import ws_member_problem
-        if extra.get("share_agent") and agent_active(agent_row(c, aid)) and not list_other_agent(c, lid, aid) and not ws_member_problem(c, lid, aid):  # 2.26.0; 2.28.0 (#935)
+        from ..agents.safety import bridge_blocks
+        if extra.get("share_agent") and agent_active(agent_row(c, aid)) and not list_other_agent(c, lid, aid) and not ws_member_problem(c, lid, aid) \
+                and not bridge_blocks(c, lid, aid):  # 2.26.0; 2.28.0 (#935); 2.30.0 (#919): no bridge between lists with different people
             c.execute("INSERT OR IGNORE INTO list_members(list_id,user_id,role,sort,added_at) VALUES(?,?,?,?,?)",
                       (lid, aid, "edit", my_max_sort(c, aid) + 1, ts))
             rec["shared"] = True
@@ -960,7 +962,8 @@ def v1_agent_chats():
         rows = [c.execute("SELECT * FROM agent_chat WHERE id=?", (r["id"],)).fetchone() for r in rows]
     names = user_names(c, [r["user_id"] for r in rows])
     rx, fs = chat_reactions_of(c, [r["id"] for r in rows]), chat_files_of(c, [r["id"] for r in rows])
-    return jsonify(data=[{**chat_dict(r, rx, fs, api=True), "user": {"id": r["user_id"], "name": names.get(r["user_id"], "")}} for r in rows],
+    nw = {u: chat_newest(c, aid, u) for u in {r["user_id"] for r in rows}}  # 2.30.0 (#1037): choice_state
+    return jsonify(data=[{**chat_dict(r, rx, fs, api=True, newest=nw[r["user_id"]]), "user": {"id": r["user_id"], "name": names.get(r["user_id"], "")}} for r in rows],
                    cursor=rows[-1]["id"] if rows else since, has_more=more)
 
 
@@ -975,9 +978,10 @@ def v1_agent_chat_post(uid):
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if not u or is_agent(u) or not agent_shares(c, aid, uid):
         raise Denied(404)
-    fb, files = chat_input(("body", "task_id", "choices", "multi"))
+    fb, files = chat_input(("body", "task_id", "choices", "multi", "permission", "expires_in"))
     b = fb if fb is not None else v1_json()
-    unknown = sorted(k for k in b if k not in ("body", "task_id", "choices", "multi"))  # 2.28.0 (#1005): answer buttons
+    # 2.28.0 (#1005): answer buttons; 2.30.0 (#1041): permission questions (permission, expires_in)
+    unknown = sorted(k for k in b if k not in ("body", "task_id", "choices", "multi", "permission", "expires_in"))
     if unknown:
         raise UnknownFields(unknown)
     if fb is not None and isinstance(b.get("multi"), str):

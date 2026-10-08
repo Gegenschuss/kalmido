@@ -144,6 +144,7 @@ The most used helpers:
 | `agents/api.py` | The REST API of an agent itself (token of an agent account). |
 | `agents/proposals.py` | Agent proposals, validation helpers, requests from people to agents. |
 | `agents/gates.py` | 2.26.0: approval requests without a pull request (ready to integrate / ready to deploy with its checklist). |
+| `agents/safety.py` | 2.30.0: agents stay inside one circle of people: bridges between lists with different people (409 + approval), moving tasks across circles waits for approval, the list restriction of agents / tokens, the agents' list access log. |
 | `agents/usage.py` | Model usage of agents, limits and the agents' audit log. |
 | `lists/public.py` | Public links of lists and checklist mode. |
 | `integrations/git.py` | Git integration of project lists (GitHub, GitLab, Gitea / Forgejo, Bitbucket) and tickets for agents. |
@@ -307,3 +308,10 @@ manage them). Every list / agent has a workspace (`lists.org_id`, `agents.org_id
 `ws_member_problem()` / `ws_check_member()` in `accounts/orgs.py`, called on every way into a list (members, folder people,
 agent shares, groups, ownership) and when the owner moves a list (`list_org_set`). The web client only decides what it
 shows (`static/js/workspace.js`, setting `workspace`); `ws_migrate()` assigns the workspaces once on the update.
+2.30.0 (#1036): calendars and address books have a workspace too (`ev_cals.org_id`, `books.org_id`); the rule for every
+shared object is `ws_fit_problem(c, org_id, user_id)` (lists use it through `ws_member_problem`), the owner moves one with
+`obj_org_set`, `ws_migrate_objs()` (`accounts/tenancy.py`) assigns them once. The boundary is guarded three ways: the
+cross-tenant matrix (`tests/p2280_api_test.py`, `tests/p2300_tenant_test.py`) with `tests/tenant_coverage_test.py`, which
+fails for every route that is neither in the matrix nor listed with a reason; the nightly boundary check in the watchdog
+(`boundary_tick`: every membership across the boundary, an admin alert, the count in `GET /api/admin/orgs`); and the schema
+rule in `tools/check_layout.py` (a new table with a person in it carries `org_id` / `list_id` or a reason in `TENANT_EXEMPT`).

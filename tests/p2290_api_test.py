@@ -110,6 +110,7 @@ W = A.post(B + "/api/lists", json={"name": "Work", "org_id": ORG}).json()
 A.put(B + f"/api/lists/{W['id']}/members", json={"user_id": CL, "role": "edit"})
 A.put(B + f"/api/lists/{W['id']}/members", json={"user_id": BOB, "role": "admin"})
 A.patch(B + f"/api/lists/{W['id']}", json={"agent_members": True})
+A.patch(B + f"/api/lists/{W['id']}", json={"listen_agent_ids": [CL]})  # 2.30.0 (#1034): task_added only where the agent listens in
 ag = {a["id"]: a for a in A.get(B + "/api/agents").json()["agents"]}
 check(ag[CL]["permission_mode"] == "auto" and ag[CL]["may_set_mode"] is True, "#1029: the chat header knows the mode and that the admin may switch it " + str({k: ag[CL].get(k) for k in ("permission_mode", "may_set_mode")}))
 r = A.put(B + f"/api/agents/{CL}/permission-mode", json={"mode": "ask"})
@@ -205,6 +206,10 @@ r = A.put(B + "/api/folders/props", json={"folder": "Clients", "props": {"org_id
 check(r.ok and r.json()["props"]["org_id"] == ORG, "#1030: the folder's workspace + agent " + r.text[:200])
 ls = lists_of(A)
 check(all(ls[x["id"]]["org_id"] == ORG for x in (L1, L2, L3)), "#1030: every list of the folder and its subfolder is the organisation's")
+# 2.30.0 (#919): C3 (Alice + Carol) and Work (Alice + Bob) through one agent would be a bridge: the folder skips C3, its
+# owner confirms it in the list itself
+check(any(x["id"] == L3["id"] for x in r.json().get("skipped", r.json().get("lists", []))) or CL not in members(A, L3["id"]), "2.30.0: the folder leaves the bridge list out " + r.text[:300])
+check(A.put(B + f"/api/lists/{L3['id']}/agent", json={"agent_id": CL, "bridge_ok": True}).ok, "2.30.0: ... confirmed in the list")
 check(all(CL in members(A, x["id"]) for x in (L1, L2, L3)) and all(ls[x["id"]]["agent_members"] for x in (L1, L2)), "#929: the folder's agent joined every list, Members may use it on")
 # a new list in the folder
 N1 = A.post(B + "/api/lists", json={"name": "N1", "folder": "Clients"}).json()

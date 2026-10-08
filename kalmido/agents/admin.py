@@ -29,6 +29,7 @@ from ..agents.core import (
 
 # ---- agents: admin (Settings > Users > Agents)
 def agent_admin_dict(c, a):
+    from ..agents.safety import agent_bridges_info, list_ids_out
     from ..agents.proposals import prop_mode
     from ..agents.usage import usage_limits, usage_state
     from ..api.scopes import agent_scope_dict
@@ -45,7 +46,9 @@ def agent_admin_dict(c, a):
             "owner": ({"id": a["owner_id"], "name": user_names(c, [a["owner_id"]]).get(a["owner_id"], "")} if a["owner_id"] else None),  # 2.7.2 (#420)
             "admin_paused": bool(a["admin_paused"]),
             **agent_scope_dict(c, a),  # 2.15.0 (#479): scopes, effective_scopes, allowed_ips
-            "lists": [{"id": d["id"], "name": d["name"], "role": d["role"]} for d in visible_lists(c, a["user_id"]) if not d["is_inbox"]]}
+            "lists": [{"id": d["id"], "name": d["name"], "role": d["role"]} for d in visible_lists(c, a["user_id"]) if not d["is_inbox"]],
+            # 2.30.0 (#919): limited to these lists ([] = all), the lists it connects although their people differ
+            "list_ids": list_ids_out(a["list_ids"] if "list_ids" in a.keys() else ""), "bridges": agent_bridges_info(c, a["user_id"])}
 
 
 def need_agent_admin(c, aid):
@@ -61,9 +64,9 @@ def agent_token_new(c, aid, days=None):
     a = agent_row(c, aid)
     exp = iso(now_utc() + timedelta(days=as_int(days, tr("Expiry"), 1, 3650))) if days not in (None, "", 0) else None
     tok = "abk_" + secrets.token_urlsafe(32)
-    c.execute("INSERT INTO api_tokens(user_id,name,token_hash,prefix,scopes,expires_at,created_at,allowed_ips) VALUES(?,?,?,?,?,?,?,?)",
+    c.execute("INSERT INTO api_tokens(user_id,name,token_hash,prefix,scopes,expires_at,created_at,allowed_ips,list_ids) VALUES(?,?,?,?,?,?,?,?,?)",
               (aid, "Agent", _token_hash(tok), tok[:12], (a["scopes"] if a and a["scopes"] else ",".join(SCOPES_AGENT_DEFAULT)), exp,
-               iso(now_utc()), (a["allowed_ips"] if a else "") or ""))
+               iso(now_utc()), (a["allowed_ips"] if a else "") or "", (a["list_ids"] if a and "list_ids" in a.keys() else "") or ""))
     return tok
 
 
@@ -294,6 +297,13 @@ def admin_agent_update(aid):
         except BadInput:
             c.rollback()
             raise
+    if "list_ids" in b:  # 2.30.0 (#919): limited to selected lists of its own
+        from ..agents.safety import agent_lists_set
+        try:
+            agent_lists_set(c, aid, b["list_ids"], ok=b.get("bridge_ok") is True)
+        except BadInput:
+            c.rollback()
+            raise
     if "enabled" in b:
         if not isinstance(b["enabled"], bool):
             return err(tr("Invalid value: {0}", "enabled"))
@@ -444,6 +454,12 @@ def agent_org_set(c, aid, v):
                          (SELECT list_id FROM list_members WHERE user_id=?))""", (v or 0, aid, aid)).fetchone()[0]
         if n:
             raise BadInput(tr("The agent is still in {0} lists of another workspace: take it out of them first", n))
+        # 2.30.0 (#1036): calendars and address books follow the same rule
+        n = c.execute("""SELECT (SELECT COUNT(*) FROM ev_cal_members m JOIN ev_cals k ON k.id=m.cal_id WHERE m.user_id=? AND COALESCE(k.org_id,0)!=?)
+                              + (SELECT COUNT(*) FROM book_members m JOIN books b ON b.id=m.book_id WHERE m.user_id=? AND COALESCE(b.org_id,0)!=?)""",
+                      (aid, v or 0, aid, v or 0)).fetchone()[0]
+        if n:
+            raise BadInput(tr("The agent is still in {0} calendars or address books of another workspace: take it out of them first", n))
     c.execute("UPDATE agents SET org_id=? WHERE user_id=?", (v, aid))
 
 
@@ -583,7 +599,7 @@ def my_agent_update(aid):
     a = need_own_agent(c, aid)
     b = body()
     unknown = sorted(k for k in b if k not in ("display_name", "note", "enabled", "scopes", "allowed_ips", "provider", "pause_reason", "org_id",
-                                               "runtime"))
+                                               "runtime", "list_ids", "bridge_ok"))
     if unknown:
         return err(tr("Invalid value: {0}", ", ".join(unknown)))
     if "org_id" in b:  # 2.28.0 (#935): the owner moves the agent into another workspace (its lists must fit: none of another one)
@@ -595,6 +611,13 @@ def my_agent_update(aid):
     if "scopes" in b or "allowed_ips" in b:  # 2.15.0 (#479): the owner decides what the agent may do (within the admin's limit)
         try:
             agent_scopes_set(c, aid, b)
+        except BadInput:
+            c.rollback()
+            raise
+    if "list_ids" in b:  # 2.30.0 (#919): the owner limits it to selected lists
+        from ..agents.safety import agent_lists_set
+        try:
+            agent_lists_set(c, aid, b["list_ids"], ok=b.get("bridge_ok") is True)
         except BadInput:
             c.rollback()
             raise

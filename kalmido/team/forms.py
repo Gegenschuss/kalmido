@@ -178,7 +178,7 @@ def qr_svg():
 def _find(c, token):
     if not FORM_TOKEN_RE.fullmatch(token or ""):
         return None
-    return c.execute("""SELECT f.*, l.owner_id AS l_owner, l.name AS l_name FROM forms f JOIN lists l ON l.id=f.list_id
+    return c.execute("""SELECT f.*, l.owner_id AS l_owner, l.name AS l_name, l.org_id AS l_org FROM forms f JOIN lists l ON l.id=f.list_id
                         JOIN users u ON u.id=l.owner_id WHERE f.token_hash=? AND f.enabled=1 AND u.disabled=0 AND l.archived=0""",
                      (_token_hash(token),)).fetchone()
 
@@ -221,7 +221,11 @@ def _may_use(c, f):
             return _gone(lg)
         return None
     owner_orgs, mine = set(user_orgs(c, f["l_owner"])), set(user_orgs(c, g.user["id"]))
-    if owner_orgs and not owner_orgs & mine and not g.user["is_admin"]:
+    # 2.30.0 (#1036): the form of an organisation's list is for the people of THAT organisation (not of every organisation of
+    # its owner); in the mode workspaces instance admins are no exception (as everywhere there)
+    if f["l_org"]:
+        owner_orgs = {f["l_org"]}
+    if owner_orgs and not owner_orgs & mine and not (g.user["is_admin"] and instance_mode(c) != "workspaces"):
         return _gone(lg)
     return None
 

@@ -353,7 +353,7 @@ function modRowHtml(k, opt = () => '') {
 // 2.7.0 (#405 S2): the Agents page only with the module on, or for an admin while agents exist (they manage them there)
 const aiPaneOn = () => !!S.me && (feat('agents') || (!!S.me.is_admin && (S.agents || []).length > 0));
 // 2.29.0 (#1024): ONE "Set up" (first question: for me / for the team); the server-wide switches are "Administration" (admins)
-const AI_SUBS = [['agents', 'bot', N_('Status|agents')], ['lists', 'list', N_('Lists')], ['usage', 'chart', N_('Usage')], ['log', 'clock', N_('Log')], ['setup', 'help', N_('Set up|agents')], ['admin', 'gear', N_('Administration|agents')]];  // 2.7.2 (#420): Set up
+const AI_SUBS = [['agents', 'bot', N_('Status|agents')], ['lists', 'list', N_('Lists')], ['usage', 'chart', N_('Usage')], ['log', 'clock', N_('Log')], ['setup', 'help', N_('Set up|agents')], ['safe', 'lock', N_('Use safely')], ['admin', 'gear', N_('Administration|agents')]];  // 2.30.0 (#920): Use safely  // 2.7.2 (#420): Set up
 const aiSubs = () => AI_SUBS.filter(([k]) => k === 'log' || k === 'admin' ? !!S.me?.is_admin : k === 'usage' ? !!S.me?.is_admin || (S.agents || []).length > 0 : true);
 function aiSubCur(want) { const ks = aiSubs().map(x => x[0]), k = want || LS.get('aiSub', 'agents'); return ks.includes(k) ? k : 'agents'; }
 function aiHtml(hint, want) {
@@ -377,6 +377,7 @@ function aiHtml(hint, want) {
     <div class="aiu" id="s-aiu"></div>`) : ''}
     ${adm ? pane('log', audHtml()) : ''}
     ${pane('setup', agSetupPaneHtml(hint))}
+    ${pane('safe', agSafeHtml())}
     ${adm ? pane('admin', agAdminPaneHtml(hint)) : ''}`;
 }
 // ---- 2.7.2 (#420) Settings > Agents > Set up: my personal agents (when an admin allows them), the admins' switch for
@@ -458,9 +459,9 @@ function agSetupWire(md) {
       if (!a) { agSetupDraw(md); return; }
       if (k === 'token') { agTokenModal(a, `/api/my/agents/${a.id}/token`); return; }
       if (k === 'perm') {  // 2.15.0 (#479): what my agent may do (within the admin's limit) and from where
-        permModal(tr('Permissions of {0}', a.name), box._j.scopes || [], a.scopes, a.allowed_ips, async (scopes, ips) => {
-          await calReq('PATCH', `/api/my/agents/${a.id}`, {scopes, allowed_ips: ips}); toast(tr('Saved')); agSetupDraw(md);
-        }, `<div class="shint keep">${tr('Deleting lists or fields, emptying the trash, changing 10 or more tasks at once, moving lists, folders and sharing always wait for your approval.')}</div>`);
+        permModal(tr('Permissions of {0}', a.name), box._j.scopes || [], a.scopes, a.allowed_ips, async (scopes, ips, pm) => {
+          await calReq('PATCH', `/api/my/agents/${a.id}`, {scopes, allowed_ips: ips, list_ids: listCapVal(pm, 'pm-lcap')}); toast(tr('Saved')); agSetupDraw(md);  // 2.30.0 (#919)
+        }, `<div class="row"><label>${tr('Lists')}</label>${listCapHtml(a.list_ids, a.lists, 'pm-lcap')}</div>${bridgesHtml(a)}<div class="shint keep">${tr('Deleting lists or fields, emptying the trash, changing 10 or more tasks at once, moving lists, folders and sharing always wait for your approval.')}</div>`);
         return;
       }
       if (k === 'pause') {
@@ -693,7 +694,7 @@ function settingsModal(focus) {
   };
   pane.help += aboutHtml(chk, hint);
   const secs = SET_SECS.filter(([k]) => pane[k]);
-  let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'integr', caldav: 'integr', tokens: 'account', apppw: 'account', about: 'help', groups: 'users', dayplan: 'general'}[focus] || focus;
+  let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: 'ai', agentsafe: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'integr', caldav: 'integr', tokens: 'account', apppw: 'account', about: 'help', groups: 'users', dayplan: 'general'}[focus] || focus;
   if (!secs.some(([k]) => k === cur)) cur = LS.get('settingsSec', 'general');
   if (!secs.some(([k]) => k === cur)) cur = 'general';
   const md = modal(`<div class="shdr"><button type="button" class="iconbtn sback" data-m="s-index" title="${esc(tr('All settings'))}" aria-label="${esc(tr('All settings'))}">${ic('back', 's')}</button><h3>${tr('Settings')}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><span class="ssearch">${ic('search', 's')}<input type="search" id="s-search" placeholder="${esc(tr('Search settings'))}" aria-label="${esc(tr('Search settings'))}" autocomplete="off" aria-controls="s-sres"></span><div class="ssres hidden" id="s-sres" role="listbox" aria-label="${esc(tr('Search settings'))}"></div><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
@@ -854,7 +855,7 @@ function settingsModal(focus) {
   ntfyShow(md);
   if (cur === 'users') { aaDraw(md); bkDraw(md); orphDraw(md); grpDraw(md); }
   aiTblWire(md);
-  if (cur === 'ai') aiSubShow(md, {agents: 'agents', usage: 'usage', activity: 'log'}[focus]);  // 2.5.1 (#393)
+  if (cur === 'ai') aiSubShow(md, {agents: 'agents', usage: 'usage', activity: 'log', agentsafe: 'safe'}[focus]);  // 2.5.1 (#393)
   md.addEventListener('click', e => { const b = e.target.closest('[data-aisub]'); if (b) aiSubShow(md, b.dataset.aisub, true); const g = e.target.closest('[data-aigo]'); if (g) aiSubShow(md, g.dataset.aigo, true); });
   md.addEventListener('click', e => { const b = e.target.closest('[data-admsub]'); if (b) admSubShow(md, b.dataset.admsub, true); });  // 2.24.0 (#826)
   if (S.me?.is_admin) hostWire(md);

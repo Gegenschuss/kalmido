@@ -244,7 +244,8 @@ def openapi_spec():
             "day_hours": nul("number", minimum=1, maximum=24, description="Hours per day / shift (owner); null = the server's value"),
             "listen_agent_ids": {"type": "array", "items": {"type": "integer"},
                                  "description": "2.13.1 (#471): agents of the list that get a 'comment' event for EVERY comment of a person "
-                                                "in this list (only on tasks they can see); [] = none. Owner / list admins, never an agent token"},
+                                                "in this list (only on tasks they can see); 2.30.0 (#1034): they listen in, also task_added / "
+                                                "tasks_added for created and moved tasks; [] = none. Owner / list admins, never an agent token"},
             "agent_members": {"type": "boolean", "description": "2.26.0 (#928): members may see and use the list's agents (chat, "
                               "mention, assign, comment to them). Off (default): only the owner, list admins and instance admins can; "
                               "members still see what the agents do. Owner / list admins, never an agent token"},

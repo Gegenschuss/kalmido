@@ -32,7 +32,7 @@ def op_cals(c, uid):
 
 
 def op_cal_new(c, uid, b):
-    _unknown(b, ("name", "color", "description"))
+    _unknown(b, ("name", "color", "description", "org_id"))  # 2.30.0 (#1036): org_id = its workspace
     cid = cal_create(c, uid, b)
     bump(c)
     c.commit()
@@ -40,8 +40,12 @@ def op_cal_new(c, uid, b):
 
 
 def op_cal_edit(c, uid, cid, b):
-    _unknown(b, ("name", "color", "description", "hidden"))
+    _unknown(b, ("name", "color", "description", "hidden", "org_id"))
     cal, role = need_evcal(c, cid)
+    if "org_id" in b:  # 2.30.0 (#1036): the owner moves it into another workspace (409 while a member does not fit)
+        from ..accounts.orgs import obj_org_set
+        if obj_org_set(c, "ev_cals", "cal_id", "ev_cal_members", cid, b["org_id"], "cal"):
+            cal_touch(c, cid)
     f = {k: b[k] for k in ("name", "color", "description") if k in b}
     if f:
         if role != "owner":

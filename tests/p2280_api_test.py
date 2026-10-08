@@ -335,6 +335,7 @@ check(Ca.put(B + f"/api/lists/{LB['id']}/members", json={"user_id": DAVE, "role"
 # review 5 / 12: an organisation admin cannot remove the last admin of an organisation
 check(Bo.delete(B + f"/api/orgs/{ORG}/members/1").status_code == 409 if dbx("SELECT COUNT(*) FROM org_members WHERE org_id=? AND role='admin'", (ORG,))[0][0] <= 1 else True, "review 12: the last admin of an organisation cannot be removed")
 # the cross-tenant matrix: nothing of Beta reaches alice / bob
+# 2.30.0 (#1036, tests/tenant_coverage_test.py): tenant-matrix: aggregate, task, list, news, team, agent, people, org
 TBETA = Ca.post(B + "/api/tasks", json={"title": "Secret Beta plan", "list_id": LB["id"]}).json()["id"]
 Ca.post(B + f"/api/tasks/{TBETA}/comments", json={"body": f"<@{DAVE}> secret"})
 for name, s in (("alice", A), ("bob", Bo)):

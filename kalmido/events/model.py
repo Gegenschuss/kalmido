@@ -128,7 +128,7 @@ def my_cal_ids(c, uid, hidden=True):
 def cal_public(c, r, uid, names=None):
     role = ev_role(c, uid, r)
     d = {"id": r["id"], "name": r["name"], "color": r["color"], "description": r["description"], "owner_id": r["owner_id"],
-         "role": role, "sort": r["sort"]}
+         "role": role, "sort": r["sort"], "org_id": r["org_id"]}  # 2.30.0 (#1036): its workspace (None = private)
     if names is not None:
         d["owner_name"] = names.get(r["owner_id"], "?")
     if role == "owner":
@@ -173,13 +173,17 @@ def cal_fields(b, create=False):
 
 
 def cal_create(c, uid, b):
+    """2.30.0 (#1036): b.org_id = its workspace (None / 0 = private, else an organisation of uid); not given: the default
+    of a new object (ws_obj_default: an agent's workspace, else the person's first organisation)."""
+    from ..accounts.orgs import clean_org_id, ws_obj_default
     f = cal_fields(b, True)
+    oid = clean_org_id(c, b["org_id"], uid) if "org_id" in b else ws_obj_default(c, uid)
     if c.execute("SELECT COUNT(*) FROM ev_cals WHERE owner_id=?", (uid,)).fetchone()[0] >= EV_CALS_MAX:
         raise Denied(409, tr("At most {0} calendars", EV_CALS_MAX))
     ts = iso_ms(now_utc())
     srt = (c.execute("SELECT MAX(sort) FROM ev_cals WHERE owner_id=?", (uid,)).fetchone()[0] or 0) + 1
-    return c.execute("INSERT INTO ev_cals(owner_id,name,color,description,sort,created_at,changed_at) VALUES(?,?,?,?,?,?,?)",
-                     (uid, f["name"], f.get("color") or ev_next_color(c, uid), f.get("description", ""), srt, ts, ts)).lastrowid
+    return c.execute("INSERT INTO ev_cals(owner_id,name,color,description,sort,created_at,changed_at,org_id) VALUES(?,?,?,?,?,?,?,?)",
+                     (uid, f["name"], f.get("color") or ev_next_color(c, uid), f.get("description", ""), srt, ts, ts, oid)).lastrowid
 
 
 def default_cal(c, uid, create=True):
@@ -208,6 +212,12 @@ def cal_member_set(c, cid, uid, role):
     cal = c.execute("SELECT * FROM ev_cals WHERE id=?", (cid,)).fetchone()
     if not u or uid == cal["owner_id"] or personal_agent_foreign(c, uid, me()):
         raise Denied(404, tr("unknown user"))
+    from ..accounts.orgs import need_visible, ws_fit_problem
+    if not c.execute("SELECT 1 FROM ev_cal_members WHERE cal_id=? AND user_id=?", (cid, uid)).fetchone():  # a new member
+        need_visible(c, uid)  # 2.30.0 (#1036, B2): only people one may see (404 as for an unknown id)
+        p = ws_fit_problem(c, cal["org_id"], uid, "cal")  # 2.30.0 (#1036, B3): an organisation's calendar only inside it
+        if p:
+            raise Denied(409, p)
     old = c.execute("SELECT role FROM ev_cal_members WHERE cal_id=? AND user_id=?", (cid, uid)).fetchone()
     if old:
         c.execute("UPDATE ev_cal_members SET role=? WHERE cal_id=? AND user_id=?", (role, cid, uid))
@@ -690,6 +700,7 @@ def att_clean(c, items, eid=None):
     me_ = me() if has_request_context() else None
     had = {r[0]: r for r in c.execute("SELECT contact_id, email, name FROM event_attendees WHERE event_id=? AND contact_id IS NOT NULL",
                                       (eid,))} if eid else {}
+    had_u = {r[0] for r in c.execute("SELECT user_id FROM event_attendees WHERE event_id=? AND user_id IS NOT NULL", (eid,))} if eid else set()
     if not isinstance(items, list) or len(items) > EV_ATT_MAX:
         raise BadInput(tr("Invalid value: {0}", "attendees"))
     out, seen = [], set()
@@ -707,7 +718,7 @@ def att_clean(c, items, eid=None):
             u = as_int(a["user_id"], "user_id", 1)
             from ..accounts.orgs import may_see
             if not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (u,)).fetchone() or (me_ and personal_agent_foreign(c, u, me_)) \
-                    or (me_ and eid is None and not may_see(c, me_, u)):  # 2.22.0 (#752): only people one may see (new events)
+                    or (me_ and u not in had_u and not may_see(c, me_, u)):  # 2.22.0 (#752): only people one may see; 2.30.0 (#1036): also newly invited ones of an existing event
                 raise BadInput(tr("unknown user"))
             row["user_id"], key = u, ("u", u)
             if u != me_:

@@ -62,7 +62,7 @@ const V = B + 'api/v1';
   await fetch(V + `/tasks/${TW}/comments`, {method: 'POST', headers: AGH, body: JSON.stringify({body: 'I looked at the build, all green.'})});
   await fetch(V + `/tasks/${TW2}/comments`, {method: 'POST', headers: AGH, body: JSON.stringify({body: 'Stock levels noted.'})});
   // a question with buttons in the chat
-  const q = await (await fetch(V + '/agent/chats/1', {method: 'POST', headers: AGH, body: JSON.stringify({body: 'May I run the deploy?\n```\n./deploy.sh prod\n```', choices: [{id: 'allow', label: 'Allow', style: 'primary'}, {id: 'deny', label: 'Deny', style: 'danger'}]})})).json();
+  const q = await (await fetch(V + '/agent/chats/1', {method: 'POST', headers: AGH, body: JSON.stringify({body: 'May I run the deploy?\n```\n./deploy.sh prod\n```', choices: [{id: 'go', label: 'Allow', style: 'primary'}, {id: 'stop', label: 'Deny', style: 'danger'}]})})).json();  // 2.30.0: ids allow / deny = a permission question (p2300_chat_ui)
   check(q.choices && q.choices.choices.length === 2, '#1005: the question with buttons is stored');
 
   // ================= #935 the switch, the lists of the workspace
@@ -169,7 +169,7 @@ const V = B + 'api/v1';
   const ch2 = d.querySelector('#chat-msgs .cchoices');
   check(ch2.classList.contains('done') && [...ch2.querySelectorAll('.cchb')].every(b => b.disabled) && ch2.querySelector('.cchb.on')?.textContent.includes('Allow') && /Answered/.test(ch2.querySelector('.cchans')?.textContent || ''), '#1005: answered: the choice shown, the buttons locked');
   const ev = await (await fetch(V + '/agent/events?since=0', {headers: AGH})).json();
-  check(ev.data.some(e => e.event === 'chat_choice' && e.data.choice_ids[0] === 'allow'), '#1005: the agent got the event chat_choice');
+  check(ev.data.some(e => e.event === 'chat_choice' && e.data.choice_ids[0] === 'go'), '#1005: the agent got the event chat_choice');
   w.close();
 
   // ================= #965 / #970 / #1011 Settings > Users and Agents

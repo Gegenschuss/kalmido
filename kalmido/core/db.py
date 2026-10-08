@@ -349,6 +349,14 @@ def init_db(guard=True):
         from ..accounts.orgs import instance_sync, ws_migrate
         instance_sync(c)  # 2.23.0 (#799): the organisation mode's one organisation with every account
         ws_migrate(c)  # 2.28.0 (#935), once: every list and agent gets its workspace
+        from ..accounts.tenancy import ws_migrate_objs
+        ws_migrate_objs(c)  # 2.30.0 (#1036), once: every calendar and address book gets its workspace
+        if gsetting(c, "migr_listen2300") != "1":  # 2.30.0 (#1034), once: "listens in" keeps who listened before
+            from ..agents.core import listen_migrate
+            n = listen_migrate(c)
+            gset(c, "migr_listen2300", "1")
+            if n:
+                print("agents listening in:", n, "lists written explicitly", flush=True)
         # 2.22.0 (#740), once: lists shared before go into the folder of the same name as with their owner (created when
         # missing) -- only where the person has not put the list into a folder of their own
         if gsetting(c, "migr_folders2220") != "1":

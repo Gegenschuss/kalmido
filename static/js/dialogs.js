@@ -112,7 +112,8 @@ async function projectNextSteps(lid) {
     if (b.dataset.m === 'close') md.remove();
     if (b.dataset.m === 'repo') { md.remove(); listModal(lid); setTimeout(() => { const r = $('.lmodal #l-repos-h'); r?.scrollIntoView?.({block: 'start'}); }, 150); }
     if (b.dataset.m === 'share') {
-      try { await api('PUT', `/api/lists/${lid}/members`, {user_id: +$('#ns-agent', md).value, role: 'edit'}); } catch { return; }
+      if (!await agSafeFirst()) return;  // 2.30.0 (#920 / #919)
+      try { await bridgeTry(ok => api('PUT', `/api/lists/${lid}/members`, {user_id: +$('#ns-agent', md).value, role: 'edit', ...(ok ? {bridge_ok: true} : {})})); } catch { return; }
       b.disabled = true; b.textContent = tr('Shared'); await load(); render();
     }
   });
@@ -248,8 +249,9 @@ function listMenuItems(id, anchor) {
   // 2.27.0 (#974): "Agent: <name>…" right under "Share…": opens the share dialog at its Agents part (one place for the setting)
   if (agentsOn() && shareOk(l) && canManage(l) && !l.is_inbox && !l.archived) {
     const ag = listAgents(l)[0];
-    items.push({label: ag ? tr('Agent: {0}…', ag.name) : tr('Agent…'), icon: 'bot', cls: 'magent', fn: () => shareModal(id, {focus: 'agents'})});
+    items.push({label: ag ? tr('Agent: {0}…', ag.name) : tr('Agent…'), ...(ag ? {sub: listenLabel(l)} : {}), icon: 'bot', cls: 'magent', fn: () => shareModal(id, {focus: 'agents'})});  // 2.30.0 (#1034)
   }
+  if (agentsOn() && !l.is_inbox && listAgents(l).length) items.push({label: tr('Agent access'), icon: 'eye', cls: 'magacc', fn: () => agAccessModal(id)});  // 2.30.0 (#919): the access log
   // 2.27.0 (#990): a section can be added from here too (also in an empty list)
   if (!l.is_inbox && !l.archived && canEditList(id)) items.push({label: tr('Add section…'), icon: 'plus', cls: 'msecadd', fn: async () => {
     const n = await askPrompt(tr('Name of the section / column'), '', {ok: tr('Add')}); if (n && n.trim()) await sectionCreate(id, n.trim());
@@ -364,7 +366,7 @@ const shareOk = l => !!l && !l.is_inbox && (collab() || !!S.me?.is_admin);
 function shareSummary(l) {
   const ppl = listPeople(l).filter(p => !(S.me && p.user_id === S.me.id) && !agentById(p.user_id) && !p.agent), ags = listAgents(l);
   if (!collab()) return tr('Owner: {0}', l.owner_name || S.me?.display_name || '');
-  return [ppl.length ? trn('Shared with {0} person', 'Shared with {0} people', ppl.length) : tr('Not shared with anyone yet'), ags.length ? trn('{0} agent', '{0} agents', ags.length) : ''].filter(Boolean).join(' · ');
+  return [ppl.length ? trn('Shared with {0} person', 'Shared with {0} people', ppl.length) : tr('Not shared with anyone yet'), ags.length ? trn('{0} agent', '{0} agents', ags.length) : '', ags.length ? listenLabel(l) : ''].filter(Boolean).join(' · ');
 }
 function shareModal(id, opt = {}) {
   const l0 = listById(id); if (!shareOk(l0)) return;
@@ -456,7 +458,8 @@ function shareModal(id, opt = {}) {
     if (m === 'share' || m === 'share-ag') {
       const [us, rs] = m === 'share' ? ['#l-adduser', '#l-addrole'] : ['#sh-addagent', '#sh-agrole'];
       const u = +$(us, md).value; if (!u) return;
-      act(() => api('PUT', `/api/lists/${id}/members`, {user_id: u, role: $(rs, md).value}), tr('Shared')); return;
+      if (m === 'share-ag' && !await agSafeFirst()) return;  // 2.30.0 (#920)
+      act(() => bridgeTry(ok => api('PUT', `/api/lists/${id}/members`, {user_id: u, role: $(rs, md).value, ...(ok ? {bridge_ok: true} : {})})), tr('Shared')); return;  // 2.30.0 (#919)
     }
     if (b.dataset.mrm) {
       const p = listPeople(listById(id)).find(x => x.user_id === +b.dataset.mrm), ag = p && isAg(p);

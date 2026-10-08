@@ -122,11 +122,13 @@ def need_agent():
 
 
 def lst_brief(c, lid):
-    r = c.execute("SELECT id, name, is_inbox, agent_tidy FROM lists WHERE id=?", (lid,)).fetchone()
+    r = c.execute("SELECT id, name, is_inbox, agent_tidy, ptype FROM lists WHERE id=?", (lid,)).fetchone()
     if not r:
         return {"id": lid, "name": ""}
     return {"id": r["id"], "name": tr("Inbox") if r["is_inbox"] and inbox_default(r["name"]) else r["name"], "agent_tidy": r["agent_tidy"] or "off",
-            "tidy_agent_id": tidy_agent_of(c, lid)}  # 2.4.1 (#379)
+            "tidy_agent_id": tidy_agent_of(c, lid),  # 2.4.1 (#379)
+            # 2.30.0 (#1034): the list's project type and the agents that listen in (new / moved tasks, every comment)
+            "project_type": r["ptype"] or None, "listen_agent_ids": listen_agents_of(c, lid)}
 
 
 # ---- events: queue (polling) + webhook, long-polling wake-up
@@ -169,6 +171,10 @@ def agent_emit(c, aid, event, data, actor="auto"):
             or (data.get("room") or {}).get("list_id")
         if lid and c.execute("SELECT 1 FROM lists WHERE id=? AND life='health'", (lid,)).fetchone():
             return None
+        if lid and a["list_ids"]:  # 2.30.0 (#919): an agent limited to selected lists hears nothing of the others
+            from ..agents.safety import ids_parse
+            if lid not in ids_parse(a["list_ids"]):
+                return None
     if actor == "auto":
         actor = wh_actor(c) if has_request_context() and getattr(g, "user", None) else None
     if actor and actor.get("id") == aid:
@@ -309,27 +315,54 @@ def agent_assign_event(c, tid, kind, uid):
         agent_emit(c, uid, kind, agent_task_data(c, tid, uid))
 
 
-def listen_ids(raw, tidy_mode, tidy_agent, agents):
-    """2.13.1 (#471): lists.agent_listen -> the agent ids (sorted) among `agents` (the list's agents). NULL = the default:
-    the tidy agent while tidying is on."""
-    if raw is None:
-        ids = {tidy_agent} if tidy_agent and (tidy_mode or "off") != "off" else set()
-    else:
-        ids = {int(x) for x in str(raw).split(",") if x.strip().isdigit()}
-    return sorted(i for i in ids if i in agents)
+# 2.30.0 (#1034): an agent of a list either LISTENS IN (it gets every task created in or moved into the list -- task_added /
+# tasks_added -- and every comment a person writes there) or is reached only by an @mention, an assignment or a wake.
+# Default by project type: "Software / AI development" lists listen, all others not. lists.agent_listen keeps the choices
+# that differ from that default: "" / NULL = the default for every agent; "*" / "-*" = every agent on / off (the folder
+# setting); "3" / "-3" = this agent on / off (the list's own switch). A newly connected agent follows the default (or "*"),
+# a change of the project type starts over with the new type's default. Tidying (agent_tidy) is a separate switch.
+LISTEN_DEFAULT_PTYPES = ("software",)
+
+
+def listen_default(ptype):
+    return (ptype or "") in LISTEN_DEFAULT_PTYPES
+
+
+def listen_ids(raw, ptype, agents):
+    """lists.agent_listen + the project type -> the listening agent ids (sorted) among `agents` (the list's agents)."""
+    dflt, own = listen_default(ptype), {}
+    for x in str(raw or "").split(","):
+        x = x.strip()
+        if x in ("*", "-*"):
+            dflt = x == "*"
+        elif x.lstrip("-").isdigit():
+            own[int(x.lstrip("-"))] = not x.startswith("-")
+    return sorted(i for i in agents if own.get(i, dflt))
 
 
 def listen_agents_of(c, lid):
-    r = c.execute("SELECT agent_listen, agent_tidy FROM lists WHERE id=?", (lid,)).fetchone()
+    r = c.execute("SELECT agent_listen, ptype FROM lists WHERE id=?", (lid,)).fetchone()
     if not r:
         return []
-    ags = set(list_agents(c, lid))
-    return listen_ids(r["agent_listen"], r["agent_tidy"], tidy_agent_of(c, lid) if r["agent_listen"] is None else None, ags)
+    return listen_ids(r["agent_listen"], r["ptype"], set(list_agents(c, lid)))
+
+
+def listen_store(c, lid, on_ids, agents):
+    """Stores the listening agents of list lid explicitly per agent (the list's own switch): on_ids on, the other agents off."""
+    keep = [x.strip() for x in str(c.execute("SELECT agent_listen FROM lists WHERE id=?", (lid,)).fetchone()[0] or "").split(",")
+            if x.strip() in ("*", "-*")]
+    own = [str(a) if a in on_ids else f"-{a}" for a in sorted(agents)]
+    c.execute("UPDATE lists SET agent_listen=? WHERE id=?", (",".join(keep + own), lid))
+
+
+def listen_set_all(c, lid, on):
+    """The folder setting "Agent listens in": every agent of list lid on / off (None = back to the project type's default)."""
+    c.execute("UPDATE lists SET agent_listen=? WHERE id=?", (None if on is None else ("*" if on else "-*"), lid))
 
 
 def list_listen_update(c, lid, ids):
-    """2.13.1 (#471): "Agent reads every comment" -- owner / list admins (agent-owned list: its members with edit rights);
-    never an agent. ids: agents of the list ([] = nobody)."""
+    """2.13.1 (#471): "Agent reads every comment" -- 2.30.0 (#1034): "Agent listens in". Owner / list admins (agent-owned list:
+    its members with edit rights); never an agent. ids: agents of the list ([] = nobody)."""
     if not isinstance(ids, list) or len(ids) > 50 or not all(isinstance(x, int) and not isinstance(x, bool) for x in ids):
         raise BadInput(tr("Invalid value: {0}", "listen_agent_ids"))
     role = need_list(c, lid, write=False)
@@ -340,7 +373,28 @@ def list_listen_update(c, lid, ids):
     bad = [x for x in ids if x not in ags]
     if bad:
         raise BadInput(tr("This agent is not in the list"))
-    c.execute("UPDATE lists SET agent_listen=? WHERE id=?", (",".join(str(x) for x in sorted(set(ids))), lid))
+    listen_store(c, lid, set(ids), ags)
+
+
+def listen_migrate(c):
+    """2.30.0 (#1034), once: the meaning of lists.agent_listen changed (see listen_ids). Every list keeps exactly the agents
+    that listened before: an explicit choice is written per agent; a list on the old default (the tidy agent while tidying
+    was on) gets that agent written, except software lists, which take the new default (every agent of the list listens in)."""
+    n = 0
+    for r in c.execute("SELECT id, agent_listen, agent_tidy, ptype FROM lists").fetchall():
+        ags = set(list_agents(c, r["id"]))
+        if r["agent_listen"] is None:
+            if listen_default(r["ptype"]):
+                continue
+            tid = tidy_agent_of(c, r["id"]) if (r["agent_tidy"] or "off") != "off" else None
+            on = {tid} if tid in ags else set()
+        else:
+            on = {int(x) for x in str(r["agent_listen"]).split(",") if x.strip().isdigit()} & ags
+        val = ",".join(str(a) if a in on else f"-{a}" for a in sorted(ags))
+        if val != (r["agent_listen"] or ""):
+            c.execute("UPDATE lists SET agent_listen=? WHERE id=?", (val or None, r["id"]))
+            n += 1
+    return n
 
 
 def list_agent_access_update(c, lid, b):
@@ -423,7 +477,10 @@ def burst_tick(c):
             continue
         ids = [r[0] for r in c.execute(f"SELECT id FROM tasks WHERE list_id=? AND deleted_at IS NULL AND id IN ({','.join('?' * len(h['ids']))})",
                                        (lid, *h["ids"]))] if h["ids"] else []
+        listen = set(listen_agents_of(c, lid))  # 2.30.0 (#1034): only agents that listen in
         for aid in list_agents(c, lid):
+            if aid not in listen:
+                continue
             mine = [t for t in ids if task_visible(c, t, aid, full=True)]
             if not mine:
                 continue
@@ -444,7 +501,9 @@ def burst_tick(c):
 def agent_added_events(c, tid, from_lid=None, source=None):
     """2.23.0 (#795): a top-level task was created in (from_lid None) or moved into (from_lid = the list it came from) a list:
     'task_added' to every agent of that list that sees the task (the agent's own actions excluded by agent_emit). moved_from
-    {id, name} only when the agent may see the list it came from; source: 'form' / 'mail' / 'errors' / 'capture' ..."""
+    {id, name} only when the agent may see the list it came from; source: 'form' / 'mail' / 'errors' / 'capture' ...
+    2.30.0 (#1034): only to the agents that listen in (listen_agents_of; software lists by default); a moved task also gets
+    the list's tidy event (a created one gets it from agent_tidy_events at its creation)."""
     ag = agent_ids(c)
     if not ag:
         return
@@ -453,11 +512,16 @@ def agent_added_events(c, tid, from_lid=None, source=None):
         return
     if not list_agents(c, t["list_id"]):
         return
+    if from_lid:
+        agent_tidy_events(c, tid, moved=True)
+    listen = set(listen_agents_of(c, t["list_id"]))
+    if not listen:
+        return
     if burst_hit("added", t["list_id"]):  # 2.29.0 (#1031): a bulk move / script -> one 'tasks_added' later (burst_tick)
         _burst_hold(t["list_id"], tid, "moved" if from_lid else "created", from_lid, source)
         return
     for aid in list_agents(c, t["list_id"]):
-        if not task_visible(c, tid, aid, full=True):
+        if aid not in listen or not task_visible(c, tid, aid, full=True):
             continue
         extra = {"how": "moved" if from_lid else "created"}
         if from_lid and list_role(c, from_lid, aid):
@@ -492,16 +556,16 @@ def task_being_edited(tid):
         return _TEDIT.get(tid, 0) > time.time()
 
 
-def agent_tidy_events(c, tid):
+def agent_tidy_events(c, tid, moved=False):
     """A new top-level task by a person in a list with tidy on: 'tidy' to the list's tidy agent (2.4.1: only that one),
-    2.27.0 (#999): once the task is left alone (tidy_tick)."""
+    2.27.0 (#999): once the task is left alone (tidy_tick). 2.30.0 (#1034): also a task a person moved into the list (moved)."""
     t = c.execute("SELECT t.*, l.agent_tidy FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=?", (tid,)).fetchone()
-    if not t or t["parent_id"] or (t["agent_tidy"] or "off") == "off" or is_agent(g.user):
+    if not t or t["parent_id"] or (t["agent_tidy"] or "off") == "off" or not has_request_context() or is_agent(g.user):
         return
     aid = tidy_agent_of(c, t["list_id"])
     # 2.29.0 (#1031): tasks created in bulk through the API (a script, an import) are not tidied one by one; typing in the app
-    # (a quick brain dump) still gets every tidy event
-    if aid and act_via() == "api" and burst_hit("tidy", t["list_id"]):
+    # (a quick brain dump) still gets every tidy event. 2.30.0: a bulk move (also in the app) neither
+    if aid and (act_via() == "api" or moved) and burst_hit("tidy", t["list_id"]):
         return
     if aid and task_visible(c, tid, aid, write=True):
         if TIDY_QUIET_S <= 0:  # KALMIDO_TIDY_QUIET_S=0: at once, as before 2.27 (the older test suites)

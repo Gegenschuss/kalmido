@@ -31,7 +31,7 @@ def op_books(c, uid):
 
 
 def op_book_new(c, uid, b):
-    _unknown(b, ("name", "color"))
+    _unknown(b, ("name", "color", "org_id"))  # 2.30.0 (#1036): org_id = its workspace
     bid = book_create(c, uid, b)
     bump(c)
     c.commit()
@@ -39,8 +39,12 @@ def op_book_new(c, uid, b):
 
 
 def op_book_edit(c, uid, bid, b):
-    _unknown(b, ("name", "color", "birthdays_list_id"))
+    _unknown(b, ("name", "color", "birthdays_list_id", "org_id"))
     bk, role = need_book(c, bid, manage=True)
+    if "org_id" in b:  # 2.30.0 (#1036): the owner moves it into another workspace (409 while a member does not fit)
+        from ..accounts.orgs import obj_org_set
+        if obj_org_set(c, "books", "book_id", "book_members", bid, b["org_id"], "book"):
+            book_touch(c, bid)
     f = book_fields({k: b[k] for k in ("name", "color") if k in b})
     if "birthdays_list_id" in b:  # birthdays + anniversaries of this book's contacts become tasks of this list ('' / null = off)
         lid = b["birthdays_list_id"]

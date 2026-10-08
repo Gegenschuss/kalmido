@@ -13,7 +13,7 @@ from ..core.config import API_PREFIX, app
 from ..core.i18n import N_, tr, trn
 from ..core.db import bump, db, err, gsetting, iso, now_utc, usettings
 from ..accounts.session import me
-from ..core.access import Denied, need_list, need_task, need_time, ROLES, task_visible, tvis, vis_sql, wr_sql
+from ..core.access import Denied, need_list, need_task, need_time, ROLES, task_visible, token_lists, tvis, vis_sql, wr_sql
 from ..core.serializers import load_tasks
 from ..core.state import visible_lists
 from ..lists.lists import list_delete, member_remove, member_set
@@ -24,7 +24,7 @@ from ..lists.sections import (
 from ..tasks.validation import as_int
 from ..tasks.tasks import task_update
 from ..tasks.lifecycle import task_restore, task_skip, trash_empty
-from ..tasks.attachments import attachment_upload
+from ..tasks.attachments import attachment_upload, text_attachment_create, TEXT_MAX
 from ..tasks.batch import attachment_delete, task_batch
 from ..collab.comments import collab_user, comment_delete, comment_update, lang_of, user_names
 from ..collab.news import news_add, news_list, news_read
@@ -496,6 +496,9 @@ def v1_task_move(tid):
     cur = c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()
     if b.get("list_id") and b["list_id"] != cur["list_id"] and "section_id" not in b:
         ch["section_id"] = None  # another list: no section unless one of that list is given
+    if b.get("list_id") and b["list_id"] != cur["list_id"]:
+        from ..agents.safety import move_gate
+        move_gate(c, [(tid, b["list_id"])])  # 2.30.0 (#919): an agent moving it to other people waits for approval
     if ch:
         v1_call(task_update, tid, body=ch)
     t = c.execute("SELECT list_id, section_id, parent_id FROM tasks WHERE id=?", (tid,)).fetchone()
@@ -547,6 +550,9 @@ def v1_task_batch():
             seen = [x for x in _BATCH_SEEN.get(me(), []) if now - x[0] < APPROVAL_BATCH_WINDOW]
             _BATCH_SEEN[me()] = seen
             recent = sum(x[1] for x in seen)
+    if vis and act == "update" and data.get("list_id"):  # 2.30.0 (#919): moving tasks to other people waits for approval
+        from ..agents.safety import move_gate
+        move_gate(c, [(i, data["list_id"]) for i in vis])
     if vis and len(vis) + recent >= APPROVAL_BATCH_MIN:
         lids = [r[0] for r in c.execute(f"SELECT list_id FROM tasks WHERE id IN ({','.join('?' * len(vis))})", vis)]
         top = max(set(lids), key=lids.count) if lids else None
@@ -756,6 +762,25 @@ def v1_attachment_upload(tid):
     return jsonify(data=new, next_cursor=None), 201
 
 
+@app.post("/api/v1/tasks/<int:tid>/attachments/text")
+@v1_view
+def v1_attachment_text(tid):
+    """2.30.0 (#380): {name, content}: a text file (Markdown, plain text, HTML / CSS / JS, data, code; UTF-8, at most 1 MB) on the
+    task. Not a known text ending (e.g. .sh, .exe) -> ".txt" is appended; the name of an existing file of the task -> a new
+    version "name (v2).ext" next to it (the old one stays). Same rights as an upload (may change the task)."""
+    v1_args(())
+    c = db()
+    _v1_live(c, tid)
+    b = _v1_body(("name", "content"))
+    if not isinstance(b.get("name"), str) or not isinstance(b.get("content"), str):
+        raise BadInput(tr("Expected {0}", '{"name": "...", "content": "..."}'))
+    try:
+        a = text_attachment_create(c, tid, b["name"], b["content"])
+    except ValueError as e:
+        raise BadInput(str(e)) from None
+    return jsonify({**a, "url": f"/api/v1/attachments/{a['id']}"}), 201
+
+
 @app.delete("/api/v1/attachments/<int:aid>")
 @v1_view
 def v1_attachment_delete(aid):
@@ -867,7 +892,7 @@ def v1_list_members(lid):
 def v1_member_set(lid, user_id):
     """{role: admin | edit | participant | view}: share the list with a person (owner / list admins)."""
     v1_args(())
-    b = _v1_body(("role",))
+    b = _v1_body(("role", "bridge_ok"))  # 2.30.0 (#919): bridge_ok counts only from a person's token
     uid = as_int(user_id, "user_id", 1)
     c = db()
     need_list(c, lid, write=False, manage=True)
@@ -880,7 +905,7 @@ def v1_member_set(lid, user_id):
         raise Denied(404)  # checked before an approval, so a job never names or waits for someone it cannot share with
     need_approval(c, N_("Share the list “{0}” with {1} ({2})"), (c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0],
                                                                   u["display_name"] or u["username"], ("tr", ROLE_WORD[role])), list_id=lid)
-    v1_call(member_set, lid, body={"user_id": uid, "role": b.get("role", "edit")})
+    v1_call(member_set, lid, body={"user_id": uid, "role": b.get("role", "edit"), "bridge_ok": b.get("bridge_ok") is True})
     return jsonify(data=v1_members(c, lid), next_cursor=None)
 
 
@@ -958,7 +983,9 @@ def v1_news():
     if a.get("filter") not in (None, "mentions", "me"):
         raise BadInput(tr("Invalid value: {0}", "filter"))
     j = v1_call(news_list)
-    return jsonify(data=j["items"], unread=j["unread"], next_cursor=None)
+    tl = token_lists()  # 2.30.0 (#919): a token limited to selected lists sees only their News (and News without a list)
+    items = [x for x in j["items"] if tl is None or not x.get("list_id") or x["list_id"] in tl]
+    return jsonify(data=items, unread=j["unread"] if tl is None else sum(1 for x in items if not x.get("read")), next_cursor=None)
 
 
 @app.post("/api/v1/news/read")
@@ -1077,6 +1104,8 @@ def v1_list_status(lid):
 def v1_export():
     """Everything you own as JSON (the same as Settings > Data > Export)."""
     v1_args(())
+    if token_lists() is not None:  # 2.30.0 (#919): the export holds every list and personal data: not for a limited token
+        raise Denied(403, tr("A token limited to selected lists cannot export everything"))
     return export_json()
 
 
@@ -1185,6 +1214,19 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                                                   | errs("400", "403", "404", "413"), [pid()], scope="attachments:write"),
                                              "requestBody": {"required": True, "content": {"multipart/form-data": {"schema": {
                                                  "type": "object", "properties": {"file": {"type": "string", "format": "binary"}}}}}}}},
+        "/tasks/{id}/attachments/text": {"post": op(
+            "Create a text file on a task (Markdown, plain text, HTML / CSS / JS, data, code)", T,
+            ok({"type": "object", "properties": {"id": {"type": "integer"}, "task_id": {"type": "integer"}, "name": {"type": "string"},
+                                                 "mime": {"type": "string"}, "size": {"type": "integer"}, "created_at": {"type": "string"},
+                                                 "version": {"type": "integer"}, "replaces": {"type": ["integer", "null"]},
+                                                 "url": {"type": "string"}}}, "Created", "201") | errs("400", "403", "404", "413"),
+            [pid()], scope="attachments:write",
+            body={"type": "object", "required": ["name", "content"], "properties": {
+                "name": {"type": "string", "description": "File name with its ending, e.g. report.md"},
+                "content": {"type": "string", "description": f"UTF-8 text, at most {TEXT_MAX // 1024} KB"}}},
+            desc="2.30.0: the app shows Markdown formatted and everything else as source text, never runs it. An ending that is not "
+                 "a known text type (.sh, .ps1, .bat, .exe ...) gets .txt appended. A name the task already has creates a new "
+                 "version next to it (report (v2).md; version + replaces in the answer), the old file stays.")},
         "/attachments/{id}": {"delete": op("Remove a file of a task or comment", T, nobody | errs("403", "404"), [pid("id", "Attachment id")],
                                            scope="attachments:write")},
         "/comments/{id}": {

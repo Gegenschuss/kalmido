@@ -149,7 +149,8 @@ function agBandHtml() {
   const cell = a => {
     const st = agentHst(a), t = a.status_task ? taskById(a.status_task) : null, kids = t ? children(t.id) : [];
     const p = kids.length ? Math.round(100 * kids.filter(x => x.status).length / kids.length) : null;
-    const what = t ? `<span class="mono">#${t.id}</span> ${esc(t.title)}` : esc(a.status_text || (st === 'offline' ? agentSt(a) : '–'));
+    // 2.30.0 (#1039): a status without a task (a chat answer) stays in the chat and the header chip, not in a list's band
+    const what = t ? `<span class="mono">#${t.id}</span> ${esc(t.title)}` : esc(st === 'offline' ? agentSt(a) : '–');
     return `<button class="agb-a hs-${st}" data-act="team-agent" data-aid="${a.id}" title="${esc(agentHstLine(a))}"><span class="agb-h">${hdot(st)}<b>${esc(a.name)}</b><span class="muted">${esc(tr(AG_HST[st]))}</span></span><span class="agb-t">${what}</span><span class="agb-p ${st === 'working' && p === null ? 'run' : ''}" aria-hidden="true"><i style="width:${p ?? (st === 'working' ? 40 : 0)}%"></i></span></button>`;
   };
   // 2.13.2 (#478 N7): in Today the card "… waits for you" shows the same jobs: the band leaves its waiting cell out there
@@ -318,7 +319,8 @@ function ltagsWire(md, lid) {
 // leaves, the new one joins) and offers Undo (back to the previous agent). ags: [{id, name}] for the message.
 async function setListAgent(lid, aid, ags = [], after = null) {
   const nm = id => ags.find(a => a.id === id)?.name || agentById(id)?.name || '';
-  let j; try { j = await api('PUT', `/api/lists/${lid}/agent`, {agent_id: aid}); } catch { await load(); render(); return false; }
+  if (aid && !await agSafeFirst()) return false;  // 2.30.0 (#920)
+  let j; try { j = await bridgeTry(ok => api('PUT', `/api/lists/${lid}/agent`, {agent_id: aid, ...(ok ? {bridge_ok: true} : {})})); } catch { await load(); render(); return false; }  // 2.30.0 (#919)
   await load(); render();
   const prev = j.previous ?? null; if (prev === aid) return true;
   const back = async () => { try { await api('PUT', `/api/lists/${lid}/agent`, {agent_id: prev}); } catch { /* shown */ } await load(); render(); after?.(); };
@@ -345,15 +347,20 @@ function tidyRowHtml(l) {
       : tr('Give an agent of this list edit rights first')}</div>${listenRowHtml(l, ags, may)}`;
 }
 // 2.13.1 (#471): "Agent reads every comment": the chosen agents get every comment of a person in this list (not only on
-// tasks they follow or where they are @mentioned); default: the tidy agent while tidying is on
+// tasks they follow or where they are @mentioned). 2.30.0 (#1034): "Agent listens in": also every task created in or moved
+// into the list; on by default in software projects (l.listen_default), off elsewhere (then only @mentions, assignments and
+// wake reach it); a switch in every list. Tidying is its own setting above.
+const listenOn = l => listAgents(l).some(a => (l.listen_agent_ids || []).includes(a.id));
+const listenLabel = l => listenOn(l) ? tr('Agent listens in') : tr('Agent only via @');
 function listenRowHtml(l, ags, may) {
   const on = new Set(l.listen_agent_ids || []);
+  const dflt = l.listen_default ? tr('Default for software projects: on.') : tr('Default for this kind of list: off, the agent reacts only to an @mention, an assignment or a wake.');
   // 2.27.0 (#964): one agent per list: a plain switch like the two above (lists from before 2.26 with several agents keep the boxes)
-  if (ags.length === 1) return `<div class="lsnrow lsn1"><label class="chkl swl agacc lsnag"><span class="swc"><input type="checkbox" role="switch" data-lsn="${ags[0].id}" ${on.has(ags[0].id) ? 'checked' : ''} ${may ? '' : 'disabled'}><span class="swt" aria-hidden="true"></span></span><span>${tr('Agent reads every comment')}</span></label></div>
-    <div class="shint keep aghint">${tr('{0} gets every comment people write in this list, also without an @mention and on tasks it never touched (only tasks it can see).', esc(ags[0].name))}</div>`;
-  return `<div class="row lsnrow" role="group" aria-labelledby="l-lsn-h"><span class="lbl" id="l-lsn-h">${tr('Agent reads every comment')}</span><div class="lsnags">${ags.map(a =>
+  if (ags.length === 1) return `<div class="lsnrow lsn1"><label class="chkl swl agacc lsnag"><span class="swc"><input type="checkbox" role="switch" data-lsn="${ags[0].id}" ${on.has(ags[0].id) ? 'checked' : ''} ${may ? '' : 'disabled'}><span class="swt" aria-hidden="true"></span></span><span>${tr('Agent listens in')}</span></label></div>
+    <div class="shint keep aghint">${tr('{0} gets every new or moved task and every comment people write in this list, without an @mention (only tasks it can see).', esc(ags[0].name))} ${esc(dflt)}</div>`;
+  return `<div class="row lsnrow" role="group" aria-labelledby="l-lsn-h"><span class="lbl" id="l-lsn-h">${tr('Agent listens in')}</span><div class="lsnags">${ags.map(a =>
     `<label class="lsnag"><input type="checkbox" data-lsn="${a.id}" ${on.has(a.id) ? 'checked' : ''} ${may ? '' : 'disabled'}><span>${esc(a.name)}</span></label>`).join('')}</div></div>
-    <div class="shint lhint">${tr('The checked agents get every comment people write in this list, also without an @mention and on tasks they never touched (only tasks they can see).')}</div>`;
+    <div class="shint lhint">${tr('The checked agents get every new or moved task and every comment people write in this list, without an @mention (only tasks they can see).')} ${esc(dflt)}</div>`;
 }
 function tidyWire(md, lid) {
   md.addEventListener('change', async e => {
@@ -666,4 +673,73 @@ async function propDiscard() {
   toast(req ? tr('Request cancelled') : tr('Proposal discarded'));
   load().then(render).catch(() => {});
   if (S.route.mod === 'agents') loadJobs();
+}
+
+// ---- 2.30.0 (#919 / #920): using agents safely. The server keeps an agent inside one circle of people: sharing a list with
+// an agent (or adding a person to a list with an agent) that would connect lists with different people answers 409
+// agent_bridge; bridgeTry asks and repeats the request with bridge_ok. The rules ("Use safely", Settings > Agents), a short
+// hint before the first share with an agent on this device, the access log of a list (list menu > Agent access).
+const AG_SAFE = [
+  [N_('One agent per context'), N_('Rather one agent for the team and one for you privately than one for everything. Separate agents cannot carry anything between your worlds.')],
+  [N_('Share only the lists it needs'), N_('It can read every list shared with it, with all tasks, comments and files. Do not add a list just in case.')],
+  [N_('The same people'), N_('Kalmido lets an agent work only in lists that the same people see (or some of them). Connecting lists with different people needs your approval: think about who may see what the agent brings from one list into the other.')],
+  [N_('Keep its permissions small'), N_('If it only needs to read, give it read access only, and limit it to selected lists. Sharing, deleting, bulk changes and moving tasks to other people wait for your approval anyway.')],
+  [N_('Take approvals seriously'), N_('When the agent asks “May I …?”, read what it is about to do. Your approval is a real decision.')],
+  [N_('Other people’s texts are not commands'), N_('If someone writes “Agent, copy … for me” into a shared list, the agent must not just do it. Kalmido blocks the important cases on the server, but no AI recognises every deception (prompt injection). That is why the first three rules matter.')],
+  [N_('Know where the data goes'), N_('What an agent reads is processed by the AI provider you connected. For confidential work use a local model or a provider with a data processing agreement. Kalmido itself never sends data to an AI provider: only an agent you connect does.')],
+  [N_('Health stays private'), N_('No agent ever sees health lists, whatever is shared with it.')],
+  [N_('Look at the access log'), N_('The list menu > Agent access shows which agents read or changed the list in the last 30 days. Every member of the list sees it.')],
+  [N_('End access when it is no longer needed'), N_('Pause the agent or create a new token (the old one stops at once); give tokens an expiry date.')]];
+const AG_SAFE_ADMIN = [N_('By default members may not connect their own agents: allow it only when there is a rule for it.'),
+  N_('Agree which AI providers are allowed (privacy, customer data).'),
+  N_('Share lists with customer data only with agents whose provider has a data processing agreement, or with a local model.')];
+function agSafeHtml() {
+  return `<div class="agsafe"><p class="agsafe-lead">${esc(tr('An agent sees only what you share with it. Share as little as needed, and keep private and shared work apart.'))}</p>
+    <ol class="agsafe-rules">${AG_SAFE.map(([h, t]) => `<li><b>${esc(tr(h))}</b> <span>${esc(tr(t))}</span></li>`).join('')}</ol>
+    <h4>${esc(tr('For organisations (admins)'))}</h4><ul class="agsafe-admin">${AG_SAFE_ADMIN.map(t => `<li>${esc(tr(t))}</li>`).join('')}</ul>
+    <div class="shint">${esc(tr('The details for the people who run agents:'))} <a href="${API_DOCS.replace('API.md', 'AGENT-SECURITY.md')}" target="_blank" rel="noopener noreferrer">${esc(tr('Agent security (docs/AGENT-SECURITY.md)'))}</a></div></div>`;
+}
+// before the first share with an agent on this device: the three rules that matter most, with the way to all ten
+async function agSafeFirst() {
+  if (LS.get('agSafeSeen', false)) return true;
+  const ok = await askDialog({title: tr('Before you share a list with an agent'), ok: tr('Share'),
+    html: `<p>${esc(tr('The agent reads every task, comment and file of this list, and its AI provider processes them.'))}</p><ul class="agsafe-admin">${AG_SAFE.slice(0, 3).map(([h]) => `<li>${esc(tr(h))}</li>`).join('')}</ul><p class="muted">${esc(tr('All rules: Settings > Agents > Use safely.'))}</p>`});
+  if (ok) LS.set('agSafeSeen', true);
+  return ok;
+}
+// fn(ok) sends the request (ok: with bridge_ok). A refused bridge asks once and repeats it; "Cancel" rejects with e.declined
+async function bridgeTry(fn) {
+  try { return await fn(false); }
+  catch (e) {
+    if (e?.data?.code !== 'agent_bridge') throw e;
+    if (!await askConfirm(tr('Connect lists with different people?'), e.message, {ok: tr('Connect anyway'), danger: true})) { e.declined = true; toast(tr('Not shared')); throw e; }
+    return await fn(true);
+  }
+}
+// list menu > Agent access: per agent and day how often it read / changed the list (last 30 days)
+async function agAccessModal(lid) {
+  let j; try { j = await api('GET', `/api/lists/${lid}/agent-access`); } catch { return; }
+  const per = new Map();
+  for (const r of j.data) { const a = per.get(r.agent_id) || {name: r.name, read: 0, write: 0, days: new Set(), last: r.day}; a.read += r.read; a.write += r.write; a.days.add(r.day); if (r.day > a.last) a.last = r.day; per.set(r.agent_id, a); }
+  const rows = [...per.entries()].map(([id, a]) => `<div class="mrow agacc" data-agacc="${id}">${avBtn(id, a.name)}<span class="n"><b>${esc(a.name)}</b><small class="muted">${esc(tr('read {0} times, changed {1} times, on {2} days', a.read, a.write, a.days.size))} · ${esc(tr('last on {0}', fmtDayAbs(a.last)))}</small></span></div>`).join('');
+  const md = modal(`<h3>${esc(tr('Agent access: {0}', lname(listById(lid) || {name: ''})))}</h3>
+    <div class="shint">${esc(tr('Which agents read or changed this list in the last {0} days (one count per request). Every member of the list sees this.', j.days))}</div>
+    <div class="members">${rows || `<div class="muted mhint">${esc(tr('No agent accessed this list in that time.'))}</div>`}</div>
+    <div class="foot"><span class="spacer"></span><button class="btn pri" data-m="close">${tr('Close')}</button></div>`);
+  md.classList.add('agaccmd');
+  md.addEventListener('click', e => { if (e.target.closest('[data-m="close"]')) md.remove(); });
+}
+// the lists an agent / a token is limited to (none ticked = all of its lists)
+function listCapHtml(sel, lists, id) {
+  const on = new Set(sel || []);
+  return `<details class="sdet lcap" ${on.size ? 'open' : ''}><summary>${esc(on.size ? trn('Limited to {0} list', 'Limited to {0} lists', on.size) : tr('All its lists'))}</summary>
+    <p class="lcaphint muted">${esc(tr('Tick lists to limit access to them; nothing ticked = every list it is in. Other lists then do not exist for it, and it gets no events about them.'))}</p>
+    <div class="lcapgrid" id="${id}">${(lists || []).map(l => `<label class="chkl"><input type="checkbox" data-lcap="${l.id}" ${on.has(l.id) ? 'checked' : ''}><span>${esc(l.name)}</span></label>`).join('') || `<span class="muted">${esc(tr('No lists yet.'))}</span>`}</div></details>`;
+}
+const listCapVal = (md, id) => $$(`#${id} [data-lcap]:checked`, md).map(x => +x.dataset.lcap);
+// the agent's dialog: the lists it connects although their people differ (approved or from before 2.30)
+function bridgesHtml(a) {
+  const bs = a?.bridges || []; if (!bs.length) return '';
+  const nm = l => l.name == null ? tr('a list you cannot see') : `“${l.name}”`;
+  return `<div class="shint keep warn agbridges">${ic('alert', 's')} <b>${esc(tr('Connects lists with different people'))}</b><ul>${bs.map(b => `<li>${esc(nm(b.lists[0]))} + ${esc(nm(b.lists[1]))} · ${esc(b.approved ? tr('approved by {0}', b.by_name || '?') : tr('not approved (from before, or via a group)'))}</li>`).join('')}</ul>${esc(tr('Content of one list can reach the other people through the agent. Use one agent per context, limit it to selected lists, or take it out of one of them.'))}</div>`;
 }

@@ -258,10 +258,10 @@ def t_send_chat(api, a):
             except ValueError:
                 raise ApiError(400, f"files: {f['name']} is not valid base64") from None
             files.append((f["name"], f.get("mime") or "application/octet-stream", data))
-        return api.call("POST", f"/agent/chats/{int(a['user_id'])}", multipart=(_pick(a, ("body", "task_id", "choices", "multi")), files))
+        return api.call("POST", f"/agent/chats/{int(a['user_id'])}", multipart=(_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in")), files))
     if not a.get("body"):
         raise ApiError(400, "body (or files) is required")
-    return api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=_pick(a, ("body", "task_id", "choices", "multi")))
+    return api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in")))
 
 
 def t_get_attachment(api, a):
@@ -502,9 +502,13 @@ TOOLS = [
     ("send_chat", "Answer in the chat with one person (user_id), optionally about a task. files (2.13.1): images / files to "
                   "attach, [{name, base64, mime?}] (at most 10, each within the server's upload limit); with files the body may be empty. "
                   "choices (2.28.0): answer buttons under the message, [{id, label, style?: primary | danger}] (at most 8; multi: several may "
-                  "be picked) -- use them for questions and permission requests (put the command in a code block in the body, buttons "
-                  "Allow / Deny). The person's answer arrives as the event chat_choice (message_id, choice_ids, labels); do not ask twice.",
+                  "be picked) -- use them for questions. Only the newest message's buttons stay live: a newer message (yours or the "
+                  "person's) makes older open buttons expire. Permission requests (2.30.0): permission=true (buttons Allow / Deny are "
+                  "added; put the command in a code block in the body), expires_in = seconds it stays open; such a question stays "
+                  "answerable while newer messages come. The person's answer arrives as the event chat_choice (message_id, "
+                  "choice_ids, labels; permission questions also approval and a reaction event) -- act once per message_id; do not ask twice.",
      _obj({"user_id": S_ID, "body": {"type": "string"}, "task_id": S_ID,
+           "permission": {"type": "boolean"}, "expires_in": {"type": "integer", "minimum": 10, "maximum": 604800},
            "choices": {"type": "array", "maxItems": 8, "items": {"type": "object", "properties": {
                "id": {"type": "string", "maxLength": 40}, "label": {"type": "string", "maxLength": 80},
                "style": {"type": "string", "enum": ["default", "primary", "danger"]}}, "required": ["id", "label"]}},
@@ -512,6 +516,12 @@ TOOLS = [
            "files": {"type": "array", "maxItems": 10, "items": {"type": "object", "properties": {
                "name": {"type": "string"}, "base64": {"type": "string"}, "mime": {"type": "string"}}, "required": ["name", "base64"]}}},
           ["user_id"]), t_send_chat),
+    ("withdraw_chat_choices", "2.30.0: take back the open answer buttons of one of your chat messages (user_id, message_id), "
+                              "e.g. when the question is no longer current without a new message. outcome (permission questions "
+                              "only): allowed | denied | expired when you decided another way (an answer in words, your time limit).",
+     _obj({"user_id": S_ID, "message_id": S_ID, "outcome": {"type": "string", "enum": ["allowed", "denied", "expired"]}},
+          ["user_id", "message_id"]),
+     lambda api, a: api.call("POST", f"/agent/chats/{int(a['user_id'])}/messages/{int(a['message_id'])}/withdraw", body=_pick(a, ("outcome",)))),
     ("list_attachments", "Files of a task and of its comments (id, name, mime, size, comment_id): only tasks you see with their "
                          "comments. Read one with get_attachment.",
      _obj({"task_id": S_ID}, ["task_id"]), lambda api, a: api.call("GET", f"/tasks/{int(a['task_id'])}/attachments")),
@@ -566,11 +576,11 @@ CT_KEYS = tuple(CT_IN)
 TOOLS += [
     ("list_event_calendars", "2.21.0 (module Events): the event calendars you see (own + shared) with your role.", _obj({}),
      lambda api, a: api.call("GET", "/event-calendars")),
-    ("create_event_calendar", "2.21.0: a new own calendar.", _obj({"name": {"type": "string"}, "color": {"type": "string"}, "description": {"type": "string"}}, ["name"]),
-     lambda api, a: api.call("POST", "/event-calendars", body=_pick(a, ("name", "color", "description")))),
+    ("create_event_calendar", "2.21.0: a new own calendar (2.30.0: org_id = its workspace; default: yours).", _obj({"name": {"type": "string"}, "color": {"type": "string"}, "description": {"type": "string"}, "org_id": {"type": ["integer", "null"], "description": "2.30.0: its workspace (an organisation id of yours; null = private)"}}, ["name"]),
+     lambda api, a: api.call("POST", "/event-calendars", body=_pick(a, ("name", "color", "description", "org_id")))),
     ("update_event_calendar", "2.21.0: rename / recolour a calendar (owner) or hide it from your own views (hidden).",
-     _obj({"calendar_id": S_ID, "name": {"type": "string"}, "color": {"type": "string"}, "description": {"type": "string"}, "hidden": {"type": "boolean"}}, ["calendar_id"]),
-     lambda api, a: api.call("PATCH", f"/event-calendars/{int(a['calendar_id'])}", body=_pick(a, ("name", "color", "description", "hidden")))),
+     _obj({"calendar_id": S_ID, "name": {"type": "string"}, "color": {"type": "string"}, "description": {"type": "string"}, "hidden": {"type": "boolean"}, "org_id": {"type": ["integer", "null"], "description": "2.30.0: its workspace (an organisation id of yours; null = private)"}}, ["calendar_id"]),
+     lambda api, a: api.call("PATCH", f"/event-calendars/{int(a['calendar_id'])}", body=_pick(a, ("name", "color", "description", "hidden", "org_id")))),
     ("delete_event_calendar", "2.21.0: delete a calendar with all its events (owner).", _obj({"calendar_id": S_ID}, ["calendar_id"]),
      lambda api, a: api.call("DELETE", f"/event-calendars/{int(a['calendar_id'])}")),
     ("share_event_calendar", "2.21.0: share a calendar with a person: view or edit (owner).",
@@ -608,11 +618,11 @@ TOOLS += [
      lambda api, a: api.call("GET", f"/tasks/{int(a['task_id'])}/events")),
     ("list_address_books", "2.21.0 (module Contacts, scope contacts): the address books you see.", _obj({}),
      lambda api, a: api.call("GET", "/address-books")),
-    ("create_address_book", "2.21.0: a new own address book.", _obj({"name": {"type": "string"}, "color": {"type": "string"}}, ["name"]),
-     lambda api, a: api.call("POST", "/address-books", body=_pick(a, ("name", "color")))),
+    ("create_address_book", "2.21.0: a new own address book (2.30.0: org_id = its workspace; default: yours).", _obj({"name": {"type": "string"}, "color": {"type": "string"}, "org_id": {"type": ["integer", "null"], "description": "2.30.0: its workspace (an organisation id of yours; null = private)"}}, ["name"]),
+     lambda api, a: api.call("POST", "/address-books", body=_pick(a, ("name", "color", "org_id")))),
     ("update_address_book", "2.21.0: rename / recolour an address book, or choose the list for its birthdays (owner).",
-     _obj({"book_id": S_ID, "name": {"type": "string"}, "color": {"type": "string"}, "birthdays_list_id": {"type": ["integer", "null"]}}, ["book_id"]),
-     lambda api, a: api.call("PATCH", f"/address-books/{int(a['book_id'])}", body=_pick(a, ("name", "color", "birthdays_list_id")))),
+     _obj({"book_id": S_ID, "name": {"type": "string"}, "color": {"type": "string"}, "birthdays_list_id": {"type": ["integer", "null"]}, "org_id": {"type": ["integer", "null"], "description": "2.30.0: its workspace (an organisation id of yours; null = private)"}}, ["book_id"]),
+     lambda api, a: api.call("PATCH", f"/address-books/{int(a['book_id'])}", body=_pick(a, ("name", "color", "birthdays_list_id", "org_id")))),
     ("delete_address_book", "2.21.0: delete an address book with its contacts (owner).", _obj({"book_id": S_ID}, ["book_id"]),
      lambda api, a: api.call("DELETE", f"/address-books/{int(a['book_id'])}")),
     ("share_address_book", "2.21.0: share an address book: view or edit (owner). Contacts are personal data.",
@@ -855,6 +865,12 @@ TOOLS += [
     # ---- files + comments
     ("upload_attachment", "Attach files to a task: files = [{name, base64, mime?}] (at most 10, each within the server's upload limit).",
      _obj({"task_id": S_ID, "files": FILES}, ["task_id", "files"]), t_upload_attachment),
+    ("create_text_file", "2.30.0: write a text file onto a task -- Markdown, plain text, HTML / CSS / JS, JSON / CSV and code "
+                         "(UTF-8, at most 1 MB): name with its ending (report.md) + content. People see Markdown formatted, everything "
+                         "else as source; nothing is ever run. Endings that are not text (.sh, .ps1, .bat, .exe ...) become .txt. "
+                         "The same name again = a new version next to the old file (report (v2).md).",
+     _obj({"task_id": S_ID, "name": {"type": "string", "maxLength": 150}, "content": {"type": "string"}}, ["task_id", "name", "content"]),
+     lambda api, a: api.call("POST", f"/tasks/{int(a['task_id'])}/attachments/text", body=_pick(a, ("name", "content")))),
     ("delete_attachment", "Remove a file of a task (or of your comment).", _obj({"attachment_id": S_ID}, ["attachment_id"]),
      lambda api, a: api.call("DELETE", f"/attachments/{_id(a, 'attachment_id')}")),
     ("delete_chat_attachment", "Remove a file you sent in a chat.", _obj({"attachment_id": S_ID}, ["attachment_id"]),
@@ -1126,7 +1142,7 @@ TOOL_MAP = {t[0]: t for t in TOOLS}
 
 TOOL_SCOPES = {
     "agent": ("get_agent", "react_to_chat", "set_status", "list_events", "wait_for_events", "list_jobs", "create_job", "get_job",
-              "submit_proposal", "propose_to_other_topic", "update_job", "list_chats", "chat_typing", "send_chat", "report_usage", "get_usage"),
+              "submit_proposal", "propose_to_other_topic", "update_job", "list_chats", "chat_typing", "send_chat", "withdraw_chat_choices", "report_usage", "get_usage"),
     "tasks:write": ("add_contract", "add_device", "add_upkeep", "sync_read_later", "add_occasion", "add_deadline", "ingredients_to_shopping", "give_stars", "add_reward", "update_reward", "request_reward",
                     "decide_reward", "create_note", "update_note", "create_task", "update_task", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "batch_tasks",
                     "reopen_task", "skip_occurrence", "take_task", "add_subtask", "add_dependency", "remove_dependency", "create_habit",
@@ -1142,7 +1158,7 @@ TOOL_SCOPES = {
     "delete": ("delete_reward", "delete_note", "delete_list", "delete_section", "delete_task", "restore_task", "empty_trash", "delete_field", "delete_template",
                "delete_filter", "delete_habit"),
     "attachments:read": ("get_attachment",),
-    "attachments:write": ("upload_attachment", "delete_attachment", "upload_project_file", "delete_project_file"),
+    "attachments:write": ("upload_attachment", "create_text_file", "delete_attachment", "upload_project_file", "delete_project_file"),
     "time": ("start_timer", "stop_timer", "add_time_entry", "update_time_entry", "delete_time_entry"),
     "export": ("export_data",),
     "calendar": ("list_event_calendars", "create_event_calendar", "update_event_calendar", "delete_event_calendar", "share_event_calendar",

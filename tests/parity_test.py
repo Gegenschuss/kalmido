@@ -242,6 +242,9 @@ APP_ONLY = [
     ("2.29.0 (#1029): the permission mode switch in the chat header; in the API it is the agent's runtime (admins: "
      "PATCH /api/admin/agents/{id}, owners: PATCH /api/my/agents/{id}), the agent reads it in GET /agent",
      ("PUT /api/agents/{}/permission-mode",)),
+    ("2.30.0 (#919): what people see about agents in their lists: the access log of a list (list menu > Agent access) and the "
+     "lists an agent connects although their people differ; an agent's own token reads neither (GET /me shows its list_ids)",
+     ("GET /api/lists/{}/agent-access", "GET /api/agents/{}/bridges")),
 ]
 
 

@@ -54,7 +54,9 @@ migrates itself.
 
 - AI agents: see **[docs/AGENT-SECURITY.md](docs/AGENT-SECURITY.md)** for the threat model (only designated people by
   account id instruct an agent; task text, comments and other agents are data), what Kalmido enforces (never admin, only
-  shared lists, kill switch, usage limits, audit log) and a tested host sandbox recipe for Claude Code.
+  shared lists, kill switch, usage limits, audit log; 2.30.0: no agent between lists with different people unless a
+  person approves the bridge, list restriction per agent and token, an access log per list) and a tested host sandbox
+  recipe for Claude Code. Self-hosting hardening (reverse proxy, firewall, backups, updates): **[docs/SELF-HOSTING.md](docs/SELF-HOSTING.md)**.
 
 - The single sign-on header (`AUTH_PROXY_HEADER`) is a password. Only trust it from your proxy, and make
   the proxy strip client-supplied copies. See *Login* and *Reverse proxy* in the README.
@@ -65,8 +67,11 @@ migrates itself.
 - Webhook receivers should check `X-Kalmido-Signature` and the timestamp (5 minute window) before trusting a payload.
 - Public list links are readable by anyone who has the link. Use *View only* unless ticking off is wanted, a password
   for anything sensitive, and *New link* if a link got out.
-- The Paperless integration uses one API token: every user an admin grants Paperless access can see that
-  token's whole archive.
+- Paperless (2.1.0): server connections set up by an admin carry no shared token; every person the admin allows
+  enters their **own** Paperless token, so Paperless' own permissions apply per person. Personal connections are seen
+  and used only by their owner. Tokens are write-only and encrypted with `KALMIDO_SECRET_KEY`. Only the legacy
+  connection from the environment (`PAPERLESS_TOKEN`) still uses one token: every user an admin grants *Paperless
+  access* to it can see that token's whole archive, so prefer server connections with personal tokens.
 - Backups contain everything (all users' data, the server secrets in the settings table). They are only served to
   admins; keep copies you move elsewhere encrypted (*Encrypt backups*) and the passphrase outside the server. A
   restore replaces all data and is refused for anything but a complete, untampered Kalmido archive (see *Backups and

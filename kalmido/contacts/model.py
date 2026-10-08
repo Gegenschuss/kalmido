@@ -85,6 +85,7 @@ def my_book_ids(c, uid):
 def book_public(c, b, uid, names=None):
     role = book_role(c, uid, b)
     d = {"id": b["id"], "name": b["name"], "color": b["color"], "owner_id": b["owner_id"], "role": role,
+         "org_id": b["org_id"],  # 2.30.0 (#1036): its workspace (None = private)
          "imported": bool(b["src_id"]), "birthdays_list_id": b["occ_list_id"] if role == "owner" else None,
          "count": c.execute("SELECT COUNT(*) FROM contacts WHERE book_id=? AND kind!='group'", (b["id"],)).fetchone()[0]}
     if names is not None:
@@ -121,14 +122,18 @@ def book_fields(b, create=False):
 
 
 def book_create(c, uid, b, src_id=None):
+    """2.30.0 (#1036): b.org_id = its workspace (None / 0 = private, else an organisation of uid); not given: an address book
+    mirrored from an outside account (src_id) is private, else the default of a new object (ws_obj_default)."""
+    from ..accounts.orgs import clean_org_id, ws_obj_default
     f = book_fields(b, True)
+    oid = clean_org_id(c, b["org_id"], uid) if "org_id" in b else (None if src_id else ws_obj_default(c, uid))
     if c.execute("SELECT COUNT(*) FROM books WHERE owner_id=?", (uid,)).fetchone()[0] >= BOOKS_MAX:
         raise Denied(409, tr("At most {0} address books", BOOKS_MAX))
     used = [r[0] for r in c.execute("SELECT color FROM books WHERE owner_id=?", (uid,))]
     col = f.get("color") or next((x for x in BOOK_COLORS if x not in used), BOOK_COLORS[0])
     ts = iso_ms(now_utc())
-    return c.execute("INSERT INTO books(owner_id,name,color,src_id,created_at,changed_at) VALUES(?,?,?,?,?,?)",
-                     (uid, f["name"], col, src_id, ts, ts)).lastrowid
+    return c.execute("INSERT INTO books(owner_id,name,color,src_id,created_at,changed_at,org_id) VALUES(?,?,?,?,?,?,?)",
+                     (uid, f["name"], col, src_id, ts, ts, oid)).lastrowid
 
 
 def default_book(c, uid, create=True):
@@ -156,6 +161,12 @@ def book_member_set(c, bid, uid, role):
         raise Denied(404, tr("unknown user"))
     if is_agent(u) and not has_request_context():
         raise Denied(404, tr("unknown user"))
+    if not c.execute("SELECT 1 FROM book_members WHERE book_id=? AND user_id=?", (bid, uid)).fetchone():  # a new member
+        from ..accounts.orgs import need_visible, ws_fit_problem
+        need_visible(c, uid)  # 2.30.0 (#1036, B2): only people one may see (404 as for an unknown id)
+        p = ws_fit_problem(c, b["org_id"], uid, "book")  # 2.30.0 (#1036, B3): an organisation's address book only inside it
+        if p:
+            raise Denied(409, p)
     if c.execute("SELECT 1 FROM book_members WHERE book_id=? AND user_id=?", (bid, uid)).fetchone():
         c.execute("UPDATE book_members SET role=? WHERE book_id=? AND user_id=?", (role, bid, uid))
     else:

@@ -12,6 +12,7 @@ usage: p251_api_test.py <datadir>"""
 import base64
 import json
 import os
+import sqlite3
 import subprocess
 import sys
 import time
@@ -119,7 +120,13 @@ TEAM = A.post(B + "/api/lists", json={"name": "Team board"}).json()["id"]
 assert A.put(B + f"/api/lists/{TEAM}/members", json={"user_id": AG, "role": "edit"}).ok
 T = A.post(B + "/api/tasks", json={"title": "Write the release notes", "list_id": TEAM}).json()["id"]
 BL = Bo.post(B + "/api/lists", json={"name": "Bob private"}).json()["id"]
-assert Bo.put(B + f"/api/lists/{BL}/members", json={"user_id": AG, "role": "edit"}).ok
+# 2.30.0 (#919): Alice's and Bob's private lists through one agent are a bridge (409, Bob cannot approve it for Alice's
+# list); the log test needs the agent in both, so the membership is written like one from before 2.30
+assert Bo.put(B + f"/api/lists/{BL}/members", json={"user_id": AG, "role": "edit"}).status_code == 409
+_c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+_c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,'edit','edit',0,'2026-01-01T00:00:00+00:00')", (BL, AG))
+_c.commit()
+_c.close()
 TB = Bo.post(B + "/api/tasks", json={"title": "Bob secret task", "list_id": BL}).json()["id"]
 check(ag.get(f"/tasks/{T}").ok and ag.get(f"/tasks/{TB}").ok, "agent reads both tasks")
 for _ in range(30):

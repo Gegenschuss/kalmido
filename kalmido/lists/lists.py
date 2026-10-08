@@ -324,7 +324,7 @@ def list_update(lid):
     pt_out = {}
     if "ptype" in b:  # 2.18.0 (#408): the project type of an existing list (owner / list admins), see list_ptype_set
         try:
-            pt_out = list_ptype_set(c, lid, role, b["ptype"], skip=set(b))
+            pt_out = list_ptype_set(c, lid, role, b["ptype"], skip=set(b) | (given & {"listen_agent_ids"}))
         except BadInput as e:
             return err(str(e))
         except Denied as e:
@@ -367,7 +367,8 @@ def list_update(lid):
             grp_touch(c, me())  # 2.10.0 (#441): moved into / out of a folder shared with a group
             folder_autoshare(c, lid)  # 2.22.0 (#740): moved into a folder shared with people
             if vals["folder"] != (tidy0["folder"] if tidy0 else None):  # really moved (the dialog sends the folder with every save)
-                folder_list_arrived(c, lid, keep=tuple(k for k in ("org_id", "agent_tidy", "agent_members", "agent_peers") if k in given))
+                folder_list_arrived(c, lid, keep=tuple(k for k in ("org_id", "agent_tidy", "agent_members", "agent_peers") if k in given)
+                                    + (("agent_listen",) if "listen_agent_ids" in given else ()))
     else:
         if "rate" in b or "ticket_tpl" in b or "day_hours" in b or any(k in b for k in LIST_FIELDS if k not in MEMBER_LIST_FIELDS):
             return err(tr("Only the owner can change this list"), 403)
@@ -379,6 +380,8 @@ def list_update(lid):
         for k in ("agent_tidy", "agent_members", "agent_peers"):
             if k in given and (now[k] or 0) != (tidy0[k] or 0) and vals.get("folder", tidy0["folder"]) == tidy0["folder"]:
                 list_own_mark(c, lid, k)
+        if "listen_agent_ids" in given and vals.get("folder", tidy0["folder"]) == tidy0["folder"]:  # 2.30.0 (#1034)
+            list_own_mark(c, lid, "agent_listen")
     bump(c)
     c.commit()
     return jsonify(ok=True, conflicts=conflicts, **pt_out)
@@ -465,6 +468,11 @@ def list_delete(lid):
     return jsonify(ok=True)
 
 
+def _agent_bridge_blocks(c, lid, uid):
+    from ..agents.safety import bridge_blocks
+    return bridge_blocks(c, lid, uid)
+
+
 @app.put("/api/lists/<int:lid>/members")
 def member_set(lid):
     """{user_id, role: admin|edit|participant|view} -- the owner or a list admin shares the list (or changes a member's
@@ -501,7 +509,8 @@ def member_set(lid):
         from ..accounts.orgs import ws_member_problem
         if not r or r[0] == me() or r[0] == c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0] or \
                 c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, r[0])).fetchone() or \
-                ws_member_problem(c, lid, r[0]):  # 2.28.0 (#935): not of the list's workspace -> nothing happens, nothing is revealed
+                ws_member_problem(c, lid, r[0]) or _agent_bridge_blocks(c, lid, r[0]):  # 2.28.0 (#935): not of the list's workspace;
+            # 2.30.0 (#919): would connect lists with different people through the list's agent -> nothing happens, nothing is revealed
             return jsonify(ok=True, by_email=True)
         uid = r[0]
     elif not may_see(c, me(), uid):
@@ -513,6 +522,9 @@ def member_set(lid):
         return err(tr("The owner's role cannot be changed"), 403)
     from ..accounts.orgs import ws_check_member
     ws_check_member(c, lid, uid)  # 2.28.0 (#935): an organisation's list only inside it, agents only in their workspace (409)
+    if not (b.get("email") and not b.get("user_id")):  # 2.30.0 (#919): no agent bridge between lists with different people
+        from ..agents.safety import bridge_check  # (by e-mail address: skipped silently above, it must not reveal an account)
+        bridge_check(c, lid, uid, ok=b.get("bridge_ok") is True)
     if is_kid(c, uid):  # 2.19.0 (#653): a kid only ever takes part (sees what is assigned to it / where it comes along)
         role = "participant"
     lname = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]
@@ -576,6 +588,9 @@ def _folder_member_add(c, lid, uid, role, actor):
         return False
     from ..accounts.orgs import ws_member_problem
     if ws_member_problem(c, lid, uid):  # 2.28.0 (#935): not of the list's workspace (the list is skipped)
+        return False
+    from ..agents.safety import bridge_blocks
+    if bridge_blocks(c, lid, uid):  # 2.30.0 (#919): would connect lists with different people through an agent (skipped)
         return False
     role = "participant" if is_kid(c, uid) else role
     if role == "admin" and is_agent(u):  # 2.29.0: an agent is never a list admin (as in member_set)
@@ -735,6 +750,9 @@ def agent_share_add(c, lid, aid, actor):
             c.execute("SELECT 1 FROM lists WHERE id=? AND life='health'", (lid,)).fetchone() or \
             list_other_agent(c, lid, aid) or ws_member_problem(c, lid, aid):  # 2.22.0 (#663) health; 2.26.0: one agent per list; 2.28.0: workspace
         return False
+    from ..agents.safety import bridge_blocks
+    if bridge_blocks(c, lid, aid):  # 2.30.0 (#919): a list with other people than the agent's other lists (skipped)
+        return False
     lname = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]
     c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?)",
               (lid, aid, "edit", "edit", my_max_sort(c, aid) + 1, iso(now_utc())))
@@ -811,10 +829,13 @@ def list_agent_set(lid):
                                    "ORDER BY m.user_id", (lid,))]
     if new is not None and new in cur:
         return jsonify(previous=new, agent_id=new)
+    if new is not None:  # 2.30.0 (#919): checked before the old agent leaves (409 agent_bridge; bridge_ok confirms)
+        from ..agents.safety import bridge_check
+        bridge_check(c, lid, new, ok=b.get("bridge_ok") is True)
     for old in cur:
         v1_call(member_remove, lid, old)
     if new is not None:
-        v1_call(member_set, lid, body={"user_id": new, "role": b.get("role") or "edit"})
+        v1_call(member_set, lid, body={"user_id": new, "role": b.get("role") or "edit", "bridge_ok": b.get("bridge_ok") is True})
     if not g.get("folder_applying") and lr["owner_id"] == me():  # 2.29.0 (#1030): chosen for this list itself
         from ..lists.folders import list_own_mark
         list_own_mark(c, lid, "agent_id")
@@ -830,7 +851,8 @@ def agent_share_all(aid):
     d = agent_share_get(c, me())
     skip = set(d["skip"].get(str(aid), []))
     from ..core.access import ONE_AGENT_MSG, list_other_agent
-    n, other = 0, []
+    from ..agents.safety import bridge_blocks
+    n, other, bridged = 0, [], []
     for (lid, name) in c.execute("SELECT id, name FROM lists WHERE owner_id=? AND is_inbox=0 AND COALESCE(archived,0)=0 ORDER BY id",
                                  (me(),)).fetchall():
         if lid in skip:
@@ -839,9 +861,12 @@ def agent_share_all(aid):
             n += 1
         elif list_other_agent(c, lid, aid) and not c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, aid)).fetchone():
             other.append({"id": lid, "name": name})  # 2.26.0: one agent per list
+        elif not c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, aid)).fetchone() and bridge_blocks(c, lid, aid):
+            bridged.append({"id": lid, "name": name})  # 2.30.0 (#919): other people than its other lists -> share it by hand
     bump(c)
     c.commit()
-    return jsonify(added=n, **agent_share_counts(c, aid, d), **({"other_agent": other, "other_agent_reason": tr(ONE_AGENT_MSG)} if other else {}))
+    return jsonify(added=n, **agent_share_counts(c, aid, d), **({"other_agent": other, "other_agent_reason": tr(ONE_AGENT_MSG)} if other else {}),
+                   **({"bridge": bridged, "bridge_reason": tr("These lists have other people than the agent’s other lists: share them one by one to confirm it")} if bridged else {}))
 
 
 def list_created(c, uid, lid, agents=True):

@@ -21,9 +21,8 @@ function attHtml(a) {
   const del = !canEdit(t) ? '' : `<button class="attdel" data-act="att-del" data-att="${a.id}" title="${tr('Remove')}">${ic('x', 's')}</button>` +
     (plOn() ? `<button class="attpl ${sending ? 'busy' : ''}" data-act="att-pl" data-att="${a.id}" title="${sending ? tr('being sent to Paperless') : tr('File in Paperless')}">${ic('archive', 's')}</button>` : '');
   if (isImg(a)) return `<div class="att img"><a href="${attUrl(a)}" data-act="att-view" data-att="${a.id}" title="${esc(a.name)}"><img src="${attUrl(a)}" loading="lazy" alt="${esc(a.name)}"></a>${del}</div>`;
-  const pdf = a.mime === 'application/pdf';
   if (a.size === 0) return `<div class="att file broken"><span class="attx">${ic('file')}<span class="an">${esc(a.name)}</span><span class="as">${esc(tr('File damaged or missing'))}</span></span>${del}</div>`;  // 2.13.2 (#478 N6): an old 0-byte file says so
-  return `<div class="att file"><a href="${attUrl(a, !pdf)}" ${pdf ? 'target="_blank" rel="noopener"' : 'download'} title="${esc(a.name)}">${ic(pdf ? 'pdf' : 'file')}<span class="an">${esc(a.name)}</span><span class="as">${fmtSize(a.size)}</span></a>${del}</div>`;
+  return `<div class="att file">${attFileA(a)}${del}</div>`;  // 2.30.0 (#1035): text files open in the viewer
 }
 // 2.1.0 (#180): several Paperless connections (S.paperless.conns: id 0 = the server's legacy one, server ones with my own
 // token, my personal ones); only usable ones (my token set) can search / link / show thumbnails
@@ -120,6 +119,70 @@ function attLightbox(id, list) {
     if (b || e.target === m || e.target.tagName === 'IMG') m.remove();
   });
   document.body.appendChild(m);
+}
+// ---- 2.30.0 (#1035 #380): text files (Markdown, plain text, code, data) open in a viewer instead of only downloading:
+// Markdown formatted with the description's renderer (switch "Formatted / Source"), everything else as source text
+// (highlighted where the language is known). Safe: the file is fetched as text (the server sends it as a download,
+// octet-stream), rendered by the escaping renderer only -- nothing in it is ever run (no HTML, no script, only http(s) /
+// mailto links that open in a new tab with noopener noreferrer). Larger than TV_MAX: only the download.
+const TV_MAX = 1024 * 1024;
+const TV_EXT = new Set(('md markdown txt text log csv tsv json jsonl ndjson xml yml yaml toml ini cfg conf env properties html htm css scss sass less ' +
+  'js mjs cjs jsx ts tsx py pyi rb go rs java kt kts scala swift c h cc cpp cxx hpp cs php pl lua r dart ex exs erl hs ml clj sql graphql proto ' +
+  'tf diff patch vue svelte rst adoc tex bib srt vtt sh bash zsh fish ps1 bat cmd mk cmake gradle lock gitignore dockerfile').split(' '));
+const attExt = a => { const n = String(a?.name || ''), i = n.lastIndexOf('.'); return i > 0 && i < n.length - 1 ? n.slice(i + 1).toLowerCase() : ''; };
+const isMdFile = a => ['md', 'markdown'].includes(attExt(a)) || a?.mime === 'text/markdown';
+const isTextFile = a => !!a && !isImg(a) && a.mime !== 'application/pdf' && (TV_EXT.has(attExt(a)) || /^text\//.test(a.mime || '')
+  || /^application\/(json|xml|yaml|x-yaml|javascript|x-sh|sql|toml|x-ndjson)\b/.test(a.mime || ''));
+// the file tile's link (task, comment and chat files): text files carry what the viewer needs (data-tview)
+function attFileA(a) {
+  const pdf = a.mime === 'application/pdf', tv = isTextFile(a) && a.size <= TV_MAX;
+  const o = tv ? esc(JSON.stringify({url: attUrl(a, true), name: a.name, size: a.size, agent: a.agent || '', md: isMdFile(a), ext: attExt(a)})) : '';
+  return `<a href="${attUrl(a, !pdf)}" ${pdf ? 'target="_blank" rel="noopener"' : 'download'}${tv ? ` data-tview="${o}"` : ''} title="${esc(a.name)}">${ic(pdf ? 'pdf' : 'file')}<span class="an">${esc(a.name)}</span><span class="as">${fmtSize(a.size)}${a.agent ? ` · <span class="attag">${esc(tr('Created by agent'))}</span>` : ''}</span></a>`;
+}
+document.addEventListener('click', e => {
+  const l = e.target.closest?.('a[data-tview]');
+  if (!l || e.button || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;  // a modifier: the browser's download
+  let o; try { o = JSON.parse(l.dataset.tview); } catch { return; }
+  e.preventDefault(); e.stopPropagation();
+  textView(o);
+}, true);
+async function textView(o) {
+  $('.lightbox')?.remove();
+  let mode = o.md && LS.get('tvMode', 'fmt') !== 'src' ? 'fmt' : 'src', text = null, fail = '';
+  const m = document.createElement('div'), back = document.activeElement;
+  m.className = 'lightbox tview';
+  m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true'); m.setAttribute('aria-label', o.name);
+  const lang = HL_ALIAS[o.ext] || o.ext;
+  const body = () => fail ? `<div class="tvmsg">${esc(fail)}</div>` : text === null ? `<div class="tvmsg muted">${tr('Loading…')}</div>`
+    : mode === 'fmt' ? `<div class="md mdc tvmd">${renderMd(text, true)}</div>` : `<pre class="mdpre tvsrc"><code>${hlCode(text, lang)}</code></pre>`;
+  const draw = () => {
+    m.innerHTML = `<div class="tvbox"><div class="tvbar"><div class="tvname"><b>${esc(o.name)}</b><span>${fmtSize(o.size)}</span></div>
+      ${o.md ? `<div class="seg tvseg" role="group"><button type="button" data-tv="fmt" class="${mode === 'fmt' ? 'on' : ''}" aria-pressed="${mode === 'fmt'}">${tr('Formatted')}</button><button type="button" data-tv="src" class="${mode === 'src' ? 'on' : ''}" aria-pressed="${mode === 'src'}">${tr('Source')}</button></div>` : ''}
+      <span class="spacer"></span>
+      <button type="button" class="iconbtn" data-tv="copy" title="${esc(tr('Copy'))}" aria-label="${esc(tr('Copy'))}" ${text === null ? 'disabled' : ''}>${ic('copy')}</button>
+      <a class="iconbtn" href="${esc(o.url)}" download="${esc(o.name)}" title="${esc(tr('Download'))}" aria-label="${esc(tr('Download'))}">${ic('download')}</a>
+      <button type="button" class="iconbtn" data-tv="x" title="${esc(tr('Close'))}" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
+      ${o.agent ? `<div class="tvnote">${ic('bot', 's')}<span>${esc(tr('Created by agent {0}. Check it before you run anything from it.', o.agent))}</span></div>` : ''}
+      <div class="tvbody">${body()}</div></div>`;
+  };
+  draw();
+  m.addEventListener('click', e => {
+    const b = e.target.closest('[data-tv]');
+    if (e.target === m || b?.dataset.tv === 'x') { m.remove(); back?.focus?.(); return; }
+    if (!b) return;
+    if (b.dataset.tv === 'copy') { if (text !== null) copyText(text); return; }
+    if (b.dataset.tv !== mode) { mode = b.dataset.tv; LS.set('tvMode', mode); draw(); $('[data-tv="' + mode + '"]', m)?.focus(); }
+  });
+  document.body.appendChild(m);
+  $('[data-tv="x"]', m)?.focus();
+  try {
+    const r = await fetch(o.url, {credentials: 'same-origin'});
+    if (!r.ok) throw new Error(r.status === 404 || r.status === 410 ? tr('File damaged or missing') : tr('Could not load the file'));
+    const buf = await r.arrayBuffer();
+    if (buf.byteLength > TV_MAX) throw new Error(tr('Too large for the preview, please download it'));
+    text = new TextDecoder('utf-8').decode(buf);
+  } catch (e) { fail = e instanceof TypeError ? tr('Could not load the file') : e.message; }
+  if (m.isConnected) draw();
 }
 function depthOf(t) { let n = 0, p = t; while (p && p.parent_id && n < 5) { p = S.tasks.get(p.parent_id); n++; } return n; }
 // small, safe markdown: everything is escaped first, only whitelisted inline / block syntax is turned into html
@@ -279,11 +342,26 @@ function renderMd0(src, ro) {
   };
   let code = null, lang = '';  // 2.13.4: ``` fenced code blocks (agents send them): kept as they are, in mono, scrolling
   // sideways; 2.18.0 (#408 G): highlighted by their language (```js), with a Copy button
+  let skip = -1, quote = [];  // 2.30.0 (#1035): tables (rows up to index skip), > quotes, ---, #### .. ######
+  const flushQuote = () => { if (quote.length) { h += `<blockquote>${quote.join('<br>')}</blockquote>`; quote = []; } };
   lines.forEach((ln, i) => {
     let m;
+    if (i <= skip) return;
     if (code !== null) { if (/^\s*```\s*$/.test(ln)) { h += mdCodeBlock(code, lang); code = null; } else code.push(ln); return; }
+    if ((m = ln.match(/^\s*>\s?(.*)/))) { flushPara(); closeList(); quote.push(mdInline(m[1])); return; }
+    flushQuote();
     if ((m = ln.match(/^\s*```\s*([^\s`]*)/))) { flushPara(); closeList(); code = []; lang = m[1]; return; }
-    if ((m = ln.match(/^(#{1,3})\s+(.*)/))) { flushPara(); closeList(); h += `<h${m[1].length + 3}>${mdInline(m[2])}</h${m[1].length + 3}>`; }
+    if (ln.includes('|') && MD_TBL_SEP.test(lines[i + 1] || '')) {
+      flushPara(); closeList();
+      const al = mdCells(lines[i + 1]).map(c => /^:-+:$/.test(c) ? ' class="ta-c"' : /-:$/.test(c) ? ' class="ta-r"' : '');
+      const row = (l, tag) => `<tr>${al.map((a, k) => `<${tag}${a}>${mdInline(mdCells(l)[k] ?? '')}</${tag}>`).join('')}</tr>`;
+      let j = i + 2, body = '';
+      while (j < lines.length && lines[j].includes('|') && lines[j].trim()) body += row(lines[j++], 'td');
+      h += `<div class="mdtbl"><table><thead>${row(ln, 'th')}</thead>${body ? `<tbody>${body}</tbody>` : ''}</table></div>`;
+      skip = j - 1; return;
+    }
+    if (/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/.test(ln)) { flushPara(); closeList(); h += '<hr>'; return; }
+    if ((m = ln.match(/^(#{1,6})\s+(.*)/))) { flushPara(); closeList(); const n = Math.min(m[1].length + 3, 6); h += `<h${n}>${mdInline(m[2])}</h${n}>`; }
     else if ((m = ln.match(/^\s*[-*]\s+\[( |x|X)\]\s*(.*)/))) { flushPara(); item('ul', ln, `<input type="checkbox" ${ro ? 'disabled' : `data-mdline="${i}"`} ${m[1] !== ' ' ? 'checked' : ''}><span>${mdInline(m[2])}</span>`, `cb ${m[1] !== ' ' ? 'on' : ''}`); }
     else if ((m = ln.match(/^\s*[-*•]\s+(.*)/))) { flushPara(); item('ul', ln, mdInline(m[1])); }
     else if ((m = ln.match(/^\s*(\d+)[.)]\s+(.*)/))) { flushPara(); item('ol', ln, mdInline(m[2]), '', +m[1]); }
@@ -291,8 +369,16 @@ function renderMd0(src, ro) {
     else { closeList(); para.push(mdInline(ln)); }
   });
   if (code !== null) h += mdCodeBlock(code, lang);
-  flushPara(); closeList();
+  flushQuote(); flushPara(); closeList();
   return h;
+}
+// 2.30.0 (#1035): table cells of a "| a | b |" line (\| = a literal pipe inside a cell); the separator line "|---|:-:|"
+const MD_TBL_SEP = /^\s*\|?(?:\s*:?-+:?\s*\|)+\s*(?::?-+:?\s*)?$/;
+function mdCells(l) {
+  let t = l.trim();
+  if (t.startsWith('|')) t = t.slice(1);
+  if (t.endsWith('|') && !t.endsWith('\\|')) t = t.slice(0, -1);
+  return t.split(/(?<!\\)\|/).map(c => c.trim());
 }
 function autosize(el) { if (!el) return; el.style.height = 'auto'; if (el.scrollHeight) el.style.height = el.scrollHeight + 'px'; }
 // base: the value before the edit when the caller already changed the local copy (markdown checkbox)

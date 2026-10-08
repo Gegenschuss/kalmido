@@ -527,6 +527,8 @@ def list_ptype_set(c, lid, role, k, skip=()):
             out["ptype_missing"] = ptype_missing(c, lid, k, lang(c, me()))
         return out
     c.execute("UPDATE lists SET ptype=? WHERE id=?", (k, lid))
+    if "listen_agent_ids" not in skip:  # 2.30.0 (#1034): a new type starts over with its default (software: agents listen in)
+        c.execute("UPDATE lists SET agent_listen=NULL WHERE id=?", (lid,))
     if not k:
         return out
     p, prev = PTYPES[k], out["ptype_prev"]
