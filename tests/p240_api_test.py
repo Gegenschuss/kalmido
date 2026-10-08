@@ -150,13 +150,13 @@ L5 = r.json()["id"]
 # a member's own placement
 check(A.put(B + f"/api/lists/{L1}/members", json={"user_id": BOB, "role": "edit"}).ok, "share Website with bob")
 check(Bo.patch(B + f"/api/lists/{L1}", json={"folder": "Work/Clients"}).ok, "member: own folder path")
-check(folder(Bo, L1) == "Work/Clients" and folder(A, L1) == "Clients/Company X", "member path is bob's own")
+check(folder(Bo, L1) == "Clients/Company X" and folder(A, L1) == "Clients/Company X", "2.27.0 (#988): a list in its owner's folder sits there for bob too")
 
 # ---- rename / move
 check(A.post(B + "/api/folders/rename", json={"old": "Clients", "new": "Customers"}).ok, "rename a top folder")
 check(folder(A, L1) == "Customers/Company X" and folder(A, L2) == "Customers" and folder(A, L3) == "Customers/Company Y",
       "subfolders and lists move along")
-check(folder(Bo, L1) == "Work/Clients", "bob's folders untouched")
+check(folder(Bo, L1) == "Customers/Company X", "2.27.0 (#988): bob sees the owner's rename")
 o = json.loads(settings(A)["folders"])
 check(o[:3] == ["Customers", "Customers/Company X", "Customers/Company Y"], f"order follows: {o}")
 check("Customers/Company Y" in json.loads(settings(A)["folders_closed"]), "folded state follows the rename")
@@ -172,7 +172,7 @@ check(A.post(B + "/api/folders/rename", json={"old": "Company Y", "new": "Home/C
 check(folder(A, L3) == "Home/Company Y", "nested")
 check(A.post(B + "/api/folders/rename", json={"old": "Home/Company Y", "new": "Home/Company Y/deeper"}).status_code == 400,
       "never 3 levels")
-check(Bo.post(B + "/api/folders/rename", json={"old": "Work", "new": "Job"}).ok and folder(Bo, L1) == "Job/Clients", "member renames own folders")
+check(Bo.post(B + "/api/folders/rename", json={"old": "Work", "new": "Job"}).ok and folder(Bo, L1) == folder(A, L1), "2.27.0 (#988): a member's rename leaves the owner's placement")
 check(folder(A, L1) == "Customers/Company X", "the owner's placement stays")
 # ---- delete: children move up one level
 check(A.post(B + "/api/folders/delete", json={"name": "Home/Company Y"}).ok, "delete a subfolder")
@@ -247,7 +247,7 @@ check(ev and ev[-1]["data"]["task"]["type"] == "bug", "agent event: task.type")
 # ================================================================== #243 project types
 FE = settings(A)["features"]
 A.patch(B + "/api/settings", json={"features": ",".join(f for f in FE.split(",") if f not in ("kanban", "deps"))})
-r = A.post(B + "/api/lists", json={"name": "Kalmido", "ptype": "software", "folder": "Dev/Tools"})
+r = A.post(B + "/api/lists", json={"name": "Kalmido", "ptype": "software", "folder": "Dev/Tools", "sections": True})
 check(r.ok, f"software project: {r.status_code} {r.text[:120]}")
 j = r.json()
 SW = j["id"]
@@ -259,12 +259,12 @@ check(L["kind"] == "project" and L["view"] == "list" and L["tickets"] == 1 and L
 secs = [x["name"] for x in st(A)["sections"] if x["list_id"] == SW]
 check(secs == ["Backlog", "Next", "In progress", "Review", "Done"], f"software sections: {secs}")
 A.patch(B + "/api/settings", json={"lang": "de"})
-AG = A.post(B + "/api/lists", json={"name": "Kunde X", "ptype": "agency"}).json()
+AG = A.post(B + "/api/lists", json={"name": "Kunde X", "ptype": "agency", "sections": True}).json()
 secs = [x["name"] for x in st(A)["sections"] if x["list_id"] == AG["id"]]
 check(secs == ["Anfrage", "Konzept", "Umsetzung", "Abnahme", "Abrechnung"], f"agency sections in German: {secs}")
 fl = [(f["name"], f["type"]) for f in st(A)["fields"] if f["list_id"] == AG["id"]]
 check(fl == [("Kunde", "text"), ("Budget h", "number")], f"agency fields: {fl}")
-PR = A.post(B + "/api/lists", json={"name": "Umzug", "ptype": "private"}).json()
+PR = A.post(B + "/api/lists", json={"name": "Umzug", "ptype": "private", "sections": True}).json()
 secs = [x["name"] for x in st(A)["sections"] if x["list_id"] == PR["id"]]
 check(secs == ["Ideen", "Planung", "Erledigen"] and not [f for f in st(A)["fields"] if f["list_id"] == PR["id"]], f"private: {secs}")
 A.patch(B + "/api/settings", json={"lang": "en"})
@@ -343,7 +343,7 @@ start(keep=True)
 A = sess("alice")
 Bo = sess("bob")
 check(folder(A, L4) == "Kunden" + C + "Firma", f"owner row: kept top-level ({folder(A, L4)!r})")
-check(folder(Bo, L1) == "Privat" + C + "Alt", f"member row: kept top-level ({folder(Bo, L1)!r})")
+check(folder(Bo, L1) == folder(A, L1), f"2.27.0 (#988): member row mirrors the owner ({folder(Bo, L1)!r})")
 check(json.loads(settings(A)["folders"])[0] == "Kunden" + C + "Firma", "folder order migrated")
 check(dbx("SELECT value FROM settings WHERE key='migr_folder_path'") == [("1",)], "migration done once")
 

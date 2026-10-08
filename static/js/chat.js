@@ -56,14 +56,15 @@ const roomIcon = r => r.kind === 'dm' ? av(r.user_id, r.name, 'avatar') : `<span
 function viewTeam() {
   if (!teamOn()) return `<div class="empty">${tr('The team chat needs collaboration (Settings > Modules).')}</div>`;
   if (S.tc.rooms === null && !S.tc.loading) { S.tc.loading = true; loadTeam().then(() => { S.tc.loading = false; if (S.route.mod === 'team') renderView(); }); }
-  const rid = S.tc.rid, rooms = S.tc.rooms || [];
+  // 2.27.0 (#986): only conversations that have messages (newest first); an empty one shows once it is opened / written in
+  const rid = S.tc.rid, rooms = (S.tc.rooms || []).filter(r => r.last || r.id === rid);
   const list = `<nav class="tclist" aria-label="${esc(tr('Conversations'))}">
     <div class="tchead"><b>${tr('Conversations')}</b><span class="spacer"></span><button type="button" class="btn sm pri" data-act="tc-new" aria-haspopup="${S.tc.people.length ? 'menu' : 'dialog'}">${ic('plus', 's')}${tr('New message')}</button></div>
     ${S.tc.rooms === null ? `<div class="muted mhint">${tr('Loading…')}</div>` : rooms.length ? rooms.map(r => `<button type="button" class="tcrow ${r.id === rid ? 'on' : ''} ${r.unread ? 'unread' : ''}" data-act="tc-open" data-rid="${r.id}" ${r.id === rid ? 'aria-current="true"' : ''}>
       ${roomIcon(r)}<span class="tcmain"><span class="tcn">${esc(roomName(r))}${r.kind === 'list' ? `<span class="tck">${ic('users', 's')}${r.members}</span>` : ''}</span>
       <span class="tclast">${r.last ? esc((r.last.user_id === S.me?.id ? tr('You') + ': ' : r.kind === 'list' ? uname(r.last.user_id, S.tc.users) + ': ' : '') + mdBrief(r.last.text)) : `<span class="muted">${tr('No messages yet')}</span>`}</span></span>
       <span class="tcside">${r.last_at ? `<time>${esc(relTime(r.last_at))}</time>` : ''}${r.unread ? `<span class="nbadge ${r.mention ? 'ment' : ''}" aria-label="${esc(trn('{0} unread', '{0} unread', r.unread))}">${r.mention ? '@' : ''}${r.unread}</span>` : ''}${r.muted ? `<span class="tcmute" title="${esc(tr('Muted'))}">${ic('belloff', 's')}</span>` : ''}</span></button>`).join('')
-    : `<div class="empty tcempty">${heron('empty')}<b>${tr('No conversations yet')}</b><span>${S.tc.people.length ? tr('Write to someone you work with, or share a list: every shared list gets its own chat.') : tr('Share a list with someone: every shared list gets its own chat.')}</span></div>`}
+    : `<div class="empty tcempty">${heron('empty')}<b>${tr('No conversations yet')}</b><span>${S.tc.people.length || (S.tc.rooms || []).length ? tr('Write to someone you work with, or share a list: every shared list gets its own chat.') : tr('Share a list with someone: every shared list gets its own chat.')}</span>${S.tc.people.length || (S.tc.rooms || []).length ? `<button type="button" class="btn sm pri" data-act="tc-new">${ic('plus', 's')}${tr('Start a conversation')}</button>` : ''}</div>`}
   </nav>`;
   return `<div class="tcwrap"><div class="tcview ${rid ? 'inroom' : ''}">${list}${rid ? `<section class="tcroom" aria-label="${esc(roomName(S.tc.room ? {...S.tc.room, name: (rooms.find(x => x.id === rid) || {}).name} : rooms.find(x => x.id === rid)))}">${tcRoomHtml()}</section>` : (isMobile() ? '' : `<section class="tcroom tcnone"><div class="empty">${ic('comment')}<span>${tr('Pick a conversation.')}</span></div></section>`)}</div></div>`;
 }
@@ -168,8 +169,11 @@ async function tcMute() {
   toast(on ? tr('Muted: only mentions notify you') : tr('Notifications on')); renderView();
 }
 function tcNewMenu(anchor) {
-  if (!S.tc.people.length) { dmWhy(); return; }  // 2.24.0 (#906): the button is always there and explains why not yet
-  menu(anchor, S.tc.people.map(p => ({label: p.name, fn: () => dmOpen(p.id, p.name)})));
+  // 2.27.0 (#986): people (a direct message) and the chats of shared lists nobody has written in yet
+  const quiet = (S.tc.rooms || []).filter(r => r.kind === 'list' && !r.last).sort((a, b) => roomName(a).localeCompare(roomName(b), LOCALE()));
+  if (!S.tc.people.length && !quiet.length) { dmWhy(); return; }  // 2.24.0 (#906): the button is always there and explains why not yet
+  menu(anchor, [...S.tc.people.map(p => ({label: p.name, icon: 'user', fn: () => dmOpen(p.id, p.name)})),
+    ...(quiet.length ? [...(S.tc.people.length ? ['-'] : []), ...quiet.map(r => ({label: roomName(r), icon: 'users', fn: () => go('team/' + r.id)}))] : [])]);
 }
 // 2.24.0 (#906): a direct message from anywhere (the person card, "Tasks of …", the team chat). When it cannot work yet the
 // button still shows and says why (team chat off, nobody to write to, or the server's reason).

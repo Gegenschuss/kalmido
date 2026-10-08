@@ -1119,7 +1119,15 @@ def v1_task_tidy(tid):
         raise Denied(409, tr("Tidying up is not set to automatic in this list"))
     if tidy_agent_of(c, t["list_id"]) != me():  # 2.4.1 (#379): exactly one agent tidies a list
         raise Denied(403, tr("Another agent tidies up this list"))
-    s = clean_suggestion(c, t, v1_json())
+    b = dict(v1_json() or {})
+    # 2.27.0 (#999): never over someone's work. Refused (409, try again later) while a person edits the task, when people
+    # changed it after the tidy event went out, or when base_updated_at (the task's updated_at the agent read) is old
+    base = b.pop("base_updated_at", None)
+    from ..agents.core import task_being_edited
+    p = c.execute("SELECT sent_at FROM tidy_pending WHERE task_id=?", (tid,)).fetchone()
+    if task_being_edited(tid) or (base is not None and base != t["updated_at"]) or (p and p["sent_at"] and (t["updated_at"] or "") > p["sent_at"]):
+        raise Denied(409, tr("Someone is working on this task right now: tidy it up later"))
+    s = clean_suggestion(c, t, b)
     tidy_apply(c, c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone(), s)
     bump(c)
     c.commit()

@@ -215,10 +215,8 @@ document.addEventListener('click', async e => {
   const ls = e.target.closest('[data-lsort]');
   if (ls) {
     e.preventDefault(); e.stopPropagation();
-    const id = +ls.dataset.lsort, order = sideOrder(), i = order.findIndex(l => l.id === id);
-    const can = d => i >= 0 && order[i + d] && order[i + d].folder === order[i].folder;
-    menu(ls, [{label: tr('Move up'), icon: 'chev', cls: 'mup', dis: !can(-1), fn: () => moveList(id, -1)}, {label: tr('Move down'), icon: 'chev', dis: !can(1), fn: () => moveList(id, 1)},
-      {label: tr('Move to folder…'), icon: 'folder', fn: () => folderPick(ls, id)}]);
+    const id = +ls.dataset.lsort;
+    menu(ls, [...listMoveItems(id), {label: tr('Move to folder…'), icon: 'folder', fn: () => folderPick(ls, id)}]);  // 2.27.0 (#991): + top / bottom
     return;
   }
   const fs = e.target.closest('[data-fsort]');
@@ -316,7 +314,7 @@ document.addEventListener('click', async e => {
     case 'job-do': jobDo(+a.dataset.jid, a.dataset.a); break;
     case 'prop-open': propOpen(+a.dataset.jid); break;  // 2.3.0
     case 'aiu-more': settingsModal('usage'); break;
-    case 'ag-setup': settingsModal('agents'); break;  // 2.22.0 (#739)
+    case 'ag-setup': LS.set('aiSub', 'setup'); settingsModal('agents'); break;  // 2.22.0 (#739); 2.27.0 (#955): at "Set up"
     case 'jobs-f': S.jobs.f = a.dataset.f; LS.set('jobsFilter', a.dataset.f); S.jobs.items = null; renderView(); break;
     case 'c-react': e.stopPropagation(); commentReact(+a.dataset.cid, a.dataset.e); break;
     case 'c-react-who': e.stopPropagation(); commentReactWho(+a.dataset.cid, a.dataset.e); break;
@@ -531,6 +529,7 @@ document.addEventListener('click', async e => {
     case 'tl-prev': case 'tl-next': S.tlStart = addDays(S.tlStart, act === 'tl-next' ? 14 : -14); renderView(); break;
     case 'tl-today': S.tlStart = addDays(weekStartOf(today()), -7); { const tl = $('#tlscroll'); renderView(); const n = $('#tlscroll'); if (n) n.scrollLeft = 5 * tlDW(); } break;
     case 'sort': sortMenu(a); break;
+    case 'sort-shared': LS.del('sort2.' + S.route.key); render(); break;  // 2.27.0 (#988)
     case 'od-move': overdueAct(a); break;
     case 'od-other': overdueOther(a); break;  // 2.24.0 (UX-35)
     case 'od-hide': LS.set('odHide', today()); renderView(); break;

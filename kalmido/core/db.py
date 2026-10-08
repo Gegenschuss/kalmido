@@ -372,6 +372,17 @@ def init_db(guard=True):
             gset(c, "migr_folder931", "1")
             if n:
                 print("lists in shared folders shared afterwards (#931):", n, flush=True)
+        # 2.27.0 (#988), once: every member's copy of a list in its owner's folder is put where the owner has it (folder +
+        # place); from now on the owner's arrangement is mirrored for everyone (visible_lists, list_reorder)
+        if gsetting(c, "migr_order988") != "1":
+            n = c.execute("""UPDATE list_members SET folder=(SELECT l.folder FROM lists l WHERE l.id=list_members.list_id),
+                                 sort=(SELECT l.sort FROM lists l WHERE l.id=list_members.list_id)
+                             WHERE list_id IN (SELECT id FROM lists WHERE COALESCE(folder,'')!='')
+                               AND (folder IS NOT (SELECT l.folder FROM lists l WHERE l.id=list_members.list_id)
+                                    OR sort IS NOT (SELECT l.sort FROM lists l WHERE l.id=list_members.list_id))""").rowcount
+            gset(c, "migr_order988", "1")
+            if n:
+                print("shared lists arranged like their owners have them (#988):", n, flush=True)
         for (uid,) in c.execute("SELECT id FROM users").fetchall():
             ensure_inbox(c, uid)
             for k, v in USER_DEFAULTS.items():

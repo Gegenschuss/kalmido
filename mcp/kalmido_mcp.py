@@ -522,9 +522,10 @@ TOOLS = [
      _obj({"from": {"type": "string"}, "to": {"type": "string"}, "group": {"type": "string", "enum": ["day", "task", "list", "model"]}}),
      lambda api, a: api.call("GET", "/agent/usage", _pick(a, ("from", "to", "group")))),
     ("tidy_task", "Tidy a task in a list with agent tidy mode 'auto': new title / notes / section / list tags / priority. "
-     "Kalmido keeps the original text at the top of the notes.",
+     "Kalmido keeps the original text at the top of the notes. base_updated_at (2.27.0): the task's updated_at you read; "
+     "409 = someone is working on the task right now, try again later.",
      _obj({"task_id": S_ID, "title": {"type": "string"}, "notes": {"type": "string"}, "section_id": {"type": ["integer", "null"]},
-           "list_tags": STRS, "priority": PRIO}, ["task_id"]), t_tidy),
+           "list_tags": STRS, "priority": PRIO, "base_updated_at": {"type": "string"}}, ["task_id"]), t_tidy),
 ]
 
 
@@ -694,8 +695,9 @@ TOOLS += [
     ("get_list", "One list with its sections and custom fields.", _obj({"list_id": S_ID}, ["list_id"]),
      lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}")),
     ("create_list", "Create a list (you become its owner). kind project = time tracking, dependencies, custom fields, overview. "
-                    "project_type agency | software | private = a project of that built-in type (sections, fields, ticket types).",
-     _obj({**LIST_PROPS, "project_type": {"type": "string", "enum": ["agency", "software", "private"]}}, ["name"]),
+                    "project_type agency | software | private = a project of that built-in type (fields, ticket types); "
+                    "sections true (2.27.0) = also the type's standard sections (default: none).",
+     _obj({**LIST_PROPS, "project_type": {"type": "string", "enum": ["agency", "software", "private"]}, "sections": {"type": "boolean"}}, ["name"]),
      lambda api, a: api.call("POST", "/lists", body=a)),
     ("update_list", "Change a list: name, color, folder (moving your own list into another folder waits for approval), view, kind, "
                     "archived (true = archive), done_at_bottom, nag, day_hours, project_type (2.18.0, owner / list admins: "

@@ -402,6 +402,12 @@ shard 7  # ---------------------------------------------------------------- shar
 # UI: resizable sidebar (#932), multi-select + multi-edit in the task panel (#936), the iOS keyboard (#937)
        run p2260_api "$PY" p2260_api_test.py "$KALMIDO_TEST_DATA"
        run p2260_ui node p2260_ui.js "$KALMIDO_TEST_DATA"
+# 2.27.0 "Bugs & polish": the version of the code (#968), projects without sections (#972), the share target assigns to me
+# (#1001), the owner's arrangement mirrored + the list's sort (#988), tidy-up waits for quiet (#999, restarts its container
+# with KALMIDO_TIDY_QUIET_S=2); then the UI: the new-version bar, the task panel, the list dialog, sections, agents per folder,
+# the team chat, the grips under menus, typing with the list scrolled (#958)
+       run p2270_api "$PY" p2270_api_test.py "$KALMIDO_TEST_DATA"
+       run p2270_ui node p2270_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

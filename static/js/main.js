@@ -54,7 +54,7 @@ if (window.visualViewport) {
     // the link goes into the link field; a bare link gets domain + path as title
     const [u, rest] = shareLink(meta.text, meta.url);
     const title = meta.title || rest || (u ? urlTitle(u) : '') || (files[0] ? files[0].name.replace(/\.[^.]+$/, '') : '');
-    openQuickSheet(title, {url: u, list_id: inbox().id, files});
+    openQuickSheet(title, {url: u, list_id: inbox().id, files, ...(S.me ? {assignee_id: S.me.id} : {})});  // 2.27.0 (#1001): yours
     }
   } else if (location.pathname === '/share') {  // Android share sheet (text only, old manifest) -> new task
     const q = new URLSearchParams(location.search);
@@ -62,7 +62,7 @@ if (window.visualViewport) {
     history.replaceState(null, '', '/#inbox');
     await route();
     const [u, rest] = shareLink(text, (q.get('url') || '').trim());
-    openQuickSheet((q.get('title') || '').trim() || rest || (u ? urlTitle(u) : ''), {url: u, list_id: inbox().id});
+    openQuickSheet((q.get('title') || '').trim() || rest || (u ? urlTitle(u) : ''), {url: u, list_id: inbox().id, ...(S.me ? {assignee_id: S.me.id} : {})});  // 2.27.0 (#1001): yours
   } else if (new URLSearchParams(location.search).get('action') === 'new') {  // app shortcut "New task"
     history.replaceState(null, '', '/' + (location.hash || ''));
     await route();

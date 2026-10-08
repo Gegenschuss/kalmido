@@ -484,6 +484,7 @@ function applyState(j) {
   S.timer = j.timer || null; S.timeTotals = j.time_totals || {};
   S.timeLists = j.time_lists || {}; S.timeDayH = +j.time_day_h || 8;  // 2.7.0 (#407)
   S.fields = j.fields || [];
+  S.folderOrders = j.folder_orders || {};  // 2.27.0 (#988): the order of other people's folders I see their lists in
   S.collabAll = j.collab_all !== false; S.timeAll = j.time_all !== false; S.about = j.about || {};
   S.calendars = j.calendars || {enabled: false, subs: 0};
   S.api = j.api || {enabled: false}; S.caldav = j.caldav || {enabled: false}; S.webhooks = j.webhooks || {enabled: false}; S.publicLinks = !!j.public_links;
@@ -549,7 +550,8 @@ setInterval(async () => {
   if (document.hidden) return;
   try {
     if (OUT.q.length) { flush(); staleDraw(); return; }  // 2.13.0 (#453 A13): the chip says how many changes wait
-    const {v, n, c, t, ty} = await api('GET', '/api/version');
+    const {v, n, c, t, ty, app} = await api('GET', '/api/version');
+    verCheck(app);  // 2.27.0 (#968)
     if (ty !== undefined) { const sig = JSON.stringify(ty); if (sig !== S.ctypingSig) { S.ctypingSig = sig; S.ctyping = ty; if (S.sel) agentLive(); } }  // 2.22.0 (#693)
     if (t !== undefined && t !== S.teamSig) { const first = S.teamSig === undefined; S.teamSig = t; if (!first && !editing()) teamChanged(); }  // 2.17.0 (#419)
     if (c !== undefined && c !== S.calSig) {  // calendar subscriptions synced / changed: fetch the shown range again
@@ -586,6 +588,40 @@ function staleDraw() {
   if (el.parentElement !== host) { if (dtop) (dtop.querySelector('.spacer') || dtop.lastElementChild).after(el); else host.appendChild(el); }
   el.classList.toggle('indet', !!dtop);
 }
+// 2.27.0 (#968): the code in the browser vs. the server. index.html carries the version of the code it came with; /api/version
+// says what the server runs. Differ they (a window open across an update, a service worker that still served the old code):
+// a bar "New version available – Reload"; once nobody types (no field, dialog or unsent change, 20 s without input, or the app
+// comes back to the front) it reloads by itself, once per new version. Help shows both versions.
+const APP_VER = document.querySelector?.('meta[name="kalmido-version"]')?.content || '';
+S.serverVer = '';
+let verIdle = Date.now();
+for (const t of ['keydown', 'pointerdown', 'input']) document.addEventListener(t, () => { verIdle = Date.now(); }, true);
+function verStale() { return !!(APP_VER && S.serverVer && APP_VER !== S.serverVer); }
+// text typed but not sent / saved (a comment, a chat message, the quick add) also holds the automatic reload back
+const verDraft = () => ['#c-input', '#tc-in', '#chat-in', '#qinput', '#qsheet', '#d-sub'].some(s => ($(s)?.value || '').trim());
+const verQuiet = () => !editing() && !editFocused() && !$('.modal') && !$('#pop:not(.hidden)') && !$('.qadd.sheet') && !OUT.q.length && !S.multiMode && !verDraft();
+async function verReload() {
+  try { if (OUT.q.length) await flush(); } catch { /* offline: the outbox stays in this browser and is sent after the reload */ }
+  try { if (typeof flushSaves === 'function') await flushSaves(); } catch { /* nothing waiting */ }
+  try { sessionStorage.setItem('kalmido-reloaded', S.serverVer); } catch { /* private mode */ }
+  try { const reg = await navigator.serviceWorker?.getRegistration(); await reg?.update(); } catch { /* no service worker */ }
+  location.reload();
+}
+function verCheck(app) {
+  if (app) S.serverVer = app;
+  let el = $('#newver');
+  if (!verStale()) { if (el) el.remove(); return; }
+  let once = ''; try { once = sessionStorage.getItem('kalmido-reloaded') || ''; } catch { /* private mode */ }
+  if (once !== S.serverVer && verQuiet() && (document.hidden || Date.now() - verIdle > 20000)) { verReload(); return; }
+  if (!el) {
+    el = document.createElement('div'); el.id = 'newver'; el.setAttribute('role', 'status');
+    el.innerHTML = `${ic('sync', 's')}<span>${esc(tr('New version available'))}</span><button type="button" class="btn sm pri" data-nv="go">${esc(tr('Reload'))}</button>`;
+    document.body.appendChild(el);
+  }
+  el.title = tr('This window runs v{0}, the server v{1}', APP_VER, S.serverVer);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden && verStale()) verCheck(); });
+document.addEventListener('click', e => { const b = e.target.closest?.('[data-nv="go"]'); if (b) { b.disabled = true; verReload(); } });
 document.addEventListener('visibilitychange', async () => {
   if (!document.hidden && !editing()) { try { await load(); render(); } catch { /* offline */ } }
   if (!document.hidden) wpSweep();  // 2.19.0 (#668)
@@ -645,7 +681,7 @@ const SMART = {
   doable: {name: N_('Now doable'), icon: 'zap'},  // 1.7.0
   waiting: {name: N_('Waiting on someone'), icon: 'hourglass'},  // 2.1.0 (#335)
   pinned: {name: N_('Pinned|view'), icon: 'pin'},  // 2.16.0 (#648): every pinned task of every list
-  assigned: {name: N_('Assigned to me'), icon: 'user'},
+  assigned: {name: N_('My tasks'), icon: 'user'},
   all: {name: N_('All'), icon: 'all'},
   done: {name: N_('Completed'), icon: 'done'},
   trash: {name: N_('Trash'), icon: 'trash'},

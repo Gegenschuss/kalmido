@@ -26,7 +26,7 @@ function openPop(anchor, html, onClose) {
   return p;
 }
 function menu(anchor, items) {
-  items = items.filter(Boolean);
+  items = items.filter(Boolean).filter((x, i, a) => x !== '-' || (i > 0 && i < a.length - 1 && a[i - 1] !== '-'));  // 2.27.0: no doubled / edge separators
   const btn = (it, i, j) => `<button role="menuitem" data-i="${i}" ${j != null ? `data-j="${j}"` : ''} class="${it.on ? 'on' : ''} ${it.cls || ''}" ${it.dis ? 'disabled aria-disabled="true"' : ''} ${it.title ? `title="${esc(it.title)}"` : ''}>${it.dot ? `<span class="mdot">${hdot(it.dot)}</span>` : it.icon ? ic(it.icon, 's') : ''}<span class="ml">${esc(it.label)}${it.sub ? `<small class="msub">${esc(it.sub)}</small>` : ''}</span>${it.keys && !isMobile() ? kb(it.keys) : ''}${it.on ? `<span class="mchk" aria-hidden="true">${ic('check', 's')}</span>` : ''}</button>`;
   // {row: [item, item]} = one line of equal buttons (1.5.1: "Today" / "Tomorrow" on top of the task menu)
   const p = openPop(anchor, `<div class="menu-list" role="menu">${items.map((it, i) => it === '-' ? '<hr>' : it.row ? `<div class="mquick" role="group">${it.row.map((x, j) => btn(x, i, j)).join('')}</div>` : btn(it, i)).join('')}</div>`);
@@ -626,8 +626,18 @@ function snoozeSheet(id, anchor, extra = [], head = false, pre = []) {
 }
 function sortMenu(anchor) {
   const cur = sortMode();
-  const set = m => { LS.set('sort2.' + S.route.key, m); render(); };
   const l = routeList(), cfs = l ? fieldsOf(l.id).filter(f => f.type !== 'url') : [];
+  // 2.27.0 (#988): owner / list admins set the list's sort for everyone; a member's choice stays on this device (and the view
+  // says that it is an own sort)
+  const set = async m => {
+    if (l && !l.is_inbox && canManage(l)) {
+      const k = S.route.key, before = l.sort_mode || '';
+      LS.del('sort2.' + k); l.sort_mode = m; render();
+      try { await api('PATCH', '/api/lists/' + l.id, {sort_mode: m}); } catch { l.sort_mode = before; render(); }
+      return;
+    }
+    LS.set('sort2.' + S.route.key, m); render();
+  };
   // 1.7.0: "Flow" = in the order the dependencies allow (only with the dependencies module)
   // 2.0.8 (#319): "Created" newest first; picking it again while it is on flips to oldest first (and back)
   const crOn = cur === 'created' || cur === 'created_asc';
@@ -666,13 +676,26 @@ function vvSync() {
   st.setProperty('--vvt', Math.max(0, Math.round(vv.offsetTop)) + 'px');
   st.setProperty('--vvh', Math.round(vv.height) + 'px');
   st.setProperty('--vvb', kb ? Math.max(0, Math.round(window.innerHeight - vv.offsetTop - vv.height)) + 'px' : '0px');  // hidden below (keyboard)
-  if ((vv.height >= window.innerHeight - 2 || !kb) && !kbBlind() && (window.scrollY || document.documentElement.scrollTop)) { window.scrollTo(0, 0); vvSoon(); }
+  if ((vv.height >= window.innerHeight - 2 || !kb) && !kbBlind() && !typingTouch() && (window.scrollY || document.documentElement.scrollTop)) { window.scrollTo(0, 0); vvSoon(); }
   chatFit(); tlKbSync(); vvPin(kb);
   vvDebugUpd();
   // the focused field of a sheet / the docked composer stays above a real keyboard (iOS does not resize the layout)
   const a = document.activeElement;
-  if (kb && a && a.getBoundingClientRect && !a.closest('#view .chview, .vvpin')) { const r = a.getBoundingClientRect(), lim = vv.offsetTop + vv.height; if (r.bottom > lim - 4 || r.top < vv.offsetTop) a.scrollIntoView?.({block: 'nearest'}); }
+  // 2.27.0 (#958, again #669): typing must never move what is behind. Each key can fire a viewport event (iOS' suggestion bar,
+  // its own caret reveal); a scrollIntoView then scrolled every scrolled ancestor (the list scrolled up, the task panel) and
+  // the page. Now: never for the boxes that sit above the keyboard anyway (the add sheet, a pinned box), only when the field
+  // really is under the keyboard, and once per focus.
+  if (kb && a && a.getBoundingClientRect && !a.closest('#view .chview, .vvpin, .qadd.sheet') && a._vvRev !== vvFocusN) {
+    const r = a.getBoundingClientRect(), lim = vv.offsetTop + vv.height;
+    if (r.bottom > lim - 4) { a._vvRev = vvFocusN; a.scrollIntoView?.({block: 'nearest'}); }
+  }
 }
+// 2.27.0 (#958): while a field has the focus on a touch screen, the page is left where the phone put it (only the numbers
+// --vvt / --vvh / --vvb follow); the reset to the top waits for the focus to leave (focusout below). A desktop / DeX window
+// (fine pointer) keeps the reset at once (#832: focusing the quick add must not slide the whole app up).
+let vvFocusN = 0;
+document.addEventListener('focusin', () => { vvFocusN++; });
+const typingTouch = () => editFocused() && coarseOnly();
 // 2.26.0 (#937): iOS ignores interactive-widget=resizes-content, so a box docked at the bottom of a scrolling area (the
 // docked quick add, the comment box of the task panel, the team chat's composer) stays at the bottom of the LAYOUT
 // viewport, under the keyboard. While a real keyboard is up and the focus is in such a box that is not fully visible, the
@@ -706,7 +729,7 @@ for (const t of ['focusin', 'focusout']) document.addEventListener(t, () => { cl
 let vvSoonF = 0;
 function vvSoon() { if (vvSoonF || !window.visualViewport) return; vvSoonF = requestAnimationFrame(() => { vvSoonF = 0; vvSync(); }); }
 if (window.visualViewport) visualViewport.addEventListener('resize', () => { for (const ms of [120, 350, 700]) setTimeout(vvSoon, ms); });
-window.addEventListener('scroll', () => { if ((window.scrollY || document.documentElement.scrollTop) && !kbReal() && !kbBlind()) window.scrollTo(0, 0); vvSoon(); }, {passive: true});
+window.addEventListener('scroll', () => { if ((window.scrollY || document.documentElement.scrollTop) && !kbReal() && !kbBlind() && !typingTouch()) window.scrollTo(0, 0); vvSoon(); }, {passive: true});
 // 2.26.x (#952): on an iPhone / iPad touch screen (no fine pointer) a focused field of the add sheet or a docked box whose
 // keyboard is not reported (yet) may leave the page scrolled: iOS's own reveal is not undone. (A top-anchored sheet
 // fallback was tried and dropped: iOS does report the keyboard once it is up; the sheet only has to get the focus in the

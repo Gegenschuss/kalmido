@@ -118,11 +118,14 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
 
   // ================= jsdom: #419 the team chat
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  w.eval(`go('team')`); await until(() => d.querySelector('.tclist .tcrow'));
-  const rws = [...d.querySelectorAll('.tclist .tcrow')];
-  check(rws.length === 1 && rws[0].textContent.includes('Website') && !d.querySelector('.tclist').textContent.includes('Garden'), '#419: the shared project has a channel, the private one not');
+  w.eval(`go('team')`); await until(() => w.eval('S.tc.rooms !== null') && d.querySelector('.tclist'));
+  // 2.27.0 (#986): a channel shows once it has messages; "New message" offers the quiet channels of shared lists
+  check(!d.querySelector('.tclist .tcrow'), '#986: no empty channels in the list');
   check(d.querySelector('[data-act="tc-new"]')?.getAttribute('aria-haspopup') === 'menu', 'a "Message…" button for direct messages');
-  click(w, rws[0]); await until(() => d.querySelector('#tc-in') && w.eval('!!S.tc.room'));  // 2.24.0: the room's members are loaded (mentions)
+  click(w, d.querySelector('.tchead [data-act="tc-new"]')); await sleep(200);
+  const tcm = [...d.querySelectorAll('#pop [role="menuitem"]')];
+  check(tcm.some(b => b.textContent.includes('Website')) && !tcm.some(b => b.textContent.includes('Garden')), '#419: the shared project has a channel, the private one not');
+  click(w, tcm.find(b => b.textContent.includes('Website'))); await until(() => d.querySelector('#tc-in') && w.eval('!!S.tc.room'));  // 2.24.0: the room's members are loaded (mentions)
   check(d.querySelector('#tc-msgs[role="log"]') && d.querySelector('.tcrhead').textContent.includes('Website'), 'the channel opens with a log and its name');
   const box = d.querySelector('#tc-in');
   type(w, box, 'Hi @Bob, the text is ready');

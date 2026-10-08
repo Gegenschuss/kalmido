@@ -679,7 +679,7 @@ def v1_list_create():
     v1_args(())
     b = v1_json()
     unknown = sorted(k for k in b if k not in ("name", "color", "folder", "checklist", "done_at_bottom", "kind", "tickets", "project_type", "nag", "day_hours",
-                                               "family"))
+                                               "family", "sections"))
     if unknown:
         raise UnknownFields(unknown)
     later = {k: b.pop(k) for k in ("nag", "day_hours") if k in b}  # 2.7.0: set right after the list exists
@@ -694,6 +694,8 @@ def v1_list_create():
         raise BadInput(tr("Invalid value: {0}", "tickets"))
     if b.get("project_type") is not None and b["project_type"] not in PTYPES:
         raise BadInput(tr("Invalid value: {0}", "project_type"))
+    if "sections" in b and (not isinstance(b["sections"], bool) or not b.get("project_type")):  # 2.27.0 (#972)
+        raise BadInput(tr("Invalid value: {0}", "sections"))
     if b.get("project_type"):
         b = {**{k: v for k, v in b.items() if k not in ("project_type", "kind", "checklist", "done_at_bottom", "tickets")}, "ptype": b["project_type"]}
     if "kind" in b and b["kind"] not in LIST_KINDS and b["kind"] not in LIST_KIND_ALIASES:

@@ -268,7 +268,7 @@ const hasTag = (t, g) => t.tags.includes(g) || (t.ltags || []).some(x => x.toLow
 function tagEditHtml(t, ro) {
   const l = listById(t.list_id), shared = !!l?.shared && collab(), lt = listTags(t.list_id), mayList = canEditList(t.list_id);
   const lpills = (t.ltags || []).map(g => { const c = cssColor(ltagColor(g, t.list_id)); return `<span class="tagpill ltag" ${c ? `style="--tc:${c}"` : ''} title="${esc(tr('List tag: visible to everyone in the list'))}">#${esc(g)}${ro ? '' : `<button data-act="ltag-rm" data-tag="${esc(g)}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button>`}</span>`; }).join('');
-  const ppills = t.tags.map(g => `<span class="tagpill ${shared ? 'ptag' : ''}" ${shared ? `title="${esc(tr('Personal tag: only visible to you'))}"` : ''}>${shared ? ic('user', 's') : ''}#${esc(g)}${ro ? '' : `${shared && mayList ? `<button data-act="tag-promote" data-tag="${esc(g)}" title="${esc(tr('Make it a list tag (visible to everyone in the list)'))}" aria-label="${esc(tr('Make it a list tag'))}">${ic('users', 's')}</button>` : ''}<button data-act="tag-rm" data-tag="${esc(g)}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button>`}</span>`).join('');
+  const ppills = t.tags.map(g => `<span class="tagpill ${shared ? 'ptag' : ''}" ${shared ? `title="${esc(tr('Personal tag: only visible to you'))}"` : ''}>${shared ? ic('user', 's') : ''}#${esc(g)}${ro ? '' : `${(shared || (collab() && l && !l.is_inbox)) && mayList ? `<button data-act="tag-promote" data-tag="${esc(g)}" title="${esc(tr('Make it a list tag (visible to everyone in the list)'))}" aria-label="${esc(tr('Make it a list tag'))}">${ic('users', 's')}</button>` : ''}<button data-act="tag-rm" data-tag="${esc(g)}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button>`}</span>`).join('');
   const own = [...new Set([...S.tasks.values()].flatMap(x => x.tags))].filter(g => !lt.some(x => x.name.toLowerCase() === g.toLowerCase()));
   return `<div class="tagedit">${lpills}${ppills}${ro ? '' : `<input id="d-tag" placeholder="${tr('+ Tag')}" aria-label="${esc(tr('Tags'))}" list="taglist" enterkeyhint="done" autocomplete="off">`}<datalist id="taglist">${lt.map(x => `<option value="${esc(x.name)}" label="${esc(tr('List tag'))}">`).join('')}${own.map(g => `<option value="${esc(g)}" ${shared ? `label="${esc(tr('Personal'))}"` : ''}>`).join('')}</datalist></div>`;
 }
@@ -340,7 +340,7 @@ function tidyRowHtml(l) {
   const acc = sw('l-agm', 'agent_members', tr('Members may see and use the agent'), tr('Off: only you and list admins can chat with the agent, @mention it or assign it tasks here. Members still see what it does.'))
     + sw('l-agp', 'agent_peers', tr('Agents may address each other'), tr('Off: what an agent writes or assigns here never reaches another agent. Instructions only ever come from people.'));
   return `${acc}<div class="row"><label for="l-tidy">${tr('Agent may tidy up entries')}</label><select id="l-tidy" ${may && cands.length ? '' : 'disabled'}>${TIDY.map(([k, n]) => `<option value="${k}" ${(l.agent_tidy || 'off') === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
-    ${cands.length ? `<div class="row"><label for="l-tidyag">${tr('Tidy up by')}</label>${tidyAgentSel(l, 'l-tidyag', may ? '' : 'disabled')}</div>` : ''}
+    ${cands.length > 1 ? `<div class="row"><label for="l-tidyag">${tr('Tidy up by')}</label>${tidyAgentSel(l, 'l-tidyag', may ? '' : 'disabled')}</div>` : ''}
     <div class="shint lhint">${cands.length ? tr('{0} turns long, quickly typed entries into a short title and suggests section, tags and priority. The original text always stays at the top of the notes; every change is in the history.', esc(who.name))
       : tr('Give an agent of this list edit rights first')}</div>${listenRowHtml(l, ags, may)}`;
 }
@@ -348,6 +348,9 @@ function tidyRowHtml(l) {
 // tasks they follow or where they are @mentioned); default: the tidy agent while tidying is on
 function listenRowHtml(l, ags, may) {
   const on = new Set(l.listen_agent_ids || []);
+  // 2.27.0 (#964): one agent per list: a plain switch like the two above (lists from before 2.26 with several agents keep the boxes)
+  if (ags.length === 1) return `<div class="lsnrow lsn1"><label class="chkl swl agacc lsnag"><span class="swc"><input type="checkbox" role="switch" data-lsn="${ags[0].id}" ${on.has(ags[0].id) ? 'checked' : ''} ${may ? '' : 'disabled'}><span class="swt" aria-hidden="true"></span></span><span>${tr('Agent reads every comment')}</span></label></div>
+    <div class="shint keep aghint">${tr('{0} gets every comment people write in this list, also without an @mention and on tasks it never touched (only tasks it can see).', esc(ags[0].name))}</div>`;
   return `<div class="row lsnrow" role="group" aria-labelledby="l-lsn-h"><span class="lbl" id="l-lsn-h">${tr('Agent reads every comment')}</span><div class="lsnags">${ags.map(a =>
     `<label class="lsnag"><input type="checkbox" data-lsn="${a.id}" ${on.has(a.id) ? 'checked' : ''} ${may ? '' : 'disabled'}><span>${esc(a.name)}</span></label>`).join('')}</div></div>
     <div class="shint lhint">${tr('The checked agents get every comment people write in this list, also without an @mention and on tasks they never touched (only tasks they can see).')}</div>`;
@@ -404,7 +407,7 @@ function viewAgents() {
       <div class="agb"><button class="btn sm" data-act="chat-open" data-aid="${a.id}" ${a.enabled ? '' : 'disabled'}>${ic('comment', 's')} ${tr('Chat')}${a.chat_unread ? ` <span class="nbadge">${a.chat_unread}</span>` : ''}</button></div></div>`;
   const items = S.jobs.items || [];
   return `<div class="agview">
-    ${ags.length ? `<div class="agcards">${ags.map(card).join('')}</div>` : `<div class="empty hempty">${heron('agent')}<span>${tr('No agent works with you yet. An agent is an AI assistant (or a script) with its own account: set up your own under Settings > Agents, or ask an admin to add one, then share a list with it.')}</span><button type="button" class="btn" data-act="ag-setup">${ic('bot', 's')} ${tr('Set up an agent…')}</button></div>`}
+    ${ags.length ? `<div class="agcards">${ags.map(card).join('')}</div>` : `<div class="empty hempty">${heron('agent')}<b>${tr('No agent is available to you yet.')}</b><span>${tr('The owner of a list can let its members use the list’s agent (Share › Agents). You can also connect an agent of your own.')}</span><button type="button" class="btn" data-act="ag-setup">${ic('bot', 's')} ${tr('Connect your own agent…')}</button></div>`}
     ${ags.length ? aiuCardHtml() : ''}
     <div class="agjh"><h2>${tr('Jobs')}</h2><span class="spacer"></span><div class="seg" role="group"><button class="${S.jobs.f === 'open' ? 'on' : ''}" data-act="jobs-f" data-f="open">${tr('Open|jobs')}</button><button class="${S.jobs.f === 'all' ? 'on' : ''}" data-act="jobs-f" data-f="all">${tr('All')}</button></div></div>
     ${S.jobs.err ? `<div class="muted mhint">${esc(S.jobs.err)}</div>` : ''}

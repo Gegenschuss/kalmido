@@ -7,6 +7,68 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.27.0] - 2026-10-08
+
+**In short:** Bugs & polish. A window that still runs old code after an update now says so and reloads (#968);
+shared folders and lists look the same for everyone (#988); automatic tidy-up waits until nobody types (#999); new
+projects start without sections unless you ask for them (#972); comments are back at the bottom of a task (#957);
+plus 20 smaller fixes and changes.
+
+### Fixed
+- **Old code after an update** (#968): a window (or installed app) that stayed open across an update kept running the
+  code it had loaded, while Help showed the server's new version. The page now names the version of its code, and when
+  the server runs another version a bar says **"New version available – Reload"**. With nothing typed, no draft and no
+  change waiting it reloads by itself once. Settings > Help shows the version of the app in the window next to the
+  server's.
+- **Typing moved the list behind** (#958, again after #669): on phones every key could fire a viewport event that
+  scrolled the list or the task panel behind the quick add sheet or the comment box. While a field has the focus on a
+  touch screen the page is left alone; a field is only scrolled into view when it really is under the keyboard, once per
+  focus, never for the boxes that sit above the keyboard anyway.
+- **Hidden rows that stayed visible** (#966): the `hidden` attribute now always hides, so "Used for" is gone from
+  project dialogs and the chat's width grip no longer stays behind at the task panel's edge (#978).
+- **Family fields in work lists** (#975): "Who comes along", "Take turns" and the stars only show in family and
+  household lists, never in projects (a task that already uses them keeps showing them).
+- **Menus under the width grips and the agent chat** (#976, #963): menus and popovers are above the grips, the chat
+  panel and a pinned composer; while a menu or dialog is open the grips step aside. The emoji picker of "+" in the agent
+  chat panel opened behind the panel and seemed to do nothing.
+- **Order in shared folders** (#988): a list in its owner's folder sits for every member in the owner's folder and
+  place; the owner's folders keep their order among each other in every member's sidebar (members' own folders stay
+  where they are). Existing arrangements are aligned once on the update. Only the owner moves those lists.
+- **The sort of a shared list** (#988): set by the owner or a list admin for everyone (`sort_mode`); a member may look
+  at it sorted otherwise on one device and the list says so, with "Back to the shared sort".
+- **Automatic tidy-up over your typing** (#999): the tidy event for a new task waits until it was left alone for two
+  minutes (`KALMIDO_TIDY_QUIET_S`) and nobody edits it (the task panel tells the server while a field has the focus).
+  An agent's tidy is refused (409) while a person edits the task, after people changed it since the event, or when its
+  `base_updated_at` is old. The original text always stays.
+- **Empty list without "+ Section"** (#990): also in an empty list, and "Add section…" in the list's menu.
+- **A list to the very end of a folder** (#991): dropping on the lower half of a list puts it after that list;
+  "Move to the top / bottom" in the list's menu in the sidebar and in the sort mode.
+- **Agent status** (#1007): the agent band of a list and the header asked for the agents' status only when data
+  changed and showed "not connected" while the chat said "ready"; the status is now fetched again once it is older than
+  a minute.
+- **The assignee cell** (#1002) of lists with their own columns is always visible (faint) so it reads as clickable.
+- **Column widths** (#1006): a visible line between the column titles shows where to drag, with a tooltip.
+
+### Changed
+- **New projects without sections** (#972): a project of a built-in type starts without the type's sections; the box
+  "With the standard sections" (off by default) names them. API: `sections: true` with `ptype` / `project_type`.
+- **List type at the top** (#977): "Type: Simple list | Project" replaces the "Project features" checkbox in the list
+  dialogs; the project fields show right below it.
+- **Comments at the bottom again** (#957): below the folded "More details", whose summary line tells what it holds
+  (tags, link, fields, documents).
+- **"Agent: <name>…"** (#974) in a list's menus and the command palette opens the share dialog at its agent.
+- **Settings > Agents > Lists** (#964): grouped by folder (each group folds), a filter (with / without an agent, by
+  agent) and one agent for all lists of a folder at once (one undo). With one agent per list "Agent reads every
+  comment" is a switch and "Tidy up by" is gone.
+- **List tags in lists that are not shared** (#967), with the hint that everyone sees them once the list is shared.
+- **"Views" above the lists** by default again (#984); an own arrangement of the sidebar stays.
+- **Team chat** (#986): only conversations with messages, newest first; "New message" also starts the chat of a shared
+  list nobody wrote in yet.
+- **The Agents tab without an agent** (#955) explains why and offers to connect your own.
+- **"My tasks"** (#1001) instead of "Assigned to me"; what lands in your own inbox (mail, the share sheet, the drop
+  inbox) and what you create in "My tasks" is assigned to you.
+- **Longer descriptions** before "Show more" (#994): about nine lines, only the last one fades.
+
 ## [2.26.1] - 2026-10-07
 
 **In short:** The iPhone keyboard no longer covers the quick add sheet (#952), Back on tablets closes only the open
@@ -2909,7 +2971,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.26.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.27.0...HEAD
+[2.27.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.27.0
 [2.26.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.26.1
 [2.26.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.26.0
 [2.25.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.25.0

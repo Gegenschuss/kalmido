@@ -894,7 +894,8 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
         "/agents/{id}/chat/{mid}/reactions": {"post": op("React to a message of your chat with an agent (2.7.2): 👍 / 👎 on an agent's message "
                                                          "that asks something (asks, 2.13.0) = approval / rejection; the agent gets the event reaction", AG, ok(chat_rx_out) | errs("400", "403", "404"),
                                                          [pid("id", "Agent id"), pid("mid", "Message id")], scope=W, body=chat_rx_in)},
-        "/tasks/{id}/tidy": {"post": op("Tidy a task (agents; list set to automatic)", AG, ok(ref("Task")) | errs("400", "403", "404", "409"),
+        "/tasks/{id}/tidy": {"post": op("Tidy a task (agents; list set to automatic). 2.27.0: also base_updated_at (the task's updated_at "
+                                        "the agent read); 409 while a person edits the task or changed it since the tidy event", AG, ok(ref("Task")) | errs("400", "403", "404", "409"),
                                         [pid()], scope=W, body=ref("TidyInput"))},
         "/comments/{id}/reactions": {"post": op("React to a comment", C_ := "Comments", ok(ref("Comment")) | errs("400", "403", "404"),
                                                 [pid("id", "Comment id")], scope=W, body={"type": "object", "required": ["emoji"], "properties": {

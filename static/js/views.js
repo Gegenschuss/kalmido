@@ -131,7 +131,16 @@ function sortDefault(k = S.route.key) {
   const l = k.startsWith('l:') ? listById(+k.slice(2)) : null;
   return l && l.kind === 'project' && !isKanban() && !isTimeline() ? 'flow' : 'prio';
 }
-const sortMode = (k = S.route.key) => { const m = LS.get('sort2.' + k, null); return !m || (m === 'flow' && !depsOn()) ? sortDefault(k) : m; };
+// 2.27.0 (#988): a list's sort is the list's (lists.sort_mode, set by its owner / list admins, the same for everyone); a
+// member's own choice on this device ('sort2.' + key) is a temporary look the view points out (sortOwnHint)
+const sortList = k => k.startsWith('l:') ? listById(+k.slice(2)) : null;
+const sortShared = (k = S.route.key) => { const l = sortList(k); return l && l.sort_mode && !(l.sort_mode === 'flow' && !depsOn()) ? l.sort_mode : null; };
+const sortMode = (k = S.route.key) => {
+  const l = sortList(k), m = LS.get('sort2.' + k, null), own = m && !(m === 'flow' && !depsOn()) ? m : null;
+  if (l && canManage(l) && l.sort_mode) return sortShared(k) || sortDefault(k);
+  return own || sortShared(k) || sortDefault(k);
+};
+const sortOwn = (k = S.route.key) => { const l = sortList(k); return !!l && l.shared && !canManage(l) && !!LS.get('sort2.' + k, null) && sortMode(k) !== (sortShared(k) || sortDefault(k)); };
 const dueKey = t => (t.due || '9999') + (t.due_time || '99');
 // Flow ties: start date (a task without one starts on its due date), due date + time, priority, manual order
 const flowTie = (a, b) => (a.start || a.due || '9999').localeCompare(b.start || b.due || '9999') || dueKey(a).localeCompare(dueKey(b)) || b.priority - a.priority || bySort(a, b);

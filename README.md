@@ -18,6 +18,13 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.27.0** (2026-10-08): Bugs & polish. A window running **old code after an update** says so and reloads; **shared
+  folders look the same for everyone**; automatic **tidy-up waits until nobody types**; new **projects start without
+  sections** unless you ask; **comments at the bottom** of a task again; agents per folder in the settings; and 20
+  smaller fixes.
+- **2.26.0** (2026-10-06): Agents in a team. The list owner decides **who may address its agent**, agents do not
+  instruct each other, **one agent per list**, approvals **to integrate and to deploy** without a pull request; several
+  tasks **edited at once** in the task panel, a **resizable sidebar**.
 - **2.25.0** (2026-10-06): Usability, part 2. **One word per thing** in every language (*Plan*, *Focus timer*, *Start*,
   *Project status*, *Project page*, *Waiting on someone* vs. *Blocked by*, *Shown fields*); **a sidebar you arrange**
   (groups up / down, hide groups and entries); **settings that start with an overview** on phones, modules in folded
@@ -107,9 +114,11 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   folded folders stay folded on all your devices. Drag lists into a subfolder, a subfolder into another folder or onto
   *Lists* (top level); the folder menu (…) has *New subfolder…*, *Rename*, *Move into a folder…* / *Move to the top
   level* and *Dissolve* (lists and subfolders move up one level). Opening a folder shows the tasks of all its lists,
-  subfolders included, with a small header per subfolder. In the list dialog type `Clients / Company X`. Folders are
-  per person: in a shared list everyone keeps their own place. The API takes and returns the path (`"folder":
-  "Clients/Company X"`, at most two levels)
+  subfolders included, with a small header per subfolder. In the list dialog type `Clients / Company X`. A list in
+  its owner's folder sits for everyone in that folder and place, and the owner's folders keep their order among each
+  other in every member's sidebar (2.27.0); a shared list without a folder can be filed where each member likes. The
+  sort of a shared list is set by its owner or a list admin for everyone; a member may sort it otherwise on one device
+  and the list says so. The API takes and returns the path (`"folder": "Clients/Company X"`, at most two levels)
 - **Quick capture** from anywhere: `q` (or Ctrl+Space, also while typing somewhere else) opens a small box, the quick
   add syntax works and it lands in the inbox whatever view is open (unless you name a list). The installed app's icon
   menu has *Quick add*. The page `/capture` holds a **bookmarklet**: drag it to the bookmarks bar, click it on any
@@ -1191,15 +1200,16 @@ entries are there again.
 **Project types.** *Lists > + > New project…* (or type *Project* in the new list dialog, the command palette, the
 setup and the first welcome card) starts from a type:
 
-| Type | Sections | Also |
+| Type | Standard sections (2.27.0: only when ticked) | Also |
 |---|---|---|
 | Agency | Request · Concept · Production · Approval · Billing | fields *Client* (text) and *Budget h* (number), time tracking |
 | Software / AI dev | Backlog · Next · In progress · Review · Done | Kanban view, ticket types, dependencies, *Move dependent tasks along*; a next-steps dialog to connect a repository and, optionally, share the list with a coding agent |
 | Personal | Ideas · Planning · To do | no fields |
 
-The names come in your language (German: Anfrage / Konzept / Umsetzung …). A type switches the modules it needs on
-for you and says so. Types are templates: change anything afterwards. API: `POST /api/v1/lists {"project_type":
-"agency" | "software" | "private"}`.
+A new project starts without sections; tick *With the standard sections* to get the type's (2.27.0). The names come
+in your language (German: Anfrage / Konzept / Umsetzung …). A type switches the modules it needs on for you and says
+so. Types are templates: change anything afterwards. API: `POST /api/v1/lists {"project_type": "agency" | "software" |
+"private", "sections": true}`.
 
 **Ticket types.** A list setting (*Ticket types*, in the list dialog of a project; on for Software / AI dev): tasks
 get a type, *Bug*, *Feature* or *Task*, shown as a small chip with an icon, set in the task panel or in quick add
@@ -1548,6 +1558,7 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `KALMIDO_ADMIN_ALERT_WINDOW` | `3600` | Seconds over which counted events (failed logins, skipped watchdog rows, removed devices) are summed up into one alert |
 | `KALMIDO_CALENDARS` | `1` | `0` turns calendar subscriptions off (no fetching, no events, the settings say so) |
 | `KALMIDO_GIT_POLL` | `180` | 2.2.0: seconds between two checks of a connected repository (see *Git integration*) |
+| `KALMIDO_TIDY_QUIET_S` | `120` | 2.27.0: seconds a new task must be left alone before its agent gets the `tidy` event (and nobody may have it open in a field); `0` = at once |
 | `KALMIDO_AUDIT_DAYS` | `90` | 2.2.1: days the agents' activity log is kept (see *AI agents*); `0` = no log |
 | `KALMIDO_CALENDAR_ALLOW_HOSTS` | | Internal hosts calendar subscriptions may reach, comma list of `host` or `host:port` (in addition to the list under *Settings > Administration > Advanced*) |
 | `KALMIDO_CALENDAR_MAX_MB` | `10` | Largest calendar download (ICS file or CalDAV answer) in MB |
@@ -1771,7 +1782,9 @@ Restoring the safety backup undoes a restore. Without the app: stop the containe
 ## Updating
 
 Kalmido follows [semantic versioning](https://semver.org/); every release is listed in [CHANGELOG.md](CHANGELOG.md)
-and on the [releases page](https://github.com/Gegenschuss/kalmido/releases). *Settings > Help* shows the running version.
+and on the [releases page](https://github.com/Gegenschuss/kalmido/releases). *Settings > Help* shows the running version
+and, since 2.27.0, the version of the app in that window. A window that was open across an update shows *New version
+available – Reload* and reloads by itself once nothing is being typed.
 
 **Update check:** every 6 hours the server asks the GitHub API for the latest release and compares it with its own
 version (after a failed check, e.g. GitHub's rate limit, again after an hour; right after an update at once). Admins then see a dot on the settings gear and, under *Settings > Help*, "v2.5.0 installed — v2.5.1

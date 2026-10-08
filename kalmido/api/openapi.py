@@ -217,6 +217,8 @@ def openapi_spec():
             "tickets": {"type": "boolean", "description": "Ticket types on (2.4.0)"},
             "project_type": {"type": "string", "enum": list(PTYPES), "description": "2.4.0: a project of a built-in type (sections, "
                              "custom fields, view, ticket types; switches the modules it needs on for you); kind / checklist / tickets are ignored"},
+            "sections": {"type": "boolean", "default": False, "description": "2.27.0: with project_type: create the type's standard sections "
+                         "(e.g. Backlog … Done); without it the project starts without sections"},
             "family": nul("string", enum=[*[x for x in FAM_LIST_KINDS if x], None], description="2.19.0: what the list is for in the Family module: "
                           "shopping (sections = shop areas, a new item goes to its area of last time, a shopping mode in the app), meals "
                           "(the meal plan: due = the day, notes = ingredients), birthdays, household, packing; null = an ordinary list"),

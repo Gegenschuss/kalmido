@@ -68,8 +68,9 @@ const TABLET = {'(min-width:600px) and (min-height:600px)': true};
   const body = [...d.querySelector('#detail .dbody').children].map(x => x.id || ['subsec', 'attsec', 'plsec', 'fields', 'cfsec', 'tesec'].find(c => x.classList.contains(c)) || (/^Tags/.test(x.querySelector('h5')?.textContent || '') ? 'tags' : x.className));
   // 2.24.0 (UX-41): description, subtasks, comments first; a set dependency stays outside the fold; tags, attachments (none
   // yet), fields and the history fold into "More details" at the end
-  const order = ['d-content', 'subsec', 'd-tl', 'd-deps', 'd-more'].map(k => body.indexOf(k));
-  check(order.every((v, i) => v >= 0 && (!i || v > order[i - 1])) && body[body.length - 1] === 'd-more', 'detail order: description, subtasks, comments, the dependency, then "More details": ' + body.join('|'));
+  // 2.27.0 (#957, back to #322): the comments last, below "More details"
+  const order = ['d-content', 'subsec', 'd-deps', 'd-more', 'd-tl'].map(k => body.indexOf(k));
+  check(order.every((v, i) => v >= 0 && (!i || v > order[i - 1])) && body[body.length - 1] === 'd-tl', 'detail order: description, subtasks, the dependency, "More details", then the comments: ' + body.join('|'));
   const more = d.querySelector('#detail #d-more');
   check(more && more.querySelector('.attsec') && more.querySelector('.fields') && [...more.querySelectorAll('.dsec h5')].some(h => /^Tags/.test(h.textContent)), '"More details" holds tags, attachments, fields');
   check(!d.querySelector('#detail #d-hist') || more.contains(d.querySelector('#detail #d-hist')), '2.0.7: the folded history of a private list is under "More details"');

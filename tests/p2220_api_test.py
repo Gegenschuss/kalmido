@@ -464,7 +464,7 @@ fo = json.loads(Bo.get(B + "/api/state").json()["settings"]["folders"])
 check(bl["folder"] == "Private/Money" and "Private" in fo and "Private/Money" in fo, "#740: the list lands with Bob in the same folder (created) " + str(fo))
 Bo.patch(B + f"/api/lists/{FL}", json={"folder": "Mine"})
 A.patch(B + f"/api/lists/{FL}", json={"folder": "Other"})
-check(next(l for l in Bo.get(B + "/api/state").json()["lists"] if l["id"] == FL)["folder"] == "Mine", "#740: Bob's own placement stays")
+check(next(l for l in Bo.get(B + "/api/state").json()["lists"] if l["id"] == FL)["folder"] == "Other", "#740 / 2.27.0 (#988): the owner's placement for everyone")
 L2 = A.post(B + "/api/lists", json={"name": "Garden", "folder": "Home"}).json()["id"]
 r = A.put(B + "/api/folders/people", json={"folder": "Home", "user_id": BOB, "role": "view"})
 check(r.ok and r.json()["shared"] == 1 and next(l for l in Bo.get(B + "/api/state").json()["lists"] if l["id"] == L2)["role"] == "view", "#740: share a folder: its lists")
@@ -494,7 +494,7 @@ def _up():
 check(until(_up, 60), "#740: restarted")
 Bo = sess(None); Bo.post(B + "/api/auth/login", json={"username": "bob", "password": "bob-new-pass-1"})
 bl = {l["id"]: l for l in Bo.get(B + "/api/state").json()["lists"]}
-check(bl[L3]["folder"] == "House" and bl[FL]["folder"] == "Mine", "#740: the update sorts older shares in (own placements stay)")
+check(bl[L3]["folder"] == "House" and bl[FL]["folder"] == "Other", "#740: the update sorts older shares in (2.27.0: placed like the owner)")
 subprocess.run(["docker", "exec", "-d", CT, "python", "/data/stub_mail.py"])
 
 # ================================================================== #741: the purpose "Home"

@@ -88,6 +88,11 @@ const PTYPE_UI = [['', N_('Blank'), 'list', N_('An empty project: add sections a
   ['agency', N_('Agency'), 'brief', N_('Request, concept, production, approval, billing; client and budget fields; time tracking')],
   ['software', N_('Software / AI dev'), 'code', N_('Backlog to Done on a board, bug / feature tickets, dependencies, a repository and coding agents')],
   ['private', N_('Personal|project type'), 'home', N_('Ideas, planning, to do: a light project without fields')]];
+// 2.27.0 (#972): the standard sections of each built-in project type (kalmido/lists/templates.py PTYPES), named next to the
+// box "With the standard sections" in the New list dialog; a new project gets them only when the box is ticked
+const PTYPE_SECS = {agency: [N_('Request'), N_('Concept'), N_('Production'), N_('Approval'), N_('Billing')],
+  software: [N_('Backlog'), N_('Next|section'), N_('In progress'), N_('Review'), N_('Done|section')], private: [N_('Ideas'), N_('Planning'), N_('To do|section')]};
+const ptSecsLine = k => (PTYPE_SECS[k] || []).map(x => tr(x)).join(', ');
 const MOD_NAMES = {time: N_('Time tracking'), fields: N_('Custom fields'), kanban: N_('Kanban'), deps: N_('Dependencies')};
 // after a project type switched modules on for this person: say which
 function modulesOnToast(on) { if (on?.length) toast(tr('Switched on for you: {0}', on.map(m => tr(MOD_NAMES[m] || m)).join(', '))); }
@@ -238,12 +243,23 @@ function listMenuItems(id, anchor) {
   const own = isOwner(l), k = l.kind || 'list', at = () => typeof anchor === 'function' ? anchor() : anchor;
   // 2.25.0 (UX-12): only what works here: the inbox has no "Edit list…" and no list / project switch
   const items = [...(l.is_inbox ? [] : [{label: tr('Edit list…'), icon: 'edit', fn: () => listModal(id)}]), ...(shareOk(l) && !l.archived ? [{label: tr(collab() ? N_('Share…') : N_('Ownership…')), icon: 'users', fn: () => shareModal(id)}] : [])];
+  // 2.27.0 (#974): "Agent: <name>…" right under "Share…": opens the share dialog at its Agents part (one place for the setting)
+  if (agentsOn() && shareOk(l) && canManage(l) && !l.is_inbox && !l.archived) {
+    const ag = listAgents(l)[0];
+    items.push({label: ag ? tr('Agent: {0}…', ag.name) : tr('Agent…'), icon: 'bot', cls: 'magent', fn: () => shareModal(id, {focus: 'agents'})});
+  }
+  // 2.27.0 (#990): a section can be added from here too (also in an empty list)
+  if (!l.is_inbox && !l.archived && canEditList(id)) items.push({label: tr('Add section…'), icon: 'plus', cls: 'msecadd', fn: async () => {
+    const n = await askPrompt(tr('Name of the section / column'), '', {ok: tr('Add')}); if (n && n.trim()) await sectionCreate(id, n.trim());
+  }});
   // 2.14.0 (#425): "Columns…" replaces "Show task numbers" and "Hide / Show assignee column" (per device until then); high up
   if (!l.archived) items.push(colItem(id));
   // 2.17.0 (#442 #419): the list's notes and (shared) its team chat
   if (notesOn(l) && !l.archived) { const n = notesOf(id).length; items.push({label: n ? tr('Notes ({0})', n) : tr('Notes'), icon: 'edit', fn: () => go('notes/' + id)}); }
   if (teamOn() && l.shared && !l.archived && l.role !== 'participant') items.push({label: tr('Team chat'), icon: 'comment', fn: () => listChat(id)});
   if (!l.is_inbox && !l.archived) items.push({label: tr('Move to folder…'), icon: 'folder', fn: () => folderPick(at(), id)});
+  // 2.27.0 (#991): from the sidebar (right-click / long press): its place among the lists of its folder
+  if (!l.is_inbox && !l.archived && typeof anchor !== 'function' && anchor?.closest?.('#side')) items.push('-', ...listMoveItems(id), '-');
   if (propOn() && !l.archived) {  // 2.3.0 (#262 #263)
     if (l.is_inbox && own) items.push({label: propWith(N_('Sort the inbox with {0}…'), N_('Sort the inbox with an agent…')), icon: 'bot', fn: () => propRequest('triage', {})});
     else if (!l.is_inbox && canEditList(id)) items.push({label: tr('Tasks from notes…'), icon: 'bot', fn: () => propRequest('extract', {lid: id})});
@@ -348,7 +364,7 @@ function shareSummary(l) {
   if (!collab()) return tr('Owner: {0}', l.owner_name || S.me?.display_name || '');
   return [ppl.length ? trn('Shared with {0} person', 'Shared with {0} people', ppl.length) : tr('Not shared with anyone yet'), ags.length ? trn('{0} agent', '{0} agents', ags.length) : ''].filter(Boolean).join(' · ');
 }
-function shareModal(id) {
+function shareModal(id, opt = {}) {
   const l0 = listById(id); if (!shareOk(l0)) return;
   const own = isOwner(l0), hint = t => `<div class="shint lhint">${t}</div>`;
   const md = modal(`<div class="lhdr"><h3>${esc(tr(collab() ? N_('Share “{0}”') : N_('Owner of “{0}”'), lname(l0)))}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
@@ -411,7 +427,9 @@ function shareModal(id) {
       await setListAgent(id, e.target.value ? +e.target.value : null, (users || []).filter(u => u.agent).map(u => ({id: u.id, name: u.display_name})), draw);
       draw();
     });
-    if (canManage(l0)) api('GET', '/api/users').then(j => { users = j.users.filter(u => !u.disabled).map(u => ({id: u.id, display_name: u.display_name, agent: !!u.agent})); draw(); }).catch(() => { users = []; draw(); });
+    // 2.27.0 (#974): opened from "Agent…": scrolled to the Agents part, its choice focused
+    const toAgents = () => { if (opt.focus !== 'agents' || !md.isConnected) return; const el = $('#sh-agsel', md) || $('#sh-ag-h', md); el?.scrollIntoView?.({block: 'center'}); $('#sh-agsel', md)?.focus({preventScroll: true}); };
+    if (canManage(l0)) api('GET', '/api/users').then(j => { users = j.users.filter(u => !u.disabled).map(u => ({id: u.id, display_name: u.display_name, agent: !!u.agent})); draw(); toAgents(); }).catch(() => { users = []; draw(); });
   }
   const act = async (fn, msg) => { try { await fn(); await load(); render(); draw(); if (msg) toast(msg); } catch { /* api() showed it */ } };
   md.addEventListener('change', e => {
@@ -499,14 +517,15 @@ function listModal(id, folder = '', o = {}) {
     <div class="row"><label for="l-name">${tr('Name')}</label><button class="emobtn" id="l-emo" title="${tr('Choose icon')}" ${dis}>${id && l.icon ? licon(l, 'licon m') : emo || ic('list')}</button><input id="l-name" value="${esc(base)}" ${dis}></div>
     <div class="emogrid hidden" id="l-emogrid"><button data-emo="" class="none" title="${tr('No icon')}">${ic('ban', 's')}</button>${EMOJIS.map(e => `<button data-emo="${e}" class="${e === emo && !l.icon ? 'on' : ''}">${e}</button>`).join('')}<input id="l-emocustom" placeholder="${tr('custom')}" maxlength="8">
       ${id && own ? `<div class="lipickw"><span class="muted lipl">${tr('Or a picture')}</span>${liconPickHtml(l)}</div>` : ''}</div>
-    <div class="row"><label for="l-folder">${tr('Folder')}</label><input id="l-folder" value="${esc(fDisp(l.folder))}" list="l-folders" placeholder="${esc(tr('optional · Folder / Subfolder'))}"><datalist id="l-folders">${folderNames().map(f => `<option value="${esc(fDisp(f))}">`).join('')}</datalist></div>
+    <input type="hidden" id="l-kind" value="${(l.kind || 'list') === 'project' ? 'project' : 'list'}">
+    <div class="row lkrow" ${l.is_inbox ? 'hidden' : ''}><label id="l-kindlab">${tr('Type|list')}</label><div class="seg lkseg" role="radiogroup" aria-labelledby="l-kindlab"><label class="${(l.kind || 'list') === 'project' ? '' : 'on'}"><input type="radio" name="l-kindr" id="l-kindl" value="list" ${(l.kind || 'list') === 'project' ? '' : 'checked'} ${dis}>${ic('list', 's')} ${tr('Simple list')}</label><label class="${(l.kind || 'list') === 'project' ? 'on' : ''}"><input type="radio" name="l-kindr" id="l-kindp" value="project" ${(l.kind || 'list') === 'project' ? 'checked' : ''} ${dis}>${ic('brief', 's')} ${tr('Project')}</label></div></div>
+    <div class="shint lhint" id="l-khint" ${l.is_inbox ? 'hidden' : ''}>${kindHint(l.kind || 'list')}</div>
+    <div class="row"><label for="l-folder">${tr('Folder')}</label><input id="l-folder" value="${esc(fDisp(l.folder))}" list="l-folders" placeholder="${esc(tr('optional · Folder / Subfolder'))}" ${l.mirrored ? `disabled title="${esc(mirroredMsg(l))}"` : ''}><datalist id="l-folders">${folderNames().map(f => `<option value="${esc(fDisp(f))}">`).join('')}</datalist></div>
     ${listDlgTeamHtml(l, id)}
     <div class="row"><label for="l-view">${tr('View')}</label><select id="l-view"><option value="list">${tr('List')}</option>${feat('kanban') ? `<option value="kanban" ${l.view === 'kanban' ? 'selected' : ''}>${tr('Kanban')}</option>` : ''}${feat('timeline') ? `<option value="timeline" ${l.view === 'timeline' ? 'selected' : ''}>${tr('Timeline')}</option>` : ''}</select></div>
-    <input type="hidden" id="l-kind" value="${(l.kind || 'list') === 'project' ? 'project' : 'list'}">
-    <div class="row lkrow" ${l.is_inbox ? 'hidden' : ''}><label class="chkl"><input type="checkbox" id="l-kindp" ${(l.kind || 'list') === 'project' ? 'checked' : ''} ${dis}> ${tr('Project features')}</label></div>
-    <div class="shint lhint" id="l-khint" ${l.is_inbox ? 'hidden' : ''}>${kindHint(l.kind || 'list')}</div>
     ${famOn() && own && !l.is_inbox ? `<div class="row lfamrow" ${(l.kind || 'list') === 'project' ? 'hidden' : ''}><label for="l-fam">${tr('Used for')}</label><select id="l-fam">${FAM_KINDS.map(([k, n]) => `<option value="${k}" ${(l.family || o.family || '') === k ? 'selected' : ''} ${FAM_KIND_ICON[k] ? `data-ico="${FAM_KIND_ICON[k]}"` : ''}>${tr(n)}</option>`).join('')}</select></div>` : ''}
     ${id ? '' : `<div class="lptype" ${(l.kind || 'list') === 'project' ? '' : 'hidden'}><div class="ptlab">${tr('Start from')}</div><div class="ptcards" role="radiogroup" aria-label="${esc(tr('Start from'))}">${PTYPE_UI.map(([k, n, i, dsc]) => `<button type="button" class="ptcard ${k === (o.ptype || '') ? 'on' : ''}" role="radio" aria-checked="${k === (o.ptype || '')}" data-pt="${k}">${ic(i, 's')}<b>${tr(n)}</b><small class="muted">${tr(dsc)}</small></button>`).join('')}${tplOf('list').map(tp => `<button type="button" class="ptcard" role="radio" aria-checked="false" data-pt="tpl:${tp.id}">${ic('copy', 's')}<b>${esc(tp.name)}</b><small class="muted" data-ptd="${tp.id}">${tr('Your template')}</small></button>`).join('')}</div>
+      <div class="row ptsecs" ${PTYPE_SECS[o.ptype || ''] ? '' : 'hidden'}><label class="chkl"><input type="checkbox" id="l-ptsecs"> ${tr('With the standard sections')}</label><span class="muted" id="l-ptsecsl">${esc(ptSecsLine(o.ptype || ''))}</span></div>
       <div class="ptdates" hidden><div class="row"><label>${tr('Project start')}</label>${dateIn('l-pstart', today(), {label: tr('Project start'), clear: false})}</div><div class="row"><label>${tr('End (optional)')}</label>${dateIn('l-pend', '', {label: tr('End (optional)'), empty: tr('none')})}<span class="muted">${tr('stretches or squeezes the dates')}</span></div></div></div>`}
     <div class="kproj" ${(l.kind || 'list') === 'project' ? '' : 'hidden'}>
     ${id && !l.is_inbox ? ptypeRowHtml(l) : ''}
@@ -532,7 +551,7 @@ function listModal(id, folder = '', o = {}) {
     ${id && !l.is_inbox && collab() && l.shared ? `<h4>${tr('Notifications')}</h4><div class="row"><label for="l-bell">${ic(BELL_ICON[l.bell || 'default'], 's')} ${tr('This list')}</label><select id="l-bell" data-native>${BELLS.map(([m, n]) => `<option value="${m}" ${(l.bell || 'default') === m ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     <div class="shint lhint" id="l-bellhint">${tr(BELLS.find(b => b[0] === (l.bell || 'default'))[2])} · ${tr('only for you')}</div>
     <div class="row" id="l-bellc" ${l.bell === 'custom' ? '' : 'hidden'}><span class="spacer"></span><button type="button" class="btn sm" data-m="bell-custom">${ic('sliders', 's')} ${tr('Choose events…')}</button></div>` : ''}
-    ${id && !l.is_inbox && collab() && (l.shared || listTags(id).length) ? `<h4>${tr('List tags')}</h4><div class="shint lhint">${tr('Tags of this list: everyone in it sees them, with their colour. Personal tags (with the person icon) stay yours.')}</div><div class="members" id="l-ltags">${ltagsBoxHtml(l)}</div>` : ''}
+    ${id && !l.is_inbox && collab() ? `<h4>${tr('List tags')}</h4><div class="shint lhint">${tr('Tags of this list: everyone in it sees them, with their colour. Personal tags (with the person icon) stay yours.')}${l.shared ? '' : ' ' + tr('They become visible to everyone as soon as you share the list.')}</div><div class="members" id="l-ltags">${ltagsBoxHtml(l)}</div>` : ''}
     <div class="foot">${id && !l.is_inbox && own ? (l.archived ? `<button class="btn" data-m="arch">${ic('undo', 's')} ${tr('Restore from the archive')}</button><button class="btn danger" data-m="del">${ic('trash', 's')} ${tr('Delete permanently…')}</button>` : `<button class="btn" data-m="arch" title="${tr('Hidden from your lists; undo or restore any time. Deleting for good is only possible from the archive.')}">${ic('archive', 's')} ${tr('Archive')}</button>`) : ''}${id && !own ? `<button class="btn danger" data-m="leave">${ic('logout', 's')} ${tr('Leave list')}</button>` : ''}${id ? `<button class="btn" data-m="tpl" title="${tr('Save the sections and open tasks as a template')}">${ic('copy', 's')} ${tr('Save as template')}</button>` : ''}<span class="spacer"></span>${id ? '' : `<button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Create')}</button>`}</div>`);
   if (id) md.classList.add('lmodal'); else md.classList.add('lnew');
   if (!id && tplOf('list').length) api('GET', '/api/templates').then(j => {  // 2.4.0 (#328): what each own template brings
@@ -607,8 +626,11 @@ function listModal(id, folder = '', o = {}) {
     onRemove(md, () => { if (pend.size) autosave(); });
   }
   md.addEventListener('change', e => {
-    if (e.target.id === 'l-kindp') { $('#l-kind', md).value = e.target.checked ? 'project' : 'list'; }  // 2.25.0 (UX-52)
-    if (e.target.id === 'l-kind' || e.target.id === 'l-kindp') { const k = $('#l-kind', md).value; $('#l-khint', md).innerHTML = kindHint(k); $('.kproj', md).hidden = k !== 'project'; if ($('.lfamrow', md)) $('.lfamrow', md).hidden = k === 'project'; if ($('.lptype', md)) $('.lptype', md).hidden = k !== 'project'; if (id) autosave(); return; }
+    if (e.target.id === 'l-kindp' || e.target.id === 'l-kindl') {  // 2.25.0 (UX-52); 2.27.0 (#977): Type = Simple list | Project
+      const pj = $('#l-kindp', md).checked; $('#l-kind', md).value = pj ? 'project' : 'list';
+      $$('.lkseg label', md).forEach(x => x.classList.toggle('on', $('input', x).checked));
+    }
+    if (e.target.id === 'l-kind' || e.target.id === 'l-kindp' || e.target.id === 'l-kindl') { const k = $('#l-kind', md).value; $('#l-khint', md).innerHTML = kindHint(k); $('.kproj', md).hidden = k !== 'project'; if ($('.lfamrow', md)) $('.lfamrow', md).hidden = k === 'project'; if ($('.lptype', md)) $('.lptype', md).hidden = k !== 'project'; if (id) autosave(); return; }
     if (id && e.target.id === 'l-ptype') {
       // 2.18.0 review (R1): arrow keys on a closed select fire "change" for every value passed; while the keyboard
       // walks the options only the hint follows, the type is saved once on Enter / leaving the field
@@ -671,6 +693,7 @@ function listModal(id, folder = '', o = {}) {
       $$('.ptcard', md).forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', x === b); });
       const tp = b.dataset.pt.startsWith('tpl:');
       $('.ptdates', md).hidden = !tp;
+      $('.ptsecs', md).hidden = !PTYPE_SECS[b.dataset.pt]; $('#l-ptsecsl', md).textContent = ptSecsLine(b.dataset.pt);  // 2.27.0 (#972)
       const pt = PTYPE_UI.find(x => x[0] === b.dataset.pt);
       // 2.22.0 (#749): every new list opens as a list (the board is one tap away)
       if ($('#l-tickets', md)) { $('#l-tickets', md).checked = b.dataset.pt === 'software'; $('#l-tickets', md).closest('.row').hidden = !!b.dataset.pt; }
@@ -722,7 +745,7 @@ function listModal(id, folder = '', o = {}) {
       if (pt.startsWith('tpl:')) {  // 2.4.0 (#328): the person's own template, dates from the project start (optionally to an end)
         try { n = {id: (await api('POST', `/api/templates/${+pt.slice(4)}/apply`, {name: body.name, folder: body.folder, ...(body.color ? {color: body.color} : {}), start: $('#l-pstart', md).value || today(), ...($('#l-pend', md).value ? {end: $('#l-pend', md).value} : {})})).list_id}; } catch { return; }
       } else {
-        try { n = await api('POST', '/api/lists', pt ? {name: b0.name, folder: b0.folder, color: b0.color, ptype: pt} : b0); } catch { return; }
+        try { n = await api('POST', '/api/lists', pt ? {name: b0.name, folder: b0.folder, color: b0.color, ptype: pt, ...($('#l-ptsecs', md)?.checked ? {sections: true} : {})} : b0); } catch { return; }
       }
       if (rate || nag) await api('PATCH', '/api/lists/' + n.id, {...(rate ? {rate} : {}), ...(nag ? {nag} : {})}).catch(() => {});
       md.remove(); await load(); go('l/' + n.id);

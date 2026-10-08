@@ -1134,6 +1134,12 @@ events first.
 | `suggest` | The agent gets a `tidy` event for new entries. It posts a comment with a structured suggestion. A 👍 from someone who may change the task (or the **Apply** button) applies it. A 👎 marks it as rejected. |
 | `auto` | The agent gets a `tidy` event and applies the tidy-up itself with `POST /api/v1/tasks/{id}/tidy`. |
 
+Since 2.27.0 tidying never runs into someone's typing: the `tidy` event for a new task waits until nobody has changed
+the task for two minutes (`KALMIDO_TIDY_QUIET_S`, `0` = at once) and nobody has it open in a field (the web client tells the
+server while a field of the task panel has the focus). `POST /api/v1/tasks/{id}/tidy` answers `409` while a person edits
+the task, when people changed it after the event went out, or when the body's `base_updated_at` (the task's `updated_at`
+you read) is no longer current: try again later, never overwrite. The original text always stays at the top of the notes.
+
 The agent reads the mode from `GET /api/v1/lists` (`agent_tidy`, `tidy_agent_id`); the `tidy` event carries it too (`mode`, `list.agent_tidy`, `list.tidy_agent_id`), with the list's sections to pick from. People see and change the mode of all their lists at once in **Settings > Agents** (2.0.8), next to which agent sees which list and which one tidies it up.
 
 ```

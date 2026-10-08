@@ -147,7 +147,7 @@ check(lr["folder"] == bob_before["folder"] == "Bobs folder" and lr["sort"] == bo
       f"the new owner keeps their folder / place / view ({lr} vs {bob_before})")
 check(ms[ids["carol"]]["role"] == "participant" and ms[AG]["role"] == "edit", "the other members keep their roles")
 check(state_list(Bo, L1)["role"] == "owner" and state_list(A, L1)["role"] == "admin", "state: bob owner, alice admin")
-check(state_list(Bo, L1)["folder"] == "Bobs folder" and state_list(A, L1)["folder"] == "Work", "state: folders")
+check(state_list(Bo, L1)["folder"] == "Bobs folder" and state_list(A, L1)["folder"] == "Bobs folder", "state: folders (2.27.0, #988: the owner's place for everyone)")
 check(state_list(A, L1)["owner_name"] == "Bob", "owner_name Bob")
 # the list still works for everyone
 check(Bo.post(B + "/api/tasks", json={"title": "By the new owner", "list_id": L1}).ok, "the new owner adds a task")

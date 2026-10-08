@@ -79,13 +79,14 @@ async function swTests() {
   let it = [...d.querySelectorAll('#pop .menu-list button')].find(b => b.textContent.trim() === 'Created');
   check(it && !it.classList.contains('on'), 'sort menu: "Created"');
   click(w, it); await sleep(300);
-  check(w.__store[`tasks.sort2.l:${HOME}`] === '"created"' && JSON.stringify(order()) === JSON.stringify([t3, t2, t1]), 'Created: newest first: ' + order());
+  check(w.eval(`listById(${HOME}).sort_mode`) === 'created' &&  // 2.27.0 (#988): the list's sort, for everyone
+    JSON.stringify(order()) === JSON.stringify([t3, t2, t1]), 'Created: newest first: ' + order());
   check(d.querySelectorAll('#view .trow .meta .crd').length === 3 && /Created/.test(d.querySelector('#view .trow .crd').title), 'rows show the creation date while sorted by it');
   w.eval('sortMenu(document.querySelector("#top h1"))'); await sleep(100);
   it = d.querySelector('#pop .menu-list button.on');
   check(it && it.textContent.trim() === 'Created: newest first' && /reverse/.test(it.title), 'the active item names the direction');
   click(w, it); await sleep(300);
-  check(w.__store[`tasks.sort2.l:${HOME}`] === '"created_asc"' && JSON.stringify(order()) === JSON.stringify([t1, t2, t3]), 'picked again: oldest first: ' + order());
+  check(w.eval(`listById(${HOME}).sort_mode`) === 'created_asc' && JSON.stringify(order()) === JSON.stringify([t1, t2, t3]), 'picked again: oldest first: ' + order());
   w.eval(`go('all')`); await sleep(400);
   check(!d.querySelector('#view .trow .crd'), '"All" keeps its own sort (per view)');
   w.eval('sortMenu(document.querySelector("#top h1"))'); await sleep(100);
@@ -121,11 +122,9 @@ async function swTests() {
     w.eval(`settingsModal('ai')`); await sleep(500);
     click(w, d.querySelector('.modal.smodal [data-aisub="lists"]')); await sleep(800);  // 2.5.1 (#393): the sub-tab Lists
     const tb = d.querySelector('.modal.smodal #s-ai-tbl');
-    // 2.5.1: first only the shared lists + "Show all (2)"
-    const first = [...(tb?.querySelectorAll('.airow:not(.aihead)') || [])];
-    check(first.length === 1 && +first[0].dataset.lid === WEB && /Show all \(2\)/.test(tb.querySelector('[data-aiall="1"]')?.textContent || ''), `${lab}: first the shared list + Show all (2)`);
-    click(w, tb.querySelector('[data-aiall="1"]')); await sleep(300);
-    const rows = [...(tb?.querySelectorAll('.airow:not(.aihead)') || [])];
+    // 2.27.0 (#964): every list I manage at once, grouped by folder (the "Show all" step is gone)
+    check(tb.querySelector('.aigrp') && !tb.querySelector('[data-aiall]'), `${lab}: grouped by folder, no "Show all"`);
+    const rows = [...(tb?.querySelectorAll('.airow[data-lid]') || [])];
     check(tb && rows.length === 2 && rows.some(r => +r.dataset.lid === WEB) && rows.some(r => +r.dataset.lid === HOME) && !rows.some(r => +r.dataset.lid === BOBS),
       `${lab}: every list I manage (not Bob's, not the inbox): ${rows.map(r => r.textContent.trim().slice(0, 20))}`);
     check(/List.*Agent.*Tidy up/.test(tb?.querySelector('.aihead')?.textContent || ''), `${lab}: the column heads`);
@@ -141,7 +140,6 @@ async function swTests() {
   d.querySelector('.modal.smodal').remove();
   w.eval(`settingsModal('ai')`); await sleep(900);
   check(d.querySelector('.modal.smodal [data-aisub="lists"]').getAttribute('aria-selected') === 'true' && !d.querySelector('#aisp-lists').hidden, 'reopened: the sub-tab Lists is remembered on this device');
-  click(w, d.querySelector('#s-ai-tbl [data-aiall="1"]')); await sleep(300);
   const agSel = () => d.querySelector(`#s-ai-tbl .airow[data-lid="${HOME}"] select[data-aisel]`);
   agSel().value = String(AG); agSel().dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(1400);
   let st = await call('GET', '/api/state');

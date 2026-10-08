@@ -577,6 +577,14 @@ def task_typing(tid):
     return jsonify(task_typing_set(c, tid, me()))
 
 
+@app.post("/api/tasks/<int:tid>/editing")
+def task_editing(tid):
+    """2.27.0 (#999): "I am editing this task" (a field of its panel has the focus) for TASK_EDIT_S seconds: tidying waits."""
+    from ..agents.core import task_editing_set
+    c = db()
+    return jsonify(task_editing_set(c, tid, me()))
+
+
 @app.post("/api/v1/tasks/<int:tid>/typing")
 @v1_view
 def v1_task_typing(tid):

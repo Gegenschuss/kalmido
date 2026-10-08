@@ -204,8 +204,22 @@ function folderNames() {
   const used = S.lists.filter(l => !l.is_inbox && !l.archived && l.folder).map(l => l.folder);
   const all = [...new Set([...arr.filter(x => typeof x === 'string' && x), ...used])];
   for (const p of [...all]) { const t = fParent(p); if (t && !all.includes(t)) all.push(t); }
-  return all.filter(p => !fParent(p)).flatMap(t => [t, ...all.filter(p => fParent(p) === t)]);
+  return folderMirror(all.filter(p => !fParent(p))).flatMap(t => [t, ...folderMirror(all.filter(p => fParent(p) === t))]);
 }
+// 2.27.0 (#988): the folders of another person (where I see their lists) keep THEIR order among each other, in the places
+// they take in my sidebar; my own folders stay where I put them
+function folderMirror(arr) {
+  const out = [...arr];
+  for (const order of Object.values(S.folderOrders || {})) {
+    const theirs = order.filter(f => out.includes(f));
+    if (theirs.length < 2) continue;
+    const slots = out.map((f, i) => theirs.includes(f) ? i : -1).filter(i => i >= 0);
+    slots.forEach((i, k) => { out[i] = theirs[k]; });
+  }
+  return out;
+}
+// 2.27.0 (#988): a list in someone else's folder sits where its owner put it; only the owner changes that
+const mirroredMsg = l => tr('{0} arranges the lists of this shared folder for everyone.', l?.owner_name || tr('The owner'));
 const folderSubs = t => folderNames().filter(p => fParent(p) === t);
 function sideOrder() {  // lists as shown: top-level lists first, then folder by folder (a folder's lists, then its subfolders)
   const ls = S.lists.filter(l => !l.is_inbox && !l.archived);
@@ -237,6 +251,7 @@ async function saveFolders(arr) {
 }
 async function setListFolder(id, f) {
   const l = listById(id); if (!l || l.folder === f) return;
+  if (l.mirrored) { toast(mirroredMsg(l)); return; }  // 2.27.0 (#988)
   const order = sideOrder().filter(x => x.id !== id);
   const last = order.map(x => x.folder).lastIndexOf(f);  // append at the end of the target folder
   if (last >= 0) order.splice(last + 1, 0, l);
@@ -262,6 +277,7 @@ async function newFolder(thenList, parent = '') {
 // rename / move a folder (with its lists and subfolders) and delete it (lists and subfolders move up one level)
 async function folderMove(from, to, label) {
   if (!to || to === from) return;
+  { const m = S.lists.find(l => l.mirrored && fUnder(l.folder, from)); if (m) { toast(mirroredMsg(m)); return; } }  // 2.27.0 (#988)
   if (folderNames().includes(to) && !await askConfirm(tr('Merge into “{0}”?', fDisp(to)), tr('A folder of that name exists: the lists go into it.'), {ok: tr('Merge')})) return;
   try { await api('POST', '/api/folders/rename', {old: from, new: to}); } catch { return; }
   await load(); render();
@@ -330,8 +346,23 @@ async function saveListOrder(order, folder, label) {
   };
   return histAdd({label: label || tr('Lists reordered'), undo: go(before, f0, ids, folder), redo: go(ids, folder, before, f0)});
 }
+// 2.27.0 (#991): to the very top / bottom of its folder (keyboard, the list's menu in the sidebar)
+function moveListEnd(id, dir) {
+  const order = sideOrder(), l = order.find(x => x.id === id); if (!l) return;
+  if (l.mirrored) { toast(mirroredMsg(l)); return; }
+  const same = order.filter(x => (x.folder || '') === (l.folder || '')), j = dir < 0 ? order.indexOf(same[0]) : order.indexOf(same[same.length - 1]);
+  if (order[j] === l) return;
+  order.splice(order.indexOf(l), 1); order.splice(dir < 0 ? j : order.indexOf(same[same.length - 1]) + 1, 0, l);
+  saveListOrder(order, undefined, tr('Moved list {0}', qn(lname(l))));
+}
+const listMoveItems = id => {
+  const order = sideOrder(), i = order.findIndex(l => l.id === id), can = d => i >= 0 && order[i + d] && (order[i + d].folder || '') === (order[i].folder || '');
+  return [{label: tr('Move up'), icon: 'chev', cls: 'mup', dis: !can(-1), fn: () => moveList(id, -1)}, {label: tr('Move down'), icon: 'chev', dis: !can(1), fn: () => moveList(id, 1)},
+    {label: tr('Move to the top'), icon: 'chev', cls: 'mup mtop', dis: !can(-1), fn: () => moveListEnd(id, -1)}, {label: tr('Move to the bottom'), icon: 'chev', cls: 'mbot', dis: !can(1), fn: () => moveListEnd(id, 1)}];
+};
 function moveList(id, dir) {
   const order = sideOrder(), i = order.findIndex(l => l.id === id), j = i + dir;
+  if (order[i]?.mirrored) { toast(mirroredMsg(order[i])); return; }  // 2.27.0 (#988)
   if (i < 0 || j < 0 || j >= order.length || order[j].folder !== order[i].folder) return;
   [order[i], order[j]] = [order[j], order[i]];
   saveListOrder(order, undefined, tr('Moved list {0}', qn(lname(listById(id)))));
@@ -358,32 +389,35 @@ function folderDropKind(from, t) {
   if (folderSubs(from).length) return null;  // a folder with subfolders stays top-level (two levels at most)
   return to === fParent(from) ? null : 'into';
 }
-const sideMark = (t, drag) => {  // the same highlights for mouse and touch; false = not a valid target
-  $$('#side .dropbefore, #side .drop').forEach(x => x.classList.remove('dropbefore', 'drop'));
+// 2.27.0 (#991): the lower half of a list row = after it (so a list can go to the very end of a folder)
+const sideAfter = (t, y) => !!t && t.classList.contains('srow') && y != null && (() => { const r = t.getBoundingClientRect(); return r.height > 0 && y > r.top + r.height / 2; })();
+const sideMark = (t, drag, y) => {  // the same highlights for mouse and touch; false = not a valid target
+  $$('#side .dropbefore, #side .dropafter, #side .drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
   if (!t || (drag.list && t.dataset.list && +t.dataset.list === drag.list)) return false;
   if (drag.folder != null) {
     const kd = folderDropKind(drag.folder, t); if (!kd) return false;
     t.classList.add(kd === 'before' || (kd === 'into' && fParent(t.dataset.folder)) ? 'dropbefore' : 'drop');
     return true;
   }
-  t.classList.add(t.classList.contains('srow') ? 'dropbefore' : 'drop');
+  t.classList.add(t.classList.contains('srow') ? (sideAfter(t, y) ? 'dropafter' : 'dropbefore') : 'drop');
   return true;
 };
 document.addEventListener('dragover', e => {
   if (!listDrag && folderDrag === null) return;
-  if (sideMark(sideDropTarget(e.target), {list: listDrag, folder: folderDrag})) e.preventDefault();
+  if (sideMark(sideDropTarget(e.target), {list: listDrag, folder: folderDrag}, e.clientY)) e.preventDefault();
 });
 document.addEventListener('drop', e => {
   if (!listDrag && folderDrag === null) return;
   e.preventDefault(); e.stopImmediatePropagation();
   const drag = {list: listDrag, folder: folderDrag}; listDrag = null; folderDrag = null;
-  $$('#side .dropbefore, #side .drop').forEach(x => x.classList.remove('dropbefore', 'drop'));
-  sideDrop(drag, sideDropTarget(e.target, drag.folder !== null));
+  $$('#side .dropbefore, #side .dropafter, #side .drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
+  const t = sideDropTarget(e.target, drag.folder !== null);
+  sideDrop(drag, t, sideAfter(t, e.clientY));
 }, true);
 // one drop in the sidebar (mouse or touch): a folder before a folder, a list into a folder (its header or empty body),
 // out of a folder (the "Lists" header), or before another list (taking over that list's folder). One request; moving
 // into / out of a folder can be undone.
-async function sideDrop(drag, t) {
+async function sideDrop(drag, t, after = false) {
   if (!t) return;
   if (drag.folder != null) {
     const kd = folderDropKind(drag.folder, t), from = drag.folder;
@@ -401,6 +435,7 @@ async function sideDrop(drag, t) {
     return;
   }
   const id = drag.list, l = listById(id); if (!l) return;
+  if (l.mirrored) { toast(mirroredMsg(l)); return; }  // 2.27.0 (#988)
   const f0 = l.folder || '';
   const undoFolder = (f, e) => { if (f !== f0 && e) offerUndo(f ? tr('Moved to folder {0}', fDisp(f)) : tr('Removed from folder'), e); };
   if (t.classList.contains('fhead') || t.classList.contains('fempty')) { const f = (t.closest('[data-folder]') || t).dataset.folder; undoFolder(f, await setListFolder(id, f)); return; }
@@ -408,7 +443,7 @@ async function sideDrop(drag, t) {
   const order = sideOrder(), moving = order.find(x => x.id === id), target = listById(+t.dataset.list);
   if (!moving || !target || moving === target) return;
   order.splice(order.indexOf(moving), 1);
-  order.splice(order.indexOf(target), 0, moving);
+  order.splice(order.indexOf(target) + (after ? 1 : 0), 0, moving);
   const nf = target.folder || '';
   const e = await saveListOrder(order, (moving.folder || '') !== nf ? {[moving.id]: nf} : undefined,
     (moving.folder || '') !== nf ? (nf ? tr('Moved {0} to folder {1}', qn(lname(moving)), fDisp(nf)) : tr('Took {0} out of its folder', qn(lname(moving)))) : tr('Moved list {0}', qn(lname(moving))));
@@ -451,7 +486,7 @@ document.addEventListener('touchmove', e => {
   sd.moved = true; sd.lx = p.clientX; sd.ly = p.clientY;
   sd.ghost.style.top = (p.clientY - sd.dy) + 'px';
   const t = sideDropTarget(document.elementFromPoint(p.clientX, p.clientY), sd.folder != null);
-  sideMark(t, sd);
+  sideMark(t, sd, p.clientY);
   const side = $('#side'), r = side.getBoundingClientRect();
   if (r.height && side.scrollBy) { if (p.clientY < r.top + 48) side.scrollBy(0, -12); else if (p.clientY > r.bottom - 48) side.scrollBy(0, 12); }
   // hovering a closed folder for a moment opens it
@@ -467,10 +502,10 @@ function sdEnd(e) {
   sdHeld = true; setTimeout(() => { sdHeld = false; }, 500);
   st.ghost.remove(); st.el.classList.remove('dragging');
   const t = st.moved ? sideDropTarget(document.elementFromPoint(st.lx, st.ly), st.folder != null) : null;
-  $$('#side .dropbefore, #side .drop').forEach(x => x.classList.remove('dropbefore', 'drop'));
+  $$('#side .dropbefore, #side .dropafter, #side .drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
   if (!st.moved && st.reorder) return;  // a tap on the grip
   if (!st.moved) { const el = st.list ? $(`#side .srow[data-list="${st.list}"]`) : $(`#side .fhead[data-folder="${rmEsc(st.folder)}"]`); if (el) st.list ? listMenu(el, st.list) : folderMenu(el, st.folder); return; }
-  if (t && e?.type === 'touchend') sideDrop({list: st.list, folder: st.folder}, t);
+  if (t && e?.type === 'touchend') sideDrop({list: st.list, folder: st.folder}, t, sideAfter(t, st.ly));
 }
 document.addEventListener('touchend', sdEnd);
 document.addEventListener('touchcancel', sdEnd);

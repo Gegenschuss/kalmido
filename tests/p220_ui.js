@@ -76,7 +76,8 @@ const taskOf = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)
     const order = [...d.querySelectorAll('#detail .dsec')].map(x => x.id || x.className);
     const ic = order.indexOf('d-code'), it = order.findIndex(x => x === 'd-tl'), iti = order.findIndex(x => /fields/.test(x));
     // 2.24.0 (UX-41): the comments come first; Code follows the fields under "More details"
-    check(ic > iti && (it < 0 || ic > it) && !!d.querySelector('#detail #d-more #d-code'), `${lab}: Code after the fields, under "More details": ${order.join(',')}`);
+    // 2.27.0 (#957): the comments come last again (after "More details")
+    check(ic > iti && (it < 0 || ic < it) && !!d.querySelector('#detail #d-more #d-code'), `${lab}: Code after the fields, under "More details": ${order.join(',')}`);
     if (!mobile) {
       const w2 = await boot({user: 'alice', hash: 'l/' + P}); await sleep(500);
       const chip = [...w2.document.querySelectorAll('.gitc')].find(x => /#5/.test(x.textContent));

@@ -1,5 +1,6 @@
 """Agents: accounts, event queue + long polling, runtime settings, permissions of people towards agents."""
 import json
+import os
 import re
 import uuid
 import threading
@@ -12,7 +13,7 @@ from ..core.i18n import tr
 from ..core.db import inbox_default, iso, now_utc, parse_iso
 from ..accounts.session import me
 from ..accounts.pictures import avatar_url
-from ..core.access import Denied, list_people, list_role, MANAGE_ROLES, need_list, task_visible, vis_sql, WRITE_ROLES
+from ..core.access import Denied, list_people, list_role, MANAGE_ROLES, need_list, need_task, task_visible, vis_sql, WRITE_ROLES
 from ..core.state import visible_sections
 from ..tasks.validation import valid_hm
 from ..collab.comments import comment_plain, user_names
@@ -385,14 +386,77 @@ def agent_added_events(c, tid, from_lid=None, source=None):
         agent_emit(c, aid, "task_added", agent_task_data(c, tid, aid, **extra))
 
 
+# 2.27.0 (#999): tidying never runs into someone's typing. A new task's 'tidy' event waits (tidy_pending) until nobody has
+# changed the task for TIDY_QUIET_S and nobody has it open in a field (the client's "editing" signal, task_editing_set);
+# the watchdog sends it then (tidy_tick). An agent's tidy is refused (409) when people changed the task after the event,
+# or while someone edits it; the original text always stays (tidy_apply).
+TIDY_QUIET_S = int(os.environ.get("KALMIDO_TIDY_QUIET_S", "120"))
+TASK_EDIT_S = 45
+_TEDIT, _TEDIT_LOCK = {}, threading.Lock()
+
+
+def task_editing_set(c, tid, uid):
+    need_task(c, tid, write=False)
+    now = time.time()
+    with _TEDIT_LOCK:
+        for k in [k for k, v in _TEDIT.items() if v <= now]:
+            _TEDIT.pop(k, None)
+        if len(_TEDIT) < 5000:
+            _TEDIT[tid] = now + TASK_EDIT_S
+    return {"ok": True, "seconds": TASK_EDIT_S}
+
+
+def task_being_edited(tid):
+    with _TEDIT_LOCK:
+        return _TEDIT.get(tid, 0) > time.time()
+
+
 def agent_tidy_events(c, tid):
-    """A new top-level task by a person in a list with tidy on: 'tidy' to the list's tidy agent (2.4.1: only that one)."""
+    """A new top-level task by a person in a list with tidy on: 'tidy' to the list's tidy agent (2.4.1: only that one),
+    2.27.0 (#999): once the task is left alone (tidy_tick)."""
     t = c.execute("SELECT t.*, l.agent_tidy FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=?", (tid,)).fetchone()
     if not t or t["parent_id"] or (t["agent_tidy"] or "off") == "off" or is_agent(g.user):
         return
     aid = tidy_agent_of(c, t["list_id"])
     if aid and task_visible(c, tid, aid, write=True):
-        agent_emit(c, aid, "tidy", agent_task_data(c, tid, aid, mode=t["agent_tidy"]))
+        if TIDY_QUIET_S <= 0:  # KALMIDO_TIDY_QUIET_S=0: at once, as before 2.27 (the older test suites)
+            agent_emit(c, aid, "tidy", agent_task_data(c, tid, aid, mode=t["agent_tidy"]))
+            c.execute("INSERT OR REPLACE INTO tidy_pending(task_id,actor_id,created_at,sent_at) VALUES(?,?,?,?)", (tid, g.user["id"], iso(now_utc()), iso(now_utc())))
+            return
+        c.execute("INSERT OR REPLACE INTO tidy_pending(task_id,actor_id,created_at,sent_at) VALUES(?,?,?,NULL)", (tid, g.user["id"], iso(now_utc())))
+
+
+def tidy_tick(c):
+    """Watchdog: sends the waiting 'tidy' events of tasks nobody touched for TIDY_QUIET_S and nobody edits right now."""
+    now = now_utc()
+    quiet = iso(now - timedelta(seconds=TIDY_QUIET_S))
+    c.execute("DELETE FROM tidy_pending WHERE sent_at IS NOT NULL AND sent_at<?", (iso(now - timedelta(days=2)),))
+    # people changed the task after its event went out (the agent's tidy is refused then): it waits for quiet again and
+    # gets a new event, so an agent is never stuck on "try again later"
+    c.execute("""UPDATE tidy_pending SET sent_at=NULL, created_at=? WHERE sent_at IS NOT NULL
+                 AND (SELECT updated_at FROM tasks WHERE id=tidy_pending.task_id) > sent_at
+                 AND NOT EXISTS (SELECT 1 FROM activity a WHERE a.task_id=tidy_pending.task_id AND a.kind='tidy' AND a.created_at>=tidy_pending.sent_at)
+                 AND NOT EXISTS (SELECT 1 FROM comments k WHERE k.task_id=tidy_pending.task_id AND COALESCE(k.suggestion,'')!=''
+                                 AND k.created_at>=tidy_pending.sent_at)""",
+              (iso(now),))
+    rows = c.execute("""SELECT p.*, t.updated_at, t.deleted_at, t.list_id, l.agent_tidy FROM tidy_pending p JOIN tasks t ON t.id=p.task_id
+                        JOIN lists l ON l.id=t.list_id WHERE p.sent_at IS NULL ORDER BY p.created_at LIMIT 50""").fetchall()
+    sent = 0
+    for r in rows:
+        if r["deleted_at"] or (r["agent_tidy"] or "off") == "off":
+            c.execute("DELETE FROM tidy_pending WHERE task_id=?", (r["task_id"],))
+            continue
+        if max(r["updated_at"] or "", r["created_at"]) > quiet or task_being_edited(r["task_id"]):
+            continue
+        aid = tidy_agent_of(c, r["list_id"])
+        if aid and task_visible(c, r["task_id"], aid, write=True):
+            u = c.execute("SELECT id, username, display_name, kind FROM users WHERE id=?", (r["actor_id"],)).fetchone() if r["actor_id"] else None
+            actor = {"id": u["id"], "name": u["display_name"] or u["username"], "kind": "agent" if u["kind"] == "agent" else "person"} if u else None
+            agent_emit(c, aid, "tidy", agent_task_data(c, r["task_id"], aid, mode=r["agent_tidy"]), actor=actor)
+            sent += 1
+        c.execute("UPDATE tidy_pending SET sent_at=? WHERE task_id=?", (iso(now), r["task_id"]))
+    c.commit()  # never leave the watchdog's connection holding a write transaction
+    return sent
 
 
 # ---- 2.4.1 (#377): runtime settings of an agent. Kalmido never runs the agent: it stores what an admin wants (model,

@@ -135,7 +135,7 @@ const lst = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)).l
   check(!d.querySelector('.lmodal .lrepo').hidden, 'a list that already has a repository keeps showing it');
   // 2.18.0 review (R1): arrow keys through the select save ONCE (on Enter / leaving it), one history step, the offer fits
   md = d.querySelector('.lmodal'); sel = md.querySelector('#l-ptype');
-  check(/Project features/.test(md.querySelector('.lkrow')?.textContent || ''), 'the kind is the switch "Project features" (2.25.0; not "Type" next to "Project type")');
+  check(/Simple list/.test(md.querySelector('.lkrow')?.textContent || '') && md.querySelector('.lkrow #l-kindp'), 'the kind: Simple list | Project (2.27.0, #977; was the switch "Project features")');
   const kd = (el, key) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key, bubbles: true, cancelable: true}));
   const h0 = w.eval('HIST.undo.length');
   sel.focus(); kd(sel, 'ArrowDown'); change(w, sel, 'agency'); kd(sel, 'ArrowDown'); change(w, sel, 'software'); await sleep(700);

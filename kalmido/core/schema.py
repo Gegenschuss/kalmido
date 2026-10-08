@@ -285,6 +285,9 @@ CREATE TABLE IF NOT EXISTS agent_events (         -- 2.0.0: event queue per agen
   id INTEGER PRIMARY KEY, agent_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   uuid TEXT NOT NULL, event TEXT NOT NULL, payload TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS agent_events_agent ON agent_events(agent_id, id);
+CREATE TABLE IF NOT EXISTS tidy_pending (          -- 2.27.0 (#999): a new task waits for its 'tidy' event until people let it be
+  task_id INTEGER PRIMARY KEY REFERENCES tasks(id) ON DELETE CASCADE, actor_id INTEGER, created_at TEXT NOT NULL,
+  sent_at TEXT);
 CREATE TABLE IF NOT EXISTS agent_jobs (           -- 2.0.0: jobs an agent reports (Agents tab)
   id INTEGER PRIMARY KEY, agent_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
@@ -834,6 +837,9 @@ MIGRATIONS = [
     # other agents); both off for existing lists too
     ("lists", "agent_members", "ALTER TABLE lists ADD COLUMN agent_members INTEGER NOT NULL DEFAULT 0"),
     ("lists", "agent_peers", "ALTER TABLE lists ADD COLUMN agent_peers INTEGER NOT NULL DEFAULT 0"),
+    # 2.27.0 (#988): the sort of a list for everyone in it (owner / list admins set it; '' = the default); a member may look
+    # at it sorted otherwise for a while (on that device), the app says so
+    ("lists", "sort_mode", "ALTER TABLE lists ADD COLUMN sort_mode TEXT NOT NULL DEFAULT ''"),
 ]
 INDEXES = """
 CREATE INDEX IF NOT EXISTS lists_owner ON lists(owner_id);

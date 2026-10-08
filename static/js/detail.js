@@ -212,8 +212,21 @@ const DETAIL_ORDER = ['family', 'life', 'subtasks', 'deps', 'links', 'tags', 'at
 // 2.24.0 (UX-41): what a task needs first comes first: description, subtasks, comments (the assignee sits in the header).
 // The rest folds into "More details" (open state per device); a section that holds something worth seeing at once
 // (files, a waiting-on, events / contacts) stays outside the fold.
-const DETAIL_TOP = ['family', 'life', 'subtasks', 'comments'];
+// 2.27.0 (#957, back to #322): the comments come LAST again, below "More details" (the box stays at the bottom edge); the fold
+// says in its summary line what it holds, so nothing is overlooked
+const DETAIL_TOP = ['family', 'life', 'subtasks'];
 const DETAIL_MORE = ['deps', 'links', 'attachments', 'tags', 'paperless', 'fields', 'custom', 'time', 'code', 'history'];  // code: 2.2.0 (#271)  // history: private lists only (2.0.7)
+// 2.27.0 (#957): the summary line of the folded "More details": what is set inside it ("3 tags · Link · 2 fields")
+function moreSummary(t, ks) {
+  const out = [], has = k => ks.includes(k);
+  const ntag = (t.tags || []).length + (t.ltags || []).length;
+  if (has('tags') && ntag) out.push(trn('{0} tag', '{0} tags', ntag));
+  if (has('fields') && t.url) out.push(tr('Link'));
+  const nf = has('custom') ? fieldsOf(t.list_id).filter(f => { const v = (t.fields || {})[f.id]; return v !== undefined && v !== null && v !== ''; }).length : 0;
+  if (nf) out.push(trn('{0} field', '{0} fields', nf));
+  if (has('paperless') && (t.paperless || []).length) out.push(trn('{0} document', '{0} documents', t.paperless.length));
+  return out.join(' · ');
+}
 // 2.7.2 (#424): where a task lives, at the top of its panel: Folder › List › Section › (parent task). Every part jumps
 // there (the list, scrolled to the section / the parent) and closes the bell's dropdown. Only lists the viewer has.
 function crumbsHtml(t, l, parent) {
@@ -381,7 +394,8 @@ function renderDetail0() {
         const keep = k => (k === 'attachments' && (t.attachments || []).length) || (k === 'deps' && (t.waiting_at || (t.blockers || []).length)) || (k === 'links' && (((S.tcontacts || {})[t.id] || []).length || ((S.evlinks || {})[t.id] || []).length));
         const top = DETAIL_TOP.map(k => SEC[k]).concat(DETAIL_MORE.filter(keep).map(k => SEC[k]));
         const rest = DETAIL_MORE.filter(k => !keep(k)).map(k => SEC[k]).filter(x => x && x.trim());
-        return top.join('\n      ') + (rest.length ? `<details class="dmore" id="d-more" ${LS.get('dMore', false) ? 'open' : ''}><summary>${ic('chev', 's fcar')}<span>${tr('More details')}</span></summary>${rest.join('\n')}</details>` : '');
+        const sum = moreSummary(t, DETAIL_MORE.filter(k => !keep(k)));
+        return top.join('\n      ') + (rest.length ? `<details class="dmore" id="d-more" ${LS.get('dMore', false) ? 'open' : ''}><summary>${ic('chev', 's fcar')}<span>${tr('More details')}</span>${sum ? `<span class="dmsum muted">${esc(sum)}</span>` : ''}</summary>${rest.join('\n')}</details>` : '') + SEC.comments;
       })()}
     </div>
     <div class="dbot">${cmOk && !(cm === 'full' && cmtNew()) ? cmComposer(t) : ''}<div class="dfoot"><span class="dfc" title="${esc(createdLine(t))}">${esc(createdLine(t))}</span>
@@ -419,4 +433,19 @@ async function saveLink(v) {
   S.editLink = false;
   if ((t.url || '') === v) { renderDetail(); return; }
   await patchTask(t.id, {url: v || null});
+}
+// 2.27.0 (#999): while a field of the task panel has the focus (title, description, subtasks, fields), the server learns
+// "someone is editing this task" (every 20 s while typing): an agent's automatic tidy-up waits until it is left alone
+{
+  let last = 0, lastId = 0;
+  const ping = () => {
+    const a = document.activeElement, id = S.sel;
+    if (!(id > 0) || !a || !a.closest?.('#detail') || !editFocused() || document.hidden || !collab()) return;
+    const t = taskById(id); if (!t || !listById(t.list_id)?.agent_tidy || listById(t.list_id).agent_tidy === 'off') return;
+    if (id === lastId && Date.now() - last < 20000) return;
+    last = Date.now(); lastId = id;
+    fetch(`/api/tasks/${id}/editing`, {method: 'POST', headers: {'X-Requested-With': 'kalmido'}}).catch(() => {});  // never queued offline
+  };
+  document.addEventListener('focusin', ping);
+  document.addEventListener('input', ping);
 }

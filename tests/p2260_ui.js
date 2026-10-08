@@ -27,7 +27,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
 const click = (w, el, o = {}) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, ...o}));
 const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: k, bubbles: true, cancelable: true, ...o}));
 const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
-const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };  // local date (UTC broke it near midnight)
 const getT = async id => (await call('GET', '/api/tasks/' + id));
 
 (async () => {

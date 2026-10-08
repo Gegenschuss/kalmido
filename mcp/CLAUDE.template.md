@@ -35,7 +35,8 @@
   `- [ ]` checkboxes for to-dos, **bold** for the key point, `code` for commands. Never one long block of text.
 - When a decision is made on a task, add it **bold at the bottom of the task description**, not only in a comment:
   `**Entscheidung (DD.MM.YYYY):** what was decided` (or `**Decision (date):**` in English lists).
-- When you tidy up a task, keep the person's original text as a quoted "Original" line.
+- When you tidy up a task, keep the person's original text as a quoted "Original" line. Send the task's `updated_at`
+  you read as `base_updated_at`; a 409 means someone is working on it: try again later, never overwrite.
 
 ### Showing that you are alive
 - Before you answer in the chat, send the **typing signal** (`chat_typing`), then answer.

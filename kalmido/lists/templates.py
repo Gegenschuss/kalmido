@@ -469,18 +469,20 @@ PTYPES = {
 PTYPE_NAMES = {"agency": N_("Agency"), "software": N_("Software / AI dev"), "private": N_("Personal|project type")}
 
 
-def ptype_template(k, lg):
+def ptype_template(k, lg, sections=False):
     p = PTYPES[k]
-    return {"kind": "project", "view": p["view"], "sections": [tr(x, lg=lg) for x in p["sections"]],
+    return {"kind": "project", "view": p["view"], "sections": [tr(x, lg=lg) for x in p["sections"]] if sections else [],
             "fields": [{"name": tr(n, lg=lg), "type": t, "options": {}, "pinned": 1} for n, t in p["fields"]],
             "tasks": [], "deps": [], "rel": True, "span": 0, "tickets": p["tickets"], "ticket_tpl": {}, "dep_shift": p["dep_shift"]}
 
 
-def ptype_create(c, uid, k, name, folder="", color="", start=None):
-    """A new project list of type k for uid; returns (list id, [modules switched on])."""
+def ptype_create(c, uid, k, name, folder="", color="", start=None, sections=False):
+    """A new project list of type k for uid; returns (list id, [modules switched on]). 2.27.0 (#972): the type's standard
+    sections only when asked for (sections=True: the box "With the standard sections" / API sections: true); without them
+    the project starts empty (modules, ticket types, fields and the view still come with the type)."""
     if k not in PTYPES:
         raise BadInput(tr("Invalid value: {0}", tr("Project type")))
-    lid = tpl_apply_list(c, uid, ptype_template(k, lang(c, uid)), name, folder, start or local_now().date(), color=color)
+    lid = tpl_apply_list(c, uid, ptype_template(k, lang(c, uid), sections), name, folder, start or local_now().date(), color=color)
     c.execute("UPDATE lists SET ptype=? WHERE id=?", (k, lid))  # 2.18.0 (#408): the type is kept (list dialog, API)
     fs = [x for x in (usettings(c, uid).get("features") or "").split(",") if x]
     on = [m for m in PTYPES[k]["modules"] if m not in fs]

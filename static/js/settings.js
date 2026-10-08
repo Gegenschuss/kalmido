@@ -840,7 +840,7 @@ function settingsModal(focus) {
   if (cur === 'users') { aaDraw(md); bkDraw(md); orphDraw(md); grpDraw(md); }
   aiTblWire(md);
   if (cur === 'ai') aiSubShow(md, {agents: 'agents', usage: 'usage', activity: 'log'}[focus]);  // 2.5.1 (#393)
-  md.addEventListener('click', e => { const b = e.target.closest('[data-aisub]'); if (b) aiSubShow(md, b.dataset.aisub, true); });
+  md.addEventListener('click', e => { const b = e.target.closest('[data-aisub]'); if (b) aiSubShow(md, b.dataset.aisub, true); const g = e.target.closest('[data-aigo]'); if (g) aiSubShow(md, g.dataset.aigo, true); });
   md.addEventListener('click', e => { const b = e.target.closest('[data-admsub]'); if (b) admSubShow(md, b.dataset.admsub, true); });  // 2.24.0 (#826)
   if (S.me?.is_admin) hostWire(md);
   aiuWire(md, only => { const box = $('#s-aiu', md); if (only && box && S.aiu.data) box.innerHTML = aiuHtml(S.aiu.data, Math.max(240, Math.min(720, (box.clientWidth || 560) - 8))); else aiuDraw(md); });  // 2.1.1 (#326)
@@ -1264,10 +1264,17 @@ function aaWire(md) {
 // project links (Settings > Help, command palette); always a new tab without referrer
 const ABOUT_LINKS = [['https://kalmido.com', N_('Website'), 'link'], ['https://github.com/Gegenschuss/kalmido', N_('Source code on GitHub'), 'file'], ['https://github.com/Gegenschuss/kalmido/issues', N_('Report a problem'), 'alert']];
 const openExt = u => { const w = window.open(u, '_blank', 'noopener,noreferrer'); if (w) w.opener = null; };
+// 2.27.0 (#968): the code in this window (index.html) next to the server's version; differ they: marked + "Reload"
+function aboutVerRows(a) {
+  const srv = S.serverVer || a.version || '', app = APP_VER || '';
+  if (!app) return '';
+  const off = srv && app !== srv;
+  return `<div class="row aboutapp${off ? ' off' : ''}"><label>${tr('App in this window')}</label><span>v${esc(app)}${off ? ` · <b>${esc(tr('Server: v{0}', srv))}</b> <button type="button" class="btn sm pri" data-nv="go">${esc(tr('Reload'))}</button>` : ` · <span class="muted">${esc(tr('up to date'))}</span>`}</span></div>`;
+}
 // Settings > Help: version, and for admins the result of the daily update check (server side, never automatic)
 function aboutHtml(chk, hint) {
   const a = S.about || {};
-  let h = `<h4 id="s-about-h">${tr('About')}</h4><div class="row"><label>${tr('Version')}</label><span class="aboutver">Kalmido v${esc(a.version || '?')}</span></div>
+  let h = `<h4 id="s-about-h">${tr('About')}</h4><div class="row"><label>${tr('Version')}</label><span class="aboutver">Kalmido v${esc(a.version || '?')}</span></div>${aboutVerRows(a)}
     <div class="row aboutcopy"><label>©</label><span class="muted">2026 Gegenschuss Doberenz Enders Grund eGbR · AGPL-3.0</span></div>
     <div class="row aboutlinks"><label></label>${ABOUT_LINKS.map(([u, n, i]) => `<a class="btn sm" href="${u}" target="_blank" rel="noopener noreferrer">${ic(i, 's')} ${tr(n)}</a>`).join('')}</div>`;
   if (!S.me?.is_admin) return h;

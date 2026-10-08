@@ -11,7 +11,7 @@ import urllib.parse
 import urllib.request
 from flask import jsonify, redirect, request, Response, send_from_directory
 
-from ..core.config import app, ATT_DIR, MAX_FILE_MB, ntfy_attachment_url, NTFY_IN, safe_urlopen
+from ..core.config import app, APP_VERSION, ATT_DIR, MAX_FILE_MB, ntfy_attachment_url, NTFY_IN, safe_urlopen
 from ..core.i18n import lang, N_, tr, trn
 from ..core.db import bump, connect, db, default_uid, err, gset, gsetting, iso, now_utc
 from ..accounts.session import client_ip, GATE, me
@@ -43,6 +43,23 @@ def headers(resp):
     return resp
 
 
+_INDEX = {}
+
+
+def index_page():
+    """index.html with the version of this code (2.27.0, #968): the client compares it with /api/version "app" and offers a reload
+    when the server runs a newer version than the code in the browser."""
+    path = os.path.join(app.static_folder, "index.html")
+    mt = os.path.getmtime(path)
+    if _INDEX.get("mt") != mt:
+        with open(path, encoding="utf-8") as f:
+            _INDEX.update(mt=mt, html=f.read().replace('<meta name="kalmido-version" content="">',
+                                                       f'<meta name="kalmido-version" content="{APP_VERSION}">', 1))
+    r = Response(_INDEX["html"], mimetype="text/html")
+    r.headers["Cache-Control"] = "no-cache"
+    return r
+
+
 @app.errorhandler(413)
 def too_large(_):  # json, not flask's html page (the client treats html as "session expired")
     from ..integrations.importers import IMPORT_MAX_MB
@@ -56,20 +73,20 @@ def too_large(_):  # json, not flask's html page (the client treats html as "ses
 
 @app.get("/")
 def index():
-    return send_from_directory(app.static_folder, "index.html")
+    return index_page()
 
 
 @app.get("/capture")
 def capture():
     # 2.4.0 (#187): quick capture page (the bookmarklet opens it as a small popup with ?title&url; without them it shows
     # the bookmarklet and the keyboard shortcuts). The client does it all; saving is a normal session request.
-    return send_from_directory(app.static_folder, "index.html")
+    return index_page()
 
 
 @app.get("/share")
 def share():
     # Android Web Share Target (manifest share_target): the client reads ?title&text&url
-    return send_from_directory(app.static_folder, "index.html")
+    return index_page()
 
 
 def new_inbox_task(c, uid, title, content="", tt_id=None, url=None):
@@ -77,9 +94,11 @@ def new_inbox_task(c, uid, title, content="", tt_id=None, url=None):
     inbox = my_inbox(c, uid)
     ts = iso(now_utc())
     srt = c.execute("SELECT COALESCE(MIN(sort),0)-1 FROM tasks WHERE list_id=? AND parent_id IS NULL", (inbox,)).fetchone()[0]
-    tid = c.execute("INSERT INTO tasks(list_id,title,content,sort,created_at,updated_at,tt_id,created_by,url) VALUES(?,?,?,?,?,?,?,?,?)",
+    # 2.27.0 (#1001): what lands in your own inbox (mail, the share sheet, /drop, the ntfy inbox) is yours: assigned to you,
+    # so it also shows in "My tasks"
+    tid = c.execute("INSERT INTO tasks(list_id,title,content,sort,created_at,updated_at,tt_id,created_by,url,assignee_id) VALUES(?,?,?,?,?,?,?,?,?,?)",
                     (inbox, (title or tr("Shared", lg=lang(c, uid)))[:300], content or "", srt, ts, ts, tt_id, uid,
-                     url if valid_url(url) else None)).lastrowid
+                     url if valid_url(url) else None, uid)).lastrowid
     log_act(c, tid, "created", uid=uid)
     return tid
 
@@ -369,5 +388,5 @@ def version():
     from ..collab.teamchat import tchat_sig
     from ..agents.chat import task_typing_for
     c = db()
-    return jsonify(v=int(gsetting(c, "version")), n=news_sig(c, me()), c=cal_sig(c, me()), t=tchat_sig(c, me()),  # t: 2.17.0 (#419)
+    return jsonify(v=int(gsetting(c, "version")), app=APP_VERSION, n=news_sig(c, me()), c=cal_sig(c, me()), t=tchat_sig(c, me()),  # app: 2.27.0 (#968), t: 2.17.0 (#419)
                    ty=task_typing_for(c, me()))  # ty: 2.22.0 (#693) who is writing a comment where

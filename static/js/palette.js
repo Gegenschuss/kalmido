@@ -201,6 +201,10 @@ function palAll() {
   add('a:newlist', 'action', tr('New list'), 'list', () => listModal());
   add('a:newproject', 'action', tr('New project…'), 'brief', () => listModal(null, '', {kind: 'project'}));  // 2.4.0 (#243)
   add('a:newfilter', 'action', tr('New filter'), 'filter', () => filterModal());
+  {  // 2.27.0 (#974): the open list's agent, in the share dialog
+    const rl = S.route.mod === 'tasks' && /^l:\d/.test(S.route.key || '') ? listById(+S.route.key.slice(2)) : null;
+    if (rl && agentsOn() && shareOk(rl) && canManage(rl) && !rl.is_inbox && !rl.archived) add('a:listagent', 'action', tr('Agent for this list…'), 'bot', () => shareModal(rl.id, {focus: 'agents'}));
+  }
   add('a:dayplan', 'action', tr('Plan my day'), 'cal', () => dayplanModal('day'));  // 2.10.0 (#440)
   add('a:dayfill', 'action', tr('Fill free time'), 'clock', () => dayplanModal('fill'));
   if (feat('habits')) add('a:newhabit', 'action', tr('New habit'), 'habit', () => { go('habits'); habitModal(); });
@@ -265,7 +269,7 @@ function palAll() {
     if ((k === 'pinned' && !cn.pinned) || (k === 'waiting' && !cn.waiting)) continue;
     add('v:' + k, 'view', tr(SMART[k].name), SMART[k].icon, () => go(k), {keys: {today: 'g t', tomorrow: 'g m', week: 'g w', doable: 'g d', inbox: 'g i', all: 'g a'}[k]});
   }
-  if (collab()) add('v:assigned', 'view', tr('Assigned to me'), 'user', () => go('assigned'));
+  if (collab()) add('v:assigned', 'view', tr('My tasks'), 'user', () => go('assigned'));
   // 2.25.0 (UX-47): "Message to …" for everyone one can write to (when typing)
   if (teamOn()) for (const p of teamPeople()) add('dm:' + p.id, 'action', tr('Message to {0}', p.name), 'comment', () => dmOpen(p.id, p.name), {qonly: true});
   add('v:home', 'view', tr('Start|home'), 'home', () => go('home'));  // 2.17.0 (#475)

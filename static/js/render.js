@@ -176,9 +176,10 @@ function counts() {
 const SIDE_FOLDED = ['views'];
 // 2.25.0 (UX-03): the order of the groups and what is hidden is the person's (user setting "sidebar": json {order, hidden};
 // hidden: "g:<group>" or "e:<entry>"; the same on every device). "Lists" can be moved but not hidden.
-const SIDE_GROUPS = ['focus', 'clients', 'lists', 'filters', 'tags', 'views', 'team'];
+// 2.27.0 (#984): "Views" by default above the lists again (right below Plan, still folded); an own arrangement stays
+const SIDE_GROUPS = ['focus', 'views', 'clients', 'lists', 'filters', 'tags', 'team'];
 const SIDE_NAMES = {focus: N_('Plan|nav'), clients: N_('Clients'), lists: N_('Lists'), filters: N_('Filters'), tags: N_('Tags'), views: N_('Views'), team: N_('Conversations|nav')};
-const SIDE_PLAN = [['tomorrow', N_('Tomorrow')], ['week', N_('Next 7 days')], ['doable', N_('Now doable')], ['pinned', N_('Pinned|view')], ['waiting', N_('Waiting on someone')], ['assigned', N_('Assigned to me')]];
+const SIDE_PLAN = [['tomorrow', N_('Tomorrow')], ['week', N_('Next 7 days')], ['doable', N_('Now doable')], ['pinned', N_('Pinned|view')], ['waiting', N_('Waiting on someone')], ['assigned', N_('My tasks')]];
 const sideViewEntries = () => [['cal', N_('Calendar'), feat('cal')], ['timeline', N_('Timeline'), feat('timeline')], ['matrix', N_('Matrix'), feat('matrix')], ['habits', N_('Habits'), feat('habits')],
   ['pomo', N_('Focus timer'), feat('pomo')], ['time', N_('Time tracking'), timeOn()], ['stats', N_('Statistics'), feat('stats')], ['contacts', N_('Contacts'), feat('contacts')], ['life', N_('Home & life'), lifeOn()],
   ['workload', N_('Workload'), workloadOn()], ['review', N_('Review & journal'), feat('review')], ['family', N_('Family'), famOn()], ['overview', N_('Project status'), overviewOn()], ['agents', N_('Agents'), agentsTab()]].filter(x => x[2]);
@@ -253,7 +254,7 @@ function renderSide() {
     ['week', row('week', ic('week'), tr('Next 7 days'), c.week)], ['doable', row('doable', ic('zap'), tr('Now doable'), c.doable)],
     ['pinned', c.pinned || (onTasks && k === 'pinned') ? row('pinned', ic('pin'), tr('Pinned|view'), c.pinned) : ''],  // 2.16.0 (#648): only while something is pinned
     ['waiting', c.waiting || (onTasks && k === 'waiting') ? row('waiting', ic('hourglass'), tr('Waiting on someone'), c.waiting) : ''],
-    ['assigned', collab() && (hasSharing() || c.assigned) ? row('assigned', ic('user'), tr('Assigned to me'), c.assigned) : '']];
+    ['assigned', collab() && (hasSharing() || c.assigned) ? row('assigned', ic('user'), tr('My tasks'), c.assigned) : '']];
   const planHidden = plan.filter(([x, h]) => h && hid('e:' + x) && !(onTasks && k === x)).length;
   const focus = plan.filter(([x, h]) => h && (!hid('e:' + x) || (onTasks && k === x))).map(([, h]) => h).join('')
     + (planHidden ? `<button class="srow smore" data-act="side-more" title="${esc(tr('Settings > Appearance > Sidebar'))}">${ic('plus')}<span class="n">${esc(trn('{0} more view', '{0} more views', planHidden))}</span></button>` : '');
@@ -994,7 +995,7 @@ function lcHead(l, lc) {  // the column titles above the rows (wide layouts)
   lcwApply(l.id);
   // 2.16.0 (#634): a grip at the right edge of each column title: drag = the column's width on this device (per list),
   // double-click = its standard width; for the keyboard a separator (← → 0.5 rem, Enter = standard)
-  return `<div class="lchead" data-lid="${l.id}"><span class="spacer"></span>${ks.map((k, i) => { const n = colName(l, k); return `<span class="lc ${lcCls(k)} ${lcOvf(i)}" data-k="${esc(k)}" title="${esc(n)}"><span class="lcn" aria-hidden="true">${k === 'who' || k === 'prio' ? ic(COL_ICON[k], 's') : `<span>${esc(colShort(l, k))}</span>`}</span>${isTouch() ? '' : `<i class="lcg" data-lcg="${esc(k)}" role="separator" aria-orientation="vertical" tabindex="0" aria-label="${esc(tr('Width of the column {0}', n))}" ${lcwGet(l.id)[k] ? `aria-valuenow="${lcwGet(l.id)[k]}" aria-valuetext="${esc(tr('{0} rem', String(lcwGet(l.id)[k])))}"` : `aria-valuetext="${esc(tr('Standard width'))}"`} aria-valuemin="${LCW_MIN}" aria-valuemax="${LCW_MAX}"></i>`}</span>`; }).join('')}</div>`;
+  return `<div class="lchead" data-lid="${l.id}"><span class="spacer"></span>${ks.map((k, i) => { const n = colName(l, k); return `<span class="lc ${lcCls(k)} ${lcOvf(i)}" data-k="${esc(k)}" title="${esc(n)}"><span class="lcn" aria-hidden="true">${k === 'who' || k === 'prio' ? ic(COL_ICON[k], 's') : `<span>${esc(colShort(l, k))}</span>`}</span>${isTouch() ? '' : `<i class="lcg" data-lcg="${esc(k)}" title="${esc(tr('Drag the column width · double-click = standard width'))}" role="separator" aria-orientation="vertical" tabindex="0" aria-label="${esc(tr('Width of the column {0}', n))}" ${lcwGet(l.id)[k] ? `aria-valuenow="${lcwGet(l.id)[k]}" aria-valuetext="${esc(tr('{0} rem', String(lcwGet(l.id)[k])))}"` : `aria-valuetext="${esc(tr('Standard width'))}"`} aria-valuemin="${LCW_MIN}" aria-valuemax="${LCW_MAX}"></i>`}</span>`; }).join('')}</div>`;
 }
 // ---- 2.16.0 (#634): column widths per device and list (localStorage lcw.<list>: {key: rem}), applied as one style sheet
 const LCW_MIN = 2.5, LCW_MAX = 24;
@@ -1015,9 +1016,9 @@ document.addEventListener('pointerdown', e => {
   e.preventDefault(); e.stopPropagation();
   const lid = +g.closest('.lchead').dataset.lid, k = g.dataset.lcg, cell = g.closest('.lc');
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, x0 = e.clientX, w0 = cell.getBoundingClientRect().width / rem;
-  g.setPointerCapture?.(e.pointerId); document.body.classList.add('pgdrag');
+  g.setPointerCapture?.(e.pointerId); document.body.classList.add('pgdrag'); g.classList.add('drag');
   const mv = ev => lcwSet(lid, k, w0 + (ev.clientX - x0) / rem);
-  const up = () => { g.removeEventListener('pointermove', mv); document.body.classList.remove('pgdrag'); };
+  const up = () => { g.removeEventListener('pointermove', mv); document.body.classList.remove('pgdrag'); g.classList.remove('drag'); };
   g.addEventListener('pointermove', mv); g.addEventListener('pointerup', up, {once: true}); g.addEventListener('pointercancel', up, {once: true});
 }, true);
 document.addEventListener('dblclick', e => { const g = e.target.closest?.('.lchead .lcg'); if (g) lcwSet(+g.closest('.lchead').dataset.lid, g.dataset.lcg, null); });
@@ -1129,6 +1130,7 @@ function viewListBody() {
   // 2.25.0 (UX-28): a shopping or packing list gets the tip "Show completed at the bottom" once (was in the tour)
   if (rl && !ro && isOwner(rl) && !ck && (['shopping', 'packing'].includes(rl.family) || /einkauf|shopping|groceries|pack(liste|ing)|courses|compra|spesa|boodschap|paklijst/i.test(rl.name)) && !hintSeen('dab')) h += `<div class="onehint" data-hint="dab">${ic('cart', 's')}<span>${esc(tr('Shopping or packing? With “Show completed at the bottom” what you tick off stays visible at the bottom and comes back with one tap.'))}</span><button type="button" class="btn sm" data-act="dab-on" data-id="${rl.id}">${tr('Turn on')}</button><button type="button" class="iconbtn hx" data-act="hint-x" data-k="dab" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;
   if (S.route.key === 'today') h += waitCard() + reviewCard() + overdueBanner() + cevTodayBlock();  // 2.24.0 (UX-35): the planners in "…"  // 2.10.0 (#440): review + planner
+  if (rl && sortOwn()) h += `<div class="onehint sortown">${ic('sort', 's')}<span>${esc(tr('You see your own sort of this shared list.'))}</span><button type="button" class="btn sm" data-act="sort-shared">${tr('Back to the shared sort')}</button></div>`;  // 2.27.0 (#988)
   if (flow && FLOW.cyc) h += `<div class="flowhint">${ic('deps', 's')}${esc(tr('Some tasks block each other in a circle; they are ordered by date.'))}</div>`;
   if (lc && total0(groups)) h += lcHead(rl, lc);
   if (cols) h += `<div class="fcolhead"><span class="spacer"></span>${cols.map(f => `<span class="fcell t-${esc(f.type)}" title="${esc(f.name)}">${esc(f.name)}</span>`).join('')}</div>`;
@@ -1166,7 +1168,8 @@ function viewListBody() {
   // 2.19.0 (#667): the end of a list takes a dragged task into a new section
   if (rl && !ro && !rl.is_inbox && total && canEditList(rl.id)) h += `<div class="sdrop snew" data-newsec="1">${ic('plus', 's')}<span>${tr('New section')}</span></div>`;
   if (cut) h += `<div class="rowmore"><button type="button" class="btn" data-act="rows-more">${ic('down', 's')}${esc(trn('Show {0} more task', 'Show {0} more tasks', Math.min(cut, ROW_CAP)))}</button><span class="muted">${esc(trn('{0} task not shown yet', '{0} tasks not shown yet', cut))}</span></div>`;
-  if (v.list && !ro && total && !rl?.is_inbox) h += `<button class="iconbtn" data-act="section-new" style="margin:.375rem 0 0 -.25rem">${ic('plus', 's')} ${tr('Section')}</button>`;  // 2.25.0 (UX-27 / UX-38): once there are tasks, never in the inbox
+  // 2.25.0 (UX-27 / UX-38): never in the inbox; 2.27.0 (#990): also in an empty list (a project may start without sections, #972)
+  if (v.list && !ro && !rl?.is_inbox && (!rl || canEditList(rl.id))) h += `<button class="iconbtn secnew" data-act="section-new" style="margin:.375rem 0 0 -.25rem">${ic('plus', 's')} ${tr('Section')}</button>`;
   if (ck) {  // 2.7.2 (#414) "Show completed at the bottom" (was the checklist type): done items stay below in "Done" (open by
     // default), one tap puts them back on the list
     const k = 'ckdone:' + rl.id, closed = S.collapsed.has(k), done = v.done.slice().sort((a, b) => a.title.localeCompare(b.title, LOCALE()));

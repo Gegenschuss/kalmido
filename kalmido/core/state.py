@@ -41,6 +41,27 @@ def _jtrip(v):
     return t if isinstance(t, dict) else None
 
 
+def folder_orders(c, uid, lists):
+    """2.27.0 (#988): {owner id: [folder, ...]} the order of the folders of other people the viewer sees mirrored lists in, as
+    their owners arranged them (only folders the viewer sees anyway: the folders of those lists and their parents)."""
+    seen = {}
+    for d in lists:
+        if d.get("mirrored") and d["folder"]:
+            f = seen.setdefault(d["owner_id"], set())
+            f.add(d["folder"])
+            if "/" in d["folder"]:
+                f.add(d["folder"].split("/", 1)[0])
+    out = {}
+    for oid, fs in seen.items():
+        try:
+            arr = json.loads(usettings(c, oid).get("folders") or "[]")
+        except ValueError:
+            arr = []
+        order = [x for x in arr if isinstance(x, str) and x in fs]
+        out[str(oid)] = order + sorted(fs - set(order))
+    return out
+
+
 def visible_lists(c, uid):
     """Lists the user sees, with role, sharing info and the user's own folder / sort / view."""
     from ..lists.lists import columns_out
@@ -96,6 +117,8 @@ def visible_lists(c, uid):
         d["status_by_name"] = snames.get(r["status_by"], "")
         if r["owner_id"] != uid:
             d.update(folder=r["m_folder"], sort=r["m_sort"], view=r["m_view"] or r["view"], role=r["m_role"])
+            if r["folder"]:  # 2.27.0 (#988): a list in its owner's folder sits for everyone where the owner put it (mirrored)
+                d.update(folder=r["folder"], sort=r["sort"], mirrored=True)
         else:
             d["role"] = "owner"
         d["members"] = members.get(r["id"], [])
@@ -126,7 +149,8 @@ def visible_lists(c, uid):
         d["trip"] = _jtrip(r["trip"])  # 2.22.0 (#663): {from, to, where} of a trip list, else null
         d.pop("col_cfg", None)
         out.append(d)
-    out.sort(key=lambda d: (-d["is_inbox"], d["sort"], d["id"]))
+    # 2.27.0 (#988): lists placed by their owner (mirrored) come first in their order, then the viewer's own (two numberings)
+    out.sort(key=lambda d: (-d["is_inbox"], 0 if d.get("mirrored") else 1, d["sort"], d["id"]))
     return out
 
 
@@ -193,7 +217,8 @@ def state():
         me={**user_public(u), "orgs": _org_names(c, u["id"]), "is_admin": bool(u["is_admin"]), "auth": g.auth_via, "has_password": bool(u["password_hash"]),
             "ntfy_inbox": bool(NTFY_IN["token"]) and inbox_user(c) == uid},
         setup_pending=bool(u["is_admin"]) and gsetting(c, "setup_step2") == "pending",  # 2.13.0 (#453 A16)
-        lists=visible_lists(c, uid),
+        lists=(vl := visible_lists(c, uid)),
+        folder_orders=folder_orders(c, uid, vl),  # 2.27.0 (#988)
         inbox_names=inbox_names(),  # 2.15.0 (#632): default names of an inbox (shown in the UI language)
         filters=[{**dict(r), "rules": json.loads(r["rules"] or "{}")}
                  for r in c.execute("SELECT * FROM filters WHERE user_id=? ORDER BY sort, id", (uid,))],

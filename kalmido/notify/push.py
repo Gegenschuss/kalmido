@@ -454,6 +454,7 @@ def watchdog_tick(c):
     from ..notify.alerts import aa_tick
     from ..tasks.dayplan import _wd_review
     from ..agents.chat import chat_files_gc
+    from ..agents.core import tidy_tick
     from ..agents.proposals import prop_cleanup
     from ..agents.usage import audit_cleanup, usage_cleanup
     from ..family.v1 import _wd_rotations
@@ -477,6 +478,7 @@ def watchdog_tick(c):
     _wd_section(c, "audit cleanup", audit_cleanup)  # 2.2.1 (#358)
     _wd_section(c, "proposal cleanup", prop_cleanup)  # 2.3.0
     _wd_section(c, "chat files cleanup", chat_files_gc)  # 2.13.1 (#465)
+    _wd_section(c, "tidy events", tidy_tick)  # 2.27.0 (#999)
     _wd_section(c, "time", time_watchdog, users, S, LG)
     now = local_now()
     _wd_section(c, "reminders", _wd_reminders, users, S, LG, now)

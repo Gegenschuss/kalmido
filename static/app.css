@@ -4,6 +4,8 @@
    1.2 Appearance (per device, settings > Appearance): every size is in rem and 1rem = 16px x --ui, so the font size
    setting (90 / 100 / 112 / 125 %) scales text, rows, icons, spacing and dialogs together. Only hairlines,
    bars and outlines (<= 2px) and the breakpoints (viewport px) stay fixed. */
+/* 2.27.0 (#966): the hidden attribute always hides (a rule like .row{display:flex} kept "hidden" rows visible) */
+[hidden]{display:none!important}
 @font-face{font-family:"Geist";src:url("/static/fonts/Geist-Variable.woff2") format("woff2");font-weight:100 900;font-style:normal;font-display:swap}
 @font-face{font-family:"Geist Mono";src:url("/static/fonts/GeistMono-Variable.woff2") format("woff2");font-weight:100 900;font-style:normal;font-display:swap}
 /* Atkinson Hyperlegible (Braille Institute, SIL OFL 1.1, latin subset): only downloaded when chosen */
@@ -100,6 +102,7 @@ kbd{display:inline-flex;align-items:center;justify-content:center;min-width:1.12
 .srow:hover{background:var(--bg3);color:var(--text)}
 .srow.on{background:var(--bg3);color:var(--text);box-shadow:inset 2px 0 0 var(--accent)}
 .srow.dropbefore{box-shadow:inset 0 2px 0 var(--accent)}
+.srow.dropafter{box-shadow:inset 0 -2px 0 var(--accent)}
 .srow.reorder{cursor:default}
 .srow.reorder .iconbtn{padding:.25rem}
 .shead button.on{color:var(--accent)}
@@ -247,7 +250,8 @@ svg.i.up{transform:rotate(180deg)}
 .fields select{width:100%}
 
 /* ---------- popover / sheet ---------- */
-#pop{position:fixed;z-index:60;background:var(--bg2);border-radius:var(--r-l);box-shadow:var(--shadow);padding:.375rem;width:18.75rem;max-height:80dvh;overflow-y:auto}
+#pop{position:fixed;z-index:63;background:var(--bg2);border-radius:var(--r-l);box-shadow:var(--shadow);padding:.375rem;width:18.75rem;max-height:80dvh;overflow-y:auto}
+/* 2.27.0 (#963 #976): menus and popovers above the agent chat panel (60), the width grips (61) and a pinned composer (62) */
 #scrim{position:fixed;inset:0;background:rgba(4,6,9,.55);z-index:50}
 #scrim.clear{background:transparent}
 #scrim.overmodal{z-index:74}#pop.overmodal{z-index:76}  /* #318: a menu opened inside a dialog shows above it */
@@ -2222,7 +2226,8 @@ body.chat-yield #achat{display:none}
 @media (min-width:1000px){body.chat-yield .dchatb{display:inline-flex!important}}
 /* ---- 2.0.2: comments under the description (#242), inline title edit (#182), section "+" (#283), list icons (#245),
    agent typing / working indicators (#299), iOS home-screen gap (#286) */
-.md.clamp{max-height:calc(8 * 1.45em);overflow:hidden;-webkit-mask-image:linear-gradient(#000 62%,transparent);mask-image:linear-gradient(#000 62%,transparent)}
+/* 2.27.0 (#994): at least six lines fully readable before "Show more"; only the last line fades */
+.md.clamp{max-height:calc(9 * 1.45em);overflow:hidden;-webkit-mask-image:linear-gradient(#000 84%,transparent);mask-image:linear-gradient(#000 84%,transparent)}
 .mdmore{align-self:flex-start;margin:-.25rem 0 .25rem;font-size:var(--fs-s)}
 .dtabs{display:flex;margin:0 0 .25rem}
 .dtabs button{flex:1;justify-content:center;gap:.375rem}
@@ -2754,6 +2759,9 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 /* K11: the "nobody assigned" circle is quiet: hover / focus only (desktop), gone on touch screens */
 .whob.wnone{opacity:0;transition:opacity .12s}
 .trow:hover .whob.wnone,.whob.wnone:focus-visible,.trow.sel .whob.wnone{opacity:1}
+/* 2.27.0 (#1002): in a list with its own columns the empty assignee cell is always visible (faint), so it reads as clickable */
+.lcols .whob.wnone,.trow .meta .mlc .whob.wnone{opacity:.5}
+.lcols .whob.wnone:hover,.trow .meta .mlc .whob.wnone:hover{opacity:1}
 @media (hover:none),(pointer:coarse){ .whob.wnone{display:none} }
 .aimodoff{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
 .aimodoff>span{flex:1 1 14rem}
@@ -3059,6 +3067,12 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 /* #433: the change check failed for more than 30 s */
 #stale{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 1rem);z-index:55;display:inline-flex;align-items:center;gap:.375rem;padding:.375rem .75rem;border-radius:2rem;border:1px solid var(--line,transparent);background:var(--bg3);color:var(--text2);font:inherit;font-size:var(--fs-s);cursor:pointer;box-shadow:var(--shadow);max-width:calc(100vw - 2rem)}
 #stale span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 2.27.0 (#968): a newer version runs on the server than the code in this window */
+#newver{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + .5rem);z-index:95;display:inline-flex;align-items:center;gap:.5rem;padding:.375rem .4375rem .375rem .875rem;border-radius:2rem;border:1px solid var(--accent);background:var(--bg2);color:var(--text);font-size:var(--fs-s);box-shadow:var(--shadow);max-width:calc(100vw - 2rem)}
+#newver span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:899px){ #newver{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 4.75rem)} }
+#newver svg{color:var(--accent);flex:none}
+.aboutapp.off>span>b{color:var(--p3)}
 @media (max-width:899px){ #stale{bottom:calc(env(safe-area-inset-bottom,0px) + 4.75rem)} }
 @media (pointer:coarse){ #stale{min-height:2.75rem} }
 /* #417: the robot needs a little room on phones / tight headers */
@@ -3761,6 +3775,9 @@ input:not([type=checkbox]):not([type=radio]):focus,select:focus,textarea:focus{b
 .menu-list .mwho{opacity:1!important;color:var(--muted);font-size:var(--fs-s)}
 /* 2.16.0 (#639): the grips between list | task | chat */
 .pgrip{position:fixed;width:.625rem;z-index:61;cursor:col-resize;touch-action:none;display:flex;justify-content:center}
+/* 2.27.0 (#976): a grip never lies over a menu, a popover or a dialog: while one is open the grips step aside (no line, no
+   tooltip, no drag) */
+body:has(#pop:not(.hidden)) .pgrip,body:has(.modal) .pgrip,body:has(#pop:not(.hidden)) .lchead .lcg,body:has(.modal) .lchead .lcg{visibility:hidden;pointer-events:none}
 .pgrip::after{content:"";width:2px;height:100%;background:transparent;border-radius:1px}
 .pgrip:hover::after,.pgrip.drag::after{background:var(--accent)}
 .pgrip:focus{outline:none}
@@ -3772,8 +3789,10 @@ body.pgdrag,body.pgdrag *{cursor:col-resize!important;user-select:none!important
 .lchead .lc{position:relative;overflow:visible}
 .lchead .lc .lcn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-flex;align-items:center}
 .lchead .lcg{position:absolute;top:-.25rem;bottom:-.25rem;right:-.4375rem;width:.5rem;cursor:col-resize;touch-action:none;border-radius:2px}
-.lchead .lcg::after{content:"";position:absolute;left:.1875rem;top:0;bottom:0;width:2px;background:transparent}
-.lchead:hover .lcg::after{background:var(--line2)}
+/* 2.27.0 (#1006): a quiet line between the column titles shows where to drag; stronger over the header, accent on the grip */
+.lchead .lcg::after{content:"";position:absolute;left:.1875rem;top:.375rem;bottom:.375rem;width:1px;background:var(--line2);border-radius:1px}
+.lchead:hover .lcg::after{background:var(--faint);top:.125rem;bottom:.125rem}
+.lchead .lcg:hover::after,.lchead .lcg:focus-visible::after,.lchead .lcg.drag::after{width:2px;top:0;bottom:0}
 .lchead .lcg:hover::after,.lchead .lcg:focus-visible::after{background:var(--accent)}
 .lchead .lcg:focus{outline:none}.lchead .lcg:focus-visible{outline:2px solid var(--accent)}
 /* 2.16.0 (#642): the sidebar's own density (Compact / Comfortable / Custom). Compact: less room between groups and rows,
@@ -3851,7 +3870,9 @@ body.pgdrag,body.pgdrag *{cursor:col-resize!important;user-select:none!important
 .cbub.tcedit textarea{min-height:3.5rem;resize:vertical}
 .tcebtn{display:flex;gap:.375rem;justify-content:flex-end}
 .tccomp{border-top:1px solid var(--line)}
-.tcempty{padding:2rem 1rem;text-align:center}
+.tcempty{padding:2rem 1rem;text-align:center;display:flex;flex-direction:column;align-items:center;gap:.375rem}
+.tcempty b{color:var(--text)}
+.tcempty .btn{margin-top:.625rem}  /* 2.27.0 (#986) */
 @media (max-width:899px){
   body.in-team #view{overflow:hidden;padding-bottom:calc(var(--tabs-h) + var(--safe-b));display:flex;flex-direction:column;overscroll-behavior:none}
   body.in-team.kb-open #view{padding-bottom:0}
@@ -4846,3 +4867,43 @@ body.msel #view .qdock{visibility:hidden}
 @media (max-width:899px){
   .snmore{background:var(--bg2);padding-left:.5rem;box-shadow:-1.25rem 0 .75rem -.25rem var(--bg2)}
 }
+/* 2.27.0 (#977): the list's type as a visible choice (Simple list | Project) at the top of the list dialog */
+.lkseg label{display:inline-flex;align-items:center;gap:.3125rem;padding:.3125rem .75rem;border-radius:var(--r-s);color:var(--muted);font-size:var(--fs-m);cursor:pointer;position:relative;min-height:2rem}
+.lkseg label:hover{color:var(--text)}
+.lkseg label.on{background:var(--bg3);color:var(--text);font-weight:550}
+.lkseg input{position:absolute;opacity:0;width:1px;height:1px;margin:0;pointer-events:none}
+.lkseg label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:1px}
+.lkseg label:has(input:disabled){cursor:default;opacity:.7}
+@media (pointer:coarse){ .lkseg label{min-height:2.75rem} }
+.ptsecs .muted{font-size:var(--fs-s)}
+/* 2.27.0 (#964): one agent per list: "Agent reads every comment" is a switch like the access switches above it */
+.lsn1 .lsnag.agacc{display:flex;width:100%}
+.lsn1 .lsnag .swc input{position:absolute;inset:-.75rem -.375rem;width:auto;height:auto}
+/* 2.27.0 (#957): what "More details" holds, in its summary line */
+.dmore > summary .dmsum{font-weight:400;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dmore > summary .dmsum::before{content:"· ";}
+.dmore[open] > summary .dmsum{display:none}
+.lchead .lcg.drag::after{background:var(--accent)}
+/* 2.27.0 (#964): Settings > Agents > Lists grouped by folder (a group row folds and sets one agent for the whole folder) */
+.aitblctl{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+.aitblctl input{flex:1 1 12rem}
+.aitblctl select{flex:0 1 14rem;min-width:0}
+.airow.aigrp{background:var(--bg2);padding:.25rem .625rem}
+.airow.aigrp .aigt{display:inline-flex;align-items:center;gap:.375rem;flex:1;min-width:0;min-height:2.25rem;padding:0;border:0;background:none;color:var(--text);font:inherit;cursor:pointer;text-align:left}
+.airow.aigrp .aigt b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.airow.aigrp .aigt[aria-expanded="false"] .fcar{transform:rotate(-90deg)}
+.airow.aigrp .aigsel{width:100%;max-width:16rem;min-width:0}
+.airow:not(.aigrp):not(.aihead) .ailn{padding-left:1.25rem}
+@media (pointer:coarse){ .airow.aigrp .aigt{min-height:2.75rem} }
+@media (max-width:599px){ .airow.aigrp .aigsel{max-width:none} .airow:not(.aigrp):not(.aihead) .ailn{padding-left:0} }
+.lkseg{max-width:100%;min-width:0}
+.lkseg label{min-width:0;white-space:nowrap}
+.ptsecs{flex-direction:column;align-items:flex-start;row-gap:.125rem;margin-top:.75rem}
+.modal .row.ptsecs label.chkl{font-size:var(--fs-m)}
+.ptsecs #l-ptsecsl{padding-left:1.625rem}
+.ptsecs .muted{min-width:0;overflow-wrap:anywhere}
+@media (max-width:899px){ .lkrow{flex-wrap:wrap} .lkseg{flex:1 1 100%} .lkseg label{flex:1;justify-content:center} }
+.modal .row .lkseg label{min-width:0;color:var(--muted);font-size:var(--fs-m)}
+.modal .row .lkseg label.on{color:var(--text)}
+@media (max-width:899px){ .modal .row .lkseg label{min-width:0;flex:1} }
+.tcempty .btn{display:inline-flex;align-items:center;gap:.375rem}

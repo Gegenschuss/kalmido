@@ -234,7 +234,16 @@ function agentLive() {
 setInterval(() => { if (S.chat.aid && !document.hidden && $('#chat-st')) agentLive(); }, 2000);
 // 2.6.1 (#402): the header dots follow the clock too ("offline" once an agent stopped polling), without asking the server
 let hdSig = '';
-setInterval(() => { if (document.hidden || !$('#top')) return; const sg = shownAgents().map(a => a.id + agentHst(a)).join(); if (sg !== hdSig) { const first = !hdSig; hdSig = sg; if (!first) renderTop(); } }, 30000);
+// 2.27.0 (#1007): the dots, the list's agent band and the chat said different things ("not connected" vs. "ready"): the
+// age of the last contact counted on from the last full state load, which only comes when data changes. Now the agents'
+// status is asked again (GET /api/agents) once it is older than a minute, then the header AND the band follow
+setInterval(async () => {
+  if (document.hidden || !$('#top')) return;
+  if (agentsOn() && Date.now() - (S.agentsAt || 0) > 60000) await agentPoll();
+  const sg = shownAgents().map(a => a.id + agentHst(a)).join(); if (sg === hdSig) return;
+  const first = !hdSig; hdSig = sg; if (first) return;
+  renderTop(); if ($('#view .agband')) viewSafeRender();
+}, 30000);
 // sync while typing in the task panel: no full reload, but the agents' status still comes along
 async function agentPoll() {
   if (!agentsOn()) return;

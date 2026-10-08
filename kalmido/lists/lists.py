@@ -24,6 +24,7 @@ LIST_KINDS = ("list", "project")
 # as a deprecated alias (= kind list + the option on), the boolean "checklist" as an alias of done_at_bottom.
 LIST_KIND_ALIASES = {"checklist": "list"}
 MEMBER_LIST_FIELDS = ("folder", "sort", "view")  # a member's own sidebar placement / view
+LIST_SORTS = ("", "prio", "custom", "date", "title", "creator", "flow", "created", "created_asc")  # 2.27.0 (#988): lists.sort_mode
 LIST_VIEWS = ("list", "kanban", "timeline")
 LIST_COLOR_RE = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})")
 LIST_NAME_MAX, FOLDER_MAX = 200, 100
@@ -201,7 +202,9 @@ def list_create():
     color, folder = clean_color(b.get("color", "")), clean_folder(b.get("folder", ""))
     if b.get("ptype"):  # 2.4.0 (#243): a project of a built-in type (sections, fields, view, ticket types, modules)
         c = db()
-        lid, on = ptype_create(c, me(), b["ptype"], name, folder, color)
+        if "sections" in b and not isinstance(b["sections"], bool):
+            return err(tr("Invalid value: {0}", "sections"))
+        lid, on = ptype_create(c, me(), b["ptype"], name, folder, color, sections=b.get("sections") is True)  # 2.27.0 (#972)
         bump(c)
         c.commit()
         return jsonify({**dict(c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()), "modules_on": on})
@@ -276,6 +279,14 @@ def list_update(lid):
         except BadInput as e:
             return err(str(e))
         b = {k: v for k, v in b.items() if k != "client_id"}
+    if "sort_mode" in b:  # 2.27.0 (#988): the list's sort, the same for every member (owner / list admins)
+        if role not in MANAGE_ROLES:
+            return err(tr("Only the owner and list admins can change the sort of this list"), 403)
+        sm = b["sort_mode"]
+        if not isinstance(sm, str) or not (sm in LIST_SORTS or re.fullmatch(r"cf:\d{1,9}", sm)):
+            return err(tr("Invalid value: {0}", "sort_mode"))
+        c.execute("UPDATE lists SET sort_mode=? WHERE id=?", (sm, lid))
+        b = {k: v for k, v in b.items() if k != "sort_mode"}
     if "columns" in b:  # 2.14.0 (#425): the list's columns, the same for every member (owner / list admins)
         if role not in MANAGE_ROLES:
             return err(tr("Only the owner and list admins can change the shown fields"), 403)

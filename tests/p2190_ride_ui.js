@@ -80,8 +80,9 @@ const key = (w, el, k) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: 
 
   // ================= jsdom: "+" in the team chat
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  w.eval(`go('team')`); await until(() => d.querySelector('.tclist .tcrow'));
-  click(w, d.querySelector('.tclist .tcrow')); await until(() => d.querySelector('#tc-in'));
+  // 2.27.0 (#986): empty channels are not listed; the first quiet one opens from "New message"
+  w.eval(`go('team')`); await until(() => w.eval('S.tc.rooms !== null'));
+  w.eval(`go('team/' + S.tc.rooms.find(r => r.kind === 'list').id)`); await until(() => d.querySelector('#tc-in'));
   const RID = w.eval('S.tc.rid');
   const m1 = await call('POST', `/api/team/rooms/${RID}/messages`, {body: 'Dinner at 7?'}, CB);
   w.eval('teamChanged()');

@@ -565,7 +565,7 @@ function drawTimeline() {
   }
   if (S.tlScroll === S.sel && S.tl.comments) { S.tlScroll = null; const b = $('#d-tl-items'); (cmtNew() ? $('#d-tl') : b?.lastElementChild)?.scrollIntoView({block: 'nearest'}); }  // opened from a comment (#386: newest first = the top)
 }
-const mdIsLong = s => { s = String(s || ''); return s.split('\n').length > 8 || s.length > 640; };
+const mdIsLong = s => { s = String(s || ''); return s.split('\n').length > 10 || s.length > 900; };  // 2.27.0 (#994): 8 -> 10 lines, 640 -> 900 characters
 async function loadTimeline(id) {
   if (!(id > 0) || !(cmtOn() || collab()) || S.tasks.get(id)?.context) return;  // 2.0.7: collab = the history
   const my = S.tlSeq = (S.tlSeq || 0) + 1, v = S.v;

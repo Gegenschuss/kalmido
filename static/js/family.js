@@ -292,6 +292,9 @@ function famDetailHtml(t, l, ro) {
   if (!famOn() || !t || t.id <= 0 || t.context) return '';
   const out = [], ppl = listPeople(l).filter(p => !p.agent && !(l.members || []).find(m => m.user_id === p.user_id && m.agent));
   const shared = !!l?.shared && collab();
+  // 2.27.0 (#975): "Who comes along", "Take turns" and the stars are for family / household lists (Used for: …, Home & life),
+  // never for a project or an ordinary work list; a task that already uses one of them keeps showing it
+  const proj = (l?.kind || 'list') === 'project', famL = !proj && !!(l?.family || l?.life);
   if (isOcc(t)) {
     const w = occWhat(t);
     out.push(`<div class="row"><label for="d-fname">${t.fam.kind === 'birthday' ? tr('Birthday of') : tr('Anniversary of')}</label><input id="d-fname" value="${esc(t.fam.name || '')}" maxlength="100" ${ro ? 'readonly' : ''}></div>
@@ -301,18 +304,18 @@ function famDetailHtml(t, l, ro) {
     out.push(`<div class="row"><label>${tr('Household deadline')}</label><span class="muted">${esc(dlName(t.fam.type))}${t.fam.who ? ' · ' + esc(t.fam.who) : ''}</span></div>
       <div class="row"><label>${t.fam.notice ? tr('Ends on') : tr('Expires on')}</label>${ro ? `<span>${esc(fmtDateLoc(t.fam.expires || ''))}</span>` : dateIn('d-fexp', t.fam.expires || '', {label: t.fam.notice ? tr('Ends on') : tr('Expires on'), clear: false})}${t.fam.notice ? `<span class="muted">${esc(trn('notice period {0} month', 'notice period {0} months', t.fam.notice))}</span>` : ''}</div>`);
   }
-  if (shared && (t.rotation || (t.repeat && !t.fam))) {  // taking turns: only repeating tasks of shared lists (not a birthday / deadline)
+  if (shared && (t.rotation || (famL && t.repeat && !t.fam))) {  // taking turns: only repeating tasks of shared lists (not a birthday / deadline)
     const r = t.rotation, on = !!r, who = new Set(r?.who || []);
     out.push(`<div class="row frot"><label>${tr('Take turns')}</label><label class="swc"><input type="checkbox" id="d-rot" ${on ? 'checked' : ''} ${ro || !canEditList(t.list_id) ? 'disabled' : ''}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('Take turns'))}</span></label>${on ? `<span class="muted">${esc(rotOrder(t))}</span>` : ''}</div>
       ${on ? `<div class="row"><label>${tr('Who')}</label><div class="fpeople" role="group" aria-label="${esc(tr('Who takes turns'))}">${ppl.map(p => `<button type="button" class="fperson ${who.has(p.user_id) ? 'on' : ''}" data-rotp="${p.user_id}" aria-pressed="${who.has(p.user_id)}" ${ro ? 'disabled' : ''}>${av(p.user_id, p.name)}<span>${esc(p.name)}</span></button>`).join('')}</div></div>
       <div class="row"><label>${tr('Next person')}</label><div class="seg" role="radiogroup" aria-label="${esc(tr('Next person'))}"><button type="button" role="radio" data-rotm="done" class="${r.mode !== 'week' ? 'on' : ''}" aria-checked="${r.mode !== 'week'}" ${ro ? 'disabled' : ''}>${tr('after each time')}</button><button type="button" role="radio" data-rotm="week" class="${r.mode === 'week' ? 'on' : ''}" aria-checked="${r.mode === 'week'}" ${ro ? 'disabled' : ''}>${tr('every week')}</button></div></div>` : ''}`);
   }
-  if (shared && ppl.length > 1) {  // who comes along (family events)
+  if (shared && ppl.length > 1 && (famL || (t.people || []).length)) {  // who comes along (family events)
     const pp = new Set(t.people || []);
     out.push(`<div class="row"><label>${tr('Who comes along')}</label><div class="fpeople" role="group" aria-label="${esc(tr('Who comes along'))}">${ppl.map(p => `<button type="button" class="fperson ${pp.has(p.user_id) ? 'on' : ''}" data-famp="${p.user_id}" aria-pressed="${pp.has(p.user_id)}" ${ro || !canEditList(t.list_id) ? 'disabled' : ''}>${av(p.user_id, p.name)}<span>${esc(p.name)}</span></button>`).join('')}</div></div>`);
   }
   const kidIn = (l?.members || []).some(m => S.kidIds?.has(m.user_id));
-  if ((kidIn && !t.fam) || t.stars != null) {
+  if ((kidIn && !t.fam && !proj) || t.stars != null) {
     out.push(`<div class="row"><label for="d-stars">${tr('Stars for a child')}</label><input id="d-stars" class="numin" type="number" inputmode="numeric" min="0" max="50" value="${esc(t.stars ?? '')}" placeholder="1" ${ro || !canEditList(t.list_id) ? 'readonly' : ''}><span class="muted">★</span></div>`);
   }
   if (famKindOf(t.list_id) === 'meals' && !t.parent_id) {
