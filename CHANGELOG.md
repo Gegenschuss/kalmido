@@ -7,6 +7,13 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.31.2] - 2026-10-09
+
+### Fixed
+- **Done circle on a phone** (#1051): 2.31.1 had narrowed its touch area below 44 px; it is 44 px wide again and grows
+  to the left instead of over the ticket number, and a subtask arrow next to it stays tappable.
+- **Tests**: the check of the folded daily review no longer depends on the time of day.
+
 ## [2.31.1] - 2026-10-08
 
 ### Fixed
@@ -3273,7 +3280,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.31.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.31.2...HEAD
+[2.31.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.31.2
 [2.31.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.31.1
 [2.31.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.31.0
 [2.30.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.30.0

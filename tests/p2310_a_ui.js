@@ -107,8 +107,11 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return ds(d
     const rv = await ev(`(() => { const c = document.querySelector('#view .rvcard'), n = c && c.querySelector('.rvnums'); return c ? {fold: c.classList.contains('fold'), mono: !n || getComputedStyle(n).fontFamily === getComputedStyle(document.querySelector('#view .meta .mid')).fontFamily} : null; })()`);
     check(rv && !rv.fold && !rv.mono, `${tag}: #1052 the review card in full on the first read, numbers in the normal font ` + JSON.stringify(rv));
     await shot('p2310a-390-today-review.png');
-    await nav(B + '#today'); await ready(ev); await sleep(800);
-    const fd = await ev(`(() => { const c = document.querySelector('#view .rvcard'); if (!c) return null; const r = c.getBoundingClientRect(); return {fold: c.classList.contains('fold'), h: Math.round(r.height), txt: c.textContent.replace(/\\s+/g, ' ').trim(), plan: !!c.querySelector('[data-act="dayplan"]'), sx: document.documentElement.scrollWidth}; })()`);
+    // the card shows by itself only after the end of the working hours: end them right after midnight, so the check holds at
+    // any time of day (a run after midnight saw no card)
+    check((await call('PATCH', '/api/settings', {work_start: '00:00', work_end: '00:01'})).ok, `${tag}: working hours 00:00-00:01 for the review`);
+    await nav(B + '#today'); await ready(ev); await ev(`(async () => { await load(); render(); return 1; })()`); await sleep(800);
+    const fd = await ev(`(() => { const c = document.querySelector('#view .rvcard'); if (!c) return {none: 1, dp: S.dayplan, day: S.review.day, busy: S.review.busy, data: !!S.review.data, route: S.route.key, hidden: localStorage.getItem('reviewHidden'), now: new Date().toString()}; const r = c.getBoundingClientRect(); return {fold: c.classList.contains('fold'), h: Math.round(r.height), txt: c.textContent.replace(/\\s+/g, ' ').trim(), plan: !!c.querySelector('[data-act="dayplan"]'), sx: document.documentElement.scrollWidth}; })()`);
     check(fd && fd.fold && fd.h <= 56 && /1 done · \d+ still open/.test(fd.txt) && fd.plan && fd.sx <= 390, `${tag}: #1052 back in Today the review is one line ("1 done · … · Plan tomorrow") ` + JSON.stringify(fd));
     await shot('p2310a-390-today.png');
     await ev(`(() => { document.querySelector('#view .rvcard .rvfold').click(); return 1; })()`); await sleep(500);

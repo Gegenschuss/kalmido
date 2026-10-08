@@ -5186,6 +5186,9 @@ a.nitem.ndm{text-decoration:none;color:inherit}
 .aisub button{flex:1 0 auto}
 .aisub{scroll-padding-inline:.5rem}
 /* 2.31.1 (#1051 device test): on a phone the number starts the meta line right of the done circle; the circle's touch area
-   (::after, 17 px each side) reached over it, so a tap on the number ticked the task off. Rightwards it now ends ~6 px
-   past the circle, short of the title column (up and down and to the left it keeps its 44 px) */
-@media (max-width:899px){ :root .trow .chk::after{right:-.375rem} }
+   (::after, 17 px each side) reached over it, so a tap on the number ticked the task off. Rightwards it now ends 2 px
+   past the circle, short of the title column */
+@media (max-width:899px){
+  :root .trow .chk::after{left:auto;right:-.125rem;width:2.75rem}  /* still 44 px wide: it grows to the left instead */
+  .trow > .caret{z-index:1}  /* the subtask arrow left of the circle stays tappable above that area */
+}
