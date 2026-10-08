@@ -57,7 +57,8 @@ AGENT_EVENTS = ("mention", "comment", "assigned", "unassigned", "chat", "reactio
                 "job_request",   # 2.3.0 (#260-#263): a person asks for a proposal
                 "runtime_changed", "reset",  # 2.4.1 (#377): an admin changed its runtime settings / pressed "Reset now"
                 "team_message",  # 2.17.0 (#419): someone @mentioned the agent in a list's team chat
-                "task_added")  # 2.23.0 (#795): a task was created in / moved into a list shared with the agent
+                "task_added",  # 2.23.0 (#795): a task was created in / moved into a list shared with the agent
+                "chat_choice")  # 2.28.0 (#1005): the person pressed an answer button of a chat message (message_id, choice_ids)
 JOB_STATES = ("running", "waiting", "done", "failed", "stopped")
 JOB_ACTIONS = ("approve", "reject", "stop")
 REACTIONS = ("up", "down", "heart")   # the fixed set; any other single emoji is stored as itself
@@ -583,21 +584,19 @@ def agent_usable(c, aid, uid, lid):
     o = agent_owner(c, aid)
     if o is not None:
         return o == uid
-    if u["is_admin"]:
-        return True
+    # 2.28.0 (#965): an instance admin is no exception any more -- only the list's owner / admins and open lists
     return bool(c.execute(f"SELECT 1 FROM lists l WHERE l.id=? AND {_OPEN_SQL}", (lid, uid, aid, uid)).fetchone())
 
 
 def agent_shares(c, aid, uid):
-    """Does uid share a list with agent aid (or is uid an admin)? 2.7.2 (#420): a personal agent only with its owner.
-    2.26.0 (#928): only lists open to uid for their agents count (see _OPEN_SQL; default: owner and list admins)."""
+    """Does uid share a list with agent aid? 2.7.2 (#420): a personal agent only with its owner. 2.26.0 (#928): only lists
+    open to uid for their agents count (see _OPEN_SQL; default: owner and list admins). 2.28.0 (#965): instance admins are no
+    exception: they reach an agent in the chat, at @, when assigning and sharing only through such lists; every agent is
+    listed for them in the administration alone (personal agents of others there only by name, with the kill switch)."""
     from ..agents.admin import agent_owner
     o = agent_owner(c, aid)
     if o is not None:
         return o == uid
-    u = c.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone()
-    if u and u["is_admin"]:
-        return True
     return bool(c.execute(f"""SELECT 1 FROM lists l WHERE l.id IN {vis_sql()} AND {_OPEN_SQL} AND (l.owner_id=? OR l.id IN
                               (SELECT list_id FROM list_members WHERE user_id=?)) LIMIT 1""", (aid, aid, uid, aid, uid, uid, uid)).fetchone())
 
@@ -627,7 +626,9 @@ def job_visible(c, j, uid):
         return False
     if u["kind"] == "agent":
         return j["agent_id"] == uid
-    if u["is_admin"] or j["user_id"] == uid:
+    if j["user_id"] == uid:
+        return True
+    if u["is_admin"] and agent_shares(c, j["agent_id"], uid):  # 2.28.0 (#965): an admin sees the jobs of agents it reaches
         return True
     return bool(j["task_id"]) and task_visible(c, j["task_id"], uid, full=True)
 
@@ -636,7 +637,7 @@ def job_may_act(c, j, uid, action):
     u = c.execute("SELECT is_admin, kind FROM users WHERE id=?", (uid,)).fetchone()
     if not u or u["kind"] == "agent":
         return False
-    if u["is_admin"] or j["user_id"] == uid:
+    if j["user_id"] == uid or (u["is_admin"] and agent_shares(c, j["agent_id"], uid)):
         return True
     if not j["task_id"]:
         return False
@@ -657,6 +658,8 @@ def agent_public(c, a, uid=None):
                        (a["user_id"], uid)).fetchone()[0] if uid else 0
     return {"id": a["user_id"], "username": a["username"], "name": a["display_name"] or a["username"],
             "display_name": a["display_name"] or a["username"],
+            # 2.28.0 (#935 / #965): the workspace it works in (null = private) and whose personal agent it is (null = team)
+            "org_id": a["org_id"] if "org_id" in a.keys() else None, "owner_id": a["owner_id"] if "owner_id" in a.keys() else None,
             "avatar": avatar_url(c.execute("SELECT * FROM users WHERE id=?", (a["user_id"],)).fetchone()),
             "enabled": agent_active(a), "status": a["status"] or "idle", "status_text": a["status_text"] or "", "status_at": a["status_at"],
             # 2.26.0 (#949): paused with a reason (the agent itself, its owner or an admin)

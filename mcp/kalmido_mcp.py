@@ -254,10 +254,10 @@ def t_send_chat(api, a):
             except ValueError:
                 raise ApiError(400, f"files: {f['name']} is not valid base64") from None
             files.append((f["name"], f.get("mime") or "application/octet-stream", data))
-        return api.call("POST", f"/agent/chats/{int(a['user_id'])}", multipart=(_pick(a, ("body", "task_id")), files))
+        return api.call("POST", f"/agent/chats/{int(a['user_id'])}", multipart=(_pick(a, ("body", "task_id", "choices", "multi")), files))
     if not a.get("body"):
         raise ApiError(400, "body (or files) is required")
-    return api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=_pick(a, ("body", "task_id")))
+    return api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=_pick(a, ("body", "task_id", "choices", "multi")))
 
 
 def t_get_attachment(api, a):
@@ -493,8 +493,15 @@ TOOLS = [
                     "send_chat ends them).",
      _obj({"chat_user_id": S_ID}, ["chat_user_id"]), lambda api, a: api.call("POST", "/agent/typing", body=_pick(a, ("chat_user_id",)))),
     ("send_chat", "Answer in the chat with one person (user_id), optionally about a task. files (2.13.1): images / files to "
-                  "attach, [{name, base64, mime?}] (at most 10, each within the server's upload limit); with files the body may be empty.",
+                  "attach, [{name, base64, mime?}] (at most 10, each within the server's upload limit); with files the body may be empty. "
+                  "choices (2.28.0): answer buttons under the message, [{id, label, style?: primary | danger}] (at most 8; multi: several may "
+                  "be picked) -- use them for questions and permission requests (put the command in a code block in the body, buttons "
+                  "Allow / Deny). The person's answer arrives as the event chat_choice (message_id, choice_ids, labels); do not ask twice.",
      _obj({"user_id": S_ID, "body": {"type": "string"}, "task_id": S_ID,
+           "choices": {"type": "array", "maxItems": 8, "items": {"type": "object", "properties": {
+               "id": {"type": "string", "maxLength": 40}, "label": {"type": "string", "maxLength": 80},
+               "style": {"type": "string", "enum": ["default", "primary", "danger"]}}, "required": ["id", "label"]}},
+           "multi": {"type": "boolean"},
            "files": {"type": "array", "maxItems": 10, "items": {"type": "object", "properties": {
                "name": {"type": "string"}, "base64": {"type": "string"}, "mime": {"type": "string"}}, "required": ["name", "base64"]}}},
           ["user_id"]), t_send_chat),

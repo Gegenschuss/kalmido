@@ -408,6 +408,13 @@ shard 7  # ---------------------------------------------------------------- shar
 # the team chat, the grips under menus, typing with the list scrolled (#958)
        run p2270_api "$PY" p2270_api_test.py "$KALMIDO_TEST_DATA"
        run p2270_ui node p2270_ui.js "$KALMIDO_TEST_DATA"
+# 2.28.0 "Work and private apart, messages": workspaces (#935: lists / agents of a workspace, the mode workspaces with several
+# organisations, organisation admins, leaving, the cross-tenant matrix, the migration; restarts its container), admins reach
+# agents only through lists + personal agents (#965 #970 #1011), News "For you" / "Activity" (#987), chat answer buttons
+# (#1005); then the UI: the workspace switch, the list dialog, the News tabs and the bell, the agent cards and dialog, the
+# buttons in the chat, the robot badge (#985), the grips under a right-click menu (#976) in Firefox
+       run p2280_api "$PY" p2280_api_test.py "$KALMIDO_TEST_DATA"
+       run p2280_ui node p2280_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

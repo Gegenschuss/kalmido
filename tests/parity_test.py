@@ -233,6 +233,10 @@ APP_ONLY = [
      ("=GET /api/life/karakeep", "=PUT /api/life/karakeep", "=DELETE /api/life/karakeep", "GET /api/life/karakeep/lists")),
     ("2.23.0 (#463): a person's hours per week (their own setting / an admin's) and a QR code image for the screen",
      ("PUT /api/workload/capacity/", "POST /api/qr")),
+    ("2.28.0 (#935): a person's organisations (workspaces) and their admins' member management: people only (agents 403)",
+     ("* /api/orgs",)),
+    ("2.28.0 (#1005): a person answers an agent's question with a button: in the API as POST /agents/{id}/chat/{mid}/choice (a person's token); agents never answer",
+     ("POST /api/agents/{}/chat/{}/choice",)),
 ]
 
 
@@ -335,6 +339,7 @@ API_ONLY = {  # REST routes on purpose without an MCP tool (reason)
     "DELETE /me/app-passwords/{}": "account: never for agents",
     "PATCH /me/notifications": "account: never for agents",
     "POST /agents/{}/chat/{}/reactions": "a person's reaction in an agent chat (the agent: react_to_chat)",
+    "POST /agents/{}/chat/{}/choice": "2.28.0 (#1005): a person's answer to an agent's buttons; agents never answer (the agent asks with send_chat choices)",
     "GET /lists/{}/links": "in get_project_overview",
     "GET /lists/{}/milestones": "in get_project_overview",
     "GET /lists/{}/error-hook": "2.18.0: the error-report webhook carries a secret URL; agents are refused (403), people manage it",

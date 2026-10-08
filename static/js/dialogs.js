@@ -9,6 +9,8 @@ function modal(html) {
   m.innerHTML = `<div class="card">${html}</div>`;
   m.addEventListener('mousedown', e => { if (e.target === m) m.remove(); });
   document.body.appendChild(m);
+  document.body.classList.add('modal-open');  // 2.28.0 (#976): the grips step aside while a dialog is open
+  onRemove(m, () => { const dc = m.ownerDocument; if (dc && dc.body && !dc.querySelector('.modal')) dc.body.classList.remove('modal-open'); });
   vvSync();
   modalA11y(m);
   return m;
@@ -388,7 +390,9 @@ function shareModal(id, opt = {}) {
     const box = $('#l-members', md);
     if (box) {
       const ppl = people.filter(p => !isAg(p));
-      const cand = users && users.filter(u => !u.agent && u.id !== S.me?.id && !people.some(p => p.user_id === u.id));
+      // 2.28.0 (#935): an organisation's list is shared only with its members
+      const fits = u => !cur.org_id || (u.orgs || []).includes(cur.org_id);
+      const cand = users && users.filter(u => !u.agent && u.id !== S.me?.id && !people.some(p => p.user_id === u.id) && fits(u));
       box.innerHTML = ppl.map(p => row(cur, p, mng)).join('') +
         (mng ? (users === null ? `<div class="muted mhint">${tr('Loading…')}</div>` : cand.length ? `<div class="mrow madd"><select id="l-adduser" aria-label="${esc(tr('Invite'))}"><option value="">${tr('Share with …')}</option>${cand.map(u => `<option value="${u.id}">${esc(u.display_name)}</option>`).join('')}</select>${roleSel('id="l-addrole"', 'edit')}<button class="btn sm" data-m="share">${ic('plus', 's')} ${tr('Add')}</button></div>`
           : `<div class="muted mhint">${users.filter(u => !u.agent).length > 1 ? tr('Shared with everyone') : tr('No other users yet. An admin can add them in the settings.')}</div>`) + `<details class="rolehelp sdet"><summary>${tr('What the roles may do')}</summary>${ROLES.map(([, n, h]) => `<div><b>${tr(n)}</b> <span class="muted">${tr(h)}</span></div>`).join('')}</details>`
@@ -396,9 +400,10 @@ function shareModal(id, opt = {}) {
     }
     const aw = $('#sh-agwrap', md);
     if (aw) {
-      const ags = people.filter(isAg), acand = users ? users.filter(u => u.agent && !people.some(p => p.user_id === u.id)) : [];
+      const agFits = u => !wsOn() || (u.org_id || null) === (cur.org_id || null);  // 2.28.0 (#935): agents of the list's workspace
+      const ags = people.filter(isAg), acand = users ? users.filter(u => u.agent && !people.some(p => p.user_id === u.id) && agFits(u)) : [];
       aw.innerHTML = ags.length || (mng && acand.length) ? `<h4 id="sh-ag-h">${tr('Agents')}</h4>${hint(tr('An agent sees exactly the lists shared with it, nothing else. Stopping the sharing ends its access at once.'))}
-        <div class="members" id="sh-agents">${mng && !agentById(cur.owner_id) && (users || []).some(u => u.agent) ? '' : ags.map(p => row(cur, p, mng)).join('')}${mng && !agentById(cur.owner_id) && (users || []).some(u => u.agent) ? `<div class="row"><label for="sh-agsel">${tr('Agent')}</label><select id="sh-agsel"><option value="">${tr('No agent')}</option>${users.filter(u => u.agent).map(u => `<option value="${u.id}" ${ags[0]?.user_id === u.id ? 'selected' : ''}>${esc(u.display_name)}</option>`).join('')}</select></div>` : ''}</div>
+        <div class="members" id="sh-agents">${mng && !agentById(cur.owner_id) && (users || []).some(u => u.agent && agFits(u)) ? '' : ags.map(p => row(cur, p, mng)).join('')}${mng && !agentById(cur.owner_id) && (users || []).some(u => u.agent && agFits(u)) ? `<div class="row"><label for="sh-agsel">${tr('Agent')}</label><select id="sh-agsel"><option value="">${tr('No agent')}</option>${users.filter(u => u.agent && (agFits(u) || ags.some(p => p.user_id === u.id))).map(u => `<option value="${u.id}" ${ags[0]?.user_id === u.id ? 'selected' : ''}>${esc(u.display_name)}${!agFits(u) ? ' · ' + esc(tr('other workspace')) : ''}</option>`).join('')}</select></div>` : ''}${ags.some(p => !agFits((users || []).find(u => u.id === p.user_id) || {org_id: cur.org_id})) ? `<div class="shint keep">${ic('alert', 's')} ${esc(tr('This agent works in another workspace (from before the workspaces). Take it out of the list, or keep it on purpose.'))}</div>` : ''}</div>
         <div id="l-tidyrow">${tidyRowHtml(cur)}</div>` : '';
     }
     const gw = $('#sh-grpwrap', md);  // 2.10.0 (#441)
@@ -429,7 +434,7 @@ function shareModal(id, opt = {}) {
     });
     // 2.27.0 (#974): opened from "Agent…": scrolled to the Agents part, its choice focused
     const toAgents = () => { if (opt.focus !== 'agents' || !md.isConnected) return; const el = $('#sh-agsel', md) || $('#sh-ag-h', md); el?.scrollIntoView?.({block: 'center'}); $('#sh-agsel', md)?.focus({preventScroll: true}); };
-    if (canManage(l0)) api('GET', '/api/users').then(j => { users = j.users.filter(u => !u.disabled).map(u => ({id: u.id, display_name: u.display_name, agent: !!u.agent})); draw(); toAgents(); }).catch(() => { users = []; draw(); });
+    if (canManage(l0)) api('GET', '/api/users').then(j => { users = j.users.filter(u => !u.disabled).map(u => ({id: u.id, display_name: u.display_name, agent: !!u.agent, orgs: u.orgs || [], org_id: u.org_id ?? null})); /* 2.28.0 (#935): + the workspace */ draw(); toAgents(); }).catch(() => { users = []; draw(); });
   }
   const act = async (fn, msg) => { try { await fn(); await load(); render(); draw(); if (msg) toast(msg); } catch { /* api() showed it */ } };
   md.addEventListener('change', e => {
@@ -521,6 +526,9 @@ function listModal(id, folder = '', o = {}) {
     <div class="row lkrow" ${l.is_inbox ? 'hidden' : ''}><label id="l-kindlab">${tr('Type|list')}</label><div class="seg lkseg" role="radiogroup" aria-labelledby="l-kindlab"><label class="${(l.kind || 'list') === 'project' ? '' : 'on'}"><input type="radio" name="l-kindr" id="l-kindl" value="list" ${(l.kind || 'list') === 'project' ? '' : 'checked'} ${dis}>${ic('list', 's')} ${tr('Simple list')}</label><label class="${(l.kind || 'list') === 'project' ? 'on' : ''}"><input type="radio" name="l-kindr" id="l-kindp" value="project" ${(l.kind || 'list') === 'project' ? 'checked' : ''} ${dis}>${ic('brief', 's')} ${tr('Project')}</label></div></div>
     <div class="shint lhint" id="l-khint" ${l.is_inbox ? 'hidden' : ''}>${kindHint(l.kind || 'list')}</div>
     <div class="row"><label for="l-folder">${tr('Folder')}</label><input id="l-folder" value="${esc(fDisp(l.folder))}" list="l-folders" placeholder="${esc(tr('optional · Folder / Subfolder'))}" ${l.mirrored ? `disabled title="${esc(mirroredMsg(l))}"` : ''}><datalist id="l-folders">${folderNames().map(f => `<option value="${esc(fDisp(f))}">`).join('')}</datalist></div>
+    ${wsOn() && !l.is_inbox && (own || id) ? `<div class="row lwsrow"><label for="l-ws">${tr('Workspace')}</label>${own ? wsSelectHtml('l-ws', id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder))) : `<span class="muted">${esc(wsLabel(l.org_id))}</span>`}</div>
+    <div class="shint lhint" id="l-wshint">${(id ? l.org_id : (o.org_id !== undefined ? o.org_id : wsDefaultOrg(folder))) ? tr('Shared only inside the organisation; its agents may join. “Used for” and Home & life are private only.') : tr('Private: share it with anyone you may see; the organisation’s agents cannot join. Switching to an organisation needs every person in it to be a member.')}</div>
+    ${id && (S.wsMismatches || {})[String(id)] ? `<div class="shint keep lhint">${ic('alert', 's')} ${esc(tr('An agent of another workspace is in this list (from before the workspaces): take it out in the Share dialog, or keep it on purpose.'))}</div>` : ''}` : ''}
     ${listDlgTeamHtml(l, id)}
     <div class="row"><label for="l-view">${tr('View')}</label><select id="l-view"><option value="list">${tr('List')}</option>${feat('kanban') ? `<option value="kanban" ${l.view === 'kanban' ? 'selected' : ''}>${tr('Kanban')}</option>` : ''}${feat('timeline') ? `<option value="timeline" ${l.view === 'timeline' ? 'selected' : ''}>${tr('Timeline')}</option>` : ''}</select></div>
     ${famOn() && own && !l.is_inbox ? `<div class="row lfamrow" ${(l.kind || 'list') === 'project' ? 'hidden' : ''}><label for="l-fam">${tr('Used for')}</label><select id="l-fam">${FAM_KINDS.map(([k, n]) => `<option value="${k}" ${(l.family || o.family || '') === k ? 'selected' : ''} ${FAM_KIND_ICON[k] ? `data-ico="${FAM_KIND_ICON[k]}"` : ''}>${tr(n)}</option>`).join('')}</select></div>` : ''}
@@ -569,7 +577,8 @@ function listModal(id, folder = '', o = {}) {
     const nm = $('#l-name', md).value.trim().replace(EMO_RE, '');
     const body = own ? {name: l.is_inbox && !emo && nm === tr('Inbox') ? (inboxDef(l.name) ? l.name : 'Eingang') : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: $('#l-rate', md).value.trim()} : {}), ...($('#l-tickets', md) ? {tickets: $('#l-tickets', md).checked} : {}),
       ...($('#l-nag', md) ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dayh', md) ? {day_hours: $('#l-dayh', md).value.trim()} : {}), ...($('#l-dab', md) ? {checklist: $('#l-dab', md).checked} : {}),
-      ...($('#l-fam', md) && !$('.lfamrow', md)?.hidden ? {family: $('#l-fam', md).value} : {})}
+      ...($('#l-fam', md) && !$('.lfamrow', md)?.hidden ? {family: $('#l-fam', md).value} : {}),
+      ...($('#l-ws', md) ? {org_id: $('#l-ws', md).value ? +$('#l-ws', md).value : null} : {})}  // 2.28.0 (#935)
       : {folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value};  // members: only their own placement / view
     if (own && !nm) delete body.name;  // an empty name is never saved (leaving the field puts the saved one back)
     return body;
@@ -636,6 +645,16 @@ function listModal(id, folder = '', o = {}) {
       // walks the options only the hint follows, the type is saved once on Enter / leaving the field
       if (ptKeys) { ptPend = true; $('#l-pthint', md).textContent = ptypeHint(e.target.value); return; }
       ptypeChange(e.target.value); return;
+    }
+    if (e.target.id === 'l-fam' && e.target.value && $('#l-ws', md)?.value) {  // 2.28.0 (#935): "Used for" makes the list private
+      $('#l-ws', md).value = ''; toast(tr('Family, household and Home & life lists are private: they cannot belong to an organisation'));
+      const h0 = $('#l-wshint', md); if (h0) h0.textContent = tr('Private: share it with anyone you may see; the organisation’s agents cannot join. Switching to an organisation needs every person in it to be a member.');
+    }
+    if (e.target.id === 'l-ws') {  // 2.28.0 (#935): the hint follows
+      const org = !!e.target.value;
+      if (org && $('#l-fam', md)?.value) { $('#l-fam', md).value = ''; }  // an organisation's list has no "Used for"
+      const h = $('#l-wshint', md); if (h) h.textContent = org ? tr('Shared only inside the organisation; its agents may join. “Used for” and Home & life are private only.') : tr('Private: share it with anyone you may see; the organisation’s agents cannot join. Switching to an organisation needs every person in it to be a member.');
+      if (id) autosave(); return;
     }
     if (id && ['l-view', 'l-depshift', 'l-tickets', 'l-nag', 'l-dab', 'l-fam'].includes(e.target.id)) { autosave(); return; }
     if (!id && e.target.id === 'l-fam' && ['shopping', 'packing'].includes(e.target.value) && $('#l-dab', md)) $('#l-dab', md).checked = true;
@@ -736,7 +755,7 @@ function listModal(id, folder = '', o = {}) {
     if (a === 'save' && !id) {  // a new list (an existing one saves itself)
       const nm = $('#l-name', md).value.trim().replace(EMO_RE, '');
       if (!nm) return $('#l-name', md).focus();
-      const body = own ? {name: l.is_inbox && !emo && nm === tr('Inbox') ? (inboxDef(l.name) ? l.name : 'Eingang') : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: $('#l-rate', md).value.trim()} : {}), ...($('#l-nag', md)?.value ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dab', md)?.checked ? {checklist: true} : {}), ...($('#l-fam', md)?.value && !$('.lfamrow', md)?.hidden ? {family: $('#l-fam', md).value} : {})}
+      const body = own ? {name: l.is_inbox && !emo && nm === tr('Inbox') ? (inboxDef(l.name) ? l.name : 'Eingang') : emo + nm, folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value, color: $('#l-col button.on', md)?.dataset.c || '', kind: $('#l-kind', md).value, ...($('#l-depshift', md) ? {dep_shift: $('#l-depshift', md).checked} : {}), ...($('#l-rate', md) ? {rate: $('#l-rate', md).value.trim()} : {}), ...($('#l-nag', md)?.value ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dab', md)?.checked ? {checklist: true} : {}), ...($('#l-fam', md)?.value && !$('.lfamrow', md)?.hidden ? {family: $('#l-fam', md).value} : {}), ...($('#l-ws', md) ? {org_id: $('#l-ws', md).value ? +$('#l-ws', md).value : null} : {})}  // 2.28.0 (#935)
         : {folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value};  // members: only their own placement / view
       if (body.folder && !folderNames().includes(body.folder)) await api('PATCH', '/api/settings', {folders: JSON.stringify([...folderNames(), body.folder])});
       const {rate, nag, day_hours: _dh, ...b0} = body;
@@ -745,7 +764,7 @@ function listModal(id, folder = '', o = {}) {
       if (pt.startsWith('tpl:')) {  // 2.4.0 (#328): the person's own template, dates from the project start (optionally to an end)
         try { n = {id: (await api('POST', `/api/templates/${+pt.slice(4)}/apply`, {name: body.name, folder: body.folder, ...(body.color ? {color: body.color} : {}), start: $('#l-pstart', md).value || today(), ...($('#l-pend', md).value ? {end: $('#l-pend', md).value} : {})})).list_id}; } catch { return; }
       } else {
-        try { n = await api('POST', '/api/lists', pt ? {name: b0.name, folder: b0.folder, color: b0.color, ptype: pt, ...($('#l-ptsecs', md)?.checked ? {sections: true} : {})} : b0); } catch { return; }
+        try { n = await api('POST', '/api/lists', pt ? {name: b0.name, folder: b0.folder, color: b0.color, ptype: pt, ...($('#l-ptsecs', md)?.checked ? {sections: true} : {}), ...('org_id' in b0 ? {org_id: b0.org_id} : {})} : b0); } catch { return; }
       }
       if (rate || nag) await api('PATCH', '/api/lists/' + n.id, {...(rate ? {rate} : {}), ...(nag ? {nag} : {})}).catch(() => {});
       md.remove(); await load(); go('l/' + n.id);

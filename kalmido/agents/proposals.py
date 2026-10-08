@@ -572,6 +572,8 @@ def prop_run(c, j, sel, ed, extra):
         folder = clean_folder(extra.get("folder") if extra.get("folder") is not None else prop.get("folder") or "", False)
         lid = c.execute("INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind) VALUES(?,?,?,?,?,?,?,?,?)",
                         (name, "", folder, my_max_sort(c, uid) + 1, "list", ts, uid, 0, "project")).lastrowid
+        from ..accounts.orgs import ws_apply_default
+        ws_apply_default(c, uid, lid)  # 2.28.0 (#935): the default workspace
         rec["list"] = lid
         list_created(c, uid, lid)  # 2.4.2 (#391); 2.25.0 (#931): + groups and people of a shared folder
         secs = {}
@@ -599,7 +601,8 @@ def prop_run(c, j, sel, ed, extra):
                 if i in ids and d in ids:
                     c.execute("INSERT OR IGNORE INTO task_deps(task_id,blocker_id,created_by,created_at) VALUES(?,?,?,?)", (ids[i], ids[d], uid, ts))
         from ..core.access import list_other_agent
-        if extra.get("share_agent") and agent_active(agent_row(c, aid)) and not list_other_agent(c, lid, aid):  # 2.26.0
+        from ..accounts.orgs import ws_member_problem
+        if extra.get("share_agent") and agent_active(agent_row(c, aid)) and not list_other_agent(c, lid, aid) and not ws_member_problem(c, lid, aid):  # 2.26.0; 2.28.0 (#935)
             c.execute("INSERT OR IGNORE INTO list_members(list_id,user_id,role,sort,added_at) VALUES(?,?,?,?,?)",
                       (lid, aid, "edit", my_max_sort(c, aid) + 1, ts))
             rec["shared"] = True
@@ -972,11 +975,13 @@ def v1_agent_chat_post(uid):
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if not u or is_agent(u) or not agent_shares(c, aid, uid):
         raise Denied(404)
-    fb, files = chat_input(("body", "task_id"))
+    fb, files = chat_input(("body", "task_id", "choices", "multi"))
     b = fb if fb is not None else v1_json()
-    unknown = sorted(k for k in b if k not in ("body", "task_id"))
+    unknown = sorted(k for k in b if k not in ("body", "task_id", "choices", "multi"))  # 2.28.0 (#1005): answer buttons
     if unknown:
         raise UnknownFields(unknown)
+    if fb is not None and isinstance(b.get("multi"), str):
+        b["multi"] = b["multi"].lower() in ("1", "true", "yes")
     r = chat_post(c, aid, uid, "agent", b, files)
     text = r["body"] or " ".join(f"📎 {f['name']}" for f in chat_files_of(c, [r["id"]]).get(r["id"], []))
     c.execute("UPDATE agents SET typing_user=NULL, typing_until=0 WHERE user_id=? AND typing_user=?", (aid, uid))  # 2.4.1: answered
@@ -1055,6 +1060,24 @@ def v1_agent_chat_react(uid, mid):
         raise Denied(404)
     g.v1_body = b
     return jsonify(chat_react_req(c, m, aid))
+
+
+@app.post("/api/v1/agents/<int:aid>/chat/<mid>/choice")
+@v1_view
+def v1_agent_chat_choice(aid, mid):
+    """2.28.0 (#1005): {choice_ids: [...]} -- a person (own token) answers an agent's question with its buttons."""
+    from ..agents.chat import chat_choice_set
+    from ..agents.core import need_chat_agent
+    v1_args(())
+    c = db()
+    need_chat_agent(c, aid)
+    mid = as_int(mid, "mid", 1)
+    m = c.execute("SELECT * FROM agent_chat WHERE id=? AND agent_id=? AND user_id=?", (mid, aid, me())).fetchone()
+    if not m:
+        raise Denied(404)
+    m2 = chat_choice_set(c, m, me(), v1_json().get("choice_ids"))
+    c.commit()
+    return jsonify(chat_one(c, m2, api=True))
 
 
 @app.post("/api/v1/agents/<int:aid>/chat/<mid>/reactions")

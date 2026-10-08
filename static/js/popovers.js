@@ -4,14 +4,14 @@
 
 // ------------------------------------------------------------------ popovers
 let popRet = null;  // 2.16.0 (#473): where the focus goes back to when a popover / menu closes
-function closePop() { popFocusBack(); const t = $('#toast'); if (t && !t.classList.contains('hidden') && $('#pop.sheet:not(.hidden)')) requestAnimationFrame(() => toastPlace(t)); $('#pop').classList.add('hidden'); $('#pop').classList.remove('sheet', 'overmodal'); $('#scrim').classList.add('hidden'); $('#scrim').classList.remove('clear', 'overmodal'); popOnClose && popOnClose(); popOnClose = null; }
+function closePop() { popFocusBack(); document.body.classList.remove('pop-open'); /* 2.28.0 (#976) */ const t = $('#toast'); if (t && !t.classList.contains('hidden') && $('#pop.sheet:not(.hidden)')) requestAnimationFrame(() => toastPlace(t)); $('#pop').classList.add('hidden'); $('#pop').classList.remove('sheet', 'overmodal'); $('#scrim').classList.add('hidden'); $('#scrim').classList.remove('clear', 'overmodal'); popOnClose && popOnClose(); popOnClose = null; }
 let popOnClose = null;
 function openPop(anchor, html, onClose) {
   const p = $('#pop');
   p.onclick = null;  // a click handler of the previous popover (menu, calendar event) never carries over
   p.onpointerdown = null; p.ondblclick = null; p.classList.remove('bellpop', 'bpfull'); p.style.width = '';  // 2.7.0: nothing of the bell's dropdown carries over
   if (p.classList.contains('hidden')) { const ae = document.activeElement; popRet = anchor?.focus && anchor.isConnected && !anchor.closest?.('#pop') ? anchor : ae && ae !== document.body && !ae.closest?.('#pop') ? ae : null; }
-  p.innerHTML = html; p.classList.remove('hidden');
+  p.innerHTML = html; p.classList.remove('hidden'); document.body.classList.add('pop-open');  // 2.28.0 (#976): the grips step aside
   $('#scrim').classList.remove('hidden');
   // #318: a menu opened from inside a dialog (e.g. Settings > Agents > "Share a list with an agent…") goes above it
   const om = !!anchor?.closest?.('.modal'); p.classList.toggle('overmodal', om); $('#scrim').classList.toggle('overmodal', om);

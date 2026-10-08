@@ -163,6 +163,13 @@ def tchat_unread(c, uid):
     return sum(x["unread"] for x in tchat_rooms(c, uid) if not x["muted"] or x["mention"])
 
 
+def tchat_dm_unread(c, uid):
+    """2.28.0 (#987): unread direct messages (people writing to me) -- counted at the bell as "For you"."""
+    if not tchat_on(c, uid):
+        return 0
+    return sum(x["unread"] for x in tchat_rooms(c, uid) if x["kind"] == "dm" and not x["muted"])
+
+
 def md_brief(text):
     """2.18.0 (review): the Markdown markers out of a one-line preview (team chat list): code fences ("```js"), `code`,
     **bold**, ~~strike~~, *italic*, headings, quotes, list / checkbox markers, links -> their text. Keep in sync with

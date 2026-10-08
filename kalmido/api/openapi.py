@@ -223,8 +223,10 @@ def openapi_spec():
                           "shopping (sections = shop areas, a new item goes to its area of last time, a shopping mode in the app), meals "
                           "(the meal plan: due = the day, notes = ingredients), birthdays, household, packing; null = an ordinary list"),
             "nag": {"type": "string", "enum": list(NAG_VALUES), "description": "2.7.0: default nag interval of the list's tasks (owner)"},
-            "day_hours": nul("number", minimum=1, maximum=24, description="2.7.0: hours per day / shift (owner); null = the server's value")}},
+            "day_hours": nul("number", minimum=1, maximum=24, description="2.7.0: hours per day / shift (owner); null = the server's value"),
+            "org_id": nul("integer", description="2.28.0: the workspace: an organisation you belong to, null = private (default: the folder's, else private)")}},
         "ListPatch": {"type": "object", "additionalProperties": False, "properties": {
+            "org_id": nul("integer", description="2.28.0: the list's workspace (the owner; 409 while people / agents in it do not fit, for family / Home & life lists and the inbox)"),
             "client_id": nul("integer", description="2.23.0: the client of the list (owner / list admins; a client you see); null = none"),
             "life": nul("string", enum=["contracts", "home", "health", "travel", "reading", None], description="2.22.0: what the list is for in "
                         "Home & life (health lists are private: never visible to agents, tokens need the scope private); null = none"),

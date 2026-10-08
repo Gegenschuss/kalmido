@@ -191,7 +191,8 @@ check(r.status_code == 201 and f"<@{ids['bob']}>" in msg["body"] and "@Zed" in m
 check(until(lambda: [p for p in pushes() if p["topic"] == "t-bob"]) and not [p for p in pushes() if p["topic"] in ("t-carol", "t-zed", "t-alice")],
       "push: only the mentioned member (a channel message without a mention does not push)")
 check(Bo.get(B + "/api/team").json()["rooms"][0]["unread"] == 1 and Bo.get(B + "/api/team").json()["rooms"][0]["mention"] is True, "Bob: 1 unread, a mention")
-check(Bo.get(B + "/api/state").json()["team"] == {"enabled": True, "unread": 1}, "/api/state: team unread")
+tm = Bo.get(B + "/api/state").json()["team"]
+check(tm["enabled"] is True and tm["unread"] == 1, "/api/state: team unread " + str(tm))
 v0 = Bo.get(B + "/api/version").json()["t"]
 check(Bo.post(B + f"/api/team/rooms/{RID}/read", json={}).json()["unread"] == 0, "read: nothing unread any more")
 check(Bo.get(B + "/api/version").json()["t"] != v0, "the change marker moves on reading (other devices update)")

@@ -57,7 +57,7 @@ function viewTeam() {
   if (!teamOn()) return `<div class="empty">${tr('The team chat needs collaboration (Settings > Modules).')}</div>`;
   if (S.tc.rooms === null && !S.tc.loading) { S.tc.loading = true; loadTeam().then(() => { S.tc.loading = false; if (S.route.mod === 'team') renderView(); }); }
   // 2.27.0 (#986): only conversations that have messages (newest first); an empty one shows once it is opened / written in
-  const rid = S.tc.rid, rooms = (S.tc.rooms || []).filter(r => r.last || r.id === rid);
+  const rid = S.tc.rid, rooms = (S.tc.rooms || []).filter(r => (r.last || r.id === rid) && (r.kind === 'dm' || r.id === rid || inWs(listById(r.list_id))));  // 2.28.0 (#935)
   const list = `<nav class="tclist" aria-label="${esc(tr('Conversations'))}">
     <div class="tchead"><b>${tr('Conversations')}</b><span class="spacer"></span><button type="button" class="btn sm pri" data-act="tc-new" aria-haspopup="${S.tc.people.length ? 'menu' : 'dialog'}">${ic('plus', 's')}${tr('New message')}</button></div>
     ${S.tc.rooms === null ? `<div class="muted mhint">${tr('Loading…')}</div>` : rooms.length ? rooms.map(r => `<button type="button" class="tcrow ${r.id === rid ? 'on' : ''} ${r.unread ? 'unread' : ''}" data-act="tc-open" data-rid="${r.id}" ${r.id === rid ? 'aria-current="true"' : ''}>

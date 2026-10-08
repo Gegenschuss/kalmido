@@ -148,7 +148,7 @@ SEC = A.post(B + "/api/sections", json={"list_id": TEAM, "name": "Doing"}).json(
 
 # ================================================================== who may ask which agent
 ids = lambda s: sorted(a["id"] for a in s.get(B + "/api/proposals/agents").json()["agents"])  # noqa: E731
-check(ids(A) == sorted([AG, AG2]), f"admin: every agent (admins count as sharing): {ids(A)}")
+check(ids(A) == [AG], f"admin: only the agents of her lists (2.28.0 #965: admins are no exception): {ids(A)}")
 check(ids(Bo) == [AG], f"bob shares Team with claude only: {ids(Bo)}")
 check(ids(Ca) == [], f"carol shares nothing: {ids(Ca)}")
 check([a["id"] for a in Bo.get(B + "/api/state").json()["proposers"]] == [AG], "state: proposers")

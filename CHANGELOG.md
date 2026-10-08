@@ -7,6 +7,79 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.28.0] - 2026-10-08
+
+**In short:** Work and private apart, messages. Every list and agent belongs to a **workspace** -- your private space or
+one of your organisations; a switch in the sidebar shows one at a time, and the server keeps an organisation's lists and
+agents inside it (#935). A new server mode `workspaces` runs several organisations on one shared server, each with its
+own admins. **Personal agents are invisible to admins** (#965); *Add agent* asks team or personal (#970); *Users* shows
+people only, agents are grouped under *Agents* (#1011); a **robot badge** marks agents wherever people appear (#985).
+News split into **For you** (what people send you) and **Activity**; the bell counts only *For you* (#987). Agents can
+ask with **answer buttons** in the chat (#1005).
+
+### Added
+- **Workspaces** (#935): every list has one (`org_id`, `null` = private); an organisation's list is shared only with the
+  organisation's members (a person who is not a member is refused with a clear message; a share by e-mail address into
+  it does nothing and reveals nothing), its groups must consist of members, its ownership stays inside. Agents work in
+  one workspace (`agents.org_id`) and join only its lists; "Used for" (family / household) and Home & life lists are
+  private only, the inbox always is. The owner changes a list's workspace in the list dialog (refused while people or
+  agents in it do not fit). The sidebar's switch *Private | <organisation> | All* (setting `workspace`, followed on every
+  device) shows the lists, tasks, News, agents and team chats of one workspace; a chip in the header says which. A new
+  list starts in the shown workspace (or in the one of its folder's lists). *Settings > Account > Workspaces* lists your
+  organisations and their members.
+- **Server mode `workspaces`** (`KALMIDO_INSTANCE_MODE=workspaces`): several organisations as workspaces on one shared
+  server. People see the members of their organisations and the people they are connected with -- nobody else, instance
+  admins included (*Users* shows only them and how many others there are). The instance admin creates organisations
+  (`POST /api/admin/orgs`, with a first admin) and deletes empty ones; **organisation admins** (`org_members.role`)
+  manage their members (add by e-mail address, roles, removal), name and e-mail domains (`/api/orgs/...`), also without
+  being server admins. Registrations join by e-mail domain. The login page names no organisation.
+- **Leaving an organisation**: the person's lists of that workspace go to an organisation admin (the one who removes
+  them, or the next admin), the person leaves every list of the organisation; private lists go with the person. When the
+  only admin leaves, the operator (an instance admin) takes the organisation over and is told (News).
+- **Migration**: on the update every list of a server with an organisation stays in the organisation (a server from before
+  = one company), except family / household lists, Home & life lists, lists in a top folder named like *Private* /
+  *Family* / *Home* (several languages) and every inbox: those are private. Team agents work in the organisation, a
+  personal agent in the workspace most of its lists are in. An agent that already sits in a list of another workspace is
+  kept and pointed out (list dialog, share dialog, *Settings > Account > Workspaces*); the owner decides.
+- **Answer buttons in the chat** (#1005): `POST /api/v1/agent/chats/{user_id}` (and MCP `send_chat`) take `choices`
+  `[{id, label, style?: primary | danger}]` (at most 8) and `multi`; the buttons show under the message, a tap answers
+  (several with `multi`, then *Send*), the choice is shown and the buttons lock. The person's answer comes as the event
+  `chat_choice` (`message_id`, `choice_ids`, `labels`, `user`) and in `GET /agent/chats` as `choice`;
+  `POST /api/agents/{id}/chat/{mid}/choice {choice_ids}` (web and `/api/v1`, a person's own token). Only the chat's
+  person answers, once; agents never. For permission requests: the command in a code block, buttons *Allow* / *Deny*.
+- **"Belongs to"** on an agent (#965 / #970): admins create a **personal agent for a person** (`owner_id` on
+  `POST /api/admin/agents`) or turn a team agent into one (`PATCH ... {owner_id}`); *Add agent…* asks *Team agent* or
+  *Personal agent* and explains both. An agent's workspace (`org_id`) is set there too (personal agents: by their owner).
+- **Robot badge** (#985): a small robot on an agent's picture wherever people appear (members, share dialog, News,
+  comments, chat), with a tooltip and a text for screen readers.
+- **News "For you" / "Activity"** (#987): items carry `to_me` (an @mention, assignment, reply to your comment or
+  approval decision **by a person**; everything agents do and every plain change is activity); `unread_me` in
+  `/api/news` and the state. The News view has the tabs *For you | Activity | All*, the bell's dropdown shows *For you*
+  first, the bell counts only *For you* plus unread direct messages (`team.dm_unread`), the start page shows a banner
+  *N messages for you* while something is unread.
+
+- **Display name first** (#926): the user and agent dialogs ask for the display name first (it may be anything) and show
+  the username below it with what it is for (the login, @mentions); the username is suggested from the display name
+  ("Team Dev AI" becomes "team-dev-ai") until typed by hand, and a wrong one gets an error that names the
+  suggestion. Renaming an agent says that @mentions use the new name.
+
+### Changed
+- **Admins reach agents like everyone** (#965): an instance admin sees and uses an agent (chat, @, assigning, sharing,
+  `GET /api/agents`, jobs) only through lists it is in -- as the owner / a list admin, or where *Members may see and use
+  the agent* is on. Every agent is still listed in the administration; somebody else's **personal agent** comes there as
+  name + owner + kill switch only (`restricted`), every other change answers 403.
+- **Settings > Users shows people only** (#1011); one row says how many agents there are and leads to *Agents*, where
+  the agents are grouped: team agents, my personal agents, personal agents of others.
+- **Pushes for what agents do are off by default** (#987): an agent's comments, completions, new tasks and status
+  changes push only with the new setting *Pushes for what agents do* (`agent_push`); an agent's @mention of you and its
+  approval requests push as before.
+- Organisation News: being added to / removed from an organisation is a News item.
+
+### Fixed
+- **Width grips over menus** (#976, hardened): the 2.27 rule relied on `:has()`, which browsers from before 2023 ignore.
+  The code now also marks the page while a menu, popover or dialog is open (`body.pop-open` / `body.modal-open`), so the
+  grips step aside in every browser; a right-click on a list or folder in the sidebar opens its menu (mouse).
+
 ## [2.27.0] - 2026-10-08
 
 **In short:** Bugs & polish. A window that still runs old code after an update now says so and reloads (#968);
@@ -2971,7 +3044,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.27.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.28.0...HEAD
+[2.28.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.28.0
 [2.27.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.27.0
 [2.26.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.26.1
 [2.26.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.26.0

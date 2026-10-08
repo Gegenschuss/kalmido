@@ -155,7 +155,7 @@ const initials = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => 
 const avUrl = id => (id && ((S.avatars || {})[id] || (S.me && +id === S.me.id ? S.me.avatar : ''))) || '';
 function av(id, name, cls = 'avatar', attrs = '', inner = '') {
   const u = avUrl(id), ag = id ? agentDot(id) : '';  // 2.0.0: agents get a status dot
-  if (ag) { cls += ' agent'; inner += ag; }
+  if (ag || (id && isAgentUser(id))) { cls += ' agent'; inner += ag + botBadge(); }  // 2.28.0 (#985): + the robot badge
   return `<span class="${cls}${u ? ' pic' : ''}" ${attrs}>${u ? `<img src="${esc(u)}" alt="" loading="lazy" decoding="async" draggable="false">` : esc(initials(name))}${inner}</span>`;
 }
 // 2.7.2 (#418): a person's picture as a button: a tap / click opens the person card (agents: status, chat, current task;
@@ -192,7 +192,7 @@ const bySort = (a, b) => a.sort - b.sort || a.id - b.id;
 const archivedTask = t => !!t && !!listById(t.list_id)?.archived;
 const archHidden = t => archivedTask(t) && !(S.route.mod === 'tasks' && S.route.key === 'l:' + t.list_id);
 // ctx: include the read-only context parents of a participant's subtasks (only the list view shows them, above their subtask)
-function openTasks(ctx = false) { return [...S.tasks.values()].filter(t => t.status === 0 && !archHidden(t) && (ctx || !t.context)); }
+function openTasks(ctx = false) { return [...S.tasks.values()].filter(t => t.status === 0 && !archHidden(t) && !wsHidden(t) && (ctx || !t.context)); }  // 2.28.0 (#935): + the workspace
 
 // ------------------------------------------------------------------ api + offline outbox
 // While offline, task/habit writes are applied locally and queued (localStorage outbox); on reconnect
@@ -496,6 +496,7 @@ function applyState(j) {
   S.kids = j.kids || []; S.kidIds = new Set(j.kid_ids || []);  // 2.19.0 (#653)
   S.peopleVis = j.people_visibility || 'all';  // 2.22.0 (#752)
   S.instanceMode = j.instance_mode || 'organisation';
+  S.workspaces = !!j.workspaces; S.wsMismatches = j.ws_mismatches || {};  // 2.28.0 (#935)
   S.storage = j.storage || null; S.announce = j.announce || null;  // 2.24.0 (#910 / #907)  // 2.23.0 (#799): organisation | shared | multi
   S.clients = j.clients || [];  // 2.23.0 (#463): the clients I see, with their lists
   if (S.booted && S.route?.mod === 'clients') clReload();  // a change elsewhere: the client's sums again

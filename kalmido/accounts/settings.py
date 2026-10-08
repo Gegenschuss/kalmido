@@ -27,7 +27,7 @@ SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "review_sent", "ntfy_
 SIDE_GROUPS = ("focus", "clients", "lists", "filters", "tags", "views", "team")  # 2.25.0 (UX-03)
 DASH_WIDGETS = ("wait", "today", "news", "chat", "projects", "pinned", "notes", "agents", "stats", "search", "family")  # 2.17.0 (#475), 2.19.0
 SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "time_focus", "paperless_keep", "celebrate", "cal_today",
-                  "date_confirm", "digest_mail", "mail_from_me", "today_inbox")
+                  "date_confirm", "digest_mail", "mail_from_me", "today_inbox", "agent_push")  # 2.28.0 (#987): agent_push
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24)}
 
@@ -75,6 +75,14 @@ def clean_setting(k, v):
         return ",".join(dict.fromkeys(ids))
     if k == "roadmap":
         return clean_roadmap_pref(v)
+    if k == "workspace":  # 2.28.0 (#935): all | private | org:<id> (an organisation the person belongs to)
+        from ..accounts.orgs import user_orgs
+        if sv in ("", "all", "private"):
+            return sv or "all"
+        m = re.fullmatch(r"org:(\d{1,9})", sv)
+        if not m or int(m.group(1)) not in user_orgs(db(), me()):
+            raise bad
+        return sv
     if k == "sidebar":  # 2.25.0 (UX-03): {"order": [groups], "hidden": ["g:<group>" | "e:<entry>"]} ('' = default)
         if sv == "":
             return ""

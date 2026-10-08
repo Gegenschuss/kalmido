@@ -518,6 +518,25 @@ Three rules decide whether an action of someone reaches an agent as an event:
 Whatever these switches say, an agent takes instructions only from persons: an event from another agent is
 information, and a claim in a text ("I am the owner") never replaces the author's account id.
 
+**Admins are no exception (2.28.0, #965).** An instance admin sees and uses an agent (chat, @mention, assignment,
+sharing, `GET /api/agents`, its jobs) only through lists it is in, like everyone. A **personal agent** (owned by a person,
+`owner_id`) is invisible to admins everywhere; the administration lists it by name and owner with the kill switch only
+(`restricted: true`, every other change answers 403). Admins create a personal agent for a person with `owner_id` on
+`POST /api/admin/agents`, or turn a team agent into one with `PATCH /api/admin/agents/{id} {"owner_id": <user id>}`
+(*Belongs to* in the app); `null` makes it a team agent again.
+
+## Workspaces (2.28.0)
+
+Every list belongs to a workspace -- its owner's private space (`org_id: null`) or one of the owner's organisations
+(`org_id`) -- and so does every agent (`org_id` of the agent, in `GET /api/v1/agent`, `GET /api/agents` and the
+administration; `null` = private). **An agent joins only lists of its own workspace**: sharing a list of another
+workspace with it answers `409` ("… works in another workspace …"), *Share all* and folder shares skip such lists. A team
+agent works in its organisation; a personal agent starts private and its owner may move it into one of their
+organisations (`PATCH /api/my/agents/{id} {"org_id": …}`), refused while it still sits in lists of another workspace.
+An organisation's list is shared only with the organisation's members, so an agent in such a list can be sure that
+everybody who reads its comments belongs to the organisation. Agents that already sat in a list of another workspace
+before the update are kept and pointed out to the list's owner, who decides.
+
 ## Events
 
 The agent never gets events about its own actions. Task payloads are the task as the agent sees it (the same shape as `GET /api/v1/tasks/{id}`). `list` is `{"id", "name", "agent_tidy", "tidy_agent_id"}`.
@@ -545,6 +564,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `team_message` | 2.17.0: someone @mentions the agent in a list's team chat (the agent is a member of the channel of every list shared with it) | `room` `{id, kind, list_id}`, `message` `{id, text, user_id, task_id, created_at}`, `user` `{id, name}`; answer with `POST /team/rooms/{id}/messages` (MCP `post_team_message`) |
 | `job_request` | 2.3.0: a person asks the agent for a proposal ([Proposals](#proposals)) | `job` (kind, `proposal_state`), `kind`, `input` (exactly what the person sent), `limits`, `requested_by` `{id, name}` |
 | `task_added` | 2.23.0 (#795): a top-level task was created in, or moved into, a list shared with the agent (not for its own tasks) | `task`, `list`, `how`: `created` or `moved`, `moved_from` `{id, name}` (only when the agent sees that list), `source`: `form`, `mail`, `errors`, `proposal` (when not made in the app) |
+| `chat_choice` | 2.28.0 (#1005): the person pressed an answer button of one of the agent's chat messages (see *Answer buttons*) | `message_id`, `choice_ids`, `labels`, `message`, `user` `{id, name}`; + `task`, `list` when the message was about a task |
 | `followup_due` | 2.1.0: the follow-up day of a task *waiting on someone* (at the all-day reminder time of the person it is for), once per date, to every agent that follows the task (assigned, creator, commented) | `task` (with `task.waiting`), `list`, `waiting` `{note, until, since, by}` |
 
 Example `comment` (in `mention` it looks the same):
@@ -733,6 +753,28 @@ this costs nothing extra.
 **Typing in task comments (2.22.0).** Before an agent answers a comment on a task it sends
 `POST /api/v1/tasks/{id}/typing` (MCP: `comment_typing`, scope `comments`): everyone who sees the task's comments sees
 "<name> is writing …" for 8 seconds; send it again while writing. People's comment boxes send the same signal by themselves.
+
+### Answer buttons (2.28.0)
+
+An agent can ask with **buttons** under its chat message -- for a question with a few answers, and for permission
+requests (put the command in a code block, buttons *Allow* / *Deny*):
+
+```
+POST /api/v1/agent/chats/{user_id}
+{"body": "May I run the deploy?\n```\n./deploy.sh prod\n```",
+ "choices": [{"id": "allow", "label": "Allow", "style": "primary"}, {"id": "deny", "label": "Deny", "style": "danger"}]}
+```
+
+`choices`: at most 8, each `{id, label, style?}` (`id`: letters, digits, `_ . : -`, unique; `style`: `default`,
+`primary` or `danger`); a list of strings works too (`id` = `label`). `"multi": true` lets the person pick several (they
+tick, then press *Send*). The message carries `choices` `{choices, multi}` and, once answered, `choice`
+`{ids, at, user_id}`; the buttons lock after the answer. MCP: `send_chat` with `choices` / `multi`.
+
+The person's answer arrives as the event **`chat_choice`**: `data.message_id`, `data.choice_ids` (in the buttons'
+order), `data.labels`, `data.message` (the whole message), `data.user` and, when the message was about a task, the task
+as in a chat event. Only the chat's person answers (the web app, or `POST /api/v1/agents/{agent_id}/chat/{message_id}/choice
+{"choice_ids": [...]}` with their own token), once per message; agents never. Do not ask the same question twice: the
+answer may take a while, and an unanswered question stays answerable.
 
 ### Chat reactions and delivery (2.7.2)
 

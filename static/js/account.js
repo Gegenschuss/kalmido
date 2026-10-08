@@ -205,6 +205,18 @@ function storageHtml() {
     ${q.level === 'warn' || q.level === 'high' ? `<div class="shint keep">${ic('alert', 's')} ${esc(tr('Almost full: from 100 % new files cannot be uploaded.'))}</div>` : ''}
     ${q.level === 'full' ? `<div class="row"><span class="shint keep">${ic('alert', 's')} ${esc(tr('Your storage is full: new files cannot be uploaded.'))}</span>${q.support ? `<a class="btn sm pri" href="${esc(quotaMail(q))}">${ic('send', 's')} ${tr('Contact support')}</a>` : ''}</div>` : ''}${syncHtml()}`;
 }
+// 2.28.0 (#926): the display name comes first and may be anything; the username (login, @mention) is suggested from it
+// ("Team Dev AI" -> "team-dev-ai") until typed by hand, and a wrong one gets an error that names the suggestion
+const USER_RE = /^[a-z0-9._-]{1,32}$/;
+const slugUser = n => String(n || '').toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9._-]+/g, '-').replace(/^[-._]+|[-._]+$/g, '').slice(0, 32);
+const userNameBad = v => USER_RE.test(v) ? '' : (slugUser(v) ? tr('Spaces and capitals are not allowed here – did you mean {0}? The display name may be anything.', slugUser(v)) : tr('Username: 1-32 characters a-z, 0-9, dot, dash, underscore'));
+// wires a display-name field to a username field: the suggestion follows the name until the username was typed by hand
+function userNameFollow(md, nameId, userId, hintId) {
+  const nm = $('#' + nameId, md), un = $('#' + userId, md); if (!nm || !un) return;
+  un.dataset.auto = un.value ? '' : '1';
+  nm.addEventListener('input', () => { if (un.dataset.auto) un.value = slugUser(nm.value); });
+  un.addEventListener('input', () => { un.dataset.auto = ''; const h = hintId && $('#' + hintId, md); if (h) { h.textContent = userNameBad(un.value); h.hidden = !h.textContent; } });
+}
 function accountHtml() {
   const m = S.me, pw = m.auth === 'session' || m.has_password;
   return `<h4 id="s-account-h">${tr('Account')}</h4>
@@ -213,6 +225,7 @@ function accountHtml() {
     <div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="a-avpick">${avPickHtml()}</div></div>
     ${pw ? `<div class="row"><label for="a-cur">${tr('Password')}</label><input type="password" id="a-cur" placeholder="${tr('current password')}" autocomplete="current-password"><input type="password" id="a-new" placeholder="${tr('new password')}" autocomplete="new-password"><button class="btn sm" data-acc="pw">${tr('Change')}</button></div>` : ''}
     ${storageHtml()}
+    ${wsPaneOn() ? wsPaneHtml(t => `<div class="shint">${t}</div>`) : ''}
     ${tfaHtml()}
     ${apwHtml()}
     <details class="sdev"><summary>${ic('key', 's')}${tr('Advanced · for developers')}</summary>
@@ -318,6 +331,8 @@ const VIS_UI = [['all', N_('Everyone on this server')], ['org', N_('Only people 
 // 2.23.0 (#799): the kind of instance comes from the configuration (KALMIDO_INSTANCE_MODE): an organisation shows its name
 // only, a shared server says so; only an instance that kept several organisations from 2.22 still edits them here
 const orgsHtml = () => S.instanceMode === 'shared' ? `<h4 id="a-orgs-h">${tr('Organisation')}</h4><div class="shint">${tr('A shared server: no organisations; people see only the people they are connected with and share by e-mail address (set by the server configuration).')}</div>`
+  : S.instanceMode === 'workspaces' ? `<h4 id="a-orgs-h">${tr('Organisations')}</h4><div class="shint">${tr('A shared server with workspaces: every organisation is its own workspace with its own admins, who manage its members. People see the members of their organisations and the people they are connected with; private lists stay invisible to an organisation.')}</div>
+  <div class="members" id="a-orgs"><div class="muted mhint">${tr('Loading…')}</div></div><div class="row"><button class="btn sm" data-acc="org-new">${ic('plus', 's')} ${tr('New organisation')}</button></div>`
   : `<h4 id="a-orgs-h">${S.instanceMode === 'multi' ? tr('Organisations') : tr('Organisation')}</h4><div class="members" id="a-orgs"><div class="muted mhint">${tr('Loading…')}</div></div>
   ${S.instanceMode === 'multi' ? `<div class="row"><label for="a-vis">${tr('People see')}</label><select id="a-vis"></select></div>
   <div class="shint">${tr('Whom people see in the share dialog, as attendees and in the user list. Admins always see everyone. With several companies or households on one server: own organisation or own contacts.')}</div>`
@@ -326,43 +341,99 @@ async function orgsDraw(md) {
   const box = $('#a-orgs', md); if (!box) return;
   let j; try { j = await api('GET', '/api/admin/orgs'); } catch { return; }
   S.orgs = j.orgs;
-  box.innerHTML = j.orgs.length ? j.orgs.map(o => `<div class="mrow"><span class="fem" aria-hidden="true">${esc(o.icon || '🏢')}</span><span class="n">${esc(o.name)} <span class="muted">${esc(trn('{0} member', '{0} members', o.members.length))}${o.domains ? ' · ' + esc(o.domains) : ''}</span></span>${j.editable ? `<button class="iconbtn" data-acc="org-edit" data-oid="${o.id}" title="${esc(tr('Edit organisation'))}" aria-label="${esc(tr('Edit {0}', o.name))}">${ic('edit', 's')}</button>` : ''}</div>`).join('') : `<div class="muted mhint">${tr('No organisation yet.')}</div>`;
+  box.innerHTML = j.orgs.length ? j.orgs.map(o => `<div class="mrow"><span class="fem" aria-hidden="true">${esc(o.icon || '🏢')}</span><span class="n">${esc(o.name)} <span class="muted">${esc(trn('{0} member', '{0} members', o.members.length))}${(o.admins || []).length ? ' · ' + esc(trn('{0} admin', '{0} admins', o.admins.length)) : ''}${o.domains ? ' · ' + esc(o.domains) : ''}</span></span>${j.editable ? `<button class="iconbtn" data-acc="org-edit" data-oid="${o.id}" title="${esc(tr('Edit organisation'))}" aria-label="${esc(tr('Edit {0}', o.name))}">${ic('edit', 's')}</button>` : ''}${j.creatable ? `<button class="iconbtn danger" data-acc="org-del" data-oid="${o.id}" title="${esc(tr('Delete'))}" aria-label="${esc(tr('Delete {0}', o.name))}">${ic('trash', 's')}</button>` : ''}</div>`).join('') : `<div class="muted mhint">${tr('No organisation yet.')}</div>`;
   // 2.24.0 (UX-23): the one organisation of an "organisation" server: rename it here (unless the configuration fixes it)
   if (!j.editable && S.instanceMode === 'organisation' && !S.about?.org_name_env && j.orgs.length === 1) box.firstElementChild?.insertAdjacentHTML('beforeend', `<button class="iconbtn" data-acc="org-rename" title="${esc(tr('Rename'))}" aria-label="${esc(tr('Rename {0}', j.orgs[0].name))}">${ic('edit', 's')}</button>`);
   const vs = $('#a-vis', md); if (vs) vs.innerHTML = VIS_UI.map(([k, n]) => `<option value="${k}" ${k === j.visibility ? 'selected' : ''}>${esc(tr(n))}</option>`).join('');
 }
 async function orgModal(o, done) {
-  let us = []; try { us = (await api('GET', '/api/users')).users.filter(u => !u.disabled); } catch { return; }
-  const mem = new Set(o?.members || []);
+  let us = []; try { us = (await api('GET', '/api/users')).users.filter(u => !u.disabled && u.kind !== 'agent'); } catch { return; }
+  const mem = new Set(o?.members || []), adm = new Set(o?.admins || []);  // 2.28.0 (#935): + the organisation's admins
   const md = modal(`<h3>${o ? tr('Edit organisation') : tr('New organisation')}</h3>
     <div class="row"><label for="og-name">${tr('Name')}</label><input id="og-name" maxlength="60" value="${esc(o?.name || '')}"></div>
     <div class="row"><label for="og-icon">${tr('Symbol')}</label><input id="og-icon" maxlength="8" class="numin" value="${esc(o?.icon || '')}" placeholder="🏢"></div>
     <div class="row"><label for="og-dom">${tr('E-mail domains')}</label><input id="og-dom" maxlength="500" value="${esc(o?.domains || '')}" placeholder="example.com" autocapitalize="off"><span class="muted">${tr('registrations with these addresses join it')}</span></div>
-    <div class="row"><label>${tr('Members')}</label><div class="fpeople" role="group" aria-label="${esc(tr('Members'))}">${us.map(u => `<button type="button" class="fperson ${mem.has(u.id) ? 'on' : ''}" data-ogm="${u.id}" aria-pressed="${mem.has(u.id)}">${av(u.id, u.display_name)}<span>${esc(u.display_name)}</span></button>`).join('')}</div></div>
-    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
+    ${o ? `<div class="row"><label>${tr('Members')}</label><div class="fpeople" role="group" aria-label="${esc(tr('Members'))}">${us.map(u => `<button type="button" class="fperson ${mem.has(u.id) ? 'on' : ''}" data-ogm="${u.id}" aria-pressed="${mem.has(u.id)}">${av(u.id, u.display_name)}<span>${esc(u.display_name)}</span></button>`).join('')}</div></div>
+    <div class="row"><label>${tr('Admins of the organisation')}</label><div class="fpeople" id="og-adm" role="group" aria-label="${esc(tr('Admins of the organisation'))}">${us.filter(u => mem.has(u.id)).map(u => `<button type="button" class="fperson ${adm.has(u.id) ? 'on' : ''}" data-oga="${u.id}" aria-pressed="${adm.has(u.id)}">${av(u.id, u.display_name)}<span>${esc(u.display_name)}</span></button>`).join('')}</div></div>
+    <div class="shint">${tr('Admins of an organisation manage its members, name and e-mail domains (Settings > Workspaces); they are not admins of the server.')}</div>` : `<div class="shint">${tr('You become its first member and admin; add people afterwards.')}</div>`}
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${o ? tr('Save') : tr('Create')}</button></div>`);
   md.addEventListener('click', async e => {
     const p = e.target.closest('[data-ogm]');
-    if (p) { const id = +p.dataset.ogm; mem.has(id) ? mem.delete(id) : mem.add(id); p.classList.toggle('on', mem.has(id)); p.setAttribute('aria-pressed', mem.has(id)); return; }
+    if (p) { const id = +p.dataset.ogm; mem.has(id) ? mem.delete(id) : mem.add(id); if (!mem.has(id)) adm.delete(id); p.classList.toggle('on', mem.has(id)); p.setAttribute('aria-pressed', mem.has(id)); const ab = $('#og-adm', md); if (ab) ab.innerHTML = us.filter(u => mem.has(u.id)).map(u => `<button type="button" class="fperson ${adm.has(u.id) ? 'on' : ''}" data-oga="${u.id}" aria-pressed="${adm.has(u.id)}">${av(u.id, u.display_name)}<span>${esc(u.display_name)}</span></button>`).join(''); return; }
+    const pa = e.target.closest('[data-oga]');
+    if (pa) { const id = +pa.dataset.oga; adm.has(id) ? adm.delete(id) : adm.add(id); pa.classList.toggle('on', adm.has(id)); pa.setAttribute('aria-pressed', adm.has(id)); return; }
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
     try {
-      if (b.dataset.m === 'save') { const body = {name: $('#og-name', md).value.trim(), icon: $('#og-icon', md).value.trim(), domains: $('#og-dom', md).value, members: [...mem]}; await api('PATCH', `/api/admin/orgs/${o.id}`, body); }
+      if (b.dataset.m === 'save') {
+        const body = {name: $('#og-name', md).value.trim(), icon: $('#og-icon', md).value.trim(), domains: $('#og-dom', md).value};
+        if (o) {
+          await api('PATCH', `/api/admin/orgs/${o.id}`, {...body, members: [...mem], admins: [...adm].filter(id => mem.has(id))});
+        } else await api('POST', '/api/admin/orgs', body);
+      }
       md.remove(); done && done(); await load(); render();
     } catch { /* api() said it */ }
+  });
+}
+// ---- 2.28.0 (#935): Settings > Workspaces -- my organisations; an organisation's admin adds / removes members and sets their
+// role (also when not an admin of the server), renames it, sets its e-mail domains
+const wsPaneOn = () => wsOn() && !S.me?.kid;
+function wsPaneHtml(hint) {
+  return `<h4 id="s-ws-h">${tr('Workspaces')}</h4>${hint(tr('Private and your organisations. Every list belongs to one workspace; the switch in the sidebar shows one at a time. An organisation’s list is shared only inside it; private sharing stays invisible to the organisation.'))}
+    <div class="members" id="s-ws" aria-labelledby="s-ws-h"><div class="muted mhint">${tr('Loading…')}</div></div>`;
+}
+async function wsPaneDraw(md) {
+  const box = $('#s-ws', md); if (!box) return;
+  let j; try { j = await api('GET', '/api/orgs'); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
+  box._j = j;
+  const mm = Object.keys(j.mismatches || {}).length;
+  const org = o => `<details class="sdet wsorg" data-oid="${o.id}" ${j.orgs.length === 1 ? 'open' : ''}><summary><span class="fem" aria-hidden="true">${esc(o.icon || '🏢')}</span><b>${esc(o.name)}</b> <span class="muted">${esc(trn('{0} member', '{0} members', o.members.length))} · ${esc(trn('{0} list', '{0} lists', o.lists))}${o.role === 'admin' ? ' · ' + esc(tr('you are an admin')) : ''}</span></summary>
+    ${o.members.map(m => `<div class="mrow ${m.disabled ? 'off' : ''}">${av(m.id, m.name)}<span class="n">${esc(m.name)}${m.agent ? ' ' + agentBadge() : ''}${m.id === S.me?.id ? ' ' + tr('(me)') : ''}</span>${o.role === 'admin' && j.manage && !m.agent ? `<select data-wsrole="${m.id}" aria-label="${esc(tr('Role of {0}', m.name))}"><option value="member" ${m.role !== 'admin' ? 'selected' : ''}>${tr('Member')}</option><option value="admin" ${m.role === 'admin' ? 'selected' : ''}>${tr('Admin')}</option></select><button class="iconbtn" data-wsrm="${m.id}" title="${esc(m.id === S.me?.id ? tr('Leave the organisation') : tr('Remove from the organisation'))}" aria-label="${esc(m.id === S.me?.id ? tr('Leave the organisation') : tr('Remove {0} from the organisation', m.name))}">${ic('x', 's')}</button>` : `<span class="muted">${m.agent ? tr('Agent') : m.role === 'admin' ? tr('Admin') : tr('Member')}</span>`}</div>`).join('')}
+    ${o.role === 'admin' && j.manage ? `<div class="row wsadd"><input id="ws-add-${o.id}" type="email" placeholder="${esc(tr('Add by e-mail address'))}" aria-label="${esc(tr('Add by e-mail address'))}" autocomplete="off"><button class="btn sm" data-wsadd="${o.id}">${ic('plus', 's')} ${tr('Add')}</button></div>
+    <div class="row"><label for="ws-name-${o.id}">${tr('Name')}</label><input id="ws-name-${o.id}" value="${esc(o.name)}" maxlength="60"><label for="ws-dom-${o.id}">${tr('E-mail domains')}</label><input id="ws-dom-${o.id}" value="${esc(o.domains || '')}" placeholder="example.com"><button class="btn sm" data-wssave="${o.id}">${tr('Save')}</button></div>` : ''}
+    ${o.role !== 'admin' || !j.manage ? `<div class="row"><button class="btn sm" data-wsrm="${S.me?.id}" data-oidx="${o.id}">${ic('logout', 's')} ${tr('Leave the organisation')}</button></div>` : ''}</details>`;
+  box.innerHTML = (j.orgs.length ? j.orgs.map(org).join('') : `<div class="muted mhint">${tr('You belong to no organisation: everything is private.')}</div>`)
+    + (mm ? `<div class="shint keep">${ic('alert', 's')} ${esc(trn('{0} list of yours has an agent of another workspace (from before the workspaces). Open the list’s Share dialog to take it out or keep it.', '{0} lists of yours have an agent of another workspace (from before the workspaces). Open the lists’ Share dialogs to take it out or keep it.', mm))}</div>` : '');
+}
+function wsPaneWire(md) {
+  md.addEventListener('change', async e => {
+    const r = e.target.dataset?.wsrole; if (!r) return;
+    const oid = +e.target.closest('[data-oid]').dataset.oid;
+    try { await api('PUT', `/api/orgs/${oid}/members`, {user_id: +r, role: e.target.value}); toast(tr('Saved')); } catch { /* shown */ }
+    wsPaneDraw(md);
+  });
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('[data-wsadd],[data-wsrm],[data-wssave]'); if (!b) return;
+    const oid = +(b.dataset.oidx || b.closest('[data-oid]')?.dataset.oid || 0);
+    try {
+      if (b.dataset.wsadd) { const em = $('#ws-add-' + oid, md).value.trim(); if (!em) return; const r = await api('PUT', `/api/orgs/${oid}/members`, {email: em}); toast(r.by_email ? tr('If this address has an account, the person is now a member.') : tr('Added')); }
+      else if (b.dataset.wssave) { await api('PATCH', `/api/orgs/${oid}`, {name: $('#ws-name-' + oid, md).value.trim(), domains: $('#ws-dom-' + oid, md).value}); toast(tr('Saved')); }
+      else if (b.dataset.wsrm) {
+        const uid = +b.dataset.wsrm, self = uid === S.me?.id, o = (($('#s-ws', md)._j || {}).orgs || []).find(x => x.id === oid), m = o?.members.find(x => x.id === uid);
+        if (!await askConfirm(self ? tr('Leave the organisation “{0}”?', o?.name || '') : tr('Remove {0} from the organisation?', m?.name || ''), self ? tr('Your lists of this workspace go to one of its admins and you leave every list of the organisation.') : tr('The person’s lists of this workspace come to you and the person leaves every list of the organisation.'), {ok: self ? tr('Leave') : tr('Remove'), danger: true})) return;
+        await api('DELETE', `/api/orgs/${oid}/members/${uid}`); toast(self ? tr('You left the organisation') : tr('Removed'));
+      }
+      await load(); render();
+    } catch { /* api() showed it */ }
+    wsPaneDraw(md);
   });
 }
 function accountWire(md) {
   let users = [];
   const drawUsers = async () => {
     const box = $('#a-users', md); if (!box) return;
-    try { const j = await api('GET', '/api/users'); users = j.users; S.mailOut = !!j.mail_out; } catch { return; }
-    // 2.1.2 (#346): agents are rows too (badge); they are edited in their own dialog (Settings > Agents)
-    box.innerHTML = users.map(u => `<div class="mrow ${u.disabled ? 'off' : ''}" data-urow="${u.id}">${u.avatar ? `<span class="avatar pic"><img src="${esc(u.avatar)}" alt="" loading="lazy"></span>` : av(0, u.display_name)}<span class="n">${esc(u.display_name)}${u.kind === 'agent' ? ' ' + agentBadge() : ''} <span class="muted">${esc(u.username)}${u.is_admin ? ' · ' + tr('Admin') : ''}${u.disabled ? ' · ' + tr('disabled') : ''}${u.proxy_login ? ' · ' + tr('SSO: {0}', u.proxy_login) : ''}${u.paperless_access && S.paperless?.configured ? ' · Paperless' : ''}${u.twofa?.length ? ' · ' + tr('2FA') : ''}${u.oidc_linked ? ' · OIDC' : ''}${u.invite === 'invited' ? ' · ' + tr('Invited') : u.invite === 'expired' ? ' · ' + tr('Invitation expired') : ''}${u.signup === 'pending' ? ' · ' + tr('waits for approval') : u.signup === 'confirm' ? ' · ' + tr('registration not confirmed') : ''}</span></span>${u.signup === 'pending' ? `<button class="btn sm pri" data-acc="user-approve" data-uid="${u.id}">${ic('check', 's')} ${tr('Approve')}</button>` : ''}${u.kind === 'agent'
+    let j; try { j = await api('GET', '/api/users'); users = j.users; S.mailOut = !!j.mail_out; } catch { return; }
+    // 2.28.0 (#1011): people only; the agents are managed under Agents (one row says how many)
+    const nAg = users.filter(u => u.kind === 'agent').length;
+    box.innerHTML = (nAg ? `<div class="mrow agsum"><span class="avatar agent">${ic('bot', 's')}</span><span class="n">${esc(trn('{0} agent', '{0} agents', nAg))}</span><button class="linkbtn" data-act="agents-go">${tr('Manage under Agents')}</button></div>` : '')
+      + (j.others ? `<div class="shint keep">${esc(trn('{0} more person on this server you do not see (another organisation).', '{0} more people on this server you do not see (other organisations).', j.others))}</div>` : '')
+      + users.filter(u => u.kind !== 'agent').map(u => `<div class="mrow ${u.disabled ? 'off' : ''}" data-urow="${u.id}">${u.avatar ? `<span class="avatar pic"><img src="${esc(u.avatar)}" alt="" loading="lazy"></span>` : av(0, u.display_name)}<span class="n">${esc(u.display_name)}${u.kind === 'agent' ? ' ' + agentBadge() : ''} <span class="muted">${esc(u.username)}${u.is_admin ? ' · ' + tr('Admin') : ''}${u.disabled ? ' · ' + tr('disabled') : ''}${u.proxy_login ? ' · ' + tr('SSO: {0}', u.proxy_login) : ''}${u.paperless_access && S.paperless?.configured ? ' · Paperless' : ''}${u.twofa?.length ? ' · ' + tr('2FA') : ''}${u.oidc_linked ? ' · OIDC' : ''}${u.invite === 'invited' ? ' · ' + tr('Invited') : u.invite === 'expired' ? ' · ' + tr('Invitation expired') : ''}${u.signup === 'pending' ? ' · ' + tr('waits for approval') : u.signup === 'confirm' ? ' · ' + tr('registration not confirmed') : ''}</span></span>${u.signup === 'pending' ? `<button class="btn sm pri" data-acc="user-approve" data-uid="${u.id}">${ic('check', 's')} ${tr('Approve')}</button>` : ''}${u.kind === 'agent'
       ? `<button class="linkbtn agmng" data-acc="agent-edit" data-uid="${u.id}" title="${esc(tr('Open the agent dialog'))}">${tr('Managed under Agents')}</button>`
       : `<button class="iconbtn" data-acc="user-edit" data-uid="${u.id}" title="${tr('Edit user')}">${ic('edit', 's')}</button>`}</div>`).join('');
   };
   drawUsers();
   orgsDraw(md);
+  if (wsPaneOn()) { wsPaneDraw(md); wsPaneWire(md); }  // 2.28.0 (#935)
   md.addEventListener('change', async e => {  // 2.22.0 (#752): whom people see
     if (e.target.id !== 'a-vis') return;
     try { await api('PUT', '/api/admin/orgs/visibility', {mode: e.target.value}); toast(tr('Saved')); await load(); } catch { /* api() said it */ }
@@ -391,6 +462,11 @@ function accountWire(md) {
       if (a === 'user-new') userModal(null, drawUsers);
       if (a === 'user-approve') { await api('POST', `/api/users/${b.dataset.uid}/approve`, {}); toast(tr('Approved: the person can log in now')); drawUsers(); }  // 2.23.0 (#711)
       if (a === 'org-edit') orgModal((S.orgs || []).find(o => o.id === +b.dataset.oid), () => orgsDraw(md));
+      if (a === 'org-new') orgModal(null, () => { orgsDraw(md); load().then(render).catch(() => {}); });  // 2.28.0 (#935)
+      if (a === 'org-del') {
+        const o = (S.orgs || []).find(x => x.id === +b.dataset.oid);
+        if (o && await askConfirm(tr('Delete the organisation “{0}”?', o.name), tr('Only possible while it has no lists. Its members keep their accounts.'), {ok: tr('Delete'), danger: true})) { await api('DELETE', `/api/admin/orgs/${o.id}`); toast(tr('Deleted')); orgsDraw(md); load().then(render).catch(() => {}); }
+      }
       if (a === 'org-rename') { const o = (S.orgs || [])[0]; const v = await askPrompt(tr('Name of your organisation'), o?.name || '', {ok: tr('Save'), input: {max: 60}}); if (v && v.trim() && v.trim() !== o?.name) { try { await api('PATCH', '/api/admin/settings', {org_name: v.trim()}); await load(); render(); orgsDraw(md); toast(tr('Saved')); } catch { /* shown */ } } }
       if (a === 'user-edit') userModal(users.find(u => u.id === +b.dataset.uid), drawUsers);
       if (a === 'agent-edit') {
@@ -403,12 +479,13 @@ function accountWire(md) {
 }
 function userModal(u, done) {
   const md = modal(`<h3>${u ? tr('Edit user') : tr('New user')}</h3>
-    <div class="row"><label for="u-user">${tr('Username')}</label><input id="u-user" value="${esc(u?.username || '')}" ${u ? 'disabled' : ''} autocapitalize="off" placeholder="${tr('a-z, 0-9, . - _')}"></div>
-    <div class="row"><label for="u-name">${tr('Display name')}</label><input id="u-name" value="${esc(u?.display_name || '')}" maxlength="60"></div>
+    <div class="row"><label for="u-name">${tr('Display name')}</label><input id="u-name" value="${esc(u?.display_name || '')}" maxlength="60" placeholder="${esc(tr('e.g. Alice Example'))}"></div>
+    <div class="row"><label for="u-user">${tr('Username')}</label><input id="u-user" class="unin" value="${esc(u?.username || '')}" ${u ? 'disabled' : ''} autocapitalize="off" placeholder="${tr('a-z, 0-9, . - _')}"><span class="muted">${tr('for the login and @mentions')}</span></div>
+    <div class="shint keep" id="u-userhint" hidden></div>
     <div class="row"><label for="u-pw">${tr('Password')}</label><input type="password" id="u-pw" autocomplete="new-password" placeholder="${u ? (u.has_password ? tr('unchanged') : tr('none (single sign-on only)')) : tr('optional, min. 8 characters')}"></div>
     <div class="row"><label for="u-proxy">${tr('SSO login')}</label><input id="u-proxy" value="${esc(u?.proxy_login || '')}" autocapitalize="off" placeholder="${tr('user name at the login proxy (optional)')}"></div>
     <div class="row"><label for="u-email">${tr('E-mail')}</label><input id="u-email" type="email" value="${esc(u?.email || '')}" autocapitalize="off" placeholder="${tr('optional, links an OIDC login')}"></div>
-    ${S.instanceMode === 'multi' && ((S.orgs || []).length > 1 || (u && (S.orgs || []).length)) ? `<div class="row"><label>${tr('Organisations')}</label><div class="fpeople" role="group" aria-label="${esc(tr('Organisations'))}">${S.orgs.map(o => { const on = u ? (u.orgs || []).includes(o.id) : o.members.includes(S.me.id); return `<button type="button" class="fperson ${on ? 'on' : ''}" data-uorg="${o.id}" aria-pressed="${on}"><span aria-hidden="true">${esc(o.icon || '🏢')}</span><span>${esc(o.name)}</span></button>`; }).join('')}</div></div>` : ''}
+    ${['multi', 'workspaces'].includes(S.instanceMode) && ((S.orgs || []).length > 1 || (u && (S.orgs || []).length)) ? `<div class="row"><label>${tr('Organisations')}</label><div class="fpeople" role="group" aria-label="${esc(tr('Organisations'))}">${S.orgs.map(o => { const on = u ? (u.orgs || []).includes(o.id) : o.members.includes(S.me.id); return `<button type="button" class="fperson ${on ? 'on' : ''}" data-uorg="${o.id}" aria-pressed="${on}"><span aria-hidden="true">${esc(o.icon || '🏢')}</span><span>${esc(o.name)}</span></button>`; }).join('')}</div></div>` : ''}
     <div class="row"><label for="u-topic">${tr('ntfy topic')}</label><input id="u-topic" value="${esc(u?.ntfy_topic || '')}" autocapitalize="off" placeholder="${tr('empty = random')}"></div>
     ${u ? `<div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="u-avpick" data-cur="${esc(u.avatar || '')}">${avPickHtml(u.avatar || '', false, u.display_name || u.username)}</div></div>` : ''}
     <div class="row"><label>${tr('Rights')}</label><label class="chkl"><input type="checkbox" id="u-admin" ${u?.is_admin ? 'checked' : ''}> ${tr('Admin')}</label>${S.paperless?.configured ? `<label class="chkl" title="${tr('Search, link and view documents of the Paperless archive')}"><input type="checkbox" id="u-pl" ${u?.paperless_access ? 'checked' : ''}> ${tr('Paperless access')}</label>` : ''}${u ? `<label class="chkl"><input type="checkbox" id="u-dis" ${u.disabled ? 'checked' : ''}> ${tr('disabled')}</label>` : ''}</div>
@@ -474,6 +551,7 @@ function userModal(u, done) {
         if (u) { body.disabled = $('#u-dis', md).checked; await api('PATCH', '/api/users/' + u.id, body); }
         else {
           body.username = $('#u-user', md).value.trim().toLowerCase(); if (!body.ntfy_topic) delete body.ntfy_topic;
+          if (userNameBad(body.username)) { const h = $('#u-userhint', md); h.textContent = userNameBad(body.username); h.hidden = false; need($('#u-user', md)); return; }  // 2.28.0 (#926)
           if (!pw && $('#u-inv', md)?.checked) { body.invite = true; if (S.mailOut && !body.email) { toast(tr('Please enter the e-mail address for the invitation')); $('#u-email', md).focus(); return; } }
           const nu = await api('POST', '/api/users', body); created = true;
           if (nu.invitation) { md.remove(); done && done(); inviteResult(nu.invitation, nu.display_name); await offerCollab(); await load(); render(); return; }
@@ -484,7 +562,8 @@ function userModal(u, done) {
       await load(); render();
     } catch { /* api() showed it */ }
   });
-  if (!isTouch() && (!u))  setTimeout(() => $('#u-user', md).focus(), 50);
+  userNameFollow(md, 'u-name', 'u-user', 'u-userhint');  // 2.28.0 (#926)
+  if (!isTouch() && (!u))  setTimeout(() => $('#u-name', md).focus(), 50);
 }
 // 2.22.0 (#697): what happened to an invitation / reset link: sent by e-mail, or the link to copy (no SMTP, no address)
 function inviteResult(j, name) {

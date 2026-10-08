@@ -54,7 +54,7 @@ def _domains(v):
 
 def org_for_email(c, email):
     from ..accounts.orgs import instance_mode
-    if instance_mode(c) != "multi":
+    if instance_mode(c) not in ("multi", "workspaces"):  # 2.28.0 (#935): workspaces join by domain too
         return None  # organisation: the one organisation anyway (create_user); shared: none
     dom = email.rsplit("@", 1)[-1].lower()
     for r in c.execute("SELECT id, domains FROM orgs ORDER BY id"):
@@ -179,11 +179,11 @@ def auth_signup():
 @app.post("/api/users/<int:uid>/approve")
 def user_approve(uid):
     """Admins: a registration that waits for approval becomes an active account (declining = deleting it)."""
-    from ..accounts.users import need_admin, user_admin_dict
+    from ..accounts.users import admin_sees, need_admin, user_admin_dict
     need_admin()
     c = db()
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
-    if not u:
+    if not u or not admin_sees(c, uid):  # 2.28.0 (#935)
         raise Denied(404)
     if u["signup"] != "pending":
         return err(tr("This account does not wait for an approval"), 409)
@@ -225,8 +225,9 @@ def signup_admin(c):
 # older one stops when a new one is made. Two-factor accounts still need their second step.
 def _may_link(c, uid):
     from ..family.family import parent_of
+    from ..accounts.users import admin_sees
     t = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
-    if not t or (t["kind"] or "user") == "agent":
+    if not t or (t["kind"] or "user") == "agent" or not (admin_sees(c, uid) or parent_of(c, me(), uid)):  # 2.28.0 (#935)
         raise Denied(404)
     if not (g.user["is_admin"] or parent_of(c, me(), uid)):
         raise Denied(403)

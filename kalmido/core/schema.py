@@ -840,6 +840,17 @@ MIGRATIONS = [
     # 2.27.0 (#988): the sort of a list for everyone in it (owner / list admins set it; '' = the default); a member may look
     # at it sorted otherwise for a while (on that device), the app says so
     ("lists", "sort_mode", "ALTER TABLE lists ADD COLUMN sort_mode TEXT NOT NULL DEFAULT ''"),
+    # 2.28.0 (#935): workspaces. lists.org_id = the organisation a list belongs to (NULL = the owner's private space); an
+    # organisation's list is shared only inside it, a private one never with the organisation's agents. agents.org_id = the
+    # workspace an agent works in (NULL = private: a personal agent in its owner's private space); it joins only lists of
+    # that workspace. org_members.role = member | admin (an organisation's admin manages its members; not the instance admin)
+    ("lists", "org_id", "ALTER TABLE lists ADD COLUMN org_id INTEGER REFERENCES orgs(id) ON DELETE SET NULL"),
+    ("agents", "org_id", "ALTER TABLE agents ADD COLUMN org_id INTEGER REFERENCES orgs(id) ON DELETE SET NULL"),
+    ("org_members", "role", "ALTER TABLE org_members ADD COLUMN role TEXT NOT NULL DEFAULT 'member'"),
+    # 2.28.0 (#1005): a chat message of an agent may carry answer buttons (choices, json [{id, label, style?}] + multi) and the
+    # person's answer (choice, json {ids, at}); 2.28.0 (#987): notifications.to_me = a message from a person for me
+    ("agent_chat", "choices", "ALTER TABLE agent_chat ADD COLUMN choices TEXT"),
+    ("agent_chat", "choice", "ALTER TABLE agent_chat ADD COLUMN choice TEXT"),
 ]
 INDEXES = """
 CREATE INDEX IF NOT EXISTS lists_owner ON lists(owner_id);
@@ -859,6 +870,7 @@ CREATE INDEX IF NOT EXISTS templates_user ON templates(user_id);
 CREATE INDEX IF NOT EXISTS push_subs_user ON push_subs(user_id);
 CREATE UNIQUE INDEX IF NOT EXISTS users_oidc ON users(oidc_subject) WHERE oidc_subject IS NOT NULL;
 CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS lists_org ON lists(org_id) WHERE org_id IS NOT NULL;
 """
 MAX_DEPTH = 3  # task > subtask > sub-subtask
 # per user (table user_settings)
@@ -942,6 +954,11 @@ USER_DEFAULTS = {
     "news_kinds": "mention,assign,comment,unblock,share,status",
     # 2.1.0 (#317): the rest of the notification matrix, json {event: {news?, push?}} (see NOTIF_ROWS; '' = defaults)
     "notify": "",
+    # 2.28.0 (#935): the workspace the app shows: all | private | org:<id> (the sidebar's switch; followed on every device)
+    "workspace": "all",
+    # 2.28.0 (#987): 1 = pushes for what agents do (their comments, new tasks, completions, status); off by default -- an
+    # agent's @mention of me and its approval requests push as before
+    "agent_push": "0",
 }
 # global, server-internal (table settings); the legacy single-user rows stay there untouched
 GLOBAL_DEFAULTS = {

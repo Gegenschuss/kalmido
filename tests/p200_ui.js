@@ -44,6 +44,7 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
   check(row?.querySelector('.who.agent .adot.st-working'), 'assignee avatar of the agent has the status dot');
   // ---- detail: agent badge, reactions, approval, wake
   w.eval(`openDetail(${T1})`); await sleep(1200);
+  for (let i = 0; i < 30 && !d.querySelector(`.cm[data-cid="${k1}"]`); i++) await sleep(200);  // 2.28.0: the comments load after the panel
   const cm = d.querySelector(`.cm[data-cid="${k1}"]`);
   check(cm?.querySelector('.abadge') && /Agent/.test(cm.querySelector('.abadge').textContent), 'agent badge on its comment');
   check(cm && cm.querySelectorAll('.rx.add').length === 3, 'three reaction buttons (❤️ 👍 👎)');
@@ -173,6 +174,7 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
   for (let i = 0; i < 50 && !agrow; i++) { await sleep(200); agrow = d.querySelector('#s-ags [data-agid]'); }
   check(agrow && /Claude/.test(agrow.textContent) && /polling only/.test(agrow.querySelector('.n')?.title || ''), 'AI colleague > Agents lists the agent (2.5.1: details in the tooltip)');
   d.querySelector('[data-ag="new"]').click(); await sleep(300);
+  d.querySelector('#pop [role="menuitem"]')?.click(); await sleep(300);  // 2.28.0 (#970): "Add agent…" asks team or personal first
   d.querySelector('#ag-user').value = 'robo'; d.querySelector('#ag-name').value = 'Robo';
   d.querySelector('.modal:last-of-type [data-m="ok"]').click(); await sleep(1200);
   check(/API token of Robo/.test(d.body.textContent) && [...d.querySelectorAll('input, code')].some(x => /abk_/.test(x.value || x.textContent)), 'new agent: token shown once');

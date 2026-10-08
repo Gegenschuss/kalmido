@@ -173,7 +173,7 @@ def visible_sections(c, uid, tasks=None):
 def state():
     from ..lists.groups import groups_for, grp_of_user
     from ..integrations.paperless import pl_state
-    from ..collab.news import news_sig, news_unread, notif_matrix
+    from ..collab.news import news_items, news_sig, news_unread, news_unread_me, notif_matrix
     from ..personal.habits import pomo_stats
     from ..personal.timetrack import time_day_h, time_list_totals, time_running, time_totals
     from ..accounts.onboarding import sample_state
@@ -187,7 +187,8 @@ def state():
     from ..agents.proposals import prop_agents
     from ..lists.public import public_links_on
     from ..collab.notes import notes_brief
-    from ..collab.teamchat import tchat_on, tchat_unread
+    from ..collab.teamchat import tchat_dm_unread, tchat_on, tchat_unread
+    from ..accounts.orgs import has_workspaces, workspaces_for, ws_mismatches
     from ..family.family import kids_for
     from ..events.model import cals_for, events_on
     from ..contacts.model import books_for, contacts_on, task_contacts
@@ -212,10 +213,14 @@ def state():
         h["logs"] = logs.get(h["id"], {})
         h["notes"] = notes.get(h["id"], {})
     u = g.user
+    nitems = news_items(c, uid, s)[0]
     return jsonify(
         v=int(gsetting(c, "version")),
         me={**user_public(u), "orgs": _org_names(c, u["id"]), "is_admin": bool(u["is_admin"]), "auth": g.auth_via, "has_password": bool(u["password_hash"]),
-            "ntfy_inbox": bool(NTFY_IN["token"]) and inbox_user(c) == uid},
+            "ntfy_inbox": bool(NTFY_IN["token"]) and inbox_user(c) == uid,
+            "workspaces": workspaces_for(c, uid)},  # 2.28.0 (#935): my organisations [{id, name, icon, role}]
+        workspaces=has_workspaces(c),  # 2.28.0 (#935): lists / agents have a workspace (private | an organisation)
+        ws_mismatches={str(k): v for k, v in ws_mismatches(c, uid).items()},  # 2.28.0: agents of another workspace in my lists
         setup_pending=bool(u["is_admin"]) and gsetting(c, "setup_step2") == "pending",  # 2.13.0 (#453 A16)
         lists=(vl := visible_lists(c, uid)),
         folder_orders=folder_orders(c, uid, vl),  # 2.27.0 (#988)
@@ -241,7 +246,7 @@ def state():
         ntfy_url=NTFY_URL,
         webpush={"enabled": WEBPUSH_ON, "key": vapid_public() if WEBPUSH_ON else "", "devices": webpush_count(c, uid)},
         languages=languages(),
-        news={"unread": news_unread(c, uid, s), "sig": news_sig(c, uid)},
+        news={"unread": sum(1 for x in nitems if not x["read"]), "unread_me": news_unread_me(c, uid, s, nitems), "sig": news_sig(c, uid)},  # 2.28.0 (#987): + "For you"
         avatars=avatar_map(c, uid),
         templates=[dict(r) for r in c.execute("SELECT id, kind, name FROM templates WHERE user_id=? ORDER BY name COLLATE NOCASE, id",
                                               (uid,))],
@@ -257,7 +262,7 @@ def state():
         share={"drop_url": PUBLIC_URL.rstrip("/") + "/drop", "ios_shortcut": IOS_SHORTCUT_URL},
         sample=sample_state(c, uid),
         notes=notes_brief(c, uid),  # 2.17.0 (#442)
-        team={"enabled": tchat_on(c, uid), "unread": tchat_unread(c, uid)},  # 2.17.0 (#419)
+        team={"enabled": tchat_on(c, uid), "unread": tchat_unread(c, uid), "dm_unread": tchat_dm_unread(c, uid)},  # 2.17.0 (#419); 2.28.0 (#987): + DMs
         agents=agents_for(c, uid),
         proposers=prop_agents(c, uid),  # 2.3.0: agents I may ask for a proposal
         groups=groups_for(c, full=bool(u["is_admin"])) if collab_all() else [],  # 2.10.0 (#441)

@@ -172,8 +172,9 @@ def newtask_events(c, tid):
         if not s or not task_visible(c, tid, uid, full=True):
             continue
         news_add(c, uid, "newtask", task_id=tid, actor=actor, s=s)
+        from ..collab.news import agent_push_ok
         if not notif_ok(c, uid, s, "newtask", "push", t["list_id"]) or not push_reachable(c, uid, s) or \
-                not burst_gate(c, uid, tid, event=True):
+                not burst_gate(c, uid, tid, event=True) or not agent_push_ok(c, uid, s, actor):  # 2.28.0 (#987)
             continue
         lg = lang_of(s)
         lname = tr("Inbox", lg=lg) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]

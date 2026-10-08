@@ -69,6 +69,8 @@ def onboarding():
     kind = "project" if {"time", "deps", "fields"} & set(feats) else "list"
     lid = c.execute("INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,kind) VALUES(?,?,?,?,?,?,?,?)",
                     (tr("Getting started", lg=lg), "#2dd4bf", "", my_max_sort(c, uid) + 1, "list", ts, uid, kind)).lastrowid
+    from ..accounts.orgs import ws_apply_default
+    ws_apply_default(c, uid, lid)  # 2.28.0 (#935): the default workspace
     for i, (title, content, prio, due, subs) in enumerate(onboarding_tasks(feats, touch, mac)):
         t = tr(title, "⌘K" if mac else "Ctrl+K", lg=lg) if "{0}" in title else tr(title, lg=lg)
         tid = c.execute("""INSERT INTO tasks(list_id,title,content,priority,due,sort,created_at,updated_at,created_by)
@@ -159,6 +161,8 @@ def sample_create(c, uid):
     lid = c.execute("INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind) VALUES(?,?,?,?,?,?,?,?,?)",
                     (tr("Example: Image film for client Muster", lg=lg), "#8b5cf6", "", srt + 1, "list", ts, uid, 0,
                      "project" if project else "list")).lastrowid
+    from ..accounts.orgs import ws_apply_default
+    ws_apply_default(c, uid, lid)  # 2.28.0 (#935): the default workspace
     track("list", lid)
     secs = []
     for i, n in enumerate(SAMPLE_SECTIONS):
@@ -223,6 +227,8 @@ def sample_create(c, uid):
     # reused for the next shoot)
     cl = c.execute("INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind) VALUES(?,?,?,?,?,?,?,?,?)",
                    (tr("Example: Shoot day packing list", lg=lg), "#f59e0b", "", srt + 2, "list", ts, uid, 1, "list")).lastrowid
+    from ..accounts.orgs import ws_apply_default
+    ws_apply_default(c, uid, cl)  # 2.28.0 (#935): the default workspace
     track("list", cl)
     for i, n in enumerate(SAMPLE_PACKING):
         track("task", c.execute("INSERT INTO tasks(list_id,title,sort,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?)",

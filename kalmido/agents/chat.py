@@ -105,6 +105,9 @@ def chat_dict(r, rx=None, files=None, api=False):
     return {"id": r["id"], "agent_id": r["agent_id"], "user_id": r["user_id"], "from": r["sender"], "body": r["body"],
             "task_id": r["task_id"], "created_at": r["created_at"], "delivered_at": r["delivered_at"],
             "reactions": (rx or {}).get(r["id"], []), "asks": r["sender"] == "agent" and chat_asks(r["body"]),
+            # 2.28.0 (#1005): answer buttons of an agent's message ({choices: [{id, label, style?}], multi}) and the person's
+            # answer ({ids, at}); null without
+            "choices": _jload(r["choices"]) if "choices" in r.keys() else None, "choice": _jload(r["choice"]) if "choice" in r.keys() else None,
             "attachments": [{**f, "url": (f"/api/v1/chat-attachments/{f['id']}" if api else f"/api/chat-files/{f['id']}")}
                             for f in (files or {}).get(r["id"], [])]}
 
@@ -187,15 +190,98 @@ def chat_file_paths(c, where, args):
     return [r[0] for r in c.execute(f"SELECT f.path FROM chat_files f JOIN agent_chat m ON m.id=f.message_id WHERE {where}", args)]
 
 
+def _jload(v):
+    try:
+        return json.loads(v) if v else None
+    except ValueError:
+        return None
+
+
+CHOICES_MAX, CHOICE_LABEL_MAX, CHOICE_ID_RE = 8, 80, re.compile(r"[A-Za-z0-9_.:-]{1,40}")
+CHOICE_STYLES = ("default", "primary", "danger")
+
+
+def chat_choices_clean(v, multi):
+    """2.28.0 (#1005): choices from the agent -> the stored json, or None. [{id, label, style?}] (at most CHOICES_MAX, ids
+    unique); multi: the person may pick several. Also accepted: a list of strings (id = label)."""
+    if v in (None, "", []):
+        return None
+    if isinstance(v, str):
+        try:
+            v = json.loads(v)
+        except ValueError:
+            raise BadInput(tr("Invalid value: {0}", "choices")) from None
+    if not isinstance(v, list) or len(v) > CHOICES_MAX:
+        raise BadInput(tr("Invalid value: {0}", "choices"))
+    out, ids = [], set()
+    for x in v:
+        if isinstance(x, str):
+            x = {"id": x, "label": x}
+        if not isinstance(x, dict) or not isinstance(x.get("id"), str) or not CHOICE_ID_RE.fullmatch(x["id"]) \
+                or not isinstance(x.get("label", x["id"]), str) or not str(x.get("label", x["id"])).strip() or x["id"] in ids:
+            raise BadInput(tr("Invalid value: {0}", "choices"))
+        st = x.get("style", "default")
+        if st not in CHOICE_STYLES:
+            raise BadInput(tr("Invalid value: {0}", "choices"))
+        ids.add(x["id"])
+        out.append({"id": x["id"], "label": str(x.get("label", x["id"])).strip()[:CHOICE_LABEL_MAX], **({"style": st} if st != "default" else {})})
+    if multi not in (None, True, False, 0, 1):
+        raise BadInput(tr("Invalid value: {0}", "multi"))
+    return json.dumps({"choices": out, "multi": bool(multi)}, ensure_ascii=False)
+
+
+def chat_choice_set(c, m, uid, ids):
+    """2.28.0 (#1005): the person (the chat's partner) answers an agent message with buttons: stores the choice (once),
+    sends the agent the event chat_choice. Returns the message row. BadInput / Denied."""
+    ch = _jload(m["choices"])
+    if m["sender"] != "agent" or not ch or m["user_id"] != uid:
+        raise Denied(404)
+    if m["choice"]:
+        raise Denied(409, tr("This question was answered already"))
+    valid = [x["id"] for x in ch["choices"]]
+    if not isinstance(ids, list) or not ids or not all(isinstance(x, str) and x in valid for x in ids) or len(set(ids)) != len(ids) \
+            or (len(ids) > 1 and not ch.get("multi")):
+        raise BadInput(tr("Invalid value: {0}", "choice_ids"))
+    ans = {"ids": [x for x in valid if x in ids], "at": iso_ms(now_utc()), "user_id": uid}
+    c.execute("UPDATE agent_chat SET choice=? WHERE id=?", (json.dumps(ans), m["id"]))
+    m2 = c.execute("SELECT * FROM agent_chat WHERE id=?", (m["id"],)).fetchone()
+    labels = [x["label"] for x in ch["choices"] if x["id"] in ans["ids"]]
+    data = {"message_id": m["id"], "choice_ids": ans["ids"], "labels": labels, "message": chat_one(c, m2, api=True),
+            "user": {"id": uid, "name": user_names(c, [uid]).get(uid, "")}}
+    if m["task_id"] and task_visible(c, m["task_id"], m["agent_id"], full=True):
+        data.update(agent_task_data(c, m["task_id"], m["agent_id"]))
+    agent_emit(c, m["agent_id"], "chat_choice", data)
+    bump(c)
+    return m2
+
+
+@app.post("/api/agents/<int:aid>/chat/<int:mid>/choice")
+def agent_chat_choice(aid, mid):
+    """2.28.0 (#1005): {choice_ids: [...]} -- I answer an agent's question with one of its buttons (several with multi)."""
+    c = db()
+    need_chat_agent(c, aid)
+    m = c.execute("SELECT * FROM agent_chat WHERE id=? AND agent_id=? AND user_id=?", (mid, aid, me())).fetchone()
+    if not m:
+        raise Denied(404)
+    try:
+        m2 = chat_choice_set(c, m, me(), body().get("choice_ids"))
+    except BadInput as e:
+        return err(str(e))
+    c.commit()
+    return jsonify(chat_one(c, m2))
+
+
 def chat_post(c, aid, uid, sender, b, files, allowed_keys=("body", "task_id")):
-    """A chat message with optional files (both sides). b: the fields; returns the new row (caller commits)."""
+    """A chat message with optional files (both sides). b: the fields; returns the new row (caller commits).
+    2.28.0 (#1005): an agent's message may carry choices (+ multi)."""
     text = b.get("body")
     if files and (text is None or (isinstance(text, str) and not text.strip())):
         text = ""
     else:
         text = chat_body(text)
     tid = chat_task(c, b.get("task_id"), uid, aid)
-    r = chat_add(c, aid, uid, sender, text, tid)
+    choices = chat_choices_clean(b.get("choices"), b.get("multi")) if sender == "agent" else None
+    r = chat_add(c, aid, uid, sender, text, tid, choices)
     if files:
         saved = []
         try:
@@ -369,9 +455,9 @@ def chat_body(v):
     return v.strip()
 
 
-def chat_add(c, aid, uid, sender, text, tid):
-    mid = c.execute("INSERT INTO agent_chat(agent_id,user_id,sender,body,task_id,created_at) VALUES(?,?,?,?,?,?)",
-                    (aid, uid, sender, text, tid, iso_ms(now_utc()))).lastrowid
+def chat_add(c, aid, uid, sender, text, tid, choices=None):
+    mid = c.execute("INSERT INTO agent_chat(agent_id,user_id,sender,body,task_id,created_at,choices) VALUES(?,?,?,?,?,?,?)",
+                    (aid, uid, sender, text, tid, iso_ms(now_utc()), choices)).lastrowid
     cut = c.execute("SELECT id FROM agent_chat WHERE agent_id=? AND user_id=? ORDER BY id DESC LIMIT 1 OFFSET ?", (aid, uid, CHAT_KEEP)).fetchone()
     if cut:  # 2.13.1 (#465): the files of trimmed messages leave the disk
         g.chat_unlink = getattr(g, "chat_unlink", []) + chat_file_paths(c, "m.agent_id=? AND m.user_id=? AND m.id<=?", (aid, uid, cut[0]))

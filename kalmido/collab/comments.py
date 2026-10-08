@@ -333,7 +333,7 @@ def lang_of(s):
 def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None):
     """Decides who gets a push for this comment (burst state updated in c, caller commits).
     Returns [(user id, title, message, click, priority)] to send after the commit."""
-    from ..collab.news import bell_all_users, news_add, notif_ok
+    from ..collab.news import agent_push_ok, bell_all_users, news_add, notif_ok
     from ..notify.push import push_prio, push_reachable
     from ..agents.core import agent_ids
     author = me()
@@ -366,9 +366,13 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
         # 2.1.0 (#317): which event of the notification settings this comment is for uid (first match)
         row = "mention" if mentioned else "comment" if uid in (t["assignee_id"], t["created_by"]) else \
             "reply" if uid == prev else "follow"
-        news_add(c, uid, "mention" if mentioned else "comment", task_id=t["id"], comment_id=cid, actor=author, row=row, s=s)
+        # 2.28.0 (#987): a reply to my comment (the one right before) is marked: it counts as "For you" in the News
+        news_add(c, uid, "mention" if mentioned else "comment", task_id=t["id"], comment_id=cid, actor=author, row=row, s=s,
+                 data={"reply": 1} if uid == prev and not mentioned else None)
         if not notif_ok(c, uid, s, row, "push", t["list_id"]) or not push_reachable(c, uid, s) or \
                 not burst_gate(c, uid, t["id"], mentioned=mentioned):
+            continue
+        if not mentioned and not agent_push_ok(c, uid, s, author):  # 2.28.0 (#987): an agent's comments push only when wanted
             continue
         lg = lang_of(s)
         what = snippet or trn("{0} file", "{0} files", nfiles, lg=lg)
@@ -395,7 +399,7 @@ def push_day(due, due_time, lg):
 
 def task_event(c, tid, kind, prev_assignee=None):
     """assign / unassign / complete pushes; queued in g.pushes and sent once the request succeeded."""
-    from ..collab.news import bell_all_users, KIND_ROW, news_add, notif_ok
+    from ..collab.news import agent_push_ok, bell_all_users, KIND_ROW, news_add, notif_ok
     from ..notify.push import push_prio, push_reachable
     from ..agents.core import agent_assign_event, agent_ids
     actor = me()
@@ -424,6 +428,8 @@ def task_event(c, tid, kind, prev_assignee=None):
         news_add(c, uid, kind, task_id=tid, actor=actor, s=s)
         if not notif_ok(c, uid, s, KIND_ROW[kind], "push", t["list_id"]) or not push_reachable(c, uid, s) or \
                 not burst_gate(c, uid, tid, event=True):
+            continue
+        if kind == "complete" and not agent_push_ok(c, uid, s, actor):  # 2.28.0 (#987)
             continue
         lg = lang_of(s)
         who = name if actor else tr("Someone via the public link", lg=lg)

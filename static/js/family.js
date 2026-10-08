@@ -294,7 +294,7 @@ function famDetailHtml(t, l, ro) {
   const shared = !!l?.shared && collab();
   // 2.27.0 (#975): "Who comes along", "Take turns" and the stars are for family / household lists (Used for: …, Home & life),
   // never for a project or an ordinary work list; a task that already uses one of them keeps showing it
-  const proj = (l?.kind || 'list') === 'project', famL = !proj && !!(l?.family || l?.life);
+  const proj = (l?.kind || 'list') === 'project', famL = !proj && !l?.org_id && !!(l?.family || l?.life);  // 2.28.0 (#935): never in an organisation's list
   if (isOcc(t)) {
     const w = occWhat(t);
     out.push(`<div class="row"><label for="d-fname">${t.fam.kind === 'birthday' ? tr('Birthday of') : tr('Anniversary of')}</label><input id="d-fname" value="${esc(t.fam.name || '')}" maxlength="100" ${ro ? 'readonly' : ''}></div>

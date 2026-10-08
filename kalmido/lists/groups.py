@@ -87,10 +87,11 @@ def grp_sync(c, lids, actor=None):
         if not lr:
             continue
         want, gname = {}, {}
+        from ..accounts.orgs import ws_member_problem
         if not lr["is_inbox"]:
             for gid, role, _via in grp_shares_of_list(c, lid):
                 for uid in grp_members(c, gid):
-                    if uid == lr["owner_id"] or uid in agents:
+                    if uid == lr["owner_id"] or uid in agents or ws_member_problem(c, lid, uid):  # 2.28.0 (#935): of the list's workspace only
                         continue
                     if role_max(want.get(uid), role) != want.get(uid):
                         want[uid], gname[uid] = role_max(want.get(uid), role), gid
@@ -154,8 +155,16 @@ def grp_dict(c, r, full=True):
 
 
 def groups_for(c, uid=None, full=False):
-    """Every group with its members (names only; persons see all groups to share with them)."""
-    return [grp_dict(c, r, full) for r in c.execute("SELECT * FROM groups ORDER BY name COLLATE NOCASE, id")]
+    """Every group with its members (names only; persons see all groups to share with them). 2.28.0 (#935): in the mode
+    workspaces only the members one may see."""
+    from ..accounts.orgs import instance_mode, visible_people
+    out = [grp_dict(c, r, full) for r in c.execute("SELECT * FROM groups ORDER BY name COLLATE NOCASE, id")]
+    if instance_mode(c) == "workspaces" and has_request_context() and getattr(g, "user", None) is not None:
+        vis = visible_people(c, me())
+        if vis is not None:
+            for d in out:
+                d["members"] = [m for m in d["members"] if m["user_id"] in vis]
+    return out
 
 
 def grp_clean_name(v):
@@ -177,6 +186,9 @@ def grp_set_members(c, gid, ids, actor=None):
         u = c.execute("SELECT kind FROM users WHERE id=?", (x,)).fetchone()
         if not u or u["kind"] == "agent":
             raise BadInput(tr("Only people can be group members"))
+        from ..accounts.users import admin_sees
+        if has_request_context() and getattr(g, "user", None) is not None and not admin_sees(c, x):  # 2.28.0 (#935): mode workspaces
+            raise BadInput(tr("unknown user"))
         want.add(x)
     before = grp_list_ids(c, gid)
     cur = set(grp_members(c, gid))
@@ -305,6 +317,11 @@ def list_group_set(lid, gid):
     if c.execute("SELECT is_inbox FROM lists WHERE id=?", (lid,)).fetchone()[0]:
         return err(tr("The inbox cannot be shared"))
     role = grp_role(body())
+    from ..accounts.orgs import ws_member_problem
+    for uid in grp_members(c, gid):  # 2.28.0 (#935): everyone in the group must belong to the list's workspace
+        p = ws_member_problem(c, lid, uid)
+        if p:
+            return err(p, 409)
     if c.execute("SELECT 1 FROM group_shares WHERE list_id=? AND group_id=?", (lid, gid)).fetchone():
         c.execute("UPDATE group_shares SET role=? WHERE list_id=? AND group_id=?", (role, lid, gid))
     else:
@@ -350,6 +367,14 @@ def folder_group_set(gid):
     if not f:
         return err(tr("Name missing"))
     role = grp_role(b)
+    from ..accounts.orgs import ws_member_problem
+    from ..lists.lists import _in_folder
+    for l in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND is_inbox=0", (me(),)).fetchall():  # 2.28.0 (#935)
+        if _in_folder(l["folder"], f):
+            for uid in grp_members(c, gid):
+                p = ws_member_problem(c, l["id"], uid)
+                if p:
+                    return err(p, 409)
     if c.execute("SELECT 1 FROM group_shares WHERE owner_id=? AND folder=? AND group_id=? AND list_id IS NULL", (me(), f, gid)).fetchone():
         c.execute("UPDATE group_shares SET role=? WHERE owner_id=? AND folder=? AND group_id=? AND list_id IS NULL", (role, me(), f, gid))
     else:

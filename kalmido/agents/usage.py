@@ -753,6 +753,8 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                             "body": {"type": "string"}, "task_id": nul("integer"), "created_at": {"type": "string"},
                                             "delivered_at": nul("string", description="2.7.2 (#422): when the agent fetched the person's message (event poll, MCP, webhook, chat read); null = not yet / an agent message"),
                                             "asks": {"type": "boolean", "description": "2.13.0: an agent message that asks something (a question mark outside code and links); only there a 👍 / 👎 of the person is an approval / rejection"},
+                                            "choices": nul("object", description="2.28.0 (#1005): answer buttons of an agent message: {choices: [{id, label, style?: primary | danger}], multi}"),
+                                            "choice": nul("object", description="2.28.0 (#1005): the person's answer {ids, at, user_id}; null while open. The agent gets the event chat_choice"),
                                             "attachments": {"type": "array", "description": "2.13.1 (#465): images / files of the message; download with GET /chat-attachments/{id}",
                                                             "items": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"},
                                                                                                        "mime": {"type": "string"}, "size": {"type": "integer"},
@@ -870,7 +872,11 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                             ok(ref("ChatMessage"), "Created", "201") | errs("400", "403", "404", "413"), [pid("id", "User id")], scope=W),
                                          "requestBody": {"required": True, "content": {
                                              "application/json": {"schema": {"type": "object", "required": ["body"], "properties": {
-                                                 "body": {"type": "string"}, "task_id": {"type": "integer"}}}},
+                                                 "body": {"type": "string"}, "task_id": {"type": "integer"},
+                                                 "choices": {"type": "array", "maxItems": 8, "description": "2.28.0 (#1005): answer buttons; the person's answer comes as the event chat_choice (message_id, choice_ids, labels)",
+                                                             "items": {"type": "object", "required": ["id", "label"], "properties": {"id": {"type": "string", "maxLength": 40}, "label": {"type": "string", "maxLength": 80},
+                                                                                                                                    "style": {"type": "string", "enum": ["default", "primary", "danger"]}}}},
+                                                 "multi": {"type": "boolean", "description": "several buttons may be chosen"}}}},
                                              "multipart/form-data": {"schema": {"type": "object", "properties": {
                                                  "body": {"type": "string"}, "task_id": {"type": "integer"},
                                                  "file": {"type": "array", "items": {"type": "string", "format": "binary"}}}}}}}}},
@@ -891,6 +897,10 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                                                   ok(chat_rx_out) | errs("400", "403", "404"), [pid("id", "User id"), pid("mid", "Message id")],
                                                                   scope=W, body=chat_rx_in)},
         "/agents": {"get": op("Agents you share lists with (an agent: itself)", AG, ok(ref("AgentPage")) | errs())},
+        "/agents/{id}/chat/{mid}/choice": {"post": op("2.28.0 (#1005): answer an agent's question with one of its buttons ({choice_ids}); once per message; "
+                                                      "the agent gets the event chat_choice", AG, ok(ref("ChatMessage")) | errs("400", "403", "404", "409"),
+                                                      [pid("id", "Agent id"), pid("mid", "Message id")], scope=W,
+                                                      body={"type": "object", "required": ["choice_ids"], "properties": {"choice_ids": {"type": "array", "items": {"type": "string"}}}})},
         "/agents/{id}/chat/{mid}/reactions": {"post": op("React to a message of your chat with an agent (2.7.2): 👍 / 👎 on an agent's message "
                                                          "that asks something (asks, 2.13.0) = approval / rejection; the agent gets the event reaction", AG, ok(chat_rx_out) | errs("400", "403", "404"),
                                                          [pid("id", "Agent id"), pid("mid", "Message id")], scope=W, body=chat_rx_in)},

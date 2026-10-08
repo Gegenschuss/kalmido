@@ -226,9 +226,11 @@ def invite_accept():
 def user_invite(uid):
     """Admins: {send?: true} -> a new invitation (no password yet) or reset link (has one): by e-mail when possible, the
     link always in the answer (to copy without SMTP)."""
-    from ..accounts.users import need_admin
+    from ..accounts.users import admin_sees, need_admin
     need_admin()
     c = db()
+    if not admin_sees(c, uid):  # 2.28.0 (#935): mode workspaces: only people the admin sees
+        raise Denied(404)
     b = body()
     out = invite_new(c, uid, g.user["id"], send=b.get("send", True) is not False)
     bump(c)

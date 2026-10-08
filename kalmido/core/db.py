@@ -147,7 +147,7 @@ def create_user(c, username, display_name="", password=None, proxy_login=None, i
     # 2.22.0 (#752): every new account belongs to an organisation: the instance's first one (the caller may change it)
     first = c.execute("SELECT id FROM orgs ORDER BY id LIMIT 1").fetchone()
     from ..accounts.orgs import instance_mode
-    if first and instance_mode(c) != "shared":
+    if first and instance_mode(c) in ("organisation", "multi"):  # 2.28.0 (#935): mode workspaces: by domain / an admin, never by default
         c.execute("INSERT OR IGNORE INTO org_members(org_id,user_id) VALUES(?,?)", (first[0], uid))
     return uid
 
@@ -346,8 +346,9 @@ def init_db(guard=True):
                     gset(c, "people_visibility", "org")
                 print("organisations:", name, "with every account", flush=True)
             gset(c, "migr_orgs2220", "1")
-        from ..accounts.orgs import instance_sync
+        from ..accounts.orgs import instance_sync, ws_migrate
         instance_sync(c)  # 2.23.0 (#799): the organisation mode's one organisation with every account
+        ws_migrate(c)  # 2.28.0 (#935), once: every list and agent gets its workspace
         # 2.22.0 (#740), once: lists shared before go into the folder of the same name as with their owner (created when
         # missing) -- only where the person has not put the list into a folder of their own
         if gsetting(c, "migr_folders2220") != "1":

@@ -112,14 +112,33 @@ def make_agent(c, uid):
     c.execute("INSERT OR IGNORE INTO agents(user_id,enabled,status,created_at) VALUES(?,1,'idle',?)", (uid, iso(now_utc())))
 
 
+def agent_restricted_dict(c, a):
+    """2.28.0 (#965): somebody else's personal agent as an admin sees it: name, owner, whether it runs -- the kill switch and
+    nothing else (no lists, tokens, chat, usage)."""
+    return {"id": a["user_id"], "username": a["username"], "name": a["display_name"] or a["username"], "display_name": a["display_name"] or a["username"],
+            "owner": {"id": a["owner_id"], "name": user_names(c, [a["owner_id"]]).get(a["owner_id"], "")}, "owner_id": a["owner_id"],
+            "org_id": a["org_id"], "enabled": bool(a["enabled"]), "disabled": bool(a["disabled"]), "admin_paused": bool(a["admin_paused"]),
+            "status": "paused" if not a["enabled"] else (a["status"] or "idle"), "created_at": a["created_at"], "restricted": True, "lists": [], "tokens": []}
+
+
 @app.get("/api/admin/agents")
 def admin_agents():
+    """Every agent for the administration. 2.28.0 (#965): a personal agent of somebody else comes restricted (name, owner,
+    kill switch); in the mode workspaces only agents of people the admin may see."""
     from ..api.scopes import scopes_offer
+    from ..accounts.users import admin_sees
     need_admin()
     c = db()
     rows = c.execute("""SELECT a.*, u.username, u.display_name, u.avatar, u.disabled FROM agents a JOIN users u ON u.id=a.user_id
                         WHERE u.kind='agent' ORDER BY u.id""").fetchall()
-    return jsonify(agents=[agent_admin_dict(c, a) for a in rows], events=list(AGENT_EVENTS), webhooks=WH_ON, api=API_ON,
+    out = []
+    for a in rows:
+        if a["owner_id"] and a["owner_id"] != me():
+            if admin_sees(c, a["owner_id"]):
+                out.append(agent_restricted_dict(c, a))
+        elif admin_sees(c, a["user_id"]):
+            out.append(agent_admin_dict(c, a))
+    return jsonify(agents=out, events=list(AGENT_EVENTS), webhooks=WH_ON, api=API_ON,
                    scopes=scopes_offer(c, g.user, agent=True), default_scopes=list(SCOPES_AGENT_DEFAULT))  # 2.15.0 (#479)
 
 
@@ -140,6 +159,12 @@ def admin_agent_create():
     uid = create_user(c, username, (b.get("display_name") or "").strip()[:60] or username, None, None, False, paperless_access=False)
     make_agent(c, uid)
     c.execute("UPDATE agents SET note=?, provider=? WHERE user_id=?", (str(b.get("note") or "")[:AGENT_NOTE_MAX], str(b.get("provider") or "").strip()[:80], uid))
+    try:  # 2.28.0 (#965 / #970 / #935): owner_id = a personal agent of that person (default: a team agent), org_id = its workspace
+        agent_owner_set(c, uid, b.get("owner_id"), bool(b.get("owner_id")))
+        agent_org_set(c, uid, b["org_id"] if "org_id" in b else "auto")
+    except BadInput:
+        c.rollback()
+        raise
     try:  # 2.15.0 (#479): scopes (default read + tasks:write + comments) and the address restriction
         agent_scopes_set(c, uid, {"scopes": b.get("scopes") or list(SCOPES_AGENT_DEFAULT), **({"allowed_ips": b["allowed_ips"]} if "allowed_ips" in b else {})})
     except BadInput:
@@ -202,6 +227,11 @@ def admin_agent_update(aid):
         lim = usage_limits_clean(b["limits"])
         c.execute("UPDATE agents SET usage_limits=?, usage_alerted='' WHERE user_id=?", (lim, aid))
         print("agent", aid, "usage limits", lim or "none", "by", g.user["username"], flush=True)
+    if a0["owner_id"] and a0["owner_id"] != me():  # 2.28.0 (#965): somebody else's personal agent: the kill switch and "Belongs to" only
+        extra = sorted(k for k in b if k not in ("enabled", "owner_id"))
+        if extra:
+            c.rollback()
+            return err(tr("A personal agent of another person: only its owner changes it (you can pause it)"), 403)
     if "display_name" in b:
         c.execute("UPDATE users SET display_name=? WHERE id=?", ((b["display_name"] or "").strip()[:60] or
                                                                 agent_row(c, aid)["username"], aid))
@@ -209,6 +239,16 @@ def admin_agent_update(aid):
         c.execute("UPDATE agents SET note=? WHERE user_id=?", (str(b["note"] or "")[:AGENT_NOTE_MAX], aid))
     if "provider" in b:  # 2.24.0 (#896)
         c.execute("UPDATE agents SET provider=? WHERE user_id=?", (str(b["provider"] or "").strip()[:80], aid))
+    if "owner_id" in b or "org_id" in b:  # 2.28.0 (#965 / #935): "Belongs to" (team | a person) and the workspace
+        try:
+            if "owner_id" in b:
+                agent_owner_set(c, aid, b["owner_id"], True)
+                print("agent", aid, "belongs to", b["owner_id"] or "team", "(was", a0["owner_id"] or "team", ") set by", g.user["username"], flush=True)
+            if "org_id" in b:
+                agent_org_set(c, aid, b["org_id"])
+        except BadInput:
+            c.rollback()
+            raise
     if "pause_reason" in b:  # 2.26.0 (#949): pause with a reason (text) / resume (null or ""): status paused <-> idle
         pr = b["pause_reason"]
         if pr is not None and not isinstance(pr, str):
@@ -361,6 +401,46 @@ def agent_owner(c, aid):
     return r["owner_id"] if r else None
 
 
+def agent_owner_set(c, aid, owner, given):
+    """2.28.0 (#965): "Belongs to": null = a team agent, a user id = that person's personal agent (only they see and use it;
+    its lists stay). Nothing when not given. BadInput for an unknown person / an agent / a disabled account."""
+    if not given:
+        return
+    if owner in (None, "", 0, "team"):
+        c.execute("UPDATE agents SET owner_id=NULL, admin_paused=0 WHERE user_id=?", (aid,))
+        return
+    if isinstance(owner, bool) or not isinstance(owner, int) or \
+            not c.execute("SELECT 1 FROM users WHERE id=? AND kind!='agent' AND disabled=0", (owner,)).fetchone():
+        raise BadInput(tr("Invalid value: {0}", "owner_id"))
+    c.execute("UPDATE agents SET owner_id=? WHERE user_id=?", (owner, aid))
+
+
+def agent_org_set(c, aid, v):
+    """2.28.0 (#935): the workspace an agent works in: null / 'private' = private, an organisation id, 'auto' = the first
+    organisation of its owner (a team agent: the instance's first one). Checked: a personal agent only in an organisation its
+    owner belongs to. Nothing without organisations."""
+    from ..accounts.orgs import has_workspaces, main_org, user_orgs
+    if not has_workspaces(c):
+        return
+    a = agent_row(c, aid)
+    if v == "auto":
+        oids = user_orgs(c, a["owner_id"]) if a["owner_id"] else []
+        v = oids[0] if oids else (None if a["owner_id"] else main_org(c))
+    if v in (None, "", 0, "0", "private"):
+        c.execute("UPDATE agents SET org_id=NULL WHERE user_id=?", (aid,))
+        return
+    if isinstance(v, bool) or not isinstance(v, int) or not c.execute("SELECT 1 FROM orgs WHERE id=?", (v,)).fetchone():
+        raise BadInput(tr("Invalid value: {0}", "org_id"))
+    if a["owner_id"] and v not in user_orgs(c, a["owner_id"]):
+        raise BadInput(tr("The owner of this agent is not a member of that organisation"))
+    if (a["org_id"] or None) != v:
+        n = c.execute("""SELECT COUNT(*) FROM lists l WHERE COALESCE(l.org_id,0)!=? AND l.is_inbox=0 AND (l.owner_id=? OR l.id IN
+                         (SELECT list_id FROM list_members WHERE user_id=?))""", (v or 0, aid, aid)).fetchone()[0]
+        if n:
+            raise BadInput(tr("The agent is still in {0} lists of another workspace: take it out of them first", n))
+    c.execute("UPDATE agents SET org_id=? WHERE user_id=?", (v, aid))
+
+
 def personal_agent_foreign(c, aid, uid):
     """True if aid is somebody else's personal agent (uid may not share with / find it)."""
     o = agent_owner(c, aid)
@@ -470,6 +550,11 @@ def my_agent_create():
     c.execute("UPDATE agents SET note=?, owner_id=?, usage_limits=?, provider=? WHERE user_id=?",
               (str(b.get("note") or "")[:AGENT_NOTE_MAX], me(), gsetting(c, "user_agents_limits") or "", str(b.get("provider") or "").strip()[:80], uid))
     c.execute("UPDATE users SET avatar=? WHERE id=?", ("p:robot", uid))
+    try:  # 2.28.0 (#935): its workspace (default: the owner's first organisation, like a list; "private" = only private lists)
+        agent_org_set(c, uid, b["org_id"] if "org_id" in b else "auto")
+    except BadInput:
+        c.rollback()
+        raise
     try:  # 2.15.0 (#479)
         agent_scopes_set(c, uid, {"scopes": b.get("scopes") or list(SCOPES_AGENT_DEFAULT), **({"allowed_ips": b["allowed_ips"]} if "allowed_ips" in b else {})})
     except BadInput:
@@ -491,9 +576,15 @@ def my_agent_update(aid):
     c = db()
     a = need_own_agent(c, aid)
     b = body()
-    unknown = sorted(k for k in b if k not in ("display_name", "note", "enabled", "scopes", "allowed_ips", "provider", "pause_reason"))
+    unknown = sorted(k for k in b if k not in ("display_name", "note", "enabled", "scopes", "allowed_ips", "provider", "pause_reason", "org_id"))
     if unknown:
         return err(tr("Invalid value: {0}", ", ".join(unknown)))
+    if "org_id" in b:  # 2.28.0 (#935): the owner moves the agent into another workspace (its lists must fit: none of another one)
+        try:
+            agent_org_set(c, aid, b["org_id"])
+        except BadInput:
+            c.rollback()
+            raise
     if "scopes" in b or "allowed_ips" in b:  # 2.15.0 (#479): the owner decides what the agent may do (within the admin's limit)
         try:
             agent_scopes_set(c, aid, b)

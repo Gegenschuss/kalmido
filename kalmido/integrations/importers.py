@@ -94,6 +94,8 @@ def import_ticktick(c, text, uid):
             lid = c.execute("INSERT INTO lists(name,folder,sort,view,created_at,owner_id) VALUES(?,?,?,?,?,?)",
                             (name[:LIST_NAME_MAX], folder_seg(r.get("Folder Name") or ""), srt,
                              "kanban" if r.get("View Mode") == "kanban" else "list", ts, uid)).lastrowid
+            from ..accounts.orgs import ws_apply_default
+            ws_apply_default(c, uid, lid)  # 2.28.0 (#935): the default workspace
             list_created(c, uid, lid)  # 2.25.0 (#931): agents, groups and people of a shared folder
             lists[name] = lid
             stats["lists"] += 1
@@ -1345,6 +1347,8 @@ def imp_run(c, uid, plan, opts, dry):
                 sort_l += 1
                 lid = c.execute("INSERT INTO lists(name,folder,sort,view,created_at,owner_id) VALUES(?,?,?,?,?,?)",
                                 (L["name"] or tr("Import", lg=lg), L["folder"], sort_l, L["view"], ts, uid)).lastrowid
+                from ..accounts.orgs import ws_apply_default
+                ws_apply_default(c, uid, lid)  # 2.28.0 (#935): the default workspace
                 list_created(c, uid, lid)  # 2.25.0 (#931)
                 own[L["name"]] = lid
                 created["lists"].append(lid)

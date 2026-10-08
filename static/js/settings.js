@@ -366,7 +366,7 @@ function aiHtml(hint, want) {
     ${feat('agents') ? '' : `<div class="shint aimodoff">${ic('grid', 's')} <span>${tr('The Agents module (the tab with their status, jobs to approve and the chat) is switched off for you.')}</span> <button class="btn sm" data-m="go-modules">${tr('Open Modules')}</button></div>`}
     ${collab() ? '' : hint(tr('Agents work together with you in shared lists: switch on Collaboration (Settings > Modules) as well.'))}
     <div class="members aglist" id="${adm ? 's-ags' : 's-myags'}"><div class="muted mhint">${tr('Loading…')}</div></div>
-    <div class="row aibtns">${adm ? `<button class="btn sm" data-ag="new">${ic('plus', 's')} ${tr('Add agent')}</button>` : ''}<button class="btn sm" data-m="ag-guide" title="${esc(tr('Set up an agent step by step, or let Claude Code do it'))}">${ic('help', 's')} ${tr('Setup guide')}</button></div>
+    <div class="row aibtns">${adm ? `<button class="btn sm" data-ag="new" aria-haspopup="menu">${ic('plus', 's')} ${tr('Add agent…')}</button>` : `<button class="btn sm" data-aigo="setup">${ic('plus', 's')} ${tr('Personal agent…')}</button>`}<button class="btn sm" data-m="ag-guide" title="${esc(tr('Set up an agent step by step, or let Claude Code do it'))}">${ic('help', 's')} ${tr('Setup guide')}</button></div>
     ${agDotsHtml(hint)}`)}
     ${pane('lists', `<h4 id="s-ai-lists-h">${ags.length > 1 ? tr('Which lists they see') : tr('Which lists it sees')}</h4>
     ${hint(tr('An agent sees exactly the lists shared with it, nothing else. Share or stop sharing below or in the list’s Share dialog; taking a list out ends the access at once.'))}
@@ -409,9 +409,10 @@ async function agSetupDraw(md) {
     <span class="agacts"><button class="iconbtn" data-myag-act="perm" title="${esc(tr('Permissions'))}" aria-label="${esc(tr('Permissions of {0}', a.name))}">${ic('lock', 's')}</button><button class="iconbtn" data-myag-act="token" title="${esc(tr('New API token'))}" aria-label="${esc(tr('New API token'))}">${ic('key', 's')}</button>
       <button class="iconbtn ${a.enabled ? 'danger' : ''}" data-myag-act="pause" title="${esc(a.enabled ? tr('Pause') : tr('Resume'))}" aria-label="${esc(a.enabled ? tr('Pause') : tr('Resume'))}" ${!a.enabled && a.admin_paused ? 'disabled' : ''}>${ic(a.enabled ? 'pause' : 'play', 's')}</button>
       <button class="iconbtn danger" data-myag-act="del" title="${esc(tr('Delete'))}" aria-label="${esc(tr('Delete'))}">${ic('trash', 's')}</button></span></div>`;
-  const add = j.allowed && j.count < j.max ? `<div class="row myagnew"><input id="myag-user" placeholder="${esc(tr('Username, e.g. my-claude'))}" aria-label="${esc(tr('Username'))}" maxlength="32" autocapitalize="off" autocomplete="off" spellcheck="false"><input id="myag-name" placeholder="${esc(tr('Display name'))}" aria-label="${esc(tr('Display name'))}" maxlength="60"><input id="myag-prov" placeholder="${esc(tr('Where it runs, e.g. Claude (Anthropic, USA)'))}" aria-label="${esc(tr('Where it runs'))}" maxlength="80"><button class="btn sm pri" data-myag-act="new">${ic('plus', 's')} ${tr('Create agent')}</button></div>
+  const add = j.allowed && j.count < j.max ? `<div class="row myagnew"><input id="myag-name" placeholder="${esc(tr('Display name'))}" aria-label="${esc(tr('Display name'))}" maxlength="60"><input id="myag-user" placeholder="${esc(tr('Username, e.g. my-claude'))}" aria-label="${esc(tr('Username'))}" title="${esc(tr('for the login and @mentions'))}" maxlength="32" autocapitalize="off" autocomplete="off" spellcheck="false"><input id="myag-prov" placeholder="${esc(tr('Where it runs, e.g. Claude (Anthropic, USA)'))}" aria-label="${esc(tr('Where it runs'))}" maxlength="80"><button class="btn sm pri" data-myag-act="new">${ic('plus', 's')} ${tr('Create agent')}</button></div>
     <div class="shint keep">${esc(trn('You can have {0} personal agent.', 'You can have {0} personal agents.', j.max))} ${esc(tr('You connect it yourself (your own provider and key): what it reads in your lists goes to that provider, and you are responsible for it. Everyone in a list you share with it is told where it runs.'))}</div>` : '';
   box.innerHTML = (j.agents.map(row).join('') || (j.allowed ? '' : `<div class="muted mhint">${tr('Your organisation does not let members connect agents (an admin can allow it: Administration > Organisation).')}</div>`)) + add;
+  userNameFollow(box, 'myag-name', 'myag-user');  // 2.28.0 (#926)
   if (S.me?.is_admin) {
     try {
       const p = await api('GET', '/api/admin/agent-policy'); const sw = $('#s-uag', md), mx = $('#s-uagmax', md); if (sw) sw.checked = p.user_agents; if (mx) { mx.value = p.max_per_user; mx.disabled = !p.user_agents; }
@@ -435,6 +436,7 @@ function agSetupWire(md) {
     try {
       if (k === 'new') {
         const un = $('#myag-user', md).value.trim().toLowerCase(); if (!un) { need($('#myag-user', md)); return; }
+        if (userNameBad(un)) { toast(userNameBad(un)); need($('#myag-user', md)); return; }  // 2.28.0 (#926)
         b.disabled = true;
         const r = await api('POST', '/api/my/agents', {username: un, display_name: $('#myag-name', md).value.trim(), provider: $('#myag-prov', md)?.value.trim() || ''});
         secretModal(tr('API token of {0}', r.name), r.token, tr('Copy it now into the agent’s configuration: it is shown only this once.') + ' ' + tr('Then share lists with the agent (list dialog > Sharing).'));

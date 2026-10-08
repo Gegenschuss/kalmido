@@ -27,10 +27,11 @@ def owner_candidates(c, lid, owner):
     roles = {r[0]: r[1] for r in c.execute("SELECT user_id, role FROM list_members WHERE list_id=?", (lid,))}
     rows = c.execute("SELECT id, username, display_name FROM users WHERE disabled=0 AND COALESCE(kind,'user')!='agent' AND id!=? "
                      "ORDER BY id", (owner,)).fetchall()
-    from ..accounts.orgs import visible_people
+    from ..accounts.orgs import list_org, user_orgs, visible_people
     vis = visible_people(c, me()) if has_request_context() else None  # 2.22.0 (#752): only people one may see (members always)
+    oid = list_org(c, lid)  # 2.28.0 (#935): an organisation's list stays in the organisation
     out = [{"id": r["id"], "name": r["display_name"] or r["username"], "role": roles.get(r["id"])} for r in rows
-           if vis is None or r["id"] in vis or r["id"] in roles]
+           if (vis is None or r["id"] in vis or r["id"] in roles) and (not oid or oid in user_orgs(c, r["id"]))]
     out.sort(key=lambda x: (x["role"] is None, x["name"].lower()))
     return out
 
@@ -139,6 +140,8 @@ def list_owner_set(lid):
         return err(tr("An agent cannot own a list"))
     if new == lr["owner_id"]:
         return err(tr("{0} already owns this list", u["display_name"] or u["username"]))
+    from ..accounts.orgs import ws_check_member
+    ws_check_member(c, lid, new)  # 2.28.0 (#935): an organisation's list stays inside the organisation (409)
     old, nname = owner_transfer(c, lr, new)
     bump(c)
     c.commit()

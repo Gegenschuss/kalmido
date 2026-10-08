@@ -203,7 +203,7 @@ function renderSide() {
     `<button class="srow ${onTasks && k === key && !(key === 'all' && isRoadmap()) ? 'on' : ''}" data-go="${esc(keyToHash(key))}" data-drop="${esc(key)}" ${GO_KEY[key] && !isTouch() ? `title="${esc(kt(name, GO_KEY[key]))}"` : ''} ${extra}>${icon}<span class="n">${esc(name)}</span><span class="c ${key === 'today' && c.over ? 'over' : ''}">${n || ''}</span>${after}</button>`;
   const mrow = (mod, icon, name, after = '', attrs = '') => `<button class="srow smod ${S.route.mod === mod ? 'on' : ''}" data-go="${mod}" ${GO_KEY[mod] && !isTouch() ? `title="${esc(kt(name, GO_KEY[mod]))}"` : ''} ${attrs}>${ic(icon)}<span class="n">${esc(name)}</span>${after}</button>`;
   const head = (g, label, acts = '', n = '', tip = '') => `<div class="shead sgh ${g === 'lists' ? 'lroot' : ''} ${sideOpen(g) ? '' : 'closed'}" ${tip ? `title="${esc(tip)}"` : ''}><button class="sgt" data-act="side-group" data-g="${g}" aria-expanded="${sideOpen(g)}">${ic('chev', 's fcar')}<span>${esc(label)}</span>${!sideOpen(g) && n ? `<span class="c">${n}</span>` : ''}</button><span class="spacer"></span>${acts}</div>`;
-  const lists = S.lists.filter(l => !l.is_inbox && !l.archived);
+  const lists = S.lists.filter(l => !l.is_inbox && !l.archived && inWs(l));  // 2.28.0 (#935): the shown workspace
   const listRow = l => {
     // 2.23.0 (#794): ONE fixed icon column for a picture, an emoji (taken from the name) or the dot, so the names line up
     const em = !l.icon && leadEmoji(l.name);
@@ -232,8 +232,9 @@ function renderSide() {
       : `<span class="c" ${n ? `aria-label="${esc(trn('{0} open task', '{0} open tasks', n))}"` : ''}>${n || ''}</span>${ic('chev', 's fcar')}<button class="iconbtn fmenu" data-act="folder-menu" data-folder="${esc(f)}" title="${tr('Folder')}" aria-label="${esc(tr('Folder') + ' ' + fDisp(f))}">${ic('dots', 's')}</button>`}</div>`};
   };
   const fempty = () => `<div class="fempty">${isMobile() ? tr('empty: assign lists in sort mode') : tr('empty: drag a list here')}</div>`;
-  for (const f of folderNames().filter(x => !fParent(x))) {
-    const top = fhead(f), subs = folderSubs(f);
+  const wsAll = wsCur() === 'all';
+  for (const f of folderNames().filter(x => !fParent(x) && (wsAll || lists.some(l => fUnder(l.folder, x))))) {  // 2.28.0: folders with lists here
+    const top = fhead(f), subs = folderSubs(f).filter(sf => wsAll || lists.some(l => fUnder(l.folder, sf)));
     lh += top.html;
     if (top.closed) continue;
     let body = lists.filter(l => l.folder === f).map(listRow).join('');
@@ -243,7 +244,7 @@ function renderSide() {
     }
     lh += `<div class="fbody" data-folder="${esc(f)}">${body || fempty()}</div>`;
   }
-  const archived = S.lists.filter(l => l.archived);
+  const archived = S.lists.filter(l => l.archived && inWs(l));
   const tags = Object.keys(c.tags).sort((a, b) => a.localeCompare(b, 'de'));
   const tagsOpen = S.collapsed.has('side:tags-open') || tags.some(t => onTasks && k === 'tag:' + t);
   // Focus: the smart lists
@@ -259,7 +260,7 @@ function renderSide() {
   const focus = plan.filter(([x, h]) => h && (!hid('e:' + x) || (onTasks && k === x))).map(([, h]) => h).join('')
     + (planHidden ? `<button class="srow smore" data-act="side-more" title="${esc(tr('Settings > Appearance > Sidebar'))}">${ic('plus')}<span class="n">${esc(trn('{0} more view', '{0} more views', planHidden))}</span></button>` : '');
   const convo = [teamOn() && (hasSharing() || S.team?.unread) ? `<button class="srow ${S.route.mod === 'team' ? 'on' : ''}" data-go="team">${ic('comment')}<span class="n">${tr('Team chat')}</span><span class="c ${S.team?.unread ? 'nunread' : ''}">${S.team?.unread ? `${S.team.unread}<span class="sr"> ${esc(tr('unread'))}</span>` : ''}</span></button>` : '',  // 2.17.0 (#419)
-    collab() && (hasSharing() || S.news?.unread) ? `<button class="srow ${S.route.mod === 'news' ? 'on' : ''}" data-go="news" title="${esc(tr('Assignments, @mentions, comments and follow-ups for you'))}">${ic('bell')}<span class="n">${tr('News')}</span><span class="c ${S.news?.unread ? 'nunread' : ''}">${S.news?.unread || ''}</span></button>` : ''].join('');
+    collab() && (hasSharing() || S.news?.unread) ? `<button class="srow ${S.route.mod === 'news' ? 'on' : ''}" data-go="news" title="${esc(tr('Assignments, @mentions, comments and follow-ups for you'))}">${ic('bell')}<span class="n">${tr('News')}</span><span class="c ${bellCount() ? 'nunread' : ''}">${bellCount() || ''}</span></button>` : ''].join('');  // 2.28.0 (#987): the number = "For you"
   // Views: every switched-on module (the rail's old job)
   const aw = (S.agents || []).reduce((n, x) => n + x.waiting + x.chat_unread, 0);
   const views = [feat('cal') ? mrow('cal', 'cal', tr('Calendar')) : '',
@@ -299,6 +300,7 @@ function renderSide() {
     team: `${team ? grp('team', tr('Conversations|nav'), team, '', ppl.length + ags.length + grps.length + (convo.match(/class="srow/g) || []).length) : ''}`};
   $('#side').innerHTML = `
     <div class="sbrand"><button type="button" class="sbhome ${S.route.mod === 'home' ? 'on' : ''}" data-go="home" title="${esc(tr('Start|home'))}" aria-label="${esc(APP_NAME + ': ' + tr('Start|home'))}" ${S.route.mod === 'home' ? 'aria-current="page"' : ''}>${logoSvg(20)}<span>${esc(APP_NAME)}</span>${S.me?.orgs?.[0] && S.me.orgs[0].trim().toLowerCase() !== APP_NAME.toLowerCase() ? `<small class="sborg">${esc(S.me.orgs[0])}</small>` : ''}</button><span class="spacer"></span>${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(tr('Account') + ': ' + S.me.display_name)}" aria-label="${esc(tr('Account') + ': ' + S.me.display_name)}">${av(S.me.id, S.me.display_name)}${updDot() ? `<span class="dot" title="${esc(tr('Update available'))}"></span>` : ''}</button>` : ''}</div>
+    ${wsBarHtml()}
     <button class="scmd" data-act="palette" title="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span></button>
     ${sideGroupOrder().filter(g => !hid('g:' + g) || g === 'lists').map(g => SB[g] || '').join('')}
     <div class="sgroup sfoot">
@@ -386,7 +388,7 @@ function renderTop0() {
   const kl = m === 'tasks' && k.startsWith('l:') ? listById(+k.slice(2)) : null;
   const badge = kl?.kind === 'project' ? `<span class="kbadge" title="${esc(projectParts().join(', '))}">${tr('Project')}</span>` : '';
   S.bandOn = bandAgents().length > 0;  // 2.8.0 (#434): the band shows the agents' dots, the header pill keeps only the robot
-  setHtml($('#top'), `<button class="iconbtn menu" data-act="side" aria-label="${tr('Menu')}">${ic('menu')}</button><h1 title="${esc(title)}">${kl?.icon ? licon(kl, 'licon h') : ''}<span class="ht">${esc(title)}</span>${badge}${nOpen ? `<span class="hn" aria-label="${esc(trn('{0} open task', '{0} open tasks', nOpen))}">${nOpen}</span>` : ''}${ms}</h1>${cf}${off}${timerPill()}${pm}${acts}${isMobile() ? '' : histBtns()}${pal}${tnew}${stChip()}${agentChip()}${bellBtn()}`);  // 2.7.2 (#417): the agents' robot + dots directly before the bell  // 2.7.0 (#405): touch tablets / an unfolded Fold have the room for ← →
+  setHtml($('#top'), `<button class="iconbtn menu" data-act="side" aria-label="${tr('Menu')}">${ic('menu')}</button><h1 title="${esc(title)}">${kl?.icon ? licon(kl, 'licon h') : ''}<span class="ht">${esc(title)}</span>${badge}${nOpen ? `<span class="hn" aria-label="${esc(trn('{0} open task', '{0} open tasks', nOpen))}">${nOpen}</span>` : ''}${ms}</h1>${cf}${off}${timerPill()}${pm}${acts}${isMobile() ? '' : histBtns()}${pal}${tnew}${wsChip()}${stChip()}${agentChip()}${bellBtn()}`);  // 2.7.2 (#417): the agents' robot + dots directly before the bell  // 2.7.0 (#405): touch tablets / an unfolded Fold have the room for ← →
   fitTop();
 }
 // ---- 2.6.0 (K01 + K02, UX audit 2): the header has a fixed priority on every width. The title comes first: it keeps at

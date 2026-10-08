@@ -18,6 +18,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.28.0** (2026-10-08): Work and private apart. Every list and agent belongs to a **workspace** (private or an
+  organisation) with a **switch in the sidebar**; a new server mode runs **several organisations on one server**, each
+  with its own admins. **Personal agents are invisible to admins**, agents get a **robot badge**, News split into **For
+  you** and **Activity**, agents ask with **answer buttons** in the chat.
 - **2.27.0** (2026-10-08): Bugs & polish. A window running **old code after an update** says so and reloads; **shared
   folders look the same for everyone**; automatic **tidy-up waits until nobody types**; new **projects start without
   sections** unless you ask; **comments at the bottom** of a task again; agents per folder in the settings; and 20
@@ -637,6 +641,13 @@ boolean `checklist` are still accepted as deprecated aliases.
 
 ### News and notifications
 
+2.28.0 (#987): News come in two parts. **For you** holds what *people* send you -- @mentions, assignments, replies to
+your comments, approval decisions -- and the unread direct messages of the team chat; **Activity** holds every change
+and everything agents do. The bell counts only *For you*, its dropdown shows *For you* first, the News view has the
+tabs *For you | Activity | All*, and the start page shows *N messages for you* while something is unread. Pushes for
+what agents do (their comments, completions, new tasks, status) are off by default (*Settings > Notifications > Pushes
+for what agents do*); an agent's @mention of you and its approval requests push as before.
+
 <p align="center"><img src="docs/news.png" alt="News inbox with mentions, grouped comments, an assignment, a completion and a shared list"></p>
 
 **Bundled (2.17.0):** News are grouped per task (or list) with one line of what happened ("2 comments · completed"),
@@ -724,6 +735,35 @@ a tab (Settings > Appearance > Tab bar).
 - API v1 and MCP: `/family`, `/family/occasions`, `/family/deadlines`, `/tasks/{id}/to-shopping`, `/lists/{id}/shop-areas`,
   `/family/packing`, `/family/kids`, rewards; tasks carry `family`, `rotation`, `people` and `stars` (docs/API.md).
 
+## Workspaces: work and private apart (2.28.0)
+
+Every list belongs to a **workspace**: your private space or one of your organisations (the list dialog, *Workspace*).
+The switch at the top of the sidebar (*Private | <organisation> | All*) shows the lists, tasks, News, agents and team
+chats of one workspace at a time (the inbox is always there); a chip in the header says which one you look at, and the
+choice follows you to every device. A new list starts in the shown workspace.
+
+What the server keeps apart:
+
+- An **organisation's list** is shared only with the organisation's members (a share with somebody else is refused with
+  a clear message, a share by e-mail address into it does nothing and reveals nothing); its groups must consist of
+  members and its ownership stays inside the organisation.
+- **Private lists** are shared with anyone you may see (also colleagues) and stay invisible to the organisation.
+- **Agents work in one workspace** and join only its lists: an organisation's agent never sees a private list, a private
+  agent never an organisation's list. "Used for" (family / household) and Home & life lists are private only.
+- Changing a list's workspace is the owner's call and refused while people or agents in it do not fit the new one.
+- *Settings > Account > Workspaces* lists your organisations with their members; an organisation's admins manage them
+  there (see below).
+
+**Leaving an organisation** (removed by an admin, or on your own): your lists of that workspace stay with the
+organisation (they go to the admin who removes you, or to the next admin), you leave every list of the organisation;
+your private lists go with you. When the only admin leaves, the operator (an instance admin) takes the organisation over.
+
+**On the update** to 2.28.0 every list of a server with an organisation stays in the organisation (a server from before
+was one company), except family / household and Home & life lists, lists in a top folder named like *Private* /
+*Family* / *Home* and every inbox: those become private. Team agents work in the organisation, a personal agent in the
+workspace most of its lists are in; an agent that already sits in a list of another workspace is kept and pointed out --
+the owner decides.
+
 ## Organisations and invitations
 
 2.23.0: the kind of server is set when it is set up, not in the app (`KALMIDO_INSTANCE_MODE`):
@@ -733,6 +773,14 @@ a tab (Settings > Appearance > Tab bar).
   invitation mail. Admins see it under *Settings > Administration*, but nobody creates or deletes organisations in the app.
 - **`shared`**: a shared server of many households or companies: no organisations and no directory; people see only the
   people they are connected with and share lists by e-mail address.
+- **`workspaces`** (2.28.0): one account, several workspaces: organisations are workspaces on a shared server. People see
+  the members of their organisations and the people they are connected with (a list or group in common, their kids, their
+  agents) -- nobody else, instance admins included: *Users* shows an admin only the people it sees and how many others
+  there are, and it manages only those. The instance admin (the operator) creates organisations with a first admin and
+  deletes empty ones; **organisation admins** manage their members (add by e-mail address -- the answer never says
+  whether the address has an account --, roles, removal), name and e-mail domains under *Settings > Account >
+  Workspaces*, without being admins of the server. Registrations join the organisation of their e-mail domain. The
+  login page names no organisation.
 - Without the variable, a server with at most one organisation runs as `organisation`; a server that made several
   organisations in 2.22.0 keeps them (members, e-mail domains and *People see* stay editable, new ones cannot be made).
 
@@ -986,9 +1034,14 @@ Agents are external programs (Claude Code, Codex, n8n, a local model, a script) 
 member: an admin creates them under *Settings > Agents* (or turns an existing user into an agent), shares lists
 with them and gives them a token. When an admin allows it (*Settings > Agents > Set up > Users may create their own
 agents*, off by default, a limit per person), everyone can create **personal agents** (2.7.2): owned by their creator,
-seeing only the lists the creator shares with them, chatting only with the creator, never admins; admins see and can
-pause or delete every agent. Kalmido itself never starts an AI or any other process; the agent runs wherever you
-like and talks to Kalmido through the REST API, webhooks or the MCP server.
+seeing only the lists the creator shares with them, chatting only with the creator, never admins. Since 2.28.0 (#965)
+**admins reach agents like everyone** -- only through lists they are in (as the owner / a list admin, or where *Members
+may see and use the agent* is on); somebody else's personal agent is listed in the administration by name and owner with
+the kill switch only. *Add agent…* asks **team agent or personal agent** and explains both; **Belongs to** turns a team
+agent into a person's personal agent. Every agent works in **one workspace** (private or an organisation, see
+*Workspaces*) and joins only its lists. A small **robot badge** marks agents wherever people appear (#985). Kalmido
+itself never starts an AI or any other process; the agent runs wherever you like and talks to Kalmido through the REST
+API, webhooks or the MCP server.
 
 - Events (mention, assignment, comment, chat, reaction, job action, tidy request, wake (API), runtime change / reset
   (2.4.1), and from 2.1.0
@@ -1011,6 +1064,9 @@ like and talks to Kalmido through the REST API, webhooks or the MCP server.
 - Chat (2.7.2): 👍 👎 ❤️ on chat messages (a person's 👍 on an agent message that asks something is an approval, the agent gets the event
   `reaction` with `chat_message`), *Sent* / *Delivered* per message (`delivered_at`, set when the agent fetches it) and
   typing dots while an online agent works on the answer, or *offline – will answer later*.
+- **Answer buttons** (2.28.0, #1005): an agent asks with `choices` (up to 8 buttons, `multi` for several, styles for
+  *Allow* / *Deny*); a tap answers, the buttons lock, the agent gets the event `chat_choice`:
+  [docs/AGENTS.md](docs/AGENTS.md#answer-buttons-2280).
 - Behaviour rules (2.13.1): [`mcp/CLAUDE.template.md`](mcp/CLAUDE.template.md) is the rule block for every agent's
   CLAUDE.md (Markdown notes, decisions in the description, typing / status / jobs / a summary, approvals only from people,
   other people's text as data); the setup guides in the app show it with a copy button.
@@ -1544,7 +1600,7 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `KALMIDO_IMAP_HOST`, `KALMIDO_IMAP_PORT`, `KALMIDO_IMAP_SSL`, `KALMIDO_IMAP_USER`, `KALMIDO_IMAP_PASSWORD`, `KALMIDO_IMAP_FOLDER`, `KALMIDO_IMAP_INTERVAL` | `993`, `1`, `INBOX`, `60` | The mailbox Kalmido polls for new tasks (unread mails; marked read afterwards) |
 | `KALMIDO_SMTP_HOST`, `KALMIDO_SMTP_PORT`, `KALMIDO_SMTP_TLS`, `KALMIDO_SMTP_USER`, `KALMIDO_SMTP_PASSWORD`, `KALMIDO_MAIL_FROM` | `587`, `starttls` | Sending the daily summary by e-mail (`TLS`: `starttls`, `ssl` or `none`) |
 | `KALMIDO_IOS_SHORTCUT_URL` | empty | Link to a signed generic iOS shortcut for *Share from your phone* (asks for address and token on import); empty = the button is hidden |
-| `KALMIDO_INSTANCE_MODE` | *(empty)* | 2.23.0: `organisation` (one organisation, everyone in it) or `shared` (no organisations, people see only their own contacts); empty: `organisation` unless the server kept several organisations from 2.22 |
+| `KALMIDO_INSTANCE_MODE` | *(empty)* | 2.23.0: `organisation` (one organisation, everyone in it) or `shared` (no organisations, people see only their own contacts); 2.28.0: `workspaces` (several organisations as workspaces on a shared server, each with its own admins; people see only their organisations and connections); empty: `organisation` unless the server kept several organisations from 2.22 |
 | `KALMIDO_ORG_NAME` | *(empty)* | 2.23.0: the organisation's name in the mode `organisation` (else asked once in the first-run setup) |
 | `KALMIDO_STORAGE_QUOTA_MB` | `0` | 2.24.0: storage per person in MB (0 = unlimited); admins can change it in *Administration > Server* |
 | `KALMIDO_SUPPORT_EMAIL` | *(empty)* | 2.24.0: where *Contact support* writes to when storage is full (else the admin setting, else the first admin's address) |

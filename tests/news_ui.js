@@ -14,8 +14,10 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   let w = await boot({user: 'alice'}), d = w.document;
   const st = await api(w, 'GET', '/api/news');
   const bell = d.querySelector('#top .bell');
-  check(bell && bell.querySelector('.nbadge')?.textContent === String(st.unread) && st.unread > 0, `bell with badge ${st.unread}`);
-  check(d.querySelector('#side .srow[data-go="news"] .c')?.textContent === String(st.unread), 'sidebar News row with count');
+  // 2.28.0 (#987): the bell and the sidebar count only what people sent me (unread_me), the News view shows everything
+  const nMe = st.unread_me;
+  check(bell && (nMe ? bell.querySelector('.nbadge')?.textContent === String(nMe) : !bell.querySelector('.nbadge')) && st.unread > 0, `bell with badge ${nMe} (for me) of ${st.unread}`);
+  check((d.querySelector('#side .srow[data-go="news"] .c')?.textContent || '') === String(nMe || ''), 'sidebar News row with count');
   // 2.6.1 (#403): the bell opens a dropdown with the newest News; "Show all" goes to #news
   const mod0 = w.eval('S.route.mod');
   bell.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true})); await sleep(700);

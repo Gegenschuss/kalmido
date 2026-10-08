@@ -11,7 +11,7 @@ S.nf = {items: null, users: {}, sig: null, filter: LS.get('newsFilter', '') ? 'm
 // bottom); "Show all" goes to the full view, a click outside / Esc closes it and I stay in my list
 function bellBtn() {
   if (!collab()) return '';
-  const n = S.news?.unread || 0;
+  const n = bellCount();  // 2.28.0 (#987): only what people send me (+ unread direct messages)
   return `<button class="iconbtn bell ${S.route.mod === 'news' ? 'on' : ''}" data-act="bell-pop" aria-haspopup="dialog" title="${esc(tr('News') + ' · ' + newsWhat())}" aria-label="${esc(n ? trn('{0} unread news item', '{0} unread news items', n) : tr('News'))}">${ic('bell')}${n ? `<span class="nbadge">${n > 99 ? '99+' : n}</span>` : ''}</button>`;
 }
 // 2.6.1 (#404): filter chips (view only, per device): which kinds of News show, in the News view and under the bell
@@ -29,15 +29,28 @@ function newsChipsHtml(items, attr) {
 }
 function newsKindSet(k) { S.nf.kind = !k || S.nf.kind === k ? '' : k; LS.set('newsKind', S.nf.kind); }
 const BELL_N = 8;
+// 2.28.0 (#987): the unread direct messages (people writing to me) as rows at the top of "For you"
+const dmRows = () => teamOn() ? (S.tc.rooms || []).filter(r => r.kind === 'dm' && r.unread && !r.muted) : [];
+const dmRowHtml = r => `<a class="nitem unread k-dm ndm" href="#team/${r.id}" aria-label="${esc(trn('{0} new message from {1}', '{0} new messages from {1}', r.unread, r.name))}">${av(r.user_id, r.name, 'avatar', '', `<i class="nk">${ic('comment', 's')}</i>`)}<div class="nmain"><div class="ntext">${trn('{0} new message from {1}', '{0} new messages from {1}', r.unread, `<b>${esc(r.name)}</b>`)}</div>${r.last ? `<div class="nexc">${esc(mdBrief(r.last.text))}</div>` : ''}</div>${r.last_at ? `<time>${relTime(r.last_at)}</time>` : ''}</a>`;
+const newsSecHead = (k, n, first) => `<div class="nsec ${first ? 'first' : ''}">${k === 'me' ? ic('at', 's') : ic('pulse', 's')}<span>${k === 'me' ? tr('For you') : tr('Activity')}</span>${n ? `<span class="c nunread">${n}</span>` : ''}</div>`;
 function bellPopHtml() {
-  const mine = S.nf.items && S.nf.f === S.nf.filter ? S.nf.items : null, n = S.news?.unread || 0;
-  const all = (mine || []).map((it, i) => [it, i]).filter(([it]) => !S.nf.unread || !it.read || it.keep);
+  const mine = S.nf.items && S.nf.f === S.nf.filter ? S.nf.items : null, n = bellCount(), nAll = S.news?.unread || 0;
+  if (teamOn() && S.tc.rooms === null && !S.tc.loading) { S.tc.loading = true; loadTeam().then(() => { S.tc.loading = false; }); }
+  const all0 = (mine || []).map((it, i) => [it, i]).filter(([it]) => (!S.nf.unread || !it.read || it.keep) && newsInWs(it));
+  const forMe = all0.filter(([it]) => newsForMe(it)), act = all0.filter(([it]) => !newsForMe(it));
+  const all = [...forMe, ...act];  // "For you" first, then the activity
   const shown = all.filter(([it]) => newsKindOk(it)).slice(0, BELL_N);
-  const head = `<div class="bphead"><button type="button" class="bphl" data-bp="news" title="${esc(tr('Show all'))}"><b id="bp-h">${tr('News')}</b><span class="bpchev" aria-hidden="true">›</span></button>${n ? `<span class="bpnew">${esc(trn('{0} new', '{0} new', n))}</span>` : ''}<span class="spacer"></span>${n ? `<button type="button" class="btn sm bpread" data-bp="readall" title="${esc(tr('Mark all as read'))}" aria-label="${esc(tr('Mark all as read'))}">${ic('check', 's')}<span>${tr('All read')}</span></button>` : ''}<button type="button" class="iconbtn" data-bp="settings" title="${esc(tr('What shows up here'))}" aria-label="${esc(tr('What shows up here'))}">${ic('gear', 's')}</button></div>`;
+  const dms = dmRows();
+  const head = `<div class="bphead"><button type="button" class="bphl" data-bp="news" title="${esc(tr('Show all'))}"><b id="bp-h">${tr('News')}</b><span class="bpchev" aria-hidden="true">›</span></button>${n ? `<span class="bpnew">${esc(trn('{0} new', '{0} new', n))}</span>` : ''}<span class="spacer"></span>${nAll ? `<button type="button" class="btn sm bpread" data-bp="readall" title="${esc(tr('Mark all as read'))}" aria-label="${esc(tr('Mark all as read'))}">${ic('check', 's')}<span>${tr('All read')}</span></button>` : ''}<button type="button" class="iconbtn" data-bp="settings" title="${esc(tr('What shows up here'))}" aria-label="${esc(tr('What shows up here'))}">${ic('gear', 's')}</button></div>`;
   let body;
   if (!mine) body = `<div class="empty bpempty">${S.nf.err === 'offline' ? tr('News are only available online.') : S.nf.err ? esc(S.nf.err) : tr('Loading…')}</div>`;
   else if (!shown.length) body = `<div class="empty bpempty">${ic('bell')}<span>${all.length ? tr('Nothing of this kind.') : S.nf.unread && mine.length ? tr('No unread news') : tr('No news')}</span>${all.length ? '' : `<small class="muted">${esc(newsWhat())}</small>`}</div>`;
-  else body = newsBundled() ? `<div class="nlist bplist nbund">${newsBundledHtml(all.filter(([it]) => newsKindOk(it)).slice(0, 40), true)}</div>` : `<div class="nlist bplist">${shown.map(([it, i]) => newsItemHtml(it, i, true)).join('')}</div>`;  // 2.17.0 (#452)
+  else if (newsBundled()) body = `<div class="nlist bplist nbund">${dms.map(dmRowHtml).join('')}${newsBundledHtml(all.filter(([it]) => newsKindOk(it)).slice(0, 40), true)}</div>`;  // 2.17.0 (#452)
+  else {  // 2.28.0 (#987): two sections
+    const me_ = shown.filter(([it]) => newsForMe(it)), ac = shown.filter(([it]) => !newsForMe(it));
+    body = `<div class="nlist bplist">${dms.length || me_.length ? newsSecHead('me', dms.reduce((a, r) => a + r.unread, 0) + me_.filter(([it]) => !it.read).length, true) + dms.map(dmRowHtml).join('') + me_.map(([it, i]) => newsItemHtml(it, i, true)).join('') : ''}${ac.length ? newsSecHead('act', ac.filter(([it]) => !it.read).length, !dms.length && !me_.length) + ac.map(([it, i]) => newsItemHtml(it, i, true)).join('') : ''}</div>`;
+  }
+  if (!mine && dms.length) body = `<div class="nlist bplist">${newsSecHead('me', dms.reduce((a, r) => a + r.unread, 0), true)}${dms.map(dmRowHtml).join('')}</div>`;
   const grab = isMobile() ? `<div class="bpgrab" data-bpgrab role="button" tabindex="0" aria-label="${esc(tr('Drag up for more room, tap for full height'))}" title="${esc(tr('Drag up for more room, tap for full height'))}"><i></i></div>`
     : `<button type="button" class="bpgrip" data-bpgrip aria-label="${esc(tr('Resize (arrow keys; double-click: default size)'))}" title="${esc(tr('Drag to resize · double-click: default size'))}"></button>`;
   return `<div class="bpop" role="dialog" aria-labelledby="bp-h">${isMobile() ? grab : ''}${head}${mine ? newsChipsHtml(all.map(x => x[0]), 'data-bpk') : ''}${body}<div class="bpfoot"><button type="button" class="btn pri" data-bp="all">${tr('Show all')}${mine && all.length > shown.length ? ` <span class="bpn">${all.length}</span>` : ''}</button></div>${isMobile() ? '' : grab}</div>`;
@@ -180,12 +193,13 @@ function newsText(it, U) {
     case 'take': return tr('{0} took a task of your group {1}', who, q(d.group || ''));  // 2.10.0 (#441)
     case 'unassign': return tr('{0} removed you as assignee', who);
     case 'complete': return tr('{0} completed a task', who);
-    case 'share': return d.role === 'view' ? tr('{0} shared the list {1} with you (view only)', who, q(newsListName(it)))
+    case 'share': return d.org ? (d.role === 'admin' ? tr('{0} added you to the organisation {1} as an admin', who, q(d.name || '')) : tr('{0} added you to the organisation {1}', who, q(d.name || '')))  // 2.28.0 (#935)
+      : d.role === 'view' ? tr('{0} shared the list {1} with you (view only)', who, q(newsListName(it)))
       : d.role === 'participant' ? tr('{0} added you to {1} as a participant (you see the tasks assigned to you)', who, q(newsListName(it)))
         : d.role === 'admin' ? tr('{0} shared the list {1} with you as an admin', who, q(newsListName(it)))
           : d.group ? tr('{0} shared the list {1} with your group {2}', who, q(newsListName(it)), q(d.group)) : tr('{0} shared the list {1} with you', who, q(newsListName(it)));
     case 'role': return tr('{0} changed your role in {1} to {2}', who, q(newsListName(it)), q(roleLabel(d.role)));
-    case 'unshare': return tr('{0} removed you from the list {1}', who, q(newsListName(it)));
+    case 'unshare': return d.org ? tr('{0} removed you from the organisation {1}', who, q(d.name || '')) : tr('{0} removed you from the list {1}', who, q(newsListName(it)));  // 2.28.0 (#935)
     case 'owner': return tr('{0} made you the owner of the list {1}', who, q(newsListName(it)));  // 2.1.2 (#349)
     case 'unblock': return d.hidden ? tr('{0} completed a task you cannot see: your task is unblocked', who) : tr('{0} completed {1}: your task is unblocked', who, q(d.title || ''));
     case 'newtask': return tr('{0} added a task', who);
@@ -212,13 +226,14 @@ function newsItemHtml(it, i, pop) {
   const task = many ? `<div class="ntask"><span class="nt">${esc(it.tasks.slice(0, 2).map(x => x.title).join(' · '))}</span>${it.tasks.length > 2 ? `<span class="muted">+${it.tasks.length - 2}</span>` : ''}</div>`
     : it.task_id ? `<div class="ntask"><span class="nt">${esc(it.task_title || '')}</span><span class="muted nl">${esc(newsListName(it))}</span></div>` : '';
   const ex = it.excerpt ? `<div class="nexc">${newsExcerpt(it.excerpt, U)}</div>` : '';
-  return `<div class="nitem ${it.read ? '' : 'unread'} k-${esc(it.kind)}" role="button" tabindex="0" ${pop ? 'data-bp="open"' : 'data-act="news-open"'} data-i="${i}" aria-label="${esc((it.read ? '' : tr('Unread') + ': ') + newsText(it, U).replace(/<[^>]+>/g, ''))}">
+  return `<div class="nitem ${it.read ? '' : 'unread'} k-${esc(it.kind)} ${it.to_me ? 'tome' : ''}" role="button" tabindex="0" ${pop ? 'data-bp="open"' : 'data-act="news-open"'} data-i="${i}" aria-label="${esc((it.read ? '' : tr('Unread') + ': ') + newsText(it, U).replace(/<[^>]+>/g, ''))}">
     ${it.actor_id ? `<button type="button" class="avb" data-mcard="${+it.actor_id}" data-mname="${esc(uname(it.actor_id, U))}" aria-haspopup="dialog" title="${esc(tr('Show {0}', uname(it.actor_id, U)))}" aria-label="${esc(tr('Show {0}', uname(it.actor_id, U)))}">` : ''}${av(it.actor_id, uname(it.actor_id, U), 'avatar', '', `<i class="nk">${ic(NEWS_ICON[it.kind] || 'bell', 's')}</i>`)}${it.actor_id ? '</button>' : ''}
     <div class="nmain"><div class="ntext">${newsText(it, U)}</div>${task}${ex}</div>
     <time title="${esc(fmtWhen(it.created_at))}">${relTime(it.created_at)}</time>${isTouch() ? '' : `<button class="iconbtn ndel" ${pop ? 'data-bp="dismiss"' : 'data-act="news-dismiss"'} data-i="${i}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button>`}</div>`;
 }
 // 2.25.0 (UX-47): what lands in News (the bell) and what does not
 const newsWhat = () => teamOn() ? tr('Assignments, @mentions, comments on your tasks and follow-ups land here. Messages are in the team chat.') : tr('Assignments, @mentions, comments on your tasks and follow-ups land here.');
+const newsTab = () => { const t = LS.get('newsTab', 'all'); return ['me', 'act', 'all'].includes(t) ? t : 'all'; };  // 2.28.0 (#987): all = both sections, For you first
 function viewNews() {
   const f = S.nf.filter, fresh = S.nf.sig === (S.news?.sig ?? '') && S.nf.f === f && !!S.nf.items;
   // 1.9.0 (#246): "Loading…" only while a request really runs; an empty feed says so instead of loading forever
@@ -228,18 +243,29 @@ function viewNews() {
     return `<div class="nchips nfrow" role="group" aria-label="${esc(tr('Show only'))}"><button type="button" class="nchip ${f || k0 ? '' : 'on'}" data-act="news-filter" data-f="" data-nk="" aria-pressed="${!f && !k0}">${tr('All')}</button><button type="button" class="nchip ${f ? 'on' : ''}" data-act="news-filter" data-f="me" data-fme aria-pressed="${!!f}">${ic('at', 's')}${tr('Mentions & assigned to me')}</button>${h}</div>`; };
   const bar0 = `<div class="nbar"><button class="btn sm ntog ${S.nf.unread ? 'on' : ''}" data-act="news-unread" aria-pressed="${S.nf.unread}" title="${esc(tr('Hide news you have already read'))}">${ic('eye', 's')}${tr('Unread only')}</button><button class="btn sm ntog ${newsBundled() ? 'on' : ''}" data-act="news-bundle" aria-pressed="${newsBundled()}" title="${esc(tr('Group by task, what needs you first'))}">${ic('columns', 's')}${tr('Bundled')}</button><span class="spacer"></span>${S.news?.unread && (S.agents || []).some(x => x.enabled) ? `<button class="btn sm" data-act="news-sum" aria-haspopup="menu" title="${esc(tr('An agent summarizes your unread news in its chat'))}">${ic('bot', 's')}${tr('Summarize')}</button>` : ''}${S.news?.unread ? `<button class="btn sm" data-act="news-readall">${ic('check', 's')}${tr('Mark all as read')}</button>` : ''}<button class="iconbtn" data-act="news-settings" title="${esc(tr('What shows up here'))}" aria-label="${esc(tr('What shows up here'))}">${ic('gear', 's')}</button></div>`;
   const mine0 = S.nf.items && S.nf.f === f ? S.nf.items : null;
-  const bar = bar0 + fchips((mine0 || []).filter(it => !S.nf.unread || !it.read || it.keep));
+  // 2.28.0 (#987): "For you" (people: mentions, assignments, replies, direct messages) | "Activity" (changes, agents) | All
+  const tab = newsTab(), nMe = (mine0 || []).filter(it => !it.read && newsForMe(it) && newsInWs(it)).length + dmRows().reduce((a, r) => a + r.unread, 0), nAct = (mine0 || []).filter(it => !it.read && !newsForMe(it) && newsInWs(it)).length;
+  if (teamOn() && S.tc.rooms === null && !S.tc.loading) { S.tc.loading = true; loadTeam().then(() => { S.tc.loading = false; if (S.route.mod === 'news') renderView(); }); }
+  const tabs = `<div class="seg ntabs" role="tablist" aria-label="${esc(tr('News'))}">${[['all', 'bell', N_('All'), 0], ['me', 'at', N_('For you'), nMe], ['act', 'pulse', N_('Activity'), nAct]].map(([k, i, n, c]) => `<button type="button" role="tab" class="${tab === k ? 'on' : ''}" aria-selected="${tab === k}" data-act="news-tab" data-tab="${k}">${ic(i, 's')}<span>${tr(n)}</span>${c ? `<span class="c nunread">${c}</span>` : ''}</button>`).join('')}</div>`;
+  const inTab = it => newsInWs(it) && (tab === 'all' || (tab === 'me') === newsForMe(it));
+  const bar = tabs + bar0 + fchips((mine0 || []).filter(it => (!S.nf.unread || !it.read || it.keep) && inTab(it)));
   if (S.nf.err && !S.nf.items) return bar + `<div class="empty">${S.nf.err === 'offline' ? tr('News are only available online.') : esc(S.nf.err)}</div>`;
   const mine = S.nf.items && S.nf.f === f ? S.nf.items : null;
   if (!mine && (S.nf.loading || S.nf.queued)) return bar + `<div class="empty">${tr('Loading…')}</div>`;
   // #302 unread only: read items hide (one opened just now stays until the next load); data-i keeps the index in S.nf.items
-  const vis = (mine || []).map((it, i) => [it, i]).filter(([it]) => !S.nf.unread || !it.read || it.keep);
+  const vis = (mine || []).map((it, i) => [it, i]).filter(([it]) => (!S.nf.unread || !it.read || it.keep) && inTab(it));
+  const dms = tab === 'act' ? [] : dmRows().filter(r => !S.nf.unread || r.unread);
+  const dmh = dms.length ? `<div class="nlist ndms">${dms.map(dmRowHtml).join('')}</div>` : '';
   const chips = '';  // 2.13.0: in the one filter row of the bar
   const shown = vis.filter(([it]) => newsKindOk(it));
-  if (mine && mine.length && !vis.length) return bar + `<div class="empty nempty">${ic('bell')}<b>${tr('No unread news')}</b><span>${tr('Everything is read. Switch off “Unread only” to see older news.')}</span></div>`;
-  if (!mine || !mine.length) return bar + `<div class="empty nempty">${ic('bell')}<b>${tr('No news')}</b><span>${f ? tr('No mentions or assignments.') : esc(newsWhat())}</span></div>`;
-  if (!shown.length) return bar + chips + `<div class="empty nempty">${ic('bell')}<b>${tr('Nothing of this kind.')}</b></div>`;
-  return bar + chips + (newsBundled() ? `<div class="nbund">${newsBundledHtml(shown, false)}</div>` : `<div class="nlist">${shown.map(([it, i]) => newsItemHtml(it, i)).join('')}</div>`) + `${isTouch() && !newsBundled() ? `<div class="muted nswipe">${tr('Swipe an item sideways to remove it.')}</div>` : ''}`;
+  if (mine && mine.length && !vis.length && !dms.length) return bar + `<div class="empty nempty">${ic('bell')}<b>${tab === 'me' ? tr('Nothing for you right now') : tr('No unread news')}</b><span>${tab === 'me' ? tr('Mentions, assignments, replies and direct messages from people land here.') : tr('Everything is read. Switch off “Unread only” to see older news.')}</span></div>`;
+  if ((!mine || !mine.length) && !dms.length) return bar + `<div class="empty nempty">${ic('bell')}<b>${tr('No news')}</b><span>${f ? tr('No mentions or assignments.') : esc(newsWhat())}</span></div>`;
+  if (!shown.length && !dms.length) return bar + chips + `<div class="empty nempty">${ic('bell')}<b>${tr('Nothing of this kind.')}</b></div>`;
+  // 2.28.0 (#987): "All" shows the two sections, what people sent me first, the activity behind it
+  const listHtml = () => { if (newsBundled()) return `<div class="nbund">${newsBundledHtml(shown, false)}</div>`; if (tab !== 'all') return `<div class="nlist">${shown.map(([it, i]) => newsItemHtml(it, i)).join('')}</div>`;
+    const me_ = shown.filter(([it]) => newsForMe(it)), ac = shown.filter(([it]) => !newsForMe(it));
+    return `<div class="nlist">${dms.length || me_.length ? newsSecHead('me', dms.reduce((a, r) => a + r.unread, 0) + me_.filter(([it]) => !it.read).length, true) + dmh + me_.map(([it, i]) => newsItemHtml(it, i)).join('') : ''}${ac.length ? newsSecHead('act', ac.filter(([it]) => !it.read).length, !dms.length && !me_.length) + ac.map(([it, i]) => newsItemHtml(it, i)).join('') : ''}</div>`; };
+  return bar + chips + (tab === 'all' && !newsBundled() ? '' : dmh) + listHtml() + `${isTouch() && !newsBundled() ? `<div class="muted nswipe">${tr('Swipe an item sideways to remove it.')}</div>` : ''}`;
 }
 async function loadNews() {
   if (S.nf.loading) return;
@@ -250,8 +276,8 @@ async function loadNews() {
     const j = await rawFetch('GET', '/api/news' + (f ? '?filter=' + f : ''));
     Object.assign(S.nf, {items: j.items, users: j.users || {}, sig: j.sig, f, err: null});
     if (j.avatars) S.avatars = {...(S.avatars || {}), ...j.avatars};
-    const changed = !S.news || S.news.unread !== j.unread || S.news.sig !== j.sig;
-    S.news = {unread: j.unread, sig: j.sig};
+    const changed = !S.news || S.news.unread !== j.unread || S.news.sig !== j.sig || S.news.unread_me !== j.unread_me;
+    S.news = {unread: j.unread, unread_me: j.unread_me ?? S.news?.unread_me ?? 0, sig: j.sig};
     if (changed) { renderTop(); renderTabs(); renderSide(); }
   } catch (e) {
     if (e.message !== 'auth') { S.nf.err = e instanceof Offline ? 'offline' : e.message; S.nf.sig = S.news?.sig ?? ''; S.nf.f = f; }
@@ -267,7 +293,7 @@ async function newsReadAll() {
   if (!ids.length) return;
   toast(trn('{0} marked as read', '{0} marked as read', n), async () => {
     before.forEach(x => { x.read = false; x.keep = true; });
-    try { const k = await rawFetch('POST', '/api/news/read', {unread: true, ids}); S.news = {unread: k.unread, sig: k.sig}; S.nf.sig = null; } catch { toast(tr('Only available online.')); }
+    try { const k = await rawFetch('POST', '/api/news/read', {unread: true, ids}); S.news = {unread: k.unread, unread_me: k.unread_me ?? S.news?.unread_me ?? 0, sig: k.sig}; S.nf.sig = null; } catch { toast(tr('Only available online.')); }
     render(); if ($('#pop .bpop')) { const b = $('#top .bell'); closePop(); if (b) bellPop(b); }
   });
 }
@@ -276,7 +302,7 @@ async function newsRead(body) {
   if (body.all) wpSweep(null, true);  // 2.19.0 (#668): "Mark all as read" closes every notification (here; the server the others)
   try {
     const j = await rawFetch('POST', '/api/news/read', body);
-    S.news = {unread: j.unread, sig: j.sig}; S.nf.sig = j.sig;
+    S.news = {unread: j.unread, unread_me: j.unread_me ?? S.news?.unread_me ?? 0, sig: j.sig}; S.nf.sig = j.sig;
     render(); return j;
   } catch { /* offline: stays unread on the server */ }
   render();
@@ -286,11 +312,11 @@ async function newsRead(body) {
 async function newsDismiss(i) {
   const it = (S.nf.items || [])[i]; if (!it) return;
   S.nf.items.splice(i, 1);
-  if (!it.read && S.news) S.news.unread = Math.max(0, (S.news.unread || 0) - 1);
+  if (!it.read && S.news) { S.news.unread = Math.max(0, (S.news.unread || 0) - 1); if (it.to_me) S.news.unread_me = Math.max(0, (S.news.unread_me || 0) - 1); }
   renderView(); renderTop(); renderTabs(); renderSide();
   try {
     const j = await rawFetch('POST', '/api/news/dismiss', {ids: it.ids});
-    S.news = {unread: j.unread, sig: j.sig}; S.nf.sig = j.sig;
+    S.news = {unread: j.unread, unread_me: j.unread_me ?? S.news?.unread_me ?? 0, sig: j.sig}; S.nf.sig = j.sig;
   } catch { S.nf.sig = null; }  // offline: reloaded next time
   render();
 }
@@ -317,7 +343,7 @@ async function newsDismiss(i) {
 })();
 async function newsOpen(i) {
   const it = (S.nf.items || [])[i]; if (!it) return;
-  if (!it.read) { it.read = true; it.keep = true; newsRead({ids: it.ids}); }
+  if (!it.read) { it.read = true; it.keep = true; if (it.to_me && S.news) { S.news.unread_me = Math.max(0, (S.news.unread_me || 0) - 1); renderTop(); } newsRead({ids: it.ids}); }
   if (/comment|mention/.test(it.kind || '')) S.tlScroll = it.task_id;  // 2.0.6: opened for a comment: show the newest
   if (it.kind === 'proposal') { propOpen(it.data?.job); return; }  // 2.3.0
   if (it.kind === 'evinvite' && it.data?.event_id) { evOpen(it.data.event_id); return; }  // 2.21.0 (#659 / #658)

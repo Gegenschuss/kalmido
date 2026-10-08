@@ -444,6 +444,7 @@ def v1_list(d):
     return {"id": d["id"], "name": name, "color": d["color"], "folder": d["folder"], "is_inbox": bool(d["is_inbox"]),
             "archived": bool(d["archived"]), "done_at_bottom": bool(d.get("checklist")), "checklist": bool(d.get("checklist")),
             "kind": d.get("kind") or "list", "view": d["view"], "role": d["role"],
+            "org_id": d.get("org_id"),  # 2.28.0 (#935): the workspace (null = private)
             "owner_id": d["owner_id"], "owner_name": d["owner_name"], "shared": d["shared"],
             "status": d.get("status") or None, "progress": d["progress"], "created_at": d["created_at"],
             "tags": d.get("tags") or [], "agent_tidy": d.get("agent_tidy") or "off", "tidy_agent_id": d.get("tidy_agent_id"),
@@ -679,7 +680,7 @@ def v1_list_create():
     v1_args(())
     b = v1_json()
     unknown = sorted(k for k in b if k not in ("name", "color", "folder", "checklist", "done_at_bottom", "kind", "tickets", "project_type", "nag", "day_hours",
-                                               "family", "sections"))
+                                               "family", "sections", "org_id"))  # 2.28.0 (#935): org_id
     if unknown:
         raise UnknownFields(unknown)
     later = {k: b.pop(k) for k in ("nag", "day_hours") if k in b}  # 2.7.0: set right after the list exists
@@ -720,7 +721,7 @@ def v1_list_patch(lid):
     b = v1_json()
     unknown = sorted(k for k in b if k not in ("name", "color", "folder", "view", "kind", "nag", "day_hours", "done_at_bottom", "checklist",
                                                "listen_agent_ids", "columns", "archived", "project_type", "family", "life", "trip",
-                                               "client_id", "agent_members", "agent_peers"))
+                                               "client_id", "agent_members", "agent_peers", "org_id"))  # 2.28.0 (#935)
     if unknown:
         raise UnknownFields(unknown)
     if "family" in b and b["family"] is None:  # 2.19.0 (#653): null = an ordinary list

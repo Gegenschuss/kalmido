@@ -204,7 +204,9 @@ def list_create():
         c = db()
         if "sections" in b and not isinstance(b["sections"], bool):
             return err(tr("Invalid value: {0}", "sections"))
-        lid, on = ptype_create(c, me(), b["ptype"], name, folder, color, sections=b.get("sections") is True)  # 2.27.0 (#972)
+        from ..accounts.orgs import clean_org_id, ws_default_org
+        oid = clean_org_id(c, b["org_id"], me()) if "org_id" in b else ws_default_org(c, me(), folder)  # 2.28.0 (#935)
+        lid, on = ptype_create(c, me(), b["ptype"], name, folder, color, sections=b.get("sections") is True, org_id=oid)  # 2.27.0 (#972)
         bump(c)
         c.commit()
         return jsonify({**dict(c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()), "modules_on": on})
@@ -226,10 +228,12 @@ def list_create():
     c = db()
     uid = me()
     srt = my_max_sort(c, uid) + 1
+    from ..accounts.orgs import clean_org_id, ws_default_org
+    oid = clean_org_id(c, b["org_id"], uid) if "org_id" in b else ws_default_org(c, uid, folder)  # 2.28.0 (#935): the workspace
     # 2.2.1 (#359): dep_shift ("Move dependent tasks along") is taken at creation too (before, only PATCH set it)
-    cur = c.execute("INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind,dep_shift,tickets) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+    cur = c.execute("INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind,dep_shift,tickets,org_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                     (name, color, folder, srt, view, iso(now_utc()), uid, dab, kind,
-                     clean_list_value("dep_shift", b.get("dep_shift")), clean_list_value("tickets", b.get("tickets"))))
+                     clean_list_value("dep_shift", b.get("dep_shift")), clean_list_value("tickets", b.get("tickets")), oid))
     list_created(c, uid, cur.lastrowid)  # 2.4.2 (#391) agents, 2.10.0 (#441) groups, 2.22.0 (#740) / 2.25.0 (#931) folder people
     bump(c)
     c.commit()
@@ -279,6 +283,10 @@ def list_update(lid):
         except BadInput as e:
             return err(str(e))
         b = {k: v for k, v in b.items() if k != "client_id"}
+    if "org_id" in b:  # 2.28.0 (#935): the workspace of the list (owner only; members / agents must fit)
+        from ..accounts.orgs import list_org_set
+        list_org_set(c, lid, b["org_id"])  # Denied 403 / 409
+        b = {k: v for k, v in b.items() if k != "org_id"}
     if "sort_mode" in b:  # 2.27.0 (#988): the list's sort, the same for every member (owner / list admins)
         if role not in MANAGE_ROLES:
             return err(tr("Only the owner and list admins can change the sort of this list"), 403)
@@ -323,6 +331,9 @@ def list_update(lid):
     if b.get("kind") == "checklist" and "checklist" not in vals:  # deprecated alias: a plain list with the option on
         vals["checklist"] = 1
     if role == "owner":
+        if vals.get("family") or vals.get("life"):  # 2.28.0 (#935): "Used for" / Home & life make the list private (409 with an organisation agent in it)
+            from ..accounts.orgs import ws_private_for
+            ws_private_for(c, lid)
         if "archived" in vals:  # 1.6.1: archived_at follows the flag (set on the change to archived, cleared on restore)
             c.execute("UPDATE lists SET archived_at=CASE WHEN ?=0 THEN NULL WHEN archived=0 THEN ? ELSE archived_at END "
                       "WHERE id=?", (vals["archived"], iso(now_utc()), lid))
@@ -468,8 +479,10 @@ def member_set(lid):
         # never says whether the address has an account
         em = str(b["email"]).strip().lower()[:200]
         r = c.execute("SELECT id FROM users WHERE lower(email)=? AND disabled=0 AND COALESCE(kind,'user')!='agent'", (em,)).fetchone()
+        from ..accounts.orgs import ws_member_problem
         if not r or r[0] == me() or r[0] == c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0] or \
-                c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, r[0])).fetchone():
+                c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, r[0])).fetchone() or \
+                ws_member_problem(c, lid, r[0]):  # 2.28.0 (#935): not of the list's workspace -> nothing happens, nothing is revealed
             return jsonify(ok=True, by_email=True)
         uid = r[0]
     elif not may_see(c, me(), uid):
@@ -479,6 +492,8 @@ def member_set(lid):
         return err(tr("unknown user"), 404)
     if uid == c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0]:
         return err(tr("The owner's role cannot be changed"), 403)
+    from ..accounts.orgs import ws_check_member
+    ws_check_member(c, lid, uid)  # 2.28.0 (#935): an organisation's list only inside it, agents only in their workspace (409)
     if is_kid(c, uid):  # 2.19.0 (#653): a kid only ever takes part (sees what is assigned to it / where it comes along)
         role = "participant"
     lname = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]
@@ -539,6 +554,9 @@ def _folder_member_add(c, lid, uid, role, actor):
         return False
     from ..core.access import list_other_agent
     if list_other_agent(c, lid, uid):  # 2.26.0: one agent per list (the list is skipped)
+        return False
+    from ..accounts.orgs import ws_member_problem
+    if ws_member_problem(c, lid, uid):  # 2.28.0 (#935): not of the list's workspace (the list is skipped)
         return False
     role = "participant" if is_kid(c, uid) else role
     c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?)",
@@ -659,9 +677,10 @@ def agent_share_add(c, lid, aid, actor):
     from ..collab.news import news_add
     from ..integrations.webhooks import wh_note_list
     from ..core.access import list_other_agent
+    from ..accounts.orgs import ws_member_problem
     if c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, aid)).fetchone() or \
             c.execute("SELECT 1 FROM lists WHERE id=? AND life='health'", (lid,)).fetchone() or \
-            list_other_agent(c, lid, aid):  # 2.22.0 (#663) health; 2.26.0: one agent per list
+            list_other_agent(c, lid, aid) or ws_member_problem(c, lid, aid):  # 2.22.0 (#663) health; 2.26.0: one agent per list; 2.28.0: workspace
         return False
     lname = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]
     c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?)",

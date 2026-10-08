@@ -385,7 +385,7 @@ def template_apply(tid):
         return jsonify(task=one_task(c, new))
     name = str(b.get("name") or "").strip()[:200] or d.get("name") or r["name"]
     start, end = tpl_dates(b, base)
-    lid = tpl_apply_list(c, uid, d, name, clean_folder(b.get("folder") or ""), start, end,
+    lid = tpl_apply_list(c, uid, d, name, clean_folder(b.get("folder") or ""), start, end, org_id="auto",
                          color=clean_color(b["color"]) if b.get("color") else None)
     bump(c)
     c.commit()
@@ -406,7 +406,7 @@ def tpl_dates(b, today_):
     return start, end
 
 
-def tpl_apply_list(c, uid, d, name, folder, start, end=None, color=None):
+def tpl_apply_list(c, uid, d, name, folder, start, end=None, color=None, org_id=None):
     """A new list of uid from a list template d (2.4.0: also the built-in project types). Dates relative to start;
     with end and a template span of at least one day, every offset is stretched / squeezed to fit (start .. end).
     Sections, custom fields, dependencies, ticket types. The caller commits; returns the list id."""
@@ -414,11 +414,13 @@ def tpl_apply_list(c, uid, d, name, folder, start, end=None, color=None):
     span = int(d.get("span") or 0)
     scale = (end - start).days / span if end and span > 0 else 1.0
     tt = d.get("ticket_tpl") if isinstance(d.get("ticket_tpl"), dict) else {}
-    lid = c.execute("""INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,kind,checklist,tickets,ticket_tpl,dep_shift)
-                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
+    from ..accounts.orgs import ws_default_org
+    lid = c.execute("""INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,kind,checklist,tickets,ticket_tpl,dep_shift,org_id)
+                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (name, d.get("color") or "" if color is None else color, folder, my_max_sort(c, uid) + 1, d.get("view") or "list",
                      iso(now_utc()), uid, lk, 1 if d.get("done_at_bottom") or d.get("kind") == "checklist" else 0, 1 if d.get("tickets") else 0,
-                     json.dumps(tt, ensure_ascii=False) if tt else "", 1 if d.get("dep_shift") else 0)).lastrowid
+                     json.dumps(tt, ensure_ascii=False) if tt else "", 1 if d.get("dep_shift") else 0,
+                     ws_default_org(c, uid, folder) if org_id == "auto" else org_id)).lastrowid  # 2.28.0 (#935): the workspace, before anyone joins
     secs = [c.execute("INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, s, i)).lastrowid
             for i, s in enumerate(d.get("sections") or [])]
     fmap = []
@@ -476,13 +478,13 @@ def ptype_template(k, lg, sections=False):
             "tasks": [], "deps": [], "rel": True, "span": 0, "tickets": p["tickets"], "ticket_tpl": {}, "dep_shift": p["dep_shift"]}
 
 
-def ptype_create(c, uid, k, name, folder="", color="", start=None, sections=False):
+def ptype_create(c, uid, k, name, folder="", color="", start=None, sections=False, org_id="auto"):
     """A new project list of type k for uid; returns (list id, [modules switched on]). 2.27.0 (#972): the type's standard
     sections only when asked for (sections=True: the box "With the standard sections" / API sections: true); without them
     the project starts empty (modules, ticket types, fields and the view still come with the type)."""
     if k not in PTYPES:
         raise BadInput(tr("Invalid value: {0}", tr("Project type")))
-    lid = tpl_apply_list(c, uid, ptype_template(k, lang(c, uid), sections), name, folder, start or local_now().date(), color=color)
+    lid = tpl_apply_list(c, uid, ptype_template(k, lang(c, uid), sections), name, folder, start or local_now().date(), color=color, org_id=org_id)
     c.execute("UPDATE lists SET ptype=? WHERE id=?", (k, lid))  # 2.18.0 (#408): the type is kept (list dialog, API)
     fs = [x for x in (usettings(c, uid).get("features") or "").split(",") if x]
     on = [m for m in PTYPES[k]["modules"] if m not in fs]

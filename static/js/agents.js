@@ -51,7 +51,7 @@ function agentBusy() {
 const AG_HST = {ready: N_('ready'), working: N_('working'), waiting: N_('waiting for you'), offline: N_('offline'), error: N_('error'), paused: N_('paused')};
 const HDOT_MAX = 5;
 const agentHidden = () => new Set(String(S.settings?.agents_hidden || '').split(',').filter(Boolean).map(Number));
-const shownAgents = () => { if (!agentsOn()) return []; const h = agentHidden(); return (S.agents || []).filter(a => !h.has(a.id)); };
+const shownAgents = () => { if (!agentsOn()) return []; const h = agentHidden(); return (S.agents || []).filter(a => !h.has(a.id) && wsAgentIn(a)); };  // 2.28.0 (#935): of the shown workspace
 function agentHst(a) {
   if (!a.enabled || agentOffline(a)) return 'offline';
   if (a.status === 'paused') return 'paused';  // 2.26.0 (#949): paused with a reason
@@ -401,7 +401,7 @@ function jobHtml(j) {
 function viewAgents() {
   if (S.jobs.items === null) { S.jobs.items = []; loadJobs(); aiuLoad().then(() => { if (S.route.mod === 'agents') renderView(); }); }  // 2.1.1: the usage card
   if (S.route.agent && chatFull()) return chatViewHtml(S.route.agent);
-  const ags = S.agents || [];
+  const ags = (S.agents || []).filter(a => wsAgentIn(a));  // 2.28.0 (#935)
   const card = a => `<div class="agcard ${a.enabled ? '' : 'off'}">${avBtn(a.id, a.name, 'avatar lg')}<div class="agi"><b>${esc(a.name)}</b><span class="muted">${esc(agentSt(a))}${a.status_text && agentHst(a) !== 'offline' ? ' · ' + esc(a.status_text) : ''}</span>
       <span class="muted agn">${esc([a.running && trn('{0} running', '{0} running', a.running), a.waiting && trn('{0} waiting', '{0} waiting', a.waiting)].filter(Boolean).join(' · '))}</span></div>
       <div class="agb"><button class="btn sm" data-act="chat-open" data-aid="${a.id}" ${a.enabled ? '' : 'disabled'}>${ic('comment', 's')} ${tr('Chat')}${a.chat_unread ? ` <span class="nbadge">${a.chat_unread}</span>` : ''}</button></div></div>`;

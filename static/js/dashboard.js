@@ -170,6 +170,15 @@ function dashCard(k) {
   }
   return '';
 }
+// 2.28.0 (#987): "N messages for you" above everything on the start page while something from people is unread
+function forMeBanner() {
+  if (!collab()) return '';
+  const n = bellCount(); if (!n) return '';
+  if (S.nf.items === null || S.nf.sig !== (S.news?.sig ?? '')) { if (!S.nf.loading) loadNews().then(() => { if (S.route.mod === 'home') renderView(); }); }
+  const its = (S.nf.items || []).map((it, i) => [it, i]).filter(([it]) => !it.read && newsForMe(it) && newsInWs(it)).slice(0, 4), dms = dmRows().slice(0, 3);
+  return `<section class="dtome" aria-labelledby="dtome-h"><h3 id="dtome-h">${ic('at', 's')}<span>${trn('{0} message for you', '{0} messages for you', n)}</span><span class="spacer"></span><a class="linkbtn" href="#news">${tr('Show all')}</a></h3>
+    <ul class="dwl">${dms.map(r => `<li><a href="#team/${r.id}">${av(r.user_id, r.name, 'avatar')}<span class="dwt"><b>${esc(r.name)}</b> ${esc(r.last ? mdBrief(r.last.text) : '')}</span><span class="nbadge">${r.unread}</span></a></li>`).join('')}${its.map(([it, i]) => `<li><button type="button" class="dwb" data-act="news-open" data-i="${i}">${av(it.actor_id, uname(it.actor_id, S.nf.users), 'avatar')}<span class="dwt">${newsText(it, S.nf.users)}${it.task_title ? ' · ' + esc(it.task_title) : ''}</span></button></li>`).join('')}</ul></section>`;
+}
 function viewHome() {
   const {order, hidden} = dashPref();
   const greet = (() => { const h = new Date().getHours(); return h < 11 ? tr('Good morning, {0}', S.me?.display_name || '') : h < 18 ? tr('Hello, {0}', S.me?.display_name || '') : tr('Good evening, {0}', S.me?.display_name || ''); })();
@@ -183,7 +192,7 @@ function viewHome() {
   }
   const cards = order.filter(k => !hidden.has(k)).map(dashCard).filter(Boolean);
   return `<div class="dash"><div class="dashhead"><h2>${esc(greet)}</h2><span class="muted">${esc(fmtDateLoc(today()))}</span><span class="spacer"></span><button type="button" class="btn sm" data-act="dash-custom">${ic('sliders', 's')}${tr('Customize')}</button></div>
-    <div class="dgrid">${cards.join('') || `<p class="muted">${tr('Every card is hidden. Customize brings them back.')}</p>`}</div></div>`;
+    ${forMeBanner()}<div class="dgrid">${cards.join('') || `<p class="muted">${tr('Every card is hidden. Customize brings them back.')}</p>`}</div></div>`;
 }
 document.addEventListener('click', e => {
   const a = e.target.closest?.('[data-act^="dash-"]'); if (!a) return;

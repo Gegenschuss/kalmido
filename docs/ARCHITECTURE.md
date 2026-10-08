@@ -301,3 +301,9 @@ organisation named after the instance's domain was created with every existing a
 `organisation` (one organisation, every account in it, synced at start by `instance_sync`), `shared` (no organisations,
 visibility fixed to "own contacts") or, without the variable on an instance that kept several organisations, `multi`.
 The app never creates or deletes organisations; `user_orgs()` / `vis_mode()` answer by the mode.
+2.28.0 (#935): + `workspaces` (several organisations as workspaces on a shared server; `visible_people()` = the members of
+one's organisations + connections, admins included; the instance admin creates organisations, `org_members.role` admins
+manage them). Every list / agent has a workspace (`lists.org_id`, `agents.org_id`, NULL = private); the one check is
+`ws_member_problem()` / `ws_check_member()` in `accounts/orgs.py`, called on every way into a list (members, folder people,
+agent shares, groups, ownership) and when the owner moves a list (`list_org_set`). The web client only decides what it
+shows (`static/js/workspace.js`, setting `workspace`); `ws_migrate()` assigns the workspaces once on the update.

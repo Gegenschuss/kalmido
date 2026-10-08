@@ -457,6 +457,14 @@ function folderPick(anchor, id) {
 }
 // touch (phone drawer, tablets): long-press a list or a folder, then drag -- same targets and highlights as the mouse.
 // Held and let go without moving: the list's menu (edit, type, "Move to folder…") / the folder's menu.
+// 2.28.0 (#976): a right-click on a list or folder in the sidebar opens its menu (mouse; touch uses the long press below)
+document.addEventListener('contextmenu', e => {
+  if (isTouch() || S.listReorder || e.shiftKey) return;
+  const r = e.target.closest?.('#side .srow[data-list]'), fh = !r && e.target.closest?.('#side .fhead[data-folder]');
+  if (!r && !fh) return;
+  e.preventDefault();
+  if (r) listMenu(r, +r.dataset.list); else folderMenu(fh, fh.dataset.folder);
+});
 let sd = null, sdHeld = false;
 document.addEventListener('touchstart', e => {
   const r = e.target.closest?.('#side .srow[data-list]'), fh = !r && e.target.closest?.('#side .fhead');

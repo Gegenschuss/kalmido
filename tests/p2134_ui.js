@@ -38,6 +38,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
   const ag = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'claude', display_name: 'Claude'});
   const AG = ag.id, TOK = ag.token;
   const L = (await call('POST', '/api/lists', {name: 'Heide'})).id;
+  await call('PUT', `/api/lists/${L}/members`, {user_id: AG, role: 'edit'});  // 2.28.0 (#965): admins reach an agent only through a list
   const L2 = (await call('POST', '/api/lists', {name: 'Elsewhere'})).id;
   await call('POST', '/api/sections', {list_id: L, name: 'Mitnehmen'});
   const SEC = (await call('GET', '/api/state')).sections.find(s => s.list_id === L).id;

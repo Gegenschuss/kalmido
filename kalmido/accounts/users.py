@@ -49,6 +49,7 @@ def user_admin_dict(c, u):
             "signup": u["signup"] or "",  # 2.23.0 (#711): confirm (e-mail not confirmed) | pending (waits for approval) | ''
             "kid": bool(u["kid"]),
             "orgs": [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=? ORDER BY org_id", (u["id"],))],  # 2.22.0 (#752)
+            **({"org_id": (c.execute("SELECT org_id FROM agents WHERE user_id=?", (u["id"],)).fetchone() or [None])[0]} if (u["kind"] or "user") == "agent" else {}),  # 2.28.0 (#935)
             "lists": c.execute("SELECT COUNT(*) FROM lists WHERE owner_id=? AND is_inbox=0", (u["id"],)).fetchone()[0],
             "storage": _storage(c, u["id"])}  # 2.24.0 (#910): {used, quota_mb}
 
@@ -58,20 +59,39 @@ def _storage(c, uid):
     return user_storage(c, uid)
 
 
+def admin_sees(c, uid):
+    """2.28.0 (#935): in the mode workspaces an instance admin manages only the people they may see (their organisations and
+    connections); elsewhere every account."""
+    from ..accounts.orgs import instance_mode, may_see
+    return instance_mode(c) != "workspaces" or may_see(c, me(), uid)
+
+
+def user_orgs_public(c, uid):
+    return [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=? ORDER BY org_id", (uid,))]
+
+
 @app.get("/api/users")
 def users_list():
-    """Everyone: enabled users (for sharing). Admins: all users with account details."""
+    """Everyone: enabled users (for sharing). Admins: all users with account details (2.28.0, mode workspaces: only the
+    people they may see, plus the number of the others)."""
     c = db()
+    from ..accounts.orgs import visible_people
     if g.user["is_admin"]:
         from ..integrations.mail import MAIL_OUT_ON
-        return jsonify(users=[user_admin_dict(c, u) for u in c.execute("SELECT * FROM users ORDER BY id")], mail_out=MAIL_OUT_ON)
+        vis = visible_people(c, me())
+        rows = c.execute("SELECT * FROM users ORDER BY id").fetchall()
+        return jsonify(users=[user_admin_dict(c, u) for u in rows if vis is None or u["id"] in vis], mail_out=MAIL_OUT_ON,
+                       others=sum(1 for u in rows if vis is not None and u["id"] not in vis))
     if not collab_all():  # nobody to share with
         return jsonify(users=[user_public(g.user)])
     mine = me()  # 2.7.2 (#420): somebody else's personal agent is not in the list
-    from ..accounts.orgs import visible_people
     vis = visible_people(c, mine)  # 2.22.0 (#752): only the people this person may see (organisation / contacts)
-    return jsonify(users=[user_public(u) for u in c.execute("""SELECT * FROM users WHERE disabled=0 AND id NOT IN
-                                                                 (SELECT user_id FROM agents WHERE owner_id IS NOT NULL AND owner_id!=?) ORDER BY id""", (mine,))
+    # 2.28.0 (#935): + the organisations of each person (ids), so the share dialog offers only the list's workspace; agents
+    # carry the workspace they work in
+    ag_org = {r[0]: r[1] for r in c.execute("SELECT user_id, org_id FROM agents")}
+    return jsonify(users=[{**user_public(u), "orgs": user_orgs_public(c, u["id"]), **({"org_id": ag_org.get(u["id"])} if u["id"] in ag_org else {})}
+                          for u in c.execute("""SELECT * FROM users WHERE disabled=0 AND id NOT IN
+                                                (SELECT user_id FROM agents WHERE owner_id IS NOT NULL AND owner_id!=?) ORDER BY id""", (mine,))
                           if vis is None or u["id"] in vis])
 
 
@@ -135,7 +155,7 @@ def user_create():
     # 2.22.0 (#752): the organisations of the new person: given, else the creating admin's (else the instance's first)
     orgs = b.get("orgs")
     from ..accounts.orgs import instance_mode
-    if instance_mode(c) != "multi":  # 2.23.0 (#799): organisation = the one (create_user), shared = none
+    if instance_mode(c) not in ("multi", "workspaces"):  # 2.23.0 (#799): organisation = the one (create_user), shared = none
         orgs = []
     if orgs is None:
         orgs = [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=?", (me(),))]
@@ -170,15 +190,20 @@ def user_update(uid):
     b = body()
     c = db()
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
-    if not u:
+    if not u or not admin_sees(c, uid):  # 2.28.0 (#935): mode workspaces: only people the admin may see
         return err(tr("unknown user"), 404)
     from ..accounts.orgs import instance_mode
-    if "orgs" in b and instance_mode(c) == "multi":  # 2.22.0 (#752): the person's organisations (replaces them); 2.23.0: multi only
+    if "orgs" in b and instance_mode(c) in ("multi", "workspaces"):  # 2.22.0 (#752): the person's organisations (replaces them); 2.23.0: multi only; 2.28.0: + workspaces
         if not isinstance(b["orgs"], list) or not all(isinstance(x, int) for x in b["orgs"]):
             return err(tr("Invalid value: {0}", "orgs"))
-        c.execute("DELETE FROM org_members WHERE user_id=?", (uid,))
+        from ..accounts.orgs import org_leave
+        have = {r[0]: r[1] for r in c.execute("SELECT org_id, role FROM org_members WHERE user_id=?", (uid,))}
+        for o in sorted(set(have) - set(b["orgs"])):  # 2.28.0 (#935): taken out of an organisation = leaving it (lists stay with it)
+            heir = (c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND u.disabled=0 AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (o, uid)).fetchone() or [me()])[0]
+            org_leave(c, o, uid, heir if heir != uid else me())
         for o in b["orgs"]:
-            c.execute("INSERT OR IGNORE INTO org_members(org_id,user_id) SELECT id, ? FROM orgs WHERE id=?", (uid, o))
+            if o not in have:
+                c.execute("INSERT OR IGNORE INTO org_members(org_id,user_id,role) SELECT id, ?, 'member' FROM orgs WHERE id=?", (uid, o))
     if uid == me() and (("is_admin" in b and not b["is_admin"]) or b.get("disabled") or b.get("kind") == "agent"):
         return err(tr("You cannot remove your own admin rights or disable yourself"))
     if "kind" in b:  # 2.0.0: person <-> agent
@@ -275,7 +300,7 @@ def user_delete(uid):
     need_admin()
     c = db()
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
-    if not u:
+    if not u or not admin_sees(c, uid):  # 2.28.0 (#935)
         return err(tr("unknown user"), 404)
     if uid == me():
         return err(tr("You cannot delete yourself"))

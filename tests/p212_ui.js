@@ -105,18 +105,17 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
       check(/None: every list is owned by an active person/.test(d.querySelector('#s-orph').textContent), `${lab}: none left`);
       check(w.eval(`listById(${DEV})?.role`) === 'owner', `${lab}: alice owns Dev list, in her sidebar`);
     }
-    // #346 the users list: the agent as a row
-    const agrow = d.querySelector(`#a-users [data-urow="${ag.id}"]`);
-    check(agrow && agrow.querySelector('.abadge') && agrow.querySelector('[data-acc="agent-edit"]') && !agrow.querySelector('[data-acc="user-edit"]')
-      && /Managed under Agents/.test(agrow.textContent), `${lab}: agent row with badge + "Managed under Agents"`);
+    // #346 the users list: the agent as a row -> 2.28.0 (#1011): people only, one row counts the agents and leads to Agents
+    const agrow = d.querySelector('#a-users .mrow.agsum');
+    check(agrow && !d.querySelector(`#a-users [data-urow="${ag.id}"]`) && /agent/.test(agrow.textContent) && agrow.querySelector('[data-act="agents-go"]'), `${lab}: agent row with badge + "Managed under Agents"`);
     check(d.querySelector(`#a-users [data-urow="${ids.bob}"] [data-acc="user-edit"]`), `${lab}: people keep the edit button`);
     w.close();
   }
 
   // ================= the agent dialog: username + picture
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  w.eval(`settingsModal('users')`);
-  const lnk = await until(() => d.querySelector(`#a-users [data-urow="${ag.id}"] [data-acc="agent-edit"]`));
+  w.eval(`settingsModal('agents')`);  // 2.28.0 (#1011): the agent dialog opens from Settings > Agents
+  const lnk = await until(() => d.querySelector(`#s-ags [data-agid="${ag.id}"] [data-ag="edit"]`));
   click(w, lnk);
   let am = await until(() => d.querySelector('#ag-avpick')?.closest('.modal'));
   check(am && !am.querySelector('#ag-user').disabled && am.querySelector('#ag-user').value === 'claude', 'agent dialog opened from the users list; username editable');
@@ -136,7 +135,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   w.eval(`settingsModal('ai')`);
   const ed = await until(() => d.querySelector(`#s-ags [data-agid="${ag.id}"] [data-ag="edit"]`));
   click(w, ed); am = await until(() => d.querySelector('#ag-avpick')?.closest('.modal'));
-  check(/Profilbild/.test(am.textContent) && /API-Tokens gelten nach dem Umbenennen weiter/.test(am.textContent), 'German: the agent dialog');
+  check(/Profilbild/.test(am.textContent) && /API-Tokens funktionieren nach einer Umbenennung weiter/.test(am.textContent), 'German: the agent dialog');  // 2.28.0 (#926): the hint names the @mentions too
   am.querySelector('#ag-user').value = 'bob';
   click(w, am.querySelector('[data-m="ok"]')); await sleep(800);
   check(!am.querySelector('#ag-err').hidden && /existiert/.test(am.querySelector('#ag-err').textContent), 'taken username: error in the dialog: ' + am.querySelector('#ag-err').textContent);
@@ -148,7 +147,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   w.eval(`settingsModal('users')`);
   await until(() => d.querySelector('#s-orph-h'));
   check(/Listen von Agenten oder deaktivierten Benutzern/.test(d.querySelector('#s-orph-h').textContent), 'German: the Administration section');
-  check(/Verwaltet unter Agenten/.test((await until(() => d.querySelector(`#a-users [data-urow="${ag.id}"]`)))?.textContent || ''), 'German: agent row');
+  check(/Unter Agenten verwalten/.test((await until(() => d.querySelector('#a-users .mrow.agsum')))?.textContent || ''), 'German: agent row');  // 2.28.0 (#1011): one row for all agents
   w.close();
 
   check(errs.length === 0, 'no script errors: ' + errs.join(' | '));

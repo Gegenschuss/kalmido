@@ -41,6 +41,26 @@ NEWS_EXCERPT = 300
 NEWS_GROUPS = {"mention": ("mention",), "assign": ("assign", "unassign", "take"), "comment": ("comment",), "complete": ("complete",),
                "unblock": ("unblock",), "share": ("share", "role", "unshare", "owner", "agentjoin"), "status": ("status",)}
 NEWS_TO_ME = ("mention", "assign", "unassign", "take")  # filter "Mentions & assigned to me"
+# 2.28.0 (#987): "For you": messages from PEOPLE to me -- @mentions, assignments, replies to my comments (data.reply), an
+# approver's decision; everything agents do and every plain change is "Activity". The bell counts only "For you".
+NEWS_FOR_ME = ("mention", "assign", "take", "apdecide")
+
+
+def news_to_me(kind, actor_id, data, agents):
+    if actor_id in agents or not actor_id:
+        return False
+    if kind in NEWS_FOR_ME:
+        return True
+    return kind == "comment" and bool((data or {}).get("reply"))
+
+
+def agent_push_ok(c, uid, s, actor):
+    """2.28.0 (#987): a push about what an AGENT did (its comments, completions, new tasks, status) only when the person
+    switched "Pushes for what agents do" on (setting agent_push); mentions by agents and approval requests are not affected."""
+    from ..agents.core import agent_ids
+    if not actor or actor not in agent_ids(c):
+        return True
+    return (s or {}).get("agent_push") == "1"
 
 
 def news_wanted(s, kind):
@@ -227,7 +247,7 @@ def list_push(c, uid, row, lid, title_fn, msg_fn, click=None):
     if not uid or uid == me() or uid in agent_ids(c):
         return
     s = collab_user(c, uid, lid)
-    if not s or not notif_ok(c, uid, s, row, "push", lid) or not push_reachable(c, uid, s):
+    if not s or not notif_ok(c, uid, s, row, "push", lid) or not push_reachable(c, uid, s) or not agent_push_ok(c, uid, s, me()):
         return
     lg = lang_of(s)
     g.pushes.append((uid, title_fn(lg), msg_fn(lg), click or f"{PUBLIC_URL}/#l/{lid}", push_prio(s)))
@@ -294,7 +314,9 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
         kind = r["kind"]
         if (mentions_only and kind != "mention") or (to_me and kind not in NEWS_TO_ME):
             continue
-        if kind in ("share", "role", "status", "owner", "agentjoin"):
+        if kind in ("share", "unshare") and r["list_id"] is None and '"org"' in (r["data"] or ""):  # 2.28.0 (#935): an organisation
+            pass
+        elif kind in ("share", "role", "status", "owner", "agentjoin"):
             if not sees(r["list_id"]):
                 continue
         elif kind == "usage":  # 2.1.1 (#326): an agent's usage limit, for admins (no task, no list)
@@ -360,6 +382,7 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
         data = json.loads(r["data"] or "{}")
         if kind == "status":
             body = data.get("note") or ""
+        tome = news_to_me(kind, r["actor_id"], data, agents)  # 2.28.0 (#987)
         if kind == "unblock":  # the blocker's title only if I (still) see it
             bl = c.execute("SELECT title, list_id FROM tasks WHERE id=?", (data.get("blocker"),)).fetchone()
             data = {"title": bl["title"], "hidden": False} if bl and sees(bl["list_id"]) and sees_task(data.get("blocker"), False) \
@@ -371,7 +394,7 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
                     "task_title": r["t_title"] if not lk else None,
                     "list_id": r["t_list"] if r["task_id"] and not lk else r["list_id"],
                     "comment_id": r["comment_id"], "excerpt": body, "data": data, "created_at": r["created_at"],
-                    "read": read})
+                    "read": read, "to_me": tome})
         if kind == "comment" and r["actor_id"] in agents:
             out[-1].update(agent=True, tasks=[{"id": r["task_id"], "title": r["t_title"]}])
     return out, user_names(c, uids)
@@ -388,6 +411,12 @@ def news_unread(c, uid, s=None):
     return sum(1 for x in news_items(c, uid, s)[0] if not x["read"])
 
 
+def news_unread_me(c, uid, s=None, items=None):
+    """2.28.0 (#987): unread items from people for me (the bell's number)."""
+    items = news_items(c, uid, s)[0] if items is None else items
+    return sum(1 for x in items if not x["read"] and x.get("to_me"))
+
+
 @app.get("/api/news")
 def news_list():
     """My feed (only my own rows). ?filter=mentions: mentions only; ?filter=me (1.9.0): mentions + (un)assignments."""
@@ -397,6 +426,7 @@ def news_list():
     f = request.args.get("filter")
     items, names = news_items(c, uid, s, mentions_only=f == "mentions", to_me=f == "me")
     return jsonify(items=items, users={str(k): v for k, v in names.items()}, unread=news_unread(c, uid, s),
+                   unread_me=news_unread_me(c, uid, s, items if not f else None),  # 2.28.0 (#987)
                    sig=news_sig(c, uid), enabled=collab_on(s), avatars=avatar_map(c, uid))
 
 
@@ -414,7 +444,7 @@ def news_dismiss():
         part = ids[i:i + 500]
         c.execute(f"DELETE FROM notifications WHERE user_id=? AND id IN ({','.join('?' * len(part))})", (uid, *part))
     c.commit()
-    return jsonify(ok=True, unread=news_unread(c, uid), sig=news_sig(c, uid))
+    return jsonify(ok=True, unread=news_unread(c, uid), unread_me=news_unread_me(c, uid), sig=news_sig(c, uid))
 
 
 @app.post("/api/news/read")
@@ -436,7 +466,7 @@ def news_read():
             part = ids[i:i + 500]
             c.execute(f"UPDATE notifications SET read_at=NULL WHERE user_id=? AND id IN ({','.join('?' * len(part))})", (uid, *part))
         c.commit()
-        return jsonify(ok=True, unread=news_unread(c, uid), sig=news_sig(c, uid))
+        return jsonify(ok=True, unread=news_unread(c, uid), unread_me=news_unread_me(c, uid), sig=news_sig(c, uid))
     if b.get("all"):
         tids |= {r[0] for r in c.execute("SELECT DISTINCT task_id FROM notifications WHERE user_id=? AND read_at IS NULL "
                                          "AND task_id IS NOT NULL", (uid,))}
@@ -456,7 +486,7 @@ def news_read():
                       (ts, uid, *part))
     push_handled(c, uid, sorted(tids), ("*",) if b.get("all") else ())  # 2.19.0 (#668): "all read" closes them all
     c.commit()
-    return jsonify(ok=True, unread=news_unread(c, uid), sig=news_sig(c, uid), **({"marked": marked} if b.get("all") else {}))
+    return jsonify(ok=True, unread=news_unread(c, uid), unread_me=news_unread_me(c, uid), sig=news_sig(c, uid), **({"marked": marked} if b.get("all") else {}))
 
 
 NEWS_CLEAN = {"at": 0.0}

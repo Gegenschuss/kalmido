@@ -302,6 +302,12 @@ document.addEventListener('click', async e => {
     case 'st-chip': stChipMenu(a); break;
     case 'share-list': shareModal(+a.dataset.id); break;
     case 'dm': dmOpen(+a.dataset.uid, personNameAny(+a.dataset.uid)); break;  // 2.24.0 (#906)
+    case 'ws-set': wsSet(a.dataset.ws); break;  // 2.28.0 (#935)
+    case 'ws-menu': wsMenu(a); break;
+    case 'chat-choice': chatChoice(+a.dataset.mid, a.dataset.cid); break;  // 2.28.0 (#1005)
+    case 'chat-choice-send': chatChoice(+a.dataset.mid, null, true); break;
+    case 'agents-go': settingsModal('agents'); break;  // 2.28.0 (#1011)
+    case 'news-tab': LS.set('newsTab', a.dataset.tab); renderView(); break;  // 2.28.0 (#987)
     case 'chat-open': chatOpen(+a.dataset.aid); break;
     case 'chat-close': chatClose(); break;
     case 'chat-send': chatSend(); break;

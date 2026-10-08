@@ -57,8 +57,26 @@ function chatMsgs() {
   return older + S.chat.msgs.map(m => { const t = m.task_id && taskById(m.task_id), mine = m.from !== 'agent';
     // 2.7.2 (#422): my messages say Sent / Delivered (the agent fetched it); (#421) reactions, quick 👍 👎 ❤️ on the agent's
     const dlv = mine ? `<span class="cdlv ${m.delivered_at ? 'on' : ''}" title="${esc(m.delivered_at ? tr('Delivered') + ' · ' + fmtWhen(m.delivered_at) : tr('Sent'))}">${ic('check', 's')}${m.delivered_at ? ic('check', 's') : ''}<span>${m.delivered_at ? tr('Delivered') : tr('Sent')}</span></span>` : '';
-    return `<div class="cmsg ${mine ? 'me' : 'ag'}${rxShow('c' + m.id)}" data-k="m${m.id}" data-mid="${m.id}">${m.body ? `<div class="cbub">${commentBody(m.body, {})}</div>` : ''}${chatAttHtml(m)}${t ? `<button class="runtask" data-act="open-id" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : ''}<div class="cmeta"><time>${fmtWhen(m.created_at)}</time>${dlv}${chatRxHtml(m, a)}</div></div>`; }).join('')
+    return `<div class="cmsg ${mine ? 'me' : 'ag'}${rxShow('c' + m.id)}" data-k="m${m.id}${m.choice ? 'a' : ''}" data-mid="${m.id}">${m.body ? `<div class="cbub">${commentBody(m.body, {})}</div>` : ''}${chatAttHtml(m)}${chatChoicesHtml(m)}${t ? `<button class="runtask" data-act="open-id" data-id="${t.id}">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : ''}<div class="cmeta"><time>${fmtWhen(m.created_at)}</time>${dlv}${chatRxHtml(m, a)}</div></div>`; }).join('')
     + (off ? `<div class="chpend off" data-k="off" role="status">${ic('clock', 's')}<span>${esc(tr('{0} is offline – will answer later', a.name))}</span></div>` : '');
+}
+// 2.28.0 (#1005): the answer buttons under an agent's question; a tap answers (several with multi: tick, then "Send"), the
+// choice is shown and the buttons lock
+function chatChoicesHtml(m) {
+  const ch = m.from === 'agent' && m.choices; if (!ch || !(ch.choices || []).length) return '';
+  const ans = m.choice, ids = new Set(ans?.ids || []), multi = !!ch.multi, sel = S.chat.pick?.[m.id] || new Set();
+  const btn = c => `<button type="button" class="cchb ${c.style ? 'st-' + esc(c.style) : ''} ${ids.has(c.id) || sel.has(c.id) ? 'on' : ''}" data-act="chat-choice" data-mid="${m.id}" data-cid="${esc(c.id)}" ${ans ? 'disabled' : ''} ${multi ? `aria-pressed="${sel.has(c.id)}"` : ''}>${ids.has(c.id) ? ic('check', 's') : ''}<span>${esc(c.label)}</span></button>`;
+  return `<div class="cchoices ${ans ? 'done' : ''}" role="group" aria-label="${esc(tr('Answer'))}">${ch.choices.map(btn).join('')}${multi && !ans ? `<button type="button" class="btn sm pri cchsend" data-act="chat-choice-send" data-mid="${m.id}" ${sel.size ? '' : 'disabled'}>${ic('send', 's')} ${tr('Send')}</button>` : ''}${ans ? `<small class="muted cchans">${esc(tr('Answered'))} · ${fmtWhen(ans.at)}</small>` : ''}</div>`;
+}
+async function chatChoice(mid, cid, send = false) {
+  const m = S.chat.msgs.find(x => x.id === mid); if (!m || m.choice) return;
+  S.chat.pick ||= {};
+  if (m.choices?.multi && !send) { const s = S.chat.pick[mid] ||= new Set(); s.has(cid) ? s.delete(cid) : s.add(cid); chatPatch({}); return; }
+  const ids = send ? [...(S.chat.pick[mid] || [])] : [cid]; if (!ids.length) return;
+  try {
+    const r = await api('POST', `/api/agents/${S.chat.aid}/chat/${mid}/choice`, {choice_ids: ids});
+    Object.assign(m, r); delete S.chat.pick[mid]; chatPatch({});
+  } catch { /* api() said it */ }
 }
 // 2.13.1 (#465): the images / files of a chat message: thumbnails (lightbox on click) and file tiles; the sender removes
 // its own (on my messages: x; the agent's files are the agent's)
@@ -707,6 +725,11 @@ function audSetDay(md) { const inp = $('#aud-day', md); if (inp) { inp.value = S
 // 2.5.1 (#393): one card per agent: name, status dot, at most two facts (state · lists), a third line only for a reached
 // limit or a failing webhook, the usage of today / 7 days on the right. Admins: Test / Edit / Pause; others: no actions.
 function agCardHtml(a, adm) {
+  if (a.restricted) {  // 2.28.0 (#965): somebody else's personal agent: name, owner, the kill switch -- nothing else
+    return `<div class="mrow agsrow agrestr ${a.enabled ? '' : 'off'}" data-agid="${a.id}">${av(a.id, a.name)}<span class="n"><span class="agnm"><b>${esc(a.name)}</b> <span class="agown" title="${esc(tr('Personal agent of {0}', a.owner?.name || ''))}">${ic('user', 's')}${esc(a.owner?.name || '')}</span></span>
+      <small class="muted agfacts">${esc(tr('Personal agent of {0}: only its owner sees its lists, chats and settings', a.owner?.name || ''))}</small></span>
+      <span class="agacts"><button class="iconbtn ${a.enabled ? 'danger' : ''}" data-ag="pause" title="${a.enabled ? tr('Pause (kill switch): its token and webhook stop at once') : tr('Resume')}" aria-label="${a.enabled ? tr('Emergency stop') : tr('Resume')}">${ic(a.enabled ? 'stop' : 'play', 's')}<span class="aglbl">${a.enabled ? tr('Emergency stop') : tr('Resume')}</span></button></span></div>`;
+  }
   const u = (S.aiu.data?.agents || []).find(x => x.id === a.id), m = S.aiu.data?.cost && S.aiu.m === 'cost' ? 'cost' : 'tokens';
   const off = !a.enabled, st = off ? 'paused' : agentOffline(a) ? 'offline' : a.limit_reached || a.usage?.reached ? 'error' : a.status || 'idle';
   const facts = [off ? tr('paused') : agentSt(a), adm ? trn('{0} list', '{0} lists', (a.lists || []).length) : a.running || a.waiting ? [a.running && trn('{0} running', '{0} running', a.running), a.waiting && trn('{0} waiting', '{0} waiting', a.waiting)].filter(Boolean).join(' · ') : ''].filter(Boolean);
@@ -714,7 +737,8 @@ function agCardHtml(a, adm) {
   const wh = adm && a.webhook && (!a.webhook.enabled || (a.webhook.last && !a.webhook.last.ok)) ? `<small class="agwarn">${tr('webhook')} ${whState(a.webhook)}</small>` : '';
   const lim = a.usage?.reached || u?.limit_reached ? `<small class="agwarn aiulr">${ic('chart', 's')} ${a.usage ? aiuLimLine(a.usage) : esc(tr('limit reached'))}</small>` : '';
   const use = u && u.totals.d30.calls ? `<span class="agu" title="${esc(tr('Usage') + ': ' + tr('Today') + ' / ' + tr('7 days'))}"><small class="muted">${tr('Today')}</small> ${esc(aiuVal(u.totals.today, m))}<small class="muted">· ${tr('7 days')}</small> ${esc(aiuVal(u.totals.d7, m))}</span>` : '';
-  return `<div class="mrow agsrow ${off ? 'off' : ''}" data-agid="${a.id}">${av(a.id, a.name)}<span class="n" ${more ? `title="${esc(more)}"` : ''}><span class="agnm"><b>${esc(a.name)}</b>${adm && a.username ? ` <span class="muted">${esc(a.username)}</span>` : ''}${adm && a.owner ? ` <span class="agown" title="${esc(tr('Personal agent of {0}', a.owner.name))}">${ic('user', 's')}${esc(a.owner.name)}</span>` : ''}</span>
+  const wsl = wsOn() && adm ? ` <span class="agws" title="${esc(tr('Workspace: {0}', wsLabel(a.org_id)))}">${a.org_id ? ic('brief', 's') : ic('home', 's')}${esc(wsLabel(a.org_id))}</span>` : '';  // 2.28.0 (#935)
+  return `<div class="mrow agsrow ${off ? 'off' : ''}" data-agid="${a.id}">${av(a.id, a.name)}<span class="n" ${more ? `title="${esc(more)}"` : ''}><span class="agnm"><b>${esc(a.name)}</b>${adm && a.username ? ` <span class="muted">${esc(a.username)}</span>` : ''}${adm && a.owner ? ` <span class="agown" title="${esc(tr('Personal agent of {0}', a.owner.name))}">${ic('user', 's')}${esc(a.owner.name)}</span>` : ''}${wsl}</span>
       <small class="muted agfacts"><i class="adot st-${esc(st)}" aria-hidden="true"></i>${esc(facts.join(' · '))}</small>${lim}${wh}</span>${use}
     ${adm ? `<span class="agacts"><button class="iconbtn" data-ag="test" title="${tr('Send test')}" aria-label="${tr('Send test')}" ${a.enabled ? '' : 'disabled'}>${ic('send', 's')}</button>
       <button class="iconbtn" data-ag="edit" title="${tr('Edit')}" aria-label="${tr('Edit')}">${ic('edit', 's')}</button>
@@ -735,7 +759,10 @@ async function agDraw(md) {
   let j; try { [j] = await Promise.all([api('GET', '/api/admin/agents'), us]); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
   box._j = j; S.agOffer = j.scopes; S.agDefScopes = j.default_scopes;  // 2.15.0 (#479)
   if (!box.isConnected) return;
-  box.innerHTML = j.agents.length ? j.agents.map(a => agCardHtml(a, true)).join('') : `<div class="muted mhint">${tr('No agents yet.')}</div>`;
+  // 2.28.0 (#1011): grouped -- team agents, my personal agents, other people's personal agents (name + kill switch only)
+  const team = j.agents.filter(a => !a.owner), mine = j.agents.filter(a => a.owner && a.owner.id === S.me?.id), other = j.agents.filter(a => a.owner && a.owner.id !== S.me?.id);
+  const grp = (t, arr) => arr.length ? `<h5 class="aggh">${esc(t)} <span class="muted">${arr.length}</span></h5>${arr.map(a => agCardHtml(a, true)).join('')}` : '';
+  box.innerHTML = j.agents.length ? (team.length && (mine.length || other.length) ? grp(tr('Team agents'), team) : team.map(a => agCardHtml(a, true)).join('')) + grp(tr('My personal agents'), mine) + grp(tr('Personal agents of others'), other) : `<div class="muted mhint">${tr('No agents yet.')}</div>`;
   const ex = $('.aiexp', md); if (ex && j.agents.length) ex.open = false;  // the explanation stays open only while there is no agent
 }
 function agWire(md) {
@@ -743,8 +770,9 @@ function agWire(md) {
     const b = e.target.closest('[data-ag]'); if (!b) return;
     const box = $('#s-ags', md), a = (box?._j?.agents || []).find(x => x.id === +b.closest('[data-agid]')?.dataset.agid), k = b.dataset.ag;
     const tblAgain = () => { const t = $('#s-ai-tbl', md); if (t) { t._ags = null; aiTblDraw(md); } };  // 2.0.8: the overview table knows the new / paused agent
-    if (k === 'new') { agModal(null, () => { agDraw(md); tblAgain(); }); return; }
+    if (k === 'new') { agNewChooser(b, () => { agDraw(md); tblAgain(); }); return; }  // 2.28.0 (#970)
     if (!a) return;
+    if (k === 'edit' && a.restricted) return;
     if (k === 'edit') agModal(a, () => agDraw(md));
     if (k === 'test') {
       b.disabled = true;
@@ -765,11 +793,23 @@ function agWire(md) {
     }
   });
 }
-function agModal(a, done) {
-  const md = modal(`<h3>${a ? tr('Edit agent') : tr('Add agent')}</h3>
-    <div class="row"><label for="ag-user">${tr('Username')}</label><input id="ag-user" value="${esc(a?.username || '')}" autocapitalize="off" autocomplete="off" spellcheck="false" maxlength="32" placeholder="claude"></div>
-    ${a ? `<div class="shint keep">${tr('a-z, 0-9, . - _ · its API tokens keep working after a rename')}</div>` : ''}
+// 2.28.0 (#970): "Add agent" asks what kind -- a team agent (for lists with several people) or a personal one (only you see
+// and use it); admins create both here, the owner of a personal one is set in the dialog ("Belongs to")
+function agNewChooser(anchor, done) {
+  menu(anchor, [{label: tr('Team agent'), sub: tr('For lists with several people. Admins create it; the list owner decides who may address it.'), icon: 'users', fn: () => agModal(null, done, {kind: 'team'})},
+    {label: tr('Personal agent'), sub: tr('Only you see and use it; others in your lists cannot address it.'), icon: 'user', fn: () => agModal(null, done, {kind: 'personal'})}]);
+}
+function agModal(a, done, o = {}) {
+  const personal = a ? !!a.owner : o.kind === 'personal';
+  const ownerSel = (people) => `<div class="row"><label for="ag-owner">${tr('Belongs to')}</label><select id="ag-owner"><option value="" ${!personal ? 'selected' : ''}>${tr('Team agent')}</option>${people.map(u => `<option value="${u.id}" ${(a ? a.owner?.id : S.me?.id) === u.id ? 'selected' : ''}>${esc(tr('Personal agent of {0}', u.display_name))}</option>`).join('')}</select></div>
+    <div class="shint" id="ag-ownhint">${personal ? tr('Only this person sees and uses it: in the chat, at @, when assigning and sharing. Admins see it by name with the kill switch only.') : tr('A team agent for lists with several people; the owner of a list decides who may address it.')}</div>`;
+  const md = modal(`<h3>${a ? tr('Edit agent') : personal ? tr('New personal agent') : tr('New team agent')}</h3>
+    <div id="ag-ownrow">${ownerSel(S.me ? [S.me] : [])}</div>
+    ${wsOn() ? `<div class="row"><label for="ag-ws">${tr('Workspace')}</label>${wsSelectHtml('ag-ws', a ? a.org_id : (wsCur().startsWith('org:') ? +wsCur().slice(4) : (personal ? null : S.me?.workspaces?.[0]?.id)))}</div><div class="shint">${tr('An agent works in one workspace and joins only its lists; a private agent never sees an organisation’s lists.')}</div>` : ''}
     <div class="row"><label for="ag-name">${tr('Display name')}</label><input id="ag-name" value="${esc(a?.name || '')}" maxlength="60" placeholder="Claude"></div>
+    <div class="row"><label for="ag-user">${tr('Username')}</label><input id="ag-user" class="unin" value="${esc(a?.username || '')}" autocapitalize="off" autocomplete="off" spellcheck="false" maxlength="32" placeholder="claude"><span class="muted">${tr('for the login and @mentions')}</span></div>
+    <div class="shint keep" id="ag-userhint" hidden></div>
+    ${a ? `<div class="shint keep">${tr('a-z, 0-9, . - _ · its API tokens keep working after a rename; @mentions use the new name')}</div>` : ''}
     <div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="ag-avpick">${avPickHtml(a ? a.avatar || '' : '/static/avatars/robot.svg', !!a, a?.name || 'AI')}</div></div>
     <div class="row"><label for="ag-note">${tr('Note')}</label><input id="ag-note" value="${esc(a?.note || '')}" maxlength="2000" placeholder="${tr('What it is for (only admins see this)')}"></div>
     <div class="row"><label for="ag-prov">${tr('Where it runs')}</label><input id="ag-prov" value="${esc(a?.provider || '')}" maxlength="80" placeholder="${esc(tr('e.g. Claude (Anthropic, USA)'))}"></div>
@@ -786,6 +826,8 @@ function agModal(a, done) {
     ${agRtFields(a)}
     <div class="foot stfoot"><div class="calerr" role="alert" id="ag-err" hidden></div>${a ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${a ? tr('Save') : tr('Create')}</button></div>`);
   md.addEventListener('change', e => { if (e.target.id === 'ag-ac') $('#ag-acp', md).disabled = !e.target.checked; });  // 2.4.1 (#377)
+  md.addEventListener('change', e => { if (e.target.id === 'ag-owner') { const h = $('#ag-ownhint', md); if (h) h.textContent = e.target.value ? tr('Only this person sees and uses it: in the chat, at @, when assigning and sharing. Admins see it by name with the kill switch only.') : tr('A team agent for lists with several people; the owner of a list decides who may address it.'); } });
+  api('GET', '/api/users').then(j => { const box = $('#ag-ownrow', md); if (box && md.isConnected) { const cur = $('#ag-owner', md)?.value; box.innerHTML = ownerSel(j.users.filter(u => u.kind !== 'agent' && !u.disabled)); if (cur !== undefined) $('#ag-owner', md).value = cur; } }).catch(() => {});  // 2.28.0 (#965): whose personal agent
   // 2.1.2 (#346): the picture: a preset or none is sent with Save, an own photo (existing agents) is uploaded at once
   const avBox = $('#ag-avpick', md), avMark = k => $$('[data-av]', avBox).forEach(x => { x.classList.toggle('on', x.dataset.av === k); x.setAttribute('aria-pressed', x.dataset.av === k); });
   md.addEventListener('click', e => {
@@ -829,8 +871,11 @@ function agModal(a, done) {
       const rt = agRtBody(md); if (!rt) return;
       const body = {display_name: $('#ag-name', md).value.trim(), note: $('#ag-note', md).value.trim(), provider: $('#ag-prov', md)?.value.trim() || '', proposals: $('#ag-prop', md).value, webhook_url: $('#ag-url', md).value.trim(), ...aiuLimBody(md), runtime: rt,
         ...(S.agOffer ? {scopes: scopesVal(md)} : {}), allowed_ips: $('#ag-ips', md).value.trim()};  // 2.15.0 (#479)
+      const ow = $('#ag-owner', md); if (ow && (!a || String(a.owner?.id || '') !== ow.value)) body.owner_id = ow.value ? +ow.value : null;  // 2.28.0 (#965)
+      const wsel = $('#ag-ws', md); if (wsel && (!a || String(a.org_id || '') !== wsel.value)) body.org_id = wsel.value ? +wsel.value : null;  // 2.28.0 (#935)
       const un = $('#ag-user', md).value.trim().toLowerCase();
       if (!un) { need($('#ag-user', md)); return; }
+      if (userNameBad(un)) { show(userNameBad(un)); need($('#ag-user', md)); return; }  // 2.28.0 (#926)
       if (!a || un !== a.username) body.username = un;
       const avk = avBox.dataset.pick; if (avk) body.avatar_preset = avk === 'none' ? null : avk;
       b.disabled = true; show('');
@@ -841,7 +886,8 @@ function agModal(a, done) {
       else toast(tr('Saved'));
     } catch (x) { show(x.message); } finally { b.disabled = false; }
   });
-  setTimeout(() => $(a ? '#ag-name' : '#ag-user', md)?.focus(), 50);
+  userNameFollow(md, 'ag-name', 'ag-user', 'ag-userhint');  // 2.28.0 (#926)
+  setTimeout(() => $('#ag-name', md)?.focus(), 50);
 }
 
 // ---- 2.1.1 (#326) model usage of the agents: what they report (POST /api/v1/agent/usage), totals today / 7 d / 30 d per
