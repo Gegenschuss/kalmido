@@ -251,8 +251,10 @@ function listMenuItems(id, anchor) {
     const ag = listAgents(l)[0];
     items.push({label: ag ? tr('Agent: {0}…', ag.name) : tr('Agent…'), ...(ag ? {sub: listenLabel(l)} : {}), icon: 'bot', cls: 'magent', fn: () => shareModal(id, {focus: 'agents'})});  // 2.30.0 (#1034)
   }
-  if (agentsOn() && !l.is_inbox && listAgents(l).length) items.push({label: tr('Agent access'), icon: 'eye', cls: 'magacc', fn: () => agAccessModal(id)});  // 2.30.0 (#919): the access log
+  if (agentsOn() && !l.is_inbox && listAgents(l).length) items.push({label: tr('Agent access'), icon: 'eye', cls: 'magacc', rare: 1, fn: () => agAccessModal(id)});  // 2.30.0 (#919): the access log
   // 2.27.0 (#990): a section can be added from here too (also in an empty list)
+  // 2.31.0 (#1053): "Set status" left the list header; here (and on the project page) it stays one tap away
+  if (statusFor(l) && !l.is_inbox && !l.archived && canEditList(id)) items.push({label: tr('Set status'), icon: 'pulse', cls: 'mstatus', fn: () => statusModal(id)});
   if (!l.is_inbox && !l.archived && canEditList(id)) items.push({label: tr('Add section…'), icon: 'plus', cls: 'msecadd', fn: async () => {
     const n = await askPrompt(tr('Name of the section / column'), '', {ok: tr('Add')}); if (n && n.trim()) await sectionCreate(id, n.trim());
   }});
@@ -265,18 +267,26 @@ function listMenuItems(id, anchor) {
   // 2.27.0 (#991): from the sidebar (right-click / long press): its place among the lists of its folder
   if (!l.is_inbox && !l.archived && typeof anchor !== 'function' && anchor?.closest?.('#side')) items.push('-', ...listMoveItems(id), '-');
   if (propOn() && !l.archived) {  // 2.3.0 (#262 #263)
-    if (l.is_inbox && own) items.push({label: propWith(N_('Sort the inbox with {0}…'), N_('Sort the inbox with an agent…')), icon: 'bot', fn: () => propRequest('triage', {})});
-    else if (!l.is_inbox && canEditList(id)) items.push({label: tr('Tasks from notes…'), icon: 'bot', fn: () => propRequest('extract', {lid: id})});
+    if (l.is_inbox && own) items.push({label: propWith(N_('Sort the inbox with {0}…'), N_('Sort the inbox with an agent…')), icon: 'bot', rare: 1, fn: () => propRequest('triage', {})});
+    else if (!l.is_inbox && canEditList(id)) items.push({label: tr('Tasks from notes…'), icon: 'bot', rare: 1, fn: () => propRequest('extract', {lid: id})});
   }
   // 2.13.0 (#453 A7): not a second "List"; 2.18.0 review: "As a list / As a project", "Type: Project" read like the project type
   // 2.25.0 (UX-52): list or project is the switch "Project features" in "Edit list…" (no "As a list / As a project" here)
   void k;
-  if (collab() && l.shared) items.push({label: tr('Notifications: {0}', bellLabel(l.bell)), icon: BELL_ICON[l.bell || 'default'], fn: () => bellMenu(at(), id)});
-  if (progressFor(l) && !l.is_inbox) items.push('-', progHidden(id) ? {label: tr('Show progress'), icon: 'eye', fn: () => setProgHidden(id, false)} : {label: tr('Hide progress'), icon: 'x', fn: () => setProgHidden(id, true)});
+  if (collab() && l.shared) items.push({label: tr('Notifications: {0}', bellLabel(l.bell)), icon: BELL_ICON[l.bell || 'default'], rare: 1, fn: () => bellMenu(at(), id)});
+  if (progressFor(l) && !l.is_inbox) items.push(progHidden(id) ? {label: tr('Show progress'), icon: 'eye', rare: 1, fn: () => setProgHidden(id, false)} : {label: tr('Hide progress'), icon: 'x', rare: 1, fn: () => setProgHidden(id, true)});
   // U12: archive (with undo) instead of delete; deleting for good only from the archive
-  if (own && !l.is_inbox) items.push('-', l.archived ? {label: tr('Restore from the archive'), icon: 'undo', fn: () => listArchive(id, false)} : {label: tr('Archive'), icon: 'archive', fn: () => listArchive(id, true)},
-    {label: l.archived ? tr('Delete permanently…') : tr('Delete…'), icon: 'trash', cls: 'flag-5', fn: () => listDeleteForGood(id)});  // 2.25.0 (UX-13): delete from every list menu
-  return items;
+  if (own && !l.is_inbox) items.push('-', l.archived ? {label: tr('Restore from the archive'), icon: 'undo', danger: 1, fn: () => listArchive(id, false)} : {label: tr('Archive'), icon: 'archive', danger: 1, fn: () => listArchive(id, true)},
+    {label: l.archived ? tr('Delete permanently…') : tr('Delete…'), icon: 'trash', cls: 'flag-5', danger: 1, fn: () => listDeleteForGood(id)});  // 2.25.0 (UX-13): delete from every list menu
+  return listMenuSort(items);
+}
+// 2.31.0 (#1056): the list menu in three parts: the everyday entries (in their order; a new one lands here), the rare ones
+// (notifications, progress, agent access, tasks from notes: rare: 1) in a second level "More list options…" (one alone stays
+// inline), and what cannot simply be taken back (archive, delete: danger: 1) last, set apart
+function listMenuSort(items) {
+  const rare = items.filter(x => x && x.rare), dang = items.filter(x => x && x.danger), main = items.filter(x => x && !x.rare && !x.danger);
+  while (main[main.length - 1] === '-') main.pop();
+  return [...main, ...(rare.length > 1 ? [{label: tr('More list options…'), icon: 'sliders', cls: 'mlmore', more: rare}] : rare), ...(dang.length ? ['-', ...dang] : [])];
 }
 // 2.1.0 (#317): the bell of a list (mine only): all / default (the matrix in Settings > Notifications) / mute
 // 2.6.1 (#404): + custom = my own choice per event (News and Push each), for this list only

@@ -7,6 +7,60 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.31.0] - 2026-10-08
+
+**In short:** Phone everyday, part 1 of a usability round. **Task rows line up** on a phone (the ticket number moved into
+the meta line, no dead zone next to the circle), **Today is calmer** (the daily review folds to one line once read,
+the overdue actions sit in the Overdue heading, the agent band only shows when an agent needs you), the **list head is
+one slim line**, the **task panel on a phone drops its tabs** and on a desktop shows the **comments in their own
+resizable area**, **menus come in groups** with the dangerous entries last, the **Search tab opens the search** at once,
+a **column title sorts** the list, and a **dot on your picture** shows your connection. Fixes: file names next to the
+"Created by agent" label, Markdown tables on narrow screens, the agent sub-tabs on a phone.
+
+### Added
+- **Comments in their own area on a desktop** (#344): the task panel shows the properties above and the comments (with
+  the history and its switch) below; drag the line between them or use the arrow keys (Home / End for the limits),
+  fold the area with a double-click, Enter or the arrow in its head. Position and fold are saved per user
+  (`detail_split` 20-85, `detail_cm_fold`) and apply on every desktop; without comments the area says so. Phones,
+  foldables and touch tablets keep comments at the end of the panel.
+- **Sort by a column title** (#354): in lists with their own columns (*Shown fields…*) a click on a column title sorts
+  by it, a second click reverses, a third returns to the sort from before; arrow and `aria-sort` on the title, Enter /
+  Space work, right-click offers both directions, *Hide column* and *Shown fields…*. Saved like the sort menu (list
+  owners and admins for everyone, with a one-time note; members on their device). New `sort_mode` values `date_desc`,
+  `prio_asc`, `col:who|tags|time|progress|deps[_desc]`, `cf:<id>_desc`.
+- **Connection dot on your picture** (#378): green online, grey offline (the tooltip counts the waiting changes),
+  yellow while syncing; the state is also given as text, and the account menu starts with it ("Online · All saved",
+  or "Offline · 3 changes waiting" with *Try again*). The offline chip in the header stays.
+
+### Changed
+- **Task rows on a phone** (#1051): the ticket number moved from its own column into the meta line under the title, so
+  titles with and without numbers line up; a tap on the number or a gap in the row opens the task. The pin shows only
+  on pinned tasks (on a desktop also on hover, where one click pins). Today no longer repeats a "Today" chip on every
+  task, only its time.
+- **Today** (#1052): the daily review folds to one line ("1 done · 7 open", *Plan tomorrow*) after the first look of the
+  day and unfolds with its arrow (remembered for the day); its numbers use the normal font. *All to today* and
+  *Another day…* moved into the Overdue heading. The agent band on Today appears only when an agent needs you (a
+  question, an approval, an error or a limit), not for "offline".
+- **List head** (#1053): progress, overdue and the next due date share one slim line; *Set status* moved into the list's
+  "…" menu and the project page (a set status still shows); the view switch on a phone is lower (36 px).
+- **Task panel on a phone** (#1054): the "Details | Comments" tabs are gone, a small "To the comments" link with the
+  count jumps down; comment order and history moved into a "…" menu in the comment head; the assignee is chosen in one
+  place (the chip under the title: people, agents, groups, *Take over*); the "Created by" footer uses the normal font.
+- **Menus in groups** (#1056): the list menu, the task menu, the swipe menu and *More* show small group headings, with
+  archive and delete last and set apart; rarely used list options (notifications, progress, agent access, tasks from
+  notes) moved into *More list options…* (a second level with *Back*, → and ← on the keyboard); in the task panel the
+  menu no longer repeats date and priority.
+- **One search on a phone** (#1057): the *Search* tab opens the search with the keyboard; while that tab is pinned, the
+  header magnifier and the drawer's search field are gone (nothing behind the open drawer is tappable), and the *Lists*
+  tab opens the drawer at the lists.
+
+### Fixed
+- **File tiles** (#1050): the name gets its own line, so size and the "Created by agent" label no longer squeeze it to
+  two letters.
+- **Markdown tables** (#1048): in the file viewer, descriptions, comments and the chat, short cells stay on one line,
+  words never break letter by letter, and wide tables scroll sideways in their frame.
+- **Settings > Agents on a phone** (#1046): the sub-tabs keep their width and scroll sideways instead of overlapping.
+
 ## [2.30.0] - 2026-10-08
 
 **In short:** Clear boundaries, calmer agents. **Calendars and address books belong to a workspace** like lists, and a
@@ -3209,7 +3263,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.30.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.31.0...HEAD
+[2.31.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.31.0
 [2.30.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.30.0
 [2.29.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.29.0
 [2.28.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.28.0

@@ -293,7 +293,8 @@ document.addEventListener('click', async e => {
   const ev = e.target.closest('.cal .ev, .week .ev');
   if (ev) { if (!swiped) openDetail(+ev.dataset.id); return; }
   const a = e.target.closest('[data-act]');
-  if (!a) return;
+  // 2.31.0 (#1051): the gaps of a task row (between the circle and the title, its padding) open the task like its title
+  if (!a) { const r = e.target.classList?.contains('trow') && e.target.closest('#view') ? e.target : null; if (r && r.querySelector(':scope > .tmain[data-act="open"]') && !swiped) openDetail(+r.dataset.id); return; }
   const act = a.dataset.act;
   const row = a.closest('.trow');
   const id = +(a.dataset.id || (row && row.dataset.id) || 0);
@@ -361,6 +362,7 @@ document.addEventListener('click', async e => {
     case 'take': e.stopPropagation(); takeTask(id || S.sel); break;  // 2.10.0 (#441)
     case 'dayplan': dayplanModal(a.dataset.mode || 'day', a.dataset.day || today()); break;  // 2.10.0 (#440)
     case 'unplan': patchUndoable(+a.dataset.id, {plan_start: null}, tr('Unplanned {0}', qn(String(taskById(+a.dataset.id)?.title || '').slice(0, 40)))); break;  // 2.11.0: the day plan's slot only
+    case 'review-fold': { const open = a.getAttribute('aria-expanded') === 'true'; LS.set('reviewOpen', open ? '' : today()); if (open) S.review.route = null; renderView(); break; }  // 2.31.0 (#1052)
     case 'review-hide': LS.set('reviewHidden', today()); if (S.route.review) go('today'); else renderView(); break;
     case 'ck-uncheck': case 'ck-clear': {
       e.stopPropagation();
@@ -379,14 +381,17 @@ document.addEventListener('click', async e => {
     }
     case 'palette': closeSide(); openPalette(); break;
     case 'new-task': { const q = currentQuickInput(); if (q && (!isMobile() || tabletDock())) q.focus(); else openQuickSheet(); break; }
-    case 'side': $('#side').classList.add('open'); $('#scrim').classList.remove('hidden'); popOnClose = closeSide; sideRet = a; setTimeout(() => { if (document && $('#side.open') && !$('#side').contains(document.activeElement)) { sideRove(); const f = sideItems().find(x => x.tabIndex === 0) || sideItems()[0]; f?.focus({preventScroll: true}); } }, 60); break;  // 2.16.0 (#473): the drawer takes the focus
+    case 'side': $('#side').classList.add('open'); $('#scrim').classList.remove('hidden'); popOnClose = closeSide; sideRet = a; if (a.closest('#tabs') || S.sideToLists) { S.sideToLists = false; sideToLists(); } setTimeout(() => { if (document && $('#side.open') && !$('#side').contains(document.activeElement)) { sideRove(); const f = sideItems().find(x => x.tabIndex === 0) || sideItems()[0]; f?.focus({preventScroll: true}); } }, 60); break;  // 2.16.0 (#473): the drawer takes the focus
     case 'settings': closeSide(); settingsModal(); break;
     // 2.16.0 (#641): the account sits as the picture at the right of the Kalmido row (sidebar + drawer): Account, Settings,
     // Log out (the account rows at the top of the drawer / the bottom of the sidebar are gone)
-    case 'user-menu': menu(a, [{label: S.me ? `${S.me.display_name} · ${S.me.username}` : '', icon: 'user', dis: true, cls: 'mwho'}, '-',
+    case 'user-menu': { const n = netState(); menu(a, [{label: S.me ? `${S.me.display_name} · ${S.me.username}` : '', icon: 'user', dis: true, cls: 'mwho'},
+      // 2.31.0 (#378): the connection as the first line (online = "All saved" from 2.25), offline / waiting: try again now
+      {label: n.k === 'on' ? tr('Online') + ' · ' + tr('All saved') : n.label, icon: n.k === 'on' ? 'check' : n.k === 'off' ? 'cloudoff' : 'sync', dis: true, cls: 'mnet n-' + n.k},
+      ...(n.k !== 'on' ? [{label: tr('Try again'), icon: 'sync', fn: () => { if (OUT.q.length) flush(); refreshNow().then(staleDraw).catch(() => {}); }}] : []), '-',
       {label: tr('Account'), icon: 'user', fn: () => { closeSide(); settingsModal('account'); }},
       {label: tr('Settings'), icon: 'gear', keys: 'g s', fn: () => { closeSide(); settingsModal(); }},
-      ...(S.me?.auth === 'session' ? ['-', {label: tr('Log out'), icon: 'logout', fn: logout}] : [])]); break;
+      ...(S.me?.auth === 'session' ? ['-', {label: tr('Log out'), icon: 'logout', fn: logout}] : [])]); break; }
     case 'tabs-more': tabsMore(a); break;
     case 'list-chat': listChat(+a.dataset.id); break;  // 2.17.0 (#419)
     case 'rows-more': rowsMore(); break;  // 2.17.0 (#649)
@@ -461,12 +466,14 @@ document.addEventListener('click', async e => {
     case 'link-edit': S.editLink = true; renderDetail(); setTimeout(() => { const i = $('#d-url'); if (i) { i.focus(); i.select(); } }, 0); break;
     case 'link-rm': { const t = taskById(S.sel); if (t) patchUndoable(t.id, {url: null}, tr('Link removed')); break; }
     case 'tl-order': cmtOrderToggle(); break;  // 2.4.2 (#386)
-    case 'tl-act': LS.set('showActivity', !showAct()); a.classList.toggle('on', showAct()); a.setAttribute('aria-pressed', showAct()); $('span', a).textContent = showAct() ? tr('With activity') : tr('Comments only'); drawTimeline(); break;
+    case 'tl-act': tlActToggle(); break;
+    case 'tl-menu': e.stopPropagation(); tlMenu(a); break;  // 2.31.0 (#1054)
+    case 'cm-fold': dsFoldToggle(); break;  // 2.31.0 (#344)
     case 'md-subtasks': mdToSubtasks(); break;
     case 'ms-open': openDetail(+a.dataset.id); break;  // 2.18.0 (#430): a task of the milestone
     case 'ms-copy': { const md = S.msr?.j?.release_notes; if (!md) break; try { await navigator.clipboard.writeText(md); toast(tr('Copied')); } catch { toast(tr('Copy failed')); } break; }
     case 'md-more': { (S.mdMore ||= new Set()); S.mdMore.has(S.sel) ? S.mdMore.delete(S.sel) : S.mdMore.add(S.sel); const m = $('#d-md'), open = S.mdMore.has(S.sel); if (m) m.classList.toggle('clamp', !open); a.textContent = open ? tr('Show less') : tr('Show more'); a.setAttribute('aria-expanded', open); break; }
-    case 'd-tab': { LS.set('dTab', a.dataset.tab); const b = $('#detail .dbody'); if (b) b.classList.toggle('dtab-c', a.dataset.tab === 'comments'); $$('#detail .dtabs button').forEach(x => { x.classList.toggle('on', x === a); x.setAttribute('aria-selected', x === a); }); if (a.dataset.tab === 'comments') $('#d-tl-items')?.lastElementChild?.scrollIntoView({block: 'nearest'}); break; }
+    case 'd-jump-cm': $('#d-tl')?.scrollIntoView({block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth'}); break;  // 2.31.0 (#1054): replaces the Details | Comments tabs
     case 'sec-add': e.stopPropagation(); secAddOpen(+a.dataset.sec || 0); break;
     case 'c-send': sendComment(); break;
     case 'c-file-rm': { const arr = S.cfiles[S.sel] || []; arr.splice(+a.dataset.i, 1); $('#c-files').innerHTML = composerFiles(S.sel); break; }
@@ -680,8 +687,6 @@ document.addEventListener('change', async e => {
   if (t.id === 'd-ms') { msToggle(S.sel, t.checked); return; }  // 2.18.0 (#430)
   if (t.id === 'd-msel') { const m = t.value ? S.tasks.get(+t.value) : null; patchUndoable(S.sel, {milestone_id: m ? m.id : null}, m ? tr('Milestone: {0}', m.title) : tr('Milestone removed')); return; }
   if (t.id === 'd-ttype') patchUndoable(S.sel, {ttype: t.value}, t.value ? tr('Type: {0}', ttName(t.value)) : tr('Type removed'));  // 2.4.0 (#340)
-  if (t.id === 'd-assignee') patchTask(S.sel, t.value.startsWith('g:') ? {assignee_group_id: +t.value.slice(2), assignee_id: null}
-    : {assignee_id: t.value ? +t.value : null, ...(taskById(S.sel)?.assignee_group_id ? {assignee_group_id: null} : {})});  // 2.10.0 (#441)
   if (t.dataset?.cf !== undefined && t.closest('#detail')) saveField(t);
   if (t.id === 'pomo-task') { pomoTask = t.value; LS.set('pomoTask', t.value); }
   if ((t.id === 'tv-from' || t.id === 'tv-to') && t.value) { S.tv[t.id.slice(3)] = t.value; LS.set(t.id === 'tv-from' ? 'timeFrom' : 'timeTo', t.value); renderView(); }

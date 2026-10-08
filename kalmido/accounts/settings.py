@@ -27,9 +27,11 @@ SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "review_sent", "ntfy_
 SIDE_GROUPS = ("focus", "clients", "lists", "filters", "tags", "views", "team")  # 2.25.0 (UX-03)
 DASH_WIDGETS = ("wait", "today", "news", "chat", "projects", "pinned", "notes", "agents", "stats", "search", "family")  # 2.17.0 (#475), 2.19.0
 SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "time_focus", "paperless_keep", "celebrate", "cal_today",
-                  "date_confirm", "digest_mail", "mail_from_me", "today_inbox", "agent_push")  # 2.28.0 (#987): agent_push
+                  "date_confirm", "digest_mail", "mail_from_me", "today_inbox", "agent_push",  # 2.28.0 (#987): agent_push
+                  "detail_cm_fold")  # 2.31.0 (#344)
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
-                "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24)}
+                "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
+                "detail_split": (20, 85)}  # 2.31.0 (#344)
 
 
 def clean_setting(k, v):

@@ -18,6 +18,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.31.0** (2026-10-08): Phone everyday. **Task rows line up** on a phone, **Today is calmer** (the daily review
+  folds, overdue actions in the heading, the agent band only when needed), a **one-line list head**, the task panel
+  **without tabs** on a phone and with a **resizable comments area** on a desktop, **menus in groups**, the *Search* tab
+  opens the search, **sort by a column title**, a **connection dot** on your picture.
 - **2.30.0** (2026-10-08): Clear boundaries, calmer agents. **Calendars and address books belong to a workspace** like
   lists, a **nightly boundary check**; agents never **bridge lists with different people** unasked, can be **limited to
   chosen lists** and leave an **access log**; **Allow / Deny** buttons and answer buttons that expire; agents **listen in
@@ -610,7 +614,10 @@ boolean `checklist` are still accepted as deprecated aliases.
 - **Comments** (module *Comments*, on by default): everyone who can see a task can comment on it, including *View only*
   members (they still cannot change the task). In private lists and without collaboration, comments are personal
   notes with a timestamp: no @mentions, no News, no pushes, no history of your own changes. Checklists have none.
-  The comments and the history sit at the end of the task panel (all of them, oldest first); the comment box stays at
+  On a desktop (2.31.0, #344) the comments and the history have their own area below the properties: drag the line
+  between them (or use the arrow keys) to resize it, fold it with a double-click or the arrow in its head; position and
+  fold are saved per user. On phones and tablets the comments and the history sit at the end of the task panel (a small
+  *To the comments* link jumps there; order and history are in the "…" of the comment head). The comment box stays at
   the bottom edge of the panel while you scroll, a single line until you use it. Opened from a comment (News, a
   push), the panel shows the newest one. Comments support a little Markdown,
   links, files (images show as thumbnails inside the comment, not in the task's attachment list) and

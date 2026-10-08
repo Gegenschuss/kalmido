@@ -367,6 +367,15 @@ const showAct = () => LS.get('showActivity', true);
 // 2.4.2 (#386): comment order per user (all devices): old = oldest first, the box at the bottom edge (sticky);
 // new = newest first, the box right above the newest comment (no scrolling to answer)
 const cmtNew = () => S.settings?.comment_order === 'new';
+// 2.31.0 (#1054): the "…" of the comment head: order (saved per user) and the history between the comments (per device)
+function tlMenu(anchor) {
+  const t = taskById(S.sel); if (!t) return;
+  const nw = cmtNew(), keep = tr('Order of the comments, saved for you on all devices');
+  menu(anchor, [{label: tr('Oldest first'), icon: 'sort', on: !nw, cls: 'mtlold', title: keep, fn: () => { if (nw) cmtOrderToggle(); }},
+    {label: tr('Newest first'), icon: 'sort', on: nw, cls: 'mtlnew', title: keep, fn: () => { if (!nw) cmtOrderToggle(); }},
+    ...(cmSocial(t) ? ['-', {label: tr('With activity'), icon: 'clock', on: showAct(), cls: 'mtlact', title: tr('Show the history of changes between the comments'), fn: tlActToggle}] : [])]);
+}
+function tlActToggle() { LS.set('showActivity', !showAct()); renderDetail(); }
 async function cmtOrderToggle() {
   const v = cmtNew() ? 'old' : 'new', f = document.activeElement?.id === 'c-input';
   S.settings.comment_order = v; renderDetail(); if (f) $('#c-input')?.focus();
@@ -544,7 +553,7 @@ function timelineItems(ro = false) {
   const U = T.users || {};
   const items = [...T.comments.map(c => ({at: c.created_at, c, ro})), ...(showAct() || !soc ? (soc ? T.activity || [] : tlForeign(taskById(T.id))).map(a => ({at: a.created_at, a})) : [])]
     .sort((x, y) => new Date(x.at) - new Date(y.at) || (x.c ? 1 : 0) - (y.c ? 1 : 0));
-  if (!items.length) return soc ? `<div class="muted cmempty">${tr('No comments yet.')}</div>` : '';
+  if (!items.length) return soc || cmSplitOn(taskById(T.id)) ? `<div class="muted cmempty">${tr('No comments yet.')}</div>` : '';  // 2.31.0 (#344): the split keeps its area
   const lastC = [...items].reverse().find(it => it.c);
   if (cmtNew()) items.reverse();  // 2.4.2 (#386)
   // 2.13.2 (#478 F5): comments of the same author in a row (within 15 minutes) are one group: only the first shows the
@@ -564,8 +573,10 @@ function composerFiles(tid) {
 }
 function timelineHtml(t) {
   const n = S.tl.id === t.id && S.tl.comments ? S.tl.comments.length : t.comment_count || 0, soc = cmSocial(t);
-  const nw = cmtNew(), top = nw && cmtOn() && t.id > 0 && !t.context;
-  return `<h5 class="cmhead"><span>${tr('Comments')}</span><span class="c" id="d-tl-count">${n || ''}</span><span class="spacer"></span><button class="cmtoggle cmorder" data-act="tl-order" aria-label="${esc(tr('Order of the comments') + ': ' + (nw ? tr('Newest first') : tr('Oldest first')))}" title="${esc(tr('Order of the comments, saved for you on all devices'))}">${ic('sort', 's')}<span>${nw ? tr('Newest first') : tr('Oldest first')}</span></button>${soc ? `<button class="cmtoggle ${showAct() ? 'on' : ''}" data-act="tl-act" aria-pressed="${showAct()}" title="${tr('Show the history of changes between the comments')}">${ic('clock', 's')}<span>${showAct() ? tr('With activity') : tr('Comments only')}</span></button>` : ''}</h5>
+  const nw = cmtNew(), top = nw && cmtOn() && t.id > 0 && !t.context, split = cmSplitOn(t);
+  // 2.31.0 (#1054): order and history sit in a small "…" menu (were two big switches); "Comments only" says so in the head.
+  // (#344) the desktop split folds its area with the arrow at the end
+  return `<h5 class="cmhead"><span>${tr('Comments')}</span><span class="c" id="d-tl-count">${n || ''}</span>${soc && !showAct() ? `<span class="cmmode">${tr('Comments only')}</span>` : ''}<span class="spacer"></span><button type="button" class="iconbtn cmmenu" data-act="tl-menu" aria-haspopup="menu" aria-label="${esc(tr('Comment options'))}" title="${esc(tr('Comment options'))}">${ic('dots', 's')}</button>${split ? `<button type="button" class="iconbtn dsfoldb" data-act="cm-fold" aria-controls="d-cpane" aria-expanded="${!dsFold()}" aria-label="${esc(dsFold() ? tr('Show the comments') : tr('Fold the comments'))}" title="${esc(dsFold() ? tr('Show the comments') : tr('Fold the comments'))}">${ic('chev', 's')}</button>` : ''}</h5>
     ${top ? cmComposer(t, true) : ''}<div class="cms" id="d-tl-items">${S.tl.id === t.id ? timelineItems() : `<div class="muted cmempty">${tr('Loading…')}</div>`}</div>
     ${soc ? typingHtml(taskTypers(t), 'd-typing') : ''}`;
 }
@@ -583,8 +594,8 @@ function drawTimeline() {
   const box = $('#d-tl-items'); if (box) patchKids(box, timelineItems());  // 2.12.2 (#451): only changed / new comments
   const hb = $('#d-hist-items'); if (hb) hb.innerHTML = histItems();
   const n = $('#d-tl-count'); if (n) n.textContent = S.tl.comments?.length || '';
-  const n2 = $('#d-tab-count'); if (n2) n2.textContent = S.tl.comments?.length || '';
-  const t = taskById(S.sel), want = !!t && ((S.tl.comments?.length || 0) > 0 || cmSocial(t) || tlForeign(t).length > 0);
+  const n2 = $('#d-jump-count'); if (n2) n2.textContent = S.tl.comments?.length || '';
+  const t = taskById(S.sel), want = !!t && (cmSplitOn(t) || (S.tl.comments?.length || 0) > 0 || cmSocial(t) || tlForeign(t).length > 0);
   if (t && $('#detail .dcomp') && !!$('#d-tl') !== want) {  // #315: the list appears with the first comment (or goes with the last)
     const f = document.activeElement?.id === 'c-input'; renderDetail(); if (f) $('#c-input')?.focus();
   }
@@ -602,7 +613,7 @@ async function loadTimeline(id) {
     drawTimeline(); return;
   }
   if (my !== S.tlSeq || S.sel !== id) return;
-  const first = S.tl.id !== id;
+  const first = S.tl.id !== id, fresh = first || !S.tl.comments;  // 2.31.0: fresh = the comments arrive for the first time
   const seen = S.tl.id === id ? S.tl.seen : j.seen;  // "new" marks stay while the panel is open
   S.tl = {...j, id, v, seen};
   if (S.cedit && !j.comments.some(c => c.id === S.cedit)) S.cedit = null;
@@ -611,7 +622,10 @@ async function loadTimeline(id) {
   if (t && (t.unread || t.comment_count !== j.comments.length)) { t.unread = 0; t.comment_count = j.comments.length; viewSafeRender(); }
   if (top > (j.seen || 0)) rawFetch('POST', `/api/tasks/${id}/seen`).catch(() => {});
   // 2.24.0 (UX-41): opened with an unread comment of someone else: straight to the comments
-  if (first && j.comments.some(c => c.id > (j.seen || 0) && c.user_id !== S.me?.id)) setTimeout(() => { if (S.sel === id) $('#d-tl')?.scrollIntoView?.({block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth'}); }, 60);
+  // 2.31.0 (#344): the desktop split shows the comments anyway: its area starts at the newest one
+  const pane = fresh && $('#detail.dsplit #d-cpane');
+  if (pane && !cmtNew()) pane.scrollTop = pane.scrollHeight;
+  else if (first && j.comments.some(c => c.id > (j.seen || 0) && c.user_id !== S.me?.id)) setTimeout(() => { if (S.sel === id) $('#d-tl')?.scrollIntoView?.({block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth'}); }, 60);
 }
 async function capi(method, url, body) {  // comments: never queued, clear message when offline
   try { return await rawFetch(method, url, body); }

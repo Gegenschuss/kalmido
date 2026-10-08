@@ -30,14 +30,35 @@ function openPop(anchor, html, onClose) {
   p.style.left = Math.max(12, x) + 'px'; p.style.top = y + 'px';
   return p;
 }
-function menu(anchor, items) {
-  items = items.filter(Boolean).filter((x, i, a) => x !== '-' || (i > 0 && i < a.length - 1 && a[i - 1] !== '-'));  // 2.27.0: no doubled / edge separators
-  const btn = (it, i, j) => `<button role="menuitem" data-i="${i}" ${j != null ? `data-j="${j}"` : ''} class="${it.on ? 'on' : ''} ${it.cls || ''}" ${it.dis ? 'disabled aria-disabled="true"' : ''} ${it.title ? `title="${esc(it.title)}"` : ''}>${it.dot ? `<span class="mdot">${hdot(it.dot)}</span>` : it.icon ? ic(it.icon, 's') : ''}<span class="ml">${esc(it.label)}${it.sub ? `<small class="msub">${esc(it.sub)}</small>` : ''}</span>${it.keys && !isMobile() ? kb(it.keys) : ''}${it.on ? `<span class="mchk" aria-hidden="true">${ic('check', 's')}</span>` : ''}</button>`;
+// 2.31.0 (#1056): menu groups. {head: 'View'} starts a group with a small heading (role="group" + aria-label), '-' is a quiet
+// separator; a heading or separator at the end, before another one, or a separator on top is dropped (empty groups vanish).
+// {label, more: [items]} = a second level ("More list options…"): it opens in the same place with "Back" on top; → opens it,
+// ← goes back. Arrow keys only stop on menu items (headings and separators are skipped).
+function menuTidy(items) {
+  const a = items.filter(Boolean), o = [];
+  for (let i = a.length - 1; i >= 0; i--) { const x = a[i], nx = o[0]; if ((x === '-' || x.head) && (!nx || nx === '-' || nx.head)) continue; o.unshift(x); }
+  while (o[0] === '-') o.shift();
+  return o;
+}
+function menu(anchor, items, back, fsel) {
+  items = menuTidy(items);  // 2.27.0: no doubled / edge separators
+  const btn = (it, i, j) => `<button role="menuitem" data-i="${i}" ${j != null ? `data-j="${j}"` : ''} class="${it.on ? 'on' : ''} ${it.cls || ''}${it.more ? ' msubm' : ''}" ${it.more ? 'aria-haspopup="menu"' : ''} ${it.dis ? 'disabled aria-disabled="true"' : ''} ${it.title ? `title="${esc(it.title)}"` : ''}>${it.dot ? `<span class="mdot">${hdot(it.dot)}</span>` : it.icon ? ic(it.icon, 's') : ''}<span class="ml">${esc(it.label)}${it.sub ? `<small class="msub">${esc(it.sub)}</small>` : ''}</span>${it.keys && !isMobile() ? kb(it.keys) : ''}${it.on ? `<span class="mchk" aria-hidden="true">${ic('check', 's')}</span>` : ''}${it.more ? `<span class="mchev" aria-hidden="true">${ic('right', 's')}</span>` : ''}</button>`;
   // {row: [item, item]} = one line of equal buttons (1.5.1: "Today" / "Tomorrow" on top of the task menu)
-  const p = openPop(anchor, `<div class="menu-list" role="menu">${items.map((it, i) => it === '-' ? '<hr>' : it.row ? `<div class="mquick" role="group">${it.row.map((x, j) => btn(x, i, j)).join('')}</div>` : btn(it, i)).join('')}</div>`);
-  p.onclick = e => { const b = e.target.closest('[data-i]'); if (!b || b.disabled) return; let it = items[+b.dataset.i]; if (it.row) it = it.row[+b.dataset.j]; closePop(); it.fn(); };
+  let html = '', grp = false;
+  items.forEach((it, i) => {
+    if ((it === '-' || it.head) && grp) { html += '</div>'; grp = false; }
+    if (it === '-') html += '<hr role="separator">';
+    else if (it.head) { html += `<div class="mgrp" role="group" aria-label="${esc(it.head)}"><div class="mgh" aria-hidden="true">${esc(it.head)}</div>`; grp = true; }
+    else html += it.row ? `<div class="mquick" role="group">${it.row.map((x, j) => btn(x, i, j)).join('')}</div>` : btn(it, i);
+  });
+  if (grp) html += '</div>';
+  const p = openPop(anchor, `<div class="menu-list" role="menu">${html}</div>`);
+  const up = () => menu(anchor, items, back, '.msubm');
+  p._menuBack = back || null;
+  p._menuOpen = it => menu(anchor, [{label: tr('Back'), icon: 'back', cls: 'mback', fn: up}, {head: it.label.replace(/…$/, '')}, ...it.more], up, '[role="menuitem"]:not(.mback):not([disabled])');
+  p.onclick = e => { const b = e.target.closest('[data-i]'); if (!b || b.disabled) return; let it = items[+b.dataset.i]; if (it.row) it = it.row[+b.dataset.j]; if (it.more) { p._menuOpen(it); return; } closePop(); it.fn(); };
   // 2.16.0 (#473): the menu gets the focus (first item); ↑ ↓ Home End move in it, Esc / Tab out close it (keydown below)
-  setTimeout(() => { if (document && !p.classList.contains('hidden') && !p.contains(document.activeElement)) p.querySelector('[role="menuitem"]:not([disabled])')?.focus({preventScroll: true}); }, 0);
+  setTimeout(() => { if (document && !p.classList.contains('hidden') && !p.contains(document.activeElement)) ((fsel && p.querySelector(fsel)) || p.querySelector('[role="menuitem"]:not([disabled])'))?.focus({preventScroll: true}); }, 0);
   return p;
 }
 function popFocusBack() {
@@ -51,6 +72,10 @@ function popFocusBack() {
 document.addEventListener('keydown', e => {
   const m = e.target.closest?.('#pop [role="menu"]'); if (!m || e.altKey || e.ctrlKey || e.metaKey) return;
   const it = $$('[role="menuitem"]:not([disabled])', m), i = it.indexOf(e.target.closest('[role="menuitem"]'));
+  // 2.31.0 (#1056): → on an entry with a second level opens it, ← inside a second level goes back
+  const p = $('#pop');
+  if (e.key === 'ArrowRight' && e.target.closest('.msubm') && p._menuOpen) { e.preventDefault(); e.stopPropagation(); e.target.closest('.msubm').click(); return; }
+  if (e.key === 'ArrowLeft' && !e.target.closest('.mquick') && p._menuBack) { e.preventDefault(); e.stopPropagation(); p._menuBack(); return; }
   const to = {ArrowDown: i + 1, ArrowUp: i - 1, ArrowRight: e.target.closest('.mquick') ? i + 1 : null, ArrowLeft: e.target.closest('.mquick') ? i - 1 : null, Home: 0, End: it.length - 1}[e.key];
   if (to != null && it.length) { e.preventDefault(); e.stopPropagation(); it[(to + it.length) % it.length].focus(); }
   else if (e.key === 'Tab') closePop();
@@ -560,40 +585,47 @@ function taskMenu(anchor, id, o = {}) {
   if (!canEdit(t)) { roToast(); return; }
   const sib = siblings(t), i = sib.findIndex(x => x.id === t.id);
   const l = listById(t.list_id), open = t.status === 0;
+  // 2.31.0 (#1056): groups with small headings (Plan, Organize, Time, Structure); won't do + delete last, set apart. In the task
+  // panel date and priority are not repeated: the panel's header has both (the date chip, Today / Tomorrow, the flag)
+  const inPanel = !!anchor?.closest?.('#detail .dtop') && !!$('#detail .dtop [data-act="date"]') && !!$('#detail .dtop [data-act="prio"]');
   menu(anchor, [
     // 2.25.0 (UX-11): opened by a long press: the title on top, then "Select" (more tasks follow with a tap)
     ...(o.select ? [{label: t.title.length > 60 ? t.title.slice(0, 59) + '…' : t.title, cls: 'mhead', dis: true, fn: () => {}}, {label: tr('Select'), icon: 'select', fn: () => { S.multiMode = true; S.multi.add(id); S.multiLast = id; render(); }}, '-'] : []),
+    {head: tr('Plan|nav')},
     // date
-    quickDueRow(id), {label: tr('New date…'), icon: 'clock', keys: 's', fn: () => snoozeSheet(id, anchor)},
+    ...(inPanel ? [] : [quickDueRow(id), {label: tr('New date…'), icon: 'clock', keys: 's', fn: () => snoozeSheet(id, anchor)}]),
     ...(t.repeat && t.due && open ? [{label: tr('Skip this occurrence'), icon: 'skip', fn: async () => {
       const b0 = snapTask(t);
       const j = await api('POST', `/api/tasks/${id}/skip`);
       putTask(j); render(); if (S.sel === id) renderDetail();
       if (j.next_due) histFields(tr('Skipped an occurrence of {0}', qn(t.title.slice(0, 40))), [[b0, snapTask(S.tasks.get(id)), ['due', 'start', 'repeat']]], {res: j});
       toast(j.next_due ? tr('Skipped, next occurrence: {0}', dayLabel(j.next_due)) : tr('Will be sent as soon as the server is reachable'));
-    }}] : []), '-',
+    }}] : []),
     // priority, assignee
-    PRIO_ROW(id),
-    ...(collab() && l?.shared && t.id > 0 && !t.context && canAssign(t) ? [{label: tr('Assign…'), icon: 'user', fn: () => assignMenu(anchor, id)}] : []), '-',
+    ...(inPanel ? [] : [PRIO_ROW(id)]),
+    ...(collab() && l?.shared && t.id > 0 && !t.context && canAssign(t) ? [{label: tr('Assign…'), icon: 'user', fn: () => assignMenu(anchor, id)}] : []),
+    {head: tr('Organize')},
     // where it lives
     ...(open ? [moveListItem(anchor, id)] : []),
     ...(open && !t.parent_id && (S.sections.some(x => x.list_id === t.list_id) || canEditList(t.list_id)) ? [{label: tr('Move to section…'), icon: 'columns', fn: () => sectionPicker(anchor, id)}] : []),
     // 2.16.0 (#473, WCAG 2.5.7): what dragging does, as menu items (also Alt+↑ / ↓)
-    ...(open && t.id > 0 && S.route.mod === 'tasks' && $(`#view .trow[data-id="${id}"]`) ? [{row: [{label: tr('Move up'), icon: 'up', title: kt(tr('Move up'), 'Alt+ArrowUp'), fn: () => taskNudge(id, -1)}, {label: tr('Move down'), icon: 'down', title: kt(tr('Move down'), 'Alt+ArrowDown'), fn: () => taskNudge(id, 1)}]}] : []), '-',
+    ...(open && t.id > 0 && S.route.mod === 'tasks' && $(`#view .trow[data-id="${id}"]`) ? [{row: [{label: tr('Move up'), icon: 'up', title: kt(tr('Move up'), 'Alt+ArrowUp'), fn: () => taskNudge(id, -1)}, {label: tr('Move down'), icon: 'down', title: kt(tr('Move down'), 'Alt+ArrowDown'), fn: () => taskNudge(id, 1)}]}] : []),
     // waiting
     ...(open ? [t.waiting_at ? {label: tr('No longer waiting'), icon: 'hourglass', fn: () => waitClear(id)}
       : {label: tr('Waiting on someone…'), icon: 'hourglass', fn: () => waitDialog(id)}] : []),
     // 2.23.0 (#463): an approval (a person of the shared list decides)
     ...(open && t.id > 0 && collab() && l?.shared && t.approval !== 'pending' ? [{label: tr('Ask for approval…'), icon: 'eye', fn: () => approvalRequest(id)}] : []),
     // pin
-    {label: t.pinned ? tr('Unpin') : tr('Pin'), icon: 'pin', fn: () => patchTask(id, {pinned: t.pinned ? 0 : 1})}, '-',
+    {label: t.pinned ? tr('Unpin') : tr('Pin'), icon: 'pin', fn: () => patchTask(id, {pinned: t.pinned ? 0 : 1})},
+    {head: tr('Time|menu')},
     // time
     ...(feat('pomo') ? [{label: tr('Start focus session'), icon: 'timer', fn: () => { pomoStart(id); go('pomo'); }}] : []),
     ...(tFor(t) ? [S.timer && S.timer.task_id === id ? {label: tr('Stop timer'), icon: 'stop', fn: timerStop} : {label: tr('Start time tracking'), icon: 'clock', fn: () => timerStart({task_id: id})},
-      {label: tr('Add time…'), icon: 'plus', fn: () => entryModal(null, {task_id: id})}] : []), '-',
+      {label: tr('Add time…'), icon: 'plus', fn: () => entryModal(null, {task_id: id})}] : []),
+    {head: tr('Structure')},
     // template
     {label: tr('Save as template'), icon: 'copy', fn: () => saveTemplate({task_id: id}, t.title)},
-    {label: tr('Duplicate'), icon: 'sub', fn: () => createTask({title: t.title, content: t.content, list_id: t.list_id, section_id: t.section_id, priority: t.priority, due: t.due, due_time: t.due_time, reminders: t.reminders, repeat: t.repeat, repeat_from: t.repeat_from, tags: t.tags, parent_id: t.parent_id, url: t.url || null, ...(t.ms ? {ms: 1} : {}), ...(t.milestone_id ? {milestone_id: t.milestone_id} : {}), ...(t.fields && Object.keys(t.fields).length ? {fields: t.fields} : {})})}, '-',
+    {label: tr('Duplicate'), icon: 'sub', fn: () => createTask({title: t.title, content: t.content, list_id: t.list_id, section_id: t.section_id, priority: t.priority, due: t.due, due_time: t.due_time, reminders: t.reminders, repeat: t.repeat, repeat_from: t.repeat_from, tags: t.tags, parent_id: t.parent_id, url: t.url || null, ...(t.ms ? {ms: 1} : {}), ...(t.milestone_id ? {milestone_id: t.milestone_id} : {}), ...(t.fields && Object.keys(t.fields).length ? {fields: t.fields} : {})})},
     // structure + more
     ...(isMs(t) || (!t.parent_id && !children(t.id).length && t.id > 0) ? [{label: isMs(t) ? tr('Make it a normal task') : tr('Make it a milestone'), icon: 'flag', fn: () => msToggle(id)}] : []),  // 2.18.0 (#430)
     ...(i > 0 && depthOf(sib[i - 1]) < 2 && !isMs(t) && !isMs(sib[i - 1]) ? [{label: tr('Indent (under “{0}”)', sib[i - 1].title.slice(0, 24)), icon: 'indent', fn: () => patchTask(id, {parent_id: sib[i - 1].id})}] : []),
@@ -601,10 +633,10 @@ function taskMenu(anchor, id, o = {}) {
     ...(t.parent_id && S.tasks.get(t.parent_id)?.parent_id ? [{label: tr('Make it a main task'), icon: 'arrow', fn: () => patchTask(id, {parent_id: null})}] : []),
     ...(propBreakOk(t) ? [{label: propWith(N_('Break down with {0}…'), N_('Break down with an agent…')), icon: 'bot', fn: () => propRequest('subtasks', {tid: id})}] : []),  // 2.3.0 (#261)
     ...(t.id > 0 && !t.context && listRepos(t.list_id).length && !codeShown(t) ? [{label: tr('Link code…'), icon: 'git', title: tr('Copies a branch name for this task; commits and pull requests that name #{0} are linked too', t.id), fn: () => gitCopyBranch(t)}] : []),  // 2.4.2 (#387)
-    {label: t.status === -1 ? tr('Reopen') : tr("Won't do (discard)"), icon: 'ban', fn: () => t.status === -1 ? toggleTask(id) : wontDo(id)},
     '-',
+    {label: t.status === -1 ? tr('Reopen') : tr("Won't do (discard)"), icon: 'ban', fn: () => t.status === -1 ? toggleTask(id) : wontDo(id)},
     ...(canDelete(t) ? [{label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => deleteTask(id)}] : []),
-  ].reduce((o, x) => x === '-' && (!o.length || o[o.length - 1] === '-') ? o : [...o, x], []).filter((x, k, a) => x !== '-' || k < a.length - 1));
+  ]);
 }
 const propBreakOk = t => propOn() && t && t.id > 0 && t.status === 0 && depthOf(t) < 2 && canEditList(t.list_id);
 function siblings(t) {  // same parent (or same list at top level), in custom order
@@ -629,24 +661,35 @@ function snoozeSheet(id, anchor, extra = [], head = false, pre = []) {
     ...extra,
   ]);
 }
+// 2.27.0 (#988): owner / list admins set the list's sort for everyone; a member's choice stays on this device (and the view
+// says that it is an own sort). 2.31.0 (#354): also the column titles' clicks; m = '' = back to the list's sort
+let sortQ = Promise.resolve();
+async function sortSet(m) {
+  const l = routeList(), k = S.route.key;
+  if (l && !l.is_inbox && canManage(l)) {
+    const before = l.sort_mode || '';
+    LS.del('sort2.' + k); l.sort_mode = m; render();
+    // fix 2.31: quick clicks on a column title send one PATCH after the other (in flight together they could land in the
+    // wrong order on the server and leave the older sort)
+    const q = sortQ = sortQ.then(() => api('PATCH', '/api/lists/' + l.id, {sort_mode: m})).catch(() => { if (l.sort_mode === m) { l.sort_mode = before; render(); } });
+    await q;
+    return;
+  }
+  if (m) LS.set('sort2.' + k, m); else LS.del('sort2.' + k);
+  render();
+}
 function sortMenu(anchor) {
   const cur = sortMode();
   const l = routeList(), cfs = l ? fieldsOf(l.id).filter(f => f.type !== 'url') : [];
-  // 2.27.0 (#988): owner / list admins set the list's sort for everyone; a member's choice stays on this device (and the view
-  // says that it is an own sort)
-  const set = async m => {
-    if (l && !l.is_inbox && canManage(l)) {
-      const k = S.route.key, before = l.sort_mode || '';
-      LS.del('sort2.' + k); l.sort_mode = m; render();
-      try { await api('PATCH', '/api/lists/' + l.id, {sort_mode: m}); } catch { l.sort_mode = before; render(); }
-      return;
-    }
-    LS.set('sort2.' + S.route.key, m); render();
-  };
+  const set = m => { LS.del('sortback.' + S.route.key); return sortSet(m); };  // a pick here ends a column title's round
+  // 2.31.0 (#354): a sort picked by a column title shows as its own line (on); a click flips it, like "Created"
+  const cc = sortByCol(cur) ? colOfSort(cur) : null;
+  const ccDir = cc && (sortDir(cur) === 'ascending' ? tr('ascending|sort') : tr('descending|sort'));
   // 1.7.0: "Flow" = in the order the dependencies allow (only with the dependencies module)
   // 2.0.8 (#319): "Created" newest first; picking it again while it is on flips to oldest first (and back)
   const crOn = cur === 'created' || cur === 'created_asc';
-  menu(anchor, [...[['prio', N_('Priority, then manual')], ['custom', N_('Manual only')], ['date', N_('Date')], ['title', N_('Title')], ['creator', N_('Creator|sort')], ...(depsOn() ? [['flow', N_('Flow|sort')]] : [])].map(([m, n]) => ({label: tr(n), on: cur === m, fn: () => set(m)})),
+  menu(anchor, [...(cc ? [{label: tr('Column: {0}', (l && colName(l, cc)) || cc) + ' · ' + ccDir, icon: 'sort', on: true, cls: 'sortcol', title: tr('Click again to reverse the direction'), fn: () => { const p = colSorts(cc); set(cur === p[0] ? p[1] : p[0]); }}, '-'] : []),
+    ...[['prio', N_('Priority, then manual')], ['custom', N_('Manual only')], ['date', N_('Date')], ['title', N_('Title')], ['creator', N_('Creator|sort')], ...(depsOn() ? [['flow', N_('Flow|sort')]] : [])].map(([m, n]) => ({label: tr(n), on: cur === m, fn: () => set(m)})),
     {label: !crOn ? tr('Created|sort') : cur === 'created' ? tr('Created: newest first') : tr('Created: oldest first'), on: crOn, cls: 'sortcr', title: crOn ? tr('Click again to reverse the direction') : '', fn: () => set(cur === 'created' ? 'created_asc' : 'created')},
     ...(cfs.length ? ['-', ...cfs.map(f => ({label: tr('Field: {0}', f.name), icon: FT_ICON[f.type], on: cur === 'cf:' + f.id, fn: () => set('cf:' + f.id)}))] : []),
     ...(doneToggleView() ? ['-', doneItem()] : []),

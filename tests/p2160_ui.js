@@ -48,7 +48,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   // ================= jsdom: #641 the account picture in the Kalmido row
   let w = await boot({user: 'alice', hash: 'l/' + L}), d = w.document;
   const acct = d.querySelector('#side .sbrand .sbacct');
-  check(acct && acct.querySelector('.avatar') && acct.getAttribute('aria-haspopup') === 'menu' && acct.getAttribute('aria-label') === 'Account: Alice', '#641: the account picture at the right of the Kalmido row, named');
+  check(acct && acct.querySelector('.avatar') && acct.getAttribute('aria-haspopup') === 'menu' && /^Account: Alice( · |$)/.test(acct.getAttribute('aria-label')), '#641: the account picture at the right of the Kalmido row, named');
   check(!d.querySelector('#side .suser') && !d.querySelector('#side .sdtop'), '#641: the old account rows (drawer top, sidebar bottom) are gone');
   check(d.querySelector('#side .sbrand .sbhome') && d.querySelector('#side .sfoot .sset'), 'the logo and the Settings row stay');
   click(w, acct); await sleep(150);

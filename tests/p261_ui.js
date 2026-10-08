@@ -240,7 +240,7 @@ const HEAD = `(() => {
   let lb = (await call('GET', '/api/state', null, CKB)).lists.find(l => l.id === L);
   check(lb.bell === 'custom' && lb.bell_custom.newtask.news === 1 && lb.bell_custom.comment.push === 0 && lb.bell_custom.comment.news === 1, 'saved: ' + JSON.stringify(lb.bell_custom));
   check(/Notifications for Launch: Custom selection/.test(d.querySelector('#toast').textContent), 'toast: ' + d.querySelector('#toast').textContent);
-  check(w.eval(`listMenuItems(${L}).some(x => x.label === 'Notifications: Custom selection')`), 'list menu names it');
+  check(w.eval(`listMenuItems(${L}).flatMap(x => x.more || [x]).some(x => x.label === 'Notifications: Custom selection')`), 'list menu names it');
   w.eval(`listModal(${L})`); await sleep(500);
   const lsel = d.querySelector('.lmodal #l-bell');
   check(lsel.value === 'custom' && !d.querySelector('.lmodal #l-bellc').hidden && /own choice per event/.test(d.querySelector('#l-bellhint').textContent), 'list dialog: custom + "Choose events…"');

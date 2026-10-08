@@ -491,10 +491,20 @@ function agSetupWire(md) {
     agSetupDraw(md);
   });
 }
+// 2.31.0 (#1046): a sub-tab strip wider than the screen scrolls sideways; the chosen tab is scrolled into view (only the strip
+// moves, not the dialog)
+function segReveal(b) {
+  const st = b?.parentElement; if (!st) return;
+  const go = () => { if (!b.isConnected || st.scrollWidth <= st.clientWidth + 1) return;
+    const sr = st.getBoundingClientRect(), br = b.getBoundingClientRect();
+    if (br.left < sr.left) st.scrollLeft -= sr.left - br.left + 8; else if (br.right > sr.right) st.scrollLeft += br.right - sr.right + 8; };
+  requestAnimationFrame(go); setTimeout(go, 400);  // once more when the pane has loaded (a scrollbar of the dialog narrows the strip)
+}
 // shows one sub-tab and loads what it needs (save: remember it for this device)
 function aiSubShow(md, want, save) {
   const k = aiSubCur(want); if (save) LS.set('aiSub', k);
   $$('[data-aisub]', md).forEach(b => { const on = b.dataset.aisub === k; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
+  segReveal($(`[data-aisub="${k}"]`, md));
   $$('[data-aisp]', md).forEach(p => { p.hidden = p.dataset.aisp !== k; });
   if (k === 'agents') return agDraw(md);
   if (k === 'lists') return aiTblDraw(md);
@@ -514,6 +524,7 @@ function admSubsHtml(parts, want) {
 function admSubShow(md, want, save) {
   const k = admSubCur(want); if (save) LS.set('admSub', k);
   $$('[data-admsub]', md).forEach(b => { const on = b.dataset.admsub === k; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
+  segReveal($(`[data-admsub="${k}"]`, md));
   $$('[data-admp]', md).forEach(p => { p.hidden = p.dataset.admp !== k; });
 }
 // Organisation: whether members may connect their own agents (#896, the policy user_agents of #420, off by default)

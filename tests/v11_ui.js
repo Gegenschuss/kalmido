@@ -25,7 +25,10 @@ async function api(cookie, method, url, body) {
   check(gs(), 'first start: "Getting started" list created');
   check(d.querySelector('#view .trow') && /Tick me off/.test(d.querySelector('#view').textContent), 'Today shows the sample tasks');
   check(d.querySelector('#view .trow.pr5') && d.querySelector('#view .trow .chk'), 'row: priority bar class + square checkbox');
-  check(d.querySelector('#view .trow.hascols .tcols .c-date') && d.querySelector('#view .trow .meta .dt.m-col'), 'desktop: date column + mobile meta copy');
+  // 2.31.0 (#1051): in Today a task due today (no time) carries no date chip and an empty date cell; every other dated
+  // row keeps its mobile meta copy (class m-col) of the date column
+  const dRows = [...d.querySelectorAll('#view .trow.hascols')].filter(r => r.querySelector('.tcols .c-date'));
+  check(dRows.length && dRows.every(r => !!r.querySelector('.c-date .cdt').textContent.trim() === !!r.querySelector('.meta .dt.m-col')), 'desktop: date column + mobile meta copy');
   check(/\d/.test(d.querySelector('#top h1 .hn')?.textContent || ''), 'title: open count (mono)');
   const tour = () => d.querySelector('.tour');
   check(tour() && tour().dataset.step === 'side' && /Smart lists/.test(d.querySelector('.tcard').textContent), 'tour: step 1 smart lists');

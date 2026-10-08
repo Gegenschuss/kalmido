@@ -13,8 +13,10 @@ function progBar(p, cls = '') {
   return `<div class="lprog ${cls}" title="${esc(tr('{0} of {1} done ({2}%)', p.done, p.total, pct(p)))}"><div class="pbar"><i style="width:${pct(p)}%"></i></div><span><b>${pct(p)}%</b> ${p.done}/${p.total}</span></div>`;
 }
 function progMeta(p) {
+  // 2.31.0 (#1053): phones show the next due day short (calendar glyph + day, the full text as its title)
+  const nd = p.next_due ? tr('Next due: {0}', dayLabel(p.next_due)) : '';
   return (p.overdue ? `<span class="lmeta over">${trn('{0} overdue', '{0} overdue', p.overdue)}</span>` : '') +
-    (p.next_due ? `<span class="lmeta">${tr('Next due: {0}', esc(dayLabel(p.next_due)))}</span>` : '');  // 2.13.0 (#453 P1): says what "next" is
+    (p.next_due ? `<span class="lmeta lnext" title="${esc(nd)}"><span class="lnf">${esc(nd)}</span><span class="lns" aria-hidden="true">${ic('cal', 's')}${esc(dayLabel(p.next_due))}</span></span>` : '');  // 2.13.0 (#453 P1): says what "next" is
 }
 function statusPill(l, act = true, empty = l.shared) {
   if (!statusFor(l) || l.is_inbox) return '';
@@ -35,9 +37,11 @@ function vsegHtml(l) {
 }
 function listHead(l, o = {}) {
   if (!l || l.is_inbox) return vsegHtml(l) + agBandHtml();
-  const p = l.progress || {done: 0, total: 0, overdue: 0}, showP = progressFor(l) && p.total > 0 && !progHidden(l.id), pill = o.noPill ? '' : statusPill(l), ts = timeSumHtml([l]);
+  // 2.31.0 (#1053): one slim line: bar left, overdue + next due right; "Set status" (no status yet) is not repeated here,
+  // it lives on the project page and in the list's "…" menu (a status that is set still shows as its pill)
+  const p = l.progress || {done: 0, total: 0, overdue: 0}, showP = progressFor(l) && p.total > 0 && !progHidden(l.id), pill = o.noPill ? '' : statusPill(l, true, false), ts = timeSumHtml([l]);
   if (!showP && !pill && !ts) return vsegHtml(l) + famBar(l) + lifeBar(l) + agBandHtml();
-  return `${vsegHtml(l)}${famBar(l) + lifeBar(l)}<div class="lhead">${showP ? `<span class="lpg">${progBar(p)}<button class="iconbtn lpx" data-act="prog-hide" data-id="${l.id}" title="${tr('Hide progress')}" aria-label="${tr('Hide progress')}">${ic('x', 's')}</button></span>` + progMeta(p) : ''}<span class="spacer"></span>${ts}${pill}</div>${statusNote(l)}${agBandHtml()}`;
+  return `${vsegHtml(l)}${famBar(l) + lifeBar(l)}<div class="lhead">${showP ? `<span class="lprow"><span class="lpg">${progBar(p)}<button class="iconbtn lpx" data-act="prog-hide" data-id="${l.id}" title="${tr('Hide progress')}" aria-label="${tr('Hide progress')}">${ic('x', 's')}</button></span>${progMeta(p)}</span>` : ''}<span class="spacer"></span>${ts}${pill}</div>${statusNote(l)}${agBandHtml()}`;
 }
 // ---- 2.7.0 (#407): the tracked time of a project list (or of a folder's project lists) in its header, in hours and in
 // working days. Hours per day / shift: the list's own value (list dialog, owner; the same for every member), else the
@@ -522,7 +526,7 @@ function cfMatch(t, fid, r) {
   }
   return true;
 }
-function cfSortCmp(fid) {
+function cfSortCmp(fid, desc = false) {  // 2.31.0 (#354): desc = the other way round, empty values stay last
   const f = fieldById(fid);
   if (!f) return bySort;
   const key = t => {
@@ -533,7 +537,7 @@ function cfSortCmp(fid) {
     if (f.type === 'person') return (personName(t.list_id, +v) || '').toLowerCase();
     return String(v).toLowerCase();
   };
-  return (a, b) => { const x = key(a), y = key(b); if (x === y) return b.priority - a.priority || bySort(a, b); if (x == null) return 1; if (y == null) return -1; return x < y ? -1 : 1; };
+  return (a, b) => { const x = key(a), y = key(b); if (x === y) return b.priority - a.priority || bySort(a, b); if (x == null) return 1; if (y == null) return -1; return (x < y ? -1 : 1) * (desc ? -1 : 1); };
 }
 function actField(d) {
   if (d.v == null) return '';

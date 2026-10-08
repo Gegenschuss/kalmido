@@ -707,6 +707,10 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 .att.file svg{color:var(--accent);flex:none}
 .att .an{font-size:.8125rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .att .as{font-size:.6875rem;color:var(--muted);white-space:nowrap}
+/* 2.31.0 (#1050): the name has its own line and the whole width; size and "Created by agent" go below it and shorten first */
+.att .atxt{display:flex;flex-direction:column;flex:1 1 auto;min-width:8ch;line-height:1.3}
+.att .atxt .an{max-width:100%}
+.att .atxt .as{overflow:hidden;text-overflow:ellipsis;min-width:0;max-width:100%}
 .attdel{position:absolute;top:.25rem;right:.25rem;width:1.375rem;height:1.375rem;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;display:grid;place-items:center;opacity:0}
 .att:hover .attdel{opacity:1}
 .attadd{display:inline-flex;align-items:center;gap:.375rem;padding:.5rem .75rem;border-radius:var(--radius);border:1px dashed var(--bg4);color:var(--muted);font-size:.8125rem;cursor:pointer;min-height:2.75rem}
@@ -1207,6 +1211,20 @@ svg.chart{display:block;max-width:100%;overflow:visible}
 .lprog b{color:var(--text);font-weight:600}
 .lmeta{white-space:nowrap}
 .lmeta.over{color:var(--p5)}
+/* 2.31.0 (#1053): progress, overdue and next due in one slim line (phones: the bar takes the room left, the texts right) */
+.lprow{display:inline-flex;align-items:center;gap:.375rem 1.25rem;min-width:0}
+.lnext .lns{display:none}
+.lnext .lns .i{margin-right:.25rem;vertical-align:-.125rem}
+@media (max-width:899px){
+  #view .lhead{gap:.25rem .75rem;margin-bottom:.375rem}
+  .lprow{flex:1 1 100%;gap:.75rem}
+  .lprow .lpg{flex:1 1 auto;min-width:0}
+  .lprow .lprog{flex:1 1 auto;min-width:0;gap:.5rem}
+  .lprow .lprog .pbar{flex:1 1 auto;width:auto;max-width:none;min-width:2.5rem}
+  .lprow .lmeta{flex:none}
+  .lnext .lnf{display:none}
+  .lnext .lns{display:inline-flex;align-items:center}
+}
 .stpill{--sc:var(--muted);display:inline-flex;align-items:center;gap:.375rem;padding:2px .5rem;border-radius:var(--r-s);font-size:.75rem;font-weight:600;color:var(--sc);background:color-mix(in srgb,var(--sc) 14%,transparent);white-space:nowrap}
 .stpill i{width:.4375rem;height:.4375rem;border-radius:50%;background:currentColor;flex:none}
 .stpill.none{font-weight:500;background:none;border:1px dashed var(--line)}
@@ -2113,6 +2131,13 @@ body.tl-typing #tabs,body.tl-typing #fab{display:none}
 .odban .odto{color:var(--muted);display:inline-flex}
 .odban .spacer{flex:1}
 @media (max-width:640px){.odban .odto{display:none}.odban .btn.sm{min-height:2.25rem}}
+/* 2.31.0 (#1052): Today grouped by date: the overdue actions in the head of "Overdue" instead of a card of their own */
+.ghead .odact{order:6;display:inline-flex;gap:.375rem;margin-left:.375rem;flex:none}
+.ghead .odact .btn.sm{font-weight:500;color:var(--text2);padding-top:.1875rem;padding-bottom:.1875rem}
+@media (pointer:coarse){ .ghead .odact .btn.sm{min-height:2.75rem} }  /* fix 2.31: 44 px on touch (own line on phones) */
+/* review 2.31: on narrow screens the overdue actions get a line of their own under the heading (long German labels) */
+.ghead:has(.odact){flex-wrap:wrap}
+@media (max-width:640px){ .ghead .odact{flex:1 0 100%;order:7;margin:.25rem 0 0 1.25rem} }
 /* 1.8.1: the sign-in / first-run screens are a page of their own, centered on every screen (tablets in portrait,
    e.g. a Galaxy Fold unfolded, showed a bottom sheet under 900 px) and never see-through (light theme dimmed the app) */
 .modal.authscreen,:root[data-theme] .modal.authscreen{background:var(--bg);align-items:center;padding:calc(1rem + var(--safe-t)) 1rem calc(1rem + var(--safe-b))}
@@ -2244,11 +2269,35 @@ body.pop-open #chatfab,body.modal-open #chatfab{visibility:hidden}
 /* 2.27.0 (#994): at least six lines fully readable before "Show more"; only the last line fades */
 .md.clamp{max-height:calc(9 * 1.45em);overflow:hidden;-webkit-mask-image:linear-gradient(#000 84%,transparent);mask-image:linear-gradient(#000 84%,transparent)}
 .mdmore{align-self:flex-start;margin:-.25rem 0 .25rem;font-size:var(--fs-s)}
-.dtabs{display:flex;margin:0 0 .25rem}
-.dtabs button{flex:1;justify-content:center;gap:.375rem}
-.dtabs .c{font:500 var(--fs-xs)/1 var(--mono);color:var(--muted)}
-.dtabs .c:empty{display:none}
-.dbody.dtab-c>:not(.dtitle):not(#d-tl):not(.dtabs){display:none!important}
+/* 2.31.0 (#1054): the phone's "Details | Comments" tabs are gone: a small jump to the comments next to the assignee */
+.dmeta .djump{display:inline-flex;align-items:center;gap:.25rem;margin-left:auto;min-height:1.5rem;text-decoration:none;color:var(--text2);font-size:var(--fs-s)}
+.dmeta .djump svg{width:.875rem;height:.875rem}
+.dmeta .djump .c{color:var(--muted);font-variant-numeric:tabular-nums}
+.dmeta .djump .c:empty{display:none}
+@media (pointer:coarse){ .dmeta .djump{min-height:2.75rem} }  /* fix 2.31: 44 px on touch */
+.dmeta .dwho.ro{cursor:default}
+.dfoot .dfc{font-family:var(--sans)}
+.cmhead .cmmode{color:var(--muted);font-weight:400;font-size:var(--fs-xs)}
+.cmhead .iconbtn{min-width:1.5rem;min-height:1.5rem;padding:.25rem}
+.cmhead .iconbtn svg{width:.875rem;height:.875rem}
+/* 2.31.0 (#344): desktop: the properties on top, the comments in their own area below, a draggable line between them */
+#detail.dsplit{overflow:hidden;overflow:clip}
+#detail.dsplit .dbody{flex:var(--dsT,60) 1 0;min-height:0;overflow-y:auto;padding-bottom:1.25rem}
+#detail.dsplit .dbody>*{flex-shrink:0}
+#detail.dsplit .dcpane{flex:var(--dsC,40) 1 0;min-height:0;overflow-y:auto;padding:0 1.25rem .75rem;overscroll-behavior:contain}
+.dsgrip{flex:none;position:relative;height:.625rem;margin:0;cursor:row-resize;touch-action:none;z-index:3}
+.dsgrip::after{content:"";position:absolute;left:0;right:0;top:50%;border-top:1px solid var(--line)}
+.dsgrip::before{content:"";position:absolute;left:50%;top:50%;width:2rem;height:.25rem;margin:-.125rem 0 0 -1rem;border-radius:1rem;background:var(--bg4);z-index:1}
+.dsgrip:hover::after,.dsgrip.drag::after,.dsgrip:focus-visible::after{border-top:2px solid var(--accent)}
+.dsgrip:hover::before,.dsgrip.drag::before,.dsgrip:focus-visible::before{background:var(--accent)}
+.dsgrip:focus-visible{outline:none}
+#detail.dsplit .dcpane #d-tl{border-top:0;padding-top:0}
+#detail.dsplit .dcpane .cmhead{position:sticky;top:0;z-index:1;background:var(--bg2);margin:0;padding:.375rem 0}
+.dsfoldb svg{transition:transform .15s}
+#detail.dsfold .dsfoldb svg{transform:rotate(180deg)}
+#detail.dsplit.dsfold .dbody{flex:1 1 0}
+#detail.dsplit.dsfold .dcpane{flex:0 0 auto;overflow:hidden;padding-bottom:0}
+#detail.dsfold .dcpane #d-tl>:not(.cmhead){display:none}
 .atyping{display:flex;align-items:center;gap:.5rem;padding:.375rem .25rem;font-size:var(--fs-s);color:var(--text2)}
 .atyping .ttx{min-width:0;overflow-wrap:anywhere}
 .atdots{display:inline-flex;gap:.1875rem;flex:none;padding:.3125rem .4375rem;border-radius:.75rem;background:var(--bg3)}
@@ -3221,6 +3270,22 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 .trow.sel .tgut{color:var(--accent)}
 .trow.done .tgut{opacity:.6}
 @media (min-width:900px){ .trow.hascols .tgut{margin-top:0} .trow.hascols{padding-top:0;padding-bottom:0} }
+/* 2.31.0 (#1051): phones: the task number moves into the meta line (.mid), so titles with and without one start at the same x;
+   the whole row right of the circle opens the task */
+.meta .mid{display:none}
+@media (max-width:899px){
+  .trow .tgut{display:none}
+  .meta .mid{display:inline-flex;font:var(--fs-s) var(--mono);font-variant-numeric:tabular-nums;color:var(--muted)}
+  .trow.sel .meta .mid{color:var(--accent)}
+}
+/* 2.31.0 (#1051): the row's pin: on the row only when pinned; a mouse also sees it on hover (and pins with it) */
+.trow > .rpin{display:none}
+@media (min-width:900px) and (hover:hover) and (pointer:fine){
+  .lwrap .trow > .rpin{display:inline-flex;flex:none;align-self:center;margin:-.25rem 0;opacity:0;color:var(--muted);transition:opacity .12s}
+  .lwrap .trow:hover > .rpin,.lwrap .trow > .rpin:focus-visible,.lwrap .trow > .rpin.on{opacity:1}
+  .lwrap .trow > .rpin.on{color:var(--accent)}
+  .lwrap .trow:has(> .rpin) .meta .pinm{display:none}
+}
 /* rows, columns: calm mono metadata */
 .tcols{color:var(--text2)}
 /* phone tab bar */
@@ -3292,15 +3357,26 @@ button.gchip:hover{color:var(--text)}
 .rvcard{border:1px solid var(--line2);border-left:.1875rem solid var(--accent);border-radius:var(--r-l);background:var(--bg2);padding:.625rem .75rem;margin:.25rem 0 .75rem}
 .rvhd{display:flex;align-items:center;gap:.5rem}
 .rvhd h3{margin:0;font-size:var(--fs-l);display:flex;align-items:center;gap:.375rem}
-.rvnums{display:flex;gap:1rem;flex-wrap:wrap;margin:.375rem 0;font:var(--fs-s) var(--mono);color:var(--text2)}
-.rvnums b{color:var(--text);font-size:var(--fs-l)}
+.rvnums{display:flex;gap:1rem;flex-wrap:wrap;margin:.375rem 0;font-size:var(--fs-s);color:var(--text2)}
+.rvnums b{color:var(--text);font-size:var(--fs-l);font-variant-numeric:tabular-nums}
+/* 2.31.0 (#1052): the review folded to one line after its first read; the chevron unfolds / folds it */
+.rvhd .rvfold{flex:none;display:inline-grid;place-items:center;width:1.5rem;height:1.5rem;margin-left:-.25rem;border-radius:var(--r-s);color:var(--muted)}
+.rvhd .rvfold:hover{color:var(--text);background:var(--bg3)}
+.rvcard.fold{display:flex;align-items:center;gap:.5rem;padding:.25rem .375rem .25rem .5rem}
+.rvcard.fold .rvfold{flex:1 1 auto;min-width:0;display:flex;align-items:center;justify-content:flex-start;gap:.5rem;min-height:2rem;padding:0 .25rem;border-radius:var(--r-s);color:var(--text2);font-size:var(--fs-s);text-align:left}
+.rvcard.fold .rvfold:hover{background:var(--bg3)}
+.rvcard.fold .rvfold svg{transform:rotate(-90deg);flex:none;color:var(--muted)}
+.rvcard.fold .rvft{font-weight:600;color:var(--text);white-space:nowrap}
+.rvcard.fold .rvfn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.rvcard.fold .btn{flex:none}
+@media (max-width:899px){ .rvcard.fold .rvft{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap} }  /* review 2.31: hidden, still part of the name */
 .rvcard h4{margin:.5rem 0 .25rem;font-size:var(--fs-s);color:var(--muted)}
 .rvl{margin:0;padding-left:1.125rem;font-size:var(--fs-m)}
 .rvl li.ok{color:var(--text2);text-decoration:line-through;text-decoration-color:var(--faint)}
 .rvtm{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.5rem;font-size:var(--fs-s)}
 .rvtm .muted{flex:1;min-width:12rem}
 @media (pointer:coarse){
-  .dpbar .btn,.dptabs .seg button,.dpm .foot .btn,.dpm [data-dp="close"],.rvcard .btn,.rvhd .iconbtn{min-height:2.75rem;min-width:2.75rem;justify-content:center}
+  .dpbar .btn,.dptabs .seg button,.dpm .foot .btn,.dpm [data-dp="close"],.rvcard .btn,.rvhd .iconbtn,.rvcard .rvfold,.rvcard.fold .rvfold,.rvcard.fold .iconbtn{min-height:2.75rem;min-width:2.75rem;justify-content:center}
 }
 /* ================= 2.13.0 polish (#453) */
 /* A2: chat reactions appear on hover / focus / long press as a small bar over the bubble's corner; the newest open question
@@ -3361,8 +3437,9 @@ button.chmode{cursor:pointer}button.chmode:hover{color:var(--text);border-color:
 /* A7: the view switch under the list title on phones; a check on the active menu entry */
 .vsegm{display:flex;gap:.25rem;overflow-x:auto;scrollbar-width:none;margin:.25rem 0 .5rem;padding:.1875rem;background:var(--bg3);border-radius:var(--radius)}
 .vsegm::-webkit-scrollbar{display:none}
-.vsegm button{flex:1 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:.375rem;min-height:2.75rem;padding:0 .75rem;border:0;border-radius:calc(var(--radius) - .125rem);background:none;color:var(--text2);font:inherit;font-size:var(--fs-s);white-space:nowrap;cursor:pointer}
+.vsegm button{flex:1 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:.375rem;min-height:2.25rem;padding:0 .75rem;border:0;border-radius:calc(var(--radius) - .125rem);background:none;color:var(--text2);font:inherit;font-size:var(--fs-s);white-space:nowrap;cursor:pointer}
 .vsegm button.on{background:var(--bg);color:var(--text);font-weight:600;box-shadow:0 0 0 1px var(--line2)}
+/* 2.31.0 (#1053): the view switch 36 px high (was 44); a tap target of 24 px at least stays (WCAG 2.5.8) */
 .menu-list .mchk{margin-left:auto;padding-left:.5rem;color:var(--accent);display:inline-flex}
 /* P1: the progress bar keeps its × next to it; the time sum says what it is */
 .lpg{display:inline-flex;align-items:center;gap:.25rem;min-width:0}
@@ -3645,6 +3722,15 @@ pre.mdpre code{font:inherit;background:none;padding:0;border:0}
 .lcols .tchip,.lcols .subc,.lcols .blk,.lcols .crd{display:inline-flex;align-items:center;gap:.25rem}
 .lchead{display:flex;align-items:center;gap:.75rem;padding:0 .5rem .25rem .75rem;border-bottom:1px solid var(--line);margin-bottom:2px;font:500 var(--fs-xs)/1.2 var(--mono);color:var(--muted)}
 .lchead .spacer{flex:1}
+/* 2.31.0 (#354): the column titles sort on click; the row wrapper only carries the table semantics */
+.lchead .lcrow{display:contents}
+.lchead .lcs{display:inline-flex;align-items:center;gap:.25rem;min-width:0;max-width:100%;min-height:1.5rem;padding:0 .125rem;margin:0 -.125rem;border:0;border-radius:var(--r-s);background:none;color:inherit;font:inherit;cursor:pointer;text-align:inherit}
+.lchead .lc-who .lcs,.lchead .lc-prio .lcs{min-width:1.5rem;justify-content:center}  /* review 2.31: 24 px target */
+.lchead .lcs:hover,.lchead .lc.sorted .lcs{color:var(--text)}
+.lchead .lcs:focus{outline:none}.lchead .lcs:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.lchead .lcsa{display:inline-flex;flex:none;color:var(--accent)}
+.lchead .lcsa .cup{transform:rotate(180deg)}
+@media (pointer:coarse){ .lchead .lcs{min-height:2.75rem} }  /* fix 2.31: touch tablets: 44 px column titles */
 .mlc,.trow .meta .mlc{display:none;align-items:center;gap:.25rem}
 .lc.o10{display:none}.trow .meta .mlc.o10{display:inline-flex}
 @media (min-width:900px){
@@ -3797,6 +3883,14 @@ input:not([type=checkbox]):not([type=radio]):focus,select:focus,textarea:focus{b
 .sbrand .sbacct{position:relative;display:grid;place-items:center;min-width:2rem;min-height:2rem;border-radius:50%;flex:none}
 .sbrand .sbacct .avatar{width:1.625rem;height:1.625rem;font-size:.6875rem}
 .sbrand .sbacct:hover .avatar{box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 45%,transparent)}
+/* 2.31.0 (#378): the own connection at the own picture: green online, grey offline, yellow syncing; a darker edge keeps
+   the light yellow / grey at 3:1 on the light theme, the ring of the sidebar colour lifts it off the picture */
+.sbrand .sbacct .netdot{position:absolute;right:calc(50% - .9375rem);bottom:calc(50% - .9375rem);width:.625rem;height:.625rem;box-sizing:border-box;border-radius:50%;--nd:var(--st-ready);background:var(--nd);border:1px solid color-mix(in srgb,var(--nd) 40%,var(--text));box-shadow:0 0 0 2px var(--bg2);pointer-events:none}
+.sbrand .sbacct .netdot.n-off{--nd:var(--st-off)}
+.sbrand .sbacct .netdot.n-sync{--nd:var(--st-wait)}
+@media (prefers-reduced-motion:no-preference){ .sbrand .sbacct .netdot.n-sync{animation:ndpulse 1.2s ease-in-out infinite} }
+@keyframes ndpulse{50%{opacity:.55}}
+#pop .mnet.n-on svg.i{color:var(--st-ready)}
 .sbrand .sbacct .dot{position:absolute;top:0;right:0;width:.5rem;height:.5rem;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--bg2)}
 @media (pointer:coarse){ .sbrand .sbacct{min-width:2.75rem;min-height:2.75rem} }
 .menu-list .mwho{opacity:1!important;color:var(--muted);font-size:var(--fs-s)}
@@ -4700,7 +4794,7 @@ button.lkchip:hover{border-color:var(--accent)}
 /* UX-16: nothing found: one clear line in the middle of the dialog */
 .sbody.snores{position:relative}
 .sbody.snores::after{content:attr(data-nores);position:absolute;inset:3rem 1rem auto;text-align:center;color:var(--muted);font-size:var(--fs-l)}
-@media (pointer:coarse){ .cmhead .cmtoggle{min-height:2.75rem} }  /* 2.24.0: the comments sit high in the panel now: 44 px targets */
+@media (pointer:coarse){ .cmhead .cmtoggle,.cmhead .cmmenu,.cmhead .iconbtn{min-height:2.75rem;min-width:2.75rem} }  /* 2.24.0: the comments sit high in the panel now: 44 px targets */
 /* ---- 2.25.0 "Usability part 2" ---- */
 /* UX-43: a menu item may carry a second, smaller line (what the choice does) */
 .menu-list .msub{display:block;font-size:var(--fs-s);color:var(--muted);font-weight:400;white-space:normal}
@@ -5043,6 +5137,12 @@ a.nitem.ndm{text-decoration:none;color:inherit}
   .tvbody{padding:.75rem .875rem calc(.75rem + var(--safe-b))}
 }
 .md .mdtbl{overflow-x:auto;margin:.375rem 0 .625rem;max-width:100%}
+/* 2.31.0 (#1048): cells never break inside a word (the text's break-word / anywhere made narrow columns wrap letter by
+   letter); a table wider than its place scrolls sideways in its frame, everywhere markdown shows (files, notes, comments) */
+.mdtbl{overflow-x:auto;max-width:100%;overscroll-behavior-x:contain}
+.mdtbl table{word-break:normal;overflow-wrap:normal}
+.mdtbl th,.mdtbl td{word-break:normal;overflow-wrap:normal;min-width:4ch}
+.mdtbl .nw{white-space:nowrap}
 .md table{border-collapse:collapse;font-size:var(--fs-m)}
 .md th,.md td{border:1px solid var(--line2);padding:.3125rem .625rem;text-align:left;vertical-align:top}
 .md th{background:var(--bg3);font-weight:600}
@@ -5067,3 +5167,21 @@ a.nitem.ndm{text-decoration:none;color:inherit}
 .cdlg .wsnew{display:flex;gap:.625rem;align-items:center;margin:2px 0 .625rem}
 .cdlg .wsnew select{flex:1;min-width:0}
 .lcaphint{margin:.25rem 0 .5rem;font-size:.85rem}
+/* 2.31.0 (#1056): menu groups: a small heading per group (role="group"), a hairline between groups, the second level ("More list
+   options…") with a chevron; arrow keys skip headings and lines (only menu items take the focus) */
+.menu-list .mgrp{display:flex;flex-direction:column}
+.menu-list .mgrp:not(:first-child){border-top:1px solid var(--line);margin:.25rem -.375rem 0;padding:.25rem .375rem 0}
+.menu-list hr+.mgrp{border-top:0;margin-top:0;padding-top:0}
+.menu-list .mgh{font:600 var(--fs-xs)/1.2 var(--sans);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:.375rem .5rem .25rem;user-select:none}
+.menu-list button.msubm .ml{flex:1}
+.menu-list .mchev{margin-left:auto;padding-left:.5rem;color:var(--muted);display:inline-flex}
+.menu-list button.mback{color:var(--muted)}
+/* 2.31.0 (#1057): phones with "Search" in the tab bar: one search (the tab); the header magnifier, the drawer's search field
+   and the search button next to the open drawer step aside (without the tab they stay) */
+@media (max-width:899px){
+  body.tab-search #top .cmdbar,body.tab-search #side .scmd,body.tab-search #scrim .sidesearch{display:none!important}
+}
+/* 2.31.0 (#1046): sub-tabs (Settings > Agents, Administration) keep their real width; the strip scrolls sideways instead of
+   letting the labels run into each other */
+.aisub button{flex:1 0 auto}
+.aisub{scroll-padding-inline:.5rem}

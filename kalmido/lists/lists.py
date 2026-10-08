@@ -25,6 +25,9 @@ LIST_KINDS = ("list", "project")
 LIST_KIND_ALIASES = {"checklist": "list"}
 MEMBER_LIST_FIELDS = ("folder", "sort", "view")  # a member's own sidebar placement / view
 LIST_SORTS = ("", "prio", "custom", "date", "title", "creator", "flow", "created", "created_asc")  # 2.27.0 (#988): lists.sort_mode
+# 2.31.0 (#354): the sorts of a click on a column title (the other direction, the columns without a menu entry)
+LIST_SORTS += ("date_desc", "prio_asc")
+LIST_SORT_RE = r"cf:\d{1,9}(_desc)?|col:(who|tags|time|progress|deps)(_desc)?"
 LIST_VIEWS = ("list", "kanban", "timeline")
 LIST_COLOR_RE = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})")
 LIST_NAME_MAX, FOLDER_MAX = 200, 100
@@ -296,7 +299,7 @@ def list_update(lid):
         if role not in MANAGE_ROLES:
             return err(tr("Only the owner and list admins can change the sort of this list"), 403)
         sm = b["sort_mode"]
-        if not isinstance(sm, str) or not (sm in LIST_SORTS or re.fullmatch(r"cf:\d{1,9}", sm)):
+        if not isinstance(sm, str) or not (sm in LIST_SORTS or re.fullmatch(LIST_SORT_RE, sm)):
             return err(tr("Invalid value: {0}", "sort_mode"))
         c.execute("UPDATE lists SET sort_mode=? WHERE id=?", (sm, lid))
         b = {k: v for k, v in b.items() if k != "sort_mode"}

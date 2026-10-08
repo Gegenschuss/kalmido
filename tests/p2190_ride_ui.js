@@ -95,9 +95,11 @@ const key = (w, el, k) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: 
   w.close();
 
   // ================= Firefox: the magnifier next to the open drawer, real taps
+  // 2.31.0 (#1057): with "Search" in the tab bar (the default) the phone has only that one search; this suite checks the
+  // magnifier / drawer field of before, which stay for a tab bar without "Search"
   const ffLogin = async ({ev, nav}, theme) => {
     await nav(B + 'static/icon.svg');
-    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
+    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.tabbar', '["s:inbox","s:today","lists"]'); return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
   };
   const ready = async ev => { for (let i = 0; i < 40 && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(250); await sleep(800); };

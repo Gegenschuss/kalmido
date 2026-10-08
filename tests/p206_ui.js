@@ -48,8 +48,10 @@ const TABLET = {'(min-width:600px) and (min-height:600px)': true};
   let w = await boot({user: 'alice', hash: 'l/' + PRIV}), d = w.document;
   w.eval(`openDetail(${bank})`); await sleep(700);
   let ci = d.querySelector('#detail .dbot .dcomp #c-input');
-  check(ci && !d.querySelector('#detail #d-tl') && ci.placeholder === 'Write a comment…' && !ci.closest('.ccomp').classList.contains('used'), 'private task without comments: no list, only the box (compact), without the @ hint');
-  check(!d.querySelector('#detail [data-act="tl-act"]') && !d.querySelector('#detail .cmfold') && !d.querySelector('#detail .cmempty'), 'private: no activity switch, no fold toggle, no "No comments yet"');
+  // 2.31.0 (#344): a desktop keeps the comments area (split) with "No comments yet."; phones keep only the box (p2310_b_ui)
+  check(ci && d.querySelector('#detail.dsplit #d-cpane #d-tl .cmempty') && ci.placeholder === 'Write a comment…' && !ci.closest('.ccomp').classList.contains('used'), 'private task without comments: the empty area + the box (compact), without the @ hint');
+  click(w, d.querySelector('#detail [data-act="tl-menu"]')); await sleep(50);
+  check(!d.querySelector('#pop .mtlact') && !d.querySelector('#detail .cmfold'), 'private: no activity switch, no fold toggle'); w.eval('closePop()');
   ci.focus(); ci.value = 'Asked for the IBAN form'; ci.dispatchEvent(new w.Event('input', {bubbles: true}));
   check(ci.closest('.ccomp').classList.contains('used'), 'typing opens the bar (files, Send)');
   click(w, d.querySelector('[data-act="c-send"]')); await sleep(1200);
@@ -65,7 +67,7 @@ const TABLET = {'(min-width:600px) and (min-height:600px)': true};
   await call('POST', `/api/tasks/${copy}/comments`, {body: 'Draft is in the drive'});
   w = await boot({user: 'alice', hash: 'l/' + WEB}); d = w.document;
   w.eval(`openDetail(${copy})`); await sleep(1000);
-  const body = [...d.querySelector('#detail .dbody').children].map(x => x.id || ['subsec', 'attsec', 'plsec', 'fields', 'cfsec', 'tesec'].find(c => x.classList.contains(c)) || (/^Tags/.test(x.querySelector('h5')?.textContent || '') ? 'tags' : x.className));
+  const body = [...d.querySelectorAll('#detail .dbody > *, #detail .dcpane > *')].map(x => x.id || ['subsec', 'attsec', 'plsec', 'fields', 'cfsec', 'tesec'].find(c => x.classList.contains(c)) || (/^Tags/.test(x.querySelector('h5')?.textContent || '') ? 'tags' : x.className));
   // 2.24.0 (UX-41): description, subtasks, comments first; a set dependency stays outside the fold; tags, attachments (none
   // yet), fields and the history fold into "More details" at the end
   // 2.27.0 (#957, back to #322): the comments last, below "More details"
@@ -83,7 +85,7 @@ const TABLET = {'(min-width:600px) and (min-height:600px)': true};
   // ================= #315 shared list: full section with activity switch + mention hint; checklist: none
   w = await boot({user: 'alice', hash: 'l/' + TEAM}); d = w.document;
   w.eval(`openDetail(${plan})`); await sleep(800);
-  check(d.querySelector('#detail #d-tl') && d.querySelector('#detail .dcomp #c-input')?.placeholder === 'Write a comment… (@ mentions someone)' && d.querySelector('#detail [data-act="tl-act"]'), 'shared list: the list with the history (activity switch), @ hint');
+  check(d.querySelector('#detail #d-tl') && d.querySelector('#detail .dcomp #c-input')?.placeholder === 'Write a comment… (@ mentions someone)' && d.querySelector('#detail [data-act="tl-menu"]'), 'shared list: the list with the history (activity switch in the "…"), @ hint');
   w.eval(`go('l/${CKL}'); openDetail(${milk})`); await sleep(600);
   check(d.querySelector('#detail #d-title'), 'an item of a list with completed at the bottom opens as a full task (2.7.2; was: no comments)');
   w.close();
@@ -108,7 +110,8 @@ const TABLET = {'(min-width:600px) and (min-height:600px)': true};
   await call('PATCH', '/api/settings', {features: ALL.split(',').filter(f => f !== 'collab').join(',')});
   w = await boot({user: 'alice', hash: 'l/' + TEAM}); d = w.document;
   w.eval(`openDetail(${plan})`); await sleep(700);
-  check(!d.querySelector('#detail #d-tl') && d.querySelector('#detail #c-input') && !d.querySelector('#detail [data-act="tl-act"]'), 'collaboration off: the box, no history');
+  click(w, d.querySelector('#detail [data-act="tl-menu"]')); await sleep(50);
+  check(!d.querySelector('#detail #d-tl .actl') && d.querySelector('#detail #c-input') && !d.querySelector('#pop .mtlact'), 'collaboration off: the box, no history'); w.eval('closePop()');
   w.close();
   await call('PATCH', '/api/settings', {features: ALL});
 

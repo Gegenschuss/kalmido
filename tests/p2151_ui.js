@@ -129,7 +129,10 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
     Object.defineProperty(vv, 'offsetTop', {configurable: true, get: () => window.__kb.t});
     window.__setKb = (hh, t) => { window.__kb.h = hh; window.__kb.t = t; vv.dispatchEvent(new Event('resize')); vv.dispatchEvent(new Event('scroll')); return 1; };
     return 1; })()`;
-  const ffLogin = async ({ev, nav}, theme = 'light', user = 'alice', ls = {}) => {
+  // 2.31.0 (#1057): with "Search" in the tab bar (the default) the phone has only that one search; this suite checks the
+  // magnifier / drawer field of before, which stay for a tab bar without "Search"
+  const ffLogin = async ({ev, nav}, theme = 'light', user = 'alice', ls0 = {}) => {
+    const ls = {'tasks.tabbar': '["s:inbox","s:today","lists"]', ...ls0};
     await nav(B + 'static/icon.svg');
     await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); ${Object.entries(ls).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`).join(' ')} return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${user}', password: 'password123'})}).then(r => r.status)`);

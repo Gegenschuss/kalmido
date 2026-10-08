@@ -244,7 +244,7 @@ c.commit()`, path.join(DATA, 'tasks.db'), JSON.stringify(ids)]);
   click(w, cav(me)); await sleep(300);
   check(/\(me\)/.test(d.querySelector('#pop .mcard')?.textContent || ''), 'my own avatar: "(me)"');
   w.eval('closePop()');
-  check(!d.querySelector('#d-tl-items .cm .chead [data-mcard]') && !d.querySelector('.dassign [data-mcard], #d-assignee [data-mcard]'), 'only the avatar (no other new card spots, the assignee keeps assigning)');
+  check(!d.querySelector('#d-tl-items .cm .chead [data-mcard]') && !d.querySelector('.dassign [data-mcard], #detail .dwho [data-mcard]'), 'only the avatar (no other new card spots, the assignee keeps assigning)');
   w.close();
 
   // ================= German

@@ -14,14 +14,14 @@ document.addEventListener('error', e => {
   const img = e.target; if (img?.tagName !== 'IMG' || !img.closest?.('.att.img')) return;
   const box = img.closest('.att.img'), a = img.closest('a');
   box.classList.replace('img', 'file'); box.classList.add('broken');
-  if (a) a.innerHTML = `${ic('file')}<span class="an">${esc(img.alt || '')}</span><span class="as">${esc(tr('File damaged or missing'))}</span>`;
+  if (a) a.innerHTML = `${ic('file')}<span class="atxt"><span class="an">${esc(img.alt || '')}</span><span class="as">${esc(tr('File damaged or missing'))}</span></span>`;
 }, true);
 function attHtml(a) {
   const t = taskById(S.sel), sending = (t?.paperless || []).some(p => p.status === 'pending' && p.att_id === a.id);
   const del = !canEdit(t) ? '' : `<button class="attdel" data-act="att-del" data-att="${a.id}" title="${tr('Remove')}">${ic('x', 's')}</button>` +
     (plOn() ? `<button class="attpl ${sending ? 'busy' : ''}" data-act="att-pl" data-att="${a.id}" title="${sending ? tr('being sent to Paperless') : tr('File in Paperless')}">${ic('archive', 's')}</button>` : '');
   if (isImg(a)) return `<div class="att img"><a href="${attUrl(a)}" data-act="att-view" data-att="${a.id}" title="${esc(a.name)}"><img src="${attUrl(a)}" loading="lazy" alt="${esc(a.name)}"></a>${del}</div>`;
-  if (a.size === 0) return `<div class="att file broken"><span class="attx">${ic('file')}<span class="an">${esc(a.name)}</span><span class="as">${esc(tr('File damaged or missing'))}</span></span>${del}</div>`;  // 2.13.2 (#478 N6): an old 0-byte file says so
+  if (a.size === 0) return `<div class="att file broken"><span class="attx">${ic('file')}<span class="atxt"><span class="an">${esc(a.name)}</span><span class="as">${esc(tr('File damaged or missing'))}</span></span></span>${del}</div>`;  // 2.13.2 (#478 N6): an old 0-byte file says so
   return `<div class="att file">${attFileA(a)}${del}</div>`;  // 2.30.0 (#1035): text files open in the viewer
 }
 // 2.1.0 (#180): several Paperless connections (S.paperless.conns: id 0 = the server's legacy one, server ones with my own
@@ -137,7 +137,7 @@ const isTextFile = a => !!a && !isImg(a) && a.mime !== 'application/pdf' && (TV_
 function attFileA(a) {
   const pdf = a.mime === 'application/pdf', tv = isTextFile(a) && a.size <= TV_MAX;
   const o = tv ? esc(JSON.stringify({url: attUrl(a, true), name: a.name, size: a.size, agent: a.agent || '', md: isMdFile(a), ext: attExt(a)})) : '';
-  return `<a href="${attUrl(a, !pdf)}" ${pdf ? 'target="_blank" rel="noopener"' : 'download'}${tv ? ` data-tview="${o}"` : ''} title="${esc(a.name)}">${ic(pdf ? 'pdf' : 'file')}<span class="an">${esc(a.name)}</span><span class="as">${fmtSize(a.size)}${a.agent ? ` · <span class="attag">${esc(tr('Created by agent'))}</span>` : ''}</span></a>`;
+  return `<a href="${attUrl(a, !pdf)}" ${pdf ? 'target="_blank" rel="noopener"' : 'download'}${tv ? ` data-tview="${o}"` : ''} title="${esc(a.name)}">${ic(pdf ? 'pdf' : 'file')}<span class="atxt"><span class="an">${esc(a.name)}</span><span class="as">${fmtSize(a.size)}${a.agent ? ` · <span class="attag">${esc(tr('Created by agent'))}</span>` : ''}</span></span></a>`;  // 2.31.0 (#1050): the name on its own line
 }
 document.addEventListener('click', e => {
   const l = e.target.closest?.('a[data-tview]');
@@ -353,8 +353,10 @@ function renderMd0(src, ro) {
     if ((m = ln.match(/^\s*```\s*([^\s`]*)/))) { flushPara(); closeList(); code = []; lang = m[1]; return; }
     if (ln.includes('|') && MD_TBL_SEP.test(lines[i + 1] || '')) {
       flushPara(); closeList();
-      const al = mdCells(lines[i + 1]).map(c => /^:-+:$/.test(c) ? ' class="ta-c"' : /-:$/.test(c) ? ' class="ta-r"' : '');
-      const row = (l, tag) => `<tr>${al.map((a, k) => `<${tag}${a}>${mdInline(mdCells(l)[k] ?? '')}</${tag}>`).join('')}</tr>`;
+      const al = mdCells(lines[i + 1]).map(c => /^:-+:$/.test(c) ? 'ta-c' : /-:$/.test(c) ? 'ta-r' : '');
+      // 2.31.0 (#1048): a short cell ("wert 1", "12 €", a date) stays on one line; long text wraps between words only
+      const cls = (a, v) => { const c = [a, String(v).trim().length <= 16 ? 'nw' : ''].filter(Boolean).join(' '); return c ? ` class="${c}"` : ''; };
+      const row = (l, tag) => { const cs = mdCells(l); return `<tr>${al.map((a, k) => `<${tag}${cls(a, cs[k] ?? '')}>${mdInline(cs[k] ?? '')}</${tag}>`).join('')}</tr>`; };
       let j = i + 2, body = '';
       while (j < lines.length && lines[j].includes('|') && lines[j].trim()) body += row(lines[j++], 'td');
       h += `<div class="mdtbl"><table><thead>${row(ln, 'th')}</thead>${body ? `<tbody>${body}</tbody>` : ''}</table></div>`;

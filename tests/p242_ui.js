@@ -86,13 +86,16 @@ async function firefox(fn) {
   // ================= #386 comment order
   let w = await boot({user: 'alice', hash: 't/' + T}), d = w.document;
   await until(() => d.querySelectorAll('#d-tl-items .cm').length === 3);
-  let tg = d.querySelector('#d-tl [data-act="tl-order"]');
-  check(tg && /Oldest first/.test(tg.textContent) && d.querySelector('#d-tl [data-act="tl-act"]'), 'toggle "Oldest first" next to "With activity"');
+  // 2.31.0 (#1054): order and history are entries of the "…" in the comment head (were two switches)
+  const tlMenuItems = async () => { click(w, d.querySelector('#d-tl [data-act="tl-menu"]')); await sleep(60); return [...d.querySelectorAll('#pop [role="menuitem"]')]; };
+  let mi = await tlMenuItems();
+  check(mi.find(b => b.classList.contains('mtlold'))?.classList.contains('on') && mi.some(b => b.classList.contains('mtlnew')) && mi.some(b => b.classList.contains('mtlact')), '"…": "Oldest first" (checked), "Newest first", "With activity"');
   check(bodies(d).join() === 'First,Secon,Third', 'oldest first: ' + bodies(d));
   check(d.querySelector('#detail .dbot .dcomp #c-input') && !d.querySelector('#d-tl .dcomp'), 'oldest first: the box in the sticky bottom');
-  click(w, tg); await sleep(900);
-  tg = d.querySelector('#d-tl [data-act="tl-order"]');
-  check(/Newest first/.test(tg?.textContent || ''), 'toggled: "Newest first"');
+  click(w, mi.find(b => b.classList.contains('mtlnew'))); await sleep(900);
+  mi = await tlMenuItems();
+  check(mi.find(b => b.classList.contains('mtlnew'))?.classList.contains('on'), 'toggled: "Newest first" checked');
+  w.eval('closePop()');
   check(bodies(d).join() === 'Third,Secon,First', 'newest first: ' + bodies(d));
   const top = d.querySelector('#d-tl .dcomp.dctop');
   check(top && top.querySelector('#c-input') && !d.querySelector('#detail .dbot .dcomp') && top.compareDocumentPosition(d.querySelector('#d-tl-items')) & w.Node.DOCUMENT_POSITION_FOLLOWING, 'newest first: the box above the newest comment, not at the bottom');
@@ -106,7 +109,7 @@ async function firefox(fn) {
   const ta = d.querySelector('#c-input'); ta.value = 'Fourth'; ta.dispatchEvent(new w.Event('input', {bubbles: true}));
   click(w, d.querySelector('[data-act="c-send"]')); await until(() => d.querySelectorAll('#d-tl-items .cm').length === 4);
   check(bodies(d)[0] === 'Fourt' && d.querySelector('#d-tl .dctop #c-input')?.value === '', 'sent: the new comment on top, the box empty and still on top');
-  click(w, d.querySelector('#d-tl [data-act="tl-order"]')); await sleep(900);
+  click(w, (await tlMenuItems()).find(b => b.classList.contains('mtlold'))); await sleep(900);
   check(bodies(d).join() === 'First,Secon,Third,Fourt' && d.querySelector('#detail .dbot .dcomp'), 'back to oldest first');
   w.close();
 
@@ -234,8 +237,10 @@ async function firefox(fn) {
   // ================= German
   await call('PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', hash: 't/' + T}); d = w.document;
-  await until(() => d.querySelector('#d-tl [data-act="tl-order"]'));
-  check(/Älteste zuerst/.test(d.querySelector('#d-tl [data-act="tl-order"]').textContent), 'German: "Älteste zuerst"');
+  await until(() => d.querySelector('#d-tl [data-act="tl-menu"]'));
+  click(w, d.querySelector('#d-tl [data-act="tl-menu"]')); await sleep(60);
+  check(/Älteste zuerst/.test(d.querySelector('#pop .mtlold')?.textContent || '') && d.querySelector('#d-tl [data-act="tl-menu"]').getAttribute('aria-label') === 'Optionen für Kommentare', 'German: "Älteste zuerst" in the "…"');
+  w.eval('closePop()');
   w.eval(`settingsModal('ai')`); await sleep(500);
   click(w, d.querySelector('.modal.smodal [data-aisub="lists"]')); await sleep(1200);
   pane = d.querySelector('.modal.smodal [data-pane="ai"]');
@@ -260,7 +265,7 @@ async function firefox(fn) {
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: W, height: Hh}});
       await nav(B + '#l/' + L); await sleep(2500);
       await ev(`openDetail(${T})`); await sleep(1500);
-      if (W < 900) await ev(`document.querySelector('[data-act="d-tab"][data-tab="comments"]')?.click()`);
+      if (W < 900) await ev(`document.querySelector('[data-act="d-jump-cm"]')?.click()`);  // 2.31.0 (#1054): was the Comments tab
       await sleep(300);
       const m1 = await fit('#detail');
       const onTop = await ev(`!!document.querySelector('#d-tl .dctop #c-input') && !document.querySelector('#detail .dbot .dcomp')`);

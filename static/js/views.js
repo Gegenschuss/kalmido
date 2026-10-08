@@ -172,9 +172,37 @@ function flowSort(arr) {
 // the creator's display name for "Sort: Creator" (cached per sort call)
 let CRN = null;
 const crName = t => { if (!t.created_by) return ''; if (CRN.has(t.created_by)) return CRN.get(t.created_by); const n = personNameAny(t.created_by) || ''; CRN.set(t.created_by, n); return n; };
+// 2.31.0 (#354): a click on a column title (the title row of a list with its own columns) sorts by that column, a second
+// click the other way round, a third back to the list's sort. [first click, second click] per column: the menu's modes
+// where it has them (Date earliest first, Priority highest first, Created newest first), else A-Z / smallest first.
+// Empty values stay at the bottom in both directions; ties keep the manual order.
+const COL_SORTS = {due: ['date', 'date_desc'], prio: ['prio', 'prio_asc'], created: ['created', 'created_asc']};
+const colSorts = k => COL_SORTS[k] || (k.startsWith('f:') ? ['cf:' + k.slice(2), 'cf:' + k.slice(2) + '_desc'] : ['col:' + k, 'col:' + k + '_desc']);
+const SORT_DIR = {prio: 'descending', created: 'descending'};
+const sortDir = m => SORT_DIR[m] || (/_desc$/.test(m) ? 'descending' : 'ascending');
+const colOfSort = m => m === 'date_desc' ? 'due' : m === 'prio_asc' ? 'prio' : /^cf:\d+_desc$/.test(m) ? 'f:' + m.slice(3, -5) : m.startsWith('col:') ? m.slice(4).replace(/_desc$/, '') : null;
+const sortByCol = m => /^(date_desc|prio_asc|col:)/.test(m) || /^cf:\d+_desc$/.test(m);  // a display sort from a column title
+const colSortCmp = (key, desc) => (a, b) => {
+  const x = key(a), y = key(b);
+  if (x == null || y == null || x === y) return (x == null) - (y == null) || bySort(a, b);
+  return (typeof x === 'string' ? x.localeCompare(y, LOCALE()) : x - y) * (desc ? -1 : 1) || bySort(a, b);
+};
+const COL_KEY = {
+  who: t => t.assignee_group_id ? grpName(t.assignee_group_id) : t.assignee_id ? personName(t.list_id, t.assignee_id) || '?' : null,
+  tags: t => [...(t.ltags || []), ...(t.tags || [])].map(String).sort((a, b) => a.localeCompare(b, LOCALE()))[0] ?? null,
+  time: t => { const s = tFor(t) && t.id > 0 ? taskTime(t.id)[0] : 0; return s >= 60 ? s : null; },
+  progress: t => { const k = children(t.id); return k.length ? k.filter(x => x.status !== 0).length / k.length : null; },
+  deps: t => t.blocked && t.status === 0 ? 1 : null,
+};
 function sortTasks(arr, m = sortMode()) {
   if (m === 'flow') return flowSort(arr);
   CRN = new Map();
+  if (m === 'date_desc') return arr.sort(colSortCmp(t => t.due ? dueKey(t) : null, true));
+  if (m === 'prio_asc') return arr.sort(colSortCmp(t => t.priority || null, false));
+  let cm = /^col:(\w+?)(_desc)?$/.exec(m);
+  if (cm && COL_KEY[cm[1]]) return arr.sort(colSortCmp(COL_KEY[cm[1]], !!cm[2]));
+  cm = /^cf:(\d+)_desc$/.exec(m);
+  if (cm) return arr.sort(cfSortCmp(+cm[1], true));
   const f = {
     custom: bySort,
     date: (a, b) => dueKey(a).localeCompare(dueKey(b)) || b.priority - a.priority || bySort(a, b),

@@ -109,6 +109,7 @@ async function firefox(fn) {
   check((await v1(ag.token, 'GET', `/agent/jobs/${JB.id}`)).input?.hint === 'max 5', 'the hint was sent');
   check(/Sent to Claude/.test(d.querySelector('#toast')?.textContent || ''), 'toast: sent');
   w.eval(`listMenu(document.querySelector('#top h1'), ${TEAM})`);
+  if (!menuTexts(d).includes('Tasks from notes…')) menuClick(w, d, /More list options/);  // 2.31.0 (#1056): a rare entry, in the second level
   check(menuTexts(d).includes('Tasks from notes…'), 'list menu: Tasks from notes…');
   menuClick(w, d, /Tasks from notes/);
   md = await until(() => d.querySelector('.modal.ppreq'));

@@ -14,7 +14,7 @@ function openDetail(id) {
   d.classList.remove('hidden');
   $('#app').classList.add('detail-open'); fitLayout();
   renderDetail();
-  if (other) d.scrollTop = 0;  // 2.18.0 review (R7): a different task starts at its top, not at the previous one's scroll position
+  if (other) { d.scrollTop = 0; if (d.classList.contains('dsplit')) $('.dbody', d).scrollTop = 0; }  // 2.18.0 review (R7): a different task starts at its top, not at the previous one's scroll position
   requestAnimationFrame(() => d.classList.add('open'));
   // 2.16.0 (#473): the panel is a named region; opened with the keyboard (Enter / o on a row) or on a phone (it covers the
   // list) it takes the focus, closing it gives the focus back to the row (closeDetail)
@@ -299,8 +299,80 @@ function dWhoChip(t, ro) {
   const name = t.assignee_group_id ? (S.groups || []).find(g => g.id === t.assignee_group_id)?.name || tr('Group') : t.assignee_id ? personName(t.list_id, t.assignee_id) || personNameAny(t.assignee_id) || '?' : '';
   const inner = t.assignee_id ? av(t.assignee_id, name, 'avatar who') : ic(t.assignee_group_id ? 'users' : 'user', 's');
   const lab = name ? tr('Assigned to {0}', name) : tr('Nobody assigned');
-  return `<button type="button" class="dchip dwho ${name ? 'set' : ''}" data-act="assign" data-id="${t.id}" aria-haspopup="menu" title="${esc(lab + (ro || !canAssign(t) ? '' : ' · ' + tr('Assign…')))}" aria-label="${esc(lab + ' · ' + tr('Assign…'))}">${inner}<span class="dct">${esc(name || tr('Assign'))}</span></button>`;
+  const lock = (ro || !canAssign(t)) && !myGroup(t.assignee_group_id);  // 2.31.0 (#1054): the only assignee control: says when it is locked
+  return `<button type="button" class="dchip dwho ${name ? 'set' : ''} ${lock ? 'ro' : ''}" data-act="assign" data-id="${t.id}" aria-haspopup="menu" ${lock ? 'aria-disabled="true"' : ''} title="${esc(lab + (lock ? '' : ' · ' + tr('Assign…')))}" aria-label="${esc(lab + (lock ? '' : ' · ' + tr('Assign…')))}">${inner}<span class="dct">${esc(name || tr('Assign'))}</span></button>`;
 }
+// ---- 2.31.0 (#344): desktop (not phones, the Fold, touch tablets): the properties on top, the comments with the history and
+// its switch in their own area below, the line between them dragged with the mouse or moved with the keyboard (a separator:
+// ↑ ↓ 5 %, Shift 10 %, Home / End, Enter or a double-click folds the comments area, a drag unfolds it). The properties' share
+// (settings detail_split, %) and the fold (detail_cm_fold) are saved per user on the server, so every desktop gets them.
+// Without the comments module (or a read-only context task) there is no split: the panel stays one stream.
+const CSPL_MIN = 20, CSPL_MAX = 85, CSPL_DEF = 60;
+const cmSplitOn = t => !!t && cmtOn() && t.id > 0 && !t.context && !isTouch();
+// a change of this device: wins over a state reload that still has the old value, until the server's state has it too
+let dsPend = null;
+const dsVal = k => {
+  if (dsPend && Object.keys(dsPend).every(x => String(S.settings?.[x]) === String(dsPend[x]))) dsPend = null;
+  return dsPend && k in dsPend ? dsPend[k] : S.settings?.[k];
+};
+const dsTop = () => { const v = +dsVal('detail_split'); return v ? Math.max(CSPL_MIN, Math.min(CSPL_MAX, Math.round(v))) : CSPL_DEF; };
+const dsFold = () => String(dsVal('detail_cm_fold')) === '1';
+function dsApply(v = dsTop()) {
+  const d = $('#detail'), g = $('#d-sgrip'), f = dsFold(); if (!d) return;
+  d.style.setProperty('--dsT', String(v)); d.style.setProperty('--dsC', String(100 - v));
+  d.classList.toggle('dsfold', f);
+  if (g) { g.setAttribute('aria-valuenow', String(v)); g.setAttribute('aria-valuetext', f ? tr('Comments folded') : tr('{0} % properties, {1} % comments', v, 100 - v)); }
+  const b = $('#d-tl .dsfoldb');
+  if (b) { b.setAttribute('aria-expanded', String(!f)); const lab = f ? tr('Show the comments') : tr('Fold the comments'); b.title = lab; b.setAttribute('aria-label', lab); }
+}
+let dsT = null;
+function dsSave(patch) {
+  dsPend = {...dsPend, ...patch};
+  dsApply();
+  clearTimeout(dsT);
+  dsT = setTimeout(() => {
+    const body = {detail_split: String(dsTop()), detail_cm_fold: dsFold() ? '1' : '0'};
+    dsPend = {...body};
+    api('PATCH', '/api/settings', body).catch(() => { /* api() showed it; the local value stays */ });
+  }, 400);
+}
+function dsFoldToggle(on = !dsFold()) {
+  dsSave({detail_cm_fold: on ? '1' : '0'});
+  if (!on) { const p = $('#d-cpane'); if (p && !cmtNew()) p.scrollTop = p.scrollHeight; }
+}
+document.addEventListener('keydown', e => {
+  const g = e.target.closest?.('#d-sgrip'); if (!g || e.altKey || e.ctrlKey || e.metaKey) return;
+  const v = dsTop(), st = e.shiftKey ? 10 : 5;
+  const to = {ArrowUp: v - st, ArrowDown: v + st, Home: CSPL_MIN, End: CSPL_MAX}[e.key];
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); dsFoldToggle(); return; }
+  if (to == null) return;
+  e.preventDefault();
+  dsSave({detail_split: Math.max(CSPL_MIN, Math.min(CSPL_MAX, to)), ...(dsFold() ? {detail_cm_fold: '0'} : {})});
+});
+document.addEventListener('dblclick', e => { if (e.target.closest?.('#d-sgrip')) dsFoldToggle(); });
+document.addEventListener('pointerdown', e => {
+  const g = e.target.closest?.('#d-sgrip'); if (!g || e.button) return;
+  const body = $('#detail .dbody'), bot = $('#detail .dbot'); if (!body) return;
+  e.preventDefault();
+  const top = body.getBoundingClientRect().top, end = bot ? bot.getBoundingClientRect().top : $('#detail').getBoundingClientRect().bottom;
+  const y0 = e.clientY; let v = dsTop(), moved = false;
+  try { g.setPointerCapture(e.pointerId); } catch { /* old browsers */ }
+  g.classList.add('drag');
+  const mv = ev => {
+    if (!moved && Math.abs(ev.clientY - y0) < 3) return;
+    if (!moved && dsFold()) dsPend = {...dsPend, detail_cm_fold: '0'};
+    moved = true;
+    v = Math.max(CSPL_MIN, Math.min(CSPL_MAX, Math.round((ev.clientY - top) / Math.max(1, end - top) * 100)));
+    dsApply(v);
+  };
+  const up = () => {
+    g.removeEventListener('pointermove', mv); g.removeEventListener('pointerup', up); g.removeEventListener('pointercancel', up);
+    g.classList.remove('drag');
+    if (moved) dsSave({detail_split: v, detail_cm_fold: '0'});
+  };
+  g.addEventListener('pointermove', mv); g.addEventListener('pointerup', up); g.addEventListener('pointercancel', up);
+  g.focus({preventScroll: true});
+});
 document.addEventListener('toggle', e => { if (e.target.id === 'd-more') LS.set('dMore', e.target.open); }, true);
 function renderDetail() { return keepFocus($('#detail'), renderDetail0); }
 function renderDetail0() {
@@ -320,15 +392,19 @@ function renderDetail0() {
   const ncm = S.tl.id === t.id && S.tl.comments ? S.tl.comments.length : t.comment_count || 0;
   // the list of comments shows once there is something in it (comments; in shared lists the history; elsewhere the changes
   // others made); the box itself is always there (sticky at the bottom), a single line until it is used
-  const cmOk = cmtOn() && t.id > 0 && !ck && !t.context, cm = cmOk && (ncm || cmSocial(t) || tlForeign(t).length) ? 'full' : '';
+  // 2.31.0 (#344): desktop: the comments in their own area below the properties (split), shown even without comments
+  const split = !ck && cmSplitOn(t);
+  const cmOk = cmtOn() && t.id > 0 && !ck && !t.context, cm = cmOk && (split || ncm || cmSocial(t) || tlForeign(t).length) ? 'full' : '';
   // 2.0.7: private lists with collaboration keep the folded "History" of 2.0.5 (every change, mine included, the
   // import line too); it stays out of the notes above, so they have no activity noise
   const hist = collab() && t.id > 0 && !ck && !t.context && !shared;
   const mdOpen = !ro && !ck && t.content && /^\s*[-*]\s+\[ \]\s*\S/m.test(t.content) && depthOf(t) < 2;
   // 2.0.2 (#242): the comments sit right below the description, folded to the newest one (per device); long descriptions
-  // fold after ~8 lines; phones get "Details | Comments" on top
+  // fold after ~8 lines. 2.31.0 (#1054): no "Details | Comments" tabs on phones any more, a small jump to the comments instead
   const mdLong = mdMode && mdIsLong(t.content), mdClamp = mdLong && !(S.mdMore || new Set()).has(t.id);
-  const dtab = cm === 'full' && isMobile() ? LS.get('dTab', 'details') : 'details';
+  // 2.31.0 (#1054): the assignee once, as the chip under the title (people, agents, groups, "Take it"; no select below)
+  const whoOn = !ck && t.id > 0 && collab() && (shared || t.assignee_id);
+  const jump = cm === 'full' && !split ? `<button type="button" class="linkbtn djump" data-act="d-jump-cm" aria-controls="d-tl">${ic('down', 's')}<span>${tr('To the comments')}</span><span class="c" id="d-jump-count">${ncm || ''}</span></button>` : '';
   // 2.18.0 (#430): a milestone (no subtasks; its own section with progress, burndown, release notes) / the milestone a task
   // of a list with milestones belongs to (open ones + the current one)
   const msT = isMs(t), msSel = !msT && !t.context ? msOfList(t.list_id).filter(m => m.status === 0 || m.id === t.milestone_id) : [];
@@ -346,13 +422,12 @@ function renderDetail0() {
 </div>`,
     paperless: ck ? '' : `${plOn() || (t.paperless?.length && feat('paperless')) ? `<div class="dsec plsec"><h5>Paperless</h5><div class="plinks">${(t.paperless || []).map(plHtml).join('')}</div>
         ${t.id > 0 && !ro && plOn() ? `<button class="attadd" data-act="pl-search">${ic('archive', 's')}<span>${tr('Link document')}</span></button>` : ''}</div>` : ''}`,
-    fields: ck ? (collab() && shared ? `<div class="dsec fields"><label for="d-assignee">${tr('Assignee')}</label><select id="d-assignee" data-sheet-av ${ro || !canAssign(t) ? 'disabled' : ''}><option value="">${tr('Nobody')}</option>${assigneeOpts(t, l)}</select>${myGroup(t.assignee_group_id) ? `<button class="btn sm dtake" data-act="take" type="button">${ic('check', 's')} ${tr('Take it')}</button>` : ''}</div>` : '') : `<div class="dsec fields">
+    fields: ck ? '' : `<div class="dsec fields">
         ${''/* 2.25.0 (UX-44): list and section are changed in the path on top (a tap on it), no fields here any more */}
         ${ticketsOn(t.list_id) ? `<label for="d-ttype">${tr('Type')}</label><select id="d-ttype" data-sheet-ico="bug" ${ro ? 'disabled' : ''}><option value="">${tr('None')}</option>${TTYPES.map(([k, n, i]) => `<option value="${k}" data-ico="${i}" ${t.ttype === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>` : ''}
         ${msTog ? `<label for="d-ms">${tr('Milestone')}</label><label class="chkl dmsl"><input type="checkbox" id="d-ms" ${msT ? 'checked' : ''} ${ro ? 'disabled' : ''}><i class="msd" aria-hidden="true"></i>${tr('This task is a milestone')}</label>` : ''}
         ${msSel.length ? `<label for="d-msel">${msTog ? tr('Belongs to') : tr('Milestone')}</label><select id="d-msel" data-sheet-ico="flag" ${ro ? 'disabled' : ''}><option value="">${tr('None')}</option>${msSel.map(m => `<option value="${m.id}" ${m.id === t.milestone_id ? 'selected' : ''}>${esc(m.title + (m.due ? ' · ' + fmtDateLoc(m.due) : ''))}</option>`).join('')}</select>` : ''}
         <label>${tr('Link')}</label>${linkField(t, ro)}
-        ${collab() && (shared || t.assignee_id) ? `<label for="d-assignee">${tr('Assignee')}</label><select id="d-assignee" data-sheet-av ${ro || !canAssign(t) ? 'disabled' : ''}><option value="">${tr('Nobody')}</option>${assigneeOpts(t, l)}</select>${myGroup(t.assignee_group_id) ? `<button class="btn sm dtake" data-act="take" type="button">${ic('check', 's')} ${tr('Take it')}</button>` : ''}` : ''}
         ${t.id > 0 && !t.context ? aiuTaskLine(t) : ''}
       </div>`,
     custom: ck ? '' : `${fieldsOf(t.list_id).length ? `<div class="dsec cfsec"><h5>${tr('Fields')}</h5><div class="fields cf">${fieldsOf(t.list_id).map(f => fieldEditor(f, t, ro)).join('')}</div></div>` : ''}`,
@@ -375,11 +450,10 @@ function renderDetail0() {
       <button class="iconbtn dchatb" data-act="chat-unyield" title="${esc(tr('Chat'))}" aria-label="${esc(tr('Chat'))}">${ic('bot')}</button>
       <button class="iconbtn dclose" data-act="close-detail" title="${tr('Close (Esc)')}" aria-label="${tr('Close (Esc)')}">${ic('x')}</button>
     </div>
-    <div class="dbody ${ck ? 'ckbody' : ''} ${dtab === 'comments' ? 'dtab-c' : ''}">
-      ${cm === 'full' && isMobile() ? `<div class="seg dtabs" role="tablist" aria-label="${esc(tr('Task'))}"><button role="tab" data-act="d-tab" data-tab="details" class="${dtab === 'details' ? 'on' : ''}" aria-selected="${dtab === 'details'}">${tr('Details')}</button><button role="tab" data-act="d-tab" data-tab="comments" class="${dtab === 'comments' ? 'on' : ''}" aria-selected="${dtab === 'comments'}">${tr('Comments')}<span class="c" id="d-tab-count">${ncm || ''}</span></button></div>` : ''}
+    <div class="dbody ${ck ? 'ckbody' : ''}">
       ${crumbsHtml(t, l, parent)}
       <div class="dtitle"><textarea id="d-title" rows="1" placeholder="${tr('Title')}" aria-label="${tr('Title')}" ${ro ? 'readonly' : ''}>${esc(t.title)}</textarea></div>
-      ${!ck && t.id > 0 && !t.context && collab() && (shared || t.assignee_id) ? `<div class="dmeta">${dWhoChip(t, ro)}</div>` : ''}
+      ${whoOn || jump ? `<div class="dmeta">${whoOn ? dWhoChip(t, ro) : ''}${whoOn && myGroup(t.assignee_group_id) ? `<button class="btn sm dtake" data-act="take" type="button">${ic('check', 's')} ${tr('Take it')}</button>` : ''}${jump}</div>` : ''}
       ${!ck && t.due && (t.deadline || nagOf(t)) && t.status === 0 ? `<div class="ddl">${dlChip(t, 'big')}${nagOf(t) ? `<button type="button" class="dnag" data-act="date" data-id="${t.id}" title="${esc(tr('Change'))}">${ic('repeat', 's')}${esc(tr('Repeat reminder') + ': ' + nagLabel(nagOf(t)))}</button>` : ''}</div>` : ''}
       ${!ck && planOf(t) ? `<div class="dplan">${ic('clock', 's')}<span class="dplt">${esc(tr('Planned: {0}', planLabel(t)))}</span>${ro ? '' : `<button type="button" class="linkbtn" data-act="unplan" data-id="${t.id}">${tr('Unplan')}</button>`}</div>` : ''}
       ${t.waiting_at && !ck ? waitBar(t, ro) : ''}
@@ -395,15 +469,17 @@ function renderDetail0() {
         const top = DETAIL_TOP.map(k => SEC[k]).concat(DETAIL_MORE.filter(keep).map(k => SEC[k]));
         const rest = DETAIL_MORE.filter(k => !keep(k)).map(k => SEC[k]).filter(x => x && x.trim());
         const sum = moreSummary(t, DETAIL_MORE.filter(k => !keep(k)));
-        return top.join('\n      ') + (rest.length ? `<details class="dmore" id="d-more" ${LS.get('dMore', false) ? 'open' : ''}><summary>${ic('chev', 's fcar')}<span>${tr('More details')}</span>${sum ? `<span class="dmsum muted">${esc(sum)}</span>` : ''}</summary>${rest.join('\n')}</details>` : '') + SEC.comments;
+        return top.join('\n      ') + (rest.length ? `<details class="dmore" id="d-more" ${LS.get('dMore', false) ? 'open' : ''}><summary>${ic('chev', 's fcar')}<span>${tr('More details')}</span>${sum ? `<span class="dmsum muted">${esc(sum)}</span>` : ''}</summary>${rest.join('\n')}</details>` : '') + (split ? '' : SEC.comments);
       })()}
     </div>
+    ${split ? `<div class="dsgrip" id="d-sgrip" role="separator" tabindex="0" aria-orientation="horizontal" aria-controls="d-cpane" aria-label="${esc(tr('Size of the comments area'))}" title="${esc(tr('Drag to resize; double-click or Enter folds the comments'))}" aria-valuemin="${CSPL_MIN}" aria-valuemax="${CSPL_MAX}" aria-valuenow="${dsTop()}"></div><div class="dcpane" id="d-cpane">${SEC.comments}</div>` : ''}
     <div class="dbot">${cmOk && !(cm === 'full' && cmtNew()) ? cmComposer(t) : ''}<div class="dfoot"><span class="dfc" title="${esc(createdLine(t))}">${esc(createdLine(t))}</span>
       <span class="spacer"></span>
       ${ck ? '' : runItems().filter(x => x.tid === t.id).map(x => `<button class="drun k-${x.k}" data-act="run-pop" title="${esc(tr(RUN_KIND[x.k][1]))}">${ic(RUN_KIND[x.k][0], 's')}<span ${x.attr}>${x.txt}</span><span class="drl">${tr(RUN_KIND[x.k][1])}</span></button>`).join('')}
       </div></div>`);
   // 2.4.1 (#385): no Delete / Track time in the footer any more (Delete sat right below the comment box's Send on a phone);
   // both are in the task's "…" menu (Delete with undo), a running timer still shows here as its pill
+  $('#detail').classList.toggle('dsplit', split); if (split) dsApply(); else $('#detail').classList.remove('dsfold');
   autosize($('#d-title')); autosize($('#d-content')); autosize($('#c-input'));
   if (isMobile() && $('#stale')) staleDraw();
 }

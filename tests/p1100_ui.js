@@ -128,7 +128,7 @@ const menuItems = d => [...d.querySelectorAll('.menu-list [role="menuitem"]')];
   w.eval('closeDetail()');
   // own task detail: editable, but no delete / list change / assignee change
   w.eval(`openDetail(${T1})`); await sleep(900);
-  check(!d.querySelector('#d-title').readOnly && !d.querySelector('#detail [data-act="crumb-menu"]') && d.querySelector('#d-assignee').disabled, 'own task: editable, list (path without a move menu, 2.25.0) + assignee locked');
+  check(!d.querySelector('#d-title').readOnly && !d.querySelector('#detail [data-act="crumb-menu"]') && d.querySelector('#detail .dwho[aria-disabled="true"]'), 'own task: editable, list (path without a move menu, 2.25.0) + assignee locked (2.31.0: the chip)');
   check(d.querySelector('#d-tl'), 'own task: comments');
   d.querySelector('#detail [data-act="task-menu"]').click(); await sleep(300);
   check(!menuItems(d).some(b => /^Delete$/.test(b.textContent.trim())), 'no Delete in the task menu');

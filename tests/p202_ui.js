@@ -39,7 +39,7 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
   let w = await boot({user: 'alice', hash: 'l/' + L}), d = w.document;
   w.eval(`openDetail(${T1})`); await sleep(1300);
   const tl = d.querySelector('#d-tl');
-  const body = [...d.querySelector('#detail .dbody').children].map(x => x.id || x.className);
+  const body = [...d.querySelectorAll('#detail .dbody > *, #detail .dcpane > *')].map(x => x.id || x.className);
   // 2.24.0 (UX-41): the comments follow the subtasks; only "More details" (folded) may come after them
   check(body.filter(x => x !== 'd-more' && x !== 'dmore').indexOf('d-tl') === body.filter(x => x !== 'd-more' && x !== 'dmore').length - 1 && body.indexOf('d-content') < body.indexOf('d-tl'), 'comments at the end of the panel (before "More details"): ' + body.join('|').slice(0, 160));
   const cms = [...tl.querySelectorAll('.cm')];
@@ -211,13 +211,12 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
   w.eval('chatClose()');
   w.close();
 
-  // ---- phone: "Details | Comments", tab bar ring
+  // ---- phone: the jump to the comments (2.31.0, was "Details | Comments"), tab bar ring
   w = await boot({user: 'alice', hash: 'l/' + L, mobile: true, ls: {'tasks.tabbar': JSON.stringify(['m:tasks', 'agents', 'settings'])}}); d = w.document;
   w.eval(`openDetail(${T1})`); await sleep(1200);
-  const tabs = d.querySelectorAll('#detail .dtabs button');
-  check(tabs.length === 2 && tabs[0].classList.contains('on') && d.querySelector('#d-tab-count').textContent === '3', 'phone: Details | Comments (3) on top');
-  tabs[1].click(); await sleep(150);
-  check(d.querySelector('#detail .dbody').classList.contains('dtab-c') && d.querySelectorAll('#d-tl .cm').length === 3 && d.querySelector('#detail .dcomp #c-input') && w.__store['tasks.dTab'] === '"comments"', 'Comments tab: all comments + the box, remembered');
+  // 2.31.0 (#1054): no tabs any more: a small jump "To the comments (3)" next to the assignee, the comments stay below
+  check(!d.querySelector('#detail .dtabs') && d.querySelector('#detail .dmeta [data-act="d-jump-cm"]') && d.querySelector('#d-jump-count').textContent === '3', 'phone: no Details | Comments tabs, a jump to the comments (3)');
+  check(d.querySelectorAll('#d-tl .cm').length === 3 && d.querySelector('#detail .dcomp #c-input'), 'the comments + the box in the stream');
   check(d.querySelector('#tabs [data-go="agents"].aspin'), 'tab bar agents tab: spinning ring');
   w.close();
 

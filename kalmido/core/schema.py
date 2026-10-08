@@ -934,6 +934,9 @@ USER_DEFAULTS = {
     "folders": "[]",            # json list: folder order in the sidebar (also keeps empty folders); 2.4.0: paths "A/b"
     "folders_closed": "[]",     # 2.4.0 (#361): json list of the folder paths folded in the sidebar (all devices)
     "comment_order": "old",     # 2.4.2 (#386): comments in the task panel: old = oldest first (box below), new = newest first (box above)
+    # 2.31.0 (#344): the task panel on a desktop: the properties' share above the comments area in % (20-85) and whether
+    # the comments area is folded (1); per user, so every desktop shows it the same way
+    "detail_split": "60", "detail_cm_fold": "0",
     # 2.4.2 (#391): sharing with agents, per agent id (string): {"auto": [agent ids that get my new lists],
     # "skip": {"<agent id>": [list ids I stopped sharing with it]}}; written only by /api/agents/<aid>/share-all + /autoshare
     # and the member routes (server-only)

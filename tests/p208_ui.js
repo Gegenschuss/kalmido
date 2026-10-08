@@ -200,7 +200,9 @@ async function swTests() {
   check(/Ideas/.test(d.activeElement?.textContent || ''), 'ArrowDown moves to the next option');
   click(w, d.activeElement); await sleep(900);
   check((await call('GET', '/api/state')).tasks.find(t => t.id === plan).section_id === SEC, 'picking fires change: section saved');
-  const asel = d.querySelector('#detail #d-assignee');
+  // 2.31.0 (#1054): the panel has no assignee select any more; a people select like the ones in the dialogs (data-sheet-av)
+  const asel = d.createElement('select'); asel.id = 't-people'; asel.setAttribute('data-sheet-av', ''); asel.innerHTML = '<option value="">Nobody</option><option value="1">Alice</option><option value="2">Bob</option>';
+  d.querySelector('#detail .dbody').appendChild(asel);
   mdown(w, asel); await sleep(50);
   check(d.querySelector('#pop [role="option"] .avatar'), 'assignee options with avatars');
   key(w, d.querySelector('#pop'), 'Escape'); d.body.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true})); await sleep(50);

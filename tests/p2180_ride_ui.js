@@ -182,9 +182,11 @@ const LONG = 'Website relaunch 2026 for the client';
   const tm = await call('POST', '/api/time/start', {task_id: T[1]});
   check(tm.status === 200, 'a running timer (crowds the header)');
   await tcall('PUT', '/agent/status', TOK, {status: 'working', task_id: T[0], text: 'Breaking it down'});
+  // 2.31.0 (#1057): with "Search" in the tab bar (the default) the phone has only that one search; this suite checks the
+  // magnifier / drawer field of before, which stay for a tab bar without "Search"
   const ffLogin = async ({ev, nav}, theme = 'light') => {
     await nav(B + 'static/icon.svg');
-    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
+    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.tabbar', '["s:inbox","s:today","lists"]'); return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
   };
   const ready = async (ev, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300); await sleep(900); };

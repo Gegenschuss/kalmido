@@ -1,7 +1,7 @@
 // 1.7.0 UI tests (jsdom), fresh DB: the sort mode "Flow" (topological order by "Waiting on", ties by start / due /
 // priority / manual order, the "Next" marker, sections, cycles fall back to date order with a hint, default in project
 // lists only with the dependencies module, hidden without it); "Overdue in one click" on Today (Today / Tomorrow / Next
-// week / pick a date, time and repeat kept, view-only tasks skipped and counted, one undo step, x hides it until tomorrow,
+// week / pick a date, time and repeat kept, view-only tasks skipped and counted, one undo step, 2.31.0: in the head of "Overdue",
 // only on Today); the smart list "Now doable" (open, not waiting, due today / overdue / undated, mine; collaboration
 // off = all; sidebar row + count, g d, palette, tab item, German).
 const {boot, errs, sleep, B, login} = require('./boot');
@@ -121,13 +121,14 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   const o3 = await mk('Overdue of bob', SH, {due: addD(T0, -2)}, BK);
   const onToday = await mk('Due today', PLAIN, {due: T0});
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  const ban = () => d.querySelector('#view .odban');
+  // 2.31.0 (#1052): Today grouped by date: the actions sit in the head of "Overdue" (no banner card of its own)
+  const ban = () => d.querySelector('#view .ghead.over .odact')?.closest('.ghead');
   // overdue on Today: Test (project, waiting), o1, o2, o3
   const odN = w.eval('overdueTasks().length');
-  check(ban() && new RegExp(`${odN} overdue`).test(ban().textContent), `banner on Today: "${ban()?.textContent.replace(/\s+/g, ' ').trim()}"`);
+  check(ban() && ban().querySelector('.odact') && !d.querySelector('#view .odban'), `overdue actions in the head of Overdue: "${ban()?.textContent.replace(/\s+/g, ' ').trim()}"`);
   check(odN === 4, 'overdue counted: Test, two own tasks, one view-only: ' + odN);
   // 2.24.0 (UX-35): "All to today" + "Another day…" (Tomorrow / Next week (Mon) / Pick a date… in its menu)
-  check([...ban().querySelectorAll('.btn')].map(b => b.textContent.trim()).join('|') === 'All to today|Another day…', 'banner: All to today / Another day…');
+  check([...ban().querySelectorAll('.odact .btn')].map(b => b.textContent.trim()).join('|') === 'All to today|Another day…', 'head: All to today / Another day…');
   const other = lab => { click(w, ban().querySelector('[data-act="od-other"]')); const b = [...d.querySelectorAll('#pop .menu-list button')].find(x => x.textContent.trim() === lab); click(w, b); };
   const h0 = w.eval('HIST.undo.length');
   other('Tomorrow');
@@ -141,7 +142,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   check(/3 tasks changed/.test(d.querySelector('#toast')?.textContent || '') && /1 task skipped \(view only\)/.test(d.querySelector('#toast')?.textContent || ''), 'toast counts moved and skipped: ' + d.querySelector('#toast')?.textContent);
   check(w.eval('HIST.undo.length') === h0 + 1, 'one undo step');
   await until(() => !w.eval('HIST.busy'));
-  check(ban() && /1 overdue/.test(ban().textContent), 'banner now counts the view-only one only');
+  check(ban() && /Overdue\s*1(?!\d)/.test(ban().textContent), 'Overdue now holds the view-only one only: ' + ban()?.textContent);
   click(w, ban().querySelector('[data-d="0"]')); await sleep(400);
   check(/view/.test(d.querySelector('#toast')?.textContent || '') && (await st()).tasks.find(t => t.id === o3).due === addD(T0, -2), 'only view-only overdue left: a toast, nothing moves');
   d.querySelector('#top [data-act="hist-undo"]').click();
@@ -165,10 +166,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   w.eval(`go('l/${PLAIN}')`); await sleep(300);
   check(!ban(), 'no banner in a list');
   w.eval(`go('today')`); await sleep(300);
-  click(w, ban().querySelector('[data-act="od-hide"]')); await sleep(100);
-  check(!ban() && w.eval(`LS.get('odHide')`) === T0, 'x hides it until tomorrow (per device)');
-  w.eval(`LS.set('odHide', '${addD(T0, -1)}'); renderView()`);
-  check(!!ban(), 'hidden yesterday = shown again today');
+  check(!!ban() && !ban().querySelector('[data-act="od-hide"]'), 'the head of Overdue has no x (2.31.0: no card to hide)');
   w.close();
 
   // ================= (5) Now doable
@@ -235,7 +233,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   w.eval(`sortMenu(document.querySelector('#top h1'))`); await sleep(100);
   check(menuLabels(d).includes('Ablauf'), 'German: "Ablauf" in the sort menu: ' + menuLabels(d));
   w.eval(`go('today')`); await sleep(300);
-  check(/überfällig/.test(d.querySelector('#view .odban')?.textContent || '') && /Alle auf heute/.test(d.querySelector('#view .odban')?.textContent || ''), 'German banner');
+  check(/Überfällig/.test(ban()?.textContent || '') && /Alle auf heute/.test(ban()?.querySelector('.odact')?.textContent || ''), 'German head of Overdue');
   w.close();
 
   const bad = errs.filter(e => !/Could not parse CSS/.test(e));

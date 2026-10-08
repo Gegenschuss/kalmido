@@ -140,7 +140,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   w = await boot({user: 'alice', mobile: true, hash: 'l/' + P}); d = w.document;
   const seg = d.querySelector('#view .vsegm');
   check(seg && [...seg.querySelectorAll('button')].map(b => b.textContent.trim()).join('|') === 'Project|List|Kanban|Timeline' && seg.querySelector('button.on[aria-pressed="true"]')?.textContent.trim() === 'List', 'A7: phone: Overview (first in projects) / List / Kanban / Timeline under the title, the active one marked');
-  const more = w.eval('topMoreItems().filter(x => x !== "-").map(x => x.label || "")');
+  const more = w.eval('topMoreItems().filter(x => x !== "-" && !x.head).map(x => x.label || "")');
   check(!more.includes('List') && !more.includes('Kanban') && !more.includes('As a project') && more.includes('Edit list…') && new Set(more).size === more.length, 'A7: "…" without the views, no type entries (2.25.0), no duplicates: ' + more.join(' | '));
   click(w, seg.querySelector('[data-act="view-kanban"]')); await until(() => d.querySelector('#view .kanban'));
   check(d.querySelector('#view .kanban') && d.querySelector('#view .vsegm button.on')?.textContent.trim() === 'Kanban', 'A7: a tap switches to Kanban');
@@ -353,7 +353,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     // A7: the view switch; A11 habits; P13 contrast
     await nav(B + '?p=2#l/' + P); await ready(ev);
     const vs = await ev(`(() => { const s = document.querySelector('#view .vsegm'); if (!s) return null; const r = s.getBoundingClientRect(); return {n: s.querySelectorAll('button').length, h: Math.min(...[...s.querySelectorAll('button')].map(b => b.getBoundingClientRect().height)), right: r.right, vw: innerWidth, txt: s.textContent}; })()`);
-    check(vs && vs.n === 4 && vs.h >= 43.5 && vs.right <= vs.vw + .5 && /Liste/.test(vs.txt) && /Projekt/.test(vs.txt), '390 A7: the view switch under the title (German), 44 px, inside the screen ' + JSON.stringify(vs));
+    check(vs && vs.n === 4 && vs.h >= 35.5 && vs.right <= vs.vw + .5 && /Liste/.test(vs.txt) && /Projekt/.test(vs.txt), '390 A7: the view switch under the title (German), 36 px (2.31.0 #1053, was 44), inside the screen ' + JSON.stringify(vs));
     const ctr = await ev(`(() => { const C = ${CTR}, bg = ${bgOf}; const sp = [...document.querySelectorAll('#tabs button:not(.on) > span')].filter(s => s.offsetWidth)[0]; return sp ? C(getComputedStyle(sp).color, bg(sp)) : 0; })()`);
     check(ctr >= 4.5, '390 P13: inactive tab label contrast ' + ctr.toFixed(2));
     await shot('p2130-list-390.png');
@@ -406,7 +406,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     for (const pct of [150, 50]) {
       await ev(`(() => { localStorage.setItem('tasks.fsize', '${pct}'); return 1; })()`);
       await nav(B + `?fs=${pct}#l/` + P); await ready(ev);
-      const r = await ev(`(() => { const small = [...document.querySelectorAll('#top button, #view .iconbtn, #tabs button, #view .vsegm button')].filter(e => e.offsetWidth).filter(e => e.getBoundingClientRect().height < 43.5).map(e => (e.className || e.tagName) + ':' + Math.round(e.getBoundingClientRect().height)); return {ui: getComputedStyle(document.documentElement).getPropertyValue('--ui').trim(), over: document.documentElement.scrollWidth > innerWidth, small, h1: !!document.querySelector('#top h1')?.offsetWidth}; })()`);
+      const r = await ev(`(() => { const small = [...document.querySelectorAll('#top button, #view .iconbtn, #tabs button, #view .vsegm button')].filter(e => e.offsetWidth).filter(e => e.getBoundingClientRect().height < (e.closest('.vsegm') ? 35.5 : 43.5)).map(e => (e.className || e.tagName) + ':' + Math.round(e.getBoundingClientRect().height)); return {ui: getComputedStyle(document.documentElement).getPropertyValue('--ui').trim(), over: document.documentElement.scrollWidth > innerWidth, small, h1: !!document.querySelector('#top h1')?.offsetWidth}; })()`);
       check(!r.over && r.h1 && (pct === 150 || !r.small.length), `390 #429 ${pct} %: no sideways overflow, the title shows` + (pct === 50 ? ', touch targets still 44 px ' : ' ') + JSON.stringify(r));
       await shot(`p2130-fontsize-${pct}-390.png`);
     }
@@ -471,11 +471,11 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     const cw = await ev(`(() => { const v = document.querySelector('#view'), wb = document.querySelector('#wbody'); return wb ? {view: v.scrollHeight - v.clientHeight, wb: wb.scrollHeight > wb.clientHeight} : null; })()`);
     check(!cw || (cw.view <= 1 && cw.wb), '904 P15: week view: the page does not scroll, the hour grid does ' + JSON.stringify(cw));
     await shot('p2130-week-904-dark-fr.png');
-    // P3 (fr): the overdue card keeps its × in the corner
+    // P3 (fr): 2.31.0 (#1052): the overdue actions sit in the head of "Overdue" (no card); they fit next to the title
     await call('POST', '/api/tasks', {title: 'En retard', list_id: P, due: day(-2)});
     await nav(B + '?f=3#today'); await ready(ev);
-    const od = await ev(`(() => { const o = document.querySelector('#view .odban'); if (!o) return null; const x = o.querySelector('[data-act="od-hide"]').getBoundingClientRect(), r = o.getBoundingClientRect(); return {corner: x.right >= r.right - 8 && x.top <= r.top + 8, h: Math.min(...[...o.querySelectorAll('.btn')].map(b => b.getBoundingClientRect().height))}; })()`);
-    check(od && od.corner && od.h >= 43.5, '904 P3 / P14: the overdue card: × in its corner, 44 px buttons ' + JSON.stringify(od));
+    const od = await ev(`(() => { const g = document.querySelector('#view .ghead.over'), o = g && g.querySelector('.odact'); if (!o) return null; const r = g.getBoundingClientRect(), bs = [...o.querySelectorAll('.btn')].map(b => b.getBoundingClientRect()); return {n: bs.length, inside: bs.every(b => b.right <= r.right + 1 && b.left >= r.left), h: Math.min(...bs.map(b => b.height)), card: !!document.querySelector('#view .odban')}; })()`);
+    check(od && od.n === 2 && od.inside && od.h >= 24 && !od.card, '904 P3 / P14: the overdue actions in the head of Overdue, inside it, >= 24 px ' + JSON.stringify(od));
     await shot('p2130-today-904-dark-fr.png');
   }, true);
 

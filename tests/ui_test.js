@@ -32,11 +32,12 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   check(/Alice created the task/.test(tl?.textContent), 'activity text in English');
   check(/Alice set the link to github\.com/.test(tl?.textContent), 'link activity line');
   check(d.querySelector('.linkchip')?.textContent.trim() === 'github.com' && d.querySelector('.linkchip').rel === 'noopener noreferrer', 'detail link chip');
-  check(d.querySelector('#d-assignee'), 'assignee picker present (collab on)');
-  // activity toggle, remembered per device
-  d.querySelector('[data-act="tl-act"]').click(); await sleep(100);
-  check(d.querySelectorAll('#d-tl .actl').length === 0 && w.__store['tasks.showActivity'] === 'false', 'toggle hides activity and remembers it');
-  d.querySelector('[data-act="tl-act"]').click(); await sleep(100);
+  check(d.querySelector('#detail .dmeta .dwho'), 'assignee chip present (collab on; 2.31.0: the only assignee control)');
+  // activity toggle, remembered per device (2.31.0 #1054: in the "…" of the comment head)
+  const tlAct = async () => { d.querySelector('#d-tl [data-act="tl-menu"]').click(); await sleep(50); d.querySelector('#pop .mtlact').click(); await sleep(100); };
+  await tlAct();
+  check(d.querySelectorAll('#d-tl .actl').length === 0 && w.__store['tasks.showActivity'] === 'false' && /Comments only/.test(d.querySelector('#d-tl .cmhead').textContent), 'toggle hides activity and remembers it');
+  await tlAct();
   check(d.querySelectorAll('#d-tl .actl').length >= 1, 'toggle shows activity again');
   // moderation: alice owns the list -> delete buttons on others' comments, edit only on hers
   const others = [...d.querySelectorAll('#d-tl .cm')].filter(c => !/^Alice/.test(c.querySelector('.chead b').textContent));
@@ -147,8 +148,10 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   check(!d.querySelector('#side .shr'), 'collab off: no shared icon');
   check(!d.querySelector('#side .srow[data-go="assigned"]'), 'collab off: no "Assigned to me"');
   w.eval(`openDetail(${ids.ST})`); await sleep(600);
-  check(!d.querySelector('#d-assignee'), 'collab off: no assignee picker');
-  check(!d.querySelector('#d-tl [data-act="tl-act"]') && !d.querySelector('#d-tl .actl') && !d.querySelector('#d-tl .rx'), '2.0.6 (#315) collab off: comments as notes only (no activity, no reactions)');
+  check(!d.querySelector('#detail .dwho'), 'collab off: no assignee chip');
+  d.querySelector('#d-tl [data-act="tl-menu"]')?.click(); await sleep(50);
+  const noAct = d.querySelector('#pop [role="menuitem"]') && !d.querySelector('#pop .mtlact'); w.eval('closePop()');
+  check(noAct && !d.querySelector('#d-tl .actl') && !d.querySelector('#d-tl .rx'), '2.0.6 (#315) collab off: comments as notes only (no activity, no reactions)');
   check(d.querySelector('.linkchip'), 'collab off, links on: link chip still shown');
   check(!/only visible to you/.test(d.querySelector('#detail').textContent), 'collab off: no sharing hint at tags');
   w.eval('closeDetail()');

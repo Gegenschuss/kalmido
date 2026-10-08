@@ -103,7 +103,7 @@ const V = B + 'api/v1';
   await until(() => d.querySelector('.modal #tk-lcap'));
   check([...d.querySelectorAll('.modal #tk-lcap [data-lcap]')].length >= 2, '#919: the token dialog offers the list limit');
   d.querySelectorAll('.modal').forEach(m => m.remove());
-  const items = w.eval(`listMenuItems(${AB}).filter(x => x && x.label).map(x => x.label)`);
+  const items = w.eval(`listMenuItems(${AB}).flatMap(x => x.more || [x]).filter(x => x && x.label).map(x => x.label)`);
   check(items.includes('Agent access'), '#919: the list menu has "Agent access" ' + items.join('|'));
   w.eval(`agAccessModal(${AB})`);
   await until(() => d.querySelector('.agaccmd .agacc'));

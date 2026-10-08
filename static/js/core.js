@@ -328,6 +328,7 @@ function applyLocal(e) {
 async function flush() {
   if (OUT.flushing || !OUT.q.length) return;
   OUT.flushing = true;
+  netDotDraw();  // 2.31.0 (#378): yellow while the changes go out
   const fix = v => (typeof v === 'number' && v < 0 && idmap[v]) ? idmap[v] : v;
   const idmap = LS.get('idmap', {});
   let dropped = 0, skipped = 0, sent = 0;
@@ -385,6 +386,23 @@ function savedChip() {
   if (!el) { el = document.createElement('div'); el.id = 'savedok'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
   el.innerHTML = `${ic('check', 's')}<span>${esc(tr('All saved'))}</span>`; el.classList.add('on');
   clearTimeout(savedChip.t); savedChip.t = setTimeout(() => el.classList.remove('on'), 2500);
+}
+// 2.31.0 (#378): the own connection as a small dot at the own picture (sidebar / drawer, desktop and phone): green online,
+// grey offline (with the number of waiting changes), yellow while changes go out. The colour is never the only sign: the dot
+// and the picture's button carry the state as text (aria-label, tooltip), the account menu shows it as its first line.
+function netState() {
+  const q = OUT.q.length;
+  if (!OUT.online) return {k: 'off', label: [OUT.down ? (OUT.maint ? tr('Server in maintenance') : tr('Server not reachable')) : tr('Offline'), q ? trn('{0} change waiting', '{0} changes waiting', q) : ''].filter(Boolean).join(' · ')};
+  if (q || OUT.flushing) return {k: 'sync', label: tr('Syncing')};
+  return {k: 'on', label: tr('Online')};
+}
+const netDotHtml = () => { const n = netState(); return `<span class="netdot n-${n.k}" role="img" aria-label="${esc(n.label)}" title="${esc(n.label)}"></span>`; };
+const acctLabel = () => tr('Account') + ': ' + (S.me?.display_name || '') + ' · ' + netState().label;
+function netDotDraw() {
+  if (!globalThis.document) return;
+  const n = netState();
+  for (const d of $$('.sbacct .netdot')) { d.className = 'netdot n-' + n.k; d.setAttribute('aria-label', n.label); d.title = n.label; }
+  for (const b of $$('.sbacct')) { b.setAttribute('aria-label', acctLabel()); b.title = acctLabel(); }
 }
 // 2.25.0 (UX-55): while changes wait, the server is asked again every 2 s (not only on the 4 s poll)
 function flushSoon() { if (flushSoon.t) return; flushSoon.t = setTimeout(() => { flushSoon.t = null; if (globalThis.document && OUT.q.length && !document.hidden) flush(); }, 2000); }
@@ -765,13 +783,12 @@ async function route() {
   // 2.13.0 (#453 A10): #agents/<id> (the push "… answered") opens the chat right away on Fold / desktop too
   if (r.mod === 'agents' && r.agent && !chatFull() && !$('#achat:not(.hidden)') && agentById(r.agent)) chatOpen(r.agent);
 }
-// 2.0.8 (#331): the push button "Reply" opens the task with the comment box focused (the sticky box of 2.0.6; on a phone
-// with the Details / Comments tabs, the Comments tab); the panel may still be loading, so it tries for a moment
+// 2.0.8 (#331): the push button "Reply" opens the task with the comment box focused (the sticky box of 2.0.6); the panel may still be loading, so it tries for a moment
 function replyFocus(id, n = 0) {
   if (S.sel !== id) return;
   const ci = $('#detail #c-input');
   if (!ci) { if (n < 20) setTimeout(() => replyFocus(id, n + 1), 150); else if (!taskById(id)) toast(tr('Task not found')); return; }
-  const tab = $('#detail .dtabs [data-tab="comments"]'); if (tab && !tab.classList.contains('on')) tab.click();
+  if ($('#detail.dsfold')) dsFoldToggle(false);  // 2.31.0 (#344): a folded comments area opens
   ci.closest('.ccomp')?.classList.add('used');
   try { ci.focus({preventScroll: true}); } catch { ci.focus(); }
   ci.scrollIntoView?.({block: 'nearest'});

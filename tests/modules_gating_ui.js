@@ -45,7 +45,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
     deps: [['dependency section', d => d.querySelector('#d-deps')], ['waiting mark', d => d.querySelector('#view .blk')]],
     fields: [['custom fields', d => d.querySelector('#detail .cfsec')], ['list dialog', (d, w) => { w.eval(`listModal(${P})`); const x = !!d.querySelector('.modal #l-fields'); d.querySelectorAll('.modal').forEach(m => m.remove()); return x; }]],
     progress: [['progress bar', d => d.querySelector('#view .lhead .lprog')]],
-    collab: [['bell', d => d.querySelector('#top .bell')], ['activity switch', d => d.querySelector('#d-tl [data-act="tl-act"]')], ['assignee', d => d.querySelector('#d-assignee')]],
+    collab: [['bell', d => d.querySelector('#top .bell')], ['activity switch', (d, w) => { d.querySelector('#d-tl [data-act="tl-menu"]')?.click(); const x = !!d.querySelector('#pop .mtlact'); w.eval('closePop()'); return x; }], ['assignee', d => d.querySelector('#detail .dwho')]],  // 2.31.0 (#1054): the switch is in the "…", the assignee the chip
     comments: [['comment section', d => d.querySelector('#d-tl')], ['comment box', d => d.querySelector('#c-input')]],  // 2.0.6 (#315): a module of its own
   };
   const run = async (feats, label, want) => {

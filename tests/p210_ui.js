@@ -86,7 +86,7 @@ const TOKEN = 'bob-ui-server-token-4c2e', PTOKEN = 'bob-ui-personal-token-9d1f';
 
   // ================= #317 the list bell
   w = await boot({user: 'bob', hash: 'l/' + TEAM}); d = w.document;
-  let items = w.eval(`listMenuItems(${TEAM}, document.querySelector('#top h1')).filter(x => x !== '-').map(x => x.label)`);
+  let items = w.eval(`listMenuItems(${TEAM}, document.querySelector('#top h1')).flatMap(x => x.more || [x]).filter(x => x !== '-').map(x => x.label)`);
   check(items.includes('Notifications: Default'), 'list menu: Notifications: Default ' + items);
   w.eval(`bellMenu(document.querySelector('#top h1'), ${TEAM})`); await sleep(200);
   const bells = [...d.querySelectorAll('#pop .menu-list button')];

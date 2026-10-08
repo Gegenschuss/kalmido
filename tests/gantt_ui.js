@@ -232,6 +232,7 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
   check(await until(async () => (await call('GET', '/api/state')).settings.hide_progress.split(',').includes(String(HOME))) && !d.querySelector('.lhead .lprog'), 'x: bar hidden, stored for the user');
   d.querySelector('#top [data-act="top-more"]').click(); await sleep(100);  // 1.5: the list menu is part of the header's "…"
   pop = d.querySelector('#pop:not(.hidden)');
+  if (!/Show progress/.test(pop.textContent)) { pop.querySelector('.msubm')?.click(); await sleep(100); }  // 2.31.0 (#1056): "More list options…"
   const sp = [...pop.querySelectorAll('button')].find(b => /Show progress/.test(b.textContent));
   check(sp, 'list menu: Show progress');
   sp.click();

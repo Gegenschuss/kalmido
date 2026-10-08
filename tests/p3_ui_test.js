@@ -165,7 +165,9 @@ const ds = n => { const d = new Date(Date.now() + n * 864e5); return `${d.getFul
   await w.eval('load().then(render)'); w.location.hash = 'l/' + WORK; await sleep(500);
   const lh = d.querySelector('.lhead');
   check(lh && /25% 1\/4/.test(lh.querySelector('.lprog').textContent.replace(/\s+/g, ' ')) && /1 overdue/.test(lh.textContent), 'header: progress 1/4, 1 overdue: ' + lh?.textContent);
-  lh.querySelector('[data-act="status"]').click(); await sleep(400);
+  // 2.31.0 (#1053): no "Set status" in the list header any more; it is in the list's "…" menu (and on the project page)
+  check(!lh.querySelector('[data-act="status"]'), 'header: no "Set status" button (2.31.0)');
+  w.eval(`listMenuItems(${WORK}).find(x => x && x.cls === 'mstatus').fn()`); await sleep(400);
   md = lastModal(d);
   md.querySelector('[data-st="at_risk"]').click();
   md.querySelector('#st-note').value = 'Vendor is late';

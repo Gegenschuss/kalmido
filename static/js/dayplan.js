@@ -139,9 +139,15 @@ function reviewCard() {
   const r = S.review.data; if (!r) return '';
   const li = (arr, cls) => arr.slice(0, 5).map(x => `<li class="${cls}">${esc(x.title)}</li>`).join('') + (arr.length > 5 ? `<li class="muted">${esc(trn('and {0} more', 'and {0} more', arr.length - 5))}</li>` : '');
   const tm = r.tomorrow;
-  return `<section class="rvcard" aria-labelledby="rv-h"><div class="rvhd"><h3 id="rv-h">${ic('done', 's')} ${tr('Daily review')}</h3><span class="spacer"></span><button class="iconbtn" data-act="review-hide" title="${esc(tr('Hide for today'))}" aria-label="${esc(tr('Hide for today'))}">${ic('x', 's')}</button></div>
+  const plan = `<button class="btn sm" data-act="dayplan" data-mode="day" data-day="${esc(tm.date)}">${ic('cal', 's')} ${tm.date === addDays(today(), 1) ? tr('Plan tomorrow') : esc(tr('Plan {0}', fmtDayAbs(tm.date)))}</button>`;
+  // 2.31.0 (#1052): after the first read (the visit of Today that showed it) the card folds to one line for the rest of the
+  // day: "1 done · 7 still open · Plan tomorrow"; the line unfolds it again (remembered per device and day)
+  if (LS.get('reviewSeen', '') !== t0) { LS.set('reviewSeen', t0); S.review.route = S.route; }
+  const fold = !S.route.review && S.review.route !== S.route && LS.get('reviewOpen', '') !== t0;
+  if (fold) return `<section class="rvcard fold" aria-label="${esc(tr('Daily review'))}"><button type="button" class="rvfold" data-act="review-fold" aria-expanded="false">${ic('chev', 's')}<span class="rvft">${esc(tr('Daily review'))}</span><span class="rvfn">${r.done.length} ${tr('done|review')} · ${r.open.length} ${tr('still open')}</span></button>${plan}<button class="iconbtn" data-act="review-hide" title="${esc(tr('Hide for today'))}" aria-label="${esc(tr('Hide for today'))}">${ic('x', 's')}</button></section>`;
+  return `<section class="rvcard" aria-labelledby="rv-h"><div class="rvhd"><button type="button" class="rvfold" data-act="review-fold" aria-expanded="true" aria-label="${esc(tr('Daily review'))}">${ic('chev', 's')}</button><h3 id="rv-h">${ic('done', 's')} ${tr('Daily review')}</h3><span class="spacer"></span><button class="iconbtn" data-act="review-hide" title="${esc(tr('Hide for today'))}" aria-label="${esc(tr('Hide for today'))}">${ic('x', 's')}</button></div>
     <div class="rvnums"><span><b>${r.done.length}</b> ${tr('done|review')}</span><span><b>${r.open.length}</b> ${tr('still open')}</span><span><b>${r.moved.length}</b> ${tr('moved')}</span></div>
     ${r.done.length ? `<ul class="rvl">${li(r.done, 'ok')}</ul>` : ''}
     <div class="rvtm"><span class="muted">${esc(tm.count ? tr('Suggestion for {0}: {1}', fmtDayAbs(tm.date), tm.plan.slice(0, 3).map(x => x.start + ' ' + x.title).join(', ')) : tr('Nothing planned for {0} yet.', fmtDayAbs(tm.date)))}</span>
-      <button class="btn sm" data-act="dayplan" data-mode="day" data-day="${esc(tm.date)}">${ic('cal', 's')} ${tm.date === addDays(today(), 1) ? tr('Plan tomorrow') : esc(tr('Plan {0}', fmtDayAbs(tm.date)))}</button>${feat('review') ? `<a class="btn sm" href="#review">${ic('journal', 's')} ${tr('Journal')}</a>` : ''}</div></section>`;
+      ${plan}${feat('review') ? `<a class="btn sm" href="#review">${ic('journal', 's')} ${tr('Journal')}</a>` : ''}</div></section>`;
 }

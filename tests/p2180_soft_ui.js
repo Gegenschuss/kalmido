@@ -303,7 +303,9 @@ const lst = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)).l
     check(ov.o <= 0 && ov.d <= 1, `${tag}: task panel: nothing sideways ` + JSON.stringify(ov));
     await shot(`p2180-soft-${th}-${vw}-code.png`);
     // 2.18.0 review (R7): opening a DIFFERENT task starts at its top
-    const sc = await ev(`(() => { const d = document.querySelector('#detail'), m = document.querySelector('#d-more'); if (m) m.open = true; d.scrollTop = 600; const was = d.scrollTop; openDetail(${OLD}); return {was, now: document.querySelector('#detail').scrollTop}; })()`);
+    // 2.31.0 (#344): on a desktop the properties scroll in .dbody (the comments have their own area below), else #detail
+    const sc = await ev(`(() => { const sx = () => { const d = document.querySelector('#detail'); return d.classList.contains('dsplit') ? d.querySelector('.dbody') : d; };
+      const m = document.querySelector('#d-more'); if (m) m.open = true; sx().scrollTop = 600; const was = sx().scrollTop; openDetail(${OLD}); return {was, now: sx().scrollTop, split: document.querySelector('#detail').classList.contains('dsplit')}; })()`);
     check(sc.was > 0 && sc.now === 0, `${tag}: another task opens at its top ` + JSON.stringify(sc));
     await o.nav(B + '#t/' + OLD); await ready(ev); await sleep(400);
     const ov2 = await ev(`(() => ({o: document.documentElement.scrollWidth - innerWidth, d: (document.querySelector('#detail').scrollWidth - document.querySelector('#detail').clientWidth), pre: (() => { const p = document.querySelector('#d-md pre'); return p ? p.scrollWidth > p.clientWidth : null; })()}))()`);

@@ -303,8 +303,11 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     const lq = await ev(`(() => { const last = [...document.querySelectorAll('#tc-msgs .cmsg.me')].pop(), q = last?.querySelector('.cmeta'), b = document.querySelector('#tc-msgs'); if (!q || !b) return null; return {qb: Math.round(q.getBoundingClientRect().bottom), bb: Math.round(b.getBoundingClientRect().bottom)}; })()`);
     check(lq && lq.qb <= lq.bb + 1, `${tag}: the last own message: its reactions are not hidden behind the box ` + JSON.stringify(lq));
     await o.nav(B + '#today'); await ready(ev);
-    const sb = await ev(`(() => { const b = document.querySelector('#top [data-act="palette"]'); const r = b?.getBoundingClientRect(); return r && r.width >= 30 && r.right <= innerWidth ? Math.round(r.width) : 0; })()`);
-    check(sb > 0, `${tag}: the header has the search icon on the phone (${sb})`);
+    // 2.31.0 (#1057): ONE search on the phone: with the tab "Search" pinned the header magnifier steps aside, the tab is it
+    const sb = await ev(`(() => { const vis = b => { const r = b?.getBoundingClientRect(); return r && r.width >= 30 && r.right <= innerWidth ? Math.round(r.width) : 0; };
+      const hd = vis(document.querySelector('#top [data-act="palette"]')), tb = vis(document.querySelector('#tabs [data-act="palette"]'));
+      return document.body.classList.contains('tab-search') ? (!hd && tb ? tb : 0) : hd; })()`);
+    check(sb > 0, `${tag}: one search on the phone: the header icon, or the tab "Search" when it is pinned (${sb})`);
     if (th === 'light') {
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 904, height: 1080}});
       await o.nav(B + '#t/' + T[0]); await ready(ev); await sleep(600);

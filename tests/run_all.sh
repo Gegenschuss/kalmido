@@ -438,6 +438,15 @@ fresh; run p2300_files_api "$PY" p2300_files_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2300_agentsafe_api "$PY" p2300_agentsafe_api_test.py "$KALMIDO_TEST_DATA"
        run p2300_agentsafe_ui node p2300_agentsafe_ui.js "$KALMIDO_TEST_DATA"
        run p2300_ui_fixes node p2300_ui_fixes.js "$KALMIDO_TEST_DATA"
+# 2.31.0 "Phone everyday" (UX round part 1): the task row, Today and the list head (#1051 #1052 #1053), the task panel
+# (#1054 phone without tabs, #344 the comments area on a desktop with a draggable split), file tiles and tables
+# (#1050 #1048), grouped menus, one search and the agent sub-tabs (#1056 #1057 #1046), sorting by a column title and
+# the connection dot on your picture (#354 #378); each suite starts its own container
+fresh; run p2310_a_ui node p2310_a_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2310_b_api "$PY" p2310_b_api_test.py "$KALMIDO_TEST_DATA"
+       run p2310_b_ui node p2310_b_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2310_c_ui node p2310_c_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2310_d_ui node p2310_d_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

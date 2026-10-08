@@ -88,7 +88,7 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
 
   // ================= #957 comments last; #994 more lines of the description
   w.eval(`openDetail(${T1})`); await until(() => d.querySelector('#d-tl .cm'));
-  const kids = [...d.querySelector('#detail .dbody').children].map(x => x.id || x.className);
+  const kids = [...d.querySelectorAll('#detail .dbody > *, #detail .dcpane > *')].map(x => x.id || x.className);
   check(kids.indexOf('d-more') >= 0 && kids.indexOf('d-tl') === kids.length - 1 && kids.indexOf('d-more') < kids.indexOf('d-tl'), '#957: "More details" above, the comments last ' + kids.join('|').slice(0, 200));
   check(/1 tag/.test(d.querySelector('#d-more .dmsum')?.textContent || ''), '#957: the folded details say what they hold ' + d.querySelector('#d-more summary')?.textContent);
   check(d.querySelector('#d-md.clamp') && w.getComputedStyle(d.querySelector('#d-md')).maxHeight !== 'none', '#994: a 12-line description still folds');
@@ -219,7 +219,7 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
     check(/Drag the column width/.test(await ev(`document.querySelector('.lchead .lcg')?.title || ''`)), `${tag}: #1006 its tooltip`);
     await shot(`p2270-${th}-1440-columns.png`);
     await ev(`(() => { openDetail(${TP}); return 1; })()`); await sleep(900);
-    const ord = await ev(`[...document.querySelector('#detail .dbody').children].map(x => x.id || x.className).join('|')`);
+    const ord = await ev(`[...document.querySelectorAll('#detail .dbody > *, #detail .dcpane > *')].map(x => x.id || x.className).join('|')`);
     check(/d-more.*d-tl|d-tl$/.test(ord), `${tag}: #957 the comments last ` + ord.slice(-80));
     await shot(`p2270-${th}-1440-panel.png`);
     // a menu open: the grips step aside

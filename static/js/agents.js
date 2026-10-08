@@ -108,6 +108,9 @@ function bandAgents() {
   const k = S.route.key;
   if (k.startsWith('l:')) { const l = listById(+k.slice(2)), ids = new Set(listAgents(l).map(a => a.id)); return sh.filter(a => ids.has(a.id)); }
   if (k.startsWith('folder:')) { const ids = new Set(folderLists(k.slice(7)).flatMap(listAgents).map(a => a.id)); return sh.filter(a => ids.has(a.id)); }
+  // 2.31.0 (#1052): Today shows the band only when something needs me (an error, a question / approval); "offline" or
+  // "ready" is already in the header chip
+  if (k === 'today') return sh.filter(a => a.waiting || a.limit_reached || ['error', 'waiting'].includes(a.status) || ['error', 'waiting'].includes(agentHst(a)));
   return BAND_KEYS.includes(k) && !isRoadmap() ? sh : [];
 }
 S.bandJobs = {v: -1, items: [], busy: false};

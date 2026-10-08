@@ -200,7 +200,8 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
         check(lay.sw <= lay.cw + 1 && !lay.out.length, `${vw}px: no horizontal overflow ${JSON.stringify(lay)}`);
         check(vw >= 1100 ? lay.cols === 2 : lay.cols === 1, `${vw}px: ${vw >= 1100 ? 'two columns' : 'one column'} ${JSON.stringify(lay)}`);
         if (touch) {
-          const small = await ev(SMALL('#view .pov button, #view .pov .povup, #view .povl a, #view .povf > a'));
+          // 2.31.0 (#1053): the view switch is 36 px high on phones (checked in p2310_a_ui / p2130_ui), not 44
+          const small = (await ev(SMALL('#view .pov button, #view .pov .povup, #view .povl a, #view .povf > a'))).filter(x => !(x[3] >= 35.5 && ['Project', 'List', 'Kanban', 'Timeline'].includes(x[1])));
           check(!small.length, `${vw}px: touch targets >= 44 px: ${JSON.stringify(small)}`);
           const seg = await ev(`(() => [...document.querySelectorAll('#top .vseg')].filter(e => e.offsetWidth).length)()`);
           check(seg === 0, `${vw}px: the view switch is not in the phone header (it is in "…")`);

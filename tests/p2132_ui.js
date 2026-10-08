@@ -215,9 +215,10 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     check(!y2.sel && y2.chat && y2.focus === 'chat-in', '1100 N1: back to the chat, its box has the focus ' + JSON.stringify(y2));
     await ev(`(() => { chatClose(); return 1; })()`);
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1440, height: 900}}); await sleep(500);
-    // N2: Tab through Today's agent band while the agent's status changes (live re-renders): the focus walks on
+    // N2: Tab through the agent band while the agent's status changes (live re-renders): the focus walks on. 2.31.0
+    // (#1052): Today shows the band only when something needs me, so this runs in the project list (band always there)
     const J2 = (await tcall('POST', '/agent/jobs', TOK, {title: 'Approve me', state: 'waiting'})).id;
-    await nav(B + '#today'); await ready(ev); await sleep(800);
+    await nav(B + '#l/' + P); await ready(ev); await sleep(800);
     await ev(`(() => { document.querySelector('#view .agband .agb-tog').focus(); return 1; })()`);
     const seen = [];
     const id = () => ev(`(() => { const a = document.activeElement; return a ? (a.dataset.act || a.id || a.tagName) + ':' + (a.dataset.jid || a.dataset.aid || '') + ':' + [...document.querySelectorAll('button, a, input')].indexOf(a) : '-'; })()`);

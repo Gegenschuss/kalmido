@@ -90,8 +90,9 @@ const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
   else check(true, 'UX-30: (no docked bar in this jsdom width)');
   // UX-35: Today
   w.eval(`go('today')`); await sleep(300);
-  const ob = d.querySelector('#view .odban');
-  check(ob && ob.querySelectorAll('.btn').length === 2 && ob.querySelector('[data-act="od-move"][data-d="0"]') && ob.querySelector('[data-act="od-other"]'), 'UX-35: one slim overdue line: "All to today" + "Another day…"');
+  // 2.31.0 (#1052): grouped by date, the two actions sit in the head of "Overdue" (no line of their own)
+  const ob = d.querySelector('#view .ghead.over .odact');
+  check(ob && !d.querySelector('#view .odban') && ob.querySelectorAll('.btn').length === 2 && ob.querySelector('[data-act="od-move"][data-d="0"]') && ob.querySelector('[data-act="od-other"]'), 'UX-35 / #1052: "All to today" + "Another day…" in the head of Overdue');
   check(!d.querySelector('#view .dpbar'), 'UX-35: no planner buttons above the list');
   click(w, d.querySelector('#top [data-act="top-more"]')); await sleep(150);
   const items = [...d.querySelectorAll('#pop .menu-list button')].map(b => b.textContent.trim());
@@ -101,7 +102,7 @@ const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
   check([...d.querySelectorAll('#pop .menu-list button')].map(b => b.textContent.trim()).join('|') === 'Tomorrow|Next week (Mon)|Pick a date…', 'UX-35: "Another day…" = Tomorrow / Next week / Pick a date');
   w.eval('closePop()');
   click(w, ob.querySelector('[data-act="od-move"]')); await sleep(400);
-  check(!d.querySelector('#view .odban') && w.eval(`S.tasks.get(${T1}).due`) === w.eval('today()'), 'UX-35: All to today moves them');
+  check(!d.querySelector('#view .ghead.over') && w.eval(`S.tasks.get(${T1}).due`) === w.eval('today()'), 'UX-35: All to today moves them');
   // UX-01 / UX-06 / UX-08: the sidebar
   const grps = [...d.querySelectorAll('#side .sgroup')].map(x => (x.className.match(/sg-(\w+)/) || [])[1]).filter(Boolean);
   check(grps.indexOf('views') < grps.indexOf('lists') && grps.indexOf('focus') < grps.indexOf('views'), 'UX-01 / 2.27.0 (#984): Focus, Views (folded), then the lists ' + grps.join(','));
@@ -137,12 +138,13 @@ const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
   const who = d.querySelector('#detail .dmeta .dwho');
   check(who && /Bob/.test(who.textContent) && who.dataset.act === 'assign', 'UX-41: the assignee right under the title');
   const secs = [...d.querySelectorAll('#detail .dbody > .dsec, #detail .dbody > details')].map(x => x.id || x.className.split(' ').slice(0, 2).join('.'));
-  check(d.querySelector('#detail details#d-more') && d.querySelector('#detail #d-more #d-assignee'), 'UX-41: the rest folds into "More details" ' + secs.join(','));
+  check(d.querySelector('#detail details#d-more') && d.querySelector('#detail #d-more .fields') && !d.querySelector('#detail #d-assignee'), 'UX-41: the rest folds into "More details" (2.31.0: no second assignee there) ' + secs.join(','));
   check(!d.querySelector('#detail #d-more').open, 'UX-41: folded by default');
   d.querySelector('#detail #d-more').open = true; d.querySelector('#detail #d-more').dispatchEvent(new w.Event('toggle'));
   check(w.__store['tasks.dMore'] === 'true', 'UX-41: the fold is remembered per device');
   w.eval(`taskMenu(document.querySelector('#view .trow[data-id="${T1}"]') || document.querySelector('#top h1'), ${T1})`); await sleep(150);
-  const ml = [...d.querySelectorAll('#pop .menu-list > button, #pop .menu-list > .mquick')].map(b => b.classList.contains('mquick') ? '[' + [...b.querySelectorAll('button')].map(x => x.textContent.trim()).join('/') + ']' : b.textContent.trim().replace(/\s*\S$/, x => x));
+  // 2.31.0 (#1056): the entries sit in groups with small headings (.mgrp); document order stays the menu order
+  const ml = [...d.querySelectorAll('#pop .menu-list > button, #pop .menu-list > .mquick, #pop .menu-list > .mgrp > button, #pop .menu-list > .mgrp > .mquick')].map(b => b.classList.contains('mquick') ? '[' + [...b.querySelectorAll('button')].map(x => x.textContent.trim()).join('/') + ']' : b.textContent.trim().replace(/\s*\S$/, x => x));
   const pos = re => ml.findIndex(x => re.test(x));
   check(pos(/^\[Today\/Tomorrow\]/) === 0 && pos(/New date/) === 1, 'UX-09 / UX-10: the date first, "New date…" ' + ml.slice(0, 3).join(' | '));
   check(pos(/\[High\/Medium\/Low\/None\]/) > 1 && pos(/\[High/) < pos(/Assign/) && pos(/Assign/) < pos(/Move to list/) && pos(/Move to list/) < pos(/Waiting on someone/) && pos(/Waiting/) < pos(/^Pin/) && pos(/^Pin/) < pos(/Save as template/) && pos(/Save as template/) < pos(/^Delete/),

@@ -104,8 +104,12 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   row = d.querySelector(`.trow[data-id="${T1}"]`);
   check(row && row.querySelector('.gchip') && /Office/.test(row.querySelector('.gchip').textContent), 'the row shows the group chip');
   w.openDetail(T1); await sleep(400);
-  const sel = d.querySelector('#d-assignee');
-  check(sel && [...sel.querySelectorAll('optgroup option')].some(o => o.value === `g:${G1}` && o.selected), 'panel select: the group is selected');
+  // 2.31.0 (#1054): the panel's assignee is the chip under the title (no select): it names the group, its menu has it checked
+  const wch = d.querySelector('#detail .dmeta .dwho');
+  check(wch && /Office/.test(wch.textContent), 'panel chip: the group is shown');
+  if (wch) click(w, wch); await sleep(200);
+  check([...d.querySelectorAll('#pop [role="menuitem"].on')].some(b => /Office/.test(b.textContent)), 'panel chip menu: the group is checked');
+  w.eval('closePop()');
   w.close();
 
   // ================= bob: Assigned to me, sidebar group, Take it

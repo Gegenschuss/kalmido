@@ -128,16 +128,17 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   check(det.querySelector('#d-title') && det.querySelector('#d-content')?.getAttribute('placeholder') === 'Description', 'item: title and description (2.7.2)');
   check(det.querySelector('#d-sub') && det.querySelector('[data-act="crumb-menu"][data-k="list"]') && det.querySelector('[data-act="date"]') && det.querySelector('[data-act="prio"]'),
     'full task: subtasks, list, date, priority (2.7.2)');
-  check(!det.querySelector('#d-assignee'), 'not shared: no assignee');
+  check(!det.querySelector('.dwho'), 'not shared: no assignee');
   const m0 = (await st()).tasks.find(t => t.id === milk);
   check(m0.tags.includes('dairy') && m0.url === 'https://example.org/milk' && m0.content === 'the good one', 'the data stays (tags, link, note)');
   click(w, det.querySelector('[data-act="task-menu"]')); await sleep(80);
   const ckm = [...d.querySelectorAll('#pop .menu-list button')].map(b => b.textContent);
-  check(ckm.some(x => /New date/i.test(x)), 'the full task menu (2.7.2; 2.24.0: "New date…" was "Snooze…"): ' + ckm);
+  // 2.31.0 (#1056): in the panel the menu leaves out date and priority (the panel's header has both)
+  check(ckm.some(x => /Duplicate/i.test(x)) && ckm.some(x => /Move to list/i.test(x)) && !ckm.some(x => /New date/i.test(x)), 'the full task menu (2.7.2; 2.31.0: without date / priority in the panel): ' + ckm);
   w.eval('closePop()');
   await call('PUT', `/api/lists/${SHOP}/members`, {user_id: BOB, role: 'edit'});
   await w.eval('load()'); w.eval('render(); renderDetail()'); await sleep(200);
-  check(d.querySelector('#detail #d-assignee'), 'shared (collaboration on): the assignee shows');
+  check(d.querySelector('#detail .dmeta .dwho'), 'shared (collaboration on): the assignee shows');
   await call('DELETE', `/api/lists/${SHOP}/members/${BOB}`);
   await closeW(w);
 
@@ -147,17 +148,20 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   check(d.querySelector('#detail #d-tl') && d.querySelector('#detail .dcomp #c-input'), 'shared list: comments with composer (2.0.6: the box at the bottom edge)');
   check(!d.querySelector('#detail #d-hist'), 'shared list: no separate history (it lives between the comments)');
   check(d.querySelector('#detail #d-content')?.getAttribute('placeholder') === 'Description' && d.querySelector('#detail #d-content').getAttribute('aria-label') === 'Description', '1.7.1: plain "Description" placeholder (Markdown explained in Help)');
-  const tg = d.querySelector('#detail [data-act="tl-act"]');
-  check(tg && tg.getAttribute('aria-pressed') === 'true' && /With activity/.test(tg.textContent), 'activity toggle names its state');
-  click(w, tg); await sleep(50);
-  check(tg.getAttribute('aria-pressed') === 'false' && /Comments only/.test(tg.textContent), 'toggled: "Comments only"');
+  // 2.31.0 (#1054): the switch is a checked entry in the "…" of the comment head; "Comments only" shows in the head
+  click(w, d.querySelector('#detail [data-act="tl-menu"]')); await sleep(50);
+  const tg = d.querySelector('#pop .mtlact');
+  check(tg && tg.classList.contains('on') && /With activity/.test(tg.textContent) && !/Comments only/.test(d.querySelector('#d-tl .cmhead').textContent), 'activity entry names its state (checked)');
+  click(w, tg); await sleep(80);
+  check(/Comments only/.test(d.querySelector('#d-tl .cmhead .cmmode')?.textContent || ''), 'toggled: "Comments only"');
   await call('POST', `/api/tasks/${plan}/comments`, {body: 'Ping from the old days'});
   await closeW(w);
   await call('DELETE', `/api/lists/${TEAM}/members/${BOB}`);
   w = await boot({user: 'alice', hash: 'l/' + WORK}); d = w.document;
   w.eval(`openDetail(${t1})`); await sleep(400);
   // 2.0.6 (#315) replaces U18: private lists get comments too (personal notes): no list yet, only the box (one line)
-  check(!d.querySelector('#detail #d-tl') && d.querySelector('#detail .dcomp #c-input')?.placeholder === 'Write a comment…' && !d.querySelector('#detail [data-act="tl-act"]'), 'private list, no comments: only the comment box, without the @ hint');
+  // 2.31.0 (#344): on a desktop the comments area stays (split) and says "No comments yet."
+  check(d.querySelector('#detail.dsplit #d-cpane #d-tl .cmempty') && d.querySelector('#detail .dcomp #c-input')?.placeholder === 'Write a comment…' && !d.querySelector('#detail .cmmode'), 'private list, no comments: the empty comments area + the box, without the @ hint');
   const hist = d.querySelector('#detail #d-hist');
   check(hist && hist.tagName === 'DETAILS' && !hist.open && /^History/.test(hist.querySelector('summary').textContent) && !hist.closest('#d-tl'), '2.0.7: private list keeps the folded history of 2.0.5, outside the notes');
   w.eval(`go('l/${TEAM}'); openDetail(${plan})`); await sleep(600);

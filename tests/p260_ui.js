@@ -118,6 +118,8 @@ const TOUCH = `(() => {
     // 2.16.0 (#473): a task's title is a keyboard / screen-reader stop; on touch the whole row is the target that opens it
     const row = e.matches('.ttl[data-kt]') && e.closest('.trow'); if (row) { const rr = row.getBoundingClientRect(); w = Math.max(w, rr.width); h = Math.max(h, rr.height); }
     if (w >= 43.5 && h >= 43.5) continue;
+    // 2.31.0 (#1053, decided): the view tabs of a list header (.vsegm) are a compact segmented control, 36 px high, 44 wide
+    if (e.closest('.vsegm') && w >= 43.5 && h >= 35.5) continue;
     const cls = typeof e.className === 'string' ? e.className.trim().split(/\\s+/)[0] : '', pe = e.parentElement;
     const par = pe && (pe.id ? '#' + pe.id : typeof pe.className === 'string' && pe.className.trim() ? '.' + pe.className.trim().split(/\\s+/)[0] : '');
     out.push(e.tagName.toLowerCase() + (cls ? '.' + cls : '') + (e.dataset.act ? '[' + e.dataset.act + ']' : '') + (par ? ' in ' + par : '') + ' ' + Math.round(w) + 'x' + Math.round(h));

@@ -165,8 +165,10 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   w.eval(`go('l/${WORK}')`); await sleep(300);
   await call('PATCH', `/api/tasks/${a}`, {due: addD(T0, 3), due_time: '14:30'}); await w.eval('load()'); w.eval('render()');
   w.eval(`taskMenu(document.querySelector('#view .trow[data-id="${a}"]'), ${a})`); await sleep(80);
-  const q = [...d.querySelectorAll('#pop .menu-list > .mquick:first-child button')];
-  check(q.length === 2 && d.querySelector('#pop .menu-list').firstElementChild.classList.contains('mquick'), 'task menu: two buttons on top');
+  // 2.31.0 (#1056): the menu is grouped; the first group "Plan" starts with the two buttons (right under its small heading)
+  const g0 = d.querySelector('#pop .menu-list').firstElementChild;
+  const q = [...d.querySelectorAll('#pop .menu-list > .mgrp:first-child > .mgh + .mquick button')];
+  check(q.length === 2 && g0.classList.contains('mgrp') && g0.querySelector('.mgh').textContent === 'Plan' && g0.children[1].classList.contains('mquick'), 'task menu: two buttons on top');
   check(q.map(x => x.textContent.trim()).join('|') === 'Today|Tomorrow', 'labels: ' + q.map(x => x.textContent.trim()));
   click(w, q[1]);
   check(await until(async () => (await task(a)).due === T1), 'Tomorrow: due tomorrow');
