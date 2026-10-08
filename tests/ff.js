@@ -29,7 +29,12 @@ module.exports = ({tag, check, shots, prefs: extra = []}) => async function fire
     }
     if (!ws) { check(false, 'no WebDriver BiDi connection to Firefox'); return; }
     ws.onmessage = m => { const j = JSON.parse(m.data); if (j.id && pend.has(j.id)) { const p = pend.get(j.id); pend.delete(j.id); j.type === 'error' ? p.rej(new Error(p.method + ': ' + j.error + ' ' + j.message)) : p.res(j.result); } };
-    const cmd = (method, params = {}) => new Promise((res, rej) => { const id = ++seq; pend.set(id, {res, rej, method}); ws.send(JSON.stringify({id, method, params})); });
+    // 2.27.0: a command that never answers (a hung page, a promise that never settles) fails after 120 s with its name and
+    // what it ran, instead of stalling the whole CI shard until the job's time limit
+    const cmd = (method, params = {}) => new Promise((res, rej) => {
+      const id = ++seq, t = setTimeout(() => { if (pend.has(id)) { pend.delete(id); rej(new Error(`${method}: no answer within 120 s ` + String(params.expression || params.url || '').slice(0, 160))); } }, 120000);
+      pend.set(id, {res: v => { clearTimeout(t); res(v); }, rej: e => { clearTimeout(t); rej(e); }, method}); ws.send(JSON.stringify({id, method, params}));
+    });
     const unwrap = v => !v ? v : v.type === 'array' ? v.value.map(unwrap) : v.type === 'object' ? Object.fromEntries(v.value.map(([k, x]) => [typeof k === 'string' ? k : unwrap(k), unwrap(x)])) : v.value;
     await cmd('session.new', {capabilities: {}});
     const ctx = (await cmd('browsingContext.getTree', {})).contexts[0].context;
