@@ -333,7 +333,9 @@ const TOUCH = `(() => {
               check(h.more && h.bell && h.more[0] >= 0 && h.more[1] <= h.vw + 0.5 && h.bell[1] <= h.vw + 0.5 && h.more[1] <= h.bell[0] + 0.5 && !h.out.length, `${tag}: "…" and the bell inside, nothing sticking out ${JSON.stringify({more: h.more, bell: h.bell, vw: h.vw, out: h.out})}`);
               check(h.st || h.ach, `${tag}: the agent shows (pill or status chip)`);
               if (theme === 'dark') await shot(`p260-head-${name}${panel ? '-panel' : ''}-${Wd}.png`);
-              if (panel) await ev(`typeof closeDetail === 'function' ? closeDetail() : null`).catch(() => {});
+              // 2.26.1 (#953): closing the task on a touch screen goes back one history step; that traversal must be over before
+              // the next navigation (otherwise Firefox's navigate never answers)
+              if (panel) { await ev(`typeof closeDetail === 'function' ? closeDetail() : null`).catch(() => {}); await sleep(800); }
             }
           }
           // K18: the toast above the composer, the tab bar and the + button
