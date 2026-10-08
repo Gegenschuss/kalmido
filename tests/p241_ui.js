@@ -95,7 +95,7 @@ async function firefox(fn) {
   await until(() => !d.querySelector('#ag-model'));
   let a = await adm(ag.id);
   const srt = o => JSON.stringify(Object.keys(o || {}).sort().map(k => [k, o[k]]));
-  check(srt(a.runtime) === srt({model: 'sonnet', autocompact: true, autocompact_pct: 70, nightly_reset: '04:00', reset_seq: 0}), 'saved: ' + JSON.stringify(a.runtime));
+  check(srt(a.runtime) === srt({model: 'sonnet', autocompact: true, autocompact_pct: 70, nightly_reset: '04:00', permission_mode: '', reset_seq: 0}), 'saved: ' + JSON.stringify(a.runtime));
   check((await v1(ag.token, 'GET', '/agent')).runtime?.model === 'sonnet', 'the agent reads it');
   // reopen: values shown, Reset now
   w.eval(`agModal(${JSON.stringify(a)}, null)`);
@@ -141,7 +141,7 @@ async function firefox(fn) {
   w.eval(`chatOpen(${ag.id})`); await sleep(900);
   const hd = () => d.querySelector('#achat .chath');
   const st = () => d.querySelector('#chat-st');
-  check(hd() && !hd().querySelector('[data-act="agent-wake"]') && hd().querySelectorAll('button:not(.avb):not(.ib)').length === 1, 'chat header: no Wake button (only close; 2.7.2: the picture is a card button)');
+  check(hd() && !hd().querySelector('[data-act="agent-wake"]') && hd().querySelectorAll('button:not(.avb):not(.ib):not(.chmode):not([data-act="chat-dock"])').length === 1, 'chat header: no Wake button (only close; 2.7.2: the picture is a card button; 2.29.0: + the permission badge and the window button)');
   check(st() && /ready/.test(st().textContent) && st().querySelector('.adot.st-idle') && !st().querySelector('.atdots'), 'ready: green dot, no typing dots');
   await v1(ag.token, 'POST', '/agent/typing', {chat_user_id: me});
   w.eval('load().then(render)'); await sleep(800);

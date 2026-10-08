@@ -233,6 +233,10 @@ def t_react_chat(api, a):
                     body={"emoji": a["emoji"], "on": not a.get("remove")})
 
 
+# 2.29.0 (#1031): an event cursor, or "latest" (start from now: no events, only the newest cursor)
+S_SINCE = {"type": ["integer", "string"], "minimum": 0, "description": "event cursor (seq), or \"latest\""}
+
+
 def t_wait(api, a):
     w = max(0, min(WAIT_MAX, int(a.get("wait", 30))))
     return api.call("GET", "/agent/events", {"since": a.get("since"), "wait": w, "limit": a.get("limit")}, timeout=w + 20)
@@ -454,11 +458,14 @@ TOOLS = [
      "your chat messages: event reaction with data.chat_message {id, text, from, created_at}, data.reaction {emoji, user} and "
      "data.approval (approved = a person's 👍, rejected = 👎). Fetching a chat event marks the message delivered for the person. "
      "comment: tasks you follow (assignee, creator, earlier commenter) and, in lists where you read every comment (listen_agent_ids), "
-     "every comment of a person. Chat messages carry attachments [{id, name, mime, size}]: read them with get_attachment source chat.",
-     _obj({"since": {"type": "integer", "minimum": 0}, "limit": {"type": "integer", "minimum": 1, "maximum": 500}}),
+     "every comment of a person. Chat messages carry attachments [{id, name, mime, size}]: read them with get_attachment source chat. "
+     "No backlog floods: since='latest' on a first start returns no events, only the newest cursor; events older than two days come as "
+     "ONE event missed {count, events: {type: n}, from, to} (read the current state instead); many tasks added to one list at once "
+     "(bulk move, import, script) come as ONE event tasks_added {list, task_ids, count, how}.",
+     _obj({"since": S_SINCE, "limit": {"type": "integer", "minimum": 1, "maximum": 500}}),
      lambda api, a: api.call("GET", "/agent/events", _pick(a, ("since", "limit")))),
     ("wait_for_events", "Long-poll: like list_events, but waits up to `wait` seconds (max 60) until an event arrives.",
-     _obj({"since": {"type": "integer", "minimum": 0}, "wait": {"type": "integer", "minimum": 0, "maximum": WAIT_MAX},
+     _obj({"since": S_SINCE, "wait": {"type": "integer", "minimum": 0, "maximum": WAIT_MAX},
            "limit": {"type": "integer", "minimum": 1, "maximum": 500}}), t_wait),
     ("list_jobs", "The agent's jobs. state: running | waiting | done | failed | stopped.",
      _obj({"state": {"type": "string", "enum": ["running", "waiting", "done", "failed", "stopped"]}}),

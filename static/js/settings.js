@@ -352,12 +352,13 @@ function modRowHtml(k, opt = () => '') {
 // settingsModal('agents' / 'usage' / 'activity') opens the matching one. Each sub-tab loads its data only when shown.
 // 2.7.0 (#405 S2): the Agents page only with the module on, or for an admin while agents exist (they manage them there)
 const aiPaneOn = () => !!S.me && (feat('agents') || (!!S.me.is_admin && (S.agents || []).length > 0));
-const AI_SUBS = [['agents', 'bot', N_('Status|agents')], ['lists', 'list', N_('Lists')], ['usage', 'chart', N_('Usage')], ['log', 'clock', N_('Log')], ['setup', 'help', N_('Set up|agents')]];  // 2.7.2 (#420): Set up
-const aiSubs = () => AI_SUBS.filter(([k]) => k === 'log' ? !!S.me?.is_admin : k === 'usage' ? !!S.me?.is_admin || (S.agents || []).length > 0 : true);
+// 2.29.0 (#1024): ONE "Set up" (first question: for me / for the team); the server-wide switches are "Administration" (admins)
+const AI_SUBS = [['agents', 'bot', N_('Status|agents')], ['lists', 'list', N_('Lists')], ['usage', 'chart', N_('Usage')], ['log', 'clock', N_('Log')], ['setup', 'help', N_('Set up|agents')], ['admin', 'gear', N_('Administration|agents')]];  // 2.7.2 (#420): Set up
+const aiSubs = () => AI_SUBS.filter(([k]) => k === 'log' || k === 'admin' ? !!S.me?.is_admin : k === 'usage' ? !!S.me?.is_admin || (S.agents || []).length > 0 : true);
 function aiSubCur(want) { const ks = aiSubs().map(x => x[0]), k = want || LS.get('aiSub', 'agents'); return ks.includes(k) ? k : 'agents'; }
 function aiHtml(hint, want) {
   const adm = !!S.me?.is_admin, ags = S.agents || [], cur = aiSubCur(want);
-  const mine = S.lists.some(l => !l.archived && !l.is_inbox && canManage(l));
+  const mine = S.lists.some(l => !l.archived && !l.is_inbox && (canManage(l) || l.owner_id !== S.me?.id));  // 2.29.0 (#345): shared ones too
   const pane = (k, body) => `<div class="aisp" data-aisp="${k}" id="aisp-${k}" role="tabpanel" aria-labelledby="ais-${k}" ${k === cur ? '' : 'hidden'}>${body}</div>`;
   const subs = aiSubs();
   return `<div class="seg aisub" role="tablist" aria-label="${esc(tr('Agents'))}">${subs.map(([k, i, n]) => `<button type="button" role="tab" id="ais-${k}" data-aisub="${k}" aria-controls="aisp-${k}" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}">${ic(i, 's')}<span>${tr(n)}</span></button>`).join('')}</div>
@@ -366,7 +367,7 @@ function aiHtml(hint, want) {
     ${feat('agents') ? '' : `<div class="shint aimodoff">${ic('grid', 's')} <span>${tr('The Agents module (the tab with their status, jobs to approve and the chat) is switched off for you.')}</span> <button class="btn sm" data-m="go-modules">${tr('Open Modules')}</button></div>`}
     ${collab() ? '' : hint(tr('Agents work together with you in shared lists: switch on Collaboration (Settings > Modules) as well.'))}
     <div class="members aglist" id="${adm ? 's-ags' : 's-myags'}"><div class="muted mhint">${tr('Loading…')}</div></div>
-    <div class="row aibtns">${adm ? `<button class="btn sm" data-ag="new" aria-haspopup="menu">${ic('plus', 's')} ${tr('Add agent…')}</button>` : `<button class="btn sm" data-aigo="setup">${ic('plus', 's')} ${tr('Personal agent…')}</button>`}<button class="btn sm" data-m="ag-guide" title="${esc(tr('Set up an agent step by step, or let Claude Code do it'))}">${ic('help', 's')} ${tr('Setup guide')}</button></div>
+    <div class="row aibtns">${adm ? `<button class="btn sm" data-ag="new" aria-haspopup="menu">${ic('plus', 's')} ${tr('Add agent…')}</button>` : `<button class="btn sm" data-aigo="setup">${ic('plus', 's')} ${tr('Personal agent…')}</button>`}<button class="btn sm" data-m="ag-guide" title="${esc(tr('Set up an agent step by step, or let Claude Code do it'))}">${ic('help', 's')} ${tr('How to set one up')}</button></div>
     ${agDotsHtml(hint)}`)}
     ${pane('lists', `<h4 id="s-ai-lists-h">${ags.length > 1 ? tr('Which lists they see') : tr('Which lists it sees')}</h4>
     ${hint(tr('An agent sees exactly the lists shared with it, nothing else. Share or stop sharing below or in the list’s Share dialog; taking a list out ends the access at once.'))}
@@ -375,7 +376,8 @@ function aiHtml(hint, want) {
     ${subs.some(x => x[0] === 'usage') ? pane('usage', `${hint(adm ? tr('What the agents report about their model usage: tokens and, if they send it, the cost. You see every agent; limits are set per agent (Edit).') : tr('What the agents in your lists report about their model usage, counted in the lists you see.'))}
     <div class="aiu" id="s-aiu"></div>`) : ''}
     ${adm ? pane('log', audHtml()) : ''}
-    ${pane('setup', agSetupPaneHtml(hint))}`;
+    ${pane('setup', agSetupPaneHtml(hint))}
+    ${adm ? pane('admin', agAdminPaneHtml(hint)) : ''}`;
 }
 // ---- 2.7.2 (#420) Settings > Agents > Set up: my personal agents (when an admin allows them), the admins' switch for
 // that, and the two guides (a team agent on a server / a personal agent on your own computer), each for Linux, macOS and
@@ -383,21 +385,31 @@ function aiHtml(hint, want) {
 function agSetupPaneHtml(hint) {
   const adm = !!S.me?.is_admin, g = LS.get('agGuide', adm ? 'team' : 'own'), os = LS.get('agOs', /Win/.test(navigator.platform || '') ? 'win' : /Mac/.test(navigator.platform || '') ? 'mac' : 'linux');
   const seg = (k, cur, opts) => `<div class="seg agsseg" role="tablist" data-agseg="${k}">${opts.map(([v, n, i]) => `<button type="button" role="tab" data-agsv="${v}" aria-selected="${v === cur}" class="${v === cur ? 'on' : ''}">${i ? ic(i, 's') : ''}<span>${tr(n)}</span></button>`).join('')}</div>`;
-  return `<h4 id="s-myown-h">${tr('Your personal agents')}</h4>
+  return `<h4 id="s-agg-h">${tr('Who is the agent for?')}</h4>
+    ${seg('guide', g, [['own', N_('For me'), 'user'], ['team', N_('For the team'), 'users']])}
+    <p class="agwhy muted" id="s-agwhy">${agWhyHtml(g, adm)}</p>
+    ${seg('os', os, [['linux', 'Linux'], ['mac', 'macOS'], ['win', 'Windows']])}
+    <div class="agguidebox" id="s-agguide" role="tabpanel">${agSetupHtml(g, os)}</div>
+    <div class="row aibtns"><button class="btn sm" data-m="ag-guide-cc" title="${esc(tr('Set up an agent step by step, or let Claude Code do it'))}">${ic('bot', 's')} ${tr('Let Claude Code set it up (Linux)')}</button></div>
+    <h4 id="s-myown-h">${tr('Your personal agents')}</h4>
     ${hint(tr('A personal agent is yours: it sees only the lists you share with it, only you can chat with it, and it is never an admin. You run it on your own computer.'))}
-    <div class="members aglist" id="s-myown" aria-labelledby="s-myown-h"><div class="muted mhint">${tr('Loading…')}</div></div>
-    ${adm ? `<h4 id="s-uag-h">${tr('Personal agents for everyone')}</h4>
+    <div class="members aglist" id="s-myown" aria-labelledby="s-myown-h"><div class="muted mhint">${tr('Loading…')}</div></div>`;
+}
+// 2.29.0 (#1024): one sentence per choice, so the difference is clear before the steps
+function agWhyHtml(g, adm) {
+  return g === 'team' ? esc(tr('A team agent belongs to the team (in the workspaces: the organisation). An admin creates it under Status > Add agent; it works in the lists shared with it, for the people those lists allow.')) + (adm ? '' : ' ' + esc(tr('Ask an admin to create it.')))
+    : esc(tr('A personal agent is only yours: only you see it, chat with it and share your lists with it. You create it below and run it on your own computer.'));
+}
+// 2.29.0 (#1024): the server-wide switches (admins), no longer mixed into "Set up"
+function agAdminPaneHtml(hint) {
+  return `${hint(tr('Server-wide rules for every agent. Agents themselves are created under Status (team) or Set up (personal).'))}
+    <h4 id="s-uag-h">${tr('Personal agents for everyone')}</h4>
     <div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" id="s-uag"><span class="swt" aria-hidden="true"></span></span><span>${tr('Users may create their own agents')}</span></label></div>
     <div class="row"><label for="s-uagmax">${tr('Per person at most')}</label><input id="s-uagmax" type="number" inputmode="numeric" min="1" max="20" value="2" class="numin"></div>
     ${hint(tr('Off by default. You see every agent under Status and can pause or delete it; usage limits apply to them like to every agent.'))}
     <h4 id="s-sclim-h">${tr('Permission limit')}</h4>
     ${hint(tr('What agents and API tokens may get at most on this server. A permission switched off here stops working for every existing token at once; turned on again it comes back.'))}
-    <div id="s-sclim" aria-labelledby="s-sclim-h"></div>` : ''}
-    <h4 id="s-agg-h">${tr('Guides')}</h4>
-    ${seg('guide', g, [['team', N_('Team agent on a server'), 'users'], ['own', N_('Personal agent on your computer'), 'user']])}
-    ${seg('os', os, [['linux', 'Linux'], ['mac', 'macOS'], ['win', 'Windows']])}
-    <div class="agguidebox" id="s-agguide" role="tabpanel">${agSetupHtml(g, os)}</div>
-    <div class="row aibtns"><button class="btn sm" data-m="ag-guide-cc" title="${esc(tr('Set up an agent step by step, or let Claude Code do it'))}">${ic('bot', 's')} ${tr('Let Claude Code set it up (Linux)')}</button></div>`;
+    <div id="s-sclim" aria-labelledby="s-sclim-h"></div>`;
 }
 async function agSetupDraw(md) {
   const box = $('#s-myown', md); if (!box) return;
@@ -428,6 +440,7 @@ function agSetupWire(md) {
       const k = sg.closest('[data-agseg]').dataset.agseg; LS.set(k === 'guide' ? 'agGuide' : 'agOs', sg.dataset.agsv);
       $$(`[data-agseg="${k}"] [data-agsv]`, md).forEach(b => { const on = b === sg; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
       const box = $('#s-agguide', md); if (box) box.innerHTML = agSetupHtml($('[data-agseg="guide"] .on', md)?.dataset.agsv || 'own', $('[data-agseg="os"] .on', md)?.dataset.agsv || 'linux');
+      const why = $('#s-agwhy', md); if (why) why.innerHTML = agWhyHtml($('[data-agseg="guide"] .on', md)?.dataset.agsv || 'own', !!S.me?.is_admin);  // 2.29.0 (#1024)
       return;
     }
     if (e.target.closest('[data-m="ag-guide-cc"]')) { agGuideModal(); return; }
@@ -486,7 +499,7 @@ function aiSubShow(md, want, save) {
   if (k === 'lists') return aiTblDraw(md);
   if (k === 'usage') return aiuDraw(md);
   if (k === 'log') return audDraw(md);
-  if (k === 'setup') return agSetupDraw(md);
+  if (k === 'setup' || k === 'admin') return agSetupDraw(md);  // 2.29.0 (#1024): the admin switches are filled there too
 }
 // ---- 2.24.0 (#826): Settings > Administration in five sub-tabs (the pattern of Agents): People, Sign-in, Organisation,
 // Server, Log & errors. The last one is remembered per device; the settings search opens the sub-tab of its hit.

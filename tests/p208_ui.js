@@ -125,8 +125,8 @@ async function swTests() {
     // 2.27.0 (#964): every list I manage at once, grouped by folder (the "Show all" step is gone)
     check(tb.querySelector('.aigrp') && !tb.querySelector('[data-aiall]'), `${lab}: grouped by folder, no "Show all"`);
     const rows = [...(tb?.querySelectorAll('.airow[data-lid]') || [])];
-    check(tb && rows.length === 2 && rows.some(r => +r.dataset.lid === WEB) && rows.some(r => +r.dataset.lid === HOME) && !rows.some(r => +r.dataset.lid === BOBS),
-      `${lab}: every list I manage (not Bob's, not the inbox): ${rows.map(r => r.textContent.trim().slice(0, 20))}`);
+    check(tb && rows.filter(r => !r.classList.contains('airo')).length === 2 && rows.some(r => +r.dataset.lid === WEB) && rows.some(r => +r.dataset.lid === HOME) && rows.some(r => +r.dataset.lid === BOBS && r.classList.contains('airo') && !r.querySelector('select')),
+      `${lab}: every list I manage, Bob's read-only (2.29.0 #345), not the inbox: ${rows.map(r => r.textContent.trim().slice(0, 20))}`);
     check(/List.*Agent.*Tidy up/.test(tb?.querySelector('.aihead')?.textContent || ''), `${lab}: the column heads`);
     const wr = tb.querySelector(`.airow[data-lid="${WEB}"]`), hr = tb.querySelector(`.airow[data-lid="${HOME}"]`);
     // 2.26.0: one agent per list -- one select per list instead of chips

@@ -25,6 +25,7 @@ ORDER = (
     "lists.groups",
     "lists.ownership",
     "lists.sections",
+    "lists.folders",
     "tasks.validation",
     "tasks.tasks",
     "tasks.roadmap",

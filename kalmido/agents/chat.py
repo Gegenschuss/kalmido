@@ -413,6 +413,23 @@ def chat_event_mids(envs):
     return out
 
 
+@app.put("/api/agents/<int:aid>/permission-mode")
+def agent_permission_mode(aid):
+    """2.29.0 (#1029): {mode: ask | auto | ''} from the chat header's badge -- the owner of a personal agent, an instance admin
+    for a team agent. The agent's host reads it before its next run (runtime.permission_mode, event runtime_changed)."""
+    from ..agents.admin import runtime_set
+    from ..agents.core import may_set_runtime
+    c = db()
+    a = need_chat_agent(c, aid)
+    if not may_set_runtime(c, a, me()):
+        raise Denied(403, tr("Only the agent’s owner (a team agent: an admin) changes this"))
+    b = body()
+    new = runtime_set(c, a, {"permission_mode": b.get("mode")})
+    bump(c)
+    c.commit()
+    return jsonify(ok=True, permission_mode=new["permission_mode"])
+
+
 @app.get("/api/agents/<int:aid>/chat")
 def agent_chat_get(aid):
     """My conversation with an agent, oldest first: the newest ?limit= messages (default 300, max 300); ?after=<id>: only

@@ -2,7 +2,7 @@
 import json
 import math
 import re
-from flask import jsonify
+from flask import g, has_request_context, jsonify
 
 from ..core.config import app
 from ..core.i18n import tr
@@ -230,6 +230,7 @@ def list_create():
     srt = my_max_sort(c, uid) + 1
     from ..accounts.orgs import clean_org_id, ws_default_org
     oid = clean_org_id(c, b["org_id"], uid) if "org_id" in b else ws_default_org(c, uid, folder)  # 2.28.0 (#935): the workspace
+    g.list_keep = ("org_id",) if "org_id" in b else ()  # 2.29.0 (#1030): an explicit workspace beats the folder's default
     # 2.2.1 (#359): dep_shift ("Move dependent tasks along") is taken at creation too (before, only PATCH set it)
     cur = c.execute("INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind,dep_shift,tickets,org_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                     (name, color, folder, srt, view, iso(now_utc()), uid, dab, kind,
@@ -250,9 +251,12 @@ def list_update(lid):
     from ..lists.templates import list_ptype_set
     from ..agents.core import list_listen_update
     from ..collab.reactions import list_tidy_update
+    from ..lists.folders import folder_list_arrived, list_own_mark
     b = web_fields(body(), WEB_LIST_EDIT, "PATCH /api/lists/{lid}")
     c = db()
     role = need_list(c, lid, write=False)
+    given = set(b)  # 2.29.0 (#1030): what this request sets on its own (kept when the list moves into a folder)
+    tidy0 = c.execute("SELECT agent_tidy, agent_members, agent_peers, folder FROM lists WHERE id=?", (lid,)).fetchone()
     if "agent_tidy" in b or "tidy_agent_id" in b:  # 2.0.0: "Agent may tidy up entries" (own permission rule, see
         # list_tidy_update); 2.4.1 (#379): "Tidy up by" (the one agent)
         e = list_tidy_update(c, lid, b.get("agent_tidy"), b.get("tidy_agent_id"), "tidy_agent_id" in b)
@@ -285,7 +289,8 @@ def list_update(lid):
         b = {k: v for k, v in b.items() if k != "client_id"}
     if "org_id" in b:  # 2.28.0 (#935): the workspace of the list (owner only; members / agents must fit)
         from ..accounts.orgs import list_org_set
-        list_org_set(c, lid, b["org_id"])  # Denied 403 / 409
+        if list_org_set(c, lid, b["org_id"]):  # Denied 403 / 409
+            list_own_mark(c, lid, "org_id")  # 2.29.0 (#1030): differs from its folder from now on
         b = {k: v for k, v in b.items() if k != "org_id"}
     if "sort_mode" in b:  # 2.27.0 (#988): the list's sort, the same for every member (owner / list admins)
         if role not in MANAGE_ROLES:
@@ -361,12 +366,19 @@ def list_update(lid):
         if "folder" in vals:
             grp_touch(c, me())  # 2.10.0 (#441): moved into / out of a folder shared with a group
             folder_autoshare(c, lid)  # 2.22.0 (#740): moved into a folder shared with people
+            if vals["folder"] != (tidy0["folder"] if tidy0 else None):  # really moved (the dialog sends the folder with every save)
+                folder_list_arrived(c, lid, keep=tuple(k for k in ("org_id", "agent_tidy", "agent_members", "agent_peers") if k in given))
     else:
         if "rate" in b or "ticket_tpl" in b or "day_hours" in b or any(k in b for k in LIST_FIELDS if k not in MEMBER_LIST_FIELDS):
             return err(tr("Only the owner can change this list"), 403)
         for k in MEMBER_LIST_FIELDS:
             if k in vals:
                 c.execute(f"UPDATE list_members SET {k}=? WHERE list_id=? AND user_id=?", (vals[k], lid, me()))
+    if tidy0:  # 2.29.0 (#1030): a tidy / agent access setting changed on its own differs from its folder from now on
+        now = c.execute("SELECT agent_tidy, agent_members, agent_peers FROM lists WHERE id=?", (lid,)).fetchone()
+        for k in ("agent_tidy", "agent_members", "agent_peers"):
+            if k in given and (now[k] or 0) != (tidy0[k] or 0) and vals.get("folder", tidy0["folder"]) == tidy0["folder"]:
+                list_own_mark(c, lid, k)
     bump(c)
     c.commit()
     return jsonify(ok=True, conflicts=conflicts, **pt_out)
@@ -409,12 +421,19 @@ def list_reorder():
     fmap = b.get("folder") or {}
     if not isinstance(fmap, dict):
         return err(tr("Invalid value: {0}", tr("Folder")))
+    moved = []
     for lid, folder in fmap.items():
         folder = clean_folder(folder)
-        c.execute("UPDATE lists SET folder=? WHERE id=? AND owner_id=?", (folder, int(lid), uid))
+        if c.execute("UPDATE lists SET folder=? WHERE id=? AND owner_id=? AND folder!=?", (folder, int(lid), uid, folder)).rowcount:
+            moved.append(int(lid))
         c.execute("UPDATE list_members SET folder=? WHERE list_id=? AND user_id=?", (folder, int(lid), uid))
     if fmap:
         grp_touch(c, uid)  # 2.10.0 (#441)
+    if moved:  # 2.29.0 (#1030 / #929): dragged into a folder: its people (as the list dialog did) and its defaults
+        from ..lists.folders import folder_list_arrived
+        for lid in moved:
+            folder_autoshare(c, lid)
+            folder_list_arrived(c, lid)
     bump(c)
     c.commit()
     return jsonify(ok=True, conflicts=conflicts)
@@ -559,6 +578,8 @@ def _folder_member_add(c, lid, uid, role, actor):
     if ws_member_problem(c, lid, uid):  # 2.28.0 (#935): not of the list's workspace (the list is skipped)
         return False
     role = "participant" if is_kid(c, uid) else role
+    if role == "admin" and is_agent(u):  # 2.29.0: an agent is never a list admin (as in member_set)
+        role = "edit"
     c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?)",
               (lid, uid, role, role, my_max_sort(c, uid) + 1, iso(now_utc())))
     member_folder_adopt(c, lid, uid)
@@ -601,7 +622,7 @@ def folder_people_put():
     c, b = db(), body()
     f = clean_folder(b.get("folder") or "")
     role = b.get("role", "edit")
-    if not f or role not in ROLES or role == "admin":
+    if not f or role not in ROLES:  # 2.29.0 (#929): admin too (list admins of every list in the folder)
         return err(tr("Invalid value: {0}", "folder" if not f else "role"))
     try:
         uid = int(b.get("user_id") or 0)
@@ -611,6 +632,10 @@ def folder_people_put():
     if not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (uid,)).fetchone() or uid == me() or personal_agent_foreign(c, uid, me()) \
             or not may_see(c, me(), uid):  # 2.22.0 (#752)
         return err(tr("unknown user"), 404)
+    from ..agents.core import is_agent
+    if role == "admin" and is_agent(c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()):
+        return err(tr("An agent cannot be a list admin"))
+    prev = c.execute("SELECT role FROM folder_people WHERE owner_id=? AND folder=? AND user_id=?", (me(), f, uid)).fetchone()
     c.execute("INSERT INTO folder_people(owner_id,folder,user_id,role,created_at) VALUES(?,?,?,?,?) ON CONFLICT(owner_id,folder,user_id) "
               "DO UPDATE SET role=excluded.role", (me(), f, uid, role, iso(now_utc())))
     from ..core.access import ONE_AGENT_MSG, list_other_agent
@@ -620,20 +645,48 @@ def folder_people_put():
     skipped = [{"id": r["id"], "name": r["name"]} for r in rows if list_other_agent(c, r["id"], uid)
                and not c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (r["id"], uid)).fetchone()]
     n = sum(1 for r in rows if _folder_member_add(c, r["id"], uid, role, me()))
+    # 2.29.0 (#929): a changed folder role reaches the lists in it where the person is already in (their personal share;
+    # a role via a group stays the higher one, as everywhere)
+    upd = 0
+    # only a CHANGED folder role is carried into the lists (a first share keeps roles set per list by hand)
+    if prev and prev[0] != role and b.get("apply", True) is not False:
+        from ..family.family import is_kid
+        r2 = "participant" if is_kid(c, uid) else role
+        for r in rows:
+            upd += c.execute("""UPDATE list_members SET own_role=?, role=CASE WHEN grole IS NOT NULL AND
+                                  (CASE grole WHEN 'admin' THEN 4 WHEN 'edit' THEN 3 WHEN 'participant' THEN 2 ELSE 1 END) >
+                                  (CASE ? WHEN 'admin' THEN 4 WHEN 'edit' THEN 3 WHEN 'participant' THEN 2 ELSE 1 END) THEN grole ELSE ? END
+                                WHERE list_id=? AND user_id=? AND COALESCE(own_role, role)!=?""", (r2, r2, r2, r["id"], uid, r2)).rowcount
     bump(c)
     c.commit()
-    return jsonify(shared=n, **({"skipped": skipped, "skipped_reason": tr(ONE_AGENT_MSG)} if skipped else {}))
+    return jsonify(shared=n, updated=upd, **({"skipped": skipped, "skipped_reason": tr(ONE_AGENT_MSG)} if skipped else {}))
 
 
 @app.delete("/api/folders/people")
 def folder_people_delete():
-    """{folder, user_id}: new lists of the folder are no longer shared with that person (the shared ones stay)."""
+    """{folder, user_id, remove?}: new lists of the folder are no longer shared with that person; 2.29.0 (#929) remove: true
+    also takes them out of the folder's lists now (like removing them from each list; a share via a group stays)."""
+    from ..api.v1 import V1Error, v1_call
     c, b = db(), body()
-    c.execute("DELETE FROM folder_people WHERE owner_id=? AND folder=? AND user_id=?", (me(), clean_folder(b.get("folder") or "", strict=False),
-                                                                                       int(b.get("user_id") or 0)))
+    f = clean_folder(b.get("folder") or "", strict=False)
+    try:
+        uid = int(b.get("user_id") or 0)
+    except (TypeError, ValueError):
+        uid = 0
+    c.execute("DELETE FROM folder_people WHERE owner_id=? AND folder=? AND user_id=?", (me(), f, uid))
+    n = 0
+    if b.get("remove") is True and f and uid and uid != me():
+        c.commit()
+        for r in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND is_inbox=0", (me(),)).fetchall():
+            if _in_folder(r["folder"], f) and c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (r["id"], uid)).fetchone():
+                try:
+                    v1_call(member_remove, r["id"], uid)
+                    n += 1
+                except V1Error:
+                    pass
     bump(c)
     c.commit()
-    return jsonify(ok=True)
+    return jsonify(ok=True, removed=n)
 
 
 # ---- 2.4.2 (#391): sharing with an agent in bulk. Per person and agent (user setting agent_share, server-only):
@@ -762,6 +815,10 @@ def list_agent_set(lid):
         v1_call(member_remove, lid, old)
     if new is not None:
         v1_call(member_set, lid, body={"user_id": new, "role": b.get("role") or "edit"})
+    if not g.get("folder_applying") and lr["owner_id"] == me():  # 2.29.0 (#1030): chosen for this list itself
+        from ..lists.folders import list_own_mark
+        list_own_mark(c, lid, "agent_id")
+        c.commit()
     return jsonify(previous=cur[0] if cur else None, agent_id=new)
 
 
@@ -792,10 +849,15 @@ def list_created(c, uid, lid, agents=True):
     templates, an agent's briefing, imports, family and life lists): the agents of "Share new lists automatically",
     the groups of a shared folder and the people of a shared folder (before, only the list dialog did all three)."""
     from ..lists.groups import grp_touch
+    from ..lists.folders import folder_list_arrived, folder_member_created
     if agents:
         agent_autoshare(c, uid, lid)
     grp_touch(c, uid)
     folder_autoshare(c, lid)
+    # 2.29.0 (#1030 / #929): the folder's defaults (workspace, agent, tidy ...) and, in a folder shared with uid, its owner +
+    # people (the list stays uid's)
+    folder_list_arrived(c, lid, keep=g.pop("list_keep", ()) if has_request_context() else ())
+    folder_member_created(c, uid, lid)
 
 
 @app.put("/api/agents/<int:aid>/autoshare")

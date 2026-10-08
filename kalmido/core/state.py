@@ -171,6 +171,7 @@ def visible_sections(c, uid, tasks=None):
 
 @app.get("/api/state")
 def state():
+    from ..lists.folders import folders_shared_in, my_folder_props
     from ..lists.groups import groups_for, grp_of_user
     from ..integrations.paperless import pl_state
     from ..collab.news import news_items, news_sig, news_unread, news_unread_me, notif_matrix
@@ -224,6 +225,7 @@ def state():
         setup_pending=bool(u["is_admin"]) and gsetting(c, "setup_step2") == "pending",  # 2.13.0 (#453 A16)
         lists=(vl := visible_lists(c, uid)),
         folder_orders=folder_orders(c, uid, vl),  # 2.27.0 (#988)
+        folder_props=my_folder_props(c, uid), folders_shared_in=folders_shared_in(c, uid),  # 2.29.0 (#1030 / #929)
         inbox_names=inbox_names(),  # 2.15.0 (#632): default names of an inbox (shown in the UI language)
         filters=[{**dict(r), "rules": json.loads(r["rules"] or "{}")}
                  for r in c.execute("SELECT * FROM filters WHERE user_id=? ORDER BY sort, id", (uid,))],

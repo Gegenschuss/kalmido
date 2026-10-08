@@ -485,6 +485,7 @@ function applyState(j) {
   S.timeLists = j.time_lists || {}; S.timeDayH = +j.time_day_h || 8;  // 2.7.0 (#407)
   S.fields = j.fields || [];
   S.folderOrders = j.folder_orders || {};  // 2.27.0 (#988): the order of other people's folders I see their lists in
+  S.folderProps = j.folder_props || {}; S.foldersSharedIn = j.folders_shared_in || [];  // 2.29.0 (#1030 / #929)
   S.collabAll = j.collab_all !== false; S.timeAll = j.time_all !== false; S.about = j.about || {};
   S.calendars = j.calendars || {enabled: false, subs: 0};
   S.api = j.api || {enabled: false}; S.caldav = j.caldav || {enabled: false}; S.webhooks = j.webhooks || {enabled: false}; S.publicLinks = !!j.public_links;

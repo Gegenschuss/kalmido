@@ -2222,6 +2222,17 @@ body.kb-open #tabs,body.kb-open #fab,body.kb-open .chview .chnote{display:none}
    area: the task panel sat under the chat. Without room for all three the task takes the chat's place (body.chat-yield) */
 @media (min-width:1000px){body.chat-open:not(.chat-yield) #app{margin-right:min(var(--chatW,26rem),40vw)} #achat{width:min(var(--chatW,26rem),40vw)}}
 body.chat-yield #achat{display:none}
+/* 2.29.0 (#363): the chat as a pop-up window (desktop) and its round button bottom right; neither takes room from the page */
+#achat.float{top:auto;left:auto;right:1.25rem;bottom:1.25rem;width:min(24rem,calc(100vw - 2rem));height:min(36rem,calc(100vh - 2.5rem));border:1px solid var(--line2);border-radius:var(--radius);overflow:hidden;z-index:62}
+#achat.float .chath{cursor:move;user-select:none}
+#achat.float.min{height:auto}#achat.float.min>:not(.chath){display:none}
+#achat.float.min [data-act="chat-min"] svg{transform:rotate(180deg)}
+body.chat-yield #achat.float{display:flex}
+#chatfab{position:fixed;right:1.25rem;bottom:1.25rem;z-index:55;width:3rem;height:3rem;padding:0;border-radius:50%;border:1px solid var(--line2);background:var(--bg2);box-shadow:var(--shadow);display:grid;place-items:center;cursor:pointer}
+#chatfab .avatar{width:2.375rem;height:2.375rem;font-size:var(--fs-s)}
+#chatfab:hover{border-color:var(--accent)}#chatfab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#chatfab .nbadge{position:absolute;top:-.25rem;right:-.25rem}
+body.pop-open #chatfab,body.modal-open #chatfab{visibility:hidden}
 .dchatb{display:none!important}
 @media (min-width:1000px){body.chat-yield .dchatb{display:inline-flex!important}}
 /* ---- 2.0.2: comments under the description (#242), inline title edit (#182), section "+" (#283), list icons (#245),
@@ -2763,6 +2774,10 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 .lcols .whob.wnone,.trow .meta .mlc .whob.wnone{opacity:.5}
 .lcols .whob.wnone:hover,.trow .meta .mlc .whob.wnone:hover{opacity:1}
 @media (hover:none),(pointer:coarse){ .whob.wnone{display:none} }
+/* 2.29.0 (#1002): in a list with an assignee column the empty cell is the only way to assign there: always there (faint),
+   also where the browser reports no hover (some desktop web apps, headless browsers, touch laptops) */
+.trow.hascols .whob.wnone{opacity:.5}.trow.hascols .whob.wnone:hover,.trow.hascols .whob.wnone:focus-visible{opacity:1}
+@media (hover:none),(pointer:coarse){ .trow.hascols .whob.wnone{display:inline-grid} }
 .aimodoff{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
 .aimodoff>span{flex:1 1 14rem}
 /* K07: the date column: one sans format like everywhere else, cut on the right (never on the left), a range = a small
@@ -3335,6 +3350,10 @@ body.in-chat #top{display:none}
 #iitip.pin{pointer-events:auto}
 #iitip.hidden{display:none}
 .chnm{display:flex;align-items:center;min-width:0}.chnm b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 2.29.0 (#1029): the agent's permission mode in the chat header */
+.chmode{flex:none;margin-left:.375rem;padding:1px .4375rem;border-radius:62rem;border:1px solid var(--line);background:transparent;color:var(--muted);font:inherit;font-size:var(--fs-xs);line-height:1rem;cursor:default;white-space:nowrap}
+button.chmode{cursor:pointer}button.chmode:hover{color:var(--text);border-color:var(--muted)}
+.chmode.pm-auto{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
 /* A7: the view switch under the list title on phones; a check on the active menu entry */
 .vsegm{display:flex;gap:.25rem;overflow-x:auto;scrollbar-width:none;margin:.25rem 0 .5rem;padding:.1875rem;background:var(--bg3);border-radius:var(--radius)}
 .vsegm::-webkit-scrollbar{display:none}
@@ -4062,6 +4081,10 @@ a.tref:hover{background:var(--accent-soft)}
 .mdcode .mdcopy{position:absolute;top:.25rem;right:.25rem;opacity:.75;background:var(--bg3)}
 .mdcode .mdcopy:hover,.mdcode .mdcopy:focus-visible{opacity:1}
 @media (pointer:coarse){ .mdcode pre.mdpre{padding-right:3.25rem} .mdcode .mdcopy{min-width:2.75rem;min-height:2.75rem;opacity:1} }
+/* 2.29.0 (#1028): in chat bubbles a code block wraps instead of scrolling sideways: no scrollbar that could sit over the next
+   line (Mac "always show scrollbars"), the whole command visible, the copy button stays in its corner */
+.cbub .mdcode{display:block;margin:.375rem 0}.cbub .mdcode:last-child{margin-bottom:0}
+.cbub pre.mdpre{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;overflow-x:hidden;margin:0}
 /* 2.18.0 (#408 F): "Similar open ticket" hint in the task panel of a new bug */
 .ddup{display:flex;align-items:center;gap:.375rem;margin:.25rem 0 .5rem;padding:.25rem .25rem .25rem .625rem;background:var(--bg3);border-radius:var(--radius);font-size:var(--fs-s);color:var(--text2);min-width:0}
 .ddup>.i{color:var(--p3);flex:none}
@@ -4966,3 +4989,13 @@ a.nitem.ndm{text-decoration:none;color:inherit}
 .cchb:disabled{cursor:default}
 .cchans{width:100%;font-size:var(--fs-xs)}
 @media (pointer:coarse){ .cchb{min-height:2.5rem} }
+/* 2.29.0 (#1030 / #929): folder settings dialog, "from the folder" in the list dialog */
+.fsapply{border:1px solid var(--line);border-radius:var(--r-s);padding:.375rem .75rem .5rem;margin:.5rem 0;display:flex;flex-direction:column;gap:.25rem}
+.fsapply legend{font-size:var(--fs-s);color:var(--text2);padding:0 .25rem}
+.fsprev{background:var(--bg3);border-radius:var(--r-s);padding:.5rem .75rem;font-size:var(--fs-s);margin:.25rem 0 .5rem}.fsprev ul{margin:.25rem 0;padding-left:1.125rem}
+.lfolderhint .fown{text-decoration:line-through;color:var(--muted)}
+.lfolderhint .linkbtn{font-size:inherit}
+.agwhy{margin:.375rem 0 .625rem;font-size:var(--fs-s);max-width:44rem}
+.lfolderhint{font-size:var(--fs-s);color:var(--text2);line-height:1.5;margin:-.125rem 0 .625rem;padding:.375rem .625rem;background:var(--bg3);border-radius:var(--r-s)}
+.lfolderhint[hidden]{display:none}.lfolderhint svg.i.s{vertical-align:-2px}
+@media (pointer:coarse){ button.chmode{min-height:2.75rem;min-width:2.75rem;padding:0 .75rem} }

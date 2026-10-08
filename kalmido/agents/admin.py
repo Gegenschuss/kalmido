@@ -195,6 +195,17 @@ def admin_agent_create():
     return jsonify({**agent_admin_dict(c, agent_row(c, uid)), "token": tok, "webhook_secret": secret}), 201
 
 
+def runtime_set(c, a, rt):
+    """Validates and stores a (partial) runtime dict of agent a; runtime_changed to the agent when something changed."""
+    cur = agent_runtime(a)
+    new = runtime_clean(cur, rt)
+    if any(new[k] != cur[k] for k in RUNTIME_DEFAULTS):
+        c.execute("UPDATE agents SET runtime=? WHERE user_id=?", (json.dumps(new), a["user_id"]))
+        agent_emit(c, a["user_id"], "runtime_changed", {"runtime": {**new, "reset_seq": cur["reset_seq"], "timezone": str(TZ)}})
+        print("agent", a["user_id"], "runtime", json.dumps(new), "by", g.user["username"], flush=True)
+    return new
+
+
 @app.patch("/api/admin/agents/<int:aid>")
 def admin_agent_update(aid):
     """{display_name?, note?, enabled?, webhook_url? ('' removes it), limits? (2.1.1: {period, metric, soft?, hard?}, null = none),
@@ -271,17 +282,12 @@ def admin_agent_update(aid):
         except (BadInput, Denied):
             c.rollback()
             raise
-    if "runtime" in b:  # 2.4.1 (#377): {model?, autocompact?, autocompact_pct?, nightly_reset?}; only the given keys change
-        cur = agent_runtime(a0)
+    if "runtime" in b:  # 2.4.1 (#377): {model?, autocompact?, autocompact_pct?, nightly_reset?, permission_mode?}; only the given keys change
         try:
-            new = runtime_clean(cur, b["runtime"])
+            runtime_set(c, a0, b["runtime"])
         except BadInput:
             c.rollback()
             raise
-        if any(new[k] != cur[k] for k in RUNTIME_DEFAULTS):
-            c.execute("UPDATE agents SET runtime=? WHERE user_id=?", (json.dumps(new), aid))
-            agent_emit(c, aid, "runtime_changed", {"runtime": {**new, "reset_seq": cur["reset_seq"], "timezone": str(TZ)}})
-            print("agent", aid, "runtime", json.dumps(new), "by", g.user["username"], flush=True)
     if "scopes" in b or "allowed_ips" in b:  # 2.15.0 (#479)
         try:
             agent_scopes_set(c, aid, b)
@@ -576,7 +582,8 @@ def my_agent_update(aid):
     c = db()
     a = need_own_agent(c, aid)
     b = body()
-    unknown = sorted(k for k in b if k not in ("display_name", "note", "enabled", "scopes", "allowed_ips", "provider", "pause_reason", "org_id"))
+    unknown = sorted(k for k in b if k not in ("display_name", "note", "enabled", "scopes", "allowed_ips", "provider", "pause_reason", "org_id",
+                                               "runtime"))
     if unknown:
         return err(tr("Invalid value: {0}", ", ".join(unknown)))
     if "org_id" in b:  # 2.28.0 (#935): the owner moves the agent into another workspace (its lists must fit: none of another one)
@@ -593,6 +600,12 @@ def my_agent_update(aid):
             raise
     if "enabled" in b and not isinstance(b["enabled"], bool):
         return err(tr("Invalid value: {0}", "enabled"))
+    if "runtime" in b:  # 2.29.0 (#1029): the owner sets the runtime of a personal agent (model, permission mode, ...)
+        try:
+            runtime_set(c, a, b["runtime"])
+        except BadInput:
+            c.rollback()
+            raise
     if "display_name" in b:
         c.execute("UPDATE users SET display_name=? WHERE id=?", ((str(b["display_name"] or "")).strip()[:60] or a["username"], aid))
     if "note" in b:

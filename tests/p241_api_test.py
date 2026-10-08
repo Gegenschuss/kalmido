@@ -147,13 +147,13 @@ AG3, ro = new_agent(A, "robo")
 
 # ================================================================== #377 runtime settings
 me = cl.get("/agent").json()
-check(me.get("runtime") == {"model": "", "autocompact": True, "autocompact_pct": None, "nightly_reset": "", "reset_seq": 0,
+check(me.get("runtime") == {"model": "", "autocompact": True, "autocompact_pct": None, "nightly_reset": "", "permission_mode": "", "reset_seq": 0,
                             "timezone": "Europe/Berlin"}, f"runtime defaults: {me.get('runtime')}")
 adm = next(a for a in A.get(B + "/api/admin/agents").json()["agents"] if a["id"] == AG)
 check(adm["runtime"]["model"] == "" and adm["runtime"]["reset_seq"] == 0, "admin list: runtime")
 cur = me["events_cursor"]
 r = A.patch(B + f"/api/admin/agents/{AG}", json={"runtime": {"model": "sonnet", "autocompact_pct": 70, "nightly_reset": "04:00"}})
-check(r.ok and r.json()["runtime"] == {"model": "sonnet", "autocompact": True, "autocompact_pct": 70, "nightly_reset": "04:00", "reset_seq": 0},
+check(r.ok and r.json()["runtime"] == {"model": "sonnet", "autocompact": True, "autocompact_pct": 70, "nightly_reset": "04:00", "permission_mode": "", "reset_seq": 0},
       f"runtime saved: {r.status_code} {r.text[:200]}")
 ev = kinds(cl, "runtime_changed", cur)
 check(len(ev) == 1 and ev[0]["data"]["runtime"]["model"] == "sonnet" and ev[0]["data"]["runtime"]["timezone"] == "Europe/Berlin"
@@ -174,7 +174,7 @@ for bad, what in (({"model": "rm -rf /"}, "model with spaces"), ({"model": "x" *
 check(A.patch(B + f"/api/admin/agents/{AG}", json={"runtime": "opus"}).status_code == 400, "runtime not an object: 400")
 check(cl.get("/agent").json()["runtime"]["model"] == "claude-opus-4-1[1m]", "a refused change changed nothing")
 r = A.patch(B + f"/api/admin/agents/{AG}", json={"runtime": {"autocompact": False, "autocompact_pct": None, "nightly_reset": "", "model": ""}})
-check(r.ok and r.json()["runtime"] == {"model": "", "autocompact": False, "autocompact_pct": None, "nightly_reset": "", "reset_seq": 0},
+check(r.ok and r.json()["runtime"] == {"model": "", "autocompact": False, "autocompact_pct": None, "nightly_reset": "", "permission_mode": "", "reset_seq": 0},
       f"back to defaults, auto-compact off: {r.json().get('runtime')}")
 check(Bo.patch(B + f"/api/admin/agents/{AG}", json={"runtime": {"model": "opus"}}).status_code == 403, "non-admin: 403")
 check(cl.patch(f"/agent", json={"runtime": {"model": "opus"}}).status_code in (403, 404, 405), "the agent cannot change it itself")

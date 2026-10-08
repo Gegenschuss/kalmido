@@ -237,6 +237,11 @@ APP_ONLY = [
      ("* /api/orgs",)),
     ("2.28.0 (#1005): a person answers an agent's question with a button: in the API as POST /agents/{id}/chat/{mid}/choice (a person's token); agents never answer",
      ("POST /api/agents/{}/chat/{}/choice",)),
+    ("2.29.0 (#1030 / #929): folder settings are per person (their own folders, like the sidebar order); people only, the "
+     "lists' own values stay in /lists/{id}", ("* /api/folders/props", "POST /api/lists/{}/folder-reset")),
+    ("2.29.0 (#1029): the permission mode switch in the chat header; in the API it is the agent's runtime (admins: "
+     "PATCH /api/admin/agents/{id}, owners: PATCH /api/my/agents/{id}), the agent reads it in GET /agent",
+     ("PUT /api/agents/{}/permission-mode",)),
 ]
 
 

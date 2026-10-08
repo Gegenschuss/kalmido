@@ -778,6 +778,8 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
         runtime={"type": "object", "description": "GET /agent only: what the agent host applies (docs/AGENTS.md, Runtime settings)",
                  "properties": {"model": {"type": "string"}, "autocompact": {"type": "boolean"}, "autocompact_pct": nul("integer"),
                                 "nightly_reset": {"type": "string", "description": "HH:MM in the server time zone, empty = off"},
+                                "permission_mode": {"type": "string", "enum": ["", "ask", "auto"],
+                                                    "description": "2.29.0: actions outside the allow list: ask the person in the chat / the host's safety check decides; empty = host default"},
                                 "reset_seq": {"type": "integer", "description": "Raised by Reset now (event reset)"},
                                 "timezone": {"type": "string"}}})
     tot = {"type": "object", "properties": {k: {"type": "integer"} for k in ("tokens", "input", "output", "cache_read", "cache_write", "calls")}

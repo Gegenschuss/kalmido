@@ -18,6 +18,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.29.0** (2026-10-08): Folders like lists, calm agents. **Folder settings** (workspace, agent, tidy-up) apply to every
+  list in a folder, a folder is **shared with roles** like a list, and a list someone adds to a shared folder is shared
+  at once; the agent **chat as a pop-up window** (button, key `A`); a visible **permission mode** per agent; agents get
+  **no backlog flood**; instances are **not indexed** by search engines.
 - **2.28.0** (2026-10-08): Work and private apart. Every list and agent belongs to a **workspace** (private or an
   organisation) with a **switch in the sidebar**; a new server mode runs **several organisations on one server**, each
   with its own admins. **Personal agents are invisible to admins**, agents get a **robot badge**, News split into **For
@@ -1606,6 +1610,8 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `KALMIDO_SUPPORT_EMAIL` | *(empty)* | 2.24.0: where *Contact support* writes to when storage is full (else the admin setting, else the first admin's address) |
 | `KALMIDO_HOSTED` | `0` | 2.24.0: `1` = a server run as a service for others: Paperless only reaches public HTTPS addresses and is off for new accounts |
 | `KALMIDO_ONBOARDING` | `1` | `0`: new accounts start empty (no "Getting started" list, no welcome tour) |
+| `KALMIDO_SEARCH_INDEX` | `0` | 2.29.0: search engines stay out by default (`X-Robots-Tag: noindex, nofollow` on every answer, `/robots.txt` with `Disallow: /`); `1` lets them index the sign-in page. Public list links, forms, feeds and the API stay noindex either way |
+| `KALMIDO_AGENT_EVENTS_STALE_H` | `48` | 2.29.0: agent events older than this many hours reach a poller as one `missed` summary instead of one by one (`0` = off; see docs/AGENTS.md) |
 | `KALMIDO_WEBPUSH` | `1` | `0` turns Web Push off (no key handed out, no new devices, everything goes to ntfy) |
 | `KALMIDO_VAPID_SUBJECT` | `PUBLIC_URL` | Contact the push services see in the VAPID signature: `mailto:you@example.com` or an https URL (Apple needs one of the two; without an https `PUBLIC_URL` the default is `mailto:admin@example.com`) |
 | `KALMIDO_WEBPUSH_HOSTS` | | Extra push services, comma list: `host`, `*.domain` or an exact origin `https://host:port` (only this form allows plain `http://`, e.g. for tests) |

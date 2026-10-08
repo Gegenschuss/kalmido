@@ -89,6 +89,9 @@ APP_VERSION = _read_version()
 UPDATE_CHECK_ENV = os.environ.get("KALMIDO_UPDATE_CHECK", "1").strip().lower() not in ("0", "false", "no", "off")
 # v1.1: new users get a "Getting started" sample list and the welcome tour (existing users never do).
 # KALMIDO_ONBOARDING=0 turns both off (new users start empty, as before; the test suites use this).
+# 2.29.0 (#1026): search engines stay out by default (X-Robots-Tag on every answer + /robots.txt "Disallow: /");
+# KALMIDO_SEARCH_INDEX=1 lets an instance be indexed - public list links and forms stay noindex either way
+SEARCH_INDEX = os.environ.get("KALMIDO_SEARCH_INDEX", "0").strip().lower() in ("1", "true", "yes", "on")
 ONBOARDING_ENV = os.environ.get("KALMIDO_ONBOARDING", "1").strip().lower() not in ("0", "false", "no", "off")
 UPDATE_URL = os.environ.get("KALMIDO_UPDATE_URL", "https://api.github.com/repos/Gegenschuss/kalmido/releases/latest")
 UPDATE_EVERY = 6 * 3600  # s (1.9.0: was a day; releases come more often)
@@ -237,7 +240,7 @@ COOKIE = "kalmido_session"
 CSRF_HEADER, CSRF_VALUE = "X-Requested-With", "kalmido"
 # reachable without a user; the proxy header is never read on PROXY_IGNORE paths (they bypass the
 # proxy login, so a client could send its own header there)
-OPEN_PATHS = {"/", "/sw.js", "/manifest.json", "/api/health", "/drop", "/drop/drop",
+OPEN_PATHS = {"/", "/sw.js", "/manifest.json", "/robots.txt", "/api/health", "/drop", "/drop/drop",
               "/api/auth/info", "/api/auth/login", "/api/auth/setup", "/api/auth/logout",
               # second step of a built-in login (a short-lived ticket cookie, see "two-factor"), passkey login, OIDC
               "/api/auth/2fa", "/api/auth/2fa/passkey/options", "/api/auth/2fa/passkey",
@@ -245,7 +248,7 @@ OPEN_PATHS = {"/", "/sw.js", "/manifest.json", "/api/health", "/drop", "/drop/dr
               "/api/auth/passkey/options", "/api/auth/passkey", "/api/auth/oidc/start", "/api/auth/oidc/callback",
               "/api/auth/invite/check", "/api/auth/invite/accept",  # 2.22.0 (#697): the "Set up your account" page
               "/api/auth/signup", "/api/auth/link"}  # 2.23.0 (#711 / #444): self-registration, a sign-in link (QR)
-PROXY_IGNORE = {"/drop", "/drop/drop", "/manifest.json", "/sw.js", "/api/health"}
+PROXY_IGNORE = {"/drop", "/drop/drop", "/manifest.json", "/sw.js", "/robots.txt", "/api/health"}
 ICAL_PREFIX = "/ical/"  # calendar feed: the secret token in the path is the only credential (never the proxy header)
 # package B: the REST API authenticates ONLY with a personal access token (Authorization: Bearer abk_...), never with
 # the proxy header or a session cookie; a public list link (/s/<token>) has no user at all

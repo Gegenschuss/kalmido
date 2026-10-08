@@ -46,6 +46,7 @@ function wsDefaultOrg(folder = '') {
   if (cur === 'private') return null;
   if (cur.startsWith('org:')) return +cur.slice(4);
   const top = String(folder || '').split('/')[0];
+  const fp = folderEff(folder); if ('org_id' in fp) return fp.org_id || null;  // 2.29.0 (#1030): the folder's workspace
   const ws = new Set(S.lists.filter(l => !l.is_inbox && folder && (l.folder === folder || String(l.folder || '').split('/')[0] === top)).map(l => l.org_id || null));
   if (ws.size === 1) return [...ws][0];
   return (S.me?.workspaces || [])[0]?.id || null;

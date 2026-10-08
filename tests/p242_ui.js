@@ -239,7 +239,7 @@ async function firefox(fn) {
   w.eval(`settingsModal('ai')`); await sleep(500);
   click(w, d.querySelector('.modal.smodal [data-aisub="lists"]')); await sleep(1200);
   pane = d.querySelector('.modal.smodal [data-pane="ai"]');
-  check(/Installationshilfe/.test(pane.textContent) && /Alle teilen/.test(pane.querySelector('#s-ai-share').textContent) && /Neue Listen automatisch/.test(pane.textContent) && /sieht \d von deinen \d Listen/.test(pane.textContent), 'German: Installationshilfe, share block');
+  check(/So richtest du einen ein/.test(pane.textContent) && /Alle teilen/.test(pane.querySelector('#s-ai-share').textContent) && /Neue Listen automatisch/.test(pane.textContent) && /sieht \d von deinen \d Listen/.test(pane.textContent), 'German: How to set one up (2.29.0), share block');
   click(w, pane.querySelector('[data-m="ag-guide"]')); await sleep(400);
   click(w, pane.querySelector('[data-m="ag-guide-cc"]')); await sleep(300);  // 2.7.2 (#420): the Set up tab, the prompt behind its button
   check(/Agent einrichten/.test(d.querySelector('.modal.agguide')?.textContent || '') && /Selbst einrichten/.test(d.querySelector('.modal.agguide').textContent), 'German: setup guide');

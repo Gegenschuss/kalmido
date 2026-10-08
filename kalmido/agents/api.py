@@ -1,6 +1,7 @@
 """The REST API of an agent itself (token of an agent account)."""
 import json
 import time
+from datetime import timedelta
 from flask import g, jsonify
 
 from ..core.config import app, PUBLIC_URL, TZ
@@ -15,7 +16,7 @@ from ..personal.timetrack import BadInput, UnknownFields
 from ..notify.push import push_prio
 from ..api.v1 import v1_args, v1_err, v1_json, v1_view
 from ..agents.core import (
-    _AGENT_COND, _AGENT_GEN, _AGENT_WAITERS, agent_active, AGENT_EVENTS, agent_ids, AGENT_JOBS_KEEP, AGENT_OFFLINE_S,
+    _AGENT_COND, _AGENT_GEN, _AGENT_WAITERS, agent_active, AGENT_EVENTS, AGENT_EVENTS_STALE_H, agent_ids, AGENT_JOBS_KEEP, AGENT_OFFLINE_S,
     AGENT_POLL_WRITE_S, agent_public, agent_row, agent_runtime, agent_shares, AGENT_STATUSES, AGENT_WAIT_MAX,
     AGENT_WAITERS_ALL, AGENT_WAITERS_PER, job_dict, JOB_LOG_MAX, JOB_STATES, JOB_TITLE_MAX, job_visible, need_agent,
     STATUS_TEXT_MAX,
@@ -96,7 +97,24 @@ def agent_poll_mark(c, aid):
 
 
 def _agent_events_after(c, aid, since, n):
-    return c.execute("SELECT id, payload FROM agent_events WHERE agent_id=? AND id>? ORDER BY id LIMIT ?", (aid, since, n)).fetchall()
+    """Rows {id, payload} after since. 2.29.0 (#1031): events older than AGENT_EVENTS_STALE_H come as ONE 'missed' summary
+    (count per event type, time span; seq = the newest folded event) instead of one by one -- an agent that was offline for
+    days or connects for the first time is not flooded; it reads the current state instead (GET /api/v1/... as needed)."""
+    out = []
+    if AGENT_EVENTS_STALE_H > 0:
+        cut = iso(now_utc() - timedelta(hours=AGENT_EVENTS_STALE_H))
+        st = c.execute("""SELECT event, COUNT(*), MAX(id), MIN(created_at), MAX(created_at) FROM agent_events
+                          WHERE agent_id=? AND id>? AND created_at<? GROUP BY event""", (aid, since, cut)).fetchall()
+        if st:
+            last = max(r[2] for r in st)
+            env = {"id": f"missed-{aid}-{last}", "seq": last, "event": "missed", "created_at": iso(now_utc()), "agent_id": aid,
+                   "actor": None, "via": "web",
+                   "data": {"count": sum(r[1] for r in st), "events": {r[0]: r[1] for r in st},
+                            "from": min(r[3] for r in st), "to": max(r[4] for r in st), "stale_hours": AGENT_EVENTS_STALE_H}}
+            out.append({"id": last, "payload": json.dumps(env, ensure_ascii=False)})
+            since = last
+    return out + c.execute("SELECT id, payload FROM agent_events WHERE agent_id=? AND id>? ORDER BY id LIMIT ?",
+                           (aid, since, n - len(out))).fetchall()
 
 
 def _waiter(aid, on):
@@ -121,6 +139,10 @@ def v1_agent_events():
     answer comes at once with busy: true (poll again later)."""
     a = v1_args(("since", "limit", "wait"))
     aid = need_agent()
+    if str(a.get("since", "")).strip().lower() in ("latest", "now"):  # 2.29.0 (#1031): a new poller starts from now
+        cur = db().execute("SELECT COALESCE(MAX(id),0) FROM agent_events WHERE agent_id=?", (aid,)).fetchone()[0]
+        agent_poll_mark(db(), aid)
+        return jsonify(data=[], cursor=cur, has_more=False, busy=False, waited=0.0)
     since = as_int(a.get("since", 0) or 0, "since", 0)
     limit = as_int(a.get("limit", 100), "limit", 1, 500)
     wait = as_int(a.get("wait", 0) or 0, "wait", 0, AGENT_WAIT_MAX)

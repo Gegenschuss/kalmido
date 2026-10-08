@@ -415,6 +415,13 @@ shard 7  # ---------------------------------------------------------------- shar
 # buttons in the chat, the robot badge (#985), the grips under a right-click menu (#976) in Firefox
        run p2280_api "$PY" p2280_api_test.py "$KALMIDO_TEST_DATA"
        run p2280_ui node p2280_ui.js "$KALMIDO_TEST_DATA"
+# 2.29.0 "Folders like lists, calm agents": folder settings (#1030 / #929: workspace, agent, tidy for the lists of a folder,
+# differing lists, Back to the folder, folder people with every role, a member's new list in a shared folder), no backlog
+# storm (#1031: since=latest, the 'missed' summary, one tasks_added for a bulk), the permission mode (#1029), noindex (#1026);
+# then the UI: the folder settings dialog, the chat pop-up (#363), the permission badge, Settings > Agents (#1024 / #345),
+# the code block in a chat bubble (#1028) in Firefox
+       run p2290_api "$PY" p2290_api_test.py "$KALMIDO_TEST_DATA"
+       run p2290_ui node p2290_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

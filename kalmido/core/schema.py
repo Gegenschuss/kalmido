@@ -607,6 +607,11 @@ CREATE TABLE IF NOT EXISTS contact_care (
 CREATE TABLE IF NOT EXISTS user_invites (
   user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, token_hash TEXT NOT NULL UNIQUE, kind TEXT NOT NULL DEFAULT 'invite',
   created_by INTEGER, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, sent_at TEXT, used_at TEXT);
+-- 2.29.0 (#1030 / #929): defaults of an owner's folder for the lists in it and its subfolders (json {org_id, agent_id,
+-- agent_members, agent_peers, agent_tidy}; see lists/folders.py); lists.folder_own = the keys a list keeps on its own
+CREATE TABLE IF NOT EXISTS folder_props (
+  owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, folder TEXT NOT NULL, props TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT NOT NULL, PRIMARY KEY (owner_id, folder));
 -- 2.22.0 (#740): "Share folder": the owner's folder is shared with a person: its lists now and every list that comes into it later
 CREATE TABLE IF NOT EXISTS folder_people (
   owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, folder TEXT NOT NULL,
@@ -851,6 +856,8 @@ MIGRATIONS = [
     # person's answer (choice, json {ids, at}); 2.28.0 (#987): notifications.to_me = a message from a person for me
     ("agent_chat", "choices", "ALTER TABLE agent_chat ADD COLUMN choices TEXT"),
     ("agent_chat", "choice", "ALTER TABLE agent_chat ADD COLUMN choice TEXT"),
+    # 2.29.0 (#1030 / #929): the folder defaults a list keeps on its own (json list of keys, "differs from the folder")
+    ("lists", "folder_own", "ALTER TABLE lists ADD COLUMN folder_own TEXT NOT NULL DEFAULT '[]'"),
 ]
 INDEXES = """
 CREATE INDEX IF NOT EXISTS lists_owner ON lists(owner_id);

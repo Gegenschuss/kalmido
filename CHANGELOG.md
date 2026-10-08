@@ -7,6 +7,70 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.29.0] - 2026-10-08
+
+**In short:** Folders like lists, calm agents. A folder now carries **settings for every list in it** -- workspace,
+agent, *Members may use it*, tidy-up -- for the lists already there and the ones added later; a list changed on its own
+keeps its value until *Back to the folder* (#1030, #929). **Sharing a folder works like sharing a list**: every role
+(admin too), a changed role reaches the lists, removing can take the person out of them, and a list someone adds to a
+folder shared with them is shared with the folder's owner and people at once (#929). On the desktop the **agent chat
+opens as a pop-up window** from anywhere (round button bottom right, key `A`, command bar), stays open across views,
+can be moved, folded and docked (#363). An agent's **permission mode** (*Auto* / *Ask first*) shows in its chat header
+and can be switched there (#1029). Agents get **no backlog flood** any more: a new poller starts from now, old events
+come as one summary, bulk changes as one event (#1031). Kalmido is **not indexed by search engines** unless you allow it
+(#1026). Settings > Agents has **one clear "Set up"** (for me / for the team) and a separate *Administration* (#1024).
+
+### Added
+- **Folder settings** (#1030, #929): *Folder settings…* in a folder's menu sets defaults for every list in the folder and
+  its subfolders (a subfolder can override its top folder): the workspace, the agent (or *No agent*), *Members may use
+  the agent*, *Agents may address each other* and *Tidy up*. Saving asks whether the existing lists follow or only new
+  ones, and first names the lists that cannot follow (a person or agent outside the workspace, a Home & life list that
+  stays private) or that were changed on their own; *Also the lists changed on their own* overrides those. A new list
+  in the folder and a list moved or dragged into it take the settings. The list dialog says what comes from the folder;
+  a list changed on its own (workspace, agent, tidy-up, agent access) is marked and offers **Back to the folder**.
+  API: `GET / PUT /api/folders/props` (`props`, `apply: all | new`, `force`, `dry_run`), `POST /api/lists/{id}/folder-reset`,
+  the state's `folder_props`; lists carry `folder_own`.
+- **Folder sharing like list sharing** (#929): every role when sharing a folder (admin, member, participant, viewer), a
+  role switch per person that reaches the folder's lists (`updated` in the answer), and removing a person asks: *Also
+  remove from the lists in the folder* (`DELETE /api/folders/people {remove: true}`) or *Only stop sharing new lists*. A
+  list someone creates in a folder shared with them stays theirs and is shared with the folder's owner (list admin) and
+  its other people (their folder roles); the new-list dialog says so and offers *Create it without a folder instead*
+  (state: `folders_shared_in`). Dragging a list into a shared folder in the sidebar now shares it too (before only the
+  list dialog did).
+- **Agent chat as a pop-up window** (#363, desktop): a round button with the agent's picture bottom right (the agent you
+  chatted with last, its unread count), the key `A` and *Chat with … as a window* in the command bar. The window floats
+  over the page without taking room, stays open while you switch lists and views, moves by its header (remembered per
+  device), folds to the header and docks as the side panel (and back; remembered).
+- **Permission mode of an agent** (#1029): runtime setting `permission_mode` (`ask` = every action outside the allow list
+  asks the person in the chat, `auto` = the host's safety check decides, empty = the host's default), a badge *Auto* /
+  *Ask first* in the chat header; the owner of a personal agent and an admin for a team agent switch it there
+  (`PUT /api/agents/{id}/permission-mode`) or in the runtime section; `PATCH /api/my/agents/{id}` takes `runtime`.
+  `GET /api/v1/agent` returns it, `runtime_changed` tells the agent.
+- **No backlog flood for agents** (#1031): `GET /api/v1/agent/events?since=latest` (also in the MCP tools) starts from now;
+  events older than `KALMIDO_AGENT_EVENTS_STALE_H` (default 48 h) come as one event `missed` `{count, events, from, to}`;
+  more than five tasks added to one list by one person within a minute come as one event `tasks_added` `{list, task_ids,
+  count, how}`; tasks created in bulk through the API get no `tidy` event each. docs/AGENTS.md explains how services should bundle events.
+- **Not indexed by search engines** (#1026): `X-Robots-Tag: noindex, nofollow` on every answer and `/robots.txt` with
+  `Disallow: /` (it redirected to the sign-in page before); `KALMIDO_SEARCH_INDEX=1` allows indexing the sign-in page,
+  public list links, forms, feeds and the API stay noindex.
+
+### Changed
+- **Settings > Agents** (#1024): one *Set up* that first asks **For me** or **For the team** (one sentence each, then the
+  guide for your system and your personal agents); the server-wide switches (*Personal agents for everyone*, the
+  permission limit) moved to a new sub-tab *Administration* (admins). Every agent card says **Personal** (whose) or
+  **Team**; *Setup guide* is now *How to set one up*.
+- **Settings > Agents > Lists** (#345): lists of others shared with you show up too, read-only with their owner and agent
+  (only the owner and list admins change them).
+
+### Fixed
+- **Code blocks in chat bubbles** (#1028): a long command wraps inside the bubble instead of scrolling sideways, so no
+  scrollbar sits over the line under it (Mac with "always show scrollbars").
+- **Empty "Assigned" cell** (#1002): in a list with an assignee column the empty cell is always there (faint) and
+  clickable, also where the browser reports no hover (some desktop web apps, touch laptops); it was hidden there.
+- Checked again with real clicks in Firefox: the sidebar grip under a right-click menu (#976), "+" in the reactions opens
+  the emoji field on top, also over the chat window (#963); typing in the quick add / comments keeps the page still
+  (#958, regression test from 2.27).
+
 ## [2.28.0] - 2026-10-08
 
 **In short:** Work and private apart, messages. Every list and agent belongs to a **workspace** -- your private space or
@@ -3044,7 +3108,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.28.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.29.0...HEAD
+[2.29.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.29.0
 [2.28.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.28.0
 [2.27.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.27.0
 [2.26.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.26.1

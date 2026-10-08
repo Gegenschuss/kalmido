@@ -9,7 +9,7 @@ const keyName = k => k === 'Mod' ? (IS_MAC ? '⌘' : 'Ctrl') : k === 'Shift' ? (
 const kb = s => `<span class="kbs">${s.split(' ').map(ch => ch.split('+').map(k => `<kbd>${esc(keyName(k))}</kbd>`).join('')).join('')}</span>`;
 const kbText = s => s.split(' ').map(ch => ch.split('+').map(keyName).join(IS_MAC ? '' : '+')).join(' ');
 const SHORTCUTS_ALL = [
-  [N_('General'), [['Mod+K', N_('Search and commands')], ['?', N_('Keyboard shortcuts')], ['n', N_('New task')], ['q', N_('Quick capture to the inbox')], ['Ctrl+Space', N_('Quick capture, also while typing')], ['/', N_('Search')], ['Mod+Z', N_('Undo')], ['Mod+Shift+Z', N_('Redo')], ['Esc', N_('Close')]]],
+  [N_('General'), [['Mod+K', N_('Search and commands')], ['?', N_('Keyboard shortcuts')], ['n', N_('New task')], ['q', N_('Quick capture to the inbox')], ['a', N_('Chat with an agent (window)')], ['Ctrl+Space', N_('Quick capture, also while typing')], ['/', N_('Search')], ['Mod+Z', N_('Undo')], ['Mod+Shift+Z', N_('Redo')], ['Esc', N_('Close')]]],
   [N_('Tasks'), [['↓', N_('Next task (or J)')], ['↑', N_('Previous task (or K)')], ['Enter', N_('Open task')], ['Space', N_('Complete task (or X)')], ['e', N_('Edit title in the list (or double-click)')], ['s', N_('Snooze task')], ['d', N_('Change date')], ['t', N_('Due today')], ['Shift+T', N_('Due tomorrow')], ['m', N_('Move to list')], ['Shift+C', N_('Collapse or expand all')]]],
   // 2.0.6 (#191): multi-select and the calendar views
   [N_('Multi-select'), [['Mod+A', N_('Select all tasks of the view')], ['Shift+↓', N_('Extend the selection down (or Shift+J)')], ['Shift+↑', N_('Extend the selection up (or Shift+K)')], ['Shift+X', N_('Select or unselect the task')],
@@ -282,6 +282,7 @@ function palAll() {
   if (agentsTab()) {
     add('v:agents', 'view', tr('Agents'), 'bot', () => go('agents'));
     for (const a of (S.agents || []).filter(x => x.enabled)) add('a:chat-' + a.id, 'action', tr('Chat with {0}', a.name), 'comment', () => chatOpen(a.id));
+    if (!chatFull()) for (const a of (S.agents || []).filter(x => x.enabled)) add('a:pop-' + a.id, 'action', tr('Chat with {0} as a window', a.name), 'comment', () => chatOpen(a.id, {float: true}));  // 2.29.0 (#363)
   }
   // lists, filters, tags
   for (const l of S.lists.filter(x => !x.archived && !x.is_inbox && inWs(x))) add('l:' + l.id, 'list', lname(l), 'list', () => go('l/' + l.id), {sw: cssColor(l.color), img: l.icon || '', ...(l.folder ? {sub: fDisp(l.folder)} : {})});

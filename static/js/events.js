@@ -310,6 +310,10 @@ document.addEventListener('click', async e => {
     case 'news-tab': LS.set('newsTab', a.dataset.tab); renderView(); break;  // 2.28.0 (#987)
     case 'chat-open': chatOpen(+a.dataset.aid); break;
     case 'chat-close': chatClose(); break;
+    case 'chat-mode': chatModeMenu(a); break;  // 2.29.0 (#1029)
+    case 'chat-pop': chatPop(); break;  // 2.29.0 (#363)
+    case 'chat-dock': chatDock(a.dataset.fl === '1'); break;
+    case 'chat-min': chatFloatMin(!$('#achat')?.classList.contains('min')); break;
     case 'chat-send': chatSend(); break;
     case 'chat-older': chatOlder(); break;  // 2.12.2 (#451)
     case 'chat-attach': $('#chat-file')?.click(); break;  // 2.13.1 (#465)
@@ -731,6 +735,7 @@ document.addEventListener('keydown', async e => {
   if (/INPUT|TEXTAREA|SELECT/.test(t.tagName) || e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.key === 'n') { e.preventDefault(); const q = currentQuickInput(); if (q && (!isMobile() || tabletDock())) q.focus(); else openQuickSheet(); }
   if (e.key === 'q' && !$('.modal')) { e.preventDefault(); quickCapture(); }
+  if (e.key === 'a' && !$('.modal') && !chatFull() && feat('agents') && chatFabAgent()) { e.preventDefault(); chatPop(); }  // 2.29.0 (#363)
   if (e.key === '/') { e.preventDefault(); go('search'); }
 });
 document.addEventListener('focusout', e => {

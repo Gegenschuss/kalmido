@@ -58,7 +58,9 @@ AGENT_EVENTS = ("mention", "comment", "assigned", "unassigned", "chat", "reactio
                 "runtime_changed", "reset",  # 2.4.1 (#377): an admin changed its runtime settings / pressed "Reset now"
                 "team_message",  # 2.17.0 (#419): someone @mentioned the agent in a list's team chat
                 "task_added",  # 2.23.0 (#795): a task was created in / moved into a list shared with the agent
-                "chat_choice")  # 2.28.0 (#1005): the person pressed an answer button of a chat message (message_id, choice_ids)
+                "chat_choice",  # 2.28.0 (#1005): the person pressed an answer button of a chat message (message_id, choice_ids)
+                "tasks_added",  # 2.29.0 (#1031): many tasks at once (a bulk move / import / script) -> ONE event with their ids
+                "missed")  # 2.29.0 (#1031): events older than AGENT_EVENTS_STALE_H, folded into one summary at the next poll
 JOB_STATES = ("running", "waiting", "done", "failed", "stopped")
 JOB_ACTIONS = ("approve", "reject", "stop")
 REACTIONS = ("up", "down", "heart")   # the fixed set; any other single emoji is stored as itself
@@ -66,6 +68,11 @@ REACTION_ALIASES = {**{k: k for k in REACTIONS}, "+1": "up", "-1": "down", "\U00
                     "\u2764\ufe0f": "heart", "\u2764": "heart"}
 TIDY_MODES = ("off", "suggest", "auto")
 AGENT_EVENTS_KEEP_DAYS, AGENT_EVENTS_KEEP_MAX = 30, 1000   # per agent
+# 2.29.0 (#1031): no backlog storm. Events older than this many hours reach a poller as one 'missed' summary (0 = off) ...
+AGENT_EVENTS_STALE_H = _env_int("KALMIDO_AGENT_EVENTS_STALE_H", 48)
+# ... and more than AGENT_BURST tasks added to one list by one person within AGENT_BURST_S become one 'tasks_added' event
+# (sent after AGENT_BURST_QUIET_S without more); bulk-created tasks get no 'tidy' event beyond the first AGENT_BURST
+AGENT_BURST, AGENT_BURST_S, AGENT_BURST_QUIET_S, AGENT_BURST_IDS = 5, 60, 15, 500
 AGENT_JOBS_KEEP = 300                                       # per agent (finished ones beyond are removed)
 JOB_LOG_MAX, JOB_TITLE_MAX, AGENT_NOTE_MAX, STATUS_TEXT_MAX = 8000, 200, 2000, 200
 CHAT_MAX, CHAT_KEEP = 8000, 1000                            # characters per message, messages per person and agent
@@ -366,6 +373,74 @@ def tidy_agent_of(c, lid, cands=None):
     return cands[0] if cands else None
 
 
+_BURST, _BURST_HELD, _BURST_LOCK = {}, {}, threading.Lock()
+
+
+def _burst_actor():
+    return wh_actor(None) if has_request_context() and getattr(g, "user", None) else None
+
+
+def burst_hit(kind, lid):
+    """2.29.0 (#1031): True when the current person already did AGENT_BURST `kind` things (task_added / tidy) in list lid within
+    AGENT_BURST_S -- the caller folds this one into a summary (or drops a tidy). Outside a request: never a burst."""
+    a = _burst_actor()
+    if not a:
+        return False
+    key, now = (kind, a["id"], lid), time.monotonic()
+    with _BURST_LOCK:
+        ts = [t for t in _BURST.get(key, ()) if now - t < AGENT_BURST_S]
+        ts.append(now)
+        _BURST[key] = ts[-(AGENT_BURST + 1):]
+        if len(_BURST) > 2000:
+            for k in [k for k, v in _BURST.items() if now - v[-1] >= AGENT_BURST_S]:
+                _BURST.pop(k, None)
+        return len(ts) > AGENT_BURST
+
+
+def _burst_hold(lid, tid, how, from_lid, source):
+    a = _burst_actor()
+    with _BURST_LOCK:
+        h = _BURST_HELD.setdefault((a["id"], lid), {"actor": a, "ids": [], "how": set(), "from": set(), "source": set()})
+        if len(h["ids"]) < AGENT_BURST_IDS:
+            h["ids"].append(tid)
+        h["n"] = h.get("n", 0) + 1
+        h["how"].add(how)
+        if from_lid:
+            h["from"].add(from_lid)
+        if source:
+            h["source"].add(source)
+        h["last"] = time.monotonic()
+
+
+def burst_tick(c):
+    """Watchdog: one 'tasks_added' per agent of the list for every burst that has been quiet for AGENT_BURST_QUIET_S."""
+    now = time.monotonic()
+    with _BURST_LOCK:
+        ready = [(k, _BURST_HELD.pop(k)) for k, h in list(_BURST_HELD.items()) if now - h["last"] >= AGENT_BURST_QUIET_S]
+    sent = 0
+    for (_, lid), h in ready:
+        if not c.execute("SELECT 1 FROM lists WHERE id=?", (lid,)).fetchone():
+            continue
+        ids = [r[0] for r in c.execute(f"SELECT id FROM tasks WHERE list_id=? AND deleted_at IS NULL AND id IN ({','.join('?' * len(h['ids']))})",
+                                       (lid, *h["ids"]))] if h["ids"] else []
+        for aid in list_agents(c, lid):
+            mine = [t for t in ids if task_visible(c, t, aid, full=True)]
+            if not mine:
+                continue
+            data = {"list": lst_brief(c, lid), "list_id": lid, "task_ids": mine, "count": len(mine),
+                    "how": "moved" if h["how"] == {"moved"} else ("created" if h["how"] == {"created"} else "mixed"),
+                    "truncated": h.get("n", 0) > len(h["ids"])}
+            if h["source"]:
+                data["source"] = sorted(h["source"])[0]
+            moved_from = [{"id": f, "name": lst_brief(c, f)["name"]} for f in sorted(h["from"]) if list_role(c, f, aid)]
+            if moved_from:
+                data["moved_from"] = moved_from
+            if agent_emit(c, aid, "tasks_added", data, actor=h["actor"]):
+                sent += 1
+    c.commit()
+    return sent
+
+
 def agent_added_events(c, tid, from_lid=None, source=None):
     """2.23.0 (#795): a top-level task was created in (from_lid None) or moved into (from_lid = the list it came from) a list:
     'task_added' to every agent of that list that sees the task (the agent's own actions excluded by agent_emit). moved_from
@@ -375,6 +450,11 @@ def agent_added_events(c, tid, from_lid=None, source=None):
         return
     t = c.execute("SELECT id, list_id, parent_id, deleted_at FROM tasks WHERE id=?", (tid,)).fetchone()
     if not t or t["parent_id"] or t["deleted_at"] or t["list_id"] == from_lid:
+        return
+    if not list_agents(c, t["list_id"]):
+        return
+    if burst_hit("added", t["list_id"]):  # 2.29.0 (#1031): a bulk move / script -> one 'tasks_added' later (burst_tick)
+        _burst_hold(t["list_id"], tid, "moved" if from_lid else "created", from_lid, source)
         return
     for aid in list_agents(c, t["list_id"]):
         if not task_visible(c, tid, aid, full=True):
@@ -419,6 +499,10 @@ def agent_tidy_events(c, tid):
     if not t or t["parent_id"] or (t["agent_tidy"] or "off") == "off" or is_agent(g.user):
         return
     aid = tidy_agent_of(c, t["list_id"])
+    # 2.29.0 (#1031): tasks created in bulk through the API (a script, an import) are not tidied one by one; typing in the app
+    # (a quick brain dump) still gets every tidy event
+    if aid and act_via() == "api" and burst_hit("tidy", t["list_id"]):
+        return
     if aid and task_visible(c, tid, aid, write=True):
         if TIDY_QUIET_S <= 0:  # KALMIDO_TIDY_QUIET_S=0: at once, as before 2.27 (the older test suites)
             agent_emit(c, aid, "tidy", agent_task_data(c, tid, aid, mode=t["agent_tidy"]))
@@ -464,7 +548,10 @@ def tidy_tick(c):
 # auto-compact, a nightly fresh restart) and hands it to the agent (GET /api/v1/agent "runtime", event runtime_changed);
 # the host's launcher applies it (docs/AGENTS.md "Runtime settings", mcp/agent_launcher.sh). "Reset now" raises reset_seq
 # and sends the event reset: the host restarts the agent with a fresh session.
-RUNTIME_DEFAULTS = {"model": "", "autocompact": True, "autocompact_pct": None, "nightly_reset": ""}
+RUNTIME_DEFAULTS = {"model": "", "autocompact": True, "autocompact_pct": None, "nightly_reset": "", "permission_mode": ""}
+# 2.29.0 (#1029): how the agent's host handles actions outside its allow list: ask = asks the person in the chat every time,
+# auto = the host's safety check decides (risky things stay blocked); '' = the host's own default
+PERMISSION_MODES = ("", "ask", "auto")
 
 
 def agent_runtime(a):
@@ -509,7 +596,21 @@ def runtime_clean(cur, b):
         if not isinstance(v, str) or (v and not valid_hm(v)):
             raise BadInput(tr("Invalid value: {0}", "nightly_reset"))
         out["nightly_reset"] = v
+    if "permission_mode" in b:
+        v = b["permission_mode"] if b["permission_mode"] is not None else ""
+        if v not in PERMISSION_MODES:
+            raise BadInput(tr("Invalid value: {0}", "permission_mode"))
+        out["permission_mode"] = v
     return out
+
+
+def may_set_runtime(c, a, uid):
+    """2.29.0 (#1029): who may switch an agent's permission mode in its chat header: the owner of a personal agent, an instance
+    admin for a team agent (like the runtime section of the administration)."""
+    if a["owner_id"]:
+        return a["owner_id"] == uid
+    u = c.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone() if uid else None
+    return bool(u and u["is_admin"])
 
 
 def agent_online(a):
@@ -680,7 +781,9 @@ def agent_public(c, a, uid=None):
             # 2.26.0 (#933): its token is in use (an interactive session) but nothing collects its events -- the setup is not
             # finished until a service (launcher / LaunchAgent / task) keeps polling
             "no_service": _no_service(c, a),
-            "my_job": bool(uid) and any(j["state"] == "running" and j["user_id"] == uid for j in jobs)}
+            "my_job": bool(uid) and any(j["state"] == "running" and j["user_id"] == uid for j in jobs),
+            # 2.29.0 (#1029): the chat header's badge (Auto / Ask) and whether the viewer may switch it
+            "permission_mode": agent_runtime(a)["permission_mode"], "may_set_mode": bool(uid) and may_set_runtime(c, a, uid)}
 
 
 def agents_for(c, uid):

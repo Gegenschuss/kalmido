@@ -17,18 +17,61 @@ function chatRelayout() {
   else return;
   if (f) setTimeout(() => { const n = $('#chat-in'); if (n) { n.focus({preventScroll: true}); chatBottom(); } }, 60);
 }
-window.addEventListener('resize', () => { clearTimeout(chatRelT); chatRelT = setTimeout(chatRelayout, 150); });
+window.addEventListener('resize', () => { clearTimeout(chatRelT); chatRelT = setTimeout(() => { chatRelayout(); chatFabDraw(); }, 150); });
 try { screen.orientation?.addEventListener('change', () => { clearTimeout(chatRelT); chatRelT = setTimeout(chatRelayout, 150); }); } catch { /* old browsers */ }
 S.chat = {aid: null, msgs: [], err: null};
-function chatOpen(aid) {
-  if (!chatFull() && document.body.classList.contains('chat-yield') && S.sel) closeDetail();  // 2.13.2 (#478 N1): the chat takes its place back
+function chatOpen(aid, o = {}) {
   if (chatFull()) { if (!/^#agents\//.test(location.hash)) S.chatBack = location.hash.slice(1); go('agents/' + aid); return; }
+  const fl = o.float ?? chatFloatOn();
+  if (!fl && document.body.classList.contains('chat-yield') && S.sel) closeDetail();  // 2.13.2 (#478 N1): the chat takes its place back
   S.chat = {aid: +aid, msgs: S.chat.aid === +aid ? S.chat.msgs : [], more: S.chat.aid === +aid && S.chat.more, err: null};
+  LS.set('chatLast', +aid);  // 2.29.0 (#363): the pop-up button opens this one next time
   let p = $('#achat');
   if (!p) { p = document.createElement('aside'); p.id = 'achat'; p.setAttribute('aria-label', tr('Chat')); document.body.appendChild(p); }
-  p.classList.remove('hidden'); document.body.classList.add('chat-open'); fitLayout(); chatDraw(); chatLoad().then(() => $('#chat-in')?.focus());
+  if (p.classList.contains('float') !== fl) { p.innerHTML = ''; delete p.dataset.aid; }
+  p.classList.toggle('float', fl); p.classList.remove('min'); document.body.classList.toggle('chat-float', fl); document.body.classList.toggle('chat-open', !fl);
+  if (fl) chatFloatPlace(p); else p.style.left = p.style.top = p.style.right = p.style.bottom = '';
+  p.classList.remove('hidden'); fitLayout(); chatDraw(); chatFabDraw(); chatLoad().then(() => $('#chat-in')?.focus());
 }
-function chatClose() { S.chat = {aid: null, msgs: [], err: null}; $('#achat')?.classList.add('hidden'); document.body.classList.remove('chat-open'); fitLayout(); if (S.route.mod === 'agents' && S.route.agent) { const b = S.chatBack; S.chatBack = null; go(b || 'agents'); } }
+function chatClose() { S.chat = {aid: null, msgs: [], err: null}; $('#achat')?.classList.add('hidden'); document.body.classList.remove('chat-open', 'chat-float'); fitLayout(); chatFabDraw(); if (S.route.mod === 'agents' && S.route.agent) { const b = S.chatBack; S.chatBack = null; go(b || 'agents'); } }
+// ---- 2.29.0 (#363) desktop: the chat as a pop-up window from anywhere -- the round button bottom right (the agent last
+// chatted with), the key A and "Chat as a window" in the command bar. The window stays open while you switch lists and views,
+// can be moved by its header, folded to the header and docked as the side panel again (remembered per device: chatFloat).
+const chatFloatOn = () => !chatFull() && LS.get('chatFloat', '') === '1';
+function chatFabAgent() {
+  const ags = (S.agents || []).filter(a => a.enabled && a.chat !== false), last = +LS.get('chatLast', 0);
+  return ags.find(a => a.id === last) || ags[0] || null;
+}
+function chatFabDraw() {
+  let b = $('#chatfab');
+  const a = S.booted && !chatFull() && feat('agents') && LS.get('chatFab', '1') !== '0' ? chatFabAgent() : null;
+  if (!a || !$('#achat')?.classList.contains('hidden') && $('#achat')) { b?.remove(); return; }
+  if (!b) { b = document.createElement('button'); b.id = 'chatfab'; b.type = 'button'; b.dataset.act = 'chat-pop'; document.body.appendChild(b); }
+  const t = tr('Chat with {0}', a.name);
+  b.title = t + ' (A)'; b.setAttribute('aria-label', t);
+  b.innerHTML = av(a.id, a.name, 'avatar') + (a.chat_unread ? `<span class="nbadge">${a.chat_unread}</span>` : '');
+}
+function chatPop(aid) {
+  const p = $('#achat');
+  if (p && !p.classList.contains('hidden') && (!aid || S.chat.aid === aid)) { if (p.classList.contains('float') && p.classList.contains('min')) { chatFloatMin(false); return; } chatClose(); return; }
+  const a = aid ? agentById(aid) : chatFabAgent(); if (!a) return;
+  chatOpen(a.id, {float: LS.get('chatFloat', '') !== '0'});
+}
+function chatDock(fl) { LS.set('chatFloat', fl ? '1' : '0'); const aid = S.chat.aid; if (aid) chatOpen(aid, {float: fl}); }
+function chatFloatMin(on) { const p = $('#achat'); if (!p) return; p.classList.toggle('min', on); const b = $('[data-act="chat-min"]', p); if (b) { b.setAttribute('aria-expanded', !on); b.title = on ? tr('Unfold') : tr('Fold'); b.setAttribute('aria-label', b.title); } if (!on) $('#chat-in')?.focus(); }
+function chatFloatPlace(p) {
+  const pos = (LS.get('chatPos', '') || '').split(',').map(Number);
+  if (pos.length === 2 && pos.every(Number.isFinite)) { p.style.left = Math.max(8, Math.min(innerWidth - 120, pos[0])) + 'px'; p.style.top = Math.max(8, Math.min(innerHeight - 60, pos[1])) + 'px'; p.style.right = p.style.bottom = 'auto'; }
+  else { p.style.left = p.style.top = ''; p.style.right = p.style.bottom = ''; }
+}
+document.addEventListener('pointerdown', e => {  // move the window by its header (not by its buttons)
+  const h = e.target.closest?.('#achat.float .chath'); if (!h || e.button !== 0 || e.target.closest('button,a,input,textarea,select')) return;
+  const p = $('#achat'), r = p.getBoundingClientRect(), dx = e.clientX - r.left, dy = e.clientY - r.top;
+  e.preventDefault();
+  const mv = ev => { p.style.left = Math.max(8, Math.min(innerWidth - 120, ev.clientX - dx)) + 'px'; p.style.top = Math.max(8, Math.min(innerHeight - 48, ev.clientY - dy)) + 'px'; p.style.right = p.style.bottom = 'auto'; };
+  const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); LS.set('chatPos', `${parseInt(p.style.left)},${parseInt(p.style.top)}`); };
+  addEventListener('pointermove', mv); addEventListener('pointerup', up);
+});
 const CHAT_PAGE = 30;
 async function chatLoad() {
   const aid = S.chat.aid; if (!aid) return;
@@ -264,6 +307,33 @@ function chatStHtml(a) {
   // 2.13.0 (#453 P11): the typing dots only once, in the line under the messages (#chat-typing); the header keeps the state
   return `<span class="chst st-${cls}${typing ? ' typing' : ''}" id="chat-st" role="status" aria-live="polite"><i class="adot st-${cls === 'limit' ? 'error' : cls}" aria-hidden="true"></i><span class="chstx">${a.status === 'paused' && a.enabled ? esc(tr('does not answer right now: {0}', a.pause_reason || a.status_text || '')) : st + (a.status_text && a.enabled && !off ? ' · ' + esc(a.status_text) : '')}</span></span>`;  // 2.26.0 (#949)
 }
+// 2.29.0 (#1029): the permission mode badge (Auto / Ask) -- the owner (a team agent: an admin) switches it here; the agent's host
+// reads it before its next run (runtime.permission_mode). Nothing when it is the host's default and the viewer cannot change it.
+const AG_PMODES = {auto: N_('Auto'), ask: N_('Ask first'), '': N_('Host default')};
+function chatModeHtml(a) {
+  const m = a.permission_mode || '';
+  if (!m && !a.may_set_mode) return '';
+  const t = tr('Permissions: {0}', tr(AG_PMODES[m] || AG_PMODES['']));
+  return a.may_set_mode ? `<button type="button" class="chmode pm-${m || 'def'}" data-act="chat-mode" title="${esc(t)}" aria-label="${esc(t)}" aria-haspopup="menu">${esc(tr(AG_PMODES[m] || AG_PMODES['']))}</button>`
+    : `<span class="chmode pm-${m}" title="${esc(t)}">${esc(tr(AG_PMODES[m]))}</span>`;
+}
+function chatModeMenu(btn) {
+  const a = agentById(S.chat.aid); if (!a) return;
+  const set = async m => {
+    try { const r = await api('PUT', `/api/agents/${a.id}/permission-mode`, {mode: m}); a.permission_mode = r.permission_mode; $$('.chmode').forEach(x => x.outerHTML = chatModeHtml(a)); toast(tr('Permissions: {0}', tr(AG_PMODES[r.permission_mode]))); }
+    catch (e) { toast(e instanceof Offline ? tr('Only available online.') : e.message); }
+  };
+  menu(btn, [
+    {label: tr('Ask first'), sub: tr('Every action outside its allow list asks you in the chat'), on: a.permission_mode === 'ask', fn: () => set('ask')},
+    {label: tr('Auto'), sub: tr('Its host’s safety check decides; risky actions stay blocked'), on: a.permission_mode === 'auto', fn: () => set('auto')},
+    {label: tr('Host default'), sub: tr('Whatever its host is set up with'), on: !a.permission_mode, fn: () => set('')}]);
+}
+// 2.29.0 (#363): window <-> side panel, fold (window only)
+function chatWinBtns() {
+  const fl = !!$('#achat.float');
+  return (fl ? `<button class="iconbtn" data-act="chat-min" title="${esc(tr('Fold'))}" aria-label="${esc(tr('Fold'))}" aria-expanded="true">${ic('chev', 's')}</button>` : '')
+    + `<button class="iconbtn" data-act="chat-dock" data-fl="${fl ? 0 : 1}" title="${esc(fl ? tr('Dock as side panel') : tr('Open as a window'))}" aria-label="${esc(fl ? tr('Dock as side panel') : tr('Open as a window'))}">${ic(fl ? 'panel' : 'expand', 's')}</button>`;
+}
 function chatInner(aid) {
   const a = agentById(aid); if (!a) return `<div class="muted mhint">${tr('Agent not found')}</div>`;
   // 2.13.0 (#453 P11): on the phone "back" sits on the left (where every back button is) and the chat header replaces the
@@ -271,8 +341,8 @@ function chatInner(aid) {
   const back = chatFull() ? `<button class="iconbtn chback" data-act="chat-close" title="${esc(tr('Back'))}" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : '';
   // 2.13.0 (#453): the note that used to sit under the input is behind the (i) next to the name
   const info = `<button type="button" class="ib" data-ii="chat-info" aria-describedby="chat-info" aria-expanded="false" aria-label="${esc(tr('More information'))}">${ic('info', 's')}</button><span class="shint iisrc" id="chat-info" data-ii="1">${tr('{0} answers when it next looks at its events (right away with a webhook or long-polling). It only sees the lists shared with it.', esc(a.name))}</span>`;
-  return `<div class="chath">${back}${avBtn(a.id, a.name, 'avatar')}<div class="chn"><span class="chnm"><b>${esc(a.name)}</b>${info}</span>${chatStHtml(a)}</div><span class="spacer"></span>
-      ${back ? '' : `<button class="iconbtn" data-act="chat-close" title="${tr('Close')}" aria-label="${tr('Close')}">${ic('x')}</button>`}</div>
+  return `<div class="chath">${back}${avBtn(a.id, a.name, 'avatar')}<div class="chn"><span class="chnm"><b>${esc(a.name)}</b>${info}${chatModeHtml(a)}</span>${chatStHtml(a)}</div><span class="spacer"></span>
+      ${back ? '' : chatWinBtns()}${back ? '' : `<button class="iconbtn" data-act="chat-close" title="${tr('Close')}" aria-label="${tr('Close')}">${ic('x')}</button>`}</div>
     <div class="chmsgs" id="chat-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${chatMsgs()}</div>
     <button type="button" class="chnew hidden" id="chat-new" data-act="chat-bottom">${tr('New message')} <span aria-hidden="true">↓</span></button>
     ${typingHtml(chatTyping(a) ? [a] : [], 'chat-typing')}
@@ -410,7 +480,8 @@ async function aiTblDraw(md) {
     try { box._ags = (await api('GET', '/api/users')).users.filter(u => u.agent && !u.disabled).map(u => ({id: u.id, name: u.display_name})); }
     catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
   }
-  const ags = box._ags, lists = S.lists.filter(l => !l.archived && !l.is_inbox && canManage(l)), ctl = $('#s-ai-tblctl', md);
+  // 2.29.0 (#345): lists of others shared with me show up too -- read-only (owner named), changeable only where I am a list admin
+  const ags = box._ags, lists = S.lists.filter(l => !l.archived && !l.is_inbox && (canManage(l) || l.owner_id !== S.me?.id)), ctl = $('#s-ai-tblctl', md);
   aiShareDraw(md, ags);
   if (!ags.length) { box.innerHTML = `<div class="muted mhint">${tr('No agents yet. An admin adds them; then they show up here.')}</div>`; if (ctl) ctl.innerHTML = ''; return; }
   if (!lists.length) { box.innerHTML = `<div class="muted mhint">${tr('You do not manage any list yet.')}</div>`; if (ctl) ctl.innerHTML = ''; return; }
@@ -427,6 +498,10 @@ async function aiTblDraw(md) {
   let two = false;
   const row = l => {
     const people = listPeople(l), has = sees(l);
+    if (!canManage(l)) {  // 2.29.0 (#345): shown, not changeable (only its owner / list admins decide)
+      const own = personNameAny(l.owner_id), ro = tr('Only {0} (or a list admin) changes this', own);
+      return `<div class="airow airo" role="row" data-lid="${l.id}"><span class="ailn" role="cell" title="${esc(lname(l) + ' · ' + tr('Owner: {0}', own))}">${esc(lname(l))} <small class="muted">${esc(own)}</small></span><span class="aiag" role="cell" title="${esc(ro)}"><span class="aimlbl" aria-hidden="true">${tr('Agent')}</span><span class="muted">${esc(has.map(a => a.name).join(', ') || tr('No agent'))}</span></span><span class="aitd" role="cell" title="${esc(ro)}"><span class="aimlbl" aria-hidden="true">${tr('Tidy up')}</span><span class="muted">${has.length ? esc(tr(TIDY_SHORT[l.agent_tidy || 'off'])) : '–'}</span></span></div>`;
+    }
     // 2.26.0: one agent per list -- one select "Agent: No agent / A / B"; switching = the old one out + the new one in
     const curA = has[0], ownerAg = has.find(a => a.id === l.owner_id);
     const chips = `<span class="aimlbl" aria-hidden="true">${tr('Agent')}</span><select class="aisel" data-aisel="${l.id}" aria-label="${esc(tr('Agent') + ': ' + lname(l))}" ${ownerAg ? 'disabled' : ''}><option value="">${tr('No agent')}</option>${ags.map(a => `<option value="${a.id}" ${curA?.id === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select>`;
@@ -724,6 +799,12 @@ function audWire(md) {
 function audSetDay(md) { const inp = $('#aud-day', md); if (inp) { inp.value = S.aud.day; dpSync(inp); } }
 // 2.5.1 (#393): one card per agent: name, status dot, at most two facts (state · lists), a third line only for a reached
 // limit or a failing webhook, the usage of today / 7 days on the right. Admins: Test / Edit / Pause; others: no actions.
+// 2.29.0 (#1024): every agent says what it is: Personal (whose) or Team
+function agKindHtml(a, adm) {
+  const own = adm ? a.owner : a.owner_id ? {id: a.owner_id, name: a.owner_id === S.me?.id ? tr('you') : personNameAny(a.owner_id)} : null;
+  return own ? ` <span class="agown" title="${esc(tr('Personal agent of {0}', own.name))}">${ic('user', 's')}${esc(tr('Personal'))} · ${esc(own.name)}</span>`
+    : ` <span class="agown agteam" title="${esc(tr('Team agent'))}">${ic('users', 's')}${esc(tr('Team'))}</span>`;
+}
 function agCardHtml(a, adm) {
   if (a.restricted) {  // 2.28.0 (#965): somebody else's personal agent: name, owner, the kill switch -- nothing else
     return `<div class="mrow agsrow agrestr ${a.enabled ? '' : 'off'}" data-agid="${a.id}">${av(a.id, a.name)}<span class="n"><span class="agnm"><b>${esc(a.name)}</b> <span class="agown" title="${esc(tr('Personal agent of {0}', a.owner?.name || ''))}">${ic('user', 's')}${esc(a.owner?.name || '')}</span></span>
@@ -738,7 +819,7 @@ function agCardHtml(a, adm) {
   const lim = a.usage?.reached || u?.limit_reached ? `<small class="agwarn aiulr">${ic('chart', 's')} ${a.usage ? aiuLimLine(a.usage) : esc(tr('limit reached'))}</small>` : '';
   const use = u && u.totals.d30.calls ? `<span class="agu" title="${esc(tr('Usage') + ': ' + tr('Today') + ' / ' + tr('7 days'))}"><small class="muted">${tr('Today')}</small> ${esc(aiuVal(u.totals.today, m))}<small class="muted">· ${tr('7 days')}</small> ${esc(aiuVal(u.totals.d7, m))}</span>` : '';
   const wsl = wsOn() && adm ? ` <span class="agws" title="${esc(tr('Workspace: {0}', wsLabel(a.org_id)))}">${a.org_id ? ic('brief', 's') : ic('home', 's')}${esc(wsLabel(a.org_id))}</span>` : '';  // 2.28.0 (#935)
-  return `<div class="mrow agsrow ${off ? 'off' : ''}" data-agid="${a.id}">${av(a.id, a.name)}<span class="n" ${more ? `title="${esc(more)}"` : ''}><span class="agnm"><b>${esc(a.name)}</b>${adm && a.username ? ` <span class="muted">${esc(a.username)}</span>` : ''}${adm && a.owner ? ` <span class="agown" title="${esc(tr('Personal agent of {0}', a.owner.name))}">${ic('user', 's')}${esc(a.owner.name)}</span>` : ''}${wsl}</span>
+  return `<div class="mrow agsrow ${off ? 'off' : ''}" data-agid="${a.id}">${av(a.id, a.name)}<span class="n" ${more ? `title="${esc(more)}"` : ''}><span class="agnm"><b>${esc(a.name)}</b>${adm && a.username ? ` <span class="muted">${esc(a.username)}</span>` : ''}${agKindHtml(a, adm)}${wsl}</span>
       <small class="muted agfacts"><i class="adot st-${esc(st)}" aria-hidden="true"></i>${esc(facts.join(' · '))}</small>${lim}${wh}</span>${use}
     ${adm ? `<span class="agacts"><button class="iconbtn" data-ag="test" title="${tr('Send test')}" aria-label="${tr('Send test')}" ${a.enabled ? '' : 'disabled'}>${ic('send', 's')}</button>
       <button class="iconbtn" data-ag="edit" title="${tr('Edit')}" aria-label="${tr('Edit')}">${ic('edit', 's')}</button>
@@ -998,13 +1079,15 @@ function agRtFields(a) {
     <div class="row"><label for="ag-model">${tr('Model')}</label><input id="ag-model" list="ag-models" value="${esc(rt.model || '')}" maxlength="100" placeholder="${esc(tr('Agent default'))}" autocomplete="off" autocapitalize="off" spellcheck="false"><datalist id="ag-models">${AG_MODELS.map(m => `<option value="${m}"></option>`).join('')}</datalist></div>
     <div class="row"><label for="ag-ac">${tr('Auto-compact')}</label><label class="chkl"><input type="checkbox" id="ag-ac" ${rt.autocompact !== false ? 'checked' : ''}> ${tr('On')}</label><span class="agpct"><input id="ag-acp" type="number" min="10" max="100" step="1" inputmode="numeric" value="${rt.autocompact_pct ?? ''}" placeholder="${esc(tr('default'))}" aria-label="${esc(tr('Compact at (% of the context)'))}" ${rt.autocompact !== false ? '' : 'disabled'}><span class="muted">%</span></span></div>
     <div class="row"><label>${tr('Nightly fresh restart')}</label>${timeIn('ag-nr', rt.nightly_reset || '', {label: tr('Nightly fresh restart'), empty: tr('Off')})}</div>
-    <div class="shint">${tr('Model: e.g. opus, sonnet, haiku or a full model id; empty = the agent’s default. Auto-compact: summarize the conversation when this much of the context is used (empty = the agent’s default). Nightly fresh restart: at this time (server time zone) the host starts the agent with a new session.')}</div>
+    <div class="row"><label for="ag-pm">${tr('Permissions')}</label><select id="ag-pm">${Object.entries(AG_PMODES).map(([k, v]) => `<option value="${k}" ${(rt.permission_mode || '') === k ? 'selected' : ''}>${esc(tr(v))}</option>`).join('')}</select></div>
+    <div class="shint">${tr('Model: e.g. opus, sonnet, haiku or a full model id; empty = the agent’s default. Auto-compact: summarize the conversation when this much of the context is used (empty = the agent’s default). Nightly fresh restart: at this time (server time zone) the host starts the agent with a new session. Permissions: Ask first = every action outside its allow list asks in the chat; Auto = its host’s safety check decides.')}</div>
     ${a ? `<div class="row"><label></label><button class="btn sm" type="button" data-m="reset" ${a.enabled ? '' : 'disabled'}>${ic('sync', 's')} ${tr('Reset now')}</button></div>` : ''}`;
 }
 function agRtBody(md) {
   const pct = $('#ag-acp', md).value.trim(), ac = $('#ag-ac', md).checked;
   if (pct && (!/^\d+$/.test(pct) || +pct < 10 || +pct > 100)) { const e = $('#ag-err', md); e.textContent = tr('Auto-compact: a percentage from 10 to 100'); e.hidden = false; $('#ag-acp', md).focus(); return null; }
-  return {model: $('#ag-model', md).value.trim(), autocompact: ac, autocompact_pct: pct ? +pct : null, nightly_reset: $('#ag-nr', md).value || ''};
+  return {model: $('#ag-model', md).value.trim(), autocompact: ac, autocompact_pct: pct ? +pct : null, nightly_reset: $('#ag-nr', md).value || '',
+    ...($('#ag-pm', md) ? {permission_mode: $('#ag-pm', md).value} : {})};
 }
 function aiuLimBody(md) {
   const soft = $('#ag-lsoft', md)?.value.trim(), hard = $('#ag-lhard', md)?.value.trim();

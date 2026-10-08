@@ -11,7 +11,7 @@ import urllib.parse
 import urllib.request
 from flask import jsonify, redirect, request, Response, send_from_directory
 
-from ..core.config import app, APP_VERSION, ATT_DIR, MAX_FILE_MB, ntfy_attachment_url, NTFY_IN, safe_urlopen
+from ..core.config import app, APP_VERSION, ATT_DIR, ICAL_PREFIX, PUB_PREFIX, SEARCH_INDEX, MAX_FILE_MB, ntfy_attachment_url, NTFY_IN, safe_urlopen
 from ..core.i18n import lang, N_, tr, trn
 from ..core.db import bump, connect, db, default_uid, err, gset, gsetting, iso, now_utc
 from ..accounts.session import client_ip, GATE, me
@@ -38,6 +38,9 @@ def headers(resp):
     resp.headers.setdefault("Permissions-Policy", PERMISSIONS_POLICY)
     if request.is_secure:  # https (directly or from a trusted proxy): browsers stay on https; a proxy's own header wins
         resp.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
+    # 2.29.0 (#1026): never indexed unless the operator allows it; public list links, forms and feeds never
+    if not SEARCH_INDEX or request.path.startswith((PUB_PREFIX, ICAL_PREFIX, "/f/", "/api/", "/dav")):
+        resp.headers["X-Robots-Tag"] = "noindex, nofollow"
     if request.path.startswith("/api/") and not request.path.startswith(("/api/attachments/", "/api/chat-files/", "/api/avatar/", "/api/list-icon/", "/api/list-files/")):
         resp.headers["Cache-Control"] = "no-store"
     return resp
@@ -350,6 +353,15 @@ def drop_to_agent(c, u, lg, to, text, files):
     name = user_names(c, [aid]).get(aid, "")
     print("drop: chat message", r["id"], "user", u["id"], "agent", aid, len(files), "files", flush=True)
     return Response(tr("Kalmido: sent to {0}", name, lg=lg) + "\n", mimetype="text/plain")
+
+
+@app.get("/robots.txt")
+def robots_txt():  # 2.29.0 (#1026): was a redirect to the sign-in page
+    body = "User-agent: *\n" + (f"Disallow: {PUB_PREFIX}\nDisallow: /f/\nDisallow: {ICAL_PREFIX}\nDisallow: /api/\n" if SEARCH_INDEX
+                                else "Disallow: /\n")
+    r = Response(body, mimetype="text/plain")
+    r.headers["Cache-Control"] = "public, max-age=3600"
+    return r
 
 
 @app.get("/manifest.json")

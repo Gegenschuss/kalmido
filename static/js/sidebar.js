@@ -289,6 +289,7 @@ function folderMenu(anchor, f) {
   menu(anchor, [
     {label: tr('New list in this folder'), icon: 'plus', fn: () => listModal(null, f)},
     ...(collab() && folderLists(f).some(l => isOwner(l)) ? [{label: tr('Share folder…'), icon: 'users', fn: () => folderPeopleModal(f)}] : []),  // 2.22.0 (#740)
+    ...(folderLists(f).some(l => isOwner(l)) || S.folderProps?.[f] ? [{label: tr('Folder settings…'), icon: 'sliders', fn: () => folderPropsModal(f)}] : []),  // 2.29.0 (#1030 / #929)
     ...(collab() && (S.groups || []).length && folderLists(f).some(l => isOwner(l)) ? [{label: tr('Share with a group…'), icon: 'users', fn: () => folderGroupsModal(f)}] : []),  // 2.10.0 (#441)
     ...(sub ? [] : [{label: tr('New subfolder…'), icon: 'folder', fn: () => newFolder(null, f)}]),
     {label: tr('Rename'), icon: 'edit', fn: async () => {
@@ -313,9 +314,16 @@ async function folderPeopleModal(f) {
   const md = modal(`<h3>${ic('users', 's')} ${esc(tr('Share folder “{0}”', fDisp(f)))}</h3>
     <p class="muted">${tr('Every list in this folder is shared now, and every list you add to it later. With them the lists land in a folder of the same name; they can move them freely.')}</p>
     <div class="fpl" id="fp-list"></div>
-    <div class="row"><label for="fp-user">${tr('Person')}</label><select id="fp-user">${users.map(u => `<option value="${u.id}">${esc(u.display_name)}</option>`).join('')}</select><select id="fp-role" aria-label="${esc(tr('Role'))}"><option value="edit">${tr('Member')}</option><option value="view">${tr('Viewer')}</option></select><button type="button" class="btn pri" data-m="add">${tr('Share')}</button></div>
+    <div class="row"><label for="fp-user">${tr('Person')}</label><select id="fp-user">${users.map(u => `<option value="${u.id}">${esc(u.display_name)}</option>`).join('')}</select><select id="fp-role" aria-label="${esc(tr('Role'))}">${FP_ROLES.map(([k, n]) => `<option value="${k}" ${k === 'edit' ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select><button type="button" class="btn pri" data-m="add">${tr('Share')}</button></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Done')}</button></div>`);
-  const draw = () => { $('#fp-list', md).innerHTML = have.length ? have.map(p => { const u = users.find(x => x.id === p.user_id); return `<div class="mrow">${av(p.user_id, u?.display_name || '?')}<span class="n">${esc(u?.display_name || '?')} <span class="muted">${esc(p.role === 'view' ? tr('Viewer') : tr('Member'))} · ${tr('new lists too')}</span></span><button class="iconbtn" data-rm="${p.user_id}" title="${esc(tr('Stop sharing new lists'))}" aria-label="${esc(tr('Stop sharing new lists with {0}', u?.display_name || '?'))}">${ic('x', 's')}</button></div>`; }).join('') : `<p class="muted">${tr('Not shared yet.')}</p>`; };
+  // 2.29.0 (#929): every role like in a list, changeable here (it reaches the lists in the folder); removing asks whether the
+  // person also leaves the folder's lists or only gets no new ones
+  const draw = () => { $('#fp-list', md).innerHTML = have.length ? have.map(p => { const u = users.find(x => x.id === p.user_id); return `<div class="mrow">${av(p.user_id, u?.display_name || '?')}<span class="n">${esc(u?.display_name || '?')} <span class="muted">${tr('new lists too')}</span></span><select data-fprole="${p.user_id}" aria-label="${esc(tr('Role of {0}', u?.display_name || '?'))}">${FP_ROLES.map(([k, n]) => `<option value="${k}" ${p.role === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select><button class="iconbtn" data-rm="${p.user_id}" title="${esc(tr('Stop sharing'))}" aria-label="${esc(tr('Stop sharing with {0}', u?.display_name || '?'))}">${ic('x', 's')}</button></div>`; }).join('') : `<p class="muted">${tr('Not shared yet.')}</p>`; };
+  md.addEventListener('change', async e => {
+    const s = e.target.closest('[data-fprole]'); if (!s) return;
+    const uid = +s.dataset.fprole;
+    try { const j = await api('PUT', '/api/folders/people', {folder: f, user_id: uid, role: s.value}); have = have.map(x => x.user_id === uid ? {...x, role: s.value} : x); toast(j.updated ? trn('Role changed in {0} list', 'Role changed in {0} lists', j.updated) : tr('Saved')); } catch { draw(); }
+  });
   draw();
   md.addEventListener('click', async e => {
     const b = e.target.closest('button'); if (!b) return;
@@ -324,8 +332,15 @@ async function folderPeopleModal(f) {
       const uid = +$('#fp-user', md).value, role = $('#fp-role', md).value; if (!uid) return;
       try { const j = await api('PUT', '/api/folders/people', {folder: f, user_id: uid, role}); have = [...have.filter(x => x.user_id !== uid), {user_id: uid, role}]; draw(); toast(trn('{0} list shared', '{0} lists shared', j.shared)); } catch { /* api() said it */ }
     }
-    if (b.dataset.rm) { try { await api('DELETE', '/api/folders/people', {folder: f, user_id: +b.dataset.rm}); have = have.filter(x => x.user_id !== +b.dataset.rm); draw(); } catch { /* api() said it */ } }
+    if (b.dataset.rm) {
+      const uid = +b.dataset.rm, nm = users.find(x => x.id === uid)?.display_name || '?';
+      menu(b, [{label: tr('Also remove from the lists in the folder'), sub: tr('{0} no longer sees them', nm), icon: 'x', fn: () => rm(uid, true)},
+        {label: tr('Only stop sharing new lists'), sub: tr('The lists shared so far stay'), icon: 'pause', fn: () => rm(uid, false)}]);
+    }
   });
+  const rm = async (uid, remove) => {
+    try { const j = await api('DELETE', '/api/folders/people', {folder: f, user_id: uid, ...(remove ? {remove: true} : {})}); have = have.filter(x => x.user_id !== uid); draw(); if (remove) toast(trn('Removed from {0} list', 'Removed from {0} lists', j.removed || 0)); } catch { /* api() said it */ }
+  };
 }
 // the sidebar order (+ folder moves) in one request, as one history step (label: what it was)
 const listOrderNow = () => S.lists.filter(l => !l.is_inbox).sort((a, b) => (a.sort || 0) - (b.sort || 0) || a.id - b.id).map(l => l.id);
@@ -518,3 +533,88 @@ function sdEnd(e) {
 document.addEventListener('touchend', sdEnd);
 document.addEventListener('touchcancel', sdEnd);
 document.addEventListener('dragend', () => { listDrag = null; folderDrag = null; });
+
+// ---- 2.29.0 (#1030 / #929) folder settings: defaults of my folder for every list in it and its subfolders (workspace, agent,
+// "Members may use it", "Agents may address each other", tidying) next to its people and roles ("Share folder"). A new list
+// in the folder gets them; on a change the existing lists follow (or only new ones); a list changed on its own keeps its
+// value ("differs from the folder") until "Back to the folder" in its dialog.
+const FP_ROLES = [['admin', N_('Admin')], ['edit', N_('Member')], ['participant', N_('Participant')], ['view', N_('Viewer')]];
+const FP_KEYS = {org_id: N_('Workspace'), agent_id: N_('Agent'), agent_members: N_('Members may use the agent'), agent_peers: N_('Agents may address each other'), agent_tidy: N_('Tidy up')};
+function folderEff(path) {
+  const parts = String(path || '').split(FSEP).filter(Boolean), out = {};
+  for (let i = 1; i <= parts.length; i++) Object.assign(out, (S.folderProps || {})[parts.slice(0, i).join(FSEP)] || {});
+  return out;
+}
+function folderValTxt(k, v) {
+  if (k === 'org_id') return wsName(v ? 'org:' + v : 'private');
+  if (k === 'agent_id') return v ? agentById(v)?.name || personNameAny(v) : tr('No agent');
+  if (k === 'agent_tidy') return tr(TIDY_SHORT[v] || v);
+  return v ? tr('On') : tr('Off');
+}
+const folderSharedIn = f => (S.foldersSharedIn || []).find(x => f && (f === x.folder || f.startsWith(x.folder + FSEP)));
+function folderHintHtml(l, id, folder) {
+  const f = id ? l.folder || '' : folder || '';
+  if (!f || (id && !isOwner(l))) return '';
+  const eff = folderEff(f), keys = Object.keys(eff).filter(k => FP_KEYS[k] && (k !== 'org_id' || wsOn()));
+  const own = id ? (() => { try { return JSON.parse(l.folder_own || '[]'); } catch { return []; } })().filter(k => keys.includes(k)) : [];
+  const parts = [];
+  if (keys.length) parts.push(`${ic('folder', 's')} ${esc(tr('From the folder “{0}”:', fDisp(f)))} ${keys.map(k => `<span class="${own.includes(k) ? 'fown' : ''}">${esc(tr(FP_KEYS[k]))}: ${esc(folderValTxt(k, eff[k]))}</span>`).join(' · ')}`);
+  if (own.length) parts.push(`${esc(tr('This list differs: {0}', own.map(k => tr(FP_KEYS[k])).join(', ')))} <button type="button" class="linkbtn" data-freset="${l.id}">${tr('Back to the folder')}</button>`);
+  const sh = !id && folderSharedIn(f);
+  if (sh) parts.push(`${ic('users', 's')} ${esc(trn('It will be shared with everyone in the folder “{1}” ({0} person).', 'It will be shared with everyone in the folder “{1}” ({0} people).', sh.people, fDisp(sh.folder)))} <button type="button" class="linkbtn" data-fnone="1">${tr('Create it without a folder instead')}</button>`);
+  return parts.join('<br>');
+}
+document.addEventListener('click', async e => {
+  const r = e.target.closest?.('[data-freset]'), n = e.target.closest?.('[data-fnone]');
+  if (r) { try { const j = await api('POST', `/api/lists/${+r.dataset.freset}/folder-reset`, {}); await load(); render(); const l = listById(+r.dataset.freset), h = $('#l-fhint'); if (h && l) { h.innerHTML = folderHintHtml(l, l.id); h.hidden = !h.innerHTML; } toast(j.skipped?.length ? j.skipped.map(x => `${tr(FP_KEYS[x.key])}: ${x.reason}`).join(' · ') : tr('Takes the folder’s settings again')); } catch { /* api() said it */ } }
+  if (n) { const i = $('#l-folder'); if (i) { i.value = ''; i.dispatchEvent(new Event('input', {bubbles: true})); } }
+});
+document.addEventListener('input', e => {
+  if (e.target.id !== 'l-folder') return;
+  const h = $('#l-fhint'); if (!h || $('.lhdr', e.target.closest('.modal'))) return;  // a new list only (an existing one shows it after saving)
+  h.innerHTML = folderHintHtml({}, 0, fNorm(e.target.value)); h.hidden = !h.innerHTML;
+  const ws = $('#l-ws'); const fp = folderEff(fNorm(e.target.value)); if (ws && 'org_id' in fp) ws.value = fp.org_id ? String(fp.org_id) : '';
+});
+async function folderPropsModal(f) {
+  let info, users = [];
+  try { [info, users] = await Promise.all([api('GET', '/api/folders/props?folder=' + encodeURIComponent(f)), api('GET', '/api/users').then(j => j.users.filter(u => u.agent && !u.disabled)).catch(() => [])]); } catch { return; }
+  const p = info.props || {}, inh = info.inherited || {};
+  const sel = (id, k, opts) => `<div class="row"><label for="${id}">${tr(FP_KEYS[k])}</label><select id="${id}" data-fk="${k}"><option value="">${esc(inh[k] ? tr('As the folder above: {0}', folderValTxt(k, inh[k].value)) : tr('Not set (each list decides)'))}</option>${opts.map(([v, n]) => `<option value="${esc(String(v))}" ${k in p && String(p[k] === true ? 1 : p[k] === false ? 0 : p[k]) === String(v) ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>`;
+  const ownN = (info.lists || []).filter(l => l.own.length).length;
+  const md = modal(`<h3>${ic('sliders', 's')} ${esc(tr('Folder settings “{0}”', fDisp(f)))}</h3>
+    <p class="muted">${tr('Defaults for every list in this folder and its subfolders, also for new ones. A list can still be changed on its own; it then keeps its value.')}</p>
+    ${wsOn() ? sel('fs-ws', 'org_id', [[0, wsName('private')], ...(S.me.workspaces || []).map(w => [w.id, w.name])]) : ''}
+    ${collab() ? sel('fs-ag', 'agent_id', [[0, tr('No agent')], ...users.map(u => [u.id, u.display_name])]) + sel('fs-am', 'agent_members', [[1, tr('On')], [0, tr('Off')]]) + sel('fs-ap', 'agent_peers', [[1, tr('On')], [0, tr('Off')]]) + sel('fs-td', 'agent_tidy', TIDY.map(([k, n]) => [k, tr(n)])) : ''}
+    ${collab() ? `<div class="row"><label>${tr('People')}</label><button type="button" class="btn sm" data-m="people">${ic('users', 's')} ${tr('People and roles…')}</button></div>` : ''}
+    <fieldset class="fsapply"><legend>${tr('Apply to')}</legend>
+      <label class="chkl"><input type="radio" name="fs-ap" value="all" checked> ${tr('New lists and the {0} lists in the folder', (info.lists || []).length)}</label>
+      <label class="chkl"><input type="radio" name="fs-ap" value="new"> ${tr('Only new lists')}</label>
+      ${ownN ? `<label class="chkl"><input type="checkbox" id="fs-force"> ${esc(trn('Also the {0} list changed on its own', 'Also the {0} lists changed on their own', ownN))}</label>` : ''}</fieldset>
+    <div class="fsprev" id="fs-prev" hidden></div>
+    <div class="foot"><div class="calerr" role="alert" id="fs-err" hidden></div><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Save')}</button></div>`);
+  let confirmed = false;
+  const bodyOf = dry => {
+    const props = {};
+    $$('[data-fk]', md).forEach(s => { const k = s.dataset.fk, v = s.value; if (v === '') { if (k in p) props[k] = null; return; }
+      props[k] = k === 'agent_members' || k === 'agent_peers' ? v === '1' : k === 'agent_tidy' ? v : +v; });
+    return {folder: f, props, apply: $('[name="fs-ap"]:checked', md).value, ...($('#fs-force', md)?.checked ? {force: true} : {}), ...(dry ? {dry_run: true} : {})};
+  };
+  md.addEventListener('change', () => { confirmed = false; $('#fs-prev', md).hidden = true; $('[data-m="ok"]', md).textContent = tr('Save'); });
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.m === 'close') { md.remove(); return; }
+    if (b.dataset.m === 'people') { md.remove(); folderPeopleModal(f); return; }
+    if (b.dataset.m !== 'ok') return;
+    const body = bodyOf(false), er = $('#fs-err', md); er.hidden = true;
+    if (!confirmed && body.apply === 'all' && Object.keys(body.props).length) {  // first say which lists cannot follow
+      let d; try { d = await api('PUT', '/api/folders/props', bodyOf(true)); } catch (x) { er.textContent = x.message; er.hidden = false; return; }
+      const bad = (d.lists || []).filter(l => l.skipped.length || l.own.length);
+      if (bad.length) {
+        const pv = $('#fs-prev', md);
+        pv.innerHTML = `<b>${esc(trn('{0} list does not follow:', '{0} lists do not follow:', bad.length))}</b><ul>${bad.map(l => `<li>${esc(l.name)}: ${esc([...l.skipped.map(x => `${tr(FP_KEYS[x.key])} – ${x.reason}`), ...l.own.map(k => tr('{0} changed on its own', tr(FP_KEYS[k])))].join('; '))}</li>`).join('')}</ul>${esc(trn('{0} setting changes in the other lists.', '{0} settings change in the other lists.', d.changed))}`;
+        pv.hidden = false; confirmed = true; b.textContent = tr('Save anyway'); return;
+      }
+    }
+    try { const r = await api('PUT', '/api/folders/props', body); md.remove(); await load(); render(); toast(r.changed ? trn('{0} setting changed in the lists', '{0} settings changed in the lists', r.changed) : tr('Saved')); } catch (x) { er.textContent = x.message; er.hidden = false; }
+  });
+}

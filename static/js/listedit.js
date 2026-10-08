@@ -212,6 +212,7 @@ const agentBusyState = () => { const ags = (S.agents || []).filter(a => a.enable
 const agentStatusLines = () => (S.agents || []).filter(a => a.enabled && a.status !== 'idle').map(agentHstLine);  // 2.13.0 (#453 P10): no stale status text while not connected
 // live update without re-rendering what someone may be typing in (task panel, chat)
 function agentLive() {
+  chatFabDraw();  // 2.29.0 (#363): the pop-up button follows the agents (unread count, last agent, module on / off)
   const t = S.sel && taskById(S.sel), d = $('#d-typing');
   if (d) d.outerHTML = typingHtml(taskTypers(t), 'd-typing');
   // 2.12.2 (#451): the typing row and the state chip are swapped only when they changed; the dots appearing make the list

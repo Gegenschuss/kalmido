@@ -443,6 +443,22 @@ Authorization: Bearer abk_...
 
 Store `cursor` and pass it as `since` next time. `since=0` returns everything that is still kept.
 
+**No backlog floods (2.29.0).** An agent that connects for the first time, or was offline for days, must not get hundreds
+of old events, each one a model run:
+
+- `since=latest` returns no events, only the newest `cursor`: a new poller (a new token, a new service) starts from now.
+  The reference launchers and the MCP tools accept it.
+- Events older than `KALMIDO_AGENT_EVENTS_STALE_H` hours (default 48, `0` = off; a poller that runs only once a day should raise it) come as **one** event `missed`
+  `{count, events: {type: n}, from, to, stale_hours}` instead of one by one. React by reading the current state
+  (`GET /api/v1/tasks?…`, the chat) rather than replaying them.
+- More than five tasks added to one list by one person within a minute (a bulk move, an import, a script, multi-select)
+  come as **one** event `tasks_added` `{list, list_id, task_ids, count, how: created | moved | mixed, moved_from?, source?}`
+  about 15 seconds after the last one; the first five still come as single `task_added` events. Tasks created in bulk
+  through the API get no `tidy` event each (only the first five); typing in the app keeps every one.
+
+Recommendation for services that start a model run per event: bundle what arrived within a few seconds into one run, and
+never start runs for events of your own owner's bulk changes.
+
 ### Long polling
 
 Add `wait=<seconds>` (maximum 60) and the request waits until an event arrives or the time is up. Then the agent reacts within a second or two, and an idle agent costs about one request a minute.
@@ -556,7 +572,9 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `chat` | a person writes in their chat with the agent | `message` `{id, body, task_id, created_at, attachments}`, `user` `{id, name}`; fetching it marks the message *delivered* (2.7.2); 2.13.1: `attachments` `[{id, name, mime, size, url}]` (images / files, `body` may then be empty) |
 | `reaction` | someone reacts to one of the agent's comments; 2.7.2: or to one of its chat messages | comments: `task`, `list`, `comment` `{id, text}`, `reaction` `{emoji, user}`, `approval`: `approved`, `rejected` or `null`; chat: `chat_message` `{id, text, from, created_at}`, `reaction`, `approval`, `user` ([Chat reactions](#chat-reactions-and-delivery-272)) |
 | `job` | someone presses Approve, Reject or Stop on one of the agent's jobs; 2.3.0: a proposal was applied (`approve`) or discarded (`reject`) | `job`, `action`: `approve`, `reject` or `stop`, `user`; for proposals also `proposal` `{state: applied \| discarded, created, changed, list_id}` |
-| `tidy` | a person creates a task in a list with tidy mode `suggest` or `auto`; 2.4.1: only to the list's tidy agent (`list.tidy_agent_id`) | `task`, `list`, `mode` |
+| `tidy` | a person creates a task in a list with tidy mode `suggest` or `auto`; 2.4.1: only to the list's tidy agent (`list.tidy_agent_id`); 2.29.0: not for tasks created in bulk through the API beyond the first five | `task`, `list`, `mode` |
+| `tasks_added` | 2.29.0: more than five tasks added to one list by one person within a minute ([No backlog floods](#polling-no-public-endpoint-needed)) | `list`, `list_id`, `task_ids`, `count`, `how`, `moved_from`?, `source`?, `truncated` |
+| `missed` | 2.29.0: events older than two days (`KALMIDO_AGENT_EVENTS_STALE_H`), folded into one at the next poll | `count`, `events` `{type: n}`, `from`, `to`, `stale_hours` |
 | `wake` | `POST …/wake` ([Wake endpoint](#wake-endpoint-for-agents-without-an-event-loop)) | `task` and `list` (or none), `user`, `source`: `task` or `chat` |
 | `runtime_changed` | 2.4.1: an admin changed the agent's [runtime settings](#runtime-settings) | `runtime` |
 | `reset` | 2.4.1: an admin pressed *Reset now*: the host should restart the agent with a fresh session | `reset_seq`, `runtime`, `user` |
@@ -875,6 +893,12 @@ agent accordingly.
 | Auto-compact | summarize the conversation when this much of the context is used; off = never | `autocompact` (bool), `autocompact_pct` (10-100 or `null` = the agent's default) |
 | Nightly fresh restart | a new session every night at this time, in the server's time zone | `nightly_reset` (`"HH:MM"`, `""` = off), `timezone` |
 | Reset now (button) | restart with a fresh session right away | `reset_seq` goes up by one, event `reset` |
+| Permissions (2.29.0) | how the host handles actions outside the agent's allow list: *Ask first* (every such action asks the person in the chat), *Auto* (the host's own safety check decides; risky actions stay blocked), empty = the host's default | `permission_mode` (`"ask"`, `"auto"`, `""`) |
+
+2.29.0: the permission mode shows as a small badge in the agent's chat header (*Auto* / *Ask first*). The owner of a
+personal agent, and an admin for a team agent, switch it there (`PUT /api/agents/{id}/permission-mode {"mode": "auto"}`)
+or in the runtime section; the owner of a personal agent also through `PATCH /api/my/agents/{id} {"runtime": {…}}`. The
+host reads it before every run (Claude Code: `--permission-mode` with `default` for *ask*, `auto` for *auto*).
 
 ```
 GET /api/v1/agent   -> {…, "runtime": {"model": "sonnet", "autocompact": true, "autocompact_pct": 70,

@@ -90,7 +90,7 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   // ================= Settings > Agents > Set up: the admin's limit, the admin's agent dialog
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
   w.eval(`settingsModal('ai')`); await sleep(500);
-  await w.eval(`aiSubShow(document.querySelector('.smodal'), 'setup', false)`);
+  await w.eval(`aiSubShow(document.querySelector('.smodal'), 'admin', false)  /* 2.29.0 (#1024): the limit sits under Administration */`);
   await until(() => d.querySelector('#s-sclim .sclim'));
   const lim = [...d.querySelectorAll('#s-sclim .sclim')];
   check(lim.length === 2 && !lim[0].querySelector('[data-scope="account"]') && lim[1].querySelector('[data-scope="account"]'), 'limit: agents (no account) + personal tokens');
@@ -241,7 +241,7 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
     // the admin's limit grids
     await nav(B + '#today'); await ready(ev);
     await ev(`(() => { settingsModal('ai'); return 1; })()`); await sleep(600);
-    await ev(`(() => { aiSubShow(document.querySelector('.smodal'), 'setup', false); return 1; })()`);
+    await ev(`(() => { aiSubShow(document.querySelector('.smodal'), 'admin', false); return 1; })()`);
     for (let i = 0; i < 20 && !(await ev(`!!document.querySelector('#s-sclim .sclim')`)); i++) await sleep(300);
     const lm = await ev(`(() => { const rows = [...document.querySelectorAll('#s-sclim .chkl')].map(x => x.getBoundingClientRect()); return {n: rows.length, over: document.documentElement.scrollWidth - innerWidth, out: rows.filter(x => x.right > innerWidth + 1).length, minH: Math.round(Math.min(...rows.map(x => x.height)))}; })()`);
     check(lm.n === 25 && lm.over <= 1 && lm.out === 0 && lm.minH >= 44, `${tag}: the limit grids fit ` + JSON.stringify(lm));
