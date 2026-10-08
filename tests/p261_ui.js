@@ -282,6 +282,8 @@ const HEAD = `(() => {
         }
         await shot(`p261-head-${vw}.png`);
         await ev(`document.querySelector('#top .bell').click(); 1`); await sleep(1200);
+        // 2.31.2: the dropdown is placed again once the News have loaded (CI measured it in between once): wait for that
+        await until(() => ev(`(() => { const r = document.querySelector('#pop').getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth + .5 && r.bottom <= innerHeight + .5; })()`), 27);
         const bp = await ev(`(() => { const p = document.querySelector('#pop'); const r = p.getBoundingClientRect(); const ch = [...p.querySelectorAll('.nchip, [data-bp="all"]')].map(e => { const b = e.getBoundingClientRect(); return [b.width, b.height]; }); return {open: !p.classList.contains('hidden'), sheet: p.classList.contains('sheet'), l: r.left, r: r.right, t: r.top, b: r.bottom, ih: innerHeight, iw: innerWidth, ch, mod: S.route.mod}; })()`);
         check(bp.open && bp.l >= 0 && bp.r <= bp.iw + .5 && bp.b <= bp.ih + .5 && bp.mod === 'tasks', `${vw}px: the bell's ${touch ? 'sheet' : 'dropdown'} inside the viewport, the view stays ${JSON.stringify(bp)}`);
         check(touch ? bp.sheet : !bp.sheet, `${vw}px: ${touch ? 'a sheet' : 'a dropdown'}`);
