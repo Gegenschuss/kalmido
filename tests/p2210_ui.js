@@ -341,7 +341,8 @@ const ALL = 'cal,timeline,comments,collab,events,contacts';
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1440, height: 900}});
     check(await ffLogin(o, 'alice', 'light') === 200, tag + ': login');
     await o.nav(B + '#cal'); await ready(ev, '#view .calbar');
-    await ev(`(() => { S.calMode = 'week'; S.calSel = '${t1}'; calInvalidate(); renderView(); document.querySelector('#wbody').scrollTop = 8 * weekH(); return 1; })()`); await sleep(900);
+    // the week of the day after tomorrow (2.31.2: the week of tomorrow lacked it on a Friday when weeks start on Sunday)
+    await ev(`(() => { S.calMode = 'week'; S.calSel = '${t2}'; calInvalidate(); renderView(); document.querySelector('#wbody').scrollTop = 8 * weekH(); return 1; })()`); await sleep(900);
     check(await sideways(ev) <= 0, `${tag}: week: nothing sideways`);
     await axe(ev, `${tag} week view`);
     // drag over free time: 13:00-14:30 of the day after tomorrow
