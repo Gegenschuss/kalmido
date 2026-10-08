@@ -473,7 +473,7 @@ document.addEventListener('click', async e => {
     case 'ms-open': openDetail(+a.dataset.id); break;  // 2.18.0 (#430): a task of the milestone
     case 'ms-copy': { const md = S.msr?.j?.release_notes; if (!md) break; try { await navigator.clipboard.writeText(md); toast(tr('Copied')); } catch { toast(tr('Copy failed')); } break; }
     case 'md-more': { (S.mdMore ||= new Set()); S.mdMore.has(S.sel) ? S.mdMore.delete(S.sel) : S.mdMore.add(S.sel); const m = $('#d-md'), open = S.mdMore.has(S.sel); if (m) m.classList.toggle('clamp', !open); a.textContent = open ? tr('Show less') : tr('Show more'); a.setAttribute('aria-expanded', open); break; }
-    case 'd-jump-cm': $('#d-tl')?.scrollIntoView({block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth'}); break;  // 2.31.0 (#1054): replaces the Details | Comments tabs
+    case 'd-jump-cm': { const tl = $('#d-tl'); if (tl) { tl.style.scrollMarginTop = ($('#detail .dtop')?.offsetHeight || 0) + 'px'; tl.scrollIntoView({block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth'}); } break; }  // 2.31.0 (#1054): replaces the Details | Comments tabs; 2.31.1: the heading stays below the sticky panel header
     case 'sec-add': e.stopPropagation(); secAddOpen(+a.dataset.sec || 0); break;
     case 'c-send': sendComment(); break;
     case 'c-file-rm': { const arr = S.cfiles[S.sel] || []; arr.splice(+a.dataset.i, 1); $('#c-files').innerHTML = composerFiles(S.sel); break; }

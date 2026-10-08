@@ -2137,7 +2137,7 @@ body.tl-typing #tabs,body.tl-typing #fab{display:none}
 @media (pointer:coarse){ .ghead .odact .btn.sm{min-height:2.75rem} }  /* fix 2.31: 44 px on touch (own line on phones) */
 /* review 2.31: on narrow screens the overdue actions get a line of their own under the heading (long German labels) */
 .ghead:has(.odact){flex-wrap:wrap}
-@media (max-width:640px){ .ghead .odact{flex:1 0 100%;order:7;margin:.25rem 0 0 1.25rem} }
+@media (max-width:640px){ .ghead .odact{flex:1 0 calc(100% - 1.25rem);max-width:calc(100% - 1.25rem);flex-wrap:wrap;order:7;margin:.25rem 0 0 1.25rem} }  /* 2.31.1: 100% + the indent ran 2 px out at font size XL; the two buttons wrap instead */
 /* 1.8.1: the sign-in / first-run screens are a page of their own, centered on every screen (tablets in portrait,
    e.g. a Galaxy Fold unfolded, showed a bottom sheet under 900 px) and never see-through (light theme dimmed the app) */
 .modal.authscreen,:root[data-theme] .modal.authscreen{background:var(--bg);align-items:center;padding:calc(1rem + var(--safe-t)) 1rem calc(1rem + var(--safe-b))}
@@ -5185,3 +5185,7 @@ a.nitem.ndm{text-decoration:none;color:inherit}
    letting the labels run into each other */
 .aisub button{flex:1 0 auto}
 .aisub{scroll-padding-inline:.5rem}
+/* 2.31.1 (#1051 device test): on a phone the number starts the meta line right of the done circle; the circle's touch area
+   (::after, 17 px each side) reached over it, so a tap on the number ticked the task off. Rightwards it now ends ~6 px
+   past the circle, short of the title column (up and down and to the left it keeps its 44 px) */
+@media (max-width:899px){ :root .trow .chk::after{right:-.375rem} }

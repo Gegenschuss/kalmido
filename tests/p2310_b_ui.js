@@ -239,7 +239,7 @@ const CHIP = `(() => { const a = [...document.querySelectorAll('#detail .attsec 
     const mr = await ev(`(() => { const r = document.querySelector('#d-tl [data-act="tl-menu"]').getBoundingClientRect(); return {w: Math.round(r.width), h: Math.round(r.height)}; })()`);
     check(mr.w >= 24 && mr.h >= 24, '390: #1054 the "…" of the comment head ' + JSON.stringify(mr));
     await ev(`(() => { document.querySelector('#detail .djump').click(); return 1; })()`); await sleep(700);
-    check(await ev(`(() => { const r = document.querySelector('#d-tl').getBoundingClientRect(); return r.top >= 0 && r.top < innerHeight / 2; })()`), '390: #1054 the jump brings the comments up');
+    check(await ev(`(() => { const r = document.querySelector('#d-tl').getBoundingClientRect(); const h = document.querySelector('#detail .dtop').getBoundingClientRect(); return r.top >= Math.round(h.bottom) - 1 && r.top < innerHeight / 2; })()`), '390: #1054 the jump brings the comments up, below the panel header (2.31.1)');
     await ev(`(() => { document.querySelector('#d-tl [data-act="tl-menu"]').click(); return 1; })()`); await sleep(400);
     check(await ev(`(() => { const p = document.querySelector('#pop'); const r = p.getBoundingClientRect(); return !p.classList.contains('hidden') && r.left >= 0 && r.right <= innerWidth + 1 && !!p.querySelector('.mtlact'); })()`), '390: #1054 the "…" menu opens on the screen');
     await shot('p2310b-390-comments.png');

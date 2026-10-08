@@ -82,7 +82,9 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return ds(d
     await shot('p2310a-390-list.png');
     // #1051 a tap on the number (now in the meta line, where the dead zone was) opens the task; the circle's own 44 px
     // target ends where the title begins
-    const pt = await ev(`(() => { const r = ${rowJs(T1)}; r.scrollIntoView({block: 'center'}); const c = r.querySelector('.chk'), t = r.querySelector('.ttl').getBoundingClientRect(), m = r.querySelector('.meta .mid').getBoundingClientRect(), hit = c.getBoundingClientRect().right + parseFloat(getComputedStyle(c, '::after').right) * -1; return {x: m.left + m.width / 2, y: m.top + m.height / 2, hitEnd: Math.round(hit), title: Math.round(t.left)}; })()`);
+    const pt = await ev(`(() => { const r = ${rowJs(T1)}; r.scrollIntoView({block: 'center'}); const c = r.querySelector('.chk'), t = r.querySelector('.ttl').getBoundingClientRect(), m = r.querySelector('.meta .mid').getBoundingClientRect(), hit = c.getBoundingClientRect().right + parseFloat(getComputedStyle(c, '::after').right) * -1; return {x: m.left + m.width / 2, y: m.top + m.height / 2, hitEnd: Math.round(hit), title: Math.round(t.left), num: Math.round(m.left)}; })()`);
+    // 2.31.1 (device test): on a real phone the circle's touch area reached over the number and ticked the task off
+    check(pt.hitEnd <= pt.num - 4 && pt.hitEnd <= pt.title - 4, `${tag}: #1051 the circle's touch area ends before the number and the title ` + JSON.stringify(pt));
     await sleep(300);
     await tap(cmd, ctx, pt.x, pt.y); await sleep(900);
     check(await ev(`S.sel === ${T1} && !!document.querySelector('#detail.open')`) && !(await call('GET', '/api/state')).tasks.find(t => t.id === T1)?.status, `${tag}: #1051 a tap on the number opens the task ` + JSON.stringify(pt));

@@ -7,6 +7,16 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.31.1] - 2026-10-08
+
+### Fixed
+- **Task rows on a phone** (#1051): a tap on the ticket number in the meta line ticked the task off on real phones (the
+  done circle's touch area reached over the number); the area now ends before the number and the title, and the number
+  opens the task as intended.
+- **Today on a phone** (#1052): with the largest font size the overdue actions under the Overdue heading ran past the
+  screen edge; they now wrap.
+- **"To the comments"** (#1054): the jump no longer hides the comments heading under the panel's header.
+
 ## [2.31.0] - 2026-10-08
 
 **In short:** Phone everyday, part 1 of a usability round. **Task rows line up** on a phone (the ticket number moved into
@@ -3263,7 +3273,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.31.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.31.1...HEAD
+[2.31.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.31.1
 [2.31.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.31.0
 [2.30.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.30.0
 [2.29.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.29.0
