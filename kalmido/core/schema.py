@@ -708,6 +708,60 @@ CREATE TABLE IF NOT EXISTS folder_notif (
 -- many accounts from exactly one private address = the reverse proxy does not pass the client's address on
 CREATE TABLE IF NOT EXISTS login_ips (
   ip TEXT NOT NULL, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, at TEXT NOT NULL, PRIMARY KEY (ip, user_id));
+-- 2.36.1 (#1021): office & finance (module "office", B): settings + master data of an organisation (tenant). All rows
+-- belong to an organisation (ON DELETE CASCADE). New tables only: 2.36.0 runs on with them
+CREATE TABLE IF NOT EXISTS office_settings (
+  org_id INTEGER PRIMARY KEY REFERENCES orgs(id) ON DELETE CASCADE, data TEXT NOT NULL DEFAULT '{}', updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS office_services (
+  id INTEGER PRIMARY KEY, org_id INTEGER NOT NULL REFERENCES orgs(id) ON DELETE CASCADE, name_de TEXT NOT NULL, name_en TEXT NOT NULL DEFAULT '',
+  category TEXT NOT NULL DEFAULT '', sort REAL NOT NULL DEFAULT 0, unit TEXT NOT NULL DEFAULT 'day', daily_rate REAL, hourly_rate REAL,
+  raw_fee INTEGER NOT NULL DEFAULT 0, producing INTEGER NOT NULL DEFAULT 0, intext TEXT NOT NULL DEFAULT 'extern', role TEXT NOT NULL DEFAULT '',
+  tax TEXT NOT NULL DEFAULT 'standard', archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS office_services_org ON office_services(org_id);
+CREATE TABLE IF NOT EXISTS office_equipment (
+  id INTEGER PRIMARY KEY, org_id INTEGER NOT NULL REFERENCES orgs(id) ON DELETE CASCADE, name TEXT NOT NULL, category TEXT NOT NULL DEFAULT '',
+  daily_rate REAL, archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS office_equipment_org ON office_equipment(org_id);
+CREATE TABLE IF NOT EXISTS office_sets (
+  id INTEGER PRIMARY KEY, org_id INTEGER NOT NULL REFERENCES orgs(id) ON DELETE CASCADE, name TEXT NOT NULL, discount_pct REAL,
+  items TEXT NOT NULL DEFAULT '[]', archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS office_sets_org ON office_sets(org_id);
+CREATE TABLE IF NOT EXISTS office_texts (
+  id INTEGER PRIMARY KEY, org_id INTEGER NOT NULL REFERENCES orgs(id) ON DELETE CASCADE, kind TEXT NOT NULL, key TEXT NOT NULL DEFAULT '',
+  text_de TEXT NOT NULL DEFAULT '', text_en TEXT NOT NULL DEFAULT '', sort REAL NOT NULL DEFAULT 0, archived INTEGER NOT NULL DEFAULT 0);
+CREATE INDEX IF NOT EXISTS office_texts_org ON office_texts(org_id);
+CREATE TABLE IF NOT EXISTS office_contracts (
+  id INTEGER PRIMARY KEY, org_id INTEGER NOT NULL REFERENCES orgs(id) ON DELETE CASCADE, name TEXT NOT NULL,
+  client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL, date TEXT NOT NULL DEFAULT '', raw_included INTEGER NOT NULL DEFAULT 0,
+  rights_time_id INTEGER REFERENCES office_texts(id) ON DELETE SET NULL, rights_territory_id INTEGER REFERENCES office_texts(id) ON DELETE SET NULL,
+  rights_media_id INTEGER REFERENCES office_texts(id) ON DELETE SET NULL, rights_note_de TEXT NOT NULL DEFAULT '', rights_note_en TEXT NOT NULL DEFAULT '',
+  closing_de TEXT NOT NULL DEFAULT '', closing_en TEXT NOT NULL DEFAULT '', rates TEXT NOT NULL DEFAULT '{}', note TEXT NOT NULL DEFAULT '',
+  archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS office_contracts_org ON office_contracts(org_id);
+CREATE TABLE IF NOT EXISTS office_numbers (
+  org_id INTEGER NOT NULL REFERENCES orgs(id) ON DELETE CASCADE, kind TEXT NOT NULL, period TEXT NOT NULL DEFAULT '',
+  last INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (org_id, kind, period));
+-- 2.36.1 (#1021): office & finance (C): quotations and their positions; the automatic lines (producing, raw data,
+-- discount) are not stored, the calculator makes them; totals = cache of the calculator. New tables only: 2.36.0 runs on
+-- unchanged with them.
+CREATE TABLE IF NOT EXISTS office_docs (
+  id INTEGER PRIMARY KEY, org_id INTEGER NOT NULL REFERENCES orgs(id) ON DELETE CASCADE, kind TEXT NOT NULL DEFAULT 'offer',
+  number TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'draft', lang TEXT NOT NULL DEFAULT 'de', currency TEXT NOT NULL DEFAULT 'EUR',
+  fx_rate REAL, vat_mode TEXT NOT NULL DEFAULT 'vat', client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL,
+  recipient TEXT NOT NULL DEFAULT '{}', project_title TEXT NOT NULL DEFAULT '', project_ref TEXT NOT NULL DEFAULT '',
+  date TEXT NOT NULL DEFAULT '', valid_until TEXT NOT NULL DEFAULT '', contract_id INTEGER REFERENCES office_contracts(id) ON DELETE SET NULL,
+  raw_mode TEXT NOT NULL DEFAULT 'optional', raw_factor REAL, prod_quotient REAL, producing_rate REAL, discount_pct REAL,
+  intro TEXT NOT NULL DEFAULT '', closing TEXT NOT NULL DEFAULT '', rights TEXT NOT NULL DEFAULT '{}', fields TEXT NOT NULL DEFAULT '[]',
+  totals TEXT NOT NULL DEFAULT '{}', created_by INTEGER, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, sent_at TEXT);
+CREATE INDEX IF NOT EXISTS office_docs_org ON office_docs(org_id, kind);
+CREATE UNIQUE INDEX IF NOT EXISTS office_docs_number ON office_docs(org_id, number) WHERE number != '';
+CREATE TABLE IF NOT EXISTS office_doc_items (
+  id INTEGER PRIMARY KEY, doc_id INTEGER NOT NULL REFERENCES office_docs(id) ON DELETE CASCADE, sort REAL NOT NULL DEFAULT 0,
+  kind TEXT NOT NULL DEFAULT 'service', service_id INTEGER REFERENCES office_services(id) ON DELETE SET NULL,
+  title TEXT NOT NULL DEFAULT '', detail TEXT NOT NULL DEFAULT '', qty REAL NOT NULL DEFAULT 1, unit TEXT NOT NULL DEFAULT 'day',
+  rate REAL NOT NULL DEFAULT 0, tax TEXT NOT NULL DEFAULT 'standard', raw_fee INTEGER NOT NULL DEFAULT 0, producing INTEGER NOT NULL DEFAULT 0,
+  intext TEXT NOT NULL DEFAULT 'intern', cost REAL NOT NULL DEFAULT 0, discountable INTEGER NOT NULL DEFAULT 1);
+CREATE INDEX IF NOT EXISTS office_doc_items_doc ON office_doc_items(doc_id);
 """
 # Bumped when the database layout changes (stored in PRAGMA user_version). A backup can be restored when its
 # schema version is not newer than this one (older ones are migrated by init_db).
@@ -1073,6 +1127,10 @@ USER_DEFAULTS = {
     "side_icons": "line",       # 2.36.0 (#1117): the sidebar's list icons: line (grey line icon for the name's emoji) | emoji | dot
     "side_progress": "1",       # 2.36.0 (#1117): progress bars of projects in the sidebar (0 = hidden)
     "cal_today": "1",           # "Events today" block on Today (external calendar subscriptions)
+    "cal_tasks": "1",           # 2.36.1 (#1127): tasks with a date in the calendar views (0 = events only; Today, search, feeds unchanged)
+    "cal_lists_hidden": "[]",   # 2.36.1 (#1127): json list of list ids whose tasks the calendar views leave out
+    "today_cals_hidden": "[]",  # 2.36.1 (#1127): json list of calendar keys ("e:<evcal id>" | "s:<subscription id>") left out of "Events today"
+    "plan_cals_off": "[]",      # 2.36.1 (#956): json list of calendar keys whose events do not count as busy when planning the day
     "tour": "done",             # welcome tour: pending (new users) | done; existing users never see it
     "onboard": "done",          # "Getting started" list: pending (new users, created on first start) | done
     "sample_ask": "1",          # 1.8.0: the welcome tour offers the sample project (0 = decided in the setup / created once)

@@ -55,7 +55,7 @@ const feats = st => st.settings.features.split(',');
   let jar = {}, w = await open(jar), d = w.document;
   check(await step1(w), 'setup: step 2 appears after the admin was created');
   check(/What do you use Kalmido for\?/.test(d.querySelector('.setupcard').textContent), 'step 2 title');
-  check([...d.querySelectorAll('[data-su-preset]')].map(b => b.dataset.suPreset).join() === 'me,home,family,team,software', '2.19.0: the purposes: For me, (2.22.0) Home, Family, Team, Software projects');
+  check([...d.querySelectorAll('[data-su-preset]')].map(b => b.dataset.suPreset).join() === 'me,home,family,team,software,office', '2.19.0: the purposes: For me, (2.22.0) Home, Family, Team, Software projects, (2.36.1) Office & finance');
   check(d.querySelector('[data-su-preset="me"]').classList.contains('on') && d.querySelector('[data-su-preset="me"]').getAttribute('aria-pressed') === 'true' && !d.querySelector('[data-su-preset="team"]').classList.contains('on'), '"For me" preselected');
   check(!d.querySelector('[data-use="comments"]').checked && !d.querySelector('[data-use="collab"]').checked && !d.querySelector('[data-use="family"]').checked, 'For me: comments, collaboration + Family off');
   check([...d.querySelectorAll('[data-su-start]')].map(b => b.dataset.suStart).join() === ',sample,agency,software,private' && d.querySelector('[data-su-start=""]').classList.contains('on'), 'K21: "Start with": Empty (preselected), Sample, Agency, Software, Personal');

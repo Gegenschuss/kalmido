@@ -194,7 +194,7 @@ const SIDE_NAMES = {focus: N_('Plan|nav'), clients: N_('Clients'), lists: N_('Li
 const SIDE_PLAN = [['tomorrow', N_('Tomorrow')], ['week', N_('Next 7 days')], ['doable', N_('Now doable')], ['pinned', N_('Pinned|view')], ['waiting', N_('Waiting on someone')], ['stale', N_('Lying idle')], ['assigned', N_('My tasks')]];
 const sideViewEntries = () => [['cal', N_('Calendar'), feat('cal')], ['timeline', N_('Timeline'), feat('timeline')], ['matrix', N_('Matrix'), feat('matrix')], ['habits', N_('Habits'), feat('habits')],
   ['pomo', N_('Focus timer'), feat('pomo')], ['time', N_('Time tracking'), timeOn()], ['stats', N_('Statistics'), feat('stats')], ['contacts', N_('Contacts'), feat('contacts')], ['life', N_('Home & life'), lifeOn()],
-  ['workload', N_('Workload'), workloadOn()], ['review', N_('Review & journal'), feat('review')], ['family', N_('Family'), famOn()], ['overview', N_('Project status'), overviewOn()], ['agents', N_('Agents'), agentsTab()]].filter(x => x[2]);
+  ['workload', N_('Workload'), workloadOn()], ['office', N_('Office & finance'), officeOn()], ['review', N_('Review & journal'), feat('review')], ['family', N_('Family'), famOn()], ['overview', N_('Project status'), overviewOn()], ['agents', N_('Agents'), agentsTab()]].filter(x => x[2]);
 function sidePref() {
   let o = {}; try { o = JSON.parse(S.settings?.sidebar || '{}') || {}; } catch { o = {}; }
   return {order: Array.isArray(o.order) ? o.order : [], hidden: Array.isArray(o.hidden) ? o.hidden : []};
@@ -291,6 +291,7 @@ function renderSide() {
     feat('contacts') ? mrow('contacts', 'users', tr('Contacts')) : '',  // 2.21.0 (#658)
     lifeOn() ? mrow('life', 'home', tr('Home & life')) : '',  // 2.22.0 (#663)
     workloadOn() ? mrow('workload', 'chart', tr('Workload')) : '',  // 2.23.0 (#463)
+    officeOn() ? mrow('office', 'receipt', tr('Office & finance')) : '',  // 2.36.1 (#1021)
     feat('review') ? mrow('review', 'journal', tr('Review & journal')) : '',
     famOn() ? mrow('family', 'family', tr('Family'), (S.kids || []).some(k => (k.requests || 0) > 0) ? `<span class="c nunread">${(S.kids || []).reduce((n, k) => n + (k.requests || 0), 0)}</span>` : '') : '',
     overviewOn() ? mrow('overview', 'pulse', tr('Project status'), `<span class="c ${ovProblems() ? 'over' : ''}">${ovProblems() || ''}</span>`, `title="${esc(tr('Where is it stuck?'))}"`) : '',
@@ -687,6 +688,7 @@ function renderView0() {
   else if (m === 'review') setHtml(el, viewReview());
   else if (m === 'clients') setHtml(el, viewClients());  // 2.23.0 (#463)
   else if (m === 'workload') setHtml(el, viewWorkload());
+  else if (m === 'office') setHtml(el, viewOffice());  // 2.36.1 (#1021)
   else if (S.route.key === 'search') setHtml(el, viewSearch());
   else if (S.route.key === 'done' || S.route.key === 'trash') setHtml(el, viewHistory());
   else if (S.route.key === 'archived') setHtml(el, viewArchived());

@@ -100,6 +100,7 @@ UPDATE_MAX_BYTES = 256 * 1024
 WATCHDOG_INTERVAL = int(os.environ.get("TASKS_WATCHDOG_INTERVAL", "30"))
 
 ATT_DIR = os.environ.get("TASKS_ATTACHMENTS", os.path.join(os.path.dirname(DB), "attachments"))
+OFFICE_DIR = os.environ.get("TASKS_OFFICE_DIR", os.path.join(os.path.dirname(DB), "office"))  # 2.36.1 (#1021): logos (in backups)
 MAX_FILE_MB = int(os.environ.get("TASKS_MAX_FILE_MB", "50"))
 # shown in the browser; everything else is served as a download (svg/html could carry script)
 INLINE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp", "image/avif", "image/bmp",

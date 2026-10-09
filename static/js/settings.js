@@ -283,8 +283,10 @@ async function setLang(code) {
 }
 // U04: the modules, grouped, each with one sentence; admins also get the switch for the whole server (collaboration, time)
 const MOD_GROUPS = [[N_('Views'), ['cal', 'timeline', 'kanban', 'matrix']], [N_('Calendar and people'), ['events', 'contacts']], [N_('For you'), ['habits', 'pomo', 'stats', 'comments']],
-  [N_('Projects and team'), ['collab', 'time', 'progress', 'deps', 'fields', 'agents', 'clients', 'workload', 'forms']], [N_('At home'), ['family', 'contracts', 'home', 'care', 'health', 'review', 'travel', 'reading']]];
-const MOD_DESC = {cal: N_('Month, week and day view of your tasks'), timeline: N_('Tasks with start and end as bars over time'), kanban: N_('Lists as boards with columns'),
+  [N_('Projects and team'), ['collab', 'time', 'progress', 'deps', 'fields', 'agents', 'clients', 'workload', 'forms']], [N_('At home'), ['family', 'contracts', 'home', 'care', 'health', 'review', 'travel', 'reading']],
+  [N_('Office & finance'), ['office']]];  // 2.36.1 (#1021)
+const MOD_DESC = {office: N_('Quotations with a calculator, services and rates, equipment, text blocks, framework contracts and PDF documents; needs an organisation (business area)'),  // 2.36.1 (#1021)
+  cal: N_('Month, week and day view of your tasks'), timeline: N_('Tasks with start and end as bars over time'), kanban: N_('Lists as boards with columns'),
   matrix: N_('Urgent and important in four quadrants'), habits: N_('Daily and weekly habits with streaks'), pomo: N_('Pomodoro timer and stopwatch'),
   stats: N_('Completions, on-time rate, focus time and streaks'), collab: N_('Share lists, assign tasks, @mentions, activity and News'),
   comments: N_('Timestamped notes on your tasks; in shared lists with collaboration also @mentions and News'),

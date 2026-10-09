@@ -1,0 +1,146 @@
+{
+  "code": "DE",
+  "name": "Deutschland",
+  "name_en": "Germany",
+  "version": 1,
+  "community": false,
+  "currency": "EUR",
+  "lang": "de",
+  "tax": {
+    "standard": 19,
+    "reduced": 7,
+    "exempt": 0,
+    "labels": {
+      "de": {"standard": "19 % MwSt.", "reduced": "7 % MwSt.", "exempt": "steuerfrei"},
+      "en": {"standard": "19 % VAT", "reduced": "7 % VAT", "exempt": "tax exempt"}
+    },
+    "exempt_note": {
+      "de": "Nicht im Inland steuerbar - Reverse-Charge-Verfahren (Steuerschuldnerschaft des Leistungsempfängers).",
+      "en": "Not taxable in Germany - reverse-charge procedure (VAT to be accounted for by the recipient)."
+    }
+  },
+  "formats": {
+    "date": "dd.mm.yyyy",
+    "decimal": ",",
+    "thousands": ".",
+    "currency_pos": "after"
+  },
+  "required_fields": [
+    "company_name", "company_address", "tax_number_or_vat_id", "recipient_name", "recipient_address",
+    "invoice_number", "invoice_date", "delivery_date_or_period", "line_items", "net_per_tax_rate",
+    "tax_rate_and_amount", "gross_total"
+  ],
+  "labels": {
+    "de": {
+      "offer": "Kostenvoranschlag",
+      "offer_no": "Angebot Nr.",
+      "invoice": "Rechnung",
+      "invoice_no": "Rechnung Nr.",
+      "project": "Projekttitel",
+      "ref": "Ref./PO-Nr.",
+      "client": "Kunde",
+      "date": "Datum",
+      "valid_until": "Gültig bis",
+      "pos": "Pos.",
+      "title": "Leistung",
+      "qty": "Menge",
+      "unit_price": "Preis",
+      "vat": "MwSt.",
+      "total": "Gesamt",
+      "net_total": "Summe Netto",
+      "gross_total": "Summe Brutto",
+      "incl_raw": "inklusive Rohdaten",
+      "excl_raw": "ohne Rohdaten",
+      "raw_optional": "Optional: Bereitstellung der Rohdaten",
+      "raw_included": "Bereitstellung der Rohdaten",
+      "producing": "Producing",
+      "discount": "Rabatt",
+      "rights": "Rechteübertragung",
+      "rights_time": "Zeitliche Auswertung",
+      "rights_territory": "Räumliche Auswertung",
+      "rights_media": "Mediale Auswertung",
+      "rights_exceptions": "Ausnahmen",
+      "rights_exclusive": "Exklusiv",
+      "page_of": "Seite {x} von {y}",
+      "signature": "Mit freundlichen Grüßen",
+      "order": "Auftragserteilung",
+      "order_hint": "Ort, Datum, Unterschrift",
+      "units": {"day": "Tage", "hour": "Std.", "piece": "Stk.", "minute": "Min.", "flat": "pauschal"},
+      "units_one": {"day": "Tag", "hour": "Std.", "piece": "Stk.", "minute": "Min.", "flat": "pauschal"},
+      "unit_one": {"day": "Tag", "hour": "Std.", "piece": "Stk.", "minute": "Min.", "flat": "pauschal"}
+    },
+    "en": {
+      "offer": "Quotation",
+      "offer_no": "Quotation No.",
+      "invoice": "Invoice",
+      "invoice_no": "Invoice No.",
+      "project": "Project",
+      "ref": "Ref./PO No.",
+      "client": "Client",
+      "date": "Date",
+      "valid_until": "Valid until",
+      "pos": "No.",
+      "title": "Title",
+      "qty": "x",
+      "unit_price": "Unit Price",
+      "vat": "VAT",
+      "total": "Total",
+      "net_total": "Net Total",
+      "gross_total": "Gross Total",
+      "incl_raw": "including raw data",
+      "excl_raw": "excluding raw data",
+      "raw_optional": "Optional: delivery of raw data",
+      "raw_included": "Delivery of raw data",
+      "producing": "Producing",
+      "discount": "Discount",
+      "rights": "Transfer of rights",
+      "rights_time": "Duration of License",
+      "rights_territory": "Territorial Rights",
+      "rights_media": "Rights by Medium",
+      "rights_exceptions": "Exceptions",
+      "rights_exclusive": "Exclusive",
+      "page_of": "Page {x} of {y}",
+      "signature": "Kind regards",
+      "order": "Order confirmation",
+      "order_hint": "Place, date, signature",
+      "units": {"day": "days", "hour": "hrs", "piece": "pcs", "minute": "min", "flat": "flat"},
+      "units_one": {"day": "day", "hour": "hr", "piece": "pc", "minute": "min", "flat": "flat"},
+      "unit_one": {"day": "day", "hour": "hr", "piece": "pc", "minute": "min", "flat": "flat"}
+    }
+  },
+  "texts": {
+    "intro": {
+      "de": "vielen Dank für Ihre Anfrage. Gerne unterbreiten wir Ihnen folgendes Angebot:",
+      "en": "thank you for your enquiry. We are pleased to submit the following quotation:"
+    },
+    "salutation": {"de": "Sehr geehrte Damen und Herren,", "en": "Dear Sir or Madam,"},
+    "closing": {
+      "de": "Wir freuen uns auf die Zusammenarbeit und stehen für Rückfragen gerne zur Verfügung.",
+      "en": "We look forward to working with you and are happy to answer any questions."
+    },
+    "vat_note": {"de": "Alle Preise zuzüglich 7 % bzw. 19 % MwSt.", "en": "All prices plus 7 % or 19 % VAT."},
+    "vat_note_novat": {"de": "Alle Preise netto, ohne MwSt.", "en": "All prices net, without VAT."},
+    "rights_note": {"de": "Im Übrigen gelten unsere AGB.", "en": "Our general terms and conditions apply."},
+    "valid_note": {"de": "Dieses Angebot ist gültig bis {date}.", "en": "This quotation is valid until {date}."},
+    "rights_time": [
+      {"key": "unlimited", "de": "unbegrenzt", "en": "in perpetuity"},
+      {"key": "1y", "de": "1 Jahr ab Erstveröffentlichung", "en": "1 year from first publication"},
+      {"key": "2y", "de": "2 Jahre ab Erstveröffentlichung", "en": "2 years from first publication"}
+    ],
+    "rights_territory": [
+      {"key": "world", "de": "weltweit", "en": "worldwide"},
+      {"key": "dach", "de": "DACH", "en": "Germany, Austria, Switzerland"},
+      {"key": "de", "de": "Deutschland", "en": "Germany"},
+      {"key": "world_ex_music", "de": "weltweit außer Musik auf Messe/Event (DE)", "en": "worldwide except music on trade shows / live events (DE)"}
+    ],
+    "rights_media": [
+      {"key": "internal", "de": "intern", "en": "internal use"},
+      {"key": "internal_web_unpaid", "de": "intern, web, unpaid media", "en": "internal use, web, unpaid media"},
+      {"key": "all", "de": "alle Medien", "en": "all media"},
+      {"key": "web_social_paid", "de": "web, social media, paid media", "en": "web, social media, paid media"}
+    ]
+  },
+  "numbering": {"offer": "KVA-{yyyy}-{seq:03}", "invoice": "RE-{yyyy}-{seq:03}"},
+  "einvoice": {"formats": ["zugferd", "xrechnung"], "status": "planned"},
+  "bookkeeping": {"export": "datev", "status": "planned"}
+}

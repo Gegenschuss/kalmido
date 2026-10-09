@@ -43,7 +43,7 @@ const ago = d => new Date(Date.now() - d * 86400000).toISOString().slice(0, 19) 
   let gd = new Date(g0.to + 'T12:00:00Z'); while ([0, 6].includes(gd.getUTCDay())) gd = new Date(gd - 86400000);
   const GD = gd.toISOString().slice(0, 10);
   sql('INSERT INTO comments(task_id, user_id, body, created_at) VALUES(?,?,?,?)', [T3, ME, 'sketched it', GD + 'T10:00:00+00:00']);
-  const te = await call('POST', '/api/time/entries', {task_id: T3, minutes: 90, note: 'first draft', start: new Date().toISOString().slice(0, 10) + 'T08:00'});
+  const te = await call('POST', '/api/time/entries', {task_id: T3, minutes: 90, note: 'first draft', start: new Date().toLocaleDateString('sv', {timeZone: 'Europe/Berlin'}) + 'T08:00'});  // today in the app's time zone
   check(te.id || te.status < 300, 'setup: a time entry this week ' + JSON.stringify(te).slice(0, 120));
 
   const ffLogin = async ({ev, nav}) => {

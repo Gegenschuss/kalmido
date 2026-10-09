@@ -7,6 +7,64 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.36.1] - 2026-10-10
+
+**In short:** Office & finance, stage 1, plus calendar switches. A new **Office & finance** module for organisations
+with master data (services and rates, equipment and sets, text blocks with a rights catalogue, framework contracts, a
+German country pack) and **quotations** with a live calculator and a **PDF** on real A4 pages. In the calendar,
+**subscribed calendars, own calendars and tasks** can be switched on and off right from the calendar view, per
+calendar also for *Today* and for *Plan the day*, and event titles in the phone timeline no longer run over each other.
+
+### Added
+- **Office & finance module** (#1021, stage 1): a switchable module in the business area (needs an organisation),
+  with a new setup purpose *Office & finance* (Team plus clients, workload, forms and the office module). Tabs:
+  quotations, services (DE/EN names, categories, daily/hourly rates, raw data and producing flags, tax rate),
+  equipment and sets with a set discount, text blocks (intro, closing, notes, free blocks, rights catalogue for
+  duration, territory and media), several framework contracts with special rates, and settings (company lines,
+  logo, print colour, document language, currency and USD rate, number scheme with preview, producing quotient and
+  rate, raw data factor, validity, country pack). Organisation admins edit master data and settings, members read
+  them and write quotations; agents and children have no access in this stage.
+- **Country pack DE** as a data file: VAT 19 % / 7 % / 0 %, date and number formats, document labels in German and
+  English, default texts and the rights catalogue. Packs are validated on load.
+- **Quotations** (#1021): positions picked from your services in the document language, quantities with comma or
+  point, headings and text blocks between positions, automatic lines for **producing days** (production days divided
+  by the quotient, rounded to half days), **optional or included raw data** and a **discount**, each explained in
+  plain words; EUR or USD, with or without VAT; a framework contract presets raw data, rights and closing; a
+  **transfer of rights** block (duration, territory, media, exceptions, exclusivity); own fields; status draft / sent /
+  accepted / declined; duplicate; numbers from your scheme. Totals are calculated on the server; external costs and
+  the surplus are visible to organisation admins only.
+- **PDF quotations** (#1021): A4 pages in a DIN 5008 layout (address window, key data on the right, table with
+  category headings, raw data option, totals, rights section, order confirmation field, four-column footer), several
+  pages with a short header, repeated table head and "Page x of y", German or English labels, EUR or USD. Built
+  without any new dependency.
+- **Company logo** for documents: organisation admins upload a PNG, JPEG or WebP; it is part of backups.
+- **Master data import / export** as one JSON file (admins import, additive or overwriting matches).
+- **Calendar switches** (#1127): the *Calendars* window (button in the calendar header, a sheet on phones) lists
+  *Tasks with a date* (all, and per list), your own calendars and subscriptions, each with three switches:
+  *Calendar*, *Today* and *Plan the day*. Tapping a calendar's name in the timeline hides it (with *Undo*), its menu
+  offers *Only this calendar* and *Show all*. Changes apply at once and follow you across devices.
+- **Today's events per calendar** (#1127): the *Events today* block on Today has a menu with its own switches,
+  independent of the calendar view.
+- **Leave calendars out of the day plan** (#956): calendars switched off for *Plan the day* are ignored by the day
+  planner and by *Agent plans the day*; the *Plan the day* dialog has a *Calendars* row with the same switches.
+
+### Changed
+- **Day planning counts your own events** as busy time too, not only subscriptions (#956); all-day events still do
+  not block time.
+
+### Fixed
+- **Phone timeline** (#1126): every calendar has its own row, titles stay inside their bar and end with "…" before
+  the next event, overlapping events move to their own sub-row, tapping an event shows its full title.
+
+### Upgrade notes
+- New tables only: `office_settings`, `office_services`, `office_equipment`, `office_sets`, `office_texts`,
+  `office_contracts`, `office_numbers`, `office_docs`, `office_doc_items` (all tied to an organisation and deleted
+  with it). Logos are stored under `office/<organisation>/` next to the database and included in backups.
+  2.36.0 keeps running on the migrated database.
+- New user settings `cal_tasks`, `cal_lists_hidden`, `today_cals_hidden`, `plan_cals_off`; existing accounts keep
+  everything visible.
+- The office module has no agent API or MCP tools yet; they follow after a security review.
+
 ## [2.36.0] - 2026-10-09
 
 **In short:** Sidebar, lock and comments. The sidebar gets calm grey **line icons** instead of emojis, a task can be
@@ -3576,7 +3634,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.36.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.36.1...HEAD
+[2.36.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.36.1
 [2.36.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.36.0
 [2.35.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.35.0
 [2.34.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.34.0

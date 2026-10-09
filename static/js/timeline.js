@@ -120,7 +120,7 @@ function viewTimeline(listId, inCal) {
   const DW = tlDW();
   if (!S.tlStart) S.tlStart = addDays(weekStartOf(today()), -7);
   const start = S.tlStart, end = addDays(start, TL_DAYS - 1), t0 = today();
-  const all = openTasks().filter(t => !listId || t.list_id === listId);
+  const all = openTasks().filter(t => (!listId || t.list_id === listId) && (!inCal || cvxTaskOn(t)));  // 2.36.1 (#1127): the calendar's task switches
   const dated = all.filter(t => t.due && t.due >= start && (t.start || t.due) <= end);
   const undated = all.filter(t => !t.due).length;
   const ndOn = tlNdOn(listId), und = ndOn ? all.filter(t => !t.due) : [];

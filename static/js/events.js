@@ -525,6 +525,10 @@ document.addEventListener('click', async e => {
     case 'filter-new': closeSide(); filterModal(); break;
     case 'filter-edit': filterModal(id); break;
     case 'cal-done': setShowDone(!showDoneCal(), 'cal'); break;
+    // 2.36.1 (#1127): timeline names hide a calendar, "…" on a name / on "Events today" opens the calendar switches
+    case 'cvx-tlhide': cvxTlHide(a.dataset.key, a.dataset.name); break;
+    case 'cvx-tlmenu': e.stopPropagation(); cvxTlMenu(a, a.dataset.key, a.dataset.name); break;
+    case 'cvx-today-menu': e.stopPropagation(); cvxTodayMenu(a); break;
     case 'cal-mode': S.calMode = a.dataset.k; LS.set('calMode', S.calMode); if (S.calMode === 'month') S.calMonth = S.calSel.slice(0, 7); renderView(); break;
     case 'tl-pick-cancel': tlPickEnd(); break;
     case 'rm-view': if (a.dataset.k !== (isRoadmap() ? 'timeline' : 'list')) { S.rmScrollReset = true; rmSet({v: a.dataset.k}, 'all'); } break;

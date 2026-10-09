@@ -53,7 +53,9 @@ const FEATS = [['cal', N_('Calendar')], ['timeline', N_('Timeline')], ['matrix',
   // 2.22.0 (#663): Home & life, each off by default
   ['contracts', N_('Contracts')], ['home', N_('Home & devices')], ['care', N_('Staying in touch')], ['health', N_('Health')], ['review', N_('Review & journal')], ['travel', N_('Travel')], ['reading', N_('Read later')],
   // 2.23.0 (#463): package "Team, family, clients", each off by default
-  ['clients', N_('Clients')], ['workload', N_('Workload')], ['forms', N_('Forms')]];
+  ['clients', N_('Clients')], ['workload', N_('Workload')], ['forms', N_('Forms')],
+  // 2.36.1 (#1021): Office & finance (business area: needs an organisation), off by default
+  ['office', N_('Office & finance')]];
 const FEAT_DESC = {deps: N_('“Blocked by” in the task details, arrows and linking in the timeline, what is stuck in the project status, a notice when a task is unblocked'),
   fields: N_('Own fields per list (text, number, selection, date, person, link), as columns and in the task details'),collab: N_('Comments, activity history, @mentions, News, sharing lists and assigning tasks'), stats: N_('Completed tasks, on-time rate, overdue trend, focus time and habit streaks'),
   time: N_('Timer on tasks, manual entries, reports per list and task, CSV export and a printable timesheet'),
@@ -61,6 +63,7 @@ const FEAT_DESC = {deps: N_('“Blocked by” in the task details, arrows and li
   workload: N_('How much each person of your organisation has on their plate per week, against their hours per week'),
   forms: N_('A link with a small form (requests, bug reports) that creates a task in a list; agents can sort it in'),
   agents: N_('A tab with the agents (AI assistants, bots) you share lists with: their status, jobs to approve and the chat'),
+  office: N_('Quotations with a calculator, services and rates, equipment, text blocks, framework contracts and PDF documents of your organisation'),
   progress: N_('Progress bar in the list header and the project status (“Where is it stuck?”); with collaboration also a status per list')};
 const feat = f => (S.settings.features ?? FEATS.map(x => x[0]).join(',')).split(',').includes(f);
 // collaboration off (own switch, or the admin's switch for the whole server): no comments / activity / mentions /
@@ -76,7 +79,7 @@ const tlForeign = t => !!t && collab() && S.tl.id === t.id ? (S.tl.activity || [
 // admins: a newer release was found by the server's daily update check (dot on the settings gear)
 const updDot = () => !!(S.me?.is_admin && S.about?.available);
 // module views: tasks always, News with the collaboration module, the overview with "progress" (see overviewOn), the rest by their own switch
-const modOn = m => m === 'tasks' || m === 'home' || m === 'notes' || (m === 'team' ? teamOn() : m === 'agents' ? agentsTab() : m === 'news' ? collab() : m === 'overview' ? overviewOn() : m === 'time' ? timeOn() : m === 'family' ? feat(m) || !!S.me?.kid : m === 'life' ? lifeOn() : m === 'workload' ? workloadOn() : feat(m));
+const modOn = m => m === 'tasks' || m === 'home' || m === 'notes' || (m === 'team' ? teamOn() : m === 'agents' ? agentsTab() : m === 'news' ? collab() : m === 'overview' ? overviewOn() : m === 'time' ? timeOn() : m === 'family' ? feat(m) || !!S.me?.kid : m === 'life' ? lifeOn() : m === 'workload' ? workloadOn() : m === 'office' ? officeOn() : feat(m));
 // no "+" button on views without tasks
 // views of the tasks module that are not a task list (no quick add, no selection, no open-count)
 const NOLIST_KEYS = ['done', 'trash', 'search', 'archived'];
@@ -109,7 +112,7 @@ document.addEventListener('scroll', e => {
   if (e.target !== v || QS.top == null || Date.now() - QS.at > 400 || document.activeElement?.id !== 'qinput') return;
   if (Math.abs(v.scrollTop - QS.top) > 1) v.scrollTop = QS.top;
 }, true);
-const noFab = () => ['habits', 'pomo', 'news', 'stats', 'time', 'overview', 'agents', 'team', 'notes', 'family', 'contacts', 'life', 'review', 'clients', 'workload'].includes(S.route.mod) || NOLIST_KEYS.includes(S.route.key) || isOverview();
+const noFab = () => ['habits', 'pomo', 'news', 'stats', 'time', 'overview', 'agents', 'team', 'notes', 'family', 'contacts', 'life', 'review', 'clients', 'workload', 'office'].includes(S.route.mod) || NOLIST_KEYS.includes(S.route.key) || isOverview();
 // package 3: progress bar / overview (switch "progress"), project status (+ collaboration), custom fields, dependencies
 // 2.13.0 (#453, Fold screenshots): the round + only on phones; tablets / an unfolded Fold add with the docked "Add task"
 // bar or, in views without it (calendar, Kanban, timeline), the header's "New task" button
@@ -786,6 +789,7 @@ function parseHash() {
   if (a === 'ev' && +b) return {mod: 'cal', key: 'cal', ev: +b};  // 2.21.0 (#659): a push / News about an event
   if (a === 'contacts') return {mod: 'contacts', key: 'contacts', contact: +b || null};  // 2.21.0 (#658)
   if (a === 'client' && +b) return {mod: 'clients', key: 'clients', client: +b};  // 2.23.0 (#463)
+  if (a === 'office') return {mod: 'office', key: 'office', tab: b || '', id: +(h.split('/')[2]) || null};  // 2.36.1 (#1021): office/<tab>/<id>
   if (['cal', 'matrix', 'habits', 'pomo', 'news', 'stats', 'time', 'overview', 'family', 'life', 'review', 'clients', 'workload'].includes(a)) return {mod: a, key: a};  // 2.22.0 (#663): life, review
   if (SMART[a]) return {mod: 'tasks', key: a};
   return {mod: 'tasks', key: START_KEY};
@@ -801,7 +805,7 @@ async function route() {
   }
   if (r.key.startsWith('f:') && !S.filters.some(f => f.id === +r.key.slice(2))) r.key = START_KEY;
   if (!r.task) S.bellBack = false;
-  S.route = {mod: r.mod, key: r.key, ...(r.agent ? {agent: r.agent} : {}), ...(r.review ? {review: true} : {}), ...(r.client ? {client: r.client} : {})};
+  S.route = {mod: r.mod, key: r.key, ...(r.agent ? {agent: r.agent} : {}), ...(r.review ? {review: true} : {}), ...(r.client ? {client: r.client} : {}), ...(r.mod === 'office' ? {tab: r.tab, id: r.id} : {})};  // 2.36.1 (#1021): office/<tab>/<id>
   if (r.mod === 'team') teamRoute(r.rid || null); else if (S.tc.rid) teamRoute(null);  // 2.17.0
   if (r.mod === 'notes') noteRoute(r.lid, r.nid || null); else if (S.nt.id) { noteFlush(); S.nt.id = null; }
   if (r.noteMissing) setTimeout(() => toast(tr('This note does not exist or you cannot see it.')), 0);  // 2.10.0: review = #today/review

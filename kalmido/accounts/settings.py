@@ -32,6 +32,7 @@ SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "tim
                   "detail_cm_fold",  # 2.31.0 (#344)
                   "list_emoji",  # 2.32.0 (#1077)
                   "side_progress",  # 2.36.0 (#1117)
+                  "cal_tasks",  # 2.36.1 (#1127)
                   "agent_steps_live", "agent_steps_always")  # 2.32.0 (#1081)
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
@@ -43,7 +44,7 @@ def clean_setting(k, v):
     The watchdog reads these for every user, so malformed values are never stored."""
     from ..notify.push import PUSH_CHANNELS, PUSH_PRIORITIES
     bad = BadInput(tr("Invalid value: {0}", k))
-    if isinstance(v, (dict, list)) and k not in ("folders", "folders_closed", "show_done_views"):
+    if isinstance(v, (dict, list)) and k not in ("folders", "folders_closed", "show_done_views", *CAL_LIST_KEYS):
         raise bad
     sv = "" if v is None else str(v).strip()
     if k == "allday_time":
@@ -178,6 +179,8 @@ def clean_setting(k, v):
         return json.dumps(list(dict.fromkeys(f for f in (clean_folder(x, False) for x in arr) if f)), ensure_ascii=False)
     if k == "show_done_views":
         return clean_done_views(v)
+    if k in CAL_LIST_KEYS:  # 2.36.1 (#1127, #956): json lists (list ids / calendar keys "e:<id>" | "s:<id>")
+        return clean_cal_list(k, v)
     if k == "side_icons":  # 2.36.0 (#1117)
         if sv not in ("line", "emoji", "dot"):
             raise bad
@@ -194,6 +197,30 @@ def clean_setting(k, v):
 
 
 DONE_VIEWS_MAX = 500
+# 2.36.1 (#1127, #956): the calendar visibility lists (a json list each; stored sorted and without doubles)
+CAL_LIST_KEYS = ("cal_lists_hidden", "today_cals_hidden", "plan_cals_off")
+CAL_LIST_MAX = 500
+
+
+def clean_cal_list(k, v):
+    """cal_lists_hidden: list ids (ints); today_cals_hidden / plan_cals_off: calendar keys "e:<evcal id>" | "s:<sub id>".
+    -> stored json; BadInput if malformed. Ids of calendars / lists that no longer exist are harmless (never matched)."""
+    bad = BadInput(tr("Invalid value: {0}", k))
+    if v is None or (isinstance(v, str) and not v.strip()):
+        return "[]"
+    try:
+        arr = json.loads(v) if isinstance(v, str) else v
+    except ValueError:
+        raise bad from None
+    if not isinstance(arr, list) or len(arr) > CAL_LIST_MAX:
+        raise bad
+    if k == "cal_lists_hidden":
+        if not all(isinstance(x, int) and not isinstance(x, bool) and 0 < x < 10 ** 12 for x in arr):
+            raise bad
+        return json.dumps(sorted(set(arr)))
+    if not all(isinstance(x, str) and re.fullmatch(r"[es]:[1-9][0-9]{0,11}", x) for x in arr):
+        raise bad
+    return json.dumps(sorted(set(arr)))
 
 
 def clean_done_views(v):

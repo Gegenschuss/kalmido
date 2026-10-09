@@ -31,13 +31,14 @@ function calByDay(lo, hi) {
   for (const t of S.tasks.values()) {
     if (!t.due || t.due < lo || t.due > hi || archivedTask(t) || t.context) continue;  // a participant's context parent is not theirs
     if (t.status && !showDoneCal()) continue;
+    if (!cvxTaskOn(t)) continue;  // 2.36.1 (#1127): tasks / lists switched off for the calendar views
     add(t.due, t);
   }
   // future repeats of recurring tasks (server-computed RRULE), shown as ghosts. While a newer answer loads, the old
   // items stay visible; one whose task lost its repeat or moved past that day is dropped right away
   for (const o of S.occ.items) {
     const t = S.tasks.get(o.id);
-    if (t && t.status === 0 && t.repeat && t.due && o.date > t.due && o.date >= lo && o.date <= hi && !archivedTask(t)) add(o.date, {...t, due: o.date, ghost: true});
+    if (t && t.status === 0 && t.repeat && t.due && o.date > t.due && o.date >= lo && o.date <= hi && !archivedTask(t) && cvxTaskOn(t)) add(o.date, {...t, due: o.date, ghost: true});
   }
   for (const a of byDay.values()) a.sort((a, b) => a.status - b.status || (a.due_time || '99').localeCompare(b.due_time || '99') || b.priority - a.priority);
   ensureOcc(lo, hi);
@@ -125,10 +126,12 @@ function cevTodayBlock() {  // "Events today" at the top of Today (setting cal_t
   if (!feat('cal') || !calEvOn() || S.settings.cal_today === '0') return '';  // Calendar module off: gone here too
   const t0 = today();
   ensureCalEv(t0, t0);
-  const evs = cevOn(t0).sort(cevSort);
-  if (!evs.length) return '';
+  const all = cevOn(t0), evs = all.filter(cvxTodayOn).sort(cevSort);  // 2.36.1 (#1127): calendars switched off for Today
+  if (!all.length) return '';
   const closed = S.collapsed.has('cev-today');
-  return `<div class="group cevtoday"><div class="ghead ${closed ? 'closed' : ''}" data-act="collapse" data-key="cev-today">${ic('chev', 's')}${tr('Events today')} <span class="c">${evs.length}</span></div>${closed ? '' : `<div class="cevlist">${evs.map(e => cevRow(e, t0)).join('')}</div>`}</div>`;
+  // the head's "…" menu switches single calendars off / on here (the block stays while a calendar is switched off)
+  const mn = `<button class="iconbtn gact cvxtm" data-act="cvx-today-menu" aria-haspopup="menu" title="${esc(tr('Calendars on Today'))}" aria-label="${esc(tr('Calendars on Today'))}">${ic('dots', 's')}</button>`;
+  return `<div class="group cevtoday"><div class="ghead ${closed ? 'closed' : ''}" data-act="collapse" data-key="cev-today">${ic('chev', 's')}${tr('Events today')} <span class="c">${evs.length}</span>${mn}</div>${closed ? '' : `<div class="cevlist">${evs.map(e => cevRow(e, t0)).join('') || `<div class="muted mhint">${tr('All calendars are switched off here. Switch one on in the menu.')}</div>`}</div>`}</div>`;
 }
 function cevLinkify(s) {  // escaped text; only http(s) URLs become links
   const re = /https?:\/\/[^\s<>"'`\\]+/gi;
@@ -171,28 +174,41 @@ async function cevToTask(e) {
   }
   try { const t = await createTask(body); toast(tr('Task created from the event')); openDetail(t.id); } catch { /* api() showed it */ }
 }
-function tlCalRows(start, end, DW) {  // calendar timeline: one row per subscription (overlaps in extra lanes, at most 4)
+function tlCalRows(start, end, DW) {  // calendar timeline: one row per calendar (overlaps in extra lanes, at most 6)
   if (!calEvOn()) return '';
   ensureCalEv(start, end);
-  const bySub = new Map();
-  for (const e of S.cal.items) if (e.d1 >= start && e.d0 <= end && cevWs(e)) { if (!bySub.has(e.sub)) bySub.set(e.sub, []); bySub.get(e.sub).push(e); }
-  if (!bySub.size) return '';
+  // 2.36.1 (#1127): own calendars get their own rows too (before: every own event sat in one nameless row)
+  const byCal = new Map();
+  for (const e of S.cal.items) if (e.d1 >= start && e.d0 <= end && cevWs(e)) { const k = cvxKey(e); if (!byCal.has(k)) byCal.set(k, []); byCal.get(k).push(e); }
+  if (!byCal.size) return '';
+  const days = diffDays(start, end) + 1;
   let h = `<div class="tl-row tl-grp"><div class="tl-name">${tr('Calendars')}</div><div class="tl-track"></div></div>`;
-  for (const [sub, list] of bySub) {
-    // all-day / multi-day events claim the first lanes, the (short) timed ones fill the rest
+  for (const [key, list] of byCal) {
+    // all-day / multi-day events claim the first lanes, the (short) timed ones fill the rest; an event that overlaps
+    // another one of its lane goes to the next lane (#1126: never two titles over each other)
     list.sort((a, b) => (b.all_day - a.all_day) || a.d0.localeCompare(b.d0) || cevSort(a, b));
     const lanes = [];
     const placed = list.map(e => {
       const s = e.d0 < start ? start : e.d0, en = e.d1 > end ? end : e.d1;
-      let l = lanes.findIndex(x => x < s);
-      if (l < 0) { l = lanes.length; lanes.push(en); } else lanes[l] = en;
+      // the first lane with no event on these days (not only after its last one: a short event before the others fits too)
+      let l = lanes.findIndex(x => !x.some(([a, b]) => s <= b && en >= a));
+      if (l < 0) { l = lanes.length; lanes.push([]); }
+      lanes[l].push([s, en]);
       return {e, s, en, l};
     });
-    const cc = cssColor(S.cal.subs[sub]?.color) || '#94a3b8';
-    for (let l = 0; l < Math.min(lanes.length, 4); l++) {
-      h += `<div class="tl-row tl-cal" style="--cc:${cc}"><div class="tl-name">${l ? '' : `<i class="cevdot"></i>${esc(S.cal.subs[sub]?.name || '')}`}</div><div class="tl-track">${placed.filter(p => p.l === l).map(p => {
+    const cc = cevColor(list[0]), name = cevCal(list[0]), inv = list[0].own && list[0].cal == null;  // inv: invitations (no calendar of mine)
+    for (let l = 0; l < Math.min(lanes.length, 6); l++) {
+      const inLane = placed.filter(p => p.l === l).sort((a, b) => a.s.localeCompare(b.s));
+      // #1127: a tap on the name hides the calendar (toast with Undo), "…" offers "Only this one" / "Show all"
+      const nm = l ? '' : inv ? `<i class="cevdot"></i><span class="tln">${esc(name)}</span>`
+        : `<button type="button" class="cvxtln" data-act="cvx-tlhide" data-key="${key}" data-name="${esc(name)}" title="${esc(tr('Hide this calendar'))}"><i class="cevdot"></i><span class="tln">${esc(name)}</span></button><button type="button" class="iconbtn cvxtlm" data-act="cvx-tlmenu" data-key="${key}" data-name="${esc(name)}" aria-haspopup="menu" aria-label="${esc(tr('More for {0}', name))}" title="${esc(tr('More'))}">${ic('dots', 's')}</button>`;
+      h += `<div class="tl-row tl-cal" style="--cc:${cc}"><div class="tl-name">${nm}</div><div class="tl-track">${inLane.map((p, i) => {
+        // #1126: the bar is as wide as the event; its title stays inside the element and may only run on over the free
+        // track up to the next bar of the same lane (cut with "…" there), never outside the row
         const x = diffDays(start, p.s) * DW, w = (diffDays(p.s, p.en) + 1) * DW;
-        return `<div class="tl-cev ${w < 110 ? 'short' : ''}" data-cev="${p.e.id}" style="left:${x + 2}px;width:${w - 4}px" title="${esc(cevTitle(p.e))}"><span>${esc(cevTitle(p.e))}</span></div>`;
+        const nx = inLane[i + 1] ? diffDays(start, inLane[i + 1].s) * DW : days * DW;
+        const free = Math.max(w, nx - x);
+        return `<div class="tl-cev" data-cev="${p.e.id}" style="left:${x + 2}px;width:${free - 4}px;--bw:${w - 4}px" title="${esc(cevTitle(p.e))}"><i class="cvxbar"></i><span>${esc(cevTitle(p.e))}</span></div>`;
       }).join('')}</div></div>`;
     }
   }
@@ -363,7 +379,9 @@ function calBar(title, done = true, extra = '') {
   const on = showDoneCal(), dn = done ? `<button class="btn sm chip ${on ? 'on' : ''}" data-act="cal-done" aria-pressed="${on}" aria-label="${esc(tr('Completed'))}" title="${esc(on ? tr('Hide completed') : tr('Show completed'))}">${ic('eye', 's')}<span class="cdl">${tr('Completed')}</span></button>` : '';
   const modes = [['month', N_('Month')], ['week', N_('Week')], ['day', N_('Day')], ...(feat('events') ? [['agenda', N_('Agenda')]] : []), ...(feat('timeline') ? [['timeline', N_('Timeline')]] : [])].map(([k, n]) => [k, tr(n)]);
   // 2.21.0 (#659): "+ Event" and the calendars (own, shared: show, share, import, the phone)
-  const evb = feat('events') ? `<button class="btn sm pri evnew" data-act="ev-new" title="${esc(tr('New event'))}" aria-label="${esc(tr('New event'))}">${ic('plus', 's')}<span class="cdl">${tr('Event')}</span></button><button class="btn sm" data-act="ev-cals" title="${esc(tr('Calendars'))}" aria-label="${esc(tr('Calendars'))}">${ic('cal', 's')}<span class="cdl">${tr('Calendars')}</span></button>` : '';
+  // 2.36.1 (#1127): the "Calendars" window (own calendars, subscriptions, tasks) opens here too, also without own events
+  const evb = (feat('events') ? `<button class="btn sm pri evnew" data-act="ev-new" title="${esc(tr('New event'))}" aria-label="${esc(tr('New event'))}">${ic('plus', 's')}<span class="cdl">${tr('Event')}</span></button>` : '')
+    + (feat('events') || S.calendars?.enabled ? `<button class="btn sm" data-act="ev-cals" title="${esc(tr('Calendars'))}" aria-label="${esc(tr('Calendars'))}">${ic('cal', 's')}<span class="cdl">${tr('Calendars')}</span></button>` : '');
   return `<div class="calbar"><h2>${title}</h2><div class="seg">${modes.map(([k, n]) => `<button class="${S.calMode === k ? 'on' : ''}" data-act="cal-mode" data-k="${k}">${n}</button>`).join('')}</div>${dn}${evb}${extra}
     <div class="calnav"><button class="iconbtn" data-act="cal-prev" title="${esc(tr('Previous period'))}" aria-label="${esc(tr('Previous period'))}">${ic('left')}</button><button class="btn sm" data-act="cal-today">${tr('Today')}</button><button class="iconbtn" data-act="cal-next" title="${esc(tr('Next period'))}" aria-label="${esc(tr('Next period'))}">${ic('right')}</button></div></div>`;
 }
@@ -445,4 +463,84 @@ function layoutDay(evs, extra = []) {  // side-by-side lanes for overlapping tim
   }
   if (cluster.length) close();
   return out;
+}
+
+// ------------------------------------------------------------------ 2.36.1 (#1126 #1127 #956): which calendars show where
+// Four user settings (server, every device): cal_tasks + cal_lists_hidden (tasks in the calendar views), today_cals_hidden
+// (the "Events today" block) and plan_cals_off (the day planner, also the agent's). A calendar is keyed "e:<own calendar id>"
+// or "s:<subscription id>". "Show in my calendar" stays what it was (evcals.hidden / cal_subs.visible, one field each);
+// a calendar hidden there is gone from Today and the planner as well (the server does not even send its events).
+const cvxKey = e => e.own ? `e:${e.cal}` : `s:${e.sub}`;
+function cvxList(k) { try { const a = JSON.parse(S.settings?.[k] || '[]'); return Array.isArray(a) ? a : []; } catch { return []; } }
+const cvxTodayOn = e => (e.own && e.cal == null) || !cvxList('today_cals_hidden').includes(cvxKey(e));
+const cvxTaskOn = t => S.settings?.cal_tasks !== '0' && !cvxList('cal_lists_hidden').includes(t.list_id);
+// stores one of the json lists (the local copy first, so the views redraw at once)
+function cvxSave(k, arr) {
+  S.settings[k] = typeof arr === 'string' ? arr : JSON.stringify(arr);
+  return api('PATCH', '/api/settings', {[k]: arr}).catch(() => { /* api() showed it; the local value stays until the next load */ });
+}
+const cvxOff = (k, key, off) => cvxSave(k, [...cvxList(k).filter(x => x !== key), ...(off ? [key] : [])]);  // off = listed
+// every calendar I have: own ones from the state, subscriptions from GET /api/calendars (cached in S.cvxSubs)
+async function cvxCals(fresh) {
+  if (S.calendars?.enabled && (fresh || !S.cvxSubs)) { try { S.cvxSubs = (await api('GET', '/api/calendars')).subs || []; } catch { S.cvxSubs = S.cvxSubs || null; } }
+  return cvxVisibleCals(true);
+}
+// sync: own calendars + subscriptions (from the cache, else the last events answer = the visible ones); all = hidden ones too
+function cvxVisibleCals(all) {
+  const out = (S.evcals || []).filter(c => all || !c.hidden).map(c => ({key: `e:${c.id}`, id: c.id, name: c.name, color: cssColor(c.color) || 'var(--accent)', on: !c.hidden, own: true, c}));
+  if (!S.calendars?.enabled && !S.cvxSubs) return out;
+  const subs = S.cvxSubs ? S.cvxSubs.map(x => [x.id, x, !!x.visible]) : Object.entries(S.cal.subs || {}).map(([id, x]) => [+id, x, true]);
+  for (const [id, x, on] of subs) if (all || on) out.push({key: `s:${id}`, id, name: x.name || tr('Calendar'), color: cssColor(x.color) || '#94a3b8', on, own: false, c: x});
+  return out;
+}
+// "Show in my calendar" for one calendar; draw = redraw the views (false while several are switched in a row)
+async function cvxShow(key, on, draw = true) {
+  const [k, id] = key.split(':'), n = +id;
+  try {
+    if (k === 'e') { await api('PATCH', `/api/evcals/${n}`, {hidden: !on}); const c = evCal(n); if (c) c.hidden = !on; }
+    else {
+      await api('PATCH', `/api/calendars/${n}`, {visible: on});
+      const x = (S.cvxSubs || []).find(s => s.id === n); if (x) x.visible = on;
+      const cnt = S.cvxSubs ? S.cvxSubs.filter(s => s.visible).length : Math.max(0, (S.calendars?.subs || 0) + (on ? 1 : -1));
+      S.calendars = {...(S.calendars || {}), enabled: true, subs: cnt};
+    }
+  } catch { return false; }
+  if (draw) cvxRedraw();
+  return true;
+}
+function cvxRedraw() { calInvalidate(); renderView(); }  // the events are fetched again (hidden calendars send none)
+async function cvxTlHide(key, name) {  // timeline: a tap on the name hides the calendar, the toast takes it back
+  if (!await cvxShow(key, false)) return;
+  toast(tr('Calendar “{0}” hidden', name), () => cvxShow(key, true));
+}
+async function cvxOnly(key) {  // "Only this one": every other calendar off (the toast shows all again)
+  const cs = await cvxCals();
+  for (const c of cs) if (c.on !== (c.key === key)) await cvxShow(c.key, c.key === key, false);
+  cvxRedraw();
+  toast(tr('Only this calendar is shown'), cvxAll, null, tr('Show all'));
+}
+async function cvxAll() {
+  const cs = await cvxCals();
+  for (const c of cs) if (!c.on) await cvxShow(c.key, true, false);
+  cvxRedraw();
+}
+function cvxTlMenu(anchor, key, name) {
+  menu(anchor, [{label: tr('Hide this calendar'), icon: 'eyeoff', fn: () => cvxTlHide(key, name)},
+    {label: tr('Only this calendar'), icon: 'eye', fn: () => cvxOnly(key)},
+    {label: tr('Show all calendars'), icon: 'all', fn: cvxAll}, '-',
+    {label: tr('Calendars…'), icon: 'cal', fn: evCalsModal}]);
+}
+// Today: the "…" of "Events today" switches single calendars off / on in this block only
+function cvxTodayMenu(anchor) {
+  const cs = cvxVisibleCals(), off = cvxList('today_cals_hidden');
+  menu(anchor, [...cs.map(c => ({label: c.name, on: !off.includes(c.key), fn: async () => { await cvxOff('today_cals_hidden', c.key, !off.includes(c.key)); renderView(); }})),
+    cs.length ? '-' : null, off.length ? {label: tr('Show all calendars'), icon: 'all', fn: async () => { await cvxSave('today_cals_hidden', []); renderView(); }} : null,
+    {label: tr('Calendars…'), icon: 'cal', fn: evCalsModal}].filter(Boolean));
+}
+// the day plan dialog (#956): a fold-out "Calendars" line, each switch = counts as busy when planning (also for an agent)
+function cvxPlanRow(open) {
+  const cs = cvxVisibleCals(); if (!cs.length) return '';
+  const off = cvxList('plan_cals_off'), n = cs.filter(c => !off.includes(c.key)).length;
+  return `<details class="cvxdp" ${open ? 'open' : ''}><summary>${ic('cal', 's')} ${tr('Calendars')} <span class="muted">${esc(tr('{0} of {1} considered', n, cs.length))}</span></summary>
+    <div class="cvxdpl">${cs.map(c => `<label class="cvxdpr" style="--cc:${cssColor(c.color)}"><input type="checkbox" data-cvxplan="${c.key}" ${off.includes(c.key) ? '' : 'checked'}><i class="cevdot"></i><span>${esc(c.name)}</span><small class="muted">${tr('consider when planning')}</small></label>`).join('')}</div></details>`;
 }

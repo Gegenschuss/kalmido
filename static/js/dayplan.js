@@ -41,7 +41,8 @@ async function dayplanModal(mode = 'day', day = today()) {
   $('.dpm')?.remove();
   const md = modal(`<div class="calerr" role="alert" id="dp-err" hidden></div><div class="muted mhint">${tr('Loading…')}</div>`);
   md.classList.add('dpm');
-  const st = {mode, day, p: null, sel: new Set()}, alt = day !== today() ? day : addDays(today(), 1);
+  const st = {mode, day, p: null, sel: new Set(), cals: false}, alt = day !== today() ? day : addDays(today(), 1);
+  await cvxCals().catch(() => {});  // 2.36.1 (#956): the subscriptions for the "Calendars" line
   const draw = () => {
     const p = st.p; if (!p || !md.isConnected) return;
     const rows = [...dpRowsOf(p), ...p.plan.map((t, i) => ({...t, kind: 'plan', key: String(i)}))];
@@ -53,6 +54,7 @@ async function dayplanModal(mode = 'day', day = today()) {
         <div class="seg" role="group" aria-label="${esc(tr('Day'))}"><button data-dp="day" data-v="${today()}" class="${st.day === today() ? 'on' : ''}" aria-pressed="${st.day === today()}">${tr('Today')}</button><button data-dp="day" data-v="${alt}" class="${st.day === alt ? 'on' : ''}" aria-pressed="${st.day === alt}">${alt === addDays(today(), 1) ? tr('Tomorrow') : esc(fmtDayAbs(alt))}</button></div></div>
       <div class="dpsum muted">${esc(tr('{0}, working hours {1}–{2}', fmtDayAbs(p.date), p.work.start, p.work.end))} · ${esc(trn('{0} event', '{0} events', ev))} · ${esc(tr('{0} planned', fmtH(p.plan.reduce((n, t) => n + (t.duration || 0), 0))))} · ${esc(tr('{0} still free', fmtH(p.free_min)))}${allDay.length ? ' · ' + esc(tr('all day: {0}', allDay.map(e => e.title).join(', '))) : ''}</div>
       <div class="calerr" role="alert" id="dp-err" hidden></div>
+      ${cvxPlanRow(st.cals)}
       ${dpTimeline(rows, defer, {sel: st.sel, acts: true})}
       <div class="shint keep">${tr('Applying sets the planned start and duration of the selected tasks (a task without a duration gets {0} minutes); due dates and deadlines stay as they are. One step, undo takes it back.', p.default_duration)}</div>
       <div class="foot ppfoot">${ags.length ? `<button class="btn" data-dp="agent">${ic('bot', 's')} ${tr('Let an agent plan')}</button>` : ''}<span class="spacer"></span><button class="btn" data-dp="close">${tr('Cancel')}</button><button class="btn pri" data-dp="apply" ${n ? '' : 'disabled'}>${ic('check', 's')} ${esc(trn('Apply {0} entry', 'Apply {0} entries', n))}</button></div>`;
@@ -62,7 +64,10 @@ async function dayplanModal(mode = 'day', day = today()) {
     st.sel = new Set(st.p.plan.map((x, i) => String(i)));
     draw();
   };
-  md.addEventListener('change', e => {
+  md.addEventListener('toggle', e => { if (e.target.classList?.contains('cvxdp')) st.cals = e.target.open; }, true);
+  md.addEventListener('change', async e => {
+    const cp = e.target.closest('[data-cvxplan]');  // 2.36.1 (#956): a calendar counts (or not) when planning -> plan again
+    if (cp) { await cvxOff('plan_cals_off', cp.dataset.cvxplan, !cp.checked); fetchPlan(); return; }
     if (!e.target.classList.contains('ppc')) return;
     const r = e.target.closest('.ppi'); if (!r) return;
     e.target.checked ? st.sel.add(r.dataset.k) : st.sel.delete(r.dataset.k);

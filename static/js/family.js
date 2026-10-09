@@ -467,10 +467,10 @@ async function purposeSet(p) {
   const n = PURPOSES.find(x => x[0] === p);
   // 2.25.0 (UX-25): the dialog lists what changes (modules on / off, tabs that leave the tab bar)
   const want = new Set(PURPOSE_MODS[p] || []), mname = k => tr(FEATS.find(x => x[0] === k)?.[1] || k);
-  const ton = PURPOSE_ALL.filter(k => want.has(k) && !feat(k)), toff = PURPOSE_ALL.filter(k => !want.has(k) && feat(k));
+  const ton = [...PURPOSE_ALL, ...(PURPOSE_EXTRA[p] || [])].filter(k => want.has(k) && !feat(k)), toff = PURPOSE_ALL.filter(k => !want.has(k) && feat(k));
   const tabs = tabIds().filter(id => id.startsWith('m:') && toff.includes(id.slice(2))).map(id => mname(id.slice(2)));
   const chg = `<ul class="cdlg-l">${ton.length ? `<li>${esc(tr('On: {0}', ton.map(mname).join(', ')))}</li>` : ''}${toff.length ? `<li>${esc(tr('Off: {0}', toff.map(mname).join(', ')))}</li>` : ''}${tabs.length ? `<li>${esc(tr('Leaves the tab bar: {0}', tabs.join(', ')))}</li>` : ''}${!ton.length && !toff.length ? `<li>${esc(tr('No module changes.'))}</li>` : ''}</ul>`;
-  const once = p === 'family' && !S.lists.some(l => l.family) ? tr('A shopping list, household chores, birthdays and a meal plan are created once (in the folder Family).') : p === 'software' ? tr('A software project is created once.') : p === 'team' ? tr('The sample project is created once.') : '';
+  const once = p === 'family' && !S.lists.some(l => l.family) ? tr('A shopping list, household chores, birthdays and a meal plan are created once (in the folder Family).') : p === 'software' ? tr('A software project is created once.') : p === 'team' || p === 'office' ? tr('The sample project is created once.') : '';
   if (!await askConfirm(tr('Switch to “{0}”?', tr(n[2])), '', {ok: tr('Set up'), html: `<p>${esc(tr('Your modules are switched to fit; nothing is deleted and everything can be changed again below.'))}</p>${chg}${once ? `<p>${esc(once)}</p>` : ''}`})) return false;
   let j; try { j = await api('POST', '/api/me/purpose', {purpose: p}); } catch { return false; }
   S.settings.features = j.features; S.settings.purpose = p;

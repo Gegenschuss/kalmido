@@ -1229,13 +1229,18 @@ const PURPOSES = [['me', 'user', N_('For me'), N_('Your own tasks: lists, remind
   ['home', 'home', N_('Home'), N_('Your household and life: contracts, warranties and upkeep, staying in touch, health, a journal, trips and read later.')],
   ['family', 'family', N_('Family'), N_('Shared lists, a shopping list with shop areas, household chores taking turns, birthdays, a meal plan and accounts for children.')],
   ['team', 'users', N_('Team'), N_('Sharing, assigning, comments, time tracking, a timeline with dependencies, custom fields and project progress.')],
-  ['software', 'code', N_('Software projects'), N_('Everything of Team plus a software project: a board from backlog to done, bug and feature tickets, a repository.')]];
+  ['software', 'code', N_('Software projects'), N_('Everything of Team plus a software project: a board from backlog to done, bug and feature tickets, a repository.')],
+  // 2.36.1 (#1021): the business area
+  ['office', 'brief', N_('Office & finance'), N_('Everything of Team plus clients, workload, forms and the office: services and rates, quotations with a calculator, text blocks and PDF documents of your organisation.')]];
 const PURPOSE_MODS = {me: ['cal', 'events', 'contacts'],
   home: ['cal', 'events', 'contacts', 'habits', 'contracts', 'home', 'care', 'health', 'review', 'travel', 'reading'],
   family: ['cal', 'habits', 'comments', 'collab', 'family', 'events', 'contacts', 'contracts', 'home', 'travel'],
   // 2.25.0 (UX-25): Team / Software hold only what the name promises (no habits, focus timer, matrix, statistics)
   team: ['cal', 'timeline', 'kanban', 'comments', 'collab', 'time', 'progress', 'deps', 'fields', 'events', 'contacts'],
-  software: ['cal', 'timeline', 'kanban', 'comments', 'collab', 'time', 'progress', 'deps', 'fields', 'events', 'contacts']};
+  software: ['cal', 'timeline', 'kanban', 'comments', 'collab', 'time', 'progress', 'deps', 'fields', 'events', 'contacts'],
+  office: ['cal', 'timeline', 'kanban', 'comments', 'collab', 'time', 'progress', 'deps', 'fields', 'events', 'contacts', 'clients', 'workload', 'forms', 'office']};
+// 2.36.1 (#1021): the modules a purpose switches ON in addition (never off by another purpose; server: PURPOSE_EXTRA)
+const PURPOSE_EXTRA = {office: ['clients', 'workload', 'forms', 'office']};
 // every module a purpose switches (on or off); the rest (agents, clients …) stays as it is (server: PURPOSE_MODS)
 const PURPOSE_ALL = ['cal', 'timeline', 'matrix', 'kanban', 'habits', 'pomo', 'stats', 'comments', 'collab', 'time', 'progress', 'deps', 'fields', 'family', 'events', 'contacts', 'contracts', 'home', 'care', 'health', 'review', 'travel', 'reading'];
 // First-run setup, step 2 ("What do you want to use?"): only right after the first admin was created, never on
@@ -1294,7 +1299,7 @@ async function setupChoices(el, logo) {
       <h3>${tr('What do you use Kalmido for?')}</h3>
       <p class="muted">${tr('Pick a start, untick what you do not need. Everything can be changed later in Settings.')}</p>
       <div class="supresets">${Object.entries(SETUP_PRESETS).map(([k, p]) => `<button type="button" class="supreset ${matches(k) ? 'on' : ''}" data-su-preset="${k}" aria-pressed="${matches(k)}"><b>${ic(p.icon, 's')}${tr(p.name)}</b><small class="muted">${tr(p.desc)}</small></button>`).join('')}</div>
-      ${askOrg && ['team', 'software'].includes(preset) ? `<h3><label for="su-org">${tr('Name of your team or company')} <span class="muted">${tr('(optional)')}</span></label></h3><input id="su-org" class="suorg" maxlength="60" value="${esc(orgName)}" placeholder="${esc(tr('e.g. your company'))}"><p class="muted">${tr('Shown next to the app name and in invitations. You can change it later in Settings > Administration > Organisation.')}</p>` : ''}
+      ${askOrg && ['team', 'software', 'office'].includes(preset) ? `<h3><label for="su-org">${tr('Name of your team or company')} <span class="muted">${tr('(optional)')}</span></label></h3><input id="su-org" class="suorg" maxlength="60" value="${esc(orgName)}" placeholder="${esc(tr('e.g. your company'))}"><p class="muted">${tr('Shown next to the app name and in invitations. You can change it later in Settings > Administration > Organisation.')}</p>` : ''}
       <details class="sucust" ${custOpen ? 'open' : ''}><summary>${tr('Customize…')} <span class="muted">${esc(setupCount(picked))}</span></summary>
       <div class="suse-main">${SETUP_MAIN.map(row).join('')}</div>
       <div class="suse-list">${SETUP_MODS.map(row).join('')}</div></details>
@@ -1325,7 +1330,7 @@ async function setupChoices(el, logo) {
     }
     const post = async (url, body) => { const r = await fetch(url, {method: url.endsWith('settings') ? 'PATCH' : 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify(body)}); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || tr('Error {0}', r.status)); };
     try {
-      if (b.dataset.su === 'go') await post('/api/admin/setup', {lang, collab_all: picked.has('collab'), time_all: picked.has('time'), modules: SETUP_MODS.map(x => x[0]).filter(k => picked.has(k)), sample: start === 'sample', ...(start && start !== 'sample' ? {project_type: start} : {}), ...(matches(preset) ? {purpose: preset} : {}), ...(askOrg && ['team', 'software'].includes(preset) && orgName.trim() ? {org_name: orgName.trim()} : {})});
+      if (b.dataset.su === 'go') await post('/api/admin/setup', {lang, collab_all: picked.has('collab'), time_all: picked.has('time'), modules: SETUP_MODS.map(x => x[0]).filter(k => picked.has(k)), sample: start === 'sample', ...(start && start !== 'sample' ? {project_type: start} : {}), ...(matches(preset) ? {purpose: preset} : {}), ...(askOrg && ['team', 'software', 'office'].includes(preset) && orgName.trim() ? {org_name: orgName.trim()} : {})});
       else return;
       location.replace('/');
     } catch (err) { $('#su-err', el).textContent = err.message || tr('Server not reachable.'); }

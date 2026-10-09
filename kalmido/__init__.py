@@ -107,6 +107,13 @@ ORDER = (
     "life.v1",
     "team.clients",
     "team.workload",
+    "office.packs",  # 2.36.1 (#1021): country packs (data), used by office.model
+    "office.model",  # 2.36.1 (#1021): office & finance (B); C/D append office.calc, office.docs, office.pdf
+    "office.web",
+    "office.calc",  # 2.36.1 (#1021): the quotation calculator (C, no imports)
+    "office.docs",  # 2.36.1 (#1021): quotations (C)
+    "office.pdf",  # 2.36.1 (#1021): the PDF writer (D, no kalmido imports)
+    "office.pdfweb",  # 2.36.1 (#1021): quotation PDF + company logo routes (D; the writer office.pdf has no routes)
     "team.approvals",
     "team.forms",
     "team.v1",

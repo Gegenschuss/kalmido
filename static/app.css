@@ -1465,10 +1465,12 @@ svg.chart{display:block;max-width:100%;overflow:visible}
 .cevtoday .ghead{padding-top:.5rem}
 .tl-cal .tl-name{gap:.4375rem;cursor:default;color:var(--text2)}
 .tl-cal .tl-name:hover{color:var(--text2)}
-.tl-cev{position:absolute;top:.4375rem;height:1.25rem;border-radius:.3125rem;background:var(--cct);border:1px solid var(--ccb);font-size:.75rem;display:flex;align-items:center;padding:0 .4375rem;cursor:pointer;overflow:hidden;white-space:nowrap}
-.tl-cev span{overflow:hidden;text-overflow:ellipsis;pointer-events:none}
-.tl-cev.short{overflow:visible}
-.tl-cev.short span{position:absolute;left:calc(100% + .375rem);color:var(--text2);max-width:12rem;font-size:.75rem}
+/* 2.36.1 A (#1126): the element spans the free track up to the next bar of the lane, the coloured bar (.cvxbar, --bw) is
+   the event itself; the title starts inside the bar and is cut with "…" where the next bar begins -- never outside the row */
+.tl-cev{position:absolute;top:.4375rem;height:1.25rem;font-size:.75rem;display:flex;align-items:center;cursor:pointer;overflow:hidden;white-space:nowrap;min-width:.5rem}
+.tl-cev .cvxbar{position:absolute;left:0;top:0;bottom:0;width:var(--bw,100%);max-width:100%;border-radius:.3125rem;background:var(--cct);border:1px solid var(--ccb);box-sizing:border-box;pointer-events:none}
+.tl-cev:hover .cvxbar,.tl-cev:focus-visible .cvxbar{border-color:var(--cc)}
+.tl-cev span{position:relative;padding:0 .4375rem;overflow:hidden;text-overflow:ellipsis;pointer-events:none;max-width:100%;color:var(--text)}
 .cevpop{display:flex;flex-direction:column;gap:.4375rem;padding:.375rem .375rem .25rem}
 .cevh{display:flex;align-items:baseline;gap:.5rem;font-size:var(--fs-b);line-height:1.3;overflow-wrap:anywhere}
 .cevh .cevdot{width:.625rem;height:.625rem;transform:translateY(-1px)}
@@ -5577,3 +5579,149 @@ body.lydragging,body.lydragging *{cursor:grabbing!important;-webkit-user-select:
 #detail.tlk #d-md{cursor:text}
 /* 2.36.0 (#1110): the agent's suggestion buttons sit below the time / reactions line of its message */
 .cmsg > .cmeta + .cchoices{margin-top:.375rem;margin-bottom:0}
+
+/* 2.36.1 A (#1127 #956): calendar switches -- timeline names, the "Calendars" window, "Events today" menu, day plan line */
+.tl-cal .tl-name{gap:.25rem;padding-right:.125rem}
+.cvxtln{display:flex;align-items:center;gap:.4375rem;flex:1;min-width:0;height:100%;min-height:1.5rem;padding:0;border:0;background:none;color:inherit;font:inherit;cursor:pointer;text-align:left}
+.cvxtln .tln{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cvxtln:hover .tln,.cvxtln:focus-visible .tln{color:var(--accent)}
+.cvxtlm{flex:none;width:1.5rem;height:1.5rem;min-width:1.5rem;min-height:1.5rem;padding:0;color:var(--muted)}
+.cevtoday .ghead{display:flex;align-items:center}
+.cevtoday .ghead .cvxtm{margin-left:auto}
+.cvxhead{display:flex;align-items:center;gap:.5rem;padding:.25rem .375rem 0;font-size:.6875rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.cvxhead span{flex:none;width:2.25rem;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cvxhead .cvxhn{flex:1;width:auto;text-align:left;text-transform:none;letter-spacing:0;font-size:.75rem;color:var(--text2);font-weight:600}
+.cvxrow{display:flex;align-items:center;gap:.5rem;padding:.25rem .375rem;border-radius:var(--radius);min-height:2.75rem}
+.cvxrow:hover,.evcrow:hover{background:var(--bg2)}
+.cvxrow.sub{padding-left:1.5rem;min-height:2.25rem}
+.cvxrow .evcn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.evcrow .evcn{white-space:nowrap}
+.cvxrow .cevdot{width:.625rem;height:.625rem;border-radius:50%;background:var(--cc);flex:none;display:inline-block}
+.cvxrow .swc.off,.evcrow .swc.off{opacity:.35}
+.cvxfold{flex:none;width:1.75rem;height:1.75rem;min-width:1.75rem;min-height:1.75rem;padding:0;color:var(--muted)}
+.cvxfold svg{transition:transform .15s}
+.cvxfold[aria-expanded="true"] svg{transform:rotate(90deg)}
+.cvxgrp{margin:.5rem 0 .25rem;font-size:.75rem;font-weight:600;color:var(--text2)}
+.cvxrow .iconbtn.cvxsp,.evcrow .iconbtn.cvxsp{visibility:hidden}
+.cvxdp{margin:.5rem 0;border:1px solid var(--line);border-radius:var(--radius);padding:.25rem .5rem}
+.cvxdp summary{cursor:pointer;display:flex;align-items:center;gap:.375rem;min-height:2rem;font-size:.8125rem}
+.cvxdpl{display:flex;flex-direction:column;gap:.125rem;padding:.25rem 0 .375rem}
+.cvxdpr{display:flex;align-items:center;gap:.5rem;min-height:2.25rem;padding:0 .25rem;border-radius:var(--radius);cursor:pointer;font-size:.8125rem}
+.cvxdpr:hover{background:var(--bg3)}
+.cvxdpr input{accent-color:var(--accent);width:1.125rem;height:1.125rem;flex:none}
+.cvxdpr .cevdot{width:.625rem;height:.625rem;border-radius:50%;background:var(--cc);flex:none;display:inline-block}
+.cvxdpr span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cvxdpr small{font-size:.6875rem}
+@media (max-width:599px){ .cvxdpr small{display:none} .cvxhead span{width:2rem} }
+/* 2.36.1 B: Office & finance (#1021) -- the module view, master data rows, dialogs, settings */
+.office .ofchead{display:flex;align-items:baseline;gap:.75rem;flex-wrap:wrap;margin-bottom:.5rem}
+.office .ofchead h2{display:flex;align-items:center;gap:.5rem;margin:0;font-size:var(--fs-l)}
+.office .ofcorg{font-size:var(--fs-s)}
+.ofctabs{margin-bottom:.75rem;max-width:100%}
+.ofctabs button{min-height:2.25rem}
+.ofcbar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem}
+.ofcgrp{display:flex;align-items:center;gap:.5rem;margin:1rem 0 .25rem;font-size:var(--fs-s);color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.ofcgrp .c{font-weight:400;text-transform:none;letter-spacing:0}
+.ofclist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.ofcrow{display:flex;align-items:center;gap:.625rem;width:100%;text-align:left;min-height:2.75rem;padding:.375rem .625rem;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--line2);color:var(--text)}
+.ofcrow:hover,.ofcrow:focus-visible{border-color:var(--accent)}
+.ofcrow.arch{opacity:.6}
+.ofcrow .ofcn{flex:1;min-width:0;display:flex;flex-direction:column}
+.ofcrow .ofcn b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ofcrow .ofcn small{font-size:var(--fs-s);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ofcrow>svg{color:var(--muted);flex:none}
+.ofcdlg .card{width:min(40rem,100%)}
+.ofcdlg .row textarea{flex:1;min-width:0;width:100%}
+.ofchint{font-size:var(--fs-s);flex-basis:100%}
+.ofcitems{display:flex;flex-direction:column;gap:.375rem;margin-bottom:.5rem}
+.ofcitem{display:flex;gap:.375rem;align-items:center}
+.ofcitem select{flex:1;min-width:0}
+.ofcitem input{width:4.5rem;flex:none}
+.ofcrates summary{cursor:pointer;color:var(--text2);margin:.5rem 0}
+.ofcrates .ofcrl{max-height:16rem;overflow:auto;padding:.25rem 0}
+.ofcset{max-width:48rem}
+.ofcset h3{margin:1.25rem 0 .5rem;font-size:var(--fs-m)}
+.ofcset .row{display:flex;gap:.625rem;align-items:center;margin-bottom:.625rem;flex-wrap:wrap}
+.ofcset .row label{min-width:10rem;color:var(--muted);font-size:var(--fs-m)}
+.ofcset .row input:not([type=checkbox]):not([type=file]),.ofcset .row select,.ofcset .row textarea{flex:1;min-width:0}
+.ofcset .row .lacts input.numin{flex:0 0 6rem}
+.ofcsw{display:inline-block;width:1.25rem;height:1.25rem;border-radius:50%;border:1px solid var(--line2)}
+.ofclogo{max-height:3rem;max-width:12rem;object-fit:contain;background:#fff;border-radius:var(--r-s);padding:.125rem}
+.ofcset .foot{display:flex;align-items:center;gap:.5rem;margin:.75rem 0}
+@media (max-width:599px){ .ofcset .row label{min-width:100%} .ofcbar .chkl{font-size:var(--fs-s)} .ofcrow{min-height:2.75rem} }
+/* 2.36.1 C: Office & finance (#1021) -- quotations: the list, the editor (head, positions, automatic lines, totals, rights) */
+.ofdbar select{min-height:2.25rem}
+.ofdrow .ofdsum{display:flex;flex-direction:column;align-items:flex-end;gap:.125rem;flex:0 0 auto}
+.ofdrow .ofdsum b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.rotag.st-sent{color:var(--accent)} .rotag.st-accepted{color:var(--ok,#2a8a4a)} .rotag.st-declined{color:var(--muted);text-decoration:line-through}
+.ofdhead{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:0 0 .75rem}
+.ofdhead .ofdnum{display:flex;align-items:center;gap:.5rem;font-size:var(--fs-l)}
+.ofdhead .ofdstat{min-height:2.25rem}
+.ofdhead .ofdsave{font-size:var(--fs-s)}
+.ofdeditor{display:flex;flex-direction:column;gap:.75rem}
+.ofdsec{border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2);padding:.5rem .75rem}
+.ofdsec>summary{cursor:pointer;display:flex;align-items:center;gap:.5rem;min-height:2.5rem;list-style:none}
+.ofdsec>summary::-webkit-details-marker{display:none}
+.ofdsec>summary::before{content:"";width:.5rem;height:.5rem;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(-45deg);transition:transform .15s}
+.ofdsec[open]>summary::before{transform:rotate(45deg)}
+.ofdsec h3,.ofdsec summary h3{margin:0;font-size:var(--fs);font-weight:600}
+section.ofdsec h3{min-height:2.5rem;display:flex;align-items:center}
+.ofdsecb{padding:.25rem 0 .5rem}
+.ofdgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(18rem,1fr));gap:.25rem 1.5rem}
+.ofdgrid .row{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;min-height:2.5rem}
+.ofdgrid .row label{min-width:9rem;color:var(--muted);font-size:var(--fs-s)}
+.ofdgrid .row input,.ofdgrid .row select,.ofdgrid .row textarea{flex:1;min-width:8rem}
+.ofdgrid .row input.numin{flex:0 0 6rem}
+.ofdgrid .row .ofchint{flex-basis:100%;font-size:var(--fs-s);margin-left:9.5rem}
+.ofdits{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.375rem}
+.ofdit{display:flex;align-items:flex-start;gap:.5rem;padding:.5rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg)}
+.ofdit .ofdpos{flex:0 0 1.75rem;min-height:2.25rem;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums;color:var(--muted)}
+.ofdit .ofditb{flex:1;min-width:0;display:flex;flex-direction:column;gap:.375rem}
+.ofdit input,.ofdit select,.ofdit textarea{min-height:2.25rem}
+.ofdit .ofdtt{font-weight:500;width:100%}
+.ofdit .ofddt{width:100%;font-size:var(--fs-s)}
+.ofdit .ofdnums{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap}
+.ofdit .ofdnums input.numin{width:5rem;flex:0 0 5rem}
+.ofdit .ofdnums input.ofdrate{width:6.5rem;flex-basis:6.5rem}
+.ofdit .ofdnums select{max-width:8rem}
+.ofdit .ofdlt{margin-left:auto;font-variant-numeric:tabular-nums;white-space:nowrap;min-width:6rem;text-align:right}
+.ofdit .ofdflags{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;font-size:var(--fs-s)}
+.ofdit .ofdflags .chkl{display:inline-flex;align-items:center;gap:.25rem;min-height:1.75rem}
+.ofdit .ofdcost input{width:5rem;margin-left:.25rem}
+.ofdit .ofdmv{display:flex;flex-direction:column;gap:.125rem;flex:0 0 auto}
+.ofdit .ofdmv .ib{min-width:1.75rem;min-height:1.75rem}
+.ofdhd input{flex:1;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.ofdtx textarea{flex:1;resize:vertical}
+.ofdadd{display:flex;gap:.5rem;flex-wrap:wrap;margin:.5rem 0}
+.ofdautos{margin-top:.75rem}
+.ofdauto{display:flex;align-items:center;gap:.5rem;padding:.375rem .5rem;border-radius:var(--radius);background:var(--bg2);min-height:2.5rem}
+.ofdauto .ofcn{flex:1;min-width:0;display:flex;flex-direction:column}
+.ofdauto .ofcn small{font-size:var(--fs-s)}
+.ofdauto .ofdlt{font-variant-numeric:tabular-nums;white-space:nowrap}
+.ofdrules{margin-top:.5rem}
+.ofdtotals{margin-top:.75rem;padding:.5rem .75rem;border-top:2px solid var(--accent)}
+.ofdtotals dl{margin:0;display:flex;flex-direction:column;gap:.125rem;max-width:28rem;margin-left:auto}
+.ofdtotals .ofdtr{display:flex;justify-content:space-between;gap:1rem;min-height:1.75rem;align-items:center}
+.ofdtotals .ofdtr dt{color:var(--muted)} .ofdtotals .ofdtr dd{margin:0;font-variant-numeric:tabular-nums;font-weight:500}
+.ofdtotals .tr-net dd,.ofdtotals .tr-gross dd{font-size:var(--fs-l);font-weight:600}
+.ofdtotals .ofdnote{text-align:right;font-size:var(--fs-s);margin:.5rem 0 0}
+.ofdtotals .ofdint{text-align:right;font-size:var(--fs-s);margin:.25rem 0 0;display:flex;justify-content:flex-end;align-items:center;gap:.25rem}
+.ofdrt .ofdrtf{display:flex;gap:.5rem;flex:1;flex-wrap:wrap} .ofdrt .ofdrtf select,.ofdrt .ofdrtf input{flex:1;min-width:10rem}
+.ofdsecb .row{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;min-height:2.5rem;margin:.125rem 0}
+.ofdsecb .row label{min-width:9rem;color:var(--muted);font-size:var(--fs-s)}
+.ofdsecb .row input,.ofdsecb .row select,.ofdsecb .row textarea{flex:1;min-width:8rem}
+.ofdsecb .row.ofdtxt select{min-height:2.25rem}
+.ofdsecb .row .ofdtxt{flex:1;min-width:0;display:flex} .ofdsecb .row .ofdtxt select{width:100%;max-width:100%;min-width:0;min-height:2.25rem}
+.ofdsecb textarea{width:100%;resize:vertical;margin-bottom:.5rem}
+.ofdfld{display:flex;gap:.5rem;align-items:center} .ofdfld input{flex:1;min-width:6rem}
+.ofdpick .ofdslist{max-height:60vh;overflow:auto;margin:.5rem 0}
+.ofdpick .ofcgrp{margin:.5rem 0 .25rem}
+@media (max-width:599px){
+  .ofdgrid{grid-template-columns:1fr} .ofdgrid .row label,.ofdsecb .row label{min-width:100%} .ofdgrid .row .ofchint{margin-left:0}
+  .ofdit{padding:.5rem .375rem;flex-wrap:wrap} .ofdit .ofdpos{flex-basis:1.25rem} .ofdit .ofditb{flex:1 1 calc(100% - 2rem)} .ofdit .ofdmv{flex-direction:row;margin-left:auto} .ofdit .ofdmv .ib{min-width:2.25rem;min-height:2.25rem}
+  .ofdit .ofdnums input.numin{width:4.25rem;flex-basis:4.25rem} .ofdit .ofdnums select{max-width:6rem}
+  .ofdhead .btn span{display:none} .ofdhead .ofdback span{display:inline}
+  .ofdtotals dl{max-width:none}
+  .ofdrt .ofdrtf{flex-direction:column;flex-wrap:nowrap;width:100%;min-width:0} .ofdrt .ofdrtf select,.ofdrt .ofdrtf input{width:100%;min-width:0;flex:none}
+  .ofdsecb .row .chkl{justify-content:flex-start;gap:.5rem}
+}

@@ -331,27 +331,72 @@ function viewAgenda() {
 
 // ---- calendars: list, new, rename / colour, hide, share, import (ICS), export, delete; the phone setup
 async function evCalsModal() {
+  // 2.36.1 (#1127 #956): ONE window for everything the calendar shows: "Tasks" (all dated tasks, fold-out: per list), my own
+  // calendars, then the subscriptions; each calendar row has three switches: in my calendar (evcals.hidden /
+  // cal_subs.visible, the same field as in the settings), on Today (today_cals_hidden) and when planning (plan_cals_off).
+  // On a phone the dialog is the usual sheet from below.
   let users = [];
   if (collab()) users = await evPeople();
   const md = modal(`<div class="lhdr"><h3>${ic('cal', 's')} ${tr('Calendars')}</h3><span class="spacer"></span><button class="iconbtn" data-evc="close" aria-label="${tr('Close')}">${ic('x')}</button></div><div id="evc-body"></div>
-    <div class="foot"><button class="btn" data-evc="phone">${ic('phone', 's')} ${tr('On the phone…')}</button><span class="spacer"></span><button class="btn pri" data-evc="new">${ic('plus', 's')} ${tr('New calendar')}</button></div>`);
+    <div class="foot">${feat('events') ? `<button class="btn" data-evc="phone">${ic('phone', 's')} ${tr('On the phone…')}</button>` : ''}<span class="spacer"></span>${S.calendars?.enabled ? `<button class="btn" data-evc="subs">${ic('gear', 's')} ${tr('Subscriptions…')}</button>` : ''}${feat('events') ? `<button class="btn pri" data-evc="new">${ic('plus', 's')} ${tr('New calendar')}</button>` : ''}</div>`);
   md.classList.add('evcmodal');
-  const draw = () => {
-    const cs = S.evcals || [];
-    $('#evc-body', md).innerHTML = cs.length ? `<ul class="evclist">${cs.map(c => `<li class="evcrow" style="--cc:${cssColor(c.color) || 'var(--accent)'}">
-      <label class="swc" title="${esc(tr('Show in my calendar'))}"><input type="checkbox" data-evcshow="${c.id}" ${c.hidden ? '' : 'checked'}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('Show {0} in my calendar', c.name))}</span></label>
-      <i class="cevdot"></i><span class="evcn">${esc(c.name)}${wsOn() && c.role === 'owner' ? `<span class="muted wslbl"> · ${esc(wsLabel(c.org_id))}</span>` : ''}${c.role !== 'owner' ? `<span class="muted"> · ${esc(c.owner_name || '')} · ${esc(c.role === 'edit' ? tr('can edit') : tr('can view'))}</span>` : c.members?.length ? `<span class="muted"> · ${esc(trn('shared with {0} person', 'shared with {0} people', c.members.length))}</span>` : ''}</span>
-      <button class="iconbtn" data-evcmenu="${c.id}" aria-haspopup="menu" aria-label="${esc(tr('More for {0}', c.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></li>`).join('')}</ul>`
-      : `<p class="muted">${tr('No calendar yet. A new event creates one.')}</p>`;
+  const st = {lists: false};
+  const sw = (key, kind, on, dis, label) => `<label class="swc ${dis ? 'off' : ''}" title="${esc(label)}"><input type="checkbox" data-cvx="${kind}" data-key="${key}" ${on ? 'checked' : ''} ${dis ? 'disabled' : ''}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(label)}</span></label>`;
+  const three = c => {  // Today + planning (off while the calendar is hidden: hidden = gone from Today and the planner too)
+    const off = !c.on;
+    return sw(c.key, 'today', c.on && !cvxList('today_cals_hidden').includes(c.key), off, tr('Show {0} on Today', c.name))
+      + sw(c.key, 'plan', c.on && !cvxList('plan_cals_off').includes(c.key), off, tr('Consider {0} when planning', c.name));
   };
+  const head = `<div class="cvxhead"><span class="cvxhn"></span><span title="${esc(tr('In my calendar'))}">${tr('Calendar|col')}</span><span title="${esc(tr('On Today'))}">${tr('Today')}</span><span title="${esc(tr('When planning'))}">${tr('Plan|col')}</span></div>`;
+  const draw = () => {
+    const cs = S.evcals || [], hidL = cvxList('cal_lists_hidden'), tasksOn = S.settings.cal_tasks !== '0';
+    const lists = [...S.lists.filter(l => !l.archived && !l.is_inbox), ...S.lists.filter(l => !l.archived && l.is_inbox)];
+    // tasks: one switch for all dated tasks, fold-out: one per list (the lists are only listed, never changed here)
+    const tl = `<div class="cvxgrp">${tr('Tasks')}</div><div class="cvxrow" style="--cc:var(--accent)">
+      ${sw('tasks', 'tasks', tasksOn, false, tr('Show tasks in my calendar'))}<i class="cevdot"></i><span class="evcn">${tr('Tasks with a date')}${hidL.length && tasksOn ? `<span class="muted"> · ${esc(trn('{0} list hidden', '{0} lists hidden', hidL.length))}</span>` : ''}</span>
+      <button class="iconbtn cvxfold" data-evc="lists" aria-expanded="${st.lists}" aria-label="${esc(tr('Per list'))}" title="${esc(tr('Per list'))}">${ic('right', 's')}</button></div>
+      ${st.lists ? lists.map(l => `<div class="cvxrow sub" style="--cc:${cssColor(l.color) || 'var(--muted)'}">${sw(String(l.id), 'list', !hidL.includes(l.id), !tasksOn, tr('Show {0} in my calendar', lname(l)))}<i class="cevdot"></i><span class="evcn">${esc(lname(l))}</span></div>`).join('') : ''}`;
+    const own = !feat('events') ? '' : `<div class="cvxgrp">${tr('My calendars')}</div>${cs.length ? head + `<ul class="evclist">${cs.map(c => `<li class="evcrow" style="--cc:${cssColor(c.color) || 'var(--accent)'}">
+      <i class="cevdot"></i><span class="evcn">${esc(c.name)}${wsOn() && c.role === 'owner' ? `<span class="muted wslbl"> · ${esc(wsLabel(c.org_id))}</span>` : ''}${c.role !== 'owner' ? `<span class="muted"> · ${esc(c.owner_name || '')} · ${esc(c.role === 'edit' ? tr('can edit') : tr('can view'))}</span>` : c.members?.length ? `<span class="muted"> · ${esc(trn('shared with {0} person', 'shared with {0} people', c.members.length))}</span>` : ''}</span>
+      <label class="swc" title="${esc(tr('Show in my calendar'))}"><input type="checkbox" data-evcshow="${c.id}" ${c.hidden ? '' : 'checked'}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('Show {0} in my calendar', c.name))}</span></label>
+      ${three({key: `e:${c.id}`, name: c.name, on: !c.hidden})}
+      <button class="iconbtn" data-evcmenu="${c.id}" aria-haspopup="menu" aria-label="${esc(tr('More for {0}', c.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></li>`).join('')}</ul>`
+      : `<p class="muted">${tr('No calendar yet. A new event creates one.')}</p>`}`;
+    const subs = cvxVisibleCals(true).filter(c => !c.own);
+    const sb = !S.calendars?.enabled ? '' : `<div class="cvxgrp">${tr('Subscriptions')}</div>${subs.length ? (cs.length && feat('events') ? '' : head) + subs.map(c => `<div class="cvxrow" style="--cc:${cssColor(c.color)}">
+      <i class="cevdot"></i><span class="evcn">${esc(c.name)}</span>${sw(c.key, 'show', c.on, false, tr('Show {0} in my calendar', c.name))}${three(c)}
+      <button class="iconbtn" data-cvxmenu="${c.key}" data-name="${esc(c.name)}" aria-haspopup="menu" aria-label="${esc(tr('More for {0}', c.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>`).join('')
+      : `<p class="muted">${tr('No subscriptions yet. Add one under Settings > Integrations > Calendars.')}</p>`}`;
+    $('#evc-body', md).innerHTML = tl + own + sb;
+  };
+  await cvxCals(true).catch(() => {});
   draw();
-  const refresh = async () => { await load().catch(() => {}); calInvalidate(); draw(); renderView(); };
+  const redraw = () => { cvxRedraw(); draw(); };
+  const refresh = async () => { await load().catch(() => {}); await cvxCals(true).catch(() => {}); redraw(); };
   md.addEventListener('change', async e => {
-    const s = e.target.closest('[data-evcshow]'); if (!s) return;
-    try { await api('PATCH', `/api/evcals/${s.dataset.evcshow}`, {hidden: !s.checked}); } catch { s.checked = !s.checked; return; }
-    refresh();
+    const s = e.target.closest('[data-evcshow]');
+    if (s) {
+      try { await api('PATCH', `/api/evcals/${s.dataset.evcshow}`, {hidden: !s.checked}); } catch { s.checked = !s.checked; return; }
+      const c = evCal(+s.dataset.evcshow); if (c) c.hidden = !s.checked;
+      redraw(); return;
+    }
+    const x = e.target.closest('[data-cvx]'); if (!x) return;
+    const kind = x.dataset.cvx, key = x.dataset.key, on = x.checked;
+    if (kind === 'tasks') { await cvxSave('cal_tasks', on ? '1' : '0'); redraw(); return; }
+    if (kind === 'list') { await cvxOff('cal_lists_hidden', +key, !on); redraw(); return; }
+    if (kind === 'today') { await cvxOff('today_cals_hidden', key, !on); renderView(); return; }
+    if (kind === 'plan') { await cvxOff('plan_cals_off', key, !on); return; }
+    if (kind === 'show') { if (!await cvxShow(key, on)) { x.checked = !on; return; } draw(); }
   });
   md.addEventListener('click', async e => {
+    const sm = e.target.closest('[data-cvxmenu]');
+    if (sm) {
+      const key = sm.dataset.cvxmenu;
+      menu(sm, [{label: tr('Only this calendar'), icon: 'eye', fn: async () => { await cvxOnly(key); draw(); }},
+        {label: tr('Show all calendars'), icon: 'all', fn: async () => { await cvxAll(); draw(); }}, '-',
+        {label: tr('Subscriptions…'), icon: 'gear', sub: tr('Settings > Integrations > Calendars'), fn: () => { md.remove(); settingsModal('calendars'); }}]);
+      return;
+    }
     const m = e.target.closest('[data-evcmenu]');
     if (m) {
       const c = evCal(+m.dataset.evcmenu); if (!c) return;
@@ -362,13 +407,17 @@ async function evCalsModal() {
         own && collab() && {label: tr('Share…'), icon: 'users', fn: () => evShareModal(c, users, refresh)},
         evWrite(c) && {label: tr('Import a calendar file (ICS)…'), icon: 'upload', fn: () => evImport(c, refresh)},
         {label: tr('Export (ICS)'), icon: 'download', fn: () => { location.href = `/api/evcals/${c.id}/export.ics`; }},
+        {label: tr('Only this calendar'), icon: 'eye', fn: async () => { await cvxOnly(`e:${c.id}`); draw(); }},  // 2.36.1 (#1127)
+        {label: tr('Show all calendars'), icon: 'all', fn: async () => { await cvxAll(); draw(); }},
         !own && {label: tr('Leave this calendar'), icon: 'logout', fn: async () => { if (!await askConfirm(tr('Leave the calendar “{0}”?', c.name), '', {ok: tr('Leave'), danger: true})) return; try { await api('DELETE', `/api/evcals/${c.id}/members/${S.me.id}`); } catch { return; } refresh(); }},
         own && {label: tr('Delete…'), icon: 'trash', cls: 'danger', fn: async () => { if (!await askConfirm(tr('Delete the calendar “{0}” with all its events?', c.name), tr('This cannot be undone.'), {ok: tr('Delete'), danger: true})) return; try { await api('DELETE', `/api/evcals/${c.id}`); } catch { return; } refresh(); }}]);
       return;
     }
     const b = e.target.closest('[data-evc]'); if (!b) return;
     if (b.dataset.evc === 'close') md.remove();
+    if (b.dataset.evc === 'lists') { st.lists = !st.lists; draw(); }
     if (b.dataset.evc === 'phone') { md.remove(); davGuide(); }
+    if (b.dataset.evc === 'subs') { md.remove(); settingsModal('calendars'); }
     if (b.dataset.evc === 'new') {
       const n = await wsAskNew(tr('New calendar'));  // 2.30.0 (#1036): with its workspace
       if (!n) return;

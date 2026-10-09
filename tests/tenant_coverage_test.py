@@ -60,6 +60,9 @@ KINDS = {
     "template": ("matrix", "p2300_tenant_test.py: templates by id, from / into lists of others"),
     "form": ("matrix", "p2300_tenant_test.py: forms by id, the form page for another organisation"),
     "client": ("matrix", "p2300_tenant_test.py: clients by id, workload"),
+    # 2.36.1 (#1021): office & finance -- every row belongs to an organisation (org_id), read through office_org (the workspace
+    # one works in); foreign ids 404; agents and kids 403 before any query; a private person 400. No /api/v1, no MCP in stage 1
+    "office": ("matrix", "p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF)"),
     "webhook": ("matrix", "p2300_tenant_test.py: webhooks by id, deliveries only of visible tasks"),
     "export": ("matrix", "p2300_tenant_test.py: the export has only the own data"),
     "stats": ("matrix", "p2300_tenant_test.py: statistics count only own / visible tasks"),
@@ -169,6 +172,19 @@ ROUTES = {
     "POST /api/v1/clients": "client", "GET /api/v1/clients/{}": "client", "PATCH /api/v1/clients/{}": "client",
     "DELETE /api/v1/clients/{}": "client", "GET /api/v1/workload": "client", "GET /api/workload": "client",
     "PUT /api/workload/capacity/{}": "client",
+    # ---- office (B: settings, packs, master data, import / export)
+    "GET /api/office/settings": "office", "PUT /api/office/settings": "office", "GET /api/office/number-preview": "office",
+    "GET /api/office/packs": "office", "GET /api/office/packs/{}": "office", "POST /api/office/packs/validate": "office",
+    "GET /api/office/{}": "office", "POST /api/office/{}": "office", "GET /api/office/{}/{}": "office", "PATCH /api/office/{}/{}": "office",
+    "DELETE /api/office/{}/{}": "office", "GET /api/office/export": "office", "POST /api/office/import": "office",
+    # ---- office (C, 2.36.1 #1021): quotations of an organisation (10)
+    "GET /api/office/docs": "office", "POST /api/office/docs": "office", "GET /api/office/docs/{}": "office",
+    "PATCH /api/office/docs/{}": "office", "DELETE /api/office/docs/{}": "office", "PUT /api/office/docs/{}/items": "office",
+    "POST /api/office/docs/{}/number": "office", "POST /api/office/docs/{}/status": "office",
+    "POST /api/office/docs/{}/duplicate": "office", "GET /api/office/docs/{}/render": "office",
+    # ---- office (D, 2.36.1 #1021): the quotation PDF and the organisation's logo (4)
+    "GET /api/office/docs/{}/pdf": "office", "GET /api/office/logo": "office", "POST /api/office/logo": "office",
+    "DELETE /api/office/logo": "office",
     # ---- comment (9)
     "POST /api/comments/{}/decide": "comment", "POST /api/v1/comments/{}/reactions": "comment",
     "DELETE /api/v1/comments/{}/reactions/{}": "comment", "PATCH /api/v1/comments/{}": "comment",

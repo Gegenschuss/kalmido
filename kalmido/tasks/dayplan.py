@@ -1,4 +1,5 @@
 """Day planning ("Plan my day") and the evening review."""
+import json
 from datetime import date, datetime, timedelta, timezone
 from flask import jsonify, request
 
@@ -59,29 +60,51 @@ def next_workday(d):
     return d
 
 
+def plan_cals_off(c, uid):
+    """2.36.1 (#956): the calendar keys ("e:<evcal id>" | "s:<subscription id>") whose events do not count when planning."""
+    try:
+        return set(json.loads(usettings(c, uid).get("plan_cals_off") or "[]") or [])
+    except ValueError:
+        return set()
+
+
 def dayplan_events(c, uid, day):
-    """The day's events of uid's visible calendar subscriptions: [{title, start, end (local minutes), all_day}]."""
-    if not CAL_ON:
-        return []
+    """The day's events of uid's visible calendar subscriptions and own calendars: [{title, start, end (local minutes), all_day}].
+    2.36.1 (#956): calendars switched off for planning (setting plan_cals_off) are left out; all-day events are listed but
+    never count as busy (the planner only takes the timed ones)."""
     out = []
     ds = day.isoformat()
-    for r in c.execute("""SELECT e.title, e.all_day, e.start, e.end FROM cal_events e JOIN cal_subs s ON s.id=e.sub_id
-                          WHERE s.user_id=? AND s.visible=1 AND e.d1>=? AND e.d0<=? ORDER BY e.start LIMIT ?""",
-                       (uid, ds, ds, DAYPLAN_MAX_EVENTS)):
-        if r["all_day"]:
-            out.append({"title": r["title"], "all_day": True, "start": None, "end": None})
+    off = plan_cals_off(c, uid)
+    rows = []
+    if CAL_ON:
+        rows = [(r["title"], r["all_day"], r["start"], r["end"]) for r in c.execute(
+            """SELECT e.title, e.all_day, e.start, e.end, s.id AS sid FROM cal_events e JOIN cal_subs s ON s.id=e.sub_id
+               WHERE s.user_id=? AND s.visible=1 AND e.d1>=? AND e.d0<=? ORDER BY e.start LIMIT ?""",
+            (uid, ds, ds, DAYPLAN_MAX_EVENTS)) if f"s:{r['sid']}" not in off]
+    from ..events.model import events_on, ev_range
+    if events_on(c, uid):  # 2.36.1 (#956): own events (and shared calendars, invitations) count like a subscription's
+        for o in ev_range(c, uid, day, day):
+            if o.get("status") == "cancelled" or (o.get("cal") is not None and f"e:{o['cal']}" in off):
+                continue
+            rows.append((o["title"], o["all_day"], o["start"], o["end"]))
+            if len(rows) >= DAYPLAN_MAX_EVENTS * 2:
+                break
+    for title, all_day, start, end in rows:
+        if all_day:
+            out.append({"title": title, "all_day": True, "start": None, "end": None})
             continue
         try:
-            a = parse_iso(r["start"]).astimezone(TZ)
-            b = parse_iso(r["end"]).astimezone(TZ)
+            a = parse_iso(start).astimezone(TZ)
+            b = parse_iso(end).astimezone(TZ)
         except (ValueError, TypeError):
             continue
         day0 = datetime(day.year, day.month, day.day, tzinfo=TZ)
         sa = max(0, int((a - day0).total_seconds() // 60))
         sb = min(1440, int((b - day0).total_seconds() // 60))
         if sb > sa:
-            out.append({"title": r["title"], "all_day": False, "start": _min_hm(sa), "end": _min_hm(sb) if sb < 1440 else "24:00",
+            out.append({"title": title, "all_day": False, "start": _min_hm(sa), "end": _min_hm(sb) if sb < 1440 else "24:00",
                         "s": sa, "e": sb})
+    out.sort(key=lambda e: (not e["all_day"], e.get("s") or 0, e["title"]))
     return out
 
 

@@ -70,7 +70,7 @@ const STUB = 'http://127.0.0.1:8095';
   await until(() => [...d.querySelectorAll('.tl-cev')].some(x => /Conference trip/.test(x.textContent)));
   check(d.querySelector('.tl-grp .tl-name')?.textContent === 'Calendars' && d.querySelectorAll('.tl-cal').length >= 3, 'timeline: a calendars group with rows per calendar');
   const conf = [...d.querySelectorAll('.tl-cev')].find(x => /Conference trip/.test(x.textContent));
-  check(conf && Math.abs(parseFloat(conf.style.width) - (3 * w.eval('tlDW()') - 4)) < 1, 'timeline: 3-day all-day event spans 3 days');
+  check(conf && Math.abs(parseFloat(conf.style.getPropertyValue('--bw')) - (3 * w.eval('tlDW()') - 4)) < 1, 'timeline: 3-day all-day event spans 3 days');  // 2.36.1 (#1126): the bar width is --bw, the element may run on over free days
   click(w, conf); await sleep(150);
   check(/Conference trip/.test(d.querySelector('#pop .cevpop')?.textContent || ''), 'timeline: popover');
   w.eval('closePop()');

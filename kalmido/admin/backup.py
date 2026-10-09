@@ -19,7 +19,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 from flask import g, jsonify, request, send_file
 
-from ..core.config import app, APP_VERSION, ATT_DIR, DB, SESSION_DAYS, TZ
+from ..core.config import app, APP_VERSION, ATT_DIR, DB, OFFICE_DIR, SESSION_DAYS, TZ
 from ..core.schema import SCHEMA_TRIGGERS, SCHEMA_VERSION
 from ..core.i18n import N_, tr
 from ..core.db import body, connect, db, err, gset, gsetting, init_db, iso, local_now, now_utc, parse_iso
@@ -68,7 +68,8 @@ BK_SCRYPT = {"n": 2 ** 15, "r": 8, "p": 1}
 BK_CONFIRM = "RESTORE"
 BK_NAME_RE = re.compile(r"kalmido-backup-(\d{8})-(\d{6})-(auto|manual|safety)\.zip(\.enc)?")
 BK_UPLOAD_RE = re.compile(r"upload-([a-f0-9]{24})")
-BK_MEMBER_RE = re.compile(r"attachments/(\d{1,12})/([^/\\\x00-\x1f]{1,255})")
+# members: attachments/<task>/<file>; 2.36.1 (#1021): office/<org>/<file> (the logos of the office module, same rules)
+BK_MEMBER_RE = re.compile(r"(attachments|office)/(\d{1,12})/([^/\\\x00-\x1f]{1,255})")
 BK_ERR = {"busy": N_("Another backup or restore is running, please try again in a moment."),
           "disk": N_("Not enough free disk space for the backup."),
           "io": N_("The backup could not be written ({0})."),
@@ -234,7 +235,7 @@ def bk_create(kind="manual", c=None):
         pw = bk_passphrase(c) if encrypt else ""
         if encrypt and len(pw) < 10:
             raise BackupError("no_passphrase")
-        need = os.path.getsize(DB) + (_dir_size(ATT_DIR) if os.path.isdir(ATT_DIR) else 0)
+        need = os.path.getsize(DB) + sum(_dir_size(d) for d in (ATT_DIR, OFFICE_DIR) if os.path.isdir(d))
         free = shutil.disk_usage(BK_DIR).free
         if free < need * (2.2 if encrypt else 1.2) + 64 * 1024 * 1024:
             raise BackupError("disk")
@@ -256,12 +257,14 @@ def bk_create(kind="manual", c=None):
         with zipfile.ZipFile(zp, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6, allowZip64=True) as z:
             z.write(dbp, "tasks.db")
             files.append(["tasks.db", os.path.getsize(dbp), _sha256_file(dbp)])
-            if os.path.isdir(ATT_DIR):
-                for root, dirs, fns in os.walk(ATT_DIR):
+            for base, prefix in ((ATT_DIR, "attachments/"), (OFFICE_DIR, "office/")):
+                if not os.path.isdir(base):
+                    continue
+                for root, dirs, fns in os.walk(base):
                     dirs[:] = sorted(d for d in dirs if not os.path.islink(os.path.join(root, d)))
                     for fn in sorted(fns):
                         full = os.path.join(root, fn)
-                        rel = "attachments/" + os.path.relpath(full, ATT_DIR).replace(os.sep, "/")
+                        rel = prefix + os.path.relpath(full, base).replace(os.sep, "/")
                         if os.path.islink(full) or not os.path.isfile(full) or not BK_MEMBER_RE.fullmatch(rel):
                             continue
                         try:
@@ -507,7 +510,7 @@ def bk_check_zip(z):
     for i in infos:
         n = i.filename
         m = BK_MEMBER_RE.fullmatch(n)
-        ok = n in ("manifest.json", "tasks.db") or (m and m.group(2) not in (".", ".."))
+        ok = n in ("manifest.json", "tasks.db") or (m and m.group(3) not in (".", ".."))
         if not ok or n in seen or i.is_dir() or i.flag_bits & 0x1 or i.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
             raise BackupError("members")
         if (i.external_attr >> 16) & 0o170000 not in (0, 0o100000):  # symlinks / devices (unix mode bits)
@@ -595,9 +598,9 @@ def bk_check_db(p):
         c.close()
 
 
-def bk_prepare(path, pw, work, att_dest=None):
-    """Checks an archive completely; extracts tasks.db into work (and the attachments into att_dest, if given).
-    Returns (manifest, db path)."""
+def bk_prepare(path, pw, work, att_dest=None, office_dest=None):
+    """Checks an archive completely; extracts tasks.db into work (and the attachments into att_dest, the office files
+    into office_dest, if given). Returns (manifest, db path)."""
     zp, _ = bk_open(path, pw, work)
     try:
         with zipfile.ZipFile(zp) as z:
@@ -619,9 +622,12 @@ def bk_prepare(path, pw, work, att_dest=None):
                         if n != want[1] or h.hexdigest() != want[2]:
                             raise BackupError("hash")
                         continue
-                    d = os.path.join(att_dest, m.group(1))
-                    dest = os.path.join(d, m.group(2))
-                    root = os.path.realpath(att_dest) + os.sep
+                    base = office_dest if m.group(1) == "office" else att_dest
+                    if base is None:  # (an office member, but the caller restores attachments only)
+                        continue
+                    d = os.path.join(base, m.group(2))
+                    dest = os.path.join(d, m.group(3))
+                    root = os.path.realpath(base) + os.sep
                     if not os.path.realpath(dest).startswith(root) or not os.path.realpath(d).startswith(root):
                         raise BackupError("members")
                     os.makedirs(d, mode=0o755, exist_ok=True)
@@ -687,10 +693,13 @@ def bk_restore(path, pw, admin, via):
     work = tempfile.mkdtemp(prefix=".restore-", dir=BK_DIR)
     att_new = ATT_DIR.rstrip(os.sep) + ".restore-" + secrets.token_hex(4)
     att_old = ATT_DIR.rstrip(os.sep) + ".pre-restore-" + secrets.token_hex(4)
+    off_new = OFFICE_DIR.rstrip(os.sep) + ".restore-" + secrets.token_hex(4)
+    off_old = OFFICE_DIR.rstrip(os.sep) + ".pre-restore-" + secrets.token_hex(4)
     gate = False
     try:
         os.makedirs(att_new, mode=0o755)
-        man, dbp = bk_prepare(path, pw, work, att_new)
+        os.makedirs(off_new, mode=0o755)
+        man, dbp = bk_prepare(path, pw, work, att_new, off_new)
         cur = connect()
         try:
             keep = {r[0]: r[1] for r in cur.execute("SELECT key, value FROM settings WHERE key LIKE 'bk\\_%' ESCAPE '\\'")}
@@ -703,12 +712,17 @@ def bk_restore(path, pw, admin, via):
         safety = bk_create("safety")
         pre = os.path.join(work, "pre-restore.db")  # the current database, for a rollback if anything below fails
         _sqlite_copy(DB, pre)
-        moved = swapped = False
+        moved = swapped = omoved = oswapped = False
         try:
             if os.path.isdir(ATT_DIR):
                 os.rename(ATT_DIR, att_old)
                 moved = True
             os.rename(att_new, ATT_DIR)
+            if os.path.isdir(OFFICE_DIR):
+                os.rename(OFFICE_DIR, off_old)
+                omoved = True
+            os.rename(off_new, OFFICE_DIR)
+            oswapped = True
             _sqlite_copy(dbp, DB)
             swapped = True
             _reset_caches()
@@ -734,8 +748,13 @@ def bk_restore(path, pw, admin, via):
             if os.path.isdir(ATT_DIR) and moved:
                 os.rename(ATT_DIR, att_new)
                 os.rename(att_old, ATT_DIR)
+            if oswapped:
+                os.rename(OFFICE_DIR, off_new)
+            if omoved:
+                os.rename(off_old, OFFICE_DIR)
             raise
         shutil.rmtree(att_old, ignore_errors=True)
+        shutil.rmtree(off_old, ignore_errors=True)
         print(f"restore: {os.path.basename(path)} restored by {admin} (safety backup {safety})", flush=True)
         aa_now("security", f"restore:{int(time.time())}", N_("{0} restored a backup from {1} (safety backup of the previous state: {2})."),
                [admin, str(man.get("created_at", "?"))[:16].replace("T", " ") + " UTC", safety])
@@ -750,6 +769,7 @@ def bk_restore(path, pw, admin, via):
             GATE.end()
         shutil.rmtree(work, ignore_errors=True)
         shutil.rmtree(att_new, ignore_errors=True)
+        shutil.rmtree(off_new, ignore_errors=True)
         _BK.update(running="", started=0.0)
         _BK_LOCK.release()
 

@@ -47,8 +47,8 @@ const FAM = 'cal,habits,comments,collab,family';
   check(w.eval('S.route.mod') === 'tasks' && !d.querySelector('#side [data-go="family"]') && !d.querySelector('#tabs [data-k="m:family"], #tabs [data-mod="family"]'), 'off: #family goes to the tasks, no sidebar row, no tab');
   check(!w.eval(`PURPOSES.length && feat('family')`), 'off: feat(family) false');
   w.eval(`settingsModal('modules')`); await sleep(400);
-  check(d.querySelector('.smodal [data-feat="family"]') && !d.querySelector('.smodal [data-feat="family"]').checked && d.querySelectorAll('.smodal .purposes [data-purpose]').length === 5,
-    'Settings > Modules: the Family switch (off) and the five purposes (2.22.0: Home)');
+  check(d.querySelector('.smodal [data-feat="family"]') && !d.querySelector('.smodal [data-feat="family"]').checked && d.querySelectorAll('.smodal .purposes [data-purpose]').length === 6,
+    'Settings > Modules: the Family switch (off) and the six purposes (2.22.0: Home, 2.36.1: Office & finance)');
   // "What do you use Kalmido for?" -> Family (confirm), the starter lists come
   click(w, d.querySelector('.smodal [data-purpose="family"]'));
   check(await until(() => w.eval(`feat('family')`) && (w.eval('S.lists') || []).filter(l => l.family).length === 4, 60), 'purpose Family: the module on, four starter lists');

@@ -89,7 +89,7 @@ PACKING = {
               N_("Tickets and bookings"), N_("Toiletries"), N_("Headphones")))]),
 }
 # what each answer of "What do you use Kalmido for?" switches on / off (agents stay as they are)
-PURPOSES = ("me", "home", "family", "team", "software")  # 2.22.0 (#741): "home"
+PURPOSES = ("me", "home", "family", "team", "software", "office")  # 2.22.0 (#741): "home"; 2.36.1 (#1021): "office"
 _LIFE = ("contracts", "home", "care", "health", "review", "travel", "reading")  # 2.22.0 (#663): Home & life
 PURPOSE_MODS = ("cal", "timeline", "matrix", "kanban", "habits", "pomo", "stats", "comments", "collab", "time", "progress",
                 "deps", "fields", "family", "events", "contacts") + _LIFE
@@ -98,7 +98,11 @@ PURPOSE_ON = {"me": ("cal", "events", "contacts"),
               "family": ("cal", "habits", "comments", "collab", "family", "events", "contacts", "contracts", "home", "travel"),
               # 2.25.0 (UX-25): a package holds only what its name promises (no habits, focus timer, matrix, statistics)
               "team": ("cal", "timeline", "kanban", "comments", "collab", "time", "progress", "deps", "fields", "events", "contacts"),
-              "software": ("cal", "timeline", "kanban", "comments", "collab", "time", "progress", "deps", "fields", "events", "contacts")}
+              "software": ("cal", "timeline", "kanban", "comments", "collab", "time", "progress", "deps", "fields", "events", "contacts"),
+              "office": ("cal", "timeline", "kanban", "comments", "collab", "time", "progress", "deps", "fields", "events", "contacts")}
+# 2.36.1 (#1021): "Office & finance" = Team + the business modules; they are switched ON by this purpose only and never
+# switched off by another purpose (clients, workload, forms stay as they are, see PURPOSE_MODS)
+PURPOSE_EXTRA = {"office": ("clients", "workload", "forms", "office")}
 
 
 # 2.19.0: what a child account may change: tick / untick (and undo) the tasks it sees, ask for a reward, its own
@@ -723,6 +727,7 @@ def purpose_apply(c, uid, purpose, examples=True):
     fs = [x for x in (usettings(c, uid).get("features") or "").split(",") if x]
     on = set(PURPOSE_ON[purpose])
     fs = [x for x in fs if x not in PURPOSE_MODS or x in on] + [x for x in PURPOSE_MODS if x in on and x not in fs]
+    fs += [x for x in PURPOSE_EXTRA.get(purpose, ()) if x not in fs]
     uset(c, uid, "features", ",".join(fs))
     uset(c, uid, "purpose", purpose)
     created = []
@@ -732,7 +737,7 @@ def purpose_apply(c, uid, purpose, examples=True):
         elif purpose == "software" and not c.execute("SELECT 1 FROM lists WHERE owner_id=? AND ptype='software' AND archived=0", (uid,)).fetchone():
             lid, _ = ptype_create(c, uid, "software", tr(PTYPE_NAMES["software"], lg=lang(c, uid)))
             created.append(lid)
-        elif purpose == "team" and not sample_state(c, uid):
+        elif purpose in ("team", "office") and not sample_state(c, uid):
             created.append(sample_create(c, uid))
     return {"features": ",".join(fs), "created": created}
 

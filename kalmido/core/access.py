@@ -70,7 +70,8 @@ FEAT_OFF = {"pomo": N_("The focus timer is turned off in your settings"), "habit
             "reading": N_("Read later is turned off in your settings"),
             # 2.23.0 (#463): package "Team, family, clients"
             "clients": N_("Clients are turned off in your settings"), "workload": N_("Workload is turned off in your settings"),
-            "forms": N_("Forms are turned off in your settings")}
+            "forms": N_("Forms are turned off in your settings"),
+            "office": N_("Office & finance is turned off in your settings")}  # 2.36.1 (#1021)
 
 
 # 2.22.0 (#663): health lists (lists.life 'health') are private. An agent never sees them (whatever list it is a member

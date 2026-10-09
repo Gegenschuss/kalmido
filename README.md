@@ -18,6 +18,11 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.36.1** (2026-10-10): Office & finance, stage 1. A new **Office & finance** module for organisations with
+  services and rates, equipment, text blocks, framework contracts and a German country pack, **quotations** with a
+  live calculator (producing days, raw data, discount, EUR/USD, transfer of rights) and a **PDF** on real A4 pages.
+  Calendars and tasks can be **switched on and off from the calendar view**, also per calendar for Today and for
+  planning the day, and the phone timeline keeps titles inside their bars. Details: [docs/OFFICE.md](docs/OFFICE.md).
 - **2.36.0** (2026-10-09): Sidebar, lock and comments. A calmer **sidebar** with grey **line icons** (emoji or dot
   as a setting, progress bars can be switched off), **lock a task** against accidental edits (tasks created by agents
   start locked), selecting text no longer opens the editor, code blocks in comments **wrap**, and an open task keeps
