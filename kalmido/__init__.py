@@ -31,7 +31,6 @@ ORDER = (
     "tasks.roadmap",
     "tasks.lifecycle",
     "tasks.attachments",
-    "integrations.paperless",
     "tasks.batch",
     "collab.replies",  # 2.33.0 (#1076): before comments / teamchat / agents.chat (they import it)
     "collab.comments",

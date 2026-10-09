@@ -118,6 +118,7 @@ async function dropTask0(id, el, clientY) {
     } else if (!kcol) return;
   }
   if (item.list_id && !canEditList(item.list_id)) { roToast(); return; }
+  if (tlkHits(t, item)) { tlkToast(t); render(); return; }  // 2.36.0 (#1118): a locked task keeps its list / day / priority
   const before = snapTask(t);
   Object.assign(t, item);
   render();

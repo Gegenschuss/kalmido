@@ -178,7 +178,7 @@ check(g.ok and "attachment" in g.headers.get("Content-Disposition", "") and g.he
 check(D.get(B + f"/api/attachments/{att['pic.png']['id']}").status_code == 404, "dave cannot download comment file")
 check(requests.get(B + f"/api/attachments/{att['pic.png']['id']}").status_code == 401, "anonymous cannot download comment file")
 check(Bb.delete(B + f"/api/attachments/{att['n.txt']['id']}").status_code == 403, "edit member cannot delete someone else's comment file")
-check(A.post(B + f"/api/attachments/{att['n.txt']['id']}/to-paperless").status_code == 400, "comment file cannot go to Paperless")
+check(A.post(B + f"/api/attachments/{att['n.txt']['id']}/to-paperless").status_code == 404, "2.36.0: no Paperless upload route")
 check(C.delete(B + f"/api/attachments/{att['n.txt']['id']}").ok, "author removes one file from own comment")
 paths = [os.path.join(DATA, "attachments", str(ST))]
 nfiles = lambda: sum(len(fs) for _, _, fs in os.walk(os.path.join(DATA, "attachments")))

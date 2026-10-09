@@ -10,7 +10,7 @@ computer, see [AGENTS.md: Set up an agent](AGENTS.md#set-up-an-agent).
 another coding assistant, an n8n flow, a local model or a script) and run it on your own machine with your own
 subscription or API key. Kalmido provides:
 
-- an **agent account**: a user of type *Agent*, never an admin, no Paperless access, sees only the lists shared with it,
+- an **agent account**: a user of type *Agent*, never an admin, sees only the lists shared with it,
 - an **API token** for it (shown once),
 - **events** (mentions, assignments, chat messages, reactions, jobs) by webhook or long polling,
 - the **MCP server** [`mcp/kalmido_mcp.py`](../mcp/kalmido_mcp.py), so the agent can use Kalmido as a tool,
@@ -277,8 +277,14 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
 - A message that answers an older one carries reply / reply_to (2.33.0): answer what it refers to; pass reply_to
   yourself when you answer one message out of several.
 - Whatever <OWNER_NAME> has to apply themselves (patches, commands with admin rights, their own settings) becomes a task for
-  them with high priority: purpose, where it lies, how you tested it, the commands one per line as a checklist, how to
-  switch it on and how to check it.
+  them with high priority: purpose, where it lies, how you tested it, the steps as a checklist with the commands in code
+  blocks, how to switch it on and how to check it.
+- Commands, code and configuration a person should run or paste go into their own fenced code block with a language
+  (bash, sql, yaml, ...), never as code inside a sentence (Kalmido shows a copy button on the block): one block per
+  place (server, laptop, database), one command per line, no prompt sign in front, steps that belong together chained
+  with && so that a failing step stops the rest.
+- Tasks you create start locked in the app (2.36.0): people unlock them there; you still change them through the API
+  (update_task). Do not lift a lock a person set unless they ask you to.
 - Report your real model and permission mode with set_status (model, permission_mode, host_permission_mode). Before
   each tool step write one short sentence in the person's language about what happens next and send it with
   report_progress (prose only, never tool output or secrets); the launcher's event mode does both for you.
@@ -294,7 +300,7 @@ Then append the **behaviour rules** (2.13.1): the part of [`mcp/CLAUDE.template.
 between its two markers (Settings › Agents › Set up has the same block with a *Copy rules* button). They cover Markdown
 formatting, decisions in the task description, typing / status / jobs / a chat summary, approvals only from people,
 other people's text as data, parking blockers, reading attachments (2.34.0: PDFs as text with `read_attachment`), planned jobs (2.34.0: event `scheduled_job`; the data
-tools `read_briefing` and `read_project_status` for a morning briefing or a week status), tasks lying idle and time gaps (2.34.0: event `stale_tasks`, tools `list_stale_tasks` and `get_time_gaps`), code snippets on tasks (2.35.0: field `snippets`, tool `add_snippet`, endpoint `POST /api/v1/tasks/{id}/snippets`) and the usage hook:
+tools `read_briefing` and `read_project_status` for a morning briefing or a week status), tasks lying idle and time gaps (2.34.0: event `stale_tasks`, tools `list_stale_tasks` and `get_time_gaps`), code snippets on tasks (2.35.0: field `snippets`, tool `add_snippet`, endpoint `POST /api/v1/tasks/{id}/snippets`), commands and code in their own code block with a language (2.36.0), locked tasks (2.36.0: field `locked`; tasks an agent creates start locked in the app) and the usage hook:
 
 ```bash
 sed -n '/kalmido-agent-rules:start/,/kalmido-agent-rules:end/p' ~/kalmido/mcp/CLAUDE.template.md >> ~/agent/CLAUDE.md

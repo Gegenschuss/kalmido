@@ -154,7 +154,12 @@ def openapi_spec():
                      "changes); lists carry only snippets_n. Writing sends the whole list (a snippet with its "
                      "id stays that snippet; [] removes all); POST /tasks/{id}/snippets appends one. Task events carry at most 10, "
                      "code cut to 4000 characters (truncated: true) and snippets_total; get_task has the full code"},
-        "snippets_n": {"type": "integer", "description": "2.35.0: the number of code snippets (also in lists)"}}
+        "snippets_n": {"type": "integer", "description": "2.35.0: the number of code snippets (also in lists)"},
+        # 2.36.0 (#1118): the lock
+        "locked": {"type": "boolean", "description": "2.36.0: locked in the app: title, notes, dates, priority, list, tags, repeat "
+                   "and assignee are read-only there until a person with write access unlocks it (comments, checkboxes in the "
+                   "notes, completing and subtasks stay free). Tasks created with an agent token start locked (send "
+                   "locked: false to create an open one); the API itself is not bound by the lock and can set or clear it"}}
     task_in = {k: v for k, v in task_props.items() if k in V1_TASK_IN}
     task_in["priority"] = {"oneOf": [prio, {"type": "integer", "enum": list(PRIORITIES)}]}
     task_in["reminders"] = {"oneOf": [{"type": "array", "items": {"type": "integer"}}, {"type": "string"}]}

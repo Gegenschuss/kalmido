@@ -144,7 +144,7 @@ def life_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "notice": {"type": "integer"}, "notice_unit": {"type": "string", "enum": list(NOTICE_UNITS), "description": "d days, w weeks, m months"},
         "due": nul("string", format="date", description="The last day to cancel"), "ends": nul("string", format="date", description="The end of the current term"),
         "renew_months": {"type": "integer", "description": "0 = it ends, else it renews by this many months"},
-        "days": nul("integer"), "account": {"type": "string"}, "start": nul("string", format="date"), "documents": {"type": "integer"}}}
+        "days": nul("integer"), "account": {"type": "string"}, "start": nul("string", format="date")}}
     schemas["Life"] = {"type": "object", "properties": {
         "modules": {"type": "array", "items": {"type": "string", "enum": list(LIFE_MODS)}, "description": "The switched-on modules"},
         "contracts": {"type": "object", "properties": {"items": {"type": "array", "items": ref("LifeContract")}, "monthly": {"type": "number"},
@@ -173,7 +173,7 @@ def life_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                                                "start": d, "account": {"type": "string"},
                                                "list_id": nul("integer", description="Default: the first Contracts list (created when missing)")}},
                                            scope="tasks:write")}
-    paths["/life/devices"] = {"post": op("A device with its warranty (a task due when the warranty ends; link the receipt from Paperless)", T, created,
+    paths["/life/devices"] = {"post": op("A device with its warranty (a task due when the warranty ends; attach the receipt as a file)", T, created,
                                          body={"type": "object", "required": ["name"], "properties": {
                                              "name": {"type": "string"}, "model": {"type": "string"}, "bought": d, "warranty": d, "lead_days": lead,
                                              "list_id": nul("integer")}}, scope="tasks:write")}

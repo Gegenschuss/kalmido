@@ -209,7 +209,7 @@ A short checklist for a new server:
 
 1. **Before:** lower the DNS TTL of the name a day ahead; make a backup (*Back up now*).
 2. **Copy:** the data folder (database, attachments, backups), the `.env` and above all **`KALMIDO_SECRET_KEY`**:
-   without it, stored secrets (repository and Paperless tokens, sign-on client secret) cannot be decrypted and must be
+   without it, stored secrets (repository tokens, sign-on client secret) cannot be decrypted and must be
    entered again.
 3. **Start** the new server and check the attachments (number and size, see above) and the counts (users, lists,
    tasks; `GET /api/v1/admin/status` with an admin token) against the old server.

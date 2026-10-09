@@ -29,11 +29,13 @@ def _norm(v):
     return None if v in ("", None) else str(v)
 
 
-def apply_update(c, tid, b, conflicts=None):
+def apply_update(c, tid, b, conflicts=None, lock=False):
     """b may carry `_prev` = the values the client saw before its edit (offline replay, detail typing).
     A field whose server value differs from `_prev` was changed elsewhere meanwhile: it is NOT
     overwritten but reported back as a conflict (client lets the user pick).
-    The caller checked write access to the task; moves are checked here (Denied)."""
+    The caller checked write access to the task; moves are checked here (Denied).
+    lock (2.36.0, #1118): a direct edit of a person (PATCH /api/tasks/<id>, multi-select, undo) honours the task lock; applied
+    proposals / suggestions, dependent dates and roadmap shifts do not (they were approved or switched on on purpose)."""
     from ..collab.comments import assignment_events
     from ..personal.timetrack import BadInput
     from ..lists.fields import field_value, set_field_values
@@ -95,6 +97,10 @@ def apply_update(c, tid, b, conflicts=None):
     if e:
         return e
     cur = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()  # also the "before" of the activity log
+    from ..tasks.validation import lock_problem
+    e = lock_problem(c, cur, f, b) if lock else None  # 2.36.0 (#1118): a locked task keeps its locked fields (app writes)
+    if e:
+        return e
     if f.get("ttype") and f["ttype"] != cur["ttype"] and "content" not in f and not (cur["content"] or "").strip():
         tpl = ticket_template(c, f.get("list_id") or cur["list_id"], f["ttype"])  # 2.4.0 (#340): empty notes get the template
         if tpl:
@@ -490,6 +496,10 @@ def task_skip(tid):
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
     if not t["repeat"] or not t["due"]:
         return err(tr("Not a recurring task"))
+    from ..tasks.validation import lock_problem
+    e = lock_problem(c, t, {"due": ""})  # 2.36.0 (#1118): skipping moves the date, which a locked task keeps (app writes)
+    if e:
+        return err(e)
     cnt = rr_count(t["repeat"])
     base = dict(t)
     base["repeat_from"] = "due"  # skipping always means: the next regular date

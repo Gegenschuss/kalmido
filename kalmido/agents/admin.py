@@ -15,7 +15,7 @@ from ..core.serializers import unlink_files
 from ..core.state import visible_lists
 from ..lists.ownership import owner_transfer
 from ..tasks.validation import as_int
-from ..integrations.paperless import pl_forget_user
+from ..accounts.users import user_forget_conns
 from ..collab.comments import user_names
 from ..personal.timetrack import BadInput
 from ..accounts.users import avatar_upload, need_admin, user_purge
@@ -106,9 +106,9 @@ def agent_enable(c, aid, on):
 
 
 def make_agent(c, uid):
-    """users row uid becomes an agent (never admin, no Paperless, no web sessions); its tokens and lists stay."""
+    """users row uid becomes an agent (never admin, no web sessions); its tokens and lists stay."""
     c.execute("UPDATE users SET kind='agent', is_admin=0, paperless_access=0 WHERE id=?", (uid,))
-    pl_forget_user(c, uid)  # 2.1.0: an agent has no Paperless (personal connections, tokens, grants go)
+    user_forget_conns(c, uid)  # personal connection rows, stored tokens, grants go
     c.execute("DELETE FROM sessions WHERE user_id=?", (uid,))
     c.execute("UPDATE list_members SET role='edit', own_role='edit' WHERE user_id=? AND role='admin'", (uid,))
     c.execute("DELETE FROM group_members WHERE user_id=?", (uid,))  # 2.10.0 (#441): agents are never group members
@@ -393,8 +393,8 @@ def admin_agent_test(aid):
 # ---- 2.7.2 (#420): personal agents. An admin allows people to create their own agents (instance setting user_agents, off
 # by default; user_agents_max per person, default 2; user_agents_limits = the usage limits every new one starts with).
 # A personal agent belongs to its creator (agents.owner_id): only the owner shares lists with it, chats with it and manages
-# it (name, note, pause, new token, delete); other people never find it in their share pickers. It is never an admin and
-# gets no Paperless (make_agent). Admins see every agent (with its owner) and can pause or delete it.
+# it (name, note, pause, new token, delete); other people never find it in their share pickers. It is never an admin
+# (make_agent). Admins see every agent (with its owner) and can pause or delete it.
 USER_AGENTS_MAX_DEFAULT, USER_AGENTS_MAX_CAP = 2, 20
 
 

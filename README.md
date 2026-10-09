@@ -18,6 +18,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.36.0** (2026-10-09): Sidebar, lock and comments. A calmer **sidebar** with grey **line icons** (emoji or dot
+  as a setting, progress bars can be switched off), **lock a task** against accidental edits (tasks created by agents
+  start locked), selecting text no longer opens the editor, code blocks in comments **wrap**, and an open task keeps
+  its **scroll position** when new comments arrive. The Paperless connection is removed.
 - **2.35.0** (2026-10-09): Agents, chat and polish. **Approval cards** in the agent chat, **code snippets** in
   tasks, **#123 links** everywhere, **arrange blocks in the view**, organisation admins manage the **lists of their
   organisation**, **links to files** on network drives, and the agent launcher's **event mode**.
@@ -132,7 +136,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **Free for everyone in the house or team.** No per-seat subscription, unlimited users, lists and tasks, and everyone you share a list with works in it for free.
 - **One app instead of three.** Tasks, habits, focus timer and real time tracking with rates and timesheets, plus the team essentials: sharing, assignment, comments, activity, a News inbox, dependencies, project status and custom fields.
 - **Simple when you want it.** Switch *Collaboration* off and it is a quiet personal list again.
-- **Yours.** Runs on your own server, no vendor account, no telemetry (the optional update check only asks GitHub for the latest version number), open source under the AGPL-3.0. Fits a self-hosted setup: single sign-on through your proxy, Web Push or ntfy notifications, Paperless-ngx, a calendar feed.
+- **Yours.** Runs on your own server, no vendor account, no telemetry (the optional update check only asks GitHub for the latest version number), open source under the AGPL-3.0. Fits a self-hosted setup: single sign-on through your proxy, Web Push or ntfy notifications, a calendar feed.
 - **Honest trade-offs.** No native apps or widgets (it is an installable web app), no location-based reminders, and it is a hobby project, not a company with a support desk.
 
 ## Features
@@ -287,7 +291,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 **AI agents**
 - **Agents as team members**: an admin adds an agent (Claude Code, Codex, n8n, a local model, your own script) as a
-  user of type *Agent*: never an admin, no Paperless, sees only the lists shared with it, with its own API token, an
+  user of type *Agent*: never an admin, sees only the lists shared with it, with its own API token, an
   optional webhook and an on/off switch that stops everything at once
 - **Settings > Agents** (called *AI colleague* before 2.6.0; 2.7.0: shown while the *Agents* module is on, and to
   admins while agents exist): one tab in four sub-tabs (2.5.1). *Status* (2.7.0, was *Overview*): a card per agent with its state, lists and
@@ -362,7 +366,6 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - **Events and contacts** (2.21.0): your own calendars and address books in Kalmido, synced with the phone's calendar and contacts apps ([Events](#events), [Contacts](#contacts))
 - **Calendar apps (CalDAV), both ways**: every list as a task list in Reminders (iPhone, iPad, Mac), Thunderbird, Evolution, Tasks.org or DAVx⁵ on Android, with an app password per device ([Calendar apps](#calendar-apps-caldav))
 - **Calendar subscription**: your open tasks with a date as an ICS feed for Google Calendar, Apple Calendar, Outlook or Thunderbird
-- Optional [Paperless-ngx](https://docs.paperless-ngx.com) integration: link documents to tasks, send attachments to Paperless
 - **Import from Todoist, Trello, Asana, Microsoft To Do, TickTick and any ICS / VTODO file** (Apple Reminders exports, Nextcloud Tasks, Thunderbird) with a preview, re-import without duplicates and undo ([Moving from other apps](#moving-from-other-apps)); export everything as JSON (incl. your time entries)
 - **REST API** with personal access tokens (`/api/v1`, OpenAPI 3.1) and signed **webhooks** for Home Assistant, n8n or your own scripts ([docs/API.md](docs/API.md))
 - **Appearance per device**: dark or light theme, compact or comfortable rows, font size from 75 to 150 % in 5 % steps, also with Ctrl + / − / 0 (the whole interface scales, not just the text), Geist, your system font or the low-vision friendly [Atkinson Hyperlegible](https://www.brailleinstitute.org/freefont/), and seven accent colors (violet by default) that all meet WCAG AA in both themes
@@ -401,7 +404,7 @@ client website project with sections, tickets, milestones, time entries and depe
 simulated agent that waits for your approval). There is no server behind it: an in-browser stand-in for the API keeps
 everything in your browser's storage, the page's Content-Security-Policy forbids every network connection
 (`connect-src 'none'`), and there is no analytics. *Reset demo* brings the sample back. Features that need a server
-(push notifications, CalDAV, calendar subscriptions, real agents, Paperless, Git, webhooks, OIDC, more users) show a
+(push notifications, CalDAV, calendar subscriptions, real agents, Git, webhooks, OIDC, more users) show a
 short notice with the way to install.
 
 The demo is built from the current sources by `python3 tools/build_demo.py [out_dir]` (static files only; serve the
@@ -473,7 +476,7 @@ if you edited them, tasks you added yourself stay, and so does their list.
 
 No proxy needed for a quick look. After the quick start above, open **http://localhost:3040** on the same machine.
 Everything works there, including installing it as an app and offline mode (browsers treat `localhost` as secure).
-Push notifications, Paperless and `/drop` stay off until you configure them.
+Push notifications and `/drop` stay off until you configure them.
 
 To try it from your phone or another device on your network, change the port line in `docker-compose.yml` to
 `"3040:3040"`, run `docker compose up -d` again and open `http://<your-computer's-ip>:3040`. Over plain HTTP the
@@ -517,7 +520,7 @@ own list with the same name is reused) or one existing list you can edit. The im
 <p align="center"><img src="docs/share.png" width="760" alt="The Share dialog of a project: people with their roles open, groups, agents, the public link and the owner folded with their state"></p>
 
 - **Accounts:** admins manage users under *Settings > Administration* (username, display name, optional password,
-  optional SSO login, admin flag, Paperless access, ntfy topic, disable / delete). Everyone can change their own display name and
+  optional SSO login, admin flag, ntfy topic, disable / delete). Everyone can change their own display name and
   password under *Settings > Account*, and a profile picture there (a heron preset, an own photo or just the initials;
   admins can set a preset for someone else, e.g. the bot user of an API integration). The *Users* block comes first
   under *Settings > Administration*; agents are listed there too (with the *Agent* badge) and open their own dialog
@@ -574,22 +577,6 @@ own list with the same name is reused) or one existing list you can edit. The im
   lists' tasks plus everything assigned to you.
 - **Export** (*Settings > Data > Export*) contains your data and the lists you own (tasks with links, comments and history) and your templates.
   Note: the export of a list owner includes the comments that other members wrote in the owner's shared lists.
-- **Paperless connections** (2.1.0). The connection from the environment (`PAPERLESS_TOKEN`, named *Paperless*) works
-  as before: it is the whole archive of that token's account, so an admin grants it per user (*Paperless access*;
-  admins have it by default). Besides it:
-  - **Server connections** (*Settings > Users > Paperless connections*, admins): a name (e.g. *Office*) and the address
-    of a Paperless server, **no shared token**. The admin picks who may use it; each of them enters their **own** API
-    token under *Settings > Integrations*, so Paperless' own permissions and groups decide what each person sees. A new
-    address removes the stored tokens; taking a person off removes theirs.
-  - **Personal connections** (*Settings > Integrations > Add my own connection*): name, address and your token. Only you
-    see and use it; admins can neither see nor grant it, and no API answers with it for anyone else. Its address must
-    be public, or a host an admin allowed for internal requests (the calendar allow-list, `KALMIDO_CALENDAR_ALLOW_HOSTS`).
-  - Tokens are write-only: the app only shows "•••• set", never the token. They are stored encrypted (AES-GCM) with
-    `KALMIDO_SECRET_KEY`, which lives only in the environment, never in the database or a backup. Without it no token
-    can be stored (the environment connection keeps working); **losing the key means everyone enters their tokens
-    again**. Kalmido never follows a redirect of a Paperless server, so a token only ever goes to its own address.
-  - With more than one connection the link dialog and *Send to Paperless* ask which one. A link remembers its
-    connection; people who cannot use that connection only see "Paperless document".
 
 ### Public links
 
@@ -769,8 +756,7 @@ everyone and each person may override it. The start page can also be a tab (Sett
 - **Meal plan**: the next seven days of meals in the Family view (*+* per day); write the ingredients as a list in a meal's notes and
   the cart button puts them on the shopping list, without doubling what is already on it.
 - **Household deadlines**: *Household deadline* in the Family view: passport, ID card, car inspection (every two years), insurance
-  and contracts (due on the last day to cancel, every year) or anything else, with a lead time that fits; link the
-  Paperless document in the task.
+  and contracts (due on the last day to cancel, every year) or anything else, with a lead time that fits.
 - **Packing lists** from templates: holiday, swimming pool, daycare, camping, business trip.
 - API v1 and MCP: `/family`, `/family/occasions`, `/family/deadlines`, `/tasks/{id}/to-shopping`, `/lists/{id}/shop-areas`,
   `/family/packing`, `/family/kids`, rewards; tasks carry `family`, `rotation`, `people` and `stars` (docs/API.md).
@@ -877,8 +863,8 @@ calendar, CalDAV, sharing and the API work as everywhere.
 - **Contracts & subscriptions**: provider, cost (per month, quarter or year), the end of the current term, the notice
   period and the renewal. The task is due on the **last day to cancel** and reminds you before it; ticking it off means
   you keep it (it moves on to the next term), *Cancelled* in the task panel ends it. The card sums the cost per month and
-  per year. Link the contract from Paperless in the task.
-- **Home & devices**: devices with their warranty end (a reminder before it; link the receipt) and **upkeep** that comes
+  per year.
+- **Home & devices**: devices with their warranty end (a reminder before it; attach the receipt) and **upkeep** that comes
   back every few months, with suggestions (heating, smoke detectors, tyres, descaling …).
 - **Staying in touch** (needs Contacts): on a contact's card choose *every 2 weeks … every year*; *In touch today* notes
   it. The card lists who is due, a push once a day names them. Your choices are yours only.
@@ -1200,14 +1186,14 @@ folder's owner connects it; the token stays sealed.
 - **Token:** a fine-grained token with *read-only* access to the repository (contents, pull requests, commit statuses /
   checks) is enough (GitLab: `read_api`; Bitbucket: a read-only repository or workspace access token, or
   `user:app-password`); a public repository works without one (with GitHub's much lower limit for anonymous requests).
-  Like the Paperless tokens it is write-only (the page only says *Token set*) and encrypted with `KALMIDO_SECRET_KEY`;
+  It is write-only (the page only says *Token set*) and encrypted with `KALMIDO_SECRET_KEY`;
   without the key no token can be stored. Kalmido never gets write access: it only reads.
 - **Polling, not webhooks:** the server asks the Git server itself, every 3 minutes per repository
   (`KALMIDO_GIT_POLL`), with ETags (unchanged answers cost GitHub no rate limit), pauses when the rate limit runs low
   and backs off while a repository fails (up to an hour). So it works on a server that GitHub cannot reach (behind a
   VPN, in the office LAN). A background thread does it, a few repositories at a time: requests never wait on it.
   Internal Git servers need the host on the admin allow-list (*Settings > Administration > Advanced*, or
-  `KALMIDO_CALENDAR_ALLOW_HOSTS`), the same SSRF guard as calendar subscriptions and Paperless.
+  `KALMIDO_CALENDAR_ALLOW_HOSTS`), the same SSRF guard as calendar subscriptions.
 - **Matching** (tasks of the connected list only): `#123` (the task number, in the address `#t/123`) in a commit
   message, a pull request title or description, or a branch named `kalmido-123` (also `kalmido-123-…`), `task-123-…` or `123-…`.
 - **Task panel > Code** (after the fields, before the comments): the linked pull requests (open / merged / closed,
@@ -1441,8 +1427,8 @@ small **×** next to it (*Show progress* in the list's … menu or the list dial
   for what belongs to the project as a whole. *Description* in Markdown; *Key links* (title + address, in your order,
   an icon from the address such as a repository or a design file, nothing is fetched from the linked site);
   *Milestones* (milestone tasks of the list, see below); *Project files* uploaded on the
-  project itself (same size limit and download rules as task files: images and PDFs open, everything else downloads),
-  Paperless documents linked to the project (with the Paperless module) and, read-only, *Attachments from tasks* with
+  project itself (same size limit and download rules as task files: images and PDFs open, everything else downloads)
+  and, read-only, *Attachments from tasks* with
   a link to each task; *Members* with their roles (with collaboration); *Status updates* with *Set status*; the
   tracked time with the budget. Owner, list admins and members change it, viewers and participants read it
   (participants only see the files of their own tasks). The choice of the tab is remembered per device; the list's own
@@ -1513,11 +1499,11 @@ access tokens (never the session cookie or the proxy header), so it needs no suc
 
 **Headers:** every page and API response carries a strict Content-Security-Policy (no inline scripts,
 `frame-ancestors 'none'`), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`
-and a restrictive `Permissions-Policy`. Attachments and Paperless thumbnails are served with a sandbox CSP; only images
+and a restrictive `Permissions-Policy`. Attachments are served with a sandbox CSP; only images
 and PDFs are shown inline, everything else is a download. Your proxy does not need to add anything.
 
 **Server-side requests:** the browser makes no external requests; the server only contacts the services you configure
-(ntfy, Paperless), the push services of the browsers that subscribed to Web Push (see *Notifications*), the calendar
+(ntfy, Git hosts), the push services of the browsers that subscribed to Web Push (see *Notifications*), the calendar
 links and CalDAV servers your users subscribe to (with an SSRF guard that refuses internal addresses unless an admin
 allows the host, see *Calendar subscriptions*), the OpenID Connect provider if you configure one (same guard), your users' webhook URLs (same guard, no redirects, see [docs/API.md](docs/API.md#webhooks)), plus an optional update check against GitHub (`api.github.com`,
 see *Updating*), all http/https only with redirects only within the same host (calendar links: see there). Web Push only goes to https endpoints of an allow-list of known push services, so a crafted
@@ -1680,8 +1666,7 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `NTFY_INBOX_URL`, `NTFY_INBOX_TOKEN`, `NTFY_INBOX_TOPIC` | | Optional share inbox: each message on this ntfy topic becomes an inbox task. The topic must be access-controlled (see *Share from your phone*) |
 | `NTFY_INBOX_USER` | first admin | Username whose inbox receives the share inbox |
 | `NTFY_INBOX_PUBLIC` | | Public ntfy URL, if attachment links use a different address than `NTFY_INBOX_URL` |
-| `PAPERLESS_API`, `PAPERLESS_PUBLIC_URL`, `PAPERLESS_TOKEN` | | Paperless-ngx integration (internal API URL, URL for your browser, API token). Only users an admin allows get access |
-| `KALMIDO_SECRET_KEY` | | 2.1.0: 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts the users' own Paperless tokens and (2.2.0) repository tokens and webhook secrets; without it none can be stored. Keep a copy outside the server: losing it means everyone enters their tokens again. Never in the database or backups |
+| `KALMIDO_SECRET_KEY` | | 2.1.0: 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts (2.2.0) repository tokens and webhook secrets; without it none can be stored. Keep a copy outside the server: losing it means everyone enters their tokens again. Never in the database or backups |
 | `TASKS_MAX_FILE_MB` | `50` | Maximum size per attachment (task and comment files) |
 | `KALMIDO_IMPORT_MAX_MB`, `KALMIDO_IMPORT_MAX_TASKS` | `20`, `20000` | Limits of one import (*Moving from other apps*) |
 | `KALMIDO_IMPORT_RATE` | `30` | Imports and previews per user within 10 minutes |
@@ -1698,7 +1683,7 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `KALMIDO_ORG_NAME` | *(empty)* | 2.23.0: the organisation's name in the mode `organisation` (else asked once in the first-run setup) |
 | `KALMIDO_STORAGE_QUOTA_MB` | `0` | 2.24.0: storage per person in MB (0 = unlimited); admins can change it in *Administration > Server* |
 | `KALMIDO_SUPPORT_EMAIL` | *(empty)* | 2.24.0: where *Contact support* writes to when storage is full (else the admin setting, else the first admin's address) |
-| `KALMIDO_HOSTED` | `0` | 2.24.0: `1` = a server run as a service for others: Paperless only reaches public HTTPS addresses and is off for new accounts |
+| `KALMIDO_HOSTED` | `0` | 2.24.0: `1` = a server run as a service for others: integrations only reach public HTTPS addresses |
 | `KALMIDO_ONBOARDING` | `1` | `0`: new accounts start empty (no "Getting started" list, no welcome tour) |
 | `KALMIDO_SEARCH_INDEX` | `0` | 2.29.0: search engines stay out by default (`X-Robots-Tag: noindex, nofollow` on every answer, `/robots.txt` with `Disallow: /`); `1` lets them index the sign-in page. Public list links, forms, feeds and the API stay noindex either way |
 | `KALMIDO_AGENT_EVENTS_STALE_H` | `48` | 2.29.0: agent events older than this many hours reach a poller as one `missed` summary instead of one by one (`0` = off; see docs/AGENTS.md) |
@@ -1850,7 +1835,7 @@ Regular users never get them. Each alert comes in the admin's language.
 | Update available | the update check found a new release (once per version) |
 | Web Push delivery | a device was removed because its push service refused it (404 / 410, or 4xx five times in a row), or pushes fell back to ntfy although the user has devices |
 | Watchdog errors | rows the background job had to skip (e.g. a reminder with a broken value), summed up per hour with their ids |
-| Integration problems | the ntfy share inbox was refused (guessable topic) or cannot reach its server, Paperless is unreachable or refuses the token for more than 15 minutes, five ntfy or Web Push deliveries in a row failed |
+| Integration problems | the ntfy share inbox was refused (guessable topic) or cannot reach its server for more than 15 minutes, five ntfy or Web Push deliveries in a row failed |
 | Security events | five or more failed logins within an hour and every login rate-limit trip (per user / IP), bursts of invalid `/drop` or calendar feed tokens, a new admin, a changed server switch (collaboration, time tracking, update check, admin alerts, admin topic) |
 | Storage and health | less than 5 % or 1 GB free on the data volume, a failed daily `PRAGMA quick_check`, the attachment folder not writable |
 

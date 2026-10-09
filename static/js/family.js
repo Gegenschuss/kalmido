@@ -166,7 +166,7 @@ function dlModal() {
     $('.dlnotice', md).hidden = !(type in NOTICE);
     const lead = {passport: 90, id_card: 60, car: 30, insurance: 21, contract: 14, other: 14}[type];
     $('#dl-hint', md).textContent = [type in NOTICE ? tr('Due on the last day to cancel (the end minus the notice period).') : '', type === 'car' ? tr('Repeats every two years.') : type in NOTICE ? tr('Repeats every year.') : '',
-      trn('Reminder {0} day before and on the day.', 'Reminder {0} days before and on the day.', lead), tr('Link the Paperless document in the task afterwards.')].filter(Boolean).join(' ');
+      trn('Reminder {0} day before and on the day.', 'Reminder {0} days before and on the day.', lead)].filter(Boolean).join(' ');
     $('#dl-explab', md).textContent = type in NOTICE ? tr('Ends on') : tr('Expires on');
   };
   hint();

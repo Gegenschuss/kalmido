@@ -12,13 +12,12 @@ import urllib.request
 from datetime import timedelta
 from flask import g, jsonify
 
-from ..core.config import app, ATT_DIR, DB, NTFY_URL, PL_TOKEN, PUBLIC_URL
+from ..core.config import app, ATT_DIR, DB, NTFY_URL, PUBLIC_URL
 from ..core.schema import GLOBAL_DEFAULTS
 from ..core.i18n import lang, LANGS, N_, tr, trn
 from ..core.db import body, db, default_uid, err, gset, gsetting, iso, local_now, now_utc, usettings
 from ..accounts.session import me
 from ..tasks.validation import valid_hm
-from ..integrations.paperless import PaperlessError, pl_legacy, pl_req
 from ..personal.timetrack import BadInput
 from ..accounts.users import need_admin
 from ..notify.push import (
@@ -54,11 +53,10 @@ AA_KEEP = 500         # rows kept in admin_alerts
 AA_LIST = 50          # rows shown in the settings
 AA_STORAGE_EVERY = 600
 AA_QC_EVERY = 86400
-AA_PL_PROBE_EVERY = 600
 # names of the watchdog parts in _wd_fail (shown in the alert)
 AA_WD_WHAT = {"section": N_("a whole watchdog part"), "settings of user": N_("user settings"),
               "reminder of task": N_("reminders"), "focus session": N_("focus sessions"), "habit": N_("habit reminders"),
-              "digest of user": N_("daily digests"), "paperless link": N_("Paperless uploads"),
+              "digest of user": N_("daily digests"),
               "collab push": N_("collaboration pushes"), "time entry": N_("time tracking"), "tick": N_("the watchdog loop")}
 AA_SWITCH_LABEL = {"collab_all": N_("Collaboration for everyone"), "time_all": N_("Time tracking for everyone"),
                    "update_check": N_("Check daily for a new version"), "aa_on": N_("Admin alerts"),
@@ -67,7 +65,7 @@ AA_SWITCH_LABEL = {"collab_all": N_("Collaboration for everyone"), "time_all": N
                    "oidc_autocreate": N_("Create accounts on the first OIDC login"), "bk_on": N_("Automatic backups"),
                    "public_links": N_("Public links to lists")}
 _AA_LOCK = threading.Lock()
-_AA = {"q": [], "b": {}, "int": {}, "disk_at": 0.0, "qc_at": 0.0, "pl_at": 0.0, "storage": {}, "qc": {}}
+_AA = {"q": [], "b": {}, "int": {}, "disk_at": 0.0, "qc_at": 0.0, "storage": {}, "qc": {}}
 
 
 def _clamp_int(v, lo, hi, dflt):
@@ -354,26 +352,15 @@ def _aa_storage(c, cfg, now):
 
 
 def _aa_integrations(c, cfg, ints, now):
-    if PL_TOKEN and now - _AA["pl_at"] >= AA_PL_PROBE_EVERY:  # nobody used Paperless lately: ask it once
-        _AA["pl_at"] = now
-        try:
-            pl_req(pl_legacy(), "/api/correspondents/?page_size=1&fields=id", timeout=8)
-        except PaperlessError:
-            pass
-        ints = {k: dict(v) for k, v in _AA["int"].items()}
     for name, s in ints.items():
         if s.get("alerted") and now - s["alerted"] < max(cfg["cooldown_h"] * 3600, AA_WINDOW):
             continue
         mins = int((now - s["since"]) // 60)
-        if name in ("inbox", "paperless"):
+        if name == "inbox":
             if now - s["since"] < cfg["integ_min"] * 60:
                 continue
-            if name == "inbox":
-                st = aa_emit(c, cfg, "integration", "inbox:" + s["err"],
-                             N_("The ntfy share inbox has not reached its ntfy server for {0} min ({1})."), [mins, s["err"]])
-            else:
-                st = aa_emit(c, cfg, "integration", "paperless:" + s["err"], N_("Paperless has been failing for {0} min ({1})."),
-                             [mins, s["err"]])
+            st = aa_emit(c, cfg, "integration", "inbox:" + s["err"],
+                         N_("The ntfy share inbox has not reached its ntfy server for {0} min ({1})."), [mins, s["err"]])
         elif s["n"] >= AA_FAIL_ROW and name == "oidc":
             st = aa_emit(c, cfg, "integration", "oidc:" + s["err"], N_("{0} logins with the OIDC provider in a row failed ({1})."),
                          [s["n"], s["err"]])

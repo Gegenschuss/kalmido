@@ -1,4 +1,4 @@
-/* Kalmido web client: Attachments, Paperless documents and the share target.
+/* Kalmido web client: Attachments and the share target.
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
@@ -17,71 +17,11 @@ document.addEventListener('error', e => {
   if (a) a.innerHTML = `${ic('file')}<span class="atxt"><span class="an">${esc(img.alt || '')}</span><span class="as">${esc(tr('File damaged or missing'))}</span></span>`;
 }, true);
 function attHtml(a) {
-  const t = taskById(S.sel), sending = (t?.paperless || []).some(p => p.status === 'pending' && p.att_id === a.id);
-  const del = !canEdit(t) ? '' : `<button class="attdel" data-act="att-del" data-att="${a.id}" title="${tr('Remove')}">${ic('x', 's')}</button>` +
-    (plOn() ? `<button class="attpl ${sending ? 'busy' : ''}" data-act="att-pl" data-att="${a.id}" title="${sending ? tr('being sent to Paperless') : tr('File in Paperless')}">${ic('archive', 's')}</button>` : '');
+  const t = taskById(S.sel);
+  const del = !canEdit(t) ? '' : `<button class="attdel" data-act="att-del" data-att="${a.id}" title="${tr('Remove')}">${ic('x', 's')}</button>`;
   if (isImg(a)) return `<div class="att img"><a href="${attUrl(a)}" data-act="att-view" data-att="${a.id}" title="${esc(a.name)}"><img src="${attUrl(a)}" loading="lazy" alt="${esc(a.name)}"></a>${del}</div>`;
   if (a.size === 0) return `<div class="att file broken"><span class="attx">${ic('file')}<span class="atxt"><span class="an">${esc(a.name)}</span><span class="as">${esc(tr('File damaged or missing'))}</span></span></span>${del}</div>`;  // 2.13.2 (#478 N6): an old 0-byte file says so
   return `<div class="att file">${attFileA(a)}${del}</div>`;  // 2.30.0 (#1035): text files open in the viewer
-}
-// 2.1.0 (#180): several Paperless connections (S.paperless.conns: id 0 = the server's legacy one, server ones with my own
-// token, my personal ones); only usable ones (my token set) can search / link / show thumbnails
-const plConns = () => (S.paperless?.conns || []).filter(c => c.usable);
-const plConn = id => (S.paperless?.conns || []).find(c => c.id === (id || 0));
-const plQ = id => `?conn=${encodeURIComponent(id || 0)}`;
-function plHtml(p) {
-  // a document of a connection I cannot use: I only see that there is one
-  const cn = !p.hidden && plConn(p.conn);
-  if (p.hidden || !plOn() || !cn?.usable) return `<div class="plink">${ic('archive')}<div class="pt"><b>${tr('Paperless document')}</b><span>${tr('Linked through a Paperless connection you cannot use')}</span></div></div>`;
-  const x = !canEdit(taskById(S.sel)) ? '' : `<button class="attdel" data-act="pl-del" data-pl="${esc(p.id)}" title="${tr('Remove link')}">${ic('x', 's')}</button>`;
-  if (p.status === 'pending') return `<div class="plink pending"><span class="spin"></span><div class="pt"><b>${esc(p.title)}</b><span>${tr('Paperless is processing the document…')}</span></div></div>`;
-  if (p.status === 'error') return `<div class="plink err">${ic('archive')}<div class="pt"><b>${esc(p.title)}</b><span>${esc(p.message || tr('Error'))}</span></div>${x}</div>`;
-  const sub = [plConns().length > 1 ? cn.name : '', p.correspondent, p.created ? fmtDate(p.created) : '', p.message].filter(Boolean).join(' · ');
-  const doc = encodeURIComponent(p.doc_id);
-  return `<div class="plink"><a href="${esc(cn.url)}/documents/${doc}/details" target="_blank" rel="noopener"><img src="/api/paperless/thumb/${doc}${plQ(cn.id)}" loading="lazy" alt=""><div class="pt"><b>${esc(p.title)}</b><span>${esc(sub)}</span></div></a>${x}</div>`;
-}
-// pick a connection when more than one is usable (menu at the anchor); resolves the id or null
-function plPick(anchor) {
-  const cs = plConns();
-  if (cs.length < 2) return Promise.resolve(cs[0]?.id ?? null);
-  return new Promise(res => {
-    let done = false;
-    menu(anchor, cs.map(c => ({label: c.name, icon: 'archive', fn: () => { done = true; res(c.id); }})));
-    popOnClose = () => setTimeout(() => { if (!done) res(null); }, 0);  // closed without a pick
-  });
-}
-function plSearchModal(taskId, o = {}) {  // 2.7.1 (#410): o.pick(doc, conn) + o.linked ('conn:doc') = the list's documents
-  const cs = plConns();
-  let conn = cs.some(c => c.id === +LS.get('plConn', -1)) ? +LS.get('plConn', -1) : cs[0]?.id ?? 0;
-  const md = modal(`<h3>${tr('Link Paperless document')}</h3>
-    ${cs.length > 1 ? `<div class="row plconn"><label for="pl-conn">${tr('Connection')}</label><select id="pl-conn">${cs.map(c => `<option value="${c.id}" ${c.id === conn ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div>` : ''}
-    <input id="pl-q" placeholder="${tr('Search: title, content, correspondent')}" autocomplete="off" enterkeyhint="search" style="width:100%">
-    <div class="muted" id="pl-info" style="font-size:var(--fs-s);margin:.5rem 2px">${tr('Recently added')}</div>
-    <div class="plres" id="pl-res"><div class="muted" style="padding:.75rem">${tr('Loading…')}</div></div>
-    <div class="foot"><a class="btn" id="pl-open" href="${esc(plConn(conn)?.url || '')}" target="_blank" rel="noopener">${ic('archive', 's')} ${tr('Open Paperless')}</a><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
-  md.classList.add('plmodal');
-  const linked = () => o.linked ? new Set([...o.linked].filter(k => k.startsWith(conn + ':')).map(k => +k.split(':')[1])) : new Set((taskById(taskId)?.paperless || []).filter(p => (p.conn || 0) === conn).map(p => p.doc_id));
-  let timer, seq = 0;
-  const run = async q => {
-    const my = ++seq, ln = linked();
-    try {
-      const j = await api('GET', `/api/paperless/search${plQ(conn)}&q=${encodeURIComponent(q)}`);
-      if (my !== seq) return;
-      $('#pl-info', md).textContent = q ? trn('{0} result', '{0} results', j.count) : tr('Recently added');
-      $('#pl-res', md).innerHTML = j.items.map(d => `<button class="plitem ${ln.has(d.id) ? 'on' : ''}" data-doc="${d.id}"><img src="/api/paperless/thumb/${d.id}${plQ(conn)}" loading="lazy" alt=""><div class="pt"><b>${esc(d.title)}</b><span>${esc([d.correspondent, d.created ? fmtDate(d.created) : '', d.pages ? trn('{0} page', '{0} pages', d.pages) : ''].filter(Boolean).join(' · '))}</span>${d.snippet ? `<small>${esc(d.snippet)}</small>` : ''}</div>${ln.has(d.id) ? ic('check', 's') : ''}</button>`).join('') || `<div class="muted" style="padding:.75rem">${tr('Nothing found.')}</div>`;
-    } catch (e) { if (my === seq) $('#pl-res', md).innerHTML = `<div class="muted" style="padding:.75rem">${esc(e.message)}</div>`; }
-  };
-  run('');
-  $('#pl-q', md).addEventListener('input', e => { clearTimeout(timer); timer = setTimeout(() => run(e.target.value.trim()), 250); });
-  $('#pl-conn', md)?.addEventListener('change', e => { conn = +e.target.value; LS.set('plConn', conn); $('#pl-open', md).href = plConn(conn)?.url || ''; run($('#pl-q', md).value.trim()); });
-  md.addEventListener('click', async e => {
-    const b = e.target.closest('[data-doc]'); if (!b) return;
-    if (b.classList.contains('on')) { toast(tr('Already linked')); return; }
-    if (o.pick) { try { await o.pick(+b.dataset.doc, conn); } catch { return; } md.remove(); toast(tr('Linked')); return; }
-    const t = await api('POST', `/api/tasks/${taskId}/paperless`, {doc_id: +b.dataset.doc, conn});
-    putTask(t); md.remove(); render(); if (S.sel === taskId) renderDetail(); toast(tr('Linked'));
-  });
-  if (!isMobile()) setTimeout(() => $('#pl-q', md).focus(), 50);
 }
 // 2.13.2 (#478 N6): a 0-byte file is never sent (the server refuses it too): a clear message instead of a broken tile
 function noEmpty(files) {

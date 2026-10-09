@@ -26,7 +26,6 @@ from ..core.access import Denied, is_project, list_role, MANAGE_ROLES, need_list
 from ..tasks.validation import log_act
 from ..tasks.tasks import one_task
 from ..tasks.lifecycle import do_complete, signed, undo_status
-from ..integrations.paperless import pl_norm_url, PL_TOKEN_MAX
 from ..personal.timetrack import BadInput, UnknownFields
 from ..notify.push import _b64u, _b64u_dec
 from ..notify.alerts import _env_int, aa_count
@@ -38,7 +37,7 @@ from ..agents.core import is_agent
 # A PROJECT list can be connected to one or more repositories (list dialog > "Repository"): GitHub (github.com or a GitHub
 # Enterprise server) or Gitea / Forgejo. Only the list owner and list admins (people, never agents) connect, change or remove
 # them; everyone who sees the list sees the results. The access token (read-only is enough; optional for public repos) is
-# write-only and sealed like the Paperless tokens of 2.1.0 (AES-GCM, KALMIDO_SECRET_KEY, associated data = the connection);
+# write-only and sealed (AES-GCM, KALMIDO_SECRET_KEY, associated data = the connection);
 # without the key no token can be stored.
 # Kalmido only READS: a background thread (git_loop, like the calendar sync) polls every connection every KALMIDO_GIT_POLL
 # seconds (default 180) with ETag / If-None-Match (a 304 costs GitHub no rate limit), reads the rate-limit headers (below
@@ -97,6 +96,25 @@ class GitRate(Exception):
     def __init__(self, until):
         super().__init__("rate")
         self.until = until
+
+
+GIT_TOKEN_MAX = 400  # longest access token accepted
+
+
+def git_norm_base_url(u):
+    """The base URL of a self-hosted Git server (http(s), no credentials / query / fragment; a trailing /api is dropped)."""
+    from ..calendars.subscriptions import cal_norm_url
+    u = cal_norm_url(u)
+    from ..admin.hosting import hosted
+    if not u or not u.lower().startswith(("https://",) if hosted() else ("http://", "https://")):  # 2.24.0 (#905): hosted = HTTPS only
+        return None
+    p = urllib.parse.urlsplit(u)
+    if p.query or p.fragment:
+        return None
+    u = u.rstrip("/")
+    if u.lower().endswith("/api"):
+        u = u[:-4]
+    return u
 
 
 def git_err_text(stored):
@@ -850,7 +868,7 @@ def git_clean_input(b):
     if not git_owner_ok(provider, owner) or not GIT_NAME_RE.fullmatch(name or "") or name in (".", ".."):
         raise BadInput(tr("Enter the repository as owner/name"))
     if base:
-        base = pl_norm_url(base)
+        base = git_norm_base_url(base)
         if not base or urllib.parse.urlsplit(base).path.rstrip("/").endswith(GIT_API_SUFFIX):
             raise BadInput(tr("Invalid value: {0}", "base_url"))
         if GIT_HOSTS.get((urllib.parse.urlsplit(base).hostname or "").lower()) == provider:
@@ -858,7 +876,7 @@ def git_clean_input(b):
     elif provider == "gitea":
         raise BadInput(tr("Enter the address of the Gitea / Forgejo server"))
     token = b.get("token")
-    if token is not None and (not isinstance(token, str) or len(token) > PL_TOKEN_MAX or any(ch.isspace() for ch in token.strip())):
+    if token is not None and (not isinstance(token, str) or len(token) > GIT_TOKEN_MAX or any(ch.isspace() for ch in token.strip())):
         raise BadInput(tr("Invalid value: {0}", "token"))
     return provider, base, owner, name, (token or "").strip()
 
@@ -959,7 +977,7 @@ def git_update(cid):
     out = {}
     if "token" in b:
         t = b["token"]
-        if t is not None and (not isinstance(t, str) or len(t) > PL_TOKEN_MAX or any(ch.isspace() for ch in t.strip())):
+        if t is not None and (not isinstance(t, str) or len(t) > GIT_TOKEN_MAX or any(ch.isspace() for ch in t.strip())):
             return err(tr("Invalid value: {0}", "token"))
         t = (t or "").strip()
         if t and not SECRET_KEY:

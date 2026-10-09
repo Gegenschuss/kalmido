@@ -49,7 +49,7 @@ const S = {
   calMode: LS.get('calMode', 'month'), tlStart: null, quickPreset: {}, editContent: false,
   tl: {id: null}, drafts: {}, cfiles: {}, cedit: null, editLink: false,  // comments timeline of the open task
 };
-const FEATS = [['cal', N_('Calendar')], ['timeline', N_('Timeline')], ['matrix', N_('Eisenhower matrix')], ['habits', N_('Habits')], ['pomo', N_('Focus timer')], ['kanban', N_('Kanban')], ['paperless', N_('Paperless link')], ['collab', N_('Collaboration')], ['stats', N_('Statistics')], ['time', N_('Time tracking')], ['progress', N_('Project progress')], ['deps', N_('Dependencies')], ['fields', N_('Custom fields')], ['agents', N_('Agents')], ['comments', N_('Comments')], ['family', N_('Family')], ['events', N_('Events')], ['contacts', N_('Contacts')],
+const FEATS = [['cal', N_('Calendar')], ['timeline', N_('Timeline')], ['matrix', N_('Eisenhower matrix')], ['habits', N_('Habits')], ['pomo', N_('Focus timer')], ['kanban', N_('Kanban')], ['collab', N_('Collaboration')], ['stats', N_('Statistics')], ['time', N_('Time tracking')], ['progress', N_('Project progress')], ['deps', N_('Dependencies')], ['fields', N_('Custom fields')], ['agents', N_('Agents')], ['comments', N_('Comments')], ['family', N_('Family')], ['events', N_('Events')], ['contacts', N_('Contacts')],
   // 2.22.0 (#663): Home & life, each off by default
   ['contracts', N_('Contracts')], ['home', N_('Home & devices')], ['care', N_('Staying in touch')], ['health', N_('Health')], ['review', N_('Review & journal')], ['travel', N_('Travel')], ['reading', N_('Read later')],
   // 2.23.0 (#463): package "Team, family, clients", each off by default
@@ -143,6 +143,52 @@ const canEditList = id => WRITE_ROLES.includes(listRole(id));              // se
 const isPart = id => listRole(id) === 'participant';
 const canAddTo = id => canEditList(id) || isPart(id);                     // new tasks (a participant's become theirs)
 const canEdit = t => !!t && (canEditList(t.list_id) || (isPart(t.list_id) && !t.context));
+// 2.36.0 (#1118): the lock of a task (t.locked = 1, stored at the server, the same on every device and for everybody sharing
+// the list). Locked: title, notes, date / time, priority, list, tags, repeat, assignee; free: comments, checkboxes in the
+// notes, completing / reopening, subtasks, sort order, pin. Whoever may change the task may lock / unlock it. tlkHits =
+// would this change touch a locked field (checkbox ticks are no change of the notes); api() stops such a write with the
+// hint + "Unlock", the openers (date, priority, assign, move, title, notes) stop before anything opens (tlkStop).
+const TLK_FIELDS = ['title', 'content', 'due', 'due_time', 'start', 'priority', 'list_id', 'repeat', 'repeat_from', 'assignee_id', 'assignee_group_id', 'rotation', 'tags', 'add_tags', 'ltags'];
+const tlkIs = t => !!t && !!t.locked;
+const tlkCb = s => String(s || '').replace(/^(\s*(?:[-*+]|\d+[.)])\s+\[)[ xX](\])/gm, '$1 $2').trimEnd();
+const tlkSet0 = a => JSON.stringify([...(a || [])].map(x => String(x).toLowerCase()).sort());
+function tlkHits(t, b) {
+  if (!tlkIs(t) || !b || typeof b !== 'object' || ('locked' in b && !b.locked)) return false;
+  const n = x => x === '' || x === undefined ? null : x;
+  return TLK_FIELDS.some(k => {
+    if (!(k in b)) return false;
+    const v = b[k];
+    if (k === 'content') return tlkCb(v) !== tlkCb(t.content);
+    if (k === 'list_id') return !!v && +v !== +t.list_id;
+    if (k === 'tags') return tlkSet0(v) !== tlkSet0(t.tags);
+    if (k === 'ltags') return tlkSet0(v) !== tlkSet0(t.ltags);
+    if (k === 'add_tags') return (v || []).some(x => !(t.tags || []).includes(x));
+    return String(n(v)) !== String(n(t[k]));
+  });
+}
+function tlkToast(t) { toast(tr('This task is locked. Unlock it to change it.'), () => tlkSet(t.id, false), 6000, tr('Unlock')); }
+const tlkStop = t => { if (!tlkIs(t) || !canEdit(t)) return false; tlkToast(t); return true; };
+async function tlkSet(id, on) {
+  const t = taskById(id); if (!t || !(t.id > 0)) return;
+  if (!canEdit(t)) { roToast(); return; }
+  await patchUndoable(id, {locked: on ? 1 : 0}, on ? tr('Task locked') : tr('Task unlocked'));
+}
+// the safety net in api(): a write of the app that would change a locked field is not sent (the server refuses it too)
+function tlkGuard(method, url, body) {
+  if (method === 'GET' || !body || typeof body !== 'object' || body instanceof FormData) return null;
+  const pm = method === 'PATCH' && url.match(/^\/api\/tasks\/(\d+)$/);
+  let hit = null;
+  if (pm) { const t = S.tasks.get(+pm[1]); if (tlkHits(t, body)) hit = t; }
+  else if (url === '/api/tasks/batch' && (body.action === 'patch' || body.action === 'patch_each')) {
+    hit = (body.ids || []).map(i => S.tasks.get(+i)).find(t => tlkHits(t, body.action === 'patch' ? body.data : (body.data?.items || {})[t?.id]));
+  } else if (url === '/api/tasks/reorder') {
+    hit = (body.items || []).map(it => [S.tasks.get(+it.id), it]).find(([t, it]) => tlkHits(t, Object.fromEntries(Object.entries(it).filter(([k]) => ['list_id', 'priority', 'due', 'start', 'due_time'].includes(k)))))?.[0];
+  }
+  if (!hit) return null;
+  tlkToast(hit);
+  const e = new Error(tr('This task is locked. Unlock it to change it.')); e.shown = true; e.locked = true;
+  return e;
+}
 const canManage = l => !!l && ['owner', 'admin'].includes(l.role || 'owner');  // members + roles
 const canAssign = t => !!t && collab() && canEditList(t.list_id);
 const isOwner = l => !l || !l.role || l.role === 'owner';
@@ -248,6 +294,7 @@ function savedPing() {
   clearTimeout(savedPing.t); savedPing.t = setTimeout(() => el.classList.remove('on'), 1600);
 }
 async function api(method, url, body) {
+  const lk = tlkGuard(method, url, body); if (lk) throw lk;  // 2.36.0 (#1118)
   if (queueable(method, url) && !(body instanceof FormData) && OUT.q.length) return enqueue(method, url, body);
   try { const j = await rawFetch(method, url, body); if (method !== 'GET' && S.sel && new RegExp(`^/api/tasks/${S.sel}(/|$)`).test(url)) savedPing(); return j; }
   catch (e) {
@@ -494,7 +541,6 @@ function applyState(j) {
   foldSync();  // 2.4.0 (#361): folded folders follow the user (all devices)
   S.tasks = new Map(j.tasks.map(t => [t.id, t]));
   S.filters = j.filters || [];
-  S.paperless = j.paperless || {enabled: false};
   S.notify = j.notify || null;  // 2.1.0 (#317) the notification matrix (the server's view)
   S.ntfyInbox = j.ntfy_inbox || {enabled: false};
   S.webpush = j.webpush || {enabled: false};
@@ -528,7 +574,6 @@ function applyState(j) {
   // language changed on another device: switch once its file is loaded (the boot awaits it itself)
   if (S.booted && (j.settings.lang || 'en') !== I18N.code) i18nLoad(j.settings.lang).then(ok => { if (ok) render(); });
 }
-const plOn = () => S.paperless?.enabled && feat('paperless');
 async function load() {
   let j;
   try {

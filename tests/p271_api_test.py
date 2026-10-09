@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""2.7.1 API (#410), own container (start.sh, with the fake Paperless of fake_services.py):
+"""2.7.1 API (#410), own container (start.sh):
 the overview of a project list: GET /api/lists/<id>/overview (only project lists: 409 otherwise; who may read it per role,
 participants see only the files of their own tasks), the description (Markdown, owner / list admin / member, never a viewer
 or participant, length limit), key links (http / https only, title from the address, order, limit), milestones (date, done,
 in /api/state with the list for the timeline), project files (upload with the attachment rules: size limit, safe file
-names, html / svg never inline, sandbox CSP; download per role; delete; removed with the list), Paperless documents of the
-list (hidden for users without access), task files gathered read-only, members + status history + time; the token API
+names, html / svg never inline, sandbox CSP; download per role; delete; removed with the list), task files gathered read-only, members + status history + time; the token API
 (/api/v1/lists/<id>/overview, links, milestones, files; scopes; unknown fields) and the OpenAPI document.
 usage: p271_api_test.py <datadir>"""
 import os
@@ -40,12 +39,8 @@ def sess(user):
     return s
 
 
-env = dict(os.environ, EXTRA="-e PAPERLESS_TOKEN=pl-legacy-env-token -e PAPERLESS_API=http://127.0.0.1:8082 "
-                             "-e PAPERLESS_PUBLIC_URL=https://paperless.example.test")
-r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
+r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], capture_output=True, text=True)
 assert r.returncode == 0, r.stdout + r.stderr
-subprocess.run(["cp", os.path.join(N, "fake_services.py"), DATA], check=True)
-subprocess.run(["docker", "exec", "-d", CT, "python", "/data/fake_services.py"], check=True)
 time.sleep(0.8)
 
 requests.post(B + "/api/auth/setup", headers=H, json={"username": "alice", "display_name": "Alice", "password": "password123"})
@@ -155,7 +150,7 @@ check(A.delete(B + f"/api/list-files/{fh}").ok and A.get(B + f"/api/list-files/{
 on_disk = subprocess.run(["docker", "exec", CT, "sh", "-c", f"ls /data/attachments/lists/{P}/"], capture_output=True, text=True).stdout.split()
 check(len(on_disk) == 1 and on_disk[0].endswith("brief.pdf"), f"files below attachments/lists/<id>/, the deleted one gone: {on_disk}")
 
-# ================================================================== task files (read-only, per role) + Paperless
+# ================================================================== task files (read-only, per role)
 T1 = A.post(B + "/api/tasks", json={"title": "Wireframes", "list_id": P}).json()["id"]
 T2 = A.post(B + "/api/tasks", json={"title": "Pat's copy", "list_id": P, "assignee_id": ids["pat"]}).json()["id"]
 A.post(B + f"/api/tasks/{T1}/attachments", files={"file": ("wire.png", b"\x89PNG\r\n\x1a\nx", "image/png")})
@@ -167,16 +162,6 @@ o = Pa.get(B + f"/api/lists/{P}/overview").json()
 check([f["name"] for f in o["task_files"]] == ["copy.txt"], f"participant: only files of their tasks {o['task_files']}")
 A.delete(B + f"/api/tasks/{T1}")
 check([f["name"] for f in A.get(B + f"/api/lists/{P}/overview").json()["task_files"]] == ["copy.txt"], "trash: not listed")
-
-r = A.post(B + f"/api/lists/{P}/paperless", json={"doc_id": 42, "conn": 0})
-check(r.ok and r.json()["paperless"][0]["title"] == "Secret doc 42", f"admin links a Paperless document to the list {r.text[:150]}")
-again = A.post(B + f"/api/lists/{P}/paperless", json={"doc_id": 42, "conn": 0}).json()["paperless"]
-check(len(again) == 1, "linking twice: once")
-p = Bo.get(B + f"/api/lists/{P}/overview").json()["paperless"][0]
-check(p.get("hidden") is True and p["doc_id"] is None and "Secret" not in p["title"], f"no Paperless access: hidden {p}")
-check(Bo.post(B + f"/api/lists/{P}/paperless", json={"doc_id": 1, "conn": 0}).status_code == 403, "no access: cannot link")
-check(Vi.delete(B + f"/api/lists/{P}/paperless/{p['id']}").status_code == 403, "viewer cannot unlink")
-check(A.delete(B + f"/api/lists/{P}/paperless/{p['id']}").json()["paperless"] == [], "unlink")
 
 # status history + time in the overview
 A.post(B + f"/api/lists/{P}/status", json={"status": "at_risk", "note": "Copy late"})

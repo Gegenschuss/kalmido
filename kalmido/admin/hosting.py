@@ -12,8 +12,8 @@ from ..accounts.session import me
 from ..api.v1 import v1_args, v1_err, v1_json, v1_view
 
 # ---- the kind of server (#905). KALMIDO_HOSTED=1: an instance run as a service for others (no private networks behind it):
-# integrations may only reach public HTTPS addresses (Paperless: the admin's internal-host allow-list does not apply) and
-# Paperless is off for new accounts. Self-hosted servers (the default) keep everything as before.
+# integrations may only reach public HTTPS addresses (the admin's internal-host allow-list does not apply).
+# Self-hosted servers (the default) keep everything as before.
 HOSTED = os.environ.get("KALMIDO_HOSTED", "0").strip().lower() in ("1", "true", "yes", "on")
 SELFHOST_DOCS = "https://github.com/Gegenschuss/kalmido#readme"
 

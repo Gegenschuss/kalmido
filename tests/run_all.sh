@@ -487,6 +487,11 @@ fresh; run p2350_c_api "$PY" p2350_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2350_c_ui node p2350_c_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2350_d_api "$PY" p2350_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2350_d_ui node p2350_d_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2360_b_api "$PY" p2360_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2360_b_ui node p2360_b_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2360_c_api "$PY" p2360_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2360_a_ui node p2360_a_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2360_d_ui node p2360_d_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

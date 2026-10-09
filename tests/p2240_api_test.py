@@ -10,7 +10,7 @@
  - #899 mail limits: per sender and per receiving address and day (mail_budget), the admin setting mail_day_limit
  - #896 agents: "where it runs" (provider) on admin and personal agents; everyone in a list gets the News "agentjoin" when
    an agent joins (not the person who added it), the organisation setting user_agents in about
- - #905 KALMIDO_HOSTED=1: about.hosted, Paperless only https:// and off for new accounts
+ - #905 KALMIDO_HOSTED=1: about.hosted, the old module "paperless" off for new accounts (2.36.0: connection removed)
 Restarts its container (start.sh). usage: p2240_api_test.py <datadir>"""
 import json
 import os
@@ -228,9 +228,6 @@ subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], check=True, stdout=s
                env={**os.environ, "KEEP": "1", "EXTRA": "-e KALMIDO_HOSTED=1 -e KALMIDO_SECRET_KEY=" + "A" * 43 + "="})
 A, Bo = sess("alice"), sess("bob")
 check(A.get(B + "/api/about").json().get("hosted") is True and "hosted" not in Bo.get(B + "/api/about").json(), "#905: about.hosted (admins)")
-check(Bo.get(B + "/api/state").json()["paperless"]["hosted"] is True, "#905: the Paperless state knows it")
-r = Bo.post(B + "/api/paperless/conns", json={"name": "home", "url": "http://paperless.example.com", "token": "abc"})
-check(r.status_code == 400, f"#905: hosted: http:// is refused {r.status_code} {r.text[:120]}")
 feats = dbx("SELECT value FROM settings WHERE key='default_features'")
 check(feats and "paperless" not in feats[0][0].split(","), f"#905: hosted: Paperless is off for new accounts {feats}")
 r = A.post(B + "/api/users", json={"username": "dave", "password": "password123"})

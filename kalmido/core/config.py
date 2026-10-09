@@ -105,16 +105,13 @@ MAX_FILE_MB = int(os.environ.get("TASKS_MAX_FILE_MB", "50"))
 INLINE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp", "image/avif", "image/bmp",
                 "image/heic", "image/heif", "application/pdf"}
 
-# Paperless-ngx integration (link documents, send attachments). Empty token = feature off.
-PL_TOKEN = os.environ.get("PAPERLESS_TOKEN", "")
-PL_API = os.environ.get("PAPERLESS_API", "").rstrip("/")
-PL_PUBLIC = os.environ.get("PAPERLESS_PUBLIC_URL", "").rstrip("/")
+# 2.36.0 (#1116): the Paperless connection is removed; PAPERLESS_* variables that are still set are ignored.
 
 
 def _secret_key_env():
-    """2.1.0 (#180): KALMIDO_SECRET_KEY = 32 random bytes, base64 (standard or URL-safe). Encrypts the users' Paperless
-    tokens. It never lives in the database or the data directory (so a backup alone never reveals a token); without it
-    no token can be stored. Losing it means everyone enters their tokens again. Returns (key or None, problem)."""
+    """2.1.0 (#180): KALMIDO_SECRET_KEY = 32 random bytes, base64 (standard or URL-safe). Encrypts stored
+    tokens (repositories, read-later, sign-on client secret). It never lives in the database or the data directory (so a
+    backup alone never reveals a token); without it no token can be stored. Losing it means everyone enters their tokens again. Returns (key or None, problem)."""
     raw = os.environ.get("KALMIDO_SECRET_KEY", "").strip()
     if not raw:
         return None, "unset"
@@ -134,7 +131,7 @@ NTFY_IN = {"token": os.environ.get("NTFY_INBOX_TOKEN", ""), "url": os.environ.ge
            "user": os.environ.get("NTFY_INBOX_USER", "").strip().lower()}  # username; empty = first admin
 
 
-# ---- outbound HTTP (ntfy publish, ntfy inbox, Paperless). Only http/https (no file://, ftp://, data:),
+# ---- outbound HTTP (ntfy publish, ntfy inbox, Git, calendars). Only http/https (no file://, ftp://, data:),
 # no proxy from the environment, redirects only within the same origin (a redirect never carries a token
 # to another host). User-supplied URLs (task links, shared text) are NEVER fetched server-side.
 class _SameOriginRedirect(urllib.request.HTTPRedirectHandler):

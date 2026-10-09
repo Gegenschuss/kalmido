@@ -184,7 +184,6 @@ def state():
     from ..lists.folders import folders_shared_in, my_folder_props
     from ..notify.caps import notif_ask_state
     from ..lists.groups import groups_for, grp_of_user
-    from ..integrations.paperless import pl_state
     from ..collab.news import news_items, news_sig, news_unread, news_unread_me, notif_matrix
     from ..personal.habits import pomo_stats
     from ..personal.timetrack import time_day_h, time_list_totals, time_running, time_totals
@@ -254,7 +253,6 @@ def state():
                             (uid, uid)).fetchone()[0]),
         settings={k: v for k, v in s.items() if k not in ("digest_sent", "digest_mail_sent", "review_sent")},
         notify=notif_matrix(s),  # 2.1.0 (#317)
-        paperless=pl_state(c, u),
         ntfy_inbox={"enabled": bool(NTFY_IN["token"]), "server": NTFY_IN["public"], "topic": NTFY_IN["topic"]},
         ntfy_url=NTFY_URL,
         webpush={"enabled": WEBPUSH_ON, "key": vapid_public() if WEBPUSH_ON else "", "devices": webpush_count(c, uid)},

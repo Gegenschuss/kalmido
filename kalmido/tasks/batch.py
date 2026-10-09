@@ -46,6 +46,11 @@ def task_reorder():
         if not r or not list_role(c, r[0]) or not task_visible(c, int(it["id"]), me()):
             continue  # unknown (e.g. deleted elsewhere, or not visible): nothing to do
         role = need_task(c, int(it["id"]))
+        from ..tasks.validation import lock_problem  # 2.36.0 (#1118): dragging a locked task to another list / day / priority
+        e = lock_problem(c, c.execute("SELECT * FROM tasks WHERE id=?", (int(it["id"]),)).fetchone(),
+                         clean_task({k: v for k, v in it.items() if k in ("list_id", "priority", "due", "start", "due_time")}))
+        if e:
+            raise Denied(400, e)
         if it.get("list_id"):
             if role == "participant" and as_int(it["list_id"], "list_id", 1) != r[0]:
                 raise Denied(403, tr("Participants cannot move tasks to another list"))
@@ -134,7 +139,7 @@ def task_batch():
             if role == "participant" and action == "delete":
                 raise Denied(403, tr("Participants cannot delete tasks"))
             if action == "patch":
-                e = apply_update(c, tid, data)
+                e = apply_update(c, tid, data, lock=True)
                 if e:
                     errors.append(e)
                     continue
@@ -142,7 +147,7 @@ def task_batch():
                 if str(tid) not in per or not isinstance(per[str(tid)], dict):
                     continue
                 cf, title = [], c.execute("SELECT title FROM tasks WHERE id=?", (tid,)).fetchone()[0]
-                e = apply_update(c, tid, per[str(tid)], cf)
+                e = apply_update(c, tid, per[str(tid)], cf, lock=True)
                 for x in cf:
                     conflict(tid, x["field"], x["server"], x["mine"], title)
                 if e:

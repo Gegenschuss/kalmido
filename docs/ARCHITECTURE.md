@@ -9,7 +9,7 @@ development workflow see [CONTRIBUTING.md](../CONTRIBUTING.md).
  browser (PWA)                          server (one container)                      outside (optional)
  ---------------------------            -------------------------------------       ------------------------
  static/index.html                      app.py  (entry point)                       ntfy / Web Push services
- static/js/*.js   (web client)  --->    kalmido/  (Flask app, ~80 modules)  --->    Paperless-ngx, Git hosts,
+ static/js/*.js   (web client)  --->    kalmido/  (Flask app, ~80 modules)  --->    Git hosts, Karakeep,
  static/sw.js     (offline)     <---    SQLite database (one file)                  calendars, IMAP / SMTP,
  static/i18n/*.json                     background threads (watchdog ...)           webhooks, OIDC provider
                                               ^
@@ -112,7 +112,6 @@ The most used helpers:
 | `tasks/roadmap.py` | The roadmap and shifting a list's dates (dependent tasks move along). |
 | `tasks/lifecycle.py` | Applying changes, completing (repeats), undo, skip, reopen, delete, trash and restore. |
 | `tasks/attachments.py` | Files of tasks (upload, download, delete). |
-| `integrations/paperless.py` | Paperless-ngx: linking documents, sending attachments, personal and server connections, polling. |
 | `tasks/batch.py` | Reordering and batch changes of tasks, occurrences of repeating tasks, deleting attachments. |
 | `collab/comments.py` | Comments, mentions, the activity timeline and collaboration pushes. |
 | `collab/news.py` | The News feed and the notification settings (matrix + list bells). |
@@ -124,7 +123,7 @@ The most used helpers:
 | `accounts/users.py` | Users and the own account (admin user management, passwords, deletion). |
 | `lists/templates.py` | Task and list templates, built-in project types. |
 | `tasks/dependencies.py` | Dependencies between tasks ("blocked by"). |
-| `lists/projects.py` | Project lists: status, progress, the overview (description, links, files, Paperless), milestone reports. |
+| `lists/projects.py` | Project lists: status, progress, the overview (description, links, files), milestone reports. |
 | `lists/fields.py` | Custom fields of a list. |
 | `personal/stats.py` | Statistics (module "stats"). |
 | `calendars/icalfeed.py` | The subscribable ICS calendar feed of a user's tasks. |
@@ -245,11 +244,11 @@ registering the ones of its area.
 | `detail.js` | The detail panel of a task. |
 | `multiedit.js` | 2.26.0: several selected tasks edited at once in the task panel (common values, "Mixed", one undo step). |
 | `collab.js` | News and comments + activity (module "collab"). |
-| `attachments.js` | Attachments, Paperless documents and the share target. |
+| `attachments.js` | Attachments and the share target. |
 | `undo.js` | Undo / redo history. |
 | `popovers.js` | Popovers (date, priority, list, tags, reminders, repeat ...). |
 | `dialogs.js` | Modals: the app's own dialogs, the list dialog and the share dialog. |
-| `settings.js` | Settings: notifications, Web Push, autosave settings, personal agents, import, Paperless. |
+| `settings.js` | Settings: notifications, Web Push, autosave settings, personal agents, import. |
 | `integrations.js` | API tokens + scopes, webhooks, public links, calendar apps (CalDAV). |
 | `account.js` | Account, users (admin), login, groups, passkeys, two-factor, sign-in policy, backups, the sample project. |
 | `templates.js` | Templates and statistics. |

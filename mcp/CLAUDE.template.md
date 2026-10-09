@@ -53,7 +53,13 @@
 
 ### Writing in Kalmido
 - Format every note, comment and chat answer as **Markdown**: short `##` headings, `-` lists, `1.` steps,
-  `- [ ]` checkboxes for to-dos, **bold** for the key point, `code` for commands. Never one long block of text.
+  `- [ ]` checkboxes for to-dos, **bold** for the key point, `code` for names, files and short values. Never one long
+  block of text.
+- **Everything a person should run or paste** (commands, code, configuration) goes into its own fenced code block with
+  a language (` ```bash `, ` ```sql `, ` ```yaml `), in chat answers, tasks and comments alike, never as code inside a
+  sentence: Kalmido shows a copy button on the block. One block per place (server, laptop, database), one command per
+  line, no prompt sign (`$`, `#`, `>`) in front; chain steps that belong together with `&&`, so that a failing step
+  stops the rest instead of applying half of it.
 - When a decision is made on a task, add it **bold at the bottom of the task description**, not only in a comment:
   `**Entscheidung (DD.MM.YYYY):** what was decided` (or `**Decision (date):**` in English lists).
 - **Recorded decisions are binding.** Before you change a task, a feature or a text, read the decision lines in its
@@ -69,8 +75,13 @@
   channels stay apart.
 - Everything a person has to apply themselves (a patch, a command that needs admin rights, a setting only they can
   change) goes into **a task for them with high priority**, not only into the chat: what it does, where it lies, how you
-  tested it, the commands one per line as a checklist, how to switch it on and how to check that it works. Follow-ups go
-  as a comment into the same task while it is open.
+  tested it, the steps as a checklist with the commands in code blocks, how to switch it on and how to check that it
+  works. Follow-ups go as a comment into the same task while it is open.
+- **Locked tasks (2.36.0).** Tasks you create start **locked**: in the app their title, description, date, priority,
+  list, tags, repeat and assignee are read-only until a person unlocks them (comments, checkboxes in the description,
+  completing and subtasks stay free). The lock binds only the app: you can still change a locked task through the API
+  (`update_task`; the field `locked` shows the state). Create a task with `locked: false` only when the person should
+  edit it freely, and do not lift a lock a person set unless they ask you to.
 - Tick off what you delivered yourself and close the task with a short comment (what was done, where). Before you report
   "done", compare the open points of the task with what you delivered.
 - Write status texts, summaries and questions in plain words that a non-technical person understands.

@@ -15,7 +15,7 @@ from ..life.model import _dump, life_list, need_life
 
 
 # ---------------------------------------------------------------- 2.22.0 (#663): Karakeep
-# Off by default (module "reading"). A person connects their own Karakeep (URL + API key, like a personal Paperless
+# Off by default (module "reading"). A person connects their own Karakeep (URL + API key, like a repository
 # connection): the key is sealed with the server key (associated data = the person), never shown again, and only ever
 # sent to that host (no redirects, the SSRF guard of the calendar subscriptions: public addresses only, internal hosts
 # only where an admin allowed them). A sync (by hand, else about every hour in the background) adds every bookmark that

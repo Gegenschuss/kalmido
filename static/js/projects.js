@@ -152,8 +152,8 @@ function viewOverview() {
 }
 
 // ---- 2.7.1 (#410): the overview of a project list (tab next to List / Kanban / Timeline, project lists only; not the
-// "Where is it stuck?" view across all projects). Description (Markdown), key links, milestones, project files + Paperless
-// documents of the list, the files of its tasks (read-only), members, status updates and the tracked time. Loaded from
+// "Where is it stuck?" view across all projects). Description (Markdown), key links, milestones, project files,
+// the files of its tasks (read-only), members, status updates and the tracked time. Loaded from
 // GET /api/lists/<id>/overview (online); the milestones also come with the list in /api/state (timeline markers).
 // Which lists show their overview is remembered per device (LS pov); the list's own view (List / Kanban / Timeline) stays.
 S.pov = new Set(LS.get('pov', []));
@@ -202,12 +202,6 @@ function povFile(f, url, del, src = 'pf') {
   if (img) return `<div class="povf povimg"><a href="${url(f, false)}" data-pov="img-view" data-src="${src}" data-id="${f.id}" title="${esc(f.name)}"><img src="${url(f, false)}" loading="lazy" alt="${esc(f.name)}"><span class="pfn">${esc(f.name)}</span></a>${del || ''}</div>`;
   return `<div class="povf"><a href="${url(f, !(pdf || img))}" ${pdf || img ? 'target="_blank" rel="noopener"' : 'download'} title="${esc(f.name)}">${ic(img ? 'file' : pdf ? 'pdf' : 'file')}<span class="pfn">${esc(f.name)}</span><span class="muted pfs">${fmtSize(f.size)}</span></a>${del || ''}</div>`;
 }
-function povPl(p, del) {
-  const cn = !p.hidden && plConn(p.conn);
-  if (p.hidden || !plOn() || !cn?.usable) return `<div class="povf">${ic('archive')}<span class="pfn">${tr('Paperless document')}</span><span class="muted pfs">${tr('Linked through a Paperless connection you cannot use')}</span></div>`;
-  const sub = [p.correspondent, p.created ? fmtDate(p.created) : ''].filter(Boolean).join(' · ');
-  return `<div class="povf"><a href="${esc(cn.url)}/documents/${encodeURIComponent(p.doc_id)}/details" target="_blank" rel="noopener">${ic('archive')}<span class="pfn">${esc(p.title)}</span><span class="muted pfs">${esc(sub)}</span></a>${del || ''}</div>`;
-}
 const povDel = (k, id, lab) => `<button class="iconbtn povx" data-pov="${k}" data-id="${id}" title="${esc(lab)}" aria-label="${esc(lab)}">${ic('x', 's')}</button>`;
 function povSec(id, title, body, extra = '', empty = '') {
   // 2.32.0 (#1061): an empty block is one line (title, a short hint, its button); it grows once it has content
@@ -246,16 +240,13 @@ function viewProjOv() {
       ${can ? `<button class="iconbtn" data-pov="ms-edit" data-id="${m.id}" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit'))}">${ic('edit', 's')}</button>` : ''}</div>`).join('');
   P.ms = x => povSec('ms', tr('Milestones'), ms, (can ? `<button class="btn sm" data-pov="ms-add">${ic('plus', 's')}<span>${tr('Add milestone')}</span></button>` : '') + x, emp(!ms, tr('No milestones yet. They also show in the timeline.')));
   // files
-  const plList = feat('paperless') && (plOn() || j.paperless.length);
-  const files = j.files.map(f => povFile(f, povFileUrl, can ? povDel('file-del', f.id, tr('Remove')) : '', 'pf')).join('') +
-    (plList ? j.paperless.map(p => povPl(p, can && !p.hidden && plOn() ? povDel('pl-del', p.id, tr('Remove link')) : '')).join('') : '');
-  const fAdd = can ? `<label class="btn sm povup" title="${esc(tr('Images, PDFs, documents'))}">${ic('upload', 's')}<span>${tr('Add file')}</span><input type="file" id="pov-file" multiple hidden></label>${plList && plOn() ? `<button class="btn sm" data-pov="pl-add">${ic('archive', 's')}<span>${tr('Link document')}</span></button>` : ''}` : '';
-  const tf = j.task_files.map(f => isImg(f) ? povFile(f, attUrl, `<button class="povt" data-pov="task" data-id="${f.task_id}" title="${esc(tr('Open task'))}">${ic('sub', 's')}<span>${esc(f.task_title)}</span></button>`, 'tf') : `<div class="povf"><a href="${attUrl(f, !(f.mime === 'application/pdf' || isImg(f)))}" ${f.mime === 'application/pdf' || isImg(f) ? 'target="_blank" rel="noopener"' : 'download'} title="${esc(f.name)}">${ic(f.mime === 'application/pdf' ? 'pdf' : 'file')}<span class="pfn">${esc(f.name)}</span><span class="muted pfs">${fmtSize(f.size)}</span></a><button class="povt" data-pov="task" data-id="${f.task_id}" title="${esc(tr('Open task'))}">${ic('sub', 's')}<span>${esc(f.task_title)}</span></button></div>`).join('') +
-    (feat('paperless') ? j.task_paperless.map(p => povPl(p, `<button class="povt" data-pov="task" data-id="${p.task_id}" title="${esc(tr('Open task'))}">${ic('sub', 's')}<span>${esc(p.task_title)}</span></button>`)).join('') : '');
+  const files = j.files.map(f => povFile(f, povFileUrl, can ? povDel('file-del', f.id, tr('Remove')) : '', 'pf')).join('');
+  const fAdd = can ? `<label class="btn sm povup" title="${esc(tr('Images, PDFs, documents'))}">${ic('upload', 's')}<span>${tr('Add file')}</span><input type="file" id="pov-file" multiple hidden></label>` : '';
+  const tf = j.task_files.map(f => isImg(f) ? povFile(f, attUrl, `<button class="povt" data-pov="task" data-id="${f.task_id}" title="${esc(tr('Open task'))}">${ic('sub', 's')}<span>${esc(f.task_title)}</span></button>`, 'tf') : `<div class="povf"><a href="${attUrl(f, !(f.mime === 'application/pdf' || isImg(f)))}" ${f.mime === 'application/pdf' || isImg(f) ? 'target="_blank" rel="noopener"' : 'download'} title="${esc(f.name)}">${ic(f.mime === 'application/pdf' ? 'pdf' : 'file')}<span class="pfn">${esc(f.name)}</span><span class="muted pfs">${fmtSize(f.size)}</span></a><button class="povt" data-pov="task" data-id="${f.task_id}" title="${esc(tr('Open task'))}">${ic('sub', 's')}<span>${esc(f.task_title)}</span></button></div>`).join('');
   const fEmpty = !files && !tf;
   P.files = x => povSec('files', tr('Project files'), `${files ? `<div class="povfl">${files}</div>` : ''}
       ${can && !isTouch() ? `<div class="muted povdz">${ic('upload', 's')} ${tr('Or drop files here')}</div>` : ''}
-      ${tf ? `<details class="povtf" ${LS.get('povTf', true) ? 'open' : ''}><summary>${tr('Attachments from tasks')} <span class="muted">${j.task_files.length + (feat('paperless') ? j.task_paperless.length : 0)}</span></summary><div class="povfl">${tf}</div></details>` : ''}`, fAdd + x, emp(fEmpty, tr('No project files yet: contracts, briefings, plans.')));
+      ${tf ? `<details class="povtf" ${LS.get('povTf', true) ? 'open' : ''}><summary>${tr('Attachments from tasks')} <span class="muted">${j.task_files.length}</span></summary><div class="povfl">${tf}</div></details>` : ''}`, fAdd + x, emp(fEmpty, tr('No project files yet: contracts, briefings, plans.')));
   // side: key links, members, time
   const links = j.links.map((x, i) => `<div class="povl">${flkLink(x.url, 'povla', `${ic(povLinkIcon(x.url), 's')}<span class="pln">${esc(x.title)}</span><span class="muted plh">${esc(povHost(x.url))}</span>`)}
       ${can ? `<span class="povlb">${i ? `<button class="iconbtn" data-pov="link-up" data-id="${x.id}" title="${esc(tr('Move up'))}" aria-label="${esc(tr('Move up'))}">${ic('chev', 's up')}</button>` : ''}<button class="iconbtn" data-pov="link-edit" data-id="${x.id}" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit'))}">${ic('edit', 's')}</button></span>` : ''}</div>`).join('');
@@ -348,8 +339,6 @@ document.addEventListener('click', async e => {
     case 'ms-open': openDetail(id); break;  // 2.18.0 (#430): milestones are tasks (progress, burndown, release notes there)
     case 'ms-done': { const m = j.milestones.find(x => x.id === id); if (!m) break; try { await povApi('PATCH', `/api/lists/${l.id}/milestones/${id}`, {done: !m.done}); } catch { return; } await load(); render(); break; }
     case 'file-del': { const f = j.files.find(x => x.id === id); if (!f || !await askConfirm(tr('Delete “{0}”?', f.name), tr('The file is removed for everyone in this project.'), {ok: tr('Delete'), danger: true})) break; try { await povApi('DELETE', `/api/list-files/${id}`); } catch { /* shown */ } break; }
-    case 'pl-add': plSearchModal(0, {linked: new Set(j.paperless.filter(p => !p.hidden).map(p => `${p.conn || 0}:${p.doc_id}`)), pick: async (doc, conn) => { await povApi('POST', `/api/lists/${l.id}/paperless`, {doc_id: doc, conn}); }}); break;
-    case 'pl-del': try { await povApi('DELETE', `/api/lists/${l.id}/paperless/${id}`); } catch { /* shown */ } break;
     case 'task': if (S.tasks.get(id)) openDetail(id); else go('t/' + id); break;
   }
 });

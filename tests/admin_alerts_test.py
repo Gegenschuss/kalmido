@@ -3,7 +3,7 @@
 recipients (enabled admins only, each in their language), no private content (task titles, comments, unknown
 login names), cooldown per identical key, hourly cap, daily summary mode, kind toggles, the recent list + clear,
 disk space with a fake threshold, the integrity check (a NOT NULL violation planted in the database), and the env
-overrides KALMIDO_ADMIN_ALERTS=0 / KALMIDO_ADMIN_TOPIC (with the refused ntfy share inbox and an unreachable Paperless).
+overrides KALMIDO_ADMIN_ALERTS=0 / KALMIDO_ADMIN_TOPIC (with the refused ntfy share inbox; 2.36.0: PAPERLESS_* set but ignored).
 Starts its OWN test containers (start.sh, KALMIDO_ADMIN_ALERTS=1, 3 s aggregation window) with the stub ntfy, a fake
 push service (stub_webpush.py) and a fake GitHub release API inside.
 usage: admin_alerts_test.py <datadir>"""
@@ -427,7 +427,7 @@ switch("collab_all", True)
 time.sleep(2)
 check(not admin_msgs(), "env off: no alerts at all")
 
-# ------------------------------------------------------------------ container 3: KALMIDO_ADMIN_TOPIC, refused inbox, Paperless down
+# ------------------------------------------------------------------ container 3: KALMIDO_ADMIN_TOPIC, refused inbox, PAPERLESS_* ignored
 clear()
 start(keep=True, extra=["-e KALMIDO_ADMIN_TOPIC=env-admins", "-e NTFY_INBOX_TOKEN=tk", "-e NTFY_INBOX_URL=https://ntfy.sh",
                         "-e NTFY_INBOX_TOPIC=inbox", "-e PAPERLESS_TOKEN=pl", "-e PAPERLESS_API=http://127.0.0.1:9"])
@@ -439,9 +439,9 @@ check(m and "share inbox was not started" in m[0]["msg"], f"refused share inbox 
 check(not admin_msgs("t-alice") and not admin_msgs("t-carol"), "env topic: nothing to the own topics")
 r = A.post(B + "/api/admin/alerts/test")
 check(r.ok and r.json()["ok"] and admin_msgs("env-admins")[-1]["title"] == "Kalmido test alert", "test alert to the env topic (first admin's language)")
-check(patch({"integ_min": 1}).ok, "Paperless: 1 minute")
-m = wait_for(lambda: [x for x in admin_msgs("env-admins") if "Paperless" in x["msg"]], t=80)
-check(m and "Paperless has been failing for 1 min" in m[0]["msg"] and "URLError" in m[0]["msg"], f"Paperless outage reported: {m}")
+check(patch({"integ_min": 1}).ok, "integrations: 1 minute")
+time.sleep(5)
+check(not [x for x in admin_msgs("env-admins") if "Paperless" in x["msg"]], "2.36.0: no Paperless probe or alert (PAPERLESS_* ignored)")
 no_private(ntfy_log(), "env run")
 
 print(f"admin alerts: {OKS[0]} ok, {len(FAILS)} failed")

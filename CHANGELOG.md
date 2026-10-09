@@ -7,6 +7,54 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.36.0] - 2026-10-09
+
+**In short:** Sidebar, lock and comments. The sidebar gets calm grey **line icons** instead of emojis, a task can be
+**locked** against accidental edits (tasks created by agents start locked), selecting text in a description no longer
+opens the editor, code blocks in comments **wrap**, an open task **keeps its scroll position** when something new
+arrives, and the **Paperless connection is removed**.
+
+### Added
+- **Lock a task** (#1118): the lock button at the top of a task makes title, description, dates, priority, list, tags,
+  repeat and assignee read-only until someone who may edit the task unlocks it; comments, checkboxes in the
+  description, completing / reopening and subtasks stay free. A small lock shows in the task row; trying to change a
+  locked field says so and offers *Unlock*. Dragging, multi-select, shortcuts and *Skip this occurrence* respect the
+  lock, undo and the history record it. Read-only members cannot toggle it.
+- **Tasks created by agents start locked** (#1118): the agent API and MCP read and write the new task field `locked`
+  (`locked: false` on create keeps a task open); the lock only guards the app, agents keep changing tasks through the
+  API.
+- **Sidebar settings** (#1117): *Settings > Appearance > Sidebar* offers list icons as *Lines* (default), *Emoji* or
+  *Dot*, and a switch for the progress bars in the sidebar (on by default). The line icon set grows to 200; lists with
+  an emoji in their name get a matching line icon, and new lists get one suggested.
+
+### Changed
+- **Calmer sidebar** (#1117): grey line icons with the list colour as the icon's dot (the emoji stays in the name),
+  the share icon shows on hover or keyboard focus (always on touch devices), progress bars are 1 px and respect a
+  project's own *Hide progress*, folder heads are quieter.
+- **Agent chat** (#1110): the suggestion button sits below the time and reactions of the agent's message; permission
+  questions and approval cards are unchanged.
+- **Agent rules** (template, guides, in-app setup): commands and code for the person always go in their own fenced
+  code block with a language, one block per place, one command per line, no prompt sign (#1100); the rules explain
+  locked tasks.
+
+### Removed
+- **Paperless connection** (#1116): linking documents, sending attachments, personal and server connections, the
+  module switch and the *Paperless access* user right are gone. `PAPERLESS_*` variables are ignored; existing link
+  data stays in the database untouched.
+
+### Fixed
+- Selecting text in a task description (drag, double or triple click, long press) no longer opens the editor; clicks
+  in code blocks, tables and links never do (#1118).
+- Code blocks in comments and in the description wrap like in the chat instead of scrolling sideways; no scroll bar
+  covers the next line, *Copy* still takes the original text. A comment's quick reactions no longer cover its Reply /
+  Edit / Delete buttons (#1119).
+- An open task keeps its scroll position when a new comment or chat message arrives; reading at the end, you stay at
+  the end (#1120).
+
+### Upgrade notes
+- New column `tasks.locked` (default 0 = open); existing tasks, including those created by agents before, stay open.
+  2.35.0 keeps running on the migrated database. The Paperless tables and `users.paperless_access` are kept.
+
 ## [2.35.0] - 2026-10-09
 
 **In short:** Agents, chat and polish. Agents **ask for approval with a card** (Yes / No, pinned until answered,
@@ -3528,7 +3576,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.35.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.36.0...HEAD
+[2.36.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.36.0
 [2.35.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.35.0
 [2.34.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.34.0
 [2.33.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.33.0

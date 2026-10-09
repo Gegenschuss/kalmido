@@ -202,18 +202,15 @@ def overview_spec(paths, schemas, op, ok, errs, ref, pid, nul, page):
                 "ideal": {"type": "array", "items": {"type": "object", "properties": {"day": {"type": "string"}, "open": {"type": "integer"}}}}}},
             "release_notes": {"type": "string", "description": "Markdown"}}},
         "ProjectFile": lfile, "ProjectFilePage": page("ProjectFile"),
-        "ProjectOverview": {"type": "object", "description": "The overview of a project list (2.7.1). Task files and Paperless "
-                                                             "documents of tasks are read-only here (change them on the task).",
+        "ProjectOverview": {"type": "object", "description": "The overview of a project list (2.7.1). Task files are read-only "
+                                                             "here (change them on the task).",
                             "properties": {
                                 "list_id": {"type": "integer"}, "name": {"type": "string"}, "role": {"type": "string"},
                                 "can_edit": {"type": "boolean"}, "description": {"type": "string", "description": "Markdown"},
                                 "links": {"type": "array", "items": ref("KeyLink")}, "milestones": {"type": "array", "items": ref("Milestone")},
                                 "files": {"type": "array", "items": ref("ProjectFile")},
-                                "paperless": {"type": "array", "items": {"type": "object"}, "description": "Documents linked to the list "
-                                              "(hidden: true = a connection the token's user cannot use)"},
                                 "task_files": {"type": "array", "items": {"type": "object"}, "description": "Files of the list's tasks, "
                                                "each with task_id + task_title (download: GET /tasks/{id} ... the web app's file URL)"},
-                                "task_paperless": {"type": "array", "items": {"type": "object"}},
                                 "members": {"type": "array", "items": {"type": "object"}, "description": "Owner + members with role "
                                             "(empty while collaboration is off)"},
                                 "status": {"type": "object", "description": "current, note, at, history (newest first, at most 10)"},

@@ -1,5 +1,5 @@
-# fake ntfy inbox (8081), fake Paperless (8082) and an "attacker / internal service" sink (8084) for
-# security_test.py; runs INSIDE the test container (docker exec -d python /data/fake_services.py), logs to /data/fake.log
+# fake ntfy inbox (8081), the former Paperless port (8082, 2.36.0: only a sink that logs; nothing may reach it) and an
+# "attacker / internal service" sink (8084) for security_test.py; runs INSIDE the test container (docker exec -d python /data/fake_services.py), logs to /data/fake.log
 import json
 import threading
 import time
@@ -56,21 +56,6 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, b'good file from ntfy', 'text/plain')
         if port == 8084:
             return self._send(200, b'secret-internal-data', 'text/plain')
-        if port == 8082:
-            if '/thumb/' in self.path:
-                if self.path.startswith('/api/documents/7/'):
-                    return self._send(200, b'<html><script>alert(1)</script></html>', 'text/html')
-                return self._send(200, b'\x89PNG\r\n\x1a\nfake', 'image/png')
-            if self.path.startswith('/api/correspondents/'):
-                return self._send(200, json.dumps({"results": [{"id": 1, "name": "Tax office"}]}))
-            if self.path.startswith('/api/documents/?'):
-                return self._send(200, json.dumps({"count": 1, "results": [{"id": 7, "title": "Admin salary slip 2026",
-                                                                          "created": "2026-01-01", "correspondent": 1, "page_count": 2}]}))
-            if self.path.startswith('/api/documents/'):
-                did = int(self.path.split('/')[3])
-                return self._send(200, json.dumps({"id": did, "title": f"Secret doc {did}", "created": "2026-01-01", "correspondent": 1}))
-            if self.path.startswith('/api/tasks/'):
-                return self._send(200, '[]')
         self._send(404, '{}')
 
     def do_POST(self):

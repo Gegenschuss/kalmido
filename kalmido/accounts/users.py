@@ -21,7 +21,6 @@ from ..accounts.pictures import (
 from ..accounts.login import session_via, twofa_clear, twofa_methods
 from ..core.access import collab_all, Denied, list_role, need_list, vis_sql
 from ..core.serializers import attachment_files, unlink_files
-from ..integrations.paperless import pl_forget_user
 from ..personal.timetrack import BadInput
 
 
@@ -37,12 +36,23 @@ def _invite_state(c, uid):
     return invite_state(c, uid)
 
 
+def user_forget_conns(c, uid):
+    """A user is deleted / becomes an agent: their own connection rows, stored tokens and grants go (list bells too).
+    2.36.0 (#1116): the Paperless connection is gone from the app; its tables stay (the way back), but a deleted person's
+    tokens never outlive them."""
+    c.execute("DELETE FROM pl_tokens WHERE conn_id IN (SELECT id FROM pl_conns WHERE kind='personal' AND owner_id=?)", (uid,))
+    c.execute("DELETE FROM pl_conns WHERE kind='personal' AND owner_id=?", (uid,))
+    c.execute("DELETE FROM pl_tokens WHERE user_id=?", (uid,))
+    c.execute("DELETE FROM pl_conn_users WHERE user_id=?", (uid,))
+    c.execute("DELETE FROM list_bell WHERE user_id=?", (uid,))
+
+
 def user_admin_dict(c, u):
     from ..family.family import kid_parents
     return {**user_public(u), "kind": u["kind"] or "user", "is_admin": bool(u["is_admin"]), "disabled": bool(u["disabled"]),
             "has_password": bool(u["password_hash"]), "proxy_login": u["proxy_login"] or "",
             "created_at": u["created_at"], "ntfy_topic": usettings(c, u["id"])["ntfy_topic"],
-            "paperless_access": bool(u["paperless_access"]), "email": u["email"] or "",
+            "email": u["email"] or "",
             "twofa": twofa_methods(c, u), "oidc_linked": bool(u["oidc_subject"]),
             "parents": kid_parents(c, u["id"]) if u["kid"] else [],  # 2.19.0 (#653)
             "invite": _invite_state(c, u["id"]),  # 2.22.0 (#697): invited | expired | null
@@ -127,8 +137,7 @@ def user_create():
     if topic and not NTFY_TOPIC_RE.fullmatch(topic):
         return err(tr("ntfy topic: 1-64 characters a-z, A-Z, 0-9, dash, underscore"))
     uid = create_user(c, username, (b.get("display_name") or "").strip()[:60] or username, pw or None, proxy,
-                      bool(b.get("is_admin")), ntfy_topic=topic or None, onboard=True,
-                      paperless_access=bool(b["paperless_access"]) if "paperless_access" in b else bool(b.get("is_admin")))
+                      bool(b.get("is_admin")), ntfy_topic=topic or None, onboard=True)
     email = str(b.get("email") or "").strip()[:200]
     if email and not EMAIL_RE.fullmatch(email):
         c.rollback()
@@ -220,9 +229,9 @@ def user_update(uid):
             c.execute("DELETE FROM agents WHERE user_id=?", (uid,))
             c.execute("UPDATE users SET kind='user' WHERE id=?", (uid,))
         u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
-    if is_agent(u) and (b.get("is_admin") or b.get("paperless_access")):
+    if is_agent(u) and b.get("is_admin"):
         c.rollback()
-        return err(tr("An agent is never an admin and has no Paperless access"))
+        return err(tr("An agent is never an admin"))
     if (("is_admin" in b and not b["is_admin"]) or b.get("disabled")) and u["is_admin"] and not _active_admins(c, uid):
         return err(tr("At least one active admin is needed"))
     if "display_name" in b:
@@ -257,8 +266,6 @@ def user_update(uid):
         c.execute("UPDATE users SET avatar=? WHERE id=?", (f"p:{p}" if p else None, uid))
         if (u["avatar"] or "") != (f"p:{p}" if p else ""):
             avatar_drop_file(uid, u["avatar"])
-    if "paperless_access" in b:  # Paperless = the archive of the token owner: only for users an admin allows
-        c.execute("UPDATE users SET paperless_access=? WHERE id=?", (1 if b["paperless_access"] else 0, uid))
     if "email" in b:  # optional; OIDC links a user by it (verified e-mail claim)
         email = str(b["email"] or "").strip()[:200]
         if email and not EMAIL_RE.fullmatch(email):
@@ -331,7 +338,7 @@ def user_purge(c, uid):
     c.execute("UPDATE tasks SET assignee_id=NULL WHERE assignee_id=?", (uid,))
     c.execute("UPDATE tasks SET created_by=NULL WHERE created_by=?", (uid,))
     c.execute("DELETE FROM task_field_values WHERE value=? AND field_id IN (SELECT id FROM list_fields WHERE type='person')", (str(uid),))
-    pl_forget_user(c, uid)  # 2.1.0: personal Paperless connections, tokens, grants; list bells
+    user_forget_conns(c, uid)  # personal connection rows, stored tokens, grants; list bells
     a = c.execute("SELECT webhook_id FROM agents WHERE user_id=?", (uid,)).fetchone()
     if a and a["webhook_id"]:
         c.execute("DELETE FROM webhooks WHERE id=?", (a["webhook_id"],))

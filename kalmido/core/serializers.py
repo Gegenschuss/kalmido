@@ -45,7 +45,6 @@ def tags_for(c, ids=None, uid=None):
 
 
 def load_tasks(c, where, args=(), full_snips=False):
-    from ..integrations.paperless import pl_usable_ids
     from ..personal.timetrack import vis_ids
     from ..collab.reactions import ltags_for
     from ..integrations.git import git_code_for
@@ -72,16 +71,6 @@ def load_tasks(c, where, args=(), full_snips=False):
             if a["kind"] == "agent":
                 d["agent"] = a["display_name"] or a["username"]
             atts.setdefault(a["task_id"], []).append(d)
-    pls = {}
-    pl_ok = pl_usable_ids(c, viewer) if ids else set()  # 2.1.0: per connection (0 = the legacy one)
-    for p in c.execute("SELECT id, task_id, doc_id, title, correspondent, created, status, message, att_id, conn_id "
-                       "FROM paperless_links ORDER BY id"):
-        if p["task_id"] in ids:
-            d = {k: p[k] for k in p.keys() if k not in ("task_id", "conn_id")}
-            d["conn"] = p["conn_id"] or 0
-            if d["conn"] not in pl_ok:  # a connection the viewer cannot use: they only learn that there is a document
-                d.update(doc_id=None, title=tr("Paperless document"), correspondent="", created="", message="", hidden=True, conn=None)
-            pls.setdefault(p["task_id"], []).append(d)
     # comment count + unread (comments of others newer than the last one I have seen)
     cms, uid = {}, (g.user["id"] if has_request_context() and getattr(g, "user", None) else None)
     if uid and ids:
@@ -127,7 +116,6 @@ def load_tasks(c, where, args=(), full_snips=False):
         if r["id"] in gcode and r["id"] not in ctx:
             d["code"] = gcode[r["id"]]
         d["attachments"] = atts.get(r["id"], [])
-        d["paperless"] = pls.get(r["id"], [])
         d["comment_count"], d["unread"] = cms.get(r["id"], (0, 0))
         d["fields"] = fvs.get(r["id"], {})
         d["blocked"] = len(blk.get(r["id"], []))
@@ -138,7 +126,7 @@ def load_tasks(c, where, args=(), full_snips=False):
         if r["id"] in aiu and r["id"] not in ctx:
             d["ai_usage"] = aiu[r["id"]]
         if r["id"] in ctx:
-            d.update(content="", url=None, attachments=[], paperless=[], comment_count=0, unread=0, fields={},
+            d.update(content="", url=None, attachments=[], comment_count=0, unread=0, fields={},
                      blockers=[], blocked=0, blocking=0, context=True)
             d.pop("snippets", None)  # 2.35.0 (#1095)
             d.pop("snippets_n", None)

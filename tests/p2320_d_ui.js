@@ -60,7 +60,7 @@ const FEAT = 'cal,comments,collab,agents,kanban,timeline';
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
   w.eval(`listModal(null)`); md = await until(() => d.querySelector('.modal #l-name'));
   input(w, md, 'Holiday'); await sleep(200);
-  check(d.querySelector('#l-emo').classList.contains('sugg') && !d.querySelector('#l-emo svg'), '#1077: on: "Holiday" suggests an icon');
+  check(d.querySelector('#l-emo').classList.contains('sugg') && /\p{Extended_Pictographic}/u.test(d.querySelector('#l-emo').textContent) && !d.querySelector('#l-emo svg:not(.l)'), '#1077: on: "Holiday" suggests an icon (2.36.0: as a line icon)');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
 
   // ================= #1058 the Share dialog

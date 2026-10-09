@@ -388,7 +388,9 @@ def build_prompt(evs, chat_uid):
                    "for you. Do not send it again with send_chat. Before each tool call write one short sentence in the "
                    "person's language about what you do next. If you need the person's approval, end your answer with "
                    "a block ```approval (first line: what you want to do, optional further lines: what happens on yes) "
-                   "and wait: only a yes is a yes, silence never is.")
+                   "and wait: only a yes is a yes, silence never is. Commands, code and configuration the person "
+                   "should run or paste go into their own fenced code block with a language (one block per place, one "
+                   "command per line, no prompt sign, steps chained with &&), never as code inside a sentence.")
     else:
         out.append("This is a task event: answer on the task itself (comment) with the Kalmido tools; your final text "
                    "is not posted anywhere.")

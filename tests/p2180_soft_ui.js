@@ -309,7 +309,8 @@ const lst = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)).l
     check(sc.was > 0 && sc.now === 0, `${tag}: another task opens at its top ` + JSON.stringify(sc));
     await o.nav(B + '#t/' + OLD); await ready(ev); await sleep(400);
     const ov2 = await ev(`(() => ({o: document.documentElement.scrollWidth - innerWidth, d: (document.querySelector('#detail').scrollWidth - document.querySelector('#detail').clientWidth), pre: (() => { const p = document.querySelector('#d-md pre'); return p ? p.scrollWidth > p.clientWidth : null; })()}))()`);
-    check(ov2.o <= 0 && ov2.d <= 1 && ov2.pre === true, `${tag}: a long code line scrolls inside its block, a long path wraps ` + JSON.stringify(ov2));
+    // 2.36.0 (#1119): code blocks in the description wrap like in the chat instead of scrolling sideways
+    check(ov2.o <= 0 && ov2.d <= 1 && ov2.pre === false, `${tag}: a long code line wraps inside its block, a long path wraps ` + JSON.stringify(ov2));
   }, touch);
   // another accent: the code colours do not depend on it
   await firefox(async o => {

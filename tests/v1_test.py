@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """1.0 tests: version / about, the instance-wide collaboration switch, the update check (fake GitHub API
-inside the container) and hidden Paperless document ids. Starts its OWN test container (start.sh).
+inside the container) and (2.36.0) no Paperless data in any answer. Starts its OWN test container (start.sh).
 usage: v1_test.py <datadir>"""
 import json
 import os
@@ -179,7 +179,9 @@ r = subprocess.run(["docker", "run", "--rm", "--network", "none", "-e", "TASKS_D
                     "import app; c=app.connect(); print(app.UPDATE_CHECK_ENV, app.update_enabled(c))"], capture_output=True, text=True)
 check(r.stdout.strip().splitlines()[-1:] == ["False False"], f"KALMIDO_UPDATE_CHECK=0 turns it off: {r.stdout} {r.stderr[-300:]}")
 
-# ------------------------------------------------------------------ Paperless doc_id hidden without access
+# ------------------------------------------------------------------ Paperless rows stay in the database, never in an answer
+# 2.36.0 (#1116): the Paperless connection is removed; linked documents stay in paperless_links (the way back) but no task,
+# state or export answer carries them any more
 lid = A.post(B + "/api/lists", json={"name": "Shared", "kind": "project"}).json()["id"]
 A.put(B + f"/api/lists/{lid}/members", json={"user_id": ids["bob"], "role": "edit"})
 tid = A.post(B + "/api/tasks", json={"title": "with document", "list_id": lid}).json()["id"]
@@ -187,18 +189,17 @@ dbx("INSERT INTO paperless_links(task_id,doc_id,title,correspondent,created,stat
     (tid, 4711, "Salary 2026", "Employer", "2026-01-01", "2026-09-01T00:00:00Z"))
 ta = A.get(B + f"/api/tasks/{tid}").json()
 tb = Bo.get(B + f"/api/tasks/{tid}").json()
-check(ta["paperless"][0]["doc_id"] == 4711, "admin with access sees the doc id")
-check(tb["paperless"][0]["doc_id"] is None and tb["paperless"][0]["hidden"] is True
-      and tb["paperless"][0]["title"] != "Salary 2026", f"no access: doc id + title hidden: {tb['paperless']}")
+check("paperless" not in ta and "paperless" not in tb, "task: no Paperless field")
 sb = [t for t in Bo.get(B + "/api/state").json()["tasks"] if t["id"] == tid][0]
-check(sb["paperless"][0]["doc_id"] is None, "no access: state hides the doc id")
+check("paperless" not in sb and "Salary 2026" not in Bo.get(B + "/api/state").text, "state: no Paperless data")
 blid = Bo.post(B + "/api/lists", json={"name": "Bob own", "kind": "project"}).json()["id"]
 btid = Bo.post(B + "/api/tasks", json={"title": "bob doc", "list_id": blid}).json()["id"]
 dbx("INSERT INTO paperless_links(task_id,doc_id,title,status,added_at) VALUES(?,?,?,'ok',?)", (btid, 815, "Contract", "2026-09-01T00:00:00Z"))
 ex = Bo.get(B + "/api/export.json").json()
-check(ex["paperless_links"] and all(p["doc_id"] is None and p["title"] == "" for p in ex["paperless_links"]), "export: doc id hidden without access")
-exa = A.get(B + "/api/export.json").json()
-check(any(p["doc_id"] == 4711 for p in exa["paperless_links"]), "export: owner with access keeps the doc id")
+check("paperless_links" not in ex and "paperless_connections" not in ex, "export: no Paperless data")
+exa = A.get(B + "/api/export.json")
+check("Salary 2026" not in exa.text, "export of the owner: no Paperless titles")
+check(dbx("SELECT COUNT(*) FROM paperless_links")[0][0] == 2, "the rows stay in the database")
 tl = A.post(B + f"/api/tasks/{tid}/comments", json={"body": "see doc"})
 check(tl.ok, "comment while collaboration is on")
 

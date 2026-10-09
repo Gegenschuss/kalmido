@@ -36,7 +36,7 @@ from ..accounts.login import _user
 # account", unless the admin turned on "Create accounts on first login". Optional required group; optional admin group
 # (the admin flag then follows the group, the last active admin is never demoted). Secrets are never logged.
 # 2.9.0 (#438): the provider can also be set up in Settings > Administration > Sign-in (stored in settings.oidc_*, the
-# client secret sealed with KALMIDO_SECRET_KEY like the Paperless tokens). Every KALMIDO_OIDC_* variable that is set wins
+# client secret sealed with KALMIDO_SECRET_KEY like the repository tokens). Every KALMIDO_OIDC_* variable that is set wins
 # over the stored value of that field (the settings show it locked). Optional: admins by verified e-mail domain
 # (KALMIDO_OIDC_ADMIN_DOMAINS / the setting), next to the admin group.
 OIDC_FIELDS = (("issuer", "KALMIDO_OIDC_ISSUER"), ("client_id", "KALMIDO_OIDC_CLIENT_ID"),

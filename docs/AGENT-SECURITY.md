@@ -86,7 +86,7 @@ These hold no matter what the model decides:
   status class and day and exports CSV; denied calls (401 / 403 / 429) are marked. Retention: `KALMIDO_AUDIT_DAYS`
   (default 90, `0` = off). API: `GET /api/admin/agents/{id}/audit`, `GET /api/v1/admin/agents/{id}/audit` (scope
   *admin-read*).
-- **Write-only secrets.** API tokens are stored hashed and shown once; repository and Paperless tokens are encrypted
+- **Write-only secrets.** API tokens are stored hashed and shown once; repository tokens are encrypted
   (`KALMIDO_SECRET_KEY`) and never returned by the API.
 - **Human approval for merges.** A coding agent's merge request is approved only by a 👍 of a person, never of another
   agent. Kalmido itself never merges or pushes. 2.26.0: the same for integrations without a pull request and for

@@ -15,7 +15,6 @@ from ..core.access import collab_all, Denied, list_people, list_role, MANAGE_ROL
 from ..core.serializers import unlink_files
 from ..tasks.tasks import WEB_COMMENT
 from ..tasks.attachments import save_attachments
-from ..integrations.paperless import pl_usable_ids
 from .replies import reply_check, with_replies
 
 
@@ -109,10 +108,9 @@ def timeline(tid):
     acts = [{"id": a["id"], "user_id": a["user_id"], "kind": a["kind"], "data": json.loads(a["data"] or "{}"),
              "created_at": a["created_at"]}
             for a in c.execute("SELECT * FROM activity WHERE task_id=? ORDER BY id", (tid,))] if collab_all() else []
-    vis, pl_ok = None, pl_usable_ids(c, me())
+    vis = None
+    acts = [a for a in acts if a["kind"] not in ("paperless", "paperless_rm", "paperless_send")]  # 2.36.0 (#1116): connection removed
     for a in acts:
-        if a["kind"] in ("paperless", "paperless_rm") and (a["data"].get("conn") or 0) not in pl_ok:
-            a["data"] = {"title": tr("Paperless document")}
         if a["kind"] in DEP_ACTS and a["data"].get("id"):
             vis = vis if vis is not None else vis_ids(c, me())
             o = c.execute("SELECT list_id FROM tasks WHERE id=?", (a["data"]["id"],)).fetchone()

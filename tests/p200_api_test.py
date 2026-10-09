@@ -147,8 +147,8 @@ check(users[CL]["kind"] == "agent" and users[CL].get("agent") is True and users[
 check(any(x["id"] == CL and x.get("agent") for x in Bo.get(B + "/api/users").json()["users"]), "share picker marks agents")
 r = A.patch(B + f"/api/users/{CL}", json={"is_admin": True})
 check(r.status_code == 400 and dbx("SELECT is_admin FROM users WHERE id=?", (CL,))[0][0] == 0, "agent never admin")
-r = A.patch(B + f"/api/users/{CL}", json={"paperless_access": True})
-check(r.status_code == 400 and dbx("SELECT paperless_access FROM users WHERE id=?", (CL,))[0][0] == 0, "agent never Paperless")
+A.patch(B + f"/api/users/{CL}", json={"paperless_access": True})  # 2.36.0 (#1116): the flag is ignored
+check(dbx("SELECT paperless_access FROM users WHERE id=?", (CL,))[0][0] == 0, "agent never Paperless")
 check(cl.get("/admin/users").status_code == 403 and cl.get("/admin/status").status_code == 403, "agent: no admin API")
 check(Bo.get(V + "/agent").status_code in (401, 404) and Api(Bo.post(B + "/api/me/tokens", json={"name": "b", "scopes": ["read", "write"]})
                                                             .json()["token"]).get("/agent").status_code == 403, "agent endpoints: agents only")

@@ -35,6 +35,11 @@ function renderMultiBar() {
 }
 async function batch(action, data, clear, ids = [...S.multi], note = '') {
   if (!ids.length) return;
+  if (action === 'patch') {  // 2.36.0 (#1118): locked tasks keep their locked fields; the others change
+    const lk = ids.filter(i => tlkHits(S.tasks.get(i), data));
+    if (lk.length === ids.length) { tlkToast(S.tasks.get(lk[0])); return; }
+    if (lk.length) { ids = ids.filter(i => !lk.includes(i)); note = [note, trn('{0} locked task skipped', '{0} locked tasks skipped', lk.length)].filter(Boolean).join(' · '); }
+  }
   const snaps = ids.flatMap(withKids);
   const cs = action === 'complete' ? celeSnap(ids) : null;
   const j = await api('POST', '/api/tasks/batch', {ids, action, data});

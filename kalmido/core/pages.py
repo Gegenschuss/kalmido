@@ -30,7 +30,7 @@ PERMISSIONS_POLICY = ("camera=(), microphone=(), geolocation=(), payment=(), usb
 
 @app.after_request
 def headers(resp):
-    # own CSPs (attachments, Paperless thumbnails) are kept; everything else gets the app CSP
+    # own CSPs (attachments) are kept; everything else gets the app CSP
     resp.headers.setdefault("Content-Security-Policy", CSP)
     resp.headers.setdefault("X-Content-Type-Options", "nosniff")
     resp.headers.setdefault("Referrer-Policy", "same-origin")

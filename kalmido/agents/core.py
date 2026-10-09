@@ -26,7 +26,7 @@ from ..integrations.webhooks import wh_actor, wh_log, WH_QUEUE_MAX
 # ---------------------------------------------------------------- 2.0.0: agents, reactions, shared list tags, tidy
 # AGENTS are users of kind 'agent' (users.kind): an AI assistant, a bot, an n8n flow -- anything that works through the
 # REST API. An admin creates them (Settings > Users > Agents) or turns an existing user into one. An agent is never an admin,
-# never gets Paperless, cannot log in to the web app (only its API tokens work) and sees exactly the lists shared with it
+# cannot log in to the web app (only its API tokens work) and sees exactly the lists shared with it
 # (or that it owns). Kalmido never starts an agent or any AI process: it only tells the agent what happened, as signed
 # webhooks (the webhook machinery: HMAC, retries, delivery log) and/or through a queue the agent polls
 # (GET /api/v1/agent/events, optionally long-polling with wait=). Kill switch: agents.enabled = 0 -> its tokens are

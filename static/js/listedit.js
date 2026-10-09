@@ -10,6 +10,7 @@ function inlineEditStart(id) {
   const t = taskById(id);
   if (!t || !(t.id > 0)) return;
   if (!canEdit(t)) { roToast(); return; }
+  if (tlkStop(t)) return;  // 2.36.0 (#1118): locked
   if (!$(`#view .trow[data-id="${id}"] .ttl`)) return;
   if (S.ie && S.ie.id !== id) inlineEditCommit();
   S.ie = {id, v: t.title};

@@ -58,6 +58,21 @@ function announce(msg) {
   r.textContent = ''; clearTimeout(announceT);
   announceT = setTimeout(() => { r.textContent = String(msg || ''); }, 60);
 }
+// 2.36.0 (#1118, part 1): a click in the description opens the editor only when it was a plain click: no text selected,
+// the pointer did not move between press and release, no long press (a phone's select), no double / triple click (the
+// first click waits TLK_MD_WAIT ms for a second one), never in code blocks, tables, links or buttons. A locked task shows
+// the hint with "Unlock" instead. Keyboard (Enter on the description) opens at once.
+const TLK_MD = {x: 0, y: 0, t: 0, n: 0}, TLK_MD_WAIT = 280, TLK_MD_LONG = 450;
+document.addEventListener('pointerdown', e => { if (e.target.closest?.('#d-md')) Object.assign(TLK_MD, {x: e.clientX, y: e.clientY, t: Date.now()}); }, true);
+const tlkMdSel = () => !!String(window.getSelection?.() || '').trim();
+function tlkMdClick(e) {
+  const t = taskById(S.sel), n = ++TLK_MD.n;
+  if (!canEdit(t) || e.target.closest('a, button, input, pre, code, table, .mdcode, [data-mcard]')) return;
+  if (e.detail > 1 || tlkMdSel()) return;
+  if (e.detail === 1 && (Math.hypot(e.clientX - TLK_MD.x, e.clientY - TLK_MD.y) > 4 || Date.now() - TLK_MD.t > TLK_MD_LONG)) return;
+  const open = () => { if (n !== TLK_MD.n || tlkMdSel() || S.sel !== t.id) return; if (tlkIs(t)) tlkToast(t); else editContent(); };
+  if (e.detail === 0) open(); else setTimeout(open, TLK_MD_WAIT);
+}
 function toast(msg, undo, ms, label) {  // label: the button's text instead of "Undo" (2.13.0: "Open")
   const el = $('#toast');
   announce(msg + (undo ? ' · ' + (label || tr('Undo')) + (isTouch() ? '' : ' (' + kbText('Mod+Z') + ')') : ''));
@@ -251,7 +266,7 @@ document.addEventListener('click', async e => {
   if (mcd) { e.preventDefault(); e.stopPropagation(); mentionCard(mcd); return; }
   const mcp = e.target.closest('.md [data-mdcopy]');  // 2.18.0 (#408 G): "Copy" of a code block (never opens the editor)
   if (mcp) { e.preventDefault(); e.stopPropagation(); copyText(mcp.closest('.mdcode')?.querySelector('pre')?.textContent || ''); return; }
-  if (e.target.closest('#d-md') && !e.target.closest('a')) { if (canEdit(taskById(S.sel))) editContent(); return; }
+  if (e.target.closest('#d-md')) { tlkMdClick(e); return; }  // 2.36.0 (#1118): selecting text never opens the editor
   const cev = e.target.closest('#view [data-cev]');
   if (cev) { const v = cev.dataset.cev; cevPop(cev, /^\d+$/.test(v) ? +v : v); return; }  // 2.21.0: own events have ids k<n>
   const rg = e.target.closest('#tl-deps [data-rmdep]');
@@ -455,6 +470,7 @@ document.addEventListener('click', async e => {
       await setListView(l, act.slice(5)); break;
     }
     case 'pin': { const t = taskById(id); patchTask(id, {pinned: t.pinned ? 0 : 1}); break; }
+    case 'tlk-toggle': { const t = taskById(id); if (t) tlkSet(id, !t.locked).catch(() => {}); break; }  // 2.36.0 (#1118)
     case 'conflicts': conflictModal(); break;
     case 'att-view': e.preventDefault(); attLightbox(+a.dataset.att); break;
     case 'catt-view': {
@@ -498,23 +514,8 @@ document.addEventListener('click', async e => {
       if (S.cedit === cid) S.cedit = null;
       await loadTimeline(S.sel); break;
     }
-    case 'pl-search': plSearchModal(S.sel); break;
     case 'wait-edit': waitDialog(+a.dataset.id); break;
     case 'wait-clear': waitClear(+a.dataset.id); break;
-    case 'pl-del': {
-      const t = taskById(S.sel), p = t?.paperless?.find(x => x.id === +a.dataset.pl);
-      if (!p || !await askConfirm(tr('Remove the link to “{0}”?', p.title), tr('The document stays in Paperless.'), {ok: tr('Remove')})) break;
-      putTask(await api('DELETE', `/api/paperless-links/${p.id}`)); render(); renderDetail(); break;
-    }
-    case 'att-pl': {
-      e.preventDefault(); e.stopPropagation();
-      const t = taskById(S.sel), at = t?.attachments?.find(x => x.id === +a.dataset.att);
-      if (!at || a.classList.contains('busy')) break;
-      const conn = await plPick(a); if (conn === null) break;  // 2.1.0: which connection, if there are several
-      if (!await askConfirm(tr('File “{0}” in Paperless?', at.name), S.settings.paperless_keep === '1' ? tr('The attachment also stays here.') : tr('Once consumed, the link replaces the attachment.'), {ok: plConns().length > 1 ? tr('Send to {0}', plConn(conn)?.name || 'Paperless') : tr('Send to Paperless')})) break;
-      putTask(await api('POST', `/api/attachments/${at.id}/to-paperless`, {conn})); render(); renderDetail();
-      toast(tr('Sent to Paperless, processing')); break;
-    }
     case 'att-del': {
       const t = taskById(S.sel), at = t?.attachments?.find(x => x.id === +a.dataset.att);
       if (!at || !await askConfirm(tr('Remove “{0}”?', at.name), tr('The file is deleted.'), {ok: tr('Remove'), danger: true})) break;
@@ -705,6 +706,10 @@ document.addEventListener('change', async e => {
 });
 document.addEventListener('keydown', async e => {
   const t = e.target;
+  // 2.36.0 (#1118): typing into the read-only title / description of a locked task: the hint with "Unlock"
+  if ((t.id === 'd-title' || t.id === 'd-content') && t.readOnly && !e.ctrlKey && !e.metaKey && !e.altKey && (e.key.length === 1 || ['Backspace', 'Delete'].includes(e.key))) {
+    const lt = taskById(S.sel); if (tlkStop(lt)) { e.preventDefault(); return; }
+  }
   if (e.key === 'Enter' && !e.isComposing) {
     if (t.id === 'qinput' || t.id === 'qsheet') { e.preventDefault(); submitQuick(t); return; }
     if (t.id === 'd-title') { e.preventDefault(); t.blur(); return; }

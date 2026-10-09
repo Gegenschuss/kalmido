@@ -20,7 +20,7 @@ let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
 const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
-const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,progress,deps,fields,agents,comments';
+const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,deps,fields,agents,comments';
 const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
 const firefox = require('./ff')({tag: 'p271_ui', check, shots: 'P271_SHOTS'});  // 2.7.2: the shared Firefox helper (with the start retry)
@@ -169,10 +169,10 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(!d.querySelector('[data-pov="desc-edit"], [data-pov="link-add"], [data-pov="ms-add"], #pov-file, .povx') && d.querySelector('[data-pov="ms-done"]').disabled, 'viewer: read only');
   check(/Goal/.test(d.querySelector('#pov-desc').textContent), 'viewer sees the description');
   w.close();
-  await call('PATCH', '/api/settings', {features: ALL.replace(',collab', '').replace(',paperless', '')});
+  await call('PATCH', '/api/settings', {features: ALL.replace(',collab', '')});
   w = await boot({user: 'alice', hash: 'l/' + P, ls: {'tasks.pov': JSON.stringify([P])}}); d = w.document;
   await until(() => d.querySelector('#view .pov .povs'));
-  check(!d.querySelector('#pov-people') && !d.querySelector('#pov-status') && !d.querySelector('[data-pov="pl-add"]'), 'without collaboration / Paperless: no members, status or Paperless');
+  check(!d.querySelector('#pov-people') && !d.querySelector('#pov-status'), 'without collaboration: no members or status');
   w.close();
   await call('PATCH', '/api/settings', {features: ALL});
   if (errs.length) check(false, 'JS errors: ' + [...new Set(errs)].join(' | '));

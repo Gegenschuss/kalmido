@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Security regression tests (audit 2026-09-28): every finding of the audit + the design caveats.
 Starts its OWN test container (start.sh, KALMIDO_TEST_IMAGE) on the test ports with a fake ntfy inbox / fake
-Paperless / attacker sink inside the container (fake_services.py). Never touches the live stack.
+Paperless (2.36.0: must never be reached) / attacker sink inside the container (fake_services.py). Never touches the live stack.
 usage: security_test.py <datadir>"""
 import json
 import os
@@ -173,42 +173,26 @@ r = subprocess.run(["docker", "run", "--rm", "--network", "none", "-e", "TASKS_D
 check("ntfy inbox NOT started" in r.stdout + r.stderr, "importer refuses ntfy.sh with topic inbox at start")
 
 # ------------------------------------------------------------------ HIGH-2: Paperless gate
-check(A.get(B + "/api/state").json()["paperless"]["enabled"] is True, "admin (setup user) has Paperless access")
-check(Ma.get(B + "/api/state").json()["paperless"]["enabled"] is False, "non-admin: paperless.enabled false")
-check(Ma.get(B + "/api/state").json()["paperless"].get("url") == "", "non-admin: no Paperless URL")
-check(Ma.get(B + "/api/paperless/search?q=salary").status_code == 403, "non-admin cannot search Paperless")
-check(Ma.get(B + "/api/paperless/thumb/8").status_code == 403, "non-admin cannot fetch thumbnails")
+# 2.36.0 (#1116): the Paperless connection is removed. PAPERLESS_* are still set on this container: they are ignored, every
+# former route is gone for everyone (404) and nothing ever reaches the fake Paperless (8082).
 mt = Ma.post(B + "/api/tasks", json={"title": "mallory task"}).json()["id"]
-check(Ma.post(B + f"/api/tasks/{mt}/paperless", json={"doc_id": 7}).status_code == 403, "non-admin cannot link a document")
 r = Ma.post(B + f"/api/tasks/{mt}/attachments", files={"file": ("m.pdf", b"%PDF-1.4 x", "application/pdf")})
 maid = r.json()["attachments"][0]["id"]
-check(Ma.post(B + f"/api/attachments/{maid}/to-paperless").status_code == 403, "non-admin cannot upload into Paperless")
-check(not [x for x in fake_log() if x["port"] == 8082 and x["method"] == "POST"], "nothing was uploaded to Paperless")
-r = A.get(B + "/api/paperless/search?q=salary")
-check(r.ok and r.json()["items"][0]["title"] == "Admin salary slip 2026", "admin can search")
-r = A.get(B + "/api/paperless/thumb/7")
-check(r.status_code == 502 and "text/html" not in r.headers.get("Content-Type", ""), "html thumbnail from upstream is refused")
-r = A.get(B + "/api/paperless/thumb/8")
-check(r.ok and r.headers["Content-Type"] == "image/png" and r.headers.get("X-Content-Type-Options") == "nosniff"
-      and "sandbox" in r.headers.get("Content-Security-Policy", ""), "image thumbnail: fixed type, nosniff, sandbox CSP")
+for s_, who in ((A, "admin"), (Ma, "non-admin")):
+    check("paperless" not in s_.get(B + "/api/state").json(), f"{who}: no Paperless state")
+    check(s_.get(B + "/api/paperless/search?q=salary").status_code == 404, f"{who}: Paperless search gone")
+    check(s_.get(B + "/api/paperless/thumb/8").status_code == 404, f"{who}: thumbnails gone")
+    check(s_.post(B + f"/api/tasks/{mt}/paperless", json={"doc_id": 7}).status_code == 404, f"{who}: linking gone")
+    check(s_.post(B + f"/api/attachments/{maid}/to-paperless").status_code == 404, f"{who}: upload gone")
+check(not [x for x in fake_log() if x["port"] == 8082], "nothing ever reached Paperless")
 users = {u["username"]: u for u in A.get(B + "/api/users").json()["users"]}
-check(users["alice"]["paperless_access"] is True and users["bob"]["paperless_access"] is False, "users list shows paperless_access")
-check(Bo.patch(B + f"/api/users/{ids['bob']}", json={"paperless_access": True}).status_code == 403, "non-admin cannot grant itself access")
-check(A.patch(B + f"/api/users/{ids['bob']}", json={"paperless_access": True}).ok, "admin grants bob access")
-check(Bo.get(B + "/api/paperless/search?q=x").ok and Bo.get(B + "/api/state").json()["paperless"]["enabled"], "bob has access now")
-# shared list: alice links a doc, carol (member, no access) sees no title
+check("paperless_access" not in users["alice"], "users list: no Paperless access flag")
+# shared list used further below
 Sh = A.post(B + "/api/lists", json={"name": "Shared", "kind": "project"}).json()["id"]
 A.put(B + f"/api/lists/{Sh}/members", json={"user_id": ids["bob"], "role": "edit"})
 A.put(B + f"/api/lists/{Sh}/members", json={"user_id": ids["carol"], "role": "edit"})
 ts = A.post(B + "/api/tasks", json={"title": "shared doc task", "list_id": Sh}).json()["id"]
-r = A.post(B + f"/api/tasks/{ts}/paperless", json={"doc_id": 9})
-check(r.ok and r.json()["paperless"][0]["title"] == "Secret doc 9", "admin links a document")
-pc = Ca.get(B + f"/api/tasks/{ts}").json()["paperless"]
-check(pc and pc[0]["title"] == "Paperless document" and pc[0].get("hidden") and not pc[0]["correspondent"], "member without access: title hidden")
-tl = Ca.get(B + f"/api/tasks/{ts}/timeline").json()
-check(not [a for a in tl["activity"] if a["kind"] == "paperless" and "Secret" in json.dumps(a["data"])], "member without access: activity title hidden")
-check(Ca.delete(B + f"/api/paperless-links/{pc[0]['id']}").status_code == 403, "member without access cannot unlink")
-check(Bo.get(B + f"/api/tasks/{ts}").json()["paperless"][0]["title"] == "Secret doc 9", "member with access sees the title")
+check("paperless" not in Ca.get(B + f"/api/tasks/{ts}").json(), "task: no Paperless field")
 
 # ------------------------------------------------------------------ MEDIUM-1: validation + watchdog robustness
 bad = [({"due": "not-a-date"}, "due"), ({"due": "2026-02-30"}, "impossible date"), ({"due": "2026-10-01", "due_time": "25:99"}, "due_time"),

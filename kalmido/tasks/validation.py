@@ -22,7 +22,8 @@ TASK_FIELDS = ("list_id", "section_id", "parent_id", "title", "content", "priori
                "plan_start",  # 2.11.0: planned start "YYYY-MM-DDTHH:MM" (day plan), independent of the due date
                "ms", "milestone_id",  # 2.18.0 (#430): a milestone (1) / the milestone of the same list a task belongs to
                "fam", "rotation", "stars",  # 2.19.0 (#653): family data, household rotation, stars of a kid
-               "snippets")  # 2.35.0 (#1095): code snippets (JSON list, tasks/snippets.py)
+               "snippets",  # 2.35.0 (#1095): code snippets (JSON list, tasks/snippets.py)
+               "locked")  # 2.36.0 (#1118): the lock (1 = the app shows the task read-only, see lock_problem)
 # 2.4.0 (#340): ticket types of a task (API v1 / MCP / events: "type"); '' = none
 TICKET_TYPES = ("bug", "feature", "task")
 
@@ -95,6 +96,8 @@ def log_changes(c, tid, old, act=None):
     if "snippets" in new.keys() and ch("snippets"):  # 2.35.0 (#1095): the code snippets changed (how many there are now)
         from ..tasks.snippets import snip_parse
         log_act(c, tid, "snippets", {"n": len(snip_parse(new["snippets"]))})
+    if "locked" in new.keys() and ch("locked"):  # 2.36.0 (#1118): locked / unlocked
+        log_act(c, tid, "lock", {"on": bool(new["locked"])})
     if ch("ms"):  # 2.18.0 (#430): turned into a milestone / back into a task
         log_act(c, tid, "ms", {"on": bool(new["ms"])})
     if ch("milestone_id"):  # 2.18.0 (#430): the milestone the task belongs to (title kept: it may be renamed later)
@@ -353,6 +356,10 @@ def clean_task(b):
                 v = clean_rotation(v)
             if k == "stars":
                 v = None if v in ("", None) else as_int(v, tr("Stars"), 0, STARS_MAX)
+            if k == "locked":  # 2.36.0 (#1118): true / false / 0 / 1
+                if v not in (True, False, 0, 1, None):
+                    raise BadInput(tr("Invalid value: {0}", "locked"))
+                v = 1 if v else 0
             if k == "snippets":  # 2.35.0 (#1095)
                 from ..tasks.snippets import snip_clean
                 v = snip_clean(v)
@@ -376,6 +383,59 @@ def clean_task(b):
     if out.get("start") and out.get("due") and out["start"] > out["due"]:
         out["start"] = out["due"]
     return out
+
+
+# ---------------------------------------------------------------- 2.36.0 (#1118): the lock of a task
+# A locked task (tasks.locked = 1) keeps its title, notes, dates, priority, list, tags, repeat and assignee in the app
+# until someone who may change the task unlocks it. Free while locked: comments, ticking a checkbox in the notes,
+# completing / reopening, subtasks, sort order, pin, reminders, files, custom fields. The server checks writes of the app
+# (and public links) too, so a second device with an old state cannot get around it; the agent API (token) and CalDAV
+# are not bound by it (the lock is a guard of the user interface). A request that unlocks may change the rest at once.
+LOCK_FIELDS = ("title", "content", "due", "due_time", "start", "priority", "list_id", "repeat", "repeat_from",
+               "assignee_id", "assignee_group_id", "rotation")
+_LOCK_CB = re.compile(r"^(\s*(?:[-*+]|\d+[.)])\s+\[)[ xX](\])", re.M)
+
+
+def lock_applies():
+    """True when the current request is bound by task locks (the app or a public link, not the API / CalDAV)."""
+    from ..api.v1 import act_via
+    return has_request_context() and act_via() not in ("api", "caldav")
+
+
+def lock_problem(c, cur, f, b=None):
+    """The error text when the change f (clean_task values; b = the raw body for tags) touches a locked field of the
+    task row cur, else None. Checkbox ticks in the notes are no change of the notes."""
+    if not cur or "locked" not in cur.keys() or not cur["locked"] or not lock_applies():
+        return None
+    if "locked" in f and not f["locked"]:
+        return None  # unlocking (and changing in the same request) is allowed to whoever may change the task
+    from ..tasks.lifecycle import _norm
+    hit = False
+    for k in LOCK_FIELDS:
+        if k not in f or k not in cur.keys():
+            continue
+        if k == "content":
+            hit = _LOCK_CB.sub(r"\1 \2", f[k] or "").rstrip() != _LOCK_CB.sub(r"\1 \2", cur[k] or "").rstrip()
+        elif k == "list_id":
+            hit = bool(f[k]) and f[k] != cur[k]
+        else:
+            hit = _norm(f[k]) != _norm(cur[k])
+        if hit:
+            break
+    if not hit and isinstance(b, dict):
+        from ..tasks.tasks import my_tags
+        if "tags" in b and isinstance(b["tags"], list):
+            hit = sorted({str(x).strip().lstrip("#") for x in b["tags"] if str(x).strip()}) != sorted(my_tags(c, cur["id"]))
+        elif b.get("add_tags") and isinstance(b["add_tags"], list):
+            hit = bool({str(x).strip().lstrip("#") for x in b["add_tags"]} - set(my_tags(c, cur["id"])))
+        if not hit and "ltags" in b:
+            from ..collab.reactions import clean_ltag_names, ltag_names
+            try:
+                new = clean_ltag_names(b["ltags"])
+            except Exception:  # noqa: BLE001 -- invalid names: set_ltags reports them; a change in any case
+                new = None
+            hit = new is None or sorted(x.casefold() for x in new) != sorted(x.casefold() for x in ltag_names(c, cur["id"]))
+    return tr("This task is locked. Unlock it to change it.") if hit else None
 
 
 def descendants(c, tid):

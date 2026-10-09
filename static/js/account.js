@@ -491,7 +491,7 @@ function accountWire(md) {
     const nAg = users.filter(u => u.kind === 'agent').length;
     box.innerHTML = (nAg ? `<div class="mrow agsum"><span class="avatar agent">${ic('bot', 's')}</span><span class="n">${esc(trn('{0} agent', '{0} agents', nAg))}</span><button class="linkbtn" data-act="agents-go">${tr('Manage under Agents')}</button></div>` : '')
       + (j.others ? `<div class="shint keep">${esc(trn('{0} more person on this server you do not see (another organisation).', '{0} more people on this server you do not see (other organisations).', j.others))}</div>` : '')
-      + users.filter(u => u.kind !== 'agent').map(u => `<div class="mrow ${u.disabled ? 'off' : ''}" data-urow="${u.id}">${u.avatar ? `<span class="avatar pic"><img src="${esc(u.avatar)}" alt="" loading="lazy"></span>` : av(0, u.display_name)}<span class="n">${esc(u.display_name)}${u.kind === 'agent' ? ' ' + agentBadge() : ''} <span class="muted">${esc(u.username)}${u.is_admin ? ' · ' + tr('Admin') : ''}${u.disabled ? ' · ' + tr('disabled') : ''}${u.proxy_login ? ' · ' + tr('SSO: {0}', u.proxy_login) : ''}${u.paperless_access && S.paperless?.configured ? ' · Paperless' : ''}${u.twofa?.length ? ' · ' + tr('2FA') : ''}${u.oidc_linked ? ' · OIDC' : ''}${u.invite === 'invited' ? ' · ' + tr('Invited') : u.invite === 'expired' ? ' · ' + tr('Invitation expired') : ''}${u.signup === 'pending' ? ' · ' + tr('waits for approval') : u.signup === 'confirm' ? ' · ' + tr('registration not confirmed') : ''}</span></span>${u.signup === 'pending' ? `<button class="btn sm pri" data-acc="user-approve" data-uid="${u.id}">${ic('check', 's')} ${tr('Approve')}</button>` : ''}${u.kind === 'agent'
+      + users.filter(u => u.kind !== 'agent').map(u => `<div class="mrow ${u.disabled ? 'off' : ''}" data-urow="${u.id}">${u.avatar ? `<span class="avatar pic"><img src="${esc(u.avatar)}" alt="" loading="lazy"></span>` : av(0, u.display_name)}<span class="n">${esc(u.display_name)}${u.kind === 'agent' ? ' ' + agentBadge() : ''} <span class="muted">${esc(u.username)}${u.is_admin ? ' · ' + tr('Admin') : ''}${u.disabled ? ' · ' + tr('disabled') : ''}${u.proxy_login ? ' · ' + tr('SSO: {0}', u.proxy_login) : ''}${u.twofa?.length ? ' · ' + tr('2FA') : ''}${u.oidc_linked ? ' · OIDC' : ''}${u.invite === 'invited' ? ' · ' + tr('Invited') : u.invite === 'expired' ? ' · ' + tr('Invitation expired') : ''}${u.signup === 'pending' ? ' · ' + tr('waits for approval') : u.signup === 'confirm' ? ' · ' + tr('registration not confirmed') : ''}</span></span>${u.signup === 'pending' ? `<button class="btn sm pri" data-acc="user-approve" data-uid="${u.id}">${ic('check', 's')} ${tr('Approve')}</button>` : ''}${u.kind === 'agent'
       ? `<button class="linkbtn agmng" data-acc="agent-edit" data-uid="${u.id}" title="${esc(tr('Open the agent dialog'))}">${tr('Managed under Agents')}</button>`
       : `<button class="iconbtn" data-acc="user-edit" data-uid="${u.id}" title="${tr('Edit user')}">${ic('edit', 's')}</button>`}</div>`).join('');
   };
@@ -552,10 +552,10 @@ function userModal(u, done) {
     ${['multi', 'workspaces'].includes(S.instanceMode) && ((S.orgs || []).length > 1 || (u && (S.orgs || []).length)) ? `<div class="row"><label>${tr('Organisations')}</label><div class="fpeople" role="group" aria-label="${esc(tr('Organisations'))}">${S.orgs.map(o => { const on = u ? (u.orgs || []).includes(o.id) : o.members.includes(S.me.id); return `<button type="button" class="fperson ${on ? 'on' : ''}" data-uorg="${o.id}" aria-pressed="${on}"><span aria-hidden="true">${esc(o.icon || '🏢')}</span><span>${esc(o.name)}</span></button>`; }).join('')}</div></div>` : ''}
     <div class="row"><label for="u-topic">${tr('ntfy topic')}</label><input id="u-topic" value="${esc(u?.ntfy_topic || '')}" autocapitalize="off" placeholder="${tr('empty = random')}"></div>
     ${u ? `<div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="u-avpick" data-cur="${esc(u.avatar || '')}">${avPickHtml(u.avatar || '', false, u.display_name || u.username)}</div></div>` : ''}
-    <div class="row"><label>${tr('Rights')}</label><label class="chkl"><input type="checkbox" id="u-admin" ${u?.is_admin ? 'checked' : ''}> ${tr('Admin')}</label>${S.paperless?.configured ? `<label class="chkl" title="${tr('Search, link and view documents of the Paperless archive')}"><input type="checkbox" id="u-pl" ${u?.paperless_access ? 'checked' : ''}> ${tr('Paperless access')}</label>` : ''}${u ? `<label class="chkl"><input type="checkbox" id="u-dis" ${u.disabled ? 'checked' : ''}> ${tr('disabled')}</label>` : ''}</div>
+    <div class="row"><label>${tr('Rights')}</label><label class="chkl"><input type="checkbox" id="u-admin" ${u?.is_admin ? 'checked' : ''}> ${tr('Admin')}</label>${u ? `<label class="chkl"><input type="checkbox" id="u-dis" ${u.disabled ? 'checked' : ''}> ${tr('disabled')}</label>` : ''}</div>
     ${!u || (u.kind !== 'agent' && u.id !== S.me.id) ? `<div class="row"><label>${tr('Child account')}</label><label class="chkl"><input type="checkbox" id="u-kid" aria-controls="u-parrow" aria-expanded="${!!u?.kid}" ${u?.kid ? 'checked' : ''}> ${tr('A simple view with big buttons, stars and rewards; takes part in shared lists only with what is assigned to it')}</label></div>
     <div class="row kidopts" id="u-parrow" ${u?.kid ? '' : 'hidden'}><label>${tr('Parents')}</label><div class="fpeople" id="u-parents" role="group" aria-label="${esc(tr('Parents'))}"><span class="muted">${tr('Loading…')}</span></div></div>` : ''}
-    ${u && !u.is_admin && u.id !== S.me.id ? `<div class="row"><label for="u-kind">${tr('Type')}</label><select id="u-kind"><option value="user">${tr('Person')}</option><option value="agent" ${u.kind === 'agent' ? 'selected' : ''}>${tr('Agent (API only, never admin, no Paperless)')}</option></select></div>` : ''}
+    ${u && !u.is_admin && u.id !== S.me.id ? `<div class="row"><label for="u-kind">${tr('Type')}</label><select id="u-kind"><option value="user">${tr('Person')}</option><option value="agent" ${u.kind === 'agent' ? 'selected' : ''}>${tr('Agent (API only, never admin)')}</option></select></div>` : ''}
     ${u?.has_password ? `<div class="row"><label></label><label class="chkl"><input type="checkbox" id="u-nopw"> ${tr('Remove password (single sign-on only)')}</label></div>` : ''}
     ${!u ? `<div class="row"><label>${tr('Invitation')}</label><label class="chkl"><input type="checkbox" id="u-inv" checked> ${S.mailOut ? tr('Send an invitation by e-mail: the person sets their own password') : tr('Create an invitation link: the person sets their own password')}</label></div>`
       : u.kind !== 'agent' && !u.disabled ? `<div class="row"><label>${u.has_password ? tr('Password') : tr('Invitation')}</label><button type="button" class="btn sm" data-m="invite">${ic(u.has_password ? 'key' : 'send', 's')} ${u.has_password ? tr('Send a link to set a new password') : u.invite ? tr('Send the invitation again') : tr('Send an invitation')}</button></div>` : ''}
@@ -602,14 +602,13 @@ function userModal(u, done) {
         const body = {display_name: $('#u-name', md).value.trim(), proxy_login: $('#u-proxy', md).value.trim(), email: $('#u-email', md).value.trim(), ntfy_topic: $('#u-topic', md).value.trim(), is_admin: $('#u-admin', md).checked};
         if ($('#u-2fareset', md)?.checked) { if (!await askConfirm(tr('Reset the two-factor authentication of “{0}”?', u.display_name), tr('They log in with the password alone (or must set it up again if it is required).'), {ok: tr('Reset'), danger: true})) return; body.reset_2fa = true; }
         if ($('#u-oidcun', md)?.checked) body.oidc_unlink = true;
-        if ($('#u-pl', md)) body.paperless_access = $('#u-pl', md).checked;
         if ($('#u-kid', md) && ($('#u-kid', md).checked || u?.kid)) { body.kid = $('#u-kid', md).checked; if (body.kid) { body.parents = [...par]; body.is_admin = false; } }
         const avk = $('#u-avpick', md)?.dataset.pick; if (avk) body.avatar_preset = avk === 'none' ? null : avk;
         if ($('[data-uorg]', md)) body.orgs = $$('[data-uorg][aria-pressed="true"]', md).map(x => +x.dataset.uorg);  // 2.22.0 (#752)
         const pw = $('#u-pw', md).value;
         if (pw) body.password = pw; else if ($('#u-nopw', md)?.checked) body.password = '';
         if ($('#u-kind', md) && $('#u-kind', md).value !== (u.kind || 'user')) {
-          if ($('#u-kind', md).value === 'agent' && !await askConfirm(tr('Make “{0}” an agent?', u.display_name), tr('An agent works only through its API tokens: no web login, never admin, no Paperless. Its lists and tokens stay. Manage it under Settings > Agents.'), {ok: tr('Make agent')})) return;
+          if ($('#u-kind', md).value === 'agent' && !await askConfirm(tr('Make “{0}” an agent?', u.display_name), tr('An agent works only through its API tokens: no web login, never admin. Its lists and tokens stay. Manage it under Settings > Agents.'), {ok: tr('Make agent')})) return;
           body.kind = $('#u-kind', md).value;
         }
         if (u) { body.disabled = $('#u-dis', md).checked; await api('PATCH', '/api/users/' + u.id, body); }
@@ -1237,7 +1236,7 @@ const PURPOSE_MODS = {me: ['cal', 'events', 'contacts'],
   // 2.25.0 (UX-25): Team / Software hold only what the name promises (no habits, focus timer, matrix, statistics)
   team: ['cal', 'timeline', 'kanban', 'comments', 'collab', 'time', 'progress', 'deps', 'fields', 'events', 'contacts'],
   software: ['cal', 'timeline', 'kanban', 'comments', 'collab', 'time', 'progress', 'deps', 'fields', 'events', 'contacts']};
-// every module a purpose switches (on or off); the rest (agents, Paperless, clients …) stays as it is (server: PURPOSE_MODS)
+// every module a purpose switches (on or off); the rest (agents, clients …) stays as it is (server: PURPOSE_MODS)
 const PURPOSE_ALL = ['cal', 'timeline', 'matrix', 'kanban', 'habits', 'pomo', 'stats', 'comments', 'collab', 'time', 'progress', 'deps', 'fields', 'family', 'events', 'contacts', 'contracts', 'home', 'care', 'health', 'review', 'travel', 'reading'];
 // First-run setup, step 2 ("What do you want to use?"): only right after the first admin was created, never on
 // existing installs. Three presets (1.2: "Simple list"; "Just me" preselected; "Projects & team" = everything), then
@@ -1252,25 +1251,23 @@ const SETUP_MODS = [['cal', N_('Calendar'), N_('Month, week and day view of your
   ['habits', N_('Habits'), N_('Daily and weekly habits with streaks')], ['pomo', N_('Focus timer'), N_('Pomodoro timer and stopwatch')],
   ['stats', N_('Statistics'), N_('Completions, on-time rate, focus time and streaks')], ['progress', N_('Project progress'), N_('Progress per list and the project status (“Where is it stuck?”)')],
   ['deps', N_('Dependencies'), N_('Tasks blocked by other tasks, with arrows in the timeline (Gantt)')], ['fields', N_('Custom fields'), N_('Own fields per list, such as budget, client or phase')],
-  ['paperless', N_('Paperless link'), N_('Link documents from Paperless-ngx to tasks')],
   ['comments', N_('Comments'), N_('Timestamped notes on your tasks; in shared lists with collaboration also @mentions and News')],
   ['family', N_('Family'), N_('Birthdays, household chores taking turns, shopping lists with shop areas, a meal plan, deadlines, packing lists and accounts for children')]];
 // 2.7.0 (K21, #405): a simple start for a new instance; one question "Start with" below. 2.19.0 (#653): the presets are the
 // answers to "What do you use Kalmido for?" (For me = the simple start, Family, Team, Software projects)
 const SETUP_PRESETS = Object.fromEntries(PURPOSES.map(([k, i, n, d]) => [k, {name: n, icon: i, desc: d,
-  off: [...SETUP_MAIN, ...SETUP_MODS].map(x => x[0]).filter(x => x !== 'paperless' && !PURPOSE_MODS[k].includes(x))}]));
+  off: [...SETUP_MAIN, ...SETUP_MODS].map(x => x[0]).filter(x => !PURPOSE_MODS[k].includes(x))}]));
 // 2.25.0 (UX-19): the same count as Settings > Modules: what is picked here against every module (the ones not offered
 // here, such as Home & life or Clients, start off and are switched on later in Settings > Modules)
-function setupCount(picked, pl) {
-  const here = SETUP_MAIN.length + SETUP_MODS.filter(([k]) => k !== 'paperless' || pl).length, all = MOD_GROUPS.flatMap(([, ks]) => ks).filter(k => k !== 'paperless' || pl).length;
-  const on = [...picked].filter(k => k !== 'paperless' || pl).length;
+function setupCount(picked) {
+  const here = SETUP_MAIN.length + SETUP_MODS.length, all = MOD_GROUPS.flatMap(([, ks]) => ks).length;
+  const on = picked.size;
   return all > here ? tr('{0} of {1} modules on · {2} more in Settings > Modules', on, all, all - here) : tr('{0} of {1} modules on', on, all);
 }
 async function setupChoices(el, logo) {
   let st = {};
   try { st = await (await fetch('/api/state', {headers: {'X-Requested-With': 'kalmido'}})).json(); } catch { /* offline: defaults */ }
   const langs = st.languages || [{code: 'en', name: 'English'}];
-  const pl = !!st.paperless?.configured;
   const all = [...SETUP_MAIN, ...SETUP_MODS].map(x => x[0]);
   let lang = I18N.code || 'en', preset = 'me', picked, custOpen = false, start = '';
   const askOrg = st.about?.instance_mode === 'organisation' && !st.about?.org_name_env;  // 2.23.0 (#799): asked once
@@ -1298,9 +1295,9 @@ async function setupChoices(el, logo) {
       <p class="muted">${tr('Pick a start, untick what you do not need. Everything can be changed later in Settings.')}</p>
       <div class="supresets">${Object.entries(SETUP_PRESETS).map(([k, p]) => `<button type="button" class="supreset ${matches(k) ? 'on' : ''}" data-su-preset="${k}" aria-pressed="${matches(k)}"><b>${ic(p.icon, 's')}${tr(p.name)}</b><small class="muted">${tr(p.desc)}</small></button>`).join('')}</div>
       ${askOrg && ['team', 'software'].includes(preset) ? `<h3><label for="su-org">${tr('Name of your team or company')} <span class="muted">${tr('(optional)')}</span></label></h3><input id="su-org" class="suorg" maxlength="60" value="${esc(orgName)}" placeholder="${esc(tr('e.g. your company'))}"><p class="muted">${tr('Shown next to the app name and in invitations. You can change it later in Settings > Administration > Organisation.')}</p>` : ''}
-      <details class="sucust" ${custOpen ? 'open' : ''}><summary>${tr('Customize…')} <span class="muted">${esc(setupCount(picked, pl))}</span></summary>
+      <details class="sucust" ${custOpen ? 'open' : ''}><summary>${tr('Customize…')} <span class="muted">${esc(setupCount(picked))}</span></summary>
       <div class="suse-main">${SETUP_MAIN.map(row).join('')}</div>
-      <div class="suse-list">${SETUP_MODS.filter(([k]) => k !== 'paperless' || pl).map(row).join('')}</div></details>
+      <div class="suse-list">${SETUP_MODS.map(row).join('')}</div></details>
       <h3 id="su-start-h">${tr('Start with')}</h3>
       <div class="sustarts ptcards" role="radiogroup" aria-labelledby="su-start-h">${STARTS.map(([k, n, i, d]) => `<button type="button" class="ptcard ${k === start ? 'on' : ''}" role="radio" aria-checked="${k === start}" data-su-start="${k}">${ic(i, 's')}<b>${tr(n)}</b><small class="muted">${tr(d)}</small></button>`).join('')}</div>
       <p class="muted sunote">${tr('More projects any time: Lists > + > New project.')}</p>
@@ -1314,7 +1311,7 @@ async function setupChoices(el, logo) {
     const c = e.target.closest('[data-use]'); if (!c) return;
     c.checked ? picked.add(c.dataset.use) : picked.delete(c.dataset.use);
     $$('[data-su-preset]', el).forEach(b => { b.classList.toggle('on', matches(b.dataset.suPreset)); b.setAttribute('aria-pressed', matches(b.dataset.suPreset)); });
-    const sm = $('.sucust summary .muted', el); if (sm) sm.textContent = setupCount(picked, pl);
+    const sm = $('.sucust summary .muted', el); if (sm) sm.textContent = setupCount(picked);
   });
   el.addEventListener('click', async e => {
     const b = e.target.closest('button'); if (!b) return;
@@ -1328,7 +1325,7 @@ async function setupChoices(el, logo) {
     }
     const post = async (url, body) => { const r = await fetch(url, {method: url.endsWith('settings') ? 'PATCH' : 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify(body)}); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || tr('Error {0}', r.status)); };
     try {
-      if (b.dataset.su === 'go') await post('/api/admin/setup', {lang, collab_all: picked.has('collab'), time_all: picked.has('time'), modules: SETUP_MODS.map(x => x[0]).filter(k => picked.has(k) || (k === 'paperless' && !pl)), sample: start === 'sample', ...(start && start !== 'sample' ? {project_type: start} : {}), ...(matches(preset) ? {purpose: preset} : {}), ...(askOrg && ['team', 'software'].includes(preset) && orgName.trim() ? {org_name: orgName.trim()} : {})});
+      if (b.dataset.su === 'go') await post('/api/admin/setup', {lang, collab_all: picked.has('collab'), time_all: picked.has('time'), modules: SETUP_MODS.map(x => x[0]).filter(k => picked.has(k)), sample: start === 'sample', ...(start && start !== 'sample' ? {project_type: start} : {}), ...(matches(preset) ? {purpose: preset} : {}), ...(askOrg && ['team', 'software'].includes(preset) && orgName.trim() ? {org_name: orgName.trim()} : {})});
       else return;
       location.replace('/');
     } catch (err) { $('#su-err', el).textContent = err.message || tr('Server not reachable.'); }

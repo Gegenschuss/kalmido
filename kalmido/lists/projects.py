@@ -1,4 +1,4 @@
-"""Project lists: status, progress, the overview (description, links, files, Paperless), milestone reports."""
+"""Project lists: status, progress, the overview (description, links, files), milestone reports."""
 import mimetypes
 import os
 import uuid
@@ -20,7 +20,6 @@ from ..tasks.validation import TITLE_MAX, valid_date
 from ..tasks.tasks import task_create, task_update
 from ..tasks.lifecycle import task_complete, task_delete, task_reopen
 from ..tasks.attachments import safe_name
-from ..integrations.paperless import need_paperless, pl_conn_arg, pl_doc, pl_usable_ids
 from ..collab.comments import collab_user, user_names
 from ..collab.news import bell_custom_clean, BELL_MODES, list_bell, list_push, news_add
 from ..personal.timetrack import BadInput, time_day_h, time_list_totals, web_fields
@@ -131,8 +130,8 @@ def list_status_history(lid):
 # Every project list has an overview next to List / Kanban / Timeline: a description (Markdown), key links (title + URL,
 # in an order the editors choose), milestones (name + local day + done; also markers in the timeline), project files
 # (uploaded on the list itself: the same size limit, file names and download rules as task files, stored below
-# ATT_DIR/lists/<list id>/), Paperless documents linked to the list, and read-only: the files of the list's tasks (each
-# with its task), Paperless documents of its tasks, members + roles, the status history and the tracked time.
+# ATT_DIR/lists/<list id>/), and read-only: the files of the list's tasks (each
+# with its task), members + roles, the status history and the tracked time.
 # Reading: everyone who sees the list (a participant: the task files of the tasks they fully see only). Changing: owner,
 # list admins and members (edit); viewers and participants read only. Only lists of the type "project".
 OV_DESC_MAX = 20000      # characters of the description
@@ -211,18 +210,6 @@ def milestones_of_lists(c, ids):
     return out
 
 
-def list_paperless_dicts(c, lid, uid):
-    pl_ok = pl_usable_ids(c, uid)
-    out = []
-    for p in c.execute("SELECT * FROM list_paperless WHERE list_id=? ORDER BY id", (lid,)):
-        d = {"id": p["id"], "doc_id": p["doc_id"], "title": p["title"], "correspondent": p["correspondent"], "created": p["created"],
-             "conn": p["conn_id"] or 0, "added_at": p["added_at"]}
-        if d["conn"] not in pl_ok:  # a connection the viewer cannot use: only that there is a document
-            d.update(doc_id=None, title=tr("Paperless document"), correspondent="", created="", hidden=True, conn=None)
-        out.append(d)
-    return out
-
-
 def overview_build(c, lid, uid):
     """Everything of the overview of list lid as uid sees it (the caller checked need_overview)."""
     from ..agents.core import agent_ids
@@ -243,16 +230,6 @@ def overview_build(c, lid, uid):
               for r in c.execute(f"""SELECT a.id, a.name, a.mime, a.size, a.created_at, a.task_id, t.title FROM attachments a
                                      JOIN tasks t ON t.id=a.task_id WHERE t.list_id=? AND t.deleted_at IS NULL
                                      AND a.comment_id IS NULL{cond} ORDER BY a.id DESC LIMIT {OV_TASK_FILES_MAX}""", args)]
-    pl_ok = pl_usable_ids(c, uid)
-    tpl = []
-    for p in c.execute(f"""SELECT p.id, p.doc_id, p.title, p.correspondent, p.created, p.conn_id, p.task_id, t.title AS task_title
-                           FROM paperless_links p JOIN tasks t ON t.id=p.task_id WHERE t.list_id=? AND t.deleted_at IS NULL
-                           AND p.status='ok'{cond} ORDER BY p.id DESC LIMIT {OV_TASK_FILES_MAX}""", args):
-        d = {"id": p["id"], "doc_id": p["doc_id"], "title": p["title"], "correspondent": p["correspondent"], "created": p["created"],
-             "conn": p["conn_id"] or 0, "task_id": p["task_id"], "task_title": p["task_title"]}
-        if d["conn"] not in pl_ok:
-            d.update(doc_id=None, title=tr("Paperless document"), correspondent="", created="", hidden=True, conn=None)
-        tpl.append(d)
     members = []
     if collab_all():
         members = [{"user_id": lst["owner_id"], "name": names.get(lst["owner_id"], ""), "role": "owner"}]
@@ -269,8 +246,8 @@ def overview_build(c, lid, uid):
                    "created_at": r["created_at"]} for r in srows]
     out = {"list_id": lid, "name": lst["name"], "role": role, "can_edit": role in WRITE_ROLES,
            "description": lst["description"] or "", "links": links, "milestones": ms,
-           "files": [ov_file_dict(r, names) for r in frows], "paperless": list_paperless_dicts(c, lid, uid),
-           "task_files": tfiles, "task_paperless": tpl, "members": members,
+           "files": [ov_file_dict(r, names) for r in frows],
+           "task_files": tfiles, "members": members,
            "status": {"current": lst["status"] or None, "note": lst["status_note"] or "", "at": lst["status_at"], "history": status},
            "time": None}
     if time_all():
@@ -626,37 +603,3 @@ def list_purge_files(gone):
     for lid, icon, paths in gone:
         list_icon_drop_file(lid, icon)
         list_files_drop(paths)
-
-
-# ---- Paperless documents of the list (same connections + rules as on tasks)
-@app.post("/api/lists/<int:lid>/paperless")
-def list_paperless_link(lid):
-    c = db()
-    need_overview(c, lid, write=True)
-    b = body()
-    cid = pl_conn_arg(b.get("conn"))
-    cn = need_paperless(c, cid)
-    try:
-        doc_id = int(b.get("doc_id") or 0)
-    except (TypeError, ValueError):
-        return err(tr("unknown"))
-    if not c.execute("SELECT 1 FROM list_paperless WHERE list_id=? AND doc_id=? AND COALESCE(conn_id,0)=?", (lid, doc_id, cid)).fetchone():
-        d = pl_doc(cn, doc_id)
-        c.execute("""INSERT INTO list_paperless(list_id,conn_id,doc_id,title,correspondent,created,added_by,added_at)
-                     VALUES(?,?,?,?,?,?,?,?)""", (lid, cid or None, d["doc_id"], d["title"], d["correspondent"], d["created"],
-                                                  me(), iso(now_utc())))
-        bump(c)
-        c.commit()
-    return jsonify(overview_build(c, lid, me()))
-
-
-@app.delete("/api/lists/<int:lid>/paperless/<int:rid>")
-def list_paperless_unlink(lid, rid):
-    c = db()
-    need_overview(c, lid, write=True)
-    r = need_ov_row(c, "list_paperless", lid, rid)
-    need_paperless(c, r["conn_id"] or 0)
-    c.execute("DELETE FROM list_paperless WHERE id=?", (rid,))
-    bump(c)
-    c.commit()
-    return jsonify(overview_build(c, lid, me()))

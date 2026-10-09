@@ -708,6 +708,7 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 .emogrid button:hover{background:var(--bg4)}
 .emogrid button.on{background:color-mix(in srgb,var(--accent) 22%,transparent);box-shadow:inset 0 0 0 1px var(--accent)}
 .emogrid button.none{color:var(--muted)}
+.emogrid button svg.i.l{color:var(--muted)}.emogrid button.on svg.i.l{color:var(--text)}  /* 2.36.0 (#1117): line icons to choose */
 .emogrid input{grid-column:span 3;padding:.375rem .5rem;font-size:.875rem}
 @media (max-width:899px){ .modal .row label{min-width:100%} .modal .row .emobtn + input{flex:1} }
 
@@ -747,36 +748,10 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 .tl-bar.mode-r{box-shadow:inset -.25rem 0 0 var(--text)}
 .tl-bar.mode-m{transform:translateY(-2px)}
 
-/* ---------- paperless ---------- */
-.plinks{display:flex;flex-direction:column;gap:.375rem;margin-bottom:.5rem}
-.plinks:empty{display:none}
-.plink{position:relative;display:flex;align-items:center;gap:.625rem;background:var(--bg3);border:1px solid var(--line);border-radius:var(--radius);padding:.375rem 2.125rem .375rem .375rem;min-height:3.5rem}
-.plink a{display:flex;align-items:center;gap:.625rem;color:var(--text);text-decoration:none;min-width:0;flex:1}
-.plink img,.plitem img{width:2.5rem;height:3.25rem;object-fit:cover;object-position:top;border-radius:.25rem;background:var(--bg4);flex:none}
-.plink > svg{width:2.5rem;color:var(--muted);flex:none}
-.plink .pt,.plitem .pt{display:flex;flex-direction:column;min-width:0;flex:1}
-.plink b,.plitem b{font-weight:500;font-size:.875rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.plink span,.plitem span{font-size:.75rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.plink.err span{color:var(--danger);white-space:normal}
-.plink.pending{opacity:.85}
-.plink .attdel{top:50%;transform:translateY(-50%)}
-.plink:hover .attdel{opacity:1}
 .spin{width:1.125rem;height:1.125rem;margin:0 .6875rem;border:2px solid var(--bg4);border-top-color:var(--accent);border-radius:50%;animation:spin .9s linear infinite;flex:none}
 @keyframes spin{to{transform:rotate(360deg)}}
-.attpl{position:absolute;top:.25rem;right:1.875rem;width:1.375rem;height:1.375rem;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;display:grid;place-items:center;opacity:0}
-.att:hover .attpl{opacity:1}
-.att.file .attpl{right:1.875rem}
 .att.file a{padding-right:3.625rem}
-.attpl.busy{opacity:1;color:var(--accent);animation:pulse 1.2s ease-in-out infinite}
 @keyframes pulse{50%{opacity:.4}}
-.plres{display:flex;flex-direction:column;gap:.25rem;max-height:min(60dvh,32.5rem);overflow-y:auto}
-.plitem{display:flex;align-items:center;gap:.625rem;padding:.375rem;border-radius:var(--radius);text-align:left;width:100%}
-.plitem:hover{background:var(--bg3)}
-.plitem.on{opacity:.55}
-.plitem small{font-size:.6875rem;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.plitem > svg{color:var(--accent)}
-.plmodal .card{width:min(38.75rem,100%)}
-@media (hover:none){ .attpl,.plink .attdel{opacity:1} }
 
 /* ---------- light theme (per device: auto follows the OS) ---------- */
 :root[data-theme="light"]{--bg:#ffffff;--bg2:#f8f8f9;--bg3:#efeff1;--bg4:#dcdce0;--line:#eeeef0;--line2:#e3e3e6;--text:#131418;--text2:#464951;--muted:#60636c;--faint:#8d9096;--accent:var(--acc-l);--accent-ink:var(--acc-ink-l);--p5:#b3372f;--p3:#97600b;--p1:#3565a8;--ok:#2f9e44;--danger:#b3372f;--st-ready:#2f9e44;--st-work:#1c7ed6;--st-wait:#d99a00;--st-wait-t:#8a6200;--st-off:#8d9096;--st-err:#c92a2a;--wait-soft:#fff8e1;--shadow:0 .75rem 2.25rem rgba(19,20,24,.12),0 0 0 1px var(--line2);--cs:light;color-scheme:light}
@@ -2444,18 +2419,7 @@ body.pop-open #chatfab,body.modal-open #chatfab{visibility:hidden}
 .waitbar .wtxt{display:flex;flex-direction:column;align-items:flex-start;flex:1;min-width:0;background:none;border:0;padding:0;color:var(--text);text-align:left;font:inherit;cursor:pointer}
 .waitbar .wtxt b{font-weight:500;font-size:.875rem}
 .waitbar .wtxt span{font-size:var(--fs-s);color:var(--muted);overflow-wrap:anywhere}
-/* 2.1.0 (#180): Paperless connections */
-.plc .n{display:flex;flex-direction:column;min-width:0}
-.plc small{overflow-wrap:anywhere}
-.pltok{font-size:var(--fs-s);color:var(--muted)}
-.pltok.ok{color:var(--accent)}
-.pltok.bad{color:var(--danger)}
-.plnew,.plsrv{border:1px solid var(--line);border-radius:var(--radius);padding:.375rem .75rem;margin:.375rem 0}
-.plnew summary,.plsrv summary{cursor:pointer;display:flex;align-items:center;gap:.375rem;flex-wrap:wrap;padding:.25rem 0}
-.plsrv summary .muted{font-size:var(--fs-s)}
-.plusers{display:flex;flex-wrap:wrap;gap:.25rem .75rem}
 .shint.warn{color:var(--danger)}
-.plconn{margin-bottom:.5rem}
 .srow .bellm{opacity:.7}
 /* 2.1.1 (#326) model usage of the agents: Settings > AI colleague > Usage, the card in the Agents view, the task panel line */
 .aiu h5{margin:1rem 0 .375rem;font-size:var(--fs-s);color:var(--muted);font-weight:600}
@@ -4245,6 +4209,13 @@ a.tref:hover{background:var(--accent-soft)}
    line (Mac "always show scrollbars"), the whole command visible, the copy button stays in its corner */
 .cbub .mdcode{margin:.375rem 0}.cbub .mdcode:last-child{margin-bottom:0}
 .cbub pre.mdpre{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;overflow-x:hidden;margin:0}
+/* 2.36.0 (#1119): code blocks in task comments and the description wrap like in the chat (no sideways scrolling, no scroll
+   bar over the next line); the code inside the block is no inline-code chip; "Copy" still takes the original text */
+.cbody pre.mdpre,#d-md pre.mdpre{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;overflow-x:hidden}
+.cbody pre code,#d-md pre code{background:none;padding:0;border:0;border-radius:0;font-size:inherit;font-family:inherit}
+/* the quick reactions (hover / keyboard focus) sit at the right end of the comment's reaction row instead of over its
+   Reply / Edit / Delete buttons at the top right */
+.cmrxq{top:auto;bottom:.3125rem}
 /* 2.18.0 (#408 F): "Similar open ticket" hint in the task panel of a new bug */
 .ddup{display:flex;align-items:center;gap:.375rem;margin:.25rem 0 .5rem;padding:.25rem .25rem .25rem .625rem;background:var(--bg3);border-radius:var(--radius);font-size:var(--fs-s);color:var(--text2);min-width:0}
 .ddup>.i{color:var(--p3);flex:none}
@@ -4705,12 +4676,23 @@ button.lkchip:hover{border-color:var(--accent)}
 #side .fhead{min-height:var(--srow-h);margin:0;padding:0 .5rem}
 #side .fhead:not(.fsub){margin-top:.75rem}
 #side .fhead.fsub{margin-top:.25rem}
-#side .fhead .sic svg{color:var(--muted)}
+#side .fhead .sic svg{color:var(--faint)}  /* 2.36.0 (#1117): quieter */
 #side .fhead .fcar{order:3;width:.875rem;height:.875rem;margin-left:.125rem}
 #side .fhead .fmenu{order:4}
 #side .fhead .c{order:2}
 #side .fbody{margin-top:0}
 #side .srow .semo,#side .scl .semo{font-size:.9375rem}
+/* 2.36.0 (#1117): a calmer sidebar: line icons in grey (6.1:1 dark, 5.7:1 light on the sidebar), only their dot in the list colour
+   (--dot, set per row), the open list's icon in the text colour; lists without a matching icon get a round dot. The share icon
+   shows on hover / keyboard focus (touch: always); folder heads are quieter (smaller, grey name, faint folder icon). */
+#side .sic.sln svg{color:var(--muted)}
+#side .srow.on .sic.sln svg{color:var(--text)}
+#side .sic .sw.rd{width:.5rem;height:.5rem;border-radius:50%}
+#side .srow .shr:not(.bellm){opacity:0;transition:opacity .12s}
+#side .srow:hover .shr:not(.bellm),#side .srow:focus-visible .shr:not(.bellm),#side .srow:focus-within .shr:not(.bellm){opacity:.8}
+@media (hover:none){ #side .srow .shr:not(.bellm){opacity:.8} }
+#side .fhead .n{font-weight:500;color:var(--muted);font-size:var(--fs-s);letter-spacing:.01em}
+#side .fhead.on .n{color:var(--text)}
 /* 2.23.0 (#463): clients */
 .clients .clhead{display:flex;align-items:center;gap:.5rem;margin:0 0 .75rem;flex-wrap:wrap}
 .clients .clhead h2,.wload .clhead h2{margin:0;font-size:var(--fs-l);font-weight:600}
@@ -4868,7 +4850,7 @@ button.lkchip:hover{border-color:var(--accent)}
 #side .shead button{align-items:center;justify-content:center}
 /* UX-07: a project's progress as a thin line under its name instead of "0 %" */
 #side .srow[data-list]{position:relative}
-#side .srow .sprog{position:absolute;left:2.25rem;right:.5rem;bottom:.25rem;height:.125rem;border-radius:.0625rem;background:var(--line2);pointer-events:none}
+#side .srow .sprog{position:absolute;left:2.25rem;right:.5rem;bottom:.1875rem;height:1px;border-radius:0;background:var(--line2);pointer-events:none}  /* 2.36.0 (#1117): 1 px on a faint line */
 #side .srow .sprog::after{content:"";position:absolute;left:0;top:0;bottom:0;width:var(--p);border-radius:inherit;background:var(--accent)}
 @media (forced-colors:active){ #side .srow .sprog{background:GrayText} #side .srow .sprog::after{background:Highlight} }
 /* UX-03: Settings > Appearance > Sidebar */
@@ -5588,3 +5570,10 @@ body.lydragging,body.lydragging *{cursor:grabbing!important;-webkit-user-select:
 }
 .lyed{max-width:none}  /* 2.35.0 (#1097): the blocks get the view's width (two side by side as in the view); the list stays narrow */
 .lyed .lylist,.lyed .lyopts{max-width:40rem}
+/* 2.36.0 (#1118): the lock of a task: a small lock after the title in the row, the lock button in the task header */
+.ttl .tlkr{display:inline-flex;vertical-align:-.15em;margin-left:.3rem;color:var(--muted)}
+.ttl .tlkr svg{width:.85rem;height:.85rem}
+#detail .dtop .tlkb.on{color:var(--accent)}
+#detail.tlk #d-md{cursor:text}
+/* 2.36.0 (#1110): the agent's suggestion buttons sit below the time / reactions line of its message */
+.cmsg > .cmeta + .cchoices{margin-top:.375rem;margin-bottom:0}

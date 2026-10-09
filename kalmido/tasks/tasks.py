@@ -1,6 +1,6 @@
 """Creating and changing tasks: milestones, moving subtrees, tags, assignees, waiting on external."""
 from datetime import date, timedelta
-from flask import jsonify
+from flask import g, has_request_context, jsonify
 
 from ..core.config import app, PUBLIC_URL
 from ..core.schema import MAX_DEPTH, USER_DEFAULTS
@@ -236,6 +236,9 @@ def task_create():
         tpl = ticket_template(c, f["list_id"], f["ttype"])
         if tpl:
             f["content"] = tpl
+    from ..agents.core import is_agent
+    if "locked" not in f and has_request_context() and is_agent(getattr(g, "user", None)):
+        f["locked"] = 1  # 2.36.0 (#1118, decision 09.10.2026): a task an agent creates starts locked in the app
     ts = iso(now_utc())
     f["created_by"] = me()
     if f.get("assignee_id") or f.get("assignee_group_id"):
@@ -384,7 +387,7 @@ def task_update(tid):
     conflicts = []
     old = c.execute("SELECT due, status, deleted_at FROM tasks WHERE id=?", (tid,)).fetchone()
     b = web_fields(field_alias(body(), "content", "notes"), WEB_TASK_EDIT, "PATCH /api/tasks/{tid}")
-    e = apply_update(c, tid, b, conflicts)
+    e = apply_update(c, tid, b, conflicts, lock=True)
     if e:
         return err(e)
     new_due = c.execute("SELECT due FROM tasks WHERE id=?", (tid,)).fetchone()[0]

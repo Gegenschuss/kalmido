@@ -613,6 +613,17 @@ const AUTO_EMO = [
   ['👶', 'baby bébé bebé neonato'],
   ['🧹', 'putzen cleaning ménage limpieza pulizie schoonmaken'],
 ];
+// 2.36.0 (#1117): with line icons in the sidebar (the default) the list dialog shows and offers line icons too; each one stands
+// for an emoji that stays the start of the name, so the other sidebar styles (emoji, dot) keep working with the same lists
+const sbiEmo = e => { const k = e && sbiMode() === 'line' ? sbiIconFor(e) : ''; return k ? ic(k, 'l') + `<span class="sr">${esc(e)}</span>` : e; };  // the emoji stays the button's name
+function sbiGrid() {  // the grid's emojis: in line mode one per line icon (the first emoji that maps to it), else the emoji set
+  if (sbiMode() !== 'line') return EMOJIS;
+  const seen = new Set(), out = [];
+  for (const e of [...EMOJIS, ...AUTO_EMO.map(x => x[0]), ...Object.values(SBI_EMO).map(x => x.split(' ')[0])]) {
+    const k = sbiIconFor(e); if (k && !seen.has(k)) { seen.add(k); out.push(e); }
+  }
+  return out;
+}
 function autoEmoji(name) {
   if (S.settings && S.settings.list_emoji === '0') return '';  // 2.32.0 (#1077): switched off in Settings > Appearance
   const words = String(name || '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(w => w.length > 2);
@@ -629,8 +640,8 @@ function listModal(id, folder = '', o = {}) {
   // 1.5.1: an existing list saves itself like the settings (every change at once, "Saved · Undo", one history step each);
   // a new list keeps Cancel / Create
   const md = modal(`${id ? `<div class="lhdr"><h3>${tr('Edit list')}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>` : `<h3>${tr('New list')}</h3>`}
-    <div class="row"><label for="l-name">${tr('Name')}</label><button class="emobtn" id="l-emo" title="${tr('Choose icon')}" ${dis}>${id && l.icon ? licon(l, 'licon m') : emo || ic('list')}</button><input id="l-name" value="${esc(base)}" ${dis}></div>
-    <div class="emogrid hidden" id="l-emogrid"><button data-emo="" class="none" title="${tr('No icon')}">${ic('ban', 's')}</button>${EMOJIS.map(e => `<button data-emo="${e}" class="${e === emo && !l.icon ? 'on' : ''}">${e}</button>`).join('')}<input id="l-emocustom" placeholder="${tr('custom')}" maxlength="8">
+    <div class="row"><label for="l-name">${tr('Name')}</label><button class="emobtn" id="l-emo" title="${tr('Choose icon')}" ${dis}>${id && l.icon ? licon(l, 'licon m') : sbiEmo(emo) || ic('list')}</button><input id="l-name" value="${esc(base)}" ${dis}></div>
+    <div class="emogrid hidden" id="l-emogrid"><button data-emo="" class="none" title="${tr('No icon')}">${ic('ban', 's')}</button>${sbiGrid().map(e => `<button data-emo="${e}" class="${e === emo && !l.icon ? 'on' : ''}">${sbiEmo(e)}</button>`).join('')}<input id="l-emocustom" placeholder="${tr('custom')}" maxlength="8">
       ${id && own ? `<div class="lipickw"><span class="muted lipl">${tr('Or a picture')}</span>${liconPickHtml(l)}</div>` : ''}</div>
     <input type="hidden" id="l-kind" value="${(l.kind || 'list') === 'project' ? 'project' : 'list'}">
     <div class="row lkrow" ${l.is_inbox ? 'hidden' : ''}><label id="l-kindlab">${tr('Type|list')}</label><div class="seg lkseg" role="radiogroup" aria-labelledby="l-kindlab"><label class="${(l.kind || 'list') === 'project' ? '' : 'on'}"><input type="radio" name="l-kindr" id="l-kindl" value="list" ${(l.kind || 'list') === 'project' ? '' : 'checked'} ${dis}>${ic('list', 's')} ${tr('Simple list')}</label><label class="${(l.kind || 'list') === 'project' ? 'on' : ''}"><input type="radio" name="l-kindr" id="l-kindp" value="project" ${(l.kind || 'list') === 'project' ? 'checked' : ''} ${dis}>${ic('brief', 's')} ${tr('Project')}</label></div></div>
@@ -707,7 +718,7 @@ function listModal(id, folder = '', o = {}) {
     if (!md.isConnected) return;
     const x = listById(id); if (!x) return;
     const m1 = x.name.match(EMO_RE);
-    if (force || document.activeElement !== $('#l-name', md)) { emo = m1 ? m1[1] : ''; $('#l-name', md).value = x.is_inbox && inboxDef(x.name) ? tr('Inbox') : m1 ? x.name.slice(m1[0].length) : x.name; $('#l-emo', md).innerHTML = emo || ic('list'); }
+    if (force || document.activeElement !== $('#l-name', md)) { emo = m1 ? m1[1] : ''; $('#l-name', md).value = x.is_inbox && inboxDef(x.name) ? tr('Inbox') : m1 ? x.name.slice(m1[0].length) : x.name; $('#l-emo', md).innerHTML = sbiEmo(emo) || ic('list'); }
     if (document.activeElement !== $('#l-folder', md)) $('#l-folder', md).value = fDisp(x.folder || '');
     $('#l-view', md).value = listView(x); $('#l-kind', md).value = x.kind || 'list'; if ($('#l-kindp', md)) $('#l-kindp', md).checked = (x.kind || 'list') === 'project';
     $('#l-khint', md).innerHTML = kindHint(x.kind || 'list'); $('.kproj', md).hidden = (x.kind || 'list') !== 'project';
@@ -847,7 +858,7 @@ function listModal(id, folder = '', o = {}) {
       if (!md.isConnected) return;
       const x = listById(id) || l;
       if (url && emo) { emo = ''; $$('#l-emogrid [data-emo]', md).forEach(y => y.classList.remove('on')); await autosave(); }
-      $('#l-emo', md).innerHTML = x.icon ? licon(x, 'licon m') : emo || ic('list');
+      $('#l-emo', md).innerHTML = x.icon ? licon(x, 'licon m') : sbiEmo(emo) || ic('list');
       const w = $('.lipickw', md); if (w) w.innerHTML = `<span class="muted lipl">${tr('Or a picture')}</span>${liconPickHtml(x)}`;
       if (url) $('#l-emogrid', md).classList.add('hidden');
       return;
@@ -857,7 +868,7 @@ function listModal(id, folder = '', o = {}) {
       const w = $('.lipickw', md); if (w && listById(id)) w.innerHTML = `<span class="muted lipl">${tr('Or a picture')}</span>${liconPickHtml(listById(id))}`;
       emo = b.dataset.emo;
       $$('#l-emogrid button', md).forEach(x => x.classList.toggle('on', x === b && !!emo));
-      $('#l-emo', md).innerHTML = emo || ic('list');
+      $('#l-emo', md).innerHTML = sbiEmo(emo) || ic('list');
       $('#l-emogrid', md).classList.add('hidden');
       if (id) autosave();
       return;
@@ -898,7 +909,7 @@ function listModal(id, folder = '', o = {}) {
     const s = autoEmoji(e.target.value);
     if (s === emo) return;
     emo = s;
-    const b = $('#l-emo', md); b.innerHTML = emo || ic('list'); b.title = emo ? tr('Suggested icon: tap to change or remove it') : tr('Choose icon');
+    const b = $('#l-emo', md); b.innerHTML = sbiEmo(emo) || ic('list'); b.title = emo ? tr('Suggested icon: tap to change or remove it') : tr('Choose icon');
     b.classList.toggle('sugg', !!emo);
     $$('#l-emogrid button', md).forEach(x => x.classList.toggle('on', !!emo && x.dataset.emo === emo));
   });

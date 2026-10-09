@@ -43,7 +43,7 @@ The agent works through the REST API, webhooks or the [MCP server](../mcp/README
   - an optional **webhook URL** and signing secret.
   - an **Enabled** switch.
   - a **note**, for example who runs the agent and where.
-- **Limited by design.** An agent is never an admin and never has Paperless access. It cannot sign in to the web app. It sees only the lists that are shared with it (plus lists it owns), with the role it was given (Member, Participant or Viewer; never list admin). An agent shares a list (only one it owns) only after a person's approval ([2.15.0](#requests-that-wait-for-a-person-2150)) and never becomes or hands over the owner of a list. A list an agent created is managed by an admin: *Settings > Administration > Lists owned by agents or disabled users > Take over* (2.1.2) makes a person the owner and keeps the agent in the list as a Member. Admins can rename an agent (username, display name) and give it a profile picture in its dialog under *Settings > Agents*.
+- **Limited by design.** An agent is never an admin. It cannot sign in to the web app. It sees only the lists that are shared with it (plus lists it owns), with the role it was given (Member, Participant or Viewer; never list admin). An agent shares a list (only one it owns) only after a person's approval ([2.15.0](#requests-that-wait-for-a-person-2150)) and never becomes or hands over the owner of a list. A list an agent created is managed by an admin: *Settings > Administration > Lists owned by agents or disabled users > Take over* (2.1.2) makes a person the owner and keeps the agent in the list as a Member. Admins can rename an agent (username, display name) and give it a profile picture in its dialog under *Settings > Agents*.
 - **Team and personal agents (2.7.2).** Agents created by an admin are team agents. If an admin allows it, people can also create their own [personal agent](#personal-agents-272): it belongs to them, sees only what they share with it, and only they can chat with it.
 - **Kill switch.** Turning **Enabled** off stops the agent at once:
   - its token is refused (`403`).
@@ -121,7 +121,7 @@ connect agents* (Settings > Administration > Organisation; the same policy as be
   ```
 - **Owned by its creator.** A personal agent (`owner` in the agent lists, `agents.owner_id`) sees only the lists its
   owner shares with it. Only the owner can share lists with it and chat with it; nobody else finds it in a share
-  dialog. Like every agent it is never an admin, has no Paperless access and cannot sign in to the web app; the usage
+  dialog. Like every agent it is never an admin and cannot sign in to the web app; the usage
   limits and the audit log apply as for every agent.
 - **Admins keep control.** *Settings > Agents* lists every agent with its owner. Admins pause one
   (`PATCH /api/admin/agents/{id} {"enabled": false}`), change its limits, or delete it: `DELETE /api/admin/agents/{id}` (lists the agent created go to its owner,
@@ -684,6 +684,20 @@ carry only the number `snippets_n` -- read the task itself for the code:
   send a truncated copy back (`400`).
 - The search (`search_tasks`, the app's search) also finds the code and the file path of snippets (not their metadata).
 
+### Locked tasks (2.36.0)
+
+A task can be **locked** in the app: its title, description, date and time, priority, list, tags, repeat and assignee
+are read-only there until someone who may change the task unlocks it (the lock button in the task header; the hint on
+an edit attempt offers *Unlock*). Comments, checkboxes in the description, completing / reopening and subtasks stay
+free. Every task in events and in the API has `"locked": true | false`.
+
+- Tasks created with an **agent token** (`POST /api/v1/tasks`, `POST /api/v1/tasks/{id}/subtasks`, MCP `create_task` /
+  `add_subtask`) start **locked**; send `"locked": false` to create an open one. Tasks people create stay open.
+- The lock binds only the app: an agent changes a locked task through the API as before (`PATCH /api/v1/tasks/{id}`,
+  MCP `update_task`) and can set or clear it with `{"locked": true | false}`. Do not lift a lock a person set unless
+  they ask you to.
+- Locking and unlocking show in the task's history; existing tasks were not locked by the update.
+
 ### Waiting on someone (2.1.0)
 
 (Called *waiting on external* before 2.25.0; the API and the MCP tools kept their names.) A task can wait for someone
@@ -1195,6 +1209,11 @@ curl -H "Authorization: Bearer $KALMIDO_TOKEN" -F body="Here is the fixed layout
 the setup guide show the same block with a *Copy rules* button. In short:
 
 - notes, comments and chat answers as Markdown (headings, lists, checkboxes; never one block of text);
+- 2.36.0: everything a person should run or paste (commands, code, configuration) in its own fenced code block with a
+  language (the app shows a copy button on it), never as code inside a sentence; one block per place (server, laptop,
+  database), one command per line, no prompt sign, steps that belong together chained with `&&`;
+- 2.36.0: tasks an agent creates start locked in the app; the agent still changes them through the API and does not lift
+  a lock a person set unless asked (see [Locked tasks](#locked-tasks-2360));
 - decisions bold at the bottom of the task description: `**Entscheidung (DD.MM.YYYY):** …`, not only in a comment;
 - typing signal before a chat answer (`chat_typing`) and before a comment answer on a task (`comment_typing`, 2.22.0); status `working` with a text while working, `idle` only when nothing runs; one job
   per larger piece of work with short progress lines; one chat summary when it stops working;

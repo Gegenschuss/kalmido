@@ -38,7 +38,7 @@ from ..agents.core import agent_ids, is_agent
 #   shopping = a list with lists.family 'shopping': its sections are the shop areas (defaults on creation), a new item
 #     goes to the area it had last time (shop_memory), the app has a shopping mode with big ticks
 #   household deadlines = tasks with fam {kind: deadline, type, who, expires, notice, lead} from built-in types (passport,
-#     ID card, car inspection, insurance, contract, other); a Paperless document is linked like on any task
+#     ID card, car inspection, insurance, contract, other); files are attached like on any task
 #   meal plan = tasks of a list with family 'meals' (due = the day, notes = the ingredients); one tap puts the
 #     ingredients on a shopping list (POST /api/tasks/<id>/to-shopping, open items are not doubled)
 #   packing lists = built-in templates (holiday, pool, daycare, camping, business trip) -> a list with "done at the
@@ -88,7 +88,7 @@ PACKING = {
         ("", (N_("Laptop and charger"), N_("Phone chargers"), N_("Business clothes"), N_("Documents for the meeting"),
               N_("Tickets and bookings"), N_("Toiletries"), N_("Headphones")))]),
 }
-# what each answer of "What do you use Kalmido for?" switches on / off (agents and Paperless stay as they are)
+# what each answer of "What do you use Kalmido for?" switches on / off (agents stay as they are)
 PURPOSES = ("me", "home", "family", "team", "software")  # 2.22.0 (#741): "home"
 _LIFE = ("contracts", "home", "care", "health", "review", "travel", "reading")  # 2.22.0 (#663): Home & life
 PURPOSE_MODS = ("cal", "timeline", "matrix", "kanban", "habits", "pomo", "stats", "comments", "collab", "time", "progress",

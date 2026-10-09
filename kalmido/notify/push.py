@@ -25,7 +25,6 @@ from ..accounts.session import GATE
 from ..core.access import task_visible, vis_sql
 from ..tasks.validation import NAG_HOUR_CAP, NAG_MINUTES, valid_hm
 from ..tasks.tasks import _wd_followups
-from ..integrations.paperless import paperless_poll
 from ..collab.comments import collab_on, task_push_tick
 from ..collab.news import news_cleanup, news_unread, notif_ok
 from ..personal.habits import pomo_close, pomo_elapsed, pomo_planned_end
@@ -461,7 +460,6 @@ def watchdog_tick(c):
     from ..events.model import _wd_events
     from ..life.model import _wd_care
     from ..life.karakeep import _wd_reading
-    _wd_section(c, "paperless", paperless_poll)  # 2.1.0: every connection (cheap without pending uploads)
     users = {r["id"]: r for r in c.execute("SELECT * FROM users WHERE disabled=0")}
     S, LG = {}, {}
     for uid in users:

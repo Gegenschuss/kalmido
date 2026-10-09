@@ -152,6 +152,7 @@ function selSheet(el) {
 function prioMenu(anchor, id) {
   const t = taskById(id);
   if (!canEdit(t)) { roToast(); return; }
+  if (tlkStop(t)) return;  // 2.36.0 (#1118): locked
   menu(anchor, [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', on: t.priority === p, cls: p ? 'flag-' + p : '', fn: () => patchTask(id, {priority: p})})));
 }
 // 2.6.1 (#401): by default every change in the date popover (day, time, start, duration, reminders, repeat) is saved at
@@ -162,6 +163,7 @@ const dateInstant = () => S.settings?.date_confirm !== '1';
 function datePop(anchor, id) {
   const t = taskById(id);
   if (!canEdit(t)) { roToast(); return; }
+  if (tlkStop(t)) return;  // 2.36.0 (#1118): locked
   const st = {due: t.due, due_time: t.due_time, reminders: t.reminders, repeat: t.repeat, repeat_from: t.repeat_from, start: t.start, duration: t.duration, month: (t.due || today()).slice(0, 7),
     deadline: t.deadline || 0, nag: t.nag || ''};
   const instant = dateInstant(), before = snapTask(t);
@@ -524,6 +526,7 @@ window.addEventListener('resize', () => { if (DP.el) dpPlace(); });
 async function quickDue(id, days) {
   const t = taskById(id); if (!t) return;
   if (!canEdit(t)) { roToast(); return; }
+  if (tlkStop(t)) return;  // 2.36.0 (#1118): locked
   const d = addDays(today(), days);
   if (t.due === d) { toast(tr('Already due {0}', dayLabel(d))); return; }
   await patchUndoable(id, {due: d, ...(t.start && t.start >= d ? {start: null} : {})}, tr('Date: {0}', dayLabel(d)));
@@ -579,7 +582,7 @@ async function waitClear(id) {
 // menus): date · priority · assignee · list / section · waiting · pin · time · template · structure · delete. The short
 // menus (swipe, selection) keep the same order and end with "All…".
 const PRIO_ROW = id => { const t = taskById(id); return {row: [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', cls: p ? 'flag-' + p : '', on: t?.priority === p, title: tr('Priority') + ': ' + tr(n), fn: () => patchTask(id, {priority: p})}))}; };
-const moveListItem = (anchor, id) => ({label: tr('Move to list…'), icon: 'list', keys: 'm', fn: () => { const t = taskById(id); menu(anchor, S.lists.filter(l => !l.archived && l.id !== t?.list_id && canAddTo(l.id)).map(l => ({label: lname(l), icon: l.is_inbox ? 'inbox' : 'list', fn: () => patchUndoable(id, {list_id: l.id}, tr('Moved to {0}', lname(l)))}))); }});
+const moveListItem = (anchor, id) => ({label: tr('Move to list…'), icon: 'list', keys: 'm', fn: () => { const t = taskById(id); if (tlkStop(t)) return; menu(anchor, S.lists.filter(l => !l.archived && l.id !== t?.list_id && canAddTo(l.id)).map(l => ({label: lname(l), icon: l.is_inbox ? 'inbox' : 'list', fn: () => patchUndoable(id, {list_id: l.id}, tr('Moved to {0}', lname(l)))}))); }});
 function taskMenu(anchor, id, o = {}) {
   const t = taskById(id);
   if (!canEdit(t)) { roToast(); return; }

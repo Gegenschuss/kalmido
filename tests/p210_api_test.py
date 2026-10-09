@@ -5,22 +5,14 @@
    follow / new task in a shared list / status / reminder), the list bell (all / default / mute: mentions and assignments
    still come through), PATCH /api/settings (partial object and the web app's whole string), GET /api/v1/me
    notifications + PATCH /api/v1/me/notifications, validation, a list I do not see
- - #180 Paperless connections: the legacy one from the environment keeps working; server connections (admin: name + URL,
-   no token, who may use it) with each user's own token; personal connections only for their owner (neither another
-   user nor an admin sees or uses them, in the UI API, the admin API and the v1 API); tokens never in any answer or page,
-   encrypted at rest (AES-GCM, KALMIDO_SECRET_KEY), sent only to their connection (the fake Paperless logs the header);
-   the SSRF guard for personal connections (internal only when an admin allowed the host); a new server address drops
-   the tokens, taking a user off drops theirs; links remember their connection (others see "a document"); without the
-   key: tokens cannot be stored (409), stored ones are unusable, the legacy connection still works
  - #335 waiting on external: set / change / clear (web API + v1 + ?waiting=), validation, the follow-up day fires once
    (push "Follow up", News "followup" to the person it is for, event followup_due to the following agent)
-Starts its OWN containers (start.sh) with the fake Paperless (fake_services.py, 127.0.0.1:8082) and the fake push
-service (stub_webpush.py, 127.0.0.1:9997) inside.
+Starts its OWN container (start.sh) with the fake push service (stub_webpush.py, 127.0.0.1:9997) inside.
+(2.36.0: the Paperless part is gone with the Paperless connection.)
 usage: p210_api_test.py <datadir>"""
 import base64
 import json
 import os
-import sqlite3
 import subprocess
 import sys
 import time
@@ -85,13 +77,6 @@ def clear():
             pass
 
 
-def fake_log():
-    try:
-        return [json.loads(x) for x in open(os.path.join(DATA, "fake.log"), encoding="utf-8") if x.strip()]
-    except FileNotFoundError:
-        return []
-
-
 class Browser:
     def __init__(self, path):
         self.key = ec.generate_private_key(ec.SECP256R1())
@@ -147,12 +132,11 @@ class Api:
 
 
 def start(with_key=True, keep=False):
-    extra = ["-e KALMIDO_WEBPUSH_HOSTS=" + STUB, "-e PAPERLESS_TOKEN=pl-legacy-env-token", "-e PAPERLESS_API=http://127.0.0.1:8082",
-             "-e PAPERLESS_PUBLIC_URL=https://paperless.example.test"] + (["-e KALMIDO_SECRET_KEY=" + KEY] if with_key else [])
+    extra = ["-e KALMIDO_WEBPUSH_HOSTS=" + STUB] + (["-e KALMIDO_SECRET_KEY=" + KEY] if with_key else [])
     env = dict(os.environ, EXTRA=" ".join(extra), **({"KEEP": "1"} if keep else {}))
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
-    for f in ("stub_webpush.py", "fake_services.py"):
+    for f in ("stub_webpush.py",):
         subprocess.run(["cp", os.path.join(N, f), DATA])
         subprocess.run(["docker", "exec", "-d", CT, "python", "/data/" + f])
     time.sleep(0.8)
@@ -344,124 +328,6 @@ time.sleep(2.5)
 check(len(settle(bphone.notes, 3)) == 1 and len(news(Bo, "followup")) == 1, "fires once per date")
 check("followup_due" in cl.get("/agent").json().get("events", []), "the agent's event list names followup_due")
 Bo.patch(B + "/api/settings", json={"allday_time": "09:00"})
-
-# ================================================================== #180 Paperless connections
-BTOK, PTOK, BTOK2 = "bob-server-token-8f1d", "bob-personal-token-77aa", "bob-server-token-NEW2"
-c = A.get(B + "/api/paperless/conns").json()
-check(c["key"] and [x["id"] for x in c["conns"]] == [0] and c["conns"][0]["kind"] == "legacy", f"admin: the legacy connection: {c}")
-check(Bo.get(B + "/api/paperless/conns").json()["conns"] == [], "bob: none")
-check(Bo.get(B + "/api/paperless/search", params={"conn": 0}).status_code == 403, "bob: no legacy access")
-check(A.get(B + "/api/paperless/search").ok, "legacy works (no conn = 0)")
-r = A.post(B + "/api/admin/paperless", json={"name": "Office", "url": "http://127.0.0.1:8082/api/", "users": [ids["bob"]]})
-SRV = r.json()["id"]
-check(r.status_code == 201 and r.json()["url"] == "http://127.0.0.1:8082" and r.json()["users"] == [ids["bob"]], f"server connection: {r.text}")
-check(A.post(B + "/api/admin/paperless", json={"name": "x", "url": "ftp://x"}).status_code == 400, "bad URL 400")
-check(Bo.post(B + "/api/admin/paperless", json={"name": "x", "url": "https://x.example"}).status_code == 403, "not an admin 403")
-check(A.post(B + "/api/admin/paperless", json={"name": "x", "url": "https://x.example", "users": [AG]}).status_code == 400, "an agent cannot be granted")
-bc = Bo.get(B + "/api/paperless/conns").json()["conns"]
-check([(x["id"], x["token_set"], x["usable"]) for x in bc] == [(SRV, False, False)], f"bob sees it, no token yet: {bc}")
-check(Bo.get(B + "/api/paperless/search", params={"conn": SRV}).status_code == 403, "no token: 403")
-check(Ge.patch(B + f"/api/paperless/conns/{SRV}", json={"token": "x"}).status_code == 404, "gert (not granted) cannot set a token")
-r = Bo.patch(B + f"/api/paperless/conns/{SRV}", json={"token": BTOK})
-check(r.ok and r.json()["token_set"] and r.json()["usable"], "bob sets his token")
-check(Bo.patch(B + f"/api/paperless/conns/{SRV}", json={"name": "Mine now"}).status_code == 400, "a user cannot rename a server connection")
-open(os.path.join(DATA, "fake.log"), "w").close()
-r = Bo.get(B + "/api/paperless/search", params={"conn": SRV, "q": "tax"})
-check(r.ok and r.json()["items"] and r.json()["conn"] == SRV, "bob searches with his token")
-auths = {x["auth"] for x in fake_log()}
-check(auths == {"Token " + BTOK}, f"only bob's token went out: {auths}")
-check(Bo.get(B + f"/api/paperless/thumb/7", params={"conn": SRV}).status_code == 502, "thumbnail type guard still applies")
-check(Bo.get(B + f"/api/paperless/thumb/8", params={"conn": SRV}).ok, "thumbnail")
-# personal connection: internal address blocked until an admin allows the host
-r = Bo.post(B + "/api/paperless/conns", json={"name": "Private", "url": "http://127.0.0.1:8082", "token": PTOK})
-PER = r.json()["id"]
-check(r.status_code == 201 and r.json()["kind"] == "personal" and r.json()["usable"], f"personal connection: {r.text}")
-check(Bo.post(B + "/api/paperless/conns", json={"name": "x", "url": "http://127.0.0.1:8082"}).status_code == 400, "a token is needed")
-r = Bo.get(B + "/api/paperless/search", params={"conn": PER})
-check(r.status_code == 502 and "internal" in r.json()["error"], f"SSRF guard: {r.text[:200]}")
-A.patch(B + "/api/admin/settings", json={"cal_allow_hosts": "127.0.0.1:8082"})
-open(os.path.join(DATA, "fake.log"), "w").close()
-r = Bo.get(B + "/api/paperless/search", params={"conn": PER})
-check(r.ok and {x["auth"] for x in fake_log()} == {"Token " + PTOK}, f"allowed host: bob's personal token only: {r.status_code}")
-# nobody else sees or uses it
-ac = [x["id"] for x in A.get(B + "/api/paperless/conns").json()["conns"]]
-check(PER not in ac and SRV not in ac, f"alice (admin) does not see bob's connections: {ac}")
-adm = A.get(B + "/api/admin/paperless").json()
-check([x["id"] for x in adm["servers"]] == [SRV] and adm["servers"][0]["tokens"] == 1 and "Private" not in json.dumps(adm), "admin API: server only, no personal")
-for s_, who in ((A, "alice"), (Ge, "gert")):
-    check(s_.get(B + "/api/paperless/search", params={"conn": PER}).status_code == 403, f"{who} cannot search bob's personal connection")
-    check(s_.patch(B + f"/api/paperless/conns/{PER}", json={"token": "hijack"}).status_code == 404, f"{who} cannot set a token on it")
-    check(s_.delete(B + f"/api/paperless/conns/{PER}").status_code == 404, f"{who} cannot delete it")
-    check(s_.post(B + f"/api/paperless/conns/{PER}/test").status_code == 404, f"{who} cannot test it")
-check(A.patch(B + f"/api/admin/paperless/{PER}", json={"users": [1]}).status_code == 404, "admin cannot grant a personal connection")
-check(A.delete(B + f"/api/admin/paperless/{PER}").status_code == 404, "admin cannot delete a personal connection")
-check(Bo.delete(B + f"/api/paperless/conns/{SRV}").status_code == 403, "a user cannot delete a server connection")
-check(Bo.post(B + f"/api/paperless/conns/{PER}/test").json()["ok"], "test: ok")
-# links remember their connection
-r = Bo.post(B + f"/api/tasks/{BT}/paperless", json={"doc_id": 11, "conn": PER})
-pl = r.json()["paperless"]
-check(r.ok and pl[0]["title"] == "Secret doc 11" and pl[0]["conn"] == PER, f"bob links through his personal connection: {pl}")
-ap = next(t for t in A.get(B + "/api/state").json()["tasks"] if t["id"] == BT)["paperless"]
-check(ap[0]["hidden"] and ap[0]["title"] == "Paperless document" and ap[0]["conn"] is None and ap[0]["doc_id"] is None, f"alice sees only that there is one: {ap}")
-check(A.delete(B + f"/api/paperless-links/{ap[0]['id']}").status_code == 403, "alice cannot remove bob's link")
-r = A.post(B + f"/api/tasks/{BT}/paperless", json={"doc_id": 3})
-check(r.ok and any(x["conn"] == 0 and x["title"] == "Secret doc 3" for x in r.json()["paperless"]), "legacy link (conn 0)")
-bp = next(t for t in Bo.get(B + "/api/state").json()["tasks"] if t["id"] == BT)["paperless"]
-check(any(x.get("hidden") for x in bp) and any(x["title"] == "Secret doc 11" for x in bp), "bob: his link visible, the legacy one hidden")
-ex = A.get(B + "/api/export.json").text
-check("Secret doc 11" not in ex, "alice's export: no title of bob's document")
-bex = json.loads(Bo.get(B + "/api/export.json").text)
-check({x["name"] for x in bex["paperless_connections"]} == {"Office", "Private"} and "token" not in json.dumps(bex["paperless_connections"]).replace("token_set", ""),
-      "bob's export: his connections, no tokens")
-hist = Bo.get(B + f"/api/tasks/{BT}/timeline").json()
-check(any(a["kind"] == "paperless" and a["data"].get("title") == "Secret doc 11" for a in hist.get("activity", [])), "history: bob sees the title")
-ah = A.get(B + f"/api/tasks/{BT}/timeline").json()
-check(not any(a["data"].get("title") == "Secret doc 11" for a in ah.get("activity", [])), "history: alice does not")
-# never a token in any answer or page, never plaintext in the database
-for pth in ("/", "/api/state", "/api/me", "/api/admin/paperless", "/api/paperless/conns", "/api/export.json"):
-    for s_ in (A, Bo):
-        s_.get(B + pth)
-Api(tok).get("/me")
-leak = [t for t in (BTOK, PTOK, "pl-legacy-env-token", KEY) if any(t in x for x in SEEN)]
-check(not leak, f"no token in any answer: {leak}")
-raw = open(os.path.join(DATA, "tasks.db"), "rb").read() + b"".join(open(os.path.join(DATA, f), "rb").read() for f in os.listdir(DATA) if f.startswith("tasks.db-"))
-check(BTOK.encode() not in raw and PTOK.encode() not in raw and KEY.encode() not in raw, "tokens + key not in the database files")
-db = sqlite3.connect(os.path.join(DATA, "tasks.db"))
-toks = [r[0] for r in db.execute("SELECT token FROM pl_tokens")]
-db.close()
-check(len(toks) == 2 and all(t.startswith("v1.") for t in toks), f"sealed at rest: {len(toks)}")
-check(not any(KEY in open(os.path.join(dp, f), "rb").read().decode("latin-1") for dp, _, fs in os.walk(DATA) for f in fs), "the key is nowhere in the data dir")
-# admin: a new address drops the tokens; taking bob off drops his
-A.patch(B + f"/api/admin/paperless/{SRV}", json={"url": "http://127.0.0.1:8082/other"})
-bc = {x["id"]: x for x in Bo.get(B + "/api/paperless/conns").json()["conns"]}
-check(not bc[SRV]["token_set"], "a new address dropped the token")
-A.patch(B + f"/api/admin/paperless/{SRV}", json={"url": "http://127.0.0.1:8082"})
-Bo.patch(B + f"/api/paperless/conns/{SRV}", json={"token": BTOK2})
-A.patch(B + f"/api/admin/paperless/{SRV}", json={"users": []})
-check(SRV not in [x["id"] for x in Bo.get(B + "/api/paperless/conns").json()["conns"]], "access taken away")
-db = sqlite3.connect(os.path.join(DATA, "tasks.db"))
-check(db.execute("SELECT COUNT(*) FROM pl_tokens WHERE conn_id=?", (SRV,)).fetchone()[0] == 0, "... and his token deleted")
-db.close()
-A.patch(B + f"/api/admin/paperless/{SRV}", json={"users": [ids["bob"]]})
-Bo.patch(B + f"/api/paperless/conns/{SRV}", json={"token": BTOK2})
-check(Bo.delete(B + f"/api/paperless/conns/{SRV}/token").ok and not {x["id"]: x for x in Bo.get(B + "/api/paperless/conns").json()["conns"]}[SRV]["token_set"],
-      "bob removes his token")
-Bo.patch(B + f"/api/paperless/conns/{SRV}", json={"token": BTOK2})
-
-# ---- without the key: nothing can be stored, stored tokens are unusable, the legacy connection keeps working
-start(with_key=False, keep=True)
-A, Bo = sess("alice"), sess("bob")
-c = Bo.get(B + "/api/paperless/conns").json()
-check(not c["key"] and all(not x["usable"] and x["token_set"] and not x["token_ok"] for x in c["conns"]), f"no key: tokens unusable: {c}")
-r = Bo.post(B + "/api/paperless/conns", json={"name": "New", "url": "https://p.example", "token": "abc"})
-check(r.status_code == 409 and "KALMIDO_SECRET_KEY" in r.json()["error"], f"no key: 409 + hint: {r.text[:160]}")
-check(Bo.patch(B + f"/api/paperless/conns/{SRV}", json={"token": "abc"}).status_code == 409, "no key: a token cannot be set")
-check(A.get(B + "/api/admin/paperless").json()["key"] is False, "admin sees the missing key")
-check(A.get(B + "/api/paperless/search").ok, "legacy connection still works without the key")
-# the key back: the stored tokens work again
-start(with_key=True, keep=True)
-Bo = sess("bob")
-check(Bo.get(B + "/api/paperless/search", params={"conn": SRV}).ok, "the key back: the stored token works again")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

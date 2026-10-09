@@ -198,7 +198,7 @@ had been made in the app. Webhooks fire too.
 | `GET /lists/{id}/tags` | read | The list tags of a list (shared by its members) |
 | `POST /lists/{id}/tags` | structure | Create a list tag `{name, color?}` (members with edit rights) |
 | `PATCH /lists/{id}/tags/{tag_id}` · `DELETE …` | structure | Rename / recolour · delete a list tag (removed from every task) |
-| `GET /lists/{id}/overview` | read | 2.7.1: the overview of a project list: description, key links, milestones, project files, Paperless documents, the files of its tasks, members, status history, tracked time (409 for other list types) |
+| `GET /lists/{id}/overview` | read | 2.7.1: the overview of a project list: description, key links, milestones, project files, the files of its tasks, members, status history, tracked time (409 for other list types) |
 | `PATCH /lists/{id}/overview` | structure | The description `{description}` (Markdown, at most 20000 characters; owner, list admins, members) |
 | `GET` · `POST /lists/{id}/links` | read · structure | Key links `{title?, url}` (http / https; at most 50) |
 | `PATCH` · `DELETE /lists/{id}/links/{link_id}`, `PUT /lists/{id}/links/order` | structure | Change · remove a link, reorder `{ids}` |
@@ -272,7 +272,7 @@ had been made in the app. Webhooks fire too.
   "created_at": "2026-09-29T08:15:00+00:00", "updated_at": "2026-09-29T08:15:00+00:00", "completed_at": null,
   "deleted": false, "fields": {"3": "opt2"}, "blocked": false, "comment_count": 0,
   "attachments": [{"id": 5, "name": "x-ray.pdf", "mime": "application/pdf", "size": 81234}],
-  "deadline": false, "deadline_in_today": false, "nag": "", "plan_start": null
+  "deadline": false, "deadline_in_today": false, "nag": "", "plan_start": null, "locked": false
 }
 ```
 
@@ -286,10 +286,17 @@ default; from the first reminder on, not during the person's quiet hours), `tags
 created when you may change the list), `assignee_id` (someone who can see the list), `assignee_group_id` (2.10.0: a group the
 list is shared with; setting one clears the other), (2.11.0) `plan_start` (the day plan's slot, `YYYY-MM-DDTHH:MM` local
 time or `null`; independent of `due`), `pinned`, `fields`
-(custom field values by field id); `content` is accepted as an alias of `notes` (2.2.1). `tags` are personal: every user has their own tags on a shared task; `list_tags`
+(custom field values by field id), (2.36.0) `locked` (boolean, see below); `content` is accepted as an alias of `notes` (2.2.1). `tags` are personal: every user has their own tags on a shared task; `list_tags`
 belong to the list and everyone in it sees them. Attachments are
 listed (name, type, size) in the task; read them with `GET /tasks/{id}/attachments` + `GET /attachments/{id}` (`attachments:read`) and add
 them with `POST /tasks/{id}/attachments` (`attachments:write`).
+
+**Locked tasks** (2.36.0): `locked: true` makes a task read-only **in the app**: title, notes, date and time,
+priority, list, tags, repeat and assignee stay as they are until someone who may change the task unlocks it there
+(comments, checkboxes in the notes, completing / reopening and subtasks stay free; the app's own writes are checked by
+the server too). The API is not bound by the lock: a token changes a locked task as before and can set or clear
+`locked`. Tasks created with an **agent's** token start locked unless the request sends `"locked": false`; tasks
+created with a personal access token stay open.
 
 **Code** (2.2.0, `GET /tasks/{id}` only): in a list connected to a repository a task also has `code` (the linked pull
 requests `[{repo, n, title, state: open | merged | closed, ci: success | failure | pending | null, author, url, branch}]`,
@@ -702,7 +709,7 @@ sends `task.completed` only.
 - `data.task` has the same fields as the API, as the webhook's owner sees the task (their own tags). `data.changes`
   (for `task.updated`), `data.permanent` (for `task.deleted`), `data.comment` (`{id, author_id, text, created_at,
   files}` for `comment.created`), `data.member` and `data.role` (for `list.shared`).
-- Never in a payload: passwords, tokens, secrets, attachment contents, Paperless data.
+- Never in a payload: passwords, tokens, secrets, attachment contents.
 
 **Headers**
 

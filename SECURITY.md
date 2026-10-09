@@ -45,7 +45,7 @@ migrates itself.
 - `semgrep` flags SQL built with f-strings: the interpolated parts are fixed SQL fragments or `?`
   placeholder lists, never user input; values always go through parameters.
 - `semgrep` / `bandit` flag `urllib` requests with a URL from configuration: server-side requests only go to
-  the ntfy / Paperless servers the admin configures and to the GitHub releases API, through a wrapper that
+  the ntfy servers, Git hosts and calendar servers the admin or users configure and to the GitHub releases API, through a wrapper that
   allows http/https only and same-host redirects.
 - ZAP reports the `style-src 'unsafe-inline'` part of the Content-Security-Policy: scripts are strictly
   `'self'`; inline styles are used for user-chosen list colours (validated hex values).
@@ -67,11 +67,6 @@ migrates itself.
 - Webhook receivers should check `X-Kalmido-Signature` and the timestamp (5 minute window) before trusting a payload.
 - Public list links are readable by anyone who has the link. Use *View only* unless ticking off is wanted, a password
   for anything sensitive, and *New link* if a link got out.
-- Paperless (2.1.0): server connections set up by an admin carry no shared token; every person the admin allows
-  enters their **own** Paperless token, so Paperless' own permissions apply per person. Personal connections are seen
-  and used only by their owner. Tokens are write-only and encrypted with `KALMIDO_SECRET_KEY`. Only the legacy
-  connection from the environment (`PAPERLESS_TOKEN`) still uses one token: every user an admin grants *Paperless
-  access* to it can see that token's whole archive, so prefer server connections with personal tokens.
 - Backups contain everything (all users' data, the server secrets in the settings table). They are only served to
   admins; keep copies you move elsewhere encrypted (*Encrypt backups*) and the passphrase outside the server. A
   restore replaces all data and is refused for anything but a complete, untampered Kalmido archive (see *Backups and

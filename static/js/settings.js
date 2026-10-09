@@ -1,4 +1,4 @@
-/* Kalmido web client: Settings: notifications, Web Push, autosave settings, personal agents, import, Paperless.
+/* Kalmido web client: Settings: notifications, Web Push, autosave settings, personal agents, import.
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
@@ -182,15 +182,16 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-trnd': ['time_rounding', N_('Rounding'), 'sel'], 's-tcur': ['time_currency', N_('Currency'), 'text'], 's-ttarget': ['time_target', N_('Daily target'), 'num'],
   's-trem': ['time_remind_h', N_('Reminder after'), 'num'], 's-tstop': ['time_autostop_h', N_('Stop automatically after'), 'num'], 's-tfocus': ['time_focus', N_('Focus sessions'), 'chk'],
   's-icalscope': ['ical_scope', N_('Calendar subscription'), 'sel'], 's-icalalarm': ['ical_alarms', N_('as calendar alarms'), 'chk'],
-  's-plkeep': ['paperless_keep', N_('Also keep the attachment in Kalmido'), 'chk'], 's-caltoday': ['cal_today', N_('Events on Today'), 'chk'],
+  's-caltoday': ['cal_today', N_('Events on Today'), 'chk'],
   's-dateok': ['date_confirm', N_('Confirm changes of the date with OK'), 'chk'],  // 2.6.1 (#401)
   's-qfrom': ['quiet_from', N_('Quiet from'), 'time'], 's-qto': ['quiet_to', N_('Quiet until'), 'time'],  // 2.7.0 (#413)
   's-wfrom': ['work_start', N_('Working hours from'), 'time'], 's-wto': ['work_end', N_('Working hours until'), 'time'],  // 2.10.0 (#440)
   's-review': ['review_time', N_('Daily review at'), 'time'],
   's-brief': ['brief_time', N_('Morning briefing at'), 'time'],  // 2.34.0 (#264)
   's-lemo': ['list_emoji', N_('Suggest icons for new lists'), 'chk'],  // 2.32.0 (#1077)
+  's-sideic': ['side_icons', N_('List icons'), 'sel'], 's-sideprog': ['side_progress', N_('Progress in the sidebar'), 'chk'],  // 2.36.0 (#1117)
 };
-const SET_RENDER = ['sidebar', 'features', 'nav_order', 'show_done_views', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden'];
+const SET_RENDER = ['sidebar', 'side_icons', 'side_progress', 'features', 'nav_order', 'show_done_views', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden'];
 function setVal(el, kind) {  // the value a control stands for; undefined = not valid (nothing is saved)
   const v = el.value;
   if (kind === 'chk') return el.checked ? '1' : '0';
@@ -250,7 +251,7 @@ function settingsSync() {
   const s = S.settings;
   for (const [id, [k, , kind]] of Object.entries(SETS)) {
     const el = $('#' + id, md); if (!el || el === document.activeElement) continue;
-    if (kind === 'chk') el.checked = k === 'celebrate' || k === 'list_emoji' || k === 'ical_alarms' || k === 'cal_today' || k === 'time_focus' ? s[k] !== '0' : s[k] === '1';
+    if (kind === 'chk') el.checked = k === 'celebrate' || k === 'list_emoji' || k === 'side_progress' || k === 'ical_alarms' || k === 'cal_today' || k === 'time_focus' ? s[k] !== '0' : s[k] === '1';
     else { el.value = s[k] ?? ''; if (el.dataset.dp) dpSync(el); }
   }
   for (const el of $$('[data-feat]', md)) el.checked = feat(el.dataset.feat);
@@ -282,14 +283,13 @@ async function setLang(code) {
 }
 // U04: the modules, grouped, each with one sentence; admins also get the switch for the whole server (collaboration, time)
 const MOD_GROUPS = [[N_('Views'), ['cal', 'timeline', 'kanban', 'matrix']], [N_('Calendar and people'), ['events', 'contacts']], [N_('For you'), ['habits', 'pomo', 'stats', 'comments']],
-  [N_('Projects and team'), ['collab', 'time', 'progress', 'deps', 'fields', 'agents', 'clients', 'workload', 'forms']], [N_('At home'), ['family', 'contracts', 'home', 'care', 'health', 'review', 'travel', 'reading']], [N_('Connections'), ['paperless']]];
+  [N_('Projects and team'), ['collab', 'time', 'progress', 'deps', 'fields', 'agents', 'clients', 'workload', 'forms']], [N_('At home'), ['family', 'contracts', 'home', 'care', 'health', 'review', 'travel', 'reading']]];
 const MOD_DESC = {cal: N_('Month, week and day view of your tasks'), timeline: N_('Tasks with start and end as bars over time'), kanban: N_('Lists as boards with columns'),
   matrix: N_('Urgent and important in four quadrants'), habits: N_('Daily and weekly habits with streaks'), pomo: N_('Pomodoro timer and stopwatch'),
   stats: N_('Completions, on-time rate, focus time and streaks'), collab: N_('Share lists, assign tasks, @mentions, activity and News'),
   comments: N_('Timestamped notes on your tasks; in shared lists with collaboration also @mentions and News'),
   time: N_('Timers and manual time entries on tasks, reports and CSV export'), progress: N_('Progress per list and the project status (“Where is it stuck?”)'),
   deps: N_('Tasks blocked by other tasks, with arrows in the timeline (Gantt)'), fields: N_('Own fields per list, such as budget, client or phase'),
-  paperless: N_('Link documents from Paperless-ngx to tasks'),
   events: N_('Appointments in your own calendars next to the tasks, shared calendars, invitations, synced with the phone’s calendar'),
   contacts: N_('Your address books: contacts linked to tasks and events, birthdays, synced with the phone’s contacts'),
   family: N_('Birthdays, household chores taking turns, shopping lists with shop areas, a meal plan, deadlines, packing lists and accounts for children'),
@@ -332,7 +332,7 @@ function modulesHtml(hint) {
 }
 // 2.25.0 (UX-19): the module groups start folded and say how many are on ("3 of 4 on"); the total on top counts the same
 // switches (every module shown here), and the setup counts against it too
-const modGroupKeys = ks => ks.filter(k => k !== 'paperless' || S.paperless?.enabled || feat('paperless'));
+const modGroupKeys = ks => ks;
 const modGroupCount = r => tr('{0} of {1} on', r.filter(k => feat(k)).length, r.length);
 const modAll = () => MOD_GROUPS.flatMap(([, ks]) => modGroupKeys(ks));
 const modCount = () => { const a = modAll(); return tr('{0} of {1} modules on', a.filter(k => feat(k)).length, a.length); };
@@ -365,7 +365,7 @@ function aiHtml(hint, want) {
   const subs = aiSubs();
   return `<div class="seg aisub" role="tablist" aria-label="${esc(tr('Agents'))}">${subs.map(([k, i, n]) => `<button type="button" role="tab" id="ais-${k}" data-aisub="${k}" aria-controls="aisp-${k}" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}">${ic(i, 's')}<span>${tr(n)}</span></button>`).join('')}</div>
     ${pane('agents', `<details class="shelp sdet aiexp" ${ags.length ? '' : 'open'}><summary>${tr('Agents are AI team members: they work only through the API and see only the lists shared with them.')}</summary>
-      <p>${tr('An agent is a team member for an AI assistant or a bot (Claude Code, Codex, n8n, a local model …): it works only through the API, is never an admin, gets no Paperless access and sees only the lists shared with it. Kalmido tells it about mentions, assignments, chat messages and reactions by webhook or through an event queue it polls; Kalmido itself never starts an AI.')} <a href="${API_DOCS.replace('API.md', 'AGENTS.md')}" target="_blank" rel="noopener noreferrer">${tr('How to connect an agent')}</a></p></details>
+      <p>${tr('An agent is a team member for an AI assistant or a bot (Claude Code, Codex, n8n, a local model …): it works only through the API, is never an admin and sees only the lists shared with it. Kalmido tells it about mentions, assignments, chat messages and reactions by webhook or through an event queue it polls; Kalmido itself never starts an AI.')} <a href="${API_DOCS.replace('API.md', 'AGENTS.md')}" target="_blank" rel="noopener noreferrer">${tr('How to connect an agent')}</a></p></details>
     ${feat('agents') ? '' : `<div class="shint aimodoff">${ic('grid', 's')} <span>${tr('The Agents module (the tab with their status, jobs to approve and the chat) is switched off for you.')}</span> <button class="btn sm" data-m="go-modules">${tr('Open Modules')}</button></div>`}
     ${collab() ? '' : hint(tr('Agents work together with you in shared lists: switch on Collaboration (Settings > Modules) as well.'))}
     <div class="members aglist" id="${adm ? 's-ags' : 's-myags'}"><div class="muted mhint">${tr('Loading…')}</div></div>
@@ -594,7 +594,7 @@ function hostWire(md) {
     try { await api('PUT', '/api/admin/announcement', body); } catch { return; }
     try { const j = await api('GET', '/api/about'); S.about = {...S.about, ...j}; } catch { /* keep */ }
     await load(); render(); toast(body.text ? tr('Notice published') : tr('Notice removed'));
-    const p = $('[data-admp="server"]', md); if (p) { p.innerHTML = instanceHtml((id, on, label) => `<label class="chkl"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}> ${label}</label>`, t => `<div class="shint">${t}</div>`) + hostHtml(t => `<div class="shint">${t}</div>`) + plaHtml() + bkHtml() + stoHtml(); plaDraw(md); bkDraw(md); }
+    const p = $('[data-admp="server"]', md); if (p) { p.innerHTML = instanceHtml((id, on, label) => `<label class="chkl"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}> ${label}</label>`, t => `<div class="shint">${t}</div>`) + hostHtml(t => `<div class="shint">${t}</div>`) + bkHtml() + stoHtml(); bkDraw(md); }
   });
 }
 function settingsModal(focus) {
@@ -619,7 +619,10 @@ function settingsModal(focus) {
       <h4 id="s-side-h">${tr('Sidebar')}</h4>
       ${hint(tr('The order of the groups and what they show; the same on every device. The eye hides a group, the boxes single entries.'))}
       <div class="navlist sidecfg" id="s-sidebar"></div>
-      <div class="row" style="margin-top:.5rem"><span class="spacer"></span><button class="btn sm" data-m="side-reset">${tr('Default')}</button></div>`,
+      <div class="row" style="margin-top:.5rem"><span class="spacer"></span><button class="btn sm" data-m="side-reset">${tr('Default')}</button></div>
+      <div class="row"><label for="s-sideic">${tr('List icons')}</label><select id="s-sideic">${[['line', N_('Lines')], ['emoji', N_('Emoji')], ['dot', N_('Dot')]].map(([v, n]) => `<option value="${v}" ${(s.side_icons || 'line') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
+      <div class="row">${chk('s-sideprog', s.side_progress !== '0', tr('Progress in the sidebar'))}</div>
+      ${hint(tr('Lines: a calm grey icon for the emoji at the start of a list name (the emoji stays in the name), its dot in the list colour. Dot: only the list colour. A project can also hide its progress in its own settings. For all your devices.'))}`,
     general: `<h4 id="s-lang-h">${tr('Language')}</h4>
       <div class="row"><div class="seg" id="s-lang" role="group" aria-labelledby="s-lang-h">${(S.languages || []).map(L => `<button data-lang-set="${esc(L.code)}" class="${(s.lang || 'en') === L.code ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div></div>
       ${hint(tr('Applies to all devices and to the notifications. Quick add understands English, German and the language chosen here.'))}
@@ -673,11 +676,6 @@ function settingsModal(focus) {
         <li>${tr('<b>Only reachable at home or over a VPN?</b> Google Calendar, iCloud and Outlook.com fetch the feed from their own servers and then cannot reach it. Use an app that fetches on the device instead: on Android ICSx⁵ (the calendar then shows up in every calendar app), on a Mac the location “On My Mac” instead of iCloud, or Thunderbird.')}</li></ul></details>
       ${hintK(tr('Anyone who knows the link sees these tasks. If it got out, create a new link: the old one stops working at once.'))}
       ${caldavHtml(hint)}
-      ${S.paperless?.personal || S.paperless?.enabled ? `<h4 id="s-pl-h">Paperless</h4>
-      ${hint(tr('Link documents from Paperless-ngx to tasks. Your connections: the ones an admin set up for you (you enter your own API token, so Paperless shows you exactly what you may see there) and your own, which only you see and use.'))}
-      ${S.paperless?.hosted ? `<div class="shint keep">${ic('alert', 's')} ${tr('On this hosted server only Paperless servers that are reachable over the internet with HTTPS can be connected, none in your own network.')} <a href="https://github.com/Gegenschuss/kalmido#readme" target="_blank" rel="noopener noreferrer">${tr('Self-hosting Kalmido reaches servers in your own network too.')}</a></div>` : ''}
-      <div class="members" id="s-plc"><div class="muted mhint">${tr('Loading…')}</div></div>
-      ${S.paperless?.enabled ? `<div class="row"><label>${tr('After upload')}</label>${chk('s-plkeep', s.paperless_keep === '1', tr('Also keep the attachment in Kalmido'))}</div>` : ''}` : ''}
       <h4 id="s-mail-h">${tr('Tasks by e-mail')}</h4><div id="s-mail"></div>
       ${shareHtml(hint)}
       <ul class="slist">
@@ -701,7 +699,7 @@ function settingsModal(focus) {
       users: usersHtml() + grpHtml() + orphHtml(),
       signin: `<div id="s-signin">${signinHtml(hint)}</div>`,
       org: orgsHtml() + orgAgentsHtml(hint),
-      server: instanceHtml(chk, hint) + hostHtml(hint) + plaHtml() + bkHtml() + stoHtml(),
+      server: instanceHtml(chk, hint) + hostHtml(hint) + bkHtml() + stoHtml(),
       log: aaHtml()}, {users: 'users', groups: 'users'}[focus]) : '',  // 1.9.0: users first
     help: `<h4>${tr('Getting started')}</h4>
       <div class="row"><button class="btn sm" data-m="tour">${ic('arrow', 's')} ${tr('Restart the welcome tour')}</button>${isMobile() ? '' : `<button class="btn sm" data-m="keys">${ic('help', 's')} ${tr('Keyboard shortcuts')} ${kb('?')}</button>`}<button class="btn sm" data-m="cele-try">${ic('check', 's')} ${tr('Show the celebration')}</button></div>
@@ -882,7 +880,6 @@ function settingsModal(focus) {
   if (cur === 'integr') { icalDraw(md); calsDraw(md); whDraw(md); }
   calsWire(md); whWire(md); if (S.me?.is_admin) { agWire(md); audWire(md); }
   agSetupWire(md);  // 2.7.2 (#420)
-  plcWire(md); if (S.me?.is_admin) plaWire(md);
   if (cur === 'notify') wpDraw(md);
   ntfyShow(md);
   if (cur === 'users') { aaDraw(md); bkDraw(md); orphDraw(md); grpDraw(md); }
@@ -1140,110 +1137,6 @@ function instanceHtml(chk, hint) {
 }
 // Settings > Users > Whole server > Admin alerts: operational warnings to the admins via ntfy (server side, own
 // "Save"; loaded when the pane opens). Recent alerts below, with "Clear".
-// ---- 2.1.0 (#180): Paperless connections. Tokens are write-only: the page only ever learns "set" / "not set".
-const plTokenIn = (id, ph) => `<input type="password" id="${id}" autocomplete="off" spellcheck="false" placeholder="${esc(ph || tr('API token'))}" maxlength="400">`;
-function plcRowHtml(c) {
-  const kind = c.kind === 'legacy' ? tr('set up on the server') : c.kind === 'server' ? tr('set up by an admin · your own token') : tr('personal · only you');
-  const tok = c.kind === 'legacy' ? '' : c.token_set ? (c.token_ok ? `<span class="pltok ok">•••• ${tr('set')}</span>` : `<span class="pltok bad">${tr('token unreadable, enter it again')}</span>`) : `<span class="pltok">${tr('no token yet')}</span>`;
-  return `<div class="mrow plc" data-plc="${c.id}">${ic('archive', 's')}<span class="n"><b>${esc(c.name)}</b><small class="muted">${esc(c.url)} · ${esc(kind)}</small>${tok}</span>
-    ${c.kind === 'legacy' ? '' : `<button class="btn sm" data-plc-act="token">${ic('key', 's')} ${c.token_set ? tr('Replace token') : tr('Enter token')}</button>`}
-    ${c.usable ? `<button class="iconbtn" data-plc-act="test" title="${esc(tr('Test the connection'))}" aria-label="${esc(tr('Test the connection'))}">${ic('check', 's')}</button>` : ''}
-    ${c.kind !== 'legacy' && c.token_set ? `<button class="iconbtn" data-plc-act="untoken" title="${esc(tr('Remove my token'))}" aria-label="${esc(tr('Remove my token'))}">${ic('x', 's')}</button>` : ''}
-    ${c.kind === 'personal' ? `<button class="iconbtn" data-plc-act="del" title="${esc(tr('Delete connection'))}" aria-label="${esc(tr('Delete connection'))}">${ic('trash', 's')}</button>` : ''}</div>`;
-}
-async function plcDraw(md) {
-  const box = $('#s-plc', md); if (!box) return;
-  let j;
-  try { j = await api('GET', '/api/paperless/conns'); } catch { box.innerHTML = ''; return; }
-  S.paperless = {...S.paperless, conns: j.conns, key: j.key, enabled: j.conns.some(c => c.usable)};
-  box.innerHTML = (j.conns.length ? j.conns.map(plcRowHtml).join('') : `<div class="muted mhint">${tr('No Paperless connection yet.')}</div>`) +
-    (j.key ? `<details class="plnew"><summary>${ic('plus', 's')} ${tr('Add my own connection')}</summary>
-      <div class="row"><label for="plc-name">${tr('Name')}</label><input id="plc-name" maxlength="60" placeholder="${esc(tr('e.g. Private'))}"></div>
-      <div class="row"><label for="plc-url">${tr('Address')}</label><input id="plc-url" type="url" inputmode="url" placeholder="https://paperless.example.com"></div>
-      <div class="row"><label for="plc-tok">${tr('API token')}</label>${plTokenIn('plc-tok')}</div>
-      <div class="shint keep">${tr('In Paperless: your profile (top right) > My Profile > API Auth Token. The token is stored encrypted and never shown again; only you can use this connection.')}</div>
-      <div class="row"><label></label><button class="btn sm pri" data-plc-act="add">${ic('plus', 's')} ${tr('Add')}</button></div></details>`
-      : `<div class="shint keep">${tr('Tokens cannot be stored on this server yet: the server operator has to set a secret key first (KALMIDO_SECRET_KEY, see the installation guide).')}</div>`);
-}
-function plcWire(md) {
-  if (!$('#s-plc', md)) return;
-  plcDraw(md);
-  md.addEventListener('click', async e => {
-    const b = e.target.closest('[data-plc-act]'); if (!b || !b.closest('#s-plc')) return;
-    const act = b.dataset.plcAct, id = +b.closest('[data-plc]')?.dataset.plc;
-    b.disabled = true;
-    try {
-      if (act === 'add') {
-        const body = {name: $('#plc-name', md).value.trim(), url: $('#plc-url', md).value.trim(), token: $('#plc-tok', md).value.trim()};
-        if (!body.name || !body.url || !body.token) { toast(tr('Name, address and token are needed')); return; }
-        await api('POST', '/api/paperless/conns', body); toast(tr('Connection added'));
-      } else if (act === 'token') {
-        const t = await askPrompt(tr('Your API token for this connection'), '', {input: {type: 'password', max: 400}, ok: tr('Save')}); if (!t) return;
-        await api('PATCH', `/api/paperless/conns/${id}`, {token: t.trim()}); toast(tr('Token saved'));
-      } else if (act === 'untoken') {
-        if (!await askConfirm(tr('Remove your token?'), tr('You can no longer search or link documents of this connection until you enter it again.'), {ok: tr('Remove')})) return;
-        await api('DELETE', `/api/paperless/conns/${id}/token`);
-      } else if (act === 'del') {
-        if (!await askConfirm(tr('Delete this connection?'), tr('Documents linked through it stay on the tasks, without title.'), {ok: tr('Delete'), danger: true})) return;
-        await api('DELETE', `/api/paperless/conns/${id}`);
-      } else if (act === 'test') {
-        const j = await api('POST', `/api/paperless/conns/${id}/test`); toast(j.ok ? tr('Connection works') : j.error || tr('Error'), null, 5000); return;
-      }
-      await plcDraw(md); render(); if (S.sel) renderDetail();
-    } catch { /* api() showed it */ } finally { b.disabled = false; }
-  });
-}
-// admins: server connections (name + address + who may use it); never a token, never anyone's personal connection
-const plaHtml = () => `<h4 id="s-pla-h">${tr('Paperless connections')}</h4><div id="s-pla"><div class="muted mhint">${tr('Loading…')}</div></div>`;
-async function plaDraw(md) {
-  const box = $('#s-pla', md); if (!box) return;
-  let j, users;
-  try { [j, users] = await Promise.all([api('GET', '/api/admin/paperless'), api('GET', '/api/users').then(x => x.users.filter(u => !u.disabled && !u.agent))]); } catch { box.innerHTML = ''; return; }
-  const ulist = (sel, cid) => `<div class="plusers">${users.map(u => `<label class="chkl"><input type="checkbox" data-pla-user="${u.id}" ${cid != null ? `data-pla-conn="${cid}"` : ''} ${sel.includes(u.id) ? 'checked' : ''}> ${esc(u.display_name)}</label>`).join('')}</div>`;
-  box.innerHTML = `<div class="shint">${tr('A connection names a Paperless server; every user you allow enters their own API token for it (Settings > Integrations), so Paperless decides what each one sees. Users can also add personal connections, which you never see.')}</div>
-    ${j.key ? '' : `<div class="shint warn">${j.key_problem === 'invalid' ? tr('KALMIDO_SECRET_KEY is invalid (it must be 32 random bytes, base64).') : tr('Set KALMIDO_SECRET_KEY (32 random bytes, base64, e.g. openssl rand -base64 32) in the environment and restart: without it no token can be stored. Keep a copy: if it is lost, everyone has to enter their tokens again.')}</div>`}
-    ${j.legacy.configured ? `<div class="mrow plc">${ic('archive', 's')}<span class="n"><b>Paperless</b><small class="muted">${esc(j.legacy.url)} · ${tr('token in the environment, for users with “Paperless access”')}</small></span></div>` : ''}
-    ${j.servers.map(c => `<details class="plsrv" data-pla="${c.id}"><summary>${ic('archive', 's')}<b>${esc(c.name)}</b> <span class="muted">${esc(c.url)} · ${trn('{0} user', '{0} users', c.users.length)} · ${trn('{0} token set', '{0} tokens set', c.tokens)}</span></summary>
-      <div class="row"><label>${tr('Name')}</label><input data-pla-f="name" maxlength="60" value="${esc(c.name)}"></div>
-      <div class="row"><label>${tr('Address')}</label><input data-pla-f="url" type="url" value="${esc(c.url)}"></div>
-      <div class="shint keep">${tr('A new address removes the tokens stored for it.')}</div>
-      <div class="row"><label>${tr('Who may use it')}</label>${ulist(c.users, c.id)}</div>
-      <div class="row"><label></label><button class="btn sm danger" data-pla-act="del">${ic('trash', 's')} ${tr('Remove connection')}</button></div></details>`).join('')}
-    <details class="plnew"><summary>${ic('plus', 's')} ${tr('New server connection')}</summary>
-      <div class="row"><label for="pla-name">${tr('Name')}</label><input id="pla-name" maxlength="60" placeholder="${esc(tr('e.g. Office'))}"></div>
-      <div class="row"><label for="pla-url">${tr('Address')}</label><input id="pla-url" type="url" inputmode="url" placeholder="https://paperless.example.com"></div>
-      <div class="row"><label>${tr('Who may use it')}</label>${ulist([], null)}</div>
-      <div class="row"><label></label><button class="btn sm pri" data-pla-act="add">${ic('plus', 's')} ${tr('Add')}</button></div></details>`;
-}
-function plaWire(md) {
-  if (!$('#s-pla', md)) return;
-  plaDraw(md);
-  const users = el => [...el.querySelectorAll('[data-pla-user]:checked')].map(x => +x.dataset.plaUser);
-  md.addEventListener('change', async e => {
-    const d = e.target.closest('[data-pla]'); if (!d || !d.closest('#s-pla')) return;
-    const id = +d.dataset.pla, f = e.target.dataset.plaF;
-    try {
-      if (f) await api('PATCH', `/api/admin/paperless/${id}`, {[f]: e.target.value.trim()});
-      else if (e.target.dataset.plaUser) await api('PATCH', `/api/admin/paperless/${id}`, {users: users(d)});
-      setSaved(null);
-    } catch { plaDraw(md); }
-  });
-  md.addEventListener('click', async e => {
-    const b = e.target.closest('[data-pla-act]'); if (!b || !b.closest('#s-pla')) return;
-    b.disabled = true;
-    try {
-      if (b.dataset.plaAct === 'add') {
-        const box = b.closest('.plnew');
-        await api('POST', '/api/admin/paperless', {name: $('#pla-name', md).value.trim(), url: $('#pla-url', md).value.trim(), users: users(box)});
-      } else {
-        const id = +b.closest('[data-pla]').dataset.pla;
-        if (!await askConfirm(tr('Remove this Paperless connection?'), tr('The users lose it and their tokens for it are deleted. Linked documents stay on the tasks, without title.'), {ok: tr('Remove'), danger: true})) return;
-        await api('DELETE', `/api/admin/paperless/${id}`);
-      }
-      await plaDraw(md); await load(); render();
-    } catch { /* api() showed it */ } finally { b.disabled = false; }
-  });
-}
 const aaHtml = () => `<h4 id="s-aa-h">${tr('Admin alerts')}</h4><div id="s-aa"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 const AA_STATE = {sent: N_('delivered'), failed: N_('not delivered'), queued: N_('waiting for the summary'), summarized: N_('in the summary'), capped: N_('hourly limit reached'), listed: N_('only listed (no device or topic yet)')};
 function aaWhen(x) { return x ? new Date(x).toLocaleString(I18N.code || 'en', {dateStyle: 'short', timeStyle: 'short'}) : ''; }

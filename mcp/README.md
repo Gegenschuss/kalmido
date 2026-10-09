@@ -167,7 +167,7 @@ The env file holds `KALMIDO_URL` and `KALMIDO_TOKEN` (optional `KALMIDO_USAGE_PR
 
 ## Security
 
-- The token has exactly the agent's permissions: only the lists shared with it, only its scopes (2.15.0), never admin rights, no Paperless access. An admin can pause the agent at any time. A paused agent's token stops working at once.
+- The token has exactly the agent's permissions: only the lists shared with it, only its scopes (2.15.0), never admin rights. An admin can pause the agent at any time. A paused agent's token stops working at once.
 - Keep the token out of shared config files. The server never prints or logs it.
 - A person can chat with the agent even if they cannot see every list the agent sees. The agent must not quote content from lists that this person cannot see.
 

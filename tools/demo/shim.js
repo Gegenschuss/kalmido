@@ -5,7 +5,7 @@
    Implemented: lists, sections, tasks (subtasks, tags, fields, dependencies, repeats, trash), Today / Upcoming / kanban /
    timeline / calendar data, comments (local), time tracking, habits, filters, milestones and project status, day plan,
    settings (appearance, language, modules) and a simulated agent with one approval. Everything that needs a server
-   (push, CalDAV, calendar subscriptions, real agents, Paperless, Git, webhooks, OIDC, more users, imports, backups) answers
+   (push, CalDAV, calendar subscriptions, real agents, Git, webhooks, OIDC, more users, imports, backups) answers
    with a calm "not available in the demo" notice and a link to the install page. */
 'use strict';
 (() => {
@@ -38,7 +38,7 @@
   // ---------------------------------------------------------------- seed (sample data in the visitor's language)
   const TASK_DEF = {assigned_by: null, assignee_group_id: null, assignee_id: null, attachments: [], completed_at: null, completed_by: null,
     content: '', created_by: 1, deadline: 0, deleted_at: null, due: null, due_time: null, duration: null, fields: {}, ltags: [], nag: '',
-    paperless: [], parent_id: null, pinned: 0, plan_start: null, priority: 0, reminders: '', repeat: '', repeat_from: 'due', section_id: null,
+    parent_id: null, pinned: 0, plan_start: null, priority: 0, reminders: '', repeat: '', repeat_from: 'due', section_id: null,
     sort: 0, start: null, status: 0, tags: [], tt_id: null, ttype: '', unread: 0, url: null, wait_by: null, wait_fired: '', wait_note: '',
     wait_until: null, waiting_at: null};
   const LIST_DEF = {agent_tidy: 'off', columns: null, archived: 0, archived_at: null, bell: 'default', bell_custom: {}, checklist: 0, color: '', day_hours: null,
@@ -49,7 +49,7 @@
     date_confirm: '0', default_reminder: '0', digest_time: '', features: 'cal,timeline,matrix,habits,kanban,collab,stats,time,progress,deps,fields,comments,agents',
     features_rev: '9', folders: '[]', folders_closed: '[]', hide_blocked_today: '0', hide_progress: '', ical_alarms: '1', ical_scope: 'all',
     lang: 'en', nav_order: 'tasks,cal,matrix,habits', news_kinds: 'mention,assign,comment,unblock,share,status', notify: '', ntfy_topic: '',
-    onboard: 'done', paperless_keep: '0', pomo_focus: '25', pomo_long: '15', pomo_long_every: '4', pomo_short: '5', progress_subtasks: '0',
+    onboard: 'done', pomo_focus: '25', pomo_long: '15', pomo_long_every: '4', pomo_short: '5', progress_subtasks: '0',
     push_channel: 'webpush', push_priority: '4', quiet_from: '22:00', quiet_to: '07:00', review_time: '', roadmap: '', sample_ask: '0',
     show_done_views: '{}', time_autostop_h: '12', time_currency: '€', time_focus: '1', time_remind_h: '4', time_rounding: '0', time_target: '0',
     tour: 'done', work_end: '17:00', work_start: '09:00'};
@@ -173,7 +173,7 @@
       filters: clone(DB.filters), sections: clone(DB.sections).sort((a, b) => a.sort - b.sort || a.id - b.id), fields: clone(DB.fields),
       tasks, habits: clone(DB.habits), pomo: null, pomo_today: {count: 0, minutes: 0},
       counts: {done: live().filter(t => t.status !== 0).length, trash: DB.tasks.filter(t => t.deleted_at).length},
-      settings: clone(DB.settings), notify: {}, paperless: {configured: false, conns: [], enabled: false, key: false, personal: true, url: ''},
+      settings: clone(DB.settings), notify: {},
       ntfy_inbox: {enabled: false, server: '', topic: ''}, ntfy_url: '', webpush: {devices: 0, enabled: false, key: ''},
       languages: [{beta: false, code: 'de', name: 'Deutsch'}, {beta: false, code: 'en', name: 'English'}, {beta: true, code: 'es', name: 'Español'},
         {beta: true, code: 'fr', name: 'Français'}, {beta: true, code: 'it', name: 'Italiano'}, {beta: true, code: 'nl', name: 'Nederlands'}],
@@ -316,13 +316,13 @@
   }
 
   // ---------------------------------------------------------------- routes
-  const GATED = /^\/api\/(push|ical|calendars(?!\/events)|paperless|admin|import|imports|repos|me\/(webhooks|tokens|app-passwords|2fa|passkeys|drop-token)|my\/agents|users$|users\/|backups|public|oidc|attachments|list-files|templates|news\/|pomo|ntfy|sample|onboarding|proposals|folders\/groups|agents\/usage|family\/contacts)|\/(members|groups|owner|public-link|repos|paperless|files|icon|git-undo|attachments|take|wake|waiting)(\/|$|\?)/;
+  const GATED = /^\/api\/(push|ical|calendars(?!\/events)|admin|import|imports|repos|me\/(webhooks|tokens|app-passwords|2fa|passkeys|drop-token)|my\/agents|users$|users\/|backups|public|oidc|attachments|list-files|templates|news\/|pomo|ntfy|sample|onboarding|proposals|folders\/groups|agents\/usage|family\/contacts)|\/(members|groups|owner|public-link|repos|paperless|files|icon|git-undo|attachments|take|wake|waiting)(\/|$|\?)/;
   // automatic background calls of the app: answered quietly (no notice)
   const QUIET = {
     'GET /api/push/subs': () => ({subs: []}), 'GET /api/push/vapid': () => ({key: ''}), 'GET /api/my/agents': () => ({allowed: false, max: 0, count: 0, agents: [], api: false}),
     'GET /api/imports': () => ({imports: []}), 'GET /api/templates': () => ({templates: []}), 'GET /api/calendars': () => ({subs: [], enabled: false}),
     'GET /api/me/tokens': () => ({tokens: []}), 'GET /api/me/webhooks': () => ({webhooks: []}), 'GET /api/me/app-passwords': () => ({passwords: []}),
-    'GET /api/me/2fa': () => ({totp: false, passkeys: [], recovery_left: 0}), 'GET /api/paperless/conns': () => ({conns: []}),
+    'GET /api/me/2fa': () => ({totp: false, passkeys: [], recovery_left: 0}),
     'GET /api/agents/usage': () => ({days: [], agents: []}), 'POST /api/onboarding': () => ({ok: true, created: false}), 'POST /api/news/read': () => ({ok: true}),
     'GET /api/pomo/stats': () => ({days: [], total: 0}), 'GET /api/ical': () => ({enabled: false}),
   };
@@ -436,9 +436,9 @@
   on('GET', '/api/lists/(\\d+)/overview', (q, b, id) => {
     const l = listById(id) || gone(), sec = DB.time.filter(e => e.list_id === l.id).reduce((a, e) => a + secsOf(e), 0);
     return {can_edit: true, description: l.description || '', files: [], links: [], list_id: l.id, members: [{name: DB.me.display_name, role: 'owner', user_id: 1}, ...(l.members || []).map(m => ({name: agentName(), role: m.role, user_id: m.user_id}))],
-      milestones: clone(l.milestones || []), name: l.name, paperless: [], role: 'owner',
+      milestones: clone(l.milestones || []), name: l.name, role: 'owner',
       status: {at: l.status_at, current: l.status, note: l.status_note, history: DB.status.filter(s => s.list_id === l.id).map(s => ({...s, name: DB.me.display_name})).reverse()},
-      task_files: [], task_paperless: [], time: {budget_h: null, day_hours: 8, seconds: sec}};
+      task_files: [], time: {budget_h: null, day_hours: 8, seconds: sec}};
   });
   on('PATCH', '/api/lists/(\\d+)/overview', (q, b, id) => { const l = listById(id) || gone(); if ('description' in b) l.description = String(b.description || ''); return {ok: true}; });
   on('POST', '/api/lists/(\\d+)/milestones', (q, b, id) => { const l = listById(id) || gone(); if (!String(b.name || '').trim()) bad('Name missing');

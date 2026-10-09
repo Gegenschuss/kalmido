@@ -15,7 +15,6 @@ from ..core.db import body, bump, db, err, iso, local_now, now_utc, uset, usetti
 from ..accounts.session import me, user_public
 from ..lists.lists import clean_folder
 from ..tasks.validation import clean_reminders, valid_hm
-from ..integrations.paperless import pl_conns_for, pl_usable_ids
 from ..collab.news import NEWS_GROUPS, notif_update
 from ..personal.timetrack import BadInput
 from .layouts import LAYOUT_KEYS
@@ -28,10 +27,11 @@ SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "review_sent", "ntfy_
                         "brief_sent", "brief_read")  # 2.34.0 (#264)
 SIDE_GROUPS = ("focus", "clients", "lists", "filters", "tags", "views", "team")  # 2.25.0 (UX-03)
 DASH_WIDGETS = ("wait", "today", "news", "chat", "projects", "pinned", "notes", "agents", "stats", "search", "family")  # 2.17.0 (#475), 2.19.0
-SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "time_focus", "paperless_keep", "celebrate", "cal_today",
+SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "time_focus", "celebrate", "cal_today",
                   "date_confirm", "digest_mail", "mail_from_me", "today_inbox", "agent_push",  # 2.28.0 (#987): agent_push
                   "detail_cm_fold",  # 2.31.0 (#344)
                   "list_emoji",  # 2.32.0 (#1077)
+                  "side_progress",  # 2.36.0 (#1117)
                   "agent_steps_live", "agent_steps_always")  # 2.32.0 (#1081)
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
@@ -178,6 +178,10 @@ def clean_setting(k, v):
         return json.dumps(list(dict.fromkeys(f for f in (clean_folder(x, False) for x in arr) if f)), ensure_ascii=False)
     if k == "show_done_views":
         return clean_done_views(v)
+    if k == "side_icons":  # 2.36.0 (#1117)
+        if sv not in ("line", "emoji", "dot"):
+            raise bad
+        return sv
     if k == "comment_order":  # 2.4.2 (#386)
         if sv not in ("old", "new"):
             raise bad
@@ -421,7 +425,6 @@ def export_json():
         "pomos": ("SELECT * FROM pomos WHERE user_id=?", (uid,)),
         "filters": ("SELECT * FROM filters WHERE user_id=?", (uid,)),
         "attachments": (f"SELECT * FROM attachments WHERE task_id IN {task_ids}", (uid,)),
-        "paperless_links": (f"SELECT * FROM paperless_links WHERE task_id IN {task_ids}", (uid,)),
         "comments": (f"SELECT * FROM comments WHERE task_id IN {task_ids} AND deleted_at IS NULL", (uid,)),
         "activity": (f"SELECT * FROM activity WHERE task_id IN {task_ids}", (uid,)),
         "settings": ("SELECT key, value FROM user_settings WHERE user_id=?", (uid,)),
@@ -435,7 +438,6 @@ def export_json():
         "list_links": (f"SELECT * FROM list_links WHERE list_id IN {own}", (uid,)),
         "list_milestones": (f"SELECT * FROM list_milestones WHERE list_id IN {own}", (uid,)),
         "list_files": (f"SELECT * FROM list_files WHERE list_id IN {own}", (uid,)),
-        "list_paperless": (f"SELECT * FROM list_paperless WHERE list_id IN {own}", (uid,)),
         "list_layouts": ("SELECT * FROM list_layouts WHERE user_id=?", (uid,)),
         "list_notif": (f"SELECT * FROM list_notif WHERE list_id IN {own}", (uid,)),  # 2.33.0 (#927): my notification templates
         "folder_notif": ("SELECT * FROM folder_notif WHERE owner_id=?", (uid,)),
@@ -463,15 +465,9 @@ def export_json():
                          f"WHERE list_id IN {own}", (uid,)),
     }
     data = {t: [dict(r) for r in c.execute(sql, args)] for t, (sql, args) in q.items()}
-    pl_ok = pl_usable_ids(c, uid)  # 2.1.0: documents of connections I cannot use: no titles
-    for p in data["paperless_links"] + data["list_paperless"]:
-        if (p.get("conn_id") or 0) not in pl_ok:
-            p.update(doc_id=None, title="", correspondent="", created="", **({"message": ""} if "message" in p else {}))
-    for a in data["activity"]:
-        if a["kind"] in ("paperless", "paperless_rm") and (json.loads(a["data"] or "{}").get("conn") or 0) not in pl_ok:
+    for a in data["activity"]:  # 2.36.0 (#1116): old entries of the removed Paperless connection carry no document data
+        if a["kind"] in ("paperless", "paperless_rm", "paperless_send"):
             a["data"] = "{}"
-    # my own connections (name + URL; tokens never leave the server)
-    data["paperless_connections"] = [{k: x[k] for k in ("id", "kind", "name", "url", "token_set")} for x in pl_conns_for(c, uid)]
     data["user"] = user_public(g.user)
     name = f"kalmido-export-{local_now():%Y-%m-%d}.json"
     return Response(json.dumps(data, ensure_ascii=False, indent=1), mimetype="application/json",

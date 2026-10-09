@@ -1,10 +1,6 @@
-// 2.1.0 UI tests (jsdom), own container (start.sh) with KALMIDO_SECRET_KEY, the legacy Paperless connection from the
-// environment and the fake Paperless (fake_services.py) inside:
+// 2.1.0 UI tests (jsdom), own container (start.sh) with KALMIDO_SECRET_KEY (2.36.0: the Paperless part is gone):
 // #317 Settings > Notifications: the matrix (events x News / Push, reminder without News, saved per checkbox, undo),
 //      German, phone; the list bell (list menu > Notifications, the list dialog, the muted icon in the sidebar)
-// #180 Settings > Integrations: my connections (server ones with "no token yet" / "•••• set", enter a token, my own
-//      connection), never a token in the page; the admin's server connections without anyone's personal one; the link
-//      dialog picks the connection
 // #335 waiting on external: task menu > dialog (note + follow-up day), the chip on the row, the bar in the task panel,
 //      the smart view "Waiting on external", clearing with one click (+ undo), the News / history texts; SW v60
 const {execFileSync} = require('child_process');
@@ -17,15 +13,12 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 const CT = process.env.KALMIDO_TEST_CONTAINER || 'kalmido-test';
 const KEY = require('crypto').randomBytes(32).toString('base64');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore', env: {...process.env,
-  EXTRA: `-e KALMIDO_SECRET_KEY=${KEY} -e PAPERLESS_TOKEN=pl-legacy-env-token -e PAPERLESS_API=http://127.0.0.1:8082 -e PAPERLESS_PUBLIC_URL=https://paperless.example.test`}});
-fs.copyFileSync(path.join(__dirname, 'fake_services.py'), path.join(DATA, 'fake_services.py'));
-execFileSync('docker', ['exec', '-d', CT, 'python', '/data/fake_services.py']);
+  EXTRA: `-e KALMIDO_SECRET_KEY=${KEY}`}});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
 const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const change = (w, el) => el && el.dispatchEvent(new w.Event('change', {bubbles: true}));
-const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,progress,deps,fields,comments,agents';
-const TOKEN = 'bob-ui-server-token-4c2e', PTOKEN = 'bob-ui-personal-token-9d1f';
+const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,deps,fields,comments,agents';
 
 (async () => {
   await sleep(600);
@@ -103,47 +96,6 @@ const TOKEN = 'bob-ui-server-token-4c2e', PTOKEN = 'bob-ui-personal-token-9d1f';
   check((await call('GET', '/api/state', null, CKB)).lists.find(l => l.id === TEAM).bell === 'all' && /every comment/.test(d.querySelector('#l-bellhint').textContent), 'list dialog: All');
   w.close();
   await call('PUT', `/api/lists/${TEAM}/bell`, {mode: 'default'}, CKB);
-
-  // ================= #180 connections
-  const SRV = (await call('POST', '/api/admin/paperless', {name: 'Office', url: 'http://127.0.0.1:8082', users: [BOB]})).id;
-  await call('PATCH', '/api/admin/settings', {cal_allow_hosts: '127.0.0.1:8082'});
-  w = await boot({user: 'bob', hash: 'today'}); d = w.document;
-  w.eval(`settingsModal('integr')`); await sleep(900);
-  let box = d.querySelector('#s-plc');
-  let row = box?.querySelector(`[data-plc="${SRV}"]`);
-  check(row && /Office/.test(row.textContent) && /no token yet/.test(row.textContent) && /set up by an admin/.test(row.textContent), 'my connections: the server one, no token yet');
-  check(box.querySelector('.plnew') && box.querySelector('#plc-tok').type === 'password', 'add my own: a password field');
-  w.prompt = () => TOKEN;
-  click(w, row.querySelector('[data-plc-act="token"]')); await sleep(1200);
-  row = d.querySelector(`#s-plc [data-plc="${SRV}"]`);
-  check(row && /•••• set/.test(row.textContent) && row.querySelector('[data-plc-act="untoken"]'), 'token set: "•••• set" + remove');
-  d.querySelector('#plc-name').value = 'Private'; d.querySelector('#plc-url').value = 'http://127.0.0.1:8082'; d.querySelector('#plc-tok').value = PTOKEN;
-  click(w, d.querySelector('[data-plc-act="add"]')); await sleep(1200);
-  const per = [...d.querySelectorAll('#s-plc [data-plc]')].find(r => /Private/.test(r.textContent));
-  check(per && /personal · only you/.test(per.textContent) && per.querySelector('[data-plc-act="del"]'), 'my own connection listed');
-  check(!d.documentElement.outerHTML.includes(TOKEN) && !d.documentElement.outerHTML.includes(PTOKEN), 'no token anywhere in the page');
-  check(w.eval('plConns().length') === 2, 'two usable connections');
-  w.close();
-  // the link dialog picks the connection
-  w = await boot({user: 'bob', hash: 't/' + T2}); d = w.document; await sleep(500);
-  w.eval(`plSearchModal(${T2})`); await sleep(900);
-  const cs = d.querySelector('.plmodal #pl-conn');
-  check(cs && cs.options.length === 2, 'link dialog: connection select');
-  check(d.querySelector('.plmodal .plitem img')?.getAttribute('src').includes('conn='), 'thumbnails carry the connection');
-  click(w, d.querySelector('.plmodal .plitem')); await sleep(900);
-  const lk = (await call('GET', '/api/state', null, CKB)).tasks.find(t => t.id === T2).paperless[0];
-  check(lk && lk.conn === +cs.value && lk.title, 'linked with that connection');
-  w.eval('renderDetail()'); await sleep(200);
-  check(d.querySelector('.plsec .plink a')?.getAttribute('href') === 'http://127.0.0.1:8082/documents/7/details', 'the document opens on its connection: ' + d.querySelector('.plsec .plink a')?.getAttribute('href'));
-  w.close();
-  // alice (admin): server connections only, bob's link hidden
-  w = await boot({user: 'alice', hash: 't/' + T2}); d = w.document; await sleep(500);
-  check(/Linked through a Paperless connection you cannot use/.test(d.querySelector('.plsec')?.textContent || ''), "alice: bob's document only as 'a document'");
-  w.eval(`settingsModal('users')`); await sleep(1200);
-  const pla = d.querySelector('#s-pla');
-  check(pla && pla.querySelector(`[data-pla="${SRV}"]`) && /1 token set/.test(pla.textContent) && !/Private/.test(pla.textContent), 'admin: the server connection, not the personal one');
-  check(!d.documentElement.outerHTML.includes(TOKEN) && !d.documentElement.outerHTML.includes(PTOKEN) && !d.documentElement.outerHTML.includes('pl-legacy-env-token'), 'admin page: no token');
-  w.close();
 
   // ================= #335 waiting on external
   for (const [mobile, lab] of [[false, 'desktop'], [true, 'phone']]) {

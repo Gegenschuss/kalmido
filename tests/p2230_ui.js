@@ -52,9 +52,9 @@ const BASE = 'cal,comments,collab,time,progress,agents';
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
   // #794: the icon column in the sidebar
   const sb = w.eval(`(() => { const f = [...document.querySelectorAll('#side .fhead')].find(x => /Work/.test(x.textContent)); const g = [...document.querySelectorAll('#side .srow[data-list]')].find(x => /Goals/.test(x.textContent));
-    return {fic: !!f?.querySelector('.sic svg'), chevLast: f && [...f.children].findIndex(x => x.classList?.contains('fcar')) > [...f.children].findIndex(x => x.classList?.contains('n')), emo: g?.querySelector('.sic.semo')?.textContent, name: g?.querySelector('.n')?.textContent,
+    return {fic: !!f?.querySelector('.sic svg'), chevLast: f && [...f.children].findIndex(x => x.classList?.contains('fcar')) > [...f.children].findIndex(x => x.classList?.contains('n')), emo: g?.querySelector('.sic.semo')?.textContent || (g?.querySelector('.sic.sln svg') && !/🎯/.test(g.textContent) ? 'line' : ''), name: g?.querySelector('.n')?.textContent,
       dots: [...document.querySelectorAll('#side .srow[data-list]')].every(r => r.querySelector('.sic'))}; })()`);
-  check(sb.fic && sb.chevLast && sb.emo === '🎯' && sb.name === 'Goals' && sb.dots, '#794: folder icon in the icon column, the arrow at the end, the emoji in the column, the name without it ' + JSON.stringify(sb));
+  check(sb.fic && sb.chevLast && sb.emo === 'line' && sb.name === 'Goals' && sb.dots, '#794: folder icon in the icon column, the arrow at the end, the emoji as a line icon in the column (2.36.0, #1117), the name without it ' + JSON.stringify(sb));
   w.close();
   await call('PATCH', '/api/settings', {features: BASE + ',clients,workload,forms'});
 

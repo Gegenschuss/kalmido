@@ -419,6 +419,7 @@ function actText0(a, U) {
     case 'parent': return d.title ? tr('{0} made the task a subtask of {1}', who, q(d.title)) : tr('{0} made the task a main task', who);
     case 'snippets': return d.n ? tr('{0} changed the code snippets ({1})', who, d.n) : tr('{0} removed the code snippets', who);  // 2.35.0 (#1095)
     case 'ttype': return d.to ? tr('{0} set the type to {1}', who, q(ttName(d.to))) : tr('{0} removed the type', who);  // 2.4.0 (#340)
+    case 'lock': return d.on ? tr('{0} locked the task', who) : tr('{0} unlocked the task', who);  // 2.36.0 (#1118)
     case 'ms': return d.on ? tr('{0} made the task a milestone', who) : tr('{0} made the milestone a normal task', who);  // 2.18.0 (#430)
     case 'milestone': return d.title ? tr('{0} added the task to the milestone {1}', who, q(d.title)) : tr('{0} removed the task from its milestone', who);
     case 'repeat': return d.rule ? tr('{0} set the repetition to {1}', who, q(repeatLabel(d.rule))) : tr('{0} stopped the repetition', who);
@@ -429,11 +430,8 @@ function actText0(a, U) {
     case 'skip': return tr('{0} skipped an occurrence, next one {1}', who, q(fmtDayAbs(d.next)));
     case 'attach': return (d.n || 1) === 1 ? tr('{0} added the attachment {1}', who, q((d.names || [])[0] || '')) : trn('{1} added {0} attachment', '{1} added {0} attachments', d.n, who);
     case 'attach_rm': return tr('{0} removed the attachment {1}', who, q(d.name || ''));
-    case 'paperless': return tr('{0} linked the Paperless document {1}', who, q(d.title || ''));
     case 'waiting': return d.until ? tr('{0} set the task to waiting on someone ({1}), follow up on {2}', who, q(d.note || '–'), q(dayLabel(d.until))) : tr('{0} set the task to waiting on someone ({1})', who, q(d.note || '–'));
     case 'waiting_rm': return tr('{0} ended the waiting on someone', who);
-    case 'paperless_rm': return tr('{0} removed the Paperless document {1}', who, q(d.title || ''));
-    case 'paperless_send': return tr('{0} sent {1} to Paperless', who, q(d.name || ''));
     case 'subtask': return tr('{0} added the subtask {1}', who, q(d.title || ''));
     case 'dep_add': return d.hidden ? tr('{0} marked the task as blocked by a task you cannot see', who) : tr('{0} marked the task as blocked by {1}', who, q(d.title || ''));
     case 'dep_rm': return d.hidden ? tr('{0} removed a dependency on a task you cannot see', who) : tr('{0} removed the dependency on {1}', who, q(d.title || ''));
@@ -597,6 +595,7 @@ function cmComposer(t, top = false) {  // top: 2.4.2 (#386) newest first, the bo
 }
 function drawTimeline() {
   if (S.tl.id !== S.sel) return;
+  const sc = cmxScrollGet();  // 2.36.0 (#1120): who reads the newest comments at the end stays there when one arrives
   const box = $('#d-tl-items'); if (box) patchKids(box, timelineItems());  // 2.12.2 (#451): only changed / new comments
   const hb = $('#d-hist-items'); if (hb) hb.innerHTML = histItems();
   const n = $('#d-tl-count'); if (n) n.textContent = S.tl.comments?.length || '';
@@ -605,6 +604,7 @@ function drawTimeline() {
   if (t && $('#detail .dcomp') && !!$('#d-tl') !== want) {  // #315: the list appears with the first comment (or goes with the last)
     const f = document.activeElement?.id === 'c-input'; renderDetail(); if (f) $('#c-input')?.focus();
   }
+  cmxScrollSet(sc, true);
   if (S.tlScroll === S.sel && S.tl.comments) { S.tlScroll = null; const b = $('#d-tl-items'); (cmtNew() ? $('#d-tl') : b?.lastElementChild)?.scrollIntoView({block: 'nearest'}); }  // opened from a comment (#386: newest first = the top)
 }
 const mdIsLong = s => { s = String(s || ''); return s.split('\n').length > 10 || s.length > 900; };  // 2.27.0 (#994): 8 -> 10 lines, 640 -> 900 characters

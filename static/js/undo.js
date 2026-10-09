@@ -12,7 +12,7 @@
 // /api/tasks/batch, one transaction however many tasks it touches. Offline: a step whose operation still waits in the
 // outbox is taken out of the queue and the local state restored (never sent); otherwise task steps are queued like
 // any other change (the buttons show the pending state). Steps on lists that became view-only refuse.
-const UNDO_FIELDS = ['list_id', 'section_id', 'parent_id', 'due', 'due_time', 'start', 'duration', 'reminders', 'repeat', 'repeat_from', 'priority', 'pinned', 'assignee_id', 'ttype', 'deadline', 'nag', 'assignee_group_id', 'plan_start', 'ms', 'milestone_id'];  // 2.18.0: ms, milestone_id (#430)  // 2.11.0: plan_start  // 2.10.0: assignee_group_id  // 2.4.0: ttype (#340), 2.7.0: deadline, nag
+const UNDO_FIELDS = ['list_id', 'section_id', 'parent_id', 'due', 'due_time', 'start', 'duration', 'reminders', 'repeat', 'repeat_from', 'priority', 'pinned', 'assignee_id', 'ttype', 'deadline', 'nag', 'assignee_group_id', 'plan_start', 'ms', 'milestone_id', 'locked'];  // 2.18.0: ms, milestone_id (#430)  // 2.11.0: plan_start  // 2.10.0: assignee_group_id  // 2.4.0: ttype (#340), 2.7.0: deadline, nag
 const HIST_FIELDS = [...UNDO_FIELDS, 'title', 'content', 'url', 'tags', 'fields'];
 const HIST_MAX = 30, HIST_MENU = 10;
 const HIST = {undo: [], redo: [], busy: false, group: null, gToast: null, toastE: null, sess: 0, ids: {}, secmap: new Map()};
@@ -267,6 +267,7 @@ document.addEventListener('keydown', e => {
 function histLabel(b, a) {
   const n = qn(String(a.title || b.title || '').slice(0, 40)), ch = HIST_FIELDS.filter(k => reverseOf(b, a, [k]));
   const has = k => ch.includes(k);
+  if (ch.length === 1 && has('locked')) return a.locked ? tr('Locked {0}', n) : tr('Unlocked {0}', n);  // 2.36.0 (#1118)
   if (has('list_id')) return tr('Moved {0} to {1}', n, lname(listById(a.list_id)) || '?');
   if (has('parent_id')) return a.parent_id ? tr('{0} is now a subtask', n) : tr('{0} is now a main task', n);
   if (ch.length === 1 && has('title')) return tr('Renamed {0}', n);

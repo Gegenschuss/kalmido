@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS attachments (
   path TEXT NOT NULL,                           -- relative to ATT_DIR
   created_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS attachments_task ON attachments(task_id);
+-- 2.36.0 (#1116): the Paperless connection is removed from the app. Its tables (paperless_links, pl_conns,
+-- pl_conn_users, pl_tokens, list_paperless) and users.paperless_access stay as they are: no data is lost, the way back stays open.
 CREATE TABLE IF NOT EXISTS paperless_links (
   id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
   doc_id INTEGER,                               -- NULL while an upload is still being consumed
@@ -952,6 +954,10 @@ MIGRATIONS = [
     ("agents", "stale_sent", "ALTER TABLE agents ADD COLUMN stale_sent TEXT NOT NULL DEFAULT ''"),
     # 2.35.0 (#1095): the code snippets of a task (JSON list, '' = none; tasks/snippets.py). New column only
     ("tasks", "snippets", "ALTER TABLE tasks ADD COLUMN snippets TEXT NOT NULL DEFAULT ''"),
+    # 2.36.0 (#1118): the lock of a task (1 = locked: title, notes, dates, priority, list, tags, repeat and assignee are
+    # read-only in the app until someone with write access unlocks it; the agent API is not bound by it). New column only,
+    # existing tasks stay 0 = open
+    ("tasks", "locked", "ALTER TABLE tasks ADD COLUMN locked INTEGER NOT NULL DEFAULT 0"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
@@ -1019,7 +1025,7 @@ USER_DEFAULTS = {
     #            @mentions, pushes and News
     # progress = progress bar in the list header + the "Where is it stuck?" overview
     # deps = dependencies ("waiting on", timeline arrows + linking, unblock notifications); fields = custom fields
-    "features": "cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,progress,deps,fields,comments,events,contacts",
+    "features": "cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,deps,fields,comments,events,contacts",
     "nav_order": "tasks,cal,matrix,habits,pomo",   # order of the mobile tab bar / desktop rail
     "folders": "[]",            # json list: folder order in the sidebar (also keeps empty folders); 2.4.0: paths "A/b"
     "folders_closed": "[]",     # 2.4.0 (#361): json list of the folder paths folded in the sidebar (all devices)
@@ -1034,7 +1040,6 @@ USER_DEFAULTS = {
     # and the member routes (server-only)
     "agent_share": "{}",
     "features_rev": "10",       # one-shot migrations of the features list
-    "paperless_keep": "0",      # 1 = keep the local attachment after it was consumed by Paperless
     "lang": "en",               # UI + push language: en or a static/i18n/<code>.json
     "ical_scope": "all",        # calendar feed: all = every visible open task with a date, mine = mine / assigned to me
     "ical_alarms": "1",         # calendar feed: reminders as VALARM
@@ -1065,6 +1070,8 @@ USER_DEFAULTS = {
     "purpose": "",              # 2.19.0 (#653): what the person uses Kalmido for (me | family | team | software; server-only)
     "celebrate": "1",           # the heron celebrates an emptied Today / a completed list or project
     "list_emoji": "1",          # 2.32.0 (#1077): a new list suggests an icon from its name (0 = off)
+    "side_icons": "line",       # 2.36.0 (#1117): the sidebar's list icons: line (grey line icon for the name's emoji) | emoji | dot
+    "side_progress": "1",       # 2.36.0 (#1117): progress bars of projects in the sidebar (0 = hidden)
     "cal_today": "1",           # "Events today" block on Today (external calendar subscriptions)
     "tour": "done",             # welcome tour: pending (new users) | done; existing users never see it
     "onboard": "done",          # "Getting started" list: pending (new users, created on first start) | done
@@ -1099,7 +1106,7 @@ GLOBAL_DEFAULTS = {
     "aa_max_hour": "10",        # at most N alerts per hour (the rest is only listed)
     "aa_disk_pct": "5",         # low disk: free space below N % ...
     "aa_disk_mb": "1024",       # ... or below N MB (0 = that check off)
-    "aa_integ_min": "15",       # Paperless / ntfy inbox failing for N minutes
+    "aa_integ_min": "15",       # ntfy inbox failing for N minutes
     "aa_update_notified": "",   # last version an update alert went out for
     "aa_digest_sent": "",       # day of the last daily summary
     "cal_allow_hosts": "",      # admin: internal hosts calendar subscriptions may reach ("host, host:port")

@@ -336,6 +336,8 @@ def task_core(r, tags, fields):
             # 2.23.0 (#463): an approval: pending | approved | changes | rejected (null = none) and who decides
             "approval": (r["approval"] or None) if "approval" in r.keys() else None,
             "approver_id": r["approver_id"] if "approval" in r.keys() and r["approval"] else None,
+            # 2.36.0 (#1118): locked in the app (tasks created with an agent token start locked; the API is not bound by it)
+            "locked": bool(r["locked"]) if "locked" in r.keys() else False,
             # 2.35.0 (#1095): the code snippets: one task (GET / change / webhook row) all of them, lists only snippets_n
             **_snips(r)}
 
@@ -377,7 +379,7 @@ def task_for(c, row, uid):
 V1_TASK_IN = ("title", "notes", "list_id", "section_id", "parent_id", "priority", "due", "due_time", "start", "duration",
               "reminders", "repeat", "repeat_from", "url", "tags", "assignee_id", "pinned", "fields", "list_tags", "type",
               "deadline", "deadline_in_today", "nag", "assignee_group_id", "plan_start", "milestone", "milestone_id",
-              "family", "rotation", "stars", "people", "snippets")
+              "family", "rotation", "stars", "people", "snippets", "locked")
 
 
 def v1_task_in(b, allowed=V1_TASK_IN):
@@ -426,6 +428,10 @@ def v1_task_in(b, allowed=V1_TASK_IN):
             if not isinstance(v, bool):
                 raise BadInput(tr("Invalid value: {0}", "milestone"))
             out["ms"] = 1 if v else 0
+        elif k == "locked":  # 2.36.0 (#1118): boolean -> 0 / 1
+            if not isinstance(v, bool):
+                raise BadInput(tr("Invalid value: {0}", "locked"))
+            out["locked"] = 1 if v else 0
         elif k == "family":  # 2.19.0 (#653): the column fam
             out["fam"] = v
         else:

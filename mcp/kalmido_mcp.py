@@ -2,8 +2,8 @@
 """Kalmido MCP server: lets an AI agent (Claude Code, Claude Desktop, any MCP client) use Kalmido as a tool.
 
 Python 3 standard library only. It talks to the Kalmido REST API (/api/v1) with the agent's personal access token, so the
-agent can never do more than its Kalmido user may: it sees only the lists shared with it, is never an admin and has no
-Paperless access. Kalmido itself never starts AI processes; this server runs wherever YOU run your agent.
+agent can never do more than its Kalmido user may: it sees only the lists shared with it and is never an
+admin. Kalmido itself never starts AI processes; this server runs wherever YOU run your agent.
 
 Configuration (environment):
   KALMIDO_URL     base address of the instance, e.g. https://tasks.example.com
@@ -162,6 +162,10 @@ TASK_FIELDS = {
                      "id": {"type": "string"}, "lang": {"type": "string", "maxLength": 20, "description": "py, js, ts, sh, sql, diff, json, ...; empty = automatic"},
                      "path": {"type": ["string", "null"], "maxLength": 300}, "line": {"type": ["integer", "null"], "minimum": 1},
                      "code": {"type": "string", "maxLength": 20000}}}},
+    # 2.36.0 (#1118): the lock of a task (a guard of the app, not of the API)
+    "locked": {"type": "boolean", "description": "2.36.0: locked in the app (title, notes, dates, priority, list, tags, repeat and "
+               "assignee read-only there until a person unlocks it; comments, checkboxes, completing and subtasks stay free). "
+               "Tasks you create start locked; send false for an open one. You can still change locked tasks through the API."},
 }
 SUGGESTION = {"type": "object", "description": "structured tidy suggestion (lists with agent tidy 'suggest'/'auto'); "
               "a 👍 by someone who may change the task applies it",
@@ -371,7 +375,7 @@ TOOLS = [
                    "clone and push with your own git credentials.",
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/repos")),
     ("get_project_overview", "The overview of a project list (read-only): description (Markdown), key links (title + url, in "
-                             "order), milestones (name, day, done; since 2.18.0 their ids are task ids), project files and Paperless documents of the list, the files "
+                             "order), milestones (name, day, done; since 2.18.0 their ids are task ids), project files, the files "
                              "of its tasks (with task_id), members with roles, the project status with its history and the tracked "
                              "time. 409 for lists that are not projects.",
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/overview")),
@@ -1151,7 +1155,7 @@ TOOLS += [
                             "with their default lead days, repeat and notice period.",
      _obj({}), lambda api, a: api.call("GET", "/family/deadline-types")),
     ("add_deadline", "2.19.0: a household deadline task: due = expires minus notice_months, a deadline with reminders lead_days before "
-                     "and on the day; list_id default: the first Household list. Link a Paperless document in the app afterwards.",
+                     "and on the day; list_id default: the first Household list.",
      _obj({"type": {"type": "string", "enum": ["passport", "id_card", "car", "insurance", "contract", "other"]}, "expires": {"type": "string"},
            "who": {"type": "string"}, "notice_months": {"type": "integer", "minimum": 0, "maximum": 24},
            "lead_days": {"type": "integer", "minimum": 0, "maximum": 365}, "title": {"type": "string"}, "list_id": S_ID}, ["expires"]),
@@ -1192,7 +1196,7 @@ TOOLS += [
     ("list_upkeep_presets", "2.22.0: suggested upkeep tasks (heating, smoke detectors, tyres ...) with their interval.",
      _obj({}), lambda api, a: api.call("GET", "/life/upkeep-presets")),
     ("add_contract", "2.22.0: a contract / subscription: a task due on the last day to cancel (ends minus the notice period), repeating with "
-                     "the renewal (renew_months, 0 = it ends), reminders lead_days before and on the day. Link the document from Paperless in the app.",
+                     "the renewal (renew_months, 0 = it ends), reminders lead_days before and on the day.",
      _obj({"name": {"type": "string"}, "ends": {**D, "description": "End of the current term, YYYY-MM-DD"}, "provider": {"type": "string"},
            "cost": {"type": "number"}, "per": {"type": "string", "enum": ["month", "quarter", "year"]}, "notice": {"type": "integer", "minimum": 0, "maximum": 365},
            "notice_unit": {"type": "string", "enum": ["d", "w", "m"]}, "renew_months": {"type": "integer", "minimum": 0, "maximum": 120},

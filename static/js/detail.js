@@ -208,14 +208,14 @@ try {
 function taskById(id) { return S.tasks.get(id) || (S.extra || []).find(t => t.id === id); }
 // 2.0.6 (#316 / #322): the task panel below the title and the description, top to bottom; the comments and
 // the history come last, the comment box stays at the bottom edge of the panel (sticky, see cmComposer())
-const DETAIL_ORDER = ['family', 'life', 'subtasks', 'deps', 'links', 'tags', 'attachments', 'paperless', 'fields', 'custom', 'time', 'snippets', 'code', 'history', 'comments'];  // snippets: 2.35.0 (#1095)
+const DETAIL_ORDER = ['family', 'life', 'subtasks', 'deps', 'links', 'tags', 'attachments', 'fields', 'custom', 'time', 'snippets', 'code', 'history', 'comments'];  // snippets: 2.35.0 (#1095)
 // 2.24.0 (UX-41): what a task needs first comes first: description, subtasks, comments (the assignee sits in the header).
 // The rest folds into "More details" (open state per device); a section that holds something worth seeing at once
 // (files, a waiting-on, events / contacts) stays outside the fold.
 // 2.27.0 (#957, back to #322): the comments come LAST again, below "More details" (the box stays at the bottom edge); the fold
 // says in its summary line what it holds, so nothing is overlooked
 const DETAIL_TOP = ['family', 'life', 'subtasks'];
-const DETAIL_MORE = ['deps', 'links', 'attachments', 'tags', 'paperless', 'fields', 'custom', 'time', 'snippets', 'code', 'history'];  // code: 2.2.0 (#271)  // history: private lists only (2.0.7)
+const DETAIL_MORE = ['deps', 'links', 'attachments', 'tags', 'fields', 'custom', 'time', 'snippets', 'code', 'history'];  // code: 2.2.0 (#271)  // history: private lists only (2.0.7)
 // 2.27.0 (#957): the summary line of the folded "More details": what is set inside it ("3 tags · Link · 2 fields")
 function moreSummary(t, ks) {
   const out = [], has = k => ks.includes(k);
@@ -224,7 +224,6 @@ function moreSummary(t, ks) {
   if (has('fields') && t.url) out.push(tr('Link'));
   const nf = has('custom') ? fieldsOf(t.list_id).filter(f => { const v = (t.fields || {})[f.id]; return v !== undefined && v !== null && v !== ''; }).length : 0;
   if (nf) out.push(trn('{0} field', '{0} fields', nf));
-  if (has('paperless') && (t.paperless || []).length) out.push(trn('{0} document', '{0} documents', t.paperless.length));
   if (has('snippets') && snipCount(t)) out.push(trn('{0} code snippet', '{0} code snippets', snipCount(t)));  // 2.35.0 (#1095)
   return out.join(' · ');
 }
@@ -375,7 +374,25 @@ document.addEventListener('pointerdown', e => {
   g.focus({preventScroll: true});
 });
 document.addEventListener('toggle', e => { if (e.target.id === 'd-more') LS.set('dMore', e.target.open); }, true);
-function renderDetail() { return keepFocus($('#detail'), renderDetail0); }
+// 2.36.0 (#1120): a rebuild of the open task (the poll after a new chat message or comment) keeps the scroll positions of
+// the panel, its body and the comments area; who was at the very end (newest comments) stays there, also when a comment
+// arrives. Only for the same task: another task starts at its top (openDetail)
+let cmxShown = null;
+function cmxScrollGet() {
+  const d = $('#detail'); if (!d || cmxShown == null || cmxShown !== S.sel) return null;
+  const m = el => el && {top: el.scrollTop, end: el.scrollHeight - el.clientHeight > 4 && el.scrollHeight - el.clientHeight - el.scrollTop < 4};
+  return {id: cmxShown, d: m(d), b: m($('.dbody', d)), p: m($('#d-cpane', d))};
+}
+function cmxScrollSet(s, endOnly = false) {
+  const d = $('#detail'); if (!s || !d || s.id !== S.sel) return;
+  const put = (el, v) => { if (!el || !v || (endOnly && !v.end)) return; const want = v.end ? el.scrollHeight : v.top; if (Math.abs(el.scrollTop - want) > 1) el.scrollTop = want; };
+  put(d, s.d); put($('.dbody', d), s.b); put($('#d-cpane', d), s.p);
+}
+function renderDetail() {
+  const s = cmxScrollGet(), r = keepFocus($('#detail'), renderDetail0);
+  cmxShown = S.sel; cmxScrollSet(s);
+  return r;
+}
 function renderDetail0() {
   const t = taskById(S.sel); if (!t) return;
   const l = listById(t.list_id);
@@ -385,6 +402,9 @@ function renderDetail0() {
   const dueTxt = t.due ? dueLabel(t) : tr('Date');
   const mdMode = t.content && !S.editContent;
   const ro = !canEdit(t), shared = l && l.shared;
+  // 2.36.0 (#1118): a locked task: title, notes, date, priority, list, tags, repeat, assignee read-only (tlkR); the lock
+  // button next to Pin switches it; comments, checkboxes, completing and subtasks stay free
+  const tlkL = !ro && tlkIs(t), tlkR = ro || tlkL;
   // U07 (owner decision 3) applied to the checklist type; 2.7.2 (#414): the type is gone, every item is a full task
   const ck = false;
   // 2.0.6 (#315): comments everywhere (module "comments"), also in private lists and without collaboration (personal
@@ -399,7 +419,7 @@ function renderDetail0() {
   // 2.0.7: private lists with collaboration keep the folded "History" of 2.0.5 (every change, mine included, the
   // import line too); it stays out of the notes above, so they have no activity noise
   const hist = collab() && t.id > 0 && !ck && !t.context && !shared;
-  const mdOpen = !ro && !ck && t.content && /^\s*[-*]\s+\[ \]\s*\S/m.test(t.content) && depthOf(t) < 2;
+  const mdOpen = !tlkR && !ck && t.content && /^\s*[-*]\s+\[ \]\s*\S/m.test(t.content) && depthOf(t) < 2;
   // 2.0.2 (#242): the comments sit right below the description, folded to the newest one (per device); long descriptions
   // fold after ~8 lines. 2.31.0 (#1054): no "Details | Comments" tabs on phones any more, a small jump to the comments instead
   const mdLong = mdMode && mdIsLong(t.content), mdClamp = mdLong && !(S.mdMore || new Set()).has(t.id);
@@ -417,12 +437,10 @@ function renderDetail0() {
     comments: cm === 'full' ? `<div class="dsec cmsec ${cmtNew() ? 'cmnew' : ''}" id="d-tl">${timelineHtml(t)}</div>` : '',
     history: hist ? `<details class="dsec cmsec cmro" id="d-hist"><summary><span>${tr('History')}</span></summary><div class="cms" id="d-hist-items">${S.tl.id === t.id ? histItems() : `<div class="muted cmempty">${tr('Loading…')}</div>`}</div></details>` : '',
     deps: ck ? '' : `${t.id > 0 && dFor(t) && !t.context ? `<div class="dsec depsec" id="d-deps">${depsHtml(t)}</div>` : waitExtHtml(t, ro, true)}`,  // 2.22.0 (#686)
-    tags: ck ? '' : `<div class="dsec"><h5>${tr('Tags')}${shared && collab() && t.tags.length ? ` <span class="muted h5note">${ic('user', 's')} ${tr('= only visible to you')}</span>` : ''}</h5>${tagEditHtml(t, ro)}</div>`,
+    tags: ck ? '' : `<div class="dsec"><h5>${tr('Tags')}${shared && collab() && t.tags.length ? ` <span class="muted h5note">${ic('user', 's')} ${tr('= only visible to you')}</span>` : ''}</h5>${tagEditHtml(t, tlkR)}</div>`,
     attachments: ck ? '' : `<div class="dsec attsec"><h5>${tr('Attachments')}</h5><div class="atts">${(t.attachments || []).map(attHtml).join('')}
         ${t.id > 0 && !ro ? `<label class="attadd" title="${esc(isTouch() ? tr('Images, PDFs, documents') : tr('Images, PDFs, documents') + ' · ' + tr('or drop files here / paste an image with Ctrl+V'))}">${ic('clip', 's')}<span>${tr('Add file')}</span><input type="file" id="d-file" multiple hidden></label>` : ''}</div>
 </div>`,
-    paperless: ck ? '' : `${plOn() || (t.paperless?.length && feat('paperless')) ? `<div class="dsec plsec"><h5>Paperless</h5><div class="plinks">${(t.paperless || []).map(plHtml).join('')}</div>
-        ${t.id > 0 && !ro && plOn() ? `<button class="attadd" data-act="pl-search">${ic('archive', 's')}<span>${tr('Link document')}</span></button>` : ''}</div>` : ''}`,
     fields: ck ? '' : `<div class="dsec fields">
         ${''/* 2.25.0 (UX-44): list and section are changed in the path on top (a tap on it), no fields here any more */}
         ${ticketsOn(t.list_id) ? `<label for="d-ttype">${tr('Type')}</label><select id="d-ttype" data-sheet-ico="bug" ${ro ? 'disabled' : ''}><option value="">${tr('None')}</option>${TTYPES.map(([k, n, i]) => `<option value="${k}" data-ico="${i}" ${t.ttype === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>` : ''}
@@ -443,28 +461,29 @@ function renderDetail0() {
       <button class="iconbtn back" data-act="close-detail" aria-label="${tr('Back')}">${ic('back')}</button>
       <button class="chk ${t.status === 2 ? 'on' : t.status === -1 ? 'wont' : 'p' + t.priority}${msT ? ' ms' : ''}" data-act="toggle" data-id="${t.id}" role="checkbox" aria-checked="${t.status === 2}" aria-label="${esc(msT ? tr('Complete milestone: {0}', t.title) : tr('Complete: {0}', t.title))}" title="${esc(kt(msT ? tr('Complete milestone') : tr('Complete task'), 'x'))}" ${ro ? 'disabled' : ''}>${t.status === 2 ? ic('check') : ''}</button>
       ${ck ? '' : `<button class="dchip ${t.due ? 'set ' + dueClass(t) : ''}" data-act="date" data-id="${t.id}" title="${esc((t.due ? dueTxt + ' · ' : '') + kt(tr('Change date'), 'd'))}" ${ro ? 'disabled' : ''}>${ic('cal', 's')}<span class="dct">${dueTxt}</span>${t.repeat ? ' ' + ic('repeat', 's') : ''}${t.reminders && t.due ? ' ' + ic('bell', 's') : ''}</button>`}
-      ${ck || ro ? '' : [[0, 'sun', tr('Today')], [1, 'sunrise', tr('Tomorrow')]].map(([n, i, lab]) => `<button class="iconbtn dq ${t.due === addDays(today(), n) ? 'on' : ''}" data-act="due-q" data-d="${n}" data-id="${t.id}" title="${esc(kt(tr('Due: {0}', lab), n ? 'Shift+T' : 't'))}" aria-label="${esc(tr('Due: {0}', lab))}">${ic(i, 's')}<span class="dql">${esc(lab)}</span></button>`).join('')}
+      ${ck || tlkR ? '' : [[0, 'sun', tr('Today')], [1, 'sunrise', tr('Tomorrow')]].map(([n, i, lab]) => `<button class="iconbtn dq ${t.due === addDays(today(), n) ? 'on' : ''}" data-act="due-q" data-d="${n}" data-id="${t.id}" title="${esc(kt(tr('Due: {0}', lab), n ? 'Shift+T' : 't'))}" aria-label="${esc(tr('Due: {0}', lab))}">${ic(i, 's')}<span class="dql">${esc(lab)}</span></button>`).join('')}
       ${ck ? '' : '<span class="dbr" aria-hidden="true"></span>'}<span class="spacer"></span>
       ${ro ? (t.context ? `<span class="rotag" title="${esc(tr('The main task of a subtask assigned to you: read-only, without notes, files and comments'))}">${ic('sub', 's')}${tr('Context')}</span>`
         : `<span class="rotag" title="${esc(tr('View only, shared by {0}', l?.owner_name || ''))}">${ic('eye', 's')}${tr('View only')}</span>`) : `${ck ? '' : `<button class="iconbtn ${t.pinned ? 'on' : ''}" data-act="pin" data-id="${t.id}" title="${t.pinned ? tr('Unpin') : tr('Pin')}" aria-label="${tr('Pin')}" aria-pressed="${!!t.pinned}">${ic('pin')}<span class="dpw dpin">${esc(t.pinned ? tr('Pinned') : tr('Pin'))}</span></button>
       <button class="iconbtn ${t.priority ? 'flag-' + t.priority : ''}" data-act="prio" data-id="${t.id}" aria-haspopup="menu" title="${esc(tr('Priority') + ': ' + prioWord(t.priority))}" aria-label="${esc(tr('Priority') + ': ' + prioWord(t.priority))}">${ic('flag')}<span class="dpw">${esc(t.priority ? prioWord(t.priority) : tr('Priority'))}</span></button>`}
+      ${ck || !(t.id > 0) ? '' : `<button class="iconbtn tlkb ${tlkL ? 'on' : ''}" data-act="tlk-toggle" data-id="${t.id}" title="${esc(tlkL ? tr('Locked: tap to unlock') : tr('Lock: title, description, date and more stay as they are'))}" aria-label="${esc(tr('Lock'))}" aria-pressed="${tlkL}">${ic('lock')}<span class="dpw">${esc(tlkL ? tr('Locked') : tr('Lock'))}</span></button>`}
       <button class="iconbtn" data-act="task-menu" data-id="${t.id}" title="${tr('More')}" aria-label="${tr('More')}">${ic('dots')}</button>`}
       <button class="iconbtn dchatb" data-act="chat-unyield" title="${esc(tr('Chat'))}" aria-label="${esc(tr('Chat'))}">${ic('bot')}</button>
       <button class="iconbtn dclose" data-act="close-detail" title="${tr('Close (Esc)')}" aria-label="${tr('Close (Esc)')}">${ic('x')}</button>
     </div>
     <div class="dbody ${ck ? 'ckbody' : ''}">
       ${crumbsHtml(t, l, parent)}
-      <div class="dtitle"><textarea id="d-title" rows="1" placeholder="${tr('Title')}" aria-label="${tr('Title')}" ${ro ? 'readonly' : ''}>${esc(t.title)}</textarea></div>
-      ${whoOn || jump ? `<div class="dmeta">${whoOn ? dWhoChip(t, ro) : ''}${whoOn && myGroup(t.assignee_group_id) ? `<button class="btn sm dtake" data-act="take" type="button">${ic('check', 's')} ${tr('Take it')}</button>` : ''}${jump}</div>` : ''}
+      <div class="dtitle"><textarea id="d-title" rows="1" placeholder="${tr('Title')}" aria-label="${tr('Title')}" ${tlkR ? 'readonly' : ''}>${esc(t.title)}</textarea></div>
+      ${whoOn || jump ? `<div class="dmeta">${whoOn ? dWhoChip(t, tlkR) : ''}${whoOn && myGroup(t.assignee_group_id) ? `<button class="btn sm dtake" data-act="take" type="button">${ic('check', 's')} ${tr('Take it')}</button>` : ''}${jump}</div>` : ''}
       ${!ck && t.due && (t.deadline || nagOf(t)) && t.status === 0 ? `<div class="ddl">${dlChip(t, 'big')}${nagOf(t) ? `<button type="button" class="dnag" data-act="date" data-id="${t.id}" title="${esc(tr('Change'))}">${ic('repeat', 's')}${esc(tr('Repeat reminder') + ': ' + nagLabel(nagOf(t)))}</button>` : ''}</div>` : ''}
       ${!ck && planOf(t) ? `<div class="dplan">${ic('clock', 's')}<span class="dplt">${esc(tr('Planned: {0}', planLabel(t)))}</span>${ro ? '' : `<button type="button" class="linkbtn" data-act="unplan" data-id="${t.id}">${tr('Unplan')}</button>`}</div>` : ''}
       ${t.waiting_at && !ck ? waitBar(t, ro) : ''}
       ${ck ? '' : approvalBar(t, ro)}
       ${ck || ro ? '' : dupHintHtml(t)}
-      <div class="md ${mdMode ? '' : 'hidden'} ${mdClamp ? 'clamp' : ''}" id="d-md" title="${tr('Click to edit')}">${mdMode ? mdMentions(mdTaskRefs(renderMd(t.content, false, {lid: t.list_id}), true), t) : ''}</div>
+      <div class="md ${mdMode ? '' : 'hidden'} ${mdClamp ? 'clamp' : ''}" id="d-md" title="${tlkL ? esc(tr('Locked')) : tr('Click to edit')}">${mdMode ? mdMentions(mdTaskRefs(renderMd(t.content, false, {lid: t.list_id}), true), t) : ''}</div>
       ${mdLong ? `<button class="linkbtn mdmore" data-act="md-more" aria-expanded="${!mdClamp}">${mdClamp ? tr('Show more') : tr('Show less')}</button>` : ''}
       ${mdOpen && mdMode ? `<button class="btn sm mdsub" data-act="md-subtasks">${ic('sub', 's')} ${tr('Turn the open checklist items into subtasks')}</button>` : ''}
-      <textarea id="d-content" class="dcontent ${mdMode ? 'hidden' : ''}" placeholder="${ck ? tr('Note') : tr('Description')}" aria-label="${ck ? tr('Note') : tr('Description')}" ${ro ? 'readonly' : ''}>${esc(t.content)}</textarea>
+      <textarea id="d-content" class="dcontent ${mdMode ? 'hidden' : ''}" placeholder="${ck ? tr('Note') : tr('Description')}" aria-label="${ck ? tr('Note') : tr('Description')}" ${tlkR ? 'readonly' : ''}>${esc(t.content)}</textarea>
       ${msT && t.id > 0 ? `<div class="dsec mssec" id="d-ms">${msReportHtml(t)}</div>` : ''}
       ${(() => {  // 2.24.0 (UX-41)
         const keep = k => (k === 'snippets' && (snipCount(t) || S.snip?.tid === t.id || listById(t.list_id)?.ptype === 'software'))  // 2.35.0 (#1095)
@@ -482,6 +501,7 @@ function renderDetail0() {
       </div></div>`);
   // 2.4.1 (#385): no Delete / Track time in the footer any more (Delete sat right below the comment box's Send on a phone);
   // both are in the task's "…" menu (Delete with undo), a running timer still shows here as its pill
+  $('#detail').classList.toggle('tlk', tlkL);  // 2.36.0 (#1118)
   $('#detail').classList.toggle('dsplit', split); if (split) dsApply(); else $('#detail').classList.remove('dsfold');
   autosize($('#d-title')); autosize($('#d-content')); autosize($('#c-input'));
   if (isMobile() && $('#stale')) staleDraw();

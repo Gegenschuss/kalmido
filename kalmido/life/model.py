@@ -21,12 +21,12 @@ from ..family.family import PACKING
 # ---------------------------------------------------------------- 2.22.0 (#663): "Home & life"
 # Kalmido connects and reminds instead of rebuilding special tools. Seven modules, each OFF by default and switched on
 # one by one (Settings > Modules > At home). Everything is made of the usual objects (lists, repeating tasks, reminders,
-# deadlines, Paperless links, contacts), so calendar, pushes, CalDAV, sharing and the API keep working:
+# deadlines, files, contacts), so calendar, pushes, CalDAV, sharing and the API keep working:
 #   contracts  = a task per contract: tasks.fam {kind: contract, name, provider, cost, per, notice, nu, start?, account?};
 #                due = the last day to cancel (end of the term minus the notice period), the repeat = the renewal
 #                (completing it = extended: the next term), the end of the term is due + notice; cost per month / year
 #   home       = devices (fam {kind: device, name, model?, bought?, warranty?}: a task due when the warranty ends, the
-#                receipt linked from Paperless) and upkeep (fam {kind: upkeep, item?}: a repeating task: heating, smoke
+#                receipt attached as a file) and upkeep (fam {kind: upkeep, item?}: a repeating task: heating, smoke
 #                detectors, tyres ...)
 #   care       = "stay in touch" per person and contact (table contact_care: every N days, the last time, a note); one
 #                push a day lists who is due (needs the module Contacts)
@@ -262,7 +262,7 @@ def contract_out(t, today):
             "yearly": round(monthly * 12, 2) if monthly is not None else None, "notice": f.get("notice") or 0, "notice_unit": f.get("nu") or "m",
             "due": t["due"], "ends": contract_end(t["due"], f), "renew_months": renew_months(t["repeat"]),
             "days": (date.fromisoformat(t["due"]) - today).days if t["due"] else None, "account": f.get("account") or "",
-            "start": f.get("start") or None, "documents": len(t.get("paperless") or [])}
+            "start": f.get("start") or None}
 
 
 # ---- home: devices + upkeep

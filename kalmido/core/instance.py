@@ -65,7 +65,7 @@ def about_info(c, u):
         from ..accounts.signup import signup_admin
         d.update(signup_admin(c))  # 2.23.0 (#711)
         from ..admin.hosting import hosting_admin
-        d.update(hosting_admin(c))  # 2.24.0 (#905 #907 #910 #899); people see "hosted" in the Paperless state only
+        d.update(hosting_admin(c))  # 2.24.0 (#905 #907 #910 #899)
     return d
 
 
@@ -188,7 +188,7 @@ def admin_settings():
     return jsonify(about_info(c, g.user))
 
 
-SETUP_MODULES = ("cal", "timeline", "matrix", "kanban", "habits", "pomo", "stats", "progress", "deps", "fields", "paperless")
+SETUP_MODULES = ("cal", "timeline", "matrix", "kanban", "habits", "pomo", "stats", "progress", "deps", "fields")
 
 
 @app.post("/api/admin/setup")

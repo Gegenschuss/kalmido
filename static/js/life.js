@@ -75,7 +75,7 @@ function viewLife() {
   if (d.travel) {
     const ts = d.travel.trips;
     const body = ts.length ? `<ul class="flist">${ts.map(x => `<li><a href="#l/${x.list_id}" class="frow"><span class="fem" aria-hidden="true">${x.state === 'now' ? '🧳' : x.state === 'past' ? '🏁' : '✈️'}</span><span class="ft"><b>${esc(x.name)}</b><span class="muted">${esc([x.where, fmtDateLoc(x.from) + ' – ' + fmtDateLoc(x.to)].filter(Boolean).join(' · '))}</span></span><span class="lwhen"><small class="muted">${esc(tr('{0} open', x.open))}</small>${x.state === 'upcoming' ? `<span class="fwhen ${x.days <= 7 ? 'soon' : ''}">${esc(daysWord(x.days))}</span>` : `<span class="fwhen">${esc(x.state === 'now' ? tr('travelling') : tr('done|trip'))}</span>`}</span></a></li>`).join('')}</ul>`
-      : `<p class="muted">${tr('A trip gets its own list: bookings, what to do before you leave and the packing list, with the documents from Paperless.')}</p>`;
+      : `<p class="muted">${tr('A trip gets its own list: bookings, what to do before you leave and the packing list.')}</p>`;
     cards.push(card('travel', 'plane', tr('Travel'), body, btn('life-trip', 'plus', tr('Trip'))));
   }
   if (d.reading) {
@@ -135,7 +135,7 @@ function contractModal(t) {
       <div class="row"><label for="lf-acc">${tr('Paid from')}</label><input id="lf-acc" maxlength="100" value="${esc(f.account || '')}" placeholder="${esc(tr('e.g. joint account, credit card'))}"></div>
       <div class="row"><label>${tr('Since')}</label>${dateIn('lf-start', f.start || '', {label: tr('Since'), empty: tr('optional')})}</div></details>
     ${t ? '' : lifeListOpts('contracts')}
-    <div class="shint lhint keep">${tr('Due on the last day to cancel. Ticking it off means you keep it: it moves on to the next term. Link the contract from Paperless in the task.')}</div>
+    <div class="shint lhint keep">${tr('Due on the last day to cancel. Ticking it off means you keep it: it moves on to the next term.')}</div>
     ${lifeFoot(t ? tr('Save') : tr('Add'))}`, async md => {
     const v = id => $(id, md)?.value?.trim() ?? '';
     const name = v('#lf-name'), endsV = v('#lf-ends');
@@ -171,7 +171,7 @@ function deviceModal() {
     <div class="row"><label>${tr('Warranty until')}</label>${dateIn('lf-warr', addDays(today(), 730), {label: tr('Warranty until'), empty: tr('none')})}</div>
     <div class="row"><label for="lf-lead">${tr('Remind me')}</label><select id="lf-lead">${leadOpts(30)}</select></div>
     ${lifeListOpts('home')}
-    <div class="shint lhint keep">${tr('Link the receipt from Paperless in the task, so it is at hand when something breaks.')}</div>
+    <div class="shint lhint keep">${tr('Attach the receipt to the task, so it is at hand when something breaks.')}</div>
     ${lifeFoot()}`, async md => {
     const v = id => $(id, md)?.value?.trim() ?? '';
     if (!v('#lf-name')) { $('#lf-name', md).focus(); throw new Error(tr('Please enter a name')); }
