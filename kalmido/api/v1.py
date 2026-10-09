@@ -1136,7 +1136,8 @@ def v1_comment(c, d, names):
             "author": {"id": d["user_id"], "name": names.get(d["user_id"], ""), "agent": bool(au and au["kind"] == "agent")},
             "reactions": d.get("reactions") or [], "suggestion": d.get("suggestion"),
             "body": d["body"], "text": comment_plain(c, d["body"]), "mentions": d["mentions"], "created_at": d["created_at"],
-            "edited_at": d["edited_at"], "attachments": [{k: a[k] for k in ("id", "name", "mime", "size")} for a in d["attachments"]]}
+            "edited_at": d["edited_at"], "attachments": [{k: a[k] for k in ("id", "name", "mime", "size")} for a in d["attachments"]],
+            "reply_to": d.get("reply_to"), "reply": d.get("reply")}  # 2.33.0 (#1076)
 
 
 @app.get("/api/v1/tasks/<int:tid>/comments")
@@ -1149,7 +1150,8 @@ def v1_comments(tid):
     rows = c.execute("SELECT * FROM comments WHERE task_id=? AND deleted_at IS NULL ORDER BY id", (tid,)).fetchall()
     atts = att_dicts(c, "task_id=? AND comment_id IS NOT NULL", (tid,))
     names = user_names(c, [r["user_id"] for r in rows])
-    return jsonify(data=[v1_comment(c, d, names) for d in with_reactions(c, [{**comment_dict(r, atts), "task_id": tid} for r in rows])],
+    from ..collab.replies import with_replies
+    return jsonify(data=[v1_comment(c, d, names) for d in with_replies(c, "c", with_reactions(c, [{**comment_dict(r, atts), "task_id": tid} for r in rows]))],
                    next_cursor=None)
 
 
@@ -1158,12 +1160,12 @@ def v1_comments(tid):
 def v1_comment_create(tid):
     v1_args(())
     b = v1_json()
-    reject_unknown(b, ("body", "suggestion"))  # 2.2.1 (#359): 400 unknown_field
+    reject_unknown(b, ("body", "suggestion", "reply_to"))  # 2.2.1 (#359): 400 unknown_field; 2.33.0 (#1076): reply_to
     if not isinstance(b.get("body"), str):
         raise BadInput(tr("Expected {0}", '{"body": "..."}'))
     c = db()
     _v1_live(c, tid, write=False, full=True)  # view-only members may comment (as in the app)
-    j = v1_call(comment_create, tid, body={"body": b["body"], **({"suggestion": b["suggestion"]} if "suggestion" in b else {})})
+    j = v1_call(comment_create, tid, body={"body": b["body"], **{k: b[k] for k in ("suggestion", "reply_to") if k in b}})
     return jsonify(v1_comment(c, {**j, "task_id": tid}, user_names(c, [me()]))), 201
 
 
@@ -1259,7 +1261,12 @@ def v1_habit_checkin(hid):
 @app.get("/api/v1/search")
 @v1_view
 def v1_search():
-    a = v1_args(("q", "limit", "cursor"))
+    if request.args.get("scope") == "messages":  # 2.33.0 (#1080): comments, team chat, agent chats
+        from ..collab.msgsearch import v1_search_messages
+        return v1_search_messages()
+    a = v1_args(("q", "limit", "cursor", "scope"))
+    if a.get("scope") not in (None, "", "tasks"):
+        raise BadInput(tr("Invalid value: {0}", "scope"))
     q = (a.get("q") or "").strip()
     if not q or len(q) > 200:
         raise BadInput(tr("Invalid value: {0}", "q"))

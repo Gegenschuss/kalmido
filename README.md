@@ -18,6 +18,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.33.0** (2026-10-09): Agents and notifications. **Reply to one message** (swipe right on a phone), **search in
+  chats and comments**, owners choose **how much a shared list notifies** its people, a **plan usage ring** for agents,
+  a **repository on a folder**, *Your IP* under Administration > Server.
 - **2.32.0** (2026-10-09): Shorter ways. **Arrange your views** (Today, Time tracking, overviews, start page and the
   **project page** as blocks), a **long press selects** tasks on a phone, **swipe through tasks** in the task panel, a
   **folded share dialog**, **quick add chips**; agents show their **steps while they work** and the **model that really
@@ -669,6 +672,12 @@ tabs *For you | Activity | All*, and the start page shows *N messages for you* w
 what agents do (their comments, completions, new tasks, status) are off by default (*Settings > Notifications > Pushes
 for what agents do*); an agent's @mention of you and its approval requests push as before.
 
+**Notification templates** (2.33.0, #927): the owner of a shared list or folder chooses in the share dialog how much
+the other people are notified at most -- *Read only* (mentions, assignments, direct replies), *Collaborate* (+ comments
+on their tasks and due reminders), *Everything* or *Custom*, also per person. Members can set themselves quieter, never
+louder, and see who limited the list; the News list stays complete, only pushes are held back. New shares start with
+*Read only*; lists and folders shared before 2.33.0 keep *Everything* until the owner chooses (asked once).
+
 <p align="center"><img src="docs/news.png" alt="News inbox with mentions, grouped comments, an assignment, a completion and a shared list"></p>
 
 **Bundled (2.17.0):** News are grouped per task (or list) with one line of what happened ("2 comments · completed"),
@@ -927,6 +936,11 @@ devices (notification row *Team chat*; muting a conversation leaves only mention
 the list menu (*Team chat*) and a project's overview. The REST API and the MCP server have it too (`/team/...`, see
 docs/API.md); agents cannot open direct messages.
 
+**Reply to one message** (2.33.0, #1076): swipe a message to the right on a phone (or *Reply* on hover / in its menu
+on a computer); the answer shows a small quote that jumps to the original, and its author is notified. The same works
+in comments and the agent chat. **Search** (#1080): the magnifier in a chat's header searches that conversation; the
+search page and the command field find messages and comments everywhere you may read them.
+
 ## Notes
 
 Every list and project has **notes**: Markdown documents next to the tasks for meeting notes, briefings and decisions
@@ -1079,6 +1093,12 @@ agent into a person's personal agent. Every agent works in **one workspace** (pr
 itself never starts an AI or any other process; the agent runs wherever you like and talks to Kalmido through the REST
 API, webhooks or the MCP server.
 
+**Plan usage ring** (2.33.0, #1045): an agent can report how much of its plan it has used (`PUT /api/v1/agent/quota`,
+MCP `report_plan_usage`, Claude Code's status line `rate_limits` as it is); a ring next to its name in the chat header
+fills up, turns yellow from 75 % and red with "paused until …" at the agent's own limit, and greys out when the report
+is older than 24 hours. Agents also receive the message a reply refers to and can search the chats they are in
+(`search_messages`).
+
 - **Safe by default** (2.30.0, #919 / #920): an agent never connects two lists with **different people** unasked --
   sharing such a list with it (or adding a person to a list with an agent) asks the owner first (*Connect anyway*), and
   existing bridges are flagged in the agent's settings; an agent that moves a task into a list more people see waits for
@@ -1157,6 +1177,11 @@ GitHub Enterprise server), **GitLab** (gitlab.com or your own server, also neste
 **Gitea / Forgejo** (the server's address) and **Bitbucket Cloud** (2.18.0; Bitbucket Server / Data Center is not
 supported). Pasting a github.com, gitlab.com or bitbucket.org address picks the provider. Only the list owner and list
 admins connect, change or remove them; everyone in the list sees the results.
+
+**A repository on a folder** (2.33.0, #934): *Folder settings > Repository* connects a repository once for every
+project list in the folder and its subfolders, also lists added later; `#id` and `fixes #id` work across all of them
+with one poll per repository. A list can switch it off (*Edit list > Repository*) or connect its own instead. Only the
+folder's owner connects it; the token stays sealed.
 
 - **Token:** a fine-grained token with *read-only* access to the repository (contents, pull requests, commit statuses /
   checks) is enough (GitLab: `read_api`; Bitbucket: a read-only repository or workspace access token, or
@@ -1442,6 +1467,8 @@ small **×** next to it (*Show progress* in the list's … menu or the list dial
 **Built-in (default):** username and password (hashed with scrypt), an HttpOnly `SameSite=Lax` session cookie
 ("stay logged in" = 30 days), failed logins are rate-limited per user name and address (5), per address (20) and per user
 name from all addresses (100, against slow distributed guessing) within 15 minutes, so one attacker cannot lock a person out.
+*Administration > Server* shows **your IP** as the server sees it (2.33.0): if it shows a Docker gateway such as
+`172.18.0.1` instead of your public address, the proxy hides the clients (see docs/SELF-HOSTING.md).
 Behind a reverse proxy Kalmido takes the client address from `X-Forwarded-For` of a trusted proxy (`KALMIDO_TRUSTED_PROXIES`,
 default loopback + the Docker bridge gateway). Upgrading from the single-user
 version: your data is moved to the user `admin` (or `AUTH_BOOTSTRAP_USER`); give it a password once with
@@ -1628,6 +1655,8 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `AUTH_TRUSTED_PROXIES` | | Comma list of IPs / CIDRs whose header is trusted (direct peer) |
 | `AUTH_PROXY_PORT` | | Extra container port; if set, the header is only trusted on it (see *Login*) |
 | `KALMIDO_TRUSTED_PROXIES` | `127.0.0.1,::1,172.17.0.1` | Reverse proxies (IPs / CIDRs of the direct peer) whose `X-Forwarded-For` / `-Proto` / `-Host` are believed: the real client address for login lockouts, logs and alerts, https for cookies and CalDAV. The `AUTH_TRUSTED_PROXIES` peers count too; `none` = trust nobody. A proxy in another container on its own Docker network arrives from that network's gateway (e.g. `172.18.0.1`): add it |
+| `KALMIDO_IP_WARN_ACCOUNTS` | `3` | 2.33.0 (#834): warn in the log and under *Administration > Server* when at least this many accounts sign in from one private address within 7 days (the client addresses do not arrive: check the reverse proxy, see docs/SELF-HOSTING.md); only private addresses are kept, 14 days |
+| `KALMIDO_NOTIF_TEMPLATE` | `read` | 2.33.0 (#927): the notification template a newly shared list or folder starts with: `read` (mentions, assignments, direct replies), `work`, `all` |
 | `KALMIDO_TRUSTED_PROXY_COUNT` | `1` | Proxies in a row in front of Kalmido; the client is the entry that many places from the right in `X-Forwarded-For` |
 | `AUTH_BOOTSTRAP_USER`, `AUTH_BOOTSTRAP_NAME`, `AUTH_BOOTSTRAP_PROXY_LOGIN` | `admin` | Account that receives the data when upgrading from the single-user version |
 | `AUTH_SESSION_DAYS` | `30` | Lifetime of a "stay logged in" session |

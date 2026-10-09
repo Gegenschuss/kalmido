@@ -436,6 +436,8 @@ def export_json():
         "list_files": (f"SELECT * FROM list_files WHERE list_id IN {own}", (uid,)),
         "list_paperless": (f"SELECT * FROM list_paperless WHERE list_id IN {own}", (uid,)),
         "list_layouts": ("SELECT * FROM list_layouts WHERE user_id=?", (uid,)),
+        "list_notif": (f"SELECT * FROM list_notif WHERE list_id IN {own}", (uid,)),  # 2.33.0 (#927): my notification templates
+        "folder_notif": ("SELECT * FROM folder_notif WHERE owner_id=?", (uid,)),
         "agent_steps": ("SELECT id, agent_id, job_id, message_id, text, created_at FROM agent_steps WHERE user_id=?", (uid,)),  # 2.32.0 (#1081)  # 2.32.0 (#1063): my own project page arrangements
         # 2.21.0 (#659 / #658): my event calendars with their events + attendees, my address books with their contacts
         "event_calendars": ("SELECT * FROM ev_cals WHERE owner_id=?", (uid,)),

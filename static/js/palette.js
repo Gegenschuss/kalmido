@@ -328,7 +328,8 @@ function palItems() {
   const r = parseQuick(q, new Set()), d = quickDefaults(), tl = listById(r.list_id || d.list_id) || inbox();
   const create = {id: 'new:', kind: 'action', cls: 'pdo', label: tr('Create as task: {0}', r.title || q), sub: [tl ? lname(tl) : '', r.due ? dayLabel(r.due) + (r.due_time ? ' ' + r.due_time : '') : ''].filter(Boolean).join(' · '), icon: 'plus', fn: () => palCreate(q)};
   const asks = (S.agents || []).filter(x => x.enabled && x.chat !== false).slice(0, 3).map(x => ({id: 'ask:' + x.id, kind: 'action', cls: 'pdo', label: tr('Ask {0}: {1}', x.name, q), sub: tr('Sends it to the chat'), icon: 'bot', img: x.avatar || null, fn: () => palAsk(x.id, q)}));
-  return hits.length ? [...hits, ...asks, create] : [create, ...asks];
+  const msgs = palMsgItems(q);  // 2.33.0 (#1080): hits in comments and chats (chat.js), on their way while typing
+  return hits.length ? [...hits, ...asks, create, ...msgs] : [create, ...asks, ...msgs];
 }
 function palCreate(q) {
   const r = parseQuick(q, new Set()), d = quickDefaults();
@@ -339,7 +340,7 @@ async function palAsk(aid, text) {
   try { await api('POST', `/api/agents/${aid}/chat`, {body: text}); } catch { return; }
   chatOpen(aid);
 }
-const PAL_GROUP = {viewed: N_('Recently viewed'), recent: N_('Recent'), task: N_('Selected task'), action: N_('Actions'), view: N_('Go to')};
+const PAL_GROUP = {viewed: N_('Recently viewed'), recent: N_('Recent'), task: N_('Selected task'), action: N_('Actions'), view: N_('Go to'), msgs: N_('Messages')};
 function palDraw() {
   const el = $('.palette'); if (!el) return;
   PAL.items = palItems();
@@ -349,8 +350,8 @@ function palDraw() {
     if (x.group && x.group !== last) { h += `<div class="pgroup">${tr(PAL_GROUP[x.group])}</div>`; last = x.group; }
     h += `<button class="pitem ${i === PAL.i ? 'on' : ''} ${x.cls || ''}" data-pi="${i}" role="option" aria-selected="${i === PAL.i}" id="pi-${i}">
       <span class="pic">${x.img ? `<img class="picon" src="${esc(x.img)}" alt="">` : x.sw !== undefined ? `<span class="psw" style="${x.sw ? 'background:' + x.sw : ''}"></span>` : ic(x.icon, 's')}</span>
-      <span class="pl"><span class="plt">${esc(x.label)}</span>${x.sub ? `<span class="pls">${esc(x.sub)}</span>` : ''}</span>
-      ${x.keys ? kb(x.keys) : ''}${x.kind === 'action' || x.kind === 'setting' || x.kind === 'view' ? '' : `<span class="pk">${esc(tr(PAL_KIND[x.kind] || x.kind))}</span>`}</button>`;
+      <span class="pl"><span class="plt">${esc(x.label)}</span>${x.subHtml ? `<span class="pls pmsg">${x.subHtml}</span>` : x.sub ? `<span class="pls">${esc(x.sub)}</span>` : ''}</span>
+      ${x.keys ? kb(x.keys) : ''}${x.kind === 'action' || x.kind === 'setting' || x.kind === 'view' || x.kind === 'msg' ? '' : `<span class="pk">${esc(tr(PAL_KIND[x.kind] || x.kind))}</span>`}</button>`;
   });
   // 2.16.0 (#644): an empty field says what it can do (only what exists; no key hints on touch)
   const ags = (S.agents || []).filter(x => x.enabled);
@@ -408,7 +409,7 @@ function palRun(i) {
     closePalette(); palCreate(q);
     return;
   }
-  if (!x.id.startsWith('mv:') && !x.id.startsWith('ask:') && !x.id.startsWith('new:') && !x.id.startsWith('a:move') && !x.id.startsWith('rv:')) LS.set('palRecent', [x.id, ...LS.get('palRecent', []).filter(y => y !== x.id)].slice(0, 8));
+  if (!x.id.startsWith('mv:') && !x.id.startsWith('ask:') && !x.id.startsWith('new:') && !x.id.startsWith('a:move') && !x.id.startsWith('rv:') && !x.id.startsWith('msg:')) LS.set('palRecent', [x.id, ...LS.get('palRecent', []).filter(y => y !== x.id)].slice(0, 8));
   if (!x.keep) closePalette();
   x.fn();
 }

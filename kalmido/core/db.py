@@ -392,6 +392,14 @@ def init_db(guard=True):
             gset(c, "migr_order988", "1")
             if n:
                 print("shared lists arranged like their owners have them (#988):", n, flush=True)
+        # 2.33.0 (#927), once: lists / folders shared so far keep every notification ("all", written explicitly; new shares
+        # start with "read"), their owners are asked once in the app
+        if gsetting(c, "migr_notiftpl2330") != "1":
+            from ..notify.caps import notif_tpl_migrate
+            nl, nf = notif_tpl_migrate(c)
+            gset(c, "migr_notiftpl2330", "1")
+            if nl or nf:
+                print("notification templates: shared lists", nl, "and folders", nf, "kept on \"all\" (#927)", flush=True)
         for (uid,) in c.execute("SELECT id FROM users").fetchall():
             ensure_inbox(c, uid)
             for k, v in USER_DEFAULTS.items():
@@ -486,6 +494,8 @@ def init_db(guard=True):
             counts = repair_data(c)
             gset(c, "migr_auditfix", "1")
             print("audit migration: Paperless access granted to", n, "admin(s); repaired:", counts, flush=True)
+        from ..collab.msgsearch import msg_index_init
+        msg_index_init(c)  # 2.33.0 (#1080): the message search index (FTS5 + triggers), built once
         c.execute("COMMIT")
     except Exception:
         c.execute("ROLLBACK")

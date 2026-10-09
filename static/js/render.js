@@ -11,7 +11,7 @@ function render() {
   document.body.classList.toggle('kidmode', !!S.me?.kid);  // 2.19.0 (#653): a kid's simple view (no sidebar, tab bar, + button)
   sideSearchSync(); badgeSync();
   if (S.shop) shopDraw();  // 2.19.0: shopping mode follows every reload (the app's own poll included)
-  fitLayout(true); renderSide(); annSync(); renderTop(); renderView(); renderTabs(); quotaNudge();
+  fitLayout(true); renderSide(); annSync(); ntfAskSync(); renderTop(); renderView(); renderTabs(); quotaNudge();
   $('#fab').innerHTML = ic('plus'); $('#fab').setAttribute('aria-label', tr('New task')); $('#fab').title = kt(tr('New task'), 'n');
   fabSync();
   if (S.sel && S.tasks.has(S.sel) && !$('#detail').contains(document.activeElement)) renderDetail();
@@ -1342,7 +1342,7 @@ function viewHistory() {
   return [...g.entries()].map(([k, ts]) => `<div class="group"><div class="ghead">${dayLabel(k, true)} <span class="c">${ts.length}</span></div>${ts.map(t => taskRow(t, {showList: true, drag: false, tcols: {list: true}})).join('')}</div>`).join('');
 }
 function viewSearch() {
-  return `<div class="search"><input id="searchq" type="search" aria-label="${esc(tr('Search'))}" placeholder="${tr('Search titles and notes')}" autocomplete="off" enterkeyhint="search"></div><div id="sresults">${S.searchRes ? renderSearchRes() : ''}</div>`;
+  return `<div class="search"><input id="searchq" type="search" aria-label="${esc(tr('Search'))}" placeholder="${tr('Search titles and notes')}" autocomplete="off" enterkeyhint="search"></div><div id="sresults">${S.searchRes ? renderSearchRes() : ''}</div><div id="smsgs">${msgSecHtml()}</div>`;
 }
 function renderSearchRes() {
   if (!S.searchRes.length) return heronEmpty('empty', tr('No results.'), tr('Try fewer or other words.'));
@@ -1358,6 +1358,7 @@ async function doSearch(q) {
   S.searchQ = q; if (S.searchEnter !== q) S.searchEnter = null;
   clearTimeout(searchTimer);
   searchTimer = setTimeout(async () => {
+    if (S.msg.q !== q) msgSecRun(q);  // 2.33.0 (#1080): "Messages" below the tasks (chat.js)
     if (!q.trim()) { S.searchRes = null; $('#sresults').innerHTML = ''; return; }
     const j = await api('GET', '/api/tasks?scope=search&q=' + encodeURIComponent(q));
     // 2.13.0: "#447" / "447" puts that task (one this person sees) first

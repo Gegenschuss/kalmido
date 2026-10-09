@@ -44,7 +44,7 @@ const V = B + 'api/v1';
   const T2 = (await call('POST', '/api/tasks', {title: 'Settings page slow', list_id: SW})).id;
   const say = async (body, extra = {}) => (await fetch(V + `/agent/chats/${ME.id}`, {method: 'POST', headers: AGH, body: JSON.stringify({body, ...extra})})).json();
   const status = b => fetch(V + '/agent/status', {method: 'PUT', headers: AGH, body: JSON.stringify(b)});
-  const cm = (d, id) => d.querySelector(`#chat-msgs .cmsg[data-mid="${id}"]`);
+  const cm = (d, id) => d.querySelector(`#chat-msgs .cmsg[data-mid="a:${id}"]`);
 
   // ================= #1037 only the newest buttons are live
   const q1 = await say('Shall I plan 2.30 now?', {choices: [{id: 'yes', label: 'Plan 2.30', style: 'primary'}, {id: 'no', label: 'Later'}]});
@@ -169,7 +169,7 @@ const V = B + 'api/v1';
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
   };
   const ready = async (ev, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300); await sleep(800); };
-  const geo = `(() => { const m = document.querySelector('#chat-msgs .cmsg[data-mid="${fresh.id}"]'); const b = m ? [...m.querySelectorAll('.cperm .cchb')] : []; if (b.length !== 2) return null;
+  const geo = `(() => { const m = document.querySelector('#chat-msgs .cmsg[data-mid="a:${fresh.id}"]'); const b = m ? [...m.querySelectorAll('.cperm .cchb')] : []; if (b.length !== 2) return null;
     const r = b.map(x => x.getBoundingClientRect()); const hit = r.map(x => document.elementFromPoint(x.left + x.width / 2, x.top + x.height / 2));
     return {side: Math.abs(r[0].top - r[1].top) < 2 && r[0].right <= r[1].left, free: hit.every((h, i) => b[i].contains(h)), h: Math.min(r[0].height, r[1].height)}; })()`;
   for (const th of ['light', 'dark']) await firefox(async o => {
@@ -189,10 +189,10 @@ const V = B + 'api/v1';
       await cmd('input.releaseActions', {context: ctx}); await sleep(300);
 
       await cmd('input.performActions', {context: ctx, actions: [{type: 'key', id: 'k', actions: [{type: 'keyDown', value: ''}, {type: 'keyUp', value: ''}]}]}); await sleep(600);
-      check(await ev(`!!document.querySelector('#chat-msgs .cmsg[data-mid="${fresh.id}"] .cperm')`), `${tag}: #1041 Enter in the message box does not allow`);
-      await ev(`(() => { document.querySelector('#chat-msgs .cmsg[data-mid="${fresh.id}"] .cperm .cchb.st-primary').focus(); return 1; })()`);
+      check(await ev(`!!document.querySelector('#chat-msgs .cmsg[data-mid="a:${fresh.id}"] .cperm')`), `${tag}: #1041 Enter in the message box does not allow`);
+      await ev(`(() => { document.querySelector('#chat-msgs .cmsg[data-mid="a:${fresh.id}"] .cperm .cchb.st-primary').focus(); return 1; })()`);
       await cmd('input.performActions', {context: ctx, actions: [{type: 'key', id: 'k', actions: [{type: 'keyDown', value: ''}, {type: 'keyUp', value: ''}]}]}); await sleep(1200);
-      check(await ev(`/^(\u{1F44D}\\s*)?Allowed/u.test(document.querySelector('#chat-msgs .cmsg[data-mid="${fresh.id}"] .cpermst.ok')?.textContent.trim() || '')`), `${tag}: #1041 Enter on the focused Allow button allows ` + await ev(`document.activeElement?.className + ' | ' + (document.querySelector('#chat-msgs .cmsg[data-mid="${fresh.id}"]')?.innerHTML || '').slice(-400) + ' | ' + document.querySelector('#toast')?.textContent`));
+      check(await ev(`/^(\u{1F44D}\\s*)?Allowed/u.test(document.querySelector('#chat-msgs .cmsg[data-mid="a:${fresh.id}"] .cpermst.ok')?.textContent.trim() || '')`), `${tag}: #1041 Enter on the focused Allow button allows ` + await ev(`document.activeElement?.className + ' | ' + (document.querySelector('#chat-msgs .cmsg[data-mid="a:${fresh.id}"]')?.innerHTML || '').slice(-400) + ' | ' + document.querySelector('#toast')?.textContent`));
       await shot(`p2300-${th}-1440-permission-allowed.png`);
     }
     await ev(`(() => { chatClose(); shareModal(${SW}, {focus: 'agents'}); return 1; })()`); await sleep(1200);

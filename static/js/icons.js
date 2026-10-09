@@ -60,6 +60,7 @@ const P = {
   edit: icPath('M4 16V12.5L12.5 4L16 7.5L7.5 16H4M10.5 6L14 9.5') + icDot(16, 16, 1.6),
   undo: icPath('M7 4.5L3.5 8L7 11.5M4 8H12A4.5 4.5 0 0 1 12 17H9'),
   redo: icPath('M13 4.5L16.5 8L13 11.5M16 8H8A4.5 4.5 0 0 0 8 17H11'),
+  reply: icPath('M8 4.5L3.5 9L8 13.5M4 9H11A5 5 0 0 1 16 14V16'),  // 2.33.0 (#1076): answer one message
   folder: icPath('M17 9V15A2 2 0 0 1 15 17H5A2 2 0 0 1 3 15V5A2 2 0 0 1 5 3H8L10 5.5H13') + icDot(16, 5.5),
   cart: icPath('M2.5 3.5H5L7 13H15L17 6.5H8') + icFill(8, 16.5, 1.3) + icDot(14.5, 16.5, 1.6),
   sort: icPath('M4.5 4V16M2 13.5L4.5 16L7 13.5M9.5 5H17M9.5 10H15M9.5 15H12.5'),

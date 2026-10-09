@@ -132,6 +132,7 @@ The most used helpers:
 | `integrations/importers.py` | Importers: TickTick, Todoist, Trello, Asana, Microsoft To Do, ICS / VTODO (preview, dry run, undo). |
 | `notify/push.py` | Notifications: ntfy, Web Push (RFC 8030 / 8291 / 8292), reminders and nags, the watchdog tick and loop. |
 | `notify/alerts.py` | Admin alerts via ntfy (recording, sending, settings). |
+| `notify/caps.py` | 2.33.0 (#927): the owner's notification template of a list / shared folder (read, work, all, custom; per person), a ceiling for pushes checked in `notif_ok`; the one-time question to owners of lists shared before. |
 | `calendars/subscriptions.py` | External calendars (read-only subscriptions): SSRF guard, ICS / CalDAV sync, API. |
 | `admin/backup.py` | Backups and restore (admins). |
 | `api/v1.py` | REST API /api/v1 with personal access tokens: token management, authentication, the routes, errors, groups. |
@@ -154,6 +155,8 @@ The most used helpers:
 | `api/scopes.py` | Token scopes, approvals and the complete agent API (the routes the web client has). |
 | `collab/notes.py` | Notes of a list / project. |
 | `collab/teamchat.py` | Team chat (rooms and direct messages). |
+| `collab/msgsearch.py` | 2.33.0: search in comments, team chat and agent chats: the FTS5 index `msg_fts` (kept by triggers, built in `init_db`), visibility, snippets. |
+| `collab/replies.py` | 2.33.0: replies to one message (comments, team chat, agent chat): `reply_to` checks and the short quotes. |
 | `integrations/mail.py` | Tasks by e-mail (IMAP) and the daily summary by e-mail (SMTP). |
 | `accounts/orgs.py` | Organisations (#752): people in 1..n organisations and whom a person may see (all / own organisation / own contacts). |
 | `accounts/invite.py` | Invitations and reset links (#697): a one-time link by e-mail with which a person sets their own password. |
@@ -181,6 +184,7 @@ The most used helpers:
 | `team/v1.py` | Clients, workload, approvals, forms: the REST API v1 (+ MCP) and its OpenAPI part. |
 | `accounts/signup.py` | Self-registration on the login page and sign-in links (QR) for people without e-mail. |
 | `admin/hosting.py` | Running Kalmido for others (2.24.0): storage quota per person, the notice / maintenance banner, daily e-mail limits, the "agent joined" notice, `KALMIDO_HOSTED`. |
+| `admin/clientip.py` | 2.33.0 (#834): does the client's address arrive? Private sign-in addresses (14 days), the warning when many accounts sign in from one private address (log + Administration > Server), "Your IP". |
 | `startup.py` | Start-up: init_db() and the background threads (watchdog, update check, calendars, backups, webhooks, mail, git). |
 
 ### Adding a route

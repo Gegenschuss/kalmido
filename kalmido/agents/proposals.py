@@ -978,10 +978,10 @@ def v1_agent_chat_post(uid):
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if not u or is_agent(u) or not agent_shares(c, aid, uid):
         raise Denied(404)
-    fb, files = chat_input(("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id"))
+    fb, files = chat_input(("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "reply_to"))
     b = fb if fb is not None else v1_json()
     # 2.28.0 (#1005): answer buttons; 2.30.0 (#1041): permission questions (permission, expires_in)
-    unknown = sorted(k for k in b if k not in ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id"))
+    unknown = sorted(k for k in b if k not in ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "reply_to"))  # 2.33.0: reply_to
     if unknown:
         raise UnknownFields(unknown)
     jid = None

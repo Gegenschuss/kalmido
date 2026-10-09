@@ -54,6 +54,7 @@ def openapi_spec():
     from ..api.scopes import api479_spec, scope_refine
     from ..collab.notes import notes_spec
     from ..collab.teamchat import team_spec
+    from ..collab.msgsearch import msgsearch_spec
     from ..family.family import FAM_LIST_KINDS, STARS_MAX
     from ..family.v1 import family_spec
     from ..events.v1 import events_spec
@@ -80,7 +81,7 @@ def openapi_spec():
     def errs(*codes):
         text = {"400": "Invalid input", "401": "Missing, invalid or expired token", "403": "Not allowed (scope, role or a switched-off module)",
                 "404": "Not found or not visible to the token's user", "409": "Conflict", "410": "The file is damaged or missing on the server", "413": "Too large",
-                "429": "Rate limit reached (see Retry-After)"}
+                "429": "Rate limit reached (see Retry-After)", "503": "Not available on this server"}
         return {c: {"description": text[c], "content": {"application/json": {"schema": ref("Error")}}} for c in ("401", "429") + codes}
 
     def op(summary, tag, responses, params=(), body=None, desc=None, scope="read"):
@@ -297,8 +298,17 @@ def openapi_spec():
             "author": {"type": "object", "properties": {"id": nul("integer"), "name": {"type": "string"}}},
             "body": {"type": "string", "description": "Markdown; mentions as <@user_id>"}, "text": {"type": "string", "description": "Plain text, mentions as @name"},
             "mentions": {"type": "array", "items": {"type": "integer"}}, "created_at": {"type": "string", "format": "date-time"},
-            "edited_at": nul("string", format="date-time"), "attachments": {"type": "array", "items": ref("Attachment")}}},
-        "CommentInput": {"type": "object", "additionalProperties": False, "required": ["body"], "properties": {"body": {"type": "string", "maxLength": MAX_COMMENT}}},
+            "edited_at": nul("string", format="date-time"), "attachments": {"type": "array", "items": ref("Attachment")},
+            "reply_to": nul("integer", description="2.33.0 (#1076): the answered comment of the same task"),
+            "reply": {"anyOf": [ref("ReplyQuote"), {"type": "null"}]}}},
+        # 2.33.0 (#1076): the short quote of an answered message (comments, team chat, agent chat)
+        "ReplyQuote": {"type": "object", "description": "2.33.0 (#1076): a short quote of the answered message; deleted = the original is gone "
+                       "(deleted or trimmed: no text then)", "properties": {
+            "id": {"type": "integer"}, "deleted": {"type": "boolean"}, "user_id": nul("integer", description="Its author (an agent's message: the agent)"),
+            "name": {"type": "string"}, "text": {"type": "string", "description": "Plain text, at most 140 characters (+ …)"},
+            "from": {"type": "string", "enum": ["user", "agent"], "description": "Agent chat only"}}},
+        "CommentInput": {"type": "object", "additionalProperties": False, "required": ["body"], "properties": {"body": {"type": "string", "maxLength": MAX_COMMENT},
+                         "reply_to": {"type": "integer", "description": "2.33.0 (#1076): answer this comment of the same task (else 400); its author is notified like a mention"}}},
         "CommentPage": page("Comment"),
         "TimeEntry": {"type": "object", "properties": {
             "id": {"type": "integer"}, "user_id": {"type": "integer"}, "user_name": {"type": "string"}, "task_id": nul("integer"),
@@ -506,8 +516,17 @@ def openapi_spec():
                                  "post": op("Comment on a task (needs the Comments module; @mentions and notifications need collaboration)", C, ok(ref("Comment"), "Created", "201") | errs("400", "403", "404"),
                                             [pid()], body=ref("CommentInput"), scope="write")},
         "/tags": {"get": op("Your tags with task counts", S_, ok(ref("TagPage")) | errs())},
-        "/search": {"get": op("Search titles, notes, links and custom fields", S_, ok(ref("TaskPage")) | errs("400"),
-                              [{**q("q", "Search text"), "required": True}, limit, cursor])},
+        "/search": {"get": op("Search titles, notes, links and custom fields of tasks; 2.33.0 (#1080) scope=messages: task comments, "
+                              "team chat and agent chats you may read (MessageHit pages, newest first; agents: their own chats and the "
+                              "lists shared with them)", S_,
+                              ok({"oneOf": [ref("TaskPage"), page("MessageHit")]}) | errs("400", "503"),
+                              [{**q("q", "Search text (words; case, accents and ä/ae do not matter; each word matches word beginnings)"), "required": True},
+                               q("scope", "tasks (default) or messages", {"type": "string", "enum": ["tasks", "messages"]}),
+                               q("art", "messages: only these kinds, comma-separated: c (comments), t (team chat), a (agent chat)"),
+                               q("sender", "messages: only from this user id", {"type": "integer"}),
+                               q("room", "messages: only this team chat room", {"type": "integer"}),
+                               q("agent", "messages: only the chat with this agent (an agent: with this person)", {"type": "integer"}),
+                               q("task", "messages: only the comments of this task", {"type": "integer"}), limit, cursor])},
         "/time/entries": {"get": op("Time entries (needs time tracking), newest first", TI, ok(ref("TimeEntryPage")) | errs("400", "403"),
                                     [q("from", "First day (default: 6 days ago)", date_s), q("to", "Last day (default: today)", date_s),
                                      q("scope", "mine (default) or all (everyone in shared lists)", {"type": "string", "enum": ["mine", "all"]}),
@@ -545,8 +564,11 @@ def openapi_spec():
     contacts_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.21.0 (#658)
     life_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.22.0 (#663)
     team_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.17.0 (#419)
+    msgsearch_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.33.0 (#1080)
     pkgc_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.23.0 (#463)
     hosting_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.24.0 (#907 #910)
+    from ..notify.caps import notif_tpl_spec
+    notif_tpl_spec(paths, schemas, op, ok, errs, ref, pid, nul, page)  # 2.33.0 (#927)
     scope_refine(paths)
     _SPEC["s"] = {
         "openapi": "3.1.0",

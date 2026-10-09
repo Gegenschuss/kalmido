@@ -167,11 +167,11 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   const ans = await tcall('POST', '/agent/chats/1', TOK, {body: 'Yes. Shall I merge?'});
   await w.eval('chatLoad()'); await sleep(200);
   check(d.querySelector('#chat-typing').classList.contains('hidden'), 'answered: no more dots');
-  const am = d.querySelector(`#chat-msgs .cmsg.ag[data-mid="${ans.id}"]`);
+  const am = d.querySelector(`#chat-msgs .cmsg.ag[data-mid="a:${ans.id}"]`);
   const up = am && am.querySelector('.rx.add[data-e="up"]');
   check(up && am.querySelectorAll('.rx.add').length === 3, 'quick 👍 👎 ❤️ on the agent\'s message');
   click(w, up); await sleep(400);
-  check(d.querySelector(`#chat-msgs .cmsg.ag[data-mid="${ans.id}"] .rx.on[data-e="up"]`), 'my 👍 shows');
+  check(d.querySelector(`#chat-msgs .cmsg.ag[data-mid="a:${ans.id}"] .rx.on[data-e="up"]`), 'my 👍 shows');
   const evs = (await tcall('GET', `/agent/events?since=${cur}`, TOK)).data.filter(e => e.event === 'reaction');
   check(evs.length && evs[evs.length - 1].data.approval === 'approved' && evs[evs.length - 1].data.chat_message.id === ans.id, 'the agent got the approval');
   // offline (no event poll for 5 minutes): "answers later"

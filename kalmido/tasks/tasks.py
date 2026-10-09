@@ -156,7 +156,7 @@ WEB_TASK_NEW = frozenset(TASK_FIELDS) | {"tags", "ltags", "fields", "people"}
 WEB_TASK_EDIT = WEB_TASK_NEW | {"add_tags", "_prev", "_act"}
 WEB_LIST_NEW = frozenset({"name", "color", "folder", "view", "kind", "checklist", "done_at_bottom", "dep_shift", "tickets", "ptype", "family", "sections", "org_id"})  # 2.28.0 (#935): org_id
 WEB_LIST_EDIT = frozenset(LIST_FIELDS) | {"client_id", "rate", "agent_tidy", "tidy_agent_id", "listen_agent_ids", "agent_members", "agent_peers", "_prev", "ticket_tpl", "day_hours", "done_at_bottom", "columns", "ptype", "sort_mode", "org_id"}
-WEB_COMMENT = frozenset({"body", "suggestion"})
+WEB_COMMENT = frozenset({"body", "suggestion", "reply_to"})  # 2.33.0 (#1076): reply_to
 
 
 @app.post("/api/tasks")
@@ -361,7 +361,7 @@ def _wd_followup(c, t, users, S, LG, now):
         cs = collab_user(c, rcpt, None)
         if cs:
             news_add(c, rcpt, "followup", task_id=t["id"], data={"note": t["wait_note"][:200], "until": t["wait_until"]}, s=cs)
-        if notif_ok(c, rcpt, s, "followup", "push"):
+        if notif_ok(c, rcpt, s, "followup", "push", t["list_id"]):  # 2.33.0 (#927): + the list (owner's template)
             lname = tr("Inbox", lg=lg) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
             push = (tr("Follow up: {0}", t["title"], lg=lg),
                     (tr("Waiting on: {0}", t["wait_note"], lg=lg) + " · " if t["wait_note"] else "") + lname)

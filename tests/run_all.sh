@@ -457,6 +457,18 @@ fresh; run p2320_b_api "$PY" p2320_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2320_b_ui node p2320_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2320_c_ui node p2320_c_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2320_d_ui node p2320_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.33.0 "Agents and notifications": replies to one message and the jump to it, iPhone comment focus (#1076 #1087),
+# search in chats and comments (#1080), notification templates per list and folder, the client IP check (#927 #834),
+# the agents' plan usage ring, a repository on a folder and the sticky Done bar (#1045 #934 #1086); each suite starts
+# its own container
+fresh; run p2330_a_api "$PY" p2330_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2330_a_ui node p2330_a_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2330_b_api "$PY" p2330_b_api_test.py "$KALMIDO_TEST_DATA"
+       run p2330_b_ui node p2330_b_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2330_c_api "$PY" p2330_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2330_c_ui node p2330_c_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2330_d_api "$PY" p2330_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2330_d_ui node p2330_d_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

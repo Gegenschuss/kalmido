@@ -24,6 +24,8 @@ try:
     migrate_family_events(_c)  # 2.21.0 (#659), once: the family events of 2.19 (tasks with people) become events
 finally:
     _c.close()
+from .admin.clientip import ip_startup_check
+ip_startup_check()  # 2.33.0 (#834): many accounts from one private address -> warn in the log
 if os.environ.get("TASKS_WATCHDOG", "1") == "1":
     threading.Thread(target=watchdog, daemon=True).start()
     if UPDATE_CHECK_ENV:

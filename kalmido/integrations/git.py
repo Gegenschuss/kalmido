@@ -198,17 +198,36 @@ def git_keys(text):
     return {int(x) for x in GIT_KEY_RE.findall(text or "")}
 
 
-def git_task_ids(c, lid, ids):
+def git_task_ids(c, lids, ids):
+    """The ids among ids of live tasks in the lists lids (one list id or a set: 2.33.0 #934, a folder repository serves all
+    project lists of its folder)."""
     ids = sorted({int(i) for i in ids if i})[:200]
-    if not ids:
+    lids = sorted({lids} if isinstance(lids, int) else set(lids))
+    if not ids or not lids:
         return set()
-    return {r[0] for r in c.execute(f"SELECT id FROM tasks WHERE list_id=? AND deleted_at IS NULL AND id IN ({','.join('?' * len(ids))})",
-                                    (lid, *ids))}
+    return {r[0] for r in c.execute(f"""SELECT id FROM tasks WHERE list_id IN ({','.join('?' * len(lids))}) AND deleted_at IS NULL
+                                        AND id IN ({','.join('?' * len(ids))})""", (*lids, *ids))}
+
+
+def git_conn_lists(c, r):
+    """2.33.0 (#934): the lists connection r serves -- its list, or for a folder repository every project list of the folder
+    that uses it (not switched off, no own repository, no nearer folder repository)."""
+    from ..integrations.gitfolder import gf_lists_of_conn
+    lids = gf_lists_of_conn(c, r["id"])
+    return {r["list_id"]} if lids is None else lids
+
+
+def git_conns_of_list(c, lid):
+    """2.33.0 (#934): the repositories list lid uses: its own ones, else the ones of its folder (inherited)."""
+    from ..integrations.gitfolder import gf_conns_for_list, gf_own_conns
+    return gf_own_conns(c, lid) or gf_conns_for_list(c, lid)
 
 
 def git_public(c, r, manage=False):
     web = git_urls(r["provider"], r["base_url"])[1]
+    from ..integrations.gitfolder import gf_folder
     d = {"id": r["id"], "list_id": r["list_id"], "provider": r["provider"], "base_url": r["base_url"],
+         "folder": gf_folder(c, r["id"]),  # 2.33.0 (#934): a folder repository (the folder's path), None = the list's own
          "web_url": f"{web}/{r['owner']}/{r['repo']}", "owner": r["owner"], "repo": r["repo"],
          "full_name": f"{r['owner']}/{r['repo']}", "default_branch": r["default_branch"] or None,
          "status": "error" if r["last_error"] and r["last_error"] != "rate" else "ok" if r["polled_at"] else "new",
@@ -434,15 +453,16 @@ def git_take_tags(c, r, items):
     c.execute("""DELETE FROM git_tags WHERE conn_id=? AND rowid NOT IN
                  (SELECT rowid FROM git_tags WHERE conn_id=? ORDER BY seen_at DESC, rowid DESC LIMIT ?)""", (r["id"], r["id"], GIT_TAGS_KEEP))
     changed = False
-    ms = c.execute("SELECT id, title FROM tasks WHERE list_id=? AND ms=1 AND status=0 AND deleted_at IS NULL ORDER BY id",
-                   (r["list_id"],)).fetchall()
+    lids = sorted(git_conn_lists(c, r))  # 2.33.0 (#934): a folder repository: the milestones of all its lists
+    ms = c.execute(f"SELECT id, title FROM tasks WHERE list_id IN ({','.join('?' * len(lids))}) AND ms=1 AND status=0 AND deleted_at IS NULL ORDER BY id",
+                   lids).fetchall() if lids else []
     for n in new:
         v = git_version(n)
         if not v:
             continue
         for t in ms:
             if v in {git_version(x) for x in GIT_TOK_RE.findall(t["title"] or "")}:
-                changed |= git_close(c, r, t["id"], "tag", n, n, git_tag_url(r, n))
+                changed |= git_close(c, r, t["id"], "tag", n, n, git_tag_url(r, n), set(lids))
     return changed
 
 
@@ -453,10 +473,10 @@ def _git_after(ts, since):
         return False
 
 
-def git_close(c, r, tid, kind, ref, title, url):
+def git_close(c, r, tid, kind, ref, title, url, lids=None):
     """A keyword in a merged pull request / a default-branch commit: completes task tid once (git_closes)."""
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
-    if not t or t["deleted_at"] or t["status"] != 0 or t["list_id"] != r["list_id"] or \
+    if not t or t["deleted_at"] or t["status"] != 0 or t["list_id"] not in (lids if lids is not None else {r["list_id"]}) or \
             c.execute("SELECT 1 FROM git_closes WHERE task_id=?", (tid,)).fetchone():
         return False
     undo = {}
@@ -472,7 +492,7 @@ def git_close(c, r, tid, kind, ref, title, url):
 
 def git_take_prs(c, r, items, baseline):
     changed = False
-    lid, repo = r["list_id"], f"{r['owner']}/{r['repo']}"
+    lid, repo = git_conn_lists(c, r), f"{r['owner']}/{r['repo']}"
     for raw in (items or [])[:GIT_ITEMS]:
         p = git_pr_of(raw)
         if not p:
@@ -505,13 +525,13 @@ def git_take_prs(c, r, items, baseline):
                 log_act(c, tid, "git_pr", {"repo": repo, "n": p["number"], "title": p["title"][:200], "url": p["url"], "state": p["state"]}, uid=None)
         if p["state"] == "merged" and _git_after(p["merged_at"], r["created_at"]):
             for tid in sorted(git_task_ids(c, lid, git_keys(p["title"] + "\n" + p["body"]))):
-                changed |= git_close(c, r, tid, "pr", n, f"#{n} {p['title']}", p["url"])
+                changed |= git_close(c, r, tid, "pr", n, f"#{n} {p['title']}", p["url"], lid)
     return changed
 
 
 def git_take_commits(c, r, items, branch, default):
     changed = False
-    lid, bid = r["list_id"], (None if default else git_branch_id(branch))
+    lid, bid = git_conn_lists(c, r), (None if default else git_branch_id(branch))
     for raw in (items or [])[:GIT_ITEMS]:
         m = git_commit_of(raw)
         if not m:
@@ -528,7 +548,7 @@ def git_take_commits(c, r, items, branch, default):
                                       (tid, r["id"], "commit", m["sha"], iso(now_utc()))).rowcount)
         if default and _git_after(m["at"], r["created_at"]):
             for tid in sorted(git_task_ids(c, lid, git_keys(m["message"]))):
-                changed |= git_close(c, r, tid, "commit", m["sha"], first, m["url"])
+                changed |= git_close(c, r, tid, "commit", m["sha"], first, m["url"], lid)
     return changed
 
 
@@ -569,6 +589,8 @@ def git_ci_of(k, sha, gh):
 
 def git_poll(c, cid):
     """One poll of connection cid (the background thread). Never raises for provider problems (stored in last_error)."""
+    from ..integrations.gitfolder import gf_rehome
+    gf_rehome(c, cid)  # 2.33.0 (#934): a folder repository hangs on a list that is still in its folder
     r = c.execute("SELECT k.*, l.archived FROM git_conns k JOIN lists l ON l.id=k.list_id WHERE k.id=?", (cid,)).fetchone()
     if not r:
         return
@@ -705,15 +727,16 @@ def git_repos_of_lists(c, ids):
     out = {}
     if not ids:
         return out
-    for r in c.execute(f"SELECT * FROM git_conns WHERE list_id IN ({','.join('?' * len(ids))}) ORDER BY id", list(ids)):
-        d = git_public(c, r)
-        out.setdefault(r["list_id"], []).append({k: d[k] for k in ("id", "provider", "full_name", "web_url", "default_branch", "status")})
+    for lid in ids:  # 2.33.0 (#934): own repositories, else the folder's
+        for r in git_conns_of_list(c, lid):
+            d = git_public(c, r)
+            out.setdefault(lid, []).append({k: d[k] for k in ("id", "provider", "full_name", "web_url", "default_branch", "status", "folder")})
     return out
 
 
 def git_repo_for_task(c, t):
     """data.repo of an agent's task event / get_task: the list's first repository + branch suggestion + linked code."""
-    rows = c.execute("SELECT * FROM git_conns WHERE list_id=? ORDER BY id", (t["list_id"],)).fetchall()
+    rows = git_conns_of_list(c, t["list_id"])  # 2.33.0 (#934): also a folder repository
     if not rows:
         return None
     first = git_public(c, rows[0])
@@ -732,7 +755,7 @@ def git_parse_pr_url(c, lid, url):
     u = str(url or "").strip()
     if len(u) > 500:
         return None
-    for r in c.execute("SELECT * FROM git_conns WHERE list_id=? ORDER BY id", (lid,)):
+    for r in git_conns_of_list(c, lid):  # 2.33.0 (#934): also a folder repository
         web = git_urls(r["provider"], r["base_url"])[1]
         # 2.18.0: GitLab .../-/merge_requests/<n>, Bitbucket .../pull-requests/<n>
         tail = {"gitlab": r"/-/merge_requests/(\d{1,9})", "bitbucket": r"/pull-requests/(\d{1,9})"}.get(r["provider"], r"/pulls?/(\d{1,9})")
@@ -779,9 +802,12 @@ def git_list(lid):
     c = db()
     role = need_list(c, lid, write=False)
     manage = role in MANAGE_ROLES and not is_agent(g.user)
-    rows = c.execute("SELECT * FROM git_conns WHERE list_id=? ORDER BY id", (lid,)).fetchall()
+    from ..integrations.gitfolder import gf_conns_for_list, gf_own_conns, gf_list_state
+    rows = gf_own_conns(c, lid)
+    # 2.33.0 (#934): the folder's repositories this list uses (or would use: switched off / an own repository), read-only here
     return jsonify(repos=[git_public(c, r, manage) for r in rows], may=manage, key=bool(SECRET_KEY),
-                   project=is_project(c, lid), max=GIT_MAX_CONNS, errors=errhook_public(c, lid, manage))  # 2.18.0: error reports
+                   project=is_project(c, lid), max=GIT_MAX_CONNS, errors=errhook_public(c, lid, manage),  # 2.18.0: error reports
+                   folder=gf_list_state(c, lid), folder_repos=[git_public(c, r) for r in gf_conns_for_list(c, lid, ignore_own=True, ignore_off=True)])
 
 
 def git_clean_input(b):
@@ -867,11 +893,18 @@ def git_add(lid):
         return err(str(e))
     if token and not SECRET_KEY:
         return err(git_key_error(), 409)
-    if c.execute("SELECT COUNT(*) FROM git_conns WHERE list_id=?", (lid,)).fetchone()[0] >= GIT_MAX_CONNS:
+    from ..integrations.gitfolder import gf_own_conns
+    own = gf_own_conns(c, lid)  # 2.33.0 (#934): a folder repository hanging on this list does not count
+    if len(own) >= GIT_MAX_CONNS:
         return err(tr("At most {0} repositories per list", GIT_MAX_CONNS), 409)
-    if c.execute("SELECT 1 FROM git_conns WHERE list_id=? AND provider=? AND base_url=? AND owner=? COLLATE NOCASE AND repo=? COLLATE NOCASE",
-                 (lid, provider, base, owner, name)).fetchone():
+    if any((x["provider"], x["base_url"], x["owner"].lower(), x["repo"].lower()) == (provider, base, owner.lower(), name.lower()) for x in own):
         return err(tr("This repository is already connected"), 409)
+    return git_connect(c, lid, provider, base, owner, name, token)
+
+
+def git_connect(c, lid, provider, base, owner, name, token, folder=None):
+    """Checks the repository with the token (nothing is stored on an error) and stores the connection on list lid; folder
+    (2.33.0 #934): a folder repository (lid = one of the folder's lists, it serves all of them)."""
     if not cal_rate(me()):
         return err(tr("Too many attempts, please wait a few minutes"), 429)
     # check it at once (read the repository with the token): errors show in the dialog, nothing is stored
@@ -891,6 +924,8 @@ def git_add(lid):
     cid = c.execute("""INSERT INTO git_conns(list_id,provider,base_url,owner,repo,default_branch,created_by,created_at,next_at)
                        VALUES(?,?,?,?,?,?,?,?,0)""", (lid, provider, base, owner, name, dflt,
                                                        me(), iso(now_utc()))).lastrowid
+    if folder:
+        c.execute("INSERT INTO git_folders(conn_id,owner_id,folder,created_at) VALUES(?,?,?,?)", (cid, me(), folder, iso(now_utc())))
     if token:
         c.execute("UPDATE git_conns SET token=? WHERE id=?", (git_seal(cid, "token", token), cid))
     bump(c)
@@ -903,6 +938,9 @@ def git_need_conn(c, cid, manage=True):
     r = c.execute("SELECT * FROM git_conns WHERE id=?", (cid,)).fetchone()
     if not r:
         raise Denied(404)
+    from ..integrations.gitfolder import gf_need_conn
+    if gf_need_conn(c, r, manage):  # 2.33.0 (#934): a folder repository: its folder's owner manages it
+        return r
     if manage:
         if not list_role(c, r["list_id"]):
             raise Denied(404)

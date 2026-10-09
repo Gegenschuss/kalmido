@@ -256,8 +256,10 @@ def agent_task_data(c, tid, aid, full=None, **extra):
 
 
 def agent_comment(c, k):
+    from ..collab.replies import reply_of
+    rt, rq = reply_of(c, "c", k)  # 2.33.0 (#1076): the comment answers this one (a short quote)
     return {"id": k["id"], "author_id": k["user_id"], "text": comment_plain(c, k["body"]), "body": k["body"], "created_at": k["created_at"],
-            "suggestion": json.loads(k["suggestion"]) if k["suggestion"] else None}
+            "suggestion": json.loads(k["suggestion"]) if k["suggestion"] else None, "reply_to": rt, "reply": rq}
 
 
 def agent_comment_events(c, t, cid, mentions, new_mentions, created=True):
@@ -850,7 +852,14 @@ def agent_public(c, a, uid=None):
             "permission_mode": agent_runtime(a)["permission_mode"], "may_set_mode": bool(uid) and may_set_runtime(c, a, uid),
             # 2.32.0 (#1079): what its host reports it really runs with (model as the host names it, the mode of the current
             # run, the host's own default); the runtime's wished model next to it (set: … · runs: …)
-            "host": _host_info(a), "runtime_model": agent_runtime(a)["model"]}
+            "host": _host_info(a), "runtime_model": agent_runtime(a)["model"],
+            # 2.33.0 (#1045): its plan usage (the ring in the chat header; null = never reported)
+            "quota": _quota(a)}
+
+
+def _quota(a):
+    from ..agents.quota import quota_public
+    return quota_public(a)
 
 
 def _host_info(a):

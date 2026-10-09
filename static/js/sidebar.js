@@ -381,13 +381,14 @@ function folderMenu(anchor, f) {
 }
 // 2.22.0 (#740): share a whole folder with people: its lists now and every list that comes into it later (switchable off
 // per person); the lists land with them in a folder of the same name
-async function folderPeopleModal(f) {
+async function folderPeopleModal(f, opt = {}) {
   let users = [], have = [];
   try { users = (await api('GET', '/api/users')).users.filter(u => !u.disabled && S.me && u.id !== S.me.id && u.kind !== 'agent' && !u.agent); have = (await api('GET', '/api/folders/people?folder=' + encodeURIComponent(f))).people; } catch { return; }
   const md = modal(`<h3>${ic('users', 's')} ${esc(tr('Share folder “{0}”', fDisp(f)))}</h3>
     <p class="muted">${tr('Every list in this folder is shared now, and every list you add to it later. With them the lists land in a folder of the same name; they can move them freely.')}</p>
     <div class="fpl" id="fp-list"></div>
     <div class="row"><label for="fp-user">${tr('Person')}</label><select id="fp-user">${users.map(u => `<option value="${u.id}">${esc(u.display_name)}</option>`).join('')}</select><select id="fp-role" aria-label="${esc(tr('Role'))}">${FP_ROLES.map(([k, n]) => `<option value="${k}" ${k === 'edit' ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select><button type="button" class="btn pri" data-m="add">${tr('Share')}</button></div>
+    <details class="shsec" id="fp-sec-ntf" ${opt.focus === 'ntf' ? 'open' : ''}><summary><h4 id="fp-ntf-h">${tr('Notifications for members')}</h4><span class="shsecst muted" id="fp-st-ntf"></span>${ic('chev', 's shchev')}</summary><div id="fp-ntf"><div class="muted mhint">${tr('Loading…')}</div></div></details>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Done')}</button></div>`);
   // 2.29.0 (#929): every role like in a list, changeable here (it reaches the lists in the folder); removing asks whether the
   // person also leaves the folder's lists or only gets no new ones
@@ -402,6 +403,7 @@ async function folderPeopleModal(f) {
     try { const j = await api('PUT', '/api/folders/people', {folder: f, user_id: uid, role: s.value}); have = have.map(x => x.user_id === uid ? {...x, role: s.value} : x); toast(j.updated ? trn('Role changed in {0} list', 'Role changed in {0} lists', j.updated) : tr('Saved')); } catch { draw(); }
   });
   draw();
+  ntfLoad($('#fp-ntf', md), 'folder', f, j => { const st = $('#fp-st-ntf', md); if (st) st.textContent = ntfName(j.effective?.tpl); if (opt.focus === 'ntf' && !md._ntfs) { md._ntfs = 1; $('#fp-sec-ntf', md)?.scrollIntoView?.({block: 'start'}); } });  // 2.33.0 (#927)
   md.addEventListener('click', async e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); await load(); render(); return; }
@@ -663,6 +665,7 @@ async function folderPropsModal(f) {
     ${wsOn() ? sel('fs-ws', 'org_id', [[0, wsName('private')], ...(S.me.workspaces || []).map(w => [w.id, w.name])]) : ''}
     ${collab() ? sel('fs-ag', 'agent_id', [[0, tr('No agent')], ...users.map(u => [u.id, u.display_name])]) + sel('fs-am', 'agent_members', [[1, tr('On')], [0, tr('Off')]]) + sel('fs-ap', 'agent_peers', [[1, tr('On')], [0, tr('Off')]]) + sel('fs-td', 'agent_tidy', TIDY.map(([k, n]) => [k, tr(n)])) + sel('fs-al', 'agent_listen', [[1, tr('On')], [0, tr('Off: only via @')]]) : ''}
     ${collab() ? `<div class="row"><label>${tr('People')}</label><button type="button" class="btn sm" data-m="people">${ic('users', 's')} ${tr('People and roles…')}</button></div>` : ''}
+    <div class="row"><label>${tr('Repository')}</label><button type="button" class="btn sm" data-m="repos">${ic('git', 's')} ${tr('Repository…')}</button></div>
     <fieldset class="fsapply"><legend>${tr('Apply to')}</legend>
       <label class="chkl"><input type="radio" name="fs-ap" value="all" checked> ${tr('New lists and the {0} lists in the folder', (info.lists || []).length)}</label>
       <label class="chkl"><input type="radio" name="fs-ap" value="new"> ${tr('Only new lists')}</label>
@@ -681,6 +684,7 @@ async function folderPropsModal(f) {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
     if (b.dataset.m === 'people') { md.remove(); folderPeopleModal(f); return; }
+    if (b.dataset.m === 'repos') { md.remove(); folderRepoModal(f); return; }  // 2.33.0 (#934)
     if (b.dataset.m !== 'ok') return;
     const body = bodyOf(false), er = $('#fs-err', md); er.hidden = true;
     if (!confirmed && body.apply === 'all' && Object.keys(body.props).length) {  // first say which lists cannot follow

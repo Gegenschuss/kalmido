@@ -101,8 +101,15 @@
   asked: what is done, what is open, what they should test or decide.
 
 ### Team chat
-- In a list's team chat you get the event `team_message` only when someone @mentions you: answer there
-  (`post_team_message`), short and in Markdown. Do not post there on your own unless someone asked you to report there.
+- In a list's team chat you get the event `team_message` only when someone @mentions you (or answers one of your
+  messages): answer there (`post_team_message`), short and in Markdown. Do not post there on your own unless someone
+  asked you to report there.
+- **Replies (2.33.0).** A message that answers an older one carries `reply_to` + `reply` (a short quote; `deleted: true`
+  when the original is gone). Read the quote before you answer: the person means THAT message, not the newest topic.
+  When you answer one message out of several, pass its id as `reply_to` (`send_chat`, `add_comment`,
+  `post_team_message`); not on every answer.
+- When someone refers to something said earlier (a decision, a number, "as discussed"), find it with `search_messages`
+  (comments, channels, your chats) instead of paging through old messages, then read the place itself.
 
 ### New tasks in your lists
 - The event `task_added` tells you that a task was created in, or moved into, a list where you listen in (`how`,
@@ -159,4 +166,7 @@
 ### Usage
 - Report your model usage with the hook `mcp/claude_usage_hook.py`, registered as **Stop and SubagentStop** hook in
   `.claude/settings.json` (numbers only, never text).
+- If your host knows your plan usage (e.g. Claude Code's status line `rate_limits`), it reports it with
+  `report_plan_usage` (the ring next to your name). Before a large piece of work, at your own limit: finish the current
+  step, park cleanly and start nothing big until the reset.
 <!-- kalmido-agent-rules:end -->

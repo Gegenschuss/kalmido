@@ -39,6 +39,36 @@ and the Docker bridge gateway). Two setups go wrong:
   address and forwards the gateway. Run the proxy with host networking (or make sure published ports are NAT-ed, not
   proxied), then check that Kalmido's log (`docker logs kalmido`) shows real client addresses.
 
+The most common case: a proxy such as Caddy in Docker with published ports (`ports: ["80:80", "443:443"]`). Docker's
+userland proxy (`docker-proxy`) accepts the connections, so the proxy sees the Docker gateway (`172.x.0.1`) as the client
+for every request and passes exactly that on. Two ways out:
+
+```yaml
+# 1. the proxy on the host network: it sees the real client addresses (no "ports:" needed)
+services:
+  caddy:
+    image: caddy:2
+    network_mode: host
+```
+
+```json
+// 2. or switch Docker's userland proxy off (/etc/docker/daemon.json, then restart Docker): published ports are NAT-ed
+//    by the kernel and keep the client address. For IPv6 also enable "ip6tables": true (Docker 27+ does by default).
+{ "userland-proxy": false }
+```
+
+Then set `KALMIDO_TRUSTED_PROXIES` to the address Kalmido sees the proxy at (host networking: `127.0.0.1,::1`; a proxy
+container on its own network: that network's gateway or the proxy's container address) and nothing else.
+
+**Check it in the app (2.33).** *Administration > Server > Your IP* shows the address the server sees for your own
+request, and the proxy it came through (trusted or not). From outside your network it must be your public address, not
+a private one like `172.18.0.1`. Kalmido also watches successful sign-ins: when several accounts (default 3,
+`KALMIDO_IP_WARN_ACCOUNTS`) sign in from exactly one private address within 7 days, it warns in the server log
+(`WARNING client addresses do not arrive ...`, at the start and when it first happens) and under *Administration >
+Server* ("Client addresses do not arrive - check the proxy"). Only private sign-in addresses are kept for this, for 14
+days; public addresses are never stored. A small office or family behind one NAT address on the same LAN can trigger it
+too: then the warning is expected and harmless.
+
 **A CDN proxy sees everything.** With a CDN in proxy mode (for example Cloudflare's orange cloud or a Cloudflare
 Tunnel) TLS ends at the CDN: it sees every request and answer in plain text. For privacy use DNS only and terminate
 TLS in your own proxy with your own certificate.

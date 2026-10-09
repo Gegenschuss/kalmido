@@ -79,7 +79,7 @@ exports.boot = async function boot({user = 'alice', mobile = false, hash = '', l
   // setting), p2170_ui passes ls: {'tasks.newsBundle': null} for the bundled default
   const store = {'tasks.newsBundle': 'false', ...(hash || 'tasks.lastKey' in ls ? {} : {'tasks.lastKey': '"today"'}), ...ls};
   for (const k of Object.keys(store)) if (store[k] === null) delete store[k];
-  const vc = new VirtualConsole(); vc.on('jsdomError', e => { if (!/navigation|Not implemented/.test(e.message)) exports.errs.push(e.message); });
+  const vc = new VirtualConsole(); vc.on('jsdomError', e => { if (!/navigation|Not implemented/.test(e.message)) { exports.errs.push(e.message); console.log('script error:', String((e.detail && e.detail.stack) || e.stack || '').split('\n').slice(0, 4).join(' | ')); } });
   const dom = await JSDOM.fromURL(B + path + (hash ? '#' + hash : ''), {runScripts: 'dangerously', resources: new PooledLoader(), pretendToBeVisual: true, virtualConsole: vc,
     beforeParse(w) {
       w.matchMedia = q => ({matches: q in media ? media[q] : /max-width/.test(q) ? mobile : false, addEventListener() {}, addListener() {}});  // media: {'(prefers-reduced-motion: reduce)': true}

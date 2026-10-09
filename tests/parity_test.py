@@ -44,6 +44,7 @@ APP_TO_API = {
     "GET /api/state": ["GET /lists", "GET /tasks", "GET /habits", "GET /filters", "GET /me"],
     "GET /api/me/storage": ["GET /me/storage"],  # 2.24.0 (#910)
     "GET /api/tasks": ["GET /tasks", "GET /search", "GET /trash"],
+    "GET /api/search/messages": ["GET /search"],  # 2.33.0 (#1080): ?scope=messages
     "GET /api/tasks/{}": ["GET /tasks/{}"],
     "POST /api/tasks": ["POST /tasks", "POST /tasks/{}/subtasks"],
     "PATCH /api/tasks/{}": ["PATCH /tasks/{}"],
@@ -109,6 +110,7 @@ APP_TO_API = {
     "GET /api/lists/{}/status": ["GET /lists/{}/overview"],
     "POST /api/lists/{}/status": ["PUT /lists/{}/status"],
     "GET /api/lists/{}/repos": ["GET /lists/{}/repos"],
+    "GET /api/lists/{}/notify-template": ["GET /lists/{}/notify-template"],  # 2.33.0 (#927): agents read it, never change it
     "POST /api/filters": ["POST /filters"],
     "PATCH /api/filters/{}": ["PATCH /filters/{}"],
     "DELETE /api/filters/{}": ["DELETE /filters/{}"],
@@ -211,8 +213,11 @@ APP_ONLY = [
     ("Paperless: never for tokens or agents", ("* /api/paperless", "* /api/tasks/{}/paperless", "POST /api/attachments/{}/to-paperless",
                                              "* /api/lists/{}/paperless")),
     ("public links: sharing outside the instance, people only", ("* /api/lists/{}/public-link",)),
+    ("2.33.0 (#927): notification templates are set by the owner in the app; agents only read a list's template",
+     ("PUT /api/lists/{}/notify-template", "* /api/folders/notify-template", "POST /api/notify-templates/asked")),
     ("repositories: their secrets are entered by people; the API reads them (GET /lists/{id}/repos)", (
-        "POST /api/lists/{}/repos", "* /api/repos/", "POST /api/hooks/git/", "POST /api/tasks/{}/git-undo")),
+        "POST /api/lists/{}/repos", "* /api/repos/", "POST /api/hooks/git/", "POST /api/tasks/{}/git-undo",
+        "* /api/folders/repos", "PUT /api/lists/{}/folder-repo")),  # 2.33.0 (#934): folder repositories, read through /lists/{id}/repos
     ("2.18.0: the error-report webhook of a list: its secret URL is shown once to people (owner / list admins); the inbound hook "
      "is called by the error service, not by a client", ("* /api/lists/{}/error-hook", "POST /api/hooks/issues/")),
     ("external calendar subscriptions and the calendar feed link: personal settings", ("* /api/calendars", "* /api/ical")),
@@ -338,6 +343,7 @@ for name, _, schema, fn in mcp.TOOLS:
 reached = {c for s in CALLS.values() for c in s}
 API_ONLY = {  # REST routes on purpose without an MCP tool (reason)
     "GET /openapi.json": "the API description itself",
+    "GET /lists/{}/notify-template": "2.33.0 (#927): the owner's notification ceiling of a list; agents get no pushes, it is read by scripts",
     "POST /import/{}": "imports of other apps' files: people upload them (multipart) in the app or with the REST API",
     "POST /imports/{}/undo": "belongs to the import",
     "POST /lists/{}/owner": "transferring a list: never agents (403)",

@@ -274,6 +274,8 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
 - Set your status (set_status) while you work on something, and back to idle when done.
 - Before you answer a task event, read the whole task: description, properties and all comments (get_task).
 - Answer task events only with a comment on the task, never with a copy in your chat.
+- A message that answers an older one carries reply / reply_to (2.33.0): answer what it refers to; pass reply_to
+  yourself when you answer one message out of several.
 - Whatever <OWNER_NAME> has to apply themselves (patches, commands with admin rights, their own settings) becomes a task for
   them with high priority: purpose, where it lies, how you tested it, the commands one per line as a checklist, how to
   switch it on and how to check it.
@@ -477,6 +479,15 @@ every subagent as *SubagentStop* hook (both wired in step 7, the same command) a
 Usage* then shows it, and the limits in the agent's dialog apply. Optional keys in the env file:
 `KALMIDO_USAGE_PRICES` (a price table to show costs), `KALMIDO_USAGE_TASK`, `KALMIDO_USAGE_STATE_DIR`. Test it without
 sending: `python3 ~/kalmido/mcp/claude_usage_hook.py --dry-run ~/.config/kalmido/agent.env < /dev/null`.
+
+**Plan usage ring (2.33.0, optional).** The chat header can show how much of the agent's plan is used (Claude's 5-hour and
+weekly windows) as a ring next to its name: yellow from 75 %, red from your limit with *paused until …*. Claude Code
+hands these values (`rate_limits`) only to a *status line* command, so set one up for the agent's interactive sessions
+(`statusLine` in `~/agent/.claude/settings.json`, script `~/agent/bin/statusline.sh` from
+[docs/AGENTS.md, Plan usage](AGENTS.md#plan-usage-the-ring-in-the-chat-header-2330)); it sends them with
+`PUT /api/v1/agent/quota` at most every 5 minutes. A headless host (`claude -p`, the launcher) has no status line:
+report from your own bookkeeping after each run (`windows` with label, percent, reset time) or leave it out: without a
+report there is simply no ring. Claude Code runs the status line itself, so it needs no entry in the agent's allow list.
 
 ### 11. Test checklist
 

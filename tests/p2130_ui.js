@@ -64,7 +64,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   check((await tcall('POST', `/agent/chats/${ME}`, TOK, {body: 'See https://example.org/?a=1 and `x?`'})).id && (await call('GET', `/api/agents/${AG}/chat`)).messages.pop().asks === false, 'A2: a ? in a link or code is no question');
   w = await boot({user: 'alice', hash: 'l/' + P}); d = w.document;
   w.eval(`chatOpen(${AG})`); await until(() => d.querySelectorAll('#chat-msgs .cmsg.ag').length >= 3);
-  const r1 = d.querySelector(`#chat-msgs .cmsg[data-mid="${q1.id}"]`), r2 = d.querySelector(`#chat-msgs .cmsg[data-mid="${q2.id}"]`);
+  const r1 = d.querySelector(`#chat-msgs .cmsg[data-mid="a:${q1.id}"]`), r2 = d.querySelector(`#chat-msgs .cmsg[data-mid="a:${q2.id}"]`);
   // 2.18.0 (#651, intended change): the quick reactions are visible in the meta line of every message (no hidden bar)
   check(r1 && r1.querySelectorAll('.cmeta .rxrow .rx.add').length === 3 && !r1.querySelector('.rxhint') && !/counts as/.test(r1.querySelector('[data-e="up"]').getAttribute('aria-label')), 'A2 / #651: a status message: 👍 👎 ❤️ visible, plain reactions');
   check(r2 && !r2.querySelector('.rxhint'), 'A2: an older question has no "👍 = approval" hint (only the newest message)');
@@ -74,7 +74,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   check(rp1.status === 200 && rp1.approval === null, 'A2: 👍 on a status message is a plain reaction, no approval');
   const q3 = await tcall('POST', `/agent/chats/${ME}`, TOK, {body: 'May I merge the branch?'});
   await w.eval('chatLoad()'); await sleep(300);
-  const r3 = () => d.querySelector(`#chat-msgs .cmsg[data-mid="${q3.id}"]`);
+  const r3 = () => d.querySelector(`#chat-msgs .cmsg[data-mid="a:${q3.id}"]`);
   // 2.30.0 (#1041, intended change): no "👍 = approval" hint any more; 👍 / 👎 stay one tap away on the newest question
   check(!r3()?.querySelector('.rxhint') && r3()?.querySelector('.rxrow [data-e="up"]:not(.rxq)') && r3()?.querySelector('.rxrow [data-e="down"]:not(.rxq)'), 'A2: the newest question keeps 👍 / 👎 at hand, without the hint');
   check(/counts as approval/.test(r3()?.querySelector('.rxrow [data-e="up"]')?.getAttribute('aria-label') || ''), 'A2: its 👍 says it counts as approval');

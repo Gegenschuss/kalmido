@@ -534,7 +534,7 @@ def _wd_reminder(c, t, users, S, LG, now):
         # 2.19.0 (#653): everyone who comes along gets it too (in their language, with their settings)
         for who in ([rcpt] if rcpt else []) + reminder_people(c, t, users, rcpt):
             sw, lgw = S.get(who, USER_DEFAULTS), LG.get(who, "en")
-            if not notif_ok(c, who, sw, "reminder", "push"):
+            if not notif_ok(c, who, sw, "reminder", "push", t["list_id"]):  # 2.33.0 (#927): + the list (owner's template)
                 continue  # 2.1.0 (#317): reminders can be switched off in the notification settings
             when = tr("all day", lg=lgw) if not t["due_time"] else tr("at {0}", t["due_time"], lg=lgw)
             day = tr("today", lg=lgw) if t["due"] == now.date().isoformat() else \

@@ -113,6 +113,7 @@ ROUTES = {
     "POST /api/v1/agents/{}/chat/{}/choice": "agent", "POST /api/v1/agents/{}/chat/{}/reactions": "agent",
     "POST /api/v1/agent/typing": "agent", "GET /api/v1/agents": "agent", "POST /api/v1/agent/proposals": "agent",
     "GET /api/agents/jobs/{}/steps": "agent", "POST /api/v1/agent/progress": "agent",  # 2.32.0 (#1081)
+    "PUT /api/v1/agent/quota": "agent", "GET /api/v1/agent/quota": "agent", "DELETE /api/v1/agent/quota": "agent",  # 2.33.0 (#1045)
     "POST /api/v1/agent/usage": "agent", "GET /api/v1/agent/usage": "agent", "GET /api/agents/usage": "agent",
     "GET /api/agents/{}/share": "agent", "PUT /api/lists/{}/agent": "agent", "POST /api/agents/{}/share-all": "agent",
     "PUT /api/agents/{}/autoshare": "agent",
@@ -217,6 +218,12 @@ ROUTES = {
     "PUT /api/folders/groups/{}": "folder", "DELETE /api/folders/groups/{}": "folder", "GET /api/folders/people": "folder",
     "PUT /api/folders/people": "folder", "DELETE /api/folders/people": "folder", "POST /api/folders/rename": "folder",
     "POST /api/folders/delete": "folder",
+    "GET /api/folders/repos": "folder", "POST /api/folders/repos": "folder", "PUT /api/lists/{}/folder-repo": "list",  # 2.33.0 (#934)
+    "GET /api/folders/notify-template": "folder", "PUT /api/folders/notify-template": "folder",  # 2.33.0 (#927)
+    "GET /api/lists/{}/notify-template": "list", "PUT /api/lists/{}/notify-template": "list",
+    "GET /api/v1/lists/{}/notify-template": "list", "POST /api/notify-templates/asked": "own",
+    "GET /api/search/messages": "aggregate",  # 2.33.0 (#1080): only what the person may read (vis_sql, rooms, own agent chats)
+    "GET /api/admin/client-ip": "admin",  # 2.33.0 (#834)
     # ---- form (10)
     "GET /api/lists/{}/forms": "form", "POST /api/lists/{}/forms": "form", "PATCH /api/forms/{}": "form",
     "DELETE /api/forms/{}": "form", "GET /f/{}": "form", "POST /f/{}": "form", "GET /api/v1/lists/{}/forms": "form",

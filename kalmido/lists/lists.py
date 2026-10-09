@@ -463,6 +463,8 @@ def list_delete(lid):
               (ts, inbox, lid))
     icon = c.execute("SELECT icon FROM lists WHERE id=?", (lid,)).fetchone()[0]
     lfiles = [r[0] for r in c.execute("SELECT path FROM list_files WHERE list_id=?", (lid,))]  # 2.7.1 (#410)
+    from ..integrations.gitfolder import gf_before_list_delete
+    gf_before_list_delete(c, lid)  # 2.33.0 (#934): a folder repository hanging on it moves to another list of its folder
     c.execute("DELETE FROM lists WHERE id=?", (lid,))
     bump(c)
     c.commit()

@@ -319,7 +319,8 @@ async function bellSet(id, mode, custom) {
 }
 function bellMenu(anchor, id) {
   const l = listById(id); if (!l) return;
-  menu(anchor, BELLS.map(([m, n, h]) => ({label: tr(n), title: tr(h), icon: BELL_ICON[m], on: (l.bell || 'default') === m, fn: () => m === 'custom' ? bellCustomModal(id) : bellSet(id, m)})));
+  const cap = l.notif_cap ? [{label: tr('{0} has limited the notifications for this list', l.notif_cap.by || l.owner_name || '') + ': ' + ntfName(l.notif_cap.tpl), icon: 'lock', fn: () => toast(tr('Pushes allowed: {0}', (l.notif_cap.allowed || []).map(ntfRowName).join(', ') || tr('none')))}] : [];  // 2.33.0 (#927)
+  menu(anchor, [...BELLS.map(([m, n, h]) => ({label: tr(n), title: tr(h), icon: BELL_ICON[m], on: (l.bell || 'default') === m, fn: () => m === 'custom' ? bellCustomModal(id) : bellSet(id, m)})), ...cap]);
 }
 // "Custom selection…": the events x News / Push for this list (same table as Settings > Notifications)
 function bellCustomModal(id) {
@@ -380,7 +381,7 @@ function shareSummary(l) {
 }
 // 2.32.0 (#1058): the parts below "People" fold (closed at first, a short state in the folded line); people stay open.
 // Ids of the old headings stay (l-pub-h, sh-own-h, sh-ag-h, sh-grp-h) for links and tests.
-const SH_HID = {grp: 'sh-grp-h', ag: 'sh-ag-h', pub: 'l-pub-h', own: 'sh-own-h'};
+const SH_HID = {grp: 'sh-grp-h', ag: 'sh-ag-h', pub: 'l-pub-h', own: 'sh-own-h', ntf: 'sh-ntf-h'};  // 2.33.0 (#927): + notifications
 const shSec = (k, title, inner, hide = false, open = false) => `<details class="shsec" id="sh-sec-${k}" ${hide ? 'hidden' : ''} ${open ? 'open' : ''}><summary><h4 id="${SH_HID[k]}">${title}</h4><span class="shsecst muted" id="sh-st-${k}"></span>${ic('chev', 's shchev')}</summary>${inner}</details>`;
 function shareModal(id, opt = {}) {
   const l0 = listById(id); if (!shareOk(l0)) return;
@@ -390,6 +391,8 @@ function shareModal(id, opt = {}) {
     ${collab() && S.peopleVis === 'contacts' && canManage(l0) ? `<div class="row shmail"><input id="sh-email" type="email" autocomplete="off" placeholder="${esc(tr('Share by e-mail address'))}" aria-label="${esc(tr('Share by e-mail address'))}"><button type="button" class="btn sm" data-m="share-mail">${ic('send', 's')} ${tr('Share')}</button></div>` : ''}
     ${collab() ? shSec('grp', tr('Groups'), `<div id="sh-grpwrap"></div>`, true) : ''}
     ${collab() && agentsOn() ? shSec('ag', tr('Agents'), `<div class="shint lhint keep">${tr('An agent sees exactly the lists shared with it, nothing else. Stopping the sharing ends its access at once.')}</div><div id="sh-agwrap"></div>`, true) : ''}
+    ${own && collab() ? shSec('ntf', tr('Notifications for members'), `<div id="sh-ntf"><div class="muted mhint">${tr('Loading…')}</div></div>`, false, opt.focus === 'ntf') : ''}
+    ${!own && collab() ? ntfMemberHint(l0) : ''}
     ${own && S.publicLinks ? shSec('pub', tr('Public link'), `<div id="l-pub"><div class="muted mhint">${tr('Loading…')}</div></div>`) : ''}
     ${shSec('own', tr('Owner'), `<div id="sh-ownwrap"><div class="muted mhint" id="sh-owner"></div><div id="l-owner"></div></div>`, false, !collab())}
     <div class="foot"><button class="btn" data-m="list-edit">${ic('edit', 's')} ${tr('List settings…')}</button><span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);
@@ -443,6 +446,7 @@ function shareModal(id, opt = {}) {
   };
   draw(); drawOwner();
   if (own && S.publicLinks) pubWire(md, id);
+  if (own && collab() && $('#sh-ntf', md)) ntfLoad($('#sh-ntf', md), 'list', id, j => { shSecSet('ntf', true, ntfName(j.effective?.tpl)); if (opt.focus === 'ntf' && !md._ntfs) { md._ntfs = 1; $('#sh-sec-ntf', md)?.scrollIntoView?.({block: 'start'}); } });  // 2.33.0 (#927)
   if (collab()) {
     tidyWire(md, id);
     md.addEventListener('change', async e => {  // 2.26.0: the list's one agent (switching = old out, new in, with Undo)
@@ -493,6 +497,79 @@ function shareModal(id, opt = {}) {
   });
   return md;
 }
+// ---- 2.33.0 (#927): the owner's notification template for the other people of a list / a shared folder: a ceiling for
+// their pushes (they can be quieter, never louder; the News stay complete). The server checks it (notif_ok -> cap_ok).
+// The same block sits in the Share dialog and in "Share folder"; per person another template; a list in a folder follows
+// the folder until it gets its own. Members see who limited it (list menu > Notifications, Share dialog).
+const NTF_TPLS = [['read', N_('Read only'), N_('Pushes only for mentions, assignments and direct replies')],
+  ['work', N_('Collaborate'), N_('Also comments on their own or assigned tasks and due reminders')],
+  ['all', N_('Everything'), N_('Nothing limited, as in their own settings')], ['custom', N_('Custom'), N_('You choose the events')]];
+const NTF_CUSTOM = ['mention', 'reply', 'assign', 'approval', 'comment', 'follow', 'newtask', 'complete', 'status', 'unblock', 'chat', 'reminder', 'errreport', 'share'];
+const NTF_WORK = ['mention', 'reply', 'assign', 'approval', 'comment', 'reminder'];
+const ntfName = t => tr((NTF_TPLS.find(x => x[0] === t) || NTF_TPLS[0])[1]);
+const ntfRowName = r => { const x = NOTIF_ROWS.find(y => y[0] === r); return x ? tr(x[1]) : r; };
+function ntfMemberHint(l) {
+  const c = l?.notif_cap; if (!c) return '';
+  return `<div class="shint keep ntfhint">${ic('belloff', 's')} <span>${esc(tr('{0} has limited the notifications for this list', c.by || l.owner_name || ''))}: <b>${esc(ntfName(c.tpl))}</b></span></div>`;
+}
+function ntfHtml(j, scope) {
+  const inh = j.inherited || {tpl: 'read'}, own = j.own, cur = own ? own.tpl : (inh.folder ? 'inherit' : inh.tpl);
+  const eff = j.effective || {tpl: 'read', custom: {}};
+  const opts = [...(inh.folder ? [['inherit', tr('As the folder “{0}”', fDisp(inh.folder)), ntfName(inh.tpl)]] : []), ...NTF_TPLS.map(([v, n, d]) => [v, tr(n), tr(d)])];
+  const cust = eff.tpl === 'custom' ? eff.custom || {} : Object.fromEntries(NTF_WORK.map(r => [r, 1]));
+  const pOpt = (p, v, n) => `<option value="${v}" ${(p.own?.tpl || '') === v ? 'selected' : ''}>${esc(n)}</option>`;
+  const people = (j.people || []).map(p => `<div class="mrow ntfp"><span class="n">${esc(p.name)}</span><select data-ntfu="${p.user_id}" aria-label="${esc(tr('Notifications for {0}', p.name))}">${pOpt(p, '', scope === 'list' ? tr('As the list') : tr('As the folder'))}${NTF_TPLS.filter(([v]) => v !== 'custom' || p.own?.tpl === 'custom').map(([v, n]) => pOpt(p, v, tr(n))).join('')}</select></div>`).join('');
+  return `<div class="shint lhint keep">${esc(tr('The most the other people get as a push about this. They can make it quieter, not louder; their News list stays complete.') + ' ' + tr('New shares start with “{0}”.', ntfName(j.default || 'read')))}</div>
+    <div class="ntfopts" role="radiogroup" aria-label="${esc(tr('Notifications for members'))}">${opts.map(([v, n, d]) => `<label class="ntfopt"><input type="radio" name="ntf-tpl" value="${v}" ${cur === v ? 'checked' : ''}><span><b>${esc(n)}</b><small class="muted">${esc(d)}</small></span></label>`).join('')}</div>
+    <div class="ntfcust" ${eff.tpl === 'custom' && cur !== 'inherit' ? '' : 'hidden'} role="group" aria-label="${esc(tr('Custom'))}">${NTF_CUSTOM.map(r => `<label class="chkl"><input type="checkbox" data-ntfc="${r}" ${cust[r] ? 'checked' : ''}> ${esc(ntfRowName(r))}</label>`).join('')}</div>
+    ${scope === 'folder' && j.lists_own ? `<div class="shint keep">${esc(trn('{0} list in this folder has its own template.', '{0} lists in this folder have their own template.', j.lists_own))} <button type="button" class="btn sm" data-ntf="reset">${esc(tr('Use the folder’s for all'))}</button></div>` : ''}
+    ${people ? `<details class="sdet ntfppl"><summary>${esc(tr('Per person'))}</summary><div class="members">${people}</div></details>` : ''}`;
+}
+const ntfUrl = (scope, key) => scope === 'list' ? `/api/lists/${key}/notify-template` : '/api/folders/notify-template?folder=' + encodeURIComponent(key);
+async function ntfLoad(box, scope, key, onSync) {
+  let j; try { j = await api('GET', ntfUrl(scope, key)); } catch { box.innerHTML = ''; return null; }
+  if (!box.isConnected) return null;
+  const draw = jj => { box._j = jj; const open = !!$('.ntfppl', box)?.open; box.innerHTML = ntfHtml(jj, scope); if (open) { const d = $('.ntfppl', box); if (d) d.open = true; } onSync?.(jj); };
+  draw(j);
+  const put = async b => {
+    try { const jj = await api('PUT', scope === 'list' ? ntfUrl(scope, key) : '/api/folders/notify-template', scope === 'list' ? b : {folder: key, ...b}); draw(jj); S.notifAsk = []; ntfAskSync(); toast(tr('Saved')); }
+    catch { draw(box._j); }
+  };
+  const custNow = () => Object.fromEntries($$('[data-ntfc]', box).map(x => [x.dataset.ntfc, x.checked ? 1 : 0]));
+  box.addEventListener('change', e => {
+    const t = e.target;
+    if (t.name === 'ntf-tpl') { put(t.value === 'inherit' ? {tpl: null} : t.value === 'custom' ? {tpl: 'custom', custom: custNow()} : {tpl: t.value}); return; }
+    if (t.dataset.ntfc) { put({tpl: 'custom', custom: custNow()}); return; }
+    if (t.dataset.ntfu) put({user_id: +t.dataset.ntfu, tpl: t.value || null});
+  });
+  box.addEventListener('click', async e => {
+    if (!e.target.closest('[data-ntf="reset"]')) return;
+    if (!await askConfirm(tr('All lists in this folder follow the folder’s template?'), tr('Their own templates for everyone are removed; templates per person stay.'), {ok: tr('Apply')})) return;
+    put({reset_lists: true});
+  });
+  return j;
+}
+// the one-time question to owners of lists shared before 2.33 (kept on "Everything"): choose a template or keep it
+function ntfAskSync() {
+  const main = $('#main'); if (!main) return;
+  const items = S.notifAsk || []; let bar = $('#ntfask');
+  if (!items.length || S.me?.kid) { bar?.remove(); return; }
+  if (!bar) { bar = document.createElement('div'); bar.id = 'ntfask'; bar.className = 'annbar ntfask'; bar.setAttribute('role', 'region'); bar.setAttribute('aria-label', tr('Notifications for members')); const ab = $('#annbar'); if (ab) ab.after(bar); else main.prepend(bar); }
+  const html = `${ic('bell', 's')}<span class="annt">${esc(tr('Your shared lists still notify everyone about everything. You can now limit that per list or folder.'))}</span><span class="ntfaskb"><button type="button" class="btn sm pri" data-act="ntfask-choose">${esc(tr('Choose template'))}</button><button type="button" class="btn sm" data-act="ntfask-keep">${esc(tr('Keep as it is'))}</button></span>`;
+  if (bar.innerHTML !== html) bar.innerHTML = html;
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest?.('[data-act="ntfask-choose"], [data-act="ntfask-keep"]'); if (!b) return;
+  const items = S.notifAsk || [];
+  const open = it => it.kind === 'folder' ? folderPeopleModal(it.folder, {focus: 'ntf'}) : shareModal(it.id, {focus: 'ntf'});
+  if (b.dataset.act === 'ntfask-choose' && items.length > 1) {
+    menu(b, items.map(it => ({label: it.kind === 'folder' ? fDisp(it.folder) : it.name, icon: it.kind === 'folder' ? 'folder' : 'list', fn: () => open(it)})));
+    return;
+  }
+  if (b.dataset.act === 'ntfask-choose') { if (items[0]) open(items[0]); return; }  // answered once a template is chosen (the server notes it)
+  try { await api('POST', '/api/notify-templates/asked', {}); } catch { return; }
+  S.notifAsk = []; ntfAskSync();
+});
 // 2.22.0 (#682): a new list / project gets a fitting emoji from its name (a local word list in the six languages, no AI):
 // suggested in the dialog as soon as a word matches, one tap on it changes or removes it; existing lists stay as they are
 const AUTO_EMO = [

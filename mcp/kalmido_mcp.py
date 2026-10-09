@@ -217,6 +217,8 @@ def t_add_comment(api, a):
     b = {"body": a["body"]}
     if a.get("suggestion"):
         b["suggestion"] = a["suggestion"]
+    if a.get("reply_to"):  # 2.33.0 (#1076): answer one comment of the same task
+        b["reply_to"] = int(a["reply_to"])
     return api.call("POST", f"/tasks/{int(a['task_id'])}/comments", body=b)
 
 
@@ -258,10 +260,10 @@ def t_send_chat(api, a):
             except ValueError:
                 raise ApiError(400, f"files: {f['name']} is not valid base64") from None
             files.append((f["name"], f.get("mime") or "application/octet-stream", data))
-        return api.call("POST", f"/agent/chats/{int(a['user_id'])}", multipart=(_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id")), files))
+        return api.call("POST", f"/agent/chats/{int(a['user_id'])}", multipart=(_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "reply_to")), files))
     if not a.get("body"):
         raise ApiError(400, "body (or files) is required")
-    return api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id")))
+    return api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "reply_to")))
 
 
 def t_get_attachment(api, a):
@@ -385,6 +387,19 @@ TOOLS = [
     ("search_tasks", "Full-text search in titles, notes, links and custom fields of visible tasks.",
      _obj({"q": {"type": "string", "minLength": 1}, "limit": {"type": "integer", "minimum": 1, "maximum": 500}}, ["q"]),
      lambda api, a: api.call("GET", "/search", _pick(a, ("q", "limit")))),
+    ("search_messages", "2.33.0: full-text search in task comments, team chat and your own chats with people (only what you may read: "
+                        "the lists shared with you, their channels, your chats). Words match word beginnings; case, accents and ä/ae do not "
+                        "matter. Newest first; each hit: art (c comment | t team chat | a agent chat), chat_type, task_id / room_id / "
+                        "user_id, sender, created_at, snippet (plain text) with marks. Read the place with get_task / the chat tools.",
+     _obj({"q": {"type": "string", "minLength": 1, "maxLength": 200},
+           "art": {"type": "string", "description": "Only these kinds, comma-separated: c, t, a"},
+           "sender": {**S_ID, "description": "Only messages from this user id"},
+           "room": {**S_ID, "description": "Only this team chat room"},
+           "chat_with": {**S_ID, "description": "Only your chat with this user (an agent: the person; a person: the agent)"},
+           "task": {**S_ID, "description": "Only the comments of this task"},
+           "limit": {"type": "integer", "minimum": 1, "maximum": 500}, "cursor": {"type": "string"}}, ["q"]),
+     lambda api, a: api.call("GET", "/search", {"scope": "messages", **_pick(a, ("q", "art", "sender", "room", "task", "limit", "cursor")),
+                                                **({"agent": a["chat_with"]} if "chat_with" in a else {})})),
     ("get_task", "One task with its comments (reactions, suggestions included). In a list connected to a repository also `code` "
                  "(linked pull requests with state + CI, commits) and `repo` (provider, web_url, owner, repo, default_branch, a "
                  "suggested branch name kalmido-<id>).",
@@ -403,8 +418,9 @@ TOOLS = [
      _obj({"task_id": S_ID}, ["task_id"]), lambda api, a: api.call("DELETE", f"/tasks/{int(a['task_id'])}/waiting")),
     ("list_waiting", "Open tasks waiting on someone (task.waiting = {note, until, since, by}).",
      _obj({"list_id": S_ID, "limit": {"type": "integer", "minimum": 1, "maximum": 500}, "cursor": {"type": "string"}}), t_list_waiting),
-    ("add_comment", "Comment on a task (Markdown; mention people as <@user_id>). Optional structured tidy suggestion.",
-     _obj({"task_id": S_ID, "body": {"type": "string", "minLength": 1}, "suggestion": SUGGESTION}, ["task_id", "body"]), t_add_comment),
+    ("add_comment", "Comment on a task (Markdown; mention people as <@user_id>). Optional structured tidy suggestion. reply_to (2.33.0): "
+                    "the id of a comment of the same task you answer (its author is notified; the app shows a quote above yours).",
+     _obj({"task_id": S_ID, "body": {"type": "string", "minLength": 1}, "suggestion": SUGGESTION, "reply_to": S_ID}, ["task_id", "body"]), t_add_comment),
     ("request_merge_approval", "Ask for approval to merge your pull request: posts a 'ready to merge' comment on the task "
                                "(structured field kind merge_request). pr_url must be a pull request of a repository connected to "
                                "the task's list (GitLab: .../-/merge_requests/<n>, Bitbucket: .../pull-requests/<n>). Wait for the reaction event with approval 'approved' (👍 by the list owner / a list "
@@ -517,6 +533,8 @@ TOOLS = [
                   "answerable while newer messages come. The person's answer arrives as the event chat_choice (message_id, "
                   "choice_ids, labels; permission questions also approval and a reaction event) -- act once per message_id; do not ask twice.",
      _obj({"user_id": S_ID, "body": {"type": "string"}, "task_id": S_ID,
+           "reply_to": {**S_ID, "description": "2.33.0: the id of a message of this conversation you answer (a message's reply / reply_to "
+                                               "show what the person answered)"},
            "job_id": {**S_ID, "description": "2.32.0: this message is the result of your job for this person (its history shows under it)"},
            "permission": {"type": "boolean"}, "expires_in": {"type": "integer", "minimum": 10, "maximum": 604800},
            "choices": {"type": "array", "maxItems": 8, "items": {"type": "object", "properties": {
@@ -555,6 +573,23 @@ TOOLS = [
                   "day | task | list | model, with totals and where it stands against its limit.",
      _obj({"from": {"type": "string"}, "to": {"type": "string"}, "group": {"type": "string", "enum": ["day", "task", "list", "model"]}}),
      lambda api, a: api.call("GET", "/agent/usage", _pick(a, ("from", "to", "group")))),
+    # 2.33.0 (#1045): the usage ring in the chat header
+    ("report_plan_usage", "2.33.0: report how much of your plan's quota you have used; people who chat with you see it as a ring next "
+                          "to your name (yellow from 75 %, red from your limit with 'paused until', grey after 24 h without a report). "
+                          "Either windows [{label, percent, resets_at (ISO 8601 or Unix seconds), main}] (at most 6; main = the one the "
+                          "ring shows) or rate_limits exactly as Claude Code's status line JSON gives it (five_hour / seven_day / "
+                          "spend_limit; the week fills the ring). limit = your own pause limit in percent. measured_at = when the values were "
+                          "read, if not just now (the ring greys out 24 h after it). Replaces the last report.",
+     _obj({"windows": {"type": "array", "maxItems": 6, "items": _obj({
+               "label": {"type": "string", "minLength": 1, "maxLength": 40}, "percent": {"type": "number", "minimum": 0, "maximum": 1000},
+               "resets_at": {"type": ["string", "number"]}, "main": {"type": "boolean"}}, ["label", "percent"])},
+           "rate_limits": {"type": "object"}, "limit": {"type": "number", "minimum": 1, "maximum": 100},
+           "measured_at": {"type": ["string", "number"]}}),
+     lambda api, a: api.call("PUT", "/agent/quota", body=_pick(a, ("windows", "rate_limits", "limit", "measured_at")))),
+    ("get_plan_usage", "2.33.0: your last plan usage report as people see it (null = none).", _obj({}),
+     lambda api, a: api.call("GET", "/agent/quota")),
+    ("clear_plan_usage", "2.33.0: remove your plan usage report (the ring disappears).", _obj({}),
+     lambda api, a: api.call("DELETE", "/agent/quota")),
     ("tidy_task", "Tidy a task in a list with agent tidy mode 'auto': new title / notes / section / list tags / priority. "
      "Kalmido keeps the original text at the top of the notes. base_updated_at (2.27.0): the task's updated_at you read; "
      "409 = someone is working on the task right now, try again later.",
@@ -992,9 +1027,10 @@ TOOLS += [
                        "are <@user id>.",
      _obj({"room_id": S_ID, "before": S_ID, "limit": {"type": "integer", "minimum": 1, "maximum": 100}}, ["room_id"]),
      lambda api, a: api.call("GET", f"/team/rooms/{int(a['room_id'])}/messages", _pick(a, ("before", "limit")))),
-    ("post_team_message", "2.17.0: write in a team chat channel (Markdown; mention people as <@user id>; task_id links a task).",
-     _obj({"room_id": S_ID, "body": {"type": "string", "maxLength": 8000}, "task_id": S_ID}, ["room_id", "body"]),
-     lambda api, a: api.call("POST", f"/team/rooms/{int(a['room_id'])}/messages", body=_pick(a, ("body", "task_id")))),
+    ("post_team_message", "2.17.0: write in a team chat channel (Markdown; mention people as <@user id>; task_id links a task). "
+                          "reply_to (2.33.0): the id of a message of the same conversation you answer.",
+     _obj({"room_id": S_ID, "body": {"type": "string", "maxLength": 8000}, "task_id": S_ID, "reply_to": S_ID}, ["room_id", "body"]),
+     lambda api, a: api.call("POST", f"/team/rooms/{int(a['room_id'])}/messages", body=_pick(a, ("body", "task_id", "reply_to")))),
     ("edit_team_message", "2.17.0: change your own team chat message.", _obj({"message_id": S_ID, "body": {"type": "string"}}, ["message_id", "body"]),
      lambda api, a: api.call("PATCH", f"/team/messages/{int(a['message_id'])}", body={"body": a["body"]})),
     ("delete_team_message", "2.17.0: delete your own team chat message.", _obj({"message_id": S_ID}, ["message_id"]),
@@ -1152,7 +1188,8 @@ TOOL_MAP = {t[0]: t for t in TOOLS}
 
 TOOL_SCOPES = {
     "agent": ("get_agent", "react_to_chat", "set_status", "report_progress", "list_events", "wait_for_events", "list_jobs", "create_job", "get_job",
-              "submit_proposal", "propose_to_other_topic", "update_job", "list_chats", "chat_typing", "send_chat", "withdraw_chat_choices", "report_usage", "get_usage"),
+              "submit_proposal", "propose_to_other_topic", "update_job", "list_chats", "chat_typing", "send_chat", "withdraw_chat_choices", "report_usage", "get_usage",
+              "report_plan_usage", "get_plan_usage", "clear_plan_usage"),
     "tasks:write": ("add_contract", "add_device", "add_upkeep", "sync_read_later", "add_occasion", "add_deadline", "ingredients_to_shopping", "give_stars", "add_reward", "update_reward", "request_reward",
                     "decide_reward", "create_note", "update_note", "create_task", "update_task", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "batch_tasks",
                     "reopen_task", "skip_occurrence", "take_task", "add_subtask", "add_dependency", "remove_dependency", "create_habit",

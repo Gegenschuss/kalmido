@@ -74,7 +74,7 @@ const LONG = 'Website relaunch 2026 for the client';
   check(cm().length >= 3 && agm().every(m => m.querySelectorAll('.cmeta .rxrow .rx[data-e]').length === 3 && m.querySelector('.rxrow .rxtog')) && cm().filter(m => m.classList.contains('me')).every(m => !m.querySelector('.rxrow .rx:not([disabled])')),
     '#823: the agent\'s messages: a smiley with 👍 👎 ❤️ behind it; my own: no reactions');
   check(agm().every(m => m.querySelectorAll('.rxrow .rx[tabindex="0"]').length === 1 && m.querySelectorAll('.rxrow .rx[tabindex="-1"]').length === 3), '#651: one Tab stop per message (roving tabindex; 2.19.0: + "More reactions")');
-  const R = id => d.querySelector(`#chat-msgs .cmsg[data-mid="${id}"]`);
+  const R = id => d.querySelector(`#chat-msgs .cmsg[data-mid="a:${id}"]`);
   click(w, R(q1.id).querySelector('.rxrow .rxtog'));  // 2.23.0 (#823): open the quick reactions
   const up1 = R(q1.id).querySelector('.rxrow [data-e="up"]');
   check(up1.getAttribute('aria-label') === 'React with thumbs up' && up1.getAttribute('aria-pressed') === 'false' && !up1.querySelector('.rxn'), '#651: names: "React with thumbs up", not pressed, no count ' + up1.getAttribute('aria-label'));
@@ -123,11 +123,11 @@ const LONG = 'Website relaunch 2026 for the client';
   click(w, bm().querySelector('.rxrow .rxtog'));
   click(w, bm().querySelector('.rxrow [data-e="up"]'));
   check(await until(() => bm()?.querySelector('.rxrow .rx.on[data-e="up"][aria-pressed="true"] .rxn')?.textContent === '1'), '#651 team chat: one tap, count 1');
-  check((await call('POST', `/api/team/messages/${bm().dataset.mid}/reactions`, {emoji: 'up'}, CB)).status === 400, '#823: Bob cannot react to his own message');
+  check((await call('POST', `/api/team/messages/${bm().dataset.mid.split(":").pop()}/reactions`, {emoji: 'up'}, CB)).status === 400, '#823: Bob cannot react to his own message');
   click(w, bm().querySelector('.rxrow [data-e="up"]'));
   check(await until(() => !bm()?.querySelector('.rxrow [data-e="up"] .rxn')), 'a second tap takes mine back');
   // edit to empty + Save -> "Delete this message?"
-  const myM = () => d.querySelector(`#tc-msgs .cmsg[data-mid="${mA.id}"]`);
+  const myM = () => d.querySelector(`#tc-msgs .cmsg[data-mid="t:${mA.id}"]`);
   await until(() => myM());
   click(w, myM().querySelector('[data-act="tc-msg-menu"]')); await sleep(80);
   click(w, [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => /Edit/.test(b.textContent))); await sleep(100);
@@ -263,13 +263,13 @@ const LONG = 'Website relaunch 2026 for the client';
     // 2.32.0 (#1062, owner decision): the smiley only after a long press -- before it nothing tappable under the agent's messages
     // (an open question keeps 👍 / 👎: they stay 44 px)
     check(rr.length >= 2 && rr.every(x => x.n === 0 || x.w <= 1 || (x.w >= 43.5 && x.h >= 43.5 && x.l >= 0 && x.r <= vw && x.op >= .6)), `${tag}: no smiley before a long press, what shows is 44 px ` + JSON.stringify(rr));
-    const P = `(() => { const e = document.querySelector('#chat-msgs .cmsg[data-mid="${q1.id}"] .rxrow [data-e="down"]'); e.scrollIntoView({block: 'center'}); const q = e.getBoundingClientRect(); return {x: q.left + q.width / 2, y: q.top + q.height / 2}; })()`;
-    await ev(`(() => { document.querySelector('#chat-msgs .cmsg[data-mid="${q1.id}"] .rxrow .rxtog')?.click(); return 1; })()`); await sleep(300);
+    const P = `(() => { const e = document.querySelector('#chat-msgs .cmsg[data-mid="a:${q1.id}"] .rxrow [data-e="down"]'); e.scrollIntoView({block: 'center'}); const q = e.getBoundingClientRect(); return {x: q.left + q.width / 2, y: q.top + q.height / 2}; })()`;
+    await ev(`(() => { document.querySelector('#chat-msgs .cmsg[data-mid="a:${q1.id}"] .rxrow .rxtog')?.click(); return 1; })()`); await sleep(300);
     let p = await ev(P); await tap(p.x, p.y);
-    check(await until(() => ev(`document.querySelector('#chat-msgs .cmsg[data-mid="${q1.id}"] .rxrow [data-e="down"]')?.getAttribute('aria-pressed') === 'true'`), 30), `${tag}: one tap on 👎 reacts`);
+    check(await until(() => ev(`document.querySelector('#chat-msgs .cmsg[data-mid="a:${q1.id}"] .rxrow [data-e="down"]')?.getAttribute('aria-pressed') === 'true'`), 30), `${tag}: one tap on 👎 reacts`);
     await shot(`p2180r-${vw}x${vh}-${th}-chat.png`);
     p = await ev(P); await tap(p.x, p.y);
-    check(await until(() => ev(`document.querySelector('#chat-msgs .cmsg[data-mid="${q1.id}"] .rxrow [data-e="down"]')?.getAttribute('aria-pressed') === 'false'`), 30), `${tag}: a second tap takes it back`);
+    check(await until(() => ev(`document.querySelector('#chat-msgs .cmsg[data-mid="a:${q1.id}"] .rxrow [data-e="down"]')?.getAttribute('aria-pressed') === 'false'`), 30), `${tag}: a second tap takes it back`);
     const x = await ev(`document.documentElement.scrollWidth - innerWidth`);
     check(x <= 0, `${tag} chat: nothing sideways (${x})`);
     // 2.18.0 (owner feedback, screenshot): the reaction is a compact pill (drawn smaller inside the 44 px hit area), never a big circle

@@ -53,7 +53,8 @@ USAGE_RANGE_MAX = 366                                    # days of GET /api/v1/a
 USAGE_PERIODS, USAGE_METRICS, USAGE_GROUPS = ("day", "month"), ("tokens", "cost"), ("day", "task", "list", "model")
 USAGE_FIELDS = ("model", "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "cost_usd", "task_id",
                 "list_id", "job_id", "note")
-USAGE_EXEMPT = {("POST", "agent/usage"), ("GET", "agent/usage"), ("PUT", "agent/status"), ("GET", "agent")}
+USAGE_EXEMPT = {("POST", "agent/usage"), ("GET", "agent/usage"), ("PUT", "agent/status"), ("GET", "agent"),
+                ("PUT", "agent/quota"), ("GET", "agent/quota"), ("DELETE", "agent/quota")}  # 2.33.0 (#1045)
 USAGE_SUM = """COUNT(*) AS calls, COALESCE(SUM(input_tokens),0) AS input, COALESCE(SUM(output_tokens),0) AS output,
                COALESCE(SUM(cache_read_tokens),0) AS cache_read, COALESCE(SUM(cache_write_tokens),0) AS cache_write,
                SUM(cost_usd) AS cost"""
@@ -751,6 +752,8 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                               "enabled": {"type": "boolean"}}}
     msg = {"type": "object", "properties": {"id": {"type": "integer"}, "user_id": {"type": "integer"}, "from": {"type": "string", "enum": ["user", "agent"]},
                                             "body": {"type": "string"}, "task_id": nul("integer"), "created_at": {"type": "string"},
+                                            "reply_to": nul("integer", description="2.33.0 (#1076): the answered message of this conversation; reply = its quote"),
+                                            "reply": {"anyOf": [ref("ReplyQuote"), {"type": "null"}]},
                                             "delivered_at": nul("string", description="2.7.2 (#422): when the agent fetched the person's message (event poll, MCP, webhook, chat read); null = not yet / an agent message"),
                                             "asks": {"type": "boolean", "description": "2.13.0: an agent message that asks something (a question mark outside code and links); only there a 👍 / 👎 of the person is an approval / rejection"},
                                             "choices": nul("object", description="2.28.0 (#1005): answer buttons of an agent message: {choices: [{id, label, style?: primary | danger}], multi}"),
@@ -781,6 +784,9 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
         last_poll_at=nul("string"), typing={"type": "number", "description": "Seconds left of its typing signal to you in the chat"},
         host={"type": "object", "description": "2.32.0 (#1079): what the host last reported (PUT /agent/status): model, permission_mode, "
                                               "host_permission_mode, at"},
+        quota=nul("object", description="2.33.0 (#1045): its plan usage as last reported (PUT /agent/quota; null = never): windows "
+                  "[{key, label, percent, resets_at, reset_passed}], main (index), limit, at, stale (older than 24 h), level ok | warn | over, "
+                  "percent (the main window), paused_until (the main window's reset when over the limit)"),
         runtime={"type": "object", "description": "GET /agent only: what the agent host applies (docs/AGENTS.md, Runtime settings)",
                  "properties": {"model": {"type": "string"}, "autocompact": {"type": "boolean"}, "autocompact_pct": nul("integer"),
                                 "nightly_reset": {"type": "string", "description": "HH:MM in the server time zone, empty = off"},
@@ -842,6 +848,29 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                                                                       "2.32.0: the permission mode the current run really uses"},
                                                                   "host_permission_mode": {"type": "string", "enum": ["", "ask", "auto"], "description":
                                                                                            "2.32.0: the host's own default (shown as \"Host default (Auto)\")"}}})},
+        # 2.33.0 (#1045): the usage ring
+        "/agent/quota": {
+            "put": op("2.33.0 (#1045): report your plan usage (e.g. the 5-hour and weekly windows of a Claude plan); people who chat with "
+                      "you see it as a ring in the chat header (accent, yellow from 75 %, red from your limit with \"paused until\" the main "
+                      "window's reset; greyed out after 24 h without a report). Either windows (at most 6; main = the one the ring shows, "
+                      "default the first) or rate_limits exactly as Claude Code's status line gives it (five_hour, seven_day, spend_limit "
+                      "with used_percentage and resets_at in Unix seconds; the week is the main window). limit: your own pause limit in "
+                      "percent. Replaces the last report; no windows = remove. Allowed also over the hard usage limit.", AG,
+                      ok({"type": "object", "properties": {"quota": nul("object")}}) | errs("400", "403"), scope=W, body={
+                          "type": "object", "additionalProperties": False, "properties": {
+                              "windows": {"type": "array", "maxItems": 6, "items": {"type": "object", "required": ["label", "percent"],
+                                                                                     "additionalProperties": False, "properties": {
+                                  "label": {"type": "string", "maxLength": 40, "description": "e.g. \"Week\", \"5 hours\""},
+                                  "percent": {"type": "number", "minimum": 0, "maximum": 1000},
+                                  "resets_at": {"oneOf": [{"type": "string", "format": "date-time"}, {"type": "number"}, {"type": "null"}],
+                                                "description": "ISO 8601 with a time zone or Unix epoch seconds"},
+                                  "main": {"type": "boolean"}}}},
+                              "rate_limits": {"type": "object", "description": "Claude Code's status line object as it is"},
+                              "limit": nul("number", description="1-100: from here the ring is red and shows \"paused until\""),
+                              "measured_at": nul("string", description="When the values were read (ISO with zone or Unix seconds; default now): "
+                                                 "the ring greys out 24 h after this, so hosts that relay older values stay honest")}}),
+            "get": op("2.33.0 (#1045): your last plan usage report (null = none)", AG, ok({"type": "object", "properties": {"quota": nul("object")}}) | errs("403")),
+            "delete": op("2.33.0 (#1045): remove your plan usage report (the ring disappears)", AG, ok({"type": "object", "properties": {"quota": nul("object")}}) | errs("403"), scope=W)},
         # 2.32.0 (#1081): steps (prose between tool calls), only for the person of the chat run / the job
         "/agent/progress": {"post": op(
             "2.32.0 (#1081): one step of your work -- the short prose you write between tool calls (\"I look at the tests first\"). "
@@ -902,6 +931,8 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                          "requestBody": {"required": True, "content": {
                                              "application/json": {"schema": {"type": "object", "required": ["body"], "properties": {
                                                  "body": {"type": "string"}, "task_id": {"type": "integer"},
+                                                 "reply_to": {"type": "integer", "description": "2.33.0 (#1076): answer this message of the conversation "
+                                                              "with this person (else 400); the app shows the quote above your answer"},
                                                  "job_id": {"type": "integer", "description": "2.32.0 (#1081): this message is the result of your job "
                                                             "(for this person): its history shows under it"},
                                                  "choices": {"type": "array", "maxItems": 8, "description": "2.28.0 (#1005): answer buttons; the person's answer comes as the event chat_choice (message_id, choice_ids, labels)",
@@ -913,7 +944,7 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                                  "expires_in": {"type": "integer", "minimum": 10, "maximum": 604800, "description": "2.30.0 (#1041): seconds a permission "
                                                                 "question stays open; then it shows as not answered (denied)"}}}},
                                              "multipart/form-data": {"schema": {"type": "object", "properties": {
-                                                 "body": {"type": "string"}, "task_id": {"type": "integer"},
+                                                 "body": {"type": "string"}, "task_id": {"type": "integer"}, "reply_to": {"type": "integer"},
                                                  "file": {"type": "array", "items": {"type": "string", "format": "binary"}}}}}}}}},
         "/agent/usage": {  # 2.1.1 (#326)
             "post": op("Report model usage (numbers and ids only; allowed also over the hard limit)", AG,

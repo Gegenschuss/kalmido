@@ -293,7 +293,10 @@ def git_spec(paths, schemas, op, ok, errs, ref, pid, nul, page):
                                              "web_url": {"type": "string"}, "owner": {"type": "string"}, "repo": {"type": "string"},
                                              "full_name": {"type": "string"}, "default_branch": nul("string"),
                                              "status": {"type": "string", "enum": ["new", "ok", "error"]}, "error": {"type": "string"},
-                                             "polled_at": nul("string")}}
+                                             "polled_at": nul("string"),
+                                             "folder": nul("string", description="2.33.0 (#934): a repository of the list's folder "
+                                                           "(it serves every project list in it): \"\" for agents and everyone but the folder's owner, who sees "
+                                                           "the folder's path; null = the list's own")}}
     code = {"type": "object", "description": "Linked pull requests (state open / merged / closed, ci success / failure / pending / null) "
                                              "and commits (2.2.0)",
             "properties": {"prs": {"type": "array", "items": {"type": "object"}}, "commits": {"type": "array", "items": {"type": "object"}}}}
@@ -305,7 +308,8 @@ def git_spec(paths, schemas, op, ok, errs, ref, pid, nul, page):
                                              "web_url, owner, repo, default_branch, a suggested branch, the linked code (2.2.0)"}
     schemas["List"]["properties"]["repos"] = {"type": "array", "items": {"type": "object"}}
     schemas["CommentInput"]["properties"]["suggestion"] = {"oneOf": [ref("TidyInput"), ref("MergeRequestInput")]}
-    paths["/lists/{id}/repos"] = {"get": op("Repositories connected to a list (never a token)", "Lists", ok(ref("RepoPage")) | errs("404"),
+    paths["/lists/{id}/repos"] = {"get": op("Repositories connected to a list (never a token); 2.33.0: without own ones the list's folder's "
+                                            "repositories it uses (folder = the folder's path)", "Lists", ok(ref("RepoPage")) | errs("404"),
                                             [pid("id", "List id")])}
     # 2.18.0 (#408): the error-report webhook of a list (people with the owner / list admin role change it, never agents)
     hook = {"type": "object", "properties": {
@@ -330,5 +334,6 @@ def v1_git_list(lid):
     v1_args(())
     c = db()
     need_list(c, lid, write=False)
-    rows = c.execute("SELECT * FROM git_conns WHERE list_id=? ORDER BY id", (lid,)).fetchall()
+    from ..integrations.git import git_conns_of_list
+    rows = git_conns_of_list(c, lid)  # 2.33.0 (#934): its own repositories, else the folder's (folder = its path)
     return jsonify(data=[git_public(c, r) for r in rows])

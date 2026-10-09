@@ -69,6 +69,9 @@ TENANT_EXEMPT = {
     "imports": _OWN, "sample_items": _OWN, "app_passwords": _OWN, "dav_sync2": _OWN, "journal": _OWN, "contact_care": _OWN,
     "user_invites": "an invitation / password link of one account (admins only)", "folder_props": _OWN + " (the defaults of a folder; each list keeps its org_id)",
     "folder_people": "the owner's folder shared with people: every list share goes through the workspace rule (_folder_member_add)",
+    "folder_notif": _OWN + " (2.33.0 #927: the owner's notification template of a folder; it only limits pushes of people already in its lists)",
+    "git_folders": _OWN + " (2.33.0 #934: the owner's folder repository; it serves only the owner's lists in that folder)",
+    "login_ips": "2.33.0 (#834): private sign-in addresses for the proxy check, admins only (instance diagnostics)",
     "ev_cal_members": _CAL, "events": _CAL, "ev_reminded": _CAL, "event_attendees": _CAL + "; invited people must be visible",
     "book_members": _BOOK, "contacts": _BOOK,
     "groups": "instance-wide groups of the operator: visible only through members one may see (B1); shares go through the rule",
@@ -115,6 +118,16 @@ for t, body in sorted(tables.items()):
                    "in tools/check_layout.py with the reason why the workspace boundary needs none (#1036)")
 for t in sorted(set(TENANT_EXEMPT) - set(tables)):
     ERR.append(f"schema: TENANT_EXEMPT names {t}, which is no table (any more)")
+
+# 2.33.0: the client modules share one global scope -- a second top-level function of the same name silently replaces
+# the first (the message search's msToggle broke the milestone switch)
+_seen = {}
+for f in sorted(glob.glob(os.path.join(ROOT, "static", "js", "*.js"))):
+    for m in re.finditer(r"^(?:async )?function ([A-Za-z_$][\w$]*)", open(f, encoding="utf-8").read(), re.M):
+        n = m.group(1)
+        if n in _seen and _seen[n] != os.path.basename(f):
+            ERR.append(f"client: function {n} is defined in {_seen[n]} and {os.path.basename(f)} (one replaces the other)")
+        _seen.setdefault(n, os.path.basename(f))
 
 for e in ERR:
     print("ERROR:", e)

@@ -46,7 +46,7 @@ const V = B + 'api/v1';
   const v1 = async (method, url, body) => (await fetch(V + url, {method, headers: AGH, body: body ? JSON.stringify(body) : undefined})).json();
   const say = (body, extra = {}) => v1('POST', `/agent/chats/${ME.id}`, {body, ...extra});
   const step = text => v1('POST', '/agent/progress', {text, chat_user_id: ME.id});
-  const cm = (d, id) => d.querySelector(`#chat-msgs .cmsg[data-mid="${id}"]`);
+  const cm = (d, id) => d.querySelector(`#chat-msgs .cmsg[data-mid="a:${id}"]`);
 
   // ================= #1079 the header
   await v1('PUT', '/agent/status', {status: 'idle', model: 'Opus 5.5', host_permission_mode: 'auto', permission_mode: 'auto'});

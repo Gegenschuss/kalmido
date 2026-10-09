@@ -51,6 +51,7 @@ By default the server binds to `127.0.0.1`. It rejects requests with an `Origin`
 | `list_list_tags` | shared tags of a list | `GET /api/v1/lists/{id}/tags` |
 | `list_tasks` | tasks filtered by list, status, tag, list tag or assignee; `compact: true` = only the fields to scan a list with (id, title, list_id, section_id, parent_id, status, due, due_time, priority, tags, list_tags, assignee_id), `false` = full tasks, not given = full up to 25 tasks per page, compact above (`"compact": true` in the result) | `GET /api/v1/tasks` (`?fields=compact`) |
 | `search_tasks` | full-text search | `GET /api/v1/search?q=` |
+| `search_messages` | 2.33.0: full-text search in task comments, team chat channels and your own chats (only what the token may read; snippet + marks, newest first; filters art, sender, room, chat_with, task) | `GET /api/v1/search?scope=messages&q=` |
 | `get_task` | a task plus its comments (reactions, suggestions); 2.2.0: `code` (linked pull requests + CI, commits) and `repo` (the list's repository, a suggested branch) | `GET /api/v1/tasks/{id}` + `/comments` |
 | `create_task` / `update_task` / `complete_task` | change tasks | `POST /api/v1/tasks`, `PATCH /api/v1/tasks/{id}`, `POST .../complete` |
 | `add_comment` | comment, optionally with a structured tidy suggestion | `POST /api/v1/tasks/{id}/comments` |
@@ -77,6 +78,8 @@ By default the server binds to `127.0.0.1`. It rejects requests with an `Origin`
 | `get_project_overview` | 2.7.1: the overview of a project list (description, key links, milestones, files, members, status, time), read-only | `GET /api/v1/lists/{id}/overview` |
 | `request_merge_approval` | 2.2.0: a *Ready to merge* comment for your pull request (`task_id`, `pr_url`, `summary`); wait for the `reaction` event with `approval: "approved"` before merging | `POST /api/v1/tasks/{id}/comments` with `suggestion.kind = merge_request` |
 | `get_usage` | 2.1.1: the agent's own usage by day, task, list or model, with its limit | `GET /api/v1/agent/usage` |
+| `report_plan_usage` | 2.33.0: the plan usage (e.g. 5-hour and weekly window, percent and reset time, an own limit) -- the ring in the chat header; takes Claude Code's `rate_limits` as it is | `PUT /api/v1/agent/quota` |
+| `get_plan_usage` / `clear_plan_usage` | 2.33.0: read / remove that report | `GET` / `DELETE /api/v1/agent/quota` |
 
 2.15.0 (#479): the rest of the REST API as tools. Each needs the permission (scope) of its REST call; `tools/list`
 shows only the tools the token may use (from `GET /api/v1/me`, refreshed every 5 minutes):

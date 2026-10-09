@@ -7,6 +7,61 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.33.0] - 2026-10-09
+
+**In short:** Agents and notifications. **Reply to one message** (swipe it to the right on a phone, *Reply* on a
+computer) in comments, team chat and the agent chat, with a quote that jumps to the original; **search in chats and
+comments**; list and folder owners choose **how much the other people are notified** (new shares start with *Read
+only*); a **ring shows an agent's plan usage** next to its name; a **repository connected to a folder** serves every
+project list in it; *Administration > Server* shows **your IP as the server sees it**. Fixes for the iPhone: the
+comment box no longer pushes the task header away, the *Done* bar of *Customize* stays reachable.
+
+### Added
+- **Replies to one message** (#1076): swipe a comment or a chat message to the right on a phone (not from the screen
+  edge, which stays the system back gesture), or use *Reply* on hover and in the message menu on a computer. A bar
+  above the input shows what you answer (× or Escape cancels); the answer carries a small quote that jumps to the
+  original and highlights it, loading older messages when needed ("Message deleted" when it is gone). The author of the
+  original gets "… replied to your message" like a mention. Agents receive the reference (`reply_to`, `reply` with a
+  short quote) in comments, team messages and chat messages and reply the same way (REST, MCP `reply_to`, OpenAPI).
+- **Search in chats and comments** (#1080): a magnifier in the header of a team chat or the agent chat searches that
+  conversation (hits marked, arrows or Enter / Shift+Enter step through them); the command field and the search page
+  add a *Messages* section with sender, chat, date and snippet, filter chips (comments, team chats, agent chats) and a
+  sender filter. Case, accents and ä / ae spellings do not matter. `GET /api/v1/search?scope=messages`, MCP
+  `search_messages`; only what you may see, agents only their shared lists and their own chats. A full-text index
+  (SQLite FTS5) is built once at the first start and kept current.
+- **Notification templates for shared lists and folders** (#927): in the share dialog the owner chooses how much the
+  other people are notified at most: *Read only* (mentions, assignments, direct replies), *Collaborate* (+ comments
+  on their tasks and due reminders), *Everything* or *Custom*, also per person. Members can be quieter, never louder,
+  and see who limited a list. Only pushes are limited, the News list stays complete. New shares start with *Read only*
+  (`KALMIDO_NOTIF_TEMPLATE`); lists and folders shared before keep *Everything* and their owners are asked once.
+  Agents can read the setting (`GET /api/v1/lists/{id}/notify-template`), never change it.
+- **Plan usage ring for agents** (#1045): agents report their plan usage (`PUT /api/v1/agent/quota` with windows or
+  Claude Code's status line `rate_limits` as it is, an own limit and the time it was measured; MCP
+  `report_plan_usage`). A ring next to the agent's name in the chat header fills with the main window: yellow from
+  75 %, red from the agent's limit with "paused until …", grey when the report is older than 24 hours; hover or tap
+  lists every window with its reset time. docs/AGENTS.md shows a status line script for Claude Code.
+- **Repository on a folder** (#934): *Folder settings > Repository* connects one repository for every project list in
+  the folder and its subfolders, also lists added later; `#id`, branch names and `fixes #id` work across all of them
+  with one poll per repository. A list can switch it off or connect its own; only the folder's owner connects it, the
+  token stays sealed.
+- **Your IP** (#834): *Administration > Server* shows the client address as the server sees it, and Kalmido warns there
+  and in its log when many accounts sign in from one private address (a reverse proxy in Docker that hides the client
+  addresses; `KALMIDO_IP_WARN_ACCOUNTS`). docs/SELF-HOSTING.md explains `network_mode: host`, `"userland-proxy": false`
+  and `KALMIDO_TRUSTED_PROXIES`.
+
+### Fixed
+- **iPhone: the comment box pushed the task header away** (#1087): focusing it moved the page by the keyboard height;
+  the task panel now follows the visible area.
+- **iPhone: *Done* out of reach in *Customize*** (#1086): the bar with *Done* sticks to the top of every Customize
+  editor (Today, start page, projects, time tracking, agents).
+
+### Upgrade notes
+- Additive database changes only: columns `reply_to` (comments, team and agent chat messages), `agents.quota`,
+  `lists.git_folder_off`; tables `list_notif`, `folder_notif`, `login_ips`, `git_folders`; the full-text index
+  `msg_fts` with its triggers. 2.32.0 keeps running on a migrated database.
+- Lists and folders that are already shared keep notifying everyone as before (*Everything*); their owners are asked
+  once in the app. Set `KALMIDO_NOTIF_TEMPLATE=all` to start new shares with *Everything* as well.
+
 ## [2.32.0] - 2026-10-09
 
 **In short:** Shorter ways, part 2 of the usability round, and a more talkative agent chat. **Views you arrange
@@ -3357,7 +3412,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.32.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.33.0...HEAD
+[2.33.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.33.0
 [2.32.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.32.0
 [2.31.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.31.2
 [2.31.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.31.1

@@ -50,7 +50,7 @@ function mdBrief(t) {
   t = t.replace(/!?\[([^\]]*)\]\([^)\s]*\)/g, '$1').replace(/\*\*|__|~~|`/g, '');
   return t.replace(/(^|[^\w*])\*(?=\S)([^*\n]+?)\*(?!\w)/g, '$1$2').replace(/\s+/g, ' ').trim();
 }
-const editingTeam = () => document.activeElement?.id === 'tc-in' || document.activeElement?.classList?.contains('tc-edit');
+const editingTeam = () => document.activeElement?.id === 'tc-in' || document.activeElement?.id === 'ms-q' || document.activeElement?.classList?.contains('tc-edit');
 const roomName = r => r ? (r.kind === 'dm' ? (r.name || '?') : lname(listById(r.list_id)) || r.name || '?') : '';
 const roomIcon = r => r.kind === 'dm' ? av(r.user_id, r.name, 'avatar') : `<span class="tcico">${licon(listById(r.list_id), 'licon') || ic('users', 's')}</span>`;
 function viewTeam() {
@@ -73,10 +73,10 @@ function tcRoomHtml() {
   const name = roomName(r || room);
   const head = `<div class="tcrhead"><button type="button" class="iconbtn tcback" data-act="tc-back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>
     ${r ? roomIcon(r) : ''}<div class="tcrt"><b>${esc(name)}</b>${room && room.kind === 'list' ? `<span class="muted">${esc(room.members.map(m => m.name).slice(0, 6).join(', '))}${room.members.length > 6 ? ' +' + (room.members.length - 6) : ''}</span>` : ''}</div>
-    <span class="spacer"></span>${room && room.kind === 'list' ? `<button type="button" class="iconbtn" data-act="tc-list" data-id="${room.list_id}" title="${esc(tr('Open the list'))}" aria-label="${esc(tr('Open the list'))}">${ic('list')}</button>` : ''}
+    <span class="spacer"></span>${msgSearchBtn('t', rid)}${room && room.kind === 'list' ? `<button type="button" class="iconbtn" data-act="tc-list" data-id="${room.list_id}" title="${esc(tr('Open the list'))}" aria-label="${esc(tr('Open the list'))}">${ic('list')}</button>` : ''}
     <button type="button" class="iconbtn ${room?.muted ? 'on' : ''}" data-act="tc-mute" aria-pressed="${!!room?.muted}" title="${esc(room?.muted ? tr('Muted: only mentions notify you') : tr('Mute (only mentions notify you)'))}" aria-label="${esc(tr('Mute'))}">${ic(room?.muted ? 'belloff' : 'bell')}</button></div>`;
-  return `${head}<div class="chmsgs tcmsgs" id="tc-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${tcMsgsHtml()}</div>
-    <div class="chcomp tccomp"><div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea id="tc-in" rows="1" name="kalmido-team-message" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${esc(tr('Message to {0}…', name.length > 18 ? name.slice(0, 17).trimEnd() + '…' : name))}" aria-label="${esc(tr('Message to {0}…', name))}" enterkeyhint="send" maxlength="8000">${esc(S.drafts['team:' + rid] || '')}</textarea>
+  return `${head}${msBarHtml('t', rid)}<div class="chmsgs tcmsgs" id="tc-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${tcMsgsHtml()}</div>
+    ${replyBarHtml('t:' + rid)}<div class="chcomp tccomp"><div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea id="tc-in" rows="1" name="kalmido-team-message" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${esc(tr('Message to {0}…', name.length > 18 ? name.slice(0, 17).trimEnd() + '…' : name))}" aria-label="${esc(tr('Message to {0}…', name))}" enterkeyhint="send" maxlength="8000">${esc(S.drafts['team:' + rid] || '')}</textarea>
     <button type="button" class="btn pri" data-act="tc-send">${ic('send', 's')}<span>${tr('Send')}</span></button></div>`;
 }
 function tcMsgsHtml() {
@@ -91,11 +91,11 @@ function tcMsgsHtml() {
     const rxr = rxRow(m.reactions || [], {mid: m.id, act: 'tc-react', dis: !!m.deleted || S.tc.edit === m.id, own: mine, key: 't' + m.id});  // 2.18.0 (#651), 2.23.0 (#823)
     const body = m.deleted ? `<div class="cbub del"><span class="muted">${tr('Message deleted')}</span></div>`
       : S.tc.edit === m.id ? `<div class="cbub tcedit"><div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea class="tc-edit" aria-label="${esc(tr('Edit message'))}" rows="2">${esc(m.body.replace(/<@(\d+)>/g, (_, id) => '@' + uname(+id, U)))}</textarea><div class="tcebtn"><button type="button" class="btn sm" data-act="tc-edit-cancel">${tr('Cancel')}</button><button type="button" class="btn sm pri" data-act="tc-edit-save" data-mid="${m.id}">${tr('Save')}</button></div></div>`
-        : `<div class="cbub">${commentBody(m.body, U)}</div>`;
-    h += `<div class="cmsg ${mine ? 'me' : 'ag'} ${first ? 'first' : ''}${rxShow('t' + m.id)}" data-k="m${m.id}" data-mid="${m.id}">
+        : `${replyQuoteHtml(m, 't')}<div class="cbub">${commentBody(m.body, U)}</div>`;  // 2.33.0 (#1076): the quote of the answered message
+    h += `<div class="cmsg ${mine ? 'me' : 'ag'} ${first ? 'first' : ''}${rxShow('t' + m.id)}" data-k="m${m.id}" data-mid="t:${m.id}">
       ${first && !mine ? `<div class="tcwho">${av(m.user_id, uname(m.user_id, U), 'avatar sm')}<b>${esc(uname(m.user_id, U))}</b>${ags.has(m.user_id) ? agentBadge() : ''}</div>` : ''}
       ${body}${m.task ? `<button class="runtask" data-act="open-id" data-id="${m.task.id}">${ic('arrow', 's')}<span>${esc(m.task.title)}</span></button>` : ''}
-      <div class="cmeta"><time title="${esc(fmtWhen(m.created_at))}">${fmtWhen(m.created_at)}</time>${m.edited_at && !m.deleted ? `<span class="muted">${tr('edited')}</span>` : ''}${rxr}${mine && !m.deleted ? `<button type="button" class="rx rxtog" data-act="tc-msg-menu" data-mid="${m.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button>` : ''}</div></div>`;
+      <div class="cmeta"><time title="${esc(fmtWhen(m.created_at))}">${fmtWhen(m.created_at)}</time>${m.edited_at && !m.deleted ? `<span class="muted">${tr('edited')}</span>` : ''}${rxr}${m.deleted || S.tc.edit === m.id ? '' : replyBtn('chrbtn mreply')}${mine && !m.deleted ? `<button type="button" class="rx rxtog" data-act="tc-msg-menu" data-mid="${m.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button>` : ''}</div></div>`;
   }
   return h;
 }
@@ -127,9 +127,10 @@ async function tcSend() {
   const hadF = document.activeElement === ta;
   if (!S.tc.room) { try { await loadRoom(rid); } catch { /* sent without the mention lookup */ } }  // 2.24.0: @names need the members
   let m;
-  try { m = await rawFetch('POST', `/api/team/rooms/${rid}/messages`, {body: tcMentions(text)}); }
+  const rto = replyTo('t:' + rid);  // 2.33.0 (#1076)
+  try { m = await rawFetch('POST', `/api/team/rooms/${rid}/messages`, {body: tcMentions(text), ...(rto ? {reply_to: rto} : {})}); }
   catch (e) { toast(e instanceof Offline ? tr('You are offline: the message was not sent and stays in the box') : e.message); return; }
-  ta.value = ''; delete S.drafts['team:' + rid]; autosize(ta);
+  ta.value = ''; delete S.drafts['team:' + rid]; autosize(ta); replySent('t:' + rid);
   S.tc.msgs.push(m);
   const r = (S.tc.rooms || []).find(x => x.id === rid); if (r) { r.last = {id: m.id, user_id: m.user_id, text, created_at: m.created_at}; r.last_at = m.created_at; }
   tcPatch(true);
@@ -142,7 +143,7 @@ async function tcReact(mid, emoji) {
 }
 function tcMsgMenu(anchor, mid) {
   const m = S.tc.msgs.find(x => x.id === mid); if (!m) return;
-  menu(anchor, [{label: tr('Edit'), icon: 'edit', fn: () => { S.tc.edit = mid; tcPatch(); setTimeout(() => { const t = $('#tc-msgs .tc-edit'); if (t) { t.focus(); autosize(t); } }, 0); }},
+  menu(anchor, [{label: tr('Reply'), icon: 'reply', fn: () => replyStart('t', mid)}, {label: tr('Edit'), icon: 'edit', fn: () => { S.tc.edit = mid; tcPatch(); setTimeout(() => { const t = $('#tc-msgs .tc-edit'); if (t) { t.focus(); autosize(t); } }, 0); }},
     {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => tcMsgDelete(mid)}]);
 }
 async function tcMsgDelete(mid) {
@@ -364,3 +365,203 @@ document.addEventListener('click', e => {
   else return;
   e.preventDefault(); e.stopPropagation();
 });
+
+// ------------------------------------------------------------------ 2.33.0 (#1080) search in conversations
+// Task comments, team chat (channels, direct messages) and agent chats. msgSearch(q, filters) merges the hits of every source
+// (newest first). Today there is one source, the server (kalmido/collab/msgsearch.py: only what the person may read). 2.34
+// (#909) adds a device source for end-to-end encrypted direct messages, which the server cannot read:
+// MSG_SOURCES.push({id: 'device', search: async (q, f) => ({hits, total, next})}) -- a hit is {art: c|t|a, id, chat_type:
+// task|list|dm|agent, task_id?, room_id?, agent_id?, chat_name, sender: {id, name, agent}, created_at, snippet, marks}.
+// Three places use it: the search field of an open chat (the magnifier in its header), the "Messages" part of the command
+// field (palette.js) and of the search page (render.js viewSearch) with filter chips. A hit opens through msgJump (collab.js).
+const MSG_SOURCES = [{id: 'server', search: async (q, f = {}) => {
+  const p = new URLSearchParams({q});
+  for (const k of ['art', 'sender', 'room', 'agent', 'task', 'limit', 'offset']) if (f[k] != null && f[k] !== '') p.set(k, f[k]);
+  const j = await rawFetch('GET', '/api/search/messages?' + p);
+  return {hits: j.hits || [], total: j.total || 0, next: j.next_offset ?? null};
+}}];
+async function msgSearch(q, f = {}) {
+  const rs = await Promise.allSettled(MSG_SOURCES.map(s => s.search(q, f)));
+  const ok = rs.filter(r => r.status === 'fulfilled').map(r => r.value);
+  if (!ok.length && rs.length) throw rs[0].reason;
+  const seen = new Set(), hits = [];
+  for (const r of ok) for (const h of r.hits) { const k = h.art + ':' + h.id; if (!seen.has(k)) { seen.add(k); hits.push(h); } }
+  hits.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '') || b.id - a.id);
+  return {hits, total: ok.reduce((n, r) => n + (r.total || 0), 0), next: ok.find(r => r.next != null)?.next ?? null};
+}
+const MSG_KIND = {task: N_('Comment'), list: N_('Team chat'), dm: N_('Direct message'), agent: N_('Agent chat')};
+const msgIcon = h => h.chat_type === 'agent' ? 'bot' : h.chat_type === 'list' ? 'users' : h.chat_type === 'dm' ? 'user' : 'comment';
+// the snippet with its hits as <mark> (marks count code points, like the server)
+function msgSnip(h) {
+  const cs = Array.from(h.snippet || ''); let o = '', at = 0;
+  for (const [s, e] of h.marks || []) { if (s < at) continue; o += esc(cs.slice(at, s).join('')) + '<mark>' + esc(cs.slice(s, e).join('')) + '</mark>'; at = e; }
+  return o + esc(cs.slice(at).join(''));
+}
+function msgOpen(h) {
+  if (!h) return;
+  return window.msgJump?.({art: h.art, id: h.id, task: h.task_id, chat: h.room_id, agent: h.agent_id});
+}
+function msgHitHtml(h, i, act) {
+  return `<button type="button" class="mhit" data-act="${act}" data-i="${i}"><span class="mhic">${ic(msgIcon(h), 's')}</span><span class="mhm">
+    <span class="mhh"><b>${esc(h.sender?.name || '?')}</b><span class="mhc">${esc(tr(MSG_KIND[h.chat_type] || ''))}${h.chat_name ? ' · ' + esc(h.chat_name) : ''}</span><time datetime="${esc(h.created_at || '')}">${h.created_at ? esc(fmtWhen(h.created_at)) : ''}</time></span>
+    <span class="mhs">${msgSnip(h)}</span></span></button>`;
+}
+// the words of a query, folded like the server (case, accents; ä = ae): marking them in a message on the screen
+const msgWords = q => (String(q || '').match(/[\p{L}\p{N}_]+/gu) || []).slice(0, 8);
+const msgFoldCh = ch => ch === 'ß' ? 'ss' : ch.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+function msgVariants(w) {
+  const f = Array.from(w).map(msgFoldCh).join(''), x = Array.from(w.replace(/[äöüÄÖÜ]/g, c => c + 'e')).map(msgFoldCh).join('');
+  return [...new Set([f, x, f.replace(/ae/g, 'a').replace(/oe/g, 'o').replace(/ue/g, 'u')])];
+}
+function msgUnmark() { $$('mark.mshl').forEach(m => { const p = m.parentNode; if (!p) return; p.replaceChild(document.createTextNode(m.textContent), m); p.normalize(); }); }
+function msgMark(el, q) {
+  msgUnmark(); if (!el) return;
+  const vs = msgWords(q).flatMap(msgVariants).filter(Boolean); if (!vs.length) return;
+  const root = $('.cbub, .cbody, .cmbody', el) || el, nodes = [], tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  while (tw.nextNode()) nodes.push(tw.currentNode);
+  for (const n of nodes) {
+    const t = n.nodeValue, chars = Array.from(t); let f = '', pos = [], off = 0;
+    for (const ch of chars) { const x = msgFoldCh(ch); f += x; for (let k = 0; k < x.length; k++) pos.push(off); off += ch.length; }
+    const rng = [];
+    for (const v of vs) { let i = -1; while ((i = f.indexOf(v, i + 1)) >= 0) { if (i > 0 && /[\p{L}\p{N}_]/u.test(f[i - 1])) continue; const s = pos[i], e = i + v.length < pos.length ? pos[i + v.length] : t.length; rng.push([s, Math.max(e, s + 1)]); } }
+    if (!rng.length) continue;
+    rng.sort((a, b) => a[0] - b[0]);
+    const frag = document.createDocumentFragment(); let at = 0;
+    for (const [s, e] of rng) { if (s < at) continue; frag.append(t.slice(at, s)); const m = document.createElement('mark'); m.className = 'mshl'; m.textContent = t.slice(s, e); frag.append(m); at = e; }
+    frag.append(t.slice(at)); n.parentNode.replaceChild(frag, n);
+  }
+}
+
+// ---- the search field of an open chat: art t (a team chat room) or a (the chat with an agent); key = room / agent id
+S.ms = {open: false, art: null, key: null, q: '', hits: [], i: -1, busy: false, t: 0};
+const msOpenFor = (art, key) => S.ms.open && S.ms.art === art && S.ms.key === key;
+const msgSearchBtn = (art, key) => `<button type="button" class="iconbtn msbtn ${msOpenFor(art, key) ? 'on' : ''}" data-act="ms-toggle" data-art="${art}" data-key="${key}" aria-expanded="${msOpenFor(art, key)}" title="${esc(tr('Search in this chat'))}" aria-label="${esc(tr('Search in this chat'))}">${ic('search')}</button>`;
+function msCount() {
+  const m = S.ms;
+  return m.busy ? tr('Searching…') : !m.q.trim() ? '' : !m.hits.length ? tr('No hits') : tr('{0} of {1}', m.i + 1, m.hits.length);
+}
+function msBarHtml(art, key) {
+  if (!msOpenFor(art, key)) return '';
+  const n = S.ms.hits.length;
+  return `<div class="mqbar" role="search"><span class="msico" aria-hidden="true">${ic('search', 's')}</span><input id="ms-q" type="search" value="${esc(S.ms.q)}" placeholder="${esc(tr('Search in this chat'))}" aria-label="${esc(tr('Search in this chat'))}" autocomplete="off" enterkeyhint="search">
+    <span class="mscount" aria-live="polite">${esc(msCount())}</span>
+    <button type="button" class="iconbtn" data-act="ms-older" ${n && S.ms.i < n - 1 ? '' : 'disabled'} title="${esc(tr('Older hit'))}" aria-label="${esc(tr('Older hit'))}">${ic('up', 's')}</button>
+    <button type="button" class="iconbtn" data-act="ms-newer" ${n && S.ms.i > 0 ? '' : 'disabled'} title="${esc(tr('Newer hit'))}" aria-label="${esc(tr('Newer hit'))}">${ic('down', 's')}</button>
+    <button type="button" class="iconbtn" data-act="ms-close" title="${esc(tr('Close search'))}" aria-label="${esc(tr('Close search'))}">${ic('x', 's')}</button></div>`;
+}
+// the bar sits right under the chat's header (drawn with it, and swapped in place when the chat is not drawn again)
+function msBarSync(focus) {
+  const bar = $('.mqbar'), btn = S.ms.art ? $(`[data-act="ms-toggle"][data-art="${S.ms.art}"][data-key="${S.ms.key}"]`) : null;
+  $$('[data-act="ms-toggle"]').forEach(b => { const on = msOpenFor(b.dataset.art, +b.dataset.key); b.classList.toggle('on', on); b.setAttribute('aria-expanded', on); });
+  if (!S.ms.open || !btn) { bar?.remove(); return; }
+  const head = btn.closest('.tcrhead, .chath'); if (!head) return;
+  if (bar && bar.previousElementSibling === head) {  // keep the field (its caret, the keyboard): only the counter + arrows
+    const tmp = document.createElement('div'); tmp.innerHTML = msBarHtml(S.ms.art, S.ms.key);
+    $('.mscount', bar).textContent = msCount();
+    for (const a of ['ms-older', 'ms-newer']) $(`[data-act="${a}"]`, bar).disabled = $(`[data-act="${a}"]`, tmp).disabled;
+  } else { bar?.remove(); head.insertAdjacentHTML('afterend', msBarHtml(S.ms.art, S.ms.key)); }
+  if (focus) $('#ms-q')?.focus();
+}
+function msSearchToggle(art, key) {
+  if (msOpenFor(art, key)) { msClose(); return; }
+  Object.assign(S.ms, {open: true, art, key, q: '', hits: [], i: -1, busy: false});
+  msBarSync(true);
+}
+function msClose() {
+  const f = document.activeElement?.id === 'ms-q';
+  Object.assign(S.ms, {open: false, q: '', hits: [], i: -1}); msgUnmark(); msBarSync();
+  if (f) (S.ms.art === 't' ? $('#tc-in') : $('#chat-in'))?.focus({preventScroll: true});
+}
+async function msRun(q) {
+  const m = S.ms, art = m.art, key = m.key; m.q = q;
+  if (!q.trim()) { Object.assign(m, {hits: [], i: -1, busy: false}); msgUnmark(); msBarSync(); return; }
+  m.busy = true; msBarSync();
+  let r;
+  try { r = await msgSearch(q, {art, [art === 't' ? 'room' : 'agent']: key, limit: 50}); }
+  catch (e) { if (m.q === q) { m.busy = false; msBarSync(); toast(e instanceof Offline ? tr('Only available online.') : e.message); } return; }
+  if (m.q !== q || m.art !== art || m.key !== key || !m.open) return;
+  Object.assign(m, {hits: r.hits, i: r.hits.length ? 0 : -1, busy: false}); msBarSync();
+  if (r.hits.length) msGo(0);
+  else msgUnmark();
+}
+async function msGo(i) {
+  const m = S.ms, h = m.hits[i]; if (!h) return;
+  m.i = i; msBarSync();
+  const q = m.q, ok = await msgOpen(h);
+  if (ok && m.open && m.q === q) msgMark($(`[data-mid="${h.art}:${h.id}"]`), q);
+}
+document.addEventListener('input', e => {
+  if (e.target.id !== 'ms-q') return;
+  const q = e.target.value; S.ms.q = q; clearTimeout(S.ms.t); S.ms.t = setTimeout(() => msRun(q), 300);
+});
+document.addEventListener('keydown', e => {
+  if (e.target.id !== 'ms-q') return;
+  if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); if (S.ms.q !== e.target.value || !S.ms.hits.length) { clearTimeout(S.ms.t); msRun(e.target.value); } else msGo(e.shiftKey ? Math.max(0, S.ms.i - 1) : Math.min(S.ms.hits.length - 1, S.ms.i + 1)); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); msGo(Math.min(S.ms.hits.length - 1, S.ms.i + 1)); }
+  else if (e.key === 'ArrowDown') { e.preventDefault(); msGo(Math.max(0, S.ms.i - 1)); }
+  else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); msClose(); }
+}, true);
+document.addEventListener('click', e => {
+  const a = e.target.closest?.('[data-act^="ms-"]'); if (!a) return;
+  const act = a.dataset.act;
+  if (act === 'ms-toggle') msSearchToggle(a.dataset.art, +a.dataset.key);
+  else if (act === 'ms-older') msGo(Math.min(S.ms.hits.length - 1, S.ms.i + 1));
+  else if (act === 'ms-newer') msGo(Math.max(0, S.ms.i - 1));
+  else if (act === 'ms-close') msClose();
+  else if (act === 'ms-hit') msgOpen(S.msg.hits[+a.dataset.i]);
+  else if (act === 'ms-art') { S.msg.art = a.dataset.v; msgSecRun(S.msg.q); }
+  else if (act === 'ms-more') msgSecRun(S.msg.q, true);
+  else return;
+  e.preventDefault(); e.stopPropagation();
+});
+document.addEventListener('change', e => { if (e.target.id === 'ms-sender') { S.msg.sender = e.target.value; msgSecRun(S.msg.q); } });
+
+// ---- "Messages" on the search page: filter chips (all / comments / team chats / agent chats), the sender, more pages
+S.msg = {q: '', art: '', sender: '', hits: [], total: 0, next: null, busy: false, err: null, senders: {}};
+const MSG_CHIPS = [['', N_('All')], ['c', N_('Comments')], ['t', N_('Team chats')], ['a', N_('Agent chats')]];
+function msgSecHtml() {
+  const m = S.msg; if (!m.q.trim()) return '';
+  const snd = Object.entries(m.senders).sort((a, b) => a[1].localeCompare(b[1], LOCALE()));
+  return `<section class="msec" aria-labelledby="msec-h"><h2 class="ghead" id="msec-h">${tr('Messages')} ${m.busy ? '' : `<span class="c">${m.total}</span>`}</h2>
+    <div class="mschips" role="group" aria-label="${esc(tr('Show'))}">${MSG_CHIPS.map(([v, n]) => `<button type="button" class="chip ${m.art === v ? 'on' : ''}" data-act="ms-art" data-v="${v}" aria-pressed="${m.art === v}">${esc(tr(n))}</button>`).join('')}
+    ${snd.length > 1 || m.sender ? `<select id="ms-sender" aria-label="${esc(tr('Sender'))}"><option value="">${esc(tr('All senders'))}</option>${snd.map(([id, n]) => `<option value="${id}" ${String(m.sender) === id ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>` : ''}</div>
+    <div class="mslist">${m.err ? `<div class="muted mhint">${esc(m.err)}</div>` : m.hits.length ? m.hits.map((h, i) => msgHitHtml(h, i, 'ms-hit')).join('') : m.busy ? `<div class="muted mhint">${tr('Searching…')}</div>` : `<div class="muted mhint">${tr('No messages found.')}</div>`}</div>
+    ${m.next != null ? `<button type="button" class="btn sm msmore" data-act="ms-more">${tr('Show more')}</button>` : ''}</section>`;
+}
+function msgSecDraw() { const el = $('#smsgs'); if (el) el.innerHTML = msgSecHtml(); }
+async function msgSecRun(q, more = false) {
+  const m = S.msg;
+  if (q !== m.q) { m.senders = {}; m.sender = ''; }
+  m.q = q; m.err = null;
+  if (!q.trim()) { Object.assign(m, {hits: [], total: 0, next: null}); msgSecDraw(); return; }
+  m.busy = true; if (!more) { m.hits = []; m.next = null; } msgSecDraw();
+  const f = {art: m.art, sender: m.sender, limit: 20, offset: more ? m.next || 0 : 0};
+  let r;
+  try { r = await msgSearch(q, f); }
+  catch (e) { if (m.q === q) { m.busy = false; m.err = e instanceof Offline ? tr('Only available online.') : e.message; msgSecDraw(); } return; }
+  if (m.q !== q || m.art !== f.art || m.sender !== f.sender) return;
+  m.busy = false; m.hits = more ? [...m.hits, ...r.hits] : r.hits; m.total = r.total; m.next = r.next;
+  for (const h of r.hits) if (h.sender?.id) m.senders[h.sender.id] = h.sender.name;
+  msgSecDraw();
+}
+
+// ---- the command field (palette.js): up to 5 hits as the group "Messages", "All messages" opens the search page
+const PALM = {q: '', hits: null, total: 0, t: 0};
+function palMsgItems(q) {
+  q = q.trim();
+  if (q.length < 2 || !collab() && !feat('agents') && !feat('comments')) return [];
+  if (PALM.q !== q) {
+    PALM.q = q; PALM.hits = null; clearTimeout(PALM.t);
+    PALM.t = setTimeout(async () => {
+      let r; try { r = await msgSearch(q, {limit: 5}); } catch { return; }
+      if (PALM.q !== q) return;
+      PALM.hits = r.hits; PALM.total = r.total;
+      if ($('.palette') && PAL.q.trim() === q) palDraw();
+    }, 250);
+    return [];
+  }
+  if (!PALM.hits?.length) return [];
+  const it = PALM.hits.map((h, i) => ({id: 'msg:' + h.art + h.id + ':' + i, kind: 'msg', group: 'msgs', label: `${h.sender?.name || '?'} · ${h.chat_name || tr(MSG_KIND[h.chat_type])}`, subHtml: msgSnip(h), icon: msgIcon(h), fn: () => msgOpen(h)}));
+  if (PALM.total > PALM.hits.length) it.push({id: 'msg:all', kind: 'msg', group: 'msgs', label: tr('All {0} messages', PALM.total), icon: 'search', fn: () => { go('search'); setTimeout(() => { const i = $('#searchq'); if (i) i.value = q; doSearch(q); }, 0); }});
+  return it;
+}

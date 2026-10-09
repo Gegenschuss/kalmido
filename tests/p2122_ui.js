@@ -79,12 +79,12 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
     const mine = await call('POST', `/api/agents/${AG}/chat`, {body: 'From the phone ' + tag});
     await w.eval('load().then(render).then(chatLoad)'); await sleep(300);  // 2.13.0: wait for the chat refresh load() starts (slow runners)
     same('my new message');
-    const mrow = d.querySelector(`#chat-msgs .cmsg[data-mid="${mine.id}"]`);
+    const mrow = d.querySelector(`#chat-msgs .cmsg[data-mid="a:${mine.id}"]`);
     check(mrow && /Sent/.test(mrow.textContent), `${tag}: my message, Sent`);
     await tcall('GET', `/agent/chats?since=${mine.id - 1}`, TOK);
     await w.eval('chatLoad()'); await w.eval('load().then(render).then(chatLoad)'); await sleep(300);  // 2.13.0: wait for the chat refresh load() starts (slow runners)
     same('delivered');
-    check(/Delivered/.test(d.querySelector(`#chat-msgs .cmsg[data-mid="${mine.id}"]`)?.textContent || ''), `${tag}: Delivered in place`);
+    check(/Delivered/.test(d.querySelector(`#chat-msgs .cmsg[data-mid="a:${mine.id}"]`)?.textContent || ''), `${tag}: Delivered in place`);
     // the agent types and works
     await tcall('POST', '/agent/typing', TOK, {chat_user_id: ME});
     await tcall('PUT', '/agent/status', TOK, {status: 'working', text: 'thinking'});
@@ -95,7 +95,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
     const ans = await say('Here you go ' + tag);
     await w.eval('load().then(render).then(chatLoad)'); await sleep(300);  // 2.13.0: wait for the chat refresh load() starts (slow runners)
     same('new answer');
-    check(d.querySelector(`#chat-msgs .cmsg[data-mid="${ans.id}"]`) && d.querySelector('#chat-msgs').lastElementChild.dataset.mid === String(ans.id), `${tag}: the answer is appended ` + (d.querySelector('#chat-msgs')?.lastElementChild?.outerHTML || '-').replace(/<svg.*?<\/svg>/g, '').slice(0, 300));
+    check(d.querySelector(`#chat-msgs .cmsg[data-mid="a:${ans.id}"]`) && d.querySelector('#chat-msgs').lastElementChild.dataset.mid === 'a:' + ans.id, `${tag}: the answer is appended ` + (d.querySelector('#chat-msgs')?.lastElementChild?.outerHTML || '-').replace(/<svg.*?<\/svg>/g, '').slice(0, 300));
     // a status change (agent band / header dots)
     await tcall('PUT', '/agent/status', TOK, {status: 'idle'});
     await w.eval('agentPoll()'); w.eval('renderTop(); render()'); await sleep(300);

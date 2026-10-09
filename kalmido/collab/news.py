@@ -217,6 +217,10 @@ def notif_ok(c, uid, s, row, ch, lid=None):
     m = notif_matrix(s)[row]
     if ch == "news" and m["news"] is None:
         return False
+    if ch == "push" and lid:  # 2.33.0 (#927): the list owner's template is a ceiling for pushes (the News stay complete)
+        from ..notify.caps import cap_ok
+        if not cap_ok(c, uid, row, lid):
+            return False
     bell, cust = list_bell(c, uid, lid) if lid and row not in NOTIF_NO_BELL else ("default", {})
     if bell == "mute" and row not in NOTIF_UNMUTED:
         return False

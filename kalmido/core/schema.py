@@ -399,6 +399,10 @@ CREATE INDEX IF NOT EXISTS git_links_conn ON git_links(conn_id, kind, ref);
 CREATE TABLE IF NOT EXISTS git_closes (           -- completions by "fixes #id": once per task; undo = what do_complete filled
   task_id INTEGER PRIMARY KEY REFERENCES tasks(id) ON DELETE CASCADE, conn_id INTEGER NOT NULL, kind TEXT NOT NULL,
   ref TEXT NOT NULL, undo TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL, undone_at TEXT);
+CREATE TABLE IF NOT EXISTS git_folders (          -- 2.33.0 (#934): a repository connected to a folder (git_conns row on one of its lists)
+  conn_id INTEGER PRIMARY KEY REFERENCES git_conns(id) ON DELETE CASCADE,
+  owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, folder TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS git_folders_owner ON git_folders(owner_id, folder);
 CREATE TABLE IF NOT EXISTS git_tags (             -- 2.18.0 (#408): tag names a connection has seen (a NEW one can reach a milestone)
   conn_id INTEGER NOT NULL REFERENCES git_conns(id) ON DELETE CASCADE, name TEXT NOT NULL, seen_at TEXT NOT NULL,
   PRIMARY KEY (conn_id, name));
@@ -668,12 +672,25 @@ CREATE INDEX IF NOT EXISTS forms_list ON forms(list_id);
 CREATE TABLE IF NOT EXISTS list_layouts (
   list_id INTEGER NOT NULL REFERENCES lists(id) ON DELETE CASCADE, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   layout TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (list_id, user_id));
+-- 2.33.0 (#927): the owner's notification template of a list / of a shared folder (see notify/caps.py): read | work | all |
+-- custom (json {event: 0|1}); user_id 0 = for everyone, else for that person. New tables: 2.32 runs on with them
+CREATE TABLE IF NOT EXISTS list_notif (
+  list_id INTEGER NOT NULL REFERENCES lists(id) ON DELETE CASCADE, user_id INTEGER NOT NULL DEFAULT 0,
+  tpl TEXT NOT NULL, custom TEXT, updated_at TEXT NOT NULL, PRIMARY KEY (list_id, user_id));
+CREATE TABLE IF NOT EXISTS folder_notif (
+  owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, folder TEXT NOT NULL, user_id INTEGER NOT NULL DEFAULT 0,
+  tpl TEXT NOT NULL, custom TEXT, updated_at TEXT NOT NULL, PRIMARY KEY (owner_id, folder, user_id));
+-- 2.33.0 (#834): successful sign-ins from PRIVATE addresses (one row per address and account, last time; kept 14 days):
+-- many accounts from exactly one private address = the reverse proxy does not pass the client's address on
+CREATE TABLE IF NOT EXISTS login_ips (
+  ip TEXT NOT NULL, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, at TEXT NOT NULL, PRIMARY KEY (ip, user_id));
 """
 # Bumped when the database layout changes (stored in PRAGMA user_version). A backup can be restored when its
 # schema version is not newer than this one (older ones are migrated by init_db).
 SCHEMA_VERSION = 2  # package B only added tables + a column: older versions can still restore its backups
 # triggers / views a restored database may contain (anything else is refused: it would run inside this app)
-SCHEMA_TRIGGERS = {"time_task_list", "time_task_title"}
+SCHEMA_TRIGGERS = {"time_task_list", "time_task_title"} | {  # 2.33.0 (#1080): the message search index, re-created at start
+    f"msg_fts_{t}_{w}" for t in ("comments", "tchat_msgs", "agent_chat") for w in ("ai", "au", "ad")}
 # time_entries.task_title follows a rename only for entries of users who still see the task (a former
 # member keeps the old snapshot and never learns new titles). Re-created on every start (init_db).
 TIME_TITLE_TRIGGER = """CREATE TRIGGER time_task_title AFTER UPDATE OF title ON tasks WHEN NEW.title IS NOT OLD.title
@@ -896,6 +913,15 @@ MIGRATIONS = [
     # (#1081): the job a chat message is the result of (its history "Verlauf" shows under it). New columns only.
     ("agents", "host_info", "ALTER TABLE agents ADD COLUMN host_info TEXT NOT NULL DEFAULT ''"),
     ("agent_chat", "job_id", "ALTER TABLE agent_chat ADD COLUMN job_id INTEGER REFERENCES agent_jobs(id) ON DELETE SET NULL"),
+    # 2.33.0 (#1076): a reply to one message of the same place (task comments, team chat, agent chat); nullable, no foreign
+    # key (a deleted / trimmed original shows as "Message deleted"); 2.32 never reads it. Way back: the column stays unused.
+    ("comments", "reply_to", "ALTER TABLE comments ADD COLUMN reply_to INTEGER"),
+    ("tchat_msgs", "reply_to", "ALTER TABLE tchat_msgs ADD COLUMN reply_to INTEGER"),
+    ("agent_chat", "reply_to", "ALTER TABLE agent_chat ADD COLUMN reply_to INTEGER"),
+    # 2.33.0 (#1045): the agent's plan usage it reports (json {windows, main, limit, at}; '' = none -> no ring). New column only
+    ("agents", "quota", "ALTER TABLE agents ADD COLUMN quota TEXT NOT NULL DEFAULT ''"),
+    # 2.33.0 (#934): a project list does not use its folder's repository (1 = switched off). New column only
+    ("lists", "git_folder_off", "ALTER TABLE lists ADD COLUMN git_folder_off INTEGER NOT NULL DEFAULT 0"),
 ]
 INDEXES = """
 CREATE INDEX IF NOT EXISTS lists_owner ON lists(owner_id);

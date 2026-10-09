@@ -114,8 +114,11 @@ async function gateDecide(cid, skip) {
 function repoBoxHtml(l) {
   return `<h4 id="l-repos-h">${tr('Repository')}</h4><div class="shint lhint">${tr('Pull requests, commits and CI at the tasks of this list: mention #123 (the task number) in a commit or pull request, or name a branch kalmido-123-…. “fixes #123” in a merged pull request completes the task.')}</div><div class="members" id="l-repos"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 }
-function repoWire(md, lid) {
+// 2.33.0 (#934): folder = the folder dialog's "Repository" (GET / POST /api/folders/repos); a list shows the repositories it
+// takes from its folder below its own ones, with "Switch off for this list" / "Use it again" (list owner / admins)
+function repoWire(md, lid, folder) {
   const box = $('#l-repos', md); if (!box) return;
+  const isProj = () => !!folder || listById(lid)?.kind === 'project';
   let j = null, edit = null, secret = null, errUrl = null;
   const provSel = `<select id="rp-prov" aria-label="${esc(tr('Provider'))}">${GIT_PROV.map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select>`;
   const draw = () => {
@@ -138,9 +141,26 @@ function repoWire(md, lid) {
         ${j.key ? '' : `<div class="shint keep lhint">${esc(tr('Set KALMIDO_SECRET_KEY on the server to store repository tokens (32 random bytes, base64)'))}</div>`}
         <div class="rpcerr" id="rp-cerr" role="alert"></div>
         <div class="row rprow"><span class="spacer"></span><button class="btn sm pri" data-rp="add">${ic('plus', 's')} ${tr('Connect')}</button></div></div>` : '';
-    box.innerHTML = rows + (listById(lid)?.kind === 'project' ? add : `<div class="muted mhint">${tr('Make this list a project to connect a repository')}</div>`)
-      + (!j.may && !j.repos.length && listById(lid)?.kind === 'project' ? `<div class="muted mhint">${tr('The list owner and list admins connect repositories.')}</div>` : '')
-      + errHookHtml();
+    box.innerHTML = rows + (isProj() ? add : `<div class="muted mhint">${tr('Make this list a project to connect a repository')}</div>`)
+      + (!folder && !j.may && !j.repos.length && isProj() ? `<div class="muted mhint">${tr('The list owner and list admins connect repositories.')}</div>` : '')
+      + (folder ? folderSumHtml() : foldHtml() + errHookHtml());
+  };
+  // 2.33.0 (#934): the repositories this list takes from its folder
+  const repoNames = rs => rs.map(r => r.full_name).join(', ');
+  const foldHtml = () => {
+    const fs = j.folder, rs = j.folder_repos || []; if (!fs?.inherited || !rs.length || listById(lid)?.kind !== 'project') return '';
+    const st = fs.own ? tr('Not used: this list has its own repository') : fs.off ? tr('Switched off for this list') : tr('Used by this list');
+    const ctl = !j.may || fs.own ? '' : `<button class="btn sm" data-rp="fold-use" data-use="${fs.off ? 1 : 0}">${esc(fs.off ? tr('Use it again') : tr('Switch off for this list'))}</button>`;
+    return `<div class="mrow reporow repofold">${ic('folder', 's')}<span class="n"><b>${esc(fs.folder ? tr('From the folder “{0}”', fDisp(fs.folder)) : tr('From its folder'))}</b><span class="muted rpm">${esc(repoNames(rs))}</span><span class="rst">${esc(st)}</span></span>${ctl}</div>`;
+  };
+  const folderSumHtml = () => {
+    const ls = (j.lists || []).filter(l => l.project), use = ls.filter(l => l.uses && l.via === folder), inh = j.inherited;
+    const why = l => l.own ? tr('has its own repository') : l.off ? tr('switched off') : l.via && l.via !== folder ? tr('uses the subfolder “{0}”', fDisp(l.via)) : '';
+    const not = ls.filter(l => !(l.uses && l.via === folder) && (j.repos.length || inh));
+    return (inh && !j.repos.length ? `<div class="mrow reporow repofold">${ic('folder', 's')}<span class="n"><b>${esc(tr('From the folder “{0}”', fDisp(inh.folder)))}</b><span class="muted rpm">${esc(repoNames(inh.repos))}</span></span></div>` : '')
+      + (j.repos.length ? `<div class="shint keep lhint" role="status">${esc(tr('Used by {0} of {1} project lists in this folder, also by new ones.', use.length, ls.length))}</div>` : '')
+      + (j.repos.length && not.length ? `<ul class="rpnot muted">${not.map(l => `<li>${esc(l.name)}${why(l) ? ': ' + esc(why(l)) : ''}</li>`).join('')}</ul>` : '')
+      + (!ls.length ? `<div class="muted mhint">${tr('No project lists in this folder yet: lists that become projects use it.')}</div>` : '');
   };
   // 2.18.0 (#408 "Software 2" F): error reports -> bug tickets (a secret webhook URL, shown once; owner / list admins)
   const errHookHtml = () => {
@@ -166,7 +186,11 @@ function repoWire(md, lid) {
       : pv === 'gitlab' ? tr('gitlab.com or your own GitLab server; groups with subgroups work (group/sub/project).') : '';
     if (h) { h.textContent = txt; h.hidden = !txt; }
   };
-  const reload = async () => { try { j = await api('GET', `/api/lists/${lid}/repos`); } catch { j = {repos: [], may: false, key: true, project: false, max: 0}; } draw(); };
+  const reload = async () => {
+    try { j = await api('GET', folder ? '/api/folders/repos?folder=' + encodeURIComponent(folder) : `/api/lists/${lid}/repos`); if (folder) j.may = true; }
+    catch { j = {repos: [], may: false, key: true, project: false, max: 0}; }
+    draw();
+  };
   box.addEventListener('click', async e => {
     const b = e.target.closest('[data-rp]'); if (!b) return;
     const rid = +(b.closest('[data-rid]')?.dataset.rid || b.closest('.repoedit')?.previousElementSibling?.dataset.rid || edit || 0);
@@ -178,7 +202,7 @@ function repoWire(md, lid) {
       // 2.18.0 review (R11): a failed connect says why next to the fields (not only in a toast that is gone in seconds)
       const ce = $('#rp-cerr', box), nm = $('#rp-name', box);
       ce.textContent = ''; nm.removeAttribute('aria-invalid');
-      try { await rawFetch('POST', `/api/lists/${lid}/repos`, body); toast(tr('Repository connected')); }
+      try { await rawFetch('POST', folder ? '/api/folders/repos' : `/api/lists/${lid}/repos`, folder ? {...body, folder} : body); toast(tr('Repository connected')); }
       catch (er) {
         b.disabled = false; if (!md.isConnected) return;
         ce.textContent = er instanceof Offline ? tr('Offline: only works again with a connection') : er.message === 'auth' ? '' : er.message;
@@ -186,6 +210,10 @@ function repoWire(md, lid) {
         return;
       }
       await reload(); await load(); render();
+    } else if (k === 'fold-use') {
+      try { await api('PUT', `/api/lists/${lid}/folder-repo`, {use: b.dataset.use === '1'}); } catch { return; }
+      toast(b.dataset.use === '1' ? tr('The list uses the folder’s repository again') : tr('Switched off for this list'));
+      await reload(); await load(); render(); $('#l-repos [data-rp="fold-use"]', md)?.focus();
     } else if (k === 'err-on') {
       await errSet('on');
     } else if (k === 'err-copy') {
@@ -228,6 +256,15 @@ function repoWire(md, lid) {
     selfHint();
   });
   reload();
+}
+// 2.33.0 (#934): folder settings > Repository: one connection for every project list in the folder (only its owner)
+function folderRepoModal(f) {
+  const md = modal(`<h3>${ic('git', 's')} ${esc(tr('Repository of the folder “{0}”', fDisp(f)))}</h3>
+    <div class="shint keep lhint">${tr('Every project list in this folder and its subfolders uses it, also new ones: #123 and “fixes #123” in commits and pull requests find the tasks of all these lists. A list can switch it off or connect its own repository; a subfolder can have its own.')}</div>
+    <div class="members" id="l-repos"><div class="muted mhint">${tr('Loading…')}</div></div>
+    <div class="foot"><span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);
+  md.addEventListener('click', e => { if (e.target.closest('[data-m="close"]')) md.remove(); });
+  repoWire(md, 0, f);
 }
 
 // ================================================================== 2.17.0 package B "Communication"

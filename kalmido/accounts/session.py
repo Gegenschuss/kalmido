@@ -286,6 +286,8 @@ def start_session(c, uid, remember, via="password"):
     c.execute("DELETE FROM sessions WHERE expires_at<?", (iso(now_utc()),))
     c.execute("INSERT INTO sessions(token_hash,user_id,created_at,expires_at,via) VALUES(?,?,?,?,?)",
               (_token_hash(tok), uid, iso(now_utc()), iso(now_utc() + timedelta(days=days)), via))
+    from ..admin.clientip import login_seen
+    login_seen(c, uid)  # 2.33.0 (#834): many accounts from one private address = the proxy hides the client addresses
     return tok, (days * 86400 if remember else None)
 
 

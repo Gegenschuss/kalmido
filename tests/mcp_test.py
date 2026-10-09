@@ -201,6 +201,12 @@ CASES = [
     ("report_usage", {"model": "claude-x", "input_tokens": 10, "output_tokens": 5, "cache_read_tokens": 7, "cost_usd": 0.01, "task_id": 7, "note": "hi"},
      "POST", "/api/v1/agent/usage", {"model": "claude-x", "input_tokens": 10, "output_tokens": 5, "cache_read_tokens": 7, "cost_usd": 0.01, "task_id": 7, "note": "hi"}, {}),
     ("get_usage", {"group": "task", "from": "2031-01-01"}, "GET", "/api/v1/agent/usage", None, {"group": "task", "from": "2031-01-01"}),
+    # 2.33.0 (#1045) the usage ring
+    ("report_plan_usage", {"rate_limits": {"seven_day": {"used_percentage": 41.2, "resets_at": 1999999999}}, "limit": 90}, "PUT", "/api/v1/agent/quota",
+     {"rate_limits": {"seven_day": {"used_percentage": 41.2, "resets_at": 1999999999}}, "limit": 90}, {}),
+    ("report_plan_usage", {"windows": [{"label": "Week", "percent": 12}]}, "PUT", "/api/v1/agent/quota", {"windows": [{"label": "Week", "percent": 12}]}, {}),
+    ("get_plan_usage", {}, "GET", "/api/v1/agent/quota", None, {}),
+    ("clear_plan_usage", {}, "DELETE", "/api/v1/agent/quota", None, {}),
     # 2.2.0 (#271 / #339) code
     ("list_repos", {"list_id": 4}, "GET", "/api/v1/lists/4/repos", None, {}),
     ("get_project_overview", {"list_id": 4}, "GET", "/api/v1/lists/4/overview", None, {}),  # 2.7.1 (#410)

@@ -16,6 +16,7 @@ from ..core.serializers import unlink_files
 from ..tasks.tasks import WEB_COMMENT
 from ..tasks.attachments import save_attachments
 from ..integrations.paperless import pl_usable_ids
+from .replies import reply_check, with_replies
 
 
 # ---------------------------------------------------------------- comments + activity timeline
@@ -79,7 +80,8 @@ def att_dicts(c, where, args):
 def comment_dict(r, atts):
     return {"id": r["id"], "user_id": r["user_id"], "body": r["body"], "created_at": r["created_at"],
             "edited_at": r["edited_at"], "mentions": [int(x) for x in (r["mentions"] or "").split(",") if x],
-            "attachments": atts.get(r["id"], []), "suggestion": json.loads(r["suggestion"]) if r["suggestion"] else None}
+            "attachments": atts.get(r["id"], []), "suggestion": json.loads(r["suggestion"]) if r["suggestion"] else None,
+            "reply_to": r["reply_to"] if "reply_to" in r.keys() else None}  # 2.33.0 (#1076): + reply (with_replies)
 
 
 def need_live_comment(c, cid):
@@ -116,10 +118,11 @@ def timeline(tid):
             o = c.execute("SELECT list_id FROM tasks WHERE id=?", (a["data"]["id"],)).fetchone()
             if not o or o["list_id"] not in vis or not task_visible(c, a["data"]["id"], me()):
                 a["data"] = {"hidden": True}
-    comments = with_reactions(c, [comment_dict(r, atts) for r in rows])
+    comments = with_replies(c, "c", with_reactions(c, [comment_dict(r, atts) for r in rows]))
     ids = {x["user_id"] for x in comments + acts} | {m for x in comments for m in x["mentions"]} \
         | {a["data"].get("to") for a in acts if a["kind"] == "assign"} | {a["data"].get("agent") for a in acts} | {a["data"].get("approver") for a in acts} \
-        | {a["data"].get("by") for a in acts} | {u["id"] for x in comments for e in x["reactions"] for u in e["users"]}
+        | {a["data"].get("by") for a in acts} | {u["id"] for x in comments for e in x["reactions"] for u in e["users"]} \
+        | {x["reply"]["user_id"] for x in comments if x.get("reply")}
     seen = c.execute("SELECT seen_id FROM task_seen WHERE user_id=? AND task_id=?", (me(), tid)).fetchone()
     ag = agent_ids(c)
     ppl = task_people(c, t["list_id"]) if collab_all() else []
@@ -152,10 +155,15 @@ def comment_input():
     """(text, files) from a JSON body or a multipart form (comment with files)."""
     from ..personal.timetrack import web_fields
     if request.files or request.form:
-        web_fields({k: 1 for k in [*request.form, *request.files]}, {"body", "file"}, "POST /api/tasks/{tid}/comments (form)")
+        web_fields({k: 1 for k in [*request.form, *request.files]}, {"body", "file", "reply_to"}, "POST /api/tasks/{tid}/comments (form)")
         return (request.form.get("body") or "").strip(), [f for f in request.files.getlist("file") if f and f.filename]
     web_fields(body(), WEB_COMMENT, "POST /api/tasks/{tid}/comments")
     return (body().get("body") or "").strip(), []
+
+
+def comment_reply_in():
+    """2.33.0 (#1076): reply_to of a JSON body or a multipart form."""
+    return request.form.get("reply_to") if (request.files or request.form) else body().get("reply_to")
 
 
 @app.post("/api/tasks/<int:tid>/comments")
@@ -180,6 +188,10 @@ def comment_create(tid):
     if not text and not files:
         return err(tr("The comment is empty"))
     text, mentions = clean_mentions(c, t["list_id"], text) if collab_all() else (text, [])
+    try:  # 2.33.0 (#1076): a reply to a comment of the same task (else 400)
+        orig = reply_check(c, "c", comment_reply_in(), task_id=tid)
+    except BadInput as e:
+        return err(str(e))
     sug = body().get("suggestion") if not (request.files or request.form) else None
     if isinstance(sug, dict) and sug.get("kind") == "merge_request":  # 2.2.0 (#339): "ready to merge" of a coding agent
         if not is_agent(g.user):
@@ -213,9 +225,10 @@ def comment_create(tid):
             sug = {**clean_suggestion(c, t, sug), "state": "open"}
         except BadInput as e:
             return err(str(e))
-    cid = c.execute("INSERT INTO comments(task_id,user_id,body,mentions,created_at,suggestion) VALUES(?,?,?,?,?,?)",
+    cid = c.execute("INSERT INTO comments(task_id,user_id,body,mentions,created_at,suggestion,reply_to) VALUES(?,?,?,?,?,?,?)",
                     (tid, me(), text, ",".join(map(str, mentions)), iso_ms(now_utc()),
-                     json.dumps(sug, ensure_ascii=False) if sug else None)).lastrowid
+                     json.dumps(sug, ensure_ascii=False) if sug else None, orig["id"] if orig else None)).lastrowid
+    replied = orig["user_id"] if orig and orig["user_id"] != me() else None
     if sug and sug.get("kind") == "merge_request":
         git_merge_link(c, t, sug)
     saved = []
@@ -226,15 +239,15 @@ def comment_create(tid):
         return err(e)
     c.execute("INSERT INTO task_seen(user_id,task_id,seen_id) VALUES(?,?,?) "
               "ON CONFLICT(user_id,task_id) DO UPDATE SET seen_id=MAX(seen_id, excluded.seen_id)", (me(), tid, cid))
-    pushes = comment_pushes(c, t, cid, text, mentions, mentions, len(files)) if collab_all() else []
-    if collab_all():
-        agent_comment_events(c, t, cid, mentions, mentions)
+    pushes = comment_pushes(c, t, cid, text, mentions, mentions, len(files), replied=replied) if collab_all() else []
+    if collab_all():  # 2.33.0 (#1076): an agent whose comment is answered hears it like a mention
+        agent_comment_events(c, t, cid, mentions, mentions + ([replied] if replied and replied not in mentions else []))
     wh_note(c, tid, "comment", cid=cid)
     bump(c)
     c.commit()
     send_pushes(pushes)
     r = c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone()
-    return jsonify(with_reactions(c, [comment_dict(r, att_dicts(c, "comment_id=?", (cid,)))])[0])
+    return jsonify(with_replies(c, "c", with_reactions(c, [comment_dict(r, att_dicts(c, "comment_id=?", (cid,)))]))[0])
 
 
 @app.patch("/api/comments/<int:cid>")
@@ -267,8 +280,8 @@ def comment_update(cid):
     bump(c)
     c.commit()
     send_pushes(pushes)
-    return jsonify(with_reactions(c, [comment_dict(c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone(),
-                                                   att_dicts(c, "comment_id=?", (cid,)))])[0])
+    return jsonify(with_replies(c, "c", with_reactions(c, [comment_dict(c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone(),
+                                                                         att_dicts(c, "comment_id=?", (cid,)))]))[0])
 
 
 @app.delete("/api/comments/<int:cid>")
@@ -330,14 +343,15 @@ def lang_of(s):
     return s.get("lang") if s.get("lang") in LANGS else "en"
 
 
-def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None):
+def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None, replied=None):
     """Decides who gets a push for this comment (burst state updated in c, caller commits).
-    Returns [(user id, title, message, click, priority)] to send after the commit."""
+    Returns [(user id, title, message, click, priority)] to send after the commit.
+    2.33.0 (#1076): replied = the author of the answered comment: "replied to your message", counted like a mention."""
     from ..collab.news import agent_push_ok, bell_all_users, news_add, notif_ok
     from ..notify.push import push_prio, push_reachable
     from ..agents.core import agent_ids
     author = me()
-    ids = {t["assignee_id"], t["created_by"]} | set(notify_mentions)
+    ids = {t["assignee_id"], t["created_by"]} | set(notify_mentions) | ({replied} if replied else set())
     before = {r[0] for r in c.execute("SELECT DISTINCT user_id FROM comments WHERE task_id=? AND deleted_at IS NULL AND id<?",
                                       (t["id"], cid))}
     ids |= before
@@ -362,13 +376,14 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
             continue
         if "comments" not in (s.get("features") or "").split(","):  # 2.0.6: comments off -> no comment News / pushes
             continue
-        mentioned = uid in notify_mentions
+        mentioned = uid in notify_mentions or uid == replied
         # 2.1.0 (#317): which event of the notification settings this comment is for uid (first match)
         row = "mention" if mentioned else "comment" if uid in (t["assignee_id"], t["created_by"]) else \
             "reply" if uid == prev else "follow"
         # 2.28.0 (#987): a reply to my comment (the one right before) is marked: it counts as "For you" in the News
-        news_add(c, uid, "mention" if mentioned else "comment", task_id=t["id"], comment_id=cid, actor=author, row=row, s=s,
-                 data={"reply": 1} if uid == prev and not mentioned else None)
+        ment = uid in notify_mentions
+        news_add(c, uid, "mention" if ment else "comment", task_id=t["id"], comment_id=cid, actor=author, row=row, s=s,
+                 data={"reply": 1} if not ment and (uid == prev or uid == replied) else None)
         if not notif_ok(c, uid, s, row, "push", t["list_id"]) or not push_reachable(c, uid, s) or \
                 not burst_gate(c, uid, t["id"], mentioned=mentioned):
             continue
@@ -377,7 +392,8 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
         lg = lang_of(s)
         what = snippet or trn("{0} file", "{0} files", nfiles, lg=lg)
         who = names.get(author, "?")
-        msg = tr("{0} mentioned you: {1}", who, what, lg=lg) if mentioned else tr("{0} commented: {1}", who, what, lg=lg)
+        msg = tr("{0} mentioned you: {1}", who, what, lg=lg) if uid in notify_mentions else \
+            tr("{0} replied to your message: {1}", who, what, lg=lg) if uid == replied else tr("{0} commented: {1}", who, what, lg=lg)
         out.append((uid, t["title"], msg, f"{PUBLIC_URL}/#t/{t['id']}", push_prio(s), comment_push_extra(t, lg)))
     return out
 

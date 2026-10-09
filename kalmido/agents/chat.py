@@ -116,8 +116,15 @@ def chat_dict(r, rx=None, files=None, api=False, newest=None):
             # choices.expires_at; choice_state open | answered | expired (a newer message came, the time ran out) | withdrawn
             "choices": ch, "choice": ans, "choice_state": choice_state(r, ch, ans, newest),
             "job_id": r["job_id"] if "job_id" in r.keys() else None,  # 2.32.0 (#1081): the job whose result this is
+            **chat_reply(r),  # 2.33.0 (#1076): reply_to + reply (the quote of the answered message)
             "attachments": [{**f, "url": (f"/api/v1/chat-attachments/{f['id']}" if api else f"/api/chat-files/{f['id']}")}
                             for f in (files or {}).get(r["id"], [])]}
+
+
+def chat_reply(r):
+    from ..collab.replies import reply_quotes
+    rt = r["reply_to"] if "reply_to" in r.keys() else None
+    return {"reply_to": rt, "reply": reply_quotes(db(), "a", [rt]).get(rt) if rt else None}
 
 
 # ---- 2.30.0 (#1037): only the newest question's buttons are live. An agent message's buttons expire as soon as a newer
@@ -409,8 +416,13 @@ def chat_post(c, aid, uid, sender, b, files, allowed_keys=("body", "task_id")):
     else:
         text = chat_body(text)
     tid = chat_task(c, b.get("task_id"), uid, aid)
+    from ..collab.replies import reply_check
+    orig = reply_check(c, "a", b.get("reply_to"), agent_id=aid, user_id=uid)  # 2.33.0 (#1076): the same conversation (else 400)
     choices = chat_choices_clean(b.get("choices"), b.get("multi"), b.get("permission"), b.get("expires_in")) if sender == "agent" else None
     r = chat_add(c, aid, uid, sender, text, tid, choices)
+    if orig:
+        c.execute("UPDATE agent_chat SET reply_to=? WHERE id=?", (orig["id"], r["id"]))
+        r = c.execute("SELECT * FROM agent_chat WHERE id=?", (r["id"],)).fetchone()
     if files:
         saved = []
         try:
@@ -635,7 +647,7 @@ def agent_chat_post(aid):
     if not agent_active(a):
         return err(tr("This agent is paused"), 409)
     try:
-        fb, files = chat_input(("body", "task_id"))
+        fb, files = chat_input(("body", "task_id", "reply_to"))
         r = chat_post(c, aid, me(), "user", fb if fb is not None else body(), files)
     except UnknownFields as e:
         return err(str(e))

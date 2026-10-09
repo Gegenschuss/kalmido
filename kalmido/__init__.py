@@ -33,6 +33,7 @@ ORDER = (
     "tasks.attachments",
     "integrations.paperless",
     "tasks.batch",
+    "collab.replies",  # 2.33.0 (#1076): before comments / teamchat / agents.chat (they import it)
     "collab.comments",
     "collab.news",
     "personal.habits",
@@ -56,6 +57,7 @@ ORDER = (
     "calendars.subscriptions",
     "admin.backup",
     "api.v1",
+    "notify.caps",  # 2.33.0 (#927)
     "tasks.dayplan",
     "api.openapi",
     "integrations.webhooks",
@@ -63,6 +65,7 @@ ORDER = (
     "collab.reactions",
     "agents.chat",
     "agents.steps",  # 2.32.0 (#1081 / #1079)
+    "agents.quota",  # 2.33.0 (#1045)
     "agents.admin",
     "agents.api",
     "agents.proposals",
@@ -71,11 +74,13 @@ ORDER = (
     "agents.usage",
     "lists.public",
     "integrations.git",
+    "integrations.gitfolder",  # 2.33.0 (#934)
     "integrations.errorreports",
     "api.projects",
     "api.scopes",
     "collab.notes",
     "collab.teamchat",
+    "collab.msgsearch",  # 2.33.0 (#1080)
     "integrations.mail",
     "accounts.invite",
     "family.family",
@@ -102,6 +107,7 @@ ORDER = (
     "team.v1",
     "accounts.signup",
     "admin.hosting",
+    "admin.clientip",  # 2.33.0 (#834)
     "startup",
 )
 MODULES = [importlib.import_module(f"{__name__}.{m}") for m in ORDER]

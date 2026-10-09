@@ -594,7 +594,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `runtime_changed` | 2.4.1: an admin changed the agent's [runtime settings](#runtime-settings) | `runtime` |
 | `reset` | 2.4.1: an admin pressed *Reset now*: the host should restart the agent with a fresh session | `reset_seq`, `runtime`, `user` |
 | `ping` | the "Send test" button in the admin settings | `message` |
-| `team_message` | 2.17.0: someone @mentions the agent in a list's team chat (the agent is a member of the channel of every list shared with it) | `room` `{id, kind, list_id}`, `message` `{id, text, user_id, task_id, created_at}`, `user` `{id, name}`; answer with `POST /team/rooms/{id}/messages` (MCP `post_team_message`) |
+| `team_message` | 2.17.0: someone @mentions the agent in a list's team chat (the agent is a member of the channel of every list shared with it) | `room` `{id, kind, list_id}`, `message` `{id, text, user_id, task_id, created_at, reply_to, reply}`, `user` `{id, name}`; 2.33.0: also when someone answers one of the agent's channel messages (`reply_to`, see [Replies](#replies-to-one-message-2330)); answer with `POST /team/rooms/{id}/messages` (MCP `post_team_message`) |
 | `job_request` | 2.3.0: a person asks the agent for a proposal ([Proposals](#proposals)) | `job` (kind, `proposal_state`), `kind`, `input` (exactly what the person sent), `limits`, `requested_by` `{id, name}` |
 | `task_added` | 2.23.0 (#795): a top-level task was created in, or moved into, a list shared with the agent (not for its own tasks); 2.30.0: only when the agent [listens in](#agent-listens-in-2300) there | `task`, `list`, `how`: `created` or `moved`, `moved_from` `{id, name}` (only when the agent sees that list), `source`: `form`, `mail`, `errors`, `proposal` (when not made in the app) |
 | `chat_choice` | 2.28.0 (#1005): the person pressed an answer button of one of the agent's chat messages (see *Answer buttons*); 2.30.0: also a 👍 / 👎 on a permission question | `message_id`, `choice_ids`, `labels`, `message`, `user` `{id, name}`; + `task`, `list` when the message was about a task; permission questions: `permission: true`, `approval`, `via`: `button` or `reaction` |
@@ -899,6 +899,29 @@ order), `data.labels`, `data.message` (the whole message), `data.user` and, when
 as in a chat event. Only the chat's person answers (the web app, or `POST /api/v1/agents/{agent_id}/chat/{message_id}/choice
 {"choice_ids": [...]}` with their own token), once per message; agents never. Do not ask the same question twice: the
 answer may take a while, and an unanswered question stays answerable.
+
+### Replies to one message (2.33.0)
+
+A comment, a team chat message and a chat message may answer ONE earlier message of the same place (the same task, the
+same team conversation, the same chat between a person and the agent): the field `reply_to` (its id) when writing, and on
+every message `reply_to` + `reply`, a short quote of the original:
+
+```
+{"id": 812, "deleted": false, "user_id": 3, "name": "Bob", "text": "Should the notes mention the new search?", "from": "user"}
+```
+
+`text` is plain text (Markdown out, mentions as @name), at most 140 characters; `from` (`user` | `agent`) only in the
+agent chat; an original that is gone (deleted, or trimmed from a long chat) comes as `{"id": …, "deleted": true}`.
+A `reply_to` of another place, an unknown id or a deleted message is refused with 400.
+
+- **Read it**: when a person answers an older message, the event carries the quote (`chat`: `message.reply`; `comment` /
+  `mention`: `comment.reply`; `team_message`: `message.reply`). Answer what the person answered, not only the newest topic.
+- **Write it**: `POST /api/v1/agent/chats/{user_id}` `{"body": "...", "reply_to": 1234}` (MCP `send_chat` `reply_to`),
+  `POST /api/v1/tasks/{id}/comments` `{"body": "...", "reply_to": 812}` (`add_comment`), `POST /api/v1/team/rooms/{id}/messages`
+  (`post_team_message`). Use it when you answer one message out of several, not on every answer.
+- **Notifications**: the author of the original gets a push "... replied to your message" (it counts like an @mention in
+  the notification settings); an agent whose comment or channel message is answered gets the event `mention` /
+  `team_message`, like an @mention.
 
 ### Chat reactions and delivery (2.7.2)
 
@@ -1207,6 +1230,13 @@ Read-only helpers for an agent's own planning: `GET /api/v1/dayplan?date=&mode=`
 `GET /api/v1/dayplan/review?date=` (MCP `get_day_review`) return the built-in plan and the daily review of the token's
 user.
 
+## Notification templates (2.33.0)
+
+The owner of a shared list (or folder) decides how much the other people in it are notified at most: `read`, `work`,
+`all` or `custom`. It only limits pushes to people; agents get their events as before. An agent can read the setting of
+a list it is in with `GET /api/v1/lists/{id}/notify-template` (what applies to it, and who set it) but never change it:
+there is no write route in the API, and the app refuses agents.
+
 ## Groups (2.10.0)
 
 Admins create groups of people (Settings > Administration > Groups; optionally their members follow a sign-in group of
@@ -1250,8 +1280,8 @@ panel shows *Agent usage* on tasks with reports (only to people who see the task
 - *Soft limit*: the admins get a News item and a push (notification event *An agent reached a usage limit*) at 80 % and
   100 %, each once per period.
 - *Hard limit*: the admins are told too, and from then on every API call of the agent gets **429** with a clear message
-  and `Retry-After` (seconds until the period ends), except `POST` / `GET /agent/usage`, `PUT /agent/status` and
-  `GET /agent`. People see the agent as *limit reached*. It ends when the period rolls over or an admin raises the limit.
+  and `Retry-After` (seconds until the period ends), except `POST` / `GET /agent/usage`, `PUT /agent/status`,
+  `/agent/quota` (2.33.0) and `GET /agent`. People see the agent as *limit reached*. It ends when the period rolls over or an admin raises the limit.
   `GET /agent` has `usage_limit` (the same object as `limit` above) so the agent can check where it stands.
 
 ### Claude Code: report usage automatically
@@ -1289,6 +1319,67 @@ KALMIDO_TOKEN=abk_...
 Try it first with `--dry-run` (prints the reports, sends nothing):
 `echo '{"session_id": "x", "transcript_path": "/path/to/session.jsonl"}' | python3 mcp/claude_usage_hook.py --dry-run`
 (a subagent: `{"hook_event_name": "SubagentStop", "session_id": "x", "agent_id": "a1", "agent_transcript_path": "/path/to/agent.jsonl"}`).
+
+### Plan usage: the ring in the chat header (2.33.0)
+
+Many agents run on a plan with quota windows (a Claude plan: 5 hours and a week). The agent's host reports where it
+stands; people who may chat with the agent (everyone it shares a list with) see a small **ring right of its name** in
+the chat header. It fills with the **main window** (the week): accent colour, **yellow from 75 %**, **red from the
+agent's own limit** (no limit: 100 %) with *paused until <reset of the main window>* under the name. A report older than
+24 hours turns the ring grey; without any report there is no ring. Hover, keyboard focus or a tap lists every window
+with its percentage and reset time (in the date format of the viewer's language, e.g. `09.10.2026 14:00`). A window
+whose reset time has passed counts as 0 %.
+
+```
+PUT /api/v1/agent/quota  {"windows": [{"label": "Week", "percent": 41.2, "resets_at": "2026-10-14T09:00:00+02:00", "main": true},
+                                      {"label": "5 hours", "percent": 23.5, "resets_at": 1791802800}],
+                          "limit": 90}                                    (optional, 1-100: your pause limit)
+  or                     {"rate_limits": {…exactly as Claude Code's status line gives it…}, "limit": 90}
+  -> 200 {"quota": {windows: [{key, label, percent, resets_at, reset_passed}], main, limit, at, stale,
+                    level: ok | warn | over, percent, paused_until}}
+GET    /api/v1/agent/quota   -> {"quota": … | null}
+DELETE /api/v1/agent/quota   -> {"quota": null}      (the ring disappears; so does a PUT with no windows)
+```
+
+At most 6 windows, labels up to 40 characters; `resets_at` is ISO 8601 with a time zone or Unix epoch seconds; without
+`main` the first window fills the ring. Add `measured_at` (same formats, default: now) when you relay values that were
+read earlier, e.g. from a file a status line wrote: the ring greys out 24 h after that time, never after the relay. A
+report replaces the previous one: send all windows each time. Report after
+every run or job (more often is fine; people's apps reload only when something visible changes). `GET /api/v1/agent`
+and the agents list carry the same object as `quota`. MCP: `report_plan_usage`, `get_plan_usage`, `clear_plan_usage`.
+
+**Claude Code.** Its status line command gets the session data as JSON on stdin; for Pro / Max plans (and behind a
+gateway with spend limits) it contains `rate_limits` after the first answer of the session:
+
+```json
+{"rate_limits": {"five_hour": {"used_percentage": 23.5, "resets_at": 1738425600},
+                 "seven_day": {"used_percentage": 41.2, "resets_at": 1738857600}}}
+```
+
+Send that object as it is; Kalmido names the windows *5 hours*, *Week* and *Spend limit* (`spend_limit`) in the viewer's
+language and fills the ring with the week. A status line script that prints a short line and reports at most every 5
+minutes (`statusLine` in `.claude/settings.json`: `{"type": "command", "command": "~/agent/bin/statusline.sh"}`):
+
+```bash
+#!/bin/sh
+# ~/agent/bin/statusline.sh -- reads the status line JSON, reports rate_limits to Kalmido (at most every 5 minutes)
+. ~/.config/kalmido/agent.env          # KALMIDO_URL, KALMIDO_TOKEN (never print them)
+in=$(cat)
+rl=$(printf '%s' "$in" | jq -c '.rate_limits // empty')
+stamp=~/.cache/kalmido-quota.stamp
+if [ -n "$rl" ] && [ -z "$(find "$stamp" -mmin -5 2>/dev/null)" ]; then
+  touch "$stamp"
+  # the token goes through --config on stdin, never on the command line (visible in the process list)
+  printf 'header = "Authorization: Bearer %s"\n' "$KALMIDO_TOKEN" | curl -fsS -m 10 --config - -X PUT \
+    "$KALMIDO_URL/api/v1/agent/quota" -H 'Content-Type: application/json' \
+    --data-binary "{\"rate_limits\": $rl, \"limit\": 90}" >/dev/null 2>&1 &
+fi
+printf '%s' "$in" | jq -r '"\(.model.display_name) · week \(.rate_limits.seven_day.used_percentage // "-")%"'
+```
+
+The status line runs only in interactive sessions. A host that runs the agent headless (`claude -p`) reports from its own
+bookkeeping instead, e.g. the values an interactive status line saved to a file last, with `windows` or `rate_limits`
+after each run. Agents on the same plan report the same values.
 
 ## Audit log
 
@@ -1509,7 +1600,7 @@ with the scope it needs). The tools:
   `share_list_with_group`, `unshare_list_from_group`, `list_folders`, `rename_folder`, `delete_folder`
 - sections: `list_sections`, `create_section`, `rename_section`, `reorder_sections`, `delete_section`
 - tasks: `list_tasks` (`compact: true` for a short form; without it, pages of more than 25 tasks come back compact),
-  `search_tasks`, `get_task`, `create_task`, `update_task`, `complete_task`, `reopen_task`, `delete_task`,
+  `search_tasks`, `search_messages` (2.33.0: comments, team chat, your chats), `get_task`, `create_task`, `update_task`, `complete_task`, `reopen_task`, `delete_task`,
   `move_task` (list / section / parent + `before_id` / `after_id` / `position`), `batch_tasks`, `skip_occurrence`,
   `take_task`, `list_subtasks`, `add_subtask`, `list_trash`, `restore_task`, `empty_trash`, `list_tags`, `get_roadmap`
 - dependencies and fields: `get_dependencies`, `add_dependency`, `remove_dependency`, `list_fields`, `create_field`,
@@ -1595,7 +1686,21 @@ own chat.
 |---|---|---|
 | `GET /team/rooms` | `list_team_chats` | read |
 | `GET /team/rooms/{id}/messages?before=&limit=` | `read_team_chat` | read |
-| `POST /team/rooms/{id}/messages` `{body, task_id?}` (mentions as `<@user id>`) | `post_team_message` | comments |
+| `POST /team/rooms/{id}/messages` `{body, task_id?, reply_to?}` (mentions as `<@user id>`; 2.33.0 `reply_to`: a message of the same conversation) | `post_team_message` | comments |
 | `PATCH /team/messages/{id}` · `DELETE …` (own messages) | `edit_team_message` · `delete_team_message` | comments |
 | `POST /team/messages/{id}/reactions` `{emoji, on?}` | `react_team_message` | comments |
 | `POST /team/rooms/{id}/read` `{last_id?}` | `mark_team_chat_read` | comments |
+
+**Searching conversations (2.33.0)**: `GET /search?scope=messages&q=…` (MCP `search_messages`, scope read) finds words in
+the comments of the tasks of your lists, in the channels of those lists and in your own chats with people -- never in
+direct messages between people and never in another agent's chats. Words match word beginnings; case, accents and ä / ae
+do not matter. Filters: `art` (`c` comments, `t` team chat, `a` your chats, comma-separated), `sender` (user id), `room`,
+`task`, `agent` (for an agent: the person of the chat; MCP `chat_with`). Newest first, pages with `limit` + `cursor`. A hit
+names its place (`task_id` / `room_id` / `user_id`) and carries a plain-text `snippet` with `marks` (`[start, end)` of the
+hits); read the whole conversation with `get_task` / `read_team_chat` / `list_chats`. Use it when someone refers to
+something said earlier ("as we discussed about the invoice") instead of paging through old messages.
+
+```bash
+curl -s -H "Authorization: Bearer $KALMIDO_TOKEN" \
+  "$KALMIDO_URL/api/v1/search?scope=messages&q=invoice%20dishwasher&art=c,t&limit=10"
+```

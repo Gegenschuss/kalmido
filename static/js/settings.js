@@ -554,7 +554,20 @@ function hostHtml(hint) {
     <h4 id="s-maillim-h">${tr('E-mails per day')}</h4>
     ${hint(tr('Invitations and new sign-in links a person can have sent per day (at most 5 a day go to one address). Over the limit the link is shown to copy instead.'))}
     <div class="row"><label for="s-maillim">${tr('Per account and day')}</label><input id="s-maillim" inputmode="numeric" class="numin" value="${esc(String(a.mail_day_limit || 30))}"></div>
-    ${a.hosted ? `<div class="shint keep">${ic('alert', 's')} ${tr('Hosted server (KALMIDO_HOSTED): integrations only reach public HTTPS addresses.')}</div>` : ''}`;
+    ${a.hosted ? `<div class="shint keep">${ic('alert', 's')} ${tr('Hosted server (KALMIDO_HOSTED): integrations only reach public HTTPS addresses.')}</div>` : ''}
+    <h4 id="s-ip-h">${tr('Your IP')}</h4><div id="s-ipbox" aria-labelledby="s-ip-h"><div class="muted mhint">${tr('Loading…')}</div></div>${(setTimeout(ipFill, 0), '')}`;
+}
+// 2.33.0 (#834): the address the server sees for me (self-test behind a reverse proxy) and the warning when many accounts
+// sign in from one private address (the proxy does not pass the client's address on)
+async function ipFill() {
+  const box = $('#s-ipbox'); if (!box || box._busy) return;
+  box._busy = true;
+  let j; try { j = await api('GET', '/api/admin/client-ip'); } catch { box.innerHTML = ''; return; } finally { box._busy = false; }
+  if (!box.isConnected) return;
+  const warn = j.warning ? `<div class="shint keep ipwarn" role="alert">${ic('alert', 's')} <span><b>${esc(tr('Client addresses do not arrive – check the proxy'))}</b><br>${esc(tr('{0} of {1} accounts signed in from the one private address {2} in the last 7 days. The sign-in lockout then hits everyone at once. Run the reverse proxy with network_mode: host (or "userland-proxy": false) and set KALMIDO_TRUSTED_PROXIES, see the self-hosting guide.', j.warning.accounts, j.warning.total, j.warning.ip))}</span></div>` : '';
+  box.innerHTML = `<div class="row"><label>${tr('As the server sees it')}</label><code class="ipv">${esc(j.ip || '?')}</code>${j.private ? ` <span class="muted">${esc(tr('private address'))}</span>` : ''}</div>
+    ${j.via_proxy ? `<div class="row"><label>${tr('Via proxy')}</label><code class="ipv">${esc(j.peer)}</code> <span class="muted">${esc(j.peer_trusted ? tr('trusted (KALMIDO_TRUSTED_PROXIES)') : tr('not trusted'))}</span></div>` : ''}
+    <div class="shint">${esc(tr('Compare it with your device’s address on the internet. If it shows a private address like 172.x.0.1 while you are outside, the reverse proxy hides the client addresses.'))}</div>${warn}`;
 }
 async function hostSave(md, patch, label) {
   try { const j = await api('PATCH', '/api/admin/settings', patch); S.about = {...S.about, ...j}; toast(label); return true; }

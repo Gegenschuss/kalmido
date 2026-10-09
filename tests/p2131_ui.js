@@ -55,8 +55,8 @@ const form = (fields, files) => { const fd = new FormData(); for (const [k, v] o
     const tag = mobile ? 'phone' : 'desktop';
     const w = await boot({user: 'alice', mobile, hash: mobile ? 'agents/' + AG : 'l/' + L}), d = w.document;
     if (!mobile) w.eval(`chatOpen(${AG})`);
-    await until(() => d.querySelector(`#chat-msgs .cmsg[data-mid="${M2.id}"]`));
-    const mine = d.querySelector(`#chat-msgs .cmsg[data-mid="${M1.id}"]`), theirs = d.querySelector(`#chat-msgs .cmsg[data-mid="${M2.id}"]`);
+    await until(() => d.querySelector(`#chat-msgs .cmsg[data-mid="a:${M2.id}"]`));
+    const mine = d.querySelector(`#chat-msgs .cmsg[data-mid="a:${M1.id}"]`), theirs = d.querySelector(`#chat-msgs .cmsg[data-mid="a:${M2.id}"]`);
     check(mine?.querySelector('.chatts .att.img img')?.getAttribute('src').startsWith(`/api/chat-files/${M1.attachments[0].id}?v=`)
       && /log\.txt/.test(mine.querySelector('.chatts .att.file')?.textContent || ''), `${tag}: my image as thumbnail, the text file as tile`);
     check(mine.querySelectorAll('[data-act="chat-file-rm"]').length === 2 && theirs && !theirs.querySelector('[data-act="chat-file-rm"]')
@@ -82,10 +82,10 @@ const form = (fields, files) => { const fd = new FormData(); for (const [k, v] o
     const w = await boot({user: 'alice', hash: 'l/' + L}), d = w.document;
     w.confirm = () => true;
     w.eval(`chatOpen(${AG})`);
-    await until(() => d.querySelector(`#chat-msgs .cmsg[data-mid="${M1.id}"] [data-act="chat-file-rm"]`));
-    click(w, d.querySelector(`#chat-msgs .cmsg[data-mid="${M1.id}"] [data-act="chat-file-rm"][data-fid="${M1.attachments[1].id}"]`));
-    await until(() => d.querySelectorAll(`#chat-msgs .cmsg[data-mid="${M1.id}"] .chatts .att`).length === 1);
-    check(d.querySelectorAll(`#chat-msgs .cmsg[data-mid="${M1.id}"] .chatts .att`).length === 1, 'remove: the file goes, the message stays');
+    await until(() => d.querySelector(`#chat-msgs .cmsg[data-mid="a:${M1.id}"] [data-act="chat-file-rm"]`));
+    click(w, d.querySelector(`#chat-msgs .cmsg[data-mid="a:${M1.id}"] [data-act="chat-file-rm"][data-fid="${M1.attachments[1].id}"]`));
+    await until(() => d.querySelectorAll(`#chat-msgs .cmsg[data-mid="a:${M1.id}"] .chatts .att`).length === 1);
+    check(d.querySelectorAll(`#chat-msgs .cmsg[data-mid="a:${M1.id}"] .chatts .att`).length === 1, 'remove: the file goes, the message stays');
     check((await call('GET', `/api/agents/${AG}/chat`)).messages.find(m => m.id === M1.id).attachments.length === 1, 'remove: gone on the server');
     // #469: the rules block in both guides
     const tpl = fs.readFileSync(path.join(__dirname, '..', 'mcp', 'CLAUDE.template.md'), 'utf8');
@@ -159,7 +159,7 @@ const form = (fields, files) => { const fd = new FormData(); for (const [k, v] o
       for (let i = 0; i < 30; i++) { const ms = (await call('GET', `/api/agents/${AG}/chat`)).messages; if (ms.length > n0) { last = ms[ms.length - 1]; break; } await sleep(200); }
       check(last && last.body === `Pasted and dropped ${vw}` && last.attachments.map(a => a.name).join() === 'pasted.png,dropped.txt', `${vw}px: sent as one message with both files ${JSON.stringify(last && {b: last.body, a: last.attachments.map(a => a.name)})}`);
       await sleep(600);
-      const after = await ev(`(() => ({box: document.querySelectorAll('#chat-files .cfile').length, val: document.querySelector('#chat-in').value, row: !!document.querySelector('#chat-msgs .cmsg[data-mid="${last?.id}"] .chatts img')}))()`);
+      const after = await ev(`(() => ({box: document.querySelectorAll('#chat-files .cfile').length, val: document.querySelector('#chat-in').value, row: !!document.querySelector('#chat-msgs .cmsg[data-mid="a:${last?.id}"] .chatts img')}))()`);
       check(after.box === 0 && after.val === '' && after.row, `${vw}px: box emptied, the message shows its thumbnail ${JSON.stringify(after)}`);
       // the file input path
       const fi = await ev(`(() => { const i = document.querySelector('#chat-file'); const dt = new DataTransfer(); dt.items.add(new File(['x'], 'picked.txt', {type: 'text/plain'})); i.files = dt.files; i.dispatchEvent(new Event('change', {bubbles: true})); return document.querySelector('#chat-files').textContent; })()`);

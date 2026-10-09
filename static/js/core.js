@@ -517,6 +517,7 @@ function applyState(j) {
   S.peopleVis = j.people_visibility || 'all';  // 2.22.0 (#752)
   S.instanceMode = j.instance_mode || 'organisation';
   S.workspaces = !!j.workspaces; S.wsMismatches = j.ws_mismatches || {};  // 2.28.0 (#935)
+  S.notifAsk = j.notif_ask || [];  // 2.33.0 (#927): the one-time question about notification templates
   S.storage = j.storage || null; S.announce = j.announce || null;  // 2.24.0 (#910 / #907)  // 2.23.0 (#799): organisation | shared | multi
   S.clients = j.clients || [];  // 2.23.0 (#463): the clients I see, with their lists
   if (S.booted && S.route?.mod === 'clients') clReload();  // a change elsewhere: the client's sums again

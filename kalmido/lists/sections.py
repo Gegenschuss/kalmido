@@ -119,6 +119,10 @@ def folder_rename():
     for fp in c.execute("SELECT folder, user_id FROM folder_people WHERE owner_id=?", (uid,)).fetchall():  # 2.22.0 (#740)
         if folder_under(fp[0], old):
             c.execute("UPDATE OR REPLACE folder_people SET folder=? WHERE owner_id=? AND folder=? AND user_id=?", (new + fp[0][len(old):], uid, fp[0], fp[1]))
+    from ..notify.caps import folder_tpl_rename
+    folder_tpl_rename(c, uid, old, new)  # 2.33.0 (#927): the folder's notification templates go along
+    from ..integrations.gitfolder import gf_rename
+    gf_rename(c, uid, old, new)  # 2.33.0 (#934): the folder's repositories go along
     bump(c)
     c.commit()
     return jsonify(ok=True)
@@ -143,6 +147,8 @@ def folder_delete():
             return (parent + FOLDER_SEP + rest) if parent else rest
         return p
     _folder_move(c, uid, lambda p: "" if up(p) == "\0" else up(p))
+    from ..integrations.gitfolder import gf_folder_removed
+    gf_folder_removed(c, uid, lambda p: "" if up(p) == "\0" else up(p))  # 2.33.0 (#934): its repositories go to the parent folder
     c.execute("DELETE FROM folder_people WHERE owner_id=? AND folder=?", (uid, name))  # 2.22.0 (#740): the folder is gone
     bump(c)
     c.commit()

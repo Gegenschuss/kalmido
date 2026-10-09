@@ -613,3 +613,15 @@ document.addEventListener('click', e => { if (Date.now() - dswAt < 400 && e.targ
 document.addEventListener('touchend', () => { dswOff(); dswEnd(); });
 document.addEventListener('touchcancel', () => { dswOff(); if (dsw?.lock === 'x') { dsw.d.classList.remove('dswipe'); dswMove(dsw.d, 0, true); } dsw = null; });
 
+
+// ---- 2.33.0 (#1087): iPhone: the focus in the comment box made iOS pan the page up by the keyboard (visualViewport.offsetTop
+// ~310 px) to reveal the box -- the task panel is fixed to the layout viewport, so its header went out of sight above. While
+// a real keyboard is up, the page is panned (offsetTop > 0) and the focus is in the task panel's bottom box, the panel itself
+// sits exactly in the visible part (top --vvt, height --vvh, like the phone chat, #478 N8): header at the top, the box right
+// above the keyboard (it is visible then, vvPin leaves it alone). Android (the layout shrinks, offsetTop 0) never gets it.
+function detailKbFit(kb) {
+  const d = $('#detail'); if (!d) return;
+  const vv = window.visualViewport, a = document.activeElement;
+  const on = !!(kb && vv && vv.offsetTop > 1 && isMobile() && editFocused() && a?.closest?.('#detail .dbot'));
+  if (d.classList.contains('vvfix') !== on) d.classList.toggle('vvfix', on);
+}

@@ -193,12 +193,12 @@ const BASE = 'cal,comments,collab,time,progress,agents';
   check((await call('POST', `/api/team/messages/${MA}/reactions`, {emoji: 'up'})).status === 400, '#823: no reaction on my own message (400)');
   check((await call('POST', `/api/team/messages/${MA}/reactions`, {emoji: 'heart'}, BCK)).status === 200, '#823: Bob reacts to mine');
   w = await boot({user: 'alice', hash: `team/${RID}`}); d = w.document;
-  await until(() => d.querySelector(`#view .cmsg[data-mid="${MA}"]`), 60);
-  const mine = d.querySelector(`#view .cmsg[data-mid="${MA}"]`), his = d.querySelector(`#view .cmsg[data-mid="${MB}"]`);
+  await until(() => d.querySelector(`#view .cmsg[data-mid="t:${MA}"]`), 60);
+  const mine = d.querySelector(`#view .cmsg[data-mid="t:${MA}"]`), his = d.querySelector(`#view .cmsg[data-mid="t:${MB}"]`);
   check(mine && !mine.querySelector('.rx:not([disabled]):not([data-act="tc-msg-menu"])') && mine.querySelector('.rx[disabled]')?.textContent.includes('❤'), '#823: my message: only Bob\'s heart, read-only ' + mine?.querySelector('.cmeta')?.innerHTML.slice(0, 200));
   check(his && his.querySelector('.rxtog') && his.querySelectorAll('.rx.rxq').length >= 3, '#823: Bob\'s message: the smiley and the hidden quick reactions');
   click(w, his.querySelector('.rxtog')); await sleep(150);
-  check(d.querySelector(`#view .cmsg[data-mid="${MB}"]`).classList.contains('rxshow'), '#823: the smiley opens them');
+  check(d.querySelector(`#view .cmsg[data-mid="t:${MB}"]`).classList.contains('rxshow'), '#823: the smiley opens them');
   w.close();
 
   // ================= #824: an agent at work (for the Firefox pictures: the dot at the tab, the "More" menu)
@@ -265,7 +265,7 @@ const BASE = 'cal,comments,collab,time,progress,agents';
     if (vw !== 690) {  // #823 + #824: the team chat (reactions behind the smiley) and an agent at work
       await ev(`(() => { location.hash = '#team/${RID}'; return 1; })()`); await ready(ev, '#view .cmsg');
       await shot(`p2230-${vw}-${th}-teamchat.png`);
-      await ev(`(() => { const b = document.querySelector('#view .cmsg[data-mid="${MB}"] .rxtog'); b && b.click(); return 1; })()`); await sleep(400);
+      await ev(`(() => { const b = document.querySelector('#view .cmsg[data-mid="t:${MB}"] .rxtog'); b && b.click(); return 1; })()`); await sleep(400);
       if (vw === 390) await axe(ev, `${tag} team chat with the reactions open`);
       await shot(`p2230-${vw}-${th}-teamchat-react.png`);
     }

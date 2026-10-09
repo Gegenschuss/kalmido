@@ -5254,6 +5254,8 @@ a.nitem.ndm{text-decoration:none;color:inherit}
 .lyb{min-width:0}
 .lyb > .dcard{height:100%}
 .lyed{max-width:40rem}
+/* 2.33.0 (#1086): the editor's head with "Done" stays at the top of the scrolling view (under the page header), also on the phone */
+.lyed>.dashhead{position:sticky;top:0;z-index:6;background:var(--bg);margin-top:0;padding:.5rem 0;box-shadow:0 1px 0 var(--line)}
 .lyopts{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem 1rem;margin:0 0 .75rem}
 .lyed .dcust{max-width:none}
 .lyed .dcust li[draggable]{cursor:grab}
@@ -5300,6 +5302,26 @@ a.nitem.ndm{text-decoration:none;color:inherit}
 .chl2 .chst{flex:0 1 auto}
 .chmodel{flex:none;max-width:55%;color:var(--muted);font-size:var(--fs-s);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .chmodel::before{content:"·";margin-right:.375rem}
+/* 2.33.0 (#1045): the usage ring right of the agent's name (the tap area of .ib reaches 44 px through its ::after) */
+.chring{width:1.25rem;height:1.25rem;margin-left:.375rem;cursor:pointer;color:var(--accent)}
+.chring svg{width:1.125rem;height:1.125rem;display:block}
+.chring circle{fill:none;stroke-width:2.5}
+.chring .rbg{stroke:var(--line2)}
+.chring .rfg{stroke:currentColor;stroke-linecap:round}
+.chring.q-warn{color:var(--st-wait)}
+.chring.q-over{color:var(--danger)}
+.chring.q-stale{color:var(--faint);opacity:.7}
+.chring:hover,.chring[aria-expanded="true"]{color:var(--accent);filter:brightness(1.15)}
+.chring.q-warn:hover,.chring.q-warn[aria-expanded="true"]{color:var(--st-wait)}
+.chring.q-over:hover,.chring.q-over[aria-expanded="true"]{color:var(--danger)}
+.chring.q-stale:hover,.chring.q-stale[aria-expanded="true"]{color:var(--faint)}
+.chring:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* 2.33.0 (#934): repositories from the folder (list dialog) / lists that do not use the folder's repository (folder dialog) */
+.repofold .rst{color:var(--muted)}
+.repofold .btn{flex:none}
+.rpnot{margin:.25rem 0 .5rem;padding-left:1.25rem;font-size:var(--fs-s)}
+.chqp{flex:none;color:var(--danger);font-size:var(--fs-s);white-space:nowrap}
+.chqp::before{content:"·";margin-right:.375rem;color:var(--muted)}
 .chstog{color:var(--muted)}
 .chstog.on{color:var(--accent)}
 .jobv{margin-top:.375rem;font-size:var(--fs-s)}
@@ -5325,3 +5347,74 @@ a.nitem.ndm{text-decoration:none;color:inherit}
 @media (max-width:37.5rem){ .chnm b{flex:none;max-width:45%} .chnm .chmode{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis} }  /* 2.32.0 (#1079): the name before the longer badge */
 .lybar{display:flex;align-items:center;gap:.5rem}
 .agview .lygrid,.ovw .lygrid{row-gap:.75rem}
+/* 2.33.0 (#1080): search in conversations -- the bar under a chat's header, the hits (search page, command field) */
+.mqbar{flex:none;display:flex;align-items:center;gap:.25rem;padding:.375rem .5rem .375rem .75rem;border-bottom:1px solid var(--line);background:var(--bg)}
+.mqbar .msico{color:var(--muted);display:inline-flex}
+.mqbar input{flex:1;min-width:0;font-size:var(--fs-m);padding:.375rem .5rem}
+.mqbar .mscount{font:var(--fs-xs) var(--mono);color:var(--muted);white-space:nowrap;min-width:3.5rem;text-align:right}
+.msbtn.on{color:var(--accent)}
+mark.mshl{background:color-mix(in srgb,var(--accent) 28%,transparent);color:inherit;border-radius:.125rem;padding:0 .0625rem}
+.msec{margin-top:1rem}
+#sresults:has(~ #smsgs .mhit) .hempty{display:none}  /* no tasks, but messages: the messages right away */
+.msec h2.ghead{margin:0;cursor:default}
+.mschips{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;margin:.25rem 0 .5rem}
+.mschips .chip{font-size:var(--fs-s);padding:.25rem .75rem;min-height:2rem;border:1px solid var(--line);border-radius:99rem;background:none;color:var(--text2);cursor:pointer}
+.mschips .chip.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.mschips select{font-size:var(--fs-s);min-height:2rem}
+.mslist{display:flex;flex-direction:column}
+.mhit{display:flex;gap:.625rem;align-items:flex-start;width:100%;text-align:left;padding:.625rem .5rem;border:0;border-bottom:1px solid var(--line);background:none;color:inherit;font:inherit;cursor:pointer;border-radius:0}
+.mhit:hover,.mhit:focus-visible{background:var(--accent-soft)}
+.mhit .mhic{color:var(--muted);display:inline-flex;padding-top:.125rem}
+.mhit .mhm{display:flex;flex-direction:column;gap:.125rem;min-width:0;flex:1}
+.mhit .mhh{display:flex;flex-wrap:wrap;align-items:baseline;gap:.375rem;font-size:var(--fs-s)}
+.mhit .mhc{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.mhit time{color:var(--muted);font-size:var(--fs-xs);white-space:nowrap}
+.mhit .mhs{font-size:var(--fs-m);color:var(--text2);overflow-wrap:anywhere}
+.mhit mark,.pitem .pmsg mark{background:color-mix(in srgb,var(--accent) 22%,transparent);color:inherit;border-radius:.125rem}
+.pitem .pls.pmsg{font-family:inherit}
+.msmore{margin:.75rem auto 0;display:flex}
+@media (pointer:coarse){ .mqbar .iconbtn,.mschips .chip,.mschips select{min-height:2.75rem;min-width:2.75rem} .mhit{min-height:2.75rem} }
+/* 2.33.0 (#1076): replies to one message -- the quote above an answer, the reply bar above the box, the swipe arrow,
+   the jump mark (msgJump, also for the search #1080) */
+.mquote{display:flex;flex-direction:column;align-items:flex-start;max-width:100%;min-width:0;margin:0 0 .25rem;padding:.25rem .5rem;border:0;border-left:.1875rem solid var(--accent);border-radius:.375rem;background:color-mix(in srgb,var(--accent) 8%,var(--bg3));color:var(--text2);font:inherit;font-size:.8125rem;line-height:1.35;text-align:left;cursor:pointer}
+.mquote b{font-size:.75rem;color:var(--text)}
+.mquote span{display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.mquote:hover{background:color-mix(in srgb,var(--accent) 14%,var(--bg3))}
+.mquote:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mquote.del{flex-direction:row;align-items:center;gap:.25rem;cursor:default;border-left-color:var(--line2);font-style:italic;color:var(--faint)}
+.rbar{display:flex;align-items:center;gap:.5rem;padding:.25rem .5rem .25rem .75rem;border-top:1px solid var(--line);background:var(--bg2);font-size:.8125rem;color:var(--text2)}
+.rbar>svg{flex:none;color:var(--accent)}
+.rbar+.chcomp{border-top:0}
+.rbq{flex:1;min-width:0;display:flex;flex-direction:column;border-left:.1875rem solid var(--accent);padding-left:.5rem}
+.rbq b{font-size:.75rem;color:var(--text)}
+.rbq span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rbar .iconbtn{flex:none;min-width:2.75rem;min-height:2.75rem;display:inline-flex;align-items:center;justify-content:center}
+.dcomp .rbar{border-top:0;padding:0 0 .375rem;background:transparent}
+.cmsg .mreply{opacity:0;transition:opacity .1s}
+.cmsg:hover .mreply,.cmsg:focus-within .mreply,.cmsg .mreply:focus-visible{opacity:1}
+@media (hover:none){ .cmsg .mreply{display:none} }
+.rsw{position:relative;touch-action:pan-y}
+.rswarr{position:absolute;left:-2.25rem;top:50%;display:flex;color:var(--faint);opacity:.5;transform:translateY(-50%) scale(.8);transition:transform .12s,opacity .12s}
+.rswarr.on{color:var(--accent);opacity:1;transform:translateY(-50%) scale(1.15)}
+.msg-hit{animation:msghit 1.5s ease-out}
+.cmsg.msg-hit{border-radius:var(--r-l)}
+@keyframes msghit{0%,45%{background:color-mix(in srgb,var(--accent) 22%,transparent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 45%,transparent)}100%{background:transparent;box-shadow:none}}
+@media (prefers-reduced-motion:reduce){ .msg-hit{animation:none;background:color-mix(in srgb,var(--accent) 18%,transparent);box-shadow:0 0 0 2px var(--accent)} .rswarr{transition:none} }
+/* 2.33.0 (#927): notification template of a list / folder (owner) + the one-time question */
+.ntfopts{display:grid;gap:.375rem;margin:.5rem 0}
+.ntfopt{display:flex;gap:.625rem;align-items:flex-start;padding:.5rem .625rem;min-height:2.75rem;border:1px solid var(--line2);border-radius:.625rem;cursor:pointer}
+.ntfopt:has(input:checked){border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.ntfopt input{flex:none;margin-top:.1875rem}
+.ntfopt span{display:flex;flex-direction:column;gap:.125rem;min-width:0;font-size:var(--fs-b)}
+.ntfopt small{font-size:var(--fs-s)}
+.ntfcust{display:grid;grid-template-columns:repeat(auto-fill,minmax(14rem,1fr));gap:.25rem .75rem;margin:.25rem 0 .5rem}
+.ntfcust .chkl{min-height:1.75rem}
+.ntfppl .ntfp select{margin-left:auto;max-width:12rem}
+.ntfhint{display:flex;gap:.375rem;align-items:flex-start}
+.ntfask{flex-wrap:wrap}
+.ntfask .ntfaskb{display:flex;gap:.375rem;flex:none;margin-left:auto}
+@media (max-width:899px){ .ntfask{margin:.375rem .5rem 0} .ntfask .annt{flex:1 1 calc(100% - 1.5rem)} .ntfask .ntfaskb .btn{min-height:2.75rem} .ntfcust .chkl{min-height:2.75rem} }
+/* 2.33.0 (#1087): iPhone keyboard with the focus in the comment box: the task panel fills exactly the visible part (detailKbFit) */
+@media (max-width:899px){ #detail.vvfix{top:var(--vvt,0px);bottom:auto;height:var(--vvh,100dvh);transition:none} }
+.chrbtn{display:inline-flex;align-items:center;justify-content:center;height:1.5rem;padding:0 .4375rem;border-radius:99rem;border:1px solid var(--line2);background:transparent;color:var(--text2);cursor:pointer}
+@media (pointer:coarse){ .chrbtn{min-width:2.75rem;min-height:2.75rem} }

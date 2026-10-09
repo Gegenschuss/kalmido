@@ -65,7 +65,7 @@ const key = (w, el, k) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: 
 
   // ================= jsdom: "+" in the agent chat
   w.eval(`chatOpen(${AG})`); await until(() => d.querySelectorAll('#chat-msgs .cmsg').length >= 1, 60);
-  const msg = () => d.querySelector(`#chat-msgs .cmsg[data-mid="${q1.id}"]`);
+  const msg = () => d.querySelector(`#chat-msgs .cmsg[data-mid="a:${q1.id}"]`);
   const plus = () => msg()?.querySelector('.rxrow [data-act="rx-more"]');
   check(plus() && plus().getAttribute('aria-haspopup') === 'dialog' && plus().getAttribute('aria-label') === 'More reactions' && plus().tabIndex === -1, 'agent chat: "+" More reactions after 👍 👎 ❤️ (not an extra Tab stop)');
   const up = msg().querySelector('.rxrow [data-e="up"]'); up.focus(); key(w, up, 'End');
@@ -86,7 +86,7 @@ const key = (w, el, k) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: 
   const RID = w.eval('S.tc.rid');
   const m1 = await call('POST', `/api/team/rooms/${RID}/messages`, {body: 'Dinner at 7?'}, CB);
   w.eval('teamChanged()');
-  const tm = () => d.querySelector(`#tc-msgs .cmsg[data-mid="${m1.id}"]`);
+  const tm = () => d.querySelector(`#tc-msgs .cmsg[data-mid="t:${m1.id}"]`);
   await until(() => tm());
   click(w, tm().querySelector('.rxrow [data-act="rx-more"]')); await sleep(200);
   d.querySelector('#pop #rx-in').value = '🍝';
@@ -129,8 +129,8 @@ const key = (w, el, k) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: 
     await ev(`(() => { closePalette(); return 1; })()`);
     // the chat "+" with a real tap
     await o.nav(B + '#agents/' + AG); await ready(ev); await sleep(800);
-    await ev(`(() => { document.querySelector('#chat-msgs .cmsg[data-mid="${q1.id}"] .rxrow .rxtog')?.click(); return 1; })()`); await sleep(300);  // 2.23.0 (#823): behind the smiley
-    const pb = await ev(`(() => { const e = document.querySelector('#chat-msgs .cmsg[data-mid="${q1.id}"] .rxrow [data-act="rx-more"]'); e.scrollIntoView({block: 'center'}); const r = e.getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height}; })()`);
+    await ev(`(() => { document.querySelector('#chat-msgs .cmsg[data-mid="a:${q1.id}"] .rxrow .rxtog')?.click(); return 1; })()`); await sleep(300);  // 2.23.0 (#823): behind the smiley
+    const pb = await ev(`(() => { const e = document.querySelector('#chat-msgs .cmsg[data-mid="a:${q1.id}"] .rxrow [data-act="rx-more"]'); e.scrollIntoView({block: 'center'}); const r = e.getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height}; })()`);
     check(pb.w >= 43.5 && pb.h >= 43.5, `${tag}: "+" is a 44 px target ` + JSON.stringify(pb));
     await tap(pb.x, pb.y);
     check(await until(() => ev(`!!document.querySelector('#pop:not(.hidden) .rxgrid')`), 30), `${tag}: one tap opens the emoji grid`);

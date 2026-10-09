@@ -16,6 +16,7 @@ from ..notify.push import push_handled, push_prio, push_reachable
 from ..api.v1 import v1_args, v1_call, v1_json, v1_view
 from ..agents.core import agent_emit, AGENT_EVENT_COMMENT_CHARS, agent_ids, is_agent
 from ..collab.reactions import clean_emoji
+from ..collab.replies import reply_check, reply_quotes
 
 
 # ---------------------------------------------------------------- 2.17.0 (#419): team chat
@@ -207,12 +208,15 @@ def tchat_rx(c, ids):
     return out
 
 
-def tchat_msg_dict(c, m, rx=None):
+def tchat_msg_dict(c, m, rx=None, quotes=None):
     t = c.execute("SELECT id, title FROM tasks WHERE id=? AND deleted_at IS NULL", (m["task_id"],)).fetchone() if m["task_id"] else None
+    # 2.33.0 (#1076): reply_to + reply (a short quote of the answered message; quotes = reply_quotes of a page)
+    rt = m["reply_to"] if "reply_to" in m.keys() and not m["deleted_at"] else None
+    rq = (quotes if quotes is not None else reply_quotes(c, "t", [rt])).get(rt) if rt else None
     return {"id": m["id"], "room_id": m["room_id"], "user_id": m["user_id"], "body": "" if m["deleted_at"] else m["body"],
             "task": {"id": t["id"], "title": t["title"]} if t and task_visible(c, t["id"], me()) else None,
             "created_at": m["created_at"], "edited_at": m["edited_at"], "deleted": bool(m["deleted_at"]),
-            "reactions": (rx or {}).get(m["id"], [])}
+            "reactions": (rx or {}).get(m["id"], []), "reply_to": rt, "reply": rq}
 
 
 def tchat_clean_mentions(c, r, text):
@@ -274,17 +278,20 @@ def tchat_messages(rid):
     more = len(rows) > lim
     rows = list(reversed(rows[:lim]))
     rx = tchat_rx(c, [m["id"] for m in rows])
+    qs = reply_quotes(c, "t", [m["reply_to"] for m in rows if not m["deleted_at"]])
     mem = tchat_room_members(c, r)
     names = user_names(c, mem | {m["user_id"] for m in rows if m["user_id"]})
     lr, muted = tchat_last_read(c, rid, me())
     return jsonify(room={"id": r["id"], "kind": r["kind"], "list_id": r["list_id"], "muted": muted, "last_read": lr,
                          "members": [{"id": u, "name": names.get(u, "?"), "agent": u in agent_ids(c)} for u in sorted(mem)]},
-                   messages=[tchat_msg_dict(c, m, rx) for m in rows], has_more=more, users={str(k): v for k, v in names.items()})
+                   messages=[tchat_msg_dict(c, m, rx, qs) for m in rows], has_more=more, users={str(k): v for k, v in names.items()})
 
 
 @app.post("/api/team/rooms/<int:rid>/messages")
 def tchat_post(rid):
-    """{body, task_id?} -- a message; @mentions as <@id> (members of the room only)."""
+    """{body, task_id?, reply_to?} -- a message; @mentions as <@id> (members of the room only); 2.33.0 (#1076) reply_to: a message
+    of the same conversation (its author gets "replied to your message", like a mention)."""
+    from ..personal.timetrack import BadInput
     c = db()
     need_tchat(c)
     r = need_room(c, rid)
@@ -298,20 +305,29 @@ def tchat_post(rid):
     if tid is not None and (isinstance(tid, bool) or not isinstance(tid, int) or not task_visible(c, tid, me())):
         return err(tr("Invalid value: {0}", "task_id"))
     text, mentions = tchat_clean_mentions(c, r, text.strip())
+    try:
+        orig = reply_check(c, "t", b.get("reply_to"), room_id=rid)
+    except BadInput as e:
+        return err(str(e))
     ts = iso_ms(now_utc())
-    mid = c.execute("INSERT INTO tchat_msgs(room_id,user_id,body,task_id,created_at) VALUES(?,?,?,?,?)", (rid, me(), text, tid, ts)).lastrowid
+    mid = c.execute("INSERT INTO tchat_msgs(room_id,user_id,body,task_id,created_at,reply_to) VALUES(?,?,?,?,?,?)",
+                    (rid, me(), text, tid, ts, orig["id"] if orig else None)).lastrowid
     c.execute("UPDATE tchat_rooms SET last_at=? WHERE id=?", (ts, rid))
     c.execute("INSERT INTO tchat_reads(room_id,user_id,last_id) VALUES(?,?,?) ON CONFLICT(room_id,user_id) DO UPDATE SET last_id=excluded.last_id",
               (rid, me(), mid))
     m = c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone()
-    tchat_notify(c, r, m, mentions)
+    tchat_notify(c, r, m, mentions, replied=orig["user_id"] if orig and orig["user_id"] != me() else None)
     c.commit()
     return jsonify(tchat_msg_dict(c, m)), 201
 
 
-def tchat_notify(c, r, m, mentions):
-    """Pushes (DM: always; channel: @mentions, and every message for whoever set the list bell to "all") + agent events."""
+def tchat_notify(c, r, m, mentions, replied=None):
+    """Pushes (DM: always; channel: @mentions, and every message for whoever set the list bell to "all") + agent events.
+    2.33.0 (#1076): replied = the author of the answered message: it counts as a mention ("replied to your message")."""
     sender = m["user_id"]
+    if replied and replied not in mentions and replied in tchat_room_members(c, r):
+        mentions = [*mentions, replied]
+    rq = reply_quotes(c, "t", [m["reply_to"]]).get(m["reply_to"]) if m["reply_to"] else None
     names = user_names(c, [sender] + mentions)
     who = names.get(sender, "?")
     ags = agent_ids(c)
@@ -322,7 +338,8 @@ def tchat_notify(c, r, m, mentions):
             if uid in mentions:
                 agent_emit(c, uid, "team_message", {"room": {"id": r["id"], "kind": r["kind"], "list_id": r["list_id"]},
                                                      "message": {"id": m["id"], "text": text[:AGENT_EVENT_COMMENT_CHARS], "user_id": sender,
-                                                                 "task_id": m["task_id"], "created_at": m["created_at"]},
+                                                                 "task_id": m["task_id"], "created_at": m["created_at"],
+                                                                 "reply_to": m["reply_to"], "reply": rq},
                                                      "user": {"id": sender, "name": who}})
             continue
         s = collab_user(c, uid, r["list_id"])
@@ -342,7 +359,9 @@ def tchat_notify(c, r, m, mentions):
         else:
             ln = c.execute("SELECT name FROM lists WHERE id=?", (r["list_id"],)).fetchone()
             title = tr("{0} in {1}", who, ln["name"] if ln else "?", lg=lg)
-        g.pushes.append((uid, title, text[:300], f"{PUBLIC_URL}/#team/{r['id']}", push_prio(s)))
+        msg = tr("{0} replied to your message: {1}", who, text, lg=lg) if uid == replied and r["kind"] == "list" else \
+            tr("Replied to your message: {0}", text, lg=lg) if uid == replied else text
+        g.pushes.append((uid, title, msg[:300], f"{PUBLIC_URL}/#team/{r['id']}", push_prio(s)))
 
 
 def need_tmsg(c, mid, edit=False):
@@ -472,7 +491,7 @@ def v1_tchat_messages(rid):
 def v1_tchat_post(rid):
     v1_args(())
     b = v1_json()
-    reject_unknown(b, ("body", "task_id"))
+    reject_unknown(b, ("body", "task_id", "reply_to"))  # 2.33.0 (#1076): reply_to
     return jsonify(v1_call(tchat_post, rid, body=b)), 201
 
 
@@ -523,7 +542,9 @@ def team_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "id": {"type": "integer"}, "room_id": {"type": "integer"}, "user_id": nul("integer"),
         "body": {"type": "string", "description": "Markdown, mentions as <@user id>"}, "task": nul("object"),
         "created_at": {"type": "string", "format": "date-time"}, "edited_at": nul("string", format="date-time"),
-        "deleted": {"type": "boolean"}, "reactions": {"type": "array", "items": {"type": "object"}}}}
+        "deleted": {"type": "boolean"}, "reactions": {"type": "array", "items": {"type": "object"}},
+        "reply_to": nul("integer", description="2.33.0: the answered message of this conversation"),
+        "reply": {"anyOf": [ref("ReplyQuote"), {"type": "null"}]}}}
     schemas["TeamMessagePage"] = page("TeamMessage")
     rp, mp = pid(desc="Conversation (room) id"), pid(desc="Message id")
     paths["/team/rooms"] = {"get": op("2.17.0: your team chat conversations (channels of shared lists, direct messages) with unread counts",
@@ -535,7 +556,9 @@ def team_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "get": op("Messages of a conversation, oldest first (?before=<id> for older ones)", TC, ok(ref("TeamMessagePage")) | errs("400", "404"),
                   [rp, q("before", "Only messages older than this id", {"type": "integer"}), q("limit", "At most this many (1-100)", {"type": "integer"})]),
         "post": op("Write in a conversation; mention people as <@id>", TC, ok(ref("TeamMessage"), "Created", "201") | errs("400", "404"), [rp],
-                   body={"type": "object", "properties": {"body": {"type": "string"}, "task_id": {"type": "integer"}}, "required": ["body"]}, scope="comments")}
+                   body={"type": "object", "properties": {"body": {"type": "string"}, "task_id": {"type": "integer"},
+                                                          "reply_to": {"type": "integer", "description": "2.33.0: answer this message of the same conversation (else 400)"}},
+                         "required": ["body"]}, scope="comments")}
     paths["/team/rooms/{id}/read"] = {"post": op("Mark a conversation read (up to last_id) and / or mute it", TC, ok({"type": "object"}) | errs("400", "404"),
                                                  [rp], body={"type": "object", "properties": {"last_id": {"type": "integer"}, "muted": {"type": "boolean"}}}, scope="comments")}
     paths["/team/messages/{id}"] = {

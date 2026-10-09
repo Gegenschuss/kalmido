@@ -538,13 +538,14 @@ function cattHtml(a, cid, editing) {
 function commentHtml(c, U, ro = false) {
   const mine = S.me && c.user_id === S.me.id, editing = !ro && S.cedit === c.id;
   const isNew = !ro && !mine && c.id > (S.tl.seen || 0);
-  const acts = ro ? '' : mine || S.tl.moderator ? `<span class="cacts">${mine ? `<button class="iconbtn" data-act="c-edit" data-cid="${c.id}" title="${tr('Edit')}">${ic('edit', 's')}</button>` : ''}<button class="iconbtn" data-act="c-del" data-cid="${c.id}" title="${tr('Delete')}">${ic('trash', 's')}</button></span>` : '';
+  // 2.33.0 (#1076): Reply on every comment (hover / keyboard; phones swipe right)
+  const acts = ro ? '' : `<span class="cacts">${editing ? '' : replyBtn()}${mine ? `<button class="iconbtn" data-act="c-edit" data-cid="${c.id}" title="${tr('Edit')}">${ic('edit', 's')}</button>` : ''}${mine || S.tl.moderator ? `<button class="iconbtn" data-act="c-del" data-cid="${c.id}" title="${tr('Delete')}">${ic('trash', 's')}</button>` : ''}</span>`;
   const files = c.attachments?.length ? `<div class="atts catts">${c.attachments.map(a => cattHtml(a, c.id, editing)).join('')}</div>` : '';
   const main = editing ? `<div class="cedit"><textarea class="c-edit-input" data-cid="${c.id}" rows="2">${esc(decodeMentions(c.body, U))}</textarea><div class="mpick hidden"></div>${files}<div class="cbar"><span class="spacer"></span><button class="btn sm" data-act="c-edit-cancel">${tr('Cancel')}</button><button class="btn sm pri" data-act="c-edit-save" data-cid="${c.id}">${tr('Save')}</button></div></div>`
-    : `${c.body ? `<div class="cbody">${commentBody(c.body, U, taskById(c.task_id || S.sel)?.list_id)}</div>` : ''}${files}${sugHtml(c, ro)}${reactHtml(c, ro)}`;
+    : `${ro ? '' : replyQuoteHtml(c, 'c')}${c.body ? `<div class="cbody">${commentBody(c.body, U, taskById(c.task_id || S.sel)?.list_id)}</div>` : ''}${files}${sugHtml(c, ro)}${reactHtml(c, ro)}`;
   // 2.5.1 (#395): the author's avatar opens the same card as an @mention (only in the comment list, not read-only copies)
   const cav = ro ? av(c.user_id, uname(c.user_id, U)) : `<button type="button" class="cmav" data-mcard="${c.user_id}" data-mname="${esc(uname(c.user_id, U))}" aria-haspopup="dialog" title="${esc(tr('Show {0}', uname(c.user_id, U)))}">${av(c.user_id, uname(c.user_id, U))}</button>`;
-  return `<div class="cm ${isNew ? 'new' : ''}${rxShow('k' + c.id)}" data-cid="${c.id}">${cav}<div class="cmain"><div class="chead"><b>${esc(uname(c.user_id, U))}</b>${isAgentUser(c.user_id) ? agentBadge() : ''}<span class="muted">${fmtWhen(c.created_at)}${c.edited_at ? ' · ' + tr('edited') : ''}</span>${acts}</div>${main}</div></div>`;
+  return `<div class="cm ${isNew ? 'new' : ''}${rxShow('k' + c.id)}" data-cid="${c.id}" data-mid="c:${c.id}">${cav}<div class="cmain"><div class="chead"><b>${esc(uname(c.user_id, U))}</b>${isAgentUser(c.user_id) ? agentBadge() : ''}<span class="muted">${fmtWhen(c.created_at)}${c.edited_at ? ' · ' + tr('edited') : ''}</span>${acts}</div>${main}</div></div>`;
 }
 function timelineItems(ro = false) {
   const T = S.tl, soc = cmSocial(taskById(T.id));
@@ -584,7 +585,7 @@ function timelineHtml(t) {
 // footer); one line until it is used (focus, text or files), then the bar with files and Send
 function cmComposer(t, top = false) {  // top: 2.4.2 (#386) newest first, the box above the newest comment
   const soc = cmSocial(t), used = !!S.drafts[t.id] || !!(S.cfiles[t.id] || []).length;
-  return `<div class="dcomp ${top ? 'dctop' : ''}"><div class="ccomp ${used ? 'used' : ''}"><textarea id="c-input" rows="1" name="kalmido-comment" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${soc ? tr('Write a comment… (@ mentions someone)') : tr('Write a comment…')}" aria-label="${tr('Comment')}">${esc(S.drafts[t.id] || '')}</textarea>
+  return `<div class="dcomp ${top ? 'dctop' : ''}">${replyBarHtml('c:' + t.id)}<div class="ccomp ${used ? 'used' : ''}"><textarea id="c-input" rows="1" name="kalmido-comment" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${soc ? tr('Write a comment… (@ mentions someone)') : tr('Write a comment…')}" aria-label="${tr('Comment')}">${esc(S.drafts[t.id] || '')}</textarea>
       <div class="mpick hidden"></div>
       <div class="cfiles" id="c-files">${composerFiles(t.id)}</div>
       <div class="cbar"><label class="iconbtn" title="${tr('Attach files')}">${ic('clip', 's')}<input type="file" id="c-file" multiple hidden></label><span class="muted chint">${isMobile() ? '' : tr('Ctrl+Enter sends')}</span><span class="spacer"></span><button class="btn sm pri" data-act="c-send">${ic('send', 's')} ${tr('Send')}</button></div></div></div>`;
@@ -643,13 +644,14 @@ async function sendComment() {
   const big = files.find(f => f.size > 50 * 1024 * 1024);
   if (big) { toast(tr('{0} is larger than 50 MB', big.name)); return; }
   const text = encodeMentions(raw, S.tl.id === tid ? S.tl.people : []);
-  let payload = {body: text};
-  if (files.length) { payload = new FormData(); payload.append('body', text); files.forEach((f, i) => payload.append('file', f, f.name || `bild-${Date.now()}-${i}.png`)); }
+  const rto = replyTo('c:' + tid);  // 2.33.0 (#1076)
+  let payload = {body: text, ...(rto ? {reply_to: rto} : {})};
+  if (files.length) { payload = new FormData(); payload.append('body', text); if (rto) payload.append('reply_to', rto); files.forEach((f, i) => payload.append('file', f, f.name || `bild-${Date.now()}-${i}.png`)); }
   const btn = $('[data-act="c-send"]'); if (btn) btn.disabled = true;
   try { await capi('POST', `/api/tasks/${tid}/comments`, payload); }
   catch { return; }
   finally { if (btn) btn.disabled = false; }
-  delete S.drafts[tid]; delete S.cfiles[tid];
+  delete S.drafts[tid]; delete S.cfiles[tid]; replySent('c:' + tid);
   if (S.sel === tid) { const i = $('#c-input'); if (i) { i.value = ''; autosize(i); } const f = $('#c-files'); if (f) f.innerHTML = ''; }
   await loadTimeline(tid);
   const box = $('#d-tl-items'); if (box) (cmtNew() ? box.firstElementChild : box.lastElementChild)?.scrollIntoView({block: 'nearest'});
@@ -717,3 +719,157 @@ document.addEventListener('keydown', e => {
   }
 }, true);
 document.addEventListener('mousedown', e => { if (e.target.closest('.mpick')) e.preventDefault(); });  // keep the caret in the box
+
+// ------------------------------------------------------------------ 2.33.0 (#1076 / #1080): jump to one message
+// window.msgJump({art, id, task, chat, agent}) -- art 'c' = a task comment (task = its task id), 't' = a team chat message
+// (chat = its room id), 'a' = an agent chat message (agent = the agent's id). Opens the place (the task with its comments,
+// the conversation), loads older pages until the message is there, scrolls to it and marks it for a moment (.msg-hit).
+// Gone (deleted, trimmed, no rights): "Message not found". Every message in the DOM carries data-mid="<art>:<id>".
+// Used by the reply quotes (#1076) and the search hits (#1080). Returns true when the message was found.
+const msgWait = async (fn, ms = 8000) => { const t0 = Date.now(); for (;;) { const v = fn(); if (v) return v; if (Date.now() - t0 > ms) return null; await new Promise(r => setTimeout(r, 100)); } };
+function msgHit(el) {
+  if (!el) return false;
+  $$('.msg-hit').forEach(x => x.classList.remove('msg-hit'));
+  try { el.scrollIntoView?.({block: 'center', behavior: reducedMotion() ? 'auto' : 'smooth'}); } catch { try { el.scrollIntoView?.(); } catch { /* old browsers */ } }
+  el.classList.add('msg-hit');
+  clearTimeout(msgHit.t); msgHit.t = setTimeout(() => $$('.msg-hit').forEach(x => x.classList.remove('msg-hit')), 1600);
+  return true;
+}
+const msgMissing = () => { toast(tr('Message not found')); return false; };
+async function msgJump(o = {}) {
+  const art = o.art, id = +o.id; if (!id || !['c', 't', 'a'].includes(art)) return msgMissing();
+  const sel = `[data-mid="${art}:${id}"]`;
+  if (art === 'c') {
+    const tid = +o.task; if (!tid) return msgMissing();
+    if (S.sel !== tid) { if (!taskById(tid)) { try { (S.extra ||= []).push(await rawFetch('GET', `/api/tasks/${tid}`)); } catch { return msgMissing(); } } openDetail(tid); }
+    if (!await msgWait(() => S.sel === tid && S.tl.id === tid && (S.tl.comments || S.tl.err))) return msgMissing();
+    if (!(S.tl.comments || []).some(c => c.id === id)) return msgMissing();
+    if ($('#detail.dsfold')) dsFoldToggle(false);
+    return msgHit(await msgWait(() => $('#detail ' + sel), 3000)) || msgMissing();
+  }
+  if (art === 't') {
+    const rid = +o.chat; if (!rid || !teamOn()) return msgMissing();
+    if (S.route.mod !== 'team' || S.tc.rid !== rid) go('team/' + rid);
+    if (!await msgWait(() => S.tc.rid === rid && S.tc.room)) return msgMissing();
+    for (let n = 0; n < 60 && !S.tc.msgs.some(m => m.id === id) && S.tc.more && S.tc.msgs.length && S.tc.msgs[0].id > id; n++) { await loadRoom(rid, true); if (S.tc.rid !== rid) return false; }
+    if (!S.tc.msgs.some(m => m.id === id && !m.deleted)) return msgMissing();
+    tcPatch(); S.tc.fitUntil = 0;
+    return msgHit(await msgWait(() => $('#tc-msgs ' + sel), 3000)) || msgMissing();
+  }
+  const aid = +o.agent; if (!aid || !agentById(aid)) return msgMissing();
+  if (S.chat.aid !== aid || !$('#chat-msgs')) chatOpen(aid);
+  if (!await msgWait(() => S.chat.aid === aid && $('#chat-msgs') && (S.chat.msgs.length || S.chat.err))) return msgMissing();
+  for (let n = 0; n < 60 && !S.chat.msgs.some(m => m.id === id) && S.chat.more && S.chat.msgs[0].id > id; n++) { await chatOlder(); if (S.chat.aid !== aid) return false; }
+  if (!S.chat.msgs.some(m => m.id === id)) return msgMissing();
+  S.chat.pin = false;
+  return msgHit(await msgWait(() => $('#chat-msgs ' + sel), 3000)) || msgMissing();
+}
+window.msgJump = msgJump;
+
+// ------------------------------------------------------------------ 2.33.0 (#1076): reply to one message
+// Comments, team chat, agent chat. Desktop: the reply button on hover / keyboard focus (and "Reply" in a message's menu);
+// phones: swipe a message to the right (not from the left edge: that is the phone's own Back gesture; only clearly
+// sideways, an arrow shows how far). The reply bar sits above the box (quote, X); the answer shows a small quote above it
+// (a tap jumps to the original, msgJump), a deleted original says "Message deleted". State per place:
+// S.reply['c:<task>' | 't:<room>' | 'a:<agent>'] = {id, name, text}.
+S.reply = {};
+const replyCtx = art => art === 'c' ? (S.sel ? 'c:' + S.sel : null) : art === 't' ? (S.tc?.rid ? 't:' + S.tc.rid : null) : art === 'a' ? (S.chat?.aid ? 'a:' + S.chat.aid : null) : null;
+const replyIn = art => $(art === 'c' ? '#detail #c-input' : art === 't' ? '#tc-in' : '#chat-in');
+function replyMsg(art, id) {
+  const m = art === 'c' ? (S.tl.comments || []).find(x => x.id === id) : art === 't' ? (S.tc.msgs || []).find(x => x.id === id) : (S.chat.msgs || []).find(x => x.id === id);
+  if (!m || m.deleted) return null;
+  const U = art === 'c' ? S.tl.users : art === 't' ? S.tc.users : {};
+  const name = art === 'a' ? (m.from === 'agent' ? agentById(S.chat.aid)?.name || '' : tr('You')) : m.user_id === S.me?.id ? tr('You') : uname(m.user_id, U);
+  let text = mdBrief(decodeMentions(m.body || '', U));
+  if (!text) text = (m.attachments || [])[0]?.name || '';
+  return {id, name, mine: art === 'a' ? m.from !== 'agent' : m.user_id === S.me?.id, text: text.length > 140 ? text.slice(0, 140) + '…' : text};
+}
+// the quote above an answer; place: the task / room / agent the message lives in
+function replyQuoteHtml(m, art) {
+  const q = m?.reply; if (!q || m.deleted) return '';
+  if (q.deleted) return `<div class="mquote del">${ic('reply', 's')}<span>${esc(tr('Message deleted'))}</span></div>`;
+  const name = q.user_id && q.user_id === S.me?.id ? tr('You') : q.name || tr('Someone');
+  return `<button type="button" class="mquote" data-act="msg-jump" data-art="${art}" data-id="${q.id}" title="${esc(tr('Show the message'))}" aria-label="${esc(tr('Reply to {0}: {1}', name, q.text) + ' – ' + tr('Show the message'))}"><b>${esc(name)}</b><span>${esc(q.text)}</span></button>`;
+}
+const replyBtn = (cls = 'iconbtn') => `<button type="button" class="${cls} mreply" data-act="msg-reply" title="${esc(tr('Reply'))}" aria-label="${esc(tr('Reply'))}">${ic('reply', 's')}</button>`;
+function replyBarHtml(ctx) {
+  const r = ctx && S.reply[ctx];
+  return `<div class="rbar${r ? '' : ' hidden'}" data-rbar="${esc(ctx || '')}" role="status">${r ? `${ic('reply', 's')}<span class="rbq"><b>${esc(r.mine ? tr('Reply to your own message') : tr('Reply to {0}', r.name))}</b><span>${esc(r.text)}</span></span><button type="button" class="iconbtn" data-act="reply-x" title="${esc(tr('Cancel reply'))}" aria-label="${esc(tr('Cancel reply'))}">${ic('x', 's')}</button>` : ''}</div>`;
+}
+function replyBarDraw(ctx) { const b = $(`[data-rbar="${ctx}"]`); if (b) b.outerHTML = replyBarHtml(ctx); }
+function replyStart(art, id) {
+  const ctx = replyCtx(art), r = ctx && replyMsg(art, id); if (!r) return;
+  S.reply[ctx] = r; replyBarDraw(ctx);
+  const ta = replyIn(art); if (!ta) return;
+  ta.closest('.ccomp')?.classList.add('used');
+  try { ta.focus({preventScroll: true}); } catch { ta.focus(); }
+  announce(r.mine ? tr('Reply to your own message') : tr('Reply to {0}', r.name));
+}
+function replyCancel(ctx, focus = true) {
+  if (!ctx || !S.reply[ctx]) return false;
+  delete S.reply[ctx]; replyBarDraw(ctx);
+  if (focus) replyIn(ctx[0])?.focus({preventScroll: true});
+  return true;
+}
+// the reply_to of the next message of a place (null = none); sent() clears it
+const replyTo = ctx => (ctx && S.reply[ctx]?.id) || null;
+const replySent = ctx => { if (ctx && S.reply[ctx]) { delete S.reply[ctx]; replyBarDraw(ctx); } };
+document.addEventListener('click', e => {
+  const a = e.target.closest?.('[data-act="msg-reply"], [data-act="msg-jump"], [data-act="reply-x"]'); if (!a) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  if (a.dataset.act === 'reply-x') { replyCancel(a.closest('[data-rbar]')?.dataset.rbar); return; }
+  if (a.dataset.act === 'msg-jump') {
+    const art = a.dataset.art;
+    msgJump({art, id: +a.dataset.id, task: art === 'c' ? S.sel : null, chat: art === 't' ? S.tc.rid : null, agent: art === 'a' ? S.chat.aid : null});
+    return;
+  }
+  const host = a.closest('[data-mid]'), [art, id] = String(host?.dataset.mid || '').split(':');
+  if (art && +id) replyStart(art, +id);
+});
+// Escape in a box with an open reply: first the reply goes (window capture: before the boxes' own Escape)
+window.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || e.isComposing) return;
+  const t = e.target, art = t.id === 'c-input' ? 'c' : t.id === 'tc-in' ? 't' : t.id === 'chat-in' ? 'a' : null;
+  if (art && !S.mp && replyCancel(replyCtx(art), false)) { e.preventDefault(); e.stopImmediatePropagation(); }
+}, true);
+// phones: swipe right on a message
+{
+  const RSW_EDGE = 32, RSW_MIN = 56, RSW_MAX = 88;
+  let sw = null;
+  const swMove = e => {
+    if (!sw) return;
+    const t = e.touches?.[0]; if (!t) return;
+    const dx = t.clientX - sw.x, dy = t.clientY - sw.y;
+    if (!sw.lock) {
+      if (Math.hypot(dx, dy) < 10) return;
+      if (dx > 0 && dx > Math.abs(dy) * 1.6) { sw.lock = true; sw.m.classList.add('rsw'); sw.m.insertAdjacentHTML('afterbegin', `<span class="rswarr" aria-hidden="true">${ic('reply', 's')}</span>`); }
+      else { swEnd(true); return; }
+    }
+    if (e.cancelable) e.preventDefault();
+    sw.dx = Math.max(0, Math.min(RSW_MAX, dx < RSW_MIN ? dx : RSW_MIN + (dx - RSW_MIN) / 3));
+    sw.m.style.transform = `translateX(${sw.dx}px)`;
+    const on = sw.dx >= RSW_MIN, arr = sw.m.querySelector(':scope > .rswarr');
+    if (arr && arr.classList.contains('on') !== on) { arr.classList.toggle('on', on); if (on && navigator.vibrate) navigator.vibrate(8); }
+  };
+  const swEnd = cancel => {
+    const st = sw; sw = null; document.removeEventListener('touchmove', swMove, {passive: false});
+    if (!st || !st.lock) return;
+    const m = st.m, go = !cancel && st.dx >= RSW_MIN;
+    m.style.transition = reducedMotion() ? 'none' : 'transform .16s ease-out'; m.style.transform = '';
+    setTimeout(() => { m.style.transition = ''; m.classList.remove('rsw'); m.querySelector(':scope > .rswarr')?.remove(); }, 180);
+    if (go) { const [art, id] = String(m.dataset.mid).split(':'); replyStart(art, +id); }
+  };
+  document.addEventListener('touchstart', e => {
+    if (sw) swEnd(true);
+    if (e.touches?.length !== 1) return;
+    const m = e.target.closest?.('#detail .cm[data-mid], #tc-msgs .cmsg[data-mid], #chat-msgs .cmsg[data-mid]');
+    if (!m || m.querySelector('.cedit, .tcedit') || e.target.closest('textarea, input, pre, table, .rxrow, .catts, .chatts, .cchoices, .cperm, [contenteditable="true"]')) return;
+    const t = e.touches[0]; if (t.clientX < RSW_EDGE || t.clientX > innerWidth - RSW_EDGE) return;
+    const sel = getSelection?.(); if (sel && !sel.isCollapsed && String(sel).trim()) return;
+    const [art, id] = String(m.dataset.mid).split(':'); if (!replyCtx(art) || !replyMsg(art, +id)) return;
+    sw = {m, x: t.clientX, y: t.clientY, dx: 0, lock: false};
+    document.addEventListener('touchmove', swMove, {passive: false});
+  }, {passive: true});
+  document.addEventListener('touchend', () => swEnd(false), {passive: true});
+  document.addEventListener('touchcancel', () => swEnd(true), {passive: true});
+}

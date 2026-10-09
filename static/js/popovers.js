@@ -725,7 +725,7 @@ function vvSync() {
   st.setProperty('--vvh', Math.round(vv.height) + 'px');
   st.setProperty('--vvb', kb ? Math.max(0, Math.round(window.innerHeight - vv.offsetTop - vv.height)) + 'px' : '0px');  // hidden below (keyboard)
   if ((vv.height >= window.innerHeight - 2 || !kb) && !kbBlind() && !typingTouch() && (window.scrollY || document.documentElement.scrollTop)) { window.scrollTo(0, 0); vvSoon(); }
-  chatFit(); tlKbSync(); vvPin(kb);
+  chatFit(); tlKbSync(); detailKbFit(kb); vvPin(kb);  // 2.33.0 (#1087): detailKbFit before the pin decides
   vvDebugUpd();
   // the focused field of a sheet / the docked composer stays above a real keyboard (iOS does not resize the layout)
   const a = document.activeElement;

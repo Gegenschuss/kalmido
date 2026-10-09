@@ -68,6 +68,7 @@ def visible_lists(c, uid):
     from ..lists.groups import grp_name, grp_shares_of_list
     from ..collab.comments import user_names
     from ..collab.news import bell_custom_of
+    from ..notify.caps import cap_hint
     from ..lists.projects import list_progress, milestones_of_lists
     from ..agents.core import agent_ids, listen_default, listen_ids
     from ..collab.reactions import ltags_of_lists
@@ -133,6 +134,8 @@ def visible_lists(c, uid):
         d["icon"] = list_icon_url(r)  # 2.0.2: URL of the own list icon, "" = none
         d["bell"], bc = bells.get(r["id"], ("default", None))  # 2.1.0 (#317): my bell for this list
         d["bell_custom"] = bell_custom_of(bc)  # 2.6.1 (#404): my own choice of events (kept while another mode is set)
+        # 2.33.0 (#927): the owner limits my pushes about this list ({tpl, by, allowed}; null = not limited)
+        d["notif_cap"] = cap_hint(c, r["id"], uid, d["owner_name"]) if r["owner_id"] != uid and collab_all() else None
         d["repos"] = repos.get(r["id"], [])
         d["milestones"] = mss.get(r["id"], [])
         # 2.10.0 (#441): the groups the list is shared with (directly or through a folder of its owner)
@@ -179,6 +182,7 @@ def visible_sections(c, uid, tasks=None):
 @app.get("/api/state")
 def state():
     from ..lists.folders import folders_shared_in, my_folder_props
+    from ..notify.caps import notif_ask_state
     from ..lists.groups import groups_for, grp_of_user
     from ..integrations.paperless import pl_state
     from ..collab.news import news_items, news_sig, news_unread, news_unread_me, notif_matrix
@@ -291,6 +295,7 @@ def state():
         clients=clients_brief(c, uid),  # 2.23.0 (#463): the clients I see (module clients) with their lists
         storage=_quota(c, uid),  # 2.24.0 (#910): used / limit / level
         announce=_announce(c),  # 2.24.0 (#907): the notice above the app (or null)
+        notif_ask=notif_ask_state(c, uid, s),  # 2.33.0 (#927): owners of lists shared before 2.33 are asked once
     )
 
 
