@@ -170,8 +170,9 @@ const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
   click(w, md.querySelector('[data-admsub="org"]')); await sleep(100);
   const oa = md.querySelector('#s-orgagents');
   check(oa && !oa.checked && /Members may connect agents/.test(oa.closest('label').textContent), '#896: Organisation: "Members may connect agents", off by default');
-  oa.checked = true; oa.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(400);
-  check((await call('GET', '/api/admin/agent-policy')).user_agents === true, '#896: the switch sets the policy');
+  oa.checked = true; oa.dispatchEvent(new w.Event('change', {bubbles: true}));
+  // 2.32.0: wait for the PUT instead of a fixed 400 ms (failed once on a slow CI runner)
+  check(await until(async () => (await call('GET', '/api/admin/agent-policy')).user_agents === true), '#896: the switch sets the policy');
   // UX-16: the search
   click(w, md.querySelector('[data-admsub="users"]'));
   const sq = md.querySelector('#s-search');
