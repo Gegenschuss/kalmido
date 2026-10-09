@@ -283,8 +283,9 @@ def overview_build(c, lid, uid):
 @app.get("/api/lists/<int:lid>/overview")
 def overview_get(lid):
     c = db()
-    need_overview(c, lid)
-    return jsonify(overview_build(c, lid, me()))
+    role = need_overview(c, lid)
+    from ..accounts.layouts import page_layouts
+    return jsonify({**overview_build(c, lid, me()), "layout": page_layouts(c, lid, me(), role)})  # 2.32.0 (#983)
 
 
 @app.patch("/api/lists/<int:lid>/overview")

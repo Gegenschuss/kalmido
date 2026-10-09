@@ -22,9 +22,14 @@ function renderMultiBar() {
   const mob = isMobile();
   const btn = ([act, i, lab, cls]) => `<button class="mbb ${cls || ''}" data-act="${act}" data-ico="${i}" title="${esc(lab)}" aria-label="${esc(lab)}">${ic(i, 's')}<span class="mbl">${esc(lab)}</span></button>`;
   b.setAttribute('role', 'toolbar'); b.setAttribute('aria-label', tr('Selection'));
+  // 2.32.0 (#1055): a phone's bar is Move, Date, Complete and More (Edit, Select all, the task's menu, Delete); a long press
+  // on a row starts the selection, more rows join with a tap
+  const acts = !n ? btn(['mb-all', 'all', tr('All')])
+    : mob ? btn(['mb-move', 'folder', tr('Move')]) + btn(['mb-date', 'cal', tr('Date')]) + btn(['mb-done', 'done', tr('Complete')]) + btn(['mb-menu', 'dots', tr('More')])
+      : btn(['mb-done', 'done', tr('Complete')]) + btn(['mb-del', 'trash', tr('Delete'), 'danger']);
+  b.classList.toggle('mb4', mob && n > 0);
   b.innerHTML = `<span class="mcount" role="status">${n ? tr('{0} selected', n) : tr('Tap tasks')}</span>
-    ${n ? '' : btn(['mb-all', 'all', tr('All')])}${n >= 2 && mob ? btn(['me-sheet', 'edit', tr('Edit'), 'pri']) : ''}
-    ${n ? btn(['mb-done', 'done', tr('Complete')]) + btn(['mb-del', 'trash', tr('Delete'), 'danger']) : ''}
+    ${acts}
     <button class="iconbtn mbx" data-act="mb-close" title="${esc(tr('Clear selection') + ' (Esc)')}" aria-label="${esc(tr('Clear selection'))}">${ic('x')}</button>`;
   meSync();
 }
@@ -76,6 +81,21 @@ function overdueAct(a) {
   const d = a.dataset.d;
   if (d === 'pick') { dpOpen(a, {kind: 'date', value: today(), min: today(), clear: false, label: tr('Pick a date…'), onPick: v => { if (v) overdueMove(v); }}); return; }
   overdueMove(d === 'w' ? nextWeekday(1) : addDays(today(), +d));
+}
+// 2.32.0 (#1055): the lists the selection can move to (the bar's Move, the key m without the multi panel)
+function multiMoveMenu(a) {
+  menu(a, S.lists.filter(l => !l.archived && canEditList(l.id)).map(l => ({label: lname(l), icon: l.is_inbox ? 'inbox' : 'list', fn: () => batch('patch', {list_id: l.id, section_id: null}, true)})));
+}
+// 2.32.0 (#1055): the phone bar's More: what does not fit into the four buttons
+function multiMoreMenu(a) {
+  const ids = [...S.multi], one = ids.length === 1 ? taskById(ids[0]) : null;
+  menu(a, [
+    ...(ids.length >= 2 ? [{label: tr('Edit'), icon: 'edit', fn: () => { ME.sheet = true; meSync(); }}] : []),
+    ...(one && one.id > 0 && canEdit(one) ? [{label: tr('More actions'), icon: 'dots', fn: () => taskMenu($(`#view .trow[data-id="${one.id}"] .ttl`) || a, one.id)}] : []),
+    {label: tr('Select all'), icon: 'all', fn: () => { $$('#view .trow').forEach(r => S.multi.add(+r.dataset.id)); render(); }},
+    '-',
+    {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => batch('delete', {}, true)},
+  ]);
 }
 function multiDateMenu(a) {
   menu(a, [
@@ -158,20 +178,73 @@ function filterModal(id) {
 
 // files from the desktop: drop on the open detail or on a task row; images from the clipboard
 const hasFiles = e => [...(e.dataTransfer?.types || [])].includes('Files');
+// 2.32.0 (#362): files dropped anywhere else on an open list (its main area, not the project page) or on a list in the
+// sidebar: one new task per file in that list, the file name without its extension as the title, the file attached.
+// The project page keeps its own drop on "Project files"; the agents' chat keeps its own.
+function fileListTarget(e) {
+  const sr = e.target.closest?.('#side .srow[data-drop]');
+  if (sr) { const k = sr.dataset.drop, l = k === 'inbox' ? inbox() : k.startsWith('l:') ? listById(+k.slice(2)) : null; return l && !l.archived && canAddTo(l.id) ? {l, el: sr} : null; }
+  const v = e.target.closest?.('#view'); if (!v || e.target.closest('#pov-files, .chview, .pov, input, textarea')) return null;
+  const l = routeList(); if (!l || l.archived || !canAddTo(l.id) || curView(l) === 'overview') return null;
+  return {l, el: v};
+}
+function fileDropHint(t) {
+  let h = $('#fdhint');
+  if (!t) { h?.remove(); return; }
+  if (!h) { h = document.createElement('div'); h.id = 'fdhint'; h.setAttribute('role', 'status'); document.body.appendChild(h); }
+  const txt = tr('Drop: one new task per file in {0}', lname(t.l));
+  if (h.textContent !== txt) h.innerHTML = `${ic('upload', 's')}<span>${esc(txt)}</span>`;
+  const r = (t.el.id === 'view' ? t.el : $('#view') || t.el).getBoundingClientRect();
+  h.style.left = Math.round(r.left + r.width / 2) + 'px'; h.style.top = Math.round(r.top + 12) + 'px';
+}
+async function filesToTasks(l, files) {
+  files = noEmpty(files);
+  if (!files.length) return;
+  if (!OUT.online) { toast(tr('Offline: only works again with a connection')); return; }
+  const max = 50 * 1024 * 1024, big = files.find(f => f.size > max);
+  if (big) { toast(tr('{0} is larger than 50 MB', big.name)); return; }
+  toast(files.length === 1 ? tr('Uploading…') : tr('Uploading {0} files…', files.length));
+  let n = 0;
+  await histGroup(async () => {
+    for (const f of files) {
+      let t = null;
+      try {
+        t = await createTask({title: (f.name || tr('File')).replace(/\.[^.]+$/, '') || f.name, list_id: l.id, priority: 0});
+        const fd = new FormData(); fd.append('file', f, f.name);
+        putTask(await api('POST', `/api/tasks/${t.id}/attachments`, fd)); n++;
+      } catch {
+        // 2.32 review: the upload failed (size limit of the server, network): no task without its file stays behind
+        if (t?.id) { try { await api('DELETE', `/api/tasks/${t.id}`); S.tasks.delete(t.id); } catch {} }
+        break; /* api() showed it */
+      }
+    }
+  });
+  render();
+  if (n) toast(trn('{0} task created with its file', '{0} tasks created with their files', n));
+}
 document.addEventListener('dragover', e => {
   if (!hasFiles(e)) return;
   const tgt = e.target.closest('#detail, #view .trow');
   $$('.filedrop').forEach(x => x.classList.remove('filedrop'));
-  if (!tgt || (tgt.id === 'detail' && !S.sel)) return;
+  if (!tgt || (tgt.id === 'detail' && !S.sel)) {
+    const lt = !tgt && fileListTarget(e); fileDropHint(lt || null);
+    if (lt) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; lt.el.classList.add('filedrop'); }
+    return;
+  }
+  fileDropHint(null);
   e.preventDefault(); e.dataTransfer.dropEffect = 'copy';
   tgt.classList.add('filedrop');
 });
-document.addEventListener('dragleave', e => { if (hasFiles(e) && !e.relatedTarget) $$('.filedrop').forEach(x => x.classList.remove('filedrop')); });
+document.addEventListener('dragleave', e => { if (hasFiles(e) && !e.relatedTarget) { $$('.filedrop').forEach(x => x.classList.remove('filedrop')); fileDropHint(null); } });
 document.addEventListener('drop', e => {
   if (!hasFiles(e)) return;
-  $$('.filedrop').forEach(x => x.classList.remove('filedrop'));
+  $$('.filedrop').forEach(x => x.classList.remove('filedrop')); fileDropHint(null);
   const tgt = e.target.closest('#detail, #view .trow');
-  if (!tgt) return;
+  if (!tgt) {
+    const lt = fileListTarget(e); if (!lt) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    filesToTasks(lt.l, e.dataTransfer.files); return;
+  }
   e.preventDefault(); e.stopImmediatePropagation();
   if (e.target.closest('.ccomp')) { addCommentFiles(e.dataTransfer.files); return; }
   const id = tgt.id === 'detail' ? S.sel : +tgt.dataset.id;

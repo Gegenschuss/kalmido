@@ -18,6 +18,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.32.0** (2026-10-09): Shorter ways. **Arrange your views** (Today, Time tracking, overviews, start page and the
+  **project page** as blocks), a **long press selects** tasks on a phone, **swipe through tasks** in the task panel, a
+  **folded share dialog**, **quick add chips**; agents show their **steps while they work** and the **model that really
+  runs**, approvals with 👍 / 👎.
 - **2.31.0** (2026-10-08): Phone everyday. **Task rows line up** on a phone, **Today is calmer** (the daily review
   folds, overdue actions in the heading, the agent band only when needed), a **one-line list head**, the task panel
   **without tabs** on a phone and with a **resizable comments area** on a desktop, **menus in groups**, the *Search* tab
@@ -143,8 +147,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   More > Open file location > Properties > *Shortcut key*; macOS: Shortcuts app > *Open URL* `https://your-host/capture` >
   *Add keyboard shortcut*; GNOME / KDE: a custom shortcut that opens that address
 - Drag and drop everywhere, also on touch: tasks onto a section header or into an empty section, sections by their
-  handle (list and kanban), lists and folders in the sidebar (long-press on a phone); long-press a task for
-  *Move to section…*
+  handle (list and kanban), lists and folders in the sidebar (long-press on a phone); on a phone a long press
+  selects a task (a bar with *Move*, *Date*, *Complete*, *More*; tap more tasks to add them, drag by the grip), and in
+  the open task a swipe left or right goes to the next or previous task
+- Drop files from the desktop on a list: one new task per file, with the file attached
 - Subtasks up to three levels, drag and drop between lists and levels
 - Priorities, tags, pinned tasks (the smart list *Pinned* collects them from every list, 2.16), Markdown notes, attachments (images, PDFs, documents)
 - A website link per task, shown as a small domain chip (paste a URL in quick add or share a page from Android)
@@ -499,7 +505,7 @@ own list with the same name is reused) or one existing list you can edit. The im
 
 ## Users and sharing
 
-<p align="center"><img src="docs/share.png" width="760" alt="The Share dialog of a project: people with their roles and Invite, the agents of the list, the public link"></p>
+<p align="center"><img src="docs/share.png" width="760" alt="The Share dialog of a project: people with their roles open, groups, agents, the public link and the owner folded with their state"></p>
 
 - **Accounts:** admins manage users under *Settings > Administration* (username, display name, optional password,
   optional SSO login, admin flag, Paperless access, ntfy topic, disable / delete). Everyone can change their own display name and
@@ -709,8 +715,12 @@ which answers with a short summary.
 A tap on the logo (*Kalmido* at the top of the sidebar) opens the **start page** (the dashboard): what waits for you (approvals,
 mentions, assignments), today's tasks (complete them right there), News bundled, the team chat, your projects with
 their progress, pinned tasks, recent notes, the agents, a few numbers and a search field. *Customize* orders the cards
-(↑ ↓, also with the keyboard) and hides the ones you do not need; the choice follows you to every device. It can also be
-a tab (Settings > Appearance > Tab bar).
+(↑ ↓, also with the keyboard) and hides the ones you do not need; the choice follows you to every device. The same
+*Customize* (2.32) arranges Today, Time tracking, the agents and projects overviews and the project page: show, hide,
+reorder, half or full width, optionally different on the phone; on the project page the owner sets the standard for
+everyone and each person may override it. The start page can also be a tab (Settings > Appearance > Tab bar).
+
+<p align="center"><img src="docs/project-page.png" width="760" alt="A project page built from blocks: description, status update, milestones, key links, members, project files with an image preview, empty blocks as single lines, Customize"></p>
 
 ## Family
 
@@ -1907,6 +1917,15 @@ an older version stays readable.
 ## Tech
 
 Python (Flask, waitress, python-dateutil, cryptography for Web Push, the stored secrets, backup encryption and the OIDC token checks, icalendar and recurring-ical-events for calendar subscriptions, py_webauthn for passkeys, segno for the QR code of the authenticator app, Pillow for profile photos) and SQLite on the server, plain JavaScript in the browser (`static/js/`, translation helpers in `i18n.js`, translations in `static/i18n/*.json`): no build step, no framework. How the code is organised: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The browser makes no external requests (website links are never fetched, no favicons, no CDN); the server only contacts services you configure, plus the optional update check against GitHub. Icons from [Lucide](https://lucide.dev).
+
+### Logo variants
+
+| File | Use |
+|---|---|
+| `static/icon.svg` | The app icon: dark tile, white heron, violet sun |
+| `static/logo-white.svg` | White heron and horizon with the violet sun, transparent, for dark backgrounds |
+| `static/icon-light.svg` | White tile, dark heron, violet sun |
+| `static/favicon.svg` | Favicon without a tile: the heron is dark in a light browser and white in a dark one |
 
 ## Limits
 

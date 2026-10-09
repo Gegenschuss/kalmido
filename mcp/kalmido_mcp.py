@@ -258,10 +258,10 @@ def t_send_chat(api, a):
             except ValueError:
                 raise ApiError(400, f"files: {f['name']} is not valid base64") from None
             files.append((f["name"], f.get("mime") or "application/octet-stream", data))
-        return api.call("POST", f"/agent/chats/{int(a['user_id'])}", multipart=(_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in")), files))
+        return api.call("POST", f"/agent/chats/{int(a['user_id'])}", multipart=(_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id")), files))
     if not a.get("body"):
         raise ApiError(400, "body (or files) is required")
-    return api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in")))
+    return api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id")))
 
 
 def t_get_attachment(api, a):
@@ -446,10 +446,19 @@ TOOLS = [
     ("set_status", "Report the agent's status, shown on its avatar: idle | working | waiting (for approval) | error | paused, plus a short text "
                    "(paused needs the reason, e.g. 'a person works interactively here': people see it in the chip and the chat; "
                    "events keep queueing until you report another status). "
-                   "task_id (optional): the task you are working on; while working, its comment area shows '<agent> is writing ...'.",
+                   "task_id (optional): the task you are working on; while working, its comment area shows '<agent> is writing ...'. "
+                   "2.32.0: model (the model you really run, as people know it, e.g. 'Opus 5.5'), permission_mode (ask | auto: what "
+                   "this run really uses) and host_permission_mode (your host's own default) are shown in the chat header.",
      _obj({"status": {"type": "string", "enum": ["idle", "working", "waiting", "error", "paused"]}, "text": {"type": "string", "maxLength": 200},
-           "task_id": S_ID},
-          ["status"]), lambda api, a: api.call("PUT", "/agent/status", body=_pick(a, ("status", "text", "task_id")))),
+           "task_id": S_ID, "model": {"type": "string", "maxLength": 80},
+           "permission_mode": {"type": "string", "enum": ["", "ask", "auto"]}, "host_permission_mode": {"type": "string", "enum": ["", "ask", "auto"]}},
+          ["status"]), lambda api, a: api.call("PUT", "/agent/status", body=_pick(a, ("status", "text", "task_id", "model", "permission_mode", "host_permission_mode")))),
+    ("report_progress", "2.32.0: one step of your work -- the short sentence you would write between tool calls ('I read the tests "
+                        "first'). chat_user_id = the person whose chat you are answering (shows live under the typing dots, kept with "
+                        "your answer), or job_id = your job for a person (its history). Only that person sees it. Prose only: NEVER "
+                        "tool output (file contents, logs, rows) and never secrets; one line, at most 500 characters, 60 per minute.",
+     _obj({"text": {"type": "string", "maxLength": 500}, "chat_user_id": S_ID, "job_id": S_ID}, ["text"]),
+     lambda api, a: api.call("POST", "/agent/progress", body=_pick(a, ("text", "chat_user_id", "job_id")))),
     ("list_events", "Events for the agent (mention, comment, assigned, unassigned, chat, reaction, job, tidy, wake, ping, followup_due, "
      "job_request, runtime_changed, reset) after cursor `since`. runtime_changed / reset: your host should restart you (see get_agent "
      "runtime). job_request = a person asks for a proposal: read data.input, answer with submit_proposal. "
@@ -508,6 +517,7 @@ TOOLS = [
                   "answerable while newer messages come. The person's answer arrives as the event chat_choice (message_id, "
                   "choice_ids, labels; permission questions also approval and a reaction event) -- act once per message_id; do not ask twice.",
      _obj({"user_id": S_ID, "body": {"type": "string"}, "task_id": S_ID,
+           "job_id": {**S_ID, "description": "2.32.0: this message is the result of your job for this person (its history shows under it)"},
            "permission": {"type": "boolean"}, "expires_in": {"type": "integer", "minimum": 10, "maximum": 604800},
            "choices": {"type": "array", "maxItems": 8, "items": {"type": "object", "properties": {
                "id": {"type": "string", "maxLength": 40}, "label": {"type": "string", "maxLength": 80},
@@ -1141,7 +1151,7 @@ TOOL_MAP = {t[0]: t for t in TOOLS}
 
 
 TOOL_SCOPES = {
-    "agent": ("get_agent", "react_to_chat", "set_status", "list_events", "wait_for_events", "list_jobs", "create_job", "get_job",
+    "agent": ("get_agent", "react_to_chat", "set_status", "report_progress", "list_events", "wait_for_events", "list_jobs", "create_job", "get_job",
               "submit_proposal", "propose_to_other_topic", "update_job", "list_chats", "chat_typing", "send_chat", "withdraw_chat_choices", "report_usage", "get_usage"),
     "tasks:write": ("add_contract", "add_device", "add_upkeep", "sync_read_later", "add_occasion", "add_deadline", "ingredients_to_shopping", "give_stars", "add_reward", "update_reward", "request_reward",
                     "decide_reward", "create_note", "update_note", "create_task", "update_task", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "batch_tasks",

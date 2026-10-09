@@ -50,15 +50,17 @@ def v1_agent():
 @app.put("/api/v1/agent/status")
 @v1_view
 def v1_agent_status():
-    """{status: idle|working|waiting|error, text?, task_id?} -- shown as the dot on the agent's avatar and in the header chip;
+    """{status: idle|working|waiting|error, text?, task_id?, model?, permission_mode?, host_permission_mode?} -- shown as the dot on the agent's avatar and in the header chip;
     while "working", the task_id's panel (else every task of its lists) shows "<agent> is working on it" (2.0.2; "is writing
     ..." only with a typing signal since 2.13.2)."""
     v1_args(())
     aid = need_agent()
     b = v1_json()
-    unknown = sorted(k for k in b if k not in ("status", "text", "task_id"))
+    unknown = sorted(k for k in b if k not in ("status", "text", "task_id", "model", "permission_mode", "host_permission_mode"))
     if unknown:
         raise UnknownFields(unknown)
+    from ..agents.steps import host_info_in, host_info_set, steps_end
+    hinfo = host_info_in(b)  # 2.32.0 (#1079): what the host really runs with (model, permission mode, its default)
     if b.get("status") not in AGENT_STATUSES:
         raise BadInput(tr("Invalid value: {0}", "status"))
     text = b.get("text") or ""
@@ -73,7 +75,10 @@ def v1_agent_status():
     old = agent_row(c, aid)
     c.execute("UPDATE agents SET status=?, status_text=?, status_at=?, status_task=? WHERE user_id=?",
               (b["status"], text.strip()[:STATUS_TEXT_MAX], iso(now_utc()), tid, aid))
-    if (old["status"], old["status_text"], old["status_task"]) != (b["status"], text.strip()[:STATUS_TEXT_MAX], tid):
+    hchg = host_info_set(c, old, hinfo)
+    if b["status"] in ("idle", "error", "paused"):
+        steps_end(c, aid)  # 2.32.0 (#1081): a run without a chat answer leaves no live steps behind
+    if hchg or (old["status"], old["status_text"], old["status_task"]) != (b["status"], text.strip()[:STATUS_TEXT_MAX], tid):
         bump(c)  # clients reload only when something visible changed (agents may report often)
     c.commit()
     return jsonify(agent_self(c, aid))
@@ -261,6 +266,9 @@ def v1_agent_job_create():
     c.execute("""DELETE FROM agent_jobs WHERE agent_id=? AND state NOT IN ('running','waiting') AND id<=(SELECT id FROM agent_jobs
                  WHERE agent_id=? ORDER BY id DESC LIMIT 1 OFFSET ?)""", (aid, aid, AGENT_JOBS_KEEP))
     job_notify(c, c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone(), None)
+    if log:
+        from ..agents.steps import steps_job_log
+        steps_job_log(c, c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone(), log)  # 2.32.0 (#1081)
     bump(c)
     c.commit()
     return jsonify(job_dict(c, c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone())), 201
@@ -315,6 +323,9 @@ def v1_agent_job_update(jid):
     f["updated_at"] = iso(now_utc())
     c.execute(f"UPDATE agent_jobs SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), jid])
     j2 = c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone()
+    if b.get("append_log"):  # 2.32.0 (#1081): a progress line is a heading of the job's history
+        from ..agents.steps import steps_job_log
+        steps_job_log(c, j2, b["append_log"])
     job_notify(c, j2, j["state"])
     if (j2["state"], j2["title"]) != (j["state"], j["title"]):
         bump(c)  # a log line alone does not make every client reload

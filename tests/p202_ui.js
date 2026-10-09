@@ -205,8 +205,9 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
   w.eval('load().then(render)'); await sleep(700);
   w.eval(`chatOpen(${CL})`); await sleep(800);
   ty = d.querySelector('#chat-typing');
-  // 2.30.0 (#1039): "working" without a task shows under the chat's last message, as "is working on it" without typing dots
-  check(ty && !ty.querySelector('.atdots') && /Claude is working on it/.test(ty.textContent), 'chat: "working" alone is no typing (no dots), but "is working on it" under the messages');
+  // 2.30.0 (#1039) / 2.32.0 (#1062): "working" without a task shows once, in the chat header ("working · Answering"); under the
+  // messages only typing dots, and "working" alone is no typing
+  check(ty && !ty.querySelector('.atdots') && !/working on it/.test(ty.textContent) && /Answering/.test(d.querySelector('#chat-st')?.textContent || ''), 'chat: "working" alone is no typing (no dots), its state only in the header');
   check(d.querySelector('#side [data-go="agents"].aspin'), 'sidebar agents row: spinning ring');
   w.eval('chatClose()');
   w.close();

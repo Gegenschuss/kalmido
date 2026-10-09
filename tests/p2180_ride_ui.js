@@ -260,7 +260,9 @@ const LONG = 'Website relaunch 2026 for the client';
     await o.nav(B + '#agents/' + AG); await ready(ev); await sleep(800);
     // 2.23.0 (#823): the agent's messages show the smiley (and an open question 👍 / 👎), the rest one tap away
     const rr = await ev(`(() => { const out = []; for (const m of document.querySelectorAll('#chat-msgs .cmsg.ag')) { const bs = [...m.querySelectorAll('.rxrow .rx')].filter(b => b.offsetWidth); const r = bs.map(b => b.getBoundingClientRect()); out.push({n: bs.length, w: Math.round(Math.min(...r.map(x => x.width))), h: Math.round(Math.min(...r.map(x => x.height))), l: Math.round(Math.min(...r.map(x => x.left))), r: Math.round(Math.max(...r.map(x => x.right))), op: Math.min(...bs.map(b => +getComputedStyle(b).opacity))}); } return out; })()`);
-    check(rr.length >= 2 && rr.every(x => x.n >= 1 && x.w >= 43.5 && x.h >= 43.5 && x.l >= 0 && x.r <= vw && x.op >= .6), `${tag}: every chat message shows its reactions (44 px, on screen, visible) ` + JSON.stringify(rr));
+    // 2.32.0 (#1062, owner decision): the smiley only after a long press -- before it nothing tappable under the agent's messages
+    // (an open question keeps 👍 / 👎: they stay 44 px)
+    check(rr.length >= 2 && rr.every(x => x.n === 0 || x.w <= 1 || (x.w >= 43.5 && x.h >= 43.5 && x.l >= 0 && x.r <= vw && x.op >= .6)), `${tag}: no smiley before a long press, what shows is 44 px ` + JSON.stringify(rr));
     const P = `(() => { const e = document.querySelector('#chat-msgs .cmsg[data-mid="${q1.id}"] .rxrow [data-e="down"]'); e.scrollIntoView({block: 'center'}); const q = e.getBoundingClientRect(); return {x: q.left + q.width / 2, y: q.top + q.height / 2}; })()`;
     await ev(`(() => { document.querySelector('#chat-msgs .cmsg[data-mid="${q1.id}"] .rxrow .rxtog')?.click(); return 1; })()`); await sleep(300);
     let p = await ev(P); await tap(p.x, p.y);
@@ -313,7 +315,8 @@ const LONG = 'Website relaunch 2026 for the client';
     check(!h.over.length && h.o <= 0 && !h.small.length && !h.folded.some(x => /^Search/.test(x)), `${tag}: the header fits ` + JSON.stringify({over: h.over, small: h.small, folded: h.folded}));
     await ev(`(() => { chatOpen(${AG}); return 1; })()`); await sleep(1500);
     const rr = await ev(`[...document.querySelectorAll('#chat-msgs .cmsg.ag')].map(m => { const bs = [...m.querySelectorAll('.rxrow .rx')].filter(b => b.offsetWidth); return {n: bs.length, h: Math.round(Math.min(...bs.map(b => b.getBoundingClientRect().height))), op: Math.min(...bs.map(b => +getComputedStyle(b).opacity))}; })`);
-    check(rr.length >= 2 && rr.every(x => x.n >= 1 && x.h >= 23.5 && x.op >= .6), `${tag}: the reactions are visible without hover (24 px) ` + JSON.stringify(rr));
+    // 2.32.0 (#1062): the smiley waits for the mouse (hover / focus); what shows without it is 24 px
+    check(rr.length >= 2 && rr.every(x => x.n >= 1 && x.h >= 23.5 && (x.op === 0 || x.op >= .6)), `${tag}: the smiley waits for hover, the rest 24 px ` + JSON.stringify(rr));
     // 2.18.0 (owner feedback, screenshot): composite input bars show the focus once, on the bar (no box inside the box)
     await o.nav(B + '#l/' + L); await ready(ev);
     const fr = await ev(`(() => { const i = document.querySelector('.qadd input, .qadd.dock input'); if (!i) return null; i.focus(); const bar = i.closest('.box').closest('.qadd.dock') || i.closest('.box');

@@ -187,6 +187,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-qfrom': ['quiet_from', N_('Quiet from'), 'time'], 's-qto': ['quiet_to', N_('Quiet until'), 'time'],  // 2.7.0 (#413)
   's-wfrom': ['work_start', N_('Working hours from'), 'time'], 's-wto': ['work_end', N_('Working hours until'), 'time'],  // 2.10.0 (#440)
   's-review': ['review_time', N_('Daily review at'), 'time'],
+  's-lemo': ['list_emoji', N_('Suggest icons for new lists'), 'chk'],  // 2.32.0 (#1077)
 };
 const SET_RENDER = ['sidebar', 'features', 'nav_order', 'show_done_views', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden'];
 function setVal(el, kind) {  // the value a control stands for; undefined = not valid (nothing is saved)
@@ -248,7 +249,7 @@ function settingsSync() {
   const s = S.settings;
   for (const [id, [k, , kind]] of Object.entries(SETS)) {
     const el = $('#' + id, md); if (!el || el === document.activeElement) continue;
-    if (kind === 'chk') el.checked = k === 'celebrate' || k === 'ical_alarms' || k === 'cal_today' || k === 'time_focus' ? s[k] !== '0' : s[k] === '1';
+    if (kind === 'chk') el.checked = k === 'celebrate' || k === 'list_emoji' || k === 'ical_alarms' || k === 'cal_today' || k === 'time_focus' ? s[k] !== '0' : s[k] === '1';
     else { el.value = s[k] ?? ''; if (el.dataset.dp) dpSync(el); }
   }
   for (const el of $$('[data-feat]', md)) el.checked = feat(el.dataset.feat);
@@ -593,6 +594,8 @@ function settingsModal(focus) {
   const pane = {
     account: S.me ? accountHtml() : '',
     look: `<div id="s-lookin">${lookHtml()}</div>
+      <h4 id="s-lemo-h">${tr('New lists')}</h4><div class="row">${chk('s-lemo', s.list_emoji !== '0', tr('Suggest icons for new lists'))}</div>
+      ${hint(tr('A new list gets an icon that matches its name; you can always choose another one. Existing lists keep their icons. For all your devices.'))}
       <h4>${tr('Tips')}</h4><div class="row"><label>${tr('Hints')}</label><button class="btn sm" data-m="hints-reset">${ic('undo', 's')} ${tr('Show tips again')}</button></div>
       ${hint(tr('Brings back the one-time hints on this device (touch screens show helper texts once).'))}
       <h4 id="s-tabbar-h">${tr('Tab bar')}${dev}</h4>
@@ -701,7 +704,7 @@ function settingsModal(focus) {
       ${depsOn() || fieldsOn() || progressOn() ? `<h4>${tr('Projects')}</h4><div class="shelp">${tr('<b>Dependencies:</b> in a task, “Waiting on…” > “Another task” picks the tasks that have to be done first; the task shows “blocked” until they are, and whoever it is assigned to gets a message once the last one is done. “Waiting on…” > “Someone outside” marks a task that waits on a person (a client, an office, a delivery) with a follow-up day. <b>Custom fields</b> (list dialog, owner): text, number, selection, date, checkbox, person or link per task; pin up to two as chips on the rows, sort and filter by them. <b>Status and progress</b> (Project progress module): the list header shows the progress; with collaboration, owner and editors set a status with a short note, and the project status (“Where is it stuck?”) lists overdue, blocked and unassigned tasks of all lists.')}</div>` : ''}
       ${feat('stats') ? `<h4>${tr('Statistics')}</h4><div class="shelp">${tr('Sidebar > Statistics (or pin it as a tab): completions per week / day and per list, on-time rate, overdue trend, focus time and habit streaks of the last 12 weeks.')}</div>` : ''}
       <h4>${tr('Gestures (phone)')}</h4>
-      <div class="shelp">${tr('Swipe right: complete · swipe left: snooze / delete · long-press: the task’s menu (with “Select” for several) · long-press and drag: reorder, move to another column, quadrant or onto a day; drag to the left edge and hold briefly to open the lists (dropping a subtask there = standalone task in that list).')}</div>`,
+      <div class="shelp">${tr('Swipe right: complete · swipe left: snooze / delete · long-press: selects the task (a bar with Move, Date, Complete and More; tap more tasks to add them, drag them by the grip) · long-press and drag: reorder, move to another column, quadrant or onto a day; drag to the left edge and hold briefly to open the lists (dropping a subtask there = standalone task in that list).')}</div>`,
   };
   pane.help += aboutHtml(chk, hint);
   const secs = SET_SECS.filter(([k]) => pane[k]);
@@ -713,8 +716,10 @@ function settingsModal(focus) {
       <div class="spanes">${secs.map(([k]) => `<section class="spane ${k === cur ? '' : 'hidden'}" role="tabpanel" id="sp-${k}" aria-labelledby="st-${k}" data-pane="${k}">${pane[k]}</section>`).join('')}</div></div>`);
   md.classList.add('smodal');
   // 2.25.0 (UX-17): a phone opens on an overview of the areas (name + what is in it); a tap opens one, ‹ goes back
-  const idx = on => { md.classList.toggle('sidx', on); if (on) $('.snav [data-sec].on', md)?.setAttribute('aria-selected', 'false'); };
-  if (isMobile() && !focus) idx(true);
+  // 2.32.0 (#1060): a phone shows no area tabs inside an area, so the header names the area (the overview says "Settings")
+  const head = () => { const h = $('.shdr h3', md); if (!h) return; const sec = isMobile() && !md.classList.contains('sidx') ? secs.find(x => x[0] === cur) : null; h.textContent = sec ? tr(sec[2]) : tr('Settings'); };
+  const idx = on => { md.classList.toggle('sidx', on); if (on) $('.snav [data-sec].on', md)?.setAttribute('aria-selected', 'false'); head(); };
+  if (isMobile() && !focus) idx(true); else head();
   md._idx = idx;
   // 2.13.2 (#478 F13): phones: a "More ›" at the right end of the cut tab strip while more tabs are hidden to the right
   { const nav = $('.snav', md); nav.insertAdjacentHTML('afterend', `<button type="button" class="snmore hidden" data-snmore tabindex="-1" aria-hidden="true">${tr('More')} ›</button>`);
@@ -736,7 +741,7 @@ function settingsModal(focus) {
   const modFocus = {layout: 'cal', collab: 'collab', focus: 'pomo', time: 'time'}[focus];
   if (modFocus) setTimeout(() => { const r = $(`[data-pane="modules"] [data-modrow="${modFocus}"]`, md); if (!r) return; const gd = r.closest('details.modgrp'); if (gd) gd.open = true; const o = $('details.mopt', r); if (o) o.open = true; r.scrollIntoView?.({block: 'start'}); r.classList.add('flash'); }, 0);
   const show = k => {
-    cur = k; LS.set('settingsSec', k);
+    cur = k; LS.set('settingsSec', k); head();
     $$('.snav button', md).forEach(b => { b.classList.toggle('on', b.dataset.sec === k); b.setAttribute('aria-selected', b.dataset.sec === k); });
     $$('.spane', md).forEach(p => p.classList.toggle('hidden', p.dataset.pane !== k));
     $('.spanes', md).scrollTop = 0;

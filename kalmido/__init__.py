@@ -38,6 +38,7 @@ ORDER = (
     "personal.habits",
     "personal.timetrack",
     "accounts.settings",
+    "accounts.layouts",  # 2.32.0 (#1063, #983)
     "accounts.onboarding",
     "accounts.users",
     "accounts.orgs",
@@ -61,6 +62,7 @@ ORDER = (
     "agents.core",
     "collab.reactions",
     "agents.chat",
+    "agents.steps",  # 2.32.0 (#1081 / #1079)
     "agents.admin",
     "agents.api",
     "agents.proposals",

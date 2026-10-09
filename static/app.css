@@ -149,7 +149,20 @@ svg.i.up{transform:rotate(180deg)}
 .qadd .chips{display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.375rem}
 .qchip{display:inline-flex;align-items:center;gap:.3125rem;font:var(--fs-s) var(--mono);padding:2px .4375rem;border-radius:var(--r-s);border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);color:var(--accent)}
 .qchip.off{border-color:var(--line2);color:var(--muted);text-decoration:line-through}
-.qhint{font:var(--fs-s) var(--mono);color:var(--muted);margin-top:.5rem}
+.qhint{font-size:var(--fs-s);color:var(--muted);margin-top:.5rem}
+/* 2.32.0 (#1059): the syntax help as chips that insert the shortcut; the sheet's buttons with a label in their own row */
+.qhint:empty{display:none}
+.qhint:has(.qhcs){display:flex;align-items:center;gap:.375rem;flex-wrap:wrap}
+.qhcs{display:flex;gap:.375rem;flex-wrap:wrap}
+.qhc{display:inline-flex;align-items:center;min-height:1.75rem;padding:.125rem .625rem;border:1px solid var(--line2);border-radius:99rem;background:var(--bg);color:var(--text2);font-size:var(--fs-s);cursor:pointer;white-space:nowrap}
+.qhc:hover{border-color:var(--accent);color:var(--accent)}
+.qhc:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.qhlead{color:var(--muted)}
+.qacts{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.625rem}
+.qacts:empty{display:none}
+.qacts .qlab{display:inline-flex;align-items:center;gap:.375rem}
+@media (pointer:coarse){ .qhc{min-height:2.25rem;padding:.25rem .75rem} .qacts .qlab{min-height:2.75rem} }
+@media (max-width:599px){ .qadd.sheet .qhcs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -.875rem;padding:0 .875rem} .qadd.sheet .qhint:has(.qhcs){flex-wrap:nowrap} }
 
 /* ---------- task rows ---------- */
 .group{margin-bottom:.5rem}
@@ -717,6 +730,9 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 .attadd:hover{border-color:var(--accent);color:var(--accent)}
 .atthint{font-size:.75rem;margin-top:.375rem}
 .filedrop{box-shadow:inset 0 0 0 2px var(--accent)!important;background:color-mix(in srgb,var(--accent) 8%,var(--bg2))!important}
+/* 2.32.0 (#362): what a drop of files onto a list does */
+#fdhint{position:fixed;transform:translateX(-50%);z-index:90;pointer-events:none;display:flex;align-items:center;gap:.5rem;max-width:min(32rem,90vw);padding:.5rem .875rem;border-radius:99rem;background:var(--accent);color:var(--accent-ink);font-size:var(--fs-s);font-weight:500;box-shadow:var(--shadow)}
+#fdhint span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lightbox{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;padding:1rem 1rem 4.375rem}
 .lightbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:.375rem}
 .lbbar{position:fixed;left:0;right:0;bottom:0;display:flex;align-items:center;gap:.375rem;padding:.75rem 1rem calc(.75rem + var(--safe-b));background:rgba(0,0,0,.6);color:#ddd;font-size:.8125rem}
@@ -2363,6 +2379,9 @@ body.pop-open #chatfab,body.modal-open #chatfab{visibility:hidden}
 .dcomp .ccomp:not(:focus-within):not(.used) .cbar,.dcomp .ccomp:not(:focus-within):not(.used) .cfiles:empty{display:none}
 .dcomp .ccomp textarea{max-height:10rem}
 #detail{scroll-padding-bottom:9rem}
+/* 2.32.0 (#1074): with the focus in the sticky comment box the padding above made each typed letter scroll the panel
+   (Chrome reveals the caret 9rem above the bottom edge, the sticky box moves along, the next letter scrolls again) */
+#detail:has(.dbot :focus){scroll-padding-bottom:0}
 .meta .crd{opacity:.75}
 /* 2.0.8 (#321) Settings > AI colleague: lists at a glance */
 .aitbl{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:var(--r-s);overflow:hidden}
@@ -2875,6 +2894,25 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 .shmodal .rolehelp.sdet{display:block}
 .shmodal .rolehelp>summary{cursor:pointer;color:var(--muted);font-size:var(--fs-s)}
 .shmodal .rolehelp[open]{display:grid}
+/* 2.32.0 (#1058): folding parts (Groups, Agents, Public link, Owner); the roles legend is a plain text toggle, no empty box */
+.shmodal .rolehelp{border:0;padding:0;margin:.125rem 0 .5rem}
+.shmodal .rolehelp>summary{list-style:none;display:inline-flex;align-items:center;gap:.25rem;min-height:1.5rem}
+.shmodal .rolehelp>summary::-webkit-details-marker{display:none}
+.shmodal .rolehelp>summary::after{content:"";border:.25rem solid transparent;border-top-color:currentColor;border-bottom:0;margin-left:.125rem;transform:translateY(1px)}
+.shmodal .rolehelp[open]>summary::after{transform:rotate(180deg)}
+.shmodal .rolehelp[open]{padding:.375rem .625rem .5rem;border:1px solid var(--line)}
+.shsec{border-top:1px solid var(--line);margin:.25rem 0 0}
+.shsec>summary{list-style:none;display:flex;align-items:center;gap:.5rem;min-height:2.75rem;cursor:pointer;border-radius:var(--r-s)}
+.shsec>summary::-webkit-details-marker{display:none}
+.shsec>summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.shsec>summary h4{margin:0;flex:none}
+.shsec .shsecst{flex:1 1 auto;min-width:0;font-size:var(--fs-s);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shsec .shchev{flex:none;color:var(--muted);transition:transform .15s}
+.shsec[open] .shchev{transform:rotate(180deg)}
+.shsec[open]>summary{margin-bottom:.25rem}
+.shsec[open] .shsecst{visibility:hidden}
+.shsec[open]{padding-bottom:.5rem}
+.shsec>summary .ib{order:1}.shsec .shsecst{order:2}.shsec .shchev{order:3}
 .shmodal #sh-owner{margin-bottom:.25rem}
 #top .shbtn .bl{font-size:var(--fs-s)}
 #top:is(.tl1,.tl2,.tl3,.tl4) .shbtn .bl{display:none}
@@ -3218,6 +3256,11 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 .ttabs{background:transparent;border:0;padding:0;gap:.125rem}
 .ttabs button{border-radius:.875rem;padding:.25rem .625rem;font-size:var(--fs-m);color:var(--text2)}
 .ttabs button.on{background:var(--bg2);color:var(--text);font-weight:600;box-shadow:inset 0 0 0 1px var(--line2)}
+.ttabs{flex:none}
+.ttabs button>.i{display:none}
+#top:is(.tl3,.tl4) .ttabs button>.i{display:inline-block}
+#top:is(.tl3,.tl4) .ttabs .vtl{display:none}
+#top:is(.tl3,.tl4) .ttabs button{padding:.25rem .5rem;min-width:2rem;justify-content:center}
 /* the second header line: progress, time, status */
 .lhead{gap:.375rem 1.25rem;margin:0 0 .875rem;color:var(--text2)}
 .lprog .pbar{width:17.5rem;max-width:30vw;height:.25rem;background:var(--line2)}
@@ -3359,6 +3402,9 @@ button.gchip:hover{color:var(--text)}
 .rvhd h3{margin:0;font-size:var(--fs-l);display:flex;align-items:center;gap:.375rem}
 .rvnums{display:flex;gap:1rem;flex-wrap:wrap;margin:.375rem 0;font-size:var(--fs-s);color:var(--text2)}
 .rvnums b{color:var(--text);font-size:var(--fs-l);font-variant-numeric:tabular-nums}
+/* 2.32.0 (#1062): no monospace outside code and numbers: the review numbers and words, the task panel's footer */
+.rvcard .rvnums,.rvcard .rvnums span,.rvcard .rvnums b,.rvcard.fold .rvfn{font-family:var(--sans);letter-spacing:normal}
+.dfoot,.dfoot .dfc{font-family:var(--sans)}
 /* 2.31.0 (#1052): the review folded to one line after its first read; the chevron unfolds / folds it */
 .rvhd .rvfold{flex:none;display:inline-grid;place-items:center;width:1.5rem;height:1.5rem;margin-left:-.25rem;border-radius:var(--r-s);color:var(--muted)}
 .rvhd .rvfold:hover{color:var(--text);background:var(--bg3)}
@@ -4840,6 +4886,10 @@ button.lkchip:hover{border-color:var(--accent)}
   .smodal.sidx .snav button.on{background:none;box-shadow:none}
   .smodal.sidx .snav button svg{grid-row:1 / span 2;color:var(--accent)}
   .smodal.sidx .snav .sndesc{display:block;grid-column:2;font-size:var(--fs-m);color:var(--muted);line-height:1.3}
+  /* 2.32.0 (#1060): inside an area no strip of area tabs (‹ goes back to the list of areas, the header names the area);
+     sub-tabs keep their real width and scroll sideways */
+  .smodal:not(.sidx) .snav,.smodal:not(.sidx) .snmore{display:none}
+  .smodal .aisub button{flex:none}
 }
 /* UX-19: Settings > Modules: groups fold, with "3 of 4 on" */
 .modtot{font-size:var(--fs-m);margin:.25rem 0 .5rem}
@@ -4951,6 +5001,10 @@ button.lkchip:hover{border-color:var(--accent)}
 @media (pointer:coarse){ .mev,.metag,.melist li,.melist .metl,.metagl input{min-height:2.75rem} }
 #mbar .mbb.pri{color:var(--accent)}
 #mbar .mbx{flex:none}
+/* 2.32.0 (#1055): the phone's selection bar: four equal labelled buttons (Move, Date, Complete, More); a grip at the end of
+   each row drags it while selecting (no long press needed there) */
+#mbar.mb4 .mbb{flex:1 1 0;min-width:3.25rem}
+.trow .tgrip{flex:none;display:inline-flex;align-items:center;justify-content:center;width:2.75rem;min-height:2.75rem;margin:-.375rem -.5rem -.375rem 0;color:var(--muted);touch-action:none;cursor:grab}
 /* the phone: the multi panel is a bottom sheet over the list (the rows above it stay tappable) */
 @media (max-width:899px){
   #detail.multi{top:auto;max-height:min(82dvh,calc(var(--vvh,100dvh) - 3rem));border-radius:1rem 1rem 0 0;border-top:1px solid var(--line2);box-shadow:0 -.75rem 2.5rem rgba(0,0,0,.35);transform:translateY(102%);padding-top:0;padding-bottom:var(--safe-b);z-index:46}
@@ -4992,7 +5046,7 @@ body.msel #view .qdock{visibility:hidden}
 @media (max-width:899px),(pointer:coarse){
   .aglist .agsrow{flex-wrap:wrap}
   .aglist .agsrow .agacts{display:flex;flex:1 0 100%;flex-wrap:wrap;justify-content:flex-end;gap:.375rem}
-  .agacts [data-ag="hold"],.agacts [data-ag="pause"]{width:auto;padding:0 .625rem;gap:.375rem;font-size:var(--fs-s)}
+  .agacts [data-ag="hold"],.agacts [data-ag="pause"],.agacts [data-ag="test"],.agacts [data-ag="edit"]{width:auto;padding:0 .625rem;gap:.375rem;font-size:var(--fs-s)}  /* 2.32.0 (#1060): send test + edit with words too */
   .agacts .aglbl{display:inline;white-space:nowrap}
 }
 /* 2.26.x (DeX): a long list name in the agents' list table wraps (two lines) instead of being cut */
@@ -5192,3 +5246,82 @@ a.nitem.ndm{text-decoration:none;color:inherit}
   :root .trow .chk::after{left:auto;right:-.125rem;width:2.75rem}  /* still 44 px wide: it grows to the left instead */
   .trow > .caret{z-index:1}  /* the subtask arrow left of the circle stays tappable above that area */
 }
+/* 2.32.0 (#1063, #983, #1061): the view builder. Blocks in the chosen order; "half" = two side by side on a computer,
+   "full" = the whole width; phones: one column. Customize = the editor list (.lyed .dcust, the start page's rows). */
+.lygrid{display:grid;grid-template-columns:minmax(0,1fr);gap:0 1rem;align-items:start}
+@media (min-width:1100px){ .lygrid{grid-template-columns:repeat(2,minmax(0,1fr))} .lygrid > .ly-full{grid-column:1/-1} }
+.dgrid > .ly-full{grid-column:1/-1}
+.lyb{min-width:0}
+.lyb > .dcard{height:100%}
+.lyed{max-width:40rem}
+.lyopts{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem 1rem;margin:0 0 .75rem}
+.lyed .dcust{max-width:none}
+.lyed .dcust li[draggable]{cursor:grab}
+.lyed .dcust li.lydragging{opacity:.5}
+.lyed .dcust li.lyover{border-color:var(--accent)}
+.lyed .lyg{color:var(--muted);display:inline-flex}
+.lyed .lysz{min-width:4rem;justify-content:center}
+.lyhint{font-size:var(--fs-s);margin:-.5rem 0 .75rem}
+.lyx{opacity:.55}
+.lyx:hover,.lyx:focus-visible{opacity:1}
+@media (pointer:coarse){ .lyx{min-width:2.75rem;min-height:2.75rem;justify-content:center} }  /* 2.32 review: the × of a block is a full touch target on a phone */
+.lyadd{display:flex;justify-content:flex-end;margin-top:.75rem}
+.povlybar{display:flex;align-items:center;gap:.5rem;margin:.5rem 0 0;font-size:var(--fs-s)}
+/* #1061: an empty block is one line: title, a short hint (cut), its button */
+.povs.povs-empty{padding:.375rem .75rem .375rem 1rem}
+.povs.povs-empty .povh{flex-wrap:nowrap;margin-bottom:0}
+.povs.povs-empty .povh h3{flex:none}
+.povemh{font-size:var(--fs-s);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto}
+.povs.povs-empty .povemh + .spacer{flex:0 0 0}
+/* #983: image previews of project files and task attachments */
+.povf.povimg a{display:flex;align-items:center;gap:.5rem;min-width:0}
+.povf.povimg img{width:3.5rem;height:3.5rem;object-fit:cover;border-radius:var(--r-s);border:1px solid var(--line);background:var(--bg);flex:none}
+@media (max-width:899px){
+  .povemh{display:none}
+  .povs.povs-empty .povemh + .spacer{flex:1 1 auto}
+  .povs.povs-empty .povh .btn{min-height:2.75rem}
+  .lyed .lysz{min-height:2.75rem}
+}
+/* ---- 2.32.0 (#1081): an agent's steps (its prose between tool calls), only ever for the person of the chat / the job.
+   Live: small grey lines under the typing dots, newest on top, a tap hides them; kept: above an answer ("Always show steps");
+   a job's history under its result and in the job list. (#1079) the model the host runs next to the permission badge.
+   (#1062) the chat's reaction smiley only on hover / focus (desktop) or after a long press (touch). (#1082) 👍 / 👎 */
+.chsteps{padding:0 .25rem .25rem}
+.chsteps.hidden{display:none}
+.chstepl{display:flex;flex-direction:column;gap:.125rem;width:100%;min-height:1.5rem;text-align:left;background:none;border:0;padding:.125rem 0;margin:0;color:var(--muted);font:inherit;font-size:var(--fs-xs);line-height:1.35;cursor:pointer}
+.chstepl:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--r-s)}
+.chstep{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;animation:chstepin .3s ease}
+.chstep+.chstep{opacity:.7}
+@keyframes chstepin{from{opacity:0;transform:translateY(-.25rem)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){ .chstep{animation:none} }
+.chstepon{font-size:var(--fs-xs);color:var(--muted)}
+.csteps{display:flex;flex-direction:column;gap:.125rem;margin:0 0 .25rem;max-width:100%;color:var(--muted);font-size:var(--fs-xs);line-height:1.35;overflow-wrap:anywhere}
+.chl2{display:flex;align-items:center;gap:.375rem;min-width:0}
+.chl2 .chst{flex:0 1 auto}
+.chmodel{flex:none;max-width:55%;color:var(--muted);font-size:var(--fs-s);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chmodel::before{content:"·";margin-right:.375rem}
+.chstog{color:var(--muted)}
+.chstog.on{color:var(--accent)}
+.jobv{margin-top:.375rem;font-size:var(--fs-s)}
+.jobv>summary{cursor:pointer;color:var(--text2);min-height:1.5rem}
+.jvb{display:flex;flex-direction:column;gap:.125rem;margin-top:.25rem;color:var(--muted);font-size:var(--fs-xs);line-height:1.4;max-height:24rem;overflow:auto;overflow-wrap:anywhere}
+.jvh{display:flex;gap:.5rem;margin-top:.375rem;color:var(--text2)}
+.jvh time{flex:none;color:var(--muted);font-variant-numeric:tabular-nums}
+.jvs{padding-left:3rem}
+.jvdl{margin-top:.375rem;align-self:flex-start;display:inline-flex;align-items:center;gap:.25rem}
+.thumb{display:inline-block;line-height:1;font-style:normal}
+@media (hover:hover) and (pointer:fine){ #chat-msgs .cmsg:not(:hover):not(:focus-within):not(.rxshow) .rx.rxtog:not([aria-expanded="true"]){opacity:0} }
+@media (hover:none),(pointer:coarse){
+  #chat-msgs .cmsg:not(.rxshow):not(:focus-within) .rxrow .rx.rxtog{position:absolute;width:1px;height:1px;min-width:0;min-height:0;margin:0;padding:0;overflow:hidden;clip-path:inset(50%)}
+  .chstepl{min-height:2.75rem;justify-content:center}
+  .jobv>summary{padding:.625rem 0}
+  .chstepon{min-height:2.75rem}
+}
+/* 2.32.0 (#1071): phones: swiping the open task sideways to the next / previous one; "3 of 12" for a moment at the top */
+#detail.dswipe{overflow-x:hidden}
+.dswpos{position:fixed;top:calc(var(--safe-t,0px) + .5rem);left:50%;transform:translate(-50%,-.5rem);z-index:70;padding:.25rem .75rem;border-radius:99rem;background:var(--bg3);border:1px solid var(--line2);color:var(--text2);font-size:var(--fs-s);box-shadow:0 .25rem 1rem rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s}
+.dswpos.on{opacity:1;transform:translate(-50%,0)}
+@media (prefers-reduced-motion:reduce){ .dswpos{transition:none} }
+@media (max-width:37.5rem){ .chnm b{flex:none;max-width:45%} .chnm .chmode{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis} }  /* 2.32.0 (#1079): the name before the longer badge */
+.lybar{display:flex;align-items:center;gap:.5rem}
+.agview .lygrid,.ovw .lygrid{row-gap:.75rem}

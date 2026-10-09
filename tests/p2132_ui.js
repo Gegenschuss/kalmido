@@ -336,16 +336,16 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     check(t11.stpill >= 43.5 && t11.whob <= -9.5, '390 F11: "Set status" 44 px high, assignee pictures with a 44 px hit area ' + JSON.stringify(t11));
     // F13 + helper texts: Settings on the phone
     await ev(`(() => { settingsModal('integr'); return 1; })()`); await sleep(1200);
-    const sn = await ev(`(() => { const b = document.querySelector('.snmore'); return {more: !!b && !b.classList.contains('hidden') && getComputedStyle(b).display !== 'none'}; })()`);
-    check(sn.more, '390 F13: the cut settings tab strip shows "More ›"');
+    // 2.32.0 (#1060) replaces F13: inside an area a phone shows no strip of area tabs (and so no "More ›"); ‹ goes back to the
+    // list of areas, the header names the area
+    const sn = await ev(`(() => { const b = document.querySelector('.snmore'), n = document.querySelector('.smodal .snav'); return {more: !!b && getComputedStyle(b).display !== 'none', nav: getComputedStyle(n).display, back: getComputedStyle(document.querySelector('.smodal .sback')).display, h: document.querySelector('.smodal .shdr h3').textContent}; })()`);
+    check(!sn.more && sn.nav === 'none' && sn.back !== 'none' && /^Integr/.test(sn.h), '390 #1060: inside an area no area tabs, a back arrow, the header names the area ' + JSON.stringify(sn));
     const CNT = `(() => { const vis = e => e.offsetWidth && e.offsetHeight && getComputedStyle(e).visibility !== 'hidden'; const root = document.querySelector('.smodal');
       const hs = [...root.querySelectorAll('.shint:not(.iisrc), .mhint, p.muted, div.muted')].filter(vis).filter(e => !e.closest('button') && e.textContent.trim().length > 25);
       return hs.filter(e => !hs.some(o => o !== e && o.contains(e))).length; })()`;
     const ni = await ev(CNT);
     check(ni <= 4, '390 helper texts: Integrations has at most 4 inline texts (was 9): ' + ni);
     await shot('p2132-390-settings-integr.png');
-    await ev(`(() => { const n = document.querySelector('.snav'); n.scrollLeft = n.scrollWidth; return 1; })()`); await sleep(400);
-    check(await ev(`document.querySelector('.snmore').classList.contains('hidden')`), '390 F13: at the end of the strip "More ›" goes');
     await ev(`(() => { document.querySelector('.snav [data-sec="users"]').click(); return 1; })()`); await sleep(1500);
     const nu = await ev(CNT);
     check(nu <= 4, '390 helper texts: Administration has at most 4 inline texts (was 8): ' + nu);

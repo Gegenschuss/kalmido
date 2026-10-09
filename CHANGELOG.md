@@ -7,6 +7,83 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.32.0] - 2026-10-09
+
+**In short:** Shorter ways, part 2 of the usability round, and a more talkative agent chat. **Views you arrange
+yourself** (Today, Time tracking, the agents and projects overviews, the start page and the **project page** as blocks:
+show, hide, reorder, half or full width, a different arrangement for the phone), **a long press selects** tasks on a
+phone with a bar for *Move*, *Date*, *Complete* and *More*, **swipe through tasks** in the open task panel, a **share
+dialog in folded parts**, **quick add with chips**, **settings on a phone without a second tab row**. Agents can show
+their **steps while they work**, the chat header names the **model and permission mode that really run**, and
+approvals use **thumbs up / down**. Fix: typing a comment no longer scrolls the task panel with every letter.
+
+### Added
+- **Arrange your views** (#1063): Today (*Customize Today…* in its "…" menu), Time tracking, the Agents overview, the
+  projects overview and the start page share one builder: *Customize* shows every block with ↑ ↓ (Alt+arrow keys,
+  dragging on a computer, each move announced), a switch to hide it and *Half* / *Full* width (two side by side on a
+  computer). *Different on the phone* keeps a second arrangement for small screens, *Reset* returns to the default.
+  Stored per person on the server (`view_today`, `view_time`, `view_agents`, `view_projects`, `dashboard`), the same on
+  every device; agents cannot change arrangements. Time tracking remembers its period and the open entries.
+- **Project page as blocks** (#983 #1061): the owner and list admins set the arrangement for everyone (*Customize* >
+  *Standard for all*), each person may override it for themselves (*Only for me*, *Reset to the standard*); a small ×
+  hides a block, *+ Block* brings it back. Images in project files and task attachments show as previews and open large.
+  Empty blocks take one line (title, hint, button) instead of a whole card. `GET/PUT /api/lists/<id>/layout`.
+- **Select by long press on a phone** (#1055): a long press on a task selects it; tapping more tasks adds them. A bar
+  offers *Move* (choose a list), *Date* (today, tomorrow, next week, pick a date, none), *Complete* and *More* (*Edit* for
+  several tasks, *More actions* for one, *Select all*, *Delete*). While selecting, every row has a grip to drag it at
+  once; holding and dragging outside the selection works as before.
+- **Swipe through tasks on a phone** (#1071): in the open task panel, swipe the properties left or right for the next or
+  previous task of the view you came from (its sort and filter); "3 of 12" shows briefly, the ends spring back, typed
+  text is saved first. The comments, fields with focus, selected text, sideways scrolling parts and the screen edges
+  (system back) are left alone.
+- **Agent steps** (#1081): an agent's short prose between its tool calls (`POST /api/v1/agent/progress` with
+  `chat_user_id` or `job_id`, MCP `report_progress`) shows as up to three small grey lines under the typing dots, only
+  for the person the agent works for; a tap hides them (*Show steps* brings them back). The switch *Always show steps*
+  in the chat header keeps them above every answer. A job result gets a folded *History* grouped by the job's progress
+  messages (300 lines, the whole history as a text file). Steps are stored with the answer or job and are never shown
+  to other members, admins, other workspaces or agents; recognisable secrets are replaced by "[removed]" before they are
+  stored, and agents are told to send prose only, never tool output. Rate limit 60 per minute and agent.
+- **Model and permission mode as they run** (#1079): `PUT /api/v1/agent/status` takes `model`, `permission_mode` and
+  `host_permission_mode`; the chat header shows "Host default (Auto)" and the running model ("Opus 5.5"), and both
+  values when the chosen model or mode differs from what runs ("set: sonnet · running: Opus 5.5").
+- **Drop files on a list** (#362): files dragged from the desktop onto an open list or a list in the sidebar become one
+  new task each, named after the file, with the file attached (one undo step); dropping on a task, the task panel,
+  comments and project files works as before.
+- **Suggest icons for new lists** (#1077): a personal switch in Settings > Appearance (on by default, all devices).
+- **Logo variants** (#1070): `static/logo-white.svg` (white mark for dark backgrounds) and `static/icon-light.svg`
+  (white tile); the favicon follows the browser's light or dark mode. The violet sun stays in every variant; the app
+  icons are unchanged.
+
+### Changed
+- **Share dialog in parts** (#1058): *People* stays open; groups, agents, the public link and the owner fold, with a
+  short state in their line (agent "listens in", link on / off / expired). The agent switches explain themselves
+  behind the (i), and *What the roles may do* is a plain fold-out line.
+- **Quick add** (#1059): the same placeholder on every device; the syntax help became chips that insert the shortcut
+  at the cursor (the keyboard stays open), also in the desktop dock and *Note to inbox*; on a phone *File* and
+  *Details* are labelled buttons in their own row.
+- **Settings on a phone** (#1060): inside an area the second row of area tabs is gone, the back arrow leads to the list
+  of areas and the header names the area; sub-tabs keep their width and scroll sideways; the agent card labels *Send
+  test* and *Edit*.
+- **Agent chat** (#1062): "working" is stated once, in the header (below the messages only the typing dots); the
+  reaction smiley under an agent's message appears on hover, focus or a long press.
+- **Calmer fonts and header** (#1062): no monospace outside code and numbers (daily review, task panel footer, quick
+  add help); with the task panel open on a computer the view tabs stay in the header as icons, *Share* moves into "…".
+- **Approvals with thumbs** (#1082): permission questions, job approvals, merge / integrate / deploy approvals and
+  task approvals use 👍 / 👎 with their text (the emoji is hidden from screen readers); the reaction button stays an
+  icon.
+- **Agent rules** (#1078): the rules template (`mcp/CLAUDE.template.md`) and docs/AGENT-SETUP.md add: read the whole
+  task with all comments before answering a task event, answer task events only on the task, hand anything a person
+  must apply themselves to them as a high-priority task with a checklist, report model and mode, steps only as prose.
+
+### Fixed
+- **Typing a comment scrolled the task panel** (#1074): on Android (Chrome) every letter in the comment box moved the
+  panel down by about 50 px; the panel's bottom scroll padding is dropped while the docked comment box has the focus,
+  and the growing box keeps the panel's position.
+
+### Upgrade notes
+- Additive database changes only: table `agent_steps`, table `list_layouts`, columns `agents.host_info`,
+  `agent_chat.job_id` and `lists.page_layout`, new user settings. 2.31.2 keeps running on a migrated database.
+
 ## [2.31.2] - 2026-10-09
 
 ### Fixed
@@ -3280,7 +3357,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.31.2...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.32.0...HEAD
+[2.32.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.32.0
 [2.31.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.31.2
 [2.31.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.31.1
 [2.31.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.31.0

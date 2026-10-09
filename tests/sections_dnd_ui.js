@@ -120,11 +120,8 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   const te = touch(w, row(t2), 'touchend'); await sleep(150);
   // 2.13.0 (#453 A14): a long press without moving selects the task in a list (Kanban keeps "Move to column…"); the
   // section picker itself is the same
-  // 2.25.0 (UX-11): the long press opens the task's menu, "Select" (Auswählen) first; it selects the task
-  const lp = d.querySelector('#pop:not(.hidden)'), selB = lp && [...lp.querySelectorAll('[role="menuitem"]')].find(x => /Auswählen/.test(x.textContent));
-  check(te.defaultPrevented && !!selB && !w.eval('S.multiMode'), 'long-press on a task without moving: its menu with "Select" (2.25.0)');
-  selB?.click(); await sleep(100);
-  check(w.eval('S.multiMode') && w.eval(`S.multi.has(${t2})`), '"Select" in that menu selects the task');
+  // 2.32.0 (#1055): the long press selects the task at once (2.25.0 UX-11 opened its menu with "Select" first)
+  check(te.defaultPrevented && !d.querySelector('#pop:not(.hidden)') && w.eval('S.multiMode') && w.eval(`S.multi.has(${t2})`), 'long-press on a task without moving selects it (2.32.0)');
   w.eval('S.multi.clear(); S.multiMode = false; render()');
   w.eval(`sectionPicker(document.querySelector('#view .trow[data-id="${t2}"]'), ${t2})`); await sleep(150);
   let pop = d.querySelector('#pop:not(.hidden)');

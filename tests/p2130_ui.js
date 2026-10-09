@@ -177,10 +177,12 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   // 2.26.0 (#936): the bar keeps count, Complete, Delete, Clear selection; from two tasks "Edit" opens the multi panel
   w.eval(`S.multiMode = true; S.multi.add(${T[0]}); renderMultiBar()`);
   let mb = [...d.querySelectorAll('#mbar .mbb:not([hidden])')].map(b => b.querySelector('.mbl')?.textContent);
-  check(mb.join('|') === 'Complete|Delete' && d.querySelector('#mbar [data-act="mb-close"]'), 'A14: phone selection bar: labels, Complete + Delete: ' + mb.join('|'));
+  // 2.32.0 (#1055): the phone's bar is Move, Date, Complete, More; Edit (from two tasks) and Delete are under More
+  check(mb.join('|') === 'Move|Date|Complete|More' && d.querySelector('#mbar [data-act="mb-close"]'), 'A14 / #1055: phone selection bar: Move, Date, Complete, More: ' + mb.join('|'));
   w.eval(`S.multi.add(${T[1]}); renderMultiBar()`);
-  mb = [...d.querySelectorAll('#mbar .mbb:not([hidden])')].map(b => b.querySelector('.mbl')?.textContent);
-  check(mb.join('|') === 'Edit|Complete|Delete', 'A14 (2.26.0): from two tasks "Edit" (the panel as a sheet): ' + mb.join('|'));
+  click(w, d.querySelector('#mbar [data-act="mb-menu"]')); await sleep(100);
+  const mm = [...d.querySelectorAll('#pop [role="menuitem"]')].map(b => b.textContent);
+  check(mm.join('|') === 'Edit|Select all|Delete', 'A14 (2.26.0) / #1055: from two tasks More offers "Edit" (the panel as a sheet): ' + mm.join('|'));
   closeAll(w); w.eval('S.multi.clear(); S.multiMode = false; render()');
   w.eval(`openQuickSheet('Call Bob tomorrow 10:00')`); await sleep(100);
   check(d.body.classList.contains('qsheet-open'), 'P8: the + button hides behind the add sheet');
@@ -376,11 +378,10 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     // A14: long press on a row = select
     const rw = await ev(`(() => { const r = document.querySelector('#view .trow .tmain').getBoundingClientRect(); return {x: r.left + 30, y: r.top + r.height / 2}; })()`);
     await tap(rw.x, rw.y, 700); await sleep(400);
-    // 2.25.0 (UX-11): the long press opens the task's menu; its "Auswählen" selects the row
-    const lpm = await ev(`(() => { const b = [...document.querySelectorAll('#pop [role="menuitem"]')].find(x => /Auswählen/.test(x.textContent)); if (b) b.click(); return !!b; })()`); await sleep(300);
-    check(lpm, '390 UX-11: the long press opens the task menu with "Auswählen"');
-    const sel = await ev(`(() => { const b = document.querySelector('#mbar'), r = b.getBoundingClientRect(); return {mode: S.multiMode, n: S.multi.size, vis: !b.classList.contains('hidden'), in: r.left >= 0 && r.right <= innerWidth + .5, lab: [...b.querySelectorAll('.mbb:not([hidden]) .mbl')].map(x => x.textContent).join('|')}; })()`);
-    check(sel.mode && sel.n === 1 && sel.vis && sel.in && /Löschen/.test(sel.lab), '390 A14: long press selects the row, the bar fits with labels ' + JSON.stringify(sel));
+    // 2.32.0 (#1055): the long press selects the row at once (2.25.0 UX-11 opened the task's menu first); the phone's bar:
+    // Verschieben, Datum, Erledigt, Mehr (Löschen is under Mehr)
+    const sel = await ev(`(() => { const b = document.querySelector('#mbar'), r = b.getBoundingClientRect(); return {mode: S.multiMode, n: S.multi.size, menu: !!document.querySelector('#pop:not(.hidden) [role="menuitem"]'), vis: !b.classList.contains('hidden'), in: r.left >= 0 && r.right <= innerWidth + .5, lab: [...b.querySelectorAll('.mbb:not([hidden]) .mbl')].map(x => x.textContent).join('|')}; })()`);
+    check(sel.mode && sel.n === 1 && !sel.menu && sel.vis && sel.in && sel.lab === 'Verschieben|Datum|Erledigen|Mehr', '390 #1055: long press selects the row, the bar fits with labels ' + JSON.stringify(sel));
     await shot('p2130-select-390.png');
     await ev(`(() => { S.multi.clear(); S.multiMode = false; render(); return 1; })()`);
     // the keyboard: the chat with a keyboard-sized viewport keeps the newest message in view (#453 N4 still holds)

@@ -119,6 +119,7 @@ The most used helpers:
 | `personal/habits.py` | Habits and focus sessions (pomodoro), private per user. |
 | `personal/timetrack.py` | Time tracking (module "time") and the unknown-JSON-field check of the REST API. |
 | `accounts/settings.py` | Per-user settings, the data export and Web Push subscriptions. |
+| `accounts/layouts.py` | 2.32.0: views built from blocks: the layout format, the project page arrangement (standard + own); people only, never agents. |
 | `accounts/onboarding.py` | Onboarding and the sample project. |
 | `accounts/users.py` | Users and the own account (admin user management, passwords, deletion). |
 | `lists/templates.py` | Task and list templates, built-in project types. |
@@ -260,7 +261,7 @@ registering the ones of its area.
 | `listedit.js` | List editing, keyboard reordering, recent lists. |
 | `git.js` | Git integration of project lists: repositories, pull requests + CI, agents' merge requests. |
 | `chat.js` | Team chat and notes of a list / project. |
-| `dashboard.js` | News bundled per task, the start page (dashboard) and Settings > Tasks by e-mail. |
+| `dashboard.js` | News bundled per task, the view builder (2.32.0: blocks per view, "Customize", project page standard + own arrangement; server side `kalmido/accounts/layouts.py`), the start page (dashboard) and Settings > Tasks by e-mail. |
 | `family.js` | The module "Family". |
 | `calevents.js` | Events (module "events"): the editor and popover, the agenda, creating in the week grid, calendars, the phone setup. |
 | `contacts.js` | Contacts (module "contacts"): the view, the editor, the card, links between contacts and tasks, import / export. |

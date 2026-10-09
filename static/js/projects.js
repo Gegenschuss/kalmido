@@ -124,9 +124,12 @@ function viewOverview() {
   const tiles = [[sum('overdue'), tr('overdue'), tr('open tasks past their date')], [sum('blocked'), tr('blocked'), tr('tasks blocked by another task')],
     ...(statusOn() ? [[riskLists().length, tr('at risk'), tr('lists at risk or off track')]] : []),
     ...(collab() && S.lists.some(l => l.shared) ? [[sum('unassigned'), tr('without assignee'), tr('open tasks in shared lists')]] : [])];
-  let h = `<div class="stats ovw"><div class="sttiles">${tiles.map(([v, l, s]) => `<div class="${v ? 'hot' : ''}"><b>${v}</b><span>${esc(l)}</span><small>${esc(s)}</small></div>`).join('')}</div>
-    <div class="nbar"><div class="seg"><button class="${S.ov.only ? '' : 'on'}" data-act="ov-only" data-k="">${tr('All lists')}</button><button class="${S.ov.only ? 'on' : ''}" data-act="ov-only" data-k="1">${tr('Needs attention')}</button></div></div>`;
-  if (!shown.length) return h + `<div class="empty">${ic('done')}${tr('Nothing stuck. No overdue or blocked tasks.')}</div></div>`;
+  // 2.32.0 (#1063): built from blocks (Customize): the totals, the projects, the explanation
+  const P = {tiles: `<div class="sttiles">${tiles.map(([v, l, s]) => `<div class="${v ? 'hot' : ''}"><b>${v}</b><span>${esc(l)}</span><small>${esc(s)}</small></div>`).join('')}</div>`};
+  let h = `<div class="stats ovw"><div class="nbar"><div class="seg"><button class="${S.ov.only ? '' : 'on'}" data-act="ov-only" data-k="">${tr('All lists')}</button><button class="${S.ov.only ? 'on' : ''}" data-act="ov-only" data-k="1">${tr('Needs attention')}</button></div><span class="spacer"></span>${S.ly.view === 'projects' ? '' : lyCustomBtn('projects')}</div>`;
+  if (S.ly.view === 'projects') return h + lyHtml('projects', {}) + '</div>';
+  if (!shown.length) return h + lyHtml('projects', P) + `<div class="empty">${ic('done')}${tr('Nothing stuck. No overdue or blocked tasks.')}</div></div>`;
+  P.projects = '';
   for (const r of shown) {
     const l = r.l, p = l.progress || {done: 0, total: 0};
     const who = t => t.assignee_id ? personName(l.id, t.assignee_id) || '?' : '';
@@ -140,11 +143,12 @@ function viewOverview() {
     }
     if (r.blocked.length) body += `<h4>${ic('lock', 's')}${tr('Blocked')} <span class="c">${r.blocked.length}</span></h4>` + ovMore(r.blocked, t => ovTask(t, `<span class="muted ovw-on">${esc(blockedTitle(t))}</span>`));
     if (r.unassigned.length) body += `<h4>${ic('user', 's')}${tr('Without assignee')} <span class="c">${r.unassigned.length}</span></h4>` + ovMore(r.unassigned, t => ovTask(t, t.due ? `<span class="muted">${esc(dayLabel(t.due))}</span>` : ''));
-    h += `<section class="stcard ovcard ${r.risk < 2 ? 'risk st-' + esc(l.status) : ''}"><div class="ovhead"><button class="ovname" data-go="l/${l.id}"><span class="sw" style="${cssColor(l.color) ? 'background:' + cssColor(l.color) : ''}"></span>${esc(lname(l))}${l.shared && collab() ? ic('users', 's') : ''}</button><span class="spacer"></span>${statusPill(l)}</div>
+    P.projects += `<section class="stcard ovcard ${r.risk < 2 ? 'risk st-' + esc(l.status) : ''}"><div class="ovhead"><button class="ovname" data-go="l/${l.id}"><span class="sw" style="${cssColor(l.color) ? 'background:' + cssColor(l.color) : ''}"></span>${esc(lname(l))}${l.shared && collab() ? ic('users', 's') : ''}</button><span class="spacer"></span>${statusPill(l)}</div>
       ${p.total ? `<div class="ovprog">${progBar(p)}${progMeta(p)}</div>` : ''}${statusNote(l)}
       ${body || `<div class="muted ovok">${ic('check', 's')}${tr('Nothing stuck')}</div>`}</section>`;
   }
-  return h + `<p class="muted stnote">${tr('Progress: completed vs. all main tasks of the list (subtasks too if set in Settings > General), won’t do and the trash left out, recurring tasks count once. Blocked = at least one task blocking it is still open.')}</p></div>`;
+  P.note = `<p class="muted stnote">${tr('Progress: completed vs. all main tasks of the list (subtasks too if set in Settings > General), won’t do and the trash left out, recurring tasks count once. Blocked = at least one task blocking it is still open.')}</p>`;
+  return h + lyHtml('projects', P) + '</div>';
 }
 
 // ---- 2.7.1 (#410): the overview of a project list (tab next to List / Kanban / Timeline, project lists only; not the
@@ -191,8 +195,10 @@ function povLinkIcon(u) {
   return 'link';
 }
 const povFileUrl = (f, dl) => `/api/list-files/${encodeURIComponent(f.id)}${dl ? '?dl=1' : ''}`;
-function povFile(f, url, del) {
+function povFile(f, url, del, src = 'pf') {
   const pdf = f.mime === 'application/pdf', img = isImg(f);
+  // 2.32.0 (#983): an image shows as a preview; a tap opens it large (the lightbox, arrows through the images here)
+  if (img) return `<div class="povf povimg"><a href="${url(f, false)}" data-pov="img-view" data-src="${src}" data-id="${f.id}" title="${esc(f.name)}"><img src="${url(f, false)}" loading="lazy" alt="${esc(f.name)}"><span class="pfn">${esc(f.name)}</span></a>${del || ''}</div>`;
   return `<div class="povf"><a href="${url(f, !(pdf || img))}" ${pdf || img ? 'target="_blank" rel="noopener"' : 'download'} title="${esc(f.name)}">${ic(img ? 'file' : pdf ? 'pdf' : 'file')}<span class="pfn">${esc(f.name)}</span><span class="muted pfs">${fmtSize(f.size)}</span></a>${del || ''}</div>`;
 }
 function povPl(p, del) {
@@ -202,9 +208,15 @@ function povPl(p, del) {
   return `<div class="povf"><a href="${esc(cn.url)}/documents/${encodeURIComponent(p.doc_id)}/details" target="_blank" rel="noopener">${ic('archive')}<span class="pfn">${esc(p.title)}</span><span class="muted pfs">${esc(sub)}</span></a>${del || ''}</div>`;
 }
 const povDel = (k, id, lab) => `<button class="iconbtn povx" data-pov="${k}" data-id="${id}" title="${esc(lab)}" aria-label="${esc(lab)}">${ic('x', 's')}</button>`;
-function povSec(id, title, body, extra = '') {
+function povSec(id, title, body, extra = '', empty = '') {
+  // 2.32.0 (#1061): an empty block is one line (title, a short hint, its button); it grows once it has content
+  if (empty || !body) return `<section class="povs povs-empty" id="pov-${id}"><div class="povh"><h3>${title}</h3>${empty ? `<span class="muted povemh" title="${esc(empty)}">${esc(empty)}</span>` : ''}<span class="spacer"></span>${extra}</div>${body}</section>`;
   return `<section class="povs" id="pov-${id}"><div class="povh"><h3>${title}</h3><span class="spacer"></span>${extra}</div>${body}</section>`;
 }
+// 2.32.0 (#983, #1063): the project page on the view builder: the project's standard (owner / admins) or my own arrangement
+const POV_BLOCKS = [['desc', N_('Description'), 'edit', 'full'], ['status', N_('Status updates'), 'pulse', 'half'], ['ms', N_('Milestones'), 'flag', 'half'],
+  ['files', N_('Project files'), 'file', 'full'], ['links', N_('Key links'), 'link', 'half'], ['people', N_('Members'), 'users', 'half'],
+  ['notes', N_('Notes'), 'journal', 'half'], ['chat', N_('Team chat'), 'comment', 'half'], ['time', N_('Tracked time'), 'clock', 'half']];
 function viewProjOv() {
   const l = routeList(), d = S.povD[l.id];
   if (!d || (!d.busy && d.v !== S.v)) setTimeout(() => povLoad(l.id), 0);
@@ -217,45 +229,50 @@ function viewProjOv() {
       <div class="povbar"><span class="muted">${tr('Markdown')}</span><span class="spacer"></span><button class="btn" data-pov="desc-cancel">${tr('Cancel')}</button><button class="btn pri" data-pov="desc-save">${tr('Save')}</button></div>`
     : j.description ? `<div class="md povmd">${renderMd(j.description, false, {lid: l.id}).replace(/<input type="checkbox"/g, '<input type="checkbox" disabled')}</div>`
       : `<div class="muted povempty">${can ? tr('No description yet. What is this project about, what is the goal?') : tr('No description yet.')}</div>`;
-  let h = povSec('desc', tr('Description'), desc, can && !ed ? `<button class="btn sm" data-pov="desc-edit">${ic('edit', 's')}<span>${tr('Edit')}</span></button>` : '');
+  const P = {}, emp = (c, t) => c ? t : '';
+  P.desc = x => povSec('desc', tr('Description'), !ed && !j.description ? '' : desc, (can && !ed ? `<button class="btn sm" data-pov="desc-edit">${ic('edit', 's')}<span>${tr('Edit')}</span></button>` : '') + x,
+    emp(!ed && !j.description, can ? tr('No description yet. What is this project about, what is the goal?') : tr('No description yet.')));
   // status updates (with collaboration: the existing project status + its history)
   if (statusFor(l)) {
     const hist = (j.status.history || []).slice(0, 5);
-    const body = `${hist.length ? `<div class="sthist povst">${hist.map(x => `<div class="shi"><span class="stdot st-${esc(x.status || 'none')}"></span><div><div><b>${esc(x.status ? statusLabel(x.status) : tr('Status cleared'))}</b> <span class="muted">${esc(x.name || tr('Someone'))} · ${esc(fmtWhen(x.created_at))}</span></div>${x.note ? `<div class="shn">${esc(x.note)}</div>` : ''}</div></div>`).join('')}</div>` : `<div class="muted povempty">${tr('No status updates yet.')}</div>`}`;
-    h += povSec('status', tr('Status updates'), body, `${l.status ? statusPill(l) : ''}${canEditList(l.id) && !l.archived ? `<button class="btn sm" data-act="status" data-id="${l.id}">${ic('pulse', 's')}<span>${tr('Set status')}</span></button>` : ''}`);
+    const body = `${hist.length ? `<div class="sthist povst">${hist.map(x => `<div class="shi"><span class="stdot st-${esc(x.status || 'none')}"></span><div><div><b>${esc(x.status ? statusLabel(x.status) : tr('Status cleared'))}</b> <span class="muted">${esc(x.name || tr('Someone'))} · ${esc(fmtWhen(x.created_at))}</span></div>${x.note ? `<div class="shn">${esc(x.note)}</div>` : ''}</div></div>`).join('')}</div>` : ''}`;
+    P.status = x => povSec('status', tr('Status updates'), body, `${l.status ? statusPill(l) : ''}${canEditList(l.id) && !l.archived ? `<button class="btn sm" data-act="status" data-id="${l.id}">${ic('pulse', 's')}<span>${tr('Set status')}</span></button>` : ''}` + x, emp(!hist.length, tr('No status updates yet.')));
   }
   // milestones
   const ms = j.milestones.map(m => `<div class="povm ${m.done ? 'done' : m.day < t0 ? 'over' : ''}">
       <button class="chk ms ${m.done ? 'on' : ''}" data-pov="ms-done" data-id="${m.id}" role="checkbox" aria-checked="${m.done}" aria-label="${esc(tr('Reached: {0}', m.name))}" ${can ? '' : 'disabled'}>${m.done ? ic('check') : ''}</button>
       <span class="pmn">${S.tasks.has(m.id) ? `<button type="button" class="linkbtn" data-pov="ms-open" data-id="${m.id}" title="${esc(tr('Open the milestone'))}"><span>${esc(m.name)}</span></button>` : `<span>${esc(m.name)}</span>`}</span><span class="pmd">${esc(m.day ? fmtDateLoc(m.day) : tr('No date'))}</span>
       ${can ? `<button class="iconbtn" data-pov="ms-edit" data-id="${m.id}" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit'))}">${ic('edit', 's')}</button>` : ''}</div>`).join('');
-  const msMain = povSec('ms', tr('Milestones'), ms || `<div class="muted povempty">${tr('No milestones yet. They also show in the timeline.')}</div>`, can ? `<button class="btn sm" data-pov="ms-add">${ic('plus', 's')}<span>${tr('Add milestone')}</span></button>` : '');
+  P.ms = x => povSec('ms', tr('Milestones'), ms, (can ? `<button class="btn sm" data-pov="ms-add">${ic('plus', 's')}<span>${tr('Add milestone')}</span></button>` : '') + x, emp(!ms, tr('No milestones yet. They also show in the timeline.')));
   // files
   const plList = feat('paperless') && (plOn() || j.paperless.length);
-  const files = j.files.map(f => povFile(f, povFileUrl, can ? povDel('file-del', f.id, tr('Remove')) : '')).join('') +
+  const files = j.files.map(f => povFile(f, povFileUrl, can ? povDel('file-del', f.id, tr('Remove')) : '', 'pf')).join('') +
     (plList ? j.paperless.map(p => povPl(p, can && !p.hidden && plOn() ? povDel('pl-del', p.id, tr('Remove link')) : '')).join('') : '');
   const fAdd = can ? `<label class="btn sm povup" title="${esc(tr('Images, PDFs, documents'))}">${ic('upload', 's')}<span>${tr('Add file')}</span><input type="file" id="pov-file" multiple hidden></label>${plList && plOn() ? `<button class="btn sm" data-pov="pl-add">${ic('archive', 's')}<span>${tr('Link document')}</span></button>` : ''}` : '';
-  const tf = j.task_files.map(f => `<div class="povf"><a href="${attUrl(f, !(f.mime === 'application/pdf' || isImg(f)))}" ${f.mime === 'application/pdf' || isImg(f) ? 'target="_blank" rel="noopener"' : 'download'} title="${esc(f.name)}">${ic(f.mime === 'application/pdf' ? 'pdf' : 'file')}<span class="pfn">${esc(f.name)}</span><span class="muted pfs">${fmtSize(f.size)}</span></a><button class="povt" data-pov="task" data-id="${f.task_id}" title="${esc(tr('Open task'))}">${ic('sub', 's')}<span>${esc(f.task_title)}</span></button></div>`).join('') +
+  const tf = j.task_files.map(f => isImg(f) ? povFile(f, attUrl, `<button class="povt" data-pov="task" data-id="${f.task_id}" title="${esc(tr('Open task'))}">${ic('sub', 's')}<span>${esc(f.task_title)}</span></button>`, 'tf') : `<div class="povf"><a href="${attUrl(f, !(f.mime === 'application/pdf' || isImg(f)))}" ${f.mime === 'application/pdf' || isImg(f) ? 'target="_blank" rel="noopener"' : 'download'} title="${esc(f.name)}">${ic(f.mime === 'application/pdf' ? 'pdf' : 'file')}<span class="pfn">${esc(f.name)}</span><span class="muted pfs">${fmtSize(f.size)}</span></a><button class="povt" data-pov="task" data-id="${f.task_id}" title="${esc(tr('Open task'))}">${ic('sub', 's')}<span>${esc(f.task_title)}</span></button></div>`).join('') +
     (feat('paperless') ? j.task_paperless.map(p => povPl(p, `<button class="povt" data-pov="task" data-id="${p.task_id}" title="${esc(tr('Open task'))}">${ic('sub', 's')}<span>${esc(p.task_title)}</span></button>`)).join('') : '');
-  const filesSec = povSec('files', tr('Project files'), `<div class="povfl">${files || `<div class="muted povempty">${tr('No project files yet: contracts, briefings, plans.')}</div>`}</div>
+  const fEmpty = !files && !tf;
+  P.files = x => povSec('files', tr('Project files'), `${files ? `<div class="povfl">${files}</div>` : ''}
       ${can && !isTouch() ? `<div class="muted povdz">${ic('upload', 's')} ${tr('Or drop files here')}</div>` : ''}
-      ${tf ? `<details class="povtf" ${LS.get('povTf', true) ? 'open' : ''}><summary>${tr('Attachments from tasks')} <span class="muted">${j.task_files.length + (feat('paperless') ? j.task_paperless.length : 0)}</span></summary><div class="povfl">${tf}</div></details>` : ''}`, fAdd);
+      ${tf ? `<details class="povtf" ${LS.get('povTf', true) ? 'open' : ''}><summary>${tr('Attachments from tasks')} <span class="muted">${j.task_files.length + (feat('paperless') ? j.task_paperless.length : 0)}</span></summary><div class="povfl">${tf}</div></details>` : ''}`, fAdd + x, emp(fEmpty, tr('No project files yet: contracts, briefings, plans.')));
   // side: key links, members, time
   const links = j.links.map((x, i) => `<div class="povl"><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" title="${esc(x.url)}">${ic(povLinkIcon(x.url), 's')}<span class="pln">${esc(x.title)}</span><span class="muted plh">${esc(povHost(x.url))}</span></a>
       ${can ? `<span class="povlb">${i ? `<button class="iconbtn" data-pov="link-up" data-id="${x.id}" title="${esc(tr('Move up'))}" aria-label="${esc(tr('Move up'))}">${ic('chev', 's up')}</button>` : ''}<button class="iconbtn" data-pov="link-edit" data-id="${x.id}" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit'))}">${ic('edit', 's')}</button></span>` : ''}</div>`).join('');
-  let side = povSec('links', tr('Key links'), links || `<div class="muted povempty">${tr('Repository, designs, documents: the addresses everyone needs.')}</div>`, can ? `<button class="btn sm" data-pov="link-add">${ic('plus', 's')}<span>${tr('Add link')}</span></button>` : '');
+  P.links = x => povSec('links', tr('Key links'), links, (can ? `<button class="btn sm" data-pov="link-add">${ic('plus', 's')}<span>${tr('Add link')}</span></button>` : '') + x, emp(!links, tr('Repository, designs, documents: the addresses everyone needs.')));
   if (collab() && j.members.length) {
-    side += povSec('people', tr('Members'), `<div class="povp">${j.members.map(p => `<div class="povpm">${avBtn(p.user_id, p.name)}<span class="ppn">${esc(p.name)}${S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : ''}</span><span class="muted">${esc(roleLabel(p.role))}</span></div>`).join('')}</div>`,
-      canManage(l) && !l.archived ? `<button class="btn sm" data-act="share-list" data-id="${l.id}">${ic('users', 's')}<span>${tr('Share…')}</span></button>` : '');
+    P.people = x => povSec('people', tr('Members'), `<div class="povp">${j.members.map(p => `<div class="povpm">${avBtn(p.user_id, p.name)}<span class="ppn">${esc(p.name)}${S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : ''}</span><span class="muted">${esc(roleLabel(p.role))}</span></div>`).join('')}</div>`,
+      (canManage(l) && !l.archived ? `<button class="btn sm" data-act="share-list" data-id="${l.id}">${ic('users', 's')}<span>${tr('Share…')}</span></button>` : '') + x);
   }
   // 2.17.0 (#442): the project's notes (newest first) and its team chat
   if (notesOn(l)) { const ns = notesOf(l.id).slice(0, 6);
-    side += povSec('notes', tr('Notes'), ns.length ? `<ul class="povnotes">${ns.map(n => `<li><a href="#note/${n.id}">${n.pinned ? ic('pin', 's') : ic('edit', 's')}<span>${esc(n.title)}</span><time class="muted">${esc(relTime(n.updated_at))}</time></a></li>`).join('')}</ul>` : `<div class="muted povempty">${tr('Meeting notes, briefings, decisions: write them next to the tasks.')}</div>`,
-      `<a class="btn sm" href="#notes/${l.id}">${ic('edit', 's')}<span>${notesOf(l.id).length ? tr('All notes') : tr('New note')}</span></a>`); }
-  if (teamOn() && l.shared) side += povSec('chat', tr('Team chat'), `<button type="button" class="btn sm" data-act="list-chat" data-id="${l.id}">${ic('comment', 's')}<span>${tr('Open the list chat')}</span></button>`);
+    P.notes = x => povSec('notes', tr('Notes'), ns.length ? `<ul class="povnotes">${ns.map(n => `<li><a href="#note/${n.id}">${n.pinned ? ic('pin', 's') : ic('edit', 's')}<span>${esc(n.title)}</span><time class="muted">${esc(relTime(n.updated_at))}</time></a></li>`).join('')}</ul>` : '',
+      `<a class="btn sm" href="#notes/${l.id}">${ic('edit', 's')}<span>${notesOf(l.id).length ? tr('All notes') : tr('New note')}</span></a>` + x, emp(!ns.length, tr('Meeting notes, briefings, decisions: write them next to the tasks.'))); }
+  if (teamOn() && l.shared) P.chat = x => povSec('chat', tr('Team chat'), '', `<button type="button" class="btn sm" data-act="list-chat" data-id="${l.id}">${ic('comment', 's')}<span>${tr('Open the list chat')}</span></button>` + x);
   const ts = timeSumHtml([l]);
-  if (timeOn() && j.time) side += povSec('time', tr('Tracked time'), ts || `<div class="muted povempty">${tr('No time tracked yet.')}</div>`);
-  return `<div class="pov">${head}<div class="povg"><div class="povc">${h}${msMain}${filesSec}</div><div class="povc povside">${side}</div></div></div>`;
+  if (timeOn() && j.time) P.time = x => povSec('time', tr('Tracked time'), ts || '', x, emp(!ts, tr('No time tracked yet.')));
+  const y = j.layout || {}, cust = S.ly.view === 'project';
+  const bar = `<div class="povlybar">${!cust && y.mine ? `<span class="muted">${tr('Your own arrangement')}</span>` : ''}<span class="spacer"></span>${cust ? '' : lyCustomBtn('project')}</div>`;
+  return `<div class="pov">${head}${bar}${lyHtml('project', P, {canStd: !!y.can_std && !l.archived, override: true})}</div>`;
 }
 async function povApi(method, url, body) {
   const lid = routeList()?.id;
@@ -317,6 +334,8 @@ document.addEventListener('click', async e => {
   const l = routeList(), d = l && S.povD[l.id], j = d?.j; if (!j) return;
   const id = +b.dataset.id || 0;
   switch (b.dataset.pov) {
+    case 'img-view': { e.preventDefault(); const pf = b.dataset.src === 'pf', all = pf ? j.files.filter(isImg) : j.task_files.filter(isImg);
+      attLightbox(id, all, pf ? povFileUrl : attUrl); break; }  // 2.32.0 (#983)
     case 'desc-edit': S.povEdit = l.id; renderView(); setTimeout(() => { const t = $('#pov-desc-in'); if (t) { t.focus(); autosize(t); } }, 20); break;
     case 'desc-cancel': S.povEdit = null; delete S.drafts['pov:' + l.id]; renderView(); break;
     case 'desc-save': { const v = $('#pov-desc-in')?.value ?? ''; S.povEdit = null; try { await povApi('PATCH', `/api/lists/${l.id}/overview`, {description: v}); } catch { S.povEdit = l.id; return; } delete S.drafts['pov:' + l.id]; renderView(); toast(tr('Saved')); break; }

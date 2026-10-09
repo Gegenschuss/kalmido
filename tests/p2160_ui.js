@@ -275,8 +275,13 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     await o.nav(B + '#agents/' + AG); await ready(ev); await sleep(900);
     // 2.23.0 (#823): the agent's messages: the smiley (and the reactions given), one tap opens 👍 👎 ❤️; mine: none of mine
     const rx = await ev(`[...document.querySelectorAll('#chat-msgs .cmsg.ag')].map(m => { const bs = [...m.querySelectorAll('.rxrow .rx')].filter(b => b.offsetWidth); if (!bs.length) return null; const r = bs.map(b => b.getBoundingClientRect()); return {me: m.classList.contains('me'), w: Math.round(Math.min(...r.map(x => x.width))), h: Math.round(Math.min(...r.map(x => x.height))), l: Math.round(Math.min(...r.map(x => x.left))), r: Math.round(Math.max(...r.map(x => x.right))), op: Math.min(...bs.map(b => +getComputedStyle(b).opacity))}; })`);
-    check(rx.length >= 1 && rx.every(x => x && x.w >= 44 && x.h >= 44 && x.op >= .6 && x.l >= 0 && x.r <= vw), `${tag}: every agent message shows its smiley (44 px, inside the screen, no long press) ` + JSON.stringify(rx));
+    // 2.32.0 (#1062, owner decision): the smiley shows only after a long press (or hover / focus with a mouse): before it, no
+    // tappable smiley under the agent's messages
+    check(rx.length >= 1 && rx.every(x => !x || x.w <= 1), `${tag}: no smiley under the agent's messages before a long press ` + JSON.stringify(rx));
     await ev(`(() => { const t = [...document.querySelectorAll('#chat-msgs .cmsg.ag .rxrow .rxtog')].pop(); t && t.click(); return 1; })()`); await sleep(300);
+    const rx2 = await ev(`(() => { const m = document.querySelector('#chat-msgs .cmsg.ag.rxshow'); const bs = m ? [...m.querySelectorAll('.rxrow .rx')].filter(b => b.offsetWidth) : []; const r = bs.map(b => b.getBoundingClientRect());
+      return bs.length ? {n: bs.length, w: Math.round(Math.min(...r.map(x => x.width))), h: Math.round(Math.min(...r.map(x => x.height))), l: Math.round(Math.min(...r.map(x => x.left))), r: Math.round(Math.max(...r.map(x => x.right)))} : null; })()`);
+    check(rx2 && rx2.n >= 3 && rx2.w >= 44 && rx2.h >= 44 && rx2.l >= 0 && rx2.r <= vw, `${tag}: opened (long press): the smiley and 👍 👎 ❤️, 44 px, inside the screen ` + JSON.stringify(rx2));
     const em = await ev(`[...document.querySelectorAll('#chat-msgs .cmsg.ag.rxshow .rxrow .rx.add[data-e]')].pop()?.dataset.e`);
     p = await ev(`(() => { const e = [...document.querySelectorAll('#chat-msgs .cmsg.ag .rxrow [data-e="${em}"]')].pop(); e.scrollIntoView({block: 'center'}); const q = e.getBoundingClientRect(); return {x: q.left + q.width / 2, y: q.top + q.height / 2}; })()`); await tap(p.x, p.y);
     check(await until(() => ev(`!!document.querySelector('#chat-msgs .cmsg.ag .chrx .rx.on[data-e="${em}"]')`)), `${tag}: a tap on ${em} reacts`);

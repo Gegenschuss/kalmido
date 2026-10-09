@@ -749,7 +749,8 @@ change its job (title, state, log: `409`). At most 20 requests wait per agent.
 
 ```
 PUT /api/v1/agent/status   {"status": "idle" | "working" | "waiting" | "error", "text": "short, max 200 chars",
-                            "task_id": 51}
+                            "task_id": 51,
+                            "model": "Opus 5.5", "permission_mode": "auto", "host_permission_mode": "auto"}   (2.32.0, optional)
 GET /api/v1/agent          -> {id, username, display_name, enabled, note, status, status_text, status_at, status_task,
                                job_tasks, jobs: {running, waiting}, webhook: {configured, enabled}, events_cursor,
                                online, last_poll_at, runtime (2.4.1)}
@@ -759,14 +760,48 @@ Where people see it (2.30.0, only where the agent really writes):
 
 - `working` **with** `task_id`: "Claude is working on it" (with the status text) in the comment area of exactly that task,
   and *working on #51* in the chat header -- not under the chat messages.
-- `working` **without** `task_id` (e.g. while answering in the chat): under the last chat message ("Claude is working on
-  it · text") and in the header chip only; never in a task and never in a list's agent band. The status text of such a
+- `working` **without** `task_id` (e.g. while answering in the chat): in the chat header ("working · text") and in the
+  header chip only (2.32.0: no longer repeated under the last chat message, there only the typing dots); never in a task
+  and never in a list's agent band. The status text of such a
   status never appears where other people read along, but keep chat content out of it anyway.
 - A running **job** with a `task_id` shows in that task; a job without one only in the **Agents** tab.
 
 Up to 2.29 a status without `task_id` also showed on every task of the lists shared with the agent. The header chip gets a
 spinning ring while an agent works and an accent dot while it waits. `idle` clears the task. Set `working` with the
 `task_id` when you start on a task event, without it for a chat answer, `idle` when done.
+
+**What the host really runs with (2.32.0).** With each status the host may report `model` (the model it really runs, as
+people know it, e.g. "Opus 5.5"; max. 80 characters), `permission_mode` (`ask` | `auto`: what the current run uses) and
+`host_permission_mode` (its own default when the person chose "Host default"). Kalmido keeps the last values with the
+agent (`host` in the agent objects people get) and shows them in the chat header: the permission badge says
+"Host default (Auto)" instead of only "Host default", the model stands next to it, and a model set in the runtime settings
+that the host has not taken over yet shows both ("set: sonnet · runs: Opus 5.5"). Unknown fields stay as before.
+
+**Steps between tool calls (2.32.0).** What an agent writes between its tool calls ("I read the tests first", "Tests
+run") can be shown to the person it works for:
+
+```
+POST /api/v1/agent/progress   {"text": "I read the failing test first", "chat_user_id": 1}   -> 201 {id, text, redacted}
+POST /api/v1/agent/progress   {"text": "Build runs on the test runner", "job_id": 42}
+```
+
+- `chat_user_id`: a chat run for that person. The newest three steps show live, small and grey under the typing dots;
+  the agent's next chat answer to that person keeps them (shown above the answer when the person switched on "Always show
+  steps" in the chat header). A status `idle`, `error` or `paused` ends a run that had no chat answer (a task event).
+- `job_id`: a job of the agent that is **for a person** (`user_id`; else 409). The steps form the job's history, grouped
+  by its progress lines (`append_log`), under the job in the Agents tab and under the chat message that carries the job's
+  result: send that message with `POST /api/v1/agent/chats/{user_id} {"body": "...", "job_id": 42}`. The app shows the
+  newest 300 lines; the whole history is a text file (`GET /api/agents/jobs/{id}/steps?format=txt`, the person only).
+- **Only that person** sees steps: never other members of the organisation, admins, other agents, shared tasks or
+  lists (there only the result; others see the job's title and its progress line as before). No token reads them back.
+- **Prose only.** Never send tool output (file contents, logs, data rows) or secrets. The server folds each step into one
+  line, keeps at most 500 characters (200 live), replaces recognisable secrets (API keys like `sk-…`, `ghp_…`, `AKIA…`,
+  `Bearer …`, private key blocks, passwords in URLs, long values after key / token / secret / password) with
+  `[entfernt]` before storing, and shows it as plain text. Stored for good with the answer / the job. At most 60 steps a
+  minute per agent (429 with `Retry-After`). MCP: `report_progress`.
+- A host running Claude Code headless gets the steps from `claude -p --output-format stream-json --verbose`: every
+  `assistant` event's `text` blocks between `tool_use` blocks are steps (send them at most every 2 seconds, the newest
+  wins); the final answer stays the `result` event.
 
 **Jobs** are shown in the **Agents** tab with the buttons Approve, Reject and Stop. Pressing a button sends a `job` event and adds a line to the task history.
 
@@ -783,7 +818,7 @@ A job object: `{id, agent_id, task_id, user_id, title, state, log, action, actio
 
 ```
 GET  /api/v1/agent/chats?since=<message id>   -> {data: [{id, user: {id, name}, from: "user" | "agent", body, task_id, created_at}], cursor}
-POST /api/v1/agent/chats/{user_id}           {"body": "…", "task_id": 51}
+POST /api/v1/agent/chats/{user_id}           {"body": "…", "task_id": 51, "job_id": 42 (2.32.0: the job whose result this is)}
 ```
 
 In a chat, the agent can create tasks and comments, but only in lists where it has the rights to do so.

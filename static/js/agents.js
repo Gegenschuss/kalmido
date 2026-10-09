@@ -133,8 +133,10 @@ async function waitJobsFresh() {
   try { S.bandJobs.items = (await api('GET', '/api/agents/jobs?state=open')).jobs || []; S.bandJobs.v = S.v; } catch { /* offline: what we have */ }
   return waitJobs();
 }
+// 2.32.0 (#1082): approvals say 👍 / 👎 (the emoji is decoration, the button's text names it)
+const thumbIc = up => `<span class="thumb" aria-hidden="true">${up ? '\u{1F44D}' : '\u{1F44E}'}</span>`;
 const waitJobBtns = j => j.kind ? `<button class="btn sm pri" data-act="prop-open" data-jid="${j.id}">${tr('Review the proposal')}</button>`
-  : `<button class="btn sm pri" data-act="job-do" data-jid="${j.id}" data-a="approve">\u{1F44D} ${tr('Approve')}</button><button class="btn sm" data-act="job-do" data-jid="${j.id}" data-a="reject">${ic('x', 's')} ${tr('Reject')}</button>`;
+  : `<button class="btn sm pri" data-act="job-do" data-jid="${j.id}" data-a="approve">${thumbIc(true)} ${tr('Approve')}</button><button class="btn sm" data-act="job-do" data-jid="${j.id}" data-a="reject">${thumbIc(false)} ${tr('Reject')}</button>`;
 function waitCard() {
   // 2.13.2 (#478 F14): like the agent pill and the chat, the card follows "agents share lists with me", not the Agents
   // module (that is the tab + the band): what waits for my approval never disappears with a switch
@@ -159,7 +161,7 @@ function agBandHtml() {
   // 2.13.2 (#478 N7): in Today the card "… waits for you" shows the same jobs: the band leaves its waiting cell out there
   const wait = job && !(S.route.key === 'today' && waitCard()) ? `<div class="agb-w" role="group" aria-label="${esc(tr('{0} waits for you', job.agent_name))}"><div class="agb-wi"><span class="agb-h">${hdot('waiting')}<b>${esc(tr('{0} waits for you', job.agent_name))}</b></span><span class="agb-t">${job.task_id ? `<span class="mono">#${job.task_id}</span> ` : ''}${esc(job.title)}</span></div>${job.kind
     ? `<button class="btn sm pri" data-act="prop-open" data-jid="${job.id}">${tr('Review the proposal')}</button>`
-    : `<button class="btn sm pri agb-ok" data-act="job-do" data-jid="${job.id}" data-a="approve" aria-label="${esc(tr('Approve'))}">\u{1F44D} ${tr('Yes|approve')}</button><button class="iconbtn agb-no" data-act="job-do" data-jid="${job.id}" data-a="reject" title="${esc(tr('Reject'))}" aria-label="${esc(tr('Reject'))}">✕</button>`}</div>` : '';
+    : `<button class="btn sm pri agb-ok" data-act="job-do" data-jid="${job.id}" data-a="approve" aria-label="${esc(tr('Approve'))}">${thumbIc(true)} ${tr('Yes|approve')}</button><button class="iconbtn agb-no" data-act="job-do" data-jid="${job.id}" data-a="reject" title="${esc(tr('Reject'))}" aria-label="${esc(tr('Reject'))}">${thumbIc(false)}</button>`}</div>` : '';
   const sum = ags.map(a => hdot(agentHst(a))).join('');
   return `<section class="agband ${open ? '' : 'closed'}" aria-label="${esc(tr('Agents live'))}"><button class="agb-tog" data-act="agband" aria-expanded="${open}" title="${esc(open ? tr('Fold the agents') : tr('Show the agents'))}" aria-label="${esc(open ? tr('Fold the agents') : tr('Show the agents'))}">${ic('chev', 's')}${open ? '' : `<span class="agb-sum">${sum}<span>${esc(ags.map(a => a.name).join(', '))}</span></span>`}</button>${open ? `<div class="agb-cells">${ags.map(cell).join('')}${wait}</div>` : (job ? `<span class="agb-wmini">${hdot('waiting')}${esc(tr('{0} waits for you', job.agent_name))}</span>` : '')}</section>`;
 }
@@ -341,7 +343,7 @@ function tidyRowHtml(l) {
   const cands = tidyCands(l), who = cands.find(a => a.id === l.tidy_agent_id) || cands[0];
   // 2.26.0 (#928): who may address the list's agents (owner / list admins switch; default off)
   const sw = (id, k, label, hint) => `<label class="chkl swl agacc"><span class="swc"><input type="checkbox" role="switch" id="${id}" data-agacc="${k}" ${l[k] ? 'checked' : ''} ${may ? '' : 'disabled'}><span class="swt" aria-hidden="true"></span></span><span>${label}</span></label>
-    <div class="shint keep aghint">${hint}</div>`;
+    <div class="shint aghint">${hint}</div>`;  // 2.32.0 (#1058): the explanation behind the (i) at the switch
   const acc = sw('l-agm', 'agent_members', tr('Members may see and use the agent'), tr('Off: only you and list admins can chat with the agent, @mention it or assign it tasks here. Members still see what it does.'))
     + sw('l-agp', 'agent_peers', tr('Agents may address each other'), tr('Off: what an agent writes or assigns here never reaches another agent. Instructions only ever come from people.'));
   return `${acc}<div class="row"><label for="l-tidy">${tr('Agent may tidy up entries')}</label><select id="l-tidy" ${may && cands.length ? '' : 'disabled'}>${TIDY.map(([k, n]) => `<option value="${k}" ${(l.agent_tidy || 'off') === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
@@ -360,7 +362,7 @@ function listenRowHtml(l, ags, may) {
   const dflt = l.listen_default ? tr('Default for software projects: on.') : tr('Default for this kind of list: off, the agent reacts only to an @mention, an assignment or a wake.');
   // 2.27.0 (#964): one agent per list: a plain switch like the two above (lists from before 2.26 with several agents keep the boxes)
   if (ags.length === 1) return `<div class="lsnrow lsn1"><label class="chkl swl agacc lsnag"><span class="swc"><input type="checkbox" role="switch" data-lsn="${ags[0].id}" ${on.has(ags[0].id) ? 'checked' : ''} ${may ? '' : 'disabled'}><span class="swt" aria-hidden="true"></span></span><span>${tr('Agent listens in')}</span></label></div>
-    <div class="shint keep aghint">${tr('{0} gets every new or moved task and every comment people write in this list, without an @mention (only tasks it can see).', esc(ags[0].name))} ${esc(dflt)}</div>`;
+    <div class="shint aghint">${tr('{0} gets every new or moved task and every comment people write in this list, without an @mention (only tasks it can see).', esc(ags[0].name))} ${esc(dflt)}</div>`;
   return `<div class="row lsnrow" role="group" aria-labelledby="l-lsn-h"><span class="lbl" id="l-lsn-h">${tr('Agent listens in')}</span><div class="lsnags">${ags.map(a =>
     `<label class="lsnag"><input type="checkbox" data-lsn="${a.id}" ${on.has(a.id) ? 'checked' : ''} ${may ? '' : 'disabled'}><span>${esc(a.name)}</span></label>`).join('')}</div></div>
     <div class="shint lhint">${tr('The checked agents get every new or moved task and every comment people write in this list, without an @mention (only tasks they can see).')} ${esc(dflt)}</div>`;
@@ -398,14 +400,15 @@ async function loadJobs() {
 function jobHtml(j) {
   const mine = j.kind && S.me && j.user_id === S.me.id;  // 2.3.0: a proposal I asked for: reviewed in its dialog
   const acts = [mine && ['requested', 'ready'].includes(j.proposal_state) && `<button class="btn sm ${j.proposal_state === 'ready' ? 'pri' : ''}" data-act="prop-open" data-jid="${j.id}">${ic('bot', 's')} ${j.proposal_state === 'ready' ? tr('Review the proposal') : tr('Open')}</button>`,
-    !j.kind && j.can_act && j.state === 'waiting' && `<button class="btn sm pri" data-act="job-do" data-jid="${j.id}" data-a="approve">${ic('check', 's')} ${tr('Approve')}</button>`,
-    !j.kind && j.can_act && j.state === 'waiting' && `<button class="btn sm" data-act="job-do" data-jid="${j.id}" data-a="reject">${ic('x', 's')} ${tr('Reject')}</button>`,
+    !j.kind && j.can_act && j.state === 'waiting' && `<button class="btn sm pri" data-act="job-do" data-jid="${j.id}" data-a="approve">${thumbIc(true)} ${tr('Approve')}</button>`,
+    !j.kind && j.can_act && j.state === 'waiting' && `<button class="btn sm" data-act="job-do" data-jid="${j.id}" data-a="reject">${thumbIc(false)} ${tr('Reject')}</button>`,
     j.can_stop && ['running', 'waiting'].includes(j.state) && `<button class="btn sm danger" data-act="job-do" data-jid="${j.id}" data-a="stop">${ic('stop', 's')} ${tr('Stop')}</button>`].filter(Boolean).join('');
   const last = String(j.log || '').trim().split('\n').pop();
   return `<div class="job st-${esc(j.state)}"><div class="jobh"><span class="jst">${esc(tr(JOB_ST[j.state] || j.state))}</span><b>${esc(j.title)}</b><span class="spacer"></span><span class="muted">${esc(j.agent_name)} · ${esc(relTime(j.updated_at))}</span></div>
     ${j.task_id ? `<button class="runtask" data-act="open-id" data-id="${j.task_id}">${ic('arrow', 's')}<span>${esc(j.task_title || '')}</span></button>` : ''}
     ${j.log ? `<details class="joblog"><summary>${esc(last.slice(0, 140))}</summary><pre>${esc(j.log)}</pre></details>` : ''}
-    ${j.action && !(j.action === 'approve' && j.state === 'waiting') ? `<div class="muted jact">${esc({approve: tr('Approved by {0}', j.action_by_name), reject: tr('Rejected by {0}', j.action_by_name), stop: tr('Stopped by {0}', j.action_by_name)}[j.action] || '')}</div>` : ''}
+    ${j.steps ? jobStepsHtml(j.id, j.steps) : ''}
+    ${j.action && !(j.action === 'approve' && j.state === 'waiting') ? `<div class="muted jact">${j.action === 'approve' ? thumbIc(true) + ' ' : j.action === 'reject' ? thumbIc(false) + ' ' : ''}${esc({approve: tr('Approved by {0}', j.action_by_name), reject: tr('Rejected by {0}', j.action_by_name), stop: tr('Stopped by {0}', j.action_by_name)}[j.action] || '')}</div>` : ''}
     ${acts ? `<div class="jobb">${acts}</div>` : ''}</div>`;
 }
 function viewAgents() {
@@ -416,6 +419,13 @@ function viewAgents() {
       <span class="muted agn">${esc([a.running && trn('{0} running', '{0} running', a.running), a.waiting && trn('{0} waiting', '{0} waiting', a.waiting)].filter(Boolean).join(' · '))}</span></div>
       <div class="agb"><button class="btn sm" data-act="chat-open" data-aid="${a.id}" ${a.enabled ? '' : 'disabled'}>${ic('comment', 's')} ${tr('Chat')}${a.chat_unread ? ` <span class="nbadge">${a.chat_unread}</span>` : ''}</button></div></div>`;
   const items = S.jobs.items || [];
+  if (ags.length) {  // 2.32.0 (#1063): the overview is built from blocks (Customize)
+    const P = {agents: `<div class="agcards">${ags.map(card).join('')}</div>`, usage: aiuCardHtml(),
+      jobs: `<div class="agjh"><h2>${tr('Jobs')}</h2><span class="spacer"></span><div class="seg" role="group"><button class="${S.jobs.f === 'open' ? 'on' : ''}" data-act="jobs-f" data-f="open">${tr('Open|jobs')}</button><button class="${S.jobs.f === 'all' ? 'on' : ''}" data-act="jobs-f" data-f="all">${tr('All')}</button></div></div>
+        ${S.jobs.err ? `<div class="muted mhint">${esc(S.jobs.err)}</div>` : ''}<div class="jobs">${items.length ? items.map(jobHtml).join('') : `<div class="muted mhint">${S.jobs.f === 'open' ? tr('No running or waiting jobs.') : tr('No jobs yet.')}</div>`}</div>`,
+      hint: `<div class="shint">${tr('Agents report their jobs here. Approve, Reject and Stop go to the agent at once and show up in the task’s history. On a comment of an agent, 👍 / 👎 by the list owner, a list admin or the assignee counts as approval or rejection.')}</div>`};
+    return `<div class="agview">${S.ly.view === 'agents' ? '' : `<div class="lybar"><span class="spacer"></span>${lyCustomBtn('agents')}</div>`}${lyHtml('agents', P)}</div>`;
+  }
   return `<div class="agview">
     ${ags.length ? `<div class="agcards">${ags.map(card).join('')}</div>` : `<div class="empty hempty">${heron('agent')}<b>${tr('No agent is available to you yet.')}</b><span>${tr('The owner of a list can let its members use the list’s agent (Share › Agents). You can also connect an agent of your own.')}</span><button type="button" class="btn" data-act="ag-setup">${ic('bot', 's')} ${tr('Connect your own agent…')}</button></div>`}
     ${ags.length ? aiuCardHtml() : ''}

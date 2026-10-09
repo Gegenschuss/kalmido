@@ -173,10 +173,11 @@ const TOUCH = `(() => {
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
   const top = d.querySelector('#top');
   check(top.querySelector('.achip') && top.querySelector('.tmini.run') && top.querySelector('.stchip [data-timer-mini]') && top.querySelector('.stchip .sta'), 'agent pill + timer pill + the merged status chip (hidden until tl2)');
-  check(top.querySelector('[data-act="top-more"]') && top.querySelector('.bell') && top.querySelector('.vseg.tf') && top.querySelector('.hist.tf') && top.querySelector('.kbtn.cmdbar:not(.tf4)') && top.querySelector('.shbtn.tf'), '"…", the bell and the foldable items');
+  check(top.querySelector('[data-act="top-more"]') && top.querySelector('.bell') && top.querySelector('.vseg.ttabs:not(.tf)') && top.querySelector('.hist.tf') && top.querySelector('.kbtn.cmdbar:not(.tf4)') && top.querySelector('.shbtn.tf'), '"…", the bell and the foldable items');
   top.classList.add('tl3');
   const labs = w.eval('topMoreItems()').filter(x => x !== '-').map(x => x.label);
-  check(['List', 'Kanban', 'Timeline', 'Share…', 'Nothing to undo'].every(x => labs.includes(x)) && !labs.some(x => /^Search/.test(x)), 'tl3: view, Share and undo in "…": ' + labs.slice(0, 8).join(' | '));
+  // 2.32.0 (#1062): the view tabs no longer fold into "…" (they become icons), Share and undo still do
+  check(['Share…', 'Nothing to undo'].every(x => labs.includes(x)) && !['List', 'Kanban', 'Timeline'].some(x => labs.includes(x)) && !labs.some(x => /^Search/.test(x)), 'tl3: Share and undo in "…", the view tabs stay: ' + labs.slice(0, 8).join(' | '));
   top.classList.replace('tl3', 'tl4');
   check(!w.eval('topFolded()').some(x => x.icon === 'search'), 'tl4: Search stays in the header (2.18.0 #651, the title is cut instead)');
   top.classList.remove('tl4');

@@ -192,7 +192,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
         await open('l/' + P);
         const hd = await ev(HEAD);
         check(hd.more && hd.bell && hd.more[1] <= vw + .5 && hd.bell[1] <= vw + .5 && !hd.out.length, `${vw}px: "…" and the bell in view ${JSON.stringify(hd)}`);
-        const lay = await ev(`(() => { const v = document.querySelector('#view'), g = document.querySelector('.povg'), cs = [...document.querySelectorAll('.povs')];
+        const lay = await ev(`(() => { const v = document.querySelector('#view'), g = document.querySelector('.pov .lygrid'), cs = [...document.querySelectorAll('.povs')];
           const vr = v.getBoundingClientRect(); return {sw: v.scrollWidth, cw: v.clientWidth, cols: getComputedStyle(g).gridTemplateColumns.split(' ').length,
           out: cs.filter(s => { const r = s.getBoundingClientRect(); return r.right > vr.right + .5 || r.left < vr.left - .5; }).map(s => s.id), n: cs.length,
           links: document.querySelectorAll('#pov-links .povl').length, ms: document.querySelectorAll('#pov-ms .povm').length}; })()`);

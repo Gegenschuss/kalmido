@@ -50,8 +50,10 @@ def agent_jobs_get():
     rows = c.execute(q + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY updated_at DESC, id DESC LIMIT 500", args).fetchall()
     rows = [j for j in rows if job_visible(c, j, me())][:200]
     names = user_names(c, [x for j in rows for x in (j["agent_id"], j["user_id"], j["action_by"])])
+    from ..agents.steps import job_steps_count
+    jc = job_steps_count(c, me(), [j["id"] for j in rows if j["user_id"] == me()])  # 2.32.0 (#1081): only my own jobs' history
     return jsonify(jobs=[{**job_dict(c, j, names), "can_act": job_may_act(c, j, me(), "approve"),
-                          "can_stop": job_may_act(c, j, me(), "stop")} for j in rows])
+                          "can_stop": job_may_act(c, j, me(), "stop"), "steps": jc.get(j["id"], 0) if j["user_id"] == me() else 0} for j in rows])
 
 
 @app.post("/api/agents/jobs/<int:jid>/action")
@@ -113,6 +115,7 @@ def chat_dict(r, rx=None, files=None, api=False, newest=None):
             # answer ({ids, at}); null without. 2.30.0 (#1037 / #1041): choices.permission (a permission question),
             # choices.expires_at; choice_state open | answered | expired (a newer message came, the time ran out) | withdrawn
             "choices": ch, "choice": ans, "choice_state": choice_state(r, ch, ans, newest),
+            "job_id": r["job_id"] if "job_id" in r.keys() else None,  # 2.32.0 (#1081): the job whose result this is
             "attachments": [{**f, "url": (f"/api/v1/chat-attachments/{f['id']}" if api else f"/api/chat-files/{f['id']}")}
                             for f in (files or {}).get(r["id"], [])]}
 
@@ -577,8 +580,22 @@ def agent_chat_get(aid):
         c.commit()
     rx, fs = chat_reactions_of(c, [r["id"] for r in rows]), chat_files_of(c, [r["id"] for r in rows])
     nw = chat_newest(c, aid, me())
+    # 2.32.0 (#1081): the agent's steps -- only here, only in the person's own conversation: stored ones with each answer
+    # (steps), the live ones of a run in progress (steps_live, newest first), the history size of a job of mine (job_steps)
+    from ..agents.steps import job_steps_count, steps_live, steps_of_messages
+    sm = steps_of_messages(c, me(), [r["id"] for r in rows if r["sender"] == "agent"])
+    jc = job_steps_count(c, me(), [r["job_id"] for r in rows if r["job_id"]])
+    msgs = []
+    for r in rows:
+        d = chat_dict(r, rx, fs, newest=nw)
+        if r["id"] in sm:
+            d["steps"] = sm[r["id"]]
+        if r["job_id"]:
+            d["job_steps"] = jc.get(r["job_id"], 0)
+        msgs.append(d)
     # 2.7.2 (#422): the server's clock, so the app can tell how long ago a message was delivered
-    return jsonify(agent=agent_public(c, a, me()), messages=[chat_dict(r, rx, fs, newest=nw) for r in rows], now=iso_ms(now_utc()), has_more=more)
+    return jsonify(agent=agent_public(c, a, me()), messages=msgs, now=iso_ms(now_utc()), has_more=more,
+                   steps_live=steps_live(c, aid, me()))
 
 
 def chat_task(c, v, uid_a, uid_b):

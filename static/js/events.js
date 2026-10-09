@@ -139,7 +139,9 @@ function openQuickSheet(prefill = '', preset = {}) {
   if (!q) {
     q = document.createElement('div');
     q.className = 'qadd sheet';
-    q.innerHTML = `<div class="box">${ic('plus')}<input id="qsheet" name="kalmido-quick-add-sheet" type="text" data-form-type="other" data-lpignore="true" placeholder="${tr("What's next?")}" autocomplete="off" enterkeyhint="send">${tplBtn()}${qExtraBtns('qsheet')}<button class="iconbtn" data-act="qsheet-send" aria-label="${tr('Add')}">${ic('arrow')}</button></div><div class="chips"></div><div class="qhint">${tr('tomorrow 3pm · !high · #tag · ~list · every monday')}</div>`;  // 2.25.0 (UX-34); 2.30.0 (#1033): the clip/square hint is gone, both buttons carry title + aria-label
+    // 2.32.0 (#1059): the same placeholder as the desktop composer; the syntax help as chips that insert the shortcut; the
+    // buttons in their own row with a short visible label (title + aria-label stay)
+    q.innerHTML = `<div class="box">${ic('plus')}<input id="qsheet" name="kalmido-quick-add-sheet" type="text" data-form-type="other" data-lpignore="true" placeholder="${tr('Add task…')}" title="${esc(tr(QEX))}" autocomplete="off" enterkeyhint="send"><button class="iconbtn" data-act="qsheet-send" aria-label="${tr('Add')}" title="${tr('Add')}">${ic('arrow')}</button></div><div class="chips"></div><div class="qhint"></div><div class="qacts">${qExtraBtns('qsheet', true)}${tplBtn(true)}</div>`;  // 2.25.0 (UX-34); 2.30.0 (#1033)
     document.body.appendChild(q);
   }
   $('#scrim').classList.remove('hidden');
@@ -148,12 +150,12 @@ function openQuickSheet(prefill = '', preset = {}) {
   const nf = preset.files?.length || 0;
   const hint = [preset.due ? dayLabel(preset.due) + (preset.due_time ? ' ' + preset.due_time : '') : '', preset.content ? tr('Link as description') : '', preset.url ? tr('Link: {0}', urlHost(preset.url)) : '',
     nf ? (nf === 1 ? tr('Attachment: {0}', preset.files[0].name) : tr('{0} attachments', nf)) : ''].filter(Boolean).join(' · ');
-  $('.qhint', q).textContent = hint || tr('tomorrow 3pm · !high · #tag · ~list · every monday');
+  const qh = $('.qhint', q); if (hint) qh.textContent = hint; else qh.innerHTML = qHelpChips('qsheet');
   const inp = $('#qsheet'); inp.value = prefill; updateChips(inp);
   q.classList.toggle('capture', !!preset.capture);
   const i0 = $('.box > svg', q); if (i0) i0.outerHTML = ic(preset.capture ? 'zap' : 'plus');
-  inp.placeholder = preset.capture ? tr('Capture to the inbox…') : preset.section_name ? tr('Add a task to {0}', preset.section_name) : tr("What's next?");
-  if (preset.capture && !hint) $('.qhint', q).textContent = tr('Goes to the inbox · ~list · tomorrow · !high · #tag');
+  inp.placeholder = preset.capture ? tr('Capture to the inbox…') : preset.section_name ? tr('Add a task to {0}', preset.section_name) : tr('Add task…');
+  if (preset.capture && !hint) qh.innerHTML = qHelpChips('qsheet', true);
   // 2.26.x (#952): the focus in the same tap (no timer first): iOS opens the keyboard only for a focus inside the user's
   // gesture, so the sheet and the keyboard come up together; a second try a moment later if something took it back
   inp.focus();
@@ -312,6 +314,8 @@ document.addEventListener('click', async e => {
     case 'chat-open': chatOpen(+a.dataset.aid); break;
     case 'chat-close': chatClose(); break;
     case 'chat-mode': chatModeMenu(a); break;  // 2.29.0 (#1029)
+    case 'steps-always': stepsAlways(); break;  // 2.32.0 (#1081)
+    case 'steps-live': stepsLive(a.dataset.on === '1'); break;
     case 'chat-pop': chatPop(); break;  // 2.29.0 (#363)
     case 'chat-dock': chatDock(a.dataset.fl === '1'); break;
     case 'chat-min': chatFloatMin(!$('#achat')?.classList.contains('min')); break;
@@ -626,6 +630,9 @@ document.addEventListener('click', async e => {
       batch('complete', {}, true); break;
     }
     case 'mb-del': batch('delete', {}, true); break;
+    case 'mb-move': multiMoveMenu(a); break;  // 2.32.0 (#1055): the phone's selection bar
+    case 'mb-date': multiDateMenu(a); break;
+    case 'mb-menu': multiMoreMenu(a); break;
     case 'mb-sort': propRequest('triage', {ids: [...S.multi]}); break;  // 2.3.0 (#262)
     case 'mb-all': $$('#view .trow').forEach(r => S.multi.add(+r.dataset.id)); render(); break;
     case 'mb-close': S.multi.clear(); S.multiMode = false; render(); break;
@@ -639,6 +646,7 @@ document.addEventListener('click', async e => {
     case 'qsheet-send': submitQuick($('#qsheet')); break;
     case 'q-open': { const i = $('#' + a.dataset.q); if (i && i.value.trim()) submitQuick(i, {open: true}); else { i?.focus(); toast(tr('Type a title first')); } break; }  // 2.14.0 (#484)
     case 'q-clip': quickFiles($('#' + a.dataset.q)); break;
+    case 'q-ins': qInsert($('#' + a.dataset.q), a.dataset.ins); break;  // 2.32.0 (#1059)
     case 'timer-pill': timerMenu(a); break;
     case 'run-pop': runPop(a); break;
     case 'timer-toggle': timerToggle(id); break;
@@ -648,11 +656,11 @@ document.addEventListener('click', async e => {
     case 'te-resume': { const en = findEntry(+a.dataset.eid); if (en) timerStart(en.task_id ? {task_id: en.task_id} : {list_id: en.list_id}, en.note); break; }
     case 'te-more': S.te.all = true; drawTaskTime(); break;
     case 'te-open': if (id) openTaskById(id); break;
-    case 'tv-period': S.tv.period = a.dataset.k; LS.set('timePeriod', S.tv.period); if (S.tv.period === 'custom' && !S.tv.from) { [S.tv.from, S.tv.to] = [addDays(today(), -29), today()]; LS.set('timeFrom', S.tv.from); LS.set('timeTo', S.tv.to); } renderView(); break;
+    case 'tv-period': S.tv.period = a.dataset.k; LS.set('timePeriod', S.tv.period); if (S.tv.period !== 'custom' && !S.tv.client) lyOptSet('time', 'bar', 'period', S.tv.period); if (S.tv.period === 'custom' && !S.tv.from) { [S.tv.from, S.tv.to] = [addDays(today(), -29), today()]; LS.set('timeFrom', S.tv.from); LS.set('timeTo', S.tv.to); } renderView(); break;
     case 'tv-scope': S.tv.scope = a.dataset.k; LS.set('timeScope', S.tv.scope); renderView(); break;
     case 'tv-lists': tvListsMenu(a); break;
     case 'tv-toggle': { const k = a.dataset.key; S.collapsed.has(k) ? S.collapsed.delete(k) : S.collapsed.add(k); LS.set('collapsed', [...S.collapsed]); renderView(); break; }
-    case 'tv-entries': S.tv.entries = !S.tv.entries; LS.set('timeEntries', S.tv.entries); renderView(); break;
+    case 'tv-entries': S.tv.entries = !S.tv.entries; LS.set('timeEntries', S.tv.entries); lyOptSet('time', 'entries', 'open', S.tv.entries); renderView(); break;
     case 'tv-sheet': timesheet(); break;
   }
 });

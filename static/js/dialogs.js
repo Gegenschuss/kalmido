@@ -378,19 +378,24 @@ function shareSummary(l) {
   if (!collab()) return tr('Owner: {0}', l.owner_name || S.me?.display_name || '');
   return [ppl.length ? trn('Shared with {0} person', 'Shared with {0} people', ppl.length) : tr('Not shared with anyone yet'), ags.length ? trn('{0} agent', '{0} agents', ags.length) : '', ags.length ? listenLabel(l) : ''].filter(Boolean).join(' · ');
 }
+// 2.32.0 (#1058): the parts below "People" fold (closed at first, a short state in the folded line); people stay open.
+// Ids of the old headings stay (l-pub-h, sh-own-h, sh-ag-h, sh-grp-h) for links and tests.
+const SH_HID = {grp: 'sh-grp-h', ag: 'sh-ag-h', pub: 'l-pub-h', own: 'sh-own-h'};
+const shSec = (k, title, inner, hide = false, open = false) => `<details class="shsec" id="sh-sec-${k}" ${hide ? 'hidden' : ''} ${open ? 'open' : ''}><summary><h4 id="${SH_HID[k]}">${title}</h4><span class="shsecst muted" id="sh-st-${k}"></span>${ic('chev', 's shchev')}</summary>${inner}</details>`;
 function shareModal(id, opt = {}) {
   const l0 = listById(id); if (!shareOk(l0)) return;
   const own = isOwner(l0), hint = t => `<div class="shint lhint">${t}</div>`;
   const md = modal(`<div class="lhdr"><h3>${esc(tr(collab() ? N_('Share “{0}”') : N_('Owner of “{0}”'), lname(l0)))}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
     ${collab() ? `<h4 id="sh-people-h">${tr('People')}</h4><div class="members" id="l-members" aria-labelledby="sh-people-h"></div>` : ''}
     ${collab() && S.peopleVis === 'contacts' && canManage(l0) ? `<div class="row shmail"><input id="sh-email" type="email" autocomplete="off" placeholder="${esc(tr('Share by e-mail address'))}" aria-label="${esc(tr('Share by e-mail address'))}"><button type="button" class="btn sm" data-m="share-mail">${ic('send', 's')} ${tr('Share')}</button></div>` : ''}
-    ${collab() ? `<div id="sh-grpwrap"></div>` : ''}
-    ${collab() && agentsOn() ? `<div id="sh-agwrap"></div>` : ''}
-    ${own && S.publicLinks ? `<h4 id="l-pub-h">${tr('Public link')}</h4><div id="l-pub"><div class="muted mhint">${tr('Loading…')}</div></div>` : ''}
-    <div id="sh-ownwrap"><h4 id="sh-own-h">${tr('Owner')}</h4><div class="muted mhint" id="sh-owner"></div><div id="l-owner"></div></div>
+    ${collab() ? shSec('grp', tr('Groups'), `<div id="sh-grpwrap"></div>`, true) : ''}
+    ${collab() && agentsOn() ? shSec('ag', tr('Agents'), `<div class="shint lhint keep">${tr('An agent sees exactly the lists shared with it, nothing else. Stopping the sharing ends its access at once.')}</div><div id="sh-agwrap"></div>`, true) : ''}
+    ${own && S.publicLinks ? shSec('pub', tr('Public link'), `<div id="l-pub"><div class="muted mhint">${tr('Loading…')}</div></div>`) : ''}
+    ${shSec('own', tr('Owner'), `<div id="sh-ownwrap"><div class="muted mhint" id="sh-owner"></div><div id="l-owner"></div></div>`, false, !collab())}
     <div class="foot"><button class="btn" data-m="list-edit">${ic('edit', 's')} ${tr('List settings…')}</button><span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);
   md.classList.add('shmodal');
   let users = null;
+  const shSecSet = (k, show, st) => { const sec = $('#sh-sec-' + k, md); if (!sec) return; sec.hidden = !show; const e = $('#sh-st-' + k, md); if (e) e.textContent = st || ''; };
   const roleSel = (attr, cur_, lab) => `<select ${attr} aria-label="${esc(lab || tr('Role'))}">${ROLES.map(([v, n, h]) => `<option value="${v}" title="${esc(tr(h))}" ${v === cur_ ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>`;
   const isAg = p => !!(p.agent || agentById(p.user_id));
   const row = (cur, p, mng) => `<div class="mrow" data-uid="${p.user_id}">${avBtn(p.user_id, p.name)}<span class="n">${esc(p.name)}${S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : ''}${isAg(p) ? agentBadge() : ''}${p.via_group ? ` <span class="muted">${tr('via a group')}</span>` : ''}</span>${mng && p.role !== 'owner' && !(S.me && p.user_id === S.me.id) && !p.via_group
@@ -414,13 +419,14 @@ function shareModal(id, opt = {}) {
     if (aw) {
       const agFits = u => !wsOn() || (u.org_id || null) === (cur.org_id || null);  // 2.28.0 (#935): agents of the list's workspace
       const ags = people.filter(isAg), acand = users ? users.filter(u => u.agent && !people.some(p => p.user_id === u.id) && agFits(u)) : [];
-      aw.innerHTML = ags.length || (mng && acand.length) ? `<h4 id="sh-ag-h">${tr('Agents')}</h4>${hint(tr('An agent sees exactly the lists shared with it, nothing else. Stopping the sharing ends its access at once.'))}
-        <div class="members" id="sh-agents">${mng && !agentById(cur.owner_id) && (users || []).some(u => u.agent && agFits(u)) ? '' : ags.map(p => row(cur, p, mng)).join('')}${mng && !agentById(cur.owner_id) && (users || []).some(u => u.agent && agFits(u)) ? `<div class="row"><label for="sh-agsel">${tr('Agent')}</label><select id="sh-agsel"><option value="">${tr('No agent')}</option>${users.filter(u => u.agent && (agFits(u) || ags.some(p => p.user_id === u.id))).map(u => `<option value="${u.id}" ${ags[0]?.user_id === u.id ? 'selected' : ''}>${esc(u.display_name)}${!agFits(u) ? ' · ' + esc(tr('other workspace')) : ''}</option>`).join('')}</select></div>` : ''}${ags.some(p => !agFits((users || []).find(u => u.id === p.user_id) || {org_id: cur.org_id})) ? `<div class="shint keep">${ic('alert', 's')} ${esc(tr('This agent works in another workspace (from before the workspaces). Take it out of the list, or keep it on purpose.'))}</div>` : ''}</div>
+      aw.innerHTML = ags.length || (mng && acand.length) ? `<div class="members" id="sh-agents">${mng && !agentById(cur.owner_id) && (users || []).some(u => u.agent && agFits(u)) ? '' : ags.map(p => row(cur, p, mng)).join('')}${mng && !agentById(cur.owner_id) && (users || []).some(u => u.agent && agFits(u)) ? `<div class="row"><label for="sh-agsel">${tr('Agent')}</label><select id="sh-agsel"><option value="">${tr('No agent')}</option>${users.filter(u => u.agent && (agFits(u) || ags.some(p => p.user_id === u.id))).map(u => `<option value="${u.id}" ${ags[0]?.user_id === u.id ? 'selected' : ''}>${esc(u.display_name)}${!agFits(u) ? ' · ' + esc(tr('other workspace')) : ''}</option>`).join('')}</select></div>` : ''}${ags.some(p => !agFits((users || []).find(u => u.id === p.user_id) || {org_id: cur.org_id})) ? `<div class="shint keep">${ic('alert', 's')} ${esc(tr('This agent works in another workspace (from before the workspaces). Take it out of the list, or keep it on purpose.'))}</div>` : ''}</div>
         <div id="l-tidyrow">${tidyRowHtml(cur)}</div>` : '';
+      shSecSet('ag', !!aw.innerHTML, ags.length ? ags.map(p => p.name).join(', ') + (listenOn(cur) ? ' · ' + tr('listens in') : '') : tr('No agent'));
     }
     const gw = $('#sh-grpwrap', md);  // 2.10.0 (#441)
-    if (gw) { const gh = shareGroupsHtml(cur, mng, roleSel); gw.innerHTML = gh ? `<h4 id="sh-grp-h">${tr('Groups')}</h4><div class="members" id="sh-groups" aria-labelledby="sh-grp-h">${gh}</div>` : ''; }
+    if (gw) { const gh = shareGroupsHtml(cur, mng, roleSel); gw.innerHTML = gh ? `<div class="members" id="sh-groups" aria-labelledby="sh-grp-h">${gh}</div>` : ''; shSecSet('grp', !!gh, trn('{0} group', '{0} groups', (cur.groups || []).length)); }
     const ow = $('#sh-owner', md); if (ow) ow.textContent = cur.owner_name || (own ? S.me?.display_name || '' : '');
+    shSecSet('own', true, cur.owner_name || (own ? S.me?.display_name || '' : ''));
     const sum = $('#l-shsum'); if (sum) sum.textContent = shareSummary(cur);
   };
   // "Transfer ownership…" (owner) / "Take over…" (admins, owner = agent or disabled user) + the history (2.1.2, #349)
@@ -445,7 +451,7 @@ function shareModal(id, opt = {}) {
       draw();
     });
     // 2.27.0 (#974): opened from "Agent…": scrolled to the Agents part, its choice focused
-    const toAgents = () => { if (opt.focus !== 'agents' || !md.isConnected) return; const el = $('#sh-agsel', md) || $('#sh-ag-h', md); el?.scrollIntoView?.({block: 'center'}); $('#sh-agsel', md)?.focus({preventScroll: true}); };
+    const toAgents = () => { if (opt.focus !== 'agents' || !md.isConnected) return; const sec = $('#sh-sec-ag', md); if (sec) sec.open = true; const el = $('#sh-agsel', md) || $('#sh-ag-h', md); el?.scrollIntoView?.({block: 'center'}); $('#sh-agsel', md)?.focus({preventScroll: true}); };
     if (canManage(l0)) api('GET', '/api/users').then(j => { users = j.users.filter(u => !u.disabled).map(u => ({id: u.id, display_name: u.display_name, agent: !!u.agent, orgs: u.orgs || [], org_id: u.org_id ?? null})); /* 2.28.0 (#935): + the workspace */ draw(); toAgents(); }).catch(() => { users = []; draw(); });
   }
   const act = async (fn, msg) => { try { await fn(); await load(); render(); draw(); if (msg) toast(msg); } catch { /* api() showed it */ } };
@@ -518,6 +524,7 @@ const AUTO_EMO = [
   ['🧹', 'putzen cleaning ménage limpieza pulizie schoonmaken'],
 ];
 function autoEmoji(name) {
+  if (S.settings && S.settings.list_emoji === '0') return '';  // 2.32.0 (#1077): switched off in Settings > Appearance
   const words = String(name || '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(w => w.length > 2);
   if (!words.length) return '';
   const hit = f => AUTO_EMO.find(([, ks]) => ks.split(' ').some(k => words.some(w => f(w, k))));  // the beginning of a word first

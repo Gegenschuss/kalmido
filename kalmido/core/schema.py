@@ -313,6 +313,17 @@ CREATE TABLE IF NOT EXISTS chat_reactions (       -- 2.7.2 (#421): heart | up | 
   message_id INTEGER NOT NULL REFERENCES agent_chat(id) ON DELETE CASCADE,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   emoji TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (message_id, user_id, emoji));
+CREATE TABLE IF NOT EXISTS agent_steps (          -- 2.32.0 (#1081): an agent's words between its tool calls (prose, filtered)
+  id INTEGER PRIMARY KEY, agent_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,   -- the ONLY person who sees them
+  job_id INTEGER REFERENCES agent_jobs(id) ON DELETE CASCADE,        -- a job's history (NULL = a chat run)
+  message_id INTEGER REFERENCES agent_chat(id) ON DELETE CASCADE,    -- the chat answer they belong to (NULL = live / none)
+  state TEXT NOT NULL DEFAULT 'live',           -- live (chat run in progress) | done | log (a job's progress line)
+  text TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS agent_steps_pair ON agent_steps(agent_id, user_id, id);
+CREATE INDEX IF NOT EXISTS agent_steps_job ON agent_steps(job_id) WHERE job_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS agent_steps_user ON agent_steps(user_id, id);
+CREATE INDEX IF NOT EXISTS agent_steps_msg ON agent_steps(message_id) WHERE message_id IS NOT NULL;
 CREATE TABLE IF NOT EXISTS agent_usage (          -- 2.1.1 (#326): model usage an agent reports (numbers + ids, never prompts)
   id INTEGER PRIMARY KEY, agent_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   model TEXT NOT NULL, input_tokens INTEGER NOT NULL DEFAULT 0, output_tokens INTEGER NOT NULL DEFAULT 0,
@@ -652,6 +663,11 @@ CREATE TABLE IF NOT EXISTS forms (
   ask_email INTEGER NOT NULL DEFAULT 1, enabled INTEGER NOT NULL DEFAULT 1, count INTEGER NOT NULL DEFAULT 0, last_at TEXT,
   created_by INTEGER, created_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS forms_list ON forms(list_id);
+-- 2.32.0 (#983, #1063): a person's own arrangement of a project page (json like the view layouts, see accounts/layouts.py);
+-- the project's standard for everyone is lists.page_layout
+CREATE TABLE IF NOT EXISTS list_layouts (
+  list_id INTEGER NOT NULL REFERENCES lists(id) ON DELETE CASCADE, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  layout TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (list_id, user_id));
 """
 # Bumped when the database layout changes (stored in PRAGMA user_version). A backup can be restored when its
 # schema version is not newer than this one (older ones are migrated by init_db).
@@ -874,6 +890,12 @@ MIGRATIONS = [
     # 2.30.0 (#919): least privilege: an agent / a token limited to these lists (csv of ids, '' = all its lists)
     ("agents", "list_ids", "ALTER TABLE agents ADD COLUMN list_ids TEXT NOT NULL DEFAULT ''"),
     ("api_tokens", "list_ids", "ALTER TABLE api_tokens ADD COLUMN list_ids TEXT NOT NULL DEFAULT ''"),
+    # 2.32.0 (#983): the project page arrangement the owner / admins set for everyone ('' = the built-in default)
+    ("lists", "page_layout", "ALTER TABLE lists ADD COLUMN page_layout TEXT NOT NULL DEFAULT ''"),
+    # 2.32.0 (#1079): what the agent's host reports it really runs with (json {model, permission_mode, host_permission_mode, at});
+    # (#1081): the job a chat message is the result of (its history "Verlauf" shows under it). New columns only.
+    ("agents", "host_info", "ALTER TABLE agents ADD COLUMN host_info TEXT NOT NULL DEFAULT ''"),
+    ("agent_chat", "job_id", "ALTER TABLE agent_chat ADD COLUMN job_id INTEGER REFERENCES agent_jobs(id) ON DELETE SET NULL"),
 ]
 INDEXES = """
 CREATE INDEX IF NOT EXISTS lists_owner ON lists(owner_id);
@@ -907,6 +929,9 @@ USER_DEFAULTS = {
     "mail_from_me": "0",        # 2.17.0 (#443): mails from my own address to the plain task address land in my inbox
     # 2.17.0 (#475): the dashboard behind the logo, json {"order": [widget keys], "hidden": [widget keys]} ('' = default)
     "dashboard": "",
+    # 2.32.0 (#1063): the views built from blocks, one key per view, json {"order", "hidden", "half", "full", "opts", "mobile"}
+    # ('' = default; accounts/layouts.py). The start page keeps "dashboard" (same shape)
+    "view_today": "", "view_time": "", "view_agents": "", "view_projects": "",
     # 2.25.0 (UX-03): the sidebar: json {"order": [groups], "hidden": ["g:<group>" | "e:<entry>"]} ('' = default)
     "sidebar": "",
     "work_start": "09:00", "work_end": "17:00",  # 2.10.0 (#440): working hours of the day planner
@@ -937,6 +962,8 @@ USER_DEFAULTS = {
     # 2.31.0 (#344): the task panel on a desktop: the properties' share above the comments area in % (20-85) and whether
     # the comments area is folded (1); per user, so every desktop shows it the same way
     "detail_split": "60", "detail_cm_fold": "0",
+    # 2.32.0 (#1081): an agent's steps in the chat: live under the typing dots (1) and kept above every answer (always, 0)
+    "agent_steps_live": "1", "agent_steps_always": "0",
     # 2.4.2 (#391): sharing with agents, per agent id (string): {"auto": [agent ids that get my new lists],
     # "skip": {"<agent id>": [list ids I stopped sharing with it]}}; written only by /api/agents/<aid>/share-all + /autoshare
     # and the member routes (server-only)
@@ -972,6 +999,7 @@ USER_DEFAULTS = {
     "evcals_hidden": "[]",      # 2.21.0 (#659): json list of the event calendars I hid from my views (server-only)
     "purpose": "",              # 2.19.0 (#653): what the person uses Kalmido for (me | family | team | software; server-only)
     "celebrate": "1",           # the heron celebrates an emptied Today / a completed list or project
+    "list_emoji": "1",          # 2.32.0 (#1077): a new list suggests an icon from its name (0 = off)
     "cal_today": "1",           # "Events today" block on Today (external calendar subscriptions)
     "tour": "done",             # welcome tour: pending (new users) | done; existing users never see it
     "onboard": "done",          # "Getting started" list: pending (new users, created on first start) | done

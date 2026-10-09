@@ -447,6 +447,16 @@ fresh; run p2310_b_api "$PY" p2310_b_api_test.py "$KALMIDO_TEST_DATA"
        run p2310_b_ui node p2310_b_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2310_c_ui node p2310_c_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2310_d_ui node p2310_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.32.0 "Shorter ways" (UX round part 2) + agent chat: the view kit and the project page (#1063 #983 #1061), agent
+# chat steps, host model / mode and thumbs approvals (#1079 #1081 #1082 #1062), phone selection mode, swiping in the
+# task panel, settings on a phone and the comment box scroll (#1055 #1071 #1060 #1074), share dialog, quick add, list
+# icons, logo variants and dropping files on a list (#1058 #1059 #1062 #1077 #1070 #362); each suite starts its own container
+fresh; run p2320_a_api "$PY" p2320_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2320_a_ui node p2320_a_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2320_b_api "$PY" p2320_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2320_b_ui node p2320_b_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2320_c_ui node p2320_c_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2320_d_ui node p2320_d_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

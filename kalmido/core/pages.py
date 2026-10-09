@@ -399,6 +399,8 @@ def version():
     from ..calendars.subscriptions import cal_sig
     from ..collab.teamchat import tchat_sig
     from ..agents.chat import task_typing_for
+    from ..agents.steps import steps_sig
     c = db()
     return jsonify(v=int(gsetting(c, "version")), app=APP_VERSION, n=news_sig(c, me()), c=cal_sig(c, me()), t=tchat_sig(c, me()),  # app: 2.27.0 (#968), t: 2.17.0 (#419)
-                   ty=task_typing_for(c, me()))  # ty: 2.22.0 (#693) who is writing a comment where
+                   ty=task_typing_for(c, me()),  # ty: 2.22.0 (#693) who is writing a comment where
+                   sp=steps_sig(c, me()))  # sp: 2.32.0 (#1081) a new step of an agent for me (the open chat fetches)

@@ -195,8 +195,10 @@ const getT = async id => (await call('GET', '/api/tasks/' + id));
   check(w.eval('S.multi.size') === 2 && !w.eval('S.sel'), '#936 phone: a tap in select mode adds the task');
   check(!d.querySelector('#detail.multi'), '#936 phone: no panel over the list until asked');
   const acts = [...d.querySelectorAll('#mbar > *')].map(x => x.dataset.act || x.className.split(' ')[0]);
-  check(JSON.stringify(acts) === JSON.stringify(['mcount', 'me-sheet', 'mb-done', 'mb-del', 'mb-close']), '#936 phone: the bar: count, Edit, Complete, Delete, Clear ' + acts.join('|'));
-  click(w, d.querySelector('#mbar [data-act="me-sheet"]')); await sleep(200);
+  // 2.32.0 (#1055): the phone's bar: Move, Date, Complete, More; "Edit" (the panel as a sheet) and Delete are under More
+  check(JSON.stringify(acts) === JSON.stringify(['mcount', 'mb-move', 'mb-date', 'mb-done', 'mb-menu', 'mb-close']), '#936 / #1055 phone: the bar: count, Move, Date, Complete, More, Clear ' + acts.join('|'));
+  click(w, d.querySelector('#mbar [data-act="mb-menu"]')); await sleep(150);
+  click(w, [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => b.textContent === 'Edit')); await sleep(200);
   check(d.querySelector('#detail.multi') && !d.querySelector('#detail').classList.contains('hidden') && /2 tasks/.test(d.querySelector('#detail .mecount').textContent), '#936 phone: "Edit" opens the panel as a sheet');
   click(w, d.querySelector('#detail [data-act="me-sheet-close"]')); await sleep(300);
   check(!d.querySelector('#detail.multi') && w.eval('S.multi.size') === 2, '#936 phone: "Done" closes the sheet, the selection stays');
@@ -329,7 +331,7 @@ const getT = async id => (await call('GET', '/api/tasks/' + id));
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     await o.nav(B + '#l/' + L); await ready(ev);
     await ev(`(() => { S.multiMode = true; S.multi = new Set([${T[0]}, ${T[2]}, ${T[4]}]); render(); return 1; })()`); await sleep(300);
-    await ev(`(() => { document.querySelector('#mbar [data-act="me-sheet"]').click(); return 1; })()`); await sleep(700);
+    await ev(`(() => { document.querySelector('#mbar [data-act="mb-menu"]').click(); [...document.querySelectorAll('#pop [role="menuitem"]')].find(b => b.textContent === 'Edit').click(); return 1; })()`); await sleep(700);  // 2.32.0 (#1055): Edit is under More
     const sh = await ev(`(() => { const r = document.querySelector('#detail').getBoundingClientRect(); return {t: Math.round(r.top), b: Math.round(r.bottom), w: Math.round(r.width), o: document.documentElement.scrollWidth - innerWidth}; })()`);
     check(sh.t > 100 && sh.b <= 845 && sh.w === 390 && sh.o <= 0, `${tag}: the multi panel is a bottom sheet (the list stays visible above) ` + JSON.stringify(sh));
     const small = await ev(`(() => [...document.querySelectorAll('#detail .mev, #detail .metag, #detail .metl, #mbar button')].filter(e => { const r = e.getBoundingClientRect(); return r.height && r.height < 43.5; }).map(e => e.className).slice(0, 5))()`);

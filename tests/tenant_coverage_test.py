@@ -112,6 +112,7 @@ ROUTES = {
     "POST /api/v1/agent/chats/{}": "agent", "POST /api/v1/agent/chats/{}/messages/{}/reactions": "agent",
     "POST /api/v1/agents/{}/chat/{}/choice": "agent", "POST /api/v1/agents/{}/chat/{}/reactions": "agent",
     "POST /api/v1/agent/typing": "agent", "GET /api/v1/agents": "agent", "POST /api/v1/agent/proposals": "agent",
+    "GET /api/agents/jobs/{}/steps": "agent", "POST /api/v1/agent/progress": "agent",  # 2.32.0 (#1081)
     "POST /api/v1/agent/usage": "agent", "GET /api/v1/agent/usage": "agent", "GET /api/agents/usage": "agent",
     "GET /api/agents/{}/share": "agent", "PUT /api/lists/{}/agent": "agent", "POST /api/agents/{}/share-all": "agent",
     "PUT /api/agents/{}/autoshare": "agent",
@@ -257,7 +258,7 @@ ROUTES = {
     "PATCH /api/lists/{}": "list", "POST /api/lists/reorder": "list", "DELETE /api/lists/{}": "list",
     "PUT /api/lists/{}/members": "list", "DELETE /api/lists/{}/members/{}": "list", "GET /api/lists/{}/owner": "list",
     "POST /api/lists/{}/owner": "list", "PUT /api/lists/{}/bell": "list", "POST /api/lists/{}/status": "list",
-    "GET /api/lists/{}/status": "list", "GET /api/lists/{}/overview": "list", "PATCH /api/lists/{}/overview": "list",
+    "GET /api/lists/{}/status": "list", "GET /api/lists/{}/overview": "list", "PATCH /api/lists/{}/overview": "list", "GET /api/lists/{}/layout": "list", "PUT /api/lists/{}/layout": "list",
     "POST /api/lists/{}/links": "list", "PATCH /api/lists/{}/links/{}": "list", "DELETE /api/lists/{}/links/{}": "list",
     "PUT /api/lists/{}/links/order": "list", "POST /api/lists/{}/milestones": "list",
     "PATCH /api/lists/{}/milestones/{}": "list", "DELETE /api/lists/{}/milestones/{}": "list",

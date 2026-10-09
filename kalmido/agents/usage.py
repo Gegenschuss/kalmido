@@ -779,6 +779,8 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
     agent["properties"].update(  # 2.4.1 (#375 / #377)
         online=nul("boolean", description="false: no event poll for 5 minutes; null: unknown (webhook, never polled)"),
         last_poll_at=nul("string"), typing={"type": "number", "description": "Seconds left of its typing signal to you in the chat"},
+        host={"type": "object", "description": "2.32.0 (#1079): what the host last reported (PUT /agent/status): model, permission_mode, "
+                                              "host_permission_mode, at"},
         runtime={"type": "object", "description": "GET /agent only: what the agent host applies (docs/AGENTS.md, Runtime settings)",
                  "properties": {"model": {"type": "string"}, "autocompact": {"type": "boolean"}, "autocompact_pct": nul("integer"),
                                 "nightly_reset": {"type": "string", "description": "HH:MM in the server time zone, empty = off"},
@@ -832,7 +834,25 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
         "/agent": {"get": op("The agent itself: status, jobs, event cursor (agent tokens only)", AG, ok(ref("Agent")) | errs("403"))},
         "/agent/status": {"put": op("Report the agent's status", AG, ok(ref("Agent")) | errs("400", "403"), scope=W, body={
             "type": "object", "required": ["status"], "properties": {"status": {"type": "string", "enum": list(AGENT_STATUSES)}, "text": {"type": "string"},
-                                                                  "task_id": nul("integer")}})},
+                                                                  "task_id": nul("integer"),
+                                                                  # 2.32.0 (#1079)
+                                                                  "model": {"type": "string", "maxLength": 80, "description": "2.32.0: the model the host really runs, "
+                                                                            "as people know it (e.g. \"Opus 5.5\"); shown in the chat header"},
+                                                                  "permission_mode": {"type": "string", "enum": ["", "ask", "auto"], "description":
+                                                                                      "2.32.0: the permission mode the current run really uses"},
+                                                                  "host_permission_mode": {"type": "string", "enum": ["", "ask", "auto"], "description":
+                                                                                           "2.32.0: the host's own default (shown as \"Host default (Auto)\")"}}})},
+        # 2.32.0 (#1081): steps (prose between tool calls), only for the person of the chat run / the job
+        "/agent/progress": {"post": op(
+            "2.32.0 (#1081): one step of your work -- the short prose you write between tool calls (\"I look at the tests first\"). "
+            "chat_user_id: a chat run for that person (shows live under the typing dots; your next chat answer to them keeps the "
+            "steps); job_id: a job that is for a person (user_id; its history \"Verlauf\"). Only that person ever sees them. "
+            "Prose only: NEVER tool output (file contents, logs, database rows) and no secrets -- the server folds it into one line, "
+            "cuts it (500 characters, live 200) and replaces recognisable secrets with [entfernt]. At most 60 per minute (429).",
+            AG, ok({"type": "object", "properties": {"id": {"type": "integer"}, "text": {"type": "string"}, "redacted": {"type": "boolean"}}},
+                   "Created", "201") | errs("400", "403", "404", "409", "429"), scope=W,
+            body={"type": "object", "required": ["text"], "additionalProperties": False, "properties": {
+                "text": {"type": "string"}, "chat_user_id": {"type": "integer"}, "job_id": {"type": "integer"}}})},
         "/agent/events": {"get": op("Events for the agent after a cursor; long-polling with wait", AG, ok(ref("EventPage")) | errs("400", "403"),
                                     [q("since", "seq of the last event you processed (0 = from the start)", {"type": "integer"}),
                                      q("limit", "At most 500", {"type": "integer"}),
@@ -882,6 +902,8 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                          "requestBody": {"required": True, "content": {
                                              "application/json": {"schema": {"type": "object", "required": ["body"], "properties": {
                                                  "body": {"type": "string"}, "task_id": {"type": "integer"},
+                                                 "job_id": {"type": "integer", "description": "2.32.0 (#1081): this message is the result of your job "
+                                                            "(for this person): its history shows under it"},
                                                  "choices": {"type": "array", "maxItems": 8, "description": "2.28.0 (#1005): answer buttons; the person's answer comes as the event chat_choice (message_id, choice_ids, labels)",
                                                              "items": {"type": "object", "required": ["id", "label"], "properties": {"id": {"type": "string", "maxLength": 40}, "label": {"type": "string", "maxLength": 80},
                                                                                                                                     "style": {"type": "string", "enum": ["default", "primary", "danger"]}}}},

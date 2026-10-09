@@ -201,10 +201,10 @@ function approvalBar(t, ro) {
   if (!t?.approval || !collab()) return '';
   const who = t.approver_id === S.me?.id ? tr('you') : apName(t.approver_id);
   const mine = t.approval === 'pending' && t.approver_id === S.me?.id;
-  const acts = mine ? `<span class="apacts"><button type="button" class="btn sm pri" data-act="ap-decide" data-k="approve" data-id="${t.id}">${ic('check', 's')} ${tr('Approve')}</button><button type="button" class="btn sm" data-act="ap-decide" data-k="changes" data-id="${t.id}">${ic('edit', 's')} ${tr('Ask for changes')}</button><button type="button" class="btn sm danger" data-act="ap-decide" data-k="reject" data-id="${t.id}">${ic('ban', 's')} ${tr('Reject')}</button></span>`
+  const acts = mine ? `<span class="apacts"><button type="button" class="btn sm pri" data-act="ap-decide" data-k="approve" data-id="${t.id}">${thumbIc(true)} ${tr('Approve')}</button><button type="button" class="btn sm" data-act="ap-decide" data-k="changes" data-id="${t.id}">${ic('edit', 's')} ${tr('Ask for changes')}</button><button type="button" class="btn sm danger" data-act="ap-decide" data-k="reject" data-id="${t.id}">${thumbIc(false)} ${tr('Reject')}</button></span>`
     : t.approval === 'pending' && !ro ? `<button type="button" class="linkbtn" data-act="ap-cancel" data-id="${t.id}">${tr('Withdraw')}</button>`
       : t.approval === 'changes' && !ro && t.status === 0 ? `<button type="button" class="linkbtn" data-act="ap-request" data-id="${t.id}">${tr('Ask again')}</button>` : '';
-  return `<div class="apbar ap-${t.approval}" role="status">${ic(t.approval === 'approved' ? 'check' : t.approval === 'rejected' ? 'ban' : 'eye', 's')}<span class="apt">${esc(tr(APPROVAL_TXT[t.approval], who))}</span>${acts}</div>`;
+  return `<div class="apbar ap-${t.approval}" role="status">${t.approval === 'approved' ? thumbIc(true) : t.approval === 'rejected' ? thumbIc(false) : ic('eye', 's')}<span class="apt">${esc(tr(APPROVAL_TXT[t.approval], who))}</span>${acts}</div>`;
 }
 const approvalChip = t => t?.approval === 'pending' && collab() ? `<span class="apchip" title="${esc(tr(APPROVAL_TXT.pending, apName(t.approver_id)))}">${ic('eye', 's')}${tr('Approval')}</span>` : '';
 const apName = id => (S.lists.flatMap(l => l.members || []).find(m => m.user_id === id)?.name) || (S.lists.find(l => l.owner_id === id)?.owner_name) || (id === S.me?.id ? S.me.display_name : '?');

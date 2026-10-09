@@ -75,7 +75,9 @@ TENANT_EXEMPT = {
     "group_members": "members of a group (see groups); materialized into list_members under the workspace rule",
     "tchat_msgs": _CHAT, "tchat_reads": _CHAT, "tchat_rx": _CHAT,
     "agent_chat": "a person's chat with an agent (agent_id + user_id; the agent's workspace decides what it sees)",
-    "chat_reactions": "per agent chat message", "agent_events": _AGENT + " (events are made only for lists it is in)",
+    "chat_reactions": "per agent chat message",
+    "agent_steps": "2.32.0 (#1081): an agent's steps for ONE person (its chat answer / its job for that person); only that person reads them",
+    "agent_events": _AGENT + " (events are made only for lists it is in)",
     "agent_bridges": _AGENT + " (an owner's approval between two lists)",
     "kid_parents": _FAM, "kid_stars": _FAM, "kid_rewards": _FAM,
 }

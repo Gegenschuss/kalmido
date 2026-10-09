@@ -132,7 +132,7 @@ const CASES = {
   // the quick add hints of fr / es / it / nl use their own words, no English keywords
   for (const lang of ['fr', 'es', 'it', 'nl']) {
     await w.eval(`i18nLoad('${lang}')`);
-    const hint = w.eval(`tr('tomorrow 3pm · !high · #tag · ~list · every monday') + ' ' + tr("Add task: “Dentist tomorrow 3pm !high #private ~list”")`);
+    const hint = w.eval(`tr('tomorrow 3pm · !high · #tag · ~list · every monday') + ' ' + tr("Type the way you think: “Dentist tomorrow 3pm !high #private ~list”")`);
     check(!/tomorrow|3pm|!high|every monday/.test(hint), `${lang}: hints without English keywords: ${hint}`);
     // and every word in the hint examples is understood
     const ex = w.eval(`tr('tomorrow 3pm · !high · #tag · ~list · every monday')`).split(' · ');

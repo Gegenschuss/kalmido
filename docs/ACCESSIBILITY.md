@@ -32,7 +32,9 @@ the app has not yet been tested by people who use a screen reader every day (see
   visible.
 - **Dragging is never the only way.** Tasks: *Move up / Move down* in the task menu or Alt+↑ / Alt+↓, *Move to
   section…*, *Move to list* (m), the date picker; the panels and columns that can be resized by dragging have a grip
-  that works with ← → and Enter (standard width) or a double-click.
+  that works with ← → and Enter (standard width) or a double-click. *Customize* on the start page, Today, Time
+  tracking, the overviews and the project page: ↑ / ↓ buttons, Alt+↑ / Alt+↓ on a row and a switch per block (each move
+  is announced); dragging the rows is only an extra on a computer.
 - **Touch targets** of 44 × 44 px on touch screens (at least 24 px everywhere, WCAG 2.5.8), also in the compact density.
 - **Reduced motion.** With "reduce motion" set in the system, animations and smooth scrolling are off.
 - **Zoom and reflow.** The app works at 320 px width and at 200 % zoom without scrolling sideways (wide boards such as

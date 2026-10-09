@@ -363,7 +363,9 @@ function renderTop0() {
     if (l) {
       const v = curView(l), vc = viewChoices(l);  // 2.7.1 (#410): + "Project overview" in project lists
       // 2.8.0 (#434): the view switch as text tabs (List / Kanban / Timeline / Project overview)
-      if (vc.length > 1 && !isMobile()) acts += `<div class="seg vseg ttabs tf" role="group" aria-label="${esc(tr('View'))}">${vc.map(([k, n, i]) => `<button class="${v === k ? 'on' : ''}" data-act="view-${k}" data-ico="${i}" title="${esc(tr(n))}" aria-pressed="${v === k}">${esc(tr(n))}</button>`).join('')}</div>`;
+      // 2.32.0 (#1062): no longer folds into "…" (no .tf): on a narrow header (tl3 / tl4, e.g. with the task panel open) the
+      // tabs become icons (the name stays as aria-label and tooltip)
+      if (vc.length > 1 && !isMobile()) acts += `<div class="seg vseg ttabs" role="group" aria-label="${esc(tr('View'))}">${vc.map(([k, n, i]) => `<button class="${v === k ? 'on' : ''}" data-act="view-${k}" data-ico="${i}" title="${esc(tr(n))}" aria-label="${esc(tr(n))}" aria-pressed="${v === k}">${ic(i, 's')}<span class="vtl">${esc(tr(n))}</span></button>`).join('')}</div>`;
       // 2.14.0 (#425): "Columns…" (the list's columns for every member) replaces the per-device field-column switch
       if (!isMobile() && v === 'list' && !l.archived) acts += `<button class="iconbtn tf ${listCols(l) ? 'on' : ''}" data-act="cols" data-ico="columns" data-id="${l.id}" title="${esc(tr('Shown fields…'))}" aria-label="${esc(tr('Shown fields…'))}" aria-haspopup="dialog">${ic('columns')}</button>`;
       // 2.6.0 (K12): Share next to the title (desktop / tablets; phones: in "…")
@@ -500,6 +502,8 @@ function topMoreItems() {
   if (isMobile()) for (const dir of ['undo', 'redo']) { const b = histBtn(dir); if (b.off && !b.p) continue; out.push({label: b.lab, icon: dir, dis: b.off, cls: 'hmi' + (b.p ? ' pend' : ''), title: b.p ? tr('waiting for the connection') : '', fn: () => histStep(dir)}); }
   // 2.24.0 (UX-35): Today's planners live here now (the header keeps its room for the tasks)
   if (m === 'tasks' && k === 'today') out.push({label: tr('Plan my day'), icon: 'cal', fn: () => dayplanModal('day')}, {label: tr('Fill free time'), icon: 'clock', fn: () => dayplanModal('fill')});
+  if (m === 'tasks' && k === 'today') out.push({label: tr('Customize Today…'), icon: 'sliders', fn: () => lyOpen('today', true)});  // 2.32.0 (#1063)
+  if (m === 'time') out.push({label: tr('Customize…'), icon: 'sliders', fn: () => lyOpen('time', true)});
   if (m === 'tasks' && !NOLIST_KEYS.includes(k) && !isKanban() && !isTimeline() && !isRoadmap() && !isOverview())
     sec.push({label: S.multiMode ? tr('End selection') : tr('Select multiple'), icon: 'select', on: S.multiMode, fn: () => { S.multiMode = !S.multiMode; if (!S.multiMode) S.multi.clear(); render(); }},
       {label: tr('Sort…'), icon: 'sort', fn: () => sortMenu($('#top [data-act="top-more"]') || $('#top h1'))});
@@ -799,6 +803,7 @@ function taskRow(t, opts = {}) {
     ${ac ? `<span class="wcell">${who}</span>` : ''}
     ${opts.ckback && !ro ? `<button class="iconbtn ckback" data-act="toggle" title="${tr('Put back on the list')}" aria-label="${tr('Put back on the list')}">${ic('undo', 's')}</button>` : ''}
     ${opts.trash ? `<button class="iconbtn" data-act="restore" title="${tr('Restore')}">${ic('undo')}</button>${listById(t.list_id)?.role === 'owner' ? `<button class="iconbtn danger" data-act="purge" title="${tr('Delete permanently')}">${ic('x')}</button>` : ''}` : ''}
+    ${S.multiMode && isTouch() && opts.drag !== false && !opts.trash && !ro && t.id > 0 ? `<span class="tgrip" title="${esc(tr('Drag to reorder'))}" aria-hidden="true">${ic('grip', 's')}</span>` : ''}
   </div>`;
   if (opts.tree && openKids && !collapsed) h += kids.filter(k => k.status === 0).map(k => taskRow(k, {...opts, depth: (opts.depth || 0) + 1, showList: false})).join('');
   return h;
@@ -1116,15 +1121,35 @@ document.addEventListener('click', e => {
   menu(b, S.lists.filter(l => !l.archived && !l.is_inbox && canAddTo(l.id)).map(l => ({label: lname(l), icon: 'list', fn: () => patchUndoable(id, {list_id: l.id}, tr('Moved to {0}', lname(l)))})));
 });
 function qaddBox(extraCls = '') {
-  return `<div class="qadd inline ${extraCls}"><div class="box">${ic('plus')}<input id="qinput" type="text" name="kalmido-quick-add" aria-label="${esc(tr('Add task…'))}" placeholder="${tr('Add task: “Dentist tomorrow 3pm !high #private ~list”')}" autocomplete="off" data-form-type="other" data-lpignore="true" aria-autocomplete="none" enterkeyhint="done">${tplBtn()}${qExtraBtns('qinput')}</div><div class="chips" id="qchips"></div></div>`;
+  return `<div class="qadd inline ${extraCls}"><div class="box">${ic('plus')}<input id="qinput" type="text" name="kalmido-quick-add" aria-label="${esc(tr('Add task…'))}" placeholder="${tr('Add task…')}" title="${esc(tr(QEX))}" autocomplete="off" data-form-type="other" data-lpignore="true" aria-autocomplete="none" enterkeyhint="done">${tplBtn()}${qExtraBtns('qinput')}</div><div class="chips" id="qchips"></div></div>`;
 }
 // 2.14.0 (#484): next to Send: "Add and open" (creates the task and opens its details at once, for notes and files) and the
 // paper clip (pick files: the task is created with them as attachments, the first file's name is the title when none
 // is typed; then its details open). Phones, Fold and desktop; 44 px targets on touch screens.
-function qExtraBtns(inp) {
-  return `<button type="button" class="iconbtn qbtn" data-act="q-clip" data-q="${inp}" title="${esc(tr('Add with a file…'))}" aria-label="${esc(tr('Add with a file…'))}">${ic('qclip', 's')}</button>`
-    + `<button type="button" class="iconbtn qbtn" data-act="q-open" data-q="${inp}" title="${esc(tr('Add and open details'))}" aria-label="${esc(tr('Add and open details'))}">${ic('qopen', 's')}</button>`;
+function qExtraBtns(inp, lab = false) {  // 2.32.0 (#1059): lab = with a short visible label (the phone sheet)
+  const b = (act, icn, t, l) => `<button type="button" class="${lab ? 'btn sm qlab' : 'iconbtn'} qbtn" data-act="${act}" data-q="${inp}" title="${esc(t)}" aria-label="${esc(t)}">${ic(icn, 's')}${lab ? `<span aria-hidden="true">${esc(l)}</span>` : ''}</button>`;
+  return b('q-clip', 'qclip', tr('Add with a file…'), tr('File|quick add')) + b('q-open', 'qopen', tr('Add and open details'), tr('Details|quick add'));
 }
+// 2.32.0 (#1059): the quick add syntax as chips; a tap puts the shortcut into the field (# and ~ only the sign, the
+// suggestions take over). The words come from the translated example line, so they are the ones the parser knows.
+const QH_TXT = N_('tomorrow 3pm · !high · #tag · ~list · every monday'), QH_CAP = N_('Goes to the inbox · ~list · tomorrow · !high · #tag');
+function qHelpChips(inp, capture = false) {
+  const parts = tr(capture ? QH_CAP : QH_TXT).split(' · ');
+  const lead = capture ? `<span class="qhlead">${esc(parts.shift())}</span>` : '';
+  return `${lead}<span class="qhcs" role="group" aria-label="${esc(tr('Insert a shortcut'))}">${parts.map(p => { const ins = /^[#~]/.test(p) ? p[0] : p;
+    return `<button type="button" class="qhc" data-act="q-ins" data-q="${inp}" data-ins="${esc(ins)}" title="${esc(tr('Insert “{0}”', ins))}">${esc(p)}</button>`; }).join('')}</span>`;
+}
+function qInsert(i, ins) {
+  if (!i || !ins) return;
+  const v = i.value, a = i.selectionStart ?? v.length, e = i.selectionEnd ?? a;
+  const pre = v.slice(0, a), post = v.slice(e);
+  const add = (pre && !/\s$/.test(pre) ? ' ' : '') + ins + (/^[#~]$/.test(ins) ? '' : ' ');
+  i.value = pre + add + (/^[#~]$/.test(ins) ? post : post.replace(/^\s+/, ''));
+  const c = (pre + add).length;
+  i.focus({preventScroll: true}); try { i.setSelectionRange(c, c); } catch { /* type without a selection */ }
+  i.dispatchEvent(new Event('input', {bubbles: true}));
+}
+document.addEventListener('mousedown', e => { if (e.target.closest?.('.qhc')) e.preventDefault(); });  // the field keeps the focus (and the phone its keyboard)
 function quickFiles(inp) {
   if (!OUT.online) { toast(tr('Offline: only works again with a connection')); return; }
   let f = $('#qfile');
@@ -1137,8 +1162,8 @@ function quickFiles(inp) {
   };
   f.click();
 }
-function tplBtn() {
-  return tplOf('task').length ? `<button class="iconbtn qtpl" data-act="tpl-use" title="${tr('New from template')}" aria-label="${tr('New from template')}">${ic('copy', 's')}</button>` : '';
+function tplBtn(lab = false) {
+  return tplOf('task').length ? `<button class="${lab ? 'btn sm qlab' : 'iconbtn'} qtpl" data-act="tpl-use" title="${tr('New from template')}" aria-label="${tr('New from template')}">${ic('copy', 's')}${lab ? `<span aria-hidden="true">${tr('Template|quick add')}</span>` : ''}</button>` : '';
 }
 // 1.5.3: desktop / tablet quick add = a composer docked at the bottom of the list column (sticky): a card with an accent
 // "+", a short placeholder, the key badge and the template button. Focused, it grows: chips for date, list and
@@ -1147,7 +1172,7 @@ function tplBtn() {
 const QEX = N_('Type the way you think: “Dentist tomorrow 3pm !high #private ~list”');
 function qdockHtml() {
   return `<div class="qdock"><div class="qadd dock"><div class="box"><span class="qplus" aria-hidden="true">${ic('plus', 's')}</span><input id="qinput" type="text" name="kalmido-quick-add" aria-label="${esc(tr('Add task…'))}" placeholder="${tr('Add task…')}" title="${esc(tr(QEX))}" autocomplete="off" data-form-type="other" data-lpignore="true" aria-autocomplete="none" enterkeyhint="done">${tplBtn()}${qExtraBtns('qinput')}${isTouch() ? '' : `<span class="qkey" title="${esc(kt(tr('New task'), 'n'))}">${kb('n')}</span>`}</div>
-    <div class="qdmore"><div class="qdchips" id="qdchips"></div><div class="chips" id="qchips"></div>${hintSeen('qsyntax') ? '' : `<div class="qhint">${tr(QEX)}</div>`}</div></div></div>`;
+    <div class="qdmore"><div class="qdchips" id="qdchips"></div><div class="chips" id="qchips"></div>${hintSeen('qsyntax') ? '' : `<div class="qhint">${qHelpChips('qinput')}</div>`}</div></div></div>`;
 }
 // the chips of the docked composer: what the task will get (a chip set here wins over the text)
 function qdockChips() {
@@ -1192,7 +1217,10 @@ function viewListBody() {
   if (rl && !ro && isOwner(rl) && !ck && (['shopping', 'packing'].includes(rl.family) || /einkauf|shopping|groceries|pack(liste|ing)|courses|compra|spesa|boodschap|paklijst/i.test(rl.name)) && !hintSeen('dab')) h += `<div class="onehint" data-hint="dab">${ic('cart', 's')}<span>${esc(tr('Shopping or packing? With “Show completed at the bottom” what you tick off stays visible at the bottom and comes back with one tap.'))}</span><button type="button" class="btn sm" data-act="dab-on" data-id="${rl.id}">${tr('Turn on')}</button><button type="button" class="iconbtn hx" data-act="hint-x" data-k="dab" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;
   // 2.31.0 (#1052): grouped by date, "All to today" / "Another day…" sit in the head of "Overdue" (no card of their own)
   const odHead = S.route.key === 'today' && groups.some(g => g.id === 'd:over' && g.tasks.length);
-  if (S.route.key === 'today') h += waitCard() + reviewCard() + (odHead ? '' : overdueBanner()) + cevTodayBlock();  // 2.24.0 (UX-35): the planners in "…"  // 2.10.0 (#440): review + planner
+  // 2.32.0 (#1063): Today is built from blocks (Customize): the cards above, the tasks, the inbox; the rest of h after
+  // the marker becomes the block "tasks"
+  const tdc = S.route.key === 'today' ? {wait: waitCard(), review: reviewCard(), overdue: odHead ? '' : overdueBanner(), events: cevTodayBlock()} : null;  // 2.24.0 (UX-35): the planners in "…"  // 2.10.0 (#440): review + planner
+  if (tdc) h += '\u0001';
   if (rl && sortOwn()) h += `<div class="onehint sortown">${ic('sort', 's')}<span>${esc(tr('You see your own sort of this shared list.'))}</span><button type="button" class="btn sm" data-act="sort-shared">${tr('Back to the shared sort')}</button></div>`;  // 2.27.0 (#988)
   if (flow && FLOW.cyc) h += `<div class="flowhint">${ic('deps', 's')}${esc(tr('Some tasks block each other in a circle; they are ordered by date.'))}</div>`;
   if (lc && total0(groups)) h += lcHead(rl, lc);
@@ -1227,7 +1255,7 @@ function viewListBody() {
     if (!closed && g.section !== undefined && !g.tasks.length && !ro) h += `<div class="sdrop" data-section="${g.section ?? ''}">${tr('Drop tasks here')}</div>`;  // shown while a task is dragged
     if (g.name) h += '</div>';
   }
-  if (tin.length) h += todayInboxHtml(tin);
+  if (tin.length) { if (tdc) tdc.inbox = todayInboxHtml(tin); else h += todayInboxHtml(tin); }
   // 2.19.0 (#667): the end of a list takes a dragged task into a new section
   if (rl && !ro && !rl.is_inbox && total && canEditList(rl.id)) h += `<div class="sdrop snew" data-newsec="1">${ic('plus', 's')}<span>${tr('New section')}</span></div>`;
   if (cut) h += `<div class="rowmore"><button type="button" class="btn" data-act="rows-more">${ic('down', 's')}${esc(trn('Show {0} more task', 'Show {0} more tasks', Math.min(cut, ROW_CAP)))}</button><span class="muted">${esc(trn('{0} task not shown yet', '{0} tasks not shown yet', cut))}</span></div>`;
@@ -1247,6 +1275,7 @@ function viewListBody() {
     if (!closed) h += v.done.sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || '')).map(t => taskRow(t, {showList, drag: false, cols, lc, tcols: {list: showList}})).join('');
     h += '</div>';
   }
+  if (tdc) { const i = h.indexOf('\u0001'); return h.slice(0, i) + lyHtml('today', {...tdc, tasks: h.slice(i + 1), inbox: tdc.inbox || ''}); }
   return h;
 }
 // 1.5.2: "Delete completed…" on the Completed view: all, or those completed more than 30 / 90 days ago, go to the

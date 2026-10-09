@@ -86,9 +86,9 @@ function mrHtml(c, s, ro) {
   const t = taskById(S.sel), p = (t?.code?.prs || []).find(x => x.n === s.number && x.repo === s.repo) || {n: s.number, url: s.pr_url, state: 'open', title: ''};
   const st = s.state === 'approved' ? tr('approved') : s.state === 'rejected' ? tr('rejected') : '';
   const may = s.state === 'open' && !ro && S.tl.approver;
-  return `<div class="sug mr ${esc(s.state || 'open')}"><div class="sugh">${ic('pr', 's')}<b>${tr('Ready to merge')}</b>${st ? `<span class="muted">· ${st}</span>` : ''}</div>
+  return `<div class="sug mr ${esc(s.state || 'open')}"><div class="sugh">${ic('pr', 's')}<b>${tr('Ready to merge')}</b>${st ? `<span class="muted">· ${s.state === 'approved' ? thumbIc(true) : thumbIc(false)} ${st}</span>` : ''}</div>
     <div class="gitl">${prRow(p)}</div>${s.summary ? `<div class="mrsum">${esc(s.summary).replace(/\n/g, '<br>')}</div>` : ''}
-    ${may ? `<div class="sugb"><button class="btn sm pri" data-act="mr-ok" data-cid="${c.id}">${ic('check', 's')} ${tr('Approve')}</button><button class="btn sm" data-act="mr-no" data-cid="${c.id}">${ic('x', 's')} ${tr('Reject')}</button><span class="muted">${tr('The agent merges only after your approval')}</span></div>` : ''}</div>`;
+    ${may ? `<div class="sugb"><button class="btn sm pri" data-act="mr-ok" data-cid="${c.id}">${thumbIc(true)} ${tr('Approve')}</button><button class="btn sm" data-act="mr-no" data-cid="${c.id}">${thumbIc(false)} ${tr('Reject')}</button><span class="muted">${tr('The agent merges only after your approval')}</span></div>` : ''}</div>`;
 }
 // 2.26.0 (#949): an agent's "ready to integrate" / "ready to deploy" request without a pull request: what goes where, the
 // evidence it attached, for deploy the approved integrations + the checklist (open tasks tagged deploy); approvers decide.
@@ -97,13 +97,13 @@ function gateHtml(c, s, ro) {
   const st = s.state === 'approved' ? tr('approved') : s.state === 'rejected' ? tr('rejected') : '';
   const may = s.state === 'open' && !ro && S.tl.approver, dep = s.kind === 'deploy', left = (s.checklist || []).length;
   const li = x => `<li><button type="button" class="linkbtn" data-act="open-id" data-id="${x.id}">#${x.id}</button> ${esc(x.title || '')}</li>`;
-  return `<div class="sug mr gate ${esc(s.state || 'open')}"><div class="sugh">${ic(dep ? 'send' : 'pr', 's')}<b>${dep ? tr('Ready to deploy') : tr('Ready to integrate')}</b>${st ? `<span class="muted">· ${st}</span>` : ''}</div>
+  return `<div class="sug mr gate ${esc(s.state || 'open')}"><div class="sugh">${ic(dep ? 'send' : 'pr', 's')}<b>${dep ? tr('Ready to deploy') : tr('Ready to integrate')}</b>${st ? `<span class="muted">· ${s.state === 'approved' ? thumbIc(true) : thumbIc(false)} ${st}</span>` : ''}</div>
     ${dep ? '' : `<div class="gref"><code>${esc(s.source || '')}</code> → <code>${esc(s.target || 'main')}</code></div>`}
     ${s.summary ? `<div class="mrsum">${esc(s.summary).replace(/\n/g, '<br>')}</div>` : ''}
     ${s.evidence ? `<details class="gev"><summary>${tr('Evidence')}</summary><pre>${esc(s.evidence)}</pre></details>` : ''}
     ${dep && (s.integrations || []).length ? `<div class="gint"><span class="muted">${tr('Integrations')}:</span> ${s.integrations.map(x => `<code>${esc(x.source || '')}</code>`).join(', ')}</div>` : ''}
     ${dep ? `<div class="gchk"><b>${left ? trn('{0} open deploy task', '{0} open deploy tasks', left) : tr('Checklist complete')}</b>${left ? `<ul>${s.checklist.map(li).join('')}</ul>` : ''}${(s.skipped || []).length ? `<div class="muted">${tr('Approved although open')}: ${s.skipped.map(x => '#' + x.id).join(', ')}</div>` : ''}</div>` : ''}
-    ${may ? `<div class="sugb">${dep && left ? `<button class="btn sm" data-act="gate-skip" data-cid="${c.id}">${ic('check', 's')} ${tr('Approve anyway')}</button>` : `<button class="btn sm pri" data-act="gate-ok" data-cid="${c.id}">${ic('check', 's')} ${tr('Approve')}</button>`}<button class="btn sm" data-act="mr-no" data-cid="${c.id}">${ic('x', 's')} ${tr('Reject')}</button><span class="muted">${dep ? tr('The agent deploys only after your approval') : tr('The agent integrates only after your approval')}</span></div>` : ''}</div>`;
+    ${may ? `<div class="sugb">${dep && left ? `<button class="btn sm" data-act="gate-skip" data-cid="${c.id}">${thumbIc(true)} ${tr('Approve anyway')}</button>` : `<button class="btn sm pri" data-act="gate-ok" data-cid="${c.id}">${thumbIc(true)} ${tr('Approve')}</button>`}<button class="btn sm" data-act="mr-no" data-cid="${c.id}">${thumbIc(false)} ${tr('Reject')}</button><span class="muted">${dep ? tr('The agent deploys only after your approval') : tr('The agent integrates only after your approval')}</span></div>` : ''}</div>`;
 }
 async function gateDecide(cid, skip) {
   let j; try { j = await api('POST', `/api/comments/${cid}/decide`, {decision: 'approve', skip_checklist: !!skip}); } catch { return; }

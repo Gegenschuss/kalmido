@@ -18,6 +18,7 @@ from ..tasks.validation import clean_reminders, valid_hm
 from ..integrations.paperless import pl_conns_for, pl_usable_ids
 from ..collab.news import NEWS_GROUPS, notif_update
 from ..personal.timetrack import BadInput
+from .layouts import LAYOUT_KEYS
 
 
 # ---------------------------------------------------------------- settings / export (per user)
@@ -28,7 +29,9 @@ SIDE_GROUPS = ("focus", "clients", "lists", "filters", "tags", "views", "team") 
 DASH_WIDGETS = ("wait", "today", "news", "chat", "projects", "pinned", "notes", "agents", "stats", "search", "family")  # 2.17.0 (#475), 2.19.0
 SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "time_focus", "paperless_keep", "celebrate", "cal_today",
                   "date_confirm", "digest_mail", "mail_from_me", "today_inbox", "agent_push",  # 2.28.0 (#987): agent_push
-                  "detail_cm_fold")  # 2.31.0 (#344)
+                  "detail_cm_fold",  # 2.31.0 (#344)
+                  "list_emoji",  # 2.32.0 (#1077)
+                  "agent_steps_live", "agent_steps_always")  # 2.32.0 (#1081)
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
                 "detail_split": (20, 85)}  # 2.31.0 (#344)
@@ -100,22 +103,18 @@ def clean_setting(k, v):
                 or not all(isinstance(x, str) and re.fullmatch(r"[ge]:[a-z_]{1,24}", x) for x in hidden):
             raise bad
         return json.dumps({"order": list(dict.fromkeys(order)), "hidden": list(dict.fromkeys(hidden))})
-    if k == "dashboard":  # 2.17.0 (#475)
-        if sv == "":
-            return ""
+    if k == "dashboard":  # 2.17.0 (#475); 2.32.0 (#1063): the shape of every view layout (widths, phone arrangement)
+        from .layouts import clean_layout
         try:
-            o = json.loads(v) if isinstance(v, str) else None
-        except ValueError:
+            return clean_layout(v if isinstance(v, str) else None, DASH_WIDGETS)
+        except BadInput:
             raise bad from None
-        if not isinstance(o, dict) or set(o) - {"order", "hidden"}:
-            raise bad
-        out = {}
-        for key in ("order", "hidden"):
-            xs = o.get(key, [])
-            if not isinstance(xs, list) or not all(isinstance(x, str) and x in DASH_WIDGETS for x in xs):
-                raise bad
-            out[key] = list(dict.fromkeys(xs))
-        return json.dumps(out)
+    if k in LAYOUT_KEYS:  # 2.32.0 (#1063)
+        from .layouts import clean_layout
+        try:
+            return clean_layout(v if isinstance(v, str) else None)
+        except BadInput:
+            raise bad from None
     if k in SETTINGS_FLAGS:
         if sv in ("true", "True"):
             return "1"
@@ -262,6 +261,9 @@ def settings_update():
                 cur["news_kinds"] = clean_setting("news_kinds", b["news_kinds"])
             vals.update(notif_update(cur, v))
             b = {k: x for k, x in b.items() if k not in ("notify", "news_kinds")}
+    if any(k in b for k in ("dashboard", *LAYOUT_KEYS)):  # 2.32.0 (#1063): only the person arranges their views
+        from .layouts import need_person
+        need_person()
     for k, v in b.items():
         if k in USER_DEFAULTS and k not in SETTINGS_SERVER_ONLY:
             if k == "lang" and v not in LANGS:
@@ -433,6 +435,8 @@ def export_json():
         "list_milestones": (f"SELECT * FROM list_milestones WHERE list_id IN {own}", (uid,)),
         "list_files": (f"SELECT * FROM list_files WHERE list_id IN {own}", (uid,)),
         "list_paperless": (f"SELECT * FROM list_paperless WHERE list_id IN {own}", (uid,)),
+        "list_layouts": ("SELECT * FROM list_layouts WHERE user_id=?", (uid,)),
+        "agent_steps": ("SELECT id, agent_id, job_id, message_id, text, created_at FROM agent_steps WHERE user_id=?", (uid,)),  # 2.32.0 (#1081)  # 2.32.0 (#1063): my own project page arrangements
         # 2.21.0 (#659 / #658): my event calendars with their events + attendees, my address books with their contacts
         "event_calendars": ("SELECT * FROM ev_cals WHERE owner_id=?", (uid,)),
         "events": ("SELECT * FROM events WHERE cal_id IN (SELECT id FROM ev_cals WHERE owner_id=?)", (uid,)),

@@ -393,13 +393,15 @@ document.addEventListener('touchstart', e => {
   if (lp?.active && e.touches.length > 1) return;  // a second finger while dragging: the drag goes on
   if (lp?.active || $('.ghost-drag:not(.side-ghost)')) tdCancel();  // 2.13.4: a drag whose end got lost: its ghost goes
   const r = e.target.closest('#view .trow, #view .ev, #view .wev, #detail .subs .trow');
-  if (!r || !r.dataset.id || e.target.closest('.chk, input, .caret') || S.multiMode || r.classList.contains('ghost')) { lp = null; return; }
+  // 2.32.0 (#1055): while selecting, a row is dragged by its grip (at once, no long press); elsewhere a tap selects
+  const grip = !!e.target.closest('.tgrip');
+  if (!r || !r.dataset.id || e.target.closest('.chk, input, .caret') || (S.multiMode && !grip) || r.classList.contains('ghost')) { lp = null; return; }
   const t0 = e.touches[0];
-  lp = {r, id: +r.dataset.id, x: t0.clientX, y: t0.clientY, active: false, tgt: e.target};
+  lp = {r, id: +r.dataset.id, x: t0.clientX, y: t0.clientY, active: false, tgt: e.target, grip};
   e.target.addEventListener('touchmove', tdMove, {passive: false});
   e.target.addEventListener('touchend', endTouchDrag);
   e.target.addEventListener('touchcancel', endTouchDrag);
-  lp.timer = setTimeout(startTouchDrag, 380);
+  if (grip) startTouchDrag(); else lp.timer = setTimeout(startTouchDrag, 380);
 }, {passive: true});
 function startTouchDrag() {
   if (!lp || !S.tasks.has(lp.id)) { lp = null; return; }
@@ -498,10 +500,10 @@ function endTouchDrag(e) {
   $$('.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
   if (el) dropTask(st.id, el, st.ly);
   else if (st.ly == null && st.r.closest('#view') && isKanban() && S.sections.some(x => x.list_id === S.tasks.get(st.id)?.list_id)) sectionPicker(st.r, st.id);  // held without moving: "Move to column…"
-  else if (st.ly == null && st.r.matches('#view .trow') && !isKanban()) {  // 2.25.0 (UX-11): long press = the task's menu, "Select" first
-    const t = taskById(st.id);
-    if (!S.multiMode && t && t.id > 0 && canEdit(t)) taskMenu(st.r.querySelector('.ttl') || st.r, st.id, {select: true});
-    else { S.multiMode = true; S.multi.add(st.id); S.multiLast = st.id; render(); }  // in a selection: one more
+  else if (st.ly == null && st.r.matches('#view .trow') && !isKanban() && !st.grip) {
+    // 2.32.0 (#1055): a long press selects the task (bar: Move, Date, Complete, More; the task's menu is under More); more
+    // rows join with a tap. Was (2.25.0, UX-11): the task's menu with "Select" first
+    S.multiMode = true; S.multi.add(st.id); S.multiLast = st.id; render();
   }
 }
 document.addEventListener('touchend', endTouchDrag);

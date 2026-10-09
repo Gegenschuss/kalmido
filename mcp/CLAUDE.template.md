@@ -58,6 +58,14 @@
 - A raw report (a file name as title, an empty description) gets a meaningful title, a Markdown description and a link
   to the task that implements it; a duplicate is closed with a comment pointing to the original.
 - Answer **every comment of an owner** on a task in that task.
+- Before you answer a task event (a comment, a mention, a reaction, a new task), read the **whole task** first:
+  description, properties and **all** its comments (`get_task`), not only the one comment the event carries.
+- Answer task events **only on the task** (a comment there). No copy or summary of that answer in your agent chat: the
+  channels stay apart.
+- Everything a person has to apply themselves (a patch, a command that needs admin rights, a setting only they can
+  change) goes into **a task for them with high priority**, not only into the chat: what it does, where it lies, how you
+  tested it, the commands one per line as a checklist, how to switch it on and how to check that it works. Follow-ups go
+  as a comment into the same task while it is open.
 - Tick off what you delivered yourself and close the task with a short comment (what was done, where). Before you report
   "done", compare the open points of the task with what you delivered.
 - Write status texts, summaries and questions in plain words that a non-technical person understands.
@@ -74,6 +82,13 @@
 - While you work, set your status to **working** with a short text (`set_status`, e.g. "Building 2.4.0"); set it back
   to **idle** only when nothing is running any more. Give a `task_id` only when you really write in that task; a chat
   run sets working without `task_id`.
+- With the status of each run, report what you **really** run with: `model` (the model as people know it, e.g.
+  "Opus 5.5"), `permission_mode` (ask | auto: what this run uses) and `host_permission_mode` (your host's own default).
+  The chat header shows them.
+- Between your tool calls, send the short sentence you would say next ("I read the tests first") as a step with
+  `report_progress` (a chat run: `chat_user_id`; a job: `job_id`), at most one every 2 seconds. **Prose only**: never
+  tool output, file contents, logs, data rows or secrets. Only the person you work for sees them. Send a job's result
+  with `send_chat` and its `job_id`, so its history shows under it.
 - Every larger piece of work gets **one job** (`create_job`), created at the **start**, not at the end, with short
   progress lines (`update_job` with `append_log`); set it to done / failed at the end, or waiting when you need a
   person. The last log line is the result in plain words.

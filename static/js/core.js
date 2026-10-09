@@ -571,7 +571,8 @@ setInterval(async () => {
   if (document.hidden) return;
   try {
     if (OUT.q.length) { flush(); staleDraw(); return; }  // 2.13.0 (#453 A13): the chip says how many changes wait
-    const {v, n, c, t, ty, app} = await api('GET', '/api/version');
+    const {v, n, c, t, ty, app, sp} = await api('GET', '/api/version');
+    if (sp !== undefined && sp !== S.stepsSig) { const first = S.stepsSig === undefined; S.stepsSig = sp; if (!first) stepsChanged(); }  // 2.32.0 (#1081)
     verCheck(app);  // 2.27.0 (#968)
     if (ty !== undefined) { const sig = JSON.stringify(ty); if (sig !== S.ctypingSig) { S.ctypingSig = sig; S.ctyping = ty; if (S.sel) agentLive(); } }  // 2.22.0 (#693)
     if (t !== undefined && t !== S.teamSig) { const first = S.teamSig === undefined; S.teamSig = t; if (!first && !editing()) teamChanged(); }  // 2.17.0 (#419)

@@ -218,6 +218,7 @@ APP_ONLY = [
     ("external calendar subscriptions and the calendar feed link: personal settings", ("* /api/calendars", "* /api/ical")),
     ("2.19.0: address books (CardDAV) for birthdays: their passwords are entered by people, like calendar subscriptions", ("* /api/family/contacts",)),
     ("the app's personal settings, onboarding and sample data", ("PATCH /api/settings", "POST /api/onboarding", "* /api/sample")),
+    ("2.32.0 (#1063, #983): how a person arranges their views and the project page: people only, never agents", ("* /api/lists/{}/layout",)),
     ("the focus timer is a personal on-screen timer; time is tracked with /time/timer", ("* /api/pomo/",)),
     ("views computed for the screen (the data is in /tasks, /tasks/{id}/dependencies, /time/entries)", (
         "GET /api/stats", "GET /api/occurrences", "GET /api/deps", "GET /api/imports")),
@@ -242,6 +243,8 @@ APP_ONLY = [
     ("2.29.0 (#1029): the permission mode switch in the chat header; in the API it is the agent's runtime (admins: "
      "PATCH /api/admin/agents/{id}, owners: PATCH /api/my/agents/{id}), the agent reads it in GET /agent",
      ("PUT /api/agents/{}/permission-mode",)),
+    ("2.32.0 (#1081): an agent's steps are read only by the person they are for, in the app (the agent sends them with "
+     "POST /agent/progress; no token reads them back)", ("GET /api/agents/jobs/{}/steps",)),
     ("2.30.0 (#919): what people see about agents in their lists: the access log of a list (list menu > Agent access) and the "
      "lists an agent connects although their people differ; an agent's own token reads neither (GET /me shows its list_ids)",
      ("GET /api/lists/{}/agent-access", "GET /api/agents/{}/bridges")),

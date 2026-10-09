@@ -4,7 +4,7 @@
 
 // ------------------------------------------------------------------ detail panel
 let saveTimers = {};
-function openDetail(id) {
+function openDetail(id, o = {}) {
   if (S.me?.kid) return;  // 2.19.0: a child ticks in its own view, no task panel
   meEnd();  // 2.26.0 (#936): one task opened (a plain click, a title of the multi panel): the selection ends
   const other = S.sel !== id;
@@ -25,7 +25,7 @@ function openDetail(id) {
   $$(`.trow[data-id="${id}"]`).forEach(r => r.classList.add('sel'));
   // 2.26.x (#953): touch tablets / the unfolded Fold too: the open task is its own history entry, so Back (Android's key /
   // gesture) closes only the task and keeps the view + sidebar; phones as before (one entry per opened task)
-  if (isMobile()) history.pushState({detail: id}, '', location.hash);
+  if (isMobile()) history[o.replace && history.state?.detail ? 'replaceState' : 'pushState']({detail: id}, '', location.hash);  // 2.32.0 (#1071): a swipe to the next task replaces the entry (Back closes the task)
   else if (isTouch() && !history.state?.detail) history.pushState({detail: id}, '', location.hash);
   if (cmtOn() && id > 0 && S.tl.id !== id) S.tl = {id};
   loadTimeline(id);
@@ -525,3 +525,91 @@ async function saveLink(v) {
   document.addEventListener('focusin', ping);
   document.addEventListener('input', ping);
 }
+
+// ---- 2.32.0 (#1071): phones: a sideways swipe on the properties of the open task (title, date, list, assignee …, not the
+// comments, the comment box or a field) goes to the next (left) / previous (right) task of the view it was opened from, in its
+// order (sorting, filter). The panel follows the finger and slides; at the first / last task it springs back. "3 of 12"
+// shows for a moment at the top. Not from the screen edges (the phone's own Back gesture), not while text is selected, not
+// in areas that scroll sideways (tables, code, images). What was typed is saved first (flushSaves).
+const DSW_EDGE = 28, DSW_MIN = 70;
+let dsw = null;
+function dswIds() { return [...new Set($$('#view .trow[data-id]').map(r => +r.dataset.id))].filter(i => S.tasks.has(i)); }
+function dswBlocked(el) {
+  const f = el.closest('textarea, input, select, [contenteditable="true"]');
+  if (f && (f === document.activeElement || f.matches('select, input[type="range"]'))) return true;  // typing / marking in a field (a field without the focus, e.g. the title, may be swiped over)
+  if (el.closest('pre, table, img, video, .dsgrip, #d-tl, .dcpane, .dbot, .subs .trow, .menu-list')) return true;
+  for (let x = el; x && x.id !== 'detail'; x = x.parentElement) {
+    if (x.scrollWidth > x.clientWidth + 1 && /auto|scroll/.test(getComputedStyle(x).overflowX)) return true;
+  }
+  return false;
+}
+document.addEventListener('touchstart', e => {
+  dsw = null;
+  if (!S.sel || !isMobile() || e.touches.length !== 1 || $('.modal') || $('#pop:not(.hidden)')) return;
+  const d = $('#detail'), el = e.target;
+  if (!d || d.classList.contains('multi') || !el.closest?.('#detail .dbody, #detail .dtop') || dswBlocked(el)) return;
+  const t0 = e.touches[0];
+  if (t0.clientX < DSW_EDGE || t0.clientX > innerWidth - DSW_EDGE) return;
+  const sel = getSelection?.(); if (sel && !sel.isCollapsed && String(sel).trim()) return;
+  dsw = {x: t0.clientX, y: t0.clientY, dx: 0, lock: null, d};
+  // 2.32 review: the non-passive move listener only lives while a swipe may start (scrolling elsewhere stays passive)
+  document.addEventListener('touchmove', dswTouchMove, {passive: false});
+}, {passive: true});
+function dswTouchMove(e) {
+  if (!dsw || (typeof lp !== 'undefined' && lp?.active)) return;
+  const t = e.touches[0], dx = t.clientX - dsw.x, dy = t.clientY - dsw.y;
+  if (!dsw.lock) {
+    if (Math.hypot(dx, dy) < 10) return;
+    dsw.lock = Math.abs(dx) > Math.abs(dy) * 1.5 ? 'x' : 'y';
+    if (dsw.lock === 'y') { dsw = null; return; }
+    const ids = dswIds(), i = ids.indexOf(S.sel);
+    if (i < 0) { dsw = null; return; }
+    dsw.ids = ids; dsw.i = i;
+    dsw.d.classList.add('dswipe');
+  }
+  if (e.cancelable) e.preventDefault();
+  const end = (dx < 0 && dsw.i >= dsw.ids.length - 1) || (dx > 0 && dsw.i <= 0);
+  dsw.dx = end ? dx / 3 : dx;  // at the first / last task it only gives a little
+  dswMove(dsw.d, dsw.dx);
+}
+function dswOff() { document.removeEventListener('touchmove', dswTouchMove, {passive: false}); }
+function dswMove(d, x, anim) {
+  for (const el of $$(':scope > .dtop, :scope > .dbody, :scope > .dsgrip, :scope > .dcpane, :scope > .dbot', d)) {
+    el.style.transition = anim && !reducedMotion() ? 'transform .18s ease-out, opacity .18s ease-out' : 'none';
+    el.style.transform = x ? `translateX(${x}px)` : '';
+    el.style.opacity = x ? String(Math.max(.4, 1 - Math.abs(x) / innerWidth)) : '';
+  }
+}
+function dswEnd() {
+  const st = dsw; dsw = null;
+  if (!st || st.lock !== 'x') return;
+  st.d.classList.remove('dswipe');
+  dswAt = Date.now();
+  const dir = st.dx < -DSW_MIN ? 1 : st.dx > DSW_MIN ? -1 : 0, next = dir ? st.ids[st.i + dir] : null;
+  if (!next) { dswMove(st.d, 0, true); return; }  // too short, or the first / last task: springs back
+  const w = innerWidth, slow = !reducedMotion();
+  dswMove(st.d, -dir * w, true);
+  setTimeout(async () => {
+    await flushSaves();
+    openDetail(next, {replace: true});
+    const d = $('#detail'); if (!d) return;
+    dswMove(d, dir * w * .35); d.offsetWidth;  // the new one comes in from the other side
+    dswMove(d, 0, true);
+    setTimeout(() => dswMove(d, 0), 220);
+    dswPos(st.ids.indexOf(next) + 1, st.ids.length);
+  }, slow ? 170 : 0);
+}
+// "3 of 12" for a moment at the top of the panel (and for screen readers)
+function dswPos(n, of) {
+  const d = $('#detail'); if (!d) return;
+  let p = $('#dswpos');
+  if (!p) { p = document.createElement('div'); p.id = 'dswpos'; p.className = 'dswpos'; p.setAttribute('role', 'status'); p.setAttribute('aria-live', 'polite'); document.body.appendChild(p); }
+  p.textContent = tr('{0} of {1}', n, of);
+  p.classList.add('on'); clearTimeout(dswPos.t); dswPos.t = setTimeout(() => p.classList.remove('on'), 1600);
+}
+// the lift that ends a swipe does not also press what is under the finger
+let dswAt = 0;
+document.addEventListener('click', e => { if (Date.now() - dswAt < 400 && e.target.closest?.('#detail')) { e.stopPropagation(); e.preventDefault(); } }, true);
+document.addEventListener('touchend', () => { dswOff(); dswEnd(); });
+document.addEventListener('touchcancel', () => { dswOff(); if (dsw?.lock === 'x') { dsw.d.classList.remove('dswipe'); dswMove(dsw.d, 0, true); } dsw = null; });
+

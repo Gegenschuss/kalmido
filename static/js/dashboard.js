@@ -94,17 +94,185 @@ const DASH = [['wait', N_('Waiting for you'), 'hourglass'], ['today', N_('Today'
   ['projects', N_('Projects'), 'brief'], ['pinned', N_('Pinned|view'), 'pin'], ['notes', N_('Notes'), 'edit'], ['agents', N_('Agents'), 'bot'],
   ['stats', N_('Statistics'), 'chart'], ['search', N_('Search'), 'search'], ['family', N_('Family'), 'family']];
 S.dash = {custom: false};
-function dashPref() {
-  let o = {}; try { o = JSON.parse(S.settings?.dashboard || '{}') || {}; } catch { o = {}; }
-  const order = [...(o.order || []).filter(k => DASH.some(d => d[0] === k)), ...DASH.map(d => d[0]).filter(k => !(o.order || []).includes(k))]
-    .filter(k => k !== 'family' || famOn());  // 2.19.0 (#653): only with the module
-  return {order, hidden: new Set(o.hidden || [])};
+// ------------------------------------------------------------------ 2.32.0 (#1063) the view builder ("Customize")
+// One module for every view built from blocks (start page, Today, Time tracking, the project page): show / hide, order,
+// width half / full (two side by side on a computer), optional "Different on the phone", saved switches of a block (opts).
+// LY[view] = {key | src/save, blocks: () => [[key, name, icon, 'half'|'full', fixed]], title, grid (css class), quick}.
+// Stored per person (all devices) as json {order, hidden, half, full, opts, mobile} (accounts/layouts.py); the start
+// page keeps its key "dashboard". The project page: the project's standard (owner / admins) or my own override.
+const LY = {};
+S.ly = {view: null, phone: false, std: false};
+const lyBlocks = v => LY[v].blocks().filter(Boolean);
+function lyRaw(v, std) {
+  const d = LY[v]; let s = d.src ? d.src(std) : LY_PEND[d.key] ?? S.settings?.[d.key];  // a value still on its way wins over a reload
+  try { const o = JSON.parse(s || '{}'); return o && typeof o === 'object' ? o : {}; } catch { return {}; }
 }
-async function dashSave(order, hidden) {
-  const v = JSON.stringify({order, hidden: [...hidden]});
-  S.settings.dashboard = v; renderView();
-  try { await api('PATCH', '/api/settings', {dashboard: v}); } catch { /* api() said it */ }
+function lyPref(v, o = {}) {
+  const raw = o.raw || lyRaw(v, o.std), bs = lyBlocks(v), keys = bs.map(b => b[0]);
+  const phone = o.phone ?? (S.ly.view === v ? S.ly.phone : isMobile());
+  const p = phone && raw.mobile ? raw.mobile : raw, po = (p.order || []).filter(k => keys.includes(k));
+  const fixed = new Set(bs.filter(b => b[4]).map(b => b[0]));
+  const order = [...po, ...keys.filter(k => !po.includes(k))];
+  const hidden = new Set((p.hidden || []).filter(k => keys.includes(k) && !fixed.has(k)));
+  const size = k => (p.full || []).includes(k) ? 'full' : (p.half || []).includes(k) ? 'half' : (bs.find(b => b[0] === k)?.[3] || 'half');
+  return {raw, part: p, order, hidden, size, fixed, mobile: !!raw.mobile, opts: raw.opts || {}};
 }
+// change the arrangement being edited (the phone one when "Different on the phone" is on and it is chosen)
+function lyChange(v, fn) {
+  const std = S.ly.view === v && S.ly.std, pr = lyPref(v, {std}), raw = JSON.parse(JSON.stringify(pr.raw));
+  const tgt = (S.ly.view === v ? S.ly.phone : isMobile()) && raw.mobile ? raw.mobile : raw;
+  const bs = lyBlocks(v), st = {order: pr.order.slice(), hidden: new Set(pr.hidden), sizes: Object.fromEntries(bs.map(b => [b[0], pr.size(b[0])]))};
+  fn(st, raw);
+  tgt.order = st.order; tgt.hidden = [...st.hidden];
+  tgt.half = bs.filter(b => b[3] !== 'half' && st.sizes[b[0]] === 'half').map(b => b[0]);
+  tgt.full = bs.filter(b => b[3] !== 'full' && st.sizes[b[0]] === 'full').map(b => b[0]);
+  lyStore(v, raw, std);
+}
+// saves go out one after the other (two quick changes must not arrive the wrong way round)
+let lyQ = Promise.resolve();
+const LY_PEND = {};
+function lyPatch(key, o) {
+  LY_PEND[key] = o;
+  lyQueue(() => api('PATCH', '/api/settings', {[key]: o}).catch(() => { /* api() said it */ }).finally(() => { if (LY_PEND[key] === o) { delete LY_PEND[key]; if (S.settings) S.settings[key] = o; } }));
+}
+const lyQueue = fn => (lyQ = lyQ.then(fn, fn));
+function lyStore(v, raw, std) {
+  const o = raw && Object.keys(raw).length ? JSON.stringify(raw) : '';
+  const d = LY[v];
+  if (d.save) { d.save(o, std); return; }
+  S.settings[d.key] = o; lyPatch(d.key, o); renderView();
+}
+// a saved switch of a block (e.g. the period of the time report): read / write without a new arrangement
+const lyOpt = (v, b, n, def) => lyPref(v).opts?.[b]?.[n] ?? def;
+function lyOptSet(v, b, n, x) {
+  const raw = lyRaw(v); if ((raw.opts?.[b] || {})[n] === x) return;
+  ((raw.opts ||= {})[b] ||= {})[n] = x;
+  if (LY[v].save) { LY[v].save(JSON.stringify(raw), false); return; }
+  S.settings[LY[v].key] = JSON.stringify(raw); lyPatch(LY[v].key, JSON.stringify(raw));
+}
+const lyAct = v => v === 'home' ? 'dash' : 'ly';
+const lyCustomBtn = v => `<button type="button" class="btn sm" data-act="${lyAct(v)}-custom" data-lyv="${v}">${ic('sliders', 's')}${tr('Customize')}</button>`;
+// the blocks of view v in the chosen order and widths; parts = {key: html | fn(closeButton) | ''} ('' = nothing to show now)
+function lyHtml(v, parts, o = {}) {
+  const d = LY[v], {order, hidden, size} = lyPref(v);
+  if (S.ly.view === v) return lyEditor(v, o);
+  const xb = (k, n) => d.quick && o.canHide !== false ? `<button type="button" class="iconbtn lyx" data-act="ly-hide" data-lyv="${v}" data-k="${k}" title="${esc(tr('Hide {0}', tr(n)))}" aria-label="${esc(tr('Hide {0}', tr(n)))}">${ic('x', 's')}</button>` : '';
+  const bs = lyBlocks(v), out = [];
+  for (const k of order) {
+    if (hidden.has(k)) continue;
+    const b = bs.find(x => x[0] === k), p = parts[k], h = typeof p === 'function' ? p(b[4] ? '' : xb(k, b[1])) : p;
+    if (h) out.push(`<div class="lyb ly-${size(k)}" data-lyk="${k}">${h}</div>`);
+  }
+  const hid = bs.filter(b => hidden.has(b[0]) && parts[b[0]] !== undefined);
+  const add = d.quick && o.canHide !== false && hid.length ? `<div class="lyadd"><button type="button" class="btn sm" data-act="ly-add" data-lyv="${v}" aria-haspopup="menu">${ic('plus', 's')}<span>${tr('Block')}</span></button></div>` : '';
+  return `<div class="${d.grid || 'lygrid'}" data-ly="${v}">${out.join('') || (o.empty ?? d.empty ?? `<p class="muted">${tr('Every block is hidden. Customize brings them back.')}</p>`)}</div>${add}`;
+}
+function lyEditor(v, o = {}) {
+  const d = LY[v], pr = lyPref(v, {std: S.ly.std}), {order, hidden, size, fixed} = pr, bs = lyBlocks(v), A = lyAct(v), n = order.length;
+  const desk = !isMobile();
+  const rows = order.map((k, i) => { const [_, nm, icon, def] = bs.find(b => b[0] === k), sz = size(k);
+    return `<li data-k="${k}" ${desk ? 'draggable="true"' : ''} tabindex="-1">${desk ? `<span class="lyg" aria-hidden="true">${ic('grip', 's')}</span>` : ''}${ic(icon, 's')}<span class="dcl">${tr(nm)}</span>
+      ${d.nosize || !desk ? '' : `<button type="button" class="btn sm lysz" data-act="ly-size" data-lyv="${v}" data-k="${k}" aria-pressed="${sz === 'full'}" title="${esc(tr('Width'))}" aria-label="${esc(tr('Width') + ': ' + tr(nm) + ', ' + (sz === 'full' ? tr('full width') : tr('half width')))}">${sz === 'full' ? tr('Full') : tr('Half')}</button>`}
+      <button type="button" class="iconbtn" data-act="${A}-mv" data-lyv="${v}" data-k="${k}" data-d="-1" ${i ? '' : 'disabled'} aria-label="${esc(tr('Move up') + ': ' + tr(nm))}">${ic('up', 's')}</button>
+      <button type="button" class="iconbtn" data-act="${A}-mv" data-lyv="${v}" data-k="${k}" data-d="1" ${i < n - 1 ? '' : 'disabled'} aria-label="${esc(tr('Move down') + ': ' + tr(nm))}">${ic('down', 's')}</button>
+      <label class="swc"><input type="checkbox" data-dshow="${k}" data-lyv="${v}" ${hidden.has(k) ? '' : 'checked'} ${fixed.has(k) ? 'disabled' : ''}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('Show {0}', tr(nm)))}</span></label></li>`; }).join('');
+  const scope = o.canStd ? `<div class="seg lyscope" role="group" aria-label="${esc(tr('Arrangement for'))}"><button type="button" class="${S.ly.std ? '' : 'on'}" aria-pressed="${!S.ly.std}" data-act="ly-scope" data-lyv="${v}" data-k="mine">${tr('Only for me')}</button><button type="button" class="${S.ly.std ? 'on' : ''}" aria-pressed="${S.ly.std}" data-act="ly-scope" data-lyv="${v}" data-k="std">${tr('Standard for everyone')}</button></div>` : '';
+  const ph = `<label class="chkl lyph"><input type="checkbox" data-lyphone="${v}" ${pr.mobile ? 'checked' : ''}> ${tr('Different on the phone')}</label>${pr.mobile ? `<div class="seg" role="group" aria-label="${esc(tr('Arrangement for'))}"><button type="button" class="${S.ly.phone ? '' : 'on'}" aria-pressed="${!S.ly.phone}" data-act="ly-dev" data-lyv="${v}" data-k="0">${tr('Computer')}</button><button type="button" class="${S.ly.phone ? 'on' : ''}" aria-pressed="${S.ly.phone}" data-act="ly-dev" data-lyv="${v}" data-k="1">${tr('Phone')}</button></div>` : ''}`;
+  const reset = o.override ? `<button type="button" class="linkbtn" data-act="${A}-reset" data-lyv="${v}">${S.ly.std ? tr('Reset to defaults') : tr('Reset to the standard')}</button>` : `<button type="button" class="linkbtn" data-act="${A}-reset" data-lyv="${v}">${tr('Reset to defaults')}</button>`;
+  return `<div class="lyed" data-lyed="${v}"><div class="dashhead"><h2>${esc(d.title())}</h2><span class="spacer"></span><button type="button" class="btn sm pri" data-act="${A}-done" data-lyv="${v}">${tr('Done')}</button></div>
+    <div class="lyopts">${scope}${ph}</div>
+    <ol class="dcust" aria-label="${esc(v === 'home' ? tr('Cards') : tr('Blocks'))}" aria-describedby="lyhint-${v}">${rows}</ol><p class="muted lyhint" id="lyhint-${v}">${desk ? tr('Drag a row or use the arrows; Alt + arrow keys move the focused row.') : tr('Use the arrows to change the order.')}</p>
+    ${reset}</div>`;
+}
+function lyOpen(v, on) {
+  if (on) { S.ly = {view: v, phone: lyRaw(v).mobile ? isMobile() : false, std: false, at: location.hash}; }
+  else S.ly = {view: null, phone: false, std: false};
+  if (v === 'home') S.dash.custom = on;
+  renderView();
+  setTimeout(() => on ? $('#view .dcust button:not([disabled])')?.focus() : $(`#view [data-act="${lyAct(v)}-custom"]`)?.focus(), 0);
+}
+function lyMove(v, k, dlt) {
+  lyChange(v, st => { const i = st.order.indexOf(k), j = i + dlt; if (i < 0 || j < 0 || j >= st.order.length) return; [st.order[i], st.order[j]] = [st.order[j], st.order[i]]; });
+  announce(dlt < 0 ? tr('Moved up') : tr('Moved down'));
+}
+document.addEventListener('click', e => {
+  const a = e.target.closest?.('[data-act^="dash-"],[data-act^="ly-"]'); if (!a) return;
+  const v = a.dataset.lyv || 'home', act = a.dataset.act.replace(/^(dash|ly)-/, ''); if (!LY[v]) return;
+  e.preventDefault(); e.stopPropagation();
+  if (act === 'custom') lyOpen(v, true);
+  else if (act === 'done') lyOpen(v, false);
+  else if (act === 'reset') { const raw = lyRaw(v, S.ly.std); lyStore(v, LY[v].src ? '' : (raw.opts ? {opts: raw.opts} : ''), S.ly.std); S.ly.phone = false; announce(tr('Reset')); }
+  else if (act === 'mv') {
+    lyMove(v, a.dataset.k, +a.dataset.d);
+    setTimeout(() => $(`#view .dcust [data-act$="-mv"][data-k="${a.dataset.k}"][data-d="${a.dataset.d}"]:not([disabled])`)?.focus() || $(`#view .dcust [data-act$="-mv"][data-k="${a.dataset.k}"]:not([disabled])`)?.focus(), 30);
+  }
+  else if (act === 'size') { const k = a.dataset.k; lyChange(v, st => { st.sizes[k] = st.sizes[k] === 'full' ? 'half' : 'full'; }); setTimeout(() => $(`#view .dcust [data-act="ly-size"][data-k="${k}"]`)?.focus(), 30); }
+  else if (act === 'scope') { S.ly.std = a.dataset.k === 'std'; S.ly.phone = false; renderView(); setTimeout(() => $(`#view [data-act="ly-scope"][data-k="${a.dataset.k}"]`)?.focus(), 0); }
+  else if (act === 'dev') { S.ly.phone = a.dataset.k === '1'; renderView(); setTimeout(() => $(`#view [data-act="ly-dev"][data-k="${a.dataset.k}"]`)?.focus(), 0); }
+  else if (act === 'hide') { const k = a.dataset.k, bl = lyBlocks(v).find(b => b[0] === k); S.ly.std = false; lyChange(v, st => st.hidden.add(k)); toast(tr('{0} hidden. “+ Block” brings it back.', tr(bl?.[1] || k))); setTimeout(() => $(`#view [data-act="ly-add"][data-lyv="${v}"]`)?.focus(), 30); }
+  else if (act === 'add') {
+    const {hidden} = lyPref(v);
+    menu(a, lyBlocks(v).filter(b => hidden.has(b[0])).map(b => ({label: tr(b[1]), icon: b[2], fn: () => { S.ly.std = false; lyChange(v, st => { st.hidden.delete(b[0]); }); }})));
+  }
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset?.lyphone) {  // "Different on the phone": a copy of the arrangement for phones (off = the copy goes)
+    const v = t.dataset.lyphone, raw = lyRaw(v, S.ly.std);
+    if (t.checked) { const {order, hidden} = lyPref(v, {raw, phone: false}); raw.mobile = {order, hidden: [...hidden], half: raw.half || [], full: raw.full || []}; S.ly.phone = true; }
+    else { delete raw.mobile; S.ly.phone = false; }
+    lyStore(v, raw, S.ly.std); setTimeout(() => $(`#view [data-lyphone="${v}"]`)?.focus(), 30); return;
+  }
+  const k = t.dataset?.dshow; if (!k) return;
+  const v = t.dataset.lyv || 'home'; if (!LY[v]) return;
+  lyChange(v, st => { if (t.checked) st.hidden.delete(k); else st.hidden.add(k); });
+  setTimeout(() => $(`#view [data-dshow="${k}"][data-lyv="${v}"]`)?.focus(), 30);
+});
+// keyboard: Alt + ↑ / ↓ on a row (or a control in it) moves the block
+document.addEventListener('keydown', e => {
+  if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+  const li = e.target.closest?.('.lyed .dcust li'); if (!li) return;
+  e.preventDefault(); const v = li.closest('.lyed').dataset.lyed, k = li.dataset.k;
+  lyMove(v, k, e.key === 'ArrowUp' ? -1 : 1);
+  setTimeout(() => $(`#view .lyed .dcust li[data-k="${k}"]`)?.focus(), 30);
+});
+// leaving the view ends Customize (it never shows up on another page)
+window.addEventListener('hashchange', () => { if (S.ly.view && S.ly.at !== location.hash) { if (S.ly.view === 'home') S.dash.custom = false; S.ly = {view: null, phone: false, std: false}; setTimeout(() => renderView(), 0); } });
+// a computer: drag the rows of the editor
+let lyDrag = null;
+document.addEventListener('dragstart', e => { const li = e.target.closest?.('.lyed .dcust li[draggable]'); if (!li) return; lyDrag = li.dataset.k; e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', li.dataset.k); } catch { /* old browsers */ } li.classList.add('lydragging'); });
+document.addEventListener('dragover', e => { if (!lyDrag) return; const li = e.target.closest?.('.lyed .dcust li'); if (!li) return; e.preventDefault(); $$('.lyed .dcust li.lyover').forEach(x => x.classList.remove('lyover')); li.classList.add('lyover'); });
+document.addEventListener('dragend', () => { lyDrag = null; $$('.lyed .dcust li.lyover,.lyed .dcust li.lydragging').forEach(x => x.classList.remove('lyover', 'lydragging')); });
+document.addEventListener('drop', e => {
+  if (!lyDrag) return; const li = e.target.closest?.('.lyed .dcust li'); if (!li) return;
+  e.preventDefault(); e.stopPropagation();
+  const v = li.closest('.lyed').dataset.lyed, k = lyDrag, to = li.dataset.k; lyDrag = null;
+  if (k !== to) { lyChange(v, st => { const i = st.order.indexOf(k), j = st.order.indexOf(to); st.order.splice(i, 1); st.order.splice(j, 0, k); }); announce(tr('Moved')); }
+});
+
+// Today and Time tracking (2.32.0): the first views on the builder; the blocks a view does not show right now simply stay out
+LY.today = {key: 'view_today', empty: '', title: () => tr('Customize Today'), blocks: () => [['wait', N_('Waiting for you'), 'hourglass', 'full'], ['review', N_('Daily review'), 'journal', 'full'],
+  ['overdue', N_('Overdue'), 'alert', 'full'], ['events', N_('Events today'), 'cal', 'full'], ['tasks', N_('Tasks'), 'list', 'full', true], ['inbox', N_('Inbox'), 'inbox', 'full']]};
+LY.time = {key: 'view_time', empty: '', title: () => tr('Customize time tracking'), blocks: () => [['tiles', N_('Totals'), 'clock', 'full'],
+  ['chart', N_('Per day'), 'chart', 'full'], ['lists', N_('By list and task'), 'list', 'full'], ['entries', N_('Entries'), 'rows', 'full']]};
+// the Agents overview (status, usage, jobs; not the settings) and the projects overview ("Where is it stuck?")
+LY.agents = {key: 'view_agents', empty: '', title: () => tr('Customize the agents overview'), blocks: () => [['agents', N_('Agents'), 'bot', 'full'], ['usage', N_('Usage'), 'chart', 'full'],
+  ['jobs', N_('Jobs'), 'list', 'full', true], ['hint', N_('Explanation'), 'info', 'full']]};
+LY.projects = {key: 'view_projects', empty: '', title: () => tr('Customize the projects overview'), blocks: () => [['tiles', N_('Totals'), 'chart', 'full'], ['projects', N_('Projects'), 'brief', 'full', true],
+  ['note', N_('Explanation'), 'info', 'full']]};
+// the project page (#983; its blocks: POV_BLOCKS in projects.js)
+LY.project = {quick: true, title: () => tr('Customize the project page'), blocks: () => POV_BLOCKS,
+  src: std => { const y = S.povD[routeList()?.id]?.j?.layout || {}; return std ? y.std : (y.mine || y.std); },
+  save: (v, std) => {
+    const l = routeList(), d = l && S.povD[l.id]; if (!d?.j) return;
+    const old = d.j.layout, seq = d.lySeq = (d.lySeq || 0) + 1; d.j.layout = {...old, [std ? 'std' : 'mine']: v}; renderView();
+    lyQueue(async () => {
+      try { const r = await api('PUT', `/api/lists/${l.id}/layout`, {layout: v, scope: std ? 'standard' : 'mine'}); if (seq === d.lySeq && d.j) { d.j.layout = r; renderView(); } }
+      catch { if (seq === d.lySeq && d.j) { d.j.layout = old; renderView(); } }
+    });
+  }};
+// the start page (#475) on the view builder
+LY.home = {key: 'dashboard', grid: 'dgrid', title: () => tr('Customize the start page'), blocks: () => DASH.filter(d => d[0] !== 'family' || famOn()).map(d => [d[0], d[1], d[2], 'half'])};
 function dashCard(k) {
   const [_, name, icon] = DASH.find(d => d[0] === k), t0 = today();
   const card = (body, more = '', n = '') => `<section class="dcard dc-${k}" aria-labelledby="dh-${k}"><h3 id="dh-${k}">${ic(icon, 's')}<span>${tr(name)}</span>${n !== '' ? `<span class="dcn">${n}</span>` : ''}<span class="spacer"></span>${more}</h3>${body}</section>`;
@@ -180,39 +348,12 @@ function forMeBanner() {
     <ul class="dwl">${dms.map(r => `<li><a href="#team/${r.id}">${av(r.user_id, r.name, 'avatar')}<span class="dwt"><b>${esc(r.name)}</b> ${esc(r.last ? mdBrief(r.last.text) : '')}</span><span class="nbadge">${r.unread}</span></a></li>`).join('')}${its.map(([it, i]) => `<li><button type="button" class="dwb" data-act="news-open" data-i="${i}">${av(it.actor_id, uname(it.actor_id, S.nf.users), 'avatar')}<span class="dwt">${newsText(it, S.nf.users)}${it.task_title ? ' · ' + esc(it.task_title) : ''}</span></button></li>`).join('')}</ul></section>`;
 }
 function viewHome() {
-  const {order, hidden} = dashPref();
   const greet = (() => { const h = new Date().getHours(); return h < 11 ? tr('Good morning, {0}', S.me?.display_name || '') : h < 18 ? tr('Hello, {0}', S.me?.display_name || '') : tr('Good evening, {0}', S.me?.display_name || ''); })();
-  if (S.dash.custom) {
-    return `<div class="dash"><div class="dashhead"><h2>${tr('Customize the start page')}</h2><span class="spacer"></span><button type="button" class="btn sm pri" data-act="dash-done">${tr('Done')}</button></div>
-      <ol class="dcust" aria-label="${esc(tr('Cards'))}">${order.map((k, i) => { const [_, n, icon] = DASH.find(d => d[0] === k); return `<li data-k="${k}">${ic(icon, 's')}<span class="dcl">${tr(n)}</span>
-        <button type="button" class="iconbtn" data-act="dash-mv" data-k="${k}" data-d="-1" ${i ? '' : 'disabled'} aria-label="${esc(tr('Move up') + ': ' + tr(n))}">${ic('up', 's')}</button>
-        <button type="button" class="iconbtn" data-act="dash-mv" data-k="${k}" data-d="1" ${i < order.length - 1 ? '' : 'disabled'} aria-label="${esc(tr('Move down') + ': ' + tr(n))}">${ic('down', 's')}</button>
-        <label class="swc"><input type="checkbox" data-dshow="${k}" ${hidden.has(k) ? '' : 'checked'}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('Show {0}', tr(n)))}</span></label></li>`; }).join('')}</ol>
-      <button type="button" class="linkbtn" data-act="dash-reset">${tr('Reset to defaults')}</button></div>`;
-  }
-  const cards = order.filter(k => !hidden.has(k)).map(dashCard).filter(Boolean);
-  return `<div class="dash"><div class="dashhead"><h2>${esc(greet)}</h2><span class="muted">${esc(fmtDateLoc(today()))}</span><span class="spacer"></span><button type="button" class="btn sm" data-act="dash-custom">${ic('sliders', 's')}${tr('Customize')}</button></div>
-    ${forMeBanner()}<div class="dgrid">${cards.join('') || `<p class="muted">${tr('Every card is hidden. Customize brings them back.')}</p>`}</div></div>`;
+  if (S.ly.view === 'home') return `<div class="dash">${lyEditor('home')}</div>`;
+  const parts = Object.fromEntries(lyBlocks('home').map(b => [b[0], dashCard(b[0])]));
+  return `<div class="dash"><div class="dashhead"><h2>${esc(greet)}</h2><span class="muted">${esc(fmtDateLoc(today()))}</span><span class="spacer"></span>${lyCustomBtn('home')}</div>
+    ${forMeBanner()}${lyHtml('home', parts, {empty: `<p class="muted">${tr('Every card is hidden. Customize brings them back.')}</p>`})}</div>`;
 }
-document.addEventListener('click', e => {
-  const a = e.target.closest?.('[data-act^="dash-"]'); if (!a) return;
-  e.preventDefault(); e.stopPropagation();
-  const {order, hidden} = dashPref();
-  if (a.dataset.act === 'dash-custom') { S.dash.custom = true; renderView(); setTimeout(() => $('#view .dcust button:not([disabled])')?.focus(), 0); }
-  else if (a.dataset.act === 'dash-done') { S.dash.custom = false; renderView(); setTimeout(() => { if (document) $('#view [data-act="dash-custom"]')?.focus(); }, 0); }
-  else if (a.dataset.act === 'dash-reset') dashSave(DASH.map(d => d[0]), new Set());
-  else if (a.dataset.act === 'dash-mv') {
-    const i = order.indexOf(a.dataset.k), j = i + +a.dataset.d; if (j < 0 || j >= order.length) return;
-    [order[i], order[j]] = [order[j], order[i]]; dashSave(order, hidden);
-    announce(+a.dataset.d < 0 ? tr('Moved up') : tr('Moved down'));
-    setTimeout(() => $(`#view .dcust [data-act="dash-mv"][data-k="${a.dataset.k}"][data-d="${a.dataset.d}"]:not([disabled])`)?.focus() || $(`#view .dcust [data-act="dash-mv"][data-k="${a.dataset.k}"]:not([disabled])`)?.focus(), 30);
-  }
-});
-document.addEventListener('change', e => {
-  const k = e.target.dataset?.dshow; if (!k) return;
-  const {order, hidden} = dashPref(); if (e.target.checked) hidden.delete(k); else hidden.add(k);
-  dashSave(order, hidden); setTimeout(() => $(`#view [data-dshow="${k}"]`)?.focus(), 30);
-});
 document.addEventListener('submit', e => {
   if (!e.target.matches?.('[data-dsearch]')) return;
   e.preventDefault();

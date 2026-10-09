@@ -106,12 +106,12 @@ async function uploadFiles(taskId, files) {
     toast(files.length === 1 ? tr('Attached') : tr('{0} files attached', files.length));
   } catch (e) { /* api() already showed the error / offline notice */ }
 }
-function attLightbox(id, list) {
+function attLightbox(id, list, url = attUrl) {  // 2.32.0 (#983): url = the address of a project file
   const t = taskById(S.sel), imgs = list || (t?.attachments || []).filter(isImg);
   let i = Math.max(0, imgs.findIndex(a => a.id === id));
   const m = document.createElement('div');
   m.className = 'lightbox';
-  const draw = () => { const a = imgs[i]; m.innerHTML = `<img src="${attUrl(a)}" alt="${esc(a.name)}"><div class="lbbar"><span>${esc(a.name)} · ${fmtSize(a.size)}</span><span class="spacer"></span>${imgs.length > 1 ? `<button data-lb="-1">${ic('left')}</button><button data-lb="1">${ic('right')}</button>` : ''}<a href="${attUrl(a, true)}" download title="${tr('Download')}">${ic('download')}</a><button data-lb="x" title="${tr('Close')}">${ic('x')}</button></div>`; };
+  const draw = () => { const a = imgs[i]; m.innerHTML = `<img src="${url(a)}" alt="${esc(a.name)}"><div class="lbbar"><span>${esc(a.name)} · ${fmtSize(a.size)}</span><span class="spacer"></span>${imgs.length > 1 ? `<button data-lb="-1">${ic('left')}</button><button data-lb="1">${ic('right')}</button>` : ''}<a href="${url(a, true)}" download title="${tr('Download')}">${ic('download')}</a><button data-lb="x" title="${tr('Close')}">${ic('x')}</button></div>`; };
   draw();
   m.addEventListener('click', e => {
     const b = e.target.closest('[data-lb]');
@@ -382,7 +382,14 @@ function mdCells(l) {
   if (t.endsWith('|') && !t.endsWith('\\|')) t = t.slice(0, -1);
   return t.split(/(?<!\\)\|/).map(c => c.trim());
 }
-function autosize(el) { if (!el) return; el.style.height = 'auto'; if (el.scrollHeight) el.style.height = el.scrollHeight + 'px'; }
+// 2.32.0 (#1074): the short "auto" height must not move the task panel behind the docked comment box (its scroll
+// position is kept; the caret reveal is handled in app.css, #detail:has(.dbot :focus))
+function autosize(el) {
+  if (!el) return;
+  const sc = el.closest?.('.dbot') ? el.closest('#detail') : null, top = sc ? sc.scrollTop : 0;
+  el.style.height = 'auto'; if (el.scrollHeight) el.style.height = el.scrollHeight + 'px';
+  if (sc && sc.scrollTop !== top) sc.scrollTop = top;
+}
 // base: the value before the edit when the caller already changed the local copy (markdown checkbox)
 // 2.13.0 (#453, flaky phone network): typed text (title, description) is saved when the field is left, plus every 5 s
 // while typing (and when the app goes to the background), not every 600 ms. Every value this device sent is remembered

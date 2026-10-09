@@ -847,7 +847,15 @@ def agent_public(c, a, uid=None):
             "no_service": _no_service(c, a),
             "my_job": bool(uid) and any(j["state"] == "running" and j["user_id"] == uid for j in jobs),
             # 2.29.0 (#1029): the chat header's badge (Auto / Ask) and whether the viewer may switch it
-            "permission_mode": agent_runtime(a)["permission_mode"], "may_set_mode": bool(uid) and may_set_runtime(c, a, uid)}
+            "permission_mode": agent_runtime(a)["permission_mode"], "may_set_mode": bool(uid) and may_set_runtime(c, a, uid),
+            # 2.32.0 (#1079): what its host reports it really runs with (model as the host names it, the mode of the current
+            # run, the host's own default); the runtime's wished model next to it (set: … · runs: …)
+            "host": _host_info(a), "runtime_model": agent_runtime(a)["model"]}
+
+
+def _host_info(a):
+    from ..agents.steps import host_info
+    return host_info(a)
 
 
 def agents_for(c, uid):

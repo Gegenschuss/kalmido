@@ -304,7 +304,8 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
         const rx = await ev(`(() => { const b = [...document.querySelectorAll('#chat-msgs .chrx .rx, #chat-msgs .chrxq .rx')].filter(e => e.offsetWidth); return b.length; })()`);
         check(rx >= 1, `${vw}px: chat reactions shown (2.23.0: the smiley of the agent's message; ${rx})`);
         if (touch) {
-          const small = await ev(SMALL('#chat-msgs .chrx .rx, #chat-msgs .chrxq .rx'));
+          // 2.32.0 (#1062): the smiley of an agent message is there only after a long press (hidden, not tappable before)
+          const small = await ev(SMALL('#chat-msgs .chrx .rx:not(.rxtog), #chat-msgs .chrxq .rx:not(.rxtog), #chat-msgs .cmsg.rxshow .rx'));
           check(!small.length, `${vw}px: chat reactions >= 44 px: ${JSON.stringify(small)}`);
         }
         const ov = await ev(`(() => { const m = document.querySelector('#chat-msgs'); return m ? {sw: m.scrollWidth, cw: m.clientWidth} : null; })()`);

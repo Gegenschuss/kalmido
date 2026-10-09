@@ -285,6 +285,7 @@ function pubDraw(md, lid, j) {
   const box = $('#l-pub', md); if (!box) return;
   const k = j.link;
   box._j = j;
+  const st = $('#sh-st-pub', md); if (st) st.textContent = k ? (k.expired ? tr('Expired') : tr('On')) : tr('Off');  // 2.32.0 (#1058): the folded line
   box.innerHTML = `${k ? `<div class="row icalrow"><input id="lp-url" readonly value="${esc(k.url)}" aria-label="${tr('Public link')}"><button class="btn sm pri" data-lp="copy">${ic('copy', 's')} ${tr('Copy')}</button></div>
       <div class="shint">${k.expired ? `<span class="calerr" role="alert">${tr('Expired')}</span> · ` : ''}${esc(trn('opened {0} time', 'opened {0} times', k.views))}${k.last_used_at ? ' · ' + esc(tr('last {0}', relTime(k.last_used_at))) : ''}</div>` : `<div class="shint keep">${tr('People without an account can open the list through a secret link: only this list, without comments, assignees or files.')}</div>`}
     <div class="row"><label for="lp-mode">${tr('Access')}</label><select id="lp-mode"><option value="view">${tr('View only')}</option><option value="tick" ${k?.mode === 'tick' ? 'selected' : ''}>${tr('View and tick off')}</option></select></div>

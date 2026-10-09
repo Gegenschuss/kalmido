@@ -978,15 +978,28 @@ def v1_agent_chat_post(uid):
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if not u or is_agent(u) or not agent_shares(c, aid, uid):
         raise Denied(404)
-    fb, files = chat_input(("body", "task_id", "choices", "multi", "permission", "expires_in"))
+    fb, files = chat_input(("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id"))
     b = fb if fb is not None else v1_json()
     # 2.28.0 (#1005): answer buttons; 2.30.0 (#1041): permission questions (permission, expires_in)
-    unknown = sorted(k for k in b if k not in ("body", "task_id", "choices", "multi", "permission", "expires_in"))
+    unknown = sorted(k for k in b if k not in ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id"))
     if unknown:
         raise UnknownFields(unknown)
+    jid = None
+    if b.get("job_id") not in (None, ""):  # 2.32.0 (#1081): this message carries the result of a job for this person
+        jid = as_int(b["job_id"], "job_id", 1)
+        jr = c.execute("SELECT user_id FROM agent_jobs WHERE id=? AND agent_id=?", (jid, aid)).fetchone()
+        if not jr or jr["user_id"] != uid:
+            raise BadInput(tr("Invalid value: {0}", "job_id"))
+    b = {k: v for k, v in b.items() if k != "job_id"}
     if fb is not None and isinstance(b.get("multi"), str):
         b["multi"] = b["multi"].lower() in ("1", "true", "yes")
     r = chat_post(c, aid, uid, "agent", b, files)
+    from ..agents.steps import steps_take
+    if jid:
+        c.execute("UPDATE agent_chat SET job_id=? WHERE id=?", (jid, r["id"]))
+        r = c.execute("SELECT * FROM agent_chat WHERE id=?", (r["id"],)).fetchone()
+    if not b.get("permission"):  # 2.32.0 (#1081): the answer takes the live steps of the run along (a permission question: the run goes on)
+        steps_take(c, aid, uid, r["id"])
     text = r["body"] or " ".join(f"📎 {f['name']}" for f in chat_files_of(c, [r["id"]]).get(r["id"], []))
     c.execute("UPDATE agents SET typing_user=NULL, typing_until=0 WHERE user_id=? AND typing_user=?", (aid, uid))  # 2.4.1: answered
     s = collab_user(c, uid, None)
