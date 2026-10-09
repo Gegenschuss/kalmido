@@ -43,7 +43,7 @@ NEWS_GROUPS = {"mention": ("mention",), "assign": ("assign", "unassign", "take")
 NEWS_TO_ME = ("mention", "assign", "unassign", "take")  # filter "Mentions & assigned to me"
 # 2.28.0 (#987): "For you": messages from PEOPLE to me -- @mentions, assignments, replies to my comments (data.reply), an
 # approver's decision; everything agents do and every plain change is "Activity". The bell counts only "For you".
-NEWS_FOR_ME = ("mention", "assign", "take", "apdecide")
+NEWS_FOR_ME = ("mention", "assign", "take", "apdecide", "orglist")  # 2.35.0 (#1101): an organisation admin acted on my list
 
 
 def news_to_me(kind, actor_id, data, agents):
@@ -113,7 +113,8 @@ BELL_CUSTOM_KEY = {"reply": "comment", "follow": "comment"}
 KIND_ROW = {"mention": "mention", "comment": "comment", "assign": "assign", "unassign": "assign", "complete": "complete",
             "share": "share", "role": "share", "unshare": "share", "unblock": "unblock", "status": "status",
             "newtask": "newtask", "approval": "approval", "followup": "followup", "usage": "usage", "owner": "share",
-            "proposal": "proposal", "take": "assign", "errreport": "errreport", "apdecide": "assign", "signup": "usage"}
+            "proposal": "proposal", "take": "assign", "errreport": "errreport", "apdecide": "assign", "signup": "usage",
+            "orglist": "share"}  # 2.35.0 (#1101): an organisation admin archived / restored / deleted / handed over a list
 
 
 def notif_stored(s):
@@ -319,6 +320,8 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
         if (mentions_only and kind != "mention") or (to_me and kind not in NEWS_TO_ME):
             continue
         if kind in ("share", "unshare") and r["list_id"] is None and '"org"' in (r["data"] or ""):  # 2.28.0 (#935): an organisation
+            pass
+        elif kind == "orglist":  # 2.35.0 (#1101): addressed to the list's people; a deleted list only lives on in data.name
             pass
         elif kind in ("share", "role", "status", "owner", "agentjoin"):
             if not sees(r["list_id"]):

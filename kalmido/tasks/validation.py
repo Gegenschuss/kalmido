@@ -10,7 +10,7 @@ from flask import g, has_request_context
 from ..core.schema import MAX_DEPTH
 from ..core.i18n import N_, tr
 from ..core.db import iso_ms, now_utc, parse_iso
-from ..core.pages import valid_url
+from ..core.pages import valid_link
 
 
 # ---------------------------------------------------------------- tasks
@@ -21,7 +21,8 @@ TASK_FIELDS = ("list_id", "section_id", "parent_id", "title", "content", "priori
                "assignee_group_id",  # 2.10.0 (#441): assigned to a group (whoever has time); excludes assignee_id
                "plan_start",  # 2.11.0: planned start "YYYY-MM-DDTHH:MM" (day plan), independent of the due date
                "ms", "milestone_id",  # 2.18.0 (#430): a milestone (1) / the milestone of the same list a task belongs to
-               "fam", "rotation", "stars")  # 2.19.0 (#653): family data, household rotation, stars of a kid
+               "fam", "rotation", "stars",  # 2.19.0 (#653): family data, household rotation, stars of a kid
+               "snippets")  # 2.35.0 (#1095): code snippets (JSON list, tasks/snippets.py)
 # 2.4.0 (#340): ticket types of a task (API v1 / MCP / events: "type"); '' = none
 TICKET_TYPES = ("bug", "feature", "task")
 
@@ -91,6 +92,9 @@ def log_changes(c, tid, old, act=None):
         log_act(c, tid, "link", {"url": new["url"]})
     if ch("ttype"):  # 2.4.0 (#340)
         log_act(c, tid, "ttype", {"to": new["ttype"] or None})
+    if "snippets" in new.keys() and ch("snippets"):  # 2.35.0 (#1095): the code snippets changed (how many there are now)
+        from ..tasks.snippets import snip_parse
+        log_act(c, tid, "snippets", {"n": len(snip_parse(new["snippets"]))})
     if ch("ms"):  # 2.18.0 (#430): turned into a milestone / back into a task
         log_act(c, tid, "ms", {"on": bool(new["ms"])})
     if ch("milestone_id"):  # 2.18.0 (#430): the milestone the task belongs to (title kept: it may be renamed later)
@@ -104,7 +108,7 @@ def check_url(f):
         return None
     u = (f["url"] or "").strip() if isinstance(f["url"], (str, type(None))) else ""
     f["url"] = u or None
-    return tr("The link must start with http:// or https://") if u and not valid_url(u) else None
+    return tr("The link must be a web address (https://…) or a file link (smb://…, file://…)") if u and not valid_link(u) else None  # 2.35.0 (#186): file links too
 
 
 # ---- input validation (security audit 2026-09-28): the watchdog and the calendar code parse these
@@ -349,6 +353,9 @@ def clean_task(b):
                 v = clean_rotation(v)
             if k == "stars":
                 v = None if v in ("", None) else as_int(v, tr("Stars"), 0, STARS_MAX)
+            if k == "snippets":  # 2.35.0 (#1095)
+                from ..tasks.snippets import snip_clean
+                v = snip_clean(v)
             if k == "ttype":
                 v = "" if v in (None, "") else v
                 if v and v not in TICKET_TYPES:

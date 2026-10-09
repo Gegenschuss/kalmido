@@ -15,7 +15,7 @@ from ..core.access import (
     WRITE_ROLES,
 )
 from ..core.serializers import unlink_files
-from ..core.pages import url_title, valid_url
+from ..core.pages import url_title, valid_link
 from ..tasks.validation import TITLE_MAX, valid_date
 from ..tasks.tasks import task_create, task_update
 from ..tasks.lifecycle import task_complete, task_delete, task_reopen
@@ -311,8 +311,8 @@ def overview_patch(lid):
 
 def ov_link_clean(b, old=None):
     url = str(b.get("url", old["url"] if old else "") or "").strip()
-    if not valid_url(url):
-        raise BadInput(tr("Link: an address starting with http:// or https://"))
+    if not valid_link(url):  # 2.35.0 (#186): file links too
+        raise BadInput(tr("The link must be a web address (https://…) or a file link (smb://…, file://…)"))
     title = str(b.get("title", old["title"] if old else "") or "").strip()[:OV_TITLE_MAX] or url_title(url)
     return title, url
 

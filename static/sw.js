@@ -2,7 +2,7 @@
 // API calls always go to the network (data must be live). Language files: de.json is precached,
 // any other static/i18n/<code>.json lands in the cache via the network-first handler on first use
 // (the client also keeps the active one in localStorage as a last offline fallback).
-const CACHE = 'tasks-shell-v114';
+const CACHE = 'tasks-shell-v115';
 const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/static/i18n/de.json', '/static/icon-192.png', '/static/icon-512.png',
   '/static/icon.svg', '/static/badge-96.png', '/static/fonts/Geist-Variable.woff2', '/static/fonts/GeistMono-Variable.woff2', '/static/quips.json',
   '/static/favicon.svg', '/static/favicon-32.png', '/static/apple-touch-icon.png', '/static/icon-maskable-512.png',  // 2.18.0 (#394)
@@ -43,11 +43,30 @@ self.addEventListener('fetch', e => {
   if (e.request.method === 'POST' && url.pathname === '/share') { e.respondWith(handleShare(e.request)); return; }
   // /s/ = public list links: never cached (no-store pages of one list; the service worker stays out of them)
   if (e.request.method !== 'GET' || url.pathname.startsWith('/api/') || url.pathname.startsWith('/s/')) return;
+  // 2.35.0 (#1094): language files come with the version of the code (?v=). Offline only the exact version is served as is;
+  // a copy of another version is marked (X-Kalmido-I18n-Stale) so the client uses it as a stopgap and fetches it again later.
+  // A response that is no JSON (a sign-in page) is never cached for a language file.
+  if (url.pathname.startsWith('/static/i18n/') && url.search) { e.respondWith(swI18n(e.request)); return; }
   // network first, fall back to cache (a new deploy shows up immediately when online)
   e.respondWith(fetch(e.request).then(r => { if (r.ok && !r.redirected && r.type === 'basic') { const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); } return r; }).catch(() => caches.match(e.request, {ignoreSearch: url.pathname === '/'})
     // 2.4.0 (#187): the quick capture page is the app shell too (offline: the capture goes to the outbox)
     .then(r => r || (url.pathname === '/capture' ? caches.match('/', {ignoreSearch: true}) : r))));
 });
+
+async function swI18n(req) {
+  try {
+    const r = await fetch(req);
+    if (r.ok && !r.redirected && r.type === 'basic' && /json/.test(r.headers.get('content-type') || '')) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
+    return r;
+  } catch (err) {
+    const hit = await caches.match(req);
+    if (hit) return hit;
+    const old = await caches.match(req, {ignoreSearch: true});
+    if (!old) throw err;
+    const h = new Headers(old.headers); h.set('X-Kalmido-I18n-Stale', '1');
+    return new Response(await old.blob(), {status: 200, headers: h});
+  }
+}
 
 // ---- Web Push: the server sends {title, body, url ('/#t/12'), tag, prio, task, due, actions: [{action, title, url}]}
 // (end-to-end encrypted, see kalmido/notify/push.py "Web Push"). Priority 5 stays on screen until dismissed. A push with the

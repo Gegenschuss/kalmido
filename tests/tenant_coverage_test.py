@@ -276,10 +276,13 @@ ROUTES = {
     # ---- news (5)
     "GET /api/v1/news": "news", "POST /api/v1/news/read": "news", "GET /api/news": "news",
     "POST /api/news/dismiss": "news", "POST /api/news/read": "news",
-    # ---- org (9)
+    # ---- org (13)
     "GET /api/admin/orgs": "org", "POST /api/admin/orgs": "org", "PATCH /api/admin/orgs/{}": "org",
     "DELETE /api/admin/orgs/{}": "org", "PUT /api/admin/orgs/visibility": "org", "GET /api/orgs": "org",
     "PATCH /api/orgs/{}": "org", "PUT /api/orgs/{}/members": "org", "DELETE /api/orgs/{}/members/{}": "org",
+    # 2.35.0 (#1101): an organisation admin's lists of the organisation (p2350_c_api_test.py: other organisation, private list, member 403)
+    "GET /api/orgs/{}/lists": "org", "POST /api/orgs/{}/lists/{}/archive": "org", "DELETE /api/orgs/{}/lists/{}": "org",
+    "POST /api/orgs/{}/lists/{}/owner": "org",
     # ---- own (119)
     "POST /api/onboarding": "own", "POST /api/sample": "own", "DELETE /api/sample": "own", "PATCH /api/settings": "own",
     "POST /api/ntfy/test": "own", "GET /api/push/vapid": "own", "GET /api/push/subs": "own", "POST /api/push/subs": "own",
@@ -344,6 +347,7 @@ ROUTES = {
     "POST /api/v1/tasks/{}/restore": "task", "GET /api/v1/tasks/{}/dependencies": "task",
     "POST /api/v1/tasks/{}/dependencies": "task", "DELETE /api/v1/tasks/{}/dependencies/{}": "task",
     "GET /api/v1/tasks/{}": "task", "PATCH /api/v1/tasks/{}": "task", "DELETE /api/v1/tasks/{}": "task",
+    "POST /api/v1/tasks/{}/snippets": "task",  # 2.35.0 (#1095): append a code snippet (p2350_d_api_test.py: other tenant 404)
     "PUT /api/v1/tasks/{}/waiting": "task", "DELETE /api/v1/tasks/{}/waiting": "task",
     "POST /api/v1/tasks/{}/complete": "task", "POST /api/v1/tasks/{}/reopen": "task",
     "GET /api/v1/tasks/{}/milestone": "task", "GET /api/v1/tasks/{}/subtasks": "task",

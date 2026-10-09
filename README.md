@@ -18,6 +18,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.35.0** (2026-10-09): Agents, chat and polish. **Approval cards** in the agent chat, **code snippets** in
+  tasks, **#123 links** everywhere, **arrange blocks in the view**, organisation admins manage the **lists of their
+  organisation**, **links to files** on network drives, and the agent launcher's **event mode**.
 - **2.34.0** (2026-10-09): Agents in everyday work. A **morning briefing** at the top of Today, a **status report**
   per project, a **Lying idle** view, **days without tracked time** and the **timesheet as text**, **planned agent
   jobs**, and agents **read PDF attachments** as text.

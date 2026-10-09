@@ -460,8 +460,18 @@ def list_delete(lid):
     # 1.5 (UX1): deleting for good only from the archive; "Delete" in the app archives (undoable) first
     if not r["archived"]:
         return err(tr("Archive the list first: only archived lists can be deleted for good"), 409)
-    # tasks go to the trash inside the owner's inbox so they stay restorable
-    inbox = my_inbox(c)
+    icon, lfiles = list_purge(c, lid, my_inbox(c))
+    bump(c)
+    c.commit()
+    list_icon_drop_file(lid, icon)
+    list_files_drop(lfiles)
+    return jsonify(ok=True)
+
+
+def list_purge(c, lid, inbox):
+    """Deletes list lid for good (the caller checked it is archived): its tasks go to the trash inside the inbox `inbox` (the
+    owner's) so they stay restorable. Returns (icon, list file paths) to drop after the caller committed (list_icon_drop_file,
+    list_files_drop). 2.35.0 (#1101): shared by the owner's delete and an organisation admin's."""
     ts = iso(now_utc())
     c.execute("UPDATE tasks SET deleted_at=COALESCE(deleted_at,?), list_id=?, section_id=NULL, assignee_id=NULL WHERE list_id=?",
               (ts, inbox, lid))
@@ -470,11 +480,7 @@ def list_delete(lid):
     from ..integrations.gitfolder import gf_before_list_delete
     gf_before_list_delete(c, lid)  # 2.33.0 (#934): a folder repository hanging on it moves to another list of its folder
     c.execute("DELETE FROM lists WHERE id=?", (lid,))
-    bump(c)
-    c.commit()
-    list_icon_drop_file(lid, icon)
-    list_files_drop(lfiles)
-    return jsonify(ok=True)
+    return icon, lfiles
 
 
 def _agent_bridge_blocks(c, lid, uid):

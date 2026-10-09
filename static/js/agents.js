@@ -419,7 +419,7 @@ function viewAgents() {
   const ags = (S.agents || []).filter(a => wsAgentIn(a));  // 2.28.0 (#935)
   const card = a => `<div class="agcard ${a.enabled ? '' : 'off'}">${avBtn(a.id, a.name, 'avatar lg')}<div class="agi"><b>${esc(a.name)}</b><span class="muted">${esc(agentSt(a))}${a.status_text && agentHst(a) !== 'offline' ? ' · ' + esc(a.status_text) : ''}</span>
       <span class="muted agn">${esc([a.running && trn('{0} running', '{0} running', a.running), a.waiting && trn('{0} waiting', '{0} waiting', a.waiting)].filter(Boolean).join(' · '))}</span></div>
-      <div class="agb"><button class="btn sm" data-act="chat-open" data-aid="${a.id}" ${a.enabled ? '' : 'disabled'}>${ic('comment', 's')} ${tr('Chat')}${a.chat_unread ? ` <span class="nbadge">${a.chat_unread}</span>` : ''}</button>
+      <div class="agb"><button class="btn sm" data-act="chat-open" data-aid="${a.id}" ${a.enabled ? '' : 'disabled'}>${ic('comment', 's')} ${tr('Chat')}${a.chat_unread ? ` <span class="nbadge">${a.chat_unread}</span>` : ''}</button>${a.approvals_open ? `<button class="btn sm apvcard" data-act="chat-open" data-aid="${a.id}">${ic('lock', 's')} ${esc(apvCount(a.approvals_open))}</button>` : ''}
       <button class="btn sm" data-act="sched-open" data-aid="${a.id}" title="${esc(tr('Planned jobs'))}">${ic('clock', 's')} ${tr('Plans')}</button></div></div>`;
   const items = S.jobs.items || [];
   if (ags.length) {  // 2.32.0 (#1063): the overview is built from blocks (Customize)
@@ -796,11 +796,16 @@ function schedRhythm(s) {
   if (s.freq === 'monthly') return `${t} ${(s.days || [1])[0]}, ${at}`;
   return `${t}, ${at}`;
 }
-const schedNext = s => s.next_at ? tr('next: {0}', fmtWhen(s.next_at)) : tr('paused');
+// 2.35.0 (#1107): plans show date + time in the date format of the language (de 10.10.2026 07:45, en-US 10/10/2026, 7:45 AM)
+function schedWhen(iso) {
+  const d = new Date(iso); if (isNaN(d)) return '';
+  try { return d.toLocaleDateString(dpLocale(), {day: '2-digit', month: '2-digit', year: 'numeric'}) + ' ' + fmtTimeLoc(`${pad(d.getHours())}:${pad(d.getMinutes())}`); } catch { return fmtWhen(iso); }
+}
+const schedNext = s => s.next_at ? tr('next: {0}', schedWhen(s.next_at)) : tr('paused');
 // lists the agent may work in for me: shared with it, not the inbox (the server checks it again)
 const schedLists = aid => (S.lists || []).filter(l => !l.archived && !l.is_inbox && listAgents(l).some(a => a.id === +aid));
 function schedRowHtml(s) {
-  const last = s.last_state ? tr(SCHED_LAST[s.last_state] || s.last_state) + (s.last_at ? ' · ' + fmtWhen(s.last_at) : '') : '';
+  const last = s.last_state ? tr(SCHED_LAST[s.last_state] || s.last_state) + (s.last_at ? ' · ' + schedWhen(s.last_at) : '') : '';
   return `<div class="schedrow ${s.enabled ? '' : 'off'}" data-sid="${s.id}"><div class="schedi"><b>${esc(s.title)}</b>
       <small class="muted">${esc(schedRhythm(s))}${s.list_name ? ' · ' + esc(s.list_name) : ''}${s.mine ? '' : ' · ' + esc(tr('by {0}', s.by_name))}</small>
       <small class="${s.enabled ? '' : 'muted'}">${esc(schedNext(s))}${last ? ` <span class="muted">· ${esc(tr('last: {0}', last))}</span>` : ''}</small></div>

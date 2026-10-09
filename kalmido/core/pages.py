@@ -114,6 +114,24 @@ def valid_url(u):
     return bool(u) and len(u) <= 2000 and bool(re.fullmatch(r"https?://[^\s/?#]+[^\s]*", u, re.I))
 
 
+# 2.35.0 (#186): links to files on a network drive / the computer instead of uploading big files: smb://, afp://, nfs://,
+# webdav(s)://, file:// and Windows paths \\server\share\... (spaces allowed, paths often have them; no control characters).
+# Never javascript: / data: / anything else. Nextcloud and other web shares are https links anyway. Kalmido never opens them.
+FILE_LINK_RE = re.compile(r"(?:(?:smb|afp|nfs|webdavs?|davs?)://[^\s/?#\\]+(?:[/?#][^\x00-\x1f\x7f]*)?"
+                          r"|file:///?[^\s\x00-\x1f\x7f][^\x00-\x1f\x7f]*"
+                          r"|\\\\[^\s\\/]+\\[^\x00-\x1f\x7f]+)", re.I)
+
+
+def file_link(u):
+    """True for a link to a file / folder on a network drive (see FILE_LINK_RE)."""
+    return isinstance(u, str) and bool(u) and len(u) <= 2000 and u == u.strip() and bool(FILE_LINK_RE.fullmatch(u))
+
+
+def valid_link(u):
+    """A website link (http/https) or a file link (#186): the task link, key links of a project, link fields."""
+    return valid_url(u) or file_link(u)
+
+
 def url_title(u):
     """Readable title for a bare link: domain (without www.) + path."""
     p = urllib.parse.urlsplit(u)

@@ -756,7 +756,8 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                             "reply": {"anyOf": [ref("ReplyQuote"), {"type": "null"}]},
                                             "delivered_at": nul("string", description="2.7.2 (#422): when the agent fetched the person's message (event poll, MCP, webhook, chat read); null = not yet / an agent message"),
                                             "asks": {"type": "boolean", "description": "2.13.0: an agent message that asks something (a question mark outside code and links); only there a 👍 / 👎 of the person is an approval / rejection"},
-                                            "choices": nul("object", description="2.28.0 (#1005): answer buttons of an agent message: {choices: [{id, label, style?: primary | danger}], multi}"),
+                                            "choices": nul("object", description="2.28.0 (#1005): answer buttons of an agent message: {choices: [{id, label, style?: primary | danger}], multi}; "
+                                                          "2.30.0 permission, expires_at; 2.35.0 (#1103) approval {title, what} (an approval request, buttons yes / no)"),
                                             "choice": nul("object", description="2.28.0 (#1005): the person's answer {ids, at, user_id}; null while open. The agent gets the event chat_choice"),
                                             "choice_state": nul("string", enum=["open", "answered", "expired", "withdrawn", None],
                                                                 description="2.30.0 (#1037): open = the buttons can be pressed; expired = a newer message came (a permission "
@@ -929,8 +930,8 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                             f"at most {CHAT_FILES_MAX} files of {MAX_FILE_MB} MB) to send images / files; body may then be empty", AG,
                                             ok(ref("ChatMessage"), "Created", "201") | errs("400", "403", "404", "413"), [pid("id", "User id")], scope=W),
                                          "requestBody": {"required": True, "content": {
-                                             "application/json": {"schema": {"type": "object", "required": ["body"], "properties": {
-                                                 "body": {"type": "string"}, "task_id": {"type": "integer"},
+                                             "application/json": {"schema": {"type": "object", "properties": {
+                                                 "body": {"type": "string", "description": "required, except with files or approval"}, "task_id": {"type": "integer"},
                                                  "reply_to": {"type": "integer", "description": "2.33.0 (#1076): answer this message of the conversation "
                                                               "with this person (else 400); the app shows the quote above your answer"},
                                                  "job_id": {"type": "integer", "description": "2.32.0 (#1081): this message is the result of your job "
@@ -942,9 +943,23 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                                  "permission": {"type": "boolean", "description": "2.30.0 (#1041): a permission question: buttons Allow / Deny "
                                                                 "(ids allow / deny, added when missing); the answer comes as chat_choice (approval) and as reaction (via button)"},
                                                  "expires_in": {"type": "integer", "minimum": 10, "maximum": 604800, "description": "2.30.0 (#1041): seconds a permission "
-                                                                "question stays open; then it shows as not answered (denied)"}}}},
+                                                                "question (2.35.0: or an approval request) stays open; then it shows as not answered (denied)"},
+                                                 "approval": {"type": "object", "required": ["title"], "additionalProperties": False,
+                                                              "description": "2.35.0 (#1103): an approval request: a card \"Approval needed\" with the buttons yes "
+                                                                             "(primary) / no, pinned at the top of the chat and counted at your name until answered "
+                                                                             "(newer messages do not expire it). Not with choices / multi / permission; body may be "
+                                                                             "left out (the title is the text). The answer comes as chat_choice with approval "
+                                                                             "approved | rejected and approval_request {title, what}; no event = not approved. "
+                                                                             "Only the person of the chat can answer, never an agent. Push \"Approval needed\" "
+                                                                             "(the person's notification row approval; at most 5 an hour per agent and person, then the plain chat push). "
+                                                                             "At most 10 open approval requests per agent and person: the next one answers 409 "
+                                                                             "(answer the open ones first). MCP request_chat_approval",
+                                                              "properties": {"title": {"type": "string", "maxLength": 200, "description": "what is to be approved"},
+                                                                             "what": {"type": "string", "maxLength": 1000, "description": "what happens on yes"},
+                                                                             "yes_label": {"type": "string", "maxLength": 80}, "no_label": {"type": "string", "maxLength": 80}}}}}},
                                              "multipart/form-data": {"schema": {"type": "object", "properties": {
                                                  "body": {"type": "string"}, "task_id": {"type": "integer"}, "reply_to": {"type": "integer"},
+                                                 "approval": {"type": "string", "description": "2.35.0 (#1103): the approval object as a JSON string"},
                                                  "file": {"type": "array", "items": {"type": "string", "format": "binary"}}}}}}}}},
         "/agent/usage": {  # 2.1.1 (#326)
             "post": op("Report model usage (numbers and ids only; allowed also over the hard limit)", AG,
@@ -963,7 +978,7 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                                                   ok(chat_rx_out) | errs("400", "403", "404"), [pid("id", "User id"), pid("mid", "Message id")],
                                                                   scope=W, body=chat_rx_in)},
         "/agent/chats/{id}/messages/{mid}/withdraw": {"post": op("2.30.0 (#1037): withdraw the open answer buttons of one of your chat messages (they disappear, "
-                                                                 "a press answers 409). outcome (permission questions only): allowed | denied | expired -- the host "
+                                                                 "a press answers 409). outcome (permission questions and 2.35.0 approval requests only; approval requests never allowed: 400): allowed | denied | expired -- the host "
                                                                  "decided another way (an answer in words, its time limit)", AG, ok(ref("ChatMessage")) | errs("400", "403", "404", "409"),
                                                                  [pid("id", "User id"), pid("mid", "Message id")], scope=W,
                                                                  body={"type": "object", "properties": {"outcome": {"type": "string", "enum": ["allowed", "denied", "expired"]}}})},

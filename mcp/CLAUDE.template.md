@@ -41,6 +41,11 @@
 - Ask for a permission in the chat with `send_chat` and `permission: true` (buttons Allow / Deny; `expires_in` = how
   long you wait). The answer comes as `chat_choice` (`approval`) and as `reaction`: act once per message. Decided another
   way (an answer in words, your time limit)? Close it with `withdraw_chat_choices` and the `outcome`.
+- **When you need a person's approval, ask with an approval request** (2.35.0: `request_chat_approval` with a `title`, what
+  happens on yes in `what`; the chat shows a card *Approval needed* with Yes / No that stays pinned until answered), never
+  only as a question in your text. The answer comes as `chat_choice` with `approval` approved / rejected. **Silence is no
+  yes**: without an answer you do not do it; remind once at most, then park it. A host that posts your answer for you
+  (the launcher's event mode) turns a final block ` ```approval ` (first line the title, then what happens) into the card.
 - A 429 is a pause, not an error: wait (`Retry-After`, else 5, 15, 30, 60 seconds) and try again; your service, jobs and
   other agents may be calling at the same time.
 - Before a large piece of work check `usage_limit` (`GET /api/v1/agent`); at the soft limit finish the current step, park
@@ -85,10 +90,11 @@
 - With the status of each run, report what you **really** run with: `model` (the model as people know it, e.g.
   "Opus 5.5"), `permission_mode` (ask | auto: what this run uses) and `host_permission_mode` (your host's own default).
   The chat header shows them.
-- Between your tool calls, send the short sentence you would say next ("I read the tests first") as a step with
-  `report_progress` (a chat run: `chat_user_id`; a job: `job_id`), at most one every 2 seconds. **Prose only**: never
-  tool output, file contents, logs, data rows or secrets. Only the person you work for sees them. Send a job's result
-  with `send_chat` and its `job_id`, so its history shows under it.
+- **Before each tool step, write one short sentence in the person's language** about what happens next ("Ich schaue mir
+  zuerst die Tests an"). Send it as a step with `report_progress` (a chat run: `chat_user_id`; a job: `job_id`), at most
+  one every 2 seconds; a host that reads your stream (the launcher's event mode) sends these sentences for you. **Prose
+  only**: never tool output, file contents, logs, data rows or secrets. Only the person you work for sees them. Send a
+  job's result with `send_chat` and its `job_id`, so its history shows under it.
 - Every larger piece of work gets **one job** (`create_job`), created at the **start**, not at the end, with short
   progress lines (`update_job` with `append_log`); set it to done / failed at the end, or waiting when you need a
   person. The last log line is the result in plain words.
@@ -158,6 +164,8 @@
 - A fix for a specific device or browser (keyboard, viewport, install, push) is "ready to test", never "fixed": keep the
   task open until the reporter confirms it on the real device.
 - Before you propose a feature, check the product's feature list (README, help): never suggest what already exists.
+- Code, logs and diffs for a task belong in its code snippets (2.35.0: `add_snippet`, or `snippets` with `update_task`),
+  not in the description; the description stays prose.
 
 ### When you are stuck
 - Never stall silently. **Park a blocker** with a short note on the task (what is missing, who has to act) and a chat
@@ -191,3 +199,72 @@
   `report_plan_usage` (the ring next to your name). Before a large piece of work, at your own limit: finish the current
   step, park cleanly and start nothing big until the reset.
 <!-- kalmido-agent-rules:end -->
+
+<!-- kalmido-tool-index:start -->
+## Events and tools (index)
+
+Not part of the rules block above; a reference for the agent. The events you can get (GET /api/v1/agent/events, the
+MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
+
+- `mention`: someone @mentioned you in a task or comment
+- `comment`: a new comment on a task you work on or listen to
+- `assigned`: a task was assigned to you
+- `unassigned`: a task is no longer assigned to you
+- `chat`: a person wrote to you in your chat
+- `reaction`: a reaction (thumbs up / down = approval) on your comment or chat message
+- `job`: a job of yours changed (approved, rejected, stopped)
+- `tidy`: a new task to tidy up (tidy mode)
+- `wake`: a person woke you (Wake button / endpoint)
+- `ping`: a connection test
+- `followup_due`: the follow-up day of a task waiting on someone outside
+- `job_request`: a person asks you for a proposal
+- `runtime_changed`: an admin changed your runtime settings
+- `reset`: an admin pressed Reset now (start a fresh session)
+- `team_message`: someone @mentioned you in a list's team chat
+- `task_added`: a task was created in / moved into a list where you listen in
+- `chat_choice`: a person pressed an answer button or answered an approval card
+- `tasks_added`: many tasks at once (one event with their ids)
+- `missed`: a summary of events that were too old to deliver one by one
+- `stale_tasks`: once a day: tasks lying idle in lists with Agent follows up
+- `scheduled_job`: a planned job of a person is due (answer in their chat)
+
+The MCP tools of the Kalmido MCP server (it lists only the ones your token may use; each tool describes itself):
+
+`add_comment`, `add_contract`, `add_deadline`, `add_dependency`, `add_device`, `add_health_entry`, `add_milestone`,
+`add_occasion`, `add_preparation_task`, `add_project_link`, `add_reward`, `add_shop_areas`, `add_snippet`,
+`add_subtask`, `add_time_entry`, `add_upkeep`, `apply_template`, `batch_tasks`, `chat_typing`, `check_in_habit`,
+`clear_plan_usage`, `clear_waiting`, `comment_typing`, `complete_task`, `create_address_book`, `create_client`,
+`create_contact`, `create_event`, `create_event_calendar`, `create_field`, `create_filter`, `create_form`,
+`create_habit`, `create_job`, `create_list`, `create_list_tag`, `create_note`, `create_packing_list`,
+`create_section`, `create_task`, `create_template`, `create_text_file`, `create_trip`, `decide_reward`,
+`delete_address_book`, `delete_attachment`, `delete_chat_attachment`, `delete_client`, `delete_comment`,
+`delete_contact`, `delete_event`, `delete_event_calendar`, `delete_field`, `delete_filter`, `delete_folder`,
+`delete_form`, `delete_habit`, `delete_list`, `delete_list_tag`, `delete_milestone`, `delete_note`,
+`delete_project_file`, `delete_project_link`, `delete_reward`, `delete_section`, `delete_task`, `delete_team_message`,
+`delete_template`, `delete_time_entry`, `edit_team_message`, `empty_trash`, `export_data`, `export_ics`,
+`export_vcards`, `get_agent`, `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`,
+`get_day_review`, `get_dependencies`, `get_event`, `get_family`, `get_group`, `get_job`, `get_life`, `get_list`,
+`get_me`, `get_milestone`, `get_note`, `get_plan_usage`, `get_project_overview`, `get_review`, `get_roadmap`,
+`get_storage`, `get_task`, `get_task_events`, `get_time_gaps`, `get_timer`, `get_usage`, `get_workload`, `give_stars`,
+`import_ics`, `import_vcards`, `ingredients_to_shopping`, `link_contact`, `list_address_books`, `list_agents`,
+`list_attachments`, `list_calendar_events`, `list_chats`, `list_clients`, `list_deadline_types`,
+`list_event_calendars`, `list_events`, `list_fields`, `list_filters`, `list_folders`, `list_forms`, `list_groups`,
+`list_habits`, `list_jobs`, `list_kids`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`,
+`list_news`, `list_notes`, `list_packing_templates`, `list_project_files`, `list_repos`, `list_schedules`,
+`list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_chats`, `list_templates`,
+`list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`,
+`move_task`, `post_team_message`, `propose_to_other_topic`, `react`, `react_team_message`, `react_to_chat`,
+`read_attachment`, `read_briefing`, `read_project_status`, `read_team_chat`, `remove_dependency`, `rename_folder`,
+`rename_section`, `reopen_task`, `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`,
+`report_progress`, `report_usage`, `request_approval`, `request_chat_approval`, `request_deploy_approval`,
+`request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_event`, `restore_task`,
+`search_contacts`, `search_messages`, `search_notes`, `search_tasks`, `send_chat`, `set_contact_care`,
+`set_list_columns`, `set_project_overview`, `set_project_status`, `set_status`, `set_waiting`, `share_address_book`,
+`share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`, `skip_occurrence`, `start_timer`,
+`stop_timer`, `submit_proposal`, `sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`,
+`unshare_address_book`, `unshare_event_calendar`, `unshare_list`, `unshare_list_from_group`, `update_address_book`,
+`update_client`, `update_comment`, `update_contact`, `update_event`, `update_event_calendar`, `update_field`,
+`update_filter`, `update_form`, `update_habit`, `update_job`, `update_list`, `update_list_tag`, `update_milestone`,
+`update_note`, `update_project_link`, `update_reward`, `update_task`, `update_template`, `update_time_entry`,
+`upload_attachment`, `upload_project_file`, `wait_for_events`, `withdraw_chat_choices`, `write_journal`
+<!-- kalmido-tool-index:end -->

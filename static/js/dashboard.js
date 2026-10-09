@@ -158,7 +158,7 @@ const lyCustomBtn = v => `<button type="button" class="btn sm" data-act="${lyAct
 // the blocks of view v in the chosen order and widths; parts = {key: html | fn(closeButton) | ''} ('' = nothing to show now)
 function lyHtml(v, parts, o = {}) {
   const d = LY[v], {order, hidden, size} = lyPref(v);
-  if (S.ly.view === v) return lyEditor(v, o);
+  if (S.ly.view === v) return lyEditor(v, {...o, parts});  // 2.35.0 (#1097): the editor shows the blocks themselves
   const xb = (k, n) => d.quick && o.canHide !== false ? `<button type="button" class="iconbtn lyx" data-act="ly-hide" data-lyv="${v}" data-k="${k}" title="${esc(tr('Hide {0}', tr(n)))}" aria-label="${esc(tr('Hide {0}', tr(n)))}">${ic('x', 's')}</button>` : '';
   const bs = lyBlocks(v), out = [];
   for (const k of order) {
@@ -182,9 +182,14 @@ function lyEditor(v, o = {}) {
   const scope = o.canStd ? `<div class="seg lyscope" role="group" aria-label="${esc(tr('Arrangement for'))}"><button type="button" class="${S.ly.std ? '' : 'on'}" aria-pressed="${!S.ly.std}" data-act="ly-scope" data-lyv="${v}" data-k="mine">${tr('Only for me')}</button><button type="button" class="${S.ly.std ? 'on' : ''}" aria-pressed="${S.ly.std}" data-act="ly-scope" data-lyv="${v}" data-k="std">${tr('Standard for everyone')}</button></div>` : '';
   const ph = `<label class="chkl lyph"><input type="checkbox" data-lyphone="${v}" ${pr.mobile ? 'checked' : ''}> ${tr('Different on the phone')}</label>${pr.mobile ? `<div class="seg" role="group" aria-label="${esc(tr('Arrangement for'))}"><button type="button" class="${S.ly.phone ? '' : 'on'}" aria-pressed="${!S.ly.phone}" data-act="ly-dev" data-lyv="${v}" data-k="0">${tr('Computer')}</button><button type="button" class="${S.ly.phone ? 'on' : ''}" aria-pressed="${S.ly.phone}" data-act="ly-dev" data-lyv="${v}" data-k="1">${tr('Phone')}</button></div>` : ''}`;
   const reset = o.override ? `<button type="button" class="linkbtn" data-act="${A}-reset" data-lyv="${v}">${S.ly.std ? tr('Reset to defaults') : tr('Reset to the standard')}</button>` : `<button type="button" class="linkbtn" data-act="${A}-reset" data-lyv="${v}">${tr('Reset to defaults')}</button>`;
+  // 2.35.0 (#1097): the blocks right in the view (drag them by the handle, on a phone hold a block; hide, width at the
+  // block; hidden ones at the bottom), the list with the arrows stays below for the keyboard and screen readers
+  const list = `<details class="lylist" ${LS.get('lyList', true) ? 'open' : ''}><summary>${ic('chev', 's fcar')}<span>${tr('Order as a list')}</span></summary>
+    <ol class="dcust" aria-label="${esc(v === 'home' ? tr('Cards') : tr('Blocks'))}" aria-describedby="lyhint-${v}">${rows}</ol><p class="muted lyhint" id="lyhint-${v}">${desk ? tr('Drag a row or use the arrows; Alt + arrow keys move the focused row.') : tr('Use the arrows to change the order.')}</p></details>`;
   return `<div class="lyed" data-lyed="${v}"><div class="dashhead"><h2>${esc(d.title())}</h2><span class="spacer"></span><button type="button" class="btn sm pri" data-act="${A}-done" data-lyv="${v}">${tr('Done')}</button></div>
     <div class="lyopts">${scope}${ph}</div>
-    <ol class="dcust" aria-label="${esc(v === 'home' ? tr('Cards') : tr('Blocks'))}" aria-describedby="lyhint-${v}">${rows}</ol><p class="muted lyhint" id="lyhint-${v}">${desk ? tr('Drag a row or use the arrows; Alt + arrow keys move the focused row.') : tr('Use the arrows to change the order.')}</p>
+    ${lydragCanvas(v, pr, o.parts || {})}
+    ${list}
     ${reset}</div>`;
 }
 function lyOpen(v, on) {
@@ -192,11 +197,11 @@ function lyOpen(v, on) {
   else S.ly = {view: null, phone: false, std: false};
   if (v === 'home') S.dash.custom = on;
   renderView();
-  setTimeout(() => on ? $('#view .dcust button:not([disabled])')?.focus() : $(`#view [data-act="${lyAct(v)}-custom"]`)?.focus(), 0);
+  setTimeout(() => on ? $('#view .dcust button:not([disabled])')?.focus({preventScroll: true}) : $(`#view [data-act="${lyAct(v)}-custom"]`)?.focus(), 0);
 }
 function lyMove(v, k, dlt) {
-  lyChange(v, st => { const i = st.order.indexOf(k), j = i + dlt; if (i < 0 || j < 0 || j >= st.order.length) return; [st.order[i], st.order[j]] = [st.order[j], st.order[i]]; });
-  announce(dlt < 0 ? tr('Moved up') : tr('Moved down'));
+  lydragDo(v, st => { const i = st.order.indexOf(k), j = i + dlt; if (i < 0 || j < 0 || j >= st.order.length) return; [st.order[i], st.order[j]] = [st.order[j], st.order[i]]; },
+    dlt < 0 ? tr('Moved up') : tr('Moved down'), true);  // 2.35.0 (#1097): undoable
 }
 document.addEventListener('click', e => {
   const a = e.target.closest?.('[data-act^="dash-"],[data-act^="ly-"]'); if (!a) return;
@@ -209,7 +214,7 @@ document.addEventListener('click', e => {
     lyMove(v, a.dataset.k, +a.dataset.d);
     setTimeout(() => $(`#view .dcust [data-act$="-mv"][data-k="${a.dataset.k}"][data-d="${a.dataset.d}"]:not([disabled])`)?.focus() || $(`#view .dcust [data-act$="-mv"][data-k="${a.dataset.k}"]:not([disabled])`)?.focus(), 30);
   }
-  else if (act === 'size') { const k = a.dataset.k; lyChange(v, st => { st.sizes[k] = st.sizes[k] === 'full' ? 'half' : 'full'; }); setTimeout(() => $(`#view .dcust [data-act="ly-size"][data-k="${k}"]`)?.focus(), 30); }
+  else if (act === 'size') { const k = a.dataset.k, cv = !!a.closest('.lycanvas'); lydragDo(v, st => { st.sizes[k] = st.sizes[k] === 'full' ? 'half' : 'full'; }, tr('Width changed'), true); setTimeout(() => $(`#view ${cv ? '.lycanvas' : '.dcust'} [data-act="ly-size"][data-k="${k}"]`)?.focus(), 30); }
   else if (act === 'scope') { S.ly.std = a.dataset.k === 'std'; S.ly.phone = false; renderView(); setTimeout(() => $(`#view [data-act="ly-scope"][data-k="${a.dataset.k}"]`)?.focus(), 0); }
   else if (act === 'dev') { S.ly.phone = a.dataset.k === '1'; renderView(); setTimeout(() => $(`#view [data-act="ly-dev"][data-k="${a.dataset.k}"]`)?.focus(), 0); }
   else if (act === 'hide') { const k = a.dataset.k, bl = lyBlocks(v).find(b => b[0] === k); S.ly.std = false; lyChange(v, st => st.hidden.add(k)); toast(tr('{0} hidden. “+ Block” brings it back.', tr(bl?.[1] || k))); setTimeout(() => $(`#view [data-act="ly-add"][data-lyv="${v}"]`)?.focus(), 30); }
@@ -228,7 +233,7 @@ document.addEventListener('change', e => {
   }
   const k = t.dataset?.dshow; if (!k) return;
   const v = t.dataset.lyv || 'home'; if (!LY[v]) return;
-  lyChange(v, st => { if (t.checked) st.hidden.delete(k); else st.hidden.add(k); });
+  lydragDo(v, st => { if (t.checked) st.hidden.delete(k); else st.hidden.add(k); }, t.checked ? tr('Shown') : tr('Hidden'), true);  // 2.35.0 (#1097): undoable
   setTimeout(() => $(`#view [data-dshow="${k}"][data-lyv="${v}"]`)?.focus(), 30);
 });
 // keyboard: Alt + ↑ / ↓ on a row (or a control in it) moves the block
@@ -250,7 +255,7 @@ document.addEventListener('drop', e => {
   if (!lyDrag) return; const li = e.target.closest?.('.lyed .dcust li'); if (!li) return;
   e.preventDefault(); e.stopPropagation();
   const v = li.closest('.lyed').dataset.lyed, k = lyDrag, to = li.dataset.k; lyDrag = null;
-  if (k !== to) { lyChange(v, st => { const i = st.order.indexOf(k), j = st.order.indexOf(to); st.order.splice(i, 1); st.order.splice(j, 0, k); }); announce(tr('Moved')); }
+  if (k !== to) lydragDo(v, st => { const i = st.order.indexOf(k), j = st.order.indexOf(to); st.order.splice(i, 1); st.order.splice(j, 0, k); }, tr('Moved'));  // 2.35.0: undoable
 });
 
 // Today and Time tracking (2.32.0): the first views on the builder; the blocks a view does not show right now simply stay out
@@ -352,8 +357,8 @@ function forMeBanner() {
 }
 function viewHome() {
   const greet = (() => { const h = new Date().getHours(); return h < 11 ? tr('Good morning, {0}', S.me?.display_name || '') : h < 18 ? tr('Hello, {0}', S.me?.display_name || '') : tr('Good evening, {0}', S.me?.display_name || ''); })();
-  if (S.ly.view === 'home') return `<div class="dash">${lyEditor('home')}</div>`;
   const parts = Object.fromEntries(lyBlocks('home').map(b => [b[0], dashCard(b[0])]));
+  if (S.ly.view === 'home') return `<div class="dash">${lyEditor('home', {parts})}</div>`;  // 2.35.0 (#1097): with the cards
   return `<div class="dash"><div class="dashhead"><h2>${esc(greet)}</h2><span class="muted">${esc(fmtDateLoc(today()))}</span><span class="spacer"></span>${lyCustomBtn('home')}</div>
     ${forMeBanner()}${lyHtml('home', parts, {empty: `<p class="muted">${tr('Every card is hidden. Customize brings them back.')}</p>`})}</div>`;
 }
@@ -405,3 +410,129 @@ async function mailWire(md) {
   });
   reload();
 }
+
+// ---- 2.35.0 (#1097): Customize right in the view. The blocks of the view (their real content, not clickable while
+// arranging) with a handle each: drag with the mouse, on a phone hold a block (then drag; the view scrolls along at the
+// edges; a swipe or the Back swipe stays a swipe). The other blocks make room while dragging. Hide and the width at the
+// block, hidden blocks at the bottom ("Hidden", a tap brings one back). Every change can be undone (toast, Ctrl+Z).
+// One code path for every view of the builder (lyEditor); the list with the arrows below stays for keyboards.
+function lydragCanvas(v, pr, parts) {
+  const d = LY[v], {order, hidden, size, fixed} = pr, bs = lyBlocks(v), desk = !isMobile();
+  const blk = k => {
+    const b = bs.find(x => x[0] === k); if (!b) return '';
+    const [, nm, icon] = b, sz = size(k), p = parts[k], h = typeof p === 'function' ? p('') : p;
+    const body = h || `<div class="lyempty">${ic(icon, 's')}<b>${esc(tr(nm))}</b><span class="muted">${esc(p === undefined ? tr('Shown here') : tr('Nothing to show right now'))}</span></div>`;
+    const wbtn = d.nosize || !desk ? '' : `<button type="button" class="btn sm lysz" data-act="ly-size" data-lyv="${v}" data-k="${k}" aria-pressed="${sz === 'full'}" title="${esc(tr('Width'))}" aria-label="${esc(tr('Width') + ': ' + tr(nm) + ', ' + (sz === 'full' ? tr('full width') : tr('half width')))}">${sz === 'full' ? tr('Full') : tr('Half')}</button>`;
+    const hbtn = fixed.has(k) ? '' : `<button type="button" class="iconbtn" data-act="ly-cvhide" data-lyv="${v}" data-k="${k}" title="${esc(tr('Hide {0}', tr(nm)))}" aria-label="${esc(tr('Hide {0}', tr(nm)))}">${ic('eyeoff', 's')}</button>`;
+    return `<div class="lyb ly-${sz} lyedb" data-lyk="${k}"><div class="lytool"><button type="button" class="lyhandle" data-lyhandle="${k}" title="${esc(desk ? tr('Drag to move; arrow keys move it too') : tr('Hold the block, then drag; arrow keys move it too'))}" aria-label="${esc(tr('Move {0}', tr(nm)))}" aria-describedby="lycvh-${v}">${ic('grip', 's')}<span>${esc(tr(nm))}</span></button><span class="spacer"></span>${wbtn}${hbtn}</div><div class="lybody" inert>${body}</div></div>`;
+  };
+  const hid = order.filter(k => hidden.has(k));
+  const tray = hid.length ? `<div class="lyhid" aria-labelledby="lyhidh-${v}"><h3 id="lyhidh-${v}">${tr('Hidden')}</h3><div class="lyhidl">${hid.map(k => { const b = bs.find(x => x[0] === k); return b ? `<button type="button" class="btn sm" data-act="ly-cvshow" data-lyv="${v}" data-k="${k}" aria-label="${esc(tr('Show {0}', tr(b[1])))}">${ic('plus', 's')}${ic(b[2], 's')}<span>${esc(tr(b[1]))}</span></button>` : ''; }).join('')}</div></div>` : '';
+  return `<p class="muted lyhint" id="lycvh-${v}">${desk ? tr('Drag a block by its handle to move it. Hide it or change its width at the block.') : tr('Hold a block, then drag it to move it. Hide it at the block.')}</p>
+    <div class="${d.grid || 'lygrid'} lycanvas" data-lycanvas="${v}">${order.filter(k => !hidden.has(k)).map(blk).join('')}</div>${tray}`;
+}
+// one undoable change of the arrangement (drag, hide, show, width, arrows): the whole stored value before / after
+function lydragDo(v, fn, msg, quiet) {
+  const std = S.ly.view === v && S.ly.std, before = JSON.stringify(lyRaw(v, std));
+  lyChange(v, fn);
+  const after = JSON.stringify(lyRaw(v, std)); if (after === before) return;
+  const put = s => () => { const o = JSON.parse(s); lyStore(v, Object.keys(o).length ? o : '', std); return {}; };
+  const e = histAdd({label: msg || tr('Arrangement changed'), undo: put(before), redo: put(after)});
+  if (quiet) announce(msg); else histToast(msg, e);
+}
+// the visible blocks in their new DOM order -> the order (hidden ones keep their places)
+function lydragOrder(v, keys) {
+  return st => { const vis = new Set(keys); let i = 0; st.order = st.order.map(k => vis.has(k) ? keys[i++] : k); };
+}
+document.addEventListener('click', e => {
+  const a = e.target.closest?.('[data-act="ly-cvhide"],[data-act="ly-cvshow"]'); if (!a) return;
+  e.preventDefault(); e.stopPropagation();
+  const v = a.dataset.lyv, k = a.dataset.k, b = LY[v] && lyBlocks(v).find(x => x[0] === k); if (!b) return;
+  const show = a.dataset.act === 'ly-cvshow';
+  lydragDo(v, st => { if (show) st.hidden.delete(k); else st.hidden.add(k); }, show ? tr('{0} shown', tr(b[1])) : tr('{0} hidden', tr(b[1])));
+  setTimeout(() => (show ? $(`#view .lycanvas [data-lyhandle="${k}"]`) : $(`#view .lyhid [data-act="ly-cvshow"][data-k="${k}"]`))?.focus(), 30);
+}, true);
+document.addEventListener('toggle', e => { if (e.target.classList?.contains('lylist')) LS.set('lyList', e.target.open); }, true);
+// keyboard on a block's handle: arrow keys move the block one place
+document.addEventListener('keydown', e => {
+  const hd = e.target.closest?.('.lycanvas .lyhandle'); if (!hd || !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+  e.preventDefault();
+  const v = hd.closest('.lycanvas').dataset.lycanvas, k = hd.dataset.lyhandle, dl = e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -1 : 1;
+  const keys = $$('.lyedb', hd.closest('.lycanvas')).map(x => x.dataset.lyk), i = keys.indexOf(k), j = i + dl;
+  if (j < 0 || j >= keys.length) return;
+  [keys[i], keys[j]] = [keys[j], keys[i]];
+  lydragDo(v, lydragOrder(v, keys), dl < 0 ? tr('Moved up') : tr('Moved down'), true);
+  setTimeout(() => $(`#view .lycanvas [data-lyhandle="${k}"]`)?.focus(), 30);
+});
+// dragging: mouse / pen from the handle (pointer events), touch from a long press anywhere on the block (touch events,
+// as the sidebar: only an active drag stops the page from scrolling)
+let lyDg = null;
+function lydragScroller(el) {
+  for (let p = el?.parentElement; p; p = p.parentElement) { const oy = getComputedStyle(p).overflowY; if ((oy === 'auto' || oy === 'scroll') && p.scrollHeight > p.clientHeight) return p; }
+  return document.scrollingElement;
+}
+function lydragBegin(el, x, y) {
+  const cv = el.closest('.lycanvas'), r = el.getBoundingClientRect(), g = el.cloneNode(true);
+  g.removeAttribute('data-lyk'); g.classList.add('lyghost');
+  g.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${Math.min(r.height, 240)}px;z-index:96;pointer-events:none`;
+  document.body.appendChild(g);
+  el.classList.add('lyplace');
+  lyDg = {...lyDg, el, cv, v: cv.dataset.lycanvas, g, dx: x - r.left, dy: y - r.top, active: true, start: $$('.lyedb', cv).map(n => n.dataset.lyk), sc: lydragScroller(cv)};
+  document.body.classList.add('lydragging');
+  if (navigator.vibrate) navigator.vibrate(12);
+}
+function lydragMove(x, y) {
+  const st = lyDg; if (!st?.active) return;
+  st.x = x; st.y = y;
+  st.g.style.left = (x - st.dx) + 'px'; st.g.style.top = (y - st.dy) + 'px';
+  const t = document.elementFromPoint(x, y)?.closest?.('.lycanvas .lyedb');
+  if (t && t !== st.el && t.parentElement === st.cv) {
+    const r = t.getBoundingClientRect(), wide = r.width > st.cv.clientWidth * .75;
+    const after = wide ? y > r.top + r.height / 2 : x > r.left + r.width / 2;
+    const ref = after ? t.nextSibling : t;
+    if (ref !== st.el && st.el.nextSibling !== ref) st.cv.insertBefore(st.el, ref);
+  }
+  // near the top / bottom edge the view scrolls along
+  clearInterval(st.auto); st.auto = null;
+  const vh = innerHeight, edge = 56, dir = y < edge ? -1 : y > vh - edge ? 1 : 0;
+  if (dir) st.auto = setInterval(() => { st.sc?.scrollBy(0, dir * 14); lydragMove(st.x, st.y); }, 30);
+}
+function lydragEnd(cancel) {
+  const st = lyDg; lyDg = null;
+  if (!st) return;
+  clearTimeout(st.timer); clearInterval(st.auto);
+  if (!st.active) return;
+  st.g.remove(); st.el.classList.remove('lyplace'); document.body.classList.remove('lydragging');
+  const keys = $$('.lyedb', st.cv).map(n => n.dataset.lyk);
+  if (cancel || keys.join() === st.start.join()) { if (cancel) renderView(); return; }
+  const nm = lyBlocks(st.v).find(b => b[0] === st.el.dataset.lyk)?.[1];
+  lydragDo(st.v, lydragOrder(st.v, keys), tr('{0} moved', tr(nm || '')));
+  setTimeout(() => $(`#view .lycanvas [data-lyhandle="${st.el.dataset.lyk}"]`)?.focus({preventScroll: true}), 30);
+}
+document.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'touch' || e.button !== 0) return;
+  const hd = e.target.closest?.('.lycanvas .lyhandle'); if (!hd) return;
+  lyDg = {x0: e.clientX, y0: e.clientY, hd, el: hd.closest('.lyedb'), active: false, mouse: true};
+});
+document.addEventListener('pointermove', e => {
+  if (!lyDg?.mouse) return;
+  if (!lyDg.active) { if (Math.hypot(e.clientX - lyDg.x0, e.clientY - lyDg.y0) < 5) return; lydragBegin(lyDg.el, lyDg.x0, lyDg.y0); }
+  e.preventDefault(); lydragMove(e.clientX, e.clientY);
+});
+document.addEventListener('pointerup', () => { if (lyDg?.mouse) lydragEnd(false); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && lyDg?.active) { e.preventDefault(); e.stopPropagation(); lydragEnd(true); } }, true);
+document.addEventListener('touchstart', e => {
+  const el = e.target.closest?.('.lycanvas .lyedb'); if (!el || e.touches.length > 1 || e.target.closest('.lytool button:not(.lyhandle)')) return;
+  const p = e.touches[0]; if (p.clientX < 24 || p.clientX > innerWidth - 24) return;  // the Back swipe from the edge stays free
+  lyDg = {x0: p.clientX, y0: p.clientY, el, active: false, touch: true};
+  lyDg.timer = setTimeout(() => { if (lyDg?.touch && !lyDg.active) lydragBegin(el, lyDg.x0, lyDg.y0); }, 420);
+}, {passive: true});
+document.addEventListener('touchmove', e => {
+  if (!lyDg?.touch) return;
+  const p = e.touches[0];
+  if (!lyDg.active) { if (Math.hypot(p.clientX - lyDg.x0, p.clientY - lyDg.y0) > 8) { clearTimeout(lyDg.timer); lyDg = null; } return; }  // a scroll / swipe
+  e.preventDefault(); lydragMove(p.clientX, p.clientY);
+}, {passive: false});
+document.addEventListener('touchend', e => { if (lyDg?.touch) { if (lyDg.active && e.cancelable) e.preventDefault(); lydragEnd(false); } });
+document.addEventListener('touchcancel', () => { if (lyDg?.touch) lydragEnd(true); });
+document.addEventListener('contextmenu', e => { if (e.target.closest?.('.lycanvas .lyedb') && isTouch()) e.preventDefault(); });  // the long press is the drag

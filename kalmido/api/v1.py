@@ -335,7 +335,19 @@ def task_core(r, tags, fields):
             "people": list(r["people"]) if "people" in r.keys() else [],
             # 2.23.0 (#463): an approval: pending | approved | changes | rejected (null = none) and who decides
             "approval": (r["approval"] or None) if "approval" in r.keys() else None,
-            "approver_id": r["approver_id"] if "approval" in r.keys() and r["approval"] else None}
+            "approver_id": r["approver_id"] if "approval" in r.keys() and r["approval"] else None,
+            # 2.35.0 (#1095): the code snippets: one task (GET / change / webhook row) all of them, lists only snippets_n
+            **_snips(r)}
+
+
+def _snips(r):
+    from ..tasks.snippets import snip_out
+    keys = r.keys()
+    if "snippets" in keys:
+        v = r["snippets"]
+        sn = [dict(s) for s in v] if isinstance(v, list) else snip_out(v)
+        return {"snippets": sn, "snippets_n": len(sn)}
+    return {"snippets_n": r["snippets_n"] if "snippets_n" in keys else 0}
 
 
 def waiting_of(r):
@@ -365,7 +377,7 @@ def task_for(c, row, uid):
 V1_TASK_IN = ("title", "notes", "list_id", "section_id", "parent_id", "priority", "due", "due_time", "start", "duration",
               "reminders", "repeat", "repeat_from", "url", "tags", "assignee_id", "pinned", "fields", "list_tags", "type",
               "deadline", "deadline_in_today", "nag", "assignee_group_id", "plan_start", "milestone", "milestone_id",
-              "family", "rotation", "stars", "people")
+              "family", "rotation", "stars", "people", "snippets")
 
 
 def v1_task_in(b, allowed=V1_TASK_IN):
@@ -427,7 +439,7 @@ def v1_task_in(b, allowed=V1_TASK_IN):
 
 def v1_one(c, tid):
     from ..integrations.git import git_repo_for_task
-    rows = load_tasks(c, "id=? AND deleted_at IS NULL", (tid,))
+    rows = load_tasks(c, "id=? AND deleted_at IS NULL", (tid,), full_snips=True)  # 2.35.0 (#1095): one task: all snippets
     if not rows:
         raise Denied(404)
     out = v1_task(rows[0])

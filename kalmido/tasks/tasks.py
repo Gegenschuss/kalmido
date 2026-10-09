@@ -112,7 +112,7 @@ def my_tags(c, tid):
 
 
 def one_task(c, tid):
-    return load_tasks(c, "id=?", (tid,))[0]
+    return load_tasks(c, "id=?", (tid,), full_snips=True)[0]  # 2.35.0 (#1095): one task with its code snippets
 
 
 def participant_assignee(c, cur, f):

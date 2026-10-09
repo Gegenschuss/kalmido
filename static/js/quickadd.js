@@ -274,7 +274,29 @@ const lname = l => !l ? '' : l.is_inbox && inboxDef(l.name) ? tr('Inbox') : list
 const norm = s => s.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
 // website link display: domain without www. (chip), domain + path (title of a bare shared link)
 const urlParse = u => { try { return new URL(u); } catch { return null; } };
-const urlHost = u => { const x = urlParse(u); return x ? x.hostname.replace(/^www\./, '') : String(u || ''); };
+// 2.35.0 (#186): file links (a file / folder on a network drive or the computer) - the same schemes as the server
+// (core/pages.py FILE_LINK_RE). They show as the share + file name; file:// and \\server\share paths a browser may not open from
+// a web page: a tap copies the address (paste it into the file manager), smb:// & co. open the system's handler, copy next to it.
+const FLK_RE = /^(?:(?:smb|afp|nfs|webdavs?|davs?):\/\/[^\s/?#\\]+(?:[/?#][^\x00-\x1f\x7f]*)?|file:\/\/\/?[^\s\x00-\x1f\x7f][^\x00-\x1f\x7f]*|\\\\[^\s\\/]+\\[^\x00-\x1f\x7f]+)$/i;
+const flkIs = u => typeof u === 'string' && u.length <= 2000 && u === u.trim() && FLK_RE.test(u);
+const flkCopyOnly = u => /^(file:|\\\\)/i.test(u);  // the browser blocks these from a web page
+function flkLabel(u) {  // "nas › Projekte › … › Angebot.pdf"
+  let s = String(u || '');
+  try { s = decodeURIComponent(s); } catch { /* keep as typed */ }
+  const parts = s.replace(/^[a-z]+:\/\/\/?/i, '').replace(/^\\\\/, '').split(/[\\/]+/).filter(Boolean);
+  return (parts.length > 3 ? [parts[0], parts[1], '…', parts[parts.length - 1]] : parts).join(' › ') || s;
+}
+// a link (http(s) or a file link) as <a> / copy button: cls, inner html; title = the full address
+function flkLink(u, cls, inner, compact) {  // compact: rows / chips, no extra copy button
+  if (!flkIs(u)) return `<a class="${cls}" href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="${esc(u)}">${inner}</a>`;
+  if (flkCopyOnly(u)) return `<button type="button" class="${cls} flk" data-flk="${esc(u)}" title="${esc(tr('Copy the address of the file: {0}', u))}">${inner}</button>`;
+  return `<a class="${cls} flk" href="${esc(u)}" rel="noopener noreferrer" title="${esc(u)}">${inner}</a>${compact ? '' : `<button type="button" class="iconbtn flkcp" data-flk="${esc(u)}" title="${esc(tr('Copy address'))}" aria-label="${esc(tr('Copy address'))}">${ic('copy', 's')}</button>`}`;
+}
+async function flkCopy(u) {
+  try { await navigator.clipboard.writeText(u); toast(tr('Address copied - paste it into the file manager')); } catch { toast(u, null, 8000); }
+}
+document.addEventListener('click', e => { const b = e.target.closest?.('[data-flk]'); if (!b) return; e.preventDefault(); e.stopPropagation(); flkCopy(b.dataset.flk); }, true);
+const urlHost = u => { if (flkIs(u)) return flkLabel(u); const x = urlParse(u); return x ? x.hostname.replace(/^www\./, '') : String(u || ''); };
 const urlTitle = u => { const x = urlParse(u); return x ? (x.hostname.replace(/^www\./, '') + x.pathname.replace(/\/+$/, '')).slice(0, 120) : String(u || '').slice(0, 120); };
 // shared text -> [link, text without it]: the first http(s) URL, trailing punctuation is not part of it
 function shareLink(text, url) {
@@ -286,6 +308,7 @@ function shareLink(text, url) {
   return [m[0].replace(/[.,;:!?]+$/, ''), clean(text.slice(0, m.index) + text.slice(m.index + m[0].length))];
 }
 const validUrl = u => /^https?:\/\/[^\s/?#]+\S*$/i.test(u || '') && u.length <= 2000;
+const validLink = u => validUrl(u) || flkIs(u);  // 2.35.0 (#186): web or file link (task link, key links, link fields)
 const nowHM = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 function nextOrToday(wd) { const t = pd(today()); return addDays(today(), (wd - t.getDay() + 7) % 7); }
 

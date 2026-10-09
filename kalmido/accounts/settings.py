@@ -441,6 +441,7 @@ def export_json():
         "folder_notif": ("SELECT * FROM folder_notif WHERE owner_id=?", (uid,)),
         "agent_steps": ("SELECT id, agent_id, job_id, message_id, text, created_at FROM agent_steps WHERE user_id=?", (uid,)),  # 2.32.0 (#1081)  # 2.32.0 (#1063): my own project page arrangements
         "agent_schedules": ("SELECT * FROM agent_schedules WHERE user_id=?", (uid,)),  # 2.34.0 (#272): my planned agent jobs
+        "org_list_actions": ("SELECT * FROM org_list_log WHERE by_id=?", (uid,)),  # 2.35.0 (#1101): what I did as an organisation admin
         # 2.21.0 (#659 / #658): my event calendars with their events + attendees, my address books with their contacts
         "event_calendars": ("SELECT * FROM ev_cals WHERE owner_id=?", (uid,)),
         "events": ("SELECT * FROM events WHERE cal_id IN (SELECT id FROM ev_cals WHERE owner_id=?)", (uid,)),

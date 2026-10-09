@@ -68,7 +68,7 @@ function meCustom(f, lid) {
       if (v == null) return;
       let x = v.trim() || null;
       if (x && f.type === 'number') x = numIn(x);
-      if (x && f.type === 'url' && !/^https?:\/\//i.test(x)) x = 'https://' + x;
+      if (x && f.type === 'url' && !/^https?:\/\//i.test(x) && !flkIs(x)) x = 'https://' + x;  // 2.35.0 (#186): file links stay
       set(x);
     });
   };

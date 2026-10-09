@@ -28,24 +28,54 @@ function uiLang() {
 // then the copy of the last loaded language in localStorage.
 // 2.25.0 (UX-29): texts of the page shell outside the app's renders (the skip link on the setup / invitation pages)
 function i18nStatic() { const sk = document.getElementById('skip'); if (sk) sk.textContent = tr('Skip to content'); }
-function i18nLoad(code) {
+// 2.35.0 (#1094): the language file is fetched with the version of the code (?v=, index.html meta kalmido-version), so no
+// browser or service-worker cache can hand out the file of an older version. The copy in localStorage carries the version
+// it was loaded with; a copy of another version (or a file the service worker only had from an older version, header
+// X-Kalmido-I18n-Stale) is only a stopgap: the texts show, I18N.stale is set and the file is fetched again a little later
+// (i18nRetry), then the app draws again - without reloading the page.
+const I18N_VER = () => (typeof document !== 'undefined' && document.querySelector?.('meta[name="kalmido-version"]')?.content) || '';
+let I18N_RT = null, I18N_RTN = 0;
+function i18nRetry() {
+  if (I18N_RT || !I18N.stale) return;
+  const wait = [3000, 10000, 30000, 60000][Math.min(I18N_RTN++, 3)];
+  I18N_RT = setTimeout(async () => {
+    I18N_RT = null; const was = I18N.code;
+    if (!I18N.stale || was !== uiLang()) return;
+    const ok = await i18nLoad(was, true);
+    if (ok && !I18N.stale) { I18N_RTN = 0; if (typeof render === 'function' && typeof S !== 'undefined' && S.booted) { try { render(); } catch { /* next render */ } } }
+    else i18nRetry();
+  }, wait);
+}
+function i18nLoad(code, again) {
   code = code || 'en';
-  if (code === I18N.code) { i18nStatic(); return Promise.resolve(true); }
+  if (code === I18N.code && !(again && I18N.stale)) { i18nStatic(); if (I18N.stale) i18nRetry(); return Promise.resolve(true); }
   if (code === 'en') { I18N = {code: 'en', dict: {}}; i18nStatic(); return Promise.resolve(true); }
   if (!/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(code)) return Promise.resolve(false);
   return I18N_PENDING[code] || (I18N_PENDING[code] = (async () => {
+    const ver = I18N_VER();
     try {
-      const r = await fetch(`/static/i18n/${code}.json`);
-      if (!r.ok) throw new Error(r.status);
-      I18N = {code, dict: await r.json()};
-      try { localStorage.setItem(I18N_CACHE_KEY, JSON.stringify(I18N)); } catch { /* private mode */ }
-      i18nStatic();
+      const r = await fetch(`/static/i18n/${code}.json${ver ? '?v=' + encodeURIComponent(ver) : ''}`);
+      // a sign-in page after a redirect (proxy login) or an error page is no language file
+      if (!r.ok || r.redirected || !/json/.test(r.headers.get('content-type') || '')) throw new Error(r.status);
+      const dict = await r.json();
+      if (!dict || typeof dict !== 'object' || !dict._meta) throw new Error('no language file');
+      const old = r.headers.get('X-Kalmido-I18n-Stale') === '1';  // the service worker had only an older version (offline)
+      const c0 = old ? i18nCached(code) : null;
+      if (c0 && c0.ver === ver) { I18N = c0; i18nStatic(); return true; }
+      I18N = {code, dict, ver: old ? '' : ver, ...(old && ver ? {stale: true} : {})};
+      if (!old) try { localStorage.setItem(I18N_CACHE_KEY, JSON.stringify(I18N)); } catch { /* private mode */ }
+      i18nStatic(); if (I18N.stale) i18nRetry();
       return true;
     } catch {
-      try { const c = JSON.parse(localStorage.getItem(I18N_CACHE_KEY)); if (c && c.code === code && c.dict) { I18N = c; i18nStatic(); return true; } } catch { /* none */ }
+      const c = i18nCached(code);
+      if (c) { I18N = {...c, ...(ver && c.ver !== ver ? {stale: true} : {})}; i18nStatic(); if (I18N.stale) i18nRetry(); return true; }
       return false;
     } finally { delete I18N_PENDING[code]; }
   })());
+}
+function i18nCached(code) {
+  try { const c = JSON.parse(localStorage.getItem(I18N_CACHE_KEY)); if (c && c.code === code && c.dict) { delete c.stale; return c; } } catch { /* none */ }
+  return null;
 }
 const i18nGet = k => I18N.dict[k] ?? I18N_EN[k];
 const LOCALE = () => i18nGet('_meta')?.locale || I18N.code;

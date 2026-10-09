@@ -308,6 +308,7 @@ document.addEventListener('click', async e => {
     case 'ws-set': wsSet(a.dataset.ws); break;  // 2.28.0 (#935)
     case 'ws-menu': wsMenu(a); break;
     case 'chat-choice': chatChoice(+a.dataset.mid, a.dataset.cid); break;  // 2.28.0 (#1005)
+    case 'apv-jump': apvJump(+a.dataset.mid); break;  // 2.35.0 (#1103)
     case 'chat-choice-send': chatChoice(+a.dataset.mid, null, true); break;
     case 'agents-go': settingsModal('agents'); break;  // 2.28.0 (#1011)
     case 'news-tab': LS.set('newsTab', a.dataset.tab); renderView(); break;  // 2.28.0 (#987)
@@ -760,7 +761,7 @@ document.addEventListener('focusout', e => {
   if (e.target.id === 'd-content' && e.target.value.trim()) {  // back to the rendered markdown
     const t = taskById(S.sel); if (t) t.content = e.target.value;
     S.editContent = false;
-    const md = $('#d-md'); if (md) { md.innerHTML = mdMentions(renderMd(e.target.value, false, {lid: taskById(S.sel)?.list_id}), taskById(S.sel)); md.classList.remove('hidden'); e.target.classList.add('hidden'); }
+    const md = $('#d-md'); if (md) { md.innerHTML = mdMentions(mdTaskRefs(renderMd(e.target.value, false, {lid: taskById(S.sel)?.list_id}), true), taskById(S.sel)); md.classList.remove('hidden'); e.target.classList.add('hidden'); }
   }
 });
 function editContent() {
@@ -774,7 +775,7 @@ function toggleMdCheckbox(i) {
   lines[i] = lines[i].replace(/\[( |x|X)\]/, m => m === '[ ]' ? '[x]' : '[ ]');
   const was = t.content;
   t.content = lines.join('\n');
-  $('#d-content').value = t.content; $('#d-md').innerHTML = mdMentions(renderMd(t.content, false, {lid: t.list_id}), t);
+  $('#d-content').value = t.content; $('#d-md').innerHTML = mdMentions(mdTaskRefs(renderMd(t.content, false, {lid: t.list_id}), true), t);
   HIST.sess++;
   queueSave(t.id, 'content', t.content, was);
 }

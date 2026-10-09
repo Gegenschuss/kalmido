@@ -7,6 +7,71 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.35.0] - 2026-10-09
+
+**In short:** Agents, chat and polish. Agents **ask for approval with a card** (Yes / No, pinned until answered,
+counted at the agent), tasks in software projects get **code snippets** (plain code with highlighting that agents read
+and write), **#123** links the task everywhere, **Customize** arranges blocks right in the view, organisation admins
+**manage the lists of their organisation**, links to **files on network drives**, and the reference **agent launcher**
+catches up with live steps, model, permission mode, usage ring, reply reference and approvals.
+
+### Added
+- **Approval requests in the agent chat** (#1103): an agent marks a message as an approval request (`approval` on
+  `POST /api/v1/agent/chats/{id}`, MCP `request_chat_approval`). It shows as an *Approval needed* card with Yes / No,
+  pinned at the top of the chat and counted at the agent in the sidebar, on its card and at the chat button until it
+  is answered; afterwards the card shows who approved or declined and when. Only the person of the chat answers, never
+  an agent; the answer reaches the agent as `chat_choice` with `approval`, silence is never a yes. At most 10 open
+  requests per agent and person. Push *Approval needed* uses the existing switch *An agent waits for my approval*
+  (at most 5 an hour per agent).
+- **Code snippets** (#1095): tasks get a *Code snippets* section (always in software projects, elsewhere from the
+  task menu): plain code with syntax highlighting (language picked or recognised), optional file path and line (opens
+  the list's repository when one is connected), Copy, a code editor with Tab indentation. Pasting code into the
+  description offers to keep it as a snippet. Search finds code; duplicating and templates keep the snippets. Agents
+  read and write them (`snippets`, `POST /api/v1/tasks/{id}/snippets`, MCP `add_snippet`); task events carry a
+  shortened copy.
+- **Task links** (#1096): "#123" links the task in the agent chat, the team chat, comments and the description, with
+  the title as tooltip; tasks you cannot see stay plain text. Links to the app itself open in the same window.
+- **Arrange blocks in the view** (#1097): *Customize* shows the blocks of a view (start page, Today, project page,
+  overviews) in place: drag a block by its handle (phone: hold, then drag; the view scrolls at the edge), hide it or
+  switch its width at the block, bring hidden blocks back, undo every change. The list with arrows stays for keyboard
+  and screen reader.
+- **Lists of the organisation** (#1101): organisation admins see the lists that belong to their organisation (name,
+  owner, numbers, never contents) under *Settings > Account > Workspaces*, and can archive, restore, hand over to
+  another member or delete them from the archive after typing the list's name (tasks go to the owner's trash). Owner
+  and members are told, every action is in the history. Private lists, private sharing and inboxes stay out of reach;
+  agents never get this.
+- **Links to files** (#186): task links, key links of projects and link fields accept links to files on network
+  drives (`smb://`, `afp://`, `nfs://`, `webdav(s)://`, `file://`, `\\server\share`); `file://` and Windows paths
+  show as a copy button because browsers do not open them.
+- **Agent launcher event mode** (#1098): `agent_launcher.sh|.ps1 --events` (new `mcp/agent_run.py`) starts one fresh
+  headless run per event and reports live steps, the real model and permission mode, typing and status, the plan
+  usage ring from Claude Code's stream (with its measurement time; stale values count as unknown), the reply
+  reference and approval cards; older servers keep working. Plan usage passes through every window Claude Code
+  reports.
+- **Checks for new agents** (#1098): both launchers must implement every capability in
+  `mcp/launcher_capabilities.json` (`tests/launcher_parity_test.py`), and every agent event, agent endpoint and MCP
+  tool must be documented in the guides and the agent template (`tests/agent_docs_coverage_test.py`).
+
+### Changed
+- Agent rules (template, guides, in-app setup): one short sentence in the person's language before each tool step;
+  approvals only as approval requests with buttons, silence is never a yes; the 2.34 tools are described (#1100).
+- The agent's step lines line up with "… is writing …", with a thin accent line (#1099).
+- The list menu no longer has *Refresh*: the app checks for changes every few seconds, the offline hint still
+  refreshes on tap (#1105).
+
+### Fixed
+- New texts no longer appear in English after an update while the browser holds an old language file: language
+  files load with the app version, a stale copy is replaced in the background without a reload, and the automatic
+  reload waits for the second report of the new version (#1094).
+- Mac: scrolling to the end of a chat no longer moves the page beside it (agent chat and team chat) (#1102).
+- Phones: the tap areas in the agent chat header no longer overlap (the permission badge moves under the agent's
+  name); the (i) of the agent switches in the share dialog
+  sits at the edge of its row; planned agent jobs show dates in your date format (#1107).
+
+### Upgrade notes
+- New table `org_list_log`, new column `tasks.snippets` (default empty); 2.34.0 keeps running on the migrated
+  database. Approval requests are stored in the existing chat table.
+
 ## [2.34.0] - 2026-10-09
 
 **In short:** Agents in everyday work. **Today starts with a briefing** (due, blocked, new since yesterday, lying
@@ -3463,7 +3528,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.34.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.35.0...HEAD
+[2.35.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.35.0
 [2.34.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.34.0
 [2.33.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.33.0
 [2.32.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.32.0

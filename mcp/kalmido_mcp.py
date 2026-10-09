@@ -154,6 +154,14 @@ TASK_FIELDS = {
     "stars": {"type": ["integer", "null"], "minimum": 0, "maximum": 50, "description": "2.19.0: stars a kid account gets for completing it (null = 1)"},
     "family": {"type": ["object", "null"], "description": "2.19.0: birthday / anniversary {kind, name, year?, lead?} or household deadline "
                "{kind: deadline, type, who, expires, notice, lead} data; easier: add_occasion / add_deadline"},
+    # 2.35.0 (#1095): code snippets (plain code, no Markdown); the whole list is replaced
+    "snippets": {"type": "array", "maxItems": 20, "description": "2.35.0: code snippets of the task (code, logs, diffs) -- the WHOLE list "
+                 "(keep the id of snippets that stay; [] removes all; read them with get_task -- task lists only carry snippets_n). "
+                 "To add one, use add_snippet.",
+                 "items": {"type": "object", "required": ["code"], "properties": {
+                     "id": {"type": "string"}, "lang": {"type": "string", "maxLength": 20, "description": "py, js, ts, sh, sql, diff, json, ...; empty = automatic"},
+                     "path": {"type": ["string", "null"], "maxLength": 300}, "line": {"type": ["integer", "null"], "minimum": 1},
+                     "code": {"type": "string", "maxLength": 20000}}}},
 }
 SUGGESTION = {"type": "object", "description": "structured tidy suggestion (lists with agent tidy 'suggest'/'auto'); "
               "a 👍 by someone who may change the task applies it",
@@ -260,10 +268,17 @@ def t_send_chat(api, a):
             except ValueError:
                 raise ApiError(400, f"files: {f['name']} is not valid base64") from None
             files.append((f["name"], f.get("mime") or "application/octet-stream", data))
-        return api.call("POST", f"/agent/chats/{int(a['user_id'])}", multipart=(_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "reply_to")), files))
+        return api.call("POST", f"/agent/chats/{int(a['user_id'])}", multipart=(_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "reply_to")), files))  # approval: see request_chat_approval
     if not a.get("body"):
         raise ApiError(400, "body (or files) is required")
     return api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "reply_to")))
+
+
+def t_request_chat_approval(api, a):
+    """2.35.0 (#1103): an approval request in the chat (a card with yes / no; the answer comes as chat_choice + approval)."""
+    b = {**_pick(a, ("body", "task_id", "reply_to", "job_id", "expires_in")),
+         "approval": _pick(a, ("title", "what", "yes_label", "no_label"))}
+    return api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=b)
 
 
 def t_get_attachment(api, a):
@@ -420,6 +435,13 @@ TOOLS = [
      _obj(TASK_FIELDS, ["title"]), lambda api, a: api.call("POST", "/tasks", body=a)),
     ("update_task", "Change fields of a task. Only the given fields change.",
      _obj({"task_id": S_ID, **{k: v for k, v in TASK_FIELDS.items() if k != "parent_id"}}, ["task_id"]), t_update_task),
+    ("add_snippet", "2.35.0: add one code snippet to a task (a diff, a log, a proposed change, an error message): plain code with a "
+                    "language (no Markdown), optional file path + line. At most 20 per task, 20000 characters each. People see it in "
+                    "the task's Code snippets section with highlighting and a Copy button.",
+     _obj({"task_id": S_ID, "code": {"type": "string", "minLength": 1, "maxLength": 20000},
+           "lang": {"type": "string", "maxLength": 20, "description": "py, js, ts, sh, sql, diff, json, ...; empty = automatic"},
+           "path": {"type": "string", "maxLength": 300}, "line": {"type": "integer", "minimum": 1}}, ["task_id", "code"]),
+     lambda api, a: api.call("POST", f"/tasks/{int(a['task_id'])}/snippets", body=_pick(a, ("code", "lang", "path", "line")))),
     ("complete_task", "Mark a task done (repeating tasks move to their next date).",
      _obj({"task_id": S_ID}, ["task_id"]), lambda api, a: api.call("POST", f"/tasks/{int(a['task_id'])}/complete")),
     ("set_waiting", "Mark a task as waiting on someone (outside: a client, an office, a delivery), or change it. note: who / "
@@ -563,9 +585,21 @@ TOOLS = [
            "files": {"type": "array", "maxItems": 10, "items": {"type": "object", "properties": {
                "name": {"type": "string"}, "base64": {"type": "string"}, "mime": {"type": "string"}}, "required": ["name", "base64"]}}},
           ["user_id"]), t_send_chat),
+    ("request_chat_approval", "2.35.0: ask the person of a chat (user_id) for an approval before you do something: a card "
+                              "'Approval needed' with the buttons yes / no, pinned at the top of the chat and counted at your name until "
+                              "answered. title = what is to be approved, what = what happens on yes; yes_label / no_label optional. "
+                              "Use it whenever you need a go-ahead, never only a question in the text. The answer arrives as the event "
+                              "chat_choice with approval approved | rejected (also from a 👍 / 👎 on the card); no answer is never a yes. "
+                              "expires_in = seconds it stays open; close it with withdraw_chat_choices (outcome denied / expired, never allowed) "
+                              "when it is no longer needed. At most 10 open requests per person (the next one: 409).",
+     _obj({"user_id": S_ID, "title": {"type": "string", "maxLength": 200}, "what": {"type": "string", "maxLength": 1000},
+           "yes_label": {"type": "string", "maxLength": 80}, "no_label": {"type": "string", "maxLength": 80},
+           "body": {"type": "string", "description": "optional text above the card (default: the title)"}, "task_id": S_ID,
+           "reply_to": S_ID, "job_id": S_ID, "expires_in": {"type": "integer", "minimum": 10, "maximum": 604800}},
+          ["user_id", "title"]), t_request_chat_approval),
     ("withdraw_chat_choices", "2.30.0: take back the open answer buttons of one of your chat messages (user_id, message_id), "
                               "e.g. when the question is no longer current without a new message. outcome (permission questions "
-                              "only): allowed | denied | expired when you decided another way (an answer in words, your time limit).",
+                              "and 2.35.0 approval requests only): allowed | denied | expired when you decided another way (an answer in words, your time limit).",
      _obj({"user_id": S_ID, "message_id": S_ID, "outcome": {"type": "string", "enum": ["allowed", "denied", "expired"]}},
           ["user_id", "message_id"]),
      lambda api, a: api.call("POST", f"/agent/chats/{int(a['user_id'])}/messages/{int(a['message_id'])}/withdraw", body=_pick(a, ("outcome",)))),
@@ -1243,10 +1277,10 @@ TOOL_MAP = {t[0]: t for t in TOOLS}
 
 TOOL_SCOPES = {
     "agent": ("get_agent", "react_to_chat", "set_status", "report_progress", "list_events", "wait_for_events", "list_jobs", "create_job", "get_job",
-              "submit_proposal", "propose_to_other_topic", "update_job", "list_chats", "chat_typing", "send_chat", "withdraw_chat_choices", "report_usage", "get_usage",
+              "submit_proposal", "propose_to_other_topic", "update_job", "list_chats", "chat_typing", "send_chat", "request_chat_approval", "withdraw_chat_choices", "report_usage", "get_usage",
               "report_plan_usage", "get_plan_usage", "clear_plan_usage", "list_schedules"),
     "tasks:write": ("add_contract", "add_device", "add_upkeep", "sync_read_later", "add_occasion", "add_deadline", "ingredients_to_shopping", "give_stars", "add_reward", "update_reward", "request_reward",
-                    "decide_reward", "create_note", "update_note", "create_task", "update_task", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "batch_tasks",
+                    "decide_reward", "create_note", "update_note", "create_task", "update_task", "add_snippet", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "batch_tasks",
                     "reopen_task", "skip_occurrence", "take_task", "add_subtask", "add_dependency", "remove_dependency", "create_habit",
                     "update_habit", "check_in_habit", "shift_list_dates", "request_approval"),
     "comments": ("comment_typing", "post_team_message", "edit_team_message", "delete_team_message", "react_team_message", "mark_team_chat_read", "add_comment", "react", "request_merge_approval", "request_integration_approval", "request_deploy_approval", "update_comment", "delete_comment", "mark_news_read",

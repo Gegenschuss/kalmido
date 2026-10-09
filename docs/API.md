@@ -279,7 +279,7 @@ had been made in the app. Webhooks fire too.
 Writable fields for `POST /tasks` and `PATCH /tasks/{id}`: `title` (required on create), `notes`, `list_id`,
 `section_id`, `parent_id`, `priority`, `due`, `due_time`, `start`, `duration` (minutes), `reminders` (minutes before the
 due time, up to 366 days = 527040), `repeat` (an RRULE body such as `FREQ=WEEKLY;BYDAY=MO`, daily or longer), `repeat_from` (`due` / `done`),
-`url`, (2.7.0) `deadline` (boolean: the due date is a deadline, the app counts down and highlights it from the first
+`url` (a web address `http(s)://…` or, 2.35.0, a file link `smb://`, `afp://`, `nfs://`, `webdav(s)://`, `file://` or `\\server\share\…`; never `javascript:` / `data:`), (2.7.0) `deadline` (boolean: the due date is a deadline, the app counts down and highlights it from the first
 reminder on), `deadline_in_today` (boolean: also on Today from the first reminder on; `true` sets `deadline` too), `nag`
 (repeat the reminder until done: `5`, `10`, `15`, `30`, `60` (minutes) or `1d`; `off` = never, empty = the list's
 default; from the first reminder on, not during the person's quiet hours), `tags` (replaces your tags on the task), `list_tags` (replaces the list tags of the task; names, missing ones are

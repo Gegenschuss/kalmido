@@ -1,0 +1,14 @@
+{
+  "about": "What a host that runs an agent for Kalmido does, and where the reference launcher does it (2.35.0, #1098). tests/launcher_parity_test.py checks that agent_launcher.sh AND agent_launcher.ps1 both carry every capability (a line '# kalmido-capability: <id>' where they do it or hand it to agent_run.py) and that agent_run.py has the code named in 'core'. A new capability of a hosted service goes here first; the test then fails until both launchers have it.",
+  "capabilities": [
+    {"id": "runtime", "since": "2.4.1", "what": "Runtime settings from GET /api/v1/agent: model, auto-compact, fresh session, restart on change / Reset now / nightly, stop while paused", "core": []},
+    {"id": "steps", "since": "2.32.0", "what": "Prose between tool calls as steps (POST /api/v1/agent/progress): text blocks only, never tool input or output, secrets masked, at most one every 2 s, the final answer is no step, none for task events", "core": ["/agent/progress", "class Stream", "STEP_GAP_S", "def redact"]},
+    {"id": "model", "since": "2.32.0", "what": "The model of the stream's init event with PUT /api/v1/agent/status (model)", "core": ["\"init\"", "def model_label", "\"model\":"]},
+    {"id": "permission_mode", "since": "2.32.0", "what": "The run's permission mode and the host default (permission_mode, host_permission_mode)", "core": ["def permission_modes", "host_permission_mode"]},
+    {"id": "quota", "since": "2.33.0", "what": "Plan usage (PUT /api/v1/agent/quota) from the stream's rate_limit_event or a status line file, with measured_at; stale values are unknown; every window passes through; optional own limit pauses new runs", "core": ["/agent/quota", "rate_limit_event", "measured_at", "unifiedWindows", "def paused_until"]},
+    {"id": "reply_ref", "since": "2.33.0", "what": "The quote of the message a person answers goes into the prompt; reply_to when one answer covers several messages", "core": ["def reply_hint", "reply_to"]},
+    {"id": "status_typing", "since": "2.0.2", "what": "Status working / idle / error per run, typing dots while a chat run lasts", "core": ["/agent/typing", "\"working\"", "\"idle\""]},
+    {"id": "approval", "since": "2.35.0", "what": "An answer ending in an ```approval block becomes an approval card (approval: {title, what}); older servers: Yes / No buttons; the answer comes back as chat_choice with approval; silence is no", "core": ["\"approval\"", "def split_approval", "approval_request"]},
+    {"id": "old_server", "since": "2.35.0", "what": "Older servers: a feature the server does not know (404 / 400) is switched off once, the rest keeps working", "core": ["progress_ok", "host_ok", "quota_ok", "approval_ok"]}
+  ]
+}

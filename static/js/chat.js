@@ -241,16 +241,28 @@ async function loadNotes(lid) {
   try { const j = await rawFetch('GET', `/api/lists/${lid}/notes`); if (S.nt.lid !== lid) return; S.nt.notes = j.notes; S.nt.mayWrite = j.may_write; S.nt.err = null; }
   catch (e) { S.nt.err = e instanceof Offline ? tr('Notes are only available online.') : e.message; }
 }
-// #123 -> a link to that task (only tasks I see; text inside code / links stays)
-function mdTaskRefs(html) {
+// #123 -> a link to that task (only tasks I see; text inside code / links / buttons and inside tags stays)
+// 2.35.0 (#1096): also in chats, comments and the description, there compact (only "#123", the title in the tooltip);
+// every tag is skipped whole (no match inside an attribute), "&#39;" is no task number
+function mdTaskRefs(html, compact) {
   let skip = 0;
-  return html.replace(/(<\/?(?:code|a|pre|button)\b[^>]*>)|#(\d{1,9})\b/g, (m, tag, id) => {
-    if (tag) { skip += tag[1] === '/' ? -1 : 1; return m; }
+  return html.replace(/<(\/?)([a-zA-Z][\w-]*)[^>]*>|(?<![&\w/#])#(\d{1,9})\b/g, (m, cl, tag, id) => {
+    if (tag) { if (/^(code|a|pre|button)$/i.test(tag)) skip = Math.max(0, skip + (cl ? -1 : 1)); return m; }
     if (skip > 0) return m;
-    const t = taskById(+id); if (!t) return m;
-    return `<a href="#t/${t.id}" class="tref" title="${esc(t.title)}">#${t.id} ${esc(t.title.slice(0, 60))}</a>`;
+    const t = taskById(+id); if (!t) return m;  // not visible to me: stays text (no title leaks)
+    return trefHtml(t, compact);
   });
 }
+const trefHtml = (t, compact) => `<a href="#t/${t.id}" class="tref" data-tref="${t.id}" title="${esc(t.title)}">#${t.id}${compact ? '' : ' ' + esc(t.title.slice(0, 60))}</a>`;
+// a tap on a task number opens the task on top of where I am (the chat stays open below it; on a phone Back closes the
+// task and shows the chat again); Ctrl / Cmd / middle click open it in a new tab as any link
+function trefOpen(e) {
+  const a = e.target.closest?.('a[data-tref]');
+  if (!a || e.ctrlKey || e.metaKey || e.shiftKey || e.button || !taskById(+a.dataset.tref)) return;  // not loaded: the link's own route (#t/<id>) finds it
+  e.preventDefault(); e.stopPropagation();
+  openDetail(+a.dataset.tref);
+}
+document.addEventListener('click', trefOpen, true);
 function noteRoute(lid, id) {
   if (S.nt.lid !== lid) { S.nt = {...S.nt, lid, notes: null, err: null}; loadNotes(lid).then(() => { if (S.route.mod === 'notes') renderView(); }); }
   if (S.nt.id !== id) { noteFlush(); S.nt.id = id; S.nt.edit = !!id && S.nt.newId === id; S.nt.newId = null; }

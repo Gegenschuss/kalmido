@@ -268,3 +268,185 @@ function folderRepoModal(f) {
 }
 
 // ================================================================== 2.17.0 package B "Communication"
+
+// ---- 2.35.0 (#1095): code snippets of a task: plain code (no Markdown) with a language (picked or recognised), an
+// optional file path + line, highlighted like the code blocks of a description (hlCode), a Copy button, a monospace
+// editor with Tab indentation. Shown in lists of the software project type, elsewhere from the task menu ("Add code
+// snippet"); agents read / write them as `snippets` (API, MCP add_snippet, task events)
+const SNIP_MAX = 20, SNIP_CODE_MAX = 20000;
+const SNIP_LANGS = [['', N_('Automatic|language')], ['text', N_('Plain text')], ['py', 'Python'], ['js', 'JavaScript'], ['ts', 'TypeScript'],
+  ['sh', 'Shell'], ['sql', 'SQL'], ['json', 'JSON'], ['yaml', 'YAML'], ['html', 'HTML / XML'], ['css', 'CSS'], ['diff', 'Diff'],
+  ['go', 'Go'], ['rust', 'Rust'], ['java', 'Java / Kotlin'], ['c', 'C / C++ / C#']];
+const snipLangName = k => { const x = SNIP_LANGS.find(l => l[0] === k); return x ? (k ? x[1] : tr(x[1])) : k; };
+// a quick guess of the language from the code itself ('' = none: shown without highlighting)
+function snipGuess(code) {
+  const s = String(code || '').slice(0, 4000), ls = s.split('\n').filter(l => l.trim());
+  if (!ls.length) return '';
+  if (/^(diff --git|--- |\+\+\+ |@@ )/m.test(s) && ls.filter(l => /^[+\-@ ]/.test(l)).length >= ls.length * 0.8) return 'diff';
+  if (/^\s*[[{]/.test(s)) { try { JSON.parse(s); return 'json'; } catch { /* not JSON */ } }
+  if (/^\s*<(!doctype|html|\?xml|[a-z][\w-]*[\s>])/i.test(s)) return 'html';
+  if (/^#!.*\b(ba|z)?sh\b|^\s*\$ \S/m.test(s)) return 'sh';
+  if (/^\s*(def |class \w+(\(.*\))?:|from [\w.]+ import |import \w+$|if __name__ == )/m.test(s)) return 'py';
+  if (/^\s*(select|insert into|update \w+ set|create (table|index)|delete from|with \w+ as)\b/im.test(s)) return 'sql';
+  if (/^\s*package \w+|^\s*func \w*\(/m.test(s)) return 'go';
+  if (/^\s*(fn |let mut |use \w+::|impl )/m.test(s)) return 'rust';
+  if (/^\s*#include\b|^\s*(int|void) main\s*\(/m.test(s)) return 'c';
+  if (/^\s*(public |private )?(class|interface) \w+.*\{|System\.out\.|^\s*fun \w+\(/m.test(s)) return 'java';
+  if (/^\s*(interface \w+|type \w+ = )|:\s*(string|number|boolean)\b/m.test(s)) return 'ts';
+  if (/\b(const|let|function|=>|require\(|console\.|export (default|const|function))\b/.test(s)) return 'js';
+  if (/^[\s.#\w-]+\{[^}]*:[^}]*;/m.test(s)) return 'css';
+  if (/^\w[\w.-]*:(\s|$)/m.test(s) && !/[{};]/.test(s)) return 'yaml';
+  return '';
+}
+const snipLang = s => s.lang === 'text' ? '' : s.lang || snipGuess(s.code);
+// 2.35.0 review (M4): lists and the state carry only the number (snippets_n); the snippets come with the task itself
+// (GET /api/tasks/<id>, the answer of a change), kept per task while its updated_at stays the same
+S.snipC = {}; S.snipLd = new Set();
+const snipCount = t => Array.isArray(t?.snippets) ? t.snippets.length : t?.snippets_n || 0;
+const snipLoaded = t => !snipCount(t) || Array.isArray(t.snippets) || S.snipC[t.id]?.at === t.updated_at;
+function snipList(t) {
+  if (!t) return [];
+  if (Array.isArray(t.snippets)) return t.snippets;
+  const c = S.snipC[t.id]; return c && c.at === t.updated_at ? c.list : [];
+}
+async function snipLoad(t) {
+  if (snipLoaded(t)) return snipList(t);
+  const j = await rawFetch('GET', '/api/tasks/' + t.id);
+  const cur = taskById(t.id) || t;  // keyed by the version on screen (the server's newest list; the next sync refreshes it)
+  S.snipC[t.id] = {at: cur.updated_at, list: j.snippets || []};
+  return S.snipC[t.id].list;
+}
+function snipLoadShow(t) {  // the panel shows "Loading…" and draws again once they are there
+  if (S.snipLd.has(t.id)) return;
+  S.snipLd.add(t.id);
+  snipLoad(t).catch(() => { S.snipC[t.id] = {at: t.updated_at, list: [], err: true}; }).finally(() => { S.snipLd.delete(t.id); if (S.sel === t.id) renderDetail(); });
+}
+// shown: there are snippets; or a software project list / opened from the task menu, for someone who may change the task
+function snipShown(t) {
+  if (!(t?.id > 0) || t.context) return false;
+  if (snipCount(t) || S.snip?.tid === t.id) return true;
+  return listById(t.list_id)?.ptype === 'software' && canEdit(t);
+}
+function snipFileUrl(t, s) {  // the file in the list's repository (as file:line links of a description), else null
+  if (!s.path) return null;
+  const keep = MD_REPO;
+  MD_REPO = listRepos(t.list_id).find(r => httpUrl(r.web_url)) || null;
+  try { return MD_REPO ? mdFileUrl(s.path + (s.line ? ':' + s.line : '')) : null; } catch { return null; } finally { MD_REPO = keep; }
+}
+function snipHtml(t, ro) {
+  if (!snipShown(t)) return '';
+  if (!snipLoaded(t)) { snipLoadShow(t); return `<div class="dsec snipsec" id="d-snips"><h5>${tr('Code snippets')} <span class="muted h5note">${snipCount(t)}</span></h5><div class="muted">${tr('Loading…')}</div></div>`; }
+  const ed = S.snip?.tid === t.id ? S.snip : null, list = snipList(t);
+  const one = s => {
+    if (ed && ed.sid === s.id && !ro) return snipEditHtml(ed);
+    const lg = snipLang(s), where = s.path ? s.path + (s.line ? ':' + s.line : '') : '', fu = where && snipFileUrl(t, s);
+    const who = s.by && s.by !== S.me?.id ? personNameAny(s.by) : '';
+    return `<div class="snip" data-sid="${esc(s.id)}">
+      <div class="sniphead"><span class="sniplang" title="${esc(s.lang ? tr('Language') : tr('Language (recognised automatically)'))}">${esc(lg ? snipLangName(lg) : tr('Plain text'))}</span>${where ? (fu ? `<a class="snippath" href="${esc(fu)}" target="_blank" rel="noopener noreferrer" title="${esc(tr('Open the file in the repository'))}"><code>${esc(where)}</code></a>` : `<code class="snippath">${esc(where)}</code>`) : ''}${who ? `<span class="muted snipby">${esc(who)}</span>` : ''}<span class="spacer"></span>
+        <button type="button" class="iconbtn" data-act="snip-copy" data-sid="${esc(s.id)}" title="${esc(tr('Copy code'))}" aria-label="${esc(tr('Copy code'))}">${ic('copy', 's')}</button>${ro ? '' : `<button type="button" class="iconbtn" data-act="snip-edit" data-sid="${esc(s.id)}" title="${esc(tr('Edit code snippet'))}" aria-label="${esc(tr('Edit code snippet'))}">${ic('edit', 's')}</button><button type="button" class="iconbtn" data-act="snip-rm" data-sid="${esc(s.id)}" title="${esc(tr('Remove code snippet'))}" aria-label="${esc(tr('Remove code snippet'))}">${ic('trash', 's')}</button>`}</div>
+      <pre class="mdpre snipcode"${lg ? ` data-lang="${esc(lg)}"` : ''}><code>${hlCode(s.code, lg)}</code></pre></div>`;
+  };
+  const add = !ro && list.length < SNIP_MAX && !(ed && ed.sid === 'new') ? `<button type="button" class="attadd" data-act="snip-new" data-id="${t.id}">${ic('plus', 's')}<span>${tr('Add code snippet')}</span></button>` : '';
+  return `<div class="dsec snipsec" id="d-snips"><h5>${tr('Code snippets')}${list.length ? ` <span class="muted h5note">${list.length}</span>` : ''}</h5>
+    ${list.map(one).join('')}${ed && ed.sid === 'new' && !ro ? snipEditHtml(ed) : ''}${add}</div>`;
+}
+function snipEditHtml(ed) {
+  const n = (ed.code || '').length;
+  return `<div class="snip snipedit" data-sid="${esc(ed.sid)}">
+    <div class="snipedrow"><label class="sr" for="snip-lang">${tr('Language')}</label><select id="snip-lang">${SNIP_LANGS.map(([k, nm]) => `<option value="${k}" ${(ed.lang || '') === k ? 'selected' : ''}>${esc(k ? nm : tr(nm) + (snipGuess(ed.code) ? ` (${snipLangName(snipGuess(ed.code))})` : ''))}</option>`).join('')}</select>
+      <input id="snip-path" value="${esc(ed.path || '')}" maxlength="300" placeholder="${esc(tr('File path (optional)'))}" aria-label="${esc(tr('File path (optional)'))}" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <input id="snip-line" value="${ed.line || ''}" inputmode="numeric" maxlength="8" placeholder="${esc(tr('Line'))}" aria-label="${esc(tr('Line (optional)'))}"></div>
+    <textarea id="snip-code" class="snipta" rows="${Math.min(18, Math.max(5, (ed.code || '').split('\n').length + 1))}" maxlength="${SNIP_CODE_MAX}" wrap="off" spellcheck="false" autocapitalize="off" autocorrect="off" aria-label="${esc(tr('Code'))}" aria-describedby="snip-hint" placeholder="${esc(tr('Paste or type code, an error message or a log'))}">${esc(ed.code || '')}</textarea>
+    <div class="snipfoot"><button type="button" class="btn sm pri" data-act="snip-save">${tr('Save')}</button><button type="button" class="btn sm" data-act="snip-cancel">${tr('Cancel')}</button><span class="muted sniphint" id="snip-hint">${esc(tr('Tab indents, Esc then Tab leaves the field'))} · <span id="snip-n">${n} / ${SNIP_CODE_MAX}</span></span></div></div>`;
+}
+async function snipOpen(tid, sid, code) {  // sid: a snippet's id or 'new'; code: prefilled (pasted into the description)
+  let t = taskById(tid); if (!t || !canEdit(t)) return;
+  if (!snipLoaded(t)) { try { await snipLoad(t); } catch { toast(tr('Code snippets are only available online.')); return; } t = taskById(tid) || t; }
+  const s = sid === 'new' ? {lang: '', path: '', line: null, code: code || ''} : snipList(t).find(x => x.id === sid);
+  if (!s) return;
+  S.snip = {tid, sid, lang: s.lang || '', path: s.path || '', line: s.line || '', code: s.code || ''};
+  if (S.sel !== tid) openDetail(tid); else renderDetail();
+  requestAnimationFrame(() => { const a = $('#snip-code'); if (a) { a.focus({preventScroll: true}); a.closest('.snip')?.scrollIntoView({block: 'nearest'}); } });
+}
+function snipDraft() {  // the editor's fields -> S.snip (a re-render of the panel keeps them)
+  if (!S.snip) return;
+  const v = id => $(id)?.value;
+  if ($('#snip-code')) Object.assign(S.snip, {code: v('#snip-code'), lang: v('#snip-lang') || '', path: v('#snip-path') || '', line: v('#snip-line') || ''});
+}
+async function snipPut(t, list, msg) {  // one undoable step (the whole list, like the API)
+  const before = {...snapTask(t), snippets: snipList(t)};  // the full list (the task may only carry snippets_n)
+  const r = await patchTask(t.id, {snippets: list}, true);
+  if (r) S.snipC[t.id] = {at: r.updated_at, list: r.snippets || []};
+  const e = before && histFields(msg, [[before, {...snapTask(S.tasks.get(t.id) || r), snippets: r?.snippets || []}, ['snippets']]], {res: r});
+  if (e) offerUndo(msg, e); else toast(msg);
+  return r;
+}
+async function snipSave() {
+  snipDraft();
+  const ed = S.snip, t = ed && taskById(ed.tid); if (!t) return;
+  const line = String(ed.line || '').trim();
+  if (line && !/^\d{1,8}$/.test(line)) { toast(tr('The line is a number')); $('#snip-line')?.focus(); return; }
+  if (!ed.code.trim()) { toast(tr('The code snippet is empty')); $('#snip-code')?.focus(); return; }
+  const s = {lang: ed.lang, path: ed.path.trim() || null, line: line ? +line : null, code: ed.code};
+  const list = snipList(t).map(x => ({...x}));
+  if (ed.sid === 'new') list.push(s); else { const i = list.findIndex(x => x.id === ed.sid); if (i < 0) list.push(s); else list[i] = {...list[i], ...s}; }
+  try { S.snip = null; await snipPut(t, list, ed.sid === 'new' ? tr('Code snippet added') : tr('Code snippet saved')); }
+  catch (e) { S.snip = ed; renderDetail(); toast(e.message || tr('Error')); }
+}
+function snipCancel() { S.snip = null; renderDetail(); }
+async function snipRm(sid) {
+  const t = taskById(S.sel); if (!t) return;
+  try { await snipPut(t, snipList(t).filter(x => x.id !== sid), tr('Code snippet removed')); } catch (e) { toast(e.message || tr('Error')); }
+}
+async function snipCopy(sid) {
+  const s = snipList(taskById(S.sel)).find(x => x.id === sid); if (!s) return;
+  try { await navigator.clipboard.writeText(s.code); toast(tr('Code copied')); } catch { toast(tr('Copying is not allowed here: select the code and copy it')); }
+}
+// Tab / Shift+Tab indent / outdent the line(s) of the selection by 4 spaces; Esc gives Tab back to the page (the next
+// Tab leaves the field, keyboard users are never trapped)
+function snipKey(e) {
+  const a = e.target;
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); snipSave(); return; }
+  if (e.key === 'Escape') { if (a.dataset.tabfree) return; a.dataset.tabfree = '1'; e.stopPropagation(); return; }  // a second Esc leaves as usual
+  if (e.key !== 'Tab' || e.ctrlKey || e.metaKey || e.altKey) { if (e.key !== 'Shift') delete a.dataset.tabfree; return; }
+  if (a.dataset.tabfree) { delete a.dataset.tabfree; return; }
+  e.preventDefault();
+  const v = a.value, s = a.selectionStart, en = a.selectionEnd, ls = v.lastIndexOf('\n', s - 1) + 1;
+  if (!e.shiftKey && s === en) { a.setRangeText('    ', s, en, 'end'); }
+  else {
+    const le = v.indexOf('\n', en - (en > s && v[en - 1] === '\n' ? 1 : 0)), end = le < 0 ? v.length : le;
+    const block = v.slice(ls, end), out = block.split('\n').map(l => e.shiftKey ? l.replace(/^( {1,4}|\t)/, '') : '    ' + l).join('\n');
+    a.setRangeText(out, ls, end, 'select');
+  }
+  a.dispatchEvent(new Event('input', {bubbles: true}));
+}
+// pasting code into the description (several lines that look like code): the toast offers the code snippets instead
+function snipPasteHint(e, t) {
+  const txt = e.clipboardData?.getData('text/plain') || '';
+  if (!t || !canEdit(t) || txt.split('\n').length < 3 || txt.length > SNIP_CODE_MAX || /^\s*```/.test(txt) || !snipGuess(txt) || snipCount(t) >= SNIP_MAX) return;
+  toast(tr('This looks like code. Put it into a code snippet instead?'), () => {
+    const a = $('#d-content'), i = a ? a.value.lastIndexOf(txt) : -1;
+    if (a && i >= 0) { a.value = a.value.slice(0, i) + a.value.slice(i + txt.length); a.dispatchEvent(new Event('input', {bubbles: true})); }
+    snipOpen(t.id, 'new', txt);
+  }, 8000, tr('Code snippet'));
+}
+document.addEventListener('keydown', e => { if (e.target.id === 'snip-code') snipKey(e); }, true);
+document.addEventListener('input', e => {
+  if (!S.snip || !e.target.closest?.('.snipedit')) return;
+  snipDraft();
+  const n = $('#snip-n'); if (n) n.textContent = `${(S.snip.code || '').length} / ${SNIP_CODE_MAX}`;
+});
+document.addEventListener('paste', e => { if (e.target.id === 'd-content') snipPasteHint(e, taskById(S.sel)); });
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-act^="snip-"]'); if (!a) return;
+  e.preventDefault(); e.stopPropagation();
+  const sid = a.dataset.sid;
+  switch (a.dataset.act) {
+    case 'snip-new': snipOpen(+a.dataset.id || S.sel, 'new'); break;
+    case 'snip-edit': snipOpen(S.sel, sid); break;
+    case 'snip-save': snipSave(); break;
+    case 'snip-cancel': snipCancel(); break;
+    case 'snip-rm': snipRm(sid); break;
+    case 'snip-copy': snipCopy(sid); break;
+  }
+}, true);

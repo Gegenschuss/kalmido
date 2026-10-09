@@ -44,6 +44,7 @@ ORDER = (
     "accounts.users",
     "accounts.orgs",
     "accounts.tenancy",
+    "accounts.orglists",  # 2.35.0 (#1101)
     "lists.templates",
     "tasks.dependencies",
     "lists.projects",
@@ -73,6 +74,7 @@ ORDER = (
     "agents.api",
     "agents.proposals",
     "tasks.attachtext",  # 2.34.0 (#368)
+    "tasks.snippets",  # 2.35.0 (#1095)
     "agents.gates",  # 2.26.0 (#949)
     "agents.safety",  # 2.30.0 (#919)
     "agents.usage",

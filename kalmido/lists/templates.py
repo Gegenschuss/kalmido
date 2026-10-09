@@ -10,7 +10,7 @@ from ..core.i18n import lang, N_, tr
 from ..core.db import body, bump, db, err, inbox_default, iso, local_now, now_utc, uset, usettings
 from ..accounts.session import me
 from ..core.access import Denied, list_role, MANAGE_ROLES, my_inbox, my_max_sort, need_list, need_task
-from ..core.pages import valid_url
+from ..core.pages import valid_link
 from ..lists.lists import list_created, clean_color, clean_folder, LIST_KINDS
 from ..tasks.validation import (
     clean_reminders, clean_ticket_tpl, log_act, rr_feasible, rr_norm, rr_problem, TICKET_TPL, TICKET_TYPES, valid_date,
@@ -44,6 +44,9 @@ def tpl_node_from_task(c, t, base, uid, depth=0, fidx=None, order=None):
          "due_time": t["due_time"] if t["due"] else None, "duration": t["duration"] if t["due_time"] else None,
          "reminders": t["reminders"] or "", "repeat": t["repeat"] or "", "repeat_from": t["repeat_from"] or "due",
          **({"ttype": t["ttype"]} if t["ttype"] else {}), **({"ms": 1} if t["ms"] and depth == 0 else {}), "children": []}
+    if t["snippets"]:  # 2.35.0 (#1095): the code snippets come along
+        from ..tasks.snippets import snip_tpl
+        n["snippets"] = snip_tpl(t["snippets"])
     if order is not None:
         n["k"] = f"n{len(order) + 1}"
         order.append((t["id"], n["k"]))
@@ -63,6 +66,11 @@ def tpl_node_from_task(c, t, base, uid, depth=0, fidx=None, order=None):
         if fv:
             n["fv"] = fv
     return n
+
+
+def _snips_tpl(v):
+    from ..tasks.snippets import snip_tpl
+    return snip_tpl(v)
 
 
 def tpl_clean_node(n, depth, count):
@@ -112,13 +120,14 @@ def tpl_clean_node(n, depth, count):
             "priority": num("priority", 0, 5) if num("priority", 0, 5) in (0, 1, 3, 5) else 0,
             "tags": [str(x).strip().lstrip("#")[:60] for x in (n.get("tags") or []) if str(x).strip().lstrip("#")][:30]
             if isinstance(n.get("tags"), list) else [],
-            "url": url if url and valid_url(url) else None,
+            "url": url if url and valid_link(url) else None,
             "due_offset": due_off, "start_offset": num("start_offset", 0, 3650) if due_off is not None else None,
             "due_time": due_time if due_off is not None else None,
             "duration": num("duration", 5, 1440) if due_time and due_off is not None else None,
             "reminders": rems if due_off is not None else "", "repeat": rep if due_off is not None else "",
             "repeat_from": "done" if n.get("repeat_from") == "done" else "due",
             **({"ttype": n["ttype"]} if n.get("ttype") in TICKET_TYPES else {}),
+            **({"snippets": _snips_tpl(n["snippets"])} if n.get("snippets") else {}),  # 2.35.0 (#1095)
             # 2.18.0 (#430): a milestone (top level, without subtasks) / the node key of the milestone a task belongs to
             **({"ms": 1} if n.get("ms") and depth == 0 and not kids else {}),
             **({"mk": n["mk"]} if isinstance(n.get("mk"), str) and re.fullmatch(r"n\d{1,5}", n["mk"]) else {}),
@@ -334,6 +343,12 @@ def tpl_insert(c, n, lid, sec, parent, base, sort, uid, fmap=None, scale=1.0, ma
          "repeat": n.get("repeat") or "" if due else "", "repeat_from": n.get("repeat_from") or "due",
          "url": n.get("url"), "sort": sort, "created_by": uid, "ttype": n.get("ttype") if n.get("ttype") in TICKET_TYPES else "",
          "ms": 1 if n.get("ms") and parent is None else 0}
+    if n.get("snippets"):  # 2.35.0 (#1095)
+        from ..tasks.snippets import snip_clean
+        try:
+            f["snippets"] = snip_clean(n["snippets"])
+        except Exception:  # noqa: BLE001 -- a broken template node simply has no snippets
+            pass
     if f["repeat"] and (rr_problem(rr_norm(f["repeat"])) or not rr_feasible(rr_norm(f["repeat"]), due)):
         f["repeat"] = ""
     ts = iso(now_utc())

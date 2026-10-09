@@ -49,7 +49,7 @@ const CONTRAST = `(() => {
   await call('PATCH', '/api/settings', {features: ALL, lang: 'en', tour: 'done'});
   const BOB = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123'})).id;
   const mkAgent = async (u, n) => { const a = await call('POST', '/api/admin/agents', {scopes: ['write'], username: u, display_name: n}); return {id: a.id, tok: a.token}; };
-  const DEV = await mkAgent('claudedev', 'ClaudeDev'), KOL = await mkAgent('kollege', 'Kollege'), ARC = await mkAgent('archivar', 'Archivar');
+  const DEV = await mkAgent('devbot', 'DevBot'), KOL = await mkAgent('kollege', 'Kollege'), ARC = await mkAgent('archivar', 'Archivar');
   const L = (await call('POST', '/api/lists', {name: 'Launch', kind: 'project', tickets: true})).id;
   const W = (await call('POST', '/api/lists', {name: 'Website', kind: 'project'})).id;
   const PLAIN = (await call('POST', '/api/lists', {name: 'Groceries'})).id;
@@ -89,7 +89,7 @@ c.commit()`, path.join(DATA, 'tasks.db'), String(L), String(KOL.id), String(ARC.
   const lrow = d.querySelector(`#side .srow[data-list="${L}"]`);
   check(lrow && lrow.classList.contains('on') && lrow.querySelector('.sw') && /--p:\s*\d+%/.test(lrow.querySelector('.sprog')?.getAttribute('style') || '') && /done/.test(lrow.querySelector('.sprog')?.getAttribute('aria-label') || ''), 'list row: dot, on, the project\'s progress as a thin line (2.25.0, UX-07)');
   const team = d.querySelector('#side .sg-team');
-  check(team && /Bob/.test(team.textContent) && /ClaudeDev/.test(team.textContent) && team.querySelector('.hdot.hs-working') && team.querySelector('.hdot.hs-offline'), 'team: people + agents with status dots');
+  check(team && /Bob/.test(team.textContent) && /DevBot/.test(team.textContent) && team.querySelector('.hdot.hs-working') && team.querySelector('.hdot.hs-offline'), 'team: people + agents with status dots');
   check(d.querySelector('#top .hms') && /Beta/.test(d.querySelector('#top .hms').textContent), 'milestone in the header');
   check(d.querySelector('#top .cmdbar[data-act="palette"]') && !d.querySelector('#top .tnew[data-act="new-task"]') && d.querySelector('#view .qdock #qinput'), 'command bar; no second "New task" above the add bar (2.25.0, UX-32)');
   click(w, d.querySelector('#top .cmdbar')); await sleep(200);

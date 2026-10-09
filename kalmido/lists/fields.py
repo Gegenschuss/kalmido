@@ -10,7 +10,7 @@ from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..core.access import collab_all, Denied, list_people, list_role, need_list, need_project, vis_sql
-from ..core.pages import valid_url
+from ..core.pages import valid_link
 from ..lists.lists import COL_MAX, columns_out
 from ..tasks.validation import log_act
 from ..collab.comments import user_names
@@ -85,8 +85,8 @@ def field_value(c, f, v, lid):
         return str(v).strip()[:1000] or None
     if t == "url":
         s = str(v).strip()
-        if not valid_url(s):
-            raise BadInput(tr("The link must start with http:// or https://"))
+        if not valid_link(s):  # 2.35.0 (#186): file links too
+            raise BadInput(tr("The link must be a web address (https://…) or a file link (smb://…, file://…)"))
         return s
     if t == "number":
         try:

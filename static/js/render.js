@@ -275,7 +275,7 @@ function renderSide() {
   const convo = [teamOn() && (hasSharing() || S.team?.unread) ? `<button class="srow ${S.route.mod === 'team' ? 'on' : ''}" data-go="team">${ic('comment')}<span class="n">${tr('Team chat')}</span><span class="c ${S.team?.unread ? 'nunread' : ''}">${S.team?.unread ? `${S.team.unread}<span class="sr"> ${esc(tr('unread'))}</span>` : ''}</span></button>` : '',  // 2.17.0 (#419)
     collab() && (hasSharing() || S.news?.unread) ? `<button class="srow ${S.route.mod === 'news' ? 'on' : ''}" data-go="news" title="${esc(tr('Assignments, @mentions, comments and follow-ups for you'))}">${ic('bell')}<span class="n">${tr('News')}</span><span class="c ${bellCount() ? 'nunread' : ''}">${bellCount() || ''}</span></button>` : ''].join('');  // 2.28.0 (#987): the number = "For you"
   // Views: every switched-on module (the rail's old job)
-  const aw = (S.agents || []).reduce((n, x) => n + x.waiting + x.chat_unread, 0);
+  const aw = (S.agents || []).reduce((n, x) => n + x.waiting + x.chat_unread + (x.approvals_open || 0), 0);  // 2.35.0 (#1103): open approvals
   const views = [feat('cal') ? mrow('cal', 'cal', tr('Calendar')) : '',
     feat('timeline') ? `<button class="srow smod ${isRoadmap() ? 'on' : ''}" data-act="side-timeline">${ic('timeline')}<span class="n">${tr('Timeline')}</span></button>` : '',
     feat('matrix') ? mrow('matrix', 'grid', tr('Matrix')) : '', feat('habits') ? mrow('habits', 'habit', tr('Habits')) : '',
@@ -296,7 +296,7 @@ function renderSide() {
   const gcount = gid => [...S.tasks.values()].filter(t => t.status === 0 && !t.deleted_at && t.assignee_group_id === gid).length;
   const team = convo + [...grps.map(gr => `<button class="srow steam sgrp ${onTasks && k === 'grp:' + gr.id ? 'on' : ''}" data-go="grp/${gr.id}" title="${esc(tr('Tasks of the group {0}', gr.name))}">${ic('users')}<span class="n">${esc(gr.name)}</span><span class="sk">${tr('Group')}</span>${gcount(gr.id) ? `<span class="c">${gcount(gr.id)}</span>` : ''}</button>`),
     ...ppl.map(p => `<button class="srow steam ${onTasks && k === 'who:' + p.id ? 'on' : ''}" data-go="who/${p.id}" title="${esc(tr('Tasks of {0}', p.name))}"><span class="sdot"><i class="pdot"></i></span><span class="n">${esc(p.name)}</span></button>`),  // 2.24.0 (UX-08): no "Person" under every name
-    ...ags.map(a => `<button class="srow steam" data-act="team-agent" data-aid="${a.id}" title="${esc(agentHstLine(a))}"><span class="sdot">${hdot(agentHst(a))}</span><span class="n">${esc(a.name)}</span><span class="sk">${tr('Agent')}</span>${a.waiting || a.chat_unread ? `<span class="c nunread">${a.waiting + a.chat_unread}</span>` : ''}</button>`)].join('');
+    ...ags.map(a => `<button class="srow steam" data-act="team-agent" data-aid="${a.id}" title="${esc(agentHstLine(a))}"><span class="sdot">${hdot(agentHst(a))}</span><span class="n">${esc(a.name)}</span><span class="sk">${tr('Agent')}</span>${a.approvals_open ? `<span class="c apvc" title="${esc(apvCount(a.approvals_open))}">${ic('lock', 's')}${a.approvals_open}<span class="sr"> ${esc(apvCount(a.approvals_open))}</span></span>` : ''}${a.waiting || a.chat_unread ? `<span class="c nunread">${a.waiting + a.chat_unread}</span>` : ''}</button>`)].join('');
   // a group folded by default (Views) keeps its rows in the page, hidden: what they show (a running timer's dot, a count)
   // stays current and the keyboard / screen readers skip them until it is opened
   const grp = (g, label, body, acts = '', n = '', tip = '') => `<div class="sgroup sg-${g}">${head(g, label, acts, n, tip)}${sideOpen(g) ? body : SIDE_FOLDED.includes(g) ? `<div class="sgfold" hidden>${body}</div>` : ''}</div>`;
@@ -519,7 +519,7 @@ function topMoreItems() {
   if (m === 'tasks' && k.startsWith('f:')) sec.push({label: tr('Edit filter'), icon: 'edit', fn: () => filterModal(+k.slice(2))});
   const l = m === 'tasks' && (k.startsWith('l:') || k === 'inbox') ? (k === 'inbox' ? inbox() : listById(+k.slice(2))) : null;
   // 2.13.0 (#453 A7): phones switch the view with the segmented control under the title (vsegHtml), no longer here
-  if (S.route.mod === 'tasks' && sharedRoute()) sec.unshift({label: tr('Refresh'), icon: 'sync', fn: () => refreshNow()});  // 2.7.2 (#433): no header button any more
+  // 2.35.0 (#1105): no "Refresh" in the list menu any more - the app checks every 4 s and the offline hint calls refreshNow()
   // 2.31.0 (#1056): in a list two groups with a small heading each: View (incl. the folded header buttons) and List; then
   // archive / delete, set apart (listMenuSort)
   const li = l ? listMenuItems(l.id, () => $('#top [data-act="top-more"]') || $('#top h1')).filter(x => !(x.cls === 'mcols' && sec.some(y => y.cls === 'mcols'))) : [];
@@ -745,7 +745,7 @@ function taskRow(t, opts = {}) {
   if (t.content && !opts.compact) meta.push(`<span>${ic('edit', 's')}</span>`);
   if (t.attachments?.length) meta.push(`<span>${ic('clip', 's')}${t.attachments.length}</span>`);
   if (t.paperless?.length && plOn()) meta.push(`<span>${ic('archive', 's')}${t.paperless.length}</span>`);
-  if (t.url) meta.push(`<a class="lnk" href="${esc(t.url)}" target="_blank" rel="noopener noreferrer" title="${esc(t.url)}">${ic('link', 's')}${esc(urlHost(t.url))}</a>`);
+  if (t.url) meta.push(flkLink(t.url, 'lnk', `${ic(flkIs(t.url) ? 'folder' : 'link', 's')}${esc(urlHost(t.url))}`, true));  // 2.35.0 (#186): file links
   if (tFor(t) && t.id > 0) {
     const [ta, tm] = taskTime(t.id), live = S.timer && S.timer.task_id === t.id;
     if (ta >= 60 || live) {
@@ -878,7 +878,7 @@ function fieldChip(f, v, lid) {
   if (f.type === 'select') { const o = selOpt(f, v); return `<span class="fchip sel" style="${cssColor(o.color) ? '--fc:' + cssColor(o.color) : ''}" title="${tip}">${esc(o.name)}</span>`; }
   if (f.type === 'checkbox') return `<span class="fchip" title="${tip}">${ic('check', 's')}${esc(f.name)}</span>`;
   if (f.type === 'person') return (isTouch() ? av : avBtn)(+v, txt, 'who', `title="${tip}"`);
-  if (f.type === 'url') return `<a class="lnk" href="${esc(v)}" target="_blank" rel="noopener noreferrer" title="${tip}">${ic('link', 's')}${esc(txt)}</a>`;
+  if (f.type === 'url') return flkLink(v, 'lnk', `${ic(flkIs(v) ? 'folder' : 'link', 's')}${esc(txt)}`, true);
   if (f.type === 'date') return `<span class="fchip ${v < today() ? 'over' : ''}" title="${tip}">${ic('cal', 's')}${esc(txt)}</span>`;
   return `<span class="fchip" title="${tip}">${f.type === 'number' ? `<i>${esc(f.name)}</i> ` : ''}${esc(txt.length > 40 ? txt.slice(0, 39) + '…' : txt)}</span>`;
 }
@@ -886,7 +886,7 @@ function fieldCell(f, v, lid) {  // column view (desktop)
   if (v == null || v === '') return '';
   if (f.type === 'select') { const o = selOpt(f, v); return o ? `<span class="fchip sel" style="${cssColor(o.color) ? '--fc:' + cssColor(o.color) : ''}">${esc(o.name)}</span>` : ''; }
   if (f.type === 'checkbox') return v === '1' ? ic('check', 's') : '';
-  if (f.type === 'url') return `<a class="lnk" href="${esc(v)}" target="_blank" rel="noopener noreferrer" title="${esc(v)}">${esc(urlHost(v))}</a>`;
+  if (f.type === 'url') return flkLink(v, 'lnk', esc(urlHost(v)), true);
   return `<span title="${esc(fieldText(f, v, lid))}">${esc(fieldText(f, v, lid))}</span>`;
 }
 // ---- 2.14.0: the heron (empty states, welcome, offline, errors). A line drawing in the text colour; its sun (the dot) is

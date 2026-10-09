@@ -64,6 +64,14 @@ def apply_update(c, tid, b, conflicts=None):
                 continue
             if k == "tags":
                 cur = my_tags(c, tid)
+            elif k == "snippets" and k in row.keys():  # 2.35.0 (#1095): compared by their content (ids, language, path, line, code)
+                from ..tasks.snippets import snip_sig
+                cur, old, mine = snip_sig(row[k]), snip_sig(old), snip_sig(b[k])
+                if cur != old and cur != mine:
+                    if conflicts is not None:
+                        conflicts.append({"field": k, "server": None, "mine": None})
+                    del b[k]
+                continue
             elif k in ("fam", "rotation") and k in row.keys():  # 2.19.0 (#653): JSON objects, compared as such
                 js = lambda v: json.dumps(_jparse(v) or None, sort_keys=True)  # noqa: E731
                 cur, old, mine = js(row[k]), js(old), js(b[k])
@@ -184,6 +192,9 @@ def apply_update(c, tid, b, conflicts=None):
                 field_value(c, fl[int(k)], v, lid)
         except BadInput as e:
             return str(e)
+    if "snippets" in f:  # 2.35.0 (#1095): unchanged snippets keep their author and time
+        from ..tasks.snippets import snip_keep
+        f["snippets"] = snip_keep(f["snippets"], cur["snippets"])
     if f:
         # a changed date / reminder set re-arms the reminder
         if any(k in f for k in ("due", "due_time", "reminders", "assignee_id")):

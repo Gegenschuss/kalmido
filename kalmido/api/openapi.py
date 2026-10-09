@@ -147,7 +147,14 @@ def openapi_spec():
                    "the list): they see the task, also as participants, and get its reminders"},
         "approval": nul("string", enum=["pending", "approved", "changes", "rejected", None], description="2.23.0: the task waits for / "
                         "had an approval (POST /tasks/{id}/approval); null = no approval"),
-        "approver_id": nul("integer", description="2.23.0: who decides on the approval (a person of the list)")}
+        "approver_id": nul("integer", description="2.23.0: who decides on the approval (a person of the list)"),
+        # 2.35.0 (#1095): code snippets (plain code, no Markdown)
+        "snippets": {"type": "array", "maxItems": 20, "items": ref("Snippet"), "description": "2.35.0: code snippets of the task "
+                     "(code, logs, diffs; plain code with a language, no Markdown). Only in one task (GET /tasks/{id} and the answers of "
+                     "changes); lists carry only snippets_n. Writing sends the whole list (a snippet with its "
+                     "id stays that snippet; [] removes all); POST /tasks/{id}/snippets appends one. Task events carry at most 10, "
+                     "code cut to 4000 characters (truncated: true) and snippets_total; get_task has the full code"},
+        "snippets_n": {"type": "integer", "description": "2.35.0: the number of code snippets (also in lists)"}}
     task_in = {k: v for k, v in task_props.items() if k in V1_TASK_IN}
     task_in["priority"] = {"oneOf": [prio, {"type": "integer", "enum": list(PRIORITIES)}]}
     task_in["reminders"] = {"oneOf": [{"type": "array", "items": {"type": "integer"}}, {"type": "string"}]}
@@ -166,6 +173,14 @@ def openapi_spec():
                                                   "attachments": {"type": "array", "items": ref("Attachment")}}},
         "TaskCompleted": {"allOf": [ref("Task"), {"type": "object", "properties": {"next_due": nul("string", format="date", description="Recurring: the next date the task moved to")}}]},
         "TaskInput": {"type": "object", "additionalProperties": False, "properties": task_in},
+        "Snippet": {"type": "object", "required": ["code"], "properties": {  # 2.35.0 (#1095)
+            "id": {"type": "string", "description": "Set by the server (keep it when you send the list back)"},
+            "lang": {"type": "string", "maxLength": 20, "description": "Language (py, js, ts, sh, sql, diff, json, …); empty = recognised by the app"},
+            "path": nul("string", maxLength=300, description="Optional file path, e.g. src/app.py"),
+            "line": nul("integer", minimum=1, description="Optional line in that file"),
+            "code": {"type": "string", "maxLength": 20000, "description": "The code itself (plain text, kept as it is)"},
+            "by": nul("integer", description="Read only: who changed it last"), "updated_at": {"type": "string", "description": "Read only"},
+            "truncated": {"type": "boolean", "description": "Only in task events: the code is cut (get_task has all of it)"}}},
         "TaskCreate": {"allOf": [ref("TaskInput"), {"type": "object", "required": ["title"]}]},
         "TaskPage": page("Task"),
         "AuditEntry": {"type": "object", "properties": {
@@ -503,6 +518,13 @@ def openapi_spec():
                                           desc="On the follow-up day the person it is for gets a reminder + News, following agents the event followup_due."),
                                 "delete": op("Clear the waiting state", T, ok(ref("Task")) | errs("403", "404"), [pid()], scope="write")},
         "/tasks/{id}/reopen": {"post": op("Reopen a completed task", T, ok(ref("Task")) | errs("403", "404"), [pid()], scope="write")},
+        # 2.35.0 (#1095): append one code snippet (a diff, a log, a proposal) without sending the whole list
+        "/tasks/{id}/snippets": {"post": op("Add a code snippet to a task", T, ok({"type": "object", "properties": {"snippet": ref("Snippet"), "task": ref("Task")}},
+                                                                                  "Created", "201") | errs("400", "403", "404"), [pid()],
+                                            body={"type": "object", "additionalProperties": False, "required": ["code"], "properties": {
+                                                "code": {"type": "string", "maxLength": 20000}, "lang": {"type": "string", "maxLength": 20},
+                                                "path": nul("string", maxLength=300), "line": nul("integer", minimum=1)}},
+                                            scope="write", desc="At most 20 snippets per task, 20000 characters each. Plain code, no Markdown.")},
         # 2.18.0 (#430): a milestone's progress, tasks, burndown and release notes
         "/tasks/{id}/milestone": {"get": op("A milestone: progress, its tasks, burndown, release notes", T, ok(ref("MilestoneReport")) | errs("403", "404"),
                                             [pid()], desc="Only for milestone tasks (milestone: true), else 404. Progress counts closed "

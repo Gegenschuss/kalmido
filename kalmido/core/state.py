@@ -363,9 +363,11 @@ def search_tasks(c, uid, raw, limit):
     fids = sorted(search_field_ids(c, uid, raw))[:2000] if raw else []
     # participants: only their own tasks match (a context parent's notes / link / fields are not theirs to search)
     return load_tasks(c, f"list_id IN {vis_sql()} AND deleted_at IS NULL AND {tvis(c, uid, write=True)} "
-                         "AND (title LIKE ? OR content LIKE ? OR url LIKE ? "
+                         "AND (title LIKE ? OR content LIKE ? OR url LIKE ? OR (snippets != '' AND id IN (SELECT s.id FROM tasks s, "
+                         "json_each(CASE WHEN json_valid(s.snippets) THEN s.snippets ELSE '[]' END) j WHERE s.snippets != '' "
+                         "AND (json_extract(j.value, '$.code') LIKE ? OR json_extract(j.value, '$.path') LIKE ?))) "
                          f"OR id IN ({','.join('?' * len(fids)) or 'NULL'})) "
-                         "ORDER BY status, updated_at DESC LIMIT ?", (uid, uid, q, q, q, *fids, limit))
+                         "ORDER BY status, updated_at DESC LIMIT ?", (uid, uid, q, q, q, q, q, *fids, limit))
 
 
 @app.get("/api/tasks/<int:tid>")
@@ -373,7 +375,7 @@ def task_get(tid):
     """One task I can see (e.g. an old completed one opened from the News feed)."""
     c = db()
     need_task(c, tid, write=False)
-    rows = load_tasks(c, "id=? AND deleted_at IS NULL", (tid,))
+    rows = load_tasks(c, "id=? AND deleted_at IS NULL", (tid,), full_snips=True)  # 2.35.0 (#1095): with the code snippets
     if not rows:
         raise Denied(404)
     return jsonify(rows[0])

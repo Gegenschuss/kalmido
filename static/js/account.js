@@ -394,6 +394,7 @@ async function wsPaneDraw(md) {
     ${o.members.map(m => `<div class="mrow ${m.disabled ? 'off' : ''}">${av(m.id, m.name)}<span class="n">${esc(m.name)}${m.agent ? ' ' + agentBadge() : ''}${m.id === S.me?.id ? ' ' + tr('(me)') : ''}</span>${o.role === 'admin' && j.manage && !m.agent ? `<select data-wsrole="${m.id}" aria-label="${esc(tr('Role of {0}', m.name))}"><option value="member" ${m.role !== 'admin' ? 'selected' : ''}>${tr('Member')}</option><option value="admin" ${m.role === 'admin' ? 'selected' : ''}>${tr('Admin')}</option></select><button class="iconbtn" data-wsrm="${m.id}" title="${esc(m.id === S.me?.id ? tr('Leave the organisation') : tr('Remove from the organisation'))}" aria-label="${esc(m.id === S.me?.id ? tr('Leave the organisation') : tr('Remove {0} from the organisation', m.name))}">${ic('x', 's')}</button>` : `<span class="muted">${m.agent ? tr('Agent') : m.role === 'admin' ? tr('Admin') : tr('Member')}</span>`}</div>`).join('')}
     ${o.role === 'admin' && j.manage ? `<div class="row wsadd"><input id="ws-add-${o.id}" type="email" placeholder="${esc(tr('Add by e-mail address'))}" aria-label="${esc(tr('Add by e-mail address'))}" autocomplete="off"><button class="btn sm" data-wsadd="${o.id}">${ic('plus', 's')} ${tr('Add')}</button></div>
     <div class="row"><label for="ws-name-${o.id}">${tr('Name')}</label><input id="ws-name-${o.id}" value="${esc(o.name)}" maxlength="60"><label for="ws-dom-${o.id}">${tr('E-mail domains')}</label><input id="ws-dom-${o.id}" value="${esc(o.domains || '')}" placeholder="example.com"><button class="btn sm" data-wssave="${o.id}">${tr('Save')}</button></div>` : ''}
+    ${o.role === 'admin' ? `<div class="row"><button type="button" class="btn sm" data-oadm="${o.id}">${ic('list', 's')} ${tr('Lists of the organisation')}</button></div>` : ''}
     ${o.role !== 'admin' || !j.manage ? `<div class="row"><button class="btn sm" data-wsrm="${S.me?.id}" data-oidx="${o.id}">${ic('logout', 's')} ${tr('Leave the organisation')}</button></div>` : ''}</details>`;
   box.innerHTML = (j.orgs.length ? j.orgs.map(org).join('') : `<div class="muted mhint">${tr('You belong to no organisation: everything is private.')}</div>`)
     + (mm ? `<div class="shint keep">${ic('alert', 's')} ${esc(trn('{0} list of yours has an agent of another workspace (from before the workspaces). Open the list’s Share dialog to take it out or keep it.', '{0} lists of yours have an agent of another workspace (from before the workspaces). Open the lists’ Share dialogs to take it out or keep it.', mm))}</div>` : '');
@@ -406,6 +407,8 @@ function wsPaneWire(md) {
     wsPaneDraw(md);
   });
   md.addEventListener('click', async e => {
+    const oa = e.target.closest('[data-oadm]');
+    if (oa) { const o = (($('#s-ws', md)._j || {}).orgs || []).find(x => x.id === +oa.dataset.oadm); oadmOpen(+oa.dataset.oadm, o?.name || ''); return; }  // 2.35.0 (#1101)
     const b = e.target.closest('[data-wsadd],[data-wsrm],[data-wssave]'); if (!b) return;
     const oid = +(b.dataset.oidx || b.closest('[data-oid]')?.dataset.oid || 0);
     try {
@@ -419,6 +422,64 @@ function wsPaneWire(md) {
       await load(); render();
     } catch { /* api() showed it */ }
     wsPaneDraw(md);
+  });
+}
+// ---- 2.35.0 (#1101): an organisation admin's "Lists of the organisation": the lists that belong to the organisation (never
+// private lists, private sharing or inboxes) with owner, numbers and the last change - never their contents. Archive / restore,
+// hand over to another person of the organisation, delete for good from the archive (the name typed to confirm); a history.
+const OADM_ACT = {archive: N_('{0} archived {1}'), restore: N_('{0} restored {1}'), delete: N_('{0} deleted {1} for good'), owner: N_('{0} handed {1} to {2}')};
+function oadmRow(x) {
+  const sub = [x.owner_agent ? tr('Owner: {0} (agent)', x.owner_name) : tr('Owner: {0}', x.owner_name), tr('{0} open', x.open) + ' / ' + trn('{0} task', '{0} tasks', x.tasks),
+    trn('{0} member', '{0} members', x.members), tr('changed {0}', fmtDateLoc(String(x.changed_at || '').slice(0, 10)) || '–')];
+  return `<div class="mrow oadmrow ${x.archived ? 'off' : ''}" data-olid="${x.id}"><span class="n"><b>${esc(x.name)}</b>${x.archived ? ` <span class="muted">${esc(tr('archived'))}</span>` : ''}<small class="muted">${esc(sub.join(' · '))}</small></span>
+    <span class="oadmb">${x.archived ? `<button type="button" class="btn sm" data-oa="restore">${tr('Restore')}</button><button type="button" class="btn sm danger" data-oa="delete">${tr('Delete…')}</button>`
+      : `<button type="button" class="btn sm" data-oa="archive">${tr('Archive')}</button>`}<button type="button" class="btn sm" data-oa="owner">${tr('Hand over…')}</button></span></div>`;
+}
+function oadmDraw(md, j) {
+  md._j = j;
+  const live = j.lists.filter(x => !x.archived), arch = j.lists.filter(x => x.archived);
+  $('#oadm-body', md).innerHTML = (j.lists.length ? `${live.map(oadmRow).join('')}${arch.length ? `<h4 class="oadmh">${esc(tr('Archive'))}</h4>${arch.map(oadmRow).join('')}` : ''}`
+    : `<div class="muted mhint">${tr('The organisation has no lists yet.')}</div>`)
+    + (j.log.length ? `<details class="sdet oadmlog"><summary>${tr('History')} <span class="muted">${j.log.length}</span></summary>${j.log.filter(r => OADM_ACT[r.action]).map(r => `<div class="mrow"><span class="n">${tr(OADM_ACT[r.action], `<b>${esc(r.by || '?')}</b>`, `<b>${esc(r.list_name)}</b>`, `<b>${esc(r.to || '')}</b>`)}<small class="muted">${esc(fmtWhen(r.at))}${r.owner && r.action !== 'owner' ? ' · ' + esc(tr('Owner: {0}', r.owner)) : ''}</small></span></div>`).join('')}</details>` : '');
+}
+async function oadmOpen(oid, name) {
+  const md = modal(`<h3>${esc(tr('Lists of the organisation {0}', name))}</h3>
+    <div class="shint keep">${tr('Only the lists that belong to the organisation, with names and numbers: their contents stay with their people. Private lists and private sharing stay invisible.')}</div>
+    <div class="members oadm" id="oadm-body"><div class="muted mhint">${tr('Loading…')}</div></div>
+    <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Close')}</button></div>`);
+  md.classList.add('oadmmd');
+  try { oadmDraw(md, await api('GET', `/api/orgs/${oid}/lists`)); } catch { $('#oadm-body', md).innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; }
+  md.addEventListener('click', async e => {
+    if (e.target.closest('[data-m="close"]')) { md.remove(); return; }
+    const b = e.target.closest('[data-oa]'); if (!b) return;
+    const x = (md._j?.lists || []).find(l => l.id === +b.closest('[data-olid]').dataset.olid); if (!x) return;
+    const k = b.dataset.oa, base = `/api/orgs/${oid}/lists/${x.id}`;
+    try {
+      let j = null;
+      if (k === 'archive') {
+        if (!await askConfirm(tr('Archive “{0}”?', x.name), tr('The list leaves the sidebar of everyone in it; nothing is deleted. {0} and the members are told. You or the owner can restore it.', x.owner_name), {ok: tr('Archive')})) return;
+        j = await api('POST', base + '/archive', {archived: true}); toast(tr('Archived'));
+      } else if (k === 'restore') { j = await api('POST', base + '/archive', {archived: false}); toast(tr('Restored')); }
+      else if (k === 'delete') {
+        const v = await askDialog({title: tr('Delete “{0}” permanently?', x.name), danger: true, ok: tr('Delete permanently'),
+          html: `<p>${esc(tr('This cannot be undone. Its tasks go to the trash in the inbox of {0} and can be restored from there; its files and the sharing are lost. {0} and the members are told.', x.owner_name))}</p><p>${esc(tr('Type the name of the list to delete it for good'))}</p>`,
+          input: {placeholder: x.name, max: 200}});
+        if (v === null) return;
+        if (v.trim() !== x.name.trim()) { toast(tr('The name does not match: nothing was deleted')); return; }
+        j = await api('DELETE', base, {confirm: v.trim()}); toast(tr('Deleted'));
+      } else if (k === 'owner') {
+        const ps = (md._j.people || []).filter(p => p.id !== x.owner_id);
+        if (!ps.length) { toast(tr('Nobody else in the organisation to hand it to')); return; }
+        const sel = `<label for="oadm-to">${esc(tr('New owner'))}</label><select id="oadm-to">${ps.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select>`;
+        let to = 0;
+        const okd = askDialog({title: tr('Hand “{0}” over', x.name), ok: tr('Hand over'), html: `<p>${esc(tr('{0} stays in the list as its admin. The new owner manages its sharing from now on.', x.owner_name))}</p><div class="row">${sel}</div>`});
+        setTimeout(() => { const s0 = $('#oadm-to'); if (s0) { to = +s0.value; s0.addEventListener('change', () => { to = +s0.value; }); } }, 0);
+        if (!await okd) return;
+        j = await api('POST', base + '/owner', {user_id: to}); toast(tr('Handed over'));
+      }
+      if (j) oadmDraw(md, j);
+      await load(); render();
+    } catch { /* api() showed it */ }
   });
 }
 function accountWire(md) {

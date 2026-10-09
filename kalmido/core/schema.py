@@ -661,6 +661,14 @@ CREATE TABLE IF NOT EXISTS org_members (
   org_id INTEGER NOT NULL REFERENCES orgs(id) ON DELETE CASCADE, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   PRIMARY KEY (org_id, user_id));
 CREATE INDEX IF NOT EXISTS org_members_user ON org_members(user_id);
+-- 2.35.0 (#1101): what organisation admins did with the lists of their organisation (archive / restore / delete / hand over):
+-- the history in Settings > Workspaces > Lists of the organisation. list_id without a reference: the row outlives the list
+CREATE TABLE IF NOT EXISTS org_list_log (
+  id INTEGER PRIMARY KEY, org_id INTEGER NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+  list_id INTEGER, list_name TEXT NOT NULL DEFAULT '',
+  action TEXT NOT NULL,                         -- archive | restore | delete | owner
+  by_id INTEGER, owner_id INTEGER, to_id INTEGER, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS org_list_log_org ON org_list_log(org_id, id);
 CREATE TABLE IF NOT EXISTS kk_conns (
   user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, url TEXT NOT NULL, token TEXT NOT NULL DEFAULT '',
   list_id INTEGER, source TEXT NOT NULL DEFAULT '', archive INTEGER NOT NULL DEFAULT 1, synced_at TEXT, error TEXT NOT NULL DEFAULT '',
@@ -942,6 +950,8 @@ MIGRATIONS = [
     ("lists", "stale_days", "ALTER TABLE lists ADD COLUMN stale_days INTEGER"),
     ("lists", "agent_followup", "ALTER TABLE lists ADD COLUMN agent_followup INTEGER NOT NULL DEFAULT 0"),
     ("agents", "stale_sent", "ALTER TABLE agents ADD COLUMN stale_sent TEXT NOT NULL DEFAULT ''"),
+    # 2.35.0 (#1095): the code snippets of a task (JSON list, '' = none; tasks/snippets.py). New column only
+    ("tasks", "snippets", "ALTER TABLE tasks ADD COLUMN snippets TEXT NOT NULL DEFAULT ''"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

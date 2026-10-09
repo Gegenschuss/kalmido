@@ -135,6 +135,18 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File agent_launcher.ps1 -e $HOME\.confi
 
 A scheduled task (Windows) and a launchd plist (macOS): [docs/AGENTS.md](../docs/AGENTS.md#set-up-an-agent).
 
+**Event mode (2.35.0):** with `--events` both launchers start [`agent_run.py`](agent_run.py) in front of the command: it
+waits for the agent's events and runs the command once per event, headless with stream-json, and sends steps, model,
+permission mode, typing / status, the plan usage ring, the reply reference and approval cards like a hosted chat service;
+the final text of a chat run is posted as the answer. The command then has no `-p`:
+
+```sh
+./agent_launcher.sh -e /path/to/kalmido-agent.env --events -- claude --mcp-config ~/.kalmido-mcp.json
+```
+
+What a launcher has to do is listed in [`launcher_capabilities.json`](launcher_capabilities.json); a test fails when the
+`.sh` or the `.ps1` lacks one.
+
 ## Claude Code usage hook
 
 [`claude_usage_hook.py`](claude_usage_hook.py) (2.1.1) reports a Claude Code session's token usage to Kalmido after every turn,
@@ -166,4 +178,6 @@ python3 tests/mcp_test.py   # stub API server, stdio + HTTP; no Docker needed
 python3 tests/parity_test.py   # app routes -> API routes -> MCP tools (no Docker)
 python3 tests/usage_hook_test.py   # the usage hook against a stub API with a sample transcript
 python3 tests/launcher_ps1_test.py # agent_launcher.ps1 against a stub API (needs pwsh; skipped without it)
+python3 tests/launcher_parity_test.py   # both launchers carry every capability; agent_run.py without a server
+python3 tests/agent_docs_coverage_test.py   # every agent event, agent endpoint and MCP tool is documented
 ```

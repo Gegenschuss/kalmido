@@ -40,6 +40,10 @@ jobs:
         run: |
           python tests/mcp_test.py
           python tests/usage_hook_test.py
+      - name: New agents (launcher parity, agent docs coverage)
+        run: |
+          python tests/launcher_parity_test.py
+          python tests/agent_docs_coverage_test.py
       - name: Install scanners
         run: pip install bandit pip-audit
       - name: bandit (fails on high severity only)

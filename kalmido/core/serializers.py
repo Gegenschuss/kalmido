@@ -10,7 +10,7 @@ from ..core.access import plists, PROJ_SQL, pvis
 
 # ---------------------------------------------------------------- serializers
 
-def task_dict(r, tags):
+def task_dict(r, tags, full_snips=False):
     from ..family.family import fam_task_out
     d = dict(r)
     d.pop("reminded", None)
@@ -24,6 +24,13 @@ def task_dict(r, tags):
         d.pop("approval", None)
         d.pop("approver_id", None)
     fam_task_out(d)  # 2.19.0 (#653): fam / rotation as objects, only when set
+    if "snippets" in d:  # 2.35.0 (#1095): lists / state only the number (snippets_n, when > 0); the snippets themselves
+        from ..tasks.snippets import snip_out  # with full_snips (one task: GET /api/tasks/<id>, the answer of a change, API)
+        sn = snip_out(d.pop("snippets"))
+        if full_snips:
+            d["snippets"] = sn
+        if sn or full_snips:
+            d["snippets_n"] = len(sn)
     d["tags"] = tags.get(r["id"], [])
     return d
 
@@ -37,7 +44,7 @@ def tags_for(c, ids=None, uid=None):
     return out
 
 
-def load_tasks(c, where, args=()):
+def load_tasks(c, where, args=(), full_snips=False):
     from ..integrations.paperless import pl_usable_ids
     from ..personal.timetrack import vis_ids
     from ..collab.reactions import ltags_for
@@ -115,7 +122,7 @@ def load_tasks(c, where, args=()):
     ppl = people_of(c, ids)  # 2.19.0 (#653): who comes along
     out = []
     for r in rows:
-        d = task_dict(r, tags)
+        d = task_dict(r, tags, full_snips)
         d["ltags"] = ltags.get(r["id"], [])
         if r["id"] in gcode and r["id"] not in ctx:
             d["code"] = gcode[r["id"]]
@@ -133,6 +140,8 @@ def load_tasks(c, where, args=()):
         if r["id"] in ctx:
             d.update(content="", url=None, attachments=[], paperless=[], comment_count=0, unread=0, fields={},
                      blockers=[], blocked=0, blocking=0, context=True)
+            d.pop("snippets", None)  # 2.35.0 (#1095)
+            d.pop("snippets_n", None)
         out.append(d)
     return out
 

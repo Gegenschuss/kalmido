@@ -78,7 +78,7 @@ const TABLET = {'(min-width:600px) and (min-height:600px)': true};
   check(!d.querySelector('#detail #d-hist') || more.contains(d.querySelector('#detail #d-hist')), '2.0.7: the folded history of a private list is under "More details"');
   check(d.querySelector('#detail > .dbot > .dcomp #c-input') && d.querySelector('#detail > .dbot > .dfoot') && !d.querySelector('#detail .dbody #c-input'), 'the comment box sits with the footer at the bottom edge (outside the scrolling content)');
   check(/Outline/.test(d.querySelector('#detail .subsec')?.textContent || ''), 'subtasks right below the description');
-  check(w.eval('JSON.stringify(DETAIL_ORDER)') === JSON.stringify(['family', 'life', 'subtasks', 'deps', 'links', 'tags', 'attachments', 'paperless', 'fields', 'custom', 'time', 'code', 'history', 'comments']), 'the order lives in one list (DETAIL_ORDER; 2.2.0: code, 2.19.0: family first, 2.21.0: links, 2.22.0: life)');
+  check(w.eval('JSON.stringify(DETAIL_ORDER)') === JSON.stringify(['family', 'life', 'subtasks', 'deps', 'links', 'tags', 'attachments', 'paperless', 'fields', 'custom', 'time', 'snippets', 'code', 'history', 'comments']), 'the order lives in one list (DETAIL_ORDER; 2.2.0: code, 2.19.0: family first, 2.21.0: links, 2.22.0: life, 2.35.0: snippets)');
   check(/\.dbot\{position:sticky;bottom:0/.test(css0), 'CSS: the box + footer are sticky at the bottom edge');
   w.close();
 

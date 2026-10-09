@@ -90,11 +90,11 @@ const clip = w => { w.__clip = []; Object.defineProperty(w.navigator, 'clipboard
   check([...d.querySelectorAll('#d-tl .cm')].some(c => /Second while you type/.test(c.textContent)) && d.querySelector('#c-input').value === 'typing…', 'new comment appears while typing, draft kept');
   ta.blur(); w.eval('closeDetail?.()'); await sleep(300);
 
-  // ---- refresh (shared list only): 2.7.2 (#432) no header button any more, "…" > Refresh everywhere
+  // ---- refresh: 2.7.2 (#432) no header button; 2.35.0 (#1105) no "…" > Refresh either - refreshNow() stays for the offline hint
   w.eval(`go('l/${SH}')`); await sleep(400);
-  check(!d.querySelector('#top [data-act="refresh"]') && w.eval('topMoreItems()').some(x => x.label === 'Refresh'), 'shared list: Refresh in "…", no header button');
+  check(!d.querySelector('#top [data-act="refresh"]') && !w.eval('topMoreItems()').some(x => x.label === 'Refresh'), 'shared list: no Refresh in "…", no header button');
   await call('bob', 'POST', '/api/tasks', {title: 'Added by Bob', list_id: SH});
-  w.eval(`topMoreItems().find(x => x.label === 'Refresh').fn()`); await sleep(900);
+  w.eval(`refreshNow()`); await sleep(900);
   check(/Added by Bob/.test(d.querySelector('#view').textContent) && /Up to date/.test(d.querySelector('#toast').textContent), 'refresh loads Bob\'s task + "Up to date"');
   w.eval(`go('l/${PRIV}')`); await sleep(400);
   check(!w.eval('topMoreItems()').some(x => x.label === 'Refresh'), 'no Refresh on a private list');
@@ -136,7 +136,7 @@ const clip = w => { w.__clip = []; Object.defineProperty(w.navigator, 'clipboard
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
   // touch: "…" > Refresh on a shared list
   w.eval(`go('l/${SH}')`); await sleep(300);
-  check(w.eval('topMoreItems()').some(x => x.label === 'Refresh') && !d.querySelector('#top [data-act="refresh"]'), 'phone: Refresh in the "…" menu, no header button');
+  check(!w.eval('topMoreItems()').some(x => x.label === 'Refresh') && !d.querySelector('#top [data-act="refresh"]'), 'phone: no Refresh in the "…" menu (#1105), no header button');
   w.close();
 
   // ---- News inbox

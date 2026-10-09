@@ -127,7 +127,7 @@ function viewOverview() {
   // 2.32.0 (#1063): built from blocks (Customize): the totals, the projects, the explanation
   const P = {tiles: `<div class="sttiles">${tiles.map(([v, l, s]) => `<div class="${v ? 'hot' : ''}"><b>${v}</b><span>${esc(l)}</span><small>${esc(s)}</small></div>`).join('')}</div>`};
   let h = `<div class="stats ovw"><div class="nbar"><div class="seg"><button class="${S.ov.only ? '' : 'on'}" data-act="ov-only" data-k="">${tr('All lists')}</button><button class="${S.ov.only ? 'on' : ''}" data-act="ov-only" data-k="1">${tr('Needs attention')}</button></div><span class="spacer"></span>${S.ly.view === 'projects' ? '' : lyCustomBtn('projects')}</div>`;
-  if (S.ly.view === 'projects') return h + lyHtml('projects', {}) + '</div>';
+  if (S.ly.view === 'projects') return h + lyHtml('projects', P) + '</div>';  // 2.35.0 (#1097): the totals as they are
   if (!shown.length) return h + lyHtml('projects', P) + `<div class="empty">${ic('done')}${tr('Nothing stuck. No overdue or blocked tasks.')}</div></div>`;
   P.projects = '';
   for (const r of shown) {
@@ -183,9 +183,10 @@ async function povLoad(lid, force) {
   finally { d.busy = false; }
   if (routeList()?.id === lid && isOverview()) viewSafeRender();
 }
-const povHost = u => { try { return new URL(u).host.replace(/^www\./, ''); } catch { return ''; } };
+const povHost = u => { if (flkIs(u)) return flkLabel(u); try { return new URL(u).host.replace(/^www\./, ''); } catch { return ''; } };
 // an icon from the address alone (nothing is fetched from the linked site)
 function povLinkIcon(u) {
+  if (flkIs(u)) return /\.pdf$/i.test(u) ? 'pdf' : 'folder';  // 2.35.0 (#186): a file on a network drive
   const h = povHost(u);
   if (/(^|\.)(github\.com|gitlab\.com|codeberg\.org|bitbucket\.org)$|gitea|forgejo/.test(h)) return 'git';
   if (/figma\.com$|miro\.com$|canva\.com$|sketch\.com$/.test(h)) return 'palette';
@@ -256,7 +257,7 @@ function viewProjOv() {
       ${can && !isTouch() ? `<div class="muted povdz">${ic('upload', 's')} ${tr('Or drop files here')}</div>` : ''}
       ${tf ? `<details class="povtf" ${LS.get('povTf', true) ? 'open' : ''}><summary>${tr('Attachments from tasks')} <span class="muted">${j.task_files.length + (feat('paperless') ? j.task_paperless.length : 0)}</span></summary><div class="povfl">${tf}</div></details>` : ''}`, fAdd + x, emp(fEmpty, tr('No project files yet: contracts, briefings, plans.')));
   // side: key links, members, time
-  const links = j.links.map((x, i) => `<div class="povl"><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" title="${esc(x.url)}">${ic(povLinkIcon(x.url), 's')}<span class="pln">${esc(x.title)}</span><span class="muted plh">${esc(povHost(x.url))}</span></a>
+  const links = j.links.map((x, i) => `<div class="povl">${flkLink(x.url, 'povla', `${ic(povLinkIcon(x.url), 's')}<span class="pln">${esc(x.title)}</span><span class="muted plh">${esc(povHost(x.url))}</span>`)}
       ${can ? `<span class="povlb">${i ? `<button class="iconbtn" data-pov="link-up" data-id="${x.id}" title="${esc(tr('Move up'))}" aria-label="${esc(tr('Move up'))}">${ic('chev', 's up')}</button>` : ''}<button class="iconbtn" data-pov="link-edit" data-id="${x.id}" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit'))}">${ic('edit', 's')}</button></span>` : ''}</div>`).join('');
   P.links = x => povSec('links', tr('Key links'), links, (can ? `<button class="btn sm" data-pov="link-add">${ic('plus', 's')}<span>${tr('Add link')}</span></button>` : '') + x, emp(!links, tr('Repository, designs, documents: the addresses everyone needs.')));
   if (collab() && j.members.length) {
@@ -283,7 +284,7 @@ async function povApi(method, url, body) {
 }
 function povLinkModal(l, x) {
   const md = modal(`<h3>${x ? tr('Edit link') : tr('Add link')}</h3>
-    <div class="row"><label for="pl-url">${tr('Address')}</label><input id="pl-url" type="url" inputmode="url" placeholder="https://…" value="${esc(x?.url || '')}" maxlength="2000"></div>
+    <div class="row"><label for="pl-url">${tr('Address')}</label><input id="pl-url" type="url" inputmode="url" placeholder="${esc(tr('https://… or smb://…'))}" value="${esc(x?.url || '')}" maxlength="2000"></div>
     <div class="row"><label for="pl-ttl">${tr('Title')}</label><input id="pl-ttl" maxlength="120" placeholder="${esc(tr('e.g. Repository, Designs'))}" value="${esc(x?.title || '')}"></div>
     <div class="foot">${x ? `<button class="btn danger" data-m="del">${tr('Remove')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   md.classList.add('povmodal');
@@ -460,7 +461,7 @@ function fieldEditor(f, t, ro) {
     case 'date': c = dateIn(id, v, {attrs: `data-cf="${f.id}"`, ro, label: f.name, empty: '–'}); break;
     case 'checkbox': c = `<span><input id="${id}" type="checkbox" data-cf="${f.id}" ${v === '1' ? 'checked' : ''} ${dis}></span>`; break;
     case 'person': c = `<select id="${id}" data-cf="${f.id}" ${dis}><option value="">–</option>${listPeople(listById(t.list_id)).map(p => `<option value="${p.user_id}" ${String(p.user_id) === v ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>`; break;
-    case 'url': c = `<span class="cfurl"><input id="${id}" type="url" inputmode="url" data-cf="${f.id}" value="${esc(v)}" placeholder="https://…" ${ro ? 'readonly' : ''}>${v ? `<a class="iconbtn" href="${esc(v)}" target="_blank" rel="noopener noreferrer" title="${esc(v)}">${ic('link', 's')}</a>` : ''}</span>`; break;
+    case 'url': c = `<span class="cfurl"><input id="${id}" type="url" inputmode="url" data-cf="${f.id}" value="${esc(v)}" placeholder="https://…" ${ro ? 'readonly' : ''}>${v ? flkLink(v, 'iconbtn', ic(flkIs(v) ? 'folder' : 'link', 's'), true) : ''}</span>`; break;
     default: c = `<input id="${id}" data-cf="${f.id}" value="${esc(v)}" maxlength="1000" ${ro ? 'readonly' : ''} placeholder="–">`;
   }
   return `<label for="${id}" title="${esc(ftLabel(f.type))}">${esc(f.name)}</label>${c}`;

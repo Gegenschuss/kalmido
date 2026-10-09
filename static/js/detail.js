@@ -208,14 +208,14 @@ try {
 function taskById(id) { return S.tasks.get(id) || (S.extra || []).find(t => t.id === id); }
 // 2.0.6 (#316 / #322): the task panel below the title and the description, top to bottom; the comments and
 // the history come last, the comment box stays at the bottom edge of the panel (sticky, see cmComposer())
-const DETAIL_ORDER = ['family', 'life', 'subtasks', 'deps', 'links', 'tags', 'attachments', 'paperless', 'fields', 'custom', 'time', 'code', 'history', 'comments'];
+const DETAIL_ORDER = ['family', 'life', 'subtasks', 'deps', 'links', 'tags', 'attachments', 'paperless', 'fields', 'custom', 'time', 'snippets', 'code', 'history', 'comments'];  // snippets: 2.35.0 (#1095)
 // 2.24.0 (UX-41): what a task needs first comes first: description, subtasks, comments (the assignee sits in the header).
 // The rest folds into "More details" (open state per device); a section that holds something worth seeing at once
 // (files, a waiting-on, events / contacts) stays outside the fold.
 // 2.27.0 (#957, back to #322): the comments come LAST again, below "More details" (the box stays at the bottom edge); the fold
 // says in its summary line what it holds, so nothing is overlooked
 const DETAIL_TOP = ['family', 'life', 'subtasks'];
-const DETAIL_MORE = ['deps', 'links', 'attachments', 'tags', 'paperless', 'fields', 'custom', 'time', 'code', 'history'];  // code: 2.2.0 (#271)  // history: private lists only (2.0.7)
+const DETAIL_MORE = ['deps', 'links', 'attachments', 'tags', 'paperless', 'fields', 'custom', 'time', 'snippets', 'code', 'history'];  // code: 2.2.0 (#271)  // history: private lists only (2.0.7)
 // 2.27.0 (#957): the summary line of the folded "More details": what is set inside it ("3 tags · Link · 2 fields")
 function moreSummary(t, ks) {
   const out = [], has = k => ks.includes(k);
@@ -225,6 +225,7 @@ function moreSummary(t, ks) {
   const nf = has('custom') ? fieldsOf(t.list_id).filter(f => { const v = (t.fields || {})[f.id]; return v !== undefined && v !== null && v !== ''; }).length : 0;
   if (nf) out.push(trn('{0} field', '{0} fields', nf));
   if (has('paperless') && (t.paperless || []).length) out.push(trn('{0} document', '{0} documents', t.paperless.length));
+  if (has('snippets') && snipCount(t)) out.push(trn('{0} code snippet', '{0} code snippets', snipCount(t)));  // 2.35.0 (#1095)
   return out.join(' · ');
 }
 // 2.7.2 (#424): where a task lives, at the top of its panel: Folder › List › Section › (parent task). Every part jumps
@@ -433,6 +434,7 @@ function renderDetail0() {
     custom: ck ? '' : `${fieldsOf(t.list_id).length ? `<div class="dsec cfsec"><h5>${tr('Fields')}</h5><div class="fields cf">${fieldsOf(t.list_id).map(f => fieldEditor(f, t, ro)).join('')}</div></div>` : ''}`,
     time: ck ? '' : `${tFor(t) && t.id > 0 && !t.context ? `<div class="dsec tesec" id="d-time">${taskTimeHtml(t)}</div>` : ''}`,
     code: ck ? '' : codeHtml(t),
+    snippets: ck ? '' : snipHtml(t, ro),  // 2.35.0 (#1095): code snippets
     family: ck ? '' : famDetailHtml(t, l, ro),  // 2.19.0 (#653)
     life: ck ? '' : lifeDetailHtml(t, l, ro),  // 2.22.0 (#663)
     links: ck ? '' : linksDetailHtml(t, ro)};  // 2.21.0 (#659 / #658): events + contacts of the task
@@ -459,13 +461,14 @@ function renderDetail0() {
       ${t.waiting_at && !ck ? waitBar(t, ro) : ''}
       ${ck ? '' : approvalBar(t, ro)}
       ${ck || ro ? '' : dupHintHtml(t)}
-      <div class="md ${mdMode ? '' : 'hidden'} ${mdClamp ? 'clamp' : ''}" id="d-md" title="${tr('Click to edit')}">${mdMode ? mdMentions(renderMd(t.content, false, {lid: t.list_id}), t) : ''}</div>
+      <div class="md ${mdMode ? '' : 'hidden'} ${mdClamp ? 'clamp' : ''}" id="d-md" title="${tr('Click to edit')}">${mdMode ? mdMentions(mdTaskRefs(renderMd(t.content, false, {lid: t.list_id}), true), t) : ''}</div>
       ${mdLong ? `<button class="linkbtn mdmore" data-act="md-more" aria-expanded="${!mdClamp}">${mdClamp ? tr('Show more') : tr('Show less')}</button>` : ''}
       ${mdOpen && mdMode ? `<button class="btn sm mdsub" data-act="md-subtasks">${ic('sub', 's')} ${tr('Turn the open checklist items into subtasks')}</button>` : ''}
       <textarea id="d-content" class="dcontent ${mdMode ? 'hidden' : ''}" placeholder="${ck ? tr('Note') : tr('Description')}" aria-label="${ck ? tr('Note') : tr('Description')}" ${ro ? 'readonly' : ''}>${esc(t.content)}</textarea>
       ${msT && t.id > 0 ? `<div class="dsec mssec" id="d-ms">${msReportHtml(t)}</div>` : ''}
       ${(() => {  // 2.24.0 (UX-41)
-        const keep = k => (k === 'attachments' && (t.attachments || []).length) || (k === 'deps' && (t.waiting_at || (t.blockers || []).length)) || (k === 'links' && (((S.tcontacts || {})[t.id] || []).length || ((S.evlinks || {})[t.id] || []).length));
+        const keep = k => (k === 'snippets' && (snipCount(t) || S.snip?.tid === t.id || listById(t.list_id)?.ptype === 'software'))  // 2.35.0 (#1095)
+          || (k === 'attachments' && (t.attachments || []).length) || (k === 'deps' && (t.waiting_at || (t.blockers || []).length)) || (k === 'links' && (((S.tcontacts || {})[t.id] || []).length || ((S.evlinks || {})[t.id] || []).length));
         const top = DETAIL_TOP.map(k => SEC[k]).concat(DETAIL_MORE.filter(keep).map(k => SEC[k]));
         const rest = DETAIL_MORE.filter(k => !keep(k)).map(k => SEC[k]).filter(x => x && x.trim());
         const sum = moreSummary(t, DETAIL_MORE.filter(k => !keep(k)));
@@ -498,14 +501,14 @@ async function mdToSubtasks() {
   offerUndo(trn('{0} subtask added', '{0} subtasks added', items.length), HIST.undo[HIST.undo.length - 1]);
 }
 function linkField(t, ro) {
-  if (t.url && !S.editLink) return `<div class="linkf"><a class="linkchip" href="${esc(t.url)}" target="_blank" rel="noopener noreferrer" title="${esc(t.url)}">${ic('link', 's')}<span>${esc(urlHost(t.url))}</span></a>${ro ? '' : `<button class="iconbtn" data-act="link-edit" title="${tr('Edit link')}">${ic('edit', 's')}</button><button class="iconbtn" data-act="link-rm" title="${tr('Remove website link')}">${ic('x', 's')}</button>`}</div>`;
-  return ro ? '<span class="muted">–</span>' : `<input id="d-url" type="url" inputmode="url" autocomplete="off" placeholder="https://…" aria-label="${esc(tr('Link'))}" value="${esc(t.url || '')}" enterkeyhint="done">`;
+  if (t.url && !S.editLink) return `<div class="linkf">${flkLink(t.url, 'linkchip', `${ic(flkIs(t.url) ? 'folder' : 'link', 's')}<span>${esc(urlHost(t.url))}</span>`)}${ro ? '' : `<button class="iconbtn" data-act="link-edit" title="${tr('Edit link')}">${ic('edit', 's')}</button><button class="iconbtn" data-act="link-rm" title="${tr('Remove website link')}">${ic('x', 's')}</button>`}</div>`;
+  return ro ? '<span class="muted">–</span>' : `<input id="d-url" type="url" inputmode="url" autocomplete="off" placeholder="${esc(tr('https://… or smb://…'))}" aria-label="${esc(tr('Link'))}" value="${esc(t.url || '')}" enterkeyhint="done">`;
 }
 async function saveLink(v) {
   const t = taskById(S.sel); if (!t) return;
   v = (v || '').trim();
   if (v && !/^https?:\/\//i.test(v) && /^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(v)) v = 'https://' + v;  // "github.com/x" -> https://
-  if (v && !validUrl(v)) { toast(tr('The link must start with http:// or https://')); return; }
+  if (v && !validLink(v)) { toast(tr('The link must be a web address (https://…) or a file link (smb://…, file://…)')); return; }  // 2.35.0 (#186)
   S.editLink = false;
   if ((t.url || '') === v) { renderDetail(); return; }
   await patchTask(t.id, {url: v || null});

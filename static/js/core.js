@@ -631,12 +631,15 @@ async function verReload() {
   try { const reg = await navigator.serviceWorker?.getRegistration(); await reg?.update(); } catch { /* no service worker */ }
   location.reload();
 }
+// 2.35.0 (#1094): the automatic reload waits until /api/version reported the new version twice in a row (not in the middle of
+// an update, while single requests still fail); after a reload the language file is checked against the code (i18nRetry)
+S.verSeen = {v: '', n: 0};
 function verCheck(app) {
-  if (app) S.serverVer = app;
+  if (app) { if (app === S.verSeen.v) S.verSeen.n++; else S.verSeen = {v: app, n: 1}; S.serverVer = app; }
   let el = $('#newver');
-  if (!verStale()) { if (el) el.remove(); return; }
+  if (!verStale()) { if (el) el.remove(); if (typeof I18N !== 'undefined' && I18N.stale) i18nRetry(); return; }
   let once = ''; try { once = sessionStorage.getItem('kalmido-reloaded') || ''; } catch { /* private mode */ }
-  if (once !== S.serverVer && verQuiet() && (document.hidden || Date.now() - verIdle > 20000)) { verReload(); return; }
+  if (once !== S.serverVer && S.verSeen.n >= 2 && verQuiet() && (document.hidden || Date.now() - verIdle > 20000)) { verReload(); return; }
   if (!el) {
     el = document.createElement('div'); el.id = 'newver'; el.setAttribute('role', 'status');
     el.innerHTML = `${ic('sync', 's')}<span>${esc(tr('New version available'))}</span><button type="button" class="btn sm pri" data-nv="go">${esc(tr('Reload'))}</button>`;

@@ -286,6 +286,8 @@ shard 5  # ---------------------------------------------------------------- shar
        run p272_ui node p272_ui.js "$KALMIDO_TEST_DATA"
 # 2.7.2 (#420): the Windows launcher agent_launcher.ps1 against a stub API (skipped without pwsh)
        run launcher_ps1 "$PY" launcher_ps1_test.py
+       run launcher_parity "$PY" launcher_parity_test.py
+       run agent_docs_coverage "$PY" agent_docs_coverage_test.py
 # 2.12.2 (#451): the agent chat while typing: paged chat API, the box keeps its node, focus and text through Delivered /
 # typing / answers / status changes, the list is only patched; in Firefox at 390 (touch) and 1280: pinned to the bottom,
 # scrolled up the place is kept + "New message", "Load older messages" keeps the message in view
@@ -478,6 +480,13 @@ fresh; run p2340_c_api "$PY" p2340_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2340_c_ui node p2340_c_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2340_d_api "$PY" p2340_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2340_d_ui node p2340_d_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2350_a_api "$PY" p2350_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2350_b_api "$PY" p2350_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2350_b_ui node p2350_b_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2350_c_api "$PY" p2350_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2350_c_ui node p2350_c_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2350_d_api "$PY" p2350_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2350_d_ui node p2350_d_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

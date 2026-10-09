@@ -237,10 +237,8 @@ runs as the agent user, `/Library/LaunchDaemons/com.kalmido.agent.plist`:
   <key>ProgramArguments</key><array>
     <string>/usr/local/bin/pwsh</string><string>-NoProfile</string><string>-File</string>
     <string>/Users/kalmido-agent/kalmido/mcp/agent_launcher.ps1</string>
-    <string>-e</string><string>/Users/kalmido-agent/.config/kalmido/agent.env</string><string>--</string>
-    <string>claude</string><string>-p</string>
-    <string>Read CLAUDE.md. Then loop: call the kalmido tool wait_for_events, handle every event following CLAUDE.md, call it again.</string>
-    <string>--mcp-config</string><string>/Users/kalmido-agent/agent/.mcp.json</string>
+    <string>-e</string><string>/Users/kalmido-agent/.config/kalmido/agent.env</string><string>--events</string><string>--</string>
+    <string>claude</string><string>--mcp-config</string><string>/Users/kalmido-agent/agent/.mcp.json</string>
   </array>
   <key>EnvironmentVariables</key><dict><key>PATH</key><string>/Users/kalmido-agent/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string></dict>
   <key>RunAtLoad</key><true/><key>KeepAlive</key><true/>
@@ -307,7 +305,7 @@ The launcher as a scheduled task that starts at boot as the agent user and keeps
 $c = Get-Credential kalmido-agent
 $h = "C:\Users\kalmido-agent"
 $a = New-ScheduledTaskAction -Execute "pwsh.exe" -WorkingDirectory "$h\agent" -Argument ("-NoProfile -ExecutionPolicy Bypass -File $h\kalmido\mcp\agent_launcher.ps1 " +
-  "-e $h\.config\kalmido\agent.env -- claude -p `"Read CLAUDE.md. Then loop: call the kalmido tool wait_for_events, handle every event following CLAUDE.md, call it again.`" --mcp-config $h\agent\.mcp.json")
+  "-e $h\.config\kalmido\agent.env --events -- claude --mcp-config $h\agent\.mcp.json")
 $t = New-ScheduledTaskTrigger -AtStartup
 $s = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1)
 Register-ScheduledTask -TaskName "Kalmido agent" -Action $a -Trigger $t -Settings $s -User $c.UserName -Password $c.GetNetworkCredential().Password
@@ -569,6 +567,12 @@ An organisation's list is shared only with the organisation's members, so an age
 everybody who reads its comments belongs to the organisation. Agents that already sat in a list of another workspace
 before the update are kept and pointed out to the list's owner, who decides.
 
+Since 2.35.0 the admins of an organisation manage its lists in the app (Settings > Workspaces > *Lists of the
+organisation*): they see name, owner and numbers (never contents) and may archive, restore, hand over or -- from the archive,
+confirmed with the list's name -- delete a list of the organisation, also one of another person. Private lists, private
+sharing and inboxes stay out of reach. This is people's work only: there is no agent API for it, and an agent account gets
+`403` even with admin rights. For an agent in such a list it is the same as when the owner archives, hands over or deletes it.
+
 ## Events
 
 The agent never gets events about its own actions. Task payloads are the task as the agent sees it (the same shape as `GET /api/v1/tasks/{id}`). `list` is `{"id", "name", "agent_tidy", "tidy_agent_id", "project_type", "listen_agent_ids"}` (the last two since 2.30.0).
@@ -598,7 +602,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `team_message` | 2.17.0: someone @mentions the agent in a list's team chat (the agent is a member of the channel of every list shared with it) | `room` `{id, kind, list_id}`, `message` `{id, text, user_id, task_id, created_at, reply_to, reply}`, `user` `{id, name}`; 2.33.0: also when someone answers one of the agent's channel messages (`reply_to`, see [Replies](#replies-to-one-message-2330)); answer with `POST /team/rooms/{id}/messages` (MCP `post_team_message`) |
 | `job_request` | 2.3.0: a person asks the agent for a proposal ([Proposals](#proposals)) | `job` (kind, `proposal_state`), `kind`, `input` (exactly what the person sent), `limits`, `requested_by` `{id, name}` |
 | `task_added` | 2.23.0 (#795): a top-level task was created in, or moved into, a list shared with the agent (not for its own tasks); 2.30.0: only when the agent [listens in](#agent-listens-in-2300) there | `task`, `list`, `how`: `created` or `moved`, `moved_from` `{id, name}` (only when the agent sees that list), `source`: `form`, `mail`, `errors`, `proposal` (when not made in the app) |
-| `chat_choice` | 2.28.0 (#1005): the person pressed an answer button of one of the agent's chat messages (see *Answer buttons*); 2.30.0: also a 👍 / 👎 on a permission question | `message_id`, `choice_ids`, `labels`, `message`, `user` `{id, name}`; + `task`, `list` when the message was about a task; permission questions: `permission: true`, `approval`, `via`: `button` or `reaction` |
+| `chat_choice` | 2.28.0 (#1005): the person pressed an answer button of one of the agent's chat messages (see *Answer buttons*); 2.30.0: also a 👍 / 👎 on a permission question | `message_id`, `choice_ids`, `labels`, `message`, `user` `{id, name}`; + `task`, `list` when the message was about a task; permission questions: `permission: true`, `approval`, `via`: `button` or `reaction`; 2.35.0 approval requests (`request_chat_approval`): `approval`, `approval_request` `{title, what}`, `via` |
 | `followup_due` | 2.1.0: the follow-up day of a task *waiting on someone* (at the all-day reminder time of the person it is for), once per date, to every agent that follows the task (assigned, creator, commented) | `task` (with `task.waiting`), `list`, `waiting` `{note, until, since, by}` |
 | `stale_tasks` | 2.34.0 (#266): once a day (from 09:00 server time), the [tasks lying idle](#tasks-lying-idle-2340) of the lists shared with the agent that have *Agent follows up* on (off by default); one bundled event per agent and day, at most 30 tasks | `tasks` `[{id, title, list_id, list_name, idle_days, reason, since, due, assignee_id, wait_note}]`, `count`, `default_days`, `lists` `[{id, name}]`, `hint` |
 | `scheduled_job` | 2.34.0 (#272): a [planned job](#planned-jobs-2340) of a person is due (once per due time; after an outage only the one missed run, `late: true`), or the person pressed *Run now* (`manual: true`). Answer in your chat with `by.id` | `schedule_id`, `title`, `prompt` (the person's words: what to do), `list_id` + `list` (or `null`), `by` / `user` `{id, name}`, `chat_with` (= `by.id`), `rhythm` `{freq, days, time, tz}`, `due_at`, `late`, `manual`, `manual_by` (`{id, name}` when a manager of the agent pressed *Run now* on another person's plan, else `null`; you still answer `by.id`), `hint` |
@@ -658,6 +662,27 @@ the API has `"type": "bug" | "feature" | "task" | null`. Set it with `POST` / `P
 (MCP `create_task` / `update_task`); a new bug or feature with empty notes gets the list's note template (steps to
 reproduce / expected / actual / environment, or goal / acceptance criteria), so fill in those headings rather than
 replacing them. `GET /api/v1/tasks?type=bug` (MCP `list_tasks` `type`) lists the open bugs.
+
+### Code snippets (2.35.0)
+
+Code, error messages, logs and diffs that belong to a task go into its **code snippets**, not into the notes. A snippet
+is plain code (no Markdown) with a language; people see it in the task's *Code snippets* section (always there in
+lists of the *Software / AI dev* project type, elsewhere added from the task menu) with highlighting and a Copy button.
+One task (`GET /api/v1/tasks/{id}`, MCP `get_task`, and the answer of a change) has
+`"snippets": [{id, lang, path, line, code, by, updated_at}]` (`[]` = none); task lists (`list_tasks`, search, subtasks)
+carry only the number `snippets_n` -- read the task itself for the code:
+
+- `lang`: `py`, `js`, `ts`, `sh`, `sql`, `diff`, `json`, `html`, `css`, `go`, `rust`, `java`, `c`, `yaml`, ... or `""`
+  (the app recognises the language); `path` + `line` (optional): the file the code belongs to, e.g. `src/app.py`, `42`.
+- Add one: `POST /api/v1/tasks/{id}/snippets` `{"code": "...", "lang": "diff", "path": "src/app.py", "line": 42}` →
+  `201 {snippet, task}` (MCP `add_snippet`, scope `tasks:write`, the same rights as changing the task).
+- Replace all: `PATCH /api/v1/tasks/{id}` `{"snippets": [...]}` (MCP `update_task` / `create_task`); send the `id` of
+  every snippet that stays, `[]` removes all. A snippet whose content did not change keeps its author (`by`) and time.
+- Limits: at most 20 snippets per task, 20000 characters of code each (`400` beyond).
+- In task events (`mention`, `comment`, `assigned`, `task_added`, ...) `task.snippets` holds at most 10 snippets with the
+  code cut to 4000 characters (`"truncated": true`) and `task.snippets_total`; `get_task` returns the full code. Never
+  send a truncated copy back (`400`).
+- The search (`search_tasks`, the app's search) also finds the code and the file path of snippets (not their metadata).
 
 ### Waiting on someone (2.1.0)
 
@@ -776,6 +801,10 @@ In the app the briefing is the first block of *Today* (numbers + "New since yest
 project page (period, preview, copy, share).
 
 ## Approvals
+
+**Rule for agents (2.35.0):** when an agent needs a person's approval before it does something, it asks with an
+approval request (`request_chat_approval`, the card *Approval needed* with Yes / No in the chat; for a task:
+`request_approval`), never only as a question in its text. Silence is no yes: without an answer it does not do it.
 
 Reactions are available to everyone: 👍 (`up`), 👎 (`down`), ❤️ (`heart`), or any other single emoji via "+" (stored as the emoji itself). Only 👍 / 👎 carry a meaning for agents (approval, see below). Hover over a reaction, or tap its count, to see who reacted.
 
@@ -901,6 +930,9 @@ POST /api/v1/agent/progress   {"text": "Build runs on the test runner", "job_id"
   `Bearer …`, private key blocks, passwords in URLs, long values after key / token / secret / password) with
   `[entfernt]` before storing, and shows it as plain text. Stored for good with the answer / the job. At most 60 steps a
   minute per agent (429 with `Retry-After`). MCP: `report_progress`.
+- **One short sentence before each tool step** (rule for agents, 2.35.0), in the language of the person: what happens
+  next ("Ich schaue mir zuerst die Tests an"). The launcher's event mode sends these sentences from the stream by itself
+  ([Runtime settings](#runtime-settings)).
 - A host running Claude Code headless gets the steps from `claude -p --output-format stream-json --verbose`: every
   `assistant` event's `text` blocks between `tool_use` blocks are steps (send them at most every 2 seconds, the newest
   wins); the final answer stays the `result` event.
@@ -1002,6 +1034,40 @@ as in a chat event. Only the chat's person answers (the web app, or `POST /api/v
 {"choice_ids": [...]}` with their own token), once per message; agents never. Do not ask the same question twice: the
 answer may take a while, and an unanswered question stays answerable.
 
+**Approval requests (2.35.0).** Whenever you need a person's go-ahead before you do something (a deploy, sending a mail,
+deleting data, spending money), ask with an **approval request**, never only with a question in the text. The app shows
+it as a card of its own with the accent edge and the heading *Approval needed*, pins it at the top of the chat until it
+is answered and counts it at your name (sidebar, agent card: *1 approval open*):
+
+```
+POST /api/v1/agent/chats/{user_id}
+{"approval": {"title": "Publish release 2.35.0", "what": "The new version goes live for everyone",
+              "yes_label": "Yes, publish", "no_label": "Not yet"}, "expires_in": 7200}
+```
+
+(MCP `request_chat_approval`.) `title` (at most 200 characters) says what is to be approved, `what` (optional, at most
+1000) what happens on yes; `yes_label` / `no_label` are optional (default: *Yes, go ahead* / *No* in the person's
+language). `body` may be left out (the title is the text) or carry more detail above the card; `task_id`, `reply_to`,
+`job_id` and `expires_in` (10 s to 7 days) work as usual. Not together with `choices`, `multi` or `permission` (400).
+The message carries `choices` with the buttons `yes` (primary) / `no` and `choices.approval` `{title, what}`. Like a
+permission question it stays open while newer messages come, until it is answered, its `expires_at` passes or you
+withdraw it (`…/withdraw`, optionally with the `outcome` `denied` or `expired`; `allowed` answers 400 for an approval
+request: only the person approves). At most **10 open approval requests** per agent and person: the next one answers
+`409` ("answer the open ones first"); close the ones that are no longer needed. A card closed by you without an answer
+shows *Closed by the agent*.
+
+The answer arrives as the event **`chat_choice`** with `choice_ids: ["yes"]` or `["no"]`, `approval` (`approved` /
+`rejected`), `approval_request` `{title, what}` and `via` (`button`, or `reaction` for a 👍 / 👎 on the open card; then
+the event `reaction` comes as well). Only the person of the chat can answer, never an agent. **No answer is never a
+yes**: without a `chat_choice` event the action stays undone; remind the person once if it is still needed, and close
+requests that are no longer current with `withdraw_chat_choices`. Afterwards the card shows *Approved by … at …* or
+*Rejected by … at …*. The person gets a push *Approval needed: <agent>* unless they switched off the row *An agent waits
+for my approval* in their notification settings (then it is a plain chat push). At most 5 such pushes per agent and
+person an hour; further requests in that hour come as a plain chat push. The push uses at least priority 4 unless the
+person chose a push priority of their own. In the app's agent list, every agent
+carries `approvals_open` (open approval requests and permission questions to the viewer), and `GET /api/agents/{id}/chat`
+returns `approvals_open` (the newest 20 open ones, also older than the loaded page).
+
 ### Replies to one message (2.33.0)
 
 A comment, a team chat message and a chat message may answer ONE earlier message of the same place (the same task, the
@@ -1082,6 +1148,7 @@ Agents read files like this:
 | A chat file (binary) | `GET /api/v1/chat-attachments/{id}`, ids from the message's `attachments` | `get_attachment` (`source: chat`) |
 | A task / comment file as text (2.34.0) | `GET /api/v1/attachments/{id}/text` (`?max_chars=`, default and at most 200000) | `read_attachment` |
 | Remove a chat file you sent | `DELETE /api/v1/chat-attachments/{id}` | – |
+| Ask for an approval in the chat (2.35.0) | `POST /api/v1/agent/chats/{user_id}` with `approval: {title, what?, yes_label?, no_label?}`; the answer: event `chat_choice` with `approval` | `request_chat_approval` |
 | Send files in the chat | `POST /api/v1/agent/chats/{user_id}` as `multipart/form-data`: `body` (optional with files), `task_id`, `file` (repeatable) | `send_chat` with `files: [{name, base64, mime?}]` |
 | Write a text file onto a task (2.30.0) | `POST /api/v1/tasks/{id}/attachments/text` with `{name, content}` (needs `attachments:write`) | `create_text_file` |
 
@@ -1201,8 +1268,32 @@ mcp/agent_launcher.sh -e ~/.config/kalmido/agent.env --once            # dry run
 mcp/agent_launcher.sh -e ~/.config/kalmido/agent.env -- claude -p "$(cat ~/agent/prompt.md)" --mcp-config ~/.kalmido-mcp.json
 ```
 
-A paused agent (403) is stopped until it is resumed; when the command ends by itself it is started again (fresh). As a
-systemd user service:
+A paused agent (403) is stopped until it is resumed; when the command ends by itself it is started again (fresh).
+
+**Event mode (2.35.0, `--events`).** The launcher then starts the event runner [`mcp/agent_run.py`](../mcp/agent_run.py)
+in front of the command (both launchers use the same runner, so Linux, macOS and Windows behave alike). It long-polls
+`GET /api/v1/agent/events` and starts one fresh headless run per event (`-p --output-format stream-json --verbose`, the
+event as prompt on stdin; several chat messages of one person in a row: one run). From the stream it sends the steps
+(`POST /api/v1/agent/progress`: the prose before each tool call, never tool input or output, secrets masked, at most one
+every 2 s, not the final answer, none for task events), the model of the init event and the permission mode
+(`PUT /api/v1/agent/status`), the plan usage of the `rate_limit_event` with `measured_at` (`PUT /api/v1/agent/quota`,
+every window Claude Code reports), typing dots and working / idle; it puts the quote a message answers (`reply`) into the
+prompt and posts the final text of a chat run as the answer (masked; the agent must not also `send_chat` it). An answer
+ending in a block ` ```approval ` (first line the title, further lines what happens on yes) becomes an approval card
+(`approval`, 2.35.0; older servers: Yes / No buttons); the person's answer arrives as `chat_choice` with `approval` and
+starts the next run. A server without steps, host info, plan usage or approval cards (before 2.32 / 2.33 / 2.35) is
+detected by its answer (404 / 400) and the feature is switched off once. Keys in the env file: `KALMIDO_EVENTS=1` (same
+as `--events`), `KALMIDO_PROMPT_FILE`, `KALMIDO_STATE_DIR` (event cursor, default `~/.cache/kalmido-agent`),
+`KALMIDO_PERMISSION_MODE`, `KALMIDO_USAGE_LIMIT`, `KALMIDO_USAGE_FILE`, `KALMIDO_USAGE_MAX_AGE_H` (default 6: older
+values count as unknown), `KALMIDO_PYTHON`. The list of these capabilities is
+[`mcp/launcher_capabilities.json`](../mcp/launcher_capabilities.json); `tests/launcher_parity_test.py` fails when one of the
+two launchers lacks one.
+
+```sh
+mcp/agent_launcher.sh -e ~/.config/kalmido/agent.env --events -- claude --mcp-config ~/.kalmido-mcp.json --permission-mode dontAsk
+```
+
+As a systemd user service:
 
 ```ini
 # ~/.config/systemd/user/kalmido-agent.service
@@ -1212,7 +1303,7 @@ After=network-online.target
 
 [Service]
 WorkingDirectory=%h/agent
-ExecStart=%h/kalmido/mcp/agent_launcher.sh -e %h/.config/kalmido/agent.env -- claude -p "Work through your Kalmido events" --mcp-config %h/.kalmido-mcp.json
+ExecStart=%h/kalmido/mcp/agent_launcher.sh -e %h/.config/kalmido/agent.env --events -- claude --mcp-config %h/.kalmido-mcp.json
 Restart=always
 RestartSec=30
 
@@ -1719,7 +1810,7 @@ with the scope it needs). The tools:
   `share_list_with_group`, `unshare_list_from_group`, `list_folders`, `rename_folder`, `delete_folder`
 - sections: `list_sections`, `create_section`, `rename_section`, `reorder_sections`, `delete_section`
 - tasks: `list_tasks` (`compact: true` for a short form; without it, pages of more than 25 tasks come back compact),
-  `search_tasks`, `search_messages` (2.33.0: comments, team chat, your chats), `get_task`, `create_task`, `update_task`, `complete_task`, `reopen_task`, `delete_task`,
+  `search_tasks`, `search_messages` (2.33.0: comments, team chat, your chats), `get_task`, `create_task`, `update_task`, `add_snippet` (2.35.0), `complete_task`, `reopen_task`, `delete_task`,
   `move_task` (list / section / parent + `before_id` / `after_id` / `position`), `batch_tasks`, `skip_occurrence`,
   `take_task`, `list_subtasks`, `add_subtask`, `list_trash`, `restore_task`, `empty_trash`, `list_tags`, `get_roadmap`
 - dependencies and fields: `get_dependencies`, `add_dependency`, `remove_dependency`, `list_fields`, `create_field`,
@@ -1743,10 +1834,56 @@ with the scope it needs). The tools:
   answer 404 for it)
 - waiting on someone: `set_waiting`, `clear_waiting`, `list_waiting`, `list_stale_tasks` (2.34.0: tasks lying idle)
 - agent channel (agent tokens only): `get_agent`, `set_status`, `list_events`, `wait_for_events`, `list_jobs`,
-  `create_job`, `get_job`, `update_job`, `submit_proposal`, `list_chats`, `send_chat`, `chat_typing`, `react_to_chat`,
-  `report_usage`, `get_usage`, `tidy_task`, `request_merge_approval`
+  `create_job`, `get_job`, `update_job`, `submit_proposal`, `list_chats`, `send_chat`, `request_chat_approval` (2.35.0),
+  `chat_typing`, `react_to_chat`, `report_usage`, `get_usage`, `tidy_task`, `request_merge_approval`
 
 Setup is in [mcp/README.md](../mcp/README.md).
+
+<!-- kalmido-tool-index:start -->
+### Tool index
+
+Every tool of `mcp/kalmido_mcp.py` (each one describes itself and its parameters in `tools/list`; the server lists only
+those the token's scopes allow). `tests/agent_docs_coverage_test.py` checks that this list, the events and the agent
+endpoints stay complete here and in `mcp/CLAUDE.template.md`.
+
+`add_comment`, `add_contract`, `add_deadline`, `add_dependency`, `add_device`, `add_health_entry`, `add_milestone`,
+`add_occasion`, `add_preparation_task`, `add_project_link`, `add_reward`, `add_shop_areas`, `add_snippet`,
+`add_subtask`, `add_time_entry`, `add_upkeep`, `apply_template`, `batch_tasks`, `chat_typing`, `check_in_habit`,
+`clear_plan_usage`, `clear_waiting`, `comment_typing`, `complete_task`, `create_address_book`, `create_client`,
+`create_contact`, `create_event`, `create_event_calendar`, `create_field`, `create_filter`, `create_form`,
+`create_habit`, `create_job`, `create_list`, `create_list_tag`, `create_note`, `create_packing_list`,
+`create_section`, `create_task`, `create_template`, `create_text_file`, `create_trip`, `decide_reward`,
+`delete_address_book`, `delete_attachment`, `delete_chat_attachment`, `delete_client`, `delete_comment`,
+`delete_contact`, `delete_event`, `delete_event_calendar`, `delete_field`, `delete_filter`, `delete_folder`,
+`delete_form`, `delete_habit`, `delete_list`, `delete_list_tag`, `delete_milestone`, `delete_note`,
+`delete_project_file`, `delete_project_link`, `delete_reward`, `delete_section`, `delete_task`, `delete_team_message`,
+`delete_template`, `delete_time_entry`, `edit_team_message`, `empty_trash`, `export_data`, `export_ics`,
+`export_vcards`, `get_agent`, `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`,
+`get_day_review`, `get_dependencies`, `get_event`, `get_family`, `get_group`, `get_job`, `get_life`, `get_list`,
+`get_me`, `get_milestone`, `get_note`, `get_plan_usage`, `get_project_overview`, `get_review`, `get_roadmap`,
+`get_storage`, `get_task`, `get_task_events`, `get_time_gaps`, `get_timer`, `get_usage`, `get_workload`, `give_stars`,
+`import_ics`, `import_vcards`, `ingredients_to_shopping`, `link_contact`, `list_address_books`, `list_agents`,
+`list_attachments`, `list_calendar_events`, `list_chats`, `list_clients`, `list_deadline_types`,
+`list_event_calendars`, `list_events`, `list_fields`, `list_filters`, `list_folders`, `list_forms`, `list_groups`,
+`list_habits`, `list_jobs`, `list_kids`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`,
+`list_news`, `list_notes`, `list_packing_templates`, `list_project_files`, `list_repos`, `list_schedules`,
+`list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_chats`, `list_templates`,
+`list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`,
+`move_task`, `post_team_message`, `propose_to_other_topic`, `react`, `react_team_message`, `react_to_chat`,
+`read_attachment`, `read_briefing`, `read_project_status`, `read_team_chat`, `remove_dependency`, `rename_folder`,
+`rename_section`, `reopen_task`, `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`,
+`report_progress`, `report_usage`, `request_approval`, `request_chat_approval`, `request_deploy_approval`,
+`request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_event`, `restore_task`,
+`search_contacts`, `search_messages`, `search_notes`, `search_tasks`, `send_chat`, `set_contact_care`,
+`set_list_columns`, `set_project_overview`, `set_project_status`, `set_status`, `set_waiting`, `share_address_book`,
+`share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`, `skip_occurrence`, `start_timer`,
+`stop_timer`, `submit_proposal`, `sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`,
+`unshare_address_book`, `unshare_event_calendar`, `unshare_list`, `unshare_list_from_group`, `update_address_book`,
+`update_client`, `update_comment`, `update_contact`, `update_event`, `update_event_calendar`, `update_field`,
+`update_filter`, `update_form`, `update_habit`, `update_job`, `update_list`, `update_list_tag`, `update_milestone`,
+`update_note`, `update_project_link`, `update_reward`, `update_task`, `update_template`, `update_time_entry`,
+`upload_attachment`, `upload_project_file`, `wait_for_events`, `withdraw_chat_choices`, `write_journal`
+<!-- kalmido-tool-index:end -->
 
 ## Use agents safely (2.30.0)
 

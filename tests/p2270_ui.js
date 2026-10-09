@@ -81,7 +81,9 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
   check(!d.querySelector('#newver'), '#968: back in step: the bar goes');
   // quiet + an update: one reload by itself, not a second time for the same version
   w.eval(`document.activeElement.blur(); document.querySelector('#qinput').value = ''; verIdle = Date.now() - 60000; sessionStorage.removeItem('kalmido-reloaded'); window.__rl = 0; verCheck('99.0.1')`);
-  check(w.__rl === 1, '#968: quiet: reloads once by itself');
+  check(!w.__rl, '#1094: the first report of a new version does not reload yet (maybe in the middle of the update)');
+  w.eval(`verCheck('99.0.1')`);
+  check(w.__rl === 1, '#968: quiet: reloads once by itself (#1094: after the second report)');
   w.eval(`sessionStorage.setItem('kalmido-reloaded', '99.0.1'); window.__rl = 0; verCheck('99.0.1')`);
   check(!w.__rl && d.querySelector('#newver'), '#968: never twice for the same version (the bar stays)');
   w.eval(`S.serverVer = '${appVer}'; verCheck('${appVer}')`);

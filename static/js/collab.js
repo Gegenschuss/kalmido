@@ -201,6 +201,10 @@ function newsText(it, U) {
     case 'role': return tr('{0} changed your role in {1} to {2}', who, q(newsListName(it)), q(roleLabel(d.role)));
     case 'unshare': return d.org ? tr('{0} removed you from the organisation {1}', who, q(d.name || '')) : tr('{0} removed you from the list {1}', who, q(newsListName(it)));  // 2.28.0 (#935)
     case 'owner': return tr('{0} made you the owner of the list {1}', who, q(newsListName(it)));  // 2.1.2 (#349)
+    case 'orglist': return ({archive: tr('{0} archived the list {1} (admin of {2})', who, q(d.name || ''), q(d.org || '')),  // 2.35.0 (#1101)
+      restore: tr('{0} restored the list {1} from the archive (admin of {2})', who, q(d.name || ''), q(d.org || '')),
+      delete: tr('{0} deleted the list {1} for good (admin of {2}). Its tasks are in the trash of the owner’s inbox.', who, q(d.name || ''), q(d.org || '')),
+      owner: tr('{0} handed the list {1} to {2} (admin of {3})', who, q(d.name || ''), q(d.to || ''), q(d.org || ''))})[d.action] || tr('{0} changed something', who);
     case 'unblock': return d.hidden ? tr('{0} completed a task you cannot see: your task is unblocked', who) : tr('{0} completed {1}: your task is unblocked', who, q(d.title || ''));
     case 'newtask': return tr('{0} added a task', who);
     case 'errreport': return d.title ? tr('New error reported: {0}', q(d.title)) : tr('A new error was reported');  // 2.18.0
@@ -219,7 +223,7 @@ function newsText(it, U) {
   }
   return tr('{0} changed something', who);
 }
-const NEWS_ICON = {mention: 'at', comment: 'comment', assign: 'user', unassign: 'user', take: 'check', complete: 'check', share: 'users', role: 'users', unshare: 'users', unblock: 'deps', status: 'pulse', newtask: 'plus', approval: 'bot', followup: 'hourglass', usage: 'chart', proposal: 'bot', errreport: 'bug', apdecide: 'eye', signup: 'user', agentjoin: 'bot'};
+const NEWS_ICON = {orglist: 'archive', mention: 'at', comment: 'comment', assign: 'user', unassign: 'user', take: 'check', complete: 'check', share: 'users', role: 'users', unshare: 'users', unblock: 'deps', status: 'pulse', newtask: 'plus', approval: 'bot', followup: 'hourglass', usage: 'chart', proposal: 'bot', errreport: 'bug', apdecide: 'eye', signup: 'user', agentjoin: 'bot'};
 function newsItemHtml(it, i, pop) {
   const U = S.nf.users;
   const many = (it.tasks || []).length > 1;  // 2.13.0 (#453 A5): an agent's comments on several tasks
@@ -413,6 +417,7 @@ function actText0(a, U) {
     case 'list': return tr('{0} moved the task to the list {1}', who, q(d.inbox && inboxDef(d.name) ? tr('Inbox') : listName(d.name)));
     case 'section': return d.name ? tr('{0} moved the task to the section {1}', who, q(d.name)) : tr('{0} removed the task from its section', who);
     case 'parent': return d.title ? tr('{0} made the task a subtask of {1}', who, q(d.title)) : tr('{0} made the task a main task', who);
+    case 'snippets': return d.n ? tr('{0} changed the code snippets ({1})', who, d.n) : tr('{0} removed the code snippets', who);  // 2.35.0 (#1095)
     case 'ttype': return d.to ? tr('{0} set the type to {1}', who, q(ttName(d.to))) : tr('{0} removed the type', who);  // 2.4.0 (#340)
     case 'ms': return d.on ? tr('{0} made the task a milestone', who) : tr('{0} made the milestone a normal task', who);  // 2.18.0 (#430)
     case 'milestone': return d.title ? tr('{0} added the task to the milestone {1}', who, q(d.title)) : tr('{0} removed the task from its milestone', who);
@@ -454,7 +459,7 @@ function actText0(a, U) {
 // comment text: the same markdown as a description (renderMd: headings, lists, read-only checkboxes, bold, code, links;
 // 2.13.2 #478 N4, before only inline), <@id> -> highlighted @name; compact in comments and chat bubbles (.mdc)
 function commentBody(body, U, lid) {  // 2.18.0 (#408 G): lid = the list (file:line links into its repository)
-  return `<div class="md mdc">${renderMd(body, true, {lid})}</div>`
+  return `<div class="md mdc">${mdTaskRefs(renderMd(body, true, {lid}), true)}</div>`  // 2.35.0 (#1096): #123 -> the task
     .replace(/&lt;@(\d+)&gt;/g, (_, id) => mentionTag(+id, uname(+id, U), !!(U || {})[id] || !!agentById(id)));
 }
 // 2.4.2 (#389): a mention is a button that opens a small card about the person or agent; a name nobody has stays text

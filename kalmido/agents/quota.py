@@ -31,6 +31,7 @@ QUOTA_WARN = 75
 # Claude Code status line (rate_limits): key -> label (the client translates the known keys); the week is the main window
 CC_WINDOWS = (("seven_day", "Week"), ("five_hour", "5 hours"), ("spend_limit", "Spend limit"))
 _BAD = re.compile(r"[<>\x00-\x1f\x7f]")
+CC_KEY_RE = re.compile(r"[a-z][a-z0-9_]{0,39}")  # 2.35.0 (#1098): further rate_limits windows
 
 
 def _pct(v, k):
@@ -81,6 +82,19 @@ def quota_in(b):
                 raise BadInput(tr("Invalid value: {0}", "rate_limits." + key))
             out.append({"key": key, "label": label, "percent": _pct(w["used_percentage"], f"rate_limits.{key}.used_percentage"),
                         "resets_at": _when(w.get("resets_at"), f"rate_limits.{key}.resets_at")})
+        # 2.35.0 (#1098): every further window Claude Code reports (e.g. a weekly one per model) passes through, labelled
+        # by its key; odd entries are skipped, never an error (a newer host must not lose its ring)
+        known = {k for k, _ in CC_WINDOWS}
+        for key, w in sorted((rl or {}).items()):
+            if key in known or len(out) >= QUOTA_WINDOWS_MAX or not isinstance(key, str) or not CC_KEY_RE.fullmatch(key):
+                continue
+            if not isinstance(w, dict) or w.get("used_percentage") is None:
+                continue
+            try:
+                out.append({"key": key, "label": key.replace("_", " ").capitalize()[:QUOTA_LABEL_MAX],
+                            "percent": _pct(w["used_percentage"], key), "resets_at": _when(w.get("resets_at"), key)})
+            except BadInput:
+                continue
         main = 0 if out else None
     else:
         ws = b.get("windows") or []

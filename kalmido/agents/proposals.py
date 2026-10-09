@@ -35,7 +35,7 @@ from ..agents.core import (
 from ..collab.reactions import clean_suggestion, tidy_apply
 from ..agents.chat import (
     chat_delivered, chat_dict, chat_file_access, chat_newest, chat_file_delete, chat_files_of, chat_input, chat_one, chat_post,
-    chat_react_req, chat_reactions_of, chat_unlink_trimmed,
+    chat_react_req, chat_reactions_of, chat_unlink_trimmed, APPROVAL_PUSH_HOUR,
 )
 
 
@@ -967,6 +967,19 @@ def v1_agent_chats():
                    cursor=rows[-1]["id"] if rows else since, has_more=more)
 
 
+def _approval_pushes_hour(c, aid, uid):
+    """How many approval requests agent aid sent person uid within the last hour (this one included)."""
+    from ..core.db import iso_ms
+    return c.execute("""SELECT COUNT(*) FROM agent_chat WHERE agent_id=? AND user_id=? AND sender='agent'
+                        AND json_extract(choices, '$.approval') IS NOT NULL AND created_at>?""",
+                     (aid, uid, iso_ms(now_utc() - timedelta(hours=1)))).fetchone()[0]
+
+
+def _chat_task_lid(c, tid):
+    r = c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone() if tid else None
+    return r["list_id"] if r else None
+
+
 @app.post("/api/v1/agent/chats/<int:uid>")
 @v1_view
 def v1_agent_chat_post(uid):
@@ -978,10 +991,11 @@ def v1_agent_chat_post(uid):
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if not u or is_agent(u) or not agent_shares(c, aid, uid):
         raise Denied(404)
-    fb, files = chat_input(("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "reply_to"))
+    fb, files = chat_input(("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "reply_to", "approval"))
     b = fb if fb is not None else v1_json()
     # 2.28.0 (#1005): answer buttons; 2.30.0 (#1041): permission questions (permission, expires_in)
-    unknown = sorted(k for k in b if k not in ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "reply_to"))  # 2.33.0: reply_to
+    unknown = sorted(k for k in b if k not in ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "reply_to",
+                                               "approval"))  # 2.33.0: reply_to; 2.35.0 (#1103): approval
     if unknown:
         raise UnknownFields(unknown)
     jid = None
@@ -1006,7 +1020,17 @@ def v1_agent_chat_post(uid):
     if s:
         name = user_names(c, [aid]).get(aid, "?")
         snippet = re.sub(r"\s+", " ", text)[:280]
-        g.pushes.append((uid, name, snippet, f"{PUBLIC_URL}/#agents/{aid}", push_prio(s)))
+        ch = json.loads(r["choices"]) if r["choices"] else {}
+        # 2.35.0 (#1103): an approval request pushes as "Approval needed" (row approval of the notification settings, on by
+        # default: a direct question to the person; the list ceiling of its task applies); off = the plain chat push
+        if ch.get("approval") and notif_ok(c, uid, s, "approval", "push", _chat_task_lid(c, r["task_id"])) \
+                and _approval_pushes_hour(c, aid, uid) <= APPROVAL_PUSH_HOUR:  # review M5: at most 5 an hour, then the plain push
+            lg = lang_of(s)
+            own = c.execute("SELECT 1 FROM user_settings WHERE user_id=? AND key='push_priority'", (uid,)).fetchone()
+            g.pushes.append((uid, tr("Approval needed: {0}", name, lg=lg), ch["approval"].get("title") or snippet,
+                             f"{PUBLIC_URL}/#agents/{aid}", push_prio(s) if own else push_prio(s, 4)))  # a chosen priority wins
+        else:
+            g.pushes.append((uid, name, snippet, f"{PUBLIC_URL}/#agents/{aid}", push_prio(s)))
     bump(c)
     c.commit()
     chat_unlink_trimmed()

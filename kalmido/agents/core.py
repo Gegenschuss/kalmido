@@ -246,6 +246,8 @@ def agent_task_data(c, tid, aid, full=None, **extra):
     from ..integrations.git import git_repo_for_task
     row = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
     task, lst = task_for(c, row, aid), lst_brief(c, row["list_id"])
+    from ..tasks.snippets import snip_event, snip_parse  # 2.35.0 (#1095): a shortened copy (full code: get_task)
+    task["snippets"], task["snippets_total"] = snip_event(row["snippets"]), len(snip_parse(row["snippets"]))
     if full is None:
         full = task_visible(c, tid, aid, full=True)
     if full:
@@ -857,7 +859,16 @@ def agent_public(c, a, uid=None):
             # run, the host's own default); the runtime's wished model next to it (set: … · runs: …)
             "host": _host_info(a), "runtime_model": agent_runtime(a)["model"],
             # 2.33.0 (#1045): its plan usage (the ring in the chat header; null = never reported)
-            "quota": _quota(a)}
+            "quota": _quota(a),
+            # 2.35.0 (#1103): open approval requests + permission questions to the viewer (the badge "1 approval open")
+            "approvals_open": _approvals_open(c, a["user_id"], uid)}
+
+
+def _approvals_open(c, aid, uid):
+    if not uid:
+        return 0
+    from ..agents.chat import chat_approvals_open
+    return len(chat_approvals_open(c, aid, uid))
 
 
 def _quota(a):

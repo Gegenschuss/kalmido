@@ -55,7 +55,7 @@ const V = B + 'api/v1';
   await call('PUT', `/api/lists/${BL}/members`, {user_id: 1, role: 'edit'}, BCK);
   await call('PUT', `/api/lists/${BL}/members`, {user_id: AG, role: 'edit'}, BCK);
   // #1028: a permission question with a long command in a code block, then text under it
-  await fetch(V + '/agent/chats/1', {method: 'POST', headers: AGH, body: JSON.stringify({body: 'May I run this?\n```\ncd ~/server-data/bin && ./kalmido-devlist.py show 362 --with-comments --format markdown --output /tmp/a-very-long-path/that/keeps/going/and/going.md\n```\nAnswer: a button, 👍 or 👎, or write "yes".', choices: [{id: 'allow', label: 'Allow', style: 'primary'}, {id: 'deny', label: 'Deny', style: 'danger'}]})});
+  await fetch(V + '/agent/chats/1', {method: 'POST', headers: AGH, body: JSON.stringify({body: 'May I run this?\n```\ncd ~/bin && ./tool.py show 362 --with-comments --format markdown --output /tmp/a-very-long-path/that/keeps/going/and/going.md\n```\nAnswer: a button, 👍 or 👎, or write "yes".', choices: [{id: 'allow', label: 'Allow', style: 'primary'}, {id: 'deny', label: 'Deny', style: 'danger'}]})});
 
   // ================= #1030 / #929 folder settings
   let w = await boot({user: 'alice', hash: 'today'}), d = w.document;

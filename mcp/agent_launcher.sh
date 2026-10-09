@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# agent_launcher.sh -- reference launcher for an agent host (Claude Code) that follows Kalmido's runtime settings (2.4.1).
+# agent_launcher.sh -- reference launcher for an agent host (Claude Code) that follows Kalmido's runtime settings (2.4.1; event mode 2.35.0).
 #
 # Kalmido never runs an agent. An admin only chooses runtime settings in Settings > Agents > (agent) > Runtime and
 # Kalmido hands them to the agent: GET /api/v1/agent -> "runtime" {model, autocompact, autocompact_pct, nightly_reset,
@@ -21,17 +21,28 @@
 #   COMMAND   what to start (default: claude). Example, a headless loop that works through its events:
 #               agent_launcher.sh -e ~/.config/kalmido/agent.env -- claude -p "$(cat ~/agent/prompt.md)" --permission-mode acceptEdits
 #   --once    print the command line and environment it would use, then exit (a dry run; the token is never printed)
+#   --events  event mode (2.35.0, recommended for Claude Code): the launcher starts mcp/agent_run.py, which waits for the
+#             agent's events and starts ONE fresh headless run of COMMAND per event (`-p --output-format stream-json
+#             --verbose`, the event as prompt on stdin), like a hosted chat service: steps between tool calls, model and
+#             permission mode, typing / status, plan usage ring, reply reference, approval cards; the final text of a
+#             chat run is posted as the answer. COMMAND then is the plain agent command without -p, e.g.
+#               agent_launcher.sh -e ~/.config/kalmido/agent.env --events -- claude --mcp-config ~/agent/.mcp.json
+#             Same as KALMIDO_EVENTS=1 in the env file. Optional keys there: KALMIDO_PROMPT_FILE (text in front of every
+#             event), KALMIDO_USAGE_LIMIT (pause new runs at this % of the week), KALMIDO_USAGE_FILE (a status line
+#             file {at, rate_limits}), KALMIDO_STATE_DIR (event cursor). Without --events: the command runs as it is.
 # Needs: bash, curl, python3 (JSON), GNU date, setsid (util-linux). See docs/AGENTS.md "Runtime settings" for a systemd unit.
 set -uo pipefail
 
 ENV_FILE=./kalmido-agent.env
 ONCE=0
+EVENTS=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -e|--env) ENV_FILE=${2:?-e needs a file}; shift 2 ;;
     --once) ONCE=1; shift ;;
+    --events) EVENTS=1; shift ;;
     --) shift; break ;;
-    -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,39p' "$0"; exit 0 ;;
     *) break ;;
   esac
 done
@@ -44,6 +55,14 @@ set -a
 . "$ENV_FILE"
 set +a
 : "${KALMIDO_URL:?KALMIDO_URL missing in $ENV_FILE}" "${KALMIDO_TOKEN:?KALMIDO_TOKEN missing in $ENV_FILE}"
+[[ "${KALMIDO_EVENTS:-0}" == 1 ]] && EVENTS=1
+# kalmido-capability: steps, model, permission_mode, quota, reply_ref, status_typing, approval, old_server
+# (event mode: mcp/agent_run.py does them for both launchers, so .sh and .ps1 cannot drift apart)
+if [[ $EVENTS == 1 ]]; then
+  RUNNER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent_run.py"
+  [[ -r "$RUNNER" ]] || { echo "agent_launcher: $RUNNER missing (event mode)" >&2; exit 2; }
+  CMD=("${KALMIDO_PYTHON:-python3}" "$RUNNER" -- "${CMD[@]}")
+fi
 POLL=${KALMIDO_POLL:-60}
 RESTART_DELAY=${KALMIDO_RESTART_DELAY:-10}
 log() { printf '%s agent_launcher: %s\n' "$(date '+%F %T')" "$*" >&2; }
@@ -69,6 +88,7 @@ print("\t".join(str(x) for x in (r.get("model") or "-", "1" if r.get("autocompac
 }
 
 PID=""
+# kalmido-capability: runtime (model, auto-compact, fresh session, restart on change / reset / nightly, pause)
 start() {  # start the command with the current settings (its own process group, so a restart ends all of it)
   local args=("${CMD[@]}") envs=()
   [[ "$MODEL" != "-" ]] && args+=(--model "$MODEL")

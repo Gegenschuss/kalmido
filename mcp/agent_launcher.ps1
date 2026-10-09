@@ -1,6 +1,6 @@
 <#
 agent_launcher.ps1 -- the PowerShell port of agent_launcher.sh (Windows; also runs with PowerShell 7 on macOS / Linux).
-A reference launcher for an agent host (Claude Code) that follows Kalmido's runtime settings (2.4.1).
+A reference launcher for an agent host (Claude Code) that follows Kalmido's runtime settings (2.4.1; event mode 2.35.0).
 
 Kalmido never runs an agent. An admin only chooses runtime settings in Settings > Agents > (agent) > Runtime and Kalmido
 hands them to the agent: GET /api/v1/agent -> "runtime" {model, autocompact, autocompact_pct, nightly_reset, reset_seq,
@@ -21,15 +21,21 @@ usage: pwsh -File agent_launcher.ps1 [-e ENV_FILE] [--once] [-- COMMAND ...]
   COMMAND        what to start (default: claude). Example:
                    pwsh -File agent_launcher.ps1 -e $HOME\.config\kalmido\agent.env -- claude -p "Work through your Kalmido events"
   --once         print the command line and environment it would use, then exit (a dry run; the token is never printed)
+  --events       event mode (2.35.0, recommended for Claude Code): starts mcp/agent_run.py (Python 3), which waits for the
+                 agent's events and runs COMMAND once per event, headless with stream-json: steps, model, permission
+                 mode, typing / status, plan usage ring, reply reference, approval cards; the final text of a chat run
+                 is posted as the answer. COMMAND is then the plain agent command without -p. Same as KALMIDO_EVENTS=1.
+                 Python: KALMIDO_PYTHON, else python3 / py / python on PATH. See agent_launcher.sh for the optional keys.
 Needs: Windows PowerShell 5.1 or PowerShell 7+. See docs/AGENTS.md "Set up an agent" for a scheduled task.
 #>
 # arguments by hand (no param block): everything after "--" (or the first unknown word) is the command, as in the .sh
-$EnvFile = '.\kalmido-agent.env'; $Once = $false; $Command = @()
+$EnvFile = '.\kalmido-agent.env'; $Once = $false; $Events = $false; $Command = @()
 for ($i = 0; $i -lt $args.Count; $i++) {
   $a = [string]$args[$i]
   if ($a -in @('-e', '--env', '-EnvFile')) { $i++; if ($i -ge $args.Count) { [Console]::Error.WriteLine('agent_launcher: -e needs a file'); exit 2 }; $EnvFile = [string]$args[$i] }
   elseif ($a -in @('--once', '-Once')) { $Once = $true }
-  elseif ($a -in @('-h', '--help')) { Get-Content -LiteralPath $PSCommandPath -TotalCount 22 | Select-Object -Skip 1; exit 0 }
+  elseif ($a -in @('--events', '-Events')) { $Events = $true }
+  elseif ($a -in @('-h', '--help')) { Get-Content -LiteralPath $PSCommandPath -TotalCount 27 | Select-Object -Skip 1; exit 0 }
   elseif ($a -eq '--') { $Command = @($args | Select-Object -Skip ($i + 1) | ForEach-Object { [string]$_ }); break }
   else { $Command = @($args | Select-Object -Skip $i | ForEach-Object { [string]$_ }); break }
 }
@@ -53,6 +59,19 @@ foreach ($raw in Get-Content -LiteralPath $EnvFile) {
 }
 if (-not $env:KALMIDO_URL) { Log "KALMIDO_URL missing in $EnvFile"; exit 2 }
 if (-not $env:KALMIDO_TOKEN) { Log "KALMIDO_TOKEN missing in $EnvFile"; exit 2 }
+if ($env:KALMIDO_EVENTS -eq '1') { $Events = $true }
+# kalmido-capability: steps, model, permission_mode, quota, reply_ref, status_typing, approval, old_server
+# (event mode: mcp/agent_run.py does them for both launchers, so .sh and .ps1 cannot drift apart)
+if ($Events) {
+  $Runner = Join-Path $PSScriptRoot 'agent_run.py'
+  if (-not (Test-Path -LiteralPath $Runner -PathType Leaf)) { Log "$Runner missing (event mode)"; exit 2 }
+  $Py = $env:KALMIDO_PYTHON
+  $order = if ($OnWindows) { @('py', 'python', 'python3') } else { @('python3', 'python') }  # Windows: python3 may be the Store stub
+  if (-not $Py) { foreach ($n in $order) { if (Get-Command $n -CommandType Application -ErrorAction SilentlyContinue) { $Py = $n; break } } }
+  if (-not $Py) { Log 'event mode needs Python 3 (KALMIDO_PYTHON or python3 / py / python on PATH)'; exit 2 }
+  $pre = @($Py); if ($Py -eq 'py') { $pre += '-3' }
+  $Command = @($pre + @($Runner, '--') + $Command)
+}
 $Poll = if ($env:KALMIDO_POLL) { [int]$env:KALMIDO_POLL } else { 60 }
 $RestartDelay = if ($env:KALMIDO_RESTART_DELAY) { [int]$env:KALMIDO_RESTART_DELAY } else { 10 }
 $Url = $env:KALMIDO_URL.TrimEnd('/') + '/api/v1/agent'
@@ -90,6 +109,7 @@ function Quote([string]$s) {  # one argument for a Windows / .NET command line
 
 $script:Proc = $null
 $script:Started = Get-Date
+# kalmido-capability: runtime (model, auto-compact, fresh session, restart on change / reset / nightly, pause)
 function Start-Agent($s) {
   $cmdArgs = @($Command)
   if ($s.model -ne '-') { $cmdArgs += @('--model', $s.model) }

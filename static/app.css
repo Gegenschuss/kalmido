@@ -5034,6 +5034,10 @@ button.lkchip:hover{border-color:var(--accent)}
 /* 2.26.0 (#928 #949): the list's agent, who may address it, pause with a reason, integrate / deploy requests */
 .agacc{display:flex;align-items:center;gap:.625rem;min-height:2.75rem;margin-top:.25rem;cursor:pointer}
 .agacc>span:last-child{flex:1}
+/* 2.35.0 (#1107): the (i) sits at the right edge of the switch row, the text takes the room in between (a tap in the middle
+   of the row hits the switch, not the (i)) */
+.agacc>span:not(.swc){flex:1;min-width:0}
+.agacc>.ib{margin-left:auto}
 .aimlbl{display:none;font-size:var(--fs-xs);color:var(--muted);min-width:4.5rem}
 .airow .aisel{width:100%;max-width:16rem}
 .airow .aitd{display:flex;align-items:center;gap:.5rem}
@@ -5463,3 +5467,124 @@ body.ms-typing #tabs,body.ms-typing #fab{display:none}
 .rptprev h4{font-size:var(--fs-l);margin:.25rem 0 .5rem}
 .rptprev h5{font-size:var(--fs-m);margin:.75rem 0 .25rem}
 @media (max-width:899px),(pointer:coarse){ .rptmodal .seg button,.rptmodal .foot .btn,.bfcard .btn,.bfcard .rvfold{min-height:2.75rem;min-width:2.75rem;justify-content:center} .bfcard.fold .rvfold{justify-content:flex-start;min-height:2.75rem} .bfcard .bfl li{min-height:1.5rem;padding:.125rem 0} }
+/* 2.35.0 (#1103): approval requests (and permission questions) = a card with the accent edge, pinned at the top until answered */
+.cmsg.ag.apv{padding:.5rem .625rem;border:1px solid var(--line);border-left:.1875rem solid var(--line2);border-radius:var(--r-l);background:var(--bg2);max-width:min(88%,34rem)}
+.cmsg.ag.apvopen{border-left-color:var(--accent);background:color-mix(in srgb,var(--accent) 6%,var(--bg2))}
+.apvh{display:flex;align-items:center;gap:.3rem;font-size:var(--fs-xs);font-weight:600;color:var(--accent);text-transform:none}
+.apvt{font-weight:600;font-size:.9375rem;line-height:1.4;overflow-wrap:anywhere}
+.apvw{font-size:.8125rem;color:var(--text2);line-height:1.4;overflow-wrap:anywhere}
+.cmsg.apv .cbub{background:transparent;padding:.125rem 0}
+.apvpins{display:flex;flex-direction:column;gap:.25rem;padding:.375rem .75rem;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--accent) 6%,var(--bg2));max-height:40%;overflow-y:auto;overscroll-behavior:contain}
+.apvpins[hidden]{display:none}
+.apvpin{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .5rem;border-left:.1875rem solid var(--accent);padding-left:.5rem}
+.apvgo{display:inline-flex;align-items:center;gap:.3rem;flex:1 1 12rem;min-width:0;min-height:2.75rem;padding:0;border:0;background:none;color:var(--text);font:inherit;font-size:.8125rem;text-align:left;cursor:pointer}
+.apvgo b{color:var(--accent);font-size:var(--fs-xs);white-space:nowrap}
+.apvgo span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.apvpin .cchoices{margin:0}
+.srow .c.apvc{display:inline-flex;align-items:center;gap:.125rem;color:var(--accent);font-weight:600}
+.nbadge.apvn{outline:2px solid var(--bg)}
+.btn.apvcard{border-color:var(--accent);color:var(--accent)}
+/* 2.35.0 (#186): file links (network drive, file://): copy-only buttons look like the links they stand for */
+button.flk{border:0;font:inherit;cursor:pointer;text-align:left;padding:0;background:none;color:inherit}
+button.flk.linkchip{padding:.3125rem .625rem;background:var(--bg3);color:var(--accent)}
+.meta button.flk.lnk{display:inline-flex;align-items:center;gap:.1875rem;color:var(--muted);max-width:10.625rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:inherit}
+.povl .povla{display:flex;align-items:center;gap:.5rem;flex:1;min-width:0;color:inherit;text-decoration:none;font-size:var(--fs-b)}
+.povl .povla .i{color:var(--accent);flex:none}
+.flkcp{flex:none}
+@media (pointer:coarse){ .povl .povla{min-height:2.75rem} }
+/* 2.35.0 (#1101): Lists of the organisation (organisation admins): name + numbers, the actions wrap under it on the phone */
+.oadmrow{padding:.5rem 2px;border-bottom:1px solid var(--line)}
+.oadmrow .n{display:flex;flex-direction:column;gap:.125rem;min-width:12rem;white-space:normal}
+.oadmrow .n small{font-size:var(--fs-s)}
+.oadmrow.off{opacity:1}
+.oadmrow.off .n b{color:var(--muted)}
+.oadmb{display:flex;gap:.375rem;flex-wrap:wrap}
+.oadmh{margin:1rem 0 .25rem;font-size:var(--fs-s);color:var(--muted)}
+.oadmlog{margin-top:.75rem}
+@media (pointer:coarse){ .oadmb .btn.sm{height:auto;min-height:2.75rem} }
+/* 2.35.0 (#1095): code snippets of a task (git.js snipHtml): plain code, highlighted like description code blocks */
+.snipsec h5{display:flex;align-items:center;gap:.375rem}
+.snip{margin:.375rem 0;border:1px solid var(--line);border-radius:var(--r-s);background:var(--bg3);min-width:0;max-width:100%}
+.sniphead{display:flex;align-items:center;gap:.375rem;padding:.125rem .25rem .125rem .625rem;border-bottom:1px solid var(--line);font-size:var(--fs-s);min-width:0}
+.sniphead .spacer{flex:1}
+.sniplang{font-weight:600;color:var(--muted);white-space:nowrap}
+.snippath{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:var(--fs-s) var(--mono)}
+a.snippath code{font:inherit;background:none;padding:0}
+.snipby{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.snip pre.snipcode{margin:0;border:0;border-radius:0 0 var(--r-s) var(--r-s);max-height:24rem;overflow:auto}
+.snipedit{padding:.5rem;display:flex;flex-direction:column;gap:.375rem}
+.snipedrow{display:flex;gap:.375rem;flex-wrap:wrap}
+.snipedrow select{flex:0 1 11rem;min-width:0}
+.snipedrow #snip-path{flex:1 1 10rem;min-width:0;font-family:var(--mono)}
+.snipedrow #snip-line{flex:0 0 5rem;width:5rem}
+.snipta{width:100%;min-height:7rem;font:var(--fs-s)/1.5 var(--mono);tab-size:4;white-space:pre;overflow:auto;resize:vertical;padding:.5rem}
+.snipfoot{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap}
+.sniphint{font-size:var(--fs-xs)}
+@media (pointer:coarse){ .sniphead .iconbtn{min-width:2.75rem;min-height:2.75rem} .snipfoot .btn.sm{min-height:2.75rem} .snipta{font-size:1rem} }  /* 1rem: no iOS zoom on focus */
+/* 2.35.0 (#1097): Customize right in the view (dashboard.js lydragCanvas): handle + hide / width at each block, a short
+   preview of its content (not clickable), the dragged block leaves a dashed place, the others make room */
+.lycanvas{margin:.5rem 0 1rem;gap:.75rem}
+.lyedb{border:1px solid var(--line);border-radius:var(--radius);background:var(--bg);min-width:0;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;transition:transform .15s}
+.lytool{display:flex;align-items:center;gap:.25rem;padding:.25rem;border-bottom:1px solid var(--line);background:var(--bg2);border-radius:var(--radius) var(--radius) 0 0}
+.lytool .spacer{flex:1}
+.lyhandle{display:inline-flex;align-items:center;gap:.375rem;min-height:2rem;padding:0 .5rem;border:0;border-radius:var(--r-s);background:none;color:var(--text);font:inherit;font-weight:600;cursor:grab;touch-action:none;min-width:0}
+.lyhandle span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lyhandle:hover{background:var(--bg3)}
+.lyhandle:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.lybody{max-height:14rem;overflow:hidden;padding:.25rem .5rem;pointer-events:none;-webkit-mask-image:linear-gradient(#000 75%,transparent);mask-image:linear-gradient(#000 75%,transparent)}
+.lyempty{display:flex;align-items:center;gap:.5rem;padding:.75rem .25rem;flex-wrap:wrap}
+.lyedb.lyplace{border-style:dashed;border-color:var(--accent);background:var(--accent-soft)}
+.lyedb.lyplace > *{visibility:hidden}
+.lyghost{opacity:.92;box-shadow:0 .5rem 1.5rem rgba(0,0,0,.25);overflow:hidden;border:1px solid var(--accent);border-radius:var(--radius);background:var(--bg)}
+body.lydragging,body.lydragging *{cursor:grabbing!important;-webkit-user-select:none;user-select:none}
+.lyhid{margin:0 0 1rem}
+.lyhid h3{font-size:var(--fs-b);margin:.25rem 0 .375rem;color:var(--muted)}
+.lyhidl{display:flex;flex-wrap:wrap;gap:.375rem}
+.lylist{margin:.5rem 0}
+.lylist > summary{display:flex;align-items:center;gap:.375rem;cursor:pointer;min-height:2.75rem;font-weight:600;list-style:none}
+.lylist > summary::-webkit-details-marker{display:none}
+.lylist > summary .fcar{transform:rotate(-90deg);transition:transform .15s}
+.lylist[open] > summary .fcar{transform:none}
+@media (pointer:coarse){ .lyhandle{min-height:2.75rem} .lytool .iconbtn,.lytool .btn.sm{min-width:2.75rem;min-height:2.75rem} .lyhid .btn.sm{min-height:2.75rem} }
+/* 2.35.0 (#1099): the steps line up with the text "… is writing …" (right of the typing dots: the chat's .875rem + the dots
+   2.1875rem + the gap .5rem), live, kept above an answer and in a job's history, with a thin, calm accent line on the left
+   as their bracket; on the phone a little less indent */
+.chsteps{padding:0 .875rem .25rem calc(3.0625rem - 2px)}
+.chstepl{border-left:2px solid color-mix(in srgb,var(--accent) 35%,transparent);padding-left:.5rem}
+.chsteps.off{padding-left:3.5625rem}
+.csteps{border-left:2px solid color-mix(in srgb,var(--accent) 35%,transparent);margin-left:calc(2.3125rem - 2px);padding-left:.5rem}
+.jvs{border-left:2px solid color-mix(in srgb,var(--accent) 25%,transparent);margin-left:2.5rem;padding-left:calc(.5rem - 2px)}
+#achat .atyping>.hdot,.chview .atyping>.hdot{margin:0 .8125rem}  /* "is working on it": the dot takes the dots' width */
+@media (max-width:599px){
+  .chsteps{padding-left:calc(2.5625rem - 2px)}
+  .chsteps.off{padding-left:2.5rem}
+  .csteps{margin-left:1rem}
+  .jvs{margin-left:1.5rem}
+}
+/* 2.35.0 (#1102): scrolling in a chat never moves the page beside it (Mac trackpad, its rubber band, Safari and Chrome):
+   the message list keeps its scroll to itself, and on a desktop the view around a chat does not scroll either (the
+   agent chat as a page: #view had 2px more than the screen; the team chat: its fixed height did not match the header) */
+.chmsgs{overscroll-behavior:contain}
+@media (min-width:900px){
+  body.in-chat #view{overflow:hidden;padding-top:0;overscroll-behavior:none}
+  body.in-team #view{overflow:hidden;display:flex;flex-direction:column;overscroll-behavior:none}
+  body.in-team .tcwrap{flex:1;min-height:0;display:flex;flex-direction:column}
+  body.in-team .tcview{flex:1;height:auto}
+}
+/* 2.35.0 (#1107): the chat header on touch screens: no two tap areas overlap (measured before: ring / (i) 23 px, (i) /
+   permission badge 7 px), each stays 44 x 44 px. The ring's 44 px box no longer reaches under the (i); on a phone the
+   permission badge moves to the start of the second line (under the name), so name, ring and (i) fit in the first */
+@media (pointer:coarse){ .chnm .chring{margin:-.75rem 0} .chnm .ib:not(.chring){margin:0 .6875rem} }
+@media (pointer:coarse) and (max-width:37.5rem){
+  .chath{gap:.5rem} .chath .chback{margin-right:.125rem}
+  .chath .chn{display:grid;grid-template-columns:auto auto auto minmax(0,1fr);align-items:center;row-gap:.25rem}
+  .chath .chnm{display:contents}
+  .chath .chnm b{grid-row:1;grid-column:1;min-width:3rem;max-width:none}
+  .chath .chnm .chring{grid-row:1;grid-column:2;margin:-.75rem 0}
+  .chath .chnm .ib:not(.chring){grid-row:1;grid-column:3;width:2.75rem;height:2.75rem;margin:-.75rem 0}
+  .chath .chnm .ib:not(.chring)::after{inset:0}
+  .chath .chnm .chmode,.chath .chnm .chmode[data-short]{grid-row:2;grid-column:1;justify-self:start;margin:-.75rem 0 -.75rem .375rem}
+  .chath .chl2{grid-row:2;grid-column:2/-1;min-width:0}
+}
+.lyed{max-width:none}  /* 2.35.0 (#1097): the blocks get the view's width (two side by side as in the view); the list stays narrow */
+.lyed .lylist,.lyed .lyopts{max-width:40rem}

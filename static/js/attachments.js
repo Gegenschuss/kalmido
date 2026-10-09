@@ -192,7 +192,13 @@ function depthOf(t) { let n = 0, p = t; while (p && p.parent_id && n < 5) { p = 
 const MD_URL = String.raw`(?:https?:\/\/|mailto:)[^\s"'<>()\[\]\x60\\]+`;
 const MD_TOK = new RegExp(String.raw`\x60([^\x60]+)\x60|\[([^\[\]]+)\]\((${MD_URL})\)|(^|[\s(])(https?:\/\/[^\s"'<>()\[\]\x60\\]+)`, 'g');
 const mdSafeUrl = u => /^(https?:\/\/[^\s"'<>()\[\]`\\]+|mailto:[^\s"'<>()\[\]`\\]+)$/i.test(u) ? u : null;
-const mdLink = (url, label) => `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+// 2.35.0 (#1096): a link to this app itself (https://<this host>/#t/123, /#list/…) opens in the same window; a task
+// link opens the task on top (trefOpen)
+const mdOwn = u => { try { const x = new URL(u); return x.origin === location.origin && x.pathname === '/' && x.hash.length > 1 ? x : null; } catch { return null; } };
+const mdLink = (url, label) => {
+  const own = mdOwn(url), tm = own && /^#t\/(\d{1,9})$/.exec(own.hash);
+  return own ? `<a href="${esc(own.hash)}"${tm ? ` data-tref="${tm[1]}"` : ''}>${label}</a>` : `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+};
 function mdFmt(t) {  // escaped text only (no attributes are produced here)
   return esc(t)
     .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
