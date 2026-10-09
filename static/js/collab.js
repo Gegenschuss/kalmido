@@ -833,6 +833,12 @@ window.addEventListener('keydown', e => {
   if (art && !S.mp && replyCancel(replyCtx(art), false)) { e.preventDefault(); e.stopImmediatePropagation(); }
 }, true);
 // phones: swipe right on a message
+function rswRowAt(e) {
+  const box = e.target.closest?.('#tc-msgs, #chat-msgs'), y = e.touches?.[0]?.clientY;
+  if (!box || y == null || e.target.closest('button, a, input, textarea, select, label, [contenteditable="true"]')) return null;
+  for (const m of box.querySelectorAll('.cmsg[data-mid]')) { const r = m.getBoundingClientRect(); if (y >= r.top && y <= r.bottom) return m; }
+  return null;
+}
 {
   const RSW_EDGE = 32, RSW_MIN = 56, RSW_MAX = 88;
   let sw = null;
@@ -862,7 +868,9 @@ window.addEventListener('keydown', e => {
   document.addEventListener('touchstart', e => {
     if (sw) swEnd(true);
     if (e.touches?.length !== 1) return;
-    const m = e.target.closest?.('#detail .cm[data-mid], #tc-msgs .cmsg[data-mid], #chat-msgs .cmsg[data-mid]');
+    // 2.34.0 (#1091): the whole row of a message counts (a short message has a narrow bubble): a touch beside it in the
+    // messages box takes the message at that height
+    const m = e.target.closest?.('#detail .cm[data-mid], #tc-msgs .cmsg[data-mid], #chat-msgs .cmsg[data-mid]') || rswRowAt(e);
     if (!m || m.querySelector('.cedit, .tcedit') || e.target.closest('textarea, input, pre, table, .rxrow, .catts, .chatts, .cchoices, .cperm, [contenteditable="true"]')) return;
     const t = e.touches[0]; if (t.clientX < RSW_EDGE || t.clientX > innerWidth - RSW_EDGE) return;
     const sel = getSelection?.(); if (sel && !sel.isCollapsed && String(sel).trim()) return;

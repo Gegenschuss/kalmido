@@ -16,6 +16,7 @@ The agent works through the REST API, webhooks or the [MCP server](../mcp/README
 - [Set up an agent](#set-up-an-agent) (2.7.2: Linux, macOS, Windows; team and personal agents)
 - [Receiving events](#receiving-events)
 - [Events](#events)
+- [Planned jobs](#planned-jobs-2340) (2.34.0)
 - [Approvals](#approvals) (2.15.0: [requests that wait for a person](#requests-that-wait-for-a-person-2150))
 - [Status, jobs and chat](#status-jobs-and-chat)
 - [Files in the chat and on tasks](#files-in-the-chat-and-on-tasks-2131) (2.13.1)
@@ -599,6 +600,8 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `task_added` | 2.23.0 (#795): a top-level task was created in, or moved into, a list shared with the agent (not for its own tasks); 2.30.0: only when the agent [listens in](#agent-listens-in-2300) there | `task`, `list`, `how`: `created` or `moved`, `moved_from` `{id, name}` (only when the agent sees that list), `source`: `form`, `mail`, `errors`, `proposal` (when not made in the app) |
 | `chat_choice` | 2.28.0 (#1005): the person pressed an answer button of one of the agent's chat messages (see *Answer buttons*); 2.30.0: also a 👍 / 👎 on a permission question | `message_id`, `choice_ids`, `labels`, `message`, `user` `{id, name}`; + `task`, `list` when the message was about a task; permission questions: `permission: true`, `approval`, `via`: `button` or `reaction` |
 | `followup_due` | 2.1.0: the follow-up day of a task *waiting on someone* (at the all-day reminder time of the person it is for), once per date, to every agent that follows the task (assigned, creator, commented) | `task` (with `task.waiting`), `list`, `waiting` `{note, until, since, by}` |
+| `stale_tasks` | 2.34.0 (#266): once a day (from 09:00 server time), the [tasks lying idle](#tasks-lying-idle-2340) of the lists shared with the agent that have *Agent follows up* on (off by default); one bundled event per agent and day, at most 30 tasks | `tasks` `[{id, title, list_id, list_name, idle_days, reason, since, due, assignee_id, wait_note}]`, `count`, `default_days`, `lists` `[{id, name}]`, `hint` |
+| `scheduled_job` | 2.34.0 (#272): a [planned job](#planned-jobs-2340) of a person is due (once per due time; after an outage only the one missed run, `late: true`), or the person pressed *Run now* (`manual: true`). Answer in your chat with `by.id` | `schedule_id`, `title`, `prompt` (the person's words: what to do), `list_id` + `list` (or `null`), `by` / `user` `{id, name}`, `chat_with` (= `by.id`), `rhythm` `{freq, days, time, tz}`, `due_at`, `late`, `manual`, `manual_by` (`{id, name}` when a manager of the agent pressed *Run now* on another person's plan, else `null`; you still answer `by.id`), `hint` |
 
 Example `comment` (in `mention` it looks the same):
 
@@ -664,6 +667,38 @@ outside Kalmido: `PUT /api/v1/tasks/{id}/waiting` with `{"note": "who / what", "
 `GET /api/v1/tasks?waiting=true` lists such tasks. Every task has `waiting` (`null` or `{note, until, since, by}`).
 The task stays open. MCP: `set_waiting`, `clear_waiting`, `list_waiting`.
 
+### Tasks lying idle (2.34.0)
+
+`GET /api/v1/stale` (MCP `list_stale_tasks`; `?list_id=`, `?days=` 1-365, `?limit=` up to 200) lists the open top-level
+tasks you can see that nobody touched for a while: no change, comment or time entry for at least the list's threshold
+(`stale_days` of the list, default 7, `0` = never; `days` overrides it), longest idle first. A task waiting on someone
+without a follow-up day ahead counts too (`reason: "waiting"`); one with a follow-up day ahead does not (it gets
+`followup_due`). Milestones, repeating tasks, family and home & life lists and tasks due or starting later are left
+out. Each item: `{id, title, list_id, list_name, idle_days, reason, since, due, assignee_id, wait_note}`.
+
+In lists where the owner or a list admin switched on **Agent follows up** (`agent_followup`, list settings; off by
+default, never settable by an agent) the list's agents get these tasks once a day as one event `stale_tasks`. What to
+do with it: for each task you can help with, write **one** short, friendly comment on the task: a question to the
+person in charge ("Is this still current?"), or for a task waiting on someone outside a draft reminder they could
+send. Ask before doing more; never contact anyone outside Kalmido yourself, and never close or move a task because it
+lies idle.
+
+```json
+{"tasks": [{"id": 77, "title": "Quote from the carpenter", "list_id": 18, "list_name": "House", "idle_days": 9,
+            "reason": "waiting", "since": "2026-09-30T08:00:00+00:00", "due": null, "assignee_id": 1, "wait_note": "carpenter Meier"}],
+ "count": 1, "default_days": 7, "lists": [{"id": 18, "name": "House"}], "hint": "These tasks have been lying idle. …"}
+```
+
+### Time gaps (2.34.0)
+
+`GET /api/v1/time/gaps` (MCP `get_time_gaps`; `?days=` 1-31, default 14; `?user_id=`) returns the working days
+(Monday to Friday, before today) on which a person completed, commented or changed tasks of project lists but tracked
+no time there: `{user_id, from, to, days: [{date, count, tasks: [{id, title, list_id}]}]}` (at most five example
+tasks per day). Without `user_id` it is the token user's own; an agent may pass the id of a person who may chat with
+it, and then only lists that the agent **and** that person see count (tasks and time entries). Pure data: suggest
+entries to the person (with `list_time_entries` for what is already there), never add time for them without asking.
+The web app shows the same as *Maybe forgotten* on top of the time page, and the timesheet can be copied as text.
+
 Example `reaction`:
 
 ```json
@@ -672,6 +707,73 @@ Example `reaction`:
  "reaction": {"emoji": "up", "user": {"id": 1, "name": "Alice"}},
  "approval": "approved"}
 ```
+
+### Planned jobs (2.34.0)
+
+People plan recurring jobs for an agent in the app (Agents > the agent's card > *Plans*): "every working day at 8: my
+morning briefing", "every Monday at 9: the week status of project X". Kalmido never runs a model itself: at the planned
+time it records ONE event `scheduled_job` for the agent, the agent does the work with its tools and answers in its chat
+with that person (`send_chat` with `user_id` = `by.id`, MCP `send_chat`). Start the answer with the job's `title`.
+
+- **Who plans**: every person who may chat with the agent, for themselves. The agent's managers (the owner of a personal
+  agent; for a team agent the instance admins who reach it through a list) see and manage all plans of the agent. Agents read their plans
+  (`GET /api/v1/agent/schedules`, MCP `list_schedules`) but cannot create or change them.
+- **Rhythm**: `daily`, `weekdays` (Mon-Fri), `weekly` on ISO weekdays (`days` `[1, 3]`, 1 = Monday), `monthly` on a day
+  (`days` `[15]`; a day the month does not have = its last day), at `time` HH:MM in the person's time zone `tz`.
+- **List**: optional. It must be open to the person for this agent (shared with the agent, see
+  [Who may address an agent](#who-may-address-an-agent-2260)) and inside the agent's list limit, otherwise the plan cannot
+  be saved. Work only with lists shared with you; `list_id` is a hint where to look, not a permission.
+- **Once per due time, no catch-up storm**: after an outage only the one missed run goes out, marked `late: true`; then
+  the plan goes on from now. A plan of a disabled account does not run. A switched-off agent (kill switch) gets nothing (the run counts as *skipped*); a paused agent
+  gets the event queued like every other one. A plan whose person no longer reaches the agent, or whose list is no
+  longer shared with it, switches itself off (`last_state` `no_access` / `no_list`).
+- **Limits**: 20 plans per person and agent; at most daily; *Run now* at most every 10 minutes per plan.
+- Templates in the app point at the data tools: *Morning briefing* (`read_briefing`), *Weekly project status*
+  (`read_project_status`), *Follow up on stale tasks* (`list_stale_tasks`), *Check time tracking* (`get_time_gaps`, `list_time_entries`).
+  The text stays the person's; treat it as their instruction for this one job, within your usual rules.
+
+Example `scheduled_job`:
+
+```json
+{"schedule_id": 4, "title": "Weekly project status", "prompt": "Read the status of the list of this plan for the last 7 days …",
+ "list_id": 18, "list": {"id": 18, "name": "Website", "agent_tidy": "off"}, "by": {"id": 1, "name": "Alice"},
+ "user": {"id": 1, "name": "Alice"}, "chat_with": 1, "rhythm": {"freq": "weekly", "days": [1], "time": "09:00", "tz": "Europe/Berlin"},
+ "due_at": "2026-10-12T07:00:00+00:00", "late": false, "manual": false, "manual_by": null, "hint": "A planned job of this person. …"}
+```
+
+### Briefing and project status (2.34.0)
+
+Two read-only data tools for planned jobs and questions like "what is up today?" or "write the week status for the
+client". Kalmido writes no prose itself: you get the data and formulate the text.
+
+- **Morning briefing of a person** `GET /briefing?user_id=<person>` (MCP `read_briefing`, scope read). Only for a
+  person who may chat with you (shares a list with you; a personal agent: its owner), else 404; only the lists that
+  person shares with you count (and your token's list limit). A personal token reads its own briefing (leave `user_id`
+  out). Answer: `counts` {`today`, `overdue`, `blocked`, `changed`, `stale`} and at most 15 rows each of `today` (due
+  today / overdue: main tasks assigned to the person, or without assignee in their own lists), `blocked` (`reason`
+  `waiting` = waiting on someone outside with `wait_note`, `blocked` = an open task blocks it), `changed` (changes by
+  others since `since` on tasks that concern the person -- assigned to them, created or commented by them, or without
+  assignee in their own lists: `kinds` `assigned` / `comment` / `status` / `due`, `by`, `at`) and `stale` (their tasks
+  lying idle, see `GET /stale`). `since` is the moment the person last marked the briefing read in the app (on an
+  earlier day), else 18:00 yesterday, never more than 7 days back; `?since=` overrides it. Reading marks nothing read.
+- **Status report of a list** `GET /lists/{id}/status-report?days=7` (or `from` / `to`, `lang`; MCP
+  `read_project_status`, scope read). Only lists shared with you. `done` (completed in the period), `in_progress`
+  (open main tasks with a change, comment or time entry in the period), `blocked`, `overdue`, `upcoming` (due from today
+  until 14 days after the period), `milestones` (reached in the period + the next open ones), `time` (project lists
+  with time tracking: `seconds`, `rounded`, per task; `null` unless time tracking is on for the person and the token
+  has the scope `time`) and `markdown`: a plain text from fixed sentences that leaves out
+  comments, descriptions, notes and every name of people or agents. Use it as a base; a client report goes out only
+  through a person.
+
+```bash
+curl -s -H "Authorization: Bearer $KALMIDO_TOKEN" "$KALMIDO_URL/api/v1/briefing?user_id=1"
+curl -s -H "Authorization: Bearer $KALMIDO_TOKEN" "$KALMIDO_URL/api/v1/lists/18/status-report?days=7&lang=de"
+```
+
+In the app the briefing is the first block of *Today* (numbers + "New since yesterday", "Blocked", "Lying idle";
+*Read* folds it for the day on every device) and an optional push at a chosen time (Settings > Notifications >
+*Morning briefing at*, off by default; only the numbers). The status report is the button *Status report* on the
+project page (period, preview, copy, share).
 
 ## Approvals
 
@@ -978,6 +1080,7 @@ Agents read files like this:
 | Files of a task and its comments | `GET /api/v1/tasks/{id}/attachments` → `[{id, task_id, comment_id, name, mime, size, created_at, url}]` | `list_attachments` |
 | One task / comment file (binary) | `GET /api/v1/attachments/{id}` (`?dl=1` = download) | `get_attachment` (`source: task`) |
 | A chat file (binary) | `GET /api/v1/chat-attachments/{id}`, ids from the message's `attachments` | `get_attachment` (`source: chat`) |
+| A task / comment file as text (2.34.0) | `GET /api/v1/attachments/{id}/text` (`?max_chars=`, default and at most 200000) | `read_attachment` |
 | Remove a chat file you sent | `DELETE /api/v1/chat-attachments/{id}` | – |
 | Send files in the chat | `POST /api/v1/agent/chats/{user_id}` as `multipart/form-data`: `body` (optional with files), `task_id`, `file` (repeatable) | `send_chat` with `files: [{name, base64, mime?}]` |
 | Write a text file onto a task (2.30.0) | `POST /api/v1/tasks/{id}/attachments/text` with `{name, content}` (needs `attachments:write`) | `create_text_file` |
@@ -986,6 +1089,22 @@ Permissions are the app's: an agent reads files only of tasks it sees with their
 participant only its own tasks) and only of its own conversations; anything else is `404`. `get_attachment` returns
 `name`, `mime`, `size` and `base64`, at most `max_bytes` (default 5 MB, at most 20 MB); images also come as an MCP image
 item so the model can look at them. A damaged file on the server answers `410`.
+
+**Reading a file as text (2.34.0).** `GET /api/v1/attachments/{id}/text` (MCP `read_attachment`, scope
+`attachments:read`, same rights as the file itself, else `404`) answers `{id, task_id, comment_id, name, mime, size, url,
+kind, text, chars, truncated, message}`:
+
+- `kind: "pdf"`: the PDF's text layer, pages separated by a blank line, plus `pages` / `pages_read`. The server reads it
+  in a separate, limited process (at most 20 MB, 1000 pages, 20 seconds, a memory limit); `text` stops at `max_chars`
+  (default and at most 200000) with `truncated: true`. A scanned PDF without a text layer answers `no_text_layer: true`
+  and an empty `text` -- there is no text recognition (OCR); say so instead of guessing. A password-protected, damaged or
+  too complex PDF answers `error` (`encrypted`, `unreadable`, `too_complex`) and a `message`.
+- `kind: "text"`: the text of a text file (Markdown, CSV, JSON, ...).
+- `kind: "image"`: no text, `url` points to the file; `read_attachment` returns the image itself (up to 5 MB).
+- `kind: "other"`: nothing to read (`message` says so).
+
+Results are cached per file content. `413` = larger than 20 MB, `503` = several PDFs are being read right now (wait for
+`Retry-After`). Typical use: a briefing PDF on a task -> `read_attachment` -> a note or a proposal of tasks.
 
 **Text files from agents (2.30.0).** Reports, reviews, Markdown notes, HTML / CSS / JS snippets, JSON / CSV and code go
 onto a task with `create_text_file` (name with its ending + UTF-8 content, at most 1 MB) -- only on tasks the agent may
@@ -1609,12 +1728,12 @@ with the scope it needs). The tools:
 - templates and filters: `list_templates`, `create_template`, `update_template`, `delete_template`, `apply_template`,
   `list_filters`, `create_filter`, `update_filter`, `delete_filter`
 - comments and reactions: `add_comment`, `update_comment`, `delete_comment`, `react`
-- files: `list_attachments`, `get_attachment` (task, chat or project files), `upload_attachment`, `create_text_file` (2.30.0), `delete_attachment`,
+- files: `list_attachments`, `get_attachment` (task, chat or project files), `read_attachment` (2.34.0: PDF / text as text), `upload_attachment`, `create_text_file` (2.30.0), `delete_attachment`,
   `delete_chat_attachment`
 - projects: `get_project_overview`, `set_project_overview`, `set_project_status`, `add_project_link`,
   `update_project_link`, `delete_project_link`, `reorder_project_links`, `add_milestone`, `update_milestone`,
   `delete_milestone`, `list_project_files`, `upload_project_file`, `delete_project_file`, `list_repos`
-- time and habits: `get_timer`, `start_timer`, `stop_timer`, `list_time_entries`, `add_time_entry`, `update_time_entry`,
+- time and habits: `get_timer`, `start_timer`, `stop_timer`, `list_time_entries`, `get_time_gaps` (2.34.0), `add_time_entry`, `update_time_entry`,
   `delete_time_entry`, `list_habits`, `create_habit`, `update_habit`, `delete_habit`, `check_in_habit`
 - News: `list_news`, `mark_news_read`
 - day plans: `get_day_plan`, `get_day_review`
@@ -1622,7 +1741,7 @@ with the scope it needs). The tools:
   `add_shop_areas`, `list_packing_templates`, `create_packing_list`, `list_kids`, `give_stars`, `add_reward`,
   `update_reward`, `delete_reward`, `request_reward`, `decide_reward` (an agent is never a parent: the kid routes
   answer 404 for it)
-- waiting on someone: `set_waiting`, `clear_waiting`, `list_waiting`
+- waiting on someone: `set_waiting`, `clear_waiting`, `list_waiting`, `list_stale_tasks` (2.34.0: tasks lying idle)
 - agent channel (agent tokens only): `get_agent`, `set_status`, `list_events`, `wait_for_events`, `list_jobs`,
   `create_job`, `get_job`, `update_job`, `submit_proposal`, `list_chats`, `send_chat`, `chat_typing`, `react_to_chat`,
   `report_usage`, `get_usage`, `tidy_task`, `request_merge_approval`

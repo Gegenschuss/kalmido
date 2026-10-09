@@ -480,17 +480,23 @@ def watchdog_tick(c):
     _wd_section(c, "chat files cleanup", chat_files_gc)  # 2.13.1 (#465)
     _wd_section(c, "tidy events", tidy_tick)  # 2.27.0 (#999)
     _wd_section(c, "agent bursts", burst_tick)  # 2.29.0 (#1031)
+    from ..agents.schedules import sched_tick
+    _wd_section(c, "agent schedules", sched_tick)  # 2.34.0 (#272): planned agent jobs
     _wd_section(c, "time", time_watchdog, users, S, LG)
     now = local_now()
     _wd_section(c, "reminders", _wd_reminders, users, S, LG, now)
     _wd_section(c, "nags", _wd_nags, users, S, LG, now)  # 2.7.0 (#413), after the reminders (a reminder counts as a nag)
     _wd_section(c, "follow-ups", _wd_followups, users, S, LG, now)  # 2.1.0 (#335)
+    from ..tasks.stale import _wd_stale
+    _wd_section(c, "stale tasks", _wd_stale, now)  # 2.34.0 (#266): once a day, agents of lists with "Agent follows up"
     _wd_section(c, "rotations", _wd_rotations, users, S, LG, now)  # 2.19.0 (#653)
     _wd_section(c, "events", _wd_events, users, S, LG, now)  # 2.21.0 (#659): event reminders, purge of deleted events
     _wd_section(c, "focus", _wd_focus, users, S, LG)
     _wd_section(c, "habits", _wd_habits, users, S, LG, now)
     _wd_section(c, "digest", _wd_digest, users, S, LG, now)
     _wd_section(c, "review", _wd_review, users, S, LG, now)  # 2.10.0 (#440)
+    from ..tasks.briefing import _wd_briefing
+    _wd_section(c, "briefing", _wd_briefing, users, S, LG, now)  # 2.34.0 (#264)
     _wd_section(c, "staying in touch", _wd_care, users, S, LG, now)  # 2.22.0 (#663)
     _wd_section(c, "read later", _wd_reading, users, S, LG, now)  # 2.22.0 (#663)
     from ..accounts.tenancy import boundary_tick

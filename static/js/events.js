@@ -312,6 +312,7 @@ document.addEventListener('click', async e => {
     case 'agents-go': settingsModal('agents'); break;  // 2.28.0 (#1011)
     case 'news-tab': LS.set('newsTab', a.dataset.tab); renderView(); break;  // 2.28.0 (#987)
     case 'chat-open': chatOpen(+a.dataset.aid); break;
+    case 'sched-open': schedOpen(+a.dataset.aid); break;  // 2.34.0 (#272): planned agent jobs
     case 'chat-close': chatClose(); break;
     case 'chat-mode': chatModeMenu(a); break;  // 2.29.0 (#1029)
     case 'steps-always': stepsAlways(); break;  // 2.32.0 (#1081)
@@ -662,6 +663,8 @@ document.addEventListener('click', async e => {
     case 'tv-toggle': { const k = a.dataset.key; S.collapsed.has(k) ? S.collapsed.delete(k) : S.collapsed.add(k); LS.set('collapsed', [...S.collapsed]); renderView(); break; }
     case 'tv-entries': S.tv.entries = !S.tv.entries; LS.set('timeEntries', S.tv.entries); lyOptSet('time', 'entries', 'open', S.tv.entries); renderView(); break;
     case 'tv-sheet': timesheet(); break;
+    case 'tvg-add': entryModal(null, {task_id: id || null, date: a.dataset.d}); break;  // 2.34.0 (#269): a day without tracked time
+    case 'tvg-x': tvgDismiss(); break;
   }
 });
 let sideRet = null;

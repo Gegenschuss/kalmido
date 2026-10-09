@@ -24,7 +24,8 @@ from .layouts import LAYOUT_KEYS
 # ---------------------------------------------------------------- settings / export (per user)
 
 SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "review_sent", "ntfy_topic", "features_rev", "onboard", "sample_ask", "agent_share",
-                        "purpose", "evcals_hidden", "care_sent")
+                        "purpose", "evcals_hidden", "care_sent",
+                        "brief_sent", "brief_read")  # 2.34.0 (#264)
 SIDE_GROUPS = ("focus", "clients", "lists", "filters", "tags", "views", "team")  # 2.25.0 (UX-03)
 DASH_WIDGETS = ("wait", "today", "news", "chat", "projects", "pinned", "notes", "agents", "stats", "search", "family")  # 2.17.0 (#475), 2.19.0
 SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "time_focus", "paperless_keep", "celebrate", "cal_today",
@@ -49,7 +50,7 @@ def clean_setting(k, v):
         if not valid_hm(sv):
             raise bad
         return sv
-    if k in ("digest_time", "review_time"):
+    if k in ("digest_time", "review_time", "brief_time"):  # 2.34.0 (#264): brief_time
         if sv and not valid_hm(sv):
             raise bad
         return sv
@@ -439,6 +440,7 @@ def export_json():
         "list_notif": (f"SELECT * FROM list_notif WHERE list_id IN {own}", (uid,)),  # 2.33.0 (#927): my notification templates
         "folder_notif": ("SELECT * FROM folder_notif WHERE owner_id=?", (uid,)),
         "agent_steps": ("SELECT id, agent_id, job_id, message_id, text, created_at FROM agent_steps WHERE user_id=?", (uid,)),  # 2.32.0 (#1081)  # 2.32.0 (#1063): my own project page arrangements
+        "agent_schedules": ("SELECT * FROM agent_schedules WHERE user_id=?", (uid,)),  # 2.34.0 (#272): my planned agent jobs
         # 2.21.0 (#659 / #658): my event calendars with their events + attendees, my address books with their contacts
         "event_calendars": ("SELECT * FROM ev_cals WHERE owner_id=?", (uid,)),
         "events": ("SELECT * FROM events WHERE cal_id IN (SELECT id FROM ev_cals WHERE owner_id=?)", (uid,)),

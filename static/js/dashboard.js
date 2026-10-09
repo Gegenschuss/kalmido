@@ -112,7 +112,10 @@ function lyPref(v, o = {}) {
   const phone = o.phone ?? (S.ly.view === v ? S.ly.phone : isMobile());
   const p = phone && raw.mobile ? raw.mobile : raw, po = (p.order || []).filter(k => keys.includes(k));
   const fixed = new Set(bs.filter(b => b[4]).map(b => b[0]));
-  const order = [...po, ...keys.filter(k => !po.includes(k))];
+  // 2.34.0 (#264): a block that is new since the arrangement was saved goes where it stands in the default order (before the
+  // next block it already has), not to the end -- the briefing belongs on top of Today
+  const order = po.slice();
+  keys.forEach((k, i) => { if (order.includes(k)) return; const nx = keys.slice(i + 1).find(x => order.includes(x)); order.splice(nx ? order.indexOf(nx) : order.length, 0, k); });
   const hidden = new Set((p.hidden || []).filter(k => keys.includes(k) && !fixed.has(k)));
   const size = k => (p.full || []).includes(k) ? 'full' : (p.half || []).includes(k) ? 'half' : (bs.find(b => b[0] === k)?.[3] || 'half');
   return {raw, part: p, order, hidden, size, fixed, mobile: !!raw.mobile, opts: raw.opts || {}};
@@ -251,7 +254,7 @@ document.addEventListener('drop', e => {
 });
 
 // Today and Time tracking (2.32.0): the first views on the builder; the blocks a view does not show right now simply stay out
-LY.today = {key: 'view_today', empty: '', title: () => tr('Customize Today'), blocks: () => [['wait', N_('Waiting for you'), 'hourglass', 'full'], ['review', N_('Daily review'), 'journal', 'full'],
+LY.today = {key: 'view_today', empty: '', title: () => tr('Customize Today'), blocks: () => [['brief', N_('Briefing'), 'sunrise', 'full'], ['wait', N_('Waiting for you'), 'hourglass', 'full'], ['review', N_('Daily review'), 'journal', 'full'],
   ['overdue', N_('Overdue'), 'alert', 'full'], ['events', N_('Events today'), 'cal', 'full'], ['tasks', N_('Tasks'), 'list', 'full', true], ['inbox', N_('Inbox'), 'inbox', 'full']]};
 LY.time = {key: 'view_time', empty: '', title: () => tr('Customize time tracking'), blocks: () => [['tiles', N_('Totals'), 'clock', 'full'],
   ['chart', N_('Per day'), 'chart', 'full'], ['lists', N_('By list and task'), 'list', 'full'], ['entries', N_('Entries'), 'rows', 'full']]};

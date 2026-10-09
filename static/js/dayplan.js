@@ -151,3 +151,52 @@ function reviewCard() {
     <div class="rvtm"><span class="muted">${esc(tm.count ? tr('Suggestion for {0}: {1}', fmtDayAbs(tm.date), tm.plan.slice(0, 3).map(x => x.start + ' ' + x.title).join(', ')) : tr('Nothing planned for {0} yet.', fmtDayAbs(tm.date)))}</span>
       ${plan}${feat('review') ? `<a class="btn sm" href="#review">${ic('journal', 's')} ${tr('Journal')}</a>` : ''}</div></section>`;
 }
+
+// ---- 2.34.0 (#264): the morning briefing, the first block of Today: the numbers (due today, overdue, blocked, new since
+// yesterday, lying idle) and the short lists "New since yesterday", "Blocked", "Lying idle" (today's tasks are Today itself).
+// "Read" is kept on the server per day (every device folds it); the folded line still opens it. Nothing to say: no block.
+S.brief = {data: null, busy: false, v: null, at: 0, open: false};
+const BRIEF_KINDS = {assigned: N_('assigned to you'), comment: N_('new comment'), status: N_('status changed'), due: N_('date changed')};
+function briefLoad(force) {
+  const b = S.brief;
+  if (b.busy || (!force && b.data && b.data.date === today() && (b.v === S.v || Date.now() - b.at < 60000))) return;
+  b.busy = true;
+  rawFetch('GET', '/api/briefing').then(j => { Object.assign(b, {data: j, v: S.v, at: Date.now()}); if (S.route.key === 'today') viewSafeRender(); })
+    .catch(() => {}).finally(() => { b.busy = false; });
+}
+function briefNums(n, fold) {
+  const parts = [[n.today, trn('{0} due today', '{0} due today', n.today)], [n.overdue, trn('{0} overdue', '{0} overdue', n.overdue)],
+    [n.blocked, trn('{0} blocked', '{0} blocked', n.blocked)], [n.changed, trn('{0} new since yesterday', '{0} new since yesterday', n.changed)],
+    [n.stale, trn('{0} lying idle', '{0} lying idle', n.stale)]].filter(p => p[0]);
+  if (fold) return esc(parts.map(p => p[1]).join(' · '));
+  return parts.map(p => { const s = String(p[1]), i = s.indexOf(String(p[0])); return i < 0 ? `<span>${esc(s)}</span>` : `<span>${esc(s.slice(0, i))}<b>${p[0]}</b>${esc(s.slice(i + String(p[0]).length))}</span>`; }).join('');
+}
+function briefCard() {
+  if (S.route.key !== 'today') return '';
+  briefLoad();
+  const d = S.brief.data; if (!d || d.date !== today()) return '';
+  const n = d.counts; if (!(n.today || n.overdue || n.blocked || n.changed || n.stale)) return '';
+  const read = d.read && !S.brief.open;
+  if (read) return `<section class="rvcard fold bfcard" aria-label="${esc(tr('Briefing'))}"><button type="button" class="rvfold" data-brief="open" aria-expanded="false">${ic('chev', 's')}<span class="rvft">${esc(tr('Briefing'))}</span><span class="rvfn">${briefNums(n, true)}</span></button></section>`;
+  const more = (all, shown) => all > shown ? `<li class="muted">${esc(trn('and {0} more', 'and {0} more', all - shown))}</li>` : '';
+  const who = x => (x.by || []).map(u => u.name).filter(Boolean).slice(0, 2).join(', ');
+  const ch = d.changed.slice(0, 5).map(x => `<li><a href="#t/${x.id}">${esc(x.title)}</a> <span class="muted">${esc([who(x), x.kinds.map(k => tr(BRIEF_KINDS[k] || k)).join(', ')].filter(Boolean).join(' · '))}</span></li>`).join('') + more(n.changed, Math.min(5, d.changed.length));
+  const bl = d.blocked.slice(0, 5).map(x => `<li><a href="#t/${x.id}">${esc(x.title)}</a> <span class="muted">${esc(x.reason === 'waiting' ? (x.wait_note ? tr('waiting on: {0}', x.wait_note) : tr('waiting on someone')) : tr('waiting for another task'))}</span></li>`).join('') + more(n.blocked, Math.min(5, d.blocked.length));
+  const st = d.stale.slice(0, 3).map(x => `<li><a href="#t/${x.id}">${esc(x.title)}</a> <span class="muted">${esc(trn('for {0} day', 'for {0} days', x.idle_days))}</span></li>`).join('') + more(n.stale, Math.min(3, d.stale.length));
+  return `<section class="rvcard bfcard" aria-labelledby="bf-h"><div class="rvhd">${d.read ? `<button type="button" class="rvfold" data-brief="close" aria-expanded="true" aria-label="${esc(tr('Briefing'))}">${ic('chev', 's')}</button>` : ''}<h3 id="bf-h">${ic('sunrise', 's')} ${tr('Briefing')}</h3><span class="spacer"></span>${d.read ? '' : `<button type="button" class="btn sm" data-brief="read">${ic('check', 's')} ${tr('Read|briefing')}</button>`}</div>
+    <div class="rvnums">${briefNums(n)}</div>
+    ${ch ? `<h4>${tr('New since yesterday')}</h4><ul class="rvl bfl">${ch}</ul>` : ''}
+    ${bl ? `<h4>${tr('Blocked')}</h4><ul class="rvl bfl">${bl}</ul>` : ''}
+    ${st ? `<h4>${tr('Lying idle')}</h4><ul class="rvl bfl">${st}</ul>` : ''}</section>`;
+}
+document.addEventListener('click', async e => {
+  const a = e.target.closest?.('[data-brief]'); if (!a) return;
+  e.preventDefault();
+  const k = a.dataset.brief;
+  if (k === 'open') { S.brief.open = true; renderView(); setTimeout(() => $('#view [data-brief="close"]')?.focus(), 0); return; }
+  if (k === 'close') { S.brief.open = false; renderView(); setTimeout(() => $('#view [data-brief="open"]')?.focus(), 0); return; }
+  if (k === 'read') {
+    try { S.brief.data = await api('POST', '/api/briefing/read', {read: true}); S.brief.at = Date.now(); } catch { return; }
+    S.brief.open = false; announce(tr('Briefing read')); renderView(); setTimeout(() => $('#view [data-brief="open"]')?.focus(), 0);
+  }
+});

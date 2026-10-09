@@ -558,6 +558,7 @@ async function load() {
   if (S.sel && S.dp.id === S.sel && S.dp.v !== S.v) loadDeps(S.sel);
   if (S.chat.aid && collab()) chatLoad();
   if (S.route.mod === 'agents' && S.jobs.items !== null) loadJobs();
+  if (typeof staleLoad === 'function') staleLoad(S.route.key === 'stale');  // 2.34.0 (#266): at most every 5 minutes, at once in its view
 }
 async function loadExtra() {
   const k = S.route.key;
@@ -703,6 +704,7 @@ const SMART = {
   week: {name: N_('Next 7 days'), icon: 'week'},
   doable: {name: N_('Now doable'), icon: 'zap'},  // 1.7.0
   waiting: {name: N_('Waiting on someone'), icon: 'hourglass'},  // 2.1.0 (#335)
+  stale: {name: N_('Lying idle'), icon: 'clock'},  // 2.34.0 (#266)
   pinned: {name: N_('Pinned|view'), icon: 'pin'},  // 2.16.0 (#648): every pinned task of every list
   assigned: {name: N_('My tasks'), icon: 'user'},
   all: {name: N_('All'), icon: 'all'},

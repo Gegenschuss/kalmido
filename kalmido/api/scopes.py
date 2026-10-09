@@ -244,7 +244,7 @@ def scope_refine(paths):
                     sc = "delete"
                 else:
                     sc = next((s for rx, s in SCOPE_RULES if re.search(rx, p)), "structure")
-            elif sc == "read" and m == "get" and (p in ("/attachments/{id}", "/lists/{id}/files/{file_id}")):
+            elif sc == "read" and m == "get" and (p in ("/attachments/{id}", "/attachments/{id}/text", "/lists/{id}/files/{file_id}")):
                 sc = "attachments:read"
             op["x-kalmido-scope"] = sc
             if sc not in ("read", "agent"):

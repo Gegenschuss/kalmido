@@ -271,7 +271,7 @@ function viewProjOv() {
   const ts = timeSumHtml([l]);
   if (timeOn() && j.time) P.time = x => povSec('time', tr('Tracked time'), ts || '', x, emp(!ts, tr('No time tracked yet.')));
   const y = j.layout || {}, cust = S.ly.view === 'project';
-  const bar = `<div class="povlybar">${!cust && y.mine ? `<span class="muted">${tr('Your own arrangement')}</span>` : ''}<span class="spacer"></span>${cust ? '' : lyCustomBtn('project')}</div>`;
+  const bar = `<div class="povlybar">${!cust && y.mine ? `<span class="muted">${tr('Your own arrangement')}</span>` : ''}<span class="spacer"></span>${cust ? '' : `<button type="button" class="btn sm" data-rpt="open" data-id="${l.id}">${ic('journal', 's')}${tr('Status report')}</button>` + lyCustomBtn('project')}</div>`;  // 2.34.0 (#265)
   return `<div class="pov">${head}${bar}${lyHtml('project', P, {canStd: !!y.can_std && !l.archived, override: true})}</div>`;
 }
 async function povApi(method, url, body) {
@@ -566,3 +566,45 @@ function actField(d) {
   if (d.type === 'url') return urlHost(d.v);
   return String(d.v);
 }
+
+// ---- 2.34.0 (#265): the status report of a project for a period (default the last 7 days): a preview of the plain text
+// the server builds from fixed sentences (done, in progress, blocked, overdue, next dates, tracked time; no comments, notes
+// or names), to copy or share with a client.
+function rptModal(lid) {
+  const l = listById(lid); if (!l) return;
+  const st = {days: 7, from: '', to: '', md: '', seq: 0};
+  const md = modal(`<h3>${esc(tr('Status report'))}: ${esc(lname(l))}</h3>
+    <div class="row rptper"><div class="seg" role="group" aria-label="${esc(tr('Period'))}">${[7, 14, 30].map(n => `<button type="button" data-rpt="days" data-n="${n}" aria-pressed="${n === 7}" class="${n === 7 ? 'on' : ''}">${esc(trn('{0} day', '{0} days', n))}</button>`).join('')}</div></div>
+    <div class="row rptdates"><label for="rpt-from">${tr('From')}</label>${dateIn('rpt-from', '', {label: tr('From'), clear: false})}<label for="rpt-to">${tr('To')}</label>${dateIn('rpt-to', '', {label: tr('To'), clear: false})}</div>
+    <div class="rptprev md" id="rpt-prev" aria-live="polite"><div class="muted">${tr('Loading…')}</div></div>
+    <p class="muted rpthint">${tr('Without comments, notes and names. Edit the text before you send it.')}</p>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button>${navigator.share ? `<button class="btn" data-rpt="share">${ic('send', 's')} ${tr('Share')}</button>` : ''}<button class="btn pri" data-rpt="copy">${ic('copy', 's')} ${tr('Copy')}</button></div>`);
+  md.classList.add('rptmodal');
+  const load = async () => {
+    const seq = ++st.seq, q = st.from || st.to ? `from=${st.from || st.to}&to=${st.to || st.from}` : `days=${st.days}`;
+    let j; try { j = await rawFetch('GET', `/api/lists/${lid}/status-report?${q}&lang=${encodeURIComponent(S.settings?.lang || 'en')}`); }
+    catch (e) { if (seq === st.seq) $('#rpt-prev', md).innerHTML = `<div class="muted">${esc(e instanceof Offline ? tr('Only available online.') : e.message)}</div>`; return; }
+    if (seq !== st.seq) return;
+    st.md = j.markdown; for (const [k, v] of [['#rpt-from', j.from], ['#rpt-to', j.to]]) { const x = $(k, md); x.value = v; dpSync(x); }  // own date picker (U23)
+    $('#rpt-prev', md).innerHTML = renderMd(j.markdown, true);
+  };
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('[data-rpt],[data-m]'); if (!b) return;
+    if (b.dataset.m === 'close') { md.remove(); return; }
+    const k = b.dataset.rpt;
+    if (k === 'days') { st.days = +b.dataset.n; st.from = st.to = ''; $$('[data-rpt="days"]', md).forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); }); load(); }
+    else if (k === 'copy' && st.md) { try { await navigator.clipboard.writeText(st.md); toast(tr('Copied')); } catch { toast(tr('Could not copy')); } }
+    else if (k === 'share' && st.md) { try { await navigator.share({title: tr('Status report') + ': ' + lname(l), text: st.md}); } catch { /* cancelled */ } }
+  });
+  md.addEventListener('change', e => {
+    if (e.target.id !== 'rpt-from' && e.target.id !== 'rpt-to') return;
+    st.from = $('#rpt-from', md).value; st.to = $('#rpt-to', md).value;
+    $$('[data-rpt="days"]', md).forEach(x => { x.classList.remove('on'); x.setAttribute('aria-pressed', 'false'); });
+    load();
+  });
+  load();
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('[data-rpt="open"]'); if (!b) return;
+  e.preventDefault(); rptModal(+b.dataset.id);
+});

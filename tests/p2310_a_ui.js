@@ -103,23 +103,23 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return ds(d
     // #1052 overdue actions in the head of "Overdue", no card
     const od = await ev(`(() => ({head: !!document.querySelector('#view .ghead.over .odact [data-act="od-move"]') && !!document.querySelector('#view .ghead.over .odact [data-act="od-other"]'), card: !!document.querySelector('#view .odban')}))()`);
     check(od.head && !od.card, `${tag}: #1052 "All to today" / "Another day…" in the head of Overdue ` + JSON.stringify(od));
-    // #1052 the review: full on its first read, numbers not in mono
-    const rv = await ev(`(() => { const c = document.querySelector('#view .rvcard'), n = c && c.querySelector('.rvnums'); return c ? {fold: c.classList.contains('fold'), mono: !n || getComputedStyle(n).fontFamily === getComputedStyle(document.querySelector('#view .meta .mid')).fontFamily} : null; })()`);
+    // #1052 the review: full on its first read, numbers not in mono (2.34.0: the briefing above it is an .rvcard too -> :not(.bfcard))
+    const rv = await ev(`(() => { const c = document.querySelector('#view .rvcard:not(.bfcard)'), n = c && c.querySelector('.rvnums'); return c ? {fold: c.classList.contains('fold'), mono: !n || getComputedStyle(n).fontFamily === getComputedStyle(document.querySelector('#view .meta .mid')).fontFamily} : null; })()`);
     check(rv && !rv.fold && !rv.mono, `${tag}: #1052 the review card in full on the first read, numbers in the normal font ` + JSON.stringify(rv));
     await shot('p2310a-390-today-review.png');
     // the card shows by itself only after the end of the working hours: end them right after midnight, so the check holds at
     // any time of day (a run after midnight saw no card)
     check((await call('PATCH', '/api/settings', {work_start: '00:00', work_end: '00:01'})).ok, `${tag}: working hours 00:00-00:01 for the review`);
     await nav(B + '#today'); await ready(ev); await ev(`(async () => { await load(); render(); return 1; })()`); await sleep(800);
-    const fd = await ev(`(() => { const c = document.querySelector('#view .rvcard'); if (!c) return {none: 1, dp: S.dayplan, day: S.review.day, busy: S.review.busy, data: !!S.review.data, route: S.route.key, hidden: localStorage.getItem('reviewHidden'), now: new Date().toString()}; const r = c.getBoundingClientRect(); return {fold: c.classList.contains('fold'), h: Math.round(r.height), txt: c.textContent.replace(/\\s+/g, ' ').trim(), plan: !!c.querySelector('[data-act="dayplan"]'), sx: document.documentElement.scrollWidth}; })()`);
+    const fd = await ev(`(() => { const c = document.querySelector('#view .rvcard:not(.bfcard)'); if (!c) return {none: 1, dp: S.dayplan, day: S.review.day, busy: S.review.busy, data: !!S.review.data, route: S.route.key, hidden: localStorage.getItem('reviewHidden'), now: new Date().toString()}; const r = c.getBoundingClientRect(); return {fold: c.classList.contains('fold'), h: Math.round(r.height), txt: c.textContent.replace(/\\s+/g, ' ').trim(), plan: !!c.querySelector('[data-act="dayplan"]'), sx: document.documentElement.scrollWidth}; })()`);
     check(fd && fd.fold && fd.h <= 56 && /1 done · \d+ still open/.test(fd.txt) && fd.plan && fd.sx <= 390, `${tag}: #1052 back in Today the review is one line ("1 done · … · Plan tomorrow") ` + JSON.stringify(fd));
     await shot('p2310a-390-today.png');
-    await ev(`(() => { document.querySelector('#view .rvcard .rvfold').click(); return 1; })()`); await sleep(500);
-    check(await ev(`!!document.querySelector('#view .rvcard:not(.fold) .rvnums')`), `${tag}: #1052 a tap unfolds it`);
+    await ev(`(() => { document.querySelector('#view .rvcard:not(.bfcard) .rvfold').click(); return 1; })()`); await sleep(500);
+    check(await ev(`!!document.querySelector('#view .rvcard:not(.bfcard):not(.fold) .rvnums')`), `${tag}: #1052 a tap unfolds it`);
     await ev(`(() => { route(); return 1; })()`); await sleep(500);
-    check(await ev(`!!document.querySelector('#view .rvcard:not(.fold)')`), `${tag}: #1052 unfolded stays unfolded today`);
-    await ev(`(() => { document.querySelector('#view .rvcard .rvfold').click(); return 1; })()`); await sleep(500);
-    check(await ev(`!!document.querySelector('#view .rvcard.fold')`), `${tag}: #1052 and folds again`);
+    check(await ev(`!!document.querySelector('#view .rvcard:not(.bfcard):not(.fold)')`), `${tag}: #1052 unfolded stays unfolded today`);
+    await ev(`(() => { document.querySelector('#view .rvcard:not(.bfcard) .rvfold').click(); return 1; })()`); await sleep(500);
+    check(await ev(`!!document.querySelector('#view .rvcard:not(.bfcard).fold')`), `${tag}: #1052 and folds again`);
   }, true);
 
   // ================= the desktop (1440, mouse)

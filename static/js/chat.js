@@ -460,7 +460,7 @@ function msBarSync(focus) {
     $('.mscount', bar).textContent = msCount();
     for (const a of ['ms-older', 'ms-newer']) $(`[data-act="${a}"]`, bar).disabled = $(`[data-act="${a}"]`, tmp).disabled;
   } else { bar?.remove(); head.insertAdjacentHTML('afterend', msBarHtml(S.ms.art, S.ms.key)); }
-  if (focus) $('#ms-q')?.focus();
+  if (focus) { $('#ms-q')?.focus(); msKbSync(); }  // 2.34.0 (#1091): also where the focus event does not come (a window without focus)
 }
 function msSearchToggle(art, key) {
   if (msOpenFor(art, key)) { msClose(); return; }
@@ -471,6 +471,7 @@ function msClose() {
   const f = document.activeElement?.id === 'ms-q';
   Object.assign(S.ms, {open: false, q: '', hits: [], i: -1}); msgUnmark(); msBarSync();
   if (f) (S.ms.art === 't' ? $('#tc-in') : $('#chat-in'))?.focus({preventScroll: true});
+  setTimeout(msKbSync, 0);  // 2.34.0 (#1091)
 }
 async function msRun(q) {
   const m = S.ms, art = m.art, key = m.key; m.q = q;
@@ -490,6 +491,16 @@ async function msGo(i) {
   const q = m.q, ok = await msgOpen(h);
   if (ok && m.open && m.q === q) msgMark($(`[data-mid="${h.art}:${h.id}"]`), q);
 }
+// 2.34.0 (#1091): on a touch screen the keyboard comes up with the chat's search field: the tab bar (and the "+") step aside
+// like for the message box (body.ms-typing; the agent chat then fits its height again)
+function msKbSync() {
+  const on = document.activeElement?.id === 'ms-q' && coarseOnly();
+  if (document.body.classList.contains('ms-typing') === on) return;
+  document.body.classList.toggle('ms-typing', on);
+  if (typeof chatFit === 'function') chatFit();
+}
+document.addEventListener('focusin', e => { if (e.target.id === 'ms-q' || document.body.classList.contains('ms-typing')) msKbSync(); });
+document.addEventListener('focusout', e => { if (e.target.id === 'ms-q') setTimeout(msKbSync, 0); });
 document.addEventListener('input', e => {
   if (e.target.id !== 'ms-q') return;
   const q = e.target.value; S.ms.q = q; clearTimeout(S.ms.t); S.ms.t = setTimeout(() => msRun(q), 300);

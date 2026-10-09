@@ -187,6 +187,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-qfrom': ['quiet_from', N_('Quiet from'), 'time'], 's-qto': ['quiet_to', N_('Quiet until'), 'time'],  // 2.7.0 (#413)
   's-wfrom': ['work_start', N_('Working hours from'), 'time'], 's-wto': ['work_end', N_('Working hours until'), 'time'],  // 2.10.0 (#440)
   's-review': ['review_time', N_('Daily review at'), 'time'],
+  's-brief': ['brief_time', N_('Morning briefing at'), 'time'],  // 2.34.0 (#264)
   's-lemo': ['list_emoji', N_('Suggest icons for new lists'), 'chk'],  // 2.32.0 (#1077)
 };
 const SET_RENDER = ['sidebar', 'features', 'nav_order', 'show_done_views', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden'];
@@ -654,6 +655,8 @@ function settingsModal(focus) {
       <div class="row"><label for="s-defrem">${tr('Default reminder')}</label><select id="s-defrem"><option value="">${tr('none')}</option>${REM_OPTS.map(([v, n]) => `<option value="${v}" ${s.default_reminder === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}${s.default_reminder && !REM_OPTS.some(o => o[0] === s.default_reminder) ? `<option value="${esc(s.default_reminder)}" selected>${esc(s.default_reminder.split(',').map(fmtRem).join(', '))}</option>` : ''}</select></div>
       <div class="row"><label for="s-digest">${tr('Daily digest at')}</label>${timeIn('s-digest', s.digest_time, {label: tr('Daily digest at'), empty: tr('off')})}</div>
       <div id="s-digmail-w"></div>
+      <div class="row"><label for="s-brief">${tr('Morning briefing at')}</label>${timeIn('s-brief', s.brief_time || '', {label: tr('Morning briefing at'), empty: tr('off')})}</div>
+      ${hint(tr('One push with the numbers of your briefing: due today, blocked, new since yesterday, lying idle. The briefing itself is the first block of Today.'))}
       <h4 id="s-quiet-h">${tr('Repeated reminders')}</h4>
       <div class="row"><label for="s-qfrom">${tr('Quiet from')}</label>${timeIn('s-qfrom', s.quiet_from ?? '22:00', {label: tr('Quiet from'), empty: tr('none')})}<label for="s-qto" class="qtol">${tr('until|time')}</label>${timeIn('s-qto', s.quiet_to ?? '07:00', {label: tr('Quiet until'), empty: tr('none')})}</div>
       ${hint(tr('A task or a list can repeat its reminder until the task is done (date dialog > Repeat reminder; list dialog for all its tasks). During the quiet hours nothing repeats; the next one comes when they end.'))}`,

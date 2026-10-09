@@ -18,6 +18,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.34.0** (2026-10-09): Agents in everyday work. A **morning briefing** at the top of Today, a **status report**
+  per project, a **Lying idle** view, **days without tracked time** and the **timesheet as text**, **planned agent
+  jobs**, and agents **read PDF attachments** as text.
 - **2.33.0** (2026-10-09): Agents and notifications. **Reply to one message** (swipe right on a phone), **search in
   chats and comments**, owners choose **how much a shared list notifies** its people, a **plan usage ring** for agents,
   a **repository on a folder**, *Your IP* under Administration > Server.
@@ -1093,6 +1096,14 @@ agent into a person's personal agent. Every agent works in **one workspace** (pr
 itself never starts an AI or any other process; the agent runs wherever you like and talks to Kalmido through the REST
 API, webhooks or the MCP server.
 
+**Everyday helpers** (2.34.0): Kalmido collects the data, the agent writes. The **morning briefing** (#264, top of
+*Today*, optional push at a time you choose) and the **project status report** (#265, *Status report* on the project
+page) are plain data views; agents read them with `read_briefing` / `read_project_status`. The **Lying idle** view
+(#266) lists tasks nobody touched for a while; with *Agent follows up* on a list (off by default) its agent gets them
+once a day (`stale_tasks`) and asks or drafts a reminder in a comment. **Planned jobs** (#272, *Plans* on an agent's
+card) send an agent a recurring order ("every Monday at 9: the week plan"; `scheduled_job`), the answer arrives in your
+chat. Agents read the **text of PDF attachments** (#368, `read_attachment`; no OCR for scans).
+
 **Plan usage ring** (2.33.0, #1045): an agent can report how much of its plan it has used (`PUT /api/v1/agent/quota`,
 MCP `report_plan_usage`, Claude Code's status line `rate_limits` as it is); a ring next to its name in the chat header
 fills up, turns yellow from 75 % and red with "paused until …" at the agent's own limit, and greys out when the report
@@ -1294,6 +1305,8 @@ disappears for all users, the time endpoints answer 403, timers running at that 
 are kept), focus sessions no longer become time entries and no timer reminders go out. Switched back on, all
 entries are there again.
 
+- **Maybe forgotten** (2.34.0, #269): working days of the last two weeks with work on tasks but no tracked time;
+  *Copy as text* on the timesheet gives date, task, duration and note with totals for an invoice.
 - **Timer:** *Start timer* in a task's detail panel or menu. The running timer shows in the top bar (with the task
   and the elapsed time) on every device you are logged in on; click it to stop, open the task or change the start
   time. One timer per person: starting another one stops the first. Start and stop also work offline: they carry
@@ -1669,6 +1682,7 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `TASKS_MAX_FILE_MB` | `50` | Maximum size per attachment (task and comment files) |
 | `KALMIDO_IMPORT_MAX_MB`, `KALMIDO_IMPORT_MAX_TASKS` | `20`, `20000` | Limits of one import (*Moving from other apps*) |
 | `KALMIDO_IMPORT_RATE` | `30` | Imports and previews per user within 10 minutes |
+| `KALMIDO_PDF_MEM_MB`, `KALMIDO_PDF_PARALLEL`, `KALMIDO_PDF_TIMEOUT_S` | `512`, `2`, `20` | 2.34.0: reading the text of a PDF (agents' *read attachment*, the briefing field) runs in its own process: its memory limit in MB, how many PDFs are read at the same time (small servers: `1`) and the seconds one PDF may take |
 | `TASKS_PUSH_GAP` | `60` | Seconds in which further comments / changes on a task are bundled into one summary push |
 | `TASKS_NEWS_DAYS` | `90` | Days a News item is kept |
 | `TASKS_NEWS_MAX` | `500` | News items kept per user (newest) |

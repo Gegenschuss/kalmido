@@ -215,6 +215,19 @@ async function ptypeAddSections(id, names) {
 }
 // list settings (type, name, colour, folder, view, "move dependent tasks along", hourly rate, archived) as one history
 // step; _prev = the values after, so a setting changed elsewhere meanwhile stays. false = the request failed
+// 2.34.0 (#266): after how many idle days an open task of the list shows in "Lying idle" (owner / list admins)
+const STALE_OPTS = [3, 5, 14, 30];
+function staleRowHtml(l) {
+  const v = l.stale_days == null ? '' : String(l.stale_days), d = S.staleDays || 7;
+  const opts = [['', tr('Default ({0} days)', d)], ...STALE_OPTS.filter(n => n !== d).map(n => [String(n), trn('{0} day', '{0} days', n)]), ['0', tr('Never|idle')]];
+  if (v && !opts.some(o => o[0] === v)) opts.splice(1, 0, [v, trn('{0} day', '{0} days', +v)]);
+  return `<div class="row lstalerow"><label for="l-stale">${tr('Lying idle after')}</label><select id="l-stale">${opts.map(([k, n]) => `<option value="${k}" ${k === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
+    <div class="shint lhint">${tr('Open tasks without a change, comment or time entry for this long show in “Lying idle”.')}</div>`;
+}
+async function staleDaysSet(lid, sel) {
+  try { await api('PATCH', `/api/lists/${lid}`, {stale_days: sel.value === '' ? null : +sel.value}); toast(tr('Saved')); await load(); staleLoad(true); }
+  catch { const l = listById(lid); sel.value = l?.stale_days == null ? '' : String(l.stale_days); }
+}
 const LIST_HIST = ['name', 'color', 'folder', 'view', 'kind', 'dep_shift', 'rate', 'archived', 'tickets', 'nag', 'day_hours', 'checklist'];  // 2.7.0: nag, day_hours; 2.7.2: checklist = "Show completed at the bottom"
 const lv = (k, v) => k === 'dep_shift' || k === 'archived' || k === 'tickets' || k === 'checklist' ? (v ? 1 : 0) : k === 'rate' || k === 'day_hours' ? (v === '' || v == null ? null : +String(v).replace(',', '.')) : v ?? '';
 async function listPatch(id, body, label, o = {}) {
@@ -503,7 +516,7 @@ function shareModal(id, opt = {}) {
 // the folder until it gets its own. Members see who limited it (list menu > Notifications, Share dialog).
 const NTF_TPLS = [['read', N_('Read only'), N_('Pushes only for mentions, assignments and direct replies')],
   ['work', N_('Collaborate'), N_('Also comments on their own or assigned tasks and due reminders')],
-  ['all', N_('Everything'), N_('Nothing limited, as in their own settings')], ['custom', N_('Custom'), N_('You choose the events')]];
+  ['all', N_('Everything'), N_('Nothing limited, as in their own settings')], ['custom', N_('Custom selection'), N_('You choose the events')]];  // 2.34.0 (#1089): own key ("Custom" is the date range)
 const NTF_CUSTOM = ['mention', 'reply', 'assign', 'approval', 'comment', 'follow', 'newtask', 'complete', 'status', 'unblock', 'chat', 'reminder', 'errreport', 'share'];
 const NTF_WORK = ['mention', 'reply', 'assign', 'approval', 'comment', 'reminder'];
 const ntfName = t => tr((NTF_TPLS.find(x => x[0] === t) || NTF_TPLS[0])[1]);
@@ -521,7 +534,7 @@ function ntfHtml(j, scope) {
   const people = (j.people || []).map(p => `<div class="mrow ntfp"><span class="n">${esc(p.name)}</span><select data-ntfu="${p.user_id}" aria-label="${esc(tr('Notifications for {0}', p.name))}">${pOpt(p, '', scope === 'list' ? tr('As the list') : tr('As the folder'))}${NTF_TPLS.filter(([v]) => v !== 'custom' || p.own?.tpl === 'custom').map(([v, n]) => pOpt(p, v, tr(n))).join('')}</select></div>`).join('');
   return `<div class="shint lhint keep">${esc(tr('The most the other people get as a push about this. They can make it quieter, not louder; their News list stays complete.') + ' ' + tr('New shares start with “{0}”.', ntfName(j.default || 'read')))}</div>
     <div class="ntfopts" role="radiogroup" aria-label="${esc(tr('Notifications for members'))}">${opts.map(([v, n, d]) => `<label class="ntfopt"><input type="radio" name="ntf-tpl" value="${v}" ${cur === v ? 'checked' : ''}><span><b>${esc(n)}</b><small class="muted">${esc(d)}</small></span></label>`).join('')}</div>
-    <div class="ntfcust" ${eff.tpl === 'custom' && cur !== 'inherit' ? '' : 'hidden'} role="group" aria-label="${esc(tr('Custom'))}">${NTF_CUSTOM.map(r => `<label class="chkl"><input type="checkbox" data-ntfc="${r}" ${cust[r] ? 'checked' : ''}> ${esc(ntfRowName(r))}</label>`).join('')}</div>
+    <div class="ntfcust" ${eff.tpl === 'custom' && cur !== 'inherit' ? '' : 'hidden'} role="group" aria-label="${esc(tr('Custom selection'))}">${NTF_CUSTOM.map(r => `<label class="chkl"><input type="checkbox" data-ntfc="${r}" ${cust[r] ? 'checked' : ''}> ${esc(ntfRowName(r))}</label>`).join('')}</div>
     ${scope === 'folder' && j.lists_own ? `<div class="shint keep">${esc(trn('{0} list in this folder has its own template.', '{0} lists in this folder have their own template.', j.lists_own))} <button type="button" class="btn sm" data-ntf="reset">${esc(tr('Use the folder’s for all'))}</button></div>` : ''}
     ${people ? `<details class="sdet ntfppl"><summary>${esc(tr('Per person'))}</summary><div class="members">${people}</div></details>` : ''}`;
 }
@@ -653,9 +666,10 @@ function listModal(id, folder = '', o = {}) {
     <div class="shint lhint">${ic('cart', 's')} ${tr('What you tick off stays visible at the bottom and comes back with one tap: handy for shopping and packing lists.')}</div>` : ''}
     <div class="row lnagrow"><label for="l-nag">${tr('Repeat reminders')}</label><select id="l-nag" ${dis}><option value="">${tr('Off|nag')}</option>${NAG_OPTS.slice(1).map(([v, n]) => `<option value="${v}" ${(l.nag || '') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     <div class="shint lhint">${tr('Default for the tasks of this list with a date: the reminder repeats until the task is done (a task can choose otherwise in its date dialog). Quiet hours: Settings > Notifications.')}</div>
+    ${id && ['owner', 'admin'].includes(l.role || 'owner') && !l.family && !l.life ? staleRowHtml(l) : ''}
     ${id && shareOk(l) ? `<h4>${tr(collab() ? N_('Sharing') : N_('Owner'))}</h4><div class="row shsum"><span class="muted" id="l-shsum">${esc(shareSummary(l))}</span><button class="btn sm" data-m="share-open">${ic('users', 's')} ${tr(collab() ? N_('Share…') : N_('Ownership…'))}</button></div>` : ''}
     ${id && !l.is_inbox && collab() && l.shared ? `<h4>${tr('Notifications')}</h4><div class="row"><label for="l-bell">${ic(BELL_ICON[l.bell || 'default'], 's')} ${tr('This list')}</label><select id="l-bell" data-native>${BELLS.map(([m, n]) => `<option value="${m}" ${(l.bell || 'default') === m ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
-    <div class="shint lhint" id="l-bellhint">${tr(BELLS.find(b => b[0] === (l.bell || 'default'))[2])} · ${tr('only for you')}</div>
+    <div class="shint lhint" id="l-bellhint">${tr(BELLS.find(b => b[0] === (l.bell || 'default'))[2])} · ${tr('only for you')}</div>${isOwner(l) ? '' : ntfMemberHint(l)}
     <div class="row" id="l-bellc" ${l.bell === 'custom' ? '' : 'hidden'}><span class="spacer"></span><button type="button" class="btn sm" data-m="bell-custom">${ic('sliders', 's')} ${tr('Choose events…')}</button></div>` : ''}
     ${id && !l.is_inbox && collab() ? `<h4>${tr('List tags')}</h4><div class="shint lhint">${tr('Tags of this list: everyone in it sees them, with their colour. Personal tags (with the person icon) stay yours.')}${l.shared ? '' : ' ' + tr('They become visible to everyone as soon as you share the list.')}</div><div class="members" id="l-ltags">${ltagsBoxHtml(l)}</div>` : ''}
     <div class="foot">${id && !l.is_inbox && own ? (l.archived ? `<button class="btn" data-m="arch">${ic('undo', 's')} ${tr('Restore from the archive')}</button><button class="btn danger" data-m="del">${ic('trash', 's')} ${tr('Delete permanently…')}</button>` : `<button class="btn" data-m="arch" title="${tr('Hidden from your lists; undo or restore any time. Deleting for good is only possible from the archive.')}">${ic('archive', 's')} ${tr('Archive')}</button>`) : ''}${id && !own ? `<button class="btn danger" data-m="leave">${ic('logout', 's')} ${tr('Leave list')}</button>` : ''}${id ? `<button class="btn" data-m="tpl" title="${tr('Save the sections and open tasks as a template')}">${ic('copy', 's')} ${tr('Save as template')}</button>` : ''}<span class="spacer"></span>${id ? '' : `<button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Create')}</button>`}</div>`);
@@ -668,6 +682,7 @@ function listModal(id, folder = '', o = {}) {
   const bellHint = v => { const h = $('#l-bellhint', md); if (h) h.textContent = tr(BELLS.find(x => x[0] === v)[2]) + ' · ' + tr('only for you'); const c = $('#l-bellc', md); if (c) c.hidden = v !== 'custom'; };
   $('#l-bell', md)?.addEventListener('change', async e => { e.stopPropagation(); if (e.target.value === 'custom') { bellHint('custom'); bellCustomModal(id); return; } await bellSet(id, e.target.value); bellHint(e.target.value); });
   $('#l-bell', md)?.addEventListener('bell-sync', e => bellHint(e.target.value));
+  $('#l-stale', md)?.addEventListener('change', e => { e.stopPropagation(); staleDaysSet(id, e.target); });  // 2.34.0 (#266)
   $('[data-m="bell-custom"]', md)?.addEventListener('click', e => { e.stopPropagation(); bellCustomModal(id); });
   // ---- autosave (existing lists)
   const pend = new Map();

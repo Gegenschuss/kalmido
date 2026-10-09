@@ -179,7 +179,7 @@ function entryModal(e, preset = {}) {
   const tid = e ? e.task_id : preset.task_id || null, lid = e ? e.list_id : preset.list_id || (tid ? taskById(tid)?.list_id : null) || (isProject(routeList()?.id) ? routeList().id : null) || S.lists.find(l => l.kind === 'project' && !l.archived)?.id;
   const md = modal(`<h3>${run ? tr('Running timer') : e ? tr('Edit time entry') : tr('Add time')}</h3>
     <div class="row"><label for="te-target">${tr('Task')}</label><select id="te-target">${targetOptions(tid, lid)}</select></div>
-    <div class="row"><label>${tr('Date')}</label>${dateIn('te-date', ds(s || new Date()), {max: today(), label: tr('Date'), clear: false})}</div>
+    <div class="row"><label>${tr('Date')}</label>${dateIn('te-date', s ? ds(s) : preset.date || ds(new Date()), {max: today(), label: tr('Date'), clear: false})}</div>
     <div class="row"><label>${run ? tr('Started at') : tr('From – to')}</label>${timeIn('te-from', s ? fmtClock(s) : '', {label: run ? tr('Started at') : tr('From'), empty: '–'})}${run ? '' : `<span class="muted">–</span>${timeIn('te-to', en ? fmtClock(en) : '', {label: tr('To'), empty: '–'})}`}</div>
     ${run ? '' : `<div class="row"><label for="te-dur">${tr('or duration')}</label><input id="te-dur" placeholder="${tr('e.g. 1:30, 45m or 1.5')}" inputmode="decimal" autocomplete="off"></div>`}
     <div class="row"><label for="te-note">${tr('Note')}</label><input id="te-note" value="${esc(e?.note || '')}" maxlength="500" autocomplete="off"></div>
@@ -319,7 +319,7 @@ function viewTime() {
   if (tv.key !== q + '|' + S.v && !tv.loading) setTimeout(loadTime, 0);
   const j = tv.data && tv.data._q === q ? tv.data : null;
   const P = {};  // 2.32.0 (#1063): the running timer stays on top, the report below is built from blocks
-  let h = `<div class="stats timev">${tvRunCard()}<div class="tvbar"><div class="seg tvseg">${TPERIODS.map(([k, n]) => `<button class="${tv.period === k ? 'on' : ''}" data-act="tv-period" data-k="${k}">${tr(n)}</button>`).join('')}</div>
+  let h = `<div class="stats timev">${tvRunCard()}${tvGapsCard()}<div class="tvbar"><div class="seg tvseg">${TPERIODS.map(([k, n]) => `<button class="${tv.period === k ? 'on' : ''}" data-act="tv-period" data-k="${k}">${tr(n)}</button>`).join('')}</div>
       ${tv.period === 'custom' ? `<span class="tvrange">${dateIn('tv-from', f, {label: tr('From'), clear: false})}<span class="muted">–</span>${dateIn('tv-to', t, {label: tr('To'), clear: false})}</span>` : `<span class="muted tvlabel">${esc(rangeLabel(f, t))}</span>`}</div>
     <div class="tvbar">${hasSharing() ? `<div class="seg"><button class="${timeScope() === 'mine' ? 'on' : ''}" data-act="tv-scope" data-k="mine">${tr('Only mine')}</button><button class="${timeScope() === 'all' ? 'on' : ''}" data-act="tv-scope" data-k="all">${tr('All members')}</button></div>` : ''}
       ${tvClient() ? `<span class="tvclient">${ic('brief', 's')}<a href="#client/${tvClient().id}">${esc(tvClient().name)}</a><button class="iconbtn" data-act="client-tvx" title="${esc(tr('All lists'))}" aria-label="${esc(tr('Show all lists again'))}">${ic('x', 's')}</button></span>` : `<button class="btn sm" data-act="tv-lists">${ic('filter', 's')} ${esc(tvListsLabel())}</button>`}<span class="spacer"></span>
@@ -398,12 +398,53 @@ function timesheet() {
   $('.tsheet')?.remove();
   const el = document.createElement('div');
   el.className = 'tsheet';
-  el.innerHTML = `<div class="tsbar"><button class="btn pri" data-ts="print">${ic('download', 's')} ${tr('Print / save as PDF')}</button><label class="chkl"><input type="checkbox" id="ts-entries" ${LS.get('tsEntries', true) ? 'checked' : ''}> ${tr('Individual entries')}</label><span class="spacer"></span><span class="muted tshint">${tr('In the print dialog choose “Save as PDF”.')}</span><button class="iconbtn" data-ts="close" aria-label="${tr('Close')}">${ic('x')}</button></div><div class="tspage ${LS.get('tsEntries', true) ? '' : 'noentries'}" lang="${esc(document.documentElement.lang)}">${doc}</div>`;
+  el.innerHTML = `<div class="tsbar"><button class="btn pri" data-ts="print">${ic('download', 's')} ${tr('Print / save as PDF')}</button><button class="btn" data-ts="copy">${ic('copy', 's')} ${tr('Copy as text')}</button><label class="chkl"><input type="checkbox" id="ts-entries" ${LS.get('tsEntries', true) ? 'checked' : ''}> ${tr('Individual entries')}</label><span class="spacer"></span><span class="muted tshint">${tr('In the print dialog choose “Save as PDF”.')}</span><button class="iconbtn" data-ts="close" aria-label="${tr('Close')}">${ic('x')}</button></div><div class="tspage ${LS.get('tsEntries', true) ? '' : 'noentries'}" lang="${esc(document.documentElement.lang)}">${doc}</div>`;
   document.body.appendChild(el);
   document.body.classList.add('tsprint');
   const close = () => { el.remove(); document.body.classList.remove('tsprint'); document.title = APP_NAME; };
-  el.addEventListener('click', ev => { const b = ev.target.closest('[data-ts]'); if (!b) return; if (b.dataset.ts === 'close') close(); else window.print(); });
+  el.addEventListener('click', async ev => {
+    const b = ev.target.closest('[data-ts]'); if (!b) return;
+    if (b.dataset.ts === 'close') close();
+    else if (b.dataset.ts === 'copy') { const txt = timesheetText(j, who + (cl ? ' · ' + cl.name : filt)); try { await navigator.clipboard.writeText(txt); toast(tr('Copied')); } catch { toast(tr('Copy failed')); } }  // 2.34.0 (#269)
+    else window.print();
+  });
   el.addEventListener('change', ev => { if (ev.target.id === 'ts-entries') { LS.set('tsEntries', ev.target.checked); $('.tspage', el).classList.toggle('noentries', !ev.target.checked); } });
   el.addEventListener('keydown', ev => { if (ev.key === 'Escape') close(); });
   document.title = `${tr('Timesheet')} ${cl ? cl.name + ' ' : ''}${rangeLabel(j.from, j.to)}${all || cl ? '' : ' ' + j.me.display_name}`;
+}
+
+// ---- 2.34.0 (#269): the timesheet as plain text (an invoice, a mail): per list the entries (date in the language's format,
+// task, duration, note), the list's sum and the total; rounded durations when the report rounds
+function timesheetText(j, head) {
+  const rm = j.rounding, all = j.scope === 'all', dur = e => rm ? e.rounded : e.seconds;
+  const out = [`${tr('Timesheet')} · ${rangeLabel(j.from, j.to)} · ${head}`];
+  if (rm) out.push(tr('rounded up to {0} min per entry', rm));
+  const byList = {}; for (const e of j.entries) (byList[e.list_id || 0] ||= []).push(e);
+  for (const l of j.lists) {
+    const es = (byList[l.id] || []).slice().sort((a, b) => a.start < b.start ? -1 : 1); if (!es.length) continue;
+    out.push('', tvListName(l));
+    for (const e of es) out.push([fmtDate(e.day), e.title || tr('No task'), hmm(dur(e)), e.note, all ? e.user_name : ''].filter(Boolean).join(' · '));
+    out.push(`${tr('Sum')}: ${hmm(rm ? l.rounded : l.seconds)} (${hoursDec(rm ? l.rounded : l.seconds)} h)${l.rate ? ' · ' + money(l.amount, j.currency) : ''}`);
+  }
+  const tot = rm ? j.total.rounded : j.total.seconds;
+  out.push('', `${tr('Total')}: ${hmm(tot)} (${hoursDec(tot)} h)${j.lists.some(l => l.rate) ? ' · ' + money(j.total.amount, j.currency) : ''}`);
+  return out.join('\n');
+}
+// ---- 2.34.0 (#269): "Maybe forgotten": working days of the last two weeks with work on tasks of project lists but no time
+// tracked (GET /api/time/gaps). A card on top of the time page with "Add time" per day; dismissed days stay away.
+S.tvg = {data: null, at: 0};
+async function tvgLoad() {
+  if (Date.now() - S.tvg.at < 300000) return;
+  S.tvg.at = Date.now();
+  try { S.tvg.data = await rawFetch('GET', '/api/time/gaps'); } catch { return; }
+  if (S.route.mod === 'time') renderView();
+}
+const tvgDays = () => { const seen = new Set(LS.get('tvGapsSeen', []) || []); return (S.tvg.data?.days || []).filter(d => !seen.has(d.date)); };
+function tvgDismiss() { LS.set('tvGapsSeen', [...new Set([...(LS.get('tvGapsSeen', []) || []), ...tvgDays().map(d => d.date)])].slice(-60)); renderView(); }
+function tvGapsCard() {
+  setTimeout(tvgLoad, 0);
+  const ds0 = tvgDays().slice(0, 5); if (!ds0.length) return '';
+  return `<section class="tvgaps" aria-labelledby="tvg-h"><div class="tvg-head"><h3 id="tvg-h">${ic('clock', 's')} ${tr('Maybe forgotten')}</h3><button type="button" class="iconbtn" data-act="tvg-x" title="${esc(tr('Dismiss'))}" aria-label="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>
+    <p class="muted">${tr('On these working days you worked on tasks but tracked no time.')}</p>
+    <ul>${ds0.map(d => `<li><span class="tvg-day">${esc(dayLabel(d.date))}</span><span class="tvg-t">${esc(d.tasks.slice(0, 2).map(t => t.title).join(', '))}${d.count > 2 ? ' ' + esc(tr('+{0} more', d.count - 2)) : ''}</span><button type="button" class="btn sm" data-act="tvg-add" data-d="${esc(d.date)}" data-id="${d.tasks[0]?.id || ''}">${ic('plus', 's')} ${tr('Add time')}</button></li>`).join('')}</ul></section>`;
 }

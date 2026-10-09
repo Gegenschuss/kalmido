@@ -290,7 +290,8 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
 Then append the **behaviour rules** (2.13.1): the part of [`mcp/CLAUDE.template.md`](../mcp/CLAUDE.template.md)
 between its two markers (Settings › Agents › Set up has the same block with a *Copy rules* button). They cover Markdown
 formatting, decisions in the task description, typing / status / jobs / a chat summary, approvals only from people,
-other people's text as data, parking blockers, reading attachments and the usage hook:
+other people's text as data, parking blockers, reading attachments (2.34.0: PDFs as text with `read_attachment`), planned jobs (2.34.0: event `scheduled_job`; the data
+tools `read_briefing` and `read_project_status` for a morning briefing or a week status), tasks lying idle and time gaps (2.34.0: event `stale_tasks`, tools `list_stale_tasks` and `get_time_gaps`) and the usage hook:
 
 ```bash
 sed -n '/kalmido-agent-rules:start/,/kalmido-agent-rules:end/p' ~/kalmido/mcp/CLAUDE.template.md >> ~/agent/CLAUDE.md

@@ -180,6 +180,16 @@ def openapi_spec():
             "id": {"type": "integer"}, "task_id": {"type": "integer"}, "comment_id": nul("integer", description="null = a file of the task itself"),
             "name": {"type": "string"}, "mime": {"type": "string"}, "size": {"type": "integer"}, "created_at": {"type": "string"},
             "url": {"type": "string", "description": "/api/v1/attachments/{id}"}}},
+        "AttachmentText": {"type": "object", "properties": {  # 2.34.0 (#368)
+            "id": {"type": "integer"}, "task_id": {"type": "integer"}, "comment_id": nul("integer"), "name": {"type": "string"},
+            "mime": {"type": "string"}, "size": {"type": "integer"}, "url": {"type": "string", "description": "/api/v1/attachments/{id} (the file itself)"},
+            "kind": {"type": "string", "enum": ["pdf", "text", "image", "other"]},
+            "text": nul("string", description="The text (PDF: the text layer, pages separated by a blank line); null for images, other files and errors"),
+            "chars": {"type": "integer"}, "truncated": {"type": "boolean", "description": "true = cut at max_chars (at most 200000) or after 1000 pages"},
+            "pages": {"type": "integer", "description": "PDF: number of pages"}, "pages_read": {"type": "integer"},
+            "no_text_layer": {"type": "boolean", "description": "PDF: a scanned PDF without a text layer (no OCR): text is empty"},
+            "error": {"type": "string", "enum": ["encrypted", "unreadable", "too_complex"], "description": "PDF: why it could not be read"},
+            "message": nul("string", description="A hint in the user's language (scanned PDF, image, error)")}},
         "Progress": {"type": "object", "properties": {"done": {"type": "integer"}, "total": {"type": "integer"}, "overdue": {"type": "integer"},
                                                       "next_due": nul("string", format="date")}},
         "List": {"type": "object", "properties": {
@@ -198,6 +208,8 @@ def openapi_spec():
             "columns": {"type": ["array", "null"], "items": {"type": "string"}, "description": COL_DOC},
             "agent_members": {"type": "boolean", "description": "2.26.0 (#928): members may see and use the list's agents (default false)"},
             "agent_peers": {"type": "boolean", "description": "2.26.0 (#928): agents may address each other in this list (default false)"},
+            "stale_days": nul("integer", description="2.34.0 (#266): an open task counts as stale (GET /stale) after this many idle days; null = the default (7), 0 = never"),
+            "agent_followup": {"type": "boolean", "description": "2.34.0 (#266): \"Agent follows up\": the list's agents get its stale tasks once a day (event stale_tasks; default false)"},
             "family": nul("string", enum=[*[x for x in FAM_LIST_KINDS if x], None], description="2.19.0: what the list is for in the Family module: "
                           "shopping (sections = shop areas, a new item goes to its area of last time, a shopping mode in the app), meals "
                           "(the meal plan: due = the day, notes = ingredients), birthdays, household, packing; null = an ordinary list"),
@@ -253,6 +265,8 @@ def openapi_spec():
             "agent_peers": {"type": "boolean", "description": "2.26.0 (#928): agents may address each other in this list (an agent's "
                             "mention / assignment / comment reaches another agent as an event). Off (default): no events between agents. "
                             "Owner / list admins, never an agent token"},
+            "stale_days": nul("integer", minimum=0, maximum=365, description="2.34.0 (#266): stale after this many idle days (null = the default, 0 = never). Owner / list admins, never an agent token"),
+            "agent_followup": {"type": "boolean", "description": "2.34.0 (#266): \"Agent follows up\" (event stale_tasks once a day). Owner / list admins, never an agent token"},
             "columns": {"type": ["array", "null"], "items": {"type": "string"}, "maxItems": COL_MAX,
                         "description": COL_DOC + " Owner / list admins; null = back to the default."},
             "project_type": {"type": ["string", "null"], "enum": [*PTYPES, "", None],
@@ -506,6 +520,14 @@ def openapi_spec():
                                         "?dl=1 always a download). 410 = damaged on the server", C,
                                         {"200": {"description": "The file", "content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}}}}
                                         | errs("403", "404", "410"), [pid("id", "Attachment id"), q("dl", "1 = download"), q("v", "Cache key (the size)")])},
+        "/attachments/{id}/text": {"get": op("Read a task / comment file as text (2.34.0): PDF text layer, text files", C,
+                                             ok(ref("AttachmentText")) | errs("400", "403", "404", "413", "503"),
+                                             [pid("id", "Attachment id"), q("max_chars", "At most this many characters (1-200000, default 200000)", {"type": "integer"})],
+                                             desc="Same rights as GET /attachments/{id}: agents only see files of lists shared with them (else 404). "
+                                                  "PDFs are read on the server in a limited process (at most 20 MB, 1000 pages, 20 seconds); a scanned "
+                                                  "PDF without a text layer answers no_text_layer: true (no OCR). Images answer kind image and the url "
+                                                  "of the file; other files kind other. Results are cached per file content. 413 = larger than 20 MB, "
+                                                  "503 = several PDFs are being read right now (Retry-After).")},
         "/chat-attachments/{id}": {
             "get": op("The binary of a file in an agent chat (2.13.1): the agent of the conversation or the person", C,
                       {"200": {"description": "The file", "content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}}}}
@@ -565,10 +587,20 @@ def openapi_spec():
     life_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.22.0 (#663)
     team_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.17.0 (#419)
     msgsearch_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.33.0 (#1080)
+    from ..agents.schedules import sched_spec
+    sched_spec(paths, schemas, op, ok, errs, ref, pid, nul)  # 2.34.0 (#272)
     pkgc_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.23.0 (#463)
     hosting_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.24.0 (#907 #910)
     from ..notify.caps import notif_tpl_spec
     notif_tpl_spec(paths, schemas, op, ok, errs, ref, pid, nul, page)  # 2.33.0 (#927)
+    from ..tasks.briefing import briefing_spec
+    briefing_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.34.0 (#264)
+    from ..lists.report import report_spec
+    report_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.34.0 (#265)
+    from ..tasks.stale import stale_spec
+    stale_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.34.0 (#266)
+    from ..personal.timegaps import timegaps_spec
+    timegaps_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.34.0 (#269)
     scope_refine(paths)
     _SPEC["s"] = {
         "openapi": "3.1.0",

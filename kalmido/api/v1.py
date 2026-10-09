@@ -452,6 +452,8 @@ def v1_list(d):
             "listen_default": bool(d.get("listen_default")),  # 2.30.0 (#1034): the project type lets agents listen in by default
             # 2.26.0 (#928): members may see and use the list's agents / agents may address each other
             "agent_members": bool(d.get("agent_members")), "agent_peers": bool(d.get("agent_peers")),
+            # 2.34.0 (#266): stale after N idle days (null = the default) / "Agent follows up" (event stale_tasks)
+            "stale_days": d.get("stale_days"), "agent_followup": bool(d.get("agent_followup")),
             "icon": d.get("icon") or "",
             "repos": d.get("repos") or [], "tickets": bool(d.get("tickets")),
             "nag": d.get("nag") or "", "day_hours": d.get("day_hours"),  # 2.7.0 (#413, #407)
@@ -736,7 +738,8 @@ def v1_list_patch(lid):
     b = v1_json()
     unknown = sorted(k for k in b if k not in ("name", "color", "folder", "view", "kind", "nag", "day_hours", "done_at_bottom", "checklist",
                                                "listen_agent_ids", "columns", "archived", "project_type", "family", "life", "trip",
-                                               "client_id", "agent_members", "agent_peers", "org_id"))  # 2.28.0 (#935)
+                                               "client_id", "agent_members", "agent_peers", "org_id",
+                                               "stale_days", "agent_followup"))  # 2.28.0 (#935); 2.34.0 (#266)
     if unknown:
         raise UnknownFields(unknown)
     if "family" in b and b["family"] is None:  # 2.19.0 (#653): null = an ordinary list

@@ -133,11 +133,15 @@ APP_TO_API = {
     "DELETE /api/time/entries/{}": ["DELETE /time/entries/{}"],
     "GET /api/time/report": ["GET /time/entries"],
     "GET /api/time/export.csv": ["GET /time/entries"],
+    "GET /api/time/gaps": ["GET /time/gaps"],  # 2.34.0 (#269)
+    "GET /api/stale": ["GET /stale"],  # 2.34.0 (#266)
     "GET /api/news": ["GET /news"],
     "POST /api/news/read": ["POST /news/read"],
     "GET /api/roadmap": ["GET /roadmap"],
     "GET /api/dayplan": ["GET /dayplan"],
     "GET /api/dayplan/review": ["GET /dayplan/review"],
+    "GET /api/briefing": ["GET /briefing"],  # 2.34.0 (#264)
+    "GET /api/lists/{}/status-report": ["GET /lists/{}/status-report"],  # 2.34.0 (#265)
     "GET /api/export.json": ["GET /export"],
     "POST /api/import/{}": ["POST /import/{}"],
     "POST /api/import/ticktick": ["POST /import/{}"],
@@ -197,6 +201,8 @@ APP_TO_API = {
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
     ("2.27.0 (#999): the web panel says a person edits a task (tidy-up waits); agents never edit in a panel", ("=POST /api/tasks/{}/editing",)),
+    ("2.34.0 (#368): the briefing field reads a PDF the person picks (nothing stored); agents read stored files with GET /attachments/{id}/text",
+     ("=POST /api/pdf-text",)),
     ("sign-in, sessions, two-factor, passkeys, OIDC: a person in a browser", ("* /api/auth/", "* /api/me/2fa", "* /api/me/passkeys", "=PATCH /api/me", "=GET /api/me")),
     ("credentials and keys of the account: tokens, webhooks, upload token, avatar, phone shortcut", (
         "* /api/me/tokens", "* /api/me/webhooks", "POST /api/me/drop-token", "* /api/me/avatar", "GET /api/me/share/")),
@@ -222,7 +228,7 @@ APP_ONLY = [
      "is called by the error service, not by a client", ("* /api/lists/{}/error-hook", "POST /api/hooks/issues/")),
     ("external calendar subscriptions and the calendar feed link: personal settings", ("* /api/calendars", "* /api/ical")),
     ("2.19.0: address books (CardDAV) for birthdays: their passwords are entered by people, like calendar subscriptions", ("* /api/family/contacts",)),
-    ("the app's personal settings, onboarding and sample data", ("PATCH /api/settings", "POST /api/onboarding", "* /api/sample")),
+    ("the app's personal settings, onboarding and sample data", ("PATCH /api/settings", "POST /api/briefing/read", "POST /api/onboarding", "* /api/sample")),
     ("2.32.0 (#1063, #983): how a person arranges their views and the project page: people only, never agents", ("* /api/lists/{}/layout",)),
     ("the focus timer is a personal on-screen timer; time is tracked with /time/timer", ("* /api/pomo/",)),
     ("views computed for the screen (the data is in /tasks, /tasks/{id}/dependencies, /time/entries)", (
@@ -250,6 +256,9 @@ APP_ONLY = [
      ("PUT /api/agents/{}/permission-mode",)),
     ("2.32.0 (#1081): an agent's steps are read only by the person they are for, in the app (the agent sends them with "
      "POST /agent/progress; no token reads them back)", ("GET /api/agents/jobs/{}/steps",)),
+    ("2.34.0 (#272): people plan jobs for an agent in the app (for themselves; admins / owners manage them); the agent only "
+     "reads its plans (GET /agent/schedules, MCP list_schedules) and gets the event scheduled_job",
+     ("* /api/agents/{}/schedules", "* /api/agent-schedules/")),
     ("2.30.0 (#919): what people see about agents in their lists: the access log of a list (list menu > Agent access) and the "
      "lists an agent connects although their people differ; an agent's own token reads neither (GET /me shows its list_ids)",
      ("GET /api/lists/{}/agent-access", "GET /api/agents/{}/bridges")),

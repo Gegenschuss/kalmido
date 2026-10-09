@@ -22,6 +22,7 @@ function viewTasks() {
   if (k === 'doable') return {...pick(t => doable(t, t0), 'none'), done: doneRecent.filter(t => doneSince(t) && mineTask(t) && !(t.due && t.due > t0))};
   if (k === 'waiting') return {...pick(t => !!t.waiting_at, 'list'), done: []};  // 2.1.0 (#335)
   if (k === 'pinned') return {...pick(t => !!t.pinned, 'list'), done: []};  // 2.16.0 (#648): grouped by list
+  if (k === 'stale') return {...pick(t => !!staleOf(t), 'list'), done: []};  // 2.34.0 (#266)
   if (k === 'all') return {...pick(() => true, 'list'), done: doneRecent};
   if (k === 'assigned') return {...pick(mineAssigned, 'list'), done: doneRecent.filter(t => !!S.me && t.assignee_id === S.me.id)};  // 2.10.0: + my groups' tasks
   if (k.startsWith('grp:')) {  // 2.10.0 (#441): open tasks assigned to a group, in the lists I see
@@ -279,4 +280,29 @@ function quickDefaults() {
     if (r.dates?.includes('today') || r.dates?.includes('3d') || r.dates?.includes('7d')) d.due = today();
   }
   return d;
+}
+
+// ---- 2.34.0 (#266): "Lying idle": open tasks nobody touched (change, comment, time entry) for a while, and tasks waiting on
+// someone without a follow-up day. The server decides (GET /api/stale: the list's own threshold, default 7 days; only
+// what I may see); the client keeps the ids and drops a task at once when it changes here.
+S.staleMap = null; S.staleAt = 0;
+async function staleLoad(force = false) {
+  if (!force && Date.now() - (S.staleAt || 0) < 300000) return;
+  S.staleAt = Date.now();
+  let j; try { j = await api('GET', '/api/stale?limit=200'); } catch { return; }  // offline: the last answer stays
+  const m = new Map((j.tasks || []).map(x => [x.id, x])), prev = S.staleMap;
+  S.staleMap = m; S.staleDays = j.default_days || 7;
+  const same = prev && prev.size === m.size && [...m.keys()].every(k => prev.has(k));
+  if (!same && S.booted) { renderSide(); if (S.route.mod === 'tasks' && S.route.key === 'stale') renderView(); }
+}
+// the server's entry while the task still looks the same here (a change made since then ends "lying idle")
+function staleOf(t) {
+  const x = t && S.staleMap?.get(t.id);
+  return x && t.status === 0 && !(t.updated_at && x.since && t.updated_at > x.since) ? x : null;
+}
+const staleCount = () => S.staleMap ? [...S.staleMap.keys()].filter(id => staleOf(S.tasks.get(id))).length : 0;
+function staleChipHtml(t) {
+  const x = staleOf(t); if (!x) return '';
+  const lbl = trn('Idle for {0} day', 'Idle for {0} days', x.idle_days);
+  return `<span class="stalem" title="${esc(lbl)}">${ic('clock', 's')}${esc(lbl)}</span>`;
 }

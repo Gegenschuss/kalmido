@@ -59,6 +59,8 @@ ORDER = (
     "api.v1",
     "notify.caps",  # 2.33.0 (#927)
     "tasks.dayplan",
+    "tasks.briefing",  # 2.34.0 (#264)
+    "lists.report",  # 2.34.0 (#265)
     "api.openapi",
     "integrations.webhooks",
     "agents.core",
@@ -66,9 +68,11 @@ ORDER = (
     "agents.chat",
     "agents.steps",  # 2.32.0 (#1081 / #1079)
     "agents.quota",  # 2.33.0 (#1045)
+    "agents.schedules",  # 2.34.0 (#272)
     "agents.admin",
     "agents.api",
     "agents.proposals",
+    "tasks.attachtext",  # 2.34.0 (#368)
     "agents.gates",  # 2.26.0 (#949)
     "agents.safety",  # 2.30.0 (#919)
     "agents.usage",
@@ -108,6 +112,8 @@ ORDER = (
     "accounts.signup",
     "admin.hosting",
     "admin.clientip",  # 2.33.0 (#834)
+    "tasks.stale",  # 2.34.0 (#266)
+    "personal.timegaps",  # 2.34.0 (#269)
     "startup",
 )
 MODULES = [importlib.import_module(f"{__name__}.{m}") for m in ORDER]

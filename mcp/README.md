@@ -64,11 +64,14 @@ By default the server binds to `127.0.0.1`. It rejects requests with an `Origin`
 | `list_chats` / `send_chat` | chat with people; 2.13.1: `send_chat` takes `files: [{name, base64, mime?}]` (multipart) | `GET /api/v1/agent/chats`, `POST /api/v1/agent/chats/{user_id}` |
 | `list_attachments` | 2.13.1: files of a task and its comments (`id`, `name`, `mime`, `size`, `comment_id`) | `GET /api/v1/tasks/{id}/attachments` |
 | `get_attachment` | 2.13.1: one file as base64 + `mime` / `name` / `size` (`source`: `task`, `chat` or (2.15.0) `project` with `list_id`, `max_bytes` default 5 MB, max 20 MB); images also as an MCP image item | `GET /api/v1/attachments/{id}`, `GET /api/v1/chat-attachments/{id}` |
+| `read_attachment` | 2.34.0: a task / comment file as text: a PDF's text layer (read on the server, `no_text_layer` for scans, no OCR) or a text file, `max_chars` (default and max 200000, `truncated`); images come back as an image | `GET /api/v1/attachments/{id}/text` |
 | `chat_typing` | typing dots in one person's chat for 10 s (2.4.1) | `POST /api/v1/agent/typing` |
 | `react_to_chat` | 2.7.2: 👍 / 👎 / ❤️ on a chat message (`user_id`, `message_id`, `emoji`, `on`, default true); a person's 👍 on your message arrives as a `reaction` event with `approval: "approved"` | `POST /api/v1/agent/chats/{user_id}/messages/{id}/reactions` |
 | `tidy_task` | tidy a task (lists in tidy mode "auto") | `POST /api/v1/tasks/{id}/tidy` |
 | `set_waiting` / `clear_waiting` | 2.1.0: mark a task as waiting on external (`note`, follow-up day `until`) or end it | `PUT` / `DELETE /api/v1/tasks/{id}/waiting` |
 | `list_waiting` | 2.1.0: open tasks waiting on external (`list_tasks` also takes `waiting: true / false`) | `GET /api/v1/tasks?waiting=true` |
+| `list_stale_tasks` | 2.34.0: tasks lying idle (no change, comment or time entry for the list's threshold, default 7 days; waiting without a follow-up day) | `GET /api/v1/stale` |
+| `get_time_gaps` | 2.34.0: working days with work on tasks but no tracked time (`user_id` = the person you work for) | `GET /api/v1/time/gaps` |
 | `list_groups` | 2.10.0: groups of people with their members (`mine` = yours) | `GET /api/v1/groups` |
 | `list_list_groups` | 2.10.0: the groups a list is shared with (role, directly or via a folder) | `GET /api/v1/lists/{id}/groups` |
 | `get_day_plan` | 2.10.0: the built-in day plan of your user (preview; `mode` day or fill) | `GET /api/v1/dayplan` |
@@ -80,6 +83,9 @@ By default the server binds to `127.0.0.1`. It rejects requests with an `Origin`
 | `get_usage` | 2.1.1: the agent's own usage by day, task, list or model, with its limit | `GET /api/v1/agent/usage` |
 | `report_plan_usage` | 2.33.0: the plan usage (e.g. 5-hour and weekly window, percent and reset time, an own limit) -- the ring in the chat header; takes Claude Code's `rate_limits` as it is | `PUT /api/v1/agent/quota` |
 | `get_plan_usage` / `clear_plan_usage` | 2.33.0: read / remove that report | `GET` / `DELETE /api/v1/agent/quota` |
+| `list_schedules` | 2.34.0: your planned jobs (people plan them in the app; when one is due you get the event `scheduled_job` and answer in the chat with that person); read-only | `GET /api/v1/agent/schedules` |
+| `read_briefing` | 2.34.0: the morning briefing of a person who may chat with you (only the lists they share with you): due today / overdue, blocked, changed since the last briefing, lying idle; data only | `GET /api/v1/briefing?user_id=` |
+| `read_project_status` | 2.34.0: the status report of a list shared with you for a period (default 7 days): done, in progress, blocked, overdue, next dates, milestones, tracked time + a plain Markdown text | `GET /api/v1/lists/{id}/status-report` |
 
 2.15.0 (#479): the rest of the REST API as tools. Each needs the permission (scope) of its REST call; `tools/list`
 shows only the tools the token may use (from `GET /api/v1/me`, refreshed every 5 minutes):
@@ -91,7 +97,7 @@ shows only the tools the token may use (from `GET /api/v1/me`, refreshed every 5
 | `update_comment`, `delete_comment`, `mark_news_read`, `delete_chat_attachment` | comments | `PATCH` / `DELETE /comments/{id}`, `POST /news/read` |
 | `create_list`, `update_list`, `share_list`, `unshare_list`, `share_list_with_group`, `unshare_list_from_group`, `create_section`, `rename_section`, `reorder_sections`, `rename_folder`, `delete_folder`, `create_field`, `update_field`, `create_list_tag`, `update_list_tag`, `delete_list_tag`, `create_template`, `update_template`, `apply_template`, `create_filter`, `update_filter`, `set_project_overview`, `set_project_status`, `add_project_link`, `update_project_link`, `delete_project_link`, `reorder_project_links`, `add_milestone`, `update_milestone`, `delete_milestone` | structure | lists, sections, folders, fields, list tags, templates, filters, overview |
 | `delete_task`, `restore_task`, `empty_trash`, `delete_list`, `delete_section`, `delete_field`, `delete_template`, `delete_filter`, `delete_habit` | delete | `DELETE …`, `POST /tasks/{id}/restore` |
-| `get_attachment` (also `source: project` + `list_id`) | attachments:read | `GET /attachments/{id}`, `/lists/{id}/files/{id}` |
+| `get_attachment` (also `source: project` + `list_id`), `read_attachment` (2.34.0) | attachments:read | `GET /attachments/{id}`, `/attachments/{id}/text`, `/lists/{id}/files/{id}` |
 | `upload_attachment` (`files: [{name, base64, mime?}]`), `delete_attachment`, `upload_project_file`, `delete_project_file` | attachments:write | multipart uploads |
 | `start_timer`, `stop_timer`, `add_time_entry`, `update_time_entry`, `delete_time_entry` | time | `/time/timer`, `/time/entries` |
 | `export_data` | export | `GET /export` |

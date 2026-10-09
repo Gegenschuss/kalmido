@@ -377,6 +377,17 @@ ROUTES = {
     "GET /api/me/webhooks": "webhook", "POST /api/me/webhooks": "webhook", "PATCH /api/me/webhooks/{}": "webhook",
     "DELETE /api/me/webhooks/{}": "webhook", "POST /api/me/webhooks/{}/secret": "webhook",
     "POST /api/me/webhooks/{}/test": "webhook", "GET /api/me/webhooks/{}/log": "webhook",
+    # ---- 2.34.0 (#264 #265): the briefing (a person's own, an agent: of a person it may chat with, only shared lists) and
+    # the status report of a list (p2340_a_api_test.py has the cross-tenant cases)
+    "GET /api/briefing": "aggregate", "POST /api/briefing/read": "own", "GET /api/v1/briefing": "aggregate",
+    "GET /api/lists/{}/status-report": "list", "GET /api/v1/lists/{}/status-report": "list",
+    # ---- 2.34.0 (#266 #269 #272 #368): stale tasks, time gaps, planned agent jobs, a file's text (p2300_tenant_test.py has the
+    # cross-tenant cases: the other organisation's people and agent get 404 / nothing of the first one); the briefing field's
+    # PDF reader reads only the uploaded file of the signed-in person and stores nothing (own)
+    "GET /api/stale": "aggregate", "GET /api/v1/stale": "aggregate", "GET /api/time/gaps": "aggregate",
+    "GET /api/v1/time/gaps": "aggregate", "GET /api/agents/{}/schedules": "agent", "POST /api/agents/{}/schedules": "agent",
+    "PATCH /api/agent-schedules/{}": "agent", "DELETE /api/agent-schedules/{}": "agent", "POST /api/agent-schedules/{}/run": "agent",
+    "GET /api/v1/agent/schedules": "agent", "GET /api/v1/attachments/{}/text": "attachment", "POST /api/pdf-text": "own",
 }
 
 # ---- 1. every route is classified, nothing stale

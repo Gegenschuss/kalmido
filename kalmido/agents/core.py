@@ -60,7 +60,10 @@ AGENT_EVENTS = ("mention", "comment", "assigned", "unassigned", "chat", "reactio
                 "task_added",  # 2.23.0 (#795): a task was created in / moved into a list shared with the agent
                 "chat_choice",  # 2.28.0 (#1005): the person pressed an answer button of a chat message (message_id, choice_ids)
                 "tasks_added",  # 2.29.0 (#1031): many tasks at once (a bulk move / import / script) -> ONE event with their ids
-                "missed")  # 2.29.0 (#1031): events older than AGENT_EVENTS_STALE_H, folded into one summary at the next poll
+                "missed",  # 2.29.0 (#1031): events older than AGENT_EVENTS_STALE_H, folded into one summary at the next poll
+                "stale_tasks",  # 2.34.0 (#266): once a day, the stale tasks of lists with "Agent follows up" on (bundled)
+                "scheduled_job",  # 2.34.0 (#272): a planned job of a person is due (agents/schedules.py); answer in their chat
+                )
 JOB_STATES = ("running", "waiting", "done", "failed", "stopped")
 JOB_ACTIONS = ("approve", "reject", "stop")
 REACTIONS = ("up", "down", "heart")   # the fixed set; any other single emoji is stored as itself

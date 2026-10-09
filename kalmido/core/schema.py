@@ -324,6 +324,20 @@ CREATE INDEX IF NOT EXISTS agent_steps_pair ON agent_steps(agent_id, user_id, id
 CREATE INDEX IF NOT EXISTS agent_steps_job ON agent_steps(job_id) WHERE job_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS agent_steps_user ON agent_steps(user_id, id);
 CREATE INDEX IF NOT EXISTS agent_steps_msg ON agent_steps(message_id) WHERE message_id IS NOT NULL;
+CREATE TABLE IF NOT EXISTS agent_schedules (      -- 2.34.0 (#272): planned jobs of a person for an agent (event scheduled_job)
+  id INTEGER PRIMARY KEY, agent_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,   -- who planned it (the agent answers in their chat)
+  title TEXT NOT NULL, prompt TEXT NOT NULL,
+  freq TEXT NOT NULL DEFAULT 'daily',           -- daily | weekdays | weekly | monthly
+  days TEXT NOT NULL DEFAULT '',                -- weekly: ISO weekdays "1,3"; monthly: the day of the month
+  at_time TEXT NOT NULL DEFAULT '09:00', tz TEXT NOT NULL DEFAULT '',   -- HH:MM in the person's IANA time zone
+  list_id INTEGER REFERENCES lists(id) ON DELETE CASCADE,            -- optional: the list it is about (shared with the agent)
+  enabled INTEGER NOT NULL DEFAULT 1, next_at TEXT,                  -- next due time (UTC), NULL = off
+  last_at TEXT, last_state TEXT NOT NULL DEFAULT '', last_seq INTEGER,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS agent_schedules_due ON agent_schedules(next_at) WHERE enabled=1;
+CREATE INDEX IF NOT EXISTS agent_schedules_pair ON agent_schedules(agent_id, user_id);
+CREATE INDEX IF NOT EXISTS agent_schedules_list ON agent_schedules(list_id) WHERE list_id IS NOT NULL;
 CREATE TABLE IF NOT EXISTS agent_usage (          -- 2.1.1 (#326): model usage an agent reports (numbers + ids, never prompts)
   id INTEGER PRIMARY KEY, agent_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   model TEXT NOT NULL, input_tokens INTEGER NOT NULL DEFAULT 0, output_tokens INTEGER NOT NULL DEFAULT 0,
@@ -922,7 +936,15 @@ MIGRATIONS = [
     ("agents", "quota", "ALTER TABLE agents ADD COLUMN quota TEXT NOT NULL DEFAULT ''"),
     # 2.33.0 (#934): a project list does not use its folder's repository (1 = switched off). New column only
     ("lists", "git_folder_off", "ALTER TABLE lists ADD COLUMN git_folder_off INTEGER NOT NULL DEFAULT 0"),
+    # 2.34.0 (#266): stale tasks. lists.stale_days = after how many idle days an open task of the list counts as stale (NULL =
+    # the default STALE_DAYS, 0 = never); lists.agent_followup = "Agent follows up" (1: the list's agents get the bundled
+    # event stale_tasks); agents.stale_sent = the day that event last went out (once a day). New columns only.
+    ("lists", "stale_days", "ALTER TABLE lists ADD COLUMN stale_days INTEGER"),
+    ("lists", "agent_followup", "ALTER TABLE lists ADD COLUMN agent_followup INTEGER NOT NULL DEFAULT 0"),
+    ("agents", "stale_sent", "ALTER TABLE agents ADD COLUMN stale_sent TEXT NOT NULL DEFAULT ''"),
 ]
+# 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
+# and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
 INDEXES = """
 CREATE INDEX IF NOT EXISTS lists_owner ON lists(owner_id);
 CREATE INDEX IF NOT EXISTS tasks_assignee ON tasks(assignee_id);
@@ -942,6 +964,10 @@ CREATE INDEX IF NOT EXISTS push_subs_user ON push_subs(user_id);
 CREATE UNIQUE INDEX IF NOT EXISTS users_oidc ON users(oidc_subject) WHERE oidc_subject IS NOT NULL;
 CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS lists_org ON lists(org_id) WHERE org_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS activity_created ON activity(created_at);
+CREATE INDEX IF NOT EXISTS activity_user ON activity(user_id, created_at);
+CREATE INDEX IF NOT EXISTS comments_user ON comments(user_id, created_at);
+CREATE INDEX IF NOT EXISTS comments_created ON comments(created_at);
 """
 MAX_DEPTH = 3  # task > subtask > sub-subtask
 # per user (table user_settings)
@@ -963,6 +989,9 @@ USER_DEFAULTS = {
     "work_start": "09:00", "work_end": "17:00",  # 2.10.0 (#440): working hours of the day planner
     "review_time": "",          # 2.10.0 (#440): evening review push (HH:MM, '' = off)
     "review_sent": "",
+    # 2.34.0 (#264): the morning briefing push (HH:MM, '' = off), the day it went out, the read state of the briefing on
+    # Today (json {day, at, prev}: read today at, the start of "changed" before that read; server-only)
+    "brief_time": "", "brief_sent": "", "brief_read": "",
     "care_sent": "",            # 2.22.0 (#663): the day of the last "Time to get in touch" push
     "today_inbox": "0",         # 2.22.0 (#681): Today also shows the inbox (own section, counted in Today's number)
     "pomo_focus": "25", "pomo_short": "5", "pomo_long": "15", "pomo_long_every": "4",

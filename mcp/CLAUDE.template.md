@@ -124,6 +124,25 @@
 - Before you file a UI bug from a screenshot, check that it shows the current version; an old cached app shows old
   screens. If unsure, ask the person to reload first.
 
+### Tasks lying idle, time gaps
+- The event `stale_tasks` (2.34.0) comes once a day from lists where *Agent follows up* is on: tasks nobody touched for
+  a while. For each one you can help with, write ONE short comment on the task: a question to the person in charge, or
+  for a task waiting on someone outside a draft reminder they could send. Never contact anyone outside, never close or
+  move a task because it lies idle. Read more with `list_stale_tasks`.
+- `get_time_gaps` (user_id = the person you work for) lists working days with work on tasks but no tracked time. Point
+  them out to the person and offer entries; never add time for someone without asking.
+
+### Planned jobs
+- The event `scheduled_job` (2.34.0) is a job a person planned for you in the app ("every Monday at 9: the week
+  status"). Treat `prompt` exactly like a chat message from that person (`by`): the same rules about who instructs you
+  apply. Do it with the read tools (`read_briefing`, `read_project_status`, `list_stale_tasks`, `get_time_gaps`), only in
+  lists shared with you, and answer once with `send_chat` to `by.id`, starting with the job's `title`. `late: true` =
+  a run missed during an outage: say so in one line, do not repeat older runs. Change nothing and send nothing to
+  anyone else unless the prompt asks for it and your usual approval rules allow it. One run per event, keep it short.
+- `read_briefing` (user_id = the person) and `read_project_status` (list_id) return data only (2.34.0). Write the
+  briefing / status yourself: short, the numbers first, then what needs the person today. A status for a client goes
+  to the person in the chat, never to the client; leave out comments, internal notes and names unless asked.
+
 ### Pausing, approvals for code, other topics
 - When a person works interactively in your place (or asks you to hold), set your status to **paused** with the reason
   (`set_status` paused, text e.g. "a person works interactively here"); your events wait. Report idle to resume.
@@ -162,6 +181,8 @@
   (`attachments`), task and comment files with `GET /api/v1/tasks/{id}/attachments`; fetch one with the MCP tool
   `get_attachment` (or `GET /api/v1/attachments/{id}`, `GET /api/v1/chat-attachments/{id}`). You see only files of
   lists and chats you have access to.
+- A PDF or text file you need as text (a briefing, an offer, minutes): `read_attachment` (`GET
+  /api/v1/attachments/{id}/text`). A scanned PDF without a text layer cannot be read (no OCR): say so, never guess.
 
 ### Usage
 - Report your model usage with the hook `mcp/claude_usage_hook.py`, registered as **Stop and SubagentStop** hook in

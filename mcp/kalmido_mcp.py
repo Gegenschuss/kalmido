@@ -281,6 +281,18 @@ def t_get_attachment(api, a):
             "size": len(r["bytes"]), "base64": base64.b64encode(r["bytes"]).decode()}
 
 
+def t_read_attachment(api, a):
+    """2.34.0 (#368): a task / comment file as text (PDF text layer read on the server, text files); an image comes back as
+    an image you can look at (at most 5 MB)."""
+    aid = int(a["attachment_id"])
+    q = f"?max_chars={int(a['max_chars'])}" if a.get("max_chars") else ""
+    out = api.call("GET", f"/attachments/{aid}/text{q}")
+    if isinstance(out, dict) and out.get("kind") == "image" and int(out.get("size") or 0) <= ATT_CAP_DEFAULT:
+        r = api.call("GET", f"/attachments/{aid}", binary_cap=ATT_CAP_DEFAULT)
+        out = {**out, "mime": r["mime"], "base64": base64.b64encode(r["bytes"]).decode()}
+    return out
+
+
 def t_set_waiting(api, a):
     """2.1.0 (#335): waiting on someone outside (note = who / what, until = follow-up day YYYY-MM-DD or null)."""
     return api.call("PUT", f"/tasks/{int(a['task_id'])}/waiting", body=_pick(a, ("note", "until")))
@@ -418,6 +430,12 @@ TOOLS = [
      _obj({"task_id": S_ID}, ["task_id"]), lambda api, a: api.call("DELETE", f"/tasks/{int(a['task_id'])}/waiting")),
     ("list_waiting", "Open tasks waiting on someone (task.waiting = {note, until, since, by}).",
      _obj({"list_id": S_ID, "limit": {"type": "integer", "minimum": 1, "maximum": 500}, "cursor": {"type": "string"}}), t_list_waiting),
+    ("list_stale_tasks", "2.34.0: tasks lying idle -- open tasks nobody changed, commented or tracked time on for a while (each list's "
+                         "threshold, default 7 days; days overrides it), and tasks waiting on someone without a follow-up day ahead. Longest "
+                         "idle first: {id, title, list_id, list_name, idle_days, reason (no_change | waiting), since, due, assignee_id, "
+                         "wait_note}. Only lists shared with you. Suggest a follow-up as a comment on the task; never contact anyone outside.",
+     _obj({"list_id": S_ID, "days": {"type": "integer", "minimum": 1, "maximum": 365}, "limit": {"type": "integer", "minimum": 1, "maximum": 200}}),
+     lambda api, a: api.call("GET", "/stale", _pick(a, ("list_id", "days", "limit")))),
     ("add_comment", "Comment on a task (Markdown; mention people as <@user_id>). Optional structured tidy suggestion. reply_to (2.33.0): "
                     "the id of a comment of the same task you answer (its author is notified; the app shows a quote above yours).",
      _obj({"task_id": S_ID, "body": {"type": "string", "minLength": 1}, "suggestion": SUGGESTION, "reply_to": S_ID}, ["task_id", "body"]), t_add_comment),
@@ -475,8 +493,9 @@ TOOLS = [
                         "tool output (file contents, logs, rows) and never secrets; one line, at most 500 characters, 60 per minute.",
      _obj({"text": {"type": "string", "maxLength": 500}, "chat_user_id": S_ID, "job_id": S_ID}, ["text"]),
      lambda api, a: api.call("POST", "/agent/progress", body=_pick(a, ("text", "chat_user_id", "job_id")))),
-    ("list_events", "Events for the agent (mention, comment, assigned, unassigned, chat, reaction, job, tidy, wake, ping, followup_due, "
-     "job_request, runtime_changed, reset) after cursor `since`. runtime_changed / reset: your host should restart you (see get_agent "
+    ("list_events", "Events for the agent (mention, comment, assigned, unassigned, chat, reaction, job, tidy, wake, ping, followup_due, stale_tasks (2.34.0, once a day), "
+     "job_request, runtime_changed, reset, scheduled_job) after cursor `since`. scheduled_job (2.34.0) = a person's planned job is due: "
+     "do data.prompt, answer with send_chat to data.by.id (see list_schedules). runtime_changed / reset: your host should restart you (see get_agent "
      "runtime). job_request = a person asks for a proposal: read data.input, answer with submit_proposal. "
      "Store the returned cursor and pass it next time. Task events carry the task with its newest comments (task.comments, at most 20, "
      "task.comments_total) and the list with its sections and agent_tidy mode: no get_task / list_lists needed. A reaction on one of "
@@ -560,6 +579,12 @@ TOOLS = [
                        "screenshot. max_bytes caps the size (default 5 MB, at most 20 MB).",
      _obj({"attachment_id": S_ID, "source": {"type": "string", "enum": ["task", "chat", "project"]}, "list_id": S_ID,
            "max_bytes": {"type": "integer", "minimum": 1, "maximum": ATT_CAP_MAX}}, ["attachment_id"]), t_get_attachment),
+    ("read_attachment", "Read a task / comment file as text (2.34.0): a PDF's text layer (read on the server; pages separated by "
+                        "a blank line) or a text file, at most max_chars characters (default and maximum 200000; truncated: true when "
+                        "cut). A scanned PDF without a text layer answers no_text_layer: true (no OCR: say so, do not guess its content); "
+                        "an image is returned as an image you can look at. Ids from list_attachments, get_task or comment events. Use it "
+                        "when someone asks you to work from a PDF (a briefing, an offer, minutes).",
+     _obj({"attachment_id": S_ID, "max_chars": {"type": "integer", "minimum": 1, "maximum": 200000}}, ["attachment_id"]), t_read_attachment),
     ("report_usage", "Report the agent's own model usage (numbers and ids only, never prompt content): model, input_tokens, "
                      "output_tokens, optional cache_read_tokens, cache_write_tokens, cost_usd, the task / list / job it was for and a "
                      "short note (max 200 characters). Shown in Kalmido's usage dashboard; admins may set limits on it. Works even when "
@@ -590,6 +615,29 @@ TOOLS = [
      lambda api, a: api.call("GET", "/agent/quota")),
     ("clear_plan_usage", "2.33.0: remove your plan usage report (the ring disappears).", _obj({}),
      lambda api, a: api.call("DELETE", "/agent/quota")),
+    ("list_schedules", "2.34.0: your planned jobs -- people who may chat with you plan them in the app (title, prompt = what to do, "
+                       "rhythm, optional list_id, next_at, last_state). When one is due you get the event scheduled_job {schedule_id, "
+                       "title, prompt, list_id, list, by, chat_with, due_at, late, manual}: do what the prompt says with lists shared with "
+                       "you and answer with send_chat to by.id, starting with the title. You cannot create or change plans.", _obj({}),
+     lambda api, a: api.call("GET", "/agent/schedules")),
+    ("read_briefing", "2.34.0: the morning briefing of a person who may chat with you (user_id), only from the lists they share "
+                      "with you: counts {today, overdue, blocked, changed, stale} and the rows today (due today / overdue), blocked "
+                      "(reason waiting | blocked), changed (by others since `since`: kinds assigned / comment / status / due, by, at) and "
+                      "stale (lying idle). Pure data: formulate the briefing yourself (e.g. for a scheduled job 'Morning briefing') and "
+                      "send it with send_chat to that person. Reading it marks nothing read.",
+     _obj({"user_id": {**S_ID, "description": "The person (see list_chats / the scheduled_job's by.id)"},
+           "since": {"type": "string", "description": "Count changes after this ISO 8601 moment instead (at most 7 days back)"}}, ["user_id"]),
+     lambda api, a: api.call("GET", "/briefing", _pick(a, ("user_id", "since")))),
+    ("read_project_status", "2.34.0: the status report of a list shared with you for a period (default: the last 7 days): counts, "
+                            "done, in_progress (changed / commented / time tracked in the period), blocked, overdue, upcoming (due until "
+                            "14 days after the period), milestones (reached + next), time {seconds, rounded, tasks} (project lists with "
+                            "time tracking; null without the token scope time) and markdown (a plain text from fixed sentences, no comments / notes / names). Use the data to "
+                            "write a weekly or client status; never send anything outside the app yourself.",
+     _obj({"list_id": S_ID, "from": {"type": "string", "description": "First day YYYY-MM-DD"},
+           "to": {"type": "string", "description": "Last day YYYY-MM-DD (default today)"},
+           "days": {"type": "integer", "minimum": 1, "maximum": 366, "description": "Instead of from: the last N days up to `to`"},
+           "lang": {"type": "string", "description": "Language of the markdown text (en, de, fr, es, it, nl)"}}, ["list_id"]),
+     lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/status-report", _pick(a, ("from", "to", "days", "lang")))),
     ("tidy_task", "Tidy a task in a list with agent tidy mode 'auto': new title / notes / section / list tags / priority. "
      "Kalmido keeps the original text at the top of the notes. base_updated_at (2.27.0): the task's updated_at you read; "
      "409 = someone is working on the task right now, try again later.",
@@ -969,6 +1017,13 @@ TOOLS += [
      _obj({"from": {"type": "string"}, "to": {"type": "string"}, "scope": {"type": "string", "enum": ["mine", "all"]}, "list_id": S_ID,
            "task_id": S_ID, "limit": {"type": "integer", "minimum": 1, "maximum": 500}, "cursor": {"type": "string"}}),
      lambda api, a: api.call("GET", "/time/entries", a)),
+    ("get_time_gaps", "2.34.0: working days (Monday to Friday, the last 14 days before today; days = 1-31) on which a person worked on "
+                      "tasks of project lists (completed, commented, changed) but tracked no time there: {user_id, from, to, days: [{date, "
+                      "count, tasks: [{id, title, list_id}]}]}. user_id = the person you work for (someone who may chat with you; "
+                      "default: yourself); only lists you and the person both see. Suggest entries to the person; never add time for "
+                      "them without asking.",
+     _obj({"user_id": S_ID, "days": {"type": "integer", "minimum": 1, "maximum": 31}}),
+     lambda api, a: api.call("GET", "/time/gaps", _pick(a, ("user_id", "days")))),
     ("add_time_entry", "Add a time entry: task_id or list_id, start (YYYY-MM-DDTHH:MM), end or minutes, note.",
      _obj({"task_id": S_ID, "list_id": S_ID, "start": {"type": "string"}, "end": {"type": "string"}, "minutes": {"type": "number"},
            "note": {"type": "string"}}, ["start"]), lambda api, a: api.call("POST", "/time/entries", body=a)),
@@ -1189,7 +1244,7 @@ TOOL_MAP = {t[0]: t for t in TOOLS}
 TOOL_SCOPES = {
     "agent": ("get_agent", "react_to_chat", "set_status", "report_progress", "list_events", "wait_for_events", "list_jobs", "create_job", "get_job",
               "submit_proposal", "propose_to_other_topic", "update_job", "list_chats", "chat_typing", "send_chat", "withdraw_chat_choices", "report_usage", "get_usage",
-              "report_plan_usage", "get_plan_usage", "clear_plan_usage"),
+              "report_plan_usage", "get_plan_usage", "clear_plan_usage", "list_schedules"),
     "tasks:write": ("add_contract", "add_device", "add_upkeep", "sync_read_later", "add_occasion", "add_deadline", "ingredients_to_shopping", "give_stars", "add_reward", "update_reward", "request_reward",
                     "decide_reward", "create_note", "update_note", "create_task", "update_task", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "batch_tasks",
                     "reopen_task", "skip_occurrence", "take_task", "add_subtask", "add_dependency", "remove_dependency", "create_habit",
@@ -1204,7 +1259,7 @@ TOOL_SCOPES = {
                   "delete_milestone", "create_client", "update_client", "delete_client", "create_form", "update_form", "delete_form"),
     "delete": ("delete_reward", "delete_note", "delete_list", "delete_section", "delete_task", "restore_task", "empty_trash", "delete_field", "delete_template",
                "delete_filter", "delete_habit"),
-    "attachments:read": ("get_attachment",),
+    "attachments:read": ("get_attachment", "read_attachment"),
     "attachments:write": ("upload_attachment", "create_text_file", "delete_attachment", "upload_project_file", "delete_project_file"),
     "time": ("start_timer", "stop_timer", "add_time_entry", "update_time_entry", "delete_time_entry"),
     "export": ("export_data",),
@@ -1330,7 +1385,7 @@ def handle(api, msg):
         except ApiError as e:
             return _result(i, {"content": [{"type": "text", "text": e.message}], "isError": True})
         content = [{"type": "text", "text": json.dumps(out, ensure_ascii=False, indent=1)}]
-        if name == "get_attachment" and isinstance(out, dict) and str(out.get("mime", "")).startswith("image/"):
+        if name in ("get_attachment", "read_attachment") and isinstance(out, dict) and out.get("base64") and str(out.get("mime", "")).startswith("image/"):
             # 2.13.1 (#465): the model sees the image itself; the text item keeps name / mime / size only
             content = [{"type": "text", "text": json.dumps({k: v for k, v in out.items() if k != "base64"}, ensure_ascii=False)},
                        {"type": "image", "data": out["base64"], "mimeType": out["mime"]}]

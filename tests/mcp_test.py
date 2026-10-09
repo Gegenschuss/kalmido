@@ -197,6 +197,8 @@ CASES = [
     ("clear_waiting", {"task_id": 7}, "DELETE", "/api/v1/tasks/7/waiting", None, {}),
     ("list_waiting", {"list_id": 4}, "GET", "/api/v1/tasks", None, {"waiting": "true", "list_id": "4"}),
     ("list_tasks", {"list_id": 4, "waiting": False}, "GET", "/api/v1/tasks", None, {"waiting": "false"}),
+    ("list_stale_tasks", {"list_id": 4, "days": 10}, "GET", "/api/v1/stale", None, {"list_id": "4", "days": "10"}),  # 2.34.0 (#266)
+    ("get_time_gaps", {"user_id": 2, "days": 7}, "GET", "/api/v1/time/gaps", None, {"user_id": "2", "days": "7"}),  # 2.34.0 (#269)
     # 2.1.1 (#326) usage
     ("report_usage", {"model": "claude-x", "input_tokens": 10, "output_tokens": 5, "cache_read_tokens": 7, "cost_usd": 0.01, "task_id": 7, "note": "hi"},
      "POST", "/api/v1/agent/usage", {"model": "claude-x", "input_tokens": 10, "output_tokens": 5, "cache_read_tokens": 7, "cost_usd": 0.01, "task_id": 7, "note": "hi"}, {}),
@@ -207,6 +209,7 @@ CASES = [
     ("report_plan_usage", {"windows": [{"label": "Week", "percent": 12}]}, "PUT", "/api/v1/agent/quota", {"windows": [{"label": "Week", "percent": 12}]}, {}),
     ("get_plan_usage", {}, "GET", "/api/v1/agent/quota", None, {}),
     ("clear_plan_usage", {}, "DELETE", "/api/v1/agent/quota", None, {}),
+    ("list_schedules", {}, "GET", "/api/v1/agent/schedules", None, {}),  # 2.34.0 (#272)
     # 2.2.0 (#271 / #339) code
     ("list_repos", {"list_id": 4}, "GET", "/api/v1/lists/4/repos", None, {}),
     ("get_project_overview", {"list_id": 4}, "GET", "/api/v1/lists/4/overview", None, {}),  # 2.7.1 (#410)

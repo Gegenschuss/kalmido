@@ -469,6 +469,15 @@ fresh; run p2330_c_api "$PY" p2330_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2330_c_ui node p2330_c_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2330_d_api "$PY" p2330_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2330_d_ui node p2330_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.34.0: agents in everyday work (briefing, project status, idle tasks, time gaps, planned jobs, attachment text)
+fresh; run p2340_b_api "$PY" p2340_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2340_b_ui node p2340_b_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2340_a_api "$PY" p2340_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2340_a_ui node p2340_a_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2340_c_api "$PY" p2340_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2340_c_ui node p2340_c_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2340_d_api "$PY" p2340_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2340_d_ui node p2340_d_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" >/dev/null 2>&1
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

@@ -1978,6 +1978,15 @@ button.tvr-task:hover{color:var(--accent)}
 .tvr-list .sw{width:.5rem;height:.5rem;border-radius:50%;background:var(--bg4)}
 .tvr-acts{display:flex;gap:.5rem}
 .tvrun.idle{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.625rem .875rem;border-left-color:var(--line)}
+/* 2.34.0 (#269): "Maybe forgotten" -- days with work on tasks but no tracked time */
+.tvgaps{background:var(--bg2);border:1px solid var(--line);border-radius:var(--r-l);padding:.625rem .875rem;margin:.25rem 0 .875rem}
+.tvgaps .tvg-head{display:flex;align-items:center;gap:.5rem}
+.tvgaps h3{margin:0;font-size:.9375rem;display:flex;align-items:center;gap:.375rem;flex:1}
+.tvgaps p{margin:.25rem 0 .5rem;font-size:.8125rem}
+.tvgaps ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.375rem}
+.tvgaps li{display:flex;align-items:center;gap:.625rem;flex-wrap:wrap;min-height:2.75rem}
+.tvgaps .tvg-day{font-weight:600;min-width:6.5rem}
+.tvgaps .tvg-t{flex:1;min-width:0;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tvr-idle{display:inline-flex;align-items:center;gap:.375rem;color:var(--muted);font-size:var(--fs-m);margin-right:.25rem}
 .tvr-go{max-width:14rem}
 .tvr-go span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -2427,6 +2436,7 @@ body.pop-open #chatfab,body.modal-open #chatfab{visibility:hidden}
 /* 2.1.0 (#335): waiting on external */
 .meta .waitm{display:inline-flex;align-items:center;gap:.1875rem;color:var(--muted);font-weight:500}
 .meta .waitm.due{color:var(--p3)}
+.meta .stalem{display:inline-flex;align-items:center;gap:.1875rem;color:var(--muted);font-weight:500}  /* 2.34.0 (#266) */
 .waitbar{display:flex;align-items:center;gap:.5rem;margin:.25rem 0 .5rem;padding:.375rem .5rem .375rem .75rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg3)}
 .waitbar.due{border-color:var(--p3)}
 .waitbar > svg{flex:none;color:var(--muted)}
@@ -5418,3 +5428,38 @@ mark.mshl{background:color-mix(in srgb,var(--accent) 28%,transparent);color:inhe
 @media (max-width:899px){ #detail.vvfix{top:var(--vvt,0px);bottom:auto;height:var(--vvh,100dvh);transition:none} }
 .chrbtn{display:inline-flex;align-items:center;justify-content:center;height:1.5rem;padding:0 .4375rem;border-radius:99rem;border:1px solid var(--line2);background:transparent;color:var(--text2);cursor:pointer}
 @media (pointer:coarse){ .chrbtn{min-width:2.75rem;min-height:2.75rem} }
+/* 2.34.0 (#1090): the usage ring's own box is 44 px on touch screens (the visible ring stays 18 px), the line keeps its height;
+   narrow phones show only the mode the agent runs with in the permission badge (full text in its label / tooltip) */
+@media (pointer:coarse){ .chnm .chring{width:2.75rem;height:2.75rem;margin:-.75rem -1rem -.75rem 0}.chnm .chring::after{inset:0} }
+@media (max-width:37.5rem){ .chmode[data-short] .pmlong{display:none}.chmode[data-short]::before{content:attr(data-short)}.chnm .chmode[data-short]{flex:none}.chnm b{flex:0 1 auto;min-width:4.5rem}.chnm .chmode[data-short]{margin-left:.25rem}.chnm button.chmode[data-short]{padding:0 .5rem} }
+/* 2.34.0 (#1091): the keyboard is up for the search field of a chat: the tab bar steps aside like for the message box */
+body.ms-typing #tabs,body.ms-typing #fab{display:none}
+@media (max-width:899px){ body.in-chat.ms-typing #view,body.in-team.ms-typing #view{padding-bottom:0} }
+/* 2.34.0 (#272): planned agent jobs (agent card > Plans) */
+.schedmd .card{width:min(40rem,100%)}
+.schedlist{display:grid;gap:.5rem;margin:.75rem 0}
+.schedrow{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;padding:.625rem .75rem;border:1px solid var(--line2);border-radius:var(--r-l);background:var(--bg2)}
+.schedrow.off{opacity:.7}
+.schedi{display:grid;gap:.125rem;flex:1 1 14rem;min-width:0}
+.schedi b{overflow-wrap:anywhere}
+.schedb{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap}
+.schedon{min-height:1.5rem;min-width:1.5rem;display:inline-flex;align-items:center;justify-content:center}
+.schedtpl{display:flex;flex-wrap:wrap;gap:.375rem}
+.schedtpl .chip{font-size:var(--fs-s);padding:.25rem .75rem;min-height:2rem;border:1px solid var(--line);border-radius:99rem;background:none;color:var(--text2);cursor:pointer}
+.schedtpl .chip.on{border-color:var(--accent);color:var(--text)}
+.schedrh{flex-wrap:wrap;gap:.5rem}
+.schedwd{display:flex;flex-wrap:wrap;gap:.25rem .625rem}
+#sc-dom{width:4.5rem}
+.schedmd #sc-prompt,.schedmd #sc-title,.schedmd #sc-list{width:100%;box-sizing:border-box}
+@media (pointer:coarse){ .schedb .btn,.schedtpl .chip,.schedon{min-height:2.75rem;min-width:2.75rem;justify-content:center} .schedwd .chkl{min-height:2.75rem} }
+@media (max-width:480px){ .schedb .schedtx{display:none} }
+/* 2.34.0 (#264): the briefing on Today (the review card's look); (#265) the status report dialog */
+.bfcard .bfl li{margin:.125rem 0}
+.bfcard .bfl a{color:var(--text);text-decoration:none}
+.bfcard .bfl a:hover{text-decoration:underline}
+.rptmodal .rptdates{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem}
+.rptmodal .rptdates input{min-height:2.25rem;font-size:var(--fs-m)}
+.rptprev{max-height:50vh;overflow:auto;border:1px solid var(--line2);border-radius:var(--r-l);padding:.5rem .75rem;margin:.5rem 0;background:var(--bg2)}
+.rptprev h4{font-size:var(--fs-l);margin:.25rem 0 .5rem}
+.rptprev h5{font-size:var(--fs-m);margin:.75rem 0 .25rem}
+@media (max-width:899px),(pointer:coarse){ .rptmodal .seg button,.rptmodal .foot .btn,.bfcard .btn,.bfcard .rvfold{min-height:2.75rem;min-width:2.75rem;justify-content:center} .bfcard.fold .rvfold{justify-content:flex-start;min-height:2.75rem} .bfcard .bfl li{min-height:1.5rem;padding:.125rem 0} }

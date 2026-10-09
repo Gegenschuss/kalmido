@@ -283,6 +283,10 @@ def list_update(lid):
         except BadInput as e:
             return err(str(e))
         b = {k: v for k, v in b.items() if k not in ("agent_members", "agent_peers")}
+    if "stale_days" in b or "agent_followup" in b:  # 2.34.0 (#266): stale after N days / "Agent follows up"
+        from ..tasks.stale import list_stale_update
+        list_stale_update(c, lid, b)  # BadInput 400 / Denied 403
+        b = {k: v for k, v in b.items() if k not in ("stale_days", "agent_followup")}
     if "client_id" in b:  # 2.23.0 (#463): the client of the list (owner / list admins, a client they see)
         from ..team.clients import list_client_set
         try:

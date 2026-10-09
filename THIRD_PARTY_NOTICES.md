@@ -82,3 +82,4 @@ It is only downloaded when chosen under Settings > Appearance, and served by Kal
   [niccokunzmann/x-wr-timezone](https://github.com/niccokunzmann/x-wr-timezone)
 - click (BSD-3-Clause), dependency of x-wr-timezone
 - Pillow (MIT-CMU / HPND), profile photos (resize, orientation, metadata removal)
+- pypdf 6.19.0 (BSD-3-Clause), reads the text layer of PDF attachments for agents and the briefing field

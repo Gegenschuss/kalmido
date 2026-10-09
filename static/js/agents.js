@@ -345,7 +345,9 @@ function tidyRowHtml(l) {
   const sw = (id, k, label, hint) => `<label class="chkl swl agacc"><span class="swc"><input type="checkbox" role="switch" id="${id}" data-agacc="${k}" ${l[k] ? 'checked' : ''} ${may ? '' : 'disabled'}><span class="swt" aria-hidden="true"></span></span><span>${label}</span></label>
     <div class="shint aghint">${hint}</div>`;  // 2.32.0 (#1058): the explanation behind the (i) at the switch
   const acc = sw('l-agm', 'agent_members', tr('Members may see and use the agent'), tr('Off: only you and list admins can chat with the agent, @mention it or assign it tasks here. Members still see what it does.'))
-    + sw('l-agp', 'agent_peers', tr('Agents may address each other'), tr('Off: what an agent writes or assigns here never reaches another agent. Instructions only ever come from people.'));
+    + sw('l-agp', 'agent_peers', tr('Agents may address each other'), tr('Off: what an agent writes or assigns here never reaches another agent. Instructions only ever come from people.'))
+    // 2.34.0 (#266): "Agent follows up": once a day the list's agents get its tasks lying idle and suggest a follow-up as a comment
+    + sw('l-agf', 'agent_followup', tr('Agent follows up'), tr('Once a day the agent gets the tasks of this list that lie idle and asks about them in a comment or drafts a reminder. Nothing is sent to anyone outside. Off by default.'));
   return `${acc}<div class="row"><label for="l-tidy">${tr('Agent may tidy up entries')}</label><select id="l-tidy" ${may && cands.length ? '' : 'disabled'}>${TIDY.map(([k, n]) => `<option value="${k}" ${(l.agent_tidy || 'off') === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     ${cands.length > 1 ? `<div class="row"><label for="l-tidyag">${tr('Tidy up by')}</label>${tidyAgentSel(l, 'l-tidyag', may ? '' : 'disabled')}</div>` : ''}
     <div class="shint lhint">${cands.length ? tr('{0} turns long, quickly typed entries into a short title and suggests section, tags and priority. The original text always stays at the top of the notes; every change is in the history.', esc(who.name))
@@ -417,7 +419,8 @@ function viewAgents() {
   const ags = (S.agents || []).filter(a => wsAgentIn(a));  // 2.28.0 (#935)
   const card = a => `<div class="agcard ${a.enabled ? '' : 'off'}">${avBtn(a.id, a.name, 'avatar lg')}<div class="agi"><b>${esc(a.name)}</b><span class="muted">${esc(agentSt(a))}${a.status_text && agentHst(a) !== 'offline' ? ' · ' + esc(a.status_text) : ''}</span>
       <span class="muted agn">${esc([a.running && trn('{0} running', '{0} running', a.running), a.waiting && trn('{0} waiting', '{0} waiting', a.waiting)].filter(Boolean).join(' · '))}</span></div>
-      <div class="agb"><button class="btn sm" data-act="chat-open" data-aid="${a.id}" ${a.enabled ? '' : 'disabled'}>${ic('comment', 's')} ${tr('Chat')}${a.chat_unread ? ` <span class="nbadge">${a.chat_unread}</span>` : ''}</button></div></div>`;
+      <div class="agb"><button class="btn sm" data-act="chat-open" data-aid="${a.id}" ${a.enabled ? '' : 'disabled'}>${ic('comment', 's')} ${tr('Chat')}${a.chat_unread ? ` <span class="nbadge">${a.chat_unread}</span>` : ''}</button>
+      <button class="btn sm" data-act="sched-open" data-aid="${a.id}" title="${esc(tr('Planned jobs'))}">${ic('clock', 's')} ${tr('Plans')}</button></div></div>`;
   const items = S.jobs.items || [];
   if (ags.length) {  // 2.32.0 (#1063): the overview is built from blocks (Customize)
     const P = {agents: `<div class="agcards">${ags.map(card).join('')}</div>`, usage: aiuCardHtml(),
@@ -462,8 +465,8 @@ function propRequest(kind, ctx = {}) {
   if (kind === 'project') {
     title = tr('New project from briefing');
     const folders = [...new Set(S.lists.map(l => l.folder).filter(Boolean))];
-    body = `<div class="row ppcol"><label for="pp-text">${tr('Briefing')}</label><textarea id="pp-text" rows="8" maxlength="50000" placeholder="${esc(tr('Paste the briefing, or load a text file'))}"></textarea></div>
-      <div class="row"><label class="btn sm ppfile">${ic('file', 's')} ${tr('Load a text file (.txt, .md)')}<input type="file" id="pp-file" accept=".txt,.md,.markdown,text/plain,text/markdown" hidden></label><span class="muted" id="pp-fname"></span></div>
+    body = `<div class="row ppcol"><label for="pp-text">${tr('Briefing')}</label><textarea id="pp-text" rows="8" maxlength="50000" placeholder="${esc(tr('Paste the briefing, or load a text file or PDF'))}"></textarea></div>
+      <div class="row"><label class="btn sm ppfile">${ic('file', 's')} ${tr('Load a file (.txt, .md, .pdf)')}<input type="file" id="pp-file" accept=".txt,.md,.markdown,.pdf,text/plain,text/markdown,application/pdf" hidden></label><span class="muted" id="pp-fname"></span></div>
       <div class="row"><label for="pp-folder">${tr('Folder')}</label><input id="pp-folder" maxlength="60" list="pp-folders" placeholder="${esc(tr('optional'))}"><datalist id="pp-folders">${folders.map(f => `<option value="${esc(fDisp(f))}">`).join('')}</datalist></div>`;
   } else if (kind === 'subtasks') {
     const t = taskById(ctx.tid); if (!t) return;
@@ -505,10 +508,21 @@ function propRequest(kind, ctx = {}) {
     else if (e.target.dataset?.lid) $('#pp-lall', md).checked = $$('#pp-lists [data-lid]', md).every(x => x.checked);
     if (e.target.id === 'pp-file') {
       const f = e.target.files?.[0]; if (!f) return;
-      if (!/\.(txt|md|markdown)$/i.test(f.name) && !/^text\/(plain|markdown)$/.test(f.type)) { err(tr('Only text files (.txt, .md)')); return; }
-      const txt = await f.text().catch(() => '');
-      if (txt.length > 50000) { err(tr('The file is too long (at most {0} characters)', (50000).toLocaleString(LOCALE()))); return; }
-      err(''); $('#pp-text', md).value = txt; $('#pp-fname', md).textContent = f.name; ctx.file = f.name;
+      // 2.34.0 (#368): a PDF's text layer is read on the server (POST /api/pdf-text, nothing stored), cut to the field's 50000
+      const pdf = /\.pdf$/i.test(f.name) || f.type === 'application/pdf';
+      if (!pdf && !/\.(txt|md|markdown)$/i.test(f.name) && !/^text\/(plain|markdown)$/.test(f.type)) { err(tr('Only text files (.txt, .md) or PDF')); return; }
+      let txt = '', cut = false;
+      if (pdf) {
+        if (f.size > 20 * 1024 * 1024) { err(tr('{0}: larger than {1} MB', f.name, 20)); return; }
+        const fd = new FormData(); fd.append('file', f, f.name);
+        $('#pp-fname', md).textContent = tr('Reading the PDF…'); err('');
+        let j; try { j = await rawFetch('POST', '/api/pdf-text', fd); } catch (x) { $('#pp-fname', md).textContent = ''; err(x instanceof Offline ? tr('Only available online.') : x.message); return; }
+        if (!md.isConnected) return;
+        if (j.no_text_layer) { $('#pp-fname', md).textContent = ''; err(j.message || tr('Scanned PDF without a text layer: it cannot be read without text recognition (OCR).')); return; }
+        txt = j.text || ''; cut = !!j.truncated;
+      } else txt = await f.text().catch(() => '');
+      if (txt.length > 50000) { if (!pdf) { err(tr('The file is too long (at most {0} characters)', (50000).toLocaleString(LOCALE()))); return; } txt = txt.slice(0, 50000); cut = true; }
+      err(''); $('#pp-text', md).value = txt; $('#pp-fname', md).textContent = f.name + (cut ? ' · ' + tr('shortened to {0} characters', (50000).toLocaleString(LOCALE())) : ''); ctx.file = f.name;
     }
   });
   md.addEventListener('click', async e => {
@@ -755,4 +769,133 @@ function bridgesHtml(a) {
   const bs = a?.bridges || []; if (!bs.length) return '';
   const nm = l => l.name == null ? tr('a list you cannot see') : `“${l.name}”`;
   return `<div class="shint keep warn agbridges">${ic('alert', 's')} <b>${esc(tr('Connects lists with different people'))}</b><ul>${bs.map(b => `<li>${esc(nm(b.lists[0]))} + ${esc(nm(b.lists[1]))} · ${esc(b.approved ? tr('approved by {0}', b.by_name || '?') : tr('not approved (from before, or via a group)'))}</li>`).join('')}</ul>${esc(tr('Content of one list can reach the other people through the agent. Use one agent per context, limit it to selected lists, or take it out of one of them.'))}</div>`;
+}
+
+// ---- 2.34.0 (#272): planned agent jobs. A person plans jobs for an agent they may chat with ("every Monday at 9: the week
+// plan"); when one is due the agent gets the event scheduled_job and answers in the chat. Kalmido runs no model itself. The
+// agent card opens the dialog: my plans (an agent's managers: all of the agent's plans), on / off, Run now, Edit, Delete;
+// "New plan" starts from a template (the text stays free to change). The next run in the language's date format.
+const SCHED_FREQ = {daily: N_('Every day'), weekdays: N_('Every working day (Mon–Fri)'), weekly: N_('Every week on'), monthly: N_('Every month on day')};
+const SCHED_LAST = {sent: N_('sent'), late: N_('sent late'), manual: N_('run by hand'), skipped: N_('skipped: the agent was switched off'),
+  no_access: N_('switched off: you no longer reach the agent'), no_list: N_('switched off: the list is no longer shared with the agent')};
+// the templates point at the data tools of the agent API / MCP; the text is the person's to change
+const SCHED_TPL = [
+  {k: 'brief', t: N_('Morning briefing'), freq: 'weekdays', time: '08:00',
+    p: N_('Read my briefing for today (tool read_briefing, user_id = my id) and write me a short overview in this chat: what is due today or overdue, what is blocked and what changed since yesterday. At most ten lines, the most important first.')},
+  {k: 'status', t: N_('Weekly project status'), freq: 'weekly', days: [1], time: '09:00', list: true,
+    p: N_('Read the status of the list of this plan for the last 7 days (tool read_project_status) and write me a short weekly status in this chat: done, in progress, blocked, next due dates and milestones. Plain text that I can forward; no internal comments.')},
+  {k: 'stale', t: N_('Follow up on stale tasks'), freq: 'weekly', days: [1], time: '10:00',
+    p: N_('Look for tasks that have been lying around (tool list_stale_tasks; only the list of this plan if it has one). For each one suggest in this chat a short, friendly reminder or the next step. Send nothing to anyone else and change nothing without asking me.')},
+  {k: 'time', t: N_('Check time tracking'), freq: 'weekly', days: [5], time: '16:00',
+    p: N_('Check my time tracking of this week (tools get_time_gaps with user_id = my id, and list_time_entries): on which working days did I work on tasks without tracking time? List them in this chat with a suggestion. Change nothing.')},
+  {k: 'own', t: N_('Own plan'), freq: 'weekly', days: [1], time: '09:00', p: ''}];
+const schedWd = i => WD[i % 7];  // ISO weekday 1..7 -> short name of the language
+function schedRhythm(s) {
+  const t = tr(SCHED_FREQ[s.freq] || s.freq), at = fmtTimeLoc(s.time);
+  if (s.freq === 'weekly') return `${t} ${(s.days || []).map(schedWd).join(', ')}, ${at}`;
+  if (s.freq === 'monthly') return `${t} ${(s.days || [1])[0]}, ${at}`;
+  return `${t}, ${at}`;
+}
+const schedNext = s => s.next_at ? tr('next: {0}', fmtWhen(s.next_at)) : tr('paused');
+// lists the agent may work in for me: shared with it, not the inbox (the server checks it again)
+const schedLists = aid => (S.lists || []).filter(l => !l.archived && !l.is_inbox && listAgents(l).some(a => a.id === +aid));
+function schedRowHtml(s) {
+  const last = s.last_state ? tr(SCHED_LAST[s.last_state] || s.last_state) + (s.last_at ? ' · ' + fmtWhen(s.last_at) : '') : '';
+  return `<div class="schedrow ${s.enabled ? '' : 'off'}" data-sid="${s.id}"><div class="schedi"><b>${esc(s.title)}</b>
+      <small class="muted">${esc(schedRhythm(s))}${s.list_name ? ' · ' + esc(s.list_name) : ''}${s.mine ? '' : ' · ' + esc(tr('by {0}', s.by_name))}</small>
+      <small class="${s.enabled ? '' : 'muted'}">${esc(schedNext(s))}${last ? ` <span class="muted">· ${esc(tr('last: {0}', last))}</span>` : ''}</small></div>
+    <div class="schedb"><label class="chkl schedon" title="${esc(tr('Active'))}"><input type="checkbox" data-sm="toggle" ${s.enabled ? 'checked' : ''} aria-label="${esc(tr('Active: {0}', s.title))}"></label>
+      <button type="button" class="btn sm" data-sm="run" ${s.enabled ? '' : 'disabled'}>${ic('play', 's')} ${tr('Run now')}</button>
+      <button type="button" class="btn sm" data-sm="edit" aria-label="${esc(tr('Edit: {0}', s.title))}">${ic('edit', 's')}<span class="schedtx"> ${tr('Edit')}</span></button>
+      <button type="button" class="btn sm danger" data-sm="del" aria-label="${esc(tr('Delete: {0}', s.title))}">${ic('trash', 's')}</button></div></div>`;
+}
+async function schedOpen(aid) {
+  const a = agentById(aid); if (!a) return;
+  let j; try { j = await api('GET', `/api/agents/${a.id}/schedules`); } catch { return; }
+  const md = modal('<div class="schedbody"></div>');
+  md.classList.add('schedmd');
+  const draw = () => {
+    const mine = j.data.filter(s => s.mine).length;
+    $('.schedbody', md).innerHTML = `<h3>${ic('clock', 's')} ${esc(tr('Planned jobs: {0}', a.name))}</h3>
+      <div class="shint">${esc(tr('{0} gets each plan at its time as a job and answers in your chat. It sees only the lists shared with it.', a.name))}</div>
+      <div class="schedlist">${j.data.length ? j.data.map(schedRowHtml).join('') : `<div class="muted mhint">${esc(tr('No plans yet.'))}</div>`}</div>
+      <div class="foot"><span class="muted">${esc(tr('{0} of {1}', mine, j.max))}</span><span class="spacer"></span><button class="btn" data-sm="close">${tr('Close')}</button>
+        ${j.may_create ? `<button class="btn pri" data-sm="new" ${mine >= j.max ? 'disabled' : ''}>${ic('plus', 's')} ${tr('New plan')}</button>` : ''}</div>`;
+  };
+  const reload = async () => { try { j = await api('GET', `/api/agents/${a.id}/schedules`); } catch { /* api() showed it */ } draw(); };
+  draw();
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('[data-sm]'); if (!b || b.dataset.sm === 'toggle') return;
+    const sid = +(b.closest('[data-sid]')?.dataset.sid || 0), s = j.data.find(x => x.id === sid);
+    if (b.dataset.sm === 'close') md.remove();
+    else if (b.dataset.sm === 'new') schedForm(md, a, null, reload);
+    else if (b.dataset.sm === 'edit' && s) schedForm(md, a, s, reload);
+    else if (b.dataset.sm === 'del' && s) {
+      if (!await askConfirm(tr('Delete this plan?'), s.title, {ok: tr('Delete'), danger: true})) return;
+      try { await api('DELETE', `/api/agent-schedules/${sid}`); toast(tr('Deleted')); } catch { return; }
+      await reload();
+    } else if (b.dataset.sm === 'run' && s) {
+      b.disabled = true;
+      try { await api('POST', `/api/agent-schedules/${sid}/run`); toast(tr('Sent to {0}', a.name)); } catch { b.disabled = false; return; }
+      await reload();
+    }
+  });
+  md.addEventListener('change', async e => {
+    const x = e.target.closest('[data-sm="toggle"]'); if (!x) return;
+    const sid = +x.closest('[data-sid]').dataset.sid;
+    try { await api('PATCH', `/api/agent-schedules/${sid}`, {enabled: x.checked}); } catch { x.checked = !x.checked; return; }
+    await reload();
+  });
+}
+// the form (new or change) inside the same dialog; "Cancel" goes back to the list
+function schedForm(md, a, s, done) {
+  const box = $('.schedbody', md), ls = schedLists(a.id), isNew = !s;
+  const tz = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { return ''; } })();
+  const v = s ? {...s} : {title: '', prompt: '', freq: 'weekly', days: [1], time: '09:00', list_id: null, enabled: true};
+  const freqOpts = Object.keys(SCHED_FREQ).map(f => `<option value="${f}" ${v.freq === f ? 'selected' : ''}>${esc(tr(SCHED_FREQ[f]))}</option>`).join('');
+  box.innerHTML = `<h3>${ic('clock', 's')} ${esc(isNew ? tr('New plan for {0}', a.name) : tr('Edit plan'))}</h3>
+    ${isNew ? `<div class="row ppcol"><span class="lbl">${tr('Start from a template')}</span><div class="schedtpl" role="group">${SCHED_TPL.map(t => `<button type="button" class="chip" data-tpl="${t.k}">${esc(tr(t.t))}</button>`).join('')}</div></div>` : ''}
+    <div class="row ppcol"><label for="sc-title">${tr('Title')}</label><input id="sc-title" maxlength="120" value="${esc(v.title)}"></div>
+    <div class="row ppcol"><label for="sc-prompt">${tr('What should the agent do?')}</label><textarea id="sc-prompt" rows="6" maxlength="4000">${esc(v.prompt)}</textarea></div>
+    <div class="row schedrh"><label for="sc-freq">${tr('Repeat')}</label><select id="sc-freq">${freqOpts}</select>
+      <span class="schedwd" id="sc-wd" role="group" aria-label="${esc(tr('Weekdays'))}">${[1, 2, 3, 4, 5, 6, 7].map(i => `<label class="chkl"><input type="checkbox" data-wd="${i}" ${(v.days || []).includes(i) ? 'checked' : ''}> ${esc(schedWd(i))}</label>`).join('')}</span>
+      <input id="sc-dom" type="number" min="1" max="31" value="${v.freq === 'monthly' ? (v.days || [1])[0] : 1}" aria-label="${esc(tr('Day of the month'))}">
+      <label for="sc-time" class="sr">${tr('Time')}</label>${timeIn('sc-time', v.time, {label: tr('Time'), clear: false})}</div>
+    <div class="row"><label for="sc-list">${tr('List')}</label><select id="sc-list"><option value="">${tr('No list')}</option>${ls.map(l => `<option value="${l.id}" ${v.list_id === l.id ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}${v.list_id && !ls.some(l => l.id === v.list_id) ? `<option value="${v.list_id}" selected>${esc(v.list_name || '?')}</option>` : ''}</select></div>
+    <div class="row"><label class="chkl"><input type="checkbox" id="sc-on" ${v.enabled ? 'checked' : ''}> ${tr('Active')}</label></div>
+    <div class="shint">${esc(tr('The agent gets title, text and list at the planned time, at most once per run; after an outage only the one missed run (marked late). Times in your time zone ({0}).', s?.tz || tz || '–'))}</div>
+    <div class="calerr" role="alert" id="sc-err" hidden></div>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-sf="back">${tr('Cancel')}</button><button class="btn pri" data-sf="save">${tr('Save')}</button></div>`;
+  const vis = () => { const f = $('#sc-freq', box).value; $('#sc-wd', box).hidden = f !== 'weekly'; $('#sc-dom', box).hidden = f !== 'monthly'; };
+  vis();
+  $('#sc-freq', box).addEventListener('change', vis);
+  $('#sc-title', box).focus();
+  box.onclick = async e => {
+    const tb = e.target.closest('[data-tpl]');
+    if (tb) {
+      const t = SCHED_TPL.find(x => x.k === tb.dataset.tpl);
+      $('#sc-title', box).value = t.k === 'own' ? '' : tr(t.t); $('#sc-prompt', box).value = t.p ? tr(t.p) : '';
+      $('#sc-freq', box).value = t.freq; $('#sc-time', box).value = t.time; dpSync($('#sc-time', box));
+      $$('[data-wd]', box).forEach(x => { x.checked = (t.days || []).includes(+x.dataset.wd); });
+      if (t.list && !$('#sc-list', box).value && ls.length) $('#sc-list', box).value = String(ls[0].id);
+      $$('[data-tpl]', box).forEach(x => x.classList.toggle('on', x === tb)); vis();
+      $(t.k === 'own' ? '#sc-title' : '#sc-prompt', box).focus();
+      return;
+    }
+    const b = e.target.closest('[data-sf]'); if (!b) return;
+    if (b.dataset.sf === 'back') { box.onclick = null; done(); return; }
+    const f = $('#sc-freq', box).value;
+    const d = {title: $('#sc-title', box).value.trim(), prompt: $('#sc-prompt', box).value.trim(), freq: f, time: $('#sc-time', box).value || '09:00',
+      days: f === 'weekly' ? $$('[data-wd]:checked', box).map(x => +x.dataset.wd) : f === 'monthly' ? [Math.max(1, Math.min(31, +$('#sc-dom', box).value || 1))] : [],
+      list_id: +$('#sc-list', box).value || null, enabled: $('#sc-on', box).checked};
+    if (isNew && tz) d.tz = tz;
+    const er = $('#sc-err', box), fail = m => { er.textContent = m; er.hidden = false; };
+    if (!d.title) return fail(tr('Please enter a title.'));
+    if (!d.prompt) return fail(tr('Please describe what the agent should do.'));
+    if (f === 'weekly' && !d.days.length) return fail(tr('Pick at least one weekday'));
+    b.disabled = true;
+    try { await rawFetch(isNew ? 'POST' : 'PATCH', isNew ? `/api/agents/${a.id}/schedules` : `/api/agent-schedules/${s.id}`, d); }
+    catch (x) { b.disabled = false; return fail(x instanceof Offline ? tr('Only available online.') : x.message); }
+    toast(tr('Saved')); box.onclick = null; done();
+  };
 }

@@ -7,6 +7,57 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.34.0] - 2026-10-09
+
+**In short:** Agents in everyday work. **Today starts with a briefing** (due, blocked, new since yesterday, lying
+idle), every project has a **status report** to copy or share, a **Lying idle** view finds tasks nobody touched, the
+time tracking points out **days without tracked time** and copies the **timesheet as text**, people **plan recurring
+jobs for an agent** ("every Monday at 9: the week plan"), and agents can **read the text of a PDF attachment**.
+Kalmido itself still calls no AI: it collects the data, the agent writes.
+
+### Added
+- **Morning briefing** (#264): Today starts with a compact briefing: due today, overdue, blocked (waiting on someone
+  or an open dependency), new since yesterday (other people's comments, assignments, status and date changes on your
+  tasks) and tasks lying idle. *Read* folds it to one line for the day on every device. Optional push with just the
+  numbers at a time you choose (*Settings > Notifications > Morning briefing at*, off by default). Agents read it with
+  `GET /api/v1/briefing?user_id=` / MCP `read_briefing`, only for people who may chat with them and only from lists
+  shared with them.
+- **Project status report** (#265): *Status report* on the project page: done, in progress, blocked, overdue, next
+  dates, milestones and tracked hours for the last 7 / 14 / 30 days or any period, as plain text to copy or share. No
+  comments, notes or names; hours only for people (and tokens with the `time` scope) who may see time tracking.
+  `GET /api/v1/lists/{id}/status-report`, MCP `read_project_status`.
+- **Tasks lying idle** (#266): a new view *Lying idle* lists open tasks without a change, comment or time entry for
+  7 days (*Lying idle after* per list: 3 to 30 days or never) and tasks waiting on someone without a follow-up day.
+  The list setting *Agent follows up* (off by default) sends the list's agent these tasks once a day (event
+  `stale_tasks`); it asks about them or drafts a reminder in a comment and never contacts anyone outside.
+  `GET /api/v1/stale`, MCP `list_stale_tasks`.
+- **Time tracking helper** (#269): *Maybe forgotten* on the time page shows working days of the last two weeks with
+  work on tasks but no tracked time (*Track time* opens an entry on that day); the timesheet has *Copy as text* (date,
+  task, duration, note, totals, in your date format). `GET /api/v1/time/gaps`, MCP `get_time_gaps`.
+- **Planned agent jobs** (#272): *Plans* on an agent's card: daily, on working days, weekly on chosen days or monthly,
+  at a time in your time zone, optionally about a shared list; templates for the morning briefing, the weekly project
+  status, idle tasks and time tracking; pause, run now, edit, delete. The agent receives `scheduled_job` once per due
+  time (after an outage only one, marked late) and answers in your chat. People plan only for themselves with agents
+  they may chat with (at most 20 per agent, at most daily); agents read their plans (`GET /api/v1/agent/schedules`,
+  MCP `list_schedules`).
+- **Read attachments as text** (#368): `GET /api/v1/attachments/{id}/text`, MCP `read_attachment`: the text layer of
+  a PDF (read in a separate process with time, memory and page limits; a scanned PDF reports `no_text_layer`, no
+  OCR), text files as text, images as images; only files the agent may see. *New project from a briefing* also loads
+  a PDF (#260).
+
+### Fixed
+- The member notification template *Custom* had the German label of the date range ("Zeitraum") (#1089); members
+  also see the owner's limit in the list settings.
+- Agent chat header on narrow phones: the usage ring has a 44 px tap area, the permission badge shows a short label
+  with the full text as its label (#1090).
+- Android: the tab bar no longer covers the input while the chat search has the focus; swipe to reply works on the
+  whole message row, not only on the bubble (#1091).
+
+### Upgrade notes
+- New table `agent_schedules`, new columns `lists.stale_days`, `lists.agent_followup`, `agents.stale_sent` and four
+  indexes; 2.33.0 keeps running on the migrated database. PDF reading needs the new Python package `pypdf` (in the
+  image); limits: `KALMIDO_PDF_MEM_MB`, `KALMIDO_PDF_PARALLEL`, `KALMIDO_PDF_TIMEOUT_S`.
+
 ## [2.33.0] - 2026-10-09
 
 **In short:** Agents and notifications. **Reply to one message** (swipe it to the right on a phone, *Reply* on a
@@ -3412,7 +3463,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.33.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.34.0...HEAD
+[2.34.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.34.0
 [2.33.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.33.0
 [2.32.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.32.0
 [2.31.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.31.2

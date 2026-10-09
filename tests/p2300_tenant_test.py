@@ -242,6 +242,11 @@ assert A.put(B + f"/api/lists/{LAG}/members", json={"user_id": AG1, "role": "edi
 r = A.post(B + f"/api/agents/{AG1}/chat", data={"body": "look"}, files=[("file", (f"{MARK}.txt", b"chat file\n", "text/plain"))])
 check(r.status_code == 201, "setup: a chat file " + r.text[:120])
 FC = (r.json().get("attachments") or [{}])[0].get("id")
+# 2.34.0 (#272): a planned job of the organisation's team agent (alice, on the agent's list)
+r = A.post(B + f"/api/agents/{AG1}/schedules", json={"title": f"{MARK} plan", "prompt": f"{MARK} prompt", "freq": "daily", "time": "09:00",
+                                                       "tz": "Europe/Berlin", "list_id": LAG})
+check(r.status_code in (200, 201), "setup: a planned job " + r.text[:120])
+SCH = r.json().get("id")
 
 # ---- B2 / B3: sharing calendars and address books
 r = Bo.put(B + f"/api/evcals/{KA}/members", json={"user_id": CAROL, "role": "view"})
@@ -355,6 +360,16 @@ for name, s in (("carol", Ca), ("dave", Da)):
     hidden(s.get(B + "/api/dayplan"), f"matrix {name}: day plan")
     hidden(s.get(B + "/api/roadmap"), f"matrix {name}: roadmap")
     hidden(s.get(B + "/api/occurrences?from=2026-10-01&to=2026-12-31"), f"matrix {name}: occurrences")
+    # 2.34.0: stale tasks (#266), time gaps (#269), planned agent jobs (#272)
+    hidden(s.get(B + "/api/stale"), f"matrix {name}: stale tasks")
+    no(s.get(B + f"/api/stale?list_id={LA}"), f"matrix {name}: stale tasks of a foreign list")
+    hidden(s.get(B + "/api/time/gaps"), f"matrix {name}: time gaps")
+    no(s.get(B + f"/api/agents/{AG1}/schedules"), f"matrix {name}: planned jobs of a foreign agent")
+    no(s.post(B + f"/api/agents/{AG1}/schedules", json={"title": "x", "prompt": "x", "freq": "daily", "time": "09:00", "tz": "Europe/Berlin"}),
+       f"matrix {name}: plan a job for a foreign agent")
+    no(s.patch(B + f"/api/agent-schedules/{SCH}", json={"enabled": False}), f"matrix {name}: planned job PATCH")
+    no(s.post(B + f"/api/agent-schedules/{SCH}/run"), f"matrix {name}: planned job run now")
+    no(s.delete(B + f"/api/agent-schedules/{SCH}"), f"matrix {name}: planned job DELETE")
     s.post(B + "/api/ical", json={"action": "create"})
     hidden(requests.get(B + s.get(B + "/api/ical").json()["url"].replace("https://kalmido.example", "")), f"matrix {name}: calendar feed")
     # people: invitations / sign-in links are no way to reach somebody of another organisation
@@ -375,11 +390,15 @@ for p in (f"/tasks/{TA}", f"/events/{EA}", f"/contacts/{CTA}", f"/clients/{CLA}"
     no(agb.get(p), f"matrix agent: GET {p}")
 if FC:
     no(agb.get(f"/chat-attachments/{FC}"), "matrix agent: chat file")
+# 2.34.0: a file's text (#368), stale tasks (#266), time gaps (#269), the agent's planned jobs (#272)
+no(agb.get(f"/attachments/{AA}/text"), "matrix agent: the text of a foreign file")
+no(agb.get(f"/stale?list_id={LA}"), "matrix agent: stale tasks of a foreign list")
+no(agb.get(f"/time/gaps?user_id={BOB}"), "matrix agent: time gaps of a person of the other organisation")
 no(agb.req("PATCH", f"/event-calendars/{KA}", json={"name": "x"}), "matrix agent: calendar PATCH")
 no(agb.req("PATCH", f"/address-books/{BA}", json={"name": "x"}), "matrix agent: address book PATCH")
 no(agb.req("PATCH", f"/templates/{TPA}", json={"name": "x"}), "matrix agent: template PATCH")
 no(agb.req("PATCH", f"/forms/{FA}", json={"title": "x"}), "matrix agent: form PATCH")
-for p in ("/event-calendars", "/address-books", "/events?from=2026-10-01&to=2026-10-31", "/contacts", "/templates", "/export", "/search?q=" + MARK, "/tasks", "/lists"):
+for p in ("/event-calendars", "/address-books", "/events?from=2026-10-01&to=2026-10-31", "/contacts", "/templates", "/export", "/search?q=" + MARK, "/tasks", "/lists", "/stale", "/time/gaps", "/agent/schedules"):
     hidden(agb.get(p), f"matrix agent: {p}")
 # webhooks: carol's hook gets nothing of the first organisation (deliveries only for visible tasks)
 WC = Ca.post(B + "/api/me/webhooks", json={"name": "c", "url": "https://hooks.example.invalid/hook", "events": ["task.created"]}).json()["id"]
@@ -389,6 +408,8 @@ time.sleep(1.5)
 q = dbx("SELECT payload FROM webhook_queue WHERE webhook_id=?", (WC,))
 lg = dbx("SELECT COUNT(*) FROM webhook_log WHERE webhook_id=?", (WC,))[0][0]
 check(not any(MARK in r_[0] for r_ in q) and (q or lg), f"matrix webhook: carol's hook has her own task, nothing of the first organisation ({len(q)} queued, {lg} logged)")
+check(SCH in {x["id"] for x in A.get(B + f"/api/agents/{AG1}/schedules").json().get("data", [])},
+      "matrix agent: the planned job is untouched (nobody of the other organisation changed or deleted it)")
 check(boundary(A)["violations"] == 0, "the boundary is still clean after the whole suite")
 
 print(f"\np2300_tenant: {OKS[0]} ok, {len(FAILS)} failed")
