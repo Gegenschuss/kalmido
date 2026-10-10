@@ -181,7 +181,7 @@ const settings = async () => (await call('GET', '/api/state')).settings;
       const op1 = await ev(`+getComputedStyle(document.querySelector('#side .srow[data-list="${CART}"] .shr:not(.bellm)')).opacity`);
       await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'm', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x: 900, y: 600, duration: 0}]}]}); await sleep(400);
       const op2 = await ev(`+getComputedStyle(document.querySelector('#side .srow[data-list="${CART}"] .shr:not(.bellm)')).opacity`);
-      check(m.op0 === 0 && op1 > 0.5 && op2 === 0, `${tag}: the share icon shows only on hover ` + JSON.stringify([m.op0, op1, op2]));
+      check(m.op0 >= 0.99 && op1 >= 0.99 && op2 >= 0.99, `${tag}: the share icon is always shown (2.36.2, #1139) ` + JSON.stringify([m.op0, op1, op2]));
       const kf = await ev(`(async () => { const r = document.querySelector('#side .srow[data-list="${CART}"]'); r.focus(); await new Promise(x => setTimeout(x, 400)); const on = document.activeElement === r && r.matches(':focus'), op = +getComputedStyle(r.querySelector('.shr:not(.bellm)')).opacity; r.blur(); return {on, op}; })()`);
       if (kf.on) check(kf.op > 0.5, `${tag}: keyboard focus on the row shows its share icon ` + JSON.stringify(kf));
       else console.log(`${tag}: keyboard focus check skipped (the headless window is not active, :focus does not match)`);

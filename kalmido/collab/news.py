@@ -12,7 +12,7 @@ from ..core.i18n import tr
 from ..core.db import body, db, err, iso, iso_ms, now_utc, usettings
 from ..accounts.session import me
 from ..accounts.pictures import avatar_map
-from ..core.access import list_role, plists, pvis
+from ..core.access import acx_task_ok, list_role, plists, pvis
 from ..collab.comments import collab_on, collab_user, lang_of, MENTION_RE, user_names
 
 
@@ -268,6 +268,8 @@ def news_add(c, uid, kind, task_id=None, list_id=None, comment_id=None, data=Non
         return
     s = s or collab_user(c, uid, None)
     if not s:
+        return
+    if task_id and not acx_task_ok(c, task_id, uid):  # 2.36.2 (#1142): requires task visibility
         return
     lid = list_id
     if lid is None and task_id:

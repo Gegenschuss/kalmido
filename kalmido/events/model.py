@@ -11,7 +11,7 @@ from ..core.config import PUBLIC_URL, TZ
 from ..core.i18n import N_, short_day, tr
 from ..core.db import bump, gset, gsetting, iso, iso_ms, now_utc, usettings
 from ..accounts.session import me
-from ..core.access import collab_all, Denied, task_visible
+from ..core.access import acx_org_ok, collab_all, Denied, task_visible
 from ..core.pages import valid_url
 from ..tasks.validation import (
     as_int, clean_reminders, rr_feasible, rr_norm, rr_problem, valid_date, valid_hm,
@@ -86,6 +86,8 @@ def ev_role(c, uid, cal):
     """owner | edit | view | None of uid for the calendar row (members only while collaboration is on)."""
     if cal is None:
         return None
+    if "org_id" in cal.keys() and not acx_org_ok(c, uid, cal["org_id"]):  # 2.36.2 (#1142): organisation calendars: members only
+        return None
     if cal["owner_id"] == uid:
         return "owner"
     if not collab_all() or c.execute("SELECT disabled FROM users WHERE id=?", (cal["owner_id"],)).fetchone()[0]:
@@ -113,11 +115,11 @@ def need_evcal(c, cid, write=False, manage=False, uid=None):
 
 def my_cal_ids(c, uid, hidden=True):
     """{calendar id: role} of the calendars uid sees (hidden=False: without the ones uid hid)."""
-    out = {r[0]: "owner" for r in c.execute("SELECT id FROM ev_cals WHERE owner_id=?", (uid,))}
+    out = {r[0]: "owner" for r in c.execute("SELECT id, org_id FROM ev_cals WHERE owner_id=?", (uid,)) if acx_org_ok(c, uid, r[1])}
     if collab_all():
-        for r in c.execute("SELECT m.cal_id, m.role, m.hidden FROM ev_cal_members m JOIN ev_cals k ON k.id=m.cal_id "
+        for r in c.execute("SELECT m.cal_id, m.role, m.hidden, k.org_id FROM ev_cal_members m JOIN ev_cals k ON k.id=m.cal_id "
                            "JOIN users u ON u.id=k.owner_id WHERE m.user_id=? AND u.disabled=0", (uid,)):
-            if hidden or not r["hidden"]:
+            if (hidden or not r["hidden"]) and acx_org_ok(c, uid, r["org_id"]):  # 2.36.2 (#1142)
                 out.setdefault(r[0], r[1])
     if not hidden:
         hid = set(json.loads(usettings(c, uid).get("evcals_hidden") or "[]") or [])

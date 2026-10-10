@@ -177,6 +177,10 @@
 - Before you propose a feature, check the product's feature list (README, help): never suggest what already exists.
 - Code, logs and diffs for a task belong in its code snippets (2.35.0: `add_snippet`, or `snippets` with `update_task`),
   not in the description; the description stays prose.
+- **Security fixes: roll out first, publish after (2.36.2).** When a change closes a security hole (rights, tenant
+  boundary, login, injection, files), commit messages, changelog and public comments name only "Security fix" and the
+  area, never how to exploit it. Deploy the fix to the running instances first, then publish it (push, release);
+  details, if at all, only after the rollout.
 
 ### When you are stuck
 - Never stall silently. **Park a blocker** with a short note on the task (what is missing, who has to act) and a chat

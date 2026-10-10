@@ -199,6 +199,14 @@ CREATE TABLE IF NOT EXISTS admin_alerts (             -- admin alerts (ntfy, adm
   state TEXT NOT NULL DEFAULT 'sent',           -- sent | failed | queued (daily summary) | summarized | capped (hourly limit)
   repeats INTEGER NOT NULL DEFAULT 0);          -- identical alerts swallowed by the cooldown since
 CREATE INDEX IF NOT EXISTS admin_alerts_key ON admin_alerts(kind, key, created_at);
+-- 2.36.2 (#1133): security alerts of the app (notify/sev.py). New tables only: 2.36.1 runs on with them.
+CREATE TABLE IF NOT EXISTS sev_known (            -- admins, org admins, agents and agent tokens already seen by the watch
+  kind TEXT NOT NULL,                           -- admin | org_admin | agent | agent_token
+  ref TEXT NOT NULL,                            -- user id | "org:user" | token hash (32 chars); '*' = the baseline of this kind is taken
+  at TEXT NOT NULL, PRIMARY KEY (kind, ref));
+CREATE TABLE IF NOT EXISTS admin_login_ips (      -- the last SEV_IPS sign-in addresses of each admin, hashed (never the address)
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  ip_hash TEXT NOT NULL, first_at TEXT NOT NULL, last_at TEXT NOT NULL, PRIMARY KEY (user_id, ip_hash));
 CREATE TABLE IF NOT EXISTS cal_subs (             -- external calendar subscriptions (read-only, private per user)
   id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   kind TEXT NOT NULL,                           -- ics | caldav
@@ -762,6 +770,21 @@ CREATE TABLE IF NOT EXISTS office_doc_items (
   rate REAL NOT NULL DEFAULT 0, tax TEXT NOT NULL DEFAULT 'standard', raw_fee INTEGER NOT NULL DEFAULT 0, producing INTEGER NOT NULL DEFAULT 0,
   intext TEXT NOT NULL DEFAULT 'intern', cost REAL NOT NULL DEFAULT 0, discountable INTEGER NOT NULL DEFAULT 1);
 CREATE INDEX IF NOT EXISTS office_doc_items_doc ON office_doc_items(doc_id);
+-- 2.36.2 (#1021, E): structured company data of an organisation (the print lines are made from it; the free lines in
+-- office_settings.data.company stay as the fallback), and the office log (#1142): changes and reads of documents and master
+-- data (detail = JSON with before / after). doc_id has no reference: the log outlives a deleted document. New tables only
+CREATE TABLE IF NOT EXISTS office_company (
+  org_id INTEGER PRIMARY KEY REFERENCES orgs(id) ON DELETE CASCADE, name TEXT NOT NULL DEFAULT '', street TEXT NOT NULL DEFAULT '',
+  zip TEXT NOT NULL DEFAULT '', city TEXT NOT NULL DEFAULT '', country TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '',
+  phone TEXT NOT NULL DEFAULT '', tax_number TEXT NOT NULL DEFAULT '', vat_id TEXT NOT NULL DEFAULT '', iban TEXT NOT NULL DEFAULT '',
+  bic TEXT NOT NULL DEFAULT '', bank_name TEXT NOT NULL DEFAULT '', register_court TEXT NOT NULL DEFAULT '', register_no TEXT NOT NULL DEFAULT '',
+  managing_directors TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '');
+CREATE TABLE IF NOT EXISTS office_doc_log (
+  id INTEGER PRIMARY KEY, org_id INTEGER NOT NULL REFERENCES orgs(id) ON DELETE CASCADE, doc_id INTEGER,
+  user_id INTEGER REFERENCES users(id) ON DELETE SET NULL, at TEXT NOT NULL, action TEXT NOT NULL, target TEXT NOT NULL DEFAULT 'doc',
+  detail TEXT NOT NULL DEFAULT '{}');
+CREATE INDEX IF NOT EXISTS office_doc_log_org ON office_doc_log(org_id, id);
+CREATE INDEX IF NOT EXISTS office_doc_log_doc ON office_doc_log(doc_id);
 """
 # Bumped when the database layout changes (stored in PRAGMA user_version). A backup can be restored when its
 # schema version is not newer than this one (older ones are migrated by init_db).
@@ -1012,6 +1035,38 @@ MIGRATIONS = [
     # read-only in the app until someone with write access unlocks it; the agent API is not bound by it). New column only,
     # existing tasks stay 0 = open
     ("tasks", "locked", "ALTER TABLE tasks ADD COLUMN locked INTEGER NOT NULL DEFAULT 0"),
+    # 2.36.2 (#1136, D): "Keep completed in their section" per list, the same for every member (NULL = the default: on for
+    # projects and lists with sections, off otherwise; lists with "Show completed at the bottom" and shopping lists are
+    # always off). New column only, older versions ignore it
+    ("lists", "done_in_section", "ALTER TABLE lists ADD COLUMN done_in_section INTEGER"),
+    # 2.36.2 (#1021, E): office foundation. Finalising a document (locked_at / locked_by) freezes a snapshot: sender
+    # (company, logo hash, colour), recipient_snapshot, tax_snapshot (rates + print words of the country pack), pack_version;
+    # per position tax_pct / net / tax_amount as decimal text. service_from / service_to = period of service. New nullable
+    # columns only: 2.36.1 reads and writes these tables unchanged
+    ("office_docs", "locked_at", "ALTER TABLE office_docs ADD COLUMN locked_at TEXT"),
+    ("office_docs", "locked_by", "ALTER TABLE office_docs ADD COLUMN locked_by INTEGER"),
+    ("office_docs", "sender", "ALTER TABLE office_docs ADD COLUMN sender TEXT"),
+    ("office_docs", "recipient_snapshot", "ALTER TABLE office_docs ADD COLUMN recipient_snapshot TEXT"),
+    ("office_docs", "tax_snapshot", "ALTER TABLE office_docs ADD COLUMN tax_snapshot TEXT"),
+    ("office_docs", "pack_version", "ALTER TABLE office_docs ADD COLUMN pack_version TEXT"),
+    ("office_docs", "service_from", "ALTER TABLE office_docs ADD COLUMN service_from TEXT"),
+    ("office_docs", "service_to", "ALTER TABLE office_docs ADD COLUMN service_to TEXT"),
+    # 2.36.2 (#1142, E): positions carry their organisation (filled from office_docs at every start: rows written by an
+    # older version get it there)
+    ("office_doc_items", "org_id", "ALTER TABLE office_doc_items ADD COLUMN org_id INTEGER REFERENCES orgs(id) ON DELETE CASCADE"),
+    ("office_doc_items", "tax_pct", "ALTER TABLE office_doc_items ADD COLUMN tax_pct TEXT"),
+    ("office_doc_items", "net", "ALTER TABLE office_doc_items ADD COLUMN net TEXT"),
+    ("office_doc_items", "tax_amount", "ALTER TABLE office_doc_items ADD COLUMN tax_amount TEXT"),
+    # 2.36.2 (#1021, E): structured billing fields of a client (address stays the free text)
+    ("clients", "street", "ALTER TABLE clients ADD COLUMN street TEXT NOT NULL DEFAULT ''"),
+    ("clients", "zip", "ALTER TABLE clients ADD COLUMN zip TEXT NOT NULL DEFAULT ''"),
+    ("clients", "city", "ALTER TABLE clients ADD COLUMN city TEXT NOT NULL DEFAULT ''"),
+    ("clients", "country", "ALTER TABLE clients ADD COLUMN country TEXT NOT NULL DEFAULT ''"),
+    ("clients", "vat_id", "ALTER TABLE clients ADD COLUMN vat_id TEXT NOT NULL DEFAULT ''"),
+    ("clients", "customer_no", "ALTER TABLE clients ADD COLUMN customer_no TEXT NOT NULL DEFAULT ''"),
+    ("clients", "buyer_reference", "ALTER TABLE clients ADD COLUMN buyer_reference TEXT NOT NULL DEFAULT ''"),
+    ("clients", "email_invoice", "ALTER TABLE clients ADD COLUMN email_invoice TEXT NOT NULL DEFAULT ''"),
+    ("clients", "payment_terms_days", "ALTER TABLE clients ADD COLUMN payment_terms_days INTEGER"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

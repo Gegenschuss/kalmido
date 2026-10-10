@@ -232,13 +232,13 @@ function moreSummary(t, ks) {
 function crumbsHtml(t, l, parent) {
   if (!l || t.id <= 0) return '';
   const sec = t.section_id && S.sections.find(x => x.id === t.section_id && x.list_id === l.id);
-  const b = (k, id, icon, label, title) => `<button type="button" class="dcb" data-act="crumb" data-k="${k}" data-id="${esc(String(id))}" title="${esc(title || label)}">${icon ? ic(icon, 's') : ''}<span>${esc(label)}</span></button>`;
+  const b = (k, id, icon, label, title) => `<button type="button" class="dcb" data-act="crumb" data-k="${k}" data-id="${esc(String(id))}" title="${esc(title || label)}">${icon ? (icon[0] === '<' ? icon : ic(icon, 's')) : ''}<span>${esc(label)}</span></button>`;
   const parts = [];
   if (l.folder && !l.is_inbox) parts.push(b('folder', l.folder, 'folder', fDisp(l.folder)));
   // 2.25.0 (UX-44): the path is where the task's place is changed: list and section open a menu (open / move)
   const mv = canEdit(t) && canEditList(t.list_id) && t.status === 0 && !t.context;
-  const bm = (k, id, icon, label) => mv ? `<button type="button" class="dcb" data-act="crumb-menu" data-k="${k}" data-id="${esc(String(id))}" aria-haspopup="menu" title="${esc(tr('Open or move: {0}', label))}">${icon ? ic(icon, 's') : ''}<span>${esc(label)}</span></button>` : b(k, id, icon, label);
-  parts.push(bm('list', l.id, l.is_inbox ? 'inbox' : 'list', lname(l)));
+  const bm = (k, id, icon, label) => mv ? `<button type="button" class="dcb" data-act="crumb-menu" data-k="${k}" data-id="${esc(String(id))}" aria-haspopup="menu" title="${esc(tr('Open or move: {0}', label))}">${icon ? (icon[0] === '<' ? icon : ic(icon, 's')) : ''}<span>${esc(label)}</span></button>` : b(k, id, icon, label);
+  parts.push(bm('list', l.id, l.is_inbox ? 'inbox' : licMark(l, 's', true) || 'list', lname(l)));  // 2.36.2 (#1135)
   if (sec) parts.push(bm('sec', sec.id, '', sec.name));
   else if (mv && !t.parent_id && (S.sections.some(x => x.list_id === l.id) || canEditList(l.id)) && !l.is_inbox) parts.push(`<button type="button" class="dcb dcadd" data-act="crumb-menu" data-k="sec" data-id="" aria-haspopup="menu" title="${esc(tr('Move to section…'))}">${ic('plus', 's')}<span class="sr">${esc(tr('Move to section…'))}</span></button>`);
   if (parent) parts.push(b('parent', parent.id, 'sub', parent.title));

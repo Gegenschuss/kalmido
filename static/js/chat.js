@@ -246,12 +246,32 @@ async function loadNotes(lid) {
 // every tag is skipped whole (no match inside an attribute), "&#39;" is no task number
 function mdTaskRefs(html, compact) {
   let skip = 0;
-  return html.replace(/<(\/?)([a-zA-Z][\w-]*)[^>]*>|(?<![&\w/#])#(\d{1,9})\b/g, (m, cl, tag, id) => {
+  return html.replace(/<(\/?)([a-zA-Z][\w-]*)[^>]*>|\b[Jj][Oo][Bb] ?#?(\d{1,9})\b|(?<![&\w/#])#(\d{1,9})\b/g, (m, cl, tag, jid, id) => {
     if (tag) { if (/^(code|a|pre|button)$/i.test(tag)) skip = Math.max(0, skip + (cl ? -1 : 1)); return m; }
     if (skip > 0) return m;
+    if (jid) return jobRefHtml(+jid, m);  // 2.36.2 (#1141): "Job #50" / "job 50" is a job, not task #50
     const t = taskById(+id); if (!t) return m;  // not visible to me: stays text (no title leaks)
     return trefHtml(t, compact);
   });
+}
+// 2.36.2 (#1141): a job number links to the job (#job/<id>: Agents > Jobs, that job unfolded with its history), only a job
+// I may see: the server is asked once per number (GET /api/agents/jobs?id=); until it answered (or when it is not mine)
+// the text stays plain text
+const JOBREF = {ok: new Set(), no: new Set(), q: new Set()};
+function jobRefHtml(id, txt) {
+  if (JOBREF.ok.has(id)) return `<a href="#job/${id}" class="jref" data-jref="${id}">${txt}</a>`;
+  if (JOBREF.no.has(id)) return txt;
+  jobRefAsk(id);
+  return `<span class="jrefq" data-jq="${id}">${txt}</span>`;
+}
+function jobRefAsk(id) {
+  if (JOBREF.q.has(id)) return;
+  JOBREF.q.add(id);
+  api('GET', '/api/agents/jobs?id=' + id).then(j => { ((j && j.jobs) || []).some(x => x.id === id) ? JOBREF.ok.add(id) : JOBREF.no.add(id); })
+    .catch(() => {}).finally(() => {  // offline: asked again with the next drawing
+      JOBREF.q.delete(id);
+      for (const e of document.querySelectorAll(`.jrefq[data-jq="${id}"]`)) if (JOBREF.ok.has(id) || JOBREF.no.has(id)) e.outerHTML = jobRefHtml(id, e.innerHTML);
+    });
 }
 const trefHtml = (t, compact) => `<a href="#t/${t.id}" class="tref" data-tref="${t.id}" title="${esc(t.title)}">#${t.id}${compact ? '' : ' ' + esc(t.title.slice(0, 60))}</a>`;
 // a tap on a task number opens the task on top of where I am (the chat stays open below it; on a phone Back closes the
@@ -342,7 +362,7 @@ function noteMenu(anchor) {
   const n = noteCur(); if (!n) return;
   const others = S.lists.filter(l => !l.archived && l.id !== n.list_id && canEditList(l.id) && notesOn(l));
   menu(anchor, [{label: tr('Copy link'), icon: 'link', fn: () => { navigator.clipboard?.writeText(`${location.origin}${location.pathname}#note/${n.id}`).then(() => toast(tr('Link copied'))); }},
-    ...(others.length ? [{label: tr('Move to list…'), icon: 'folder', fn: () => menu(anchor, others.map(l => ({label: lname(l), fn: async () => {
+    ...(others.length ? [{label: tr('Move to list…'), icon: 'folder', fn: () => menu(anchor, others.map(l => ({label: lname(l), lic: l, fn: async () => {
       try { const r = await rawFetch('PATCH', `/api/notes/${n.id}`, {list_id: l.id}); Object.assign(n, r); } catch (e) { toast(e.message); return; }
       await load(); toast(tr('Moved to {0}', lname(l))); go('note/' + n.id); }})))}] : []),
     '-', {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: async () => {

@@ -13,6 +13,7 @@ addresses and paths to your setup.
 - [Installed app (PWA) and push](#installed-app-pwa-and-push)
 - [Backup and encryption](#backup-and-encryption)
 - [Server hardening](#server-hardening)
+- [Intrusion alerts](#intrusion-alerts)
 - [Mail](#mail)
 - [Moving to a new server](#moving-to-a-new-server)
 - [Production updates](#production-updates)
@@ -195,6 +196,52 @@ A short checklist for a new server:
   one known to work, or one with a quirk setting); a busy USB 3 port can disturb 2.4 GHz Wi-Fi and Bluetooth nearby.
 - **Changed `.env`? Recreate, do not restart.** `docker compose restart` keeps the old environment; run
   `docker compose up -d` so the container is recreated with the new values.
+
+## Intrusion alerts
+
+Uptime monitoring tells you when the app is down, not when someone got in while it keeps running. Two layers help.
+
+**In the app (2.36.2).** Kalmido reports security events through the admin alerts (*Settings > Users > Whole server >
+Admin alerts*, kind *Security events*, can be switched off like the other kinds; same cooldown and hourly cap):
+
+- a new instance admin, however the flag was set (a role change, a new account, single sign-on group sync, a change in
+  the database)
+- a new admin of an organisation
+- a new agent and a new agent token
+- an admin (of the instance or an organisation) signing in from an address that is not among their last ten
+
+Admins, agents and tokens are compared on every watchdog tick, so every way of getting the role counts. The first tick
+after the update and the first sign-in of each admin after the update only record the current state, nothing is
+reported for them. Sign-in addresses are stored as a keyed hash (with `KALMIDO_SECRET_KEY`); the alert itself names the
+address. Alerts carry ids, user names and addresses only, never content.
+
+Each event also writes one line into the server log, whether admin alerts are on or not, so a log watcher outside the
+app can pick it up without access to the data:
+
+```
+kalmido-security: {"event": "new_admin", "user_id": 7, "username": "jana"}
+```
+
+Events: `new_admin`, `new_org_admin` (+ `org_id`), `new_agent`, `new_agent_token` (+ `agent_id`, `token_id`),
+`admin_login_new_ip` (+ `ip`, `via`). For example with journald (`logging: {driver: journald}`):
+`journalctl -f CONTAINER_NAME=kalmido | grep --line-buffered kalmido-security:` piped into your notifier.
+
+**On the host.** Recommended for a public server, all reported to a second machine (a small board at home is enough)
+or a push service, not only to the server itself:
+
+- **SSH logins:** a watcher on the journal reports every successful login with user, key and source address; known
+  addresses and keys can be quiet. No PAM change needed, so a broken watcher never blocks a login.
+- **Keys and accounts:** changes to `authorized_keys`, `/etc/passwd`, `/etc/shadow`, `/etc/sudoers*` and the sshd
+  configuration, reported at once (file name and key count, not the content).
+- **Checksums:** a daily comparison (for example AIDE) of the system binaries, `/etc`, the compose file, `.env` and the
+  proxy configuration; take a new baseline after system updates and after your own app updates.
+- **Containers:** a container or image you did not start, or an image hash that changed without an update by you.
+- **fail2ban:** a daily summary only when the bans are far above normal.
+- **Dead man's switch:** the server sends a signed sign of life every few minutes; the second machine alarms when it
+  stops while the app is still reachable. Check the time of each sign of life (not in the future) and remember that
+  the signature protects the transport, not against someone with root on the server.
+
+Trigger every alert once on purpose after setting it up, the dead man's switch too.
 
 ## Mail
 

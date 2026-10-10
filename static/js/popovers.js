@@ -42,14 +42,14 @@ function menuTidy(items) {
 }
 function menu(anchor, items, back, fsel) {
   items = menuTidy(items);  // 2.27.0: no doubled / edge separators
-  const btn = (it, i, j) => `<button role="menuitem" data-i="${i}" ${j != null ? `data-j="${j}"` : ''} class="${it.on ? 'on' : ''} ${it.cls || ''}${it.more ? ' msubm' : ''}" ${it.more ? 'aria-haspopup="menu"' : ''} ${it.dis ? 'disabled aria-disabled="true"' : ''} ${it.title ? `title="${esc(it.title)}"` : ''}>${it.dot ? `<span class="mdot">${hdot(it.dot)}</span>` : it.icon ? ic(it.icon, 's') : ''}<span class="ml">${esc(it.label)}${it.sub ? `<small class="msub">${esc(it.sub)}</small>` : ''}</span>${it.keys && !isMobile() ? kb(it.keys) : ''}${it.on ? `<span class="mchk" aria-hidden="true">${ic('check', 's')}</span>` : ''}${it.more ? `<span class="mchev" aria-hidden="true">${ic('right', 's')}</span>` : ''}</button>`;
+  const btn = (it, i, j) => `<button role="menuitem" data-i="${i}" ${j != null ? `data-j="${j}"` : ''} class="${it.on ? 'on' : ''} ${it.cls || ''}${it.more ? ' msubm' : ''}" ${it.more ? 'aria-haspopup="menu"' : ''} ${it.dis ? 'disabled aria-disabled="true"' : ''} ${it.title ? `title="${esc(it.title)}"` : ''}>${it.swc !== undefined ? `<span class="mswc" style="background:${cssColor(it.swc) || 'var(--bg4)'}"></span>` : it.lic && licMark(it.lic, 'mlic', true) ? licMark(it.lic, 'mlic', true) : it.dot ? `<span class="mdot">${hdot(it.dot)}</span>` : it.icon ? ic(it.icon, 's') : ''}<span class="ml">${esc(it.label)}${it.sub ? `<small class="msub">${esc(it.sub)}</small>` : ''}</span>${it.keys && !isMobile() ? kb(it.keys) : ''}${it.on ? `<span class="mchk" aria-hidden="true">${ic('check', 's')}</span>` : ''}${it.more ? `<span class="mchev" aria-hidden="true">${ic('right', 's')}</span>` : ''}</button>`;
   // {row: [item, item]} = one line of equal buttons (1.5.1: "Today" / "Tomorrow" on top of the task menu)
   let html = '', grp = false;
   items.forEach((it, i) => {
     if ((it === '-' || it.head) && grp) { html += '</div>'; grp = false; }
     if (it === '-') html += '<hr role="separator">';
     else if (it.head) { html += `<div class="mgrp" role="group" aria-label="${esc(it.head)}"><div class="mgh" aria-hidden="true">${esc(it.head)}</div>`; grp = true; }
-    else html += it.row ? `<div class="mquick" role="group">${it.row.map((x, j) => btn(x, i, j)).join('')}</div>` : btn(it, i);
+    else html += it.row ? `<div class="mquick${it.rcls ? ' ' + it.rcls : ''}" role="group"${it.rlab ? ` aria-label="${esc(it.rlab)}"` : ''}>${it.row.map((x, j) => btn(x, i, j)).join('')}</div>` : btn(it, i);
   });
   if (grp) html += '</div>';
   const p = openPop(anchor, `<div class="menu-list" role="menu">${html}</div>`);
@@ -582,7 +582,7 @@ async function waitClear(id) {
 // menus): date · priority · assignee · list / section · waiting · pin · time · template · structure · delete. The short
 // menus (swipe, selection) keep the same order and end with "All…".
 const PRIO_ROW = id => { const t = taskById(id); return {row: [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', cls: p ? 'flag-' + p : '', on: t?.priority === p, title: tr('Priority') + ': ' + tr(n), fn: () => patchTask(id, {priority: p})}))}; };
-const moveListItem = (anchor, id) => ({label: tr('Move to list…'), icon: 'list', keys: 'm', fn: () => { const t = taskById(id); if (tlkStop(t)) return; menu(anchor, S.lists.filter(l => !l.archived && l.id !== t?.list_id && canAddTo(l.id)).map(l => ({label: lname(l), icon: l.is_inbox ? 'inbox' : 'list', fn: () => patchUndoable(id, {list_id: l.id}, tr('Moved to {0}', lname(l)))}))); }});
+const moveListItem = (anchor, id) => ({label: tr('Move to list…'), icon: 'list', keys: 'm', fn: () => { const t = taskById(id); if (tlkStop(t)) return; menu(anchor, S.lists.filter(l => !l.archived && l.id !== t?.list_id && canAddTo(l.id)).map(l => ({label: lname(l), icon: l.is_inbox ? 'inbox' : 'list', lic: l, fn: () => patchUndoable(id, {list_id: l.id}, tr('Moved to {0}', lname(l)))}))); }});
 function taskMenu(anchor, id, o = {}) {
   const t = taskById(id);
   if (!canEdit(t)) { roToast(); return; }
@@ -697,10 +697,12 @@ function sortMenu(anchor) {
     {label: !crOn ? tr('Created|sort') : cur === 'created' ? tr('Created: newest first') : tr('Created: oldest first'), on: crOn, cls: 'sortcr', title: crOn ? tr('Click again to reverse the direction') : '', fn: () => set(cur === 'created' ? 'created_asc' : 'created')},
     ...(cfs.length ? ['-', ...cfs.map(f => ({label: tr('Field: {0}', f.name), icon: FT_ICON[f.type], on: cur === 'cf:' + f.id, fn: () => set('cf:' + f.id)}))] : []),
     ...(doneToggleView() ? ['-', doneItem()] : []),
-    ...(l && isOwner(l) && listView(l) === 'list' && !isOverview() ? ['-', dabItem(l)] : [])]);
+    ...(l && isOwner(l) && listView(l) === 'list' && !isOverview() ? ['-', dabItem(l), ...(dsxFixedOff(l) || l.is_inbox ? [] : [dsxItem(l)])] : [])]);
 }
 // 2.7.2 (#414): the list option "Show completed at the bottom" (owner; for everyone in the list, one undo step)
 const dabItem = l => ({label: tr('Show completed at the bottom'), icon: 'cart', on: !!l.checklist, cls: 'dabitem', fn: () => setDab(l.id, !l.checklist)});
+// 2.36.2 (#1136): "Keep completed in their section" (owner / list admins; for everyone in the list)
+const dsxItem = l => ({label: tr('Keep completed in their section'), icon: 'done', on: dsxOn(l), cls: 'dsxitem', fn: () => dsxSet(l.id, !dsxOn(l))});
 async function setDab(id, on) {
   const l = listById(id); if (!l) return;
   const e = await listPatch(id, {checklist: on}, tr('Show completed at the bottom'));

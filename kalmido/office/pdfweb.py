@@ -71,9 +71,13 @@ def opdf_doc_pdf(did):
     c, uid, oid = _ctx()
     model = odoc_render(c, did, oid)
     co = model.setdefault("company", {})
-    lp = opdf_logo_path(oid)
-    co["logo_path"] = lp if (office_settings(c, oid).get("logo") and os.path.isfile(lp)) else None
+    if not model.get("locked"):  # 2.36.2: a finalised document prints the logo of its snapshot (set by odoc_render)
+        lp = opdf_logo_path(oid)
+        co["logo_path"] = lp if (office_settings(c, oid).get("logo") and os.path.isfile(lp)) else None
     model.pop("internal", None)  # never printed
+    from .ledger import ofx_log
+    ofx_log(c, oid, "pdf", doc_id=did, dedupe_min=10)
+    c.commit()
     data = office_pdf(model)
     number = re.sub(r"[^A-Za-z0-9._-]+", "-", str(model.get("number") or "")).strip("-") or f"doc-{did}"
     inline = request.args.get("inline") == "1"
@@ -116,6 +120,8 @@ def opdf_logo_upload():
         fh.write(png)
     os.replace(lp + ".tmp", lp)
     office_logo_set(c, oid, LOGO_FILE)
+    from .ledger import ofx_log
+    ofx_log(c, oid, "upload", target="logo", detail={"bytes": len(png), "width": w, "height": h})
     c.commit()
     return jsonify(logo=LOGO_FILE, width=w, height=h, bytes=len(png))
 
@@ -129,5 +135,7 @@ def opdf_logo_delete():
     except OSError:
         pass
     office_logo_set(c, oid, "")
+    from .ledger import ofx_log
+    ofx_log(c, oid, "delete", target="logo")
     c.commit()
     return jsonify(logo="")

@@ -267,6 +267,8 @@ def bk_create(kind="manual", c=None):
                         rel = prefix + os.path.relpath(full, base).replace(os.sep, "/")
                         if os.path.islink(full) or not os.path.isfile(full) or not BK_MEMBER_RE.fullmatch(rel):
                             continue
+                        if prefix == "office/" and fn.endswith((".tmp", ".part")):  # 2.36.2 E (#1146): unfinished uploads
+                            continue
                         try:
                             digest, size = _sha256_file(full), os.path.getsize(full)
                             z.write(full, rel, compress_type=zipfile.ZIP_STORED if size > 64 * 1024 and

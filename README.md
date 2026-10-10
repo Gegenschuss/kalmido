@@ -18,6 +18,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.36.2** (2026-10-11): Organisations hardened. **Security fixes** (organisation boundary, office & finance) and
+  **admin alerts for intrusion signs**; lists show their **line icons everywhere**, the sidebar tells **people from
+  agents**, projects keep **completed tasks in their section**, quick add in *Tasks of <person>* assigns the task, a
+  new view **Assigned by me**, and office documents can be **finalised** with structured company and client data.
 - **2.36.1** (2026-10-10): Office & finance, stage 1. A new **Office & finance** module for organisations with
   services and rates, equipment, text blocks, framework contracts and a German country pack, **quotations** with a
   live calculator (producing days, raw data, discount, EUR/USD, transfer of rights) and a **PDF** on real A4 pages.

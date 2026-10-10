@@ -72,6 +72,7 @@ TENANT_EXEMPT = {
     "folder_notif": _OWN + " (2.33.0 #927: the owner's notification template of a folder; it only limits pushes of people already in its lists)",
     "git_folders": _OWN + " (2.33.0 #934: the owner's folder repository; it serves only the owner's lists in that folder)",
     "login_ips": "2.33.0 (#834): private sign-in addresses for the proxy check, admins only (instance diagnostics)",
+    "admin_login_ips": "2.36.2 (#1133): hashed sign-in addresses of admins for the security alerts (instance diagnostics)",
     "ev_cal_members": _CAL, "events": _CAL, "ev_reminded": _CAL, "event_attendees": _CAL + "; invited people must be visible",
     "book_members": _BOOK, "contacts": _BOOK,
     "groups": "instance-wide groups of the operator: visible only through members one may see (B1); shares go through the rule",

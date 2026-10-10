@@ -171,7 +171,7 @@ async function swTests() {
   // 2.25.0 (UX-44): the task panel has no list / section selects any more (the path on top moves a task); the sheet is
   // tested on selects of the same kind placed in the panel, wired like the old ones
   const mkSel = (id, label, opts, val, onCh) => { const box = d.createElement('div'); box.className = 'dsec fields'; box.innerHTML = `<label for="${id}">${label}</label><select id="${id}" data-sheet-ico="list">${opts.map(([v, t]) => `<option value="${v}" ${v === val ? 'selected' : ''}>${t}</option>`).join('')}</select>`; d.querySelector('#detail').appendChild(box); const el = box.querySelector('select'); el.addEventListener('change', () => onCh(el.value)); return el; };
-  const lsOpts = () => w.eval(`JSON.stringify(S.lists.filter(l => !l.archived).map(l => [String(l.id), lname(l)]))`);
+  const lsOpts = () => w.eval(`JSON.stringify(S.lists.filter(l => !l.archived).map(l => [String(l.id), l.is_inbox ? lname(l) : listName(l.name)]))`);
   const sel = mkSel('t-list', 'List', JSON.parse(lsOpts()), String(WEB), v => w.eval('patchTask(' + plan + ', {list_id: ' + (+v) + '})'));
   const ev = mdown(w, sel);
   const pop = d.querySelector('#pop');

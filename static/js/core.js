@@ -758,6 +758,7 @@ const SMART = {
   stale: {name: N_('Lying idle'), icon: 'clock'},  // 2.34.0 (#266)
   pinned: {name: N_('Pinned|view'), icon: 'pin'},  // 2.16.0 (#648): every pinned task of every list
   assigned: {name: N_('My tasks'), icon: 'user'},
+  byme: {name: N_('Assigned by me'), icon: 'send'},  // 2.36.2 (#1138)
   all: {name: N_('All'), icon: 'all'},
   done: {name: N_('Completed'), icon: 'done'},
   trash: {name: N_('Trash'), icon: 'trash'},
@@ -786,6 +787,7 @@ function parseHash() {
   if (a === 'today' && b === 'review') return {mod: 'tasks', key: 'today', review: true};  // 2.10.0 (#440): push "Daily review"
   if (a === 'folder' && b) return {mod: 'tasks', key: 'folder:' + h.slice(7)};  // 2.4.0: a path has a slash
   if (a === 'agents') return {mod: 'agents', key: 'agents', agent: +b || null};
+  if (a === 'job' && +b) return {mod: 'agents', key: 'agents', job: +b};  // 2.36.2 (#1141): one job, unfolded with its history
   if (a === 'ev' && +b) return {mod: 'cal', key: 'cal', ev: +b};  // 2.21.0 (#659): a push / News about an event
   if (a === 'contacts') return {mod: 'contacts', key: 'contacts', contact: +b || null};  // 2.21.0 (#658)
   if (a === 'client' && +b) return {mod: 'clients', key: 'clients', client: +b};  // 2.23.0 (#463)
@@ -810,6 +812,7 @@ async function route() {
   if (r.mod === 'notes') noteRoute(r.lid, r.nid || null); else if (S.nt.id) { noteFlush(); S.nt.id = null; }
   if (r.noteMissing) setTimeout(() => toast(tr('This note does not exist or you cannot see it.')), 0);  // 2.10.0: review = #today/review
   if (r.mod === 'agents') S.jobs.items = null;
+  S.jobFocus = r.job || null;  // 2.36.2 (#1141): #job/<id>
   if (S.route.mod !== 'tasks' || r.key !== S.lastRouteKey) { S.multi.clear(); S.multiMode = false; }
   if (r.key === 'search' && S.lastRouteKey !== 'search') S.searchFocus = true;  // 2.15.1 (#633): opening Search focuses its field on a phone too (a re-render or a task closed on top of it does not)
   S.lastRouteKey = r.key;

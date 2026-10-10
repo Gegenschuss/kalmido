@@ -5725,3 +5725,114 @@ section.ofdsec h3{min-height:2.5rem;display:flex;align-items:center}
   .ofdrt .ofdrtf{flex-direction:column;flex-wrap:nowrap;width:100%;min-width:0} .ofdrt .ofdrtf select,.ofdrt .ofdrtf input{width:100%;min-width:0;flex:none}
   .ofdsecb .row .chkl{justify-content:flex-start;gap:.5rem}
 }
+/* 2.36.2 C */
+/* (#1139) one calm blue for agents (robot symbol), not the accent: 7.6:1 dark, 4.9:1 light on the sidebar */
+:root{--bot:#8fa8e8}
+:root[data-theme="light"]{--bot:#3a55ad}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"]{--bot:#3a55ad} }
+svg.i.lbot{color:var(--bot);width:.875rem;height:.875rem;flex:none;vertical-align:-.125rem;margin-right:.25rem}
+svg.i.lbot .d{fill:var(--bot)}
+.abadge{background:color-mix(in srgb,var(--bot) 14%,transparent);color:var(--bot)}
+.abadge .i .d{fill:var(--bot)}
+/* sidebar: shared with people (grey) / agents (robot, blue) / both; always shown, quiet through the grey */
+#side .srow .shr.shk:not(.bellm){opacity:1;gap:.125rem;align-items:center}
+#side .srow .shr.shk svg.i{color:var(--muted)}
+#side .srow .shr.shk svg.i.lbot{color:var(--bot);margin:0;width:.875rem;height:.875rem}
+#side .srow .shr.shk svg.i .d{fill:currentColor}
+/* (#1135) a list's line icon / dot outside the sidebar (header, chips, menus, search, groups, archive, tabs) */
+.lic{display:inline-flex;align-items:center;justify-content:center;flex:none;width:1rem;height:1rem;vertical-align:-.1875rem}
+.lic svg.i{width:1rem;height:1rem;color:var(--muted)}
+.lic .licd{width:.5rem;height:.5rem;border-radius:50%;background:var(--faint);display:inline-block}
+#top h1 .lic.h{width:1.25rem;height:1.25rem;margin-right:.5rem}
+#top h1 .lic.h svg.i{width:1.25rem;height:1.25rem}
+#top h1 .lic.h .licd{width:.625rem;height:.625rem}
+.meta .lst .lic.lsm{width:.8125rem;height:.8125rem;margin-right:.25rem}
+.meta .lst .lic.lsm svg.i{width:.8125rem;height:.8125rem}
+.meta .lst .lic.lsm .licd{width:.4375rem;height:.4375rem}
+.ghead .lic.glic{margin-right:.125rem}
+.arow .lic.aemo{width:1rem}
+.menu-list .lic.mlic{width:1rem}
+.temoji .lic{width:1.25rem;height:1.25rem}
+.temoji .lic svg.i{width:1.25rem;height:1.25rem}
+/* the colour row at the top of a list's sidebar menu: 9 colours + none */
+.menu-list .mquick.mcols{grid-template-columns:repeat(5,1fr)}
+.menu-list .mquick.mcols button.mcol{border:0;padding:.25rem;min-height:2rem;justify-content:center}
+.menu-list .mcol .ml,.menu-list .mcol .mchk{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.menu-list .mcol .mswc{width:1.25rem;height:1.25rem;border-radius:50%;border:1px solid var(--line2);display:inline-block}
+.menu-list .mcol.on .mswc{box-shadow:0 0 0 2px var(--bg2),0 0 0 .25rem var(--text)}
+@media (pointer:coarse),(max-width:899px){ .menu-list .mquick.mcols button.mcol{min-height:2.75rem;min-width:2.75rem} }
+/* (#1130) the icon grid of the list dialog: 44 px cells on phones */
+@media (pointer:coarse),(max-width:899px){
+  .emogrid{grid-template-columns:repeat(auto-fill,minmax(2.75rem,1fr));gap:.25rem}
+  .emogrid button{height:2.75rem;min-width:2.75rem}
+  .emogrid .lipick .avopt{width:2.75rem;height:2.75rem}  /* the pictures below the grid too */
+}
+/* (#1146) calendar window: the switches and "Per list" with a 44 px target you can see; "Plan the day": the calendar lines */
+@media (pointer:coarse),(max-width:899px){
+  .cvxrow .swc,.evcrow .swc{width:2.75rem;height:2.75rem;margin:0;align-items:center;justify-content:center}
+  .cvxrow .swc .swt,.evcrow .swc .swt{width:2.25rem;height:1.25rem;flex:none}
+  .cvxrow .swc input,.evcrow .swc input{inset:0}
+  .cvxrow.sub{min-height:2.75rem}
+  .cvxrow .cvxfold{width:2.75rem;height:2.75rem;min-width:2.75rem;min-height:2.75rem}
+  .cvxdpr{min-height:2.75rem}
+  .cvxdpr input{width:1.375rem;height:1.375rem;margin:0 .6875rem}
+}
+/* 2.36.2 D (#1136, #1138): "3/8 done" in a section head, the person chip of quick add in "Tasks of X" */
+.ghead .c.dsxc{white-space:nowrap;font-variant-numeric:tabular-nums}
+.qdc.dsxwho{cursor:default;color:var(--text)}
+.qchip.dsxwho{font-family:inherit;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qnote.dsxwho{white-space:normal}
+/* 2.36.2 E (#1021, #1146): finalised documents, history / access log, company fields, client billing details, PDF button label */
+.ofdfs{border:0;margin:0;padding:0;min-width:0}
+.ofdfs[disabled] .ofdadd,.ofdfs[disabled] .ofdmv,.ofdfs[disabled] [data-ofd="fld-add"],.ofdfs[disabled] [data-ofd="fld-del"]{display:none}
+.ofdfs[disabled] input,.ofdfs[disabled] select,.ofdfs[disabled] textarea{opacity:.85}
+.ofdlocked{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:0 0 .75rem;padding:.5rem .75rem;border-radius:var(--r, .5rem);background:var(--bg3);color:var(--text);font-size:var(--fs-s)}
+.ofdlocked>span{flex:1 1 14rem}
+.ofdlocked .btn{min-height:2.25rem}
+.ofdlk{display:inline-flex;vertical-align:-.15em;margin-right:.25rem;color:var(--muted)}
+.ofdlog{list-style:none;margin:.25rem 0;padding:0;font-size:var(--fs-s)}
+.ofdlog li{padding:.25rem 0;border-bottom:1px solid var(--line)}
+.ofdlog li:last-child{border-bottom:0}
+.ofcfree,.clbill{margin:.5rem 0}
+.ofcfree>summary,.clbill>summary{cursor:pointer;min-height:2.75rem;display:flex;align-items:center;color:var(--muted);font-size:var(--fs-s)}
+.ofcfree>summary:focus-visible,.clbill>summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ofcco input#osc-country,.clbill #clb-country{text-transform:uppercase}
+@media (max-width:599px){
+  .ofdhead .ofdpdf .ofdpdft{display:inline}
+  .ofdhead .btn{min-height:2.75rem}
+}
+/* 2.36.2 B (#1140, #1123, #1141): the permission badge in the chat header without a frame: small grey text like the model
+   ("· Host default ▾"), Auto only as accent text; the touch area is an invisible ::after (44 px high on touch screens; at
+   least 44 px wide there by min-width), not the visible size. In the phone header's second line it sits under the name
+   with some air (no dot at the line start). Steps line up with "… is writing …" on phones too. A job opened by a link. */
+.chmode,button.chmode{position:relative;display:inline-flex;align-items:center;margin-left:.375rem;padding:0;border:0;border-radius:.25rem;background:none;color:var(--muted);font:inherit;font-size:var(--fs-xs);line-height:1rem;overflow:visible}
+.chmode::before{content:"·";margin-right:.375rem}
+.chmode.pm-auto{color:var(--accent);border:0}
+button.chmode:hover{color:var(--text);border:0}
+button.chmode:focus{outline:none}
+button.chmode:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.chmode::after{content:"";position:absolute;left:0;right:0;top:50%;height:max(100%,1.5rem);transform:translateY(-50%)}
+button.chmode .pmlong::after{content:"\a0\25BE";font-size:.75em}
+.chmode .pmlong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (pointer:coarse){ button.chmode,.chnm button.chmode{min-height:0;min-width:2.75rem;padding:0} button.chmode::after{height:2.75rem} }
+@media (max-width:37.5rem){
+  .chnm .chmode{overflow:visible}
+  .chmode[data-short]::before{content:"·\a0\a0" attr(data-short)}
+  button.chmode[data-short]::before{content:"·\a0\a0" attr(data-short) "\a0\25BE"}
+  .chnm button.chmode[data-short]{padding:0}
+}
+@media (pointer:coarse) and (max-width:37.5rem){
+  .chath .chn{row-gap:.625rem}
+  .chath .chnm .chmode,.chath .chnm .chmode[data-short]{margin:0 .5rem 0 .125rem}
+  .chath .chmode[data-short]::before{content:attr(data-short)}
+  .chath button.chmode[data-short]::before{content:attr(data-short) "\a0\25BE"}
+}
+@media (max-width:599px){
+  .chsteps{padding-left:calc(3.0625rem - 2px)}
+  .chsteps.off{padding-left:3.5625rem}
+}
+.job.jfocus{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.job.jfocus:focus{outline:none}
+/* 2.36.2 (device test): the logo file field of office settings stays inside the screen */
+#os-logo{max-width:100%;min-width:0}
+.lacts{min-width:0;max-width:100%;flex-wrap:wrap}

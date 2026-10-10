@@ -270,7 +270,7 @@ const listName = n => String(n ?? '').replace(/^((?:\p{Extended_Pictographic}|\p
 // display name of a list object: an inbox with its default name ("Eingang" before 2.15, since then "Inbox" in its owner's
 // language, #632: S.inboxNames) is shown in the UI language
 const inboxDef = n => n === 'Eingang' || (S.inboxNames || []).includes(n);
-const lname = l => !l ? '' : l.is_inbox && inboxDef(l.name) ? tr('Inbox') : listName(l.name);
+const lname = l => !l ? '' : l.is_inbox && inboxDef(l.name) ? tr('Inbox') : licName(l);  // 2.36.2 (#1135): as the sidebar shows it
 const norm = s => s.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
 // website link display: domain without www. (chip), domain + path (title of a bare shared link)
 const urlParse = u => { try { return new URL(u); } catch { return null; } };

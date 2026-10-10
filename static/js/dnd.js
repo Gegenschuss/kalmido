@@ -95,7 +95,8 @@ async function dropTask0(id, el, clientY) {
       if (!target) return;
       // insert before target: sort between the target and its predecessor in the rendered order
       const mode = sortMode();
-      let rows = $$('#view .trow').map(r => S.tasks.get(+r.dataset.id)).filter(x => x && x.parent_id === target.parent_id && x.id !== id);
+      // 2.36.2 (#1136): completed tasks shown in their section do not count as neighbours (only the target itself)
+      let rows = $$('#view .trow').map(r => S.tasks.get(+r.dataset.id)).filter(x => x && x.parent_id === target.parent_id && x.id !== id && (x.status === 0 || x.id === target.id));
       if (mode === 'prio' && !kcol) {  // dropping into another priority block takes over that priority
         if (target.priority !== t.priority) { item.priority = target.priority; toast(tr('Priority: {0}', tr([N_('None'), N_('Low'), '', N_('Medium'), '', N_('High')][target.priority]))); }
         rows = rows.filter(x => x.priority === target.priority);

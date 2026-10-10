@@ -75,7 +75,7 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   check(V.z === 'month' && Math.abs(parseFloat(sum(WEB).style.left) - X(1)) < .01 && Math.abs(parseFloat(sum(WEB).style.width) - (X(30) + V.dw - X(1))) < .01, `summary bar: earliest date .. latest due (month zoom) ${sum(WEB).style.left} ${sum(WEB).style.width}`);
   check(Math.abs(parseFloat(sum(FILM).style.left) - X(12)) < .01, 'summary bar starts at the earliest start');
   check(sum(WEB).querySelector('.rm-fill').style.width === '20%' && /20%/.test(sum(WEB).nextElementSibling.textContent), 'progress fill: 1 of 5 main tasks done = 20 %');
-  check(sum(WEB).style.getPropertyValue('--lc') === '#6d8cff' && sum(WEB).nextElementSibling.querySelector('.rm-em')?.textContent === '🌐', 'list colour + emoji on the summary bar');
+  check(sum(WEB).style.getPropertyValue('--lc') === '#6d8cff' && (sum(WEB).nextElementSibling.querySelector('.rm-em')?.textContent === '🌐' || !!sum(WEB).nextElementSibling.querySelector('.lic.rmlic svg')), 'list colour + emoji (2.36.2: its line icon with "Line") on the summary bar');
   check(sum(WEB).querySelectorAll('.cap').length === 2 && sum(WEB).getAttribute('role') === 'button' && sum(WEB).tabIndex === 0, 'bracket bar with end caps, focusable');
   check(/Website/.test(sum(WEB).getAttribute('aria-label')) && /20 % done/.test(sum(WEB).getAttribute('aria-label')), 'accessible label with the dates and progress');
   // arrows: across groups while expanded

@@ -163,7 +163,7 @@ def user_create():
             return err(e)
     # 2.22.0 (#752): the organisations of the new person: given, else the creating admin's (else the instance's first)
     orgs = b.get("orgs")
-    from ..accounts.orgs import instance_mode
+    from ..accounts.orgs import instance_mode, org_member_add
     if instance_mode(c) not in ("multi", "workspaces"):  # 2.23.0 (#799): organisation = the one (create_user), shared = none
         orgs = []
     if orgs is None:
@@ -175,7 +175,7 @@ def user_create():
     if known:
         c.execute("DELETE FROM org_members WHERE user_id=?", (uid,))
         for o in known:
-            c.execute("INSERT OR IGNORE INTO org_members(org_id,user_id) VALUES(?,?)", (o, uid))
+            org_member_add(c, o, uid)
     inv = None
     if b.get("invite") is True and not pw:  # 2.22.0 (#697): no password: a one-time link to set it (by e-mail when possible)
         from ..accounts.invite import invite_new
@@ -205,14 +205,15 @@ def user_update(uid):
     if "orgs" in b and instance_mode(c) in ("multi", "workspaces"):  # 2.22.0 (#752): the person's organisations (replaces them); 2.23.0: multi only; 2.28.0: + workspaces
         if not isinstance(b["orgs"], list) or not all(isinstance(x, int) for x in b["orgs"]):
             return err(tr("Invalid value: {0}", "orgs"))
-        from ..accounts.orgs import org_leave
+        from ..accounts.orgs import org_leave, org_member_add
         have = {r[0]: r[1] for r in c.execute("SELECT org_id, role FROM org_members WHERE user_id=?", (uid,))}
         for o in sorted(set(have) - set(b["orgs"])):  # 2.28.0 (#935): taken out of an organisation = leaving it (lists stay with it)
             heir = (c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND u.disabled=0 AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (o, uid)).fetchone() or [me()])[0]
             org_leave(c, o, uid, heir if heir != uid else me())
         for o in b["orgs"]:
             if o not in have:
-                c.execute("INSERT OR IGNORE INTO org_members(org_id,user_id,role) SELECT id, ?, 'member' FROM orgs WHERE id=?", (uid, o))
+                if c.execute("SELECT 1 FROM orgs WHERE id=?", (o,)).fetchone():
+                    org_member_add(c, o, uid)
     if uid == me() and (("is_admin" in b and not b["is_admin"]) or b.get("disabled") or b.get("kind") == "agent"):
         return err(tr("You cannot remove your own admin rights or disable yourself"))
     if "kind" in b:  # 2.0.0: person <-> agent

@@ -62,7 +62,7 @@ KINDS = {
     "client": ("matrix", "p2300_tenant_test.py: clients by id, workload"),
     # 2.36.1 (#1021): office & finance -- every row belongs to an organisation (org_id), read through office_org (the workspace
     # one works in); foreign ids 404; agents and kids 403 before any query; a private person 400. No /api/v1, no MCP in stage 1
-    "office": ("matrix", "p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF)"),
+    "office": ("matrix", "p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF), p2362_e_api_test.py (finalising, company fields, office log)"),
     "webhook": ("matrix", "p2300_tenant_test.py: webhooks by id, deliveries only of visible tasks"),
     "export": ("matrix", "p2300_tenant_test.py: the export has only the own data"),
     "stats": ("matrix", "p2300_tenant_test.py: statistics count only own / visible tasks"),
@@ -185,6 +185,8 @@ ROUTES = {
     # ---- office (D, 2.36.1 #1021): the quotation PDF and the organisation's logo (4)
     "GET /api/office/docs/{}/pdf": "office", "GET /api/office/logo": "office", "POST /api/office/logo": "office",
     "DELETE /api/office/logo": "office",
+    # ---- office (E, 2.36.2 #1021 / #1142): finalising a document, its history and the organisation's office log (3)
+    "POST /api/office/docs/{}/finalize": "office", "GET /api/office/docs/{}/log": "office", "GET /api/office/log": "office",
     # ---- comment (9)
     "POST /api/comments/{}/decide": "comment", "POST /api/v1/comments/{}/reactions": "comment",
     "DELETE /api/v1/comments/{}/reactions/{}": "comment", "PATCH /api/v1/comments/{}": "comment",

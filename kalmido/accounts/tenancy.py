@@ -2,7 +2,8 @@
 (ws_migrate_objs), and a nightly boundary check counts every membership that crosses it (boundary_check): people in an
 organisation's list / calendar / address book who are not its members (directly or through a group), agents in an object of
 another workspace, owners outside the organisation of their object, agents of an organisation their owner left. A finding
-is an admin alert (kind security, ids and counts only, once per new set of findings); the count is in GET /api/admin/orgs."""
+is an admin alert (kind security, ids and counts only, once per new set of findings); the count is in GET /api/admin/orgs.
+2.36.2 (#1142): memberships in an organisation's object of people outside it are removed by the nightly run (boundary_repair)."""
 import hashlib
 import json
 import os
@@ -64,6 +65,37 @@ def boundary_check(c):
     return out
 
 
+# 2.36.2 (#1142): memberships of PEOPLE in an organisation's object who are not members of that organisation are taken out
+# (like org_leave) instead of only counted -- the same rule the read layer applies (core/access.py acx_org_ok).
+# kind -> (member table, object column). Agents of another workspace stay counted only: the read layer already hides the
+# object from them, and moving the agent to the right workspace brings its access back. Owners outside their organisation
+# and agents whose owner left stay counted as before.
+REPAIR = {"list_person": ("list_members", "list_id"), "group": ("list_members", "list_id"),
+          "cal_person": ("ev_cal_members", "cal_id"), "book_person": ("book_members", "book_id")}
+TENANT_REPAIRED = N_("Workspace boundary check: {0} memberships across the boundary between organisations were removed ({1}). Settings > Administration > Organisations")
+
+
+def boundary_repair(c):
+    """Takes out every membership in an organisation's list / calendar / address book of a person who is not a member of
+    that organisation. {kind: [[object id, user id], ...]} of what was removed; the
+    caller commits."""
+    out = {}
+    if not has_workspaces(c):
+        return out
+    for k, (table, col) in REPAIR.items():
+        rows = c.execute(CHECKS[k] + " ORDER BY 1, 2").fetchall()
+        done = []
+        for oid_, uid in rows:
+            c.execute(f"DELETE FROM {table} WHERE {col}=? AND user_id=?", (oid_, uid))
+            if table == "list_members":
+                c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (oid_, uid))
+                c.execute("DELETE FROM task_people WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, oid_))
+            done.append([oid_, uid])
+        if done:
+            out[k] = done
+    return out
+
+
 def boundary_last(c):
     try:
         d = json.loads(gsetting(c, "tenant_check") or "{}")
@@ -82,6 +114,14 @@ def boundary_tick(c):
     if TENANT_CHECK_ENV != "always":
         if TENANT_CHECK_ENV in ("0", "off", "no") or now.hour < TENANT_CHECK_HOUR or last.get("day") == now.date().isoformat():
             return
+    fixed = boundary_repair(c)  # 2.36.2 (#1142): repaired, not only counted
+    if fixed:
+        n = sum(len(v) for v in fixed.values())
+        aa_now("security", "tenantfix|" + hashlib.sha256(json.dumps(fixed, sort_keys=True).encode()).hexdigest()[:16], TENANT_REPAIRED,
+               [n, ", ".join(f"{k} {len(v)}" for k, v in sorted(fixed.items()))])
+        print(f"boundary check (#1142): {n} memberships across the workspace boundary removed "
+              f"{json.dumps({k: v[:TENANT_SAMPLE] for k, v in fixed.items()})}", flush=True)
+        c.commit()
     res = boundary_check(c)
     sig = hashlib.sha256(json.dumps(res["sample"], sort_keys=True).encode()).hexdigest()[:16] if res["n"] else ""
     rec = {"day": now.date().isoformat(), "at": iso(now_utc()), "n": res["n"], "kinds": res["kinds"], "sig": sig,

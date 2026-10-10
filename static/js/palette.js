@@ -131,7 +131,7 @@ window.addEventListener('keydown', e => {
     const b = k === 'x' || k === ' ' ? $('#mbar [data-act="mb-done"]') : $(`#detail.multi [data-act="me-f"][data-f="${k === 'm' ? 'list' : 'date'}"]:not([disabled])`);
     if (b) { e.preventDefault(); b.click(); }
     else if (k === 'd') { e.preventDefault(); multiDateMenu($('#mbar .mcount') || document.body); }
-    else if (k === 'm') { e.preventDefault(); menu($('#mbar .mcount') || document.body, S.lists.filter(l => !l.archived && canEditList(l.id)).map(l => ({label: lname(l), fn: () => batch('patch', {list_id: l.id, section_id: null})}))); }
+    else if (k === 'm') { e.preventDefault(); menu($('#mbar .mcount') || document.body, S.lists.filter(l => !l.archived && canEditList(l.id)).map(l => ({label: lname(l), lic: l, fn: () => batch('patch', {list_id: l.id, section_id: null})}))); }
     return;
   }
   if (e.shiftKey && (k === 'X' || k === 'J' || k === 'K' || k === 'ArrowDown' || k === 'ArrowUp')) {  // select / extend
@@ -270,6 +270,7 @@ function palAll() {
     add('v:' + k, 'view', tr(SMART[k].name), SMART[k].icon, () => go(k), {keys: {today: 'g t', tomorrow: 'g m', week: 'g w', doable: 'g d', inbox: 'g i', all: 'g a'}[k]});
   }
   if (collab()) add('v:assigned', 'view', tr('My tasks'), 'user', () => go('assigned'));
+  if (collab() && (hasSharing() || cn.byme)) add('v:byme', 'view', tr('Assigned by me'), 'send', () => go('byme'));  // 2.36.2 (#1138)
   // 2.25.0 (UX-47): "Message to …" for everyone one can write to (when typing)
   if (teamOn()) for (const p of teamPeople()) add('dm:' + p.id, 'action', tr('Message to {0}', p.name), 'comment', () => dmOpen(p.id, p.name), {qonly: true});
   add('v:home', 'view', tr('Start|home'), 'home', () => go('home'));  // 2.17.0 (#475)
@@ -285,7 +286,7 @@ function palAll() {
     if (!chatFull()) for (const a of (S.agents || []).filter(x => x.enabled)) add('a:pop-' + a.id, 'action', tr('Chat with {0} as a window', a.name), 'comment', () => chatOpen(a.id, {float: true}));  // 2.29.0 (#363)
   }
   // lists, filters, tags
-  for (const l of S.lists.filter(x => !x.archived && !x.is_inbox && inWs(x))) add('l:' + l.id, 'list', lname(l), 'list', () => go('l/' + l.id), {sw: cssColor(l.color), img: l.icon || '', ...(l.folder ? {sub: fDisp(l.folder)} : {})});
+  for (const l of S.lists.filter(x => !x.archived && !x.is_inbox && inWs(x))) add('l:' + l.id, 'list', lname(l), 'list', () => go('l/' + l.id), {sw: cssColor(l.color), img: l.icon || '', lic: l, ...(l.folder ? {sub: fDisp(l.folder)} : {})});
   for (const f of folderNames()) add('folder:' + f, 'folder', fDisp(f), 'folder', () => go('folder/' + encodeURIComponent(f)));  // 2.4.0 (#361)
   for (const f of S.filters) add('f:' + f.id, 'filter', f.name, 'filter', () => go('f/' + f.id));
   for (const g of Object.keys(counts().tags).sort()) add('tag:' + g, 'tag', '#' + g, 'tag', () => go('tag/' + encodeURIComponent(g)));
@@ -306,7 +307,7 @@ function palItems() {
   const q = PAL.q.trim();
   if (PAL.mode === 'move') {
     const t = curTask(); if (!t) return [];
-    return (canEditList(t.list_id) ? S.lists : []).filter(l => !l.archived && canEditList(l.id) && l.id !== t.list_id).map(l => ({id: 'mv:' + l.id, kind: 'list', label: lname(l), icon: l.is_inbox ? 'inbox' : 'list', sw: cssColor(l.color),
+    return (canEditList(t.list_id) ? S.lists : []).filter(l => !l.archived && canEditList(l.id) && l.id !== t.list_id).map(l => ({id: 'mv:' + l.id, kind: 'list', label: lname(l), icon: l.is_inbox ? 'inbox' : 'list', lic: l, sw: cssColor(l.color),
       fn: () => patchUndoable(t.id, {list_id: l.id, section_id: null}, tr('Moved to {0}', lname(l)))}))
       .map(x => ({...x, score: fuzzy(q, x.label)})).filter(x => x.score > 0).sort((a, b) => b.score - a.score);
   }
@@ -349,7 +350,7 @@ function palDraw() {
   PAL.items.forEach((x, i) => {
     if (x.group && x.group !== last) { h += `<div class="pgroup">${tr(PAL_GROUP[x.group])}</div>`; last = x.group; }
     h += `<button class="pitem ${i === PAL.i ? 'on' : ''} ${x.cls || ''}" data-pi="${i}" role="option" aria-selected="${i === PAL.i}" id="pi-${i}">
-      <span class="pic">${x.img ? `<img class="picon" src="${esc(x.img)}" alt="">` : x.sw !== undefined ? `<span class="psw" style="${x.sw ? 'background:' + x.sw : ''}"></span>` : ic(x.icon, 's')}</span>
+      <span class="pic">${x.img ? `<img class="picon" src="${esc(x.img)}" alt="">` : x.lic && licMark(x.lic) ? licMark(x.lic, 'pli') : x.sw !== undefined ? `<span class="psw" style="${x.sw ? 'background:' + x.sw : ''}"></span>` : ic(x.icon, 's')}</span>
       <span class="pl"><span class="plt">${esc(x.label)}</span>${x.subHtml ? `<span class="pls pmsg">${x.subHtml}</span>` : x.sub ? `<span class="pls">${esc(x.sub)}</span>` : ''}</span>
       ${x.keys ? kb(x.keys) : ''}${x.kind === 'action' || x.kind === 'setting' || x.kind === 'view' || x.kind === 'msg' ? '' : `<span class="pk">${esc(tr(PAL_KIND[x.kind] || x.kind))}</span>`}</button>`;
   });

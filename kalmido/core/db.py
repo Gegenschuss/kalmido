@@ -265,6 +265,8 @@ def init_db(guard=True):
         for stmt in INDEXES.strip().split(";"):
             if stmt.strip():
                 c.execute(stmt)
+        from ..office.ledger import ofx_migrate
+        ofx_migrate(c)  # 2.36.2 (#1142, E): office positions carry their organisation
         for k, v in GLOBAL_DEFAULTS.items():
             c.execute("INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)", (k, v))
         from ..admin.hosting import quota_backfill

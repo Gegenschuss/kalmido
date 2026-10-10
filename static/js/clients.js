@@ -110,6 +110,7 @@ function clientModal(c) {
     <div class="row"><label for="cl-bh">${tr('Budget')}</label><span class="lacts"><input id="cl-bh" inputmode="decimal" class="numin" value="${c?.budget_h != null ? esc(fmtNum(c.budget_h, 2)) : ''}" placeholder="–" aria-label="${esc(tr('Budget in hours'))}"><span class="muted">h</span><input id="cl-ba" inputmode="decimal" class="numin" value="${c?.budget_amount != null ? esc(fmtNum(c.budget_amount, 2)) : ''}" placeholder="–" aria-label="${esc(tr('Budget as an amount'))}"><span class="muted">${esc(S.settings.time_currency || '€')}</span></span></div>
     <div class="shint lhint keep">${tr('At 80 % of the budget the bar turns amber, over 100 % red.')}</div>` : ''}
     <div class="row"><label for="cl-note">${tr('Note')}</label><textarea id="cl-note" rows="3" maxlength="4000">${esc(c?.note || '')}</textarea></div>
+    ${typeof officeOn === 'function' && officeOn() ? ofxClientBillingHtml(c?.billing || {}) : ''}
     ${c ? `<div class="row"><label>${tr('Archive')}</label><label class="chkl"><input type="checkbox" id="cl-arch" ${c.archived ? 'checked' : ''}> ${tr('Archived (hidden from the sidebar)')}</label></div>` : ''}
     <div class="aerr" role="alert"></div>
     <div class="foot">${c?.can_delete ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${c ? tr('Save') : tr('Add')}</button></div>`);
@@ -127,6 +128,7 @@ function clientModal(c) {
         phone: $('#cl-phone', md).value, address: $('#cl-addr', md).value, note: $('#cl-note', md).value};
       if ($('#cl-rate', md)) Object.assign(body, {rate: num($('#cl-rate', md).value), budget_h: num($('#cl-bh', md).value), budget_amount: num($('#cl-ba', md).value)});
       if ($('#cl-arch', md)) body.archived = $('#cl-arch', md).checked;
+      for (const el of md.querySelectorAll('[data-clb]')) body[el.dataset.clb] = el.dataset.clb === 'payment_terms_days' ? (el.value.trim() === '' ? null : +el.value.trim()) : el.value;
       const r = await rawFetch(c ? 'PATCH' : 'POST', c ? `/api/clients/${c.id}` : '/api/clients', body);
       md.remove(); await load(); render(); clReload();
       toast(c ? tr('Saved') : tr('Added: {0}', r.name));
@@ -339,3 +341,13 @@ document.addEventListener('click', async e => {
   else if (k === 'client-tvx') { S.tv.client = null; S.tv.key = ''; renderView(); }
 });
 document.addEventListener('change', e => { if (e.target.id === 'wl-org') { WLV.org = +e.target.value; WLV.data = null; wlLoad(); } });
+
+// 2.36.2 (#1021, E): billing details of a client for office & finance (structured address, VAT ID, customer number, buyer
+// reference, invoice e-mail, payment terms); folded away, the free address above stays
+const OFX_CL_FIELDS = [['street', N_('Street'), 200], ['zip', N_('Postcode'), 20], ['city', N_('City'), 120], ['country', N_('Country (ISO code)'), 2],
+  ['vat_id', N_('VAT ID'), 20], ['customer_no', N_('Customer number'), 40], ['buyer_reference', N_('Buyer reference (e.g. routing ID)'), 60],
+  ['email_invoice', N_('E-mail for invoices'), 200], ['payment_terms_days', N_('Payment terms (days)'), 3]];
+function ofxClientBillingHtml(b) {
+  const filled = OFX_CL_FIELDS.some(([k]) => b[k] != null && b[k] !== '');
+  return `<details class="clbill" ${filled ? 'open' : ''}><summary>${tr('Billing details')}</summary>${OFX_CL_FIELDS.map(([k, n, mx]) => `<div class="row"><label for="clb-${k}">${esc(tr(n))}</label><input id="clb-${k}" data-clb="${k}" maxlength="${mx}" value="${esc(b[k] ?? '')}" ${k === 'payment_terms_days' ? 'inputmode="numeric" class="numin"' : k === 'country' ? 'class="numin" autocapitalize="characters"' : k === 'email_invoice' ? 'type="email" autocomplete="off"' : ''}></div>`).join('')}</details>`;
+}

@@ -11,7 +11,7 @@ from flask import has_request_context
 from ..core.i18n import lang, N_, tr
 from ..core.db import bump, iso, iso_ms, local_now, now_utc, usettings
 from ..accounts.session import me
-from ..core.access import collab_all, Denied, list_role, task_visible, WRITE_ROLES
+from ..core.access import acx_org_ok, collab_all, Denied, list_role, task_visible, WRITE_ROLES
 from ..tasks.validation import DATE_MIN_Y
 from ..collab.comments import user_names
 from ..personal.timetrack import BadInput
@@ -50,6 +50,8 @@ def contacts_on(c, uid):
 def book_role(c, uid, b):
     if b is None:
         return None
+    if "org_id" in b.keys() and not acx_org_ok(c, uid, b["org_id"]):  # 2.36.2 (#1142): organisation books: members only
+        return None
     if b["owner_id"] != uid and c.execute("SELECT disabled FROM users WHERE id=?", (b["owner_id"],)).fetchone()[0]:
         return None  # a disabled owner's address books are gone for the members too (like in the lists of books)
     if b["owner_id"] == uid:
@@ -74,11 +76,12 @@ def need_book(c, bid, write=False, manage=False, uid=None):
 
 
 def my_book_ids(c, uid):
-    out = {r[0]: "owner" for r in c.execute("SELECT id FROM books WHERE owner_id=?", (uid,))}
+    out = {r[0]: "owner" for r in c.execute("SELECT id, org_id FROM books WHERE owner_id=?", (uid,)) if acx_org_ok(c, uid, r[1])}
     if collab_all():
-        for r in c.execute("SELECT m.book_id, m.role FROM book_members m JOIN books b ON b.id=m.book_id JOIN users u ON u.id=b.owner_id "
+        for r in c.execute("SELECT m.book_id, m.role, b.org_id FROM book_members m JOIN books b ON b.id=m.book_id JOIN users u ON u.id=b.owner_id "
                            "WHERE m.user_id=? AND u.disabled=0", (uid,)):
-            out.setdefault(r[0], r[1])
+            if acx_org_ok(c, uid, r[2]):  # 2.36.2 (#1142): organisation books only for its members
+                out.setdefault(r[0], r[1])
     return out
 
 

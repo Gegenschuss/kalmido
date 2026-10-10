@@ -582,7 +582,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 - `task.comments`: the newest 20 comments of the task, oldest first, each `{id, author {id, name, agent}, text, created_at, edited_at, attachments}` (the number of files), plus `suggestion` for tidy suggestions. A text longer than 2,000 characters is cut and marked `"truncated": true`. `task.comments_total` is the number of all comments; fetch older ones with `GET /api/v1/tasks/{id}/comments`.
 - `list.sections`: the list's sections `[{id, name}]` in their order (a participant agent sees only the sections that hold one of its tasks), and `list.agent_tidy` (`off`, `suggest` or `auto`).
 
-`unassigned` for a task the agent can no longer see has neither.
+`unassigned` for a task the agent can no longer see has neither (2.36.2: it carries only the ids and `"visible": false`).
 
 | Event | When | `data` |
 |---|---|---|
@@ -1214,6 +1214,8 @@ the setup guide show the same block with a *Copy rules* button. In short:
   database), one command per line, no prompt sign, steps that belong together chained with `&&`;
 - 2.36.0: tasks an agent creates start locked in the app; the agent still changes them through the API and does not lift
   a lock a person set unless asked (see [Locked tasks](#locked-tasks-2360));
+- 2.36.2: security fixes are rolled out first and published after: commit messages, changelog and public comments
+  name only "Security fix" and the area, never how to exploit it (see [SECURITY.md](../SECURITY.md));
 - decisions bold at the bottom of the task description: `**Entscheidung (DD.MM.YYYY):** …`, not only in a comment;
 - typing signal before a chat answer (`chat_typing`) and before a comment answer on a task (`comment_typing`, 2.22.0); status `working` with a text while working, `idle` only when nothing runs; one job
   per larger piece of work with short progress lines; one chat summary when it stops working;

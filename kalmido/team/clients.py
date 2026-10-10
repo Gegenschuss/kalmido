@@ -25,6 +25,10 @@ from ..personal.timetrack import BadInput
 CLIENT_FIELDS = ("name", "icon", "color", "contact", "email", "phone", "address", "note", "rate", "budget_h", "budget_amount",
                  "org_id", "archived")
 CLIENT_TEXT_MAX = {"name": 80, "icon": 8, "color": 20, "contact": 120, "email": 200, "phone": 60, "address": 500, "note": 4000}
+# 2.36.2 (#1021, E): structured billing fields (office & finance; people only, never in agent answers)
+CLIENT_BILLING = ("street", "zip", "city", "country", "vat_id", "customer_no", "buyer_reference", "email_invoice", "payment_terms_days")
+CLIENT_BILLING_MAX = {"street": 200, "zip": 20, "city": 120, "country": 2, "vat_id": 20, "customer_no": 40, "buyer_reference": 60,
+                      "email_invoice": 200}
 COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}")
 
 
@@ -116,6 +120,36 @@ def clean_client(c, uid, b, new=False):
             if v is not None and v not in mine and not u["is_admin"]:
                 raise BadInput(tr("You can only add clients to your own organisations"))
         out[k] = v
+    for k in CLIENT_BILLING:
+        if k not in b:
+            continue
+        v = b[k]
+        if k == "payment_terms_days":
+            if v in (None, ""):
+                out[k] = None
+                continue
+            try:
+                v = int(v)
+            except (TypeError, ValueError):
+                raise BadInput(tr("Invalid value: {0}", k)) from None
+            if isinstance(b[k], bool) or not 0 <= v <= 365:
+                raise BadInput(tr("Invalid value: {0}", k))
+            out[k] = v
+            continue
+        if v is not None and not isinstance(v, str):
+            raise BadInput(tr("Invalid value: {0}", k))
+        v = re.sub(r"\s+", " ", (v or "").strip())
+        if k == "country":
+            v = v.upper()
+            if v and not re.fullmatch(r"[A-Z]{2}", v):
+                raise BadInput(tr("Invalid value: {0}", k))
+        if k == "vat_id":
+            v = v.replace(" ", "").upper()
+        if len(v) > CLIENT_BILLING_MAX[k]:
+            raise BadInput(tr("Invalid value: {0}", k))
+        if k == "email_invoice" and v and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", v):
+            raise BadInput(tr("Invalid value: {0}", k))
+        out[k] = v
     if new or "name" in out:
         if not out.get("name"):
             raise BadInput(tr("Name missing"))
@@ -162,6 +196,8 @@ def client_public(c, uid, r, stats=False, month=None):
                            "budget_amount", "org_id", "created_by", "created_at", "updated_at")}
     d.update(archived=bool(r["archived"]), org_name=org[0] if org else "", lists=lids,
              can_delete=bool(u and (u["is_admin"] or r["created_by"] == uid)))
+    if u and (u["kind"] or "user") != "agent":  # 2.36.2: billing fields for people only
+        d["billing"] = {k: (r[k] if k in r.keys() else None) for k in CLIENT_BILLING}
     if stats:
         st = client_stats(c, uid, r["id"], lids, month)
         d["stats"] = st

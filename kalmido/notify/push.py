@@ -499,6 +499,8 @@ def watchdog_tick(c):
     _wd_section(c, "read later", _wd_reading, users, S, LG, now)  # 2.22.0 (#663)
     from ..accounts.tenancy import boundary_tick
     _wd_section(c, "boundary check", boundary_tick)  # 2.30.0 (#1036): once a night, before the alerts go out
+    from ..notify.sev import sev_scan
+    _wd_section(c, "security watch", sev_scan)  # 2.36.2 (#1133): new admins / org admins / agents / agent tokens
     _wd_section(c, "admin alerts", aa_tick)
 
 

@@ -7,6 +7,63 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.36.2] - 2026-10-11
+
+**In short:** Organisations hardened, intrusion alerts, the office foundation and many small things. This release
+contains **security fixes** (organisation boundary, office & finance, admin alerts); it was rolled out before it was
+published, details stay out of this note (see [SECURITY.md](SECURITY.md)). Lists show their **line icons
+everywhere**, the sidebar tells **people from agents** at a glance, projects can keep **completed tasks in their
+section**, quick add in *Tasks of <person>* assigns the task, and a new view **Assigned by me**. Office documents can
+be **finalised**.
+
+### Security
+- **Security fix: organisation boundary and access layer** (#1142). One central access layer with a request context
+  (the person and all of their organisations) decides which lists, calendars and address books someone may see; it is
+  the base for database row-level security later.
+- **Security fix: office & finance** (#1142, #1146), with an access log for organisation admins.
+- **Admin alerts for intrusion signs** (#1133): new instance admins, organisation admins, agents and agent tokens and an
+  admin sign-in from a new address are reported as *Security events* (switchable like the other alert kinds), plus one
+  `kalmido-security:` JSON line per event in the server log for log watchers. See *Intrusion alerts* in
+  [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md).
+- [SECURITY.md](SECURITY.md) describes the disclosure order: fixes go live first and are published afterwards (#1134).
+
+### Added
+- **Office & finance foundation** (#1021): documents can be **finalised**: number, totals, sender, recipient and tax
+  rates are frozen and a finalised document can only be duplicated (quotations stay editable as before unless you
+  finalise them). Quotations can optionally get their number only when finalised. A **period of service** per document.
+  **Structured company data** and **client billing details** (address fields, country, tax and VAT numbers, IBAN,
+  buyer reference); printed lines are built from them, the free lines remain as a fallback. An **access log** (document
+  history, settings) for organisation admins.
+- **Keep completed tasks in their section** (#1136): a list setting (list dialog and list menu), on by default for
+  projects and lists with sections, always off for shopping lists and lists that show completed at the bottom; section
+  heads show "3/8 done".
+- **Assigned by me** (#1138): a new view with the open tasks you created or assigned to someone else, grouped by person.
+- **List colour by right-click / long press** in the sidebar (#1135): nine colours plus none.
+- **Job links in the agent chat** (#1141): "Job #50" opens the job (new route `#job/<id>`, unfolded with its history)
+  instead of task #50; jobs you cannot see stay plain text.
+
+### Changed
+- **List icons everywhere** (#1135): with *Line* or *Dot* the list header, task chips, the task path, move menus, quick
+  add, search, groups, archive and roadmap show the line icon instead of the name's emoji (the name itself is
+  unchanged); *Emoji* keeps the old look.
+- **People or agents in the sidebar** (#1139): a person icon, a robot in calm blue, or both, always visible; agents get
+  the same robot where they write in chats and comments.
+- **Quick add in "Tasks of <person>"** (#1138) assigns the task to that person in a list you both use (shown as a chip,
+  changeable) and keeps it in the view; without such a list you get a hint instead of an unassigned task.
+- **Chat header** (#1140): the permission badge is small grey text without a frame, with an invisible 44 px touch area.
+
+### Fixed
+- Phone: live steps line up with "… is writing …", the permission badge keeps its distance from the name, and the
+  sidebar's "N approvals open" updates right after answering in the chat (#1123).
+- Phone tap targets of 44 px: icon grid of the list dialog (#1130), calendar switches and "Per list", the calendar lines
+  of *Plan the day*; *Office & finance* is in the *More* sheet; the quotation's PDF button has a label (#1146).
+- Office: the master-data import leaves unknown references empty and reports them; unfinished logo uploads are left out
+  of backups (#1146).
+
+### Agents
+- Behaviour rules (template, in-app guide, AGENTS.md, AGENT-SETUP.md): security fixes are rolled out first and
+  published after; commit messages and changelogs name only "Security fix" and the area.
+
 ## [2.36.1] - 2026-10-10
 
 **In short:** Office & finance, stage 1, plus calendar switches. A new **Office & finance** module for organisations
@@ -3634,7 +3691,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.36.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.36.2...HEAD
+[2.36.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.36.2
 [2.36.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.36.1
 [2.36.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.36.0
 [2.35.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.35.0

@@ -285,6 +285,8 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
   with && so that a failing step stops the rest.
 - Tasks you create start locked in the app (2.36.0): people unlock them there; you still change them through the API
   (update_task). Do not lift a lock a person set unless they ask you to.
+- A coding agent that fixes a security hole writes only "Security fix" and the area into commit messages, the changelog
+  and public comments (2.36.2), deploys the fix first and publishes it afterwards.
 - Report your real model and permission mode with set_status (model, permission_mode, host_permission_mode). Before
   each tool step write one short sentence in the person's language about what happens next and send it with
   report_progress (prose only, never tool output or secrets); the launcher's event mode does both for you.

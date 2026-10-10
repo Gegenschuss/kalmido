@@ -54,6 +54,7 @@ ORDER = (
     "integrations.importers",
     "notify.push",
     "notify.alerts",
+    "notify.sev",  # 2.36.2 (#1133)
     "calendars.subscriptions",
     "admin.backup",
     "api.v1",
@@ -114,6 +115,7 @@ ORDER = (
     "office.docs",  # 2.36.1 (#1021): quotations (C)
     "office.pdf",  # 2.36.1 (#1021): the PDF writer (D, no kalmido imports)
     "office.pdfweb",  # 2.36.1 (#1021): quotation PDF + company logo routes (D; the writer office.pdf has no routes)
+    "office.ledger",  # 2.36.2 (#1021, #1142, E): finalising, structured company data, office log
     "team.approvals",
     "team.forms",
     "team.v1",

@@ -18,6 +18,8 @@ from .calc import RAW_MODES, TAX_KEYS, dec, fmt_money, office_calc
 from .packs import office_pack
 from .model import (NAME_MAX, TEXT_MAX, UNITS, office_gate, office_org, office_number_next, office_role, office_settings,
                     office_seed_texts)
+from .ledger import (ofx_company, ofx_company_print, ofx_diff, ofx_items_brief, ofx_locked, ofx_log, ofx_logo_path, ofx_need_editable,
+                     ofx_number_at_finalize, ofx_snapshot_pack)
 
 DOC_KINDS = ("offer",)
 STATUSES = ("draft", "sent", "accepted", "declined")
@@ -108,8 +110,9 @@ def doc_row(c, oid, did):
     return r
 
 
-def doc_items(c, did):
-    return [dict(r) for r in c.execute("SELECT * FROM office_doc_items WHERE doc_id=? ORDER BY sort, id", (did,))]
+def doc_items(c, did, oid):
+    """The positions of document did; oid (the organisation) is required: 2.36.2 (#1142) every read filters by it."""
+    return [dict(r) for r in c.execute("SELECT * FROM office_doc_items WHERE doc_id=? AND org_id=? ORDER BY sort, id", (did, oid))]
 
 
 def _texts(c, oid, kind=None):
@@ -181,14 +184,17 @@ def _calc_doc(r):
 def doc_totals(c, oid, r, items=None):
     s = office_settings(c, oid)
     pack = office_pack(s["pack"]) or office_pack("DE")
-    return office_calc(_calc_doc(r), items if items is not None else doc_items(c, r["id"]), pack)
+    return office_calc(_calc_doc(r), items if items is not None else doc_items(c, r["id"], oid), pack)
 
 
 def recalc(c, oid, did):
-    """Recomputes and caches the totals of document did (after any change of its head or positions)."""
+    """Recomputes and caches the totals of document did (after any change of its head or positions). A finalised
+    document keeps its frozen totals (2.36.2)."""
     r = doc_row(c, oid, did)
+    if ofx_locked(r):
+        return _j(r["totals"], {})
     t = doc_totals(c, oid, r)
-    c.execute("UPDATE office_docs SET totals=?, updated_at=? WHERE id=?", (json.dumps(t, ensure_ascii=False), iso(now_utc()), did))
+    c.execute("UPDATE office_docs SET totals=?, updated_at=? WHERE id=? AND org_id=?", (json.dumps(t, ensure_ascii=False), iso(now_utc()), did, oid))
     return t
 
 
@@ -201,7 +207,7 @@ def doc_public(c, oid, r, admin, items=True):
     if not admin:
         d["totals"] = {k: v for k, v in d["totals"].items() if k not in ("costs", "margin")}
     if items:
-        its = doc_items(c, r["id"])
+        its = doc_items(c, r["id"], oid)
         for it in its:
             it["discountable"] = int(it.get("discountable") or 0)
             if not admin:
@@ -211,7 +217,17 @@ def doc_public(c, oid, r, admin, items=True):
         if d["contract"]:
             d["contract"] = {k: d["contract"][k] for k in ("id", "name", "raw_included", "rates", "rights_time_id", "rights_territory_id",
                                                              "rights_media_id", "rights_note_de", "rights_note_en", "closing_de", "closing_en", "date")}
-    d["can_delete"] = bool(admin)
+    locked = ofx_locked(r)
+    for k in ("sender", "recipient_snapshot", "tax_snapshot"):
+        d.pop(k, None)  # the frozen copies stay on the server (the print model shows them)
+    d["locked"] = locked
+    d["locked_by_name"] = ""
+    if locked and r["locked_by"]:
+        u = c.execute("SELECT display_name, username FROM users WHERE id=?", (r["locked_by"],)).fetchone()
+        d["locked_by_name"] = (u["display_name"] or u["username"]) if u else ""
+    d["can_edit"] = not locked
+    d["can_delete"] = bool(admin) and not locked
+    d["number_at_finalize"] = ofx_number_at_finalize(office_settings(c, oid), r["kind"])
     return d
 
 
@@ -222,7 +238,8 @@ def doc_brief(r):
             "lang": r["lang"], "currency": r["currency"], "client_id": r["client_id"], "recipient_name": rec.get("name") or "",
             "project_title": r["project_title"], "project_ref": r["project_ref"], "date": r["date"], "valid_until": r["valid_until"],
             "net": t.get("net") or 0, "net_text": fmt_money(t.get("net") or 0, r["lang"], r["currency"]),
-            "net_incl_raw": t.get("net_incl_raw"), "updated_at": r["updated_at"], "created_by": r["created_by"]}
+            "net_incl_raw": t.get("net_incl_raw"), "updated_at": r["updated_at"], "created_by": r["created_by"],
+            "locked": ofx_locked(r)}
 
 
 # ---------------------------------------------------------------- cleaning
@@ -363,9 +380,11 @@ def clean_doc(c, oid, b, cur, admin):
     for k, mx in (("project_title", NAME_MAX), ("project_ref", 80), ("intro", TEXT_MAX), ("closing", TEXT_MAX)):
         if k in b:
             f[k] = _text(b.get(k), k, mx)
-    for k in ("date", "valid_until"):
+    for k in ("date", "valid_until", "service_from", "service_to"):  # 2.36.2: period of service
         if k in b:
             f[k] = _date(b.get(k), k)
+    if f.get("service_from") and f.get("service_to") and f["service_to"] < f["service_from"]:
+        raise BadInput(tr("The period of service ends before it starts"))
     if "raw_mode" in b:
         f["raw_mode"] = _choice(b.get("raw_mode"), "raw_mode", RAW_MODES)
     for k, lo, hi, dflt in (("raw_factor", 0, 10, 0.25), ("prod_quotient", 0.01, 1000, 3), ("producing_rate", 0, 1e7, 600), ("discount_pct", 0, 100, 0)):
@@ -398,7 +417,7 @@ def clean_items(c, oid, r, items, admin):
         raise BadInput(tr("Invalid value: {0}", "items"))
     lang = r["lang"]
     ct = _contract(c, oid, r["contract_id"])
-    old = {it["id"]: it for it in doc_items(c, r["id"])}
+    old = {it["id"]: it for it in doc_items(c, r["id"], oid)}
     out = []
     for i, it in enumerate(items):
         if not isinstance(it, dict):
@@ -485,7 +504,8 @@ def doc_create(c, oid, uid, b, admin):
     f = clean_doc(c, oid, {k: v for k, v in b.items() if k != "kind"}, cur, admin)
     row.update(f)
     did = c.execute(f"INSERT INTO office_docs({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values())).lastrowid
-    _assign_number(c, oid, did, s)
+    if not ofx_number_at_finalize(s, kind):  # 2.36.2 (P2): kinds numbered at finalising stay without a number as drafts
+        _assign_number(c, oid, did, s)
     if isinstance(b.get("items"), list):
         _put_items(c, oid, doc_row(c, oid, did), b["items"], admin)
     recalc(c, oid, did)
@@ -509,7 +529,7 @@ def _assign_number(c, oid, did, s=None, manual=None):
                 break
     if c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=? AND id!=?", (oid, num, did)).fetchone():
         raise BadInput(tr("The number {0} is already used", num))
-    c.execute("UPDATE office_docs SET number=?, updated_at=? WHERE id=?", (num, iso(now_utc()), did))
+    c.execute("UPDATE office_docs SET number=?, updated_at=? WHERE id=? AND org_id=?", (num, iso(now_utc()), did, oid))
     return num
 
 
@@ -523,42 +543,51 @@ def _initials(c, uid):
 
 def _put_items(c, oid, r, items, admin):
     rows = clean_items(c, oid, r, items, admin)
-    c.execute("DELETE FROM office_doc_items WHERE doc_id=?", (r["id"],))
+    c.execute("DELETE FROM office_doc_items WHERE doc_id=? AND org_id=?", (r["id"], oid))
+    c.execute("DELETE FROM office_doc_items WHERE doc_id=? AND org_id IS NULL", (r["id"],))  # rows of an older version
     for row in rows:
         row["doc_id"] = r["id"]
+        row["org_id"] = oid
         c.execute(f"INSERT INTO office_doc_items({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
 
 
 # ---------------------------------------------------------------- the print model
-def odoc_render(c, doc_id, oid=None):
+def odoc_render(c, doc_id, oid):
     """The print model of a document (dict, see docs/OFFICE.md and tests/fixtures): everything in the document's language
-    and formats, nothing of the signed-in person. oid: the organisation the caller works in (foreign document = 404)."""
-    r = c.execute("SELECT * FROM office_docs WHERE id=?", (int(doc_id),)).fetchone()
-    if not r or (oid is not None and r["org_id"] != oid):
-        raise Denied(404)
-    oid = r["org_id"]
+    and formats, nothing of the signed-in person. oid: the organisation the caller works in (required; foreign document =
+    404). A finalised document (2.36.2) is printed from its snapshot only: frozen totals, sender, recipient, pack words."""
+    r = doc_row(c, oid, doc_id)
     s = office_settings(c, oid)
-    pack = office_pack(s["pack"]) or office_pack("DE") or {}
+    locked = ofx_locked(r)
     lang = "en" if r["lang"] == "en" else "de"
+    if locked:
+        pack = ofx_snapshot_pack(r)
+        t = _j(r["totals"], {})
+        snd = _j(r["sender"], {})
+        co = snd.get("company") or {}
+        logo_path = ofx_logo_path(oid, snd.get("logo"))
+        color = snd.get("color") or ""
+    else:
+        pack = office_pack(s["pack"]) or office_pack("DE") or {}
+        t = doc_totals(c, oid, r)
+        co = ofx_company_print(ofx_company(c, oid), s.get("company") or {}, lang, pack)
+        logo_path = None
+        if s.get("logo"):
+            import os
+            from ..core.config import OFFICE_DIR
+            p = os.path.join(OFFICE_DIR, str(oid), os.path.basename(s["logo"]))
+            logo_path = p if os.path.isfile(p) else None
+        color = s.get("color") or ""
     L = dict((pack.get("labels") or {}).get(lang) or {})
     cur = r["currency"]
-    t = doc_totals(c, oid, r)
     for ln in t["lines"]:
         if ln["kind"] in ("item", "producing", "raw", "discount"):
             ln["total_text"] = fmt_money(ln["total"], lang, cur)
             if ln.get("rate") is not None:
                 ln["rate_text"] = fmt_money(ln["rate"], lang, cur)
-    rec = _j(r["recipient"], {})
+    rec = _j(r["recipient_snapshot"] if locked and r["recipient_snapshot"] else r["recipient"], {})
     rec = {"name": rec.get("name") or "", "lines": rec.get("lines") or []}
     rights = _j(r["rights"], {})
-    co = s.get("company") or {}
-    logo_path = None
-    if s.get("logo"):
-        import os
-        from ..core.config import OFFICE_DIR
-        p = os.path.join(OFFICE_DIR, str(oid), os.path.basename(s["logo"]))
-        logo_path = p if os.path.isfile(p) else None
-    color = s.get("color") or ""
     if not re.match(r"^#[0-9a-fA-F]{6}$", color):
         color = "#2f5d8a"
     valid_text = _fmt_date(r["valid_until"], pack)
@@ -569,6 +598,10 @@ def odoc_render(c, doc_id, oid=None):
         meta.append([L.get("ref", "Ref./PO-Nr."), r["project_ref"]])
     if r["valid_until"]:
         meta.append([L.get("valid_until", "Gültig bis"), valid_text])
+    sf, st = (r["service_from"] or "", r["service_to"] or "") if "service_from" in r.keys() else ("", "")
+    if sf or st:  # 2.36.2: period of service
+        per = _fmt_date(sf, pack) if sf == st or not st else (_fmt_date(st, pack) if not sf else f"{_fmt_date(sf, pack)} – {_fmt_date(st, pack)}")
+        meta.append([L.get("service_period", "Period of service" if lang == "en" else "Leistungszeitraum"), per])
     rows = [[L.get("net_total", t["labels"]["net"]), fmt_money(t["net"], lang, cur)]]
     if t.get("net_incl_raw") is not None:
         rows.append([L.get("incl_raw", t["labels"]["net_incl_raw"]), fmt_money(t["net_incl_raw"], lang, cur)])
@@ -587,7 +620,9 @@ def odoc_render(c, doc_id, oid=None):
     labels["page_of"] = L.get("page_of") or ("Page {x} of {y}" if lang == "en" else "Seite {x} von {y}")
     role = office_role(c, g.user["id"], oid) if getattr(g, "user", None) is not None else None
     return {
-        "kind": r["kind"], "lang": lang, "currency": cur, "fx_rate": t.get("fx_rate"), "fx_note": t.get("fx_note") or "", "vat_mode": t["vat_mode"],
+        "kind": r["kind"], "lang": lang, "locked": locked, "locked_at": r["locked_at"] if locked else None,
+        "pack_version": (r["pack_version"] or "") if locked else str(pack.get("version") or ""),
+        "service_from": r["service_from"] or "", "service_to": r["service_to"] or "", "currency": cur, "fx_rate": t.get("fx_rate"), "fx_note": t.get("fx_note") or "", "vat_mode": t["vat_mode"],
         "raw_mode": t["raw_mode"], "status": r["status"], "number": r["number"], "date": r["date"], "date_text": _fmt_date(r["date"], pack),
         "valid_until": r["valid_until"], "valid_until_text": valid_text, "title": L.get("offer", "Kostenvoranschlag" if lang == "de" else "Quotation"),
         "project_title": r["project_title"], "project_ref": r["project_ref"],
@@ -632,7 +667,8 @@ def odoc_list():
 
 @app.post("/api/office/docs")
 def odoc_create():
-    """{kind?: offer, lang?, client_id?, contract_id?, project_title?, recipient?, items?: [...]} -> 201 the document (number reserved)."""
+    """{kind?: offer, lang?, client_id?, contract_id?, project_title?, recipient?, items?: [...]} -> 201 the document (number
+    reserved, unless the organisation numbers quotations when they are finalised)."""
     c, uid, oid = _ctx()
     office_seed_texts(c, oid)
     admin = office_role(c, uid, oid) == "admin"
@@ -640,31 +676,41 @@ def odoc_create():
     if not isinstance(b, dict):
         return err(tr("Invalid data"))
     did = doc_create(c, oid, uid, b, admin)
+    r = doc_row(c, oid, did)
+    ofx_log(c, oid, "create", doc_id=did, detail={"number": r["number"], "items": len(doc_items(c, did, oid))})
     bump(c)
     c.commit()
-    return jsonify(doc_public(c, oid, doc_row(c, oid, did), admin)), 201
+    return jsonify(doc_public(c, oid, r, admin)), 201
 
 
 @app.get("/api/office/docs/<int:did>")
 def odoc_get(did):
     c, uid, oid = _ctx()
-    return jsonify(doc_public(c, oid, doc_row(c, oid, did), office_role(c, uid, oid) == "admin"))
+    r = doc_row(c, oid, did)
+    ofx_log(c, oid, "open", doc_id=did, dedupe_min=10)
+    c.commit()
+    return jsonify(doc_public(c, oid, r, office_role(c, uid, oid) == "admin"))
 
 
 @app.patch("/api/office/docs/<int:did>")
 def odoc_update(did):
     """Head fields (partial); contract_id (changed) presets raw data / rights / closing unless apply_contract: false;
-    client_id fills an empty recipient (recipient_from_client: true overwrites it). Returns the document with totals."""
+    client_id fills an empty recipient (recipient_from_client: true overwrites it). Returns the document with totals.
+    A finalised document: 409."""
     c, uid, oid = _ctx()
     admin = office_role(c, uid, oid) == "admin"
     r = doc_row(c, oid, did)
+    ofx_need_editable(r)
     b = body()
     if not isinstance(b, dict):
         return err(tr("Invalid data"))
     f = clean_doc(c, oid, b, r, admin)
     if f:
+        diff = ofx_diff({k: r[k] for k in f if k in r.keys()}, f)
         f["updated_at"] = iso(now_utc())
-        c.execute(f"UPDATE office_docs SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), did])
+        c.execute(f"UPDATE office_docs SET {','.join(k + '=?' for k in f)} WHERE id=? AND org_id=?", [*f.values(), did, oid])
+        if diff["after"]:
+            ofx_log(c, oid, "update", doc_id=did, detail=diff)
     recalc(c, oid, did)
     bump(c)
     c.commit()
@@ -673,13 +719,19 @@ def odoc_update(did):
 
 @app.put("/api/office/docs/<int:did>/items")
 def odoc_items_put(did):
-    """{items: [...]} the whole list of positions in order (see clean_items). Returns the document with totals."""
+    """{items: [...]} the whole list of positions in order (see clean_items). Returns the document with totals.
+    A finalised document: 409."""
     c, uid, oid = _ctx()
     admin = office_role(c, uid, oid) == "admin"
     r = doc_row(c, oid, did)
+    ofx_need_editable(r)
     b = body()
     items = b.get("items") if isinstance(b, dict) else b
+    before = ofx_items_brief(doc_items(c, did, oid))
     _put_items(c, oid, r, items, admin)
+    after = ofx_items_brief(doc_items(c, did, oid))
+    if before != after:
+        ofx_log(c, oid, "items", doc_id=did, detail={"before": before, "after": after})
     recalc(c, oid, did)
     bump(c)
     c.commit()
@@ -688,10 +740,15 @@ def odoc_items_put(did):
 
 @app.post("/api/office/docs/<int:did>/number")
 def odoc_number(did):
-    """{number?} sets a number by hand (unique within the organisation) or reserves the next one of the scheme."""
+    """{number?} sets a number by hand (unique within the organisation) or reserves the next one of the scheme.
+    A finalised document: 409."""
     c, uid, oid = _ctx()
+    r = doc_row(c, oid, did)
+    ofx_need_editable(r)
     b = body()
     num = _assign_number(c, oid, did, manual=b.get("number") if isinstance(b, dict) and "number" in b else None)
+    if num != r["number"]:
+        ofx_log(c, oid, "number", doc_id=did, detail={"before": {"number": r["number"]}, "after": {"number": num}})
     bump(c)
     c.commit()
     return jsonify(id=did, number=num)
@@ -699,51 +756,66 @@ def odoc_number(did):
 
 @app.post("/api/office/docs/<int:did>/status")
 def odoc_status(did):
-    """{status: draft|sent|accepted|declined}; sent sets sent_at (once)."""
+    """{status: draft|sent|accepted|declined}; sent sets sent_at (once). Also for finalised quotations."""
     c, uid, oid = _ctx()
     r = doc_row(c, oid, did)
     b = body()
     st = _choice((b if isinstance(b, dict) else {}).get("status"), "status", STATUSES)
     ts = iso(now_utc())
-    c.execute("UPDATE office_docs SET status=?, updated_at=?, sent_at=COALESCE(sent_at, ?) WHERE id=?",
-              (st, ts, ts if st in ("sent", "accepted", "declined") else None, did))
+    c.execute("UPDATE office_docs SET status=?, updated_at=?, sent_at=COALESCE(sent_at, ?) WHERE id=? AND org_id=?",
+              (st, ts, ts if st in ("sent", "accepted", "declined") else None, did, oid))
+    if st != r["status"]:
+        ofx_log(c, oid, "status", doc_id=did, detail={"before": {"status": r["status"]}, "after": {"status": st}})
     bump(c)
     c.commit()
     return jsonify(doc_public(c, oid, doc_row(c, oid, did), office_role(c, uid, oid) == "admin", items=False))
 
 
+# 2.36.2: columns a copy never takes over (identity, state, the frozen snapshot of a finalised original)
+DUP_SKIP = {"id", "number", "status", "created_at", "updated_at", "sent_at", "created_by", "date", "valid_until", "totals", "locked_at",
+            "locked_by", "sender", "recipient_snapshot", "tax_snapshot", "pack_version"}
+DUP_ITEM_SKIP = {"id", "tax_pct", "net", "tax_amount"}
+
+
 @app.post("/api/office/docs/<int:did>/duplicate")
 def odoc_duplicate(did):
-    """A copy as a new draft of today with the next number (positions, rights and texts copied)."""
+    """A copy as a new draft of today with the next number (positions, rights and texts copied); also of a finalised
+    document (= a new version)."""
     c, uid, oid = _ctx()
     admin = office_role(c, uid, oid) == "admin"
     r = doc_row(c, oid, did)
     s = office_settings(c, oid)
-    row = {k: r[k] for k in r.keys() if k not in ("id", "number", "status", "created_at", "updated_at", "sent_at", "created_by", "date", "valid_until", "totals")}
+    row = {k: r[k] for k in r.keys() if k not in DUP_SKIP}
     today = local_now().date()
     ts = iso(now_utc())
     row.update(number="", status="draft", date=today.isoformat(), valid_until=(today + timedelta(days=int(s.get("offer_valid_days") or 30))).isoformat(),
                totals="{}", created_by=uid, created_at=ts, updated_at=ts, sent_at=None)
     nid = c.execute(f"INSERT INTO office_docs({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values())).lastrowid
-    for it in doc_items(c, did):
-        it.pop("id", None)
+    for it in doc_items(c, did, oid):
+        it = {k: v for k, v in it.items() if k not in DUP_ITEM_SKIP}
         it["doc_id"] = nid
+        it["org_id"] = oid
         c.execute(f"INSERT INTO office_doc_items({','.join(it)}) VALUES({','.join('?' * len(it))})", list(it.values()))
-    _assign_number(c, oid, nid, s)
+    if not ofx_number_at_finalize(s, r["kind"]):
+        _assign_number(c, oid, nid, s)
     recalc(c, oid, nid)
+    n = doc_row(c, oid, nid)
+    ofx_log(c, oid, "duplicate", doc_id=nid, detail={"from_id": did, "from_number": r["number"], "number": n["number"]})
     bump(c)
     c.commit()
-    return jsonify(doc_public(c, oid, doc_row(c, oid, nid), admin)), 201
+    return jsonify(doc_public(c, oid, n, admin)), 201
 
 
 @app.delete("/api/office/docs/<int:did>")
 def odoc_delete(did):
-    """The organisation's admin only (members: 403)."""
+    """The organisation's admin only (members: 403); a finalised document: 409."""
     c, uid, oid = _ctx()
-    doc_row(c, oid, did)
+    r = doc_row(c, oid, did)
     if office_role(c, uid, oid) != "admin":
         raise Denied(403, tr("Only an admin of this organisation can do this"))
-    c.execute("DELETE FROM office_docs WHERE id=?", (did,))
+    ofx_need_editable(r)
+    ofx_log(c, oid, "delete", doc_id=did, detail={"number": r["number"], "status": r["status"], "net": _j(r["totals"], {}).get("net")})
+    c.execute("DELETE FROM office_docs WHERE id=? AND org_id=?", (did, oid))
     bump(c)
     c.commit()
     return jsonify(ok=True)
@@ -756,4 +828,6 @@ def odoc_render_get(did):
     rd = odoc_render(c, did, oid)
     co = rd.get("company") or {}
     co["logo"] = bool(co.pop("logo_path", None))  # 2.36.1 review: no server path in the API answer
+    ofx_log(c, oid, "render", doc_id=did, dedupe_min=10)
+    c.commit()
     return jsonify(rd)

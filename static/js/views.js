@@ -30,9 +30,15 @@ function viewTasks() {
     return {...pick(t => t.assignee_group_id === gid, 'list'), done: []};
   }
   if (k === 'inbox' || k.startsWith('l:')) {
-    const lid = k === 'inbox' ? inbox().id : +k.slice(2);
-    return {...pick(t => t.list_id === lid, 'section', {list: lid}), done: doneRecent.filter(t => t.list_id === lid)};
+    const lid = k === 'inbox' ? inbox().id : +k.slice(2), done = doneRecent.filter(t => t.list_id === lid);
+    // 2.36.2 (#1136): "Keep completed in their section": the completed tasks go into their sections (inSec), not into "Completed"
+    if (dsxOn(listById(lid))) {  // (an open subtask of a shown completed task stays below it, not a second time at the top)
+      const p = pick(t => t.list_id === lid, 'section', {list: lid}), dn = showDone() ? done : [], dids = new Set(dn.map(t => t.id));
+      return {...p, open: p.open.filter(t => !dids.has(t.parent_id)), done: [], inSec: dn, dsx: true};
+    }
+    return {...pick(t => t.list_id === lid, 'section', {list: lid}), done};
   }
+  if (k === 'byme') return {...pick(dsxByMe, 'person'), done: []};  // 2.36.2 (#1138): "Assigned by me", by person
   if (k.startsWith('who:')) {  // 2.7.2 (#418): open tasks assigned to one person, in the lists I see
     const id = +k.slice(4);
     return {...pick(t => t.assignee_id === id, 'list'), done: doneRecent.filter(t => t.assignee_id === id)};
@@ -220,10 +226,10 @@ function sortTasks(arr, m = sortMode()) {
 function groupTasks(v) {
   const all = sortTasks(v.open.slice()), pinned = all.filter(t => t.pinned);
   // 1.7.0: Flow shows one sequence instead of date groups (sections and the folder's lists stay)
-  const g = groupRest(v.group === 'date' && sortMode() === 'flow' ? {...v, group: 'none'} : v, all.filter(t => !t.pinned));
+  const g = groupRest(v.group === 'date' && sortMode() === 'flow' ? {...v, group: 'none'} : v, all.filter(t => !t.pinned), v.inSec || []);
   return pinned.length ? [{id: 'pinned', name: tr('Pinned'), tasks: pinned, cls: 'pin'}, ...g] : g;
 }
-function groupRest(v, arr) {
+function groupRest(v, arr, dn = []) {  // dn: 2.36.2 (#1136) the completed tasks that stay in their sections
   const t0 = today();
   if (v.group === 'date') {
     const g = new Map();
@@ -238,15 +244,21 @@ function groupRest(v, arr) {
   if (v.group === 'list') {
     const g = new Map();
     for (const t of arr) { if (!g.has(t.list_id)) g.set(t.list_id, []); g.get(t.list_id).push(t); }
-    return (v.folder ? sideOrder() : S.lists).filter(l => g.has(l.id)).map(l => ({id: 'l:' + l.id, name: lname(l), tasks: g.get(l.id), color: cssColor(l.color) || '', img: l.icon || '',
+    return (v.folder ? sideOrder() : S.lists).filter(l => g.has(l.id)).map(l => ({id: 'l:' + l.id, name: lname(l), tasks: g.get(l.id), color: cssColor(l.color) || '', img: l.icon || '', lic: l,
       ...(v.folder && l.folder !== v.folder ? {sub: l.folder} : {})}));  // 2.4.0 (#361): the lists of a subfolder get its header
   }
   if (v.group === 'section') {
-    const secs = S.sections.filter(s => s.list_id === v.list);
-    if (!secs.length) return [{id: 'all', name: '', tasks: arr}];
-    const out = [{id: 's:0', name: tr('Unassigned'), tasks: arr.filter(t => !t.section_id || !secs.some(s => s.id === t.section_id)), section: null}];
-    for (const s of secs) out.push({id: 's:' + s.id, name: s.name, tasks: arr.filter(t => t.section_id === s.id), section: s.id});
+    const secs = S.sections.filter(s => s.list_id === v.list), mk = p => dsxMerge(arr.filter(p), dn.filter(p));
+    if (!secs.length) return [{id: 'all', name: '', tasks: mk(() => true)}];
+    const out = [{id: 's:0', name: tr('Unassigned'), tasks: mk(t => !t.section_id || !secs.some(s => s.id === t.section_id)), section: null}];
+    for (const s of secs) out.push({id: 's:' + s.id, name: s.name, tasks: mk(t => t.section_id === s.id), section: s.id});
     return out.filter((g, i) => i > 0 || g.tasks.length);
+  }
+  if (v.group === 'person') {  // 2.36.2 (#1138): one group per assignee, by name
+    const g = new Map();
+    for (const t of arr) { if (!g.has(t.assignee_id)) g.set(t.assignee_id, []); g.get(t.assignee_id).push(t); }
+    return [...g.entries()].map(([id, ts]) => ({id: 'p:' + id, name: personName(ts[0].list_id, id) || personNameAny(id) || '?', tasks: ts}))
+      .sort((a, b) => a.name.localeCompare(b.name, LOCALE()));
   }
   return [{id: 'all', name: '', tasks: arr}];
 }
@@ -269,6 +281,11 @@ function quickDefaults() {
   if (k === 'inbox') d.list_id = inbox().id;
   if (k === 'assigned' && S.me) d.assignee_id = S.me.id;
   if (k.startsWith('who:') && S.me && +k.slice(4) === S.me.id) d.assignee_id = S.me.id;
+  if (k.startsWith('who:') && S.me && +k.slice(4) !== S.me.id) {  // 2.36.2 (#1138): for that person, in a list both of us use
+    const uid = +k.slice(4), l = dsxWhoList(uid);
+    d.assignee_id = uid; d.who = uid;
+    if (l) d.list_id = l.id; else d.noList = true;
+  }
   if (k.startsWith('tag:')) d.tags = [k.slice(4)];
   if (k.startsWith('folder:')) { const fl = folderLists(k.slice(7)).filter(l => canEditList(l.id)); if (fl.length) d.list_id = fl[0].id; }  // the folder's first list (~list picks another)
   if (S.route.mod === 'cal') d.due = S.calSel;
@@ -306,3 +323,63 @@ function staleChipHtml(t) {
   const lbl = trn('Idle for {0} day', 'Idle for {0} days', x.idle_days);
   return `<span class="stalem" title="${esc(lbl)}">${ic('clock', 's')}${esc(lbl)}</span>`;
 }
+
+// ---- 2.36.2 (#1136): "Keep completed in their section" (lists.done_in_section, the same for every member of the list).
+// null = the default: on for projects (software lists, project templates) and lists with sections, off otherwise; lists with
+// "Show completed at the bottom" and shopping lists are always off. Completed tasks then stay at their place in their section
+// (crossed out, dimmed, not draggable, their subtasks below them); "Hide completed" of the view hides them there too.
+function dsxOn(l) {
+  if (!l || l.checklist || l.family === 'shopping') return false;
+  if (l.done_in_section != null && l.done_in_section !== '') return !!+l.done_in_section;
+  return l.kind === 'project' || l.ptype === 'software' || S.sections.some(s => s.list_id === l.id);
+}
+const dsxFixedOff = l => !!l && (!!l.checklist || l.family === 'shopping');
+// open tasks of a section (already sorted) + its completed ones: the same sort for both, in Flow (an order of the open
+// tasks only) a completed task follows the open task before it in the manual order
+function dsxMerge(open, done) {
+  if (!done.length) return open;
+  const m = sortMode();
+  if (m !== 'flow') return sortTasks([...open, ...done], m);
+  const out = open.slice();
+  for (const d of done.slice().sort(bySort)) { let at = 0; out.forEach((t, i) => { if (bySort(t, d) < 0) at = i + 1; }); out.splice(at, 0, d); }
+  return out;
+}
+// the number in a section's head: the open tasks, or "3/8 done" while completed tasks stay in it
+function dsxCount(g, v) {
+  const done = v.dsx ? g.tasks.filter(t => t.status).length : 0;
+  if (!done) return `<span class="c">${g.tasks.length}</span>`;
+  return `<span class="c dsxc" title="${esc(tr('{0} of {1} done', done, g.tasks.length))}">${esc(tr('{0}/{1} done', done, g.tasks.length))}</span>`;
+}
+async function dsxSet(id, on) {
+  const l = listById(id); if (!l || dsxFixedOff(l)) return;
+  try { await api('PATCH', '/api/lists/' + id, {done_in_section: on ? 1 : 0}); } catch { return; }
+  const was = l.done_in_section ?? null;
+  await load(); render();
+  offerUndo(on ? tr('Completed tasks stay in their section') : tr('Completed tasks move to “Completed”'), histAdd({label: tr('Keep completed in their section'),
+    undo: async () => { await api('PATCH', '/api/lists/' + id, {done_in_section: was}); await load(); render(); return {skipped: []}; },
+    redo: async () => { await api('PATCH', '/api/lists/' + id, {done_in_section: on ? 1 : 0}); await load(); render(); return {skipped: []}; }}));
+}
+// ---- 2.36.2 (#1138): quick add in "Tasks of X" assigns the task to X in a list both may use (X is in it, I may write);
+// the default is the list last used for X on this device, else the first such list; none = a hint instead of the inbox
+const dsxWhoUid = () => { const k = S.route.key; return S.route.mod === 'tasks' && k.startsWith('who:') && S.me && +k.slice(4) !== S.me.id ? +k.slice(4) : 0; };
+const dsxWhoLists = uid => S.lists.filter(l => !l.archived && canEditList(l.id) && listPeople(l).some(p => p.user_id === uid));
+function dsxWhoList(uid) {
+  const ls = dsxWhoLists(uid), pick = id => ls.find(l => l.id === id);
+  return (S.dsxWho?.uid === uid && pick(S.dsxWho.list_id)) || pick(+LS.get('dsxWho.' + uid, 0)) || ls[0] || null;
+}
+function dsxWhoChip() {  // the phone's quick add sheet: for whom and in which list (a tap changes the list)
+  const uid = dsxWhoUid(); if (!uid) return '';
+  const l = dsxWhoList(uid), nm = personNameAny(uid) || '?';
+  return l ? `<button type="button" class="qchip dsxwho" data-act="dsx-wlist" aria-haspopup="menu">${ic('user', 's')}${esc(tr('For {0} in {1}', nm, lname(l)))}</button>`
+    : `<span class="qnote dsxwho" role="note">${ic('alert', 's')}${esc(tr('No list with {0} that you can add to: share a list with them first.', nm))}</span>`;
+}
+function dsxWhoPick(a) {
+  const uid = dsxWhoUid(); if (!uid) return;
+  menu(a, dsxWhoLists(uid).map(l => ({label: lname(l), icon: 'list', on: dsxWhoList(uid)?.id === l.id, fn: () => {
+    S.dsxWho = {uid, list_id: l.id}; if (S.qov) delete S.qov.list_id;
+    for (const i of [$('#qinput'), $('#qsheet')]) if (i) updateChips(i);
+  }})));
+}
+// ---- 2.36.2 (#1138): "Assigned by me": open tasks I created or assigned that belong to someone else (from the tasks the
+// server sends me, i.e. only what I may see), grouped by person
+const dsxByMe = t => !!S.me && t.status === 0 && !!t.assignee_id && t.assignee_id !== S.me.id && (t.assigned_by === S.me.id || t.created_by === S.me.id);

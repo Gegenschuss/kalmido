@@ -160,7 +160,8 @@ def auth_signup():
     oid = org_for_email(c, email)
     if oid:
         c.execute("DELETE FROM org_members WHERE user_id=?", (uid,))
-        c.execute("INSERT OR IGNORE INTO org_members(org_id,user_id) VALUES(?,?)", (oid, uid))
+        from ..accounts.orgs import org_member_add
+        org_member_add(c, oid, uid)
     from ..core.schema import USER_DEFAULTS
     fs = [x for x in (gsetting(c, "default_features") or USER_DEFAULTS["features"]).split(",") if x]
     uset(c, uid, "features", ",".join(fs + ([] if "agents" in fs else ["agents"])))

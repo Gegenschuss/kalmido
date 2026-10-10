@@ -89,7 +89,7 @@ function overdueAct(a) {
 }
 // 2.32.0 (#1055): the lists the selection can move to (the bar's Move, the key m without the multi panel)
 function multiMoveMenu(a) {
-  menu(a, S.lists.filter(l => !l.archived && canEditList(l.id)).map(l => ({label: lname(l), icon: l.is_inbox ? 'inbox' : 'list', fn: () => batch('patch', {list_id: l.id, section_id: null}, true)})));
+  menu(a, S.lists.filter(l => !l.archived && canEditList(l.id)).map(l => ({label: lname(l), icon: l.is_inbox ? 'inbox' : 'list', lic: l, fn: () => batch('patch', {list_id: l.id, section_id: null}, true)})));
 }
 // 2.32.0 (#1055): the phone bar's More: what does not fit into the four buttons
 function multiMoreMenu(a) {

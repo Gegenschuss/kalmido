@@ -123,6 +123,13 @@ def user_orgs(c, uid):
     return [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=? ORDER BY org_id", (uid,))]
 
 
+def org_member_add(c, oid, uid, role="member"):
+    """2.36.2 (#1142): add uid to organisation oid (nothing when already in) and refresh the request's access contexts."""
+    c.execute("INSERT INTO org_members(org_id,user_id,role) VALUES(?,?,?) ON CONFLICT (org_id, user_id) DO NOTHING", (oid, uid, role))
+    from ..core.access import acx_drop
+    acx_drop()
+
+
 def org_names(c, uid):
     return [r[0] for r in c.execute(f"SELECT name FROM orgs WHERE id IN ({','.join(str(int(x)) for x in user_orgs(c, uid)) or 'NULL'}) ORDER BY id")]
 
@@ -482,7 +489,18 @@ def _set_members(c, oid, ids):
     roles = {r[0]: r[1] for r in c.execute("SELECT user_id, role FROM org_members WHERE org_id=?", (oid,))}
     c.execute("DELETE FROM org_members WHERE org_id=?", (oid,))
     for u in sorted(set(ids) & have):
-        c.execute("INSERT OR IGNORE INTO org_members(org_id,user_id,role) VALUES(?,?,?)", (oid, u, roles.get(u, "member")))
+        org_member_add(c, oid, u, roles.get(u, "member"))
+    # 2.36.2 (#1142): the people taken out leave the organisation the same way as with an organisation admin (org_leave):
+    # they leave its lists, calendars and address books; their lists of this workspace go to an admin who stays
+    gone = sorted(set(roles) - set(ids))
+    if gone:
+        heir = (c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' "
+                          "AND u.disabled=0 AND u.kind!='agent' ORDER BY m.user_id LIMIT 1", (oid,)).fetchone()
+                or c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0 AND kind!='agent' ORDER BY id LIMIT 1").fetchone() or [None])[0]
+        if heir and not c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (oid, heir)).fetchone():
+            org_member_add(c, oid, heir, "admin")  # no admin stays: the operator takes over (like org_member_remove)
+        for u in gone:
+            org_leave(c, oid, u, heir)
 
 
 @app.get("/api/admin/orgs")
@@ -521,7 +539,7 @@ def org_create():
     if not isinstance(adm, int) or isinstance(adm, bool) or not c.execute("SELECT 1 FROM users WHERE id=? AND kind!='agent' AND disabled=0", (adm,)).fetchone():
         c.rollback()
         return err(tr("Invalid value: {0}", "admin_id"))
-    c.execute("INSERT OR IGNORE INTO org_members(org_id,user_id,role) VALUES(?,?,'admin')", (oid, adm))
+    org_member_add(c, oid, adm, "admin")
     bump(c)
     c.commit()
     print("organisation", name, "(id", oid, ") created by", g.user["username"], flush=True)
@@ -683,7 +701,7 @@ def org_member_put(oid):
     if cur:
         c.execute("UPDATE org_members SET role=? WHERE org_id=? AND user_id=?", (role, oid, uid))
     else:
-        c.execute("INSERT INTO org_members(org_id,user_id,role) VALUES(?,?,?)", (oid, uid, role))
+        org_member_add(c, oid, uid, role)
         from ..collab.news import news_add
         news_add(c, uid, "share", list_id=None, data={"org": True, "name": c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()[0], "role": role})
     bump(c)
@@ -711,6 +729,7 @@ def org_leave(c, oid, uid, heir):
     for (lid,) in c.execute("SELECT m.list_id FROM list_members m JOIN lists l ON l.id=m.list_id WHERE m.user_id=? AND l.org_id=?", (uid, oid)).fetchall():
         c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, uid))
         c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, uid))
+        c.execute("DELETE FROM task_people WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, lid))
     # 2.30.0 (#1036): the organisation's calendars and address books follow the same way: the leaver's go to heir (else
     # they become private), the leaver leaves the ones of others
     for table, mt, key in (("ev_cals", "ev_cal_members", "cal_id"), ("books", "book_members", "book_id")):
@@ -723,6 +742,8 @@ def org_leave(c, oid, uid, heir):
         c.execute(f"DELETE FROM {mt} WHERE user_id=? AND {key} IN (SELECT id FROM {table} WHERE org_id=?)", (uid, oid))
     c.execute("UPDATE agents SET org_id=NULL WHERE owner_id=? AND org_id=?", (uid, oid))
     c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, uid))
+    from ..core.access import acx_drop
+    acx_drop()  # 2.36.2 (#1142): the request's access contexts follow the new memberships
     return n
 
 
@@ -749,6 +770,8 @@ def org_member_remove(oid, uid):
         if operator is None:
             return err(tr("The last admin of an organisation cannot leave it: make somebody else an admin first"), 409)
         c.execute("INSERT INTO org_members(org_id,user_id,role) VALUES(?,?,'admin') ON CONFLICT(org_id,user_id) DO UPDATE SET role='admin'", (oid, operator))
+        from ..core.access import acx_drop
+        acx_drop()
         heir = operator
     n = org_leave(c, oid, uid, heir)
     if operator:

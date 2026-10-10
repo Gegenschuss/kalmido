@@ -9,7 +9,7 @@ from ..core.db import db, gsetting, inbox_names, iso, local_now, now_utc, usetti
 from ..accounts.session import me, user_public
 from ..accounts.pictures import avatar_map, list_icon_url
 from ..core.access import (
-    _members_on, collab_all, Denied, health_hidden, need_task, plists, time_all, tvis, vis_sql, wr_sql, WRITE_ROLES,
+    acx_lists_sql, collab_all, Denied, health_hidden, need_task, plists, time_all, tvis, vis_sql, wr_sql, WRITE_ROLES,
 )
 from ..core.serializers import load_tasks, running_pomo
 from ..core.pages import inbox_user
@@ -75,7 +75,7 @@ def visible_lists(c, uid):
     from ..integrations.git import git_repos_of_lists
     rows = c.execute(f"""SELECT l.*, m.role AS m_role, m.folder AS m_folder, m.sort AS m_sort, m.view AS m_view
                         FROM lists l LEFT JOIN list_members m ON m.list_id=l.id AND m.user_id=?
-                        WHERE l.owner_id=? OR (m.user_id IS NOT NULL{_members_on()})""", (uid, uid)).fetchall()
+                        WHERE l.id IN {acx_lists_sql(req=False)}""", (uid, uid, uid)).fetchall()  # 2.36.2 (#1142): the one list scope
     if health_hidden(c, uid):  # 2.22.0 (#663): health lists stay private (agents, tokens without the scope "private")
         rows = [r for r in rows if r["life"] != "health"]
     if has_request_context() and getattr(g, "user", None) is not None and uid == g.user["id"]:
@@ -131,6 +131,13 @@ def visible_lists(c, uid):
         d["shared"] = bool(d["members"])
         d["tags"] = ltags.get(r["id"], [])
         d["owner_name"] = names.get(r["owner_id"], "")
+        # 2.36.2 (#1139): who else it is shared with, by kind (people: a number, agents: their names); only from the members
+        # and the owner the viewer already gets, the viewer not counted
+        others = {m["user_id"]: m["name"] for m in d["members"] if m["user_id"] != uid}
+        if d["members"] and r["owner_id"] != uid:
+            others[r["owner_id"]] = d["owner_name"]
+        d["shared_people"] = sum(1 for i in others if i not in ag)
+        d["shared_agents"] = sorted(n for i, n in others.items() if i in ag)
         d["icon"] = list_icon_url(r)  # 2.0.2: URL of the own list icon, "" = none
         d["bell"], bc = bells.get(r["id"], ("default", None))  # 2.1.0 (#317): my bell for this list
         d["bell_custom"] = bell_custom_of(bc)  # 2.6.1 (#404): my own choice of events (kept while another mode is set)

@@ -17,7 +17,7 @@ from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, iso_ms, now_utc
 from ..accounts.session import me
-from ..core.access import Denied, need_collab
+from ..core.access import Denied, need_collab, task_visible
 from ..personal.timetrack import BadInput, UnknownFields
 
 GATE_KINDS = ("integrate", "deploy")
@@ -133,7 +133,7 @@ def gate_decide_route(cid):
         author = c.execute("SELECT * FROM users WHERE id=?", (k["user_id"],)).fetchone()
         k2 = c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone()
         s2 = json.loads(k2["suggestion"])
-        if is_agent(author):
+        if is_agent(author) and task_visible(c, t["id"], author["id"], full=True):  # 2.36.2 (#1142): requires task visibility
             agent_emit(c, author["id"], "reaction", agent_task_data(
                 c, t["id"], author["id"], comment={"id": cid, "text": comment_plain(c, k2["body"]), "suggestion": s2},
                 reaction={"emoji": "up" if approve else "down", "user": {"id": me(), "name": user_names(c, [me()]).get(me(), "")}},

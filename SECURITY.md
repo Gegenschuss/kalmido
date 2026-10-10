@@ -26,6 +26,19 @@ Kalmido is a hobby project maintained by one person, not a company with a securi
 
 There is no bug bounty.
 
+## Disclosure: fixes go live first
+
+Kalmido runs as a hosted instance as well. A release that closes a security problem is rolled out to the hosted
+instance **before** its code is published here, so the fix is not readable while the hosted service still runs the old
+version. For such releases:
+
+- the changelog and the commit messages name only *Security fix* and the area (for example "Security fix:
+  organisations"), no details on how the problem could be used
+- details follow, if at all, only after the hosted instance runs the fix and self-hosters had time to update
+- self-hosters: update as soon as a release says *Security fix*
+
+Reported problems are handled the same way: fixed, rolled out, then published (with credit if you like).
+
 ## Supported versions
 
 Only the **latest release** gets fixes. Updating is quick (see *Updating* in the README), and the database

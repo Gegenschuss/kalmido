@@ -138,13 +138,13 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
   const cases = [
     ['Milch kaufen in Liste Einkauf', 'Milch kaufen', 'Einkauf'], ['Milch Liste Einkauf morgen', 'Milch', 'Einkauf'],
     ['Milch kaufen in die Liste Einkauf', 'Milch kaufen', 'Einkauf'], ['Brot in Einkauf', 'Brot', 'Einkauf'], ['Brot auf Einkauf', 'Brot', 'Einkauf'],
-    ['Buy milk to list einkauf', 'Buy milk', 'Einkauf'], ['Print report in Home Office', 'Print report', '🏠 Home Office'],
-    ['Print report into home office', 'Print report', '🏠 Home Office'], ['Call bank in list Home Office', 'Call bank', '🏠 Home Office'],
+    ['Buy milk to list einkauf', 'Buy milk', 'Einkauf'], ['Print report in Home Office', 'Print report', 'Home Office'],
+    ['Print report into home office', 'Print report', 'Home Office'], ['Call bank in list Home Office', 'Call bank', 'Home Office'],
     ['Milch in Liste Eink', 'Milch', 'Einkauf'], ['Brief an Oma in Berlin', 'Brief an Oma in Berlin', null],
     ['Tickets in Berlin trip', 'Tickets', 'Berlin trip'], ['Make a list of groceries', 'Make a list of groceries', null],
     ['shopping list for mom', 'shopping list for mom', null], ['Liste Einkauf', 'Liste Einkauf', null],
     ['in Einkauf', 'in Einkauf', null], ['Wein in Einkaufen', 'Wein in Einkaufen', null], ['Brot ~eink', 'Brot', 'Einkauf'],
-    ['Buy milk in inbox', 'Buy milk', 'Inbox']];
+    ['Buy milk in inbox', 'Buy milk', 'Inbox']];  // 2.36.2 (#1135): with "Line" (default) the shown name has no leading emoji
   for (const [t, title, list] of cases) { const r = pq(t); check(r.title === title && r.list === list && (!list || r.chip === list), `parseQuick ${JSON.stringify(t)} -> ${JSON.stringify(r)}`); }
   w.eval(`S.quick.ignore.add('list')`);
   const off = w.eval(`(() => { const r = parseQuick('Brot in Einkauf', S.quick.ignore); return [r.title, r.list_id || null, JSON.stringify(r.chips)]; })()`);

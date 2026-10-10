@@ -437,7 +437,7 @@ def task_event(c, tid, kind, prev_assignee=None):
     name = user_names(c, [actor]).get(actor, "?")
     for uid in sorted(rcpt):
         s = collab_user(c, uid, t["list_id"])
-        if not s or (kind != "unassign" and not task_visible(c, tid, uid, full=True)):
+        if not s or not task_visible(c, tid, uid, full=True):  # 2.36.2 (#1142): also for "unassign"
             continue
         news_add(c, uid, kind, task_id=tid, actor=actor, s=s)
         if not notif_ok(c, uid, s, KIND_ROW[kind], "push", t["list_id"]) or not push_reachable(c, uid, s) or \

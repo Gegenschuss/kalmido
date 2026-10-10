@@ -36,7 +36,8 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      "logo": "", "color": "", "lang": "de", "currency": "EUR", "fx_usd": 1.09, "offer_scheme": "KVA-{yyyy}-{seq:03}",
                      "prod_quotient": 3, "raw_factor": 0.25, "producing_service_id": None, "producing_rate": 600,
                      "offer_valid_days": 30, "intro_text_id": {"de": None, "en": None}, "closing_text_id": {"de": None, "en": None},
-                     "rights_default": {"time_id": None, "territory_id": None, "media_id": None}}
+                     "rights_default": {"time_id": None, "territory_id": None, "media_id": None},
+                     "offer_number_at": "create"}  # 2.36.2 (P2): "create" | "finalize" (see ledger.OFX_NUMBER_AT_FINALIZE)
 SETTINGS_KEYS = tuple(SETTINGS_DEFAULTS)
 
 
@@ -183,6 +184,10 @@ def office_settings_clean(c, oid, b, cur):
             out["fx_usd"] = round(_num(v, "fx_usd", 0.0001, 1000), 4)
         elif k == "offer_scheme":
             out["offer_scheme"] = office_scheme_clean(v)
+        elif k == "offer_number_at":
+            if v not in ("create", "finalize"):
+                raise BadInput(tr("Invalid value: {0}", k))
+            out[k] = v
         elif k == "prod_quotient":
             out["prod_quotient"] = _num(v, "prod_quotient", 0.1, 1000)
         elif k == "raw_factor":
@@ -475,23 +480,25 @@ def office_update(c, oid, kind, rid, b):
     return office_row(c, oid, kind, rid)
 
 
-def office_in_use(c, kind, rid):
-    """True when documents (C's tables) or other master data refer to the row: then delete = archive."""
+def office_in_use(c, kind, rid, oid):
+    """True when documents or other master data of organisation oid refer to the row: then delete = archive.
+    2.36.2 (#1146): every query is limited to the organisation."""
     if kind == "services":
-        if _table(c, "office_doc_items") and c.execute("SELECT 1 FROM office_doc_items WHERE service_id=? LIMIT 1", (rid,)).fetchone():
+        if c.execute("SELECT 1 FROM office_doc_items WHERE service_id=? AND org_id=? LIMIT 1", (rid, oid)).fetchone():
             return True
-        if c.execute("SELECT 1 FROM office_contracts WHERE rates LIKE ? LIMIT 1", (f'%"{rid}":%',)).fetchone():
+        if c.execute("SELECT 1 FROM office_contracts WHERE org_id=? AND rates LIKE ? LIMIT 1", (oid, f'%"{rid}":%')).fetchone():
             return True
         return False
     if kind == "equipment":
-        return bool(c.execute("SELECT 1 FROM office_sets WHERE items LIKE ? LIMIT 1", (f'%"equipment_id": {rid},%',)).fetchone()
-                    or c.execute("SELECT 1 FROM office_sets WHERE items LIKE ? LIMIT 1", (f'%"equipment_id": {rid}}}%',)).fetchone())
+        return bool(c.execute("SELECT 1 FROM office_sets WHERE org_id=? AND items LIKE ? LIMIT 1", (oid, f'%"equipment_id": {rid},%')).fetchone()
+                    or c.execute("SELECT 1 FROM office_sets WHERE org_id=? AND items LIKE ? LIMIT 1", (oid, f'%"equipment_id": {rid}}}%')).fetchone())
     if kind == "texts":
-        if c.execute("SELECT 1 FROM office_contracts WHERE rights_time_id=? OR rights_territory_id=? OR rights_media_id=? LIMIT 1", (rid, rid, rid)).fetchone():
+        if c.execute("SELECT 1 FROM office_contracts WHERE org_id=? AND (rights_time_id=? OR rights_territory_id=? OR rights_media_id=?) LIMIT 1",
+                     (oid, rid, rid, rid)).fetchone():
             return True
         return False
     if kind == "contracts":
-        return bool(_table(c, "office_docs") and c.execute("SELECT 1 FROM office_docs WHERE contract_id=? LIMIT 1", (rid,)).fetchone())
+        return bool(c.execute("SELECT 1 FROM office_docs WHERE contract_id=? AND org_id=? LIMIT 1", (rid, oid)).fetchone())
     return False
 
 
@@ -499,7 +506,7 @@ def office_delete(c, oid, kind, rid):
     """Deletes the row; when it is in use (documents, contracts, sets) it is archived instead. -> 'deleted' | 'archived'"""
     m = MD[kind]
     r = office_row(c, oid, kind, rid)
-    if office_in_use(c, kind, r["id"]):
+    if office_in_use(c, kind, r["id"], oid):
         c.execute(f"UPDATE {m['table']} SET archived=1 WHERE id=? AND org_id=?", (r["id"], oid))
         return "archived"
     c.execute(f"DELETE FROM {m['table']} WHERE id=? AND org_id=?", (r["id"], oid))
@@ -534,10 +541,6 @@ def _cols(c, table):
     return _COLS[table]
 
 
-def _table(c, name):
-    return bool(c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)).fetchone())
-
-
 # ---------------------------------------------------------------- import / export (JSON, master data only)
 EXPORT_KINDS = ("services", "equipment", "sets", "texts", "contracts")
 
@@ -557,11 +560,22 @@ def office_export(c, oid):
 def office_import(c, oid, d, overwrite=False):
     """Additive import of an export (or a hand-made file of the same shape): rows are matched by their label (services:
     name_de, equipment/sets/contracts: name, texts: kind + key); existing ones are left alone unless overwrite. Ids inside
-    the file (sets.items, contracts.rates / rights ids, settings' text ids) are mapped to the new ids. -> counts"""
+    the file (sets.items, contracts.rates / rights ids, settings' text ids) are mapped to the new ids; 2.36.2 (#1146): an id
+    that maps to no row of the file is left empty (never taken over as it is) and listed in counts["unmapped"]."""
     if not isinstance(d, dict):
         raise BadInput(tr("Invalid data"))
     counts = {k: {"added": 0, "updated": 0, "skipped": 0} for k in EXPORT_KINDS}
     idmap = {k: {} for k in EXPORT_KINDS}
+    unmapped = []
+
+    def mapped(kind, v, where, field):
+        """The new id of the file's id v of kind, or None (reported)."""
+        if v in (None, "", 0, "0"):
+            return None
+        n = idmap[kind].get(_i(v))
+        if n is None:
+            unmapped.append({"in": where[0], "name": str(where[1] or "")[:NAME_MAX], "field": field, "id": _i(v)})
+        return n
 
     def key_of(kind, r):
         if kind == "texts":
@@ -581,15 +595,26 @@ def office_import(c, oid, d, overwrite=False):
             b = {k: v for k, v in src.items() if k in MD[kind]["cols"]}
             old_id = src.get("id")
             # remap foreign ids of earlier kinds
+            where = (kind, b.get(MD[kind]["label"]))
             if kind == "sets" and isinstance(b.get("items"), list):
-                b["items"] = [{"equipment_id": idmap["equipment"].get(_i(it.get("equipment_id")), _i(it.get("equipment_id"))), "qty": it.get("qty", 1)}
-                              for it in b["items"] if isinstance(it, dict)]
+                its = []
+                for it in b["items"]:
+                    if isinstance(it, dict):
+                        eid = mapped("equipment", it.get("equipment_id"), where, "items")
+                        if eid is not None:
+                            its.append({"equipment_id": eid, "qty": it.get("qty", 1)})
+                b["items"] = its
             if kind == "contracts":
                 if isinstance(b.get("rates"), dict):
-                    b["rates"] = {str(idmap["services"].get(_i(k), _i(k))): v for k, v in b["rates"].items()}
+                    rates = {}
+                    for k_, v in b["rates"].items():
+                        sid = mapped("services", k_, where, "rates")
+                        if sid is not None:
+                            rates[str(sid)] = v
+                    b["rates"] = rates
                 for f in ("rights_time_id", "rights_territory_id", "rights_media_id"):
                     if b.get(f) is not None:
-                        b[f] = idmap["texts"].get(_i(b[f]), _i(b[f]))
+                        b[f] = mapped("texts", b[f], where, f)
                 b.pop("client_id", None)  # clients are not part of the master data file
             k = key_of(kind, b)
             cur = existing.get(k)
@@ -611,18 +636,21 @@ def office_import(c, oid, d, overwrite=False):
     if isinstance(st, dict):
         cur = office_settings(c, oid)
         b = {k: v for k, v in st.items() if k in SETTINGS_KEYS and k != "logo"}
+        where = ("settings", "")
         if "producing_service_id" in b and b["producing_service_id"] is not None:
-            b["producing_service_id"] = idmap["services"].get(_i(b["producing_service_id"]))
+            b["producing_service_id"] = mapped("services", b["producing_service_id"], where, "producing_service_id")
         for k in ("intro_text_id", "closing_text_id"):
             if isinstance(b.get(k), dict):
-                b[k] = {lg: idmap["texts"].get(_i(v)) for lg, v in b[k].items() if lg in ("de", "en")}
+                b[k] = {lg: mapped("texts", v, where, k) for lg, v in b[k].items() if lg in ("de", "en")}
         if isinstance(b.get("rights_default"), dict):
-            b["rights_default"] = {f: idmap["texts"].get(_i(v)) for f, v in b["rights_default"].items() if f in ("time_id", "territory_id", "media_id")}
+            b["rights_default"] = {f: mapped("texts", v, where, "rights_default") for f, v in b["rights_default"].items()
+                                   if f in ("time_id", "territory_id", "media_id")}
         if overwrite or not c.execute("SELECT 1 FROM office_settings WHERE org_id=?", (oid,)).fetchone():
             office_settings_save(c, oid, office_settings_clean(c, oid, b, cur))
             counts["settings"] = "updated"
         else:
             counts["settings"] = "skipped"
+    counts["unmapped"] = unmapped[:200]
     return counts
 
 

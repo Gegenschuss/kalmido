@@ -46,6 +46,12 @@ Placeholders: `{yyyy}` `{yy}` year, `{seq}` or `{seq:03}` the counter (zero-padd
 organisation, document kind and period: with `{yyyy}` / `{yy}` in the scheme it starts again every year, without it
 never. A number is reserved once and never reused.
 
+When the number is assigned depends on the document kind: quotations get it when they are created (as before); the
+organisation can switch this to "when it is finalised" (settings key `offer_number_at`: `create` | `finalize`). Then a
+draft carries no number ("Draft") and the number is assigned in the moment the document is finalised, so deleted
+drafts leave no gaps. Later document kinds (invoices) are always numbered when they are finalised. Numbers are unique per
+organisation.
+
 ## Country packs
 
 Tax rates, number and date formats, the labels of the documents and the default texts are not in the code but in a
@@ -77,6 +83,8 @@ logo file, no client ids). "Import" (organisation admin) reads the same shape ba
 example a service catalogue converted from a spreadsheet. The import is additive: rows are matched by name (services:
 `name_de`; equipment, sets, contracts: `name`; text blocks: `kind` + `key`) and existing ones are left alone unless
 "overwrite existing" is on. Ids inside the file (set items, contract rates, default text ids) are mapped to the new ids.
+An id that matches no row of the file is left empty (a set item or contract rate is dropped) and listed in the answer
+under `counts.unmapped` (`[{in, name, field, id}]`); it is never taken over as it is.
 
 Minimal file:
 
@@ -120,7 +128,46 @@ choosing a framework contract presets raw data, rights and closing unless `apply
 `PUT /api/office/docs/<id>/items` (the whole list of positions; a `service_id` fills title, rate, tax and flags),
 `POST /api/office/docs/<id>/number` (`{number}` by hand, unique per organisation, or the next one of the scheme),
 `POST /api/office/docs/<id>/status`, `POST /api/office/docs/<id>/duplicate`, `GET /api/office/docs/<id>/render` (the
-print model as JSON: all texts, labels and amounts already in the document's language and format).
+print model as JSON: all texts, labels and amounts already in the document's language and format),
+`POST /api/office/docs/<id>/finalize`, `GET /api/office/docs/<id>/log` and `GET /api/office/log?limit=` (organisation
+admins). The head also carries the period of service (`service_from`, `service_to`, dates; printed as one line).
+
+## Finalising
+
+A document can be finalised (button "Finalise" in the editor, after a confirmation; any member of the organisation).
+Finalising freezes it:
+
+- the number is assigned if it has none yet;
+- the totals are stored and never recomputed; every position keeps its tax rate, net amount and tax amount as decimal
+  text (`tax_pct`, `net`, `tax_amount`);
+- the sender (company lines and fields, colour, the logo by its SHA-256 - the file is kept as `logo-<hash>.png`), the
+  recipient (with the client's billing fields) and the country pack's rates, formats and print words (`pack_version`)
+  are stored in the document.
+
+The print model and the PDF of a finalised document are built from this snapshot only: later changes of the company,
+the logo, the services, the client or the country pack do not change it. Changing the head, the positions or the number
+and deleting answer `409` with a reason; the status of a quotation can still change. "Duplicate" makes a new open draft
+(a new version) without the snapshot. Quotations do not have to be finalised; it is an optional step for them.
+
+## Company fields
+
+Settings > Company holds the company as single fields: name, street, postcode, city, country (ISO code), e-mail, phone,
+tax number, VAT ID, bank, IBAN (check digits are verified), BIC, register court, register number, managing directors
+(table `office_company`, key `company_fields` of `GET/PUT /api/office/settings`). The printed lines are made from them
+group by group (address, contact, register, bank and tax); the free lines of the settings stay as the fallback for a group
+whose fields are empty, so existing setups print as before. Clients (module "Clients") have folded "Billing details":
+street, postcode, city, country, VAT ID, customer number, buyer reference (for example a routing ID), e-mail for
+invoices and payment terms in days; the free address stays. These fields are for people only and are not part of agent
+answers.
+
+## Access log
+
+Every change and every read of documents and master data is written to the office log (`office_doc_log`): who, when,
+what (create, change with the values before and after, positions, number, status, finalise, duplicate, delete, open,
+PDF, preview, export, import, logo) and on which document or master data. Repeated reads of the same person within ten
+minutes are written once. Organisation admins see the history of a document in its editor ("History") and the latest
+entries under Settings > Access log. The log is never part of alerts. Agents have no access to the module at all: an
+agent token on `/api/office/*` gets `403` without content.
 
 ## PDF layout
 
@@ -160,3 +207,8 @@ writer has no SVG renderer). The folder is part of the backups and restores like
 New tables, all additive and keyed by `org_id` with `ON DELETE CASCADE`: `office_settings`, `office_services`,
 `office_equipment`, `office_sets`, `office_texts`, `office_contracts`, `office_numbers`, `office_docs`,
 `office_doc_items`. A backup (Settings > Administration > Backup) contains them; an older release runs on with them.
+Since 2.36.2 also `office_company` and `office_doc_log`, the columns `locked_at`, `locked_by`, `sender`,
+`recipient_snapshot`, `tax_snapshot`, `pack_version`, `service_from`, `service_to` of `office_docs`, `org_id`,
+`tax_pct`, `net`, `tax_amount` of `office_doc_items` (positions written without `org_id` get it at the next start) and
+the billing columns of `clients` - all nullable or with a default, so the previous release runs on with them.
+Unfinished logo uploads (`*.tmp`) are not part of backups.

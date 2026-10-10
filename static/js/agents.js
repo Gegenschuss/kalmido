@@ -397,7 +397,20 @@ S.jobs = {items: null, f: LS.get('jobsFilter', 'open'), err: null};
 async function loadJobs() {
   try { S.jobs.items = (await api('GET', '/api/agents/jobs' + (S.jobs.f === 'open' ? '?state=open' : ''))).jobs; S.jobs.err = null; }
   catch (e) { S.jobs.err = e instanceof Offline ? tr('Only available online.') : e.message; S.jobs.items = S.jobs.items || []; }
+  const fj = S.jobFocus;  // 2.36.2 (#1141): #job/<id> -- a finished or older job is fetched on its own; not mine = not found
+  if (fj && !S.jobs.err && !S.jobs.items.some(j => j.id === fj)) {
+    const one = await api('GET', '/api/agents/jobs?id=' + fj).then(j => (j.jobs || []).find(x => x.id === fj)).catch(() => null);
+    if (one) S.jobs.items = [one, ...S.jobs.items]; else { S.jobFocus = null; toast(tr('Job not found')); }
+  }
+  if (S.jobFocus) S.jobOpen[S.jobFocus] = true;
   if (S.route.mod === 'agents') renderView();
+  if (S.jobFocus) setTimeout(jobFocusShow, 0);
+}
+function jobFocusShow() {
+  const e = document.getElementById('job-' + S.jobFocus);
+  if (!e) return;
+  e.scrollIntoView?.({block: 'start'});
+  e.focus?.({preventScroll: true});
 }
 function jobHtml(j) {
   const mine = j.kind && S.me && j.user_id === S.me.id;  // 2.3.0: a proposal I asked for: reviewed in its dialog
@@ -406,9 +419,10 @@ function jobHtml(j) {
     !j.kind && j.can_act && j.state === 'waiting' && `<button class="btn sm" data-act="job-do" data-jid="${j.id}" data-a="reject">${thumbIc(false)} ${tr('Reject')}</button>`,
     j.can_stop && ['running', 'waiting'].includes(j.state) && `<button class="btn sm danger" data-act="job-do" data-jid="${j.id}" data-a="stop">${ic('stop', 's')} ${tr('Stop')}</button>`].filter(Boolean).join('');
   const last = String(j.log || '').trim().split('\n').pop();
-  return `<div class="job st-${esc(j.state)}"><div class="jobh"><span class="jst">${esc(tr(JOB_ST[j.state] || j.state))}</span><b>${esc(j.title)}</b><span class="spacer"></span><span class="muted">${esc(j.agent_name)} · ${esc(relTime(j.updated_at))}</span></div>
+  const fo = S.jobFocus === j.id;  // 2.36.2 (#1141): opened by a "Job #id" link: highlighted, log + history unfolded
+  return `<div class="job st-${esc(j.state)}${fo ? ' jfocus' : ''}" id="job-${j.id}"${fo ? ' tabindex="-1"' : ''}><div class="jobh"><span class="jst">${esc(tr(JOB_ST[j.state] || j.state))}</span><b>${esc(j.title)}</b><span class="spacer"></span><span class="muted">${esc(j.agent_name)} · ${esc(relTime(j.updated_at))}</span></div>
     ${j.task_id ? `<button class="runtask" data-act="open-id" data-id="${j.task_id}">${ic('arrow', 's')}<span>${esc(j.task_title || '')}</span></button>` : ''}
-    ${j.log ? `<details class="joblog"><summary>${esc(last.slice(0, 140))}</summary><pre>${esc(j.log)}</pre></details>` : ''}
+    ${j.log ? `<details class="joblog"${fo ? ' open' : ''}><summary>${esc(last.slice(0, 140))}</summary><pre>${esc(j.log)}</pre></details>` : ''}
     ${j.steps ? jobStepsHtml(j.id, j.steps) : ''}
     ${j.action && !(j.action === 'approve' && j.state === 'waiting') ? `<div class="muted jact">${j.action === 'approve' ? thumbIc(true) + ' ' : j.action === 'reject' ? thumbIc(false) + ' ' : ''}${esc({approve: tr('Approved by {0}', j.action_by_name), reject: tr('Rejected by {0}', j.action_by_name), stop: tr('Stopped by {0}', j.action_by_name)}[j.action] || '')}</div>` : ''}
     ${acts ? `<div class="jobb">${acts}</div>` : ''}</div>`;

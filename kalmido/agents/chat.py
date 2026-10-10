@@ -38,13 +38,16 @@ def agents_get():
 
 @app.get("/api/agents/jobs")
 def agent_jobs_get():
-    """Jobs I can see (the linked task, or jobs for me; admins all), newest first. ?agent_id= ?state=open|all"""
+    """Jobs I can see (the linked task, or jobs for me; admins all), newest first. ?agent_id= ?state=open|all ?id= (one job)"""
     c = db()
     q, args = "SELECT * FROM agent_jobs", []
     where = []
     if request.args.get("agent_id"):
         where.append("agent_id=?")
         args.append(as_int(request.args["agent_id"], "agent_id", 1))
+    if request.args.get("id"):  # 2.36.2 (#1141): one job (a "Job #50" link in the chat); not visible = an empty list
+        where.append("id=?")
+        args.append(as_int(request.args["id"], "id", 1))
     if request.args.get("state", "all") == "open":
         where.append("state IN ('running','waiting')")
     rows = c.execute(q + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY updated_at DESC, id DESC LIMIT 500", args).fetchall()

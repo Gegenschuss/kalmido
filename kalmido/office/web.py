@@ -17,6 +17,7 @@ from .model import (
     office_rows, office_seed_texts, office_settings, office_settings_clean, office_settings_save, office_update, office_number_format,
     office_number_next, office_scheme_clean,
 )
+from .ledger import ofx_company, ofx_company_clean, ofx_company_save, ofx_diff, ofx_log
 
 IMPORT_MAX = 4 * 1024 * 1024
 
@@ -37,23 +38,34 @@ def office_settings_get():
         c.commit()
     s = office_settings(c, oid)
     pack = office_pack(s["pack"]) or office_pack("DE")
-    return jsonify(settings=s, org_id=oid, role=office_role(c, uid, oid), pack={"code": pack["code"], "name": pack["name"], "tax": pack["tax"],
+    return jsonify(settings=s, company_fields=ofx_company(c, oid), org_id=oid, role=office_role(c, uid, oid), pack={"code": pack["code"], "name": pack["name"], "tax": pack["tax"],
                                                                                "formats": pack["formats"], "currency": pack["currency"]},
                    number_preview=office_number_next(c, oid, "offer", s["offer_scheme"], peek=True)[0])
 
 
 @app.put("/api/office/settings")
 def office_settings_put():
-    """Org admin. Partial body with the keys of office_settings.data (logo: see POST /api/office/logo)."""
+    """Org admin. Partial body with the keys of office_settings.data (logo: see POST /api/office/logo); 2.36.2:
+    company_fields = the structured company data (office_company, partial)."""
     c, uid, oid = _ctx(admin=True)
     b = body()
     if not isinstance(b, dict):
         return err(tr("Invalid data"))
     cur = office_settings(c, oid)
     new = office_settings_clean(c, oid, b, cur)
+    if "company_fields" in b:
+        cf = ofx_company(c, oid)
+        ncf = ofx_company_clean(b["company_fields"], cf)
+        diff = ofx_diff(cf, ncf)
+        if diff["after"]:
+            ofx_company_save(c, oid, ncf)
+            ofx_log(c, oid, "update", target="company", detail=diff)
     office_settings_save(c, oid, new)
+    diff = ofx_diff(cur, new)
+    if diff["after"]:
+        ofx_log(c, oid, "update", target="settings", detail=diff)
     c.commit()
-    return jsonify(settings=office_settings(c, oid), number_preview=office_number_next(c, oid, "offer", new["offer_scheme"], peek=True)[0])
+    return jsonify(settings=office_settings(c, oid), company_fields=ofx_company(c, oid), number_preview=office_number_next(c, oid, "offer", new["offer_scheme"], peek=True)[0])
 
 
 @app.get("/api/office/number-preview")
@@ -120,6 +132,7 @@ def office_row_post(kind):
     if not isinstance(b, dict):
         return err(tr("Invalid data"))
     r = office_create(c, oid, kind, b)
+    ofx_log(c, oid, "create", target=kind, detail={"id": r["id"], "after": r})
     c.commit()
     return jsonify(r), 201
 
@@ -138,7 +151,13 @@ def office_row_patch(kind, rid):
     b = body()
     if not isinstance(b, dict):
         return err(tr("Invalid data"))
+    old = office_row(c, oid, kind, rid)
     r = office_update(c, oid, kind, rid, b)
+    diff = ofx_diff(old, r)
+    diff["after"].pop("updated_at", None)
+    diff["before"].pop("updated_at", None)
+    if diff["after"]:
+        ofx_log(c, oid, "update", target=kind, detail={"id": r["id"], **diff})
     c.commit()
     return jsonify(r)
 
@@ -148,7 +167,9 @@ def office_row_delete(kind, rid):
     """Deletes; a row used in documents / contracts / sets is archived instead -> {ok, result: deleted|archived}."""
     _kind(kind)
     c, uid, oid = _ctx(admin=True)
+    old = office_row(c, oid, kind, rid)
     res = office_delete(c, oid, kind, rid)
+    ofx_log(c, oid, "delete" if res == "deleted" else "archive", target=kind, detail={"id": old["id"], "before": old})
     c.commit()
     return jsonify(ok=True, result=res)
 
@@ -158,6 +179,8 @@ def office_row_delete(kind, rid):
 def office_export_get():
     c, uid, oid = _ctx()
     d = office_export(c, oid)
+    ofx_log(c, oid, "export", target="master_data")
+    c.commit()
     data = json.dumps(d, ensure_ascii=False, indent=1)
     return Response(data, mimetype="application/json", headers={"Content-Disposition": "attachment; filename=\"office-master-data.json\""})
 
@@ -183,5 +206,6 @@ def office_import_post():
         return err(tr("Invalid data"))
     overwrite = (request.args.get("overwrite") or (d.get("overwrite") if isinstance(d.get("overwrite"), (bool, int, str)) else "")) in (1, True, "1", "true")
     counts = office_import(c, oid, d, overwrite=overwrite)
+    ofx_log(c, oid, "import", target="master_data", detail={"overwrite": bool(overwrite), "counts": counts})
     c.commit()
     return jsonify(ok=True, counts=counts)

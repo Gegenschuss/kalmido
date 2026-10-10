@@ -72,7 +72,7 @@ def approval_apply(c, tid, b):
     note = note.strip()[:APPROVAL_NOTE_MAX]
     uid = me()
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
-    if not t or t["deleted_at"]:
+    if not t or t["deleted_at"] or not task_visible(c, tid, uid):  # 2.36.2 (#1142): requires task visibility (else 404)
         raise Denied(404)
     if act == "request":
         need_task(c, tid)  # change the task
@@ -94,6 +94,7 @@ def approval_apply(c, tid, b):
             assignment_events(c, tid, old, ap)
         return one_task(c, tid)
     if act == "cancel":
+        need_task(c, tid, write=False, full=True)  # 2.36.2 (#1142): former members cannot withdraw (404)
         role = list_role(c, t["list_id"])
         if not t["approval"] or not (t["assigned_by"] == uid or t["created_by"] == uid or role in MANAGE_ROLES):
             raise Denied(403, tr("Only the person who asked or a list admin can withdraw the request"))

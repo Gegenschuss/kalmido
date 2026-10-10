@@ -30,7 +30,7 @@ from ..accounts.session import (
     _DUMMY_HASH, _rate_blocked, _rate_fail, _rate_keys, _rate_reset, client_ip, FAIL_WINDOW, me,
 )
 from ..accounts.login import RC_ALPHABET
-from ..core.access import _members_on, collab_all, Denied, plists, pvis, task_visible, tvis, WRITE_ROLES
+from ..core.access import acx_lists_sql, collab_all, Denied, plists, pvis, task_visible, tvis, WRITE_ROLES
 from ..core.pages import valid_url
 from ..tasks.validation import (
     check_parent, CONTENT_MAX, REM_COUNT, REM_MAX, REM_MIN, rr_feasible, rr_norm, rr_problem, TITLE_MAX, valid_date,
@@ -514,8 +514,8 @@ def dav_lists(c, u):
     """{list id: row (+ role)} of the lists that are calendars for u: visible, not archived."""
     rows = c.execute(f"""SELECT l.id, l.name, l.color, l.sort, l.is_inbox, l.owner_id, l.created_at, m.role AS m_role
                          FROM lists l LEFT JOIN list_members m ON m.list_id=l.id AND m.user_id=?
-                         WHERE l.archived=0 AND (l.owner_id=? OR (m.user_id IS NOT NULL{_members_on()}))
-                         ORDER BY l.is_inbox DESC, COALESCE(m.sort, l.sort), l.id""", (u["id"], u["id"])).fetchall()
+                         WHERE l.archived=0 AND l.id IN {acx_lists_sql(req=False)}
+                         ORDER BY l.is_inbox DESC, COALESCE(m.sort, l.sort), l.id""", (u["id"], u["id"], u["id"])).fetchall()
     out = {}
     for r in rows:
         role = "owner" if r["owner_id"] == u["id"] else r["m_role"]

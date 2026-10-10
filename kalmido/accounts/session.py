@@ -231,6 +231,8 @@ def authenticate():
         if g.auth_error:
             msg = tr("This account is disabled") if g.auth_error == "disabled" else tr("No account for {0}", g.proxy_login)
             return jsonify(error=msg, auth=g.auth_error, login=g.proxy_login), 403
+        if path.startswith("/api/office/") and (request.headers.get("Authorization") or "").lower().startswith("bearer "):
+            return err(tr("Tokens cannot use this endpoint"), 403)  # 2.36.2 E (#1146): agent tokens never reach office & finance
         setup = not c.execute("SELECT 1 FROM users").fetchone()
         return jsonify(error=tr("Please log in"), auth="setup" if setup else "login"), 401
     return redirect("/", 303)
@@ -288,7 +290,10 @@ def start_session(c, uid, remember, via="password"):
               (_token_hash(tok), uid, iso(now_utc()), iso(now_utc() + timedelta(days=days)), via))
     from ..admin.clientip import login_seen
     login_seen(c, uid)  # 2.33.0 (#834): many accounts from one private address = the proxy hides the client addresses
-    return tok, (days * 86400 if remember else None)
+    from flask import has_request_context
+    from ..notify.sev import sev_login
+    sev_login(c, uid, client_ip() if has_request_context() else "", via)  # 2.36.2 (#1133): an admin from a new address
+    return tok,(days * 86400 if remember else None)
 
 
 def set_cookie(resp, tok, max_age):

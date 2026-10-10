@@ -1,7 +1,7 @@
 // Office & finance (2.36.1, #1021), part C: quotations -- the tab "Quotations" of the office view (office.js calls
 // ofdOffersTab(el)) with the list and the editor (#office/offers/<id>). The server computes the sums (kalmido/office/calc.py)
 // on every change and returns them; the editor shows exactly those figures in the document's language and currency.
-const OFD = {list: null, loading: false, q: '', status: '', doc: null, docId: null, docLoading: false, seq: 0, saving: 0, err: '', open: {head: true, rights: true, texts: false, fields: false}};
+const OFD = {list: null, loading: false, q: '', status: '', doc: null, docId: null, docLoading: false, seq: 0, saving: 0, err: '', open: {head: true, rights: true, texts: false, fields: false, log: false}, log: null, logFor: 0};
 const OFD_STATUS = [['draft', N_('Draft')], ['sent', N_('Sent')], ['accepted', N_('Accepted')], ['declined', N_('Declined')]];
 const OFD_RAW = [['optional', N_('optional (shown, not counted)')], ['included', N_('included (counted)')], ['none', N_('no raw data line')]];
 const ofdLang = d => (d || OFD.doc)?.lang === 'en' ? 'en' : 'de';
@@ -66,7 +66,7 @@ function ofdListHtml() {
   const list = rows.filter(hit);
   if (!list.length) return bar + `<div class="empty">${ic('receipt')}<span>${q || OFD.status ? tr('Nothing matches.') : tr('No quotations yet. The first one takes your services, rates and text blocks.')}</span>${!q && !OFD.status ? `<button class="btn pri" data-ofd="new">${ic('plus', 's')} ${tr('New quotation')}</button>` : ''}</div>`;
   return bar + `<ul class="ofclist ofdlist" role="list">${list.map(r => `<li><button type="button" class="ofcrow ofdrow st-${r.status}" data-ofd="open" data-id="${r.id}">
-    <span class="ofcn"><b>${esc(r.number || tr('(no number)'))}${r.recipient_name ? ` · ${esc(r.recipient_name)}` : ''}</b><small class="muted">${esc([r.project_title, r.date ? fmtDateLoc(r.date) : ''].filter(Boolean).join(' · '))}</small></span>
+    <span class="ofcn"><b>${r.locked ? `<span class="ofdlk" title="${esc(tr('Finalised'))}">${ic('lock', 's')}</span>` : ''}${esc(r.number || tr('(no number)'))}${r.recipient_name ? ` · ${esc(r.recipient_name)}` : ''}</b><small class="muted">${esc([r.project_title, r.date ? fmtDateLoc(r.date) : ''].filter(Boolean).join(' · '))}</small></span>
     <span class="ofdsum"><b>${esc(r.net_text)}</b><small class="rotag st-${r.status}">${esc(r.status_text)}</small></span>${ic('chev', 's')}</button></li>`).join('')}</ul>`;
 }
 
@@ -85,10 +85,13 @@ function ofdEditorHtml() {
   const txtOpt = kind => texts(kind).map(x => [x.id, (x.key ? x.key + ': ' : '') + ((lg === 'en' ? x.text_en || x.text_de : x.text_de || x.text_en) || '').slice(0, 70)]);
   const contracts = ofcRows('contracts').filter(x => !x.archived || x.id === d.contract_id).map(x => [x.id, x.name]);
   const clients = typeof clientsOn === 'function' && clientsOn() ? (S.clients || []).filter(c => (!c.archived && c.org_id === OFC.info?.org_id) || c.id === d.client_id).map(c => [c.id, c.name]) : [];
-  const head = `<div class="ofdhead">${back}<span class="ofdnum"><b>${esc(d.number || tr('(no number)'))}</b>${d.number ? '' : `<button type="button" class="btn sm" data-ofd="number">${tr('Assign number')}</button>`}</span>
+  const lk = !!d.locked;
+  const numTxt = d.number || (d.number_at_finalize ? tr('Draft') : tr('(no number)'));
+  const head = `<div class="ofdhead">${back}<span class="ofdnum"><b>${lk ? ic('lock', 's') + ' ' : ''}${esc(numTxt)}</b>${d.number || lk || d.number_at_finalize ? '' : `<button type="button" class="btn sm" data-ofd="number">${tr('Assign number')}</button>`}</span>
     <select id="ofd-status" data-f="status" aria-label="${esc(tr('Status'))}" class="ofdstat st-${d.status}">${OFD_STATUS.map(([v, n]) => `<option value="${v}" ${d.status === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select><span class="spacer"></span>
     <span class="ofdsave muted" aria-live="polite">${OFD.saving ? tr('Saving…') : OFD.err ? esc(OFD.err) : ''}</span>
-    <a class="btn sm" href="/api/office/docs/${d.id}/pdf" target="_blank" rel="noopener" data-ofd="pdf">${ic('file', 's')}<span>PDF</span></a>
+    ${lk ? '' : `<button type="button" class="btn sm ofdfin" data-ofd="finalize" title="${esc(tr('Freeze number, positions, sums, sender and tax rates'))}">${ic('lock', 's')}<span>${tr('Finalise')}</span></button>`}
+    <a class="btn sm ofdpdf" href="/api/office/docs/${d.id}/pdf" target="_blank" rel="noopener" data-ofd="pdf" aria-label="${esc(tr('Download PDF'))}" title="${esc(tr('Download PDF'))}">${ic('pdf', 's')}<span class="ofdpdft">PDF</span></a>
     <button type="button" class="btn sm" data-ofd="more" aria-haspopup="menu" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button></div>`;
   const headSec = ofdSec('head', tr('Head'), `
     <div class="ofdgrid">
@@ -104,6 +107,8 @@ function ofdEditorHtml() {
     ${ofdF('project_ref', tr('Ref. / PO no.'), ofdIn('project_ref', d.project_ref, {max: 80}))}
     ${ofdF('date', tr('Date'), dateIn('ofd-date', d.date, {label: tr('Date'), clear: false, attrs: 'data-f="date"'}))}
     ${ofdF('valid_until', tr('Valid until'), dateIn('ofd-valid_until', d.valid_until, {label: tr('Valid until'), attrs: 'data-f="valid_until"'}))}
+    ${ofdF('service_from', tr('Service from'), dateIn('ofd-service_from', d.service_from || '', {label: tr('Service from'), attrs: 'data-f="service_from"'}))}
+    ${ofdF('service_to', tr('Service until'), dateIn('ofd-service_to', d.service_to || '', {label: tr('Service until'), attrs: 'data-f="service_to"'}))}
     </div>`);
   const items = ofdItemsHtml(d, adm);
   const auto = ofdAutoHtml(d, t);
@@ -120,7 +125,9 @@ function ofdEditorHtml() {
   const fieldsSec = ofdSec('fields', tr('Own fields'), `<div id="ofd-fields">${fields.map((f, i) => `<div class="row ofdfld"><input data-fld="${i}" data-k="name" value="${esc(f.name)}" maxlength="80" placeholder="${esc(tr('Name'))}" aria-label="${esc(tr('Name'))}"><input data-fld="${i}" data-k="value" value="${esc(f.value)}" maxlength="500" placeholder="${esc(tr('Value'))}" aria-label="${esc(tr('Value'))}"><button type="button" class="ib" data-ofd="fld-del" data-i="${i}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button></div>`).join('')}</div><button type="button" class="btn sm" data-ofd="fld-add">${ic('plus', 's')} ${tr('Add field')}</button>`,
     fields.length ? `<span class="c muted">${fields.length}</span>` : '');
   const totals = ofdTotalsHtml(d, t, adm);
-  return `${head}<div class="ofdeditor">${headSec}<section class="ofdsec open"><h3>${tr('Positions')}</h3>${items}${auto}${totals}</section>${rightsSec}${textsSec}${fieldsSec}</div>`;
+  const banner = lk ? `<p class="ofdlocked" role="status">${ic('lock', 's')}<span>${esc(tr('Finalised on {0} by {1}. It can no longer be changed; duplicate it for a new version.', d.locked_at ? ofdWhen(d.locked_at) : '', d.locked_by_name || '?'))}</span><button type="button" class="btn sm" data-ofd="dup">${ic('copy', 's')}<span>${tr('Duplicate')}</span></button></p>` : '';
+  const logSec = adm ? ofdSec('log', tr('History'), ofdLogHtml(d)) : '';
+  return `${head}${banner}<div class="ofdeditor"><fieldset class="ofdfs" ${lk ? 'disabled' : ''}>${headSec}<section class="ofdsec open"><h3>${tr('Positions')}</h3>${items}${auto}${totals}</section>${rightsSec}${textsSec}${fieldsSec}</fieldset>${logSec}</div>`;
 }
 function ofdItemsHtml(d, adm) {
   const its = d.items || [], lg = ofdLang(d);
@@ -171,12 +178,32 @@ function ofdTotalsHtml(d, t, adm) {
     ${adm && t.costs != null ? `<p class="muted ofdint">${ic('eye', 's')} ${tr('Internal: external costs {0}, surplus {1}', ofdMoney(t.costs, d), ofdMoney(t.margin, d))}</p>` : ''}</div>`;
 }
 
+// ---- the history (organisation admins; office log of this document)
+const OFD_ACTIONS = {create: N_('created'), update: N_('changed'), items: N_('positions changed'), number: N_('number set'), status: N_('status changed'),
+  finalize: N_('finalised'), duplicate: N_('created as a copy'), delete: N_('deleted'), open: N_('opened'), pdf: N_('PDF opened'), render: N_('preview opened'),
+  export: N_('exported'), import: N_('imported'), archive: N_('archived'), upload: N_('uploaded')};
+const ofdActText = a => tr(OFD_ACTIONS[a] || a);
+const ofdWhen = iso => { try { return new Date(iso).toLocaleString(LOCALE(), {dateStyle: 'short', timeStyle: 'short'}); } catch { return iso || ''; } };
+function ofdLogHtml(d) {
+  if (!OFD.open.log) return `<p class="muted">${tr('Open to load the history.')}</p>`;
+  if (OFD.logFor !== d.id || !OFD.log) { setTimeout(() => ofdLoadLog(d.id), 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  if (!OFD.log.length) return `<p class="muted">${tr('No entries yet.')}</p>`;
+  return `<ul class="ofdlog" role="list">${OFD.log.map(x => { const ks = Object.keys(x.detail?.after || {}); return `<li><span class="muted">${esc(ofdWhen(x.at))}</span> <b>${esc(x.user_name || '?')}</b> ${esc(ofdActText(x.action))}${ks.length && x.action === 'update' ? ` <span class="muted">(${esc(ks.join(', '))})</span>` : ''}</li>`; }).join('')}</ul>`;
+}
+async function ofdLoadLog(id) {
+  if (OFD.logLoading) return;
+  OFD.logLoading = true;
+  try { const j = await api('GET', `/api/office/docs/${id}/log`); OFD.log = j.log || []; OFD.logFor = id; }
+  catch (x) { OFD.log = []; OFD.logFor = id; }
+  OFD.logLoading = false; ofdDraw();
+}
+
 // ---- saving
 async function ofdSave(method, url, body) {
   OFD.saving++; ofdSaveHint();
   try { const j = await rawFetch(method, url, body); if (OFD.doc && j && j.id === OFD.doc.id) OFD.doc = j.items ? j : {...OFD.doc, ...j}; /* the status answer has no positions */ OFD.err = ''; return j; }
   catch (x) { OFD.err = x.message || tr('unknown'); toast(OFD.err); return null; }
-  finally { OFD.saving--; ofdDraw(); OFD.list = null; }
+  finally { OFD.saving--; OFD.log = null; ofdDraw(); OFD.list = null; }
 }
 function ofdSaveHint() { const s = $('.ofdsave'); if (s) s.textContent = OFD.saving ? tr('Saving…') : ''; }
 const ofdPatch = body => ofdSave('PATCH', `/api/office/docs/${OFD.doc.id}`, body);
@@ -243,9 +270,15 @@ async function ofdClick(e) {
   if (a === 'back') { OFD.doc = null; OFD.list = null; go('office/offers'); return; }
   if (!d) return;
   if (a === 'number') { const j = await ofdSave('POST', `/api/office/docs/${d.id}/number`, {}); if (j) { d.number = j.number; ofdDraw(); } return; }
+  if (a === 'finalize') {
+    if (!await askConfirm(tr('Finalise this document?'), tr('Number, positions, sums, sender and tax rates are frozen. Afterwards it can only be duplicated.'), {ok: tr('Finalise')})) return;
+    const j = await ofdSave('POST', `/api/office/docs/${d.id}/finalize`, {}); if (j) toast(tr('Finalised as {0}', j.number || ''));
+    return;
+  }
+  if (a === 'dup') { try { const j = await rawFetch('POST', `/api/office/docs/${d.id}/duplicate`); OFD.list = null; OFD.doc = j; toast(tr('Copied as {0}', j.number || tr('Draft'))); go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); } return; }
   if (a === 'more') {
     menu(b, [
-      {label: tr('Duplicate'), icon: 'copy', fn: async () => { try { const j = await rawFetch('POST', `/api/office/docs/${d.id}/duplicate`); OFD.list = null; OFD.doc = j; toast(tr('Copied as {0}', j.number)); go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); } }},
+      {label: tr('Duplicate'), icon: 'copy', fn: async () => { try { const j = await rawFetch('POST', `/api/office/docs/${d.id}/duplicate`); OFD.list = null; OFD.doc = j; toast(tr('Copied as {0}', j.number || tr('Draft'))); go(`office/offers/${j.id}`); } catch (x) { toast(x.message || tr('unknown')); } }},
       {label: tr('Preview (print model)'), icon: 'eye', fn: () => window.open(`/api/office/docs/${d.id}/render`, '_blank', 'noopener')},
       d.can_delete ? '-' : null,
       d.can_delete ? {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: async () => {
@@ -301,4 +334,4 @@ function ofdServicePicker() {
   setTimeout(() => { if (!isTouch()) $('#ofd-sq', md)?.focus(); }, 50);
 }
 // the editor's open sections are remembered while the page lives
-document.addEventListener('toggle', e => { const s = e.target?.dataset?.sec; if (s && e.target.classList?.contains('ofdsec')) OFD.open[s] = e.target.open; }, true);
+document.addEventListener('toggle', e => { const s = e.target?.dataset?.sec; if (s && e.target.classList?.contains('ofdsec')) { const was = OFD.open[s]; OFD.open[s] = e.target.open; if (s === 'log' && e.target.open && !was) ofdDraw(); } }, true);

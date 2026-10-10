@@ -192,7 +192,7 @@ const ofcSetItemHtml = (eq, it) => `<div class="ofcitem"><select aria-label="${e
 
 // ---- settings tab (admins edit; members see the values)
 function ofcSettingsHtml() {
-  const s = OFC.info.settings, p = OFC.info.pack, adm = ofcAdmin(), co = s.company || {};
+  const s = OFC.info.settings, p = OFC.info.pack, adm = ofcAdmin(), co = s.company || {}, cf = OFC.info.company_fields || {};
   if (!OFC.data.texts && !OFC.loading.texts) setTimeout(() => ofcLoad('texts'), 0);
   if (!OFC.data.services && !OFC.loading.services) setTimeout(() => ofcLoad('services'), 0);
   const ta = (id, label, lines, hint) => `<div class="row"><label for="${id}">${esc(label)}</label><textarea id="${id}" rows="${Math.max(2, (lines || []).length + 1)}" maxlength="3000" ${adm ? '' : 'disabled'}>${esc((lines || []).join('\n'))}</textarea>${hint ? `<span class="muted ofchint">${esc(hint)}</span>` : ''}</div>`;
@@ -201,17 +201,20 @@ function ofcSettingsHtml() {
   const dis = adm ? '' : 'disabled';
   return `<form class="ofcset" id="ofc-set" autocomplete="off">
     <h3>${tr('Company')}</h3>
-    ${ofcRowF('os-name', tr('Company name'), `<input id="os-name" value="${esc(co.name || '')}" maxlength="200" ${dis}>`)}
+    ${ofcRowF('os-name', tr('Company name'), `<input id="os-name" value="${esc(cf.name || co.name || '')}" maxlength="200" ${dis}>`)}
+    ${ofcCompanyFieldsHtml(cf, dis)}
+    <details class="ofcfree"><summary>${tr('Free lines (used where the fields above are empty)')}</summary>
     ${ta('os-lines', tr('Address lines'), co.lines, tr('one line each: street, postcode and city'))}
     ${ta('os-contact', tr('Contact lines'), co.contact_lines, tr('phone, e-mail, website'))}
     ${ta('os-register', tr('Register lines'), co.register_lines, tr('legal form, register, managing director'))}
-    ${ta('os-bank', tr('Bank lines'), co.bank_lines, tr('bank, IBAN, BIC; tax number / VAT id'))}
+    ${ta('os-bank', tr('Bank lines'), co.bank_lines, tr('bank, IBAN, BIC; tax number / VAT id'))}</details>
     <div class="row"><label>${tr('Logo')}</label><span class="lacts">${logo}${adm ? `<input type="file" id="os-logo" accept="image/png,image/jpeg,image/webp" aria-label="${esc(tr('Upload logo'))}">${s.logo ? `<button type="button" class="btn sm" data-ofc="logo-del">${tr('Remove')}</button>` : ''}` : ''}</span><span class="muted ofchint">${tr('PNG at least 600 px wide (also JPEG or WebP, up to 4 MB)')}</span></div>
     ${ofcRowF('os-color', tr('Brand colour'), `<span class="lacts"><input id="os-color" value="${esc(s.color || '')}" maxlength="7" placeholder="#2f5d8a" class="numin" ${dis}><i class="ofcsw" style="background:${cssColor(s.color) || 'var(--accent)'}"></i></span>`, tr('accent in the printed documents; empty = the app’s accent colour'))}
     <h3>${tr('Documents')}</h3>
     ${ofcRowF('os-lang', tr('Document language'), ofcSel('os-lang', s.lang, [['de', 'Deutsch'], ['en', 'English']]))}
     ${ofcRowF('os-currency', tr('Currency'), `<span class="lacts">${ofcSel('os-currency', s.currency, [['EUR', 'EUR'], ['USD', 'USD']])}<label for="os-fx" class="muted">${tr('1 € in USD')}</label><input id="os-fx" value="${esc(fmtNum(s.fx_usd, 4))}" inputmode="decimal" class="numin" ${dis}></span>`)}
     ${ofcRowF('os-scheme', tr('Number scheme'), `<span class="lacts"><input id="os-scheme" value="${esc(s.offer_scheme || '')}" maxlength="80" ${dis}><span class="muted" id="os-preview">${tr('next: {0}', esc(OFC.info.number_preview || ''))}</span></span>`, tr('placeholders: {yyyy} {yy} {seq:03} {project} {client} {date} {initials}'))}
+    ${ofcRowF('os-numat', tr('Quotation number'), ofcSel('os-numat', s.offer_number_at || 'create', [['create', tr('when the quotation is created')], ['finalize', tr('when it is finalised')]]))}
     ${ofcRowF('os-valid', tr('Quotation valid for'), `<span class="lacts"><input id="os-valid" value="${esc(String(s.offer_valid_days ?? 30))}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`)}
     <h3>${tr('Calculation rules')}</h3>
     ${ofcRowF('os-pq', tr('Producing quotient'), `<input id="os-pq" value="${esc(fmtNum(s.prod_quotient, 2))}" inputmode="decimal" class="numin" ${dis}>`, tr('producing days = production days ÷ quotient, rounded to half days'))}
@@ -233,16 +236,34 @@ function ofcSettingsHtml() {
     <p class="muted">${tr('Export writes services, equipment, sets, text blocks, contracts and these settings into one JSON file; import reads such a file (also one made from a spreadsheet) and adds what is missing.')}</p>
     <div class="lacts"><a class="btn sm" href="/api/office/export" download="office-master-data.json">${ic('download', 's')} ${tr('Export')}</a>
       ${adm ? `<input type="file" id="os-import" accept="application/json,.json" hidden><button type="button" class="btn sm" data-ofc="import">${ic('upload', 's')} ${tr('Import')}</button><label class="chkl"><input type="checkbox" id="os-overwrite"> ${tr('overwrite existing')}</label>` : ''}</div>
+    ${adm ? `<h3>${tr('Access log')}</h3><p class="muted">${tr('Who opened, printed, changed or exported documents and master data of this organisation.')}</p>${ofcLogHtml()}` : ''}
   </form>`;
+}
+// 2.36.2 (#1021 P4): the company as single fields (print lines are made from them; the free lines stay the fallback)
+const OFC_CO_FIELDS = [['street', N_('Street'), 200], ['zip', N_('Postcode'), 20], ['city', N_('City'), 120], ['country', N_('Country (ISO code)'), 2],
+  ['email', N_('E-mail'), 200], ['phone', N_('Phone'), 60], ['tax_number', N_('Tax number'), 40], ['vat_id', N_('VAT ID'), 20], ['bank_name', N_('Bank'), 120],
+  ['iban', N_('IBAN'), 42], ['bic', N_('BIC'), 11], ['register_court', N_('Register court'), 120], ['register_no', N_('Register number'), 60],
+  ['managing_directors', N_('Managing directors'), 300]];
+function ofcCompanyFieldsHtml(cf, dis) {
+  return `<div class="ofcco">${OFC_CO_FIELDS.map(([k, n, mx]) => ofcRowF('osc-' + k, tr(n), `<input id="osc-${k}" data-co="${k}" value="${esc(cf[k] || '')}" maxlength="${mx}" ${k === 'country' ? 'class="numin" autocapitalize="characters"' : ''} ${dis}>`)).join('')}</div>`;
+}
+function ofcLogHtml() {
+  if (!OFC.log) return `<button type="button" class="btn sm" data-ofc="log">${ic('clock', 's')} ${tr('Show the latest entries')}</button>`;
+  if (!OFC.log.length) return `<p class="muted">${tr('No entries yet.')}</p>`;
+  const tg = {doc: N_('Quotation'), settings: N_('Settings'), company: N_('Company'), logo: N_('Logo'), master_data: N_('Master data'), services: N_('Services'),
+    equipment: N_('Equipment'), sets: N_('Sets'), texts: N_('Text blocks'), contracts: N_('Framework contracts')};
+  return `<ul class="ofdlog" role="list">${OFC.log.map(x => `<li><span class="muted">${esc(typeof ofdWhen === 'function' ? ofdWhen(x.at) : x.at)}</span> <b>${esc(x.user_name || '?')}</b> ${esc(typeof ofdActText === 'function' ? ofdActText(x.action) : x.action)} · ${esc(tr(tg[x.target] || x.target))}${x.doc_id ? ` <a href="#office/offers/${x.doc_id}">#${x.doc_id}</a>` : ''}</li>`).join('')}</ul>`;
 }
 async function ofcSaveSettings(form) {
   const v = id => $(id, form)?.value ?? '', lines = id => v(id).split('\n').map(x => x.trim()).filter(Boolean);
+  const cof = {name: v('#os-name')}; for (const [k] of OFC_CO_FIELDS) cof[k] = v('#osc-' + k).trim();
   const body = {company: {name: v('#os-name'), lines: lines('#os-lines'), contact_lines: lines('#os-contact'), register_lines: lines('#os-register'), bank_lines: lines('#os-bank')},
+    company_fields: cof, offer_number_at: v('#os-numat') || 'create',
     color: v('#os-color').trim(), lang: v('#os-lang'), currency: v('#os-currency'), fx_usd: ofcNum(v('#os-fx')), offer_scheme: v('#os-scheme'), offer_valid_days: ofcNum(v('#os-valid')),
     prod_quotient: ofcNum(v('#os-pq')), producing_service_id: +v('#os-ps') || null, producing_rate: ofcNum(v('#os-pr')), raw_factor: ofcNum(v('#os-rf')),
     intro_text_id: {de: +v('#os-intro-de') || null, en: +v('#os-intro-en') || null}, closing_text_id: {de: +v('#os-closing-de') || null, en: +v('#os-closing-en') || null},
     rights_default: {time_id: +v('#os-rt') || null, territory_id: +v('#os-rr') || null, media_id: +v('#os-rm') || null}, pack: v('#os-pack')};
-  try { const j = await api('PUT', '/api/office/settings', body); OFC.info.settings = j.settings; OFC.info.number_preview = j.number_preview; toast(tr('Saved')); ofcDraw(); }
+  try { const j = await api('PUT', '/api/office/settings', body); OFC.info.settings = j.settings; OFC.info.company_fields = j.company_fields || OFC.info.company_fields; OFC.info.number_preview = j.number_preview; OFC.log = null; toast(tr('Saved')); ofcDraw(); }
   catch (x) { const el = $('.aerr', form); if (el) el.textContent = x.message || ''; }
 }
 async function ofcLogoUpload(file) {
@@ -263,7 +284,8 @@ async function ofcImport(file, overwrite) {
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || r.statusText);
     const c = j.counts || {}, n = Object.values(c).reduce((a, x) => a + (x && typeof x === 'object' ? (x.added || 0) + (x.updated || 0) : 0), 0);
-    toast(trn('Imported: {0} entry', 'Imported: {0} entries', n)); ofcReload(); await ofcInfo(true);
+    const um = Array.isArray(c.unmapped) ? c.unmapped.length : 0;
+    toast(trn('Imported: {0} entry', 'Imported: {0} entries', n) + (um ? ' · ' + trn('{0} reference not found, left empty', '{0} references not found, left empty', um) : '')); ofcReload(); await ofcInfo(true);
   } catch (x) { toast(x.message || tr('unknown')); }
 }
 
@@ -274,6 +296,7 @@ document.addEventListener('click', async e => {
   if (a === 'new') { e.preventDefault(); ofcModal(b.dataset.kind, null); }
   else if (a === 'open') { e.preventDefault(); const r = ofcRow(b.dataset.kind, +b.dataset.id); if (r) ofcModal(b.dataset.kind, r); }
   else if (a === 'import') { e.preventDefault(); const inp = $('#os-import'); if (inp) { inp.onchange = () => { ofcImport(inp.files[0], $('#os-overwrite')?.checked); inp.value = ''; }; inp.click(); } }
+  else if (a === 'log') { e.preventDefault(); try { const j = await api('GET', '/api/office/log?limit=50'); OFC.log = j.log || []; } catch (x) { toast(x.message || ''); OFC.log = []; } ofcDraw(); }
   else if (a === 'logo-del') { e.preventDefault(); try { await api('DELETE', '/api/office/logo'); await ofcInfo(true); toast(tr('Removed')); } catch (x) { toast(x.message || ''); } }
 });
 document.addEventListener('submit', e => { const f = e.target.closest?.('#ofc-set'); if (!f) return; e.preventDefault(); ofcSaveSettings(f); });

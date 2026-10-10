@@ -98,7 +98,7 @@ function updateChips(input) {
   const chips = input.closest('.qadd').querySelector('.chips');
   if (!chips) return;
   const r = parseQuick(input.value, S.quick.ignore);
-  chips.innerHTML = r.chips.map(c => `<button class="qchip ${c.off ? 'off' : ''}" data-qtype="${esc(c.type)}" title="${c.off ? tr('recognize again') : tr("don't recognize")}">${esc(c.label)}</button>`).join('') + qMismatch(r);
+  chips.innerHTML = r.chips.map(c => `<button class="qchip ${c.off ? 'off' : ''}" data-qtype="${esc(c.type)}" title="${c.off ? tr('recognize again') : tr("don't recognize")}">${esc(c.label)}</button>`).join('') + qMismatch(r) + (input.id === 'qsheet' && !S.quickPreset?.capture ? dsxWhoChip() : '');  // 2.36.2 (#1138)
 }
 // U21: a date that is not on the repeat's own days ("tomorrow … every monday"): say what happens
 function qMismatch(r) {
@@ -126,6 +126,9 @@ async function submitQuick(input, extra = {}) {
   if (r.ttype) body.ttype = r.ttype;  // 2.4.0 (#340): !bug / !feature / !task
   if (r.ms || d.ms) body.ms = 1;  // 2.18.0 (#430): !milestone
   if (d.assignee_id && !r.list_id) body.assignee_id = d.assignee_id;
+  // 2.36.2 (#1138): in "Tasks of X": X keeps the task in a typed ~list X is in; no list shared with X = a hint, nothing added
+  if (d.who && r.list_id && dsxWhoLists(d.who).some(l => l.id === r.list_id)) body.assignee_id = d.who;
+  if (d.who && d.noList && !body.list_id) { toast(tr('No list with {0} that you can add to: share a list with them first.', personNameAny(d.who) || '?'), null, 5000); return; }
   if (body.due_time && S.settings.default_reminder !== '') body.reminders = S.settings.default_reminder;
   input.value = ''; S.quick.ignore = new Set(); updateChips(input);
   if (pasted.length) { S.qfiles[input.id] = []; qFilesDraw(input); }
@@ -137,6 +140,11 @@ async function submitQuick(input, extra = {}) {
   if (d.open && created?.id) { openDetail(created.id); return; }  // 2.14.0 (#484): "Add and open"
   if (d.files?.length && input.id === 'qsheet') closePop();
   if (created?.id && input.id === 'qinput') hintDone('qsyntax');
+  if (created?.id && d.who && body.assignee_id === d.who) {  // 2.36.2 (#1138): it stays in the view; say for whom and where
+    const wl = listById(taskById(created.id)?.list_id || body.list_id);
+    if (wl) LS.set('dsxWho.' + d.who, wl.id);
+    toast(tr('{0} assigned in {1}', personNameAny(d.who) || '?', wl ? lname(wl) : tr('Inbox')), null, 4000);
+  }
   // 2.13.0 (#453 P8): a task that does not show up in the open view (e.g. "… tomorrow 10:00" typed in Today lands in the
   // Inbox) says where it went, with "Open"
   if (created?.id && !d.files?.length && !d.open) setTimeout(() => {
@@ -258,7 +266,7 @@ document.addEventListener('click', async e => {
     if ($('#side.open') && g.closest('#side') && !history.state?.detail) try { history.replaceState({...(history.state || {}), side: 1}, '', location.href); } catch { /* old browser */ }
     go(g.dataset.go); return;
   }
-  const qc = e.target.closest('.qchip');
+  const qc = e.target.closest('.qchip:not([data-act])');  // 2.36.2 (#1138): a chip with its own action (the list of "Tasks of X") is no parser chip
   if (qc) { const t = qc.dataset.qtype; S.quick.ignore.has(t) ? S.quick.ignore.delete(t) : S.quick.ignore.add(t); const inp = qc.closest('.qadd').querySelector('input'); updateChips(inp); inp.focus(); return; }
   const cb = e.target.closest('.md input[data-mdline]');
   if (cb) { e.stopPropagation(); if (canEdit(taskById(S.sel))) toggleMdCheckbox(+cb.dataset.mdline); else { e.preventDefault(); roToast(); } return; }
@@ -581,7 +589,8 @@ document.addEventListener('click', async e => {
       dpOpen(a, {kind: 'date', value: cur || today(), clear: true, label: tr('Date'), onPick: v => { S.qov.due = v || null; qdockChips(); $('#qinput')?.focus(); }});
       break;
     }
-    case 'qd-list': menu(a, S.lists.filter(l => !l.archived && canAddTo(l.id)).map(l => ({label: lname(l), icon: 'list', fn: () => { S.qov.list_id = l.id; qdockChips(); $('#qinput')?.focus(); }}))); break;
+    case 'dsx-wlist': dsxWhoPick(a); break;  // 2.36.2 (#1138)
+    case 'qd-list': menu(a, (dsxWhoUid() ? dsxWhoLists(dsxWhoUid()) : S.lists.filter(l => !l.archived && canAddTo(l.id))).map(l => ({label: lname(l), icon: 'list', lic: l, fn: () => { S.qov.list_id = l.id; qdockChips(); $('#qinput')?.focus(); }}))); break;
     case 'qd-prio': menu(a, [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', cls: p ? 'flag-' + p : '', fn: () => { S.qov.priority = p; qdockChips(); $('#qinput')?.focus(); }}))); break;
     case 'mx-scope': mxScopeMenu(a); break;
     case 'mx-mine': mxSet({mine: !mxGet().mine}); break;
@@ -621,7 +630,7 @@ document.addEventListener('click', async e => {
     case 'mb-today': batch('patch', {due: today()}); break;
     case 'mb-tomorrow': batch('patch', {due: addDays(today(), 1)}); break;
     case 'mb-prio': menu(a, [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', cls: p ? 'flag-' + p : '', fn: () => batch('patch', {priority: p})}))); break;
-    case 'mb-list': menu(a, S.lists.filter(l => !l.archived && canEditList(l.id)).map(l => ({label: lname(l), fn: () => batch('patch', {list_id: l.id, section_id: null})}))); break;
+    case 'mb-list': menu(a, S.lists.filter(l => !l.archived && canEditList(l.id)).map(l => ({label: lname(l), lic: l, fn: () => batch('patch', {list_id: l.id, section_id: null})}))); break;
     case 'mb-ms': {  // 2.18.0 (#430): the selected tasks (one list) into one of its open milestones, or out
       const lid = msBulkList(); if (!lid) break;
       menu(a, [...msOfList(lid).filter(m => m.status === 0).map(m => ({label: m.title + (m.due ? ' · ' + fmtDateLoc(m.due) : ''), icon: 'flag', fn: () => batch('patch', {milestone_id: m.id}, false, undefined, tr('Milestone: {0}', m.title))})),

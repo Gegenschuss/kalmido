@@ -307,6 +307,14 @@ def list_update(lid):
             return err(tr("Invalid value: {0}", "sort_mode"))
         c.execute("UPDATE lists SET sort_mode=? WHERE id=?", (sm, lid))
         b = {k: v for k, v in b.items() if k != "sort_mode"}
+    if "done_in_section" in b:  # 2.36.2 (#1136): completed tasks stay in their section (owner / list admins; null = default)
+        if role not in MANAGE_ROLES:
+            return err(tr("Only the owner and list admins can change this setting"), 403)
+        dv = b["done_in_section"]
+        if isinstance(dv, float) or dv not in (None, "", 0, 1, "0", "1"):  # True / False compare equal to 1 / 0
+            return err(tr("Invalid value: {0}", "done_in_section"))
+        c.execute("UPDATE lists SET done_in_section=? WHERE id=?", (None if dv in (None, "") else int(dv), lid))
+        b = {k: v for k, v in b.items() if k != "done_in_section"}
     if "columns" in b:  # 2.14.0 (#425): the list's columns, the same for every member (owner / list admins)
         if role not in MANAGE_ROLES:
             return err(tr("Only the owner and list admins can change the shown fields"), 403)

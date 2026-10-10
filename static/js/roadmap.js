@@ -150,7 +150,7 @@ function rmSumHtml(G, r) {
   const pct = rmPct(l), col = cssColor(l.color), em = leadEmoji(l.name), ed = canEditList(l.id);
   const tip = [lname(l), when, trn('{0} open task', '{0} open tasks', r.n), pct != null ? tr('{0} % done', pct) : ''].filter(Boolean).join(' · ');
   return `<div class="rm-sum${ed ? '' : ' ro'}${b.cl ? ' cl-l' : ''}${b.cr ? ' cl-r' : ''}" data-lid="${l.id}" style="left:${b.L}px;width:${b.R - b.L}px${col ? ';--lc:' + col : ''}" tabindex="0" role="button" aria-haspopup="menu" aria-label="${esc(tip)}" title="${esc(tip + (ed ? ' · ' + (isTouch() ? tr('Long-press to move the project') : tr('Drag to move the whole project')) : ''))}"><i class="rm-fill" style="width:${pct ?? 0}%"></i><i class="cap l"></i><i class="cap r"></i></div>` +
-    `<span class="rm-lbl" style="left:${b.R + 6}px">${em ? `<span class="rm-em">${em}</span>` : ''}${pct != null ? `<b>${pct}%</b>` : ''}<span class="rm-dt">${esc(when)}</span></span>`;
+    `<span class="rm-lbl" style="left:${b.R + 6}px">${em ? (sbiMode() === 'emoji' ? `<span class="rm-em">${em}</span>` : licMark(l, 'rmlic')) : ''}${pct != null ? `<b>${pct}%</b>` : ''}<span class="rm-dt">${esc(when)}</span></span>`;
 }
 // 2.7.2: the milestones of a project (2.7.1, #410) as markers in its summary row of the "All" timeline too
 function rmMsHtml(G, l, r) {
@@ -167,7 +167,7 @@ function rmRowHtml(G, M, r) {
   }
   if (r.type === 'g') {
     const l = r.l, col = cssColor(l.color), em = leadEmoji(l.name);
-    const sw = em ? '' : `<span class="sw" style="${col ? 'background:' + col : ''}"></span>`;
+    const sw = licMark(l, 'rmlic', true) || (em ? '' : `<span class="sw" style="${col ? 'background:' + col : ''}"></span>`);  // 2.36.2 (#1135)
     // 2.18.0 review (R13): the fold toggle and "Open list" are siblings (a button inside role=button was nested-interactive)
     return `<div class="tl-row rm-row rm-g${r.open ? ' open' : ''}" data-l="${l.id}" style="top:${y}px"><div class="tl-name rm-gwrap" title="${esc(lname(l))}"><div class="rm-gname" data-act="rm-toggle" data-key="${esc(r.key)}" role="button" tabindex="0" aria-expanded="${r.open}">${ic('chev', 's rm-car' + (r.open ? '' : ' closed'))}${sw}<span class="n">${esc(lname(l))}</span>${l.role === 'view' ? `<span class="rm-ro" title="${esc(tr('View only'))}">${ic('eye', 's')}</span>` : ''}</div><button type="button" class="iconbtn rm-go" data-go="l/${l.id}" title="${esc(tr('Open list'))}" aria-label="${esc(tr('Open list'))}">${ic('arrow', 's')}</button></div>${tlCrTrack(l.id, null, 'g:' + l.id, rmCrGeo(G), canAddTo(l.id) && !S.tlPick, rmSumHtml(G, r) + rmMsHtml(G, l, r))}</div>`;
   }

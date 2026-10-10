@@ -319,3 +319,25 @@ cross-tenant matrix (`tests/p2280_api_test.py`, `tests/p2300_tenant_test.py`) wi
 fails for every route that is neither in the matrix nor listed with a reason; the nightly boundary check in the watchdog
 (`boundary_tick`: every membership across the boundary, an admin alert, the count in `GET /api/admin/orgs`); and the schema
 rule in `tools/check_layout.py` (a new table with a person in it carries `org_id` / `list_id` or a reason in `TENANT_EXEMPT`).
+
+## Access layer and request context (2.36.2)
+
+Who may see what is decided in one module, `kalmido/core/access.py`:
+
+- **Request context.** Every request carries one `AccessCtx` (`acx()`): the account, the organisations it belongs to
+  (`user_orgs()`; an agent only its own workspace `agents.org_id`), its role (`user`, `agent`, `system`, `anon`) and, for an
+  API token limited to lists, those list ids. It is built once per request from the signed-in account and its memberships,
+  never from the workspace switch: there is no "current organisation" per request, so the shared view across all workspaces
+  still answers in one response. Background work (watchdog, reminders, migrations) runs as `system_ctx()`.
+  `acx_session_vars()` lists the values a database with row-level security would receive per transaction.
+- **One list scope.** `acx_lists_sql()` is the single subquery for "lists this account may see / change" (owner, members and
+  roles, the collaboration switch, the organisation boundary, health lists and token allowlists). `vis_sql()`, `wr_sql()`,
+  the state (`visible_lists`) and CalDAV (`dav_lists`) all use it. It is standard SQL.
+- **Second floor.** `list_role`, `ev_role` and `book_role` (and the calendar / address book lists) also require membership of
+  the object's organisation (`acx_org_ok()`); private objects follow their own sharing as before.
+- **Side channels.** News entries and agent events that carry a task are only created for someone who may see the task
+  (`acx_task_ok()`), whatever triggered them.
+- **Repair.** The nightly boundary check (`accounts/tenancy.py`) removes memberships in an organisation's list, calendar or
+  address book of people outside it and reports counts and ids as a security alert; other findings are counted as before.
+- **Tests.** `tests/p2362_a_api_test.py` checks leaving an organisation, people in two organisations, side channels,
+  token allowlists, the layer directly against the database, and scans every route with a numeric id for a refusal.

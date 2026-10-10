@@ -260,6 +260,8 @@ function listMenuItems(id, anchor) {
   // 2.25.0 (UX-12): only what works here: the inbox has no "Edit list…" and no list / project switch
   const items = [...(l.is_inbox ? [] : [{label: tr('Edit list…'), icon: 'edit', fn: () => listModal(id)}]), ...(shareOk(l) && !l.archived ? [{label: tr(collab() ? N_('Share…') : N_('Ownership…')), icon: 'users', fn: () => shareModal(id)}] : [])];
   // 2.27.0 (#974): "Agent: <name>…" right under "Share…": opens the share dialog at its Agents part (one place for the setting)
+  // 2.36.2 (#1135): from the sidebar (right-click / long press): the colour in one tap (the 9 fixed colours + none)
+  if (own && !l.is_inbox && !l.archived && typeof anchor !== 'function' && anchor?.closest?.('#side')) items.unshift({rcls: 'mcols', rlab: tr('Color'), row: LCOLORS.map((c, i) => ({label: c ? tr('Color {0}', i) : tr('No color'), cls: 'mcol', swc: c, on: (l.color || '') === c, fn: () => licColor(id, c)}))}, '-');
   if (agentsOn() && shareOk(l) && canManage(l) && !l.is_inbox && !l.archived) {
     const ag = listAgents(l)[0];
     items.push({label: ag ? tr('Agent: {0}…', ag.name) : tr('Agent…'), ...(ag ? {sub: listenLabel(l)} : {}), icon: 'bot', cls: 'magent', fn: () => shareModal(id, {focus: 'agents'})});  // 2.30.0 (#1034)
@@ -296,6 +298,11 @@ function listMenuItems(id, anchor) {
 // 2.31.0 (#1056): the list menu in three parts: the everyday entries (in their order; a new one lands here), the rare ones
 // (notifications, progress, agent access, tasks from notes: rare: 1) in a second level "More list options…" (one alone stays
 // inline), and what cannot simply be taken back (archive, delete: danger: 1) last, set apart
+async function licColor(id, c) {  // 2.36.2 (#1135): the list colour from the sidebar menu, undoable
+  const l = listById(id); if (!l || (l.color || '') === c) return;
+  const e = await listPatch(id, {color: c}, tr('Colour of {0}', qn(lname(l))));
+  if (e) offerUndo(tr('Colour of {0}', lname(l)), e);
+}
 function listMenuSort(items) {
   const rare = items.filter(x => x && x.rare), dang = items.filter(x => x && x.danger), main = items.filter(x => x && !x.rare && !x.danger);
   while (main[main.length - 1] === '-') main.pop();
@@ -675,6 +682,8 @@ function listModal(id, folder = '', o = {}) {
     ${id && own && swOffer(l) ? `<div class="row lswoffer"><span></span><button type="button" class="linkbtn" data-m="sw-setup">${ic('code', 's')} ${tr('Set up as a software project…')}</button></div>` : ''}
     ${own ? `<div class="row ldabrow"><label>${tr('Completed')}</label><label class="chkl"><input type="checkbox" id="l-dab" ${l.checklist ? 'checked' : ''}> ${tr('Show completed at the bottom')}</label></div>
     <div class="shint lhint">${ic('cart', 's')} ${tr('What you tick off stays visible at the bottom and comes back with one tap: handy for shopping and packing lists.')}</div>` : ''}
+    ${id && own && !l.is_inbox ? `<div class="row ldsxrow"><span></span><label class="chkl"><input type="checkbox" id="l-dsx" ${dsxOn(l) ? 'checked' : ''} ${dsxFixedOff(l) ? 'disabled' : ''}> ${tr('Keep completed in their section')}</label></div>
+    <div class="shint lhint" id="l-dsxhint">${tr('Completed tasks stay at their place in their section, crossed out, with their subtasks. For everyone in the list. Not with “Show completed at the bottom” or for shopping lists.')}</div>` : ''}
     <div class="row lnagrow"><label for="l-nag">${tr('Repeat reminders')}</label><select id="l-nag" ${dis}><option value="">${tr('Off|nag')}</option>${NAG_OPTS.slice(1).map(([v, n]) => `<option value="${v}" ${(l.nag || '') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     <div class="shint lhint">${tr('Default for the tasks of this list with a date: the reminder repeats until the task is done (a task can choose otherwise in its date dialog). Quiet hours: Settings > Notifications.')}</div>
     ${id && ['owner', 'admin'].includes(l.role || 'owner') && !l.family && !l.life ? staleRowHtml(l) : ''}
@@ -694,6 +703,7 @@ function listModal(id, folder = '', o = {}) {
   $('#l-bell', md)?.addEventListener('change', async e => { e.stopPropagation(); if (e.target.value === 'custom') { bellHint('custom'); bellCustomModal(id); return; } await bellSet(id, e.target.value); bellHint(e.target.value); });
   $('#l-bell', md)?.addEventListener('bell-sync', e => bellHint(e.target.value));
   $('#l-stale', md)?.addEventListener('change', e => { e.stopPropagation(); staleDaysSet(id, e.target); });  // 2.34.0 (#266)
+  $('#l-dsx', md)?.addEventListener('change', e => { e.stopPropagation(); dsxSet(id, e.target.checked).then(() => { const x = listById(id), c = $('#l-dsx', md); if (x && c) c.checked = dsxOn(x); }); });  // 2.36.2 (#1136)
   $('[data-m="bell-custom"]', md)?.addEventListener('click', e => { e.stopPropagation(); bellCustomModal(id); });
   // ---- autosave (existing lists)
   const pend = new Map();
@@ -734,6 +744,7 @@ function listModal(id, folder = '', o = {}) {
     if ($('#l-nag', md)) $('#l-nag', md).value = x.nag || '';
     if ($('#l-dab', md)) $('#l-dab', md).checked = !!x.checklist;
     if ($('#l-fam', md)) $('#l-fam', md).value = x.family || '';
+    if ($('#l-dsx', md)) { $('#l-dsx', md).checked = dsxOn(x); $('#l-dsx', md).disabled = dsxFixedOff(x); }  // 2.36.2 (#1136)
   };
   let saving = Promise.resolve();
   const autosave = () => {

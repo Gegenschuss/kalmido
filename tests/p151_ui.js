@@ -305,7 +305,8 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   const arow = () => d.querySelector(`#view .arow[data-list="${OLD}"]`);
   check(!!arow() && /Old/.test(arow().querySelector('.aname').textContent), 'lists the archived list');
   check(/2 open · 0 done/.test(arow().querySelector('.ameta').textContent) && /archived /.test(arow().querySelector('.ameta').textContent), 'task counts and the archived date: ' + arow().querySelector('.ameta').textContent);
-  check(!!arow().querySelector('.aname .sw') && !!arow().querySelector(`[data-go="l/${OLD}"]`) && !!arow().querySelector('[data-act="arch-restore"]') && !!arow().querySelector('[data-act="arch-del"]'), 'colour, Open, Restore, Delete permanently');
+  check(!!arow().querySelector('.aname .sw, .aname .aemo') &&  // 2.36.2 (#1135): line icon / dot instead of the swatch
+    !!arow().querySelector(`[data-go="l/${OLD}"]`) && !!arow().querySelector('[data-act="arch-restore"]') && !!arow().querySelector('[data-act="arch-del"]'), 'colour, Open, Restore, Delete permanently');
   check(!!(await st()).lists.find(l => l.id === OLD).archived_at, 'server keeps when it was archived');
   click(w, arow().querySelector('.aacts [data-go]')); await sleep(400);
   check(w.eval('S.route.key') === `l:${OLD}` && txt().includes('Hidden in archive'), 'Open shows the list as before');

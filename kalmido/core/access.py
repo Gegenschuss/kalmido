@@ -1,5 +1,8 @@
 """Access control: who sees / changes which list and task, module switches, list roles."""
 
+import time
+from typing import NamedTuple, Optional
+
 from flask import g, has_request_context
 
 from ..core.config import app
@@ -92,10 +95,6 @@ def health_hidden(c=None, uid=None):
     return False
 
 
-def _health_sql():
-    return (" EXCEPT SELECT id FROM lists WHERE life='health'" if health_hidden() else "") + _token_lists_sql()
-
-
 # 2.30.0 (#919): least privilege. An API token (an agent's tokens carry the agent's choice) may be limited to selected lists
 # (api_tokens.list_ids, csv; '' = all): on every /api/v1 request the other lists do not exist for it -- list_role answers
 # None (404), vis_sql / wr_sql leave them out. Only the token's own user is limited (other people's roles stay).
@@ -111,11 +110,6 @@ def token_lists():
         out = frozenset(int(x) for x in raw.split(",") if x.strip().isdigit())
     g.token_lists = out
     return out
-
-
-def _token_lists_sql():
-    tl = token_lists()
-    return "" if tl is None else f" INTERSECT SELECT id FROM lists WHERE id IN ({','.join(str(int(x)) for x in sorted(tl)) or '0'})"
 
 
 def access_note(lid, write=False):
@@ -137,15 +131,165 @@ def _members_on():
     return "" if collab_all() else " AND 0"
 
 
+# ---------------------------------------------------------------- 2.36.2 (#1142): request context + the one list scope
+# Every request carries ONE access context, built once from the signed-in account (session, proxy login, API / agent token,
+# CalDAV app password, calendar feed token) and its memberships -- never from the workspace switch: there is no "current
+# organisation" per request, the shared view "All workspaces" keeps answering everything in one response.
+#   user_id      the account (None: nobody / system)
+#   org_ids      the organisations the account belongs to (user_orgs; an agent: only its own workspace agents.org_id)
+#   role         "user" | "agent" | "system" | "anon"
+#   agent_org_id the agent's workspace (None: private agent or not an agent)
+#   list_allow   frozenset of the list ids an API token is limited to (None: no limit)
+# Background threads, the watchdog and migrations use system_ctx() (greppable). In 2.37 (Postgres) exactly these values are
+# set per transaction for the row-level policies -- see acx_session_vars(), the one place that will add
+# SET LOCAL app.user_id / app.org_ids / app.role.
+class AccessCtx(NamedTuple):
+    user_id: Optional[int]
+    org_ids: tuple
+    role: str
+    agent_org_id: Optional[int]
+    list_allow: Optional[frozenset]
+
+
+def system_ctx():
+    """The context of background work (watchdog, reminders, migrations, boundary check): no per-user limits."""
+    return AccessCtx(None, (), "system", None, None)
+
+
+def _boundary_on():
+    """Organisation boundaries may exist: not in the modes shared (no organisations) and organisation (one organisation,
+    everybody in it). Without KALMIDO_INSTANCE_MODE the number of organisations decides (see _boundary_sql)."""
+    from ..accounts.orgs import INSTANCE_ENV
+    return INSTANCE_ENV not in ("shared", "organisation")
+
+
+def _boundary_sql():
+    """SQL condition that is true when the boundary applies (mode workspaces / multi; unset mode: more than one org)."""
+    from ..accounts.orgs import INSTANCE_ENV
+    return "1=1" if INSTANCE_ENV in ("workspaces", "multi") else "(SELECT COUNT(*) FROM orgs) > 1"
+
+
+def _orgs_of(c, uid):
+    """(org_ids, agent_org_id, is_agent) of account uid; agents: only their own workspace."""
+    a = c.execute("SELECT org_id FROM agents WHERE user_id=?", (uid,)).fetchone()
+    if a is not None:
+        return ((a[0],) if a[0] else ()), a[0], True
+    from ..accounts.orgs import user_orgs
+    return tuple(user_orgs(c, uid)), None, False
+
+
+def acx_of(c, uid):
+    """The access context of account uid (cached per request; no token limit -- that belongs to the request only)."""
+    if not uid:
+        return system_ctx()
+    if has_request_context():
+        cache = g.setdefault("acx_users", {})
+        if uid not in cache:
+            cache[uid] = _ctx_build(c, uid)
+        return cache[uid]
+    hit = _BG_CTX.get(uid)  # background work: a short-lived cache (memberships change rarely; 2 s)
+    if hit and hit[0] > time.monotonic():
+        return hit[1]
+    ctx = _ctx_build(c, uid)
+    if len(_BG_CTX) > 5000:
+        _BG_CTX.clear()
+    _BG_CTX[uid] = (time.monotonic() + 2.0, ctx)
+    return ctx
+
+
+_BG_CTX = {}
+
+
+def _ctx_build(c, uid):
+    orgs, aorg, agent = _orgs_of(c, uid)
+    return AccessCtx(uid, orgs, "agent" if agent else "user", aorg, None)
+
+
+def acx(c=None):
+    """The current request's access context (built once per request and account; rebuilt when g.user changes).
+    Outside a request: system_ctx()."""
+    if not has_request_context():
+        return system_ctx()
+    u = getattr(g, "user", None)
+    uid = u["id"] if u is not None else None
+    cur = g.get("acx")
+    if cur is not None and cur.user_id == uid:
+        return cur
+    if uid is None:
+        ctx = AccessCtx(None, (), "anon", None, None)
+    else:
+        ctx = acx_of(c or db(), uid)._replace(list_allow=token_lists())
+    g.acx = ctx
+    return ctx
+
+
+def acx_drop():
+    """Forget the cached contexts of this request (call after organisation memberships changed)."""
+    _BG_CTX.clear()
+    if has_request_context():
+        g.pop("acx", None)
+        g.pop("acx_users", None)
+
+
+def acx_session_vars(ctx):
+    """2.37 (Postgres row-level security): the session variables of a context -- exactly these values become
+    SET LOCAL app.user_id / app.org_ids / app.role. Not used by SQLite."""
+    return {"app.user_id": "" if ctx.user_id is None else str(ctx.user_id),
+            "app.org_ids": ",".join(str(int(x)) for x in ctx.org_ids), "app.role": ctx.role}
+
+
+def acx_org_ok(c, uid, org_id):
+    """May account uid see an object of organisation org_id at all? Private objects (None): yes (the object's own rules
+    decide). Organisation objects: only members (agents: only of their own workspace). The second floor under every
+    membership row: former members lose access even where a membership row was left behind."""
+    if not org_id or not uid or not _boundary_on():
+        return True
+    from ..accounts.orgs import instance_mode
+    if instance_mode(c) == "organisation":
+        return True  # one organisation, everybody in it (user_orgs)
+    ctx = acx_of(c, uid)
+    if ctx.role == "agent" and ctx.agent_org_id is None:
+        return True  # a private agent: its list memberships decide (as before; the boundary check counts mismatches)
+    return org_id in ctx.org_ids
+
+
+# the organisation condition of the list scope, relative to the account column p.u (standard SQL, no parameters)
+_ORG_SCOPE_SQL = ("(l.org_id IS NULL OR EXISTS (SELECT 1 FROM agents a WHERE a.user_id=p.u AND (a.org_id IS NULL OR a.org_id=l.org_id)) "
+                  "OR (NOT EXISTS (SELECT 1 FROM agents a WHERE a.user_id=p.u) "
+                  "AND EXISTS (SELECT 1 FROM org_members om WHERE om.org_id=l.org_id AND om.user_id=p.u)))")
+
+
+def acx_lists_sql(write=False, req=True):
+    """THE list scope (2.36.2, #1142): subquery of the list ids an account may see (write: change as a whole). Two ? = the
+    account id. One place for owner / members / roles, the collaboration switch, the organisation boundary and (req=True:
+    the request's own account) the health-list and token-allowlist filters. vis_sql, wr_sql, visible_lists and dav_lists use
+    it. Participants are in the read scope; what they see is decided per task (tvis)."""
+    roles = " AND role IN ('edit', 'admin')" if write else ""
+    org = f" AND (NOT ({_boundary_sql()}) OR {_ORG_SCOPE_SQL})" if _boundary_on() else ""
+    return (f"(SELECT l.id FROM lists l, (SELECT CAST(? AS INTEGER) AS u, CAST(? AS INTEGER) AS v) p "
+            f"WHERE (l.owner_id=p.u OR l.id IN (SELECT list_id FROM list_members WHERE user_id=p.v{roles}{_members_on()})){org}"
+            f"{_req_filters_sql() if req else ''})")
+
+
+def _req_filters_sql():
+    """The request's own filters as plain WHERE conditions on l (health lists, token allowlist) -- no set operations, so
+    the precedence is the same in every SQL dialect."""
+    out = " AND COALESCE(l.life, '')!='health'" if health_hidden() else ""
+    tl = token_lists()
+    if tl is not None:
+        out += f" AND l.id IN ({','.join(str(int(x)) for x in sorted(tl)) or '0'})"
+    return out
+
+
 def vis_sql():
     """Subquery of the list ids the current user may see (two ? = user id)."""
-    return f"(SELECT id FROM lists WHERE owner_id=? UNION SELECT list_id FROM list_members WHERE user_id=?{_members_on()}{_health_sql()})"
+    return acx_lists_sql()
 
 
 def wr_sql():
     """Subquery of the list ids the current user may change as a whole (two ? = user id). Participants are not in it:
     what they may change is decided per task (tvis(..., write=True))."""
-    return f"(SELECT id FROM lists WHERE owner_id=? UNION SELECT list_id FROM list_members WHERE user_id=? AND role IN ('edit', 'admin'){_members_on()}{_health_sql()})"
+    return acx_lists_sql(write=True)
 
 
 # ---------------------------------------------------------------- list roles (1.10.0)
@@ -228,12 +372,24 @@ def task_visible(c, tid, uid, write=False, full=False):
     return bool(role) and (not write or role in WRITE_ROLES)
 
 
+def acx_task_ok(c, tid, uid):
+    """2.36.2 (#1142): second floor of News entries and agent events that carry a task: only for someone who may see the
+    task (a task that no longer exists passes -- its event carries no content of a living task)."""
+    if not tid or not uid:
+        return True
+    if not c.execute("SELECT 1 FROM tasks WHERE id=?", (tid,)).fetchone():
+        return True
+    return task_visible(c, tid, uid)
+
+
 def list_role(c, lid, uid=None):
     uid = uid or me()
-    r = c.execute("SELECT owner_id, life FROM lists WHERE id=?", (lid,)).fetchone()
+    r = c.execute("SELECT owner_id, life, org_id FROM lists WHERE id=?", (lid,)).fetchone()
     if not r:
         return None
     if r[1] == "health" and health_hidden(c, uid):  # 2.22.0 (#663)
+        return None
+    if not acx_org_ok(c, uid, r[2]):  # 2.36.2 (#1142): an organisation's list only for its members
         return None
     if has_request_context() and g.get("auth_via") == "token" and getattr(g, "user", None) is not None and uid == g.user["id"]:
         tl = token_lists()  # 2.30.0 (#919): a token limited to selected lists

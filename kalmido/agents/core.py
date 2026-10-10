@@ -13,7 +13,7 @@ from ..core.i18n import tr
 from ..core.db import inbox_default, iso, now_utc, parse_iso
 from ..accounts.session import me
 from ..accounts.pictures import avatar_url
-from ..core.access import Denied, list_people, list_role, MANAGE_ROLES, need_list, need_task, task_visible, vis_sql, WRITE_ROLES
+from ..core.access import acx_task_ok, Denied, list_people, list_role, MANAGE_ROLES, need_list, need_task, task_visible, vis_sql, WRITE_ROLES
 from ..core.state import visible_sections
 from ..tasks.validation import valid_hm
 from ..collab.comments import comment_plain, user_names
@@ -178,6 +178,11 @@ def agent_emit(c, aid, event, data, actor="auto"):
             from ..agents.safety import ids_parse
             if lid not in ids_parse(a["list_ids"]):
                 return None
+        tk = data.get("task") if isinstance(data.get("task"), dict) else {}
+        etid = tk.get("id") or data.get("task_id")
+        ids_only = event == "unassigned" and set(tk) <= {"id", "list_id"}  # agent_assign_event: ids, no content
+        if isinstance(etid, int) and not ids_only and not acx_task_ok(c, etid, aid):  # 2.36.2 (#1142): requires task visibility
+            return None
     if actor == "auto":
         actor = wh_actor(c) if has_request_context() and getattr(g, "user", None) else None
     if actor and actor.get("id") == aid:
@@ -318,8 +323,14 @@ def agent_task_mentions(c, tid, old_text=""):
 
 
 def agent_assign_event(c, tid, kind, uid):
-    if uid and uid in agent_ids(c) and (kind == "unassigned" or task_visible(c, tid, uid, full=True)):
+    if not uid or uid not in agent_ids(c):
+        return
+    if task_visible(c, tid, uid, full=True):
         agent_emit(c, uid, kind, agent_task_data(c, tid, uid))
+    elif kind == "unassigned":  # 2.36.2 (#1142): out of sight -> only the ids (the agent can drop the task), no content
+        r = c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()
+        if r:
+            agent_emit(c, uid, kind, {"task": {"id": tid, "list_id": r[0]}, "list": {"id": r[0]}, "visible": False})
 
 
 # 2.30.0 (#1034): an agent of a list either LISTENS IN (it gets every task created in or moved into the list -- task_added /
