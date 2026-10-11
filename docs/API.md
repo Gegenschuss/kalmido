@@ -165,7 +165,9 @@ had been made in the app. Webhooks fire too.
 | `DELETE /me/app-passwords/{id}` | account | 2.9.0: revoke it; the calendar app using it stops at once |
 | `GET /lists` | read | Lists the user can see: own and shared, with role (`owner`, `admin`, `edit` = member, `participant`, `view` = viewer), `done_at_bottom` (2.7.2; `checklist` = the same, deprecated), progress, `icon` (URL of the list's own picture, empty = none; set in the app), `agent_tidy`, and (2.0.8) its sections `[{id, name}]` |
 | `POST /lists` | structure | Create a list: `{name, color?, folder?, kind?, done_at_bottom?, nag?, day_hours?}` (`kind`: `list` default or `project`; `checklist` (deprecated) = `list` + `done_at_bottom`). `project_type` (`agency`, `software`, `private`) creates a project of that built-in type; 2.27.0: its standard sections only with `sections: true` (a boolean, only together with `project_type`) |
-| `GET /lists/{id}` | read | One list with its sections and (2.14.0) its custom `fields` `[{id, name, type}]` (also on `GET /lists`) |
+| `GET /lists/{id}` | read | One list with its sections and (2.14.0) its custom `fields` `[{id, name, type}]` (also on `GET /lists`); 2.39.0: `playbook` = the list's effective Playbook (null = none) |
+| `GET /lists/{id}/playbook` | read | 2.39.0 (#1168): the list's Playbook, the owner's working rules for agents: `{list_id, text` (effective: the folders' parts, then the list's own)`, list_text, folders [{folder, text}], version` (a short marker)`, list_version, updated_at}`; health lists `404`. See [AGENTS.md](AGENTS.md#playbook-2390) |
+| `POST /lists/{id}/playbook/proposals` | agent | 2.39.0: **agent tokens only**, members of the list: propose a new text of the list's own Playbook `{text, note?}` -> `201 {id, state, base_version}`; at most 3 open per agent and list (`409`); people apply or discard it in the app (event `playbook_proposal`) |
 | `PATCH /lists/{id}` | structure | 2.28.0: `org_id` (the owner): the list's workspace, an organisation you belong to or `null` = private (`409` while people / agents in it do not fit, for family / Home & life lists and the inbox); lists carry `org_id`. 2.18.0: `project_type` (owner / list admins): `agency`, `software`, `private` or `null` / `""` (none); switching turns on what the type needs, nothing is deleted; lists carry `project_type`. 2.15.0: `archived` (true / false; the owner). 2.14.0: `columns` (owner / list admins; others `403`): the row columns of the list in order, the same for every member: `id` (task number in front of the title), `due`, `prio`, `who`, `tags`, `time`, `progress`, `deps`, `created`, `f:<field id>`; a key that is not listed is not shown; `null` = the default layout; unknown keys or fields of another list `400`. A new custom field joins configured columns at the end. 2.13.1: `listen_agent_ids` (owner / list admins): the agents that read every comment of a person in the list ([AGENTS.md](AGENTS.md#agent-reads-every-comment-2131)). 2.7.0: change a list. The owner: `name`, `color`, `kind`, `done_at_bottom` (2.7.2), `nag` (default nag interval of its tasks: `5`, `10`, `15`, `30`, `60` minutes, `1d`; empty / `off` = none), `day_hours` (hours per day / shift for the time sums, 1 to 24; `null` = the server's value). Members change only their own `folder` and `view` |
 | `GET /lists/{id}/repos` | read | 2.2.0: repositories connected to a (project) list: `provider` (`github` / `gitea` / `gitlab` / `bitbucket`, 2.18.0), `base_url`, `web_url`, `owner`, `repo`, `full_name`, `default_branch`, `status` (`new` / `ok` / `error`), `error`, `polled_at`. Never a token; connecting is only in the app (list owner / list admins). Lists also carry `repos`. 2.33.0: a list without repositories of its own lists the ones of its folder that it uses (`folder` = the folder's path for the folder's owner, `""` for everyone else and for agents, `null` = the list's own repository; connected by the folder's owner in the folder settings, switchable off per list); `#id` / `fixes #id` then work for the tasks of every project list in that folder |
 | `POST /lists/{id}/owner` | structure | 2.1.2: transfer the ownership `{user_id}` to another active person (never an agent); the old owner stays as a list admin. Admins may take over a list whose owner is an agent or a disabled user. Agent tokens always `403`, inboxes `409` |
@@ -895,6 +897,30 @@ Web API (signed in as a person): `GET /api/folders/people?folder=` · `PUT /api/
 (null removes a default), apply?: all | new, force?, dry_run?}` (`dry_run: true` only reports what would change);
 `POST /api/lists/{id}/folder-reset` `{keys?}` (*Back to the folder*). `/api/v1`: `GET /folders`,
 `POST /folders/rename`, `POST /folders/delete` (see [Endpoints](#endpoints)).
+
+## Playbook (2.39.0)
+
+A list's or folder's **Playbook** is a Markdown text (at most 8000 characters) with the owner's working rules for agents;
+a folder's applies to every list in it and its subfolders, the list's own part adds to it. People write it in the app;
+agents read it (`GET /api/v1/lists/{id}/playbook`, in every event of the list as `data.playbook`) and propose changes
+(`POST /api/v1/lists/{id}/playbook/proposals`), see [AGENTS.md](AGENTS.md#playbook-2390).
+
+Web API (signed in as a person): `GET /api/lists/{id}/playbook` -> `{list_id, text, version, updated_at, updated_by,
+can_edit, max, folders, effective, proposals, checks}` (proposals and checks only for those who may edit) ·
+`PUT /api/lists/{id}/playbook` `{text, base_version?}` (owner / list admins; a list of an agent: its members with edit
+rights; same text = no new version, an older `base_version` -> `409 {error, current_version}`, more than 8000
+characters -> `400`) · `GET /api/lists/{id}/playbook/versions` (newest first, at most 200: `{version, created_at, by,
+source: edit | restore | proposal | import | template, chars}`) · `GET /api/lists/{id}/playbook/versions/{v}` ·
+`POST /api/lists/{id}/playbook/restore` `{version}` · `POST /api/lists/{id}/playbook/proposals/{pid}/apply` `{text?}`
+(the agent's text or the person's edited version) · `POST …/proposals/{pid}/discard`. Folders (only their owner):
+`GET /api/folders/playbook?folder=` · `PUT /api/folders/playbook` `{folder, text, base_version?}` ·
+`GET /api/folders/playbook/versions?folder=` · `GET /api/folders/playbook/versions/{v}?folder=` ·
+`POST /api/folders/playbook/restore` `{folder, version}`. A folder's rename or move takes its Playbook along.
+Scheduled checks of a list (who may write the Playbook; for an agent of the list): `GET /api/lists/{id}/checks` ->
+`{checks, agents, max: 5}` · `POST /api/lists/{id}/checks` `{agent_id, freq, days?, time, tz?, enabled?, prompt?}` ·
+`PATCH /api/list-checks/{id}` · `DELETE /api/list-checks/{id}` · `POST /api/list-checks/{id}/run` (*Check now*, at most every
+10 minutes). The agent gets `scheduled_job` with `list_check: true`, `open_task_ids` and the `playbook`. The account
+export holds `playbooks` (every version) and `playbook_proposals`; list templates keep the list's own text.
 
 ## Lists, people and agents (2.30.0)
 

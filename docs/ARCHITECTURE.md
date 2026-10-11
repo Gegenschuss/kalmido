@@ -125,6 +125,7 @@ The most used helpers:
 | `tasks/dependencies.py` | Dependencies between tasks ("blocked by"). |
 | `lists/projects.py` | Project lists: status, progress, the overview (description, links, files), milestone reports. |
 | `lists/fields.py` | Custom fields of a list. |
+| `lists/playbook.py` | The Playbook of a list or folder (2.39.0): versions, rights, the agents' proposals, the playbook in agent events, the scheduled checks of a list. |
 | `personal/stats.py` | Statistics (module "stats"). |
 | `calendars/icalfeed.py` | The subscribable ICS calendar feed of a user's tasks. |
 | `calendars/caldav.py` | CalDAV server for tasks (VTODO) with app passwords; the /dav/ entry point for event calendars and CardDAV too. |

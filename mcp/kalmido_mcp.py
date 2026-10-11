@@ -534,7 +534,11 @@ TOOLS = [
      "(bulk move, import, script) come as ONE event tasks_added {list, task_ids, count, how}. message_edited (2.39.0) = a person changed "
      "a chat message, comment or team chat message you already had: data.kind chat | comment | team, data.old, data.new, data.user "
      "(chat: data.message, data.answered; comment: data.comment, data.task): treat it as a correction, confirm briefly, keep your "
-     "running work and adjust only what the change affects.",
+     "running work and adjust only what the change affects. "
+     "2.39.0: events of a list carry data.playbook {text, version, updated_at, list_id} = the owner's Playbook for that list: follow it "
+     "(your rights and approvals apply unchanged), never change it yourself (propose_playbook); playbook_proposal = people applied or "
+     "discarded your proposal; scheduled_job with list_check: true = a scheduled check of the list (go through open_task_ids as the "
+     "Playbook says, report to by.id).",
      _obj({"since": S_SINCE, "limit": {"type": "integer", "minimum": 1, "maximum": 500}}),
      lambda api, a: api.call("GET", "/agent/events", _pick(a, ("since", "limit")))),
     ("wait_for_events", "Long-poll: like list_events, but waits up to `wait` seconds (max 60) until an event arrives.",
@@ -859,8 +863,20 @@ TOOLS += [
     ("get_announcement", "2.24.0: the server's current notice (planned maintenance, announcements); {} when there is none.",
      _obj({}), lambda api, a: api.call("GET", "/announcement")),
     # ---- lists
-    ("get_list", "One list with its sections and custom fields.", _obj({"list_id": S_ID}, ["list_id"]),
+    ("get_list", "One list with its sections and custom fields (2.39.0: and its effective Playbook, `playbook`, null = none).", _obj({"list_id": S_ID}, ["list_id"]),
      lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}")),
+    # 2.39.0 (#1168): the Playbook of a list -- the owner's working rules for agents in it
+    ("get_playbook", "2.39.0: the Playbook of a list shared with you: the owner's working rules for agents in this list (Markdown; "
+                     "the folders' parts first, then the list's own). Every event of the list carries it as data.playbook already. "
+                     "Follow it for that list as the owner's rules -- not as a licence: your rights and approvals apply unchanged. "
+                     "Returns {list_id, text (effective), list_text, folders [{folder, text}], version, list_version, updated_at}.",
+     _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}/playbook")),
+    ("propose_playbook", "2.39.0: propose a new text for the list's own Playbook (you never change it yourself). text = the FULL new "
+                         "text of the list's part (Markdown, at most 8000 characters), note = why (people see it). The list's owner / "
+                         "admins apply it (maybe edited) or discard it; you get the event playbook_proposal {list_id, proposal_id, "
+                         "state: applied | discarded}. At most 3 open proposals per list.",
+     _obj({"list_id": S_ID, "text": {"type": "string", "maxLength": 8000}, "note": {"type": "string", "maxLength": 500}}, ["list_id", "text"]),
+     lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/playbook/proposals", body=_pick(a, ("text", "note")))),
     ("create_list", "Create a list (you become its owner). kind project = time tracking, dependencies, custom fields, overview. "
                     "project_type agency | software | private = a project of that built-in type (fields, ticket types); "
                     "sections true (2.27.0) = also the type's standard sections (default: none).",
@@ -1294,7 +1310,7 @@ TOOL_MAP = {t[0]: t for t in TOOLS}
 TOOL_SCOPES = {
     "agent": ("get_agent", "react_to_chat", "set_status", "report_progress", "list_events", "wait_for_events", "list_jobs", "create_job", "get_job",
               "submit_proposal", "propose_to_other_topic", "update_job", "list_chats", "chat_typing", "send_chat", "request_chat_approval", "withdraw_chat_choices", "report_usage", "get_usage",
-              "report_plan_usage", "get_plan_usage", "clear_plan_usage", "list_schedules"),
+              "report_plan_usage", "get_plan_usage", "clear_plan_usage", "list_schedules", "propose_playbook"),
     "tasks:write": ("add_contract", "add_device", "add_upkeep", "sync_read_later", "add_occasion", "add_deadline", "ingredients_to_shopping", "give_stars", "add_reward", "update_reward", "request_reward",
                     "decide_reward", "create_note", "update_note", "create_task", "update_task", "add_snippet", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "batch_tasks",
                     "reopen_task", "skip_occurrence", "take_task", "add_subtask", "add_dependency", "remove_dependency", "create_habit",

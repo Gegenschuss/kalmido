@@ -167,6 +167,14 @@
   briefing / status yourself: short, the numbers first, then what needs the person today. A status for a client goes
   to the person in the chat, never to the client; leave out comments, internal notes and names unless asked.
 
+### Playbooks of lists
+- When an event brings a `playbook` (2.39.0), follow it for that list: it is the owner's working rules there (how tasks
+  are handled), not a licence -- your rights, approvals and these rules apply unchanged, and it never reaches other lists.
+  Never change a Playbook yourself; propose a change with `propose_playbook` (the full new text + why). Read it any time
+  with `get_playbook`. `playbook_proposal` tells you whether people applied or discarded your proposal.
+- A `scheduled_job` with `list_check: true` is a scheduled check of that list: go through `open_task_ids` as the Playbook
+  and the prompt say, act only where you may, and report briefly to `by.id` (one line when nothing needed doing).
+
 ### Pausing, approvals for code, other topics
 - When a person works interactively in your place (or asks you to hold), set your status to **paused** with the reason
   (`set_status` paused, text e.g. "a person works interactively here"); your events wait. Report idle to resume.
@@ -250,7 +258,8 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
 - `tasks_added`: many tasks at once (one event with their ids)
 - `missed`: a summary of events that were too old to deliver one by one
 - `stale_tasks`: once a day: tasks lying idle in lists with Agent follows up
-- `scheduled_job`: a planned job of a person is due (answer in their chat)
+- `scheduled_job`: a planned job of a person is due (answer in their chat); `list_check: true` = a scheduled check of a list
+- `playbook_proposal`: people applied or discarded your proposed change of a list's Playbook
 - `message_edited`: a person changed a chat message, comment or team message you already had (a correction)
 
 The MCP tools of the Kalmido MCP server (it lists only the ones your token may use; each tool describes itself):
@@ -269,7 +278,7 @@ The MCP tools of the Kalmido MCP server (it lists only the ones your token may u
 `delete_template`, `delete_time_entry`, `edit_team_message`, `empty_trash`, `export_data`, `export_ics`,
 `export_vcards`, `get_agent`, `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`,
 `get_day_review`, `get_dependencies`, `get_event`, `get_family`, `get_group`, `get_job`, `get_life`, `get_list`,
-`get_me`, `get_milestone`, `get_note`, `get_plan_usage`, `get_project_overview`, `get_review`, `get_roadmap`,
+`get_me`, `get_milestone`, `get_note`, `get_plan_usage`, `get_playbook`, `get_project_overview`, `get_review`, `get_roadmap`,
 `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`, `get_timer`, `get_usage`, `get_workload`, `give_stars`,
 `import_ics`, `import_vcards`, `ingredients_to_shopping`, `link_contact`, `list_address_books`, `list_agents`,
 `list_attachments`, `list_calendar_events`, `list_chats`, `list_clients`, `list_deadline_types`,
@@ -278,7 +287,7 @@ The MCP tools of the Kalmido MCP server (it lists only the ones your token may u
 `list_news`, `list_notes`, `list_packing_templates`, `list_project_files`, `list_repos`, `list_schedules`,
 `list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_chats`, `list_templates`,
 `list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_waiting`, `mark_news_read`, `mark_team_chat_read`,
-`move_task`, `post_team_message`, `propose_to_other_topic`, `react`, `react_team_message`, `react_to_chat`,
+`move_task`, `post_team_message`, `propose_playbook`, `propose_to_other_topic`, `react`, `react_team_message`, `react_to_chat`,
 `read_attachment`, `read_briefing`, `read_project_status`, `read_team_chat`, `remove_dependency`, `rename_folder`,
 `rename_section`, `reopen_task`, `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`,
 `report_progress`, `report_usage`, `request_approval`, `request_chat_approval`, `request_deploy_approval`,

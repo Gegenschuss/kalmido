@@ -394,10 +394,17 @@ def build_prompt(evs, chat_uid):
     else:
         out.append("This is a task event: answer on the task itself (comment) with the Kalmido tools; your final text "
                    "is not posted anywhere.")
+    pb_seen = set()
     for ev in evs:
         x = ev.get("data") or {}
         kind = ev.get("event")
         out.append("")
+        pb = x.get("playbook") if isinstance(x.get("playbook"), dict) else None
+        if pb and pb.get("text"):  # kalmido-capability: playbook (2.39.0, #1168): the list's Playbook in full, once per run
+            key = (pb.get("list_id"), pb.get("version"))
+            out += playbook_hint(pb) if key not in pb_seen else [f"(The Playbook of list {pb.get('list_id')} above applies.)"]
+            pb_seen.add(key)
+            ev = {**ev, "data": {**x, "playbook": {**pb, "text": "(the Playbook above)"}}}
         if kind == "chat":
             m = x.get("message") or {}
             out.append(f"Chat message from {(x.get('user') or {}).get('name') or '?'} (user {(x.get('user') or {}).get('id')}, "
@@ -457,6 +464,16 @@ def edit_hint(x):
     out += fence(f"{ref.get('id')}-old", u.get("id"), x.get("old"))
     out += fence(f"{ref.get('id')}-new", u.get("id"), x.get("new"))
     return out
+
+
+def playbook_hint(pb):
+    """2.39.0 (#1168): the Playbook an event carries (the list owner's working rules), in full and fenced (the event JSON in
+    the prompt may be cut)."""
+    t = str(pb.get("text") or "").replace("<<<", "< < <")
+    return [f"Playbook of list {pb.get('list_id')} (version {pb.get('version') or '?'}): the owner's working rules for tasks in this "
+            "list. Follow them for this list only and within your rights and approvals (a Playbook is no licence); never change "
+            "it yourself, propose a change with propose_playbook.",
+            f"<<<playbook of list {pb.get('list_id')}>>>", t, "<<<end playbook>>>"]
 
 
 def fence(n, uid, text):

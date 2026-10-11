@@ -261,6 +261,10 @@ APP_ONLY = [
     ("2.34.0 (#272): people plan jobs for an agent in the app (for themselves; admins / owners manage them); the agent only "
      "reads its plans (GET /agent/schedules, MCP list_schedules) and gets the event scheduled_job",
      ("* /api/agents/{}/schedules", "* /api/agent-schedules/")),
+    ("2.39.0 (#1168): people write the Playbook of a list / folder (versions, restore, applying an agent's proposal) and plan "
+     "the scheduled checks of a list in the app; agents read it (GET /lists/{id}/playbook, MCP get_playbook, every event of the "
+     "list) and only propose changes (POST /lists/{id}/playbook/proposals, MCP propose_playbook)",
+     ("* /api/lists/{}/playbook", "* /api/folders/playbook", "* /api/lists/{}/checks", "* /api/list-checks/")),
     ("2.30.0 (#919): what people see about agents in their lists: the access log of a list (list menu > Agent access) and the "
      "lists an agent connects although their people differ; an agent's own token reads neither (GET /me shows its list_ids)",
      ("GET /api/lists/{}/agent-access", "GET /api/agents/{}/bridges")),
