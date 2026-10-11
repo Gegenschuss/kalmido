@@ -858,6 +858,7 @@ def _calls_ok(s):
     t = _TABLE_HEAD.sub(r"\1 __T(", re.sub(r"'(?:[^']|'')*'", "''", s))
     if re.search(r'"\s*\(', t):
         return False
+    t = re.sub(r'"([^"]{1,63})"', r"\1", t)  # 2.37.0 (review W3-2): "pg_catalog".fn( counts as pg_catalog.fn(
     return all(m.group(1) in _CALL_HEADS for m in re.finditer(r'(?<![\w."])([A-Za-z_][\w.]*)\s*\(', t))
 
 

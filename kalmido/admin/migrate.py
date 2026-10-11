@@ -578,7 +578,8 @@ def _write_report(m, rep):
     d = _bk_dir()
     try:
         os.makedirs(d, exist_ok=True)
-        p = os.path.join(d, f"migration-report-{m.ts}.json")
+        # a failed move overwrites one file (review W3-1: no new file per restart)
+        p = os.path.join(d, "migration-report-failed.json" if rep.get("status") == "failed" else f"migration-report-{m.ts}.json")
         with open(p, "w", encoding="utf-8") as f:
             json.dump(rep, f, indent=1, ensure_ascii=False, default=str)
         log("report:", p)
@@ -594,8 +595,6 @@ def mig_run(src, restore=False):
     log(f"moving {m.src} into Postgres" + (" (restore of an old backup)" if restore else ""))
     try:
         m.open()
-        if not restore:
-            m.safety_copy(_bk_dir())
         init_db(guard=False, load=m.run_copy)
     except Exception as e:
         m.seconds = round(time.time() - m.started, 1)
@@ -605,6 +604,13 @@ def mig_run(src, restore=False):
         if m.con is not None:
             m.con.close()
         raise MigError(why) from None
+    # 2.37.0 (review W3-1): the copy only after a successful move (the source is opened read-only, so it is the same file);
+    # before, every failed start under a restart policy left one more full copy in backups/ (disk full loop)
+    if not restore:
+        try:
+            m.safety_copy(_bk_dir())
+        except (OSError, sqlite3.Error) as e:
+            log("could not copy the SQLite database (the original stays as tasks.db.migrated-*):", e)
     m.con.close()
     m.log_summary("done")
     m.report_path = _write_report(m, m.report("ok"))
