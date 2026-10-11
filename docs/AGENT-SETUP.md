@@ -129,7 +129,9 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
    Both ask first, with a warning: the agent then also sees your private lists, and everything in them becomes input
    for a model.
 4. **Tidy up**: in the same table pick the tidy mode (off, suggest, automatic) and, if several agents are in a list,
-   which one tidies it up.
+   which one tidies it up. That agent also answers *Tidy up the list…* (2.39.0, the list's menu): it gets the open tasks
+   as a `job_request` of kind `cleanup` and answers with one proposal (merge, rename, move, close) that the person
+   applies ([AGENTS.md](AGENTS.md#tidy-up-a-list-2390)); the reference launcher runs it like any other event.
 5. *Runtime* in the agent's dialog (admins): model, auto-compact, a nightly fresh restart. The launcher in step 9
    applies them.
 

@@ -260,6 +260,7 @@ registering the ones of its area.
 | `dnd.js` | Drag & drop (desktop) and swipe (touch). |
 | `palette.js` | Keyboard shortcuts, the command palette, the welcome tour. |
 | `agents.js` | Agents, reactions, shared list tags, tidy suggestions. |
+| `cleanup.js` | "Tidy up the list": the request to the list's tidy agent and the review of its cleanup proposal (2.39.0). |
 | `dayplan.js` | Day planning and the evening review. |
 | `agentchat.js` | The chat with an agent (side panel / view) and Settings > Agents: lists, setup guides, behaviour rules, activity log, usage, runtime. |
 | `listedit.js` | List editing, keyboard reordering, recent lists. |

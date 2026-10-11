@@ -548,7 +548,7 @@ TOOLS = [
            "state": {"type": "string", "enum": ["running", "waiting", "done", "failed", "stopped"]}, "log": {"type": "string"}}, ["title"]),
      lambda api, a: api.call("POST", "/agent/jobs", body=a)),
     ("get_job", "One of the agent's jobs. A proposal job (event job_request) also carries kind (project | subtasks | triage | "
-                "extract | dayplan), input (exactly what the person sent: never ask for more), proposal (what you submitted) and limits.",
+                "extract | dayplan | cleanup), input (exactly what the person sent: never ask for more), proposal (what you submitted) and limits.",
      _obj({"job_id": S_ID}, ["job_id"]), lambda api, a: api.call("GET", f"/agent/jobs/{int(a['job_id'])}")),
     ("submit_proposal", "Answer a job_request with ONE structured proposal; the person reviews, edits and applies it. Never create "
                         "the lists / tasks yourself. proposal by kind -- project: {name, folder?, sections: [names], tasks: [{title, "
@@ -560,6 +560,11 @@ TOOLS = [
                         "default_duration), note?}], nofit: [{task_id, note?}]} -- applying sets only plan_start + duration, due dates "
                         "and deadlines never change; only task ids from "
                         "input.tasks; the input has date, now, work {start, end}, events, fixed (busy) and the built-in plan as a hint. "
+                        "cleanup (2.39.0, \"Tidy up the list\", one package of a list's open tasks; follow the list's playbook): {items: "
+                        "[{op: merge, task_ids: [keep, other, ...], title?, reason?} | {op: rename, task_id, title, reason?} | {op: move, "
+                        "task_id, section_id (null = no section)?, position? (1 = top inside the section), reason?} | {op: close, task_id, "
+                        "reason}]} -- only task ids from input.items, each at most once over all entries, section ids from input.list."
+                        "sections; merging keeps the first task (the notes of the others are appended), the others are closed as won't do. "
                         "Every kind may add summary (a short explanation). Dates YYYY-MM-DD, priority none | low | medium | high. "
                         "At most 200 entries; resubmitting replaces the proposal until the person applied or discarded it.",
      _obj({"job_id": S_ID, "proposal": {"type": "object"}}, ["job_id", "proposal"]), t_submit_proposal),

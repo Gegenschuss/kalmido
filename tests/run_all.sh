@@ -545,12 +545,19 @@ fresh; run p2380_u1_ui node p2380_u1_ui.js "$KALMIDO_TEST_DATA"
 # reads pruned, IPs masked; list icons in the list colour, multi-edit skips locked tasks, part mark in italics, palette folding
 fresh; run p2380_u2_api "$PY" p2380_u2_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2380_u2_ui node p2380_u2_ui.js "$KALMIDO_TEST_DATA"
+# 2.39.0 (#1168): the Playbook of a list / folder in the list and folder dialogs (editor, versions, proposals, regular checks)
+fresh; run p2390_u_ui node p2390_u_ui.js "$KALMIDO_TEST_DATA"
 # 2.39.0 (#1179): a person edits their own messages in the agent chat (only the sender, delivered / answered -> the event
 # message_edited only to that agent, also for edited comments and team messages the agent had), then the UI (Edit, "edited", versions)
 fresh; run p2390_c_api "$PY" p2390_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2390_c_ui node p2390_c_ui.js "$KALMIDO_TEST_DATA"
-# 2.39.0 (#1168): the Playbook of a list / folder in the list and folder dialogs (editor, versions, proposals, regular checks)
-fresh; run p2390_u_ui node p2390_u_ui.js "$KALMIDO_TEST_DATA"
+# 2.39.0 (#1151): "Tidy up the list": the request (rights, the tidy agent, health list, limits, packages of 50), the agent's
+# cleanup proposal (validation), applying merge / rename / move / close as the person with skipped tasks (editing, changed,
+# completed), one undo step + redo; then the UI on a phone (list menu, selection, dialog, review sheet, result, undo)
+fresh; run p2390_b_api "$PY" p2390_b_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2390_b_ui node p2390_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.39.0 (#1168): the Playbook of lists / folders (versions, agent API, proposals, events, scheduled list checks, templates, backup)
+fresh; run p2390_a_api "$PY" p2390_a_api_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

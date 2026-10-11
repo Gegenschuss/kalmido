@@ -145,6 +145,8 @@
   or wakes you.
 - Before you file a UI bug from a screenshot, check that it shows the current version; an old cached app shows old
   screens. If unsure, ask the person to reload first.
+- A `job_request` of kind `cleanup` (2.39.0, *Tidy up the list*): send only ONE bundled proposal (`submit_proposal`:
+  merge, rename, move, close), never change the tasks yourself; follow the list's playbook.
 
 ### Tasks lying idle, time gaps
 - The event `stale_tasks` (2.34.0) comes once a day from lists where *Agent follows up* is on: tasks nobody touched for
@@ -238,6 +240,8 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
 - `ping`: a connection test
 - `followup_due`: the follow-up day of a task waiting on someone outside
 - `job_request`: a person asks you for a proposal
+  (kind `cleanup`, 2.39.0: tidy up a list - send only ONE bundled proposal with `submit_proposal`, never change
+  the tasks yourself; follow the list's playbook)
 - `runtime_changed`: an admin changed your runtime settings
 - `reset`: an admin pressed Reset now (start a fresh session)
 - `team_message`: someone @mentioned you in a list's team chat
