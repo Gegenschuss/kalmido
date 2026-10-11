@@ -437,7 +437,7 @@ def build_prompt(evs, chat_uid):
                 out.append(f"This is a scheduled check of the list {(x.get('list') or {}).get('name') or x.get('list_id')}: go through its open "
                            f"tasks (open_task_ids, {len(x.get('open_task_ids') or [])} ids; get_task) as the Playbook and the prompt say, act "
                            "only where you may, and report briefly (one line when nothing needed doing).")
-        elif kind == "job_request":  # 2.39.0 (#1151): a proposal run (e.g. kind cleanup): one submit_proposal, nothing else
+        elif kind == "job_request":  # kalmido-capability: proposals (2.39.0, #1151): a proposal run (e.g. kind cleanup): one submit_proposal, nothing else
             j = x.get("job") or {}
             out.append(f"Proposal request \"{j.get('title') or ''}\" (kind {x.get('kind') or j.get('kind') or '?'}, job {j.get('id')}) of "
                        f"{(x.get('requested_by') or {}).get('name') or '?'}: read the full input with get_job (the event below may be "
