@@ -123,7 +123,7 @@ const settings = async () => (await call('GET', '/api/state')).settings;
   check(chk && chk.checked && /Progress in the sidebar/.test(chk.closest('label').textContent), 'Settings: "Progress in the sidebar", on');
   sel.value = 'dot'; sel.dispatchEvent(new w.Event('change', {bubbles: true}));
   check(await until(async () => (await settings()).side_icons === 'dot'), 'Settings: choosing Dot saves at once on the server');
-  check(await until(() => row(CART)?.querySelector('.sic .sw.rd') && !row(CART)?.querySelector('.sic svg')), 'Settings: the sidebar follows at once');
+  check(await until(() => row(CART)?.querySelector('.sic .licd') && !row(CART)?.querySelector('.sic svg')), 'Settings: the sidebar follows at once');
   chk.click();
   check(await until(async () => (await settings()).side_progress === '0'), 'Settings: the progress switch saves');
   check(await until(() => !row(PRJ)?.querySelector('.sprog')), 'Settings: the bar goes at once');
