@@ -11,7 +11,10 @@ ORDER = (
     "core.config",
     "core.schema",
     "core.i18n",
+    "core.pg",  # 2.37.0 (#1150): the Postgres layer (core.db re-exports it)
     "core.db",
+    "core.rls",  # 2.37.0 (#1150): row-level security, applied by init_db
+    "admin.migrate",  # 2.37.0 (#1150): the move from SQLite (migrate-sqlite), used by init_db
     "accounts.session",
     "accounts.pictures",
     "accounts.login",

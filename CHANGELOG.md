@@ -7,6 +7,15 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.37.1] - 2026-10-11
+
+**In short:** a maintenance release for 2.37.0 without changes to the app's behaviour: the build checks pass again.
+
+### Fixed
+- The module list of the server package names the three new 2.37.0 modules (the Postgres layer, row-level security and
+  the move from SQLite), and the layout check lists saved chat messages as a person's own rows (#1150, #1159).
+- The test suites run in nine parallel groups instead of eight: the last group had grown past the 30 minute limit.
+
 ## [2.37.0] - 2026-10-11
 
 **In short:** Kalmido now runs on **PostgreSQL 17** only, for every installation. **Self-hosters: this update needs
@@ -3756,7 +3765,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.37.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.37.1...HEAD
+[2.37.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.37.1
 [2.37.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.37.0
 [2.36.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.36.2
 [2.36.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.36.1

@@ -83,6 +83,7 @@ TENANT_EXEMPT = {
     "agent_steps": "2.32.0 (#1081): an agent's steps for ONE person (its chat answer / its job for that person); only that person reads them",
     "agent_events": _AGENT + " (events are made only for lists it is in)",
     "agent_bridges": _AGENT + " (an owner's approval between two lists)",
+    "chat_saves": _OWN + " (2.37.0 #1159: which chat message a person saved as a task; the task itself keeps its list)",
     "kid_parents": _FAM, "kid_stars": _FAM, "kid_rewards": _FAM,
 }
 schema_src = re.sub(r"--[^\n]*", "", read("kalmido", "core", "schema.py"))
