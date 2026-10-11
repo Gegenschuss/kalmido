@@ -236,7 +236,17 @@ def user_update(uid):
         if b["kind"] == "agent" and not is_agent(u):
             if u["is_admin"] or b.get("is_admin"):
                 return err(tr("Remove the admin rights first: an agent is never an admin"))
+            from ..accounts.orgs import user_orgs
+            was = user_orgs(c, uid)
             make_agent(c, uid)
+            if was:  # 2.37.0 (#1150): the converted account keeps working in its organisation (row-level security: a private
+                from ..agents.admin import agent_org_set  # agent never reads an organisation's lists, not even its own)
+                from ..personal.timetrack import BadInput as _BadInput
+                try:
+                    with c.savepoint():
+                        agent_org_set(c, uid, was[0])
+                except _BadInput:
+                    pass  # lists in several workspaces: stays private (the boundary check reports it)
         elif b["kind"] == "user" and is_agent(u):
             a = agent_row(c, uid)
             if a and a["webhook_id"]:

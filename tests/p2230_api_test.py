@@ -164,7 +164,8 @@ check(Ca.get(B + "/api/clients").json()["clients"] == [] and Ca.get(B + f"/api/c
 check(Ca.patch(B + f"/api/clients/{CL}", json={"name": "x"}).status_code == 404 and Ca.delete(B + f"/api/clients/{CL}").status_code == 404, "… nor change it")
 CL2 = Ca.post(B + "/api/clients", json={"name": "Other client"}).json()["id"]
 check(CL2 not in [c["id"] for c in Bo.get(B + "/api/clients").json()["clients"]], "Carol's client stays in her organisation")
-check(CL2 in [c["id"] for c in A.get(B + "/api/clients").json()["clients"]], "admins see every client")
+# 2.37.0 (#1150, decision 10.10.2026): row-level security applies to instance admins too -- only their own organisations' content
+check(CL2 not in [c["id"] for c in A.get(B + "/api/clients").json()["clients"]], "admins see the clients of their own organisations only (2.37)")
 # lists of the client
 P1 = A.post(B + "/api/lists", json={"name": "Aurora website", "kind": "project"}).json()["id"]
 P2 = A.post(B + "/api/lists", json={"name": "Aurora menu", "kind": "project"}).json()["id"]
@@ -256,7 +257,8 @@ check(next(p for p in Bo.get(B + "/api/workload").json()["people"] if p["id"] ==
       "only what the viewer sees is counted (Alice's private list not for Bob)")
 check({p["id"] for p in Ca.get(B + "/api/workload").json()["people"]} == {CAROL}, "Carol: only her organisation")
 check(Ca.get(B + "/api/workload", params={"org": ORG1}).status_code == 404, "… not another organisation")
-check({p["id"] for p in A.get(B + "/api/workload", params={"org": ORG2}).json()["people"]} == {CAROL}, "admins pick the organisation")
+# 2.37.0 (#1150, decision 10.10.2026): an organisation the admin is not in shows nobody (its people's workload is its content)
+check({p["id"] for p in A.get(B + "/api/workload", params={"org": ORG2}).json().get("people", [])} == set(), "admins: no workload of a foreign organisation (2.37)")
 check(A.get(B + "/api/workload", params={"weeks": 2, "start": D(7)}).json()["weeks"][0]["start"] == (mon + timedelta(days=7)).isoformat(), "start + weeks")
 check(requests.get(V + "/workload", headers=PT).ok, "GET /api/v1/workload")
 check(sess("tim").get(B + "/api/workload").status_code in (403, 409), "a kid: no workload")

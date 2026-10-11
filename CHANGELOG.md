@@ -7,6 +7,37 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+<!-- 2.37.0 draft (part 2 of 3; the move tool, compose file and release notes for self-hosters follow in part 3) -->
+
+**In short:** Kalmido now runs on **PostgreSQL 17** only. The organisation boundary is enforced **in the database** as
+well (row-level security), backups use `pg_dump`, folder settings explain themselves, and any chat message can be
+**saved as a task** for later.
+
+### Changed
+- **PostgreSQL instead of SQLite** (#1150). One database for every installation; `DATABASE_URL` is required (see
+  [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md#database-postgresql)). Searching messages finds word beginnings and parts
+  of words with and without umlauts as before (trigram index).
+- **Backups** (Settings > Administration > Backup) contain a `pg_dump` of the database (format 2). Backups from before
+  2.37 are listed and can be checked; restore them with 2.36 and update afterwards.
+- **Search takes your text literally:** `%`, `_` and `\` in a search are plain characters now.
+- **Invalid values** sent to the server are refused with "Invalid data" (400) instead of being stored.
+- **API:** `snippets` of a task is `null` when there are none (was an empty string).
+- **Folder settings** (#1158): *Folder settings…* is always in the folder menu, also for a folder holding only lists
+  shared by others (they keep their own settings); *Share folder…* stays visible but greyed with the reason; the check
+  before saving reads "Not saved yet" with "Save anyway"; *People and roles…* and *Repository…* open on top with
+  *Back*, and closing with unsaved changes asks first.
+
+### Added
+- **Save a chat message as a task** (#1159): every message in agent and team chats has *Save as task*: the full text,
+  its files and a link back to the message, into a list you can write to (default Inbox), optionally due "to review
+  by". A saved message shows *Saved*. Agents can offer the button (`offer_save` with `send_chat`), never save
+  themselves.
+
+### Security
+- **Row-level security per organisation** (stage 1): every table with an organisation and the organisations
+  themselves are protected in the database; instance admins see contents of their own organisations only, admin
+  overviews show counts.
+
 ## [2.36.2] - 2026-10-11
 
 **In short:** Organisations hardened, intrusion alerts, the office foundation and many small things. This release

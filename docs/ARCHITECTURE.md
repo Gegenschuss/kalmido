@@ -10,15 +10,15 @@ development workflow see [CONTRIBUTING.md](../CONTRIBUTING.md).
  ---------------------------            -------------------------------------       ------------------------
  static/index.html                      app.py  (entry point)                       ntfy / Web Push services
  static/js/*.js   (web client)  --->    kalmido/  (Flask app, ~80 modules)  --->    Git hosts, Karakeep,
- static/sw.js     (offline)     <---    SQLite database (one file)                  calendars, IMAP / SMTP,
+ static/sw.js     (offline)     <---    PostgreSQL 17 (own container)               calendars, IMAP / SMTP,
  static/i18n/*.json                     background threads (watchdog ...)           webhooks, OIDC provider
                                               ^
  agents / scripts / MCP clients  ---------->  |  /api/v1 (tokens, scopes; mcp/kalmido_mcp.py is a thin bridge)
  calendar + contacts apps          ------->  |  /dav/ (CalDAV, CardDAV), /ical/
 ```
 
-- **Server**: Python with Flask behind waitress, SQLite as the only storage (plus files below the attachments folder).
-  No ORM: SQL with parameters in every module. `python app.py` starts it (the same command as always).
+- **Server**: Python with Flask behind waitress, PostgreSQL 17 as the only database since 2.37.0 (plus files below the
+  attachments folder). No ORM: SQL with parameters in every module (see [Database](#database-postgresql-237)). `python app.py` starts it (the same command as always).
 - **Web client**: plain JavaScript without a framework and without a build step, split into files that the browser
   loads in a fixed order. The service worker caches them, so the app opens offline.
 - **API + agents**: `/api/v1` is the REST API for personal tokens and agents (scopes per operation, an OpenAPI 3.1
@@ -154,7 +154,7 @@ The most used helpers:
 | `api/scopes.py` | Token scopes, approvals and the complete agent API (the routes the web client has). |
 | `collab/notes.py` | Notes of a list / project. |
 | `collab/teamchat.py` | Team chat (rooms and direct messages). |
-| `collab/msgsearch.py` | 2.33.0: search in comments, team chat and agent chats: the FTS5 index `msg_fts` (kept by triggers, built in `init_db`), visibility, snippets. |
+| `collab/msgsearch.py` | 2.33.0: search in comments, team chat and agent chats; since 2.37.0 a trigram index (`pg_trgm`) on `kalmido_fold(body)` (unaccent + umlaut folding) per message table, visibility, snippets. |
 | `collab/chatsave.py` | 2.37.0 (#1159): a chat message (agent chat, team chat) saved as a task by a person: text, file copies, link back (`#msg/...`); `chat_saves` per person, `saved_task_id` in the chat pages. |
 | `collab/replies.py` | 2.33.0: replies to one message (comments, team chat, agent chat): `reply_to` checks and the short quotes. |
 | `integrations/mail.py` | Tasks by e-mail (IMAP) and the daily summary by e-mail (SMTP). |
@@ -280,6 +280,39 @@ registering the ones of its area.
    loads), add it to `SHELL` in `static/sw.js` in the same order and bump `CACHE` there.
 3. `python3 tools/check_layout.py` compares the three lists; `node --check` runs on every file in CI.
 
+## Database: PostgreSQL (2.37)
+
+Since 2.37.0 Kalmido runs on PostgreSQL 17 only (`DATABASE_URL`); SQLite is gone.
+
+- **One driver module.** `kalmido/core/pg.py` is the only place that knows psycopg 3. It translates the `?` placeholders
+  of the existing SQL (literals, comments and `$$` bodies are left alone), returns rows that behave like before (index,
+  name, `keys()`, `dict()`), and offers `insert_id()` (`RETURNING id`), `write_lock()` (advisory lock for check-then-write),
+  `savepoint()`, `heal()` (rollback after an aborted transaction), `like_escape()` and `system_ctx()`.
+  `db()` / `connect()` in `core/db.py` lend a connection from a pool (4 to 56, `KALMIDO_DB_POOL_MAX`; every lend is
+  checked, so a restarted database costs no errors).
+- **Session limits.** Every connection runs with `statement_timeout` 30 s, `idle_in_transaction_session_timeout`
+  5 min and `jit=off`. Network calls (mail, calendar and contact sync, Web Push) run outside open transactions.
+  `init_db` and the backup lift the statement limit for themselves.
+- **Schema.** `core/schema.py` in the PostgreSQL dialect (one source): identity ids, integers as `BIGINT`, booleans
+  stay 0/1, timestamps stay ISO text, office amounts `NUMERIC(14,4)`, four `jsonb` columns. `init_db` runs in one
+  transaction under an advisory lock, creates the extensions `unaccent` and `pg_trgm`, adds missing columns and keeps the
+  schema version in `kalmido_meta`; a database newer than the image refuses the start.
+- **Errors.** Postgres aborts the whole transaction on an error: code that catches a database error and goes on uses
+  `with c.savepoint():`. An uncaught invalid value answers 400 (`DbError` handler, with rollback) instead of storing it.
+- **Row-level security (stage 1).** On top of the access layer (below), every table with `org_id` (lists, calendars,
+  address books, agents, clients, the office tables, the organisation log) and `orgs` / `org_members` has a policy with
+  `ENABLE` + `FORCE` (`kalmido/core/rls.py`, applied by `init_db`): a row of an organisation leaves the database only for a
+  transaction whose context holds that organisation. The context (`app.user_id`, `app.org_ids`, `app.role`) is set at the
+  start of every transaction from the request (`user`, `agent`; `anon` for public links and forms, bound to exactly the
+  organisation of the resolved link) or `system` outside requests (background threads). Admin overviews count across
+  organisations in a visible `with system_ctx(c):` block (each with a reason comment; `tests/rls_static_test.py` checks
+  it), never reading contents. When the login role bypasses row-level security (the superuser of the official image), the
+  pooled connections switch to the role `kalmido_app` (`NOLOGIN`, no bypass), which `init_db` creates and grants.
+  Tests: `rls_static` (every org table has a policy) and `rls_direct` (other organisations give 0 rows, writes are
+  refused, also via CalDAV and public links).
+- **Static guards.** `tests/pg_dialect_test.py` (no SQLite dialect left, psycopg only in `pg.py`) and
+  `tests/pg_prepare_test.py` (every SQL string of the server is `PREPARE`d against the real schema).
+
 ## Tests and checks
 
 - `tests/run_all.sh`: the API, UI (jsdom and Firefox), security and calendar suites against a fresh test container
@@ -330,7 +363,8 @@ Who may see what is decided in one module, `kalmido/core/access.py`:
   API token limited to lists, those list ids. It is built once per request from the signed-in account and its memberships,
   never from the workspace switch: there is no "current organisation" per request, so the shared view across all workspaces
   still answers in one response. Background work (watchdog, reminders, migrations) runs as `system_ctx()`.
-  `acx_session_vars()` lists the values a database with row-level security would receive per transaction.
+  Since 2.37.0 these values reach the database in every transaction and row-level security enforces the organisation
+  boundary there too (see [Database](#database-postgresql-237)).
 - **One list scope.** `acx_lists_sql()` is the single subquery for "lists this account may see / change" (owner, members and
   roles, the collaboration switch, the organisation boundary, health lists and token allowlists). `vis_sql()`, `wr_sql()`,
   the state (`visible_lists`) and CalDAV (`dav_lists`) all use it. It is standard SQL.

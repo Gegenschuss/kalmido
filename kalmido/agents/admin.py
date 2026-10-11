@@ -219,105 +219,106 @@ def admin_agent_update(aid):
     from ..agents.usage import usage_limits_clean
     from ..api.scopes import agent_scopes_set
     c = db()
-    a0 = need_agent_admin(c, aid)
-    b = body()
-    secret = None
-    if "username" in b:
-        username = str(b["username"] or "").strip().lower()
-        if not USERNAME_RE.fullmatch(username):
-            return err(tr("Username: 1-32 characters a-z, 0-9, dot, dash, underscore"))
-        if c.execute("SELECT 1 FROM users WHERE username=? AND id!=?", (username, aid)).fetchone():
-            return err(tr("Username already exists"), 409)
-        if username != a0["username"]:
-            c.execute("UPDATE users SET username=? WHERE id=?", (username, aid))
-            print("agent", aid, "renamed", a0["username"], "->", username, "by", g.user["username"], flush=True)
-    old_avatar = None
-    if "avatar_preset" in b:
-        p = b["avatar_preset"]
-        if p is not None and p not in AVATAR_PRESETS:
-            c.rollback()
-            return err(tr("Invalid value: {0}", "avatar_preset"))
-        old_avatar = c.execute("SELECT avatar FROM users WHERE id=?", (aid,)).fetchone()[0]
-        c.execute("UPDATE users SET avatar=? WHERE id=?", (f"p:{p}" if p else None, aid))
-    if "limits" in b:
-        lim = usage_limits_clean(b["limits"])
-        c.execute("UPDATE agents SET usage_limits=?, usage_alerted='' WHERE user_id=?", (lim, aid))
-        print("agent", aid, "usage limits", lim or "none", "by", g.user["username"], flush=True)
-    if a0["owner_id"] and a0["owner_id"] != me():  # 2.28.0 (#965): somebody else's personal agent: the kill switch and "Belongs to" only
-        extra = sorted(k for k in b if k not in ("enabled", "owner_id"))
-        if extra:
-            c.rollback()
-            return err(tr("A personal agent of another person: only its owner changes it (you can pause it)"), 403)
-    if "display_name" in b:
-        c.execute("UPDATE users SET display_name=? WHERE id=?", ((b["display_name"] or "").strip()[:60] or
-                                                                agent_row(c, aid)["username"], aid))
-    if "note" in b:
-        c.execute("UPDATE agents SET note=? WHERE user_id=?", (str(b["note"] or "")[:AGENT_NOTE_MAX], aid))
-    if "provider" in b:  # 2.24.0 (#896)
-        c.execute("UPDATE agents SET provider=? WHERE user_id=?", (str(b["provider"] or "").strip()[:80], aid))
-    if "owner_id" in b or "org_id" in b:  # 2.28.0 (#965 / #935): "Belongs to" (team | a person) and the workspace
-        try:
-            if "owner_id" in b:
-                agent_owner_set(c, aid, b["owner_id"], True)
-                print("agent", aid, "belongs to", b["owner_id"] or "team", "(was", a0["owner_id"] or "team", ") set by", g.user["username"], flush=True)
-            if "org_id" in b:
-                agent_org_set(c, aid, b["org_id"])
-        except BadInput:
-            c.rollback()
-            raise
-    if "pause_reason" in b:  # 2.26.0 (#949): pause with a reason (text) / resume (null or ""): status paused <-> idle
-        pr = b["pause_reason"]
-        if pr is not None and not isinstance(pr, str):
-            c.rollback()
-            return err(tr("Invalid value: {0}", "pause_reason"))
-        pr = (pr or "").strip()[:200]
-        cur = agent_row(c, aid)
-        if pr:
-            c.execute("UPDATE agents SET status='paused', status_text=?, status_at=?, status_task=NULL WHERE user_id=?", (pr, iso(now_utc()), aid))
-        elif cur["status"] == "paused":
-            c.execute("UPDATE agents SET status='idle', status_text='', status_at=? WHERE user_id=?", (iso(now_utc()), aid))
-    if "proposals" in b:  # 2.3.0: who may ask it for proposals
-        if b["proposals"] not in PROP_MODES:
-            c.rollback()
-            return err(tr("Invalid value: {0}", "proposals"))
-        c.execute("UPDATE agents SET proposals=? WHERE user_id=?", (b["proposals"], aid))
-    if "webhook_url" in b:
-        try:
-            secret = agent_hook_set(c, aid, str(b["webhook_url"] or "").strip())
-        except (BadInput, Denied):
-            c.rollback()
-            raise
-    if "runtime" in b:  # 2.4.1 (#377): {model?, autocompact?, autocompact_pct?, nightly_reset?, permission_mode?}; only the given keys change
-        try:
-            runtime_set(c, a0, b["runtime"])
-        except BadInput:
-            c.rollback()
-            raise
-    if "scopes" in b or "allowed_ips" in b:  # 2.15.0 (#479)
-        try:
-            agent_scopes_set(c, aid, b)
-        except BadInput:
-            c.rollback()
-            raise
-    if "list_ids" in b:  # 2.30.0 (#919): limited to selected lists of its own
-        from ..agents.safety import agent_lists_set
-        try:
-            agent_lists_set(c, aid, b["list_ids"], ok=b.get("bridge_ok") is True)
-        except BadInput:
-            c.rollback()
-            raise
-    if "enabled" in b:
-        if not isinstance(b["enabled"], bool):
-            return err(tr("Invalid value: {0}", "enabled"))
-        agent_enable(c, aid, b["enabled"])
-        if a0["owner_id"] and a0["owner_id"] != me():  # 2.7.2 (#420): an admin paused somebody's personal agent: only an admin resumes it
-            c.execute("UPDATE agents SET admin_paused=? WHERE user_id=?", (0 if b["enabled"] else 1, aid))
-        print("agent", aid, "enabled" if b["enabled"] else "PAUSED (kill switch)", "by", g.user["username"], flush=True)
-    bump(c)
-    c.commit()
-    if old_avatar and old_avatar != c.execute("SELECT avatar FROM users WHERE id=?", (aid,)).fetchone()[0]:
-        avatar_drop_file(aid, old_avatar)
-    return jsonify({**agent_admin_dict(c, agent_row(c, aid)), "webhook_secret": secret})
+    with system_ctx(c):  # 2.37.0 (#1150): the instance admin manages agent accounts (any organisation; structure, no content)
+        a0 = need_agent_admin(c, aid)
+        b = body()
+        secret = None
+        if "username" in b:
+            username = str(b["username"] or "").strip().lower()
+            if not USERNAME_RE.fullmatch(username):
+                return err(tr("Username: 1-32 characters a-z, 0-9, dot, dash, underscore"))
+            if c.execute("SELECT 1 FROM users WHERE username=? AND id!=?", (username, aid)).fetchone():
+                return err(tr("Username already exists"), 409)
+            if username != a0["username"]:
+                c.execute("UPDATE users SET username=? WHERE id=?", (username, aid))
+                print("agent", aid, "renamed", a0["username"], "->", username, "by", g.user["username"], flush=True)
+        old_avatar = None
+        if "avatar_preset" in b:
+            p = b["avatar_preset"]
+            if p is not None and p not in AVATAR_PRESETS:
+                c.rollback()
+                return err(tr("Invalid value: {0}", "avatar_preset"))
+            old_avatar = c.execute("SELECT avatar FROM users WHERE id=?", (aid,)).fetchone()[0]
+            c.execute("UPDATE users SET avatar=? WHERE id=?", (f"p:{p}" if p else None, aid))
+        if "limits" in b:
+            lim = usage_limits_clean(b["limits"])
+            c.execute("UPDATE agents SET usage_limits=?, usage_alerted='' WHERE user_id=?", (lim, aid))
+            print("agent", aid, "usage limits", lim or "none", "by", g.user["username"], flush=True)
+        if a0["owner_id"] and a0["owner_id"] != me():  # 2.28.0 (#965): somebody else's personal agent: the kill switch and "Belongs to" only
+            extra = sorted(k for k in b if k not in ("enabled", "owner_id"))
+            if extra:
+                c.rollback()
+                return err(tr("A personal agent of another person: only its owner changes it (you can pause it)"), 403)
+        if "display_name" in b:
+            c.execute("UPDATE users SET display_name=? WHERE id=?", ((b["display_name"] or "").strip()[:60] or
+                                                                    agent_row(c, aid)["username"], aid))
+        if "note" in b:
+            c.execute("UPDATE agents SET note=? WHERE user_id=?", (str(b["note"] or "")[:AGENT_NOTE_MAX], aid))
+        if "provider" in b:  # 2.24.0 (#896)
+            c.execute("UPDATE agents SET provider=? WHERE user_id=?", (str(b["provider"] or "").strip()[:80], aid))
+        if "owner_id" in b or "org_id" in b:  # 2.28.0 (#965 / #935): "Belongs to" (team | a person) and the workspace
+            try:
+                if "owner_id" in b:
+                    agent_owner_set(c, aid, b["owner_id"], True)
+                    print("agent", aid, "belongs to", b["owner_id"] or "team", "(was", a0["owner_id"] or "team", ") set by", g.user["username"], flush=True)
+                if "org_id" in b:
+                    agent_org_set(c, aid, b["org_id"])
+            except BadInput:
+                c.rollback()
+                raise
+        if "pause_reason" in b:  # 2.26.0 (#949): pause with a reason (text) / resume (null or ""): status paused <-> idle
+            pr = b["pause_reason"]
+            if pr is not None and not isinstance(pr, str):
+                c.rollback()
+                return err(tr("Invalid value: {0}", "pause_reason"))
+            pr = (pr or "").strip()[:200]
+            cur = agent_row(c, aid)
+            if pr:
+                c.execute("UPDATE agents SET status='paused', status_text=?, status_at=?, status_task=NULL WHERE user_id=?", (pr, iso(now_utc()), aid))
+            elif cur["status"] == "paused":
+                c.execute("UPDATE agents SET status='idle', status_text='', status_at=? WHERE user_id=?", (iso(now_utc()), aid))
+        if "proposals" in b:  # 2.3.0: who may ask it for proposals
+            if b["proposals"] not in PROP_MODES:
+                c.rollback()
+                return err(tr("Invalid value: {0}", "proposals"))
+            c.execute("UPDATE agents SET proposals=? WHERE user_id=?", (b["proposals"], aid))
+        if "webhook_url" in b:
+            try:
+                secret = agent_hook_set(c, aid, str(b["webhook_url"] or "").strip())
+            except (BadInput, Denied):
+                c.rollback()
+                raise
+        if "runtime" in b:  # 2.4.1 (#377): {model?, autocompact?, autocompact_pct?, nightly_reset?, permission_mode?}; only the given keys change
+            try:
+                runtime_set(c, a0, b["runtime"])
+            except BadInput:
+                c.rollback()
+                raise
+        if "scopes" in b or "allowed_ips" in b:  # 2.15.0 (#479)
+            try:
+                agent_scopes_set(c, aid, b)
+            except BadInput:
+                c.rollback()
+                raise
+        if "list_ids" in b:  # 2.30.0 (#919): limited to selected lists of its own
+            from ..agents.safety import agent_lists_set
+            try:
+                agent_lists_set(c, aid, b["list_ids"], ok=b.get("bridge_ok") is True)
+            except BadInput:
+                c.rollback()
+                raise
+        if "enabled" in b:
+            if not isinstance(b["enabled"], bool):
+                return err(tr("Invalid value: {0}", "enabled"))
+            agent_enable(c, aid, b["enabled"])
+            if a0["owner_id"] and a0["owner_id"] != me():  # 2.7.2 (#420): an admin paused somebody's personal agent: only an admin resumes it
+                c.execute("UPDATE agents SET admin_paused=? WHERE user_id=?", (0 if b["enabled"] else 1, aid))
+            print("agent", aid, "enabled" if b["enabled"] else "PAUSED (kill switch)", "by", g.user["username"], flush=True)
+        bump(c)
+        c.commit()
+        if old_avatar and old_avatar != c.execute("SELECT avatar FROM users WHERE id=?", (aid,)).fetchone()[0]:
+            avatar_drop_file(aid, old_avatar)
+        return jsonify({**agent_admin_dict(c, agent_row(c, aid)), "webhook_secret": secret})
 
 
 @app.post("/api/admin/agents/<int:aid>/reset")
@@ -325,25 +326,27 @@ def admin_agent_reset(aid):
     """2.4.1 (#377): "Reset now": raises the agent's reset_seq and sends it the event reset; its host restarts it with a
     fresh session (Kalmido itself never starts or stops an agent)."""
     c = db()
-    a = need_agent_admin(c, aid)
-    if not agent_active(a):
-        return err(tr("This agent is paused"), 409)
-    c.execute("UPDATE agents SET reset_seq=reset_seq+1 WHERE user_id=?", (aid,))
-    rt = agent_runtime(agent_row(c, aid))
-    seq = agent_emit(c, aid, "reset", {"reset_seq": rt["reset_seq"], "runtime": {**rt, "timezone": str(TZ)},
-                                       "user": {"id": me(), "name": user_names(c, [me()]).get(me(), "")}})
-    bump(c)
-    c.commit()
-    print("agent", aid, "reset", rt["reset_seq"], "by", g.user["username"], flush=True)
-    return jsonify(ok=bool(seq), reset_seq=rt["reset_seq"])
+    with system_ctx(c):  # 2.37.0 (#1150): the instance admin manages agent accounts (any organisation; structure, no content)
+        a = need_agent_admin(c, aid)
+        if not agent_active(a):
+            return err(tr("This agent is paused"), 409)
+        c.execute("UPDATE agents SET reset_seq=reset_seq+1 WHERE user_id=?", (aid,))
+        rt = agent_runtime(agent_row(c, aid))
+        seq = agent_emit(c, aid, "reset", {"reset_seq": rt["reset_seq"], "runtime": {**rt, "timezone": str(TZ)},
+                                           "user": {"id": me(), "name": user_names(c, [me()]).get(me(), "")}})
+        bump(c)
+        c.commit()
+        print("agent", aid, "reset", rt["reset_seq"], "by", g.user["username"], flush=True)
+        return jsonify(ok=bool(seq), reset_seq=rt["reset_seq"])
 
 
 @app.post("/api/admin/agents/<int:aid>/avatar")
 def admin_agent_avatar(aid):
     """2.1.2 (#346): an own picture for an agent (multipart "file", like Settings > Account), set by an admin."""
     c = db()
-    need_agent_admin(c, aid)
-    return avatar_upload(aid)
+    with system_ctx(c):  # 2.37.0 (#1150): the instance admin manages agent accounts (any organisation; structure, no content)
+        need_agent_admin(c, aid)
+        return avatar_upload(aid)
 
 
 @app.post("/api/admin/agents/<int:aid>/token")
@@ -351,45 +354,48 @@ def admin_agent_token(aid):
     """A new API token for the agent; every older token of the agent stops at once. Shown this once."""
     need_api()
     c = db()
-    need_agent_admin(c, aid)
-    c.execute("DELETE FROM api_tokens WHERE user_id=?", (aid,))
-    tok = agent_token_new(c, aid, body().get("expires_days"))
-    c.commit()
-    return jsonify(token=tok)
+    with system_ctx(c):  # 2.37.0 (#1150): the instance admin manages agent accounts (any organisation; structure, no content)
+        need_agent_admin(c, aid)
+        c.execute("DELETE FROM api_tokens WHERE user_id=?", (aid,))
+        tok = agent_token_new(c, aid, body().get("expires_days"))
+        c.commit()
+        return jsonify(token=tok)
 
 
 @app.post("/api/admin/agents/<int:aid>/secret")
 def admin_agent_secret(aid):
     c = db()
-    a = need_agent_admin(c, aid)
-    if not a["webhook_id"]:
-        raise Denied(404)
-    secret = "whsec_" + secrets.token_urlsafe(32)
-    c.execute("UPDATE webhooks SET secret=?, updated_at=? WHERE id=?", (seal(c, f"webhook:{a['webhook_id']}", secret), iso(now_utc()),
-                                                                        a["webhook_id"]))
-    c.commit()
-    return jsonify(secret=secret)
+    with system_ctx(c):  # 2.37.0 (#1150): the instance admin manages agent accounts (any organisation; structure, no content)
+        a = need_agent_admin(c, aid)
+        if not a["webhook_id"]:
+            raise Denied(404)
+        secret = "whsec_" + secrets.token_urlsafe(32)
+        c.execute("UPDATE webhooks SET secret=?, updated_at=? WHERE id=?", (seal(c, f"webhook:{a['webhook_id']}", secret), iso(now_utc()),
+                                                                            a["webhook_id"]))
+        c.commit()
+        return jsonify(secret=secret)
 
 
 @app.post("/api/admin/agents/<int:aid>/test")
 def admin_agent_test(aid):
     """A 'ping' event into the agent's queue, and to its webhook right now (the result is answered)."""
     c = db()
-    a = need_agent_admin(c, aid)
-    if not agent_active(a):
-        return err(tr("This agent is paused"), 409)
-    seq = agent_emit(c, aid, "ping", {"message": "Kalmido agent test"})
-    env = json.loads(c.execute("SELECT payload FROM agent_events WHERE id=?", (seq,)).fetchone()[0]) if seq else None
-    out = {"ok": bool(seq), "seq": seq, "webhook": None}
-    if env and a["webhook_id"]:
-        w = c.execute("SELECT * FROM webhooks WHERE id=?", (a["webhook_id"],)).fetchone()
-        c.execute("DELETE FROM webhook_queue WHERE webhook_id=? AND delivery=?", (w["id"], env["id"]))  # sent right here instead
-        ok, status, ms, errc = wh_send(w["url"], unseal(c, f"webhook:{w['id']}", w["secret"]), "ping", env["id"], 1,
-                                       json.dumps({**env, "webhook_id": w["id"]}).encode(), wh_allow(c))
-        wh_log(c, w["id"], env["id"], "ping", 1, ok, status, errc, ms)
-        out["webhook"] = {"ok": ok, "status": status, "ms": ms, "error": errc, "error_text": wh_err_text(errc, status) if errc else ""}
-    c.commit()
-    return jsonify(out)
+    with system_ctx(c):  # 2.37.0 (#1150): the instance admin manages agent accounts (any organisation; structure, no content)
+        a = need_agent_admin(c, aid)
+        if not agent_active(a):
+            return err(tr("This agent is paused"), 409)
+        seq = agent_emit(c, aid, "ping", {"message": "Kalmido agent test"})
+        env = json.loads(c.execute("SELECT payload FROM agent_events WHERE id=?", (seq,)).fetchone()[0]) if seq else None
+        out = {"ok": bool(seq), "seq": seq, "webhook": None}
+        if env and a["webhook_id"]:
+            w = c.execute("SELECT * FROM webhooks WHERE id=?", (a["webhook_id"],)).fetchone()
+            c.execute("DELETE FROM webhook_queue WHERE webhook_id=? AND delivery=?", (w["id"], env["id"]))  # sent right here instead
+            ok, status, ms, errc = wh_send(w["url"], unseal(c, f"webhook:{w['id']}", w["secret"]), "ping", env["id"], 1,
+                                           json.dumps({**env, "webhook_id": w["id"]}).encode(), wh_allow(c))
+            wh_log(c, w["id"], env["id"], "ping", 1, ok, status, errc, ms)
+            out["webhook"] = {"ok": ok, "status": status, "ms": ms, "error": errc, "error_text": wh_err_text(errc, status) if errc else ""}
+        c.commit()
+        return jsonify(out)
 
 
 # ---- 2.7.2 (#420): personal agents. An admin allows people to create their own agents (instance setting user_agents, off
@@ -701,12 +707,13 @@ def my_agent_delete(aid):
 def admin_agent_delete(aid):
     """An admin deletes any agent; its own lists go to the owner of a personal agent, else to the admin."""
     c = db()
-    a = need_agent_admin(c, aid)
-    heir = a["owner_id"] if a["owner_id"] and c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (a["owner_id"],)).fetchone() else me()
-    files = agent_delete(c, aid, heir)
-    bump(c)
-    c.commit()
-    unlink_files(files)
-    avatar_drop_file(aid, a["avatar"])
-    print("agent", aid, "deleted by", g.user["username"], flush=True)
-    return jsonify(ok=True)
+    with system_ctx(c):  # 2.37.0 (#1150): the instance admin manages agent accounts (any organisation; structure, no content)
+        a = need_agent_admin(c, aid)
+        heir = a["owner_id"] if a["owner_id"] and c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (a["owner_id"],)).fetchone() else me()
+        files = agent_delete(c, aid, heir)
+        bump(c)
+        c.commit()
+        unlink_files(files)
+        avatar_drop_file(aid, a["avatar"])
+        print("agent", aid, "deleted by", g.user["username"], flush=True)
+        return jsonify(ok=True)

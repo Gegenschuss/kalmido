@@ -5162,7 +5162,7 @@ a.nitem.ndm{text-decoration:none;color:inherit}
 .fsapply legend{font-size:var(--fs-s);color:var(--text2);padding:0 .25rem}
 .fsprev{background:var(--bg3);border-radius:var(--r-s);padding:.5rem .75rem;font-size:var(--fs-s);margin:.25rem 0 .5rem}.fsprev ul{margin:.25rem 0;padding-left:1.125rem}
 /* 2.37.0 (#1158): the dry run is a warning (not saved yet), never a success look; the hint of a folder without own lists */
-.fsprev.unsaved{border-left:3px solid var(--p3);background:color-mix(in srgb,var(--p3) 10%,var(--bg3))}.fsprev .fsprevh{display:inline-flex;align-items:center;gap:.375rem;color:var(--text)}.fsprev .fsprevh .i{color:var(--p3)}
+.fsprev.unsaved{border-left:.1875rem solid var(--p3);background:color-mix(in srgb,var(--p3) 10%,var(--bg3))}.fsprev .fsprevh{display:inline-flex;align-items:center;gap:.375rem;color:var(--text)}.fsprev .fsprevh .i{color:var(--p3)}
 .fsnone{margin:0 0 .5rem}
 .lfolderhint .fown{text-decoration:line-through;color:var(--muted)}
 .lfolderhint .linkbtn{font-size:inherit}

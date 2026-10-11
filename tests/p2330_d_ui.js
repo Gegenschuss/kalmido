@@ -104,16 +104,23 @@ const V = B + 'api/v1';
   w.eval(`folderPropsModal('Apps')`); await until(() => d.querySelector('.modal [data-m="repos"]'));
   click(w, d.querySelector('.modal [data-m="repos"]'));
   await until(() => d.querySelector('.modal #l-repos #rp-name'));
-  check(/Repository of the folder “Apps”/.test(d.querySelector('.modal h3')?.textContent || '') && d.querySelector('.modal #l-repos #rp-name') && !d.querySelector('.modal #rp-tok').disabled,
-    '#934: folder settings > Repository opens the form ' + d.querySelector('.modal h3')?.textContent);
+  // 2.37.0 (#1158): Repository… opens as a sub-dialog over the folder settings (which step aside, hidden): look in its own dialog
+  const rmd = () => d.querySelector('.modal #l-repos')?.closest('.modal');
+  check(/Repository of the folder “Apps”/.test(rmd()?.querySelector('h3')?.textContent || '') && d.querySelector('.modal #l-repos #rp-name') && !d.querySelector('.modal #rp-tok').disabled
+    && /Back/.test(rmd()?.querySelector('[data-m="close"]')?.textContent || ''),
+    '#934: folder settings > Repository opens the form (sub-dialog with Back) ' + rmd()?.querySelector('h3')?.textContent);
   d.querySelector('.modal #rp-prov').value = 'github';
   d.querySelector('.modal #rp-base').value = GH; d.querySelector('.modal #rp-name').value = 'acme/app'; d.querySelector('.modal #rp-tok').value = TOKEN;
   click(w, d.querySelector('.modal [data-rp="add"]'));
   const frow = await until(() => d.querySelector('.modal #l-repos .reporow'));
   check(frow && /acme\/app/.test(frow.textContent) && /Token set/.test(frow.textContent), '#934: connected to the folder: ' + (frow?.textContent.replace(/\s+/g, ' ') || ''));
   check(/Used by 2 of 2 project lists in this folder/.test(d.querySelector('.modal #l-repos').textContent), '#934: how many lists use it: ' + d.querySelector('.modal #l-repos .lhint[role="status"]')?.textContent);
-  check(!d.querySelector('.modal').innerHTML.includes(TOKEN), '#934: no token in the page');
-  click(w, d.querySelector('.modal [data-m="close"]')); await sleep(100);
+  check(![...d.querySelectorAll('.modal')].some(m => m.innerHTML.includes(TOKEN)), '#934: no token in the page');
+  click(w, rmd().querySelector('[data-m="close"]')); await sleep(100);
+  // Back: the folder settings come back; close them too
+  const fpm = await until(() => { const m = d.querySelector('.modal [data-m="repos"]')?.closest('.modal'); return m && m.style.display !== 'none' && m; });
+  check(!!fpm, '#1158: Back brings the folder settings again');
+  if (fpm) { click(w, fpm.querySelector('[data-m="close"]')); await sleep(100); }
   // the list dialog: from the folder, switch off / on
   w.eval(`listModal(${PB})`);
   const fr = await until(() => d.querySelector('.lmodal #l-repos .repofold'));

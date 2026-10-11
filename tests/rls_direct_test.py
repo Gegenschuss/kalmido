@@ -96,7 +96,8 @@ ALPHA = A.get(B + "/api/state").json()["me"]["workspaces"][0]["id"]
 r = A.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": CAROL})
 assert r.status_code == 201, r.text
 BETA = r.json()["id"]
-A.delete(B + f"/api/orgs/{ALPHA}/members/{CAROL}")
+sql("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=1", (ALPHA,))  # alice administers Alpha (start-up sync only in mode organisation)
+check(A.delete(B + f"/api/orgs/{ALPHA}/members/{CAROL}").ok, "setup: carol leaves Alpha")
 check(sorted(x[0] for x in sql("SELECT user_id FROM org_members WHERE org_id=?", (ALPHA,))) == sorted([1, BOB])
       and [x[0] for x in sql("SELECT user_id FROM org_members WHERE org_id=?", (BETA,))] == [CAROL],
       "setup: Alpha = alice + bob, Beta = carol")

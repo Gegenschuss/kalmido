@@ -110,6 +110,12 @@ def sev_scan(c):
 
 
 def sev_is_admin(c, uid):
+    from ..core.pg import system_ctx
+    with system_ctx(c):  # 2.37.0 (#1150): is uid an admin of any organisation (structure; a sign-in has no context yet)
+        return _sev_is_admin(c, uid)
+
+
+def _sev_is_admin(c, uid):
     return bool(c.execute("SELECT 1 FROM users WHERE id=? AND kind!='agent' AND (is_admin=1 OR id IN "
                           "(SELECT user_id FROM org_members WHERE role='admin'))", (uid,)).fetchone())
 

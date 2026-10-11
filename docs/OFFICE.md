@@ -212,3 +212,6 @@ Since 2.36.2 also `office_company` and `office_doc_log`, the columns `locked_at`
 `tax_pct`, `net`, `tax_amount` of `office_doc_items` (positions written without `org_id` get it at the next start) and
 the billing columns of `clients` - all nullable or with a default, so the previous release runs on with them.
 Unfinished logo uploads (`*.tmp`) are not part of backups.
+Since 2.37.0 (PostgreSQL) amounts, rates and quantities are `NUMERIC(14,4)` (exact decimals; read back as numbers as
+before), and every `office_*` table is under row-level security by `org_id`: a request only ever gets rows of its own
+organisations, even if a route forgot a check.

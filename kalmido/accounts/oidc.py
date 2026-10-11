@@ -316,6 +316,12 @@ def _truthy(v):
 
 def oidc_account(c, claims):
     """The user for these claims (links / creates as configured) or OidcError(no_account|disabled|group|taken)."""
+    from ..core.pg import system_ctx
+    with system_ctx(c):  # 2.37.0 (#1150): before the login nobody is signed in: linking / creating the account and syncing its
+        return _oidc_account(c, claims)  # groups (memberships of their lists) is account structure across organisations
+
+
+def _oidc_account(c, claims):
     from ..lists.groups import grp_oidc_sync
     from ..accounts.users import _active_admins
     from ..notify.alerts import aa_now

@@ -11,6 +11,7 @@ addresses and paths to your setup.
 
 - [Reverse proxy and network](#reverse-proxy-and-network)
 - [Installed app (PWA) and push](#installed-app-pwa-and-push)
+- [Database (PostgreSQL)](#database-postgresql)
 - [Backup and encryption](#backup-and-encryption)
 - [Server hardening](#server-hardening)
 - [Intrusion alerts](#intrusion-alerts)
@@ -127,7 +128,37 @@ to *deny* and allow each app per group, so a new account does not open every app
 - **The upload token is not an API token.** *Share from your phone* uses each person's upload token for `/drop` only;
   scripts need a personal access token ([API.md](API.md#personal-access-tokens)).
 
+## Database (PostgreSQL)
+
+Since 2.37.0 Kalmido needs PostgreSQL 17 (`DATABASE_URL=postgresql://user:password@host/db`); without it the app does
+not start and says why.
+
+- **Extensions need the database owner.** `init_db` creates `unaccent` and `pg_trgm` (both trusted extensions in the
+  official image). With an external server, the user in `DATABASE_URL` must own the database, or create them once yourself.
+- **Row-level security.** Kalmido enforces the organisation boundary also in the database. If the database user can
+  bypass row-level security (the superuser of the official `postgres` image does), Kalmido creates the role `kalmido_app`
+  (no login, no bypass) and its connections switch to it; this needs the right to create roles. Otherwise create it once:
+  `CREATE ROLE kalmido_app NOLOGIN NOBYPASSRLS; GRANT kalmido_app TO <your user>;`.
+- **Connections.** Kalmido keeps up to 56 connections (`KALMIDO_DB_POOL_MAX`); `max_connections` of the server must be
+  higher (the default 100 is enough for one instance).
+- **Timeouts.** Every statement may run 30 s, a transaction may idle 5 minutes; Kalmido sets this itself per connection.
+- **Backups outside the app** (scripts, a pull from a second machine): use `pg_dump -Fc` with row-level security
+  switched on and the system context, otherwise the dump stops or misses rows:
+
+  ```bash
+  PGOPTIONS="-c app.role=system" pg_dump -Fc --enable-row-security -h db -U kalmido -d kalmido -f kalmido.dump
+  ```
+  Restore with `pg_restore --clean --if-exists --no-owner --no-privileges --single-transaction --enable-row-security`
+  and the same `PGOPTIONS`, as the database owner, then start Kalmido (it grants the rights again).
+- **After a PostgreSQL major upgrade, reindex.** The search index depends on the `unaccent` rules of the server:
+  run `REINDEX DATABASE kalmido;` once after moving to a new major version.
+
 ## Backup and encryption
+
+- **In-app backups (2.37.0).** *Back up now* and the automatic backups write a zip with a `pg_dump` of the database
+  (`kalmido.dump`), the attachments, the office files and a manifest with checksums (format 2); restoring runs in
+  maintenance mode with a safety backup first. Backups from before 2.37 (SQLite) are listed and can be checked, but are
+  restored with 2.36 and then updated to 2.37.
 
 - **Fail closed when the data disk is missing.** Keep the data folder on its own disk or volume and mount it so that
   Docker refuses to start without it, instead of creating an empty folder (an empty start shows the setup page, and
@@ -255,7 +286,8 @@ Trigger every alert once on purpose after setting it up, the dead man's switch t
 ## Moving to a new server
 
 1. **Before:** lower the DNS TTL of the name a day ahead; make a backup (*Back up now*).
-2. **Copy:** the data folder (database, attachments, backups), the `.env` and above all **`KALMIDO_SECRET_KEY`**:
+2. **Copy:** the data folder (attachments, backups) and the database (`pg_dump`, see above, or the database folder
+   with PostgreSQL stopped), the `.env` and above all **`KALMIDO_SECRET_KEY`**:
    without it, stored secrets (repository tokens, sign-on client secret) cannot be decrypted and must be
    entered again.
 3. **Start** the new server and check the attachments (number and size, see above) and the counts (users, lists,

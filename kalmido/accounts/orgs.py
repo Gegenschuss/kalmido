@@ -795,15 +795,15 @@ def org_member_remove(oid, uid):
         from ..core.access import acx_drop
         acx_drop()
         heir = operator
+    oname = c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()[0]  # 2.37.0 (#1150): before leaving it (then invisible)
     n = org_leave(c, oid, uid, heir)
     if operator:
         from ..collab.news import news_add
-        oname = c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()[0]
         news_add(c, operator, "share", list_id=None, data={"org": True, "name": oname, "role": "admin", "handover": n}, actor=uid)
         print("organisation", oid, "last admin", uid, "left: operator", operator, "took it over,", n, "lists", flush=True)
     if uid != me():
         from ..collab.news import news_add
-        news_add(c, uid, "unshare", list_id=None, data={"org": True, "name": c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()[0]})
+        news_add(c, uid, "unshare", list_id=None, data={"org": True, "name": oname})
     bump(c)
     c.commit()
     print("organisation", oid, "member", uid, "removed by" if uid != me() else "left,", g.user["username"], "lists transferred:", n, flush=True)
