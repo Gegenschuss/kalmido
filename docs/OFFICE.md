@@ -110,7 +110,10 @@ need the organisation's admin. `GET/PUT /api/office/settings`, `GET /api/office/
 `sets`, `texts`, `contracts`: `GET /api/office/<kind>?q=&archived=1`, `POST /api/office/<kind>`,
 `GET/PATCH/DELETE /api/office/<kind>/<id>` (delete archives a row that documents, contracts or sets still use).
 `GET /api/office/export`, `POST /api/office/import?overwrite=1` (JSON body or multipart `file`). Documents: see
-`/api/office/docs` below.
+`/api/office/docs` below. 2.38.0 adds `POST /api/office/docs/<id>/invoice`, `POST /api/office/docs/<id>/credit`,
+`POST /api/office/docs/from-time`, `POST /api/office/docs/reminder`, `GET/POST /api/office/docs/<id>/payments`,
+`DELETE /api/office/docs/<id>/payments/<pid>`, `POST /api/office/docs/<id>/send`, `POST /api/office/docs/<id>/datev` and
+`GET /api/office/mail-status` (see "Invoices and credit notes" below). Agents never reach `/api/office/*`.
 
 ## Quotations and the calculator
 
@@ -147,7 +150,92 @@ Finalising freezes it:
 The print model and the PDF of a finalised document are built from this snapshot only: later changes of the company,
 the logo, the services, the client or the country pack do not change it. Changing the head, the positions or the number
 and deleting answer `409` with a reason; the status of a quotation can still change. "Duplicate" makes a new open draft
-(a new version) without the snapshot. Quotations do not have to be finalised; it is an optional step for them.
+(a new version) without the snapshot. Quotations do not have to be finalised; it is an optional step for them. Since
+2.38.0 a quotation with status "sent" is locked the same way (a business letter is kept as sent; a new version = duplicate).
+
+## Invoices and credit notes
+
+(2.38.0, stage 2.) The documents tab lists quotations, invoices, credit notes and reminders (`kind` = `offer`, `invoice`,
+`credit`, `reminder`). An invoice starts in one of three ways:
+
+- **from a quotation** ("Create invoice" on the quotation, `POST /api/office/docs/<id>/invoice`): every line of the
+  quotation becomes a plain position - the producing, raw data and discount lines the calculator made are condensed
+  into positions with their amount, an uncounted raw data option is left out; rights, framework contract text,
+  recipient, project title, language, currency and rate, period of service and the PO number are taken over
+  (`source_doc_id` points back);
+- **from time entries** (`POST /api/office/docs/from-time` with `{client_id, from, to, project_id?}`): the finished time
+  entries of the client's lists in the period, one position per list with the hours; the rate is the client's hourly
+  rate when set, else 0 to fill in;
+- **empty** (`POST /api/office/docs` with `{"kind": "invoice"}`).
+
+Invoices have no producing / raw data / discount automation: a document is exactly its positions. A discount is a
+position of kind `discount` (its amount is taken off, same tax class). The invoice calculator is Decimal throughout:
+every position is quantity x rate rounded half up to 2 places (the rate converted into USD first, like quotations), the
+net is the sum of the positions, the tax per rate is computed on the rounded sum of that rate (EN 16931), and all
+amounts of `totals` are decimal strings with 2 places (`"net": "34422.90"`, `tax_lines: [{pct, base, amount}]`, `tax`,
+`gross`). A USD invoice also carries `tax_eur` and `gross_eur` by the document's rate (printed as a note). Quotations
+keep their numeric totals.
+
+Head fields of an invoice: `order_ref` (the client's PO number), `payment_days` and `due_date` (the due date is set from
+the payment days when it is empty: the client's payment terms, else the organisation's default), `vat_note` for
+documents without VAT (`reverse`, `abroad` or `small`; the text comes from the country pack and is required before
+finalising), `einvoice_format` (`zugferd` by default, `xrechnung` proposed for clients with a buyer reference).
+
+States: `draft -> issued -> sent -> paid`. `issued` comes with finalising only; `sent` with sending (or by hand);
+`paid` through payments (or by hand). The answers also carry a derived `state` (never stored): `partial` when part of
+the gross is paid, `overdue` when the due date passed and the invoice is still open. `cancelled` is set only by a credit
+note over the full amount, never by editing; there is no way back to `draft`. A status change the model does not allow
+answers `409`.
+
+Finalising an invoice checks the required fields first and answers `400` with the list of what is missing: recipient
+name and address (street, postcode and city from the client, or at least two address lines), date, period of service,
+at least one position, the company's name, address, tax number or VAT ID and IBAN (settings > company fields), a due
+date or payment days, and the VAT note for documents without VAT. Then the number is assigned (see below), the status
+becomes `issued`, the snapshot is stored like for quotations and the PDF/A-3 + e-invoice XML are written (see
+"E-invoices").
+
+Numbers: one series per organisation and kind - settings `invoice_scheme` (`RE-{yyyy}-{seq:03}`), `credit_scheme`
+(`GS-{yyyy}-{seq:03}`), `reminder_scheme` (`MA-{yyyy}-{seq:03}`); a draft has no number, the number comes with finalising
+(no gaps through deleted drafts). A number by hand (`POST /api/office/docs/<id>/number`) is accepted in the draft only
+when it follows the scheme and lies above the series' last value; the counter then continues from it. Numbers are unique
+per organisation.
+
+A **credit note** (`POST /api/office/docs/<id>/credit` on a finalised invoice; button "Credit note / cancel") is a draft
+with the invoice's positions and `cancels_id`; shorten it for a partial credit. When the credit note is finalised it
+lowers the invoice's open amount; over the full gross it sets the invoice to `cancelled`. Credit notes have their own
+number series and print "Credit note for invoice no. ...".
+
+## Payments and reminders
+
+Payments (`office_payments`): `GET /api/office/docs/<id>/payments`, `POST ... {date, amount, method: transfer|cash|card|
+other, note}` by any member on a finalised, open invoice, `DELETE /api/office/docs/<id>/payments/<pid>` by the
+organisation's admin. The sum of the payments plus the finalised credit notes against the invoice's gross gives
+`paid`, `credits` and `open` in the answers; covered in full the invoice becomes `paid` with `paid_at`, a removed payment
+reverts that. The print model of an invoice with payments shows "already paid" and "amount outstanding".
+
+Reminders (`kind` = `reminder`, "Create reminder" in the invoice list): `POST /api/office/docs/reminder` with
+`{doc_ids: [...], level: 1|2|3, fee?, deadline_days?}` makes a draft over open, finalised invoices (one client); the
+recipient comes from the first invoice. Level 1 prints "Payment reminder", 2 "Reminder", 3 "Final reminder" (country
+pack labels `reminder_1..3`), with a table of the invoices (number, date, due date, amount outstanding), the fee and the
+deadline; totals = the open amounts plus the fee. Reminders are finalised and sent like other documents (`draft ->
+issued -> sent`) and keep the amounts of their day. Defaults: settings `reminder_fee` and `reminder_deadline_days`.
+
+## Sending and DATEV
+
+`POST /api/office/docs/<id>/send` with `{to, cc?, subject?, text?, datev?}` mails a finalised document with its files
+(PDF/A-3, and for invoices and credit notes the e-invoice XML) through the server's SMTP settings (`KALMIDO_SMTP_*`);
+the status becomes `sent` and `sent_at` is set. Without SMTP the route answers `409` with a readable reason (the send
+dialog says so and offers the PDF download instead). `GET /api/office/mail-status` tells the client whether mail is set
+up and which DATEV address is configured.
+
+DATEV: the settings hold one e-mail address of the DATEV document inbox (`datev_email`); `datev: true` in the send
+body, the setting `datev_auto` or `POST /api/office/docs/<id>/datev` mail the PDF + XML of an invoice or credit note
+there (`datev_sent_at`). No credentials, no bookkeeping export (a booking batch export is a later step). Every send is
+in the office log (`send`, `datev`), payments as `payment` / `payment_delete`.
+
+Settings for all of this (`PUT /api/office/settings`): `invoice_scheme`, `credit_scheme`, `reminder_scheme`,
+`payment_days` (14), `reminder_fee` (0), `reminder_deadline_days` (10), `einvoice_format`, `datev_email`, `datev_auto`,
+`invoice_closing_de/en`, `reminder_text_de/en` (empty = the country pack's texts).
 
 ## Company fields
 
@@ -215,6 +303,10 @@ Unfinished logo uploads (`*.tmp`) are not part of backups.
 Since 2.37.0 (PostgreSQL) amounts, rates and quantities are `NUMERIC(14,4)` (exact decimals; read back as numbers as
 before), and every `office_*` table is under row-level security by `org_id`: a request only ever gets rows of its own
 organisations, even if a route forgot a check.
+Since 2.38.0 also `office_payments` (`org_id`, `doc_id`, `date`, `amount NUMERIC`, `method`, `note`, `created_by`,
+`created_at`; under row-level security as well) and the nullable columns `order_ref`, `due_date`, `payment_days`,
+`cancels_id`, `ref_doc_ids`, `reminder_level`, `reminder_fee`, `reminder_deadline_days`, `paid_at`, `source_doc_id`,
+`einvoice_format`, `pdf_sha256`, `xml_sha256`, `datev_sent_at`, `vat_note` of `office_docs`; 2.37.1 runs on with them.
 
 ## E-invoices (ZUGFeRD / XRechnung) and PDF/A-3
 
