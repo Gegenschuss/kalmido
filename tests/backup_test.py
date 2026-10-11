@@ -482,9 +482,107 @@ refused(make_zip({"kalmido.dump": dump_with(
     ["DROP TRIGGER evil ON tasks", "DROP FUNCTION evil_fn()"])}), "objects", "foreign trigger + function")
 refused(make_zip({"kalmido.dump": dump_with(["CREATE VIEW evil_v AS SELECT id FROM users"], ["DROP VIEW evil_v"])}),
         "objects", "foreign view")
-refused(make_zip({"kalmido.dump": dump_with(
-    ["CREATE FUNCTION kalmido_evil() RETURNS void LANGUAGE plpgsql AS $f$BEGIN EXECUTE 'SELECT 1'; END$f$"],
-    ["DROP FUNCTION kalmido_evil()"])}), "objects", "an own-named function with dynamic SQL")
+
+
+# 2.37.0 (review W2-1): a restore takes no code from a dump (filtered table of contents; init_db makes functions, triggers
+# and policies from the app's own source). Own-named functions / triggers that do harmful things: the restore either
+# refuses the dump or goes through WITHOUT them -- checked in pg_proc / pg_trigger / pg_class afterwards.
+CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
+
+
+def code_state():
+    return {"procs": {r[0] for r in dbx("SELECT proname FROM pg_proc WHERE proname LIKE 'kalmido%'")},
+            "trgs": {r[0] for r in dbx("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal")},
+            "rls": {r[0] for r in dbx("SELECT relname FROM pg_class WHERE relkind='r' AND relrowsecurity AND relforcerowsecurity")},
+            "pols": len(dbx("SELECT 1 FROM pg_policy"))}
+
+
+def no_code(setup, teardown, fn, trg, what):
+    global A
+    before = code_state()
+    data = make_zip({"kalmido.dump": dump_with(setup, teardown)})
+    check(code_state() == before, f"{what}: the test database is clean again before the restore")
+    up = upload(data)
+    r = restore(upload=up.json()["upload"]) if up.ok else up
+    A = sess("alice")
+    if r.ok:  # restored without the code
+        after = code_state()
+        check(fn not in after["procs"] and (trg is None or trg not in after["trgs"]), f"{what}: restored, its code is not in the database")
+        check(after == before, f"{what}: functions, triggers, policies, row security as before ({before} / {after})")
+        dbx("UPDATE kalmido_meta SET value=value WHERE key='schema_version'")  # (would fire a trigger on kalmido_meta)
+        check(code_state() == before, f"{what}: still the same after a write to kalmido_meta")
+    else:
+        check(r.status_code == 400 and r.json().get("code") == "objects", f"{what}: refused ({r.status_code} {r.text[:160]})")
+    check(titles(A) == ref, f"{what}: data unchanged")
+
+
+EVIL = "CREATE FUNCTION kalmido_evil() RETURNS trigger LANGUAGE plpgsql AS $f$BEGIN {0}; RETURN NEW; END$f$"
+EVIL_TRG = "CREATE TRIGGER kalmido_evil BEFORE UPDATE ON kalmido_meta FOR EACH ROW EXECUTE FUNCTION kalmido_evil()"
+UNDO = ["DROP FUNCTION kalmido_evil() CASCADE"]
+no_code([EVIL.format("RESET ROLE")], UNDO, "kalmido_evil", None, "own-named function with RESET ROLE")
+no_code([EVIL.format("SET app.role = 'system'")], UNDO, "kalmido_evil", None, "own-named function with SET app.role")
+no_code([EVIL.format("ALTER TABLE public.lists DISABLE ROW LEVEL SECURITY")], UNDO, "kalmido_evil", None,
+        "own-named function with ALTER TABLE ... DISABLE ROW LEVEL SECURITY")
+no_code([EVIL.format("ALTER TABLE public.lists DISABLE ROW LEVEL SECURITY"), EVIL_TRG], UNDO, "kalmido_evil", "kalmido_evil",
+        "own-named trigger on kalmido_meta")
+no_code(["CREATE FUNCTION kalmido_evil() RETURNS void LANGUAGE plpgsql AS $f$BEGIN EXECUTE 'SELECT 1'; END$f$"], UNDO,
+        "kalmido_evil", None, "an own-named function with dynamic SQL")
+check("lists" in code_state()["rls"], "lists keep FORCE row level security")
+# the second floor (the SQL of the filtered list): such statements are refused wherever they would appear
+r = subprocess.run(["docker", "exec", CT, "python3", "-c", r"""
+import json, sys
+from kalmido.admin.backup import bk_check_statement as ok
+bad = ["RESET ROLE", "RESET ALL", "RESET SESSION AUTHORIZATION", "SET ROLE kalmido", "SET LOCAL ROLE kalmido",
+       "SET session_authorization = 'kalmido'", "SET SESSION AUTHORIZATION kalmido", "SET app.role = 'system'",
+       "SET LOCAL app.role = 'system'", "SET role = 'kalmido'", "ALTER TABLE public.lists DISABLE ROW LEVEL SECURITY",
+       "ALTER TABLE public.lists NO FORCE ROW LEVEL SECURITY", "ALTER TABLE public.lists ENABLE ROW LEVEL SECURITY",
+       "DROP POLICY IF EXISTS kalmido_org ON public.lists", "CREATE POLICY p ON public.lists USING (true)",
+       "CREATE EXTENSION IF NOT EXISTS unaccent WITH SCHEMA public", "DROP EXTENSION IF EXISTS pg_trgm",
+       "CREATE FUNCTION public.kalmido_x() RETURNS void LANGUAGE c AS 'x', 'y'",
+       "CREATE FUNCTION public.kalmido_x() RETURNS void LANGUAGE sql AS $$SELECT 1$$",
+       "CREATE TRIGGER time_task_list AFTER UPDATE ON public.tasks FOR EACH ROW EXECUTE FUNCTION public.kalmido_time_task_list()",
+       "ALTER FUNCTION public.kalmido_fold(text) SET search_path = public", "DO $$BEGIN NULL; END$$",
+       "ALTER TABLE ONLY public.tasks ALTER COLUMN title SET DEFAULT set_config('role', 'x', false)",
+       "COPY public.tasks (id) FROM PROGRAM 'id'",
+       # quoted / Unicode / escape-string call heads in expressions (review W2-1, B1)
+       "ALTER TABLE ONLY public.tasks ALTER COLUMN title SET DEFAULT pg_catalog.\"set_config\"('role', 'none', false)",
+       "ALTER TABLE ONLY public.tasks ALTER COLUMN title SET DEFAULT U&\"pg\\005fread_file\"('/etc/passwd')",
+       "CREATE TABLE public.t (a text DEFAULT pg_catalog.\"set_config\"('a', 'b', false))",
+       "ALTER TABLE ONLY public.t ADD CONSTRAINT c CHECK ((pg_catalog.\"set_config\"('a', 'b', false) IS NOT NULL))",
+       "CREATE INDEX i ON public.t USING btree (a) WHERE (pg_catalog.\"set_config\"('a', 'b', false) IS NOT NULL)",
+       "ALTER TABLE ONLY public.tasks ALTER COLUMN title SET DEFAULT E'\\'' || pg_sleep(1) || '\\''",
+       "ALTER TABLE ONLY public.tasks ALTER COLUMN title SET DEFAULT pg_sleep(1)"]
+good = ["CREATE TABLE public.t (id bigint NOT NULL, title text DEFAULT ''::text NOT NULL)", "SET row_security = on",
+        "ALTER TABLE ONLY public.lists FORCE ROW LEVEL SECURITY", "SELECT pg_catalog.setval('public.tasks_id_seq', 5, true)",
+        "CREATE INDEX m ON public.chat USING gin (public.kalmido_fold(body) public.gin_trgm_ops)",
+        "CREATE TABLE public.t2 (a character varying(8) DEFAULT ''::character varying, b numeric(14,4) DEFAULT 0 NOT NULL)"]
+print(json.dumps({"bad_ok": [s for s in bad if ok(s)], "good_refused": [s for s in good if not ok(s)]}))
+"""], capture_output=True, text=True)
+try:
+    res = json.loads(r.stdout.strip().splitlines()[-1])
+except (ValueError, IndexError):
+    res = {"error": (r.stdout + r.stderr)[-400:]}
+check(res.get("bad_ok") == [] and res.get("good_refused") == [], f"statement check (second floor): {res}")
+
+# ---- 2.37.0 (review K2-5): pg_restore itself fails (the dump's data breaks a foreign key) -> way back: the data as before,
+# the safety backup listed, no folder left over
+old_safety = {x["name"] for x in state()["items"] if x["kind"] == "safety"}
+fk_dump = dump_with(["ALTER TABLE tasks DISABLE TRIGGER ALL",
+                     "INSERT INTO tasks(list_id, title, created_at, updated_at) VALUES(999999, 'orphan task', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+                     "ALTER TABLE tasks ENABLE TRIGGER ALL"],
+                    ["DELETE FROM tasks WHERE list_id=999999"])
+check(not dbx("SELECT 1 FROM tasks WHERE list_id=999999"), "K2-5: the orphan row is gone again before the restore")
+up = upload(make_zip({"kalmido.dump": fk_dump}))
+r = restore(upload=up.json()["upload"]) if up.ok else up
+A = sess("alice")
+check(r.status_code == 400 and r.json().get("code") == "restore", f"K2-5: pg_restore failed -> refused with code restore ({r.status_code} {r.text[:200]})")
+check(titles(A) == ref and not dbx("SELECT 1 FROM tasks WHERE list_id=999999"), "K2-5: data as before")
+check(code_state()["pols"] > 0 and "lists" in code_state()["rls"], "K2-5: policies and row security back")
+check(r.ok is False and r.json().get("safety") in (None, "") and len({x["name"] for x in state()["items"] if x["kind"] == "safety"} - old_safety) == 1,
+      "K2-5: the safety backup is listed (the newest of the last 3)")
+check(not any("restore" in n for n in os.listdir(DATA) + os.listdir(BK)), f"K2-5: no .restore / .pre-restore folder left: {os.listdir(DATA)}")
+check(A.post(B + "/api/tasks", json={"title": "after failed restore", "list_id": L}).ok, "K2-5: the app works after the way back")
+ref = titles(A)
 dmg = bytearray(src_dump)
 for off in range(len(dmg) // 2, len(dmg) // 2 + 4000, 7):
     dmg[off] ^= 0x5A

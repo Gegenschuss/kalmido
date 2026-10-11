@@ -48,9 +48,12 @@ from ..calendars.subscriptions import _CAL_KEY
 # at a set time (a thread, not the watchdog), rotated by retention (newest per day for N days + newest per ISO week for M
 # weeks; safety backups: the last 3). Restore (from a listed backup or an uploaded file): every member name is checked
 # against the expected layout (no paths outside, no links, no directories), sizes / member count / compression ratio are
-# limited (zip bombs), the free disk space is checked, every SHA-256 is verified while extracting, the dump is read
-# completely once (pg_restore to SQL text, nothing executed): every block readable, only the statements a Kalmido dump
-# contains (no foreign functions, views, roles, COPY ... PROGRAM ...), a schema version this app can migrate. Then:
+# limited (zip bombs), the free disk space is checked, every SHA-256 is verified while extracting. Only tables, their data,
+# sequences, indexes, constraints and defaults are taken from the dump (a filtered table of contents; functions, triggers,
+# policies, extensions and privileges never come from a backup -- init_db creates them from this app's own source); an
+# entry of any other kind (views, rules, foreign functions, ...) refuses the dump. That filtered part is read completely
+# once (pg_restore to SQL text, nothing executed): every block readable, only plain table statements (no roles, no
+# COPY ... PROGRAM, no session or role switches), a schema version this app can migrate. Then:
 # maintenance mode (new requests 503, background threads paused, waits until nothing else runs), safety backup of the
 # current state, attachments folder swapped by rename, pg_restore --clean in ONE transaction, connection pool renewed,
 # migrations, in-process caches reset, every session ended except the restoring admin's (a fresh one).
@@ -683,37 +686,101 @@ def bk_extract(z, info, dest, listed):
 
 
 # ---- the dump of a backup: read it completely once (pg_restore to SQL text, nothing is executed) before a restore
-# the statements a Kalmido dump consists of (pg_restore --clean --if-exists --no-owner --no-privileges --single-transaction);
-# anything else (views, rules, roles, foreign functions, COPY ... PROGRAM, ...) would run inside this database -> refused
+# 2.37.0 (#1150, review W2-1): a restore never takes CODE from a dump. The table of contents (pg_restore --list) is filtered
+# down to tables, their data, sequences, indexes, constraints and column defaults (bk_toc); functions, triggers, policies,
+# row security, extensions, schemas, privileges and comments are left out -- init_db creates all of them again from this
+# app's own source right after the restore (rls.apply, msgsearch, the schema triggers). An entry of an unknown kind (views,
+# rules, types, procedures, ...) or a function / trigger that is not Kalmido's refuses the whole dump ("objects").
+# Second floor: the SQL text of exactly the filtered list is read once and every statement must be one of the statements
+# below (anything else, e.g. COPY ... PROGRAM, SET ROLE, RESET, a DO block, would run inside this database -> refused)
 _ID = r'(?:"[^"]{1,63}"|\w{1,63})'
 _T = rf"public\.{_ID}"
 _STMT_OK = [re.compile(x, re.I | re.S) for x in (
-    r"SET [\w.]+ = [\w'.,\- ]*",
+    r"SET (?!(?:app\.|role\b|session_authorization\b))[\w]+ = [\w'.,\- ]*",
     rf"SELECT pg_catalog\.setval\('{_T}', \d+, (true|false)\)",
     r"BEGIN", r"COMMIT",  # pg-ok: patterns of a dump's statements (checked, not executed)
-    r"CREATE EXTENSION IF NOT EXISTS (unaccent|pg_trgm|plpgsql) WITH SCHEMA (public|pg_catalog)",
-    r"COMMENT ON EXTENSION (unaccent|pg_trgm|plpgsql) IS '[^']*'", r"COMMENT ON SCHEMA public IS '[^']*'",
-    rf"DROP (TABLE|INDEX|SEQUENCE|POLICY|EXTENSION) IF EXISTS [\w.\" ]+",
-    rf"DROP FUNCTION IF EXISTS {_T}\([\w, ]*\)", rf"DROP TRIGGER IF EXISTS {_ID} ON {_T}",
+    rf"DROP (TABLE|INDEX|SEQUENCE) IF EXISTS [\w.\" ]+",
     rf"ALTER TABLE (IF EXISTS )?(ONLY )?{_T} (DROP CONSTRAINT IF EXISTS {_ID}|ALTER COLUMN {_ID} DROP DEFAULT)",
     rf"CREATE TABLE {_T} \(.*\)",
     rf"ALTER TABLE (ONLY )?{_T} ALTER COLUMN {_ID} (ADD GENERATED (BY DEFAULT|ALWAYS) AS IDENTITY \(.*\)|SET DEFAULT .*)",
     rf"ALTER TABLE (ONLY )?{_T} ADD CONSTRAINT {_ID} (PRIMARY KEY|UNIQUE|FOREIGN KEY|CHECK) .*",
-    rf"ALTER TABLE (ONLY )?{_T} (ENABLE|FORCE) ROW LEVEL SECURITY",
     rf"CREATE (UNIQUE )?INDEX {_ID} ON (ONLY )?{_T} USING \w+ \(.*\)",
     rf"CREATE SEQUENCE {_T} .*", rf"ALTER SEQUENCE {_T} OWNED BY {_T}\.{_ID}",
-    rf"CREATE POLICY {_ID} ON {_T} .*", rf"COMMENT ON (TABLE|COLUMN) {_T}(\.{_ID})? IS '.*'",
+    rf"COMMENT ON (TABLE|COLUMN) {_T}(\.{_ID})? IS '.*'",
 )]
-_STMT_FN = re.compile(rf"CREATE FUNCTION public\.(\w+)\(.*\) RETURNS .*", re.I | re.S)
-_STMT_TRG = re.compile(rf"CREATE TRIGGER (\w+) (AFTER|BEFORE|INSTEAD OF) .* ON {_T} .*EXECUTE FUNCTION public\.(\w+)\(\)", re.I | re.S)
+_STMT_FORCE = re.compile(rf"ALTER TABLE (ONLY )?{_T} FORCE ROW LEVEL SECURITY")
 _OWN_FN = re.compile(r"(kalmido|rls)_\w+")
+# (whole words: a future column or comment containing one of them would make own backups unrestorable -> rename it or
+# narrow the word here; the round trip of tests/backup_test.py shows it at once)
 _STMT_BAD = re.compile(
-    r"\b(FROM|TO)\s+PROGRAM\b|\bSECURITY\s+DEFINER\b|\bEXECUTE\b(?!\s+(FUNCTION|PROCEDURE)\b)|\bALTER\s+(SYSTEM|ROLE|USER|DATABASE)\b"
+    r"\b(FROM|TO)\s+PROGRAM\b|\bSECURITY\s+DEFINER\b|\bEXECUTE\b|\bALTER\s+(SYSTEM|ROLE|USER|DATABASE|FUNCTION|PROCEDURE)\b"
     r"|\b(CREATE|DROP)\s+(ROLE|USER|DATABASE|SERVER|SUBSCRIPTION|PUBLICATION|EVENT\s+TRIGGER|RULE|VIEW|LANGUAGE)\b|\bGRANT\b"
-    r"|\bSET\s+(ROLE|SESSION\s+AUTHORIZATION)\b|\bCOPY\s+[\w.\"]+\s*(\(|FROM|TO)|\b(pg_read_file|pg_read_binary_file|pg_ls_\w+"
+    r"|\bRESET\b|\bSET\s+(LOCAL\s+|SESSION\s+)?(ROLE|SESSION[\s_]+AUTHORIZATION|app\.)|[\w.]*session_authorization"
+    r"|\bROW\s+LEVEL\s+SECURITY\b|\bPOLICY\b|\bEXTENSION\b|\bLANGUAGE\s+\"?c\b|\bTRIGGER\b|\bFUNCTION\b|\bPROCEDURE\b|\bDO\b"
+    r"|\bCOPY\s+[\w.\"]+\s*(\(|FROM|TO)|\b(pg_read_file|pg_read_binary_file|pg_ls_\w+"
     r"|pg_stat_file|lo_import|lo_export|lo_\w*open|dblink\w*|pg_execute_server_program|pg_terminate_backend|pg_cancel_backend"
     r"|pg_reload_conf|pg_promote|pg_file_\w+|set_config|query_to_xml\w*)\s*\(", re.I)
 _COPY = re.compile(rb'COPY public\.("[^"]{1,63}"|\w{1,63}) \((?:[^()\n]*)\) FROM stdin;\n')
+# the kinds of table-of-contents entries a restore takes over (longest first: "TABLE DATA" before "TABLE")
+_TOC_KEEP = ("SEQUENCE OWNED BY", "FK CONSTRAINT", "SEQUENCE SET", "TABLE DATA", "CONSTRAINT", "SEQUENCE", "DEFAULT",
+             "INDEX", "TABLE")
+# the kinds it leaves out (code, privileges, schema-level entries: init_db / the running database have their own)
+_TOC_SKIP = ("DATABASE PROPERTIES", "ROW SECURITY", "DEFAULT ACL", "STDSTRINGS", "SEARCHPATH", "EXTENSION", "FUNCTION",
+             "ENCODING", "TRIGGER", "COMMENT", "DATABASE", "POLICY", "SCHEMA", "ACL")
+_TOC_KINDS = tuple(sorted(_TOC_KEEP + _TOC_SKIP, key=len, reverse=True))
+_TOC_LINE = re.compile(r"(\d+); (\d+) (\d+) (.*)")
+
+
+def bk_toc(dump):
+    """The filtered table of contents of a dump (see above): (list text for pg_restore --use-list, table names).
+    BackupError("integrity") when pg_restore cannot read it, "objects" for an entry of an unknown or foreign kind."""
+    exe = _pg_tool("pg_restore")
+    lst = subprocess.run([exe, "--list", dump], stdin=subprocess.DEVNULL, capture_output=True, timeout=600, check=False,
+                         env={"PATH": os.environ.get("PATH", "")})
+    if lst.returncode:
+        raise BackupError("integrity")
+    try:
+        text = lst.stdout.decode("utf-8")
+    except UnicodeDecodeError:
+        raise BackupError("integrity") from None
+    keep, tables = [], set()
+    for ln in text.splitlines():
+        if not ln.strip() or ln.startswith(";"):
+            continue
+        m = _TOC_LINE.fullmatch(ln)
+        kind = m and next((k for k in _TOC_KINDS if m.group(4).startswith(k + " ")), None)
+        if not kind:
+            print("restore: refused dump entry:", ln[:200], flush=True)
+            raise BackupError("objects")
+        rest = m.group(4)[len(kind) + 1:].split(" ")
+        if kind == "FUNCTION":  # FUNCTION public name(args) owner
+            ok = len(rest) >= 2 and rest[0] == "public" and bool(_OWN_FN.fullmatch(rest[1].split("(", 1)[0]))
+        elif kind == "TRIGGER":  # TRIGGER public table name owner
+            ok = len(rest) >= 3 and rest[0] == "public" and (rest[2] in SCHEMA_TRIGGERS or bool(_OWN_FN.fullmatch(rest[2])))
+        elif kind == "COMMENT" and rest[:2] in (["public", "TABLE"], ["public", "COLUMN"]):
+            keep.append(ln)  # a comment on a table / column (plain text, checked below like everything else)
+            continue
+        elif kind in _TOC_KEEP:  # (a name with a space would split: refused, Kalmido has none)
+            ok = len(rest) >= 2 and rest[0] == "public" and (kind != "TABLE" or len(rest) <= 3)
+            if ok:
+                keep.append(ln)
+                if kind == "TABLE":
+                    tables.add(rest[1])
+        else:
+            ok = True
+        if not ok:
+            print("restore: refused dump entry:", ln[:200], flush=True)
+            raise BackupError("objects")
+    return "\n".join(keep) + "\n", tables
+
+
+def _toc_file(dump):
+    """bk_toc written next to the dump (the work folder of the restore); returns (path, table names)."""
+    text, tables = bk_toc(dump)
+    path = dump + ".toc"
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+    return path, tables
 
 
 def bk_statements(sql):
@@ -765,23 +832,37 @@ def bk_statements(sql):
 
 
 def bk_check_statement(s):
-    """True when the statement is one a Kalmido dump consists of."""
+    """True when the statement is one a (filtered) Kalmido dump consists of."""
     if s == "SELECT pg_catalog.set_config('search_path', '', false)":  # the preamble (set_config is refused elsewhere)
         return True
-    if _STMT_BAD.search(s):
+    if _STMT_FORCE.fullmatch(s):  # part of a TABLE entry; only ever tightens (rls.apply sets it anyway)
+        return True
+    if _STMT_BAD.search(s) or not _calls_ok(s):
         return False
-    m = _STMT_FN.fullmatch(s)
-    if m:
-        lang = re.search(r"\bLANGUAGE\s+(\w+)", s, re.I)
-        return bool(_OWN_FN.fullmatch(m.group(1)) and lang and lang.group(1).lower() in ("plpgsql", "sql"))
-    m = _STMT_TRG.fullmatch(s)
-    if m:
-        return (m.group(1) in SCHEMA_TRIGGERS or bool(_OWN_FN.fullmatch(m.group(1)))) and bool(_OWN_FN.fullmatch(m.group(3)))
     return any(rx.fullmatch(s) for rx in _STMT_OK)
 
 
-def _restore_args():
-    return ["--clean", "--if-exists", "--no-owner", "--no-privileges", "--single-transaction"]
+# 2.37.0 (review W2-1, Fable B1): every call in an expression (DEFAULT, CHECK, index, CREATE TABLE) must be one a Kalmido dump
+# has -- a positive list of call heads, not only the forbidden names above (pg_catalog."set_config"(...) as a column default
+# would run as whoever inserts). String literals are blanked first; escape / Unicode strings and quoted call heads never
+# occur in a Kalmido dump and are refused.
+_CALL_HEADS = {"IDENTITY", "KEY", "UNIQUE", "WHERE", "CHECK", "INCLUDE", "AND", "OR", "NOT", "IN", "ANY", "ARRAY", "btree",
+               "gin", "gist", "hash", "lower", "pg_catalog.lower", "numeric", "varying", "varchar", "timestamp", "COALESCE",
+               "pg_catalog.setval", "public.kalmido_fold", "kalmido_fold", "__T"}
+_TABLE_HEAD = re.compile(rf"(CREATE TABLE|REFERENCES|ON(?: ONLY)?) {_T}\s*\(")
+
+
+def _calls_ok(s):
+    if re.search(r"(?<![\w'])[EeUu]&?'|U&\"|\"\s*\(", s):
+        return False
+    t = _TABLE_HEAD.sub(r"\1 __T(", re.sub(r"'(?:[^']|'')*'", "''", s))
+    if re.search(r'"\s*\(', t):
+        return False
+    return all(m.group(1) in _CALL_HEADS for m in re.finditer(r'(?<![\w."])([A-Za-z_][\w.]*)\s*\(', t))
+
+
+def _restore_args(toc):
+    return ["--clean", "--if-exists", "--no-owner", "--no-privileges", "--single-transaction", f"--use-list={toc}"]
 
 
 def bk_scan_dump(dump):
@@ -789,9 +870,10 @@ def bk_scan_dump(dump):
     (else "integrity"), every statement one of a Kalmido dump ("objects"), the schema version (kalmido_meta) not newer
     than this app's ("schema"). Returns {"schema_version", "rows": {table: n}, "users"}."""
     exe = _pg_tool("pg_restore")
+    toc, _ = _toc_file(dump)
     rows, ddl, ddl_n, meta, table = {}, [], 0, {}, None
     with tempfile.TemporaryFile() as errf:
-        p = subprocess.Popen([exe, *_restore_args(), "-f", "-", dump], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+        p = subprocess.Popen([exe, *_restore_args(toc), "-f", "-", dump], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                              stderr=errf, env={"PATH": os.environ.get("PATH", "")})
         bad = None
         try:
@@ -859,17 +941,16 @@ def bk_scan_dump(dump):
 def bk_prepare(path, pw, work, att_dest=None, office_dest=None, restore=False):
     """Checks an archive completely; extracts the dump into work (and the attachments into att_dest, the office files into
     office_dest, if given) and reads it through once. Returns (manifest, dump path). A format-1 archive (SQLite, before
-    2.37) is checked (members, checksums) but refused for a restore."""
+    2.37) is checked (members, checksums); for a restore its tasks.db is extracted (the returned path) for the move tool."""
     zp, _ = bk_open(path, pw, work)
     try:
         with zipfile.ZipFile(zp) as z:
             man = bk_check_zip(z)
-            if man["_legacy"] and restore:
-                # 2.37 Job C: restore via migrate-sqlite (the move tool reads the tasks.db of the archive)
-                raise BackupError("legacy")
-            dbp = os.path.join(work, BK_DUMP)
+            # 2.37.0 (#1150): a format-1 archive is restored through the move tool (admin/migrate.py), which reads its tasks.db
+            legacy_restore = man["_legacy"] and restore
+            dbp = os.path.join(work, BK_LEGACY if legacy_restore else BK_DUMP)
             for i in z.infolist():
-                if i.filename == BK_DUMP:
+                if i.filename == BK_DUMP or (legacy_restore and i.filename == BK_LEGACY):
                     bk_extract(z, i, dbp, man["_listed"])
                 elif i.filename != "manifest.json":
                     m = BK_MEMBER_RE.fullmatch(i.filename)
@@ -900,6 +981,10 @@ def bk_prepare(path, pw, work, att_dest=None, office_dest=None, restore=False):
         raise BackupError("format") from None
     if not man["_legacy"]:
         man["db"] = bk_scan_dump(dbp)
+    elif restore:
+        from .migrate import is_kalmido_sqlite
+        if not is_kalmido_sqlite(dbp):
+            raise BackupError("legacy")
     return man, dbp
 
 
@@ -931,23 +1016,19 @@ def _pool_renew():
 
 
 def _pg_restore(dump):
-    """pg_restore --clean of a checked dump into the running database, in ONE transaction (an error leaves it as it was).
-    Tables of this version that the dump does not have (a backup of an older version) are dropped first, so --clean
-    cannot trip over their foreign keys; init_db creates them again, empty."""
-    exe = _pg_tool("pg_restore")
-    lst = subprocess.run([exe, "--list", dump], stdin=subprocess.DEVNULL, capture_output=True, timeout=600, check=False,
-                         env={"PATH": os.environ.get("PATH", "")})
-    if lst.returncode:
-        raise BackupError("integrity")
-    have = {m.group(1) for m in re.finditer(rb"^\d+; \d+ \d+ TABLE public (\S+) ", lst.stdout, re.M)}
-    if not {b"users", b"tasks", b"kalmido_meta"} <= have:  # (never drop anything on a list that was not understood)
+    """pg_restore --clean of a checked dump into the running database, in ONE transaction (an error leaves it as it was),
+    with the filtered table of contents only (bk_toc: no code from the dump; init_db creates it afterwards). Tables of this
+    version that the dump does not have (a backup of an older version) are dropped first, so --clean cannot trip over
+    their foreign keys; init_db creates them again, empty."""
+    toc, tables = _toc_file(dump)
+    if not {"users", "tasks", "kalmido_meta"} <= tables:  # (never drop anything on a list that was not understood)
         raise BackupError("format")
     c = _pg.connect_direct(DATABASE_URL)
     try:
         with _pg.system_ctx(c):  # the restore works on the whole database (every organisation)
             c.execute("SET LOCAL statement_timeout = 0")
             extra = [r[0] for r in c.execute("SELECT tablename FROM pg_tables WHERE schemaname='public'")
-                     if r[0].encode() not in have]
+                     if r[0] not in tables]
             for t in extra:
                 c.execute('DROP TABLE IF EXISTS "' + t.replace('"', '""') + '" CASCADE')
         c.commit()
@@ -956,9 +1037,11 @@ def _pg_restore(dump):
     if extra:
         print("restore: dropped table(s) the backup does not have:", ", ".join(extra), flush=True)
     _pool_renew()
-    _pg_run(["pg_restore", *_restore_args(), "--enable-row-security", "--exit-on-error",
-             "-d", bk_pg_env().get("PGDATABASE") or bk_pg_env().get("PGUSER") or "postgres", dump], err_code="restore")
-    _pool_renew()
+    try:
+        _pg_run(["pg_restore", *_restore_args(toc), "--enable-row-security", "--exit-on-error",
+                 "-d", bk_pg_env().get("PGDATABASE") or bk_pg_env().get("PGUSER") or "postgres", dump], err_code="restore")
+    finally:
+        _pool_renew()
 
 
 def _reset_caches():
@@ -1015,7 +1098,11 @@ def bk_restore(path, pw, admin, via):
             os.rename(off_new, OFFICE_DIR)
             oswapped = True
             swapped = True  # (from here on a failure restores the dump of before; pg_restore itself is all or nothing)
-            _pg_restore(dbp)
+            if man["_legacy"]:  # 2.37.0 (#1150): an archive of 2.36 or older: moved over from its tasks.db
+                from .migrate import mig_restore
+                mig_restore(dbp)
+            else:
+                _pg_restore(dbp)
             _reset_caches()
             init_db(guard=False)
             c = connect()
@@ -1059,7 +1146,7 @@ def bk_restore(path, pw, admin, via):
         raise
     except Exception as e:  # noqa: BLE001
         print("restore failed:", type(e).__name__, e, flush=True)
-        raise BackupError("restore", type(e).__name__) from None
+        raise BackupError("restore", str(e)[:300] if type(e).__name__ == "MigError" else type(e).__name__) from None
     finally:
         if gate:
             GATE.end()
