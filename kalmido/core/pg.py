@@ -414,7 +414,14 @@ POOL_MIN = 4
 POOL_MAX = max(POOL_MIN, int(os.environ.get("KALMIDO_DB_POOL_MAX", "") or 56))
 # Every session: no statement runs longer than 30 s, no transaction idles longer than 5 min (a hung network call inside a
 # transaction would otherwise hold its snapshot and locks). init_db and the backup lift the statement limit for themselves.
-SESSION_OPTIONS = "-c statement_timeout=30000 -c idle_in_transaction_session_timeout=300000 -c jit=off"  # 2.37: JIT costs 15-20 ms per /api/state for <3 ms queries (EXPLAIN)
+# 2.37.0 (review K2-4): KALMIDO_DB_STATEMENT_TIMEOUT overrides the 30 s (seconds; 0 = no limit) for big instances.
+try:
+    STATEMENT_TIMEOUT_S = max(0, int(float(os.environ.get("KALMIDO_DB_STATEMENT_TIMEOUT", "") or 30)))
+except ValueError:
+    print("warning: KALMIDO_DB_STATEMENT_TIMEOUT is not a number of seconds; using 30", flush=True)
+    STATEMENT_TIMEOUT_S = 30
+SESSION_OPTIONS = (f"-c statement_timeout={STATEMENT_TIMEOUT_S * 1000} -c idle_in_transaction_session_timeout=300000 "
+                   "-c jit=off")  # 2.37: JIT costs 15-20 ms per /api/state for <3 ms queries (EXPLAIN)
 
 
 def _new_conn_kwargs():
