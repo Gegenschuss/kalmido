@@ -5,7 +5,7 @@
    person, the agent sees edited_at and the current text only (v1 chat list and events)
  - not fetched yet: the text is replaced, the queued chat event carries the new text, no message_edited
  - fetched (delivered_at) or answered: message_edited only to this agent (old, new, answered), another agent gets nothing
- - an edited comment: message_edited only to the agent that got it as an event (mention), not to other agents of the list,
+ - an edited comment: message_edited only to the agent that got it as an event (mention), not to other agents,
    not when the agent no longer sees the task, never from a health list
  - an edited team chat message: message_edited to the agent that got it as team_message
  - the message search finds the new text, not the old one
@@ -74,8 +74,10 @@ for n in ("claude", "otto"):
 CL, CLH = AG["claude"]
 OT, OTH = AG["otto"]
 W = A.post(B + "/api/lists", json={"name": "Work", "org_id": ORG}).json()["id"]
-for uid in (CL, OT, BOB):
+for uid in (CL, BOB):  # one agent per list: otto works in a list of its own (another agent of the same person)
     check(A.put(B + f"/api/lists/{W}/members", json={"user_id": uid, "role": "edit"}).ok, f"setup: member {uid}")
+WO = A.post(B + "/api/lists", json={"name": "Otto's list", "org_id": ORG}).json()["id"]
+check(A.put(B + f"/api/lists/{WO}/members", json={"user_id": OT, "role": "edit"}).ok, "setup: otto in its own list")
 A.patch(B + f"/api/lists/{W}", json={"agent_members": True})  # Bob may address the agents too
 T = A.post(B + "/api/tasks", json={"title": "Write the offer", "list_id": W}).json()["id"]
 
