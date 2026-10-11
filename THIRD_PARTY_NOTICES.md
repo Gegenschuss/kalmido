@@ -83,3 +83,18 @@ It is only downloaded when chosen under Settings > Appearance, and served by Kal
 - click (BSD-3-Clause), dependency of x-wr-timezone
 - Pillow (MIT-CMU / HPND), profile photos (resize, orientation, metadata removal)
 - pypdf 6.19.0 (BSD-3-Clause), reads the text layer of PDF attachments for agents and the briefing field
+
+## Liberation Sans font (PDF documents)
+
+The PDF writer of the office module embeds Liberation Sans Regular and Bold (`kalmido/office/fonts/LiberationSans-*.ttf`,
+Digitized data Copyright (c) 2010 Google Corporation, Copyright (c) 2012 Red Hat, Inc., with Reserved Font Name Liberation),
+licensed under the SIL Open Font License, Version 1.1. The full license text ships next to the fonts as
+`kalmido/office/fonts/LICENSE-LiberationSans.txt`. The fonts are embedded unchanged (no subsetting) into every PDF/A-3 file.
+
+## sRGB ICC profile (PDF/A output intent)
+
+`kalmido/office/fonts/sRGB2014.icc` is the sRGB v2 profile of the International Color Consortium (Copyright International
+Color Consortium, 2015): "This profile is made available by the International Color Consortium, and may be copied,
+distributed, embedded, made, used, and sold without restriction. Altered versions of this profile shall have the original
+identification and copyright information removed and shall not be misrepresented as the original profile." It is embedded
+unchanged as the output intent of every PDF/A-3 file.

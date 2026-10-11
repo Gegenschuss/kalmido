@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """2.36.1 (#1021, part D): the PDF writer of Office & finance (kalmido/office/pdf.py), no server, no container.
- - a quotation from an invented print model (the structure of office.docs' odoc_render): a valid PDF 1.4 that pypdf
-   opens; the text layer carries the number, the recipient, every position, the net total, the raw data option, the
+ - a quotation from an invented print model (the structure of office.docs' odoc_render): a valid PDF 1.7 (PDF/A-3b, 2.38.0)
+   that pypdf opens; the text layer carries the number, the recipient, every position, the net total, the raw data option, the
    rights texts (umlauts, sharp s, euro sign through WinAnsiEncoding) and "Seite 1 von n"
  - 40 positions: several pages, every following page with the small head (title + number) and the repeated table head,
    the totals never alone on a page (the page with the net total has a position), a category heading never the last
@@ -151,7 +151,7 @@ def has_image(page):
 
 # ---------------------------------------------------------------- 1. the standard quotation (12 positions, DE, EUR)
 data = office_pdf(fixture())
-check(data.startswith(b"%PDF-1.4") and data.rstrip().endswith(b"%%EOF"), "a PDF 1.4 file with a trailer")
+check(data.startswith(b"%PDF-1.7") and data.rstrip().endswith(b"%%EOF"), "a PDF 1.7 file with a trailer")
 r, T = texts(data)
 n = len(r.pages)
 check(2 >= n >= 1, f"12 positions fit on one or two pages ({n})")
@@ -225,7 +225,7 @@ try:
     check("KVA-2026-031" in Tl[1], "with a logo: the number still stands in the small head")
     dj = office_pdf(fixture(), logo_bytes=jpg.getvalue())
     rj, _ = texts(dj)
-    check(has_image(rj.pages[0]) and len(dj) < 200_000, f"logo bytes (JPEG) are embedded as a FlateDecode RGB image ({len(dj)} bytes)")
+    check(has_image(rj.pages[0]) and len(dj) < 700_000, f"logo bytes (JPEG) are embedded as a FlateDecode RGB image; the two fonts take about 430 KB ({len(dj)} bytes)")
     dbad = office_pdf(fixture(), logo_bytes=b"not an image at all")
     rb, Tb = texts(dbad)
     check(not has_image(rb.pages[0]) and "KVA-2026-031" in Tb[0], "an unreadable logo is left out, the PDF still comes")
@@ -252,8 +252,10 @@ dnone = office_pdf(fixture(raw="none"))
 check("Rohdaten" not in "\n".join(texts(dnone)[1]).replace("Positionen mit Rohdaten", ""), "raw mode none: no raw data line at all")
 
 # ---------------------------------------------------------------- 5. the writer's own helpers
-check(abs(pdf.pdf_text_width("Hello", 10) - 22.78) < 0.05, f"Helvetica widths (Hello = 722+556+222+222+556 = 22.78 pt at 10 pt): {pdf.pdf_text_width('Hello', 10):.2f}")
-check(abs(pdf.pdf_text_width("Hello", 10, bold=True) - 24.45) < 0.05, "Helvetica-Bold widths")
+check(abs(pdf.pdf_text_width("Hello", 10) - 22.78) < 0.05, f"Liberation Sans widths from the TTF (Hello = 722+556+222+222+556 = 22.78 pt at 10 pt, metric-compatible with Helvetica): {pdf.pdf_text_width('Hello', 10):.2f}")
+check(abs(pdf.pdf_text_width("Hello", 10, bold=True) - 24.45) < 0.05, "Liberation Sans Bold widths")
+check(pdf.pdf_font(False).ps_name == "LiberationSans" and pdf.pdf_font(True).ps_name == "LiberationSans-Bold" and not pdf.pdf_font(False).missing,
+      "both TTF files parse (name table, every WinAnsi code has a glyph)")
 check(pdf.pdf_text_width("ÄÖÜäöüß€", 10) > 0 and pdf.pdf_encode("ÄÖÜäöüß€") == "ÄÖÜäöüß€".encode("cp1252"), "umlauts, sharp s and euro in WinAnsi")
 check(pdf.pdf_encode("a → b ≥ c") == b"a -> b >= c", "arrows and comparison signs get an ASCII fallback")
 w = pdf.pdf_wrap("Donaudampfschifffahrtsgesellschaftskapitänsmützenhersteller und mehr", 9.6, 80)
@@ -264,7 +266,27 @@ check(pdf.pdf_money(1234.5, "de", "EUR") == "1.234,50 €" and pdf.pdf_money(123
 check(pdf.pdf_num(4.5, "de") == "4,5" and pdf.pdf_num(3, "en") == "3" and pdf.pdf_num(0.25, "en") == "0.25", "quantity formats")
 check(pdf.pdf_date("2026-10-09", "de") == "09.10.2026" and pdf.pdf_date("2026-10-09", "en") == "9 October 2026" and pdf.pdf_date("", "de") == "", "date formats")
 dempty = office_pdf({})
-check(dempty.startswith(b"%PDF-1.4") and len(texts(dempty)[0].pages) == 1, "an empty model still gives a one-page PDF")
+check(dempty.startswith(b"%PDF-1.7") and len(texts(dempty)[0].pages) == 1, "an empty model still gives a one-page PDF")
+
+# ---------------------------------------------------------------- 6. PDF/A-3b structure (2.38.0, #1021 P5); veraPDF runs in CI (tools/einvoice_validate.sh)
+raw = data
+check(b"/Type /Metadata /Subtype /XML" in raw and b"<pdfaid:part>3</pdfaid:part>" in raw and b"<pdfaid:conformance>B</pdfaid:conformance>" in raw,
+      "XMP metadata with pdfaid part 3 / conformance B")
+check(b"/S /GTS_PDFA1" in raw and b"/N 3 /Alternate /DeviceRGB" in raw, "sRGB OutputIntent with an embedded ICC profile")
+check(raw.count(b"/FontFile2") == 2 and b"/BaseFont /LiberationSans " in raw and b"/BaseFont /LiberationSans-Bold" in raw, "both fonts embedded (FontFile2)")
+check(b"/ID [<" in raw and b"/EmbeddedFile" not in raw and b"/AF [" not in raw, "trailer ID; a quotation carries no embedded file")
+check(b"<dc:title><rdf:Alt><rdf:li xml:lang=\"x-default\">Kostenvoranschlag KVA-2026-031</rdf:li>" in raw, "XMP title = Info title")
+dx = office_pdf(fixture(), xml=b"<?xml version='1.0'?><rsm:CrossIndustryInvoice/>", meta={"xml_profile": "EN 16931"})
+rx, Tx = texts(dx)
+check(b"/Type /EmbeddedFile /Subtype /application#2Fxml" in dx and b"/AFRelationship /Alternative" in dx and b"/AF [" in dx
+      and b"(factur-x.xml)" in dx and b"<fx:DocumentFileName>factur-x.xml</fx:DocumentFileName>" in dx and b"<fx:ConformanceLevel>EN 16931</fx:ConformanceLevel>" in dx
+      and b"pdfaExtension:schemas" in dx, "with xml: factur-x.xml embedded as an associated file + the fx: XMP schema")
+check("KVA-2026-031" in Tx[0], "with xml: the pages are unchanged")
+att = getattr(rx, "attachments", {})
+check(b"CrossIndustryInvoice" in (att.get("factur-x.xml", [b""])[0] if isinstance(att.get("factur-x.xml"), list) else att.get("factur-x.xml", b"")),
+      "pypdf reads the attachment back")
+ddraft = office_pdf(dict(fixture(), draft_mark="Entwurf"))
+check(ddraft.startswith(b"%PDF-1.7") and "KVA-2026-031" in texts(ddraft)[1][0], "a draft mark does not break the page")
 
 print(f"office_pdf: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
