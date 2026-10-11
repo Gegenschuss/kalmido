@@ -5,7 +5,7 @@ Paperless (2.36.0: must never be reached) / attacker sink inside the container (
 usage: security_test.py <datadir>"""
 import json
 import os
-import sqlite3
+import dbx
 import statistics
 import subprocess
 import sys
@@ -61,7 +61,7 @@ def logs():
 
 
 def dbx(sql, args=()):
-    c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         r = c.execute(sql, args).fetchall()
         c.commit()

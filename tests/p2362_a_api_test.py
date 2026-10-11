@@ -15,7 +15,7 @@ import glob
 import json
 import os
 import re
-import sqlite3
+import dbx
 import subprocess
 import sys
 import time
@@ -52,7 +52,7 @@ def sess(user, pw="password123"):
 
 
 def dbx(sql, args=(), write=False):
-    c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         r = c.execute(sql, args).fetchall()
         if write:
@@ -71,7 +71,7 @@ def restart(extra, **env):
 def layer_lists(uid, write=False):
     """The list ids of account uid straight from the access layer (core/access.py acx_lists_sql), inside the container."""
     code = ("import json, sqlite3, os\nfrom kalmido.core.access import acx_lists_sql\n"
-            "c = sqlite3.connect(os.environ['TASKS_DB'])\n"
+            "c = dbx.connect(os.environ['TASKS_DB'])\n"
             f"print(json.dumps(sorted(r[0] for r in c.execute('SELECT id FROM lists WHERE id IN ' + acx_lists_sql(write={write}, req=False), ({uid}, {uid})))))")
     p = subprocess.run(["docker", "exec", CONTAINER, "python", "-c", code], capture_output=True, text=True, timeout=60)
     try:

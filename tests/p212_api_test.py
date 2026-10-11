@@ -19,7 +19,7 @@ usage: p212_api_test.py <datadir>"""
 import io
 import json
 import os
-import sqlite3
+import dbx
 import subprocess
 import sys
 import time
@@ -60,7 +60,7 @@ class Api:
 
 
 def db():
-    return sqlite3.connect(os.path.join(DATA, "tasks.db"))
+    return dbx.connect(os.path.join(DATA, "tasks.db"))
 
 
 def members(lid):

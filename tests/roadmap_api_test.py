@@ -6,7 +6,7 @@ same number of days, durations kept, undated / done / trashed tasks untouched, o
 input checks, dependents in other lists only where "Move dependent tasks along" is on and only when moved later, the
 client's one-request undo), dates at month ends, leap days and across the DST switches of Europe/Berlin, the user
 setting "roadmap", and the token API (/api/v1/roadmap read scope, /api/v1/lists/{id}/shift write scope, OpenAPI)."""
-import os, sqlite3, sys
+import os, dbx, sys
 from datetime import date, timedelta
 import requests
 
@@ -33,8 +33,8 @@ def sess(u=None):
 
 
 def db():
-    c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
-    c.row_factory = sqlite3.Row
+    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c.row_factory = dbx.Row
     return c
 
 

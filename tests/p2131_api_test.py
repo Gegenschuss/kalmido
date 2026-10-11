@@ -23,7 +23,7 @@ Starts its OWN container (start.sh).
 usage: p2131_api_test.py <datadir>"""
 import io
 import os
-import sqlite3
+import dbx
 import subprocess
 import sys
 import time
@@ -36,7 +36,7 @@ DATA = sys.argv[1]
 
 
 def legacy_agent(lid, aid, role):  # 2.26.0: one agent per list -- a second agent as in a list from before the update
-    c_ = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c_ = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     c_.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,0,'2026-01-01T00:00:00+00:00')", (lid, aid, role, role))
     c_.commit()
     c_.close()
@@ -267,7 +267,7 @@ check(requests.post(B + "/drop", headers={"Authorization": "Bearer " + dt}, data
 # ================================================================== storage check, gc, OpenAPI
 r = A.get(B + "/api/admin/storage-check").json()
 check(r["checked"] >= 5 and not r["problems"], "storage check counts chat files, all fine")
-con = sqlite3.connect(os.path.join(DATA, "tasks.db"))
+con = dbx.connect(os.path.join(DATA, "tasks.db"))
 path = con.execute("SELECT path FROM chat_files WHERE id=?", (F_IMG,)).fetchone()[0]
 con.close()
 with open(os.path.join(DATA, "attachments", path), "wb") as f:

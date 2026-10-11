@@ -11,7 +11,7 @@ me" (#1138); own container (start.sh).
    someone else; a task in a list I left is no longer sent at all, completed ones and my own are not part of it
 usage: p2362_d_api_test.py <datadir>"""
 import os
-import sqlite3
+import dbx
 import subprocess
 import sys
 
@@ -41,7 +41,7 @@ def sess(user, pw="password123"):
 
 
 def dbx(sql, args=(), write=False):
-    c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         r = c.execute(sql, args).fetchall()
         if write:

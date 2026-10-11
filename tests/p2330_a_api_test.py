@@ -10,7 +10,7 @@ usage: p2330_a_api_test.py <datadir>"""
 import base64
 import json
 import os
-import sqlite3
+import dbx
 import subprocess
 import sys
 import time
@@ -47,7 +47,7 @@ def sess(user, pw="password123"):
 
 
 def dbx(sql, args=()):
-    c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         return c.execute(sql, args).fetchall()
     finally:

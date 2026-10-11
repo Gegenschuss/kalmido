@@ -11,7 +11,7 @@ address books (discovery, BDAY / ANNIVERSARY / Apple dates, updates, sealed pass
 import json
 import os
 import shutil
-import sqlite3
+import dbx
 import subprocess
 import sys
 import time
@@ -46,7 +46,7 @@ def until(fn, secs=20):
 
 
 def dbx(q, a=()):
-    c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         r = c.execute(q, a).fetchall()
         c.commit()

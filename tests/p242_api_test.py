@@ -14,7 +14,7 @@ descriptions), sharing with an agent in bulk (#391).
 Starts its OWN containers (start.sh).
 usage: p242_api_test.py <datadir>"""
 import os
-import sqlite3
+import dbx
 import subprocess
 import sys
 import time
@@ -78,7 +78,7 @@ class Api:
 
 
 def dbx(q, a=()):
-    con = sqlite3.connect(os.path.join(DATA, "tasks.db"))
+    con = dbx.connect(os.path.join(DATA, "tasks.db"))
     try:
         r = con.execute(q, a).fetchall()
         con.commit()

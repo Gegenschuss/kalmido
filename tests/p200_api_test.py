@@ -12,7 +12,7 @@ import hashlib
 import hmac
 import json
 import os
-import sqlite3
+import dbx
 import subprocess
 import sys
 import threading
@@ -68,7 +68,7 @@ class Api:
 
 
 def dbx(sql, args=()):
-    c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         r = c.execute(sql, args).fetchall()
         c.commit()

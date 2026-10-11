@@ -7,7 +7,7 @@ task after a time; my own changes do not count), the server time; sections: crea
 (only tasks of that list without a section), rename / order / delete with the expected state (_prev), delete answers the
 section and its tasks; lists: PATCH with _prev (owner and member fields), reorder with _prev (order, folders); and the
 rights: view-only members change nothing, nobody moves tasks of another list into a section."""
-import os, sqlite3, sys, time
+import os, dbx, sys, time
 from datetime import date, timedelta
 import requests
 
@@ -34,8 +34,8 @@ def sess(u=None):
 
 
 def db():
-    c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
-    c.row_factory = sqlite3.Row
+    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c.row_factory = dbx.Row
     return c
 
 

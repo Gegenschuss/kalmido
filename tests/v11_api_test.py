@@ -4,7 +4,7 @@ language / device / module awareness, idempotency, existing accounts never, KALM
 new user settings (celebrate, tour). Starts its OWN test containers (start.sh, KALMIDO_ONBOARDING=1).
 usage: v11_api_test.py <datadir>"""
 import os
-import sqlite3
+import dbx
 import subprocess
 import sys
 
@@ -127,7 +127,7 @@ check(ts and "Share this list with someone" not in [t["title"] for t in ts], "co
 a.patch(B + "/api/admin/settings", json={"collab_all": True})
 
 # ---- 3: existing accounts (from before 1.1: no tour / onboard rows) never get it
-db = sqlite3.connect(os.path.join(DATA, "tasks.db"))
+db = dbx.connect(os.path.join(DATA, "tasks.db"))
 db.execute("DELETE FROM user_settings WHERE key IN ('tour','onboard','celebrate') AND user_id=(SELECT id FROM users WHERE username='dave')")
 db.commit()
 db.close()

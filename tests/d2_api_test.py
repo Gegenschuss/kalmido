@@ -5,7 +5,7 @@ GET /api/deps (edges between visible tasks, completed blockers), "Move dependent
 cascade by the same delta, only conflicting tasks, only when postponed, lists with the setting, edit rights, depth and
 size caps, activity line, the reverse PATCHes of the client's undo, the reorder endpoint), then the migration of
 existing users (features_rev 8, and 9 = "comments" since 2.0.6) after a restart of the container on the same data."""
-import json, os, sqlite3, subprocess, sys, time
+import json, os, dbx, subprocess, sys, time
 from datetime import date, datetime, timedelta, timezone
 import requests
 
@@ -33,8 +33,8 @@ def sess(u=None):
 
 
 def db():
-    c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
-    c.row_factory = sqlite3.Row
+    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c.row_factory = dbx.Row
     return c
 
 

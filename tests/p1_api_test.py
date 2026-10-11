@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Package 1 API tests: ICS feed, undo, completed_by, templates, statistics, manifest shortcuts.
 Runs against the TEST container (:3048 built-in login, :3041 proxy port), fresh DB in DATA."""
-import json, os, re, sqlite3, sys, time
+import json, os, re, dbx, sys, time
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 import requests
@@ -32,8 +32,8 @@ def sess(u=None):
 
 
 def db():
-    c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
-    c.row_factory = sqlite3.Row
+    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c.row_factory = dbx.Row
     return c
 
 

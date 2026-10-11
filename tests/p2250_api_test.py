@@ -11,7 +11,7 @@
 Restarts its container (start.sh). usage: p2250_api_test.py <datadir>"""
 import json
 import os
-import sqlite3
+import dbx
 import subprocess
 import sys
 import time
@@ -44,7 +44,7 @@ def sess(user, pw="password123"):
 
 
 def dbx(sql, args=(), write=False):
-    c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         r = c.execute(sql, args).fetchall()
         if write:

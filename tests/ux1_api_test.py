@@ -5,7 +5,7 @@ archive. PATCH archived (with _prev for undo / redo and the conflict rule), DELE
 sharing, custom fields and public link, and moves every task (open and done) to the trash of the owner's inbox, where
 it can be restored; members of a shared list lose access. Plus the settings the app now saves one by one (every key
 alone, the undo value back)."""
-import os, sqlite3, sys
+import os, dbx, sys
 import requests
 
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -31,8 +31,8 @@ def sess(u=None):
 
 
 def db():
-    c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
-    c.row_factory = sqlite3.Row
+    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c.row_factory = dbx.Row
     return c
 
 

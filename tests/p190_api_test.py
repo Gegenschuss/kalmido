@@ -9,7 +9,7 @@
 - Tags: count, delete (only my own tag rows, trash included, tasks stay), restore (undo), CSRF, bad input.
 - News: news_kinds setting (default without "complete"), validation, filter=me, dismiss (only own items).
 - Update check: a cached release older than the running version is not reported (admin status + about)."""
-import io, json, os, sqlite3, sys, time, uuid, zipfile
+import io, json, os, dbx, sys, time, uuid, zipfile
 import requests
 from PIL import Image
 
@@ -36,7 +36,7 @@ def sess(u=None):
 
 
 def db():
-    return sqlite3.connect(os.path.join(DATA, "tasks.db"))
+    return dbx.connect(os.path.join(DATA, "tasks.db"))
 
 
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok

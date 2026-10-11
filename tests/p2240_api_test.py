@@ -14,7 +14,7 @@
 Restarts its container (start.sh). usage: p2240_api_test.py <datadir>"""
 import json
 import os
-import sqlite3
+import dbx
 import subprocess
 import sys
 import time
@@ -47,7 +47,7 @@ def sess(user, pw="password123"):
 
 
 def dbx(sql, args=()):
-    c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         return c.execute(sql, args).fetchall()
     finally:
@@ -140,7 +140,7 @@ check(A.patch(B + "/api/admin/settings", json={"support_email": "no address"}).s
 check(Bo.get(B + "/api/state").json()["storage"]["support"] == "help@example.com", "#910: the support address reaches the app")
 # the backfill: rows from before 2.24 get their uploader (comment author, else the task's creator)
 dbx("UPDATE attachments SET user_id=NULL")
-c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
 c.execute("DELETE FROM settings WHERE key='migr_att_user'")
 c.commit()
 c.close()

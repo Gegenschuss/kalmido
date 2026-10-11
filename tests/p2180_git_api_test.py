@@ -18,7 +18,7 @@ import hashlib
 import hmac
 import json
 import os
-import sqlite3
+import dbx
 import subprocess
 import sys
 import time
@@ -98,7 +98,7 @@ def git_log():
 
 
 def dbq(sql, args=()):
-    c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         return c.execute(sql, args).fetchall()
     finally:
@@ -106,7 +106,7 @@ def dbq(sql, args=()):
 
 
 def dbw(sql, args=()):
-    c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         c.execute(sql, args)
         c.commit()

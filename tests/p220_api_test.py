@@ -20,7 +20,7 @@ import hashlib
 import hmac
 import json
 import os
-import sqlite3
+import dbx
 import subprocess
 import sys
 import time
@@ -104,7 +104,7 @@ def git_log():
 
 
 def dbq(sql, args=()):
-    c = sqlite3.connect(os.path.join(DATA, "tasks.db"))
+    c = dbx.connect(os.path.join(DATA, "tasks.db"))
     try:
         return c.execute(sql, args).fetchall()
     finally:
@@ -247,7 +247,7 @@ STATE["8091"]["team/tool"]["commits"]["develop"] = [cm("dd00001", f"Gitea commit
 STATE["8091"]["team/tool"]["status"] = {"ggg333": {"state": "pending", "total_count": 1, "statuses": [{"state": "pending"}]}}
 put_state()
 time.sleep(0.2)
-dbq_c = sqlite3.connect(os.path.join(DATA, "tasks.db"))
+dbq_c = dbx.connect(os.path.join(DATA, "tasks.db"))
 dbq_c.execute("UPDATE git_conns SET next_at=0")
 dbq_c.commit()
 dbq_c.close()
@@ -326,7 +326,7 @@ check(task_of(A, T4)["status"] == 0, "once: another keyword after the undo does 
 # ================================================================== requests never wait on the poller; rate limit; back-off
 STATE["slow"] = 3
 put_state()
-c = sqlite3.connect(os.path.join(DATA, "tasks.db"))
+c = dbx.connect(os.path.join(DATA, "tasks.db"))
 c.execute("UPDATE git_conns SET next_at=0")
 c.commit()
 c.close()
@@ -338,7 +338,7 @@ STATE["slow"] = 0
 STATE["remaining"] = 3
 put_state()
 time.sleep(4)
-c = sqlite3.connect(os.path.join(DATA, "tasks.db"))
+c = dbx.connect(os.path.join(DATA, "tasks.db"))
 c.execute("UPDATE git_conns SET next_at=0, last_error='' WHERE id=?", (RID,))
 c.commit()
 c.close()
@@ -349,7 +349,7 @@ check(j["repos"][0]["status"] == "ok", "a rate pause is not shown as an error")
 STATE["remaining"] = 4999
 STATE["rate_block"] = True
 put_state()
-c = sqlite3.connect(os.path.join(DATA, "tasks.db"))
+c = dbx.connect(os.path.join(DATA, "tasks.db"))
 c.execute("UPDATE git_conns SET next_at=0, last_error='' WHERE id=?", (RID,))
 c.commit()
 c.close()
@@ -358,7 +358,7 @@ check(row and row[0][1] > time.time() + 60, f"403 with remaining 0: paused: {row
 STATE["rate_block"] = False
 g["token"] = "rotated-on-the-server"
 put_state()
-c = sqlite3.connect(os.path.join(DATA, "tasks.db"))
+c = dbx.connect(os.path.join(DATA, "tasks.db"))
 c.execute("UPDATE git_conns SET next_at=0, last_error='' WHERE id=?", (RID,))
 c.commit()
 c.close()
@@ -473,7 +473,7 @@ check("hook_secret" not in A.get(B + f"/api/lists/{P}/repos").text and sec not i
 check(sec not in dbq("SELECT hook_secret FROM git_conns WHERE id=?", (RID,))[0][0], "the secret is sealed")
 raw = json.dumps({"action": "opened"}).encode()
 sig = "sha256=" + hmac.new(sec.encode(), raw, hashlib.sha256).hexdigest()
-c = sqlite3.connect(os.path.join(DATA, "tasks.db"))
+c = dbx.connect(os.path.join(DATA, "tasks.db"))
 # 2.15.1: the hook ignores calls within 10 s of the last poll (debounce); an earlier step may just have polled, so age
 # polled_at too, or the check below races that poll (CI flake "the hook triggers a poll")
 c.execute("UPDATE git_conns SET next_at=?, polled_at=? WHERE id=?", (time.time() + 999, "2000-01-01T00:00:00+00:00", RID))
@@ -489,7 +489,7 @@ check(r.status_code == 404, "a repository without webhook: 404")
 r = requests.post(B + f"/api/hooks/git/{RID}", data=raw, headers={"X-Gitea-Signature": hmac.new(sec.encode(), raw, hashlib.sha256).hexdigest()})
 check(r.status_code == 202, "Gitea signature header accepted")
 # 2.16.0 (#637): a hook within 10 s of the last poll is never dropped: next_at = min(next_at, polled_at + 10 s)
-c = sqlite3.connect(os.path.join(DATA, "tasks.db"))
+c = dbx.connect(os.path.join(DATA, "tasks.db"))
 t0 = time.time()
 c.execute("UPDATE git_conns SET next_at=?, polled_at=? WHERE id=?", (t0 + 999, datetime.fromtimestamp(t0 - 2, timezone.utc).isoformat(), RID))
 c.commit()

@@ -14,7 +14,7 @@ import email.message
 import email.utils
 import json
 import os
-import sqlite3
+import dbx
 import subprocess
 import sys
 import time
@@ -84,7 +84,7 @@ def clear():
 
 
 def dbq(q, a=()):
-    c = sqlite3.connect(os.path.join(DATA, "tasks.db"))
+    c = dbx.connect(os.path.join(DATA, "tasks.db"))
     try:
         return c.execute(q, a).fetchall()
     finally:

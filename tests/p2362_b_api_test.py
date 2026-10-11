@@ -12,7 +12,7 @@ stub ntfy):
 usage: p2362_b_api_test.py <datadir>"""
 import json
 import os
-import sqlite3
+import dbx
 import subprocess
 import sys
 import time
@@ -76,7 +76,7 @@ def wait_for(fn, n=1, t=8.0):
 
 
 def dbx(sql, args=(), write=False):
-    c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         r = c.execute(sql, args).fetchall()
         if write:

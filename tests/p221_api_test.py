@@ -22,7 +22,7 @@ usage: p221_api_test.py <datadir>"""
 import csv
 import io
 import os
-import sqlite3
+import dbx
 import subprocess
 import sys
 import time
@@ -40,7 +40,7 @@ def put_member(s, lid, uid, role):
     update, and the list's members may use its agents (the list switch, default off since 2.26.0). Returns a truthy object."""
     r = s.put(B + f"/api/lists/{lid}/members", json={"user_id": uid, "role": role})
     if r.status_code == 409 and "one agent" in r.text.lower():
-        c_ = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+        c_ = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
         c_.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,0,'2026-01-01T00:00:00+00:00')",
                    (lid, uid, role, role))
         c_.commit()
@@ -99,7 +99,7 @@ class Api:
 
 
 def db():
-    return sqlite3.connect(os.path.join(DATA, "tasks.db"))
+    return dbx.connect(os.path.join(DATA, "tasks.db"))
 
 
 def rows():

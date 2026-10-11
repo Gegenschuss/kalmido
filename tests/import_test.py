@@ -13,7 +13,7 @@ usage: import_test.py <datadir>"""
 import io
 import json
 import os
-import sqlite3
+import dbx
 import subprocess
 import sys
 import zipfile
@@ -49,8 +49,8 @@ def sess(user=None, pw="password123"):
 
 
 def dbx(sql, args=()):
-    c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
-    c.row_factory = sqlite3.Row
+    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c.row_factory = dbx.Row
     try:
         r = c.execute(sql, args).fetchall()
         c.commit()

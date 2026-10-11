@@ -3,7 +3,7 @@
 replays), focus -> entries without double counting, manual CRUD + permissions / IDOR, report totals on a
 seeded dataset (week / month boundaries, DST, entries crossing midnight), rounding, amounts, CSV, triggers,
 watchdog reminder / auto-stop, export, user delete, module off."""
-import csv, io, json, os, sqlite3, sys, time
+import csv, io, json, os, dbx, sys, time
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 import requests
@@ -32,8 +32,8 @@ def sess(u=None):
 
 
 def db():
-    c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
-    c.row_factory = sqlite3.Row
+    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c.row_factory = dbx.Row
     return c
 
 

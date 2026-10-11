@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """News feed API tests against the TEST container (:3048, fresh DB in DATA)."""
-import json, os, sys, time, sqlite3, subprocess
+import json, os, sys, time, dbx, subprocess
 import requests
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048"); DATA = sys.argv[1]; H = {"X-Requested-With": "kalmido"}
 FAILS, OKS = [], [0]
@@ -17,7 +17,7 @@ def pushes():
 def clear(): open(os.path.join(DATA, "ntfy.log"), "w").close()
 def news(s, f=None): return s.get(B + "/api/news", params={"filter": f} if f else None).json()
 def kinds(s): return [(x["kind"], x["count"]) for x in news(s)["items"]]
-def db(): return sqlite3.connect(os.path.join(DATA, "tasks.db"))
+def db(): return dbx.connect(os.path.join(DATA, "tasks.db"))
 
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice"); A.patch(B + "/api/users/1", json={"ntfy_topic": "t-alice"})

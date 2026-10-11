@@ -13,7 +13,7 @@
  - GET /api/v1/search?scope=messages (people + agents), GET /api/search/messages (web client), OpenAPI
 usage: p2330_b_api_test.py <datadir>"""
 import os
-import sqlite3
+import dbx
 import subprocess
 import sys
 
@@ -44,7 +44,7 @@ def sess(user, pw="password123"):
 
 
 def dbx(sql, args=(), write=False):
-    c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         r = c.execute(sql, args).fetchall()
         if write:
@@ -239,7 +239,7 @@ dbx("DELETE FROM agent_chat WHERE id=?", (A1,), write=True)
 check(f"a{A1}" not in keys(find(A, "arger")), "a trimmed agent chat message is gone")
 before = keys(find(A, "arger"))
 # a database without the index (a backup from before 2.33): built at the start
-c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
 for (n,) in c.execute("SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'msg_fts_%'").fetchall():
     c.execute(f"DROP TRIGGER {n}")
 c.execute("DROP TABLE msg_fts")

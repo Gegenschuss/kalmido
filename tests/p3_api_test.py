@@ -3,7 +3,7 @@
 unblock push + News, trash / restore, undo, recurring, batch), project status (permissions, News, history),
 progress numbers on seeded data, custom fields (CRUD per type, validation, permissions, values, moves, member
 removal, search, activity, export, templates, recurring copies)."""
-import json, os, sqlite3, sys, time
+import json, os, dbx, sys, time
 from datetime import date, timedelta
 import requests
 
@@ -30,8 +30,8 @@ def sess(u=None):
 
 
 def db():
-    c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
-    c.row_factory = sqlite3.Row
+    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c.row_factory = dbx.Row
     return c
 
 

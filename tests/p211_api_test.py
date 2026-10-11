@@ -18,7 +18,7 @@ usage: p211_api_test.py <datadir>"""
 import base64
 import json
 import os
-import sqlite3
+import dbx
 import subprocess
 import sys
 import time
@@ -34,7 +34,7 @@ DATA = sys.argv[1]
 
 
 def legacy_agent(lid, aid, role):  # 2.26.0: one agent per list -- a second agent as in a list from before the update
-    c_ = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c_ = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     c_.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,0,'2026-01-01T00:00:00+00:00')", (lid, aid, role, role))
     c_.commit()
     c_.close()
@@ -197,7 +197,7 @@ check(cl.post("/agent/usage", json={**ok, "input_tokens": 900, "output_tokens": 
 check(cl.post("/agent/usage", json={**ok, "input_tokens": 10, "output_tokens": 10, "list_id": TEAM}).status_code == 201, "report on a list only")
 check(cl.post("/agent/usage", json={**ok, "input_tokens": 5, "output_tokens": 5}).status_code == 201, "report without task / list")
 check(cx.post("/agent/usage", json={**ok, "model": "gpt-x", "input_tokens": 60, "output_tokens": 40, "task_id": T1}).status_code == 201, "codex reports")
-con = sqlite3.connect(os.path.join(DATA, "tasks.db"))
+con = dbx.connect(os.path.join(DATA, "tasks.db"))
 cols = [x[1] for x in con.execute("PRAGMA table_info(agent_usage)")]
 check(cols == ["id", "agent_id", "model", "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "cost_usd", "task_id",
                "list_id", "job_id", "note", "day", "created_at"], f"only numbers + ids stored: {cols}")
@@ -331,7 +331,7 @@ A.patch(B + "/api/settings", json={"notify": ""})
 spec = requests.get(V + "/openapi.json").json()
 check("post" in spec["paths"].get("/agent/usage", {}) and "get" in spec["paths"]["/agent/usage"], "OpenAPI documents /agent/usage")
 check(A.delete(B + f"/api/users/{AG2}").ok, "delete codex")
-con = sqlite3.connect(os.path.join(DATA, "tasks.db"))
+con = dbx.connect(os.path.join(DATA, "tasks.db"))
 check(con.execute("SELECT COUNT(*) FROM agent_usage WHERE agent_id=?", (AG2,)).fetchone()[0] == 0, "its usage rows are gone")
 con.close()
 

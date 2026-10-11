@@ -8,7 +8,7 @@
  - roadmap prefs accept {nd: bool}
 Runs against a fresh test container (start.sh). usage: p206_api_test.py <datadir>"""
 import os
-import sqlite3
+import dbx
 import subprocess
 import sys
 import time
@@ -41,7 +41,7 @@ def sess(user=None):
 
 
 def dbx(sql, args=()):
-    c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         r = c.execute(sql, args).fetchall()
         c.commit()

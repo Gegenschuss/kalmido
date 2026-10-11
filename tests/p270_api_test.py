@@ -13,7 +13,7 @@ member), /api/state time_lists {list: {s, b}} with the tracked seconds and the "
 usage: p270_api_test.py <datadir>"""
 import json
 import os
-import sqlite3
+import dbx
 import subprocess
 import sys
 import time
@@ -56,7 +56,7 @@ def clear():
 
 
 def db(sql, args=()):  # the isolated test database (bind-mounted data dir), to age nag_at like time passing
-    c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         r = c.execute(sql, args).fetchall()
         c.commit()

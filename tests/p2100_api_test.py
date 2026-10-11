@@ -19,7 +19,7 @@ usage: p2100_api_test.py <datadir>"""
 import json
 import os
 import re
-import sqlite3
+import dbx
 import subprocess
 import sys
 import time
@@ -74,7 +74,7 @@ def login(user, pw, ip=None, **hd):
 
 
 def dbx(q, a=()):
-    con = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    con = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         r = con.execute(q, a).fetchall()
         con.commit()

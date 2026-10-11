@@ -10,7 +10,7 @@ usage: admin_alerts_test.py <datadir>"""
 import base64
 import json
 import os
-import sqlite3
+import dbx
 import subprocess
 import sys
 import time
@@ -90,7 +90,7 @@ def wait_for(fn, n=1, t=10.0):
 
 
 def dbx(sql, args=()):
-    c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         r = c.execute(sql, args).fetchall()
         c.commit()
@@ -388,7 +388,7 @@ check(dbx("SELECT COUNT(*) FROM admin_alerts")[0][0] == 0, "cleared in the datab
 
 # ---- integrity check: a NOT NULL violation planted while the container is stopped -> reported after the start
 subprocess.run(["docker", "stop", "-t", "3", CT], capture_output=True)
-c = sqlite3.connect(os.path.join(DATA, "tasks.db"))
+c = dbx.connect(os.path.join(DATA, "tasks.db"))
 c.execute("CREATE TABLE zz_probe(x)")
 c.execute("INSERT INTO zz_probe VALUES(NULL)")
 c.commit()
@@ -404,12 +404,12 @@ check(alerts()["quick_check"].get("ok") is False, "settings show the failed chec
 no_private(ntfy_log(), "whole run")
 check(not [x for x in ntfy_log() if x["topic"] == "t-bob" and x["title"].lower().startswith("kalmido admin")], "bob never got an admin alert")
 subprocess.run(["docker", "stop", "-t", "3", CT], capture_output=True)
-c = sqlite3.connect(os.path.join(DATA, "tasks.db"))
+c = dbx.connect(os.path.join(DATA, "tasks.db"))
 c.execute("PRAGMA writable_schema=ON")
 c.execute("UPDATE sqlite_master SET sql='CREATE TABLE zz_probe(x)' WHERE name='zz_probe'")
 c.commit()
 c.close()
-c = sqlite3.connect(os.path.join(DATA, "tasks.db"))
+c = dbx.connect(os.path.join(DATA, "tasks.db"))
 c.execute("DROP TABLE zz_probe")
 c.commit()
 check(c.execute("PRAGMA quick_check").fetchall() == [("ok",)], "test database repaired again")

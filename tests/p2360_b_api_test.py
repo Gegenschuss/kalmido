@@ -11,7 +11,7 @@
  - OpenAPI documents locked; the rollback image 2.35 writes tasks without the column (default 0); a backup keeps the lock
 usage: p2360_b_api_test.py <datadir>"""
 import os
-import sqlite3
+import dbx
 import subprocess
 import sys
 import time
@@ -43,7 +43,7 @@ def sess(user, pw="password123"):
 
 
 def dbx(sql, args=(), write=False):
-    c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         r = c.execute(sql, args).fetchall()
         if write:
@@ -177,7 +177,7 @@ spec = requests.get(V + "/openapi.json").json()
 sch = spec["components"]["schemas"]
 check(sch["Task"]["properties"].get("locked", {}).get("type") == "boolean" or "locked" in str(sch.get("Task"))[:20000], "OpenAPI: Task.locked")
 check("locked" in sch["TaskInput"]["properties"], "OpenAPI: TaskInput.locked")
-c = sqlite3.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
 c.execute("INSERT INTO tasks(list_id,title,sort,created_at,updated_at) VALUES(?,?,?,?,?)", (W, "Old image", 0, "2026-10-09T10:00:00+00:00", "2026-10-09T10:00:00+00:00"))
 c.commit()
 c.close()
