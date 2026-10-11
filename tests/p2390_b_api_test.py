@@ -111,6 +111,7 @@ T = {}
 for k in ("dup1", "dup2", "vague", "misplaced", "stale", "editing", "changed", "done", "top"):
     T[k] = new_task(A, W, "Task " + k, content=("note of " + k) if k != "dup2" else "x" * 2500)
 SUB = new_task(A, W, "a subtask", parent_id=T["stale"])
+SUB2 = new_task(A, W, "a subtask of dup2", parent_id=T["dup2"])  # review M2: moves to the kept task on merge
 check(A.post(B + f"/api/tasks/{T['dup2']}/comments", json={"body": "a comment that stays"}).status_code in (200, 201), "setup: comment")
 
 # ================================================================== the request: rights, the tidy agent, health, limits
@@ -226,6 +227,7 @@ check(k["title"] == "Order the flyers" and f"Merged from #{T['dup2']} Task dup2"
 d2 = task(A, T["dup2"])
 check(d2["status"] == -1, f"merge: the other one is closed as won't do ({d2['status']})")
 check(len(q("SELECT id FROM comments WHERE task_id=? AND deleted_at IS NULL", (T["dup2"],))) == 1, "merge: its comment stays with it")
+check(task(A, SUB2)["parent_id"] == T["dup1"] and task(A, SUB2)["status"] == 0, "merge: an open subtask of the other one moves to the kept task")
 check(task(A, T["vague"])["title"] == "Call the printer", "rename with the person's edited title")
 m = task(A, T["misplaced"])
 check(m["section_id"] == SEC, f"move: into the section {m['section_id']}")
@@ -249,6 +251,7 @@ check(r.ok and not r.json()["none"], f"undo: {r.text[:200]}")
 check(task(A, T["dup1"])["title"] == "Task dup1" and task(A, T["dup1"])["content"] == "note of dup1", "undo: merge title + notes back")
 check(task(A, T["dup2"])["status"] == 0 and task(A, T["stale"])["status"] == 0 and task(A, SUB)["status"] == 0, "undo: closed tasks open again (subtask too)")
 check(task(A, T["vague"])["title"] == "Task vague" and task(A, T["misplaced"])["section_id"] is None, "undo: rename + move back")
+check(task(A, SUB2)["parent_id"] == T["dup2"] and task(A, SUB2)["status"] == 0, "undo: the moved subtask is back under its task")
 check(task(A, T["done"])["status"] == 2, "undo leaves the task completed by the person alone")
 r = A.post(B + f"/api/proposals/{J}/redo")
 check(r.ok and not r.json()["none"], f"redo: {r.text[:200]}")
