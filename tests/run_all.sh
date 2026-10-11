@@ -549,6 +549,8 @@ fresh; run p2380_u2_ui node p2380_u2_ui.js "$KALMIDO_TEST_DATA"
 # message_edited only to that agent, also for edited comments and team messages the agent had), then the UI (Edit, "edited", versions)
 fresh; run p2390_c_api "$PY" p2390_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2390_c_ui node p2390_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.39.0 (#1168): the Playbook of a list / folder in the list and folder dialogs (editor, versions, proposals, regular checks)
+fresh; run p2390_u_ui node p2390_u_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

@@ -263,6 +263,7 @@ registering the ones of its area.
 | `dayplan.js` | Day planning and the evening review. |
 | `agentchat.js` | The chat with an agent (side panel / view) and Settings > Agents: lists, setup guides, behaviour rules, activity log, usage, runtime. |
 | `listedit.js` | List editing, keyboard reordering, recent lists. |
+| `playbook.js` | The Playbook of a list or folder (2.39.0): the area in the list and folder dialogs, editor with preview, versions with a line diff and restore, agents' proposals, regular checks, the help examples. |
 | `git.js` | Git integration of project lists: repositories, pull requests + CI, agents' merge requests. |
 | `chat.js` | Team chat and notes of a list / project. |
 | `dashboard.js` | News bundled per task, the view builder (2.32.0: blocks per view, "Customize", project page standard + own arrangement; server side `kalmido/accounts/layouts.py`), the start page (dashboard) and Settings > Tasks by e-mail. |
