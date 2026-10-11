@@ -337,13 +337,14 @@ cancelled invoice in BT-25. A discount line is written as a positive price with 
 never negative). The amounts are decimal strings throughout; `ein_check()` (the module's own plausibility check: mandatory
 terms, the sum rules BR-CO-10/13/14/15/16/17) is used by the tests without a validator.
 
-Finalising stores the files: `<data>/office/<org_id>/doc<id>-<kind>-<number>.pdf` and `.xml` (flat below the
+Finalising an invoice, credit note or reminder stores the files: `<data>/office/<org_id>/doc<id>-<kind>-<number>.pdf` and `.xml` (flat below the
 organisation's office folder, so they are part of the backups and come back with a restore like the logo), with both
 SHA-256 in the document (`pdf_sha256`, `xml_sha256`, also in the API) and an access-log entry `store`. From then on
 `GET /api/office/docs/<id>/pdf` serves the stored file (bytes identical for ever, whatever changes later), and
 `GET /api/office/docs/<id>/xml` the stored XML (file name `<kind>-<number>.xml`; `409` for drafts and for quotations /
 reminders). A draft invoice, credit note or reminder is rendered on request with a light "Draft" mark. The mail dispatch
-attaches the stored files (PDF, and the XML for invoices / credit notes).
+attaches the stored files (PDF, and the XML for invoices / credit notes). A finalised quotation is not stored; its PDF is
+rendered from the snapshot on every request.
 
 ## Validators
 

@@ -134,7 +134,7 @@ def new_invoice(client, **kw):
 
 
 # ---------------------------------------------------------------- 1. draft: rendered PDF, no XML
-INV = new_invoice(CL)
+INV = new_invoice(CL, einvoice_format="zugferd")  # a client with a buyer reference defaults to xrechnung (F1); this one is ZUGFeRD
 r = A.get(B + f"{D}/{INV}/pdf")
 check(r.ok and r.headers["Content-Type"].startswith("application/pdf") and r.content.startswith(b"%PDF-1.7") and f'filename="invoice-doc-{INV}.pdf"' in r.headers["Content-Disposition"],
       f"draft invoice: a PDF 1.7 named by the id: {r.headers.get('Content-Disposition')}")
@@ -256,8 +256,10 @@ p = A.get(B + f"{D}/{QO}/pdf").content
 check(p.startswith(b"%PDF-1.7") and b"<pdfaid:part>3</pdfaid:part>" in p and b"/FontFile2" in p and A.get(B + f"{D}/{QO}/xml").status_code == 409,
       "a quotation prints as PDF/A-3 with the embedded font, no XML")
 r = A.post(B + f"{D}/{QO}/finalize")
-check(r.ok and len(r.json().get("pdf_sha256") or "") == 64 and os.path.isfile(os.path.join(OFFICE, str(ORG), f"doc{QO}-{r.json()['number']}.pdf")),
-      "a finalised quotation is stored as <number>.pdf with its hash")
+check(r.ok and not r.json().get("pdf_sha256") and not any(fn.startswith(f"doc{QO}-") for fn in os.listdir(os.path.join(OFFICE, str(ORG)))),
+      "a finalised quotation is not stored (rendered from its snapshot, no hash)")
+p = A.get(B + f"{D}/{QO}/pdf")
+check(p.ok and p.content.startswith(b"%PDF-1.7") and f'filename="{r.json()["number"]}.pdf"' in p.headers["Content-Disposition"], "... its PDF still comes from the snapshot, named by the number")
 
 # ---------------------------------------------------------------- 7. the backup carries the stored files
 r = A.post(B + "/api/admin/backups")

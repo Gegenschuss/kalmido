@@ -150,7 +150,7 @@ check(r.headers.get("Content-Disposition") == f'attachment; filename="{NUMBER}.p
 check(r.headers.get("Cache-Control") == "no-store", "the PDF is not cached")
 rd, T = pdf_texts(r.content)
 all_t = "\n".join(T)
-check(r.content.startswith(b"%PDF-1.4"), "a PDF 1.4 file")
+check(r.content.startswith(b"%PDF-1.7"), "a PDF 1.7 file (PDF/A-3b since 2.38.0)")
 for want in (NUMBER, "Beispielkunde AG", "z. Hd. Max Mustermann", "50667 Köln", "KOSTENVORANSCHLAG", "Imagefilm Herbstkampagne", "PO-4711",
              "Storyboard-Erstellung", "Animation 2D / Motion Design", "Sound Design", "Producing", "Die Untertitel liefern wir als SRT-Datei.",
              "Studio Nordlicht GmbH", "Hafenstraße 12", "Beispielbank", "Seite 1 von"):
