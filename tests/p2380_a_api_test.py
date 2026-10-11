@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """2.38.0 API tests, part A: invoices, credit notes, payments and reminders of Office & finance (#1021 stage 2, F1), own
 container in mode workspaces (start.sh). Invented companies, people and the test IBAN only.
+ - 2.39.0 (#1209, mini audit): control characters dropped (client, document title), a sent quotation never back to draft,
+   the instance admin sees / moves only clients of own organisations (mode workspaces)
  - an invoice from a quotation: every quotation line becomes a position (producing / raw data / discount condensed),
    rights, framework contract text, recipient, project, PO number and period of service taken over, source_doc_id
  - the parity example (invoice 663 of the template): net 34422.90, 19 % 6540.35, gross 40963.25 as exact strings
@@ -442,6 +444,28 @@ check(A.post(B + f"{D}/from-time", json={"client_id": CL, "from": "2026-05-01", 
 log = A.get(B + f"{D}/{IID}/log").json()["log"]
 acts = {x["action"] for x in log}
 check({"create", "finalize", "payment", "payment_delete"} <= acts, f"office log: invoice actions {sorted(acts)}")
+
+# ---------------------------------------------------------------- 2.39.0 (#1209): fixes from the mini audit of 2.38
+# M2: control characters never reach a document or a client (they would break the e-invoice XML); tab / line break stay
+r = A.post(B + "/api/clients", json={"name": "Steuer\x01zeichen\x0b KG", "address": "Weg 1\n12345 Ort\x07"})
+check(r.status_code == 201 and r.json()["name"] == "Steuerzeichen KG" and r.json()["address"] == "Weg 1\n12345 Ort",
+      "#1209 M2: control characters dropped from client data " + r.text[:120])
+r = A.post(B + D, json={"project_title": "Titel\x0bmit\x00Steuerzeichen", "client_id": CL})
+check(r.status_code == 201, "#1209 M2: a NUL byte in a title is no 500 " + r.text[:120])
+if r.status_code == 201:
+    OFF9 = r.json()["id"]
+    check(A.get(B + f"{D}/{OFF9}").json().get("project_title") == "TitelmitSteuerzeichen", "#1209 M2: control characters dropped from the title")
+    # N1: a sent quotation never goes back to draft (decision 2026-10-10: sent = locked; Duplicate for changes)
+    check(A.post(B + f"{D}/{OFF9}/status", json={"status": "sent"}).ok, "#1209 N1: quotation -> sent")
+    check(A.post(B + f"{D}/{OFF9}/status", json={"status": "draft"}).status_code == 409, "#1209 N1: sent quotation -> draft = 409")
+    check(A.post(B + f"{D}/{OFF9}/status", json={"status": "accepted"}).ok, "#1209 N1: sent quotation -> accepted still works")
+# M3: mode workspaces -- the instance admin sees and moves only the clients of their own organisations
+r = Ca.post(B + "/api/clients", json={"name": "Beta-Kunde"})
+check(r.status_code == 201, "setup: client of the second organisation " + r.text[:120])
+CLB = r.json().get("id")
+check(all(x["id"] != CLB for x in A.get(B + "/api/clients").json()["clients"]), "#1209 M3: the instance admin does not list a foreign organisation's client")
+check(A.get(B + f"/api/clients/{CLB}").status_code == 404, "#1209 M3: a foreign organisation's client = 404 for the instance admin")
+check(A.patch(B + f"/api/clients/{CL}", json={"org_id": ORG2}).status_code == 400, "#1209 M3: the instance admin cannot move a client into a foreign organisation")
 
 print(f"p2380_a_api_test: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
