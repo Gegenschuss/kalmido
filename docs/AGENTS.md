@@ -1535,7 +1535,8 @@ already there, as a [proposal](#proposals) of kind `cleanup`.
   right now (`why: editing`, the same signal tidying waits for), it changed after the request (`changed`), it is already
   closed or deleted (`closed`), it moved to another list (`moved`) or the person lost write access (`denied`). A merge
   appends the notes of the others to the kept task under a line *Merged from #id title* and closes the others as
-  *won't do* (their comments and files stay with them, the history names the task they went into); `close` sets *won't
+  *won't do* (their comments and files stay with them, their open subtasks move to the kept task, the history names
+  the task they went into); `close` sets *won't
   do* with the reason in the history. Everything is ONE undo step (undo, then redo again).
 - **The agent's `job` event** after applying: `{action: "approve", list_id, proposal: {state: "applied", changed, merge,
   rename, move, close, skipped}}`; after discarding `reject` / `discarded`.
