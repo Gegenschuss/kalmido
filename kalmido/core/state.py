@@ -266,7 +266,7 @@ def state():
         languages=languages(),
         news={"unread": sum(1 for x in nitems if not x["read"]), "unread_me": news_unread_me(c, uid, s, nitems), "sig": news_sig(c, uid)},  # 2.28.0 (#987): + "For you"
         avatars=avatar_map(c, uid),
-        templates=[dict(r) for r in c.execute("SELECT id, kind, name FROM templates WHERE user_id=? ORDER BY name COLLATE NOCASE, id",
+        templates=[dict(r) for r in c.execute("SELECT id, kind, name FROM templates WHERE user_id=? ORDER BY lower(name), id",
                                               (uid,))],
         timer=time_running(c, uid) if time_all() else None,
         time_totals=time_totals(c, uid) if time_all() else {},
@@ -368,9 +368,9 @@ def search_tasks(c, uid, raw, limit):
     fids = sorted(search_field_ids(c, uid, raw))[:2000] if raw else []
     # participants: only their own tasks match (a context parent's notes / link / fields are not theirs to search)
     return load_tasks(c, f"list_id IN {vis_sql()} AND deleted_at IS NULL AND {tvis(c, uid, write=True)} "
-                         "AND (title LIKE ? OR content LIKE ? OR url LIKE ? OR (snippets != '' AND id IN (SELECT s.id FROM tasks s, "
-                         "json_each(CASE WHEN json_valid(s.snippets) THEN s.snippets ELSE '[]' END) j WHERE s.snippets != '' "
-                         "AND (json_extract(j.value, '$.code') LIKE ? OR json_extract(j.value, '$.path') LIKE ?))) "
+                         "AND (title ILIKE ? OR content ILIKE ? OR url ILIKE ? OR (snippets IS NOT NULL AND EXISTS (SELECT 1 FROM "
+                         "jsonb_array_elements(CASE WHEN jsonb_typeof(snippets)='array' THEN snippets ELSE '[]'::jsonb END) j "
+                         "WHERE (j->>'code') ILIKE ? OR (j->>'path') ILIKE ?)) "
                          f"OR id IN ({','.join('?' * len(fids)) or 'NULL'})) "
                          "ORDER BY status, updated_at DESC LIMIT ?", (uid, uid, q, q, q, q, q, *fids, limit))
 

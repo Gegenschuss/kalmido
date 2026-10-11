@@ -78,7 +78,7 @@ def dayplan_events(c, uid, day):
     rows = []
     if CAL_ON:
         rows = [(r["title"], r["all_day"], r["start"], r["end"]) for r in c.execute(
-            """SELECT e.title, e.all_day, e.start, e.end, s.id AS sid FROM cal_events e JOIN cal_subs s ON s.id=e.sub_id
+            """SELECT e.title, e.all_day, e.start, e."end", s.id AS sid FROM cal_events e JOIN cal_subs s ON s.id=e.sub_id
                WHERE s.user_id=? AND s.visible=1 AND e.d1>=? AND e.d0<=? ORDER BY e.start LIMIT ?""",
             (uid, ds, ds, DAYPLAN_MAX_EVENTS)) if f"s:{r['sid']}" not in off]
     from ..events.model import events_on, ev_range

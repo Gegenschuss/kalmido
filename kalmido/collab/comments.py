@@ -8,6 +8,7 @@ from datetime import date
 from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app, PUBLIC_URL
+from ..core.pg import insert_id
 from ..core.i18n import LANGS, short_day, tr, trn
 from ..core.db import body, bump, db, err, inbox_default, iso, iso_ms, local_now, now_utc, usettings
 from ..accounts.session import me
@@ -142,7 +143,7 @@ def timeline_seen(tid):
     need_task(c, tid, write=False, full=True)
     top = c.execute("SELECT COALESCE(MAX(id),0) FROM comments WHERE task_id=?", (tid,)).fetchone()[0]
     c.execute("INSERT INTO task_seen(user_id,task_id,seen_id) VALUES(?,?,?) "
-              "ON CONFLICT(user_id,task_id) DO UPDATE SET seen_id=MAX(seen_id, excluded.seen_id)", (me(), tid, top))
+              "ON CONFLICT(user_id,task_id) DO UPDATE SET seen_id=GREATEST(task_seen.seen_id, excluded.seen_id)", (me(), tid, top))
     c.execute("UPDATE notifications SET read_at=? WHERE user_id=? AND task_id=? AND read_at IS NULL", (iso(now_utc()), me(), tid))
     push_handled(c, me(), [tid])
     c.commit()
@@ -223,9 +224,9 @@ def comment_create(tid):
             sug = {**clean_suggestion(c, t, sug), "state": "open"}
         except BadInput as e:
             return err(str(e))
-    cid = c.execute("INSERT INTO comments(task_id,user_id,body,mentions,created_at,suggestion,reply_to) VALUES(?,?,?,?,?,?,?)",
+    cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,suggestion,reply_to) VALUES(?,?,?,?,?,?,?)",
                     (tid, me(), text, ",".join(map(str, mentions)), iso_ms(now_utc()),
-                     json.dumps(sug, ensure_ascii=False) if sug else None, orig["id"] if orig else None)).lastrowid
+                     json.dumps(sug, ensure_ascii=False) if sug else None, orig["id"] if orig else None))
     replied = orig["user_id"] if orig and orig["user_id"] != me() else None
     if sug and sug.get("kind") == "merge_request":
         git_merge_link(c, t, sug)
@@ -236,7 +237,7 @@ def comment_create(tid):
         unlink_files(saved)
         return err(e)
     c.execute("INSERT INTO task_seen(user_id,task_id,seen_id) VALUES(?,?,?) "
-              "ON CONFLICT(user_id,task_id) DO UPDATE SET seen_id=MAX(seen_id, excluded.seen_id)", (me(), tid, cid))
+              "ON CONFLICT(user_id,task_id) DO UPDATE SET seen_id=GREATEST(task_seen.seen_id, excluded.seen_id)", (me(), tid, cid))
     pushes = comment_pushes(c, t, cid, text, mentions, mentions, len(files), replied=replied) if collab_all() else []
     if collab_all():  # 2.33.0 (#1076): an agent whose comment is answered hears it like a mention
         agent_comment_events(c, t, cid, mentions, mentions + ([replied] if replied and replied not in mentions else []))
@@ -329,7 +330,7 @@ def burst_gate(c, uid, tid, mentioned=False, event=False):
     now = time.time()
     st = c.execute("SELECT sent_at FROM task_push WHERE user_id=? AND task_id=?", (uid, tid)).fetchone()
     if st and now - st["sent_at"] < TASK_PUSH_GAP:
-        c.execute("""UPDATE task_push SET pending=pending+?, events=events+?, mentioned=MAX(mentioned,?)
+        c.execute("""UPDATE task_push SET pending=pending+?, events=events+?, mentioned=GREATEST(mentioned,?)
                      WHERE user_id=? AND task_id=?""", (0 if event else 1, 1 if event else 0, 1 if mentioned else 0, uid, tid))
         return False
     c.execute("INSERT INTO task_push(user_id,task_id,sent_at) VALUES(?,?,?) ON CONFLICT(user_id,task_id) "

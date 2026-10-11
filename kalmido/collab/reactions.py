@@ -4,6 +4,7 @@ import re
 from flask import g, has_request_context, jsonify
 
 from ..core.config import app
+from ..core.pg import insert_id
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, iso_ms, now_utc
 from ..accounts.session import me
@@ -82,7 +83,7 @@ def react(c, k, uid, emoji, on):
     if not on:
         c.execute("DELETE FROM comment_reactions WHERE comment_id=? AND user_id=? AND emoji=?", (k["id"], uid, emoji))
         return res
-    if not c.execute("INSERT OR IGNORE INTO comment_reactions(comment_id,user_id,emoji,created_at) VALUES(?,?,?,?)",
+    if not c.execute("INSERT INTO comment_reactions(comment_id,user_id,emoji,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
                      (k["id"], uid, emoji, iso_ms(now_utc()))).rowcount:
         return res
     t = c.execute("SELECT * FROM tasks WHERE id=?", (k["task_id"],)).fetchone()
@@ -233,7 +234,7 @@ def comment_apply(cid):
     if sug.get("state") != "open" or t["deleted_at"]:
         return err(tr("This suggestion was already handled"), 409)
     suggestion_apply(c, k, t)
-    c.execute("INSERT OR IGNORE INTO comment_reactions(comment_id,user_id,emoji,created_at) VALUES(?,?,?,?)",
+    c.execute("INSERT INTO comment_reactions(comment_id,user_id,emoji,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
               (cid, me(), "up", iso_ms(now_utc())))
     author = c.execute("SELECT * FROM users WHERE id=?", (k["user_id"],)).fetchone() if k["user_id"] else None
     if is_agent(author) and task_visible(c, t["id"], author["id"], full=True):
@@ -295,7 +296,7 @@ def ltags_of_lists(c, lids):
     lids = [x for x in lids if x]
     if not lids:
         return out
-    for r in c.execute(f"SELECT * FROM list_tags WHERE list_id IN ({','.join('?' * len(lids))}) ORDER BY sort, name COLLATE NOCASE, id", lids):
+    for r in c.execute(f"SELECT * FROM list_tags WHERE list_id IN ({','.join('?' * len(lids))}) ORDER BY sort, lower(name), id", lids):
         out.setdefault(r["list_id"], []).append({"id": r["id"], "name": r["name"], "color": r["color"]})
     return out
 
@@ -307,7 +308,7 @@ def ltags_for(c, ids):
     for i in range(0, len(ids), 900):
         part = ids[i:i + 900]
         for r in c.execute(f"""SELECT x.task_id, lt.name FROM task_list_tags x JOIN list_tags lt ON lt.id=x.tag_id JOIN tasks t ON t.id=x.task_id
-                               WHERE x.task_id IN ({','.join('?' * len(part))}) AND lt.list_id=t.list_id ORDER BY lt.sort, lt.name COLLATE NOCASE""", part):
+                               WHERE x.task_id IN ({','.join('?' * len(part))}) AND lt.list_id=t.list_id ORDER BY lt.sort, lower(lt.name)""", part):
             out.setdefault(r["task_id"], []).append(r["name"])
     return out
 
@@ -317,7 +318,7 @@ def ltag_names(c, tid):
 
 
 def ltag_get_or_create(c, lid, name, create):
-    r = c.execute("SELECT id FROM list_tags WHERE list_id=? AND name=? COLLATE NOCASE", (lid, name)).fetchone()
+    r = c.execute("SELECT id FROM list_tags WHERE list_id=? AND lower(name)=lower(?)", (lid, name)).fetchone()
     if r:
         return r[0]
     if not create:
@@ -325,8 +326,8 @@ def ltag_get_or_create(c, lid, name, create):
     if c.execute("SELECT COUNT(*) FROM list_tags WHERE list_id=?", (lid,)).fetchone()[0] >= LTAG_MAX:
         raise BadInput(tr("At most {0} list tags", LTAG_MAX))
     srt = c.execute("SELECT COALESCE(MAX(sort),0)+1 FROM list_tags WHERE list_id=?", (lid,)).fetchone()[0]
-    return c.execute("INSERT INTO list_tags(list_id,name,color,sort,created_at) VALUES(?,?,?,?,?)",
-                     (lid, name, "", srt, iso(now_utc()))).lastrowid
+    return insert_id(c, "INSERT INTO list_tags(list_id,name,color,sort,created_at) VALUES(?,?,?,?,?)",
+                     (lid, name, "", srt, iso(now_utc())))
 
 
 def set_ltags(c, tid, names, log=True):
@@ -338,7 +339,7 @@ def set_ltags(c, tid, names, log=True):
     ids = [ltag_get_or_create(c, t["list_id"], n, create) for n in names]
     c.execute("DELETE FROM task_list_tags WHERE task_id=?", (tid,))
     for i in dict.fromkeys(ids):
-        c.execute("INSERT OR IGNORE INTO task_list_tags(task_id,tag_id) VALUES(?,?)", (tid, i))
+        c.execute("INSERT INTO task_list_tags(task_id,tag_id) VALUES(?,?) ON CONFLICT DO NOTHING", (tid, i))
     after = ltag_names(c, tid)
     if log and sorted(before, key=str.casefold) != sorted(after, key=str.casefold):
         log_act(c, tid, "ltags", {"tags": after})
@@ -361,7 +362,7 @@ def ltags_follow(c, tid, lid):
                 continue
             if r["color"]:
                 c.execute("UPDATE list_tags SET color=? WHERE id=? AND color=''", (r["color"], i))
-            c.execute("INSERT OR IGNORE INTO task_list_tags(task_id,tag_id) VALUES(?,?)", (x, i))
+            c.execute("INSERT INTO task_list_tags(task_id,tag_id) VALUES(?,?) ON CONFLICT DO NOTHING", (x, i))
 
 
 def need_ltag(c, tag_id, write=True):
@@ -389,7 +390,7 @@ def ltag_create(lid):
     c = db()
     need_list(c, lid)
     f = ltag_fields(body())
-    if c.execute("SELECT 1 FROM list_tags WHERE list_id=? AND name=? COLLATE NOCASE", (lid, f["name"])).fetchone():
+    if c.execute("SELECT 1 FROM list_tags WHERE list_id=? AND lower(name)=lower(?)", (lid, f["name"])).fetchone():
         return err(tr("This tag already exists in the list"), 409)
     i = ltag_get_or_create(c, lid, f["name"], True)
     if f.get("color"):
@@ -404,7 +405,7 @@ def ltag_update(tag_id):
     c = db()
     r = need_ltag(c, tag_id)
     f = ltag_fields(body(), partial=True)
-    if "name" in f and c.execute("SELECT 1 FROM list_tags WHERE list_id=? AND name=? COLLATE NOCASE AND id!=?",
+    if "name" in f and c.execute("SELECT 1 FROM list_tags WHERE list_id=? AND lower(name)=lower(?) AND id!=?",
                                  (r["list_id"], f["name"], tag_id)).fetchone():
         return err(tr("This tag already exists in the list"), 409)
     if f:
@@ -440,7 +441,7 @@ def ltag_promote(lid):
     ids = [r[0] for r in c.execute("""SELECT g.task_id FROM task_tags g JOIN tasks t ON t.id=g.task_id
                                       WHERE g.user_id=? AND g.tag=? AND t.list_id=?""", (me(), tag, lid))]
     for x in ids:
-        c.execute("INSERT OR IGNORE INTO task_list_tags(task_id,tag_id) VALUES(?,?)", (x, i))
+        c.execute("INSERT INTO task_list_tags(task_id,tag_id) VALUES(?,?) ON CONFLICT DO NOTHING", (x, i))
         c.execute("DELETE FROM task_tags WHERE task_id=? AND user_id=? AND tag=?", (x, me(), tag))
         log_act(c, x, "ltags", {"tags": ltag_names(c, x)})
     bump(c)

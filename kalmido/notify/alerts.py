@@ -342,7 +342,9 @@ def _aa_storage(c, cfg, now):
             aa_emit(c, cfg, "storage", "attachments:readonly", N_("The attachment folder is not writable."))
     if now - _AA["qc_at"] >= AA_QC_EVERY:
         _AA["qc_at"] = now
-        rows = [str(r[0]) for r in c.execute("PRAGMA quick_check(20)").fetchall()]
+        # 2.37.0 (#1150): Postgres has no quick_check; the data page checksum failures of this database (NULL = checksums off)
+        n = c.execute("SELECT checksum_failures FROM pg_stat_database WHERE datname=current_database()").fetchone()
+        rows = ["ok"] if not n or not n[0] else [f"{n[0]} data page checksum failure(s)"] * int(n[0])
         ok = rows == ["ok"]
         _AA["qc"] = {"at": iso(now_utc()), "ok": ok}
         if not ok:

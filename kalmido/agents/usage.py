@@ -9,6 +9,7 @@ from datetime import date, datetime, timedelta, timezone
 from flask import g, jsonify, request, Response
 
 from ..core.config import API_PREFIX, app, MAX_FILE_MB, PUBLIC_URL, TZ
+from ..core.pg import insert_id
 from ..core.i18n import dec_comma, fmt_int, lang, tr
 from ..core.db import bump, connect, db, inbox_default, iso, iso_ms, local_now, now_utc, parse_iso, usettings
 from ..accounts.session import GATE, me
@@ -280,10 +281,10 @@ def v1_agent_usage_post():
         raise BadInput(tr("Invalid value: {0}", "job_id"))
     ts = iso(now_utc())
     day = local_now().date().isoformat()
-    rid = c.execute("""INSERT INTO agent_usage(agent_id,model,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,
+    rid = insert_id(c, """INSERT INTO agent_usage(agent_id,model,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,
                        cost_usd,task_id,list_id,job_id,note,day,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (aid, model.strip(), f["input_tokens"], f["output_tokens"], f["cache_read_tokens"], f["cache_write_tokens"],
-                     None if cost is None else float(cost), tid, lid, jid, note.strip(), day, ts)).lastrowid
+                     None if cost is None else float(cost), tid, lid, jid, note.strip(), day, ts))
     usage_alerts(c, aid)
     if tid:
         bump(c)  # the task panel's "AI usage" line
@@ -528,8 +529,8 @@ def admin_agents_audit(aid=None):
         if sel is not None:
             w += " AND agent_id=?"
             wa.append(sel)
-        r = c.execute(f"""SELECT COUNT(*) n, COALESCE(SUM(status IN ({','.join(map(str, AUDIT_DENIED))})), 0) den,
-                                 COALESCE(SUM(method=? AND route=?), 0) poll FROM agent_audit WHERE {w}""", (*AUDIT_POLL, *wa)).fetchone()
+        r = c.execute(f"""SELECT COUNT(*) n, COUNT(*) FILTER (WHERE status IN ({','.join(map(str, AUDIT_DENIED))})) den,
+                                 COUNT(*) FILTER (WHERE method=? AND route=?) poll FROM agent_audit WHERE {w}""", (*AUDIT_POLL, *wa)).fetchone()
         out["today"] = {"requests": r["n"], "denied": r["den"], "polls": r["poll"]}
     return jsonify(**out)
 
@@ -695,7 +696,7 @@ def v1_list_tags(lid):
     v1_args(())
     c = db()
     need_list(c, lid, write=False)
-    return jsonify(data=[v1_ltag(c, r) for r in c.execute("SELECT * FROM list_tags WHERE list_id=? ORDER BY sort, name COLLATE NOCASE", (lid,))],
+    return jsonify(data=[v1_ltag(c, r) for r in c.execute("SELECT * FROM list_tags WHERE list_id=? ORDER BY sort, lower(name)", (lid,))],
                    next_cursor=None)
 
 

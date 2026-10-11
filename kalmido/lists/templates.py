@@ -5,6 +5,7 @@ from datetime import date, timedelta
 from flask import jsonify
 
 from ..core.config import app
+from ..core.pg import insert_id
 from ..core.schema import MAX_DEPTH
 from ..core.i18n import lang, N_, tr
 from ..core.db import body, bump, db, err, inbox_default, iso, local_now, now_utc, uset, usettings
@@ -210,7 +211,7 @@ def need_template(c, tid):
 @app.get("/api/templates")
 def templates_list():
     return jsonify(templates=[tpl_dict(r) for r in db().execute(
-        "SELECT * FROM templates WHERE user_id=? ORDER BY kind DESC, name COLLATE NOCASE, id", (me(),))])
+        "SELECT * FROM templates WHERE user_id=? ORDER BY kind DESC, lower(name), id", (me(),))])
 
 
 @app.post("/api/templates")
@@ -261,7 +262,7 @@ def template_create():
                     mkeys(x.get("children") or [])
             mkeys(tasks)
             deps = [[keys[r[0]], keys[r[1]]] for r in c.execute("""SELECT d.task_id, d.blocker_id FROM task_deps d JOIN tasks t ON t.id=d.task_id
-                                                                           WHERE t.list_id=? ORDER BY d.rowid""", (lid,)).fetchall()
+                                                                           WHERE t.list_id=? ORDER BY d.created_at, d.task_id, d.blocker_id""", (lid,)).fetchall()
                     if r[0] in keys and r[1] in keys] if keys else []
             role = list_role(c, lid)
             name = tr("Inbox") if lst["is_inbox"] and inbox_default(lst["name"]) else lst["name"]
@@ -286,11 +287,11 @@ def template_create():
     if not name:
         return err(tr("Name missing"))
     ts = iso(now_utc())
-    cur = c.execute("INSERT INTO templates(user_id,kind,name,data,created_at,updated_at) VALUES(?,?,?,?,?,?)",
+    cur_id = insert_id(c, "INSERT INTO templates(user_id,kind,name,data,created_at,updated_at) VALUES(?,?,?,?,?,?)",
                     (uid, kind, name, json.dumps(data, ensure_ascii=False), ts, ts))
     bump(c)
     c.commit()
-    return jsonify(tpl_dict(c.execute("SELECT * FROM templates WHERE id=?", (cur.lastrowid,)).fetchone()))
+    return jsonify(tpl_dict(c.execute("SELECT * FROM templates WHERE id=?", (cur_id,)).fetchone()))
 
 
 @app.patch("/api/templates/<int:tid>")
@@ -353,8 +354,8 @@ def tpl_insert(c, n, lid, sec, parent, base, sort, uid, fmap=None, scale=1.0, ma
         f["repeat"] = ""
     ts = iso(now_utc())
     cols = list(f) + ["created_at", "updated_at"]
-    tid = c.execute(f"INSERT INTO tasks({','.join(cols)}) VALUES({','.join('?' * len(cols))})",
-                    [f[k] for k in f] + [ts, ts]).lastrowid
+    tid = insert_id(c, f"INSERT INTO tasks({','.join(cols)}) VALUES({','.join('?' * len(cols))})",
+                    [f[k] for k in f] + [ts, ts])
     if n.get("tags"):
         set_tags(c, tid, n["tags"], uid)
     for k, v in (n.get("fv") or {}).items() if fmap else ():
@@ -368,7 +369,7 @@ def tpl_insert(c, n, lid, sec, parent, base, sort, uid, fmap=None, scale=1.0, ma
         except (BadInput, ValueError, TypeError):
             continue
         if val is not None:
-            c.execute("INSERT OR REPLACE INTO task_field_values(task_id,field_id,value) VALUES(?,?,?)", (tid, f["id"], val))
+            c.execute("INSERT INTO task_field_values(task_id,field_id,value) VALUES(?,?,?) ON CONFLICT (task_id,field_id) DO UPDATE SET value=excluded.value", (tid, f["id"], val))
     log_act(c, tid, "created")
     if made is not None and n.get("k"):
         made[n["k"]] = tid
@@ -430,19 +431,19 @@ def tpl_apply_list(c, uid, d, name, folder, start, end=None, color=None, org_id=
     scale = (end - start).days / span if end and span > 0 else 1.0
     tt = d.get("ticket_tpl") if isinstance(d.get("ticket_tpl"), dict) else {}
     from ..accounts.orgs import ws_default_org
-    lid = c.execute("""INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,kind,checklist,tickets,ticket_tpl,dep_shift,org_id)
+    lid = insert_id(c, """INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,kind,checklist,tickets,ticket_tpl,dep_shift,org_id)
                        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (name, d.get("color") or "" if color is None else color, folder, my_max_sort(c, uid) + 1, d.get("view") or "list",
                      iso(now_utc()), uid, lk, 1 if d.get("done_at_bottom") or d.get("kind") == "checklist" else 0, 1 if d.get("tickets") else 0,
                      json.dumps(tt, ensure_ascii=False) if tt else "", 1 if d.get("dep_shift") else 0,
-                     ws_default_org(c, uid, folder) if org_id == "auto" else org_id)).lastrowid  # 2.28.0 (#935): the workspace, before anyone joins
-    secs = [c.execute("INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, s, i)).lastrowid
+                     ws_default_org(c, uid, folder) if org_id == "auto" else org_id))  # 2.28.0 (#935): the workspace, before anyone joins
+    secs = [insert_id(c, "INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, s, i))
             for i, s in enumerate(d.get("sections") or [])]
     fmap = []
     for i, fd in enumerate(d.get("fields") or []):
-        fid = c.execute("INSERT INTO list_fields(list_id,name,type,options,pinned,sort,created_at) VALUES(?,?,?,?,?,?,?)",
+        fid = insert_id(c, "INSERT INTO list_fields(list_id,name,type,options,pinned,sort,created_at) VALUES(?,?,?,?,?,?,?)",
                         (lid, fd["name"], fd["type"], json.dumps(fd.get("options") or {}, ensure_ascii=False), fd.get("pinned") or 0,
-                         i + 1, iso(now_utc()))).lastrowid
+                         i + 1, iso(now_utc())))
         fmap.append(c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone())
     made = {}
     for i, n in enumerate(d.get("tasks") or []):
@@ -462,7 +463,7 @@ def tpl_apply_list(c, uid, d, name, folder, start, end=None, color=None, org_id=
             c.execute("UPDATE tasks SET milestone_id=? WHERE id=?", (mid, tid_))
     for a, b_ in d.get("deps") or []:
         if a in made and b_ in made:
-            c.execute("INSERT OR IGNORE INTO task_deps(task_id,blocker_id,created_by,created_at) VALUES(?,?,?,?)",
+            c.execute("INSERT INTO task_deps(task_id,blocker_id,created_by,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
                       (made[a], made[b_], uid, iso(now_utc())))
     list_created(c, uid, lid)  # 2.4.2 (#391): project types + templates are new lists too; 2.25.0 (#931): + a shared folder's people
     return lid

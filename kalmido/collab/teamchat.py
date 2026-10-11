@@ -3,6 +3,7 @@ import re
 from flask import g, jsonify, request, Response
 
 from ..core.config import app, PUBLIC_URL
+from ..core.pg import insert_id
 from ..core.i18n import tr
 from ..core.db import body, db, err, iso, iso_ms, now_utc, usettings
 from ..accounts.session import me
@@ -95,14 +96,14 @@ def tchat_list_room(c, lid, create=True):
     r = c.execute("SELECT * FROM tchat_rooms WHERE kind='list' AND list_id=?", (lid,)).fetchone()
     if r or not create:
         return r
-    c.execute("INSERT OR IGNORE INTO tchat_rooms(kind,list_id,created_at) VALUES('list',?,?)", (lid, iso(now_utc())))
+    c.execute("INSERT INTO tchat_rooms(kind,list_id,created_at) VALUES('list',?,?) ON CONFLICT DO NOTHING", (lid, iso(now_utc())))
     return c.execute("SELECT * FROM tchat_rooms WHERE kind='list' AND list_id=?", (lid,)).fetchone()
 
 
 def tchat_shared_lists(c, uid):
     """The lists of uid that have a channel: shared (another person or an agent sees the whole list), not archived."""
     out = []
-    for l in c.execute(f"SELECT id, name, is_inbox FROM lists WHERE id IN {vis_sql()} AND archived=0 ORDER BY name COLLATE NOCASE", (uid, uid)):
+    for l in c.execute(f"SELECT id, name, is_inbox FROM lists WHERE id IN {vis_sql()} AND archived=0 ORDER BY lower(name)", (uid, uid)):
         if list_role(c, l["id"], uid) not in FULL_ROLES:
             continue
         if len(tchat_list_members(c, l["id"])) >= 2:
@@ -130,7 +131,7 @@ def tchat_rooms(c, uid):
         lr, muted = tchat_last_read(c, r["id"], uid)
         unread = c.execute("SELECT COUNT(*) FROM tchat_msgs WHERE room_id=? AND id>? AND deleted_at IS NULL AND COALESCE(user_id,0)!=?",
                            (r["id"], lr, uid)).fetchone()[0]
-        mention = bool(unread) and c.execute("SELECT 1 FROM tchat_msgs WHERE room_id=? AND id>? AND deleted_at IS NULL AND body LIKE ?",
+        mention = bool(unread) and c.execute("SELECT 1 FROM tchat_msgs WHERE room_id=? AND id>? AND deleted_at IS NULL AND body ILIKE ?",
                                              (r["id"], lr, f"%<@{uid}>%")).fetchone() is not None
         d = {"id": r["id"], "kind": r["kind"], "unread": unread, "mention": mention, "muted": muted,
              "last": tchat_msg_brief(c, last) if last else None, "last_at": last["created_at"] if last else None}
@@ -258,7 +259,7 @@ def tchat_dm():
     if isinstance(other, bool) or not isinstance(other, int) or other not in tchat_coworkers(c, me()):
         raise Denied(404)
     a, b = sorted((me(), other))
-    c.execute("INSERT OR IGNORE INTO tchat_rooms(kind,a,b,created_at) VALUES('dm',?,?,?)", (a, b, iso(now_utc())))
+    c.execute("INSERT INTO tchat_rooms(kind,a,b,created_at) VALUES('dm',?,?,?) ON CONFLICT DO NOTHING", (a, b, iso(now_utc())))
     r = c.execute("SELECT * FROM tchat_rooms WHERE kind='dm' AND a=? AND b=?", (a, b)).fetchone()
     c.commit()
     return jsonify(id=r["id"], kind="dm", user_id=other, name=user_names(c, [other]).get(other, "?"))
@@ -310,8 +311,8 @@ def tchat_post(rid):
     except BadInput as e:
         return err(str(e))
     ts = iso_ms(now_utc())
-    mid = c.execute("INSERT INTO tchat_msgs(room_id,user_id,body,task_id,created_at,reply_to) VALUES(?,?,?,?,?,?)",
-                    (rid, me(), text, tid, ts, orig["id"] if orig else None)).lastrowid
+    mid = insert_id(c, "INSERT INTO tchat_msgs(room_id,user_id,body,task_id,created_at,reply_to) VALUES(?,?,?,?,?,?)",
+                    (rid, me(), text, tid, ts, orig["id"] if orig else None))
     c.execute("UPDATE tchat_rooms SET last_at=? WHERE id=?", (ts, rid))
     c.execute("INSERT INTO tchat_reads(room_id,user_id,last_id) VALUES(?,?,?) ON CONFLICT(room_id,user_id) DO UPDATE SET last_id=excluded.last_id",
               (rid, me(), mid))
@@ -423,7 +424,7 @@ def tchat_react(mid):
     if on and m["user_id"] == me():  # 2.23.0 (#823): not on one's own message
         return err(tr("You cannot react to your own message"))
     if on:
-        c.execute("INSERT OR IGNORE INTO tchat_rx(message_id,user_id,emoji,created_at) VALUES(?,?,?,?)", (mid, me(), emoji, iso_ms(now_utc())))
+        c.execute("INSERT INTO tchat_rx(message_id,user_id,emoji,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING", (mid, me(), emoji, iso_ms(now_utc())))
     else:
         c.execute("DELETE FROM tchat_rx WHERE message_id=? AND user_id=? AND emoji=?", (mid, me(), emoji))
     c.commit()

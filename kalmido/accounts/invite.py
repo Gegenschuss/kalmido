@@ -11,7 +11,7 @@ from werkzeug.security import generate_password_hash
 
 from ..core.config import app, APP_DIR, APP_NAME, MIN_PASSWORD, PUBLIC_URL
 from ..core.i18n import lang, N_, tr
-from ..core.db import body, bump, db, err, gsetting, iso, now_utc, parse_iso, usettings
+from ..core.db import body, bump, db, err, gsetting, iso, now_utc, parse_iso, usettings, write_lock
 from ..accounts.session import _rate_blocked, _rate_fail, _rate_keys, client_ip
 from ..accounts.login import finish_login, pend_cookie, pend_new
 from ..core.access import Denied
@@ -66,14 +66,15 @@ def invite_new(c, uid, by, send=True, kind=None):
             out["error"] = tr("Today's e-mail limit is reached: copy the link instead")
             return out
         try:
-            inviter = c.execute("SELECT display_name, username FROM users WHERE id=?", (by,)).fetchone()
-            subject, text, body_html = invite_mail(c, u, link, kind, (inviter["display_name"] or inviter["username"]) if inviter else "")
-            try:
-                logo = {"logo": (open(os.path.join(APP_DIR, "static", "icon-192.png"), "rb").read(), "png")}
-            except OSError:
-                logo = {}
-            mail_send(u["email"], subject, text, body_html, images=logo, from_name=APP_NAME)
-            c.execute("UPDATE user_invites SET sent_at=? WHERE user_id=?", (iso(now_utc()), uid))
+            with c.savepoint():  # 2.37.0 (#1150): a failure here must not abort the caller's transaction
+                inviter = c.execute("SELECT display_name, username FROM users WHERE id=?", (by,)).fetchone()
+                subject, text, body_html = invite_mail(c, u, link, kind, (inviter["display_name"] or inviter["username"]) if inviter else "")
+                try:
+                    logo = {"logo": (open(os.path.join(APP_DIR, "static", "icon-192.png"), "rb").read(), "png")}
+                except OSError:
+                    logo = {}
+                mail_send(u["email"], subject, text, body_html, images=logo, from_name=APP_NAME)
+                c.execute("UPDATE user_invites SET sent_at=? WHERE user_id=?", (iso(now_utc()), uid))
             out["sent"] = True
         except Exception as e:  # noqa: BLE001  (the link still works: the admin can copy it)
             print("invitation mail failed:", type(e).__name__, flush=True)
@@ -190,7 +191,7 @@ def invite_accept():
         return e
     b = body()
     c = db()
-    c.execute("BEGIN IMMEDIATE")
+    write_lock(c, "accounts")  # 2.37.0 (#1150): was BEGIN IMMEDIATE
     hit = _lookup(c, b.get("token"))
     if not hit:
         c.rollback()

@@ -49,7 +49,7 @@ def wl_people(c, uid, org=None):
     q = "SELECT * FROM users WHERE disabled=0 AND kid=0 AND COALESCE(kind,'user')!='agent'"
     if orgs:
         q += f" AND id IN (SELECT user_id FROM org_members WHERE org_id IN ({','.join(str(int(x)) for x in orgs)}))"
-    rows = c.execute(q + " ORDER BY display_name COLLATE NOCASE, id").fetchall()
+    rows = c.execute(q + " ORDER BY lower(display_name), id").fetchall()
     return [r for r in rows if vis is None or r["id"] in vis], (orgs[0] if orgs else None)
 
 
@@ -101,7 +101,7 @@ def workload(c, uid, start=None, weeks=4, org=None):
             w["pct"] = round(w["minutes"] / 60 / p["capacity_h"] * 100) if p["capacity_h"] else None
             w["level"] = "none" if w["pct"] is None else "over" if w["pct"] > 100 else "warn" if w["pct"] >= 80 else "ok"
     from ..accounts.orgs import user_orgs
-    orgs = [{"id": r[0], "name": r[1]} for r in c.execute("SELECT id, name FROM orgs ORDER BY name COLLATE NOCASE, id")
+    orgs = [{"id": r[0], "name": r[1]} for r in c.execute("SELECT id, name FROM orgs ORDER BY lower(name), id")
             if g.user["is_admin"] or r[0] in user_orgs(c, uid)]
     return {"weeks": [{"start": a.isoformat(), "end": b.isoformat()} for a, b in bounds], "people": [out[i] for i in ids],
             "org_id": oid, "orgs": orgs, "today": today.isoformat()}

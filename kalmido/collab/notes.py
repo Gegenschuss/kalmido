@@ -3,6 +3,7 @@ import re
 from flask import jsonify, request, Response
 
 from ..core.config import app
+from ..core.pg import insert_id
 from ..core.i18n import tr
 from ..core.db import body, bump, db, iso, iso_ms, now_utc
 from ..accounts.session import me
@@ -124,8 +125,8 @@ def note_create(lid):
     note_role(c, lid, write=True)
     f = note_fields(body())
     ts, uid = iso(now_utc()), me()
-    nid = c.execute("INSERT INTO notes(list_id,title,body,tags,pinned,created_by,updated_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
-                    (lid, f["title"], f.get("body", ""), f.get("tags", ""), f.get("pinned", 0), uid, uid, ts, ts)).lastrowid
+    nid = insert_id(c, "INSERT INTO notes(list_id,title,body,tags,pinned,created_by,updated_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                    (lid, f["title"], f.get("body", ""), f.get("tags", ""), f.get("pinned", 0), uid, uid, ts, ts))
     bump(c)
     c.commit()
     r = c.execute("SELECT * FROM notes WHERE id=?", (nid,)).fetchone()
@@ -185,7 +186,7 @@ def notes_search(c, uid, q, lid=None, limit=50):
     if q:
         for word in q.split()[:6]:
             like = "%" + word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-            w += " AND (title LIKE ? ESCAPE '\\' OR body LIKE ? ESCAPE '\\' OR tags LIKE ? ESCAPE '\\')"
+            w += " AND (title ILIKE ? ESCAPE '\\' OR body ILIKE ? ESCAPE '\\' OR tags ILIKE ? ESCAPE '\\')"
             a += [like, like, like]
     return c.execute(f"SELECT * FROM notes WHERE {w} ORDER BY pinned DESC, updated_at DESC LIMIT ?", (*a, limit)).fetchall()
 

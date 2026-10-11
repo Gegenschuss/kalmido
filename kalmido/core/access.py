@@ -128,7 +128,7 @@ def need_feat(f):
 
 
 def _members_on():
-    return "" if collab_all() else " AND 0"
+    return "" if collab_all() else " AND FALSE"  # 2.37.0: a boolean for Postgres (was AND 0)
 
 
 # ---------------------------------------------------------------- 2.36.2 (#1142): request context + the one list scope
@@ -220,6 +220,7 @@ def acx(c=None):
     else:
         ctx = acx_of(c or db(), uid)._replace(list_allow=token_lists())
     g.acx = ctx
+    acx_session_apply(ctx)
     return ctx
 
 
@@ -231,9 +232,23 @@ def acx_drop():
         g.pop("acx_users", None)
 
 
+def acx_session_apply(ctx=None):
+    """2.37.0 (#1150): hand the request's context to its database connection. core/pg.py sets it with SET LOCAL semantics
+    (set_config(..., true)) at the start of every transaction -- also after each commit -- so it never leaks into the next
+    request on the same pooled connection. Background threads / init_db keep "system" (pg.SYSTEM)."""
+    if has_request_context() and "db" in g:
+        ctx = ctx or g.get("acx")
+        if ctx is not None:
+            g.db.set_ctx(**acx_conn_args(ctx))
+
+
+def acx_conn_args(ctx):
+    return {"user_id": ctx.user_id, "org_ids": ctx.org_ids, "role": ctx.role}
+
+
 def acx_session_vars(ctx):
-    """2.37 (Postgres row-level security): the session variables of a context -- exactly these values become
-    SET LOCAL app.user_id / app.org_ids / app.role. Not used by SQLite."""
+    """Postgres row-level security: the session variables of a context -- exactly these values are set per transaction
+    as app.user_id / app.org_ids / app.role (core/pg.py Conn.set_ctx)."""
     return {"app.user_id": "" if ctx.user_id is None else str(ctx.user_id),
             "app.org_ids": ",".join(str(int(x)) for x in ctx.org_ids), "app.role": ctx.role}
 
@@ -337,10 +352,10 @@ def _pset_sql(uid, pl, write=False):
 def tvis(c, uid, a="", write=False):
     """SQL condition (no ? params) that keeps only the task rows uid may see (write: change) among tasks of lists uid
     can access at all. Combine it with the list-level filter (vis_sql / wr_sql / a list id): it only removes the tasks
-    a participant must not see. "1" when uid is a participant nowhere (the usual case)."""
+    a participant must not see. "TRUE" when uid is a participant nowhere (the usual case)."""
     pl = plists(c, uid)
     if not pl:
-        return "1"
+        return "TRUE"  # 2.37.0 (#1150): Postgres needs a boolean (was "1")
     q = ",".join(str(int(x)) for x in pl)
     return f"({a}list_id NOT IN ({q}) OR {a}id IN ({_pset_sql(uid, pl, write)}))"
 

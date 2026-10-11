@@ -3,6 +3,7 @@ import re
 from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
+from ..core.pg import insert_id
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
@@ -162,7 +163,7 @@ def groups_for(c, uid=None, full=False):
     """Every group with its members (names only; persons see all groups to share with them). 2.28.0 (#935): in the mode
     workspaces only the members one may see."""
     from ..accounts.orgs import instance_mode, visible_people
-    out = [grp_dict(c, r, full) for r in c.execute("SELECT * FROM groups ORDER BY name COLLATE NOCASE, id")]
+    out = [grp_dict(c, r, full) for r in c.execute("SELECT * FROM groups ORDER BY lower(name), id")]
     if instance_mode(c) == "workspaces" and has_request_context() and getattr(g, "user", None) is not None:
         vis = visible_people(c, me())
         if vis is not None:
@@ -203,7 +204,7 @@ def grp_set_members(c, gid, ids, actor=None):
     for x in cur - want:
         c.execute("DELETE FROM group_members WHERE group_id=? AND user_id=?", (gid, x))
     for x in sorted(want - cur):
-        c.execute("INSERT OR IGNORE INTO group_members(group_id,user_id,added_at) VALUES(?,?,?)", (gid, x, iso(now_utc())))
+        c.execute("INSERT INTO group_members(group_id,user_id,added_at) VALUES(?,?,?) ON CONFLICT DO NOTHING", (gid, x, iso(now_utc())))
     if cur != want:
         grp_sync(c, before | grp_list_ids(c, gid), actor)
 
@@ -261,11 +262,11 @@ def group_create():
     name = grp_clean_name(b.get("name"))
     if c.execute("SELECT COUNT(*) FROM groups").fetchone()[0] >= GROUP_MAX:
         return err(tr("At most {0} groups", GROUP_MAX), 409)
-    if c.execute("SELECT 1 FROM groups WHERE name=? COLLATE NOCASE", (name,)).fetchone():
+    if c.execute("SELECT 1 FROM groups WHERE lower(name)=lower(?)", (name,)).fetchone():
         return err(tr("A group with this name exists already"), 409)
     og = str(b.get("oidc_group") or "").strip()[:200]
-    gid = c.execute("INSERT INTO groups(name,oidc_group,created_at,created_by) VALUES(?,?,?,?)",
-                    (name, og, iso(now_utc()), me())).lastrowid
+    gid = insert_id(c, "INSERT INTO groups(name,oidc_group,created_at,created_by) VALUES(?,?,?,?)",
+                    (name, og, iso(now_utc()), me()))
     if b.get("members") and not og:
         grp_set_members(c, gid, b["members"])
     bump(c)
@@ -283,7 +284,7 @@ def group_update(gid):
     r = need_group(c, gid)
     if "name" in b:
         name = grp_clean_name(b["name"])
-        if c.execute("SELECT 1 FROM groups WHERE name=? COLLATE NOCASE AND id!=?", (name, gid)).fetchone():
+        if c.execute("SELECT 1 FROM groups WHERE lower(name)=lower(?) AND id!=?", (name, gid)).fetchone():
             return err(tr("A group with this name exists already"), 409)
         c.execute("UPDATE groups SET name=? WHERE id=?", (name, gid))
     og = r["oidc_group"]

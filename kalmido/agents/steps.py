@@ -24,6 +24,7 @@ from datetime import timedelta
 from flask import g, jsonify, request, Response
 
 from ..core.config import app
+from ..core.pg import insert_id
 from ..core.i18n import tr
 from ..core.db import db, iso, iso_ms, now_utc
 from ..accounts.session import me
@@ -130,8 +131,8 @@ def v1_agent_progress():
         u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
         if not u or is_agent(u) or not agent_shares(c, aid, uid):
             raise Denied(404)
-    sid = c.execute("INSERT INTO agent_steps(agent_id,user_id,job_id,state,text,created_at) VALUES(?,?,?,?,?,?)",
-                    (aid, uid, jid, "live" if jid is None else "done", text, iso_ms(now_utc()))).lastrowid
+    sid = insert_id(c, "INSERT INTO agent_steps(agent_id,user_id,job_id,state,text,created_at) VALUES(?,?,?,?,?,?)",
+                    (aid, uid, jid, "live" if jid is None else "done", text, iso_ms(now_utc())))
     c.commit()
     return jsonify(id=sid, text=text, redacted=hit), 201
 

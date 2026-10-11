@@ -5,7 +5,6 @@ import hmac
 import json
 import os
 import re
-import sqlite3
 import time
 import urllib.error
 import urllib.parse
@@ -20,7 +19,7 @@ from flask import has_request_context, request
 from ..core.config import _origin, APP_NAME, NTFY_TOKEN, NTFY_URL, PUBLIC_URL, safe_urlopen, TZ, WATCHDOG_INTERVAL
 from ..core.schema import USER_DEFAULTS
 from ..core.i18n import LANGS, short_day, tr, trn
-from ..core.db import bump, connect, inbox_default, iso, local_now, now_utc, parse_iso, uset, usettings
+from ..core.db import bump, connect, DbError, inbox_default, iso, local_now, now_utc, parse_iso, uset, usettings
 from ..accounts.session import GATE
 from ..core.access import task_visible, vis_sql
 from ..tasks.validation import NAG_HOUR_CAP, NAG_MINUTES, valid_hm
@@ -438,7 +437,7 @@ def _wd_fail(c, what, key, e):
     aa_count("watchdog", f"{what}|{type(e).__name__}", ":".join(map(str, key)) if isinstance(key, tuple) else key)
     try:
         c.rollback()
-    except sqlite3.Error:
+    except DbError:
         pass
 
 
@@ -659,7 +658,7 @@ def _wd_nag(c, t, users, S, LG, now):
 def _wd_focus(c, users, S, LG):
     # focus sessions finished while the tab is closed
     for p in c.execute("SELECT p.*, t.title FROM pomos p LEFT JOIN tasks t ON t.id=p.task_id "
-                       "WHERE p.end IS NULL AND p.paused_at IS NULL").fetchall():
+                       "WHERE p.\"end\" IS NULL AND p.paused_at IS NULL").fetchall():
         try:
             _wd_pomo(c, p, users, S, LG)
         except Exception as e:  # noqa: BLE001

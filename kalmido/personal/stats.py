@@ -76,7 +76,7 @@ def stats_api():
 
     f_day, f_week, f_list = {}, [0.0] * STATS_WEEKS, {}
     for p in c.execute("""SELECT p.*, t.list_id FROM pomos p LEFT JOIN tasks t ON t.id=p.task_id
-                          WHERE p.user_id=? AND p.kind IN ('focus','stopwatch') AND p.end IS NOT NULL AND p.start>=?""", (uid, lo)):
+                          WHERE p.user_id=? AND p.kind IN ('focus','stopwatch') AND p."end" IS NOT NULL AND p.start>=?""", (uid, lo)):
         d = _local_day(p["start"])
         if d < mon0 or d > today:
             continue
@@ -88,7 +88,7 @@ def stats_api():
 
     # tracked time (module "time"): my entries by the local day they start (running timer up to now)
     t_week, t_list, ref = [0] * STATS_WEEKS, {}, now_utc()
-    for e in c.execute(f"SELECT start, end, seconds, list_id FROM time_entries WHERE user_id=? AND start>=? AND (list_id IS NULL OR list_id IN {PROJ_SQL})", (uid, lo)):
+    for e in c.execute(f"SELECT start, \"end\", seconds, list_id FROM time_entries WHERE user_id=? AND start>=? AND (list_id IS NULL OR list_id IN {PROJ_SQL})", (uid, lo)):
         d = _local_day(e["start"])
         if d < mon0 or d > today:
             continue

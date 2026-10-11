@@ -4,6 +4,7 @@ import math
 from flask import jsonify
 
 from ..core.config import app
+from ..core.pg import insert_id
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
 from ..accounts.session import me
@@ -20,11 +21,11 @@ def filter_create():
         return err(tr("Name missing"))
     c = db()
     srt = c.execute("SELECT COALESCE(MAX(sort),0)+1 FROM filters WHERE user_id=?", (me(),)).fetchone()[0]
-    cur = c.execute("INSERT INTO filters(name,rules,sort,created_at,user_id) VALUES(?,?,?,?,?)",
+    cur_id = insert_id(c, "INSERT INTO filters(name,rules,sort,created_at,user_id) VALUES(?,?,?,?,?)",
                     (name, json.dumps(b.get("rules") or {}), srt, iso(now_utc()), me()))
     bump(c)
     c.commit()
-    return jsonify(id=cur.lastrowid)
+    return jsonify(id=cur_id)
 
 
 def need_filter(c, fid):
@@ -118,7 +119,9 @@ def folder_rename():
     _folder_move(c, uid, lambda p: new + p[len(old):] if folder_under(p, old) else p)
     for fp in c.execute("SELECT folder, user_id FROM folder_people WHERE owner_id=?", (uid,)).fetchall():  # 2.22.0 (#740)
         if folder_under(fp[0], old):
-            c.execute("UPDATE OR REPLACE folder_people SET folder=? WHERE owner_id=? AND folder=? AND user_id=?", (new + fp[0][len(old):], uid, fp[0], fp[1]))
+            nf = new + fp[0][len(old):]  # 2.37.0 (#1150): UPDATE OR REPLACE -> drop the row in the way, then move
+            c.execute("DELETE FROM folder_people WHERE owner_id=? AND folder=? AND user_id=? AND folder<>?", (uid, nf, fp[1], fp[0]))
+            c.execute("UPDATE folder_people SET folder=? WHERE owner_id=? AND folder=? AND user_id=?", (nf, uid, fp[0], fp[1]))
     from ..notify.caps import folder_tpl_rename
     folder_tpl_rename(c, uid, old, new)  # 2.33.0 (#927): the folder's notification templates go along
     from ..integrations.gitfolder import gf_rename
@@ -194,8 +197,8 @@ def section_create():
     tids = b.get("tasks") or []
     if not isinstance(tids, list) or len(tids) > 5000 or any(isinstance(i, bool) or not isinstance(i, int) for i in tids):
         return err(tr("Invalid value: {0}", "tasks"))
-    cur = c.execute("INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, name[:200], srt))
-    sid, moved, skipped = cur.lastrowid, [], []
+    cur_id = insert_id(c, "INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, name[:200], srt))
+    sid, moved, skipped = cur_id, [], []
     for tid in tids:
         r = c.execute("SELECT list_id, section_id, deleted_at FROM tasks WHERE id=?", (tid,)).fetchone()
         if not r or r["deleted_at"] or r["list_id"] != lid or r["section_id"] is not None:

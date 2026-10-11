@@ -7,6 +7,7 @@ from datetime import date, datetime
 from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
+from ..core.pg import insert_id
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, gsetting, iso, local_now, now_utc, parse_iso
 from ..accounts.session import me
@@ -330,14 +331,14 @@ def do_complete(c, tid, status=2, undo=None):
         cols = [k for k in t.keys() if k not in ("id", "tt_id")]
         vals = {k: t[k] for k in cols}
         vals.update(status=2, repeat="", completed_at=ts, updated_at=ts, reminded="[]", completed_by=who, rotation="")
-        cur = c.execute(f"INSERT INTO tasks({','.join(cols)}) VALUES({','.join('?' * len(cols))})",
+        cur_id = insert_id(c, f"INSERT INTO tasks({','.join(cols)}) VALUES({','.join('?' * len(cols))})",
                         [vals[k] for k in cols])
         for r in c.execute("SELECT user_id, tag FROM task_tags WHERE task_id=?", (tid,)).fetchall():
-            c.execute("INSERT INTO task_tags(task_id,user_id,tag) VALUES(?,?,?)", (cur.lastrowid, r["user_id"], r["tag"]))
+            c.execute("INSERT INTO task_tags(task_id,user_id,tag) VALUES(?,?,?)", (cur_id, r["user_id"], r["tag"]))
         c.execute("INSERT INTO task_field_values(task_id,field_id,value) SELECT ?, field_id, value FROM task_field_values WHERE task_id=?",
-                  (cur.lastrowid, tid))
-        c.execute("INSERT OR IGNORE INTO sample_items(user_id,kind,item_id) SELECT user_id, 'task', ? FROM sample_items "
-                  "WHERE kind='task' AND item_id=?", (cur.lastrowid, tid))
+                  (cur_id, tid))
+        c.execute("INSERT INTO sample_items(user_id,kind,item_id) SELECT user_id, 'task', ? FROM sample_items "
+                  "WHERE kind='task' AND item_id=? ON CONFLICT DO NOTHING", (cur_id, tid))
         start = t["start"]
         if start:  # timeline range moves along with the due date
             start = (date.fromisoformat(start) + (date.fromisoformat(nxt) - date.fromisoformat(t["due"]))).isoformat()
@@ -359,7 +360,7 @@ def do_complete(c, tid, status=2, undo=None):
                 undo["kids"].append([d, k["status"], k["completed_at"], k["completed_by"]])
             c.execute("UPDATE tasks SET status=0, completed_at=NULL, completed_by=NULL WHERE id=?", (d,))
         if undo is not None:
-            undo.update(copy_id=cur.lastrowid, next=nxt)
+            undo.update(copy_id=cur_id, next=nxt)
     else:
         c.execute("UPDATE tasks SET status=?, completed_at=?, completed_by=?, updated_at=? WHERE id=?",
                   (status, ts, who, ts, tid))
@@ -466,9 +467,9 @@ def undo_status(c, tid, u):
               (tid, me(), at))
     fam = [tid, *descendants(c, tid)]  # ... and the "unblock" items / lines it caused (the tasks wait again)
     q = ",".join("?" * len(fam))
-    c.execute(f"DELETE FROM notifications WHERE kind='unblock' AND actor_id=? AND created_at>=? AND json_extract(data,'$.blocker') IN ({q})",
+    c.execute(f"DELETE FROM notifications WHERE kind='unblock' AND actor_id=? AND created_at>=? AND (data->>'blocker') IN ({q})",
               (me(), at, *fam))
-    c.execute(f"DELETE FROM activity WHERE kind='unblocked' AND user_id=? AND created_at>=? AND json_extract(data,'$.id') IN ({q})",
+    c.execute(f"DELETE FROM activity WHERE kind='unblocked' AND user_id=? AND created_at>=? AND (data->>'id') IN ({q})",
               (me(), at, *fam))
     log_act(c, tid, "reopen")
     return None

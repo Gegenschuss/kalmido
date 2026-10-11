@@ -92,8 +92,9 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
     await ev(`(() => { document.querySelectorAll('.modal, .mwrap, .smodal').forEach(m => m.remove()); return 1; })()`);
 
     // ================= the one-time question (as after the migration)
-    sql("INSERT OR REPLACE INTO list_notif(list_id,user_id,tpl,custom,updated_at) VALUES(?,0,'all',NULL,'2026-10-01T00:00:00Z')", [L]);
-    sql("INSERT OR REPLACE INTO user_settings(user_id,key,value) VALUES(1,'notif_tpl_ask','1')");
+    sql("INSERT INTO list_notif(list_id,user_id,tpl,custom,updated_at) VALUES(?,0,'all',NULL,'2026-10-01T00:00:00Z') "
+        + "ON CONFLICT (list_id,user_id) DO UPDATE SET tpl=excluded.tpl, custom=excluded.custom, updated_at=excluded.updated_at", [L]);
+    sql("INSERT INTO user_settings(user_id,key,value) VALUES(1,'notif_tpl_ask','1') ON CONFLICT (user_id,key) DO UPDATE SET value=excluded.value");
     await nav(B + 'static/icon.svg'); await nav(B + '#l/' + L); await ready(ev);
     const s5 = await ev(`(() => { const b = document.querySelector('#ntfask'); if (!b) return null; const bs = [...b.querySelectorAll('button')]; return {txt: bs.map(x => x.textContent).join('|'), h: Math.min(...bs.map(x => x.getBoundingClientRect().height)), w: b.getBoundingClientRect().right <= innerWidth + .5}; })()`);
     check(s5 && s5.txt === 'Choose template|Keep as it is' && s5.h >= 44 && s5.w, '#927: the owner is asked once (bar, 44 px buttons) ' + JSON.stringify(s5));

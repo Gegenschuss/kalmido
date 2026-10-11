@@ -28,7 +28,6 @@ import secrets
 import shutil
 import smtplib
 import socket
-import sqlite3
 import ssl
 import struct
 import tempfile
@@ -61,6 +60,9 @@ from flask import Flask, Response, g, has_request_context, jsonify, redirect, re
 from werkzeug.security import check_password_hash, generate_password_hash
 
 DB = os.environ.get("TASKS_DB", "/data/tasks.db")
+# 2.37.0 (#1150): the database is Postgres (postgresql://user:password@host/db). TASKS_DB only names the data dir (its folder holds
+# attachments, office files, backups and the marker) and a SQLite file from before 2.37 that the move tool takes over.
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
 TZ = ZoneInfo(os.environ.get("TZ", "Europe/Berlin"))
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "")  # topic of the first admin (seed); other users: settings
 NTFY_URL = os.environ.get("NTFY_URL", "https://ntfy.sh")

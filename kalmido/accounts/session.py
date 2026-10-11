@@ -205,7 +205,7 @@ def authenticate():
     c = db()
     val = proxy_login_value()
     if val:
-        u = c.execute("SELECT * FROM users WHERE proxy_login=? COLLATE NOCASE", (val,)).fetchone()
+        u = c.execute("SELECT * FROM users WHERE lower(proxy_login)=lower(?)", (val,)).fetchone()
         if u and not u["disabled"] and not is_agent(u):
             g.user, g.auth_via = u, "proxy"
         else:
@@ -241,6 +241,15 @@ def authenticate():
 _fails, _fail_lock = {}, threading.Lock()
 _DUMMY_HASH = generate_password_hash(secrets.token_urlsafe(16))  # same algorithm / parameters as real ones
 FAIL_WINDOW = 900  # s
+
+
+@app.before_request
+def acx_bind():
+    """2.37.0 (#1150): the signed-in account's access context goes onto the request's database connection (user id,
+    organisations, role; core/access.py acx_session_apply). Paths without an account keep the context "system"."""
+    if getattr(g, "user", None) is not None:
+        from ..core.access import acx
+        acx()
 
 
 def _rate_keys(username, pre="", lim=(5, 20, 100)):

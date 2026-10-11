@@ -20,7 +20,7 @@ STALE_DAYS_MAX = 365
 STALE_LIMIT_MAX = 200
 
 # The newest sign of life of a task: its own change, a comment, a time entry on it.
-_LAST_SQL = """MAX(t.updated_at,
+_LAST_SQL = """GREATEST(t.updated_at,
                    COALESCE((SELECT MAX(cm.created_at) FROM comments cm WHERE cm.task_id=t.id AND cm.deleted_at IS NULL), ''),
                    COALESCE((SELECT MAX(te.updated_at) FROM time_entries te WHERE te.task_id=t.id), ''))"""
 
@@ -44,7 +44,7 @@ def stale_tasks(c, uid, *, lids=None, limit=50, days=None):
             return []
         where += f" AND t.list_id IN ({','.join(str(i) for i in ids)})"
     if days is not None:
-        thr = "?"
+        thr = "CAST(? AS BIGINT)"  # 2.37.0 (#1150): a bare parameter in a subquery's select list would be text
         args_thr = [max(1, min(STALE_DAYS_MAX, int(days)))]
     else:
         thr = "COALESCE(l.stale_days, ?)"
@@ -59,7 +59,7 @@ def stale_tasks(c, uid, *, lids=None, limit=50, days=None):
             AND (t.due IS NULL OR substr(t.due,1,10)<=?) AND (t.start IS NULL OR t.start='' OR substr(t.start,1,10)<=?)
             AND (t.waiting_at IS NULL OR t.wait_until IS NULL OR t.wait_until<?)
             AND t.list_id IN {vis_sql()} AND {tvis(c, uid, 't.')}{where})
-        WHERE thr>0 AND julianday('now') - julianday(substr(last,1,19)) >= thr
+        WHERE thr>0 AND substr(last,1,19)::timestamp <= (now() AT TIME ZONE 'UTC') - thr * interval '1 day'
         ORDER BY last, id LIMIT ?""", args_thr + [today, today, today] + args + [limit]).fetchall()
     now = now_utc()
     out = []

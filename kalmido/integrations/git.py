@@ -19,6 +19,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from flask import g, jsonify, request
 
 from ..core.config import app, APP_NAME, APP_VERSION, PUBLIC_URL, SECRET_KEY
+from ..core.pg import insert_id
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, connect, db, err, iso, now_utc, parse_iso
 from ..accounts.session import GATE, me
@@ -462,14 +463,14 @@ def git_take_tags(c, r, items):
             names.append(n)
     ts = iso(now_utc())
     if not r["tags_at"]:
-        c.executemany("INSERT OR IGNORE INTO git_tags(conn_id,name,seen_at) VALUES(?,?,?)", [(r["id"], n, ts) for n in names])
+        c.executemany("INSERT INTO git_tags(conn_id,name,seen_at) VALUES(?,?,?) ON CONFLICT DO NOTHING", [(r["id"], n, ts) for n in names])
         c.execute("UPDATE git_conns SET tags_at=? WHERE id=?", (ts, r["id"]))
         return False
-    new = [n for n in names if c.execute("INSERT OR IGNORE INTO git_tags(conn_id,name,seen_at) VALUES(?,?,?)", (r["id"], n, ts)).rowcount]
+    new = [n for n in names if c.execute("INSERT INTO git_tags(conn_id,name,seen_at) VALUES(?,?,?) ON CONFLICT DO NOTHING", (r["id"], n, ts)).rowcount]
     if not new:
         return False
-    c.execute("""DELETE FROM git_tags WHERE conn_id=? AND rowid NOT IN
-                 (SELECT rowid FROM git_tags WHERE conn_id=? ORDER BY seen_at DESC, rowid DESC LIMIT ?)""", (r["id"], r["id"], GIT_TAGS_KEEP))
+    c.execute("""DELETE FROM git_tags WHERE conn_id=? AND name NOT IN
+                 (SELECT name FROM git_tags WHERE conn_id=? ORDER BY seen_at DESC, name DESC LIMIT ?)""", (r["id"], r["id"], GIT_TAGS_KEEP))
     changed = False
     lids = sorted(git_conn_lists(c, r))  # 2.33.0 (#934): a folder repository: the milestones of all its lists
     ms = c.execute(f"SELECT id, title FROM tasks WHERE list_id IN ({','.join('?' * len(lids))}) AND ms=1 AND status=0 AND deleted_at IS NULL ORDER BY id",
@@ -531,7 +532,7 @@ def git_take_prs(c, r, items, baseline):
                   (r["id"], p["number"], p["title"], p["state"], p["author"], p["url"], p["head_ref"], p["head_sha"], p["updated_at"], p["merged_at"]))
         fresh = old is None or not old["title"]  # a stub row from a merge request comment counts as new
         for tid in sorted(tids):
-            new = c.execute("INSERT OR IGNORE INTO git_links(task_id,conn_id,kind,ref,created_at) VALUES(?,?,?,?,?)",
+            new = c.execute("INSERT INTO git_links(task_id,conn_id,kind,ref,created_at) VALUES(?,?,?,?,?) ON CONFLICT DO NOTHING",
                             (tid, r["id"], "pr", n, iso(now_utc()))).rowcount
             if baseline:
                 continue
@@ -562,7 +563,7 @@ def git_take_commits(c, r, items, branch, default):
                      ON CONFLICT(conn_id,sha) DO UPDATE SET branch=CASE WHEN ? THEN excluded.branch ELSE git_commits.branch END""",
                   (r["id"], m["sha"], first, m["author"], m["url"], branch, m["at"], 1 if default else 0))
         for tid in sorted(tids):
-            changed |= bool(c.execute("INSERT OR IGNORE INTO git_links(task_id,conn_id,kind,ref,created_at) VALUES(?,?,?,?,?)",
+            changed |= bool(c.execute("INSERT INTO git_links(task_id,conn_id,kind,ref,created_at) VALUES(?,?,?,?,?) ON CONFLICT DO NOTHING",
                                       (tid, r["id"], "commit", m["sha"], iso(now_utc()))).rowcount)
         if default and _git_after(m["at"], r["created_at"]):
             for tid in sorted(git_task_ids(c, lid, git_keys(m["message"]))):
@@ -624,7 +625,7 @@ def git_poll(c, cid):
     # resets etags / fails / next_at) must not write its result over that reset afterwards, or the fixed connection keeps
     # showing the old 401 and waits out the backoff. Its state is written only while the row still holds the token and
     # ETags it read (the sealed token has a random nonce: every save changes it).
-    same, same_args = "id=? AND token IS ? AND etags IS ?", (cid, r["token"], r["etags"])
+    same, same_args = "id=? AND token IS NOT DISTINCT FROM ? AND etags IS NOT DISTINCT FROM ?", (cid, r["token"], r["etags"])
     baseline, changed = r["polled_at"] is None, False
 
     def get(key, path):
@@ -658,8 +659,8 @@ def git_poll(c, cid):
         if j is not None:
             changed |= git_take_tags(c, r, j)
         # branches of open pull requests that name a task: their own commits (compare with the default branch)
-        refs = [x[0] for x in c.execute("""SELECT DISTINCT p.head_ref FROM git_prs p WHERE p.conn_id=? AND p.state='open' AND p.head_ref!=''
-                                           AND p.head_ref!=? ORDER BY p.updated_at DESC""", (cid, default))][:GIT_BRANCHES]
+        refs = [x[0] for x in c.execute("""SELECT p.head_ref FROM git_prs p WHERE p.conn_id=? AND p.state='open' AND p.head_ref!=''
+                                           AND p.head_ref!=? GROUP BY p.head_ref ORDER BY MAX(p.updated_at) DESC""", (cid, default))][:GIT_BRANCHES]
         for ref in refs:
             j = get("cmp:" + ref, git_api(prov, k, "compare", default, ref))
             # GitHub / Gitea / GitLab: {commits: [oldest .. newest]}; Bitbucket: a page of the branch's own commits, newest first
@@ -723,7 +724,7 @@ def git_code_for(c, ids):
         return {}
     out = {}
     for x in c.execute("""SELECT l.task_id, p.*, k.owner, k.repo, k.provider FROM git_links l JOIN git_conns k ON k.id=l.conn_id
-                          JOIN git_prs p ON p.conn_id=l.conn_id AND p.number=CAST(l.ref AS INTEGER) WHERE l.kind='pr'
+                          JOIN git_prs p ON p.conn_id=l.conn_id AND CAST(p.number AS TEXT)=l.ref WHERE l.kind='pr'
                           ORDER BY p.state!='open', p.updated_at DESC, p.number DESC"""):
         if x["task_id"] in ids:
             lst = out.setdefault(x["task_id"], {"prs": [], "commits": []})["prs"]
@@ -800,9 +801,9 @@ def git_merge_request(c, t, s):
 
 def git_merge_link(c, t, sug):
     """After a merge request comment: link the pull request to the task at once (stub until the next poll) + poll soon."""
-    c.execute("INSERT OR IGNORE INTO git_prs(conn_id,number,title,state,url) VALUES(?,?,?,?,?)",
+    c.execute("INSERT INTO git_prs(conn_id,number,title,state,url) VALUES(?,?,?,?,?) ON CONFLICT DO NOTHING",
               (sug["conn"], sug["number"], "", "open", sug["pr_url"]))
-    c.execute("INSERT OR IGNORE INTO git_links(task_id,conn_id,kind,ref,created_at) VALUES(?,?,?,?,?)",
+    c.execute("INSERT INTO git_links(task_id,conn_id,kind,ref,created_at) VALUES(?,?,?,?,?) ON CONFLICT DO NOTHING",
               (t["id"], sug["conn"], "pr", str(sug["number"]), iso(now_utc())))
     git_wake(c, sug["conn"])
 
@@ -939,9 +940,9 @@ def git_connect(c, lid, provider, base, owner, name, token, folder=None):
     owner, name, dflt = git_repo_name_of(provider, j, owner, name)
     if not git_owner_ok(provider, owner) or not GIT_NAME_RE.fullmatch(name):
         return err(tr(GIT_ERR["parse"]), 502)
-    cid = c.execute("""INSERT INTO git_conns(list_id,provider,base_url,owner,repo,default_branch,created_by,created_at,next_at)
+    cid = insert_id(c, """INSERT INTO git_conns(list_id,provider,base_url,owner,repo,default_branch,created_by,created_at,next_at)
                        VALUES(?,?,?,?,?,?,?,?,0)""", (lid, provider, base, owner, name, dflt,
-                                                       me(), iso(now_utc()))).lastrowid
+                                                       me(), iso(now_utc())))
     if folder:
         c.execute("INSERT INTO git_folders(conn_id,owner_id,folder,created_at) VALUES(?,?,?,?)", (cid, me(), folder, iso(now_utc())))
     if token:

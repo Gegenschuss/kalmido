@@ -5,8 +5,9 @@ from datetime import timedelta
 from flask import g, jsonify
 
 from ..core.config import app, TZ, USERNAME_RE
+from ..core.pg import insert_id
 from ..core.i18n import tr, trn
-from ..core.db import body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, now_utc, uset, usettings
+from ..core.db import body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, now_utc, uset, usettings, write_lock
 from ..accounts.session import _token_hash, me
 from ..accounts.pictures import avatar_drop_file, AVATAR_PRESETS
 from ..accounts.login import seal, unseal
@@ -85,8 +86,8 @@ def agent_hook_set(c, aid, url):
         c.execute("UPDATE webhooks SET url=?, updated_at=? WHERE id=?", (url, ts, a["webhook_id"]))
         return None
     secret = "whsec_" + secrets.token_urlsafe(32)
-    wid = c.execute("""INSERT INTO webhooks(user_id,name,url,events,secret,enabled,created_at,updated_at,agent)
-                       VALUES(?,?,?,?,'',?,?,?,1)""", (aid, "Agent", url, ",".join(AGENT_EVENTS), 1 if a["enabled"] else 0, ts, ts)).lastrowid
+    wid = insert_id(c, """INSERT INTO webhooks(user_id,name,url,events,secret,enabled,created_at,updated_at,agent)
+                       VALUES(?,?,?,?,'',?,?,?,1)""", (aid, "Agent", url, ",".join(AGENT_EVENTS), 1 if a["enabled"] else 0, ts, ts))
     c.execute("UPDATE webhooks SET secret=? WHERE id=?", (seal(c, f"webhook:{wid}", secret), wid))
     c.execute("UPDATE agents SET webhook_id=? WHERE user_id=?", (wid, aid))
     return secret
@@ -112,7 +113,7 @@ def make_agent(c, uid):
     c.execute("DELETE FROM sessions WHERE user_id=?", (uid,))
     c.execute("UPDATE list_members SET role='edit', own_role='edit' WHERE user_id=? AND role='admin'", (uid,))
     c.execute("DELETE FROM group_members WHERE user_id=?", (uid,))  # 2.10.0 (#441): agents are never group members
-    c.execute("INSERT OR IGNORE INTO agents(user_id,enabled,status,created_at) VALUES(?,1,'idle',?)", (uid, iso(now_utc())))
+    c.execute("INSERT INTO agents(user_id,enabled,status,created_at) VALUES(?,1,'idle',?) ON CONFLICT DO NOTHING", (uid, iso(now_utc())))
 
 
 def agent_restricted_dict(c, a):
@@ -554,7 +555,7 @@ def my_agent_create():
     pol = agent_policy(c)
     if not pol["user_agents"]:
         raise Denied(403, tr("Personal agents are switched off on this server"))
-    c.execute("BEGIN IMMEDIATE")
+    write_lock(c, f"agent_create:{me()}")  # 2.37.0 (#1150): was BEGIN IMMEDIATE
     n = c.execute("SELECT COUNT(*) FROM agents WHERE owner_id=?", (me(),)).fetchone()[0]
     if n >= pol["max_per_user"]:
         c.rollback()

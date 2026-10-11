@@ -28,7 +28,7 @@ GATE_REF_MAX, GATE_TEXT_MAX, GATE_INTEGRATIONS_MAX, CHECKLIST_MAX = 200, 4000, 5
 def deploy_checklist(c, lid):
     """Open (not completed, not deleted) tasks of list lid with the list tag DEPLOY_TAG: [{id, title}]."""
     rows = c.execute("""SELECT t.id, t.title FROM tasks t JOIN task_list_tags x ON x.task_id=t.id JOIN list_tags lt ON lt.id=x.tag_id
-                        WHERE t.list_id=? AND lt.list_id=? AND lt.name=? COLLATE NOCASE AND t.deleted_at IS NULL
+                        WHERE t.list_id=? AND lt.list_id=? AND lower(lt.name)=lower(?) AND t.deleted_at IS NULL
                         AND t.completed_at IS NULL ORDER BY t.id LIMIT ?""", (lid, lid, DEPLOY_TAG, CHECKLIST_MAX)).fetchall()
     return [{"id": r["id"], "title": r["title"]} for r in rows]
 
@@ -127,7 +127,7 @@ def gate_decide_route(cid):
     approve = b["decision"] == "approve"
     st = gate_decide(c, k, t, me(), approve, b.get("skip_checklist", False))
     if st != "blocked":
-        c.execute("INSERT OR IGNORE INTO comment_reactions(comment_id,user_id,emoji,created_at) VALUES(?,?,?,?)",
+        c.execute("INSERT INTO comment_reactions(comment_id,user_id,emoji,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
                   (cid, me(), "up" if approve else "down", iso_ms(now_utc())))
         log_act(c, t["id"], "approval", {"agent": k["user_id"], "comment": cid, "ok": approve})
         author = c.execute("SELECT * FROM users WHERE id=?", (k["user_id"],)).fetchone()

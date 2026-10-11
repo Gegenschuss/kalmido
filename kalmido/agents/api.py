@@ -5,6 +5,7 @@ from datetime import timedelta
 from flask import g, jsonify
 
 from ..core.config import app, PUBLIC_URL, TZ
+from ..core.pg import insert_id
 from ..core.i18n import tr
 from ..core.db import bump, connect, db, iso, now_utc, parse_iso
 from ..accounts.session import GATE
@@ -261,8 +262,8 @@ def v1_agent_job_create():
     f = v1_job_in(c, aid, b, True)
     ts = iso(now_utc())
     log = (b.get("log") or b.get("append_log") or "")[-JOB_LOG_MAX:]
-    jid = c.execute("""INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)""",
-                    (aid, f.get("task_id"), f.get("user_id"), f["title"], f.get("state", "running"), log, ts, ts)).lastrowid
+    jid = insert_id(c, """INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)""",
+                    (aid, f.get("task_id"), f.get("user_id"), f["title"], f.get("state", "running"), log, ts, ts))
     c.execute("""DELETE FROM agent_jobs WHERE agent_id=? AND state NOT IN ('running','waiting') AND id<=(SELECT id FROM agent_jobs
                  WHERE agent_id=? ORDER BY id DESC LIMIT 1 OFFSET ?)""", (aid, aid, AGENT_JOBS_KEEP))
     job_notify(c, c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone(), None)

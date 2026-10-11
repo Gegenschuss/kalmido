@@ -15,6 +15,7 @@ from dateutil.rrule import rrulestr
 from flask import has_request_context, jsonify, request
 
 from ..core.config import app, TZ
+from ..core.pg import insert_id
 from ..core.schema import MAX_DEPTH, USER_DEFAULTS
 from ..core.i18n import lang, N_, tr
 from ..core.db import bump, db, err, iso, iso_ms, local_now, now_utc, parse_iso, usettings
@@ -91,9 +92,9 @@ def import_ticktick(c, text, uid):
             lid = lists[name]
         else:
             srt = my_max_sort(c, uid) + 1
-            lid = c.execute("INSERT INTO lists(name,folder,sort,view,created_at,owner_id) VALUES(?,?,?,?,?,?)",
+            lid = insert_id(c, "INSERT INTO lists(name,folder,sort,view,created_at,owner_id) VALUES(?,?,?,?,?,?)",
                             (name[:LIST_NAME_MAX], folder_seg(r.get("Folder Name") or ""), srt,
-                             "kanban" if r.get("View Mode") == "kanban" else "list", ts, uid)).lastrowid
+                             "kanban" if r.get("View Mode") == "kanban" else "list", ts, uid))
             from ..accounts.orgs import ws_apply_default
             ws_apply_default(c, uid, lid)  # 2.28.0 (#935): the default workspace
             list_created(c, uid, lid)  # 2.25.0 (#931): agents, groups and people of a shared folder
@@ -111,9 +112,8 @@ def import_ticktick(c, text, uid):
             key = (lid, col)
             if key not in sections:
                 row = c.execute("SELECT id FROM sections WHERE list_id=? AND name=?", key).fetchone()
-                sections[key] = row[0] if row else c.execute(
-                    "INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)",
-                    (lid, col, float(r.get("Column Order") or 0))).lastrowid
+                sections[key] = row[0] if row else insert_id(c, "INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)",
+                    (lid, col, float(r.get("Column Order") or 0)))
             sec = sections[key]
         all_day = (r.get("Is All Day") or "").lower() == "true"
         due, due_time = tt_date(r.get("Due Date") or r.get("Start Date"), all_day)
@@ -148,19 +148,19 @@ def import_ticktick(c, text, uid):
             rems = ""
         if due and not valid_date(due):
             due, due_time, start = None, None, None
-        cur = c.execute(
+        cur_id = insert_id(c, 
             """INSERT INTO tasks(list_id,section_id,title,content,priority,status,due,due_time,reminders,
                reminded,repeat,sort,created_at,updated_at,completed_at,tt_id,start,created_by,completed_by)
                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (lid, sec, (r.get("Title") or tr("(untitled)", lg=lang(c, uid))).strip(), content, int(r.get("Priority") or 0),
              status, due, due_time, rems, json.dumps(reminded), repeat, stats["tasks"], created, ts, completed, tt,
              start, uid, uid if completed else None))
-        idmap[tt] = cur.lastrowid
+        idmap[tt] = cur_id
         tags = [t.strip() for t in (r.get("Tags") or "").split(",") if t.strip()]
         if tags:
-            set_tags(c, cur.lastrowid, tags, uid)
+            set_tags(c, cur_id, tags, uid)
         stats["tasks"] += 1
-        r["_id"] = cur.lastrowid
+        r["_id"] = cur_id
     for r in rows:  # second pass: parents (same list only, never a cycle: see check_parent)
         p = r.get("parentId")
         if p and r.get("_id") and p in idmap and idmap[p] != r["_id"]:
@@ -1345,8 +1345,8 @@ def imp_run(c, uid, plan, opts, dry):
                 lid = own[L["name"]]
             else:
                 sort_l += 1
-                lid = c.execute("INSERT INTO lists(name,folder,sort,view,created_at,owner_id) VALUES(?,?,?,?,?,?)",
-                                (L["name"] or tr("Import", lg=lg), L["folder"], sort_l, L["view"], ts, uid)).lastrowid
+                lid = insert_id(c, "INSERT INTO lists(name,folder,sort,view,created_at,owner_id) VALUES(?,?,?,?,?,?)",
+                                (L["name"] or tr("Import", lg=lg), L["folder"], sort_l, L["view"], ts, uid))
                 from ..accounts.orgs import ws_apply_default
                 ws_apply_default(c, uid, lid)  # 2.28.0 (#935): the default workspace
                 list_created(c, uid, lid)  # 2.25.0 (#931)
@@ -1377,7 +1377,7 @@ def imp_run(c, uid, plan, opts, dry):
                 if sname:
                     if sname not in secs:
                         sec_sort += 1
-                        secs[sname] = c.execute("INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, sname, sec_sort)).lastrowid
+                        secs[sname] = insert_id(c, "INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, sname, sec_sort))
                         created["sections"].append(secs[sname])
                         stats["sections"] += 1
                         rl["sections"] += 1
@@ -1394,14 +1394,13 @@ def imp_run(c, uid, plan, opts, dry):
                         f["content"] = ((f.get("content") or "") + ("\n\n" if f.get("content") else "") +
                                         tr("Assignee ({0}): {1}", IMPORT_SOURCES[src], who, lg=lg))[:CONTENT_MAX]
                 status = t["status"] if t["status"] in (0, 2, -1) else 0
-                tid = c.execute(
-                    """INSERT INTO tasks(list_id,section_id,title,content,priority,status,due,due_time,reminders,reminded,repeat,
+                tid = insert_id(c, """INSERT INTO tasks(list_id,section_id,title,content,priority,status,due,due_time,reminders,reminded,repeat,
                        repeat_from,sort,created_at,updated_at,completed_at,tt_id,start,duration,created_by,completed_by,assignee_id,
                        assigned_by,url) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (lid, sid, f["title"], f.get("content") or "", f.get("priority") or 0, status, f.get("due"), f.get("due_time"),
                      f.get("reminders") or "", json.dumps(reminded), f.get("repeat") or "", f.get("repeat_from") or "due",
                      base_sort + i, t["created_at"] or ts, ts, (t["completed_at"] or ts) if status else None, key, f.get("start"),
-                     f.get("duration"), uid, uid if status else None, aid, uid if aid else None, t["url"])).lastrowid
+                     f.get("duration"), uid, uid if status else None, aid, uid if aid else None, t["url"]))
                 idmap[t["ext"]] = tid
                 created["tasks"].append(tid)
                 rows.append((t, tid, lid))
@@ -1438,8 +1437,8 @@ def imp_run(c, uid, plan, opts, dry):
             c.rollback()
             return rep
         if created["tasks"] or created["lists"] or created["sections"]:
-            iid = c.execute("INSERT INTO imports(user_id,source,file_name,created,report,created_at) VALUES(?,?,?,?,?,?)",
-                            (uid, src, opts.get("_fname", "")[:200], json.dumps(created), json.dumps(stats), ts)).lastrowid
+            iid = insert_id(c, "INSERT INTO imports(user_id,source,file_name,created,report,created_at) VALUES(?,?,?,?,?,?)",
+                            (uid, src, opts.get("_fname", "")[:200], json.dumps(created), json.dumps(stats), ts))
             c.execute("""DELETE FROM imports WHERE user_id=? AND id NOT IN
                          (SELECT id FROM imports WHERE user_id=? ORDER BY id DESC LIMIT ?)""", (uid, uid, IMPORT_KEEP))
             rep["import_id"] = iid

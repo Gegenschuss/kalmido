@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from flask import jsonify, request
 
 from ..core.config import app
+from ..core.pg import insert_id
 from ..core.i18n import lang, tr, trn
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
@@ -193,8 +194,8 @@ def family_reward_new(kid):
     f = _reward_fields(body())
     if c.execute("SELECT COUNT(*) FROM kid_rewards WHERE kid_id=?", (kid,)).fetchone()[0] >= KID_REWARDS_MAX:
         return err(tr("At most {0} rewards", KID_REWARDS_MAX), 409)
-    rid = c.execute("INSERT INTO kid_rewards(kid_id,title,cost,emoji,once,state,created_by,created_at) VALUES(?,?,?,?,?,?,?,?)",
-                    (kid, f["title"], f["cost"], f.get("emoji", ""), f.get("once", 0), "open", me(), iso(now_utc()))).lastrowid
+    rid = insert_id(c, "INSERT INTO kid_rewards(kid_id,title,cost,emoji,once,state,created_by,created_at) VALUES(?,?,?,?,?,?,?,?)",
+                    (kid, f["title"], f["cost"], f.get("emoji", ""), f.get("once", 0), "open", me(), iso(now_utc())))
     bump(c)
     c.commit()
     return jsonify(reward_dict(c.execute("SELECT * FROM kid_rewards WHERE id=?", (rid,)).fetchone())), 201

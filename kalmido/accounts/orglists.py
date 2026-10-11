@@ -56,7 +56,7 @@ def _ol_out(c, oid):
                                (SELECT COUNT(*) FROM tasks t WHERE t.list_id=l.id AND t.deleted_at IS NULL) AS all_n,
                                (SELECT MAX(t.updated_at) FROM tasks t WHERE t.list_id=l.id) AS changed,
                                (SELECT COUNT(*) FROM list_members m WHERE m.list_id=l.id) AS members
-                        FROM lists l WHERE l.org_id=? AND l.is_inbox=0 ORDER BY l.archived, l.name COLLATE NOCASE, l.id""", (oid,)).fetchall()
+                        FROM lists l WHERE l.org_id=? AND l.is_inbox=0 ORDER BY l.archived, lower(l.name), l.id""", (oid,)).fetchall()
     log = c.execute("SELECT * FROM org_list_log WHERE org_id=? ORDER BY id DESC LIMIT ?", (oid, OL_LOG_MAX)).fetchall()
     people = c.execute("""SELECT u.id FROM org_members m JOIN users u ON u.id=m.user_id
                           WHERE m.org_id=? AND u.disabled=0 AND COALESCE(u.kind,'user')!='agent'""", (oid,)).fetchall()

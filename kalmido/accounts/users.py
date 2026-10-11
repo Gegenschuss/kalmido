@@ -106,12 +106,12 @@ def users_list():
 
 
 def _proxy_taken(c, login, uid=None):
-    return bool(login) and bool(c.execute("SELECT 1 FROM users WHERE proxy_login=? COLLATE NOCASE AND id IS NOT ?",
+    return bool(login) and bool(c.execute("SELECT 1 FROM users WHERE lower(proxy_login)=lower(?) AND id IS DISTINCT FROM ?",
                                           (login, uid)).fetchone())
 
 
 def _active_admins(c, without=None):
-    return c.execute("SELECT COUNT(*) FROM users WHERE is_admin=1 AND disabled=0 AND id IS NOT ?", (without,)).fetchone()[0]
+    return c.execute("SELECT COUNT(*) FROM users WHERE is_admin=1 AND disabled=0 AND id IS DISTINCT FROM ?", (without,)).fetchone()[0]
 
 
 @app.post("/api/users")
@@ -377,7 +377,7 @@ def me_update():
             return err(tr("Password: at least {0} characters", MIN_PASSWORD))
         c.execute("UPDATE users SET password_hash=? WHERE id=?", (generate_password_hash(pw), u["id"]))
         tok = request.cookies.get(COOKIE)  # other sessions end, this one stays
-        c.execute("DELETE FROM sessions WHERE user_id=? AND token_hash IS NOT ?", (u["id"], _token_hash(tok) if tok else None))
+        c.execute("DELETE FROM sessions WHERE user_id=? AND token_hash IS DISTINCT FROM ?", (u["id"], _token_hash(tok) if tok else None))
     bump(c)
     c.commit()
     return jsonify(ok=True)

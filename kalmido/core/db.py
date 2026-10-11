@@ -1,15 +1,19 @@
-"""Time helpers, the database connection, start-up checks and migrations (init_db, repair_data), settings storage."""
+"""Time helpers, the database connection, start-up checks and migrations (init_db, repair_data), settings storage.
+2.37.0 (#1150): Postgres only; the driver layer is core/pg.py (placeholders, rows, pool, request context)."""
 import json
 import os
 import re
 import secrets
-import sqlite3
 from datetime import datetime, timezone
 from cryptography.hazmat.primitives.asymmetric import ec
 from flask import g, has_request_context, jsonify, request
 from werkzeug.security import generate_password_hash
 
-from ..core.config import app, ATT_DIR, BOOT_NAME, BOOT_PROXY, BOOT_USER, DB, NTFY_TOPIC, ONBOARDING_ENV, TZ
+from ..core.config import app, ATT_DIR, BOOT_NAME, BOOT_PROXY, BOOT_USER, DATABASE_URL, DB, NTFY_TOPIC, ONBOARDING_ENV, TZ
+from ..core.pg import (  # noqa: F401  (re-exported: the app imports the database API from here)
+    Conn, DatabaseError, Error as DbError, IntegrityError, OperationalError, Row, UniqueViolation, connect_direct,
+    connect_pooled, insert_id, like_escape, table_columns, table_exists, wait_ready, write_lock,
+)
 from ..core.schema import (
     GLOBAL_DEFAULTS, INDEXES, MIGRATIONS, SCHEMA, SCHEMA_VERSION, TIME_TITLE_TRIGGER, USER_DEFAULTS,
 )
@@ -50,17 +54,24 @@ def local_day(ts):
 
 
 def db():
+    """The request's connection (from the pool; context "system" until authenticate() sets the person, see set_ctx)."""
     if "db" not in g:
         g.db = connect()
     return g.db
 
 
 def connect():
-    c = sqlite3.connect(DB, timeout=10)
-    c.row_factory = sqlite3.Row
-    c.execute("PRAGMA foreign_keys=ON")
-    c.execute("PRAGMA journal_mode=WAL")
-    return c
+    """A pooled connection with context "system": background threads, start-up, the CLI. close() gives it back."""
+    if not DATABASE_URL:
+        raise DataDirError(_no_url())
+    return connect_pooled(DATABASE_URL)
+
+
+def _no_url():
+    print("FATAL: DATABASE_URL is not set. From 2.37 on Kalmido stores its data in Postgres: add the database service to "
+          "docker-compose.yml (see the template in the repository), set POSTGRES_PASSWORD in .env and "
+          "DATABASE_URL=postgresql://kalmido:<password>@db/kalmido, then start again.", flush=True)
+    return 3
 
 
 @app.teardown_appcontext
@@ -119,11 +130,11 @@ def create_user(c, username, display_name="", password=None, proxy_login=None, i
     """Inserts a user with settings (+ inbox unless the caller adopts an existing one). Returns the id.
     Paperless access defaults to admins only."""
     pl = is_admin if paperless_access is None else paperless_access
-    uid = c.execute("""INSERT INTO users(username,display_name,password_hash,proxy_login,is_admin,drop_token,created_at,
+    uid = insert_id(c, """INSERT INTO users(username,display_name,password_hash,proxy_login,is_admin,drop_token,created_at,
                                          paperless_access) VALUES(?,?,?,?,?,?,?,?)""",
                     (username, display_name or username, generate_password_hash(password) if password else None,
                      proxy_login or None, 1 if is_admin else 0, drop_token or secrets.token_urlsafe(24),
-                     iso(now_utc()), 1 if pl else 0)).lastrowid
+                     iso(now_utc()), 1 if pl else 0))
     vals = dict(USER_DEFAULTS)
     # chosen in the first-run setup ("What do you want to use?"): modules + language of new users
     for k, gk in (("features", "default_features"), ("lang", "default_lang")):
@@ -143,12 +154,13 @@ def create_user(c, username, display_name="", password=None, proxy_login=None, i
     if not vals["ntfy_topic"]:
         vals["ntfy_topic"] = random_topic()
     for k, v in vals.items():
-        c.execute("INSERT OR REPLACE INTO user_settings(user_id,key,value) VALUES(?,?,?)", (uid, k, v))
+        c.execute("INSERT INTO user_settings(user_id,key,value) VALUES(?,?,?) "
+                  "ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value", (uid, k, v))
     # 2.22.0 (#752): every new account belongs to an organisation: the instance's first one (the caller may change it)
     first = c.execute("SELECT id FROM orgs ORDER BY id LIMIT 1").fetchone()
     from ..accounts.orgs import instance_mode
     if first and instance_mode(c) in ("organisation", "multi"):  # 2.28.0 (#935): mode workspaces: by domain / an admin, never by default
-        c.execute("INSERT OR IGNORE INTO org_members(org_id,user_id) VALUES(?,?)", (first[0], uid))
+        c.execute("INSERT INTO org_members(org_id,user_id) VALUES(?,?) ON CONFLICT DO NOTHING", (first[0], uid))
     return uid
 
 
@@ -192,43 +204,38 @@ def _has_files(d):
 
 def startup_guard():
     """Raises DataDirError (exit code 3) when the database must not be (re)created or opened; returns True when this is a
-    genuinely new install (empty data dir), False for an existing, readable database."""
+    genuinely new install (an empty database and a data dir without Kalmido data), False for an existing database.
+    2.37.0 (#1150): Postgres. Refused: no DATABASE_URL; the database unreachable; an empty database next to a data dir that
+    holds Kalmido data (the marker, attachments, backups) or a SQLite database from before 2.37 that was not moved yet."""
     from ..admin.backup import BK_DIR
+    if not DATABASE_URL:
+        raise DataDirError(_no_url())
+    try:
+        wait_ready(DATABASE_URL, int(os.environ.get("KALMIDO_DB_WAIT", "60")))
+        c = connect_direct(DATABASE_URL)
+        try:
+            has_tables = table_exists(c, "users")
+        finally:
+            c.close()
+    except DbError as e:
+        print(f"FATAL: the database cannot be reached or read ({str(e).strip()[:300]}). Check DATABASE_URL and the database "
+              "service, then start again.", flush=True)
+        raise DataDirError(3) from None
+    if has_tables:
+        return False
     data = [p for p, ok in ((DATA_MARKER, os.path.exists(DATA_MARKER)), (ATT_DIR, _has_files(ATT_DIR)),
                             (BK_DIR, _has_files(BK_DIR))) if ok]
     try:
-        size = os.path.getsize(DB) if os.path.exists(DB) else None
-    except OSError as e:
-        size = f"unreadable ({e})"
-    problem = None
-    if size is None or size == 0:
-        if data:
-            problem = "is missing" if size is None else "is empty"
-    elif isinstance(size, str):
-        problem = size
-    else:
-        try:
-            c = sqlite3.connect(f"file:{os.path.abspath(DB)}?mode=ro", uri=True, timeout=10)
-            try:
-                # constraint findings (a NOT NULL / CHECK violation) leave the file readable: start, the admin alert reports them
-                # (see "admin alerts"); anything else (damaged pages, broken indexes, unreadable) refuses the start
-                rows = [r[0] for r in c.execute("PRAGMA quick_check").fetchall()]
-                hard = [x for x in rows if x != "ok" and not re.match(r"(NULL value in |CHECK constraint failed in )", str(x))]
-                if not rows or hard:
-                    problem = f"failed the integrity check ({(hard or ['?'])[0]})"
-                elif not c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='users'").fetchone() and data:
-                    problem = "has no Kalmido tables"
-            finally:
-                c.close()
-        except sqlite3.Error as e:
-            problem = f"cannot be read ({e})"
-    if problem:
-        msg = (f"FATAL: the database {DB} {problem}, but the data dir holds Kalmido data ({', '.join(data) or 'the database file'}). "
-               "Refusing to start so that no new, empty database replaces it. Check the disk / volume, restore tasks.db from a "
-               "backup (data/backups/), then start again.")
-        print(msg, flush=True)
+        old = os.path.exists(DB) and os.path.getsize(DB) > 0
+    except OSError:
+        old = True
+    if old or data:
+        what = f"a SQLite database from before 2.37 ({DB})" if old else f"Kalmido data ({', '.join(data)})"
+        print(f"FATAL: the Postgres database is empty, but the data dir holds {what}. Refusing to start so that no new, empty "
+              "database replaces it. Point DATABASE_URL at the database of this install (or move the old data first), "
+              "then start again.", flush=True)
         raise DataDirError(3)
-    return size is None or size == 0
+    return True
 
 
 def init_db(guard=True):
@@ -241,34 +248,33 @@ def init_db(guard=True):
     if guard:  # a restore checked its database itself (and must never exit the process)
         startup_guard()
     os.makedirs(ATT_DIR, exist_ok=True)
-    c = connect()
-    c.executescript(SCHEMA)
-    c.isolation_level = None
-    c.execute("BEGIN IMMEDIATE")
+    # 2.37.0 (#1150): one transaction for the schema, the additive migrations and the one-shot data migrations (Postgres has
+    # transactional DDL); an advisory lock keeps two starting containers apart (was BEGIN IMMEDIATE)
+    c = connect_direct(DATABASE_URL)
     try:
+        write_lock(c, "kalmido-init")
+        for ext in ("unaccent", "pg_trgm"):  # message search (collab/msgsearch.py); both ship with the postgres image
+            c.execute(f"CREATE EXTENSION IF NOT EXISTS {ext}")
+        c.executescript(SCHEMA)
+        have = {}
+        for t, col in c.execute("SELECT table_name, column_name FROM information_schema.columns "
+                                "WHERE table_schema=current_schema()").fetchall():
+            have.setdefault(t, set()).add(col)
         for table, col, ddl in MIGRATIONS:
-            if col not in {r[1] for r in c.execute(f"PRAGMA table_info({table})")}:
+            if col not in have.get(table, ()):
                 c.execute(ddl)
-        # task_tags from the single-user era: (task_id, tag) -> (task_id, user_id, tag); 0 = adopted below
-        if "user_id" not in {r[1] for r in c.execute("PRAGMA table_info(task_tags)")}:
-            c.execute("""CREATE TABLE task_tags_mu (task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-                         user_id INTEGER NOT NULL DEFAULT 0, tag TEXT NOT NULL, PRIMARY KEY (task_id, user_id, tag))""")
-            c.execute("INSERT INTO task_tags_mu(task_id,user_id,tag) SELECT task_id, 0, tag FROM task_tags")
-            c.execute("DROP TABLE task_tags")
-            c.execute("ALTER TABLE task_tags_mu RENAME TO task_tags")
         # 2.10.0 (#441): member rows from before groups (or written by a path that sets no own_role) are personal shares
         c.execute("UPDATE list_members SET own_role=role WHERE own_role IS NULL AND grole IS NULL")
         c.execute("CREATE INDEX IF NOT EXISTS tasks_agroup ON tasks(assignee_group_id) WHERE assignee_group_id IS NOT NULL")
         c.execute("DROP INDEX IF EXISTS tasks_tt")  # tt_id is unique per user now (tasks_tt_user)
-        c.execute("DROP TRIGGER IF EXISTS time_task_title")
-        c.execute(TIME_TITLE_TRIGGER)
+        c.executescript(TIME_TITLE_TRIGGER)
         for stmt in INDEXES.strip().split(";"):
             if stmt.strip():
                 c.execute(stmt)
         from ..office.ledger import ofx_migrate
         ofx_migrate(c)  # 2.36.2 (#1142, E): office positions carry their organisation
         for k, v in GLOBAL_DEFAULTS.items():
-            c.execute("INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)", (k, v))
+            c.execute("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT DO NOTHING", (k, v))
         from ..admin.hosting import quota_backfill
         quota_backfill(c)  # 2.24.0 (#910): who uploaded the files from before
         _COLLAB_ALL["on"] = gsetting(c, "collab_all") != "0"
@@ -342,8 +348,8 @@ def init_db(guard=True):
                 host = PUBLIC_URL.split("://", 1)[-1].split("/")[0].split(":")[0]
                 parts = [p for p in host.split(".") if p and not p.isdigit()]
                 name = (parts[-2] if len(parts) >= 2 else (parts[0] if parts else "Kalmido")).capitalize()
-                oid = c.execute("INSERT INTO orgs(name,icon,created_at) VALUES(?,?,?)", (name, "", iso(now_utc()))).lastrowid
-                c.execute("INSERT OR IGNORE INTO org_members(org_id,user_id) SELECT ?, id FROM users", (oid,))
+                oid = insert_id(c, "INSERT INTO orgs(name,icon,created_at) VALUES(?,?,?)", (name, "", iso(now_utc())))
+                c.execute("INSERT INTO org_members(org_id,user_id) SELECT ?, id FROM users WHERE true ON CONFLICT DO NOTHING", (oid,))
                 if gsetting(c, "people_visibility") in (None, ""):
                     gset(c, "people_visibility", "org")
                 print("organisations:", name, "with every account", flush=True)
@@ -389,8 +395,8 @@ def init_db(guard=True):
             n = c.execute("""UPDATE list_members SET folder=(SELECT l.folder FROM lists l WHERE l.id=list_members.list_id),
                                  sort=(SELECT l.sort FROM lists l WHERE l.id=list_members.list_id)
                              WHERE list_id IN (SELECT id FROM lists WHERE COALESCE(folder,'')!='')
-                               AND (folder IS NOT (SELECT l.folder FROM lists l WHERE l.id=list_members.list_id)
-                                    OR sort IS NOT (SELECT l.sort FROM lists l WHERE l.id=list_members.list_id))""").rowcount
+                               AND (folder IS DISTINCT FROM (SELECT l.folder FROM lists l WHERE l.id=list_members.list_id)
+                                    OR sort IS DISTINCT FROM (SELECT l.sort FROM lists l WHERE l.id=list_members.list_id))""").rowcount
             gset(c, "migr_order988", "1")
             if n:
                 print("shared lists arranged like their owners have them (#988):", n, flush=True)
@@ -402,10 +408,10 @@ def init_db(guard=True):
             gset(c, "migr_notiftpl2330", "1")
             if nl or nf:
                 print("notification templates: shared lists", nl, "and folders", nf, "kept on \"all\" (#927)", flush=True)
-        for (uid,) in c.execute("SELECT id FROM users").fetchall():
+        for (uid,) in c.execute("SELECT id FROM users ORDER BY id").fetchall():
             ensure_inbox(c, uid)
             for k, v in USER_DEFAULTS.items():
-                c.execute("INSERT OR IGNORE INTO user_settings(user_id,key,value) VALUES(?,?,?)", (uid, k, v))
+                c.execute("INSERT INTO user_settings(user_id,key,value) VALUES(?,?,?) ON CONFLICT DO NOTHING", (uid, k, v))
             # features_rev 2: paperless module added -> on by default for existing installs
             # features_rev 3: collab added (2026-09-26) -> on by default
             # features_rev 4: the "links" switch is gone (website link always on) -> dropped from the list
@@ -442,7 +448,7 @@ def init_db(guard=True):
         # read + write (stored "write" = every scope but admin-read, so they keep what they could do)
         if gsetting(c, "migr_scopes215") != "1":
             n = c.execute("""UPDATE api_tokens SET scopes=scopes || ',attachments:read'
-                             WHERE ',' || scopes || ',' NOT LIKE '%,write,%' AND ',' || scopes || ',' NOT LIKE '%,attachments:read,%'""").rowcount
+                             WHERE ',' || scopes || ',' NOT ILIKE '%,write,%' AND ',' || scopes || ',' NOT ILIKE '%,attachments:read,%'""").rowcount
             m = c.execute("UPDATE agents SET scopes='read,write' WHERE scopes=''").rowcount
             gset(c, "migr_scopes215", "1")
             print("scopes: attachments:read for", n, "read tokens,", m, "agents keep read + write", flush=True)
@@ -497,14 +503,16 @@ def init_db(guard=True):
             gset(c, "migr_auditfix", "1")
             print("audit migration: Paperless access granted to", n, "admin(s); repaired:", counts, flush=True)
         from ..collab.msgsearch import msg_index_init
-        msg_index_init(c)  # 2.33.0 (#1080): the message search index (FTS5 + triggers), built once
-        c.execute("COMMIT")
+        msg_index_init(c)  # 2.33.0 (#1080) / 2.37.0: the message search (kalmido_fold + trigram GIN indexes)
+        c.execute("INSERT INTO kalmido_meta(key,value) VALUES('schema_version',?) ON CONFLICT(key) DO UPDATE SET value="
+                  "CASE WHEN CAST(kalmido_meta.value AS BIGINT) < CAST(excluded.value AS BIGINT) THEN excluded.value "
+                  "ELSE kalmido_meta.value END", (str(int(SCHEMA_VERSION)),))
+        c.commit()
     except Exception:
-        c.execute("ROLLBACK")
+        c.rollback()
         raise
-    if c.execute("PRAGMA user_version").fetchone()[0] < SCHEMA_VERSION:
-        c.execute(f"PRAGMA user_version={int(SCHEMA_VERSION)}")
-    c.close()
+    finally:
+        c.close()
     if not os.path.exists(DATA_MARKER):  # new install, or the first start of 2.0 on a readable database
         try:
             with open(DATA_MARKER, "w", encoding="utf-8") as f:
@@ -640,7 +648,7 @@ def uset(c, uid, key, value):
 
 
 def bump(c):
-    c.execute("UPDATE settings SET value=CAST(value AS INTEGER)+1 WHERE key='version'")
+    c.execute("UPDATE settings SET value=CAST(CAST(value AS BIGINT)+1 AS TEXT) WHERE key='version'")
 
 
 def err(msg, code=400):

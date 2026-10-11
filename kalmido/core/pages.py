@@ -12,6 +12,7 @@ import urllib.request
 from flask import jsonify, redirect, request, Response, send_from_directory
 
 from ..core.config import app, APP_VERSION, ATT_DIR, ICAL_PREFIX, PUB_PREFIX, SEARCH_INDEX, MAX_FILE_MB, ntfy_attachment_url, NTFY_IN, safe_urlopen
+from .pg import insert_id
 from ..core.i18n import lang, N_, tr, trn
 from ..core.db import bump, connect, db, default_uid, err, gset, gsetting, iso, now_utc
 from ..accounts.session import client_ip, GATE, me
@@ -99,9 +100,9 @@ def new_inbox_task(c, uid, title, content="", tt_id=None, url=None):
     srt = c.execute("SELECT COALESCE(MIN(sort),0)-1 FROM tasks WHERE list_id=? AND parent_id IS NULL", (inbox,)).fetchone()[0]
     # 2.27.0 (#1001): what lands in your own inbox (mail, the share sheet, /drop, the ntfy inbox) is yours: assigned to you,
     # so it also shows in "My tasks"
-    tid = c.execute("INSERT INTO tasks(list_id,title,content,sort,created_at,updated_at,tt_id,created_by,url,assignee_id) VALUES(?,?,?,?,?,?,?,?,?,?)",
+    tid = insert_id(c, "INSERT INTO tasks(list_id,title,content,sort,created_at,updated_at,tt_id,created_by,url,assignee_id) VALUES(?,?,?,?,?,?,?,?,?,?)",
                     (inbox, (title or tr("Shared", lg=lang(c, uid)))[:300], content or "", srt, ts, ts, tt_id, uid,
-                     url if valid_url(url) else None, uid)).lastrowid
+                     url if valid_url(url) else None, uid))
     log_act(c, tid, "created", uid=uid)
     return tid
 

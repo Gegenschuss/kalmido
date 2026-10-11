@@ -184,7 +184,7 @@ def kk_sync(c, uid):
             lid = life_list(c, uid, "reading")
             c.execute("UPDATE kk_conns SET list_id=? WHERE user_id=?", (lid, uid))
         seen = {(json.loads(x[0]) or {}).get("bid") for x in c.execute(
-            "SELECT fam FROM tasks WHERE created_by=? AND fam LIKE '%\"kind\":\"bookmark\"%'", (uid,))}
+            "SELECT fam FROM tasks WHERE created_by=? AND fam ILIKE '%\"kind\":\"bookmark\"%'", (uid,))}
         cursor = None
         base = f"/lists/{r['source']}/bookmarks" if r["source"] else "/bookmarks"
         for _ in range(KK_PAGES):
@@ -204,8 +204,8 @@ def kk_sync(c, uid):
             if not cursor:
                 break
         if r["archive"]:
-            for t in c.execute("""SELECT id, fam FROM tasks WHERE created_by=? AND status=2 AND fam LIKE '%"kind":"bookmark"%'
-                                  AND fam NOT LIKE '%"arch":1%' LIMIT ?""", (uid, KK_ARCHIVE_MAX)).fetchall():
+            for t in c.execute("""SELECT id, fam FROM tasks WHERE created_by=? AND status=2 AND fam ILIKE '%"kind":"bookmark"%'
+                                  AND fam NOT ILIKE '%"arch":1%' LIMIT ?""", (uid, KK_ARCHIVE_MAX)).fetchall():
                 f = json.loads(t["fam"])
                 try:
                     kk_req(c, r, f"/bookmarks/{f['bid']}", "PATCH", {"archived": True})

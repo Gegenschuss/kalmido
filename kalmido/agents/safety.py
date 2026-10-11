@@ -169,7 +169,7 @@ def bridge_check(c, lid, uid, ok=False):
             for aid, bad in found:
                 for l2 in bad:
                     x, y = _pair(lid, l2)
-                    c.execute("INSERT OR REPLACE INTO agent_bridges(agent_id,list_a,list_b,by_id,at) VALUES(?,?,?,?,?)", (aid, x, y, by, ts))
+                    c.execute("INSERT INTO agent_bridges(agent_id,list_a,list_b,by_id,at) VALUES(?,?,?,?,?) ON CONFLICT (agent_id,list_a,list_b) DO UPDATE SET by_id=excluded.by_id, at=excluded.at", (aid, x, y, by, ts))
             print("agent bridge approved with job", g.approved_job, "list", lid, "by", by, flush=True)
             return
         raise Denied(409, tr("This would connect lists with different people through an agent; only someone who manages all of them can approve it"))
@@ -178,7 +178,7 @@ def bridge_check(c, lid, uid, ok=False):
         for aid, bad in found:
             for l2 in bad:
                 x, y = _pair(lid, l2)
-                c.execute("INSERT OR REPLACE INTO agent_bridges(agent_id,list_a,list_b,by_id,at) VALUES(?,?,?,?,?)", (aid, x, y, actor, ts))
+                c.execute("INSERT INTO agent_bridges(agent_id,list_a,list_b,by_id,at) VALUES(?,?,?,?,?) ON CONFLICT (agent_id,list_a,list_b) DO UPDATE SET by_id=excluded.by_id, at=excluded.at", (aid, x, y, actor, ts))
         print("agent bridge approved: agents", [a for a, _ in found], "list", lid, "by", actor, flush=True)
         return
     if ok and person:
@@ -261,7 +261,7 @@ def agent_lists_set(c, aid, v, ok=False):
         lids = sorted({x for p in new for x in p})
         if ok and may_approve_bridge(c, actor, aid, lids):
             for x, y in new:
-                c.execute("INSERT OR REPLACE INTO agent_bridges(agent_id,list_a,list_b,by_id,at) VALUES(?,?,?,?,?)", (aid, x, y, actor, iso(now_utc())))
+                c.execute("INSERT INTO agent_bridges(agent_id,list_a,list_b,by_id,at) VALUES(?,?,?,?,?) ON CONFLICT (agent_id,list_a,list_b) DO UPDATE SET by_id=excluded.by_id, at=excluded.at", (aid, x, y, actor, iso(now_utc())))
         elif ok:
             raise Denied(403, tr("Only someone who manages all these lists (or owns the agent) can connect them"))
         else:
@@ -369,7 +369,7 @@ def access_flush(c=None):
     c = connect() if own else c
     try:
         c.executemany("""INSERT INTO agent_list_access(agent_id,list_id,day,kind,n) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM lists WHERE id=?)
-                         ON CONFLICT(list_id,day,agent_id,kind) DO UPDATE SET n=n+excluded.n""",
+                         ON CONFLICT(list_id,day,agent_id,kind) DO UPDATE SET n=agent_list_access.n+excluded.n""",
                       [(a, l, d, k, n, l) for (a, l, d, k), n in rows.items()])
         c.commit()
     finally:

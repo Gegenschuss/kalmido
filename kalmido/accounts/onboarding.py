@@ -4,8 +4,9 @@ from datetime import datetime, timedelta, timezone
 from flask import g, has_request_context, jsonify
 
 from ..core.config import app, TZ
+from ..core.pg import insert_id
 from ..core.i18n import lang, N_, tr
-from ..core.db import body, bump, db, err, iso, local_now, now_utc, uset, usettings
+from ..core.db import body, bump, db, err, iso, local_now, now_utc, uset, usettings, write_lock
 from ..accounts.session import me
 from ..accounts.pictures import list_icon_drop_file
 from ..core.access import collab_all, list_role, my_max_sort, time_all, WRITE_ROLES
@@ -55,7 +56,7 @@ def onboarding_tasks(feats, touch, mac):
 def onboarding():
     b, c = body(), db()
     uid = me()
-    c.execute("BEGIN IMMEDIATE")
+    write_lock(c, f"onboard:{uid}")  # 2.37.0 (#1150): was BEGIN IMMEDIATE
     if usettings(c, uid).get("onboard") != "pending":
         c.rollback()
         return jsonify(ok=True, created=False)
@@ -67,14 +68,14 @@ def onboarding():
     # time tracking / dependencies / custom fields on (e.g. "Projects & team"): the sample list is a project, so the
     # timer and dependency tips work right there
     kind = "project" if {"time", "deps", "fields"} & set(feats) else "list"
-    lid = c.execute("INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,kind) VALUES(?,?,?,?,?,?,?,?)",
-                    (tr("Getting started", lg=lg), "#2dd4bf", "", my_max_sort(c, uid) + 1, "list", ts, uid, kind)).lastrowid
+    lid = insert_id(c, "INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,kind) VALUES(?,?,?,?,?,?,?,?)",
+                    (tr("Getting started", lg=lg), "#2dd4bf", "", my_max_sort(c, uid) + 1, "list", ts, uid, kind))
     from ..accounts.orgs import ws_apply_default
     ws_apply_default(c, uid, lid)  # 2.28.0 (#935): the default workspace
     for i, (title, content, prio, due, subs) in enumerate(onboarding_tasks(feats, touch, mac)):
         t = tr(title, "⌘K" if mac else "Ctrl+K", lg=lg) if "{0}" in title else tr(title, lg=lg)
-        tid = c.execute("""INSERT INTO tasks(list_id,title,content,priority,due,sort,created_at,updated_at,created_by)
-                           VALUES(?,?,?,?,?,?,?,?,?)""", (lid, t, tr(content, lg=lg), prio, day if due else None, i, ts, ts, uid)).lastrowid
+        tid = insert_id(c, """INSERT INTO tasks(list_id,title,content,priority,due,sort,created_at,updated_at,created_by)
+                           VALUES(?,?,?,?,?,?,?,?,?)""", (lid, t, tr(content, lg=lg), prio, day if due else None, i, ts, ts, uid))
         log_act(c, tid, "created", uid=uid)
         for j, st in enumerate(subs):
             c.execute("""INSERT INTO tasks(list_id,parent_id,title,sort,created_at,updated_at,created_by)
@@ -155,28 +156,28 @@ def sample_create(c, uid):
     today = local_now().date()
     ts = iso(now_utc())
     day = lambda n: (today + timedelta(days=n)).isoformat() if n is not None else None  # noqa: E731
-    track = lambda kind, iid: c.execute("INSERT OR IGNORE INTO sample_items(user_id,kind,item_id) VALUES(?,?,?)",  # noqa: E731
+    track = lambda kind, iid: c.execute("INSERT INTO sample_items(user_id,kind,item_id) VALUES(?,?,?) ON CONFLICT DO NOTHING",  # noqa: E731
                                         (uid, kind, iid))
     srt = my_max_sort(c, uid)
-    lid = c.execute("INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind) VALUES(?,?,?,?,?,?,?,?,?)",
+    lid = insert_id(c, "INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind) VALUES(?,?,?,?,?,?,?,?,?)",
                     (tr("Example: Image film for client Muster", lg=lg), "#8b5cf6", "", srt + 1, "list", ts, uid, 0,
-                     "project" if project else "list")).lastrowid
+                     "project" if project else "list"))
     from ..accounts.orgs import ws_apply_default
     ws_apply_default(c, uid, lid)  # 2.28.0 (#935): the default workspace
     track("list", lid)
     secs = []
     for i, n in enumerate(SAMPLE_SECTIONS):
-        secs.append(c.execute("INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, tr(n, lg=lg), i + 1)).lastrowid)
+        secs.append(insert_id(c, "INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, tr(n, lg=lg), i + 1)))
         track("section", secs[-1])
     fields = {}
     if project and "fields" in feats:
         cur = s.get("time_currency") or "€"
-        fields["budget"] = c.execute("INSERT INTO list_fields(list_id,name,type,options,pinned,sort,created_at) VALUES(?,?,?,?,?,?,?)",
-                                     (lid, tr("Budget", lg=lg), "number", json.dumps({"unit": cur[:12]}), 1, 1, ts)).lastrowid
+        fields["budget"] = insert_id(c, "INSERT INTO list_fields(list_id,name,type,options,pinned,sort,created_at) VALUES(?,?,?,?,?,?,?)",
+                                     (lid, tr("Budget", lg=lg), "number", json.dumps({"unit": cur[:12]}), 1, 1, ts))
         opts = [{"id": k, "name": tr(n, lg=lg), "color": col} for k, n, col in
                 (("s", N_("Small"), "#22c55e"), ("m", N_("Medium"), "#f59e0b"), ("l", N_("Large"), "#ef4444"))]
-        fields["effort"] = c.execute("INSERT INTO list_fields(list_id,name,type,options,pinned,sort,created_at) VALUES(?,?,?,?,?,?,?)",
-                                     (lid, tr("Effort", lg=lg), "select", json.dumps({"options": opts}, ensure_ascii=False), 1, 2, ts)).lastrowid
+        fields["effort"] = insert_id(c, "INSERT INTO list_fields(list_id,name,type,options,pinned,sort,created_at) VALUES(?,?,?,?,?,?,?)",
+                                     (lid, tr("Effort", lg=lg), "select", json.dumps({"options": opts}, ensure_ascii=False), 1, 2, ts))
         for f in fields.values():
             track("field", f)
     ids = {}
@@ -184,22 +185,22 @@ def sample_create(c, uid):
         if due == "tue":  # the next Tuesday (today, if it is one)
             due = (1 - today.weekday()) % 7
         done = x.get("done")
-        tid = c.execute("""INSERT INTO tasks(list_id,section_id,title,content,priority,status,due,due_time,repeat,sort,created_at,
+        tid = insert_id(c, """INSERT INTO tasks(list_id,section_id,title,content,priority,status,due,due_time,repeat,sort,created_at,
                            updated_at,completed_at,start,duration,created_by,completed_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                         (lid, secs[sec] if sec is not None else None, tr(title, lg=lg), tr(x["content"], lg=lg) if x.get("content") else "",
                          prio, 2 if done is not None else 0, day(due), x.get("time"), x.get("repeat") or "", i + 1, ts, ts,
                          iso(datetime.combine(today + timedelta(days=done), datetime.min.time().replace(hour=16), TZ).astimezone(timezone.utc))
                          if done is not None else None,
-                         day(start), x.get("dur") if x.get("time") else None, uid, uid if done is not None else None)).lastrowid
+                         day(start), x.get("dur") if x.get("time") else None, uid, uid if done is not None else None))
         ids[key] = tid
         track("task", tid)
         if x.get("tags"):
             set_tags(c, tid, [tr(t, lg=lg) for t in x["tags"]], uid)
         for j, (st, sdone) in enumerate(x.get("subs") or []):
-            sid = c.execute("""INSERT INTO tasks(list_id,section_id,parent_id,title,status,sort,created_at,updated_at,completed_at,
+            sid = insert_id(c, """INSERT INTO tasks(list_id,section_id,parent_id,title,status,sort,created_at,updated_at,completed_at,
                                created_by,completed_by) VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
                             (lid, secs[sec] if sec is not None else None, tid, tr(st, lg=lg), 2 if sdone else 0, j + 1, ts, ts,
-                             ts if sdone else None, uid, uid if sdone else None)).lastrowid
+                             ts if sdone else None, uid, uid if sdone else None))
             track("task", sid)
         for fk in ("budget", "effort"):
             if fk in fields and x.get(fk) is not None:
@@ -210,14 +211,14 @@ def sample_create(c, uid):
                       (tid, uid, tr(x["comment"], lg=lg), "", iso(now_utc() - timedelta(hours=3))))
     if project and "deps" in feats:
         for a, b in SAMPLE_DEPS:
-            c.execute("INSERT OR IGNORE INTO task_deps(task_id,blocker_id,created_by,created_at) VALUES(?,?,?,?)",
+            c.execute("INSERT INTO task_deps(task_id,blocker_id,created_by,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
                       (ids[a], ids[b], uid, ts))
     if project and "time" in feats:  # 1.5 h on the treatment yesterday afternoon
         st = datetime.combine(today - timedelta(days=1), datetime.min.time().replace(hour=14), TZ).astimezone(timezone.utc)
-        eid = c.execute("""INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,end,seconds,note,source,created_at,updated_at)
+        eid = insert_id(c, """INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,"end",seconds,note,source,created_at,updated_at)
                            VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
                         (uid, ids["concept"], lid, tr("Write the concept and treatment", lg=lg), iso(st),
-                         iso(st + timedelta(minutes=90)), 5400, tr("First draft of the treatment", lg=lg), "manual", ts, ts)).lastrowid
+                         iso(st + timedelta(minutes=90)), 5400, tr("First draft of the treatment", lg=lg), "manual", ts, ts))
         track("time", eid)
     if project and "progress" in feats:
         note = tr("Shoot dates confirmed with the client", lg=lg)
@@ -225,14 +226,14 @@ def sample_create(c, uid):
         c.execute("INSERT INTO list_status(list_id,user_id,status,note,created_at) VALUES(?,?,?,?,?)", (lid, uid, "on_track", note, ts))
     # the packing list: a plain list with "Show completed at the bottom" (2.7.2, #414; ticked items stay below and can be
     # reused for the next shoot)
-    cl = c.execute("INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind) VALUES(?,?,?,?,?,?,?,?,?)",
-                   (tr("Example: Shoot day packing list", lg=lg), "#f59e0b", "", srt + 2, "list", ts, uid, 1, "list")).lastrowid
+    cl = insert_id(c, "INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind) VALUES(?,?,?,?,?,?,?,?,?)",
+                   (tr("Example: Shoot day packing list", lg=lg), "#f59e0b", "", srt + 2, "list", ts, uid, 1, "list"))
     from ..accounts.orgs import ws_apply_default
     ws_apply_default(c, uid, cl)  # 2.28.0 (#935): the default workspace
     track("list", cl)
     for i, n in enumerate(SAMPLE_PACKING):
-        track("task", c.execute("INSERT INTO tasks(list_id,title,sort,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?)",
-                                (cl, tr(n, lg=lg), i + 1, ts, ts, uid)).lastrowid)
+        track("task", insert_id(c, "INSERT INTO tasks(list_id,title,sort,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?)",
+                                (cl, tr(n, lg=lg), i + 1, ts, ts, uid)))
     uset(c, uid, "sample_ask", "0")
     return lid
 
@@ -273,7 +274,7 @@ def sample_remove(c, uid):
 def sample_post():
     """Creates the sample project (idempotent: while one exists, {created: false, exists: true, list_id})."""
     c, uid = db(), me()
-    c.execute("BEGIN IMMEDIATE")
+    write_lock(c, f"sample:{uid}")
     st = sample_state(c, uid)
     if st:
         c.rollback()
@@ -288,7 +289,7 @@ def sample_post():
 @app.delete("/api/sample")
 def sample_delete():
     c, uid = db(), me()
-    c.execute("BEGIN IMMEDIATE")
+    write_lock(c, f"sample:{uid}")
     if not sample_state(c, uid):
         c.execute("DELETE FROM sample_items WHERE user_id=?", (uid,))
         c.commit()

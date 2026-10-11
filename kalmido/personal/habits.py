@@ -3,6 +3,7 @@ from datetime import timedelta
 from flask import jsonify
 
 from ..core.config import app, TZ
+from ..core.pg import insert_id
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc, parse_iso, usettings
 from ..accounts.session import me
@@ -62,11 +63,11 @@ def habit_create():
     srt = c.execute("SELECT COALESCE(MAX(sort),0)+1 FROM habits WHERE user_id=?", (me(),)).fetchone()[0]
     v = {k: clean_habit_value(k, b.get(k, d)) for k, d in (("color", ""), ("goal", 1), ("days", "1234567"),
                                                             ("remind_at", ""), ("per_week", 0))}
-    cur = c.execute("INSERT INTO habits(name,color,goal,days,remind_at,sort,per_week,created_at,user_id) VALUES(?,?,?,?,?,?,?,?,?)",
+    cur_id = insert_id(c, "INSERT INTO habits(name,color,goal,days,remind_at,sort,per_week,created_at,user_id) VALUES(?,?,?,?,?,?,?,?,?)",
                     (name[:200], v["color"], v["goal"], v["days"], v["remind_at"], srt, v["per_week"], iso(now_utc()), me()))
     bump(c)
     c.commit()
-    return jsonify(id=cur.lastrowid)
+    return jsonify(id=cur_id)
 
 
 @app.patch("/api/habits/<int:hid>")
@@ -131,7 +132,7 @@ def pomo_planned_end(p):
 def pomo_close(c, p, at, done):
     """Ends a session at `at` (focus on a task -> time entry, see focus_to_entry)."""
     from ..personal.timetrack import focus_to_entry
-    n = c.execute("UPDATE pomos SET end=?, done=?, notified=1 WHERE id=? AND end IS NULL", (iso(at), done, p["id"])).rowcount
+    n = c.execute("UPDATE pomos SET \"end\"=?, done=?, notified=1 WHERE id=? AND \"end\" IS NULL", (iso(at), done, p["id"])).rowcount
     if n:
         focus_to_entry(c, p["id"])
     return n
@@ -139,7 +140,7 @@ def pomo_close(c, p, at, done):
 
 def pomo_stats(c, days=1, uid=None):
     since = local_now().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=days - 1)
-    rows = c.execute("SELECT * FROM pomos WHERE kind IN ('focus','stopwatch') AND end IS NOT NULL AND start>=? AND user_id=?",
+    rows = c.execute("SELECT * FROM pomos WHERE kind IN ('focus','stopwatch') AND \"end\" IS NOT NULL AND start>=? AND user_id=?",
                      (iso(since), uid or me())).fetchall()
     return dict(count=sum(1 for r in rows if r["done"] and r["kind"] == "focus"),
                 minutes=round(sum(pomo_elapsed(r) for r in rows) / 60))
@@ -155,8 +156,8 @@ def pomo_start():
     kind = b.get("kind", "focus")
     mins = 0 if kind == "stopwatch" else int(b.get("minutes") or s["pomo_" + ("focus" if kind == "focus" else "short")])
     ts = iso(now_utc())
-    for p in c.execute("SELECT * FROM pomos WHERE end IS NULL AND user_id=?", (me(),)).fetchall():  # one at a time
-        c.execute("UPDATE pomos SET end=? WHERE id=?", (ts, p["id"]))
+    for p in c.execute("SELECT * FROM pomos WHERE \"end\" IS NULL AND user_id=?", (me(),)).fetchall():  # one at a time
+        c.execute("UPDATE pomos SET \"end\"=? WHERE id=?", (ts, p["id"]))
         focus_to_entry(c, p["id"])
     task = b.get("task_id")
     try:
@@ -188,7 +189,7 @@ def pomo_action(pid, action):
         done = 1 if action == "finish" or pomo_elapsed(p) >= p["minutes"] * 60 - 5 else 0
         planned = pomo_planned_end(p)
         at = min(ts, planned) if planned else ts  # 1.2: a late finish ends at the planned end, not hours later
-        c.execute("UPDATE pomos SET end=?, done=?, paused_at=NULL, paused_s=paused_s+? WHERE id=?",
+        c.execute("UPDATE pomos SET \"end\"=?, done=?, paused_at=NULL, paused_s=paused_s+? WHERE id=?",
                   (iso(at), done,
                    int((ts - parse_iso(p["paused_at"])).total_seconds()) if p["paused_at"] else 0, pid))
         focus_to_entry(c, pid)
@@ -203,7 +204,7 @@ def pomo_stats_api():
     since = local_now().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=29)
     rows = c.execute(f"""SELECT p.*, t.title FROM pomos p
                          LEFT JOIN tasks t ON t.id=p.task_id AND t.list_id IN {vis_sql()} AND {tvis(c, me(), "t.")}
-                         WHERE p.user_id=? AND p.kind IN ('focus','stopwatch') AND p.end IS NOT NULL AND p.start>=?
+                         WHERE p.user_id=? AND p.kind IN ('focus','stopwatch') AND p."end" IS NOT NULL AND p.start>=?
                          ORDER BY p.start DESC""", (me(), me(), me(), iso(since))).fetchall()
     per_day, per_task = {}, {}
     for r in rows:

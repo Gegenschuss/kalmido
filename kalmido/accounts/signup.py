@@ -6,7 +6,7 @@ from flask import g, jsonify
 
 from ..core.config import app, EMAIL_RE, MIN_PASSWORD, PUBLIC_URL, USERNAME_RE
 from ..core.i18n import LANGS, tr
-from ..core.db import body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, now_utc, uset, usettings
+from ..core.db import body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, now_utc, uset, usettings, write_lock
 from ..accounts.session import _accept_lang, _rate_fail, client_ip, me
 from ..accounts.login import finish_login, pend_cookie, pend_new, twofa_methods
 from ..core.access import Denied
@@ -143,14 +143,14 @@ def auth_signup():
         return err(tr("Password: at least {0} characters", MIN_PASSWORD, lg=lg))
     ulang = b.get("lang") if b.get("lang") in LANGS else lg
     answer = jsonify(ok=True, mail=mail, pending=m == "approval")
-    c.execute("BEGIN IMMEDIATE")
+    write_lock(c, "accounts")  # 2.37.0 (#1150): was BEGIN IMMEDIATE
     _cleanup(c)
     if hit_limit("signup:" + client_ip(), SIGNUP_RATE, 3600):  # counted for valid requests only
         c.commit()
         return err(tr("Too many attempts, please wait a few minutes", lg=lg), 429)
     dom = email.rsplit("@", 1)[-1].lower()
     allowed = m != "domain" or dom in _domains(gsetting(c, "signup_domains")) or org_for_email(c, email) is not None
-    taken = c.execute("SELECT 1 FROM users WHERE email=? COLLATE NOCASE", (email,)).fetchone()
+    taken = c.execute("SELECT 1 FROM users WHERE lower(email)=lower(?)", (email,)).fetchone()
     if not allowed or taken:  # the same answer: nobody learns which addresses exist or are allowed
         c.rollback()
         print("registration ignored (domain or address)", "from", client_ip(), flush=True)
@@ -260,7 +260,7 @@ def auth_link():
     if e:
         return e
     c = db()
-    c.execute("BEGIN IMMEDIATE")
+    write_lock(c, "accounts")
     hit = _lookup(c, body().get("token"), kinds=("login",))
     if not hit:
         c.rollback()

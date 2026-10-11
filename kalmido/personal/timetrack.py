@@ -3,12 +3,12 @@ import csv
 import io
 import math
 import re
-import sqlite3
 import time
 from datetime import date, datetime, timedelta, timezone
 from flask import g, has_request_context, jsonify, request, Response
 
 from ..core.config import app, PUBLIC_URL, TZ
+from ..core.pg import insert_id, Row
 from ..core.i18n import dec_comma, lang, LANGS, tr
 from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_now, now_utc, parse_iso, usettings
 from ..accounts.session import me, user_public
@@ -157,10 +157,10 @@ def vis_ids(c, uid):
 
 def evis(c, uid, a="e."):
     """SQL restriction (no ? params) for time entries: a participant sees their own entries and the ones on their
-    own tasks, never other people's entries on the rest of a participant list. "1" when uid is a participant nowhere."""
+    own tasks, never other people's entries on the rest of a participant list. "TRUE" when uid is a participant nowhere."""
     pl = plists(c, uid)
     if not pl:
-        return "1"
+        return "TRUE"
     return (f"({a}user_id={int(uid)} OR {a}list_id IS NULL OR {a}list_id NOT IN ({','.join(str(int(x)) for x in pl)}) "
             f"OR {a}task_id IN ({_pset_sql(uid, pl, write=True)}))")
 
@@ -244,7 +244,7 @@ def time_target(c, b):
 
 
 def time_running(c, uid):
-    r = c.execute(TIME_Q + " WHERE e.user_id=? AND e.end IS NULL", (uid,)).fetchone()
+    r = c.execute(TIME_Q + " WHERE e.user_id=? AND e.\"end\" IS NULL", (uid,)).fetchone()
     if not r:
         return None
     return entry_out(r, uid, vis_ids(c, uid), now_utc(), 0)
@@ -254,7 +254,7 @@ def time_totals(c, uid):
     """{task_id: [seconds of everyone I can see, my seconds]} of finished entries (the client adds my running timer)."""
     out = {}
     for r in c.execute(f"""SELECT task_id, SUM(seconds) AS s, SUM(CASE WHEN user_id=? THEN seconds ELSE 0 END) AS m
-                           FROM time_entries WHERE task_id IS NOT NULL AND end IS NOT NULL AND list_id IN {PROJ_SQL}
+                           FROM time_entries WHERE task_id IS NOT NULL AND "end" IS NOT NULL AND list_id IN {PROJ_SQL}
                              AND (user_id=? OR list_id IN {vis_sql()}) AND {evis(c, uid, "")} GROUP BY task_id""", (uid, uid, uid, uid)):
         if r["s"]:
             out[r["task_id"]] = [r["s"], r["m"]]
@@ -286,7 +286,7 @@ def time_list_totals(c, uid):
     time: the finished entries (with or without a task; the client adds my running timer) and the sum of a number field
     called "Budget h" (the agency project type's field, any language) over the list's tasks."""
     out = {}
-    for r in c.execute(f"""SELECT list_id, SUM(seconds) AS s FROM time_entries WHERE end IS NOT NULL AND list_id IN {PROJ_SQL}
+    for r in c.execute(f"""SELECT list_id, SUM(seconds) AS s FROM time_entries WHERE "end" IS NOT NULL AND list_id IN {PROJ_SQL}
                            AND (user_id=? OR list_id IN {vis_sql()}) AND {evis(c, uid, "")} GROUP BY list_id""", (uid, uid, uid)):
         if r["s"]:
             out[r["list_id"]] = {"s": r["s"], "b": None}
@@ -314,7 +314,7 @@ def time_list_totals(c, uid):
 def stop_timer(c, r, at, ts):
     end = max(parse_iso(r["start"]), at)
     sec = int((end - parse_iso(r["start"])).total_seconds())
-    c.execute("UPDATE time_entries SET end=?, seconds=?, updated_at=? WHERE id=?", (iso(end), sec, ts, r["id"]))
+    c.execute("UPDATE time_entries SET \"end\"=?, seconds=?, updated_at=? WHERE id=?", (iso(end), sec, ts, r["id"]))
     return sec
 
 
@@ -336,16 +336,16 @@ def time_start():
     at = time_at(b.get("at"), ref)
     note = str(b.get("note") or "").strip()[:500]
     stopped, end = None, None
-    run = c.execute("SELECT * FROM time_entries WHERE user_id=? AND end IS NULL", (uid,)).fetchone()
+    run = c.execute("SELECT * FROM time_entries WHERE user_id=? AND \"end\" IS NULL", (uid,)).fetchone()
     if run:
         if parse_iso(run["start"]) <= at:
             stopped = {"id": run["id"], "seconds": stop_timer(c, run, at, ts), "task_id": run["task_id"]}
         else:  # an older start arrives late (offline): it ends where the running timer began
             end = parse_iso(run["start"])
-    eid = c.execute("""INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,end,seconds,note,source,client_id,
+    eid = insert_id(c, """INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,"end",seconds,note,source,client_id,
                        created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,'timer',?,?,?)""",
                     (uid, tid, lid, title, iso(at), iso(end) if end else None,
-                     int((end - at).total_seconds()) if end else 0, note, cid, ts, ts)).lastrowid
+                     int((end - at).total_seconds()) if end else 0, note, cid, ts, ts))
     bump(c)
     c.commit()
     return jsonify(entry=one_entry(c, eid), stopped=stopped, timer=time_running(c, uid))
@@ -365,7 +365,7 @@ def time_stop():
     elif b.get("client_id"):
         r = c.execute("SELECT * FROM time_entries WHERE client_id=? AND user_id=?", (str(b["client_id"])[:64], uid)).fetchone()
     else:
-        r = c.execute("SELECT * FROM time_entries WHERE user_id=? AND end IS NULL", (uid,)).fetchone()
+        r = c.execute("SELECT * FROM time_entries WHERE user_id=? AND \"end\" IS NULL", (uid,)).fetchone()
         if not r:
             return jsonify(entry=None, timer=None, already=True)
     if not r:
@@ -423,9 +423,9 @@ def time_create():
     tid, lid, title = time_target(c, b)
     start, end, sec = entry_times(b, None, None, 0)
     src = b.get("source") if b.get("source") in TIME_SOURCES else "manual"
-    eid = c.execute("""INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,end,seconds,note,source,created_at,updated_at)
+    eid = insert_id(c, """INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,"end",seconds,note,source,created_at,updated_at)
                        VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
-                    (uid, tid, lid, title, iso(start), iso(end), sec, str(b.get("note") or "").strip()[:500], src, ts, ts)).lastrowid
+                    (uid, tid, lid, title, iso(start), iso(end), sec, str(b.get("note") or "").strip()[:500], src, ts, ts))
     bump(c)
     c.commit()
     return jsonify(one_entry(c, eid))
@@ -438,7 +438,7 @@ def time_update(eid):
     b = body()
     c = db()
     r = need_entry(c, eid)
-    if not isinstance(r, sqlite3.Row):
+    if not isinstance(r, Row):
         return r
     sets, args = [], []
     if "note" in b:
@@ -457,7 +457,7 @@ def time_update(eid):
             args.append(iso(st))
     elif any(k in b for k in ("start", "end", "minutes")):
         start, end, sec = entry_times(b, parse_iso(r["start"]), parse_iso(r["end"]), r["seconds"])
-        sets += ["start=?", "end=?", "seconds=?"]
+        sets += ["start=?", "\"end\"=?", "seconds=?"]
         args += [iso(start), iso(end), sec]
     if sets:
         c.execute(f"UPDATE time_entries SET {', '.join(sets)}, updated_at=? WHERE id=?", (*args, iso(now_utc()), eid))
@@ -471,7 +471,7 @@ def time_delete(eid):
     need_time()
     c = db()
     r = need_entry(c, eid)
-    if not isinstance(r, sqlite3.Row):
+    if not isinstance(r, Row):
         return r
     old = one_entry(c, eid)
     c.execute("DELETE FROM time_entries WHERE id=?", (eid,))
@@ -495,13 +495,13 @@ def focus_to_entry(c, pid):
     t = c.execute("SELECT list_id, title FROM tasks WHERE id=?", (p["task_id"],)).fetchone()
     if not t or not list_role(c, t["list_id"], uid) or not is_project(c, t["list_id"]):
         return None
-    if c.execute("SELECT 1 FROM time_entries WHERE user_id=? AND source='timer' AND start<? AND (end IS NULL OR end>?)",
+    if c.execute("SELECT 1 FROM time_entries WHERE user_id=? AND source='timer' AND start<? AND (\"end\" IS NULL OR \"end\">?)",
                  (uid, p["end"], p["start"])).fetchone():
         return None  # a timer ran at the same time: it already counts this time
     ts = iso(now_utc())
-    return c.execute("""INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,end,seconds,source,pomo_id,created_at,updated_at)
+    return insert_id(c, """INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,"end",seconds,source,pomo_id,created_at,updated_at)
                         VALUES(?,?,?,?,?,?,?,'focus',?,?,?)""",
-                     (uid, p["task_id"], t["list_id"], t["title"], p["start"], p["end"], sec, pid, ts, ts)).lastrowid
+                     (uid, p["task_id"], t["list_id"], t["title"], p["start"], p["end"], sec, pid, ts, ts))
 
 
 def local_bounds(d1, d2):
@@ -627,7 +627,7 @@ def time_report(c, uid, a):
     today = local_now().date()
     lo, hi = local_bounds(today, today)
     mine_today = sum(entry_secs(r, ref) for r in c.execute(
-        f"SELECT start, end, seconds FROM time_entries WHERE user_id=? AND start>=? AND start<? AND (list_id IS NULL OR list_id IN {PROJ_SQL})",
+        f"SELECT start, \"end\", seconds FROM time_entries WHERE user_id=? AND start>=? AND start<? AND (list_id IS NULL OR list_id IN {PROJ_SQL})",
         (uid, lo, hi)))
     return {"from": f.isoformat() if f else None, "to": t.isoformat() if t else None, "scope": a.get("scope", "mine"),
             "rounding": rm, "currency": s.get("time_currency") or "", "total": tot, "lists": out_lists,
@@ -695,7 +695,7 @@ def time_watchdog(c, users, S, LG):
         return
     ref = now_utc()
     for r in c.execute("SELECT e.*, t.title AS t_title FROM time_entries e LEFT JOIN tasks t ON t.id=e.task_id "
-                       "WHERE e.end IS NULL").fetchall():
+                       "WHERE e.\"end\" IS NULL").fetchall():
         try:
             _time_watch_one(c, r, users, S, LG, ref)
         except Exception as e:  # noqa: BLE001
@@ -717,7 +717,7 @@ def _time_watch_one(c, r, users, S, LG, ref):
     fnum = (lambda x: f"{x:.1f}".rstrip("0").rstrip(".").replace(".", "," if dec_comma(lg) else "."))
     if stop_h > 0 and hrs >= stop_h:
         end = start + timedelta(hours=stop_h)
-        n = c.execute("UPDATE time_entries SET end=?, seconds=?, auto_stopped=1, updated_at=? WHERE id=? AND end IS NULL",
+        n = c.execute("UPDATE time_entries SET \"end\"=?, seconds=?, auto_stopped=1, updated_at=? WHERE id=? AND \"end\" IS NULL",
                       (iso(end), int(stop_h * 3600), iso(ref), r["id"])).rowcount
         bump(c)
         c.commit()

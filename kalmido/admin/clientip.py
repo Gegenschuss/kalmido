@@ -39,9 +39,11 @@ def login_seen(c, uid):
         if not ip or not ip_private(ip):
             return
         now = now_utc()
-        c.execute("INSERT INTO login_ips(ip,user_id,at) VALUES(?,?,?) ON CONFLICT(ip,user_id) DO UPDATE SET at=excluded.at", (ip, uid, iso(now)))
-        c.execute("DELETE FROM login_ips WHERE at<?", (iso(now - timedelta(days=LOGIN_IP_DAYS)),))
-        w = ip_warning(c)
+        with c.savepoint():  # 2.37.0 (#1150): a database error must not abort the sign-in's transaction
+            c.execute("INSERT INTO login_ips(ip,user_id,at) VALUES(?,?,?) ON CONFLICT(ip,user_id) DO UPDATE SET at=excluded.at",
+                      (ip, uid, iso(now)))
+            c.execute("DELETE FROM login_ips WHERE at<?", (iso(now - timedelta(days=LOGIN_IP_DAYS)),))
+            w = ip_warning(c)
     except Exception as e:  # noqa: BLE001 - no request (a script) or a database hiccup: a sign-in never fails on this
         print("client address check skipped:", type(e).__name__, e, flush=True)
         return

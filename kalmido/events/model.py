@@ -8,6 +8,7 @@ from dateutil.rrule import rrulestr
 from flask import has_request_context
 
 from ..core.config import PUBLIC_URL, TZ
+from ..core.pg import insert_id
 from ..core.i18n import N_, short_day, tr
 from ..core.db import bump, gset, gsetting, iso, iso_ms, now_utc, usettings
 from ..accounts.session import me
@@ -184,8 +185,8 @@ def cal_create(c, uid, b):
         raise Denied(409, tr("At most {0} calendars", EV_CALS_MAX))
     ts = iso_ms(now_utc())
     srt = (c.execute("SELECT MAX(sort) FROM ev_cals WHERE owner_id=?", (uid,)).fetchone()[0] or 0) + 1
-    return c.execute("INSERT INTO ev_cals(owner_id,name,color,description,sort,created_at,changed_at,org_id) VALUES(?,?,?,?,?,?,?,?)",
-                     (uid, f["name"], f.get("color") or ev_next_color(c, uid), f.get("description", ""), srt, ts, ts, oid)).lastrowid
+    return insert_id(c, "INSERT INTO ev_cals(owner_id,name,color,description,sort,created_at,changed_at,org_id) VALUES(?,?,?,?,?,?,?,?)",
+                     (uid, f["name"], f.get("color") or ev_next_color(c, uid), f.get("description", ""), srt, ts, ts, oid))
 
 
 def default_cal(c, uid, create=True):
@@ -662,6 +663,11 @@ def ev_new_uid():
     return f"kalmido-ev-{secrets.token_hex(10)}"
 
 
+def pgb_col(k):
+    """2.37.0 (#1150): a column name for SQL built from keys (end is a reserved word in Postgres)."""
+    return '"end"' if k == "end" else k
+
+
 def ev_store(c, uid, cal_id, f, eid=None, uid_=None, href=None, attendees=None, via=None):
     """Creates (eid None) or changes an event with the validated columns f; attendees (list of dicts) replaces them.
     Returns the event id. The caller commits; the data version goes up."""
@@ -676,12 +682,12 @@ def ev_store(c, uid, cal_id, f, eid=None, uid_=None, href=None, attendees=None, 
                 "tz": f.get("tz", ""), "rrule": f.get("rrule", ""), "exdates": f.get("exdates", ""), "overrides": f.get("overrides", ""),
                 "reminders": f.get("reminders", ""), "status": f.get("status", "confirmed"), "busy": f.get("busy", 1), "url": f.get("url"),
                 "task_id": f.get("task_id"), "extra": f.get("extra", ""), "created_by": uid, "created_at": ts, "updated_at": ts}
-        eid = c.execute(f"INSERT INTO events({','.join(cols)}) VALUES({','.join('?' * len(cols))})", list(cols.values())).lastrowid
+        eid = insert_id(c, f"INSERT INTO events({','.join(map(pgb_col, cols))}) VALUES({','.join('?' * len(cols))})", list(cols.values()))
     else:
         f = {k: v for k, v in f.items() if k not in ("id", "uid", "created_by", "created_at")}
         if f:
             f["updated_at"] = ts
-            c.execute(f"UPDATE events SET {','.join(k + '=?' for k in f)}, seq=seq+1 WHERE id=?", [*f.values(), eid])
+            c.execute(f"UPDATE events SET {','.join(pgb_col(k) + '=?' for k in f)}, seq=seq+1 WHERE id=?", [*f.values(), eid])
     r = c.execute("SELECT * FROM events WHERE id=?", (eid,)).fetchone()
     a, b_ = ev_span_days(r)
     c.execute("UPDATE events SET first_day=?, last_day=? WHERE id=?", (a, b_, eid))
@@ -930,10 +936,10 @@ def migrate_family_events(c):
                   "reminders": t["reminders"] or "", "task_id": t["id"], "url": t["url"]})
         ts = iso_ms(now_utc())
         uid_ = ev_new_uid()
-        eid = c.execute("""INSERT INTO events(cal_id,uid,href,title,location,description,all_day,start,end,tz,rrule,reminders,url,task_id,
+        eid = insert_id(c, """INSERT INTO events(cal_id,uid,href,title,location,description,all_day,start,"end",tz,rrule,reminders,url,task_id,
                            created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,'',?,?,?,?,?,?,?)""",
                         (cid, uid_, uid_ + ".ics", f["title"], "", f["description"], f["all_day"], f["start"], f["end"], f["rrule"],
-                         f["reminders"], f["url"], t["id"], owner, ts, ts)).lastrowid
+                         f["reminders"], f["url"], t["id"], owner, ts, ts))
         r = c.execute("SELECT * FROM events WHERE id=?", (eid,)).fetchone()
         a, b_ = ev_span_days(r)
         c.execute("UPDATE events SET first_day=?, last_day=? WHERE id=?", (a, b_, eid))

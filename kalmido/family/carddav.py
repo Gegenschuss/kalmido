@@ -9,6 +9,7 @@ from datetime import date
 from flask import jsonify
 
 from ..core.config import _origin, app
+from ..core.pg import insert_id
 from ..core.i18n import lang, N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc, parse_iso
 from ..accounts.session import GATE, me
@@ -16,7 +17,7 @@ from ..core.access import Denied, list_role, need_list, WRITE_ROLES
 from ..tasks.validation import as_int, DATE_MIN_Y
 from ..calendars.subscriptions import (
     _cal_limited, _CAL_LOCK, _dav_href, _dav_responses, _dav_xml, cal_allow, CAL_ERR, cal_err_text, cal_href_ok,
-    cal_http, cal_norm_url, CAL_ON, cal_rate, cal_seal, CAL_TICK, cal_unseal, cal_url_hint, CalError, DAV_NS, need_cal,
+    cal_http, cal_norm_url, CAL_ON, cal_rate, cal_seal, CAL_TICK, cal_unseal, cal_url_hint, CalError, DAV_NS, need_cal, pgb_heal,
 )
 from ..family.family import (
     _jparse, CONTACT_CARDS_MAX, CONTACT_EVERY_MIN, CONTACT_SRCS_MAX, FAM_LEAD_MAX, fam_list, FAM_NAME_MAX, occ_create,
@@ -230,10 +231,11 @@ def contacts_sync(c, sid):
                 f = _jparse(c.execute("SELECT fam FROM tasks WHERE id=?", (tid,)).fetchone()[0]) or {}
                 f["card"] = uid_[:200]
                 c.execute("UPDATE tasks SET fam=? WHERE id=?", (json.dumps(f, ensure_ascii=False, separators=(",", ":")), tid))
-                c.execute("INSERT OR REPLACE INTO contact_links(src_id,uid,kind,task_id,digest,book) VALUES(?,?,?,?,?,?)", (sid, uid_, kind, tid, dig, book_s))
+                c.execute("INSERT INTO contact_links(src_id,uid,kind,task_id,digest,book) VALUES(?,?,?,?,?,?) ON CONFLICT (src_id,uid,kind) DO UPDATE SET task_id=excluded.task_id, digest=excluded.digest, book=excluded.book", (sid, uid_, kind, tid, dig, book_s))
             try:  # 2.21.0 (#658): the cards also land in an address book of their own (module Contacts on)
                 from ..contacts.model import mirror_source
-                mirror_source(c, sid, cards[:CONTACT_CARDS_MAX])
+                with c.savepoint():  # 2.37.0 (#1150): a failing statement here leaves the birthdays above intact
+                    mirror_source(c, sid, cards[:CONTACT_CARDS_MAX])
             except Exception as e:  # noqa: BLE001  (the birthdays above stay, whatever happens here)
                 print("contacts sync: mirroring source", sid, "failed:", type(e).__name__, e, flush=True)
             upd.update(status="ok", error="", fails=0, count=n, synced_at=iso(now_utc()))
@@ -242,6 +244,7 @@ def contacts_sync(c, sid):
             ce = e if isinstance(e, CalError) else CalError("error", type(e).__name__)
             if not isinstance(e, CalError):
                 print("contacts sync: source", sid, "failed:", type(e).__name__, e, flush=True)
+            pgb_heal(c)
             upd.update(status="error", error=ce.stored(), fails=s["fails"] + 1)
         c.execute(f"UPDATE contact_srcs SET {', '.join(k + '=?' for k in upd)} WHERE id=?", (*upd.values(), sid))
         c.commit()
@@ -295,9 +298,9 @@ def family_contacts_add():
     name = b.get("name") if isinstance(b.get("name"), str) and b["name"].strip() else (urllib.parse.urlsplit(url).hostname or "CardDAV")
     if not cal_rate(uid):
         return _cal_limited()
-    sid = c.execute("""INSERT INTO contact_srcs(user_id,name,url,url_hint,username,password,list_id,lead,created_at)
+    sid = insert_id(c, """INSERT INTO contact_srcs(user_id,name,url,url_hint,username,password,list_id,lead,created_at)
                        VALUES(?,?,?,?,?,?,?,?,?)""", (uid, name.strip()[:100], cal_seal(c, uid, url), cal_url_hint(url), user.strip(),
-                                                     cal_seal(c, uid, pw), lid, lead, iso(now_utc()))).lastrowid
+                                                     cal_seal(c, uid, pw), lid, lead, iso(now_utc())))
     c.commit()
     contacts_sync(c, sid)
     r = c.execute("SELECT * FROM contact_srcs WHERE id=?", (sid,)).fetchone()

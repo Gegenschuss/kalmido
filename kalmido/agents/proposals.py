@@ -6,6 +6,7 @@ from datetime import timedelta
 from flask import g, jsonify, request
 
 from ..core.config import app, PUBLIC_URL
+from ..core.pg import insert_id
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
@@ -441,9 +442,9 @@ def proposal_request():
     if lid and prop_mode(a) != "all" and list_role(c, lid, aid) and not agent_usable(c, aid, uid, lid):  # 2.26.0 (#928)
         return err(tr("The list owner has not opened this agent to members"), 403)
     ts = iso(now_utc())
-    jid = c.execute("""INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at,kind,input,prop_state,list_id)
+    jid = insert_id(c, """INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at,kind,input,prop_state,list_id)
                        VALUES(?,?,?,?,'running','',?,?,?,?,'requested',?)""",
-                    (aid, tid, uid, title[:JOB_TITLE_MAX], ts, ts, kind, json.dumps(inp, ensure_ascii=False), lid)).lastrowid
+                    (aid, tid, uid, title[:JOB_TITLE_MAX], ts, ts, kind, json.dumps(inp, ensure_ascii=False), lid))
     j = c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone()
     agent_emit(c, aid, "job_request", {"job": job_dict(c, j), "kind": kind, "input": inp, "limits": PROP_LIMITS,
                                        "requested_by": {"id": uid, "name": user_names(c, [uid]).get(uid, "")}})
@@ -531,10 +532,10 @@ def prop_insert(c, aid, lid, ts, title, notes="", section_id=None, parent_id=Non
                 assignee_id=None, duration=None, sort=0):
     """A task created from a proposal: owned / created by the person applying it; history "from a proposal by <agent>"."""
     uid = me()
-    tid = c.execute("""INSERT INTO tasks(list_id,section_id,parent_id,title,content,priority,due,start,duration,sort,created_at,updated_at,
+    tid = insert_id(c, """INSERT INTO tasks(list_id,section_id,parent_id,title,content,priority,due,start,duration,sort,created_at,updated_at,
                        created_by,assignee_id,assigned_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (lid, section_id, parent_id, title[:TITLE_MAX], notes or "", priority or 0, due, start if due else None, duration,
-                     sort, ts, ts, uid, assignee_id, uid if assignee_id else None)).lastrowid
+                     sort, ts, ts, uid, assignee_id, uid if assignee_id else None))
     log_act(c, tid, "created", {"agent": aid, "proposal": True})
     if parent_id:
         log_act(c, parent_id, "subtask", {"id": tid, "title": title[:200]})
@@ -550,11 +551,11 @@ def prop_section(c, lid, name, made):
     """Id of the section `name` in list lid (case-insensitive), created when missing (made: ids created by this apply)."""
     if not name:
         return None
-    r = c.execute("SELECT id FROM sections WHERE list_id=? AND name=? COLLATE NOCASE", (lid, name)).fetchone()
+    r = c.execute("SELECT id FROM sections WHERE list_id=? AND lower(name)=lower(?)", (lid, name)).fetchone()
     if r:
         return r[0]
     srt = c.execute("SELECT COALESCE(MAX(sort),0)+1 FROM sections WHERE list_id=?", (lid,)).fetchone()[0]
-    sid = c.execute("INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, name[:100], srt)).lastrowid
+    sid = insert_id(c, "INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, name[:100], srt))
     made.append(sid)
     return sid
 
@@ -570,15 +571,15 @@ def prop_run(c, j, sel, ed, extra):
     if kind == "project":
         name = _p_str(extra.get("name") or prop["name"], "name", PROP_NAME_MAX, True)
         folder = clean_folder(extra.get("folder") if extra.get("folder") is not None else prop.get("folder") or "", False)
-        lid = c.execute("INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind) VALUES(?,?,?,?,?,?,?,?,?)",
-                        (name, "", folder, my_max_sort(c, uid) + 1, "list", ts, uid, 0, "project")).lastrowid
+        lid = insert_id(c, "INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind) VALUES(?,?,?,?,?,?,?,?,?)",
+                        (name, "", folder, my_max_sort(c, uid) + 1, "list", ts, uid, 0, "project"))
         from ..accounts.orgs import ws_apply_default
         ws_apply_default(c, uid, lid)  # 2.28.0 (#935): the default workspace
         rec["list"] = lid
         list_created(c, uid, lid)  # 2.4.2 (#391); 2.25.0 (#931): + groups and people of a shared folder
         secs = {}
         for i, s in enumerate(prop["sections"]):
-            secs[s.casefold()] = c.execute("INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, s, i + 1)).lastrowid
+            secs[s.casefold()] = insert_id(c, "INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, s, i + 1))
             rec["sections"].append(secs[s.casefold()])
         ids = {}
         for i, t in enumerate(prop["tasks"]):
@@ -599,13 +600,13 @@ def prop_run(c, j, sel, ed, extra):
         for i, t in enumerate(prop["tasks"]):
             for d in t["depends_on"]:
                 if i in ids and d in ids:
-                    c.execute("INSERT OR IGNORE INTO task_deps(task_id,blocker_id,created_by,created_at) VALUES(?,?,?,?)", (ids[i], ids[d], uid, ts))
+                    c.execute("INSERT INTO task_deps(task_id,blocker_id,created_by,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING", (ids[i], ids[d], uid, ts))
         from ..core.access import list_other_agent
         from ..accounts.orgs import ws_member_problem
         from ..agents.safety import bridge_blocks
         if extra.get("share_agent") and agent_active(agent_row(c, aid)) and not list_other_agent(c, lid, aid) and not ws_member_problem(c, lid, aid) \
                 and not bridge_blocks(c, lid, aid):  # 2.26.0; 2.28.0 (#935); 2.30.0 (#919): no bridge between lists with different people
-            c.execute("INSERT OR IGNORE INTO list_members(list_id,user_id,role,sort,added_at) VALUES(?,?,?,?,?)",
+            c.execute("INSERT INTO list_members(list_id,user_id,role,sort,added_at) VALUES(?,?,?,?,?) ON CONFLICT DO NOTHING",
                       (lid, aid, "edit", my_max_sort(c, aid) + 1, ts))
             rec["shared"] = True
         return rec
@@ -631,7 +632,7 @@ def prop_run(c, j, sel, ed, extra):
             rec["tasks"].append(ids[i])
         for a_, b_ in prop["dependencies"]:
             if a_ in ids and b_ in ids:
-                c.execute("INSERT OR IGNORE INTO task_deps(task_id,blocker_id,created_by,created_at) VALUES(?,?,?,?)", (ids[a_], ids[b_], uid, ts))
+                c.execute("INSERT INTO task_deps(task_id,blocker_id,created_by,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING", (ids[a_], ids[b_], uid, ts))
         rec["list"] = t["list_id"]
         return rec
     if kind == "extract":
@@ -741,8 +742,8 @@ def proposal_apply(jid):
               "WHERE id=?", (me(), ts, ts, json.dumps(rec, ensure_ascii=False), jid))
     counts = {"created": len(rec["tasks"]), "changed": len(rec["changes"])}
     prop_notify_agent(c, j, "approve", "applied", {**counts, "list_id": rec["list"] if j["kind"] == "project" else None})
-    c.execute("UPDATE notifications SET read_at=? WHERE user_id=? AND kind='proposal' AND read_at IS NULL AND data LIKE ?",
-              (ts, me(), f'%"job": {jid},%'))
+    c.execute("UPDATE notifications SET read_at=? WHERE user_id=? AND kind='proposal' AND read_at IS NULL AND data->>'job' = ?",
+              (ts, me(), str(jid)))
     bump(c)
     c.commit()
     return jsonify({**counts, "list_id": rec["list"], "job": job_dict(c, c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone())})
@@ -758,8 +759,8 @@ def proposal_discard(jid):
     c.execute("UPDATE agent_jobs SET prop_state='discarded', state='stopped', action='reject', action_by=?, action_at=?, updated_at=? WHERE id=?",
               (me(), ts, ts, jid))
     prop_notify_agent(c, j, "reject", "discarded")
-    c.execute("UPDATE notifications SET read_at=? WHERE user_id=? AND kind='proposal' AND read_at IS NULL AND data LIKE ?",
-              (ts, me(), f'%"job": {jid},%'))
+    c.execute("UPDATE notifications SET read_at=? WHERE user_id=? AND kind='proposal' AND read_at IS NULL AND data->>'job' = ?",
+              (ts, me(), str(jid)))
     bump(c)
     c.commit()
     return jsonify(ok=True)
@@ -971,7 +972,7 @@ def _approval_pushes_hour(c, aid, uid):
     """How many approval requests agent aid sent person uid within the last hour (this one included)."""
     from ..core.db import iso_ms
     return c.execute("""SELECT COUNT(*) FROM agent_chat WHERE agent_id=? AND user_id=? AND sender='agent'
-                        AND json_extract(choices, '$.approval') IS NOT NULL AND created_at>?""",
+                        AND choices->>'approval' IS NOT NULL AND created_at>?""",
                      (aid, uid, iso_ms(now_utc() - timedelta(hours=1)))).fetchone()[0]
 
 
@@ -1232,7 +1233,7 @@ def v1_agent_cross_proposal():
         raise Denied(404)
     if list_role(c, lid, aid):
         raise BadInput(tr("You can see this list: create the tasks there directly"))
-    if c.execute("SELECT COUNT(*) FROM agent_jobs WHERE agent_id=? AND kind='extract' AND prop_state='ready' AND input LIKE '%\"cross\": true%'",
+    if c.execute("SELECT COUNT(*) FROM agent_jobs WHERE agent_id=? AND kind='extract' AND prop_state='ready' AND input ILIKE '%\"cross\": true%'",
                  (aid,)).fetchone()[0] >= XPROP_OPEN_MAX:
         return v1_err(429, tr("You have {0} open proposals for other topics: wait until people decided on them", XPROP_OPEN_MAX))
     tasks = [{**{k: v for k, v in t.items() if k in ("title", "notes", "due")}} if isinstance(t, dict) else t
@@ -1241,10 +1242,10 @@ def v1_agent_cross_proposal():
     p = prop_validate("extract", {"tasks": tasks, **({"summary": b["summary"]} if "summary" in b else {})}, inp)
     ts = iso(now_utc())
     aname = user_names(c, [aid]).get(aid, "?")
-    jid = c.execute("""INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at,kind,input,prop_state,list_id,proposal)
+    jid = insert_id(c, """INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at,kind,input,prop_state,list_id,proposal)
                        VALUES(?,NULL,?,?,'waiting','',?,?,'extract',?,'ready',?,?)""",
                     (aid, lst["owner_id"], tr("Proposal from {0}: {1}", aname, title)[:JOB_TITLE_MAX], ts, ts,
-                     json.dumps(inp, ensure_ascii=False), lid, json.dumps(p, ensure_ascii=False))).lastrowid
+                     json.dumps(inp, ensure_ascii=False), lid, json.dumps(p, ensure_ascii=False)))
     j = c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone()
     prop_ready_notify(c, j)
     bump(c)

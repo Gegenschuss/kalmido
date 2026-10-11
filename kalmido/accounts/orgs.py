@@ -6,6 +6,7 @@ import re
 from flask import g, jsonify
 
 from ..core.config import app
+from ..core.pg import insert_id
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, now_utc
 from ..accounts.session import me
@@ -93,10 +94,10 @@ def instance_sync(c):
         host = PUBLIC_URL.split("://", 1)[-1].split("/")[0].split(":")[0]
         parts = [p for p in host.split(".") if p and not p.isdigit()]
         name = ORG_NAME_ENV or (parts[-2] if len(parts) >= 2 else (parts[0] if parts else "Kalmido")).capitalize()
-        oid = c.execute("INSERT INTO orgs(name,icon,created_at) VALUES(?,?,?)", (name, "", iso(now_utc()))).lastrowid
+        oid = insert_id(c, "INSERT INTO orgs(name,icon,created_at) VALUES(?,?,?)", (name, "", iso(now_utc())))
     elif ORG_NAME_ENV:
         c.execute("UPDATE orgs SET name=? WHERE id=? AND name!=?", (ORG_NAME_ENV, oid, ORG_NAME_ENV))
-    c.execute("INSERT OR IGNORE INTO org_members(org_id,user_id) SELECT ?, id FROM users", (oid,))
+    c.execute("INSERT INTO org_members(org_id,user_id) SELECT ?, id FROM users ON CONFLICT DO NOTHING", (oid,))
     # 2.28.0 (#935): the instance's admins administer its one organisation
     c.execute("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id IN (SELECT id FROM users WHERE is_admin=1 AND kind!='agent')", (oid,))
 
@@ -366,7 +367,7 @@ def ws_default_org(c, uid, folder=""):
     if not has_workspaces(c):
         return None
     if folder:
-        rows = c.execute("SELECT DISTINCT org_id FROM lists WHERE owner_id=? AND is_inbox=0 AND (folder=? OR folder LIKE ?)",
+        rows = c.execute("SELECT DISTINCT org_id FROM lists WHERE owner_id=? AND is_inbox=0 AND (folder=? OR folder ILIKE ?)",
                          (uid, folder, folder.split("/", 1)[0] + "/%")).fetchall()
         oids = {r[0] for r in rows}
         if len(oids) == 1:
@@ -408,7 +409,7 @@ def ws_migrate(c):
     if not has_workspaces(c):
         return
     org_of = {}
-    for r in c.execute("SELECT user_id, MIN(org_id) AS oid FROM org_members GROUP BY user_id"):
+    for r in c.execute("SELECT user_id, MIN(org_id) AS oid FROM org_members GROUP BY user_id"):  # pg-ok: alias, not the system column
         org_of[r["user_id"]] = r["oid"]
     if instance_mode(c) == "organisation":
         mo = main_org(c)
@@ -510,7 +511,7 @@ def orgs_get():
     _need_admin()
     c = db()
     m = instance_mode(c)
-    rows = [] if m == "shared" else c.execute("SELECT * FROM orgs" + (" WHERE id=?" if m == "organisation" else "") + " ORDER BY name COLLATE NOCASE, id",
+    rows = [] if m == "shared" else c.execute("SELECT * FROM orgs" + (" WHERE id=?" if m == "organisation" else "") + " ORDER BY lower(name), id",
                                               (main_org(c),) if m == "organisation" else ()).fetchall()
     from ..accounts.tenancy import boundary_summary
     return jsonify(orgs=[org_public(c, r) for r in rows], visibility=vis_mode(c), mode=m, editable=m in ("multi", "workspaces"),
@@ -531,10 +532,10 @@ def org_create():
     if instance_mode(c) != "workspaces":
         _no_change()
     name = _clean_name(b.get("name"))
-    if c.execute("SELECT 1 FROM orgs WHERE name=? COLLATE NOCASE", (name,)).fetchone():
+    if c.execute("SELECT 1 FROM orgs WHERE lower(name)=lower(?)", (name,)).fetchone():
         return err(tr("An organisation with this name exists"), 409)
-    oid = c.execute("INSERT INTO orgs(name,icon,domains,created_at) VALUES(?,?,?,?)",
-                    (name, _clean_icon(b.get("icon")), _clean_domains(b.get("domains") or ""), iso(now_utc()))).lastrowid
+    oid = insert_id(c, "INSERT INTO orgs(name,icon,domains,created_at) VALUES(?,?,?,?)",
+                    (name, _clean_icon(b.get("icon")), _clean_domains(b.get("domains") or ""), iso(now_utc())))
     adm = b.get("admin_id", me())
     if not isinstance(adm, int) or isinstance(adm, bool) or not c.execute("SELECT 1 FROM users WHERE id=? AND kind!='agent' AND disabled=0", (adm,)).fetchone():
         c.rollback()
@@ -632,7 +633,7 @@ def _need_org_admin(c, oid):
 
 def org_mine_dict(c, r, uid):
     from ..collab.comments import user_names
-    mem = c.execute("SELECT m.user_id, m.role, u.kind, u.disabled FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? ORDER BY u.display_name COLLATE NOCASE, u.id", (r["id"],)).fetchall()
+    mem = c.execute("SELECT m.user_id, m.role, u.kind, u.disabled FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? ORDER BY lower(u.display_name), u.id", (r["id"],)).fetchall()
     names = user_names(c, [m["user_id"] for m in mem])
     return {"id": r["id"], "name": r["name"], "icon": r["icon"], "domains": r["domains"], "role": org_role(c, uid, r["id"]) or "member",
             "members": [{"id": m["user_id"], "name": names.get(m["user_id"], ""), "role": m["role"] if m["role"] in ORG_ROLES else "member",

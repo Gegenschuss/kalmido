@@ -5,6 +5,7 @@ import re
 from flask import g, has_request_context, jsonify
 
 from ..core.config import app
+from ..core.pg import insert_id
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
 from ..accounts.session import me
@@ -78,11 +79,11 @@ def folder_under(p, top):
 def folder_path_migration(c):
     """2.4.0, once: a "/" in a stored folder name becomes U+2215 (lists, member rows, every user's folder order)."""
     n = 0
-    for tbl, key in (("lists", "id"), ("list_members", "rowid")):
-        for r in c.execute(f"SELECT {key} AS k, folder FROM {tbl} WHERE folder LIKE '%/%'").fetchall():
+    for tbl, key in (("lists", "id"), ("list_members", "id")):
+        for r in c.execute(f"SELECT {key} AS k, folder FROM {tbl} WHERE folder ILIKE '%/%'").fetchall():
             c.execute(f"UPDATE {tbl} SET folder=? WHERE {key}=?", (folder_seg(r["folder"]), r["k"]))
             n += 1
-    for r in c.execute("SELECT user_id, value FROM user_settings WHERE key='folders' AND value LIKE '%/%'").fetchall():
+    for r in c.execute("SELECT user_id, value FROM user_settings WHERE key='folders' AND value ILIKE '%/%'").fetchall():
         try:
             arr = json.loads(r["value"] or "[]")
         except ValueError:
@@ -235,13 +236,13 @@ def list_create():
     oid = clean_org_id(c, b["org_id"], uid) if "org_id" in b else ws_default_org(c, uid, folder)  # 2.28.0 (#935): the workspace
     g.list_keep = ("org_id",) if "org_id" in b else ()  # 2.29.0 (#1030): an explicit workspace beats the folder's default
     # 2.2.1 (#359): dep_shift ("Move dependent tasks along") is taken at creation too (before, only PATCH set it)
-    cur = c.execute("INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind,dep_shift,tickets,org_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+    cur_id = insert_id(c, "INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind,dep_shift,tickets,org_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                     (name, color, folder, srt, view, iso(now_utc()), uid, dab, kind,
                      clean_list_value("dep_shift", b.get("dep_shift")), clean_list_value("tickets", b.get("tickets")), oid))
-    list_created(c, uid, cur.lastrowid)  # 2.4.2 (#391) agents, 2.10.0 (#441) groups, 2.22.0 (#740) / 2.25.0 (#931) folder people
+    list_created(c, uid, cur_id)  # 2.4.2 (#391) agents, 2.10.0 (#441) groups, 2.22.0 (#740) / 2.25.0 (#931) folder people
     bump(c)
     c.commit()
-    return jsonify(dict(c.execute("SELECT * FROM lists WHERE id=?", (cur.lastrowid,)).fetchone()))
+    return jsonify(dict(c.execute("SELECT * FROM lists WHERE id=?", (cur_id,)).fetchone()))
 
 
 @app.patch("/api/lists/<int:lid>")

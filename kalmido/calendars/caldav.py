@@ -22,6 +22,7 @@ from flask import g, jsonify, redirect, request, Response
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from ..core.config import app, APP_NAME, APP_VERSION, PUBLIC_URL, TZ
+from ..core.pg import insert_id
 from ..core.i18n import N_, tr
 from ..core.db import (
     body, bump, db, gset, gsetting, inbox_default, iso, iso_ms, local_now, now_utc, parse_iso, usettings,
@@ -312,8 +313,8 @@ def apppw_create(c, u, name):
     if c.execute("SELECT COUNT(*) FROM app_passwords WHERE user_id=?", (u["id"],)).fetchone()[0] >= APPPW_MAX:
         raise Denied(409, tr("At most {0} app passwords", APPPW_MAX))
     pw = apppw_new()
-    pid = c.execute("INSERT INTO app_passwords(user_id,name,pw_hash,created_at) VALUES(?,?,?,?)",
-                    (u["id"], name, generate_password_hash(apppw_norm(pw)), iso(now_utc()))).lastrowid
+    pid = insert_id(c, "INSERT INTO app_passwords(user_id,name,pw_hash,created_at) VALUES(?,?,?,?)",
+                    (u["id"], name, generate_password_hash(apppw_norm(pw)), iso(now_utc())))
     c.commit()
     print("app password", pid, "created for user", u["id"], flush=True)
     return apppw_public(c.execute("SELECT * FROM app_passwords WHERE id=?", (pid,)).fetchone()), pw
@@ -604,7 +605,7 @@ def dav_sync_save(c, u, coll):
     if c.execute("SELECT 1 FROM dav_sync WHERE user_id=? AND list_id=? AND token=?", (u["id"], coll.lst["id"], coll.hash)).fetchone():
         return coll.token
     blob = zlib.compress(json.dumps(coll.state(), separators=(",", ":")).encode("utf-8"))
-    c.execute("INSERT OR REPLACE INTO dav_sync(user_id,list_id,token,state,created_at) VALUES(?,?,?,?,?)",
+    c.execute("INSERT INTO dav_sync(user_id,list_id,token,state,created_at) VALUES(?,?,?,?,?) ON CONFLICT (user_id,list_id,token) DO UPDATE SET state=excluded.state, created_at=excluded.created_at",
               (u["id"], coll.lst["id"], coll.hash, blob, iso_ms(now_utc())))
     c.execute("""DELETE FROM dav_sync WHERE user_id=? AND list_id=? AND token NOT IN
                  (SELECT token FROM dav_sync WHERE user_id=? AND list_id=? ORDER BY created_at DESC LIMIT ?)""",

@@ -276,7 +276,7 @@ def _apply_instance(c, b):
     if "time_all" in b:
         if not b["time_all"] and time_all():  # stop running timers now (entries kept, end = now)
             now, ts = now_utc(), iso(now_utc())
-            for r in c.execute("SELECT * FROM time_entries WHERE end IS NULL").fetchall():
+            for r in c.execute("SELECT * FROM time_entries WHERE \"end\" IS NULL").fetchall():
                 stop_timer(c, r, now, ts)
         _TIME_ALL["on"] = b["time_all"]
     return None

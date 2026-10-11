@@ -6,6 +6,7 @@ from datetime import date
 from flask import g, jsonify, request
 
 from ..core.config import app
+from ..core.pg import insert_id
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc, usettings
 from ..accounts.session import me
@@ -47,7 +48,7 @@ def client_rows(c, uid, archived=True):
     if not u or u["kid"] or (u["kind"] or "user") == "agent":
         return []
     q = "SELECT * FROM clients" + ("" if archived else " WHERE archived=0")
-    rows = c.execute(q + " ORDER BY archived, name COLLATE NOCASE, id").fetchall()
+    rows = c.execute(q + " ORDER BY archived, lower(name), id").fetchall()
     if u["is_admin"]:
         return rows
     from ..accounts.orgs import user_orgs
@@ -173,7 +174,7 @@ def client_stats(c, uid, cid, lids, month=None):
         raise BadInput(tr("Invalid value: {0}", "month")) from None
     d2 = date(d1.year + (d1.month == 12), d1.month % 12 + 1, 1).toordinal() - 1
     mon = time_report(c, uid, {"scope": "all", "lists": csv, "from": d1.isoformat(), "to": date.fromordinal(d2).isoformat()})["total"]
-    est = c.execute(f"""SELECT COALESCE(SUM(duration),0), COUNT(duration), SUM(status=0), SUM(status!=0) FROM tasks
+    est = c.execute(f"""SELECT COALESCE(SUM(duration),0), COUNT(duration), SUM(CASE WHEN status=0 THEN 1 ELSE 0 END), SUM(CASE WHEN status!=0 THEN 1 ELSE 0 END) FROM tasks
                         WHERE list_id IN ({q}) AND deleted_at IS NULL AND ms=0 AND {tvis(c, uid)}""", lids).fetchone()
     return {"seconds": tot["seconds"], "rounded": tot["rounded"], "amount": tot["amount"], "month": m,
             "month_seconds": mon["seconds"], "month_amount": mon["amount"], "estimate_min": est[0] or 0, "estimated": est[1] or 0,
@@ -265,7 +266,7 @@ def client_create():
         f["org_id"] = mine[0] if mine else None
     ts = iso(now_utc())
     f.update(created_by=uid, created_at=ts, updated_at=ts)
-    cid = c.execute(f"INSERT INTO clients({','.join(f)}) VALUES({','.join('?' * len(f))})", list(f.values())).lastrowid
+    cid = insert_id(c, f"INSERT INTO clients({','.join(f)}) VALUES({','.join('?' * len(f))})", list(f.values()))
     bump(c)
     c.commit()
     return jsonify(client_public(c, uid, need_client(c, cid, uid), stats=True)), 201

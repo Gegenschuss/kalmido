@@ -6,6 +6,7 @@ import secrets
 from flask import g, jsonify, request
 
 from ..core.config import app, APP_NAME, PUBLIC_URL
+from ..core.pg import insert_id
 from ..core.i18n import lang, LANGS, tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import _accept_lang, _token_hash, me, rate_ip
@@ -127,7 +128,7 @@ def form_create(lid):
         return err(tr("At most {0} forms per list", FORMS_PER_LIST), 409)
     tok = secrets.token_urlsafe(24)
     f.update(list_id=lid, token=seal(c, f"form:{lid}", tok), token_hash=_token_hash(tok), created_by=me(), created_at=iso(now_utc()))
-    fid = c.execute(f"INSERT INTO forms({','.join(f)}) VALUES({','.join('?' * len(f))})", list(f.values())).lastrowid
+    fid = insert_id(c, f"INSERT INTO forms({','.join(f)}) VALUES({','.join('?' * len(f))})", list(f.values()))
     bump(c)
     c.commit()
     return jsonify(form_public(c, c.execute("SELECT * FROM forms WHERE id=?", (fid,)).fetchone())), 201
@@ -302,8 +303,8 @@ def form_send(token):
     ts = iso(now_utc())
     sec = f["section_id"] if f["section_id"] and c.execute("SELECT 1 FROM sections WHERE id=? AND list_id=?", (f["section_id"], lid)).fetchone() else None
     uid = g.user["id"] if g.user else None
-    tid = c.execute("""INSERT INTO tasks(list_id,section_id,title,content,sort,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?,?,?)""",
-                    (lid, sec, subject, content, srt, ts, ts, uid)).lastrowid
+    tid = insert_id(c, """INSERT INTO tasks(list_id,section_id,title,content,sort,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?,?,?)""",
+                    (lid, sec, subject, content, srt, ts, ts, uid))
     c.execute("UPDATE forms SET count=count+1, last_at=? WHERE id=?", (ts, f["id"]))
     if not g.user:
         from ..lists.public import PUB_ACTOR

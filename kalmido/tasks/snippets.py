@@ -1,6 +1,6 @@
 """2.35.0 (#1095): code snippets of a task -- plain code (no Markdown) with a language, an optional file path + line.
 
-Stored as a JSON list in tasks.snippets ('' = none; a new column, older versions ignore it). Each snippet:
+Stored as a JSON list in tasks.snippets (NULL = none; a new column, older versions ignore it). Each snippet:
 {id, lang, path, line, code, by, updated_at}. lang '' = the client recognises the language itself. The web client and
 the API replace the whole list (PATCH ... {snippets: [...]}: a snippet sent with its id stays that snippet, its author and
 time stay when nothing in it changed); POST /api/v1/tasks/<id>/snippets appends one (an agent stores a diff / a proposal).
@@ -38,11 +38,11 @@ def snip_parse(raw):
 
 
 def snip_clean(v):
-    """Client / API value -> the JSON to store ('' for none); raises BadInput. New snippets get an id, every snippet
+    """Client / API value -> the JSON to store (None for none: jsonb has no ''); raises BadInput. New snippets get an id, every snippet
     the writer as author and now as time (snip_keep restores both for unchanged ones)."""
     from ..personal.timetrack import BadInput
     if v in (None, "", []):
-        return ""
+        return None
     bad = lambda what: BadInput(tr("Invalid value: {0}", what))  # noqa: E731
     if not isinstance(v, list):
         raise bad("snippets")
@@ -84,7 +84,7 @@ def snip_clean(v):
         if not code.strip() and not path:
             continue  # an empty new snippet is not kept
         out.append({"id": sid, "lang": lang, "path": path or None, "line": line, "code": code, "by": me(), "updated_at": ts})
-    return json.dumps(out, ensure_ascii=False, separators=(",", ":")) if out else ""
+    return json.dumps(out, ensure_ascii=False, separators=(",", ":")) if out else None
 
 
 def snip_keep(new_raw, old_raw):

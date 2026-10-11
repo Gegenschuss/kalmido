@@ -6,6 +6,7 @@ from datetime import date, datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta
 
 from ..core.config import TZ
+from ..core.pg import insert_id
 from ..core.i18n import lang, N_, tr
 from ..core.db import iso, local_now, now_utc, usettings
 from ..core.access import Denied, health_hidden, my_max_sort, need_list, vis_sql, wr_sql
@@ -195,11 +196,11 @@ def life_list(c, uid, kind, create=True):
 
 def life_list_create(c, uid, kind, name=None, folder="", trip=None):
     lg = lang(c, uid)
-    lid = c.execute("""INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind,life,trip)
+    lid = insert_id(c, """INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind,life,trip)
                        VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
                     ((name or tr(LIFE_LIST_NAMES[kind], lg=lg))[:LIST_NAME_MAX], LIFE_LIST_COLORS.get(kind, ""), folder,
                      my_max_sort(c, uid) + 1, "list", iso(now_utc()), uid, 1 if kind == "travel" else 0, "list", kind,
-                     _dump(trip) if trip else "")).lastrowid
+                     _dump(trip) if trip else ""))
     # health lists never go to an agent automatically; the people of a shared folder get them like any list (#931)
     list_created(c, uid, lid, agents=kind != "health")
     return lid
@@ -216,11 +217,11 @@ def _target_list(c, uid, b, kind):
 
 def _insert(c, uid, lid, title, due=None, due_time=None, rem="", rep="", fam=None, deadline=0, prio=0, url=None, content=""):
     ts = iso(now_utc())
-    tid = c.execute("""INSERT INTO tasks(list_id,title,content,due,due_time,reminders,repeat,deadline,priority,sort,created_at,updated_at,
+    tid = insert_id(c, """INSERT INTO tasks(list_id,title,content,due,due_time,reminders,repeat,deadline,priority,sort,created_at,updated_at,
                                          created_by,fam,url) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (lid, title.strip()[:TITLE_MAX], content, due, due_time, rem, rep, deadline, prio,
                      c.execute("SELECT COALESCE(MIN(sort),0)-1 FROM tasks WHERE list_id=? AND parent_id IS NULL", (lid,)).fetchone()[0],
-                     ts, ts, uid, _dump(fam) if fam else "", url)).lastrowid
+                     ts, ts, uid, _dump(fam) if fam else "", url))
     log_act(c, tid, "created", uid=uid)
     return tid
 

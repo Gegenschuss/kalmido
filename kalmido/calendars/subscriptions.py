@@ -26,6 +26,7 @@ from dateutil.rrule import rrulestr
 from flask import jsonify, request
 
 from ..core.config import _origin, app, APP_NAME, APP_VERSION, TZ
+from ..core.pg import insert_id
 from ..core.i18n import lang, N_, tr
 from ..core.db import body, connect, db, err, gsetting, iso, iso_ms, local_now, now_utc, parse_iso
 from ..accounts.session import FAIL_WINDOW, GATE, me
@@ -719,6 +720,7 @@ def caldav_fetch(url, auth, allow):
 _CAL_LOCK = threading.Lock()
 _CAL_BUSY = set()
 CAL_EV_COLS = ("uid", "title", "location", "description", "all_day", "start", "end", "d0", "d1")
+_CAL_EV_SQL = ",".join('"end"' if k == "end" else k for k in CAL_EV_COLS)  # 2.37.0 (#1150): end is reserved in Postgres
 
 
 def cal_store(c, sid, evs, truncated):
@@ -728,11 +730,19 @@ def cal_store(c, sid, evs, truncated):
     if old and old[0] == dig:
         return False
     c.execute("DELETE FROM cal_events WHERE sub_id=?", (sid,))
-    c.executemany(f"INSERT INTO cal_events(sub_id,{','.join(CAL_EV_COLS)}) VALUES(?,{','.join('?' * len(CAL_EV_COLS))})",
+    c.executemany(f"INSERT INTO cal_events(sub_id,{_CAL_EV_SQL}) VALUES(?,{','.join('?' * len(CAL_EV_COLS))})",
                   [(sid, *[e[k] for k in CAL_EV_COLS]) for e in evs])
     c.execute("UPDATE cal_subs SET digest=?, events=?, truncated=?, changed_at=? WHERE id=?",
               (dig, len(evs), 1 if truncated else 0, iso_ms(now_utc()), sid))
     return True
+
+
+def pgb_heal(c):
+    """2.37.0 (#1150): after a caught error: a statement that failed aborted the transaction (Postgres) -> roll it back, so
+    the error can still be written down; otherwise the work so far stays (like before)."""
+    from psycopg.pq import TransactionStatus
+    if c._pg.info.transaction_status == TransactionStatus.INERROR:
+        c.rollback()
 
 
 def cal_sync(c, sid, force=False):
@@ -784,6 +794,7 @@ def cal_sync(c, sid, force=False):
             ce = e if isinstance(e, CalError) else CalError("error", type(e).__name__)
             if not isinstance(e, CalError):
                 print("calendar sync: subscription", sid, "failed:", type(e).__name__, flush=True)  # never the URL
+            pgb_heal(c)
             upd.update(status="error", error=ce.stored(), fails=s["fails"] + 1)
             if not s["name"]:
                 upd["name"] = (urllib.parse.urlsplit(url).hostname if url else "") or tr("Calendar", lg=lg)
@@ -917,11 +928,11 @@ def _cal_next_color(c, uid):
 
 def _cal_insert(c, uid, kind, url, fields, username="", password=""):
     now = iso(now_utc())
-    return c.execute("""INSERT INTO cal_subs(user_id,kind,name,color,visible,interval,url,url_hint,username,password,created_at,changed_at)
+    return insert_id(c, """INSERT INTO cal_subs(user_id,kind,name,color,visible,interval,url,url_hint,username,password,created_at,changed_at)
                         VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
                      (uid, kind, fields.get("name", ""), fields.get("color") or _cal_next_color(c, uid), fields.get("visible", 1),
                       fields.get("interval", 15), cal_seal(c, uid, url), cal_url_hint(url), username,
-                      cal_seal(c, uid, password), now, iso_ms(now_utc()))).lastrowid
+                      cal_seal(c, uid, password), now, iso_ms(now_utc())))
 
 
 def _cal_limited():

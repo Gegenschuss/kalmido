@@ -18,6 +18,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from flask import g, jsonify
 
 from ..core.config import app, TZ
+from ..core.pg import insert_id
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, parse_iso
 from ..core.access import Denied, list_role
@@ -274,10 +275,10 @@ def agent_schedule_create(aid):
     if c.execute("SELECT COUNT(*) FROM agent_schedules WHERE agent_id=? AND user_id=?", (aid, uid)).fetchone()[0] >= SCHED_MAX:
         return err(tr("At most {0} plans per agent", SCHED_MAX), 409)
     ts = iso(now_utc())
-    sid = c.execute("""INSERT INTO agent_schedules(agent_id,user_id,title,prompt,freq,days,at_time,tz,list_id,enabled,created_at,updated_at)
+    sid = insert_id(c, """INSERT INTO agent_schedules(agent_id,user_id,title,prompt,freq,days,at_time,tz,list_id,enabled,created_at,updated_at)
                        VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (aid, uid, f["title"], f["prompt"], f["freq"], f["days"], f["at_time"], f["tz"], f.get("list_id"),
-                     f.get("enabled", 1), ts, ts)).lastrowid
+                     f.get("enabled", 1), ts, ts))
     _sched_set_next(c, sid)
     c.commit()
     return jsonify(sched_dict(c, sched_row(c, sid), uid)), 201

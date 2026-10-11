@@ -23,8 +23,9 @@ from flask import g, jsonify, request
 from werkzeug.security import check_password_hash
 
 from ..core.config import app, APP_NAME, COOKIE, MIN_PASSWORD, NTFY_TOPIC, PUBLIC_URL, USERNAME_RE
+from ..core.pg import insert_id
 from ..core.i18n import lang, languages, N_, tr
-from ..core.db import adopt_orphans, body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, now_utc, uset
+from ..core.db import adopt_orphans, body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, now_utc, uset, write_lock
 from ..accounts.session import (
     _accept_lang, _DUMMY_HASH, _peer_trusted, _rate_blocked, _rate_fail, _rate_keys, _rate_reset, _token_hash,
     client_ip, FAIL_WINDOW, proxy_login_value, set_cookie, start_session, user_public,
@@ -122,7 +123,7 @@ def auth_setup():
     bound to that login and the password is optional."""
     b = body()
     c = db()
-    c.execute("BEGIN IMMEDIATE")
+    write_lock(c, "accounts")  # 2.37.0 (#1150): was BEGIN IMMEDIATE
     if c.execute("SELECT 1 FROM users").fetchone():
         c.rollback()
         return err(tr("Setup is already done"), 409)
@@ -477,10 +478,10 @@ def wa_reg_verify(c, u, cred, chal, rp, name):
     ext = cred.get("clientExtensionResults") if isinstance(cred.get("clientExtensionResults"), dict) else {}
     rk = (ext.get("credProps") or {}).get("rk") if isinstance(ext.get("credProps"), dict) else None
     name = (str(name or "").strip() or tr("Passkey"))[:PASSKEY_NAME_MAX]
-    return c.execute("""INSERT INTO webauthn_creds(user_id,cred_id,public_key,sign_count,transports,name,rp_id,aaguid,backed_up,
+    return insert_id(c, """INSERT INTO webauthn_creds(user_id,cred_id,public_key,sign_count,transports,name,rp_id,aaguid,backed_up,
                                                    discoverable,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
                      (u["id"], cid, v.credential_public_key, v.sign_count, ",".join(tr_), name, rp, str(v.aaguid or ""),
-                      1 if v.credential_backed_up else 0, None if rk is None else (1 if rk else 0), iso(now_utc()))).lastrowid
+                      1 if v.credential_backed_up else 0, None if rk is None else (1 if rk else 0), iso(now_utc())))
 
 
 def wa_auth_options(c, uid=None, uv=False):
@@ -729,7 +730,7 @@ def _last_factor_guard(c, u, removing):
 def _end_other_sessions(c, uid):
     """A second factor was just turned on: sessions elsewhere (possibly opened with a leaked password) end."""
     tok = request.cookies.get(COOKIE)
-    c.execute("DELETE FROM sessions WHERE user_id=? AND token_hash IS NOT ?", (uid, _token_hash(tok) if tok else None))
+    c.execute("DELETE FROM sessions WHERE user_id=? AND token_hash IS DISTINCT FROM ?", (uid, _token_hash(tok) if tok else None))
 
 
 @app.get("/api/me/2fa")

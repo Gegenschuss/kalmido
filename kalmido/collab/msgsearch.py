@@ -1,11 +1,10 @@
 """2.33.0 (#1080): search in conversations -- task comments, team chat (channels + direct messages) and agent chats.
 
-Index: one SQLite FTS5 table msg_fts (tokenizer unicode61, remove_diacritics 2: case and accents do not matter). Its rowid
-encodes the source: message id * 4 + kind (1 comment, 2 team chat, 3 agent chat). Triggers on the three message tables keep
-it current on every insert / edit / (soft) delete -- also when an older version runs on the same database (a rollback keeps
-writing the source tables, the triggers keep the index right; nothing in them is new to an older server). The text is indexed
-twice when it has umlauts: as written and with ä -> ae, ö -> oe, ü -> ue, ß -> ss, so "Ärger", "arger" and "aerger" all find
-it. init_db() builds the index once for existing messages (msg_index_init) and repairs it when the counts drift.
+Index (2.37.0, #1150, Postgres): no separate table. kalmido_fold(body) (IMMUTABLE: unaccent + lower case; a text with
+umlauts also once more with ä -> ae, ö -> oe, ü -> ue, ß -> ss) has a trigram GIN index on each of the three message tables
+(pg_trgm), so the index follows every insert / edit / delete by itself, also rows written straight into the tables. A query
+word matches the beginning of a word of the folded text (regular expression, word start), in the same variants as before:
+"Ärger", "arger" and "aerger" all find "Ärger". init_db() creates the function and the indexes (msg_index_init).
 
 Visibility is strict and the same as reading the conversation: comments of tasks the person may see with their comments (list
 role, participants only their own tasks, a token limited to lists), team chat rooms the person is in (channel: a full role in
@@ -37,81 +36,41 @@ CHAT_TYPES = ("task", "list", "dm", "agent")
 MSG_CAND = 1000          # candidates per kind before the per-row checks
 MSG_TERMS = 8
 SNIP = 160               # characters of a snippet
-INDEX_VERSION = "1"
+INDEX_VERSION = "2"  # 2.37.0: kalmido_fold() + trigram indexes (a new version re-creates both)
 
 _FOLD = "{x}"
 for _a, _b in (("ä", "ae"), ("ö", "oe"), ("ü", "ue"), ("Ä", "Ae"), ("Ö", "Oe"), ("Ü", "Ue"), ("ß", "ss")):
     _FOLD = f"replace({_FOLD},'{_a}','{_b}')"
 
 
-def _idx(x):
-    """SQL: the text to index for column x (as written + the umlaut-folded form when it differs)."""
-    f = _FOLD.format(x=x)
-    return f"CASE WHEN {f}={x} THEN {x} ELSE {x}||char(10)||{f} END"
+# the three message tables with an index on kalmido_fold(body)
+MSG_TABLES = ("comments", "tchat_msgs", "agent_chat")
 
 
-# (table, kind, condition for "indexed", text column)
-_SRC = (("comments", 1, "{p}deleted_at IS NULL AND {p}body!=''"),
-        ("tchat_msgs", 2, "{p}deleted_at IS NULL AND {p}body!=''"),
-        ("agent_chat", 3, "{p}body!=''"))
-
-
-# the names are also in core/schema.py SCHEMA_TRIGGERS (what a restored backup may contain)
-TRIGGER_NAMES = tuple(f"msg_fts_{t}_{w}" for t, _k, _c in _SRC for w in ("ai", "au", "ad"))
-
-
-def _triggers():
-    out = []
-    for t, k, cond in _SRC:
-        upd = "body, deleted_at" if t != "agent_chat" else "body"
-        out += [
-            # idempotent: a stale index row with the same rowid must never block writing a message (FTS5 refuses it)
-            f"CREATE TRIGGER IF NOT EXISTS msg_fts_{t}_ai AFTER INSERT ON {t} WHEN {cond.format(p='new.')} BEGIN "
-            f"DELETE FROM msg_fts WHERE rowid=new.id*4+{k}; "
-            f"INSERT INTO msg_fts(rowid, body) VALUES (new.id*4+{k}, {_idx('new.body')}); END",
-            f"CREATE TRIGGER IF NOT EXISTS msg_fts_{t}_au AFTER UPDATE OF {upd} ON {t} BEGIN "
-            f"DELETE FROM msg_fts WHERE rowid=old.id*4+{k}; "
-            f"INSERT INTO msg_fts(rowid, body) SELECT new.id*4+{k}, {_idx('new.body')} WHERE {cond.format(p='new.')}; END",
-            f"CREATE TRIGGER IF NOT EXISTS msg_fts_{t}_ad AFTER DELETE ON {t} BEGIN "
-            f"DELETE FROM msg_fts WHERE rowid=old.id*4+{k}; END"]
-    return out
-
-
-def msg_fts_ok(c):
-    return c.execute("SELECT 1 FROM sqlite_master WHERE name='msg_fts'").fetchone() is not None
-
-
-def _expected(c):
-    return sum(c.execute(f"SELECT COUNT(*) FROM {t} WHERE {cond.format(p='')}").fetchone()[0] for t, _k, cond in _SRC)
-
-
-def msg_index_rebuild(c):
-    c.execute("DELETE FROM msg_fts")
-    for t, k, cond in _SRC:
-        c.execute(f"INSERT INTO msg_fts(rowid, body) SELECT id*4+{k}, {_idx('body')} FROM {t} WHERE {cond.format(p='')}")
+def _fold_fn(c):
+    """SQL: CREATE OR REPLACE FUNCTION kalmido_fold(text) -- unaccent schema-qualified (an index expression must not depend on
+    the search path)."""
+    sch = c.execute("SELECT extnamespace::regnamespace::text FROM pg_extension WHERE extname='unaccent'").fetchone()[0]
+    ua = f"{sch}.unaccent('{sch}.unaccent'::regdictionary, %s)"
+    return ("CREATE OR REPLACE FUNCTION kalmido_fold(t text) RETURNS text LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE AS $fold$\n"
+            f"DECLARE x text := lower({ua % 't'}); y text := lower({ua % _FOLD.format(x='t')});\n"
+            "BEGIN RETURN CASE WHEN x = y THEN x ELSE x || chr(10) || y END; END $fold$")
 
 
 def msg_index_init(c):
-    """Called by init_db (inside its transaction): table + triggers (once), the first build for existing messages, a
-    rebuild when the number of indexed rows does not match the sources (e.g. a restored backup). Without FTS5 in the
-    SQLite library the search answers 503 and nothing else changes."""
-    try:
-        new = not msg_fts_ok(c)
+    """Called by init_db inside its transaction (an error must surface there): the fold function and one trigram index per
+    message table, created once; a new INDEX_VERSION replaces the function and rebuilds the indexes."""
+    have = c.execute("SELECT 1 FROM pg_proc WHERE proname='kalmido_fold' AND pronamespace=current_schema()::regnamespace").fetchone()
+    new = not have or gsetting(c, "msg_fts_v") != INDEX_VERSION
+    if new:
+        c.execute(_fold_fn(c))
+    for t in MSG_TABLES:
         if new:
-            c.execute("CREATE VIRTUAL TABLE msg_fts USING fts5(body, tokenize='unicode61 remove_diacritics 2')")
-        # re-created on every start: a restored backup may carry triggers of the same name with another body
-        for name in TRIGGER_NAMES:
-            c.execute(f"DROP TRIGGER IF EXISTS {name}")
-        for sql in _triggers():
-            c.execute(sql)
-    except Exception as e:  # noqa: BLE001 -- e.g. "no such module: fts5"
-        print("message search: no FTS5 index:", e, flush=True)
-        return
-    if new or gsetting(c, "msg_fts_v") != INDEX_VERSION or c.execute("SELECT COUNT(*) FROM msg_fts").fetchone()[0] != _expected(c):
-        msg_index_rebuild(c)
+            c.execute(f"DROP INDEX IF EXISTS msg_trgm_{t}")
+        c.execute(f"CREATE INDEX IF NOT EXISTS msg_trgm_{t} ON {t} USING gin (kalmido_fold(body) gin_trgm_ops)")
+    if new:
         gset(c, "msg_fts_v", INDEX_VERSION)
-        n = c.execute("SELECT COUNT(*) FROM msg_fts").fetchone()[0]
-        print("message search: indexed", n, "messages", flush=True)
+        print("message search: index (re)built", flush=True)
 
 
 # ---- matching (also for the snippet: the same folding as the index, in Python)
@@ -140,21 +99,22 @@ def msg_terms(q):
     return terms
 
 
-def fts_query(terms):
-    """Every word as a prefix; a word with an umlaut also as written with ae / oe / ue ("Spülmaschine" finds "Spuelmaschine")."""
-    out = []
-    for t in terms:
-        t = t.replace('"', '')
-        ex = re.sub("[äöüÄÖÜ]", lambda m: m.group(0) + "e", t)
-        out.append(f'("{t}"* OR "{ex}"*)' if ex != t else f'"{t}"*')
-    return " AND ".join(out)
-
-
 def _variants(term):
     """Folded forms of a query word: as typed (ä -> a), with ä -> ae (the text says "ae") and ae -> a (the text says "ä")."""
     f = "".join(_fold_char(ch) for ch in term)
     ex = "".join(_fold_char(ch) for ch in re.sub("[äöüÄÖÜ]", lambda m: m.group(0) + "e", term))  # ä -> ae (text written "ae")
     return {f, ex, f.replace("ae", "a").replace("oe", "o").replace("ue", "u")}
+
+
+def _pg_re(v):
+    """A folded word as a literal in a Postgres regular expression."""
+    return "".join(ch if ch.isalnum() else "\\" + ch for ch in v)
+
+
+def match_sql(terms):
+    """(SQL condition on m.body, its parameters): every word at the beginning of a word of the folded text, in any variant."""
+    pats = ["\\m(" + "|".join(sorted(_pg_re(v) for v in _variants(t) if v)) + ")" for t in terms]
+    return " AND ".join(["kalmido_fold(m.body) ~ ?"] * len(pats)), pats
 
 
 def find_marks(text, terms):
@@ -201,10 +161,8 @@ def snippet(text, marks):
 # ---- the search
 def search_messages(c, uid, q, arts=None, sender=None, room=None, agent=None, task=None):
     """Every visible message matching q, newest first: a list of hit dicts (see the module doc)."""
-    if not msg_fts_ok(c):
-        raise Denied(503, tr("The message search is not available on this server"))
     terms = msg_terms(q)
-    match = fts_query(terms)
+    mcond, match = match_sql(terms)
     agent_me = is_agent(g.user) if getattr(g, "user", None) is not None else False
     arts = set(arts or ARTS)
     if room is not None:
@@ -214,7 +172,6 @@ def search_messages(c, uid, q, arts=None, sender=None, room=None, agent=None, ta
     if task is not None:
         arts &= {"c"}
     hits = []
-    head = "WITH h AS (SELECT rowid/4 AS id FROM msg_fts WHERE msg_fts MATCH ? AND rowid%4={k}) "
     snd = " AND m.user_id=?" if sender is not None else ""
     ags = agent_ids(c)
     roles = {}
@@ -225,22 +182,22 @@ def search_messages(c, uid, q, arts=None, sender=None, room=None, agent=None, ta
         return roles[lid]
 
     if "c" in arts:
-        rows = c.execute(head.format(k=1) + f"""SELECT m.id, m.task_id, m.user_id, m.body, m.created_at, t.list_id, t.title
-            FROM h JOIN comments m ON m.id=h.id JOIN tasks t ON t.id=m.task_id
-            WHERE m.deleted_at IS NULL AND t.deleted_at IS NULL AND t.list_id IN {vis_sql()} AND {tvis(c, uid, 't.', write=True)}{snd}
+        rows = c.execute(f"""SELECT m.id, m.task_id, m.user_id, m.body, m.created_at, t.list_id, t.title
+            FROM comments m JOIN tasks t ON t.id=m.task_id
+            WHERE {mcond} AND m.deleted_at IS NULL AND t.deleted_at IS NULL AND t.list_id IN {vis_sql()} AND {tvis(c, uid, 't.', write=True)}{snd}
             {' AND m.task_id=?' if task is not None else ''} ORDER BY m.id DESC LIMIT {MSG_CAND}""",
-                         [match, uid, uid] + ([sender] if sender is not None else []) + ([task] if task is not None else [])).fetchall()
+                         match + [uid, uid] + ([sender] if sender is not None else []) + ([task] if task is not None else [])).fetchall()
         for r in rows:
             if not role(r["list_id"]):
                 continue
             hits.append({"art": "c", "chat_type": "task", "id": r["id"], "task_id": r["task_id"], "list_id": r["list_id"],
                          "chat_name": r["title"], "sender_id": r["user_id"], "created_at": r["created_at"], "_body": r["body"]})
     if "t" in arts and (collab_all() if agent_me else tchat_on(c, uid)):
-        rows = c.execute(head.format(k=2) + f"""SELECT m.id, m.room_id, m.user_id, m.body, m.created_at, r.kind, r.list_id, r.a, r.b
-            FROM h JOIN tchat_msgs m ON m.id=h.id JOIN tchat_rooms r ON r.id=m.room_id
-            WHERE m.deleted_at IS NULL AND ((r.kind='dm' AND (r.a=? OR r.b=?)) OR (r.kind='list' AND r.list_id IN {vis_sql()})){snd}
+        rows = c.execute(f"""SELECT m.id, m.room_id, m.user_id, m.body, m.created_at, r.kind, r.list_id, r.a, r.b
+            FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id
+            WHERE {mcond} AND m.deleted_at IS NULL AND ((r.kind='dm' AND (r.a=? OR r.b=?)) OR (r.kind='list' AND r.list_id IN {vis_sql()})){snd}
             {' AND m.room_id=?' if room is not None else ''} ORDER BY m.id DESC LIMIT {MSG_CAND}""",
-                         [match, uid, uid, uid, uid] + ([sender] if sender is not None else []) + ([room] if room is not None else [])).fetchall()
+                         match + [uid, uid, uid, uid] + ([sender] if sender is not None else []) + ([room] if room is not None else [])).fetchall()
         ok, lnames = {}, {}
         for r in rows:
             if r["room_id"] not in ok:
@@ -272,8 +229,8 @@ def search_messages(c, uid, q, arts=None, sender=None, room=None, agent=None, ta
         if sender is not None:
             sq = " AND ((m.sender='user' AND m.user_id=?) OR (m.sender='agent' AND m.agent_id=?))"
             a2 += [sender, sender]
-        rows = c.execute(head.format(k=3) + f"""SELECT m.id, m.agent_id, m.user_id, m.sender, m.body, m.created_at
-            FROM h JOIN agent_chat m ON m.id=h.id WHERE {cond}{sq} ORDER BY m.id DESC LIMIT {MSG_CAND}""", [match] + a2).fetchall()
+        rows = c.execute(f"""SELECT m.id, m.agent_id, m.user_id, m.sender, m.body, m.created_at
+            FROM agent_chat m WHERE {mcond} AND {cond}{sq} ORDER BY m.id DESC LIMIT {MSG_CAND}""", match + a2).fetchall()
         reach = {}
         for r in rows:
             if not agent_me:

@@ -3,6 +3,7 @@ from datetime import date, timedelta
 from flask import g, has_request_context, jsonify
 
 from ..core.config import app, PUBLIC_URL
+from ..core.pg import insert_id
 from ..core.schema import MAX_DEPTH, USER_DEFAULTS
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, inbox_default, iso, now_utc
@@ -220,7 +221,7 @@ def task_create():
     if e:
         return err(e)
     if "sort" not in f:
-        f["sort"] = c.execute("SELECT COALESCE(MIN(sort),0)-1 FROM tasks WHERE list_id=? AND parent_id IS ?",
+        f["sort"] = c.execute("SELECT COALESCE(MIN(sort),0)-1 FROM tasks WHERE list_id=? AND parent_id IS NOT DISTINCT FROM ?",
                               (f["list_id"], f.get("parent_id"))).fetchone()[0]
         if f.get("parent_id"):  # subtasks append at the end
             f["sort"] = c.execute("SELECT COALESCE(MAX(sort),0)+1 FROM tasks WHERE parent_id=?",
@@ -244,33 +245,33 @@ def task_create():
     if f.get("assignee_id") or f.get("assignee_group_id"):
         f["assigned_by"] = me()
     cols = list(f) + ["created_at", "updated_at"]
-    cur = c.execute(f"INSERT INTO tasks({','.join(cols)}) VALUES({','.join('?' * len(cols))})",
+    cur_id = insert_id(c, f"INSERT INTO tasks({','.join(cols)}) VALUES({','.join('?' * len(cols))})",
                     [f[k] for k in f] + [ts, ts])
     if b.get("tags"):
-        set_tags(c, cur.lastrowid, b["tags"])
+        set_tags(c, cur_id, b["tags"])
     if b.get("ltags"):
-        set_ltags(c, cur.lastrowid, b["ltags"], log=False)  # BadInput: 400, nothing stored
+        set_ltags(c, cur_id, b["ltags"], log=False)  # BadInput: 400, nothing stored
     if b.get("fields"):
-        set_field_values(c, cur.lastrowid, f["list_id"], b["fields"], log=False)  # BadInput: 400, nothing stored
+        set_field_values(c, cur_id, f["list_id"], b["fields"], log=False)  # BadInput: 400, nothing stored
     if b.get("people"):  # 2.19.0 (#653): who comes along
-        e = people_set(c, cur.lastrowid, f["list_id"], b["people"])
+        e = people_set(c, cur_id, f["list_id"], b["people"])
         if e:
             c.rollback()
             return err(e)
-    log_act(c, cur.lastrowid, "created")
-    agent_task_mentions(c, cur.lastrowid)
-    agent_tidy_events(c, cur.lastrowid)
-    agent_added_events(c, cur.lastrowid)  # 2.23.0 (#795)
+    log_act(c, cur_id, "created")
+    agent_task_mentions(c, cur_id)
+    agent_tidy_events(c, cur_id)
+    agent_added_events(c, cur_id)  # 2.23.0 (#795)
     if f.get("assignee_id"):
-        task_event(c, cur.lastrowid, "assign")
+        task_event(c, cur_id, "assign")
     if f.get("assignee_group_id"):
-        grp_assign_events(c, cur.lastrowid, f["assignee_group_id"])
-    newtask_events(c, cur.lastrowid)
+        grp_assign_events(c, cur_id, f["assignee_group_id"])
+    newtask_events(c, cur_id)
     if f.get("parent_id"):
-        log_act(c, f["parent_id"], "subtask", {"id": cur.lastrowid, "title": f["title"][:200]})
+        log_act(c, f["parent_id"], "subtask", {"id": cur_id, "title": f["title"][:200]})
     bump(c)
     c.commit()
-    return jsonify(one_task(c, cur.lastrowid))
+    return jsonify(one_task(c, cur_id))
 
 
 # ---- 2.1.0 (#335): "Waiting on external" (German "Warten auf Extern"): who / what the task waits for + a follow-up day.

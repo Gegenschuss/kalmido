@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta
 from flask import g, has_request_context
 
 from ..core.config import PUBLIC_URL
+from ..core.pg import insert_id
 from ..core.i18n import lang, LANGS, N_, tr
 from ..core.db import iso, local_now, now_utc, uset, usettings
 from ..accounts.session import me, user_public
@@ -329,7 +330,7 @@ def people_set(c, tid, lid, v):
         return tr("Only people who share this list can come along")
     c.execute("DELETE FROM task_people WHERE task_id=?", (tid,))
     for x in dict.fromkeys(v):
-        c.execute("INSERT OR IGNORE INTO task_people(task_id,user_id) VALUES(?,?)", (tid, x))
+        c.execute("INSERT INTO task_people(task_id,user_id) VALUES(?,?) ON CONFLICT DO NOTHING", (tid, x))
     return None
 
 
@@ -426,10 +427,10 @@ FAM_LIST_COLORS = {"shopping": "#22c55e", "meals": "#f59e0b", "birthdays": "#ec4
 
 def fam_list_create(c, uid, kind, name=None, folder=""):
     lg = lang(c, uid)
-    lid = c.execute("""INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind,family)
+    lid = insert_id(c, """INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind,family)
                        VALUES(?,?,?,?,?,?,?,?,?,?)""",
                     (name or tr(FAM_LIST_NAMES[kind], lg=lg), FAM_LIST_COLORS.get(kind, ""), folder, my_max_sort(c, uid) + 1, "list",
-                     iso(now_utc()), uid, 1 if kind in ("shopping", "packing") else 0, "list", kind)).lastrowid
+                     iso(now_utc()), uid, 1 if kind in ("shopping", "packing") else 0, "list", kind))
     list_created(c, uid, lid)  # 2.22.0 (#747): no shop areas by itself (the list bar's "Add shop areas" adds them); 2.25.0 (#931)
     return lid
 
@@ -489,11 +490,11 @@ def occ_create(c, uid, b, check=True):
     ts = iso(now_utc())
     rem = ",".join(dict.fromkeys(str(x) for x in ([lead * 1440] if lead else []) + [0]))
     title = tr("Birthday: {0}", name, lg=lg) if kind == "birthday" else tr("Anniversary: {0}", name, lg=lg)
-    tid = c.execute("""INSERT INTO tasks(list_id,title,due,reminders,repeat,sort,created_at,updated_at,created_by,fam)
+    tid = insert_id(c, """INSERT INTO tasks(list_id,title,due,reminders,repeat,sort,created_at,updated_at,created_by,fam)
                        VALUES(?,?,?,?,?,?,?,?,?,?)""",
                     (lid, title[:TITLE_MAX], due.isoformat(), rem, occ_rule(mo, dy),
                      c.execute("SELECT COALESCE(MIN(sort),0)-1 FROM tasks WHERE list_id=? AND parent_id IS NULL", (lid,)).fetchone()[0],
-                     ts, ts, uid, json.dumps(fam, ensure_ascii=False, separators=(",", ":")))).lastrowid
+                     ts, ts, uid, json.dumps(fam, ensure_ascii=False, separators=(",", ":"))))
     log_act(c, tid, "created", uid=uid)
     gifts = b.get("gifts") or []
     if not isinstance(gifts, list) or len(gifts) > 50 or not all(isinstance(x, str) for x in gifts):
@@ -543,11 +544,11 @@ def deadline_create(c, uid, b):
     ts = iso(now_utc())
     fam = {"kind": "deadline", "type": k, "who": who, "expires": exp, "notice": notice, "lead": lead}
     rem = ",".join(dict.fromkeys(str(x) for x in ([lead * 1440] if lead else []) + [0]))
-    tid = c.execute("""INSERT INTO tasks(list_id,title,due,reminders,repeat,deadline,priority,sort,created_at,updated_at,created_by,fam)
+    tid = insert_id(c, """INSERT INTO tasks(list_id,title,due,reminders,repeat,deadline,priority,sort,created_at,updated_at,created_by,fam)
                        VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (lid, title.strip()[:TITLE_MAX], due.isoformat(), rem, rep, 2, 3,
                      c.execute("SELECT COALESCE(MIN(sort),0)-1 FROM tasks WHERE list_id=? AND parent_id IS NULL", (lid,)).fetchone()[0],
-                     ts, ts, uid, json.dumps(fam, ensure_ascii=False, separators=(",", ":")))).lastrowid
+                     ts, ts, uid, json.dumps(fam, ensure_ascii=False, separators=(",", ":"))))
     log_act(c, tid, "created", uid=uid)
     return tid
 
@@ -688,8 +689,8 @@ def to_shopping(c, uid, items, lid=None, source=None):
             continue
         have.add(k)
         srt += 1
-        tid = c.execute("INSERT INTO tasks(list_id,section_id,title,sort,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?,?)",
-                        (lid, shop_area_of(c, lid, x), x, srt, ts, ts, uid)).lastrowid
+        tid = insert_id(c, "INSERT INTO tasks(list_id,section_id,title,sort,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?,?)",
+                        (lid, shop_area_of(c, lid, x), x, srt, ts, ts, uid))
         log_act(c, tid, "created", {"from": source} if source else None, uid=uid)
         added.append({"id": tid, "title": x})
     return {"list_id": lid, "added": added, "skipped": skipped}
@@ -711,7 +712,7 @@ def packing_create(c, uid, key, name=None):
     lid = fam_list_create(c, uid, "packing", (name or tr("Packing list: {0}", tr(n, lg=lg), lg=lg)).strip()[:LIST_NAME_MAX])
     ts, srt = iso(now_utc()), 0
     for si, (s, its) in enumerate(secs):
-        sid = c.execute("INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, tr(s, lg=lg), si + 1)).lastrowid if s else None
+        sid = insert_id(c, "INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, tr(s, lg=lg), si + 1)) if s else None
         for it in its:
             srt += 1
             c.execute("INSERT INTO tasks(list_id,section_id,title,sort,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?,?)",

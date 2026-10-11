@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from flask import g, has_request_context, jsonify, request, Response
 
 from ..core.config import API_PREFIX, app, APP_NAME, APP_VERSION, PUB_PREFIX, TZ
+from ..core.pg import insert_id
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_now, now_utc, parse_iso, uset, usettings
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, FAIL_WINDOW, me, rate_ip
@@ -536,8 +537,8 @@ def token_create():
     if c.execute("SELECT COUNT(*) FROM api_tokens WHERE user_id=?", (me(),)).fetchone()[0] >= API_TOKEN_MAX:
         return err(tr("At most {0} tokens", API_TOKEN_MAX), 409)
     tok = "abk_" + secrets.token_urlsafe(32)
-    tid = c.execute("INSERT INTO api_tokens(user_id,name,token_hash,prefix,scopes,expires_at,created_at,allowed_ips,list_ids) VALUES(?,?,?,?,?,?,?,?,?)",
-                    (me(), name, _token_hash(tok), tok[:12], ",".join(scopes), exp, iso(now_utc()), ips, lids)).lastrowid
+    tid = insert_id(c, "INSERT INTO api_tokens(user_id,name,token_hash,prefix,scopes,expires_at,created_at,allowed_ips,list_ids) VALUES(?,?,?,?,?,?,?,?,?)",
+                    (me(), name, _token_hash(tok), tok[:12], ",".join(scopes), exp, iso(now_utc()), ips, lids))
     c.commit()
     print("api token", tid, "created for user", me(), "scopes", ",".join(scopes), flush=True)
     return jsonify({**token_public(c.execute("SELECT * FROM api_tokens WHERE id=?", (tid,)).fetchone()), "token": tok}), 201
@@ -870,11 +871,11 @@ def v1_tasks():
             args.append(a[k])
     if a.get("tag"):  # 2.0.0: a personal tag or a list tag of that name
         where.append("(id IN (SELECT task_id FROM task_tags WHERE user_id=? AND tag=?) OR id IN (SELECT x.task_id FROM task_list_tags x "
-                     "JOIN list_tags lt ON lt.id=x.tag_id WHERE lt.name=? COLLATE NOCASE AND lt.list_id=tasks.list_id))")
+                     "JOIN list_tags lt ON lt.id=x.tag_id WHERE lower(lt.name)=lower(?) AND lt.list_id=tasks.list_id))")
         args += [uid, a["tag"].lstrip("#"), a["tag"].lstrip("#")]
     if a.get("list_tag"):
         where.append("id IN (SELECT x.task_id FROM task_list_tags x JOIN list_tags lt ON lt.id=x.tag_id "
-                     "WHERE lt.name=? COLLATE NOCASE AND lt.list_id=tasks.list_id)")
+                     "WHERE lower(lt.name)=lower(?) AND lt.list_id=tasks.list_id)")
         args.append(a["list_tag"].lstrip("#"))
     if a.get("assignee"):
         if a["assignee"] == "none":
@@ -1127,8 +1128,8 @@ def tag_restore():
     n = 0
     for i in range(0, len(ids), 500):
         part = ids[i:i + 500]
-        n += c.execute(f"""INSERT OR IGNORE INTO task_tags(task_id,user_id,tag) SELECT id, ?, ? FROM tasks
-                           WHERE id IN ({','.join('?' * len(part))}) AND list_id IN {vis_sql()} AND {tvis(c, uid)}""",
+        n += c.execute(f"""INSERT INTO task_tags(task_id,user_id,tag) SELECT id, ?, ? FROM tasks
+                           WHERE id IN ({','.join('?' * len(part))}) AND list_id IN {vis_sql()} AND {tvis(c, uid)} ON CONFLICT DO NOTHING""",
                        (uid, tag, *part, uid, uid)).rowcount
     if n:
         bump(c)
@@ -1144,10 +1145,10 @@ def v1_tags():
     c, uid = db(), me()
     rows = c.execute(f"""SELECT g.tag, COUNT(*) AS n, SUM(CASE WHEN t.status=0 THEN 1 ELSE 0 END) AS open FROM task_tags g
                          JOIN tasks t ON t.id=g.task_id WHERE g.user_id=? AND t.deleted_at IS NULL AND t.list_id IN {vis_sql()}
-                         AND {tvis(c, uid, "t.")} GROUP BY g.tag ORDER BY g.tag COLLATE NOCASE""", (uid, uid, uid)).fetchall()
+                         AND {tvis(c, uid, "t.")} GROUP BY g.tag ORDER BY lower(g.tag)""", (uid, uid, uid)).fetchall()
     out = [{"name": r["tag"], "tasks": r["n"], "open": r["open"], "kind": "personal"} for r in rows]
     for lid in [d["id"] for d in visible_lists(c, uid)]:  # 2.0.0: the list tags of the lists I see
-        out += [{**v1_ltag(c, r), "kind": "list"} for r in c.execute("SELECT * FROM list_tags WHERE list_id=? ORDER BY sort, name COLLATE NOCASE", (lid,))]
+        out += [{**v1_ltag(c, r), "kind": "list"} for r in c.execute("SELECT * FROM list_tags WHERE list_id=? ORDER BY sort, lower(name)", (lid,))]
     return jsonify(data=out, next_cursor=None)
 
 

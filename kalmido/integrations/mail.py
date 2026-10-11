@@ -14,6 +14,7 @@ from datetime import date, timedelta
 from flask import g, jsonify, request
 
 from ..core.config import app, APP_NAME, MAX_FILE_MB, PUBLIC_URL
+from ..core.pg import insert_id, table_exists
 from ..core.i18n import lang, tr, trn
 from ..core.db import body, bump, connect, db, err, iso, local_now, now_utc, uset, usettings
 from ..accounts.session import GATE, me
@@ -94,7 +95,7 @@ def mail_token_new():
             return err(tr("Invalid value: {0}", "list_id"))
         need_list(c, lid)
     tok = secrets.token_urlsafe(12).replace("-", "x").replace("_", "y")
-    c.execute("DELETE FROM mail_tokens WHERE user_id=? AND list_id IS ?", (me(), lid))
+    c.execute("DELETE FROM mail_tokens WHERE user_id=? AND list_id IS NOT DISTINCT FROM ?", (me(), lid))
     c.execute("INSERT INTO mail_tokens(token,user_id,list_id,created_at) VALUES(?,?,?,?)", (tok, me(), lid, iso(now_utc())))
     c.commit()
     return jsonify(address=mail_addr(tok), list_id=lid)
@@ -106,7 +107,7 @@ def mail_token_del():
     c = db()
     lid = request.args.get("list_id")
     lid = as_int(lid, "list_id", 1) if lid else None
-    c.execute("DELETE FROM mail_tokens WHERE user_id=? AND list_id IS ?", (me(), lid))
+    c.execute("DELETE FROM mail_tokens WHERE user_id=? AND list_id IS NOT DISTINCT FROM ?", (me(), lid))
     c.commit()
     return jsonify(ok=True)
 
@@ -186,8 +187,8 @@ def mail_import(c, raw):
     if lid:
         ts = iso(now_utc())
         srt = c.execute("SELECT COALESCE(MIN(sort),0)-1 FROM tasks WHERE list_id=? AND parent_id IS NULL", (lid,)).fetchone()[0]
-        tid = c.execute("INSERT INTO tasks(list_id,title,content,sort,created_at,updated_at,tt_id,created_by,url) VALUES(?,?,?,?,?,?,?,?,?)",
-                        (lid, title[:300], content, srt, ts, ts, "mail:" + mid, uid, url if valid_url(url) else None)).lastrowid
+        tid = insert_id(c, "INSERT INTO tasks(list_id,title,content,sort,created_at,updated_at,tt_id,created_by,url) VALUES(?,?,?,?,?,?,?,?,?)",
+                        (lid, title[:300], content, srt, ts, ts, "mail:" + mid, uid, url if valid_url(url) else None))
         log_act(c, tid, "created", uid=uid)
         from ..agents.core import agent_added_events
         agent_added_events(c, tid, source="mail")  # 2.23.0 (#795)
@@ -302,7 +303,7 @@ def digest_mail_content(c, uid, today):
     tod = [r for r in rows if r["due"] == today]
     tmr = [r for r in rows if r["due"] == tom]
     waits = c.execute("SELECT COUNT(*) FROM agent_jobs WHERE state='waiting' AND (user_id=? OR user_id IS NULL)", (uid,)).fetchone()[0] \
-        if c.execute("SELECT 1 FROM sqlite_master WHERE name='agent_jobs'").fetchone() else 0
+        if table_exists(c, "agent_jobs") else 0
     unread = news_unread(c, uid)
     chat = tchat_unread(c, uid)
     line = lambda r: f"- {r['title']}" + (f" ({r['due_time']})" if r["due_time"] else "") + f" · {r['lname']}"  # noqa: E731

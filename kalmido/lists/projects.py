@@ -6,6 +6,7 @@ from datetime import date, timedelta
 from flask import jsonify, request, send_file
 
 from ..core.config import app, ATT_DIR, INLINE_TYPES, MAX_FILE_MB, TZ
+from ..core.pg import insert_id
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, iso_ms, local_now, now_utc, parse_iso
 from ..accounts.session import me
@@ -44,11 +45,11 @@ def list_progress(c, ids, subtasks, uid=None):
     q = ",".join("?" * len(ids))
     sub = "" if subtasks else "AND t.parent_id IS NULL"
     out = {}
-    for r in c.execute(f"""SELECT t.list_id, SUM(t.status=0) AS open, SUM(t.status=2) AS done,
-                                  SUM(t.status=0 AND t.due IS NOT NULL AND t.due<?) AS overdue,
+    for r in c.execute(f"""SELECT t.list_id, COUNT(*) FILTER (WHERE t.status=0) AS open, COUNT(*) FILTER (WHERE t.status=2) AS done,
+                                  COUNT(*) FILTER (WHERE t.status=0 AND t.due IS NOT NULL AND t.due<?) AS overdue,
                                   MIN(CASE WHEN t.status=0 AND t.due>=? THEN t.due END) AS next_due
                            FROM tasks t WHERE t.list_id IN ({q}) AND t.deleted_at IS NULL AND t.status IN (0, 2) {sub}
-                             AND {tvis(c, uid, "t.", write=True) if uid else "1"} AND NOT (t.status=2 AND EXISTS (SELECT 1 FROM tasks o WHERE o.list_id=t.list_id AND o.id<t.id
+                             AND {tvis(c, uid, "t.", write=True) if uid else "TRUE"} AND NOT (t.status=2 AND EXISTS (SELECT 1 FROM tasks o WHERE o.list_id=t.list_id AND o.id<t.id
                                       AND o.created_at=t.created_at AND o.title=t.title))
                            GROUP BY t.list_id""", (t0, t0, *ids)):
         out[r["list_id"]] = {"done": r["done"] or 0, "total": (r["open"] or 0) + (r["done"] or 0),
@@ -83,7 +84,7 @@ def bell_store(c, uid, lid, mode, custom=None):
         c.execute("DELETE FROM list_bell WHERE user_id=? AND list_id=? AND mode!='default'", (uid, lid))
     else:
         c.execute("INSERT INTO list_bell(user_id,list_id,mode,custom) VALUES(?,?,?,?) ON CONFLICT(user_id,list_id) "
-                  "DO UPDATE SET mode=excluded.mode, custom=COALESCE(?, custom)", (uid, lid, mode, custom, custom))
+                  "DO UPDATE SET mode=excluded.mode, custom=COALESCE(?, list_bell.custom)", (uid, lid, mode, custom, custom))
 
 
 @app.post("/api/lists/<int:lid>/status")
@@ -176,10 +177,10 @@ def ms_migrate(c):
             else r["owner_id"]
         ts, done = r["created_at"] or iso(now_utc()), 2 if r["done"] else 0
         day = r["day"] if valid_date(r["day"]) else None
-        tid = c.execute("""INSERT INTO tasks(list_id,title,due,status,ms,sort,created_by,completed_by,completed_at,created_at,updated_at)
+        tid = insert_id(c, """INSERT INTO tasks(list_id,title,due,status,ms,sort,created_by,completed_by,completed_at,created_at,updated_at)
                            VALUES(?,?,?,?,1,?,?,?,?,?,?)""",
                         (r["list_id"], (r["name"] or "?")[:TITLE_MAX], day, done, srt, who, who if done else None,
-                         iso(now_utc()) if done else None, ts, iso(now_utc()))).lastrowid
+                         iso(now_utc()) if done else None, ts, iso(now_utc())))
         c.execute("INSERT INTO activity(task_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",
                   (tid, who, "created", "{}", ts))
     c.execute("DELETE FROM list_milestones")  # also orphan rows of lists that no longer exist
@@ -304,8 +305,8 @@ def ov_link_add(lid):
     if c.execute("SELECT COUNT(*) FROM list_links WHERE list_id=?", (lid,)).fetchone()[0] >= OV_LINKS_MAX:
         return err(tr("At most {0} links", OV_LINKS_MAX), 409)
     srt = c.execute("SELECT COALESCE(MAX(sort), 0) + 1 FROM list_links WHERE list_id=?", (lid,)).fetchone()[0]
-    nid = c.execute("INSERT INTO list_links(list_id,title,url,sort,created_by,created_at) VALUES(?,?,?,?,?,?)",
-                    (lid, title, url, srt, me(), iso(now_utc()))).lastrowid
+    nid = insert_id(c, "INSERT INTO list_links(list_id,title,url,sort,created_by,created_at) VALUES(?,?,?,?,?,?)",
+                    (lid, title, url, srt, me(), iso(now_utc())))
     bump(c)
     c.commit()
     return jsonify(ov_link_dict(c.execute("SELECT * FROM list_links WHERE id=?", (nid,)).fetchone()))

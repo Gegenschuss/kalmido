@@ -118,19 +118,23 @@ def sev_login(c, uid, ip, via="password"):
     """A sign-in (start_session): an admin from an address not among their last SEV_IPS ones is reported. The first sign-in
     of an admin after the update only stores the address. Never raises (a sign-in never fails on this)."""
     try:
-        if not ip or not sev_is_admin(c, uid):
+        if not ip:
             return
         h, now = sev_ip_hash(ip), iso(now_utc())
-        rows = {r[0] for r in c.execute("SELECT ip_hash FROM admin_login_ips WHERE user_id=?", (uid,)).fetchall()}
-        if h in rows:
-            c.execute("UPDATE admin_login_ips SET last_at=? WHERE user_id=? AND ip_hash=?", (now, uid, h))
-            c.commit()
-            return
-        c.execute("INSERT INTO admin_login_ips(user_id,ip_hash,first_at,last_at) VALUES(?,?,?,?) "
-                  "ON CONFLICT(user_id,ip_hash) DO UPDATE SET last_at=excluded.last_at", (uid, h, now, now))
-        c.execute("DELETE FROM admin_login_ips WHERE user_id=? AND ip_hash NOT IN (SELECT ip_hash FROM admin_login_ips "
-                  "WHERE user_id=? ORDER BY last_at DESC LIMIT ?)", (uid, uid, SEV_IPS))
+        with c.savepoint():  # 2.37.0 (#1150): a database error here must not abort the sign-in's transaction
+            if not sev_is_admin(c, uid):
+                return
+            rows = {r[0] for r in c.execute("SELECT ip_hash FROM admin_login_ips WHERE user_id=?", (uid,)).fetchall()}
+            if h in rows:
+                c.execute("UPDATE admin_login_ips SET last_at=? WHERE user_id=? AND ip_hash=?", (now, uid, h))
+            else:
+                c.execute("INSERT INTO admin_login_ips(user_id,ip_hash,first_at,last_at) VALUES(?,?,?,?) "
+                          "ON CONFLICT(user_id,ip_hash) DO UPDATE SET last_at=excluded.last_at", (uid, h, now, now))
+                c.execute("DELETE FROM admin_login_ips WHERE user_id=? AND ip_hash NOT IN (SELECT ip_hash FROM admin_login_ips "
+                          "WHERE user_id=? ORDER BY last_at DESC LIMIT ?)", (uid, uid, SEV_IPS))
         c.commit()
+        if h in rows:
+            return
         if rows:
             name = (c.execute("SELECT username FROM users WHERE id=?", (uid,)).fetchone() or [""])[0]
             aa_now("security", f"sev:login:{uid}:{h[:16]}", N_("Admin {0} signed in from a new address: {1}."), [name, ip])

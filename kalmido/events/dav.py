@@ -100,7 +100,7 @@ def sync_save(c, u, ec):
         c.commit()  # handed out again: the newest, never pruned first
         return ec.token
     blob = zlib.compress(json.dumps(ec.state(), separators=(",", ":")).encode("utf-8"))
-    c.execute("INSERT OR REPLACE INTO dav_sync2(user_id,coll,token,state,created_at) VALUES(?,?,?,?,?)",
+    c.execute("INSERT INTO dav_sync2(user_id,coll,token,state,created_at) VALUES(?,?,?,?,?) ON CONFLICT (user_id,coll,token) DO UPDATE SET state=excluded.state, created_at=excluded.created_at",
               (u["id"], k, ec.hash, blob, iso_ms(now_utc())))
     c.execute("""DELETE FROM dav_sync2 WHERE user_id=? AND coll=? AND token NOT IN
                  (SELECT token FROM dav_sync2 WHERE user_id=? AND coll=? ORDER BY created_at DESC LIMIT ?)""",

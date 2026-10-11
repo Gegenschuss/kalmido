@@ -18,6 +18,7 @@ from cryptography.exceptions import InvalidTag
 from flask import g, has_request_context, jsonify
 
 from ..core.config import app, APP_NAME, APP_VERSION
+from ..core.pg import insert_id
 from ..core.i18n import N_, tr
 from ..core.db import body, connect, db, err, inbox_default, iso, iso_ms, now_utc, usettings
 from ..accounts.session import _rate_blocked, _rate_fail, GATE, me
@@ -401,8 +402,8 @@ def webhook_create():
     if c.execute("SELECT COUNT(*) FROM webhooks WHERE user_id=? AND agent=0", (me(),)).fetchone()[0] >= WH_MAX:
         return err(tr("At most {0} webhooks", WH_MAX), 409)
     ts, secret = iso(now_utc()), "whsec_" + secrets.token_urlsafe(32)
-    wid = c.execute("INSERT INTO webhooks(user_id,name,url,events,secret,enabled,created_at,updated_at) VALUES(?,?,?,?,'',?,?,?)",
-                    (me(), f["name"], f["url"], f["events"], f.get("enabled", 1), ts, ts)).lastrowid
+    wid = insert_id(c, "INSERT INTO webhooks(user_id,name,url,events,secret,enabled,created_at,updated_at) VALUES(?,?,?,?,'',?,?,?)",
+                    (me(), f["name"], f["url"], f["events"], f.get("enabled", 1), ts, ts))
     c.execute("UPDATE webhooks SET secret=? WHERE id=?", (seal(c, f"webhook:{wid}", secret), wid))
     c.commit()
     return jsonify({**wh_public(c, need_webhook(c, wid)), "secret": secret}), 201

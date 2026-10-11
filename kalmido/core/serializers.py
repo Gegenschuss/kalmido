@@ -75,7 +75,7 @@ def load_tasks(c, where, args=(), full_snips=False):
     cms, uid = {}, (g.user["id"] if has_request_context() and getattr(g, "user", None) else None)
     if uid and ids:
         for r in c.execute("""SELECT k.task_id, COUNT(*) AS n,
-                                     SUM(CASE WHEN k.id > COALESCE(s.seen_id, 0) AND k.user_id IS NOT ? THEN 1 ELSE 0 END) AS u
+                                     SUM(CASE WHEN k.id > COALESCE(s.seen_id, 0) AND k.user_id IS DISTINCT FROM ? THEN 1 ELSE 0 END) AS u
                               FROM comments k LEFT JOIN task_seen s ON s.task_id=k.task_id AND s.user_id=?
                               WHERE k.deleted_at IS NULL GROUP BY k.task_id""", (uid, uid)):
             if r["task_id"] in ids:
@@ -159,5 +159,5 @@ def unlink_files(paths):
 
 
 def running_pomo(c, uid=None):
-    r = c.execute("SELECT * FROM pomos WHERE end IS NULL AND user_id=? ORDER BY id DESC LIMIT 1", (uid or me(),)).fetchone()
+    r = c.execute("SELECT * FROM pomos WHERE \"end\" IS NULL AND user_id=? ORDER BY id DESC LIMIT 1", (uid or me(),)).fetchone()
     return dict(r) if r else None

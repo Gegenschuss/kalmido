@@ -12,6 +12,7 @@ from datetime import date
 from flask import g
 
 from ..core.i18n import N_, tr
+from ..core.pg import insert_id, table_columns
 from ..core.db import db, iso, now_utc, usettings
 from ..accounts.session import me
 from ..core.access import Denied
@@ -283,28 +284,28 @@ def office_number_next(c, oid, kind, scheme, d=None, peek=False, **ctx):
         seq = (r["last"] if r else 0) + 1
     else:  # one atomic statement: two parallel requests never get the same counter value
         seq = c.execute("INSERT INTO office_numbers(org_id, kind, period, last) VALUES(?,?,?,1) ON CONFLICT(org_id, kind, period) "
-                        "DO UPDATE SET last=last+1 RETURNING last", (oid, kind, period)).fetchone()[0]
+                        "DO UPDATE SET last=office_numbers.last+1 RETURNING last", (oid, kind, period)).fetchone()[0]
     return office_number_format(scheme, seq, d, **ctx), seq
 
 
 # ---------------------------------------------------------------- master data (generic CRUD per table)
 # column -> (type, required, max/choices). type: str | num | int01 | json | choice | fk
 MD = {
-    "services": {"table": "office_services", "order": "sort, category COLLATE NOCASE, name_de COLLATE NOCASE, id", "label": "name_de",
+    "services": {"table": "office_services", "order": "sort, lower(category), lower(name_de), id", "label": "name_de",
                  "cols": {"name_de": ("str", True, NAME_MAX), "name_en": ("str", False, NAME_MAX), "category": ("str", False, 80), "sort": ("num", False, None),
                           "unit": ("choice", False, UNITS), "daily_rate": ("num0", False, None), "hourly_rate": ("num0", False, None),
                           "raw_fee": ("int01", False, None), "producing": ("int01", False, None), "intext": ("choice", False, INTEXT),
                           "role": ("str", False, 80), "tax": ("choice", False, TAXES), "archived": ("int01", False, None)}},
-    "equipment": {"table": "office_equipment", "order": "category COLLATE NOCASE, name COLLATE NOCASE, id", "label": "name",
+    "equipment": {"table": "office_equipment", "order": "lower(category), lower(name), id", "label": "name",
                   "cols": {"name": ("str", True, NAME_MAX), "category": ("str", False, 80), "daily_rate": ("num0", False, None),
                            "archived": ("int01", False, None)}},
-    "sets": {"table": "office_sets", "order": "name COLLATE NOCASE, id", "label": "name",
+    "sets": {"table": "office_sets", "order": "lower(name), id", "label": "name",
              "cols": {"name": ("str", True, NAME_MAX), "discount_pct": ("num", False, None), "items": ("items", False, None),
                       "archived": ("int01", False, None)}},
     "texts": {"table": "office_texts", "order": "kind, sort, id", "label": "key",
               "cols": {"kind": ("choice", True, TEXT_KINDS), "key": ("str", False, 80), "text_de": ("str", False, TEXT_MAX),
                        "text_en": ("str", False, TEXT_MAX), "sort": ("num", False, None), "archived": ("int01", False, None)}},
-    "contracts": {"table": "office_contracts", "order": "name COLLATE NOCASE, id", "label": "name",
+    "contracts": {"table": "office_contracts", "order": "lower(name), id", "label": "name",
                   "cols": {"name": ("str", True, NAME_MAX), "client_id": ("fk", False, "clients"), "date": ("date", False, None),
                            "raw_included": ("int01", False, None), "rights_time_id": ("fk", False, "office_texts"),
                            "rights_territory_id": ("fk", False, "office_texts"), "rights_media_id": ("fk", False, "office_texts"),
@@ -339,13 +340,13 @@ def office_rows(c, oid, kind, archived=True, q=""):
     if q:
         like = f"%{q.strip()}%"
         if kind == "services":
-            sql += " AND (name_de LIKE ? OR name_en LIKE ? OR category LIKE ?)"
+            sql += " AND (name_de ILIKE ? OR name_en ILIKE ? OR category ILIKE ?)"
             args += [like, like, like]
         elif kind == "texts":
-            sql += " AND (key LIKE ? OR text_de LIKE ? OR text_en LIKE ?)"
+            sql += " AND (key ILIKE ? OR text_de ILIKE ? OR text_en ILIKE ?)"
             args += [like, like, like]
         else:
-            sql += f" AND {m['label']} LIKE ?"
+            sql += f" AND {m['label']} ILIKE ?"
             args.append(like)
     return [_row_dict(kind, r) for r in c.execute(sql + f" ORDER BY {m['order']}", args)]
 
@@ -458,8 +459,8 @@ def office_create(c, oid, kind, b):
     if "created_at" in _cols(c, m["table"]):
         cols += ["created_at", "updated_at"]
         vals += [ts, ts]
-    cur = c.execute(f"INSERT INTO {m['table']}({','.join(cols)}) VALUES({','.join('?' * len(cols))})", vals)
-    return office_row(c, oid, kind, cur.lastrowid)
+    cur_id = insert_id(c, f"INSERT INTO {m['table']}({','.join(cols)}) VALUES({','.join('?' * len(cols))})", vals)
+    return office_row(c, oid, kind, cur_id)
 
 
 def office_update(c, oid, kind, rid, b):
@@ -486,12 +487,12 @@ def office_in_use(c, kind, rid, oid):
     if kind == "services":
         if c.execute("SELECT 1 FROM office_doc_items WHERE service_id=? AND org_id=? LIMIT 1", (rid, oid)).fetchone():
             return True
-        if c.execute("SELECT 1 FROM office_contracts WHERE org_id=? AND rates LIKE ? LIMIT 1", (oid, f'%"{rid}":%')).fetchone():
+        if c.execute("SELECT 1 FROM office_contracts WHERE org_id=? AND rates ILIKE ? LIMIT 1", (oid, f'%"{rid}":%')).fetchone():
             return True
         return False
     if kind == "equipment":
-        return bool(c.execute("SELECT 1 FROM office_sets WHERE org_id=? AND items LIKE ? LIMIT 1", (oid, f'%"equipment_id": {rid},%')).fetchone()
-                    or c.execute("SELECT 1 FROM office_sets WHERE org_id=? AND items LIKE ? LIMIT 1", (oid, f'%"equipment_id": {rid}}}%')).fetchone())
+        return bool(c.execute("SELECT 1 FROM office_sets WHERE org_id=? AND items ILIKE ? LIMIT 1", (oid, f'%"equipment_id": {rid},%')).fetchone()
+                    or c.execute("SELECT 1 FROM office_sets WHERE org_id=? AND items ILIKE ? LIMIT 1", (oid, f'%"equipment_id": {rid}}}%')).fetchone())
     if kind == "texts":
         if c.execute("SELECT 1 FROM office_contracts WHERE org_id=? AND (rights_time_id=? OR rights_territory_id=? OR rights_media_id=?) LIMIT 1",
                      (oid, rid, rid, rid)).fetchone():
@@ -537,7 +538,7 @@ _COLS = {}
 
 def _cols(c, table):
     if table not in _COLS:
-        _COLS[table] = {r[1] for r in c.execute(f"PRAGMA table_info({table})")}
+        _COLS[table] = table_columns(c, table)
     return _COLS[table]
 
 

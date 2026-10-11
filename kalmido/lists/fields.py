@@ -7,6 +7,7 @@ from datetime import date
 from flask import jsonify
 
 from ..core.config import app
+from ..core.pg import insert_id
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..core.access import collab_all, Denied, list_people, list_role, need_list, need_project, vis_sql
@@ -168,7 +169,7 @@ def need_field(c, fid, owner=True):
 
 
 def fields_pinned_ok(c, lid, fid=None):
-    n = c.execute("SELECT COUNT(*) FROM list_fields WHERE list_id=? AND pinned=1 AND id IS NOT ?", (lid, fid)).fetchone()[0]
+    n = c.execute("SELECT COUNT(*) FROM list_fields WHERE list_id=? AND pinned=1 AND id IS DISTINCT FROM ?", (lid, fid)).fetchone()[0]
     return n < FIELD_PINNED_MAX
 
 
@@ -186,8 +187,8 @@ def field_create(lid):
     if pinned and not fields_pinned_ok(c, lid):
         return err(tr("At most {0} fields can be shown on the task rows", FIELD_PINNED_MAX))
     srt = c.execute("SELECT COALESCE(MAX(sort),0)+1 FROM list_fields WHERE list_id=?", (lid,)).fetchone()[0]
-    fid = c.execute("INSERT INTO list_fields(list_id,name,type,options,pinned,sort,created_at) VALUES(?,?,?,?,?,?,?)",
-                    (lid, name, ftype, json.dumps(opts, ensure_ascii=False), pinned, srt, iso(now_utc()))).lastrowid
+    fid = insert_id(c, "INSERT INTO list_fields(list_id,name,type,options,pinned,sort,created_at) VALUES(?,?,?,?,?,?,?)",
+                    (lid, name, ftype, json.dumps(opts, ensure_ascii=False), pinned, srt, iso(now_utc())))
     cc = c.execute("SELECT col_cfg FROM lists WHERE id=?", (lid,)).fetchone()[0]
     if cc:  # 2.14.0 (#425): a list with its own columns shows a new field as its last column
         cols = columns_out(cc, {r[0] for r in c.execute("SELECT id FROM list_fields WHERE list_id=?", (lid,))})
@@ -245,7 +246,7 @@ def search_field_ids(c, uid, q):
     for f in c.execute(f"SELECT * FROM list_fields WHERE list_id IN {vis_sql()}", (uid, uid)).fetchall():
         if f["type"] in ("text", "url"):
             hits.update(r[0] for r in c.execute("""SELECT v.task_id FROM task_field_values v JOIN tasks t ON t.id=v.task_id
-                                                   WHERE v.field_id=? AND t.list_id=? AND v.value LIKE ?""", (f["id"], f["list_id"], f"%{q}%")))
+                                                   WHERE v.field_id=? AND t.list_id=? AND v.value ILIKE ?""", (f["id"], f["list_id"], f"%{q}%")))
         elif f["type"] == "select":
             oids = [o["id"] for o in json.loads(f["options"] or "{}").get("options", []) if ql in o["name"].casefold()]
             for oid in oids:

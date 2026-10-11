@@ -10,6 +10,7 @@ from datetime import timedelta
 from flask import g, jsonify, request
 
 from ..core.config import app, PUBLIC_URL
+from ..core.pg import insert_id
 from ..core.i18n import lang, tr
 from ..core.db import body, bump, db, err, iso, iso_ms, now_utc
 from ..accounts.session import me
@@ -172,21 +173,21 @@ def errhook_in(lid, token):
     hour = iso(now_utc() - timedelta(hours=1))
     # tickets made from reports in the last hour (a fingerprint can have made several, one after the other was closed)
     made = c.execute("""SELECT COUNT(*) FROM tasks t WHERE t.list_id=? AND t.created_at>? AND t.created_by IS NULL AND EXISTS
-                        (SELECT 1 FROM activity a WHERE a.task_id=t.id AND a.kind='created' AND a.data LIKE '%"report":%')""",
+                        (SELECT 1 FROM activity a WHERE a.task_id=t.id AND a.kind='created' AND a.data::text ILIKE '%"report":%')""",
                      (lid, hour)).fetchone()[0]
     if made >= ERR_NEW_PER_HOUR or r["archived"]:  # only counted
         c.execute("""INSERT INTO issue_reports(list_id,fp,task_id,count,first_at,last_at) VALUES(?,?,NULL,1,?,?)
-                     ON CONFLICT(list_id,fp) DO UPDATE SET count=count+1, last_at=excluded.last_at""", (lid, rep["fp"], now, now))
+                     ON CONFLICT(list_id,fp) DO UPDATE SET count=issue_reports.count+1, last_at=excluded.last_at""", (lid, rep["fp"], now, now))
         c.commit()
         return jsonify(ok=True, limited=True), 202
     lg = lang(c, r["owner_id"])
     sec = c.execute("SELECT id FROM sections WHERE list_id=? ORDER BY sort, id LIMIT 1", (lid,)).fetchone()
     srt = c.execute("SELECT COALESCE(MIN(sort),0)-1 FROM tasks WHERE list_id=? AND parent_id IS NULL", (lid,)).fetchone()[0]
     content = err_content(c, lid, rep, lg)[:CONTENT_MAX]
-    tid = c.execute("""INSERT INTO tasks(list_id,section_id,title,content,sort,created_at,updated_at,created_by,url,ttype)
+    tid = insert_id(c, """INSERT INTO tasks(list_id,section_id,title,content,sort,created_at,updated_at,created_by,url,ttype)
                        VALUES(?,?,?,?,?,?,?,NULL,?,?)""",
                     (lid, sec[0] if sec else None, rep["title"][:300], content, srt, now, now, rep["url"] or None,
-                     "bug" if r["tickets"] else "")).lastrowid
+                     "bug" if r["tickets"] else ""))
     c.execute("""INSERT INTO issue_reports(list_id,fp,task_id,count,first_at,last_at) VALUES(?,?,?,1,?,?)
                  ON CONFLICT(list_id,fp) DO UPDATE SET task_id=excluded.task_id, count=1, first_at=excluded.first_at,
                  last_at=excluded.last_at""", (lid, rep["fp"], tid, now, now))

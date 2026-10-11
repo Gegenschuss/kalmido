@@ -704,7 +704,7 @@ def bk_restore(path, pw, admin, via):
         man, dbp = bk_prepare(path, pw, work, att_new, off_new)
         cur = connect()
         try:
-            keep = {r[0]: r[1] for r in cur.execute("SELECT key, value FROM settings WHERE key LIKE 'bk\\_%' ESCAPE '\\'")}
+            keep = {r[0]: r[1] for r in cur.execute("SELECT key, value FROM settings WHERE key ILIKE 'bk\\_%' ESCAPE '\\'")}
             ver = int(gsetting(cur, "version") or 0)
         finally:
             cur.close()

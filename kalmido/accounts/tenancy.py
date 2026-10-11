@@ -173,7 +173,7 @@ def ws_migrate_objs(c):
     if not has_workspaces(c):
         return  # no flag yet: a server that gets organisations later (mode switch) still migrates then
     gset(c, "migr_ws2300", "1")
-    org_of = {r["user_id"]: r["oid"] for r in c.execute("SELECT user_id, MIN(org_id) AS oid FROM org_members GROUP BY user_id")}
+    org_of = {r["user_id"]: r["oid"] for r in c.execute("SELECT user_id, MIN(org_id) AS oid FROM org_members GROUP BY user_id")}  # pg-ok: alias
     if instance_mode(c) == "organisation":
         mo = main_org(c)
         for (uid,) in c.execute("SELECT id FROM users"):

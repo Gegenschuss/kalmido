@@ -10,6 +10,7 @@ from datetime import timedelta
 from flask import g, jsonify, request
 
 from ..core.config import app, ATT_DIR, MAX_FILE_MB
+from ..core.pg import insert_id
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, iso_ms, now_utc
 from ..accounts.session import me
@@ -139,8 +140,8 @@ def chat_newest(c, aid, uid):
     """Id of the newest message of the conversation that is not a permission question (0 = none). 2.35.0 (#1103): nor an
     approval request (it stays open like a permission question)."""
     r = c.execute("""SELECT MAX(id) FROM agent_chat WHERE agent_id=? AND user_id=?
-                     AND (choices IS NULL OR (COALESCE(json_extract(choices, '$.permission'), 0) = 0
-                                              AND json_extract(choices, '$.approval') IS NULL))""", (aid, uid)).fetchone()
+                     AND (choices IS NULL OR (COALESCE(choices->>'permission', '0') IN ('0', 'false')
+                                              AND choices->>'approval' IS NULL))""", (aid, uid)).fetchone()
     return (r[0] or 0) if r else 0
 
 
@@ -358,8 +359,8 @@ def chat_approvals_open(c, aid, uid):
     """2.35.0 (#1103): the open approval requests + permission questions of agent aid to person uid (newest last)."""
     out = []
     for r in c.execute("""SELECT * FROM agent_chat WHERE agent_id=? AND user_id=? AND sender='agent' AND choice IS NULL
-                          AND choices IS NOT NULL AND json_extract(choices, '$.withdrawn_at') IS NULL
-                          AND (json_extract(choices, '$.approval') IS NOT NULL OR COALESCE(json_extract(choices, '$.permission'), 0) != 0)
+                          AND choices IS NOT NULL AND choices->>'withdrawn_at' IS NULL
+                          AND (choices->>'approval' IS NOT NULL OR COALESCE(choices->>'permission', '0') NOT IN ('0', 'false'))
                           ORDER BY id""", (aid, uid)):
         if choice_state(r, _jload(r["choices"]), None) == "open":
             out.append(r)
@@ -712,8 +713,8 @@ def chat_body(v):
 
 
 def chat_add(c, aid, uid, sender, text, tid, choices=None):
-    mid = c.execute("INSERT INTO agent_chat(agent_id,user_id,sender,body,task_id,created_at,choices) VALUES(?,?,?,?,?,?,?)",
-                    (aid, uid, sender, text, tid, iso_ms(now_utc()), choices)).lastrowid
+    mid = insert_id(c, "INSERT INTO agent_chat(agent_id,user_id,sender,body,task_id,created_at,choices) VALUES(?,?,?,?,?,?,?)",
+                    (aid, uid, sender, text, tid, iso_ms(now_utc()), choices))
     cut = c.execute("SELECT id FROM agent_chat WHERE agent_id=? AND user_id=? ORDER BY id DESC LIMIT 1 OFFSET ?", (aid, uid, CHAT_KEEP)).fetchone()
     if cut:  # 2.13.1 (#465): the files of trimmed messages leave the disk
         g.chat_unlink = getattr(g, "chat_unlink", []) + chat_file_paths(c, "m.agent_id=? AND m.user_id=? AND m.id<=?", (aid, uid, cut[0]))
@@ -784,7 +785,7 @@ def chat_react(c, m, uid, emoji, on):
     if not on:
         c.execute("DELETE FROM chat_reactions WHERE message_id=? AND user_id=? AND emoji=?", (m["id"], uid, emoji))
         return res
-    if not c.execute("INSERT OR IGNORE INTO chat_reactions(message_id,user_id,emoji,created_at) VALUES(?,?,?,?)",
+    if not c.execute("INSERT INTO chat_reactions(message_id,user_id,emoji,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
                      (m["id"], uid, emoji, iso_ms(now_utc()))).rowcount:
         return res
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()

@@ -9,6 +9,7 @@ from datetime import timedelta
 from flask import g, has_request_context
 
 from ..core.config import app
+from ..core.pg import insert_id
 from ..core.i18n import tr
 from ..core.db import inbox_default, iso, now_utc, parse_iso
 from ..accounts.session import me
@@ -196,7 +197,7 @@ def agent_emit(c, aid, event, data, actor="auto"):
                 return None
     ev, ts = str(uuid.uuid4()), iso(now_utc())
     via = (act_via() or "web") if has_request_context() else "web"
-    seq = c.execute("INSERT INTO agent_events(agent_id,uuid,event,payload,created_at) VALUES(?,?,?,'{}',?)", (aid, ev, event, ts)).lastrowid
+    seq = insert_id(c, "INSERT INTO agent_events(agent_id,uuid,event,payload,created_at) VALUES(?,?,?,'{}',?)", (aid, ev, event, ts))
     env = {"id": ev, "seq": seq, "event": event, "created_at": ts, "agent_id": aid, "actor": actor, "via": via, "data": data}
     c.execute("UPDATE agent_events SET payload=? WHERE id=?", (json.dumps(env, ensure_ascii=False), seq))
     if a["webhook_id"] and WH_ON:
@@ -588,9 +589,9 @@ def agent_tidy_events(c, tid, moved=False):
     if aid and task_visible(c, tid, aid, write=True):
         if TIDY_QUIET_S <= 0:  # KALMIDO_TIDY_QUIET_S=0: at once, as before 2.27 (the older test suites)
             agent_emit(c, aid, "tidy", agent_task_data(c, tid, aid, mode=t["agent_tidy"]))
-            c.execute("INSERT OR REPLACE INTO tidy_pending(task_id,actor_id,created_at,sent_at) VALUES(?,?,?,?)", (tid, g.user["id"], iso(now_utc()), iso(now_utc())))
+            c.execute("INSERT INTO tidy_pending(task_id,actor_id,created_at,sent_at) VALUES(?,?,?,?) ON CONFLICT (task_id) DO UPDATE SET actor_id=excluded.actor_id, created_at=excluded.created_at, sent_at=excluded.sent_at", (tid, g.user["id"], iso(now_utc()), iso(now_utc())))
             return
-        c.execute("INSERT OR REPLACE INTO tidy_pending(task_id,actor_id,created_at,sent_at) VALUES(?,?,?,NULL)", (tid, g.user["id"], iso(now_utc())))
+        c.execute("INSERT INTO tidy_pending(task_id,actor_id,created_at,sent_at) VALUES(?,?,?,NULL) ON CONFLICT (task_id) DO UPDATE SET actor_id=excluded.actor_id, created_at=excluded.created_at, sent_at=NULL", (tid, g.user["id"], iso(now_utc())))
 
 
 def tidy_tick(c):

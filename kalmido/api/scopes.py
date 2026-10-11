@@ -10,6 +10,7 @@ import time
 from flask import g, jsonify, request, Response
 
 from ..core.config import API_PREFIX, app
+from ..core.pg import insert_id
 from ..core.i18n import N_, tr, trn
 from ..core.db import bump, db, err, gsetting, iso, now_utc, usettings
 from ..accounts.session import me
@@ -288,9 +289,9 @@ def need_approval(c, title, args=(), list_id=None, task_id=None):
     lg = lang_of(usettings(c, approver)) if approver else None
     args = [tr(a[1], lg=lg) if isinstance(a, tuple) else a for a in args]  # ("tr", key): a word in the approver's language
     ts = iso(now_utc())
-    jid = c.execute("""INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at,approval,list_id)
+    jid = insert_id(c, """INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at,approval,list_id)
                        VALUES(?,?,?,?,'waiting','',?,?,?,?)""",
-                    (aid, task_id, approver, tr(title, *args, lg=lg)[:300], ts, ts, json.dumps({**spec, "key": key}), list_id)).lastrowid
+                    (aid, task_id, approver, tr(title, *args, lg=lg)[:300], ts, ts, json.dumps({**spec, "key": key}), list_id))
     j = c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone()
     job_notify(c, j, None)
     if approver and not task_id:  # job_notify only adds News for task jobs: the approver hears of it anyway
@@ -465,7 +466,7 @@ def _sort_at(c, tid, lid, sid, parent, before, after, position):
         sib = c.execute("SELECT id, sort FROM tasks WHERE parent_id=? AND deleted_at IS NULL AND id!=? ORDER BY sort, id", (parent, tid)).fetchall()
     else:
         sib = c.execute("""SELECT id, sort FROM tasks WHERE list_id=? AND parent_id IS NULL AND deleted_at IS NULL AND status=0 AND id!=?
-                           AND section_id IS ? ORDER BY sort, id""", (lid, tid, sid)).fetchall()
+                           AND section_id IS NOT DISTINCT FROM ? ORDER BY sort, id""", (lid, tid, sid)).fetchall()
     ref = before or after
     if ref:
         i = next((k for k, r in enumerate(sib) if r["id"] == ref), None)

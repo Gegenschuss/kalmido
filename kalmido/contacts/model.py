@@ -9,6 +9,7 @@ from datetime import date
 from flask import has_request_context
 
 from ..core.i18n import lang, N_, tr
+from ..core.pg import insert_id
 from ..core.db import bump, iso, iso_ms, local_now, now_utc, usettings
 from ..accounts.session import me
 from ..core.access import acx_org_ok, collab_all, Denied, list_role, task_visible, WRITE_ROLES
@@ -135,8 +136,8 @@ def book_create(c, uid, b, src_id=None):
     used = [r[0] for r in c.execute("SELECT color FROM books WHERE owner_id=?", (uid,))]
     col = f.get("color") or next((x for x in BOOK_COLORS if x not in used), BOOK_COLORS[0])
     ts = iso_ms(now_utc())
-    return c.execute("INSERT INTO books(owner_id,name,color,src_id,created_at,changed_at,org_id) VALUES(?,?,?,?,?,?,?)",
-                     (uid, f["name"], col, src_id, ts, ts, oid)).lastrowid
+    return insert_id(c, "INSERT INTO books(owner_id,name,color,src_id,created_at,changed_at,org_id) VALUES(?,?,?,?,?,?,?)",
+                     (uid, f["name"], col, src_id, ts, ts, oid))
 
 
 def default_book(c, uid, create=True):
@@ -206,7 +207,7 @@ def contact_by_email(c, uid, email):
     q = ",".join("?" * len(ids))
     em = '"' + email.lower().replace('"', "") + '"'
     em = em.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-    r = c.execute(f"SELECT id FROM contacts WHERE book_id IN ({q}) AND lower(emails) LIKE ? ESCAPE '\\' ORDER BY id LIMIT 1",
+    r = c.execute(f"SELECT id FROM contacts WHERE book_id IN ({q}) AND lower(emails) ILIKE ? ESCAPE '\\' ORDER BY id LIMIT 1",
                   [*ids, f"%{em}%"]).fetchone()
     return r[0] if r else None
 
@@ -636,7 +637,7 @@ def contact_store(c, uid, book_id, f, cid=None, uid_=None, href=None, extra=None
         cols.update(book_id=book_id, uid=uid_, href=href or (re.sub(r"[^A-Za-z0-9._-]", "_", uid_)[:180] + ".vcf"), extra=extra or "",
                     version=version or "3.0", src_digest=src_digest or "", created_by=uid, created_at=ts, updated_at=ts)
         cols["search"] = search_text({**cols, **{k: _jl(cols[k]) for k in ("emails", "phones", "addresses", "groups")}})
-        cid = c.execute(f"INSERT INTO contacts({','.join(cols)}) VALUES({','.join('?' * len(cols))})", list(cols.values())).lastrowid
+        cid = insert_id(c, f"INSERT INTO contacts({','.join(cols)}) VALUES({','.join('?' * len(cols))})", list(cols.values()))
     else:
         f = dict(f)
         if extra is not None:
@@ -671,7 +672,7 @@ def contact_dict(c, r, uid=None, links=True):
                       if task_visible(c, x["task_id"], uid)]
         d["events"] = []
         from ..events.model import need_event
-        for e in c.execute("""SELECT DISTINCT e.id FROM event_attendees a JOIN events e ON e.id=a.event_id WHERE a.contact_id=?
+        for e in c.execute("""SELECT e.id FROM events e WHERE e.id IN (SELECT a.event_id FROM event_attendees a WHERE a.contact_id=?)
                               AND e.deleted_at IS NULL ORDER BY e.first_day DESC LIMIT 50""", (r["id"],)):
             try:
                 er, _ = need_event(c, e[0], uid=uid)
@@ -700,10 +701,10 @@ def contacts_query(c, uid, q="", book=None, group=None, limit=500, offset=0):
     qs = ",".join("?" * len(ids))
     where, args = f"book_id IN ({qs}) AND kind!='group'", list(ids)
     for w in [x for x in re.split(r"\s+", (q or "").lower().strip()) if x][:6]:
-        where += " AND search LIKE ? ESCAPE '\\'"
+        where += " AND search ILIKE ? ESCAPE '\\'"
         args.append("%" + w.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%")
     if group:
-        where += " AND groups LIKE ?"
+        where += " AND groups ILIKE ?"
         args.append("%" + json.dumps(group, ensure_ascii=False) + "%")
     n = c.execute(f"SELECT COUNT(*) FROM contacts WHERE {where}", args).fetchone()[0]
     rows = c.execute(f"SELECT * FROM contacts WHERE {where} ORDER BY lower(CASE WHEN family!='' THEN family ELSE fn END), lower(fn), id "
@@ -718,7 +719,7 @@ def link_set(c, uid, cid, tid, kind):
     need_contact(c, cid, uid=uid)
     if not task_visible(c, tid, uid, write=True):
         raise Denied(404)
-    c.execute("INSERT OR REPLACE INTO contact_tasks(contact_id,task_id,kind,added_by,added_at) VALUES(?,?,?,?,?)",
+    c.execute("INSERT INTO contact_tasks(contact_id,task_id,kind,added_by,added_at) VALUES(?,?,?,?,?) ON CONFLICT (contact_id,task_id) DO UPDATE SET kind=excluded.kind, added_by=excluded.added_by, added_at=excluded.added_at",
               (cid, tid, kind, uid, iso(now_utc())))
     c.execute("UPDATE tasks SET updated_at=? WHERE id=?", (iso(now_utc()), tid))
     bump(c)
@@ -795,7 +796,7 @@ def occ_sync(c, cid):
         f = _jparse(c.execute("SELECT fam FROM tasks WHERE id=?", (tid,)).fetchone()[0]) or {}
         f["card"] = r["uid"][:200]
         c.execute("UPDATE tasks SET fam=? WHERE id=?", (json.dumps(f, ensure_ascii=False, separators=(",", ":")), tid))
-        c.execute("INSERT OR REPLACE INTO contact_occ(contact_id,kind,task_id,digest) VALUES(?,?,?,?)", (cid, kind, tid, dig))
+        c.execute("INSERT INTO contact_occ(contact_id,kind,task_id,digest) VALUES(?,?,?,?) ON CONFLICT (contact_id,kind) DO UPDATE SET task_id=excluded.task_id, digest=excluded.digest", (cid, kind, tid, dig))
 
 
 # ---- import: vCard files and the external CardDAV accounts of the Family module

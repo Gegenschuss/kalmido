@@ -249,7 +249,7 @@ def list_tpl_put(lid):
         c.execute("DELETE FROM list_notif WHERE list_id=? AND user_id=?", (lid, uid))
     else:
         c.execute("INSERT INTO list_notif(list_id,user_id,tpl,custom,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(list_id,user_id) "
-                  "DO UPDATE SET tpl=excluded.tpl, custom=COALESCE(excluded.custom, custom), updated_at=excluded.updated_at",
+                  "DO UPDATE SET tpl=excluded.tpl, custom=COALESCE(excluded.custom, list_notif.custom), updated_at=excluded.updated_at",
                   (lid, uid, tpl, cust, iso(now_utc())))
     uset(c, me(), "notif_tpl_ask", "0")  # chosen: the one-time question is answered
     bump(c)
@@ -297,7 +297,7 @@ def folder_tpl_put():
             c.execute("DELETE FROM folder_notif WHERE owner_id=? AND folder=? AND user_id=?", (me(), f, uid))
         else:
             c.execute("INSERT INTO folder_notif(owner_id,folder,user_id,tpl,custom,updated_at) VALUES(?,?,?,?,?,?) "
-                      "ON CONFLICT(owner_id,folder,user_id) DO UPDATE SET tpl=excluded.tpl, custom=COALESCE(excluded.custom, custom), "
+                      "ON CONFLICT(owner_id,folder,user_id) DO UPDATE SET tpl=excluded.tpl, custom=COALESCE(excluded.custom, folder_notif.custom), "
                       "updated_at=excluded.updated_at", (me(), f, uid, tpl, cust, iso(now_utc())))
     if b.get("reset_lists") is True:
         for r in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND is_inbox=0", (me(),)).fetchall():
@@ -314,7 +314,10 @@ def folder_tpl_rename(c, uid, old, new):
     from ..lists.lists import folder_under
     for r in c.execute("SELECT DISTINCT folder FROM folder_notif WHERE owner_id=?", (uid,)).fetchall():
         if folder_under(r[0], old):
-            c.execute("UPDATE OR REPLACE folder_notif SET folder=? WHERE owner_id=? AND folder=?", (new + r[0][len(old):], uid, r[0]))
+            nf = new + r[0][len(old):]  # 2.37.0 (#1150): UPDATE OR REPLACE -> drop the rows in the way, then move
+            c.execute("DELETE FROM folder_notif WHERE owner_id=? AND folder=? AND folder<>? AND user_id IN "
+                      "(SELECT user_id FROM folder_notif WHERE owner_id=? AND folder=?)", (uid, nf, r[0], uid, r[0]))
+            c.execute("UPDATE folder_notif SET folder=? WHERE owner_id=? AND folder=?", (nf, uid, r[0]))
 
 
 # ---------------------------------------------------------------- the one-time question to owners of lists shared before 2.33
@@ -330,7 +333,7 @@ def notif_ask_state(c, uid, s):
     out += [{"kind": "list", "id": r["id"], "name": r["name"]} for r in c.execute(
         """SELECT l.id, l.name FROM lists l JOIN list_notif n ON n.list_id=l.id AND n.user_id=0
            WHERE l.owner_id=? AND l.archived=0 AND n.tpl='all' AND EXISTS (SELECT 1 FROM list_members m JOIN users hu ON hu.id=m.user_id AND COALESCE(hu.kind,'')!='agent' WHERE m.list_id=l.id)
-           ORDER BY l.name COLLATE NOCASE""", (uid,))]
+           ORDER BY lower(l.name)""", (uid,))]
     return out[:20]
 
 
@@ -352,14 +355,14 @@ def notif_tpl_migrate(c):
     for r in c.execute("SELECT DISTINCT p.owner_id, p.folder FROM folder_people p JOIN users hu ON hu.id=p.user_id "
                        "AND COALESCE(hu.kind,'')!='agent'").fetchall():  # shared with people (only agents: nothing to ask)
         folders.setdefault(r[0], []).append(r[1])
-        c.execute("INSERT OR IGNORE INTO folder_notif(owner_id,folder,user_id,tpl,custom,updated_at) VALUES(?,?,0,'all',NULL,?)", (r[0], r[1], now))
+        c.execute("INSERT INTO folder_notif(owner_id,folder,user_id,tpl,custom,updated_at) VALUES(?,?,0,'all',NULL,?) ON CONFLICT DO NOTHING", (r[0], r[1], now))
     owners, n = set(folders), 0
     for r in c.execute("""SELECT l.id, l.owner_id, l.folder FROM lists l WHERE l.owner_id IS NOT NULL
                           AND EXISTS (SELECT 1 FROM list_members m JOIN users hu ON hu.id=m.user_id AND COALESCE(hu.kind,'')!='agent' WHERE m.list_id=l.id AND m.user_id!=l.owner_id)""").fetchall():
         owners.add(r["owner_id"])
         if any(_in_folder(r["folder"] or "", f) for f in folders.get(r["owner_id"], [])):
             continue
-        n += c.execute("INSERT OR IGNORE INTO list_notif(list_id,user_id,tpl,custom,updated_at) VALUES(?,0,'all',NULL,?)", (r["id"], now)).rowcount
+        n += c.execute("INSERT INTO list_notif(list_id,user_id,tpl,custom,updated_at) VALUES(?,0,'all',NULL,?) ON CONFLICT DO NOTHING", (r["id"], now)).rowcount
     for uid in owners:
         if c.execute("SELECT 1 FROM users WHERE id=? AND COALESCE(kind,'')!='agent'", (uid,)).fetchone():
             uset(c, uid, "notif_tpl_ask", "1")

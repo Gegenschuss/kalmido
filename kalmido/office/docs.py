@@ -10,6 +10,7 @@ from datetime import date, timedelta
 from flask import g, jsonify, request
 
 from ..core.config import app
+from ..core.pg import insert_id
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied
@@ -503,7 +504,7 @@ def doc_create(c, oid, uid, b, admin):
     cur["id"] = 0
     f = clean_doc(c, oid, {k: v for k, v in b.items() if k != "kind"}, cur, admin)
     row.update(f)
-    did = c.execute(f"INSERT INTO office_docs({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values())).lastrowid
+    did = insert_id(c, f"INSERT INTO office_docs({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
     if not ofx_number_at_finalize(s, kind):  # 2.36.2 (P2): kinds numbered at finalising stay without a number as drafts
         _assign_number(c, oid, did, s)
     if isinstance(b.get("items"), list):
@@ -659,7 +660,7 @@ def odoc_list():
     q = (request.args.get("q") or "").strip()
     if q:
         like = f"%{q}%"
-        sql += " AND (number LIKE ? OR project_title LIKE ? OR project_ref LIKE ? OR recipient LIKE ?)"
+        sql += " AND (number ILIKE ? OR project_title ILIKE ? OR project_ref ILIKE ? OR recipient ILIKE ?)"
         args += [like, like, like, like]
     rows = [doc_brief(r) for r in c.execute(sql + " ORDER BY date DESC, id DESC LIMIT 500", args)]
     return jsonify(docs=rows, role=office_role(c, uid, oid), org_id=oid)
@@ -790,7 +791,7 @@ def odoc_duplicate(did):
     ts = iso(now_utc())
     row.update(number="", status="draft", date=today.isoformat(), valid_until=(today + timedelta(days=int(s.get("offer_valid_days") or 30))).isoformat(),
                totals="{}", created_by=uid, created_at=ts, updated_at=ts, sent_at=None)
-    nid = c.execute(f"INSERT INTO office_docs({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values())).lastrowid
+    nid = insert_id(c, f"INSERT INTO office_docs({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
     for it in doc_items(c, did, oid):
         it = {k: v for k, v in it.items() if k not in DUP_ITEM_SKIP}
         it["doc_id"] = nid
