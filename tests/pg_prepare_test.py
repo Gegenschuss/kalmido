@@ -32,6 +32,7 @@ STRICT = {"42803", "42804", "42883", "42702", "42P10", "42725", "42P18"}  # what
 # (file, a piece of the statement) -> why it may fail here
 EXCEPT = {
     ("core/access.py", "SELECT id FROM dn"): "the tail of a recursive query whose WITH part is built in front of it",
+    ("admin/migrate.py", "FROM sqlite_master"): "2.37 migrate-sqlite: runs against the old SQLite file, not Postgres",
 }
 
 def excepted(rel, sql):
