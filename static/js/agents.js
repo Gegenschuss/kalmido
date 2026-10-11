@@ -116,9 +116,9 @@ function bandAgents() {
 S.bandJobs = {v: -1, items: [], busy: false};
 function bandJobsLoad() {
   if (S.bandJobs.busy || S.bandJobs.v === S.v) return;
-  S.bandJobs.busy = true;
+  S.bandJobs.busy = true; const v0 = S.v;  // 2.37.0 (#1161): the version the request was asked for (a newer one fetches again)
   api('GET', '/api/agents/jobs?state=open').then(j => { S.bandJobs.items = j.jobs || []; }).catch(() => {}).finally(() => {
-    S.bandJobs.busy = false; const sig = JSON.stringify(S.bandJobs.items.map(x => x.id + x.state)); S.bandJobs.v = S.v;
+    S.bandJobs.busy = false; const sig = JSON.stringify(S.bandJobs.items.map(x => x.id + x.state)); S.bandJobs.v = v0;
     if (sig !== S.bandJobs.sig) { S.bandJobs.sig = sig; if ($('#view .agband')) renderView(); else if (S.route.key === 'today' && S.route.mod === 'tasks') viewSafeRender(); }  // 2.13.0: + the Today card
   });
 }
@@ -395,17 +395,29 @@ function tidyWire(md, lid) {
 // ---- the Agents view: agents with status, jobs (Approve / Reject / Stop), chat
 S.jobs = {items: null, f: LS.get('jobsFilter', 'open'), err: null};
 async function loadJobs() {
-  try { S.jobs.items = (await api('GET', '/api/agents/jobs' + (S.jobs.f === 'open' ? '?state=open' : ''))).jobs; S.jobs.err = null; }
-  catch (e) { S.jobs.err = e instanceof Offline ? tr('Only available online.') : e.message; S.jobs.items = S.jobs.items || []; }
+  // 2.37.0 (#1161): only the newest request counts -- an older answer that arrives late (a phone that slept in the middle
+  // of a request) would bring an ended job back to "Open" until the next change
+  const seq = S.jobs.seq = (S.jobs.seq || 0) + 1;
+  let items, err = null;
+  try { items = (await api('GET', '/api/agents/jobs' + (S.jobs.f === 'open' ? '?state=open' : ''))).jobs; }
+  catch (e) { err = e instanceof Offline ? tr('Only available online.') : e.message; }
+  if (seq !== S.jobs.seq) return;
+  S.jobs.err = err; S.jobs.items = items || S.jobs.items || [];
   const fj = S.jobFocus;  // 2.36.2 (#1141): #job/<id> -- a finished or older job is fetched on its own; not mine = not found
   if (fj && !S.jobs.err && !S.jobs.items.some(j => j.id === fj)) {
     const one = await api('GET', '/api/agents/jobs?id=' + fj).then(j => (j.jobs || []).find(x => x.id === fj)).catch(() => null);
+    if (seq !== S.jobs.seq) return;
     if (one) S.jobs.items = [one, ...S.jobs.items]; else { S.jobFocus = null; toast(tr('Job not found')); }
   }
   if (S.jobFocus) S.jobOpen[S.jobFocus] = true;
-  if (S.route.mod === 'agents') renderView();
+  if (S.route.mod === 'agents') viewSafeRender();  // 2.37.0 (#1161): a field in the view keeps its text; drawn once it is left
   if (S.jobFocus) setTimeout(jobFocusShow, 0);
 }
+// 2.37.0 (#1161): back in front (another app, another tab, the back/forward cache): the jobs list again, also while a field
+// has the focus (the full reload waits for it then)
+function jobsFront(e) { if ((e.type === 'pageshow' ? e.persisted : !document.hidden) && S.route?.mod === 'agents' && S.jobs.items !== null) loadJobs(); }
+document.addEventListener('visibilitychange', jobsFront);
+window.addEventListener('pageshow', jobsFront);
 function jobFocusShow() {
   const e = document.getElementById('job-' + S.jobFocus);
   if (!e) return;

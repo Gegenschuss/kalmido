@@ -5842,3 +5842,5 @@ button.chmode .pmlong::after{content:"\a0\25BE";font-size:.75em}
 /* 2.36.2 (device test): the logo file field of office settings stays inside the screen */
 #os-logo{max-width:100%;min-width:0}
 .lacts{min-width:0;max-width:100%;flex-wrap:wrap}
+/* 2.37.0 (#1165): the hidden field "Copy" uses without navigator.clipboard (kept in the viewport, so no page jump) */
+.cliptmp{position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;border:0;padding:0}

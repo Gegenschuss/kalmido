@@ -145,6 +145,7 @@ function tcMsgMenu(anchor, mid) {
   const m = S.tc.msgs.find(x => x.id === mid); if (!m || m.deleted) return;
   const mine = m.user_id === S.me?.id;  // 2.37.0 (#1159): the menu on every message (Save as task); Edit / Delete only on my own
   menu(anchor, [{label: tr('Reply'), icon: 'reply', fn: () => replyStart('t', mid)},
+    {label: tr('Copy'), icon: 'copy', fn: () => chatCopy(S.tc.msgs, m, 'team')},  // 2.37.0 (#1165)
     {label: m.saved_task_id ? tr('Saved as a task: open it') : tr('Save as task'), icon: 'bookmark', fn: () => m.saved_task_id ? chatSaveOpen(m.saved_task_id) : chatSaveModal('team', m, () => tcPatch())},
     ...(mine ? [{label: tr('Edit'), icon: 'edit', fn: () => { S.tc.edit = mid; tcPatch(); setTimeout(() => { const t = $('#tc-msgs .tc-edit'); if (t) { t.focus(); autosize(t); } }, 0); }},
       {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => tcMsgDelete(mid)}] : [])]);
@@ -658,6 +659,34 @@ function chatSaveModal(kind, m, done) {
   setTimeout(() => $('#cs-title', md)?.focus(), 30);
   return md;
 }
+// 2.37.0 (#1165): "Copy" in the menu of a chat message: its Markdown text (mentions as @Name). An answer the sender split
+// into parts (each ends with "_(Part 2/3)_", any word) is copied as one text when all its parts are loaded.
+const CPART = /\s*_\(\S+ (\d+)\/(\d+)\)_\s*$/;
+function chatCopyText(msgs, m, kind) {
+  const plain = x => String(x.body || '').replace(/<@(\d+)>/g, (_, id) => '@' + uname(+id, S.tc?.users || {}));
+  const p = String(m.body || '').match(CPART), i = msgs.indexOf(m);
+  if (!p || i < 0) return {text: plain(m), n: 1};
+  const k = +p[1], n = +p[2], run = msgs.slice(i - k + 1, i - k + 1 + n);
+  const whole = k >= 1 && k <= n && i - k + 1 >= 0 && run.length === n && run.every((x, j) => {
+    const q = String(x.body || '').match(CPART);
+    return q && +q[1] === j + 1 && +q[2] === n && !x.deleted && (kind === 'agent' ? x.from === m.from : x.user_id === m.user_id);
+  });
+  return whole ? {text: run.map(x => plain(x).replace(CPART, '')).join('\n\n'), n} : {text: plain(m), n: 1};
+}
+// the clipboard; without navigator.clipboard (an http address, an old browser) a hidden field and execCommand
+async function clipCopy(text) {
+  try { if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(text); return true; } } catch { /* blocked: the old way */ }
+  const back = document.activeElement, ta = document.createElement('textarea');
+  ta.className = 'cliptmp'; ta.value = text; ta.setAttribute('readonly', ''); ta.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(ta); ta.focus({preventScroll: true}); ta.select(); ta.setSelectionRange?.(0, text.length);
+  let ok = false; try { ok = !!document.execCommand?.('copy'); } catch { ok = false; }
+  ta.remove(); back?.focus?.({preventScroll: true});
+  return ok;
+}
+async function chatCopy(msgs, m, kind) {
+  const {text, n} = chatCopyText(msgs, m, kind);
+  toast(await clipCopy(text) ? (n > 1 ? tr('Copied ({0} parts)', n) : tr('Copied')) : tr('Copy failed, select the text by hand'));
+}
 document.addEventListener('click', e => {
   const a = e.target.closest?.('[data-act="csave-open"],[data-act="chat-save"],[data-act="chat-msg-menu"]'); if (!a) return;
   e.preventDefault(); e.stopPropagation();
@@ -666,5 +695,6 @@ document.addEventListener('click', e => {
   if (a.dataset.act === 'chat-save') { chatSaveModal('agent', m, () => chatPatch()); return; }
   const ag = agentById(S.chat.aid);
   menu(a, [ag?.enabled ? {label: tr('Reply'), icon: 'reply', fn: () => replyStart('a', m.id)} : null,
+    {label: tr('Copy'), icon: 'copy', fn: () => chatCopy(S.chat.msgs, m, 'agent')},  // 2.37.0 (#1165)
     {label: m.saved_task_id ? tr('Saved as a task: open it') : tr('Save as task'), icon: 'bookmark', fn: () => m.saved_task_id ? chatSaveOpen(m.saved_task_id) : chatSaveModal('agent', m, () => chatPatch())}]);
 });
