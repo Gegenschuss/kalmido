@@ -229,6 +229,13 @@ check(A.patch(B + f"/api/tasks/{TP}", json={"assignee_id": None}).ok, "unassign 
 time.sleep(0.5)
 check(S["gina"].get(B + f"/api/tasks/{TP}").status_code == 404, "after unassign: the participant no longer sees the task")
 check(dbx("SELECT COUNT(*) FROM notifications WHERE user_id=? AND task_id=?", (GINA, TP))[0][0] == n0, "unassign: no News entry for somebody who cannot see the task")
+# 2.38.0 (#1155): instead a note about the list only (no task id, no title): "removed you as assignee of a task in <list>"
+nl = dbx("SELECT kind, task_id, data FROM notifications WHERE user_id=? AND list_id=? AND kind='unassign'", (GINA, LP))
+check(len(nl) == 1 and nl[0][1] is None and MARK + " part task" not in str(nl), "#1155: unassign out of sight -> one list-only News entry " + str(nl))
+nj = S["gina"].get(B + "/api/news").json()
+gi = [x for x in nj["items"] if x["kind"] == "unassign" and x.get("list_id") == LP]
+check(len(gi) == 1 and gi[0]["task_id"] is None and gi[0]["task_title"] is None and "part task" not in str(nj),
+      "#1155: gina's News show it without the task " + str(gi)[:300])
 TQ = A.post(B + "/api/tasks", json={"title": f"{MARK} agent task", "list_id": LP, "assignee_id": AGA}).json()["id"]
 e0 = dbx("SELECT COUNT(*) FROM agent_events WHERE agent_id=? AND event='unassigned'", (AGA,))[0][0]
 check(A.patch(B + f"/api/tasks/{TQ}", json={"assignee_id": None}).ok, "unassign the agent")

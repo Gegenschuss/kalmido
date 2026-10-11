@@ -11,6 +11,7 @@ import base64
 import json
 import os
 import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
+import re
 import subprocess
 import sys
 import time
@@ -282,6 +283,9 @@ msgs = [x["msg"] for x in m]
 check(any("Login rate limit reached for user bob" in x for x in msgs), f"rate limit trip for bob: {msgs}")
 lg = [x for x in msgs if "failed logins" in x]
 check(lg and lg[0].startswith("6 failed logins") and "bob ×5" in lg[0] and "?" in lg[0], f"failed logins summed up: {lg}")
+# 2.38.0 (#1155): addresses in alerts lose their last octet (IPv6: all but the first 48 bits)
+check(lg and re.search(r"\d+\.\d+\.\d+\.x\b", lg[0]) and not any(re.search(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", x) for x in msgs),
+      f"IPs masked in the security alerts: {msgs}")
 check(any(x.startswith("5 uploads (/drop) with an invalid token") for x in msgs), f"/drop burst: {msgs}")
 check(any(x.startswith("5 calendar feed requests with an invalid link") for x in msgs), f"calendar token burst: {msgs}")
 requests.post(B + "/api/auth/login", json={"username": "carol", "password": "wrong"}, headers=H)
