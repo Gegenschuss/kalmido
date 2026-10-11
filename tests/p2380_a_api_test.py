@@ -337,6 +337,7 @@ check(rd["title"] == "Letzte Mahnung" and rd["reminder"]["level"] == 3 and rd["r
 # the reminder keeps its snapshot after a payment on the invoice
 A.post(B + f"{D}/{IID}/payments", json={"amount": 100})
 check(A.get(B + f"{D}/{RM['id']}").json()["totals"]["net"] == "30838.30", "finalised reminder keeps the amounts of its day")
+check("{days}" not in rd["closing"] and "14" in rd["closing"], f"reminder closing fills the deadline days: {rd['closing'][:80]}")
 check(A.get(B + f"{D}/{RM['id']}/pdf").content[:5] == b"%PDF-", "reminder PDF")
 check(A.get(B + D + "?kind=reminder").json()["docs"][0]["number"] == "MA-2026-001", "list of reminders")
 
