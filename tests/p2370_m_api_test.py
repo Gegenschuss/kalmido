@@ -110,7 +110,7 @@ def sess(user="alice", pw="password123"):
 
 
 def report():
-    ps = sorted(glob.glob(os.path.join(DATA, "backups", "migration-report-*.json")))
+    ps = sorted(glob.glob(os.path.join(DATA, "backups", "migration-report-*.json")), key=os.path.getmtime)
     return json.load(open(ps[-1], encoding="utf-8")) if ps else {}
 
 
@@ -293,6 +293,10 @@ check("decimal comma" in lg and "office_doc_items.rate" in lg and "row id=3" in 
 check(tables() == 0, f"(c) Postgres stays empty ({tables()} tables)")
 check(os.path.exists(DBF) and sha(DBF) == hc and not glob.glob(DBF + ".migrated-*"), "(c) tasks.db unchanged, not renamed")
 check(report().get("status") == "failed", "(c) a report of the failed move")
+# review W3-1: a failed move leaves no copy of the source and one report file, also after restarts
+check(not glob.glob(os.path.join(DATA, "backups", "pre-postgres-*.db")), "(c) no copy of the source after a failed move")
+check(glob.glob(os.path.join(DATA, "backups", "migration-report-*.json")) == [os.path.join(DATA, "backups", "migration-report-failed.json")],
+      "(c) one report file for failed moves")
 
 subprocess.run(["docker", "rm", "-f", CT], capture_output=True)
 print(f"p2370_m_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)

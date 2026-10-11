@@ -551,7 +551,11 @@ bad = ["RESET ROLE", "RESET ALL", "RESET SESSION AUTHORIZATION", "SET ROLE kalmi
        "ALTER TABLE ONLY public.t ADD CONSTRAINT c CHECK ((pg_catalog.\"set_config\"('a', 'b', false) IS NOT NULL))",
        "CREATE INDEX i ON public.t USING btree (a) WHERE (pg_catalog.\"set_config\"('a', 'b', false) IS NOT NULL)",
        "ALTER TABLE ONLY public.tasks ALTER COLUMN title SET DEFAULT E'\\'' || pg_sleep(1) || '\\''",
-       "ALTER TABLE ONLY public.tasks ALTER COLUMN title SET DEFAULT pg_sleep(1)"]
+       "ALTER TABLE ONLY public.tasks ALTER COLUMN title SET DEFAULT pg_sleep(1)",
+       # review W3-2: quotes around the schema
+       "ALTER TABLE ONLY public.tasks ALTER COLUMN title SET DEFAULT \"pg_catalog\".pg_sleep(10)::text",
+       "ALTER TABLE ONLY public.tasks ALTER COLUMN title SET DEFAULT \"pg_catalog\".lo_from_bytea(0, '\\x00')::text",
+       "ALTER TABLE ONLY public.tasks ALTER COLUMN title SET DEFAULT \"pg_catalog\".current_setting('is_superuser')"]
 good = ["CREATE TABLE public.t (id bigint NOT NULL, title text DEFAULT ''::text NOT NULL)", "SET row_security = on",
         "ALTER TABLE ONLY public.lists FORCE ROW LEVEL SECURITY", "SELECT pg_catalog.setval('public.tasks_id_seq', 5, true)",
         "CREATE INDEX m ON public.chat USING gin (public.kalmido_fold(body) public.gin_trgm_ops)",
