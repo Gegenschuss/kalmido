@@ -565,7 +565,10 @@ agent works in its organisation; a personal agent starts private and its owner m
 organisations (`PATCH /api/my/agents/{id} {"org_id": …}`), refused while it still sits in lists of another workspace.
 An organisation's list is shared only with the organisation's members, so an agent in such a list can be sure that
 everybody who reads its comments belongs to the organisation. Agents that already sat in a list of another workspace
-before the update are kept and pointed out to the list's owner, who decides.
+before the update are kept and pointed out to the list's owner, who decides. Since 2.37.0 the database enforces this as well (row-level
+security): an agent **without** a workspace (`org_id: null`) that still sits in a list of an organisation no longer
+sees that list; the move report of the update and the organisation boundary check name these cases. Fix: assign the
+agent to the organisation's workspace (`PATCH /api/my/agents/{id} {"org_id": …}`).
 
 Since 2.35.0 the admins of an organisation manage its lists in the app (Settings > Workspaces > *Lists of the
 organisation*): they see name, owner and numbers (never contents) and may archive, restore, hand over or -- from the archive,

@@ -191,7 +191,7 @@ Set `DATABASE_URL` in `.env` and remove the `db` service and the `depends_on` bl
 
   Without that role row-level security cannot be enforced. In the modes *workspaces* and *multi* Kalmido then refuses to
   start (exit code 3, the log says what to do); in the single mode it starts, but raises a security alert on every
-  start and shows a notice in the administration overview.
+  start and shows a notice under *Settings > Users > Whole server > Admin alerts*.
 - **One role for several databases.** `kalmido_app` belongs to the whole server; several Kalmido databases on one
   server share it, which is fine (the policies depend on the session, not on the role).
 
@@ -255,7 +255,10 @@ What happens to the old files:
   `data/backups/migration-report-<date-time>.json` the report (counts and checksums per table, corrections).
 - Backups from before 2.37 (zips with a `tasks.db`) can still be restored in the app; they go through the same move.
 - If the move fails, nothing is kept in PostgreSQL, `tasks.db` stays untouched and the container stops with exit code 3
-  and the reason (table and row) in the log. Fix the cause or go back (below), then start again.
+  and the reason (table and row) in the log; with `restart: unless-stopped` it keeps restarting and trying again
+  (no new files pile up: the copy of the old database is only made after a successful move, a failed one overwrites
+  `migration-report-failed.json`). Stop it (`docker compose stop kalmido`), fix the cause or go back (below), then
+  start again.
 
 **Going back to 2.36** (only if 2.37 does not work for you; everything entered since the move is lost):
 
