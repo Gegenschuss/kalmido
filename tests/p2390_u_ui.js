@@ -111,7 +111,7 @@ const FEAT = 'cal,comments,collab,agents';
     await ev(`(() => { document.querySelector('.pbvmd .pbvrow[data-v="1"] [data-pv="cmp"]').click(); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.pbvmd .pbdiff')`), 'Compare shows the line diff');
     const df = await ev(`({add: [...document.querySelectorAll('.pbvmd .pbd.add')].map(x => x.textContent), del: document.querySelectorAll('.pbvmd .pbd.del').length, sum: document.querySelector('.pbvmd .pbdsum')?.textContent})`);
-    check(df.add.length === 1 && /Second device/.test(df.add[0]) && df.del === 0 && /1 lines added, 0 removed/.test(df.sum), 'the diff: one line added ' + JSON.stringify(df));
+    check(df.add.length === 1 && /Second device/.test(df.add[0]) && df.del === 0 && /Lines: 1 added, 0 removed/.test(df.sum), 'the diff: one line added ' + JSON.stringify(df));
     await shot('p2390u-compare.png');
     await ev(`(() => { document.querySelector('.pbvmd [data-pv="restore"]').click(); return 1; })()`);
     await ready(ev, `!!document.querySelector('.cdlg')`);
@@ -190,13 +190,32 @@ const FEAT = 'cal,comments,collab,agents';
     // ================= Bob: editor of the list, no admin: reads only
     check(await asUser(ev, nav, 'bob') === 200, 'Firefox: login Bob');
     await ev(`(() => { listModal(${LID}); return 1; })()`);
-    check(await ready(ev, `!!document.querySelector('.lmodal #pb-area .pbown')`), 'Bob sees the playbook');
+    check(await ready(ev, `!!document.querySelector('.lmodal #pb-area .pbown')`), 'Bob sees the playbook ' + JSON.stringify(await ev(`({ag: agentsOn(), n: (S.agents || []).length, m: !!document.querySelector('.lmodal')})`)));
     const bb = await ev(`(() => { const b = document.querySelector('.lmodal #pb-area'); return {edit: !!b.querySelector('[data-pb="edit"]'), ck: !!b.querySelector('[data-pb="checks"]'), ro: b.querySelector('.pbro')?.textContent || '', ver: !!b.querySelector('[data-pb="versions"]'), inh: /ten years/.test(b.textContent)}; })()`);
     check(!bb.edit && !bb.ck && /Only the owner and list admins can change it/.test(bb.ro) && bb.ver && bb.inh, 'Bob: read only, no Edit, no checks, versions to read ' + JSON.stringify(bb));
     await shot('p2390u-bob-readonly.png');
     const pb = await call(CB, 'PUT', `/api/lists/${LID}/playbook`, {text: 'mine'});
     check(pb.http === 403, 'Bob cannot write it through the API either ' + pb.http);
   }, false);
+
+  // ================= a phone (touch, 390 px): the dialog is a sheet, the playbook buttons are big enough to tap
+  await firefox(async o => {
+    const {cmd, ev, ctx, nav, shot} = o;
+    await nav(B + 'static/icon.svg');
+    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
+    check(await asUser(ev, nav, 'alice') === 200, 'phone: login Alice');
+    await ev(`(() => { pbOpen(${LID}); return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('.pbmodal #pb-area [data-pb="edit"]')`), 'phone: the playbook dialog opens');
+    const m = await ev(`(() => { const c = document.querySelector('.pbmodal .card').getBoundingClientRect(); const hs = [...document.querySelectorAll('.pbmodal #pb-area .pbbtns .btn')].map(b => Math.round(b.getBoundingClientRect().height)); return {bottom: Math.round(window.innerHeight - c.bottom), w: Math.round(c.width), hs}; })()`);
+    check(m.bottom <= 1 && m.w >= 388 && m.hs.length >= 2 && m.hs.every(h => h >= 44), 'phone: a bottom sheet over the full width, buttons >= 44 px ' + JSON.stringify(m));
+    await shot('p2390u-phone.png');
+    await ev(`(() => { document.querySelector('.pbmodal #pb-area [data-pb="edit"]').click(); return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('.pbedmd #pb-text')`), 'phone: the editor opens');
+    const w = await ev(`(() => { const t = document.querySelector('.pbedmd #pb-text').getBoundingClientRect(); return t.right <= window.innerWidth && t.width > 300; })()`);
+    check(w, 'phone: the text field fits the screen');
+    await shot('p2390u-phone-editor.png');
+  }, true);
 
   console.log(`p2390_u_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
