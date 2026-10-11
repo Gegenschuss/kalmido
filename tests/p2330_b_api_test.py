@@ -212,8 +212,10 @@ while True:
         break
     r = requests.get(V + "/search", headers=CLH, params={"scope": "messages", "q": "arger", "limit": 2, "cursor": j["next_cursor"]})
 check(sorted(seen) == keys(vfind(CLH, "arger")) and pages == 3, f"v1 cursor pages ({pages}) " + str(seen))
-for bad in ({"q": ""}, {"q": "x" * 201}, {"q": "%%%"}, {"q": "a", "art": "x"}, {"q": "a", "room": "abc"}):
+for bad in ({"q": ""}, {"q": "x" * 201}, {"q": "a", "art": "x"}, {"q": "a", "room": "abc"}):
     check(A.get(B + "/api/search/messages", params=bad).status_code == 400, "400: " + str(bad)[:40])
+r = A.get(B + "/api/search/messages", params={"q": "%%%"})  # 2.38.0 (#1169): only special characters = no hits, no error
+check(r.status_code == 200 and r.json()["hits"] == [], "only %%%: 200 with no hits " + str(r.status_code))
 check(requests.get(V + "/search", headers=CLH, params={"scope": "messages", "q": "a", "foo": 1}).status_code == 400, "v1: unknown parameter 400")
 check(requests.get(V + "/search", headers=CLH, params={"scope": "nope", "q": "a"}).status_code == 400, "v1: unknown scope 400")
 r = requests.get(V + "/search", headers=CLH, params={"q": "Shared"})
