@@ -513,8 +513,17 @@ fresh; run p2362_e_ui node p2362_e_ui.js "$KALMIDO_TEST_DATA"
 # 2.37.0 (#1150): the Postgres driver layer and the static dialect guard
 fresh; run pg_layer "$PY" pg_layer_test.py "$KALMIDO_TEST_DATA"
        run pg_dialect "$PY" pg_dialect_test.py
+       run pg_prepare "$PY" pg_prepare_test.py "$KALMIDO_TEST_DATA"
 # 2.37.0 (#1150): the message search on Postgres (kalmido_fold + trigram indexes)
 fresh; run p2370_c_api "$PY" p2370_c_api_test.py "$KALMIDO_TEST_DATA"
+# 2.37.0 (#1158 / #1159): folder settings of a folder with only lists of others; a chat message saved as a task
+fresh; run p2370_u_api "$PY" p2370_u_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2370_u_ui node p2370_u_ui.js "$KALMIDO_TEST_DATA"
+# 2.37.0 part 2 (#1150): literal task search (LIKE escaping), database errors as 400
+fresh; run p2370_k_api "$PY" p2370_k_api_test.py "$KALMIDO_TEST_DATA"
+# 2.37.0 part 2 (#1150): row-level security per organisation (static guard + the policies against the test database)
+       run rls_static "$PY" rls_static_test.py
+fresh; run rls_direct "$PY" rls_direct_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

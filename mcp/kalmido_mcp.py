@@ -272,10 +272,10 @@ def t_send_chat(api, a):
             except ValueError:
                 raise ApiError(400, f"files: {f['name']} is not valid base64") from None
             files.append((f["name"], f.get("mime") or "application/octet-stream", data))
-        return api.call("POST", f"/agent/chats/{int(a['user_id'])}", multipart=(_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "reply_to")), files))  # approval: see request_chat_approval
+        return api.call("POST", f"/agent/chats/{int(a['user_id'])}", multipart=(_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "reply_to", "offer_save")), files))  # approval: see request_chat_approval
     if not a.get("body"):
         raise ApiError(400, "body (or files) is required")
-    return api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "reply_to")))
+    return api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "reply_to", "offer_save")))
 
 
 def t_request_chat_approval(api, a):
@@ -576,7 +576,9 @@ TOOLS = [
                   "person's) makes older open buttons expire. Permission requests (2.30.0): permission=true (buttons Allow / Deny are "
                   "added; put the command in a code block in the body), expires_in = seconds it stays open; such a question stays "
                   "answerable while newer messages come. The person's answer arrives as the event chat_choice (message_id, "
-                  "choice_ids, labels; permission questions also approval and a reaction event) -- act once per message_id; do not ask twice.",
+                  "choice_ids, labels; permission questions also approval and a reaction event) -- act once per message_id; do not ask twice. "
+                  "offer_save (2.37.0): true shows the button 'Save as task' under a long answer worth keeping (a plan, a summary); "
+                  "the person decides and saves it -- you never save a message yourself.",
      _obj({"user_id": S_ID, "body": {"type": "string"}, "task_id": S_ID,
            "reply_to": {**S_ID, "description": "2.33.0: the id of a message of this conversation you answer (a message's reply / reply_to "
                                                "show what the person answered)"},
@@ -586,6 +588,7 @@ TOOLS = [
                "id": {"type": "string", "maxLength": 40}, "label": {"type": "string", "maxLength": 80},
                "style": {"type": "string", "enum": ["default", "primary", "danger"]}}, "required": ["id", "label"]}},
            "multi": {"type": "boolean"},
+           "offer_save": {"type": "boolean", "description": "2.37.0: offer the person the button 'Save as task' under this message"},
            "files": {"type": "array", "maxItems": 10, "items": {"type": "object", "properties": {
                "name": {"type": "string"}, "base64": {"type": "string"}, "mime": {"type": "string"}}, "required": ["name", "base64"]}}},
           ["user_id"]), t_send_chat),

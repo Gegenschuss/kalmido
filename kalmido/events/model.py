@@ -192,12 +192,14 @@ def cal_create(c, uid, b):
 def default_cal(c, uid, create=True):
     """The person's first own calendar (created as "Calendar" when there is none)."""
     from ..core.i18n import lang
-    r = c.execute("SELECT id FROM ev_cals WHERE owner_id=? ORDER BY sort, id LIMIT 1", (uid,)).fetchone()
-    if r:
-        return r[0]
-    if not create:
-        return None
-    return cal_create(c, uid, {"name": tr("Calendar", lg=lang(c, uid))})
+    from ..core.pg import system_ctx
+    with system_ctx(c):  # 2.37.0 (#1150): also asked for other people (invitations): their calendar's id, in their workspace
+        r = c.execute("SELECT id FROM ev_cals WHERE owner_id=? ORDER BY sort, id LIMIT 1", (uid,)).fetchone()
+        if r:
+            return r[0]
+        if not create:
+            return None
+        return cal_create(c, uid, {"name": tr("Calendar", lg=lang(c, uid))})
 
 
 def cal_touch(c, cid):

@@ -74,11 +74,13 @@ def quota_info(c, uid):
     own = u["storage_quota_mb"]
     members = [uid]
     if pool == "org" and own is None:
-        r = c.execute("SELECT org_id FROM org_members WHERE user_id=? ORDER BY org_id LIMIT 1", (uid,)).fetchone()
-        if r:
-            members = [x[0] for x in c.execute("""SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id
-                                                  WHERE m.org_id=? AND u.kind!='agent' AND u.storage_quota_mb IS NULL""", (r[0],))] or [uid]
-        else:
+        from ..core.pg import system_ctx
+        with system_ctx(c):  # 2.37.0 (#1150): the pool's members (ids, structure; also when an admin looks at somebody else)
+            r = c.execute("SELECT org_id FROM org_members WHERE user_id=? ORDER BY org_id LIMIT 1", (uid,)).fetchone()
+            if r:
+                members = [x[0] for x in c.execute("""SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id
+                                                      WHERE m.org_id=? AND u.kind!='agent' AND u.storage_quota_mb IS NULL""", (r[0],))] or [uid]
+        if not r:
             pool = "user"
     else:
         pool = "user"

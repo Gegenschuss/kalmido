@@ -217,26 +217,22 @@ if r.ok:
     check(Ca.patch(B + f"/api/tasks/{T3}", json={"fields": {str(FID): "data:text/html,x"}}).status_code == 400, "#186: a link field refuses data:")
 
 # ---- a backup with the new table verifies and restores
-# 2.37 Job B: the backup (admin/backup.py) still works on the SQLite file -- backup + restore of this suite skipped until
-# it moves to pg_dump (KALMIDO_PG_BACKUP=1 runs them anyway)
-PG_BK = bool(os.environ.get("KALMIDO_PG_BACKUP"))
-if PG_BK:
-    r = A.post(B + "/api/admin/backups")
-    check(r.status_code == 202, "backup: back up now " + r.text[:100])
-    items = wait_for(lambda: [x for x in A.get(B + "/api/admin/backups").json().get("items", []) if x["kind"] == "manual"], 30)
-    name = items[0]["name"] if items else ""
-    r = A.post(B + f"/api/admin/backups/{name}/verify", json={})
-    check(r.ok and r.json().get("ok"), "backup: a backup with org_list_log verifies " + r.text[:200])
-    n0 = dbx("SELECT COUNT(*) FROM org_list_log")[0][0]
-    dbx("DELETE FROM org_list_log", write=True)
-    r = A.post(B + "/api/admin/backups/restore", json={"confirm": "RESTORE", "name": name})
-    check(r.ok and r.json().get("ok"), "backup: restore " + r.text[:200])
-    check(wait_for(lambda: dbx("SELECT COUNT(*) FROM org_list_log")[0][0] == n0, 10), "backup: the history is back after the restore")
+r = A.post(B + "/api/admin/backups")
+check(r.status_code == 202, "backup: back up now " + r.text[:100])
+items = wait_for(lambda: [x for x in A.get(B + "/api/admin/backups").json().get("items", []) if x["kind"] == "manual"], 30)
+name = items[0]["name"] if items else ""
+r = A.post(B + f"/api/admin/backups/{name}/verify", json={})
+check(r.ok and r.json().get("ok"), "backup: a backup with org_list_log verifies " + r.text[:200])
+n0 = dbx("SELECT COUNT(*) FROM org_list_log")[0][0]
+dbx("DELETE FROM org_list_log", write=True)
+r = A.post(B + "/api/admin/backups/restore", json={"confirm": "RESTORE", "name": name})
+check(r.ok and r.json().get("ok"), "backup: restore " + r.text[:200])
+check(wait_for(lambda: dbx("SELECT COUNT(*) FROM org_list_log")[0][0] == n0, 10), "backup: the history is back after the restore")
 
 # ================================================================== mode workspaces: the boundary between organisations
 restart("-e KALMIDO_INSTANCE_MODE=workspaces")
-# 2.37.0: with SQLite alice became the organisation's admin through the start-up after the restore above (Job B: skipped
-# here); without it she gets the role directly, as the instance admin who administers her organisation
+# 2.37.0: with SQLite alice became the organisation's admin through the start-up after the restore above; she gets the
+# role directly as well (the instance admin who administers her organisation; harmless when she has it already)
 dbx("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=(SELECT id FROM users WHERE username='alice')", (ORG,), write=True)
 A, Bo, Ca, Da = sess("alice"), sess("bob"), sess("carol"), sess("dave")
 r = A.post(B + "/api/admin/orgs", json={"name": "Beta", "icon": "B", "admin_id": DAVE})

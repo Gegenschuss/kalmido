@@ -183,6 +183,8 @@ def wh_flush(resp):
         try:
             wh_enqueue(db(), n)
         except Exception as e:  # noqa: BLE001  (never fail the request that already succeeded)
+            with contextlib.suppress(Exception):
+                db().heal()  # 2.37.0 (#1150): later after-request hooks may still use the connection
             print("webhooks: queueing failed:", type(e).__name__, e, flush=True)
             aa_count("watchdog", f"webhooks|{type(e).__name__}", "queue")
     return resp

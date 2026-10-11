@@ -246,7 +246,9 @@ FAIL_WINDOW = 900  # s
 @app.before_request
 def acx_bind():
     """2.37.0 (#1150): the signed-in account's access context goes onto the request's database connection (user id,
-    organisations, role; core/access.py acx_session_apply). Paths without an account keep the context "system"."""
+    organisations, role; core/access.py acx_session_apply). Since 2.37.0 part 2 every statement on a pooled connection also
+    asks core/access.py acx_conn_hook, so a route that sets g.user later (DAV, public links, forms, hooks) is covered too;
+    a request without an account reads as "anon" (no organisation unless a public path bound one), never as "system"."""
     if getattr(g, "user", None) is not None:
         from ..core.access import acx
         acx()

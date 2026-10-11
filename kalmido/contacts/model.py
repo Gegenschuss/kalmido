@@ -9,7 +9,7 @@ from datetime import date
 from flask import has_request_context
 
 from ..core.i18n import lang, N_, tr
-from ..core.pg import insert_id
+from ..core.pg import insert_id, like_escape
 from ..core.db import bump, iso, iso_ms, local_now, now_utc, usettings
 from ..accounts.session import me
 from ..core.access import acx_org_ok, collab_all, Denied, list_role, task_visible, WRITE_ROLES
@@ -704,8 +704,8 @@ def contacts_query(c, uid, q="", book=None, group=None, limit=500, offset=0):
         where += " AND search ILIKE ? ESCAPE '\\'"
         args.append("%" + w.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%")
     if group:
-        where += " AND groups ILIKE ?"
-        args.append("%" + json.dumps(group, ensure_ascii=False) + "%")
+        where += " AND groups ILIKE ? ESCAPE '\\'"
+        args.append("%" + like_escape(json.dumps(group, ensure_ascii=False)) + "%")
     n = c.execute(f"SELECT COUNT(*) FROM contacts WHERE {where}", args).fetchone()[0]
     rows = c.execute(f"SELECT * FROM contacts WHERE {where} ORDER BY lower(CASE WHEN family!='' THEN family ELSE fn END), lower(fn), id "
                      "LIMIT ? OFFSET ?", [*args, limit, offset]).fetchall()

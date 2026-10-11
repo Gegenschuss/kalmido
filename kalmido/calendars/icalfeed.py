@@ -241,6 +241,8 @@ def ical_feed(token):
         _rate_fail(keys)
         aa_count("security", "ics", client_ip())
         return Response("Not found\n", 404, content_type="text/plain; charset=utf-8")
+    from ..core.access import acx_token_bind
+    acx_token_bind(u["id"])  # 2.37.0 (#1150): the feed reads with its owner's context (row-level security)
     return Response(ics_build(c, u), content_type="text/calendar; charset=utf-8",
                     headers={"Cache-Control": "no-cache, private", "Content-Disposition": 'inline; filename="kalmido.ics"',
                              "X-Robots-Tag": "noindex"})

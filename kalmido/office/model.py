@@ -12,7 +12,7 @@ from datetime import date
 from flask import g
 
 from ..core.i18n import N_, tr
-from ..core.pg import insert_id, table_columns
+from ..core.pg import insert_id, like_escape, table_columns
 from ..core.db import db, iso, now_utc, usettings
 from ..accounts.session import me
 from ..core.access import Denied
@@ -338,15 +338,15 @@ def office_rows(c, oid, kind, archived=True, q=""):
     if not archived:
         sql += " AND archived=0"
     if q:
-        like = f"%{q.strip()}%"
+        like = f"%{like_escape(q.strip())}%"
         if kind == "services":
-            sql += " AND (name_de ILIKE ? OR name_en ILIKE ? OR category ILIKE ?)"
+            sql += " AND (name_de ILIKE ? ESCAPE '\\' OR name_en ILIKE ? ESCAPE '\\' OR category ILIKE ? ESCAPE '\\')"
             args += [like, like, like]
         elif kind == "texts":
-            sql += " AND (key ILIKE ? OR text_de ILIKE ? OR text_en ILIKE ?)"
+            sql += " AND (key ILIKE ? ESCAPE '\\' OR text_de ILIKE ? ESCAPE '\\' OR text_en ILIKE ? ESCAPE '\\')"
             args += [like, like, like]
         else:
-            sql += f" AND {m['label']} ILIKE ?"
+            sql += f" AND {m['label']} ILIKE ? ESCAPE '\\'"
             args.append(like)
     return [_row_dict(kind, r) for r in c.execute(sql + f" ORDER BY {m['order']}", args)]
 

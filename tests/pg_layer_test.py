@@ -3,7 +3,8 @@
 Placeholder translation (literals, comments, dollar quotes, % signs, `? IS NULL`), the row type (index, name, keys(), dict()),
 SQLite-like parameter typing (ints / bools as untyped literals, NUMERIC back as int / float, jsonb as text), insert_id,
 savepoints after a failed statement, write_lock across two connections, the request context (set per transaction, kept after
-commit, never handed to the next borrower of a pooled connection).
+commit, never handed to the next borrower of a pooled connection); 2.37.0 part 2: pool size, session time limits, heal(),
+dead pooled connections replaced on borrow.
 Run (container from start.sh):  python3 tests/pg_layer_test.py [datadir]
 """
 import os
@@ -80,7 +81,7 @@ check(v(c) == ("7", "3,4", "user"), "context set again after rollback")
 c.close()
 p1 = pg.connect_pooled(DATABASE_URL); p1.set_ctx(9, (1,), "agent"); a = v(p1); pid = p1.execute("SELECT pg_backend_pid()").fetchone()[0]; p1.close()
 seen = None
-for _ in range(30):  # borrow until the same server connection comes back
+for _ in range(200):  # borrow until the same server connection comes back (the pool hands idle connections out in turn)
     p2 = pg.connect_pooled(DATABASE_URL)
     if p2.execute("SELECT pg_backend_pid()").fetchone()[0] == pid:
         seen = v(p2)
@@ -88,7 +89,52 @@ for _ in range(30):  # borrow until the same server connection comes back
         break
     p2.close()
 check(a == ("9", "1", "agent"), "pooled context")
-check(seen is None or seen == ("", "", "system"), f"a reused pooled connection starts as system ({seen})")
+check(seen is not None, "the same pooled server connection came back within 200 borrows")
+check(seen == ("", "", "system"), f"a reused pooled connection starts as system ({seen})")
+
+# 2.37.0 Part 2 (W-1 / W-3): pool size and the session limits (pooled and direct connections)
+check(pg.POOL_MAX == int(os.environ.get("KALMIDO_DB_POOL_MAX") or 56) and pg.POOL_MIN == 4, f"pool 4..{pg.POOL_MAX}")
+for kind, cc in (("pooled", pg.connect_pooled(DATABASE_URL)), ("direct", pg.connect_direct(DATABASE_URL))):
+    lim = (cc.execute("SHOW statement_timeout").fetchone()[0], cc.execute("SHOW idle_in_transaction_session_timeout").fetchone()[0])
+    check(lim == ("30s", "5min"), f"{kind}: statement_timeout 30 s, idle in transaction 5 min ({lim})")
+    cc.close()
+
+# K-1: heal() rolls an aborted transaction back and leaves a healthy one alone
+c = pg.connect_direct(DATABASE_URL)
+c.execute("CREATE TEMP TABLE plh (s TEXT UNIQUE)")
+c.execute("INSERT INTO plh VALUES('a')")
+check(c.heal() is False and c.execute("SELECT COUNT(*) FROM plh").fetchone()[0] == 1, "heal() keeps a healthy transaction")
+try:
+    c.execute("INSERT INTO plh VALUES('a')")
+except pg.IntegrityError:
+    pass
+check(c.heal() is True, "heal() rolls an aborted transaction back")
+check(c.execute("SELECT 1").fetchone()[0] == 1, "the connection is usable again after heal()")
+c.close()
+
+# W-4: server connections that died (database restart) are replaced when borrowed, no request sees an error
+held = [pg.connect_pooled(DATABASE_URL) for _ in range(6)]
+pids = [h.execute("SELECT pg_backend_pid()").fetchone()[0] for h in held]
+for h in held:
+    h.close()
+k = pg.connect_direct(DATABASE_URL)
+n_term = sum(1 for (ok,) in k.execute("SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE pid = ANY(?::int[])",
+                                      ("{" + ",".join(map(str, pids)) + "}",)) if ok)
+k.commit(); k.close()
+check(n_term == 6, f"6 pooled server connections terminated ({n_term})")
+time.sleep(1)
+errs, new = [], set()
+held = []
+for _ in range(8):
+    try:
+        h = pg.connect_pooled(DATABASE_URL)
+        new.add(h.execute("SELECT pg_backend_pid()").fetchone()[0])
+        held.append(h)
+    except Exception as e:  # noqa: BLE001
+        errs.append(type(e).__name__)
+for h in held:
+    h.close()
+check(not errs and not (new & set(pids)), f"after the terminations every borrow works on a live connection (errors {errs})")
 
 # write_lock: the second writer waits for the first
 c1, c2 = pg.connect_direct(DATABASE_URL), pg.connect_direct(DATABASE_URL)

@@ -5,7 +5,7 @@ from datetime import timedelta
 from flask import g, jsonify
 
 from ..core.config import app, TZ, USERNAME_RE
-from ..core.pg import insert_id
+from ..core.pg import insert_id, system_ctx
 from ..core.i18n import tr, trn
 from ..core.db import body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, now_utc, uset, usettings, write_lock
 from ..accounts.session import _token_hash, me
@@ -155,48 +155,49 @@ def admin_agent_create():
     need_admin()
     need_api()
     b, c = body(), db()
-    username = (b.get("username") or "").strip().lower()
-    if not USERNAME_RE.fullmatch(username):
-        return err(tr("Username: 1-32 characters a-z, 0-9, dot, dash, underscore"))
-    if c.execute("SELECT 1 FROM users WHERE username=?", (username,)).fetchone():
-        return err(tr("Username already exists"), 409)
-    uid = create_user(c, username, (b.get("display_name") or "").strip()[:60] or username, None, None, False, paperless_access=False)
-    make_agent(c, uid)
-    c.execute("UPDATE agents SET note=?, provider=? WHERE user_id=?", (str(b.get("note") or "")[:AGENT_NOTE_MAX], str(b.get("provider") or "").strip()[:80], uid))
-    try:  # 2.28.0 (#965 / #970 / #935): owner_id = a personal agent of that person (default: a team agent), org_id = its workspace
-        agent_owner_set(c, uid, b.get("owner_id"), bool(b.get("owner_id")))
-        agent_org_set(c, uid, b["org_id"] if "org_id" in b else "auto")
-    except BadInput:
-        c.rollback()
-        raise
-    try:  # 2.15.0 (#479): scopes (default read + tasks:write + comments) and the address restriction
-        agent_scopes_set(c, uid, {"scopes": b.get("scopes") or list(SCOPES_AGENT_DEFAULT), **({"allowed_ips": b["allowed_ips"]} if "allowed_ips" in b else {})})
-    except BadInput:
-        c.rollback()
-        raise
-    if b.get("proposals") in PROP_MODES:  # 2.3.0
-        c.execute("UPDATE agents SET proposals=? WHERE user_id=?", (b["proposals"], uid))
-    if b.get("runtime") is not None:  # 2.4.1 (#377)
-        try:
-            c.execute("UPDATE agents SET runtime=? WHERE user_id=?", (json.dumps(runtime_clean(dict(RUNTIME_DEFAULTS), b["runtime"])), uid))
+    with system_ctx(c):  # 2.37.0 (#1150): the instance admin creates an account (structure); a team agent may land in an organisation he is not in
+        username = (b.get("username") or "").strip().lower()
+        if not USERNAME_RE.fullmatch(username):
+            return err(tr("Username: 1-32 characters a-z, 0-9, dot, dash, underscore"))
+        if c.execute("SELECT 1 FROM users WHERE username=?", (username,)).fetchone():
+            return err(tr("Username already exists"), 409)
+        uid = create_user(c, username, (b.get("display_name") or "").strip()[:60] or username, None, None, False, paperless_access=False)
+        make_agent(c, uid)
+        c.execute("UPDATE agents SET note=?, provider=? WHERE user_id=?", (str(b.get("note") or "")[:AGENT_NOTE_MAX], str(b.get("provider") or "").strip()[:80], uid))
+        try:  # 2.28.0 (#965 / #970 / #935): owner_id = a personal agent of that person (default: a team agent), org_id = its workspace
+            agent_owner_set(c, uid, b.get("owner_id"), bool(b.get("owner_id")))
+            agent_org_set(c, uid, b["org_id"] if "org_id" in b else "auto")
         except BadInput:
             c.rollback()
             raise
-    p = b.get("avatar_preset", "robot")
-    if p in AVATAR_PRESETS:
-        c.execute("UPDATE users SET avatar=? WHERE id=?", (f"p:{p}", uid))
-    uset(c, uid, "lang", usettings(c, me())["lang"])
-    ensure_inbox(c, uid)
-    try:
-        secret = agent_hook_set(c, uid, str(b.get("webhook_url") or "").strip())
-    except (BadInput, Denied):
-        c.rollback()
-        raise
-    tok = agent_token_new(c, uid)
-    bump(c)
-    c.commit()
-    print("agent", username, "(id", uid, ") created by", g.user["username"], flush=True)
-    return jsonify({**agent_admin_dict(c, agent_row(c, uid)), "token": tok, "webhook_secret": secret}), 201
+        try:  # 2.15.0 (#479): scopes (default read + tasks:write + comments) and the address restriction
+            agent_scopes_set(c, uid, {"scopes": b.get("scopes") or list(SCOPES_AGENT_DEFAULT), **({"allowed_ips": b["allowed_ips"]} if "allowed_ips" in b else {})})
+        except BadInput:
+            c.rollback()
+            raise
+        if b.get("proposals") in PROP_MODES:  # 2.3.0
+            c.execute("UPDATE agents SET proposals=? WHERE user_id=?", (b["proposals"], uid))
+        if b.get("runtime") is not None:  # 2.4.1 (#377)
+            try:
+                c.execute("UPDATE agents SET runtime=? WHERE user_id=?", (json.dumps(runtime_clean(dict(RUNTIME_DEFAULTS), b["runtime"])), uid))
+            except BadInput:
+                c.rollback()
+                raise
+        p = b.get("avatar_preset", "robot")
+        if p in AVATAR_PRESETS:
+            c.execute("UPDATE users SET avatar=? WHERE id=?", (f"p:{p}", uid))
+        uset(c, uid, "lang", usettings(c, me())["lang"])
+        ensure_inbox(c, uid)
+        try:
+            secret = agent_hook_set(c, uid, str(b.get("webhook_url") or "").strip())
+        except (BadInput, Denied):
+            c.rollback()
+            raise
+        tok = agent_token_new(c, uid)
+        bump(c)
+        c.commit()
+        print("agent", username, "(id", uid, ") created by", g.user["username"], flush=True)
+        return jsonify({**agent_admin_dict(c, agent_row(c, uid)), "token": tok, "webhook_secret": secret}), 201
 
 
 def runtime_set(c, a, rt):
@@ -439,6 +440,12 @@ def agent_org_set(c, aid, v):
     from ..accounts.orgs import has_workspaces, main_org, user_orgs
     if not has_workspaces(c):
         return
+    from ..core.pg import system_ctx
+    with system_ctx(c):  # 2.37.0 (#1150): placing an agent is organisation structure; the rules below check who may
+        _agent_org_set(c, aid, v, main_org, user_orgs)
+
+
+def _agent_org_set(c, aid, v, main_org, user_orgs):
     a = agent_row(c, aid)
     if v == "auto":
         oids = user_orgs(c, a["owner_id"]) if a["owner_id"] else []

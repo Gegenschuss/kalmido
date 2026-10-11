@@ -236,21 +236,17 @@ p.stdin.close()
 p.wait(5)
 
 # ---- a backup with snippets verifies and restores (the 2.34 rollback image ignores the new column)
-# 2.37 Job B: the backup (admin/backup.py) still works on the SQLite file -- backup + restore of this suite skipped until
-# it moves to pg_dump (KALMIDO_PG_BACKUP=1 runs them anyway)
-PG_BK = bool(os.environ.get("KALMIDO_PG_BACKUP"))
-if PG_BK:
-    r = A.post(B + "/api/admin/backups")
-    check(r.status_code == 202, "backup: back up now " + r.text[:100])
-    items = wait_for(lambda: [x for x in A.get(B + "/api/admin/backups").json().get("items", []) if x["kind"] == "manual"], 30)
-    name = items[0]["name"] if items else ""
-    r = A.post(B + f"/api/admin/backups/{name}/verify", json={})
-    check(r.ok and r.json().get("ok"), "backup: a backup with snippets verifies " + r.text[:200])
-    dbx("UPDATE tasks SET snippets=NULL WHERE id=?", (T,), write=True)  # 2.37: jsonb, NULL = none ('' is no json)
-    r = A.post(B + "/api/admin/backups/restore", json={"confirm": "RESTORE", "name": name})
-    check(r.ok and r.json().get("ok"), "backup: restore " + r.text[:200])
-    A = sess("alice")
-    check(len(A.get(B + f"/api/tasks/{T}").json().get("snippets", [])) == 20, "backup: the snippets are back after the restore")
+r = A.post(B + "/api/admin/backups")
+check(r.status_code == 202, "backup: back up now " + r.text[:100])
+items = wait_for(lambda: [x for x in A.get(B + "/api/admin/backups").json().get("items", []) if x["kind"] == "manual"], 30)
+name = items[0]["name"] if items else ""
+r = A.post(B + f"/api/admin/backups/{name}/verify", json={})
+check(r.ok and r.json().get("ok"), "backup: a backup with snippets verifies " + r.text[:200])
+dbx("UPDATE tasks SET snippets=NULL WHERE id=?", (T,), write=True)  # 2.37: jsonb, NULL = none ('' is no json)
+r = A.post(B + "/api/admin/backups/restore", json={"confirm": "RESTORE", "name": name})
+check(r.ok and r.json().get("ok"), "backup: restore " + r.text[:200])
+A = sess("alice")
+check(len(A.get(B + f"/api/tasks/{T}").json().get("snippets", [])) == 20, "backup: the snippets are back after the restore")
 
 print(f"p2350_d_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

@@ -93,6 +93,7 @@ async function page({cookie = '', hash = '', lang = null, wait = 2000, passkeys 
     }});
   await sleep(wait);
   dom.window.__jar = jar;
+  require('./boot').trackClose(dom.window);  // 2.37.0: a change check still waiting for the (slower) restore when the window closes
   return dom.window;
 }
 const api = async (w, m, u, b) => (await w.fetch(u, {method: m, headers: H, body: b ? JSON.stringify(b) : undefined})).json();
@@ -198,9 +199,6 @@ const until = async (fn, t = 5000) => { const t0 = Date.now(); while (Date.now()
   let bj = await api(w, 'GET', '/api/admin/backups');
   check(bj.on && bj.keep_daily === 7, 'backup settings saved at once (1.5)');
   check(!md.querySelector('[data-bk="save"]') && /Backups/.test(w.eval('HIST.undo[HIST.undo.length - 1].label')), 'no Save button; history step');
-  // 2.37 Job B: back up now / download / restore go through admin/backup.py (still the SQLite file); skipped until
-  // the backup moves to pg_dump (KALMIDO_PG_BACKUP_UI=1 runs them anyway)
-  if (process.env.KALMIDO_PG_BACKUP_UI) {
   click(w, md.querySelector('[data-bk="now"]'));
   await until(() => md.querySelectorAll('.bkrow').length === 1, 8000);
   check(md.querySelectorAll('.bkrow').length === 1 && /manual/.test(md.querySelector('.bkrow').textContent), 'back up now: the list shows it');
@@ -217,7 +215,8 @@ const until = async (fn, t = 5000) => { const t0 = Date.now(); while (Date.now()
   submit(w, rm.querySelector('form')); await sleep(2500);
   const st = await api(w, 'GET', '/api/state');
   check(st.tasks && !st.tasks.some(t => t.title === 'made after the backup'), 'restored (the task made afterwards is gone), admin still logged in');
-  }
+  // 2.37.0: pg_restore takes a moment; let the page's change check catch up before the window closes
+  const t0 = Date.now(); await until(() => w.eval('S.syncOk') > t0, 12000);
   w.close();
 
   // ---- German

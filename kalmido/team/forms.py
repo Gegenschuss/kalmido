@@ -6,12 +6,12 @@ import secrets
 from flask import g, jsonify, request
 
 from ..core.config import app, APP_NAME, PUBLIC_URL
-from ..core.pg import insert_id
+from ..core.pg import insert_id, system_ctx
 from ..core.i18n import lang, LANGS, tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import _accept_lang, _token_hash, me, rate_ip
 from ..accounts.login import seal, unseal
-from ..core.access import Denied, MANAGE_ROLES, need_feat, need_list
+from ..core.access import acx_anon_bind, Denied, MANAGE_ROLES, need_feat, need_list
 from ..tasks.validation import log_act
 from ..personal.timetrack import BadInput
 from ..api.v1 import hit_limit
@@ -179,9 +179,13 @@ def qr_svg():
 def _find(c, token):
     if not FORM_TOKEN_RE.fullmatch(token or ""):
         return None
-    return c.execute("""SELECT f.*, l.owner_id AS l_owner, l.name AS l_name, l.org_id AS l_org FROM forms f JOIN lists l ON l.id=f.list_id
-                        JOIN users u ON u.id=l.owner_id WHERE f.token_hash=? AND f.enabled=1 AND u.disabled=0 AND l.archived=0""",
-                     (_token_hash(token),)).fetchone()
+    with system_ctx(c):  # 2.37.0 (#1150): resolve the token (one row) across organisations ...
+        r = c.execute("""SELECT f.*, l.owner_id AS l_owner, l.name AS l_name, l.org_id AS l_org FROM forms f JOIN lists l ON l.id=f.list_id
+                         JOIN users u ON u.id=l.owner_id WHERE f.token_hash=? AND f.enabled=1 AND u.disabled=0 AND l.archived=0""",
+                      (_token_hash(token),)).fetchone()
+    if r is not None and not g.user:
+        acx_anon_bind(c, r["l_org"])  # ... a visitor without an account works inside exactly the list's organisation
+    return r
 
 
 def _lang(c, f):

@@ -5,8 +5,11 @@ weekly + safety), the "older than 2 days" and "backup failed" admin alerts, encr
 chunks, decrypted here independently; wrong passphrase refused), restore of a listed backup and of an uploaded file
 (data, attachments, safety backup, backup settings kept, every other session ended, the admin gets a fresh one,
 migrations / schema version), and refused archives: not a zip, no manifest, path traversal / absolute / symlink
-members, checksum mismatch, zip bomb, too large, newer schema (manifest and database), foreign trigger, damaged
-database -- each without changing anything. Finally KALMIDO_BACKUPS=0.
+members, checksum mismatch, zip bomb, too large, newer schema (manifest and dump), foreign trigger / view / function,
+damaged dump -- each without changing anything. 2.37.0 (#1150, Postgres): the archive holds kalmido.dump (pg_dump -Fc,
+format_version 2); a restore brings back the rows of every table of two organisations (counted per table before / after),
+attachments and office files; an archive from before 2.37 (tasks.db, format 1) is listed, uploaded and checked, but its
+restore is refused with its own code ("legacy"). Finally KALMIDO_BACKUPS=0.
 Starts its OWN test containers (start.sh, KALMIDO_ADMIN_ALERTS=1, KALMIDO_BACKUP_TICK=1, KALMIDO_BACKUP_MAX_MB=5).
 usage: backup_test.py <datadir>"""
 import base64
@@ -14,7 +17,6 @@ import hashlib
 import io
 import json
 import os
-import sqlite3  # 2.37 Job B: only for the archives' own tasks.db files
 import dbx as dbxm
 import stat
 import struct
@@ -114,7 +116,7 @@ def titles(s):
     return sorted(t["title"] for t in s.get(B + "/api/state").json()["tasks"])
 
 
-def make_zip(members, manifest=None, fix=True, schema=None):
+def make_zip(members, manifest=None, fix=True, schema=None, fv=2):
     """A zip with members {name: bytes}; manifest built from them (fix=True) unless given."""
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
@@ -128,7 +130,7 @@ def make_zip(members, manifest=None, fix=True, schema=None):
             if isinstance(data, zipfile.ZipInfo):
                 z.writestr(data, b"target")
         if manifest is None and fix:
-            manifest = {"format": "kalmido-backup", "format_version": 1, "app_version": "9.9.9", "schema_version": schema or 2,
+            manifest = {"format": "kalmido-backup", "format_version": fv, "app_version": "9.9.9", "schema_version": schema or 2,
                         "created_at": "2026-01-01T00:00:00+00:00", "kind": "manual", "counts": {}, "files": files}
         if manifest is not None:
             z.writestr("manifest.json", json.dumps(manifest))
@@ -203,268 +205,358 @@ for bad in ({"on": "yes"}, {"time": "25:00"}, {"keep_daily": 0}, {"keep_daily": 
     check(A.patch(B + "/api/admin/backups", json=bad).status_code == 400, f"invalid setting rejected: {bad}")
 check(not state()["encrypt"] and state()["time"] == "03:30", "nothing stored after invalid input")
 
-# 2.37 Job B: backup / restore still write and read a SQLite file (admin/backup.py moves to pg_dump in Job B). Until then
-# the checks below (back up now, download, schedule + alerts, retention, restore, refused archives, encryption, delete)
-# are skipped; access control, defaults / validation and KALMIDO_BACKUPS=0 run against Postgres.
-JOB_B = os.environ.get("KALMIDO_TEST_BACKUP_JOB_B") == "1"
-if JOB_B:
-    # ---- back up now: layout, manifest, checksums, file mode
+# 2.37.0 (#1150): rows of two organisations (written straight into the database: the instance mode does not matter
+# for the backup) + an office logo file -- a restore must bring back every table's rows of both
+ORGS = []
+for on in ("Org North", "Org South"):
+    oid = dbx("INSERT INTO orgs(name, icon, domains, created_at) VALUES(?, '', '', '2026-01-01T00:00:00+00:00') RETURNING id", (on,))[0][0]
+    ORGS.append(oid)
+    dbx("INSERT INTO lists(name, owner_id, org_id, created_at) VALUES(?, 1, ?, '2026-01-01T00:00:00+00:00')", (on + " list", oid))
+    dbx("INSERT INTO org_members(org_id, user_id, role) VALUES(?, 2, 'member') ON CONFLICT DO NOTHING", (oid,))
+OFF = os.path.join(DATA, "office", str(ORGS[0]))
+os.makedirs(OFF, exist_ok=True)
+open(os.path.join(OFF, "logo.png"), "wb").write(b"\x89PNG\r\n" + b"office logo" * 50)
+
+
+def table_counts():
+    """{table: rows} of every table of the database (one statement)."""
+    return {r[0]: int(r[1]) for r in dbx(
+        "SELECT relname, (xpath('/row/c/text()', query_to_xml(format('SELECT count(*) AS c FROM public.%I', relname), "
+        "false, true, '')))[1]::text FROM pg_class WHERE relnamespace = 'public'::regnamespace AND relkind = 'r'")}
+
+
+# ---- back up now: layout, manifest, checksums, file mode
+j = backup_now()
+check(len(j["items"]) == 1 and j["items"][0]["kind"] == "manual" and not j["items"][0]["encrypted"] and j["last_ok"] and not j["last_error"],
+      f"manual backup listed: {j['items']}")
+name = j["items"][0]["name"]
+p = os.path.join(BK, name)
+check(os.path.isfile(p) and stat.S_IMODE(os.stat(p).st_mode) == 0o600, "archive exists, mode 0600")
+with zipfile.ZipFile(p) as z:
+    names = z.namelist()
+    man = json.loads(z.read("manifest.json"))
+    okhash = all(hashlib.sha256(z.read(f[0])).hexdigest() == f[2] and len(z.read(f[0])) == f[1] for f in man["files"])
+check("kalmido.dump" in names and "tasks.db" not in names and "manifest.json" in names
+      and sum(n.startswith("attachments/") for n in names) == 2 and f"office/{ORGS[0]}/logo.png" in names,
+      f"zip: kalmido.dump, manifest, 2 attachments, 1 office file: {names}")
+with zipfile.ZipFile(p) as z:
+    check(z.read("kalmido.dump")[:5] == b"PGDMP", "kalmido.dump is a pg_dump archive (custom format)")
+check(man["format"] == "kalmido-backup" and man["format_version"] == 2 and man["schema_version"] == 2 and man["counts"]["tasks"] == 2
+      and man["counts"]["lists"] >= 4 and man["attachment_files"] == 3,
+      f"manifest: {dict((k, man.get(k)) for k in ('format', 'format_version', 'schema_version', 'counts', 'attachment_files'))}")
+check(okhash, "every member matches its SHA-256 and size")
+it = j["items"][0]
+check(it["counts"]["tasks"] == 2 and it["attachment_files"] == 3 and it["counts"]["users"] == 3 and not it["legacy"],
+      f"list shows the contents: {it}")
+r = A.post(B + f"/api/admin/backups/{name}/verify", json={})
+check(r.ok and r.json()["ok"] and r.json()["counts"]["tasks"] == 2 and r.json()["legacy"] is False, f"verify: {r.text[:200]}")
+
+# ---- download: admins only, the exact bytes
+r = A.get(B + f"/api/admin/backups/{name}/download")
+check(r.ok and r.content == open(p, "rb").read() and "attachment" in r.headers.get("Content-Disposition", "")
+      and r.headers.get("Cache-Control") == "no-store", "download: exact bytes, attachment, no-store")
+check(Bo.get(B + f"/api/admin/backups/{name}/download").status_code == 403, "download as user -> 403")
+check(requests.get(B + f"/api/admin/backups/{name}/download").status_code in (401, 303), "download without login refused")
+for bad in ("../tasks.db", "..%2Ftasks.db", "kalmido-backup-x.zip", "tasks.db", "%2e%2e%2ftasks.db"):
+    rr = A.get(B + f"/api/admin/backups/{bad}/download")
+    check(rr.status_code == 404 and b"SQLite" not in rr.content, f"download of {bad!r} refused")
+
+# ---- stale alert (no backup for 2 days) + schedule
+old = (datetime.now(TZ) - timedelta(days=3)).astimezone(ZoneInfo("UTC")).isoformat(timespec="seconds")
+dbx("UPDATE settings SET value=? WHERE key='bk_last_ok'", (old,))
+r = A.patch(B + "/api/admin/backups", json={"on": True, "time": "00:00"})
+check(r.ok and r.json()["on"], "switched on")
+check(bool(wait_alert("backup:stale")), "alert: last successful backup older than 2 days")
+check(bool(wait_alert("switch:bk_on:1")), "switching backups on is a security alert")
+today = datetime.now(TZ).date().isoformat()
+check(dbx("SELECT value FROM settings WHERE key='bk_last_day'")[0][0] == today, "time already passed today: first automatic backup tomorrow")
+n0 = len(state()["items"])
+dbx("UPDATE settings SET value='' WHERE key='bk_last_day'")  # as if the day had just begun
+j = wait_idle(n0, 20)
+autos = [x for x in j["items"] if x["kind"] == "auto"]
+check(len(autos) == 1 and dbx("SELECT value FROM settings WHERE key='bk_last_day'")[0][0] == today, f"scheduled backup ran once: {autos}")
+time.sleep(3)
+check(len([x for x in state()["items"] if x["kind"] == "auto"]) == 1, "not twice on the same day")
+
+# ---- failure alert: the backup folder is read-only
+os.chmod(BK, 0o500)
+try:
     j = backup_now()
-    check(len(j["items"]) == 1 and j["items"][0]["kind"] == "manual" and not j["items"][0]["encrypted"] and j["last_ok"] and not j["last_error"],
-          f"manual backup listed: {j['items']}")
-    name = j["items"][0]["name"]
-    p = os.path.join(BK, name)
-    check(os.path.isfile(p) and stat.S_IMODE(os.stat(p).st_mode) == 0o600, "archive exists, mode 0600")
-    with zipfile.ZipFile(p) as z:
-        names = z.namelist()
-        man = json.loads(z.read("manifest.json"))
-        okhash = all(hashlib.sha256(z.read(f[0])).hexdigest() == f[2] and len(z.read(f[0])) == f[1] for f in man["files"])
-    check("tasks.db" in names and "manifest.json" in names and sum(n.startswith("attachments/") for n in names) == 2,
-          f"zip: tasks.db, manifest, 2 attachments: {names}")
-    check(man["format"] == "kalmido-backup" and man["schema_version"] == 2 and man["counts"]["tasks"] == 2 and man["attachment_files"] == 2,
-          f"manifest: {dict((k, man[k]) for k in ('format', 'schema_version', 'counts', 'attachment_files'))}")
-    check(okhash, "every member matches its SHA-256 and size")
-    it = j["items"][0]
-    check(it["counts"]["tasks"] == 2 and it["attachment_files"] == 2 and it["counts"]["users"] == 3, f"list shows the contents: {it}")
-    r = A.post(B + f"/api/admin/backups/{name}/verify", json={})
-    check(r.ok and r.json()["ok"] and r.json()["counts"]["tasks"] == 2, f"verify: {r.text[:200]}")
+finally:
+    os.chmod(BK, 0o700)
+check(j["last_error"] and "could not be written" in j["last_error"], f"failure recorded: {j['last_error']}")
+check(bool(wait_alert("backup:io")), "alert: backup failed")
+j = backup_now()
+check(not j["last_error"], "the next backup clears the error")
 
-    # ---- download: admins only, the exact bytes
-    r = A.get(B + f"/api/admin/backups/{name}/download")
-    check(r.ok and r.content == open(p, "rb").read() and "attachment" in r.headers.get("Content-Disposition", "")
-          and r.headers.get("Cache-Control") == "no-store", "download: exact bytes, attachment, no-store")
-    check(Bo.get(B + f"/api/admin/backups/{name}/download").status_code == 403, "download as user -> 403")
-    check(requests.get(B + f"/api/admin/backups/{name}/download").status_code in (401, 303), "download without login refused")
-    for bad in ("../tasks.db", "..%2Ftasks.db", "kalmido-backup-x.zip", "tasks.db", "%2e%2e%2ftasks.db"):
-        rr = A.get(B + f"/api/admin/backups/{bad}/download")
-        check(rr.status_code == 404 and b"SQLite" not in rr.content, f"download of {bad!r} refused")
+# ---- retention: 14 daily + 8 weekly -> here 5 daily + 3 weekly, safety: the last 3
+src = open(os.path.join(BK, state()["items"][0]["name"]), "rb").read()
+now = datetime.now(TZ)
+fake = []
+for d in range(1, 60):
+    for hh in ((3, 30), (15, 0)) if d % 7 == 0 else ((3, 30),):
+        t = (now - timedelta(days=d)).replace(hour=hh[0], minute=hh[1], second=0)
+        fake.append(f"kalmido-backup-{t.strftime('%Y%m%d-%H%M%S')}-auto.zip")
+for d in range(1, 6):
+    t = (now - timedelta(days=d)).replace(hour=12, minute=0, second=0)
+    fake.append(f"kalmido-backup-{t.strftime('%Y%m%d-%H%M%S')}-safety.zip")
+for n in fake:
+    with open(os.path.join(BK, n), "wb") as f:
+        f.write(src)
+open(os.path.join(BK, "notes.txt"), "w").write("not a backup")
+check(A.patch(B + "/api/admin/backups", json={"keep_daily": 5, "keep_weekly": 3}).ok, "retention saved")
+before = {x["name"] for x in state()["items"]} | set(fake)
+j = backup_now()
+left = {x["name"] for x in j["items"]}
+allnames = before | left
 
-    # ---- stale alert (no backup for 2 days) + schedule
-    old = (datetime.now(TZ) - timedelta(days=3)).astimezone(ZoneInfo("UTC")).isoformat(timespec="seconds")
-    dbx("UPDATE settings SET value=? WHERE key='bk_last_ok'", (old,))
-    r = A.patch(B + "/api/admin/backups", json={"on": True, "time": "00:00"})
-    check(r.ok and r.json()["on"], "switched on")
-    check(bool(wait_alert("backup:stale")), "alert: last successful backup older than 2 days")
-    check(bool(wait_alert("switch:bk_on:1")), "switching backups on is a security alert")
-    today = datetime.now(TZ).date().isoformat()
-    check(dbx("SELECT value FROM settings WHERE key='bk_last_day'")[0][0] == today, "time already passed today: first automatic backup tomorrow")
-    n0 = len(state()["items"])
-    dbx("UPDATE settings SET value='' WHERE key='bk_last_day'")  # as if the day had just begun
-    j = wait_idle(n0, 20)
-    autos = [x for x in j["items"] if x["kind"] == "auto"]
-    check(len(autos) == 1 and dbx("SELECT value FROM settings WHERE key='bk_last_day'")[0][0] == today, f"scheduled backup ran once: {autos}")
-    time.sleep(3)
-    check(len([x for x in state()["items"] if x["kind"] == "auto"]) == 1, "not twice on the same day")
 
-    # ---- failure alert: the backup folder is read-only
-    os.chmod(BK, 0o500)
+def expected(names, daily, weekly):
+    at = {n: datetime.strptime(n[15:30], "%Y%m%d-%H%M%S") for n in names}
+    normal = sorted((n for n in names if not n.endswith("-safety.zip")), key=lambda n: (at[n], n), reverse=True)
+    keep, days, weeks = set(), [], []
+    for n in normal:
+        d, w = at[n].date(), tuple(at[n].isocalendar())[:2]
+        if d not in days:
+            days.append(d)
+            if len(days) <= daily:
+                keep.add(n)
+        if w not in weeks:
+            weeks.append(w)
+            if len(weeks) <= weekly:
+                keep.add(n)
+    keep |= set(sorted((n for n in names if n.endswith("-safety.zip")), key=lambda n: at[n], reverse=True)[:3])
+    keep |= {n for n in normal if datetime.now(TZ).replace(tzinfo=None) - at[n] < timedelta(hours=24)}
+    return keep
+
+
+exp = expected(allnames, 5, 3)
+check(left == exp, f"retention: kept everything of the last 24 h + newest per day (5 days) + per week (3 weeks) + 3 safety: extra {sorted(left - exp)} missing {sorted(exp - left)}")
+check(len([n for n in left if n.endswith("-safety.zip")]) == 3 and len([n for n in left if n in fake and "-auto" in n]) <= 8,
+      f"older ones thinned out, 3 safety backups: {sorted(left)}")
+check(os.path.exists(os.path.join(BK, "notes.txt")), "unrelated files are never deleted")
+os.remove(os.path.join(BK, "notes.txt"))
+A.patch(B + "/api/admin/backups", json={"keep_daily": 14, "keep_weekly": 8})
+
+# ---- restore a listed backup
+C0 = table_counts()
+j = backup_now()
+good = j["items"][0]["name"]
+check(j["items"][0]["kind"] == "manual", "fresh backup before the changes")
+dbx("DELETE FROM lists WHERE org_id=?", (ORGS[1],))  # 2.37.0: the second organisation goes (rows of several tables)
+dbx("DELETE FROM orgs WHERE id=?", (ORGS[1],))
+os.remove(os.path.join(OFF, "logo.png"))
+open(os.path.join(OFF, "late.png"), "wb").write(b"late office file")
+A.delete(B + f"/api/tasks/{T2}")
+A.post(B + "/api/tasks", json={"title": "created after backup", "list_id": L})
+A.post(B + f"/api/tasks/{T1}/attachments", files={"file": ("late.txt", b"late file", "text/plain")})
+A.patch(B + "/api/admin/backups", json={"keep_daily": 9})  # a backup setting changed after the backup: must survive
+before = titles(A)
+check("created after backup" in before and "deleted after backup" not in before, "changed state before the restore")
+check(restore(name=good, confirm="restore").status_code == 400, "wrong confirmation word -> 400")
+r = A.post(B + "/api/admin/backups/restore", json={"name": good})
+check(r.status_code == 400, "no confirmation word -> 400")
+check(restore(name="../tasks.db").status_code == 404, "restore of a path -> 404")
+PX.get(BP + "/api/me")
+old_cookie = A.cookies.get("kalmido_session")
+bob_cookie = Bo.cookies.get("kalmido_session")
+r = restore(name=good)
+check(r.ok and r.json()["ok"] and r.json()["safety"].endswith("-safety.zip") and not r.json()["relogin"], f"restored: {r.text[:200]}")
+new_cookie = r.cookies.get("kalmido_session")
+check(bool(new_cookie) and new_cookie != old_cookie, "the restoring admin gets a fresh session cookie")
+check(requests.get(B + "/api/me", cookies={"kalmido_session": old_cookie}).status_code == 401, "the old session of the admin ended")
+check(Bo.get(B + "/api/state").status_code == 401 and requests.get(B + "/api/me", cookies={"kalmido_session": bob_cookie}).status_code == 401,
+      "every other session ended")
+check(PX.get(BP + "/api/me").json().get("username") == "px", "proxy login keeps working after the restore")
+after = titles(A)
+check("deleted after backup" in after and "created after backup" not in after and "kept task" in after, f"data is the backup's: {after}")
+att = A.get(B + f"/api/tasks/{T1}").json()["attachments"]
+check(sorted(a["name"] for a in att) == ["note.txt", "pic.png"], f"attachments of the backup: {[a['name'] for a in att]}")
+check(A.get(B + f"/api/attachments/{ATT1['id']}").content == b"attachment one\n" * 20, "attachment file content restored")
+check(not any(n.startswith("attachments.") for n in os.listdir(DATA)), f"no leftover attachment folders: {os.listdir(DATA)}")
+check(state()["keep_daily"] == 9, "backup settings are kept across a restore")
+check(dbx("SELECT value FROM kalmido_meta WHERE key='schema_version'")[0][0] == "2"
+      and dbx("SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='totp_secret'"), "schema version + migrations")
+# 2.37.0: every table has the rows of the backup again (both organisations); the sessions start over, the restore adds
+# its own admin alert
+C1 = table_counts()
+diff = {t: (C0.get(t), C1.get(t)) for t in set(C0) | set(C1) if C0.get(t) != C1.get(t) and t not in ("sessions", "admin_alerts")}
+check(not diff and len(C0) > 50, f"restore: the row count of every table is the backup's ({len(C0)} tables), differences: {diff}")
+check([r[0] for r in dbx("SELECT name FROM orgs WHERE id IN (?, ?) ORDER BY id", tuple(ORGS))] == ["Org North", "Org South"]
+      and len(dbx("SELECT 1 FROM lists WHERE org_id IN (?, ?)", tuple(ORGS))) == 2, "both organisations and their lists are back")
+check(os.path.isfile(os.path.join(OFF, "logo.png")) and not os.path.exists(os.path.join(OFF, "late.png"))
+      and open(os.path.join(OFF, "logo.png"), "rb").read().endswith(b"office logo"), "office files: the backup's state")
+check(not any(n.startswith("office.") for n in os.listdir(DATA)), "no leftover office folders")
+rls = dbx("SELECT COUNT(*) FROM pg_class WHERE relnamespace = 'public'::regnamespace AND relrowsecurity AND relforcerowsecurity")[0][0]
+check(rls >= 10 and dbx("SELECT COUNT(*) FROM pg_policies WHERE schemaname='public'")[0][0] >= rls,
+      f"row-level security is back after the restore ({rls} tables)")
+check(dbx("SELECT COUNT(*) FROM pg_extension WHERE extname IN ('unaccent', 'pg_trgm')")[0][0] == 2
+      and dbx("SELECT kalmido_fold('Grüße')")[0][0].startswith("grusse"), "extensions + the search function survive pg_restore --clean")
+check(any(x["kind"] == "safety" and x["name"] == r.json()["safety"] for x in state()["items"]), "safety backup listed")
+check(bool(wait_alert("restore:")), "restore is a security alert")
+Bo = sess("bob")
+check(Bo.get(B + "/api/state").ok, "bob can log in again")
+# the safety backup brings the pre-restore state back
+r = restore(name=r.json()["safety"])
+A.cookies.set("kalmido_session", r.cookies.get("kalmido_session"))
+check(r.ok and "created after backup" in titles(A), "restoring the safety backup brings the changes back")
+
+# ---- restore by a proxy-header admin: no cookie needed, relogin false
+r = restore(PX, BP, name=good)
+check(r.ok and not r.json()["relogin"] and "kalmido_session" not in r.cookies, f"proxy admin restores: {r.text[:120]}")
+check(PX.get(BP + "/api/me").ok, "proxy admin still logged in")
+A = sess("alice")
+
+# ---- upload + restore an uploaded archive
+r = A.get(B + f"/api/admin/backups/{good}/download")
+up = upload(r.content)
+check(up.ok and up.json()["upload"].startswith("upload-") and up.json()["counts"]["tasks"] == 2 and not up.json()["encrypted"],
+      f"upload accepted with a summary: {up.text[:200]}")
+A.post(B + "/api/tasks", json={"title": "before upload restore", "list_id": L})
+r = restore(upload=up.json()["upload"])
+A = sess("alice")
+check(r.ok and "before upload restore" not in titles(A), "restored from the uploaded file")
+check(not os.listdir(os.path.join(BK, ".uploads")), "the uploaded file is removed afterwards")
+check(restore(upload="upload-../../tasks.db").status_code == 404, "upload id with a path -> 404")
+
+# ---- refused archives (nothing changes)
+ref = titles(A)
+src_dump = zipfile.ZipFile(os.path.join(BK, good)).read("kalmido.dump")
+
+
+def refused(data, code, what):
+    r = upload(data)
+    if r.ok:
+        r = restore(upload=r.json()["upload"])
+    ok = r.status_code in (400, 413) and (r.json().get("code") == code if code else True)
+    check(ok, f"{what}: refused ({r.status_code} {r.text[:160]})")
+    check(titles(A) == ref, f"{what}: nothing changed")
+    check(not any(n.startswith(("attachments.", ".restore")) for n in os.listdir(DATA) + os.listdir(BK)), f"{what}: no leftovers")
+
+
+refused(b"hello world, not a zip", "format", "random bytes")
+refused(make_zip({"kalmido.dump": src_dump}, fix=False), "format", "zip without manifest")
+refused(make_zip({"kalmido.dump": src_dump, "../../evil.txt": b"x"}), "members", "path traversal member")
+refused(make_zip({"kalmido.dump": src_dump, "attachments/1/../../../x": b"x"}), "members", "traversal inside attachments")
+refused(make_zip({"kalmido.dump": src_dump, "/etc/passwd": b"x"}), "members", "absolute member")
+refused(make_zip({"kalmido.dump": src_dump, "attachments/1/..": b"x"}), "members", "'..' as file name")
+refused(make_zip({"kalmido.dump": src_dump, "other.txt": b"x"}), "members", "unexpected member")
+link = zipfile.ZipInfo("attachments/1/link")
+link.external_attr = (stat.S_IFLNK | 0o777) << 16
+refused(make_zip({"kalmido.dump": src_dump, "attachments/1/link": link}), "members", "symlink member")
+refused(make_zip({"kalmido.dump": src_dump}, manifest={"format": "kalmido-backup", "format_version": 2, "app_version": "9.9.9", "schema_version": 2,
+                                                  "files": [["kalmido.dump", len(src_dump), "0" * 64]]}), "hash", "checksum mismatch")
+refused(make_zip({"kalmido.dump": src_dump}, manifest={"format": "kalmido-backup", "format_version": 2, "app_version": "9.9.9", "schema_version": 2,
+                                                  "files": [["kalmido.dump", len(src_dump) - 1, hashlib.sha256(src_dump).hexdigest()]]}), None, "size mismatch")
+refused(make_zip({"kalmido.dump": src_dump, "attachments/1/zeros.bin": b"\0" * (3 * 1024 * 1024)}), "bomb", "zip bomb (ratio)")  # 2.22.0: 3 MB (the bigger schema + 4 MB passed the 5 MB size limit first)
+refused(make_zip({"kalmido.dump": src_dump, "attachments/1/big.bin": os.urandom(6 * 1024 * 1024)}), None, "larger than KALMIDO_BACKUP_MAX_MB")
+refused(make_zip({"kalmido.dump": src_dump}, schema=99), "schema", "newer schema (manifest)")
+
+
+def dump_with(setup, teardown):
+    """The kalmido.dump of a backup taken while the database holds something a Kalmido database never has (the backup
+    itself is deleted again)."""
+    before = {x["name"] for x in state()["items"]}
+    for q in setup:
+        dbx(q)
     try:
         j = backup_now()
     finally:
-        os.chmod(BK, 0o700)
-    check(j["last_error"] and "could not be written" in j["last_error"], f"failure recorded: {j['last_error']}")
-    check(bool(wait_alert("backup:io")), "alert: backup failed")
-    j = backup_now()
-    check(not j["last_error"], "the next backup clears the error")
-
-    # ---- retention: 14 daily + 8 weekly -> here 5 daily + 3 weekly, safety: the last 3
-    src = open(os.path.join(BK, state()["items"][0]["name"]), "rb").read()
-    now = datetime.now(TZ)
-    fake = []
-    for d in range(1, 60):
-        for hh in ((3, 30), (15, 0)) if d % 7 == 0 else ((3, 30),):
-            t = (now - timedelta(days=d)).replace(hour=hh[0], minute=hh[1], second=0)
-            fake.append(f"kalmido-backup-{t.strftime('%Y%m%d-%H%M%S')}-auto.zip")
-    for d in range(1, 6):
-        t = (now - timedelta(days=d)).replace(hour=12, minute=0, second=0)
-        fake.append(f"kalmido-backup-{t.strftime('%Y%m%d-%H%M%S')}-safety.zip")
-    for n in fake:
-        with open(os.path.join(BK, n), "wb") as f:
-            f.write(src)
-    open(os.path.join(BK, "notes.txt"), "w").write("not a backup")
-    check(A.patch(B + "/api/admin/backups", json={"keep_daily": 5, "keep_weekly": 3}).ok, "retention saved")
-    before = {x["name"] for x in state()["items"]} | set(fake)
-    j = backup_now()
-    left = {x["name"] for x in j["items"]}
-    allnames = before | left
+        for q in teardown:
+            dbx(q)
+    new = [x["name"] for x in j["items"] if x["name"] not in before and x["kind"] == "manual"]
+    assert len(new) == 1 and not j["last_error"], (new, j["last_error"])
+    d = zipfile.ZipFile(os.path.join(BK, new[0])).read("kalmido.dump")
+    r = A.post(B + f"/api/admin/backups/{new[0]}/verify", json={})
+    print("dump_with verify:", r.status_code, r.text[:160], flush=True)
+    os.remove(os.path.join(BK, new[0]))
+    return d
 
 
-    def expected(names, daily, weekly):
-        at = {n: datetime.strptime(n[15:30], "%Y%m%d-%H%M%S") for n in names}
-        normal = sorted((n for n in names if not n.endswith("-safety.zip")), key=lambda n: (at[n], n), reverse=True)
-        keep, days, weeks = set(), [], []
-        for n in normal:
-            d, w = at[n].date(), tuple(at[n].isocalendar())[:2]
-            if d not in days:
-                days.append(d)
-                if len(days) <= daily:
-                    keep.add(n)
-            if w not in weeks:
-                weeks.append(w)
-                if len(weeks) <= weekly:
-                    keep.add(n)
-        keep |= set(sorted((n for n in names if n.endswith("-safety.zip")), key=lambda n: at[n], reverse=True)[:3])
-        keep |= {n for n in normal if datetime.now(TZ).replace(tzinfo=None) - at[n] < timedelta(hours=24)}
-        return keep
+refused(make_zip({"kalmido.dump": dump_with(["UPDATE kalmido_meta SET value='99' WHERE key='schema_version'"],
+                                            ["UPDATE kalmido_meta SET value='2' WHERE key='schema_version'"])}),
+        "schema", "newer schema (the dump's kalmido_meta, manifest says 2)")
+refused(make_zip({"kalmido.dump": dump_with(
+    ["CREATE FUNCTION evil_fn() RETURNS trigger LANGUAGE plpgsql AS $f$BEGIN DELETE FROM users; RETURN NULL; END$f$",
+     "CREATE TRIGGER evil AFTER INSERT ON tasks FOR EACH ROW EXECUTE FUNCTION evil_fn()"],
+    ["DROP TRIGGER evil ON tasks", "DROP FUNCTION evil_fn()"])}), "objects", "foreign trigger + function")
+refused(make_zip({"kalmido.dump": dump_with(["CREATE VIEW evil_v AS SELECT id FROM users"], ["DROP VIEW evil_v"])}),
+        "objects", "foreign view")
+refused(make_zip({"kalmido.dump": dump_with(
+    ["CREATE FUNCTION kalmido_evil() RETURNS void LANGUAGE plpgsql AS $f$BEGIN EXECUTE 'SELECT 1'; END$f$"],
+    ["DROP FUNCTION kalmido_evil()"])}), "objects", "an own-named function with dynamic SQL")
+dmg = bytearray(src_dump)
+for off in range(len(dmg) // 2, len(dmg) // 2 + 4000, 7):
+    dmg[off] ^= 0x5A
+refused(make_zip({"kalmido.dump": bytes(dmg)}), "integrity", "damaged dump (checksums fixed in the manifest)")
+refused(make_zip({"kalmido.dump": src_dump[:len(src_dump) // 2]}), "integrity", "truncated dump")
+refused(make_zip({"kalmido.dump": b"PGDMP" + os.urandom(3000)}), None, "garbage after the dump magic")
+refused(make_zip({"kalmido.dump": src_dump}, fv=1), "format", "format_version 1 with a dump")
+refused(make_zip({"kalmido.dump": src_dump, "tasks.db": b"SQLite format 3\x00"}), "format", "dump and tasks.db together")
 
+# ---- 2.37.0: an archive from before 2.37 (tasks.db, format 1): listed, uploaded and checked, its restore refused
+old_zip = make_zip({"tasks.db": b"SQLite format 3\x00" + os.urandom(4000), "attachments/1/a.txt": b"old file"}, fv=1)
+up = upload(old_zip)
+check(up.ok and up.json()["legacy"] is True and up.json()["schema_version"] == 2, f"old archive: upload accepted, marked legacy: {up.text[:200]}")
+r = A.post(B + f"/api/admin/backups/{up.json()['upload']}/verify", json={}) if up.ok else up
+check(r.ok and r.json()["ok"] and r.json()["legacy"] is True, f"old archive: verify checks its members: {r.text[:200]}")
+r = restore(upload=up.json()["upload"]) if up.ok else up
+check(r.status_code == 400 and r.json().get("code") == "legacy" and "2.36" in r.json().get("error", ""),
+      f"old archive: restore refused with its own code: {r.text[:240]}")
+check(titles(A) == ref and not any(n.startswith(("attachments.", ".restore")) for n in os.listdir(DATA) + os.listdir(BK)),
+      "old archive: nothing changed")
+r = A.post(B + "/api/admin/backups/restore", json={"confirm": "RESTORE", "upload": up.json()["upload"]},
+           headers={"Accept-Language": "de"}) if up.ok else up
+check(r.status_code == 400 and "SQLite" in r.json().get("error", ""), f"old archive: the text names the cause: {r.text[:200]}")
+old_name = "kalmido-backup-20200101-030000-manual.zip"
+open(os.path.join(BK, old_name), "wb").write(old_zip)
+r = A.get(B + "/api/admin/backups")
+it = [x for x in r.json()["items"] if x["name"] == old_name] if r.ok else []
+check(r.ok and it and it[0]["legacy"] is True and not it[0]["unreadable"], f"old archive in the folder: listed as legacy: {it}")
+r = restore(name=old_name)
+check(r.status_code == 400 and r.json().get("code") == "legacy", "old listed archive: restore refused")
+os.remove(os.path.join(BK, old_name))
 
-    exp = expected(allnames, 5, 3)
-    check(left == exp, f"retention: kept everything of the last 24 h + newest per day (5 days) + per week (3 weeks) + 3 safety: extra {sorted(left - exp)} missing {sorted(exp - left)}")
-    check(len([n for n in left if n.endswith("-safety.zip")]) == 3 and len([n for n in left if n in fake and "-auto" in n]) <= 8,
-          f"older ones thinned out, 3 safety backups: {sorted(left)}")
-    check(os.path.exists(os.path.join(BK, "notes.txt")), "unrelated files are never deleted")
-    os.remove(os.path.join(BK, "notes.txt"))
-    A.patch(B + "/api/admin/backups", json={"keep_daily": 14, "keep_weekly": 8})
+# ---- encryption
+r = A.patch(B + "/api/admin/backups", json={"encrypt": True, "passphrase": "correct horse battery"})
+check(r.ok and r.json()["encrypt"] and r.json()["passphrase_set"], "encryption on")
+check("correct horse" not in json.dumps(r.json()) and "correct horse" not in json.dumps(dbx("SELECT value FROM settings WHERE key='bk_pass'")),
+      "passphrase never returned, stored sealed")
+j = backup_now()
+check(not j["last_error"], f"encrypted backup written: {j['last_error']}")
+enc = [x for x in j["items"] if x["encrypted"]][0]
+check(enc["encrypted"] and enc["name"].endswith(".zip.enc") and enc["counts"]["tasks"] >= 2, f"encrypted backup listed with its summary: {enc}")
+ep = os.path.join(BK, enc["name"])
+raw = open(ep, "rb").read()
+check(raw.startswith(MAGIC) and b"PGDMP" not in raw and b"kept task" not in raw, "encrypted file: magic, no plain text")
+h, plain = decrypt(ep, "correct horse battery")
+with zipfile.ZipFile(io.BytesIO(plain)) as z:
+    check("kalmido.dump" in z.namelist() and z.read("kalmido.dump")[:5] == b"PGDMP" and h["kdf"] == "scrypt"
+          and h["meta"].get("format_version") == 2, "independent decryption of the documented format works")
+r = A.post(B + f"/api/admin/backups/{enc['name']}/verify", json={"passphrase": "wrong passphrase!"})
+check(r.status_code == 400 and r.json()["code"] == "passphrase", "verify with a wrong passphrase refused")
+check(A.post(B + f"/api/admin/backups/{enc['name']}/verify", json={}).ok, "verify with the saved passphrase")
+A.post(B + "/api/tasks", json={"title": "after encrypted backup", "list_id": L})
+r = restore(name=enc["name"], passphrase="wrong passphrase!")
+check(r.status_code == 400 and r.json()["code"] == "passphrase" and "after encrypted backup" in titles(A), "restore with a wrong passphrase: refused, nothing changed")
+trunc = raw[:-40]
+up = upload(trunc)
+r = restore(upload=up.json()["upload"], passphrase="correct horse battery") if up.ok else up
+check(r.status_code == 400, "truncated encrypted file refused")
+A.patch(B + "/api/admin/backups", json={"passphrase": "another passphrase 2"})
+r = restore(name=enc["name"], passphrase="correct horse battery")
+A = sess("alice")
+check(r.ok and "after encrypted backup" not in titles(A), "restore of the encrypted backup with its passphrase")
+check(len(dbx("SELECT 1 FROM lists WHERE org_id IN (?, ?)", tuple(ORGS))) == 2, "encrypted round trip: both organisations' lists")
+r = A.patch(B + "/api/admin/backups", json={"encrypt": False})
+check(r.ok and not r.json()["encrypt"], "encryption off again")
 
-    # ---- restore a listed backup
-    j = backup_now()
-    good = j["items"][0]["name"]
-    check(j["items"][0]["kind"] == "manual", "fresh backup before the changes")
-    A.delete(B + f"/api/tasks/{T2}")
-    A.post(B + "/api/tasks", json={"title": "created after backup", "list_id": L})
-    A.post(B + f"/api/tasks/{T1}/attachments", files={"file": ("late.txt", b"late file", "text/plain")})
-    A.patch(B + "/api/admin/backups", json={"keep_daily": 9})  # a backup setting changed after the backup: must survive
-    before = titles(A)
-    check("created after backup" in before and "deleted after backup" not in before, "changed state before the restore")
-    check(restore(name=good, confirm="restore").status_code == 400, "wrong confirmation word -> 400")
-    r = A.post(B + "/api/admin/backups/restore", json={"name": good})
-    check(r.status_code == 400, "no confirmation word -> 400")
-    check(restore(name="../tasks.db").status_code == 404, "restore of a path -> 404")
-    PX.get(BP + "/api/me")
-    old_cookie = A.cookies.get("kalmido_session")
-    bob_cookie = Bo.cookies.get("kalmido_session")
-    r = restore(name=good)
-    check(r.ok and r.json()["ok"] and r.json()["safety"].endswith("-safety.zip") and not r.json()["relogin"], f"restored: {r.text[:200]}")
-    new_cookie = r.cookies.get("kalmido_session")
-    check(bool(new_cookie) and new_cookie != old_cookie, "the restoring admin gets a fresh session cookie")
-    check(requests.get(B + "/api/me", cookies={"kalmido_session": old_cookie}).status_code == 401, "the old session of the admin ended")
-    check(Bo.get(B + "/api/state").status_code == 401 and requests.get(B + "/api/me", cookies={"kalmido_session": bob_cookie}).status_code == 401,
-          "every other session ended")
-    check(PX.get(BP + "/api/me").json().get("username") == "px", "proxy login keeps working after the restore")
-    after = titles(A)
-    check("deleted after backup" in after and "created after backup" not in after and "kept task" in after, f"data is the backup's: {after}")
-    att = A.get(B + f"/api/tasks/{T1}").json()["attachments"]
-    check(sorted(a["name"] for a in att) == ["note.txt", "pic.png"], f"attachments of the backup: {[a['name'] for a in att]}")
-    check(A.get(B + f"/api/attachments/{ATT1['id']}").content == b"attachment one\n" * 20, "attachment file content restored")
-    check(not any(n.startswith("attachments.") for n in os.listdir(DATA)), f"no leftover attachment folders: {os.listdir(DATA)}")
-    check(state()["keep_daily"] == 9, "backup settings are kept across a restore")
-    check(dbx("PRAGMA user_version")[0][0] == 2 and "totp_secret" in [r[1] for r in dbx("PRAGMA table_info(users)")], "schema version + migrations")
-    check(any(x["kind"] == "safety" and x["name"] == r.json()["safety"] for x in state()["items"]), "safety backup listed")
-    check(bool(wait_alert("restore:")), "restore is a security alert")
-    Bo = sess("bob")
-    check(Bo.get(B + "/api/state").ok, "bob can log in again")
-    # the safety backup brings the pre-restore state back
-    r = restore(name=r.json()["safety"])
-    A.cookies.set("kalmido_session", r.cookies.get("kalmido_session"))
-    check(r.ok and "created after backup" in titles(A), "restoring the safety backup brings the changes back")
-
-    # ---- restore by a proxy-header admin: no cookie needed, relogin false
-    r = restore(PX, BP, name=good)
-    check(r.ok and not r.json()["relogin"] and "kalmido_session" not in r.cookies, f"proxy admin restores: {r.text[:120]}")
-    check(PX.get(BP + "/api/me").ok, "proxy admin still logged in")
-    A = sess("alice")
-
-    # ---- upload + restore an uploaded archive
-    r = A.get(B + f"/api/admin/backups/{good}/download")
-    up = upload(r.content)
-    check(up.ok and up.json()["upload"].startswith("upload-") and up.json()["counts"]["tasks"] == 2 and not up.json()["encrypted"],
-          f"upload accepted with a summary: {up.text[:200]}")
-    A.post(B + "/api/tasks", json={"title": "before upload restore", "list_id": L})
-    r = restore(upload=up.json()["upload"])
-    A = sess("alice")
-    check(r.ok and "before upload restore" not in titles(A), "restored from the uploaded file")
-    check(not os.listdir(os.path.join(BK, ".uploads")), "the uploaded file is removed afterwards")
-    check(restore(upload="upload-../../tasks.db").status_code == 404, "upload id with a path -> 404")
-
-    # ---- refused archives (nothing changes)
-    ref = titles(A)
-    src_db = zipfile.ZipFile(os.path.join(BK, good)).read("tasks.db")
-
-
-    def refused(data, code, what):
-        r = upload(data)
-        if r.ok:
-            r = restore(upload=r.json()["upload"])
-        ok = r.status_code in (400, 413) and (r.json().get("code") == code if code else True)
-        check(ok, f"{what}: refused ({r.status_code} {r.text[:160]})")
-        check(titles(A) == ref, f"{what}: nothing changed")
-        check(not any(n.startswith(("attachments.", ".restore")) for n in os.listdir(DATA) + os.listdir(BK)), f"{what}: no leftovers")
-
-
-    refused(b"hello world, not a zip", "format", "random bytes")
-    refused(make_zip({"tasks.db": src_db}, fix=False), "format", "zip without manifest")
-    refused(make_zip({"tasks.db": src_db, "../../evil.txt": b"x"}), "members", "path traversal member")
-    refused(make_zip({"tasks.db": src_db, "attachments/1/../../../x": b"x"}), "members", "traversal inside attachments")
-    refused(make_zip({"tasks.db": src_db, "/etc/passwd": b"x"}), "members", "absolute member")
-    refused(make_zip({"tasks.db": src_db, "attachments/1/..": b"x"}), "members", "'..' as file name")
-    refused(make_zip({"tasks.db": src_db, "other.txt": b"x"}), "members", "unexpected member")
-    link = zipfile.ZipInfo("attachments/1/link")
-    link.external_attr = (stat.S_IFLNK | 0o777) << 16
-    refused(make_zip({"tasks.db": src_db, "attachments/1/link": link}), "members", "symlink member")
-    refused(make_zip({"tasks.db": src_db}, manifest={"format": "kalmido-backup", "format_version": 1, "app_version": "9.9.9", "schema_version": 2,
-                                                      "files": [["tasks.db", len(src_db), "0" * 64]]}), "hash", "checksum mismatch")
-    refused(make_zip({"tasks.db": src_db}, manifest={"format": "kalmido-backup", "format_version": 1, "app_version": "9.9.9", "schema_version": 2,
-                                                      "files": [["tasks.db", len(src_db) - 1, hashlib.sha256(src_db).hexdigest()]]}), None, "size mismatch")
-    refused(make_zip({"tasks.db": src_db, "attachments/1/zeros.bin": b"\0" * (3 * 1024 * 1024)}), "bomb", "zip bomb (ratio)")  # 2.22.0: 3 MB (the bigger schema + 4 MB passed the 5 MB size limit first)
-    refused(make_zip({"tasks.db": src_db, "attachments/1/big.bin": os.urandom(6 * 1024 * 1024)}), None, "larger than KALMIDO_BACKUP_MAX_MB")
-    refused(make_zip({"tasks.db": src_db}, schema=99), "schema", "newer schema (manifest)")
-    tmpdb = os.path.join(DATA, "t.db")
-    open(tmpdb, "wb").write(src_db)
-    c = sqlite3.connect(tmpdb)
-    c.execute("PRAGMA user_version=99")
-    c.commit()
-    c.close()
-    refused(make_zip({"tasks.db": open(tmpdb, "rb").read()}), "schema", "newer schema (database)")
-    open(tmpdb, "wb").write(src_db)
-    c = sqlite3.connect(tmpdb)
-    c.execute("CREATE TRIGGER evil AFTER INSERT ON tasks BEGIN DELETE FROM users; END")
-    c.commit()
-    c.close()
-    refused(make_zip({"tasks.db": open(tmpdb, "rb").read()}), "objects", "foreign trigger")
-    dmg = bytearray(src_db)
-    for off in range(4096 * 2, min(len(dmg), 4096 * 6), 7):
-        dmg[off] ^= 0x5A
-    refused(make_zip({"tasks.db": bytes(dmg)}), None, "damaged database")
-    os.remove(tmpdb)
-
-    # ---- encryption
-    r = A.patch(B + "/api/admin/backups", json={"encrypt": True, "passphrase": "correct horse battery"})
-    check(r.ok and r.json()["encrypt"] and r.json()["passphrase_set"], "encryption on")
-    check("correct horse" not in json.dumps(r.json()) and "correct horse" not in json.dumps(dbx("SELECT value FROM settings WHERE key='bk_pass'")),
-          "passphrase never returned, stored sealed")
-    j = backup_now()
-    check(not j["last_error"], f"encrypted backup written: {j['last_error']}")
-    enc = [x for x in j["items"] if x["encrypted"]][0]
-    check(enc["encrypted"] and enc["name"].endswith(".zip.enc") and enc["counts"]["tasks"] >= 2, f"encrypted backup listed with its summary: {enc}")
-    ep = os.path.join(BK, enc["name"])
-    raw = open(ep, "rb").read()
-    check(raw.startswith(MAGIC) and src_db[:16] not in raw and b"kept task" not in raw, "encrypted file: magic, no plain text")
-    h, plain = decrypt(ep, "correct horse battery")
-    with zipfile.ZipFile(io.BytesIO(plain)) as z:
-        check("tasks.db" in z.namelist() and h["kdf"] == "scrypt", "independent decryption of the documented format works")
-    r = A.post(B + f"/api/admin/backups/{enc['name']}/verify", json={"passphrase": "wrong passphrase!"})
-    check(r.status_code == 400 and r.json()["code"] == "passphrase", "verify with a wrong passphrase refused")
-    check(A.post(B + f"/api/admin/backups/{enc['name']}/verify", json={}).ok, "verify with the saved passphrase")
-    A.post(B + "/api/tasks", json={"title": "after encrypted backup", "list_id": L})
-    r = restore(name=enc["name"], passphrase="wrong passphrase!")
-    check(r.status_code == 400 and r.json()["code"] == "passphrase" and "after encrypted backup" in titles(A), "restore with a wrong passphrase: refused, nothing changed")
-    trunc = raw[:-40]
-    up = upload(trunc)
-    r = restore(upload=up.json()["upload"], passphrase="correct horse battery") if up.ok else up
-    check(r.status_code == 400, "truncated encrypted file refused")
-    A.patch(B + "/api/admin/backups", json={"passphrase": "another passphrase 2"})
-    r = restore(name=enc["name"], passphrase="correct horse battery")
-    A = sess("alice")
-    check(r.ok and "after encrypted backup" not in titles(A), "restore of the encrypted backup with its passphrase")
-    r = A.patch(B + "/api/admin/backups", json={"encrypt": False})
-    check(r.ok and not r.json()["encrypt"], "encryption off again")
-
-    # ---- delete
-    j = state()
-    n = j["items"][-1]["name"]
-    r = A.delete(B + f"/api/admin/backups/{n}")
-    check(r.ok and n not in [x["name"] for x in r.json()["items"]] and not os.path.exists(os.path.join(BK, n)), "delete a backup")
-    check(Bo.delete(B + f"/api/admin/backups/{j['items'][0]['name']}").status_code in (401, 403), "user cannot delete")
+# ---- delete
+j = state()
+n = j["items"][-1]["name"]
+r = A.delete(B + f"/api/admin/backups/{n}")
+check(r.ok and n not in [x["name"] for x in r.json()["items"]] and not os.path.exists(os.path.join(BK, n)), "delete a backup")
+check(Bo.delete(B + f"/api/admin/backups/{j['items'][0]['name']}").status_code in (401, 403), "user cannot delete")
 
 logs = subprocess.run(["docker", "logs", os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")], capture_output=True, text=True)
 check("correct horse" not in logs.stdout + logs.stderr and "another passphrase" not in logs.stdout + logs.stderr, "passphrases never logged")

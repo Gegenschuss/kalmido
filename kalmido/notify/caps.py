@@ -124,7 +124,8 @@ def cap_ok(c, uid, row, lid):
     if not lid or row not in CAP_ROWS:
         return True
     try:
-        return tpl_allows(tpl_for(c, lid, uid), row)
+        with c.savepoint():  # 2.37.0 (#1150): a failing read must not abort the caller's transaction
+            return tpl_allows(tpl_for(c, lid, uid), row)
     except Exception as e:  # noqa: BLE001 - a broken template row never blocks a push
         print("notification template check failed:", type(e).__name__, e, flush=True)
         return True

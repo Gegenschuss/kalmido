@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """2.0.0 (#279): Kalmido never creates a new, empty database on top of existing data. A data dir with the marker file,
-attachments or backups but a missing, empty, unreadable or damaged tasks.db makes the container REFUSE to start (exit code 3,
+attachments or backups but an empty database (2.37.0: Postgres; or an old SQLite tasks.db not moved yet) makes the container REFUSE to start (exit code 3,
 clear log line) instead of starting empty (whose first visitor would become the admin). An empty data dir starts fresh and
-gets the marker; an existing install without the marker (1.x) gets it on its first start.
+gets the marker; an existing install without the marker (1.x) gets it on its first start. 2.37.0: a database whose schema
+version is newer than the image's is refused too (exit code 3).
 Starts its OWN test container (start.sh).
 usage: p200_guard_test.py <datadir>"""
 import os
-import shutil
 import subprocess
 import sys
 import time
@@ -65,13 +65,6 @@ def start():
     subprocess.run(["docker", "start", CT], capture_output=True)
 
 
-def db_files(suffix_from="", suffix_to=".away"):
-    for s in ("", "-wal", "-shm"):
-        p = DBF + s
-        if os.path.exists(p + suffix_from):
-            os.rename(p + suffix_from, p + suffix_to)
-
-
 subprocess.run(["docker", "rm", "-f", os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")], capture_output=True)  # 2.7.2: the old container must not write while its data goes
 subprocess.run(["rm", "-rf", DATA])
 os.makedirs(DATA, exist_ok=True)
@@ -87,7 +80,8 @@ tid = s.post(B + "/api/tasks", json={"title": "keep me"}).json()["id"]
 check(s.post(B + f"/api/tasks/{tid}/attachments", files={"file": ("a.txt", b"data")}, headers=H).ok, "an attachment")
 
 # 2.37.0 (#1150): the database is Postgres now. "tasks.db missing / empty" -> the Postgres database is empty (its schema
-# moved aside); a damaged SQLite file / page has no Postgres counterpart here (2.37 Job B: the move tool checks old files).
+# moved aside). 2.37: no SQLite file any more (the cases of a damaged / unreadable tasks.db are gone with it; an old tasks.db
+# next to an empty database is refused below, the move tool checks old files).
 def psql(sql):
     with open(os.path.join(DATA, ".kalmido-db"), encoding="utf-8") as f:
         dbc, dbn = f.read().split()
@@ -138,6 +132,17 @@ s = requests.Session()
 s.headers.update(H)
 s.post(B + "/api/auth/login", json={"username": "alice", "password": "password123"})
 check(any(t["id"] == tid for t in s.get(B + "/api/state").json()["tasks"]), "data intact")
+# ---- 2.37.0 (#1150): a database a newer version already migrated (kalmido_meta.schema_version above this image's): refuse
+stop()
+ver = psql("SELECT value FROM kalmido_meta WHERE key='schema_version'").stdout.strip()
+check(ver.isdigit(), f"schema version stored ({ver!r})")
+psql("UPDATE kalmido_meta SET value='999' WHERE key='schema_version'")
+start()
+code, logs = exited()
+check(code == 3 and "database schema 999 is newer than this version" in logs, f"newer schema: refused (exit {code})")
+psql(f"UPDATE kalmido_meta SET value='{ver}' WHERE key='schema_version'")
+start()
+check(up(), "schema version back: starts")
 # ---- an install from before 2.0 (no marker): gets it on the first start
 stop()
 os.remove(MARK)

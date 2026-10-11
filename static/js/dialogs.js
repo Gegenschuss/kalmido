@@ -7,7 +7,7 @@ function modal(html) {
   const m = document.createElement('div');
   m.className = 'modal';
   m.innerHTML = `<div class="card">${html}</div>`;
-  m.addEventListener('mousedown', e => { if (e.target === m) m.remove(); });
+  m.addEventListener('mousedown', e => { if (e.target === m) modalClose(m); });
   document.body.appendChild(m);
   document.body.classList.add('modal-open');  // 2.28.0 (#976): the grips step aside while a dialog is open
   onRemove(m, () => { const dc = m.ownerDocument; if (dc && dc.body && !dc.querySelector('.modal')) dc.body.classList.remove('modal-open'); });
@@ -51,6 +51,35 @@ function onRemove(el, fn) {  // runs fn once el left the page (removed by any pa
   const mo = new MutationObserver(() => { if (!el.isConnected) { mo.disconnect(); fn(); } });
   mo.observe(document.body, {childList: true});
   return mo;
+}
+// 2.37.0 (#1158): closing a dialog by Esc / the backdrop goes through its own close (md._close, see modalGuard) if it has one
+const modalClose = m => { if (m._close) m._close(); else m.remove(); };
+// a dialog with unsaved input: closing it (Cancel, Esc, the backdrop) asks "Discard changes?" while dirty() is true.
+// Returns the close function for the dialog's own Cancel button.
+function modalGuard(md, dirty) {
+  md._close = async () => {
+    if (md._asking) return;
+    if (dirty()) {
+      md._asking = true;
+      const ok = await askConfirm(tr('Discard changes?'), tr('Your changes in this dialog are not saved yet.'), {ok: tr('Discard'), danger: true, cancel: tr('Keep editing')});
+      md._asking = false;
+      if (!ok) return;
+    }
+    md.remove();
+  };
+  return md._close;
+}
+// a dialog opened from inside another one: the first one steps aside (hidden, its unsaved input kept) and comes back when
+// the sub-dialog closes ("Back", Esc, the backdrop). open() returns the sub-dialog (or a promise of it; nothing = no dialog).
+function modalSub(parent, open) {
+  const from = document.activeElement;
+  parent.style.display = 'none'; parent.setAttribute('aria-hidden', 'true');
+  const show = () => {
+    if (!parent.isConnected) return;
+    parent.style.display = ''; parent.removeAttribute('aria-hidden');
+    setTimeout(() => { try { (from && parent.contains(from) ? from : parent.querySelector('.card'))?.focus({preventScroll: true}); } catch { /* gone */ } }, 0);
+  };
+  Promise.resolve(open()).then(ch => { if (ch && ch.isConnected) onRemove(ch, show); else show(); }, show);
 }
 function askDialog({title, body = '', html = '', ok, danger = false, input = null, cancel}) {
   return new Promise(res => {

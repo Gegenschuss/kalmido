@@ -13,6 +13,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from ..core.config import app, COOKIE, EMAIL_RE, MIN_PASSWORD, PUBLIC_URL, USERNAME_RE
 from ..core.i18n import lang, LANGS, N_, tr, trn
 from ..core.db import body, bump, create_user, db, ensure_inbox, err, gsetting, now_utc, uset, usettings
+from ..core.pg import system_ctx
 from ..accounts.session import _rate_blocked, _rate_fail, _rate_keys, _token_hash, me, user_public
 from ..accounts.pictures import (
     AVATAR_DIR, avatar_drop_file, AVATAR_MAX_MB, avatar_path, AVATAR_PRESETS, avatar_process, avatar_url, LIST_ICON_DIR,
@@ -58,10 +59,19 @@ def user_admin_dict(c, u):
             "invite": _invite_state(c, u["id"]),  # 2.22.0 (#697): invited | expired | null
             "signup": u["signup"] or "",  # 2.23.0 (#711): confirm (e-mail not confirmed) | pending (waits for approval) | ''
             "kid": bool(u["kid"]),
-            "orgs": [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=? ORDER BY org_id", (u["id"],))],  # 2.22.0 (#752)
-            **({"org_id": (c.execute("SELECT org_id FROM agents WHERE user_id=?", (u["id"],)).fetchone() or [None])[0]} if (u["kind"] or "user") == "agent" else {}),  # 2.28.0 (#935)
-            "lists": c.execute("SELECT COUNT(*) FROM lists WHERE owner_id=? AND is_inbox=0", (u["id"],)).fetchone()[0],
+            **_admin_struct(c, u),  # 2.22.0 (#752) orgs, 2.28.0 (#935) org_id of an agent, number of lists
             "storage": _storage(c, u["id"])}  # 2.24.0 (#910): {used, quota_mb}
+
+
+def _admin_struct(c, u):
+    """2.37.0 (#1150): ids and a count for the instance admin's account list -- read as "system" (organisation structure,
+    no content), so the admin's own organisations do not narrow them."""
+    with system_ctx(c):
+        d = {"orgs": [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=? ORDER BY org_id", (u["id"],))]}
+        if (u["kind"] or "user") == "agent":
+            d["org_id"] = (c.execute("SELECT org_id FROM agents WHERE user_id=?", (u["id"],)).fetchone() or [None])[0]
+        d["lists"] = c.execute("SELECT COUNT(*) FROM lists WHERE owner_id=? AND is_inbox=0", (u["id"],)).fetchone()[0]
+    return d
 
 
 def _storage(c, uid):
@@ -77,7 +87,8 @@ def admin_sees(c, uid):
 
 
 def user_orgs_public(c, uid):
-    return [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=? ORDER BY org_id", (uid,))]
+    with system_ctx(c):  # 2.37.0 (#1150): membership ids (structure)
+        return [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=? ORDER BY org_id", (uid,))]
 
 
 @app.get("/api/users")
@@ -98,11 +109,12 @@ def users_list():
     vis = visible_people(c, mine)  # 2.22.0 (#752): only the people this person may see (organisation / contacts)
     # 2.28.0 (#935): + the organisations of each person (ids), so the share dialog offers only the list's workspace; agents
     # carry the workspace they work in
-    ag_org = {r[0]: r[1] for r in c.execute("SELECT user_id, org_id FROM agents")}
+    with system_ctx(c):  # 2.37.0 (#1150): which accounts are agents and of which workspace (ids, structure; vis filters people)
+        ag_org = {r[0]: r[1] for r in c.execute("SELECT user_id, org_id FROM agents")}
+        rows = c.execute("""SELECT * FROM users WHERE disabled=0 AND id NOT IN
+                            (SELECT user_id FROM agents WHERE owner_id IS NOT NULL AND owner_id!=?) ORDER BY id""", (mine,)).fetchall()
     return jsonify(users=[{**user_public(u), "orgs": user_orgs_public(c, u["id"]), **({"org_id": ag_org.get(u["id"])} if u["id"] in ag_org else {})}
-                          for u in c.execute("""SELECT * FROM users WHERE disabled=0 AND id NOT IN
-                                                (SELECT user_id FROM agents WHERE owner_id IS NOT NULL AND owner_id!=?) ORDER BY id""", (mine,))
-                          if vis is None or u["id"] in vis])
+                          for u in rows if vis is None or u["id"] in vis])
 
 
 def _proxy_taken(c, login, uid=None):
@@ -171,11 +183,12 @@ def user_create():
     if not isinstance(orgs, list) or not all(isinstance(x, int) for x in orgs):
         c.rollback()
         return err(tr("Invalid value: {0}", "orgs"))
-    known = [x for x in orgs if c.execute("SELECT 1 FROM orgs WHERE id=?", (x,)).fetchone()]
-    if known:
-        c.execute("DELETE FROM org_members WHERE user_id=?", (uid,))
-        for o in known:
-            org_member_add(c, o, uid)
+    with system_ctx(c):  # 2.37.0 (#1150): the instance admin places the new account (organisation structure, no content)
+        known = [x for x in orgs if c.execute("SELECT 1 FROM orgs WHERE id=?", (x,)).fetchone()]
+        if known:
+            c.execute("DELETE FROM org_members WHERE user_id=?", (uid,))
+            for o in known:
+                org_member_add(c, o, uid)
     inv = None
     if b.get("invite") is True and not pw:  # 2.22.0 (#697): no password: a one-time link to set it (by e-mail when possible)
         from ..accounts.invite import invite_new
@@ -206,14 +219,15 @@ def user_update(uid):
         if not isinstance(b["orgs"], list) or not all(isinstance(x, int) for x in b["orgs"]):
             return err(tr("Invalid value: {0}", "orgs"))
         from ..accounts.orgs import org_leave, org_member_add
-        have = {r[0]: r[1] for r in c.execute("SELECT org_id, role FROM org_members WHERE user_id=?", (uid,))}
-        for o in sorted(set(have) - set(b["orgs"])):  # 2.28.0 (#935): taken out of an organisation = leaving it (lists stay with it)
-            heir = (c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND u.disabled=0 AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (o, uid)).fetchone() or [me()])[0]
-            org_leave(c, o, uid, heir if heir != uid else me())
-        for o in b["orgs"]:
-            if o not in have:
-                if c.execute("SELECT 1 FROM orgs WHERE id=?", (o,)).fetchone():
-                    org_member_add(c, o, uid)
+        with system_ctx(c):  # 2.37.0 (#1150): the instance admin moves the account between organisations (structure)
+            have = {r[0]: r[1] for r in c.execute("SELECT org_id, role FROM org_members WHERE user_id=?", (uid,))}
+            for o in sorted(set(have) - set(b["orgs"])):  # 2.28.0 (#935): taken out of an organisation = leaving it (lists stay with it)
+                heir = (c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND u.disabled=0 AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (o, uid)).fetchone() or [me()])[0]
+                org_leave(c, o, uid, heir if heir != uid else me())
+            for o in b["orgs"]:
+                if o not in have:
+                    if c.execute("SELECT 1 FROM orgs WHERE id=?", (o,)).fetchone():
+                        org_member_add(c, o, uid)
     if uid == me() and (("is_admin" in b and not b["is_admin"]) or b.get("disabled") or b.get("kind") == "agent"):
         return err(tr("You cannot remove your own admin rights or disable yourself"))
     if "kind" in b:  # 2.0.0: person <-> agent
@@ -312,7 +326,8 @@ def user_delete(uid):
         return err(tr("unknown user"), 404)
     if uid == me():
         return err(tr("You cannot delete yourself"))
-    n = c.execute("SELECT COUNT(*) FROM lists WHERE owner_id=? AND is_inbox=0", (uid,)).fetchone()[0]
+    with system_ctx(c):  # 2.37.0 (#1150): a count over every organisation (lists the admin cannot see still block the deletion)
+        n = c.execute("SELECT COUNT(*) FROM lists WHERE owner_id=? AND is_inbox=0", (uid,)).fetchone()[0]
     if n:
         return err(trn("The user still owns {0} list. Delete it or disable the user instead.",
                        "The user still owns {0} lists. Delete them or disable the user instead.", n), 409)

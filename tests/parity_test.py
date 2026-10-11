@@ -247,6 +247,8 @@ APP_ONLY = [
      ("PUT /api/workload/capacity/", "POST /api/qr")),
     ("2.28.0 (#935): a person's organisations (workspaces) and their admins' member management: people only (agents 403)",
      ("* /api/orgs",)),
+    ("2.37.0 (#1159): a person saves a chat message as a task with a click; agents only offer it (send_chat offer_save), never save",
+     ("=POST /api/chat-save",)),
     ("2.28.0 (#1005): a person answers an agent's question with a button: in the API as POST /agents/{id}/chat/{mid}/choice (a person's token); agents never answer",
      ("POST /api/agents/{}/chat/{}/choice",)),
     ("2.29.0 (#1030 / #929): folder settings are per person (their own folders, like the sidebar order); people only, the "

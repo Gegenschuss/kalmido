@@ -87,6 +87,7 @@ ORDER = (
     "collab.notes",
     "collab.teamchat",
     "collab.msgsearch",  # 2.33.0 (#1080)
+    "collab.chatsave",  # 2.37.0 (#1159)
     "integrations.mail",
     "accounts.invite",
     "family.family",

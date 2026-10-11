@@ -19,6 +19,7 @@ from flask import has_request_context, request
 from ..core.config import _origin, APP_NAME, NTFY_TOKEN, NTFY_URL, PUBLIC_URL, safe_urlopen, TZ, WATCHDOG_INTERVAL
 from ..core.schema import USER_DEFAULTS
 from ..core.i18n import LANGS, short_day, tr, trn
+from ..core.pg import system_ctx
 from ..core.db import bump, connect, DbError, inbox_default, iso, local_now, now_utc, parse_iso, uset, usettings
 from ..accounts.session import GATE
 from ..core.access import task_visible, vis_sql
@@ -201,59 +202,86 @@ def webpush_user(uid, payload, prio="4", ttl=86400, topic=None, only=None, stats
     """Push to every subscribed device of the user (only: one subscription id). Returns the number of devices
     whose push service accepted it. 404 / 410 = subscription gone -> removed; 429 -> no sends until Retry-After;
     400 / 401 / 403 five times in a row -> removed; 413 = payload too large (logged). stats (dict): gets
-    "subs" = the number of subscriptions tried or paused (admin alert "fell back to ntfy")."""
+    "subs" = the number of subscriptions tried or paused (admin alert "fell back to ntfy").
+    2.37.0 (#1150): three steps - read the subscriptions (short own connection), send (no connection held while the push
+    services answer), write down the results (short own connection, own commit). An own connection (not the request's):
+    it reads another person's devices and commits by itself, which must not commit the request's transaction early."""
     from ..notify.alerts import aa_count, aa_fail, aa_ok
     if not WEBPUSH_ON:
         return 0
+    q, a = "SELECT * FROM push_subs WHERE user_id=?", [uid]
+    if only is not None:
+        q, a = q + " AND id=?", a + [only]
+    ok, now = 0, time.time()
     c = connect()
     try:
-        q, a = "SELECT * FROM push_subs WHERE user_id=?", [uid]
-        if only is not None:
-            q, a = q + " AND id=?", a + [only]
-        ok, now = 0, time.time()
-        subs = c.execute(q, a).fetchall()
-        if stats is not None:
-            stats["subs"] = len(subs)
-        for sub in subs:
-            if sub["backoff_until"] > now:
-                continue
+        with system_ctx(c):  # 2.37.0 (#1150): the recipient's devices (also when someone else's request sends the push)
+            subs = c.execute(q, a).fetchall()
             # 2.0.5: a real push also carries the tags of this device's notifications that were handled elsewhere
             # (the only way on iOS, see push_dismiss_tick); the service worker closes them before showing this one
-            drop = [r[0] for r in c.execute("SELECT tag FROM push_tags WHERE sub_id=? AND handled_at IS NOT NULL AND tag!=? "
-                                            "ORDER BY handled_at LIMIT 30", (sub["id"], payload.get("tag") or ""))]
-            st, retry = webpush_send(sub, {**payload, "dismiss": drop} if drop else payload, prio, ttl, topic)
-            host = urllib.parse.urlsplit(sub["endpoint"]).hostname
-            if (st == 0 and webpush_endpoint_ok(sub["endpoint"])) or st >= 500:
-                aa_fail("webpush:" + (host or "?"), f"HTTP {st}" if st else "network")
-            elif st:
-                aa_ok("webpush:" + (host or "?"))
-            if 200 <= st < 300:
-                ok += 1
-                c.execute("UPDATE push_subs SET last_ok=?, fails=0 WHERE id=?", (iso(now_utc()), sub["id"]))
-                push_tag_sent(c, sub["id"], payload.get("tag"), drop)
-            elif st in (404, 410):
-                c.execute("DELETE FROM push_subs WHERE id=?", (sub["id"],))
-                aa_count("webpush", "removed", f"{uid}|{sub['label'][:60]}|{st}")
-                print(f"webpush: subscription {sub['id']} of user {uid} is gone ({st}, {host}), removed", flush=True)
-            elif st == 429:
-                try:
-                    wait = min(max(int(retry), 10), 3600)
-                except (TypeError, ValueError):
-                    wait = 60
-                c.execute("UPDATE push_subs SET backoff_until=? WHERE id=?", (now + wait, sub["id"]))
-                print(f"webpush: rate limited by {host}, pausing subscription {sub['id']} for {wait} s", flush=True)
-            elif st in (400, 401, 403):
-                c.execute("UPDATE push_subs SET fails=fails+1 WHERE id=?", (sub["id"],))
-                if c.execute("DELETE FROM push_subs WHERE id=? AND fails>=5", (sub["id"],)).rowcount:
-                    aa_count("webpush", "removed", f"{uid}|{sub['label'][:60]}|{st}")
-                print(f"webpush: {host} rejected the push for subscription {sub['id']} ({st})", flush=True)
-            elif st:
-                print(f"webpush: {host} answered {st} for subscription {sub['id']}" +
-                      (" (payload too large)" if st == 413 else ""), flush=True)
-        c.commit()
-        return ok
+            drops = {sub["id"]: [r[0] for r in c.execute("SELECT tag FROM push_tags WHERE sub_id=? AND handled_at IS NOT NULL "
+                                                         "AND tag!=? ORDER BY handled_at LIMIT 30", (sub["id"], payload.get("tag") or ""))]
+                     for sub in subs if not sub["backoff_until"] > now}
     finally:
         c.close()
+    if stats is not None:
+        stats["subs"] = len(subs)
+    results = []
+    for sub in subs:
+        if sub["id"] not in drops:
+            continue
+        drop = drops[sub["id"]]
+        st, retry = webpush_send(sub, {**payload, "dismiss": drop} if drop else payload, prio, ttl, topic)
+        host = urllib.parse.urlsplit(sub["endpoint"]).hostname
+        if (st == 0 and webpush_endpoint_ok(sub["endpoint"])) or st >= 500:
+            aa_fail("webpush:" + (host or "?"), f"HTTP {st}" if st else "network")
+        elif st:
+            aa_ok("webpush:" + (host or "?"))
+        if 200 <= st < 300:
+            ok += 1
+        if st:
+            results.append((sub, drop, st, retry, host))
+    if not results:
+        return ok
+    c = connect()
+    try:
+        with system_ctx(c):  # the recipients' push subscriptions (any organisation), no content
+            for sub, drop, st, retry, host in results:
+                try:
+                    with c.savepoint():  # the subscription may be gone meanwhile (removed on another device)
+                        _webpush_result(c, uid, sub, drop, st, retry, host, payload, now, aa_count)
+                except DbError as e:
+                    print(f"webpush: could not record the result for subscription {sub['id']}:", type(e).__name__, flush=True)
+        c.commit()
+    finally:
+        c.close()
+    return ok
+
+
+def _webpush_result(c, uid, sub, drop, st, retry, host, payload, now, aa_count):
+    if 200 <= st < 300:
+        c.execute("UPDATE push_subs SET last_ok=?, fails=0 WHERE id=?", (iso(now_utc()), sub["id"]))
+        if c.execute("SELECT 1 FROM push_subs WHERE id=?", (sub["id"],)).fetchone():
+            push_tag_sent(c, sub["id"], payload.get("tag"), drop)
+    elif st in (404, 410):
+        c.execute("DELETE FROM push_subs WHERE id=?", (sub["id"],))
+        aa_count("webpush", "removed", f"{uid}|{sub['label'][:60]}|{st}")
+        print(f"webpush: subscription {sub['id']} of user {uid} is gone ({st}, {host}), removed", flush=True)
+    elif st == 429:
+        try:
+            wait = min(max(int(retry), 10), 3600)
+        except (TypeError, ValueError):
+            wait = 60
+        c.execute("UPDATE push_subs SET backoff_until=? WHERE id=?", (now + wait, sub["id"]))
+        print(f"webpush: rate limited by {host}, pausing subscription {sub['id']} for {wait} s", flush=True)
+    elif st in (400, 401, 403):
+        c.execute("UPDATE push_subs SET fails=fails+1 WHERE id=?", (sub["id"],))
+        if c.execute("DELETE FROM push_subs WHERE id=? AND fails>=5", (sub["id"],)).rowcount:
+            aa_count("webpush", "removed", f"{uid}|{sub['label'][:60]}|{st}")
+        print(f"webpush: {host} rejected the push for subscription {sub['id']} ({st})", flush=True)
+    else:
+        print(f"webpush: {host} answered {st} for subscription {sub['id']}" +
+              (" (payload too large)" if st == 413 else ""), flush=True)
 
 
 # ---- 2.0.5: close a notification on the other devices once it was handled on one (#311)
@@ -353,8 +381,9 @@ def badge_count(uid):
     from ..collab.teamchat import tchat_unread
     c = connect()
     try:
-        s = usettings(c, uid)
-        return (news_unread(c, uid, s) if collab_on(s) else 0) + tchat_unread(c, uid)
+        with system_ctx(c):  # 2.37.0 (#1150): the recipient's counts, whoever's request sends the push
+            s = usettings(c, uid)
+            return (news_unread(c, uid, s) if collab_on(s) else 0) + tchat_unread(c, uid)
     except Exception:  # noqa: BLE001 - a badge never stops a push
         return 0
     finally:
@@ -405,7 +434,8 @@ def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None
     if s is None:
         c = connect()
         try:
-            s = usettings(c, uid)
+            with system_ctx(c):  # 2.37.0 (#1150): the recipient's settings
+                s = usettings(c, uid)
         finally:
             c.close()
     ch = push_channel(s)

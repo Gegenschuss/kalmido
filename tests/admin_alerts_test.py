@@ -387,10 +387,12 @@ check(A.delete(B + "/api/admin/alerts").json()["items"] == [], "clear")
 check(dbx("SELECT COUNT(*) FROM admin_alerts")[0][0] == 0, "cleared in the database")
 
 # ---- integrity check
-# 2.37 Job B: planting a broken row through writable_schema (SQLite quick_check) has no Postgres counterpart; the check now
-# reads the data page checksum failures (pg_stat_database). Only the healthy state is checked here.
+# 2.37.0 (#1150, K-3): the check reads the data page checksum failures (pg_stat_database; planting a broken page has no
+# safe counterpart here). A cluster without data checksums reports NULL: shown as "checksums off", never as an alert.
 qc = alerts().get("quick_check") or {}
-check(qc.get("ok") is not False, f"integrity check: healthy database reported ok: {qc}")
+cs = dbx("SELECT checksum_failures IS NOT NULL FROM pg_stat_database WHERE datname=current_database()")[0][0]
+check(qc.get("ok") is not False and ("at" not in qc or qc.get("checksums") is bool(cs)), f"integrity check: healthy database ok, checksums {'on' if cs else 'off'}: {qc}")
+check(not [r for r in dbx("SELECT key FROM admin_alerts") if r[0].startswith("quick_check")], "checksums off is no alert")
 no_private(ntfy_log(), "whole run")
 check(not [x for x in ntfy_log() if x["topic"] == "t-bob" and x["title"].lower().startswith("kalmido admin")], "bob never got an admin alert")
 

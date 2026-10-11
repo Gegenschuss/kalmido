@@ -186,6 +186,7 @@ def contacts_sync(c, sid):
             allow = cal_allow(c)
             url = cal_unseal(c, s["user_id"], s["url"])
             auth = (s["username"], cal_unseal(c, s["user_id"], s["password"]))
+            c.commit()  # 2.37.0 (#1150): no open transaction while the address book server is asked (snapshot, pool)
             occs, cards = [], []
             for b in carddav_books(url, auth, allow):
                 for card in carddav_cards(b, auth, allow):

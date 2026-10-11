@@ -1105,6 +1105,15 @@ A `reply_to` of another place, an unknown id or a deleted message is refused wit
   the notification settings); an agent whose comment or channel message is answered gets the event `mention` /
   `team_message`, like an @mention.
 
+### Saving a chat message as a task (2.37.0)
+
+A person can save any message of their agent chat or of the team chat as a task to look at later (the message's menu:
+*Save as task*): the task gets the whole text as Markdown, the message's files (copies) and a link back to the message;
+the list is one the person may change (the inbox by default), a review date is optional. The message then shows a small
+*Saved* mark; saving it again opens the existing task. Agents never save: for a long answer worth keeping (a plan, a
+draft, a summary) send it with `offer_save: true` (`POST /api/v1/agent/chats/{user_id}`, MCP `send_chat`); the message
+carries `offer_save` and shows the button *Save as task*, the person decides. No event comes back to the agent.
+
 ### Chat reactions and delivery (2.7.2)
 
 People react to chat messages like to comments: 👍 (`up`), 👎 (`down`), ❤️ (`heart`). Every message from
@@ -1163,6 +1172,7 @@ Agents read files like this:
 | A task / comment file as text (2.34.0) | `GET /api/v1/attachments/{id}/text` (`?max_chars=`, default and at most 200000) | `read_attachment` |
 | Remove a chat file you sent | `DELETE /api/v1/chat-attachments/{id}` | – |
 | Ask for an approval in the chat (2.35.0) | `POST /api/v1/agent/chats/{user_id}` with `approval: {title, what?, yes_label?, no_label?}`; the answer: event `chat_choice` with `approval` | `request_chat_approval` |
+| Offer to save an answer as a task (2.37.0) | `POST /api/v1/agent/chats/{user_id}` with `offer_save: true`: the button *Save as task* under the message; the person saves it (title, list, review date), agents never save | `send_chat` with `offer_save` |
 | Send files in the chat | `POST /api/v1/agent/chats/{user_id}` as `multipart/form-data`: `body` (optional with files), `task_id`, `file` (repeatable) | `send_chat` with `files: [{name, base64, mime?}]` |
 | Write a text file onto a task (2.30.0) | `POST /api/v1/tasks/{id}/attachments/text` with `{name, content}` (needs `attachments:write`) | `create_text_file` |
 

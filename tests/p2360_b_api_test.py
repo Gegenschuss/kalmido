@@ -182,20 +182,16 @@ c.execute("INSERT INTO tasks(list_id,title,sort,created_at,updated_at) VALUES(?,
 c.commit()
 c.close()
 check(dbx("SELECT locked FROM tasks WHERE title='Old image'")[0][0] == 0, "rollback 2.35: an INSERT without the column gets 0")
-# 2.37 Job B: the backup (admin/backup.py) still works on the SQLite file -- backup + restore of this suite skipped until
-# it moves to pg_dump (KALMIDO_PG_BACKUP=1 runs them anyway)
-PG_BK = bool(os.environ.get("KALMIDO_PG_BACKUP"))
-if PG_BK:
-    r = A.post(B + "/api/admin/backups")
-    check(r.status_code == 202, "backup: back up now " + r.text[:100])
-    items = wait_for(lambda: [x for x in A.get(B + "/api/admin/backups").json().get("items", []) if x["kind"] == "manual"], 30)
-    name = items[0]["name"] if items else ""
-    r = A.post(B + f"/api/admin/backups/{name}/verify", json={})
-    check(r.ok and r.json().get("ok"), "backup: verifies " + r.text[:200])
-    dbx("UPDATE tasks SET locked=0", write=True)
-    r = A.post(B + "/api/admin/backups/restore", json={"confirm": "RESTORE", "name": name})
-    check(r.ok and r.json().get("ok"), "backup: restore " + r.text[:200])
-    check(wait_for(lambda: dbx("SELECT locked FROM tasks WHERE id=?", (T,))[0][0] == 1, 10), "backup: the lock is back after the restore")
+r = A.post(B + "/api/admin/backups")
+check(r.status_code == 202, "backup: back up now " + r.text[:100])
+items = wait_for(lambda: [x for x in A.get(B + "/api/admin/backups").json().get("items", []) if x["kind"] == "manual"], 30)
+name = items[0]["name"] if items else ""
+r = A.post(B + f"/api/admin/backups/{name}/verify", json={})
+check(r.ok and r.json().get("ok"), "backup: verifies " + r.text[:200])
+dbx("UPDATE tasks SET locked=0", write=True)
+r = A.post(B + "/api/admin/backups/restore", json={"confirm": "RESTORE", "name": name})
+check(r.ok and r.json().get("ok"), "backup: restore " + r.text[:200])
+check(wait_for(lambda: dbx("SELECT locked FROM tasks WHERE id=?", (T,))[0][0] == 1, 10), "backup: the lock is back after the restore")
 
 print(f"p2360_b_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

@@ -7,7 +7,7 @@ from datetime import date
 from flask import jsonify
 
 from ..core.config import app
-from ..core.pg import insert_id
+from ..core.pg import insert_id, like_escape
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..core.access import collab_all, Denied, list_people, list_role, need_list, need_project, vis_sql
@@ -246,7 +246,7 @@ def search_field_ids(c, uid, q):
     for f in c.execute(f"SELECT * FROM list_fields WHERE list_id IN {vis_sql()}", (uid, uid)).fetchall():
         if f["type"] in ("text", "url"):
             hits.update(r[0] for r in c.execute("""SELECT v.task_id FROM task_field_values v JOIN tasks t ON t.id=v.task_id
-                                                   WHERE v.field_id=? AND t.list_id=? AND v.value ILIKE ?""", (f["id"], f["list_id"], f"%{q}%")))
+                                                   WHERE v.field_id=? AND t.list_id=? AND v.value ILIKE ? ESCAPE '\\'""", (f["id"], f["list_id"], f"%{like_escape(q)}%")))
         elif f["type"] == "select":
             oids = [o["id"] for o in json.loads(f["options"] or "{}").get("options", []) if ql in o["name"].casefold()]
             for oid in oids:

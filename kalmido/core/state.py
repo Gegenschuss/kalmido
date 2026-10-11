@@ -5,7 +5,7 @@ from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app, IOS_SHORTCUT_URL, NTFY_IN, NTFY_URL, PUBLIC_URL
 from ..core.i18n import languages
-from ..core.db import db, gsetting, inbox_names, iso, local_now, now_utc, usettings
+from ..core.db import db, gsetting, inbox_names, iso, like_escape, local_now, now_utc, usettings
 from ..accounts.session import me, user_public
 from ..accounts.pictures import avatar_map, list_icon_url
 from ..core.access import (
@@ -364,13 +364,13 @@ def task_query():
 def search_tasks(c, uid, raw, limit):
     """Visible tasks whose title, notes, link or a custom field value contains raw (web search, REST API)."""
     from ..lists.fields import search_field_ids
-    q = f"%{raw}%"
+    q = f"%{like_escape(raw)}%"  # 2.37.0 (#1150): the text literally (Postgres reads a backslash as an escape in LIKE)
     fids = sorted(search_field_ids(c, uid, raw))[:2000] if raw else []
     # participants: only their own tasks match (a context parent's notes / link / fields are not theirs to search)
     return load_tasks(c, f"list_id IN {vis_sql()} AND deleted_at IS NULL AND {tvis(c, uid, write=True)} "
-                         "AND (title ILIKE ? OR content ILIKE ? OR url ILIKE ? OR (snippets IS NOT NULL AND EXISTS (SELECT 1 FROM "
+                         "AND (title ILIKE ? ESCAPE '\\' OR content ILIKE ? ESCAPE '\\' OR url ILIKE ? ESCAPE '\\' OR (snippets IS NOT NULL AND EXISTS (SELECT 1 FROM "
                          "jsonb_array_elements(CASE WHEN jsonb_typeof(snippets)='array' THEN snippets ELSE '[]'::jsonb END) j "
-                         "WHERE (j->>'code') ILIKE ? OR (j->>'path') ILIKE ?)) "
+                         "WHERE (j->>'code') ILIKE ? ESCAPE '\\' OR (j->>'path') ILIKE ? ESCAPE '\\')) "
                          f"OR id IN ({','.join('?' * len(fids)) or 'NULL'})) "
                          "ORDER BY status, updated_at DESC LIMIT ?", (uid, uid, q, q, q, q, q, *fids, limit))
 

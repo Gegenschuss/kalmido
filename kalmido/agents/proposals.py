@@ -992,13 +992,20 @@ def v1_agent_chat_post(uid):
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if not u or is_agent(u) or not agent_shares(c, aid, uid):
         raise Denied(404)
-    fb, files = chat_input(("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "reply_to", "approval"))
+    fb, files = chat_input(("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "reply_to", "approval", "offer_save"))
     b = fb if fb is not None else v1_json()
     # 2.28.0 (#1005): answer buttons; 2.30.0 (#1041): permission questions (permission, expires_in)
     unknown = sorted(k for k in b if k not in ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "reply_to",
-                                               "approval"))  # 2.33.0: reply_to; 2.35.0 (#1103): approval
+                                               "approval", "offer_save"))  # 2.33.0: reply_to; 2.35.0 (#1103): approval; 2.37.0 (#1159): offer_save
     if unknown:
         raise UnknownFields(unknown)
+    # 2.37.0 (#1159): offer_save: true = the button "Save as task" under the message; the person saves (POST /api/chat-save),
+    # the agent never does
+    offer = b.pop("offer_save", None)
+    if fb is not None and isinstance(offer, str):  # a multipart form sends text
+        offer = offer.lower() in ("1", "true", "yes")
+    if offer not in (None, True, False):
+        raise BadInput(tr("Invalid value: {0}", "offer_save"))
     jid = None
     if b.get("job_id") not in (None, ""):  # 2.32.0 (#1081): this message carries the result of a job for this person
         jid = as_int(b["job_id"], "job_id", 1)
@@ -1010,8 +1017,8 @@ def v1_agent_chat_post(uid):
         b["multi"] = b["multi"].lower() in ("1", "true", "yes")
     r = chat_post(c, aid, uid, "agent", b, files)
     from ..agents.steps import steps_take
-    if jid:
-        c.execute("UPDATE agent_chat SET job_id=? WHERE id=?", (jid, r["id"]))
+    if jid or offer:
+        c.execute("UPDATE agent_chat SET job_id=?, offer_save=? WHERE id=?", (jid, 1 if offer else 0, r["id"]))
         r = c.execute("SELECT * FROM agent_chat WHERE id=?", (r["id"],)).fetchone()
     if not b.get("permission"):  # 2.32.0 (#1081): the answer takes the live steps of the run along (a permission question: the run goes on)
         steps_take(c, aid, uid, r["id"])

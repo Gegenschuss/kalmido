@@ -1167,7 +1167,7 @@ async function aaDraw(md, j) {
     </details>
     <div class="row"><button class="btn sm" data-aa="test" ${j.env ? '' : 'disabled'}>${ic('bell', 's')} ${tr('Send test alert')}</button></div>`;
   const st = j.storage || {}, qc = j.quick_check || {};
-  if (st.total || qc.at) h += hint([st.total ? tr('Data volume: {0} free ({1} %).', st.free >= 1e9 ? (st.free / 1e9).toFixed(1) + ' GB' : Math.round(st.free / 1e6) + ' MB', st.pct) : '', qc.at ? (qc.ok ? tr('Database check ok ({0}).', aaWhen(qc.at)) : tr('Database check FAILED ({0}).', aaWhen(qc.at))) : ''].filter(Boolean).join(' '));
+  if (st.total || qc.at) h += hint([st.total ? tr('Data volume: {0} free ({1} %).', st.free >= 1e9 ? (st.free / 1e9).toFixed(1) + ' GB' : Math.round(st.free / 1e6) + ' MB', st.pct) : '', qc.at ? (!qc.ok ? tr('Database check FAILED ({0}).', aaWhen(qc.at)) : qc.checksums === false ? tr('Database check: data checksums are off ({0}).', aaWhen(qc.at)) : tr('Database check ok ({0}).', aaWhen(qc.at))) : ''].filter(Boolean).join(' '));
   h += `<h4>${tr('Recent admin alerts')}</h4>`;
   h += j.items.length ? `<div class="members aalist">${j.items.map(a => `<div class="mrow aarow ${a.delivered || a.state === 'queued' ? '' : 'off'}" data-aaid="${a.id}"><span class="n"><b>${esc(a.label)}</b> · ${esc(a.message)}<small class="muted" style="display:block">${esc(aaWhen(a.created_at))} · ${tr(AA_STATE[a.state] || a.state)}${a.repeats ? ' · ' + trn('repeated {0} time since', 'repeated {0} times since', a.repeats) : ''}</small></span></div>`).join('')}</div>
     <div class="row"><button class="btn sm" data-aa="clear">${ic('trash', 's')} ${tr('Clear list')}</button></div>` : `<div class="muted mhint">${tr('No admin alerts yet.')}</div>`;

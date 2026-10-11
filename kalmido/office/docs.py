@@ -10,7 +10,7 @@ from datetime import date, timedelta
 from flask import g, jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id
+from ..core.pg import insert_id, like_escape
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied
@@ -659,8 +659,8 @@ def odoc_list():
         args.append(st)
     q = (request.args.get("q") or "").strip()
     if q:
-        like = f"%{q}%"
-        sql += " AND (number ILIKE ? OR project_title ILIKE ? OR project_ref ILIKE ? OR recipient ILIKE ?)"
+        like = f"%{like_escape(q)}%"
+        sql += " AND (number ILIKE ? ESCAPE '\\' OR project_title ILIKE ? ESCAPE '\\' OR project_ref ILIKE ? ESCAPE '\\' OR recipient ILIKE ? ESCAPE '\\')"
         args += [like, like, like, like]
     rows = [doc_brief(r) for r in c.execute(sql + " ORDER BY date DESC, id DESC LIMIT 500", args)]
     return jsonify(docs=rows, role=office_role(c, uid, oid), org_id=oid)

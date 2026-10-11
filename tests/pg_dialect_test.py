@@ -12,6 +12,7 @@ import sys
 import tokenize
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "kalmido")
+SERVER = len(sys.argv) <= 1
 if len(sys.argv) > 1:  # e.g. tests/pg_dialect_test.py tests  -> the SQL of the suites themselves (informational)
     ROOT = os.path.abspath(sys.argv[1])
 SQL = re.compile(r"\b(SELECT|INSERT|UPDATE|DELETE|WHERE|ORDER BY|GROUP BY|CREATE|ALTER|JOIN|BEGIN|COMMIT|ROLLBACK)\b")
@@ -37,12 +38,14 @@ IN_CODE = [  # (name, pattern) in the code itself
     ("cursor.lastrowid (use insert_id)", re.compile(r"\.lastrowid\b")),
     ("sqlite3 driver", re.compile(r"^\s*(import sqlite3|from sqlite3)|\bsqlite3\.")),
     ("isolation_level", re.compile(r"\.isolation_level\b")),
+    # 2.37.0 part 2 (K-1): core/pg.py is the only module that talks to psycopg (Conn.heal(), savepoint(), ... instead)
+    ("psycopg outside core/pg.py", re.compile(r"^\s*(import psycopg|from psycopg)|\bpsycopg\.")),
+    ("the driver connection c._pg outside core/pg.py", re.compile(r"\._pg\b")),
 ]
-# allowed outside the database layer: reading a SQLite file from before 2.37 (the move tool / old backups) -- by file
-ALLOW_SQLITE = {"admin/backup.py", "admin/migrate_sqlite.py"}
-# 2.37 Teil 1: the in-app backup still copies a SQLite file; it moves to pg_dump / pg_restore in the next step (Job B), which
-# removes this exemption
-SKIP_UNTIL_JOB_B = {"admin/backup.py"}
+ONLY_PG = {"psycopg outside core/pg.py", "the driver connection c._pg outside core/pg.py"}
+# allowed outside the database layer: reading a SQLite file from before 2.37 (the move tool) -- by file. The in-app backup
+# works with pg_dump / pg_restore since 2.37 (old SQLite archives are only listed and checked there)
+ALLOW_SQLITE = {"admin/migrate_sqlite.py"}
 
 
 def strings(src):
@@ -64,8 +67,6 @@ def main():
             if fn in ("pg_dialect_test.py", "dbx.py"):
                 continue
             rel = os.path.relpath(p, ROOT)
-            if rel in SKIP_UNTIL_JOB_B:
-                continue
             src = open(p, encoding="utf-8").read()
             lines = src.splitlines()
             ok = lambda ln: "pg-ok" in lines[ln - 1] if 0 < ln <= len(lines) else False
@@ -80,6 +81,8 @@ def main():
             for i, line in enumerate(lines, 1):
                 code = line.split("#", 1)[0]
                 for name, rx in IN_CODE:
+                    if name in ONLY_PG and (rel == os.path.join("core", "pg.py") or not SERVER):
+                        continue
                     if rx.search(code) and "pg-ok" not in line and not (name == "sqlite3 driver" and rel in ALLOW_SQLITE):
                         hits.append((rel, i, name))
     hits = sorted(set(hits))

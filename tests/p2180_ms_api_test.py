@@ -103,14 +103,10 @@ T0 = A.post(B + "/api/tasks", json={"title": "Existing task", "list_id": L}).jso
 now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 dbx("INSERT INTO list_milestones(list_id,name,day,done,created_by,created_at) VALUES(?,?,?,?,?,?)", (L, "Beta", "2026-11-01", 0, ids["bob"], now))
 dbx("INSERT INTO list_milestones(list_id,name,day,done,created_by,created_at) VALUES(?,?,?,?,?,?)", (L, "Alpha", "2026-10-01", 1, 999, now))
-# 2.37 Job B: the backup (admin/backup.py) still works on the SQLite file -- backup + restore of this suite skipped until
-# it moves to pg_dump (KALMIDO_PG_BACKUP=1 runs them anyway)
-PG_BK = bool(os.environ.get("KALMIDO_PG_BACKUP"))
-if PG_BK:
-    n0 = len(A.get(B + "/api/admin/backups").json()["items"])
-    check(A.post(B + "/api/admin/backups").status_code == 202, "a backup with the old milestone rows")
-    until(lambda: len(A.get(B + "/api/admin/backups").json()["items"]) > n0 and not A.get(B + "/api/admin/backups").json()["running"], 40)
-    OLD_BK = A.get(B + "/api/admin/backups").json()["items"][0]["name"]
+n0 = len(A.get(B + "/api/admin/backups").json()["items"])
+check(A.post(B + "/api/admin/backups").status_code == 202, "a backup with the old milestone rows")
+until(lambda: len(A.get(B + "/api/admin/backups").json()["items"]) > n0 and not A.get(B + "/api/admin/backups").json()["running"], 40)
+OLD_BK = A.get(B + "/api/admin/backups").json()["items"][0]["name"]
 subprocess.run(["docker", "restart", CT], capture_output=True)
 time.sleep(1)
 check(until(healthy, 40), "the app comes back after the restart")
@@ -312,14 +308,13 @@ nt2 = A.post(B + f"/api/templates/{tt['id']}/apply", json={"list_id": L2}).json(
 check(nt2.get("ms") == 1, "a task template of a milestone makes a milestone")
 
 # ================================================================== restore an old backup: migrated again
-if PG_BK:  # 2.37 Job B (see above)
-    r = A.post(B + "/api/admin/backups/restore", json={"name": OLD_BK, "confirm": "RESTORE"})
-    check(r.ok, f"restore of the backup from before the migration {r.text[:200]}")
-    check(dbx("SELECT COUNT(*) FROM list_milestones")[0][0] == 0, "after the restore: the old rows are migrated again")
-    rt = sorted(x[0] for x in dbx("SELECT title FROM tasks WHERE ms=1 AND list_id=?", (L,)))
-    check(rt == ["Alpha", "Beta"], f"… into milestone tasks {rt}")
-    A = sess("alice")
-    check([m["name"] for m in A.get(B + f"/api/lists/{L}/overview").json()["milestones"]] == ["Alpha", "Beta"], "overview after the restore")
+r = A.post(B + "/api/admin/backups/restore", json={"name": OLD_BK, "confirm": "RESTORE"})
+check(r.ok, f"restore of the backup from before the migration {r.text[:200]}")
+check(dbx("SELECT COUNT(*) FROM list_milestones")[0][0] == 0, "after the restore: the old rows are migrated again")
+rt = sorted(x[0] for x in dbx("SELECT title FROM tasks WHERE ms=1 AND list_id=?", (L,)))
+check(rt == ["Alpha", "Beta"], f"… into milestone tasks {rt}")
+A = sess("alice")
+check([m["name"] for m in A.get(B + f"/api/lists/{L}/overview").json()["milestones"]] == ["Alpha", "Beta"], "overview after the restore")
 
 subprocess.run(["docker", "rm", "-f", CT], capture_output=True)
 print(f"\np2180_ms_api: {OKS[0]} ok, {len(FAILS)} failed")

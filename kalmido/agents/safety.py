@@ -368,10 +368,12 @@ def access_flush(c=None):
     own = c is None
     c = connect() if own else c
     try:
-        c.executemany("""INSERT INTO agent_list_access(agent_id,list_id,day,kind,n) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM lists WHERE id=?)
-                         ON CONFLICT(list_id,day,agent_id,kind) DO UPDATE SET n=agent_list_access.n+excluded.n""",
-                      [(a, l, d, k, n, l) for (a, l, d, k), n in rows.items()])
-        c.commit()
+        from ..core.pg import system_ctx
+        with system_ctx(c):  # 2.37.0 (#1150): buffered counters of every agent (any organisation), flushed by whoever comes next
+            c.executemany("""INSERT INTO agent_list_access(agent_id,list_id,day,kind,n) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM lists WHERE id=?)
+                             ON CONFLICT(list_id,day,agent_id,kind) DO UPDATE SET n=agent_list_access.n+excluded.n""",
+                          [(a, l, d, k, n, l) for (a, l, d, k), n in rows.items()])
+            c.commit()
     finally:
         if own:
             c.close()

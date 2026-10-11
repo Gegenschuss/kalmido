@@ -89,6 +89,8 @@
   older, still visible message already offers as a button (offer the next-best different step instead). Only the newest
   message's buttons stay live: a newer message expires older open ones; take back buttons that are no longer current
   with `withdraw_chat_choices`.
+- A long chat answer worth keeping (a plan, a release draft, a summary to review later): send it with `offer_save: true`
+  (`send_chat`, 2.37.0). The person gets the button *Save as task* under it and decides; never save a message yourself.
 
 ### Showing that you are alive
 - Before you answer in the chat, send the **typing signal** (`chat_typing`), then answer. Leave a short pause (about

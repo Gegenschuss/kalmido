@@ -325,25 +325,21 @@ check(A.get(B + O + f"/sets/{SET1}").json()["items"][0]["equipment_id"] == EQ1, 
 # tenant-matrix: office
 
 # ================================================================== backup + restore keep the office tables; rollback-safe layout
-# 2.37 Job B: the backup (admin/backup.py) still works on the SQLite file -- backup + restore of this suite skipped until
-# it moves to pg_dump (KALMIDO_PG_BACKUP=1 runs them anyway)
-PG_BK = bool(os.environ.get("KALMIDO_PG_BACKUP"))
-if PG_BK:
-    r = A.post(B + "/api/admin/backups")
-    check(r.status_code == 202, "backup: back up now " + r.text[:100])
-    items = wait_for(lambda: [x for x in A.get(B + "/api/admin/backups").json().get("items", []) if x["kind"] == "manual"], 30)
-    name = items[0]["name"] if items else ""
-    r = A.post(B + f"/api/admin/backups/{name}/verify", json={})
-    check(r.ok and r.json().get("ok"), "backup: verifies " + r.text[:200])
-    n_s, n_t = dbx("SELECT COUNT(*) FROM office_services")[0][0], dbx("SELECT COUNT(*) FROM office_texts")[0][0]
-    dbx("DELETE FROM office_services", write=True)
-    dbx("DELETE FROM office_texts", write=True)
-    dbx("DELETE FROM office_settings", write=True)
-    r = A.post(B + "/api/admin/backups/restore", json={"confirm": "RESTORE", "name": name})
-    check(r.ok and r.json().get("ok"), "backup: restore " + r.text[:200])
-    check(wait_for(lambda: dbx("SELECT COUNT(*) FROM office_services")[0][0] == n_s, 10) and dbx("SELECT COUNT(*) FROM office_texts")[0][0] == n_t and dbx("SELECT COUNT(*) FROM office_settings")[0][0] == 2, "backup: the office tables are back after the restore")
-    A = sess("alice")
-    check(A.get(B + O + f"/services/{SV3}").ok and A.get(B + O + "/settings").json()["settings"]["company"]["name"] == "Studio Nordlicht GmbH", "backup: ... and readable through the API")
+r = A.post(B + "/api/admin/backups")
+check(r.status_code == 202, "backup: back up now " + r.text[:100])
+items = wait_for(lambda: [x for x in A.get(B + "/api/admin/backups").json().get("items", []) if x["kind"] == "manual"], 30)
+name = items[0]["name"] if items else ""
+r = A.post(B + f"/api/admin/backups/{name}/verify", json={})
+check(r.ok and r.json().get("ok"), "backup: verifies " + r.text[:200])
+n_s, n_t = dbx("SELECT COUNT(*) FROM office_services")[0][0], dbx("SELECT COUNT(*) FROM office_texts")[0][0]
+dbx("DELETE FROM office_services", write=True)
+dbx("DELETE FROM office_texts", write=True)
+dbx("DELETE FROM office_settings", write=True)
+r = A.post(B + "/api/admin/backups/restore", json={"confirm": "RESTORE", "name": name})
+check(r.ok and r.json().get("ok"), "backup: restore " + r.text[:200])
+check(wait_for(lambda: dbx("SELECT COUNT(*) FROM office_services")[0][0] == n_s, 10) and dbx("SELECT COUNT(*) FROM office_texts")[0][0] == n_t and dbx("SELECT COUNT(*) FROM office_settings")[0][0] == 2, "backup: the office tables are back after the restore")
+A = sess("alice")
+check(A.get(B + O + f"/services/{SV3}").ok and A.get(B + O + "/settings").json()["settings"]["company"]["name"] == "Studio Nordlicht GmbH", "backup: ... and readable through the API")
 # organisation delete cascades (ON DELETE CASCADE on every office table)
 r = A.delete(B + f"/api/admin/orgs/{BETA}")
 check(r.ok or r.status_code == 204, "cascade: delete Beta " + str(r.status_code) + r.text[:100])

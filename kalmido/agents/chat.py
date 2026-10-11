@@ -121,6 +121,8 @@ def chat_dict(r, rx=None, files=None, api=False, newest=None):
             # 2.35.0 (#1103): choices.approval = {title, what, std?} -- an approval request (buttons yes / no, a card)
             "choices": ch, "choice": ans, "choice_state": choice_state(r, ch, ans, newest),
             "job_id": r["job_id"] if "job_id" in r.keys() else None,  # 2.32.0 (#1081): the job whose result this is
+            # 2.37.0 (#1159): the agent offers "Save as task" under this message (the person saves, never the agent)
+            "offer_save": bool(r["offer_save"]) if "offer_save" in r.keys() and r["sender"] == "agent" else False,
             **chat_reply(r),  # 2.33.0 (#1076): reply_to + reply (the quote of the answered message)
             "attachments": [{**f, "url": (f"/api/v1/chat-attachments/{f['id']}" if api else f"/api/chat-files/{f['id']}")}
                             for f in (files or {}).get(r["id"], [])]}
@@ -678,9 +680,12 @@ def agent_chat_get(aid):
     from ..agents.steps import job_steps_count, steps_live, steps_of_messages
     sm = steps_of_messages(c, me(), [r["id"] for r in rows if r["sender"] == "agent"])
     jc = job_steps_count(c, me(), [r["job_id"] for r in rows if r["job_id"]])
+    from ..collab.chatsave import chat_save_of
+    saved = chat_save_of(c, me(), "agent", [r["id"] for r in rows])  # 2.37.0 (#1159): saved as a task by me
     msgs = []
     for r in rows:
         d = chat_dict(r, rx, fs, newest=nw)
+        d["saved_task_id"] = saved.get(r["id"])
         if r["id"] in sm:
             d["steps"] = sm[r["id"]]
         if r["job_id"]:

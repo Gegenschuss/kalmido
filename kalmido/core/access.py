@@ -166,7 +166,9 @@ def _boundary_on():
 def _boundary_sql():
     """SQL condition that is true when the boundary applies (mode workspaces / multi; unset mode: more than one org)."""
     from ..accounts.orgs import INSTANCE_ENV
-    return "1=1" if INSTANCE_ENV in ("workspaces", "multi") else "(SELECT COUNT(*) FROM orgs) > 1"
+    # 2.37.0 (#1150): kalmido_org_count() counts as "system" (core/rls.py) -- under row-level security a person sees only
+    # their own organisations, but whether the boundary applies is a property of the instance
+    return "1=1" if INSTANCE_ENV in ("workspaces", "multi") else "kalmido_org_count() > 1"
 
 
 def _orgs_of(c, uid):
@@ -201,7 +203,9 @@ _BG_CTX = {}
 
 
 def _ctx_build(c, uid):
-    orgs, aorg, agent = _orgs_of(c, uid)
+    from .pg import system_ctx as pg_system
+    with pg_system(c):  # 2.37.0 (#1150): the memberships themselves are read past row-level security
+        orgs, aorg, agent = _orgs_of(c, uid)
     return AccessCtx(uid, orgs, "agent" if agent else "user", aorg, None)
 
 
@@ -213,15 +217,64 @@ def acx(c=None):
     u = getattr(g, "user", None)
     uid = u["id"] if u is not None else None
     cur = g.get("acx")
-    if cur is not None and cur.user_id == uid:
+    if cur is not None and cur.user_id == uid and (uid is not None or cur.org_ids == tuple(g.get("acx_anon_orgs") or ())):
         return cur
     if uid is None:
-        ctx = AccessCtx(None, (), "anon", None, None)
+        ctx = AccessCtx(None, tuple(g.get("acx_anon_orgs") or ()), "anon", None, None)
     else:
         ctx = acx_of(c or db(), uid)._replace(list_allow=token_lists())
     g.acx = ctx
     acx_session_apply(ctx)
     return ctx
+
+
+def acx_conn_hook(c):
+    """2.37.0 (#1150, W-2): the context of the next statement on a pooled connection (core/pg.py Conn._resolve_ctx asks
+    before every statement and applies a change at once): the signed-in account ("user" / "agent" with its
+    organisations), without an account "anon" (organisations: only what a public path bound on purpose,
+    g.acx_anon_orgs), outside a request None (keep the connection's own context: "system" for background threads). c is
+    None for the cheap question; when the memberships are not cached yet the answer is pg.LOOKUP and the second call
+    (c given) reads them as "system". Never writes g.acx (that stays acx()'s, with the token's list limit)."""
+    if not has_request_context():
+        return None
+    u = getattr(g, "user", None)
+    uid = (u["id"] if u is not None else None) or None  # 0 / None: a stand-in actor (public link, hook) = nobody
+    if uid is None:
+        uid = g.get("acx_token_uid")  # a personal secret link without a session (calendar feed, /drop): its owner
+    if uid is None:
+        return (None, tuple(g.get("acx_anon_orgs") or ()), "anon")
+    cur = g.get("acx")
+    if cur is not None and cur.user_id == uid:
+        return (uid, cur.org_ids, cur.role)
+    hit = g.get("acx_users", {}).get(uid)
+    if hit is None:
+        if c is None:
+            from .pg import LOOKUP
+            return LOOKUP
+        hit = acx_of(c, uid)
+    return (uid, hit.org_ids, hit.role)
+
+
+def _acx_hook_register():
+    from .pg import set_ctx_hook
+    set_ctx_hook(acx_conn_hook)
+
+
+_acx_hook_register()
+
+
+def acx_token_bind(uid):
+    """2.37.0 (#1150): a request authenticated by a personal secret in the URL / header but without a session (the calendar
+    feed, /drop) reads with its owner's context (from the next statement on) -- g.user stays unset."""
+    g.acx_token_uid = int(uid)
+
+
+def acx_anon_bind(c, org_id):
+    """2.37.0 (#1150): a public path (list link, form, error-report / git hook) resolved its token as "system" and now
+    reads as "anon" bound to exactly the organisation of what the token opens (None: a private object, no organisation).
+    Applies to the running transaction at once and to every later one of this request."""
+    g.acx_anon_orgs = (int(org_id),) if org_id else ()
+    g.pop("acx", None)  # the next statement on c runs with it (core/pg.py asks acx_conn_hook)
 
 
 def acx_drop():

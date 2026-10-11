@@ -100,3 +100,8 @@ exports.boot = async function boot({user = 'alice', mobile = false, hash = '', l
   return dom.window;
 };
 exports.sleep = ms => new Promise(r => setTimeout(r, ms));
+// 2.37.0: the same for suites with their own jsdom page() (signin_ui.js): a late rejection of a window they closed is the harness
+exports.trackClose = w => {
+  const close = w.close.bind(w), realmTE = w.TypeError;
+  w.close = () => { if (!closedRealms.includes(realmTE)) closedRealms.push(realmTE); close(); };
+};

@@ -171,10 +171,11 @@ def api_authenticate():
             aa_count("security", "api", ip)
         return v1_err(401, tr("The API token has expired") if expired else tr("Missing or invalid API token"),
                       {"WWW-Authenticate": 'Bearer realm="kalmido"'})
+    if is_agent(u):
+        g.user = u  # 2.37.0 (#1150): from here on the agent's own context (its workspace): its row is read under it
     if is_agent(u) and not agent_active(agent_row(c, u["id"])):
         return v1_err(403, tr("This agent is paused"))
     if is_agent(u):  # 2.1.1 (#326): over its hard usage limit -> 429 (reporting usage + the status still work)
-        g.user = u
         refused = usage_refused(c, u["id"])
         if refused is not None:
             return refused
@@ -1330,7 +1331,10 @@ def v1_admin_status():
     c = db()
     info, n = update_state(c), lambda q: c.execute(q).fetchone()[0]
     latest, cur = semver(info.get("latest")), semver(APP_VERSION)
-    return jsonify(version=APP_VERSION, users=n("SELECT COUNT(*) FROM users WHERE disabled=0"), lists=n("SELECT COUNT(*) FROM lists"),
+    from ..core.pg import system_ctx
+    with system_ctx(c):  # 2.37.0 (#1150): instance counts over every organisation (numbers only)
+        n_lists = n("SELECT COUNT(*) FROM lists")
+    return jsonify(version=APP_VERSION, users=n("SELECT COUNT(*) FROM users WHERE disabled=0"), lists=n_lists,
                    open_tasks=n("SELECT COUNT(*) FROM tasks WHERE status=0 AND deleted_at IS NULL"),
                    update_available=bool(latest and cur and latest > cur), latest_version=info.get("latest") or None,
                    update_checked_at=info.get("checked_at") or None, update_error=info.get("error") or None,

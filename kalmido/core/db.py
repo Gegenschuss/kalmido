@@ -11,7 +11,7 @@ from werkzeug.security import generate_password_hash
 
 from ..core.config import app, ATT_DIR, BOOT_NAME, BOOT_PROXY, BOOT_USER, DATABASE_URL, DB, NTFY_TOPIC, ONBOARDING_ENV, TZ
 from ..core.pg import (  # noqa: F401  (re-exported: the app imports the database API from here)
-    Conn, DatabaseError, Error as DbError, IntegrityError, OperationalError, Row, UniqueViolation, connect_direct,
+    Conn, DatabaseError, DataError, Error as DbError, IntegrityError, OperationalError, Row, UniqueViolation, connect_direct,
     connect_pooled, insert_id, like_escape, table_columns, table_exists, wait_ready, write_lock,
 )
 from ..core.schema import (
@@ -72,6 +72,32 @@ def _no_url():
           "docker-compose.yml (see the template in the repository), set POSTGRES_PASSWORD in .env and "
           "DATABASE_URL=postgresql://kalmido:<password>@db/kalmido, then start again.", flush=True)
     return 3
+
+
+@app.errorhandler(DbError)
+def db_error(e):
+    """2.37.0 (#1150): a database error nobody caught. Postgres is strict where SQLite stored anything: a value of the wrong
+    type (DataError) or a broken constraint (IntegrityError) is the client's input -> 400 instead of a crash; anything else
+    stays a 500 (Flask logs it as before). The request's transaction is aborted either way: roll it back so after-request
+    hooks can still use the connection. /api/v1 and /dav keep their own error formats."""
+    c = g.get("db")
+    if c is not None:
+        try:
+            c.rollback()
+        except Exception:  # noqa: BLE001  (the connection itself may be gone)
+            pass
+    if not isinstance(e, (DataError, IntegrityError)):
+        raise e
+    import traceback
+    print(f"database error (400) {request.method} {request.path}:\n" + "".join(traceback.format_exception(e)).rstrip(), flush=True)
+    msg = tr("Invalid data")
+    if request.path.startswith("/api/v1/"):
+        from ..api.v1 import v1_err
+        return v1_err(400, msg)
+    if request.path == "/dav" or request.path.startswith("/dav/"):
+        from flask import Response
+        return Response(msg + "\n", 400, content_type="text/plain; charset=utf-8")
+    return err(msg, 400)
 
 
 @app.teardown_appcontext
@@ -157,10 +183,12 @@ def create_user(c, username, display_name="", password=None, proxy_login=None, i
         c.execute("INSERT INTO user_settings(user_id,key,value) VALUES(?,?,?) "
                   "ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value", (uid, k, v))
     # 2.22.0 (#752): every new account belongs to an organisation: the instance's first one (the caller may change it)
-    first = c.execute("SELECT id FROM orgs ORDER BY id LIMIT 1").fetchone()
     from ..accounts.orgs import instance_mode
-    if first and instance_mode(c) in ("organisation", "multi"):  # 2.28.0 (#935): mode workspaces: by domain / an admin, never by default
-        c.execute("INSERT INTO org_members(org_id,user_id) VALUES(?,?) ON CONFLICT DO NOTHING", (first[0], uid))
+    from .pg import system_ctx
+    with system_ctx(c):  # 2.37.0 (#1150): a new account is not in any organisation yet (setup / sign-up run without one)
+        first = c.execute("SELECT id FROM orgs ORDER BY id LIMIT 1").fetchone()
+        if first and instance_mode(c) in ("organisation", "multi"):  # 2.28.0 (#935): mode workspaces: by domain / an admin, never by default
+            c.execute("INSERT INTO org_members(org_id,user_id) VALUES(?,?) ON CONFLICT DO NOTHING", (first[0], uid))
     return uid
 
 
@@ -215,12 +243,22 @@ def startup_guard():
         c = connect_direct(DATABASE_URL)
         try:
             has_tables = table_exists(c, "users")
+            r = c.execute("SELECT value FROM kalmido_meta WHERE key='schema_version'").fetchone() \
+                if has_tables and table_exists(c, "kalmido_meta") else None
         finally:
             c.close()
     except DbError as e:
         print(f"FATAL: the database cannot be reached or read ({str(e).strip()[:300]}). Check DATABASE_URL and the database "
               "service, then start again.", flush=True)
         raise DataDirError(3) from None
+    try:
+        have = int(r[0]) if r else 0
+    except (TypeError, ValueError):
+        have = 0
+    if have > SCHEMA_VERSION:  # 2.37.0 (#1150): an older image on a database a newer version already migrated
+        print(f"FATAL: database schema {have} is newer than this version ({SCHEMA_VERSION}); start the matching or a newer "
+              "image.", flush=True)
+        raise DataDirError(3)
     if has_tables:
         return False
     data = [p for p, ok in ((DATA_MARKER, os.path.exists(DATA_MARKER)), (ATT_DIR, _has_files(ATT_DIR)),
@@ -252,6 +290,7 @@ def init_db(guard=True):
     # transactional DDL); an advisory lock keeps two starting containers apart (was BEGIN IMMEDIATE)
     c = connect_direct(DATABASE_URL)
     try:
+        c.execute("SET LOCAL statement_timeout = 0")  # big migrations / index builds (and waiting for another starting container)
         write_lock(c, "kalmido-init")
         for ext in ("unaccent", "pg_trgm"):  # message search (collab/msgsearch.py); both ship with the postgres image
             c.execute(f"CREATE EXTENSION IF NOT EXISTS {ext}")
@@ -504,6 +543,8 @@ def init_db(guard=True):
             print("audit migration: Paperless access granted to", n, "admin(s); repaired:", counts, flush=True)
         from ..collab.msgsearch import msg_index_init
         msg_index_init(c)  # 2.33.0 (#1080) / 2.37.0: the message search (kalmido_fold + trigram GIN indexes)
+        from .rls import apply as rls_apply
+        rls_apply(c)  # 2.37.0 (#1150): row-level security per organisation (policies + the app role)
         c.execute("INSERT INTO kalmido_meta(key,value) VALUES('schema_version',?) ON CONFLICT(key) DO UPDATE SET value="
                   "CASE WHEN CAST(kalmido_meta.value AS BIGINT) < CAST(excluded.value AS BIGINT) THEN excluded.value "
                   "ELSE kalmido_meta.value END", (str(int(SCHEMA_VERSION)),))
@@ -513,6 +554,8 @@ def init_db(guard=True):
         raise
     finally:
         c.close()
+    from .pg import pool_refresh
+    pool_refresh()  # 2.37.0 (#1150): pooled connections opened before the app role existed would bypass row-level security
     if not os.path.exists(DATA_MARKER):  # new install, or the first start of 2.0 on a readable database
         try:
             with open(DATA_MARKER, "w", encoding="utf-8") as f:

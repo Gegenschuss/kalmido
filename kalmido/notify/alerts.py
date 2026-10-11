@@ -346,7 +346,9 @@ def _aa_storage(c, cfg, now):
         n = c.execute("SELECT checksum_failures FROM pg_stat_database WHERE datname=current_database()").fetchone()
         rows = ["ok"] if not n or not n[0] else [f"{n[0]} data page checksum failure(s)"] * int(n[0])
         ok = rows == ["ok"]
-        _AA["qc"] = {"at": iso(now_utc()), "ok": ok}
+        # 2.37.0 (K-3): a cluster without data checksums (the postgres image's default) reports NULL -- say so instead of a
+        # silent "ok" (information only, no alert: POSTGRES_INITDB_ARGS=--data-checksums turns them on for a new cluster)
+        _AA["qc"] = {"at": iso(now_utc()), "ok": ok, "checksums": bool(n) and n[0] is not None}
         if not ok:
             aa_emit(c, cfg, "storage", "quick_check", Nn_("Database integrity check (quick_check) failed: {1}",
                                                           "Database integrity check (quick_check) found {0} problems, the first: {1}"),

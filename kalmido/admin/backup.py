@@ -7,8 +7,8 @@ import os
 import re
 import secrets
 import shutil
-import sqlite3
 import struct
+import subprocess
 import tempfile
 import threading
 import time
@@ -19,8 +19,9 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 from flask import g, jsonify, request, send_file
 
-from ..core.config import app, APP_VERSION, ATT_DIR, DB, OFFICE_DIR, SESSION_DAYS, TZ
+from ..core.config import app, APP_VERSION, ATT_DIR, DATABASE_URL, DB, OFFICE_DIR, SESSION_DAYS, TZ
 from ..core.schema import SCHEMA_TRIGGERS, SCHEMA_VERSION
+from ..core import pg as _pg
 from ..core.i18n import N_, tr
 from ..core.db import body, connect, db, err, gset, gsetting, init_db, iso, local_now, now_utc, parse_iso
 from ..accounts.session import _rate_blocked, _rate_fail, _rate_keys, GATE, set_cookie, start_session
@@ -38,20 +39,24 @@ from ..calendars.subscriptions import _CAL_KEY
 
 
 # ---------------------------------------------------------------- backups + restore (admins)
-# A backup is ONE zip file in BK_DIR (default: backups/ next to the database): tasks.db (a consistent copy made with
-# SQLite's online backup API while the app keeps running), attachments/<task>/<file> and manifest.json (format, app
-# and schema version, counts, SHA-256 + size of every member). Optionally encrypted with a passphrase: the zip is then
-# wrapped in an own format (".zip.enc": scrypt key derivation, AES-256-GCM in 1 MiB chunks, chunk counter and "last
-# chunk" flag authenticated, so reordering / truncation is detected). Without the passphrase an encrypted backup
-# cannot be restored by anyone, including this app. Automatic backups run daily at a set time (a thread, not the
-# watchdog), rotated by retention (newest per day for N days + newest per ISO week for M weeks; safety backups: the
-# last 3). Restore (from a listed backup or an uploaded file): every member name is checked against the expected
-# layout (no paths outside, no links, no directories), sizes / member count / compression ratio are limited (zip
-# bombs), the free disk space is checked, every SHA-256 is verified while extracting, the database must pass
-# integrity_check, carry no foreign triggers / views and have a schema version this app can migrate. Then:
+# A backup is ONE zip file in BK_DIR (default: backups/ next to the data dir): kalmido.dump (2.37.0, #1150: pg_dump custom
+# format of the Postgres database, a consistent snapshot taken while the app keeps running), attachments/<task>/<file>,
+# office/<org>/<file> and manifest.json (format_version 2, app and schema version, counts, SHA-256 + size of every member).
+# Optionally encrypted with a passphrase: the zip is then wrapped in an own format (".zip.enc": scrypt key derivation,
+# AES-256-GCM in 1 MiB chunks, chunk counter and "last chunk" flag authenticated, so reordering / truncation is detected).
+# Without the passphrase an encrypted backup cannot be restored by anyone, including this app. Automatic backups run daily
+# at a set time (a thread, not the watchdog), rotated by retention (newest per day for N days + newest per ISO week for M
+# weeks; safety backups: the last 3). Restore (from a listed backup or an uploaded file): every member name is checked
+# against the expected layout (no paths outside, no links, no directories), sizes / member count / compression ratio are
+# limited (zip bombs), the free disk space is checked, every SHA-256 is verified while extracting, the dump is read
+# completely once (pg_restore to SQL text, nothing executed): every block readable, only the statements a Kalmido dump
+# contains (no foreign functions, views, roles, COPY ... PROGRAM ...), a schema version this app can migrate. Then:
 # maintenance mode (new requests 503, background threads paused, waits until nothing else runs), safety backup of the
-# current state, attachments folder swapped by rename, database replaced through the SQLite backup API (one
-# transaction), migrations, in-process caches reset, every session ended except the restoring admin's (a fresh one).
+# current state, attachments folder swapped by rename, pg_restore --clean in ONE transaction, connection pool renewed,
+# migrations, in-process caches reset, every session ended except the restoring admin's (a fresh one).
+# Backups of format 1 (tasks.db, SQLite, up to 2.36) can still be listed, uploaded and checked, but not restored here.
+# Row-level security (2.37): pg_dump / pg_restore always run with --enable-row-security and PGOPTIONS="-c app.role=system"
+# (the policies let the system role through; the password goes through the environment, never on the command line).
 BK_ON_ENV = os.environ.get("KALMIDO_BACKUPS", "1").strip().lower() not in ("0", "false", "no", "off")
 BK_DIR = os.path.abspath(os.environ.get("KALMIDO_BACKUP_DIR", "").strip() or os.path.join(os.path.dirname(os.path.abspath(DB)), "backups"))
 BK_PASS_ENV = os.environ.get("KALMIDO_BACKUP_PASSPHRASE", "")
@@ -68,6 +73,9 @@ BK_SCRYPT = {"n": 2 ** 15, "r": 8, "p": 1}
 BK_CONFIRM = "RESTORE"
 BK_NAME_RE = re.compile(r"kalmido-backup-(\d{8})-(\d{6})-(auto|manual|safety)\.zip(\.enc)?")
 BK_UPLOAD_RE = re.compile(r"upload-([a-f0-9]{24})")
+BK_DUMP = "kalmido.dump"    # format 2 (2.37.0, Postgres): pg_dump -Fc
+BK_LEGACY = "tasks.db"      # format 1 (up to 2.36, SQLite): listed / checked, not restored here
+BK_PG_TIMEOUT = _env_int("KALMIDO_BACKUP_PG_TIMEOUT", 6 * 3600)   # s for one pg_dump / pg_restore run
 # members: attachments/<task>/<file>; 2.36.1 (#1021): office/<org>/<file> (the logos of the office module, same rules)
 BK_MEMBER_RE = re.compile(r"(attachments|office)/(\d{1,12})/([^/\\\x00-\x1f]{1,255})")
 BK_ERR = {"busy": N_("Another backup or restore is running, please try again in a moment."),
@@ -80,7 +88,9 @@ BK_ERR = {"busy": N_("Another backup or restore is running, please try again in 
           "hash": N_("The backup is damaged: a file does not match its checksum."),
           "integrity": N_("The database in the backup is damaged (integrity check failed)."),
           "schema": N_("The backup is from a newer Kalmido version (database schema {0}); update Kalmido first."),
-          "objects": N_("The database in the backup contains unexpected triggers or views and was refused."),
+          "objects": N_("The database in the backup contains unexpected objects or statements and was refused."),
+          "legacy": N_("This backup is from a version before 2.37 (SQLite). Restore it with Kalmido 2.36, then update to 2.37: the data is moved over during the update."),
+          "tools": N_("The database tools (pg_dump / pg_restore) are missing on this server."),
           "passphrase": N_("Wrong passphrase, or the encrypted backup is damaged."),
           "need_passphrase": N_("This backup is encrypted: enter its passphrase."),
           "no_passphrase": N_("Encryption needs a passphrase (at least 10 characters)."),
@@ -224,8 +234,99 @@ def bk_name(kind, encrypted):
     raise BackupError("busy")
 
 
-def bk_create(kind="manual", c=None):
-    """Writes one backup (caller holds _BK_LOCK); returns its name. BackupError on failure."""
+# ---- pg_dump / pg_restore (2.37.0, #1150)
+# libpq keyword -> environment variable: the connection of DATABASE_URL goes to the tools through the environment, so the
+# password never shows up in the process list, a log line or an error text
+_PG_ENV = {"host": "PGHOST", "hostaddr": "PGHOSTADDR", "port": "PGPORT", "dbname": "PGDATABASE", "user": "PGUSER",
+           "password": "PGPASSWORD", "passfile": "PGPASSFILE", "service": "PGSERVICE", "options": "PGOPTIONS",
+           "sslmode": "PGSSLMODE", "sslrootcert": "PGSSLROOTCERT", "sslcert": "PGSSLCERT", "sslkey": "PGSSLKEY",
+           "sslcrl": "PGSSLCRL", "sslnegotiation": "PGSSLNEGOTIATION", "gssencmode": "PGGSSENCMODE",
+           "channel_binding": "PGCHANNELBINDING", "connect_timeout": "PGCONNECT_TIMEOUT",
+           "target_session_attrs": "PGTARGETSESSIONATTRS", "application_name": "PGAPPNAME"}
+
+
+def bk_pg_env():
+    """Environment for pg_dump / pg_restore: only the basics of this process (never its own PG* variables) + the
+    connection of DATABASE_URL; row security stays on and the session runs as the "system" role of the policies."""
+    try:
+        d = _pg.conninfo_dict(DATABASE_URL)
+    except Exception:  # noqa: BLE001 -- the URL itself must not end up in an error text
+        raise BackupError("io", "DATABASE_URL") from None
+    env = {k: v for k, v in os.environ.items() if k in ("PATH", "HOME", "LANG", "LC_ALL", "TZ", "TMPDIR")}
+    for k, v in d.items():
+        if k in _PG_ENV and v not in (None, ""):
+            env[_PG_ENV[k]] = str(v)
+    env["PGOPTIONS"] = (env.get("PGOPTIONS", "") + " -c app.role=system").strip()
+    env.setdefault("PGCONNECT_TIMEOUT", "15")
+    return env
+
+
+def _pg_tool(name):
+    exe = shutil.which(name)
+    if not exe:
+        raise BackupError("tools")
+    return exe
+
+
+def _pg_errline(raw, tool):
+    """First meaningful line of a tool's stderr (short; libpq never prints the password)."""
+    for ln in (raw or b"").decode("utf-8", "replace").splitlines():
+        ln = ln.strip()
+        if ln and not ln.startswith(("WARNING", "HINT", "DETAIL")):
+            return ln[:200]
+    return f"{tool} failed"
+
+
+def _pg_run(args, err_code="io", timeout=None):
+    """Runs pg_dump / pg_restore with the database environment; BackupError(err_code, first stderr line) on failure."""
+    exe = _pg_tool(args[0])
+    try:
+        p = subprocess.run([exe, *args[1:]], env=bk_pg_env(), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                           stderr=subprocess.PIPE, timeout=timeout or BK_PG_TIMEOUT, check=False)
+    except subprocess.TimeoutExpired:
+        raise BackupError(err_code, f"{args[0]}: timeout") from None
+    if p.returncode:
+        raise BackupError(err_code, _pg_errline(p.stderr, args[0]))
+
+
+def bk_db_bytes(c):
+    """Size of the database on the server (for the free space check; the dump is usually much smaller)."""
+    try:
+        return int(c.execute("SELECT pg_database_size(current_database())").fetchone()[0] or 0)
+    except Exception:  # noqa: BLE001 -- only an estimate
+        c.rollback()
+        return 0
+
+
+def bk_dump(dest):
+    """pg_dump -Fc of the whole database into dest, from one snapshot that also gives the manifest its counts and schema
+    version. Returns (counts, schema version)."""
+    _pg_tool("pg_dump")
+    s = _pg.connect_direct(DATABASE_URL)
+    try:
+        # the next transaction is REPEATABLE READ (one snapshot for the counts and, exported, for pg_dump); no timeouts
+        # for this session while pg_dump runs
+        s.execute("SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL REPEATABLE READ")
+        s.execute("SET statement_timeout = 0")
+        s.execute("SET idle_in_transaction_session_timeout = 0")
+        s.commit()
+        with _pg.system_ctx(s):  # the whole database (all organisations), also when a request makes the safety backup
+            snap = s.execute("SELECT pg_export_snapshot()").fetchone()[0]
+            counts = {k: int(s.execute(q).fetchone()[0]) for k, q in (
+                ("users", "SELECT COUNT(*) FROM users"), ("lists", "SELECT COUNT(*) FROM lists"),
+                ("tasks", "SELECT COUNT(*) FROM tasks WHERE deleted_at IS NULL"), ("attachments", "SELECT COUNT(*) FROM attachments"))}
+            r = s.execute("SELECT value FROM kalmido_meta WHERE key='schema_version'").fetchone()
+            schema = int(r[0]) if r and str(r[0]).isdigit() else SCHEMA_VERSION
+            # the snapshot stays valid while this transaction is open
+            _pg_run(["pg_dump", "-Fc", "-Z", "6", "--enable-row-security", f"--snapshot={snap}", "-f", dest])
+        return counts, schema
+    finally:
+        s.close()
+
+
+def bk_create(kind="manual", c=None, keep_dump=None):
+    """Writes one backup (caller holds _BK_LOCK); returns its name. BackupError on failure. keep_dump: also keep a copy of
+    the dump at this path (the restore's way back)."""
     own = c is None
     c = c or connect()
     tmp = None
@@ -235,28 +336,20 @@ def bk_create(kind="manual", c=None):
         pw = bk_passphrase(c) if encrypt else ""
         if encrypt and len(pw) < 10:
             raise BackupError("no_passphrase")
-        need = os.path.getsize(DB) + sum(_dir_size(d) for d in (ATT_DIR, OFFICE_DIR) if os.path.isdir(d))
+        need = bk_db_bytes(c) + sum(_dir_size(d) for d in (ATT_DIR, OFFICE_DIR) if os.path.isdir(d))
         free = shutil.disk_usage(BK_DIR).free
         if free < need * (2.2 if encrypt else 1.2) + 64 * 1024 * 1024:
             raise BackupError("disk")
         tmp = tempfile.mkdtemp(prefix=".tmp-", dir=BK_DIR)
-        dbp = os.path.join(tmp, "tasks.db")
-        src, dst = connect(), sqlite3.connect(dbp)
-        try:
-            src.backup(dst)
-        finally:
-            src.close()
-        dst.execute("PRAGMA journal_mode=DELETE")
-        counts = {k: dst.execute(q).fetchone()[0] for k, q in (
-            ("users", "SELECT COUNT(*) FROM users"), ("lists", "SELECT COUNT(*) FROM lists"),
-            ("tasks", "SELECT COUNT(*) FROM tasks WHERE deleted_at IS NULL"), ("attachments", "SELECT COUNT(*) FROM attachments"))}
-        schema = dst.execute("PRAGMA user_version").fetchone()[0] or SCHEMA_VERSION
-        dst.close()
+        dbp = os.path.join(tmp, BK_DUMP)
+        counts, schema = bk_dump(dbp)
+        if keep_dump:
+            shutil.copyfile(dbp, keep_dump)
         files, att_bytes = [], 0
         zp = os.path.join(tmp, "backup.zip")
         with zipfile.ZipFile(zp, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6, allowZip64=True) as z:
-            z.write(dbp, "tasks.db")
-            files.append(["tasks.db", os.path.getsize(dbp), _sha256_file(dbp)])
+            z.write(dbp, BK_DUMP, compress_type=zipfile.ZIP_STORED)  # pg_dump -Fc compresses itself
+            files.append([BK_DUMP, os.path.getsize(dbp), _sha256_file(dbp)])
             for base, prefix in ((ATT_DIR, "attachments/"), (OFFICE_DIR, "office/")):
                 if not os.path.isdir(base):
                     continue
@@ -278,7 +371,7 @@ def bk_create(kind="manual", c=None):
                             continue
                         files.append([rel, size, digest])
                         att_bytes += size
-            meta = {"format": "kalmido-backup", "format_version": 1, "app_version": APP_VERSION, "schema_version": schema,
+            meta = {"format": "kalmido-backup", "format_version": 2, "app_version": APP_VERSION, "schema_version": schema,
                     "created_at": iso(now_utc()), "kind": kind, "counts": counts, "db_bytes": files[0][1],
                     "attachment_files": len(files) - 1, "attachment_bytes": att_bytes}
             z.writestr("manifest.json", json.dumps({**meta, "files": files}, ensure_ascii=False))
@@ -298,7 +391,7 @@ def bk_create(kind="manual", c=None):
         raise
     except OSError as e:
         raise BackupError("io", aa_oserr(e)) from None
-    except (sqlite3.Error, zipfile.BadZipFile, ValueError) as e:
+    except (_pg.Error, zipfile.BadZipFile, ValueError) as e:
         raise BackupError("io", type(e).__name__) from None
     finally:
         if tmp:
@@ -369,7 +462,9 @@ def bk_public(x):
     return {"name": x["name"], "kind": x["kind"], "encrypted": x["encrypted"], "size": x["size"], "created_at": iso(x["at"]),
             "app_version": m.get("app_version", ""), "schema_version": m.get("schema_version"), "counts": m.get("counts") or {},
             "attachment_files": m.get("attachment_files"), "attachment_bytes": m.get("attachment_bytes"),
-            "unreadable": bool(m.get("unreadable"))}
+            "unreadable": bool(m.get("unreadable")),
+            # 2.37.0: a backup from before 2.37 (SQLite): listed and checked, restored only through 2.36 + the update
+            "legacy": not m.get("unreadable") and m.get("format_version", 1) < 2}
 
 
 def bk_prune(c):
@@ -406,31 +501,43 @@ def bk_prune(c):
 
 
 def bk_run(kind):
-    """Backup + retention with its bookkeeping and alerts (own connection; any thread). Returns the name or None."""
+    """Backup + retention with its bookkeeping and alerts (own connection; any thread). Returns the name or None. Never
+    raises: a database that cannot be reached (2.37.0: Postgres down) is a failed backup like any other."""
     if not _BK_LOCK.acquire(blocking=False):
         return None
     _BK.update(running=kind, started=time.time())
-    c = connect()
+    c = None
     try:
-        name = bk_create(kind, c)
-        bk_prune(c)
-        for k, v in (("bk_last_ok", iso(now_utc())), ("bk_last_name", name), ("bk_last_error", ""), ("bk_last_error_at", "")):
-            gset(c, k, v)
-        c.commit()
+        try:
+            c = connect()
+            name = bk_create(kind, c)
+            bk_prune(c)
+            for k, v in (("bk_last_ok", iso(now_utc())), ("bk_last_name", name), ("bk_last_error", ""), ("bk_last_error_at", "")):
+                gset(c, k, v)
+            c.commit()
+        except BackupError:
+            raise
+        except Exception as e:  # noqa: BLE001 -- the database is gone (pool timeout, connection refused, ...)
+            raise BackupError("io", type(e).__name__) from None
         _BK["next_try"] = 0.0
         print("backup written:", name, flush=True)
         return name
     except BackupError as e:
-        gset(c, "bk_last_error", e.text("en"))
-        gset(c, "bk_last_error_at", iso(now_utc()))
-        c.commit()
+        try:
+            c.rollback()
+            gset(c, "bk_last_error", e.text("en"))
+            gset(c, "bk_last_error_at", iso(now_utc()))
+            c.commit()
+        except Exception:  # noqa: BLE001 -- no database: the alert below still goes out (log + admin alert queue)
+            pass
         _BK["next_try"] = time.time() + 3600
         print("backup FAILED:", e.text("en"), flush=True)
         aa_now("storage", f"backup:{e.code}", N_("Backup failed: {0}"), [{"t": BK_ERR.get(e.code, BK_ERR["format"])} if not e.args_
                                                                        else e.text("en")])
         return None
     finally:
-        c.close()
+        if c is not None:
+            c.close()
         _BK.update(running="", started=0.0)
         _BK_LOCK.release()
 
@@ -512,7 +619,7 @@ def bk_check_zip(z):
     for i in infos:
         n = i.filename
         m = BK_MEMBER_RE.fullmatch(n)
-        ok = n in ("manifest.json", "tasks.db") or (m and m.group(3) not in (".", ".."))
+        ok = n in ("manifest.json", BK_DUMP, BK_LEGACY) or (m and m.group(3) not in (".", ".."))
         if not ok or n in seen or i.is_dir() or i.flag_bits & 0x1 or i.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
             raise BackupError("members")
         if (i.external_attr >> 16) & 0o170000 not in (0, 0o100000):  # symlinks / devices (unix mode bits)
@@ -523,7 +630,8 @@ def bk_check_zip(z):
             raise BackupError("too_large", BK_MAX_BYTES // 1048576)
         if i.file_size > 1024 * 1024 and i.file_size > BK_MAX_RATIO * max(1, i.compress_size):
             raise BackupError("bomb")
-    if "manifest.json" not in seen or "tasks.db" not in seen:
+    legacy = BK_LEGACY in seen  # format 1 (SQLite, before 2.37)
+    if "manifest.json" not in seen or (BK_DUMP in seen) == legacy:
         raise BackupError("format")
     mi = z.getinfo("manifest.json")
     if mi.file_size > 64 * 1024 * 1024:
@@ -533,6 +641,8 @@ def bk_check_zip(z):
     except (ValueError, zipfile.BadZipFile):
         raise BackupError("format") from None
     if not isinstance(man, dict) or man.get("format") != "kalmido-backup" or not isinstance(man.get("files"), list):
+        raise BackupError("format")
+    if man.get("format_version", 1) != (1 if legacy else 2):
         raise BackupError("format")
     sv = man.get("schema_version")
     if isinstance(sv, bool) or not isinstance(sv, int):
@@ -549,7 +659,7 @@ def bk_check_zip(z):
     free = shutil.disk_usage(os.path.dirname(os.path.abspath(DB))).free
     if free < total * 1.1 + 64 * 1024 * 1024:
         raise BackupError("disk")
-    man["_listed"], man["_total"] = listed, total
+    man["_listed"], man["_total"], man["_legacy"] = listed, total, legacy
     return man
 
 
@@ -572,48 +682,198 @@ def bk_extract(z, info, dest, listed):
         raise BackupError("hash")
 
 
-def bk_check_db(p):
-    """The extracted database: integrity, only our triggers / no views, required tables, schema version."""
-    try:
-        c = sqlite3.connect(f"file:{p}?mode=ro", uri=True)
-    except sqlite3.Error:
-        raise BackupError("integrity") from None
-    try:
-        with contextlib.suppress(AttributeError, sqlite3.Error):
-            c.setconfig(sqlite3.SQLITE_DBCONFIG_DEFENSIVE, True)
-            c.setconfig(sqlite3.SQLITE_DBCONFIG_TRUSTED_SCHEMA, False)
-        if [r[0] for r in c.execute("PRAGMA integrity_check(20)")] != ["ok"]:
+# ---- the dump of a backup: read it completely once (pg_restore to SQL text, nothing is executed) before a restore
+# the statements a Kalmido dump consists of (pg_restore --clean --if-exists --no-owner --no-privileges --single-transaction);
+# anything else (views, rules, roles, foreign functions, COPY ... PROGRAM, ...) would run inside this database -> refused
+_ID = r'(?:"[^"]{1,63}"|\w{1,63})'
+_T = rf"public\.{_ID}"
+_STMT_OK = [re.compile(x, re.I | re.S) for x in (
+    r"SET [\w.]+ = [\w'.,\- ]*",
+    rf"SELECT pg_catalog\.setval\('{_T}', \d+, (true|false)\)",
+    r"BEGIN", r"COMMIT",  # pg-ok: patterns of a dump's statements (checked, not executed)
+    r"CREATE EXTENSION IF NOT EXISTS (unaccent|pg_trgm|plpgsql) WITH SCHEMA (public|pg_catalog)",
+    r"COMMENT ON EXTENSION (unaccent|pg_trgm|plpgsql) IS '[^']*'", r"COMMENT ON SCHEMA public IS '[^']*'",
+    rf"DROP (TABLE|INDEX|SEQUENCE|POLICY|EXTENSION) IF EXISTS [\w.\" ]+",
+    rf"DROP FUNCTION IF EXISTS {_T}\([\w, ]*\)", rf"DROP TRIGGER IF EXISTS {_ID} ON {_T}",
+    rf"ALTER TABLE (IF EXISTS )?(ONLY )?{_T} (DROP CONSTRAINT IF EXISTS {_ID}|ALTER COLUMN {_ID} DROP DEFAULT)",
+    rf"CREATE TABLE {_T} \(.*\)",
+    rf"ALTER TABLE (ONLY )?{_T} ALTER COLUMN {_ID} (ADD GENERATED (BY DEFAULT|ALWAYS) AS IDENTITY \(.*\)|SET DEFAULT .*)",
+    rf"ALTER TABLE (ONLY )?{_T} ADD CONSTRAINT {_ID} (PRIMARY KEY|UNIQUE|FOREIGN KEY|CHECK) .*",
+    rf"ALTER TABLE (ONLY )?{_T} (ENABLE|FORCE) ROW LEVEL SECURITY",
+    rf"CREATE (UNIQUE )?INDEX {_ID} ON (ONLY )?{_T} USING \w+ \(.*\)",
+    rf"CREATE SEQUENCE {_T} .*", rf"ALTER SEQUENCE {_T} OWNED BY {_T}\.{_ID}",
+    rf"CREATE POLICY {_ID} ON {_T} .*", rf"COMMENT ON (TABLE|COLUMN) {_T}(\.{_ID})? IS '.*'",
+)]
+_STMT_FN = re.compile(rf"CREATE FUNCTION public\.(\w+)\(.*\) RETURNS .*", re.I | re.S)
+_STMT_TRG = re.compile(rf"CREATE TRIGGER (\w+) (AFTER|BEFORE|INSTEAD OF) .* ON {_T} .*EXECUTE FUNCTION public\.(\w+)\(\)", re.I | re.S)
+_OWN_FN = re.compile(r"(kalmido|rls)_\w+")
+_STMT_BAD = re.compile(
+    r"\b(FROM|TO)\s+PROGRAM\b|\bSECURITY\s+DEFINER\b|\bEXECUTE\b(?!\s+(FUNCTION|PROCEDURE)\b)|\bALTER\s+(SYSTEM|ROLE|USER|DATABASE)\b"
+    r"|\b(CREATE|DROP)\s+(ROLE|USER|DATABASE|SERVER|SUBSCRIPTION|PUBLICATION|EVENT\s+TRIGGER|RULE|VIEW|LANGUAGE)\b|\bGRANT\b"
+    r"|\bSET\s+(ROLE|SESSION\s+AUTHORIZATION)\b|\bCOPY\s+[\w.\"]+\s*(\(|FROM|TO)|\b(pg_read_file|pg_read_binary_file|pg_ls_\w+"
+    r"|pg_stat_file|lo_import|lo_export|lo_\w*open|dblink\w*|pg_execute_server_program|pg_terminate_backend|pg_cancel_backend"
+    r"|pg_reload_conf|pg_promote|pg_file_\w+|set_config|query_to_xml\w*)\s*\(", re.I)
+_COPY = re.compile(rb'COPY public\.("[^"]{1,63}"|\w{1,63}) \((?:[^()\n]*)\) FROM stdin;\n')
+
+
+def bk_statements(sql):
+    """SQL text -> statements (split at ; outside quotes, dollar quotes and comments; comments dropped)."""
+    out, cur, i, n = [], [], 0, len(sql)
+    while i < n:
+        ch = sql[i]
+        if ch == "-" and sql.startswith("--", i):
+            j = sql.find("\n", i)
+            i = n if j < 0 else j + 1
+            continue
+        if ch == "/" and sql.startswith("/*", i):
+            j = sql.find("*/", i + 2)
+            i = n if j < 0 else j + 2
+            continue
+        if ch in "'\"":
+            j = i + 1
+            while j < n:
+                if sql[j] == ch:
+                    if j + 1 < n and sql[j + 1] == ch:
+                        j += 2
+                        continue
+                    break
+                j += 1
+            cur.append(sql[i:j + 1])
+            i = j + 1
+            continue
+        if ch == "$":
+            m = re.match(r"\$(\w*)\$", sql[i:i + 70])
+            if m and not (i and (sql[i - 1].isalnum() or sql[i - 1] == "_")):
+                tag = m.group(0)
+                j = sql.find(tag, i + len(tag))
+                j = n if j < 0 else j + len(tag)
+                cur.append(sql[i:j])
+                i = j
+                continue
+        if ch == ";":
+            s = " ".join("".join(cur).split())
+            if s:
+                out.append(s)
+            cur = []
+        else:
+            cur.append(ch)
+        i += 1
+    s = " ".join("".join(cur).split())
+    if s:
+        out.append(s)
+    return out
+
+
+def bk_check_statement(s):
+    """True when the statement is one a Kalmido dump consists of."""
+    if s == "SELECT pg_catalog.set_config('search_path', '', false)":  # the preamble (set_config is refused elsewhere)
+        return True
+    if _STMT_BAD.search(s):
+        return False
+    m = _STMT_FN.fullmatch(s)
+    if m:
+        lang = re.search(r"\bLANGUAGE\s+(\w+)", s, re.I)
+        return bool(_OWN_FN.fullmatch(m.group(1)) and lang and lang.group(1).lower() in ("plpgsql", "sql"))
+    m = _STMT_TRG.fullmatch(s)
+    if m:
+        return (m.group(1) in SCHEMA_TRIGGERS or bool(_OWN_FN.fullmatch(m.group(1)))) and bool(_OWN_FN.fullmatch(m.group(3)))
+    return any(rx.fullmatch(s) for rx in _STMT_OK)
+
+
+def _restore_args():
+    return ["--clean", "--if-exists", "--no-owner", "--no-privileges", "--single-transaction"]
+
+
+def bk_scan_dump(dump):
+    """Reads the whole dump through pg_restore (to SQL text; no database involved): every data block must be readable
+    (else "integrity"), every statement one of a Kalmido dump ("objects"), the schema version (kalmido_meta) not newer
+    than this app's ("schema"). Returns {"schema_version", "rows": {table: n}, "users"}."""
+    exe = _pg_tool("pg_restore")
+    rows, ddl, ddl_n, meta, table = {}, [], 0, {}, None
+    with tempfile.TemporaryFile() as errf:
+        p = subprocess.Popen([exe, *_restore_args(), "-f", "-", dump], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                             stderr=errf, env={"PATH": os.environ.get("PATH", "")})
+        bad = None
+        try:
+            for line in p.stdout:
+                if table is not None:
+                    if line == b"\\.\n":
+                        table = None
+                    else:
+                        rows[table] += 1
+                        if table == "kalmido_meta" and len(meta) < 100:
+                            k, _, v = line.rstrip(b"\n").partition(b"\t")
+                            meta[k.decode("utf-8", "replace")] = v.decode("utf-8", "replace")
+                    continue
+                if line.startswith(b"COPY "):
+                    m = _COPY.fullmatch(line)
+                    if not m:
+                        bad = "objects"
+                        break
+                    table = m.group(1).decode().strip('"')
+                    if table in rows:
+                        bad = "objects"
+                        break
+                    rows[table] = 0
+                    continue
+                if line.startswith(b"\\"):  # psql meta commands: only the \restrict / \unrestrict pair of pg_dump 17.6+
+                    if not re.fullmatch(rb"\\(un)?restrict [A-Za-z0-9]{1,128}\n", line):
+                        bad = "objects"
+                        break
+                    continue
+                ddl_n += len(line)
+                if ddl_n > 64 * 1024 * 1024:
+                    bad = "objects"
+                    break
+                ddl.append(line)
+        finally:
+            if bad:
+                p.kill()
+            p.stdout.close()
+            rc = p.wait()
+        if bad:
+            raise BackupError(bad)
+        if rc or table is not None:
             raise BackupError("integrity")
-        objs = c.execute("SELECT type, name FROM sqlite_master WHERE type IN ('trigger', 'view')").fetchall()
-        if any(t == "view" or n not in SCHEMA_TRIGGERS for t, n in objs):
-            raise BackupError("objects")
-        tables = {r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        if not {"users", "lists", "tasks", "settings", "sessions", "attachments"} <= tables:
-            raise BackupError("format")
-        sv = c.execute("PRAGMA user_version").fetchone()[0]
-        if sv > SCHEMA_VERSION:
-            raise BackupError("schema", sv)
-        return {"users": c.execute("SELECT COUNT(*) FROM users").fetchone()[0]}
-    except sqlite3.Error:
+    try:
+        sql = b"".join(ddl).decode("utf-8")
+    except UnicodeDecodeError:
         raise BackupError("integrity") from None
-    finally:
-        c.close()
+    stmts = bk_statements(sql)
+    if not any(s.startswith("CREATE TABLE public.users ") for s in stmts):
+        raise BackupError("format")
+    for s in stmts:
+        if not bk_check_statement(s):
+            print("restore: refused statement:", s[:200], flush=True)
+            raise BackupError("objects")
+    if not {"users", "lists", "tasks", "settings", "sessions", "attachments", "kalmido_meta"} <= set(rows):
+        raise BackupError("format")
+    sv = meta.get("schema_version", "")
+    if not sv.isdigit():
+        raise BackupError("format")
+    if int(sv) > SCHEMA_VERSION:
+        raise BackupError("schema", int(sv))
+    return {"schema_version": int(sv), "rows": rows, "users": rows.get("users", 0)}
 
 
-def bk_prepare(path, pw, work, att_dest=None, office_dest=None):
-    """Checks an archive completely; extracts tasks.db into work (and the attachments into att_dest, the office files
-    into office_dest, if given). Returns (manifest, db path)."""
+def bk_prepare(path, pw, work, att_dest=None, office_dest=None, restore=False):
+    """Checks an archive completely; extracts the dump into work (and the attachments into att_dest, the office files into
+    office_dest, if given) and reads it through once. Returns (manifest, dump path). A format-1 archive (SQLite, before
+    2.37) is checked (members, checksums) but refused for a restore."""
     zp, _ = bk_open(path, pw, work)
     try:
         with zipfile.ZipFile(zp) as z:
             man = bk_check_zip(z)
-            dbp = os.path.join(work, "restore.db")
+            if man["_legacy"] and restore:
+                # 2.37 Job C: restore via migrate-sqlite (the move tool reads the tasks.db of the archive)
+                raise BackupError("legacy")
+            dbp = os.path.join(work, BK_DUMP)
             for i in z.infolist():
-                if i.filename == "tasks.db":
+                if i.filename == BK_DUMP:
                     bk_extract(z, i, dbp, man["_listed"])
                 elif i.filename != "manifest.json":
                     m = BK_MEMBER_RE.fullmatch(i.filename)
-                    if att_dest is None:  # verify only: hash the member, write nothing
+                    if att_dest is None or m is None:  # verify only (or the tasks.db of an old archive): hash, write nothing
                         want, h, n = man["_listed"][i.filename], hashlib.sha256(), 0
                         with z.open(i) as src:
                             for b in iter(lambda: src.read(BK_CHUNK), b""):
@@ -638,7 +898,8 @@ def bk_prepare(path, pw, work, att_dest=None, office_dest=None):
         raise BackupError("format") from None
     except (zipfile.LargeZipFile, NotImplementedError, EOFError):
         raise BackupError("format") from None
-    man["db"] = bk_check_db(dbp)
+    if not man["_legacy"]:
+        man["db"] = bk_scan_dump(dbp)
     return man, dbp
 
 
@@ -661,14 +922,43 @@ def bk_upload_path(uid):
     return p
 
 
-def _sqlite_copy(src_path, dst_path):
-    """Copies a database through SQLite's backup API (one transaction on the destination, safe with WAL)."""
-    src, dst = sqlite3.connect(src_path, timeout=30), sqlite3.connect(dst_path, timeout=30)
+def _pool_renew():
+    """After pg_restore: no pooled connection of before may keep cached state of the old tables (plans, OIDs); every
+    idle one is closed now, a borrowed one when it comes back."""
+    p = _pg._POOL.get("p")
+    if p is not None:
+        p.drain()
+
+
+def _pg_restore(dump):
+    """pg_restore --clean of a checked dump into the running database, in ONE transaction (an error leaves it as it was).
+    Tables of this version that the dump does not have (a backup of an older version) are dropped first, so --clean
+    cannot trip over their foreign keys; init_db creates them again, empty."""
+    exe = _pg_tool("pg_restore")
+    lst = subprocess.run([exe, "--list", dump], stdin=subprocess.DEVNULL, capture_output=True, timeout=600, check=False,
+                         env={"PATH": os.environ.get("PATH", "")})
+    if lst.returncode:
+        raise BackupError("integrity")
+    have = {m.group(1) for m in re.finditer(rb"^\d+; \d+ \d+ TABLE public (\S+) ", lst.stdout, re.M)}
+    if not {b"users", b"tasks", b"kalmido_meta"} <= have:  # (never drop anything on a list that was not understood)
+        raise BackupError("format")
+    c = _pg.connect_direct(DATABASE_URL)
     try:
-        src.backup(dst)
+        with _pg.system_ctx(c):  # the restore works on the whole database (every organisation)
+            c.execute("SET LOCAL statement_timeout = 0")
+            extra = [r[0] for r in c.execute("SELECT tablename FROM pg_tables WHERE schemaname='public'")
+                     if r[0].encode() not in have]
+            for t in extra:
+                c.execute('DROP TABLE IF EXISTS "' + t.replace('"', '""') + '" CASCADE')
+        c.commit()
     finally:
-        src.close()
-        dst.close()
+        c.close()
+    if extra:
+        print("restore: dropped table(s) the backup does not have:", ", ".join(extra), flush=True)
+    _pool_renew()
+    _pg_run(["pg_restore", *_restore_args(), "--enable-row-security", "--exit-on-error",
+             "-d", bk_pg_env().get("PGDATABASE") or bk_pg_env().get("PGUSER") or "postgres", dump], err_code="restore")
+    _pool_renew()
 
 
 def _reset_caches():
@@ -701,7 +991,7 @@ def bk_restore(path, pw, admin, via):
     try:
         os.makedirs(att_new, mode=0o755)
         os.makedirs(off_new, mode=0o755)
-        man, dbp = bk_prepare(path, pw, work, att_new, off_new)
+        man, dbp = bk_prepare(path, pw, work, att_new, off_new, restore=True)
         cur = connect()
         try:
             keep = {r[0]: r[1] for r in cur.execute("SELECT key, value FROM settings WHERE key ILIKE 'bk\\_%' ESCAPE '\\'")}
@@ -711,9 +1001,8 @@ def bk_restore(path, pw, admin, via):
         if not GATE.begin(own=1, timeout=60):
             raise BackupError("maint")
         gate = True
-        safety = bk_create("safety")
-        pre = os.path.join(work, "pre-restore.db")  # the current database, for a rollback if anything below fails
-        _sqlite_copy(DB, pre)
+        pre = os.path.join(work, "pre-restore.dump")  # the current database, for a rollback if anything below fails
+        safety = bk_create("safety", keep_dump=pre)
         moved = swapped = omoved = oswapped = False
         try:
             if os.path.isdir(ATT_DIR):
@@ -725,28 +1014,33 @@ def bk_restore(path, pw, admin, via):
                 omoved = True
             os.rename(off_new, OFFICE_DIR)
             oswapped = True
-            _sqlite_copy(dbp, DB)
-            swapped = True
+            swapped = True  # (from here on a failure restores the dump of before; pg_restore itself is all or nothing)
+            _pg_restore(dbp)
             _reset_caches()
             init_db(guard=False)
             c = connect()
             try:
-                for k, v in keep.items():  # the backup settings stay as they are now (not the ones in the backup)
-                    gset(c, k, v)
-                gset(c, "version", max(ver, int(gsetting(c, "version") or 0)) + 1)
-                c.execute("DELETE FROM sessions")
-                tok = None
-                u = c.execute("SELECT * FROM users WHERE username=? AND is_admin=1 AND disabled=0", (admin,)).fetchone()
-                if u and via == "session":
-                    tok, _ = start_session(c, u["id"], True, "password")
+                with _pg.system_ctx(c):  # every session of every organisation ends
+                    for k, v in keep.items():  # the backup settings stay as they are now (not the ones in the backup)
+                        gset(c, k, v)
+                    gset(c, "version", max(ver, int(gsetting(c, "version") or 0)) + 1)
+                    c.execute("DELETE FROM sessions")
+                    tok = None
+                    u = c.execute("SELECT * FROM users WHERE username=? AND is_admin=1 AND disabled=0", (admin,)).fetchone()
+                    if u and via == "session":
+                        tok, _ = start_session(c, u["id"], True, "password")
                 c.commit()
             finally:
                 c.close()
         except Exception:
             if swapped:
-                _sqlite_copy(pre, DB)
-                _reset_caches()
-                init_db(guard=False)
+                try:
+                    _pg_restore(pre)
+                    _reset_caches()
+                    init_db(guard=False)
+                except Exception as e2:  # noqa: BLE001 -- the original error is the one to report
+                    print("restore: rolling back to the state before FAILED:", type(e2).__name__, getattr(e2, "args_", e2),
+                          f"(the safety backup {safety} holds it)", flush=True)
             if os.path.isdir(ATT_DIR) and moved:
                 os.rename(ATT_DIR, att_new)
                 os.rename(att_old, ATT_DIR)
@@ -908,7 +1202,7 @@ def backups_verify(name):
     finally:
         shutil.rmtree(work, ignore_errors=True)
     return jsonify(ok=True, created_at=man.get("created_at"), app_version=man.get("app_version"),
-                   schema_version=man.get("schema_version"), counts=man.get("counts") or {},
+                   schema_version=man.get("schema_version"), counts=man.get("counts") or {}, legacy=man["_legacy"],
                    attachment_files=man.get("attachment_files"), attachment_bytes=man.get("attachment_bytes"))
 
 
@@ -943,6 +1237,7 @@ def backups_upload():
                 with zipfile.ZipFile(p) as z:
                     man = bk_check_zip(z)
                 meta = {k: v for k, v in man.items() if not k.startswith("_") and k != "files"}
+                meta["format_version"] = 1 if man["_legacy"] else 2
             except zipfile.BadZipFile:
                 raise BackupError("format") from None
         else:
@@ -955,7 +1250,8 @@ def backups_upload():
         with contextlib.suppress(OSError):
             os.remove(p)
         raise BackupError("io", aa_oserr(e)) from None
-    return jsonify(upload=uid, size=n, encrypted=enc, created_at=meta.get("created_at", ""), app_version=meta.get("app_version", ""),
+    return jsonify(upload=uid, size=n, encrypted=enc, legacy=meta.get("format_version", 1) < 2,
+                   created_at=meta.get("created_at", ""), app_version=meta.get("app_version", ""),
                    schema_version=meta.get("schema_version"), counts=meta.get("counts") or {},
                    attachment_files=meta.get("attachment_files"), attachment_bytes=meta.get("attachment_bytes"))
 

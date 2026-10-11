@@ -43,6 +43,7 @@ KINDS = {
     "comment": ("matrix", "p2300_tenant_test.py: a comment by id (change, delete, react)"),
     "attachment": ("matrix", "p2300_tenant_test.py: a task's attachment / a list's file by id"),
     "chatfile": ("matrix", "p2300_tenant_test.py: a file of an agent chat by id"),
+    "chatsave": ("matrix", "p2370_u_api_test.py: saving a chat message of another conversation / into a list of another person (#1159)"),
     "list": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: a list by id (read, change, members, sections, fields, notes, owner)"),
     "folder": ("matrix", "p2300_tenant_test.py: folder settings / people / groups are the own folders' only"),
     "news": ("matrix", "p2280_api_test.py: News of other workspaces"),
@@ -165,6 +166,7 @@ ROUTES = {
     "DELETE /api/evcals/{}/members/{}": "calendar", "GET /api/evcals/{}/export.ics": "calendar",
     # ---- chatfile (4)
     "GET /api/chat-files/{}": "chatfile", "DELETE /api/chat-files/{}": "chatfile",
+    "POST /api/chat-save": "chatsave",  # 2.37.0 (#1159)
     "GET /api/v1/chat-attachments/{}": "chatfile", "DELETE /api/v1/chat-attachments/{}": "chatfile",
     # ---- client (13)
     "GET /api/clients": "client", "GET /api/clients/{}": "client", "POST /api/clients": "client",

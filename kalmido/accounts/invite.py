@@ -69,14 +69,18 @@ def invite_new(c, uid, by, send=True, kind=None):
             with c.savepoint():  # 2.37.0 (#1150): a failure here must not abort the caller's transaction
                 inviter = c.execute("SELECT display_name, username FROM users WHERE id=?", (by,)).fetchone()
                 subject, text, body_html = invite_mail(c, u, link, kind, (inviter["display_name"] or inviter["username"]) if inviter else "")
-                try:
-                    logo = {"logo": (open(os.path.join(APP_DIR, "static", "icon-192.png"), "rb").read(), "png")}
-                except OSError:
-                    logo = {}
-                mail_send(u["email"], subject, text, body_html, images=logo, from_name=APP_NAME)
-                c.execute("UPDATE user_invites SET sent_at=? WHERE user_id=?", (iso(now_utc()), uid))
+            try:
+                logo = {"logo": (open(os.path.join(APP_DIR, "static", "icon-192.png"), "rb").read(), "png")}
+            except OSError:
+                logo = {}
+            # 2.37.0 (#1150): the link is stored before the mail goes out (it stayed on a mail error before, too), so no
+            # transaction is open while the mail server is asked; every caller committed right after this anyway
+            c.commit()
+            mail_send(u["email"], subject, text, body_html, images=logo, from_name=APP_NAME)
+            c.execute("UPDATE user_invites SET sent_at=? WHERE user_id=?", (iso(now_utc()), uid))
             out["sent"] = True
         except Exception as e:  # noqa: BLE001  (the link still works: the admin can copy it)
+            c.heal()
             print("invitation mail failed:", type(e).__name__, flush=True)
             out["error"] = tr("The e-mail could not be sent: copy the link instead")
     return out

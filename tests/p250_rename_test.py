@@ -98,8 +98,7 @@ for _ in range(40):
         break
     time.sleep(0.5)
 zips = [n for n in names if n.endswith(".zip")]
-# 2.37 Job B: the backup is rebuilt on pg_dump (admin/backup.py); until then only the request is checked, the zip names again after it
-check(r.status_code == 202 and all(n.startswith("kalmido-backup-") for n in zips), f"backup file names ({r.status_code} {names})")
+check(r.status_code == 202 and len(zips) == 1 and all(n.startswith("kalmido-backup-") for n in zips), f"backup file names ({r.status_code} {names})")
 if zips:
     import zipfile
     with zipfile.ZipFile(os.path.join(DATA, "backups", zips[0])) as z:

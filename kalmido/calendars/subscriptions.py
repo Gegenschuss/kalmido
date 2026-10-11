@@ -740,9 +740,7 @@ def cal_store(c, sid, evs, truncated):
 def pgb_heal(c):
     """2.37.0 (#1150): after a caught error: a statement that failed aborted the transaction (Postgres) -> roll it back, so
     the error can still be written down; otherwise the work so far stays (like before)."""
-    from psycopg.pq import TransactionStatus
-    if c._pg.info.transaction_status == TransactionStatus.INERROR:
-        c.rollback()
+    c.heal()
 
 
 def cal_sync(c, sid, force=False):
@@ -765,9 +763,10 @@ def cal_sync(c, sid, force=False):
         try:
             allow = cal_allow(c)
             url = cal_unseal(c, s["user_id"], s["url"])
+            auth = (s["username"], cal_unseal(c, s["user_id"], s["password"])) if s["kind"] == "caldav" else None
+            c.commit()  # 2.37.0 (#1150): no open transaction while the calendar server is asked (snapshot, pool)
             res = None
             if s["kind"] == "caldav":
-                auth = (s["username"], cal_unseal(c, s["user_id"], s["password"]))
                 tag = caldav_tag(url, auth, allow)
                 if not (tag and tag == s["ctag"] and fresh):
                     raws = caldav_fetch(url, auth, allow)

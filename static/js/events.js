@@ -759,7 +759,7 @@ document.addEventListener('keydown', async e => {
     const ts = $('.tsheet'); if (ts && !$('.modal')) { $('[data-ts="close"]', ts).click(); return; }
     if (!$('#pop').classList.contains('hidden') || $('.qadd.sheet')) { closePop(); return; }
     if (S.multi.size || S.multiMode) { S.multi.clear(); S.multiMode = false; render(); return; }
-    const m = $$('.modal:not(.authscreen)').pop(); if (m) { m.remove(); return; }
+    const m = $$('.modal:not(.authscreen)').pop(); if (m) { modalClose(m); return; }  // 2.37.0 (#1158): its own close if it has one
     if ($('#side.open')) { closeSide(); return; }  // 2.16.0 (#473): Esc closes the drawer
     if (/INPUT|TEXTAREA/.test(t.tagName)) { t.blur(); return; }
     if (S.sel) closeDetail();

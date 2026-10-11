@@ -12,10 +12,13 @@ There is no lastrowid on the cursor: an INSERT that needs its id says so with in
 Request context (#1142 / RLS): set_ctx() stores (user_id, org_ids, role); it is applied with SET LOCAL semantics
 (set_config(..., true)) at the start of every transaction, so it survives commit() and never leaks into the next request that
 borrows the same pooled connection. Background threads, init_db and the CLI get role "system".
+Inside a request the context hook (core/access.py) derives it per transaction from g.user ("user" / "agent", or "anon" without
+an account); system_ctx(c) is the one deliberate way to read across organisations (row-level security, core/rls.py).
 """
 import contextlib
 import functools
 import itertools
+import os
 import re
 import threading
 import time
@@ -28,6 +31,7 @@ from psycopg_pool import ConnectionPool
 
 Error = psycopg.Error
 DatabaseError = psycopg.DatabaseError
+DataError = psycopg.DataError
 IntegrityError = psycopg.IntegrityError
 OperationalError = psycopg.OperationalError
 ProgrammingError = psycopg.ProgrammingError
@@ -171,6 +175,36 @@ ADAPTERS = _adapters()
 
 # --- connection wrapper ------------------------------------------------------------------------------------------------
 SYSTEM = (None, (), "system")
+LOOKUP = object()  # context hook answer: "read the memberships first" (see Conn._resolve_ctx)
+_CTX_HOOK = [None]
+
+
+def set_ctx_hook(fn):
+    """2.37.0 (#1150, W-2): register the function that derives the context of a transaction from the request
+    (core/access.py acx_conn_hook). fn(None) -> context tuple | None | LOOKUP; fn(conn) -> context tuple (may query conn)."""
+    _CTX_HOOK[0] = fn
+
+
+@contextlib.contextmanager
+def system_ctx(c):
+    """2.37.0 (#1150): run the block with app.role = 'system' (row-level security lets it see and write every
+    organisation's rows), then restore the previous context -- also after an exception. Greppable on purpose: use it only
+    where the app deliberately works across organisations (resolving a public token, counting for the admin overview,
+    creating an organisation, accepting an invitation) and never to hand content of foreign organisations to a person."""
+    c._begin()
+    if not c._sys:
+        c._sys_prev = c._ctx
+    c._sys += 1
+    c._ctx = SYSTEM
+    c._apply_ctx()
+    try:
+        yield c
+    finally:
+        c._sys -= 1
+        if not c._sys:
+            c._ctx, c._sys_prev = c._sys_prev, None
+            if not c.closed and not c._pg.closed and c._pg.info.transaction_status == TransactionStatus.INTRANS:
+                c._apply_ctx()  # same transaction goes on: back to the caller's context (aborted / ended: next _begin)
 
 
 class Conn:
@@ -180,12 +214,18 @@ class Conn:
         self._pg = pg
         self._release = release
         self._ctx = SYSTEM
+        self._sys, self._sys_prev, self._resolving = 0, None, False  # system_ctx() nesting / the context hook running
+        self._auto = release is not None  # pooled connections follow the request (hook); direct ones (init_db, CLI) keep theirs
         self._sp = itertools.count(1)
         self.closed = False
 
     # context (#1142 / RLS): who is asking
     def set_ctx(self, user_id=None, org_ids=(), role="user"):
-        self._ctx = (user_id, tuple(org_ids or ()), role)
+        ctx = (user_id, tuple(org_ids or ()), role)
+        if self._sys:  # inside system_ctx(): takes effect when the block ends
+            self._sys_prev = ctx
+            return
+        self._ctx = ctx
         if self._pg.info.transaction_status != TransactionStatus.IDLE:
             self._apply_ctx()
 
@@ -200,8 +240,37 @@ class Conn:
                          ("" if uid is None else str(uid), ",".join(str(int(o)) for o in orgs), role))
 
     def _begin(self):
-        if self._pg.info.transaction_status == TransactionStatus.IDLE:
+        idle = self._pg.info.transaction_status == TransactionStatus.IDLE
+        if self._auto and _CTX_HOOK[0] is not None and not self._sys and not self._resolving and self._resolve_ctx(idle):
+            return
+        if idle:
             self._apply_ctx()  # opens the transaction; SET LOCAL lives until commit / rollback
+
+    def _resolve_ctx(self, idle):
+        """2.37.0 (#1150, W-2): before every statement the context hook (core/access.py acx_conn_hook) says who is asking,
+        so a route that sets g.user late (DAV, public links, forms, hooks, API tokens) can never read with a stale or the
+        system context; a change is applied at once (also in the middle of a transaction). The hook answers a context,
+        None (no request: keep the stored one) or LOOKUP (the memberships must be read first: that read runs as "system",
+        then the real context replaces it). True when the context was applied here."""
+        hook = _CTX_HOOK[0]
+        ctx = hook(None)
+        if ctx is None:
+            return False
+        if ctx is LOOKUP:
+            self._resolving = True
+            try:
+                self._ctx = SYSTEM
+                self._apply_ctx()
+                ctx = hook(self)
+            finally:
+                self._resolving = False
+            idle = True  # applied below in any case
+        ctx = (ctx[0], tuple(ctx[1] or ()), ctx[2])
+        if not idle and ctx == self._ctx:
+            return False
+        self._ctx = ctx
+        self._apply_ctx()
+        return True
 
     def execute(self, sql, args=None):
         self._begin()
@@ -227,6 +296,14 @@ class Conn:
     def rollback(self):
         self._pg.rollback()
 
+    def heal(self):
+        """After a caught database error: roll back when the transaction is aborted (Postgres refuses every further
+        statement until then); a healthy transaction is left alone. True when it rolled back."""
+        if self._pg.info.transaction_status == TransactionStatus.INERROR:
+            self._pg.rollback()
+            return True
+        return False
+
     @property
     def in_transaction(self):
         return self._pg.info.transaction_status != TransactionStatus.IDLE
@@ -245,6 +322,7 @@ class Conn:
             yield self
         except BaseException:
             self._pg.execute(f"ROLLBACK TO SAVEPOINT {name}")
+            self._apply_ctx()  # 2.37.0 (#1150): a context set inside the savepoint was rolled back with it
             raise
         else:
             self._pg.execute(f"RELEASE SAVEPOINT {name}")
@@ -308,18 +386,49 @@ _LOCK = threading.Lock()
 def _configure(pg):
     pg.adapters  # noqa: B018
     pg.row_factory = _row_factory
+    _rls_enter(pg)
+
+
+def _rls_enter(pg):
+    """2.37.0 (#1150): a login role that is a superuser or has BYPASSRLS ignores row-level security -- the app's pooled
+    connections then work as the role kalmido_app (core/rls.py). Once per new connection; start-up keeps the login role."""
+    from .rls import APP_ROLE, enter_sql
+    try:
+        if pg.execute(enter_sql()).fetchone()[0]:
+            pg.execute(f"SET ROLE {APP_ROLE}")
+    finally:
+        pg.commit()
+
+
+def pool_refresh():
+    """2.37.0 (#1150): after init_db created the app role: replace connections the pool opened before (they would keep the
+    login role)."""
+    p = _POOL["p"]
+    if p is not None:
+        p.drain()
+
+
+# 2.37.0 (#1150): 16 waitress threads x up to 3 connections each (a request may borrow a second one, e.g. for a push) plus the
+# background threads. Postgres' max_connections must stay above this (its default 100 does). KALMIDO_DB_POOL_MAX overrides it.
+POOL_MIN = 4
+POOL_MAX = max(POOL_MIN, int(os.environ.get("KALMIDO_DB_POOL_MAX", "") or 56))
+# Every session: no statement runs longer than 30 s, no transaction idles longer than 5 min (a hung network call inside a
+# transaction would otherwise hold its snapshot and locks). init_db and the backup lift the statement limit for themselves.
+SESSION_OPTIONS = "-c statement_timeout=30000 -c idle_in_transaction_session_timeout=300000 -c jit=off"  # 2.37: JIT costs 15-20 ms per /api/state for <3 ms queries (EXPLAIN)
 
 
 def _new_conn_kwargs():
-    return {"autocommit": False, "prepare_threshold": None}
+    return {"autocommit": False, "prepare_threshold": None, "options": SESSION_OPTIONS}
 
 
 def pool(url):
     with _LOCK:
         p = _POOL["p"]
         if p is None:
-            p = ConnectionPool(url, min_size=4, max_size=24, timeout=30, open=False, configure=_configure,
+            # check: a cheap test of every borrowed connection, so a database restart costs no failed requests
+            p = ConnectionPool(url, min_size=POOL_MIN, max_size=POOL_MAX, timeout=30, open=False, configure=_configure,
                                kwargs={**_new_conn_kwargs(), "context": _ctx_for_adapters()},
+                               check=ConnectionPool.check_connection,
                                reset=lambda pg: pg.rollback() if pg.info.transaction_status != TransactionStatus.IDLE else None)
             p.open(wait=False)
             _POOL["p"] = p
@@ -388,3 +497,9 @@ def table_exists(c, table):
 def like_escape(s):
     """A user's text as a literal part of an ILIKE pattern (with ESCAPE '\\')."""
     return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def conninfo_dict(url):
+    """DATABASE_URL as libpq keywords (host, port, dbname, user, password, ...): admin/backup.py hands them to pg_dump /
+    pg_restore through the environment."""
+    return psycopg.conninfo.conninfo_to_dict(url)

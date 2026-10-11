@@ -138,7 +138,9 @@ def boundary_tick(c):
 
 def boundary_summary(c):
     """For GET /api/admin/orgs: the live count + when the nightly check ran last."""
-    res = boundary_check(c)
+    from ..core.pg import system_ctx
+    with system_ctx(c):  # 2.37.0 (#1150): counts and ids over every organisation, no content
+        res = boundary_check(c)
     last = boundary_last(c)
     return {"violations": res["n"], "kinds": res["kinds"], "sample": res["sample"], "checked_at": last.get("at") or None}
 

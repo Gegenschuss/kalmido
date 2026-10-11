@@ -95,7 +95,7 @@ function tcMsgsHtml() {
     h += `<div class="cmsg ${mine ? 'me' : 'ag'} ${first ? 'first' : ''}${rxShow('t' + m.id)}" data-k="m${m.id}" data-mid="t:${m.id}">
       ${first && !mine ? `<div class="tcwho">${av(m.user_id, uname(m.user_id, U), 'avatar sm')}<b>${esc(uname(m.user_id, U))}</b>${ags.has(m.user_id) ? agentBadge() : ''}</div>` : ''}
       ${body}${m.task ? `<button class="runtask" data-act="open-id" data-id="${m.task.id}">${ic('arrow', 's')}<span>${esc(m.task.title)}</span></button>` : ''}
-      <div class="cmeta"><time title="${esc(fmtWhen(m.created_at))}">${fmtWhen(m.created_at)}</time>${m.edited_at && !m.deleted ? `<span class="muted">${tr('edited')}</span>` : ''}${rxr}${m.deleted || S.tc.edit === m.id ? '' : replyBtn('chrbtn mreply')}${mine && !m.deleted ? `<button type="button" class="rx rxtog" data-act="tc-msg-menu" data-mid="${m.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button>` : ''}</div></div>`;
+      <div class="cmeta"><time title="${esc(fmtWhen(m.created_at))}">${fmtWhen(m.created_at)}</time>${m.edited_at && !m.deleted ? `<span class="muted">${tr('edited')}</span>` : ''}${rxr}${m.deleted || S.tc.edit === m.id ? '' : replyBtn('chrbtn mreply')}${m.deleted ? '' : chatSavedMark(m)}${!m.deleted ? `<button type="button" class="rx rxtog" data-act="tc-msg-menu" data-mid="${m.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button>` : ''}</div></div>`;
   }
   return h;
 }
@@ -142,9 +142,12 @@ async function tcReact(mid, emoji) {
   tcPatch(); rxRefocus('#tc-msgs', mid, emoji);
 }
 function tcMsgMenu(anchor, mid) {
-  const m = S.tc.msgs.find(x => x.id === mid); if (!m) return;
-  menu(anchor, [{label: tr('Reply'), icon: 'reply', fn: () => replyStart('t', mid)}, {label: tr('Edit'), icon: 'edit', fn: () => { S.tc.edit = mid; tcPatch(); setTimeout(() => { const t = $('#tc-msgs .tc-edit'); if (t) { t.focus(); autosize(t); } }, 0); }},
-    {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => tcMsgDelete(mid)}]);
+  const m = S.tc.msgs.find(x => x.id === mid); if (!m || m.deleted) return;
+  const mine = m.user_id === S.me?.id;  // 2.37.0 (#1159): the menu on every message (Save as task); Edit / Delete only on my own
+  menu(anchor, [{label: tr('Reply'), icon: 'reply', fn: () => replyStart('t', mid)},
+    {label: m.saved_task_id ? tr('Saved as a task: open it') : tr('Save as task'), icon: 'bookmark', fn: () => m.saved_task_id ? chatSaveOpen(m.saved_task_id) : chatSaveModal('team', m, () => tcPatch())},
+    ...(mine ? [{label: tr('Edit'), icon: 'edit', fn: () => { S.tc.edit = mid; tcPatch(); setTimeout(() => { const t = $('#tc-msgs .tc-edit'); if (t) { t.focus(); autosize(t); } }, 0); }},
+      {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => tcMsgDelete(mid)}] : [])]);
 }
 async function tcMsgDelete(mid) {
   const m = S.tc.msgs.find(x => x.id === mid); if (!m) return false;
@@ -608,3 +611,60 @@ function palMsgItems(q) {
   if (PALM.total > PALM.hits.length) it.push({id: 'msg:all', kind: 'msg', group: 'msgs', label: tr('All {0} messages', PALM.total), icon: 'search', fn: () => { go('search'); setTimeout(() => { const i = $('#searchq'); if (i) i.value = q; doSearch(q); }, 0); }});
   return it;
 }
+
+// ------------------------------------------------------------------ 2.37.0 (#1159): save a chat message as a task
+// "Save as task" in the menu of every message (agent chat and team chat, not on deleted ones) and under an agent's message
+// that offers it (offer_save; the agent never saves itself). The dialog: title (the first heading or line), the list
+// (lists the person may change, the inbox first), "To review by" (optional). The server (POST /api/chat-save) writes the
+// whole text, the files and a link back to the message; a message saved before answers "already saved" with its task.
+// A saved message shows a small "Saved" mark that opens the task.
+function chatSaveTitle(text) {
+  const ls = String(text || '').split('\n').map(x => x.trim()).filter(Boolean);
+  let t = ls.find(x => /^#{1,6}\s+\S/.test(x)) || ls[0] || '';
+  t = t.replace(/^(#{1,6}|>|[-*+]|\d+[.)])\s+/, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/<@(\d+)>/g, (_, id) => '@' + uname(+id, S.tc?.users || {})).replace(/[*_`~]+/g, '').trim();
+  return t.length > 120 ? t.slice(0, 119).trimEnd() + '…' : t;
+}
+async function chatSaveOpen(tid) {
+  if (!taskById(tid)) { try { (S.extra ||= []).push(await rawFetch('GET', `/api/tasks/${tid}`)); } catch { toast(tr('Task not found')); return; } }
+  openDetail(tid);
+}
+const chatSavedMark = m => m.saved_task_id ? `<button type="button" class="csaved" data-act="csave-open" data-tid="${m.saved_task_id}" title="${esc(tr('Saved as a task: open it'))}">${ic('bookmark', 's')}<span>${tr('Saved')}</span></button>` : '';
+function chatSaveModal(kind, m, done) {
+  if (!m || m.deleted) return;
+  if (m.saved_task_id) { toast(tr('Already saved as a task'), () => chatSaveOpen(m.saved_task_id), 6000, tr('Open')); return; }
+  const ib = inbox(), ls = [ib, ...sideOrder().filter(l => l && !l.is_inbox && !l.archived && canEditList(l.id))].filter(Boolean);
+  const md = modal(`<h3>${ic('bookmark', 's')} ${tr('Save as task')}</h3>
+    <p class="muted">${tr('The task gets the whole message, its files and a link back to it in the chat.')}</p>
+    <div class="row"><label for="cs-title">${tr('Title')}</label><input id="cs-title" maxlength="2000" value="${esc(chatSaveTitle(m.body) || tr('Saved message'))}"></div>
+    <div class="row"><label for="cs-list">${tr('List')}</label><select id="cs-list">${ls.map(l => `<option value="${l.id}" ${l === ib ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>
+    <div class="row"><label>${tr('To review by')}</label>${dateIn('cs-due', '', {label: tr('To review by'), empty: tr('No date')})}</div>
+    <div class="foot"><div class="calerr" role="alert" id="cs-err" hidden></div><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${ic('bookmark', 's')} ${tr('Save')}</button></div>`);
+  md.classList.add('csmodal');
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('button[data-m]'); if (!b) return;
+    if (b.dataset.m === 'close') { md.remove(); return; }
+    const er = $('#cs-err', md); er.hidden = true; b.disabled = true;
+    const due = $('#cs-due', md).value, title = $('#cs-title', md).value.trim();
+    let j;
+    try { j = await rawFetch('POST', '/api/chat-save', {kind, msg_id: m.id, list_id: +$('#cs-list', md).value, ...(due ? {due} : {}), ...(title ? {title} : {})}); }
+    catch (x) { er.textContent = x.message; er.hidden = false; b.disabled = false; return; }
+    md.remove();
+    const tid = j.already ? j.task_id : j.task?.id;
+    m.saved_task_id = tid;
+    if (j.task && !j.already) (S.extra ||= []).push(j.task);
+    if (done) done();
+    toast(j.already ? tr('Already saved as a task') : j.skipped_files?.length ? tr('Saved as a task (without {0}: storage full)', j.skipped_files.join(', ')) : tr('Saved as a task'), () => chatSaveOpen(tid), 6000, tr('Open'));
+  });
+  setTimeout(() => $('#cs-title', md)?.focus(), 30);
+  return md;
+}
+document.addEventListener('click', e => {
+  const a = e.target.closest?.('[data-act="csave-open"],[data-act="chat-save"],[data-act="chat-msg-menu"]'); if (!a) return;
+  e.preventDefault(); e.stopPropagation();
+  if (a.dataset.act === 'csave-open') { chatSaveOpen(+a.dataset.tid); return; }
+  const m = (S.chat?.msgs || []).find(x => x.id === +a.dataset.mid); if (!m) return;
+  if (a.dataset.act === 'chat-save') { chatSaveModal('agent', m, () => chatPatch()); return; }
+  const ag = agentById(S.chat.aid);
+  menu(a, [ag?.enabled ? {label: tr('Reply'), icon: 'reply', fn: () => replyStart('a', m.id)} : null,
+    {label: m.saved_task_id ? tr('Saved as a task: open it') : tr('Save as task'), icon: 'bookmark', fn: () => m.saved_task_id ? chatSaveOpen(m.saved_task_id) : chatSaveModal('agent', m, () => chatPatch())}]);
+});

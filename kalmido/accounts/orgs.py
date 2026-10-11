@@ -6,7 +6,7 @@ import re
 from flask import g, jsonify
 
 from ..core.config import app
-from ..core.pg import insert_id
+from ..core.pg import insert_id, like_escape, system_ctx
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, now_utc
 from ..accounts.session import me
@@ -70,17 +70,22 @@ WS_MSG_PRIVATE_ONLY = N_("Family, household and Home & life lists are private: t
 def instance_mode(c):
     if INSTANCE_ENV in INSTANCE_MODES:
         return INSTANCE_ENV
-    return "multi" if c.execute("SELECT COUNT(*) FROM orgs").fetchone()[0] > 1 else "organisation"
+    with system_ctx(c):  # 2.37.0 (#1150): instance structure (a count), the same for everybody under row-level security
+        return "multi" if c.execute("SELECT COUNT(*) FROM orgs").fetchone()[0] > 1 else "organisation"
 
 
 def main_org(c):
-    r = c.execute("SELECT id FROM orgs ORDER BY id LIMIT 1").fetchone()
+    with system_ctx(c):  # 2.37.0 (#1150): instance structure (the first organisation's id)
+        r = c.execute("SELECT id FROM orgs ORDER BY id LIMIT 1").fetchone()
     return r[0] if r else None
 
 
 def has_workspaces(c):
     """2.28.0 (#935): the instance knows organisations (any mode but shared) -> lists and agents have a workspace."""
-    return instance_mode(c) != "shared" and bool(c.execute("SELECT 1 FROM orgs LIMIT 1").fetchone())
+    if instance_mode(c) == "shared":
+        return False
+    with system_ctx(c):  # 2.37.0 (#1150): instance structure
+        return bool(c.execute("SELECT 1 FROM orgs LIMIT 1").fetchone())
 
 
 def instance_sync(c):
@@ -121,7 +126,8 @@ def user_orgs(c, uid):
     if m == "organisation":
         oid = main_org(c)
         return [oid] if oid else []
-    return [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=? ORDER BY org_id", (uid,))]
+    with system_ctx(c):  # 2.37.0 (#1150): memberships are structure the access rules need (also of other people)
+        return [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=? ORDER BY org_id", (uid,))]
 
 
 def org_member_add(c, oid, uid, role="member"):
@@ -132,14 +138,16 @@ def org_member_add(c, oid, uid, role="member"):
 
 
 def org_names(c, uid):
-    return [r[0] for r in c.execute(f"SELECT name FROM orgs WHERE id IN ({','.join(str(int(x)) for x in user_orgs(c, uid)) or 'NULL'}) ORDER BY id")]
+    with system_ctx(c):  # 2.37.0 (#1150): the names of uid's own organisations (also before a login: mails, the login page)
+        return [r[0] for r in c.execute(f"SELECT name FROM orgs WHERE id IN ({','.join(str(int(x)) for x in user_orgs(c, uid)) or 'NULL'}) ORDER BY id")]
 
 
 def org_role(c, uid, oid):
     """2.28.0 (#935): member | admin | None -- the person's role in organisation oid."""
     if not oid or oid not in user_orgs(c, uid):
         return None
-    r = c.execute("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (oid, uid)).fetchone()
+    with system_ctx(c):  # 2.37.0 (#1150): membership structure (also asked for other people)
+        r = c.execute("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (oid, uid)).fetchone()
     if instance_mode(c) == "organisation":  # the one organisation: the instance's admins administer it
         a = c.execute("SELECT is_admin FROM users WHERE id=? AND kind!='agent'", (uid,)).fetchone()
         if a and a[0]:
@@ -163,7 +171,13 @@ def _connections(c, uid):
 
 
 def visible_people(c, uid):
-    """None = everyone; else the set of user ids uid may see (uid included)."""
+    """None = everyone; else the set of user ids uid may see (uid included). 2.37.0 (#1150): computed over the memberships
+    as "system" (ids only), so the rule is the same whoever asks -- row-level security does not narrow it."""
+    with system_ctx(c):
+        return _visible_people(c, uid)
+
+
+def _visible_people(c, uid):
     u = c.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone()
     if not u:
         return None
@@ -223,10 +237,11 @@ def org_label(c, uid=None):
         return n[0] if n else ""
     if m in ("shared", "workspaces"):
         return ""
-    if m == "organisation":
-        r = c.execute("SELECT name FROM orgs WHERE id=?", (main_org(c),)).fetchone()
-        return r[0] if r else ""
-    rows = c.execute("SELECT name FROM orgs ORDER BY id LIMIT 2").fetchall()
+    with system_ctx(c):  # 2.37.0 (#1150): before a login: the instance's own name (only when it has exactly one organisation)
+        if m == "organisation":
+            r = c.execute("SELECT name FROM orgs WHERE id=?", (main_org(c),)).fetchone()
+            return r[0] if r else ""
+        rows = c.execute("SELECT name FROM orgs ORDER BY id LIMIT 2").fetchall()
     return rows[0][0] if len(rows) == 1 else ""
 
 
@@ -247,7 +262,8 @@ def list_org(c, lid):
 
 
 def agent_org(c, aid):
-    r = c.execute("SELECT org_id FROM agents WHERE user_id=?", (aid,)).fetchone()
+    with system_ctx(c):  # 2.37.0 (#1150): an agent's workspace is structure the boundary rules need (also for foreign agents)
+        r = c.execute("SELECT org_id FROM agents WHERE user_id=?", (aid,)).fetchone()
     return r["org_id"] if r else None
 
 
@@ -367,8 +383,8 @@ def ws_default_org(c, uid, folder=""):
     if not has_workspaces(c):
         return None
     if folder:
-        rows = c.execute("SELECT DISTINCT org_id FROM lists WHERE owner_id=? AND is_inbox=0 AND (folder=? OR folder ILIKE ?)",
-                         (uid, folder, folder.split("/", 1)[0] + "/%")).fetchall()
+        rows = c.execute("SELECT DISTINCT org_id FROM lists WHERE owner_id=? AND is_inbox=0 AND (folder=? OR folder ILIKE ? ESCAPE '\\')",
+                         (uid, folder, like_escape(folder.split("/", 1)[0]) + "/%")).fetchall()
         oids = {r[0] for r in rows}
         if len(oids) == 1:
             return oids.pop()
@@ -510,13 +526,14 @@ def orgs_get():
     (multi and workspaces)."""
     _need_admin()
     c = db()
-    m = instance_mode(c)
-    rows = [] if m == "shared" else c.execute("SELECT * FROM orgs" + (" WHERE id=?" if m == "organisation" else "") + " ORDER BY lower(name), id",
-                                              (main_org(c),) if m == "organisation" else ()).fetchall()
-    from ..accounts.tenancy import boundary_summary
-    return jsonify(orgs=[org_public(c, r) for r in rows], visibility=vis_mode(c), mode=m, editable=m in ("multi", "workspaces"),
-                   creatable=m == "workspaces", name_env=bool(ORG_NAME_ENV),
-                   boundary=boundary_summary(c))  # 2.30.0 (#1036): memberships across the workspace boundary (0 = clean)
+    with system_ctx(c):  # 2.37.0 (#1150): instance admin: organisation structure (names, members, counts) of every organisation, no content
+        m = instance_mode(c)
+        rows = [] if m == "shared" else c.execute("SELECT * FROM orgs" + (" WHERE id=?" if m == "organisation" else "") + " ORDER BY lower(name), id",
+                                                  (main_org(c),) if m == "organisation" else ()).fetchall()
+        from ..accounts.tenancy import boundary_summary
+        return jsonify(orgs=[org_public(c, r) for r in rows], visibility=vis_mode(c), mode=m, editable=m in ("multi", "workspaces"),
+                       creatable=m == "workspaces", name_env=bool(ORG_NAME_ENV),
+                       boundary=boundary_summary(c))  # 2.30.0 (#1036): memberships across the workspace boundary (0 = clean)
 
 
 def _no_change():
@@ -529,22 +546,23 @@ def org_create():
     2.23.0: 403 elsewhere). admin_id (default: the creating admin) becomes its first member and organisation admin."""
     _need_admin()
     c, b = db(), body()
-    if instance_mode(c) != "workspaces":
-        _no_change()
-    name = _clean_name(b.get("name"))
-    if c.execute("SELECT 1 FROM orgs WHERE lower(name)=lower(?)", (name,)).fetchone():
-        return err(tr("An organisation with this name exists"), 409)
-    oid = insert_id(c, "INSERT INTO orgs(name,icon,domains,created_at) VALUES(?,?,?,?)",
-                    (name, _clean_icon(b.get("icon")), _clean_domains(b.get("domains") or ""), iso(now_utc())))
-    adm = b.get("admin_id", me())
-    if not isinstance(adm, int) or isinstance(adm, bool) or not c.execute("SELECT 1 FROM users WHERE id=? AND kind!='agent' AND disabled=0", (adm,)).fetchone():
-        c.rollback()
-        return err(tr("Invalid value: {0}", "admin_id"))
-    org_member_add(c, oid, adm, "admin")
-    bump(c)
-    c.commit()
-    print("organisation", name, "(id", oid, ") created by", g.user["username"], flush=True)
-    return jsonify(org_public(c, c.execute("SELECT * FROM orgs WHERE id=?", (oid,)).fetchone())), 201
+    with system_ctx(c):  # 2.37.0 (#1150): instance admin manages the organisations themselves (also ones he is not in)
+        if instance_mode(c) != "workspaces":
+            _no_change()
+        name = _clean_name(b.get("name"))
+        if c.execute("SELECT 1 FROM orgs WHERE lower(name)=lower(?)", (name,)).fetchone():
+            return err(tr("An organisation with this name exists"), 409)
+        oid = insert_id(c, "INSERT INTO orgs(name,icon,domains,created_at) VALUES(?,?,?,?)",
+                        (name, _clean_icon(b.get("icon")), _clean_domains(b.get("domains") or ""), iso(now_utc())))
+        adm = b.get("admin_id", me())
+        if not isinstance(adm, int) or isinstance(adm, bool) or not c.execute("SELECT 1 FROM users WHERE id=? AND kind!='agent' AND disabled=0", (adm,)).fetchone():
+            c.rollback()
+            return err(tr("Invalid value: {0}", "admin_id"))
+        org_member_add(c, oid, adm, "admin")
+        bump(c)
+        c.commit()
+        print("organisation", name, "(id", oid, ") created by", g.user["username"], flush=True)
+        return jsonify(org_public(c, c.execute("SELECT * FROM orgs WHERE id=?", (oid,)).fetchone())), 201
 
 
 @app.patch("/api/admin/orgs/<int:oid>")
@@ -553,23 +571,24 @@ def org_update(oid):
     from 2.22 ("multi") or in the mode workspaces; else 403 (#799)."""
     _need_admin()
     c, b = db(), body()
-    if instance_mode(c) not in ("multi", "workspaces"):
-        _no_change()
-    if not c.execute("SELECT 1 FROM orgs WHERE id=?", (oid,)).fetchone():
-        return err(tr("Not found"), 404)
-    _org_patch(c, oid, b)
-    if "members" in b:
-        _set_members(c, oid, b["members"])
-    if "admins" in b:  # 2.28.0 (#935): the organisation's admins (a subset of its members)
-        if not isinstance(b["admins"], list) or not all(isinstance(x, int) and not isinstance(x, bool) for x in b["admins"]):
-            c.rollback()
-            return err(tr("Invalid value: {0}", "admins"))
-        c.execute("UPDATE org_members SET role='member' WHERE org_id=?", (oid,))
-        for x in b["admins"]:
-            c.execute("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=? AND user_id IN (SELECT id FROM users WHERE kind!='agent')", (oid, x))
-    bump(c)
-    c.commit()
-    return jsonify(org_public(c, c.execute("SELECT * FROM orgs WHERE id=?", (oid,)).fetchone()))
+    with system_ctx(c):  # 2.37.0 (#1150): instance admin manages the organisations themselves (also ones he is not in)
+        if instance_mode(c) not in ("multi", "workspaces"):
+            _no_change()
+        if not c.execute("SELECT 1 FROM orgs WHERE id=?", (oid,)).fetchone():
+            return err(tr("Not found"), 404)
+        _org_patch(c, oid, b)
+        if "members" in b:
+            _set_members(c, oid, b["members"])
+        if "admins" in b:  # 2.28.0 (#935): the organisation's admins (a subset of its members)
+            if not isinstance(b["admins"], list) or not all(isinstance(x, int) and not isinstance(x, bool) for x in b["admins"]):
+                c.rollback()
+                return err(tr("Invalid value: {0}", "admins"))
+            c.execute("UPDATE org_members SET role='member' WHERE org_id=?", (oid,))
+            for x in b["admins"]:
+                c.execute("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=? AND user_id IN (SELECT id FROM users WHERE kind!='agent')", (oid, x))
+        bump(c)
+        c.commit()
+        return jsonify(org_public(c, c.execute("SELECT * FROM orgs WHERE id=?", (oid,)).fetchone()))
 
 
 def _org_patch(c, oid, b):
@@ -587,20 +606,21 @@ def org_delete(oid):
     its owners move or delete them first). 2.23.0: 403 in the other modes."""
     _need_admin()
     c = db()
-    if instance_mode(c) != "workspaces":
-        _no_change()
-    if not c.execute("SELECT 1 FROM orgs WHERE id=?", (oid,)).fetchone():
-        return err(tr("Not found"), 404)
-    n = c.execute("SELECT COUNT(*) FROM lists WHERE org_id=?", (oid,)).fetchone()[0]
-    if n:
-        return err(tr("This organisation still has {0} lists: their owners move or delete them first", n), 409)
-    c.execute("UPDATE agents SET org_id=NULL WHERE org_id=?", (oid,))
-    c.execute("UPDATE ev_cals SET org_id=NULL WHERE org_id=?", (oid,))  # 2.30.0 (#1036): they stay with their owners, private
-    c.execute("UPDATE books SET org_id=NULL WHERE org_id=?", (oid,))
-    c.execute("DELETE FROM orgs WHERE id=?", (oid,))
-    bump(c)
-    c.commit()
-    return jsonify(ok=True)
+    with system_ctx(c):  # 2.37.0 (#1150): instance admin manages the organisations themselves (also ones he is not in)
+        if instance_mode(c) != "workspaces":
+            _no_change()
+        if not c.execute("SELECT 1 FROM orgs WHERE id=?", (oid,)).fetchone():
+            return err(tr("Not found"), 404)
+        n = c.execute("SELECT COUNT(*) FROM lists WHERE org_id=?", (oid,)).fetchone()[0]
+        if n:
+            return err(tr("This organisation still has {0} lists: their owners move or delete them first", n), 409)
+        c.execute("UPDATE agents SET org_id=NULL WHERE org_id=?", (oid,))
+        c.execute("UPDATE ev_cals SET org_id=NULL WHERE org_id=?", (oid,))  # 2.30.0 (#1036): they stay with their owners, private
+        c.execute("UPDATE books SET org_id=NULL WHERE org_id=?", (oid,))
+        c.execute("DELETE FROM orgs WHERE id=?", (oid,))
+        bump(c)
+        c.commit()
+        return jsonify(ok=True)
 
 
 @app.put("/api/admin/orgs/visibility")
@@ -608,14 +628,15 @@ def org_visibility():
     """{mode: all | org | contacts}: whom people see (admins always everyone)."""
     _need_admin()
     c, b = db(), body()
-    if instance_mode(c) != "multi":
-        _no_change()
-    if b.get("mode") not in VIS_MODES:
-        return err(tr("Invalid value: {0}", "mode"))
-    gset(c, "people_visibility", b["mode"])
-    bump(c)
-    c.commit()
-    return jsonify(visibility=b["mode"])
+    with system_ctx(c):  # 2.37.0 (#1150): instance admin manages the organisations themselves (also ones he is not in)
+        if instance_mode(c) != "multi":
+            _no_change()
+        if b.get("mode") not in VIS_MODES:
+            return err(tr("Invalid value: {0}", "mode"))
+        gset(c, "people_visibility", b["mode"])
+        bump(c)
+        c.commit()
+        return jsonify(visibility=b["mode"])
 
 
 # ---------------------------------------------------------------- 2.28.0 (#935): my organisations, their admins

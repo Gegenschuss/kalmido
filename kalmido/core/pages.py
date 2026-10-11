@@ -312,6 +312,8 @@ def drop_post():
         print("drop: 403, auth header", "missing" if not auth else
               f"len {len(auth)} starts {auth[:7]!r} ends-with-space {auth != auth.rstrip()}", flush=True)
         return Response(tr("not allowed") + "\n", 403, mimetype="text/plain")
+    from ..core.access import acx_token_bind
+    acx_token_bind(u["id"])  # 2.37.0 (#1150): reads and writes with the token owner's context (row-level security)
     lg = lang(c, u["id"])
     files = [f for key in request.files for f in request.files.getlist(key) if f and f.filename]
     text = (request.form.get("text") or "").strip()

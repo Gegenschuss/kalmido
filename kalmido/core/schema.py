@@ -792,6 +792,11 @@ CREATE TABLE IF NOT EXISTS office_doc_log (
   detail TEXT NOT NULL DEFAULT '{}');
 CREATE INDEX IF NOT EXISTS office_doc_log_org ON office_doc_log(org_id, id);
 CREATE INDEX IF NOT EXISTS office_doc_log_doc ON office_doc_log(doc_id);
+-- 2.37.0 (#1159): a chat message a person saved as a task (kind agent = agent_chat, team = tchat_msgs; per person: a team
+-- chat message can be saved by several people). A deleted task makes the message savable again (chat_save_of checks it)
+CREATE TABLE IF NOT EXISTS chat_saves (
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, kind TEXT NOT NULL, msg_id BIGINT NOT NULL,
+  task_id BIGINT REFERENCES tasks(id) ON DELETE SET NULL, created_at TEXT NOT NULL, PRIMARY KEY (user_id, kind, msg_id));
 """
 # Bumped when the database layout changes (stored in kalmido_meta.schema_version; SQLite: PRAGMA user_version). A backup can be restored when its
 # schema version is not newer than this one (older ones are migrated by init_db).
@@ -1076,6 +1081,8 @@ MIGRATIONS = [
     ("clients", "buyer_reference", "ALTER TABLE clients ADD COLUMN buyer_reference TEXT NOT NULL DEFAULT ''"),
     ("clients", "email_invoice", "ALTER TABLE clients ADD COLUMN email_invoice TEXT NOT NULL DEFAULT ''"),
     ("clients", "payment_terms_days", "ALTER TABLE clients ADD COLUMN payment_terms_days BIGINT"),
+    # 2.37.0 (#1159): an agent offers "Save as task" under its message (a button; the person saves, never the agent)
+    ("agent_chat", "offer_save", "ALTER TABLE agent_chat ADD COLUMN offer_save BIGINT NOT NULL DEFAULT 0"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

@@ -772,6 +772,7 @@ function parseHash() {
   if (a === 't' && b) return {mod: 'tasks', key: S.route.key || START_KEY, task: +b};
   if (a === 'home') return {mod: 'home', key: 'home'};  // 2.17.0 (#475): the dashboard (the logo)
   if (a === 'team') return {mod: 'team', key: 'team', rid: +b || null};  // 2.17.0 (#419)
+  if (a === 'msg' && (b === 'a' || b === 't')) { const p = h.split('/'); return {mod: 'tasks', key: S.route.key || LS.get('lastKey', START_KEY), msg: {art: b, place: +p[2], id: +p[3]}}; }  // 2.37.0 (#1159): link back to a saved message
   if (a === 'notes' && +b) return {mod: 'notes', key: 'notes', lid: +b};  // 2.17.0 (#442)
   if (a === 'note' && +b) { const n = (S.notes || []).find(x => x.id === +b); return n ? {mod: 'notes', key: 'notes', lid: n.list_id, nid: n.id} : {mod: 'tasks', key: LS.get('lastKey', START_KEY), noteMissing: true}; }
   if (a === 'reply' && b) return {mod: 'tasks', key: S.route.key || START_KEY, task: +b, reply: true};  // 2.0.8 (#331): push button "Reply"
@@ -826,6 +827,7 @@ async function route() {
   closeSide();
   if (r.task) { render(); if (taskById(r.task)?.unread || r.reply) S.tlScroll = r.task; openDetail(r.task); history.replaceState(null, '', '#' + keyToHash(S.route.key)); if (r.reply) replyFocus(r.task); return; }
   if (r.prop) { history.replaceState(null, '', '#' + keyToHash(S.route.key)); render(); propOpen(r.prop); return; }
+  if (r.msg) { history.replaceState(null, '', '#' + keyToHash(S.route.key)); render(); msgJump({art: r.msg.art, id: r.msg.id, chat: r.msg.art === 't' ? r.msg.place : null, agent: r.msg.art === 'a' ? r.msg.place : null}); return; }  // 2.37.0 (#1159)
   if (r.snooze || r.complete || r.nagoff) {
     history.replaceState(null, '', '#' + keyToHash(S.route.key));
     render();

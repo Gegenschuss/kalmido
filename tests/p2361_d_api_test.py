@@ -247,36 +247,32 @@ check(Ca.delete(B + "/api/office/logo").ok and Ca.get(B + "/api/office/logo").st
       "removing the second organisation's logo leaves the first one alone")
 
 # ---------------------------------------------------------------- backup with the logo, restore brings it back
-# 2.37 Job B: the backup (admin/backup.py) still works on the SQLite file -- backup + restore of this suite skipped until
-# it moves to pg_dump (KALMIDO_PG_BACKUP=1 runs them anyway)
-PG_BK = bool(os.environ.get("KALMIDO_PG_BACKUP"))
-if PG_BK:
-    r = A.post(B + "/api/admin/backups")
-    check(r.status_code == 202, "backup started " + r.text[:100])
-    for _ in range(100):
-        j = A.get(B + "/api/admin/backups").json()
-        if not j["running"] and j["items"]:
-            break
-        time.sleep(0.3)
-    items_b = A.get(B + "/api/admin/backups").json()["items"]
-    check(items_b and not items_b[0]["encrypted"], f"a backup exists: {items_b[:1]}")
-    NAME = items_b[0]["name"]
-    with zipfile.ZipFile(os.path.join(DATA, "backups", NAME)) as z:
-        names = z.namelist()
-        man = json.loads(z.read("manifest.json"))
-    check(f"office/{ORG}/logo.png" in names, f"the logo is a member of the backup zip: {names}")
-    check(any(f[0] == f"office/{ORG}/logo.png" for f in man["files"]), "... and listed in the manifest with its hash")
-    check(f"office/{ORG2}/logo.png" not in names, "the removed logo of the second organisation is not in it")
-    check(A.delete(B + "/api/office/logo").ok and not os.path.exists(LOGO) and A.get(B + "/api/office/logo").status_code == 404, "the admin removes the logo: file gone, 404")
-    r = A.get(B + f"{D}/{DOC}/pdf")
-    check(r.ok and not has_image(pdf_texts(r.content)[0].pages[0]), "without the logo the PDF shows the company name again")
-    r = A.post(B + "/api/admin/backups/restore", json={"name": NAME, "confirm": "RESTORE"})
-    check(r.ok, f"restore: {r.status_code} {r.text[:160]}")
-    A = sess("alice")
-    check(os.path.isfile(LOGO) and A.get(B + "/api/office/logo").status_code == 200 and A.get(B + "/api/office/settings").json()["settings"]["logo"] == "logo.png",
-          "after the restore the logo file and the setting are back")
-    r = A.get(B + f"{D}/{DOC}/pdf")
-    check(r.ok and has_image(pdf_texts(r.content)[0].pages[0]), "... and the PDF carries it again")
+r = A.post(B + "/api/admin/backups")
+check(r.status_code == 202, "backup started " + r.text[:100])
+for _ in range(100):
+    j = A.get(B + "/api/admin/backups").json()
+    if not j["running"] and j["items"]:
+        break
+    time.sleep(0.3)
+items_b = A.get(B + "/api/admin/backups").json()["items"]
+check(items_b and not items_b[0]["encrypted"], f"a backup exists: {items_b[:1]}")
+NAME = items_b[0]["name"]
+with zipfile.ZipFile(os.path.join(DATA, "backups", NAME)) as z:
+    names = z.namelist()
+    man = json.loads(z.read("manifest.json"))
+check(f"office/{ORG}/logo.png" in names, f"the logo is a member of the backup zip: {names}")
+check(any(f[0] == f"office/{ORG}/logo.png" for f in man["files"]), "... and listed in the manifest with its hash")
+check(f"office/{ORG2}/logo.png" not in names, "the removed logo of the second organisation is not in it")
+check(A.delete(B + "/api/office/logo").ok and not os.path.exists(LOGO) and A.get(B + "/api/office/logo").status_code == 404, "the admin removes the logo: file gone, 404")
+r = A.get(B + f"{D}/{DOC}/pdf")
+check(r.ok and not has_image(pdf_texts(r.content)[0].pages[0]), "without the logo the PDF shows the company name again")
+r = A.post(B + "/api/admin/backups/restore", json={"name": NAME, "confirm": "RESTORE"})
+check(r.ok, f"restore: {r.status_code} {r.text[:160]}")
+A = sess("alice")
+check(os.path.isfile(LOGO) and A.get(B + "/api/office/logo").status_code == 200 and A.get(B + "/api/office/settings").json()["settings"]["logo"] == "logo.png",
+      "after the restore the logo file and the setting are back")
+r = A.get(B + f"{D}/{DOC}/pdf")
+check(r.ok and has_image(pdf_texts(r.content)[0].pages[0]), "... and the PDF carries it again")
 
 print(f"p2361_d_api_test: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

@@ -57,7 +57,10 @@ def org_for_email(c, email):
     if instance_mode(c) not in ("multi", "workspaces"):  # 2.28.0 (#935): workspaces join by domain too
         return None  # organisation: the one organisation anyway (create_user); shared: none
     dom = email.rsplit("@", 1)[-1].lower()
-    for r in c.execute("SELECT id, domains FROM orgs ORDER BY id"):
+    from ..core.pg import system_ctx
+    with system_ctx(c):  # 2.37.0 (#1150): before a login: which organisation an address belongs to (instance structure)
+        rows = c.execute("SELECT id, domains FROM orgs ORDER BY id").fetchall()
+    for r in rows:
         if dom in _domains(r["domains"]):
             return r["id"]
     return None
@@ -159,9 +162,11 @@ def auth_signup():
     c.execute("UPDATE users SET email=?, disabled=1, signup=? WHERE id=?", (email, "confirm" if mail else "pending", uid))
     oid = org_for_email(c, email)
     if oid:
-        c.execute("DELETE FROM org_members WHERE user_id=?", (uid,))
-        from ..accounts.orgs import org_member_add
-        org_member_add(c, oid, uid)
+        from ..core.pg import system_ctx
+        with system_ctx(c):  # 2.37.0 (#1150): the new account joins its organisation before anybody is signed in
+            c.execute("DELETE FROM org_members WHERE user_id=?", (uid,))
+            from ..accounts.orgs import org_member_add
+            org_member_add(c, oid, uid)
     from ..core.schema import USER_DEFAULTS
     fs = [x for x in (gsetting(c, "default_features") or USER_DEFAULTS["features"]).split(",") if x]
     uset(c, uid, "features", ",".join(fs + ([] if "agents" in fs else ["agents"])))

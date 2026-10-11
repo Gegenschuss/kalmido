@@ -283,9 +283,12 @@ def tchat_messages(rid):
     mem = tchat_room_members(c, r)
     names = user_names(c, mem | {m["user_id"] for m in rows if m["user_id"]})
     lr, muted = tchat_last_read(c, rid, me())
+    from ..collab.chatsave import chat_save_of
+    saved = chat_save_of(c, me(), "team", [m["id"] for m in rows])  # 2.37.0 (#1159): saved as a task by me
     return jsonify(room={"id": r["id"], "kind": r["kind"], "list_id": r["list_id"], "muted": muted, "last_read": lr,
                          "members": [{"id": u, "name": names.get(u, "?"), "agent": u in agent_ids(c)} for u in sorted(mem)]},
-                   messages=[tchat_msg_dict(c, m, rx, qs) for m in rows], has_more=more, users={str(k): v for k, v in names.items()})
+                   messages=[{**tchat_msg_dict(c, m, rx, qs), "saved_task_id": saved.get(m["id"])} for m in rows], has_more=more,
+                   users={str(k): v for k, v in names.items()})
 
 
 @app.post("/api/team/rooms/<int:rid>/messages")
