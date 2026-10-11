@@ -7,8 +7,6 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
-## [2.37.0] - 2026-10-11
-
 **In short:** Kalmido now runs on **PostgreSQL 17** only, for every installation. **Self-hosters: this update needs
 action** - add the database service to your compose file and set a password (see *Upgrading* below); your data moves
 over by itself on the first start. The organisation boundary is enforced **in the database** as well (row-level
