@@ -29,13 +29,14 @@ const settings = async () => (await call('GET', '/api/state')).settings;
 const FEAT = 'cal,timeline,events,comments';
 // a synced subscription with its events, written like the sync does (sqlite inside the container)
 const py = code => execFileSync('docker', ['exec', CT, 'python', '-c', code], {encoding: 'utf8'}).trim();
-const addSub = (name, color, events) => +py(`import sqlite3, json
-c = sqlite3.connect('/data/tasks.db', timeout=10)
+const addSub = (name, color, events) => +py(`import json
+from kalmido.core.db import connect
+c = connect()
 c.execute("INSERT INTO cal_subs(user_id,kind,name,color,visible,url,status,created_at) VALUES(1,'ics',?,?,1,'x','ok','2026-01-01T00:00:00Z')", (${JSON.stringify(name)}, ${JSON.stringify(color)}))
 sid = c.execute('SELECT MAX(id) FROM cal_subs').fetchone()[0]
 for t, d0, d1, allday, st, en in json.loads(${JSON.stringify(JSON.stringify(events))}):
-    c.execute('INSERT INTO cal_events(sub_id,uid,title,all_day,start,end,d0,d1) VALUES(?,?,?,?,?,?,?,?)', (sid, t, t, allday, st, en, d0, d1))
-c.commit(); print(sid)`);
+    c.execute('INSERT INTO cal_events(sub_id,uid,title,all_day,start,"end",d0,d1) VALUES(?,?,?,?,?,?,?,?)', (sid, t, t, allday, st, en, d0, d1))
+c.commit(); c.close(); print(sid)`);
 const utc = (d, h) => { const x = new Date(`${d}T${String(h).padStart(2, '0')}:00:00`); return x.toISOString().replace(/\.\d+Z$/, 'Z'); };
 
 (async () => {

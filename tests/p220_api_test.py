@@ -513,15 +513,11 @@ check(not t8.get("code"), "the Gitea links are gone from the task")
 check(task_of(A, T5)["status"] == 2, "completed tasks stay completed")
 leak = [t for t in SEEN if TOKEN in t or GTOKEN in t or (sec and sec in t and "hook_secret" not in t)]
 check(not leak, f"no token in any answer ({len(leak)})")
-def _dbtext():  # 2.22.0: the -wal / -shm files may vanish between the listing and the read (a checkpoint)
-    out = []
-    for f in os.listdir(DATA):
-        if f.startswith("tasks.db"):
-            try:
-                out.append(open(os.path.join(DATA, f), errors="ignore").read())
-            except FileNotFoundError:
-                pass
-    return "".join(out)
+def _dbtext():  # 2.37.0 (#1150): the whole database as text (a data-only dump of the test database)
+    with open(os.path.join(DATA, ".kalmido-db"), encoding="utf-8") as f:
+        dbc, dbn = f.read().split()
+    return subprocess.run(["docker", "exec", dbc, "pg_dump", "-U", "kalmido", "-d", dbn, "--data-only"],
+                          capture_output=True, text=True, errors="ignore", check=True).stdout
 
 
 check(TOKEN not in _dbtext(), "no token in the database files")

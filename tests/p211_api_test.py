@@ -198,7 +198,8 @@ check(cl.post("/agent/usage", json={**ok, "input_tokens": 10, "output_tokens": 1
 check(cl.post("/agent/usage", json={**ok, "input_tokens": 5, "output_tokens": 5}).status_code == 201, "report without task / list")
 check(cx.post("/agent/usage", json={**ok, "model": "gpt-x", "input_tokens": 60, "output_tokens": 40, "task_id": T1}).status_code == 201, "codex reports")
 con = dbx.connect(os.path.join(DATA, "tasks.db"))
-cols = [x[1] for x in con.execute("PRAGMA table_info(agent_usage)")]
+cols = [x[0] for x in con.execute("SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema() "
+                                   "AND table_name='agent_usage' ORDER BY ordinal_position")]  # 2.37.0 (#1150): Postgres
 check(cols == ["id", "agent_id", "model", "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "cost_usd", "task_id",
                "list_id", "job_id", "note", "day", "created_at"], f"only numbers + ids stored: {cols}")
 con.close()

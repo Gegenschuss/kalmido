@@ -12,7 +12,7 @@ import hashlib
 import hmac
 import json
 import os
-import dbx
+import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
 import subprocess
 import sys
 import threading
@@ -68,7 +68,7 @@ class Api:
 
 
 def dbx(sql, args=()):
-    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         r = c.execute(sql, args).fetchall()
         c.commit()
@@ -112,7 +112,13 @@ assert r.returncode == 0, r.stdout + r.stderr
 subprocess.run(["docker", "exec", "-d", CT, "python", "/data/stub_webhook.py"])
 time.sleep(0.8)
 
-assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
+_r = sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"})
+if not _r.ok:  # 2.37.0 (#1150) diagnostics: why the first setup after a UI suite fails on the Mac runner
+    _ct = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
+    print("SETUP FAILED:", _r.status_code, _r.text[:300], flush=True)
+    print(subprocess.run(["docker", "ps", "-a", "--format", "{{.Names}} {{.Status}} {{.Ports}}"], capture_output=True, text=True).stdout, flush=True)
+    print(subprocess.run(["docker", "logs", "--tail", "40", _ct], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True).stdout[-4000:], flush=True)
+assert _r.ok
 A = sess("alice")
 A.patch(B + "/api/users/1", json={"ntfy_topic": "t-alice"})
 ids = {"alice": 1}

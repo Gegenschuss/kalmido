@@ -43,10 +43,9 @@ const firefox = require('./ff')({tag: 'p221_ui', check, shots: 'P221_SHOTS'});  
   const TEAM = (await call('POST', '/api/lists', {name: 'Team'})).id;
   for (const id of [bob, ag.id]) await call('PUT', `/api/lists/${TEAM}/members`, {user_id: id, role: 'edit'});
   // 2.26.0: one agent per list -- the second agent joins as in a list from before the update; members may use the agents
-  require('child_process').execFileSync('python3', ['-c', `import sqlite3, sys
-c = sqlite3.connect(sys.argv[1], timeout=10)
-c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,'edit','edit',0,'2026-01-01T00:00:00+00:00')", (int(sys.argv[2]), int(sys.argv[3])))
-c.commit()`, require('path').join(DATA, 'tasks.db'), String(TEAM), String(ag2.id)]);
+  require('child_process').execFileSync('python3', [require('path').join(__dirname, 'dbx.py'), DATA,  // 2.37.0 (#1150): Postgres via dbx
+    "INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,'edit','edit',0,'2026-01-01T00:00:00+00:00')",
+    JSON.stringify([TEAM, ag2.id])]);
   await call('PATCH', `/api/lists/${TEAM}`, {agent_members: true, agent_peers: true});
   const T = (await call('POST', '/api/tasks', {title: 'Shared task', list_id: TEAM})).id;
   // traffic: successes, a 404, then paused -> 403 (denied)

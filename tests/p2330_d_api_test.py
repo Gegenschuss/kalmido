@@ -9,7 +9,7 @@
  - #934 the repository on a folder (see below)
 usage: p2330_d_api_test.py <datadir>"""
 import os
-import dbx
+import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
 import subprocess
 import sys
 import time
@@ -45,7 +45,7 @@ def sess(user, pw="password123"):
 
 
 def dbx(sql, args=(), write=False):
-    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         r = c.execute(sql, args).fetchall()
         if write:

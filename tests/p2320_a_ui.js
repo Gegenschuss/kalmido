@@ -146,7 +146,12 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR
   w.close();
 
   // ================= Time tracking (#1063)
-  r = await call('POST', '/api/time/entries', {task_id: T1, start: new Date(Date.now() - 2 * 3600e3).toISOString(), minutes: 60});
+  // #1157: the entry must lie in "this week" whenever the suite runs (English: the week starts on Sunday, the client counts in
+  // the local time of this process): at most 2 h back, never before this week's start (just after it: wait a minute)
+  const wk0 = new Date(); wk0.setHours(0, 0, 0, 0); wk0.setDate(wk0.getDate() - wk0.getDay());
+  if (Date.now() - wk0.getTime() < 61e3) await sleep(61e3);
+  const t0 = Math.max(Date.now() - 2 * 3600e3, wk0.getTime());
+  r = await call('POST', '/api/time/entries', {task_id: T1, start: new Date(t0).toISOString(), minutes: Math.max(1, Math.min(60, Math.floor((Date.now() - t0) / 60e3)))});
   check(r.status === 200 || r.status === 201, 'a time entry ' + JSON.stringify(r).slice(0, 120));
   w = await boot({user: 'alice', hash: 'time'}); d = w.document;
   await until(() => d.querySelector('#view .lygrid[data-ly="time"] .lyb'));

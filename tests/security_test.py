@@ -5,7 +5,7 @@ Paperless (2.36.0: must never be reached) / attacker sink inside the container (
 usage: security_test.py <datadir>"""
 import json
 import os
-import dbx
+import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
 import statistics
 import subprocess
 import sys
@@ -61,7 +61,7 @@ def logs():
 
 
 def dbx(sql, args=()):
-    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         r = c.execute(sql, args).fetchall()
         c.commit()
@@ -239,7 +239,7 @@ for due, dtm, rem, rep in (("not-a-date", None, "0", ""), (today, None, "abc", "
     dbx("INSERT INTO tasks(list_id,title,due,due_time,reminders,repeat,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?,?,?,?)",
         (inbox_m, "poison", due, dtm, rem, rep, ts_now, ts_now, ids["mallory"]))
 dbx("UPDATE user_settings SET value='garbage' WHERE user_id=? AND key='allday_time'", (ids["mallory"],))
-dbx("INSERT INTO habits(name,remind_at,created_at,user_id,days,goal) VALUES('poison habit','xx:yy',?,?,'1234567','x')", (ts_now, ids["mallory"]))
+dbx("INSERT INTO habits(name,remind_at,created_at,user_id,days,goal) VALUES('poison habit','xx:yy',?,?,'1234567','-5')", (ts_now, ids["mallory"]))  # 2.37.0: goal is a BIGINT column now
 A.patch(B + "/api/users/1", json={"ntfy_topic": "t-alice"})
 leg = A.post(B + "/api/tasks", json={"title": "legit reminder after poison", "due": today, "due_time": tm, "reminders": "0"})
 check(leg.ok, "legit reminder task created")
@@ -296,8 +296,8 @@ for rule in ("FREQ=SECONDLY", "FREQ=DAILY;BYMONTH=2;BYMONTHDAY=30", "FREQ=DAILY;
         (my_inbox, "raw " + rule[:20], "2026-09-01", rule, ts_now, ts_now))
 r, dt = timed(lambda: A.get(B + "/api/occurrences?from=2026-09-01&to=2027-09-30"))
 check(r.ok and dt < 3, f"occurrences with raw bad rules fast ({dt:.2f}s)")
-check(not [x for x in r.json()["items"] if x["id"] in {t[0] for t in dbx("SELECT id FROM tasks WHERE title LIKE 'raw %'")}], "bad raw rules are not expanded")
-for (rid,) in dbx("SELECT id FROM tasks WHERE title LIKE 'raw %'"):
+check(not [x for x in r.json()["items"] if x["id"] in {t[0] for t in dbx("SELECT id FROM tasks WHERE title ILIKE 'raw %'")}], "bad raw rules are not expanded")
+for (rid,) in dbx("SELECT id FROM tasks WHERE title ILIKE 'raw %'"):
     r, dt = timed(lambda: A.post(B + f"/api/tasks/{rid}/complete", json={}))
     check(r.ok and dt < 3, f"complete with a bad raw rule is fast ({dt:.2f}s)")
 tok = A.post(B + "/api/ical").json()

@@ -60,10 +60,9 @@ async function firefox(fn) {
 
 // moves usage rows of an agent back by n days (the API stores today only); the data dir is the container's /data
 function backdate(agentId, ids) {
-  execFileSync('python3', ['-c', `import sqlite3, sys, json
-c = sqlite3.connect(sys.argv[1]); m = json.loads(sys.argv[2])
-for rid, d in m.items(): c.execute("UPDATE agent_usage SET day=date(day, ?) WHERE id=?", (f"-{d} days", int(rid)))
-c.commit()`, path.join(DATA, 'tasks.db'), JSON.stringify(ids)]);
+  for (const [rid, d] of Object.entries(ids))  // 2.37.0 (#1150): Postgres via dbx
+    execFileSync('python3', [path.join(__dirname, 'dbx.py'), DATA,
+      "UPDATE agent_usage SET day=to_char(day::date - CAST(? AS INTEGER), 'YYYY-MM-DD') WHERE id=?", JSON.stringify([Number(d), Number(rid)])]);
 }
 
 (async () => {

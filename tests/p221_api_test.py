@@ -121,7 +121,13 @@ def logs():
 def setup():
     s0 = requests.Session()
     s0.headers.update(H)
-    assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
+    _r = s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"})
+    if not _r.ok:  # 2.37.0 (#1150) diagnostics: why the first setup after a UI suite fails on the Mac runner
+        _ct = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
+        print("SETUP FAILED:", _r.status_code, _r.text[:300], flush=True)
+        print(subprocess.run(["docker", "ps", "-a", "--format", "{{.Names}} {{.Status}} {{.Ports}}"], capture_output=True, text=True).stdout, flush=True)
+        print(subprocess.run(["docker", "logs", "--tail", "40", _ct], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True).stdout[-4000:], flush=True)
+    assert _r.ok
     a = sess("alice")
     r = a.post(B + "/api/users", json={"username": "bob", "display_name": "Bob", "password": "password123"})
     assert r.ok, r.text

@@ -307,7 +307,7 @@ check(g1.count("BEGIN:VALARM") == 2 and "TRIGGER;RELATED=END:PT0S" in g1, "GET: 
 check("DTSTART" not in g1.split("BEGIN:VTODO")[1], "no stray DTSTART in the task (Reminders' DTSTART = DUE is not a start)")
 E1 = r.headers["ETag"]
 check(AP.get(B + WORK + "5E1C2A9B-3F4D-4E5F-8A9B-0C1D2E3F4A5B.ics").headers["ETag"] == E1, "the ETag is stable")
-check(any(a[0] == "created" and '"caldav"' in a[1] for a in db("SELECT kind, data FROM activity WHERE task_id=?", (t1,))),
+check(any(a[0] == "created" and '"caldav"' in a[1] for a in db("SELECT kind, data::text FROM activity WHERE task_id=?", (t1,))),
       "history: created via CalDAV")
 web = A.get(B + f"/api/tasks/{t1}").json()
 check(web["title"] == "Call the bank", "the web app sees the task")
@@ -426,7 +426,7 @@ check(put(TO, R4, mk("st-1", "SUMMARY:Status test", "STATUS:NEEDS-ACTION")).stat
 t4 = by_uid("st-1")
 check(put(TO, R4, mk("st-1", "SUMMARY:Status test", "STATUS:COMPLETED", "COMPLETED:20261002T100000Z", "PERCENT-COMPLETE:100")).status_code == 204
       and task(t4)["status"] == 2, "STATUS:COMPLETED -> done")
-check(any(a[0] == "complete" and '"caldav"' in a[1] for a in db("SELECT kind, data FROM activity WHERE task_id=?", (t4,))),
+check(any(a[0] == "complete" and '"caldav"' in a[1] for a in db("SELECT kind, data::text FROM activity WHERE task_id=?", (t4,))),
       "history: completed via CalDAV")
 put(TO, R4, mk("st-1", "SUMMARY:Status test", "STATUS:NEEDS-ACTION"))
 check(task(t4)["status"] == 0 and task(t4)["completed_at"] is None, "NEEDS-ACTION -> reopened")

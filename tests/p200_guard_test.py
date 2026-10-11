@@ -86,49 +86,52 @@ check(s.post(B + "/api/auth/setup", json={"username": "alice", "password": "pass
 tid = s.post(B + "/api/tasks", json={"title": "keep me"}).json()["id"]
 check(s.post(B + f"/api/tasks/{tid}/attachments", files={"file": ("a.txt", b"data")}, headers=H).ok, "an attachment")
 
-# ---- database missing, marker there: refuse
+# 2.37.0 (#1150): the database is Postgres now. "tasks.db missing / empty" -> the Postgres database is empty (its schema
+# moved aside); a damaged SQLite file / page has no Postgres counterpart here (2.37 Job B: the move tool checks old files).
+def psql(sql):
+    with open(os.path.join(DATA, ".kalmido-db"), encoding="utf-8") as f:
+        dbc, dbn = f.read().split()
+    return subprocess.run(["docker", "exec", dbc, "psql", "-U", "kalmido", "-d", dbn, "-v", "ON_ERROR_STOP=1", "-Atqc", sql],
+                          capture_output=True, text=True)
+
+
+def db_aside():
+    r = psql("ALTER SCHEMA public RENAME TO guard_away; CREATE SCHEMA public;")
+    assert r.returncode == 0, r.stderr
+
+
+def db_back():
+    r = psql("DROP SCHEMA public CASCADE; ALTER SCHEMA guard_away RENAME TO public;")
+    assert r.returncode == 0, r.stderr
+
+
+def tables():
+    return int(psql("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public'").stdout.strip() or 0)
+
+
+# ---- database empty, marker there: refuse
 stop()
-db_files()
+db_aside()
 start()
 code, logs = exited()
-check(code == 3 and "Refusing to start" in logs and "is missing" in logs, f"missing tasks.db: refused (exit {code})")
-check(not os.path.exists(DBF) or os.path.getsize(DBF) == 0, "no new database was created")
+check(code == 3 and "Refusing to start" in logs and "Kalmido data" in logs, f"empty database, marker: refused (exit {code})")
+check(tables() == 0, "no new database was created")
 # ---- also without the marker (attachments are data)
 os.rename(MARK, MARK + ".away")
 start()
 code, logs = exited()
-check(code == 3, f"missing tasks.db, no marker but attachments: refused (exit {code})")
+check(code == 3 and tables() == 0, f"empty database, no marker but attachments: refused (exit {code})")
 os.rename(MARK + ".away", MARK)
-# ---- empty file
-if os.path.exists(DBF):
-    os.remove(DBF)
-open(DBF, "wb").close()
-start()
-code, logs = exited()
-check(code == 3 and "is empty" in logs, f"empty tasks.db: refused (exit {code})")
-os.remove(DBF)
-# ---- garbage / damaged file
-shutil.copy(DBF + ".away", DBF + ".copy")
+# ---- a SQLite database from before 2.37 that was not moved yet next to an empty database: refuse
 with open(DBF, "wb") as f:
-    f.write(b"\x00garbage, not a database" * 400)
+    f.write(b"SQLite format 3\x00" + b"\x00" * 4096)
 start()
 code, logs = exited()
-check(code == 3 and "Refusing to start" in logs, f"damaged tasks.db: refused (exit {code})")
+check(code == 3 and "SQLite database from before 2.37" in logs and tables() == 0, f"old tasks.db + empty database: refused (exit {code})")
 os.remove(DBF)
-# ---- a real database with a damaged page
-with open(DBF + ".copy", "rb") as f:
-    raw = bytearray(f.read())
-if len(raw) > 8192:
-    raw[4096:8192] = b"\xff" * 4096
-with open(DBF, "wb") as f:
-    f.write(raw)
-start()
-code, logs = exited()
-check(code == 3, f"database with a damaged page: refused (exit {code})")
-os.remove(DBF)
-os.remove(DBF + ".copy")
+
 # ---- the real one back: starts, data intact
-db_files(".away", "")
+db_back()
 start()
 check(up(), "original database back: starts")
 s = requests.Session()

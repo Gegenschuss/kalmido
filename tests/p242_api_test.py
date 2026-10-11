@@ -14,7 +14,7 @@ descriptions), sharing with an agent in bulk (#391).
 Starts its OWN containers (start.sh).
 usage: p242_api_test.py <datadir>"""
 import os
-import dbx
+import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
 import subprocess
 import sys
 import time
@@ -78,7 +78,7 @@ class Api:
 
 
 def dbx(q, a=()):
-    con = dbx.connect(os.path.join(DATA, "tasks.db"))
+    con = dbxm.connect(os.path.join(DATA, "tasks.db"))
     try:
         r = con.execute(q, a).fetchall()
         con.commit()

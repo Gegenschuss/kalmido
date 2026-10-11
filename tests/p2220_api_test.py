@@ -11,7 +11,7 @@ the data export, #681 today_inbox setting."""
 import json
 import os
 import shutil
-import dbx
+import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
 import subprocess
 import sys
 import time
@@ -46,7 +46,7 @@ def until(fn, secs=20):
 
 
 def dbx(q, a=()):
-    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         r = c.execute(q, a).fetchall()
         c.commit()

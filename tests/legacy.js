@@ -6,10 +6,9 @@ const path = require('path');
 async function shareAny(call, DATA, lid, uid, role) {
   const r = await call('PUT', `/api/lists/${lid}/members`, {user_id: uid, role});
   if (r && r.status === 409 && /one agent/i.test(String(r.error || ''))) {
-    execFileSync('python3', ['-c', `import sqlite3, sys
-c = sqlite3.connect(sys.argv[1], timeout=10)
-c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,0,'2026-01-01T00:00:00+00:00')", (int(sys.argv[2]), int(sys.argv[3]), sys.argv[4], sys.argv[4]))
-c.commit()`, path.join(DATA, 'tasks.db'), String(lid), String(uid), role]);
+    execFileSync('python3', [path.join(__dirname, 'dbx.py'), DATA,  // 2.37.0 (#1150): Postgres via dbx
+      "INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,0,'2026-01-01T00:00:00+00:00')",
+      JSON.stringify([Number(lid), Number(uid), role, role])]);
   }
   await call('PATCH', `/api/lists/${lid}`, {agent_members: true, agent_peers: true});
   return r;

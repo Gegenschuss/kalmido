@@ -20,7 +20,7 @@ own container in mode workspaces (start.sh). Invented companies, people and test
    without content on /api/office/*; an unknown master data kind is 404
 usage: p2362_e_api_test.py <datadir>"""
 import os
-import dbx
+import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
 import subprocess
 import sys
 
@@ -51,7 +51,7 @@ def sess(user, pw="password123"):
 
 
 def dbx(sql, args=(), write=False):
-    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         r = c.execute(sql, args).fetchall()
         if write:

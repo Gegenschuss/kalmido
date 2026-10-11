@@ -7,7 +7,7 @@ const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const DATA = process.argv[2];
-const sql = q => execFileSync('python3', ['-c', 'import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); c.execute(sys.argv[2]); c.commit()', path.join(DATA, 'tasks.db'), q]);
+const sql = q => execFileSync('python3', [path.join(__dirname, 'dbx.py'), DATA, q]);  // 2.37.0 (#1150): Postgres via dbx
 (async () => {
   // an update is known (as if the daily check had found one)
   sql(`UPDATE settings SET value='1' WHERE key='update_check'`);

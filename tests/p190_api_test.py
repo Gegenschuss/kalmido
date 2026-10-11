@@ -243,7 +243,7 @@ check(Bb.post(B + "/api/news/dismiss", json={"ids": ["x"]}).status_code == 400, 
 
 # ================================================================== update check: stale cache
 with db() as c:
-    c.execute("INSERT OR REPLACE INTO settings(key,value) VALUES('update_info', ?)",
+    c.execute("INSERT INTO settings(key,value) VALUES('update_info', ?) ON CONFLICT (key) DO UPDATE SET value=excluded.value",
               (json.dumps({"checked_at": "2026-09-27T21:30:00Z", "latest": "1.2.0", "url": "https://github.com/x", "error": ""}),))
 tk = A.post(B + "/api/me/tokens", json={"name": "t", "scopes": ["read", "admin-read"]}).json()["token"]
 r = requests.get(B + "/api/v1/admin/status", headers={"Authorization": "Bearer " + tk})

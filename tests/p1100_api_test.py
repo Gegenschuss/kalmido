@@ -16,7 +16,7 @@ import csv
 import io
 import json
 import os
-import dbx
+import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
 import subprocess
 import sys
 import time
@@ -51,7 +51,7 @@ def sess(user=None):
 
 
 def dbx(sql, args=()):
-    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         r = c.execute(sql, args).fetchall()
         c.commit()
@@ -393,7 +393,7 @@ check(Bo.delete(B + f"/api/lists/{L}/members/{ids['dave']}").ok, "admin removes 
 check(Bo.patch(B + f"/api/lists/{L}", json={"name": "Renamed"}).status_code == 403, "list settings stay owner-only")
 check(Bo.delete(B + f"/api/comments/{c3}").ok, "admin moderates comments")
 news_d = [n for n in dbx("SELECT kind, data FROM notifications WHERE user_id=?", (ids["dave"],))]
-check(any(k == "share" and json.loads(d)["role"] == "participant" for k, d in news_d) and any(k == "role" for k, d in news_d), f"News share / role {news_d}")
+check(any(k == "share" and (d if isinstance(d, dict) else json.loads(d))["role"] == "participant" for k, d in news_d) and any(k == "role" for k, d in news_d), f"News share / role {news_d}")
 
 # ================================================================== News, pushes, reminders
 open(os.path.join(DATA, "ntfy.log"), "w").close()

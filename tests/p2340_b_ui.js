@@ -14,8 +14,7 @@ const firefox = require('./ff')({tag: 'p2340_b_ui', check, shots: 'P2340B_SHOTS'
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
-const sql = (q, args = []) => execFileSync('python3', ['-c', 'import sqlite3,sys,json; c=sqlite3.connect(sys.argv[1]); c.execute(sys.argv[2], json.loads(sys.argv[3])); c.commit()',
-  path.join(DATA, 'tasks.db'), q, JSON.stringify(args)]);
+const sql = (q, args = []) => execFileSync('python3', [path.join(__dirname, 'dbx.py'), DATA, q, JSON.stringify(args)]);  // 2.37.0 (#1150): Postgres via dbx
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
 const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,team';

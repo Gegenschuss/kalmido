@@ -4,7 +4,7 @@ inside the container) and (2.36.0) no Paperless data in any answer. Starts its O
 usage: v1_test.py <datadir>"""
 import json
 import os
-import dbx
+import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
 import subprocess
 import sys
 import time
@@ -39,7 +39,7 @@ def sess(user=None, pw="password123"):
 
 
 def dbx(sql, args=()):
-    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         r = c.execute(sql, args).fetchall()
         c.commit()
@@ -293,7 +293,7 @@ entries_before = dbx("SELECT COUNT(*) FROM time_entries")[0][0]
 check(Bo.patch(B + "/api/admin/settings", json={"time_all": False}).status_code == 403, "non-admin cannot switch time tracking off")
 r = A.patch(B + "/api/admin/settings", json={"time_all": False})
 check(r.ok and r.json()["time_all"] is False, "admin switches time tracking off")
-check(dbx("SELECT COUNT(*) FROM time_entries WHERE end IS NULL")[0][0] == 0, "off: running timers (both users) stopped at that moment")
+check(dbx("SELECT COUNT(*) FROM time_entries WHERE \"end\" IS NULL")[0][0] == 0, "off: running timers (both users) stopped at that moment")
 check(dbx("SELECT COUNT(*) FROM time_entries")[0][0] == entries_before, "off: entries kept")
 st = A.get(B + "/api/state").json()
 check(st["time_all"] is False and st["timer"] is None and st["time_totals"] == {}, "off: state without timer / totals")
@@ -315,7 +315,7 @@ check(dbx("SELECT COUNT(*) FROM time_entries")[0][0] == entries_before, "time of
 dbx("INSERT INTO time_entries(user_id,task_id,list_id,start,created_at,updated_at,source) VALUES(?,?,?,?,?,?,'timer')",
     (1, tt, None, "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z"))
 time.sleep(2.5)
-check(dbx("SELECT end FROM time_entries WHERE start='2026-01-01T00:00:00Z'")[0][0] is None, "time off: no auto-stop / timer pushes")
+check(dbx("SELECT \"end\" FROM time_entries WHERE start='2026-01-01T00:00:00Z'")[0][0] is None, "time off: no auto-stop / timer pushes")
 dbx("DELETE FROM time_entries WHERE start='2026-01-01T00:00:00Z'")
 r = A.patch(B + "/api/admin/settings", json={"time_all": True})
 check(r.ok and A.get(B + "/api/state").json()["time_all"] is True, "time tracking on again")

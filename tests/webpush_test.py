@@ -9,7 +9,7 @@ usage: webpush_test.py <datadir>"""
 import base64
 import json
 import os
-import dbx
+import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
 import subprocess
 import sys
 import time
@@ -92,7 +92,7 @@ def wait_for(fn, n=1, t=8.0):
 
 
 def dbx(sql, args=()):
-    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         r = c.execute(sql, args).fetchall()
         c.commit()
@@ -426,7 +426,7 @@ dbx("INSERT INTO time_entries(user_id,task_id,start,created_at,updated_at) VALUE
 time.sleep(2.5)
 check(not good.got() and not [x for x in ntfy_log() if x["topic"] == "t-alice"], "time tracking off (instance): no timer push")
 A.patch(B + "/api/admin/settings", json={"time_all": True})
-dbx("DELETE FROM time_entries WHERE end IS NULL")
+dbx('DELETE FROM time_entries WHERE "end" IS NULL')
 
 # ------------------------------------------------------------------ persistence + migration (restart)
 dbx("DELETE FROM user_settings WHERE key='push_channel' AND user_id=?", (ids["carol"],))  # like a user from 1.1

@@ -201,7 +201,7 @@ check(rep_() == s0 and task(A, tp2)["blocked"] == 1, "project again: everything 
 ft = A.post(B + "/api/tasks", json={"list_id": TP, "title": "Deep work"}).json()["id"]
 A.post(B + "/api/pomo/start", json={"kind": "focus", "minutes": 1, "task_id": ft})
 with db() as c:
-    pid = c.execute("SELECT id FROM pomos WHERE end IS NULL AND user_id=1").fetchone()[0]
+    pid = c.execute("SELECT id FROM pomos WHERE \"end\" IS NULL AND user_id=1").fetchone()[0]
     st0 = (datetime.now(timezone.utc) - timedelta(minutes=5)).replace(microsecond=0)
     c.execute("UPDATE pomos SET start=? WHERE id=?", (st0.isoformat(), pid))
     c.commit()
@@ -219,12 +219,12 @@ with db() as c:
 check(state(A)["pomo"] is None, "... so nothing looks like it is still running")
 A.post(B + "/api/pomo/start", json={"kind": "focus", "minutes": 25})
 with db() as c:
-    pid2 = c.execute("SELECT id FROM pomos WHERE end IS NULL AND user_id=1").fetchone()[0]
+    pid2 = c.execute("SELECT id FROM pomos WHERE \"end\" IS NULL AND user_id=1").fetchone()[0]
     c.execute("UPDATE pomos SET start=?, notified=1 WHERE id=?", ((datetime.now(timezone.utc) - timedelta(hours=10)).replace(microsecond=0).isoformat(), pid2))
     c.commit()
 A.post(B + f"/api/pomo/{pid2}/finish")
 with db() as c:
-    r3 = c.execute("SELECT start, end FROM pomos WHERE id=?", (pid2,)).fetchone()
+    r3 = c.execute("SELECT start, \"end\" FROM pomos WHERE id=?", (pid2,)).fetchone()
 check((datetime.fromisoformat(r3["end"]) - datetime.fromisoformat(r3["start"])).total_seconds() <= 25 * 60 + 1, "a late finish ends at the planned end, not hours later")
 
 # ---- "Move dependent tasks along" (list setting dep_shift)
@@ -318,7 +318,7 @@ with db() as c:
 with db() as c:  # list types from before 1.2: every list a plain list again, checklist flag set on one
     c.execute("UPDATE lists SET kind='list', checklist=0")
     c.execute("UPDATE lists SET checklist=1 WHERE id=?", (CKL,))
-    c.execute("INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,end,seconds,source,created_at,updated_at) "
+    c.execute("INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,\"end\",seconds,source,created_at,updated_at) "
               "VALUES(1,?,?,'misclick','2026-09-01T08:00:00Z','2026-09-01T08:01:00Z',60,'timer','x','x')", (pt, PL))
     c.execute("DELETE FROM settings WHERE key='migr_kind'")
     c.commit()

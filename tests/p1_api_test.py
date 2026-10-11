@@ -322,13 +322,13 @@ c = db()
 c.execute("UPDATE tasks SET deleted_at=? WHERE deleted_at IS NULL", (at(-400),))  # hide everything from above (trashed long ago)
 c.execute("UPDATE tasks SET completed_by=NULL, status=0, completed_at=NULL")  # ...and no completions
 c.execute("DELETE FROM pomos")
-FOCUS_TASK = c.execute("INSERT INTO tasks(list_id,title,created_at,updated_at,created_by) VALUES(?,?,?,?,1)", (WORK, "ft", at(-50), at(-50))).lastrowid
+FOCUS_TASK = c.execute("INSERT INTO tasks(list_id,title,created_at,updated_at,created_by) VALUES(?,?,?,?,1) RETURNING id", (WORK, "ft", at(-50), at(-50))).fetchone()[0]
 
 
 def ins(lid, title, due=None, status=0, done=None, by=None, created=-60, deleted=None, assignee=None):
     return c.execute("""INSERT INTO tasks(list_id,title,due,status,completed_at,completed_by,created_at,updated_at,deleted_at,created_by,assignee_id)
-                        VALUES(?,?,?,?,?,?,?,?,?,?,?)""", (lid, title, due, status, at(done) if done is not None else None, by,
-                                                            at(created), at(created), at(deleted) if deleted is not None else None, 1, assignee)).lastrowid
+                        VALUES(?,?,?,?,?,?,?,?,?,?,?) RETURNING id""", (lid, title, due, status, at(done) if done is not None else None, by,
+                                                            at(created), at(created), at(deleted) if deleted is not None else None, 1, assignee)).fetchone()[0]
 
 
 # completions of alice (id 1)
@@ -352,7 +352,7 @@ ins(WORK, "oassigned bob", due=D(-3), created=-5, assignee=BOB)
 
 def pomo(n, minutes, kind="focus", task=None, uid=1):
     s = datetime.combine(today + timedelta(days=n), datetime.min.time()).replace(hour=0, minute=5, tzinfo=TZ)
-    c.execute("INSERT INTO pomos(task_id,kind,minutes,start,end,done,user_id) VALUES(?,?,?,?,?,1,?)",
+    c.execute("INSERT INTO pomos(task_id,kind,minutes,start,\"end\",done,user_id) VALUES(?,?,?,?,?,1,?)",
               (task, kind, minutes, s.astimezone(timezone.utc).isoformat(timespec="seconds"),
                (s + timedelta(minutes=minutes)).astimezone(timezone.utc).isoformat(timespec="seconds"), uid))
 

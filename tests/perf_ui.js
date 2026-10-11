@@ -26,34 +26,38 @@ async function round(n) {
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, time_all: true, modules: ['kanban', 'cal', 'comments']});
   await call('PATCH', '/api/settings', {features: 'kanban,cal,comments,collab', lang: 'en', tour: 'done'});
   // seed straight into the database (the app has it open in WAL mode; one transaction)
-  execFileSync(PY, ['-c', `
-import sqlite3, random, datetime
-c = sqlite3.connect(${JSON.stringify(path.join(DATA, 'tasks.db'))}, timeout=30)
+  // 2.37.0 (#1150): Postgres -- the app's own database layer inside the test container
+  execFileSync('docker', ['exec', '-w', '/app', process.env.KALMIDO_TEST_CONTAINER || 'kalmido-test', 'python', '-c', `
+import random, datetime
+from kalmido.core.db import connect
+from kalmido.core.pg import insert_id
+c = connect()
 random.seed(7)
 now = datetime.datetime.now(datetime.timezone.utc).isoformat()
 today = datetime.date.today()
 lists = []
 for i in range(50):
-    lid = c.execute("INSERT INTO lists(name, owner_id, sort, created_at) VALUES(?,?,?,?)", (f"List {i:02d}", 1, i, now)).lastrowid
-    secs = [c.execute("INSERT INTO sections(list_id, name, sort) VALUES(?,?,?)", (lid, f"Section {k}", k)).lastrowid for k in range(3)]
+    lid = insert_id(c, "INSERT INTO lists(name, owner_id, sort, created_at) VALUES(?,?,?,?)", (f"List {i:02d}", 1, i, now))
+    secs = [insert_id(c, "INSERT INTO sections(list_id, name, sort) VALUES(?,?,?)", (lid, f"Section {k}", k)) for k in range(3)]
     lists.append((lid, secs))
 n, made = ${n}, 0
 words = "plan call write check order send review fix build test draft update clean book pay".split()
 while made < n:
     lid, secs = random.choice(lists)
     due = (today + datetime.timedelta(days=random.randint(-20, 60))).isoformat() if random.random() < .6 else None
-    t = c.execute("INSERT INTO tasks(list_id, section_id, title, priority, due, sort, created_at, updated_at, created_by) VALUES(?,?,?,?,?,?,?,?,1)",
-                  (lid, random.choice(secs + [None]), " ".join(random.sample(words, 3)).capitalize() + f" {made}", random.choice([0, 0, 1, 3, 5]), due, made, now, now)).lastrowid
+    t = insert_id(c, "INSERT INTO tasks(list_id, section_id, title, priority, due, sort, created_at, updated_at, created_by) VALUES(?,?,?,?,?,?,?,?,1)",
+                  (lid, random.choice(secs + [None]), " ".join(random.sample(words, 3)).capitalize() + f" {made}", random.choice([0, 0, 1, 3, 5]), due, made, now, now))
     made += 1
     if random.random() < .15 and made < n:
         c.execute("INSERT INTO tasks(list_id, parent_id, title, sort, created_at, updated_at, created_by) VALUES(?,?,?,?,?,?,1)", (lid, t, f"Sub {made}", made, now, now))
         made += 1
     if random.random() < .2:
-        c.execute("INSERT OR IGNORE INTO task_tags(task_id, user_id, tag) VALUES(?,1,?)", (t, random.choice(["home", "work", "urgent", "later"])))
+        c.execute("INSERT INTO task_tags(task_id, user_id, tag) VALUES(?,1,?) ON CONFLICT DO NOTHING", (t, random.choice(["home", "work", "urgent", "later"])))
     if random.random() < .1:
         c.execute("INSERT INTO comments(task_id, user_id, body, created_at) VALUES(?,1,?,?)", (t, "A comment", now))
-c.execute("UPDATE settings SET value=CAST(value AS INTEGER)+1 WHERE key='version'")
+c.execute("UPDATE settings SET value=CAST(CAST(value AS BIGINT)+1 AS TEXT) WHERE key='version'")
 c.commit()
+c.close()
 print(made)
 `], {stdio: 'ignore'});
   const L = (await call('GET', '/api/state')).j.lists.find(l => l.name === 'List 07').id;

@@ -9,7 +9,7 @@
 Starts its OWN container (start.sh). usage: p2360_c_api_test.py <datadir>"""
 import io
 import os
-import dbx
+import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
 import subprocess
 import sys
 import tempfile
@@ -53,7 +53,7 @@ def sess(user, pw="password123"):
 
 
 def dbx(sql, args=(), path=None):
-    c = dbx.connect(path or os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbxm.connect(path or os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         r = c.execute(sql, args).fetchall()
         c.commit()

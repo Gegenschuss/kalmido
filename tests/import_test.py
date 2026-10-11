@@ -13,7 +13,7 @@ usage: import_test.py <datadir>"""
 import io
 import json
 import os
-import dbx
+import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
 import subprocess
 import sys
 import zipfile
@@ -49,8 +49,8 @@ def sess(user=None, pw="password123"):
 
 
 def dbx(sql, args=()):
-    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
-    c.row_factory = dbx.Row
+    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c.row_factory = dbxm.Row
     try:
         r = c.execute(sql, args).fetchall()
         c.commit()

@@ -15,7 +15,7 @@
 Starts its OWN container (start.sh).
 usage: p2300_files_api_test.py <datadir>"""
 import os
-import dbx
+import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
 import subprocess
 import sys
 
@@ -48,7 +48,7 @@ def sess(user, pw="password123"):
 
 
 def dbx(sql, args=()):
-    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         return c.execute(sql, args).fetchall()
     finally:

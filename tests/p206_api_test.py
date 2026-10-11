@@ -8,7 +8,7 @@
  - roadmap prefs accept {nd: bool}
 Runs against a fresh test container (start.sh). usage: p206_api_test.py <datadir>"""
 import os
-import dbx
+import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
 import subprocess
 import sys
 import time
@@ -41,7 +41,7 @@ def sess(user=None):
 
 
 def dbx(sql, args=()):
-    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         r = c.execute(sql, args).fetchall()
         c.commit()
@@ -161,7 +161,7 @@ check(A.patch(B + "/api/settings", json={"roadmap": '{"nd":"x"}'}).status_code =
 # ================================================================== migration features_rev 9 (after a restart)
 dbx("UPDATE user_settings SET value='cal,collab,time' WHERE user_id=? AND key='features'", (bob,))
 dbx("UPDATE user_settings SET value='8' WHERE user_id=? AND key='features_rev'", (bob,))
-dbx("INSERT OR REPLACE INTO settings(key,value) VALUES('default_features','cal,kanban,collab,time')")
+dbx("INSERT INTO settings(key,value) VALUES('default_features','cal,kanban,collab,time') ON CONFLICT (key) DO UPDATE SET value=excluded.value")
 dbx("DELETE FROM settings WHERE key='migr_feat9'")
 restart()
 Bo = sess("bob")

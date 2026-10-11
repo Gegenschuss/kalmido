@@ -16,7 +16,7 @@ header + typing signal (#375) and the wake routes without a button (#376).
 Starts its OWN containers (start.sh).
 usage: p241_api_test.py <datadir>"""
 import os
-import dbx
+import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
 import subprocess
 import sys
 import time
@@ -34,7 +34,7 @@ def put_member(s, lid, uid, role):
     update, and the list's members may use its agents (the list switch, default off since 2.26.0). Returns a truthy object."""
     r = s.put(B + f"/api/lists/{lid}/members", json={"user_id": uid, "role": role})
     if r.status_code == 409 and "one agent" in r.text.lower():
-        c_ = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+        c_ = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
         c_.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,0,'2026-01-01T00:00:00+00:00')",
                    (lid, uid, role, role))
         c_.commit()
@@ -95,7 +95,7 @@ class Api:
 
 
 def dbx(q, a=()):
-    con = dbx.connect(os.path.join(DATA, "tasks.db"))
+    con = dbxm.connect(os.path.join(DATA, "tasks.db"))
     try:
         r = con.execute(q, a).fetchall()
         con.commit()

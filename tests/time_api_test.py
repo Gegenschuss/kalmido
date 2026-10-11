@@ -105,7 +105,7 @@ r3 = A2.post(B + "/api/time/start", json={"task_id": T2, "client_id": "c2"}).jso
 check(r3["stopped"] and r3["stopped"]["id"] == r["entry"]["id"] and 595 <= r3["stopped"]["seconds"] <= 610, f"start on another device stops the first one ({r3['stopped']})")
 check(A.get(B + "/api/state").json()["timer"]["task_id"] == T2, "device 1 now sees the timer on T2")
 with db() as c:
-    check(c.execute("SELECT COUNT(*) FROM time_entries WHERE user_id=1 AND end IS NULL").fetchone()[0] == 1, "one running timer per user")
+    check(c.execute("SELECT COUNT(*) FROM time_entries WHERE user_id=1 AND \"end\" IS NULL").fetchone()[0] == 1, "one running timer per user")
     c.execute("UPDATE time_entries SET start=? WHERE id=?", (utc(datetime.now(timezone.utc) - timedelta(minutes=5)).replace("Z", "+00:00"), r3["entry"]["id"]))
 r4 = A.post(B + "/api/time/stop", json={"id": r3["entry"]["id"]}).json()
 check(r4["timer"] is None and 295 <= r4["entry"]["seconds"] <= 310 and not r4["entry"]["running"], "stop by id")
@@ -250,7 +250,7 @@ check(pomo(Bb, "stopwatch", TS, 20) is None, "focus while a timer runs: not reco
 Bb.post(B + "/api/time/stop", json={})
 # session overlapping a finished timer entry
 with db() as c:
-    lastt = c.execute("SELECT start, end FROM time_entries WHERE user_id=%d" % ids["bob"] + " AND source='timer' ORDER BY id DESC LIMIT 1").fetchone()
+    lastt = c.execute("SELECT start, \"end\" FROM time_entries WHERE user_id=%d" % ids["bob"] + " AND source='timer' ORDER BY id DESC LIMIT 1").fetchone()
 check(pomo(Bb, "stopwatch", TS, 45) is None, "focus overlapping a finished timer entry: not recorded")
 Bb.patch(B + "/api/settings", json={"time_focus": "0"})
 check(pomo(Bb, "stopwatch", TS, 10) is None, "setting 'count focus sessions' off: no entry")

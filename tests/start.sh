@@ -41,7 +41,8 @@ if [[ -z "$(docker ps -q -f "name=^${DBC}$")" ]]; then
   for _ in $(seq 1 60); do docker exec "$DBC" psql -U kalmido -d kalmido -Atqc "SELECT 1" >/dev/null 2>&1 && break; sleep 0.5; done
 fi
 PSQL=(docker exec "$DBC" psql -U kalmido -d kalmido -v ON_ERROR_STOP=1 -Atq)
-if [[ -n "${KEEP:-}" ]]; then
+# KEEP=1 on a wiped data dir (no .kalmido-db: suites that rm -rf it first) = empty database, as a missing tasks.db was
+if [[ -n "${KEEP:-}" && -f "$D/.kalmido-db" ]]; then
   [[ "$("${PSQL[@]}" -c "SELECT 1 FROM pg_database WHERE datname='$DBN'")" == 1 ]] || "${PSQL[@]}" -c "CREATE DATABASE $DBN" >/dev/null || exit 1
 else
   "${PSQL[@]}" -c "DROP DATABASE IF EXISTS $DBN WITH (FORCE)" -c "CREATE DATABASE $DBN" >/dev/null || exit 1
@@ -53,7 +54,8 @@ docker run -d --name "$NAME" --network bridge --user "$(id -u):$(id -g)" --secur
   --link "$DBC:db" -e DATABASE_URL="postgresql://kalmido:kalmido@db/$DBN" \
   -e AUTH_PROXY_HEADER=Remote-User -e AUTH_TRUSTED_PROXIES="$GW" -e AUTH_PROXY_PORT=3045 \
   -e KALMIDO_UPDATE_CHECK=0 -e KALMIDO_ONBOARDING="${KALMIDO_ONBOARDING:-0}" -e KALMIDO_ADMIN_ALERTS="${KALMIDO_ADMIN_ALERTS:-0}" -e NTFY_URL=http://127.0.0.1:9999 -e TASKS_PUSH_GAP=3 -e TASKS_WATCHDOG_INTERVAL=1 -e KALMIDO_TIDY_QUIET_S=${KALMIDO_TIDY_QUIET_S:-0} -e KALMIDO_NOTIF_TEMPLATE=${KALMIDO_NOTIF_TEMPLATE:-all} -e TASKS_MAX_FILE_MB=1 \
-  -p "127.0.0.1:$PPORT:3045" -p "127.0.0.1:$PORT:3040" -v "$D":/data ${EXTRA:-} "$IMG" >/dev/null || exit 1
+  -p "127.0.0.1:$PPORT:3045" -p "127.0.0.1:$PORT:3040" -v "$D":/data ${EXTRA:-} "$IMG" 2>&1 >/dev/null | { grep -v "Links on the default bridge" >&2 || true; }
+[[ ${PIPESTATUS[0]} -eq 0 ]] || exit 1  # (the --link deprecation warning is noise here)
 for _ in $(seq 1 60); do
   if curl -sf "http://127.0.0.1:$PORT/api/health" >/dev/null; then
     docker exec -d "$NAME" python /data/stub_ntfy.py

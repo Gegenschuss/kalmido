@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """2.33.0 API tests (agent B: #1080 search in conversations), own container (start.sh).
- - one FTS5 index over task comments, team chat (channels + direct messages) and agent chats: case, accents and ä / ae do
+ - one index over task comments, team chat (channels + direct messages) and agent chats: case, accents and ä / ae do
    not matter ("Ärger" = "arger" = "AERGER", "Straße" = "strasse", "Café" = "cafe"), words match their beginnings
- - kept current by triggers: new, edited and (soft) deleted messages; rows written straight into the tables (as an older
-   server would after a rollback) are found too; a database without the index (a backup from before 2.33) gets it built at
-   the start, a drifted index is rebuilt
+ - always current (2.37: an expression index, no triggers): new, edited and (soft) deleted messages; rows written
+   straight into the tables are found too; a database without the index gets it built at the start, an older index
+   version is rebuilt
  - visibility: comments only of tasks the person sees (list role; not another organisation's), team chat only rooms the
    person is in (channel: list members; DM: the two), agent chats only the person's own (with agents they reach); agents
    (token): comments + channel of the lists shared with them and their own chats, never DMs, never another agent's chats
@@ -13,7 +13,7 @@
  - GET /api/v1/search?scope=messages (people + agents), GET /api/search/messages (web client), OpenAPI
 usage: p2330_b_api_test.py <datadir>"""
 import os
-import dbx
+import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
 import subprocess
 import sys
 
@@ -44,7 +44,7 @@ def sess(user, pw="password123"):
 
 
 def dbx(sql, args=(), write=False):
-    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         r = c.execute(sql, args).fetchall()
         if write:
@@ -88,7 +88,7 @@ def agent(name):
     r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments"], "username": name, "display_name": name.title()})
     aid = r.json()["id"]
     check(A.patch(B + f"/api/admin/agents/{aid}", json={"org_id": ORG}).ok, "setup: a team agent of the organisation")
-    dbx("INSERT OR IGNORE INTO org_members(org_id,user_id,role) VALUES(?,?,'member')", (ORG, aid), write=True)
+    dbx("INSERT INTO org_members(org_id,user_id,role) VALUES(?,?,'member') ON CONFLICT DO NOTHING", (ORG, aid), write=True)
     return aid, {"Authorization": "Bearer " + r.json()["token"]}
 
 
@@ -229,7 +229,7 @@ A.delete(B + f"/api/comments/{C2}")
 check(f"c{C2}" not in keys(find(A, "arger")), "a deleted comment is gone")
 A.delete(B + f"/api/team/messages/{T2}")
 check(f"t{T2}" not in keys(find(A, "arger")), "a deleted team message is gone")
-# an older server (rollback) writes the tables directly: the triggers keep the index right, nothing fails
+# rows written straight into the tables (2.37: the expression index follows them by itself)
 dbx("INSERT INTO comments(task_id,user_id,body,created_at) VALUES(?,?,?,?)", (T, ALICE, "Rückweg ohne Ärger", "2026-10-09T08:00:00Z"), write=True)
 dbx("INSERT INTO tchat_msgs(room_id,user_id,body,created_at) VALUES(?,?,?,?)", (RW, BOB, "Rückweg im Kanal", "2026-10-09T08:00:01Z"), write=True)
 check(len(find(A, "ruckweg")) == 2 and len(find(Bo, "rueckweg")) == 2, "rows written straight into the tables are found")
@@ -238,26 +238,24 @@ check(len(find(A, "ruckweg")) == 1, "rows deleted straight from the tables are g
 dbx("DELETE FROM agent_chat WHERE id=?", (A1,), write=True)
 check(f"a{A1}" not in keys(find(A, "arger")), "a trimmed agent chat message is gone")
 before = keys(find(A, "arger"))
-# a database without the index (a backup from before 2.33): built at the start
-c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
-for (n,) in c.execute("SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'msg_fts_%'").fetchall():
-    c.execute(f"DROP TRIGGER {n}")
-c.execute("DROP TABLE msg_fts")
-c.commit()
+# 2.37.0 (#1150): Postgres -- no index table, no triggers: kalmido_fold() + one trigram index per message table
+# a database without the index (e.g. a restored dump without it): built at the start
+c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+c.execute("DROP FUNCTION kalmido_fold(text) CASCADE")  # drops the three indexes with it
 c.execute("INSERT INTO comments(task_id,user_id,body,created_at) VALUES(?,?,?,?)", (T, ALICE, "Altbestand Ärger", "2026-10-09T08:00:02Z"))
-c.commit()
 c.close()
 restart()
 A = sess("alice")
 after = keys(find(A, "arger"))
 check(len(after) == len(before) + 1 and set(before) <= set(after), "a database without the index gets it built at the start " + str((before, after)))
-# a drifted index (e.g. a row lost) is rebuilt at the start
-dbx("DELETE FROM msg_fts WHERE rowid=?", (C1 * 4 + 1,), write=True)
-check(f"c{C1}" not in keys(find(A, "arger")), "setup: a lost index row")
+# an older index version is rebuilt at the start
+dbx("UPDATE settings SET value='1' WHERE key='msg_fts_v'", write=True)
 restart()
 A = sess("alice")
-check(keys(find(A, "arger")) == after, "a drifted index is rebuilt at the start")
-check(len(dbx("SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'msg_fts_%'")) == 9, "nine triggers (three tables x insert / update / delete)")
+check(keys(find(A, "arger")) == after, "an older index version is rebuilt at the start")
+check(dbx("SELECT value FROM settings WHERE key='msg_fts_v'")[0][0] == "2", "index version stored")
+check(sorted(r[0] for r in dbx("SELECT indexname FROM pg_indexes WHERE indexname LIKE 'msg_trgm_%'")) ==
+      ["msg_trgm_agent_chat", "msg_trgm_comments", "msg_trgm_tchat_msgs"], "three trigram indexes (comments, team chat, agent chat)")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

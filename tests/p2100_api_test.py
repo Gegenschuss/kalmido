@@ -19,7 +19,7 @@ usage: p2100_api_test.py <datadir>"""
 import json
 import os
 import re
-import dbx
+import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
 import subprocess
 import sys
 import time
@@ -55,7 +55,13 @@ def start(extra=""):
 def setup():
     s0 = requests.Session()
     s0.headers.update(H)
-    assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
+    _r = s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"})
+    if not _r.ok:  # 2.37.0 (#1150) diagnostics: why the first setup after a UI suite fails on the Mac runner
+        _ct = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
+        print("SETUP FAILED:", _r.status_code, _r.text[:300], flush=True)
+        print(subprocess.run(["docker", "ps", "-a", "--format", "{{.Names}} {{.Status}} {{.Ports}}"], capture_output=True, text=True).stdout, flush=True)
+        print(subprocess.run(["docker", "logs", "--tail", "40", _ct], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True).stdout[-4000:], flush=True)
+    assert _r.ok
 
 
 def sess(user, pw="password123", **hd):
@@ -74,7 +80,7 @@ def login(user, pw, ip=None, **hd):
 
 
 def dbx(q, a=()):
-    con = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    con = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         r = con.execute(q, a).fetchall()
         con.commit()
@@ -338,7 +344,7 @@ dbx("INSERT INTO cal_subs(user_id,kind,name,url,status,created_at) VALUES(?,?,?,
 sub = dbx("SELECT MAX(id) FROM cal_subs")[0][0]
 loc = datetime(D.year, D.month, D.day, 10, 0).astimezone()
 ev0 = loc.astimezone(timezone.utc)
-dbx("INSERT INTO cal_events(sub_id,uid,title,all_day,start,end,d0,d1) VALUES(?,?,?,?,?,?,?,?)",
+dbx("INSERT INTO cal_events(sub_id,uid,title,all_day,start,\"end\",d0,d1) VALUES(?,?,?,?,?,?,?,?)",
     (sub, "e1", "Client call", 0, ev0.strftime("%Y-%m-%dT%H:%M:%SZ"), (ev0 + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ"), DS, DS))
 p = A.get(B + "/api/dayplan", params={"date": DS}).json()
 slots = {x["task_id"]: (x["start"], x["end"]) for x in p["plan"]}

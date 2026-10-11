@@ -12,7 +12,7 @@ import hashlib
 import hmac
 import json
 import os
-import dbx
+import dbx as dbxm  # 2.37.0: the suite has its own dbx() helper
 import subprocess
 import sys
 import time
@@ -46,7 +46,7 @@ def sess(user=None, pw="password123"):
 
 
 def dbx(sql, args=()):
-    c = dbx.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         r = c.execute(sql, args).fetchall()
         c.commit()
@@ -307,7 +307,7 @@ got("/c2", n=55, timeout=30)
 time.sleep(1.5)
 check(dbx("SELECT COUNT(*) FROM webhook_log WHERE webhook_id=?", (wc2["id"],))[0][0] == 50, "delivery log: last 50 kept")
 check(len(Ca.get(B + f"/api/me/webhooks/{wc2['id']}/log").json()["items"]) == 50, "log API: 50")
-cols = [r[1] for r in dbx("PRAGMA table_info(webhook_log)")]
+cols = [r[1] for r in dbx("SELECT ordinal_position, column_name FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='webhook_log'")]
 check("payload" not in cols and "body" not in cols, "log table has no bodies")
 
 # ---- limits, cascade
