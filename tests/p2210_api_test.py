@@ -675,7 +675,7 @@ dbx("DELETE FROM settings WHERE key='migr_ev221'")
 subprocess.run(["docker", "restart", CT], check=True, capture_output=True)
 until(healthy, 40)
 A = sess("alice")
-row = dbx("SELECT id, title, start, end, task_id, reminders FROM events WHERE task_id=?", (FT["id"],))
+row = dbx("SELECT id, title, start, \"end\", task_id, reminders FROM events WHERE task_id=?", (FT["id"],))
 check(row and row[0][1] == "Zoo trip" and row[0][2] == f"{D7}T10:00" and row[0][3] == f"{D7}T13:00" and row[0][5] == "60",
       f"migrated: an event with the time, 3 hours, the reminder {row}")
 if row:

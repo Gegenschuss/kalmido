@@ -89,7 +89,7 @@ def agent(name):
     r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments"], "username": name, "display_name": name.title()})
     aid = r.json()["id"]
     check(A.patch(B + f"/api/admin/agents/{aid}", json={"org_id": ORG}).ok, "setup: a team agent of the organisation")
-    dbx("INSERT OR IGNORE INTO org_members(org_id,user_id,role) VALUES(?,?,'member')", (ORG, aid), write=True)
+    dbx("INSERT INTO org_members(org_id,user_id,role) VALUES(?,?,'member') ON CONFLICT DO NOTHING", (ORG, aid), write=True)
     return aid, {"Authorization": "Bearer " + r.json()["token"]}
 
 

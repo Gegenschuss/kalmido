@@ -184,7 +184,7 @@ check(requests.post(V + f"/agent/chats/{ALICE}", headers=CLH, json={"body": "x",
 check(requests.post(V + f"/agent/chats/{ALICE}", headers=CLH, json={"body": "x", "permission": True, "expires_in": 3}).status_code == 400, "#1041: expires_in below 10 s is refused")
 # expired
 p3 = agent_say("May I restart the worker?", permission=True, expires_in=10)
-dbx("UPDATE agent_chat SET choices=json_set(choices, '$.expires_at', '2000-01-01T00:00:00.000+00:00') WHERE id=?", (p3["id"],), write=True)
+dbx("UPDATE agent_chat SET choices=jsonb_set(choices, '{expires_at}', '\"2000-01-01T00:00:00.000+00:00\"') WHERE id=?", (p3["id"],), write=True)
 m = msgs()[p3["id"]]
 check(m["choice_state"] == "expired", "#1041: after expires_at the question is expired " + str(m["choice_state"]))
 check(press(p3["id"], ["allow"]).status_code == 409, "#1041: ... a press is 409")

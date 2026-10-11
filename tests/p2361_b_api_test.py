@@ -99,12 +99,12 @@ CL, CLH = r.json()["id"], {"Authorization": "Bearer " + r.json()["token"]}
 O = "/api/office"
 
 # ================================================================== schema: additive tables
-tabs = {r[0] for r in dbx("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'office_%'")}
+tabs = {r[0] for r in dbx("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name LIKE 'office_%'")}
 for t in ("office_settings", "office_services", "office_equipment", "office_sets", "office_texts", "office_contracts", "office_numbers"):
     check(t in tabs, f"schema: table {t}")
 for t in ("office_services", "office_equipment", "office_sets", "office_texts", "office_contracts"):
     check(any(r[1] == "org_id" and r[3] == 1 for r in dbx(f"PRAGMA table_info({t})")), f"schema: {t}.org_id NOT NULL")
-    check(any(r[1].endswith("_org") for r in dbx(f"PRAGMA index_list({t})")), f"schema: index on {t}(org_id)")
+    check(any(r[1].endswith("_org") for r in dbx(f"SELECT 0, indexname FROM pg_indexes WHERE schemaname=current_schema() AND tablename='{t}'")), f"schema: index on {t}(org_id)")
 
 # ================================================================== the gate
 r = Li.get(B + O + "/settings")

@@ -212,9 +212,10 @@ pa = next(x for x in D if x["method"] == "PATCH")
 check(pa["task_id"] == NT, "patch: task id")
 agents_in_log = {x[0] for x in rows()}
 check(agents_in_log <= {AG, AG2}, f"only agents in the log: {agents_in_log}")
-con = db()
-dump = "\n".join(con.iterdump())
-con.close()
+with open(os.path.join(DATA, ".kalmido-db"), encoding="utf-8") as _f:  # 2.37.0 (#1150): the log table as SQL (pg_dump)
+    _dbc, _dbn = _f.read().split()
+dump = subprocess.run(["docker", "exec", _dbc, "pg_dump", "-U", "kalmido", "-d", _dbn, "--data-only", "--inserts", "-t", "agent_audit"],
+                      capture_output=True, text=True, check=True).stdout
 aud_lines = [ln for ln in dump.splitlines() if "agent_audit" in ln]
 check(aud_lines and not any(SECRET in ln or "SEARCH-WORD" in ln or "secret notes" in ln for ln in aud_lines), "no body / query value in the log")
 check(all("?" not in x["route"] for x in D), "no query strings in routes")

@@ -211,7 +211,7 @@ r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "com
                                          "username": "betabot", "display_name": "Beta bot"})
 AGB, agb = r.json()["id"], Api(r.json()["token"])
 dbx("UPDATE agents SET org_id=? WHERE user_id=?", (BETA, AGB), write=True)
-dbx("INSERT OR IGNORE INTO org_members(org_id,user_id,role) VALUES(?,?,'member')", (BETA, AGB), write=True)
+dbx("INSERT INTO org_members(org_id,user_id,role) VALUES(?,?,'member') ON CONFLICT DO NOTHING", (BETA, AGB), write=True)
 check(boundary(A)["violations"] == 0, "workspaces: the boundary is clean")
 
 # ---- the first organisation's objects (bob), all named with MARK
@@ -279,7 +279,7 @@ no(Ca.put(B + f"/api/lists/{LB}/groups/{GA}", json={"role": "edit"}), "#1036 B1:
 no(agb.get(f"/groups/{GA}"), "#1036 B1: nor the other organisation's agent read it")
 GE = A.post(B + "/api/admin/groups", json={"name": "Empty group"}).json()["id"]
 check("Empty group" in gn(A) and "Empty group" not in gn(Bo), "#1036 B1: an empty group: its creator keeps it, nobody else sees it")
-dbx("INSERT OR IGNORE INTO group_members(group_id,user_id,added_at) VALUES(?,?,?)", (GA, CAROL, TS), write=True)
+dbx("INSERT INTO group_members(group_id,user_id,added_at) VALUES(?,?,?) ON CONFLICT DO NOTHING", (GA, CAROL, TS), write=True)
 gm = {g_["id"]: g_ for g_ in Ca.get(B + "/api/groups").json()["groups"]}
 check(GA in gm, "B1: a member of the group knows it (a group in common connects its members, as before)")
 check(BOB not in [m["user_id"] for m in agb.get(f"/groups/{GA}").json().get("members", [])], "B1: the API shows no invisible member either")

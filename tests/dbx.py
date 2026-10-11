@@ -137,6 +137,38 @@ def _psql(dbc, dbn, sql, timeout=60):
     return p.stdout
 
 
+def dump(path):
+    """The whole database of a data dir as bytes (pg_dump, data only): for "a secret is nowhere in the database" checks
+    (was: reading the tasks.db file)."""
+    dbc, dbn = _target(path)
+    p = subprocess.run(["docker", "exec", dbc, "pg_dump", "-U", "kalmido", "--data-only", dbn], capture_output=True, timeout=120)
+    if p.returncode != 0:
+        raise DbError(p.stderr.decode(errors="replace").strip())
+    return p.stdout
+
+
+class _Pairs(list):
+    """A JSON object as its (key, value) pairs."""
+
+
+def _plain(v):
+    if isinstance(v, _Pairs):
+        return {k: _plain(x) for k, x in v}
+    if isinstance(v, list):
+        return [_plain(x) for x in v]
+    return v
+
+
+_PRAGMA_TI = re.compile(r"^PRAGMA\s+table_info\(\s*['\"]?(\w+)['\"]?\s*\)$", re.I)
+_TABLE_INFO = ("SELECT c.ordinal_position - 1 AS cid, c.column_name AS name, upper(c.data_type) AS type, "
+               "CASE WHEN c.is_nullable = 'NO' THEN 1 ELSE 0 END AS notnull, "
+               "regexp_replace(c.column_default, '::[a-z ]+$', '') AS dflt_value, "
+               "CASE WHEN EXISTS (SELECT 1 FROM information_schema.table_constraints tc JOIN information_schema.key_column_usage k "
+               "ON k.constraint_name = tc.constraint_name AND k.table_schema = tc.table_schema WHERE tc.constraint_type = 'PRIMARY KEY' "
+               "AND tc.table_schema = c.table_schema AND tc.table_name = c.table_name AND k.column_name = c.column_name) THEN 1 ELSE 0 END AS pk "
+               "FROM information_schema.columns c WHERE c.table_schema = current_schema() AND c.table_name = '{t}' ORDER BY c.ordinal_position")
+
+
 class Conn:
     def __init__(self, path):
         self.dbc, self.dbn = _target(path)
@@ -144,14 +176,19 @@ class Conn:
 
     def execute(self, sql, args=()):
         q = fill(sql, args).strip().rstrip(";")
+        m = _PRAGMA_TI.match(q)
+        if m:  # the suites' schema checks: SQLite's PRAGMA table_info rows (cid, name, type, notnull, dflt_value, pk)
+            q = _TABLE_INFO.format(t=m.group(1).lower())
         if _ROWS.match(q) or (_DML.match(q) and re.search(r"\bRETURNING\b", q, re.I)):
             if _DML.match(q):
                 body = f"WITH _q AS ({q}) SELECT json_agg(row_to_json(_q)) FROM _q"
             else:
                 body = f"SELECT json_agg(row_to_json(_q)) FROM ({q}) _q"
             out = _psql(self.dbc, self.dbn, body + ";\n").strip()
-            data = json.loads(out) if out else None
-            rows = [Row(list(o.keys()), list(o.values())) for o in (data or [])]
+            # object_pairs_hook: two result columns of the same name ("?column?") stay two columns
+            data = json.loads(out, object_pairs_hook=_Pairs) if out else None
+            # json / jsonb come back as their JSON text, as through the app's own connection (and sqlite3 before)
+            rows = [Row([k for k, _ in o], [json.dumps(_plain(v)) if isinstance(v, list) else v for _, v in o]) for o in (data or [])]
             return Cursor(rows, len(rows))
         if _DML.match(q):
             out = _psql(self.dbc, self.dbn, f"WITH _q AS ({q} RETURNING 1) SELECT count(*) FROM _q;\n").strip()

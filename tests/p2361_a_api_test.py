@@ -115,12 +115,12 @@ def sub(name, color="#2dd4bf", visible=1):
 
 def sub_event(sid, title, h0, h1, day=D, all_day=False):
     if all_day:
-        dbx("INSERT INTO cal_events(sub_id,uid,title,all_day,start,end,d0,d1) VALUES(?,?,?,?,?,?,?,?)",
+        dbx("INSERT INTO cal_events(sub_id,uid,title,all_day,start,\"end\",d0,d1) VALUES(?,?,?,?,?,?,?,?)",
             (sid, title, title, 1, day.isoformat(), (day + timedelta(days=1)).isoformat(), day.isoformat(), day.isoformat()))
         return
     a = datetime(day.year, day.month, day.day, h0, 0).astimezone().astimezone(timezone.utc)
     b = datetime(day.year, day.month, day.day, h1, 0).astimezone().astimezone(timezone.utc)
-    dbx("INSERT INTO cal_events(sub_id,uid,title,all_day,start,end,d0,d1) VALUES(?,?,?,?,?,?,?,?)",
+    dbx("INSERT INTO cal_events(sub_id,uid,title,all_day,start,\"end\",d0,d1) VALUES(?,?,?,?,?,?,?,?)",
         (sid, title, title, 0, a.strftime("%Y-%m-%dT%H:%M:%SZ"), b.strftime("%Y-%m-%dT%H:%M:%SZ"), day.isoformat(), day.isoformat()))
 
 

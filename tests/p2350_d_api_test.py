@@ -242,7 +242,7 @@ items = wait_for(lambda: [x for x in A.get(B + "/api/admin/backups").json().get(
 name = items[0]["name"] if items else ""
 r = A.post(B + f"/api/admin/backups/{name}/verify", json={})
 check(r.ok and r.json().get("ok"), "backup: a backup with snippets verifies " + r.text[:200])
-dbx("UPDATE tasks SET snippets='' WHERE id=?", (T,), write=True)
+dbx("UPDATE tasks SET snippets=NULL WHERE id=?", (T,), write=True)  # 2.37: jsonb, NULL = none ('' is no json)
 r = A.post(B + "/api/admin/backups/restore", json={"confirm": "RESTORE", "name": name})
 check(r.ok and r.json().get("ok"), "backup: restore " + r.text[:200])
 A = sess("alice")

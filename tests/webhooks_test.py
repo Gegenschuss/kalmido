@@ -152,8 +152,7 @@ S1 = w1["secret"]
 lst = A.get(B + "/api/me/webhooks").json()
 check(lst["enabled"] and lst["events"] == ALL and len(lst["hooks"]) == 1 and "secret" not in lst["hooks"][0], "list: never the secret")
 row = dbx("SELECT secret FROM webhooks WHERE id=?", (w1["id"],))[0][0]
-raw = open(os.path.join(DATA, "tasks.db"), "rb").read() + (open(os.path.join(DATA, "tasks.db-wal"), "rb").read()
-                                                          if os.path.exists(os.path.join(DATA, "tasks.db-wal")) else b"")
+raw = dbxm.dump(DATA)  # 2.37.0: the whole Postgres database (was the tasks.db file + WAL)
 check(row.startswith("v1.") and S1 not in row and S1.encode() not in raw, "secret stored sealed, never in clear text")
 check(Bo.patch(B + f"/api/me/webhooks/{w1['id']}", json={"url": STUB + "/x"}).status_code == 404
       and Bo.delete(B + f"/api/me/webhooks/{w1['id']}").status_code == 404 and Bo.get(B + f"/api/me/webhooks/{w1['id']}/log").status_code == 404

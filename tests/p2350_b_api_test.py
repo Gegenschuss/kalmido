@@ -251,7 +251,7 @@ check(len(got) == 1 and got[0].get("title") == "Claude", "review M5: the 6th wit
 check(say(uid=CAROL, approval={"title": "x"}).status_code == 404, "a person who shares nothing with the agent -> 404")
 
 # ================================================================== schema
-check(not dbx("SELECT name FROM sqlite_master WHERE name LIKE '%approval%' AND type='table'"), "no new table (choices json in agent_chat)")
+check(not dbx("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name LIKE '%approval%'"), "no new table (choices json in agent_chat)")
 spec = requests.get(V + "/openapi.json").json()
 props = spec["paths"]["/agent/chats/{id}"]["post"]["requestBody"]["content"]["application/json"]["schema"]["properties"]
 check("approval" in props and props["approval"]["properties"]["title"]["maxLength"] == 200, "OpenAPI documents approval")

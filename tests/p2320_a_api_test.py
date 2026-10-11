@@ -152,9 +152,12 @@ ex = A.get(B + "/api/export.json").json()
 check([x["list_id"] for x in ex.get("list_layouts", [])] == [P] and "view_today" in json.dumps(ex.get("settings", ex)), "#1063: the data export carries my own arrangements")
 
 # ---- rollback safety: only additive changes
-cols = [r[1] for r in dbx("PRAGMA table_info(lists)")]
-check("page_layout" in cols and dbx("SELECT dflt_value FROM pragma_table_info('lists') WHERE name='page_layout'")[0][0] == "''", "rollback: lists.page_layout is a new column with a default")
-check([r[1] for r in dbx("PRAGMA table_info(list_layouts)")] == ["list_id", "user_id", "layout", "updated_at"], "rollback: list_layouts is a new table")
+# 2.37.0 (#1150): Postgres -- information_schema instead of PRAGMA table_info
+COLQ = ("SELECT column_name, column_default FROM information_schema.columns WHERE table_schema=current_schema() AND table_name=? "
+        "ORDER BY ordinal_position")
+cols = [r[0] for r in dbx(COLQ, ("lists",))]
+check("page_layout" in cols and str([r[1] for r in dbx(COLQ, ("lists",)) if r[0] == "page_layout"][0]).startswith("''"), "rollback: lists.page_layout is a new column with a default")
+check([r[0] for r in dbx(COLQ, ("list_layouts",))] == ["list_id", "user_id", "layout", "updated_at"], "rollback: list_layouts is a new table")
 # deleting the project removes the arrangements (cascade)
 A.put(B + f"/api/lists/{P}/layout", json={"layout": json.dumps({"order": ["ms"]})})
 A.delete(B + f"/api/lists/{P}")

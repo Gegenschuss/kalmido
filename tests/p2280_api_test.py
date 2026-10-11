@@ -300,7 +300,7 @@ GB = Bo.post(B + "/api/admin/groups", json={"name": "Mixed", "members": [BOB]}).
 LBO = Bo.post(B + "/api/lists", json={"name": "Org via group", "org_id": ORG}).json()["id"]
 check(Bo.put(B + f"/api/lists/{LBO}/groups/{GB}", json={"role": "edit"}).ok, "review 2: a group of members is shared into the organisation's list")
 check(Bo.patch(B + f"/api/admin/groups/{GB}", json={"members": [BOB, DAVE]}).status_code == 400, "review 2: an instance admin cannot put an invisible person into a group (workspaces)")
-dbx("INSERT OR IGNORE INTO group_members(group_id,user_id,added_at) VALUES(?,?,'2026-01-01T00:00:00+00:00')", (GB, DAVE), write=True)
+dbx("INSERT INTO group_members(group_id,user_id,added_at) VALUES(?,?,'2026-01-01T00:00:00+00:00') ON CONFLICT DO NOTHING", (GB, DAVE), write=True)
 Bo.patch(B + f"/api/lists/{LBO}/groups/{GB}", json={"role": "view"}) if False else Bo.put(B + f"/api/lists/{LBO}/groups/{GB}", json={"role": "view"})
 check(not dbx("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (LBO, DAVE)), "review 2: the group sync never carries somebody of another workspace into the organisation's list")
 check(Bo.delete(B + f"/api/admin/groups/{GB}").ok and Bo.delete(B + f"/api/lists/{LBO}/members/{BOB}").status_code in (200, 404), "review 2: the group goes again (no connection between dave and bob through it)")

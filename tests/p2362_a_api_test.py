@@ -70,8 +70,8 @@ def restart(extra, **env):
 
 def layer_lists(uid, write=False):
     """The list ids of account uid straight from the access layer (core/access.py acx_lists_sql), inside the container."""
-    code = ("import json, sqlite3, os\nfrom kalmido.core.access import acx_lists_sql\n"
-            "c = dbxm.connect(os.environ['TASKS_DB'])\n"
+    code = ("import json\nfrom kalmido.core.access import acx_lists_sql\n"
+            "from kalmido.core.db import connect\nc = connect()  # 2.37.0: Postgres (DATABASE_URL in the container)\n"
             f"print(json.dumps(sorted(r[0] for r in c.execute('SELECT id FROM lists WHERE id IN ' + acx_lists_sql(write={write}, req=False), ({uid}, {uid})))))")
     p = subprocess.run(["docker", "exec", CONTAINER, "python", "-c", code], capture_output=True, text=True, timeout=60)
     try:

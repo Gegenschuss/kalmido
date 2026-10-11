@@ -168,8 +168,9 @@ exp = repr(["http://ntfy-int:80/file/a.txt", "http://ntfy-int:80/file/b", None, 
 check(lines and lines[0] == exp, "ntfy_attachment_url mapping: " + (lines[0] if lines else out))
 check(lines[1:4] == ["blocked"] * 3, "safe_urlopen blocks file/ftp/data: " + str(lines[1:4]))
 check("allowed_ntfysh_inbox False" in out and "allowed_ntfysh_long True" in out and "allowed_own True" in out, "ntfy.sh + guessable topic refused")
-r = subprocess.run(["docker", "run", "--rm", "--network", "none", "-e", "TASKS_DB=/tmp/x.db", "-e", "NTFY_INBOX_URL=https://ntfy.sh",
-                    "-e", "NTFY_INBOX_TOKEN=x", "-w", "/app", IMG, "python", "-c", "import app"], capture_output=True, text=True)
+# 2.37.0 (#1150): a one-off process in the running container (it needs the test database; a bare container has none)
+r = subprocess.run(["docker", "exec", "-e", "NTFY_INBOX_URL=https://ntfy.sh", "-e", "NTFY_INBOX_TOKEN=x", "-e", "NTFY_INBOX_TOPIC=inbox",
+                    "-w", "/app", CT, "python", "-c", "import app"], capture_output=True, text=True)
 check("ntfy inbox NOT started" in r.stdout + r.stderr, "importer refuses ntfy.sh with topic inbox at start")
 
 # ------------------------------------------------------------------ HIGH-2: Paperless gate

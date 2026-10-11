@@ -129,8 +129,7 @@ check(re.fullmatch(r"abk_[A-Za-z0-9_-]{43}", TA) is not None, "token format abk_
 check(j["prefix"] == TA[:12] and j["scopes"] == ["read", "write"] and j["expires_at"] is None, "token: prefix, scopes, no expiry " + str(j))
 row = dbx("SELECT token_hash, prefix FROM api_tokens WHERE id=?", (j["id"],))[0]
 check(row[0] == hashlib.sha256(TA.encode()).hexdigest(), "token: SHA-256 at rest")
-raw = open(os.path.join(DATA, "tasks.db"), "rb").read() + (open(os.path.join(DATA, "tasks.db-wal"), "rb").read()
-                                                          if os.path.exists(os.path.join(DATA, "tasks.db-wal")) else b"")
+raw = dbxm.dump(DATA)  # 2.37.0: the whole Postgres database (was the tasks.db file + WAL)
 check(TA.encode() not in raw and TA[12:].encode() not in raw, "token: the token itself is nowhere in the database")
 lst = A.get(B + "/api/me/tokens").json()
 check(lst["enabled"] and len(lst["tokens"]) == 1 and "token" not in lst["tokens"][0] and "token_hash" not in lst["tokens"][0],

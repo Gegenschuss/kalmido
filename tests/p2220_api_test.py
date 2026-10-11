@@ -244,10 +244,10 @@ check(r.status_code == 400 and "Health" in r.json()["error"], "an agent never ge
 # webhooks: nothing of a health list
 wh = A.post(B + "/api/me/webhooks", json={"name": "h", "url": "http://127.0.0.1:9/hook", "events": ["task.created", "task.updated"]})
 if wh.ok:
-    n0 = dbx("SELECT COUNT(*) FROM webhook_deliveries")[0][0] if dbx("SELECT name FROM sqlite_master WHERE name='webhook_deliveries'") else 0
+    n0 = dbx("SELECT COUNT(*) FROM webhook_deliveries")[0][0] if dbx("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='webhook_deliveries'") else 0
     A.patch(B + f"/api/tasks/{hid}", json={"title": "Dentist again"})
     time.sleep(0.4)
-    n1 = dbx("SELECT COUNT(*) FROM webhook_deliveries")[0][0] if dbx("SELECT name FROM sqlite_master WHERE name='webhook_deliveries'") else 0
+    n1 = dbx("SELECT COUNT(*) FROM webhook_deliveries")[0][0] if dbx("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='webhook_deliveries'") else 0
     check(n1 == n0, "no webhook for a change in a health list")
 # the person's own app sees everything, the members they share it with too
 A.put(B + f"/api/lists/{HL}/members", json={"user_id": BOB, "role": "view"})

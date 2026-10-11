@@ -174,8 +174,8 @@ check(a["error"] == "" and a["latest"] == "100.0.0", f"404 (no release yet) is n
 A.patch(B + "/api/admin/settings", json={"update_check": False})
 check(about(A)["available"] is False, "setting off: no update shown")
 # env off: never asks, setting cannot turn it on
-r = subprocess.run(["docker", "run", "--rm", "--network", "none", "-e", "TASKS_DB=/tmp/x.db", "-e", "TASKS_WATCHDOG=0",
-                    "-e", "KALMIDO_UPDATE_CHECK=0", "-w", "/app", IMG, "python", "-c",
+# 2.37.0 (#1150): a one-off process in the running container (it needs the test database; a bare container has none)
+r = subprocess.run(["docker", "exec", "-e", "TASKS_WATCHDOG=0", "-e", "KALMIDO_UPDATE_CHECK=0", "-w", "/app", CT, "python", "-c",
                     "import app; c=app.connect(); print(app.UPDATE_CHECK_ENV, app.update_enabled(c))"], capture_output=True, text=True)
 check(r.stdout.strip().splitlines()[-1:] == ["False False"], f"KALMIDO_UPDATE_CHECK=0 turns it off: {r.stdout} {r.stderr[-300:]}")
 

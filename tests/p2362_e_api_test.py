@@ -180,7 +180,7 @@ r = A.post(B + f"{D}/{DOC}/status", json={"status": "sent"})
 check(r.ok and r.json()["status"] == "sent", "finalised quotation: status still changes")
 items = dbx("SELECT tax_pct, net, tax_amount FROM office_doc_items WHERE doc_id=? ORDER BY sort", (DOC,))
 check(items == [("19", "3000.00", "570.00"), ("7", "100.00", "7.00")], f"positions carry tax_pct / net / tax_amount as decimal text: {items}")
-snap = dbx("SELECT pack_version, sender IS NOT NULL, recipient_snapshot IS NOT NULL, tax_snapshot IS NOT NULL FROM office_docs WHERE id=?", (DOC,))[0]
+snap = dbx("SELECT pack_version, sender IS NOT NULL AS s1, recipient_snapshot IS NOT NULL AS s2, tax_snapshot IS NOT NULL AS s3 FROM office_docs WHERE id=?", (DOC,))[0]
 check(snap[0] and snap[1] == 1 and snap[2] == 1 and snap[3] == 1, f"snapshot columns written: {snap}")
 before = A.get(B + f"{D}/{DOC}/render").json()
 
