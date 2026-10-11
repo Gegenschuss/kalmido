@@ -7,6 +7,8 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.37.0] - 2026-10-11
+
 **In short:** Kalmido now runs on **PostgreSQL 17** only, for every installation. **Self-hosters: this update needs
 action** - add the database service to your compose file and set a password (see *Upgrading* below); your data moves
 over by itself on the first start. The organisation boundary is enforced **in the database** as well (row-level
@@ -3754,7 +3756,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.36.2...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.37.0...HEAD
+[2.37.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.37.0
 [2.36.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.36.2
 [2.36.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.36.1
 [2.36.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.36.0
