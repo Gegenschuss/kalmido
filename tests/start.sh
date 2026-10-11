@@ -48,10 +48,24 @@ else
   "${PSQL[@]}" -c "DROP DATABASE IF EXISTS $DBN WITH (FORCE)" -c "CREATE DATABASE $DBN" >/dev/null || exit 1
 fi
 echo "$DBC $DBN" > "$D/.kalmido-db"
+# 2.37.0 (review W2-4 / W2-2): KALMIDO_TEST_DB_LOGIN=owner|bypass -- the app logs in as its own role instead of the image's
+# superuser: "owner" = owner of the database without superuser / BYPASSRLS (the policies hold for it through FORCE),
+# "bypass" = owner with BYPASSRLS but without the right to create roles. Unset: the superuser (every standard run).
+DBU=kalmido
+if [[ -n "${KALMIDO_TEST_DB_LOGIN:-}" ]]; then
+  case "$KALMIDO_TEST_DB_LOGIN" in
+    owner) ATTR="NOSUPERUSER NOBYPASSRLS NOCREATEROLE" ;;
+    bypass) ATTR="NOSUPERUSER BYPASSRLS NOCREATEROLE" ;;
+    *) echo "KALMIDO_TEST_DB_LOGIN: owner or bypass" >&2; exit 1 ;;
+  esac
+  DBU=k_$KALMIDO_TEST_DB_LOGIN
+  "${PSQL[@]}" -c "DO \$\$BEGIN CREATE ROLE $DBU LOGIN PASSWORD 'kalmido'; EXCEPTION WHEN duplicate_object THEN NULL; END\$\$" \
+    -c "ALTER ROLE $DBU LOGIN $ATTR" -c "ALTER DATABASE $DBN OWNER TO $DBU" >/dev/null || exit 1
+fi
 # shellcheck disable=SC2086
 docker run -d --name "$NAME" --network bridge --user "$(id -u):$(id -g)" --security-opt no-new-privileges:true --cap-drop ALL \
   -e TZ=Europe/Berlin -e TASKS_DB=/data/tasks.db -e PUBLIC_URL=https://kalmido.example \
-  --link "$DBC:db" -e DATABASE_URL="postgresql://kalmido:kalmido@db/$DBN" \
+  --link "$DBC:db" -e DATABASE_URL="postgresql://$DBU:kalmido@db/$DBN" \
   -e AUTH_PROXY_HEADER=Remote-User -e AUTH_TRUSTED_PROXIES="$GW" -e AUTH_PROXY_PORT=3045 \
   -e KALMIDO_UPDATE_CHECK=0 -e KALMIDO_ONBOARDING="${KALMIDO_ONBOARDING:-0}" -e KALMIDO_ADMIN_ALERTS="${KALMIDO_ADMIN_ALERTS:-0}" -e NTFY_URL=http://127.0.0.1:9999 -e TASKS_PUSH_GAP=3 -e TASKS_WATCHDOG_INTERVAL=1 -e KALMIDO_TIDY_QUIET_S=${KALMIDO_TIDY_QUIET_S:-0} -e KALMIDO_NOTIF_TEMPLATE=${KALMIDO_NOTIF_TEMPLATE:-all} -e TASKS_MAX_FILE_MB=1 \
   -p "127.0.0.1:$PPORT:3045" -p "127.0.0.1:$PORT:3040" -v "$D":/data ${EXTRA:-} "$IMG" 2>&1 >/dev/null | { grep -v "Links on the default bridge" >&2 || true; }

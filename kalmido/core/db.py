@@ -86,18 +86,28 @@ def db_error(e):
             c.rollback()
         except Exception:  # noqa: BLE001  (the connection itself may be gone)
             pass
-    if not isinstance(e, (DataError, IntegrityError)):
+    denied = getattr(e, "sqlstate", None) == "42501"  # 2.37.0 (review K2-1): InsufficientPrivilege, e.g. a row-level
+    if not denied and not isinstance(e, (DataError, IntegrityError)):  # security policy stopped a write the app let through
         raise e
     import traceback
-    print(f"database error (400) {request.method} {request.path}:\n" + "".join(traceback.format_exception(e)).rstrip(), flush=True)
-    msg = tr("Invalid data")
+    code = 403 if denied else 400
+    print(f"database error ({code}) {request.method} {request.path}:\n" + "".join(traceback.format_exception(e)).rstrip(), flush=True)
+    if denied:  # the second floor caught what an app check missed: the admins hear it (security alerts)
+        from ..notify.alerts import aa_count
+        try:
+            who = g.user["username"]
+        except Exception:  # noqa: BLE001  (no user, or a public actor without a name)
+            who = "?"
+        aa_count("security", "rls", f"{request.method} {request.url_rule.rule if request.url_rule else request.path}"[:120],
+                 user=who)
+    msg = tr("no permission") if denied else tr("Invalid data")
     if request.path.startswith("/api/v1/"):
         from ..api.v1 import v1_err
-        return v1_err(400, msg)
+        return v1_err(code, msg)
     if request.path == "/dav" or request.path.startswith("/dav/"):
         from flask import Response
-        return Response(msg + "\n", 400, content_type="text/plain; charset=utf-8")
-    return err(msg, 400)
+        return Response(msg + "\n", code, content_type="text/plain; charset=utf-8")
+    return err(msg, code)
 
 
 @app.teardown_appcontext
@@ -259,6 +269,9 @@ def startup_guard():
         print(f"FATAL: database schema {have} is newer than this version ({SCHEMA_VERSION}); start the matching or a newer "
               "image.", flush=True)
         raise DataDirError(3)
+    from ..admin.migrate import mig_startup
+    if mig_startup(has_tables):  # 2.37.0 (#1150): the tasks.db of 2.36 next to an empty database was moved over just now
+        return False
     if has_tables:
         return False
     data = [p for p, ok in ((DATA_MARKER, os.path.exists(DATA_MARKER)), (ATT_DIR, _has_files(ATT_DIR)),
@@ -276,7 +289,9 @@ def startup_guard():
     return True
 
 
-def init_db(guard=True):
+def init_db(guard=True, load=None):
+    """load: admin/migrate.py -- load(c) copies an old SQLite database inside this transaction, after the tables and columns
+    exist and before the one-shot data migrations, triggers, indexes and row-level security."""
     from ..core.access import _COLLAB_ALL, _TIME_ALL
     from ..lists.lists import folder_path_migration
     from ..lists.projects import ms_migrate
@@ -302,6 +317,8 @@ def init_db(guard=True):
         for table, col, ddl in MIGRATIONS:
             if col not in have.get(table, ()):
                 c.execute(ddl)
+        if load is not None:
+            load(c)  # 2.37.0 (#1150): the move from SQLite (migrate-sqlite)
         # 2.10.0 (#441): member rows from before groups (or written by a path that sets no own_role) are personal shares
         c.execute("UPDATE list_members SET own_role=role WHERE own_role IS NULL AND grole IS NULL")
         c.execute("CREATE INDEX IF NOT EXISTS tasks_agroup ON tasks(assignee_group_id) WHERE assignee_group_id IS NOT NULL")
@@ -543,8 +560,15 @@ def init_db(guard=True):
             print("audit migration: Paperless access granted to", n, "admin(s); repaired:", counts, flush=True)
         from ..collab.msgsearch import msg_index_init
         msg_index_init(c)  # 2.33.0 (#1080) / 2.37.0: the message search (kalmido_fold + trigram GIN indexes)
-        from .rls import apply as rls_apply
-        rls_apply(c)  # 2.37.0 (#1150): row-level security per organisation (policies + the app role)
+        from .rls import apply as rls_apply, OFF_HELP
+        rls_on = rls_apply(c)  # 2.37.0 (#1150): row-level security per organisation (policies + the app role)
+        if not rls_on and guard:  # 2.37.0 (review W2-2): several organisations rely on it -> no start without it
+            from ..accounts.orgs import instance_mode
+            mode = instance_mode(c)
+            if mode in ("workspaces", "multi"):
+                print(f"FATAL: {OFF_HELP} The instance mode {mode!r} (several organisations) needs it. Refusing to start.",
+                      flush=True)
+                raise DataDirError(3)
         c.execute("INSERT INTO kalmido_meta(key,value) VALUES('schema_version',?) ON CONFLICT(key) DO UPDATE SET value="
                   "CASE WHEN CAST(kalmido_meta.value AS BIGINT) < CAST(excluded.value AS BIGINT) THEN excluded.value "
                   "ELSE kalmido_meta.value END", (str(int(SCHEMA_VERSION)),))
@@ -554,6 +578,10 @@ def init_db(guard=True):
         raise
     finally:
         c.close()
+    if not rls_on:  # 2.37.0 (review W2-2): single organisation / shared: it starts, but the admins hear it at every start
+        from ..notify.alerts import aa_now
+        from .i18n import N_
+        aa_now("security", "rls:off", N_("Row-level security is OFF: the database user bypasses it and the role kalmido_app cannot be used. Allow the database user to create roles or create the role (see SELF-HOSTING), then restart."))
     from .pg import pool_refresh
     pool_refresh()  # 2.37.0 (#1150): pooled connections opened before the app role existed would bypass row-level security
     if not os.path.exists(DATA_MARKER):  # new install, or the first start of 2.0 on a readable database

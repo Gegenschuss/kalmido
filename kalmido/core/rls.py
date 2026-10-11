@@ -60,8 +60,21 @@ def _policy(c, table, expr):
     c.execute(f"CREATE POLICY {POLICY} ON {table} USING ({expr}) WITH CHECK ({expr})")
 
 
+# 2.37.0 (review W2-2): the result of the last apply() -- False when the login role bypasses row-level security and the
+# app role cannot be used (core/db.py init_db: exit 3 in the modes with several organisations, else a security alert at
+# every start and a line in the admin alerts settings)
+STATE = {"enforced": True}
+
+OFF_HELP = ("row-level security is NOT enforced: the database user is a superuser or has BYPASSRLS, and the role "
+            f"{APP_ROLE} does not exist or cannot be entered (the database user may not create roles). Either allow the "
+            "database user to create roles (ALTER ROLE <user> CREATEROLE; Kalmido creates and enters the role itself at the "
+            f"next start), or create it once as a superuser: CREATE ROLE {APP_ROLE} NOLOGIN NOBYPASSRLS; GRANT {APP_ROLE} TO "
+            "<user>; -- or connect with a database user without BYPASSRLS that owns the database.")
+
+
 def apply(c):
-    """Policies + the app role (inside init_db's transaction; the caller commits)."""
+    """Policies + the app role (inside init_db's transaction; the caller commits). Returns True when row-level security
+    holds for the app's requests (STATE["enforced"])."""
     have = org_tables(c)
     extra = sorted(set(have) - set(TABLES) - set(OWN_POLICY))
     if extra:
@@ -72,31 +85,47 @@ def apply(c):
     for t, expr in OWN_RULES.items():
         _policy(c, t, expr)
     # the organisation count of the boundary rule (core/access.py _boundary_sql) is instance structure, not content: the
-    # same answer for everybody (SET app.role inside the function only)
-    c.execute("CREATE OR REPLACE FUNCTION kalmido_org_count() RETURNS bigint LANGUAGE sql STABLE "
-              "SET app.role = 'system' AS $$SELECT COUNT(*) FROM orgs$$")
-    _app_role(c)
+    # same answer for everybody ("system" inside the function only, the caller's value back before it returns). 2.37.0
+    # (review W2-4): not as "SET app.role" clause of the function -- only a superuser may store a custom setting there, so
+    # a database owner without superuser could not start
+    c.execute("CREATE OR REPLACE FUNCTION kalmido_org_count() RETURNS bigint LANGUAGE plpgsql STABLE AS $f$"
+              "DECLARE prev text := current_setting('app.role', true); n bigint; "
+              "BEGIN PERFORM set_config('app.role', 'system', true); SELECT COUNT(*) INTO n FROM orgs; "
+              "PERFORM set_config('app.role', COALESCE(prev, ''), true); RETURN n; END$f$")
+    STATE["enforced"] = _app_role(c)
+    if not STATE["enforced"]:
+        print("warning: " + OFF_HELP, flush=True)
+    return STATE["enforced"]
 
 
 def _app_role(c):
-    """When the login role bypasses row-level security: the role the app's pooled connections switch to."""
-    r = c.execute("SELECT rolsuper OR rolbypassrls, rolsuper OR rolcreaterole FROM pg_roles WHERE rolname=current_user").fetchone()
-    if not r or not r[0]:
-        return  # the login role is subject to the policies itself (it owns the tables: FORCE)
-    if not r[1] and not c.execute("SELECT 1 FROM pg_roles WHERE rolname=?", (APP_ROLE,)).fetchone():
-        print(f"warning: row-level security is NOT enforced: the database user bypasses it and may not create the role "
-              f"{APP_ROLE}. Create it (NOLOGIN NOBYPASSRLS) and grant it to the database user.", flush=True)
-        return
-    # a role belongs to the whole cluster (several Kalmido databases may share one): create it once, race-safe
-    c.execute(f"DO $r$BEGIN CREATE ROLE {APP_ROLE} NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE; "
-              f"EXCEPTION WHEN duplicate_object OR unique_violation THEN NULL; END$r$")
-    c.execute(f"ALTER ROLE {APP_ROLE} NOLOGIN NOSUPERUSER NOBYPASSRLS")
+    """When the login role bypasses row-level security: the role the app's pooled connections switch to. Returns False
+    when that is needed but impossible."""
+    r = c.execute("SELECT rolsuper, rolbypassrls, rolcreaterole FROM pg_roles WHERE rolname=current_user").fetchone()
+    if not r or not (r[0] or r[1]):
+        return True  # the login role is subject to the policies itself (it owns the tables: FORCE)
+    exists = bool(c.execute("SELECT 1 FROM pg_roles WHERE rolname=?", (APP_ROLE,)).fetchone())
+    if r[0] or r[2]:
+        # a role belongs to the whole cluster (several Kalmido databases may share one): create it once, race-safe
+        c.execute(f"DO $r$BEGIN CREATE ROLE {APP_ROLE} NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE; "
+                  f"EXCEPTION WHEN duplicate_object OR unique_violation THEN NULL; END$r$")
+        c.execute(f"ALTER ROLE {APP_ROLE} NOLOGIN NOSUPERUSER NOBYPASSRLS")
+    elif not exists:
+        return False
     c.execute(f"GRANT USAGE ON SCHEMA {_schema(c)} TO {APP_ROLE}")
     c.execute(f"GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON ALL TABLES IN SCHEMA {_schema(c)} TO {APP_ROLE}")
     c.execute(f"GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA {_schema(c)} TO {APP_ROLE}")
     c.execute(f"GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA {_schema(c)} TO {APP_ROLE}")
-    if not r[1]:  # BYPASSRLS without superuser: SET ROLE needs the membership
+    if r[0]:
+        return True  # a superuser may SET ROLE to any role
+    # without superuser SET ROLE needs a membership with the SET option (the creator's own automatic one has none)
+    if not _can_set(c) and r[2]:
         c.execute(f"GRANT {APP_ROLE} TO CURRENT_USER")
+    return _can_set(c)
+
+
+def _can_set(c):
+    return bool(c.execute(f"SELECT pg_has_role(current_user, '{APP_ROLE}', 'SET')").fetchone()[0])
 
 
 def _schema(c):
@@ -108,4 +137,4 @@ def enter_sql():
     security, the role exists and may be entered)."""
     return (f"SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_roles WHERE rolname='{APP_ROLE}') "
             f"THEN (SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname=current_user) "
-            f"AND pg_has_role(current_user, '{APP_ROLE}', 'MEMBER') ELSE false END")
+            f"AND pg_has_role(current_user, '{APP_ROLE}', 'SET') ELSE false END")

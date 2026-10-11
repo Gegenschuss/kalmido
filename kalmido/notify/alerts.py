@@ -313,6 +313,10 @@ def _aa_build(c, kind, key, b):
                                        "{0} uploads (/drop) with an invalid token within {1} min, from {2}"), [mins, _aa_list(items)], b["n"])
         return ("ics:" + top, Nn_("{0} calendar feed request with an invalid link within {1} min, from {2}",
                                   "{0} calendar feed requests with an invalid link within {1} min, from {2}"), [mins, _aa_list(items)], b["n"])
+    if kind == "security" and key == "rls":  # 2.37.0 (review K2-1): row-level security refused a write (an app check missed it)
+        return ("rls:" + ",".join(sorted(items))[:150], Nn_("{0} request was refused by the database's row-level security within {1} min ({2}; users: {3})",
+                                                          "{0} requests were refused by the database's row-level security within {1} min ({2}; users: {3})"),
+                [mins, _aa_list(items), _aa_list(b["extra"].get("user", {}))], b["n"])
     if kind == "storage" and key == "attachments":
         return ("attachments:" + ",".join(sorted(items))[:150], Nn_("Attachment folder: {0} write error ({1})",
                                                                    "Attachment folder: {0} write errors ({1})"), [_aa_list(items)], b["n"])
@@ -442,6 +446,11 @@ def aa_switch(c, admin, key, value, cfg=None):
         aa_now("security", k, N_("{0} set “{1}” to {2}."), args)
 
 
+def _rls_state():
+    from ..core.rls import STATE
+    return STATE["enforced"]
+
+
 # ---- settings API (admins): Settings > Users > Whole server > Admin alerts
 def aa_public(c):
     cfg, lg = aa_cfg(c), lang()
@@ -460,7 +469,8 @@ def aa_public(c):
             "digest_time": cfg["digest_time"], "cooldown_h": cfg["cooldown_h"], "max_hour": cfg["max_hour"],
             "disk_pct": cfg["disk_pct"], "disk_mb": cfg["disk_mb"], "integ_min": cfg["integ_min"], "admins": admins,
             "ntfy_url": NTFY_URL, "ntfy_public": NTFY_PUBLIC, "webpush": WEBPUSH_ON,
-            "storage": _AA["storage"], "quick_check": _AA["qc"], "items": items}
+            "storage": _AA["storage"], "quick_check": _AA["qc"], "items": items,
+            "rls_off": not _rls_state()}  # 2.37.0 (review W2-2)
 
 
 @app.get("/api/admin/alerts")

@@ -922,6 +922,9 @@
   "Mark all as read": "Alles als gelezen markeren",
   "News are only available online.": "Nieuws is alleen online beschikbaar.",
   "Invalid data": "Ongeldige gegevens",
+  "Row-level security is OFF: the database user bypasses it and the role kalmido_app cannot be used. Allow the database user to create roles or create the role (see SELF-HOSTING), then restart.": "Beveiliging op rijniveau staat UIT: de databasegebruiker omzeilt deze en de rol kalmido_app kan niet worden gebruikt. Sta de databasegebruiker toe rollen aan te maken of maak de rol aan (zie SELF-HOSTING) en start daarna opnieuw.",
+  "no permission": "geen toestemming",
+  "{0} request was refused by the database's row-level security within {1} min ({2}; users: {3})": ["{0} verzoek is binnen {1} min geweigerd door de beveiliging op rijniveau van de database ({2}; gebruikers: {3})", "{0} verzoeken zijn binnen {1} min geweigerd door de beveiliging op rijniveau van de database ({2}; gebruikers: {3})"],
   "General": "Algemeen",
   "Notifications": "Meldingen",
   "Integrations": "Integraties",
@@ -1770,7 +1773,9 @@
   "This backup is from a version before 2.37 (SQLite). Restore it with Kalmido 2.36, then update to 2.37: the data is moved over during the update.": "Deze back-up komt uit een versie van vóór 2.37 (SQLite). Zet hem terug met Kalmido 2.36 en werk daarna bij naar 2.37: de gegevens worden dan overgezet.",
   "The database tools (pg_dump / pg_restore) are missing on this server.": "De databasetools (pg_dump / pg_restore) ontbreken op deze server.",
   "Database check: data checksums are off ({0}).": "Databasecontrole: controlesommen staan uit ({0}).",
-  "old (SQLite)": "oud (SQLite)",
+  "old (SQLite), moved over when restored": "oud (SQLite), wordt bij het terugzetten overgezet",
+  "Move to Postgres finished: {0} tables, {1} rows (report in the backups folder).": "Overstap naar Postgres voltooid: {0} tabellen, {1} rijen (rapport in de map met back-ups).",
+  "{0} private agent(s) are members of lists of an organisation and no longer see them. Assign each agent to a workspace (Settings > Agents).": "{0} privé-agent(en) zijn lid van lijsten van een organisatie en zien die niet meer. Wijs elke agent toe aan een werkruimte (Instellingen > Agents).",
   "Wrong passphrase, or the encrypted backup is damaged.": "Onjuiste wachtwoordzin, of de versleutelde back-up is beschadigd.",
   "This backup is encrypted: enter its passphrase.": "Deze back-up is versleuteld: voer de wachtwoordzin in.",
   "Encryption needs a passphrase (at least 10 characters).": "Versleuteling vereist een wachtwoordzin (minstens 10 tekens).",
@@ -5784,5 +5789,6 @@
   "Team chat {0}": "Teamchat {0}",
   "Agents can only offer this; the person saves": "Agents kunnen dit alleen aanbieden; de persoon slaat op",
   "Saved from: {0}": "Opgeslagen uit: {0}",
-  "Open the message in the chat": "Bericht in de chat openen"
+  "Open the message in the chat": "Bericht in de chat openen",
+  "Copied ({0} parts)": "Gekopieerd ({0} delen)"
 }

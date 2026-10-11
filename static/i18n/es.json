@@ -922,6 +922,9 @@
   "Mark all as read": "Marcar todo como leído",
   "News are only available online.": "Las novedades solo están disponibles con conexión.",
   "Invalid data": "Datos no válidos",
+  "Row-level security is OFF: the database user bypasses it and the role kalmido_app cannot be used. Allow the database user to create roles or create the role (see SELF-HOSTING), then restart.": "La seguridad a nivel de fila está DESACTIVADA: el usuario de la base de datos la omite y no se puede usar el rol kalmido_app. Permite al usuario de la base de datos crear roles o crea el rol (ver SELF-HOSTING) y reinicia.",
+  "no permission": "sin permiso",
+  "{0} request was refused by the database's row-level security within {1} min ({2}; users: {3})": ["{0} solicitud fue rechazada por la seguridad a nivel de fila de la base de datos en {1} min ({2}; usuarios: {3})", "{0} solicitudes fueron rechazadas por la seguridad a nivel de fila de la base de datos en {1} min ({2}; usuarios: {3})"],
   "General": "General",
   "Notifications": "Notificaciones",
   "Integrations": "Integraciones",
@@ -1770,7 +1773,9 @@
   "This backup is from a version before 2.37 (SQLite). Restore it with Kalmido 2.36, then update to 2.37: the data is moved over during the update.": "Esta copia de seguridad es de una versión anterior a 2.37 (SQLite). Restáurala con Kalmido 2.36 y después actualiza a 2.37: los datos se trasladan durante la actualización.",
   "The database tools (pg_dump / pg_restore) are missing on this server.": "Faltan las herramientas de base de datos (pg_dump / pg_restore) en este servidor.",
   "Database check: data checksums are off ({0}).": "Comprobación de la base de datos: sumas de verificación desactivadas ({0}).",
-  "old (SQLite)": "antigua (SQLite)",
+  "old (SQLite), moved over when restored": "antigua (SQLite), se migra al restaurarla",
+  "Move to Postgres finished: {0} tables, {1} rows (report in the backups folder).": "Migración a Postgres terminada: {0} tablas, {1} filas (informe en la carpeta de copias de seguridad).",
+  "{0} private agent(s) are members of lists of an organisation and no longer see them. Assign each agent to a workspace (Settings > Agents).": "{0} agente(s) privado(s) son miembros de listas de una organización y ya no las ven. Asigna cada agente a un espacio de trabajo (Ajustes > Agentes).",
   "Wrong passphrase, or the encrypted backup is damaged.": "Frase de contraseña incorrecta, o la copia de seguridad cifrada está dañada.",
   "This backup is encrypted: enter its passphrase.": "Esta copia de seguridad está cifrada: introduce su frase de contraseña.",
   "Encryption needs a passphrase (at least 10 characters).": "El cifrado necesita una frase de contraseña (al menos 10 caracteres).",
@@ -5784,5 +5789,6 @@
   "Team chat {0}": "Chat de equipo {0}",
   "Agents can only offer this; the person saves": "Los agentes solo pueden ofrecerlo; guarda la persona",
   "Saved from: {0}": "Guardado desde: {0}",
-  "Open the message in the chat": "Abrir el mensaje en el chat"
+  "Open the message in the chat": "Abrir el mensaje en el chat",
+  "Copied ({0} parts)": "Copiado ({0} partes)"
 }
