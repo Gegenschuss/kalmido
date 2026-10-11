@@ -29,7 +29,11 @@ CHECKS = {
               "WHERE l.org_id IS NOT NULL AND m.grole IS NOT NULL AND m.own_role IS NULL AND " + _PERSON.format(o="l", m="m")
               + " AND EXISTS (SELECT 1 FROM group_members gm WHERE gm.user_id=m.user_id)"),
     "list_agent": ("SELECT m.list_id, m.user_id FROM list_members m JOIN lists l ON l.id=m.list_id JOIN agents a ON a.user_id=m.user_id "
-                   "WHERE COALESCE(a.org_id,0)!=COALESCE(l.org_id,0)"),
+                   "WHERE COALESCE(a.org_id,0)!=COALESCE(l.org_id,0) AND NOT (a.org_id IS NULL AND l.org_id IS NOT NULL)"),
+    # 2.37.0 (#1150, K2-3): a private agent (no workspace) in an organisation's list -- row-level security hides the list
+    # from it; reported on its own (assign the agent to a workspace), never changed
+    "list_agent_private": ("SELECT m.list_id, m.user_id FROM list_members m JOIN lists l ON l.id=m.list_id JOIN agents a "
+                           "ON a.user_id=m.user_id WHERE a.org_id IS NULL AND l.org_id IS NOT NULL"),
     "list_owner": ("SELECT l.id, l.owner_id FROM lists l JOIN users u ON u.id=l.owner_id WHERE l.org_id IS NOT NULL AND u.kind!='agent' "
                    "AND NOT EXISTS (SELECT 1 FROM org_members om WHERE om.org_id=l.org_id AND om.user_id=l.owner_id)"),
     "cal_person": ("SELECT m.cal_id, m.user_id FROM ev_cal_members m JOIN ev_cals k ON k.id=m.cal_id JOIN users u ON u.id=m.user_id "
@@ -130,6 +134,9 @@ def boundary_tick(c):
         aa_now("security", "tenant|" + sig, TENANT_ALERT, [res["n"], ", ".join(f"{k} {v}" for k, v in sorted(res["kinds"].items()))])
         rec["alerted"] = sig
         print(f"boundary check (#1036): {res['n']} memberships across the workspace boundary {json.dumps(res['kinds'])}", flush=True)
+        if res["kinds"].get("list_agent_private"):
+            print("boundary check (K2-3): private agents in lists of an organisation no longer see these lists; assign each "
+                  f"agent to a workspace (Settings > Agents): {json.dumps(res['sample']['list_agent_private'])}", flush=True)
     elif not res["n"]:
         rec["alerted"] = ""
     gset(c, "tenant_check", json.dumps(rec, separators=(",", ":")))

@@ -45,7 +45,7 @@ IN_CODE = [  # (name, pattern) in the code itself
 ONLY_PG = {"psycopg outside core/pg.py", "the driver connection c._pg outside core/pg.py"}
 # allowed outside the database layer: reading a SQLite file from before 2.37 (the move tool) -- by file. The in-app backup
 # works with pg_dump / pg_restore since 2.37 (old SQLite archives are only listed and checked there)
-ALLOW_SQLITE = {"admin/migrate_sqlite.py"}
+ALLOW_SQLITE = {"admin/migrate.py"}
 
 
 def strings(src):

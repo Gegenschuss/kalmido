@@ -21,7 +21,16 @@ client always sends it; a cross-site page cannot set it without a CORS preflight
 allowed). Session cookies are HttpOnly + SameSite=Lax.
 
 Code layout: the server lives in the package kalmido/ (one module per area, see docs/ARCHITECTURE.md); this file is the
-entry point (`python app.py`, `python app.py set-password <user>`, `python app.py import <file> [user]`)."""
+entry point (`python app.py`, `python app.py set-password <user>`, `python app.py import <file> [user]`,
+`python app.py migrate-sqlite [--check] [--source /data/tasks.db]`)."""
+import json as _json
+import os as _os
+import sys as _sys
+
+# 2.37.0 (#1150): the move from SQLite runs inside the start-up check, before anything touches the database
+# (kalmido/admin/migrate.py mig_startup) and ends the process there
+if __name__ == "__main__" and len(_sys.argv) >= 2 and _sys.argv[1] == "migrate-sqlite":
+    _os.environ["KALMIDO_MIGRATE_CLI"] = _json.dumps(_sys.argv[2:])
 import kalmido
 
 # every module's names stay reachable as app.<name> (python -c "import app; app.connect()", the test suites, WSGI servers
