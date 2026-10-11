@@ -143,7 +143,7 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
   check(d.querySelector(`#side .srow[data-list="${L}"] img.licon`)?.getAttribute('src') === '/static/icon.svg', 'sidebar: the picture instead of the dot');
   check(d.querySelector('#top h1 img.licon')?.getAttribute('src') === '/static/icon.svg', 'header: the picture before the list name');
   w.eval('openPalette()'); await sleep(150);
-  const pin = d.querySelector('.palette .picon');
+  const pin = d.querySelector('.palette .picon, .palette .pli img.licon');  // 2.38.0 (#1174): the palette uses listIconHtml
   check(pin && pin.getAttribute('src') === '/static/icon.svg', 'palette: the picture');
   w.eval('closePalette()');
   w.eval(`listModal(${L})`); await sleep(400);

@@ -50,7 +50,7 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
     check(Math.abs(hue(accents.orange.l) - hue(light.p5)) >= 15, `orange vs priority red (light): ${hue(accents.orange.l).toFixed(0)} / ${hue(light.p5).toFixed(0)}`);
   }
   // rem scale: no fixed px sizes > 2px outside @media conditions (they would not follow the font size)
-  const noMedia = css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/@media[^{]*\{/g, '').replace('calc(16px * var(--ui))', '');
+  const noMedia = css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/@media[^{]*\{/g, '').replace('calc(16px * var(--ui))', '').replace('max(1rem,16px)', '');  // 2.38.0 (#1173): the 16 px floor of form fields on touch screens keeps iOS from zooming on focus
   const bad = [...noMedia.matchAll(/(?<![\w.#-])(\d*\.?\d+)px/g)].map(m => +m[1]).filter(v => v > 2 && v < 9999);
   check(bad.length === 0, 'app.css: only rem sizes (px > 2 left: ' + bad.slice(0, 5) + ')');
   check(/html\{[^}]*font-size:calc\(16px \* var\(--ui\)\)/.test(css) && /:root\[data-fsize="xl"\]\{--ui:1\.25\}/.test(css) && /:root\[data-fsize="s"\]\{--ui:\.9\}/.test(css), 'root font size = 16px x --ui, sizes 90 / 112 / 125 %');

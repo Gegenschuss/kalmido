@@ -84,7 +84,7 @@ const CONTRAST = `(() => {
   const today = d.querySelector('#side .srow[data-go="today"]');
   check(today && today.querySelector('.n').nextElementSibling?.classList.contains('c') && today.querySelector('.c').textContent.trim() === '2', 'counter right after the label (Today 2)');
   const lrow = d.querySelector(`#side .srow[data-list="${L}"]`);
-  check(lrow && lrow.classList.contains('on') && lrow.querySelector('.sw') && /--p:\s*\d+%/.test(lrow.querySelector('.sprog')?.getAttribute('style') || '') && /done/.test(lrow.querySelector('.sprog')?.getAttribute('aria-label') || ''), 'list row: dot, on, the project\'s progress as a thin line (2.25.0, UX-07)');
+  check(lrow && lrow.classList.contains('on') && (lrow.querySelector('.sw') || lrow.querySelector('.lic')) /* 2.38.0 (#1174): the icon carries the colour, no dot */ && /--p:\s*\d+%/.test(lrow.querySelector('.sprog')?.getAttribute('style') || '') && /done/.test(lrow.querySelector('.sprog')?.getAttribute('aria-label') || ''), 'list row: dot, on, the project\'s progress as a thin line (2.25.0, UX-07)');
   const team = d.querySelector('#side .sg-team');
   check(team && /Bob/.test(team.textContent) && /DevBot/.test(team.textContent) && team.querySelector('.hdot.hs-working') && team.querySelector('.hdot.hs-offline'), 'team: people + agents with status dots');
   check(d.querySelector('#top .hms') && /Beta/.test(d.querySelector('#top .hms').textContent), 'milestone in the header');
