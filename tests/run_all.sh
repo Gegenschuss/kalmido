@@ -13,7 +13,7 @@ cd "$HERE"
 export KALMIDO_TEST_IMAGE=${KALMIDO_TEST_IMAGE:-kalmido:test}
 export KALMIDO_TEST_DATA=${KALMIDO_TEST_DATA:-$HERE/.data}
 PY=${PYTHON:-python3}
-SHARDS_DEFINED=8
+SHARDS_DEFINED=9
 SHARD=0; CUR=1
 if [[ "${1:-}" == "--shard" ]]; then
   [[ "${2:-}" =~ ^([0-9]+)/([0-9]+)$ ]] || { echo "usage: run_all.sh [--shard N/$SHARDS_DEFINED]"; exit 2; }
@@ -471,6 +471,7 @@ fresh; run p2330_c_api "$PY" p2330_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2330_c_ui node p2330_c_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2330_d_api "$PY" p2330_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2330_d_ui node p2330_d_ui.js "$KALMIDO_TEST_DATA"
+shard 9  # ---------------------------------------------------------------- shard 9 of 9 (2.37.1: shard 8 had reached the 30 min job limit)
 # 2.34.0: agents in everyday work (briefing, project status, idle tasks, time gaps, planned jobs, attachment text)
 fresh; run p2340_b_api "$PY" p2340_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2340_b_ui node p2340_b_ui.js "$KALMIDO_TEST_DATA"
