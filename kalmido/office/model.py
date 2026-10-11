@@ -38,7 +38,12 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      "prod_quotient": 3, "raw_factor": 0.25, "producing_service_id": None, "producing_rate": 600,
                      "offer_valid_days": 30, "intro_text_id": {"de": None, "en": None}, "closing_text_id": {"de": None, "en": None},
                      "rights_default": {"time_id": None, "territory_id": None, "media_id": None},
-                     "offer_number_at": "create"}  # 2.36.2 (P2): "create" | "finalize" (see ledger.OFX_NUMBER_AT_FINALIZE)
+                     "offer_number_at": "create",  # 2.36.2 (P2): "create" | "finalize" (see ledger.OFX_NUMBER_AT_FINALIZE)
+                     # 2.38.0 (#1021, F1): invoices -- number schemes per kind (defaults from the pack), payment terms, reminders,
+                     # the e-invoice format and the DATEV document inbox (one e-mail address; PDF + XML are mailed there)
+                     "invoice_scheme": "", "credit_scheme": "", "reminder_scheme": "", "payment_days": 14, "reminder_fee": 0,
+                     "reminder_deadline_days": 10, "einvoice_format": "zugferd", "datev_email": "", "datev_auto": 0,
+                     "invoice_closing_de": "", "invoice_closing_en": "", "reminder_text_de": "", "reminder_text_en": ""}
 SETTINGS_KEYS = tuple(SETTINGS_DEFAULTS)
 
 
@@ -108,6 +113,9 @@ def office_settings(c, oid):
         out["currency"] = out["currency"] or pack["currency"]
         if not out.get("offer_scheme"):
             out["offer_scheme"] = (pack.get("numbering") or {}).get("offer") or SETTINGS_DEFAULTS["offer_scheme"]
+        for k, dflt in (("invoice", "RE-{yyyy}-{seq:03}"), ("credit", "GS-{yyyy}-{seq:03}"), ("reminder", "MA-{yyyy}-{seq:03}")):  # 2.38.0
+            if not out.get(k + "_scheme"):
+                out[k + "_scheme"] = (pack.get("numbering") or {}).get(k) or dflt
     return out
 
 
@@ -183,8 +191,25 @@ def office_settings_clean(c, oid, b, cur):
             out["currency"] = v
         elif k == "fx_usd":
             out["fx_usd"] = round(_num(v, "fx_usd", 0.0001, 1000), 4)
-        elif k == "offer_scheme":
-            out["offer_scheme"] = office_scheme_clean(v)
+        elif k in ("offer_scheme", "invoice_scheme", "credit_scheme", "reminder_scheme"):
+            out[k] = office_scheme_clean(v)
+        elif k in ("payment_days", "reminder_deadline_days"):  # 2.38.0 (#1021, F1)
+            out[k] = int(_num(v, k, 0, 365))
+        elif k == "reminder_fee":
+            out[k] = round(_num(v, k, 0, 1e6), 2)
+        elif k == "einvoice_format":
+            if v not in ("zugferd", "xrechnung"):
+                raise BadInput(tr("Invalid value: {0}", k))
+            out[k] = v
+        elif k == "datev_email":
+            v = (v or "").strip() if isinstance(v, str) else ""
+            if v and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", v):
+                raise BadInput(tr("Invalid value: {0}", k))
+            out[k] = v[:200]
+        elif k == "datev_auto":
+            out[k] = 1 if v in (1, True, "1", "true") else 0
+        elif k in ("invoice_closing_de", "invoice_closing_en", "reminder_text_de", "reminder_text_en"):
+            out[k] = (v or "").strip()[:TEXT_MAX] if isinstance(v, str) else ""
         elif k == "offer_number_at":
             if v not in ("create", "finalize"):
                 raise BadInput(tr("Invalid value: {0}", k))

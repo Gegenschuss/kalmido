@@ -38,7 +38,7 @@ from .packs import office_pack
 
 # P2: does a document of this kind get its number only when it is finalised? (quotations: at creation, unless the
 # organisation chose otherwise; invoices / credit notes of a later release: always at finalising)
-OFX_NUMBER_AT_FINALIZE = {"offer": False, "invoice": True, "credit": True}
+OFX_NUMBER_AT_FINALIZE = {"offer": False, "invoice": True, "credit": True, "reminder": True}
 OFX_LOCKED = N_("This document is finalised and cannot be changed. Duplicate it to make a new version.")
 OFX_DETAIL_MAX = 60000
 Q2 = Decimal("0.01")
@@ -61,10 +61,16 @@ def ofx_locked(r):
     return bool(r is not None and "locked_at" in r.keys() and r["locked_at"])
 
 
+OFX_SENT = N_("This document was sent and cannot be changed. Duplicate it to make a new version.")
+
+
 def ofx_need_editable(r):
-    """409 with a readable reason when document row r is finalised (head, positions, number, delete)."""
+    """409 with a readable reason when document row r is finalised (head, positions, number, delete). 2.38.0: a sent
+    document (quotations too, decision of 2026-10-10) is locked the same way; a new version = duplicate."""
     if ofx_locked(r):
         raise Denied(409, tr(OFX_LOCKED))
+    if r is not None and r["status"] == "sent":
+        raise Denied(409, tr(OFX_SENT))
 
 
 def ofx_number_at_finalize(s, kind):
@@ -272,16 +278,20 @@ def ofx_logo_path(oid, name):
 def ofx_finalize(c, oid, uid, did):
     """Finalises document did of organisation oid (see the module text). 409 when it already is."""
     from .docs import _assign_number, _j, doc_items, doc_row, doc_totals
+    from .invoices import inv_before_finalize, inv_after_finalize
     r = doc_row(c, oid, did)
     ofx_need_editable(r)
     s = office_settings(c, oid)
     pack = office_pack(s["pack"]) or office_pack("DE") or {}
+    if r["kind"] != "offer":  # 2.38.0 (#1021, F1): the required fields of an invoice (400 with the list), due date
+        inv_before_finalize(c, oid, r, s, pack)
+        r = doc_row(c, oid, did)
     if not r["number"]:
         _assign_number(c, oid, did, s)
         r = doc_row(c, oid, did)
     lang = "en" if r["lang"] == "en" else "de"
     t = doc_totals(c, oid, r)
-    lines = {ln.get("id"): ln for ln in t["lines"] if ln.get("kind") == "item"}
+    lines = {ln.get("id"): ln for ln in t["lines"] if ln.get("kind") in ("item", "discount")}
     for it in doc_items(c, did, oid):
         ln = lines.get(it["id"])
         if not ln:
@@ -306,7 +316,8 @@ def ofx_finalize(c, oid, uid, did):
     tsnap = {"pack": pack.get("code") or "", "version": str(pack.get("version") or ""),
              "rates": {k: tax.get(k) for k in ("standard", "reduced", "exempt")}, "tax": tax,
              "formats": pack.get("formats") or {}, "labels": {lang: (pack.get("labels") or {}).get(lang) or {}},
-             "texts": {"valid_note": {lang: (((pack.get("texts") or {}).get("valid_note") or {}).get(lang) or "")}}}
+             # the pack's texts in the document's language (2.38.0: every plain text, the invoice words need them)
+             "texts": {k: {lang: v.get(lang) or ""} for k, v in (pack.get("texts") or {}).items() if isinstance(v, dict) and isinstance(v.get(lang) or "", str)}}
     ts = iso(now_utc())
     c.execute("UPDATE office_docs SET locked_at=?, locked_by=?, sender=?, recipient_snapshot=?, tax_snapshot=?, pack_version=?, totals=?, "
               "updated_at=? WHERE id=? AND org_id=?",
@@ -314,6 +325,8 @@ def ofx_finalize(c, oid, uid, did):
                tsnap["version"], json.dumps(t, ensure_ascii=False), ts, did, oid))
     ofx_log(c, oid, "finalize", doc_id=did, detail={"number": r["number"], "net": t.get("net"), "gross": t.get("gross"),
                                                      "pack_version": tsnap["version"], "logo_sha256": sha})
+    if r["kind"] != "offer":  # 2.38.0: status issued, a credit note settles its invoice, the stored PDF / XML (F2)
+        inv_after_finalize(c, oid, uid, doc_row(c, oid, did))
     return doc_row(c, oid, did)
 
 

@@ -1,20 +1,30 @@
 """2.36.1 (#1021, part D): the PDF of an office document (quotation), written without any PDF library.
 
 Input is the print model of office.docs (odoc_render): a plain dict with the document's texts, lines and totals in the
-document's language (DE / EN) -- see office_pdf() below for the keys. Output: the bytes of a PDF 1.4 file with real A4
+document's language (DE / EN) -- see office_pdf() below for the keys. Output: the bytes of a PDF/A-3b (PDF 1.7) file with real A4
 pages (DIN 5008 form B: address in the window area, sender line above it, key data on the right, fold marks), the
-base-14 fonts Helvetica / Helvetica-Bold in WinAnsiEncoding (umlauts, sharp s, euro sign), the company's logo as an
-image (PNG / JPEG / WebP through Pillow -> RGB + FlateDecode) and the company colour as the only accent (rules, title,
-category headings). Text wraps with the AFM width tables of the two fonts (below). Page breaks: following pages carry a
+embedded TrueType fonts Liberation Sans Regular / Bold (fonts/, SIL OFL 1.1) in WinAnsiEncoding (umlauts, sharp s,
+euro sign), the company's logo as an image (PNG / JPEG / WebP through Pillow -> RGB + FlateDecode) and the company
+colour as the only accent (rules, title, category headings). Text wraps with the width tables read from the TTF files.
+2.38.0 (#1021 P5): the file is PDF/A-3b -- PDF 1.7, XMP metadata (pdfaid part 3 / B, consistent with the Info
+dictionary), an sRGB OutputIntent with the embedded ICC profile (fonts/sRGB2014.icc), a file identifier in the
+trailer, all fonts embedded, no encryption, no actions; an invoice / credit note may carry its e-invoice XML as the
+embedded file factur-x.xml (AFRelationship Alternative, ZUGFeRD / Factur-X EN 16931 with the fx: XMP schema). Page breaks: following pages carry a
 small head (logo, title, number) and repeat the table head; "Page x of y" is written after all pages are laid out;
 a category heading never stays alone at the end of a page, text blocks and the rights block are not torn, the totals
 never stand alone on a page (the last position comes along); no carry-over lines.
 
 Nothing here reads the database: office.web / office.docs render the model and call office_pdf(model)."""
 import datetime
+import hashlib
 import io
+import logging
+import os
 import re
+import struct
 import zlib
+
+log = logging.getLogger(__name__)
 
 # ---- geometry (points; 1 mm = 2.8346 pt) ---------------------------------------------------------------------------
 MM = 72 / 25.4
@@ -56,39 +66,129 @@ PDF_LABELS = {
            "discount": "Discount", "producing": "Producing"},
 }
 
-# ---- AFM widths of Helvetica and Helvetica-Bold for WinAnsiEncoding (codes 32..255, 1/1000 em) -------------------
-_W_HELV = (
-    278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278, 278,  # 32
-    556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 278, 278, 584, 584, 584, 556,  # 48
-    1015, 667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556, 833, 722, 778,  # 64
-    667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 278, 278, 278, 469, 556,  # 80
-    333, 556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556,  # 96
-    556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 334, 260, 334, 584, 350,  # 112
-    556, 350, 222, 556, 333, 1000, 556, 556, 333, 1000, 667, 333, 1000, 350, 611, 350,  # 128
-    350, 222, 222, 333, 333, 350, 556, 1000, 333, 1000, 500, 333, 944, 350, 500, 667,  # 144
-    278, 333, 556, 556, 556, 556, 260, 556, 333, 737, 370, 556, 584, 333, 737, 333,  # 160
-    400, 584, 333, 333, 333, 556, 537, 278, 333, 333, 365, 556, 834, 834, 834, 611,  # 176
-    667, 667, 667, 667, 667, 667, 1000, 722, 667, 667, 667, 667, 278, 278, 278, 278,  # 192
-    722, 722, 778, 778, 778, 778, 778, 584, 778, 722, 722, 722, 722, 667, 667, 611,  # 208
-    556, 556, 556, 556, 556, 556, 889, 500, 556, 556, 556, 556, 278, 278, 278, 278,  # 224
-    556, 556, 556, 556, 556, 556, 556, 584, 611, 556, 556, 556, 556, 500, 556, 500,  # 240
-)
-_W_BOLD = (
-    278, 333, 474, 556, 556, 889, 722, 238, 333, 333, 389, 584, 278, 333, 278, 278,  # 32
-    556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 333, 333, 584, 584, 584, 611,  # 48
-    975, 722, 722, 722, 722, 667, 611, 778, 722, 278, 556, 722, 611, 833, 722, 778,  # 64
-    667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 333, 278, 333, 584, 556,  # 80
-    333, 556, 611, 556, 611, 556, 333, 611, 611, 278, 278, 556, 278, 889, 611, 611,  # 96
-    611, 611, 389, 556, 333, 611, 556, 778, 556, 556, 500, 389, 280, 389, 584, 350,  # 112
-    556, 350, 278, 556, 500, 1000, 556, 556, 333, 1000, 667, 333, 1000, 350, 611, 350,  # 128
-    350, 278, 278, 500, 500, 350, 556, 1000, 333, 1000, 556, 333, 944, 350, 500, 667,  # 144
-    278, 333, 556, 556, 556, 556, 280, 556, 333, 737, 370, 556, 584, 333, 737, 333,  # 160
-    400, 584, 333, 333, 333, 611, 556, 278, 333, 333, 365, 556, 834, 834, 834, 611,  # 176
-    722, 722, 722, 722, 722, 722, 1000, 722, 667, 667, 667, 667, 278, 278, 278, 278,  # 192
-    722, 722, 778, 778, 778, 778, 778, 584, 778, 722, 722, 722, 722, 667, 667, 611,  # 208
-    556, 556, 556, 556, 556, 556, 889, 556, 556, 556, 556, 556, 278, 278, 278, 278,  # 224
-    611, 611, 611, 611, 611, 611, 611, 584, 611, 611, 611, 611, 611, 556, 611, 556,  # 240
-)
+# ---- the embedded fonts (2.38.0, #1021 P5): Liberation Sans from fonts/, metrics read from the TTF tables ---------
+FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
+FONT_FILES = {False: "LiberationSans-Regular.ttf", True: "LiberationSans-Bold.ttf"}
+ICC_FILE = os.path.join(FONT_DIR, "sRGB2014.icc")
+# WinAnsiEncoding differs from cp1252 in the unassigned codes (bullet) and 0xA0 / 0xAD (space / hyphen)
+_WINANSI = {c: (bytes([c]).decode("cp1252", errors="replace") if c not in (0x7F, 0x81, 0x8D, 0x8F, 0x90, 0x9D) else "•") for c in range(32, 256)}
+_WINANSI[0xA0], _WINANSI[0xAD] = " ", "-"
+
+
+class _TTF:
+    """A TrueType font file: the tables needed for a simple PDF font (head, hhea, hmtx, cmap format 4, OS/2, post, name).
+    widths: advance widths of the WinAnsi codes 32..255 in 1/1000 em (a code without a glyph gets the .notdef width and
+    is listed in missing)."""
+
+    def __init__(self, path):
+        with open(path, "rb") as fh:
+            self.data = d = fh.read()
+        n = struct.unpack(">H", d[4:6])[0]
+        self.tables = {}
+        for k in range(n):
+            tag, _cs, off, ln = struct.unpack(">4sIII", d[12 + 16 * k:28 + 16 * k])
+            self.tables[tag.decode("latin-1")] = (off, ln)
+        head = self._t("head")
+        self.upem = struct.unpack(">H", head[18:20])[0] or 1000
+        self.bbox = [self._em(x) for x in struct.unpack(">hhhh", head[36:44])]
+        hhea = self._t("hhea")
+        self.ascent, self.descent = self._em(struct.unpack(">h", hhea[4:6])[0]), self._em(struct.unpack(">h", hhea[6:8])[0])
+        n_hm = struct.unpack(">H", hhea[34:36])[0]
+        hmtx = self._t("hmtx")
+        self.adv = [struct.unpack(">H", hmtx[4 * i:4 * i + 2])[0] for i in range(n_hm)]
+        self.cmap = self._cmap4()
+        os2 = self._t("OS/2")
+        self.cap_height = self._em(struct.unpack(">h", os2[88:90])[0]) if len(os2) >= 90 and struct.unpack(">H", os2[0:2])[0] >= 2 else self.ascent * 0.72
+        self.weight = struct.unpack(">H", os2[4:6])[0] if len(os2) >= 6 else 400
+        post = self._t("post")
+        self.italic_angle = struct.unpack(">i", post[4:8])[0] / 65536.0 if len(post) >= 8 else 0.0
+        self.fixed_pitch = bool(struct.unpack(">I", post[12:16])[0]) if len(post) >= 16 else False
+        self.ps_name = self._ps_name() or os.path.splitext(os.path.basename(path))[0]
+        self.missing = set()
+        w = []
+        for code in range(32, 256):
+            gid = self.cmap.get(ord(_WINANSI[code]), 0)
+            if not gid:
+                self.missing.add(code)
+            w.append(self._em(self.adv[gid] if gid < len(self.adv) else self.adv[-1]))
+        self.widths = tuple(w)
+
+    def _t(self, tag):
+        off, ln = self.tables.get(tag, (0, 0))
+        return self.data[off:off + ln]
+
+    def _em(self, v):
+        return v * 1000.0 / self.upem
+
+    def _cmap4(self):
+        """unicode -> glyph id from the (3,1) or (0,x) format 4 subtable."""
+        c = self._t("cmap")
+        n = struct.unpack(">H", c[2:4])[0]
+        best = None
+        for k in range(n):
+            pid, eid, off = struct.unpack(">HHI", c[4 + 8 * k:12 + 8 * k])
+            if struct.unpack(">H", c[off:off + 2])[0] != 4:
+                continue
+            if (pid, eid) == (3, 1):
+                best = off
+                break
+            if pid == 0 and best is None:
+                best = off
+        out = {}
+        if best is None:
+            return out
+        seg2 = struct.unpack(">H", c[best + 6:best + 8])[0]
+        segs = seg2 // 2
+        ends = struct.unpack(f">{segs}H", c[best + 14:best + 14 + seg2])
+        p = best + 16 + seg2
+        starts = struct.unpack(f">{segs}H", c[p:p + seg2])
+        p += seg2
+        deltas = struct.unpack(f">{segs}h", c[p:p + seg2])
+        p += seg2
+        ro_at = p
+        ros = struct.unpack(f">{segs}H", c[p:p + seg2])
+        for i in range(segs):
+            for ch in range(starts[i], min(ends[i], 0xFFFE) + 1):
+                if ros[i] == 0:
+                    gid = (ch + deltas[i]) & 0xFFFF
+                else:
+                    q = ro_at + 2 * i + ros[i] + 2 * (ch - starts[i])
+                    gid = struct.unpack(">H", c[q:q + 2])[0]
+                    if gid:
+                        gid = (gid + deltas[i]) & 0xFFFF
+                if gid:
+                    out[ch] = gid
+        return out
+
+    def _ps_name(self):
+        nm = self._t("name")
+        if len(nm) < 6:
+            return ""
+        cnt, so = struct.unpack(">HH", nm[2:6])
+        for k in range(cnt):
+            pid, eid, _lid, nid, ln, off = struct.unpack(">HHHHHH", nm[6 + 12 * k:18 + 12 * k])
+            if nid == 6:
+                raw = nm[so + off:so + off + ln]
+                try:
+                    return (raw.decode("utf-16-be") if pid in (0, 3) else raw.decode("latin-1")).strip()
+                except UnicodeDecodeError:
+                    continue
+        return ""
+
+
+_FONTS = {}
+
+
+def pdf_font(bold=False):
+    """The parsed font (cached per process); a missing file raises OSError at the first use."""
+    f = _FONTS.get(bool(bold))
+    if f is None:
+        f = _FONTS[bool(bold)] = _TTF(os.path.join(FONT_DIR, FONT_FILES[bool(bold)]))
+        if f.missing:
+            log.warning("office pdf: font %s lacks %d WinAnsi glyphs", f.ps_name, len(f.missing))
+    return f
+
+
 # characters outside WinAnsi that appear in office texts, mapped to something the fonts have
 _FALLBACK = str.maketrans({"→": "->", "←": "<-", "≤": "<=", "≥": ">=", "−": "-", " ": " ",
                            " ": " ", " ": " ", " ": " ", "‑": "-", "′": "'", "″": '"',
@@ -96,15 +196,19 @@ _FALLBACK = str.maketrans({"→": "->", "←": "<-", "≤": "<=", "≥": ">=", "
 
 
 def pdf_encode(s):
-    """str -> WinAnsi bytes (cp1252; unknown characters become '?')."""
+    """str -> WinAnsi bytes (cp1252; unknown characters become '?'; a code the font has no glyph for as well)."""
     s = str(s or "").translate(_FALLBACK)
-    return s.encode("cp1252", errors="replace")
+    b = s.encode("cp1252", errors="replace")
+    miss = pdf_font(False).missing | pdf_font(True).missing
+    if miss and any(ch in miss for ch in b):
+        b = bytes(63 if ch in miss else ch for ch in b)
+    return b
 
 
 def pdf_text_width(s, size, bold=False, spacing=0.0):
     """Width of s in points at the given size (plus the character spacing, like the Tc operator)."""
     b = pdf_encode(s)
-    tab = _W_BOLD if bold else _W_HELV
+    tab = pdf_font(bold).widths
     w = 0
     for ch in b:
         w += tab[ch - 32] if 32 <= ch < 256 else 556
@@ -193,6 +297,13 @@ class _Page:
         else:
             self.ops.append(f"{r:.3f} {g:.3f} {b:.3f} rg {x:.2f} {A4_H - y - h:.2f} {w:.2f} {h:.2f} re f")
 
+    def mark(self, word):
+        """A light diagonal word across the page (drafts), drawn first so the content stays on top."""
+        size = 120
+        w = pdf_text_width(word, size, True)
+        self.ops.insert(0, f"BT 0.88 0.89 0.91 rg /F2 {size} Tf 0.7071 0.7071 -0.7071 0.7071 {(A4_W - w * 0.7071) / 2 + 40:.2f} "
+                           f"{(A4_H - w * 0.7071) / 2 - 60:.2f} Tm <{pdf_encode(word).hex()}> Tj ET")
+
     def image(self, name, x, y, w, h):
         self.images.add(name)
         self.ops.append(f"q {w:.2f} 0 0 {h:.2f} {x:.2f} {A4_H - y - h:.2f} cm /{name} Do Q")
@@ -225,16 +336,126 @@ def pdf_image_object(raw):
         return None
 
 
-def pdf_write(pages, images, title="", author=""):
-    """Serialises pages ([_Page]) and images ({name: (w, h, data)}) into PDF 1.4 bytes."""
+def _xml_esc(s):
+    return str(s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+
+
+def _pdf_date(dt):
+    """datetime (aware) -> (PDF string D:YYYYMMDDHHmmSS+01'00', XMP ISO 8601 with offset)."""
+    off = dt.utcoffset() or datetime.timedelta(0)
+    sign = "-" if off.total_seconds() < 0 else "+"
+    mins = abs(int(off.total_seconds())) // 60
+    return (dt.strftime("D:%Y%m%d%H%M%S") + f"{sign}{mins // 60:02d}'{mins % 60:02d}'",
+            dt.strftime("%Y-%m-%dT%H:%M:%S") + f"{sign}{mins // 60:02d}:{mins % 60:02d}")
+
+
+def epdf_xmp(title, author, producer, creator, created, modified, xml_name=None, xml_profile="EN 16931", doc_type="INVOICE"):
+    """The XMP packet of a PDF/A-3b file (bytes, UTF-8, no filter); with xml_name the Factur-X / ZUGFeRD extension schema."""
+    fx = ""
+    if xml_name:
+        fx = f"""
+  <rdf:Description rdf:about="" xmlns:pdfaExtension="http://www.aiim.org/pdfa/ns/extension/" xmlns:pdfaSchema="http://www.aiim.org/pdfa/ns/schema#" xmlns:pdfaProperty="http://www.aiim.org/pdfa/ns/property#">
+   <pdfaExtension:schemas>
+    <rdf:Bag>
+     <rdf:li rdf:parseType="Resource">
+      <pdfaSchema:schema>Factur-X PDFA Extension Schema</pdfaSchema:schema>
+      <pdfaSchema:namespaceURI>urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#</pdfaSchema:namespaceURI>
+      <pdfaSchema:prefix>fx</pdfaSchema:prefix>
+      <pdfaSchema:property>
+       <rdf:Seq>
+        <rdf:li rdf:parseType="Resource">
+         <pdfaProperty:name>DocumentFileName</pdfaProperty:name>
+         <pdfaProperty:valueType>Text</pdfaProperty:valueType>
+         <pdfaProperty:category>external</pdfaProperty:category>
+         <pdfaProperty:description>name of the embedded XML invoice file</pdfaProperty:description>
+        </rdf:li>
+        <rdf:li rdf:parseType="Resource">
+         <pdfaProperty:name>DocumentType</pdfaProperty:name>
+         <pdfaProperty:valueType>Text</pdfaProperty:valueType>
+         <pdfaProperty:category>external</pdfaProperty:category>
+         <pdfaProperty:description>INVOICE</pdfaProperty:description>
+        </rdf:li>
+        <rdf:li rdf:parseType="Resource">
+         <pdfaProperty:name>Version</pdfaProperty:name>
+         <pdfaProperty:valueType>Text</pdfaProperty:valueType>
+         <pdfaProperty:category>external</pdfaProperty:category>
+         <pdfaProperty:description>The actual version of the Factur-X XML schema</pdfaProperty:description>
+        </rdf:li>
+        <rdf:li rdf:parseType="Resource">
+         <pdfaProperty:name>ConformanceLevel</pdfaProperty:name>
+         <pdfaProperty:valueType>Text</pdfaProperty:valueType>
+         <pdfaProperty:category>external</pdfaProperty:category>
+         <pdfaProperty:description>The conformance level of the embedded Factur-X data</pdfaProperty:description>
+        </rdf:li>
+       </rdf:Seq>
+      </pdfaSchema:property>
+     </rdf:li>
+    </rdf:Bag>
+   </pdfaExtension:schemas>
+  </rdf:Description>
+  <rdf:Description rdf:about="" xmlns:fx="urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#">
+   <fx:DocumentType>{_xml_esc(doc_type)}</fx:DocumentType>
+   <fx:DocumentFileName>{_xml_esc(xml_name)}</fx:DocumentFileName>
+   <fx:Version>1.0</fx:Version>
+   <fx:ConformanceLevel>{_xml_esc(xml_profile)}</fx:ConformanceLevel>
+  </rdf:Description>"""
+    xmp = f"""<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about="" xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/">
+   <pdfaid:part>3</pdfaid:part>
+   <pdfaid:conformance>B</pdfaid:conformance>
+  </rdf:Description>
+  <rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/">
+   <dc:title><rdf:Alt><rdf:li xml:lang="x-default">{_xml_esc(title)}</rdf:li></rdf:Alt></dc:title>
+   <dc:creator><rdf:Seq><rdf:li>{_xml_esc(author)}</rdf:li></rdf:Seq></dc:creator>
+  </rdf:Description>
+  <rdf:Description rdf:about="" xmlns:xmp="http://ns.adobe.com/xap/1.0/">
+   <xmp:CreatorTool>{_xml_esc(creator)}</xmp:CreatorTool>
+   <xmp:CreateDate>{created}</xmp:CreateDate>
+   <xmp:ModifyDate>{modified}</xmp:ModifyDate>
+  </rdf:Description>
+  <rdf:Description rdf:about="" xmlns:pdf="http://ns.adobe.com/pdf/1.3/">
+   <pdf:Producer>{_xml_esc(producer)}</pdf:Producer>
+  </rdf:Description>{fx}
+ </rdf:RDF>
+</x:xmpmeta>
+""" + " " * 2000 + "\n<?xpacket end=\"w\"?>"
+    return xmp.encode("utf-8")
+
+
+def pdf_write(pages, images, title="", author="", xml=None, meta=None):
+    """Serialises pages ([_Page]) and images ({name: (w, h, data)}) into PDF/A-3b bytes (PDF 1.7: embedded TrueType fonts,
+    XMP + Info, sRGB OutputIntent, trailer ID). xml: bytes of the e-invoice to embed as factur-x.xml (AFRelationship
+    Alternative, fx: XMP schema). meta: {"when": aware datetime, "producer", "creator", "xml_name", "xml_profile", "doc_type"}."""
+    meta = meta or {}
     objs = []  # list of bytes bodies; object number = index + 1
 
     def add(body):
         objs.append(body)
         return len(objs)
 
-    font1 = add(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>")
-    font2 = add(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>")
+    def pstr(s):
+        return b"(" + pdf_encode(s).replace(b"\\", b"\\\\").replace(b"(", b"\\(").replace(b")", b"\\)") + b")"
+
+    def stream(dict_entries, data, compress=True):
+        if compress:
+            data = zlib.compress(data, 6)
+            dict_entries = dict_entries + " /Filter /FlateDecode"
+        return add(f"<< {dict_entries} /Length {len(data)} >>\nstream\n".encode() + data + b"\nendstream")
+
+    # -- fonts: a simple TrueType font per face with its descriptor and the whole font program
+    font_ids = {}
+    for bold in (False, True):
+        f = pdf_font(bold)
+        ff = stream(f"/Length1 {len(f.data)}", f.data)
+        flags = 32 | (1 if f.fixed_pitch else 0) | (1 << 18 if bold else 0)
+        fd = add(f"<< /Type /FontDescriptor /FontName /{f.ps_name} /Flags {flags} /FontBBox [{' '.join(f'{v:.0f}' for v in f.bbox)}] "
+                 f"/ItalicAngle {f.italic_angle:.0f} /Ascent {f.ascent:.0f} /Descent {f.descent:.0f} /CapHeight {f.cap_height:.0f} "
+                 f"/StemV {140 if bold else 80} /FontFile2 {ff} 0 R >>".encode())
+        font_ids[bold] = add(f"<< /Type /Font /Subtype /TrueType /BaseFont /{f.ps_name} /FirstChar 32 /LastChar 255 "
+                             f"/Widths [{' '.join(f'{w:.2f}'.rstrip('0').rstrip('.') for w in f.widths)}] /Encoding /WinAnsiEncoding "
+                             f"/FontDescriptor {fd} 0 R >>".encode())
     img_ids = {}
     for name, (w, h, data) in images.items():
         img_ids[name] = add(f"<< /Type /XObject /Subtype /Image /Width {w} /Height {h} /ColorSpace /DeviceRGB "
@@ -246,19 +467,44 @@ def pdf_write(pages, images, title="", author=""):
         cid = add(f"<< /Length {len(content)} /Filter /FlateDecode >>\nstream\n".encode() + content + b"\nendstream")
         xo = " ".join(f"/{n} {img_ids[n]} 0 R" for n in sorted(p.images) if n in img_ids)
         pid = add(f"<< /Type /Page /Parent {pages_id} 0 R /MediaBox [0 0 {A4_W:.2f} {A4_H:.2f}] "
-                  f"/Resources << /Font << /F1 {font1} 0 R /F2 {font2} 0 R >> /XObject << {xo} >> >> "
-                  f"/Contents {cid} 0 R >>".encode())
+                  f"/Resources << /Font << /F1 {font_ids[False]} 0 R /F2 {font_ids[True]} 0 R >> /XObject << {xo} >> "
+                  f"/ProcSet [/PDF /Text /ImageC] >> /Contents {cid} 0 R >>".encode())
         page_ids.append(pid)
     assert len(objs) + 1 == pages_id
     add(f"<< /Type /Pages /Kids [{' '.join(f'{i} 0 R' for i in page_ids)}] /Count {len(page_ids)} >>".encode())
-    catalog = add(f"<< /Type /Catalog /Pages {pages_id} 0 R >>".encode())
 
-    def pstr(s):
-        return b"(" + pdf_encode(s).replace(b"\\", b"\\\\").replace(b"(", b"\\(").replace(b")", b"\\)") + b")"
-    info = add(b"<< /Producer (Kalmido) /Creator (Kalmido) /Title " + pstr(title) + b" /Author " + pstr(author) +
-               b" /CreationDate (D:" + datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d%H%M%S").encode() + b"Z) >>")
+    # -- PDF/A: output intent (sRGB), XMP, the embedded e-invoice
+    when = meta.get("when") or datetime.datetime.now(datetime.timezone.utc).astimezone()
+    d_pdf, d_xmp = _pdf_date(when)
+    producer = str(meta.get("producer") or "Kalmido")
+    creator = str(meta.get("creator") or "Kalmido")
+    try:
+        with open(ICC_FILE, "rb") as fh:
+            icc = fh.read()
+    except OSError:
+        icc = b""
+        log.warning("office pdf: ICC profile %s missing, no OutputIntent", ICC_FILE)
+    extra = ""
+    if icc:
+        icc_id = stream("/N 3 /Alternate /DeviceRGB", icc)
+        oi = add(f"<< /Type /OutputIntent /S /GTS_PDFA1 /OutputConditionIdentifier (sRGB) /Info (sRGB2014) "
+                 f"/RegistryName (http://www.color.org) /DestOutputProfile {icc_id} 0 R >>".encode())
+        extra += f" /OutputIntents [{oi} 0 R]"
+    xml_name = None
+    if xml:
+        xml_name = str(meta.get("xml_name") or "factur-x.xml")
+        ef = stream(f"/Type /EmbeddedFile /Subtype /application#2Fxml /Params << /ModDate ({d_pdf}) /Size {len(xml)} >>", xml)
+        fs = add(b"<< /Type /Filespec /F " + pstr(xml_name) + b" /UF " + pstr(xml_name) + b" /Desc (Factur-X / ZUGFeRD invoice) "
+                 b"/AFRelationship /Alternative /EF << /F " + f"{ef} 0 R /UF {ef} 0 R".encode() + b" >> >>")
+        extra += f" /Names << /EmbeddedFiles << /Names [" + " ".join([pstr(xml_name).decode("latin-1"), f"{fs} 0 R"]) + "] >> >> " + f"/AF [{fs} 0 R]"
+    xmp = epdf_xmp(title, author, producer, creator, d_xmp, d_xmp, xml_name=xml_name,
+                   xml_profile=meta.get("xml_profile") or "EN 16931", doc_type=meta.get("doc_type") or "INVOICE")
+    md = stream("/Type /Metadata /Subtype /XML", xmp, compress=False)
+    catalog = add(f"<< /Type /Catalog /Pages {pages_id} 0 R /Metadata {md} 0 R /MarkInfo << /Marked false >>{extra} >>".encode())
+    info = add(b"<< /Producer " + pstr(producer) + b" /Creator " + pstr(creator) + b" /Title " + pstr(title) + b" /Author " + pstr(author) +
+               b" /CreationDate (" + d_pdf.encode() + b") /ModDate (" + d_pdf.encode() + b") >>")
     out = io.BytesIO()
-    out.write(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    out.write(b"%PDF-1.7\n%\xe2\xe3\xcf\xd3\n")
     offsets = []
     for i, body in enumerate(objs, 1):
         offsets.append(out.tell())
@@ -267,7 +513,8 @@ def pdf_write(pages, images, title="", author=""):
     out.write(f"xref\n0 {len(objs) + 1}\n0000000000 65535 f \n".encode())
     for o in offsets:
         out.write(f"{o:010d} 00000 n \n".encode())
-    out.write(f"trailer\n<< /Size {len(objs) + 1} /Root {catalog} 0 R /Info {info} 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode())
+    fid = hashlib.md5(out.getvalue() + d_pdf.encode(), usedforsecurity=False).hexdigest()  # file identifier only
+    out.write(f"trailer\n<< /Size {len(objs) + 1} /Root {catalog} 0 R /Info {info} 0 R /ID [<{fid}> <{fid}>] >>\nstartxref\n{xref}\n%%EOF\n".encode())
     return out.getvalue()
 
 
@@ -313,14 +560,15 @@ def pdf_date(s, lang, fmt=None):
 
 
 # ---- the document ------------------------------------------------------------------------------------------------------
-def office_pdf(model, logo_bytes=None):
-    """The quotation PDF (bytes) from the print model of office.docs:
+def office_pdf(model, logo_bytes=None, xml=None, meta=None):
+    """The document PDF (bytes, PDF/A-3b) from the print model of office.docs:
     {kind, lang, currency, number, date, valid_until, title, project_title, project_ref, client (name, optional),
      company {name, lines[], contact_lines[], register_lines[], bank_lines[], logo_path, color}, recipient {name, lines[]},
      intro, lines [{kind: heading|item|text|producing|raw|discount, ...}], totals {net, tax_lines[{pct, base, amount}],
      gross, net_incl_raw, net_excl_raw, vat_note}, rights {title, rows[[label, text]], note}, closing, signature,
      fields [{name, value}], labels {...}, formats {...}}.
-    logo_bytes: the logo file (else company.logo_path is read)."""
+    logo_bytes: the logo file (else company.logo_path is read). xml / meta (2.38.0): the e-invoice XML to embed and the
+    writer's metadata, see pdf_write. model["draft_mark"]: a word printed as a light diagonal mark on every page (drafts)."""
     m = model or {}
     lang = "en" if str(m.get("lang") or "de").lower().startswith("en") else "de"
     L = dict(PDF_LABELS[lang])
@@ -439,6 +687,10 @@ def office_pdf(model, logo_bytes=None):
     addr_lines = [str(x) for x in (rc.get("lines") or []) if str(x).strip()]
     if rc.get("name") and (not addr_lines or addr_lines[0].strip() != str(rc["name"]).strip()):
         addr_lines.insert(0, str(rc["name"]))
+    if rc.get("street") and not any(str(rc["street"]).strip() in ln for ln in addr_lines):  # 2.38.0: billing fields without free lines
+        addr_lines += [str(x) for x in (rc["street"], " ".join(str(y) for y in (rc.get("zip"), rc.get("city")) if y)) if str(x).strip()]
+        if rc.get("country") and str(rc["country"]).strip().upper() != str((m.get("sender_fields") or {}).get("country") or "DE").upper():
+            addr_lines.append(str(rc["country"]))
 
     def draw_head(p, y):
         sender = str(co.get("sender_line") or "") or " · ".join(dict.fromkeys(str(x) for x in [co.get("name") or ""] + list(co.get("lines") or []) if str(x).strip()))
@@ -555,6 +807,32 @@ def office_pdf(model, logo_bytes=None):
             block(h, draw_row, table=True)
             have_table = True
             last_item_idx = len(blocks) - 1
+    # 2.38.0 (#1021): a payment reminder lists the open invoices (number, date, due, open amount) instead of positions
+    rem = m.get("reminder") if isinstance(m.get("reminder"), dict) else None
+    if rem and isinstance(rem.get("rows"), list) and rem["rows"]:
+        rcols = [str(x) for x in (rem.get("columns") or [])][:4]
+        while len(rcols) < 4:
+            rcols.append("")
+        c_r4 = 86
+        c_r1 = PDF_CW - 3 * c_r4
+        xs = [PDF_L, PDF_L + c_r1, PDF_L + c_r1 + c_r4, PDF_L + c_r1 + 2 * c_r4]
+
+        def draw_rem_head(p, y):
+            for j, (x, lab) in enumerate(zip(xs, rcols)):
+                p.text(x + 3, y + 4, lab.upper(), 7.4, True, C_INK2, align="l" if j == 0 else "r", width=(c_r1 if j == 0 else c_r4) - 6, spacing=0.6)
+            p.line(PDF_L, y + 19, PDF_L + PDF_CW, y + 19, 1.1, C_INK)
+        block(20, draw_rem_head, keep_next=True)
+        for rr in rem["rows"]:
+            if not isinstance(rr, dict):
+                continue
+            cells = [str(rr.get("number") or ""), str(rr.get("date_text") or ""), str(rr.get("due_text") or ""), str(rr.get("open_text") or money(rr.get("open") or 0))]
+
+            def draw_rem_row(p, y, cells=cells):
+                for j, (x, v) in enumerate(zip(xs, cells)):
+                    p.text(x + 3, y + 4, v, body, align="l" if j == 0 else "r", width=(c_r1 if j == 0 else c_r4) - 6)
+                p.line(PDF_L, y + 8 + lh - 0.5, PDF_L + PDF_CW, y + 8 + lh - 0.5, 0.5, C_RULE2)
+            block(8 + lh, draw_rem_row)
+        last_item_idx = len(blocks) - 1
     if not have_table:
         thead_h = 0
 
@@ -564,9 +842,11 @@ def office_pdf(model, logo_bytes=None):
     raw_inc = next((x for x in lines if x.get("kind") == "raw" and not x.get("optional")), None)
     show_tax = tot.get("show_tax_lines")
     if isinstance(tot.get("rows"), list) and tot["rows"]:  # the print model brings the rows ready-made (first = net total)
-        rows = [(str(r[0]), str(r[1]), i == 0) for i, r in enumerate(tot["rows"]) if isinstance(r, (list, tuple)) and len(r) >= 2]
-        if show_tax is None:
-            show_tax = bool(tot.get("tax_lines"))
+        given = [r for r in tot["rows"] if isinstance(r, (list, tuple)) and len(r) >= 2]
+        # 2.38.0: an invoice's rows already end with the tax lines and the grand total (show_tax_lines true) -> last row bold
+        rows = [(str(r[0]), str(r[1]), i == 0 or ((bool(show_tax) or (m.get("kind") or "offer") != "offer") and len(given) > 1 and i == len(given) - 1))
+                for i, r in enumerate(given)]
+        show_tax = False
     else:
         rows = [(L["net"], tot.get("net_text") or money(tot.get("net") or 0), True)]
         if raw_inc and tot.get("net_excl_raw") not in (None, ""):
@@ -581,7 +861,9 @@ def office_pdf(model, logo_bytes=None):
             rows.append((str(lab), money(tl.get("amount") or 0), False))
         if tot.get("gross") not in (None, ""):
             rows.append((L["gross"], money(tot.get("gross")), True))
-    notes = [str(x) for x in (tot.get("vat_note"), m.get("fx_note"), m.get("valid_note")) if x and str(x).strip()]
+    notes = [str(x) for x in (tot.get("vat_note"), m.get("vat_note_text"), tot.get("fx_line") or m.get("fx_note"), m.get("valid_note"))
+             if x and str(x).strip()]
+    notes = list(dict.fromkeys(notes))
     note = "\n".join(notes)
     tot_w = 190
     left_w = PDF_CW - tot_w - 20
@@ -607,6 +889,26 @@ def office_pdf(model, logo_bytes=None):
             p.text(PDF_L, ny, s, 8.4, False, C_INK2)
             ny += 8.4 * 1.42
     block(sum_h, draw_sum, keep_prev=last_item_idx is not None)
+
+    # -- 2.38.0 (#1021): payment information of an invoice (due text + bank line) right below the totals
+    pay = m.get("payment") if isinstance(m.get("payment"), dict) else None
+    if pay and (pay.get("text") or pay.get("iban")):
+        iban = str(pay.get("iban") or "").replace(" ", "")
+        bank = " · ".join(x for x in (str(pay.get("bank_name") or ""), ("IBAN " + " ".join(iban[i:i + 4] for i in range(0, len(iban), 4))) if iban else "",
+                                     ("BIC " + str(pay["bic"])) if pay.get("bic") else "") if x)
+        pt_lines = pdf_wrap(str(pay.get("text") or ""), body, PDF_CW) if pay.get("text") else []
+        pb_lines = pdf_wrap(bank, 8.4, PDF_CW) if bank else []
+        pay_h = 6 + len(pt_lines) * lh + (len(pb_lines) * 8.4 * 1.42 + 2 if pb_lines else 0)
+
+        def draw_pay(p, y, pt_lines=pt_lines, pb_lines=pb_lines):
+            yy = y + 4
+            for t_ in pt_lines:
+                p.text(PDF_L, yy, t_, body)
+                yy += lh
+            for t_ in pb_lines:
+                p.text(PDF_L, yy, t_, 8.4, False, C_INK2)
+                yy += 8.4 * 1.42
+        block(pay_h, draw_pay, keep_prev=True)
 
     # -- the raw data option (own dashed box below the totals)
     if raw_opt:
@@ -719,4 +1021,7 @@ def office_pdf(model, logo_bytes=None):
         draw_footer(p, n, total)
     if title_at:  # "Page 1 of n" next to the title, known only now
         title_at["page"].text(PDF_L + PDF_CW, title_at["y"] + 12, L["page"].format(1, total), 8.6, False, C_INK2, align="r")
-    return pdf_write(pages, images, title=f"{title} {number}".strip(), author=co.get("name") or "")
+    if str(m.get("draft_mark") or "").strip():
+        for p in pages:
+            p.mark(str(m["draft_mark"]).strip())
+    return pdf_write(pages, images, title=f"{title} {number}".strip(), author=co.get("name") or "", xml=xml, meta=meta)

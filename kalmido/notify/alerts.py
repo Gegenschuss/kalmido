@@ -31,7 +31,7 @@ from ..notify.push import (
 # (aa_now: one alert; aa_count: counted per window and summed up; aa_fail / aa_ok: an integration that keeps
 # failing) and the watchdog sends it (aa_tick): each kind can be switched off, identical alerts (same kind +
 # key) wait out a cooldown, at most N go out per hour, or everything is collected into one daily summary.
-# Alerts only carry counts, ids, usernames, device labels, IPs and error classes -- never task titles,
+# Alerts only carry counts, ids, usernames, device labels, IPs (2.38.0: masked, fx2_mask_ip) and error classes -- never task titles,
 # comments, list names or other content.
 def _env_int(name, dflt, lo=1):
     try:
@@ -105,9 +105,29 @@ def aa_now(kind, key, text, args=(), n=None, click=None):
         pass
 
 
+AA_IP_KEYS = ("logins", "api", "drop", "ics", "publink")  # security counters whose items are client addresses
+
+
+def fx2_mask_ip(ip):
+    """2.38.0 (#1155): an address as alerts show it: IPv4 without its last octet (203.0.113.x), IPv6 only its first 48 bits
+    (2001:db8:1::/48). The logs in the database keep the full address; anything else comes back unchanged."""
+    import ipaddress
+    try:
+        a = ipaddress.ip_address(str(ip).strip())
+    except ValueError:
+        return ip
+    if a.version == 6 and a.ipv4_mapped:
+        a = a.ipv4_mapped
+    if a.version == 4:
+        return str(a).rsplit(".", 1)[0] + ".x"
+    return f"{ipaddress.ip_network(f'{a}/48', strict=False).network_address}/48"
+
+
 def aa_count(kind, key, item=None, **extra):
     """One event of (kind, key) in the current window; item (an id, a user, an IP) and the extra values are
     tallied and listed in the summary."""
+    if kind == "security" and key in AA_IP_KEYS and item is not None:
+        item = fx2_mask_ip(item)  # 2.38.0 (#1155)
     try:
         with _AA_LOCK:
             b = _AA["b"].get((kind, key))

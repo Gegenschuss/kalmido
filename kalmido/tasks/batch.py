@@ -103,7 +103,8 @@ def task_batch():
       delete:     data.guard = {id: time}: not moved to the trash if someone else changed it after that time
                   (conflict "changed")
       undo:       a completion / reopen that changed meanwhile is reported as a conflict too
-    The answer carries conflicts [{id, title, field, server, mine}] and the server time (now)."""
+    The answer carries conflicts [{id, title, field, server, mine}], skipped [ids] (2.38.0, #1132: locked tasks that kept
+    their values; the others changed) and the server time (now)."""
     from ..collab.comments import task_event
     from ..personal.timetrack import BadInput
     from ..tasks.dependencies import completed_ids, unblock_events
@@ -118,6 +119,7 @@ def task_batch():
         return err(tr("Invalid data"))
     ts = iso(now_utc())
     errors, done, undo, finished, conflicts = [], 0, {}, [], []
+    skipped, lock_msg = [], tr("This task is locked. Unlock it to change it.")  # 2.38.0 (#1132): locked tasks are skipped, the rest changes
     per = data.get("items") if isinstance(data.get("items"), dict) else {}  # patch_each / undo: per task id
     expect = data.get("expect") if isinstance(data.get("expect"), dict) else {}
     guard = {}
@@ -142,6 +144,8 @@ def task_batch():
                 e = apply_update(c, tid, data, lock=True)
                 if e:
                     errors.append(e)
+                    if e == lock_msg:
+                        skipped.append(tid)
                     continue
             elif action == "patch_each":  # undo / redo: every task to its own values
                 if str(tid) not in per or not isinstance(per[str(tid)], dict):
@@ -152,6 +156,8 @@ def task_batch():
                     conflict(tid, x["field"], x["server"], x["mine"], title)
                 if e:
                     errors.append(e)
+                    if e == lock_msg:
+                        skipped.append(tid)
                     continue
             elif action == "complete":
                 st = int(data.get("status", 2))
@@ -203,7 +209,8 @@ def task_batch():
     unblock_events(c, finished)
     bump(c)
     c.commit()
-    return jsonify(ok=True, count=done, errors=list(dict.fromkeys(errors)), undo=undo, conflicts=conflicts, now=iso_ms(now_utc()))
+    return jsonify(ok=True, count=done, errors=list(dict.fromkeys(errors)), undo=undo, conflicts=conflicts, skipped=skipped,
+                   now=iso_ms(now_utc()))
 
 
 @app.get("/api/occurrences")

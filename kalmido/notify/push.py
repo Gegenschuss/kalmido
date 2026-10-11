@@ -478,6 +478,24 @@ def _wd_section(c, name, fn, *a):
         _wd_fail(c, "section", name, e)
 
 
+# 2.38.0 (#1155): the office log keeps every write for good (GoBD); reads (opening, the print view, the PDF) go after
+# FX2_LOG_READ_DAYS days. Once after the start, then at most every six hours.
+FX2_LOG_READ_DAYS = 90
+FX2_LOG_READS = ("open", "render", "pdf", "xml")
+FX2_PRUNE = {"at": 0.0}
+
+
+def fx2_office_log_prune(c, force=False):
+    if not force and time.time() - FX2_PRUNE["at"] < 6 * 3600:
+        return 0
+    FX2_PRUNE["at"] = time.time()
+    with system_ctx(c):  # every organisation's log (row-level security)
+        n = c.execute(f"DELETE FROM office_doc_log WHERE action IN ({','.join('?' * len(FX2_LOG_READS))}) AND at<?",
+                      (*FX2_LOG_READS, iso(now_utc() - timedelta(days=FX2_LOG_READ_DAYS)))).rowcount
+    c.commit()
+    return n
+
+
 def watchdog_tick(c):
     from ..notify.alerts import aa_tick
     from ..tasks.dayplan import _wd_review
@@ -501,6 +519,7 @@ def watchdog_tick(c):
     _wd_section(c, "collab pushes", task_push_tick, users, S, LG)
     _wd_section(c, "dismiss pushes", push_dismiss_tick)
     _wd_section(c, "news cleanup", news_cleanup)
+    _wd_section(c, "office log prune", fx2_office_log_prune)  # 2.38.0 (#1155)
     _wd_section(c, "usage cleanup", usage_cleanup)  # 2.1.1 (#326)
     _wd_section(c, "audit cleanup", audit_cleanup)  # 2.2.1 (#358)
     _wd_section(c, "proposal cleanup", prop_cleanup)  # 2.3.0

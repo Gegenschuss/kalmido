@@ -118,8 +118,10 @@ ORDER = (
     "office.calc",  # 2.36.1 (#1021): the quotation calculator (C, no imports)
     "office.docs",  # 2.36.1 (#1021): quotations (C)
     "office.pdf",  # 2.36.1 (#1021): the PDF writer (D, no kalmido imports)
+    "office.einvoice",  # 2.38.0 (#1021 P5, F2): e-invoice XML (CII EN 16931 / XRechnung) from the snapshot, used by office.pdfweb
     "office.pdfweb",  # 2.36.1 (#1021): quotation PDF + company logo routes (D; the writer office.pdf has no routes)
     "office.ledger",  # 2.36.2 (#1021, #1142, E): finalising, structured company data, office log
+    "office.invoices",  # 2.38.0 (#1021, F1): invoices, credit notes, reminders, payments, sending, DATEV inbox
     "team.approvals",
     "team.forms",
     "team.v1",

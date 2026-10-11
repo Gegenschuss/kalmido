@@ -356,6 +356,9 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             key = {"evinvite": "event_id", "evshare": "cal_id", "abshare": "book_id"}[kind]
             if not c.execute(q, (dd.get(key), uid)).fetchone():
                 continue
+        elif kind == "unassign" and r["task_id"] is None:  # 2.38.0 (#1155): out of sight: only the list (while I see it)
+            if not sees(r["list_id"]):
+                continue
         elif kind != "unshare":
             if r["t_title"] is None or r["t_del"] or not sees(r["t_list"]) or not sees_task(r["task_id"], True):
                 continue

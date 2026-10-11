@@ -490,14 +490,14 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
   .pstats{grid-template-columns:repeat(2,1fr)}
   .hstats{grid-template-columns:repeat(2,1fr)}
   .ghead .gact{opacity:1}
-  input,select,textarea{font-size:1rem}  /* no iOS zoom on focus */
+  input,select,textarea{font-size:max(1rem,16px)}  /* no iOS zoom on focus (2.38.0 #1173: also with the small text size) */
 }
 @media (hover:none){.trow:hover{background:var(--bg)}.kcards .trow:hover{background:var(--bg)}}
 
 
 /* ================= v2: pin, depth, markdown, multi-select, filters, week, timeline ================= */
-.trow{-webkit-touch-callout:none;user-select:none}
-.trow .ttl{user-select:text}
+.trow{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.trow .ttl{-webkit-user-select:text;user-select:text}
 .trow.d2{margin-left:3.5rem}
 .trow.msel{background:color-mix(in srgb,var(--accent) 12%,var(--bg))}
 .trow.msel .chk{border-color:var(--accent)}
@@ -5844,3 +5844,60 @@ button.chmode .pmlong::after{content:"\a0\25BE";font-size:.75em}
 .lacts{min-width:0;max-width:100%;flex-wrap:wrap}
 /* 2.37.0 (#1165): the hidden field "Copy" uses without navigator.clipboard (kept in the viewport, so no page jump) */
 .cliptmp{position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;border:0;padding:0}
+/* 2.38.0 (#1174): a list's colour tints its whole icon (listIconHtml), no extra dot; emoji / picture on a tinted tile (18 %);
+   light themes darken the colour a little so the icon keeps about 3:1 against the light background */
+.lic svg.i .d{fill:currentColor}
+.lic.lcol svg.i,#side .lic.lcol svg.i{color:var(--lc)}
+:root[data-theme="light"] .lic.lcol svg.i,:root[data-theme="light"] #side .lic.lcol svg.i{color:var(--lcl,var(--lc))}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"] .lic.lcol svg.i,:root[data-theme="auto"] #side .lic.lcol svg.i{color:var(--lcl,var(--lc))} }
+.lic.lict{width:1.125rem;height:1.125rem;border-radius:.3125rem}
+.lic.lict.lcol{background:color-mix(in srgb,var(--lc) 18%,transparent)}
+.lic.lict .licon{width:100%;height:100%;margin:0;border-radius:inherit}
+.lic.lict.lcol .licon{width:78%;height:78%;border-radius:.1875rem}
+.lic.lemo{font-size:.875rem;line-height:1}
+.lic.lemo.lcol{font-size:.75rem}
+#side .sic .lic.lict .licon{width:100%;height:100%}
+#side .sic .lic.lict.lcol .licon{width:78%;height:78%}
+#side .srow.on .lic:not(.lcol) svg.i{color:var(--text)}
+#top h1 .lic.h.lict{width:1.5rem;height:1.5rem;border-radius:.375rem}
+#top h1 .lic.lemo.h{font-size:1rem}
+/* 2.38.0 (#1177): the head of a menu / choice sheet on a phone: title + a 44 px X (sticky while the sheet scrolls) */
+.tch-sh{display:flex;align-items:center;gap:.5rem;position:sticky;top:-.75rem;z-index:3;background:var(--bg2);margin:-.75rem -.75rem .25rem;padding:.25rem .25rem .25rem 1rem;border-bottom:1px solid var(--line);border-radius:.875rem .875rem 0 0}
+.tch-sht{flex:1;min-width:0;font-weight:600;font-size:var(--fs-b);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tch-sht.sshead{padding:0;font-weight:500}
+.tch-shx{flex:none;width:2.75rem;height:2.75rem}
+#pop:not(.sheet) .tch-sh{display:none}
+/* 2.38.0 (#1177): the list picker: folders are headings, their lists indented (a subfolder one step deeper) */
+.menu-list .tch-fd .mgh{text-transform:none;letter-spacing:0;font-size:var(--fs-s)}
+.menu-list .tch-fd button{padding-left:1.5rem}
+.menu-list .tch-fd2 .mgh{padding-left:1.5rem}
+.menu-list .tch-fd2 button{padding-left:2.5rem}
+.menu-list .mgrp.tch-fd2:not(:first-child){border-top:0;margin-top:0;padding-top:0}
+/* 2.38.0 (#1178 / #1155): touch screens: a long press on a task row (its title too) or in the sidebar is the app's gesture
+   (select, drag, menu), never a text selection with the system's Copy bar; copying a title stays in the task's panel */
+@media (hover: none), (pointer: coarse){
+  .trow,.trow .ttl,#side{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  #side input,#side textarea{-webkit-user-select:text;user-select:text}
+}
+/* 2.38.0 (#1173): the installed app does not zoom (pinch, double tap); lifted while a picture / file view / the timeline is open */
+html.nozoom,html.nozoom body{touch-action:pan-x pan-y}
+/* 2.38.0 (#1155): touch targets on phones: "Duplicate" on a finalised offer, the "Calendars" line in Plan my day (44 px);
+   "Finalise" keeps its label next to the lock on a narrow screen (it was a bare icon) */
+@media (max-width:899px), (pointer:coarse){
+  .ofdlocked .btn{min-height:2.75rem}
+  .cvxdp summary{min-height:2.75rem}
+}
+@media (max-width:599px){ .ofdhead .ofdfin span{display:inline} }
+/* 2.38.0 (#1021, F1): invoices, credit notes, reminders in the documents tab (kind chips, state tags, payments, dialogs) */
+.ofdkinds{margin:0 0 .5rem}
+.rotag.st-issued{color:var(--muted)} .rotag.st-paid{color:var(--ok,#2a8a4a)} .rotag.st-partial{color:var(--accent)} .rotag.st-overdue{color:var(--danger)} .rotag.st-cancelled{color:var(--muted);text-decoration:line-through}
+.ofdstat.st-overdue{color:var(--danger)}
+.ofdpaysum{display:flex;gap:1rem;flex-wrap:wrap;justify-content:flex-end;margin:.5rem 0;font-variant-numeric:tabular-nums}
+.ofdpay .ib,.ofdref .ofdlt{margin-left:auto}
+.ofdpick{list-style:none;margin:0 0 .75rem;padding:0;max-height:40vh;overflow:auto;display:flex;flex-direction:column;gap:.25rem}
+.ofdpick .chkl{display:flex;align-items:flex-start;gap:.5rem;min-height:2.75rem;padding:.25rem 0}
+.ofdpick .ofcn{display:flex;flex-direction:column}
+.ofddlg .row{display:flex;flex-direction:column;gap:.25rem;margin:0 0 .5rem}
+.ofddlg textarea,.ofddlg input:not([type=checkbox]),.ofddlg select{width:100%;box-sizing:border-box}
+.ofdtotals .tr-open dd{color:var(--danger);font-weight:600}
+.ofddisc .ofdnums{margin-left:auto}

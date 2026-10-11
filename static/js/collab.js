@@ -191,7 +191,7 @@ function newsText(it, U) {
       return it.count > 1 ? trn('{1} left {0} comments', '{1} left {0} comments', it.count, (it.actors || [it.actor_id]).map(a => `<b>${esc(uname(a, U))}</b>`).join(', ')) : tr('{0} commented', who);
     case 'assign': return d.group ? tr('{0} assigned a task to your group {1}', who, q(d.group)) : tr('{0} assigned a task to you', who);
     case 'take': return tr('{0} took a task of your group {1}', who, q(d.group || ''));  // 2.10.0 (#441)
-    case 'unassign': return tr('{0} removed you as assignee', who);
+    case 'unassign': return !it.task_id && it.list_id ? tr('{0} removed you as assignee of a task in {1}', who, q(newsListName(it))) : tr('{0} removed you as assignee', who);  // 2.38.0 (#1155): out of sight
     case 'complete': return tr('{0} completed a task', who);
     case 'share': return d.org ? (d.role === 'admin' ? tr('{0} added you to the organisation {1} as an admin', who, q(d.name || '')) : tr('{0} added you to the organisation {1}', who, q(d.name || '')))  // 2.28.0 (#935)
       : d.role === 'view' ? tr('{0} shared the list {1} with you (view only)', who, q(newsListName(it)))

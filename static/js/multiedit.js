@@ -97,9 +97,12 @@ async function meApply(k, fn, lab) {
   const ts = meTasks(), f = meFields(ts).find(x => x.k === k), may = ts.filter(t => (f?.perm || canEdit)(t));
   const items = {};
   for (const t of may) { const d = fn(t); if (d) items[t.id] = d; }
+  // 2.38.0 (#1132): locked tasks keep their locked fields and are skipped, the others change (like the selection bar)
+  const lk = Object.keys(items).filter(i => tlkHits(S.tasks.get(+i), items[i]));
+  for (const i of lk) delete items[i];
   const ids = Object.keys(items).map(Number);
   ME.chg.add(k);
-  if (!ids.length) { meRender(); return; }
+  if (!ids.length) { if (lk.length) tlkToast(S.tasks.get(+lk[0])); meRender(); return; }
   const one = new Set(Object.values(items).map(x => JSON.stringify(x))).size === 1;
   const snaps = ids.flatMap(withKids);
   let j;
@@ -109,7 +112,7 @@ async function meApply(k, fn, lab) {
   if (j?.errors?.length && !j.count) return;
   const pairs = snaps.filter(b => ids.includes(b.id)).map(b => [b, snapTask(S.tasks.get(b.id))]);
   const e = histFields(trn('{1}: {0} task changed', '{1}: {0} tasks changed', ids.length, lab), pairs, {res: j, fields: [...UNDO_FIELDS, 'tags', 'ltags', 'fields']});
-  const msg = trn('{0} task changed', '{0} tasks changed', ids.length);
+  const msg = [trn('{0} task changed', '{0} tasks changed', ids.length), lk.length ? trn('{0} locked task skipped', '{0} locked tasks skipped', lk.length) : ''].filter(Boolean).join(' · ');
   if (e) offerUndo(msg, e); else toast(msg);
 }
 // tags: add to all / remove from all. A list tag of a task's list goes into its list tags, any other name is a personal tag

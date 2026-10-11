@@ -139,11 +139,13 @@ const mdLink = (url, label) => {
   const own = mdOwn(url), tm = own && /^#t\/(\d{1,9})$/.exec(own.hash);
   return own ? `<a href="${esc(own.hash)}"${tm ? ` data-tref="${tm[1]}"` : ''}>${label}</a>` : `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
 };
-function mdFmt(t) {  // escaped text only (no attributes are produced here)
+function mdFmt(t) {  // escaped text only (no attribute takes anything from the text)
   return esc(t)
     .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
     .replace(/(^|[^*\w])\*([^*\s][^*]*?)\*(?!\w)/g, '$1<i>$2</i>')
-    .replace(/~~([^~]+)~~/g, '<s>$1</s>');
+    .replace(/~~([^~]+)~~/g, '<s>$1</s>')
+    // 2.38.0 (#1171): the part mark of a split answer, "_(Part 2/2)_" (any word), in italics; other underscores stay as they are
+    .replace(/(^|\s)_\(([^()\s_]+ \d{1,3}\/\d{1,3})\)_(?=\s|$)/g, '$1<i class="mdpart">($2)</i>');
 }
 // 2.18.0 review (R6): backslash escapes as in standard Markdown ("\*" = a literal *, e.g. in error-report tickets): the
 // escaped character becomes a private-use placeholder before any rule runs and is put back (escaped) at the end; inside

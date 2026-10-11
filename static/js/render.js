@@ -87,7 +87,7 @@ function tabItem(id) {
   if (kind === 'l') {
     const l = listById(+v); if (!l || l.is_inbox) return null;
     const em = leadEmoji(l.name), name = sbiMode() !== 'emoji' ? lname(l) : em ? l.name.slice(em.length).trim() : l.name;
-    return {id, go: 'l/' + v, icon: l.icon ? `<span class="temoji">${licon(l, 'licon t')}</span>` : sbiMode() !== 'emoji' ? `<span class="temoji">${licMark(l, '', true)}</span>` : em ? `<span class="temoji">${em}</span>` : `<span class="tsw" style="${cssColor(l.color) ? 'background:' + cssColor(l.color) : ''}"></span>`, label: name, key: 'l:' + v};
+    return {id, go: 'l/' + v, icon: `<span class="temoji">${listIconHtml(l, {emoji: true})}</span>`, label: name, key: 'l:' + v};  // 2.38.0 (#1174)
   }
   if (kind === 'f') { const f = S.filters.find(x => x.id === +v); return f ? {id, go: 'f/' + v, icon: ic('filter', 'l'), label: f.name, key: 'f:' + v} : null; }
   if (kind === 'tag' && v) return {id, go: 'tag/' + encodeURIComponent(v), icon: ic('tag', 'l'), label: v, key: 'tag:' + v};
@@ -221,12 +221,31 @@ function licName(l) {
   const nm = listName(l?.name), em = l && !l.icon && sbiMode() !== 'emoji' ? leadEmoji(l.name) : '';
   return em ? nm.slice(em.length).trim() || nm : nm;
 }
-function licMark(l, cls = '', full = false) {  // full: a list without an emoji gets its round dot too (header, archive, menus)
+function licMark(l, cls = '', full = false) {  // full: a list without an emoji gets its icon too (header, archive, menus)
   if (!l || l.is_inbox || l.icon || sbiMode() === 'emoji') return '';
-  const em = leadEmoji(l.name), lk = em && sbiMode() === 'line' ? sbiIconFor(em) : '', col = cssColor(l.color);
+  return listIconHtml(l, {cls, full});
+}
+// 2.38.0 (#1174): ONE way to draw a list's icon everywhere (sidebar, header, menus, search, archive, agents): the line icon
+// itself takes the list colour (no extra dot); a list without a matching icon gets the plain list icon; an emoji or a picture
+// cannot be recoloured and sits on a lightly tinted tile instead; no colour = grey as before; the "Dot" setting keeps its dot.
+// opts: cls (extra class), full (also lists without an emoji, default true), emoji (show the name's emoji as a tile - only where
+// the name is shown without it), pic (the list's own picture, default true). '' for none (the caller falls back).
+function licDim(hex) {  // the list colour 40 % towards the light theme's text colour: about 3:1 on a light background
+  const h = hex.slice(1), x = h.length < 6 ? [...h.slice(0, 3)].map(c => c + c) : [h.slice(0, 2), h.slice(2, 4), h.slice(4, 6)];
+  return '#' + x.map((v, i) => Math.round(parseInt(v, 16) * .6 + [19, 20, 24][i] * .4).toString(16).padStart(2, '0')).join('');
+}
+function listIconHtml(l, opts = {}) {
+  const {cls = '', full = true, emoji = false, pic = true} = opts;
+  if (!l || l.is_inbox) return '';
+  const sm = sbiMode(), col = cssColor(l.color), st = col ? ` style="--lc:${col};--lcl:${licDim(col)}"` : '', cc = col ? ' lcol' : '';
+  if (l.icon) return pic && sm !== 'dot' ? `<span class="lic lict${cc} ${cls}" aria-hidden="true"${st}>${licon(l, 'licon')}</span>` : '';
+  const em = leadEmoji(l.name);
+  if (sm === 'emoji') return em ? (emoji ? `<span class="lic lict lemo${cc} ${cls}" aria-hidden="true"${st}>${esc(em)}</span>` : '')
+    : full ? `<span class="lic${cc} ${cls}" aria-hidden="true"${st}>${ic('list')}</span>` : '';
   if (!em && !full) return '';
-  return lk ? `<span class="lic ${cls}" aria-hidden="true" style="--dot:${col || 'var(--faint)'}">${ic(lk)}</span>`
-    : `<span class="lic ${cls}" aria-hidden="true"><span class="licd" style="${col ? 'background:' + col : ''}"></span></span>`;
+  const lk = em && sm === 'line' ? sbiIconFor(em) : '';
+  if (sm === 'dot') return `<span class="lic ${cls}" aria-hidden="true"><span class="licd" style="${col ? 'background:' + col : ''}"></span></span>`;
+  return `<span class="lic${cc} ${cls}" aria-hidden="true"${st}>${ic(lk || 'list')}</span>`;
 }
 // 2.36.2 (#1139): an agent gets a small robot in a calm blue (--bot) wherever it writes or sends; people get no symbol
 const licBot = () => ic('bot', 's lbot');
@@ -252,9 +271,9 @@ function renderSide() {
     // 2.23.0 (#794): ONE fixed icon column for a picture, an emoji (taken from the name) or the dot, so the names line up
     // 2.36.0 (#1117): what the column shows follows Settings > Appearance > Sidebar: a grey line icon for the name's emoji with its
     // dot in the list colour (default), the emoji itself, or only a round dot; a list's own picture stays (not with "Dot")
-    const em = !l.icon && leadEmoji(l.name), sm = sbiMode(), col = cssColor(l.color);
-    const lk = sm === 'line' && em ? sbiIconFor(em) : '', pic = l.icon && sm !== 'dot';
-    const sw = `<span class="sic${em && sm === 'emoji' ? ' semo' : ''}${lk ? ' sln' : ''}" aria-hidden="true"${lk ? ` style="--dot:${col || 'var(--faint)'}"` : ''}>${pic ? licon(l, 'licon') : em && sm === 'emoji' ? esc(em) : lk ? ic(lk) : `<span class="sw${sm === 'emoji' ? '' : ' rd'}" style="${col ? 'background:' + col : ''}"></span>`}</span>`;
+    const em = !l.icon && leadEmoji(l.name);
+    // 2.38.0 (#1174): the icon itself in the list colour (listIconHtml), no extra dot
+    const sw = `<span class="sic" aria-hidden="true">${listIconHtml(l, {emoji: true})}</span>`;
     const nmOf = x => em ? listName(x.name).slice(em.length).trim() : listName(x.name);
     // 2.25.0 (UX-07): one number per row (the open tasks); a project's progress is a thin bar along the row's bottom
     const pg = progressFor(l) && l.progress?.total && sbiProg() && !progHidden(l.id) ? `<span class="sprog" role="img" style="--p:${pct(l.progress)}%" aria-label="${esc(tr('{0} of {1} done ({2}%)', l.progress.done, l.progress.total, pct(l.progress)))}" title="${esc(tr('{0} of {1} done ({2}%)', l.progress.done, l.progress.total, pct(l.progress)))}"></span>` : '';
@@ -440,7 +459,7 @@ function renderTop0() {
   const kl = m === 'tasks' && k.startsWith('l:') ? listById(+k.slice(2)) : null;
   const badge = kl?.kind === 'project' ? `<span class="kbadge" title="${esc(projectParts().join(', '))}">${tr('Project')}</span>` : '';
   S.bandOn = bandAgents().length > 0;  // 2.8.0 (#434): the band shows the agents' dots, the header pill keeps only the robot
-  setHtml($('#top'), `<button class="iconbtn menu" data-act="side" aria-label="${tr('Menu')}">${ic('menu')}</button><h1 title="${esc(title)}">${kl?.icon ? licon(kl, 'licon h') : licMark(kl, 'h')}<span class="ht">${esc(title)}</span>${badge}${nOpen ? `<span class="hn" aria-label="${esc(trn('{0} open task', '{0} open tasks', nOpen))}">${nOpen}</span>` : ''}${ms}</h1>${cf}${off}${timerPill()}${pm}${acts}${isMobile() ? '' : histBtns()}${pal}${tnew}${wsChip()}${stChip()}${agentChip()}${bellBtn()}`);  // 2.7.2 (#417): the agents' robot + dots directly before the bell  // 2.7.0 (#405): touch tablets / an unfolded Fold have the room for ← →
+  setHtml($('#top'), `<button class="iconbtn menu" data-act="side" aria-label="${tr('Menu')}">${ic('menu')}</button><h1 title="${esc(title)}">${listIconHtml(kl, {cls: 'h', full: false})}<span class="ht">${esc(title)}</span>${badge}${nOpen ? `<span class="hn" aria-label="${esc(trn('{0} open task', '{0} open tasks', nOpen))}">${nOpen}</span>` : ''}${ms}</h1>${cf}${off}${timerPill()}${pm}${acts}${isMobile() ? '' : histBtns()}${pal}${tnew}${wsChip()}${stChip()}${agentChip()}${bellBtn()}`);  // 2.7.2 (#417): the agents' robot + dots directly before the bell  // 2.7.0 (#405): touch tablets / an unfolded Fold have the room for ← →
   fitTop();
   netDotDraw();  // 2.31.0 (#378): the dot at the own picture follows every change of the connection
 }
@@ -1159,7 +1178,7 @@ document.addEventListener('click', e => {
   e.preventDefault(); e.stopPropagation();
   const id = +b.dataset.id, t = taskById(id); if (!t) return;
   if (b.dataset.act === 'tin-due') { const d = addDays(today(), +b.dataset.d); patchUndoable(id, {due: d}, tr('Due: {0}', dayLabel(d))); return; }
-  menu(b, S.lists.filter(l => !l.archived && !l.is_inbox && canAddTo(l.id)).map(l => ({label: lname(l), icon: 'list', lic: l, fn: () => patchUndoable(id, {list_id: l.id}, tr('Moved to {0}', lname(l)))})));
+  tch_listPicker(b, {filter: l => !l.is_inbox && canAddTo(l.id), pick: l => patchUndoable(id, {list_id: l.id}, tr('Moved to {0}', lname(l)))});  // 2.38.0 (#1177)
 });
 function qaddBox(extraCls = '') {
   return `<div class="qadd inline ${extraCls}"><div class="box">${ic('plus')}<input id="qinput" type="text" name="kalmido-quick-add" aria-label="${esc(tr('Add task…'))}" placeholder="${tr('Add task…')}" title="${esc(tr(QEX))}" autocomplete="off" data-form-type="other" data-lpignore="true" aria-autocomplete="none" enterkeyhint="done">${tplBtn()}${qExtraBtns('qinput')}</div><div class="chips" id="qchips"></div></div>`;
@@ -1364,7 +1383,7 @@ function viewArchived() {
   if (!ls.length) return `<div class="empty">${ic('archive')}${tr('No archived lists.')}<br><span class="muted">${tr('Archive a list from its “…” menu; it disappears from the sidebar and its tasks from Today and the calendar.')}</span></div>`;
   return `<div class="archv">${ls.map(l => {
     const p = l.progress || {done: 0, total: 0}, own = isOwner(l), em = leadEmoji(l.name), name = em ? l.name.slice(em.length).trim() : listName(l.name);
-    const mark = sbiMode() !== 'emoji' ? licMark(l, 'aemo', true) || `<span class="sw"></span>` : em ? `<span class="aemo">${em}</span>` : `<span class="sw" style="${cssColor(l.color) ? 'background:' + cssColor(l.color) : ''}"></span>`;
+    const mark = listIconHtml(l, {cls: 'aemo', emoji: true});  // 2.38.0 (#1174)
     const meta = [l.folder && `${ic('folder', 's')}${esc(fDisp(l.folder))}`, `${esc(tr('{0} open', p.total - p.done))} · ${esc(tr('{0} done', p.done))}`,
       l.archived_at && esc(tr('archived {0}', fmtDateLoc(ds(new Date(l.archived_at))))), !own && `${ic('users', 's')}${esc(tr('Shared by {0}', l.owner_name || '?'))}`].filter(Boolean);
     return `<div class="arow" data-list="${l.id}"><button class="aname" data-go="l/${l.id}" title="${esc(tr('Open {0}', name))}">${mark}<span class="n">${esc(name)}</span></button>

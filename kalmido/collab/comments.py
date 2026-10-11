@@ -438,7 +438,11 @@ def task_event(c, tid, kind, prev_assignee=None):
     name = user_names(c, [actor]).get(actor, "?")
     for uid in sorted(rcpt):
         s = collab_user(c, uid, t["list_id"])
-        if not s or not task_visible(c, tid, uid, full=True):  # 2.36.2 (#1142): also for "unassign"
+        if not s:
+            continue
+        if not task_visible(c, tid, uid, full=True):  # 2.36.2 (#1142): also for "unassign"
+            if kind == "unassign":  # 2.38.0 (#1155): out of sight -> a note with the list name only, no task content
+                fx2_unassign_hidden(c, uid, t, actor, name, s)
             continue
         news_add(c, uid, kind, task_id=tid, actor=actor, s=s)
         if not notif_ok(c, uid, s, KIND_ROW[kind], "push", t["list_id"]) or not push_reachable(c, uid, s) or \
@@ -457,6 +461,22 @@ def task_event(c, tid, kind, prev_assignee=None):
         else:
             title, msg = tr("{0} completed: {1}", who, t["title"], lg=lg), lname
         g.pushes.append((uid, title, msg, f"{PUBLIC_URL}/#t/{tid}", push_prio(s)))
+
+
+def fx2_unassign_hidden(c, uid, t, actor, name, s):
+    """2.38.0 (#1155): someone who no longer sees the task after losing it (a participant) still learns about it: a News
+    entry about the list (no task id, no title) and the push of the "Assignments" row with the list name only."""
+    from ..collab.news import KIND_ROW, news_add, notif_ok
+    from ..notify.push import push_prio, push_reachable
+    news_add(c, uid, "unassign", list_id=t["list_id"], actor=actor, s=s, data={"hidden": 1})
+    if not notif_ok(c, uid, s, KIND_ROW["unassign"], "push", t["list_id"]) or not push_reachable(c, uid, s) or \
+            not burst_gate(c, uid, t["id"], event=True):
+        return
+    lg = lang_of(s)
+    who = name if actor else tr("Someone via the public link", lg=lg)
+    lname = tr("Inbox", lg=lg) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
+    g.pushes.append((uid, tr("{0} removed you as assignee of a task in {1}", who, lname, lg=lg), lname,
+                     f"{PUBLIC_URL}/#l/{t['list_id']}", push_prio(s)))
 
 
 def assignment_events(c, tid, old_assignee, new_assignee):

@@ -75,7 +75,7 @@ def finish_login(c, u, remember, via, extra=None):
 
 @app.post("/api/auth/login")
 def auth_login():
-    from ..notify.alerts import aa_count, aa_now
+    from ..notify.alerts import aa_count, aa_now, fx2_mask_ip
     from ..agents.core import is_agent
     b = body()
     username = (b.get("username") or "").strip().lower()
@@ -96,7 +96,7 @@ def auth_login():
         for k in _rate_fail(keys):
             if k.startswith("ip:"):
                 aa_now("security", "ratelimit:" + k, N_("Login rate limit reached for IP {0} (logins refused for {1} min)."),
-                       [client_ip(), FAIL_WINDOW // 60])
+                       [fx2_mask_ip(client_ip()), FAIL_WINDOW // 60])
             elif u:
                 aa_now("security", "ratelimit:" + k, N_("Login rate limit reached for user {0} (logins refused for {1} min)."),
                        [username, FAIL_WINDOW // 60])

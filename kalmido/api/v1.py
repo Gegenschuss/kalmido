@@ -41,7 +41,7 @@ from ..lists.templates import PTYPES
 from ..lists.projects import bell_store, ms_report
 from ..calendars.caldav import apppw_create, apppw_delete, apppw_list, dav_info
 from ..integrations.importers import imp_request, imp_undo
-from ..notify.alerts import _env_int, aa_count, aa_now
+from ..notify.alerts import _env_int, aa_count, aa_now, fx2_mask_ip
 from ..admin.backup import BK_ON_ENV
 
 
@@ -167,7 +167,7 @@ def api_authenticate():
         if tok and not expired:  # a missing header is a client mistake; a wrong token is counted and reported
             for k in _rate_fail(bad):
                 aa_now("security", "ratelimit:" + k, N_("API rate limit reached for IP {0}: too many invalid tokens (refused for {1} min)."),
-                       [ip, FAIL_WINDOW // 60])
+                       [fx2_mask_ip(ip), FAIL_WINDOW // 60])
             aa_count("security", "api", ip)
         return v1_err(401, tr("The API token has expired") if expired else tr("Missing or invalid API token"),
                       {"WWW-Authenticate": 'Bearer realm="kalmido"'})

@@ -1,0 +1,954 @@
+"""Office & finance, stage 2 (2.38.0, #1021, F1): invoices, credit notes and reminders (kinds invoice / credit / reminder of
+office_docs), payments (office_payments), sending by e-mail and the DATEV document inbox.
+
+States: invoice / credit  draft -> issued (= finalised, ledger.ofx_finalize) -> sent -> paid; derived in the answers
+(never stored): partial (part paid), overdue (due date passed, still open). cancelled is stored on an invoice only when a
+credit note over its full amount is finalised (cancels_id) -- never by editing; back to draft does not exist.
+reminder: draft -> issued -> sent. Numbers come with finalising (OFX_NUMBER_AT_FINALIZE), one scheme per kind
+(settings invoice_scheme / credit_scheme / reminder_scheme), a manual number only in the draft and only above the series'
+last value. Amounts: the calculator (calc.inv_calc) is Decimal throughout; totals of these kinds are decimal strings.
+Every route: office_gate (no agents, no kids) + office_org; foreign documents are 404. No agent reaches any of this."""
+import json
+import re
+import smtplib
+from datetime import date, timedelta
+from decimal import Decimal
+
+from flask import g, jsonify, request
+
+from ..core.config import app
+from ..core.pg import insert_id, write_lock
+from ..core.i18n import N_, tr
+from ..core.db import body, bump, db, err, iso, local_now, now_utc
+from ..core.access import Denied
+from ..personal.timetrack import BadInput
+from .calc import INV_VAT_NOTES, dec, dstr, fmt_money, inv_calc, inv_open, money
+from .packs import office_pack
+from .model import office_gate, office_org, office_role, office_settings
+from .ledger import ofx_company, ofx_locked, ofx_log, ofx_need_editable
+
+INV_KINDS = ("invoice", "credit", "reminder")
+INV_STATUSES = {"invoice": ("draft", "issued", "sent", "paid", "cancelled"), "credit": ("draft", "issued", "sent", "paid"),
+                "reminder": ("draft", "issued", "sent")}
+PAY_METHODS = ("transfer", "cash", "card", "other")
+REMINDER_LEVELS = (1, 2, 3)
+STATE_TXT = {"issued": N_("Finalised"), "paid": N_("Paid"), "partial": N_("Partly paid"), "overdue": N_("Overdue"), "cancelled": N_("Cancelled")}
+TITLE_FALLBACK = {"invoice": {"de": "Rechnung", "en": "Invoice"}, "credit": {"de": "Gutschrift", "en": "Credit note"},
+                  "reminder_1": {"de": "Zahlungserinnerung", "en": "Payment reminder"}, "reminder_2": {"de": "Mahnung", "en": "Reminder"},
+                  "reminder_3": {"de": "Letzte Mahnung", "en": "Final reminder"}}
+
+
+def _j(s, default):
+    try:
+        v = json.loads(s) if s else default
+    except ValueError:
+        return default
+    return v if isinstance(v, type(default)) else default
+
+
+def _col(r, k, default=None):
+    return r[k] if r is not None and k in r.keys() and r[k] is not None else default
+
+
+def _ctx(admin=False):
+    c = db()
+    uid = office_gate(c)
+    return c, uid, office_org(c, uid, admin=admin)
+
+
+# ---------------------------------------------------------------- schemes and numbers
+def inv_scheme(s, kind):
+    """The number scheme of a kind from the settings (office_settings fills the pack's defaults)."""
+    return s.get(kind + "_scheme") or s.get("offer_scheme")
+
+
+def inv_manual_seq(scheme, num):
+    """The counter value a manual number carries under the scheme, None when it does not follow the scheme."""
+    from .model import SCHEME_RE
+    parts, pos, pat = [], 0, ""
+    for m in SCHEME_RE.finditer(scheme):
+        pat += re.escape(scheme[pos:m.start()])
+        pat += r"(\d+)" if m.group(1).startswith("seq") else r".+?"
+        pos = m.end()
+    pat += re.escape(scheme[pos:])
+    m = re.fullmatch(pat, num)
+    if not m or not m.groups():
+        return None
+    try:
+        return int(m.group(1))
+    except ValueError:
+        return None
+
+
+def inv_manual_number(c, oid, r, s, num):
+    """2.38.0: a manual number of an invoice / credit note must follow the scheme and lie above the series' last value
+    (no back-dating); the counter then continues from it. BadInput otherwise."""
+    from .model import office_scheme_period
+    scheme = inv_scheme(s, r["kind"])
+    seq = inv_manual_seq(scheme, num)
+    if seq is None:
+        raise BadInput(tr("The number must follow the scheme {0}", scheme))
+    d = date.fromisoformat(r["date"]) if r["date"] else local_now().date()
+    period = office_scheme_period(scheme, d)
+    row = c.execute("SELECT last FROM office_numbers WHERE org_id=? AND kind=? AND period=?", (oid, r["kind"], period)).fetchone()
+    last = row["last"] if row else 0
+    if seq < last or (seq == last and num != (r["number"] or "")):  # 2.38.0 review: re-setting its own number is fine
+        raise BadInput(tr("The number must be above the last one of the series ({0})", last))
+    c.execute("INSERT INTO office_numbers(org_id, kind, period, last) VALUES(?,?,?,?) ON CONFLICT(org_id, kind, period) DO UPDATE SET last=excluded.last",
+              (oid, r["kind"], period, seq))
+
+
+# ---------------------------------------------------------------- payments and the derived state
+def inv_paid_map(c, oid, doc_ids=None):
+    """{doc_id: {"paid": Decimal, "credits": Decimal}} of the organisation (all documents or the given ones):
+    the payments recorded and the gross of the finalised credit notes against each invoice."""
+    out = {}
+    ids = [int(x) for x in doc_ids] if doc_ids is not None else None
+    if ids is not None and not ids:
+        return out
+    q = " AND doc_id IN (" + ",".join("?" * len(ids)) + ")" if ids is not None else ""
+    for row in c.execute(f"SELECT doc_id, SUM(amount) AS s FROM office_payments WHERE org_id=?{q} GROUP BY doc_id", [oid] + (ids or [])):
+        out.setdefault(row["doc_id"], {"paid": Decimal(0), "credits": Decimal(0)})["paid"] = money(dec(row["s"]))
+    q = " AND cancels_id IN (" + ",".join("?" * len(ids)) + ")" if ids is not None else ""
+    for row in c.execute("SELECT cancels_id, totals FROM office_docs WHERE org_id=? AND kind='credit' AND locked_at IS NOT NULL AND cancels_id IS NOT NULL" + q,
+                         [oid] + (ids or [])):
+        t = _j(row["totals"], {})
+        out.setdefault(row["cancels_id"], {"paid": Decimal(0), "credits": Decimal(0)})["credits"] += money(dec(t.get("gross") or 0))
+    return out
+
+
+def inv_state(r, pm, today=None):
+    """The derived state of a row: the stored status, or partial / overdue for an open invoice."""
+    st = r["status"]
+    if r["kind"] not in ("invoice", "credit") or st in ("draft", "paid", "cancelled"):
+        return st
+    t = _j(r["totals"], {})
+    p = pm.get(r["id"]) or {"paid": Decimal(0), "credits": Decimal(0)}
+    gross = money(dec(t.get("gross") or 0))
+    covered = p["paid"] + p["credits"]
+    if gross > 0 and covered >= gross:
+        return "paid"
+    if r["kind"] == "invoice":
+        if p["paid"] > 0:
+            return "partial"
+        due = _col(r, "due_date") or ""
+        if due and due < (today or local_now().date().isoformat()):
+            return "overdue"
+    return st
+
+
+def inv_money_fields(r, pm):
+    """paid / open / credits of a row as decimal strings (for the list and the document)."""
+    t = _j(r["totals"], {})
+    p = pm.get(r["id"]) or {"paid": Decimal(0), "credits": Decimal(0)}
+    paid, open_ = inv_open(t.get("gross") or 0, p["paid"], p["credits"])
+    if r["status"] == "cancelled":
+        open_ = "0.00"
+    return {"paid": paid, "credits": dstr(p["credits"]), "open": open_}
+
+
+def inv_refresh_paid(c, oid, did):
+    """After a payment or a credit note: an open invoice covered in full becomes paid (paid_at); one no longer covered
+    goes back to sent / issued."""
+    r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (did, oid)).fetchone()
+    if not r or r["kind"] not in ("invoice", "credit") or not ofx_locked(r) or r["status"] == "cancelled":
+        return
+    pm = inv_paid_map(c, oid, [did])
+    t = _j(r["totals"], {})
+    gross = money(dec(t.get("gross") or 0))
+    p = pm.get(did) or {"paid": Decimal(0), "credits": Decimal(0)}
+    ts = iso(now_utc())
+    if gross > 0 and p["paid"] + p["credits"] >= gross:
+        if r["status"] != "paid":
+            c.execute("UPDATE office_docs SET status='paid', paid_at=?, updated_at=? WHERE id=? AND org_id=?", (ts, ts, did, oid))
+    elif r["status"] == "paid":
+        c.execute("UPDATE office_docs SET status=?, paid_at=NULL, updated_at=? WHERE id=? AND org_id=?",
+                  ("sent" if r["sent_at"] else "issued", ts, did, oid))
+
+
+# ---------------------------------------------------------------- finalising (called by ledger.ofx_finalize)
+def inv_missing(c, oid, r, s, pack, items):
+    """The required fields of an invoice that are still missing (names in the signed-in person's language)."""
+    miss = []
+    rec = _j(r["recipient"], {})
+    cl = c.execute("SELECT * FROM clients WHERE id=? AND org_id=?", (r["client_id"], oid)).fetchone() if r["client_id"] else None
+    if not (rec.get("name") or "").strip():
+        miss.append(tr("recipient name"))
+    addr_ok = cl is not None and all((cl[k] if k in cl.keys() else "") for k in ("street", "zip", "city"))
+    if not addr_ok and len([x for x in (rec.get("lines") or []) if x.strip()]) < 2:
+        miss.append(tr("recipient address (street, postcode and city)"))
+    if not r["date"]:
+        miss.append(tr("date"))
+    if r["kind"] == "reminder":
+        if not _j(_col(r, "ref_doc_ids") or "[]", []):
+            miss.append(tr("invoices to remind of"))
+        return miss
+    if not (_col(r, "service_from") or _col(r, "service_to")):
+        miss.append(tr("period of service"))
+    if not any(it.get("kind") == "service" for it in items):
+        miss.append(tr("at least one position"))
+    co = ofx_company(c, oid)
+    free = s.get("company") or {}
+    if not (co.get("name") or free.get("name")):
+        miss.append(tr("company name"))
+    if not ((co.get("street") and co.get("zip") and co.get("city")) or free.get("lines")):
+        miss.append(tr("company address"))
+    if not (co.get("tax_number") or co.get("vat_id")):
+        miss.append(tr("tax number or VAT ID"))
+    if not co.get("iban"):
+        miss.append(tr("IBAN"))
+    if r["kind"] == "invoice" and not (_col(r, "due_date") or _col(r, "payment_days")) and not s.get("payment_days"):
+        miss.append(tr("due date or payment days"))
+    if r["vat_mode"] == "novat" and (_col(r, "vat_note") or "") not in INV_VAT_NOTES:
+        miss.append(tr("VAT note (reverse charge / not taxable / small business)"))
+    return miss
+
+
+def inv_before_finalize(c, oid, r, s, pack):
+    """400 with the list of missing fields; sets the due date of an invoice from its payment days when it has none."""
+    from .docs import doc_items
+    items = doc_items(c, r["id"], oid)
+    miss = inv_missing(c, oid, r, s, pack, items)
+    if miss:
+        raise BadInput(tr("Missing before finalising: {0}", ", ".join(miss)))
+    if r["kind"] in ("invoice", "credit"):
+        inv_check_date(c, oid, r, s)
+    if r["kind"] == "invoice" and not _col(r, "due_date"):
+        days = _col(r, "payment_days")
+        if days is None:
+            days = int(s.get("payment_days") or 14)
+        d = date.fromisoformat(r["date"]) + timedelta(days=int(days))
+        c.execute("UPDATE office_docs SET due_date=?, payment_days=? WHERE id=? AND org_id=?", (d.isoformat(), int(days), r["id"], oid))
+
+
+def inv_check_date(c, oid, r, s):
+    """2.38.0 review (GoBD, chronological series): the date of an invoice / credit note being finalised lies neither in
+    the future nor before the date of the last finalised document of the same series (organisation, kind, counter
+    period); the due date never lies before the date. BadInput otherwise."""
+    from .model import office_scheme_period
+    d = r["date"]
+    if d > local_now().date().isoformat():
+        raise BadInput(tr("The date must not lie in the future"))
+    due = _col(r, "due_date")
+    if due and due < d:
+        raise BadInput(tr("The due date must not lie before the date"))
+    scheme = inv_scheme(s, r["kind"])
+    period = office_scheme_period(scheme, date.fromisoformat(d))
+    for row in c.execute("SELECT date FROM office_docs WHERE org_id=? AND kind=? AND locked_at IS NOT NULL AND id<>? AND date>? ORDER BY date DESC",
+                         (oid, r["kind"], r["id"], d)):
+        try:
+            if office_scheme_period(scheme, date.fromisoformat(row["date"])) == period:
+                raise BadInput(tr("The date must not lie before the last finalised document of this series ({0})", row["date"]))
+        except ValueError:
+            continue
+
+
+def inv_after_finalize(c, oid, uid, r):
+    """Status issued; a credit note settles its invoice (cancelled when it covers the full gross, else the open amount
+    shrinks); then the optional store hook of the PDF / XML writer (F2)."""
+    ts = iso(now_utc())
+    c.execute("UPDATE office_docs SET status='issued', updated_at=? WHERE id=? AND org_id=? AND status='draft'", (ts, r["id"], oid))
+    if r["kind"] == "credit" and _col(r, "cancels_id"):
+        inv_ = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=? AND kind='invoice'", (r["cancels_id"], oid)).fetchone()
+        if inv_ is not None:
+            ti, tc = _j(inv_["totals"], {}), _j(r["totals"], {})
+            credited = sum((money(dec(_j(x["totals"], {}).get("gross") or 0)) for x in c.execute(
+                "SELECT totals FROM office_docs WHERE org_id=? AND kind='credit' AND cancels_id=? AND locked_at IS NOT NULL AND id<>?",
+                (oid, inv_["id"], r["id"]))), Decimal(0))
+            if credited + money(dec(tc.get("gross") or 0)) > money(dec(ti.get("gross") or 0)):  # 2.38.0 review: credits never exceed the invoice
+                raise Denied(409, tr("The credit notes would exceed the amount of the invoice"))
+            if money(dec(tc.get("gross") or 0)) >= money(dec(ti.get("gross") or 0)) and inv_["status"] != "cancelled":
+                c.execute("UPDATE office_docs SET status='cancelled', updated_at=? WHERE id=? AND org_id=?", (ts, inv_["id"], oid))
+                ofx_log(c, oid, "status", doc_id=inv_["id"], detail={"before": {"status": inv_["status"]}, "after": {"status": "cancelled"}, "credit_id": r["id"]})
+            else:
+                inv_refresh_paid(c, oid, inv_["id"])
+    hook = _f2("epdf_store")
+    if hook is not None:
+        hook(c, oid, r["id"])
+
+
+def _f2(name):
+    """A function of F2's PDF / e-invoice modules when it exists (the modules are built in parallel)."""
+    for mod in ("pdfweb", "pdf", "einvoice"):
+        try:
+            m = __import__("kalmido.office." + mod, fromlist=[name])
+        except ImportError:
+            continue
+        fn = getattr(m, name, None)
+        if callable(fn):
+            return fn
+    return None
+
+
+# ---------------------------------------------------------------- making documents
+def _lines_eur(c, oid, r):
+    """The automatic lines of a quotation (producing, raw data, discount) in EUR: the calculator run in EUR."""
+    from .docs import _calc_doc, doc_items
+    from .calc import office_calc
+    s = office_settings(c, oid)
+    pack = office_pack(s["pack"]) or office_pack("DE")
+    d = _calc_doc(r)
+    d["currency"] = "EUR"
+    return office_calc(d, doc_items(c, r["id"], oid), pack)["lines"]
+
+
+def inv_items_from_offer(c, oid, r):
+    """The positions of an invoice from quotation r: every quotation line becomes a plain position with its amount (the
+    producing / raw data / discount automation of the quotation is condensed into positions; an uncounted raw data option
+    is left out). Rates stay in EUR; the invoice converts them with its own rate."""
+    from .docs import doc_items
+    items = doc_items(c, r["id"], oid)
+    out = []
+    for it in items:
+        row = {k: it.get(k) for k in ("kind", "service_id", "title", "detail", "qty", "unit", "rate", "tax", "intext", "cost")}
+        row.update(raw_fee=0, producing=0, discountable=1)
+        out.append(row)
+    for ln in _lines_eur(c, oid, r):
+        if ln["kind"] == "producing":
+            out.append({"kind": "service", "service_id": None, "title": ln["title"], "detail": ln.get("detail") or "", "qty": ln["qty"], "unit": "day",
+                        "rate": ln["rate"], "tax": "standard", "intext": "intern", "cost": 0, "raw_fee": 0, "producing": 0, "discountable": 1})
+        elif ln["kind"] == "raw" and not ln.get("optional"):
+            out.append({"kind": "service", "service_id": None, "title": ln["title"], "detail": ln.get("detail") or "", "qty": 1, "unit": "flat",
+                        "rate": ln["total"], "tax": "standard", "intext": "intern", "cost": 0, "raw_fee": 0, "producing": 0, "discountable": 1})
+        elif ln["kind"] == "discount":
+            out.append({"kind": "discount", "service_id": None, "title": ln["title"], "detail": ln.get("detail") or "", "qty": 1, "unit": "flat",
+                        "rate": abs(dec(ln["total"])), "tax": "standard", "intext": "intern", "cost": 0, "raw_fee": 0, "producing": 0, "discountable": 1})
+    return out
+
+
+def _insert_doc(c, oid, uid, row):
+    ts = iso(now_utc())
+    row.update(org_id=oid, number="", status="draft", totals="{}", created_by=uid, created_at=ts, updated_at=ts, sent_at=None)
+    return insert_id(c, f"INSERT INTO office_docs({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
+
+
+def _put_rows(c, oid, did, rows):
+    for i, row in enumerate(rows):
+        row = dict(row)
+        row.update(doc_id=did, org_id=oid, sort=i)
+        row["qty"] = float(dec(row.get("qty"), "1"))
+        row["rate"] = float(dec(row.get("rate"), "0"))
+        row["cost"] = float(dec(row.get("cost"), "0"))
+        c.execute(f"INSERT INTO office_doc_items({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
+
+
+def inv_default_texts(c, oid, s, kind, lang):
+    """intro / closing of an invoice, credit note or reminder: the organisation's text (settings), else the pack's."""
+    pack = office_pack(s["pack"]) or office_pack("DE") or {}
+    texts = pack.get("texts") or {}
+    sal = (texts.get("salutation") or {}).get(lang) or ""
+    intro = (texts.get(kind + "_intro") or {}).get(lang) or ""
+    if sal and intro:
+        intro = sal + "\n" + intro
+    if kind == "reminder":
+        closing = s.get("reminder_text_" + lang) or (texts.get("reminder_closing") or {}).get(lang) or ""
+    else:
+        closing = s.get("invoice_closing_" + lang) or (texts.get("invoice_closing") or {}).get(lang) or ""
+    return intro, closing
+
+
+def inv_new_row(c, oid, s, kind, lang, src=None):
+    """The head of a new invoice-kind draft (from quotation / invoice src or empty)."""
+    today = local_now().date()
+    intro, closing = inv_default_texts(c, oid, s, kind, lang)
+    row = {"kind": kind, "lang": lang, "currency": (s.get("currency") or "EUR").upper(), "fx_rate": s.get("fx_usd") or 1.09, "vat_mode": "vat",
+           "client_id": None, "recipient": json.dumps({"name": "", "lines": []}), "project_title": "", "project_ref": "", "date": today.isoformat(),
+           "valid_until": "", "contract_id": None, "raw_mode": "none", "raw_factor": 0, "prod_quotient": 3, "producing_rate": 0, "discount_pct": 0,
+           "intro": intro, "closing": closing, "rights": json.dumps({"time": {"id": None, "text": ""}, "territory": {"id": None, "text": ""},
+                                                                   "media": {"id": None, "text": ""}, "exceptions": "", "exclusive": 0, "note": ""}),
+           "fields": "[]", "service_from": None, "service_to": None, "order_ref": "", "due_date": None,
+           "payment_days": int(s.get("payment_days") or 14) if kind == "invoice" else None, "vat_note": "", "einvoice_format": s.get("einvoice_format") or "zugferd"}
+    if src is not None:
+        for k in ("lang", "currency", "fx_rate", "vat_mode", "client_id", "recipient", "project_title", "project_ref", "contract_id", "rights", "fields",
+                  "service_from", "service_to", "vat_note"):
+            if k in src.keys() and src[k] is not None:
+                row[k] = src[k]
+        row["order_ref"] = _col(src, "order_ref") or src["project_ref"] or ""
+        if src["lang"] != lang:
+            row["intro"], row["closing"] = inv_default_texts(c, oid, s, kind, src["lang"])
+        if src["client_id"]:
+            cl = c.execute("SELECT buyer_reference, payment_terms_days FROM clients WHERE id=? AND org_id=?", (src["client_id"], oid)).fetchone()
+            if cl is not None:
+                if cl["payment_terms_days"] and kind == "invoice":
+                    row["payment_days"] = int(cl["payment_terms_days"])
+                if cl["buyer_reference"] and kind == "invoice":
+                    row["einvoice_format"] = "xrechnung"
+    return row
+
+
+def inv_apply_client(c, oid, row, b):
+    """A new draft with a client: its payment terms and (buyer reference = XRechnung) its e-invoice format, unless given."""
+    if not row.get("client_id") or row.get("kind") != "invoice":
+        return
+    cl = c.execute("SELECT buyer_reference, payment_terms_days FROM clients WHERE id=? AND org_id=?", (row["client_id"], oid)).fetchone()
+    if cl is None:
+        return
+    if cl["payment_terms_days"] and "payment_days" not in b:
+        row["payment_days"] = int(cl["payment_terms_days"])
+    if cl["buyer_reference"] and "einvoice_format" not in b:
+        row["einvoice_format"] = "xrechnung"
+
+
+def inv_from_offer(c, oid, uid, offer):
+    s = office_settings(c, oid)
+    row = inv_new_row(c, oid, s, "invoice", offer["lang"], offer)
+    row["source_doc_id"] = offer["id"]
+    did = _insert_doc(c, oid, uid, row)
+    _put_rows(c, oid, did, inv_items_from_offer(c, oid, offer))
+    return did
+
+
+def inv_credit_of(c, oid, uid, inv_):
+    """A credit note draft over the whole invoice (positions copied; the person shortens it for a partial credit)."""
+    from .docs import doc_items
+    s = office_settings(c, oid)
+    row = inv_new_row(c, oid, s, "credit", inv_["lang"], inv_)
+    row["cancels_id"] = inv_["id"]
+    row["source_doc_id"] = inv_["id"]
+    did = _insert_doc(c, oid, uid, row)
+    rows = []
+    for it in doc_items(c, inv_["id"], oid):
+        r_ = {k: it.get(k) for k in ("kind", "service_id", "title", "detail", "qty", "unit", "rate", "tax", "intext", "cost")}
+        r_.update(raw_fee=0, producing=0, discountable=1)
+        rows.append(r_)
+    _put_rows(c, oid, did, rows)
+    return did
+
+
+def inv_from_time(c, oid, uid, b):
+    """{client_id, from, to, project_id?}: an invoice draft from the finished time entries of the client's lists in the
+    period, one position per list (project) with the hours; rate = the client's hourly rate when set, else 0 (to fill in)."""
+    from .docs import _date, _recipient_from_client
+    cid = b.get("client_id")
+    try:
+        cid = int(cid)
+    except (TypeError, ValueError):
+        raise BadInput(tr("Invalid value: {0}", "client_id"))
+    cl = c.execute("SELECT * FROM clients WHERE id=? AND org_id=?", (cid, oid)).fetchone()
+    if cl is None:
+        raise Denied(404)
+    d_from, d_to = _date(b.get("from"), "from"), _date(b.get("to"), "to")
+    if not d_from or not d_to or d_to < d_from:
+        raise BadInput(tr("Invalid value: {0}", "from/to"))
+    pid = b.get("project_id")
+    # the WHERE part first (a fragment: pg_prepare only checks the complete statement below)
+    sql = ("FROM time_entries e JOIN lists l ON l.id=e.list_id "
+           "WHERE l.client_id=? AND l.org_id=? AND e.\"end\" IS NOT NULL AND e.start>=? AND e.start<?")
+    args = [cid, oid, d_from + "T00:00:00", (date.fromisoformat(d_to) + timedelta(days=1)).isoformat() + "T00:00:00"]
+    if pid not in (None, "", 0):
+        try:
+            pid = int(pid)
+        except (TypeError, ValueError):
+            raise BadInput(tr("Invalid value: {0}", "project_id"))
+        sql += " AND e.list_id=?"
+        args.append(pid)
+    groups = c.execute(f"SELECT e.list_id, l.name AS lname, SUM(e.seconds) AS secs {sql} GROUP BY e.list_id, l.name ORDER BY l.name", args).fetchall()
+    s = office_settings(c, oid)
+    row = inv_new_row(c, oid, s, "invoice", s.get("lang") or "de")
+    row.update(client_id=cid, recipient=json.dumps(_recipient_from_client(dict(cl)), ensure_ascii=False), service_from=d_from, service_to=d_to,
+               project_title=cl["name"])
+    if "payment_terms_days" in cl.keys() and cl["payment_terms_days"]:
+        row["payment_days"] = int(cl["payment_terms_days"])
+    did = _insert_doc(c, oid, uid, row)
+    rate = cl["rate"] if "rate" in cl.keys() and cl["rate"] else 0
+    rows = []
+    for gr in groups:
+        hours = (dec(gr["secs"] or 0) / 3600).quantize(Decimal("0.01"))
+        if hours <= 0:
+            continue
+        rows.append({"kind": "service", "service_id": None, "title": gr["lname"] or tr("Hours"), "detail": "", "qty": hours, "unit": "hour", "rate": rate,
+                     "tax": "standard", "intext": "intern", "cost": 0, "raw_fee": 0, "producing": 0, "discountable": 1})
+    _put_rows(c, oid, did, rows)
+    return did, len(rows)
+
+
+def inv_reminder_rows(c, oid, ids):
+    """The invoices a reminder lists (snapshot rows for totals.lines): open, finalised invoices of the organisation."""
+    pm = inv_paid_map(c, oid, ids)
+    rows = []
+    for did in ids:
+        r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=? AND kind='invoice'", (did, oid)).fetchone()
+        if r is None:
+            raise Denied(404)
+        if not ofx_locked(r) or r["status"] in ("cancelled", "paid"):
+            raise BadInput(tr("Only open, finalised invoices can be reminded of ({0})", r["number"] or did))
+        mf = inv_money_fields(r, pm)
+        rows.append({"kind": "ref", "id": r["id"], "number": r["number"], "date": r["date"], "due_date": _col(r, "due_date") or "", "gross": _j(r["totals"], {}).get("gross"),
+                     "open": mf["open"], "currency": r["currency"]})
+    return rows
+
+
+def inv_reminder_totals(c, oid, r, pack=None):
+    """The totals of a reminder: the open amounts of its invoices (snapshot in ref_doc_ids / totals.lines once finalised) plus the fee."""
+    lang = "en" if r["lang"] == "en" else "de"
+    cur = r["currency"]
+    ids = _j(_col(r, "ref_doc_ids") or "[]", [])
+    if ofx_locked(r):
+        lines = [ln for ln in _j(r["totals"], {}).get("lines", []) if ln.get("kind") == "ref"]
+    else:
+        lines = inv_reminder_rows(c, oid, ids) if ids else []
+    total = sum((money(dec(ln["open"])) for ln in lines), Decimal(0))
+    fee = money(dec(_col(r, "reminder_fee") or 0))
+    gross = total + fee
+    for ln in lines:
+        ln["open_text"] = fmt_money(ln["open"], lang, cur)
+    return {"lang": lang, "currency": cur, "fx_rate": None, "fx_note": "", "vat_mode": "novat", "raw_mode": "none", "lines": lines,
+            "net": dstr(total), "net_text": fmt_money(total, lang, cur), "fee": dstr(fee), "fee_text": fmt_money(fee, lang, cur), "tax_lines": [],
+            "tax": "0.00", "tax_total": "0.00", "gross": dstr(gross), "gross_text": fmt_money(gross, lang, cur), "costs": "0.00", "margin": "0.00",
+            "vat_note": "", "labels": {"net": "", "gross": "", "discount": ""}, "level": int(_col(r, "reminder_level") or 1),
+            "deadline_days": int(_col(r, "reminder_deadline_days") or 0), "raw_amount": "0.00", "producing_days": 0, "discount": "0.00"}
+
+
+def inv_check_reminder(c, oid, ids, rows):
+    """2.38.0 review: a reminder lists issued / sent invoices with an open amount, all of the same client and currency."""
+    keys = set()
+    for did, ln in zip(ids, rows):
+        r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (did, oid)).fetchone()
+        if r["status"] not in ("issued", "sent") or money(dec(ln["open"])) <= 0:
+            raise BadInput(tr("Only open, finalised invoices can be reminded of ({0})", r["number"] or did))
+        who = r["client_id"] if r["client_id"] else (_j(r["recipient"], {}).get("name") or "").strip().lower()
+        keys.add((who, r["currency"]))
+    if len(keys) > 1:
+        raise BadInput(tr("A reminder covers invoices of one client in one currency only"))
+
+
+def inv_make_reminder(c, oid, uid, b):
+    ids = b.get("doc_ids")
+    if not isinstance(ids, list) or not ids or len(ids) > 50:
+        raise BadInput(tr("Invalid value: {0}", "doc_ids"))
+    try:
+        ids = [int(x) for x in ids]
+    except (TypeError, ValueError):
+        raise BadInput(tr("Invalid value: {0}", "doc_ids"))
+    s = office_settings(c, oid)
+    rows = inv_reminder_rows(c, oid, ids)
+    first = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (ids[0], oid)).fetchone()
+    inv_check_reminder(c, oid, ids, rows)
+    level = b.get("level", 1)
+    if level not in REMINDER_LEVELS:
+        raise BadInput(tr("Invalid value: {0}", "level"))
+    fee = dec(b.get("fee") if b.get("fee") not in (None, "") else (s.get("reminder_fee") or 0))
+    if fee < 0 or fee > 1000000:
+        raise BadInput(tr("Invalid value: {0}", "fee"))
+    try:
+        days = int(b.get("deadline_days") if b.get("deadline_days") not in (None, "") else (s.get("reminder_deadline_days") or 10))
+    except (TypeError, ValueError):
+        raise BadInput(tr("Invalid value: {0}", "deadline_days"))
+    if days < 0 or days > 365:
+        raise BadInput(tr("Invalid value: {0}", "deadline_days"))
+    row = inv_new_row(c, oid, s, "reminder", first["lang"], first)
+    row.update(ref_doc_ids=json.dumps(ids), reminder_level=int(level), reminder_fee=float(fee), reminder_deadline_days=days, currency=first["currency"],
+               service_from=None, service_to=None, order_ref="", payment_days=None, project_title=first["project_title"])
+    did = _insert_doc(c, oid, uid, row)
+    return did
+
+
+# ---------------------------------------------------------------- the print model (invoice kinds), on top of docs.odoc_render
+def inv_title(L, lang, kind, level=1):
+    key = kind if kind != "reminder" else f"reminder_{level if level in REMINDER_LEVELS else 1}"
+    return L.get(key) or TITLE_FALLBACK[key][lang]
+
+
+def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
+    """Adds the keys of invoices / credit notes / reminders to print model m (see iface: title per kind, order_ref, due
+    date, tax lines per rate, EUR tax line for USD, the credit note's invoice, the reminder's table, the payment info)."""
+    texts = pack.get("texts") or {}
+    cur = r["currency"]
+    kind = r["kind"]
+    level = int(_col(r, "reminder_level") or 1)
+    m["title"] = inv_title(L, lang, kind, level)
+    m["order_ref"] = _col(r, "order_ref") or ""
+    m["due_date"] = _col(r, "due_date") or ""
+    m["due_date_text"] = fmt_date(m["due_date"], pack)
+    m["payment_days"] = _col(r, "payment_days")
+    m["einvoice_format"] = _col(r, "einvoice_format") or ""
+    m["vat_note_key"] = _col(r, "vat_note") or ""
+    m["vat_note_text"] = ((texts.get("vat_note_" + m["vat_note_key"]) or {}).get(lang) or "") if m["vat_note_key"] else ""
+    sf, st = m.get("service_from") or "", m.get("service_to") or ""
+    m["service_period_text"] = (fmt_date(sf, pack) if sf == st or not st else (fmt_date(st, pack) if not sf else f"{fmt_date(sf, pack)} – {fmt_date(st, pack)}")) if (sf or st) else ""
+    snd = _j(r["sender"], {}) if ofx_locked(r) else {}
+    fields = snd.get("fields") if snd else ofx_company(c, oid)
+    m["sender_fields"] = {k: (fields or {}).get(k) or "" for k in ("name", "street", "zip", "city", "country", "email", "phone", "tax_number", "vat_id",
+                                                                   "iban", "bic", "bank_name", "register_court", "register_no", "managing_directors")}
+    rec = _j(r["recipient_snapshot"], {}) if ofx_locked(r) and r["recipient_snapshot"] else {}
+    if not rec and r["client_id"]:
+        cl = c.execute("SELECT * FROM clients WHERE id=? AND org_id=?", (r["client_id"], oid)).fetchone()
+        if cl is not None:
+            rec = {k: (cl[k] if k in cl.keys() else "") for k in ("street", "zip", "city", "country", "vat_id", "customer_no", "buyer_reference", "email_invoice")}
+    for k in ("street", "zip", "city", "country", "vat_id", "customer_no", "buyer_reference", "email_invoice"):
+        m["recipient"][k] = rec.get(k) or ""
+    num_label = L.get(kind + "_no") or (L.get("invoice_no", "Rechnung Nr.") if kind == "invoice" else m["title"] + (" No." if lang == "en" else " Nr."))
+    meta = [[num_label, r["number"] or ("Draft" if lang == "en" else "Entwurf")]]
+    cancels = None
+    if kind == "credit" and _col(r, "cancels_id"):
+        ci = c.execute("SELECT id, number, date FROM office_docs WHERE id=? AND org_id=?", (r["cancels_id"], oid)).fetchone()
+        if ci is not None:
+            cancels = {"id": ci["id"], "number": ci["number"], "date_text": fmt_date(ci["date"], pack)}
+            meta.append([L.get("to_invoice", "zu Rechnung Nr." if lang == "de" else "Credit note for invoice no."), f"{ci['number']} ({cancels['date_text']})"])
+    m["cancels"] = cancels
+    if m["order_ref"]:
+        meta.append([L.get("ref", "Ref./PO-Nr."), m["order_ref"]])
+    if r["project_title"]:
+        meta.append([L.get("project", "Projekttitel"), r["project_title"]])
+    if m["recipient"].get("customer_no"):
+        meta.append([L.get("customer_no", "Kunden-Nr." if lang == "de" else "Customer no."), m["recipient"]["customer_no"]])
+    meta.append([L.get("date", "Datum"), m["date_text"]])
+    if m["service_period_text"]:
+        meta.append([L.get("service_period", "Leistungszeitraum" if lang == "de" else "Service period"), m["service_period_text"]])
+    if kind == "invoice" and m["due_date"]:
+        meta.append([L.get("due", "Fällig am" if lang == "de" else "Due on"), m["due_date_text"]])
+    if cur == "USD" and t.get("fx_rate"):
+        meta.append([L.get("fx", "Wechselkurs 1 €" if lang == "de" else "Exchange rate €1"), t.get("fx_note") or ""])
+    m["meta"] = meta
+    tot = m["totals"]
+    tot["show_tax_lines"] = kind != "reminder"
+    for k in ("net", "tax", "gross", "currency", "fx_rate", "fx_note", "tax_eur", "gross_eur", "tax_eur_text", "gross_eur_text"):
+        if k in t:
+            tot[k] = t[k]
+    tot["tax_lines"] = t.get("tax_lines") or []
+    tot["tax_total"] = t.get("tax") or "0.00"
+    tot["net_text"] = fmt_money(t.get("net") or 0, lang, cur)
+    tot["tax_text"] = fmt_money(t.get("tax") or 0, lang, cur)
+    tot["gross_text"] = fmt_money(t.get("gross") or 0, lang, cur)
+    pm = inv_paid_map(c, oid, [r["id"]])
+    mf = inv_money_fields(r, pm)
+    tot["paid"], tot["open"] = mf["paid"], mf["open"]
+    tot["open_text"] = fmt_money(mf["open"], lang, cur)
+    tot["vat_note"] = m["vat_note_text"] if r["vat_mode"] == "novat" else ""
+    tot["fx_line"] = ""
+    if cur == "USD" and t.get("tax_eur") is not None:
+        tot["fx_line"] = ((texts.get("fx_tax_note") or {}).get(lang) or ("Steuerbetrag entspricht {tax} EUR, Kurs 1 EUR = {rate} USD" if lang == "de" else
+                                                                       "Tax amount equals EUR {tax}, rate EUR 1 = USD {rate}")).replace(
+            "{tax}", fmt_money(t["tax_eur"], lang, "EUR").replace(" €", "").replace("€", "")).replace("{rate}", str(t.get("fx_rate") or "").replace(".", "," if lang == "de" else "."))
+    if kind == "reminder":
+        rows = [[L.get("open_total", "Offener Betrag" if lang == "de" else "Amount outstanding"), tot["net_text"]]]
+        if dec(t.get("fee") or 0) > 0:
+            rows.append([L.get("reminder_fee", "Mahngebühr" if lang == "de" else "Reminder fee"), t.get("fee_text") or ""])
+        rows.append([L.get("invoice_total", "Rechnungsbetrag" if lang == "de" else "Total"), tot["gross_text"]])
+        deadline = ""
+        if r["date"] and _col(r, "reminder_deadline_days"):
+            deadline = fmt_date((date.fromisoformat(r["date"]) + timedelta(days=int(r["reminder_deadline_days"]))).isoformat(), pack)
+        m["reminder"] = {"level": level, "title": m["title"], "fee": t.get("fee") or "0.00", "fee_text": t.get("fee_text") or "", "deadline_days": int(_col(r, "reminder_deadline_days") or 0),
+                         "deadline_text": deadline,
+                         "columns": [L.get("col_invoice", "Rechnung" if lang == "de" else "Invoice"), L.get("date", "Datum"), L.get("col_due", "Fällig" if lang == "de" else "Due"),
+                                     L.get("amount", "Betrag" if lang == "de" else "Amount")],
+                         "rows": [{"id": ln.get("id"), "number": ln.get("number"), "date_text": fmt_date(ln.get("date"), pack), "due_text": fmt_date(ln.get("due_date"), pack),
+                                   "open": ln.get("open"), "open_text": ln.get("open_text") or fmt_money(ln.get("open") or 0, lang, cur)} for ln in t.get("lines") or []],
+                         "total_open": t.get("net"), "total_open_text": tot["net_text"]}
+        m["lines"] = []
+        m["rights"] = {"title": "", "rows": [], "exceptions": "", "exclusive": 0, "note": ""}
+        # the closing may carry {days} / {date} (pack text or the organisation's own): the deadline of this reminder
+        m["closing"] = (m.get("closing") or "").replace("{days}", str(int(_col(r, "reminder_deadline_days") or 0))).replace("{date}", deadline)
+    else:
+        rows = [[L.get("subtotal", "Zwischensumme" if lang == "de" else "Subtotal"), tot["net_text"]]]
+        for tl in tot["tax_lines"]:
+            rows.append([tl.get("label") or "", tl.get("amount_text") or fmt_money(tl.get("amount") or 0, lang, cur)])
+        rows.append([L.get("credit_total" if kind == "credit" else "invoice_total", ("Gutschriftsbetrag" if kind == "credit" else "Rechnungsbetrag") if lang == "de" else "Total"), tot["gross_text"]])
+        if kind == "invoice" and dec(mf["paid"]) > 0:
+            rows.append([L.get("paid", "Bereits bezahlt" if lang == "de" else "Already paid"), fmt_money(mf["paid"], lang, cur)])
+            rows.append([L.get("open", "Offener Betrag" if lang == "de" else "Amount outstanding"), tot["open_text"]])
+        m["reminder"] = None
+    tot["rows"] = rows
+    sfd = m["sender_fields"]
+    ptext = ""
+    if kind == "invoice":
+        ptext = ((texts.get("payment_note") or {}).get(lang) or ("Zahlbar bis {date} ohne Abzug." if lang == "de" else "Payable by {date} without deduction.")).replace("{date}", m["due_date_text"]) if m["due_date"] else ""
+    m["payment"] = {"iban": sfd["iban"], "bic": sfd["bic"], "bank_name": sfd["bank_name"], "text": ptext} if kind != "credit" else None
+    m["valid_note"] = ""
+    m["valid_until"] = ""
+    m["valid_until_text"] = ""
+    return m
+
+
+# ---------------------------------------------------------------- sending
+def inv_files(c, oid, did):
+    """[(name, bytes, mime)] to attach: F2's epdf_doc_files (PDF/A-3 + XML) when it exists, else the plain PDF."""
+    fn = _f2("epdf_doc_files")
+    if fn is not None:
+        files = fn(c, oid, did)
+        if files:
+            return files
+    from .docs import odoc_render
+    from .pdf import office_pdf
+    m = odoc_render(c, did, oid)
+    m.pop("internal", None)
+    number = re.sub(r"[^A-Za-z0-9._-]+", "-", str(m.get("number") or "")).strip("-") or f"doc-{did}"
+    return [(f"{m['kind']}-{number}.pdf", office_pdf(m), "application/pdf")]
+
+
+def _mail_text(r, lang, s):
+    co = _j(r["sender"], {}).get("company") or {}
+    name = co.get("name") or (s.get("company") or {}).get("name") or ""
+    if lang == "en":
+        return f"Dear Sir or Madam,\n\nplease find attached the document {r['number']}.\n\nKind regards\n{name}"
+    return f"Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie das Dokument {r['number']}.\n\nMit freundlichen Grüßen\n{name}"
+
+
+def inv_clean_subject(v, limit=200):
+    """2.38.0 review: a mail subject on one line (CR / LF become a space), at most limit characters."""
+    v = v if isinstance(v, str) else ""
+    return re.sub(r"\s*[\r\n]+\s*", " ", v).strip()[:limit].strip()
+
+
+def _mail(to, subject, text, **kw):
+    """mail_send with a readable 409 when the mail server refuses; the details only go to the server log."""
+    from ..integrations.mail import mail_send
+    try:
+        mail_send(to, subject, text, **kw)
+    except (smtplib.SMTPException, OSError) as e:
+        app.logger.warning("office mail failed: %s: %s", type(e).__name__, e)
+        raise Denied(409, tr("Mail server refused the message"))
+
+
+def inv_datev_ready(c, oid, r, s):
+    """409 when the DATEV copy cannot go out (no SMTP, no inbox address, not finalised)."""
+    from ..integrations.mail import MAIL_OUT_ON
+    if not MAIL_OUT_ON:
+        raise Denied(409, tr("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"))
+    if not s.get("datev_email"):
+        raise Denied(409, tr("No DATEV inbox address in the settings"))
+    if not ofx_locked(r):
+        raise Denied(409, tr("Finalise the document first"))
+
+
+def inv_send(c, oid, uid, r, b):
+    """Mails the finalised document r to b["to"] (cc, subject, text optional) with its PDF (+ XML) and records it (status
+    sent, log). Returns (files, datev): datev = the DATEV copy is due (b["datev"] true, or the setting datev_auto while
+    the document has not gone to DATEV yet); the caller commits the customer mail first and sends that copy afterwards
+    (2.38.0 review: a DATEV failure never undoes or repeats the customer mail). Its prerequisites are checked before
+    anything goes out. 409 without SMTP."""
+    from ..integrations.mail import MAIL_OUT_ON
+    if not MAIL_OUT_ON:
+        raise Denied(409, tr("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"))
+    if not ofx_locked(r):
+        raise Denied(409, tr("Finalise the document first"))
+    to = (b.get("to") or "").strip() if isinstance(b.get("to"), str) else ""
+    cc = (b.get("cc") or "").strip() if isinstance(b.get("cc"), str) else ""
+    mail_re = r"[^@\s,]+@[^@\s,]+\.[^@\s,]+"
+    if not re.fullmatch(mail_re, to) or (cc and not re.fullmatch(mail_re, cc)):
+        raise BadInput(tr("Invalid value: {0}", "to"))
+    s = office_settings(c, oid)
+    explicit = b.get("datev") in (1, True, "1", "true")
+    datev = r["kind"] in ("invoice", "credit") and (explicit or (b.get("datev") is None and s.get("datev_auto") and not _col(r, "datev_sent_at")))
+    if datev:
+        inv_datev_ready(c, oid, r, s)
+    lang = "en" if r["lang"] == "en" else "de"
+    pack = office_pack(s["pack"]) or office_pack("DE") or {}
+    title = inv_title((pack.get("labels") or {}).get(lang) or {}, lang, r["kind"], int(_col(r, "reminder_level") or 1))
+    subject = inv_clean_subject(b.get("subject")) or f"{title} {r['number']}"
+    text = (b.get("text") or "").strip() if isinstance(b.get("text"), str) else ""
+    text = text[:5000] or _mail_text(r, lang, s)
+    files = inv_files(c, oid, r["id"])
+    u = g.user
+    _mail(to, subject, text, attachments=files, cc=cc or None, from_name=(u["display_name"] if u is not None and "display_name" in u.keys() else None))
+    ts = iso(now_utc())
+    c.execute("UPDATE office_docs SET status=CASE WHEN status IN ('issued') THEN 'sent' ELSE status END, sent_at=COALESCE(sent_at, ?), updated_at=? "
+              "WHERE id=? AND org_id=?", (ts, ts, r["id"], oid))
+    ofx_log(c, oid, "send", doc_id=r["id"], detail={"to": to, "cc": cc, "files": [f[0] for f in files]})
+    return files, datev
+
+
+def inv_datev(c, oid, r, s=None, files=None):
+    """Mails PDF + XML of a finalised invoice / credit note to the DATEV document inbox (settings datev_email)."""
+    s = s or office_settings(c, oid)
+    inv_datev_ready(c, oid, r, s)
+    files = files or inv_files(c, oid, r["id"])
+    _mail(s["datev_email"], f"{r['kind']} {r['number']}", f"{r['kind']} {r['number']} ({r['date']})", attachments=files)
+    ts = iso(now_utc())
+    c.execute("UPDATE office_docs SET datev_sent_at=?, updated_at=? WHERE id=? AND org_id=?", (ts, ts, r["id"], oid))
+    ofx_log(c, oid, "datev", doc_id=r["id"], detail={"to": s["datev_email"], "files": [f[0] for f in files]})
+
+
+# ---------------------------------------------------------------- routes
+def _answer(c, oid, uid, did, code=200):
+    from .docs import doc_public, doc_row
+    return jsonify(doc_public(c, oid, doc_row(c, oid, did), office_role(c, uid, oid) == "admin")), code
+
+
+@app.post("/api/office/docs/<int:did>/invoice")
+def inv_from_offer_post(did):
+    """An invoice draft from quotation did (every quotation line becomes a position; rights, framework contract, recipient,
+    project, language, currency, rate and PO number are taken over; source_doc_id). 201 the invoice."""
+    from .docs import doc_row, recalc
+    c, uid, oid = _ctx()
+    r = doc_row(c, oid, did)
+    if r["kind"] != "offer":
+        raise Denied(409, tr("Only a quotation can be turned into an invoice"))
+    nid = inv_from_offer(c, oid, uid, r)
+    recalc(c, oid, nid)
+    ofx_log(c, oid, "create", doc_id=nid, detail={"kind": "invoice", "from_id": did, "from_number": r["number"]})
+    bump(c)
+    c.commit()
+    return _answer(c, oid, uid, nid, 201)
+
+
+@app.post("/api/office/docs/<int:did>/credit")
+def inv_credit_post(did):
+    """A credit note draft to the finalised invoice did (positions copied, cancels_id). 201 the credit note."""
+    from .docs import doc_row, recalc
+    c, uid, oid = _ctx()
+    r = doc_row(c, oid, did)
+    if r["kind"] != "invoice" or not ofx_locked(r):
+        raise Denied(409, tr("A credit note needs a finalised invoice"))
+    if r["status"] == "cancelled":
+        raise Denied(409, tr("This invoice is already cancelled"))
+    nid = inv_credit_of(c, oid, uid, r)
+    recalc(c, oid, nid)
+    ofx_log(c, oid, "create", doc_id=nid, detail={"kind": "credit", "cancels_id": did, "from_number": r["number"]})
+    bump(c)
+    c.commit()
+    return _answer(c, oid, uid, nid, 201)
+
+
+@app.post("/api/office/docs/from-time")
+def inv_from_time_post():
+    """{client_id, from, to, project_id?} -> 201 an invoice draft from the client's time entries (one position per list)."""
+    from .docs import recalc
+    c, uid, oid = _ctx()
+    b = body()
+    if not isinstance(b, dict):
+        return err(tr("Invalid data"))
+    nid, n = inv_from_time(c, oid, uid, b)
+    recalc(c, oid, nid)
+    ofx_log(c, oid, "create", doc_id=nid, detail={"kind": "invoice", "from": "time", "positions": n})
+    bump(c)
+    c.commit()
+    return _answer(c, oid, uid, nid, 201)
+
+
+@app.post("/api/office/docs/reminder")
+def inv_reminder_post():
+    """{doc_ids: [...], level: 1|2|3, fee?, deadline_days?} -> 201 a reminder draft over those open invoices."""
+    from .docs import recalc
+    c, uid, oid = _ctx()
+    b = body()
+    if not isinstance(b, dict):
+        return err(tr("Invalid data"))
+    nid = inv_make_reminder(c, oid, uid, b)
+    recalc(c, oid, nid)
+    ofx_log(c, oid, "create", doc_id=nid, detail={"kind": "reminder", "doc_ids": b.get("doc_ids")})
+    bump(c)
+    c.commit()
+    return _answer(c, oid, uid, nid, 201)
+
+
+def _payment_public(c, r):
+    d = dict(r)
+    d["amount"] = dstr(d.get("amount") or 0)
+    u = c.execute("SELECT display_name, username FROM users WHERE id=?", (r["created_by"],)).fetchone() if r["created_by"] else None
+    d["created_by_name"] = (u["display_name"] or u["username"]) if u else ""
+    return d
+
+
+def inv_payments(c, oid, did):
+    return [_payment_public(c, r) for r in c.execute("SELECT * FROM office_payments WHERE org_id=? AND doc_id=? ORDER BY date, id", (oid, did))]
+
+
+@app.get("/api/office/docs/<int:did>/payments")
+def inv_payments_get(did):
+    from .docs import doc_row
+    c, uid, oid = _ctx()
+    r = doc_row(c, oid, did)
+    pm = inv_paid_map(c, oid, [did])
+    return jsonify(payments=inv_payments(c, oid, did), **inv_money_fields(r, pm))
+
+
+@app.post("/api/office/docs/<int:did>/payments")
+def inv_payment_post(did):
+    """{date, amount, method?: transfer|cash|card|other, note?} on a finalised invoice; covers the gross -> paid. 201 the document."""
+    from .docs import _date, doc_row
+    c, uid, oid = _ctx()
+    doc_row(c, oid, did)
+    write_lock(c, f"office_pay_{did}")  # 2.38.0 review: check and write of one invoice's payments in one go
+    r = doc_row(c, oid, did)
+    if r["kind"] != "invoice" or not ofx_locked(r) or r["status"] in ("cancelled", "paid"):
+        raise Denied(409, tr("Payments go on finalised, open invoices only"))
+    b = body()
+    if not isinstance(b, dict):
+        return err(tr("Invalid data"))
+    amt = dec(b.get("amount"), "NaN") if b.get("amount") not in (None, "") else Decimal("NaN")
+    if amt.is_nan() or amt <= 0 or amt > Decimal("100000000"):
+        raise BadInput(tr("Invalid value: {0}", "amount"))
+    d = _date(b.get("date"), "date") or local_now().date().isoformat()
+    if d > local_now().date().isoformat():
+        raise BadInput(tr("The date must not lie in the future"))
+    if money(amt) > dec(inv_money_fields(r, inv_paid_map(c, oid, [did]))["open"]):
+        raise Denied(409, tr("The payment exceeds the open amount"))
+    method = b.get("method") or "transfer"
+    if method not in PAY_METHODS:
+        raise BadInput(tr("Invalid value: {0}", "method"))
+    note = (b.get("note") or "").strip()[:500] if isinstance(b.get("note"), str) else ""
+    pid = insert_id(c, "INSERT INTO office_payments(org_id, doc_id, date, amount, method, note, created_by, created_at) VALUES(?,?,?,?,?,?,?,?)",
+                    (oid, did, d, float(money(amt)), method, note, uid, iso(now_utc())))
+    inv_refresh_paid(c, oid, did)
+    ofx_log(c, oid, "payment", doc_id=did, detail={"id": pid, "date": d, "amount": dstr(amt), "method": method})
+    bump(c)
+    c.commit()
+    return _answer(c, oid, uid, did, 201)
+
+
+@app.delete("/api/office/docs/<int:did>/payments/<int:pid>")
+def inv_payment_delete(did, pid):
+    """The organisation's admin removes a payment (a wrong entry); the state follows."""
+    from .docs import doc_row
+    c, uid, oid = _ctx()
+    doc_row(c, oid, did)
+    if office_role(c, uid, oid) != "admin":
+        raise Denied(403, tr("Only an admin of this organisation can do this"))
+    write_lock(c, f"office_pay_{did}")
+    p = c.execute("SELECT * FROM office_payments WHERE id=? AND doc_id=? AND org_id=?", (pid, did, oid)).fetchone()
+    if p is None:
+        raise Denied(404)
+    c.execute("DELETE FROM office_payments WHERE id=? AND org_id=?", (pid, oid))
+    inv_refresh_paid(c, oid, did)
+    ofx_log(c, oid, "payment_delete", doc_id=did, detail={"id": pid, "date": p["date"], "amount": dstr(p["amount"])})
+    bump(c)
+    c.commit()
+    return _answer(c, oid, uid, did)
+
+
+@app.post("/api/office/docs/<int:did>/send")
+def inv_send_post(did):
+    """{to, cc?, subject?, text?, datev?: bool} mails the finalised document with its files; status sent."""
+    from .docs import doc_row
+    c, uid, oid = _ctx()
+    r = doc_row(c, oid, did)
+    b = body()
+    if not isinstance(b, dict):
+        return err(tr("Invalid data"))
+    files, datev = inv_send(c, oid, uid, r, b)
+    bump(c)
+    c.commit()  # 2.38.0 review: the customer mail is recorded before the DATEV copy is tried
+    if datev:
+        try:
+            inv_datev(c, oid, doc_row(c, oid, did), files=files)
+        except Denied as e:
+            c.rollback()
+            raise Denied(409, tr("Sent to the recipient; the copy to the DATEV inbox failed: {0}", e.text()))
+        bump(c)
+        c.commit()
+    resp, code = _answer(c, oid, uid, did)
+    return resp, code
+
+
+@app.post("/api/office/docs/<int:did>/datev")
+def inv_datev_post(did):
+    """Mails PDF + XML of the finalised invoice / credit note to the DATEV inbox only."""
+    from .docs import doc_row
+    c, uid, oid = _ctx()
+    r = doc_row(c, oid, did)
+    if r["kind"] not in ("invoice", "credit"):
+        raise Denied(409, tr("Only invoices and credit notes go to the DATEV inbox"))
+    inv_datev(c, oid, r)
+    bump(c)
+    c.commit()
+    return _answer(c, oid, uid, did)
+
+
+@app.get("/api/office/mail-status")
+def inv_mail_status():
+    """{smtp: bool, datev_email: str} so the send dialog can say when mail is not set up."""
+    from ..integrations.mail import MAIL_OUT_ON
+    c, uid, oid = _ctx()
+    s = office_settings(c, oid)
+    return jsonify(smtp=bool(MAIL_OUT_ON), datev_email=s.get("datev_email") or "", datev_auto=int(s.get("datev_auto") or 0))

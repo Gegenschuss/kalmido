@@ -15,17 +15,19 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
-from .calc import RAW_MODES, TAX_KEYS, dec, fmt_money, office_calc
+from .calc import INV_ITEM_KINDS, INV_VAT_NOTES, RAW_MODES, TAX_KEYS, dec, fmt_money, inv_calc, office_calc
 from .packs import office_pack
 from .model import (NAME_MAX, TEXT_MAX, UNITS, office_gate, office_org, office_number_next, office_role, office_settings,
                     office_seed_texts)
 from .ledger import (ofx_company, ofx_company_print, ofx_diff, ofx_items_brief, ofx_locked, ofx_log, ofx_logo_path, ofx_need_editable,
                      ofx_number_at_finalize, ofx_snapshot_pack)
+from .invoices import (INV_KINDS, INV_STATUSES, STATE_TXT, inv_apply_client, inv_manual_number, inv_money_fields, inv_new_row, inv_paid_map, inv_payments,
+                       inv_reminder_totals, inv_render, inv_scheme, inv_state)
 
-DOC_KINDS = ("offer",)
+DOC_KINDS = ("offer",) + INV_KINDS  # 2.38.0 (#1021, F1): invoices, credit notes, reminders live in office/invoices.py
 STATUSES = ("draft", "sent", "accepted", "declined")
 ITEM_KINDS = ("service", "text", "heading")
-STATUS_TXT = {"draft": N_("Draft"), "sent": N_("Sent"), "accepted": N_("Accepted"), "declined": N_("Declined")}
+STATUS_TXT = {"draft": N_("Draft"), "sent": N_("Sent"), "accepted": N_("Accepted"), "declined": N_("Declined"), **STATE_TXT}
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 MAX_ITEMS = 300
 MAX_FIELDS = 20
@@ -185,7 +187,10 @@ def _calc_doc(r):
 def doc_totals(c, oid, r, items=None):
     s = office_settings(c, oid)
     pack = office_pack(s["pack"]) or office_pack("DE")
-    return office_calc(_calc_doc(r), items if items is not None else doc_items(c, r["id"], oid), pack)
+    if r["kind"] == "reminder":  # 2.38.0: a reminder has no positions, its lines are the invoices it lists
+        return inv_reminder_totals(c, oid, r, pack)
+    calc = inv_calc if r["kind"] in ("invoice", "credit") else office_calc
+    return calc(_calc_doc(r), items if items is not None else doc_items(c, r["id"], oid), pack)
 
 
 def recalc(c, oid, did):
@@ -203,8 +208,24 @@ def doc_public(c, oid, r, admin, items=True):
     d = dict(r)
     for k, dflt in (("recipient", {}), ("rights", {}), ("fields", []), ("totals", {})):
         d[k] = _j(d.get(k), dflt)
-    d["status_text"] = tr(STATUS_TXT.get(d["status"], d["status"]))
+    pm = inv_paid_map(c, oid, [r["id"]]) if r["kind"] in ("invoice", "credit") else {}
+    d["state"] = inv_state(r, pm)  # 2.38.0: the derived state (partial / overdue) next to the stored status
+    d["status_text"] = tr(STATUS_TXT.get(d["state"], d["state"]))
     d["net_text"] = fmt_money(d["totals"].get("net") or 0, d["lang"], d["currency"])
+    d["gross_text"] = fmt_money(d["totals"].get("gross") or 0, d["lang"], d["currency"])
+    d["ref_doc_ids"] = _j(d.get("ref_doc_ids") or "[]", [])
+    if r["kind"] in ("invoice", "credit"):
+        d.update(inv_money_fields(r, pm))
+        d["open_text"] = fmt_money(d["open"], d["lang"], d["currency"])
+        if items:
+            d["payments"] = inv_payments(c, oid, r["id"]) if r["kind"] == "invoice" else []
+            cr = c.execute("SELECT id, number, status, locked_at, totals FROM office_docs WHERE org_id=? AND kind='credit' AND cancels_id=? ORDER BY id",
+                           (oid, r["id"])).fetchall() if r["kind"] == "invoice" else []
+            d["credits_of"] = [{"id": x["id"], "number": x["number"], "status": x["status"], "locked": bool(x["locked_at"]), "gross": _j(x["totals"], {}).get("gross")} for x in cr]
+            if r["kind"] == "credit" and d.get("cancels_id"):
+                x = c.execute("SELECT id, number FROM office_docs WHERE id=? AND org_id=?", (d["cancels_id"], oid)).fetchone()
+                d["cancels"] = {"id": x["id"], "number": x["number"]} if x else None
+    d["statuses"] = list(INV_STATUSES.get(r["kind"]) or STATUSES)
     if not admin:
         d["totals"] = {k: v for k, v in d["totals"].items() if k not in ("costs", "margin")}
     if items:
@@ -226,21 +247,28 @@ def doc_public(c, oid, r, admin, items=True):
     if locked and r["locked_by"]:
         u = c.execute("SELECT display_name, username FROM users WHERE id=?", (r["locked_by"],)).fetchone()
         d["locked_by_name"] = (u["display_name"] or u["username"]) if u else ""
-    d["can_edit"] = not locked
-    d["can_delete"] = bool(admin) and not locked
+    d["can_edit"] = not locked and r["status"] != "sent"  # 2.38.0: sent documents are locked as well
+    d["can_delete"] = bool(admin) and not locked and r["status"] != "sent"
     d["number_at_finalize"] = ofx_number_at_finalize(office_settings(c, oid), r["kind"])
     return d
 
 
-def doc_brief(r):
+def doc_brief(r, pm=None):
     rec = _j(r["recipient"], {})
     t = _j(r["totals"], {})
-    return {"id": r["id"], "kind": r["kind"], "number": r["number"], "status": r["status"], "status_text": tr(STATUS_TXT.get(r["status"], r["status"])),
-            "lang": r["lang"], "currency": r["currency"], "client_id": r["client_id"], "recipient_name": rec.get("name") or "",
-            "project_title": r["project_title"], "project_ref": r["project_ref"], "date": r["date"], "valid_until": r["valid_until"],
-            "net": t.get("net") or 0, "net_text": fmt_money(t.get("net") or 0, r["lang"], r["currency"]),
-            "net_incl_raw": t.get("net_incl_raw"), "updated_at": r["updated_at"], "created_by": r["created_by"],
-            "locked": ofx_locked(r)}
+    pm = pm if pm is not None else {}
+    state = inv_state(r, pm)
+    d = {"id": r["id"], "kind": r["kind"], "number": r["number"], "status": r["status"], "state": state, "status_text": tr(STATUS_TXT.get(state, state)),
+         "lang": r["lang"], "currency": r["currency"], "client_id": r["client_id"], "recipient_name": rec.get("name") or "",
+         "project_title": r["project_title"], "project_ref": r["project_ref"], "date": r["date"], "valid_until": r["valid_until"],
+         "net": t.get("net") or 0, "net_text": fmt_money(t.get("net") or 0, r["lang"], r["currency"]),
+         "gross": t.get("gross") or 0, "gross_text": fmt_money(t.get("gross") or 0, r["lang"], r["currency"]),
+         "net_incl_raw": t.get("net_incl_raw"), "updated_at": r["updated_at"], "created_by": r["created_by"],
+         "locked": ofx_locked(r), "due_date": r["due_date"] if "due_date" in r.keys() else None, "cancels_id": r["cancels_id"] if "cancels_id" in r.keys() else None}
+    if r["kind"] in ("invoice", "credit"):
+        d.update(inv_money_fields(r, pm))
+        d["open_text"] = fmt_money(d["open"], r["lang"], r["currency"])
+    return d
 
 
 # ---------------------------------------------------------------- cleaning
@@ -378,12 +406,30 @@ def clean_doc(c, oid, b, cur, admin):
                 f["recipient"] = json.dumps(_recipient_from_client(cl), ensure_ascii=False)
     if "recipient" in b and b.get("recipient") is not None:
         f["recipient"] = json.dumps(_recipient_clean(b["recipient"]), ensure_ascii=False)
-    for k, mx in (("project_title", NAME_MAX), ("project_ref", 80), ("intro", TEXT_MAX), ("closing", TEXT_MAX)):
+    for k, mx in (("project_title", NAME_MAX), ("project_ref", 80), ("intro", TEXT_MAX), ("closing", TEXT_MAX), ("order_ref", 80)):
         if k in b:
             f[k] = _text(b.get(k), k, mx)
-    for k in ("date", "valid_until", "service_from", "service_to"):  # 2.36.2: period of service
+    for k in ("date", "valid_until", "service_from", "service_to", "due_date"):  # 2.36.2: period of service; 2.38.0: due date
         if k in b:
             f[k] = _date(b.get(k), k)
+    nd = f.get("date", cur["date"])
+    ndue = f.get("due_date", cur["due_date"] if "due_date" in cur.keys() else None)
+    if nd and ndue and ndue < nd and ("date" in f or "due_date" in f):  # 2.38.0 review
+        raise BadInput(tr("The due date must not lie before the date"))
+    if "payment_days" in b:  # 2.38.0 (#1021, F1): invoice fields
+        v = _num(b.get("payment_days"), "payment_days", 0, 365)
+        f["payment_days"] = None if v is None else int(v)
+    if "vat_note" in b:
+        f["vat_note"] = _choice(b.get("vat_note") or "", "vat_note", ("",) + INV_VAT_NOTES)
+    if "einvoice_format" in b:
+        f["einvoice_format"] = _choice(b.get("einvoice_format") or "", "einvoice_format", ("", "zugferd", "xrechnung"))
+    if cur["kind"] == "reminder":
+        if "reminder_level" in b:
+            f["reminder_level"] = int(_num(b.get("reminder_level"), "reminder_level", 1, 3) or 1)
+        if "reminder_fee" in b:
+            f["reminder_fee"] = _num(b.get("reminder_fee"), "reminder_fee", 0, 1e6) or 0
+        if "reminder_deadline_days" in b:
+            f["reminder_deadline_days"] = int(_num(b.get("reminder_deadline_days"), "reminder_deadline_days", 0, 365) or 0)
     if f.get("service_from") and f.get("service_to") and f["service_to"] < f["service_from"]:
         raise BadInput(tr("The period of service ends before it starts"))
     if "raw_mode" in b:
@@ -424,12 +470,19 @@ def clean_items(c, oid, r, items, admin):
         if not isinstance(it, dict):
             raise BadInput(tr("Invalid value: {0}", "items"))
         kind = it.get("kind") or "service"
-        _choice(kind, "items.kind", ITEM_KINDS)
+        _choice(kind, "items.kind", ITEM_KINDS if r["kind"] == "offer" else INV_ITEM_KINDS)  # 2.38.0: discount positions on invoices
         row = {"sort": i, "kind": kind, "service_id": None, "title": _text(it.get("title"), "items.title", 500),
                "detail": _text(it.get("detail"), "items.detail", 4000), "qty": 1, "unit": "day", "rate": 0, "tax": "standard",
                "raw_fee": 0, "producing": 0, "intext": "intern", "cost": 0, "discountable": 1}
         prev = old.get(it.get("id")) if it.get("id") else None
-        if kind == "service":
+        if kind == "discount":  # 2.38.0: a discount position: its amount (qty x rate) is taken off, same tax class
+            row["qty"] = _num(it.get("qty"), "items.qty", 0, 1e6) or 1
+            row["unit"] = _choice(it.get("unit") or "flat", "items.unit", UNITS)
+            row["rate"] = abs(_num(it.get("rate"), "items.rate", -1e8, 1e8) or 0)
+            row["tax"] = _choice(it.get("tax") or "standard", "items.tax", TAX_KEYS)
+            if not row["title"]:
+                raise BadInput(tr("Invalid value: {0}", "items.title"))
+        elif kind == "service":
             sv = _service(c, oid, it.get("service_id")) if it.get("service_id") else None
             if it.get("service_id") and not sv:
                 raise Denied(404)
@@ -474,6 +527,19 @@ def doc_create(c, oid, uid, b, admin):
     kind = _choice(b.get("kind") or "offer", "kind", DOC_KINDS)
     lang = _choice(b.get("lang") or s.get("lang") or "de", "lang", ("de", "en"))
     today = local_now().date()
+    if kind != "offer":  # 2.38.0 (#1021, F1): an empty invoice / credit note / reminder draft
+        from .invoices import _insert_doc
+        row = inv_new_row(c, oid, s, kind, lang)
+        cur = dict(row)
+        cur["id"] = 0
+        cur["kind"] = kind
+        row.update(clean_doc(c, oid, {k: v for k, v in b.items() if k != "kind"}, cur, admin))
+        inv_apply_client(c, oid, row, b)
+        did = _insert_doc(c, oid, uid, row)
+        if isinstance(b.get("items"), list) and kind != "reminder":
+            _put_items(c, oid, doc_row(c, oid, did), b["items"], admin)
+        recalc(c, oid, did)
+        return did
     prod_rate = s.get("producing_rate") or 600
     if s.get("producing_service_id"):
         sv = _service(c, oid, s["producing_service_id"])
@@ -520,11 +586,13 @@ def _assign_number(c, oid, did, s=None, manual=None):
         num = _text(manual, "number", 80)
         if not num:
             raise BadInput(tr("Invalid value: {0}", "number"))
+        if r["kind"] != "offer":  # 2.38.0: only above the series' last value (no back-dating), the counter follows
+            inv_manual_number(c, oid, r, s, num)
     else:
         rec = _j(r["recipient"], {})
         d = date.fromisoformat(r["date"]) if r["date"] else local_now().date()
         for _ in range(50):  # a scheme without {seq} uniqueness (e.g. only {date}): keep counting until free
-            num, _seq = office_number_next(c, oid, r["kind"], s["offer_scheme"], d, project=r["project_title"], client=rec.get("name") or "",
+            num, _seq = office_number_next(c, oid, r["kind"], inv_scheme(s, r["kind"]), d, project=r["project_title"], client=rec.get("name") or "",
                                            initials=_initials(c, r["created_by"]))
             if not c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=? AND id!=?", (oid, num, did)).fetchone():
                 break
@@ -620,7 +688,7 @@ def odoc_render(c, doc_id, oid):
     labels["units"] = L.get("units") or {}
     labels["page_of"] = L.get("page_of") or ("Page {x} of {y}" if lang == "en" else "Seite {x} von {y}")
     role = office_role(c, g.user["id"], oid) if getattr(g, "user", None) is not None else None
-    return {
+    m = {
         "kind": r["kind"], "lang": lang, "locked": locked, "locked_at": r["locked_at"] if locked else None,
         "pack_version": (r["pack_version"] or "") if locked else str(pack.get("version") or ""),
         "service_from": r["service_from"] or "", "service_to": r["service_to"] or "", "currency": cur, "fx_rate": t.get("fx_rate"), "fx_note": t.get("fx_note") or "", "vat_mode": t["vat_mode"],
@@ -644,6 +712,9 @@ def odoc_render(c, doc_id, oid):
         "valid_note": valid_note, "fields": _j(r["fields"], []), "labels": labels, "formats": pack.get("formats") or {},
         "internal": {"costs": t["costs"], "margin": t["margin"]} if role == "admin" else None,
     }
+    if r["kind"] != "offer":  # 2.38.0 (#1021, F1): the invoice words on top (title, due date, tax lines, reminder table, payment info)
+        inv_render(c, oid, r, m, t, pack, L, lang, _fmt_date)
+    return m
 
 
 # ---------------------------------------------------------------- routes
@@ -652,9 +723,11 @@ def odoc_list():
     """?kind=offer&status=&q= -> the organisation's documents, newest first (brief rows)."""
     c, uid, oid = _ctx()
     kind = request.args.get("kind") or "offer"
+    if kind not in DOC_KINDS:
+        kind = "offer"
     sql, args = "SELECT * FROM office_docs WHERE org_id=? AND kind=?", [oid, kind]
     st = request.args.get("status")
-    if st in STATUSES:
+    if st in STATUSES + ("issued", "paid", "cancelled") and st not in ("partial", "overdue"):
         sql += " AND status=?"
         args.append(st)
     q = (request.args.get("q") or "").strip()
@@ -662,7 +735,10 @@ def odoc_list():
         like = f"%{like_escape(q)}%"
         sql += " AND (number ILIKE ? ESCAPE '\\' OR project_title ILIKE ? ESCAPE '\\' OR project_ref ILIKE ? ESCAPE '\\' OR recipient ILIKE ? ESCAPE '\\')"
         args += [like, like, like, like]
-    rows = [doc_brief(r) for r in c.execute(sql + " ORDER BY date DESC, id DESC LIMIT 500", args)]
+    pm = inv_paid_map(c, oid) if kind in ("invoice", "credit") else {}
+    rows = [doc_brief(r, pm) for r in c.execute(sql + " ORDER BY date DESC, id DESC LIMIT 500", args)]
+    if st in ("partial", "overdue"):  # derived states: filtered after the fact
+        rows = [x for x in rows if x["state"] == st]
     return jsonify(docs=rows, role=office_role(c, uid, oid), org_id=oid)
 
 
@@ -761,10 +837,18 @@ def odoc_status(did):
     c, uid, oid = _ctx()
     r = doc_row(c, oid, did)
     b = body()
-    st = _choice((b if isinstance(b, dict) else {}).get("status"), "status", STATUSES)
+    st = _choice((b if isinstance(b, dict) else {}).get("status"), "status", STATUSES if r["kind"] == "offer" else INV_STATUSES[r["kind"]])
     ts = iso(now_utc())
+    if r["kind"] != "offer" and st != r["status"]:  # 2.38.0: issued only by finalising, never back to draft, cancelled only by a credit note
+        ok = ofx_locked(r) and r["status"] != "cancelled" and st in ("sent", "paid") and (st != "paid" or r["kind"] == "invoice")
+        if not ok:
+            raise Denied(409, tr("This status change is not allowed ({0} to {1})", r["status"], st))
+        if r["status"] == "paid" and c.execute("SELECT 1 FROM office_payments WHERE org_id=? AND doc_id=? LIMIT 1", (oid, did)).fetchone():
+            raise Denied(409, tr("Payments are recorded on this invoice; remove them first"))  # 2.38.0 review
     c.execute("UPDATE office_docs SET status=?, updated_at=?, sent_at=COALESCE(sent_at, ?) WHERE id=? AND org_id=?",
               (st, ts, ts if st in ("sent", "accepted", "declined") else None, did, oid))
+    if r["kind"] != "offer":
+        c.execute("UPDATE office_docs SET paid_at=CASE WHEN status='paid' THEN COALESCE(paid_at, ?) ELSE NULL END WHERE id=? AND org_id=?", (ts, did, oid))
     if st != r["status"]:
         ofx_log(c, oid, "status", doc_id=did, detail={"before": {"status": r["status"]}, "after": {"status": st}})
     bump(c)
@@ -774,7 +858,9 @@ def odoc_status(did):
 
 # 2.36.2: columns a copy never takes over (identity, state, the frozen snapshot of a finalised original)
 DUP_SKIP = {"id", "number", "status", "created_at", "updated_at", "sent_at", "created_by", "date", "valid_until", "totals", "locked_at",
-            "locked_by", "sender", "recipient_snapshot", "tax_snapshot", "pack_version"}
+            "locked_by", "sender", "recipient_snapshot", "tax_snapshot", "pack_version",
+            "due_date", "paid_at", "pdf_sha256", "xml_sha256", "datev_sent_at",  # 2.38.0: the invoice's own marks
+            "cancels_id", "ref_doc_ids", "source_doc_id"}  # 2.38.0 review: a copy is a fresh document, bound to nothing
 DUP_ITEM_SKIP = {"id", "tax_pct", "net", "tax_amount"}
 
 
@@ -789,8 +875,8 @@ def odoc_duplicate(did):
     row = {k: r[k] for k in r.keys() if k not in DUP_SKIP}
     today = local_now().date()
     ts = iso(now_utc())
-    row.update(number="", status="draft", date=today.isoformat(), valid_until=(today + timedelta(days=int(s.get("offer_valid_days") or 30))).isoformat(),
-               totals="{}", created_by=uid, created_at=ts, updated_at=ts, sent_at=None)
+    row.update(number="", status="draft", date=today.isoformat(), totals="{}", created_by=uid, created_at=ts, updated_at=ts, sent_at=None,
+               valid_until=(today + timedelta(days=int(s.get("offer_valid_days") or 30))).isoformat() if r["kind"] == "offer" else "")
     nid = insert_id(c, f"INSERT INTO office_docs({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
     for it in doc_items(c, did, oid):
         it = {k: v for k, v in it.items() if k not in DUP_ITEM_SKIP}

@@ -293,3 +293,98 @@ def _num(d):
     if d == d.to_integral():
         return int(d)
     return float(d.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP).normalize())
+
+
+# ---------------------------------------------------------------- 2.38.0 (#1021, F1): invoices, credit notes, reminders
+INV_ITEM_KINDS = ("service", "text", "heading", "discount")
+INV_VAT_NOTES = ("reverse", "abroad", "small")
+
+
+def dstr(d):
+    """A Decimal as money text with exactly 2 places ("34422.90"); the exact figures of invoices travel as such strings."""
+    return format(money(dec(d)), "f")
+
+
+def inv_calc(doc, items, pack=None):
+    """The invoice calculator (invoices and credit notes): no producing / raw data / discount automation -- a document is
+    exactly its positions; a discount is a position of kind "discount" (its amount is taken off, same tax class).
+    Every position is money(qty x rate) (rate converted into USD first, like quotations); the document's net is the sum of
+    the positions; the tax per rate is computed on the rounded sum of that rate (EN 16931), half up to 2 places.
+    All amounts of the result are decimal strings with 2 places ("net": "34422.90"); the lines keep the numbers the editor
+    shows (qty / rate / total). USD: tax_eur / gross_eur = the tax and the total in EUR by doc["fx_rate"] (VAT law)."""
+    doc = doc or {}
+    lang = "en" if str(doc.get("lang") or "de").lower().startswith("en") else "de"
+    currency = "USD" if str(doc.get("currency") or "EUR").upper() == "USD" else "EUR"
+    fx = dec(doc.get("fx_rate"), "1.09") if currency == "USD" else Decimal(1)
+    if fx <= 0:
+        fx = Decimal(1)
+    novat = str(doc.get("vat_mode") or "vat") == "novat"
+    rates = {k: (Decimal(0) if novat else pack_tax(pack, k)) for k in TAX_KEYS}
+
+    def conv(rate):
+        r = dec(rate)
+        return money(r * fx) if currency == "USD" else money(r)
+
+    lines, pos = [], 0
+    net = Decimal(0)
+    costs = Decimal(0)
+    base = {k: Decimal(0) for k in TAX_KEYS}
+    for it in items or []:
+        kind = it.get("kind") or "service"
+        if kind == "heading":
+            lines.append({"kind": "heading", "title": it.get("title") or ""})
+            continue
+        if kind == "text":
+            lines.append({"kind": "text", "text": it.get("detail") or it.get("text") or it.get("title") or ""})
+            continue
+        qty = dec(it.get("qty"), "1")
+        rate = conv(it.get("rate"))
+        total = money(qty * rate)
+        if kind == "discount":
+            total = -abs(total)
+        tax = it.get("tax") if it.get("tax") in TAX_KEYS else "standard"
+        pos += 1
+        net += total
+        base[tax] += total
+        if kind != "discount":
+            costs += money(dec(it.get("cost")) * qty * (fx if currency == "USD" else 1))
+        unit = it.get("unit") or "day"
+        lines.append({"kind": "discount" if kind == "discount" else "item", "pos": pos, "id": it.get("id"), "service_id": it.get("service_id"),
+                      "title": it.get("title") or (label(pack, lang, "discount") if kind == "discount" else ""), "detail": it.get("detail") or "",
+                      "qty": _num(qty), "qty_text": fmt_qty(qty, lang), "unit": unit, "unit_text": unit_text(pack, lang, unit, qty),
+                      "rate": _num(rate), "rate_text": fmt_money(rate, lang, currency), "tax": tax, "tax_pct": _num(rates[tax]),
+                      "total": _num(total), "total_text": fmt_money(total, lang, currency), "net": dstr(total), "intext": it.get("intext") or "intern"})
+    tax_lines, tax_sum = [], Decimal(0)
+    if not novat:
+        for k in TAX_KEYS:
+            if base[k] == 0:
+                continue
+            amt = money(base[k] * rates[k] / 100)
+            tax_sum += amt
+            tax_lines.append({"rate_key": k, "pct": format(rates[k].normalize(), "f"), "base": dstr(base[k]), "amount": dstr(amt),
+                              "base_text": fmt_money(base[k], lang, currency), "amount_text": fmt_money(amt, lang, currency),
+                              "label": label(pack, lang, "tax_" + k, pct=fmt_qty(rates[k], lang))})
+    gross = net + tax_sum
+    out = {
+        "lang": lang, "currency": currency, "fx_rate": format(fx.normalize(), "f") if currency == "USD" else None,
+        "fx_note": label(pack, lang, "fx_note", rate=fmt_qty(fx, lang)) if currency == "USD" else "",
+        "vat_mode": "novat" if novat else "vat", "raw_mode": "none",
+        "net": dstr(net), "net_text": fmt_money(net, lang, currency), "tax_lines": tax_lines, "tax": dstr(tax_sum), "tax_total": dstr(tax_sum),
+        "tax_text": fmt_money(tax_sum, lang, currency), "gross": dstr(gross), "gross_text": fmt_money(gross, lang, currency),
+        "costs": dstr(costs), "margin": dstr(net - costs), "items_net": dstr(net), "discount": "0.00", "raw_amount": "0.00", "producing_days": 0,
+        "vat_note": label(pack, lang, "novat_note") if novat else "",
+        "lines": lines,
+        "labels": {k: label(pack, lang, k) for k in ("net", "gross", "discount")},
+    }
+    if currency == "USD":  # the tax (and the total) in EUR as well, by the document's rate
+        out["tax_eur"] = dstr(tax_sum / fx)
+        out["gross_eur"] = dstr(gross / fx)
+        out["tax_eur_text"] = fmt_money(tax_sum / fx, lang, "EUR")
+        out["gross_eur_text"] = fmt_money(gross / fx, lang, "EUR")
+    return out
+
+
+def inv_open(gross, paid, credits="0"):
+    """(paid, open) as strings: open = gross - paid - credits, never below zero."""
+    o = money(dec(gross)) - money(dec(paid)) - money(dec(credits))
+    return dstr(paid), dstr(o if o > 0 else Decimal(0))

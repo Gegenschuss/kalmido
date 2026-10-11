@@ -5,19 +5,29 @@ GET /api/office/docs/<id>/pdf   the document as a PDF file (office_gate + the or
 POST / GET / DELETE /api/office/logo   the organisation's logo for the print: PNG / JPEG / WebP up to LOGO_MAX_MB, scaled
                                 to at most LOGO_MAX_PX width and stored as PNG below <data dir>/office/<org_id>/logo.png
                                 (organisation admin writes, members see it). SVG is not accepted (no renderer in the PDF).
-The office folder is part of the backups (admin/backup.py: OFFICE_DIR), next to the attachments."""
+The office folder is part of the backups (admin/backup.py: OFFICE_DIR), next to the attachments.
+
+2.38.0 (#1021 P5): finalising stores the document's files -- epdf_store(c, org_id, doc_id) writes the PDF/A-3 (and, for an
+invoice / credit note, the e-invoice XML; ZUGFeRD = embedded in the PDF as well, XRechnung = separate only) as
+<data dir>/office/<org_id>/doc<id>-<kind>-<number>.pdf / .xml (flat below the organisation folder so the backup's member
+rule and restore cover them unchanged), notes both SHA-256 in office_docs and logs "store". GET .../pdf serves the
+stored file of a finalised document (a draft is rendered with a "Draft" mark), GET .../xml the stored XML (409 for
+drafts and other kinds). epdf_doc_files(c, org_id, doc_id) hands the files to the mail dispatch of office.ledger / web."""
+import datetime
+import hashlib
 import io
 import os
 import re
 
 from flask import jsonify, request, Response, send_file
 
-from ..core.config import app, OFFICE_DIR
+from ..core.config import app, APP_VERSION, OFFICE_DIR
 from ..core.i18n import tr
 from ..core.db import db, err
 from ..core.access import Denied
 from .model import office_gate, office_logo_set, office_org, office_settings
 from .pdf import office_pdf
+from .einvoice import ein_build
 
 LOGO_MAX_MB = 4
 LOGO_MAX_PX = 1600
@@ -64,28 +74,167 @@ def _ctx(admin=False):
     return c, uid, office_org(c, uid, admin=admin)
 
 
-@app.get("/api/office/docs/<int:did>/pdf")
-def opdf_doc_pdf(did):
-    """The quotation as PDF (members of the organisation). ?inline=1 shows it in the browser instead of downloading."""
+# ---------------------------------------------------------------- 2.38.0 (#1021 P5): the stored files of a finalised document
+EPDF_KINDS_XML = ("invoice", "credit")
+
+
+def epdf_name(r):
+    """The file name stem of document row r: <number> for a quotation, <kind>-<number> for the invoice kinds."""
+    number = re.sub(r"[^A-Za-z0-9._-]+", "-", str(r["number"] or "")).strip("-") or f"doc-{r['id']}"
+    return number if r["kind"] == "offer" else f"{r['kind']}-{number}"
+
+
+def _stored(oid, r, ext):
+    """Path of the stored file of row r (None when there is none)."""
+    p = os.path.join(OFFICE_DIR, str(int(oid)), f"doc{int(r['id'])}-{epdf_name(r)}.{ext}")
+    return p if os.path.isfile(p) else None
+
+
+def _stored_or_missing(c, oid, r, ext):
+    """2.38.0 review: the stored file of r; None for a draft or an older finalised document that never had one (rendered
+    from its snapshot). A finalised document whose stored file has gone (sha noted, file missing) answers 409 and logs
+    store_missing instead of a silent new rendering that could differ from the original."""
+    from .ledger import ofx_locked, ofx_log
+    p = _stored(oid, r, ext)
+    sha = r[ext + "_sha256"] if (ext + "_sha256") in r.keys() else ""
+    if p or not ofx_locked(r) or not sha:
+        return p
+    ofx_log(c, oid, "store_missing", doc_id=r["id"], detail={"file": ext, "sha256": sha})
+    c.commit()
+    raise Denied(409, tr("The stored file of this document is missing"))
+
+
+def _model(c, oid, did):
     from .docs import odoc_render
-    c, uid, oid = _ctx()
     model = odoc_render(c, did, oid)
     co = model.setdefault("company", {})
     if not model.get("locked"):  # 2.36.2: a finalised document prints the logo of its snapshot (set by odoc_render)
         lp = opdf_logo_path(oid)
         co["logo_path"] = lp if (office_settings(c, oid).get("logo") and os.path.isfile(lp)) else None
+        if model.get("kind") in ("invoice", "credit", "reminder"):  # 2.38.0: a draft invoice is marked as such
+            model["draft_mark"] = tr("Draft", lg=model.get("lang") or "de")
     model.pop("internal", None)  # never printed
+    return model
+
+
+def epdf_format(c, oid, r):
+    """The e-invoice format of row r: its own einvoice_format, else the organisation's setting, else zugferd."""
+    fmt = (r["einvoice_format"] if "einvoice_format" in r.keys() else "") or office_settings(c, oid).get("einvoice_format") or "zugferd"
+    return fmt if fmt in ("zugferd", "xrechnung") else "zugferd"
+
+
+def _render(c, oid, r, model=None):
+    """(pdf bytes, xml bytes or None, format) of document row r from its print model (the snapshot when finalised)."""
+    from .ledger import ofx_locked
+    model = model or _model(c, oid, r["id"])
+    xml, fmt = None, ""
+    if r["kind"] in EPDF_KINDS_XML and ofx_locked(r):
+        fmt = epdf_format(c, oid, r)
+        xml = ein_build(model, fmt)
+    when = None
+    if ofx_locked(r):
+        try:
+            when = datetime.datetime.fromisoformat(str(r["locked_at"]).replace("Z", "+00:00")).astimezone()
+        except ValueError:
+            when = None
+    meta = {"when": when, "producer": f"Kalmido {APP_VERSION}", "xml_profile": "EN 16931", "doc_type": "INVOICE"}
+    pdf = office_pdf(model, xml=xml if fmt == "zugferd" else None, meta=meta)
+    return pdf, xml, fmt
+
+
+def epdf_store(c, oid, did):
+    """Called at the end of ofx_finalize (office.ledger): writes the PDF/A-3 (+ XML for invoice / credit) of the now
+    frozen document below the organisation's office folder, notes pdf_sha256 / xml_sha256 in office_docs and logs
+    "store". XRechnung without the client's buyer reference raises BadInput (400) -> the finalising is rolled back."""
+    from .docs import doc_row
     from .ledger import ofx_log
-    ofx_log(c, oid, "pdf", doc_id=did, dedupe_min=10)
-    c.commit()
-    data = office_pdf(model)
-    number = re.sub(r"[^A-Za-z0-9._-]+", "-", str(model.get("number") or "")).strip("-") or f"doc-{did}"
-    inline = request.args.get("inline") == "1"
-    resp = Response(data, mimetype="application/pdf")
-    resp.headers["Content-Disposition"] = f'{"inline" if inline else "attachment"}; filename="{number}.pdf"'
+    r = doc_row(c, oid, did)
+    pdf, xml, fmt = _render(c, oid, r)
+    d = os.path.join(OFFICE_DIR, str(int(oid)))
+    os.makedirs(d, mode=0o755, exist_ok=True)
+    stem = os.path.join(d, f"doc{int(did)}-{epdf_name(r)}")
+    shas = {}
+    for ext, data in (("pdf", pdf), ("xml", xml)):
+        if data is None:
+            continue
+        with open(stem + "." + ext + ".part", "wb") as fh:
+            fh.write(data)
+        os.replace(stem + "." + ext + ".part", stem + "." + ext)
+        shas[ext] = hashlib.sha256(data).hexdigest()
+    c.execute("UPDATE office_docs SET pdf_sha256=?, xml_sha256=? WHERE id=? AND org_id=?", (shas.get("pdf", ""), shas.get("xml", ""), did, oid))
+    ofx_log(c, oid, "store", doc_id=did, detail={"pdf_sha256": shas.get("pdf", ""), "xml_sha256": shas.get("xml", ""), "format": fmt,
+                                                 "pdf_bytes": len(pdf), "xml_bytes": len(xml or b"")})
+    return shas
+
+
+def epdf_doc_files(c, oid, did):
+    """[(file name, bytes, mime)] of document did for the mail dispatch: the stored PDF (and XML for an invoice / credit
+    note); a finalised document without stored files (older) or a draft is rendered on the fly."""
+    from .docs import doc_row
+    r = doc_row(c, oid, did)
+    name = epdf_name(r)
+    out = []
+    p, x = _stored_or_missing(c, oid, r, "pdf"), _stored_or_missing(c, oid, r, "xml")
+    if p:
+        with open(p, "rb") as fh:
+            out.append((name + ".pdf", fh.read(), "application/pdf"))
+        if x:
+            with open(x, "rb") as fh:
+                out.append((name + ".xml", fh.read(), "application/xml"))
+        return out
+    pdf, xml, _fmt = _render(c, oid, r)
+    out.append((name + ".pdf", pdf, "application/pdf"))
+    if xml:
+        out.append((name + ".xml", xml, "application/xml"))
+    return out
+
+
+def _file_response(data, name, mime, inline=False):
+    resp = Response(data, mimetype=mime)
+    resp.headers["Content-Disposition"] = f'{"inline" if inline else "attachment"}; filename="{name}"'
     resp.headers["Cache-Control"] = "no-store"
     resp.headers["X-Content-Type-Options"] = "nosniff"
     return resp
+
+
+@app.get("/api/office/docs/<int:did>/pdf")
+def opdf_doc_pdf(did):
+    """The document as PDF (members of the organisation). ?inline=1 shows it in the browser instead of downloading.
+    2.38.0: a finalised document answers with its stored file (bytes identical for ever); a draft is rendered."""
+    from .docs import doc_row
+    from .ledger import ofx_log
+    c, uid, oid = _ctx()
+    r = doc_row(c, oid, did)
+    ofx_log(c, oid, "pdf", doc_id=did, dedupe_min=10)
+    c.commit()
+    p = _stored_or_missing(c, oid, r, "pdf")
+    if p:
+        with open(p, "rb") as fh:
+            data = fh.read()
+    else:
+        data = _render(c, oid, r)[0]
+    return _file_response(data, epdf_name(r) + ".pdf", "application/pdf", inline=request.args.get("inline") == "1")
+
+
+@app.get("/api/office/docs/<int:did>/xml")
+def opdf_doc_xml(did):
+    """The e-invoice XML of a finalised invoice / credit note (members of the organisation); 409 for drafts and other
+    kinds. The stored file; an older finalised document without one is built from its snapshot."""
+    from .docs import doc_row
+    from .ledger import ofx_locked, ofx_log
+    c, uid, oid = _ctx()
+    r = doc_row(c, oid, did)
+    if r["kind"] not in EPDF_KINDS_XML or not ofx_locked(r):
+        raise Denied(409, tr("The e-invoice XML exists for finalised invoices and credit notes only."))
+    ofx_log(c, oid, "xml", doc_id=did, dedupe_min=10)
+    c.commit()
+    x = _stored_or_missing(c, oid, r, "xml")
+    if x:
+        with open(x, "rb") as fh:
+            data = fh.read()
+    else:
+        data = _render(c, oid, r)[1]
+    return _file_response(data, epdf_name(r) + ".xml", "application/xml")
 
 
 @app.get("/api/office/logo")

@@ -18,7 +18,7 @@ from datetime import timedelta
 from ..core.config import app, SECRET_KEY
 from ..core.i18n import N_
 from ..core.db import iso, now_utc
-from .alerts import _AA, _AA_LOCK, aa_now
+from .alerts import _AA, _AA_LOCK, aa_now, fx2_mask_ip
 
 SEV_IPS = 10  # sign-in addresses remembered per admin
 SEV_KINDS = ("admin", "org_admin", "agent", "agent_token")
@@ -143,7 +143,7 @@ def sev_login(c, uid, ip, via="password"):
             return
         if rows:
             name = (c.execute("SELECT username FROM users WHERE id=?", (uid,)).fetchone() or [""])[0]
-            aa_now("security", f"sev:login:{uid}:{h[:16]}", N_("Admin {0} signed in from a new address: {1}."), [name, ip])
+            aa_now("security", f"sev:login:{uid}:{h[:16]}", N_("Admin {0} signed in from a new address: {1}."), [name, fx2_mask_ip(ip)])
             sev_log("admin_login_new_ip", user_id=uid, username=name, ip=ip, via=via)
     except Exception as e:  # noqa: BLE001
         print("admin sign-in check skipped:", type(e).__name__, e, flush=True)

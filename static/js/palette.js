@@ -173,11 +173,16 @@ document.addEventListener('mousedown', e => { if (S.kf && e.target.closest('#vie
 
 // ---- command palette (Ctrl/Cmd+K): fuzzy search over actions, views, lists, filters, tags, settings and tasks
 const PAL = {q: '', i: 0, mode: null, items: []};
-const fold = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+const fold = s => String(s || '').toLowerCase().replace(/ß/g, 'ss').normalize('NFD').replace(/[̀-ͯ]/g, '');
+// 2.38.0 (#1171): the query folded like the message search (msgVariants, chat.js): "aerger" finds "Ärger", "müller" "Mueller"
+const palQv = q => palQv.k === q ? palQv.v : (palQv.k = q, palQv.v = msgVariants(q));
 // subsequence match with bonuses for word starts and runs; 0 = no match
 function fuzzy(q, s) {
   if (!q) return 1;
-  const a = fold(s), b = fold(q);
+  const a = fold(s);
+  return Math.max(...palQv(q).map(b => fuzzy1(a, b)));
+}
+function fuzzy1(a, b) {
   const at = a.indexOf(b);
   if (at >= 0) return 1000 - at * 2 - a.length * 0.1 + (at === 0 || /[\s\-_/#~.(]/.test(a[at - 1]) ? 200 : 0);
   let score = 0, j = 0, run = 0, last = -2, good = 0;
@@ -350,7 +355,7 @@ function palDraw() {
   PAL.items.forEach((x, i) => {
     if (x.group && x.group !== last) { h += `<div class="pgroup">${tr(PAL_GROUP[x.group])}</div>`; last = x.group; }
     h += `<button class="pitem ${i === PAL.i ? 'on' : ''} ${x.cls || ''}" data-pi="${i}" role="option" aria-selected="${i === PAL.i}" id="pi-${i}">
-      <span class="pic">${x.img ? `<img class="picon" src="${esc(x.img)}" alt="">` : x.lic && licMark(x.lic) ? licMark(x.lic, 'pli') : x.sw !== undefined ? `<span class="psw" style="${x.sw ? 'background:' + x.sw : ''}"></span>` : ic(x.icon, 's')}</span>
+      <span class="pic">${x.lic && listIconHtml(x.lic, {cls: 'pli'}) ? listIconHtml(x.lic, {cls: 'pli'}) : x.img ? `<img class="picon" src="${esc(x.img)}" alt="">` : x.sw !== undefined ? `<span class="psw" style="${x.sw ? 'background:' + x.sw : ''}"></span>` : ic(x.icon, 's')}</span>
       <span class="pl"><span class="plt">${esc(x.label)}</span>${x.subHtml ? `<span class="pls pmsg">${x.subHtml}</span>` : x.sub ? `<span class="pls">${esc(x.sub)}</span>` : ''}</span>
       ${x.keys ? kb(x.keys) : ''}${x.kind === 'action' || x.kind === 'setting' || x.kind === 'view' || x.kind === 'msg' ? '' : `<span class="pk">${esc(tr(PAL_KIND[x.kind] || x.kind))}</span>`}</button>`;
   });

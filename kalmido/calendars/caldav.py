@@ -369,7 +369,7 @@ def dav_401():
 
 def dav_login():
     """The person of this request (HTTP Basic: user name + app password) or raises DavError / returns a 401."""
-    from ..notify.alerts import aa_count, aa_now
+    from ..notify.alerts import aa_count, aa_now, fx2_mask_ip
     from ..api.v1 import hit_limit
     from ..agents.core import is_agent
     if not dav_secure():
@@ -404,7 +404,7 @@ def dav_login():
         for k in _rate_fail(keys):
             if k.startswith("dav:ip:"):
                 aa_now("security", "ratelimit:" + k, N_("Login rate limit reached for IP {0} (logins refused for {1} min)."),
-                       [client_ip(), FAIL_WINDOW // 60])
+                       [fx2_mask_ip(client_ip()), FAIL_WINDOW // 60])
             elif u:
                 aa_now("security", "ratelimit:" + k, N_("Login rate limit reached for user {0} (logins refused for {1} min)."),
                        [username, FAIL_WINDOW // 60])

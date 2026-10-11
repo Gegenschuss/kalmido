@@ -89,7 +89,7 @@ function overdueAct(a) {
 }
 // 2.32.0 (#1055): the lists the selection can move to (the bar's Move, the key m without the multi panel)
 function multiMoveMenu(a) {
-  menu(a, S.lists.filter(l => !l.archived && canEditList(l.id)).map(l => ({label: lname(l), icon: l.is_inbox ? 'inbox' : 'list', lic: l, fn: () => batch('patch', {list_id: l.id, section_id: null}, true)})));
+  tch_listPicker(a, {filter: l => canEditList(l.id), pick: l => batch('patch', {list_id: l.id, section_id: null}, true)});  // 2.38.0 (#1177)
 }
 // 2.32.0 (#1055): the phone bar's More: what does not fit into the four buttons
 function multiMoreMenu(a) {
@@ -562,9 +562,11 @@ function folderPick(anchor, id) {
 // Held and let go without moving: the list's menu (edit, type, "Move to folder…") / the folder's menu.
 // 2.28.0 (#976): a right-click on a list or folder in the sidebar opens its menu (mouse; touch uses the long press below)
 document.addEventListener('contextmenu', e => {
-  if (isTouch() || S.listReorder || e.shiftKey) return;
+  if (S.listReorder || e.shiftKey) return;
   const r = e.target.closest?.('#side .srow[data-list]'), fh = !r && e.target.closest?.('#side .fhead[data-folder]');
   if (!r && !fh) return;
+  if (e.pointerType === 'touch') { e.preventDefault(); return; }  // 2.38.0 (#1155): the long press below is the app's, no browser menu
+  if (isTouch()) return;
   e.preventDefault();
   if (r) listMenu(r, +r.dataset.list); else folderMenu(fh, fh.dataset.folder);
 });

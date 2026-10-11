@@ -510,3 +510,14 @@ function endTouchDrag(e) {
 }
 document.addEventListener('touchend', endTouchDrag);
 document.addEventListener('touchcancel', endTouchDrag);
+// 2.38.0 (#1178): on a touch screen the long press on a task row (its title too) is the app's: the browser's own menu (Copy,
+// Select all, Search) never opens over it. When the browser took the press away from the app (touchcancel, so no selection
+// above), its menu event starts the selection instead. A mouse (also in a narrow window) keeps the browser's menu.
+document.addEventListener('contextmenu', e => {
+  const r = e.target.closest?.('#view .trow[data-id]');
+  if (!r || !(e.pointerType ? e.pointerType === 'touch' : isTouch()) || e.target.closest('input,textarea,.ttlin')) return;
+  e.preventDefault();
+  const id = +r.dataset.id;
+  if (lp || S.multiMode || isKanban() || !S.tasks.has(id) || r.classList.contains('ghost')) return;
+  S.multiMode = true; S.multi.add(id); S.multiLast = id; render();
+});

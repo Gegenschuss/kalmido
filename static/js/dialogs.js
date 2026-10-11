@@ -15,6 +15,13 @@ function modal(html) {
   modalA11y(m);
   return m;
 }
+// 2.38.0 (#1170): touch: a button in a dialog's foot (Save, Cancel ...) does not take the focus from the field being typed in, like
+// Send in the chat (#478): on iOS the first tap otherwise only closed the keyboard, the dialog moved and the tap missed Save
+for (const ev of ['pointerdown', 'mousedown']) document.addEventListener(ev, e => {
+  const b = e.target.closest?.('.modal .foot button'); if (!b || !isTouch()) return;
+  const a = document.activeElement;
+  if (a && b.closest('.modal').contains(a) && (/^(INPUT|TEXTAREA)$/.test(a.tagName) || a.isContentEditable)) e.preventDefault();
+});
 // 2.16.0 (#473): every dialog is a modal dialog for screen readers (role, name from its heading), keeps Tab inside, gets the
 // focus (its own field if it focuses one, else the dialog itself, so a phone keyboard does not pop up) and gives it back to
 // where it came from when it closes (Esc, backdrop, a button, code)
@@ -1028,6 +1035,7 @@ function lookHtml() {
     <h4>${tr('Font size')}</h4>
     <div class="row lkfs"><span class="lkA" aria-hidden="true">A</span><input type="range" id="s-fsize" min="${FS_MIN}" max="${FS_MAX}" step="5" value="${fsPct()}" aria-label="${esc(tr('Font size'))}" aria-valuetext="${fsPct()} %"><span class="lkA lkA2" aria-hidden="true">A</span><output id="s-fsv" for="s-fsize">${fsPct()} %</output><button class="btn sm" data-m="fs-reset" ${fsPct() === 100 ? 'disabled' : ''}>${tr('Reset (100 %)')}</button></div>
     <div class="shint">${tr('Scales the whole interface: text, rows, icons, spacing and dialogs.')}</div>
+    ${tch_standalone() ? `<div class="shint">${tr('In the installed app, zooming with two fingers is off. For bigger text, set the font size here.')}</div>` : ''}
     <h4>${tr('Font')}</h4>
     <div class="lkopts lkfont" id="s-font" role="group">${LOOK.font.map(([v, n]) => `<button ${on('font', v)}><span class="lkAa lkf-${v}">Aa</span><span class="lkn">${tr(n)}</span></button>`).join('')}</div>
     <div class="shint">${tr('Atkinson Hyperlegible is designed for low vision readers. Dates, times, counters and tags always stay in Geist Mono.')}</div>

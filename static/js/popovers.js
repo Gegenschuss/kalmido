@@ -11,6 +11,16 @@ function closePop() { popFocusBack(); document.body.classList.remove('pop-open')
 // its scrim and close hook back: a tap next to it closes only the drawer, like before the menu.
 function sideRearm() { if ($('#side.open') && $('#pop').classList.contains('hidden') && !popOnClose) { $('#scrim').classList.remove('hidden'); popOnClose = closeSide; } }
 let popOnClose = null;
+// 2.38.0 (#1155): ONE place that tidies the overlays when a view or a chat opens: an open quick-add sheet closes, and a scrim
+// that nothing needs any more (no drawer, menu or sheet: e.g. the drawer was opened over the quick-add sheet on Android and
+// took its close hook) goes, so it never stays over the new view catching taps
+function tch_overlaysClose() {
+  if ($('.qadd.sheet')) { const q = $('.qadd.sheet'); if (popOnClose && !$('#side.open')) closePop(); if (q.isConnected) { q.remove(); S.quickPreset = {}; S.qMoved = false; document.body.classList.remove('qsheet-open'); } }
+  const sc = $('#scrim');
+  if (sc && !sc.classList.contains('hidden') && !$('#side.open') && $('#pop').classList.contains('hidden') && !$('.qadd.sheet')) {
+    sc.classList.add('hidden'); sc.classList.remove('clear', 'overmodal'); if (popOnClose === closeSide) popOnClose = null;
+  }
+}
 function openPop(anchor, html, onClose) {
   const p = $('#pop');
   p.onclick = null;  // a click handler of the previous popover (menu, calendar event) never carries over
@@ -36,27 +46,33 @@ function openPop(anchor, html, onClose) {
 // ← goes back. Arrow keys only stop on menu items (headings and separators are skipped).
 function menuTidy(items) {
   const a = items.filter(Boolean), o = [];
-  for (let i = a.length - 1; i >= 0; i--) { const x = a[i], nx = o[0]; if ((x === '-' || x.head) && (!nx || nx === '-' || nx.head)) continue; o.unshift(x); }
+  for (let i = a.length - 1; i >= 0; i--) { const x = a[i], nx = o[0]; if ((x === '-' || x.head) && (!nx || nx === '-' || (nx.head && !x.keep))) continue; o.unshift(x); }
   while (o[0] === '-') o.shift();
   return o;
 }
-function menu(anchor, items, back, fsel) {
+// 2.38.0 (#1177): on a phone every menu / choice sheet has a head: its title (the item that opened it, or the caller's) and a
+// 44 px X to close it; a tap on the X closes the sheet (one handler below)
+let tchSheetT = '';
+const tch_sheetHead = (t, id = 'tch-sht', cls = '') => `<div class="tch-sh"><span class="tch-sht ${cls}" id="${id}">${esc(t || '')}</span><button type="button" class="iconbtn tch-shx" aria-label="${esc(tr('Close'))}" title="${esc(tr('Close'))}">${ic('x')}</button></div>`;
+document.addEventListener('click', e => { if (e.target.closest?.('#pop .tch-shx')) { e.preventDefault(); closePop(); } });
+function menu(anchor, items, back, fsel, title) {
   items = menuTidy(items);  // 2.27.0: no doubled / edge separators
-  const btn = (it, i, j) => `<button role="menuitem" data-i="${i}" ${j != null ? `data-j="${j}"` : ''} class="${it.on ? 'on' : ''} ${it.cls || ''}${it.more ? ' msubm' : ''}" ${it.more ? 'aria-haspopup="menu"' : ''} ${it.dis ? 'disabled aria-disabled="true"' : ''} ${it.title ? `title="${esc(it.title)}"` : ''}>${it.swc !== undefined ? `<span class="mswc" style="background:${cssColor(it.swc) || 'var(--bg4)'}"></span>` : it.lic && licMark(it.lic, 'mlic', true) ? licMark(it.lic, 'mlic', true) : it.dot ? `<span class="mdot">${hdot(it.dot)}</span>` : it.icon ? ic(it.icon, 's') : ''}<span class="ml">${esc(it.label)}${it.sub ? `<small class="msub">${esc(it.sub)}</small>` : ''}</span>${it.keys && !isMobile() ? kb(it.keys) : ''}${it.on ? `<span class="mchk" aria-hidden="true">${ic('check', 's')}</span>` : ''}${it.more ? `<span class="mchev" aria-hidden="true">${ic('right', 's')}</span>` : ''}</button>`;
+  const tt = title || tchSheetT, hd = isMobile() ? tch_sheetHead(tt) : '';
+  const btn = (it, i, j) => `<button role="menuitem" data-i="${i}" ${j != null ? `data-j="${j}"` : ''} class="${it.on ? 'on' : ''} ${it.cls || ''}${it.more ? ' msubm' : ''}" ${it.more ? 'aria-haspopup="menu"' : ''} ${it.dis ? 'disabled aria-disabled="true"' : ''} ${it.title ? `title="${esc(it.title)}"` : ''}>${it.swc !== undefined ? `<span class="mswc" style="background:${cssColor(it.swc) || 'var(--bg4)'}"></span>` : it.lic && listIconHtml(it.lic, {cls: 'mlic'}) ? listIconHtml(it.lic, {cls: 'mlic'}) : it.dot ? `<span class="mdot">${hdot(it.dot)}</span>` : it.icon ? ic(it.icon, 's') : ''}<span class="ml">${esc(it.label)}${it.sub ? `<small class="msub">${esc(it.sub)}</small>` : ''}</span>${it.keys && !isMobile() ? kb(it.keys) : ''}${it.on ? `<span class="mchk" aria-hidden="true">${ic('check', 's')}</span>` : ''}${it.more ? `<span class="mchev" aria-hidden="true">${ic('right', 's')}</span>` : ''}</button>`;
   // {row: [item, item]} = one line of equal buttons (1.5.1: "Today" / "Tomorrow" on top of the task menu)
   let html = '', grp = false;
   items.forEach((it, i) => {
     if ((it === '-' || it.head) && grp) { html += '</div>'; grp = false; }
     if (it === '-') html += '<hr role="separator">';
-    else if (it.head) { html += `<div class="mgrp" role="group" aria-label="${esc(it.head)}"><div class="mgh" aria-hidden="true">${esc(it.head)}</div>`; grp = true; }
+    else if (it.head) { html += `<div class="mgrp${it.cls ? ' ' + it.cls : ''}" role="group" aria-label="${esc(it.head)}"><div class="mgh" aria-hidden="true">${esc(it.head)}</div>`; grp = true; }
     else html += it.row ? `<div class="mquick${it.rcls ? ' ' + it.rcls : ''}" role="group"${it.rlab ? ` aria-label="${esc(it.rlab)}"` : ''}>${it.row.map((x, j) => btn(x, i, j)).join('')}</div>` : btn(it, i);
   });
   if (grp) html += '</div>';
-  const p = openPop(anchor, `<div class="menu-list" role="menu">${html}</div>`);
+  const p = openPop(anchor, `${hd}<div class="menu-list" role="menu"${hd && tt ? ' aria-labelledby="tch-sht"' : ''}>${html}</div>`);
   const up = () => menu(anchor, items, back, '.msubm');
   p._menuBack = back || null;
   p._menuOpen = it => menu(anchor, [{label: tr('Back'), icon: 'back', cls: 'mback', fn: up}, {head: it.label.replace(/…$/, '')}, ...it.more], up, '[role="menuitem"]:not(.mback):not([disabled])');
-  p.onclick = e => { const b = e.target.closest('[data-i]'); if (!b || b.disabled) return; let it = items[+b.dataset.i]; if (it.row) it = it.row[+b.dataset.j]; if (it.more) { p._menuOpen(it); return; } closePop(); it.fn(); };
+  p.onclick = e => { const b = e.target.closest('[data-i]'); if (!b || b.disabled) return; let it = items[+b.dataset.i]; if (it.row) it = it.row[+b.dataset.j]; if (it.more) { p._menuOpen(it); return; } closePop(); tchSheetT = String(it.label || '').replace(/…$/, ''); try { it.fn(); } finally { tchSheetT = ''; } };
   // 2.16.0 (#473): the menu gets the focus (first item); ↑ ↓ Home End move in it, Esc / Tab out close it (keydown below)
   setTimeout(() => { if (document && !p.classList.contains('hidden') && !p.contains(document.activeElement)) ((fsel && p.querySelector(fsel)) || p.querySelector('[role="menuitem"]:not([disabled])'))?.focus({preventScroll: true}); }, 0);
   return p;
@@ -111,7 +127,7 @@ function selSheet(el) {
     if (g !== grp) { grp = g; if (g) body += `<div class="ssgrp" role="presentation">${esc(g.label)}</div>`; }
     body += item(o, i);
   });
-  const p = openPop(el, `<div class="selsheet">${lab ? `<div class="sshead" id="ss-h">${esc(lab)}</div>` : ''}${search ? `<div class="sssearch">${ic('search', 's')}<input id="ss-q" type="search" placeholder="${esc(tr('Search'))}" aria-label="${esc(tr('Search'))}" autocomplete="off" enterkeyhint="search"></div>` : ''}<div class="menu-list" role="listbox" ${lab ? 'aria-labelledby="ss-h"' : `aria-label="${esc(tr('Choose'))}"`}>${body}</div></div>`, () => { if (el.isConnected) try { el.focus({preventScroll: true}); } catch { /* ignore */ } });
+  const p = openPop(el, `${tch_sheetHead(lab, 'ss-h', 'sshead')}<div class="selsheet">${search ? `<div class="sssearch">${ic('search', 's')}<input id="ss-q" type="search" placeholder="${esc(tr('Search'))}" aria-label="${esc(tr('Search'))}" autocomplete="off" enterkeyhint="search"></div>` : ''}<div class="menu-list" role="listbox" ${lab ? 'aria-labelledby="ss-h"' : `aria-label="${esc(tr('Choose'))}"`}>${body}</div></div>`, () => { if (el.isConnected) try { el.focus({preventScroll: true}); } catch { /* ignore */ } });
   p.classList.add('selpop');
   const btns = () => [...p.querySelectorAll('[data-si]')].filter(b => !b.hidden && !b.disabled);
   p.onclick = e => {
@@ -582,7 +598,21 @@ async function waitClear(id) {
 // menus): date · priority · assignee · list / section · waiting · pin · time · template · structure · delete. The short
 // menus (swipe, selection) keep the same order and end with "All…".
 const PRIO_ROW = id => { const t = taskById(id); return {row: [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', cls: p ? 'flag-' + p : '', on: t?.priority === p, title: tr('Priority') + ': ' + tr(n), fn: () => patchTask(id, {priority: p})}))}; };
-const moveListItem = (anchor, id) => ({label: tr('Move to list…'), icon: 'list', keys: 'm', fn: () => { const t = taskById(id); if (tlkStop(t)) return; menu(anchor, S.lists.filter(l => !l.archived && l.id !== t?.list_id && canAddTo(l.id)).map(l => ({label: lname(l), icon: l.is_inbox ? 'inbox' : 'list', lic: l, fn: () => patchUndoable(id, {list_id: l.id}, tr('Moved to {0}', lname(l)))}))); }});
+const moveListItem = (anchor, id) => ({label: tr('Move to list…'), icon: 'list', keys: 'm', fn: () => { const t = taskById(id); if (tlkStop(t)) return; tch_listPicker(anchor, {filter: l => l.id !== t?.list_id && canAddTo(l.id), pick: l => patchUndoable(id, {list_id: l.id}, tr('Moved to {0}', lname(l)))}); }});
+// 2.38.0 (#1177): ONE list picker for "Move to list…" (task menu, a note, the Inbox's move button): the Inbox first, then the
+// lists in the sidebar's order; a folder is only a heading with its lists indented below it (a subfolder one step deeper).
+// opts: filter(list) = which lists, pick(list) = what a choice does, title = the sheet's title (default "Move to list")
+function tch_listPicker(anchor, o = {}) {
+  const ok = l => !!l && !l.archived && (!o.filter || o.filter(l)), ib = inbox();
+  const it = l => ({label: lname(l), icon: l.is_inbox ? 'inbox' : 'list', lic: l, cls: 'tch-l', fn: () => o.pick(l)});
+  const ls = sideOrder().filter(ok), rows = [...(ok(ib) ? [it(ib)] : []), ...ls.filter(l => !l.folder).map(it)];
+  for (const f of folderNames()) {
+    const fl = ls.filter(l => l.folder === f), sub = !!fParent(f);
+    if (!fl.length && (sub || !ls.some(l => fUnder(l.folder, f)))) continue;  // a folder without lists here is left out
+    rows.push({head: sub ? fName(f) : f, cls: 'tch-fd' + (sub ? ' tch-fd2' : ''), keep: !sub}, ...fl.map(it));
+  }
+  return menu(anchor, rows, null, null, o.title || tr('Move to list'));
+}
 function taskMenu(anchor, id, o = {}) {
   const t = taskById(id);
   if (!canEdit(t)) { roToast(); return; }
@@ -871,3 +901,31 @@ document.addEventListener('contextmenu', e => {
   e.preventDefault();
   taskMenu(r.querySelector('.ttl') || r, t.id);
 });
+// 2.38.0 (#1173): the installed app (display-mode standalone, iOS: navigator.standalone) does not zoom by pinch or double tap,
+// like a native app: html.nozoom (touch-action pan-x pan-y) + the viewport without user scaling. The browser tab keeps zooming
+// (WCAG 1.4.4, axe meta-viewport). While a picture or a file view (.lightbox) or the timeline is open, pinching works again.
+// Bigger text: the system's font size is still followed (rem based).
+let tchVp = null;
+const tch_standalone = () => { try { return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; } catch { return false; } };
+const tch_zoomFree = () => !!document.querySelector('.lightbox') || (S.route?.mod === 'tasks' && (isTimeline() || isRoadmap()));
+function tch_zoomSync() {
+  if (typeof document === 'undefined' || !document) return;  // a closed window (observer after unload)
+  const de = document.documentElement, m = document.querySelector('meta[name="viewport"]'), sa = tch_standalone();
+  let lock = false; try { lock = sa && !tch_zoomFree(); } catch { /* not ready yet */ }
+  de.classList.toggle('standalone', sa); de.classList.toggle('nozoom', lock);
+  if (!m) return;
+  if (tchVp == null) tchVp = m.getAttribute('content') || '';
+  const want = lock ? tchVp + ', maximum-scale=1, user-scalable=no' : tchVp;
+  if (m.getAttribute('content') !== want) m.setAttribute('content', want);
+}
+{
+  const go = () => {
+    tch_zoomSync();
+    try { new MutationObserver(tch_zoomSync).observe(document.body, {childList: true}); const v = $('#view'); if (v) new MutationObserver(tch_zoomSync).observe(v, {childList: true}); } catch { /* old browser */ }
+    try { matchMedia('(display-mode: standalone)').addEventListener?.('change', tch_zoomSync); } catch { /* old browser */ }
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
+  window.addEventListener('hashchange', () => setTimeout(tch_zoomSync, 0));
+  // iOS ignores user-scalable in places: its pinch gesture is stopped while the app is locked
+  document.addEventListener('gesturestart', e => { if (document.documentElement.classList.contains('nozoom')) e.preventDefault(); });
+}

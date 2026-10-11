@@ -21,6 +21,7 @@ window.addEventListener('resize', () => { clearTimeout(chatRelT); chatRelT = set
 try { screen.orientation?.addEventListener('change', () => { clearTimeout(chatRelT); chatRelT = setTimeout(chatRelayout, 150); }); } catch { /* old browsers */ }
 S.chat = {aid: null, msgs: [], err: null};
 function chatOpen(aid, o = {}) {
+  tch_overlaysClose();  // 2.38.0 (#1155): no quick-add sheet or stale scrim stays over the chat
   if (chatFull()) { if (!/^#agents\//.test(location.hash)) S.chatBack = location.hash.slice(1); go('agents/' + aid); return; }
   const fl = o.float ?? chatFloatOn();
   if (!fl && document.body.classList.contains('chat-yield') && S.sel) closeDetail();  // 2.13.2 (#478 N1): the chat takes its place back

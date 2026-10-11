@@ -92,11 +92,9 @@ def _folded(text):
 
 
 def msg_terms(q):
-    """The words of a query (max 8, each max 64 chars); BadInput when there is none."""
-    terms = [w[:64] for w in re.findall(r"\w+", q or "")][:MSG_TERMS]
-    if not terms:
-        raise BadInput(tr("Invalid value: {0}", "q"))
-    return terms
+    """The words of a query (max 8, each max 64 chars); [] when there is none (only %, _, spaces or punctuation:
+    2.38.0, #1169 no hits instead of an error)."""
+    return [w[:64] for w in re.findall(r"\w+", q or "") if w.strip("_")][:MSG_TERMS]
 
 
 def _variants(term):
@@ -162,6 +160,8 @@ def snippet(text, marks):
 def search_messages(c, uid, q, arts=None, sender=None, room=None, agent=None, task=None):
     """Every visible message matching q, newest first: a list of hit dicts (see the module doc)."""
     terms = msg_terms(q)
+    if not terms:
+        return []
     mcond, match = match_sql(terms)
     agent_me = is_agent(g.user) if getattr(g, "user", None) is not None else False
     arts = set(arts or ARTS)

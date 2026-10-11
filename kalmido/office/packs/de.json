@@ -11,8 +11,16 @@
     "reduced": 7,
     "exempt": 0,
     "labels": {
-      "de": {"standard": "19 % MwSt.", "reduced": "7 % MwSt.", "exempt": "steuerfrei"},
-      "en": {"standard": "19 % VAT", "reduced": "7 % VAT", "exempt": "tax exempt"}
+      "de": {
+        "standard": "19 % MwSt.",
+        "reduced": "7 % MwSt.",
+        "exempt": "steuerfrei"
+      },
+      "en": {
+        "standard": "19 % VAT",
+        "reduced": "7 % VAT",
+        "exempt": "tax exempt"
+      }
     },
     "exempt_note": {
       "de": "Nicht im Inland steuerbar - Reverse-Charge-Verfahren (Steuerschuldnerschaft des Leistungsempfängers).",
@@ -26,9 +34,18 @@
     "currency_pos": "after"
   },
   "required_fields": [
-    "company_name", "company_address", "tax_number_or_vat_id", "recipient_name", "recipient_address",
-    "invoice_number", "invoice_date", "delivery_date_or_period", "line_items", "net_per_tax_rate",
-    "tax_rate_and_amount", "gross_total"
+    "company_name",
+    "company_address",
+    "tax_number_or_vat_id",
+    "recipient_name",
+    "recipient_address",
+    "invoice_number",
+    "invoice_date",
+    "delivery_date_or_period",
+    "line_items",
+    "net_per_tax_rate",
+    "tax_rate_and_amount",
+    "gross_total"
   ],
   "labels": {
     "de": {
@@ -65,9 +82,49 @@
       "signature": "Mit freundlichen Grüßen",
       "order": "Auftragserteilung",
       "order_hint": "Ort, Datum, Unterschrift",
-      "units": {"day": "Tage", "hour": "Std.", "piece": "Stk.", "minute": "Min.", "flat": "pauschal"},
-      "units_one": {"day": "Tag", "hour": "Std.", "piece": "Stk.", "minute": "Min.", "flat": "pauschal"},
-      "unit_one": {"day": "Tag", "hour": "Std.", "piece": "Stk.", "minute": "Min.", "flat": "pauschal"}
+      "units": {
+        "day": "Tage",
+        "hour": "Std.",
+        "piece": "Stk.",
+        "minute": "Min.",
+        "flat": "pauschal"
+      },
+      "units_one": {
+        "day": "Tag",
+        "hour": "Std.",
+        "piece": "Stk.",
+        "minute": "Min.",
+        "flat": "pauschal"
+      },
+      "unit_one": {
+        "day": "Tag",
+        "hour": "Std.",
+        "piece": "Stk.",
+        "minute": "Min.",
+        "flat": "pauschal"
+      },
+      "credit": "Gutschrift",
+      "credit_no": "Gutschrift Nr.",
+      "reminder_1": "Zahlungserinnerung",
+      "reminder_2": "Mahnung",
+      "reminder_3": "Letzte Mahnung",
+      "reminder_no": "Mahnung Nr.",
+      "to_invoice": "zu Rechnung Nr.",
+      "customer_no": "Kunden-Nr.",
+      "service_period": "Leistungszeitraum",
+      "due": "Fällig am",
+      "fx": "Wechselkurs 1 €",
+      "subtotal": "Zwischensumme",
+      "invoice_total": "Rechnungsbetrag",
+      "credit_total": "Gutschriftsbetrag",
+      "paid": "Bereits bezahlt",
+      "open": "Offener Betrag",
+      "open_total": "Offener Betrag",
+      "reminder_fee": "Mahngebühr",
+      "col_invoice": "Rechnung",
+      "amount": "Betrag",
+      "payment": "Zahlung",
+      "col_due": "Fällig"
     },
     "en": {
       "offer": "Quotation",
@@ -103,9 +160,49 @@
       "signature": "Kind regards",
       "order": "Order confirmation",
       "order_hint": "Place, date, signature",
-      "units": {"day": "days", "hour": "hrs", "piece": "pcs", "minute": "min", "flat": "flat"},
-      "units_one": {"day": "day", "hour": "hr", "piece": "pc", "minute": "min", "flat": "flat"},
-      "unit_one": {"day": "day", "hour": "hr", "piece": "pc", "minute": "min", "flat": "flat"}
+      "units": {
+        "day": "days",
+        "hour": "hrs",
+        "piece": "pcs",
+        "minute": "min",
+        "flat": "flat"
+      },
+      "units_one": {
+        "day": "day",
+        "hour": "hr",
+        "piece": "pc",
+        "minute": "min",
+        "flat": "flat"
+      },
+      "unit_one": {
+        "day": "day",
+        "hour": "hr",
+        "piece": "pc",
+        "minute": "min",
+        "flat": "flat"
+      },
+      "credit": "Credit note",
+      "credit_no": "Credit note No.",
+      "reminder_1": "Payment reminder",
+      "reminder_2": "Reminder",
+      "reminder_3": "Final reminder",
+      "reminder_no": "Reminder No.",
+      "to_invoice": "Credit note for invoice No.",
+      "customer_no": "Customer No.",
+      "service_period": "Service period",
+      "due": "Due on",
+      "fx": "Exchange rate €1",
+      "subtotal": "Subtotal",
+      "invoice_total": "Total",
+      "credit_total": "Credit total",
+      "paid": "Already paid",
+      "open": "Amount outstanding",
+      "open_total": "Amount outstanding",
+      "reminder_fee": "Reminder fee",
+      "col_invoice": "Invoice",
+      "amount": "Amount",
+      "payment": "Payment",
+      "col_due": "Due"
     }
   },
   "texts": {
@@ -113,34 +210,148 @@
       "de": "vielen Dank für Ihre Anfrage. Gerne unterbreiten wir Ihnen folgendes Angebot:",
       "en": "thank you for your enquiry. We are pleased to submit the following quotation:"
     },
-    "salutation": {"de": "Sehr geehrte Damen und Herren,", "en": "Dear Sir or Madam,"},
+    "salutation": {
+      "de": "Sehr geehrte Damen und Herren,",
+      "en": "Dear Sir or Madam,"
+    },
     "closing": {
       "de": "Wir freuen uns auf die Zusammenarbeit und stehen für Rückfragen gerne zur Verfügung.",
       "en": "We look forward to working with you and are happy to answer any questions."
     },
-    "vat_note": {"de": "Alle Preise zuzüglich 7 % bzw. 19 % MwSt.", "en": "All prices plus 7 % or 19 % VAT."},
-    "vat_note_novat": {"de": "Alle Preise netto, ohne MwSt.", "en": "All prices net, without VAT."},
-    "rights_note": {"de": "Im Übrigen gelten unsere AGB.", "en": "Our general terms and conditions apply."},
-    "valid_note": {"de": "Dieses Angebot ist gültig bis {date}.", "en": "This quotation is valid until {date}."},
+    "vat_note": {
+      "de": "Alle Preise zuzüglich 7 % bzw. 19 % MwSt.",
+      "en": "All prices plus 7 % or 19 % VAT."
+    },
+    "vat_note_novat": {
+      "de": "Alle Preise netto, ohne MwSt.",
+      "en": "All prices net, without VAT."
+    },
+    "rights_note": {
+      "de": "Im Übrigen gelten unsere AGB.",
+      "en": "Our general terms and conditions apply."
+    },
+    "valid_note": {
+      "de": "Dieses Angebot ist gültig bis {date}.",
+      "en": "This quotation is valid until {date}."
+    },
     "rights_time": [
-      {"key": "unlimited", "de": "unbegrenzt", "en": "in perpetuity"},
-      {"key": "1y", "de": "1 Jahr ab Erstveröffentlichung", "en": "1 year from first publication"},
-      {"key": "2y", "de": "2 Jahre ab Erstveröffentlichung", "en": "2 years from first publication"}
+      {
+        "key": "unlimited",
+        "de": "unbegrenzt",
+        "en": "in perpetuity"
+      },
+      {
+        "key": "1y",
+        "de": "1 Jahr ab Erstveröffentlichung",
+        "en": "1 year from first publication"
+      },
+      {
+        "key": "2y",
+        "de": "2 Jahre ab Erstveröffentlichung",
+        "en": "2 years from first publication"
+      }
     ],
     "rights_territory": [
-      {"key": "world", "de": "weltweit", "en": "worldwide"},
-      {"key": "dach", "de": "DACH", "en": "Germany, Austria, Switzerland"},
-      {"key": "de", "de": "Deutschland", "en": "Germany"},
-      {"key": "world_ex_music", "de": "weltweit außer Musik auf Messe/Event (DE)", "en": "worldwide except music on trade shows / live events (DE)"}
+      {
+        "key": "world",
+        "de": "weltweit",
+        "en": "worldwide"
+      },
+      {
+        "key": "dach",
+        "de": "DACH",
+        "en": "Germany, Austria, Switzerland"
+      },
+      {
+        "key": "de",
+        "de": "Deutschland",
+        "en": "Germany"
+      },
+      {
+        "key": "world_ex_music",
+        "de": "weltweit außer Musik auf Messe/Event (DE)",
+        "en": "worldwide except music on trade shows / live events (DE)"
+      }
     ],
     "rights_media": [
-      {"key": "internal", "de": "intern", "en": "internal use"},
-      {"key": "internal_web_unpaid", "de": "intern, web, unpaid media", "en": "internal use, web, unpaid media"},
-      {"key": "all", "de": "alle Medien", "en": "all media"},
-      {"key": "web_social_paid", "de": "web, social media, paid media", "en": "web, social media, paid media"}
-    ]
+      {
+        "key": "internal",
+        "de": "intern",
+        "en": "internal use"
+      },
+      {
+        "key": "internal_web_unpaid",
+        "de": "intern, web, unpaid media",
+        "en": "internal use, web, unpaid media"
+      },
+      {
+        "key": "all",
+        "de": "alle Medien",
+        "en": "all media"
+      },
+      {
+        "key": "web_social_paid",
+        "de": "web, social media, paid media",
+        "en": "web, social media, paid media"
+      }
+    ],
+    "invoice_intro": {
+      "de": "für das oben genannte Projekt erlauben wir uns, Ihnen folgende Leistungen in Rechnung zu stellen:",
+      "en": "regarding the project referenced above, we are pleased to submit the following charges for our services:"
+    },
+    "invoice_closing": {
+      "de": "Der Gesamtbetrag wird mit Erhalt dieser Rechnung zur Zahlung fällig. Es gelten unsere allgemeinen Geschäftsbedingungen.",
+      "en": "Please remit the invoice amount to the account specified above. Our general terms and conditions apply."
+    },
+    "credit_intro": {
+      "de": "zu der unten genannten Rechnung erteilen wir Ihnen folgende Gutschrift:",
+      "en": "regarding the invoice referenced below we issue the following credit note:"
+    },
+    "reminder_intro": {
+      "de": "sicher ist Ihrer Aufmerksamkeit entgangen, dass folgende Rechnungen noch nicht beglichen sind:",
+      "en": "it may have escaped your attention that the following invoices are still outstanding:"
+    },
+    "reminder_closing": {
+      "de": "Wir bitten Sie darum, den kompletten Rechnungsbetrag innerhalb von {days} Werktagen auf unser oben genanntes Bankkonto zu überweisen.",
+      "en": "Please transfer the full amount within {days} working days to the bank account above."
+    },
+    "payment_note": {
+      "de": "Zahlbar bis {date} ohne Abzug.",
+      "en": "Payable by {date} without deduction."
+    },
+    "fx_tax_note": {
+      "de": "Steuerbetrag entspricht {tax} EUR, Kurs 1 EUR = {rate} USD",
+      "en": "Tax amount equals EUR {tax}, rate EUR 1 = USD {rate}"
+    },
+    "vat_note_reverse": {
+      "de": "Steuerschuldnerschaft des Leistungsempfängers (Reverse-Charge-Verfahren, § 13b UStG).",
+      "en": "VAT to be accounted for by the recipient (reverse charge, Art. 196 Directive 2006/112/EC)."
+    },
+    "vat_note_abroad": {
+      "de": "Nicht im Inland steuerbar.",
+      "en": "Not taxable in Germany."
+    },
+    "vat_note_small": {
+      "de": "Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.",
+      "en": "No VAT is charged (small business, section 19 German VAT Act)."
+    }
   },
-  "numbering": {"offer": "KVA-{yyyy}-{seq:03}", "invoice": "RE-{yyyy}-{seq:03}"},
-  "einvoice": {"formats": ["zugferd", "xrechnung"], "status": "planned"},
-  "bookkeeping": {"export": "datev", "status": "planned"}
+  "numbering": {
+    "offer": "KVA-{yyyy}-{seq:03}",
+    "invoice": "RE-{yyyy}-{seq:03}",
+    "credit": "GS-{yyyy}-{seq:03}",
+    "reminder": "MA-{yyyy}-{seq:03}"
+  },
+  "einvoice": {
+    "formats": [
+      "zugferd",
+      "xrechnung"
+    ],
+    "status": "ready",
+    "profile": "EN16931"
+  },
+  "bookkeeping": {
+    "export": "datev",
+    "status": "planned"
+  }
 }

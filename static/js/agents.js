@@ -512,7 +512,7 @@ function propRequest(kind, ctx = {}) {
   } else if (kind === 'extract') {
     const l = listById(ctx.lid); if (!l) return;
     title = tr('Tasks from notes');
-    body = `<div class="pptask">${ic('list', 's')}<b>${esc(lname(l))}</b></div>
+    body = `<div class="pptask">${listIconHtml(l, {cls: 's'}) || ic('list', 's')}<b>${esc(lname(l))}</b></div>
       <div class="row ppcol"><label for="pp-text">${tr('Notes')}</label><textarea id="pp-text" rows="8" maxlength="50000" placeholder="${esc(tr('Paste the meeting notes'))}"></textarea></div>`;
   }
   const md = modal(`<h3>${ic('bot', 's')} ${esc(title)}</h3>${body}${propAgentRow()}<div class="shint" id="pp-priv"></div>
