@@ -412,6 +412,18 @@ ROUTES = {
     "GET /api/v1/time/gaps": "aggregate", "GET /api/agents/{}/schedules": "agent", "POST /api/agents/{}/schedules": "agent",
     "PATCH /api/agent-schedules/{}": "agent", "DELETE /api/agent-schedules/{}": "agent", "POST /api/agent-schedules/{}/run": "agent",
     "GET /api/v1/agent/schedules": "agent", "GET /api/v1/attachments/{}/text": "attachment", "POST /api/pdf-text": "own",
+    # 2.39.0 (#1168): the Playbook of a list (need_list: people who do not see the list 404, p2390_a_api_test.py) and of a
+    # folder (the own folders only), agent proposals, the scheduled list checks (an agent of the list); #1179: editing an own
+    # message in an agent chat (only the sender, only an agent one may use)
+    "GET /api/lists/{}/playbook": "list", "PUT /api/lists/{}/playbook": "list", "GET /api/lists/{}/playbook/versions": "list",
+    "GET /api/lists/{}/playbook/versions/{}": "list", "POST /api/lists/{}/playbook/restore": "list",
+    "POST /api/lists/{}/playbook/proposals/{}/apply": "list", "POST /api/lists/{}/playbook/proposals/{}/discard": "list",
+    "GET /api/v1/lists/{}/playbook": "list", "POST /api/v1/lists/{}/playbook/proposals": "list",
+    "GET /api/folders/playbook": "folder", "PUT /api/folders/playbook": "folder", "GET /api/folders/playbook/versions": "folder",
+    "GET /api/folders/playbook/versions/{}": "folder", "POST /api/folders/playbook/restore": "folder",
+    "GET /api/lists/{}/checks": "agent", "POST /api/lists/{}/checks": "agent", "PATCH /api/list-checks/{}": "agent",
+    "DELETE /api/list-checks/{}": "agent", "POST /api/list-checks/{}/run": "agent",
+    "PATCH /api/agents/{}/chat/{}": "agent",
 }
 
 # ---- 1. every route is classified, nothing stale
