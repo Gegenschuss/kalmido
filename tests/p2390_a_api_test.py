@@ -199,7 +199,8 @@ check("/lists/{id}/playbook" in spec["paths"] and "/lists/{id}/playbook/proposal
       and "playbook_proposal" in str(spec), "#1168: OpenAPI documents the routes and the event")
 
 # ---- the playbook in events
-A.patch(B + f"/api/lists/{W}", json={"listen_agent_ids": [CL]})
+A.patch(B + f"/api/lists/{W}", json={"listen_agent_ids": [CL], "agent_members": True})  # members may address the agent
+A.patch(B + f"/api/lists/{W2}", json={"listen_agent_ids": [CL]})
 s1 = last_seq()
 T1 = Ca.post(B + "/api/tasks", json={"title": "Receipt dentist 80 EUR", "list_id": W}).json()["id"]
 ev = wait_for(lambda: events(kinds={"task_added"}, since=s1))
@@ -207,13 +208,13 @@ pb = (ev[0]["data"].get("playbook") or {}) if ev else {}
 check(ev and pb.get("text") == eff and pb.get("list_id") == W and pb.get("version") == d["version"] and pb.get("updated_at"),
       "#1168: task_added carries the playbook " + str(pb)[:200])
 s1 = last_seq()
-Ca.post(B + f"/api/tasks/{T1}/comments", json={"body": "@claude please read this receipt"})
+Ca.post(B + f"/api/tasks/{T1}/comments", json={"body": f"<@{CL}> please read this receipt"})
 ev = wait_for(lambda: events(kinds={"mention", "comment"}, since=s1))
 check(ev and all((e["data"].get("playbook") or {}).get("text") == eff for e in ev), "#1168: mention / comment carry it " + str([e["event"] for e in ev]))
 s1 = last_seq()
-T0 = Ca.post(B + "/api/tasks", json={"title": "Loose task", "list_id": W2}).json()["id"]
-ev = wait_for(lambda: events(kinds={"task_added"}, since=s1), 2)
-check(all((e["data"].get("playbook") or {}).get("text") == "Household rules: be brief." for e in ev), "#1168: another list: its own effective Playbook")
+A.post(B + "/api/tasks", json={"title": "Loose task", "list_id": W2})
+ev = wait_for(lambda: events(kinds={"task_added"}, since=s1))
+check(ev and all((e["data"].get("playbook") or {}).get("text") == "Household rules: be brief." for e in ev), "#1168: another list: its own effective Playbook")
 check(A.patch(B + f"/api/lists/{W}", json={"agent_tidy": "suggest"}).ok, "setup: tidy suggest")
 s1 = last_seq()
 Ca.post(B + "/api/tasks", json={"title": "so we need to check the receipt of the pharmacy and also the other one from may", "list_id": W})
