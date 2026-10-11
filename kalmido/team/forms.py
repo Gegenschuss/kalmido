@@ -183,6 +183,12 @@ def _find(c, token):
         r = c.execute("""SELECT f.*, l.owner_id AS l_owner, l.name AS l_name, l.org_id AS l_org FROM forms f JOIN lists l ON l.id=f.list_id
                          JOIN users u ON u.id=l.owner_id WHERE f.token_hash=? AND f.enabled=1 AND u.disabled=0 AND l.archived=0""",
                       (_token_hash(token),)).fetchone()
+    if r is not None and g.user and r["access"] == "public" and r["l_org"]:
+        from ..accounts.orgs import user_orgs
+        if r["l_org"] not in user_orgs(c, g.user["id"]):
+            # 2.37.0 (review K2-2): a signed-in person of another organisation uses a public form like a visitor (the
+            # context hook prefers g.user, whose organisations do not include the list's)
+            g.user = None
     if r is not None and not g.user:
         acx_anon_bind(c, r["l_org"])  # ... a visitor without an account works inside exactly the list's organisation
     return r

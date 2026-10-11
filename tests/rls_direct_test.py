@@ -257,6 +257,27 @@ if r.status_code == 201:
 else:
     check(False, "setup: a public form " + r.text[:120])
 
+# ---- 2.37.0 (review K2-2): carol (signed in, organisation Beta) opens the public link and the public form of the Alpha list:
+# both work as for a visitor without an account (read and written inside Alpha only), nothing of carol's own shows
+TC = Bo.post(B + "/api/tasks", json={"title": f"{MARK} carol ticks", "list_id": LA}).json()["id"]
+page = Ca.get(B + url)
+check(page.status_code == 200 and f"{MARK} carol ticks" in page.text and "Beta list" not in page.text
+      and "other list task" not in page.text and "Carol" not in page.text,
+      f"K2-2: carol (Beta) opens the public link of an Alpha list: its tasks, nothing else ({page.status_code})")
+r = Ca.post(B + url + "/tick", data={"task": str(TC), "to": "done"}, allow_redirects=False)
+check(r.status_code == 303 and sql("SELECT status, completed_by FROM tasks WHERE id=?", (TC,))[0][0] != 0,
+      f"K2-2: carol ticks through the public link ({r.status_code})")
+if "furl" in globals():
+    fp = Ca.get(B + furl)
+    check(fp.status_code == 200 and f"{MARK} form" in fp.text and "Carol" not in fp.text and 'name="name"' in fp.text,
+          f"K2-2: carol opens the public form of an Alpha list like a visitor ({fp.status_code})")
+    r2 = Ca.post(B + furl, data={"subject": "Carol request", "text": "hi", "name": "Visitor C"})
+    row = sql("SELECT created_by, content FROM tasks WHERE list_id=? AND title='Carol request'", (LA,))
+    check(r2.status_code == 200 and len(row) == 1 and row[0][0] is None and "Visitor C" in row[0][1],
+          f"K2-2: carol's form request lands in the Alpha list as a visitor's ({r2.status_code} {row})")
+    check(MARK not in " ".join(x["name"] for x in Ca.get(B + "/api/state").json()["lists"]),
+          "K2-2: afterwards carol's own state still has no Alpha list")
+
 # ---- background work is "system": a reminder of an Alpha task fires
 now = datetime.fromisoformat(subprocess.run(["docker", "exec", CONTAINER, "date", "+%Y-%m-%dT%H:%M:%S"], capture_output=True, text=True).stdout.strip())
 due = now - timedelta(minutes=2)

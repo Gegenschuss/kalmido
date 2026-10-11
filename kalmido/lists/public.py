@@ -68,6 +68,8 @@ def pub_find(c, token):
     if not r or (r["expires_at"] and parse_iso(r["expires_at"]) <= now_utc()):
         return None
     acx_anon_bind(c, r["l_org"])  # ... then the page reads as nobody, inside exactly the list's organisation
+    # 2.37.0 (review K2-2): also for a signed-in visitor (the context hook prefers g.user): a public page is nobody's
+    g.user, g.auth_via = PUB_ACTOR, "public"
     return r
 
 
