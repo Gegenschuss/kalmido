@@ -153,13 +153,22 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
+      - name: Start PostgreSQL
+        # 2.37.0: Kalmido needs PostgreSQL 17
+        run: |
+          docker run -d --name kalmido-zap-db -e POSTGRES_USER=kalmido -e POSTGRES_PASSWORD=zap -e POSTGRES_DB=kalmido \
+            -e POSTGRES_INITDB_ARGS=--data-checksums postgres:17 -c max_connections=100
+          for i in $(seq 1 60); do docker exec kalmido-zap-db pg_isready -U kalmido -d kalmido -q && break; sleep 1; done
+          docker exec kalmido-zap-db pg_isready -U kalmido -d kalmido
       - name: Start Kalmido
         run: |
           docker build -t kalmido:test .
           mkdir -p /tmp/zapdata
           docker run -d --name kalmido-zap --user "$(id -u):$(id -g)" -e KALMIDO_UPDATE_CHECK=0 -e TASKS_DB=/data/tasks.db \
+            -e DATABASE_URL=postgresql://kalmido:zap@db:5432/kalmido --link kalmido-zap-db:db \
             -p 127.0.0.1:3040:3040 -v /tmp/zapdata:/data kalmido:test
-          for i in $(seq 1 60); do curl -sf http://127.0.0.1:3040/api/health && break; sleep 1; done
+          for i in $(seq 1 90); do curl -sf http://127.0.0.1:3040/api/health && break; sleep 1; done
+          curl -sf http://127.0.0.1:3040/api/health || { docker logs kalmido-zap 2>&1 | tail -40; exit 1; }
       - name: ZAP baseline scan (unauthenticated)
         run: |
           docker run --rm --network host ghcr.io/zaproxy/zaproxy:stable \

@@ -11,7 +11,15 @@ services:
       - no-new-privileges:true
     cap_drop: [ALL]
     env_file: .env
+    environment:
+      # 2.37.0: the data lives in PostgreSQL (service "db" below). An own / managed server instead: set DATABASE_URL in
+      # .env and remove the db service and depends_on (docs/SELF-HOSTING.md). Use letters and digits for the password.
+      DATABASE_URL: ${DATABASE_URL:-postgresql://kalmido:${POSTGRES_PASSWORD}@db:5432/kalmido}
+    depends_on:
+      db:
+        condition: service_healthy
     volumes:
+      # attachments, backups, office files; an old tasks.db here moves to PostgreSQL on the first start of 2.37
       - ./data:/data
     ports:
       # Built-in login by default (setup page on the first start). Keep it on localhost behind a
@@ -20,3 +28,31 @@ services:
       # Single sign-on via a trusted proxy header (see .env.example / README): map the proxy port
       # only to the address your proxy connects to, e.g. instead of the line above:
       # - "127.0.0.1:3040:3045"
+
+  db:
+    # PostgreSQL 17 (2.37.0). Stay on 17 when updating; a new major version needs a dump + restore (docs/SELF-HOSTING.md).
+    image: postgres:17
+    container_name: kalmido-db
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      POSTGRES_USER: kalmido
+      POSTGRES_DB: kalmido
+      # set in .env (e.g. openssl rand -hex 24); only read when the database folder is created
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      # page checksums: damaged pages are reported instead of read silently
+      POSTGRES_INITDB_ARGS: --data-checksums
+    # Kalmido keeps up to 56 connections (KALMIDO_DB_POOL_MAX); the server must allow more
+    command: ["postgres", "-c", "max_connections=100"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kalmido -d kalmido"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    # time for a clean shutdown (no recovery on the next start)
+    stop_grace_period: 60s
+    volumes:
+      # the database files; no port is published, only Kalmido reaches the database
+      - ./pgdata:/var/lib/postgresql/data

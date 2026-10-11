@@ -12,6 +12,7 @@ addresses and paths to your setup.
 - [Reverse proxy and network](#reverse-proxy-and-network)
 - [Installed app (PWA) and push](#installed-app-pwa-and-push)
 - [Database (PostgreSQL)](#database-postgresql)
+- [Upgrade to 2.37 (PostgreSQL required)](#upgrade-to-237-postgresql-required)
 - [Backup and encryption](#backup-and-encryption)
 - [Server hardening](#server-hardening)
 - [Intrusion alerts](#intrusion-alerts)
@@ -130,35 +131,161 @@ to *deny* and allow each app per group, so a new account does not open every app
 
 ## Database (PostgreSQL)
 
-Since 2.37.0 Kalmido needs PostgreSQL 17 (`DATABASE_URL=postgresql://user:password@host/db`); without it the app does
-not start and says why.
+Since 2.37.0 Kalmido needs PostgreSQL 17 (`DATABASE_URL=postgresql://user:password@host:5432/db`); without it the app
+does not start and says why. The `docker-compose.yml` of the repository brings its own server (service `db`,
+`postgres:17`, data in `./pgdata`, password `POSTGRES_PASSWORD` in `.env`); nothing else is needed. Coming from an older
+version: [Upgrade to 2.37](#upgrade-to-237-postgresql-required).
 
+- **Password in the URL.** Use letters and digits only (`openssl rand -hex 24`): characters like `@`, `/`, `:` or `#`
+  break the URL. `POSTGRES_PASSWORD` is only read when `./pgdata` is created; to change it later, also run
+  `ALTER ROLE kalmido PASSWORD '...'` inside the database.
+- **Settings of the `db` service.** `POSTGRES_INITDB_ARGS=--data-checksums` (damaged pages are reported, not read
+  silently; only takes effect when `./pgdata` is created), `max_connections=100`, a `pg_isready` health check that
+  Kalmido waits for, and no published port. Keep the image on major version 17 (see "major upgrade" below).
 - **Extensions need the database owner.** `init_db` creates `unaccent` and `pg_trgm` (both trusted extensions in the
   official image). With an external server, the user in `DATABASE_URL` must own the database, or create them once yourself.
-- **Row-level security.** Kalmido enforces the organisation boundary also in the database. If the database user can
-  bypass row-level security (the superuser of the official `postgres` image does), Kalmido creates the role `kalmido_app`
-  (no login, no bypass) and its connections switch to it; this needs the right to create roles. Otherwise create it once:
-  `CREATE ROLE kalmido_app NOLOGIN NOBYPASSRLS; GRANT kalmido_app TO <your user>;`.
 - **Connections.** Kalmido keeps up to 56 connections (`KALMIDO_DB_POOL_MAX`); `max_connections` of the server must be
   higher (the default 100 is enough for one instance).
-- **Timeouts.** Every statement may run 30 s, a transaction may idle 5 minutes; Kalmido sets this itself per connection.
+- **Timeouts.** A statement may run 30 s (`KALMIDO_DB_STATEMENT_TIMEOUT`, seconds, `0` = no limit; raise it for very
+  large instances, for example when deleting a user with many tasks or opening office numbers over many years), a
+  transaction may idle 5 minutes. At the start Kalmido waits up to 60 s for the database (`KALMIDO_DB_WAIT`).
 - **Backups outside the app** (scripts, a pull from a second machine): use `pg_dump -Fc` with row-level security
   switched on and the system context, otherwise the dump stops or misses rows:
 
   ```bash
-  PGOPTIONS="-c app.role=system" pg_dump -Fc --enable-row-security -h db -U kalmido -d kalmido -f kalmido.dump
+  docker compose exec -T -e PGOPTIONS="-c app.role=system" db pg_dump -Fc --enable-row-security -U kalmido -d kalmido > kalmido.dump
   ```
+
+  Against an external server:
+
+  ```bash
+  PGOPTIONS="-c app.role=system" pg_dump -Fc --enable-row-security -h db.example.com -U kalmido -d kalmido -f kalmido.dump
+  ```
+
   Restore with `pg_restore --clean --if-exists --no-owner --no-privileges --single-transaction --enable-row-security`
-  and the same `PGOPTIONS`, as the database owner, then start Kalmido (it grants the rights again).
+  and the same `PGOPTIONS`, as the database owner, with Kalmido stopped, then start Kalmido (it creates its functions,
+  policies and rights again). The attachments are not in the database: copy the data folder as well.
 - **After a PostgreSQL major upgrade, reindex.** The search index depends on the `unaccent` rules of the server:
-  run `REINDEX DATABASE kalmido;` once after moving to a new major version.
+  run `REINDEX DATABASE kalmido;` once after moving to a new major version. A new major version (18, ...) cannot open the
+  `./pgdata` of 17: dump with 17, start the new version on an empty folder, restore.
+
+### Own or managed PostgreSQL server
+
+Set `DATABASE_URL` in `.env` and remove the `db` service and the `depends_on` block from `docker-compose.yml`.
+
+- **Best: a user that owns the database and has neither superuser nor `BYPASSRLS`.** The organisation policies then
+  apply to it directly (Kalmido forces row-level security also for the table owner); nothing else to set up.
+
+  ```sql
+  CREATE ROLE kalmido LOGIN PASSWORD '...';
+  CREATE DATABASE kalmido OWNER kalmido;
+  ```
+- **A user that bypasses row-level security** (a superuser, as in the official image, or a role with `BYPASSRLS`):
+  Kalmido then creates the role `kalmido_app` (no login, no bypass) and its connections switch to it. Creating it needs
+  superuser or `CREATEROLE`. If the user has neither, create the role once yourself:
+
+  ```sql
+  CREATE ROLE kalmido_app NOLOGIN NOSUPERUSER NOBYPASSRLS;
+  GRANT kalmido_app TO kalmido;
+  ```
+
+  Without that role row-level security cannot be enforced. In the modes *workspaces* and *multi* Kalmido then refuses to
+  start (exit code 3, the log says what to do); in the single mode it starts, but raises a security alert on every
+  start and shows a notice in the administration overview.
+- **One role for several databases.** `kalmido_app` belongs to the whole server; several Kalmido databases on one
+  server share it, which is fine (the policies depend on the session, not on the role).
+
+## Upgrade to 2.37 (PostgreSQL required)
+
+2.37 moves the data from the SQLite file `data/tasks.db` into PostgreSQL. On the first start Kalmido does this by
+itself, in one transaction, and checks the result (row counts and checksums per table) before it commits. Plan a short
+maintenance window: the app is offline while it copies (seconds for a family instance, a few minutes for large ones).
+
+1. **Back up first.** In the app: *Back up now* (Settings > Users > Whole server > Backups) and copy the zip off the
+   server. Then stop Kalmido and keep a plain copy of the database file:
+
+   ```bash
+   docker compose stop kalmido
+   ```
+
+   ```bash
+   mkdir -p ../kalmido-before-2.37 && cp -p data/tasks.db* ../kalmido-before-2.37/
+   ```
+2. **Add the database service.** Take the `docker-compose.yml` of 2.37 (the `db` service, the `DATABASE_URL` line and
+   the `depends_on` block of the `kalmido` service); keep your own changes (ports, volumes) as they were.
+3. **Set the password and the version** in `.env`:
+
+   ```bash
+   echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)" >> .env
+   ```
+
+   and `KALMIDO_IMAGE=ghcr.io/gegenschuss/kalmido:2.37.0` (if you pin the version).
+4. **Fetch the images and start the database:**
+
+   ```bash
+   docker compose pull
+   ```
+
+   ```bash
+   docker compose up -d db
+   ```
+5. **Optional dry run.** It reads `tasks.db`, checks and counts everything, reports what it would correct and writes
+   nothing:
+
+   ```bash
+   docker compose run --rm kalmido python app.py migrate-sqlite --check
+   ```
+6. **Start Kalmido.** The move runs on this start:
+
+   ```bash
+   docker compose up -d
+   ```
+
+   ```bash
+   docker compose logs -f kalmido
+   ```
+
+   The lines starting with `migrate-sqlite:` show the progress and the result.
+7. **Check** that the app opens and the numbers look right (users, lists, tasks, attachments).
+
+What happens to the old files:
+
+- `data/tasks.db` is renamed to `data/tasks.db.migrated-<date-time>`; it is never deleted. Later starts ignore it.
+- `data/backups/pre-postgres-<date-time>.db` is a copy of the source taken before the move,
+  `data/backups/migration-report-<date-time>.json` the report (counts and checksums per table, corrections).
+- Backups from before 2.37 (zips with a `tasks.db`) can still be restored in the app; they go through the same move.
+- If the move fails, nothing is kept in PostgreSQL, `tasks.db` stays untouched and the container stops with exit code 3
+  and the reason (table and row) in the log. Fix the cause or go back (below), then start again.
+
+**Going back to 2.36** (only if 2.37 does not work for you; everything entered since the move is lost):
+
+```bash
+docker compose down
+```
+
+Pin the previous version in `.env` (for example `KALMIDO_IMAGE=ghcr.io/gegenschuss/kalmido:2.36.2`), then put the old
+file back and move the new database folder aside (a later upgrade needs an empty database again):
+
+```bash
+mv data/tasks.db.migrated-<date-time> data/tasks.db
+```
+
+```bash
+mv pgdata pgdata.unused-$(date +%Y%m%d)
+```
+
+```bash
+docker compose up -d kalmido
+```
+
+2.36 ignores `DATABASE_URL` and the `db` service; you can leave them in place for the next attempt.
 
 ## Backup and encryption
 
 - **In-app backups (2.37.0).** *Back up now* and the automatic backups write a zip with a `pg_dump` of the database
   (`kalmido.dump`), the attachments, the office files and a manifest with checksums (format 2); restoring runs in
-  maintenance mode with a safety backup first. Backups from before 2.37 (SQLite) are listed and can be checked, but are
-  restored with 2.36 and then updated to 2.37.
+  maintenance mode with a safety backup first. Backups from before 2.37 (SQLite, a `tasks.db` in the zip) can
+  still be restored: the database file goes through the same move to PostgreSQL as an upgrade.
 
 - **Fail closed when the data disk is missing.** Keep the data folder on its own disk or volume and mount it so that
   Docker refuses to start without it, instead of creating an empty folder (an empty start shows the setup page, and

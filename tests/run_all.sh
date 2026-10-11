@@ -524,6 +524,14 @@ fresh; run p2370_k_api "$PY" p2370_k_api_test.py "$KALMIDO_TEST_DATA"
 # 2.37.0 part 2 (#1150): row-level security per organisation (static guard + the policies against the test database)
        run rls_static "$PY" rls_static_test.py
 fresh; run rls_direct "$PY" rls_direct_test.py "$KALMIDO_TEST_DATA"
+# 2.37.0 part 3 (#1161 / #1165): the jobs list follows the end of a job; copy a whole chat message
+fresh; run p2370_j_ui node p2370_j_ui.js "$KALMIDO_TEST_DATA"
+# 2.37.0 part 3 (#1150): the move from SQLite (migrate-sqlite): new install, big synthetic 2.36 database, broken values, --check,
+# second start, an old backup zip through the restore, private agents in organisation lists (K2-3); own containers
+fresh; run p2370_m_api "$PY" p2370_m_api_test.py "$KALMIDO_TEST_DATA"
+# 2.37.0 part 3 (review W2-4 / W2-2 / K2-1): row-level security with a login role that owns the database without superuser /
+# BYPASSRLS (policies, backup + restore), and a role that bypasses it without kalmido_app (exit 3 / alert); own database container
+fresh; run rls_owner "$PY" rls_owner_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
