@@ -18,6 +18,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.38.0** (2026-10-12): **Invoices** in Office & finance: invoices, credit notes and payment reminders with a GoBD-style
+  number series, exact amounts, **ZUGFeRD / XRechnung e-invoices** in PDF/A-3, payments, sending by e-mail and a copy to the
+  DATEV inbox (see [docs/OFFICE.md](docs/OFFICE.md)). Phones: long press on a title always multi-selects, *Move to list* shows
+  folders like the sidebar, the installed app does not zoom by accident, the list colour tints the whole icon.
 - **2.37.0** (2026-10-11): **PostgreSQL 17 for every installation** (SQLite ends; self-hosters add the database
   service, the data moves over by itself on the first start, see [Upgrade to 2.37](docs/SELF-HOSTING.md#upgrade-to-237-postgresql-required)).
   Row-level security per organisation in the database, backups with `pg_dump`, chat messages can be **saved as a

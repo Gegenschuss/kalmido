@@ -7,6 +7,53 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.38.0] - 2026-10-12
+
+**In short:** Office & finance can now **issue invoices**: invoices, credit notes and payment reminders with a GoBD-style
+number series, exact amounts, **ZUGFeRD / XRechnung e-invoices** inside PDF/A-3 files, payments, sending by e-mail and a
+copy to the DATEV document inbox. On phones, a long press on a task title always starts the multi-select, *Move to list*
+shows folders like the sidebar, the installed app no longer zooms by accident, and the list colour tints the whole icon.
+
+### Added
+- **Invoices, credit notes and reminders** (#1021, stage 2 of Office & finance): a quotation becomes an invoice with one
+  click (positions condensed, rights and framework-contract text carried over, PO number and service period), invoices can
+  also be built from time entries or from scratch. The **number is assigned when the document is finalised** (drafts have
+  none, so deleted drafts leave no gap), one series per kind and organisation, unique, and nothing can be changed after
+  finalising or sending; a cancellation is a **credit note** that points at the invoice. Amounts are exact decimals
+  throughout; invoices in USD state the tax in EUR with the exchange rate. **Payments** (paid / partly paid / overdue) and
+  **payment reminders** (three levels, fee, deadline, the invoices listed) use the same model. Documents are **sent by
+  e-mail** from Kalmido (PDF, for invoices also the XML), optionally with a copy to the **DATEV document inbox** (address in
+  the module's settings). Not in this release: the DATEV booking batch (CSV), shooting calculation, quotation to project,
+  importing old documents, a pack catalogue and a bookkeeping role.
+- **E-invoices and PDF/A-3** (#1021): finalised documents are written as PDF/A-3b with the embedded font Liberation Sans
+  and an sRGB output intent; invoices and credit notes carry a **ZUGFeRD (EN 16931) XML** inside the PDF or, for public
+  buyers with a routing ID, a separate **XRechnung** XML (download in the document). The PDF and XML are stored at
+  finalising with their SHA-256 and served unchanged afterwards; drafts print with a "Draft" mark. The build checks run
+  veraPDF and the KoSIT validator against generated samples (`tools/einvoice_validate.sh`).
+
+### Changed
+- Quotations are locked once they are sent (change them by duplicating), as decided for stage 2 (#1021).
+- The list colour tints the **whole list icon** in the sidebar and everywhere a list is shown; emoji and picture icons sit on
+  a tinted tile (#1174).
+- *Move to list…* (task menu, chat notes, inbox) shows the lists in the **order of the sidebar with their folders**, and menu
+  sheets on phones have a head with a close button (#1177).
+- The **installed app** (home screen) no longer zooms on pinch or double tap; picture lightbox, file view and timeline keep
+  their zoom, and a browser tab can still zoom to 200 % (#1173).
+- Multi-edit **skips locked tasks** and changes the rest instead of stopping (#1132).
+
+### Fixed
+- A long press on a task title on a phone starts the **multi-select** instead of selecting text (#1178); the sidebar no
+  longer selects text on a long press either (#1155).
+- iOS: *Save as task* saves on the **first tap** on Save while the keyboard is open (#1170).
+- Chat: the part mark of split answers is shown in italics; the command palette folds ae / oe / ue like the message search
+  (#1171).
+- Message search with only special characters answers an empty list instead of an error (#1169).
+- Phone touch targets of 44 px for *Duplicate* and *Finalise* on documents and the calendar row of *Plan my day*; a quick
+  add left open no longer leaves its veil over the agent chat (#1155).
+- Security fix (admin alerts): addresses in alert texts are masked; the full log stays in the database (#1155).
+- An assignment taken away from someone who cannot see the list now tells them with the list name only; read entries of the
+  office access log are pruned after 90 days (#1155).
+
 ## [2.37.1] - 2026-10-11
 
 **In short:** a maintenance release for 2.37.0 without changes to the app's behaviour: the build checks pass again.
@@ -3765,7 +3812,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.37.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.38.0...HEAD
+[2.38.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.38.0
 [2.37.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.37.1
 [2.37.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.37.0
 [2.36.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.36.2
