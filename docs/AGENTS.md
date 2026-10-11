@@ -609,6 +609,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `followup_due` | 2.1.0: the follow-up day of a task *waiting on someone* (at the all-day reminder time of the person it is for), once per date, to every agent that follows the task (assigned, creator, commented) | `task` (with `task.waiting`), `list`, `waiting` `{note, until, since, by}` |
 | `stale_tasks` | 2.34.0 (#266): once a day (from 09:00 server time), the [tasks lying idle](#tasks-lying-idle-2340) of the lists shared with the agent that have *Agent follows up* on (off by default); one bundled event per agent and day, at most 30 tasks | `tasks` `[{id, title, list_id, list_name, idle_days, reason, since, due, assignee_id, wait_note}]`, `count`, `default_days`, `lists` `[{id, name}]`, `hint` |
 | `scheduled_job` | 2.34.0 (#272): a [planned job](#planned-jobs-2340) of a person is due (once per due time; after an outage only the one missed run, `late: true`), or the person pressed *Run now* (`manual: true`). Answer in your chat with `by.id` | `schedule_id`, `title`, `prompt` (the person's words: what to do), `list_id` + `list` (or `null`), `by` / `user` `{id, name}`, `chat_with` (= `by.id`), `rhythm` `{freq, days, time, tz}`, `due_at`, `late`, `manual`, `manual_by` (`{id, name}` when a manager of the agent pressed *Run now* on another person's plan, else `null`; you still answer `by.id`), `hint` |
+| `message_edited` | 2.39.0 (#1179): a person edited a message the agent already had: their chat message after the agent fetched (`delivered_at`) or answered it, a comment the agent got as `comment` / `mention` / `assigned`, a team chat message it got as `team_message`. Only to the agent(s) that had it, only while they still see the task / room (health lists never). A chat message not fetched yet is simply replaced (the queued `chat` event carries the new text, no `message_edited`). Treat it as a correction: confirm briefly, keep your running work, adjust only what the change affects | `kind`: `chat` \| `comment` \| `team`, `old`, `new`, `user` `{id, name}`; chat: `message` `{id, user_id, task_id, created_at, edited_at}`, `answered` (you wrote after it); comment: `comment` `{id, task_id, created_at, edited_at}`, `task`, `list`, `list_id`; team: `room` `{id, kind, list_id}`, `message` |
 
 Example `comment` (in `mention` it looks the same):
 
@@ -1156,6 +1157,23 @@ online (it polled in the last two minutes) and has not answered yet, for up to a
 status `working` or a typing signal (`POST /api/v1/agent/typing`) keeps them going. While the agent is offline or
 paused the app says *Agent is offline – will answer later*. An agent needs to do nothing for this; typing signals
 still make the dots more accurate.
+
+**Edited messages (2.39.0, #1179).** A person can edit their own messages in the chat (menu at the message > *Edit*);
+the message then says *edited* and the person sees the earlier versions. Chat messages carry `edited_at` (`null` =
+never edited) and `body` is always the current text; the earlier versions are never sent to the agent. As long as the
+agent has not fetched the message (no `delivered_at`) and not answered after it, the text is simply replaced, also in
+the queued `chat` event. After that the agent gets the event `message_edited` (only this agent):
+
+```json
+{"event": "message_edited", "data": {"kind": "chat", "message": {"id": 812, "user_id": 1, "task_id": null,
+  "created_at": "2026-10-11T18:02:11.204+00:00", "edited_at": "2026-10-11T18:03:40.551+00:00"},
+  "old": "Plan the week with three tasks", "new": "Plan the week with four tasks",
+  "user": {"id": 1, "name": "Ann"}, "answered": false}}
+```
+
+Treat it as a correction: confirm it briefly in the chat, do not throw away running work and do not restart it, adjust
+only what the change affects. Edited task comments and team chat messages reach the agents that got them as an event
+the same way (`kind: comment` with `comment`, `task`, `list`; `kind: team` with `room`), never a new push to people.
 
 ## Files in the chat and on tasks (2.13.1)
 

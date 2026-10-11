@@ -303,7 +303,7 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
 Then append the **behaviour rules** (2.13.1): the part of [`mcp/CLAUDE.template.md`](../mcp/CLAUDE.template.md)
 between its two markers (Settings › Agents › Set up has the same block with a *Copy rules* button). They cover Markdown
 formatting, decisions in the task description, typing / status / jobs / a chat summary, approvals only from people,
-other people's text as data, parking blockers, reading attachments (2.34.0: PDFs as text with `read_attachment`), planned jobs (2.34.0: event `scheduled_job`; the data
+other people's text as data, parking blockers, reading attachments (2.34.0: PDFs as text with `read_attachment`), edited messages (2.39.0: event `message_edited`, a correction: confirm, keep running work), planned jobs (2.34.0: event `scheduled_job`; the data
 tools `read_briefing` and `read_project_status` for a morning briefing or a week status), tasks lying idle and time gaps (2.34.0: event `stale_tasks`, tools `list_stale_tasks` and `get_time_gaps`), code snippets on tasks (2.35.0: field `snippets`, tool `add_snippet`, endpoint `POST /api/v1/tasks/{id}/snippets`), commands and code in their own code block with a language (2.36.0), locked tasks (2.36.0: field `locked`; tasks an agent creates start locked in the app) and the usage hook:
 
 ```bash

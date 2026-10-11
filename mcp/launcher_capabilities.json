@@ -9,6 +9,7 @@
     {"id": "reply_ref", "since": "2.33.0", "what": "The quote of the message a person answers goes into the prompt; reply_to when one answer covers several messages", "core": ["def reply_hint", "reply_to"]},
     {"id": "status_typing", "since": "2.0.2", "what": "Status working / idle / error per run, typing dots while a chat run lasts", "core": ["/agent/typing", "\"working\"", "\"idle\""]},
     {"id": "approval", "since": "2.35.0", "what": "An answer ending in an ```approval block becomes an approval card (approval: {title, what}); older servers: Yes / No buttons; the answer comes back as chat_choice with approval; silence is no", "core": ["\"approval\"", "def split_approval", "approval_request"]},
-    {"id": "old_server", "since": "2.35.0", "what": "Older servers: a feature the server does not know (404 / 400) is switched off once, the rest keeps working", "core": ["progress_ok", "host_ok", "quota_ok", "approval_ok"]}
+    {"id": "old_server", "since": "2.35.0", "what": "Older servers: a feature the server does not know (404 / 400) is switched off once, the rest keeps working", "core": ["progress_ok", "host_ok", "quota_ok", "approval_ok"]},
+    {"id": "message_edited", "since": "2.39.0", "what": "message_edited (a person changed a chat message, comment or team message the agent already had): a run of its own with the old and the new text fenced, a correction (confirm, keep running work); a chat edit is answered in that chat", "core": ["\"message_edited\"", "def edit_hint"]}
   ]
 }

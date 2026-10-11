@@ -531,7 +531,10 @@ TOOLS = [
      "every comment of a person. Chat messages carry attachments [{id, name, mime, size}]: read them with get_attachment source chat. "
      "No backlog floods: since='latest' on a first start returns no events, only the newest cursor; events older than two days come as "
      "ONE event missed {count, events: {type: n}, from, to} (read the current state instead); many tasks added to one list at once "
-     "(bulk move, import, script) come as ONE event tasks_added {list, task_ids, count, how}.",
+     "(bulk move, import, script) come as ONE event tasks_added {list, task_ids, count, how}. message_edited (2.39.0) = a person changed "
+     "a chat message, comment or team chat message you already had: data.kind chat | comment | team, data.old, data.new, data.user "
+     "(chat: data.message, data.answered; comment: data.comment, data.task): treat it as a correction, confirm briefly, keep your "
+     "running work and adjust only what the change affects.",
      _obj({"since": S_SINCE, "limit": {"type": "integer", "minimum": 1, "maximum": 500}}),
      lambda api, a: api.call("GET", "/agent/events", _pick(a, ("since", "limit")))),
     ("wait_for_events", "Long-poll: like list_events, but waits up to `wait` seconds (max 60) until an event arrives.",
@@ -564,7 +567,8 @@ TOOLS = [
      _obj({"job_id": S_ID, "title": {"type": "string"}, "state": {"type": "string", "enum": ["running", "waiting", "done", "failed", "stopped"]},
            "log": {"type": "string"}, "append_log": {"type": "string"}}, ["job_id"]), t_update_job),
     ("list_chats", "Chat messages people sent to the agent (all conversations) after message id `since`, with reactions and "
-                   "delivered_at (reading them marks them delivered).",
+                   "delivered_at (reading them marks them delivered). 2.39.0: edited_at = the person edited the message later "
+                   "(body is the current text; edited after you had it: the event message_edited).",
      _obj({"since": {"type": "integer", "minimum": 0}}), lambda api, a: api.call("GET", "/agent/chats", _pick(a, ("since",)))),
     ("chat_typing", "Show typing dots in one person's chat for 10 seconds while you write an answer (call again to keep them; "
                     "send_chat ends them).",

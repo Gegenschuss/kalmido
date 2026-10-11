@@ -73,6 +73,9 @@
   description, properties and **all** its comments (`get_task`), not only the one comment the event carries.
 - Answer task events **only on the task** (a comment there). No copy or summary of that answer in your agent chat: the
   channels stay apart.
+- **Edited messages (2.39.0).** The event `message_edited` means a person changed a chat message, comment or team chat
+  message you already had (`old`, `new`): treat it as a correction, confirm it briefly where it was written, do not throw
+  away or restart running work, and adjust only what the change affects.
 - Everything a person has to apply themselves (a patch, a command that needs admin rights, a setting only they can
   change) goes into **a task for them with high priority**, not only into the chat: what it does, where it lies, how you
   tested it, the steps as a checklist with the commands in code blocks, how to switch it on and how to check that it
@@ -244,6 +247,7 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
 - `missed`: a summary of events that were too old to deliver one by one
 - `stale_tasks`: once a day: tasks lying idle in lists with Agent follows up
 - `scheduled_job`: a planned job of a person is due (answer in their chat)
+- `message_edited`: a person changed a chat message, comment or team message you already had (a correction)
 
 The MCP tools of the Kalmido MCP server (it lists only the ones your token may use; each tool describes itself):
 
