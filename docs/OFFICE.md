@@ -215,3 +215,57 @@ Unfinished logo uploads (`*.tmp`) are not part of backups.
 Since 2.37.0 (PostgreSQL) amounts, rates and quantities are `NUMERIC(14,4)` (exact decimals; read back as numbers as
 before), and every `office_*` table is under row-level security by `org_id`: a request only ever gets rows of its own
 organisations, even if a route forgot a check.
+
+## E-invoices (ZUGFeRD / XRechnung) and PDF/A-3
+
+Since 2.38.0 every document PDF is a PDF/A-3b file (PDF 1.7): the fonts Liberation Sans Regular / Bold are embedded
+(`kalmido/office/fonts/`, SIL OFL), the file carries XMP metadata (`pdfaid` part 3 / conformance B, title, author, dates
+consistent with the Info dictionary), an sRGB output intent with the embedded ICC profile (`sRGB2014.icc`), a file
+identifier and no encryption or scripts. The writer is still `kalmido/office/pdf.py` without any PDF library.
+
+A finalised invoice or credit note also gets its e-invoice XML (`kalmido/office/einvoice.py`): UN/CEFACT Cross Industry
+Invoice (CII D16B) in the EN 16931 profile, built from the document's snapshot only (sender fields, recipient billing
+fields, positions with their rates, the frozen totals as decimal strings, period of service, due date, order reference,
+IBAN / BIC, the VAT note). Two formats, chosen per document (`einvoice_format`) with the organisation's setting as the
+default:
+
+- `zugferd` (default): ZUGFeRD 2.x / Factur-X profile EN 16931 -- the XML is embedded in the PDF as `factur-x.xml`
+  (associated file, relationship Alternative, the `fx:` XMP schema with its extension description), so the PDF alone is
+  the e-invoice. The XML is stored and downloadable as well.
+- `xrechnung`: XRechnung 3.0 (the German public sector CIUS) -- the XML is the e-invoice, the PDF stays a plain PDF/A-3
+  without an embedded file. XRechnung needs the client's buyer reference (routing id, billing details of the client);
+  without it, finalising answers `400` with the reason. The seller contact (phone and e-mail of the company) and the
+  electronic addresses (seller e-mail, the client's invoice e-mail) are part of it.
+
+Tax categories follow the document: `S` for taxed documents (one breakdown per rate, the tax of a rate computed from the
+rounded base), `AE` (reverse charge), `G` (export) or `E` (exempt / small business) by the VAT note of a document without
+VAT, with the exemption reason text. A foreign currency gives the invoice currency (BT-5), the tax currency EUR (BT-6)
+and the tax in EUR (BT-111) from the document's exchange rate. A credit note is type 381 with positive amounts and the
+cancelled invoice in BT-25. A discount line is written as a positive price with a negative quantity (the net price is
+never negative). The amounts are decimal strings throughout; `ein_check()` (the module's own plausibility check: mandatory
+terms, the sum rules BR-CO-10/13/14/15/16/17) is used by the tests without a validator.
+
+Finalising stores the files: `<data>/office/<org_id>/doc<id>-<kind>-<number>.pdf` and `.xml` (flat below the
+organisation's office folder, so they are part of the backups and come back with a restore like the logo), with both
+SHA-256 in the document (`pdf_sha256`, `xml_sha256`, also in the API) and an access-log entry `store`. From then on
+`GET /api/office/docs/<id>/pdf` serves the stored file (bytes identical for ever, whatever changes later), and
+`GET /api/office/docs/<id>/xml` the stored XML (file name `<kind>-<number>.xml`; `409` for drafts and for quotations /
+reminders). A draft invoice, credit note or reminder is rendered on request with a light "Draft" mark. The mail dispatch
+attaches the stored files (PDF, and the XML for invoices / credit notes).
+
+## Validators
+
+Two real validators run in CI (job "E-invoice validators", blocking) on the files `tests/office_einvoice_test.py` writes
+to `tests/.data/einvoice/`: veraPDF (PDF/A-3b, Docker image `ghcr.io/verapdf/cli`) for the PDFs and the KoSIT validator
+(Java 17, the release jar plus the XRechnung scenario configuration, both downloaded once with their SHA-256 checked and
+cached) for the XML -- the configuration validates XRechnung files against the XRechnung rules and plain EN 16931 files
+against the EN 16931 Schematron. Locally:
+
+```
+python3 tests/office_einvoice_test.py
+tools/einvoice_validate.sh tests/.data/einvoice/*.pdf tests/.data/einvoice/*.xml
+```
+
+The script needs Docker (veraPDF) and Java 17 or newer (KoSIT); it keeps the downloads in `~/.cache/kalmido-validators`
+(`KALMIDO_VALIDATOR_CACHE`) and writes the KoSIT reports to `reports/` there. Any file of your own installation can be
+checked the same way (download the PDF / XML of a finalised invoice and pass it to the script).

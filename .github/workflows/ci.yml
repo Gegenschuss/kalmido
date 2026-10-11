@@ -54,6 +54,40 @@ jobs:
           cat /tmp/requirements.txt
           pip-audit --strict -r /tmp/requirements.txt
 
+  einvoice:
+    # 2.38.0 (#1021 P5): the e-invoice files Kalmido writes pass the real validators -- veraPDF (PDF/A-3b) and the KoSIT
+    # validator (EN 16931 / XRechnung Schematron); tests/office_einvoice_test.py writes the files, tools/einvoice_validate.sh
+    # checks them (blocking)
+    name: E-invoice validators (veraPDF, KoSIT)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: checks
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Validator cache (KoSIT jar + XRechnung configuration)
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/kalmido-validators
+          key: kalmido-validators-${{ hashFiles('tools/einvoice_validate.sh') }}
+      - name: Test dependencies
+        run: pip install -r tests/requirements.txt
+      - name: Write the e-invoice files (XML + PDF/A-3)
+        run: |
+          python tests/office_pdf_test.py
+          python tests/office_einvoice_test.py
+      - name: veraPDF + KoSIT
+        run: tools/einvoice_validate.sh tests/.data/einvoice/*.pdf tests/.data/einvoice/*.xml
+      - name: Reports on failure
+        if: failure()
+        run: for f in ~/.cache/kalmido-validators/reports/*-report.xml; do echo "== $f"; grep -oE 'rep:message[^>]*>[^<]*' "$f" | head -30; done 2>/dev/null || true
+
   demo:
     # 2.12.0 (#436): the browser demo builds from the current sources and runs without a server (jsdom smoke test + Firefox
     # layout when the runner has one), and quick add understands all six languages (on the demo build, no container)
