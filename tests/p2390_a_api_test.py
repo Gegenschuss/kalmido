@@ -352,6 +352,13 @@ d = A.get(PB(W)).json()
 check([x["folder"] for x in d["folders"]] == ["House", "House/Money"] and d["effective"].startswith("Household rules"),
       "#1168: the folder's Playbooks go along with a rename " + str(d["folders"])[:200])
 check(A.get(F, params={"folder": "Home"}).json()["text"] == "", "#1168: nothing left under the old name")
+# review M3: a removed folder's own Playbook ends with an empty version (a new folder of that name starts without the old rules)
+TMPL = A.post(B + "/api/lists", json={"name": "Scratch", "folder": "Tmp"}).json()["id"]
+check(A.put(F, json={"folder": "Tmp", "text": "Old rules of Tmp."}).ok, "setup: Playbook of the folder Tmp")
+check(A.post(B + "/api/folders/delete", json={"name": "Tmp"}).ok, "setup: remove the folder Tmp")
+d = A.get(F, params={"folder": "Tmp"}).json()
+check(d["text"] == "" and [v["version"] for v in A.get(F + "/versions", params={"folder": "Tmp"}).json()["versions"]] == [2, 1],
+      "#1168: the removed folder's Playbook ends empty, its history stays " + str(d)[:200])
 
 # ---- a backup with the new tables verifies and restores
 r = A.post(B + "/api/admin/backups")
