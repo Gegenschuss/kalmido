@@ -7,6 +7,39 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.39.0] - 2026-10-12
+
+**In short:** Every list and folder can have a **Playbook**: the owner's working rules for the agents of that list, with
+versions, agent proposals and optional scheduled checks. The tidy agent of a list can now **tidy up an existing list**
+(a proposal first, nothing changes before you confirm, one step to undo), and your own **messages to an agent can be
+edited** afterwards.
+
+### Added
+- **Playbook per list and folder** (#1168): Markdown rules (up to 8,000 characters, with preview) that every agent event
+  of the list carries along; a folder's Playbook applies to all lists inside it and a list adds its own part. Only the
+  owner and list admins write it; agents read it (`get_playbook`) and may only **propose** a change, which a person takes
+  over, edits or discards. Every save is a **version** (who, when), with a line comparison and *Restore*. A list can be
+  **checked on a schedule** by one of its agents (for example every day at 07:00), switchable off at any time; the check
+  event carries the Playbook and the open tasks the agent may see. The Playbook travels with templates, the account
+  export and backups. See [docs/AGENTS.md](docs/AGENTS.md#playbook-2390).
+- **Tidy up a list** (#1151): *Tidy up the list* in the list menu (or for the selected tasks) asks the list's tidy agent
+  for one bundled proposal: merge duplicates, rename, move to a section, close as *won't do* with a reason. Nothing
+  changes until you confirm in the proposal sheet; the whole run is **undone in one step**. Tasks somebody is editing or
+  that changed since the agent looked are skipped and listed, the bulk-change protection stays, open subtasks of a merged
+  task move to the kept one, and the list's Playbook goes along with the request. See
+  [docs/AGENTS.md](docs/AGENTS.md#tidy-up-a-list-2390).
+- **Edit your own messages to an agent** (#1179): *Edit* in the menu of your message in the agent chat, marked *edited*
+  with the earlier versions (only for you), the same way comments and team chat messages are edited. A message the
+  agent has not fetched yet is simply replaced; once fetched or answered, only that agent gets the new event
+  `message_edited` with the old and the new text and keeps its running work. Edited comments and team messages an
+  agent already had send the same event. MCP, the agent template and the reference launcher know the event.
+
+### Fixed
+- Office & finance hardening after the review of 2.38 (#1209): finalising a document and credit notes are serialised,
+  control characters are removed from document and client texts (well-formed e-invoice XML), a sent quotation can no
+  longer return to draft, invoice mails carry the company's address as *Reply-To*, client lists respect the organisation
+  boundary for every account, and new document folders are private to the app.
+
 ## [2.38.0] - 2026-10-12
 
 **In short:** Office & finance can now **issue invoices**: invoices, credit notes and payment reminders with a GoBD-style
@@ -3812,7 +3845,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.38.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.39.0...HEAD
+[2.39.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.39.0
 [2.38.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.38.0
 [2.37.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.37.1
 [2.37.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.37.0

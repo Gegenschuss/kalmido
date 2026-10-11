@@ -18,6 +18,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.39.0** (2026-10-12): a **Playbook** per list and folder (working rules for the list's agents, versions, agent
+  proposals, scheduled checks), **tidy up an existing list** by its tidy agent (proposal first, confirm, one-step undo) and
+  **edit your own messages** to an agent (see [docs/AGENTS.md](docs/AGENTS.md#playbook-2390)).
 - **2.38.0** (2026-10-12): **Invoices** in Office & finance: invoices, credit notes and payment reminders with a GoBD-style
   number series, exact amounts, **ZUGFeRD / XRechnung e-invoices** in PDF/A-3, payments, sending by e-mail and a copy to the
   DATEV inbox (see [docs/OFFICE.md](docs/OFFICE.md)). Phones: long press on a title always multi-selects, *Move to list* shows
