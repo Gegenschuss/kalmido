@@ -1,12 +1,12 @@
 // 2.36.0 UI tests (agent A), own container (start.sh). #1117 a calmer sidebar. jsdom:
 //   the icon set (about 200 line icons, each with exactly one dot of class d, no two alike), the emoji -> line icon map;
 //   the settings side_icons (line | emoji | dot, default line) and side_progress (default on): stored on the server, bad
-//   values refused; the sidebar column per mode (line icon with --dot = the list colour, the emoji, a round dot; a list
-//   without a matching icon gets the round dot; the emoji never in the name), the progress bar off by the switch and by the
+//   values refused; the sidebar column per mode (2.38.0 #1174: the line icon in the list colour, the emoji on a tinted tile, a round dot; a list
+//   without a matching icon gets the list icon; the emoji never in the name), the progress bar off by the switch and by the
 //   per-list "Hide progress"; Settings > Appearance > Sidebar (select + switch save at once); the list dialog suggests a line
 //   icon (the emoji stays its accessible name) and its grid offers one button per line icon
-// Firefox 1280 (mouse, light + dark): grey icons >= 3:1 against the sidebar, the dot in the list colour, the open list's
-//   icon in the text colour, the share icon hidden until hover / focus, the bar 1 px, the folder head smaller and grey;
+// Firefox 1280 (mouse, light + dark): icons in the list colour >= 3:1 against the sidebar (#1174), the open list's
+//   icon keeps its colour, the share icon hidden until hover / focus, the bar 1 px, the folder head smaller and grey;
 //   390 touch: the share icon visible, the rows >= 44 px; screenshots
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -65,16 +65,19 @@ const settings = async () => (await call('GET', '/api/state')).settings;
 
   // ================= the sidebar: line (default)
   const row = id => d.querySelector(`#side .srow[data-list="${id}"]`);
-  const col = id => { const x = row(id); return {svg: !!x?.querySelector('.sic.sln svg'), emo: x?.querySelector('.sic.semo')?.textContent || '', rd: !!x?.querySelector('.sic .sw.rd'),
-    sq: !!x?.querySelector('.sic .sw:not(.rd)'), dot: x?.querySelector('.sic')?.getAttribute('style') || '', bg: x?.querySelector('.sic .sw')?.getAttribute('style') || '', name: x?.querySelector('.n')?.textContent,
+  const LISTSVG = () => { const t = d.createElement('div'); t.innerHTML = w.eval(`ic('list')`); return t.querySelector('svg').innerHTML; };
+  // 2.38.0 (#1174): the icon itself carries the list colour (--lc on .lic), the dot setting keeps its round dot (.licd)
+  const col = id => { const x = row(id); return {svg: !!x?.querySelector('.sic .lic svg'), emo: x?.querySelector('.sic .lemo')?.textContent || '', rd: !!x?.querySelector('.sic .licd'),
+    list: !!x?.querySelector('.sic .lic svg') && x.querySelector('.sic .lic svg').innerHTML === LISTSVG(),
+    dot: x?.querySelector('.sic .lic')?.getAttribute('style') || '', bg: x?.querySelector('.sic .licd')?.getAttribute('style') || '', name: x?.querySelector('.n')?.textContent,
     prog: !!x?.querySelector('.sprog'), shr: !!x?.querySelector('.shr')}; };
   let c = col(CART);
-  check(c.svg && /--dot:#e8590c/.test(c.dot) && !c.emo && c.name === 'Shopping', 'line: the cart as a line icon, its dot in the list colour, the name without the emoji ' + JSON.stringify(c));
+  check(c.svg && /--lc:#e8590c/.test(c.dot) && !c.list && !c.rd && !c.emo && c.name === 'Shopping', 'line: the cart as a line icon in the list colour, the name without the emoji ' + JSON.stringify(c));
   check(c.shr, 'line: the shared list keeps its share icon in the markup');
   c = col(RED);
-  check(!c.svg && c.rd && /#1c7ed6/.test(c.bg) && c.name === 'Red things', 'line: no matching icon -> a round dot in the list colour ' + JSON.stringify(c));
+  check(c.svg && c.list && !c.rd && /--lc:#1c7ed6/.test(c.dot) && c.name === 'Red things', 'line: no matching icon -> the list icon in the list colour (#1174) ' + JSON.stringify(c));
   c = col(PLAIN);
-  check(!c.svg && c.rd && /#2f9e44/.test(c.bg), 'line: no emoji -> a round dot ' + JSON.stringify(c));
+  check(c.svg && c.list && !c.rd && /--lc:#2f9e44/.test(c.dot), 'line: no emoji -> the list icon in the list colour (#1174) ' + JSON.stringify(c));
   c = col(PRJ);
   check(c.svg && c.prog && c.name === 'Releases', 'line: the project in its folder with a line icon and its progress bar ' + JSON.stringify(c));
   check(!/\p{Extended_Pictographic}/u.test([...d.querySelectorAll('#side .srow[data-list]')].map(x => x.textContent).join('')), 'line: no emoji anywhere in the list rows');
@@ -85,9 +88,9 @@ const settings = async () => (await call('GET', '/api/state')).settings;
   w = await boot({user: 'alice', hash: 'l/' + CART}); d = w.document;
   await until(() => row(CART));
   c = col(CART);
-  check(!c.svg && c.emo === '🛒' && c.name === 'Shopping', 'emoji: the emoji in the column (as before) ' + JSON.stringify(c));
+  check(!c.svg && c.emo === '🛒' && /--lc:#e8590c/.test(c.dot) && c.name === 'Shopping', 'emoji: the emoji in the column on a tile tinted in the list colour (#1174) ' + JSON.stringify(c));
   c = col(PLAIN);
-  check(c.sq && !c.rd, 'emoji: a list without an emoji keeps the square dot (as before) ' + JSON.stringify(c));
+  check(c.svg && c.list && !c.rd && /--lc:#2f9e44/.test(c.dot), 'emoji: a list without an emoji gets the list icon in its colour (#1174) ' + JSON.stringify(c));
   w.close();
   await call('PATCH', '/api/settings', {side_icons: 'dot'});
   w = await boot({user: 'alice', hash: 'l/' + CART}); d = w.document;
@@ -159,7 +162,7 @@ const settings = async () => (await call('GET', '/api/state')).settings;
     const cart = R(${CART}), prj = R(${PRJ}), svg = prj.querySelector('.sic svg'), on = cart.querySelector('.sic svg');
     const fh = [...document.querySelectorAll('#side .fhead')].find(x => /Work/.test(x.textContent)), rowFs = parseFloat(getComputedStyle(prj.querySelector('.n')).fontSize);
     const shr = cart.querySelector('.shr:not(.bellm)'), op0 = +getComputedStyle(shr).opacity, cr0 = cart.getBoundingClientRect(); window.__hov = {x: Math.round(cr0.left + cr0.width / 2), y: Math.round(cr0.top + cr0.height / 2)};
-    return {grey: +cr(getComputedStyle(svg).color, side).toFixed(2), dot: getComputedStyle(prj.querySelector('.sic svg .d')).fill, active: getComputedStyle(on).color, text: getComputedStyle(document.body).color,
+    return {grey: +cr(getComputedStyle(svg).color, side).toFixed(2), icol: getComputedStyle(svg).color, dot: getComputedStyle(prj.querySelector('.sic svg .d')).fill, active: getComputedStyle(on).color, activeCr: +cr(getComputedStyle(on).color, side).toFixed(2), text: getComputedStyle(document.body).color,
       onRow: cart.classList.contains('on'), bar: prj.querySelector('.sprog')?.getBoundingClientRect().height, fhFs: parseFloat(getComputedStyle(fh.querySelector('.n')).fontSize), rowFs,
       fhGrey: +cr(getComputedStyle(fh.querySelector('.n')).color, side).toFixed(2), fhText: getComputedStyle(fh.querySelector('.n')).color, op0, hov: window.__hov,
       minH: Math.min(...[...document.querySelectorAll('#side .srow[data-list]')].map(x => x.getBoundingClientRect().height))};
@@ -171,9 +174,10 @@ const settings = async () => (await call('GET', '/api/state')).settings;
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 800}});
       await o.nav(B + '#l/' + CART); await ready(ev);
       const m = await ev(MEASURE);
-      check(m.grey >= 3, `${tag}: grey line icon >= 3:1 against the sidebar (WCAG 1.4.11) ` + JSON.stringify(m));
-      check(m.dot === 'rgb(112, 72, 232)', `${tag}: the icon's dot in the list colour ` + m.dot);
-      check(m.onRow && m.active === m.text, `${tag}: the open list's icon in the text colour ` + JSON.stringify([m.active, m.text]));
+      // 2.38.0 (#1174): the whole icon in the list colour (light: a little darker), >= 3:1; its dot the same colour
+      check(m.grey >= 3, `${tag}: the coloured line icon >= 3:1 against the sidebar (WCAG 1.4.11) ` + JSON.stringify(m));
+      check(m.dot === m.icol && (theme === 'dark' ? m.icol === 'rgb(112, 72, 232)' : m.icol !== m.text), `${tag}: the whole icon in the list colour, no separate dot ` + JSON.stringify([m.icol, m.dot]));
+      check(m.onRow && m.active !== m.text && m.activeCr >= 3, `${tag}: the open list's icon keeps its colour and stays readable ` + JSON.stringify([m.active, m.activeCr]));
       check(m.bar > 0 && m.bar <= 1.01, `${tag}: the progress bar is 1 px ` + m.bar);
       check(m.fhFs < m.rowFs && m.fhGrey >= 4.5 && m.fhText !== m.text, `${tag}: the folder head is smaller and grey (still >= 4.5:1) ` + JSON.stringify([m.fhFs, m.rowFs, m.fhGrey]));
       // a real mouse over the row (WebDriver BiDi pointer), then the keyboard: Tab focus inside the sidebar
@@ -195,7 +199,7 @@ const settings = async () => (await call('GET', '/api/state')).settings;
     await o.nav(B + '#l/' + CART); await ready(ev);
     await ev(`(() => { document.querySelector('[data-act="side"]')?.click(); return 1; })()`); await sleep(700);
     const m = await ev(`(() => { const cart = document.querySelector('#side .srow[data-list="${CART}"]'), shr = cart.querySelector('.shr:not(.bellm)');
-      return {op: +getComputedStyle(shr).opacity, minH: Math.min(...[...document.querySelectorAll('#side .srow[data-list]')].map(x => x.getBoundingClientRect().height)), svg: !!cart.querySelector('.sic.sln svg'),
+      return {op: +getComputedStyle(shr).opacity, minH: Math.min(...[...document.querySelectorAll('#side .srow[data-list]')].map(x => x.getBoundingClientRect().height)), svg: !!cart.querySelector('.sic .lic svg'),
         fits: document.querySelector('#side').scrollWidth <= document.querySelector('#side').clientWidth + 1}; })()`);
     check(m.op > 0.5, `${tag}: touch: the share icon stays visible ` + m.op);
     check(m.minH >= 44 && m.svg && m.fits, `${tag}: rows >= 44 px, line icons, nothing sideways ` + JSON.stringify(m));
