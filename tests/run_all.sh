@@ -536,6 +536,15 @@ fresh; run rls_owner "$PY" rls_owner_test.py "$KALMIDO_TEST_DATA"
 # 2.38.0 (#1021, F1): invoices, credit notes, payments, reminders of Office & finance
 fresh; run p2380_a_api "$PY" p2380_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2380_a_ui node p2380_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.38.0 (#1021 P5, F2): e-invoice XML (EN 16931 / XRechnung) + PDF/A-3 writer without a server; stored PDF / XML at finalising
+       run office_einvoice "$PY" office_einvoice_test.py
+fresh; run p2380_b_api "$PY" p2380_b_api_test.py "$KALMIDO_TEST_DATA"
+# 2.38.0 U1 (#1178 #1177 #1173 #1170 #1155): long press = selection on touch, list picker + sheet head, zoom lock in the app
+fresh; run p2380_u1_ui node p2380_u1_ui.js "$KALMIDO_TEST_DATA"
+# 2.38.0 U2 (#1132 #1169 #1155 #1174 #1171): locked tasks skipped in a batch, search with only special characters, office log
+# reads pruned, IPs masked; list icons in the list colour, multi-edit skips locked tasks, part mark in italics, palette folding
+fresh; run p2380_u2_api "$PY" p2380_u2_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2380_u2_ui node p2380_u2_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

@@ -183,7 +183,8 @@ got = got[0] if isinstance(got, list) else got
 check(got == xml, "pypdf reads factur-x.xml back byte for byte")
 txt = "\n".join(p.extract_text() or "" for p in r.pages)
 check("RE-2026-663" in txt and "Beispielkunde AG" in txt and "40.963,25" in txt and "Filmherstellung" in txt, "the printed invoice carries number, client, total")
-check("Interaktiver Film" in txt, "project title printed")
+check("Interaktiver Film" in txt and "Zahlbar bis 22.05.2026" in txt and "IBAN DE02 1203 0000 0000 2020 51" in txt, "project title, payment text and bank line printed")
+check(txt.count("40.963,25") == 1 and txt.count("6.540,35") == 1, "the totals rows of the model are printed once (no doubled tax line)")
 
 # ---------------------------------------------------------------- 3. credit note
 mc = fixture("credit")
