@@ -237,6 +237,23 @@ Settings for all of this (`PUT /api/office/settings`): `invoice_scheme`, `credit
 `payment_days` (14), `reminder_fee` (0), `reminder_deadline_days` (10), `einvoice_format`, `datev_email`, `datev_auto`,
 `invoice_closing_de/en`, `reminder_text_de/en` (empty = the country pack's texts).
 
+### Rules the server enforces (2.38.0)
+
+- Finalising an invoice or credit note: the date must not lie in the future and not before the last finalised document of
+  the same series (organisation, kind, counter year); `due_date` must not lie before `date` (400 with the reason).
+- A duplicate of a credit note or reminder is a fresh document: `cancels_id`, `ref_doc_ids` and `source_doc_id` are not
+  copied. The finalised credit notes against one invoice may not exceed its gross (409).
+- Payments: only on finalised, open invoices (409 on paid or cancelled), never above the open amount (409), never dated in
+  the future (400); checked and booked under a lock per invoice. An invoice with booked payments cannot be set back from
+  `paid` by hand (409).
+- Reminders: all invoices of one client in one currency, finalised or sent, with an open amount (400 otherwise).
+- Sending: the DATEV address and the mail server are checked before the mail to the recipient goes out; the recipient's
+  mail is booked first, the DATEV copy afterwards, and a failing DATEV copy answers 409 without undoing the first (repeat
+  it with `POST .../datev`). Line breaks in the subject become spaces (subject 200 characters, text 5000); a refusing
+  mail server answers 409 with a generic reason, details stay in the server log.
+- A finalised document whose stored PDF or XML is missing answers 409 (logged as `store_missing`) instead of being
+  rendered again from the snapshot; drafts are always rendered.
+
 ## Company fields
 
 Settings > Company holds the company as single fields: name, street, postcode, city, country (ISO code), e-mail, phone,
