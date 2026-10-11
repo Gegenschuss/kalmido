@@ -7,21 +7,46 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
-<!-- 2.37.0 draft (part 2 of 3; the move tool, compose file and release notes for self-hosters follow in part 3) -->
+## [2.37.0] - 2026-10-11
 
-**In short:** Kalmido now runs on **PostgreSQL 17** only. The organisation boundary is enforced **in the database** as
-well (row-level security), backups use `pg_dump`, folder settings explain themselves, and any chat message can be
-**saved as a task** for later.
+**In short:** Kalmido now runs on **PostgreSQL 17** only, for every installation. **Self-hosters: this update needs
+action** - add the database service to your compose file and set a password (see *Upgrading* below); your data moves
+over by itself on the first start. The organisation boundary is enforced **in the database** as well (row-level
+security), backups use `pg_dump`, any chat message can be **saved as a task** or **copied** as a whole, folder
+settings explain themselves, and finished agent jobs leave *Open* without a reload.
+
+### Upgrading (self-hosters, required)
+- **PostgreSQL is required** (#1150); SQLite is no longer supported. Take the new `docker-compose.yml` (service `db`
+  with `postgres:17`), put `POSTGRES_PASSWORD=<long random letters and digits>` into `.env`, then
+  `docker compose pull && docker compose up -d`. Without `DATABASE_URL` Kalmido does not start and prints these steps.
+- **Automatic move:** on the first start Kalmido copies `data/tasks.db` into the empty database in one transaction,
+  compares row counts and checksums of every table, and only then renames the old file to
+  `tasks.db.migrated-<time>` (never deleted). A report lands in `data/backups/migration-report-<time>.json`, a copy
+  of the old database in `data/backups/pre-postgres-<time>.db`. If anything does not match, nothing is kept in
+  PostgreSQL, `tasks.db` stays untouched and the container stops with the reason in its log.
+  Dry run first: `docker compose run --rm kalmido python app.py migrate-sqlite --check`.
+- **Way back:** pin the 2.36.2 image, rename `tasks.db.migrated-<time>` back to `tasks.db`, start. Changes made after
+  the move are not in that file. Step by step: [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md#upgrade-to-237-postgresql-required).
+- **Own or managed PostgreSQL:** use a database owner without superuser/BYPASSRLS, or let Kalmido create its role
+  `kalmido_app` (needs CREATEROLE). If row-level security cannot be enforced, Kalmido refuses to start in workspace
+  mode and raises a security alert on every start otherwise. New settings `KALMIDO_DB_STATEMENT_TIMEOUT` (seconds,
+  default 30) and `KALMIDO_DB_POOL_MAX`.
+- The app image is about **80 MB larger** (PostgreSQL client for backups).
 
 ### Changed
-- **PostgreSQL instead of SQLite** (#1150). One database for every installation; `DATABASE_URL` is required (see
-  [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md#database-postgresql)). Searching messages finds word beginnings and parts
-  of words with and without umlauts as before (trigram index).
-- **Backups** (Settings > Administration > Backup) contain a `pg_dump` of the database (format 2). Backups from before
-  2.37 are listed and can be checked; restore them with 2.36 and update afterwards.
+- **PostgreSQL instead of SQLite** (#1150). Searching messages finds word beginnings and parts of words with and
+  without umlauts as before (trigram index).
+- **Backups** (Settings > Administration > Backup) contain a `pg_dump` of the database (format 2). A restore takes
+  only tables and data from a backup; functions, triggers and access rules are always rebuilt by Kalmido itself.
+  **Backups from before 2.37** (with `tasks.db`) can still be restored: they are moved over like the database above.
+- **Instance admins see contents of their own organisations only**; admin overviews of other organisations show
+  counts. The admin interface is per organisation, a backup still covers the whole instance.
 - **Search takes your text literally:** `%`, `_` and `\` in a search are plain characters now.
 - **Invalid values** sent to the server are refused with "Invalid data" (400) instead of being stored.
 - **API:** `snippets` of a task is `null` when there are none (was an empty string).
+- **Private agents in organisation lists:** an agent without a workspace no longer sees lists of an organisation it
+  was added to before 2.28; the move report and the organisation boundary check name these cases (assign the agent
+  to a workspace).
 - **Folder settings** (#1158): *Folder settings…* is always in the folder menu, also for a folder holding only lists
   shared by others (they keep their own settings); *Share folder…* stays visible but greyed with the reason; the check
   before saving reads "Not saved yet" with "Save anyway"; *People and roles…* and *Repository…* open on top with
@@ -32,11 +57,20 @@ well (row-level security), backups use `pg_dump`, folder settings explain themse
   its files and a link back to the message, into a list you can write to (default Inbox), optionally due "to review
   by". A saved message shows *Saved*. Agents can offer the button (`offer_save` with `send_chat`), never save
   themselves.
+- **Copy a whole message** (#1165): *Copy* in the same message menu copies the Markdown text; an answer that was split
+  into several parts is copied as one.
+- `python app.py migrate-sqlite [--check] [--source FILE]` for the move by hand.
+
+### Fixed
+- **Agent jobs** (#1161): a finished job no longer stays under *Open* until you reload; the list reloads when the app
+  comes back to the foreground and ignores late answers.
+- Public forms and links opened by someone signed in to another organisation work like for visitors.
 
 ### Security
 - **Row-level security per organisation** (stage 1): every table with an organisation and the organisations
-  themselves are protected in the database; instance admins see contents of their own organisations only, admin
-  overviews show counts.
+  themselves are protected in the database. A database permission error answers 403 and is counted for the admin
+  alerts.
+- Backups: hardened restore checks.
 
 ## [2.36.2] - 2026-10-11
 

@@ -18,6 +18,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.37.0** (2026-10-11): **PostgreSQL 17 for every installation** (SQLite ends; self-hosters add the database
+  service, the data moves over by itself on the first start, see [Upgrade to 2.37](docs/SELF-HOSTING.md#upgrade-to-237-postgresql-required)).
+  Row-level security per organisation in the database, backups with `pg_dump`, chat messages can be **saved as a
+  task** or **copied** whole, clearer folder settings, finished agent jobs leave *Open* without a reload.
 - **2.36.2** (2026-10-11): Organisations hardened. **Security fixes** (organisation boundary, office & finance) and
   **admin alerts for intrusion signs**; lists show their **line icons everywhere**, the sidebar tells **people from
   agents**, projects keep **completed tasks in their section**, quick add in *Tasks of <person>* assigns the task, a
@@ -437,14 +441,15 @@ curl -fsSL https://kalmido.com/install.sh | sh
 ```sh
 git clone --branch v2.5.0 https://github.com/Gegenschuss/kalmido.git   # or the latest tag, see Releases
 cd kalmido
-cp .env.example .env        # set TZ and PUBLIC_URL at least
+cp .env.example .env        # set TZ, PUBLIC_URL and POSTGRES_PASSWORD at least
 docker compose up -d --build
 ```
 
 Instead of building, you can use the prebuilt image (linux/amd64 and linux/arm64): put
 `KALMIDO_IMAGE=ghcr.io/gegenschuss/kalmido:2.5.0` into `.env`, then `docker compose pull && docker compose up -d`.
 
-Kalmido now listens on `http://127.0.0.1:3040`. Data (SQLite database and attachments) lives in `./data`.
+Kalmido now listens on `http://127.0.0.1:3040`. The database runs in the `db` service (PostgreSQL 17, files in
+`./pgdata`), attachments and backups live in `./data`. Coming from 2.36 or older: [Upgrade to 2.37](docs/SELF-HOSTING.md#upgrade-to-237-postgresql-required).
 Open it: the first start shows a **setup page** that creates the first account (the admin). Do this right
 after installing, whoever gets there first becomes admin. A second step asks **what you want to use**, with three
 starting points:
@@ -1891,8 +1896,8 @@ address (without `/drop`, it adds that itself) and the token on import.
 *Settings > Administration > Whole server > Backups* (admins):
 
 - **Automatic backups:** once a day at a set time (default 03:30) Kalmido writes one archive into `data/backups/`
-  (`KALMIDO_BACKUP_DIR`): `kalmido-backup-<date>-<time>-auto.zip` with `tasks.db` (a consistent copy made with SQLite's
-  online backup API while Kalmido keeps running), `attachments/` and `manifest.json` (app and schema version, counts,
+  (`KALMIDO_BACKUP_DIR`): `kalmido-backup-<date>-<time>-auto.zip` with `kalmido.dump` (a consistent `pg_dump` made while Kalmido
+  keeps running), `attachments/` and `manifest.json` (app and schema version, counts,
   size + SHA-256 of every file). Off until an admin turns it on. *Back up now* makes one at any time.
 - **Retention:** everything from the last 24 hours, then the newest backup of each of the last 14 days that have one
   and the newest of each of the last 8 weeks (both adjustable); the last 3 safety backups. Other files in the folder
@@ -1909,20 +1914,22 @@ address (without `/drop`, it adds that itself) and the token on import.
 **Restore** a listed backup or an uploaded file (larger files: copy them into the backup folder, they show up in the
 list). You type `RESTORE` to confirm. Kalmido then:
 
-1. checks the archive completely: only the expected members (`manifest.json`, `tasks.db`, `attachments/<task>/<file>`;
+1. checks the archive completely: only the expected members (`manifest.json`, `kalmido.dump`, `attachments/<task>/<file>`;
    no paths outside, no links, no folders), size and member limits (`KALMIDO_BACKUP_MAX_MB`), compression ratio (zip
-   bombs), free disk space, every SHA-256 while extracting, SQLite `integrity_check`, no foreign triggers or views, a
-   schema version this Kalmido can migrate (a backup from a newer version is refused);
+   bombs), free disk space, every SHA-256 while extracting, the dump's table of contents and statements (only tables,
+   data, sequences, indexes, constraints and plain defaults are taken; functions, triggers and access rules are always
+   rebuilt by Kalmido), a schema version this Kalmido can migrate (a backup from a newer version is refused);
 2. switches to maintenance (other requests get "please try again in a minute", background jobs pause) and waits
    until nothing else runs;
 3. makes a **safety backup** of the current state (listed as "before a restore");
-4. swaps the attachments folder and replaces the database through SQLite's backup API (one transaction), runs the
-   migrations; if anything fails, the previous database and attachments are put back;
+4. swaps the attachments folder and replaces the database with `pg_restore` (one transaction), runs the migrations;
+   if anything fails, the previous database and attachments are put back. Backups from before 2.37 (`tasks.db`) are
+   moved over into PostgreSQL the same way as on the first start of 2.37;
 5. ends every session except yours (you get a fresh one; with single sign-on nothing changes). The backup settings
    themselves stay as they are.
 
-Restoring the safety backup undoes a restore. Without the app: stop the container, unzip an archive into `./data`
-(`tasks.db`, `attachments/`), start it again.
+Restoring the safety backup undoes a restore. Without the app: see *Backup* in [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md)
+(`pg_restore` of `kalmido.dump`, attachments unzipped into `./data`).
 
 *Settings > Data > Export* gives every user a JSON dump of their own data.
 
@@ -1943,7 +1950,7 @@ How to update depends on how you installed:
 
 | Installed with | Update |
 |---|---|
-| the installer | `~/kalmido/update.sh` (Windows: `update.ps1`): backs up `data/tasks.db` to `data/backups/`, then fetches the latest release and restarts |
+| the installer | `~/kalmido/update.sh` (Windows: `update.ps1`): backs up the database to `data/backups/` (from 2.37 a `pg_dump`; Windows: in-app backups), adds a database password to `.env` if missing, then fetches the latest release and restarts |
 | prebuilt image (`KALMIDO_IMAGE`) | set the new version in `KALMIDO_IMAGE` (or use `:latest`), then `docker compose pull && docker compose up -d` |
 | git + local build | `git fetch --tags && git checkout v2.5.0 && docker compose up -d --build` |
 
@@ -1956,7 +1963,7 @@ an older version stays readable.
 
 ## Tech
 
-Python (Flask, waitress, python-dateutil, cryptography for Web Push, the stored secrets, backup encryption and the OIDC token checks, icalendar and recurring-ical-events for calendar subscriptions, py_webauthn for passkeys, segno for the QR code of the authenticator app, Pillow for profile photos) and SQLite on the server, plain JavaScript in the browser (`static/js/`, translation helpers in `i18n.js`, translations in `static/i18n/*.json`): no build step, no framework. How the code is organised: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The browser makes no external requests (website links are never fetched, no favicons, no CDN); the server only contacts services you configure, plus the optional update check against GitHub. Icons from [Lucide](https://lucide.dev).
+Python (Flask, waitress, python-dateutil, cryptography for Web Push, the stored secrets, backup encryption and the OIDC token checks, icalendar and recurring-ical-events for calendar subscriptions, py_webauthn for passkeys, segno for the QR code of the authenticator app, Pillow for profile photos) and PostgreSQL 17 (psycopg) on the server, plain JavaScript in the browser (`static/js/`, translation helpers in `i18n.js`, translations in `static/i18n/*.json`): no build step, no framework. How the code is organised: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The browser makes no external requests (website links are never fetched, no favicons, no CDN); the server only contacts services you configure, plus the optional update check against GitHub. Icons from [Lucide](https://lucide.dev).
 
 ### Logo variants
 
@@ -1978,9 +1985,8 @@ Kalmido is built for one person, a household or a small team, not as a hosted se
 - **Users:** devices poll for changes every few seconds, and any change makes every active device reload its
   state. That is fine for a handful of people; with more than roughly 20 to 30 users active at the same time
   it becomes wasteful.
-- **Database:** SQLite in WAL mode handles hundreds of thousands of tasks without trouble. Writes are
-  serialised, which only matters under many writes per second. Attachments are stored as files, not in the
-  database.
+- **Database:** PostgreSQL handles hundreds of thousands of tasks without trouble, with a connection pool (up to 56
+  connections, `KALMIDO_DB_POOL_MAX`). Attachments are stored as files, not in the database.
 
 If you run into these limits, the next steps would be per-user change tracking, sending only changes
 instead of the full state, and rendering long lists incrementally. Issues and pull requests are welcome.
