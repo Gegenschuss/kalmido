@@ -244,6 +244,13 @@ xd = ein.ein_build(md, "zugferd")
 check(b"<ram:ChargeAmount>422.90</ram:ChargeAmount>" in xd and b'<ram:BilledQuantity unitCode="C62">-1</ram:BilledQuantity>' in xd and b"<ram:LineTotalAmount>-422.90</ram:LineTotalAmount>" in xd,
       "discount line: positive price, negative quantity (BR-27)")
 check(t(xd, MS + "ram:LineTotalAmount") == "34000.00" and t(xd, MS + "ram:GrandTotalAmount") == "40460.00" and ein.ein_check(xd) == [], f"discount totals + check: {ein.ein_check(xd)}")
+# 2.38.0 review: the discount position as the invoice calculator delivers it (qty and rate positive, net negative)
+mq = fixture()
+mq["lines"].append({"kind": "discount", "pos": 5, "title": "Rabatt", "qty": "1", "rate": "422.90", "tax_pct": 19, "total": "-422.90", "net": "-422.90"})
+mq["totals"].update({"net": "34000.00", "tax_lines": [{"pct": "19", "base": "34000.00", "amount": "6460.00"}], "tax": "6460.00", "gross": "40460.00", "open": "40460.00"})
+xq = ein.ein_build(mq, "zugferd")
+check(b"<ram:ChargeAmount>422.90</ram:ChargeAmount>" in xq and b'<ram:BilledQuantity unitCode="C62">-1</ram:BilledQuantity>' in xq and b"<ram:LineTotalAmount>-422.90</ram:LineTotalAmount>" in xq
+      and ein.ein_check(xq) == [], f"calculator discount line: quantity -1, price positive, line total negative: {ein.ein_check(xq)}")
 mp = fixture(paid="10000.00")
 xp = ein.ein_build(mp, "zugferd")
 check(t(xp, MS + "ram:TotalPrepaidAmount") == "10000.00" and t(xp, MS + "ram:DuePayableAmount") == "30963.25" and ein.ein_check(xp) == [], "part payment: BT-113 / BT-115")

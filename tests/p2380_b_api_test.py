@@ -23,6 +23,8 @@ import zipfile
 
 import requests
 
+import dbx as dbxm
+
 N = os.path.dirname(os.path.abspath(__file__))
 SRC = os.environ.get("KALMIDO_SRC") or os.path.join(N, "..")
 DATA = sys.argv[1]
@@ -30,6 +32,17 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 FAILS, OKS = [], [0]
 
+
+
+def dbx(sql, args=(), write=False):
+    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    try:
+        r = c.execute(sql, args).fetchall()
+        if write:
+            c.commit()
+        return r
+    finally:
+        c.close()
 
 def check(cond, what):
     if cond:
@@ -277,6 +290,14 @@ with zipfile.ZipFile(os.path.join(DATA, "backups", NAME)) as z:
     check(f"office/{ORG}/doc{INV}-invoice-{NUM}.pdf" in names and f"office/{ORG}/doc{INV}-invoice-{NUM}.xml" in names, f"the stored PDF + XML are members of the backup zip: {[n for n in names if n.startswith('office/')]}")
     check(any(f_[0] == f"office/{ORG}/doc{INV}-invoice-{NUM}.xml" and f_[2] == XSHA for f_ in man["files"]), "... listed in the manifest with the same SHA-256")
     check(z.read(f"office/{ORG}/doc{INV}-invoice-{NUM}.pdf") == stored_pdf, "... the PDF in the zip is the stored file")
+
+# ---------------------------------------------------------------- 8. a stored file that has gone (2.38.0 review)
+# the reminder's stored PDF is no longer where its row points (number changed underneath): 409 + store_missing, no new rendering
+dbx("UPDATE office_docs SET number=? WHERE id=?", ("MA-GONE-1", RM), write=True)
+r = A.get(B + f"{D}/{RM}/pdf")
+check(r.status_code == 409 and "missing" in r.json().get("error", ""), "finalised document without its stored file: 409 " + r.text[:120])
+check(dbx("SELECT COUNT(*) FROM office_doc_log WHERE doc_id=? AND action='store_missing'", (RM,))[0][0] >= 1, "... logged as store_missing")
+check(A.get(B + f"{D}/{QO}/pdf").ok, "... a finalised quotation without a stored file still renders from its snapshot")
 
 print(f"p2380_b_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

@@ -375,6 +375,69 @@ check(len(its) == 1 and its[0]["unit"] == "hour" and float(its[0]["qty"]) == 2.5
       f"one position per list with hours and the client's rate: {[(x['title'], x['qty'], x['unit'], x['rate']) for x in its]}")
 check(A.post(B + f"{D}/from-time", json={"client_id": CL, "from": "2026-05-31", "to": "2026-05-01"}).status_code == 400, "from-time: period validated")
 
+# ---------------------------------------------------------------- review fixes 2.38.0: back-dating, reminders, credits, payments, sending
+import ast
+import datetime as _dt
+TODAY = _dt.date.today()
+r = A.post(B + D, json={"kind": "invoice", "client_id": CL, "service_from": "2026-05-01", "date": f"{TODAY.year}-01-01", "items": [{"title": "Beratung", "qty": 1, "rate": 100}]})
+BD = r.json()["id"]
+if TODAY.month > 1 or TODAY.day > 1:
+    r = A.post(B + f"{D}/{BD}/finalize")
+    check(r.status_code == 400 and "series" in r.json().get("error", ""), "back-dating before the last finalised invoice of the series: 400 " + r.text[:160])
+r = A.patch(B + f"{D}/{BD}", json={"date": (TODAY + _dt.timedelta(days=3)).isoformat()})
+r = A.post(B + f"{D}/{BD}/finalize")
+check(r.status_code == 400 and "future" in r.json().get("error", ""), "an invoice dated in the future: 400 " + r.text[:160])
+r = A.patch(B + f"{D}/{BD}", json={"date": TODAY.isoformat(), "due_date": (TODAY - _dt.timedelta(days=1)).isoformat()})
+check(r.status_code == 400 and "due date" in r.json().get("error", ""), "due date before the date: 400 " + r.text[:120])
+A.delete(B + f"{D}/{BD}")
+# a reminder covers one client only
+r = A.post(B + "/api/clients", json={"name": "Zweitkunde KG", "street": "Allee 3", "zip": "20095", "city": "Hamburg", "country": "DE"})
+CLX = r.json()["id"]
+r = A.post(B + D, json={"kind": "invoice", "client_id": CLX, "service_from": "2026-05-01", "items": [{"title": "Beratung", "qty": 10, "rate": 100}]})
+INVX = r.json()["id"]
+check(A.post(B + f"{D}/{INVX}/finalize").ok, "invoice of a second client finalised")
+r = A.post(B + f"{D}/reminder", json={"doc_ids": [IID, INVX], "level": 1})
+check(r.status_code == 400 and "one client" in r.json().get("error", ""), "reminder over invoices of two clients: 400 " + r.text[:120])
+check(A.post(B + f"{D}/reminder", json={"doc_ids": [INVX], "level": 1}).status_code == 201, "reminder over one client's invoice: 201")
+# a duplicated credit note is a fresh one, bound to no invoice; credit notes never exceed the invoice
+r = A.post(B + f"{D}/{CR['id']}/duplicate")
+check(r.status_code == 201 and r.json()["kind"] == "credit" and r.json()["cancels_id"] is None and r.json()["status"] == "draft", "duplicated credit note: no cancels_id " + r.text[:120])
+A.delete(B + f"{D}/{r.json()['id']}")
+r = A.post(B + f"{D}/{INVX}/credit")
+CRA = r.json()["id"]
+A.put(B + f"{D}/{CRA}/items", json={"items": [{"title": "Beratung", "qty": 1, "rate": 100}]})
+check(A.post(B + f"{D}/{CRA}/finalize").ok, "partial credit note (119.00) on the second client's invoice")
+r = A.post(B + f"{D}/{INVX}/credit")
+CRB = r.json()["id"]
+r = A.post(B + f"{D}/{CRB}/finalize")
+check(r.status_code == 409 and "exceed" in r.json().get("error", ""), "a second full credit note would exceed the invoice: 409 " + r.text[:120])
+check(A.get(B + f"{D}/{CRB}").json()["locked"] is False and A.get(B + f"{D}/{INVX}").json()["status"] == "issued", "... nothing finalised, the invoice stays open")
+A.delete(B + f"{D}/{CRB}")
+# payments: no overpayment, no future date, nothing on a paid invoice, paid -> sent only without payments
+open_x = A.get(B + f"{D}/{INVX}").json()["open"]
+check(open_x == "1071.00", f"open amount after the partial credit note: {open_x}")
+r = A.post(B + f"{D}/{INVX}/payments", json={"amount": "1071.01"})
+check(r.status_code == 409 and "exceeds" in r.json().get("error", ""), "overpayment: 409 " + r.text[:120])
+r = A.post(B + f"{D}/{INVX}/payments", json={"amount": "10", "date": (TODAY + _dt.timedelta(days=2)).isoformat()})
+check(r.status_code == 400 and "future" in r.json().get("error", ""), "payment dated in the future: 400 " + r.text[:120])
+r = A.post(B + f"{D}/{INVX}/payments", json={"amount": open_x})
+check(r.status_code == 201 and r.json()["status"] == "paid", "the open amount -> paid " + r.text[:120])
+check(A.post(B + f"{D}/{INVX}/payments", json={"amount": "1"}).status_code == 409, "payment on a paid invoice: 409")
+r = A.post(B + f"{D}/{INVX}/status", json={"status": "sent"})
+check(r.status_code == 409 and "Payments" in r.json().get("error", ""), "paid -> sent by hand with payments recorded: 409 " + r.text[:120])
+r = A.post(B + f"{D}/{INV2}/status", json={"status": "sent"})
+check(r.ok and r.json()["status"] == "sent", "paid by hand without payments -> sent again " + r.text[:120])
+# sending: a subject with a line break is cleaned (pure function), without SMTP the 409 comes first
+src = open(os.path.join(os.environ.get("KALMIDO_SRC") or os.path.join(N, ".."), "kalmido", "office", "invoices.py"), encoding="utf-8").read()
+fn = next(x for x in ast.parse(src).body if isinstance(x, ast.FunctionDef) and x.name == "inv_clean_subject")
+ns = {"re": __import__("re")}
+exec(compile(ast.Module(body=[fn], type_ignores=[]), "invoices.py", "exec"), ns)
+check(ns["inv_clean_subject"]("Rechnung\r\nBcc: x@y.example") == "Rechnung Bcc: x@y.example" and len(ns["inv_clean_subject"]("x" * 500)) == 200
+      and ns["inv_clean_subject"](None) == "", "subject: line breaks become a space, at most 200 characters")
+r = A.post(B + f"{D}/{IID}/send", json={"to": "rechnung@beispielkunde.example", "subject": "Rechnung\nBcc: x@y.example", "text": "x" * 9000})
+check(r.status_code == 409, "sending with a line break in the subject (no SMTP): 409, not 500 " + r.text[:120])
+check(A.post(B + f"{D}/from-time", json={"client_id": CL, "from": "2026-05-01", "to": "2026-05-31", "project_id": "abc"}).status_code == 400, "from-time: invalid project_id 400")
+
 # ---------------------------------------------------------------- the office log knows the new actions
 log = A.get(B + f"{D}/{IID}/log").json()["log"]
 acts = {x["action"] for x in log}
