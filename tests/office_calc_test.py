@@ -134,5 +134,51 @@ tb = office_calc(DOC, [{"kind": "text", "detail": "A free text block"}, it("A", 
 check(tb["lines"][0] == {"kind": "text", "text": "A free text block"} and tb["lines"][1]["pos"] == 1, "text blocks pass through and do not count as positions")
 check(office_calc({}, [], None)["net"] == 0 and office_calc({}, [], None)["lines"] == [], "empty document")
 
+# ---------------------------------------------------------------- 2.38.0 (#1021, F1): the invoice calculator inv_calc
+inv_calc, dstr = calc.inv_calc, calc.dstr
+# parity with the template's invoice 663: four charged positions (the uncounted raw data option is not on the invoice)
+RE663 = [{"kind": "heading", "title": "FILMHERSTELLUNG OHNE ANKAUF VON ROH- UND PROJEKTDATEN"}, it("Filmherstellung", 1, "32840.40"),
+         {"kind": "heading", "title": "Zusatzkosten:"}, it("Sprachfassung EN", 1, 1215), it("Cube-Integration in UI", 1, 262.5), it("Webhosting (3 Monate)", 1, 105)]
+t = inv_calc({"lang": "de", "currency": "EUR"}, RE663)
+check(t["net"] == "34422.90" and t["tax"] == "6540.35" and t["gross"] == "40963.25", f"invoice 663 parity: {t['net']} / {t['tax']} / {t['gross']}")
+check(t["tax_lines"] == [{"rate_key": "standard", "pct": "19", "base": "34422.90", "amount": "6540.35", "base_text": "34.422,90 €", "amount_text": "6.540,35 €", "label": "MwSt. 19 %"}],
+      f"invoice 663: one tax line per rate with exact strings: {t['tax_lines']}")
+check(isinstance(t["net"], str) and isinstance(t["gross"], str) and all(isinstance(x["amount"], str) for x in t["tax_lines"]), "invoice amounts are decimal strings")
+check([ln["kind"] for ln in t["lines"]] == ["heading", "item", "heading", "item", "item", "item"] and t["lines"][1]["pos"] == 1 and t["lines"][5]["pos"] == 4, "invoice lines keep headings, positions numbered")
+check(t["lines"][1]["net"] == "32840.40" and t["lines"][1]["total_text"] == "32.840,40 €", "invoice line carries net as string and text")
+check(t["fx_rate"] is None and "tax_eur" not in t and t["vat_note"] == "", "EUR invoice: no rate, no EUR tax line")
+# a reduced-rate position next to the standard one: tax per rate on the rounded sum of that rate
+t = inv_calc({"lang": "en"}, RE663 + [it("Buchlizenz", 3, "10.01", tax="reduced")])
+check([(x["pct"], x["base"], x["amount"]) for x in t["tax_lines"]] == [("19", "34422.90", "6540.35"), ("7", "30.03", "2.10")], f"tax per rate: {t['tax_lines']}")
+check(t["net"] == "34452.93" and t["gross"] == "40995.38", f"net / gross with two rates: {t['net']} {t['gross']}")
+# USD: the rate converted first (2 places), tax and gross also in EUR by the document's rate
+t = inv_calc({"lang": "en", "currency": "USD", "fx_rate": "1.09"}, RE663)
+check(t["net"] == "37520.97" and t["tax"] == "7128.98" and t["gross"] == "44649.95", f"USD invoice: {t['net']} {t['tax']} {t['gross']}")
+check(t["tax_eur"] == "6540.35" and t["gross_eur"] == "40963.26" and t["tax_eur_text"] == "€6,540.35" and t["fx_rate"] == "1.09", f"USD invoice: tax in EUR by the rate: {t.get('tax_eur')} {t.get('gross_eur')}")
+# credit note = the same calculator over the copied positions (positive amounts)
+t = inv_calc({"lang": "de"}, [it("Webhosting (3 Monate)", 1, 105)])
+check(t["net"] == "105.00" and t["tax"] == "19.95" and t["gross"] == "124.95", f"credit note amounts: {t['net']} {t['tax']} {t['gross']}")
+# rounding at the 0.005 borders: half up per position and per tax rate
+t = inv_calc({"lang": "de"}, [it("a", 1, "0.005"), it("b", 3, "0.015")])
+check(t["lines"][0]["net"] == "0.01" and t["lines"][1]["net"] == "0.06" and t["net"] == "0.07" and t["tax"] == "0.01" and t["gross"] == "0.08",
+      f"half-up rounding (rate rounded to 2 places first, like the template: 0.015 -> 0.02): {[ln['net'] for ln in t['lines']]} {t['net']} {t['tax']} {t['gross']}")
+t = inv_calc({"lang": "de"}, [it("c", 1, "100.025")])
+check(t["lines"][0]["net"] == "100.03" and t["tax"] == "19.01", f"0.005 border on the rate: {t['lines'][0]['net']} tax {t['tax']}")
+t = inv_calc({"lang": "de"}, [it("d", 7, "14.285")])
+check(t["lines"][0]["net"] == "100.03" and t["tax"] == "19.01", f"rate 14.285 -> 14.29 before the product: {t['lines'][0]['net']}")
+# a discount position: its amount is taken off (same tax class); no percent automation on invoices
+t = inv_calc({"lang": "de"}, RE663 + [{"kind": "discount", "title": "Nachlass", "qty": 1, "rate": 100, "tax": "standard"}])
+check(t["net"] == "34322.90" and t["tax"] == "6521.35" and t["gross"] == "40844.25" and t["lines"][-1]["kind"] == "discount" and t["lines"][-1]["total"] == -100 and t["lines"][-1]["net"] == "-100.00",
+      f"discount position: {t['net']} {t['tax']} {t['gross']} {t['lines'][-1]}")
+t = inv_calc({"lang": "de"}, RE663 + [{"kind": "discount", "title": "Nachlass", "qty": 1, "rate": -100}])
+check(t["net"] == "34322.90", "a negative discount rate counts the same way")
+t = inv_calc({"lang": "de", "discount_pct": 10, "raw_mode": "included", "raw_factor": 0.25, "prod_quotient": 3, "producing_rate": 600},
+             [it("Schnitt", 3, 1000, raw=1, prod=1)])
+check(t["net"] == "3000.00" and [ln["kind"] for ln in t["lines"]] == ["item"], "invoices ignore the quotation automation (producing, raw data, discount percent)")
+# novat: no tax lines, the pack's note
+t = inv_calc({"lang": "de", "vat_mode": "novat"}, RE663)
+check(t["tax_lines"] == [] and t["tax"] == "0.00" and t["gross"] == "34422.90" and t["vat_note"], "novat invoice: gross = net, note text")
+check(dstr("1234.5") == "1234.50" and dstr(0) == "0.00" and dstr("-0.004") == "0.00" or dstr("-0.004") == "-0.00", f"dstr: {dstr('1234.5')} {dstr(0)}")
+
 print(f"office_calc_test: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

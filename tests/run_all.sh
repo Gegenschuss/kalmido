@@ -533,6 +533,8 @@ fresh; run p2370_m_api "$PY" p2370_m_api_test.py "$KALMIDO_TEST_DATA"
 # 2.37.0 part 3 (review W2-4 / W2-2 / K2-1): row-level security with a login role that owns the database without superuser /
 # BYPASSRLS (policies, backup + restore), and a role that bypasses it without kalmido_app (exit 3 / alert); own database container
 fresh; run rls_owner "$PY" rls_owner_test.py "$KALMIDO_TEST_DATA"
+# 2.38.0 (#1021, F1): invoices, credit notes, payments, reminders of Office & finance
+fresh; run p2380_a_api "$PY" p2380_a_api_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
