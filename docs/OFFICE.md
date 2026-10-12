@@ -102,6 +102,52 @@ role, tax, archived), `equipment` (name, category, daily_rate, archived), `sets`
 raw_included, rights_time_id, rights_territory_id, rights_media_id, rights_note_de, rights_note_en, closing_de,
 closing_en, rates {service_id: rate}, note, archived), `settings` (the keys of the settings tab).
 
+## Importing legacy data (2.39.1)
+
+Settings > "Import legacy data" (organisation admins only) takes over what an office kept in a spreadsheet and old PDF
+documents. It is a function of the app: the person uploads the files, sees a preview, corrects it and confirms. Nothing
+is guessed in the background and no language model is involved.
+
+- **Spreadsheet (.xlsx)**: read with the Python standard library only (no macros, no formulas evaluated, files with XML
+  entities refused, at most 10 MB). Sheets or tables (Excel "Format as table") are found by name: `Contacts` (column
+  `addresses`, one address text per cell), `Services` (`serviceDE`, `serviceEN`, `dailyrate`, `hourlyrate`, `rawfee`,
+  `producingfee`, `order`, `category`, `freelancer`, `intext`), `Equipment` (`device`, `category`, `dailyrate`). Separator
+  rows like `---- VIDEO ----` are the category of the rows below, not services. `Staff` and `Freelancer` are only counted:
+  Kalmido has no master data for them yet.
+- **Addresses** are split by rules into company, contact person, street, postcode, city and country: German postcodes
+  have 5 digits, Austrian and Swiss 4 (without a country line the split is marked unsure), `D-` / `A-` / `CH-` prefixes and
+  a country line set the country, "z. Hd." / "Attn." / "Herr" / "Frau" and `c/o` lines go to the contact, a P.O. box is
+  taken as the street (marked). Every unsure split shows its reason; the fields can be edited in the preview, rows can be
+  deselected, and the original text is kept in the client's free address field.
+- **Duplicates**: the normalised company name (without legal form, accents and punctuation) plus the postcode is compared
+  with the organisation's clients and within the file. A duplicate is skipped by default; an existing client can instead
+  be merged (only its empty fields are filled) or the row added as a new client.
+- **Old invoices and quotations** are uploaded as PDF files (several at once, at most 20 MB each, checked by their first
+  bytes). The file name proposes the key data: `<project no>_<client>_<project>__<date>_R.pdf` is an invoice,
+  `<project>_<client>_KV<n>_<date>_<initials>.pdf` a quotation; dates as `dd.mm.yy`, `dd.mm.yyyy`, `yyyy-mm-dd` or
+  `yyyymmdd`. The client is proposed by name and can be changed; amount and "paid" are entered by hand. The number is the
+  file name without `.pdf`. An archived document is read-only: the original PDF is stored unchanged (folder 0700, file
+  0600, part of every backup) and is never re-rendered, renumbered, sent or turned into an e-invoice. The documents tab
+  lists it under "Archive" with the sum of the archived invoices and of the paid ones; the other lists and the reminders
+  do not count it.
+- **Numbers**: an archived number is never given to a new document (the automatic number skips it, a manual one is
+  refused). The import page proposes to continue the invoice / quotation counter after the highest archived number (a
+  number that follows today's scheme, else the project number of the file name); the person confirms, the counter is
+  never lowered.
+- **Undo**: every confirmed import is a run (list with date, person, count). Undoing removes what the run added unless
+  something builds on it by now - a client with a list, document, framework contract or archived document of another run
+  stays, as does a service used in a document or as the producing rate, and equipment in a set; the answer says what
+  stayed. Fields a merge filled are emptied again while they still hold the imported value.
+
+Routes (organisation admin; members only read the archive): `POST /api/office/legacy/preview` (multipart `file`, stores
+nothing), `POST /api/office/legacy/split` `{address}`, `POST /api/office/legacy/import` `{clients, services, equipment}`
+(the preview's rows with `action` new / merge / skip and `merge_id`), `GET /api/office/legacy/runs`,
+`POST /api/office/legacy/runs/<id>/undo`, `POST /api/office/legacy/archive/parse` `{names}`,
+`POST /api/office/legacy/archive/run`, `POST /api/office/legacy/archive` (multipart `file` + `run_id`, `kind`, `number`,
+`project_no`, `project`, `client_id`, `client_name`, `date`, `amount`, `paid`; 409 for a used number or the same PDF
+twice), `GET /api/office/legacy/archive?kind=`, `PATCH /api/office/legacy/archive/<id>` (only `amount`, `paid`,
+`client_id`), `GET /api/office/legacy/archive/<id>/pdf`, `GET/POST /api/office/legacy/counter` `{kind, last}`.
+
 ## Web API
 
 All routes require a signed-in person with the module on and an organisation (`400` with a hint otherwise); writes
@@ -327,6 +373,8 @@ Since 2.38.0 also `office_payments` (`org_id`, `doc_id`, `date`, `amount NUMERIC
 `created_at`; under row-level security as well) and the nullable columns `order_ref`, `due_date`, `payment_days`,
 `cancels_id`, `ref_doc_ids`, `reminder_level`, `reminder_fee`, `reminder_deadline_days`, `paid_at`, `source_doc_id`,
 `einvoice_format`, `pdf_sha256`, `xml_sha256`, `datev_sent_at`, `vat_note` of `office_docs`; 2.37.1 runs on with them.
+Since 2.39.1 also `office_import_runs` and `office_archive` (both under row-level security) and the nullable column
+`import_run_id` of `clients`, `office_services` and `office_equipment`; 2.39.0 runs on with them.
 
 ## E-invoices (ZUGFeRD / XRechnung) and PDF/A-3
 
