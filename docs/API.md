@@ -128,8 +128,8 @@ carry `blocked` and `fields`, and `fields` can still be written (the same as the
 modules). `GET /me` reports all four under `features`: `collaboration`, `time_tracking`, `dependencies`,
 `custom_fields`.
 
-**List types**: every list has `kind` (`list` or `project`). Time entries, dependencies, custom field
-values and a project status need a project list (both lists for a dependency): otherwise `409 conflict` with a message
+**List types**: every list has `kind` (`list` or `project`). Time entries, dependencies and a project status need a
+project list (both lists for a dependency; 2.39.1: custom fields work in every list): otherwise `409 conflict` with a message
 such as *Make this list a project to track time*. Time entries of lists that are not projects (any more) are left out
 of `GET /time/entries`. 2.7.2: the separate type *Shopping & packing list* (`kind: "checklist"`) is gone; every list
 has the display option `done_at_bottom` (*Show completed at the bottom*: completed tasks stay visible at the bottom and

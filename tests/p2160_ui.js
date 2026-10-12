@@ -87,9 +87,9 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   check(lg && lg.getAttribute('role') === 'separator' && lg.tabIndex === 0 && lg.getAttribute('aria-label') === 'Width of the column Date', '#634: a grip in the column title ' + (lg && lg.getAttribute('aria-label')));
   check(!d.querySelector('.lchead[aria-hidden="true"]') && d.querySelector('.lchead .lc .lcn[aria-hidden="true"]'), 'the titles stay hidden from screen readers, the grips are reachable');
   check(d.querySelector(`#view .trow .lc[data-k="due"]`), 'the cells carry their column key');
-  key(w, lg, 'ArrowRight', {shiftKey: true}); await sleep(50);
+  key(w, lg, 'ArrowLeft', {shiftKey: true}); await sleep(50);  // 2.39.1 (#1217): the grip is the line left of the column, ← moves it = wider
   const lw = JSON.parse(w.__store['tasks.lcw.' + L] || '{}');
-  check(lw.due > 0 && /\.lc\[data-k="due"\]\{width:[\d.]+rem/.test(d.getElementById('lcw-style')?.textContent || ''), '#634: Shift+→ widens the column (per device and list) ' + JSON.stringify(lw));
+  check(lw.due > 0 && /\.lc\[data-k="due"\]\{width:[\d.]+rem/.test(d.getElementById('lcw-style')?.textContent || ''), '#634: Shift+← widens the column (per device and list) ' + JSON.stringify(lw));
   lg.dispatchEvent(new w.MouseEvent('dblclick', {bubbles: true}));
   check(!('tasks.lcw.' + L in w.__store) && !d.getElementById('lcw-style').textContent, '#634: a double-click = the standard width');
   w.close();
@@ -218,7 +218,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     // the column grip
     await ev(`(() => { chatClose(); return 1; })()`); await sleep(400);
     const cg = await ev(`(() => { const g = document.querySelector('.lchead .lcg[data-lcg="due"]'), c = g.closest('.lc').getBoundingClientRect(), b = g.getBoundingClientRect(); return {x: b.left + b.width / 2, y: b.top + b.height / 2, w: c.width}; })()`);
-    await drag(cg.x, cg.y, 60, 0, 'mouse'); await sleep(400);
+    await drag(cg.x, cg.y, -60, 0, 'mouse'); await sleep(400);  // 2.39.1 (#1217): the line left of the column, dragged left = wider
     const cw = await ev(`(() => ({head: document.querySelector('.lchead .lc[data-k="due"]').getBoundingClientRect().width, cell: document.querySelector('#view .trow .lc[data-k="due"]').getBoundingClientRect().width, over: document.documentElement.scrollWidth - innerWidth}))()`);
     check(cw.head >= cg.w + 45 && Math.abs(cw.head - cw.cell) <= 1 && cw.over <= 0, `1440: dragging the column grip widens the column, title and cells alike (${Math.round(cg.w)} -> ${Math.round(cw.head)})`);
     await shot('p2160-1440-columns.png');
