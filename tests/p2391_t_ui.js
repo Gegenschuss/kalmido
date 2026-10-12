@@ -143,7 +143,8 @@ const FEAT = 'comments,collab,fields';
     check((await task(T1)).fields[String(FC)] === undefined, '#1327: and off again');
     // sorting an empty column: a hint
     const he = await mid(`.lchead .lc[data-k="f:${FE}"] .lcs`); await clickAt(he.x, he.y); await sleep(300);
-    check(/No values in this column yet/.test(await ev(`document.querySelector('#toast')?.textContent || ''`)), '#1327: sorting an empty column says so');
+    const tt = await ev(`document.querySelector('#toast')?.textContent || ''`);
+    check(/No values in this column yet/.test(tt), '#1327: sorting an empty column says so ' + JSON.stringify([he, tt]));
     await ev(`(() => { sortSet(''); return 1; })()`); await sleep(200);
     // the arrow in the column title opens the column menu
     check(await ev(`!!document.querySelector('.lchead .lc[data-k="due"] .lcmb[aria-haspopup="menu"]')`), '#1327: an arrow button in the column title');
@@ -180,7 +181,8 @@ const FEAT = 'comments,collab,fields';
     await nav(B + '#l/' + PLAIN); await ready(`!!document.querySelector('#view .trow')`); await sleep(300);
     check(await ev(`!document.querySelector('#view .lcols') && !document.querySelector('#view .lchead')`), '#1217: a list without columns: no column lines');
     await signIn('bob');
-    await nav(B + '#l/' + L); await ready(`!!document.querySelector('#tc-${T1}')`); await sleep(400);
+    // a new page load: a hash change alone keeps alice's loaded state in the page
+    await nav(B + 'static/icon.svg'); await nav(B + '#l/' + L); await ready(`!!document.querySelector('#tc-${T1}')`); await sleep(400);
     check(await ev(`!document.querySelector('#view .lc[data-fe]') && !!document.querySelector('${cellSel(T1, FA)}')`), '#1327: a viewer sees the cells but cannot edit them');
     p = await mid(cellSel(T1, FA)); await clickAt(p.x, p.y); await sleep(300);
     check(!(await ev(`!!document.querySelector('.tcin')`)), '#1327: a viewer\'s click opens no field');
