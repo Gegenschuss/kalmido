@@ -144,7 +144,7 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
     ['Tickets in Berlin trip', 'Tickets', 'Berlin trip'], ['Make a list of groceries', 'Make a list of groceries', null],
     ['shopping list for mom', 'shopping list for mom', null], ['Liste Einkauf', 'Liste Einkauf', null],
     ['in Einkauf', 'in Einkauf', null], ['Wein in Einkaufen', 'Wein in Einkaufen', null], ['Brot ~eink', 'Brot', 'Einkauf'],
-    ['Buy milk in inbox', 'Buy milk', 'Inbox']];  // 2.36.2 (#1135): with "Line" (default) the shown name has no leading emoji
+    ['Buy milk in inbox', 'Buy milk', 'Basket'], ['Buy milk in basket', 'Buy milk', 'Basket']];  // 2.39.1 (#1219): the inbox is shown as "Basket"; the old word still works  // 2.36.2 (#1135): with "Line" (default) the shown name has no leading emoji
   for (const [t, title, list] of cases) { const r = pq(t); check(r.title === title && r.list === list && (!list || r.chip === list), `parseQuick ${JSON.stringify(t)} -> ${JSON.stringify(r)}`); }
   w.eval(`S.quick.ignore.add('list')`);
   const off = w.eval(`(() => { const r = parseQuick('Brot in Einkauf', S.quick.ignore); return [r.title, r.list_id || null, JSON.stringify(r.chips)]; })()`);
