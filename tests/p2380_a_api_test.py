@@ -203,7 +203,7 @@ check(rd["vat_note_key"] == "reverse" and "Reverse" in rd["vat_note_text"] and r
       f"novat render: VAT note text, no tax lines: {rd.get('vat_note_text')}")
 
 # ---------------------------------------------------------------- finalising the parity invoice
-r = A.post(B + f"{D}/{IID}/number", json={"number": "RE-2026-005"})
+r = A.post(B + f"{D}/{IID}/number", json={"number": "RE-2026-005", "reason": "numbers 2-4 used in the old program"})  # 2.39.1 (#1210 N2): a gap needs a reason
 check(r.ok and r.json()["number"] == "RE-2026-005", "manual number above the last one accepted " + r.text[:120])
 r = Bo.post(B + f"{D}/{IID}/finalize")
 check(r.ok and r.json()["number"] == "RE-2026-005" and r.json()["status"] == "issued" and r.json()["state"] == "issued" and r.json()["locked"] is True, "member finalises the invoice " + r.text[:160])

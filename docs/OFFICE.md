@@ -197,8 +197,9 @@ becomes `issued`, the snapshot is stored like for quotations and the PDF/A-3 + e
 Numbers: one series per organisation and kind - settings `invoice_scheme` (`RE-{yyyy}-{seq:03}`), `credit_scheme`
 (`GS-{yyyy}-{seq:03}`), `reminder_scheme` (`MA-{yyyy}-{seq:03}`); a draft has no number, the number comes with finalising
 (no gaps through deleted drafts). A number by hand (`POST /api/office/docs/<id>/number`) is accepted in the draft only
-when it follows the scheme and lies above the series' last value; the counter then continues from it. Numbers are unique
-per organisation.
+when it follows the scheme and lies above the series' last value; the counter then continues from it. A number more than
+one above the counter leaves a gap and needs `{number, reason}` (at least 5 characters; kept in the office log). Checking
+and writing a number run under one lock per organisation. Numbers are unique per organisation.
 
 A **credit note** (`POST /api/office/docs/<id>/credit` on a finalised invoice; button "Credit note / cancel") is a draft
 with the invoice's positions and `cancels_id`; shorten it for a partial credit. When the credit note is finalised it
