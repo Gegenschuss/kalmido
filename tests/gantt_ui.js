@@ -210,7 +210,7 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
   check(md.querySelector('#l-kind').value === 'list' && md.querySelector('#l-kindp') && !md.querySelector('#l-kindp').checked, 'new list dialog: the switch Project features, off (2.25.0)');
   check(md.querySelector('.kproj').hidden, 'type List: project settings hidden');
   { const kp = md.querySelector('#l-kindp'); kp.checked = true; kp.dispatchEvent(new w.Event('change', {bubbles: true})); }
-  check(!md.querySelector('.kproj').hidden && /time tracking, dependencies with the Gantt timeline, custom fields, progress and status/.test(md.querySelector('#l-khint').textContent), 'type Project: hint names the features that are on');
+  check(!md.querySelector('.kproj').hidden && /time tracking, dependencies with the Gantt timeline, progress and status/.test(md.querySelector('#l-khint').textContent), 'type Project: hint names the features that are on');  // 2.39.1 (#1217): custom fields are in every list, not a project feature
   check(md.querySelector('#l-dab') && /shopping and packing/i.test(md.textContent), '2.7.2: "Show completed at the bottom" instead of a type');
   md.remove();
   const srow = d.querySelector(`#side .srow[data-list="${PL}"]`);
