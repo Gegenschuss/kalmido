@@ -142,9 +142,10 @@ const FEAT = 'comments,collab,fields';
     p = await mid(cellSel(T1, FC)); await clickAt(p.x, p.y); await sleep(900);
     check((await task(T1)).fields[String(FC)] === undefined, '#1327: and off again');
     // sorting an empty column: a hint
-    const he = await mid(`.lchead .lc[data-k="f:${FE}"] .lcs`); await clickAt(he.x, he.y); await sleep(300);
+    // the sixth column does not fit next to the others at this width (it is folded away), so the click goes to its button directly
+    await ev(`(() => { document.querySelector('.lchead .lc[data-k="f:${FE}"] .lcs').click(); return 1; })()`); await sleep(300);
     const tt = await ev(`document.querySelector('#toast')?.textContent || ''`);
-    check(/No values in this column yet/.test(tt), '#1327: sorting an empty column says so ' + JSON.stringify([he, tt]));
+    check(/No values in this column yet/.test(tt), '#1327: sorting an empty column says so ' + JSON.stringify(tt));
     await ev(`(() => { sortSet(''); return 1; })()`); await sleep(200);
     // the arrow in the column title opens the column menu
     check(await ev(`!!document.querySelector('.lchead .lc[data-k="due"] .lcmb[aria-haspopup="menu"]')`), '#1327: an arrow button in the column title');
