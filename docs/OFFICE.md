@@ -226,7 +226,9 @@ issued -> sent`) and keep the amounts of their day. Defaults: settings `reminder
 `POST /api/office/docs/<id>/send` with `{to, cc?, subject?, text?, datev?}` mails a finalised document with its files
 (PDF/A-3, and for invoices and credit notes the e-invoice XML) through the server's SMTP settings (`KALMIDO_SMTP_*`);
 the status becomes `sent` and `sent_at` is set. Without SMTP the route answers `409` with a readable reason (the send
-dialog says so and offers the PDF download instead). `GET /api/office/mail-status` tells the client whether mail is set
+dialog says so and offers the PDF download instead). Mails with an own `text` (not the standard text) are limited to 50
+per organisation and day (UTC): admins' mails count, admins are not limited; a member past the limit gets `429` and can
+still send with the standard text. `GET /api/office/mail-status` tells the client whether mail is set
 up and which DATEV address is configured.
 
 DATEV: the settings hold one e-mail address of the DATEV document inbox (`datev_email`); `datev: true` in the send
