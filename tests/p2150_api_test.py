@@ -450,7 +450,11 @@ check(fa.patch(f"/fields/{F}", {"name": "Effort (h)"}).json()["name"] == "Effort
 fa.patch(f"/tasks/{T[10]}", {"fields": {str(F): "3"}})
 check(str(F) in fa.get(f"/tasks/{T[10]}").json()["fields"], "field value")
 check(fa.delete(f"/fields/{F}").json()["values"] == 1, "field deleted with its value")
-check(fa.post(f"/lists/{PRIV}/fields", {"name": "x", "type": "text"}).status_code == 409, "fields: project lists only")
+# 2.39.1 (#1217): custom fields work in plain lists too (no longer project lists only)
+r = fa.post(f"/lists/{PRIV}/fields", {"name": "x", "type": "text"})
+check(r.status_code == 201, f"fields: plain lists too {r.status_code}")
+if r.ok:
+    fa.delete(f"/fields/{r.json()['id']}")
 # templates
 r = fa.post("/templates", {"task_id": T[8], "name": "Tpl"})
 TPL = r.json()["id"]
