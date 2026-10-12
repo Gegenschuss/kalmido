@@ -110,6 +110,8 @@ const TOUCH = `(() => {
     const r = e.getBoundingClientRect(), st = getComputedStyle(e);
     if (!r.width || !r.height || st.visibility === 'hidden' || r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth || e.disabled) continue;
     if (top && !top.contains(e)) continue;
+    // 2.39.1 (#1181): visually hidden (1 px, clipped) - only for the keyboard and screen readers, e.g. the X of a swipe sheet on touch
+    if (r.width <= 1 && r.height <= 1 && (/inset\\(50%\\)/.test(st.clipPath) || st.overflow === 'hidden')) continue;
     if (e.tagName === 'A' && e.closest('p, .md, .cmbody, .shint, small, .muted, li')) continue;
     if (e.tagName === 'INPUT' && /text|search|email|password|number|url|date|time|range/.test(e.type)) continue;
     let w = r.width, h = r.height;
