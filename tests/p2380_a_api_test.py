@@ -255,9 +255,10 @@ A.delete(B + f"{D}/{r.json()['id']}")
 check(A.post(B + f"{D}/{EMPTY}/payments", json={"amount": 10}).status_code == 409, "payment on a draft: 409")
 check(A.post(B + f"{D}/{IID}/payments", json={"amount": -5}).status_code == 400 and A.post(B + f"{D}/{IID}/payments", json={"amount": 5, "method": "gold"}).status_code == 400,
       "payment validated")
-r = Bo.post(B + f"{D}/{IID}/payments", json={"date": "2026-06-01", "amount": "10000.00", "method": "transfer", "note": "Abschlag"})
+check(Bo.post(B + f"{D}/{IID}/payments", json={"date": "2026-06-01", "amount": "10000.00"}).status_code == 403, "2.39.1 (#1210 N3): a member cannot record a payment (403)")
+r = A.post(B + f"{D}/{IID}/payments", json={"date": "2026-06-01", "amount": "10000.00", "method": "transfer", "note": "Abschlag"})
 check(r.status_code == 201 and r.json()["state"] == "partial" and r.json()["status"] == "issued" and r.json()["paid"] == "10000.00" and r.json()["open"] == "30963.25",
-      "a member records a part payment -> partial " + r.text[:160])
+      "the admin records a part payment -> partial " + r.text[:160])
 check(r.json()["status_text"] == "Partly paid", f"state text: {r.json()['status_text']}")
 PAY1 = r.json()["payments"][0]["id"]
 r = A.post(B + f"{D}/{IID}/payments", json={"date": "2026-06-10", "amount": 30963.25, "method": "transfer"})

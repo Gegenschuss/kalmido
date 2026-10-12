@@ -182,7 +182,7 @@ documents without VAT (`reverse`, `abroad` or `small`; the text comes from the c
 finalising), `einvoice_format` (`zugferd` by default, `xrechnung` proposed for clients with a buyer reference).
 
 States: `draft -> issued -> sent -> paid`. `issued` comes with finalising only; `sent` with sending (or by hand);
-`paid` through payments (or by hand). The answers also carry a derived `state` (never stored): `partial` when part of
+`paid` through payments (or by hand; setting or leaving `paid` by hand: the organisation's admins only, members 403). The answers also carry a derived `state` (never stored): `partial` when part of
 the gross is paid, `overdue` when the due date passed and the invoice is still open. `cancelled` is set only by a credit
 note over the full amount, never by editing; there is no way back to `draft`. A status change the model does not allow
 answers `409`.
@@ -209,7 +209,7 @@ number series and print "Credit note for invoice no. ...".
 ## Payments and reminders
 
 Payments (`office_payments`): `GET /api/office/docs/<id>/payments`, `POST ... {date, amount, method: transfer|cash|card|
-other, note}` by any member on a finalised, open invoice, `DELETE /api/office/docs/<id>/payments/<pid>` by the
+other, note}` by the organisation's admins (members 403, since 2.39.1) on a finalised, open invoice, `DELETE /api/office/docs/<id>/payments/<pid>` by the
 organisation's admin. The sum of the payments plus the finalised credit notes against the invoice's gross gives
 `paid`, `credits` and `open` in the answers; covered in full the invoice becomes `paid` with `paid_at`, a removed payment
 reverts that. The print model of an invoice with payments shows "already paid" and "amount outstanding".
