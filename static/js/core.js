@@ -91,7 +91,7 @@ const NOLIST_KEYS = ['done', 'trash', 'search', 'archived'];
 // the focus (and the keyboard) with it. The height is taken while nothing is being typed, or when the width changes.
 const TD = {on: null, w: -1};
 function tdockSync() {
-  if (TD.on === null || innerWidth !== TD.w || !editFocused()) { TD.on = matchMedia('(min-width:600px) and (min-height:600px)').matches; TD.w = innerWidth; }
+  if (TD.on === null || innerWidth !== TD.w || !editFocused()) { TD.on = /[?&]mini=1\b/.test(location.search) || matchMedia('(min-width:600px) and (min-height:600px)').matches;  /* 2.39.1 (#1294): the list window keeps its composer */ TD.w = innerWidth; }
   const on = isMobile() && TD.on;
   document.documentElement.classList.toggle('tdock', on);
   return on;
@@ -133,7 +133,8 @@ const dFor = t => !!t && depsOn() && isProject(t.list_id);    // dependencies fo
 const progressFor = l => !!l && progressOn() && l.kind === 'project';
 const statusFor = l => !!l && statusOn() && l.kind === 'project';
 const fieldsAll = lid => (S.fields || []).filter(f => f.list_id === lid).sort((a, b) => a.sort - b.sort || a.id - b.id);
-const fieldsOf = lid => !fieldsOn() || !isProject(lid) ? [] : (S.fields || []).filter(f => f.list_id === lid).sort((a, b) => a.sort - b.sort || a.id - b.id);
+// 2.39.1 (#1217): custom fields in every list (plain lists too); time tracking and dependencies stay project-only
+const fieldsOf = lid => !fieldsOn() ? [] : (S.fields || []).filter(f => f.list_id === lid).sort((a, b) => a.sort - b.sort || a.id - b.id);
 const fieldById = id => (S.fields || []).find(f => f.id === id);
 const inbox = () => S.lists.find(l => l.is_inbox);
 const listById = id => S.lists.find(l => l.id === id);
@@ -750,7 +751,7 @@ function viewSafeRender() { if (editing() && $('#view')?.contains(document.activ
 // was opened: the app reopens on the last task view of the device (LS 'lastKey')
 const START_KEY = 'inbox';
 const SMART = {
-  inbox: {name: N_('Inbox'), icon: 'inbox'},
+  inbox: {name: N_('Basket'), icon: 'inbox'},
   today: {name: N_('Today'), icon: 'sun'},
   tomorrow: {name: N_('Tomorrow'), icon: 'sunrise'},
   week: {name: N_('Next 7 days'), icon: 'week'},

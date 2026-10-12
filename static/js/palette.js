@@ -9,14 +9,14 @@ const keyName = k => k === 'Mod' ? (IS_MAC ? '⌘' : 'Ctrl') : k === 'Shift' ? (
 const kb = s => `<span class="kbs">${s.split(' ').map(ch => ch.split('+').map(k => `<kbd>${esc(keyName(k))}</kbd>`).join('')).join('')}</span>`;
 const kbText = s => s.split(' ').map(ch => ch.split('+').map(keyName).join(IS_MAC ? '' : '+')).join(' ');
 const SHORTCUTS_ALL = [
-  [N_('General'), [['Mod+K', N_('Search and commands')], ['?', N_('Keyboard shortcuts')], ['n', N_('New task')], ['q', N_('Quick capture to the inbox')], ['a', N_('Chat with an agent (window)')], ['Ctrl+Space', N_('Quick capture, also while typing')], ['/', N_('Search')], ['Mod+Z', N_('Undo')], ['Mod+Shift+Z', N_('Redo')], ['Esc', N_('Close')]]],
+  [N_('General'), [['Mod+K', N_('Search and commands')], ['?', N_('Keyboard shortcuts')], ['n', N_('New task')], ['q', N_('Quick capture to the basket')], ['a', N_('Chat with an agent (window)')], ['Ctrl+Space', N_('Quick capture, also while typing')], ['/', N_('Search')], ['Mod+Z', N_('Undo')], ['Mod+Shift+Z', N_('Redo')], ['Esc', N_('Close')]]],
   [N_('Tasks'), [['↓', N_('Next task (or J)')], ['↑', N_('Previous task (or K)')], ['Enter', N_('Open task')], ['Space', N_('Complete task (or X)')], ['e', N_('Edit title in the list (or double-click)')], ['s', N_('Snooze task')], ['d', N_('Change date')], ['t', N_('Due today')], ['Shift+T', N_('Due tomorrow')], ['m', N_('Move to list')], ['Shift+C', N_('Collapse or expand all')]]],
   // 2.0.6 (#191): multi-select and the calendar views
   [N_('Multi-select'), [['Mod+A', N_('Select all tasks of the view')], ['Shift+↓', N_('Extend the selection down (or Shift+J)')], ['Shift+↑', N_('Extend the selection up (or Shift+K)')], ['Shift+X', N_('Select or unselect the task')],
     ['Space', N_('Complete the selected tasks (or X)')], ['m', N_('Move the selected tasks to a list')], ['d', N_('Change the date of the selected tasks')], ['Esc', N_('Clear the selection')]]],
   [N_('Calendar'), [['1', N_('Month')], ['2', N_('Week')], ['3', N_('Day')], ['4', N_('Timeline')], ['←', N_('Previous period')], ['→', N_('Next period')], ['.', N_('Jump to today')]]],
   [N_('Timeline'), [['Tab', N_('Focus a bar')], ['c', N_('Connect to the task it blocks')], ['Shift+F10', N_('Bar menu')], ['d', N_('Pick a date…')], ['Esc', N_('Cancel connecting')]]],
-  [N_('Go to'), [['g t', N_('Today')], ['g m', N_('Tomorrow')], ['g w', N_('Next 7 days')], ['g d', N_('Now doable')], ['g i', N_('Inbox')], ['g a', N_('All')], ['g c', N_('Calendar')], ['g h', N_('Habits')], ['g f', N_('Focus timer')], ['g s', N_('Settings')]]],
+  [N_('Go to'), [['g t', N_('Today')], ['g m', N_('Tomorrow')], ['g w', N_('Next 7 days')], ['g d', N_('Now doable')], ['g i', N_('Basket')], ['g a', N_('All')], ['g c', N_('Calendar')], ['g h', N_('Habits')], ['g f', N_('Focus timer')], ['g s', N_('Settings')]]],
 ];
 // only what the switched-on modules offer (the Timeline group needs the timeline with dependencies)
 const SC_MOD = {'g c': 'cal', 'g h': 'habits', 'g f': 'pomo'};
@@ -202,7 +202,7 @@ function palAll() {
   const add = (id, kind, label, icon, fn, extra = {}) => it.push({id, kind, label, icon, fn, ...extra});
   // actions
   add('a:new', 'action', tr('New task'), 'plus', () => { const q = currentQuickInput(); if (q && (!isMobile() || tabletDock())) q.focus(); else openQuickSheet(); }, {keys: 'n'});
-  add('a:capture', 'action', tr('Capture to the inbox'), 'zap', () => quickCapture(), {keys: 'q', sub: tr('Lands in the inbox, wherever you are')});  // 2.4.0 (#187); 2.25.0 (UX-32): one name that says where it goes
+  add('a:capture', 'action', tr('Capture to the basket'), 'zap', () => quickCapture(), {keys: 'q', sub: tr('Lands in the basket, wherever you are')});  // 2.4.0 (#187); 2.25.0 (UX-32): one name that says where it goes
   add('a:newlist', 'action', tr('New list'), 'list', () => listModal());
   add('a:newproject', 'action', tr('New project…'), 'brief', () => listModal(null, '', {kind: 'project'}));  // 2.4.0 (#243)
   add('a:newfilter', 'action', tr('New filter'), 'filter', () => filterModal());
@@ -226,7 +226,7 @@ function palAll() {
   if (feat('travel')) add('a:trip', 'action', tr('New trip'), 'plane', () => tripModal());
   if (propOn()) {  // 2.3.0 (#260 #262 #263): ask an agent for a proposal
     add('a:propproject', 'action', tr('New project from briefing…'), 'bot', () => propRequest('project'));
-    add('a:propinbox', 'action', propWith(N_('Sort the inbox with {0}…'), N_('Sort the inbox with an agent…')), 'bot', () => propRequest('triage', {}));
+    add('a:propinbox', 'action', propWith(N_('Sort the basket with {0}…'), N_('Sort the basket with an agent…')), 'bot', () => propRequest('triage', {}));
     const rl = routeList();
     if (rl && !rl.is_inbox && canEditList(rl.id)) add('a:propnotes', 'action', tr('Tasks from notes…'), 'bot', () => propRequest('extract', {lid: rl.id}));
   }
@@ -299,6 +299,7 @@ function palAll() {
   for (const [k, icon, n] of SET_SECS) {
     if (k === 'account' && !S.me) continue;
     if (k === 'users' && !S.me?.is_admin) continue;
+    if (k === 'org' && !(S.me && lmOrgPaneOn())) continue;  // 2.39.1 (#1188)
     if (k === 'ai' && !aiPaneOn()) continue;  // 2.7.0 (#405 S2/S8: was a dead branch for a "time" tab)
     add('s:' + k, 'setting', tr('Settings: {0}', tr(n)), icon, () => settingsModal(k), {keys: k === 'general' ? 'g s' : ''});
   }
@@ -441,8 +442,8 @@ function unionRect(els) {
 function tourSteps() {
   const m = isMobile(), touch = isTouch(), s = [];
   const rect = sel => () => { const e = typeof sel === 'function' ? sel() : $(sel); return e ? e.getBoundingClientRect() : null; };
-  s.push(m ? {id: 'side', t: N_('Smart lists'), d: N_('The Inbox comes first: new tasks without a list land there. Today, Tomorrow and Next 7 days collect tasks from all your lists. Lists, filters and tags are in this menu.'), sel: '#top .menu', r: rect('#top .menu')}
-    : {id: 'side', sel: '#side .sg-focus .srow', t: N_('Smart lists'), d: N_('The Inbox comes first: new tasks without a list land there. Today, Tomorrow and Next 7 days collect tasks from all your lists. Your own lists, filters and tags follow below.'),
+  s.push(m ? {id: 'side', t: N_('Smart lists'), d: N_('The Basket comes first: new tasks without a list land there. Today, Tomorrow and Next 7 days collect tasks from all your lists. Lists, filters and tags are in this menu.'), sel: '#top .menu', r: rect('#top .menu')}
+    : {id: 'side', sel: '#side .sg-focus .srow', t: N_('Smart lists'), d: N_('The Basket comes first: new tasks without a list land there. Today, Tomorrow and Next 7 days collect tasks from all your lists. Your own lists, filters and tags follow below.'),
       r: () => unionRect($$('#side .sg-focus .srow').slice(0, 4))});
   s.push({id: 'add', sel: m ? '#fab' : '#view .qadd .box', t: N_('Quick add'), d: N_('Type the way you think: “Dentist tomorrow 3pm !high #private in Family”. Dates, priority, tags and the list (~list, “in list …”) are picked up as you type.'), r: rect(m ? '#fab' : '#view .qadd .box')});
   s.push({id: 'detail', sel: '#view .trow', t: N_('Details'), d: touch ? N_('Tap a task for notes, subtasks, files and comments. Swipe right to complete, left to reschedule.') : N_('Click a task for notes, subtasks, files and comments. Drag it onto a day or a list to move it.'), r: rect('#view .trow')});
@@ -561,75 +562,102 @@ const HERON_FLY_SVG = `<svg class="cheron cfly" viewBox="0 0 140 80" aria-hidden
   <circle class="d" cx="103" cy="30" r="1.6" fill="currentColor"/></svg>`;
 const CHECK_SVG = '<svg viewBox="0 0 16 16" fill="none" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8.5 6 12.5 14 3.5"/></svg>';
 const reducedMotion = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } };
-const CELE_MS = 2600;
-// the flight at progress p (0..1): from beyond the left edge to beyond the right edge on a shallow arc, a slight bob per
-// wing beat; WINGS beats over the whole flight (calm: about one beat every 0.65 s)
-const WINGS = 4;
-function flyAt(p, vw, vh) {
-  const x = -140 + (vw + 280) * p, y = vh * 0.34 - Math.sin(Math.PI * p) * vh * 0.1 + Math.sin(Math.PI * 2 * WINGS * p) * 5;
-  const tilt = -Math.cos(Math.PI * p) * 6;  // climbs a little at first, glides down at the end
+// 2.39.1 (#1292, decided 12.10.): more punch. The heron (about a quarter of the screen wide) flies in, hovers in the middle
+// with big wing beats while a big check pops up and colourful confetti bursts to all sides, then it flies off up to the
+// right. Three levels: today < list < project (size, amount, length); a short vibration on phones; a tap ends it at once.
+// Only transform / opacity move. The calm variant (reduced motion) stays.
+const CELE_TIER = {today: {ms: 2600, s: 0.85, n: 44, vib: 30}, list: {ms: 3000, s: 1, n: 64, vib: 45}, project: {ms: 3400, s: 1.15, n: 96, vib: 60}};
+const CELE_COLORS = ['#f03e3e', '#f59f00', '#fcc419', '#37b24d', '#1c7ed6', '#ae3ec9', 'var(--accent)'];
+const CELE_MS = 2600;  // (today; the others: CELE_TIER)
+const CELE_IN = 0.28, CELE_OUT = 0.72, CELE_BURST = 0.3;  // arrives / leaves / the burst, as progress of the whole
+const celeLerp = (a, b, t) => a + (b - a) * t;
+const celeEase = t => 1 - Math.pow(1 - t, 3), celeEaseIn = t => t * t * t;
+const celeBirdW = (vw, tier) => Math.round(Math.min(380, Math.max(150, vw * 0.25)) * tier.s);
+function celeCenter(vw, vh, bw) { return {x: vw / 2 - bw / 2, y: vh * 0.4 - bw * 2 / 7}; }  // the bird box (7:4) in the middle
+// the flight at progress p (0..1): in from the left edge, hovering in the middle, off to the upper right
+function flyAt(p, vw, vh, bw = 150) {
+  const c = celeCenter(vw, vh, bw);
+  let x, y, tilt;
+  if (p < CELE_IN) { const t = celeEase(p / CELE_IN); x = celeLerp(-bw - 20, c.x, t); y = celeLerp(vh * 0.12, c.y, t); tilt = celeLerp(8, 0, t); }
+  else if (p <= CELE_OUT) { const t = (p - CELE_IN) / (CELE_OUT - CELE_IN); x = c.x; y = c.y - Math.sin(Math.PI * 2 * 3 * t) * bw * 0.035; tilt = 0; }
+  else { const t = celeEaseIn((p - CELE_OUT) / (1 - CELE_OUT)); x = celeLerp(c.x, vw + 30, t); y = celeLerp(c.y, -bw, t); tilt = celeLerp(0, -14, t); }
   return {transform: `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) rotate(${tilt.toFixed(2)}deg)`};
 }
-const wingAt = p => ({transform: `scaleY(${(0.2 + 0.8 * Math.cos(Math.PI * 2 * WINGS * p)).toFixed(3)})`});
+// wing beats: calm on the way, big and quicker while it hovers (scaleY around the shoulder, down to a full flip)
+const WINGS = 9;
+const wingAt = p => { const big = p >= CELE_IN && p <= CELE_OUT; const a = big ? 1 : 0.8; return {transform: `scaleY(${(1 - a + a * Math.cos(Math.PI * 2 * WINGS * p)).toFixed(3)})`}; };
+function checkAt(p) {  // the big check: pops (overshoot) right after the arrival, stays, fades before the flight off
+  const k = [[0, 0.2, 0], [CELE_BURST, 0.2, 0], [CELE_BURST + 0.06, 1.18, 1], [CELE_BURST + 0.12, 1, 1], [CELE_OUT + 0.06, 1, 1], [0.9, 0.85, 0], [1, 0.85, 0]];
+  let i = 0; while (i < k.length - 2 && p > k[i + 1][0]) i++;
+  const [p0, s0, o0] = k[i], [p1, s1, o1] = k[i + 1], t = p1 > p0 ? Math.min(1, Math.max(0, (p - p0) / (p1 - p0))) : 1;
+  return {transform: `translate(-50%,-50%) scale(${celeLerp(s0, s1, t).toFixed(3)})`, opacity: +celeLerp(o0, o1, t).toFixed(3)};
+}
 function celebrate(kind, {name = '', frame = null, force = false} = {}) {
   if (!force && S.settings.celebrate === '0') return;
-  $$('.cele,.cele-quip').forEach(x => x.remove());
+  celeEnd();
   const quip = nextQuip() || (kind === 'today' ? tr('Today is done.') : tr('All done.'));
   const title = kind === 'today' ? tr('Today is clear') : kind === 'project' ? tr('Project complete: {0}', name) : tr('List complete: {0}', name);
+  const tier = CELE_TIER[kind] || CELE_TIER.list;
   const q = document.createElement('div');
   q.className = 'cele-quip'; q.setAttribute('role', 'status');
   q.innerHTML = `${reducedMotion() ? HERON_SWING_SVG : ''}<div><b>${esc(title)}</b><span>${esc(quip)}</span></div>`;
+  try { if (frame === null && navigator.vibrate && matchMedia('(pointer: coarse)').matches) navigator.vibrate(tier.vib); } catch { /* not allowed */ }
   if (reducedMotion()) {  // calm variant: small heron + line, no motion
     q.classList.add('calm'); q.dataset.kind = kind;
     document.body.appendChild(q);
-    if (frame === null) setTimeout(() => q.remove(), 4200);
+    if (frame === null) CELE.timers.push(setTimeout(() => q.remove(), 4200));
+    q.addEventListener('pointerdown', celeEnd);
     return q;
   }
-  const vw = innerWidth || 1440, vh = innerHeight || 900;
+  const vw = innerWidth || 1440, vh = innerHeight || 900, dur = tier.ms, bw = celeBirdW(vw, tier);
   const el = document.createElement('div');
   el.className = 'cele'; el.dataset.kind = kind; el.setAttribute('aria-hidden', 'true');
-  el.innerHTML = `<div class="cbird">${HERON_FLY_SVG}</div>`;
+  el.innerHTML = `<div class="ccheck">${CHECK_SVG}</div><div class="cbird">${HERON_FLY_SVG}</div>`;
   document.body.appendChild(el); document.body.appendChild(q);
-  const bird = $('.cbird', el), wing = $('.cwing', el);
-  // confetti: checkmarks let go behind the heron along its way (start p0), they drift back a little and fall
-  const N = 28, pieces = [];
-  for (let i = 0; i < N; i++) {
-    const c = document.createElement('span');
-    c.className = 'cconf' + (i % 5 === 0 ? ' alt' : '');
-    c.innerHTML = CHECK_SVG;
+  const bird = $('.cbird', el), wing = $('.cwing', el), chk = $('.ccheck', el);
+  bird.style.width = bw + 'px';
+  const cy = vh * 0.4;
+  Object.assign(chk.style, {left: vw / 2 + 'px', top: (cy + bw * 0.3) + 'px', width: Math.round(bw * 0.42) + 'px', height: Math.round(bw * 0.42) + 'px'});
+  // confetti: bursts from the middle to all sides (colourful: decided 12.10.), falls with gravity, spins, fades
+  const pieces = [], sp = Math.max(vw, vh) * 0.75 * tier.s;
+  for (let i = 0; i < tier.n; i++) {
+    const c = document.createElement('span'), shape = i % 7 === 0 ? 'k' : i % 3 === 0 ? 'c' : 'r';
+    c.className = 'cconf ' + shape; c.style.setProperty('--cc', CELE_COLORS[i % CELE_COLORS.length]);
+    if (shape === 'k') c.innerHTML = CHECK_SVG;
     el.appendChild(c);
-    const p0 = 0.12 + 0.72 * (i / (N - 1)) + (Math.random() - 0.5) * 0.04;
-    pieces.push({c, p0, vx: -40 - Math.random() * 90, vy: -30 + Math.random() * 60, spin: (Math.random() - 0.5) * 720, s: 0.65 + Math.random() * 0.7, life: 0.9 + Math.random() * 0.5});
+    const a = Math.PI * 2 * (i / tier.n) + (Math.random() - 0.5) * 0.5, v = sp * (0.45 + Math.random() * 0.75);
+    pieces.push({c, vx: Math.cos(a) * v, vy: Math.sin(a) * v - sp * 0.35, spin: (Math.random() - 0.5) * 900, s: 0.7 + Math.random() * 0.8, life: 1.1 + Math.random() * 0.6});
   }
-  const birdW = Math.min(150, Math.max(104, vw * 0.12));
-  bird.style.width = birdW + 'px';
-  const confAt = (pc, tt) => {  // tt: seconds since the piece was let go (behind the tail)
-    const f = flyAt(pc.p0, vw, vh).transform.match(/translate\(([-\d.]+)px,([-\d.]+)px/);
-    const x0 = +f[1] + birdW * 0.12, y0 = +f[2] + birdW * 0.32;
-    const x = x0 + pc.vx * tt, y = y0 + pc.vy * tt + 520 * tt * tt;
+  const confAt = (pc, tt) => {  // tt: seconds since the burst
+    const x = vw / 2 + pc.vx * tt, y = cy + pc.vy * tt + 900 * tt * tt;
     return {transform: `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) rotate(${(pc.spin * tt).toFixed(1)}deg) scale(${pc.s})`,
-      opacity: tt <= 0 ? 0 : Math.max(0, 1 - Math.max(0, tt - pc.life * 0.55) / (pc.life * 0.45))};
+      opacity: tt <= 0 ? 0 : Math.max(0, 1 - Math.max(0, tt - pc.life * 0.6) / (pc.life * 0.4))};
   };
+  el.addEventListener('pointerdown', celeEnd); q.addEventListener('pointerdown', celeEnd);
   if (frame !== null || !el.animate) {  // a still frame (screenshots, tests, browsers without Web Animations)
     const p = frame ?? 0.5;
-    Object.assign(bird.style, flyAt(p, vw, vh)); Object.assign(wing.style, wingAt(p));
-    for (const pc of pieces) Object.assign(pc.c.style, confAt(pc, (p - pc.p0) * CELE_MS / 1000));
+    Object.assign(bird.style, flyAt(p, vw, vh, bw)); Object.assign(wing.style, wingAt(p)); Object.assign(chk.style, checkAt(p));
+    for (const pc of pieces) Object.assign(pc.c.style, confAt(pc, (p - CELE_BURST) * dur / 1000));
     q.classList.add('on');
-    if (frame === null) setTimeout(() => { el.remove(); q.remove(); }, 3200);
+    if (frame === null) CELE.timers.push(setTimeout(celeEnd, dur + 600));
     return el;
   }
-  const K = 48, steps = [...Array(K + 1)].map((_, i) => i / K);
-  bird.animate(steps.map(p => ({...flyAt(p, vw, vh), offset: p})), {duration: CELE_MS, easing: 'linear', fill: 'both'});
-  wing.animate(steps.map(p => ({...wingAt(p), offset: p})), {duration: CELE_MS, easing: 'linear', fill: 'both'});
+  const K = 60, steps = [...Array(K + 1)].map((_, i) => i / K);
+  bird.animate(steps.map(p => ({...flyAt(p, vw, vh, bw), offset: p})), {duration: dur, easing: 'linear', fill: 'both'});
+  wing.animate(steps.map(p => ({...wingAt(p), offset: p})), {duration: dur, easing: 'linear', fill: 'both'});
+  chk.animate(steps.map(p => ({...checkAt(p), offset: p})), {duration: dur, easing: 'linear', fill: 'both'});
   for (const pc of pieces) {
-    const dur = pc.life * 1000, ks = [...Array(13)].map((_, i) => i / 12);
-    pc.c.animate(ks.map(f => ({...confAt(pc, f * pc.life), offset: f})), {duration: dur, delay: CELE_MS * pc.p0, easing: 'linear', fill: 'both'});
+    const ks = [...Array(13)].map((_, i) => i / 12);
+    pc.c.animate(ks.map(f => ({...confAt(pc, f * pc.life), offset: f})), {duration: pc.life * 1000, delay: dur * CELE_BURST, easing: 'linear', fill: 'both'});
   }
-  setTimeout(() => q.classList.add('on'), CELE_MS * 0.3);
-  setTimeout(() => el.remove(), CELE_MS + 1600);
-  setTimeout(() => q.classList.remove('on'), 3600);
-  setTimeout(() => q.remove(), 4000);
+  CELE.timers.push(setTimeout(() => q.classList.add('on'), dur * 0.35), setTimeout(() => el.remove(), dur + 400),
+    setTimeout(() => q.classList.remove('on'), dur + 1000), setTimeout(() => q.remove(), dur + 1400));
   return el;
+}
+const CELE = {timers: []};
+function celeEnd() {  // a tap (or a new celebration) ends it at once
+  CELE.timers.forEach(clearTimeout); CELE.timers = [];
+  $$('.cele,.cele-quip').forEach(x => x.remove());
 }
 // trigger check around a completion: snapshot before, compare after the state reload
 const openByList = () => { const m = {}; for (const t of S.tasks.values()) if (t.status === 0) m[t.list_id] = (m[t.list_id] || 0) + 1; return m; };

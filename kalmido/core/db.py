@@ -134,17 +134,20 @@ def ensure_inbox(c, uid):
     if not c.execute("SELECT 1 FROM lists WHERE is_inbox=1 AND owner_id=?", (uid,)).fetchone():
         r = c.execute("SELECT value FROM user_settings WHERE user_id=? AND key='lang'", (uid,)).fetchone()
         c.execute("INSERT INTO lists(name,is_inbox,sort,created_at,owner_id) VALUES(?,1,-1,?,?)",
-                  (tr("Inbox", lg=r[0] if r and r[0] in LANGS else "en"), iso(now_utc()), uid))
+                  (tr("Basket", lg=r[0] if r and r[0] in LANGS else "en"), iso(now_utc()), uid))
 
 
 def inbox_names():
-    """Every default name of an inbox: "Eingang" (before 2.15) and "Inbox" in each language."""
+    """Every default name of an inbox: "Eingang" (before 2.15), "Inbox" in each language (2.15 - 2.39.0) and since 2.39.1
+    (#1219) "Basket" in each language."""
     if "n" not in _INBOX_NAMES:
-        _INBOX_NAMES["n"] = sorted({"Eingang"} | {tr("Inbox", lg=k) for k in LANGS})
+        _INBOX_NAMES["n"] = sorted(KB_LEGACY_INBOX_NAMES | {tr("Basket", lg=k) for k in LANGS})
     return _INBOX_NAMES["n"]
 
 
 _INBOX_NAMES = {}
+# 2.39.1 (#1219): the inbox names before the rename to "Basket" (the old translations of "Inbox"), still default names
+KB_LEGACY_INBOX_NAMES = frozenset({"Eingang", "Inbox", "Boîte de réception", "Bandeja de entrada", "In arrivo"})
 
 
 def inbox_default(name):

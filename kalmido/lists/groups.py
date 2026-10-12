@@ -343,7 +343,7 @@ def list_group_set(lid, gid):
     need_list(c, lid, write=False, manage=True)
     need_group(c, gid)
     if c.execute("SELECT is_inbox FROM lists WHERE id=?", (lid,)).fetchone()[0]:
-        return err(tr("The inbox cannot be shared"))
+        return err(tr("The basket cannot be shared"))
     role = grp_role(body())
     from ..accounts.orgs import ws_member_problem
     for uid in grp_members(c, gid):  # 2.28.0 (#935): everyone in the group must belong to the list's workspace

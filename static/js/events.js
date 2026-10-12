@@ -143,7 +143,7 @@ async function submitQuick(input, extra = {}) {
   if (created?.id && d.who && body.assignee_id === d.who) {  // 2.36.2 (#1138): it stays in the view; say for whom and where
     const wl = listById(taskById(created.id)?.list_id || body.list_id);
     if (wl) LS.set('dsxWho.' + d.who, wl.id);
-    toast(tr('{0} assigned in {1}', personNameAny(d.who) || '?', wl ? lname(wl) : tr('Inbox')), null, 4000);
+    toast(tr('{0} assigned in {1}', personNameAny(d.who) || '?', wl ? lname(wl) : tr('Basket')), null, 4000);
   }
   // 2.13.0 (#453 P8): a task that does not show up in the open view (e.g. "… tomorrow 10:00" typed in Today lands in the
   // Inbox) says where it went, with "Open"
@@ -177,7 +177,7 @@ function openQuickSheet(prefill = '', preset = {}) {
   const inp = $('#qsheet'); inp.value = prefill; updateChips(inp);
   q.classList.toggle('capture', !!preset.capture);
   const i0 = $('.box > svg', q); if (i0) i0.outerHTML = ic(preset.capture ? 'zap' : 'plus');
-  inp.placeholder = preset.capture ? tr('Capture to the inbox…') : preset.section_name ? tr('Add a task to {0}', preset.section_name) : tr('Add task…');
+  inp.placeholder = preset.capture ? tr('Capture to the basket…') : preset.section_name ? tr('Add a task to {0}', preset.section_name) : tr('Add task…');
   if (preset.capture && !hint) qh.innerHTML = qHelpChips('qsheet', true);
   // 2.26.x (#952): the focus in the same tap (no timer first): iOS opens the keyboard only for a focus inside the user's
   // gesture, so the sheet and the keyboard come up together; a second try a moment later if something took it back
@@ -197,19 +197,19 @@ function quickCapture(prefill = '', preset = {}) {
 function captureDone(created, body) {
   if (!created) return;
   const l = listById(created.list_id || body.list_id);
-  toast(tr('Captured to {0}', l ? lname(l) : tr('Inbox')));
+  toast(tr('Captured to {0}', l ? lname(l) : tr('Basket')));
   if (S.capturePage) {  // the bookmarklet popup: say it and close (a tab the script did not open stays, with a link to the app)
-    const el = $('#view'); if (el) el.innerHTML = `<div class="empty capdone">${ic('done')}${esc(tr('Captured to {0}', l ? lname(l) : tr('Inbox')))}<br><a href="/#inbox" class="btn sm">${tr('Open Kalmido')}</a></div>`;
+    const el = $('#view'); if (el) el.innerHTML = `<div class="empty capdone">${ic('done')}${esc(tr('Captured to {0}', l ? lname(l) : tr('Basket')))}<br><a href="/#inbox" class="btn sm">${tr('Open Kalmido')}</a></div>`;
     if (window.opener) setTimeout(() => window.close(), 900);
   }
 }
 const bookmarklet = () => `javascript:(()=>{window.open(${JSON.stringify(location.origin + '/capture')}+'?title='+encodeURIComponent(document.title)+'&url='+encodeURIComponent(location.href),'kalmido_capture','popup,width=560,height=420')})()`;
 function captureHelp() {  // /capture without a page: the bookmarklet + the keyboard shortcuts
-  const md = modal(`<div class="lhdr"><h3>${ic('zap', 's')} ${tr('Capture to the inbox')}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}">${ic('x')}</button></div>
-    <p class="muted">${tr('Capture a thought or the page you are reading into the inbox, from anywhere. The quick add syntax works: tomorrow, !high, #tag, ~list.')}</p>
+  const md = modal(`<div class="lhdr"><h3>${ic('zap', 's')} ${tr('Capture to the basket')}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}">${ic('x')}</button></div>
+    <p class="muted">${tr('Capture a thought or the page you are reading into the basket, from anywhere. The quick add syntax works: tomorrow, !high, #tag, ~list.')}</p>
     <h4>${tr('Bookmarklet')}</h4>
     <div class="row caprow"><a class="btn pri capbm" href="${esc(bookmarklet())}" data-act="bm-hint" draggable="true">${ic('zap', 's')} ${tr('Add to Kalmido')}</a></div>
-    <div class="shint keep">${tr('Drag the button to your bookmarks bar. On any page, click it: a small window opens with the page title and address, Enter saves it to your inbox. It runs no code of ours on that page and uses your normal sign-in.')}</div>
+    <div class="shint keep">${tr('Drag the button to your bookmarks bar. On any page, click it: a small window opens with the page title and address, Enter saves it to your basket. It runs no code of ours on that page and uses your normal sign-in.')}</div>
     <h4>${tr('Keyboard')}</h4>
     <div class="kbrow"><span>${tr('In the app')}</span>${kb('q')} ${kb('Ctrl+Space')}</div>
     <div class="shint keep">${tr('Installed app: its icon menu (right-click in the taskbar or dock, long-press on phones) has “Quick add”. A system-wide key: Windows: Start menu > right-click Kalmido > More > Open file location > Properties > Shortcut key; macOS: Shortcuts app > New shortcut “Open URL” with {0} > Add keyboard shortcut; Linux (GNOME / KDE): a custom shortcut that opens {0} in your browser.', location.origin + '/capture')}</div>

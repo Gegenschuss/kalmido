@@ -272,7 +272,7 @@ def template_create():
                                                                            WHERE t.list_id=? ORDER BY d.created_at, d.task_id, d.blocker_id""", (lid,)).fetchall()
                     if r[0] in keys and r[1] in keys] if keys else []
             role = list_role(c, lid)
-            name = tr("Inbox") if lst["is_inbox"] and inbox_default(lst["name"]) else lst["name"]
+            name = tr("Basket") if lst["is_inbox"] and inbox_default(lst["name"]) else lst["name"]
             kind, data = "list", {"name": name, "color": lst["color"], "kind": lst["kind"],
                                   "view": lst["view"] if role == "owner" else (c.execute(
                                       "SELECT COALESCE(view, ?) FROM list_members WHERE list_id=? AND user_id=?",
@@ -553,7 +553,7 @@ def list_ptype_set(c, lid, role, k, skip=()):
         raise Denied(403)
     cur = c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()
     if cur["is_inbox"]:
-        raise BadInput(tr("The inbox cannot be a project"))
+        raise BadInput(tr("The basket cannot be a project"))
     out = {"ptype_prev": {}, "modules_on": [], "ptype_missing": {"sections": [], "fields": []}}
     if (cur["ptype"] or "") == k:
         if k:

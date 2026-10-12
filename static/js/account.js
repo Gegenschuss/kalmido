@@ -111,7 +111,7 @@ async function dropTokenNew(md) {
 function shareHtml(hint) {
   const sh = S.share || {}, ios = /^https:\/\//.test(sh.ios_shortcut || '') ? sh.ios_shortcut : '';
   return `<h4 id="s-share-h">${tr('Share from your phone')}</h4>
-    ${hint(tr('Send photos, files, links and text from any app to your inbox: each share becomes a task, files are attached. Works on the go too, as long as the phone reaches Kalmido.'))}
+    ${hint(tr('Send photos, files, links and text from any app to your basket: each share becomes a task, files are attached. Works on the go too, as long as the phone reaches Kalmido.'))}
     <h5 class="ssub">${ic('phone', 's')}Android</h5>
     <div class="row"><a class="btn sm" id="s-hszip" href="/api/me/share/httpshortcuts.zip" download="kalmido-http-shortcuts.zip">${ic('download', 's')} ${tr('Download HTTP Shortcuts import')}</a></div>
     <ol class="slist">
@@ -225,7 +225,7 @@ function accountHtml() {
     <div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="a-avpick">${avPickHtml()}</div></div>
     ${pw ? `<div class="row"><label for="a-cur">${tr('Password')}</label><input type="password" id="a-cur" placeholder="${tr('current password')}" autocomplete="current-password"><input type="password" id="a-new" placeholder="${tr('new password')}" autocomplete="new-password"><button class="btn sm" data-acc="pw">${tr('Change')}</button></div>` : ''}
     ${storageHtml()}
-    ${wsPaneOn() ? wsPaneHtml(t => `<div class="shint">${t}</div>`) : ''}
+    ${wsPaneOn() ? (lmOrgPaneOn() ? lmOrgLinkHtml() : wsPaneHtml(t => `<div class="shint">${t}</div>`)) : ''}
     ${tfaHtml()}
     ${apwHtml()}
     <details class="sdev"><summary>${ic('key', 's')}${tr('Advanced · for developers')}</summary>
@@ -430,7 +430,7 @@ function wsPaneWire(md) {
 const OADM_ACT = {archive: N_('{0} archived {1}'), restore: N_('{0} restored {1}'), delete: N_('{0} deleted {1} for good'), owner: N_('{0} handed {1} to {2}')};
 function oadmRow(x) {
   const sub = [x.owner_agent ? tr('Owner: {0} (agent)', x.owner_name) : tr('Owner: {0}', x.owner_name), tr('{0} open', x.open) + ' / ' + trn('{0} task', '{0} tasks', x.tasks),
-    trn('{0} member', '{0} members', x.members), tr('changed {0}', fmtDateLoc(String(x.changed_at || '').slice(0, 10)) || '–')];
+    trn('{0} member', '{0} members', x.members), tr('changed {0}', fmtDateLoc(String(x.changed_at || '').slice(0, 10)) || '–'), x.folder && tr('Folder: {0}', fDisp(x.folder))].filter(Boolean);  // 2.39.1 (#1188): + folder path
   return `<div class="mrow oadmrow ${x.archived ? 'off' : ''}" data-olid="${x.id}"><span class="n"><b>${esc(x.name)}</b>${x.archived ? ` <span class="muted">${esc(tr('archived'))}</span>` : ''}<small class="muted">${esc(sub.join(' · '))}</small></span>
     <span class="oadmb">${x.archived ? `<button type="button" class="btn sm" data-oa="restore">${tr('Restore')}</button><button type="button" class="btn sm danger" data-oa="delete">${tr('Delete…')}</button>`
       : `<button type="button" class="btn sm" data-oa="archive">${tr('Archive')}</button>`}<button type="button" class="btn sm" data-oa="owner">${tr('Hand over…')}</button></span></div>`;
@@ -438,13 +438,15 @@ function oadmRow(x) {
 function oadmDraw(md, j) {
   md._j = j;
   const live = j.lists.filter(x => !x.archived), arch = j.lists.filter(x => x.archived);
-  $('#oadm-body', md).innerHTML = (j.lists.length ? `${live.map(oadmRow).join('')}${arch.length ? `<h4 class="oadmh">${esc(tr('Archive'))}</h4>${arch.map(oadmRow).join('')}` : ''}`
+  // 2.39.1 (#1188): grouped by owner (listadmin.js)
+  $('#oadm-body', md).innerHTML = (j.lists.length ? `${lmOadmBody({lists: live}, oadmRow)}${arch.length ? `<h4 class="oadmh">${esc(tr('Archive'))}</h4>${lmOadmBody({lists: arch}, oadmRow)}` : ''}`
     : `<div class="muted mhint">${tr('The organisation has no lists yet.')}</div>`)
     + (j.log.length ? `<details class="sdet oadmlog"><summary>${tr('History')} <span class="muted">${j.log.length}</span></summary>${j.log.filter(r => OADM_ACT[r.action]).map(r => `<div class="mrow"><span class="n">${tr(OADM_ACT[r.action], `<b>${esc(r.by || '?')}</b>`, `<b>${esc(r.list_name)}</b>`, `<b>${esc(r.to || '')}</b>`)}<small class="muted">${esc(fmtWhen(r.at))}${r.owner && r.action !== 'owner' ? ' · ' + esc(tr('Owner: {0}', r.owner)) : ''}</small></span></div>`).join('')}</details>` : '');
 }
 async function oadmOpen(oid, name) {
   const md = modal(`<h3>${esc(tr('Lists of the organisation {0}', name))}</h3>
-    <div class="shint keep">${tr('Only the lists that belong to the organisation, with names and numbers: their contents stay with their people. Private lists and private sharing stay invisible.')}</div>
+    <div class="shint keep">${tr('The lists of the organisation that are shared with at least one more person, with names and numbers: their contents stay with their people. Private lists stay invisible, also when they are shared.')}</div>
+    <div class="shint lmohint">${ic('info', 's')} ${tr('A list is missing? It is probably private and only shared. Its owner can move it into the organisation: list menu > Edit list… > Workspace.')}</div>
     <div class="members oadm" id="oadm-body"><div class="muted mhint">${tr('Loading…')}</div></div>
     <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Close')}</button></div>`);
   md.classList.add('oadmmd');
@@ -462,7 +464,7 @@ async function oadmOpen(oid, name) {
       } else if (k === 'restore') { j = await api('POST', base + '/archive', {archived: false}); toast(tr('Restored')); }
       else if (k === 'delete') {
         const v = await askDialog({title: tr('Delete “{0}” permanently?', x.name), danger: true, ok: tr('Delete permanently'),
-          html: `<p>${esc(tr('This cannot be undone. Its tasks go to the trash in the inbox of {0} and can be restored from there; its files and the sharing are lost. {0} and the members are told.', x.owner_name))}</p><p>${esc(tr('Type the name of the list to delete it for good'))}</p>`,
+          html: `<p>${esc(tr('This cannot be undone. Its tasks go to the trash in the basket of {0} and can be restored from there; its files and the sharing are lost. {0} and the members are told.', x.owner_name))}</p><p>${esc(tr('Type the name of the list to delete it for good'))}</p>`,
           input: {placeholder: x.name, max: 200}});
         if (v === null) return;
         if (v.trim() !== x.name.trim()) { toast(tr('The name does not match: nothing was deleted')); return; }
@@ -562,7 +564,7 @@ function userModal(u, done) {
     ${u && u.kind !== 'agent' && !u.is_admin && !u.disabled && u.id !== S.me.id ? `<div class="row"><label>${tr('Sign-in link')}</label><button type="button" class="btn sm" data-m="signin">${ic('key', 's')} ${tr('Sign-in link / QR code…')}</button><span class="muted">${tr('for family members without e-mail')}</span></div>` : ''}
     ${u?.twofa?.length ? `<div class="row"><label>${tr('Two-factor')}</label><label class="chkl"><input type="checkbox" id="u-2fareset"> ${tr('Reset (lost phone / passkey and recovery codes)')}</label></div>` : ''}
     ${u?.oidc_linked ? `<div class="row"><label>OIDC</label><label class="chkl"><input type="checkbox" id="u-oidcun"> ${tr('Unlink (the next OIDC login links again by user name or e-mail)')}</label></div>` : ''}
-    <div class="muted" style="font-size:var(--fs-s);line-height:1.6">${tr('Every user gets an own inbox, habits, filters, tags and settings. Lists are shared from the list’s “…” menu > Share….')}</div>
+    <div class="muted" style="font-size:var(--fs-s);line-height:1.6">${tr('Every user gets an own basket, habits, filters, tags and settings. Lists are shared from the list’s “…” menu > Share….')}</div>
     <div class="foot">${u && u.id !== S.me.id ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   // 2.19.0 (#653): a child account and its parents (people, never agents or other children)
   const par = new Set(u?.parents || []);
@@ -595,7 +597,7 @@ function userModal(u, done) {
     let created = false;
     try {
       if (b.dataset.m === 'del') {
-        if (!await askConfirm(tr('Delete user “{0}”?', u.display_name), tr('Their inbox, habits, filters and focus history are deleted. Lists they own must be deleted first.'), {ok: tr('Delete user'), danger: true})) return;
+        if (!await askConfirm(tr('Delete user “{0}”?', u.display_name), tr('Their basket, habits, filters and focus history are deleted. Lists they own must be deleted first.'), {ok: tr('Delete user'), danger: true})) return;
         await api('DELETE', '/api/users/' + u.id);
       }
       if (b.dataset.m === 'save') {
@@ -1289,7 +1291,7 @@ async function setupChoices(el, logo) {
     preset = Object.keys(SETUP_PRESETS).find(k => all.every(x => picked.has(x) === !SETUP_PRESETS[k].off.includes(x))) || '';
   }
   // 2.7.0 (K21): one question "Start with": empty, the sample project, or a project of a built-in type (agency, software, personal)
-  const STARTS = [['', N_('Empty|start'), 'list', N_('Your Inbox and Today, nothing else')], ['sample', N_('Sample project'), 'eye', N_('A small video production with dates and a packing list, to look around; remove it any time under Settings > Data')],
+  const STARTS = [['', N_('Empty|start'), 'list', N_('Your Basket and Today, nothing else')], ['sample', N_('Sample project'), 'eye', N_('A small video production with dates and a packing list, to look around; remove it any time under Settings > Data')],
     ...PTYPE_UI.slice(1).map(([k, n, i, d]) => [k, n, i, d])];
   const row = ([k, n, d]) => `<label class="suse"><input type="checkbox" data-use="${k}" ${picked.has(k) ? 'checked' : ''}><span><b>${tr(n)}</b><small class="muted">${tr(d)}</small></span></label>`;
   const matches = k => all.every(x => picked.has(x) === !SETUP_PRESETS[k].off.includes(x));
@@ -1360,7 +1362,7 @@ function sectionMenu(anchor, sid) {
     {label: tr('Move left / up'), icon: 'left', fn: () => moveSection(sid, -1)},
     {label: tr('Move right / down'), icon: 'right', fn: () => moveSection(sid, 1)},
     '-',
-    {label: tr('Delete (tasks stay)'), icon: 'trash', cls: 'flag-5', fn: () => sectionDelete(sid)},
+    {label: tr('Delete section (tasks stay)'), icon: 'trash', cls: 'flag-5', fn: () => sectionDelete(sid)},
   ]);
 }
 

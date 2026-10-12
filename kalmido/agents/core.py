@@ -131,7 +131,7 @@ def lst_brief(c, lid):
     r = c.execute("SELECT id, name, is_inbox, agent_tidy, ptype FROM lists WHERE id=?", (lid,)).fetchone()
     if not r:
         return {"id": lid, "name": ""}
-    return {"id": r["id"], "name": tr("Inbox") if r["is_inbox"] and inbox_default(r["name"]) else r["name"], "agent_tidy": r["agent_tidy"] or "off",
+    return {"id": r["id"], "name": tr("Basket") if r["is_inbox"] and inbox_default(r["name"]) else r["name"], "agent_tidy": r["agent_tidy"] or "off",
             "tidy_agent_id": tidy_agent_of(c, lid),  # 2.4.1 (#379)
             # 2.30.0 (#1034): the list's project type and the agents that listen in (new / moved tasks, every comment)
             "project_type": r["ptype"] or None, "listen_agent_ids": listen_agents_of(c, lid)}

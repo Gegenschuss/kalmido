@@ -229,7 +229,7 @@ def pub_render(c, link, token, lg):
         title = tr("Done|checklist", lg=lg) if check else tr("Recently completed", lg=lg)
         body_ += (f'<details class="donegrp"{" open" if check else ""}><summary>{e(title)} <span class="n">{len(done_top)}</span></summary>'
                   f'<ul class="tasks">{"".join(row(t) for t in done_top)}</ul></details>')
-    name = tr("Inbox") if link["l_inbox"] and inbox_default(link["l_name"]) else link["l_name"]
+    name = tr("Basket") if link["l_inbox"] and inbox_default(link["l_name"]) else link["l_name"]
     mode = tr("You can tick off items on this page.", lg=lg) if tick else tr("View only.", lg=lg)
     head = (f'<header><h1>{e(name)}</h1><p class="sub">{e(trn("{0} open item", "{0} open items", n_open, lg=lg))} · {e(mode)}</p></header>')
     return pub_html(f"{name} · {APP_NAME}", head + body_, lg)
@@ -341,7 +341,7 @@ def pub_public(c, r):
 def need_pub_owner(c, lid):
     need_list(c, lid, owner=True)
     if c.execute("SELECT is_inbox FROM lists WHERE id=?", (lid,)).fetchone()[0]:
-        raise BadInput(tr("The inbox cannot be shared"))
+        raise BadInput(tr("The basket cannot be shared"))
 
 
 def pub_new_token(c, lid):

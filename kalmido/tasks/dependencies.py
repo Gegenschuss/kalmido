@@ -177,7 +177,7 @@ def newtask_events(c, tid):
                 not burst_gate(c, uid, tid, event=True) or not agent_push_ok(c, uid, s, actor):  # 2.28.0 (#987)
             continue
         lg = lang_of(s)
-        lname = tr("Inbox", lg=lg) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
+        lname = tr("Basket", lg=lg) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
         g.pushes.append((uid, tr("{0} added: {1}", who or tr("Someone via the public link", lg=lg), t["title"], lg=lg), lname,
                          f"{PUBLIC_URL}/#t/{tid}", push_prio(s)))
 
@@ -217,7 +217,7 @@ def unblock_events(c, done_ids):
         lg = lang_of(s)
         who = user_names(c, [actor]).get(actor, "?") if actor else tr("Someone via the public link", lg=lg)
         bt = b["title"] if list_role(c, b["list_id"], uid) and task_visible(c, bl, uid) else tr("a task you cannot see", lg=lg)
-        lname = tr("Inbox", lg=lg) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
+        lname = tr("Basket", lg=lg) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
         g.pushes.append((uid, tr("Unblocked: {0}", t["title"], lg=lg),
                          tr("{0} completed {1}", who, bt, lg=lg) + " · " + lname, f"{PUBLIC_URL}/#t/{w}", push_prio(s)))
 

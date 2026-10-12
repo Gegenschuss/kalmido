@@ -25,6 +25,7 @@ TABLES = (
     "agents", "books", "clients", "ev_cals", "lists", "org_list_log",
     "office_company", "office_contracts", "office_doc_items", "office_doc_log", "office_docs", "office_equipment",
     "office_numbers", "office_payments", "office_services", "office_sets", "office_settings", "office_texts",
+    "office_import_runs", "office_archive",  # 2.39.1 (#1182)
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"

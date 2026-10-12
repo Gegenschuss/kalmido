@@ -627,7 +627,7 @@ def agents_usage_get():
     for lk, v in sorted(lists.items(), key=lambda x: -x[1]["tokens"]):
         if lk > 0:
             lr = c.execute("SELECT name, is_inbox FROM lists WHERE id=?", (lk,)).fetchone()
-            lrows.append({"list_id": lk, "name": (tr("Inbox") if lr and lr["is_inbox"] and inbox_default(lr["name"]) else lr["name"]) if lr else None, **v})
+            lrows.append({"list_id": lk, "name": (tr("Basket") if lr and lr["is_inbox"] and inbox_default(lr["name"]) else lr["name"]) if lr else None, **v})
         else:
             lrows.append({"list_id": None, "hidden": lk == -1, "none": lk == 0, "name": None, **v})
     out = []

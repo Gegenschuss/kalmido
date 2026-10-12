@@ -347,6 +347,13 @@ def ofx_migrate(c):
     of their document; the index for organisation-filtered reads."""
     c.execute("UPDATE office_doc_items SET org_id=(SELECT d.org_id FROM office_docs d WHERE d.id=office_doc_items.doc_id) "
               "WHERE org_id IS NULL")
+    # 2.39.1 (#1210 N5): then the column becomes NOT NULL (RLS lets no row without organisation through). Here and not in
+    # MIGRATIONS: an old SQLite archive (restore) is loaded after the column exists and filled just above. Every write path
+    # since 2.36.2 sets org_id, so older versions run on with it; a row that could not be filled keeps the column nullable.
+    if c.execute("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='office_doc_items' "
+                 "AND column_name='org_id' AND is_nullable='YES'").fetchone() \
+            and not c.execute("SELECT 1 FROM office_doc_items WHERE org_id IS NULL LIMIT 1").fetchone():
+        c.execute("ALTER TABLE office_doc_items ALTER COLUMN org_id SET NOT NULL")
     c.execute("CREATE INDEX IF NOT EXISTS office_doc_items_org ON office_doc_items(org_id, doc_id)")
 
 

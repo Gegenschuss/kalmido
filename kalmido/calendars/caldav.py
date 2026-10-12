@@ -267,7 +267,7 @@ def _own_id(rx, s):
 
 
 def dav_lname(r):
-    return tr("Inbox") if r["is_inbox"] and inbox_default(r["name"]) else r["name"]
+    return tr("Basket") if r["is_inbox"] and inbox_default(r["name"]) else r["name"]
 
 
 # ---- app passwords

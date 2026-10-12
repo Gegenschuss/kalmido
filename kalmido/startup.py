@@ -26,6 +26,8 @@ finally:
     _c.close()
 from .admin.clientip import ip_startup_check
 ip_startup_check()  # 2.33.0 (#834): many accounts from one private address -> warn in the log
+from .office.pdfweb import rx_office_perms
+rx_office_perms()  # 2.39.1 (#1210 N8): office folders of older versions become 0700
 if os.environ.get("TASKS_WATCHDOG", "1") == "1":
     threading.Thread(target=watchdog, daemon=True).start()
     if UPDATE_CHECK_ENV:

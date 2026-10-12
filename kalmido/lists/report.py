@@ -84,7 +84,7 @@ def project_status(c, lid, uid, *, frm=None, to=None, with_time=True):
     ahead = (max(to, today) + timedelta(days=REPORT_AHEAD_DAYS)).isoformat()
     upcoming = [r for r in opened if r["due"] and t0 <= r["due"][:10] <= ahead]
     ms_next = [r for r in opened if r["ms"] and (not r["due"] or r["due"][:10] >= t0)][:5]
-    out = {"list": {"id": lid, "name": tr("Inbox") if lst["is_inbox"] and inbox_default(lst["name"]) else lst["name"],
+    out = {"list": {"id": lid, "name": tr("Basket") if lst["is_inbox"] and inbox_default(lst["name"]) else lst["name"],
                     "project": lst["kind"] == "project", "status": lst["status"] or None},
            "from": frm.isoformat(), "to": to.isoformat(), "today": t0,
            "counts": {"done": len(done), "done_subtasks": sum(1 for r in done_all if r["parent_id"] and not r["ms"]),

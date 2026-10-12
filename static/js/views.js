@@ -113,7 +113,8 @@ function filterMatch(t, r = {}) {
 // map route key -> 0/1; not shared with the other members of a shared list). 1.8.1: no global switch any more, a view
 // without its own choice shows its completed tasks; the calendar has its own entry "cal" (toggle in its bar)
 function doneViews() { try { const o = JSON.parse(S.settings.show_done_views || '{}'); return o && typeof o === 'object' && !Array.isArray(o) ? o : {}; } catch { return {}; } }
-const showDone = (key = S.route.key) => { const v = doneViews()[key]; return v === undefined ? true : !!+v; };
+// 2.39.1 (#1214): without an own entry: the nearest folder default (hide_done), else the person's default (lmDoneDefault)
+const showDone = (key = S.route.key) => { const v = doneViews()[key]; return v === undefined ? lmDoneDefault(key) : !!+v; };
 const showDoneCal = () => showDone('cal');
 // the views that have a "Completed" group (and so the toggle)
 const doneToggleView = () => { const k = S.route.key, l = routeList(); return S.route.mod === 'tasks' && !NOLIST_KEYS.includes(k) && !isKanban() && !isTimeline() && !isRoadmap() && !isOverview() && !(l && l.checklist); };  // 2.7.2 (#414): "Show completed at the bottom" has its own group
@@ -226,7 +227,9 @@ function sortTasks(arr, m = sortMode()) {
 function groupTasks(v) {
   const all = sortTasks(v.open.slice()), pinned = all.filter(t => t.pinned);
   // 1.7.0: Flow shows one sequence instead of date groups (sections and the folder's lists stay)
-  const g = groupRest(v.group === 'date' && sortMode() === 'flow' ? {...v, group: 'none'} : v, all.filter(t => !t.pinned), v.inSec || []);
+  const g = kbOrderGroups(groupRest(v.group === 'date' && sortMode() === 'flow' ? {...v, group: 'none'} : v, all.filter(t => !t.pinned), v.inSec || []));  // 2.39.1 (#1221): own order
+  const mine = kbMineGroup();  // 2.39.1 (#1219): My tasks + "From your lists, without a date"
+  if (mine) { const ids = new Set(all.map(t => t.id)); mine.tasks = mine.tasks.filter(t => !ids.has(t.id)); if (mine.tasks.length) g.push(mine); }
   return pinned.length ? [{id: 'pinned', name: tr('Pinned'), tasks: pinned, cls: 'pin'}, ...g] : g;
 }
 function groupRest(v, arr, dn = []) {  // dn: 2.36.2 (#1136) the completed tasks that stay in their sections
@@ -244,7 +247,7 @@ function groupRest(v, arr, dn = []) {  // dn: 2.36.2 (#1136) the completed tasks
   if (v.group === 'list') {
     const g = new Map();
     for (const t of arr) { if (!g.has(t.list_id)) g.set(t.list_id, []); g.get(t.list_id).push(t); }
-    return (v.folder ? sideOrder() : S.lists).filter(l => g.has(l.id)).map(l => ({id: 'l:' + l.id, name: lname(l), tasks: g.get(l.id), color: cssColor(l.color) || '', img: l.icon || '', lic: l,
+    return (v.folder ? sideOrder() : kbListOrder()).filter(l => g.has(l.id)).map(l => ({id: 'l:' + l.id, name: lname(l), tasks: g.get(l.id), color: cssColor(l.color) || '', img: l.icon || '', lic: l,
       ...(v.folder && l.folder !== v.folder ? {sub: l.folder} : {})}));  // 2.4.0 (#361): the lists of a subfolder get its header
   }
   if (v.group === 'section') {

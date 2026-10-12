@@ -24,7 +24,7 @@ function tch_overlaysClose() {
 function openPop(anchor, html, onClose) {
   const p = $('#pop');
   p.onclick = null;  // a click handler of the previous popover (menu, calendar event) never carries over
-  p.onpointerdown = null; p.ondblclick = null; p.classList.remove('bellpop', 'bpfull'); p.style.width = '';  // 2.7.0: nothing of the bell's dropdown carries over
+  p.onpointerdown = null; p.ondblclick = null; p.classList.remove('bellpop', 'bpfull'); p.style.width = ''; p.style.height = p.style.maxHeight = p.style.transform = p.style.transition = '';  // 2.7.0: nothing of the bell's dropdown carries over (2.39.1 #1181: nor a dragged sheet height)
   if (p.classList.contains('hidden')) { const ae = document.activeElement; popRet = anchor?.focus && anchor.isConnected && !anchor.closest?.('#pop') ? anchor : ae && ae !== document.body && !ae.closest?.('#pop') ? ae : null; }
   p.innerHTML = html; p.classList.remove('hidden'); document.body.classList.add('pop-open');  // 2.28.0 (#976): the grips step aside
   $('#scrim').classList.remove('hidden');
@@ -726,7 +726,7 @@ function sortMenu(anchor) {
     ...[['prio', N_('Priority, then manual')], ['custom', N_('Manual only')], ['date', N_('Date')], ['title', N_('Title')], ['creator', N_('Creator|sort')], ...(depsOn() ? [['flow', N_('Flow|sort')]] : [])].map(([m, n]) => ({label: tr(n), on: cur === m, fn: () => set(m)})),
     {label: !crOn ? tr('Created|sort') : cur === 'created' ? tr('Created: newest first') : tr('Created: oldest first'), on: crOn, cls: 'sortcr', title: crOn ? tr('Click again to reverse the direction') : '', fn: () => set(cur === 'created' ? 'created_asc' : 'created')},
     ...(cfs.length ? ['-', ...cfs.map(f => ({label: tr('Field: {0}', f.name), icon: FT_ICON[f.type], on: cur === 'cf:' + f.id, fn: () => set('cf:' + f.id)}))] : []),
-    ...(doneToggleView() ? ['-', doneItem()] : []),
+    ...(doneToggleView() ? ['-', doneItem(), ...lmDoneResetItems()] : []),  // 2.39.1 (#1214)
     ...(l && isOwner(l) && listView(l) === 'list' && !isOverview() ? ['-', dabItem(l), ...(dsxFixedOff(l) || l.is_inbox ? [] : [dsxItem(l)])] : [])]);
 }
 // 2.7.2 (#414): the list option "Show completed at the bottom" (owner; for everyone in the list, one undo step)

@@ -25,7 +25,7 @@ from .layouts import LAYOUT_KEYS
 SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "review_sent", "ntfy_topic", "features_rev", "onboard", "sample_ask", "agent_share",
                         "purpose", "evcals_hidden", "care_sent",
                         "brief_sent", "brief_read")  # 2.34.0 (#264)
-SIDE_GROUPS = ("focus", "clients", "lists", "filters", "tags", "views", "team")  # 2.25.0 (UX-03)
+SIDE_GROUPS = ("focus", "clients", "lists", "filters", "tags", "views", "areas", "team")  # 2.25.0 (UX-03); 2.39.1 (#1185): areas
 DASH_WIDGETS = ("wait", "today", "news", "chat", "projects", "pinned", "notes", "agents", "stats", "search", "family")  # 2.17.0 (#475), 2.19.0
 SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "time_focus", "celebrate", "cal_today",
                   "date_confirm", "digest_mail", "mail_from_me", "today_inbox", "agent_push",  # 2.28.0 (#987): agent_push
@@ -33,7 +33,8 @@ SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "tim
                   "list_emoji",  # 2.32.0 (#1077)
                   "side_progress",  # 2.36.0 (#1117)
                   "cal_tasks",  # 2.36.1 (#1127)
-                  "agent_steps_live", "agent_steps_always")  # 2.32.0 (#1081)
+                  "agent_steps_live", "agent_steps_always",  # 2.32.0 (#1081)
+                  "show_done_default")  # 2.39.1 (#1214): "Hide completed" as the default of every view (0 = hide)
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
                 "detail_split": (20, 85)}  # 2.31.0 (#344)
@@ -44,7 +45,7 @@ def clean_setting(k, v):
     The watchdog reads these for every user, so malformed values are never stored."""
     from ..notify.push import PUSH_CHANNELS, PUSH_PRIORITIES
     bad = BadInput(tr("Invalid value: {0}", k))
-    if isinstance(v, (dict, list)) and k not in ("folders", "folders_closed", "show_done_views", *CAL_LIST_KEYS):
+    if isinstance(v, (dict, list)) and k not in ("folders", "folders_closed", "show_done_views", "group_order", *CAL_LIST_KEYS):
         raise bad
     sv = "" if v is None else str(v).strip()
     if k == "allday_time":
@@ -179,6 +180,8 @@ def clean_setting(k, v):
         return json.dumps(list(dict.fromkeys(f for f in (clean_folder(x, False) for x in arr) if f)), ensure_ascii=False)
     if k == "show_done_views":
         return clean_done_views(v)
+    if k == "group_order":  # 2.39.1 (#1221)
+        return kb_clean_group_order(v)
     if k in CAL_LIST_KEYS:  # 2.36.1 (#1127, #956): json lists (list ids / calendar keys "e:<id>" | "s:<id>")
         return clean_cal_list(k, v)
     if k == "side_icons":  # 2.36.0 (#1117)
@@ -239,6 +242,31 @@ def clean_done_views(v):
         if not isinstance(k, str) or not 0 < len(k) <= 120 or x not in (0, 1, "0", "1"):
             raise bad
         out[k] = int(x)
+    return json.dumps(out, ensure_ascii=False, separators=(",", ":"))
+
+
+KB_GROUP_VIEWS_MAX, KB_GROUPS_MAX = 100, 400
+
+
+def kb_clean_group_order(v):
+    """2.39.1 (#1221): the own order of the groups per view (json object route key -> [group ids such as "l:12"]) -> stored
+    json; an empty list or '' drops it (back to the sidebar order). BadInput if malformed."""
+    bad = BadInput(tr("Invalid value: {0}", "group_order"))
+    if v in (None, ""):
+        return "{}"
+    try:
+        o = json.loads(v) if isinstance(v, str) else v
+    except ValueError:
+        raise bad from None
+    if not isinstance(o, dict) or len(o) > KB_GROUP_VIEWS_MAX:
+        raise bad
+    out = {}
+    for k, arr in o.items():
+        if not isinstance(k, str) or not 0 < len(k) <= 120 or not isinstance(arr, list) or len(arr) > KB_GROUPS_MAX \
+                or not all(isinstance(x, str) and 0 < len(x) <= 120 for x in arr):
+            raise bad
+        if arr:
+            out[k] = list(dict.fromkeys(arr))
     return json.dumps(out, ensure_ascii=False, separators=(",", ":"))
 
 

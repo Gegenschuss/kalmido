@@ -164,17 +164,17 @@ async function wpDraw(md) {
 // language, color scheme, tab bar and the account / user actions apply immediately, as before.
 // The last opened section is remembered per device (LS settingsSec).
 // U05: 9 sections (8 without admin rights); Layout, Collaboration, Focus and Time tracking live in Modules now
-const SET_SECS = [['account', 'user', N_('Account')], ['general', 'sliders', N_('General')], ['look', 'palette', N_('Appearance')], ['modules', 'grid', N_('Modules')],
+const SET_SECS = [['account', 'user', N_('Account')], ['org', 'building', N_('Organisation')], ['general', 'sliders', N_('General')], ['look', 'palette', N_('Appearance')], ['modules', 'grid', N_('Modules')],
   ['notify', 'bell', N_('Notifications')], ['integr', 'link', N_('Integrations')], ['ai', 'bot', N_('Agents')], ['data', 'download', N_('Data')], ['users', 'users', N_('Administration')], ['help', 'help', N_('Help')]];
 // 2.25.0 (UX-17): what each area holds, shown in the overview a phone opens with
-const SET_DESC = {account: N_('Name, password, sign-in, storage'), general: N_('Language, Today, dates and reminders'), look: N_('Theme, font size, tab bar and sidebar'),
+const SET_DESC = {account: N_('Name, password, sign-in, storage'), org: N_('Members, roles, lists of the organisation'), general: N_('Language, Today, dates and reminders'), look: N_('Theme, font size, tab bar and sidebar'),
   modules: N_('What Kalmido shows'), notify: N_('Push, News and quiet hours'), integr: N_('Calendar on the phone, sharing, e-mail'), ai: N_('Agents and what they do'),
   data: N_('Import, export, templates, backups'), users: N_('People, sign-in, server'), help: N_('How things work, about Kalmido')};
 // ---- UX1 (U03, owner decision 2): settings save themselves. Every control applies at once, "Saved · Undo" shows in the
 // dialog header and each change is one step in the undo history ("Changed setting: …"). Text, number and time fields save
 // on blur or Enter (and after a short pause while typing); closing the dialog saves whatever is still pending.
 const SETS = {  // control id -> [setting key, label, kind]
-  's-celebrate': ['celebrate', N_('Celebrate completions'), 'chk'], 's-tinbox': ['today_inbox', N_('Show the inbox in Today'), 'chk'],  // 2.22.0 (#681)
+  's-celebrate': ['celebrate', N_('Celebrate completions'), 'chk'], 's-tinbox': ['today_inbox', N_('Show the basket in Today'), 'chk'],  // 2.22.0 (#681)
   's-hideblk': ['hide_blocked_today', N_('Hide tasks that are still blocked by another task'), 'chk'], 's-progsub': ['progress_subtasks', N_('Count subtasks in the progress of a list'), 'chk'],
   's-pushch': ['push_channel', N_('Channel'), 'sel'], 's-pushprio': ['push_priority', N_('How urgent'), 'sel'],
   's-allday': ['allday_time', N_('All-day reminder at'), 'time'], 's-defrem': ['default_reminder', N_('Default reminder'), 'sel'], 's-digest': ['digest_time', N_('Daily digest at'), 'time'],
@@ -190,8 +190,9 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-brief': ['brief_time', N_('Morning briefing at'), 'time'],  // 2.34.0 (#264)
   's-lemo': ['list_emoji', N_('Suggest icons for new lists'), 'chk'],  // 2.32.0 (#1077)
   's-sideic': ['side_icons', N_('List icons'), 'sel'], 's-sideprog': ['side_progress', N_('Progress in the sidebar'), 'chk'],  // 2.36.0 (#1117)
+  's-sdd': ['show_done_default', N_('Completed tasks'), 'sel'],  // 2.39.1 (#1214)
 };
-const SET_RENDER = ['sidebar', 'side_icons', 'side_progress', 'features', 'nav_order', 'show_done_views', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden'];
+const SET_RENDER = ['sidebar', 'side_icons', 'side_progress', 'features', 'nav_order', 'show_done_views', 'show_done_default', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden'];
 function setVal(el, kind) {  // the value a control stands for; undefined = not valid (nothing is saved)
   const v = el.value;
   if (kind === 'chk') return el.checked ? '1' : '0';
@@ -610,9 +611,12 @@ function settingsModal(focus) {
       ${hint(tr('Loud rings and vibrates longer; Urgent may also break through “Do not disturb” on some phones.'))}`;
   const pane = {
     account: S.me ? accountHtml() : '',
+    org: S.me && lmOrgPaneOn() ? wsPaneHtml(t => `<div class="shint">${t}</div>`) : '',  // 2.39.1 (#1188): Settings > Organisation
     look: `<div id="s-lookin">${lookHtml()}</div>
       <h4 id="s-lemo-h">${tr('New lists')}</h4><div class="row">${chk('s-lemo', s.list_emoji !== '0', tr('Suggest icons for new lists'))}</div>
       ${hint(tr('A new list gets an icon that matches its name; you can always choose another one. Existing lists keep their icons. For all your devices.'))}
+      <h4 id="s-sdd-h">${tr('Completed tasks')}</h4><div class="row"><label for="s-sdd">${tr('In lists and views')}</label><select id="s-sdd"><option value="1">${tr('Show completed')}</option><option value="0" ${s.show_done_default === '0' ? 'selected' : ''}>${tr('Hide completed')}</option></select></div>
+      ${hint(tr('The default for every list and view. A folder (Folder settings) or a single list (its “…” menu) can choose otherwise. For all your devices.'))}
       <h4>${tr('Tips')}</h4><div class="row"><label>${tr('Hints')}</label><button class="btn sm" data-m="hints-reset">${ic('undo', 's')} ${tr('Show tips again')}</button></div>
       ${hint(tr('Brings back the one-time hints on this device (touch screens show helper texts once).'))}
       <h4 id="s-tabbar-h">${tr('Tab bar')}${dev}</h4>
@@ -630,8 +634,8 @@ function settingsModal(focus) {
       <div class="row"><div class="seg" id="s-lang" role="group" aria-labelledby="s-lang-h">${(S.languages || []).map(L => `<button data-lang-set="${esc(L.code)}" class="${(s.lang || 'en') === L.code ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div></div>
       ${hint(tr('Applies to all devices and to the notifications. Quick add understands English, German and the language chosen here.'))}
       <h4 id="s-today-h">${tr('Today')}</h4>
-      <div class="row">${chk('s-tinbox', s.today_inbox === '1', tr('Show the inbox in Today'))}</div>
-      ${hint(tr('Tasks without a date that are still in the inbox get their own section under today’s tasks, with quick buttons to sort them; they count in Today’s number.'))}
+      <div class="row">${chk('s-tinbox', s.today_inbox === '1', tr('Show the basket in Today'))}</div>
+      ${hint(tr('Tasks without a date that are still in the basket get their own section under today’s tasks, with quick buttons to sort them; they count in Today’s number.'))}
       ${depsOn() ? `<div class="row">${chk('s-hideblk', s.hide_blocked_today === '1', tr('Hide tasks that are still blocked by another task'))}</div>` : ''}
       <h4 id="s-dates-h">${tr('Changing and completing tasks')}</h4>
       <div class="row">${chk('s-dateok', s.date_confirm === '1', tr('Confirm changes of the date with OK'))}</div>
@@ -682,7 +686,7 @@ function settingsModal(focus) {
       <h4 id="s-mail-h">${tr('Tasks by e-mail')}</h4><div id="s-mail"></div>
       ${shareHtml(hint)}
       <ul class="slist">
-        ${S.ntfyInbox?.enabled && S.me?.ntfy_inbox ? `<li>${tr('Single files also via the ntfy app:')} ${tr('In the ntfy app, add server {0} once', `<code class="topic">${esc(S.ntfyInbox.server)}</code>`)}${tr(' and log in with a user that may write to the topic (Settings > Manage users).')} ${tr('Then: share an image or text > ntfy > server as above, topic {0}. A few seconds later it is a task in the inbox, files as attachments.', `<code class="topic">${esc(S.ntfyInbox.topic)}</code>`)}</li>` : ''}</ul>
+        ${S.ntfyInbox?.enabled && S.me?.ntfy_inbox ? `<li>${tr('Single files also via the ntfy app:')} ${tr('In the ntfy app, add server {0} once', `<code class="topic">${esc(S.ntfyInbox.server)}</code>`)}${tr(' and log in with a user that may write to the topic (Settings > Manage users).')} ${tr('Then: share an image or text > ntfy > server as above, topic {0}. A few seconds later it is a task in the basket, files as attachments.', `<code class="topic">${esc(S.ntfyInbox.topic)}</code>`)}</li>` : ''}</ul>
       ${devbox(whHtml())}`,
     data: `<h4 id="s-imp-h">${tr('Import')}</h4>
       ${hint(tr('Move your tasks over from another app. You see a preview first; importing the same file again skips what is already there, and an import can be undone for 24 hours. Nothing inside the file is fetched from the internet.'))}
@@ -922,7 +926,7 @@ function settingsModal(focus) {
   const sideDraw = () => {
     const box = $('#s-sidebar', md); if (!box) return;
     const p = sidePref(), ord = sideGroupOrder();
-    const ent = g => (g === 'focus' ? SIDE_PLAN : g === 'views' ? sideViewEntries() : []).map(([x, n]) => `<label class="chkl sidee"><input type="checkbox" data-side-e="${x}" ${p.hidden.includes('e:' + x) ? '' : 'checked'}> ${esc(tr(n))}</label>`).join('');
+    const ent = g => (g === 'focus' ? SIDE_PLAN : g === 'views' ? sideViewEntries() : g === 'areas' ? sideAreaEntries() : []).map(([x, n]) => `<label class="chkl sidee"><input type="checkbox" data-side-e="${x}" ${p.hidden.includes('e:' + x) ? '' : 'checked'}> ${esc(tr(n))}</label>`).join('');
     box.innerHTML = ord.map((g, i) => { const n = tr(SIDE_NAMES[g]), shown = !p.hidden.includes('g:' + g), e = shown ? ent(g) : '';
       return `<div class="navrow sidegrp ${shown ? '' : 'off'}" data-sideg="${g}">${g === 'lists' ? `<span class="iconbtn sideye" aria-hidden="true">${ic('list', 's')}</span>` : `<button class="iconbtn sideye" data-side-eye aria-pressed="${shown}" title="${esc(shown ? tr('Hide {0}', n) : tr('Show {0}', n))}" aria-label="${esc(tr('Show {0}', n))}">${ic(shown ? 'eye' : 'eyeoff', 's')}</button>`}<span>${esc(n)}</span><button class="iconbtn" data-smove="-1" ${i ? '' : 'disabled'} title="${tr('move up')}" aria-label="${esc(tr('Move {0} up', n))}">${ic('chev', 's up')}</button><button class="iconbtn" data-smove="1" ${i < ord.length - 1 ? '' : 'disabled'} title="${tr('move down')}" aria-label="${esc(tr('Move {0} down', n))}">${ic('chev', 's')}</button></div>${e ? `<div class="sideents">${e}</div>` : ''}`; }).join('');
   };
@@ -980,7 +984,7 @@ function settingsModal(focus) {
     if (b.dataset.m === 'ag-guide') { aiSubShow(md, 'setup', true); return; }  // 2.4.2 (#392); 2.7.2 (#420): the Set up tab
     if (b.dataset.m === 'go-share') { $('.snav [data-sec="integr"]', md)?.click(); setTimeout(() => $('#s-share-h', md)?.scrollIntoView?.({block: 'start'}), 50); return; }  // 2.7.0 (#405 S3)
     if (b.dataset.m === 'go-modules') { $('.snav [data-sec="modules"]', md)?.click(); setTimeout(() => $('[data-pane="modules"] [data-modrow="agents"]', md)?.scrollIntoView?.({block: 'center'}), 50); return; }  // 2.6.0 (K09)
-    if (b.dataset.m === 'cele-try') { celebrate('today', {force: true}); return; }
+    if (b.dataset.m === 'cele-try') { const k = ['project', 'list', 'today'][(b._cele = ((b._cele ?? -1) + 1) % 3)]; celebrate(k, {force: true, name: k === 'project' ? tr('Example project') : tr('Example list')}); return; }  // 2.39.1 (#1292): each try shows the next level
     const trw = b.closest('[data-tpl]');
     if (trw) {
       const tp = ($('#s-tpls', md)._t || []).find(x => x.id === +trw.dataset.tpl); if (!tp) return;

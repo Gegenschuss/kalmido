@@ -434,6 +434,8 @@ async function folderPeopleModal(f, opt = {}) {
 // the sidebar order (+ folder moves) in one request, as one history step (label: what it was)
 const listOrderNow = () => S.lists.filter(l => !l.is_inbox).sort((a, b) => (a.sort || 0) - (b.sort || 0) || a.id - b.id).map(l => l.id);
 async function saveListOrder(order, folder, label) {
+  const adopt = folder ? await lmFolderAsk(folder) : [];  // 2.39.1 (#1188): the folder's workspace / agent only after asking
+  if (adopt === null) { renderSide(); return null; }
   const before = listOrderNow(), f0 = folder ? Object.fromEntries(Object.keys(folder).map(id => [id, listById(+id)?.folder || ''])) : null;
   const rest = S.lists.filter(l => !l.is_inbox && !order.includes(l));
   order.concat(rest).forEach((l, i) => { l.sort = i; });
@@ -441,7 +443,7 @@ async function saveListOrder(order, folder, label) {
   S.lists.sort((a, b) => b.is_inbox - a.is_inbox || a.sort - b.sort || a.id - b.id);
   renderSide();
   const ids = order.concat(rest).map(l => l.id);
-  await api('POST', '/api/lists/reorder', {ids, folder});
+  await api('POST', '/api/lists/reorder', {ids, folder, ...(adopt.length ? {folder_adopt: adopt} : {})});
   const same = before.join() === ids.join() && (!folder || Object.keys(folder).every(k => f0[k] === folder[k]));
   if (same) return null;
   const go = (to, tf, from, ff) => async () => {
@@ -630,7 +632,7 @@ document.addEventListener('dragend', () => { listDrag = null; folderDrag = null;
 // in the folder gets them; on a change the existing lists follow (or only new ones); a list changed on its own keeps its
 // value ("differs from the folder") until "Back to the folder" in its dialog.
 const FP_ROLES = [['admin', N_('Admin')], ['edit', N_('Member')], ['participant', N_('Participant')], ['view', N_('Viewer')]];
-const FP_KEYS = {org_id: N_('Workspace'), agent_id: N_('Agent'), agent_members: N_('Members may use the agent'), agent_peers: N_('Agents may address each other'), agent_tidy: N_('Tidy up'), agent_listen: N_('Agent listens in')};
+const FP_KEYS = {org_id: N_('Workspace'), agent_id: N_('Agent'), agent_members: N_('Members may use the agent'), agent_peers: N_('Agents may address each other'), agent_tidy: N_('Tidy up'), agent_listen: N_('Agent listens in'), hide_done: N_('Hide completed')};  // 2.39.1 (#1214): hide_done
 function folderEff(path) {
   const parts = String(path || '').split(FSEP).filter(Boolean), out = {};
   for (let i = 1; i <= parts.length; i++) Object.assign(out, (S.folderProps || {})[parts.slice(0, i).join(FSEP)] || {});
@@ -678,6 +680,7 @@ async function folderPropsModal(f) {
     <p class="muted">${tr('Defaults for every list in this folder and its subfolders, also for new ones. A list can still be changed on its own; it then keeps its value.')}</p>
     ${wsOn() ? sel('fs-ws', 'org_id', [[0, wsName('private')], ...(S.me.workspaces || []).map(w => [w.id, w.name])]) : ''}
     ${collab() ? sel('fs-ag', 'agent_id', [[0, tr('No agent')], ...users.map(u => [u.id, u.display_name])]) + sel('fs-am', 'agent_members', [[1, tr('On')], [0, tr('Off')]]) + sel('fs-ap', 'agent_peers', [[1, tr('On')], [0, tr('Off')]]) + sel('fs-td', 'agent_tidy', TIDY.map(([k, n]) => [k, tr(n)])) + sel('fs-al', 'agent_listen', [[1, tr('On')], [0, tr('Off: only via @')]]) : ''}
+    ${sel('fs-hd', 'hide_done', [[1, tr('On')], [0, tr('Off')]])}
     ${collab() ? `<div class="row"><label>${tr('People')}</label><button type="button" class="btn sm" data-m="people">${ic('users', 's')} ${tr('People and roles…')}</button></div>` : ''}
     <div class="row"><label>${tr('Repository')}</label><button type="button" class="btn sm" data-m="repos">${ic('git', 's')} ${tr('Repository…')}</button></div>
     <fieldset class="fsapply" ${nL ? '' : 'hidden'}><legend>${tr('Apply to')}</legend>
@@ -691,7 +694,7 @@ async function folderPropsModal(f) {
   const bodyOf = dry => {
     const props = {};
     $$('[data-fk]', md).forEach(s => { const k = s.dataset.fk, v = s.value; if (v === '') { if (k in p) props[k] = null; return; }
-      props[k] = k === 'agent_members' || k === 'agent_peers' || k === 'agent_listen' ? v === '1' : k === 'agent_tidy' ? v : +v; });
+      props[k] = k === 'agent_members' || k === 'agent_peers' || k === 'agent_listen' || k === 'hide_done' ? v === '1' : k === 'agent_tidy' ? v : +v; });
     return {folder: f, props, apply: $('[name="fs-ap"]:checked', md).value, ...($('#fs-force', md)?.checked ? {force: true} : {}), ...(dry ? {dry_run: true} : {})};
   };
   // 2.37.0 (#1158): closing with unsaved changes asks first; "People and roles…" / "Repository…" open over this dialog

@@ -10,7 +10,7 @@ from datetime import date, timedelta
 from flask import g, jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id, like_escape
+from ..core.pg import insert_id, like_escape, write_lock
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied
@@ -582,7 +582,9 @@ def doc_create(c, oid, uid, b, admin):
     return did
 
 
-def _assign_number(c, oid, did, s=None, manual=None):
+def _assign_number(c, oid, did, s=None, manual=None, reason=""):
+    from .legacyimport import fi_number_taken
+    write_lock(c, f"office_num_{int(oid)}")  # 2.39.1 (#1210 N2): check and write of a number (manual or next) in one go
     r = doc_row(c, oid, did)
     s = s or office_settings(c, oid)
     if manual is not None:
@@ -590,16 +592,17 @@ def _assign_number(c, oid, did, s=None, manual=None):
         if not num:
             raise BadInput(tr("Invalid value: {0}", "number"))
         if r["kind"] != "offer":  # 2.38.0: only above the series' last value (no back-dating), the counter follows
-            inv_manual_number(c, oid, r, s, num)
+            inv_manual_number(c, oid, r, s, num, reason)
     else:
         rec = _j(r["recipient"], {})
         d = date.fromisoformat(r["date"]) if r["date"] else local_now().date()
         for _ in range(50):  # a scheme without {seq} uniqueness (e.g. only {date}): keep counting until free
             num, _seq = office_number_next(c, oid, r["kind"], inv_scheme(s, r["kind"]), d, project=r["project_title"], client=rec.get("name") or "",
                                            initials=_initials(c, r["created_by"]))
-            if not c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=? AND id!=?", (oid, num, did)).fetchone():
+            if not c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=? AND id!=?", (oid, num, did)).fetchone() \
+                    and not fi_number_taken(c, oid, num):  # 2.39.1 (#1182): nor a number of the legacy archive
                 break
-    if c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=? AND id!=?", (oid, num, did)).fetchone():
+    if c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=? AND id!=?", (oid, num, did)).fetchone() or fi_number_taken(c, oid, num):
         raise BadInput(tr("The number {0} is already used", num))
     c.execute("UPDATE office_docs SET number=?, updated_at=? WHERE id=? AND org_id=?", (num, iso(now_utc()), did, oid))
     return num
@@ -826,9 +829,11 @@ def odoc_number(did):
     r = doc_row(c, oid, did)
     ofx_need_editable(r)
     b = body()
-    num = _assign_number(c, oid, did, manual=b.get("number") if isinstance(b, dict) and "number" in b else None)
+    b = b if isinstance(b, dict) else {}
+    reason = _text(b.get("reason"), "reason", 300)
+    num = _assign_number(c, oid, did, manual=b.get("number") if "number" in b else None, reason=reason)
     if num != r["number"]:
-        ofx_log(c, oid, "number", doc_id=did, detail={"before": {"number": r["number"]}, "after": {"number": num}})
+        ofx_log(c, oid, "number", doc_id=did, detail={"before": {"number": r["number"]}, "after": {"number": num, **({"reason": reason} if reason else {})}})
     bump(c)
     c.commit()
     return jsonify(id=did, number=num)
@@ -844,6 +849,8 @@ def odoc_status(did):
     if r["kind"] == "offer" and st == "draft" and r["status"] != "draft":  # 2.39.0 (#1209 audit N1): sent = locked, a copy for changes
         raise Denied(409, tr("This status change is not allowed ({0} to {1})", r["status"], st))
     ts = iso(now_utc())
+    if r["kind"] != "offer" and "paid" in (st, r["status"]) and st != r["status"] and office_role(c, uid, oid) != "admin":
+        raise Denied(403, tr("Only an admin of this organisation can record payments"))  # 2.39.1 (#1210 N3, decided 12.10.)
     if r["kind"] != "offer" and st != r["status"]:  # 2.38.0: issued only by finalising, never back to draft, cancelled only by a credit note
         ok = ofx_locked(r) and r["status"] != "cancelled" and st in ("sent", "paid") and (st != "paid" or r["kind"] == "invoice")
         if not ok:

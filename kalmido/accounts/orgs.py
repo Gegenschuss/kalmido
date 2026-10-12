@@ -365,7 +365,7 @@ def list_org_set(c, lid, v):
         return False  # unchanged (the list dialog sends it with every save)
     oid = clean_org_id(c, v, me())
     if lr["is_inbox"] and oid:
-        raise Denied(409, tr("The inbox is always private"))
+        raise Denied(409, tr("The basket is always private"))
     if oid and (lr["family"] or lr["life"]):
         raise Denied(409, tr(WS_MSG_PRIVATE_ONLY))
     if (oid or None) == (list_org(c, lid) or None):

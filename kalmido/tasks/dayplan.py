@@ -130,7 +130,7 @@ def dayplan_tasks(c, uid, day):
 
 def _dp_task(r, s=None, e=None, reason=""):
     dur = r["duration"] or None
-    d = {"task_id": r["id"], "title": r["title"], "list_id": r["list_id"], "list": tr("Inbox") if r["list_inbox"] else r["list_name"],
+    d = {"task_id": r["id"], "title": r["title"], "list_id": r["list_id"], "list": tr("Basket") if r["list_inbox"] else r["list_name"],
          "due": r["due"], "due_time": r["due_time"], "priority": PRIO_NAMES.get(r["priority"], "none"),
          "deadline": bool(r["deadline"]), "duration": dur or DAYPLAN_DEFAULT_MIN, "estimated": not dur}
     if s is not None:

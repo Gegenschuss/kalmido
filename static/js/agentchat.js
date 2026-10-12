@@ -238,7 +238,9 @@ function chatChoicesHtml(m) {
   if (st !== 'open' && st !== 'answered') return '';  // 2.30.0 (#1037): expired / withdrawn: gone, not only greyed out
   const ans = m.choice, ids = new Set(ans?.ids || []), multi = !!ch.multi, sel = S.chat.pick?.[m.id] || new Set();
   const btn = c => `<button type="button" class="cchb ${c.style ? 'st-' + esc(c.style) : ''} ${ids.has(c.id) || sel.has(c.id) ? 'on' : ''}" data-act="chat-choice" data-mid="${m.id}" data-cid="${esc(c.id)}" ${ans ? 'disabled' : ''} ${multi ? `aria-pressed="${sel.has(c.id)}"` : ''}>${ids.has(c.id) ? ic('check', 's') : ''}<span>${esc(c.label)}</span></button>`;
-  return `<div class="cchoices ${ans ? 'done' : ''}" role="group" aria-label="${esc(tr('Answer'))}">${ch.choices.map(btn).join('')}${multi && !ans ? `<button type="button" class="btn sm pri cchsend" data-act="chat-choice-send" data-mid="${m.id}" ${sel.size ? '' : 'disabled'}>${ic('send', 's')} ${tr('Send')}</button>` : ''}${ans ? `<small class="muted cchans">${esc(tr('Answered'))} · ${fmtWhen(ans.at)}</small>` : ''}</div>`;
+  // 2.39.1 (#1224): an open suggestion has a pen next to it: it puts the text into the message box (not sent) to extend it
+  const pen = c => `<span class="cchw">${btn(c)}<button type="button" class="cchpen" data-chpen="${m.id}" data-cid="${esc(c.id)}" title="${esc(tr('Edit before sending'))}" aria-label="${esc(tr('Edit before sending: {0}', c.label))}">${ic('edit', 's')}</button></span>`;
+  return `<div class="cchoices ${ans ? 'done' : ''}" role="group" aria-label="${esc(tr('Answer'))}">${ch.choices.map(ans ? btn : pen).join('')}${multi && !ans ? `<button type="button" class="btn sm pri cchsend" data-act="chat-choice-send" data-mid="${m.id}" ${sel.size ? '' : 'disabled'}>${ic('send', 's')} ${tr('Send')}</button>` : ''}${ans ? `<small class="muted cchans">${esc(tr('Answered'))} · ${fmtWhen(ans.at)}</small>` : ''}</div>`;
 }
 async function chatChoice(mid, cid, send = false) {
   const m = S.chat.msgs.find(x => x.id === mid) || (S.chat.apv || []).find(x => x.id === mid); if (!m || m.choice || chatChoiceSt(m) !== 'open') return;
@@ -253,6 +255,36 @@ async function chatChoice(mid, cid, send = false) {
     if (apvHeld(m)) $('#chat-in')?.focus({preventScroll: true});  // the buttons are gone: the focus goes back to the box
   } catch { chatLoad(); }  // api() said it ("This suggestion is no longer current"); the buttons follow the server
 }
+// 2.39.1 (#1224): a suggestion into the message box: the pen, right click / Alt+click (desktop), a long press (touch). Text
+// already in the box stays, the suggestion is added after it; the caret goes to the end. Nothing is sent, the suggestion
+// stays open (the agent gets the text as a normal message once it is sent).
+function chatChoiceEdit(mid, cid) {
+  const m = S.chat.msgs.find(x => x.id === mid), c = (m?.choices?.choices || []).find(x => String(x.id) === String(cid)), ta = $('#chat-in');
+  if (!c || !ta || ta.disabled) return;
+  const v = ta.value.replace(/\s+$/, '');
+  ta.value = v ? v + (/\n/.test(v) ? '\n' : ' ') + c.label : c.label;
+  ta.dispatchEvent(new Event('input', {bubbles: true}));  // the draft and the height (input handler below)
+  ta.focus({preventScroll: true}); ta.setSelectionRange(ta.value.length, ta.value.length);
+}
+const CCH_ED = '.cchw .cchb[data-act="chat-choice"]';
+let cchLong = null, cchLongDone = 0;
+document.addEventListener('click', e => {
+  const p = e.target.closest?.('.cchpen[data-chpen]');
+  if (p) { e.preventDefault(); e.stopPropagation(); chatChoiceEdit(+p.dataset.chpen, p.dataset.cid); return; }
+  const b = e.target.closest?.(CCH_ED); if (!b) return;
+  if (e.altKey || Date.now() - cchLongDone < 600) { e.preventDefault(); e.stopPropagation(); if (e.altKey) chatChoiceEdit(+b.dataset.mid, b.dataset.cid); }
+}, true);
+document.addEventListener('contextmenu', e => {
+  const b = e.target.closest?.(CCH_ED); if (!b || b.disabled) return;
+  e.preventDefault(); if (Date.now() - cchLongDone > 600) chatChoiceEdit(+b.dataset.mid, b.dataset.cid);
+});
+document.addEventListener('pointerdown', e => {
+  const b = e.pointerType === 'touch' && e.target.closest?.(CCH_ED); if (!b || b.disabled) return;
+  const x = e.clientX, y = e.clientY; clearTimeout(cchLong?.t);
+  cchLong = {x, y, t: setTimeout(() => { cchLong = null; cchLongDone = Date.now(); chatChoiceEdit(+b.dataset.mid, b.dataset.cid); }, 500)};
+});
+document.addEventListener('pointermove', e => { if (cchLong && Math.hypot(e.clientX - cchLong.x, e.clientY - cchLong.y) > 10) { clearTimeout(cchLong.t); cchLong = null; } });
+for (const ev of ['pointerup', 'pointercancel']) document.addEventListener(ev, () => { if (cchLong) { clearTimeout(cchLong.t); cchLong = null; } });
 // Enter answers a permission question only when the focus is on one of its buttons (never from the message box);
 // explicit, because a key event does not reliably activate a button in every browser / webview
 document.addEventListener('keydown', e => { const b = e.key === 'Enter' && !e.repeat && e.target.closest?.('.cperm .cchb'); if (b) { e.preventDefault(); b.click(); } });
@@ -855,7 +887,7 @@ function aiTblWire(md) {
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-aisall]'); if (!b || b.disabled) return;
     const aid = +b.dataset.aisall, a = ($('#s-ai-tbl', md)?._ags || []).find(x => x.id === aid); if (!a) return;
-    if (!await askConfirm(tr('Share all your lists with {0}?', a.name), tr('{0} then sees every task, comment and attachment of all lists you own, private ones too, and may change them (role Member). Never the inbox or archived lists; lists you stopped sharing with it in the table below stay out. You can stop sharing each list there at any time.', a.name), {ok: tr('Share all'), danger: true})) return;
+    if (!await askConfirm(tr('Share all your lists with {0}?', a.name), tr('{0} then sees every task, comment and attachment of all lists you own, private ones too, and may change them (role Member). Never the basket or archived lists; lists you stopped sharing with it in the table below stay out. You can stop sharing each list there at any time.', a.name), {ok: tr('Share all'), danger: true})) return;
     b.disabled = true;
     try { const j = await api('POST', `/api/agents/${aid}/share-all`); toast(trn('Shared {0} list with {1}', 'Shared {0} lists with {1}', j.added, a.name) + (j.bridge?.length ? ' · ' + j.bridge_reason + ': ' + j.bridge.map(l => l.name).join(', ') : '')); } catch { /* api() showed it */ }  // 2.30.0 (#919)
     await load(); render(); aiTblDraw(md);
@@ -1184,7 +1216,7 @@ function agModal(a, done, o = {}) {
     <div class="row"><label for="ag-note">${tr('Note')}</label><input id="ag-note" value="${esc(a?.note || '')}" maxlength="2000" placeholder="${tr('What it is for (only admins see this)')}"></div>
     <div class="row"><label for="ag-prov">${tr('Where it runs')}</label><input id="ag-prov" value="${esc(a?.provider || '')}" maxlength="80" placeholder="${esc(tr('e.g. Claude (Anthropic, USA)'))}"></div>
     <div class="row"><label for="ag-prop">${tr('Proposals for')}</label><select id="ag-prop">${[['shared', N_('People who share a list with it')], ['all', N_('Everyone')], ['off', N_('Nobody')]].map(([k, n]) => `<option value="${k}" ${(a?.proposals || 'shared') === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
-    <div class="shint">${tr('Who may ask it for a proposal (project from a briefing, break down a task, sort the inbox, tasks from notes). It only gets what the person sends; instance admins count as sharing a list.')}</div>
+    <div class="shint">${tr('Who may ask it for a proposal (project from a briefing, break down a task, sort the basket, tasks from notes). It only gets what the person sends; instance admins count as sharing a list.')}</div>
     ${scopesHtml(S.agOffer || [], a ? a.scopes : (S.agDefScopes || ['read', 'tasks:write', 'comments']))}
     <div class="shint keep">${tr('Deleting lists or fields, emptying the trash, changing 10 or more tasks at once, moving lists, folders and sharing always wait for a person’s approval.')}</div>
     ${ipsRow((a?.allowed_ips || []).join(', '), 'ag-ips')}

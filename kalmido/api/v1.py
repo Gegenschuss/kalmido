@@ -460,7 +460,7 @@ def v1_one(c, tid):
 
 
 def v1_list(d):
-    name = tr("Inbox") if d["is_inbox"] and inbox_default(d["name"]) else d["name"]
+    name = tr("Basket") if d["is_inbox"] and inbox_default(d["name"]) else d["name"]
     return {"id": d["id"], "name": name, "color": d["color"], "folder": d["folder"], "is_inbox": bool(d["is_inbox"]),
             "archived": bool(d["archived"]), "done_at_bottom": bool(d.get("checklist")), "checklist": bool(d.get("checklist")),
             "kind": d.get("kind") or "list", "view": d["view"], "role": d["role"],
@@ -759,7 +759,7 @@ def v1_list_patch(lid):
     unknown = sorted(k for k in b if k not in ("name", "color", "folder", "view", "kind", "nag", "day_hours", "done_at_bottom", "checklist",
                                                "listen_agent_ids", "columns", "archived", "project_type", "family", "life", "trip",
                                                "client_id", "agent_members", "agent_peers", "org_id",
-                                               "stale_days", "agent_followup"))  # 2.28.0 (#935); 2.34.0 (#266)
+                                               "stale_days", "agent_followup", "folder_adopt"))  # 2.28.0 (#935); 2.34.0 (#266); 2.39.1 (#1188)
     if unknown:
         raise UnknownFields(unknown)
     if "family" in b and b["family"] is None:  # 2.19.0 (#653): null = an ordinary list
@@ -773,6 +773,8 @@ def v1_list_patch(lid):
     for k in ("checklist", "done_at_bottom", "archived", "agent_members", "agent_peers"):
         if k in b and not isinstance(b[k], bool):
             raise BadInput(tr("Invalid value: {0}", k))
+    if "folder_adopt" in b and not isinstance(b["folder_adopt"], bool):  # 2.39.1 (#1188): take the new folder's settings
+        raise BadInput(tr("Invalid value: {0}", "folder_adopt"))
     if "archived" in b:  # 2.15.0 (#479): archive / restore (the owner); deleting for good: DELETE /lists/{id}
         b = {**b, "archived": 1 if b["archived"] else 0}
     c = db()
@@ -781,11 +783,12 @@ def v1_list_patch(lid):
         cur = c.execute("SELECT name, folder FROM lists WHERE id=?", (lid,)).fetchone()
         if clean_folder(b["folder"] or "") != (cur["folder"] or ""):
             need_approval(c, N_("Move the list “{0}” into the folder “{1}”"), (cur["name"], str(b["folder"] or "")[:100]), list_id=lid)
-    v1_call(list_update, lid, body=b)
+    j = v1_call(list_update, lid, body=b)
     d = next((x for x in visible_lists(c, me()) if x["id"] == lid), None)
     if not d:
         raise Denied(404)
-    return jsonify(v1_list(d))
+    # 2.39.1 (#1293): the modules this change switched on (custom field columns: "fields" for the owner; project_type)
+    return jsonify({**v1_list(d), **({"modules_on": j["modules_on"]} if isinstance(j, dict) and "modules_on" in j else {})})
 
 
 @app.get("/api/v1/lists/<int:lid>")

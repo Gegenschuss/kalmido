@@ -455,7 +455,7 @@ def task_event(c, tid, kind, prev_assignee=None):
             continue
         lg = lang_of(s)
         who = name if actor else tr("Someone via the public link", lg=lg)
-        lname = tr("Inbox", lg=lg) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
+        lname = tr("Basket", lg=lg) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
         if kind == "assign":
             title = tr("{0} assigned you: {1}", who, t["title"], lg=lg)
             msg = lname + (" · " + tr("due {0}", push_day(t["due"], t["due_time"], lg), lg=lg) if t["due"] else "")
@@ -477,7 +477,7 @@ def fx2_unassign_hidden(c, uid, t, actor, name, s):
         return
     lg = lang_of(s)
     who = name if actor else tr("Someone via the public link", lg=lg)
-    lname = tr("Inbox", lg=lg) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
+    lname = tr("Basket", lg=lg) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
     g.pushes.append((uid, tr("{0} removed you as assignee of a task in {1}", who, lname, lg=lg), lname,
                      f"{PUBLIC_URL}/#l/{t['list_id']}", push_prio(s)))
 

@@ -238,9 +238,9 @@ function parseQuick(text, ignore = new Set()) {
 function quickListWords(s) {
   const W = S.lists.filter(x => canAddTo(x.id) && !x.archived);
   if (!W.length) return null;
-  const words = l => lname(l).split(/\s+/).filter(w => norm(w));
   const toks = [...s.matchAll(/\S+/g)].map(m => ({w: m[0], i: m.index, e: m.index + m[0].length}));
-  const eqAt = (j, l) => { const nw = words(l); return nw.length && j + nw.length <= toks.length && norm(toks.slice(j, j + nw.length).map(t => t.w).join('')) === norm(nw.join('')) ? nw.length : 0; };
+  const eqOne = (j, nw) => nw.length && j + nw.length <= toks.length && norm(toks.slice(j, j + nw.length).map(t => t.w).join('')) === norm(nw.join('')) ? nw.length : 0;
+  const eqAt = (j, l) => Math.max(0, ...quickNames(l).map(n => eqOne(j, n.split(/\s+/).filter(w => norm(w)))));
   const hit = (a, j, n, l) => ({list: l, start: toks[a].i, end: toks[j + n - 1].e, phrase: s.slice(toks[a].i, toks[j + n - 1].e)});
   const PREP = /^(in|auf|to|into|zur|onto)$/i, ART = /^(die|der|the|meine|my)$/i;
   for (let k = 0; k < toks.length - 1; k++) {
@@ -253,15 +253,17 @@ function quickListWords(s) {
     let best = null;
     for (const l of W) { const n = eqAt(j, l); if (n && (!best || n > best.n)) best = {l, n}; }
     if (!best && (a < k || /^liste$/i.test(toks[k].w))) {
-      const q = norm(toks[j].w), fit = q.length >= 3 ? W.filter(x => norm(lname(x)).startsWith(q) || norm(x.name).startsWith(q)) : [];
+      const q = norm(toks[j].w), fit = q.length >= 3 ? W.filter(x => quickNames(x).some(n => norm(n).startsWith(q)) || norm(x.name).startsWith(q)) : [];
       if (fit.length === 1) best = {l: fit[0], n: 1};
     }
     if (best) return hit(a, j, best.n, best.l);
   }
   let best = null;
   for (const l of W) {
-    const n = words(l).length, j = toks.length - n;
-    if (n && j >= 2 && /^(in|auf|into)$/i.test(toks[j - 1].w) && eqAt(j, l) && (!best || n > best.n)) best = {l, n, j};
+    for (const nm of quickNames(l)) {
+      const n = nm.split(/\s+/).filter(w => norm(w)).length, j = toks.length - n;
+      if (n && j >= 2 && /^(in|auf|into)$/i.test(toks[j - 1].w) && eqOne(j, nm.split(/\s+/).filter(w => norm(w))) && (!best || n > best.n)) best = {l, n, j};
+    }
   }
   return best ? hit(best.j - 1, best.j, best.n, best.l) : null;
 }
@@ -270,7 +272,9 @@ const listName = n => String(n ?? '').replace(/^((?:\p{Extended_Pictographic}|\p
 // display name of a list object: an inbox with its default name ("Eingang" before 2.15, since then "Inbox" in its owner's
 // language, #632: S.inboxNames) is shown in the UI language
 const inboxDef = n => n === 'Eingang' || (S.inboxNames || []).includes(n);
-const lname = l => !l ? '' : l.is_inbox && inboxDef(l.name) ? tr('Inbox') : licName(l);  // 2.36.2 (#1135): as the sidebar shows it
+const lname = l => !l ? '' : l.is_inbox && inboxDef(l.name) ? tr('Basket') : licName(l);  // 2.36.2 (#1135): as the sidebar shows it
+// 2.39.1 (#1219): quick add still understands the old name of the basket ("inbox" / "Eingang") next to the new one
+const quickNames = l => !(l && l.is_inbox && inboxDef(l.name)) ? [lname(l)] : [...new Set([tr('Basket'), 'Basket', 'Korb', 'Inbox', 'Eingang'])];
 const norm = s => s.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
 // website link display: domain without www. (chip), domain + path (title of a bare shared link)
 const urlParse = u => { try { return new URL(u); } catch { return null; } };

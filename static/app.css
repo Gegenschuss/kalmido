@@ -51,6 +51,12 @@
 html{scrollbar-color:var(--bg4) transparent;scrollbar-width:thin;font-size:calc(16px * var(--ui))}
 body{font:var(--fs-b)/1.45 var(--sans)}
 html,body{margin:0;background:var(--bg);color:var(--text);height:100%;overscroll-behavior:none;font-feature-settings:"ss01" off;-webkit-font-smoothing:antialiased}
+/* 2.39.1 (#1189): the document itself never scrolls (Fold unfolded: a swipe past the end of the sidebar moved the whole app for a
+   moment): html/body are fixed to the screen, only the sidebar, the content and the sheets scroll inside; print keeps the flow */
+html,body{overflow:hidden}
+body{height:100dvh}
+#side{overscroll-behavior:contain}
+@media print{ html,body{height:auto;overflow:visible} }
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer;background:none;border:0;padding:0}
 input,select,textarea{background:var(--bg3);border:1px solid var(--line2);border-radius:var(--radius);padding:.375rem .5625rem;outline:0;min-width:0}
@@ -309,6 +315,7 @@ a.btn{color:inherit;text-decoration:none}
 
 /* ---------- modal ---------- */
 .modal{position:fixed;inset:0;z-index:70;display:grid;place-items:center;background:rgba(4,6,9,.6);padding:calc(var(--vvt,0px) + 1rem) 1rem calc(var(--vvb,0px) + 1rem);box-sizing:border-box}
+body>.modal{position:fixed;inset:0;max-height:none;max-width:none;margin:0}  /* 2.39.1 (#1220): an extra class on a dialog never shrinks its backdrop */
 .modal .card{background:var(--bg2);border-radius:var(--r-l);box-shadow:var(--shadow);width:min(32.5rem,100%);max-height:min(90dvh,calc(var(--vvh,100dvh) - 2rem));overflow-y:auto;padding:1.25rem}
 .modal h3{margin:0 0 .875rem;font-size:var(--fs-l);font-weight:600;letter-spacing:-.01em}
 .modal h4{margin:1.25rem 0 .5rem;font-size:var(--fs-m);color:var(--text);font-weight:600}
@@ -1038,9 +1045,9 @@ svg.chart{display:block;max-width:100%;overflow:visible}
 .ch-bar{fill:var(--accent)}
 .ch-track{fill:var(--bg4)}
 .ch-grid{stroke:var(--line);stroke-width:1}
-.ch-ax{fill:var(--muted);font-size:.6875rem;font-family:var(--mono)}
+.ch-ax{fill:var(--muted);font-size:.6875rem;font-family:var(--sans);font-variant-numeric:tabular-nums}  /* 2.39.1 (#1180): the app font, not mono */
 .ch-lab{fill:var(--text);font-size:.8125rem;font-family:var(--sans)}
-.ch-val{fill:var(--muted);font-size:.71875rem;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.ch-val{fill:var(--muted);font-size:.71875rem;font-family:var(--sans);font-variant-numeric:tabular-nums}
 .ch-hit{fill:transparent}
 .ch-hit:hover{fill:color-mix(in srgb,var(--text) 6%,transparent)}
 .ch-line{fill:none;stroke:var(--p5);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
@@ -1387,14 +1394,17 @@ svg.chart{display:block;max-width:100%;overflow:visible}
 .tfoot .tskip:hover{color:var(--text)}
 :root[data-theme="light"] .tring{box-shadow:0 0 0 2px var(--accent),0 0 0 9999px rgba(20,26,32,.42)}
 /* celebration (2.22.0, #688): the heron flies across the screen with slow wing beats; checkmark confetti falls behind it */
-.cele{position:fixed;inset:0;z-index:96;pointer-events:none;overflow:hidden;color:var(--accent)}
+.cele{position:fixed;inset:0;z-index:96;overflow:hidden;color:var(--accent);cursor:pointer;touch-action:none}  /* 2.39.1 (#1292): a tap ends it */
 .cbird{position:absolute;left:0;top:0;width:8rem;will-change:transform}
 .cbird .cheron{width:100%;height:auto;aspect-ratio:7/4;filter:drop-shadow(0 .375rem 1rem rgba(0,0,0,.35))}
 .cwing{transform-box:view-box;transform-origin:50% 56.25%;will-change:transform}
 .cheron{width:100%;height:100%;overflow:visible;filter:drop-shadow(0 .375rem 1rem rgba(0,0,0,.35))}
-.cconf{position:absolute;left:-.625rem;top:-.625rem;width:1.25rem;height:1.25rem;opacity:0;will-change:transform,opacity}
-.cconf svg{width:100%;height:100%;stroke:var(--accent)}
-.cconf.alt svg{stroke:var(--text)}
+.cconf{position:absolute;left:-.375rem;top:-.25rem;width:.75rem;height:.5rem;opacity:0;background:var(--cc,var(--accent));border-radius:.125rem;will-change:transform,opacity}
+.cconf.c{width:.625rem;height:.625rem;border-radius:50%}
+.cconf.k{left:-.625rem;top:-.625rem;width:1.25rem;height:1.25rem;background:none}
+.cconf svg{width:100%;height:100%;stroke:var(--cc,var(--accent))}
+.ccheck{position:absolute;display:grid;place-items:center;border-radius:50%;background:var(--accent);color:var(--accent-ink,#fff);opacity:0;box-shadow:0 .75rem 2.5rem rgba(0,0,0,.3);will-change:transform,opacity}
+.ccheck svg{width:58%;height:58%;stroke:currentColor}
 .cele-quip{position:fixed;left:50%;bottom:calc(1.75rem + var(--tabs-h) + var(--safe-b));z-index:97;display:flex;align-items:center;gap:.75rem;width:max-content;max-width:min(27.5rem,calc(100vw - 2rem));padding:.625rem 1rem .625rem .875rem;
   background:var(--bg2);border-radius:var(--r-l);box-shadow:var(--shadow);pointer-events:none;opacity:0;transform:translate(-50%,.5rem);transition:opacity .25s,transform .25s}
 .cele-quip.on,.cele-quip.calm{opacity:1;transform:translate(-50%,0)}
@@ -2362,7 +2372,7 @@ body.pop-open #chatfab,body.modal-open #chatfab{visibility:hidden}
 .dbot .dfoot{position:static}
 .dcomp{padding:.5rem .75rem 0;border-top:1px solid var(--line);background:var(--bg2)}
 .dcomp .ccomp{padding:.375rem .625rem}
-.dcomp .ccomp:not(:focus-within):not(.used) .cbar,.dcomp .ccomp:not(:focus-within):not(.used) .cfiles:empty{display:none}
+.dcomp .ccomp:not(:focus-within):not(.used):not(.open) .cbar,.dcomp .ccomp:not(:focus-within):not(.used):not(.open) .cfiles:empty{display:none}  /* 2.39.1 (#1202): .open = stays until a tap outside */
 .dcomp .ccomp textarea{max-height:10rem}
 #detail{scroll-padding-bottom:9rem}
 /* 2.32.0 (#1074): with the focus in the sticky comment box the padding above made each typed letter scroll the panel
@@ -3448,6 +3458,7 @@ body.in-chat #top{display:none}
 .ib:hover,.ib[aria-expanded="true"]{color:var(--accent)}
 .ib .i{width:.9375rem;height:.9375rem}
 .ib.ibl{width:auto;border-radius:var(--radius);padding:0 .25rem;font-size:var(--fs-xs);margin:-.25rem 0 .375rem}
+@media (pointer:coarse){ .ib.ibl{height:2.75rem;margin:-.9375rem 0 -.3125rem} }  /* 2.39.1 (#1210): "More information" a 44 px target, same look */
 #iitip{position:fixed;z-index:400;max-width:min(22rem,calc(100vw - 1rem));padding:.5rem .625rem;border-radius:var(--radius);background:var(--bg2);color:var(--text);border:1px solid var(--line2);box-shadow:var(--shadow);font-size:var(--fs-s);line-height:1.45;font-weight:400;text-transform:none;letter-spacing:0;white-space:normal;pointer-events:none}
 #iitip.pin{pointer-events:auto}
 #iitip.hidden{display:none}
@@ -3934,13 +3945,40 @@ body.pgdrag,body.pgdrag *{cursor:col-resize!important;user-select:none!important
 /* 2.16.0 (#634): column width grips in the column titles */
 .lchead .lc{position:relative;overflow:visible}
 .lchead .lc .lcn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-flex;align-items:center}
-.lchead .lcg{position:absolute;top:-.25rem;bottom:-.25rem;right:-.4375rem;width:.5rem;cursor:col-resize;touch-action:none;border-radius:2px}
+.lchead .lcg{position:absolute;top:-.25rem;bottom:-.25rem;left:-.75rem;width:.75rem;cursor:col-resize;touch-action:none;border-radius:2px;z-index:1}  /* 2.39.1 (#1217): 12 px, centred on the line left of the column */
 /* 2.27.0 (#1006): a quiet line between the column titles shows where to drag; stronger over the header, accent on the grip */
-.lchead .lcg::after{content:"";position:absolute;left:.1875rem;top:.375rem;bottom:.375rem;width:1px;background:var(--line2);border-radius:1px}
+.lchead .lcg::after{content:"";position:absolute;left:calc(.375rem - .5px);top:.375rem;bottom:.375rem;width:1px;background:var(--line2);border-radius:1px}
 .lchead:hover .lcg::after{background:var(--faint);top:.125rem;bottom:.125rem}
-.lchead .lcg:hover::after,.lchead .lcg:focus-visible::after,.lchead .lcg.drag::after{width:2px;top:0;bottom:0}
+.lchead .lcg:hover::after,.lchead .lcg:focus-visible::after,.lchead .lcg.drag::after{width:2px;left:calc(.375rem - 1px);top:0;bottom:0}
 .lchead .lcg:hover::after,.lchead .lcg:focus-visible::after{background:var(--accent)}
 .lchead .lcg:focus{outline:none}.lchead .lcg:focus-visible{outline:2px solid var(--accent)}
+/* 2.39.1 (#1217): fine lines between the columns through every row and the titles (lists with their own columns, wide
+   layouts): a 1 px line half a gap left of each cell, cut to the row; the cell clips its content itself (clip-path) */
+@media (min-width:900px){ @container lrows (min-width:48.0625rem){
+  .trow.haslc,.lchead{overflow-y:clip}
+  .trow.haslc .lcols .lc{position:relative;overflow:visible;clip-path:inset(-100vh 0 -100vh -.5rem)}
+  .trow.haslc .lcols .lc::before,.lchead .lc::before{content:"";position:absolute;left:calc(-.375rem - .5px);top:-100vh;bottom:-100vh;width:1px;background:var(--line);pointer-events:none}
+} }
+.lcguide{position:fixed;width:2px;margin-left:-1px;background:var(--accent);z-index:60;pointer-events:none;border-radius:1px}
+/* 2.39.1 (#1217): moving a column: the grabbed title dims, the accent line shows where it goes */
+.lchead .lc.lcmove{opacity:.45}
+body.lcmoving,body.lcmoving *{cursor:grabbing!important;user-select:none!important}
+/* 2.39.1 (#1327): custom field cells edited in the row: hover / focus show it, empty ones a quiet dash, the open field
+   fills the cell; the column title's small arrow (menu) on hover / focus */
+.lcols .lc[data-fe]{cursor:pointer;border-radius:var(--r-s)}  /* same box as the title above (columns stay aligned) */
+.lcols .lc[data-fe]:hover{background:var(--bg4);color:var(--text)}
+.lcols .lc[data-fe]:focus{outline:none}.lcols .lc[data-fe]:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.lcols .lc[data-fe]:empty::after{content:"\2013";color:var(--faint)}
+.lcols .lc.tcon{background:var(--bg);box-shadow:inset 0 0 0 1px var(--accent);cursor:text}
+.lcols .lc .tcin{flex:1;min-width:0;width:100%;border:0;padding:0;margin:0;background:transparent;color:var(--text);font:inherit;outline:none}
+.lcols .lc-f.t-number .tcin{text-align:right}
+.lcols .lc .tcu{flex:none;color:var(--muted)}
+.lchead .lc:has(>.lcmb){padding-right:1.125rem}  /* the arrow has its own room: a click on the title never hits it */
+.lchead .lcmb{position:absolute;right:-.125rem;top:50%;transform:translateY(-50%);display:none;align-items:center;justify-content:center;width:1.25rem;height:1.25rem;padding:0;border:0;border-radius:var(--r-s);background:var(--bg);color:var(--muted);cursor:pointer}
+.lchead .lc:hover .lcmb,.lchead .lcmb:focus-visible{display:inline-flex}
+.lchead .lcmb:hover{color:var(--text);background:var(--bg4)}
+.colmd .coladd{margin:.5rem 0 0}
+.colmd .colr .colfe,.colmd .colr .colfd{flex:none}
 /* 2.16.0 (#642): the sidebar's own density (Compact / Comfortable / Custom). Compact: less room between groups and rows,
    shorter group headings; on touch the rows stay 44 px (only the gaps shrink). 2.18.0 (review R8): the gaps also apply to
    "Custom" while its sidebar slider is in the compact half (data-sbase), so starting Custom does not move anything */
@@ -5894,9 +5932,9 @@ html.nozoom,html.nozoom body{touch-action:pan-x pan-y}
 .ofdstat.st-overdue{color:var(--danger)}
 .ofdpaysum{display:flex;gap:1rem;flex-wrap:wrap;justify-content:flex-end;margin:.5rem 0;font-variant-numeric:tabular-nums}
 .ofdpay .ib,.ofdref .ofdlt{margin-left:auto}
-.ofdpick{list-style:none;margin:0 0 .75rem;padding:0;max-height:40vh;overflow:auto;display:flex;flex-direction:column;gap:.25rem}
-.ofdpick .chkl{display:flex;align-items:flex-start;gap:.5rem;min-height:2.75rem;padding:.25rem 0}
-.ofdpick .ofcn{display:flex;flex-direction:column}
+ul.ofdpick{list-style:none;margin:0 0 .75rem;padding:0;max-height:40vh;overflow:auto;display:flex;flex-direction:column;gap:.25rem}  /* 2.39.1 (#1220): the list only, never the service picker's .modal */
+ul.ofdpick .chkl{display:flex;align-items:flex-start;gap:.5rem;min-height:2.75rem;padding:.25rem 0}
+ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .ofddlg .row{display:flex;flex-direction:column;gap:.25rem;margin:0 0 .5rem}
 .ofddlg textarea,.ofddlg input:not([type=checkbox]),.ofddlg select{width:100%;box-sizing:border-box}
 .ofdtotals .tr-open dd{color:var(--danger);font-weight:600}
@@ -5960,3 +5998,89 @@ html.nozoom,html.nozoom body{touch-action:pan-x pan-y}
 .chedits li{display:flex;flex-direction:column;gap:.25rem}
 .chedits time{font-size:var(--fs-xs)}
 @media (pointer:coarse){ .cmeta .cedited{min-height:2.75rem;margin:-.625rem 0} }
+/* 2.39.1 (#1181): bottom sheets on phones show a grip on top (drag it: taller / shorter, swipe down: close, static/js/sheetdrag.js);
+   on touch the X of a sheet that closes by swiping goes out of sight (it stays for screen readers and the keyboard) */
+@media (max-width:899px){
+  #pop.sheet,.dpop.sheet,.qadd.sheet,.modal:not(.smodal):not(.authscreen):not(.shopmode):not(.palette)>.card,#pop.sheet .tch-sh{background-image:linear-gradient(var(--faint),var(--faint));background-repeat:no-repeat;background-position:center .3125rem;background-size:2.25rem .25rem}
+  .sd-drag{user-select:none;-webkit-user-select:none}
+}
+@media (max-width:899px) and (pointer:coarse){
+  #pop.sheet .tch-shx:not(:focus-visible),.modal:not(.smodal):not(.authscreen):not(.shopmode):not(.palette)>.card .iconbtn[data-m="close"]:not(:focus-visible){position:absolute;width:1px;height:1px;min-width:0;min-height:0;padding:0;overflow:hidden;clip-path:inset(50%)}
+}
+@media (min-width:900px) and (pointer:coarse){ .qadd.sheet{background-image:linear-gradient(var(--faint),var(--faint));background-repeat:no-repeat;background-position:center .3125rem;background-size:2.25rem .25rem} }
+/* 2.39.1 (#1219): sorting the basket item by item; (#1221) where a group comes from + its own order; (#1185) fold all */
+.kbsortm>.card{max-width:34rem;width:100%}
+.kbsort{display:flex;flex-direction:column;gap:.875rem;outline:none}
+.kbhead{display:flex;align-items:center;gap:.5rem}.kbhead h3{margin:0;flex:1;display:flex;align-items:center;gap:.375rem}
+.kbpos{font:500 var(--fs-xs)/1 var(--mono);color:var(--muted)}
+.kbtask{display:flex;flex-direction:column;gap:.25rem;padding:.75rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg2)}
+.kbttl{font-size:var(--fs-m);overflow-wrap:anywhere}.kbnotes{margin:0;font-size:var(--fs-s);white-space:pre-line}
+.kbacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem}
+.kbact{justify-content:flex-start;gap:.5rem;min-height:2.75rem}
+.kbact kbd{font:500 var(--fs-xs)/1 var(--mono);color:var(--muted);border:1px solid var(--line);border-radius:var(--r-s);padding:.125rem .3125rem;min-width:1.25rem;text-align:center}
+.kba-del{color:var(--danger,#c0392b)}
+.kbwait{display:flex;gap:.5rem;align-items:center}.kbwait input{flex:1;min-width:0}
+.kbleg{font-size:var(--fs-xs);text-align:center}
+.kbend .hempty{padding:1.5rem 0}
+@media (pointer:coarse){.kbact kbd{display:none}.kbact{min-height:3.25rem;font-size:var(--fs-m)}}
+@media (max-width:420px){.kbacts{grid-template-columns:minmax(0,1fr)}}
+.kbcrumb{display:inline-flex;align-items:center;gap:.25rem;min-width:0;overflow:hidden;white-space:nowrap}
+.kbcrumb a{color:inherit;text-decoration:none}.kbcrumb a:hover{text-decoration:underline}
+.kbcrumb .kbcp,.kbcrumb .kbsep{color:var(--muted);font-weight:500}
+.kbcrumb .kbcl{overflow:hidden;text-overflow:ellipsis}
+.ghead .kbgrip{width:1.5rem;height:1.5rem;min-width:0;min-height:0;margin-left:-.25rem;color:var(--muted);cursor:grab;opacity:.6}
+.ghead:hover .kbgrip,.kbgrip:focus-visible{opacity:1}
+@media (pointer:coarse){.ghead .kbgrip{display:none}}
+.group.kbdragging{opacity:.5}.group.kbdrop>.ghead{box-shadow:inset 0 2px 0 var(--accent)}
+.sbrand .kbfoldall{flex:none}
+/* 2.39.1 (#1224): a suggestion with its pen (into the message box): one pill, the pen its right end; 44 px on touch */
+.cchw{display:inline-flex;align-items:stretch}
+.cchw .cchb{border-top-right-radius:0;border-bottom-right-radius:0;border-right:0;padding-right:.5rem;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
+.cchpen{display:inline-flex;align-items:center;justify-content:center;min-width:2.125rem;padding:0 .5rem 0 .375rem;border:1px solid color-mix(in srgb,var(--accent) 50%,transparent);border-left:1px solid var(--line);border-radius:0 1.0625rem 1.0625rem 0;background:var(--bg2);color:var(--muted);cursor:pointer}
+.cchpen:hover,.cchpen:focus-visible{color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.cchw .cchb.st-primary+.cchpen{border-color:transparent;background:var(--accent);color:var(--accent-ink);border-left:1px solid color-mix(in srgb,var(--accent-ink) 30%,transparent)}
+@media (pointer:coarse){ .cchw .cchb{min-height:2.75rem} .cchpen{min-width:2.75rem;min-height:2.75rem} }
+/* 2.39.1 (#1294): a list in its own small window (/?mini=1#l/<id>, miniwin.js): only the list, its title bar and the composer */
+html.mini{--tabs-h:0px}
+html.mini #side,html.mini #tabs,html.mini #top .menu,html.mini #chatfab,html.mini #achat,html.mini #fab{display:none!important}
+html.mini #app{grid-template-columns:minmax(0,1fr)}
+html.mini .qdock{display:block;bottom:0;padding-bottom:.75rem}
+html.mini #app.detail-open{grid-template-columns:minmax(0,1fr) var(--detW,25.5rem)}
+/* 2.39.1 (#1213): the loading screen of a cold start (index.html #boot): the heron and a running bar in the accent colour;
+   it fades out once the first state is drawn (main.js bootDone), never over the sign-in screen, not on reloads in a session */
+#boot{position:fixed;inset:0;z-index:65;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.75rem;background:var(--bg);transition:opacity .2s ease}
+#boot svg{width:6rem;height:6rem;border-radius:1.375rem}
+#boot .bootbar{position:relative;width:8.5rem;height:.1875rem;border-radius:62.4375rem;background:color-mix(in srgb,var(--text) 14%,transparent);overflow:hidden}
+#boot .bootbar::after{content:"";position:absolute;inset:0;width:40%;border-radius:inherit;background:var(--accent);animation:bootrun 1.1s ease-in-out infinite}
+@keyframes bootrun{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
+#boot.out{opacity:0;pointer-events:none}
+.rebooting #boot,body:has(.authscreen) #boot{display:none}
+@media (prefers-color-scheme: light){ :root:not([data-theme]) #boot{background:#ffffff} }
+@media (prefers-reduced-motion: reduce){ #boot{transition:none} #boot .bootbar::after{animation:none;width:100%;opacity:.7} }
+/* 2.39.1 (#1182): office legacy import (office_import.js) -- cards instead of a wide table, also on desktop */
+.oim .oimsec{margin:1rem 0;padding-top:.5rem;border-top:1px solid var(--line2)}
+.oim .oimsec h4{display:flex;align-items:center;gap:.375rem;margin:.25rem 0}
+.oimcards{list-style:none;margin:.5rem 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,22rem),1fr));gap:.5rem}
+.oimcard{padding:.5rem .625rem;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--line2);display:flex;flex-direction:column;gap:.375rem;min-width:0}
+.oimcard.warn{border-color:var(--p3)}
+.oimcard.off{opacity:.55}
+.oimcard.sm{gap:.125rem}
+.oimhd{display:flex;align-items:center;gap:.5rem;justify-content:space-between;min-height:2.75rem}
+.oimhd .chkl{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.oimwarn,.oimdup{margin:0;font-size:var(--fs-s);color:var(--p3);display:flex;gap:.25rem;align-items:flex-start}
+.oimdup{color:var(--muted)}
+.oimgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.375rem}
+.oimfl{display:flex;flex-direction:column;gap:.125rem;font-size:var(--fs-s);color:var(--muted);min-width:0}
+.oimfl.w2{grid-column:span 2}
+.oimfl input,.oimfl select{width:100%;min-height:2.75rem}
+.oimfl .dpw,.oimfl .dpbtn{width:100%;min-height:2.75rem}  /* 2.39.1 (#1182): the app's date picker, like the neighbours */
+.oimfl.chkl{flex-direction:row;align-items:center;min-height:2.75rem}
+.oimraw pre{white-space:pre-wrap;font-size:var(--fs-s);margin:.25rem 0}
+.oimfoot{position:sticky;bottom:0;background:var(--bg);padding:.5rem 0;gap:.5rem;flex-wrap:wrap}
+.oimctr{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:space-between}
+.oimctr p{margin:.25rem 0}
+.oimrun{display:flex;align-items:center;gap:.5rem;padding:.375rem .625rem;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--line2);min-height:2.75rem}
+.oimrun .ofcn{flex:1;min-width:0;display:flex;flex-direction:column}
+.oimsum{margin:0 0 .5rem}
+.ofdkinds{flex-wrap:wrap}
+@media (max-width:560px){ .oimgrid{grid-template-columns:repeat(2,minmax(0,1fr))} }

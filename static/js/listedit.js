@@ -139,7 +139,7 @@ function palViewed() {
     }
     if (kind === 'l') {
       const l = listById(id); if (!l || l.archived) return null;
-      return {id: 'rv:' + k, kind: 'list', label: l.is_inbox ? tr('Inbox') : lname(l), icon: 'list', sw: cssColor(l.color), img: l.icon || '', lic: l, group: 'viewed', fn: () => go(l.is_inbox ? 'inbox' : 'l/' + l.id)};
+      return {id: 'rv:' + k, kind: 'list', label: l.is_inbox ? tr('Basket') : lname(l), icon: 'list', sw: cssColor(l.color), img: l.icon || '', lic: l, group: 'viewed', fn: () => go(l.is_inbox ? 'inbox' : 'l/' + l.id)};
     }
     return null;
   }).filter(Boolean);

@@ -9,8 +9,8 @@ from flask import jsonify
 from ..core.config import app
 from ..core.pg import insert_id, like_escape
 from ..core.i18n import tr
-from ..core.db import body, bump, db, err, iso, now_utc
-from ..core.access import collab_all, Denied, list_people, list_role, need_list, need_project, vis_sql
+from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
+from ..core.access import collab_all, Denied, list_people, list_role, need_list, vis_sql
 from ..core.pages import valid_link
 from ..lists.lists import COL_MAX, columns_out
 from ..tasks.validation import log_act
@@ -164,8 +164,21 @@ def need_field(c, fid, owner=True):
     r = c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone()
     if not r:
         raise Denied(404)
-    need_list(c, r["list_id"], write=owner, owner=owner)
+    need_list(c, r["list_id"], write=owner, manage=owner)  # 2.39.1 (#1327): owner and list admins
     return r
+
+
+def tb_fields_module_on(c, lid):
+    """2.39.1 (#1293): custom fields created or shown as columns switch the module "Custom fields" on for the list's owner
+    (like project_type does for its modules); nothing is switched off. Returns ["fields"] when it was switched on, else []."""
+    r = c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()
+    if not r or not r[0]:
+        return []
+    fs = [x for x in (usettings(c, r[0]).get("features") or "").split(",") if x]
+    if "fields" in fs:
+        return []
+    uset(c, r[0], "features", ",".join(fs + ["fields"]))
+    return ["fields"]
 
 
 def fields_pinned_ok(c, lid, fid=None):
@@ -175,11 +188,10 @@ def fields_pinned_ok(c, lid, fid=None):
 
 @app.post("/api/lists/<int:lid>/fields")
 def field_create(lid):
-    """{name, type, options?, pinned?}: owner only."""
+    """{name, type, options?, pinned?}: owner and list admins (2.39.1)."""
     b = body()
     c = db()
-    need_list(c, lid, owner=True)
-    need_project(c, lid, "fields")
+    need_list(c, lid, manage=True)  # 2.39.1 (#1217): plain lists too; (#1327): owner and list admins
     if c.execute("SELECT COUNT(*) FROM list_fields WHERE list_id=?", (lid,)).fetchone()[0] >= FIELD_MAX:
         return err(tr("At most {0} fields per list", FIELD_MAX))
     name, ftype, opts = field_clean_def(b)
@@ -194,14 +206,15 @@ def field_create(lid):
         cols = columns_out(cc, {r[0] for r in c.execute("SELECT id FROM list_fields WHERE list_id=?", (lid,))})
         if cols is not None and len(cols) < COL_MAX:
             c.execute("UPDATE lists SET col_cfg=? WHERE id=?", (json.dumps([*cols, f"f:{fid}"]), lid))
+    on = tb_fields_module_on(c, lid)  # 2.39.1 (#1293)
     bump(c)
     c.commit()
-    return jsonify(field_dict(c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone()))
+    return jsonify({**field_dict(c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone()), "modules_on": on})
 
 
 @app.patch("/api/fields/<int:fid>")
 def field_update(fid):
-    """{name?, options?, pinned?, sort?}: owner only; the type cannot change. Removed select options
+    """{name?, options?, pinned?, sort?}: owner and list admins (2.39.1); the type cannot change. Removed select options
     lose their values."""
     b = body()
     c = db()

@@ -157,26 +157,38 @@ const chartW = () => Math.max(260, Math.min(760 * uiZ(), ($('#view')?.clientWidt
 function niceMax(v) { for (let p = 1; ; p *= 10) for (const m of [2, 4, 6, 10]) if (m * p >= v) return m * p; }  // even: the middle grid line stays a whole number
 const topRound = (x, y, w, h, r) => { r = Math.min(r, w / 2, h); return h <= 0 ? '' : `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`; };
 const shortDay = s => pd(s).toLocaleDateString(LOCALE(), {day: 'numeric', month: 'short'});
-function yGrid(W, padL, padT, ih, max, fmt) {
-  return [0, max / 2, max].map(v => { const y = padT + ih - ih * v / max; return `<line class="ch-grid" x1="${padL}" x2="${W}" y1="${y}" y2="${y}"/><text class="ch-ax" x="${padL - 6}" y="${y + 4 * uiZ()}" text-anchor="end">${esc(fmt(v))}</text>`; }).join('');
+// 2.39.1 (#1180): round axis steps, at most 4: counts 1 / 2 / 5 x 10^n; time (minutes) 5 / 10 / 15 / 30 min, then 1 / 2 / 5 x 10^n h
+// (no more "33h 20m" on the axis); the axis column is as wide as its longest label (nothing cut off on a phone)
+function mx_ticks(v, time) {
+  v = Math.max(1, v); const ok = s => Math.ceil(v / s) <= 4;
+  let s = time ? [5, 10, 15, 30].find(ok) : 0;
+  for (let p = 1; !s; p *= 10) for (const m of [1, 2, 5]) if (!s && ok(m * p * (time ? 60 : 1))) s = m * p * (time ? 60 : 1);
+  const n = Math.max(1, Math.ceil(v / s));
+  return {max: n * s, ticks: [...Array(n + 1)].map((_, i) => i * s)};
 }
-// 2.5.2 (K16): x-axis labels from the right end, each only where it does not touch the one to its right (the width
-// comes from the label's length in the mono axis font, so "21. Sept." no longer runs into "28. Sept.")
+const mx_axH = m => m % 60 ? `${m} min` : `${m / 60} h`;
+const mx_padL = (ticks, fmt, z) => Math.max(Math.round(28 * z), Math.round((Math.max(...ticks.map(t => String(fmt(t)).length)) * 6.6 + 10) * z));
+function yGrid(W, padL, padT, ih, max, fmt, ticks = [0, max / 2, max]) {
+  return ticks.map(v => { const y = padT + ih - ih * v / max; return `<line class="ch-grid" x1="${padL}" x2="${W}" y1="${y}" y2="${y}"/><text class="ch-ax" x="${padL - 6}" y="${y + 4 * uiZ()}" text-anchor="end">${esc(fmt(v))}</text>`; }).join('');
+}
+// 2.5.2 (K16): x-axis labels from the right end, each only where it does not touch the one to its right
+// 2.39.1 (#1180): every k-th label, the same k across the axis (even gaps: no more 20 Jul, 3 Aug, 24 Aug); k from the widest
+// label (the last one is right-aligned, so it needs 1.5 widths of room)
 function axLabels(n, labels, xOf, y, z) {
-  let h = '', minL = Infinity;
-  for (let i = n - 1; i >= 0; i--) {
-    const s = String(labels[i] ?? ''), w = (s.length * 6.9 + 2) * z, x = xOf(i), end = i === n - 1;
-    const l = end ? x - w : x - w / 2, r = end ? x : x + w / 2;
-    if (!s || r + 8 * z > minL) continue;
-    minL = l;
-    h += `<text class="ch-ax" x="${x}" y="${y}" text-anchor="${end ? 'end' : 'middle'}">${esc(s)}</text>`;
+  const mw = Math.max(0, ...labels.slice(0, n).map(s => (String(s ?? '').length * 6.4 + 2) * z)), d = n > 2 ? Math.abs(xOf(n - 2) - xOf(n - 3)) || 1 : n > 1 ? Math.abs(xOf(1) - xOf(0)) || 1 : 1;  // not the last pair: it is right-aligned
+  const k = Math.max(1, Math.ceil((mw * 1.5 + 8 * z) / d));
+  let h = '';
+  for (let i = n - 1; i >= 0; i -= k) {
+    const s = String(labels[i] ?? ''), x = xOf(i), end = i === n - 1;
+    if (s) h += `<text class="ch-ax" x="${x}" y="${y}" text-anchor="${end ? 'end' : 'middle'}">${esc(s)}</text>`;
   }
   return h;
 }
-function barChart(vals, labels, {fmt = v => String(v), tip, label, w, lw}) {  // w: own width (2.1.1: charts in a dialog); lw: px per axis label (2.5.1)
-  const z = uiZ(), W = w || chartW(), H = Math.round(170 * z), padL = Math.round(36 * z), padT = 10, padB = Math.round(24 * z), ih = H - padT - padB, n = vals.length;
-  const max = niceMax(Math.max(1, ...vals)), slot = (W - padL) / n, bw = Math.max(4, slot - Math.max(2, Math.min(10, slot * .28)));
-  let h = yGrid(W, padL, padT, ih, max, fmt);
+function barChart(vals, labels, {fmt = v => String(v), tip, label, w, lw, time}) {  // w: own width (2.1.1: charts in a dialog); lw: px per axis label (2.5.1); time: minutes (2.39.1)
+  const z = uiZ(), W = w || chartW(), {max, ticks} = mx_ticks(Math.max(...vals), time), axf = time ? mx_axH : fmt;
+  const H = Math.round(170 * z), padL = mx_padL(ticks, axf, z), padT = 10, padB = Math.round(24 * z), ih = H - padT - padB, n = vals.length;
+  const slot = (W - padL) / n, bw = Math.max(4, slot - Math.max(2, Math.min(10, slot * .28)));
+  let h = yGrid(W, padL, padT, ih, max, axf, ticks);
   const bx = i => padL + i * slot + (slot - bw) / 2;
   h += axLabels(n, labels, i => i === n - 1 ? bx(i) + bw : bx(i) + bw / 2, H - 6 * z, z);  // 2.5.1: the last label inside the chart
   vals.forEach((v, i) => {
@@ -187,10 +199,10 @@ function barChart(vals, labels, {fmt = v => String(v), tip, label, w, lw}) {  //
   return `<svg class="chart" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label + ': ' + vals.map((v, i) => tip(i)).join('; '))}">${h}</svg>`;
 }
 function lineChart(vals, labels, {tip, label}) {
-  const z = uiZ(), W = chartW(), H = Math.round(160 * z), padL = Math.round(36 * z), padT = 12, padB = Math.round(24 * z), ih = H - padT - padB, n = vals.length;
-  const max = niceMax(Math.max(1, ...vals)), slot = (W - padL - 12) / Math.max(1, n - 1);
+  const z = uiZ(), W = chartW(), {max, ticks} = mx_ticks(Math.max(...vals)), H = Math.round(160 * z), padL = mx_padL(ticks, String, z), padT = 12, padB = Math.round(24 * z), ih = H - padT - padB, n = vals.length;
+  const slot = (W - padL - 12) / Math.max(1, n - 1);
   const X = i => padL + 6 + i * slot, Y = v => padT + ih - ih * v / max;
-  let h = yGrid(W, padL, padT, ih, max, v => String(v));
+  let h = yGrid(W, padL, padT, ih, max, v => String(v), ticks);
   h += `<polyline class="ch-line" points="${vals.map((v, i) => `${X(i)},${Y(v)}`).join(' ')}"/>`;
   h += axLabels(n, labels, X, H - 6 * z, z);
   vals.forEach((v, i) => {
@@ -226,7 +238,7 @@ function heatmap(weeks, perDay, t0, {unit}) {  // weeks: first days (locale week
   return `<svg class="chart" width="${Math.min(W, lab + weeks.length * (cs + gap))}" height="${H}" role="img" aria-label="${esc(tr('Completed per day'))}">${h}</svg>
     <div class="hmleg muted">${tr('less')}${[0, 1, 2, 3, 4].map(l => `<i class="hm l${l}"></i>`).join('')}${tr('more')}</div>`;
 }
-const listLabel = x => x.id === -1 ? tr('No task') : x.id === 0 ? tr('Other lists') : x.is_inbox && inboxDef(x.name) ? tr('Inbox') : listName(x.name);
+const listLabel = x => x.id === -1 ? tr('No task') : x.id === 0 ? tr('Other lists') : x.is_inbox && inboxDef(x.name) ? tr('Basket') : listName(x.name);
 function viewStats() {
   const st = S.st;
   if ((st.v !== S.v || !st.data) && !st.loading) setTimeout(loadStats, 0);
@@ -242,7 +254,7 @@ function viewStats() {
   ];
   const mode = st.mode;
   let h = `<div class="stats"><div class="sttiles">${tiles.map(([v, l, s]) => `<div><b>${esc(String(v))}</b><span>${esc(l)}</span><small>${esc(s)}</small></div>`).join('')}</div>
-    <section class="stcard"><div class="sthead"><h3>${tr('Completed tasks')}</h3><span class="muted">${trn('{0} in 12 weeks', '{0} in 12 weeks', j.done.total)}</span><span class="spacer"></span>
+    <section class="stcard"><div class="sthead"><h3>${tr('Completed tasks')}</h3><p class="muted shint stnote">${tr('Last 12 weeks. A completed task counts for the person who ticked it off, also in shared lists; “won’t do” does not count. On time = completed on or before the due day. Overdue = your open tasks (assigned to you, or unassigned in your own lists) whose due date had passed at the end of each week, based on the current due dates.')}</p><span class="muted">${trn('{0} in 12 weeks', '{0} in 12 weeks', j.done.total)}</span><span class="spacer"></span>
       <div class="seg"><button class="${mode === 'week' ? 'on' : ''}" data-act="stats-mode" data-k="week">${tr('Weeks')}</button><button class="${mode === 'day' ? 'on' : ''}" data-act="stats-mode" data-k="day">${tr('Days')}</button></div></div>
       ${mode === 'day' ? heatmap(j.weeks, j.done.per_day, j.today, {unit: v => trn('{0} completed', '{0} completed', v)})
         : barChart(j.done.per_week, wl, {tip: i => tipW(i, trn('{0} completed', '{0} completed', j.done.per_week[i])), label: tr('Completed per week')})}</section>
@@ -251,17 +263,17 @@ function viewStats() {
     <section class="stcard"><div class="sthead"><h3>${tr('Overdue')}</h3><span class="muted">${trn('{0} overdue now', '{0} overdue now', j.overdue[j.overdue.length - 1].n)}</span></div>
       ${lineChart(j.overdue.map(x => x.n), j.overdue.map((x, i) => i === j.overdue.length - 1 ? tr('Today') : shortDay(x.date)), {label: tr('Overdue tasks at the end of each week'), tip: i => `${i === j.overdue.length - 1 ? tr('Today') : fmtDate(j.overdue[i].date)}: ${trn('{0} overdue', '{0} overdue', j.overdue[i].n)}`})}</section>`;
   if (feat('pomo')) h += `<section class="stcard"><div class="sthead"><h3>${tr('Focus time')}</h3><span class="muted">${tr('12 weeks: {0}', fmtH(j.focus.total))}</span></div>
-      ${barChart(j.focus.per_week, wl, {fmt: v => fmtH(Math.round(v)), tip: i => tipW(i, fmtH(j.focus.per_week[i])), label: tr('Focus minutes per week')})}
+      ${barChart(j.focus.per_week, wl, {fmt: v => fmtH(Math.round(v)), tip: i => tipW(i, fmtH(j.focus.per_week[i])), label: tr('Focus minutes per week'), time: true})}
       <h4>${tr('By list')}</h4>${hbarChart(j.focus.by_list.map(x => ({name: listLabel(x), v: x.minutes})), {fmt: fmtH, label: tr('Focus by list')})}</section>`;
   if (timeOn() && j.time) h += `<section class="stcard"><div class="sthead"><h3>${tr('Tracked time')}</h3><span class="muted">${tr('12 weeks: {0}', fmtH(j.time.total))}</span><span class="spacer"></span><button class="btn sm" data-go="time">${ic('clock', 's')} ${tr('Reports')}</button></div>
-      ${barChart(j.time.per_week, wl, {fmt: v => fmtH(Math.round(v)), tip: i => tipW(i, fmtH(j.time.per_week[i])), label: tr('Tracked minutes per week')})}
+      ${barChart(j.time.per_week, wl, {fmt: v => fmtH(Math.round(v)), tip: i => tipW(i, fmtH(j.time.per_week[i])), label: tr('Tracked minutes per week'), time: true})}
       <h4>${tr('By list')}</h4>${hbarChart(j.time.by_list.map(x => ({name: listLabel(x), v: x.minutes})), {fmt: fmtH, label: tr('Tracked time by list')})}</section>`;
   const hs = feat('habits') ? S.habits.filter(x => !x.archived) : [];
   if (hs.length) h += `<section class="stcard"><div class="sthead"><h3>${tr('Habits')}</h3></div><div class="sthabits">
       <div class="shh muted"><span></span><span>${tr('rate')}</span><span>${tr('streak')}</span><span>${tr('best')}</span></div>
       ${hs.map(x => { const s = habitStats(x), col = cssColor(x.color) || HCOLORS[0]; return `<div class="shr" data-act="habit-open" data-id="${x.id}" title="${esc(x.per_week ? tr('Share of the last 4 weeks that reached the target') : tr('Share of the scheduled days of the last 30 days'))}"><span class="n"><i class="sw" style="background:${col}"></i>${esc(x.name)}</span>
         <span class="rate"><svg width="64" height="8" viewBox="0 0 64 8" preserveAspectRatio="none" aria-hidden="true"><rect class="ch-track" width="64" height="8" rx="4"/><rect class="ch-bar" width="${Math.round(64 * s.rate / 100)}" height="8" rx="4"/></svg><b>${s.rate}%</b></span><span><b>${s.streak}</b> ${esc(streakUnit(x))}</span><span>${s.best}</span></div>`; }).join('')}</div></section>`;
-  h += `<p class="muted stnote">${tr('Last 12 weeks. A completed task counts for the person who ticked it off, also in shared lists; “won’t do” does not count. On time = completed on or before the due day. Overdue = your open tasks (assigned to you, or unassigned in your own lists) whose due date had passed at the end of each week, based on the current due dates.')}</p></div>`;
+  h += `</div>`;  // 2.39.1 (#1180): the long note sits behind the (i) next to the first heading (infoize, icons.js), closed by default
   return h;
 }
 let statsResize;

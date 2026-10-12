@@ -29,7 +29,7 @@ BRIEF_KINDS = {"assign": "assigned", "complete": "status", "reopen": "status", "
 
 
 def _lname(r):
-    return tr("Inbox") if r["is_inbox"] and inbox_default(r["list_name"]) else r["list_name"]
+    return tr("Basket") if r["is_inbox"] and inbox_default(r["list_name"]) else r["list_name"]
 
 
 def brief_lists(c, uid, agent_id=None):

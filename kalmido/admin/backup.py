@@ -974,7 +974,7 @@ def bk_prepare(path, pw, work, att_dest=None, office_dest=None, restore=False):
                     root = os.path.realpath(base) + os.sep
                     if not os.path.realpath(dest).startswith(root) or not os.path.realpath(d).startswith(root):
                         raise BackupError("members")
-                    os.makedirs(d, mode=0o755, exist_ok=True)
+                    os.makedirs(d, mode=0o700 if base is office_dest else 0o755, exist_ok=True)  # 2.39.1 (#1210 N8): office 0700
                     bk_extract(z, i, dest, man["_listed"])
     except zipfile.BadZipFile:
         raise BackupError("format") from None
@@ -1074,7 +1074,7 @@ def bk_restore(path, pw, admin, via):
     gate = False
     try:
         os.makedirs(att_new, mode=0o755)
-        os.makedirs(off_new, mode=0o755)
+        os.makedirs(off_new, mode=0o700)  # 2.39.1 (#1210 N8)
         man, dbp = bk_prepare(path, pw, work, att_new, off_new, restore=True)
         cur = connect()
         try:

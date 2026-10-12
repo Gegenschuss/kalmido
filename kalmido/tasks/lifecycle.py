@@ -11,7 +11,7 @@ from ..core.pg import insert_id
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, gsetting, iso, local_now, now_utc, parse_iso
 from ..accounts.session import me
-from ..core.access import collab_all, Denied, list_people, list_role, need_list, need_project, need_task, wr_sql
+from ..core.access import collab_all, Denied, list_people, list_role, need_list, need_task, wr_sql
 from ..core.serializers import attachment_files, unlink_files
 from ..lists.groups import check_group_assignee, grp_assign_events, grp_name, grp_shares_of_list
 from ..tasks.validation import (
@@ -188,9 +188,7 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
         f["assigned_by"] = me() if f["assignee_id"] else None
     if f.get("assignee_group_id") and f["assignee_group_id"] != cur["assignee_group_id"]:
         f["assigned_by"] = me()
-    if "fields" in b:  # custom field values: validated before anything is written
-        if b["fields"]:
-            need_project(c, lid, "fields")
+    if "fields" in b:  # custom field values: validated before anything is written (2.39.1 #1217: plain lists too)
         try:
             fl = {r["id"]: r for r in c.execute("SELECT * FROM list_fields WHERE list_id=?", (lid,))}
             if not isinstance(b["fields"], dict) or any(not str(k).isdigit() or int(k) not in fl for k in b["fields"]):

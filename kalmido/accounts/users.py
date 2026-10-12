@@ -429,10 +429,10 @@ def httpshortcuts_zip(url, token, lg):
     data = {
         "categories": [{"id": str(uuid.uuid4()), "name": "Kalmido", "shortcuts": [
             {**common, "id": str(uuid.uuid4()), "name": "Kalmido",
-             "description": tr("Share files to your Kalmido inbox", lg=lg),
+             "description": tr("Share files to your Kalmido basket", lg=lg),
              "parameters": [{"key": "file", "type": "file", "fileUploadOptions": {"fileUploadType": "file_picker_multi"}}]},
             {**common, "id": str(uuid.uuid4()), "name": tr("Kalmido text", lg=lg),
-             "description": tr("Share text or links to your Kalmido inbox", lg=lg), "excludeFromFileSharing": True,
+             "description": tr("Share text or links to your Kalmido basket", lg=lg), "excludeFromFileSharing": True,
              "parameters": [{"key": "text", "type": "string", "value": "{{" + var_id + "}}"}]},
         ]}],
         "variables": [{"id": var_id, "key": "kalmido_shared_text", "type": "constant", "value": "", "isShareText": True,

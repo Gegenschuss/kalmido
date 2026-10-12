@@ -593,7 +593,7 @@ def _wd_reminder(c, t, users, S, LG, now):
             when = tr("all day", lg=lgw) if not t["due_time"] else tr("at {0}", t["due_time"], lg=lgw)
             day = tr("today", lg=lgw) if t["due"] == now.date().isoformat() else \
                 short_day(date.fromisoformat(t["due"]), lgw)
-            lname = tr("Inbox", lg=lgw) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
+            lname = tr("Basket", lg=lgw) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
             notify(who, t["title"], tr("Due {0} {1} · {2}", day, when, lname, lg=lgw),
                    push_prio(sw, 4 if t["priority"] == 5 else None), f"{PUBLIC_URL}/#t/{t['id']}", s=sw,
                    actions=[(tr("Snooze", lg=lgw), f"{PUBLIC_URL}/#snooze/{t['id']}"),
@@ -694,7 +694,7 @@ def _wd_nag(c, t, users, S, LG, now):
     when = tr("all day", lg=lg) if not t["due_time"] else tr("at {0}", t["due_time"], lg=lg)
     day = tr("today", lg=lg) if t["due"] == now.date().isoformat() else \
         short_day(date.fromisoformat(t["due"]), lg)
-    lname = tr("Inbox", lg=lg) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
+    lname = tr("Basket", lg=lg) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
     head = tr("Deadline", lg=lg) if t["deadline"] else tr("Still open", lg=lg)
     notify(rcpt, t["title"], tr("{0} · due {1} {2} · {3}", head, day, when, lname, lg=lg),
            push_prio(s, 4 if t["priority"] == 5 else None), f"{PUBLIC_URL}/#t/{t['id']}", s=s,

@@ -128,7 +128,7 @@ def list_owner_set(lid):
     if mode == "owner":
         need_collab()
     if lr["is_inbox"]:
-        return err(tr("The inbox cannot be transferred"), 409)
+        return err(tr("The basket cannot be transferred"), 409)
     try:
         new = int(b.get("user_id") or 0)
     except (TypeError, ValueError):

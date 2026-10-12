@@ -1,0 +1,228 @@
+// Office & finance (2.39.1, #1182): "Import legacy data" -- the page office/import (Settings > Import legacy data) and the
+// archive list in the documents tab. A spreadsheet (.xlsx) becomes a preview of clients (split addresses with reasons,
+// duplicates), services and equipment; the person corrects, deselects and confirms. Old invoices / quotations (PDF) get
+// their key data proposed from the file name and are archived unchanged. Every confirmed import is a run that can be
+// undone while nothing builds on it. Org admins only (the server checks); members read the archive.
+const OIM = {pv: null, busy: false, filter: '', arch: [], archBusy: false, runs: null, counter: null, clients: null, list: null, listLoading: false};
+const OIM_ACTS = [['new', N_('Add as new client')], ['merge', N_('Merge into the existing client')], ['skip', N_('Skip')]];
+
+async function oimLoad() {
+  try { const j = await api('GET', '/api/office/legacy/runs'); OIM.runs = j.runs || []; } catch (x) { OIM.runs = []; }
+  try { OIM.counter = await api('GET', '/api/office/legacy/counter'); } catch { OIM.counter = null; }
+  try { const j = await api('GET', '/api/clients'); OIM.clients = (j.clients || []).filter(c => !c.archived && c.org_id === OFC.info?.org_id); } catch { OIM.clients = []; }
+  ofcDraw();
+}
+const oimClientOpts = cur => [['', tr('no client')], ...(OIM.clients || []).map(c => [c.id, c.name])].map(([v, n]) => `<option value="${esc(v)}" ${String(v) === String(cur ?? '') ? 'selected' : ''}>${esc(n)}</option>`).join('');
+
+// ---- the page
+function oimHtml() {
+  if (!ofcAdmin()) return `<div class="empty">${ic('lock')}<span>${tr('Only an admin of this organisation can do this')}</span></div>`;
+  if (OIM.runs === null && !OIM.loading) { OIM.loading = true; setTimeout(async () => { await oimLoad(); OIM.loading = false; }, 0); }
+  const back = `<div class="ofcbar"><a class="btn sm" href="#office/settings">${ic('back', 's')} ${tr('Settings')}</a></div>`;
+  return `<div class="oim">${back}<h3>${tr('Import legacy data')}</h3><p class="muted">${tr('Take over your clients, services and equipment from a spreadsheet and keep old invoices and quotations as an archive. You see everything before it is saved; every import can be undone.')}</p>
+    <section class="oimsec"><h4>${ic('list', 's')} ${tr('Master data from a spreadsheet')}</h4>
+    <p class="muted">${tr('An .xlsx file with the sheets or tables Contacts (one address per cell), Services and Equipment.')}</p>
+    <div class="lacts"><input type="file" id="oim-xlsx" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden><button type="button" class="btn sm pri" data-oim="pick-xlsx" ${OIM.busy ? 'disabled' : ''}>${ic('upload', 's')} ${tr('Choose file')}</button>${OIM.busy ? `<span class="muted">${tr('Reading…')}</span>` : ''}</div>
+    ${OIM.pv ? oimPreviewHtml() : ''}</section>
+    <section class="oimsec"><h4>${ic('archive', 's')} ${tr('Old invoices and quotations')}</h4>
+    <p class="muted">${tr('PDF files are archived unchanged: never renumbered, never sent again, no e-invoice. Key data come from the file name; please add amount and payment.')}</p>
+    <div class="lacts"><input type="file" id="oim-pdf" accept="application/pdf,.pdf" multiple hidden><button type="button" class="btn sm" data-oim="pick-pdf" ${OIM.archBusy ? 'disabled' : ''}>${ic('upload', 's')} ${tr('Choose PDF files')}</button></div>
+    ${oimArchHtml()}</section>
+    <section class="oimsec"><h4>${ic('hash', 's')} ${tr('Number counters')}</h4>${oimCounterHtml()}</section>
+    <section class="oimsec"><h4>${ic('clock', 's')} ${tr('Import runs')}</h4>${oimRunsHtml()}</section></div>`;
+}
+
+function oimPreviewHtml() {
+  const p = OIM.pv, cl = p.clients || [];
+  const unsure = cl.filter(c => c.flags?.length).length, dups = cl.filter(c => c.dup).length;
+  const n = cl.filter(c => c.action !== 'skip').length + (p.services || []).filter(s => s.action !== 'skip').length + (p.equipment || []).filter(s => s.action !== 'skip').length;
+  const f = OIM.filter;
+  const chips = `<div class="seg wrap oimf" role="tablist">${[['', tr('All ({0})', cl.length)], ['unsure', tr('Unsure ({0})', unsure)], ['dup', tr('Duplicates ({0})', dups)]].map(([k, t]) => `<button type="button" role="tab" data-oim="filter" data-f="${k}" aria-selected="${f === k}" class="${f === k ? 'on' : ''}">${esc(t)}</button>`).join('')}</div>`;
+  const rows = cl.map((c, i) => [c, i]).filter(([c]) => !f || (f === 'unsure' ? c.flags?.length : c.dup));
+  const other = Object.entries(p.other || {}).filter(([, v]) => v);
+  const otherNames = {staff: N_('Staff'), freelancer: N_('Freelancers')};
+  return `<div class="oimpv">
+    ${cl.length ? `<h4>${tr('Clients')}</h4>${chips}<ul class="oimcards" role="list">${rows.map(([c, i]) => oimClientCard(c, i)).join('')}</ul>` : `<p class="muted">${tr('No sheet Contacts found.')}</p>`}
+    ${(p.services || []).length ? `<h4>${tr('Services')}</h4><ul class="oimcards" role="list">${p.services.map((s, i) => oimSimpleCard('services', s, i, s.name_de, [s.category, s.daily_rate != null ? `${ofcMoney(s.daily_rate)}/${tr('Day|unit')}` : '', s.hourly_rate != null ? `${ofcMoney(s.hourly_rate)}/${tr('h|unit')}` : ''])).join('')}</ul>` : ''}
+    ${(p.equipment || []).length ? `<h4>${tr('Equipment')}</h4><ul class="oimcards" role="list">${p.equipment.map((s, i) => oimSimpleCard('equipment', s, i, s.name, [s.category, s.daily_rate != null ? `${ofcMoney(s.daily_rate)}/${tr('Day|unit')}` : ''])).join('')}</ul>` : ''}
+    ${other.length ? `<p class="muted">${esc(tr('Not imported (Kalmido has no master data for them yet): {0}', other.map(([k, v]) => `${tr(otherNames[k] || k)} (${v})`).join(', ')))}</p>` : ''}
+    <div class="foot stfoot oimfoot"><span class="aerr" role="alert"></span><span class="spacer"></span><button type="button" class="btn" data-oim="cancel">${tr('Cancel')}</button><button type="button" class="btn pri" data-oim="import" ${n && !OIM.busy ? '' : 'disabled'}>${esc(trn('Import {0} entry', 'Import {0} entries', n))}</button></div></div>`;
+}
+
+function oimClientCard(c, i) {
+  const on = c.action !== 'skip';
+  const fld = (k, label, mx, cls = '') => `<label class="oimfl ${cls}"><span>${esc(label)}</span><input data-oim-c="${i}" data-k="${k}" value="${esc(c[k] || '')}" maxlength="${mx}" ${on ? '' : 'disabled'}></label>`;
+  const dup = c.dup ? `<p class="oimdup">${ic('copy', 's')} ${esc(c.dup.kind === 'existing' ? tr('Already a client: {0}', c.dup.name) : tr('Twice in the file (row {0})', c.dup.row))}</p>
+    ${c.dup.kind === 'existing' ? `<select data-oim-act="${i}" aria-label="${esc(tr('What to do'))}">${OIM_ACTS.map(([v, n]) => `<option value="${v}" ${c.action === v ? 'selected' : ''}>${esc(tr(n))}</option>`).join('')}</select>` : ''}` : '';
+  return `<li class="oimcard ${on ? '' : 'off'} ${c.flags?.length ? 'warn' : ''}"><div class="oimhd"><label class="chkl"><input type="checkbox" data-oim-on="c" data-i="${i}" ${on ? 'checked' : ''}> <b>${esc(c.name || tr('(no name)'))}</b></label><span class="muted">${tr('row {0}', c.row)}</span></div>
+    ${c.reasons?.length ? `<p class="oimwarn">${ic('alert', 's')} ${esc(c.reasons.join(' · '))}</p>` : ''}${dup}
+    <div class="oimgrid">${fld('name', tr('Company'), 80, 'w2')}${fld('contact', tr('Contact person'), 120, 'w2')}${fld('street', tr('Street'), 200, 'w2')}${fld('zip', tr('Postcode'), 20)}${fld('city', tr('City'), 120)}${fld('country', tr('Country (ISO code)'), 2)}</div>
+    <details class="oimraw"><summary>${tr('Original text')}</summary><pre>${esc(c.address || '')}</pre></details></li>`;
+}
+
+function oimSimpleCard(kind, s, i, title, sub) {
+  const on = s.action !== 'skip';
+  return `<li class="oimcard sm ${on ? '' : 'off'}"><div class="oimhd"><label class="chkl"><input type="checkbox" data-oim-on="${kind}" data-i="${i}" ${on ? 'checked' : ''}> <b>${esc(title)}</b></label>${s.dup ? `<span class="rotag">${tr('exists already')}</span>` : ''}</div><small class="muted">${esc(sub.filter(Boolean).join(' · '))}</small></li>`;
+}
+
+function oimArchHtml() {
+  const a = OIM.arch;
+  if (!a.length) return '';
+  const kinds = [['invoice', tr('Invoice')], ['offer', tr('Quotation')]];
+  const n = a.filter(x => !x.done).length;
+  return `<ul class="oimcards" role="list">${a.map((x, i) => `<li class="oimcard ${x.done ? 'off' : ''} ${x.err || !x.sure || x.taken ? 'warn' : ''}"><div class="oimhd"><b>${esc(x.file_name)}</b>${x.done ? `<span class="rotag">${ic('check', 's')}${tr('Archived')}</span>` : `<button type="button" class="btn sm ghost" data-oim="arch-rm" data-i="${i}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button>`}</div>
+    ${x.err ? `<p class="oimwarn">${ic('alert', 's')} ${esc(x.err)}</p>` : x.taken ? `<p class="oimwarn">${ic('alert', 's')} ${tr('This number is already used')}</p>` : !x.sure ? `<p class="oimwarn">${ic('alert', 's')} ${tr('File name not recognised: please check the fields')}</p>` : ''}
+    <div class="oimgrid">
+      <label class="oimfl"><span>${tr('Kind')}</span><select data-oim-a="${i}" data-k="kind" ${x.done ? 'disabled' : ''}>${kinds.map(([v, t]) => `<option value="${v}" ${x.kind === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
+      <label class="oimfl w2"><span>${tr('Number')}</span><input data-oim-a="${i}" data-k="number" value="${esc(x.number)}" maxlength="120" ${x.done ? 'disabled' : ''}></label>
+      <div class="oimfl"><span>${tr('Date')}</span>${dateIn('oim-d-' + i, x.date || '', {label: tr('Date'), empty: tr('none'), ro: x.done, attrs: `data-oim-a="${i}" data-k="date"`})}</div>
+      <label class="oimfl w2"><span>${tr('Client')}</span><select data-oim-a="${i}" data-k="client_id" ${x.done ? 'disabled' : ''}>${oimClientOpts(x.client_id)}</select></label>
+      <label class="oimfl"><span>${tr('Amount')}</span><input data-oim-a="${i}" data-k="amount" value="${esc(x.amount ?? '')}" inputmode="decimal" class="numin" placeholder="${esc(x.kind === 'invoice' ? tr('gross') : tr('net'))}" ${x.done ? 'disabled' : ''}></label>
+      <label class="chkl oimfl"><input type="checkbox" data-oim-a="${i}" data-k="paid" ${x.paid ? 'checked' : ''} ${x.done || x.kind !== 'invoice' ? 'disabled' : ''}> ${tr('Paid')}</label></div></li>`).join('')}</ul>
+    <div class="foot stfoot oimfoot"><span class="spacer"></span><button type="button" class="btn" data-oim="arch-clear">${tr('Clear list')}</button><button type="button" class="btn pri" data-oim="arch-go" ${n && !OIM.archBusy ? '' : 'disabled'}>${OIM.archBusy ? esc(tr('Archiving…')) : esc(trn('Archive {0} document', 'Archive {0} documents', n))}</button></div>`;
+}
+
+function oimCounterHtml() {
+  const c = OIM.counter;
+  if (!c) return `<p class="muted">${tr('Loading…')}</p>`;
+  return ['invoice', 'offer'].map(k => {
+    const x = c[k];
+    if (!x) return '';
+    const name = k === 'invoice' ? tr('Invoices') : tr('Quotations');
+    if (!x.highest) return `<p class="muted">${esc(name)}: ${esc(tr('next number {0}', x.next_now))}</p>`;
+    const can = x.proposal > x.last;
+    return `<div class="oimctr"><p><b>${esc(name)}</b>: ${esc(tr('highest number in the archive: {0} ({1})', x.highest, x.highest_number))}<br><span class="muted">${esc(tr('next number now: {0}', x.next_now))}</span></p>
+      ${can ? `<button type="button" class="btn sm" data-oim="counter" data-kind="${k}" data-last="${x.proposal}">${esc(tr('Continue after the archive: next {0}', x.next_after))}</button>` : `<span class="muted">${tr('The counter already lies above the archive.')}</span>`}</div>`;
+  }).join('');
+}
+
+function oimRunsHtml() {
+  const r = OIM.runs;
+  if (r === null) return `<p class="muted">${tr('Loading…')}</p>`;
+  if (!r.length) return `<p class="muted">${tr('No imports yet.')}</p>`;
+  const kn = {data: N_('Master data'), archive: N_('Archive|documents')};
+  return `<ul class="ofclist" role="list">${r.map(x => `<li class="oimrun"><span class="ofcn"><b>${esc(tr(kn[x.kind] || x.kind))} · ${esc(trn('{0} entry', '{0} entries', x.total || 0))}</b><small class="muted">${esc([typeof ofdWhen === 'function' ? ofdWhen(x.created_at) : x.created_at, x.user_name].filter(Boolean).join(' · '))}</small></span>
+    ${x.undone_at ? `<span class="rotag">${tr('undone')}</span>` : `<button type="button" class="btn sm" data-oim="undo" data-id="${x.id}">${ic('undo', 's')} ${tr('Undo')}</button>`}</li>`).join('')}</ul>`;
+}
+
+// ---- the archive in the documents tab (office_docs.js asks for it when the kind "Archive" is chosen)
+async function oimLoadList() {
+  if (OIM.listLoading) return;
+  OIM.listLoading = true;
+  try { OIM.list = await api('GET', '/api/office/legacy/archive'); } catch (x) { OIM.list = {items: [], error: x.message || tr('unknown')}; }
+  OIM.listLoading = false;
+  if (typeof ofdDraw === 'function') ofdDraw();
+}
+function oimArchiveListHtml(q) {
+  if (!OIM.list) { setTimeout(oimLoadList, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  const items = (OIM.list.items || []).filter(r => !q || [r.number, r.client, r.client_name, r.project].some(v => (v || '').toLowerCase().includes(q)));
+  const sum = OIM.list.sum_invoices ? `<p class="muted oimsum">${esc(tr('Archived invoices: {0}, of which paid: {1}', ofcMoney(OIM.list.sum_invoices), ofcMoney(OIM.list.sum_paid)))}</p>` : '';
+  const imp = ofcAdmin() ? `<a class="btn sm" href="#office/import">${ic('upload', 's')} ${tr('Import legacy data')}</a>` : '';
+  if (!items.length) return `<div class="empty">${ic('archive')}<span>${q ? tr('Nothing matches.') : tr('No archived documents. Old invoices and quotations are added under Settings > Import legacy data.')}</span>${q ? '' : imp}</div>`;
+  return sum + `<ul class="ofclist ofdlist" role="list">${items.map(r => `<li><a class="ofcrow ofdrow" href="/api/office/legacy/archive/${r.id}/pdf" target="_blank" rel="noopener">
+    <span class="ofcn"><b>${esc(r.number || r.file_name)}${r.client || r.client_name ? ` · ${esc(r.client || r.client_name)}` : ''}</b><small class="muted">${esc([r.kind === 'offer' ? tr('Quotation') : tr('Invoice'), r.project, r.date ? fmtDateLoc(r.date) : ''].filter(Boolean).join(' · '))}</small></span>
+    <span class="ofdsum"><b>${r.amount != null ? esc(ofcMoney(r.amount)) : ''}</b><small class="rotag">${ic('archive', 's')}${tr('Archive|documents')}${r.kind === 'invoice' ? ' · ' + (r.paid ? tr('Paid') : tr('open')) : ''}</small></span>${ic('file', 's')}</a></li>`).join('')}</ul>` + `<div class="lacts">${imp}</div>`;
+}
+
+// ---- actions
+async function oimPreview(file) {
+  if (!file) return;
+  OIM.busy = true; ofcDraw();
+  const fd = new FormData(); fd.append('file', file);
+  try {
+    const r = await fetch('/api/office/legacy/preview', {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-Requested-With': 'kalmido'}});
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || r.statusText);
+    OIM.pv = j; OIM.filter = '';
+  } catch (x) { toast(x.message || tr('unknown')); }
+  OIM.busy = false; ofcDraw();
+}
+async function oimImport() {
+  const p = OIM.pv; if (!p) return;
+  const cl = (p.clients || []).map(c => ({row: c.row, name: c.name, contact: c.contact, street: c.street, zip: c.zip, city: c.city, country: (c.country || '').toUpperCase(), address: c.address,
+    action: c.action, merge_id: c.action === 'merge' ? c.dup?.id : undefined}));
+  OIM.busy = true; ofcDraw();
+  try {
+    const j = await api('POST', '/api/office/legacy/import', {clients: cl, services: p.services || [], equipment: p.equipment || []});
+    const c = j.counts || {};
+    toast(tr('Imported: {0} clients, {1} services, {2} devices', c.clients || 0, c.services || 0, c.equipment || 0));
+    OIM.pv = null; ofcReload('services'); ofcReload('equipment');
+    await oimLoad();
+  } catch (x) { const el = $('.oimpv .aerr'); if (el) el.textContent = x.message || ''; else toast(x.message || ''); }
+  OIM.busy = false; ofcDraw();
+}
+async function oimPickPdf(files) {
+  const fs = [...(files || [])];
+  if (!fs.length) return;
+  try {
+    const j = await api('POST', '/api/office/legacy/archive/parse', {names: fs.map(f => f.name)});
+    (j.items || []).forEach((x, i) => OIM.arch.push({...x, file: fs[i], amount: '', paid: x.kind === 'invoice' ? 1 : 0, done: false, err: ''}));
+  } catch (x) { toast(x.message || ''); }
+  ofcDraw();
+}
+async function oimArchiveGo() {
+  const todo = OIM.arch.filter(x => !x.done);
+  if (!todo.length) return;
+  OIM.archBusy = true; ofcDraw();
+  let run;
+  try { run = (await api('POST', '/api/office/legacy/archive/run')).run_id; } catch (x) { toast(x.message || ''); OIM.archBusy = false; ofcDraw(); return; }
+  let ok = 0;
+  for (const x of todo) {
+    const fd = new FormData();
+    fd.append('file', x.file, x.file_name);
+    const amt = String(x.amount ?? '').trim().replace(/\s/g, '');
+    for (const [k, v] of Object.entries({run_id: run, kind: x.kind, number: x.number, project_no: x.project_no, project: x.project, client_id: x.client_id || '', client_name: x.client_name, date: x.date, amount: amt, paid: x.paid ? 1 : 0})) fd.append(k, v ?? '');
+    try {
+      const r = await fetch('/api/office/legacy/archive', {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-Requested-With': 'kalmido'}});
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || r.statusText);
+      x.done = true; x.err = ''; ok++;
+    } catch (e) { x.err = e.message || tr('unknown'); }
+  }
+  OIM.archBusy = false; OIM.list = null;
+  toast(trn('{0} document archived', '{0} documents archived', ok));
+  await oimLoad();
+}
+
+document.addEventListener('click', async e => {
+  const b = e.target.closest?.('[data-oim]'); if (!b) return;
+  const a = b.dataset.oim;
+  if (a === 'pick-xlsx') { const i = $('#oim-xlsx'); if (i) { i.onchange = () => { oimPreview(i.files[0]); i.value = ''; }; i.click(); } }
+  else if (a === 'pick-pdf') { const i = $('#oim-pdf'); if (i) { i.onchange = () => { oimPickPdf(i.files); i.value = ''; }; i.click(); } }
+  else if (a === 'filter') { OIM.filter = b.dataset.f || ''; ofcDraw(); }
+  else if (a === 'cancel') { OIM.pv = null; ofcDraw(); }
+  else if (a === 'import') oimImport();
+  else if (a === 'arch-rm') { OIM.arch.splice(+b.dataset.i, 1); ofcDraw(); }
+  else if (a === 'arch-clear') { OIM.arch = []; ofcDraw(); }
+  else if (a === 'arch-go') oimArchiveGo();
+  else if (a === 'counter') {
+    try { await api('POST', '/api/office/legacy/counter', {kind: b.dataset.kind, last: +b.dataset.last}); toast(tr('Saved')); await oimLoad(); await ofcInfo(true); } catch (x) { toast(x.message || ''); }
+  } else if (a === 'undo') {
+    if (!await askConfirm(tr('Undo this import?'), tr('Everything it added is removed, except what is in use by now (a client with a quotation, a list or an archived document; a service in a document). Clients that were merged lose the fields the import filled in.'), {ok: tr('Undo'), danger: true})) return;
+    try {
+      const j = await api('POST', `/api/office/legacy/runs/${b.dataset.id}/undo`);
+      const k = j.kept || {}, kept = (k.clients || 0) + (k.services || 0) + (k.equipment || 0);
+      toast(tr('Import undone') + (kept ? ' · ' + trn('{0} entry stays because it is in use', '{0} entries stay because they are in use', kept) : ''));
+      OIM.list = null; ofcReload('services'); ofcReload('equipment'); await oimLoad();
+    } catch (x) { toast(x.message || ''); }
+  }
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset?.oimOn && OIM.pv) {
+    const list = t.dataset.oimOn === 'c' ? OIM.pv.clients : OIM.pv[t.dataset.oimOn], x = list?.[+t.dataset.i];
+    if (x) { x.action = t.checked ? (x.dup?.kind === 'existing' && x.action === 'merge' ? 'merge' : 'new') : 'skip'; ofcDraw(); }
+  } else if (t.dataset?.oimAct && OIM.pv) {
+    const x = OIM.pv.clients[+t.dataset.oimAct]; if (x) { x.action = t.value; ofcDraw(); }
+  } else if (t.dataset?.oimA) {
+    const x = OIM.arch[+t.dataset.oimA]; if (!x) return;
+    const k = t.dataset.k;
+    x[k] = k === 'paid' ? (t.checked ? 1 : 0) : k === 'client_id' ? (+t.value || null) : t.value;
+    if (k === 'kind' || k === 'number') { x.taken = false; ofcDraw(); }
+  }
+});
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.dataset?.oimC && OIM.pv) { const x = OIM.pv.clients[+t.dataset.oimC]; if (x) x[t.dataset.k] = t.value; }
+  else if (t.dataset?.oimA && t.tagName === 'INPUT' && t.type !== 'checkbox') { const x = OIM.arch[+t.dataset.oimA]; if (x) x[t.dataset.k] = t.value; }
+});

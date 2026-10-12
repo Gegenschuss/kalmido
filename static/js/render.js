@@ -187,22 +187,34 @@ function counts() {
 // account. Switched-off modules are left out. Each group folds (per device, LS sideGroups).
 // 2.24.0 (UX-01): "Views" starts folded and sits below the lists, so a person's own lists come right after Focus; groups
 // folded by default remember being opened (LS sideOpenG), the others being folded (LS sideGroups)
-const SIDE_FOLDED = ['views'];
+const SIDE_FOLDED = ['views', 'areas'];  // 2.39.1 (#1185): "Areas" folds like "Views"
 // 2.25.0 (UX-03): the order of the groups and what is hidden is the person's (user setting "sidebar": json {order, hidden};
 // hidden: "g:<group>" or "e:<entry>"; the same on every device). "Lists" can be moved but not hidden.
 // 2.27.0 (#984): "Views" by default above the lists again (right below Plan, still folded); an own arrangement stays
-const SIDE_GROUPS = ['focus', 'views', 'clients', 'lists', 'filters', 'tags', 'team'];
-const SIDE_NAMES = {focus: N_('Plan|nav'), clients: N_('Clients'), lists: N_('Lists'), filters: N_('Filters'), tags: N_('Tags'), views: N_('Views'), team: N_('Conversations|nav')};
+// 2.39.1 (#1185): "Views" (calendar-like ways to look at tasks) and "Areas" (the modules) instead of one grown list
+const SIDE_GROUPS = ['focus', 'views', 'areas', 'clients', 'lists', 'filters', 'tags', 'team'];
+const SIDE_NAMES = {focus: N_('Plan|nav'), clients: N_('Clients'), lists: N_('Lists'), filters: N_('Filters'), tags: N_('Tags'), views: N_('Views'), areas: N_('Areas|nav'), team: N_('Conversations|nav')};
+const SIDE_VIEW_KEYS = ['cal', 'timeline', 'matrix', 'overview', 'workload'];
+const SIDE_AREA_KEYS = ['office', 'time', 'contacts', 'habits', 'pomo', 'review', 'stats', 'life', 'family', 'agents'];
 const SIDE_PLAN = [['tomorrow', N_('Tomorrow')], ['week', N_('Next 7 days')], ['doable', N_('Now doable')], ['pinned', N_('Pinned|view')], ['waiting', N_('Waiting on someone')], ['stale', N_('Lying idle')], ['assigned', N_('My tasks')], ['byme', N_('Assigned by me')]];
-const sideViewEntries = () => [['cal', N_('Calendar'), feat('cal')], ['timeline', N_('Timeline'), feat('timeline')], ['matrix', N_('Matrix'), feat('matrix')], ['habits', N_('Habits'), feat('habits')],
+const sideModEntries = () => [['cal', N_('Calendar'), feat('cal')], ['timeline', N_('Timeline'), feat('timeline')], ['matrix', N_('Matrix'), feat('matrix')], ['habits', N_('Habits'), feat('habits')],
   ['pomo', N_('Focus timer'), feat('pomo')], ['time', N_('Time tracking'), timeOn()], ['stats', N_('Statistics'), feat('stats')], ['contacts', N_('Contacts'), feat('contacts')], ['life', N_('Home & life'), lifeOn()],
   ['workload', N_('Workload'), workloadOn()], ['office', N_('Office & finance'), officeOn()], ['review', N_('Review & journal'), feat('review')], ['family', N_('Family'), famOn()], ['overview', N_('Project status'), overviewOn()], ['agents', N_('Agents'), agentsTab()]].filter(x => x[2]);
+const sideViewEntries = () => SIDE_VIEW_KEYS.map(k => sideModEntries().find(x => x[0] === k)).filter(Boolean);
+const sideAreaEntries = () => SIDE_AREA_KEYS.map(k => sideModEntries().find(x => x[0] === k)).filter(Boolean);
 function sidePref() {
   let o = {}; try { o = JSON.parse(S.settings?.sidebar || '{}') || {}; } catch { o = {}; }
-  return {order: Array.isArray(o.order) ? o.order : [], hidden: Array.isArray(o.hidden) ? o.hidden : []};
+  const order = Array.isArray(o.order) ? o.order : [], hidden = Array.isArray(o.hidden) ? o.hidden : [];
+  // 2.39.1 (#1185): an arrangement from before "Areas": the modules were in "Views", so a hidden "Views" hides "Areas" too
+  if (!order.includes('areas') && hidden.includes('g:views') && !hidden.includes('g:areas')) hidden.push('g:areas');
+  return {order, hidden};
 }
 const sideHidden = x => sidePref().hidden.includes(x);
-const sideGroupOrder = () => [...new Set([...sidePref().order.filter(g => SIDE_GROUPS.includes(g)), ...SIDE_GROUPS])];
+const sideGroupOrder = () => {  // an own order stays; unknown groups go to the end, "Areas" (2.39.1) right after "Views"
+  const o = sidePref().order.filter(g => SIDE_GROUPS.includes(g));
+  if (o.length && !o.includes('areas')) o.splice(o.includes('views') ? o.indexOf('views') + 1 : o.length, 0, 'areas');
+  return [...new Set([...o, ...SIDE_GROUPS])];
+};
 const sideOpen = g => SIDE_FOLDED.includes(g) ? (LS.get('sideOpenG', []) || []).includes(g) : !(LS.get('sideGroups', []) || []).includes(g);
 function sideGroupToggle(g) { const key = SIDE_FOLDED.includes(g) ? 'sideOpenG' : 'sideGroups', x = new Set(LS.get(key, []) || []); x.has(g) ? x.delete(g) : x.add(g); LS.set(key, [...x]); renderSide(); }
 function teamPeople() {
@@ -317,7 +329,7 @@ function renderSide() {
   // 2.25.0 (UX-03 / UX-49): Plan (the smart lists) as [key, html]: each entry can be hidden in Settings > Appearance > Sidebar;
   // (UX-47) the team chat and News moved to the group "Conversations" with the people and agents
   const hid = x => sideHidden(x);
-  const plan = [['inbox', row('inbox', ic('inbox'), tr('Inbox'), c.lists[inbox()?.id])], ['today', row('today', ic('sun'), tr('Today'), c.today)], ['tomorrow', row('tomorrow', ic('sunrise'), tr('Tomorrow'), c.tomorrow)],
+  const plan = [['inbox', kbInboxRowTip(row('inbox', ic('inbox'), tr('Basket'), c.lists[inbox()?.id]))], ['today', row('today', ic('sun'), tr('Today'), c.today)], ['tomorrow', row('tomorrow', ic('sunrise'), tr('Tomorrow'), c.tomorrow)],
     ['week', row('week', ic('week'), tr('Next 7 days'), c.week)], ['doable', row('doable', ic('zap'), tr('Now doable'), c.doable)],
     ['pinned', c.pinned || (onTasks && k === 'pinned') ? row('pinned', ic('pin'), tr('Pinned|view'), c.pinned) : ''],  // 2.16.0 (#648): only while something is pinned
     ['waiting', c.waiting || (onTasks && k === 'waiting') ? row('waiting', ic('hourglass'), tr('Waiting on someone'), c.waiting) : ''],
@@ -331,7 +343,7 @@ function renderSide() {
     collab() && (hasSharing() || S.news?.unread) ? `<button class="srow ${S.route.mod === 'news' ? 'on' : ''}" data-go="news" title="${esc(tr('Assignments, @mentions, comments and follow-ups for you'))}">${ic('bell')}<span class="n">${tr('News')}</span><span class="c ${bellCount() ? 'nunread' : ''}">${bellCount() || ''}</span></button>` : ''].join('');  // 2.28.0 (#987): the number = "For you"
   // Views: every switched-on module (the rail's old job)
   const aw = (S.agents || []).reduce((n, x) => n + x.waiting + x.chat_unread + (x.approvals_open || 0), 0);  // 2.35.0 (#1103): open approvals
-  const views = [feat('cal') ? mrow('cal', 'cal', tr('Calendar')) : '',
+  const modRows = [feat('cal') ? mrow('cal', 'cal', tr('Calendar')) : '',
     feat('timeline') ? `<button class="srow smod ${isRoadmap() ? 'on' : ''}" data-act="side-timeline">${ic('timeline')}<span class="n">${tr('Timeline')}</span></button>` : '',
     feat('matrix') ? mrow('matrix', 'grid', tr('Matrix')) : '', feat('habits') ? mrow('habits', 'habit', tr('Habits')) : '',
     feat('pomo') ? mrow('pomo', 'timer', tr('Focus timer'), S.pomo ? '<span class="c"><span class="recdot"></span></span>' : '') : '',
@@ -344,7 +356,11 @@ function renderSide() {
     feat('review') ? mrow('review', 'journal', tr('Review & journal')) : '',
     famOn() ? mrow('family', 'family', tr('Family'), (S.kids || []).some(k => (k.requests || 0) > 0) ? `<span class="c nunread">${(S.kids || []).reduce((n, k) => n + (k.requests || 0), 0)}</span>` : '') : '',
     overviewOn() ? mrow('overview', 'pulse', tr('Project status'), `<span class="c ${ovProblems() ? 'over' : ''}">${ovProblems() || ''}</span>`, `title="${esc(tr('Where is it stuck?'))}"`) : '',
-    agentsTab() ? mrow('agents', 'bot', tr('Agents'), `<span class="c ${aw ? 'nunread' : ''}">${aw || ''}</span>`) : ''].filter(h => { const m = /data-go="(\w+)"|data-act="side-(timeline)"/.exec(h); return !m || !hid('e:' + (m[1] || m[2])) || S.route.mod === m[1]; }).join('');
+    agentsTab() ? mrow('agents', 'bot', tr('Agents'), `<span class="c ${aw ? 'nunread' : ''}">${aw || ''}</span>`) : ''].filter(h => { const m = /data-go="(\w+)"|data-act="side-(timeline)"/.exec(h); return !m || !hid('e:' + (m[1] || m[2])) || S.route.mod === m[1]; });
+  // 2.39.1 (#1185): split into "Views" and "Areas", each in its fixed order
+  const modKey = h => { const m = /data-go="(\w+)"|data-act="side-(timeline)"/.exec(h); return m ? m[1] || m[2] : ''; };
+  const modIn = keys => keys.map(x => modRows.find(h => modKey(h) === x) || '').join('');
+  const views = modIn(SIDE_VIEW_KEYS), areas = modIn(SIDE_AREA_KEYS);
   // Team: the people I share lists with (their tasks) and the agents (status dot; a click opens the chat)
   const ags = shownAgents(), ppl = teamPeople().slice(0, 12);
   // 2.10.0 (#441): my groups (admins: every group with a task); a click shows the tasks assigned to the group
@@ -366,9 +382,10 @@ function renderSide() {
     filters: `${grp('filters', tr('Filters'), S.filters.map(f => row('f:' + f.id, ic('filter'), f.name, c.filters[f.id])).join(''), `<button data-act="filter-new" title="${esc(tr('New filter') + ' · ' + tr('Combine lists, dates, priorities, tags'))}" aria-label="${tr('New filter')}">${ic('plus', 's')}</button>`, S.filters.length, tr('Combine lists, dates, priorities, tags'))}`,
     tags: `${tags.length ? `<div class="sgroup"><button class="shead stoggle ${tagsOpen ? '' : 'closed'}" data-act="side-tags" aria-expanded="${tagsOpen}">${ic('chev', 's fcar')}<span class="spacer">${tr('Tags')}</span><span class="c">${tagsOpen ? '' : tags.length}</span></button>${tagsOpen ? tags.map(t => row('tag:' + t, ic('tag'), t, c.tags[t])).join('') : ''}</div>` : ''}`,
     views: `${views ? grp('views', tr('Views'), views, '', (views.match(/class="srow smod/g) || []).length) : ''}`,
+    areas: `${areas ? grp('areas', tr('Areas|nav'), areas, '', (areas.match(/class="srow smod/g) || []).length) : ''}`,
     team: `${team ? grp('team', tr('Conversations|nav'), team, '', ppl.length + ags.length + grps.length + (convo.match(/class="srow/g) || []).length) : ''}`};
   $('#side').innerHTML = `
-    <div class="sbrand"><button type="button" class="sbhome ${S.route.mod === 'home' ? 'on' : ''}" data-go="home" title="${esc(tr('Start|home'))}" aria-label="${esc(APP_NAME + ': ' + tr('Start|home'))}" ${S.route.mod === 'home' ? 'aria-current="page"' : ''}>${logoSvg(20)}<span>${esc(APP_NAME)}</span>${S.me?.orgs?.[0] && S.me.orgs[0].trim().toLowerCase() !== APP_NAME.toLowerCase() ? `<small class="sborg">${esc(S.me.orgs[0])}</small>` : ''}</button><span class="spacer"></span>${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(acctLabel())}" aria-label="${esc(acctLabel())}">${av(S.me.id, S.me.display_name)}${netDotHtml()}${updDot() ? `<span class="dot" title="${esc(tr('Update available'))}"></span>` : ''}</button>` : ''}</div>
+    <div class="sbrand"><button type="button" class="sbhome ${S.route.mod === 'home' ? 'on' : ''}" data-go="home" title="${esc(tr('Start|home'))}" aria-label="${esc(APP_NAME + ': ' + tr('Start|home'))}" ${S.route.mod === 'home' ? 'aria-current="page"' : ''}>${logoSvg(20)}<span>${esc(APP_NAME)}</span>${S.me?.orgs?.[0] && S.me.orgs[0].trim().toLowerCase() !== APP_NAME.toLowerCase() ? `<small class="sborg">${esc(S.me.orgs[0])}</small>` : ''}</button><span class="spacer"></span>${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}${kbFoldAllBtn()}${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(acctLabel())}" aria-label="${esc(acctLabel())}">${av(S.me.id, S.me.display_name)}${netDotHtml()}${updDot() ? `<span class="dot" title="${esc(tr('Update available'))}"></span>` : ''}</button>` : ''}</div>
     ${wsBarHtml()}
     <button class="scmd" data-act="palette" title="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span></button>
     ${sideGroupOrder().filter(g => !hid('g:' + g) || g === 'lists').map(g => SB[g] || '').join('')}
@@ -433,6 +450,7 @@ function renderTop0() {
   const fk = m === 'tasks' && k.startsWith('folder:') ? k.slice(7) : m === 'matrix' && mxGet().scope.startsWith('folder:') ? mxGet().scope.slice(7) : '';
   if (fk && feat('matrix') && !isMobile()) acts += `<div class="seg vseg fseg tf" role="group" aria-label="${esc(tr('View'))}"><button class="${m === 'tasks' ? 'on' : ''}" data-act="fview" data-k="list" data-ico="list" data-f="${esc(fk)}" title="${esc(tr('List'))}" aria-pressed="${m === 'tasks'}">${ic('list', 's')}</button><button class="${m === 'matrix' ? 'on' : ''}" data-act="fview" data-k="matrix" data-ico="grid" data-f="${esc(fk)}" title="${esc(tr('Matrix'))}" aria-pressed="${m === 'matrix'}">${ic('grid', 's')}</button></div>`;
   if (m === 'tasks' && k === 'all' && feat('timeline')) { const v = isRoadmap() ? 'timeline' : 'list'; acts += `<div class="seg tf" role="group" aria-label="${tr('View')}"><button class="${v === 'list' ? 'on' : ''}" data-act="rm-view" data-k="list" data-ico="list" title="${tr('List')}" aria-pressed="${v === 'list'}">${ic('list', 's')}</button><button class="${v === 'timeline' ? 'on' : ''}" data-act="rm-view" data-k="timeline" data-ico="timeline" title="${tr('Timeline')}" aria-pressed="${v === 'timeline'}">${ic('timeline', 's')}</button></div>`; }
+  if (m === 'tasks' && k === 'inbox') acts += kbSortBtn();  // 2.39.1 (#1219)
   if (m === 'tasks' && k === 'trash' && (S.extra || []).some(t => !t.keep)) acts += `<button class="btn sm danger" data-act="trash-empty">${tr('Empty')}</button>`;
   if (m === 'tasks' && k === 'done' && (S.extra || []).length) acts += `<button class="btn sm" data-act="done-clean" title="${esc(tr('Move completed tasks to the trash'))}">${ic('trash', 's')}<span class="bl">${tr('Delete completed…')}</span></button>`;
   // 2.24.0 (#906): "Tasks of …" of another person: write to them
@@ -565,9 +583,10 @@ function topMoreItems() {
     sec.push({label: S.multiMode ? tr('End selection') : tr('Select multiple'), icon: 'select', on: S.multiMode, fn: () => { S.multiMode = !S.multiMode; if (!S.multiMode) S.multi.clear(); render(); }},
       {label: tr('Sort…'), icon: 'sort', fn: () => sortMenu($('#top [data-act="top-more"]') || $('#top h1'))});
   { const cl = m === 'tasks' ? routeList() : null; if (cl && !cl.archived && listView(cl) === 'list' && !isOverview()) sec.push(colItem(cl.id)); }  // 2.14.0 (#425)
-  if (doneToggleView()) sec.push(doneItem());
+  if (doneToggleView()) sec.push(doneItem(), ...lmDoneResetItems());  // 2.39.1 (#1214): "like the default"
   { const rl = m === 'tasks' ? routeList() : null; if (rl && isOwner(rl) && !rl.is_inbox && listView(rl) === 'list' && !isOverview()) sec.push(dabItem(rl)); }  // 2.7.2 (#414)
   sec.push(...collapseItems());
+  sec.push(...kbGroupResetItems());  // 2.39.1 (#1221)
   const mxk = m === 'tasks' ? (k === 'inbox' ? 'l:' + inbox()?.id : k.startsWith('l:') || k.startsWith('f:') || k.startsWith('folder:') ? k : '') : '';
   if (mxk && feat('matrix')) sec.push({label: tr('Show as matrix'), icon: 'grid', fn: () => { mxSet({scope: mxk}); go('matrix'); }});
   const mxs = m === 'matrix' ? mxGet().scope : '';  // 2.4.2 (#390): back from the matrix to the folder / list it shows
@@ -841,7 +860,7 @@ function taskRow(t, opts = {}) {
   let lcH = '';
   if (lc) {  // 2.14.0 (#425): the cells in the list's order; a cell the width has no room for shows in the second line
     const cells = lc.filter(k => k !== 'id').map(k => [k, lcCell(k, t, {kids, openKids, time, checklist: opts.checklist})]);
-    lcH = `<div class="lcols" id="tc-${t.id}" data-act="open">${cells.map(([k, c], i) => `<span class="lc ${lcCls(k)} ${lcOvf(i)}" data-k="${esc(k)}">${c}</span>`).join('')}</div>`;
+    lcH = `<div class="lcols" id="tc-${t.id}" data-act="open">${cells.map(([k, c], i) => `<span class="lc ${lcCls(k)} ${lcOvf(i)}" data-k="${esc(k)}"${tcAttr(k, t)}>${c}</span>`).join('')}</div>`;  // 2.39.1 (#1327): tcAttr
     cells.forEach(([k, c], i) => { if (c && i >= 2) meta.push(`<span class="mlc ${lcOvf(i)}" data-lc="${esc(k)}">${c}</span>`); });
   }
   // 2.31.0 (#1051): the number is part of the tap area (opens the task); phones show it in the meta line instead (.mid), so
@@ -1008,18 +1027,20 @@ function lcCell(k, t, x) {
 // the whole list (everyone sees the same); owner and list admins change it, everyone else sees it read-only.
 function colModal(id) {
   const l = listById(id); if (!l) return;
-  const may = canManage(l), ch = colChoices(l), names = Object.fromEntries(ch);
+  const may = canManage(l);
+  let ch = colChoices(l), names = Object.fromEntries(ch);
   const start = listCols(l) || colDefault(l).filter(k => k === 'id' || names[k]);
   let num = start.includes('id');
   const on = new Set(start.filter(k => k !== 'id'));
   let order = [...start.filter(k => k !== 'id'), ...ch.map(x => x[0]).filter(k => !on.has(k))];
   const dis = may ? '' : 'disabled';
-  const rowH = (k, i) => `<li class="colr ${on.has(k) ? 'on' : ''}" data-k="${esc(k)}">${may ? `<span class="colh" data-colh title="${esc(tr('Drag to reorder'))}" aria-hidden="true">${ic('grip', 's')}</span>` : ''}<label class="chkl"><input type="checkbox" data-colk="${esc(k)}" ${on.has(k) ? 'checked' : ''} ${dis}><span class="coln">${k.startsWith('f:') ? ic('sliders', 's') : ic(COL_ICON[k], 's')}<span>${esc(names[k])}</span></span></label>${may ? `<button type="button" class="iconbtn colmv" data-colmv="-1" ${i ? '' : 'disabled'} title="${esc(tr('Move up'))}" aria-label="${esc(tr('Move up') + ': ' + names[k])}">${ic('chev', 's cup')}</button><button type="button" class="iconbtn colmv" data-colmv="1" ${i < order.length - 1 ? '' : 'disabled'} title="${esc(tr('Move down'))}" aria-label="${esc(tr('Move down') + ': ' + names[k])}">${ic('chev', 's')}</button>` : ''}</li>`;
+  const rowH = (k, i) => `<li class="colr ${on.has(k) ? 'on' : ''}" data-k="${esc(k)}">${may ? `<span class="colh" data-colh title="${esc(tr('Drag to reorder'))}" aria-hidden="true">${ic('grip', 's')}</span>` : ''}<label class="chkl"><input type="checkbox" data-colk="${esc(k)}" ${on.has(k) ? 'checked' : ''} ${dis}><span class="coln">${k.startsWith('f:') ? ic('sliders', 's') : ic(COL_ICON[k], 's')}<span>${esc(names[k])}</span></span></label>${may && k.startsWith('f:') ? tcFieldBtns(k, names[k]) : ''}${may ? `<button type="button" class="iconbtn colmv" data-colmv="-1" ${i ? '' : 'disabled'} title="${esc(tr('Move up'))}" aria-label="${esc(tr('Move up') + ': ' + names[k])}">${ic('chev', 's cup')}</button><button type="button" class="iconbtn colmv" data-colmv="1" ${i < order.length - 1 ? '' : 'disabled'} title="${esc(tr('Move down'))}" aria-label="${esc(tr('Move down') + ': ' + names[k])}">${ic('chev', 's')}</button>` : ''}</li>`;
   const md = modal(`<h3 id="col-t">${ic('columns', 's')}${tr('Shown fields')}</h3>
     <p class="muted coldesc">${esc(tr('The same for everyone in this list. Phones show the first two fields, the rest in the second line.'))}</p>
     ${may ? '' : `<p class="rohint">${ic('lock', 's')}${esc(tr('Only the owner and list admins can change the shown fields.'))}</p>`}
     <label class="chkl colnum"><input type="checkbox" id="col-num" ${num ? 'checked' : ''} ${dis}><span class="coln">${ic('hash', 's')}<span>${tr('Task number in front of the title')}</span></span></label>
     <ul class="colls" id="col-ls" aria-labelledby="col-t" tabindex="-1">${order.map(rowH).join('')}</ul>
+    ${may ? `<div class="coladd"><button type="button" class="btn sm" data-colact="addfield">${ic('plus', 's')} ${tr('Add custom field')}</button></div>` : ''}
     <div class="foot">${may ? `<button type="button" class="btn" data-colact="reset" ${l.columns ? '' : 'disabled'} title="${esc(tr('Back to the default columns'))}">${tr('Default')}</button>` : ''}<span class="spacer"></span><button type="button" class="btn" data-colact="close">${may ? tr('Cancel') : tr('Close')}</button>${may ? `<button type="button" class="btn pri" data-colact="save">${tr('Save')}</button>` : ''}</div>`);
   md.classList.add('colmd');
   md.setAttribute('role', 'dialog'); md.setAttribute('aria-modal', 'true'); md.setAttribute('aria-labelledby', 'col-t');
@@ -1034,10 +1055,21 @@ function colModal(id) {
     if (x.id === 'col-num') num = x.checked;
     else if (x.dataset.colk) { if (x.checked) on.add(x.dataset.colk); else on.delete(x.dataset.colk); x.closest('.colr')?.classList.toggle('on', x.checked); }
   });
+  // 2.39.1 (#1327): add, change and delete custom fields right here; a new field is shown at once (saved as a column)
+  const resync = (addK, focusK) => {
+    ch = colChoices(l); names = Object.fromEntries(ch);
+    order = [...order.filter(k => names[k]), ...ch.map(x => x[0]).filter(k => !order.includes(k))];
+    for (const k of [...on]) if (!names[k]) on.delete(k);
+    if (addK && names[addK]) on.add(addK);
+    draw(focusK ? [focusK, 1] : null);
+  };
   md.addEventListener('click', async e => {
     const mv = e.target.closest('[data-colmv]');
     if (mv) { move(mv.closest('.colr').dataset.k, +mv.dataset.colmv); return; }
+    const fb = e.target.closest('[data-colfe],[data-colfd]');
+    if (fb && may) { tcFieldAct(l, fb, resync); return; }
     const b = e.target.closest('[data-colact]'); if (!b) return;
+    if (b.dataset.colact === 'addfield') { if (may) tcFieldAdd(l, resync); return; }
     if (b.dataset.colact === 'close') { md.remove(); return; }
     const next = b.dataset.colact === 'reset' ? null : [...(num ? ['id'] : []), ...order.filter(k => on.has(k))];
     md.remove();
@@ -1095,7 +1127,7 @@ function lcHead(l, lc) {  // the column titles above the rows (wide layouts)
   const cur = sortMode();
   return `<div class="lchead" data-lid="${l.id}" role="table" aria-label="${esc(tr('Column titles'))}"><div class="lcrow" role="row"><span class="spacer" role="presentation"></span>${ks.map((k, i) => { const n = colName(l, k), p = colSorts(k), on = p.includes(cur), dir = on ? sortDir(cur) : '';
     const tip = on ? (cur === p[0] ? tr('Sorted by {0}. Click again to reverse the direction', n) : tr('Sorted by {0}. Click again to go back to the list sort', n)) : tr('Sort by {0}', n);
-    return `<span class="lc ${lcCls(k)} ${lcOvf(i)}${on ? ' sorted' : ''}" data-k="${esc(k)}" role="columnheader"${on ? ` aria-sort="${dir}"` : ''} title="${esc(n)}"><button type="button" class="lcs" data-colsort="${esc(k)}" title="${esc(tip)}" aria-label="${esc(n)}"><span class="lcn" aria-hidden="true">${k === 'who' || k === 'prio' ? ic(COL_ICON[k], 's') : `<span>${esc(colShort(l, k))}</span>`}</span>${on ? `<span class="lcsa" aria-hidden="true">${ic('chev', dir === 'ascending' ? 's cup' : 's')}</span>` : ''}</button>${isTouch() ? '' : `<i class="lcg" data-lcg="${esc(k)}" title="${esc(tr('Drag the column width · double-click = standard width'))}" role="separator" aria-orientation="vertical" tabindex="0" aria-label="${esc(tr('Width of the column {0}', n))}" ${lcwGet(l.id)[k] ? `aria-valuenow="${lcwGet(l.id)[k]}" aria-valuetext="${esc(tr('{0} rem', String(lcwGet(l.id)[k])))}"` : `aria-valuenow="7" aria-valuetext="${esc(tr('Standard width'))}"`} aria-valuemin="${LCW_MIN}" aria-valuemax="${LCW_MAX}"></i>`}</span>`; }).join('')}</div></div>`;
+    return `<span class="lc ${lcCls(k)} ${lcOvf(i)}${on ? ' sorted' : ''}" data-k="${esc(k)}" role="columnheader"${on ? ` aria-sort="${dir}"` : ''} title="${esc(n)}"><button type="button" class="lcs" data-colsort="${esc(k)}" title="${esc(tip)}" aria-label="${esc(n)}"><span class="lcn" aria-hidden="true">${k === 'who' || k === 'prio' ? ic(COL_ICON[k], 's') : `<span>${esc(colShort(l, k))}</span>`}</span>${on ? `<span class="lcsa" aria-hidden="true">${ic('chev', dir === 'ascending' ? 's cup' : 's')}</span>` : ''}</button>${isTouch() ? '' : `<button type="button" class="lcmb" data-colmenu="${esc(k)}" tabindex="-1" aria-haspopup="menu" title="${esc(tr('Column menu: {0}', n))}" aria-label="${esc(tr('Column menu: {0}', n))}">${ic('chev', 's')}</button>`}${isTouch() ? '' : `<i class="lcg" data-lcg="${esc(k)}" title="${esc(tr('Drag the column width · double-click = standard width'))}" role="separator" aria-orientation="vertical" tabindex="0" aria-label="${esc(tr('Width of the column {0}', n))}" ${lcwGet(l.id)[k] ? `aria-valuenow="${lcwGet(l.id)[k]}" aria-valuetext="${esc(tr('{0} rem', String(lcwGet(l.id)[k])))}"` : `aria-valuenow="7" aria-valuetext="${esc(tr('Standard width'))}"`} aria-valuemin="${LCW_MIN}" aria-valuemax="${LCW_MAX}"></i>`}</span>`; }).join('')}</div></div>`;
 }
 // 2.31.0 (#354): first click = the column's natural order, second = reversed, third = the list's sort again
 document.addEventListener('click', e => {
@@ -1112,8 +1144,13 @@ let sortSharedHint = false;
 // 2.31.0 (#354): right-click on a column title: both directions, hide the column (owner / list admins), "Shown fields…"
 document.addEventListener('contextmenu', e => {
   const c = e.target.closest?.('.lchead .lc[data-k]'); if (!c || e.shiftKey) return;
+  if (!listById(+c.closest('.lchead').dataset.lid)) return;
+  e.preventDefault(); lcMenu(c);
+});
+// 2.39.1 (#1327): the same menu from the small arrow in the column title (hover / focus)
+document.addEventListener('click', e => { const b = e.target.closest?.('.lchead [data-colmenu]'); if (!b) return; e.preventDefault(); e.stopPropagation(); lcMenu(b.closest('.lc')); }, true);
+function lcMenu(c) {
   const l = listById(+c.closest('.lchead').dataset.lid); if (!l) return;
-  e.preventDefault();
   const k = c.dataset.k, p = colSorts(k), cur = sortMode(), lc = listCols(l) || [];
   const dirName = m => sortDir(m) === 'ascending' ? tr('Sort ascending') : tr('Sort descending');
   const pick = m => { LS.del('sortback.' + S.route.key); sortSet(m); };
@@ -1121,10 +1158,20 @@ document.addEventListener('contextmenu', e => {
     ...[p[0], p[1]].map(m => ({label: dirName(m), icon: 'sort', on: cur === m, fn: () => pick(m)})),
     '-', ...(canManage(l) ? [{label: tr('Hide column'), icon: 'eyeoff', fn: () => colSave(l.id, lc.filter(x => x !== k))}] : []),
     {label: tr('Shown fields…'), icon: 'columns', fn: () => colModal(l.id)}]);
-});
+}
 // 2.31.0: a focusable separator needs a value (axe aria-required-attr): the standard width says 7 rem, read out as "Standard width"
 // ---- 2.16.0 (#634): column widths per device and list (localStorage lcw.<list>: {key: rem}), applied as one style sheet
 const LCW_MIN = 2.5, LCW_MAX = 24;
+const LC_TITLE_MIN = 12;  // 2.39.1 (#1217): rem the title column keeps while a column gets wider
+// 2.39.1 (#1217): a thin accent line from the column titles down the list (width drag, column move); x = the element's centre
+function lcGuide(el, line, x) {
+  line = line || document.body.appendChild(Object.assign(document.createElement('div'), {className: 'lcguide'}));
+  const h = el.closest('.lchead')?.getBoundingClientRect(), b = el.getBoundingClientRect(), v = $('#view')?.getBoundingClientRect();
+  line.style.left = Math.round(x ?? b.left + b.width / 2) + 'px';
+  line.style.top = Math.round(h ? h.top : b.top) + 'px';
+  line.style.height = Math.max(0, Math.round(Math.min(innerHeight, v ? v.bottom : innerHeight) - (h ? h.top : b.top))) + 'px';
+  return line;
+}
 const lcwGet = lid => LS.get('lcw.' + lid, {}) || {};
 function lcwApply(lid) {
   let st = $('#lcw-style'); if (!st) { st = document.createElement('style'); st.id = 'lcw-style'; document.head.appendChild(st); }
@@ -1133,7 +1180,7 @@ function lcwApply(lid) {
 }
 function lcwSet(lid, k, v) {
   const w = lcwGet(lid);
-  if (v == null) delete w[k]; else w[k] = Math.round(Math.max(LCW_MIN, Math.min(LCW_MAX, v)) * 4) / 4;
+  if (v == null) delete w[k]; else w[k] = Math.round(Math.max(LCW_MIN, Math.min(LCW_MAX, v)) * 100) / 100;  // 2.39.1 (#1217): no snapping
   Object.keys(w).length ? LS.set('lcw.' + lid, w) : LS.del('lcw.' + lid);
   lcwApply(lid);
 }
@@ -1142,9 +1189,13 @@ document.addEventListener('pointerdown', e => {
   e.preventDefault(); e.stopPropagation();
   const lid = +g.closest('.lchead').dataset.lid, k = g.dataset.lcg, cell = g.closest('.lc');
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, x0 = e.clientX, w0 = cell.getBoundingClientRect().width / rem;
+  // 2.39.1 (#1217): the grip sits on the line left of its column (the columns hang on the right edge, so this line moves
+  // with the mouse): dragging left widens the column; the title keeps at least LC_TITLE_MIN; an accent line runs down the list
+  const sp = g.closest('.lchead').querySelector('.spacer'), room = sp ? Math.max(0, sp.getBoundingClientRect().width / rem - LC_TITLE_MIN) : LCW_MAX;
+  const wMax = w0 + room, guide = lcGuide(g);
   g.setPointerCapture?.(e.pointerId); document.body.classList.add('pgdrag'); g.classList.add('drag');
-  const mv = ev => lcwSet(lid, k, w0 + (ev.clientX - x0) / rem);
-  const up = () => { g.removeEventListener('pointermove', mv); document.body.classList.remove('pgdrag'); g.classList.remove('drag'); };
+  const mv = ev => { lcwSet(lid, k, Math.min(wMax, w0 - (ev.clientX - x0) / rem)); lcGuide(g, guide); };
+  const up = () => { g.removeEventListener('pointermove', mv); document.body.classList.remove('pgdrag'); g.classList.remove('drag'); guide.remove(); };
   g.addEventListener('pointermove', mv); g.addEventListener('pointerup', up, {once: true}); g.addEventListener('pointercancel', up, {once: true});
 }, true);
 document.addEventListener('dblclick', e => { const g = e.target.closest?.('.lchead .lcg'); if (g) lcwSet(+g.closest('.lchead').dataset.lid, g.dataset.lcg, null); });
@@ -1152,7 +1203,7 @@ document.addEventListener('keydown', e => {
   const g = e.target.closest?.('.lchead .lcg'); if (!g) return;
   const lid = +g.closest('.lchead').dataset.lid, k = g.dataset.lcg, rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
   const cur = g.closest('.lc').getBoundingClientRect().width / rem || lcwGet(lid)[k] || parseFloat(getComputedStyle(g.closest('.lc')).width) / rem || 7;
-  const to = {ArrowRight: cur + (e.shiftKey ? 2 : .5), ArrowLeft: cur - (e.shiftKey ? 2 : .5)}[e.key];
+  const to = {ArrowLeft: cur + (e.shiftKey ? 2 : .5), ArrowRight: cur - (e.shiftKey ? 2 : .5)}[e.key];  // 2.39.1 (#1217): the arrow moves the line
   if (to != null) { e.preventDefault(); e.stopPropagation(); lcwSet(lid, k, to); }
   else if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); lcwSet(lid, k, null); }
 }, true);
@@ -1170,7 +1221,7 @@ const todayInboxTasks = () => openTasks().filter(t => isTodayInbox(t)).sort((a, 
 function todayInboxHtml(ts) {
   const k = 'today-inbox', closed = S.collapsed.has(k);
   const acts = t => `<span class="tinacts"><button type="button" class="iconbtn" data-act="tin-due" data-d="0" data-id="${t.id}" title="${esc(tr('Today'))}" aria-label="${esc(tr('{0}: today', t.title))}">${ic('sun', 's')}</button><button type="button" class="iconbtn" data-act="tin-due" data-d="1" data-id="${t.id}" title="${esc(tr('Tomorrow'))}" aria-label="${esc(tr('{0}: tomorrow', t.title))}">${ic('sunrise', 's')}</button><button type="button" class="iconbtn" data-act="tin-move" data-id="${t.id}" aria-haspopup="menu" title="${esc(tr('Move to list'))}" aria-label="${esc(tr('Move {0} to a list', t.title))}">${ic('list', 's')}</button></span>`;
-  return `<div class="group tinbox"><div class="ghead ${closed ? 'closed' : ''}" data-act="collapse" data-key="${k}">${ic('chev', 's')}${ic('inbox', 's')}${tr('Inbox')} <span class="c">${ts.length}</span></div>
+  return `<div class="group tinbox"><div class="ghead ${closed ? 'closed' : ''}" data-act="collapse" data-key="${k}">${ic('chev', 's')}${ic('inbox', 's')}${tr('Basket')} <span class="c">${ts.length}</span></div>
     ${closed ? '' : ts.map(t => `<div class="tinrow">${taskRow(t, {drag: false, tree: false})}${acts(t)}</div>`).join('')}</div>`;
 }
 document.addEventListener('click', e => {
@@ -1192,7 +1243,7 @@ function qExtraBtns(inp, lab = false) {  // 2.32.0 (#1059): lab = with a short v
 }
 // 2.32.0 (#1059): the quick add syntax as chips; a tap puts the shortcut into the field (# and ~ only the sign, the
 // suggestions take over). The words come from the translated example line, so they are the ones the parser knows.
-const QH_TXT = N_('tomorrow 3pm · !high · #tag · ~list · every monday'), QH_CAP = N_('Goes to the inbox · ~list · tomorrow · !high · #tag');
+const QH_TXT = N_('tomorrow 3pm · !high · #tag · ~list · every monday'), QH_CAP = N_('Goes to the basket · ~list · tomorrow · !high · #tag');
 function qHelpChips(inp, capture = false) {
   const parts = tr(capture ? QH_CAP : QH_TXT).split(' · ');
   const lead = capture ? `<span class="qhlead">${esc(parts.shift())}</span>` : '';
@@ -1244,7 +1295,7 @@ function qdockChips() {
   box.innerHTML = `<button type="button" class="qdc ${due ? 'set' : ''} ${'due' in o ? 'ov' : ''}" data-act="qd-date">${ic('cal', 's')}${esc(due ? dayLabel(due) : tr('No date'))}</button>` +
     (d.who ? `<span class="qdc set dsxwho">${ic('user', 's')}${esc(personNameAny(d.who) || '?')}</span>` : '') +  // 2.36.2 (#1138): for that person
     (d.noList && !o.list_id && !r.list_id ? `<span class="qnote dsxwho" role="note">${ic('alert', 's')}${esc(tr('No list with {0} that you can add to: share a list with them first.', personNameAny(d.who) || '?'))}</span>` :
-    `<button type="button" class="qdc set ${o.list_id ? 'ov' : ''}" data-act="qd-list">${licMark(listById(lid), 's', true) || ic('list', 's')}${esc(lname(listById(lid)) || tr('Inbox'))}</button>`) +
+    `<button type="button" class="qdc set ${o.list_id ? 'ov' : ''}" data-act="qd-list">${licMark(listById(lid), 's', true) || ic('list', 's')}${esc(lname(listById(lid)) || tr('Basket'))}</button>`) +
     `<button type="button" class="qdc ${pr ? 'set flag-' + pr : ''} ${'priority' in o ? 'ov' : ''}" data-act="qd-prio">${ic('flag', 's')}${esc(tr(PRN[pr] || PRN[0]))}</button>`;
 }
 const total0 = groups => groups.some(g => g.tasks.length);
@@ -1309,12 +1360,12 @@ function viewListBody() {
     if (rl?.family === 'shopping' && famOn() && g.section && !g.tasks.length) continue;  // 2.19.0 (#653): only areas with items
     const closed = S.collapsed.has(g.id);
     const sadd = g.section !== undefined && !ro && v.list && canAddTo(v.list);
-    if (g.name) h += `<div class="group"><div class="ghead ${g.cls || ''} ${closed ? 'closed' : ''}" data-act="collapse" data-key="${g.id}" ${g.section !== undefined ? `data-section="${g.section ?? ''}"` : ''}>${g.section && !ro ? secHandle(g.section) : ''}${ic('chev', 's')}${g.img ? `<img class="gicon" src="${esc(g.img)}" alt="">` : g.lic && licMark(g.lic) ? licMark(g.lic, 'glic') : g.color ? `<span class="gsw" style="background:${cssColor(g.color)}"></span>` : ''}${esc(g.name)} ${dsxCount(g, v)}${sadd ? `<button class="iconbtn gact gadd" data-act="sec-add" data-sec="${g.section || 0}" title="${esc(tr('Add a task to {0}', g.name))}" aria-label="${esc(tr('Add a task to {0}', g.name))}">${ic('plus', 's')}</button>` : ''}${g.section && !ro ? `<button class="iconbtn gact" data-act="section-menu" data-id="${g.section}" title="${esc(tr('More') + ': ' + g.name)}" aria-label="${esc(tr('More') + ': ' + g.name)}">${ic('dots', 's')}</button>` : ''}${odHead && g.id === 'd:over' ? `<span class="odact"><button class="btn sm" data-act="od-move" data-d="0">${tr('All to today')}</button><button class="btn sm" data-act="od-other" aria-haspopup="menu">${tr('Another day…')}</button></span>` : ''}</div>`;
+    if (g.name) h += `<div class="group"${kbGroupAttr(g)}><div class="ghead ${g.cls || ''} ${closed ? 'closed' : ''}" data-act="collapse" data-key="${g.id}" ${g.section !== undefined ? `data-section="${g.section ?? ''}"` : ''}>${g.section && !ro ? secHandle(g.section) : ''}${kbGrip(g)}${ic('chev', 's')}${g.img ? `<img class="gicon" src="${esc(g.img)}" alt="">` : g.lic && licMark(g.lic) ? licMark(g.lic, 'glic') : g.color ? `<span class="gsw" style="background:${cssColor(g.color)}"></span>` : ''}${g.lic && !v.list ? kbCrumbHtml(g) : esc(g.name)} ${dsxCount(g, v)}${sadd ? `<button class="iconbtn gact gadd" data-act="sec-add" data-sec="${g.section || 0}" title="${esc(tr('Add a task to {0}', g.name))}" aria-label="${esc(tr('Add a task to {0}', g.name))}">${ic('plus', 's')}</button>` : ''}${g.section && !ro ? `<button class="iconbtn gact" data-act="section-menu" data-id="${g.section}" title="${esc(tr('More') + ': ' + g.name)}" aria-label="${esc(tr('More') + ': ' + g.name)}">${ic('dots', 's')}</button>` : ''}${odHead && g.id === 'd:over' ? `<span class="odact"><button class="btn sm" data-act="od-move" data-d="0">${tr('All to today')}</button><button class="btn sm" data-act="od-other" aria-haspopup="menu">${tr('Another day…')}</button></span>` : ''}</div>`;
     if (g.name && !closed && sadd) h += secAddHtml(g);
     // 1.7.0 Flow: the first task of each group that waits on nothing is marked "Next" (2.0.4: "Ready to start", and only
     // when some open task shown here waits on something; without dependencies the badge would say nothing)
     const nx = flow && flowDeps ? g.tasks.find(t => t.status === 0 && !t.context && !(t.blocked && dFor(t)))?.id : 0;
-    if (!closed) { const n = Math.max(0, Math.min(g.tasks.length, budget)); h += g.tasks.slice(0, n).map(t => taskRow(t, {showList, tree: true, cols, lc, tcols: {list: showList}, next: t.id === nx, crd, inToday: S.route.key === 'today', ...(v.dsx ? {dsx: showDone(), ...(t.status ? {drag: false} : {})} : {})})).join(''); budget -= n; cut += g.tasks.length - n; }
+    if (!closed) { const n = Math.max(0, Math.min(g.tasks.length, budget)); h += g.tasks.slice(0, n).map(t => taskRow(t, {showList: showList && !g.lic, tree: true, cols, lc, tcols: {list: showList && !g.lic}, next: t.id === nx, crd, inToday: S.route.key === 'today', ...(v.dsx ? {dsx: showDone(), ...(t.status ? {drag: false} : {})} : {})})).join(''); budget -= n; cut += g.tasks.length - n; }
     if (!closed && g.section !== undefined && !g.tasks.length && !ro) h += `<div class="sdrop" data-section="${g.section ?? ''}">${tr('Drop tasks here')}</div>`;  // shown while a task is dragged
     if (g.name) h += '</div>';
   }
@@ -1377,7 +1428,7 @@ async function doneCleanup() {
   offerUndo(msg, histTrash(trn('Deleted {0} completed task', 'Deleted {0} completed tasks', n), ids, snaps, j));
 }
 // 1.6.1: "Archived" = the archived lists as rows (colour / emoji, name, folder, open / done tasks, archived on, owner of a
-// shared list): Open, Restore (owner, undoable) and Delete permanently (owner, the own dialog names what is lost)
+// shared list): Open, Restore (owner, undoable) and Delete permanently (owner; 2.39.1 #1188: also list admins and organisation admins)
 function viewArchived() {
   const ls = S.lists.filter(l => l.archived).sort((a, b) => (b.archived_at || '').localeCompare(a.archived_at || '') || lname(a).localeCompare(lname(b)));
   if (!ls.length) return `<div class="empty">${ic('archive')}${tr('No archived lists.')}<br><span class="muted">${tr('Archive a list from its “…” menu; it disappears from the sidebar and its tasks from Today and the calendar.')}</span></div>`;
@@ -1388,7 +1439,7 @@ function viewArchived() {
       l.archived_at && esc(tr('archived {0}', fmtDateLoc(ds(new Date(l.archived_at))))), !own && `${ic('users', 's')}${esc(tr('Shared by {0}', l.owner_name || '?'))}`].filter(Boolean);
     return `<div class="arow" data-list="${l.id}"><button class="aname" data-go="l/${l.id}" title="${esc(tr('Open {0}', name))}">${mark}<span class="n">${esc(name)}</span></button>
       <div class="ameta">${meta.map(x => `<span>${x}</span>`).join('')}</div>
-      <div class="aacts"><button class="btn sm" data-go="l/${l.id}">${tr('Open')}</button>${own ? `<button class="btn sm" data-act="arch-restore" data-id="${l.id}">${ic('undo', 's')}<span>${tr('Restore')}</span></button><button class="btn sm danger" data-act="arch-del" data-id="${l.id}">${ic('trash', 's')}<span>${tr('Delete permanently…')}</span></button>` : ''}</div></div>`;
+      <div class="aacts"><button class="btn sm" data-go="l/${l.id}">${tr('Open')}</button>${canManage(l) || lmOrgAdmin(l) ? `<button class="btn sm" data-act="arch-restore" data-id="${l.id}">${ic('undo', 's')}<span>${tr('Restore')}</span></button><button class="btn sm danger" data-act="arch-del" data-id="${l.id}">${ic('trash', 's')}<span>${tr('Delete permanently…')}</span></button>` : ''}</div></div>`;
   }).join('')}</div>`;
 }
 function viewHistory() {

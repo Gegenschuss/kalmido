@@ -9,7 +9,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, inbox_default, iso, now_utc
 from ..accounts.session import me
 from ..core.access import (
-    Denied, list_people, list_role, my_inbox, need_collab, need_list, need_project, need_task, task_visible, WRITE_ROLES,
+    Denied, list_people, list_role, my_inbox, need_collab, need_list, need_task, task_visible, WRITE_ROLES,
 )
 from ..core.serializers import attachment_files, load_tasks
 from ..lists.lists import LIST_FIELDS
@@ -156,7 +156,7 @@ def check_assignee(c, lid, aid):
 WEB_TASK_NEW = frozenset(TASK_FIELDS) | {"tags", "ltags", "fields", "people"}
 WEB_TASK_EDIT = WEB_TASK_NEW | {"add_tags", "_prev", "_act"}
 WEB_LIST_NEW = frozenset({"name", "color", "folder", "view", "kind", "checklist", "done_at_bottom", "dep_shift", "tickets", "ptype", "family", "sections", "org_id"})  # 2.28.0 (#935): org_id
-WEB_LIST_EDIT = frozenset(LIST_FIELDS) | {"client_id", "rate", "agent_tidy", "tidy_agent_id", "listen_agent_ids", "agent_members", "agent_peers", "_prev", "ticket_tpl", "day_hours", "done_at_bottom", "columns", "ptype", "sort_mode", "org_id", "stale_days", "agent_followup", "done_in_section"}  # 2.36.2 (#1136): done_in_section
+WEB_LIST_EDIT = frozenset(LIST_FIELDS) | {"client_id", "rate", "agent_tidy", "tidy_agent_id", "listen_agent_ids", "agent_members", "agent_peers", "_prev", "ticket_tpl", "day_hours", "done_at_bottom", "columns", "ptype", "sort_mode", "org_id", "stale_days", "agent_followup", "done_in_section", "folder_adopt"}  # 2.36.2 (#1136): done_in_section
 WEB_COMMENT = frozenset({"body", "suggestion", "reply_to"})  # 2.33.0 (#1076): reply_to
 
 
@@ -231,8 +231,6 @@ def task_create():
             # order they are typed
             f["sort"] = c.execute("SELECT COALESCE(MAX(sort),0)+1 FROM tasks WHERE list_id=? AND parent_id IS NULL",
                                   (f["list_id"],)).fetchone()[0]
-    if b.get("fields"):
-        need_project(c, f["list_id"], "fields")
     if f.get("ttype") and not (f.get("content") or "").strip():  # 2.4.0 (#340): a new bug / feature gets its note template
         tpl = ticket_template(c, f["list_id"], f["ttype"])
         if tpl:
@@ -366,7 +364,7 @@ def _wd_followup(c, t, users, S, LG, now):
         if cs:
             news_add(c, rcpt, "followup", task_id=t["id"], data={"note": t["wait_note"][:200], "until": t["wait_until"]}, s=cs)
         if notif_ok(c, rcpt, s, "followup", "push", t["list_id"]):  # 2.33.0 (#927): + the list (owner's template)
-            lname = tr("Inbox", lg=lg) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
+            lname = tr("Basket", lg=lg) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
             push = (tr("Follow up: {0}", t["title"], lg=lg),
                     (tr("Waiting on: {0}", t["wait_note"], lg=lg) + " · " if t["wait_note"] else "") + lname)
     follow = {t["assignee_id"], t["created_by"]} | {r[0] for r in c.execute(

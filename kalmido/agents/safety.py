@@ -113,7 +113,7 @@ def _names(c, ids, viewer):
     for l2 in ids:
         r = c.execute("SELECT name, is_inbox FROM lists WHERE id=?", (l2,)).fetchone()
         if r and viewer and list_role(c, l2, viewer):
-            items.append({"list_id": l2, "name": tr("Inbox") if r["is_inbox"] else r["name"]})
+            items.append({"list_id": l2, "name": tr("Basket") if r["is_inbox"] else r["name"]})
         else:
             hidden += 1
     return items, hidden

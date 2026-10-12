@@ -209,7 +209,7 @@ def wh_enqueue(c, n):
     def lst(lid):
         if lid not in lists:
             r = c.execute("SELECT id, name, is_inbox FROM lists WHERE id=?", (lid,)).fetchone()
-            lists[lid] = {"id": lid, "name": tr("Inbox") if r and r["is_inbox"] and inbox_default(r["name"]) else (r["name"] if r else "")}
+            lists[lid] = {"id": lid, "name": tr("Basket") if r and r["is_inbox"] and inbox_default(r["name"]) else (r["name"] if r else "")}
         return lists[lid]
 
     def sett(uid):

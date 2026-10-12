@@ -388,6 +388,7 @@ function applyTheme() {
   const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = light ? '#f8f8f9' : '#16171a';
 }
 applyTheme();
+try { if (sessionStorage.getItem('kalmido.booted')) document.documentElement.classList.add('rebooting'); } catch { /* no storage */ }  // 2.39.1 (#1213): no loading screen on a reload within a session
 try { matchMedia('(prefers-color-scheme: light)').addEventListener('change', applyTheme); } catch { /* old browser */ }
 // density per device: compact (default on desktop) | comfortable (default on phones and touch screens)
 const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || '');

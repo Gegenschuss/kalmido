@@ -11,13 +11,21 @@ if (window.visualViewport) {
   vvSync();
 }
 
+// 2.39.1 (#1213): the loading screen of index.html (#boot) fades out once the first state is drawn (or a sign-in / error
+// screen took over); later reloads in the same session skip it (icons.js: html.rebooting)
+function bootDone() {
+  try { sessionStorage.setItem('kalmido.booted', '1'); } catch { /* no storage */ }
+  const b = document.getElementById('boot'); if (!b || b.classList.contains('out')) return;
+  b.classList.add('out'); setTimeout(() => b.remove(), 250);
+}
+
 (async () => {
   const inv = location.hash.match(/^#invite\/([A-Za-z0-9_-]{20,100})$/);  // 2.22.0 (#697): an invitation / reset link
-  if (inv) { await inviteScreen(inv[1]); return; }
+  if (inv) { bootDone(); await inviteScreen(inv[1]); return; }
   const sil = location.hash.match(/^#signin\/([A-Za-z0-9_-]{20,100})$/);  // 2.23.0 (#444): a sign-in link (QR code)
-  if (sil) { await i18nLoad(uiLang()); await signinScreen(sil[1]); return; }
+  if (sil) { bootDone(); await i18nLoad(uiLang()); await signinScreen(sil[1]); return; }
   const i18nBoot = i18nLoad(uiLang());  // last used language (localStorage), in parallel with the state
-  try { await load(); if (!S.lists.length) throw new Error('no state'); } catch (e) { if (e.message === 'auth') return; await i18nBoot; $('#view').innerHTML = heronEmpty(navigator.onLine === false ? 'offline' : 'error', tr('Server not reachable.'), tr('Reload the page once the server is reachable again.')).replace(/<\/div>$/, `<button type="button" class="btn pri" id="boot-retry">${ic('sync', 's')} ${tr('Try again')}</button></div>`); $('#boot-retry')?.addEventListener('click', () => location.reload()); return; }
+  try { await load(); if (!S.lists.length) throw new Error('no state'); } catch (e) { bootDone(); if (e.message === 'auth') return; await i18nBoot; $('#view').innerHTML = heronEmpty(navigator.onLine === false ? 'offline' : 'error', tr('Server not reachable.'), tr('Reload the page once the server is reachable again.')).replace(/<\/div>$/, `<button type="button" class="btn pri" id="boot-retry">${ic('sync', 's')} ${tr('Try again')}</button></div>`); $('#boot-retry')?.addEventListener('click', () => location.reload()); return; }
   await i18nBoot; await i18nLoad(uiLang()); S.booted = true;
   setTimeout(chatFabDraw, 0);  // 2.29.0 (#363)
   if (LS.get('after2fa', false)) { LS.set('after2fa', false); setTimeout(() => settingsModal('account'), 400); }  // 2.22.0 (#697)
@@ -82,6 +90,7 @@ if (window.visualViewport) {
     if (title || url) quickCapture(title || (url ? urlTitle(url) : ''), url ? {url} : {});
     else captureHelp();
   } else await route();
+  bootDone();  // 2.39.1 (#1213): the first view is drawn
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
     navigator.serviceWorker.addEventListener('message', swMessage);

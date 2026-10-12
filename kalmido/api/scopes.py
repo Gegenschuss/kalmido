@@ -674,7 +674,7 @@ def v1_fields(lid):
 @app.post("/api/v1/lists/<int:lid>/fields")
 @v1_view
 def v1_field_create(lid):
-    """{name, type: text | number | date | select | person | url | checkbox ..., options?, pinned?} (project lists, owner)."""
+    """{name, type: text | number | date | select | person | url | checkbox ..., options?, pinned?} (owner; 2.39.1: any list)."""
     v1_args(())
     b = _v1_body(("name", "type", "options", "pinned"))
     return jsonify(v1_call(field_create, lid, body=b)), 201
@@ -855,10 +855,11 @@ def v1_folder_delete():
 @app.delete("/api/v1/lists/<int:lid>")
 @v1_view
 def v1_list_delete(lid):
-    """Deletes an ARCHIVED list for good (owner; archive it first with PATCH archived=true). Its tasks go to the trash."""
+    """Deletes an ARCHIVED list for good (owner or list admin; archive it first with PATCH archived=true). Its tasks go to
+    the trash of the owner. 2.39.1 (#1188): list admins too; the owner is told."""
     v1_args(())
     c = db()
-    need_list(c, lid, owner=True)
+    need_list(c, lid, write=False, manage=True)
     r = c.execute("SELECT name, is_inbox, archived FROM lists WHERE id=?", (lid,)).fetchone()
     if not r["is_inbox"] and r["archived"]:
         need_approval(c, N_("Delete the list “{0}” for good"), (r["name"],), list_id=lid)
@@ -1124,7 +1125,9 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
     schemas["SectionPage"] = page("Section")
     schemas["Field"] = {"type": "object", "properties": {"id": {"type": "integer"}, "list_id": {"type": "integer"}, "name": {"type": "string"},
                                                        "type": {"type": "string"}, "options": obj, "pinned": {"type": "integer"},
-                                                       "sort": {"type": "number"}}}
+                                                       "sort": {"type": "number"},
+                                                       "modules_on": {"type": "array", "items": {"type": "string"},
+                                                                      "description": "2.39.1 (#1293): only when created: the modules switched on for the list's owner"}}}
     schemas["FieldPage"] = page("Field")
     schemas["Template"] = {"type": "object", "properties": {"id": {"type": "integer"}, "kind": {"type": "string", "enum": ["task", "list"]},
                                                           "name": {"type": "string"}, "data": obj, "count": {"type": "integer"},
@@ -1186,7 +1189,9 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                                                                [pid(), sub("blocker_id", "The task it waits on")], scope="tasks:write")},
         "/lists/{id}/fields": {
             "get": op("Custom field definitions of a list", S, ok(ref("FieldPage")) | errs("404"), [lp]),
-            "post": op("Create a custom field (project lists, owner)", S, ok(ref("Field"), "Created", "201") | errs("400", "403", "404", "409"), [lp],
+            "post": op("Create a custom field (any list, owner / list admins)", S, ok(ref("Field"), "Created", "201") | errs("400", "403", "404", "409"), [lp],
+                       desc="2.39.1 (#1293): switches the module Custom fields on for the list's owner when it is off (never off); "
+                            "the answer's modules_on names it ([\"fields\"] or []).",
                        scope="structure", body={"type": "object", "required": ["name", "type"], "properties": {
                            "name": {"type": "string"}, "type": {"type": "string"}, "options": obj, "pinned": {"type": "boolean"}}})},
         "/fields/{id}": {
@@ -1290,5 +1295,6 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
     for p_, ms in new.items():  # merged: some paths already have a GET (habits, a task's attachments, an attachment)
         paths.setdefault(p_, {}).update(ms)
     paths["/lists/{id}"]["delete"] = op("Delete an archived list for good", L, nobody | acc | errs("403", "404", "409"), [lp], scope="delete",
-                                        desc="Owner only; archive it first (PATCH archived=true). Its tasks go to the owner's trash. "
+                                        desc="Owner or list admin (2.39.1); archive it first (PATCH archived=true). Its tasks go to the owner's trash; "
+                                             "the owner is told when an admin deletes it. "
                                              "Agents: waits for approval (202).")

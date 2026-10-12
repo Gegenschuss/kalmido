@@ -60,7 +60,7 @@ PROP_TEXT_MAX, PROP_HINT_MAX = 50000, 2000   # pasted briefing / notes, the hint
 PROP_TRIAGE_MAX, PROP_LISTS_MAX = 100, 200   # inbox items per request, lists offered
 PROP_OPEN_MAX = 10                      # open (running / waiting) proposal requests per person
 PROP_KEEP_DAYS = 30                     # proposal jobs (with their input) are removed after this many days
-PROP_TITLES = {"project": N_("Project from a briefing"), "subtasks": N_("Break down: {0}"), "triage": N_("Sort the inbox"),
+PROP_TITLES = {"project": N_("Project from a briefing"), "subtasks": N_("Break down: {0}"), "triage": N_("Sort the basket"),
                "dayplan": N_("Day plan: {0}"),
                "extract": N_("Tasks from notes: {0}")}
 PROP_LIMITS = {"max_items": PROP_MAX_ITEMS, "max_bytes": PROP_MAX_BYTES, "title_max": PROP_TITLE_MAX, "notes_max": PROP_NOTES_MAX,
@@ -374,9 +374,9 @@ def prop_input(c, uid, kind, b):
                 raise BadInput(tr("Missing field: {0}", "task_ids"))
             rows = c.execute(q + f" AND id IN ({','.join('?' * len(ids))}) ORDER BY sort, id", (inbox, *ids)).fetchall()
             if len(rows) != len(set(ids)):
-                raise BadInput(tr("Only open tasks of your inbox can be sorted"))
+                raise BadInput(tr("Only open tasks of your basket can be sorted"))
         if not rows:
-            raise BadInput(tr("The inbox is empty"))
+            raise BadInput(tr("The basket is empty"))
         mine = [d for d in visible_lists(c, uid) if not d["is_inbox"] and not d["archived"] and d.get("role", "owner") in WRITE_ROLES]
         if b.get("lists") not in (None, "all"):
             want = {_p_int(x, "lists") for x in _p_list(b.get("lists"), "lists", PROP_LISTS_MAX)}

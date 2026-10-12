@@ -96,7 +96,7 @@ def list_status_set(lid):
     need_list(c, lid)
     lst = c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()
     if lst["is_inbox"]:
-        return err(tr("The inbox has no project status"))
+        return err(tr("The basket has no project status"))
     need_project(c, lid, "status")
     st = b.get("status") or ""
     if st not in LIST_STATUSES + ("",):

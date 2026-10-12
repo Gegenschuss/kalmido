@@ -80,9 +80,13 @@ def inv_manual_seq(scheme, num):
         return None
 
 
-def inv_manual_number(c, oid, r, s, num):
+INV_SKIP_REASON_MIN = 5  # 2.39.1 (#1210 N2): characters of the reason a skipped number needs
+
+
+def inv_manual_number(c, oid, r, s, num, reason=""):
     """2.38.0: a manual number of an invoice / credit note must follow the scheme and lie above the series' last value
-    (no back-dating); the counter then continues from it. BadInput otherwise."""
+    (no back-dating); the counter then continues from it. 2.39.1 (#1210 N2): more than one above the counter (a gap in
+    the series) only with a reason (kept in the office log). The caller holds the number lock. BadInput otherwise."""
     from .model import office_scheme_period
     scheme = inv_scheme(s, r["kind"])
     seq = inv_manual_seq(scheme, num)
@@ -94,6 +98,8 @@ def inv_manual_number(c, oid, r, s, num):
     last = row["last"] if row else 0
     if seq < last or (seq == last and num != (r["number"] or "")):  # 2.38.0 review: re-setting its own number is fine
         raise BadInput(tr("The number must be above the last one of the series ({0})", last))
+    if seq > last + 1 and len((reason or "").strip()) < INV_SKIP_REASON_MIN:
+        raise BadInput(tr("The number skips {0} numbers of the series; give a reason (GoBD)", seq - last - 1))
     c.execute("INSERT INTO office_numbers(org_id, kind, period, last) VALUES(?,?,?,?) ON CONFLICT(org_id, kind, period) DO UPDATE SET last=excluded.last",
               (oid, r["kind"], period, seq))
 
@@ -738,6 +744,9 @@ def inv_send(c, oid, uid, r, b):
     title = inv_title((pack.get("labels") or {}).get(lang) or {}, lang, r["kind"], int(_col(r, "reminder_level") or 1))
     subject = inv_clean_subject(b.get("subject")) or f"{title} {r['number']}"
     text = (b.get("text") or "").strip() if isinstance(b.get("text"), str) else ""
+    own = bool(text) and text[:5000] != _mail_text(r, lang, s).strip()
+    if own:
+        inv_own_text_quota(c, oid, uid)
     text = text[:5000] or _mail_text(r, lang, s)
     files = inv_files(c, oid, r["id"])
     u = g.user
@@ -749,8 +758,24 @@ def inv_send(c, oid, uid, r, b):
     ts = iso(now_utc())
     c.execute("UPDATE office_docs SET status=CASE WHEN status IN ('issued') THEN 'sent' ELSE status END, sent_at=COALESCE(sent_at, ?), updated_at=? "
               "WHERE id=? AND org_id=?", (ts, ts, r["id"], oid))
-    ofx_log(c, oid, "send", doc_id=r["id"], detail={"to": to, "cc": cc, "files": [f[0] for f in files]})
+    ofx_log(c, oid, "send", doc_id=r["id"], detail={"to": to, "cc": cc, "files": [f[0] for f in files], **({"own_text": 1} if own else {})})
     return files, datev
+
+
+INV_OWN_TEXT_DAY = 50  # 2.39.1 (#1210 N7): mails with an own text per organisation and day before members get 429
+
+
+def inv_own_text_quota(c, oid, uid):
+    """2.39.1 (#1210 N7): a member's mail with an own text: 429 once the organisation sent INV_OWN_TEXT_DAY of them since
+    midnight UTC (admins' own texts count, they are not limited; the standard text and system mails never count)."""
+    if office_role(c, uid, oid) == "admin":
+        return
+    write_lock(c, f"office_mail_{int(oid)}")
+    since = now_utc().strftime("%Y-%m-%dT00:00:00")
+    n = c.execute("SELECT COUNT(*) FROM office_doc_log WHERE org_id=? AND action='send' AND at>=? AND detail LIKE ?",  # pg-ok: own JSON, exact case
+                  (oid, since, '%"own_text": 1%')).fetchone()[0]
+    if n >= INV_OWN_TEXT_DAY:
+        raise Denied(429, tr("Your organisation sent {0} mails with an own text today; members can send more tomorrow or with the standard text", INV_OWN_TEXT_DAY))
 
 
 def inv_datev(c, oid, r, s=None, files=None):
@@ -864,6 +889,8 @@ def inv_payment_post(did):
     from .docs import _date, doc_row
     c, uid, oid = _ctx()
     doc_row(c, oid, did)
+    if office_role(c, uid, oid) != "admin":  # 2.39.1 (#1210 N3, decided 12.10.): only the organisation's admins book payments
+        raise Denied(403, tr("Only an admin of this organisation can record payments"))
     write_lock(c, f"office_pay_{did}")  # 2.38.0 review: check and write of one invoice's payments in one go
     r = doc_row(c, oid, did)
     if r["kind"] != "invoice" or not ofx_locked(r) or r["status"] in ("cancelled", "paid"):

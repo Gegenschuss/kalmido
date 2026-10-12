@@ -216,10 +216,12 @@ def openapi_spec():
             "id": {"type": "integer"}, "name": {"type": "string"}, "color": {"type": "string"},
             "folder": {"type": "string", "description": "Your folder path, at most 2 levels: \"Clients/Company X\" (2.4.0); empty = none"},
             "tickets": {"type": "boolean", "description": "Ticket types bug / feature / task on (2.4.0)"},
+            "modules_on": {"type": "array", "items": {"type": "string"}, "description": "2.39.1 (#1293): only in the answer of a PATCH with "
+                           "columns or project_type: the modules it switched on (custom field columns: [\"fields\"] for the list's owner)"},
             "is_inbox": {"type": "boolean"}, "archived": {"type": "boolean"},
             "done_at_bottom": {"type": "boolean", "description": "2.7.2: \"Show completed at the bottom\": completed tasks stay visible below the open ones and come back with one tap"},
             "checklist": {"type": "boolean", "deprecated": True, "description": "Deprecated (2.7.2): same as done_at_bottom"},
-            "kind": {"type": "string", "enum": list(LIST_KINDS), "description": "List type; project lists have time tracking, dependencies, custom fields and progress (2.7.2: the type checklist is gone, see done_at_bottom)"},
+            "kind": {"type": "string", "enum": list(LIST_KINDS), "description": "List type; project lists have time tracking, dependencies and progress (2.7.2: the type checklist is gone, see done_at_bottom; 2.39.1: custom fields in every list)"},
             "view": {"type": "string", "enum": list(LIST_VIEWS)}, "role": {"type": "string", "enum": ["owner", "admin", "edit", "participant", "view"]},
             "owner_id": {"type": "integer"}, "owner_name": {"type": "string"}, "shared": {"type": "boolean"},
             "status": nul("string", enum=[*LIST_STATUSES, None]), "progress": ref("Progress"), "created_at": {"type": "string", "format": "date-time"},
@@ -287,8 +289,11 @@ def openapi_spec():
                             "Owner / list admins, never an agent token"},
             "stale_days": nul("integer", minimum=0, maximum=365, description="2.34.0 (#266): stale after this many idle days (null = the default, 0 = never). Owner / list admins, never an agent token"),
             "agent_followup": {"type": "boolean", "description": "2.34.0 (#266): \"Agent follows up\" (event stale_tasks once a day). Owner / list admins, never an agent token"},
+            "folder_adopt": {"type": "boolean", "description": "2.39.1 (#1188): with a new folder: the list takes the folder's settings "
+                             "(workspace, agent); without it the list keeps its own (they then differ from the folder)"},
             "columns": {"type": ["array", "null"], "items": {"type": "string"}, "maxItems": COL_MAX,
-                        "description": COL_DOC + " Owner / list admins; null = back to the default."},
+                        "description": COL_DOC + " Owner / list admins; null = back to the default. 2.39.1 (#1293): custom field "
+                                       "columns (f:<id>) switch the module Custom fields on for the list's owner; the answer's modules_on names it."},
             "project_type": {"type": ["string", "null"], "enum": [*PTYPES, "", None],
                              "description": "2.18.0 (#408): the project type (owner / list admins); null / \"\" = none. Switches on what the "
                                             "type needs (type project, ticket types for software, the type's view while the list has no "
@@ -490,8 +495,8 @@ def openapi_spec():
                         "patch": op("Change a list (2.7.0)", L, ok(ref("List")) | errs("400", "403", "404"), [pid("id", "List id")],
                                     body=ref("ListPatch"), scope="write",
                                     desc="Owner: name, color, kind, nag (default nag interval of its tasks), day_hours (hours per day / "
-                                         "shift for the time sums). Owner and list admins: columns (2.14.0). Members change only their own "
-                                         "folder and view.")},
+                                         "shift for the time sums). Owner and list admins: columns (2.14.0), archived (2.39.1). Members change only "
+                                         "their own folder and view.")},
         "/lists/{id}/shift": {"post": op("Move a whole list (project) in time", L, ok(ref("ShiftResult")) | errs("400", "403", "404", "409"),
                                          [pid("id", "List id")], body=ref("ShiftInput"), scope="write",
                                          desc=f"Every open task with a date (subtasks too) moves by `days`, start and due, in one transaction; "

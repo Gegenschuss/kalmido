@@ -181,7 +181,7 @@ const roleLabel = r => r === 'owner' ? tr('Owner') : tr((ROLES.find(x => x[0] ==
 const roleHelp = r => r === 'owner' ? tr('Created the list; can rename, archive and delete it') : tr((ROLES.find(x => x[0] === r) || ROLES[1])[2]);
 function newsListName(it) {
   const l = it.list_id && listById(it.list_id);
-  return l ? (l.is_inbox ? tr('Inbox') : listName(l.name)) : listName(it.data?.name || '');
+  return l ? (l.is_inbox ? tr('Basket') : listName(l.name)) : listName(it.data?.name || '');
 }
 function newsText(it, U) {
   const d = it.data || {}, who = `<b>${esc(viaName(d, it.actor_id, U))}</b>`, q = x => `<b>${esc(x)}</b>`;
@@ -203,7 +203,10 @@ function newsText(it, U) {
     case 'owner': return tr('{0} made you the owner of the list {1}', who, q(newsListName(it)));  // 2.1.2 (#349)
     case 'orglist': return ({archive: tr('{0} archived the list {1} (admin of {2})', who, q(d.name || ''), q(d.org || '')),  // 2.35.0 (#1101)
       restore: tr('{0} restored the list {1} from the archive (admin of {2})', who, q(d.name || ''), q(d.org || '')),
-      delete: tr('{0} deleted the list {1} for good (admin of {2}). Its tasks are in the trash of the owner’s inbox.', who, q(d.name || ''), q(d.org || '')),
+      delete: tr('{0} deleted the list {1} for good (admin of {2}). Its tasks are in the trash of the owner’s basket.', who, q(d.name || ''), q(d.org || '')),
+      // 2.39.1 (#1188): a list admin archived / restored / deleted my list
+      larchive: tr('{0} archived your list {1} (list admin)', who, q(d.name || '')), lrestore: tr('{0} restored your list {1} from the archive (list admin)', who, q(d.name || '')),
+      ldelete: tr('{0} deleted your list {1} for good (list admin). Its tasks are in the trash of your basket.', who, q(d.name || '')),
       owner: tr('{0} handed the list {1} to {2} (admin of {3})', who, q(d.name || ''), q(d.to || ''), q(d.org || ''))})[d.action] || tr('{0} changed something', who);
     case 'unblock': return d.hidden ? tr('{0} completed a task you cannot see: your task is unblocked', who) : tr('{0} completed {1}: your task is unblocked', who, q(d.title || ''));
     case 'newtask': return tr('{0} added a task', who);
@@ -416,7 +419,7 @@ function actText0(a, U) {
     case 'assign': return d.to ? tr('{0} assigned the task to {1}', who, q(uname(d.to, U))) : tr('{0} removed the assignee', who);
     case 'assign_group': return d.group ? tr('{0} assigned the task to the group {1}', who, q(d.group)) : tr('{0} removed the group', who);  // 2.10.0 (#441)
     case 'take': return tr('{0} took the task (group {1})', who, q(d.group || ''));
-    case 'list': return tr('{0} moved the task to the list {1}', who, q(d.inbox && inboxDef(d.name) ? tr('Inbox') : listName(d.name)));
+    case 'list': return tr('{0} moved the task to the list {1}', who, q(d.inbox && inboxDef(d.name) ? tr('Basket') : listName(d.name)));
     case 'section': return d.name ? tr('{0} moved the task to the section {1}', who, q(d.name)) : tr('{0} removed the task from its section', who);
     case 'parent': return d.title ? tr('{0} made the task a subtask of {1}', who, q(d.title)) : tr('{0} made the task a main task', who);
     case 'snippets': return d.n ? tr('{0} changed the code snippets ({1})', who, d.n) : tr('{0} removed the code snippets', who);  // 2.35.0 (#1095)
@@ -888,3 +891,17 @@ function rswRowAt(e) {
   document.addEventListener('touchend', () => swEnd(false), {passive: true});
   document.addEventListener('touchcancel', () => swEnd(true), {passive: true});
 }
+
+// 2.39.1 (#1202): the comment composer stays open from focus until a tap outside it. With :focus-within alone a tap
+// on the paperclip first blurs the field on phones, the bar vanishes and the tap lands in the void.
+document.addEventListener('focusin', e => { if (e.target.id === 'c-input') e.target.closest('.ccomp')?.classList.add('open'); });
+document.addEventListener('pointerdown', e => {
+  const c = document.querySelector('.dcomp .ccomp.open');
+  if (c && !c.contains(e.target)) c.classList.remove('open');
+  if (e.target.id === 'c-input') e.target.closest('.ccomp')?.classList.add('open');  // a tap into the field opens it at once
+}, true);
+document.addEventListener('focusout', e => {  // keyboard: Tab away closes it, a blur without a new target (tap on the clip) does not
+  if (e.target.id !== 'c-input' || !e.relatedTarget) return;
+  const c = e.target.closest('.ccomp');
+  if (c && !c.contains(e.relatedTarget)) c.classList.remove('open');
+});

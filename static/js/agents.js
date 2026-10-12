@@ -501,11 +501,11 @@ function propRequest(kind, ctx = {}) {
       <div class="row ppcol"><label for="pp-hint">${tr('Hint (optional)')}</label><textarea id="pp-hint" rows="3" maxlength="2000" placeholder="${esc(tr('e.g. for a two-day shoot, at most 8 steps'))}"></textarea></div>`;
   } else if (kind === 'triage') {
     const n = ctx.ids ? ctx.ids.length : Math.min(100, inboxOpen());
-    if (!n) { toast(tr('The inbox is empty')); return; }
+    if (!n) { toast(tr('The basket is empty')); return; }
     ctx.n = n;
-    title = propWith(N_('Sort the inbox with {0}'), N_('Sort the inbox with an agent'));
+    title = propWith(N_('Sort the basket with {0}'), N_('Sort the basket with an agent'));
     const ls = S.lists.filter(l => !l.is_inbox && !l.archived && canEditList(l.id));
-    body = `<div class="pptask">${ic('inbox', 's')}<b>${esc(trn('{0} inbox item', '{0} inbox items', n))}</b></div>
+    body = `<div class="pptask">${ic('inbox', 's')}<b>${esc(trn('{0} basket item', '{0} basket items', n))}</b></div>
       <div class="row ppcol"><label>${tr('Lists it may suggest')}</label><div class="pplists" id="pp-lists">
         <label class="ppall"><input type="checkbox" id="pp-lall" checked> ${tr('All my lists')}</label>
         ${ls.map(l => `<label><input type="checkbox" data-lid="${l.id}" checked> ${esc(lname(l))}</label>`).join('')}</div></div>`;
@@ -523,7 +523,7 @@ function propRequest(kind, ctx = {}) {
     const l = ctx.lid && listById(ctx.lid);
     $('#pp-priv', md).innerHTML = kind === 'project' ? tr('{0} gets exactly this text (and the folder name) and proposes a project: sections, tasks, dates and dependencies. Nothing is created until you apply it.', `<b>${who()}</b>`)
       : kind === 'subtasks' ? tr('{0} gets the title and notes of this task, the titles of its subtasks and your hint, and proposes subtasks. Nothing is created until you apply them.', `<b>${who()}</b>`)
-        : kind === 'triage' ? trn('{1} gets the title and notes of this {0} inbox item and the names and sections of the lists ticked above, nothing else of your inbox. Nothing moves until you apply it.', '{1} gets the titles and notes of these {0} inbox items and the names and sections of the lists ticked above, nothing else of your inbox. Nothing moves until you apply it.', ctx.n, `<b>${who()}</b>`)
+        : kind === 'triage' ? trn('{1} gets the title and notes of this {0} basket item and the names and sections of the lists ticked above, nothing else of your basket. Nothing moves until you apply it.', '{1} gets the titles and notes of these {0} basket items and the names and sections of the lists ticked above, nothing else of your basket. Nothing moves until you apply it.', ctx.n, `<b>${who()}</b>`)
           : tr('{0} gets these notes and the names of the people in {1} (to suggest who does what) and proposes tasks for this list. Nothing is created until you apply them.', `<b>${who()}</b>`, `<b>${esc(lname(l))}</b>`);
   };
   priv();
@@ -668,7 +668,7 @@ function propItemsHtml() {
     const it = (inp.items || []).find(x => x.task_id === t.task_id) || {}, cur = taskById(t.task_id);
     return propItemHtml(String(i), {title: t.rewrite_title || cur?.title || it.title || '', due: t.due, notes: ''}, {
       orig: t.rewrite_title ? cur?.title || it.title : '',
-      fields: `<select data-f="list_id" aria-label="${esc(tr('List'))}"><option value="">${tr('Stay in the inbox')}</option>${(inp.lists || []).map(l => `<option value="${l.id}" ${l.id === t.list_id ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}</select>${propSecSel(t.list_id, t.section_id)}`,
+      fields: `<select data-f="list_id" aria-label="${esc(tr('List'))}"><option value="">${tr('Stay in the basket')}</option>${(inp.lists || []).map(l => `<option value="${l.id}" ${l.id === t.list_id ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}</select>${propSecSel(t.list_id, t.section_id)}`,
       chips: propPrio(t.priority) + (t.tags || []).map(g => `<span class="ppchip">#${esc(g)}</span>`).join('')});
   }).join('');
 }
@@ -690,7 +690,7 @@ function propDraw() {
         <label class="ppshare"><input type="checkbox" id="pp-share"> ${tr('Share the new list with {0}', esc(v.agent.name))}</label>` : ''}
       <div class="ppbar"><button class="btn sm" data-pp="all">${tr('Select all')}</button><button class="btn sm" data-pp="none">${tr('Select none')}</button></div>
       <div class="ppl">${propItemsHtml()}</div>
-      <div class="shint keep">${v.kind === 'cleanup' ? tr('Applying changes the selected tasks as you. Tasks someone is editing right now or that changed since the request are skipped. One step, undo takes it back.') : v.kind === 'dayplan' ? tr('Applying sets the planned start and duration of the selected tasks as you; due dates stay as they are. One step, undo takes it back.') : v.kind === 'triage' ? tr('Applying moves and changes the selected inbox items as you; one step, undo takes it back.') : tr('Applying creates the selected entries as you (you own them, the history names {0}); one step, undo takes it back.', esc(v.agent.name))}</div>`;
+      <div class="shint keep">${v.kind === 'cleanup' ? tr('Applying changes the selected tasks as you. Tasks someone is editing right now or that changed since the request are skipped. One step, undo takes it back.') : v.kind === 'dayplan' ? tr('Applying sets the planned start and duration of the selected tasks as you; due dates stay as they are. One step, undo takes it back.') : v.kind === 'triage' ? tr('Applying moves and changes the selected basket items as you; one step, undo takes it back.') : tr('Applying creates the selected entries as you (you own them, the history names {0}); one step, undo takes it back.', esc(v.agent.name))}</div>`;
     // 2.5.2 (K03): the footer stays visible below the entries (sticky), with the count next to Apply
     foot = `<button class="btn danger" data-pp="discard">${tr('Discard')}</button><span class="spacer"></span><span class="muted ppcount ppfc"></span><button class="btn" data-pp="close">${tr('Close')}</button><button class="btn pri" data-pp="apply"></button>`;
   } else {
@@ -714,7 +714,7 @@ async function propApply(b) {
   const e = histAdd({label: tr('Applied the proposal of {0}', name), snaps: [], after: [], ids: [], lids: r.list_id ? [r.list_id] : [],
     undo: async () => { const x = await api('POST', `/api/proposals/${jid}/undo`); return {skipped: x.skipped || [], none: !!x.none}; },
     redo: async () => { const x = await api('POST', `/api/proposals/${jid}/redo`); return {skipped: x.skipped || [], none: !!x.none}; }});
-  histToast(v.kind === 'cleanup' ? clnDone(r) : v.kind === 'dayplan' ? trn('{0} task planned', '{0} tasks planned', r.changed) : r.changed ? trn('{0} inbox item sorted', '{0} inbox items sorted', r.changed) : trn('{0} entry created', '{0} entries created', r.created), e);
+  histToast(v.kind === 'cleanup' ? clnDone(r) : v.kind === 'dayplan' ? trn('{0} task planned', '{0} tasks planned', r.changed) : r.changed ? trn('{0} basket item sorted', '{0} basket items sorted', r.changed) : trn('{0} entry created', '{0} entries created', r.created), e);
   if (v.kind === 'project' && r.list_id && listById(r.list_id)) go('l/' + r.list_id);
   if (S.route.mod === 'agents') loadJobs();
 }

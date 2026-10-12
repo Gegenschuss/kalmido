@@ -50,7 +50,7 @@ def approval_notify(c, t, state, note, rcpt):
     title = {"approved": tr("{0} approved: {1}", who, t["title"], lg=lg), "changes": tr("{0} asks for changes: {1}", who, t["title"], lg=lg),
              "rejected": tr("{0} rejected: {1}", who, t["title"], lg=lg)}[state]
     ln = c.execute("SELECT name, is_inbox FROM lists WHERE id=?", (t["list_id"],)).fetchone()
-    lname = tr("Inbox", lg=lg) if ln["is_inbox"] and inbox_default(ln["name"]) else ln["name"]
+    lname = tr("Basket", lg=lg) if ln["is_inbox"] and inbox_default(ln["name"]) else ln["name"]
     g.pushes.append((rcpt, title, (note[:200] + " · " if note else "") + lname, f"{PUBLIC_URL}/#t/{t['id']}", push_prio(s)))
 
 

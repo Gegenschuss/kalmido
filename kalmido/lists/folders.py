@@ -16,6 +16,7 @@ from ..core.access import Denied, need_collab
 from ..personal.timetrack import BadInput
 
 FOLDER_PROPS = ("org_id", "agent_id", "agent_members", "agent_peers", "agent_tidy", "agent_listen")  # 2.30.0 (#1034): agent_listen
+FOLDER_PROPS += ("hide_done",)  # 2.39.1 (#1214): "Hide completed" for the lists of the folder (the client applies it, see showDone)
 FOLDER_APPLY = ("all", "new")
 
 
@@ -218,7 +219,7 @@ def _clean_props(c, b):
                 if (o is not None and o != me()) or (o is None and not agent_shares(c, v, me()) and not g.user["is_admin"]):
                     raise BadInput(tr("Invalid value: {0}", k))
                 out[k] = v
-        elif k in ("agent_members", "agent_peers", "agent_listen"):
+        elif k in ("agent_members", "agent_peers", "agent_listen", "hide_done"):
             if not isinstance(v, bool) and v not in (0, 1):
                 raise BadInput(tr("Invalid value: {0}", k))
             out[k] = bool(v)
@@ -385,3 +386,78 @@ def folders_shared_in(c, uid):
 def my_folder_props(c, uid):
     """{folder: props} of my folders (the sidebar marks them, the list dialog says "from the folder")."""
     return {r["folder"]: _norm(_props(r["props"])) for r in c.execute("SELECT folder, props FROM folder_props WHERE owner_id=?", (uid,))}
+
+
+# 2.39.1 (#1188): moving a list into a folder with defaults never re-hangs it silently. The app asks first when the move
+# would change the workspace or the agent (both directions: private -> organisation and back) and then sends
+# folder_adopt: true; without it the list keeps its settings and the differing ones count as its own ("differs from the folder").
+LM_MOVE_KEYS = ("org_id", "agent_id", "agent_members", "agent_peers", "agent_tidy", "agent_listen")
+
+
+def lm_folder_changes(c, lid, folder):
+    """What moving my list lid into `folder` would change: [{key, from, to}] (org_id / agent_id with names too)."""
+    from ..accounts.orgs import list_org
+    lr = c.execute("SELECT owner_id, is_inbox, agent_members, agent_peers, agent_tidy, agent_listen FROM lists WHERE id=?", (lid,)).fetchone()
+    if not lr or lr["is_inbox"] or lr["owner_id"] != me():
+        return []
+    eff = _norm(folder_effective(c, lr["owner_id"], folder or "")[0])
+    out = []
+    for k in LM_MOVE_KEYS:
+        if k not in eff:
+            continue
+        v = eff[k]
+        if k == "org_id":
+            cur = list_org(c, lid) or None
+        elif k == "agent_id":
+            cur = _list_agent(c, lid)
+        elif k in ("agent_members", "agent_peers"):
+            cur, v = bool(lr[k]), bool(v)
+        elif k == "agent_listen":
+            cur, v = lr[k] == "*", bool(v)
+        else:
+            cur = lr[k] or "off"
+        if cur != v:
+            out.append({"key": k, "from": cur, "to": v})
+    names = {}
+    oids = [x[y] for x in out if x["key"] == "org_id" for y in ("from", "to") if x[y]]
+    for r in c.execute(f"SELECT id, name FROM orgs WHERE id IN ({','.join('?' * len(oids)) or 'NULL'})", oids).fetchall() if oids else []:
+        names[("org", r[0])] = r[1]
+    aids = [x[y] for x in out if x["key"] == "agent_id" for y in ("from", "to") if x[y]]
+    for r in c.execute(f"SELECT id, display_name, username FROM users WHERE id IN ({','.join('?' * len(aids)) or 'NULL'})", aids).fetchall() if aids else []:
+        names[("agent", r[0])] = r[1] or r[2]
+    for x in out:
+        if x["key"] in ("org_id", "agent_id"):
+            t = "org" if x["key"] == "org_id" else "agent"
+            x["from_name"], x["to_name"] = names.get((t, x["from"]), ""), names.get((t, x["to"]), "")
+    return out
+
+
+def lm_folder_keep(c, lid, keep=()):
+    """My list lid moved into a folder without folder_adopt: nothing is applied; what differs from the folder (and the
+    keys set in the same request) counts as the list's own from now on."""
+    r = c.execute("SELECT owner_id, folder FROM lists WHERE id=?", (lid,)).fetchone()
+    if not r or r["owner_id"] != me():
+        return
+    diff = {x["key"] for x in lm_folder_changes(c, lid, r["folder"] or "")} | set(keep)
+    eff = folder_effective(c, r["owner_id"], r["folder"] or "")[0]
+    c.execute("UPDATE lists SET folder_own=? WHERE id=?", (json.dumps(sorted(k for k in diff if k in eff)), lid))
+
+
+def lm_folder_moved(c, lid, adopt, keep=()):
+    """A list of mine really moved into another folder (PATCH, drag): adopt = the person confirmed the folder's settings."""
+    if adopt:
+        folder_list_arrived(c, lid, keep=keep)
+    else:
+        lm_folder_keep(c, lid, keep=keep)
+
+
+@app.get("/api/lists/<int:lid>/folder-preview")
+def lm_folder_preview(lid):
+    """?folder=: what moving my list into that folder would change (workspace, agent and its settings) -> {changes:
+    [{key, from, to, from_name?, to_name?}]}. Empty = nothing to confirm. Members / other lists: always empty."""
+    from ..lists.lists import clean_folder
+    from ..core.access import need_list
+    c = db()
+    need_list(c, lid, write=False)
+    f = clean_folder(request.args.get("folder") or "", strict=False)
+    return jsonify(changes=lm_folder_changes(c, lid, f))

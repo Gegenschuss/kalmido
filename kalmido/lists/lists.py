@@ -255,11 +255,12 @@ def list_update(lid):
     from ..lists.templates import list_ptype_set
     from ..agents.core import list_listen_update
     from ..collab.reactions import list_tidy_update
-    from ..lists.folders import folder_list_arrived, list_own_mark
+    from ..lists.folders import lm_folder_moved, list_own_mark
     b = web_fields(body(), WEB_LIST_EDIT, "PATCH /api/lists/{lid}")
     c = db()
     role = need_list(c, lid, write=False)
     given = set(b)  # 2.29.0 (#1030): what this request sets on its own (kept when the list moves into a folder)
+    tb_col_on = None  # 2.39.1 (#1293): modules the field columns switched on (None = no field columns sent)
     tidy0 = c.execute("SELECT agent_tidy, agent_members, agent_peers, folder FROM lists WHERE id=?", (lid,)).fetchone()
     if "agent_tidy" in b or "tidy_agent_id" in b:  # 2.0.0: "Agent may tidy up entries" (own permission rule, see
         # list_tidy_update); 2.4.1 (#379): "Tidy up by" (the one agent)
@@ -323,6 +324,9 @@ def list_update(lid):
             c.execute("UPDATE lists SET col_cfg=? WHERE id=?", (clean_columns(c, lid, b["columns"]), lid))
         except BadInput as e:
             return err(str(e))
+        if any(str(k).startswith("f:") for k in (b["columns"] or [])):  # 2.39.1 (#1293): field columns switch the module on
+            from ..lists.fields import tb_fields_module_on
+            tb_col_on = tb_fields_module_on(c, lid)
         b = {k: v for k, v in b.items() if k != "columns"}
     conflicts = []
     prev = b.get("_prev") if isinstance(b.get("_prev"), dict) else None
@@ -337,10 +341,11 @@ def list_update(lid):
             if k in b and k in (*LIST_FIELDS, "rate", "ptype") and _norm(cur.get(k)) != _norm(old) and _norm(cur.get(k)) != _norm(b[k]):
                 conflicts.append({"field": k, "server": cur.get(k), "mine": b[k]})
                 del b[k]
-    pt_out = {}
+    pt_out = {"modules_on": tb_col_on} if tb_col_on is not None else {}
     if "ptype" in b:  # 2.18.0 (#408): the project type of an existing list (owner / list admins), see list_ptype_set
         try:
             pt_out = list_ptype_set(c, lid, role, b["ptype"], skip=set(b) | (given & {"listen_agent_ids"}))
+            pt_out["modules_on"] = [*pt_out.get("modules_on", []), *[m for m in (tb_col_on or []) if m not in pt_out.get("modules_on", [])]]
         except BadInput as e:
             return err(str(e))
         except Denied as e:
@@ -383,11 +388,19 @@ def list_update(lid):
             grp_touch(c, me())  # 2.10.0 (#441): moved into / out of a folder shared with a group
             folder_autoshare(c, lid)  # 2.22.0 (#740): moved into a folder shared with people
             if vals["folder"] != (tidy0["folder"] if tidy0 else None):  # really moved (the dialog sends the folder with every save)
-                folder_list_arrived(c, lid, keep=tuple(k for k in ("org_id", "agent_tidy", "agent_members", "agent_peers") if k in given)
-                                    + (("agent_listen",) if "listen_agent_ids" in given else ()))
+                # 2.39.1 (#1188): the folder's settings only with folder_adopt (the app asked first), else the list keeps its own
+                lm_folder_moved(c, lid, b.get("folder_adopt") is True,
+                                keep=tuple(k for k in ("org_id", "agent_tidy", "agent_members", "agent_peers") if k in given)
+                                + (("agent_listen",) if "listen_agent_ids" in given else ()))
     else:
-        if "rate" in b or "ticket_tpl" in b or "day_hours" in b or any(k in b for k in LIST_FIELDS if k not in MEMBER_LIST_FIELDS):
+        adm = ("archived",) if role == "admin" else ()  # 2.39.1 (#1188): a list admin archives / restores (deleting needs the archive)
+        if "rate" in b or "ticket_tpl" in b or "day_hours" in b or any(k in b for k in LIST_FIELDS if k not in MEMBER_LIST_FIELDS + adm):
             return err(tr("Only the owner can change this list"), 403)
+        if adm and "archived" in vals:
+            lr = c.execute("SELECT id, name, owner_id, archived, is_inbox FROM lists WHERE id=?", (lid,)).fetchone()
+            if not lr["is_inbox"] and int(lr["archived"] or 0) != vals["archived"]:
+                c.execute("UPDATE lists SET archived=?, archived_at=? WHERE id=?", (vals["archived"], iso(now_utc()) if vals["archived"] else None, lid))
+                lm_owner_news(c, lr, "larchive" if vals["archived"] else "lrestore")
         for k in MEMBER_LIST_FIELDS:
             if k in vals:
                 c.execute(f"UPDATE list_members SET {k}=? WHERE list_id=? AND user_id=?", (vals[k], lid, me()))
@@ -449,10 +462,11 @@ def list_reorder():
     if fmap:
         grp_touch(c, uid)  # 2.10.0 (#441)
     if moved:  # 2.29.0 (#1030 / #929): dragged into a folder: its people (as the list dialog did) and its defaults
-        from ..lists.folders import folder_list_arrived
+        from ..lists.folders import lm_folder_moved
+        fa = b.get("folder_adopt")  # 2.39.1 (#1188): true / [list ids]: the person confirmed the folder's settings
         for lid in moved:
             folder_autoshare(c, lid)
-            folder_list_arrived(c, lid)
+            lm_folder_moved(c, lid, fa is True or (isinstance(fa, list) and lid in fa))
     bump(c)
     c.commit()
     return jsonify(ok=True, conflicts=conflicts)
@@ -462,19 +476,29 @@ def list_reorder():
 def list_delete(lid):
     from ..lists.projects import list_files_drop
     c = db()
-    need_list(c, lid, owner=True)
-    r = c.execute("SELECT is_inbox, archived FROM lists WHERE id=?", (lid,)).fetchone()
+    role = need_list(c, lid, write=False, manage=True)  # 2.39.1 (#1188): the owner or a list admin (never a server admin as such)
+    r = c.execute("SELECT id, is_inbox, archived, owner_id, name FROM lists WHERE id=?", (lid,)).fetchone()
     if r["is_inbox"]:
-        return err(tr("The inbox cannot be deleted"))
+        return err(tr("The basket cannot be deleted"))
     # 1.5 (UX1): deleting for good only from the archive; "Delete" in the app archives (undoable) first
     if not r["archived"]:
         return err(tr("Archive the list first: only archived lists can be deleted for good"), 409)
-    icon, lfiles = list_purge(c, lid, my_inbox(c))
+    if role != "owner":  # 2.39.1 (#1188): the owner hears about a list admin's delete (the News kind of #1101)
+        lm_owner_news(c, r, "ldelete", gone=True)
+    icon, lfiles = list_purge(c, lid, my_inbox(c, r["owner_id"]))  # the tasks go to the owner's trash, also when an admin deletes
     bump(c)
     c.commit()
     list_icon_drop_file(lid, icon)
     list_files_drop(lfiles)
     return jsonify(ok=True)
+
+
+def lm_owner_news(c, lr, action, gone=False):
+    """2.39.1 (#1188): a list admin archived / restored / deleted the list: News for its owner (kind orglist, action
+    larchive / lrestore / ldelete; a deleted list only lives on in data.name)."""
+    from ..collab.news import news_add
+    if lr["owner_id"] and lr["owner_id"] != me():
+        news_add(c, lr["owner_id"], "orglist", list_id=None if gone else lr["id"], data={"action": action, "name": lr["name"]})
 
 
 def list_purge(c, lid, inbox):
@@ -512,7 +536,7 @@ def member_set(lid):
     c = db()
     need_list(c, lid, write=False, manage=True)
     if c.execute("SELECT is_inbox FROM lists WHERE id=?", (lid,)).fetchone()[0]:
-        return err(tr("The inbox cannot be shared"))
+        return err(tr("The basket cannot be shared"))
     role = b.get("role", "edit")
     if role not in ROLES:
         return err(tr("Role must be admin, edit, participant or view"))

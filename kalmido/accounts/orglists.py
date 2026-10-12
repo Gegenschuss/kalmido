@@ -3,7 +3,7 @@ organisation): an overview without contents (name, owner, number of tasks, last 
 (only from the archive, confirmed with the list's name) and hand a list over to another person of the organisation.
 
 Only lists that belong to the organisation (lists.org_id): private lists, private sharing and inboxes stay invisible and
-untouchable. People only (agents 403, also with admin rights). Mode shared: no organisation, no function (404); mode
+untouchable; 2.39.1 (#1188): the overview only shows the ones shared with at least one more person. People only (agents 403, also with admin rights). Mode shared: no organisation, no function (404); mode
 organisation: the instance admins are its admins (org_role); modes multi / workspaces: the organisation role admin.
 The owner and the list's members get a News entry ("archived / deleted by admin X"), every action is logged in
 org_list_log (the history of the dialog). App only (APP_ONLY in tests/parity_test.py: an organisation admin's work)."""
@@ -51,12 +51,16 @@ def _ol_news(c, oid, lr, action, gone=False, to_name=""):
 
 def _ol_out(c, oid):
     from ..collab.comments import user_names
-    rows = c.execute("""SELECT l.id, l.name, l.owner_id, l.archived, l.archived_at, l.created_at,
+    # 2.39.1 (#1188): only lists of the organisation that are shared with at least one more person (people, not agents):
+    # private lists never (also when shared), lists without members never, inboxes never; the folder path of the owner
+    rows = c.execute("""SELECT l.id, l.name, l.owner_id, l.archived, l.archived_at, l.created_at, l.folder,
                                (SELECT COUNT(*) FROM tasks t WHERE t.list_id=l.id AND t.deleted_at IS NULL AND t.status=0) AS open_n,
                                (SELECT COUNT(*) FROM tasks t WHERE t.list_id=l.id AND t.deleted_at IS NULL) AS all_n,
                                (SELECT MAX(t.updated_at) FROM tasks t WHERE t.list_id=l.id) AS changed,
-                               (SELECT COUNT(*) FROM list_members m WHERE m.list_id=l.id) AS members
+                               (SELECT COUNT(*) FROM list_members m JOIN users u ON u.id=m.user_id
+                                 WHERE m.list_id=l.id AND m.user_id!=l.owner_id AND COALESCE(u.kind,'user')!='agent') AS members
                         FROM lists l WHERE l.org_id=? AND l.is_inbox=0 ORDER BY l.archived, lower(l.name), l.id""", (oid,)).fetchall()
+    rows = [r for r in rows if r["members"] > 0]
     log = c.execute("SELECT * FROM org_list_log WHERE org_id=? ORDER BY id DESC LIMIT ?", (oid, OL_LOG_MAX)).fetchall()
     people = c.execute("""SELECT u.id FROM org_members m JOIN users u ON u.id=m.user_id
                           WHERE m.org_id=? AND u.disabled=0 AND COALESCE(u.kind,'user')!='agent'""", (oid,)).fetchall()
@@ -68,7 +72,7 @@ def _ol_out(c, oid):
     return {
         "lists": [{"id": r["id"], "name": r["name"], "owner_id": r["owner_id"], "owner_name": names.get(r["owner_id"], ""),
                    "owner_agent": r["owner_id"] in agents, "mine": r["owner_id"] == me(), "archived": bool(r["archived"]),
-                   "archived_at": r["archived_at"], "open": r["open_n"], "tasks": r["all_n"], "members": r["members"],
+                   "archived_at": r["archived_at"], "open": r["open_n"], "tasks": r["all_n"], "members": r["members"], "folder": r["folder"] or "",
                    "changed_at": r["changed"] or r["created_at"]} for r in rows],
         "people": sorted(({"id": r[0], "name": names.get(r[0], "")} for r in people), key=lambda x: x["name"].lower()),
         "log": [{"at": r["created_at"], "action": r["action"], "list_id": r["list_id"], "list_name": r["list_name"],

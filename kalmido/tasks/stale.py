@@ -69,7 +69,7 @@ def stale_tasks(c, uid, *, lids=None, limit=50, days=None):
         except ValueError:
             idle = 0
         out.append({"id": r["id"], "title": r["title"], "list_id": r["list_id"],
-                    "list_name": tr("Inbox") if r["is_inbox"] and inbox_default(r["list_name"]) else r["list_name"],
+                    "list_name": tr("Basket") if r["is_inbox"] and inbox_default(r["list_name"]) else r["list_name"],
                     "idle_days": idle, "reason": "waiting" if r["waiting_at"] else "no_change",
                     "since": r["last"], "due": r["due"], "assignee_id": r["assignee_id"],
                     "wait_note": r["wait_note"] if r["waiting_at"] else ""})

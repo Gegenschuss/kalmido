@@ -45,7 +45,7 @@ def need_form_manager(c, lid):
     if role not in MANAGE_ROLES:
         raise Denied(403, tr("Only the owner and list admins can manage forms"))
     if c.execute("SELECT is_inbox FROM lists WHERE id=?", (lid,)).fetchone()[0]:
-        raise BadInput(tr("The inbox cannot have forms"))
+        raise BadInput(tr("The basket cannot have forms"))
     return role
 
 

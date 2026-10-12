@@ -674,7 +674,7 @@ def time_csv():
         lid = e["list_id"] if e["list_id"] in names else 0
         ln = names.get(lid, "")
         lst = next((x for x in rep["lists"] if x["id"] == lid), None)
-        ln = tr("Inbox") if lst and lst["is_inbox"] and inbox_default(ln) else (ln or tr("No list"))
+        ln = tr("Basket") if lst and lst["is_inbox"] and inbox_default(ln) else (ln or tr("No list"))
         s0 = parse_iso(e["start"]).astimezone(TZ)
         en = parse_iso(e["end"]).astimezone(TZ) if e["end"] else None
         sec, rs = e["seconds"], e["rounded"]

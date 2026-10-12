@@ -272,7 +272,7 @@ async function loadTime() {
   if (S.route.mod === 'time') renderView();
   if (S.tv.sheetNext && S.tv.data && S.route.mod === 'time') { S.tv.sheetNext = false; timesheet(); }  // 2.23.0: from a client's page
 }
-const tvListName = l => l.id === 0 ? tr('No list') : l.is_inbox && inboxDef(l.name) ? tr('Inbox') : l.name;
+const tvListName = l => l.id === 0 ? tr('No list') : l.is_inbox && inboxDef(l.name) ? tr('Basket') : l.name;
 const rangeLabel = (f, t) => f === t ? fmtDate(f) : `${fmtDate(f)} – ${fmtDate(t)}`;
 function tvListsLabel() {
   const ids = tvLists();

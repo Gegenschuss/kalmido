@@ -34,6 +34,24 @@ LOGO_MAX_PX = 1600
 LOGO_FILE = "logo.png"
 
 
+def rx_office_perms(base=None):
+    """2.39.1 (#1210 N8): at start-up the office folder and its organisation folders (made 0755 before 2.39.0) become
+    0700. Only folders this process owns, no symlinks; errors are ignored (read-only mounts, foreign owners)."""
+    base = base or OFFICE_DIR
+    try:
+        names = [""] + [n for n in os.listdir(base) if re.fullmatch(r"\d{1,12}", n)]
+    except OSError:
+        return
+    for n in names:
+        p = os.path.join(base, n) if n else base
+        try:
+            st = os.lstat(p)
+            if os.path.isdir(p) and not os.path.islink(p) and st.st_uid == os.getuid() and st.st_mode & 0o077:
+                os.chmod(p, 0o700)
+        except OSError:
+            pass
+
+
 def opdf_logo_path(oid):
     return os.path.join(OFFICE_DIR, str(int(oid)), LOGO_FILE)
 
