@@ -109,7 +109,7 @@ const FEAT = 'cal,comments,collab,agents,kanban,timeline';
   check(sh.querySelector('.box [data-act="qsheet-send"]') && !sh.querySelector('.box [data-act="q-clip"]'), '#1059: in the field only the send arrow');
   w.eval('closePop()'); await sleep(200);
   w.eval('quickCapture()'); await until(() => d.querySelector('.qadd.sheet.capture'));
-  check(/Goes to the inbox/.test(d.querySelector('.qadd.sheet .qhlead')?.textContent || '') && d.querySelectorAll('.qadd.sheet .qhc').length === 4, '#1059: capture: the lead text + the chips');
+  check(/Goes to the basket/.test(d.querySelector('.qadd.sheet .qhlead')?.textContent || '') && d.querySelectorAll('.qadd.sheet .qhc').length === 4, '#1059: capture: the lead text + the chips');
   w.eval('closePop()');
   w.close();
 

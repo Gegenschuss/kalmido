@@ -211,7 +211,7 @@ Bo = sess("bob")
 # ---- lists
 r = a.get("/lists")
 ls = r.json()
-check(r.ok and ls["next_cursor"] is None and ls["data"][0]["is_inbox"] and ls["data"][0]["name"] == "Inbox", "lists: inbox first " + str(ls["data"][:1]))
+check(r.ok and ls["next_cursor"] is None and ls["data"][0]["is_inbox"] and ls["data"][0]["name"] == "Basket", "lists: inbox first " + str(ls["data"][:1]))
 r = a.post("/lists", {"name": "Shop", "checklist": True, "color": "#2dd4bf"})
 L1 = r.json()
 check(r.status_code == 201 and L1["checklist"] is True and L1["role"] == "owner" and L1["name"] == "Shop", "list create " + str(L1))

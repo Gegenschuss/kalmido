@@ -42,7 +42,7 @@ const START = {'tasks.lastKey': null};  // boot.js seeds "today" for the older s
   w.location.hash = 'nonsense'; await sleep(300);
   check(w.eval('S.route.key') === 'inbox', 'unknown hash: the Inbox');
   // tour text
-  check(/Inbox comes first/.test(w.eval(`tourSteps()[0].d`)), 'tour: the first card names the Inbox');
+  check(/Basket comes first/.test(w.eval(`tourSteps()[0].d`)), 'tour: the first card names the Inbox');
   w.close();
 
   // a device that was on a view before keeps it
@@ -61,7 +61,7 @@ const START = {'tasks.lastKey': null};  // boot.js seeds "today" for the older s
   // German
   await call('PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', ls: START}); d = w.document;
-  check(/Eingang steht oben/.test(w.eval(`tr(tourSteps()[0].d)`)) && d.querySelector('#side .sg-focus .srow .n')?.textContent === 'Eingang', 'German: tour text + sidebar');
+  check(/Korb steht oben/.test(w.eval(`tr(tourSteps()[0].d)`)) && d.querySelector('#side .sg-focus .srow .n')?.textContent === 'Korb', 'German: tour text + sidebar');
   w.close();
 
   const bad = errs.filter(e => !/Could not parse CSS/.test(e));

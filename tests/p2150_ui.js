@@ -163,10 +163,10 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
 
   // ================= #632 + German
   w = await boot({user: 'bob', hash: 'today'}); d = w.document;
-  check([...d.querySelectorAll('#side .srow .n')].some(n => n.textContent === 'Inbox'), "#632: bob's inbox (stored 'Inbox') shows 'Inbox'");
+  check([...d.querySelectorAll('#side .srow .n')].some(n => n.textContent === 'Basket'), "#632: bob's inbox (stored 'Inbox') shows 'Basket' (2.39.1)");
   w.close();
   w = await boot({user: 'dora', hash: 'today'}); d = w.document;
-  check([...d.querySelectorAll('#side .srow .n')].some(n => n.textContent === 'Eingang'), "#632: dora (German) sees 'Eingang'");
+  check([...d.querySelectorAll('#side .srow .n')].some(n => n.textContent === 'Korb'), "#632: dora (German) sees 'Korb'");
   w.eval(`settingsModal('account')`); await sleep(400);
   const dv = d.querySelector('.smodal details.sdev'); if (dv) dv.open = true;
   await until(() => d.querySelector('#s-toks .mhint, #s-toks .tokrow'));
@@ -178,7 +178,7 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   w.close();
   await call('PATCH', '/api/settings', {lang: 'de'}, CB);
   w = await boot({user: 'bob', hash: 'today'}); d = w.document;
-  check([...d.querySelectorAll('#side .srow .n')].some(n => n.textContent === 'Eingang'), "#632: bob in German: his 'Inbox' shows as 'Eingang'");
+  check([...d.querySelectorAll('#side .srow .n')].some(n => n.textContent === 'Korb'), "#632: bob in German: his 'Inbox' shows as 'Korb'");
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'}, CB);
 

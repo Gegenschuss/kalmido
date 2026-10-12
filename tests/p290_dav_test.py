@@ -251,7 +251,7 @@ m, _ = ms(r)
 m2, _ = ms(req(D, "PROPFIND", "/dav/calendars/alice/", PF_CAL, 1))
 cals = {h: e for h, e in m2.items() if h != "/dav/calendars/alice/"}
 names = {e["props"]["{DAV:}displayname"].text: h for h, e in cals.items()}
-check(set(names) == {"Inbox", "Work", "Home", "Team"}, f"one calendar per visible list: {sorted(names)}")
+check(set(names) == {"Basket", "Work", "Home", "Team"}, f"one calendar per visible list: {sorted(names)}")
 WORK, HOME, TEAM = names["Work"], names["Home"], names["Team"]
 check(WORK == f"/dav/calendars/alice/{work}/", "calendar address = list id")
 wp = cals[WORK]["props"]

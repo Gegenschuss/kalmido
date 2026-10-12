@@ -120,7 +120,7 @@ async function firefox(fn) {
   click(w, md.querySelector('[data-m="ok"]'));
   await until(() => !d.querySelector('.modal.ppreq'));
   w.eval(`listMenu(document.querySelector('#top h1'), ${INBOX})`);
-  check(menuTexts(d).includes('Sort the inbox with Claude…') && !menuTexts(d).includes('Tasks from notes…'), 'inbox menu: Sort the inbox with Claude…');
+  check(menuTexts(d).includes('Sort the basket with Claude…') && !menuTexts(d).includes('Tasks from notes…'), 'inbox menu: Sort the basket with Claude…');
   w.eval('closePop()');
   click(w, d.querySelector('[data-act="list-new"]')); await sleep(200);
   check(menuTexts(d).includes('New project from briefing…'), 'Lists > +: New project from briefing…');
@@ -149,7 +149,7 @@ async function firefox(fn) {
   check(mb && /Sort with Claude/.test(mb.getAttribute('title')), 'selection bar: Sort with Claude…');
   click(w, mb);
   md = await until(() => d.querySelector('.modal.ppreq'));
-  check(md && /2 inbox items/.test(md.querySelector('.pptask').textContent) && /titles and notes of these 2 inbox items/.test(md.querySelector('#pp-priv').textContent), 'triage dialog: 2 items, consent');
+  check(md && /2 basket items/.test(md.querySelector('.pptask').textContent) && /titles and notes of these 2 basket items/.test(md.querySelector('#pp-priv').textContent), 'triage dialog: 2 items, consent');
   const boxes = [...md.querySelectorAll('#pp-lists [data-lid]')];
   check(boxes.length === 2 && boxes.every(b => b.checked) && md.querySelector('#pp-lall').checked, 'all my lists ticked');
   const bo = boxes.find(b => +b.dataset.lid === OTHER); bo.checked = false; change(w, bo);
@@ -235,7 +235,7 @@ async function firefox(fn) {
   await until(() => !d.querySelector('.modal.ppm'), 60);
   let t1 = await call('GET', `/api/tasks/${I1}`), t2 = await call('GET', `/api/tasks/${I2}`);
   check(t1.list_id === TEAM && t1.section_id === null && t2.title === 'gift for mum', 'triage applied: only the ticked one, section edit (none)');
-  check(/inbox item sorted/.test(d.querySelector('#toast')?.textContent || ''), 'toast: sorted');
+  check(/basket item sorted/.test(d.querySelector('#toast')?.textContent || ''), 'toast: sorted');
   await w.eval(`histStep('undo')`); await sleep(400);
   t1 = await call('GET', `/api/tasks/${I1}`);
   check(t1.list_id === INBOX, 'triage undo: back in the inbox');

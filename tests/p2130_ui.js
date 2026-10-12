@@ -188,7 +188,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   w.eval(`openQuickSheet('Call Bob tomorrow 10:00')`); await sleep(100);
   check(d.body.classList.contains('qsheet-open'), 'P8: the + button hides behind the add sheet');
   await w.eval(`submitQuick(document.querySelector('#qsheet'))`); await sleep(900);
-  check(/Inbox · Tomorrow 10:00/.test(d.querySelector('#toast')?.textContent || '') && /Open/.test(d.querySelector('#toast button')?.textContent || ''), 'P8: where the task went: ' + d.querySelector('#toast')?.textContent);
+  check(/Basket · Tomorrow 10:00/.test(d.querySelector('#toast')?.textContent || '') && /Open/.test(d.querySelector('#toast button')?.textContent || ''), 'P8: where the task went: ' + d.querySelector('#toast')?.textContent);
   closeAll(w); w.close();
 
   w = await boot({user: 'alice', hash: 'l/' + P}); d = w.document;
@@ -219,7 +219,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
 
   // ================= P2 / P3 / P5 / P7: language
   check(I18N('de')['Next|section'] === 'Als Nächstes' && I18N('fr')['Done|section'] === 'Terminé', 'P2: the software project sections are translated');
-  check(I18N('fr').Inbox === 'Boîte de réception', 'P3: "Boîte" with the circumflex');
+  check(I18N('fr')['Sort the basket'] === 'Trier le panier', 'P3: the French basket (2.39.1: Panier)');
   check(I18N('de')['Next week'] === 'Nächste Woche', 'P5: "Nächste Woche" in full');
   const bad = await fetch(B + 'api/auth/login', {method: 'POST', headers: {...H, 'Accept-Language': 'fr-FR,fr;q=0.9'}, body: JSON.stringify({username: 'alice', password: 'wrong-one'})});
   check(/(incorrect|Nom d’utilisateur|mot de passe)/i.test((await bad.json()).error || ''), 'P7: a failed login answers in the page\'s language (fr)');

@@ -21,7 +21,7 @@ the app has not yet been tested by people who use a screen reader every day (see
 - **Screen readers.** Controls have names, roles and states: a task's circle is a checkbox named after the task, the
   task title is a button described by its date, priority and other details, the panels and dialogs are named regions
   and modal dialogs, colour swatches say which colour they are and whether they are picked.
-- **Announcements.** Messages such as "Moved to Inbox · Undo" are read out (a polite live region); new chat messages are
+- **Announcements.** Messages such as "Moved to Basket · Undo" are read out (a polite live region); new chat messages are
   a log; error lines in dialogs are alerts.
 - **Errors in words.** A required field left empty says so next to the field ("Please fill in “Name”"), marks the
   field invalid and connects the message to it.

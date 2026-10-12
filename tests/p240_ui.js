@@ -199,7 +199,7 @@ async function firefox(fn) {
   w = await boot({user: 'alice', hash: 'l/' + HOME}); d = w.document;
   key(w, d.body, 'q');
   let sh = await until(() => d.querySelector('.qadd.sheet.capture'));
-  check(sh && d.querySelector('#qsheet').placeholder === 'Capture to the inbox…', 'q opens the capture box');
+  check(sh && d.querySelector('#qsheet').placeholder === 'Capture to the basket…', 'q opens the capture box');
   const qs = d.querySelector('#qsheet');
   input(w, qs, 'Call mum tomorrow');
   click(w, sh.querySelector('[data-act="qsheet-send"]'));
@@ -232,7 +232,7 @@ async function firefox(fn) {
   check([...d.querySelectorAll('.lnew .ptcard b')].map(b => b.textContent).slice(0, 4).join('|') === 'Leer|Agentur|Software / KI-Dev|Privat', 'German: project types');
   d.querySelector('.lnew').remove();
   w.eval('quickCapture()'); await sleep(100);
-  check(d.querySelector('#qsheet').placeholder === 'In den Eingang notieren …', 'German: capture box');
+  check(d.querySelector('#qsheet').placeholder === 'In den Korb notieren …', 'German: capture box');
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});
 

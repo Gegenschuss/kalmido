@@ -1427,8 +1427,8 @@ by <agent>*), and it is one undo step.
 **Flow.**
 
 1. A person starts it in the app: *New project from briefing…* (Lists > +, command palette), *Break down with
-   <agent>…* (task menu, palette), *Sort the inbox with <agent>…* (the inbox's menu, palette, or the bot button when
-   inbox items are selected), *Tasks from notes…* (a list's menu, palette), *Tidy up the list…* (2.39.0: a list's menu, or
+   <agent>…* (task menu, palette), *Sort the basket with <agent>…* (the inbox's menu - in the app the inbox is called “Basket” since 2.39.1 -, palette,
+   or the bot button when inbox items are selected), *Tasks from notes…* (a list's menu, palette), *Tidy up the list…* (2.39.0: a list's menu, or
    *Tidy up…* for selected tasks; always the list's tidy agent). With several agents they pick one.
 2. Kalmido creates a job (kind `project`, `subtasks`, `triage`, `extract`, `dayplan` or `cleanup`; state `running`, `proposal_state`
    `requested`) and sends the agent the event `job_request` with the input.

@@ -129,7 +129,7 @@ const utc = (d, h) => { const x = new Date(`${d}T${String(h).padStart(2, '0')}:0
   check(!md.querySelector('.cvxrow.sub'), 'the lists are folded');
   click(w, md.querySelector('[data-evc="lists"]')); await sleep(100);
   const lrows = [...md.querySelectorAll('.cvxrow.sub')];
-  check(lrows.length === 3 && lrows.map(r => r.querySelector('.evcn').textContent).includes('Home') && lrows.at(-1).querySelector('.evcn').textContent === 'Inbox', 'per list: Work, Home, Inbox last ' + lrows.map(r => r.querySelector('.evcn').textContent));
+  check(lrows.length === 3 && lrows.map(r => r.querySelector('.evcn').textContent).includes('Home') && lrows.at(-1).querySelector('.evcn').textContent === 'Basket', 'per list: Work, Home, Basket last ' + lrows.map(r => r.querySelector('.evcn').textContent));
   const hsw = lrows.find(r => r.querySelector('.evcn').textContent === 'Home').querySelector('input'); hsw.checked = false; change(w, hsw); await sleep(400);
   check(JSON.parse((await settings()).cal_lists_hidden).includes(HOME), 'list switch: stored (cal_lists_hidden)');
   check(/1 list hidden/.test(md.querySelector('.cvxrow:not(.sub) .evcn').textContent), 'the Tasks row counts the hidden lists');

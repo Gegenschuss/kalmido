@@ -144,7 +144,7 @@ const FEAT = 'cal,comments,collab,agents';
     await ev(`(() => { document.querySelector('#chat-msgs [data-mid="a:${am.id}"] .csoffer button').click(); return 1; })()`);
     await ready(ev, `!!document.querySelector('.csmodal #cs-title')`);
     const dl = await ev(`(() => { const md = document.querySelector('.csmodal'); return {title: md.querySelector('#cs-title').value, list: md.querySelector('#cs-list').selectedOptions[0]?.textContent, n: md.querySelector('#cs-list').options.length, due: !!md.querySelector('[data-dpfor="cs-due"]'), lists: [...md.querySelector('#cs-list').options].map(o => o.textContent)}; })()`);
-    check(dl.title === 'Release plan' && dl.list === 'Inbox' && dl.due && dl.lists.includes('Work') && dl.lists.includes('Shop DM'), '#1159: the dialog: title from the heading, the inbox, lists I may change, a date picker ' + JSON.stringify(dl));
+    check(dl.title === 'Release plan' && dl.list === 'Basket' && dl.due && dl.lists.includes('Work') && dl.lists.includes('Shop DM'), '#1159: the dialog: title from the heading, the inbox, lists I may change, a date picker ' + JSON.stringify(dl));
     await shot('p2370u-save-dialog.png');
     await ev(`(() => { dpSet(document.querySelector('.csmodal #cs-due'), '2026-10-20'); document.querySelector('.csmodal [data-m="ok"]').click(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('.csmodal') && !!document.querySelector('#chat-msgs [data-mid="a:${am.id}"] .csaved')`, 40), '#1159: saved: the dialog closes, the message shows "Saved"');

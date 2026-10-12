@@ -140,7 +140,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   check(pl.findIndex(x => /^Task \d/.test(x)) >= 0 && pl.findIndex(x => /^Task \d/.test(x)) < pl.indexOf('Ask Claude: Task') && pl[pl.length - 1] === 'Create as task: Task' && pl.indexOf('Ask Claude: Task') === pl.length - 2, '#644: real matches first, then "Ask Claude", then "Create as task" ' + pl.slice(-3).join(' | '));
   type('Water the plants tomorrow'); await sleep(50);
   pl = [...d.querySelectorAll('.palette .pitem')];
-  check(pl[0].querySelector('.plt').textContent === 'Create as task: Water the plants' && pl[0].classList.contains('on') && /Inbox · Tomorrow/.test(pl[0].querySelector('.pls')?.textContent || ''), '#644: nothing found: "Create as task" on top (with list and date) ' + pl[0].textContent.trim().slice(0, 80));
+  check(pl[0].querySelector('.plt').textContent === 'Create as task: Water the plants' && pl[0].classList.contains('on') && /Basket · Tomorrow/.test(pl[0].querySelector('.pls')?.textContent || ''), '#644: nothing found: "Create as task" on top (with list and date) ' + pl[0].textContent.trim().slice(0, 80));
   type('Which tasks are due this week?'); await sleep(50);
   click(w, [...d.querySelectorAll('.palette .pitem')].find(b => /^Ask Claude:/.test(b.textContent.trim())));
   check(await until(async () => (await call('GET', `/api/agents/${AG}/chat`)).messages?.some?.(m => m.body === 'Which tasks are due this week?')), '#644: "Ask Claude" sends the text to the chat');

@@ -79,8 +79,8 @@ async function api(cookie, method, url, body) {
   key(w, 'k', {ctrlKey: true}); await sleep(50);
   type('another list'); await sleep(20);
   key(w, 'Enter', {}, d.querySelector('.palette .pqin')); await sleep(80);
-  check(d.querySelector('.palette .pmode') && /Inbox/.test(d.querySelector('.palette .plist').textContent), 'move mode: lists offered');
-  type('inb'); await sleep(20);
+  check(d.querySelector('.palette .pmode') && /Basket/.test(d.querySelector('.palette .plist').textContent), 'move mode: lists offered');
+  type('bas'); await sleep(20);
   key(w, 'Enter', {}, d.querySelector('.palette .pqin')); await sleep(700);
   check(w.eval(`taskById(${tick.id}).list_id`) === w.eval('inbox().id'), 'move mode: task moved to the inbox');
   // no match + Enter = new task (quick add syntax)

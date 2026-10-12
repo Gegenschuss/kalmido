@@ -197,7 +197,7 @@ async function firefox(fn) {
   check(/sees 0 of your 3 lists/.test(hr()?.textContent || ''), 'helper: sees 0 of 3 (2.5.1): ' + hr()?.textContent);
   let asked = []; w.confirm = m => { asked.push(m); return false; };
   click(w, hr().querySelector('[data-aisall]')); await sleep(600);
-  check(asked.length === 1 && /private ones too/.test(asked[0]) && /Never the inbox/.test(asked[0]), 'Share all: a warning first');
+  check(asked.length === 1 && /private ones too/.test(asked[0]) && /Never the basket/.test(asked[0]), 'Share all: a warning first');
   check(!(await call('GET', '/api/state')).lists.find(l => l.id === F1).members.some(m => m.user_id === ag2.id), 'declined: nothing shared');
   w.confirm = m => { asked.push(m); return true; };
   click(w, hr().querySelector('[data-aisall]')); await sleep(1500);
