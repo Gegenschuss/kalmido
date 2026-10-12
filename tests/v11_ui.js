@@ -171,7 +171,8 @@ async function api(cookie, method, url, body) {
   d.querySelectorAll('.cele,.cele-quip').forEach(x => x.remove());
   w.eval(`celebrate('today', {frame: 0.5, force: true})`);
   const fx = parseFloat((d.querySelector('.cele .cbird').style.transform.match(/translate\(([-\d.]+)px/) || [])[1]);
-  check(Math.abs(fx - w.innerWidth / 2) < 2 && !d.querySelector('.cele .cvine') && d.querySelector('.cele .cwing'), 'frame 0.5: the heron flies across, in the middle (no vine) ' + fx);
+  const fw = parseFloat(d.querySelector('.cele .cbird').style.width);  // 2.39.1 (#1292): it hovers in the middle, about a quarter of the width
+  check(Math.abs(fx + fw / 2 - w.innerWidth / 2) < 2 && fw >= w.innerWidth * 0.2 && !d.querySelector('.cele .cvine') && d.querySelector('.cele .cwing'), 'frame 0.5: the heron hovers in the middle (no vine) ' + fx + ' ' + fw);
   // multi-select batch completing the rest of a list
   d.querySelectorAll('.cele,.cele-quip').forEach(x => x.remove());
   w.eval(`S.multi = new Set([${T3.id}])`); await w.eval(`batch('complete', {}, true)`); await sleep(100);
