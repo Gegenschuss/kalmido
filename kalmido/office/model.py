@@ -142,6 +142,7 @@ def _lines(v, name, n=12, mx=200):
         v = v.splitlines()
     if not isinstance(v, list) or any(not isinstance(x, str) for x in v):
         raise BadInput(tr("Invalid value: {0}", name))
+    v = [re.sub(r"[\x00-\x1f\x7f]", "", x) for x in v]  # 2.39.0 (#1209 audit M2): no control characters in the frozen sender
     return [x.strip()[:mx] for x in v if x.strip()][:n]
 
 
@@ -172,7 +173,7 @@ def office_settings_clean(c, oid, b, cur):
                 raise BadInput(tr("Invalid value: {0}", "company"))
             co = out["company"]
             if "name" in v:
-                co["name"] = (v.get("name") or "").strip()[:NAME_MAX] if isinstance(v.get("name"), str) else ""
+                co["name"] = re.sub(r"[\x00-\x1f\x7f]", "", v.get("name") or "").strip()[:NAME_MAX] if isinstance(v.get("name"), str) else ""
             for f in ("lines", "contact_lines", "register_lines", "bank_lines"):
                 if f in v:
                     co[f] = _lines(v[f], f)
@@ -209,7 +210,7 @@ def office_settings_clean(c, oid, b, cur):
         elif k == "datev_auto":
             out[k] = 1 if v in (1, True, "1", "true") else 0
         elif k in ("invoice_closing_de", "invoice_closing_en", "reminder_text_de", "reminder_text_en"):
-            out[k] = (v or "").strip()[:TEXT_MAX] if isinstance(v, str) else ""
+            out[k] = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", v or "").strip()[:TEXT_MAX] if isinstance(v, str) else ""
         elif k == "offer_number_at":
             if v not in ("create", "finalize"):
                 raise BadInput(tr("Invalid value: {0}", k))

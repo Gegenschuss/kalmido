@@ -49,7 +49,7 @@ from ..agents.chat import (
 # shared (default: people who share at least one list with the agent; instance admins count as sharing, as for the chat)
 # | all (every person of the instance) | off. The agent never gets general access: the job input is the only data it sees
 # (e.g. the selected inbox items, the lists the person ticked), stored with the job and deleted with it (PROP_KEEP_DAYS).
-PROP_KINDS = ("project", "subtasks", "triage", "extract", "dayplan")  # 2.10.0 (#440): dayplan
+PROP_KINDS = ("project", "subtasks", "triage", "extract", "dayplan", "cleanup")  # 2.10.0 (#440): dayplan; 2.39.0 (#1151): cleanup
 PROP_STATES = ("requested", "ready", "applied", "discarded")
 PROP_MODES = ("off", "shared", "all")
 PROP_MAX_ITEMS = 200                    # entries one proposal may create / change (tasks + subtasks)
@@ -329,6 +329,10 @@ def prop_validate(kind, b, inp):
         out["tasks"] = tasks
     elif kind == "dayplan":  # 2.10.0 (#440)
         out.update(dayplan_validate(b, inp))
+    elif kind == "cleanup":  # 2.39.0 (#1151): tidy up a list (agents/cleanup.py)
+        from ..agents.cleanup import cln_validate
+        _p_keys(b, "", (*common, "items"))
+        out.update(cln_validate(b, inp))
     return out
 
 
@@ -425,6 +429,9 @@ def proposal_request():
     kind = b.get("kind")
     if kind not in PROP_KINDS:
         return err(tr("Invalid value: {0}", "kind"))
+    if kind == "cleanup":  # 2.39.0 (#1151): always the list's tidy agent, in packages (agents/cleanup.py)
+        from ..agents.cleanup import cln_request
+        return cln_request(c, uid, b)
     try:
         aid = int(b.get("agent_id") or 0)
     except (TypeError, ValueError):
@@ -568,6 +575,9 @@ def prop_run(c, j, sel, ed, extra):
     ts = iso(now_utc())
     rec = {"at": ts, "sel": sel, "edits": ed, "extra": extra, "tasks": [], "sections": [], "changes": {}, "list": None, "undone": False}
     selected = set(sel)
+    if kind == "cleanup":  # 2.39.0 (#1151)
+        from ..agents.cleanup import cln_run
+        return cln_run(c, j, sel, edits, rec)
     if kind == "project":
         name = _p_str(extra.get("name") or prop["name"], "name", PROP_NAME_MAX, True)
         folder = clean_folder(extra.get("folder") if extra.get("folder") is not None else prop.get("folder") or "", False)
@@ -716,8 +726,11 @@ def prop_run(c, j, sel, ed, extra):
 
 def prop_notify_agent(c, j, action, state, extra=None):
     j = c.execute("SELECT * FROM agent_jobs WHERE id=?", (j["id"],)).fetchone()
-    agent_emit(c, j["agent_id"], "job", {"job": job_dict(c, j), "action": action, "proposal": {"state": state, **(extra or {})},
-                                         "user": {"id": me(), "name": user_names(c, [me()]).get(me(), "")}})
+    data = {"job": job_dict(c, j), "action": action, "proposal": {"state": state, **(extra or {})},
+            "user": {"id": me(), "name": user_names(c, [me()]).get(me(), "")}}
+    if j["kind"] == "cleanup":  # 2.39.0 (#1151): the list on top (agent_emit: health list, list limit, playbook)
+        data["list_id"] = j["list_id"]
+    agent_emit(c, j["agent_id"], "job", data)
 
 
 @app.post("/api/proposals/<int:jid>/apply")
@@ -741,7 +754,10 @@ def proposal_apply(jid):
     c.execute("UPDATE agent_jobs SET prop_state='applied', state='done', action='approve', action_by=?, action_at=?, updated_at=?, applied=? "
               "WHERE id=?", (me(), ts, ts, json.dumps(rec, ensure_ascii=False), jid))
     counts = {"created": len(rec["tasks"]), "changed": len(rec["changes"])}
-    prop_notify_agent(c, j, "approve", "applied", {**counts, "list_id": rec["list"] if j["kind"] == "project" else None})
+    if j["kind"] == "cleanup":  # 2.39.0 (#1151): counts per kind of entry + the skipped tasks (why)
+        from ..agents.cleanup import cln_result
+        counts.update(cln_result(rec))
+    prop_notify_agent(c, j, "approve", "applied", {**counts, "list_id": rec["list"] if j["kind"] in ("project", "cleanup") else None})
     c.execute("UPDATE notifications SET read_at=? WHERE user_id=? AND kind='proposal' AND read_at IS NULL AND data->>'job' = ?",
               (ts, me(), str(jid)))
     bump(c)
@@ -780,7 +796,10 @@ def proposal_undo(jid):
     if j["prop_state"] != "applied" or not rec or rec.get("undone"):
         return err(tr("Nothing to undo"), 409)
     ts, skipped, n = iso(now_utc()), [], 0
-    if j["kind"] in ("triage", "dayplan"):
+    if j["kind"] == "cleanup":  # 2.39.0 (#1151): field changes back, closed tasks open again (one step)
+        from ..agents.cleanup import cln_undo
+        n, skipped = cln_undo(c, rec)
+    elif j["kind"] in ("triage", "dayplan"):
         for tid, ch in rec["changes"].items():
             try:
                 need_task(c, int(tid))
@@ -840,6 +859,10 @@ def proposal_redo(jid):
             c.rollback()
             raise
         n = len(rec["tasks"])
+    elif j["kind"] == "cleanup":  # 2.39.0 (#1151)
+        from ..agents.cleanup import cln_undo
+        n, skipped = cln_undo(c, rec, back=False)
+        rec.update(undone=False)
     elif j["kind"] in ("triage", "dayplan"):
         for tid, ch in rec["changes"].items():
             try:
@@ -904,7 +927,7 @@ def v1_agent_job_get(jid):
 @app.post("/api/v1/agent/jobs/<int:jid>/proposal")
 @v1_view
 def v1_agent_job_proposal(jid):
-    """The agent's structured proposal for a job_request (kind project | subtasks | triage | extract, see docs/AGENTS.md).
+    """The agent's structured proposal for a job_request (kind project | subtasks | triage | extract | dayplan | cleanup, see docs/AGENTS.md).
     Validated here; replaces an earlier one until the person applied or discarded it. The job waits for the person."""
     v1_args(())
     aid = need_agent()

@@ -59,12 +59,15 @@ def _date(v, name):
     raise BadInput(tr("Invalid value: {0}", name))
 
 
+CTRL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
 def _text(v, name, mx=TEXT_MAX):
     if v is None:
         return ""
     if not isinstance(v, str):
         raise BadInput(tr("Invalid value: {0}", name))
-    return v.strip()[:mx]
+    return CTRL_RE.sub("", v).strip()[:mx]  # 2.39.0 (#1209 audit M2): control characters break the e-invoice XML / PDF/A
 
 
 def _num(v, name, lo=None, hi=None):
@@ -838,6 +841,8 @@ def odoc_status(did):
     r = doc_row(c, oid, did)
     b = body()
     st = _choice((b if isinstance(b, dict) else {}).get("status"), "status", STATUSES if r["kind"] == "offer" else INV_STATUSES[r["kind"]])
+    if r["kind"] == "offer" and st == "draft" and r["status"] != "draft":  # 2.39.0 (#1209 audit N1): sent = locked, a copy for changes
+        raise Denied(409, tr("This status change is not allowed ({0} to {1})", r["status"], st))
     ts = iso(now_utc())
     if r["kind"] != "offer" and st != r["status"]:  # 2.38.0: issued only by finalising, never back to draft, cancelled only by a credit note
         ok = ofx_locked(r) and r["status"] != "cancelled" and st in ("sent", "paid") and (st != "paid" or r["kind"] == "invoice")

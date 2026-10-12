@@ -302,6 +302,7 @@ function listMenuItems(id, anchor) {
     const ag = listAgents(l)[0];
     items.push({label: ag ? tr('Agent: {0}…', ag.name) : tr('Agent…'), ...(ag ? {sub: listenLabel(l)} : {}), icon: 'bot', cls: 'magent', fn: () => shareModal(id, {focus: 'agents'})});  // 2.30.0 (#1034)
   }
+  const pbi = pbMenuItem(l); if (pbi) items.push(pbi);  // 2.39.0 (#1168): the list's playbook
   if (agentsOn() && !l.is_inbox && listAgents(l).length) items.push({label: tr('Agent access'), icon: 'eye', cls: 'magacc', rare: 1, fn: () => agAccessModal(id)});  // 2.30.0 (#919): the access log
   // 2.27.0 (#990): a section can be added from here too (also in an empty list)
   // 2.31.0 (#1053): "Set status" left the list header; here (and on the project page) it stays one tap away
@@ -321,6 +322,7 @@ function listMenuItems(id, anchor) {
     if (l.is_inbox && own) items.push({label: propWith(N_('Sort the inbox with {0}…'), N_('Sort the inbox with an agent…')), icon: 'bot', rare: 1, fn: () => propRequest('triage', {})});
     else if (!l.is_inbox && canEditList(id)) items.push({label: tr('Tasks from notes…'), icon: 'bot', rare: 1, fn: () => propRequest('extract', {lid: id})});
   }
+  if (clnOk(l)) items.push({label: tr('Tidy up the list…'), icon: 'bot', cls: 'mclean', fn: () => clnRequest(id)});  // 2.39.0 (#1151): cleanup.js
   // 2.13.0 (#453 A7): not a second "List"; 2.18.0 review: "As a list / As a project", "Type: Project" read like the project type
   // 2.25.0 (UX-52): list or project is the switch "Project features" in "Edit list…" (no "As a list / As a project" here)
   void k;
@@ -723,6 +725,7 @@ function listModal(id, folder = '', o = {}) {
     <div class="row lnagrow"><label for="l-nag">${tr('Repeat reminders')}</label><select id="l-nag" ${dis}><option value="">${tr('Off|nag')}</option>${NAG_OPTS.slice(1).map(([v, n]) => `<option value="${v}" ${(l.nag || '') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     <div class="shint lhint">${tr('Default for the tasks of this list with a date: the reminder repeats until the task is done (a task can choose otherwise in its date dialog). Quiet hours: Settings > Notifications.')}</div>
     ${id && ['owner', 'admin'].includes(l.role || 'owner') && !l.family && !l.life ? staleRowHtml(l) : ''}
+    ${id && !l.is_inbox && pbOn(l) ? pbAreaHtml('list') : ''}
     ${id && shareOk(l) ? `<h4>${tr(collab() ? N_('Sharing') : N_('Owner'))}</h4><div class="row shsum"><span class="muted" id="l-shsum">${esc(shareSummary(l))}</span><button class="btn sm" data-m="share-open">${ic('users', 's')} ${tr(collab() ? N_('Share…') : N_('Ownership…'))}</button></div>` : ''}
     ${id && !l.is_inbox && collab() && l.shared ? `<h4>${tr('Notifications')}</h4><div class="row"><label for="l-bell">${ic(BELL_ICON[l.bell || 'default'], 's')} ${tr('This list')}</label><select id="l-bell" data-native>${BELLS.map(([m, n]) => `<option value="${m}" ${(l.bell || 'default') === m ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     <div class="shint lhint" id="l-bellhint">${tr(BELLS.find(b => b[0] === (l.bell || 'default'))[2])} · ${tr('only for you')}</div>${isOwner(l) ? '' : ntfMemberHint(l)}
@@ -735,6 +738,7 @@ function listModal(id, folder = '', o = {}) {
   }).catch(() => {});
   if (id && !l.is_inbox) repoWire(md, id);  // 2.2.0 (#271)
   if (id && !l.is_inbox && collab()) ltagsWire(md, id);
+  if (id && !l.is_inbox && pbOn(l)) pbMount(md, {lid: id});  // 2.39.0 (#1168)
   const bellHint = v => { const h = $('#l-bellhint', md); if (h) h.textContent = tr(BELLS.find(x => x[0] === v)[2]) + ' · ' + tr('only for you'); const c = $('#l-bellc', md); if (c) c.hidden = v !== 'custom'; };
   $('#l-bell', md)?.addEventListener('change', async e => { e.stopPropagation(); if (e.target.value === 'custom') { bellHint('custom'); bellCustomModal(id); return; } await bellSet(id, e.target.value); bellHint(e.target.value); });
   $('#l-bell', md)?.addEventListener('bell-sync', e => bellHint(e.target.value));

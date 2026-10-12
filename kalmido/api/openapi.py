@@ -616,6 +616,8 @@ def openapi_spec():
     msgsearch_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.33.0 (#1080)
     from ..agents.schedules import sched_spec
     sched_spec(paths, schemas, op, ok, errs, ref, pid, nul)  # 2.34.0 (#272)
+    from ..lists.playbook import pb_spec
+    pb_spec(paths, schemas, op, ok, errs, ref, pid, nul)  # 2.39.0 (#1168)
     pkgc_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.23.0 (#463)
     hosting_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.24.0 (#907 #910)
     from ..notify.caps import notif_tpl_spec

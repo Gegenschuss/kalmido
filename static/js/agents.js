@@ -646,6 +646,7 @@ function propItemHtml(k, x, o = {}) {  // one entry: checkbox, title, date and t
 function propItemsHtml() {
   const {v} = S.prop, p = v.proposal, inp = v.input;
   if (v.kind === 'dayplan') return propDayplanHtml();  // 2.10.0 (#440)
+  if (v.kind === 'cleanup') return clnItemsHtml();  // 2.39.0 (#1151): cleanup.js
   if (v.kind === 'project') {
     const secOpts = cur => `<option value="">${tr('No section')}</option>${p.sections.map(s => `<option ${s === cur ? 'selected' : ''}>${esc(s)}</option>`).join('')}`;
     return p.tasks.map((t, i) => propItemHtml(String(i), t, {
@@ -689,14 +690,14 @@ function propDraw() {
         <label class="ppshare"><input type="checkbox" id="pp-share"> ${tr('Share the new list with {0}', esc(v.agent.name))}</label>` : ''}
       <div class="ppbar"><button class="btn sm" data-pp="all">${tr('Select all')}</button><button class="btn sm" data-pp="none">${tr('Select none')}</button></div>
       <div class="ppl">${propItemsHtml()}</div>
-      <div class="shint keep">${v.kind === 'dayplan' ? tr('Applying sets the planned start and duration of the selected tasks as you; due dates stay as they are. One step, undo takes it back.') : v.kind === 'triage' ? tr('Applying moves and changes the selected inbox items as you; one step, undo takes it back.') : tr('Applying creates the selected entries as you (you own them, the history names {0}); one step, undo takes it back.', esc(v.agent.name))}</div>`;
+      <div class="shint keep">${v.kind === 'cleanup' ? tr('Applying changes the selected tasks as you. Tasks someone is editing right now or that changed since the request are skipped. One step, undo takes it back.') : v.kind === 'dayplan' ? tr('Applying sets the planned start and duration of the selected tasks as you; due dates stay as they are. One step, undo takes it back.') : v.kind === 'triage' ? tr('Applying moves and changes the selected inbox items as you; one step, undo takes it back.') : tr('Applying creates the selected entries as you (you own them, the history names {0}); one step, undo takes it back.', esc(v.agent.name))}</div>`;
     // 2.5.2 (K03): the footer stays visible below the entries (sticky), with the count next to Apply
     foot = `<button class="btn danger" data-pp="discard">${tr('Discard')}</button><span class="spacer"></span><span class="muted ppcount ppfc"></span><button class="btn" data-pp="close">${tr('Close')}</button><button class="btn pri" data-pp="apply"></button>`;
   } else {
     main = `<div class="ppwait">${ic(st === 'applied' ? 'check' : 'x')}<p>${st === 'applied' ? (v.applied?.undone ? tr('Applied, then undone.') : tr('Applied.')) : tr('Discarded. {0} was told.', agent)}</p></div>`;
   }
   P.md.querySelector('.card').innerHTML = `<h3>${ic('bot', 's')} ${esc(j.title)}</h3>
-    <div class="pphead muted"><span class="jst">${esc(tr(PROP_ST[st] || st))}</span>${agent} · ${esc(relTime(j.updated_at))}</div>
+    <div class="pphead muted"><span class="jst">${esc(tr(PROP_ST[st] || st))}</span>${agent} · ${esc(relTime(j.updated_at))}${v.kind === 'cleanup' && clnPack(v) ? ' · ' + esc(clnPack(v)) : ''}</div>
     <div class="calerr" role="alert" id="pp-err" hidden></div>${main}<div class="foot ${st === 'ready' ? 'ppfoot' : ''}">${foot}</div>`;
   if (st === 'ready') propCount();
 }
@@ -713,7 +714,7 @@ async function propApply(b) {
   const e = histAdd({label: tr('Applied the proposal of {0}', name), snaps: [], after: [], ids: [], lids: r.list_id ? [r.list_id] : [],
     undo: async () => { const x = await api('POST', `/api/proposals/${jid}/undo`); return {skipped: x.skipped || [], none: !!x.none}; },
     redo: async () => { const x = await api('POST', `/api/proposals/${jid}/redo`); return {skipped: x.skipped || [], none: !!x.none}; }});
-  histToast(v.kind === 'dayplan' ? trn('{0} task planned', '{0} tasks planned', r.changed) : r.changed ? trn('{0} inbox item sorted', '{0} inbox items sorted', r.changed) : trn('{0} entry created', '{0} entries created', r.created), e);
+  histToast(v.kind === 'cleanup' ? clnDone(r) : v.kind === 'dayplan' ? trn('{0} task planned', '{0} tasks planned', r.changed) : r.changed ? trn('{0} inbox item sorted', '{0} inbox items sorted', r.changed) : trn('{0} entry created', '{0} entries created', r.created), e);
   if (v.kind === 'project' && r.list_id && listById(r.list_id)) go('l/' + r.list_id);
   if (S.route.mod === 'agents') loadJobs();
 }

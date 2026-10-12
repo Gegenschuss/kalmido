@@ -31,6 +31,7 @@ from flask import g, jsonify, request
 from ..core.config import app, OFFICE_DIR
 from ..core.i18n import N_, tr
 from ..core.db import bump, db, iso, now_utc
+from ..core.pg import write_lock
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from .model import office_gate, office_org, office_role, office_settings
@@ -279,6 +280,7 @@ def ofx_finalize(c, oid, uid, did):
     """Finalises document did of organisation oid (see the module text). 409 when it already is."""
     from .docs import _assign_number, _j, doc_items, doc_row, doc_totals
     from .invoices import inv_before_finalize, inv_after_finalize
+    write_lock(c, f"office_doc_{int(did)}")  # 2.39.0 (#1209 audit M1): two parallel finalise calls -> the second gets 409, no lost number
     r = doc_row(c, oid, did)
     ofx_need_editable(r)
     s = office_settings(c, oid)

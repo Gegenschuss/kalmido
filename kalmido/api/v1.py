@@ -797,9 +797,12 @@ def v1_list_get(lid):
     d = next((x for x in visible_lists(c, me()) if x["id"] == lid), None)
     if not d:
         raise Denied(404)
+    from ..lists.playbook import pb_effective
+    pb = pb_effective(c, lid)  # 2.39.0 (#1168): the effective Playbook (null = none; never of a health list)
     return jsonify({**v1_list(d), "sections": [{"id": r["id"], "name": r["name"], "sort": r["sort"]}
                                                for r in visible_sections(c, me()) if r["list_id"] == lid],
-                    "fields": v1_list_fields(c, lid).get(lid, [])})
+                    "fields": v1_list_fields(c, lid).get(lid, []),
+                    "playbook": pb["text"] if pb and pb["text"] and pb["life"] != "health" else None})
 
 
 @app.post("/api/v1/lists/<int:lid>/owner")

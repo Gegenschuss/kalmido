@@ -170,6 +170,7 @@ def sched_dict(c, r, uid=None, names=None):
             "user_id": r["user_id"], "by_name": names.get(r["user_id"], ""), "mine": uid is not None and r["user_id"] == uid,
             "title": r["title"], "prompt": r["prompt"], "freq": r["freq"], "days": sched_days(r), "time": r["at_time"], "tz": r["tz"],
             "list_id": r["list_id"], "list_name": lname, "enabled": bool(r["enabled"]),
+            "list_check": bool(r["list_check"]),  # 2.39.0 (#1168): a scheduled check of a list (made in its Playbook view)
             "next_at": r["next_at"] if r["enabled"] else None, "last_at": r["last_at"], "last_state": r["last_state"] or None,
             "created_at": r["created_at"], "updated_at": r["updated_at"]}
 
@@ -210,6 +211,10 @@ def sched_fire(c, r, now, manual=False, manual_by=None):
             sched_list_ok(c, aid, uid, r["list_id"])
         except (Denied, BadInput):
             state = "no_list"
+    if not state and r["list_check"]:  # 2.39.0 (#1168): a list check needs a list and a person who may still write its Playbook
+        from ..lists.playbook import chk_ok
+        if not r["list_id"] or not chk_ok(c, r):
+            state = "no_list"
     if state:  # the plan cannot work any more: it switches itself off (the person sees why)
         c.execute("UPDATE agent_schedules SET enabled=0, next_at=NULL, last_state=?, updated_at=? WHERE id=?", (state, iso(now), r["id"]))
         return state
@@ -224,6 +229,9 @@ def sched_fire(c, r, now, manual=False, manual_by=None):
             "manual_by": {"id": manual_by, "name": user_names(c, [manual_by]).get(manual_by, "")} if manual_by else None,
             "hint": "A planned job of this person. Do what the prompt says (only with lists shared with you) and answer in "
                     "your chat with them (send_chat user_id = by.id), starting with the job's title. Nothing goes to anyone else."}
+    if r["list_check"]:  # 2.39.0 (#1168): list_check, open_task_ids, the default prompt and its own hint (the Playbook: agent_emit)
+        from ..lists.playbook import chk_event
+        chk_event(c, r, data)
     seq = agent_emit(c, aid, "scheduled_job", data) if agent_active(a) else None
     state = ("late" if late else "sent") if seq else "skipped"
     c.execute("UPDATE agent_schedules SET last_at=?, last_state=?, last_seq=? WHERE id=?", (iso(now), state, seq, r["id"]))
@@ -254,7 +262,8 @@ def agent_schedules_get(aid):
     mgr = sched_manager(c, aid, uid)
     if not agent_row(c, aid) or is_agent(g.user) or not (agent_shares(c, aid, uid) or mgr):
         raise Denied(404)
-    rows = c.execute("SELECT * FROM agent_schedules WHERE agent_id=?" + ("" if mgr else " AND user_id=?") + " ORDER BY user_id!=?, id",
+    # 2.39.0 (#1168): the scheduled checks of lists live in the list's Playbook view (the agent's managers see them here too)
+    rows = c.execute("SELECT * FROM agent_schedules WHERE agent_id=?" + ("" if mgr else " AND user_id=? AND list_check=0") + " ORDER BY user_id!=?, id",
                      (aid, uid) if mgr else (aid, uid, uid)).fetchall()
     names = user_names(c, [aid] + [r["user_id"] for r in rows])
     return jsonify(data=[sched_dict(c, r, uid, names) for r in rows], manager=mgr, max=SCHED_MAX, may_create=agent_shares(c, aid, uid),
@@ -272,7 +281,7 @@ def agent_schedule_create(aid):
         f = sched_in(c, aid, uid, body())
     except BadInput as e:
         return err(str(e))
-    if c.execute("SELECT COUNT(*) FROM agent_schedules WHERE agent_id=? AND user_id=?", (aid, uid)).fetchone()[0] >= SCHED_MAX:
+    if c.execute("SELECT COUNT(*) FROM agent_schedules WHERE agent_id=? AND user_id=? AND list_check=0", (aid, uid)).fetchone()[0] >= SCHED_MAX:
         return err(tr("At most {0} plans per agent", SCHED_MAX), 409)
     ts = iso(now_utc())
     sid = insert_id(c, """INSERT INTO agent_schedules(agent_id,user_id,title,prompt,freq,days,at_time,tz,list_id,enabled,created_at,updated_at)
@@ -357,11 +366,14 @@ def sched_spec(paths, schemas, op, ok, errs, ref, pid, nul):
         "days": {"type": "array", "items": {"type": "integer"}, "description": "weekly: ISO weekdays 1 (Monday) - 7; monthly: [day of month]"},
         "time": {"type": "string", "description": "HH:MM in tz"}, "tz": {"type": "string", "description": "IANA time zone of the person"},
         "list_id": nul("integer"), "list_name": nul("string"), "list": nul("object"), "enabled": {"type": "boolean"},
+        "list_check": {"type": "boolean", "description": "2.39.0: a scheduled check of the list against its Playbook (event scheduled_job "
+                                                         "with list_check: true, open_task_ids and playbook)"},
         "next_at": nul("string", format="date-time"), "last_at": nul("string", format="date-time"),
         "last_state": nul("string", description="sent | late | manual | skipped (you were switched off) | no_access | no_list (switched itself off)"),
         "created_at": {"type": "string", "format": "date-time"}, "updated_at": {"type": "string", "format": "date-time"}}}
     paths["/agent/schedules"] = {"get": op(
         "2.34.0 (#272): your planned jobs (agent tokens only). People who may chat with you plan them in the app; when one is due "
         "you get the event scheduled_job {schedule_id, title, prompt, list_id, list, by, user, chat_with, rhythm, due_at, late, manual, manual_by} "
+        "(2.39.0: a scheduled check of a list adds list_check: true, open_task_ids, open_tasks_more and playbook) "
         "and answer in your chat with that person. You cannot create or change plans.", "Agents",
         ok({"type": "object", "properties": {"data": {"type": "array", "items": ref("Schedule")}, "next_cursor": nul("string")}}) | errs("403"))}

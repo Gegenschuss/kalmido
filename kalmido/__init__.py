@@ -76,6 +76,8 @@ ORDER = (
     "agents.admin",
     "agents.api",
     "agents.proposals",
+    "agents.cleanup",  # 2.39.0 (#1151)
+    "lists.playbook",  # 2.39.0 (#1168)
     "tasks.attachtext",  # 2.34.0 (#368)
     "tasks.snippets",  # 2.35.0 (#1095)
     "agents.gates",  # 2.26.0 (#949)

@@ -696,5 +696,6 @@ document.addEventListener('click', e => {
   const ag = agentById(S.chat.aid);
   menu(a, [ag?.enabled ? {label: tr('Reply'), icon: 'reply', fn: () => replyStart('a', m.id)} : null,
     {label: tr('Copy'), icon: 'copy', fn: () => chatCopy(S.chat.msgs, m, 'agent')},  // 2.37.0 (#1165)
-    {label: m.saved_task_id ? tr('Saved as a task: open it') : tr('Save as task'), icon: 'bookmark', fn: () => m.saved_task_id ? chatSaveOpen(m.saved_task_id) : chatSaveModal('agent', m, () => chatPatch())}]);
+    {label: m.saved_task_id ? tr('Saved as a task: open it') : tr('Save as task'), icon: 'bookmark', fn: () => m.saved_task_id ? chatSaveOpen(m.saved_task_id) : chatSaveModal('agent', m, () => chatPatch())},
+    m.from !== 'agent' && ag?.enabled ? {label: tr('Edit'), icon: 'edit', fn: () => chatEditStart(m.id)} : null]);  // 2.39.0 (#1179): my own messages
 });

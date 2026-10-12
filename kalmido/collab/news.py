@@ -34,8 +34,9 @@ NEWS_KINDS = ("mention", "comment", "assign", "unassign", "take", "complete", "s
               "errreport",  # 2.18.0: a NEW error (new fingerprint) of the list's error-report webhook became a ticket
               "apdecide",  # 2.23.0 (#463): the approver decided on my approval request (row "assign")
               "signup",  # 2.23.0 (#711): a registration waits for approval (admins; row "usage", the admins' row)
-              "agentjoin")  # 2.24.0 (#896): an agent joined a list I am in (row "share"), with where it runs
-NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evshare", "abshare", "agentjoin")  # about a list (2.21: an event / calendar / address book), not a task
+              "agentjoin",  # 2.24.0 (#896): an agent joined a list I am in (row "share"), with where it runs
+              "playbook_proposal")  # 2.39.0 (#1168): an agent proposes a change of the Playbook of a list I decide on (row "proposal")
+NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evshare", "abshare", "agentjoin", "playbook_proposal")  # about a list (2.21: an event / calendar / address book), not a task
 NEWS_EXCERPT = 300
 # 1.9.0: per user (setting news_kinds) which groups of events create a News item; pushes are not affected
 NEWS_GROUPS = {"mention": ("mention",), "assign": ("assign", "unassign", "take"), "comment": ("comment",), "complete": ("complete",),
@@ -114,7 +115,7 @@ KIND_ROW = {"mention": "mention", "comment": "comment", "assign": "assign", "una
             "share": "share", "role": "share", "unshare": "share", "unblock": "unblock", "status": "status",
             "newtask": "newtask", "approval": "approval", "followup": "followup", "usage": "usage", "owner": "share",
             "proposal": "proposal", "take": "assign", "errreport": "errreport", "apdecide": "assign", "signup": "usage",
-            "orglist": "share"}  # 2.35.0 (#1101): an organisation admin archived / restored / deleted / handed over a list
+            "orglist": "share", "playbook_proposal": "proposal"}  # 2.35.0 (#1101): an organisation admin archived / restored / deleted / handed over a list
 
 
 def notif_stored(s):
@@ -325,7 +326,7 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             pass
         elif kind == "orglist":  # 2.35.0 (#1101): addressed to the list's people; a deleted list only lives on in data.name
             pass
-        elif kind in ("share", "role", "status", "owner", "agentjoin"):
+        elif kind in ("share", "role", "status", "owner", "agentjoin", "playbook_proposal"):
             if not sees(r["list_id"]):
                 continue
         elif kind == "usage":  # 2.1.1 (#326): an agent's usage limit, for admins (no task, no list)

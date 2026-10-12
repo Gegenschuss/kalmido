@@ -112,6 +112,8 @@ def visible_lists(c, uid):
     repos = git_repos_of_lists(c, ids)  # 2.2.0 (#271)
     mss = milestones_of_lists(c, [r["id"] for r in rows if r["kind"] == "project"])  # 2.7.1 (#410): timeline markers
     has_groups = collab_all() and bool(c.execute("SELECT 1 FROM group_shares LIMIT 1").fetchone())
+    from ..lists.playbook import pb_flags
+    pbs = pb_flags(c, rows)  # 2.39.0 (#1168): lists with an effective Playbook
     lfids = {}  # 2.14.0 (#425): custom field ids per list (columns of deleted fields are dropped)
     if ids:
         for f in c.execute(f"SELECT id, list_id FROM list_fields WHERE list_id IN ({','.join('?' * len(ids))})", ids):
@@ -164,6 +166,7 @@ def visible_lists(c, uid):
         d["agents_open"] = d["role"] in ("owner", "admin") or bool(r["agent_members"]) or r["owner_id"] in ag or viewer_admin
         d["columns"] = columns_out(r["col_cfg"], lfids.get(r["id"], set()))  # 2.14.0 (#425)
         d["trip"] = _jtrip(r["trip"])  # 2.22.0 (#663): {from, to, where} of a trip list, else null
+        d["playbook"] = bool(pbs.get(r["id"]))  # 2.39.0 (#1168): the list has an effective Playbook (its own or a folder's)
         d.pop("col_cfg", None)
         out.append(d)
     # 2.27.0 (#988): lists placed by their owner (mirrored) come first in their order, then the viewer's own (two numberings)

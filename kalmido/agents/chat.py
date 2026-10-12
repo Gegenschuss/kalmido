@@ -23,7 +23,7 @@ from ..personal.timetrack import BadInput, UnknownFields
 from ..notify.alerts import aa_count, aa_oserr
 from ..api.v1 import hit_limit, task_for, v1_args, v1_json, v1_view
 from ..agents.core import (
-    agent_active, agent_emit, AGENT_EVENT_COMMENT_CHARS, agent_public, agent_row, agent_task_data, agents_for,
+    agent_active, agent_emit, AGENT_EVENT_COMMENT_CHARS, agent_public, agent_row, agent_task_data, agent_usable, agents_for,
     CHAT_KEEP, CHAT_MAX, is_agent, JOB_ACTIONS, job_dict, job_may_act, job_visible, list_agents, lst_brief,
     need_chat_agent, WAKE_LIMIT,
 )
@@ -105,7 +105,7 @@ def agent_job_action(jid):
     return jsonify(job_dict(c, j))
 
 
-def chat_dict(r, rx=None, files=None, api=False, newest=None):
+def chat_dict(r, rx=None, files=None, api=False, newest=None, edits=False):
     """rx: {message id: reactions} of chat_reactions_of (2.7.2, #421); delivered_at (#422): when the agent fetched a person's
     message (null = not yet; the agent's own messages: null). 2.13.1 (#465): files = chat_files_of (attachments: id, name,
     mime, size, url; api: the REST address /api/v1/chat-attachments/{id}, else the app's). 2.30.0 (#1037): newest = the id
@@ -124,6 +124,9 @@ def chat_dict(r, rx=None, files=None, api=False, newest=None):
             # 2.37.0 (#1159): the agent offers "Save as task" under this message (the person saves, never the agent)
             "offer_save": bool(r["offer_save"]) if "offer_save" in r.keys() and r["sender"] == "agent" else False,
             **chat_reply(r),  # 2.33.0 (#1076): reply_to + reply (the quote of the answered message)
+            # 2.39.0 (#1179): the person edited their message (null = never); edits = the earlier versions, only for the person
+            "edited_at": r["edited_at"] if "edited_at" in r.keys() else None,
+            **({"edits": med_edits(r)} if edits else {}),
             "attachments": [{**f, "url": (f"/api/v1/chat-attachments/{f['id']}" if api else f"/api/chat-files/{f['id']}")}
                             for f in (files or {}).get(r["id"], [])]}
 
@@ -176,10 +179,10 @@ def chat_files_of(c, mids):
     return out
 
 
-def chat_one(c, r, api=False):
-    """chat_dict of one row with its reactions and files."""
+def chat_one(c, r, api=False, edits=False):
+    """chat_dict of one row with its reactions and files (edits: the earlier versions, for the person only)."""
     return chat_dict(r, chat_reactions_of(c, [r["id"]]), chat_files_of(c, [r["id"]]), api=api,
-                     newest=chat_newest(c, r["agent_id"], r["user_id"]))
+                     newest=chat_newest(c, r["agent_id"], r["user_id"]), edits=edits)
 
 
 def chat_upload_files():
@@ -684,7 +687,7 @@ def agent_chat_get(aid):
     saved = chat_save_of(c, me(), "agent", [r["id"] for r in rows])  # 2.37.0 (#1159): saved as a task by me
     msgs = []
     for r in rows:
-        d = chat_dict(r, rx, fs, newest=nw)
+        d = chat_dict(r, rx, fs, newest=nw, edits=r["sender"] == "user")
         d["saved_task_id"] = saved.get(r["id"])
         if r["id"] in sm:
             d["steps"] = sm[r["id"]]
@@ -745,7 +748,7 @@ def agent_chat_post(aid):
     chat_emit(c, aid, r)
     c.commit()
     chat_unlink_trimmed()
-    return jsonify(chat_one(c, r)), 201
+    return jsonify(chat_one(c, r, edits=True)), 201
 
 
 def chat_emit(c, aid, r):
@@ -755,6 +758,144 @@ def chat_emit(c, aid, r):
     if tid:
         data.update(agent_task_data(c, tid, aid))
     agent_emit(c, aid, "chat", data)
+
+
+# ---- 2.39.0 (#1179): a person edits their own message in the agent chat (like the team chat and comments). The earlier
+# versions stay ({body, at}, oldest first, at most MED_EDITS_MAX) and only the person sees them; the agent sees edited_at
+# and the current text. Not fetched yet (no delivered_at, no answer of the agent after it): the text is simply replaced,
+# also inside the queued 'chat' event (polling queue + webhook queue). Fetched or answered: the agent additionally gets
+# the event message_edited (old + new text) -- only this agent; it treats it as a correction, its running work goes on.
+# The same event reaches the agents that got an edited comment ('comment' / 'mention' / 'assigned') or team chat message
+# ('team_message') as an event before, while they still see it. No push to people.
+MED_EDITS_MAX = 20
+
+
+def med_edits(r):
+    """The earlier versions of a chat row [{body, at}] (oldest first)."""
+    v = r["edits"] if "edits" in r.keys() else None
+    if isinstance(v, str):
+        v = _jload(v)
+    return [x for x in v if isinstance(x, dict)] if isinstance(v, list) else []
+
+
+def med_answered(c, m):
+    """Did the agent write in this conversation after message m?"""
+    return bool(c.execute("SELECT 1 FROM agent_chat WHERE agent_id=? AND user_id=? AND sender='agent' AND id>? LIMIT 1",
+                          (m["agent_id"], m["user_id"], m["id"])).fetchone())
+
+
+def med_queued_events(c, aid, event, key, ref):
+    """Queued events of agent aid (or of every agent: aid None) whose data[key].id is ref: [(row, envelope)]. A cheap ILIKE
+    on the stored JSON first, then the exact check."""
+    q, args = "SELECT id, agent_id, uuid, payload FROM agent_events WHERE event IN ({}) AND payload ILIKE ?".format(
+        ",".join("?" * len(event))), [*event, f'%"{key}": {{"id": {int(ref)},%']
+    if aid is not None:
+        q += " AND agent_id=?"
+        args.append(aid)
+    out = []
+    for r in c.execute(q + " ORDER BY id", args).fetchall():
+        try:
+            env = json.loads(r["payload"])
+        except ValueError:
+            continue
+        if ((env.get("data") or {}).get(key) or {}).get("id") == ref:
+            out.append((r, env))
+    return out
+
+
+def med_requeue_text(c, aid, m, text, at):
+    """The message was not fetched yet: the queued 'chat' event(s) of it carry the new text (polling + webhook queue)."""
+    for r, env in med_queued_events(c, aid, ("chat",), "message", m["id"]):
+        env["data"]["message"].update(body=text, edited_at=at)
+        c.execute("UPDATE agent_events SET payload=? WHERE id=?", (json.dumps(env, ensure_ascii=False), r["id"]))
+        for w in c.execute("SELECT id, payload FROM webhook_queue WHERE delivery=?", (r["uuid"],)).fetchall():
+            try:
+                wenv = json.loads(w["payload"])
+            except ValueError:
+                continue
+            if isinstance(((wenv.get("data") or {}).get("message")), dict):
+                wenv["data"]["message"].update(body=text, edited_at=at)
+                c.execute("UPDATE webhook_queue SET payload=? WHERE id=?", (json.dumps(wenv, ensure_ascii=False), w["id"]))
+
+
+def med_chat_edit(c, m, text):
+    """Stores the new text of the person's chat row m (the caller checked the rights and commits). Returns the new row."""
+    m = c.execute("SELECT * FROM agent_chat WHERE id=? FOR UPDATE", (m["id"],)).fetchone()  # against a parallel fetch
+    at = iso_ms(now_utc())
+    edits = (med_edits(m) + [{"body": m["body"], "at": m["edited_at"] or m["created_at"]}])[-MED_EDITS_MAX:]
+    c.execute("UPDATE agent_chat SET body=?, edited_at=?, edits=? WHERE id=?", (text, at, json.dumps(edits, ensure_ascii=False), m["id"]))
+    answered = med_answered(c, m)
+    if not m["delivered_at"] and not answered:
+        med_requeue_text(c, m["agent_id"], m, text, at)
+    else:
+        uid = m["user_id"]
+        data = {"kind": "chat", "message": {"id": m["id"], "user_id": uid, "task_id": m["task_id"], "created_at": m["created_at"],
+                                            "edited_at": at},
+                "old": m["body"], "new": text, "user": {"id": uid, "name": user_names(c, [uid]).get(uid, "")}, "answered": answered}
+        if m["task_id"] and task_visible(c, m["task_id"], m["agent_id"], full=True):
+            data.update(agent_task_data(c, m["task_id"], m["agent_id"]))
+        agent_emit(c, m["agent_id"], "message_edited", data)
+    return c.execute("SELECT * FROM agent_chat WHERE id=?", (m["id"],)).fetchone()
+
+
+@app.patch("/api/agents/<int:aid>/chat/<int:mid>")
+def agent_chat_edit(aid, mid):
+    """2.39.0 (#1179): {body} -- I change the text of my own message to agent aid. Same text: nothing changes."""
+    from ..personal.timetrack import web_fields
+    c = db()
+    need_chat_agent(c, aid)
+    m = c.execute("SELECT * FROM agent_chat WHERE id=? AND agent_id=? AND user_id=?", (mid, aid, me())).fetchone()
+    if not m:
+        raise Denied(404)
+    if m["sender"] != "user":
+        raise Denied(403, tr("Only the sender can edit this message"))
+    try:  # review N1: also while the agent is paused (the waiting message is simply replaced)
+        text = chat_body(web_fields(body(), {"body"}, "PATCH /api/agents/{aid}/chat/{mid}").get("body"))
+    except BadInput as e:
+        return err(str(e))
+    if text != m["body"]:
+        m = med_chat_edit(c, m, text)
+        c.commit()
+    return jsonify(chat_one(c, m, edits=True))
+
+
+def med_comment_edited(c, t, k, old_body):
+    """A comment was edited (comments.py, before its new mentions are sent): message_edited to every agent that got it as
+    an event and still sees the task with its comments (agent_emit blocks health lists and lists outside an agent's limit)."""
+    from ..collab.comments import comment_plain
+    old, new = comment_plain(c, old_body), comment_plain(c, k["body"])
+    if old == new:
+        return
+    uid = k["user_id"]
+    who = {"id": uid, "name": user_names(c, [uid]).get(uid, "")}
+    for aid in sorted({r["agent_id"] for r, _ in med_queued_events(c, None, ("comment", "mention", "assigned"), "comment", k["id"])}):
+        # still sees the task; the person may still address it there (like the event 'comment', AGENT_GATED)
+        if not task_visible(c, t["id"], aid, full=True) or not agent_usable(c, aid, uid, t["list_id"]):
+            continue
+        agent_emit(c, aid, "message_edited", agent_task_data(
+            c, t["id"], aid, kind="comment", comment={"id": k["id"], "task_id": t["id"], "created_at": k["created_at"], "edited_at": k["edited_at"]},
+            old=old[:AGENT_EVENT_COMMENT_CHARS], new=new[:AGENT_EVENT_COMMENT_CHARS], user=who, list_id=t["list_id"]))
+
+
+def med_team_edited(c, r, m, old_body):
+    """A team chat message was edited: message_edited to the agents that got it as team_message and are still in the room."""
+    from ..collab.comments import comment_plain
+    from ..collab.teamchat import tchat_room_members
+    old, new = comment_plain(c, old_body), comment_plain(c, m["body"])
+    if old == new:
+        return
+    ags = {x["agent_id"] for x, _ in med_queued_events(c, None, ("team_message",), "message", m["id"])}
+    if not ags:
+        return
+    members, uid = tchat_room_members(c, r), m["user_id"]
+    for aid in sorted(ags & set(members)):
+        if r["list_id"] and not agent_usable(c, aid, uid, r["list_id"]):  # like team_message (AGENT_GATED)
+            continue
+        agent_emit(c, aid, "message_edited", {
+            "kind": "team", "room": {"id": r["id"], "kind": r["kind"], "list_id": r["list_id"]},
+            "message": {"id": m["id"], "user_id": uid, "task_id": m["task_id"], "created_at": m["created_at"], "edited_at": m["edited_at"]},
+            "old": old[:AGENT_EVENT_COMMENT_CHARS], "new": new[:AGENT_EVENT_COMMENT_CHARS],
+            "user": {"id": uid, "name": user_names(c, [uid]).get(uid, "")}})
 
 
 def chat_unlink_trimmed():

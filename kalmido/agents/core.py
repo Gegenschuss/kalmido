@@ -64,6 +64,8 @@ AGENT_EVENTS = ("mention", "comment", "assigned", "unassigned", "chat", "reactio
                 "missed",  # 2.29.0 (#1031): events older than AGENT_EVENTS_STALE_H, folded into one summary at the next poll
                 "stale_tasks",  # 2.34.0 (#266): once a day, the stale tasks of lists with "Agent follows up" on (bundled)
                 "scheduled_job",  # 2.34.0 (#272): a planned job of a person is due (agents/schedules.py); answer in their chat
+                "playbook_proposal",  # 2.39.0 (#1168): people applied / discarded the agent's proposed change of a list's Playbook
+                "message_edited",  # 2.39.0 (#1179): a person changed a chat message / comment / team message the agent already had
                 )
 JOB_STATES = ("running", "waiting", "done", "failed", "stopped")
 JOB_ACTIONS = ("approve", "reject", "stop")
@@ -195,6 +197,11 @@ def agent_emit(c, aid, event, data, actor="auto"):
         if actor.get("kind") == "agent" or event in AGENT_GATED:
             if not agent_usable(c, aid, actor["id"], lid):
                 return None
+    if lid and isinstance(lid, int) and "playbook" not in data:  # 2.39.0 (#1168): the list's effective Playbook comes along
+        from ..lists.playbook import pb_event
+        pb = pb_event(c, lid)
+        if pb:
+            data = {**data, "playbook": pb}
     ev, ts = str(uuid.uuid4()), iso(now_utc())
     via = (act_via() or "web") if has_request_context() else "web"
     seq = insert_id(c, "INSERT INTO agent_events(agent_id,uuid,event,payload,created_at) VALUES(?,?,?,'{}',?)", (aid, ev, event, ts))

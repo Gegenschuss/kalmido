@@ -249,6 +249,7 @@ def inv_after_finalize(c, oid, uid, r):
     ts = iso(now_utc())
     c.execute("UPDATE office_docs SET status='issued', updated_at=? WHERE id=? AND org_id=? AND status='draft'", (ts, r["id"], oid))
     if r["kind"] == "credit" and _col(r, "cancels_id"):
+        write_lock(c, f"office_credits_{int(r['cancels_id'])}")  # 2.39.0 (#1209 audit M1): parallel credit notes see each other
         inv_ = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=? AND kind='invoice'", (r["cancels_id"], oid)).fetchone()
         if inv_ is not None:
             ti, tc = _j(inv_["totals"], {}), _j(r["totals"], {})
@@ -696,7 +697,7 @@ def _mail(to, subject, text, **kw):
     try:
         mail_send(to, subject, text, **kw)
     except (smtplib.SMTPException, OSError) as e:
-        app.logger.warning("office mail failed: %s: %s", type(e).__name__, e)
+        app.logger.warning("office mail failed: %s", type(e).__name__)  # 2.39.0 (#1209 audit N6): no addresses in the log
         raise Denied(409, tr("Mail server refused the message"))
 
 
@@ -740,7 +741,11 @@ def inv_send(c, oid, uid, r, b):
     text = text[:5000] or _mail_text(r, lang, s)
     files = inv_files(c, oid, r["id"])
     u = g.user
-    _mail(to, subject, text, attachments=files, cc=cc or None, from_name=(u["display_name"] if u is not None and "display_name" in u.keys() else None))
+    from .ledger import ofx_company
+    rt = ofx_company(c, oid).get("email") or ""  # 2.39.0 (#1209 audit N4): the client's answer goes to the company, not the server
+    rt = rt if re.fullmatch(r"[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]+", rt) else None
+    _mail(to, subject, text, attachments=files, cc=cc or None, from_name=(u["display_name"] if u is not None and "display_name" in u.keys() else None),
+          reply_to=rt)
     ts = iso(now_utc())
     c.execute("UPDATE office_docs SET status=CASE WHEN status IN ('issued') THEN 'sent' ELSE status END, sent_at=COALESCE(sent_at, ?), updated_at=? "
               "WHERE id=? AND org_id=?", (ts, ts, r["id"], oid))

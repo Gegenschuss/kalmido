@@ -395,6 +395,8 @@ def tchat_edit(mid):
         return err(tr("The message is too long (max. {0} characters)", TCHAT_MAX))
     text, _ = tchat_clean_mentions(c, r, text.strip())
     c.execute("UPDATE tchat_msgs SET body=?, edited_at=? WHERE id=?", (text, iso_ms(now_utc()), mid))
+    from ..agents.chat import med_team_edited  # 2.39.0 (#1179): agents that got it as team_message learn the change
+    med_team_edited(c, r, c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone(), m["body"])
     c.commit()
     m = c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone()
     return jsonify(tchat_msg_dict(c, m, tchat_rx(c, [mid])))

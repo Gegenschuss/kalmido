@@ -42,6 +42,17 @@ def _user(c, uid):
     return c.execute("SELECT id, is_admin, kid, kind FROM users WHERE id=?", (uid,)).fetchone()
 
 
+def _org_boundary(c):
+    """2.39.0 (#1209 audit M3): organisations are separate (modes workspaces / multi, unset mode: more than one org) -- then
+    the instance admin sees and moves only the clients of their own organisations, like everybody else."""
+    from ..accounts.orgs import INSTANCE_ENV
+    if INSTANCE_ENV in ("workspaces", "multi"):
+        return True
+    if INSTANCE_ENV in ("shared", "organisation"):
+        return False
+    return c.execute("SELECT kalmido_org_count()").fetchone()[0] > 1  # counts all orgs also under row-level security
+
+
 def client_rows(c, uid, archived=True):
     """The clients uid may see (rows), sorted by name."""
     u = _user(c, uid)
@@ -49,7 +60,7 @@ def client_rows(c, uid, archived=True):
         return []
     q = "SELECT * FROM clients" + ("" if archived else " WHERE archived=0")
     rows = c.execute(q + " ORDER BY archived, lower(name), id").fetchall()
-    if u["is_admin"]:
+    if u["is_admin"] and not _org_boundary(c):
         return rows
     from ..accounts.orgs import user_orgs
     orgs = set(user_orgs(c, uid))
@@ -93,7 +104,7 @@ def clean_client(c, uid, b, new=False):
         if k in CLIENT_TEXT_MAX:
             if v is not None and not isinstance(v, str):
                 raise BadInput(tr("Invalid value: {0}", k))
-            v = (v or "").strip()
+            v = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", v or "").strip()  # 2.39.0 (#1209 audit M2): no control characters (invoice XML)
             if k != "address" and k != "note":
                 v = re.sub(r"\s+", " ", v)
             v = v[:CLIENT_TEXT_MAX[k]]
@@ -118,7 +129,7 @@ def clean_client(c, uid, b, new=False):
             mine = set(user_orgs(c, uid))
             if v is not None and not c.execute("SELECT 1 FROM orgs WHERE id=?", (v,)).fetchone():
                 raise BadInput(tr("Invalid value: {0}", k))
-            if v is not None and v not in mine and not u["is_admin"]:
+            if v is not None and v not in mine and not (u["is_admin"] and not _org_boundary(c)):
                 raise BadInput(tr("You can only add clients to your own organisations"))
         out[k] = v
     for k in CLIENT_BILLING:

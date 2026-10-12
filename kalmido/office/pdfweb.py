@@ -151,7 +151,7 @@ def epdf_store(c, oid, did):
     r = doc_row(c, oid, did)
     pdf, xml, fmt = _render(c, oid, r)
     d = os.path.join(OFFICE_DIR, str(int(oid)))
-    os.makedirs(d, mode=0o755, exist_ok=True)
+    os.makedirs(d, mode=0o700, exist_ok=True)  # 2.39.0 (#1209 audit N8)
     stem = os.path.join(d, f"doc{int(did)}-{epdf_name(r)}")
     shas = {}
     for ext, data in (("pdf", pdf), ("xml", xml)):
@@ -264,7 +264,7 @@ def opdf_logo_upload():
     except ValueError as e:
         return err(str(e))
     lp = opdf_logo_path(oid)
-    os.makedirs(os.path.dirname(lp), mode=0o755, exist_ok=True)
+    os.makedirs(os.path.dirname(lp), mode=0o700, exist_ok=True)  # 2.39.0 (#1209 audit N8)
     with open(lp + ".tmp", "wb") as fh:
         fh.write(png)
     os.replace(lp + ".tmp", lp)

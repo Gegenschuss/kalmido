@@ -186,6 +186,7 @@ function meHtml() {
   const ts = meTasks(), mob = isMobile();
   const fields = meFields(ts).map(f => meRow(f, ts)).join('');
   return `<div class="dtop metop"><h2 class="mecount" id="me-h">${esc(trn('{0} task', '{0} tasks', ts.length))}</h2><span class="spacer"></span>
+      ${clnSel() ? `<button type="button" class="iconbtn" data-act="mb-clean" title="${esc(tr('Tidy up…'))}" aria-label="${esc(tr('Tidy up…'))}">${ic('bot')}</button>` : ''}
       ${propInboxSel() ? `<button type="button" class="iconbtn" data-act="mb-sort" title="${esc(propWith(N_('Sort with {0}…'), N_('Sort with an agent…')))}" aria-label="${esc(propWith(N_('Sort with {0}…'), N_('Sort with an agent…')))}">${ic('bot')}</button>` : ''}
       <button type="button" class="iconbtn" data-act="mb-all" title="${esc(tr('Select all'))}" aria-label="${esc(tr('Select all'))}">${ic('all')}</button>
       ${mob ? `<button type="button" class="btn sm pri" data-act="me-sheet-close">${tr('Done')}</button>` : `<button type="button" class="iconbtn dclose" data-act="mb-close" title="${esc(tr('Clear selection') + ' (Esc)')}" aria-label="${esc(tr('Clear selection'))}">${ic('x')}</button>`}</div>

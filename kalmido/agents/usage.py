@@ -742,7 +742,8 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
     ev = {"type": "object", "properties": {"id": {"type": "string"}, "seq": {"type": "integer"}, "event": {"type": "string", "enum": list(AGENT_EVENTS)},
                                            "created_at": {"type": "string", "format": "date-time"}, "agent_id": {"type": "integer"},
                                            "actor": {"oneOf": [{"type": "null"}, {"type": "object"}]}, "via": {"type": "string"},
-                                           "data": {"type": "object"}}}
+                                           "data": {"type": "object", "description": "2.39.0 (#1179) message_edited: {kind: chat | comment | team, message | comment, "
+                                                                                    "old, new, user, answered (chat), task + list (comment)} -- a correction, keep your running work"}}}
     job = {"type": "object", "properties": {k: {"type": "integer"} for k in ("id", "agent_id")} | {
         "task_id": nul("integer"), "user_id": nul("integer"), "title": {"type": "string"}, "state": {"type": "string", "enum": list(JOB_STATES)},
         "log": {"type": "string"}, "action": nul("string", enum=[*JOB_ACTIONS, None]), "created_at": {"type": "string"}, "updated_at": {"type": "string"},
@@ -756,6 +757,8 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                             "reply_to": nul("integer", description="2.33.0 (#1076): the answered message of this conversation; reply = its quote"),
                                             "reply": {"anyOf": [ref("ReplyQuote"), {"type": "null"}]},
                                             "delivered_at": nul("string", description="2.7.2 (#422): when the agent fetched the person's message (event poll, MCP, webhook, chat read); null = not yet / an agent message"),
+                                            "edited_at": nul("string", description="2.39.0 (#1179): when the person last edited their message (null = never); "
+                                                             "body is the current text. Edited after you fetched or answered it: the event message_edited (old, new)"),
                                             "asks": {"type": "boolean", "description": "2.13.0: an agent message that asks something (a question mark outside code and links); only there a 👍 / 👎 of the person is an approval / rejection"},
                                             "choices": nul("object", description="2.28.0 (#1005): answer buttons of an agent message: {choices: [{id, label, style?: primary | danger}], multi}; "
                                                           "2.30.0 permission, expires_at; 2.35.0 (#1103) approval {title, what} (an approval request, buttons yes / no)"),
@@ -910,7 +913,7 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                 "tasks": {"type": "array", "items": {"type": "object", "required": ["title"], "properties": {
                     "title": {"type": "string"}, "notes": {"type": "string"}, "due": {"type": "string", "format": "date"}}}}}})},
         "/agent/jobs/{id}/proposal": {"post": op(
-            "Submit the structured proposal for a job_request (kind project | subtasks | triage | extract | dayplan; see docs/AGENTS.md). "
+            "Submit the structured proposal for a job_request (kind project | subtasks | triage | extract | dayplan | cleanup; see docs/AGENTS.md). "
             "Validated; replaces an earlier one until the person applied or discarded it", AG,
             ok(ref("Job"), "Created", "201") | errs("400", "403", "404", "409", "413"), [pid("id", "Job id")], scope=W,
             body={"type": "object", "properties": {"kind": {"type": "string", "enum": list(PROP_KINDS)},
@@ -919,7 +922,9 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                  f"depends_on[]}}]}}; subtasks: {{items[{{title, notes?, due?, estimate?}}], dependencies[[a, b]]?}}; triage: "
                                  f"{{items[{{task_id, list_id?, section_id?, tags[], priority?, due?, rewrite_title?}}]}}; extract: {{tasks[{{title, "
                                  f"notes?, assignee_id?, due?, section?}}]}}; dayplan (2.10.0): {{items[{{task_id, start (HH:MM), duration?, note?}}], nofit[{{task_id, "
-                                 f"note?}}]}} (2.11.0: applying sets plan_start + duration, never due dates; task ids from input.tasks). At most {PROP_MAX_ITEMS} entries, {PROP_MAX_BYTES // 1024} KB."})},
+                                 f"note?}}]}} (2.11.0: applying sets plan_start + duration, never due dates; task ids from input.tasks); cleanup (2.39.0): {{items[{{op: merge, "
+                                 f"task_ids[keep, ...], title?, reason?}} | {{op: rename, task_id, title, reason?}} | {{op: move, task_id, section_id|null, position?, reason?}} | "
+                                 f"{{op: close, task_id, reason}}]}} (task ids from input.items, each once). At most {PROP_MAX_ITEMS} entries, {PROP_MAX_BYTES // 1024} KB."})},
         "/agent/chats": {"get": op("Chat messages after a cursor", AG, ok(ref("ChatPage")) | errs("400", "403"),
                                    [q("since", "Message id", {"type": "integer"}), q("user_id", "One person", {"type": "integer"}), q("limit", "At most 500", {"type": "integer"})])},
         "/tasks/{id}/typing": {"post": op("2.22.0 (#693): \"<name> is writing …\" in the task's comments for 8 s (send it again while writing; "

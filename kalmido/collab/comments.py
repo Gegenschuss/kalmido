@@ -273,6 +273,9 @@ def comment_update(cid):
     c.execute("UPDATE comments SET body=?, mentions=?, edited_at=? WHERE id=?",
               (text, ",".join(map(str, mentions)), iso(now_utc()), cid))
     new_m = [m for m in mentions if m not in old] if collab_all() else []
+    if not t["deleted_at"]:  # 2.39.0 (#1179): agents that got this comment as an event learn the change (before new mentions)
+        from ..agents.chat import med_comment_edited
+        med_comment_edited(c, t, c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone(), r["body"])
     pushes = comment_pushes(c, t, cid, text, mentions, new_m, 0, only=new_m) if new_m and not t["deleted_at"] else []
     if new_m and not t["deleted_at"]:
         agent_comment_events(c, t, cid, mentions, new_m, created=False)

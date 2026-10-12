@@ -186,7 +186,14 @@ def tpl_clean(kind, d):
             # 2.4.0 (#328 / #340): dates relative to the project start (rel), its length in days (span), the dependencies,
             # the list's ticket types + templates and "Move dependent tasks along"
             "rel": bool(d.get("rel")), "span": span(tasks), "deps": deps, "tickets": 1 if d.get("tickets") else 0,
-            "ticket_tpl": tt, "dep_shift": 1 if d.get("dep_shift") else 0}
+            "ticket_tpl": tt, "dep_shift": 1 if d.get("dep_shift") else 0,
+            # 2.39.0 (#1168): the list's own Playbook (its text; the new list gets it as its first version, source template)
+            "playbook": _tpl_playbook(d.get("playbook"))}
+
+
+def _tpl_playbook(v):
+    from ..lists.playbook import PB_MAX
+    return v.replace("\r\n", "\n").strip()[:PB_MAX] if isinstance(v, str) else ""
 
 
 def tpl_count(d):
@@ -273,6 +280,7 @@ def template_create():
                                   "sections": [s["name"] for s in secs], "tasks": tasks, "fields": fdefs,
                                   "rel": rel, "deps": deps, "tickets": lst["tickets"], "dep_shift": lst["dep_shift"],
                                   "done_at_bottom": lst["checklist"],
+                                  "playbook": _tpl_list_playbook(c, lid),  # 2.39.0 (#1168)
                                   "ticket_tpl": json.loads(lst["ticket_tpl"] or "{}") if role == "owner" else {}}
         else:
             kind = b.get("kind") if b.get("kind") in ("task", "list") else None
@@ -422,6 +430,12 @@ def tpl_dates(b, today_):
     return start, end
 
 
+def _tpl_list_playbook(c, lid):
+    from ..lists.playbook import pb_current
+    r = pb_current(c, lid)
+    return r["body"] if r else ""
+
+
 def tpl_apply_list(c, uid, d, name, folder, start, end=None, color=None, org_id=None):
     """A new list of uid from a list template d (2.4.0: also the built-in project types). Dates relative to start;
     with end and a template span of at least one day, every offset is stretched / squeezed to fit (start .. end).
@@ -465,6 +479,9 @@ def tpl_apply_list(c, uid, d, name, folder, start, end=None, color=None, org_id=
         if a in made and b_ in made:
             c.execute("INSERT INTO task_deps(task_id,blocker_id,created_by,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
                       (made[a], made[b_], uid, iso(now_utc())))
+    if d.get("playbook"):  # 2.39.0 (#1168): the template's Playbook becomes the new list's first version
+        from ..lists.playbook import pb_save
+        pb_save(c, _tpl_playbook(d["playbook"]), "template", uid, lid=lid)
     list_created(c, uid, lid)  # 2.4.2 (#391): project types + templates are new lists too; 2.25.0 (#931): + a shared folder's people
     return lid
 

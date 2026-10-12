@@ -217,6 +217,7 @@ function newsText(it, U) {
     case 'followup': return d.note ? tr('Follow up today: waiting on {0}', q(d.note)) : tr('Follow up today: the task is waiting on someone');
     case 'usage': return aiuNewsText(d);  // 2.1.1 (#326)
     case 'proposal': return tr('{0} has a proposal for you: {1}', who, q(d.title || ''));  // 2.3.0
+    case 'playbook_proposal': return pbNewsText(it, who, q);  // 2.39.0 (#1168)
     case 'evinvite': case 'evshare': return evNewsText(it, who, q);  // 2.21.0 (#659)
     case 'abshare': return d.role === 'edit' ? tr('{0} shared the address book {1} with you', who, q(d.name || '')) : tr('{0} shared the address book {1} with you (view only)', who, q(d.name || ''));  // 2.21.0 (#658)
     case 'status': return d.status ? tr('{0} set {1} to {2}', who, q(newsListName(it)), `<span class="stpill st-${esc(d.status)} inl"><i></i>${esc(statusLabel(d.status))}</span>`) : tr('{0} cleared the status of {1}', who, q(newsListName(it)));
@@ -350,6 +351,7 @@ async function newsOpen(i) {
   if (!it.read) { it.read = true; it.keep = true; if (it.to_me && S.news) { S.news.unread_me = Math.max(0, (S.news.unread_me || 0) - 1); renderTop(); } newsRead({ids: it.ids}); }
   if (/comment|mention/.test(it.kind || '')) S.tlScroll = it.task_id;  // 2.0.6: opened for a comment: show the newest
   if (it.kind === 'proposal') { propOpen(it.data?.job); return; }  // 2.3.0
+  if (it.kind === 'playbook_proposal') { pbNewsOpen(it); return; }  // 2.39.0 (#1168)
   if (it.kind === 'evinvite' && it.data?.event_id) { evOpen(it.data.event_id); return; }  // 2.21.0 (#659 / #658)
   if (it.kind === 'evshare') { go('cal'); setTimeout(evCalsModal, 150); return; }
   if (it.kind === 'abshare') { go('contacts'); return; }

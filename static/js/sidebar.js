@@ -98,6 +98,7 @@ function multiMoreMenu(a) {
     ...(ids.length >= 2 ? [{label: tr('Edit'), icon: 'edit', fn: () => { ME.sheet = true; meSync(); }}] : []),
     ...(one && one.id > 0 && canEdit(one) ? [{label: tr('More actions'), icon: 'dots', fn: () => taskMenu($(`#view .trow[data-id="${one.id}"] .ttl`) || a, one.id)}] : []),
     {label: tr('Select all'), icon: 'all', fn: () => { $$('#view .trow').forEach(r => S.multi.add(+r.dataset.id)); render(); }},
+    ...(clnSel() ? [{label: tr('Tidy up…'), icon: 'bot', cls: 'mclean', fn: () => clnRequest(clnSel().id, ids)}] : []),  // 2.39.0 (#1151)
     '-',
     {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => batch('delete', {}, true)},
   ]);
@@ -684,6 +685,7 @@ async function folderPropsModal(f) {
       <label class="chkl"><input type="radio" name="fs-ap" value="new" ${nL ? '' : 'checked'}> ${tr('Only new lists')}</label>
       ${ownN ? `<label class="chkl"><input type="checkbox" id="fs-force"> ${esc(trn('Also the {0} list changed on its own', 'Also the {0} lists changed on their own', ownN))}</label>` : ''}</fieldset>
     <div class="fsprev" id="fs-prev" hidden></div>
+    ${pbOn() ? pbAreaHtml('folder') : ''}
     <div class="foot"><div class="calerr" role="alert" id="fs-err" hidden></div><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Save')}</button></div>`);
   let confirmed = false;
   const bodyOf = dry => {
@@ -696,6 +698,7 @@ async function folderPropsModal(f) {
   // (it steps aside and comes back with its state on "Back")
   const snap = () => JSON.stringify(bodyOf(false)), start = snap();
   const close = modalGuard(md, () => snap() !== start);
+  if (pbOn()) pbMount(md, {folder: f});  // 2.39.0 (#1168): the folder's playbook (saved on its own)
   md.addEventListener('change', () => { confirmed = false; $('#fs-prev', md).hidden = true; $('[data-m="ok"]', md).textContent = tr('Save'); });
   md.addEventListener('click', async e => {
     const b = e.target.closest('button'); if (!b) return;
