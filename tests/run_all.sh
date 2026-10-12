@@ -558,6 +558,7 @@ fresh; run p2390_b_api "$PY" p2390_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2390_b_ui node p2390_b_ui.js "$KALMIDO_TEST_DATA"
 # 2.39.0 (#1168): the Playbook of lists / folders (versions, agent API, proposals, events, scheduled list checks, templates, backup)
 fresh; run p2390_a_api "$PY" p2390_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2391_m_ui node p2391_m_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
