@@ -69,7 +69,7 @@ async function swTests() {
   w.eval('settingsModal()'); await sleep(400);
   let md = d.querySelector('.modal.smodal');
   const secs = [...md.querySelectorAll('.snav [data-sec]')].map(b => b.dataset.sec);
-  check(JSON.stringify(secs) === JSON.stringify(['account', 'general', 'look', 'modules', 'notify', 'integr', 'ai', 'data', 'users', 'help']), 'admin tabs incl. ai: ' + secs);
+  check(JSON.stringify(secs) === JSON.stringify(['account', 'org', 'general', 'look', 'modules', 'notify', 'integr', 'ai', 'data', 'users', 'help']), 'admin tabs incl. ai: ' + secs);  // 2.39.1 (#1188): Settings > Organisation
   const tab = md.querySelector('.snav [data-sec="ai"]');
   check(/Agents/.test(tab.textContent) && tab.querySelector('svg, use, .ic, i') !== null, 'tab "Agents" with an icon (2.6.0, K09: was "AI colleague")');
   check(!md.querySelector('[data-pane="users"] #s-ags'), 'Administration no longer holds the agents block');
