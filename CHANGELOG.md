@@ -7,6 +7,67 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.39.1] - 2026-10-12
+
+**In short:** Lists with columns now work **like a spreadsheet**, the inbox becomes the **Basket** with a *Sort* mode,
+Office & finance can **import legacy data** from an Excel workbook and keep old invoices as an archive, and a long row of
+phone and interface fixes.
+
+### Added
+- **Lists like a spreadsheet** (#1217, #1327): fine column lines across all rows, column widths follow the mouse (no
+  snapping, the title keeps a minimum width, widths are kept per device and list), **drag a column heading** to reorder
+  the columns (undo works). Click a custom-field cell to **edit it in place** (number, text, link, date, choice with its
+  colours, person, checkbox; Enter or a click outside saves, Esc cancels, Tab moves on); a small arrow on the column
+  heading opens the column menu. *Shown fields* can add, rename and delete custom fields. **Custom fields now work in
+  plain lists** too (columns, details, filters); time tracking and dependencies stay with projects. List admins may now
+  manage custom fields like the owner.
+- **The inbox is now the Basket** (#1219): same place, new name in every language (internal names such as `is_inbox` stay).
+  A **Sort** button walks through the basket item by item (to a list, assign to me, today, tomorrow, a date, waiting
+  for someone, delete, skip; keys 0-7, Esc ends; large buttons on phones). *My tasks* keeps showing what is assigned to
+  you and adds a collapsible group *From your lists, no date* with the open tasks of lists only you use.
+- **Group headings show their origin** (#1221): *Folder › List* in My tasks and other cross-list views, every part
+  clickable; groups can be reordered (drag the handle, long press on phones), the order is kept per view on every device,
+  *Reset order* in the view menu.
+- **Sidebar: Views and Areas** (#1185): *Views* (calendar, timeline, matrix, project status, workload) and *Areas*
+  (office, time, contacts, habits, focus, review, statistics, home, family, agents); your own arrangement stays. One
+  icon in the sidebar header collapses or expands everything.
+- **Legacy data import for Office & finance** (#1182): upload an .xlsx workbook, Kalmido splits the one-field addresses
+  of the *Contacts* sheet into company, contact, street, postcode, town and country, marks unsure splits, finds
+  duplicates and lets you correct everything in a preview before importing; services and equipment come along. Old
+  invoices and quotations are uploaded as PDFs into a **read-only archive** (details suggested from the file name),
+  new numbers never collide with archived ones, and every import run can be **undone**. Only organisation admins import.
+  See [docs/OFFICE.md](docs/OFFICE.md).
+- **Settings > Organisation** (#1188): members and roles, *Lists of the organisation* (shared lists in the organisation's
+  area, grouped by owner, with their folder path) and the history in one place.
+- **Hide completed as a default** (#1214): a personal default in *Settings > Appearance*, a folder setting that applies
+  to its lists and subfolders, and every list can still choose for itself (*Completed: as default* resets it).
+- **Open a list in its own window** (#1294): double click or middle click a list in the sidebar, or *Open in its own
+  window* in the list menu (desktop): a slim window with only that list, live updates included.
+- **Use a suggestion as a draft** (#1224): the pencil on a reply suggestion in the agent chat (or right click / long
+  press) puts its text into the input field instead of sending it.
+- A **loading screen** with the heron and a running bar while the app starts (#1213).
+
+### Changed
+- **List admins may delete shared lists** (#1188), still in two steps (archive first); the tasks go to the owner's
+  trash and the owner is told. Server admins get no extra right on other people's lists. Moving a list into a folder
+  with defaults (area, agent) now asks first.
+- Custom fields created or shown as columns through the API **switch the *Custom fields* module on** for the list's
+  owner; the answer names it in `modules_on` (#1293).
+- List menu texts say what they act on: *Archive list*, *Delete list…*, *Restore list from archive* (#1291).
+- The celebration has more punch (#1292): the heron in the middle, a big check mark, colourful confetti, three levels
+  (today, list, project), a short vibration on phones, a tap ends it; *Reduce motion* keeps the calm version.
+- Office: **only organisation admins record payments** and mark invoices as paid; a manual invoice number that skips
+  numbers needs a reason; members may send at most 50 mails with their own text per organisation and day (#1210).
+
+### Fixed
+- Phones: bottom sheets can be dragged to a height and swiped down to close (#1181); the whole app no longer slides
+  away when you swipe past the end of the sidebar on foldables (#1189); the paper clip in the comment field can be
+  tapped without typing first (#1202); statistics charts with round axis steps, no cut-off labels and the explanation
+  behind an info icon (#1180).
+- The dimmed backdrop of the *Add service* dialog covered only half of the window (#1220).
+- Office files restored from a backup are private (0700) and document items always belong to an organisation; larger
+  tap targets for *More info* in the Playbook section (#1210).
+
 ## [2.39.0] - 2026-10-12
 
 **In short:** Every list and folder can have a **Playbook**: the owner's working rules for the agents of that list, with

@@ -18,6 +18,12 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.39.1** (2026-10-12): **lists like a spreadsheet** (column lines, drag widths and column order, edit custom-field cells
+  in place, custom fields in plain lists), the inbox is now the **Basket** with a *Sort* mode and *My tasks* shows your own
+  unshared lists, group headings show where a group comes from, list admins may delete shared lists, *Settings >
+  Organisation*, *Hide completed* as a default, **legacy data import** for Office & finance (clients and services from
+  an .xlsx, old invoices and quotations as a read-only archive), invoice payments only by organisation admins, phone
+  sheets you can drag and swipe away, a loading screen, a bigger celebration and a list in its own window.
 - **2.39.0** (2026-10-12): a **Playbook** per list and folder (working rules for the list's agents, versions, agent
   proposals, scheduled checks), **tidy up an existing list** by its tidy agent (proposal first, confirm, one-step undo) and
   **edit your own messages** to an agent (see [docs/AGENTS.md](docs/AGENTS.md#playbook-2390)).
@@ -173,9 +179,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   sort of a shared list is set by its owner or a list admin for everyone; a member may sort it otherwise on one device
   and the list says so. The API takes and returns the path (`"folder": "Clients/Company X"`, at most two levels)
 - **Quick capture** from anywhere: `q` (or Ctrl+Space, also while typing somewhere else) opens a small box, the quick
-  add syntax works and it lands in the inbox whatever view is open (unless you name a list). The installed app's icon
+  add syntax works and it lands in the basket whatever view is open (unless you name a list). The installed app's icon
   menu has *Quick add*. The page `/capture` holds a **bookmarklet**: drag it to the bookmarks bar, click it on any
-  page and a small window opens with the page's title and address, Enter saves it to your inbox (your normal
+  page and a small window opens with the page's title and address, Enter saves it to your basket (your normal
   sign-in, no code of Kalmido runs on that page). A system-wide key for it: Windows: Start menu > right-click Kalmido >
   More > Open file location > Properties > *Shortcut key*; macOS: Shortcuts app > *Open URL* `https://your-host/capture` >
   *Add keyboard shortcut*; GNOME / KDE: a custom shortcut that opens that address
@@ -204,7 +210,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   *Snooze*. Nothing repeats during your quiet hours (*Settings > Notifications*, 22:00 to 07:00 by default), for a
   list whose bell is muted, or with *Repeated reminders* switched off in the notification matrix; completed, deleted
   and archived tasks stop at once, and every interval sends one push at most
-- Smart lists (inbox, the start view; today, tomorrow, next 7 days, now doable, all), combinable filters (list, date, priority, tag)
+- Smart lists (basket, the start view; today, tomorrow, next 7 days, now doable, all), combinable filters (list, date, priority, tag)
 - **Plan my day** (2.10.0): in Today, *Plan my day* puts your open tasks into the free time between the day's calendar
   events and timed tasks within your working hours (*Settings > General > Day planning*): overdue and due first, then
   deadlines and priority, 30 minutes for a task without a duration; what does not fit is listed as *does not fit
@@ -270,7 +276,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   number field *Budget h* (the agency project type has one) adds a budget bar: tracked against the sum of the budgets
 
 **Together**
-- Several users, each with their own inbox, habits, filters, tags, settings and notifications
+- Several users, each with their own basket, habits, filters, tags, settings and notifications
 - **Groups** (2.10.0): an admin creates groups (*Office*, *Field team*; optionally synced from a sign-in group of the
   OIDC provider). Share a list or a whole folder with a group and a role: whoever joins gets access, whoever leaves loses
   it, and a person's role is the higher of their own and the group's. Assign a task to a group, "whoever has time": it is
@@ -381,7 +387,7 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 - On phones every choice list (list, section, assignee, settings) opens as a bottom sheet like the app's menus: icons, a check on the current value, a search field for long lists
 - Mobile layout with swipe gestures, long-press drag, configurable tab bar per device (on the desktop one sidebar with grouped navigation: Focus, Views, Lists, Filters, Tags and Team); tablets in portrait keep the composer at the bottom
 - Push notifications without an extra app (Web Push: Chrome, Edge, Firefox, Safari, iPhone and iPad from the Home Screen) or via [ntfy](https://ntfy.sh): reminders with *Done* / *Snooze*, focus end, habit reminders, daily digest, comments and assignments; a notification you handled on one device (task completed or opened, News read) closes on your other devices
-- Share from your phone into the inbox: a ready-made import for the Android app HTTP Shortcuts, a guide for the iPhone Shortcuts app (see below); app shortcuts (long-press the icon: new task, today, news, search)
+- Share from your phone into the basket: a ready-made import for the Android app HTTP Shortcuts, a guide for the iPhone Shortcuts app (see below); app shortcuts (long-press the icon: new task, today, news, search)
 - Profile pictures: ten heron presets (2.19.0) or your own photo (cropped square, resized, metadata removed), shown wherever the initials were
 - **Events and contacts** (2.21.0): your own calendars and address books in Kalmido, synced with the phone's calendar and contacts apps ([Events](#events), [Contacts](#contacts))
 - **Calendar apps (CalDAV), both ways**: every list as a task list in Reminders (iPhone, iPad, Mac), Thunderbird, Evolution, Tasks.org or DAVx⁵ on Android, with an app password per device ([Calendar apps](#calendar-apps-caldav))
@@ -571,12 +577,12 @@ own list with the same name is reused) or one existing list you can edit. The im
   A participant's view is filtered on the server everywhere (search, calendar feed, statistics, time reports, News,
   pushes, reminders, the REST API, webhooks), not only hidden in the app; sections show only when they hold one of
   their tasks. Changing a role takes effect at once. Lists shared before 1.10.0 keep their meaning: *Can edit* is now
-  *Member*, *View only* is *Viewer*. Members can leave a list; the inbox cannot be shared.
+  *Member*, *View only* is *Viewer*. Members can leave a list; the basket cannot be shared.
 - **Transfer ownership:** the owner hands a list to another person in the Share dialog (*Owner > Transfer ownership…*)
   (a member or anyone they could share with; confirmed twice). The new owner gets it in the same folder and place
   where they had it as a member (otherwise at the end of their sidebar) and a News item; the old owner stays in the
   list as a **list admin**, where it was in their sidebar. Every transfer is noted under *Owner* in the Share dialog ("Ownership
-  transferred from X to Y"). Agents never become owners and never transfer; inboxes cannot be transferred.
+  transferred from X to Y"). Agents never become owners and never transfer; baskets cannot be transferred.
   **Admins take over** lists whose owner is an agent or a disabled user, which nobody could manage otherwise (agents
   cannot share, disabled users cannot log in): *Settings > Administration > Lists owned by agents or disabled users >
   Take over* (for themselves or another person), or *Take over…* in the Share dialog when they are in the list. An
@@ -613,7 +619,7 @@ assignees, tags, files, custom fields or anything from other lists; task notes o
 - **Password** (optional, stored hashed): visitors enter it once per browser (a cookie for that link only). Changing
   or removing the password, *New link* and *Turn off* take effect at once.
 - **Expiry** (optional): the link works through the end of that day.
-- Only the owner creates and manages the link; the inbox cannot be shared. The page loads no scripts and nothing
+- Only the owner creates and manages the link; the basket cannot be shared. The page loads no scripts and nothing
   external, is marked `noindex`, is never cached, and has a strict Content-Security-Policy. Views, ticks, unknown links
   and wrong passwords are rate-limited per address; an unusual number of views of one link sends the admins an alert.
 - Admins can turn public links off for everyone (*Settings > Administration > Whole server*; existing links then stop working
@@ -786,7 +792,7 @@ everyone and each person may override it. The start page can also be a tab (Sett
 
 Every list belongs to a **workspace**: your private space or one of your organisations (the list dialog, *Workspace*).
 The switch at the top of the sidebar (*Private | <organisation> | All*) shows the lists, tasks, News, agents and team
-chats of one workspace at a time (the inbox is always there); a chip in the header says which one you look at, and the
+chats of one workspace at a time (the basket is always there); a chip in the header says which one you look at, and the
 choice follows you to every device. A new list starts in the shown workspace.
 
 What the server keeps apart:
@@ -807,7 +813,7 @@ your private lists go with you. When the only admin leaves, the operator (an ins
 
 **On the update** to 2.28.0 every list of a server with an organisation stays in the organisation (a server from before
 was one company), except family / household and Home & life lists, lists in a top folder named like *Private* /
-*Family* / *Home* and every inbox: those become private. Team agents work in the organisation, a personal agent in the
+*Family* / *Home* and every basket: those become private. Team agents work in the organisation, a personal agent in the
 workspace most of its lists are in; an agent that already sits in a list of another workspace is kept and pointed out --
 the owner decides.
 
@@ -966,10 +972,10 @@ both versions. API: `/lists/{id}/notes`, `/notes` (docs/API.md), MCP tools `list
 ## Tasks by e-mail
 
 With one mailbox set up (`KALMIDO_MAIL_ADDRESS` + `KALMIDO_IMAP_*`, see *Configuration*), everyone gets a **secret
-address** for new tasks: Settings > Integrations > *Tasks by e-mail* (`tasks+<token>@example.com` lands in your inbox,
+address** for new tasks: Settings > Integrations > *Tasks by e-mail* (`tasks+<token>@example.com` lands in your basket,
 an address per list lands in that list while you may change it). The subject becomes the title, the text the
 description, attachments become files, "Fwd:" / "WG:" are dropped, the same message never twice. *New address* makes the
-old one stop working. Optionally, mails from your own address (an admin stores it under Settings > Users) to the plain address go to your inbox
+old one stop working. Optionally, mails from your own address (an admin stores it under Settings > Users) to the plain address go to your basket
 too (off by default: sender addresses can be forged). The mailbox must deliver plus addresses (`+…`) to it, which most
 providers do. With `KALMIDO_SMTP_*` the **daily summary** (Settings > Notifications, *Daily digest at*) also comes by
 e-mail: overdue, today, tomorrow, what waits for you and what is unread; *Send now* tries it.
@@ -982,7 +988,7 @@ e-mail: overdue, today, tomorrow, what waits for you and what is unread; *Send n
 and day view, in the calendar's timeline and, optionally, as *Events today* at the top of *Today*. Events are
 read-only and look different from tasks (tinted and outlined in the calendar's colour; all-day events in the all-day
 row). A click shows title, time, place, description (plain text, only http / https links are clickable) and the
-calendar, plus **Create task from event** (a task in the inbox with the event's title, date, time and duration,
+calendar, plus **Create task from event** (a task in the basket with the event's title, date, time and duration,
 opened for editing). Subscriptions are private: list members never see them. Two ways to add one:
 
 - **Link (ICS / iCal)**, `https://` or `webcal://`:
@@ -1167,7 +1173,7 @@ is older than 24 hours. Agents also receive the message a reply refers to and ca
   *Tasks from notes…* send the agent exactly what you chose (event `job_request`); it answers with one structured
   proposal (`POST /api/v1/agent/jobs/{id}/proposal`, MCP `submit_proposal`) and you review it: tick, edit title / date
   / section / assignee, *Apply* creates everything as you (one undo step) or *Discard*. The agent never creates that
-  structure itself and never gets general access to your inbox; the input is kept with the job for at most 30 days. The
+  structure itself and never gets general access to your basket; the input is kept with the job for at most 30 days. The
   admin decides per agent who may ask it (people sharing a list with it, everyone, nobody):
   [docs/AGENTS.md](docs/AGENTS.md#proposals).
 - Runtime settings (2.4.1): admins choose per agent the model, auto-compact on / off with a threshold, a nightly fresh
