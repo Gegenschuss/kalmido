@@ -92,7 +92,7 @@ check(r.ok and [t["id"] for t in r.json()["data"]] == [T1], f"#1217: the search 
 r = requests.get(V + f"/tasks/{T1}", headers=TK)
 check(r.ok and r.json().get("fields", {}).get(str(FA)) == "12.5", f"#1217: v1 task carries the values: {r.text[:160]}")
 r = A.patch(B + f"/api/lists/{L}", json={"columns": ["due", f"f:{FA}", f"f:{FS['id']}"]})
-check(r.ok and "modules_on" not in r.json(), f"web PATCH columns, module on already: no modules_on: {r.text[:120]}")
+check(r.ok and r.json().get("modules_on") == [], f"web PATCH field columns, module on already: modules_on []: {r.text[:120]}")
 P = A.post(B + "/api/lists", json={"name": "Project", "kind": "project"}).json()["id"]
 FP = A.post(B + f"/api/lists/{P}/fields", json={"name": "Budget", "type": "number"}).json()["id"]
 check(A.patch(B + f"/api/tasks/{T1}", json={"fields": {str(FP): "3"}}).status_code == 400, "#1217: a field of another list: 400")
@@ -135,16 +135,18 @@ r = requests.patch(V + f"/lists/{L2}", headers=TK, json={"columns": ["due"]})
 check(r.ok and "modules_on" not in r.json(), f"#1293: columns without fields: no modules_on: {r.text[:200]}")
 r = requests.patch(V + f"/lists/{L2}", headers=TK, json={"columns": ["due", f"f:{F2}"]})
 check(r.ok and r.json().get("modules_on") == [], f"#1293: already on: modules_on []: {r.text[:200]}")
-# an agent (list admin) creates a field in Alice's list: Alice's module goes on, not Bob's, not the agent's business
+# an agent (edit member of Alice's list) cannot define fields; Bob (list admin, module off) creates one: Alice's module
+# goes on (the owner), Bob's stays off
 fields_off(A)
 L3 = A.post(B + "/api/lists", json={"name": "Agent setup"}).json()["id"]
-check(A.put(B + f"/api/lists/{L3}/members", json={"user_id": CL, "role": "admin"}).ok, "setup: agent as list admin")
+check(A.put(B + f"/api/lists/{L3}/members", json={"user_id": CL, "role": "edit"}).ok, "setup: agent as edit member")
 check(A.put(B + f"/api/lists/{L3}/members", json={"user_id": USERS["bob"], "role": "admin"}).ok, "setup: bob as list admin")
-r = requests.post(V + f"/lists/{L3}/fields", headers=CLH, json={"name": "Stage", "type": "text"})
-check(r.status_code == 201 and r.json().get("modules_on") == ["fields"], f"#1293 agent: modules_on for the owner: {r.status_code} {r.text[:160]}")
-check("fields" in feats(A) and set(feats(Bo)) == bob_before, "#1293 agent: the owner's module on, another admin's untouched")
+check(requests.post(V + f"/lists/{L3}/fields", headers=CLH, json={"name": "Stage", "type": "text"}).status_code == 403, "agent as edit member: 403")
+r = Bo.post(B + f"/api/lists/{L3}/fields", json={"name": "Stage", "type": "text"})
+check(r.ok and r.json().get("modules_on") == ["fields"], f"#1293: a list admin's field switches the owner's module on: {r.text[:160]}")
+check("fields" in feats(A) and set(feats(Bo)) == bob_before, "#1293: the owner's module on, the admin's untouched")
 # nothing is ever switched off: a list without field columns leaves the module as it is
-r = requests.patch(V + f"/lists/{L3}", headers=CLH, json={"columns": None})
+r = requests.patch(V + f"/lists/{L2}", headers=TK, json={"columns": None})
 check(r.ok and "fields" in feats(A), "#1293: columns null switch nothing off")
 # the OpenAPI document names it
 spec = requests.get(V + "/openapi.json", headers=TK).json()
