@@ -979,7 +979,7 @@ TOOLS += [
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}/fields")),
     ("create_field", "Create a custom field in a list (owner / list admins; 2.39.1: any list, switches the module Custom fields on for the "
                      "list's owner, the answer's modules_on names it): type text | number | date | select | person | url | checkbox "
-                     "...; options for select: {options: [{id, label, color?}]}.",
+                     "...; options for select: {options: [{id?, name, color?}]}.",
      _obj({"list_id": S_ID, "name": {"type": "string", "minLength": 1}, "type": {"type": "string"}, "options": {"type": "object"},
            "pinned": {"type": "boolean"}}, ["list_id", "name", "type"]),
      lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/fields", body=_without(a, "list_id"))),
