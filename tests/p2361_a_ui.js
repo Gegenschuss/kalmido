@@ -152,9 +152,13 @@ const utc = (d, h) => { const x = new Date(`${d}T${String(h).padStart(2, '0')}:0
   w.eval(`S.calMode = 'timeline'; renderView()`); await sleep(300);
   check(!d.querySelector('#view .tl-bar') && d.querySelector('#view .tl-cev'), 'timeline (in the calendar): no task bars, the calendar rows stay');
   await call('PATCH', '/api/settings', {cal_tasks: '1', cal_lists_hidden: []});
-  w.eval(`S.settings.cal_tasks = '1'; S.settings.cal_lists_hidden = '[]'; S.calMode = 'month'; renderView()`); await sleep(200);
   // (the day cell shows 3 chips, the events first: the list below the month has every task of the selected day)
-  check([...d.querySelectorAll('#view .cal .ev')].some(x => /Write the report/.test(x.textContent)) && /Water the plants/.test(d.querySelector('#view .agenda')?.textContent || ''), 'tasks on again: the chips are back');
+  // wait instead of checking once: a late settings reload from the switches above can still land after the PATCH (CI, 2.39.1)
+  const chipsBack = () => [...d.querySelectorAll('#view .cal .ev')].some(x => /Write the report/.test(x.textContent)) && /Water the plants/.test(d.querySelector('#view .agenda')?.textContent || '');
+  check(await until(async () => {
+    w.eval(`S.settings.cal_tasks = '1'; S.settings.cal_lists_hidden = '[]'; S.calMode = 'month'; renderView()`); await sleep(200);
+    return chipsBack();
+  }, 20), 'tasks on again: the chips are back');
   // a subscription's "show" switch in the window: off -> row gone from the timeline without a reload, on again
   click(w, d.querySelector('#view .calbar [data-act="ev-cals"]')); await until(() => d.querySelector('.modal.evcmodal .cvxrow'));
   md = d.querySelector('.modal.evcmodal');
