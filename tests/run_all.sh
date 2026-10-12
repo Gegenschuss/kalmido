@@ -566,6 +566,9 @@ fresh; run p2391_f_ui node p2391_f_ui.js "$KALMIDO_TEST_DATA"
 # 2.39.1 (#1217 / #1327 / #1293): lists like a table: custom fields in plain lists, column lines / widths / moving, cell editing, the API switches the module on
 fresh; run p2391_t_api "$PY" p2391_t_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2391_t_ui node p2391_t_ui.js "$KALMIDO_TEST_DATA"
+# 2.39.1 (#1188 list admins delete, Lists of the organisation, folder defaults on a move; #1291 menu texts; #1214 Hide completed default)
+fresh; run p2391_l_api "$PY" p2391_l_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2391_l_ui node p2391_l_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
