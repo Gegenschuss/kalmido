@@ -33,6 +33,7 @@ const FEAT = 'comments,collab,agents,stats,time';
   const L = (await call(CA, 'POST', '/api/lists', {name: 'Errands'})).id;
   const T = (await call(CA, 'POST', '/api/tasks', {title: 'Buy paint', list_id: L})).id;
   await call(CA, 'POST', '/api/tasks', {title: 'Return the drill', list_id: L});
+  await call(CA, 'PUT', `/api/lists/${L}/members`, {user_id: ag.id, role: 'edit'});  // the agent may write to whom it shares a list with
   const q = await (await fetch(B + 'api/v1/agent/chats/1', {method: 'POST', headers: AGH, body: JSON.stringify({body: 'What next?', choices: [{id: 'a', label: 'Plan the week'}, {id: 'b', label: 'Tidy the basket'}]})})).json();
   check(q.choices && q.choices.choices.length === 2, 'a chat question with two suggestions ' + JSON.stringify(q).slice(0, 300));
 
