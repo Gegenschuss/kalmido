@@ -44,6 +44,7 @@ const FEAT = 'cal,comments,collab,agents';
   await call('PUT', `/api/lists/${SH}/members`, {user_id: AG, role: 'edit'});
   const BT = (await call('POST', '/api/lists', {name: 'Bob Team', org_id: ORG}, CB)).id;
   const BP = (await call('POST', '/api/lists', {name: 'Bob Private', org_id: null}, CB)).id;
+  await call('PUT', `/api/lists/${BT}/members`, {user_id: me.id, role: 'edit'}, CB);  // 2.39.1 (#1188): the overview lists shared lists only
   await call('POST', '/api/tasks', {title: 'Bob task', list_id: BT}, CB);
   const appVer = (await (await fetch(B)).text()).match(/name="kalmido-version" content="([^"]*)"/)?.[1] || '';
   check(/^\d+\.\d+\.\d+/.test(appVer), '#1094: the page names its version ' + appVer);
@@ -113,7 +114,7 @@ const FEAT = 'cal,comments,collab,agents';
 
   // ================= #1101 Lists of the organisation
   w = await boot({user: 'alice'}); d = w.document;
-  w.eval(`settingsModal('account')`); await until(() => d.querySelector('#s-ws .wsorg'));
+  w.eval(`settingsModal('org')`); await until(() => d.querySelector('#s-ws .wsorg'));  // 2.39.1 (#1188): Settings > Organisation
   const ob = d.querySelector(`#s-ws [data-oadm="${ORG}"]`);
   check(ob && /Lists of the organisation/.test(ob.textContent), '#1101: the admin has "Lists of the organisation"');
   click(w, ob); await until(() => d.querySelector('.oadmmd .oadmrow'));

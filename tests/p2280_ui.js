@@ -203,8 +203,8 @@ const V = B + 'api/v1';
   agmd.querySelector('#ag-user').value = 'Bad Name'; agmd.querySelector('#ag-user').dispatchEvent(new w.Event('input', {bubbles: true}));
   check(!agmd.querySelector('#ag-userhint').hidden && /did you mean bad-name/.test(agmd.querySelector('#ag-userhint').textContent), '#926: a wrong username gets the suggestion ' + agmd.querySelector('#ag-userhint').textContent);
   agmd.remove();
-  // Account > Workspaces
-  w.eval(`settingsModal('account')`); await until(() => d.querySelector('#s-ws .wsorg'));
+  // Account > Workspaces; 2.39.1 (#1188): Settings > Organisation (Account links there)
+  w.eval(`settingsModal('org')`); await until(() => d.querySelector('#s-ws .wsorg'));
   const wsb = d.querySelector('#s-ws');
   check(wsb.textContent.includes(ORGN) && /you are an admin/.test(wsb.textContent) && wsb.querySelectorAll('.wsorg .mrow').length >= 2, '#935: Settings > Account > Workspaces lists the organisation and its members');
   check(wsb.querySelector('.wsorg .mrow .avatar.agent .abot-b'), '#985: agents among the members carry the badge');
@@ -261,7 +261,7 @@ const V = B + 'api/v1';
     await shot(`p2280-${th}-1440-chat-choices.png`);
     await ev(`(() => { settingsModal('agents'); return 1; })()`); await sleep(1200);
     await shot(`p2280-${th}-1440-settings-agents.png`);
-    await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); settingsModal('account'); return 1; })()`); await sleep(1200);
+    await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); settingsModal('org'); return 1; })()`); await sleep(1200);
     await ev(`(() => { document.querySelector('#s-ws')?.scrollIntoView(); return 1; })()`); await sleep(300);
     await shot(`p2280-${th}-1440-settings-workspaces.png`);
     await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); return 1; })()`);

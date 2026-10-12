@@ -111,7 +111,7 @@ r = A.get(B + f"/api/orgs/{ORG}/lists")
 check(r.ok, "#1101: the instance admin is the organisation's admin in the mode organisation " + r.text[:120])
 j = r.json()
 ls = {x["id"]: x for x in j["lists"]}
-check(TEAM in ls and KEEP in ls, "#1101: the organisation's lists are listed")
+check(TEAM in ls and KEEP not in ls, "#1101 + #1188 (2.39.1): the organisation's shared lists are listed, one without members not")
 check(PRIV not in ls and BINBOX not in ls and not any(x["name"] == "Bob Private" for x in j["lists"]), "#1101: never a private list or an inbox")
 check(ls[TEAM]["owner_id"] == BOB and ls[TEAM]["owner_name"] == "Bob" and ls[TEAM]["open"] == 1 and ls[TEAM]["tasks"] == 2 and ls[TEAM]["members"] == 1
       and ls[TEAM]["changed_at"] and ls[TEAM]["archived"] is False, "#1101: name, owner, numbers, last change " + json.dumps(ls[TEAM]))
@@ -242,7 +242,7 @@ check(A.delete(B + f"/api/orgs/{ORG}/members/{DAVE}").ok, "workspaces: dave leav
 BL = Da.post(B + "/api/lists", json={"name": "Beta plan", "org_id": BETA}).json()["id"]
 check(dbx("SELECT org_id FROM lists WHERE id=?", (BL,))[0][0] == BETA, "workspaces: dave's list belongs to Beta")
 r = Da.get(B + f"/api/orgs/{BETA}/lists")
-check(r.ok and [x["id"] for x in r.json()["lists"]] == [BL], "workspaces: Beta's admin sees Beta's lists only")
+check(r.ok and [x["id"] for x in r.json()["lists"]] == [], "workspaces: Beta's admin sees Beta's lists only (2.39.1 #1188: none shared yet)")
 check(Da.get(B + f"/api/orgs/{ORG}/lists").status_code == 404, "workspaces: another organisation's admin: 404 for our organisation")
 check(Da.post(B + f"/api/orgs/{ORG}/lists/{KEEP}/archive", json={"archived": True}).status_code == 404, "workspaces: ... and for its lists")
 check(Da.post(B + f"/api/orgs/{BETA}/lists/{KEEP}/archive", json={"archived": True}).status_code == 404, "workspaces: our list through Beta: 404")

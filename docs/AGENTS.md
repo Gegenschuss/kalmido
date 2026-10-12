@@ -571,10 +571,11 @@ security): an agent **without** a workspace (`org_id: null`) that still sits in 
 sees that list; the move report of the update and the organisation boundary check name these cases. Fix: assign the
 agent to the organisation's workspace (`PATCH /api/my/agents/{id} {"org_id": …}`).
 
-Since 2.35.0 the admins of an organisation manage its lists in the app (Settings > Workspaces > *Lists of the
-organisation*): they see name, owner and numbers (never contents) and may archive, restore, hand over or -- from the archive,
-confirmed with the list's name -- delete a list of the organisation, also one of another person. Private lists, private
-sharing and inboxes stay out of reach. This is people's work only: there is no agent API for it, and an agent account gets
+Since 2.35.0 the admins of an organisation manage its lists in the app (2.39.1: Settings > Organisation > *Lists of the
+organisation*, grouped by owner, only lists shared with at least one more person): they see name, owner, folder and numbers
+(never contents) and may archive, restore, hand over or -- from the archive, confirmed with the list's name -- delete a list
+of the organisation, also one of another person. Private lists, private sharing and inboxes stay out of reach. Since 2.39.1
+a list admin may archive and delete a shared list too (the tasks go to the owner's trash, the owner is told). This is people's work only: there is no agent API for it, and an agent account gets
 `403` even with admin rights. For an agent in such a list it is the same as when the owner archives, hands over or deletes it.
 
 ## Events

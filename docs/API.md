@@ -243,7 +243,7 @@ had been made in the app. Webhooks fire too.
 | `DELETE /attachments/{id}` | attachments:write | 2.15.0: remove a file of a task (or of your comment) |
 | `PATCH /comments/{id}` · `DELETE …` | comments | 2.15.0: edit your comment `{body}`; delete (author, list owner / admins) |
 | `GET /folders` · `POST /folders/rename` · `POST /folders/delete` | read · structure | 2.15.0: your folders `{path, lists}`; rename / move `{old, new}`; remove `{name}` (its lists move up). Agents: approval |
-| `DELETE /lists/{id}` | delete | 2.15.0: delete an archived list for good (owner; archive it with `PATCH {archived: true}` first, else `409`); its tasks go to the owner's trash. Agents: approval |
+| `DELETE /lists/{id}` | delete | 2.15.0: delete an archived list for good (owner; 2.39.1: also a list admin, the owner is told; archive it with `PATCH {archived: true}` first, else `409`); its tasks go to the owner's trash. Agents: approval |
 | `GET /lists/{id}/members` · `PUT …/{user_id}` · `DELETE …/{user_id}` | read · structure | 2.15.0: owner and members with roles; share with a person `{role}` (owner / list admins); stop sharing, or leave (your own id). Agents: approval |
 | `PUT /lists/{id}/status` | structure | 2.15.0: a project status update `{status: on_track \| at_risk \| off_track \| on_hold \| complete \| "", note?}`; members are told |
 | `GET /filters` · `POST …` · `PATCH /filters/{id}` · `DELETE …` | read · structure · delete | 2.15.0: saved filters `{name, rules}` |
@@ -897,6 +897,13 @@ Web API (signed in as a person): `GET /api/folders/people?folder=` · `PUT /api/
 (null removes a default), apply?: all | new, force?, dry_run?}` (`dry_run: true` only reports what would change);
 `POST /api/lists/{id}/folder-reset` `{keys?}` (*Back to the folder*). `/api/v1`: `GET /folders`,
 `POST /folders/rename`, `POST /folders/delete` (see [Endpoints](#endpoints)).
+
+2.39.1: a list moved into another folder takes the folder's workspace and agent settings only with `folder_adopt: true`
+(`PATCH /lists/{id}`, also in `/api/v1`; dragging: `POST /api/lists/reorder` with `folder_adopt: [list ids]`); without it
+the list keeps them and they count as its own (*differs from the folder*). The app asks first:
+`GET /api/lists/{id}/folder-preview?folder=` names what would change (`changes: [{key, from, to}]`). The folder setting
+`hide_done` (*Hide completed*) is a default for the lists of the folder and its subfolders; the person's setting
+`show_done_default` (`"1"` show / `"0"` hide) holds for every view without its own choice.
 
 ## Playbook (2.39.0)
 

@@ -238,10 +238,10 @@ inf = A.get(B + "/api/folders/props?folder=Clients/Sub").json()
 check(inf["props"].get("org_id") == 0 and "agent_id" in inf["inherited"], "#1030: a subfolder knows what it inherits " + str(inf)[:200])
 # a list moved into the folder
 M = A.post(B + "/api/lists", json={"name": "Mover", "org_id": None}).json()
-A.patch(B + f"/api/lists/{M['id']}", json={"folder": "Clients"})
+A.patch(B + f"/api/lists/{M['id']}", json={"folder": "Clients", "folder_adopt": True})  # 2.39.1 (#1188): taken only when confirmed
 check(lists_of(A)[M["id"]]["org_id"] == ORG and CL in members(A, M["id"]), "#1030: a list moved into the folder takes its settings")
 M2 = A.post(B + "/api/lists", json={"name": "Dragged", "org_id": None}).json()
-A.post(B + "/api/lists/reorder", json={"ids": [M2["id"]], "folder": {str(M2["id"]): "Clients"}})
+A.post(B + "/api/lists/reorder", json={"ids": [M2["id"]], "folder": {str(M2["id"]): "Clients"}, "folder_adopt": [M2["id"]]})
 check(lists_of(A)[M2["id"]]["org_id"] == ORG, "#1030: ... also dragged in the sidebar")
 # validation
 check(A.put(B + "/api/folders/props", json={"folder": "Clients", "props": {"color": "red"}}).status_code == 400, "#1030: unknown settings are refused")
