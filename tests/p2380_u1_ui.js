@@ -64,8 +64,8 @@ const TOUCH = {'(hover: none)': true, '(hover:none)': true, '(pointer:coarse)': 
   check(!pop.classList.contains('hidden') && pop.querySelector('.tch-sh .tch-sht')?.textContent === 'Move to list', '#1177 the picker sheet is titled "Move to list" ' + pop.querySelector('.tch-sht')?.textContent);
   check(pop.querySelector('.menu-list')?.getAttribute('aria-labelledby') === 'tch-sht', '#1177 the menu is named by its title');
   const rows = [...pop.querySelectorAll('.menu-list > button, .menu-list > .mgrp > .mgh, .menu-list > .mgrp > button')].map(x => x.classList.contains('mgh') ? '#' + x.textContent : x.querySelector('.ml')?.textContent);
-  check(rows.join('|') === 'Inbox|Beta|#Studio|Homepage|#Shop|Shopping|#Zeta|Zlist', '#1177 Inbox first, the sidebar order, folders as headings, the current list left out: ' + rows.join('|'));
-  check(w.eval(`sideOrder().map(l => l.name).filter(n => n !== 'Alpha').join('|')`) === rows.filter(x => x !== 'Inbox' && !x.startsWith('#')).join('|'), '#1177 the lists in exactly the sidebar order');
+  check(rows.join('|') === 'Basket|Beta|#Studio|Homepage|#Shop|Shopping|#Zeta|Zlist', '#1177 Inbox first, the sidebar order, folders as headings, the current list left out: ' + rows.join('|'));
+  check(w.eval(`sideOrder().map(l => l.name).filter(n => n !== 'Alpha').join('|')`) === rows.filter(x => x !== 'Basket' && !x.startsWith('#')).join('|'), '#1177 the lists in exactly the sidebar order');
   check(pop.querySelector('.mgrp.tch-fd2 > .mgh')?.textContent === 'Shop' && pop.querySelector('.mgrp.tch-fd2 button .ml')?.textContent === 'Shopping', '#1177 the subfolder is one step deeper');
   check(![...pop.querySelectorAll('.mgh')].some(h => h.closest('button')), '#1177 a folder is only a heading, not a choice');
   click(w, pop.querySelector('.tch-shx')); await sleep(100);
@@ -157,7 +157,8 @@ const TOUCH = {'(hover: none)': true, '(hover:none)': true, '(pointer:coarse)': 
     await o.nav(B + '#l/' + L.Alpha); await ready(ev); await sleep(500);
     check(await ev(`getComputedStyle(document.querySelector('#view .trow .ttl')).userSelect`) === 'none', '#1178 390 touch: the title is not selectable');
     await ev(`(() => { taskMenu(document.querySelector('#view .trow'), +document.querySelector('#view .trow').dataset.id); return 1; })()`); await sleep(400);
-    check(await ev(`(() => { const r = document.querySelector('#pop .tch-shx')?.getBoundingClientRect(); return !!r && r.width >= 44 && r.height >= 44 && r.top >= 0; })()`), '#1177 390: the X of the sheet is 44 px and visible');
+    // 2.39.1 (#1181): on touch the X is out of sight (a swipe down closes the sheet); it stays for screen readers and the keyboard
+    check(await ev(`(() => { const x = document.querySelector('#pop .tch-shx'), r = x?.getBoundingClientRect(); return !!x && !!x.getAttribute('aria-label') && (r.width >= 44 && r.height >= 44 && r.top >= 0 || getComputedStyle(x).clipPath !== 'none'); })()`), '#1177 390: the X of the sheet is there (44 px, or out of sight on touch since #1181)');
     await ev(`(() => { [...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /Move to list/.test(b.textContent)).click(); return 1; })()`); await sleep(400);
     await shot('p2380u1-390-move-to-list.png');
     await ev(`(() => { document.querySelector('#pop .tch-shx').click(); return 1; })()`);

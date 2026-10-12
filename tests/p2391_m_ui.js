@@ -26,7 +26,7 @@ const FEAT = 'comments,collab,agents,stats,time';
   const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
   check(r.ok, 'setup');
   const CA = await login('alice');
-  await call(CA, 'POST', '/api/admin/setup', {lang: 'en', collab_all: true, modules: ['comments']});
+  await call(CA, 'POST', '/api/admin/setup', {lang: 'en', collab_all: true, time_all: true, modules: ['cal', 'comments']});
   await call(CA, 'PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
   const ag = await call(CA, 'POST', '/api/admin/agents', {scopes: ['read', 'tasks:write', 'comments'], username: 'helper', display_name: 'Helper'});
   const AGH = {Authorization: 'Bearer ' + ag.token, 'Content-Type': 'application/json'};
@@ -34,7 +34,7 @@ const FEAT = 'comments,collab,agents,stats,time';
   const T = (await call(CA, 'POST', '/api/tasks', {title: 'Buy paint', list_id: L})).id;
   await call(CA, 'POST', '/api/tasks', {title: 'Return the drill', list_id: L});
   const q = await (await fetch(B + 'api/v1/agent/chats/1', {method: 'POST', headers: AGH, body: JSON.stringify({body: 'What next?', choices: [{id: 'a', label: 'Plan the week'}, {id: 'b', label: 'Tidy the basket'}]})})).json();
-  check(q.choices && q.choices.choices.length === 2, 'a chat question with two suggestions');
+  check(q.choices && q.choices.choices.length === 2, 'a chat question with two suggestions ' + JSON.stringify(q).slice(0, 300));
 
   const ffLogin = async ({ev, nav}) => {
     await nav(B + 'static/icon.svg');
@@ -65,11 +65,16 @@ const FEAT = 'comments,collab,agents,stats,time';
     await ev(`(() => { openDetail(${T}); return 1; })()`);
     await until(ev, `!!document.querySelector('#c-input')`);
     await sleep(500);
-    await ev(`(() => { window._fc = 0; document.addEventListener('click', e => { if (e.target.type === 'file') { window._fc++; e.preventDefault(); } }, true); const t = document.getElementById('c-input'); t.scrollIntoView({block: 'center'}); t.focus(); return 1; })()`);
-    await sleep(400);
+    await ev(`(() => { window._fc = 0; document.addEventListener('click', e => { if (e.target.type === 'file') { window._fc++; e.preventDefault(); } }, true); document.getElementById('c-input')?.scrollIntoView({block: 'center'}); return 1; })()`);
+    await sleep(300);
+    const ci = await rect(ev, '#c-input');
+    if (ci) await tap(cmd, ctx, ci.x, ci.y);  // a real tap into the field (the keyboard would come up)
+    await sleep(500);
+    if (!(await ev(`document.activeElement?.id === 'c-input'`))) await ev(`(() => { document.getElementById('c-input')?.focus(); return 1; })()`);
+    await sleep(300);
     const clipSel = '.dcomp .ccomp .cbar label.iconbtn';
     const clip = await rect(ev, clipSel);
-    check(clip && clip.w > 0, '#1202: the bar with the paperclip shows while the field has the focus');
+    check(clip && clip.w > 0, '#1202: the bar with the paperclip shows while the field has the focus ' + JSON.stringify(await ev(`({ci: !!document.getElementById('c-input'), act: document.activeElement?.id || document.activeElement?.tagName, cls: document.querySelector('.dcomp .ccomp')?.className, bar: document.querySelector('.dcomp .ccomp .cbar') ? getComputedStyle(document.querySelector('.dcomp .ccomp .cbar')).display : 'none-el'})`)));
     if (clip) {
       await tap(cmd, ctx, clip.x, clip.y); await sleep(400);
       const st = await ev(`(() => ({bar: getComputedStyle(document.querySelector('.dcomp .ccomp .cbar')).display, open: document.querySelector('.dcomp .ccomp').classList.contains('open'), fc: window._fc}))()`);
@@ -91,7 +96,7 @@ const FEAT = 'comments,collab,agents,stats,time';
       check(p2 && p2.h > p.h + 40, `#1181: dragged up, the sheet is taller (${p.h} -> ${p2 && p2.h})`);
       await shot('p2391m-390-sheet-tall.png');
       const p3 = p2 || p;
-      await drag(195, p3.top + 12, 0, 700, 'touch'); await sleep(700);
+      await drag(195, p3.top + 12, 0, Math.min(700, 830 - p3.top - 12), 'touch'); await sleep(700);
       check(await ev(`document.getElementById('pop').classList.contains('hidden')`), '#1181: swiped down, the menu is closed');
       await ev(`(() => { listMenu(document.querySelector('#top h1'), ${L}); return 1; })()`); await sleep(400);
       const p4 = await rect(ev, '#pop.sheet');
@@ -102,12 +107,12 @@ const FEAT = 'comments,collab,agents,stats,time';
     await ev(`(() => { dpOpen(document.querySelector('#top h1'), {kind: 'date', value: '', onPick() {}}); return 1; })()`); await sleep(400);
     const dp = await rect(ev, '.dpop.sheet');
     check(!!dp, '#1181: the date picker is a sheet on the phone');
-    if (dp) { await drag(195, dp.top + 8, 0, 500, 'touch'); await sleep(700); check(await ev(`!document.getElementById('dpop')`), '#1181: the date picker closes with a swipe down'); }
+    if (dp) { await drag(195, dp.top + 8, 0, Math.min(500, 830 - dp.top - 8), 'touch'); await sleep(700); check(await ev(`!document.getElementById('dpop')`), '#1181: the date picker closes with a swipe down'); }
     // a dialog in sheet form; a pull down in its scrolled-to-top content closes it too
     await ev(`(() => { listModal(${L}); return 1; })()`); await sleep(700);
     const md = await rect(ev, '.modal:not(.smodal) > .card');
     check(!!md, '#1181: the list dialog opens as a sheet');
-    if (md) { await drag(195, md.top + 70, 0, 500, 'touch'); await sleep(800); check(await ev(`!document.querySelector('.modal:not(.smodal)')`), '#1181: the dialog closes with a swipe down from its content (scrolled to the top)'); }
+    if (md) { await drag(195, md.top + 70, 0, Math.min(500, 830 - md.top - 70), 'touch'); await sleep(800); check(await ev(`!document.querySelector('.modal:not(.smodal)')`), '#1181: the dialog closes with a swipe down from its content (scrolled to the top)'); }
 
     // ---- #1180 statistics
     const ax = await ev(`(() => {
