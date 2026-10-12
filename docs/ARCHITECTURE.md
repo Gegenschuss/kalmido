@@ -246,6 +246,7 @@ registering the ones of its area.
 | `detail.js` | The detail panel of a task. |
 | `multiedit.js` | 2.26.0: several selected tasks edited at once in the task panel (common values, "Mixed", one undo step). |
 | `sheetdrag.js` | 2.39.1: bottom sheets on phones (menus, date picker, quick add, dialogs) dragged taller / shorter at their grip and swiped down to close. |
+| `miniwin.js` | 2.39.1: a list in its own small browser window (double / middle click in the sidebar, list menu); the window (`/?mini=1#l/<id>`) shows only the list and keeps its UI state to itself. |
 | `collab.js` | News and comments + activity (module "collab"). |
 | `attachments.js` | Attachments and the share target. |
 | `undo.js` | Undo / redo history. |
