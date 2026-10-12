@@ -90,7 +90,7 @@ const FEAT = 'comments,collab,fields';
     check(Math.abs(c1.l - (c0.l - 37)) <= 2, `#1217: the line moved with the mouse (${c0.l} -> ${c1.l})`);
     check(!(await ev(`!!document.querySelector('.lcguide')`)), '#1217: the accent guide is gone after the drag');
     const g2 = await mid(`.lchead .lcg[data-lcg="due"]`);
-    await drag(g2.x, g2.y, -2000, 0, 'mouse'); await sleep(300);
+    await drag(g2.x, g2.y, 5 - g2.x, 0, 'mouse'); await sleep(300);  // as far left as the window goes
     const tw = await ev(`document.querySelector('.lchead .spacer').getBoundingClientRect().width / parseFloat(getComputedStyle(document.documentElement).fontSize)`);
     check(tw >= 11.5, `#1217: the title keeps its minimum width (${tw.toFixed(1)} rem)`);
     await ev(`(() => { lcwSet(${L}, 'due', null); lcwSet(${L}, 'f:${FA}', null); return 1; })()`); await sleep(200);
