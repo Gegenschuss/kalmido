@@ -245,6 +245,7 @@ registering the ones of its area.
 | `habits.js` | The Eisenhower matrix, habits and the pomodoro timer. |
 | `detail.js` | The detail panel of a task. |
 | `multiedit.js` | 2.26.0: several selected tasks edited at once in the task panel (common values, "Mixed", one undo step). |
+| `sheetdrag.js` | 2.39.1: bottom sheets on phones (menus, date picker, quick add, dialogs) dragged taller / shorter at their grip and swiped down to close. |
 | `collab.js` | News and comments + activity (module "collab"). |
 | `attachments.js` | Attachments and the share target. |
 | `undo.js` | Undo / redo history. |
