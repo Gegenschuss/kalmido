@@ -22,7 +22,7 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
 const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
 const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,team,notes,pomo';
 // what the menus offered before 2.31 (flat): each of it must still be reachable (main level or the second level)
-const LIST_BEFORE = ['Edit list…', 'Share…', 'Agent: Claude…', 'Agent access', 'Add section…', 'Shown fields…', 'Team chat', 'Move to folder…', 'Tasks from notes…', 'Notifications: Default', 'Hide progress', 'Archive', 'Delete…'];
+const LIST_BEFORE = ['Edit list…', 'Share…', 'Agent: Claude…', 'Agent access', 'Add section…', 'Shown fields…', 'Team chat', 'Move to folder…', 'Tasks from notes…', 'Notifications: Default', 'Hide progress', 'Archive list', 'Delete list…'];
 const RARE = ['Agent access', 'Tasks from notes…', 'Notifications: Default', 'Hide progress'];
 
 (async () => {
@@ -55,14 +55,14 @@ const RARE = ['Agent access', 'Tasks from notes…', 'Notifications: Default', '
   check(more && more.label === 'More list options…' && RARE.every(l => more.more.some(x => x.label === l)), '#1056 the rare entries sit in "More list options…" ' + (more ? more.more.map(x => x.label).join('|') : 'none'));
   check(RARE.every(l => !it.some(x => x.label === l)), '#1056 ... and not on the first level');
   const lab = it.map(x => x === '-' ? '-' : x.label);
-  check(lab.slice(-3).join('|') === '-|Archive|Delete…', '#1056 archive + delete last, after a separator ' + lab.join('|'));
+  check(lab.slice(-3).join('|') === '-|Archive list|Delete list…', '#1056 archive + delete last, after a separator ' + lab.join('|'));
   // the header "…" of the list: View + List headings, in this order, danger last
   const top = w.eval('topMoreItems()');
   const heads = top.filter(x => x && x.head).map(x => x.head);
   check(heads.join('|') === 'View|List', '#1056 header "…": headings View, List ' + heads.join('|'));
   const tl = top.map(x => x === '-' ? '-' : x.head ? '#' + x.head : x.label);
   check(tl.indexOf('#View') < tl.indexOf('Sort…') && tl.indexOf('Sort…') < tl.indexOf('#List') && tl.indexOf('#List') < tl.indexOf('Edit list…'), '#1056 Sort… under View, Edit list… under List ' + tl.join('|'));
-  check(tl.slice(-2).join('|') === 'Archive|Delete…' && tl[tl.length - 3] === '-', '#1056 header "…": archive + delete last, set apart');
+  check(tl.slice(-2).join('|') === 'Archive list|Delete list…' && tl[tl.length - 3] === '-', '#1056 header "…": archive + delete last, set apart');
   // rendered: groups with aria-label, separators, keyboard skips headings, → / ← for the second level
   w.eval(`menu(document.querySelector('#top [data-act="top-more"]'), topMoreItems())`);
   await until(() => d.querySelector('#pop [role="menuitem"]'));
