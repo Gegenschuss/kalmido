@@ -115,7 +115,8 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
 
 1. *Settings > Agents > Status > Add agent* (admins): a username (e.g. `claude`), a display name and optionally a
    note (who runs it and where). **Permissions** (2.15.0): it starts with *Read*, *Tasks* and *Comments*; tick only what
-   it needs on top (structure, delete, files, time, export). Copy the **API token**: it is shown only once. You can
+   it needs on top (structure, delete, files, time, export). With *structure* it can set up a list with custom fields as
+   columns; that switches the module *Custom fields* on for the list's owner (2.39.1). Copy the **API token**: it is shown only once. You can
    rotate it later in the agent's dialog (optionally with an expiry); the old token stops at once. Deleting lists or
    fields, emptying the trash, changing 10+ tasks at once, moving lists and sharing always wait for a person's approval.
 2. **Share lists** with it in the table *Your lists at a glance*: one click on the agent's chip shares a list (role

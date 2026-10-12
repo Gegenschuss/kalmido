@@ -367,7 +367,8 @@ TOOLS = [
                          "(only as the list's owner or admin). Keys: id (task number in front of the title), due, prio, who "
                          "(assignee), tags, time (tracked), progress (subtasks), deps (dependencies), created, f:<field id> "
                          "(custom fields; ids in the fields of list_lists). A key that is not listed is not shown. columns: null = the "
-                         "default layout. Phones show the first two as columns, the rest in the second line.",
+                         "default layout. Phones show the first two as columns, the rest in the second line. 2.39.1: f:<id> columns switch the "
+                         "module Custom fields on for the list's owner (modules_on in the answer).",
      _obj({"list_id": S_ID, "columns": {"type": ["array", "null"], "items": {"type": "string"}, "maxItems": 40}}, ["list_id", "columns"]),
      lambda api, a: api.call("PATCH", f"/lists/{int(a['list_id'])}", body={"columns": a["columns"]})),
     ("list_repos", "Repositories connected to a list (provider github | gitlab | gitea (also Forgejo) | bitbucket (Bitbucket Cloud), "
@@ -976,7 +977,8 @@ TOOLS += [
     # ---- custom fields
     ("list_fields", "Custom field definitions of a list (id, name, type, options). Values: the task's fields {field id: value}.",
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}/fields")),
-    ("create_field", "Create a custom field in a project list (owner): type text | number | date | select | person | url | checkbox "
+    ("create_field", "Create a custom field in a list (owner / list admins; 2.39.1: any list, switches the module Custom fields on for the "
+                     "list's owner, the answer's modules_on names it): type text | number | date | select | person | url | checkbox "
                      "...; options for select: {options: [{id, label, color?}]}.",
      _obj({"list_id": S_ID, "name": {"type": "string", "minLength": 1}, "type": {"type": "string"}, "options": {"type": "object"},
            "pinned": {"type": "boolean"}}, ["list_id", "name", "type"]),

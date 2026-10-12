@@ -1958,7 +1958,8 @@ with the scope it needs). The tools:
   `move_task` (list / section / parent + `before_id` / `after_id` / `position`), `batch_tasks`, `skip_occurrence`,
   `take_task`, `list_subtasks`, `add_subtask`, `list_trash`, `restore_task`, `empty_trash`, `list_tags`, `get_roadmap`
 - dependencies and fields: `get_dependencies`, `add_dependency`, `remove_dependency`, `list_fields`, `create_field`,
-  `update_field`, `delete_field`
+  `update_field`, `delete_field` (2.39.1, #1293: custom fields in every list, not only projects; creating a field or
+  showing it with `set_list_columns` switches the module *Custom fields* on for the list's owner, the answer's `modules_on` names it)
 - list tags: `list_list_tags`, `create_list_tag`, `update_list_tag`, `delete_list_tag`
 - templates and filters: `list_templates`, `create_template`, `update_template`, `delete_template`, `apply_template`,
   `list_filters`, `create_filter`, `update_filter`, `delete_filter`
