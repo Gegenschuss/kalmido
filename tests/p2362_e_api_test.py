@@ -284,11 +284,15 @@ check(Bo.get(B + O + "/nonsense").status_code == 404 and Bo.post(B + f"{D}/{OPEN
 Bo.patch(B + "/api/settings", json={"features": FEAT})
 
 # ---------------------------------------------------------------- positions of an older version get their org_id at start
+# 2.39.1 (#1210 N5): org_id is NOT NULL since the start of this version; a database from before it has no constraint yet,
+# so the test lifts it for the old-style row and checks that the next start fills the row and sets the constraint again
+dbx("ALTER TABLE office_doc_items ALTER COLUMN org_id DROP NOT NULL", write=True)
 dbx("INSERT INTO office_doc_items(doc_id, sort, kind, title, qty, unit, rate, tax) VALUES(?,?,?,?,?,?,?,?)", (OPEN, 5, "service", "Alt-Position", 1, "day", 50, "standard"), write=True)
 check(dbx("SELECT org_id FROM office_doc_items WHERE title='Alt-Position'")[0][0] is None, "an old-style position without org_id")
 subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], check=True, stdout=subprocess.DEVNULL, env=dict(env, KEEP="1"))
 A = sess("alice")
 check(dbx("SELECT org_id FROM office_doc_items WHERE title='Alt-Position'")[0][0] == ORG, "after the start it has its org_id")
+check(dbx("SELECT is_nullable FROM information_schema.columns WHERE table_name='office_doc_items' AND column_name='org_id'")[0][0] == "NO", "and org_id is NOT NULL again")
 d = A.get(B + f"{D}/{OPEN}").json()
 check(any(x["title"] == "Alt-Position" for x in d["items"]), "and shows in its document")
 check(A.get(B + f"{D}/{DOC}/render").json()["totals"]["net"] == NET, "the finalised document still renders its frozen sums after the restart")
