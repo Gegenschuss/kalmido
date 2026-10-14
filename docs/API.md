@@ -982,6 +982,9 @@ agents have none (`403`).
 
 | Call | What it does |
 |---|---|
+| `PUT /api/lists/{id}/in-mine` | 2.41.0 (#1365), web API (the signed-in person): `{on: true \| false}` shows the list's tasks in the person's *My tasks* or not (only for that person; `404` for a list the person cannot see, agents `404`). Answer `{ok, on, mine_hidden}`; `GET /api/state` carries `mine_hidden` (list ids). The app puts the tasks of such a list into the folded group *Hidden* at the end of *My tasks*, the person's tasks of it due today or overdue into *From hidden lists* |
+| `GET /api/me/wait-suggestions` | 2.41.0 (#1205), web API: the person's earlier *Waiting on* texts, newest first (at most 50): `{items: [{note, at}]}` -- only texts the person wrote (also on completed tasks), never another person's text of a shared list |
+| `DELETE /api/me/wait-suggestions` | 2.41.0 (#1205), web API: `{note}` takes the text out of the person's suggestions (the tasks keep it; using it again brings it back). Answer `{ok, items}` |
 | `PUT /api/tasks/mine-order` | Web API (the signed-in person): `{ids: [task ids, top first]}` replaces the person's order; ids of tasks the person cannot see are skipped (at most 5000). Answer `{ok, count}` |
 
 `GET /api/state` carries it as `mine_order` (`{task id: position}`, 0 = on top). A task without a position (new, or newly

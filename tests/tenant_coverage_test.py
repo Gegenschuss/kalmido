@@ -266,7 +266,8 @@ ROUTES = {
     "GET /ical/{}.ics": "ical", "GET /api/ical": "ical", "POST /api/ical": "ical",
     # ---- list (100)
     "GET /api/lists/{}/agent-access": "list",  # 2.30.0 (#919): the agents' access log of a list (its members)
-    "PUT /api/lists/{}/favorite": "list", "DELETE /api/lists/{}/favorite": "list", "PUT /api/lists/{}/icon": "list", "POST /api/lists/{}/icon": "list", "DELETE /api/lists/{}/icon": "list",
+    "PUT /api/lists/{}/favorite": "list", "DELETE /api/lists/{}/favorite": "list", "PUT /api/lists/{}/in-mine": "list",  # 2.41.0 (#1365)
+    "PUT /api/lists/{}/icon": "list", "POST /api/lists/{}/icon": "list", "DELETE /api/lists/{}/icon": "list",
     "GET /api/list-icon/{}/{}.png": "list", "GET /api/v1/lists/{}/tags": "list", "POST /api/v1/lists/{}/tags": "list",
     "PATCH /api/v1/lists/{}/tags/{}": "list", "DELETE /api/v1/lists/{}/tags/{}": "list",
     "GET /api/v1/lists/{}/overview": "list", "PATCH /api/v1/lists/{}/overview": "list",
@@ -314,7 +315,8 @@ ROUTES = {
     "GET /api/orgs/{}/lists": "org", "POST /api/orgs/{}/lists/{}/archive": "org", "DELETE /api/orgs/{}/lists/{}": "org",
     "POST /api/orgs/{}/lists/{}/owner": "org",
     # ---- own (119)
-    "PUT /api/tasks/mine-order": "own", "POST /api/onboarding": "own", "POST /api/sample": "own", "DELETE /api/sample": "own", "PATCH /api/settings": "own",
+    "PUT /api/tasks/mine-order": "own", "GET /api/me/wait-suggestions": "own", "DELETE /api/me/wait-suggestions": "own",  # 2.41.0 (#1205)
+    "POST /api/onboarding": "own", "POST /api/sample": "own", "DELETE /api/sample": "own", "PATCH /api/settings": "own",
     "POST /api/ntfy/test": "own", "GET /api/push/vapid": "own", "GET /api/push/subs": "own", "POST /api/push/subs": "own",
     "DELETE /api/push/subs/{}": "own", "POST /api/push/unsubscribe": "own", "POST /api/push/handled": "own",
     "POST /api/push/test": "own", "GET /api/me": "own", "PATCH /api/me": "own", "POST /api/me/drop-token": "own",

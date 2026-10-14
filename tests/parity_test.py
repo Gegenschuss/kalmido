@@ -259,6 +259,9 @@ APP_ONLY = [
      "count with DELETE /fields/{id} itself (values)", ("GET /api/fields/{}/count",)),
     ("2.40.0 (#1344 / #1361): the own order of My tasks and the favourite star are personal app settings of a person; "
      "agents never set them", ("PUT /api/tasks/mine-order", "* /api/lists/{}/favorite")),
+    ("2.41.0 (#1365 / #1205): \"Show in My tasks\" per list and the person's Waiting-on suggestions are personal app "
+     "settings of a person; agents never set them (an agent writes the waiting text itself with PUT /tasks/{id}/waiting)",
+     ("PUT /api/lists/{}/in-mine", "* /api/me/wait-suggestions")),
     ("2.29.0 (#1029): the permission mode switch in the chat header; in the API it is the agent's runtime (admins: "
      "PATCH /api/admin/agents/{id}, owners: PATCH /api/my/agents/{id}), the agent reads it in GET /agent",
      ("PUT /api/agents/{}/permission-mode",)),
