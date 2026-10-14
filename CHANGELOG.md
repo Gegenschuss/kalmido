@@ -7,6 +7,9 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+### Fixed
+- The pen next to a long (shortened) task description can be clicked again: the shortened text no longer lies over it (#1203).
+
 ## [2.40.1] - 2026-10-14
 
 ### Fixed

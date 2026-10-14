@@ -529,7 +529,7 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 :is(.ttl,.tln,.dtt,.kbttl,.dpn,.ev,.wev,.tl-bar,.rm-tname) code{font-family:var(--mono);font-size:.9em;background:var(--bg3);padding:0 .25em;border-radius:.25rem}
 .trow .ttl a[href]{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
 /* 2.40.0 (#1203): the pen that opens the description editor (touch screens / "only with the pen") */
-.mdpen{float:right;margin:-.25rem -.25rem .25rem .5rem;color:var(--muted)}
+.mdpen{float:right;margin:-.25rem -.25rem .25rem .5rem;color:var(--muted);position:relative;z-index:1}  /* 2.40.2: above the masked (clamped) text, which is its own layer */
 /* 2.40.1: pen + description in one block: the panel body is a flex column, where the float alone took its own row */
 .mdbox{display:flow-root;min-width:0}
 .mdbox .md.clamp{overflow:clip}  /* hidden would make the clamped text a box narrower than the pen's row (BFC beside a float) */
