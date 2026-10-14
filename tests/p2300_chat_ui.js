@@ -158,7 +158,8 @@ const V = B + 'api/v1';
   await call('PATCH', `/api/lists/${SW}`, {folder: 'Dev'});
   await w.eval('load().then(render)'); await sleep(500);
   w.eval(`folderPropsModal('Dev')`); await until(() => d.querySelector('.modal #fs-al'), 60);
-  check(d.querySelector('.modal #fs-al') && /Agent listens in/.test(d.querySelector('.modal label[for="fs-al"]')?.textContent || ''), '#1034: the folder settings have "Agent listens in"');
+  // 2.41.0 (#1423): a switch (inside its label) instead of a select
+  check(d.querySelector('.modal #fs-al') && /Agent listens in/.test(d.querySelector('.modal #fs-al')?.closest('label')?.textContent || ''), '#1034: the folder settings have "Agent listens in"');
   w.close();
 
   // ================= Firefox: the permission question for real

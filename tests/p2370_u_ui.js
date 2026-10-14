@@ -1,9 +1,9 @@
 // 2.37.0 UI tests, part U, own container (start.sh), Firefox (desktop, mouse):
 // - #1158 folder settings: Alice's folder "Studio" (two lists of her own) with the subfolder "Studio/Shopping" that holds only a
 //   list Bob shared with her. The subfolder's menu shows "Folder settings…" and the share entries greyed out with the reason;
-//   its dialog says the settings hold for new lists. In "Studio" a value that one list cannot take: the dry run says
-//   "Not saved yet" + "Save anyway", saving and opening again shows the values; "People and roles…" opens over the dialog,
-//   "Back" brings it back with the unsaved choice; closing with changes asks first (Keep editing / Discard)
+//   its dialog says the settings hold for new lists. In "Studio" a value that one list cannot take: 2.41.0 (#1423) saved at
+//   once, the lists that do not follow are named; opening again shows the values; "Share…" opens over the dialog,
+//   "Back" brings it back; closing asks nothing (everything is saved)
 // - #1159 chat message saved as a task: see the second half
 const path = require('path');
 const {execFileSync} = require('child_process');
@@ -76,64 +76,52 @@ const FEAT = 'cal,comments,collab,agents';
     await ready(ev, `!!document.querySelector('.modal #fs-am')`);
     const sub = await ev(`(() => ({hint: document.querySelector('.modal .fsnone')?.textContent.trim() || '', apply: document.querySelector('.modal .fsapply')?.hidden, nw: document.querySelector('.modal [name="fs-ap"]:checked')?.value}))()`);
     check(/Applies to new lists in this folder\. Shared lists of others keep their settings\./.test(sub.hint) && sub.apply === true && sub.nw === 'new', '#1158: the dialog says it holds for new lists ' + JSON.stringify(sub));
-    await ev(`(() => { const s = document.querySelector('.modal #fs-am'); s.value = '1'; s.dispatchEvent(new Event('change', {bubbles: true})); document.querySelector('.modal [data-m="ok"]').click(); return 1; })()`);
-    check(await ready(ev, `!document.querySelector('.modal #fs-am')`), '#1158: the subfolder saves at once (no list to ask about)');
+    // 2.41.0 (#1423): the folder settings save every change at once (switches, "Saved · Undo"); no Save / Save anyway, no
+    // question when closing. "Share…" (the folder's Share dialog, #1420) and Repository… still open over it with Back.
+    await ev(`(() => { const s = document.querySelector('.modal #fs-am'); s.checked = true; s.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('.modal .ssaved.on')`), '#1158: the subfolder saves at once (no list to ask about)');
     const sp = await call(CA, 'GET', '/api/folders/props?folder=' + encodeURIComponent('Studio/Shopping'));
     check(sp.props && sp.props.agent_members === true, '#1158: the subfolder\'s value is stored ' + JSON.stringify(sp.props));
+    await ev(`(() => { document.querySelector('.modal [data-m="close"]').click(); return 1; })()`);
+    await ready(ev, `!document.querySelector('.modal #fs-am')`);
 
-    // ================= #1158: the dry run in "Studio" says "Not saved yet"
+    // ================= #1158: a value one list cannot take is named (after saving now)
     await ev(`(() => { folderPropsModal('Studio'); return 1; })()`);
     await ready(ev, `!!document.querySelector('.modal #fs-td')`);
-    await ev(`(() => { const set = (id, v) => { const s = document.querySelector('.modal ' + id); s.value = v; s.dispatchEvent(new Event('change', {bubbles: true})); }; set('#fs-am', '1'); set('#fs-td', 'suggest'); document.querySelector('.modal [data-m="ok"]').click(); return 1; })()`);
+    await ev(`(() => { const s = document.querySelector('.modal #fs-am'); s.checked = true; s.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
+    await ready(ev, `!!document.querySelector('.modal .ssaved.on')`);
+    await ev(`(() => { const s = document.querySelector('.modal #fs-td'); s.disabled = false; s.value = 'suggest'; s.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
     await ready(ev, `!document.querySelector('.modal #fs-prev').hidden`);
-    const pv = await ev(`(() => { const p = document.querySelector('.modal #fs-prev'); return {txt: p.textContent, cls: p.className, role: p.getAttribute('role'), btn: document.querySelector('.modal [data-m="ok"]').textContent, still: !!document.querySelector('.modal #fs-td')}; })()`);
-    check(/^Not saved yet/.test(pv.txt.trim()) && /unsaved/.test(pv.cls) && pv.role === 'alert' && pv.btn === 'Save anyway' && pv.still, '#1158: the dry run: "Not saved yet" + "Save anyway", the dialog stays ' + JSON.stringify(pv));
-    await shot('p2370u-not-saved.png');
-    await ev(`(() => { document.querySelector('.modal [data-m="ok"]').click(); return 1; })()`);
-    check(await ready(ev, `!document.querySelector('.modal #fs-td')`), '#1158: "Save anyway" saves and closes');
+    const pv = await ev(`(() => { const p = document.querySelector('.modal #fs-prev'); return {txt: p.textContent, role: p.getAttribute('role'), ok: !!document.querySelector('.modal [data-m="ok"]'), still: !!document.querySelector('.modal #fs-td')}; })()`);
+    check(/do(es)? not follow/.test(pv.txt) && pv.role === 'status' && !pv.ok && pv.still, '#1158: the lists that do not follow are named, the dialog stays ' + JSON.stringify(pv));
+    await shot('p2370u-not-following.png');
+    await ev(`(() => { document.querySelector('.modal [data-m="close"]').click(); return 1; })()`);
+    check(await ready(ev, `!document.querySelector('.modal #fs-td')`), '#1158: closing closes at once (everything is saved)');
     await ev(`(() => { folderPropsModal('Studio'); return 1; })()`);
     await ready(ev, `!!document.querySelector('.modal #fs-td')`);
-    const vals = await ev(`(() => ({am: document.querySelector('.modal #fs-am').value, ap: !!document.querySelector('.modal #fs-ap[data-fk]'), td: document.querySelector('.modal #fs-td').value}))()`);
-    check(vals.am === '1' && !vals.ap && vals.td === 'suggest', '#1158: open again shows the saved values (2.40.0 #1373: no agent_peers select) ' + JSON.stringify(vals));
+    const vals = await ev(`(() => ({am: document.querySelector('.modal #fs-am').checked, ap: !!document.querySelector('.modal #fs-ap[data-fk]'), td: document.querySelector('.modal #fs-td').value}))()`);
+    check(vals.am === true && !vals.ap && vals.td === 'suggest', '#1158: open again shows the saved values (2.40.0 #1373: no agent_peers select) ' + JSON.stringify(vals));
 
-    // ================= #1158: "People and roles…" as a sub-dialog with Back; closing with changes asks
-    await ev(`(() => { const s = document.querySelector('.modal #fs-am'); s.value = '0'; s.dispatchEvent(new Event('change', {bubbles: true})); document.querySelector('.modal [data-m="people"]').click(); return 1; })()`);
-    await ready(ev, `!!document.querySelector('.modal #fp-list')`);
-    const pp = await ev(`(() => { const ms = [...document.querySelectorAll('.modal')]; const props = ms.find(x => x.querySelector('#fs-am')); return {n: ms.length, hidden: props && getComputedStyle(props).display === 'none', back: document.querySelector('.modal #fp-list')?.closest('.modal').querySelector('[data-m="close"]')?.textContent.trim()}; })()`);
-    check(pp.n === 2 && pp.hidden && pp.back === 'Back', '#1158: People and roles opens over the folder dialog with Back ' + JSON.stringify(pp));
-    await ev(`(() => { document.querySelector('.modal #fp-list').closest('.modal').querySelector('[data-m="close"]').click(); return 1; })()`);
-    await ready(ev, `!document.querySelector('.modal #fp-list')`);
-    const bk = await ev(`(() => { const p = document.querySelector('.modal #fs-am')?.closest('.modal'); return {there: !!p, shown: p && getComputedStyle(p).display !== 'none', am: p && p.querySelector('#fs-am').value}; })()`);
-    check(bk.there && bk.shown && bk.am === '0', '#1158: Back brings the folder dialog with the unsaved choice ' + JSON.stringify(bk));
+    // ================= #1158: "Share…" as a sub-dialog with Back
+    await ev(`(() => { document.querySelector('.modal [data-m="people"]').click(); return 1; })()`);
+    await ready(ev, `!!document.querySelector('.modal.fshmodal')`);
+    const pp = await ev(`(() => { const ms = [...document.querySelectorAll('.modal')]; const props = ms.find(x => x.querySelector('#fs-am')); return {n: ms.length, hidden: props && getComputedStyle(props).display === 'none', back: document.querySelector('.modal.fshmodal .foot .btn.pri')?.textContent.trim()}; })()`);
+    check(pp.n === 2 && pp.hidden && pp.back === 'Back', '#1158: the Share dialog opens over the folder dialog with Back ' + JSON.stringify(pp));
+    await ev(`(() => { document.querySelector('.modal.fshmodal .foot .btn.pri').click(); return 1; })()`);
+    await ready(ev, `!document.querySelector('.modal.fshmodal')`);
+    const bk = await ev(`(() => { const p = document.querySelector('.modal #fs-am')?.closest('.modal'); return {there: !!p, shown: p && getComputedStyle(p).display !== 'none', am: p && p.querySelector('#fs-am').checked}; })()`);
+    check(bk.there && bk.shown && bk.am === true, '#1158: Back brings the folder dialog back ' + JSON.stringify(bk));
     // Repository… the same way
     await ev(`(() => { document.querySelector('.modal [data-m="repos"]').click(); return 1; })()`);
     await ready(ev, `!!document.querySelector('.modal #l-repos')`);
     await ev(`(() => { document.querySelector('.modal #l-repos').closest('.modal').querySelector('[data-m="close"]').click(); return 1; })()`);
     await ready(ev, `!document.querySelector('.modal #l-repos')`);
-    check(await ev(`document.querySelector('.modal #fs-am')?.value === '0' && getComputedStyle(document.querySelector('.modal #fs-am').closest('.modal')).display !== 'none'`), '#1158: Repository… and back keeps the state too');
-    // Cancel with changes asks; Keep editing stays
+    check(await ev(`document.querySelector('.modal #fs-am')?.checked === true && getComputedStyle(document.querySelector('.modal #fs-am').closest('.modal')).display !== 'none'`), '#1158: Repository… and back keeps the state too');
     await ev(`(() => { document.querySelector('.modal #fs-am').closest('.modal').querySelector('[data-m="close"]').click(); return 1; })()`);
-    await ready(ev, `!!document.querySelector('.cdlg')`);
-    const ask = await ev(`(() => ({t: document.querySelector('.cdlg h3')?.textContent, no: document.querySelector('.cdlg [data-cd="no"]')?.textContent, yes: document.querySelector('.cdlg [data-cd="yes"]')?.textContent}))()`);
-    check(ask.t === 'Discard changes?' && ask.no === 'Keep editing' && ask.yes === 'Discard', '#1158: closing with changes asks ' + JSON.stringify(ask));
-    await shot('p2370u-discard.png');
-    await ev(`(() => { document.querySelector('.cdlg [data-cd="no"]').click(); return 1; })()`);
     await sleep(300);
-    check(await ev(`!document.querySelector('.cdlg') && document.querySelector('.modal #fs-am')?.value === '0'`), '#1158: Keep editing leaves the dialog as it was');
-    // Esc asks too; Discard closes without saving
-    await ev(`(() => { document.querySelector('.modal #fs-am').dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true})); return 1; })()`);
-    await ready(ev, `!!document.querySelector('.cdlg')`);
-    check(await ev(`document.querySelector('.cdlg h3')?.textContent === 'Discard changes?'`), '#1158: Esc with changes asks too');
-    await ev(`(() => { const f = document.querySelector('.cdlg form'); f.requestSubmit ? f.requestSubmit() : f.dispatchEvent(new Event('submit', {cancelable: true})); return 1; })()`);
-    check(await ready(ev, `!document.querySelector('.modal #fs-am') && !document.querySelector('.cdlg')`), '#1158: Discard closes the dialog');
+    check(await ev(`!document.querySelector('.modal #fs-am') && !document.querySelector('.cdlg')`), '#1158: closing asks nothing (saved at once)');
     const st = await call(CA, 'GET', '/api/folders/props?folder=Studio');
-    check(st.props && st.props.agent_members === true, '#1158: discarded = nothing saved ' + JSON.stringify(st.props));
-    // without changes: Cancel closes at once
-    await ev(`(() => { folderPropsModal('Studio'); return 1; })()`);
-    await ready(ev, `!!document.querySelector('.modal #fs-am')`);
-    await ev(`(() => { document.querySelector('.modal #fs-am').closest('.modal').querySelector('[data-m="close"]').click(); return 1; })()`);
-    await sleep(300);
-    check(await ev(`!document.querySelector('.modal #fs-am') && !document.querySelector('.cdlg')`), '#1158: without changes Cancel closes at once');
+    check(st.props && st.props.agent_members === true && st.props.agent_tidy === 'suggest', '#1158: the values stay saved ' + JSON.stringify(st.props));
 
     // ================= #1159: save an agent message (the offer button), the mark, saving again, the link back
     await nav(B + '#agents/' + ag.id);

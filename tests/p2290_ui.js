@@ -67,12 +67,18 @@ const V = B + 'api/v1';
   click(w, [...d.querySelectorAll('#pop [role="menuitem"]')].find(x => /Folder settings/.test(x.textContent)));
   await until(() => d.querySelector('.modal #fs-ws'));
   let md = d.querySelector('.modal');
-  check(md && md.querySelector('#fs-ws') && md.querySelector('#fs-ag') && md.querySelector('#fs-am') && md.querySelector('#fs-td') && md.querySelectorAll('[name="fs-ap"]').length === 2, '#1030: workspace, agent, members, tidy and "apply to" in the dialog');
+  // 2.41.0 (#1420 / #1423): the agents are chosen in the folder's Share dialog (several), the settings save at once
+  check(md && md.querySelector('#fs-ws') && md.querySelector('#fs-ags') && md.querySelector('[data-m="share-ag"]') && md.querySelector('#fs-am') && md.querySelector('#fs-td') && md.querySelectorAll('[name="fs-ap"]').length === 2, '#1030: workspace, agents (link to Share), members, tidy and "apply to" in the dialog');
   check(/2 lists in the folder/.test(md.textContent), '#1030: "apply to" counts the lists ' + md.querySelector('.fsapply')?.textContent);
   change(w, md.querySelector('#fs-ws'), String(ORG));
-  change(w, md.querySelector('#fs-ag'), String(AG));
-  click(w, md.querySelector('[data-m="ok"]'));
   await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === C1)?.org_id === ORG);
+  await until(() => w.eval(`folderEff('Clients').org_id === ${ORG}`));  // the app has loaded the saved folder workspace
+  md.remove();
+  w.eval(`LS.set('agSafeSeen', true); folderShareModal('Clients')`);
+  const agsel = await until(() => d.querySelector('.modal.fshmodal #fsh-agadd'));
+  if (agsel) { change(w, agsel, String(AG)); click(w, d.querySelector('.modal.fshmodal [data-m="fsh-agadd"]')); }
+  await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === C2)?.members.some(m => m.user_id === AG));
+  d.querySelectorAll('.modal').forEach(m => m.remove());
   let st = await call('GET', '/api/state');
   check(st.lists.find(l => l.id === C1).org_id === ORG && st.lists.find(l => l.id === C2).members.some(m => m.user_id === AG), '#1030: saved: both lists in the organisation, the agent in them');
   check(st.folder_props.Clients && st.folder_props.Clients.agent_id === AG, '#1030: the state knows the folder settings ' + JSON.stringify(st.folder_props));
@@ -96,10 +102,10 @@ const V = B + 'api/v1';
   await call('PUT', '/api/folders/props', {folder: 'Clients', props: {agent_tidy: 'off'}, apply: 'new'});
   await call('PATCH', `/api/lists/${C1}`, {agent_tidy: 'suggest'});
   change(w, md.querySelector('#fs-td'), 'auto');
-  click(w, md.querySelector('[data-m="ok"]'));
+  // 2.41.0 (#1423): saved at once (no "Save anyway"); the lists that keep their own value are named after it
   await until(() => !md.querySelector('#fs-prev')?.hidden || !md.isConnected);
-  check(md.isConnected && !md.querySelector('#fs-prev').hidden && /Client/.test(md.querySelector('#fs-prev').textContent) && /Save anyway/.test(md.querySelector('[data-m="ok"]').textContent),
-    '#1030: lists that keep their own value are named first, "Save anyway" ' + (md.querySelector('#fs-prev')?.textContent || '').slice(0, 160));
+  check(md.isConnected && !md.querySelector('#fs-prev').hidden && /Client/.test(md.querySelector('#fs-prev').textContent) && !md.querySelector('[data-m="ok"]'),
+    '#1030: lists that keep their own value are named ' + (md.querySelector('#fs-prev')?.textContent || '').slice(0, 160));
   md.remove();
   // folder people: every role, switch per person, removing asks
   w.eval(`folderPeopleModal('Clients')`); await until(() => d.querySelector('.modal #fp-role'));

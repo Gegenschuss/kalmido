@@ -114,7 +114,7 @@ const labels = (w, id) => w.eval(`listMenuItems(${id}, document.body).filter(x =
   check(w.eval(`showDone('l:${MV}')`) === false && w.eval(`lmDoneResetItems('l:${MV}').length`) === 0, '#1214: back to the folder default');
   check(!/"l:\d+"/.test((await call('GET', '/api/state', null, CB)).settings.show_done_views || ''), '#1214: the own entry is gone on the server');
   w.eval(`folderPropsModal('Clients')`); await until(() => d.querySelector('#fs-hd'));
-  check(d.querySelector('#fs-hd')?.value === '1', '#1214: Folder settings show Hide completed');
+  check(d.querySelector('#fs-hd')?.checked === true, '#1214: Folder settings show Hide completed');  // 2.41.0 (#1423): a switch
   w.close();
 
   console.log(`${ok} ok, ${F.length} failed`);
