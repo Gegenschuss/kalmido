@@ -247,6 +247,11 @@ registering the ones of its area.
 | `multiedit.js` | 2.26.0: several selected tasks edited at once in the task panel (common values, "Mixed", one undo step). |
 | `sheetdrag.js` | 2.39.1: bottom sheets on phones (menus, date picker, quick add, dialogs) dragged taller / shorter at their grip and swiped down to close. |
 | `miniwin.js` | 2.39.1: a list in its own small browser window (double / middle click in the sidebar, list menu); the window (`/?mini=1#l/<id>`) shows only the list and keeps its UI state to itself. |
+| `favorites.js` | 2.40.0: favourite lists (#1361): the star, the *Favourites* section of the sidebar, *Only favourites* and the favourites filter of views. |
+| `mineorder.js` | 2.40.0: your own order of *My tasks* (#1344), kept per person on the server (`user_task_order`). |
+| `mdtitle.js` | 2.40.0: inline Markdown in task titles (`mdTitle`) and the plain text for attributes, tabs and notifications (`mdPlain`). |
+| `formguard.js` | 2.40.0: keeps unsaved form input in Office & finance across redraws and view switches, *Save / Discard*, a question before leaving (#1371). |
+| `countries.js` | 2.40.0: the country picker (names from the browser, ISO 3166 alpha-2 codes) of the client card, company data and import preview. |
 | `collab.js` | News and comments + activity (module "collab"). |
 | `attachments.js` | Attachments and the share target. |
 | `undo.js` | Undo / redo history. |
