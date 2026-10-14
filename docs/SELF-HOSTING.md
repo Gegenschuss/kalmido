@@ -326,7 +326,8 @@ only the database and the data folder hold ciphertext.
   of tasks in the organisation's lists (comments included), project files of its lists, stored invoices / credit notes
   (PDF/A-3 and e-invoice XML) and the archived PDFs of the legacy import. A stored PDF stays a PDF/A-3 without a
   password: it is sealed only on disk and served as the original (same checksum). Not encrypted: names, addresses,
-  task texts, logos, profile pictures, files in agent chats and private lists, the search index.
+  task texts, logos, profile pictures, files in agent chats and private lists, the search index. The cache of texts read
+  from attachments (`textcache/`, at most 30 days) is sealed with a key derived from the master key.
 - **The keys.** `KALMIDO_SECRET_KEY` (32 random bytes, base64) is the master key. Each organisation gets a random key,
   stored in the database only wrapped with a key derived from the master key. Without `KALMIDO_SECRET_KEY` nothing is
   encrypted (everything as before); *Settings > Organisation > Encryption* says so.
