@@ -93,7 +93,8 @@
 - End every chat answer with exactly **one** suggestion for the next step as an answer button; never offer one that an
   older, still visible message already offers as a button (offer the next-best different step instead). Only the newest
   message's buttons stay live: a newer message expires older open ones; take back buttons that are no longer current
-  with `withdraw_chat_choices`.
+  with `withdraw_chat_choices`. A host that posts your answer for you (the launcher's event mode, 2.40.0) turns a final
+  block ` ```suggest ` (one line per suggestion) into the button.
 - A long chat answer worth keeping (a plan, a release draft, a summary to review later): send it with `offer_save: true`
   (`send_chat`, 2.37.0). The person gets the button *Save as task* under it and decides; never save a message yourself.
 

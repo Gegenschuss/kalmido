@@ -191,7 +191,8 @@ with open(os.environ["FAKE_CALLS"], "a") as f:
     f.write(json.dumps({"args": args, "prompt": prompt}) + "\n")
 mode, again = os.environ.get("FAKE_MODE"), "--resume" in args
 final = {"fix": "Shall I deploy 1.2 now?" if not again else "Ready to deploy 1.2.\n\n```approval\nDeploy 1.2\n```",
-         "stubborn": "Das ist klein genug, um es in 2.40 mitzunehmen.", "plain": "All builds are green."}[mode]
+         "stubborn": "Das ist klein genug, um es in 2.40 mitzunehmen.", "plain": "All builds are green.",
+         "suggest": "All green.\n\n```suggest\nShow the log\nRun the tests\n```"}[mode]
 print(json.dumps({"type": "system", "subtype": "init", "model": "m", "session_id": "sess-1"}), flush=True)
 print(json.dumps({"type": "result", "subtype": "success", "is_error": False, "result": final, "session_id": "sess-1"}), flush=True)
 ''')
@@ -201,8 +202,8 @@ class StubApi:
     def __init__(self):
         self.posts = []
 
-    def chat(self, uid, body, approval=None, reply_to=None, task_id=None):
-        self.posts.append({"uid": uid, "body": body, "approval": approval})
+    def chat(self, uid, body, approval=None, reply_to=None, task_id=None, suggest=None):
+        self.posts.append({"uid": uid, "body": body, "approval": approval, "suggest": suggest})
         return {"id": len(self.posts)}
 
     def status(self, *a, **k):
@@ -211,16 +212,41 @@ class StubApi:
     typing = progress = quota = status
 
 
-def agent_run(mode, ev=None):
+def agent_run(mode, ev=None, rr=None):
     os.environ.update(FAKE_MODE=mode, FAKE_CALLS=CALLS)
     if os.path.exists(CALLS):
         os.remove(CALLS)
-    rr = ar.Runner([sys.executable, FAKE], os.path.join(os.getcwd(), "state2"))
+    rr = rr or ar.Runner([sys.executable, FAKE], os.path.join(os.getcwd(), "state2"))
     rr.api = rr.usage.api = StubApi()
     ev = ev or {"event": "chat", "data": {"user": {"id": 7, "name": "Ann"}, "message": {"id": 1, "body": "status?"}}}
     rr.run(ar.Runner.chat_uid(ev), [ev])
     with open(CALLS) as f:
         return rr.api.posts, [json.loads(l) for l in f]
+
+
+# 2.40.0 (#1100 suggest_buttons): a ```suggest block -> up to 3 answer buttons; a typed number picks one
+rs = ar.Runner([sys.executable, FAKE], os.path.join(os.getcwd(), "state3"))
+posts, calls = agent_run("suggest", rr=rs)
+check(len(calls) == 1 and posts[0]["body"] == "All green." and posts[0]["suggest"] == ["Show the log", "Run the tests"], f"suggest block -> buttons: {posts}")
+posts, calls = agent_run("plain", {"event": "chat", "data": {"user": {"id": 7}, "message": {"id": 2, "body": "2"}}}, rr=rs)
+check("The number picks your suggestion: Run the tests." in calls[0]["prompt"], "a typed number picks the suggestion")
+posts, calls = agent_run("plain", {"event": "chat", "data": {"user": {"id": 7}, "message": {"id": 3, "body": "2"}}}, rr=rs)
+check("picks your suggestion" not in calls[0]["prompt"], "only the suggestions of the last answer count")
+sent = []
+api = ar.Api("http://127.0.0.1:9", "t")
+
+
+def fake_post(uid, b):
+    sent.append(b)
+    if "choices" in b:
+        raise ar.ApiError(400, "unknown field choices")
+    return {"id": 1}
+
+
+api._post_chat = fake_post
+api.chat(7, "All green.", suggest=["Show the log", "Run the tests"])
+check(sent[0]["choices"] == [{"id": "s1", "label": "Show the log"}, {"id": "s2", "label": "Run the tests"}]
+      and sent[1]["body"] == "All green.\n\nNext: 1) Show the log  2) Run the tests" and api.choices_ok is False, f"no buttons: a numbered line: {sent}")
 
 
 posts, calls = agent_run("fix")

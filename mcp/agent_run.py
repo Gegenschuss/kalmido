@@ -180,7 +180,7 @@ class Api:
                 return self.req("POST", f"/agent/chats/{uid}", {k: v for k, v in b.items() if k != "reply_to"}, timeout=60)
             raise
 
-    def chat(self, uid, body, approval=None, reply_to=None, task_id=None):
+    def chat(self, uid, body, approval=None, reply_to=None, task_id=None, suggest=None):
         b = {"body": body}
         if task_id:
             b["task_id"] = task_id
@@ -207,6 +207,15 @@ class Api:
                 self.choices_ok = False
                 body = body + "\n\n**Approval needed:** " + approval["title"] + " (answer yes or no)"
                 b["body"] = body
+        if suggest and not approval:  # 2.40.0 (#1100 suggest_buttons): the suggestions as answer buttons (2.28+)
+            if self.choices_ok is not False:
+                try:
+                    return self._post_chat(uid, {**b, "choices": [{"id": f"s{i + 1}", "label": s[:80]} for i, s in enumerate(suggest[:3])]})
+                except ApiError as e:
+                    if e.status != 400:
+                        raise
+                    self.choices_ok = False
+            b["body"] = (body + "\n\n" if body else "") + suggest_line(suggest)  # no buttons: a numbered line
         return self._post_chat(uid, b)
 
 
@@ -397,8 +406,9 @@ def build_prompt(evs, chat_uid):
                    "person's language about what you do next. If you need the person's approval or ask them to decide (a "
                    "proposal, variants, \"shall I ...?\"), end your answer with "
                    "a block ```approval (first line: what you want to do, optional further lines: what happens on yes) "
-                   "and wait: only a yes is a yes, silence never is. Commands, code and configuration the person "
-                   "should run or paste go into their own fenced code block with a language (one block per place, one "
+                   "and wait: only a yes is a yes, silence never is. Up to three short next steps for the person may "
+                   "follow in a final block ```suggest (one per line): they become answer buttons. Commands, code "
+                   "and configuration the person should run or paste go into their own fenced code block with a language (one block per place, one "
                    "command per line, no prompt sign, steps chained with &&), never as code inside a sentence.")
     else:
         out.append("This is a task event: answer on the task itself (comment) with the Kalmido tools; your final text "
@@ -422,6 +432,9 @@ def build_prompt(evs, chat_uid):
             if hint:
                 out.append(hint)
             out += fence(m.get("id"), (x.get("user") or {}).get("id"), m.get("body"))
+            if x.get("picked_suggestion"):
+                out.append("(The number picks your suggestion: " + " ".join(str(x["picked_suggestion"]).replace("<<<", "< < <").split())
+                           + ". Treat it as that request.)")
             if m.get("attachments"):
                 out.append(f"(with {len(m['attachments'])} file(s): see attachments in the event below)")
         elif kind == "chat_choice" and x.get("approval") in ("approved", "rejected"):
@@ -627,6 +640,7 @@ class Runner:
         self.pmode, self.host_pmode = permission_modes(cmd)
         self.model = ""
         self.approvals = {}  # message id -> {uid, title, what, at}: the approval requests this runner posted
+        self.suggestions = {}  # chat user id -> the suggestions of the last answer (2.40.0: a typed number picks one)
 
     def host(self):
         return {"model": model_label(self.model), "permission_mode": self.pmode, "host_permission_mode": self.host_pmode}
@@ -694,7 +708,18 @@ class Runner:
                 out.append((uid, [ev]))
         return out
 
+    def pick_suggestion(self, uid, evs):
+        """2.40.0 (#1100 suggest_buttons): a chat message that is only a number (1-3) picks that suggestion of the last
+        answer; a pressed button arrives as chat_choice with its label anyway."""
+        sugg = self.suggestions.pop(uid, None) if uid else None
+        for ev in evs:
+            x = ev.get("data") or {}
+            body = str((x.get("message") or {}).get("body") or "").strip().rstrip(".)")
+            if sugg and ev.get("event") == "chat" and body.isdigit() and 1 <= int(body) <= len(sugg):
+                x["picked_suggestion"] = sugg[int(body) - 1]
+
     def run(self, uid, evs):
+        self.pick_suggestion(uid, evs)
         prompt = build_prompt(evs, uid)
         args = list(self.cmd)
         if "-p" not in args and "--print" not in args:
@@ -721,16 +746,17 @@ class Runner:
                 body, appr, sugg = self.check_approval(args, uid, body, appr, sugg, st.session_id, what)
                 if done:  # closing open cards from words is not done by this runner yet
                     log(f"{len(done)} approval-done line(s) left as they are")
-                if sugg and not appr:
-                    body = (body + "\n\n" if body else "") + suggest_line(sugg)
+                if appr:
+                    sugg = []
                 ids = [int((e.get("data") or {}).get("message", {}).get("id") or 0) for e in evs if e.get("event") == "chat"]
                 reply_to = ids[-1] if len(ids) > 1 and ids[-1] else None  # several messages: say which one it answers
-                parts = chunks(body) or ([""] if appr else [])
+                parts = chunks(body) or ([""] if appr or sugg else [])
+                self.suggestions[uid] = sugg  # a typed number in the next message picks one
                 try:
                     for i, part in enumerate(parts):
                         last = i == len(parts) - 1
-                        r = self.api.chat(uid, part or appr["title"], approval=appr if last else None,
-                                          reply_to=reply_to if i == 0 else None)
+                        r = self.api.chat(uid, part or (appr["title"] if appr else ""), approval=appr if last else None,
+                                          reply_to=reply_to if i == 0 else None, suggest=sugg if last else None)
                         if last and appr and isinstance(r, dict) and r.get("id"):
                             self.approvals[str(r["id"])] = {"uid": uid, **appr, "at": time.time()}
                     log(f"answer posted: {len(body)} chars{', approval' if appr else ''}")

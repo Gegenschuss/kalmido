@@ -141,7 +141,8 @@ permission mode, typing / status, the plan usage ring, the reply reference and a
 the final text of a chat run is posted as the answer. The command then has no `-p`. 2.40.0: a chat answer that asks to
 decide or makes a proposal without a final ` ```approval ` block goes back to the agent once (same session, the complete
 answer with the block); still none -> it is posted with a note that nothing happens without an explicit yes
-(`KALMIDO_APPROVAL_CHECK=0` switches this off).
+(`KALMIDO_APPROVAL_CHECK=0` switches this off). A final ` ```suggest ` block (up to three next steps) becomes answer
+buttons; a typed number picks one. Long answers go in numbered parts with code blocks closed and reopened at the cut.
 
 ```sh
 ./agent_launcher.sh -e /path/to/kalmido-agent.env --events -- claude --mcp-config ~/.kalmido-mcp.json
