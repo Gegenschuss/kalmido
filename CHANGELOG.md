@@ -7,6 +7,8 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.41.1] - 2026-10-14
+
 ### Fixed
 - The News badge and an open News view update within the poll again when a comment brings news (#1376).
 - Withdrawing comment questions answers 404 for an unknown comment before the agent check (#1383); the per-area change
@@ -4046,7 +4048,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.41.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.41.1...HEAD
+[2.41.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.41.1
 [2.41.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.41.0
 [2.40.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.40.2
 [2.40.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.40.1
