@@ -257,6 +257,8 @@ APP_ONLY = [
      "with PATCH /lists/{id} itself", ("GET /api/lists/{}/folder-preview",)),
     ("2.40.0 (#1192): the app counts the tasks with a value of a field for its delete confirmation; the API answers the "
      "count with DELETE /fields/{id} itself (values)", ("GET /api/fields/{}/count",)),
+    ("2.40.0 (#1344 / #1361): the own order of My tasks and the favourite star are personal app settings of a person; "
+     "agents never set them", ("PUT /api/tasks/mine-order", "* /api/lists/{}/favorite")),
     ("2.29.0 (#1029): the permission mode switch in the chat header; in the API it is the agent's runtime (admins: "
      "PATCH /api/admin/agents/{id}, owners: PATCH /api/my/agents/{id}), the agent reads it in GET /agent",
      ("PUT /api/agents/{}/permission-mode",)),

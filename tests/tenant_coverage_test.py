@@ -192,7 +192,7 @@ ROUTES = {
     # ---- office (F1, 2.38.0 #1021): invoices, credit notes, reminders, payments, sending, DATEV inbox (11)
     "POST /api/office/docs/{}/invoice": "office", "POST /api/office/docs/{}/credit": "office", "POST /api/office/docs/from-time": "office",
     "POST /api/office/docs/reminder": "office", "GET /api/office/docs/{}/payments": "office", "POST /api/office/docs/{}/payments": "office",
-    "DELETE /api/office/docs/{}/payments/{}": "office", "POST /api/office/docs/{}/send": "office", "POST /api/office/docs/{}/datev": "office",
+    "DELETE /api/office/docs/{}/payments/{}": "office", "POST /api/office/docs/{}/send": "office", "POST /api/office/docs/{}/fee": "office", "POST /api/office/docs/{}/datev": "office",
     "GET /api/office/mail-status": "office", "GET /api/office/docs/{}/xml": "office",  # F2: the e-invoice XML of a finalised document
     # ---- office (2.39.1 #1182): legacy import (preview, split, import, runs + undo, archive of old PDFs, counter) (13)
     "POST /api/office/legacy/preview": "office", "POST /api/office/legacy/split": "office", "POST /api/office/legacy/import": "office",
@@ -266,7 +266,7 @@ ROUTES = {
     "GET /ical/{}.ics": "ical", "GET /api/ical": "ical", "POST /api/ical": "ical",
     # ---- list (100)
     "GET /api/lists/{}/agent-access": "list",  # 2.30.0 (#919): the agents' access log of a list (its members)
-    "PUT /api/lists/{}/icon": "list", "POST /api/lists/{}/icon": "list", "DELETE /api/lists/{}/icon": "list",
+    "DAV /api/lists/{}/favorite": "list", "PUT /api/lists/{}/icon": "list", "POST /api/lists/{}/icon": "list", "DELETE /api/lists/{}/icon": "list",
     "GET /api/list-icon/{}/{}.png": "list", "GET /api/v1/lists/{}/tags": "list", "POST /api/v1/lists/{}/tags": "list",
     "PATCH /api/v1/lists/{}/tags/{}": "list", "DELETE /api/v1/lists/{}/tags/{}": "list",
     "GET /api/v1/lists/{}/overview": "list", "PATCH /api/v1/lists/{}/overview": "list",
@@ -314,7 +314,7 @@ ROUTES = {
     "GET /api/orgs/{}/lists": "org", "POST /api/orgs/{}/lists/{}/archive": "org", "DELETE /api/orgs/{}/lists/{}": "org",
     "POST /api/orgs/{}/lists/{}/owner": "org",
     # ---- own (119)
-    "POST /api/onboarding": "own", "POST /api/sample": "own", "DELETE /api/sample": "own", "PATCH /api/settings": "own",
+    "PUT /api/tasks/mine-order": "own", "POST /api/onboarding": "own", "POST /api/sample": "own", "DELETE /api/sample": "own", "PATCH /api/settings": "own",
     "POST /api/ntfy/test": "own", "GET /api/push/vapid": "own", "GET /api/push/subs": "own", "POST /api/push/subs": "own",
     "DELETE /api/push/subs/{}": "own", "POST /api/push/unsubscribe": "own", "POST /api/push/handled": "own",
     "POST /api/push/test": "own", "GET /api/me": "own", "PATCH /api/me": "own", "POST /api/me/drop-token": "own",
