@@ -430,7 +430,7 @@ def list_agent_access_update(c, lid, b):
     owner = c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0]
     if is_agent(g.user) or not (role in MANAGE_ROLES or (owner in agent_ids(c) and role in WRITE_ROLES)):
         raise Denied(403, tr("Only the list owner or a list admin can change this"))
-    for k in ("agent_members", "agent_peers"):
+    for k in ("agent_members",):  # 2.40.0 (#1373): agent_peers is ignored (fixed off)
         if k in b:
             if not isinstance(b[k], bool) and b[k] not in (0, 1):
                 raise BadInput(tr("Invalid value: {0}", k))
@@ -750,7 +750,7 @@ def is_approver(c, t, uid):
 # 2.26.0 (#928): the events a person can only send to an agent where the agent is open to them (agent_usable); the
 # others are list automations the list's owner switched on (tidy, task_added) or checked where they start (job_request:
 # POST /api/proposals, chat: agent_shares, job: job_may_act). An agent's actions never reach another agent unless the list
-# has agent_peers on (every event).
+# had agent_peers on; 2.40.0 (#1373): never (every event).
 AGENT_GATED = ("mention", "comment", "assigned", "unassigned", "reaction", "team_message", "wake")
 AGENT_UNGATED = ("job", "ping", "runtime_changed", "reset", "followup_due")
 # 2.26.0 (#928): the SQL condition "list l is open to person ? for agent ?": owner, list admin (own role), the list
@@ -771,7 +771,7 @@ def agent_usable(c, aid, uid, lid):
     if not u or not lst or not list_role(c, lid, uid) or not list_role(c, lid, aid):
         return False
     if u["kind"] == "agent":
-        return bool(lst["agent_peers"])
+        return False  # 2.40.0 (#1373): agents never address each other (lists.agent_peers stays in the database, unused)
     o = agent_owner(c, aid)
     if o is not None:
         return o == uid

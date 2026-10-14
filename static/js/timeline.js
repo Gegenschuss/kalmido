@@ -30,7 +30,7 @@ function tlBarHtml(t, start, end, DW, pick, deps) {
   const pad = DW >= 12 ? 2 : .5, x = diffDays(start, s) * DW, w = (diffDays(s, e) + 1) * DW;
   const wait = tlWaiting(t), conf = wait && tlConflict(t), ed = canEdit(t) && t.status === 0;
   const when = t.start && t.start < t.due ? `${fmtDayAbs(t.start)} – ${fmtDayAbs(t.due)}` : fmtDayAbs(t.due);
-  const tip = [t.title, when, wait ? blockedTitle(t) : '', conf ? tr('Starts before “{0}” is due', conf.title) : '', t.status === 2 ? tr('done') : ''].filter(Boolean).join(' · ');
+  const tip = [mdPlain(t.title), when, wait ? blockedTitle(t) : '', conf ? tr('Starts before “{0}” is due', conf.title) : '', t.status === 2 ? tr('done') : ''].filter(Boolean).join(' · ');
   const mark = pick ? (tlCanLink(pick.from, t.id) ? ' tl-ok' : ' tl-no') + (pick.from === t.id ? ' tl-from' : '') : '';
   // 2.7.0 (K14): the label of a short bar goes right of it, or left of it near the end of the range; it never runs past the
   // range, and on the left it stops before the name column (max-width in px, the room there)
@@ -38,7 +38,7 @@ function tlBarHtml(t, start, end, DW, pick, deps) {
   const sh = w < 110 || String(t.title || '').length * 6.5 + 24 > w;
   const span = TL_DAYS * DW, room = span - (x + w) - 24, lroom = x - 16, left = sh && room < 120 && lroom > room;
   const lmax = sh ? Math.max(40, Math.min(220, left ? lroom : room)) : 0;
-  return `<div class="tl-bar p${t.priority} ${sh ? 'short' : ''}${left ? ' lbl-l' : ''}${wait ? ' wait' : ''}${conf ? ' conf' : ''}${ed ? '' : ' ro'}${t.status ? ' done' : ''}${mark}" data-id="${t.id}" style="left:${x + pad}px;width:${Math.max(TL_MINW, w - 2 * pad)}px" title="${esc(tip)}" tabindex="0" role="button" aria-label="${esc(tip)}">${wait ? ic('lock', 's tl-lk') : ''}<span${lmax ? ` style="max-width:${Math.round(lmax)}px"` : ''}>${esc(t.title)}</span><i class="h l"></i><i class="h r"></i></div>` +
+  return `<div class="tl-bar p${t.priority} ${sh ? 'short' : ''}${left ? ' lbl-l' : ''}${wait ? ' wait' : ''}${conf ? ' conf' : ''}${ed ? '' : ' ro'}${t.status ? ' done' : ''}${mark}" data-id="${t.id}" style="left:${x + pad}px;width:${Math.max(TL_MINW, w - 2 * pad)}px" title="${esc(tip)}" tabindex="0" role="button" aria-label="${esc(tip)}">${wait ? ic('lock', 's tl-lk') : ''}<span${lmax ? ` style="max-width:${Math.round(lmax)}px"` : ''}>${mdTitleNL(t.title)}</span><i class="h l"></i><i class="h r"></i></div>` +
     (deps && ed && !pick && dFor(t) ? `<button type="button" class="tl-knob" data-knob="${t.id}" style="left:${x + Math.max(w, TL_MINW + 2 * pad) + 9}px" tabindex="-1" aria-hidden="true" title="${tr('Drag onto the task this one blocks')}"></button>` : '');
 }
 // 1.5.3 (q): undated tasks in the timeline: per list a folding group "No date (n)" at the end, one row per task with an
@@ -52,7 +52,7 @@ function tlNdRows(l, ts) {
   for (const t of ts.filter(x => !x.parent_id || !ids.has(x.parent_id)).sort(bySort)) add(t);
   const k = 'tlnd:' + l.id, closed = S.collapsed.has(k), ed = canEditList(l.id);
   return `<div class="tl-row tl-grp tl-ndhead" data-ndl="${l.id}"><div class="tl-name" data-act="collapse-tl" data-key="${k}" role="button" aria-expanded="${!closed}">${ic('chev', 's fcar' + (closed ? ' shut' : ''))}${tr('No date')} <span class="c">${ts.length}</span></div><div class="tl-track"></div></div>` +
-    (closed ? '' : ord.map(t => `<div class="tl-row tl-nd"><div class="tl-name" data-act="open" data-id="${t.id}">${t.parent_id && ids.has(t.parent_id) ? '<span class="muted">↳ </span>' : ''}<span class="tln">${esc(t.title)}</span>${tlWaiting(t) ? `<span class="tl-wf" title="${esc(blockedTitle(t))}">${ic('lock', 's')}${esc(tr('blocked by {0}', blockedNames(t)))}</span>` : ''}</div><div class="tl-track ndt${ed && canEdit(t) ? ' ed' : ''}" data-nd="${t.id}" title="${ed && canEdit(t) ? esc(isTouch() ? tr('Tap a day to set the date; hold and drag for a range') : tr('Click a day to set the date, drag across days for a range')) : ''}"></div></div>`).join(''));
+    (closed ? '' : ord.map(t => `<div class="tl-row tl-nd"><div class="tl-name" data-act="open" data-id="${t.id}">${t.parent_id && ids.has(t.parent_id) ? '<span class="muted">↳ </span>' : ''}<span class="tln">${mdTitleNL(t.title)}</span>${tlWaiting(t) ? `<span class="tl-wf" title="${esc(blockedTitle(t))}">${ic('lock', 's')}${esc(tr('blocked by {0}', blockedNames(t)))}</span>` : ''}</div><div class="tl-track ndt${ed && canEdit(t) ? ' ed' : ''}" data-nd="${t.id}" title="${ed && canEdit(t) ? esc(isTouch() ? tr('Tap a day to set the date; hold and drag for a range') : tr('Click a day to set the date, drag across days for a range')) : ''}"></div></div>`).join(''));
 }
 const tlNdBtn = (on, n, act = 'tl-nd') => `<button class="btn sm chip ${on ? 'on' : ''}" data-act="${act}" aria-pressed="${on}" title="${esc(tr('Show tasks without a date as rows to draw into'))}">${ic('cal', 's')} ${tr('No date')}${n ? ` <span class="c">${n}</span>` : ''}</button>`;
 // ---- 2.18.0 (#462): sections in the timeline / roadmap, (#431) new tasks drawn right into it, milestone diamonds
@@ -89,8 +89,8 @@ function tlAddRow(l, geo, top) {
 // keyboard (Enter, arrows, menu) and the arrows work as for bars; no ends to resize
 function tlMsHtml(t, start, DW) {
   const x = diffDays(start, t.due) * DW + DW / 2, w = isTouch() ? 44 : 24, ed = canEdit(t) && t.status === 0;
-  const lbl = tr('Milestone: {0}, {1}', t.title, fmtDateLoc(t.due));
-  return `<div class="tl-bar tl-dia short${ed ? '' : ' ro'}${t.status ? ' done' : t.due < today() ? ' over' : ''}" data-id="${t.id}" data-ms="1" style="left:${x - w / 2}px;width:${w}px" title="${esc(lbl)}" tabindex="0" role="button" aria-label="${esc(lbl)}"><span>${esc(t.title)}</span></div>`;
+  const lbl = tr('Milestone: {0}, {1}', mdPlain(t.title), fmtDateLoc(t.due));
+  return `<div class="tl-bar tl-dia short${ed ? '' : ' ro'}${t.status ? ' done' : t.due < today() ? ' over' : ''}" data-id="${t.id}" data-ms="1" style="left:${x - w / 2}px;width:${w}px" title="${esc(lbl)}" tabindex="0" role="button" aria-label="${esc(lbl)}"><span>${mdTitleNL(t.title)}</span></div>`;
 }
 // 2.18.0 review (R10): a month / quarter label used to sit only at the month's first day, so scrolled a few days in it was
 // cut ("er 2026") or gone. Each label now spans its whole period (width up to the next label) and its text is sticky
@@ -151,7 +151,7 @@ function viewTimeline(listId, inCal) {
     for (const sg of tlSecs(g.l.id, g.ts, !!listId)) {
       const shut = !!sg.key && S.collapsed.has(sg.key);
       if (sg.key) h += tlSecRow(g.l, sg, !shut, cr, geo, null);  // 2.18.0 review (R10): no roadmap top here (was an invalid style="top:px")
-      if (!shut) h += sg.ts.map(t => `<div class="tl-row${t.ms ? ' tl-msrow' : ''}${sg.key ? ' tl-insec' : ''}"><div class="tl-name" data-act="open" data-id="${t.id}" title="${esc(t.title)}">${t.parent_id ? '<span class="muted">↳ </span>' : ''}<span class="tln">${esc(t.title)}</span></div><div class="tl-track">${bar(t)}</div></div>`).join('');
+      if (!shut) h += sg.ts.map(t => `<div class="tl-row${t.ms ? ' tl-msrow' : ''}${sg.key ? ' tl-insec' : ''}"><div class="tl-name" data-act="open" data-id="${t.id}" title="${esc(mdPlain(t.title))}">${t.parent_id ? '<span class="muted">↳ </span>' : ''}<span class="tln">${mdTitleNL(t.title)}</span></div><div class="tl-track">${bar(t)}</div></div>`).join('');
     }
     return h + (g.nd.length ? tlNdRows(g.l, g.nd) : '') + (cr ? tlAddRow(g.l, geo, null) : '');
   }).join('');

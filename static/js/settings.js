@@ -189,10 +189,11 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-review': ['review_time', N_('Daily review at'), 'time'],
   's-brief': ['brief_time', N_('Morning briefing at'), 'time'],  // 2.34.0 (#264)
   's-lemo': ['list_emoji', N_('Suggest icons for new lists'), 'chk'],  // 2.32.0 (#1077)
+  's-prbg': ['prio_bg', N_('Priority as background'), 'sel'],  // 2.40.0 (#1416)
   's-sideic': ['side_icons', N_('List icons'), 'sel'], 's-sideprog': ['side_progress', N_('Progress in the sidebar'), 'chk'],  // 2.36.0 (#1117)
   's-sdd': ['show_done_default', N_('Completed tasks'), 'sel'],  // 2.39.1 (#1214)
 };
-const SET_RENDER = ['sidebar', 'side_icons', 'side_progress', 'features', 'nav_order', 'show_done_views', 'show_done_default', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden'];
+const SET_RENDER = ['sidebar', 'prio_bg', 'side_icons', 'side_progress', 'features', 'nav_order', 'show_done_views', 'show_done_default', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden'];
 function setVal(el, kind) {  // the value a control stands for; undefined = not valid (nothing is saved)
   const v = el.value;
   if (kind === 'chk') return el.checked ? '1' : '0';
@@ -623,6 +624,9 @@ function settingsModal(focus) {
       ${hint(tr('At the bottom on a phone (the desktop shows every module in the sidebar). A phone fits {0} tabs, the rest goes under “More”.', TAB_MAX))}
       <div class="navlist" id="s-tabbar"></div>
       <div class="row" style="margin-top:.5rem"><select id="s-tabadd" style="flex:1" aria-label="${tr('+ Add tab …')}"></select><button class="btn sm" data-m="tab-reset">${tr('Default')}</button></div>
+      <h4 id="s-prbg-h">${tr('Task rows')}</h4>
+      <div class="row"><label for="s-prbg">${tr('Priority as background')}</label><select id="s-prbg">${[['', N_('Off')], ['soft', N_('Subtle')], ['strong', N_('Strong')]].map(([v, n]) => `<option value="${v}" ${(s.prio_bg || '') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
+      ${hint(tr('Tasks with a priority get a light background in its colour (high red, medium orange, low blue) in lists, Today and on boards; the bar at the edge stays.'))}
       <h4 id="s-side-h">${tr('Sidebar')}</h4>
       ${hint(tr('The order of the groups and what they show; the same on every device. The eye hides a group, the boxes single entries.'))}
       <div class="navlist sidecfg" id="s-sidebar"></div>
@@ -643,6 +647,8 @@ function settingsModal(focus) {
       <div class="row">${chk('s-celebrate', s.celebrate !== '0', tr('Celebrate completions'))}</div>
       ${hint(tr('When Today is cleared or a list or project is complete, the heron flies by with a one-liner. With reduced motion (system setting) it just says hello.'))}
       <div class="row">${chk('s-progsub', s.progress_subtasks === '1', tr('Count subtasks in the progress of a list'))}</div>
+      <div class="row">${chk('s-mdpen', td_mdPenOnly(), tr('Edit the description only with the pen'))}</div>
+      ${hint(tr('On this device a tap on the formatted description does not open the editor (handy while scrolling); the small pen next to it does. On by default on touch screens.'))}
       <h4 id="s-plan-h">${tr('Day planning')}</h4>
       <div class="row"><label for="s-wfrom">${tr('Working hours')}</label>${timeIn('s-wfrom', s.work_start || '09:00', {label: tr('Working hours from'), clear: false})}<label for="s-wto" class="qtol">${tr('until|time')}</label>${timeIn('s-wto', s.work_end || '17:00', {label: tr('Working hours until'), clear: false})}</div>
       <div class="row"><label for="s-review">${tr('Daily review at')}</label>${timeIn('s-review', s.review_time || '', {label: tr('Daily review at'), empty: tr('off')})}</div>
@@ -719,10 +725,12 @@ function settingsModal(focus) {
       <div class="shelp">${tr('<b>Descriptions:</b> <code>**bold**</code>, <code>*italic*</code>, <code>~~strikethrough~~</code>, <code>&#96;code&#96;</code>, links as <code>[text](https://…)</code> or a plain https:// address, headings <code>#</code> / <code>##</code> / <code>###</code>, lists <code>- item</code> or <code>1. item</code>, checklists <code>- [ ]</code> / <code>- [x]</code> (tick them right in the formatted text). “Turn the open checklist items into subtasks” below the formatted description makes real subtasks of the unticked items.')}${collab() ? '<br>' + tr('<b>Comments:</b> the same bold, italic, strikethrough, code and links, plus line breaks and @mentions; no headings, lists or checklists.') : ''}</div>
       <h4>${tr('Lists and projects')}</h4>
       <div class="shelp">${tr('A list is a plain task list; a project adds the project modules you switched on (list menu … > Project). For shopping or packing lists: list menu … (or Sort) > Show completed at the bottom: what you tick off stays visible at the bottom and comes back with one tap.')}</div>
+      <h4>${tr('Favourites')}</h4>
+      <div class="shelp">${tr(VW_FAV_HELP)}</div>
       <h4>${tr('Templates')}</h4>
       <div class="shelp">${tr('Task menu (…) or list dialog > Save as template. The template button in the add bar creates the task in the current list, Lists > + > New list from template a whole list. Manage them under Settings > Data.')}</div>
       ${timeOn() ? `<h4>${tr('Time tracking')}</h4><div class="shelp">${tr('Start a timer from a task (detail panel, task menu …) or add time by hand; the running timer shows in the top bar on every device. Sidebar > Time tracking: hours per list and task for a week, month or any range, CSV export and a printable timesheet. In shared lists everyone sees the time of all members, but only changes their own entries. Finished focus sessions on a task count as time unless a timer ran at the same time.')}</div>` : ''}
-      ${depsOn() || fieldsOn() || progressOn() ? `<h4>${tr('Projects')}</h4><div class="shelp">${tr('<b>Dependencies:</b> in a task, “Waiting on…” > “Another task” picks the tasks that have to be done first; the task shows “blocked” until they are, and whoever it is assigned to gets a message once the last one is done. “Waiting on…” > “Someone outside” marks a task that waits on a person (a client, an office, a delivery) with a follow-up day. <b>Custom fields</b> (list dialog, owner): text, number, selection, date, checkbox, person or link per task; pin up to two as chips on the rows, sort and filter by them. <b>Status and progress</b> (Project progress module): the list header shows the progress; with collaboration, owner and editors set a status with a short note, and the project status (“Where is it stuck?”) lists overdue, blocked and unassigned tasks of all lists.')}</div>` : ''}
+      ${depsOn() || fieldsOn() || progressOn() ? `<h4>${tr('Projects')}</h4><div class="shelp">${tr('<b>Dependencies:</b> in a task, “Waiting on…” > “Another task” picks the tasks that have to be done first; the task shows “blocked” until they are, and whoever it is assigned to gets a message once the last one is done. “Waiting on…” > “Someone outside” marks a task that waits on a person (a client, an office, a delivery) with a follow-up day. <b>Custom fields</b> (list dialog, owner and list admins): text, number, selection, date, checkbox, person or link per task; show up to two in the task rows, sort and filter by them. <b>Status and progress</b> (Project progress module): the list header shows the progress; with collaboration, owner and editors set a status with a short note, and the project status (“Where is it stuck?”) lists overdue, blocked and unassigned tasks of all lists.')}</div>` : ''}
       ${feat('stats') ? `<h4>${tr('Statistics')}</h4><div class="shelp">${tr('Sidebar > Statistics (or pin it as a tab): completions per week / day and per list, on-time rate, overdue trend, focus time and habit streaks of the last 12 weeks.')}</div>` : ''}
       <h4>${tr('Gestures (phone)')}</h4>
       <div class="shelp">${tr('Swipe right: complete · swipe left: snooze / delete · long-press: selects the task (a bar with Move, Date, Complete and More; tap more tasks to add them, drag them by the grip) · long-press and drag: reorder, move to another column, quadrant or onto a day; drag to the left edge and hold briefly to open the lists (dropping a subtask there = standalone task in that list).')}</div>`,
@@ -900,6 +908,7 @@ function settingsModal(focus) {
   if (S.me) { tfaWire(md); tokWire(md); apwWire(md); }
   if (S.me?.is_admin) oidcWire(md);
   if (S.me?.is_admin) { aaWire(md); bkWire(md); orphWire(md); }
+  md.addEventListener('change', e => { if (e.target.id === 's-mdpen') { LS.set('mdPenOnly', e.target.checked); if (S.sel) renderDetail(); } });  // 2.40.0 (#1203): this device
   md.addEventListener('change', async e => {
     if (e.target.id !== 's-wpdev') return;
     e.target.disabled = true;

@@ -10,7 +10,7 @@ from dateutil.rrule import rrulestr
 from flask import jsonify, Response
 
 from ..core.config import app, APP_NAME, PUBLIC_URL, TZ
-from ..core.i18n import LANGS, tr
+from ..core.i18n import LANGS, md_plain, tr
 from ..core.db import body, db, err, inbox_default, local_now, now_utc, parse_iso, usettings
 from ..accounts.session import _rate_blocked, _rate_fail, client_ip, me
 from ..core.access import tvis, vis_sql
@@ -169,7 +169,7 @@ def ics_event(t, s, lg, host, key, stamp):
     def vevent(uid, st, rr):
         prio = {5: 1, 3: 5, 1: 9}.get(t["priority"])
         return (["BEGIN:VEVENT", f"UID:{uid}", f"DTSTAMP:{stamp}", f"CREATED:{ics_utc(parse_iso(t['created_at']))}",
-                 f"LAST-MODIFIED:{ics_utc(parse_iso(t['updated_at']))}", f"SUMMARY:{ics_text(t['title'])}"] + when(st) +
+                 f"LAST-MODIFIED:{ics_utc(parse_iso(t['updated_at']))}", f"SUMMARY:{ics_text(md_plain(t['title']))}"] + when(st) +
                 ([f"RRULE:{rr}"] if rr else []) +
                 [f"DESCRIPTION:{ics_text(chr(10).join(desc))}", f"URL:{deep}", "TRANSP:TRANSPARENT"] +
                 ([f"PRIORITY:{prio}"] if prio else []) + alarms() + ["END:VEVENT"])

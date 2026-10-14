@@ -134,7 +134,7 @@ const progressFor = l => !!l && progressOn() && l.kind === 'project';
 const statusFor = l => !!l && statusOn() && l.kind === 'project';
 const fieldsAll = lid => (S.fields || []).filter(f => f.list_id === lid).sort((a, b) => a.sort - b.sort || a.id - b.id);
 // 2.39.1 (#1217): custom fields in every list (plain lists too); time tracking and dependencies stay project-only
-const fieldsOf = lid => !fieldsOn() ? [] : (S.fields || []).filter(f => f.list_id === lid).sort((a, b) => a.sort - b.sort || a.id - b.id);
+const fieldsOf = lid => !fieldsOn() ? [] : td_rc('fo' + lid, () => (S.fields || []).filter(f => f.list_id === lid).sort((a, b) => a.sort - b.sort || a.id - b.id));  // 2.40.0 (#1430): once per render
 const fieldById = id => (S.fields || []).find(f => f.id === id);
 const inbox = () => S.lists.find(l => l.is_inbox);
 const listById = id => S.lists.find(l => l.id === id);
@@ -541,7 +541,7 @@ function applyState(j) {
   }
   S.lists = j.lists; S.inboxNames = j.inbox_names || []; S.sections = j.sections; S.habits = j.habits; S.pomo = j.pomo;
   S.notes = j.notes || []; S.team = j.team || {enabled: false, unread: 0};  // 2.17.0 (#442 #419)
-  S.pomoToday = j.pomo_today; S.avatars = j.avatars || {}; S.share = j.share || null; S.settings = j.settings; S.languages = j.languages || [{code: 'en', name: 'English'}]; LS.set('lang', j.settings.lang || 'en'); document.documentElement.lang = j.settings.lang || 'en'; S.counts = j.counts; S.v = j.v; S.ntfyUrl = j.ntfy_url;
+  S.pomoToday = j.pomo_today; S.avatars = j.avatars || {}; S.share = j.share || null; S.settings = j.settings; S.mineOrder = moFromState(j); S.languages = j.languages || [{code: 'en', name: 'English'}]; LS.set('lang', j.settings.lang || 'en'); document.documentElement.lang = j.settings.lang || 'en'; S.counts = j.counts; S.v = j.v; S.ntfyUrl = j.ntfy_url;
   foldSync();  // 2.4.0 (#361): folded folders follow the user (all devices)
   S.tasks = new Map(j.tasks.map(t => [t.id, t]));
   S.filters = j.filters || [];
@@ -609,17 +609,43 @@ async function load() {
   if (S.route.mod === 'agents' && S.jobs.items !== null) loadJobs();
   if (typeof staleLoad === 'function') staleLoad(S.route.key === 'stale');  // 2.34.0 (#266): at most every 5 minutes, at once in its view
 }
+// 2.40.0 (#1432): Completed / Trash show 100 tasks first, "Load more" adds 100; a change reloads as many as are shown
+const HIST_PAGE = 100;
+S.hist = {k: null, n: HIST_PAGE, next: null, deletable: null, kept: null};
 async function loadExtra() {
   const k = S.route.key;
   if (S.route.mod === 'tasks' && (k === 'done' || k === 'trash')) {
-    S.extra = (await api('GET', `/api/tasks?scope=${k}`)).tasks;
+    if (S.hist.k !== k) S.hist = {k, n: HIST_PAGE, next: null, deletable: null, kept: null};
+    const j = await api('GET', `/api/tasks?scope=${k}&limit=${Math.min(S.hist.n, 2000)}`);
+    if (S.hist.k !== k) return;
+    Object.assign(S.hist, {next: j.next || null, deletable: j.deletable ?? null, kept: j.kept ?? null});
+    S.extra = j.tasks;
   } else if (S.route.mod !== 'news' && S.route.mod !== 'time') S.extra = null;  // News / time reports: tasks fetched on demand stay
+}
+async function histMore(b) {
+  const k = S.hist.k; if (!S.hist.next || !k) return;
+  if (b) b.disabled = true;
+  try {
+    const j = await api('GET', `/api/tasks?scope=${k}&limit=${HIST_PAGE}&before=${encodeURIComponent(S.hist.next)}`);
+    if (S.hist.k !== k) return;
+    const ids = new Set((S.extra || []).map(t => t.id));
+    S.extra = [...(S.extra || []), ...(j.tasks || []).filter(t => !ids.has(t.id))];
+    S.hist.n += HIST_PAGE; S.hist.next = j.next || null;
+  } catch (e) { if (e instanceof Offline) toast(tr('Only available online.')); if (b) b.disabled = false; return; }
+  renderView();
 }
 function putTask(t) { S.tasks.set(t.id, t); _kidsIx = null; }
 
 // poll for changes made elsewhere (phone <-> desktop)
+// 2.40.0 (#1430): changes from elsewhere are drawn bundled: what arrives within TD_RS_MS is one render (a render that runs
+// anyway in between takes it along, see render())
+const TD_RS_MS = 300;
+let td_rsT = 0;
+function td_renderSoon() { if (td_rsT) return; td_rsT = setTimeout(() => { td_rsT = 0; if (editing()) S.viewStale = true; else render(); }, TD_RS_MS); }
+let td_polling = false;  // 2.40.0 (#1430): a slow answer (many changes elsewhere) does not start a second load + render on top
 setInterval(async () => {
-  if (document.hidden) return;
+  if (document.hidden || td_polling) return;
+  td_polling = true;
   try {
     if (OUT.q.length) { flush(); staleDraw(); return; }  // 2.13.0 (#453 A13): the chip says how many changes wait
     const {v, n, c, t, ty, app, sp} = await api('GET', '/api/version');
@@ -632,13 +658,13 @@ setInterval(async () => {
       if (!first && calEvOn() && !editing()) { calInvalidate(); if (S.route.mod === 'cal' || S.route.key === 'today') renderView(); }
     }
     const chg = v !== S.v || (n !== undefined && collab() && n !== S.news?.sig);
-    if (chg && !editing()) { S.viewStale = false; await load(); render(); }
+    if (chg && !editing()) { S.viewStale = false; await load(); td_renderSoon(); }  // 2.40.0 (#1430): bundled
     else if (v !== S.v && editing() && S.sel > 0 && (cmtOn() || collab()) && S.tl.id === S.sel && S.tlPollV !== v) { S.tlPollV = v; loadTimeline(S.sel); agentPoll(); }  // 1.9.0
     else if (chg && editing() && S.chat.aid && collab() && S.chatPollV !== `${v}/${n}`) { S.chatPollV = `${v}/${n}`; chatLoad(); agentPoll(); }  // 2.12.2 (#451): typing, the chat still updates (patched)
     else if (S.viewStale && !editing()) viewSafeRender();
     if (v !== S.v && editing() && S.route.mod === 'agents' && S.jobs.items !== null && S.jobsPollV !== v) { S.jobsPollV = v; loadJobs(); }  // 2.37.0 (#1161)
     S.syncOk = Date.now(); staleDraw();
-  } catch { staleDraw(); /* offline */ }
+  } catch { staleDraw(); /* offline */ } finally { td_polling = false; }
 }, 4000);
 // 2.7.2 (#433): instead of a refresh button in the header of shared lists, a small hint once the change check has failed
 // for more than 30 s: "Offline – last update N min ago"; a tap tries again (refreshNow). "…" keeps "Refresh".
@@ -822,6 +848,7 @@ async function route() {
   if (r.mod === 'tasks' && r.key !== 'search') LS.set('lastKey', r.key);
   if (r.mod === 'tasks' && r.key.startsWith('l:')) recentPush('l', +r.key.slice(2));
   S.extra = (r.key === 'done' || r.key === 'trash' || r.mod === 'news' || r.mod === 'time') ? [] : null;
+  S.hist.k = null;  // 2.40.0 (#1432): entering Completed / Trash starts with the first page again
   if (S.extra) await loadExtra().catch(() => { S.extra = []; });
   // 2.26.x (#953): back to an entry that was left from the open drawer (phone / folded sidebar): the drawer opens again
   // and stays; the next Back goes on as before

@@ -277,7 +277,7 @@ function jobRefAsk(id) {
       for (const e of document.querySelectorAll(`.jrefq[data-jq="${id}"]`)) if (JOBREF.ok.has(id) || JOBREF.no.has(id)) e.outerHTML = jobRefHtml(id, e.innerHTML);
     });
 }
-const trefHtml = (t, compact) => `<a href="#t/${t.id}" class="tref" data-tref="${t.id}" title="${esc(t.title)}">#${t.id}${compact ? '' : ' ' + esc(t.title.slice(0, 60))}</a>`;
+const trefHtml = (t, compact) => `<a href="#t/${t.id}" class="tref" data-tref="${t.id}" title="${esc(mdPlain(t.title))}">#${t.id}${compact ? '' : ' ' + esc(mdPlain(t.title).slice(0, 60))}</a>`;  // 2.40.0 (#1409): plain
 // a tap on a task number opens the task on top of where I am (the chat stays open below it; on a phone Back closes the
 // task and shows the chat again); Ctrl / Cmd / middle click open it in a new tab as any link
 function trefOpen(e) {

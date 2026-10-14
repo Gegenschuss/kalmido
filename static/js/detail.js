@@ -459,7 +459,7 @@ function renderDetail0() {
   setHtml($('#detail'), `
     <div class="dtop">
       <button class="iconbtn back" data-act="close-detail" aria-label="${tr('Back')}">${ic('back')}</button>
-      <button class="chk ${t.status === 2 ? 'on' : t.status === -1 ? 'wont' : 'p' + t.priority}${msT ? ' ms' : ''}" data-act="toggle" data-id="${t.id}" role="checkbox" aria-checked="${t.status === 2}" aria-label="${esc(msT ? tr('Complete milestone: {0}', t.title) : tr('Complete: {0}', t.title))}" title="${esc(kt(msT ? tr('Complete milestone') : tr('Complete task'), 'x'))}" ${ro ? 'disabled' : ''}>${t.status === 2 ? ic('check') : ''}</button>
+      <button class="chk ${t.status === 2 ? 'on' : t.status === -1 ? 'wont' : 'p' + t.priority}${msT ? ' ms' : ''}" data-act="toggle" data-id="${t.id}" role="checkbox" aria-checked="${t.status === 2}" aria-label="${esc(msT ? tr('Complete milestone: {0}', mdPlain(t.title)) : tr('Complete: {0}', mdPlain(t.title)))}" title="${esc(kt(msT ? tr('Complete milestone') : tr('Complete task'), 'x'))}" ${ro ? 'disabled' : ''}>${t.status === 2 ? ic('check') : ''}</button>
       ${ck ? '' : `<button class="dchip ${t.due ? 'set ' + dueClass(t) : ''}" data-act="date" data-id="${t.id}" title="${esc((t.due ? dueTxt + ' · ' : '') + kt(tr('Change date'), 'd'))}" ${ro ? 'disabled' : ''}>${ic('cal', 's')}<span class="dct">${dueTxt}</span>${t.repeat ? ' ' + ic('repeat', 's') : ''}${t.reminders && t.due ? ' ' + ic('bell', 's') : ''}</button>`}
       ${ck || tlkR ? '' : [[0, 'sun', tr('Today')], [1, 'sunrise', tr('Tomorrow')]].map(([n, i, lab]) => `<button class="iconbtn dq ${t.due === addDays(today(), n) ? 'on' : ''}" data-act="due-q" data-d="${n}" data-id="${t.id}" title="${esc(kt(tr('Due: {0}', lab), n ? 'Shift+T' : 't'))}" aria-label="${esc(tr('Due: {0}', lab))}">${ic(i, 's')}<span class="dql">${esc(lab)}</span></button>`).join('')}
       ${ck ? '' : '<span class="dbr" aria-hidden="true"></span>'}<span class="spacer"></span>
@@ -480,7 +480,8 @@ function renderDetail0() {
       ${t.waiting_at && !ck ? waitBar(t, ro) : ''}
       ${ck ? '' : approvalBar(t, ro)}
       ${ck || ro ? '' : dupHintHtml(t)}
-      <div class="md ${mdMode ? '' : 'hidden'} ${mdClamp ? 'clamp' : ''}" id="d-md" title="${tlkL ? esc(tr('Locked')) : tr('Click to edit')}">${mdMode ? mdMentions(mdTaskRefs(renderMd(t.content, false, {lid: t.list_id}), true), t) : ''}</div>
+      ${mdMode && !ro && (isTouch() || td_mdPenOnly()) ? `<button type="button" class="iconbtn mdpen" data-act="md-edit" title="${esc(tr('Edit description'))}" aria-label="${esc(tr('Edit description'))}">${ic('edit', 's')}</button>` : ''}
+      <div class="md ${mdMode ? '' : 'hidden'} ${mdClamp ? 'clamp' : ''}" id="d-md" title="${tlkL ? esc(tr('Locked')) : td_mdPenOnly() ? '' : tr('Click to edit')}">${mdMode ? mdMentions(mdTaskRefs(renderMd(t.content, false, {lid: t.list_id}), true), t) : ''}</div>
       ${mdLong ? `<button class="linkbtn mdmore" data-act="md-more" aria-expanded="${!mdClamp}">${mdClamp ? tr('Show more') : tr('Show less')}</button>` : ''}
       ${mdOpen && mdMode ? `<button class="btn sm mdsub" data-act="md-subtasks">${ic('sub', 's')} ${tr('Turn the open checklist items into subtasks')}</button>` : ''}
       <textarea id="d-content" class="dcontent ${mdMode ? 'hidden' : ''}" placeholder="${ck ? tr('Note') : tr('Description')}" aria-label="${ck ? tr('Note') : tr('Description')}" ${tlkR ? 'readonly' : ''}>${esc(t.content)}</textarea>
@@ -510,12 +511,25 @@ function renderDetail0() {
 async function mdToSubtasks() {
   const t = taskById(S.sel); if (!t || !canEdit(t) || depthOf(t) >= 2) return;
   const keep = [], items = [];
-  for (const ln of String(t.content || '').split('\n')) { const m = ln.match(/^\s*[-*]\s+\[ \]\s*(.*\S)/); if (m) items.push(m[1].trim()); else keep.push(ln); }
+  // 2.40.0 (#1409): the lines indented below an item (up to the next line that is not) become the new subtask's description
+  const lines = String(t.content || '').split('\n'), ind = x => x.match(/^\s*/)[0].replace(/\t/g, '    ').length;
+  for (let i = 0; i < lines.length; i++) {
+    const ln = lines[i], m = ln.match(/^\s*[-*]\s+\[ \]\s*(.*\S)/); if (!m) { keep.push(ln); continue; }
+    const body = []; let j = i + 1;
+    for (; j < lines.length; j++) {
+      if (!lines[j].trim()) { let k = j + 1; while (k < lines.length && !lines[k].trim()) k++; if (k < lines.length && ind(lines[k]) > ind(ln)) { body.push(''); continue; } break; }
+      if (ind(lines[j]) <= ind(ln)) break;
+      body.push(lines[j]);
+    }
+    const cut = Math.min(...body.filter(x => x.trim()).map(x => x.match(/^\s*/)[0].length));
+    items.push({title: m[1].trim(), content: body.map(x => x.slice(cut)).join('\n').trim()});
+    i = j - 1;
+  }
   if (!items.length) return;
   flushSaves();
   await histGroup(async () => {
-    for (const title of items) await createTask({title: title.slice(0, 500), parent_id: t.id, list_id: t.list_id, section_id: t.section_id});
-    await patchUndoable(t.id, {content: keep.join('\n').replace(/\n{3,}/g, '\n\n').trim()});
+    for (const it of items) await createTask({title: it.title.slice(0, 500), ...(it.content ? {content: it.content} : {}), parent_id: t.id, list_id: t.list_id, section_id: t.section_id});
+    await patchUndoable(t.id, {content: keep.join('\n').replace(/\n{3,}/g, '\n\n').trim(), _act: 'md_subtasks'});
   }, trn('{0} checklist item of {1} is now a subtask', '{0} checklist items of {1} are now subtasks', items.length, qn(t.title.slice(0, 40))));
   S.editContent = false; renderDetail();
   offerUndo(trn('{0} subtask added', '{0} subtasks added', items.length), HIST.undo[HIST.undo.length - 1]);

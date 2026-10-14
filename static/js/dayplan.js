@@ -21,16 +21,16 @@ function dpTimeline(rows, defer, o = {}) {
   const hgt = d => `style="min-height:${Math.min(8, 2.75 + Math.max(0, (d || 30) - 30) / 30 * 0.75).toFixed(2)}rem"`;
   const item = r => {
     const on = !o.sel || o.sel.has(r.key);
-    if (r.kind === 'event' || r.kind === 'fixed') return `<div class="dprow ${r.kind}" ${hgt(dpMin(r.end) - dpMin(r.start))}><span class="dpt">${esc(r.start)}<small>${esc(r.end)}</small></span><span class="dpb">${ic(r.kind === 'event' ? 'cal' : 'lock', 's')}<span class="dpn">${esc(r.title)}</span><span class="muted dps">${r.kind === 'event' ? tr('Event') : tr(DP_REASON[r.reason] || 'fixed')}</span></span></div>`;
+    if (r.kind === 'event' || r.kind === 'fixed') return `<div class="dprow ${r.kind}" ${hgt(dpMin(r.end) - dpMin(r.start))}><span class="dpt">${esc(r.start)}<small>${esc(r.end)}</small></span><span class="dpb">${ic(r.kind === 'event' ? 'cal' : 'lock', 's')}<span class="dpn">${mdTitleNL(r.title)}</span><span class="muted dps">${r.kind === 'event' ? tr('Event') : tr(DP_REASON[r.reason] || 'fixed')}</span></span></div>`;
     return `<div class="dprow plan ppi ${on ? '' : 'off'}" data-k="${esc(r.key)}" ${hgt(r.duration)}><span class="dpt">${esc(r.start)}<small>${esc(r.end)}</small></span>
       <label class="ppcl"><input type="checkbox" class="ppc" ${on ? 'checked' : ''} aria-label="${esc(tr('Select {0}', r.title))}"></label>
-      <span class="dpb"><span class="dpn">${esc(r.title)}</span><span class="muted dps">${esc(r.list || '')}${r.list ? ' · ' : ''}${r.estimated ? '≈ ' : ''}${esc(fmtH(r.duration))}${r.reason ? ' · ' + esc(tr(DP_REASON[r.reason] || r.reason)) : ''}${r.note ? ' · ' + esc(r.note) : ''}</span></span></div>`;
+      <span class="dpb"><span class="dpn">${mdTitleNL(r.title)}</span><span class="muted dps">${esc(r.list || '')}${r.list ? ' · ' : ''}${r.estimated ? '≈ ' : ''}${esc(fmtH(r.duration))}${r.reason ? ' · ' + esc(tr(DP_REASON[r.reason] || r.reason)) : ''}${r.note ? ' · ' + esc(r.note) : ''}</span></span></div>`;
   };
   // 2.11.0: what does not fit is only listed (no checkbox): its due date, time and deadline stay as they are
   // 2.13.0 (#453 A8): no dead end: "Tomorrow" plans it for tomorrow's start of work (its due date stays), "Plan on …"
   // opens its date dialog
   const dfr = defer.map(r => `<div class="dprow nofit"><span class="dpt">${ic('clock', 's')}</span>
-    <span class="dpb"><span class="dpn">${esc(r.title)}</span><span class="muted dps">${[r.due ? tr('Due: {0}', fmtDayAbs(r.due)) : '', r.note || ''].filter(Boolean).map(esc).join(' · ')}</span></span>${o.acts && r.task_id ? `<span class="dpna"><button class="btn sm" data-dp="nofit-tm" data-id="${r.task_id}">${tr('Tomorrow')}</button><button class="btn sm" data-dp="nofit-date" data-id="${r.task_id}">${tr('Plan on …')}</button></span>` : ''}</div>`).join('');
+    <span class="dpb"><span class="dpn">${mdTitleNL(r.title)}</span><span class="muted dps">${[r.due ? tr('Due: {0}', fmtDayAbs(r.due)) : '', r.note || ''].filter(Boolean).map(esc).join(' · ')}</span></span>${o.acts && r.task_id ? `<span class="dpna"><button class="btn sm" data-dp="nofit-tm" data-id="${r.task_id}">${tr('Tomorrow')}</button><button class="btn sm" data-dp="nofit-date" data-id="${r.task_id}">${tr('Plan on …')}</button></span>` : ''}</div>`).join('');
   const all = rows.slice().sort((a, b) => dpMin(a.start) - dpMin(b.start) || (a.kind === 'plan') - (b.kind === 'plan'));
   return `<div class="dptl">${all.map(item).join('') || `<div class="muted mhint">${tr('Nothing to plan: no open tasks fit into the free time.')}</div>`}</div>
     ${dfr ? `<h4 class="dph">${tr('Does not fit today')}</h4><div class="dptl">${dfr}</div>` : ''}`;
@@ -142,7 +142,7 @@ function reviewCard() {
     return '';
   }
   const r = S.review.data; if (!r) return '';
-  const li = (arr, cls) => arr.slice(0, 5).map(x => `<li class="${cls}">${esc(x.title)}</li>`).join('') + (arr.length > 5 ? `<li class="muted">${esc(trn('and {0} more', 'and {0} more', arr.length - 5))}</li>` : '');
+  const li = (arr, cls) => arr.slice(0, 5).map(x => `<li class="${cls}">${mdTitleNL(x.title)}</li>`).join('') + (arr.length > 5 ? `<li class="muted">${esc(trn('and {0} more', 'and {0} more', arr.length - 5))}</li>` : '');
   const tm = r.tomorrow;
   const plan = `<button class="btn sm" data-act="dayplan" data-mode="day" data-day="${esc(tm.date)}">${ic('cal', 's')} ${tm.date === addDays(today(), 1) ? tr('Plan tomorrow') : esc(tr('Plan {0}', fmtDayAbs(tm.date)))}</button>`;
   // 2.31.0 (#1052): after the first read (the visit of Today that showed it) the card folds to one line for the rest of the
@@ -185,9 +185,9 @@ function briefCard() {
   if (read) return `<section class="rvcard fold bfcard" aria-label="${esc(tr('Briefing'))}"><button type="button" class="rvfold" data-brief="open" aria-expanded="false">${ic('chev', 's')}<span class="rvft">${esc(tr('Briefing'))}</span><span class="rvfn">${briefNums(n, true)}</span></button></section>`;
   const more = (all, shown) => all > shown ? `<li class="muted">${esc(trn('and {0} more', 'and {0} more', all - shown))}</li>` : '';
   const who = x => (x.by || []).map(u => u.name).filter(Boolean).slice(0, 2).join(', ');
-  const ch = d.changed.slice(0, 5).map(x => `<li><a href="#t/${x.id}">${esc(x.title)}</a> <span class="muted">${esc([who(x), x.kinds.map(k => tr(BRIEF_KINDS[k] || k)).join(', ')].filter(Boolean).join(' · '))}</span></li>`).join('') + more(n.changed, Math.min(5, d.changed.length));
-  const bl = d.blocked.slice(0, 5).map(x => `<li><a href="#t/${x.id}">${esc(x.title)}</a> <span class="muted">${esc(x.reason === 'waiting' ? (x.wait_note ? tr('waiting on: {0}', x.wait_note) : tr('waiting on someone')) : tr('waiting for another task'))}</span></li>`).join('') + more(n.blocked, Math.min(5, d.blocked.length));
-  const st = d.stale.slice(0, 3).map(x => `<li><a href="#t/${x.id}">${esc(x.title)}</a> <span class="muted">${esc(trn('for {0} day', 'for {0} days', x.idle_days))}</span></li>`).join('') + more(n.stale, Math.min(3, d.stale.length));
+  const ch = d.changed.slice(0, 5).map(x => `<li><a href="#t/${x.id}">${mdTitleNL(x.title)}</a> <span class="muted">${esc([who(x), x.kinds.map(k => tr(BRIEF_KINDS[k] || k)).join(', ')].filter(Boolean).join(' · '))}</span></li>`).join('') + more(n.changed, Math.min(5, d.changed.length));
+  const bl = d.blocked.slice(0, 5).map(x => `<li><a href="#t/${x.id}">${mdTitleNL(x.title)}</a> <span class="muted">${esc(x.reason === 'waiting' ? (x.wait_note ? tr('waiting on: {0}', x.wait_note) : tr('waiting on someone')) : tr('waiting for another task'))}</span></li>`).join('') + more(n.blocked, Math.min(5, d.blocked.length));
+  const st = d.stale.slice(0, 3).map(x => `<li><a href="#t/${x.id}">${mdTitleNL(x.title)}</a> <span class="muted">${esc(trn('for {0} day', 'for {0} days', x.idle_days))}</span></li>`).join('') + more(n.stale, Math.min(3, d.stale.length));
   return `<section class="rvcard bfcard" aria-labelledby="bf-h"><div class="rvhd">${d.read ? `<button type="button" class="rvfold" data-brief="close" aria-expanded="true" aria-label="${esc(tr('Briefing'))}">${ic('chev', 's')}</button>` : ''}<h3 id="bf-h">${ic('sunrise', 's')} ${tr('Briefing')}</h3><span class="spacer"></span>${d.read ? '' : `<button type="button" class="btn sm" data-brief="read">${ic('check', 's')} ${tr('Read|briefing')}</button>`}</div>
     <div class="rvnums">${briefNums(n)}</div>
     ${ch ? `<h4>${tr('New since yesterday')}</h4><ul class="rvl bfl">${ch}</ul>` : ''}

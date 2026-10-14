@@ -1,0 +1,66 @@
+/* Kalmido web client: "My tasks" in the person's own order (2.40.0, #1344).
+   Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md).
+   - the view menu switches between "Own order" (default) and "Grouped by list" (setting mine_view: own | lists)
+   - dragging a task in "My tasks" changes only the person's own order (PUT /api/tasks/mine-order, queued offline like the other
+     task writes; /api/state: mine_order {task id: pos}); tasks.sort of the shared list stays untouched
+   - new and newly assigned tasks (no place yet) stand on top, newest first
+   - "Own order": a grey subtitle "List › Section" under every task, a tap opens the list
+   - "Grouped by list": the groups can be put in an own order (#1221); a task dropped into another group moves to that list */
+'use strict';
+
+const moView = () => S.settings?.mine_view === 'lists' ? 'lists' : 'own';
+const moActive = () => S.route.mod === 'tasks' && S.route.key === 'assigned';
+const moOwn = () => moActive() && moView() === 'own';
+// what counts as mine: assigned to me or one of my groups; without collaboration every task of my lists (#1344: always shown)
+const moPred = () => collab() ? mineAssigned : mineTask;
+const moFromState = j => OUT.q.some(e => e.url === '/api/tasks/mine-order') ? (S.mineOrder || {}) : (j.mine_order || {});
+const moPos = t => { const p = S.mineOrder?.[t.id]; return p == null ? null : +p; };
+function moCmp(a, b) {
+  const x = moPos(a), y = moPos(b);
+  if (x == null && y == null) return (b.created_at || '').localeCompare(a.created_at || '') || b.id - a.id;  // not placed yet: newest first
+  if (x == null) return -1;
+  if (y == null) return 1;
+  return x - y || a.id - b.id;
+}
+const moSort = arr => arr.sort(moCmp);
+// every task of "My tasks" in the current own order (unfiltered: a view filtered to favourites keeps the hidden tasks' places)
+function moAll() {
+  const p = moPred(), m = openTasks(true).filter(t => !t.context && p(t)), ids = new Set(m.map(t => t.id));
+  return moSort(m.filter(t => !t.parent_id || !ids.has(t.parent_id)));
+}
+async function moSave(ids) {
+  S.mineOrder = Object.fromEntries(ids.map((id, i) => [id, i]));
+  render();
+  try { await api('PUT', '/api/tasks/mine-order', {ids: ids.filter(id => id > 0)}); } catch { /* api() showed it; offline it waits in the outbox */ }
+}
+// dnd.js dropTask0: a drop onto a row of "My tasks" -> true when handled here (never a change of tasks.sort)
+async function moDrop(t, row, after) {
+  if (!moActive() || !row) return false;
+  const target = S.tasks.get(+row.dataset.id);
+  if (!target || target.id === t.id) return true;
+  const all = moAll().map(x => x.id);
+  if (!all.includes(t.id) || !all.includes(target.id)) return true;  // e.g. "From your lists, without a date": no own order there
+  const ids = all.filter(x => x !== t.id);
+  ids.splice(ids.indexOf(target.id) + (after ? 1 : 0), 0, t.id);
+  if (moView() === 'lists' && target.list_id !== t.list_id) {  // grouped: into another group = into that list
+    if (!canEditList(target.list_id)) { roToast(); return true; }
+    if (tlkHits(t, {list_id: target.list_id})) { tlkToast(t); render(); return true; }  // a locked task keeps its list
+    S.mineOrder = Object.fromEntries(ids.map((id, i) => [id, i]));
+    try { await patchUndoable(t.id, {list_id: target.list_id, section_id: null}, tr('Moved to {0}', lname(listById(target.list_id)))); } catch { return true; }
+  }
+  await moSave(ids);
+  return true;
+}
+// the grey subtitle "List › Section" (render.js taskRow, own order only)
+function moSubHtml(t) {
+  const l = listById(t.list_id); if (!l) return '';
+  const sec = t.section_id ? S.sections.find(s => s.id === t.section_id)?.name : '';
+  const txt = lname(l) + (sec ? ' › ' + sec : '');
+  return `<button type="button" class="mosub" data-go="${esc(keyToHash(l.is_inbox ? 'inbox' : 'l:' + l.id))}" title="${esc(tr('Open {0}', lname(l)))}">${licMark(l, 'lsm')}<span>${esc(txt)}</span></button>`;
+}
+// the view menu (render.js topMoreItems)
+function moViewItems() {
+  if (!moActive()) return [];
+  const set = v => () => { if (moView() === v) return; S.settings.mine_view = v; render(); api('PATCH', '/api/settings', {mine_view: v}).catch(() => {}); };
+  return [{label: tr('Own order'), icon: 'sort', on: moView() === 'own', fn: set('own')}, {label: tr('Grouped by list'), icon: 'list', on: moView() === 'lists', fn: set('lists')}];
+}

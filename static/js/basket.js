@@ -37,7 +37,7 @@ function kbOrderGroups(gs) {
   return gs.map((g, i) => [g, i]).sort((x, y) => (x[0].lic ? at(x[0].id) : -1) - (y[0].lic ? at(y[0].id) : -1) || x[1] - y[1]).map(x => x[0]);
 }
 async function kbGroupSave(ids) {
-  const o = kbGroupPrefs(); if (ids && ids.length) o[S.route.key] = ids; else delete o[S.route.key];
+  const o = kbGroupPrefs(); delete o[S.route.key]; if (ids && ids.length) o[S.route.key] = ids;  // #1334: the last saved view last (the server keeps the newest 40)
   S.settings.group_order = JSON.stringify(o);
   render();
   try { await api('PATCH', '/api/settings', {group_order: S.settings.group_order}); } catch { /* offline: the next save sends it */ }
@@ -151,7 +151,7 @@ function kbSortDraw() {
   const n = KB.ids.length, pos = Math.min(KB.i + 1, n);
   const acts = KB_ACTS.filter(([a]) => kbActOn(a)).map(([a, k, i, lab]) => `<button type="button" class="btn kbact kba-${a}" data-kbs="${a}" aria-keyshortcuts="${k}"><kbd aria-hidden="true">${k}</kbd>${ic(i, 's')}<span>${esc(tr(lab))}</span></button>`).join('');
   box.innerHTML = `<div class="kbhead"><h3>${ic('inbox', 's')} ${tr('Sort the basket')}</h3><span class="kbpos">${esc(tr('{0} of {1}', pos, n))}</span><button type="button" class="iconbtn" data-kbs="end" title="${esc(tr('End (Esc)'))}" aria-label="${esc(tr('End (Esc)'))}">${ic('x', 's')}</button></div>
-    <div class="kbtask"><b class="kbttl">${esc(t.title)}</b>${t.notes ? `<p class="kbnotes muted">${esc(String(t.notes).slice(0, 280))}</p>` : ''}${t.due ? `<span class="muted">${esc(tr('Date: {0}', dayLabel(t.due)))}</span>` : ''}</div>
+    <div class="kbtask"><b class="kbttl">${mdTitleNL(t.title)}</b>${t.notes ? `<p class="kbnotes muted">${esc(String(t.notes).slice(0, 280))}</p>` : ''}${t.due ? `<span class="muted">${esc(tr('Date: {0}', dayLabel(t.due)))}</span>` : ''}</div>
     ${KB.waitOpen ? `<div class="kbwait"><label for="kb-wn">${tr('Waiting on')}</label><input id="kb-wn" maxlength="300" placeholder="${esc(tr('who or what, e.g. offer from the carpenter'))}" enterkeyhint="done"><button type="button" class="btn pri" data-kbs="wait-ok">${tr('OK')}</button></div>` : ''}
     <div class="kbacts" role="group" aria-label="${esc(tr('Sort the basket'))}">${acts}</div>
     ${isTouch() ? '' : `<div class="kbleg muted">${esc(tr('Keys: the numbers on the buttons, Esc ends'))}</div>`}`;

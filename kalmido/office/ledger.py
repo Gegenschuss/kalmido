@@ -45,9 +45,13 @@ OFX_DETAIL_MAX = 60000
 Q2 = Decimal("0.01")
 
 COMPANY_COLS = ("name", "street", "zip", "city", "country", "email", "phone", "tax_number", "vat_id", "iban", "bic", "bank_name",
-                "register_court", "register_no", "managing_directors")
+                "register_court", "register_no", "managing_directors", "md_label")
 COMPANY_MAX = {"name": 200, "street": 200, "zip": 20, "city": 120, "country": 2, "email": 200, "phone": 60, "tax_number": 40,
-               "vat_id": 20, "iban": 42, "bic": 11, "bank_name": 120, "register_court": 120, "register_no": 60, "managing_directors": 300}
+               "vat_id": 20, "iban": 42, "bic": 11, "bank_name": 120, "register_court": 120, "register_no": 60, "managing_directors": 300, "md_label": 20}
+# 2.40.0 (#1377): the word before the names of the management in the printed footer (md_label; '' = "Geschäftsführung" as before)
+FE_MD_LABELS = {"": ("Geschäftsführung", "Managing directors"), "shareholders": ("Gesellschafter", "Shareholders"),
+                "owner_m": ("Inhaber", "Owner"), "owner_f": ("Inhaberin", "Owner"), "board": ("Vorstand", "Executive board"),
+                "partners": ("Partner", "Partners")}
 # words of the printed company lines (the document's language); a pack may override them with labels[lang]["company_<key>"]
 COMPANY_WORDS = {
     "de": {"phone": "Tel.", "email": "E-Mail", "tax_number": "Steuernummer", "vat_id": "USt-IdNr.", "iban": "IBAN", "bic": "BIC",
@@ -185,11 +189,14 @@ def ofx_company_clean(v, cur):
             x = x.replace(" ", "").upper()
         if k == "country":
             x = x.upper()
+        if k == "md_label" and x not in FE_MD_LABELS:  # 2.40.0 (#1377)
+            raise BadInput(tr("Invalid value: {0}", k))
         if len(x) > COMPANY_MAX[k]:
             raise BadInput(tr("Invalid value: {0}", k))
         if x:
-            if k == "country" and not re.fullmatch(r"[A-Z]{2}", x):
-                raise BadInput(tr("Invalid value: {0}", k))
+            if k == "country" and x != (cur.get(k) or ""):  # 2.40.0 (#1372): ISO 3166-1 alpha-2 only (UK -> GB, EL -> GR); an
+                from .countries import fk_country  # old value sent back unchanged stays (the dialog marks it)
+                x = fk_country(x)
             if k == "email" and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", x):
                 raise BadInput(tr("Invalid value: {0}", k))
             if k == "iban" and not _iban_ok(x):
@@ -227,7 +234,8 @@ def ofx_company_print(fields, free, lang="de", pack=None):
     if f.get("register_court") or f.get("register_no"):
         reg.append(" ".join(x for x in (W["register"] + ":" if f.get("register_court") else "", f.get("register_court"), f.get("register_no")) if x))
     if f.get("managing_directors"):
-        reg.append(f"{W['managing_directors']}: {f['managing_directors']}")
+        md = FE_MD_LABELS[f.get("md_label")][lg == "en"] if f.get("md_label") in FE_MD_LABELS and f.get("md_label") else W["managing_directors"]  # 2.40.0 (#1377)
+        reg.append(f"{md}: {f['managing_directors']}")
     bank = []
     if f.get("bank_name"):
         bank.append(f["bank_name"])
@@ -314,6 +322,9 @@ def ofx_finalize(c, oid, uid, did):
         if cl:
             for k in ("street", "zip", "city", "country", "vat_id", "customer_no", "buyer_reference", "email_invoice", "payment_terms_days"):
                 rsnap[k] = cl[k] if k in cl.keys() else None
+            from .docs import fk_doc_contact
+            k = fk_doc_contact(c, r["client_id"], r["contact_id"] if "contact_id" in r.keys() else None)  # 2.40.0 (#1380)
+            rsnap["contact"] = {"name": k["name"], "email": k["email"], "phone": k["phone"]} if k else None
     tax = pack.get("tax") or {}
     tsnap = {"pack": pack.get("code") or "", "version": str(pack.get("version") or ""),
              "rates": {k: tax.get(k) for k in ("standard", "reduced", "exempt")}, "tax": tax,

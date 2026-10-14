@@ -402,6 +402,27 @@ def _org_clients(c, oid):
     return [dict(r) for r in c.execute("SELECT id, name, zip, city, street, contact, country, address FROM clients WHERE org_id=? ORDER BY id", (oid,))]
 
 
+def _cname(s):
+    return re.sub(r"\s+", " ", s or "").strip().lower()
+
+
+def fk_other_contact(c, a, dup, rows):
+    """2.40.0 (#1380): True when duplicate row a names a contact person its client (existing: dup.id; in the file: the
+    row dup.row and the rows already added to it) does not have yet."""
+    from .contacts_cl import fk_has_name
+    n = _cname(a.get("contact"))
+    if not n:
+        return False
+    if dup["kind"] == "existing":
+        cl = c.execute("SELECT contact FROM clients WHERE id=?", (dup["id"],)).fetchone()
+        return not fk_has_name(c, dup["id"], a["contact"]) and not (cl and _cname(cl["contact"]) == n)
+    for x in rows:
+        if x["row"] == dup["row"] or (x.get("dup") or {}).get("row") == dup["row"]:
+            if _cname(x.get("contact")) == n:
+                return False
+    return True
+
+
 # ---------------------------------------------------------------- preview of a spreadsheet
 def _num(v):
     s = str(v or "").strip().replace("€", "").replace("EUR", "").replace(" ", "")
@@ -465,6 +486,8 @@ def fi_preview(c, oid, raw):
                         break
             seen.append((n, a["zip"], a["row"], a["name"]))
             a["action"] = "skip" if a["dup"] else "new"
+            if a["dup"] and fk_other_contact(c, a, a["dup"], out["clients"]):
+                a["action"] = "contact"  # 2.40.0 (#1380): same company + postcode, another contact person: add them to the client
             a["reasons"] = [tr(FI_REASONS[f]) for f in a["flags"]]
             out["clients"].append(a)
     t = _table(book, "services", "leistungen")
@@ -476,6 +499,11 @@ def fi_preview(c, oid, raw):
                                               "order": ("order", "sort"), "cat": ("category", "kategorie"), "role": ("freelancer", "role"),
                                               "ie": ("intext",)}.items()}
         cell = lambda row, k: str(row[ix[k]]).strip() if ix[k] is not None and ix[k] < len(row) else ""  # noqa: E731
+        rules = office_settings(c, oid)  # 2.40.0 (#1379): the raw data / producing columns only while their switch is on
+        if not rules.get("raw_on"):
+            ix["raw"] = None
+        if not rules.get("producing_on"):
+            ix["prod"] = None
         cat = ""
         names = set()
         for i, row in enumerate(rows):
@@ -538,12 +566,38 @@ def _run_row(c, oid, rid):
 MERGE_FIELDS = ("contact", "street", "zip", "city", "country", "address")
 
 
-def _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client):
+def _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client, made=None):
+    from .contacts_cl import fk_add, fk_has_name, fk_sync
     if not isinstance(x, dict):
         raise BadInput(tr("Invalid data"))
+    made = {} if made is None else made  # row -> the client it became (new / merged), for "contact" rows of the same file
     act = x.get("action") or "new"
     if act == "skip":
         counts["skipped"] += 1
+        return
+    if act == "contact":  # 2.40.0 (#1380): add the row's contact person to an existing client / the client of an earlier row
+        if x.get("merge_id") not in (None, ""):
+            try:
+                tid = int(x.get("merge_id"))
+            except (TypeError, ValueError):
+                raise BadInput(tr("Invalid value: {0}", "merge_id")) from None
+        else:
+            tid = made.get(x.get("contact_row"))
+            if not tid:
+                raise BadInput(tr("The client of row {0} is not imported", x.get("contact_row") if isinstance(x.get("contact_row"), int) else "?"))
+        if not c.execute("SELECT 1 FROM clients WHERE id=? AND org_id=?", (tid, oid)).fetchone():
+            raise BadInput(tr("Invalid value: {0}", "merge_id"))
+        name = str(x.get("contact") or "").strip()
+        if not name:
+            raise BadInput(tr("Name missing"))
+        if not fk_has_name(c, tid, name):
+            fk_add(c, tid, oid, {"name": name[:120]}, run_id=rid)
+            fk_sync(c, tid)
+            counts["contacts"] = counts.get("contacts", 0) + 1
+        else:
+            counts["skipped"] += 1
+        if isinstance(x.get("row"), int):
+            made[x["row"]] = tid
         return
     f = {k: x.get(k) for k in ("name", "contact", "street", "zip", "city", "country", "address") if x.get(k) is not None}
     if act == "merge":
@@ -560,6 +614,11 @@ def _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client):
         if fill:
             c.execute(f"UPDATE clients SET {', '.join(k + '=?' for k in fill)}, updated_at=? WHERE id=? AND org_id=?", [*fill.values(), ts, mid, oid])
             merged[str(mid)] = {**merged.get(str(mid), {}), **fill}
+            if fill.get("contact") and not fk_has_name(c, mid, fill["contact"]):  # 2.40.0 (#1380): the filled contact = a contact person
+                fk_add(c, mid, oid, {"name": fill["contact"]}, run_id=rid, default=True)
+                fk_sync(c, mid)
+        if isinstance(x.get("row"), int):
+            made[x["row"]] = mid
         counts["merged"] += 1
         return
     if act != "new":
@@ -567,7 +626,11 @@ def _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client):
     f["org_id"] = oid
     f = clean_client(c, uid, f, new=True)
     f.update(org_id=oid, created_by=uid, created_at=ts, updated_at=ts, import_run_id=rid)
-    insert_id(c, f"INSERT INTO clients({','.join(f)}) VALUES({','.join('?' * len(f))})", list(f.values()))
+    cid = insert_id(c, f"INSERT INTO clients({','.join(f)}) VALUES({','.join('?' * len(f))})", list(f.values()))
+    if f.get("contact"):  # 2.40.0 (#1380): the default contact person (removed with the client by the undo)
+        fk_add(c, cid, oid, {"name": f["contact"]}, run_id=rid, default=True)
+    if isinstance(x.get("row"), int):
+        made[x["row"]] = cid
     counts["clients"] += 1
 
 
@@ -581,12 +644,13 @@ def fi_import(c, oid, uid, b):
     if not all(isinstance(v, list) for v in lists.values()) or sum(len(v) for v in lists.values()) > 3 * FI_ROWS_MAX:
         raise BadInput(tr("Invalid data"))
     rid = _run_new(c, oid, uid, "data")
-    counts = {"clients": 0, "merged": 0, "services": 0, "equipment": 0, "skipped": 0}
+    counts = {"clients": 0, "merged": 0, "contacts": 0, "services": 0, "equipment": 0, "skipped": 0}
     merged = {}
+    made = {}
     ts = iso(now_utc())
     for x in lists["clients"]:
         try:
-            _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client)
+            _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client, made)
         except BadInput as e:  # say which row: the preview can be long
             raise BadInput(tr("Row {0}: {1}", x.get("row") if isinstance(x, dict) and isinstance(x.get("row"), int) else "?", str(e))) from None
     for kind, cols in (("services", ("name_de", "name_en", "category", "sort", "unit", "daily_rate", "hourly_rate", "raw_fee", "producing", "intext", "role")),
@@ -618,11 +682,13 @@ def fi_undo(c, oid, uid, rid):
     r = _run_row(c, oid, rid)
     if r["undone_at"]:
         raise Denied(409, tr("This import has already been undone"))
-    removed = {"clients": 0, "services": 0, "equipment": 0, "archive": 0, "merged": 0}
+    removed = {"clients": 0, "services": 0, "equipment": 0, "archive": 0, "merged": 0, "contacts": 0}
     kept = {"clients": 0, "services": 0, "equipment": 0}
+    kept_ids = set()
     for row in c.execute("SELECT id FROM clients WHERE org_id=? AND import_run_id=?", (oid, rid)).fetchall():
         if _client_used(c, oid, row["id"], rid):
             kept["clients"] += 1
+            kept_ids.add(row["id"])
             continue
         c.execute("DELETE FROM clients WHERE id=? AND org_id=?", (row["id"], oid))
         removed["clients"] += 1
@@ -647,6 +713,17 @@ def fi_undo(c, oid, uid, rid):
             c.execute(f"UPDATE clients SET {', '.join(k + '=?' for k in back)}, updated_at=? WHERE id=? AND org_id=?",
                       [""] * len(back) + [iso(now_utc()), int(cid), oid])
             removed["merged"] += 1
+    # 2.40.0 (#1380): the contact persons the run added to other clients (a kept client of the run keeps its own)
+    from .contacts_cl import fk_sync
+    touched = set()
+    for row in c.execute("SELECT id, client_id FROM office_client_contacts WHERE org_id=? AND import_run_id=?", (oid, rid)).fetchall():
+        if row["client_id"] in kept_ids:
+            continue
+        c.execute("DELETE FROM office_client_contacts WHERE id=? AND org_id=?", (row["id"], oid))
+        touched.add(row["client_id"])
+        removed["contacts"] += 1
+    for cid in touched:
+        fk_sync(c, cid)
     files = []
     for row in c.execute("SELECT id, file FROM office_archive WHERE org_id=? AND run_id=?", (oid, rid)).fetchall():
         files.append(row["file"])
@@ -828,6 +905,10 @@ def fi_archive_add(c, oid, uid, raw, file_name, b):
     run = _run_row(c, oid, rid)
     if run["kind"] != "archive" or run["undone_at"]:
         raise BadInput(tr("Invalid value: {0}", "run_id"))
+    with c.savepoint():  # 2.40.0 (#1421): the ticked proposals of the PDF's address (new client / contact person)
+        made = fk_archive_people(c, oid, uid, b, rid)
+    if made:
+        b = dict(b, client_id=made)
     f = _archive_fields(c, oid, b)
     if not f["number"]:
         f["number"] = _txt(re.sub(r"\.pdf$", "", file_name or "", flags=re.I), 120)
@@ -845,13 +926,25 @@ def fi_archive_add(c, oid, uid, raw, file_name, b):
     d = os.path.join(OFFICE_DIR, str(int(oid)))
     os.makedirs(d, mode=0o700, exist_ok=True)  # like the stored invoices (2.39.0 #1209 audit N8)
     p = os.path.join(d, name)
+    # 2.40.0 (#1335): only the ".part" is written here; the caller renames it to its name after the commit (fk_archive_done)
+    # and removes it when the commit fails -- an archive-*.pdf never exists without its row
     fd = os.open(p + ".part", os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0), 0o600)
     with os.fdopen(fd, "wb") as fh:
         fh.write(raw)
-    os.replace(p + ".part", p)
     c.execute("UPDATE office_archive SET file=? WHERE id=? AND org_id=?", (name, aid, oid))
     _run_count(c, oid, rid)
-    return aid
+    return aid, p
+
+
+def fk_archive_done(p, committed):
+    """2.40.0 (#1335): after the commit the .part becomes the archived file; without a commit it is removed."""
+    try:
+        if committed:
+            os.replace(p + ".part", p)
+        else:
+            os.unlink(p + ".part")
+    except OSError:
+        pass
 
 
 def _run_count(c, oid, rid):
@@ -876,6 +969,135 @@ def fi_archive_rows(c, oid, kind=""):
         sql += " AND kind=?"
         args.append(kind)
     return [_archive_public(r, names) for r in c.execute(sql + " ORDER BY date DESC, id DESC", args)]
+
+
+# ---------------------------------------------------------------- 2.40.0 (#1421): the recipient's address of an old PDF
+# The text layer of the first page (tasks.attachtext.pdf_text, no OCR: a scan only gets a hint). The recipient block is
+# the lines above the first postcode + city line that is not the organisation's own (its postcode / city, its name, a
+# one-line sender "Firma · Straße · PLZ Ort"); split like a spreadsheet address (fi_split_address), with its reasons.
+# Then the proposals, each only a suggestion the person ticks: a new client (no client matches), the contact person for a
+# client that has another one, a note when the address differs from the client card.
+FK_STOP_RE = re.compile(r"(?:\btel\b|telefon|phone|\bfax\b|e-?mail|www\.|https?:|@|\biban\b|\bbic\b|ust-?id|steuer|vat\b|"
+                        r"rechnung|angebot|kostenvoranschlag|gutschrift|invoice|quotation|offer\b|datum|date\b|seite|page\b|kunden-?nr|customer)", re.I)
+FK_SENDER_RE = re.compile(r"[·•|]|\s[-–]\s.*\d{4,5}")
+FK_ZIPLINE_RE = re.compile(r"^(?:[A-Z]{1,2}\s?[-–]\s?)?\d{4,5}\s+\S")
+FK_PDF_LINES = 45  # lines of the first page looked at
+
+
+def fk_pdf_block(text, own):
+    """The recipient block (list of lines) of a document's text, [] when none is found. own: the organisation's company
+    fields (name, zip, city) -- their lines are the sender, not the recipient."""
+    first = (text or "").split("\f")[0]
+    lines = [re.sub(r"\s+", " ", x).strip() for x in first.replace("\r", "\n").split("\n")]
+    lines = [x for x in lines if x][:FK_PDF_LINES]
+    oname = fi_norm(own.get("name") or "")
+    ozip, ocity = (own.get("zip") or "").replace(" ", ""), (own.get("city") or "").strip().lower()
+    ostreet = _cname(own.get("street")).replace(" ", "")
+
+    def own_line(ln):
+        n = fi_norm(ln)
+        return bool(oname) and len(oname) >= 4 and oname in n
+    for i, ln in enumerate(lines):
+        if not (FK_ZIPLINE_RE.match(ln) or (NL_ZIP_RE.match(ln) and i)) or len(ln) > 60 or FK_SENDER_RE.search(ln) or own_line(ln):
+            continue
+        m = ZIP_RE.match(ln)
+        if m and ozip and m.group("zip") == ozip and m.group("city").strip().lower() == ocity and any(
+                own_line(x) or (ostreet and _cname(x).replace(" ", "") == ostreet) for x in lines[max(0, i - 3):i]):
+            continue  # the organisation's own address block (letterhead); a client in the same town stays
+        top = i
+        while top > 0 and i - top < 5:
+            up = lines[top - 1]
+            if FK_SENDER_RE.search(up) or FK_STOP_RE.search(up) and not ATTN_RE.match(up) or own_line(up) or len(up) > 70:
+                break
+            top -= 1
+        if top == i:
+            continue  # a postcode line without anything above it is no address
+        block = lines[top:i + 1]
+        if i + 1 < len(lines) and lines[i + 1].strip(" .").lower() in COUNTRIES:
+            block.append(lines[i + 1])
+        return block
+    return []
+
+
+def fk_pdf_address(c, oid, raw, uid, client_id=None):
+    """-> {status: ok | no_text | none | busy | error, address?: split + reasons, client_id, client_name, new_client,
+    add_contact, address_differs}."""
+    from ..tasks.attachtext import pdf_text
+    from .contacts_cl import fk_has_name
+    from .ledger import ofx_company
+    t = pdf_text(raw, owner=uid)
+    if t.get("error"):
+        return {"status": "busy" if t["error"] == "busy" else "error"}
+    if t.get("no_text_layer"):
+        return {"status": "no_text"}
+    block = fk_pdf_block(t.get("text") or "", ofx_company(c, oid) or {})
+    if not block:
+        return {"status": "none"}
+    a = fi_split_address("\n".join(block))
+    if len(block) < 3 and "one_line" not in a["flags"]:
+        a["flags"].append("extra_lines" if len(block) > 4 else "no_street")
+    a["reasons"] = [tr(FI_REASONS[f]) for f in dict.fromkeys(a["flags"])]
+    out = {"status": "ok", "address": a, "unsure": bool(a["flags"]), "client_id": None, "client_name": "", "new_client": False,
+           "add_contact": "", "address_differs": False}
+    n = fi_norm(a["name"])
+    known = _org_clients(c, oid)
+    hit = next((k for k in known if _same(n, a["zip"], fi_norm(k["name"]), k["zip"] or "")), None)
+    if hit is None and client_id:
+        hit = next((k for k in known if k["id"] == client_id), None)
+    if hit is None:
+        out["new_client"] = bool(a["name"])
+        return out
+    out["client_id"], out["client_name"] = hit["id"], hit["name"]
+    if a["contact"] and not fk_has_name(c, hit["id"], a["contact"]) and _cname(hit["contact"]) != _cname(a["contact"]):
+        out["add_contact"] = a["contact"][:120]
+    for k in ("street", "zip", "city"):
+        if a[k] and (hit[k] or "") and _cname(a[k]).replace(" ", "") != _cname(hit[k]).replace(" ", ""):
+            out["address_differs"] = True
+    return out
+
+
+def fk_archive_people(c, oid, uid, b, rid):
+    """2.40.0 (#1421): the ticked proposals of an archived PDF -- new_client (JSON {name, contact, street, zip, city,
+    country}: a client of this run; the same company + postcode again in the run reuses it) and add_contact (a name for
+    the client_id) -> the client id to file the document under (or None)."""
+    from ..team.clients import clean_client
+    from .contacts_cl import fk_add, fk_has_name, fk_sync
+    cid = None
+    raw = b.get("new_client")
+    if raw:
+        try:
+            x = json.loads(raw) if isinstance(raw, str) else raw
+        except ValueError:
+            raise BadInput(tr("Invalid value: {0}", "new_client")) from None
+        if not isinstance(x, dict):
+            raise BadInput(tr("Invalid value: {0}", "new_client"))
+        f = {k: x.get(k) for k in ("name", "contact", "street", "zip", "city", "country") if isinstance(x.get(k), str)}
+        n = fi_norm(f.get("name") or "")
+        same = next((k for k in _org_clients(c, oid) if _same(n, f.get("zip") or "", fi_norm(k["name"]), k["zip"] or "")), None)
+        if same:
+            cid = same["id"]
+        else:
+            f["org_id"] = oid
+            f = clean_client(c, uid, f, new=True)
+            ts = iso(now_utc())
+            f.update(org_id=oid, created_by=uid, created_at=ts, updated_at=ts, import_run_id=rid)
+            cid = insert_id(c, f"INSERT INTO clients({','.join(f)}) VALUES({','.join('?' * len(f))})", list(f.values()))
+            if f.get("contact"):
+                fk_add(c, cid, oid, {"name": f["contact"]}, run_id=rid, default=True)
+    name = str(b.get("add_contact") or "").strip()
+    if name:
+        tid = cid
+        if tid is None:
+            try:
+                tid = int(b.get("client_id"))
+            except (TypeError, ValueError):
+                raise BadInput(tr("Invalid value: {0}", "client_id")) from None
+        if not c.execute("SELECT 1 FROM clients WHERE id=? AND org_id=?", (tid, oid)).fetchone():
+            raise BadInput(tr("Invalid value: {0}", "client_id"))
+        if not fk_has_name(c, tid, name):
+            fk_add(c, tid, oid, {"name": name[:120]}, run_id=rid)
+            fk_sync(c, tid)
+    return cid
 
 
 # ---------------------------------------------------------------- the counter proposal
@@ -995,6 +1217,21 @@ def fi_parse_post():
     return jsonify(items=items)
 
 
+@app.post("/api/office/legacy/archive/address")
+def fk_archive_address_post():
+    """2.40.0 (#1421) org admin. multipart 'file' (PDF) + client_id? (the file name's proposal) -> the recipient's address
+    read from the text layer of page 1 and the proposals (new client / contact person / address differs); nothing stored."""
+    c, uid, oid = _ctx()
+    f, raw = _upload("file", FI_PDF_MAX)
+    if raw[:1024].find(b"%PDF-") < 0:
+        raise BadInput(tr("Only PDF files can be archived"))
+    try:
+        cid = int(request.form.get("client_id") or 0) or None
+    except ValueError:
+        cid = None
+    return jsonify(fk_pdf_address(c, oid, raw, uid, cid))
+
+
 @app.post("/api/office/legacy/archive/run")
 def fi_archive_run_post():
     """Org admin: opens an archive run (the uploads that follow carry its id; one run = one "undo")."""
@@ -1011,10 +1248,15 @@ def fi_archive_post():
     client_name, date (YYYY-MM-DD), amount, paid -> 201 the archived document. 409 for a used number or the same PDF."""
     c, uid, oid = _ctx()
     f, raw = _upload("file", FI_PDF_MAX)
-    aid = fi_archive_add(c, oid, uid, raw, f.filename or "", request.form.to_dict())
-    from .ledger import ofx_log
-    ofx_log(c, oid, "upload", target="archive", detail={"archive_id": aid, "bytes": len(raw)})
-    c.commit()
+    aid, p = fi_archive_add(c, oid, uid, raw, f.filename or "", request.form.to_dict())
+    try:
+        from .ledger import ofx_log
+        ofx_log(c, oid, "upload", target="archive", detail={"archive_id": aid, "bytes": len(raw)})
+        c.commit()
+    except BaseException:
+        fk_archive_done(p, False)
+        raise
+    fk_archive_done(p, True)
     r = c.execute("SELECT * FROM office_archive WHERE id=? AND org_id=?", (aid, oid)).fetchone()
     return jsonify(_archive_public(r)), 201
 

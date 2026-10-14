@@ -69,7 +69,11 @@ def log_changes(c, tid, old, act=None):
     ch = lambda k: _norm(old[k]) != _norm(new[k])  # noqa: E731
     if ch("title"):
         log_act(c, tid, "title", {"to": new["title"][:200]})
-    if ch("content"):
+    if ch("content") and act == "md_subtasks" and (old["content"] or "").strip():
+        # 2.40.0 (#1409): "Turn the open checklist items into subtasks" keeps the text before in the history (own entry, never
+        # merged), the app offers "Restore" there -- after a reload and on every device
+        log_act(c, tid, "md_subtasks", {"prev": (old["content"] or "")[:20000]})
+    elif ch("content"):
         log_act(c, tid, "content")
     if ch("due") or ch("due_time") or ch("start"):
         log_act(c, tid, "snooze" if act == "snooze" and new["due"] else "dep_shift" if act == "dep_shift" else "due",

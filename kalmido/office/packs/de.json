@@ -116,6 +116,7 @@
       "fx": "Wechselkurs 1 €",
       "subtotal": "Zwischensumme",
       "invoice_total": "Rechnungsbetrag",
+      "reminder_total": "Gesamtbetrag",
       "credit_total": "Gutschriftsbetrag",
       "paid": "Bereits bezahlt",
       "open": "Offener Betrag",
@@ -138,7 +139,7 @@
       "valid_until": "Valid until",
       "pos": "No.",
       "title": "Title",
-      "qty": "x",
+      "qty": "Qty",
       "unit_price": "Unit Price",
       "vat": "VAT",
       "total": "Total",
@@ -194,6 +195,7 @@
       "fx": "Exchange rate €1",
       "subtotal": "Subtotal",
       "invoice_total": "Total",
+      "reminder_total": "Total amount due",
       "credit_total": "Credit total",
       "paid": "Already paid",
       "open": "Amount outstanding",
@@ -300,12 +302,16 @@
       "en": "regarding the project referenced above, we are pleased to submit the following charges for our services:"
     },
     "invoice_closing": {
-      "de": "Der Gesamtbetrag wird mit Erhalt dieser Rechnung zur Zahlung fällig. Es gelten unsere allgemeinen Geschäftsbedingungen.",
-      "en": "Please remit the invoice amount to the account specified above. Our general terms and conditions apply."
+      "de": "Bitte überweisen Sie den Gesamtbetrag unter Angabe der Rechnungsnummer auf unser angegebenes Bankkonto. Es gelten unsere allgemeinen Geschäftsbedingungen.",
+      "en": "Please transfer the total amount, quoting the invoice number, to our bank account stated on this invoice. Our general terms and conditions apply."
     },
     "credit_intro": {
       "de": "zu der unten genannten Rechnung erteilen wir Ihnen folgende Gutschrift:",
       "en": "regarding the invoice referenced below we issue the following credit note:"
+    },
+    "credit_closing": {
+      "de": "Den Gutschriftsbetrag erstatten wir Ihnen oder verrechnen ihn mit offenen Rechnungen. Bei Fragen stehen wir Ihnen gerne zur Verfügung.",
+      "en": "We will refund the credited amount to you or offset it against open invoices. Please do not hesitate to contact us with any questions."
     },
     "reminder_intro": {
       "de": "sicher ist Ihrer Aufmerksamkeit entgangen, dass folgende Rechnungen noch nicht beglichen sind:",
@@ -314,6 +320,22 @@
     "reminder_closing": {
       "de": "Wir bitten Sie darum, den kompletten Rechnungsbetrag innerhalb von {days} Werktagen auf unser oben genanntes Bankkonto zu überweisen.",
       "en": "Please transfer the full amount within {days} working days to the bank account above."
+    },
+    "reminder_intro_2": {
+      "de": "leider konnten wir trotz unserer Zahlungserinnerung bis heute keinen Zahlungseingang für folgende Rechnungen feststellen:",
+      "en": "despite our payment reminder, we have not yet received payment for the following invoices:"
+    },
+    "reminder_closing_2": {
+      "de": "Wir bitten Sie, den offenen Gesamtbetrag innerhalb von {days} Werktagen auf unser oben genanntes Bankkonto zu überweisen. Sollten Sie die Zahlung inzwischen veranlasst haben, betrachten Sie dieses Schreiben bitte als gegenstandslos.",
+      "en": "Please transfer the total amount outstanding within {days} working days to the bank account above. If you have already arranged payment, please disregard this letter."
+    },
+    "reminder_intro_3": {
+      "de": "trotz unserer Zahlungserinnerung und Mahnung sind folgende Rechnungen weiterhin unbezahlt:",
+      "en": "despite our payment reminder and our reminder notice, the following invoices remain unpaid:"
+    },
+    "reminder_closing_3": {
+      "de": "Wir fordern Sie hiermit letztmalig auf, den offenen Gesamtbetrag innerhalb von {days} Werktagen auf unser oben genanntes Bankkonto zu überweisen. Geht die Zahlung bis dahin nicht ein, werden wir ohne weitere Ankündigung rechtliche Schritte einleiten; die dadurch entstehenden Kosten gehen zu Ihren Lasten.",
+      "en": "This is our final request to transfer the total amount outstanding within {days} working days to the bank account above. If payment is not received by then, we will take legal action without further notice; any costs arising from this will be charged to you."
     },
     "payment_note": {
       "de": "Zahlbar bis {date} ohne Abzug.",

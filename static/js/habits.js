@@ -114,7 +114,7 @@ function habitStats(h) {
 }
 function viewHabits() {
   const hs = S.habits.filter(h => !h.archived);
-  if (!S.habits.length) return `<div class="empty">${ic('habit')}${tr('No habits yet.')}<br><br><button class="btn pri" data-act="habit-new">${ic('plus', 's')} ${tr('Create habit')}</button></div>`;
+  if (!S.habits.length) return `<div class="empty nempty eact">${ic('habit')}<span>${tr('No habits yet.')}</span><button class="btn pri" data-act="habit-new">${ic('plus', 's')} ${tr('Create habit')}</button></div>`;
   const mon = mondayOf(today()), t0 = today();
   // U10: the last 7 days up to today (yesterday can always be ticked, also on a Monday)
   const days = [...Array(7)].map((_, i) => addDays(t0, i - 6));
@@ -233,7 +233,7 @@ function viewPomo() {
   const total = sw ? 3600 : p ? p.minutes * 60 : pomoMinutes(kind) * 60;
   const rem = sw ? total - (el % 3600) : pomoRemaining();
   const C = 2 * Math.PI * 46;
-  const opts = sortTasks(openTasks().filter(t => !t.parent_id)).map(t => `<option value="${t.id}" ${String(p ? p.task_id : pomoTask) === String(t.id) ? 'selected' : ''}>${esc(t.title)}</option>`).join('');
+  const opts = sortTasks(openTasks().filter(t => !t.parent_id)).map(t => `<option value="${t.id}" ${String(p ? p.task_id : pomoTask) === String(t.id) ? 'selected' : ''}>${esc(mdPlain(t.title))}</option>`).join('');
   const tt = p && p.task_id && S.tasks.get(p.task_id);
   return `<div class="pomo">
     <div class="seg">${[['focus', N_('Focus')], ['short', N_('Short break')], ['long', N_('Long break')], ['stopwatch', N_('Stopwatch')]].map(([k, n]) => `<button class="${kind === k ? 'on' : ''}" data-act="pomo-kind" data-k="${k}" ${p ? 'disabled' : ''}>${tr(n)}</button>`).join('')}</div>

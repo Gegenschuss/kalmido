@@ -87,7 +87,7 @@ function viewLife() {
       + (kk.connected ? btn('life-kksync', 'sync', tr('Fetch now')) : '') + btn('life-kk', 'link', kk.connected ? tr('Karakeep…') : tr('Connect Karakeep…'));
     cards.push(card('reading', 'book', tr('Read later'), body, acts, r.count || ''));
   }
-  if (!cards.length) return `<div class="dash life"><div class="empty">${ic('home')}${tr('Switch on the parts of Home & life you want under Settings > Modules.')}<button type="button" class="btn" data-act="life-mods">${tr('Modules')}</button></div></div>`;
+  if (!cards.length) return `<div class="dash life"><div class="empty nempty eact">${ic('home')}<span>${tr('Switch on the parts of Home & life you want under Settings > Modules.')}</span><button type="button" class="btn" data-act="life-mods">${tr('Modules')}</button></div></div>`;
   return `<div class="dash fam life"><div class="dgrid">${cards.join('')}</div></div>`;
 }
 

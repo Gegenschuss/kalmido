@@ -4,7 +4,10 @@
 // their key data proposed from the file name and are archived unchanged. Every confirmed import is a run that can be
 // undone while nothing builds on it. Org admins only (the server checks); members read the archive.
 const OIM = {pv: null, busy: false, filter: '', arch: [], archBusy: false, runs: null, counter: null, clients: null, list: null, listLoading: false};
-const OIM_ACTS = [['new', N_('Add as new client')], ['merge', N_('Merge into the existing client')], ['skip', N_('Skip')]];
+const OIM_ACTS = [['contact', N_('Add as contact person to the client')], ['new', N_('Add as new client')], ['merge', N_('Merge into the existing client')], ['skip', N_('Skip')]];
+// 2.40.0 (#1380): the actions a duplicate offers (in the file: no merge; "contact person" only with a contact name)
+const oimActs = c => OIM_ACTS.filter(([v]) => (v !== 'merge' || c.dup?.kind === 'existing') && (v !== 'contact' || (c.contact || '').trim()));
+if (typeof fgWatch === 'function') fgWatch(() => !!OIM.pv || OIM.arch.some(x => !x.done));  // 2.40.0 (#1371): an open preview asks before the page closes
 
 async function oimLoad() {
   try { const j = await api('GET', '/api/office/legacy/runs'); OIM.runs = j.runs || []; } catch (x) { OIM.runs = []; }
@@ -53,10 +56,10 @@ function oimClientCard(c, i) {
   const on = c.action !== 'skip';
   const fld = (k, label, mx, cls = '') => `<label class="oimfl ${cls}"><span>${esc(label)}</span><input data-oim-c="${i}" data-k="${k}" value="${esc(c[k] || '')}" maxlength="${mx}" ${on ? '' : 'disabled'}></label>`;
   const dup = c.dup ? `<p class="oimdup">${ic('copy', 's')} ${esc(c.dup.kind === 'existing' ? tr('Already a client: {0}', c.dup.name) : tr('Twice in the file (row {0})', c.dup.row))}</p>
-    ${c.dup.kind === 'existing' ? `<select data-oim-act="${i}" aria-label="${esc(tr('What to do'))}">${OIM_ACTS.map(([v, n]) => `<option value="${v}" ${c.action === v ? 'selected' : ''}>${esc(tr(n))}</option>`).join('')}</select>` : ''}` : '';
+    <select data-oim-act="${i}" aria-label="${esc(tr('What to do'))}">${oimActs(c).map(([v, n]) => `<option value="${v}" ${c.action === v ? 'selected' : ''}>${esc(tr(n))}</option>`).join('')}</select>` : '';
   return `<li class="oimcard ${on ? '' : 'off'} ${c.flags?.length ? 'warn' : ''}"><div class="oimhd"><label class="chkl"><input type="checkbox" data-oim-on="c" data-i="${i}" ${on ? 'checked' : ''}> <b>${esc(c.name || tr('(no name)'))}</b></label><span class="muted">${tr('row {0}', c.row)}</span></div>
     ${c.reasons?.length ? `<p class="oimwarn">${ic('alert', 's')} ${esc(c.reasons.join(' · '))}</p>` : ''}${dup}
-    <div class="oimgrid">${fld('name', tr('Company'), 80, 'w2')}${fld('contact', tr('Contact person'), 120, 'w2')}${fld('street', tr('Street'), 200, 'w2')}${fld('zip', tr('Postcode'), 20)}${fld('city', tr('City'), 120)}${fld('country', tr('Country (ISO code)'), 2)}</div>
+    <div class="oimgrid">${fld('name', tr('Company'), 80, 'w2')}${fld('contact', tr('Contact person'), 120, 'w2')}${fld('street', tr('Street'), 200, 'w2')}${fld('zip', tr('Postcode'), 20)}${fld('city', tr('City'), 120)}<div class="oimfl"><span>${esc(tr('Country'))}</span>${ctyField('oim-cty-' + i, c.country, {attrs: `data-oim-c="${i}" data-k="country"`, dis: on ? '' : 'disabled', label: tr('Country')})}</div></div>
     <details class="oimraw"><summary>${tr('Original text')}</summary><pre>${esc(c.address || '')}</pre></details></li>`;
 }
 
@@ -78,8 +81,38 @@ function oimArchHtml() {
       <div class="oimfl"><span>${tr('Date')}</span>${dateIn('oim-d-' + i, x.date || '', {label: tr('Date'), empty: tr('none'), ro: x.done, attrs: `data-oim-a="${i}" data-k="date"`})}</div>
       <label class="oimfl w2"><span>${tr('Client')}</span><select data-oim-a="${i}" data-k="client_id" ${x.done ? 'disabled' : ''}>${oimClientOpts(x.client_id)}</select></label>
       <label class="oimfl"><span>${tr('Amount')}</span><input data-oim-a="${i}" data-k="amount" value="${esc(x.amount ?? '')}" inputmode="decimal" class="numin" placeholder="${esc(x.kind === 'invoice' ? tr('gross') : tr('net'))}" ${x.done ? 'disabled' : ''}></label>
-      <label class="chkl oimfl"><input type="checkbox" data-oim-a="${i}" data-k="paid" ${x.paid ? 'checked' : ''} ${x.done || x.kind !== 'invoice' ? 'disabled' : ''}> ${tr('Paid')}</label></div></li>`).join('')}</ul>
+      <label class="chkl oimfl"><input type="checkbox" data-oim-a="${i}" data-k="paid" ${x.paid ? 'checked' : ''} ${x.done || x.kind !== 'invoice' ? 'disabled' : ''}> ${tr('Paid')}</label></div>${oimAddrHtml(x, i)}</li>`).join('')}</ul>
     <div class="foot stfoot oimfoot"><span class="spacer"></span><button type="button" class="btn" data-oim="arch-clear">${tr('Clear list')}</button><button type="button" class="btn pri" data-oim="arch-go" ${n && !OIM.archBusy ? '' : 'disabled'}>${OIM.archBusy ? esc(tr('Archiving…')) : esc(trn('Archive {0} document', 'Archive {0} documents', n))}</button></div>`;
+}
+
+// 2.40.0 (#1421): the recipient's address read from page 1 of the PDF and the proposals (each only with a tick)
+function oimAddrHtml(x, i) {
+  const r = x.addr;
+  if (!r) return x.addrBusy ? `<p class="muted oimaddr">${tr('Reading the address…')}</p>` : '';
+  if (r.status === 'no_text') return `<p class="muted oimaddr">${ic('info', 's')} ${tr('No text in the PDF (a scan?): the address is not read, there is no text recognition.')}</p>`;
+  if (r.status === 'none') return `<p class="muted oimaddr">${ic('info', 's')} ${tr('No recipient address found on page 1.')}</p>`;
+  if (r.status !== 'ok') return `<p class="muted oimaddr">${ic('info', 's')} ${tr('The PDF could not be read; the address stays empty.')}</p>`;
+  const a = r.address || {}, dis = x.done ? 'disabled' : '';
+  const line = [a.name, a.contact, a.street, [a.zip, a.city].filter(Boolean).join(' '), a.country].filter(Boolean).join(' · ');
+  const box = (k, on, txt) => `<label class="chkl"><input type="checkbox" data-oim-p="${k}" data-i="${i}" ${on ? 'checked' : ''} ${dis}> ${esc(txt)}</label>`;
+  return `<div class="oimaddr"><p><span class="muted">${tr('Address in the PDF')}:</span> ${esc(line)}</p>
+    ${a.reasons?.length ? `<p class="oimwarn">${ic('alert', 's')} ${esc(a.reasons.join(' · '))}</p>` : ''}
+    ${r.new_client ? box('new', x.pNew, tr('Create a new client: {0}', a.name)) : ''}
+    ${r.add_contact ? box('contact', x.pContact, tr('Add as contact person to {1}: {0}', r.add_contact, r.client_name)) : ''}
+    ${r.address_differs ? `<p class="muted">${ic('info', 's')} ${esc(tr('Address differs from the client card of {0}', r.client_name))}</p>` : ''}</div>`;
+}
+async function oimReadAddr(x) {
+  x.addrBusy = true;
+  const fd = new FormData(); fd.append('file', x.file, x.file_name); if (x.client_id) fd.append('client_id', x.client_id);
+  try {
+    const r = await fetch('/api/office/legacy/archive/address', {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-Requested-With': 'kalmido'}});
+    x.addr = r.ok ? await r.json() : {status: 'error'};
+  } catch { x.addr = {status: 'error'}; }
+  x.addrBusy = false;
+  if (x.addr.status === 'ok') {
+    x.pNew = !!x.addr.new_client && !x.addr.unsure; x.pContact = !!x.addr.add_contact && !x.addr.unsure;
+    if (x.addr.client_id && !x.client_id) x.client_id = x.addr.client_id;
+  }
 }
 
 function oimCounterHtml() {
@@ -119,9 +152,10 @@ function oimArchiveListHtml(q) {
   const sum = OIM.list.sum_invoices ? `<p class="muted oimsum">${esc(tr('Archived invoices: {0}, of which paid: {1}', ofcMoney(OIM.list.sum_invoices), ofcMoney(OIM.list.sum_paid)))}</p>` : '';
   const imp = ofcAdmin() ? `<a class="btn sm" href="#office/import">${ic('upload', 's')} ${tr('Import legacy data')}</a>` : '';
   if (!items.length) return `<div class="empty">${ic('archive')}<span>${q ? tr('Nothing matches.') : tr('No archived documents. Old invoices and quotations are added under Settings > Import legacy data.')}</span>${q ? '' : imp}</div>`;
-  return sum + `<ul class="ofclist ofdlist" role="list">${items.map(r => `<li><a class="ofcrow ofdrow" href="/api/office/legacy/archive/${r.id}/pdf" target="_blank" rel="noopener">
+  // 2.40.0 (#1366): the row shows the PDF in the browser, the button next to it downloads it
+  return sum + `<ul class="ofclist ofdlist oimarch" role="list">${items.map(r => `<li><a class="ofcrow ofdrow" href="/api/office/legacy/archive/${r.id}/pdf" target="_blank" rel="noopener">
     <span class="ofcn"><b>${esc(r.number || r.file_name)}${r.client || r.client_name ? ` · ${esc(r.client || r.client_name)}` : ''}</b><small class="muted">${esc([r.kind === 'offer' ? tr('Quotation') : tr('Invoice'), r.project, r.date ? fmtDateLoc(r.date) : ''].filter(Boolean).join(' · '))}</small></span>
-    <span class="ofdsum"><b>${r.amount != null ? esc(ofcMoney(r.amount)) : ''}</b><small class="rotag">${ic('archive', 's')}${tr('Archive|documents')}${r.kind === 'invoice' ? ' · ' + (r.paid ? tr('Paid') : tr('open')) : ''}</small></span>${ic('file', 's')}</a></li>`).join('')}</ul>` + `<div class="lacts">${imp}</div>`;
+    <span class="ofdsum"><b>${r.amount != null ? esc(ofcMoney(r.amount)) : ''}</b><small class="rotag">${ic('archive', 's')}${tr('Archive|documents')}${r.kind === 'invoice' ? ' · ' + (r.paid ? tr('Paid') : tr('open')) : ''}</small></span>${ic('file', 's')}</a><a class="ib oimdl" href="/api/office/legacy/archive/${r.id}/pdf?download=1" download aria-label="${esc(tr('Download PDF'))}" title="${esc(tr('Download PDF'))}">${ic('download', 's')}</a></li>`).join('')}</ul>` + `<div class="lacts">${imp}</div>`;
 }
 
 // ---- actions
@@ -140,12 +174,13 @@ async function oimPreview(file) {
 async function oimImport() {
   const p = OIM.pv; if (!p) return;
   const cl = (p.clients || []).map(c => ({row: c.row, name: c.name, contact: c.contact, street: c.street, zip: c.zip, city: c.city, country: (c.country || '').toUpperCase(), address: c.address,
-    action: c.action, merge_id: c.action === 'merge' ? c.dup?.id : undefined}));
+    action: c.action, merge_id: (c.action === 'merge' || c.action === 'contact') && c.dup?.kind === 'existing' ? c.dup.id : undefined,
+    contact_row: c.action === 'contact' && c.dup?.kind === 'file' ? c.dup.row : undefined}));
   OIM.busy = true; ofcDraw();
   try {
     const j = await api('POST', '/api/office/legacy/import', {clients: cl, services: p.services || [], equipment: p.equipment || []});
     const c = j.counts || {};
-    toast(tr('Imported: {0} clients, {1} services, {2} devices', c.clients || 0, c.services || 0, c.equipment || 0));
+    toast(tr('Imported: {0} clients, {1} services, {2} devices', c.clients || 0, c.services || 0, c.equipment || 0) + (c.contacts ? ' · ' + trn('{0} contact person added', '{0} contact persons added', c.contacts) : ''));
     OIM.pv = null; ofcReload('services'); ofcReload('equipment');
     await oimLoad();
   } catch (x) { const el = $('.oimpv .aerr'); if (el) el.textContent = x.message || ''; else toast(x.message || ''); }
@@ -156,9 +191,10 @@ async function oimPickPdf(files) {
   if (!fs.length) return;
   try {
     const j = await api('POST', '/api/office/legacy/archive/parse', {names: fs.map(f => f.name)});
-    (j.items || []).forEach((x, i) => OIM.arch.push({...x, file: fs[i], amount: '', paid: x.kind === 'invoice' ? 1 : 0, done: false, err: ''}));
+    (j.items || []).forEach((x, i) => OIM.arch.push({...x, file: fs[i], amount: '', paid: x.kind === 'invoice' ? 1 : 0, done: false, err: '', addrBusy: true}));
   } catch (x) { toast(x.message || ''); }
   ofcDraw();
+  for (const x of OIM.arch.filter(y => y.addrBusy && !y.addr)) { await oimReadAddr(x); ofcDraw(); }  // one after the other (the server reads one PDF per person at a time)
 }
 async function oimArchiveGo() {
   const todo = OIM.arch.filter(x => !x.done);
@@ -172,6 +208,9 @@ async function oimArchiveGo() {
     fd.append('file', x.file, x.file_name);
     const amt = String(x.amount ?? '').trim().replace(/\s/g, '');
     for (const [k, v] of Object.entries({run_id: run, kind: x.kind, number: x.number, project_no: x.project_no, project: x.project, client_id: x.client_id || '', client_name: x.client_name, date: x.date, amount: amt, paid: x.paid ? 1 : 0})) fd.append(k, v ?? '');
+    const ad = x.addr?.address;  // 2.40.0 (#1421): the ticked proposals
+    if (ad && x.pNew && x.addr.new_client) fd.append('new_client', JSON.stringify({name: ad.name, contact: ad.contact, street: ad.street, zip: ad.zip, city: ad.city, country: ad.country}));
+    if (x.pContact && x.addr?.add_contact) { fd.append('add_contact', x.addr.add_contact); if (!x.client_id) fd.set('client_id', x.addr.client_id || ''); }
     try {
       const r = await fetch('/api/office/legacy/archive', {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-Requested-With': 'kalmido'}});
       const j = await r.json().catch(() => ({}));
@@ -211,9 +250,11 @@ document.addEventListener('change', e => {
   const t = e.target;
   if (t.dataset?.oimOn && OIM.pv) {
     const list = t.dataset.oimOn === 'c' ? OIM.pv.clients : OIM.pv[t.dataset.oimOn], x = list?.[+t.dataset.i];
-    if (x) { x.action = t.checked ? (x.dup?.kind === 'existing' && x.action === 'merge' ? 'merge' : 'new') : 'skip'; ofcDraw(); }
+    if (x) { if (!t.checked) { x.was = x.action; x.action = 'skip'; } else x.action = x.was && x.was !== 'skip' ? x.was : (x.dup && (x.contact || '').trim() ? 'contact' : 'new'); ofcDraw(); }
   } else if (t.dataset?.oimAct && OIM.pv) {
     const x = OIM.pv.clients[+t.dataset.oimAct]; if (x) { x.action = t.value; ofcDraw(); }
+  } else if (t.dataset?.oimP) {
+    const x = OIM.arch[+t.dataset.i]; if (x) { if (t.dataset.oimP === 'new') x.pNew = t.checked; else x.pContact = t.checked; }
   } else if (t.dataset?.oimA) {
     const x = OIM.arch[+t.dataset.oimA]; if (!x) return;
     const k = t.dataset.k;

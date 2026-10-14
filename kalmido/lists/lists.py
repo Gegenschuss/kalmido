@@ -257,6 +257,7 @@ def list_update(lid):
     from ..collab.reactions import list_tidy_update
     from ..lists.folders import lm_folder_moved, list_own_mark
     b = web_fields(body(), WEB_LIST_EDIT, "PATCH /api/lists/{lid}")
+    b = {k: v for k, v in b.items() if k != "agent_peers"}  # 2.40.0 (#1373): fixed off, still accepted from old clients, ignored
     c = db()
     role = need_list(c, lid, write=False)
     given = set(b)  # 2.29.0 (#1030): what this request sets on its own (kept when the list moves into a folder)
@@ -390,23 +391,34 @@ def list_update(lid):
             if vals["folder"] != (tidy0["folder"] if tidy0 else None):  # really moved (the dialog sends the folder with every save)
                 # 2.39.1 (#1188): the folder's settings only with folder_adopt (the app asked first), else the list keeps its own
                 lm_folder_moved(c, lid, b.get("folder_adopt") is True,
-                                keep=tuple(k for k in ("org_id", "agent_tidy", "agent_members", "agent_peers") if k in given)
+                                keep=tuple(k for k in ("org_id", "agent_tidy", "agent_members") if k in given)
                                 + (("agent_listen",) if "listen_agent_ids" in given else ()))
     else:
-        adm = ("archived",) if role == "admin" else ()  # 2.39.1 (#1188): a list admin archives / restores (deleting needs the archive)
+        # 2.39.1 (#1188): a list admin archives / restores (deleting needs the archive); 2.40.0 (#1431): and renames / recolours it
+        adm = ("archived", "name", "color") if role == "admin" else ()
         if "rate" in b or "ticket_tpl" in b or "day_hours" in b or any(k in b for k in LIST_FIELDS if k not in MEMBER_LIST_FIELDS + adm):
             return err(tr("Only the owner can change this list"), 403)
+        if adm and ("name" in vals or "color" in vals):
+            lr = c.execute("SELECT id, name, owner_id, is_inbox FROM lists WHERE id=?", (lid,)).fetchone()
+            if lr["is_inbox"]:
+                return err(tr("Only the owner can change this list"), 403)
+            if "color" in vals:
+                c.execute("UPDATE lists SET color=? WHERE id=?", (vals["color"], lid))
+            if "name" in vals and vals["name"] != lr["name"]:
+                c.execute("UPDATE lists SET name=? WHERE id=?", (vals["name"], lid))
+                lm_owner_news(c, lr, "lrename", extra={"old": lr["name"], "name": vals["name"]})  # colour / icon: no news
         if adm and "archived" in vals:
             lr = c.execute("SELECT id, name, owner_id, archived, is_inbox FROM lists WHERE id=?", (lid,)).fetchone()
             if not lr["is_inbox"] and int(lr["archived"] or 0) != vals["archived"]:
                 c.execute("UPDATE lists SET archived=?, archived_at=? WHERE id=?", (vals["archived"], iso(now_utc()) if vals["archived"] else None, lid))
                 lm_owner_news(c, lr, "larchive" if vals["archived"] else "lrestore")
+                lr_members_news(c, lr, "larchive" if vals["archived"] else "lrestore")  # 2.40.0 (#1337)
         for k in MEMBER_LIST_FIELDS:
             if k in vals:
                 c.execute(f"UPDATE list_members SET {k}=? WHERE list_id=? AND user_id=?", (vals[k], lid, me()))
     if tidy0:  # 2.29.0 (#1030): a tidy / agent access setting changed on its own differs from its folder from now on
         now = c.execute("SELECT agent_tidy, agent_members, agent_peers FROM lists WHERE id=?", (lid,)).fetchone()
-        for k in ("agent_tidy", "agent_members", "agent_peers"):
+        for k in ("agent_tidy", "agent_members"):
             if k in given and (now[k] or 0) != (tidy0[k] or 0) and vals.get("folder", tidy0["folder"]) == tidy0["folder"]:
                 list_own_mark(c, lid, k)
         if "listen_agent_ids" in given and vals.get("folder", tidy0["folder"]) == tidy0["folder"]:  # 2.30.0 (#1034)
@@ -493,12 +505,22 @@ def list_delete(lid):
     return jsonify(ok=True)
 
 
-def lm_owner_news(c, lr, action, gone=False):
+def lm_owner_news(c, lr, action, gone=False, extra=None):
     """2.39.1 (#1188): a list admin archived / restored / deleted the list: News for its owner (kind orglist, action
-    larchive / lrestore / ldelete; a deleted list only lives on in data.name)."""
+    larchive / lrestore / ldelete; a deleted list only lives on in data.name). 2.40.0 (#1431): lrename (data.old / data.name)."""
     from ..collab.news import news_add
     if lr["owner_id"] and lr["owner_id"] != me():
-        news_add(c, lr["owner_id"], "orglist", list_id=None if gone else lr["id"], data={"action": action, "name": lr["name"]})
+        news_add(c, lr["owner_id"], "orglist", list_id=None if gone else lr["id"], data={"action": action, "name": lr["name"], **(extra or {})})
+
+
+def lr_members_news(c, lr, action):
+    """2.40.0 (#1337): a list admin archived / restored the list: News for its members too (people, never agents; the same
+    people as an organisation admin's action, orglists._ol_people), with data.member so the text does not say "your list"."""
+    from ..collab.news import news_add
+    from ..accounts.orglists import _ol_people
+    for uid in _ol_people(c, lr):
+        if uid != lr["owner_id"]:
+            news_add(c, uid, "orglist", list_id=lr["id"], data={"action": action, "name": lr["name"], "member": 1})
 
 
 def list_purge(c, lid, inbox):

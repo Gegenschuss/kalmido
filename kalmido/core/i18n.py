@@ -94,6 +94,28 @@ def trn(one, other, n, *a, lg=None):
 
 
 # 2.11.0 (#439): number and short date formats of the server texts (pushes, CSV, public pages) per language
+# 2.40.0 (#1409): task titles may carry inline Markdown (bold, italic, strikethrough, code, links); where there is no HTML
+# (push, ntfy, mails, the calendar feed) the marks go, the text stays. The same rules as mdPlain in static/js/mdtitle.js.
+_MDP_ANY = re.compile(r"[*~`\[\\]|https?://|mailto:")
+_MDP = ((re.compile(r"\[([^\[\]]+)\]\((?:https?://|mailto:)[^\s\"'<>()\[\]`\\]+\)"), r"\1"),
+        (re.compile(r"`([^`]+)`"), r"\1"),
+        (re.compile(r"\*\*([^*]+)\*\*"), r"\1"),
+        (re.compile(r"(^|[^*\w])\*([^*\s][^*]*?)\*(?!\w)"), r"\1\2"),
+        (re.compile(r"~~([^~]+)~~"), r"\1"))
+_MDP_ESC = re.compile(r"\\([!-/:-@\[-`{-~])")  # \* = a literal * (kept aside while the rules run)
+
+
+def md_plain(s):
+    """A title (or a short text) without its inline Markdown marks: [label](url) -> label, `x` / **x** / *x* / ~~x~~ -> x."""
+    s = "" if s is None else str(s)
+    if not _MDP_ANY.search(s):
+        return s
+    s = _MDP_ESC.sub(lambda m: chr(0xE000 + ord(m.group(1))), re.sub("[\uE000-\uE07F]", "", s))
+    for rx, to in _MDP:
+        s = rx.sub(to, s)
+    return re.sub("[\uE000-\uE07F]", lambda m: chr(ord(m.group(0)) - 0xE000), s)
+
+
 COMMA_LANGS = ("de", "fr", "es", "it", "nl")  # decimal comma (and ";" as the CSV separator, as their spreadsheets expect)
 
 

@@ -332,6 +332,10 @@ def init_db(guard=True, load=None):
                 c.execute(stmt)
         from ..office.ledger import ofx_migrate
         ofx_migrate(c)  # 2.36.2 (#1142, E): office positions carry their organisation
+        from ..office.contacts_cl import fk_migrate
+        fk_migrate(c)  # 2.40.0 (#1380): the contact field of a client becomes its default contact person
+        from ..office.model import fe_office_rules_migrate
+        fe_office_rules_migrate(c)  # 2.40.0 (#1379): producing / raw data stay on where they are used
         for k, v in GLOBAL_DEFAULTS.items():
             c.execute("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT DO NOTHING", (k, v))
         from ..admin.hosting import quota_backfill
@@ -735,3 +739,24 @@ def body():
     if b is not None:
         return b
     return request.get_json(silent=True) or {}
+
+
+# 2.40.0 (#1432): "Load more" pages (jobs, completed, trash) -- a composite cursor "<timestamp>|<id>" so rows with the
+# same timestamp are neither repeated nor skipped; next page = rows ordered (ts DESC, id DESC) after the cursor
+def ag_cursor(ts, rid):
+    return f"{ts or ''}|{int(rid)}"
+
+
+def ag_cursor_parse(raw):
+    """(timestamp, id) of a cursor of ag_cursor, None when there is none; ValueError when it is broken."""
+    if not raw:
+        return None
+    ts, _, rid = str(raw).rpartition("|")
+    if not _ or not rid.isdigit() or len(ts) > 40:
+        raise ValueError(raw)
+    return ts, int(rid)
+
+
+def ag_limit(raw, dflt, hi):
+    """?limit= for a paged list: dflt without, at most hi (ValueError when not a number)."""
+    return max(1, min(int(raw), hi)) if raw not in (None, "") else dflt

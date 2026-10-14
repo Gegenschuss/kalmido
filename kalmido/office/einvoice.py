@@ -76,9 +76,16 @@ def _date8(s):
 
 
 def _country(v, fallback="DE"):
+    """2.40.0 (#1372): a code from the ISO list (UK -> GB, EL -> GR); an unknown code is stopped before finalising
+    (invoices.inv_missing), a free word is looked up, empty = the fallback."""
+    try:
+        from .countries import fk_country_code
+    except ImportError:  # loaded on its own (tests/office_einvoice_test.py): only the two corrections
+        def fk_country_code(x):
+            return {"UK": "GB", "EL": "GR"}.get(x.upper(), x.upper())
     s = str(v or "").strip()
     if re.fullmatch(r"[A-Za-z]{2}", s):
-        return s.upper()
+        return fk_country_code(s) or fallback  # 2.40.0 (review): an unknown pair of letters is no country
     return COUNTRY_WORDS.get(s.lower(), fallback)
 
 
@@ -96,7 +103,41 @@ def _date_el(parent, tag, iso, prefix="udt"):
         _e(_e(parent, tag), f"{prefix}:DateTimeString", d8, format="102")
 
 
-def _party(parent, tag, name, fields, lang, home, contact=False, email=None, legal_id=None):
+_ZIP_RE = re.compile(r"^(?:([A-Z]{1,2})\s*-\s*)?(\d{4,5})\s+(\S.*)$")
+
+
+def fd_split_address(lines):
+    """2.40.0 (#1368): free address lines -> street / line2 / line3 / zip / city. The LAST line with a postcode pattern
+    ("12345 Town", "1010 Wien", "CH-8000 Zürich") is zip + city, the line before it the street (LineOne), the lines before
+    that LineTwo / LineThree. No postcode line found (e.g. UK): the last line is the city, the one before the street."""
+    lines = [str(x).strip() for x in (lines or []) if str(x).strip()]
+    out = {}
+    if not lines:
+        return out
+    idx = next((i for i in range(len(lines) - 1, -1, -1) if _ZIP_RE.match(lines[i])), None)
+    if idx is None:
+        idx, zip_, city = len(lines) - 1, "", lines[-1]
+    else:
+        mm = _ZIP_RE.match(lines[idx])
+        zip_, city = mm.group(2), mm.group(3).strip()
+        pre = {"D": "DE", "A": "AT", "F": "FR", "B": "BE", "I": "IT", "L": "LU"}.get(mm.group(1) or "", mm.group(1) or "")
+        tail = lines[idx + 1:]  # a country line after "zip city" ("Deutschland", "AT")
+        cc = _country(tail[-1], "") if tail else ""
+        if cc or pre:
+            out["country"] = cc or pre
+    before = lines[:idx]
+    out["zip"], out["city"] = zip_, city
+    if before:
+        out["street"] = before[-1]
+        extra = before[:-1]
+        if extra:
+            out["line2"] = extra[0]
+        if len(extra) > 1:
+            out["line3"] = ", ".join(extra[1:])
+    return out
+
+
+def _party(parent, tag, name, fields, lang, home, contact=False, email=None, legal_id=None, person=None):
     """A trade party (seller / buyer) in the schema order: Name, legal organisation, contact, address, URI, tax ids."""
     f = fields or {}
     p = _e(parent, tag)
@@ -110,9 +151,19 @@ def _party(parent, tag, name, fields, lang, home, contact=False, email=None, leg
             _e(_e(ct, "ram:TelephoneUniversalCommunication"), "ram:CompleteNumber", f["phone"])
         if f.get("email"):
             _e(_e(ct, "ram:EmailURIUniversalCommunication"), "ram:URIID", f["email"])
+    elif person and person.get("name"):  # 2.40.0 (#1380): the buyer's contact person (BG-9, BT-56/57/58) of the document
+        ct = _e(p, "ram:DefinedTradeContact")
+        _e(ct, "ram:PersonName", person["name"])
+        if person.get("phone"):
+            _e(_e(ct, "ram:TelephoneUniversalCommunication"), "ram:CompleteNumber", person["phone"])
+        if person.get("email"):
+            _e(_e(ct, "ram:EmailURIUniversalCommunication"), "ram:URIID", person["email"])
     a = _e(p, "ram:PostalTradeAddress")
     _e(a, "ram:PostcodeCode", f.get("zip") or "")
     _e(a, "ram:LineOne", f.get("street") or "")
+    for k, tg in (("line2", "ram:LineTwo"), ("line3", "ram:LineThree")):  # 2.40.0 (#1368): extra free address lines
+        if f.get(k):
+            _e(a, tg, f[k])
     _e(a, "ram:CityName", f.get("city") or "")
     _e(a, "ram:CountryID", _country(f.get("country"), home))
     if email:
@@ -205,14 +256,14 @@ def ein_build(model, fmt="zugferd"):
     _party(ag, "ram:SellerTradeParty", sf.get("name") or (m.get("company") or {}).get("name"), sf, lang, home, contact=True,
            email=sf.get("email"), legal_id=sf.get("register_no"))
     rfields = {"street": rc.get("street"), "zip": rc.get("zip"), "city": rc.get("city"), "country": rc.get("country"), "vat_id": rc.get("vat_id")}
-    if not rfields["street"] and not rfields["city"]:  # only free address lines: street = line 1, "zip city" = line 2
+    if not rfields["street"] and not rfields["city"]:  # only free address lines (2.40.0 #1368: see fd_split_address)
         lines = [str(x) for x in (rc.get("lines") or []) if str(x).strip() and str(x).strip() != str(rc.get("name") or "").strip()]
-        if lines:
-            rfields["street"] = lines[0]
-            mm = re.match(r"(\S+)\s+(.+)", lines[1]) if len(lines) > 1 else None
-            if mm:
-                rfields["zip"], rfields["city"] = mm.group(1), mm.group(2)
-    _party(ag, "ram:BuyerTradeParty", rc.get("name"), rfields, lang, home, email=rc.get("email_invoice"))
+        sp = fd_split_address(lines)
+        if rfields.get("country"):
+            sp.pop("country", None)
+        rfields.update(sp)
+    _party(ag, "ram:BuyerTradeParty", rc.get("name"), rfields, lang, home, email=rc.get("email_invoice"),
+           person=rc.get("contact") if isinstance(rc.get("contact"), dict) else None)
     if m.get("order_ref"):
         _e(_e(ag, "ram:BuyerOrderReferencedDocument"), "ram:IssuerAssignedID", m["order_ref"])
     _e(tx, "ram:ApplicableHeaderTradeDelivery")  # BG-13: the period of service stands in BillingSpecifiedPeriod below
@@ -261,6 +312,8 @@ def ein_build(model, fmt="zugferd"):
         _e(pt, "ram:Description", str(pay["text"])[:500])
     if m.get("due_date"):
         _date_el(pt, "ram:DueDateDateTime", m.get("due_date"))
+    elif kind == "credit":  # 2.40.0 (#1368): a credit note is not "payable on receipt"; BR-CO-25 still wants terms
+        _e(pt, "ram:Description", "Der Betrag wird erstattet oder verrechnet." if lang == "de" else "The amount will be refunded or offset.")
     elif not pay.get("text"):
         _e(pt, "ram:Description", "Zahlbar sofort ohne Abzug." if lang == "de" else "Payable on receipt.")
     gross = tot.get("gross") if tot.get("gross") not in (None, "") else line_sum + tax_sum

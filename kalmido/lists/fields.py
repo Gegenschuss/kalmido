@@ -241,6 +241,14 @@ def field_update(fid):
     return jsonify(field_dict(c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone()))
 
 
+@app.get("/api/fields/<int:fid>/count")
+def field_count(fid):
+    """2.40.0 (#1192): how many tasks hold a value of the field (for the delete confirmation); owner and list admins."""
+    c = db()
+    need_field(c, fid)
+    return jsonify(tasks=c.execute("SELECT COUNT(DISTINCT task_id) FROM task_field_values WHERE field_id=?", (fid,)).fetchone()[0])
+
+
 @app.delete("/api/fields/<int:fid>")
 def field_delete(fid):
     c = db()

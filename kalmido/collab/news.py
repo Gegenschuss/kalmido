@@ -438,9 +438,30 @@ def news_list():
     s = usettings(c, uid)
     f = request.args.get("filter")
     items, names = news_items(c, uid, s, mentions_only=f == "mentions", to_me=f == "me")
-    return jsonify(items=items, users={str(k): v for k, v in names.items()}, unread=news_unread(c, uid, s),
-                   unread_me=news_unread_me(c, uid, s, items if not f else None),  # 2.28.0 (#987)
+    unread_me = news_unread_me(c, uid, s, items if not f else None)  # 2.28.0 (#987)
+    try:
+        page, nxt = ag_news_page(items, request.args.get("limit"), request.args.get("before"))
+    except ValueError:
+        return err(tr("Invalid data"))
+    return jsonify(items=page, users={str(k): v for k, v in names.items()}, unread=news_unread(c, uid, s),
+                   unread_me=unread_me, next=nxt,
                    sig=news_sig(c, uid), enabled=collab_on(s), avatars=avatar_map(c, uid))
+
+
+def ag_news_page(items, limit, before):
+    """2.40.0 (#1432): ?limit=50 (at most 500) "Load more" pages of the feed (items newest first, the id of an item is its
+    newest row). The pages count the READ items: the first page (no before) = the newest `limit` read items plus EVERY
+    unread one (the tab counters, "Unread only"); ?before=<next> = the next older read items. So ?limit=<all loaded>
+    brings back exactly what was shown. next = null at the end. Without ?limit: the whole feed as before."""
+    if limit in (None, ""):
+        return items, None
+    n, b = max(1, min(int(limit), 500)), (int(before) if before not in (None, "") else None)
+    reads = [x for x in items if x["read"] and (b is None or x["id"] < b)]
+    page, nxt = reads[:n], (reads[n - 1]["id"] if len(reads) > n else None)
+    if b is None:
+        keep = {x["id"] for x in page}
+        page = [x for x in items if not x["read"] or x["id"] in keep]
+    return page, nxt
 
 
 @app.post("/api/news/dismiss")

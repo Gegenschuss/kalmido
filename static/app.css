@@ -187,6 +187,16 @@ svg.i.up{transform:rotate(180deg)}
 .trow.done::before{opacity:.35}
 .trow:hover{background:var(--bg2)}
 .trow.sel{background:color-mix(in srgb,var(--accent) 7%,var(--bg2))}
+/* 2.40.0 (#1416): "Priority as background" (Settings > Appearance): a light tint of the priority colour on open tasks in
+   lists, Today and board cards; selected / marked rows keep their accent, completed ones stay plain; the edge bar stays.
+   Dark: 9 % / 16 %, light: 6 % / 13 % (muted text keeps at least 4.5:1 on the strong tint) */
+:root{--prbg1:9%;--prbg2:16%}  /* light values after the main light theme block (#1416) */
+body.prbg-soft{--prbgk:var(--prbg1)}body.prbg-strong{--prbgk:var(--prbg2)}
+body.prbg-soft .trow.pr5,body.prbg-strong .trow.pr5{--prbgc:var(--p5)}
+body.prbg-soft .trow.pr3,body.prbg-strong .trow.pr3{--prbgc:var(--p3)}
+body.prbg-soft .trow.pr1,body.prbg-strong .trow.pr1{--prbgc:var(--p1)}
+body:is(.prbg-soft,.prbg-strong) .trow:is(.pr5,.pr3,.pr1):not(.sel):not(.msel):not(.done){background:color-mix(in srgb,var(--prbgc) var(--prbgk),var(--bg))}
+body:is(.prbg-soft,.prbg-strong) .trow:is(.pr5,.pr3,.pr1):not(.sel):not(.msel):not(.done):hover{background:color-mix(in srgb,var(--prbgc) calc(var(--prbgk) + 5%),var(--bg))}
 .trow.kfocus{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 55%,transparent)}
 .trow.done .ttl{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--faint)}
 .trow.sub{margin-left:1.75rem}
@@ -515,6 +525,11 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 .iconbtn.on{color:var(--accent)}
 
 .md{line-height:1.6;cursor:text;min-height:1.5rem;word-break:break-word}
+/* 2.40.0 (#1409): inline Markdown in task titles (rows, calendar, timeline, roadmap, dashboard, briefing) */
+:is(.ttl,.tln,.dtt,.kbttl,.dpn,.ev,.wev,.tl-bar,.rm-tname) code{font-family:var(--mono);font-size:.9em;background:var(--bg3);padding:0 .25em;border-radius:.25rem}
+.trow .ttl a[href]{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+/* 2.40.0 (#1203): the pen that opens the description editor (touch screens / "only with the pen") */
+.mdpen{float:right;margin:-.25rem -.25rem .25rem .5rem;color:var(--muted)}
 .md p{margin:0 0 .5rem}
 .md h4,.md h5,.md h6{margin:.625rem 0 .375rem;font-size:.9375rem}
 .md h4{font-size:1.0625rem}
@@ -763,6 +778,8 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 /* ---------- light theme (per device: auto follows the OS) ---------- */
 :root[data-theme="light"]{--bg:#ffffff;--bg2:#f8f8f9;--bg3:#efeff1;--bg4:#dcdce0;--line:#eeeef0;--line2:#e3e3e6;--text:#131418;--text2:#464951;--muted:#60636c;--faint:#8d9096;--accent:var(--acc-l);--accent-ink:var(--acc-ink-l);--p5:#b3372f;--p3:#97600b;--p1:#3565a8;--ok:#2f9e44;--danger:#b3372f;--st-ready:#2f9e44;--st-work:#1c7ed6;--st-wait:#d99a00;--st-wait-t:#8a6200;--st-off:#8d9096;--st-err:#c92a2a;--wait-soft:#fff8e1;--shadow:0 .75rem 2.25rem rgba(19,20,24,.12),0 0 0 1px var(--line2);--cs:light;color-scheme:light}
 @media (prefers-color-scheme: light){ :root[data-theme="auto"]{--bg:#ffffff;--bg2:#f8f8f9;--bg3:#efeff1;--bg4:#dcdce0;--line:#eeeef0;--line2:#e3e3e6;--text:#131418;--text2:#464951;--muted:#60636c;--faint:#8d9096;--accent:var(--acc-l);--accent-ink:var(--acc-ink-l);--p5:#b3372f;--p3:#97600b;--p1:#3565a8;--ok:#2f9e44;--danger:#b3372f;--st-ready:#2f9e44;--st-work:#1c7ed6;--st-wait:#d99a00;--st-wait-t:#8a6200;--st-off:#8d9096;--st-err:#c92a2a;--wait-soft:#fff8e1;--shadow:0 .75rem 2.25rem rgba(19,20,24,.12),0 0 0 1px var(--line2);--cs:light;color-scheme:light} }
+:root[data-theme="light"]{--prbg1:6%;--prbg2:13%}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"]{--prbg1:6%;--prbg2:13%} }
 :root[data-theme="light"] .cal .cell.out{background:rgba(0,0,0,.025)}
 @media (prefers-color-scheme: light){ :root[data-theme="auto"] .cal .cell.out{background:rgba(0,0,0,.025)} }
 :root[data-theme="light"] #side.open,:root[data-theme="light"] .ghost-drag{box-shadow:0 .75rem 1.875rem rgba(0,0,0,.16)}
@@ -977,6 +994,8 @@ button.whob:hover .who.none{opacity:1;border-color:var(--accent);color:var(--acc
 .nitem:hover .ndel,.nitem .ndel:focus-visible{opacity:1}
 .nitem{touch-action:pan-y}
 .empty.nempty{display:flex;flex-direction:column;align-items:center;gap:.375rem}.empty.nempty b{color:var(--text);font-weight:600}
+/* 2.40.0 (#1415): an empty state with a button (Clients, Habits, Home & life): symbol, text of a readable width, the button below */
+.empty.eact > span{max-width:28rem}.empty.eact > .btn{margin-top:.625rem}
 .nswipe{font-size:var(--fs-s);margin:.75rem .625rem;max-width:47.5rem}
 .nkinds{display:flex;flex-direction:column;gap:.375rem;margin:.25rem 0 .75rem}
 
@@ -1199,7 +1218,7 @@ svg.chart{display:block;max-width:100%;overflow:visible}
 .fcols .t-number,.fcolhead .t-number{text-align:right;font-variant-numeric:tabular-nums}
 .fcolhead{display:flex;gap:.5rem;padding:0 .5rem .25rem;border-bottom:1px solid var(--line);margin-bottom:2px}
 .fcolhead .fcell{font-size:var(--fs-s);font-weight:500}
-@media (max-width:899px){ .fcols,.fcolhead{display:none} }
+@media (max-width:599px){ .fcols,.fcolhead{display:none} }  /* 2.40.0 (#1191): from 600 px on */
 /* list header: progress + status */
 .lhead{display:flex;align-items:center;flex-wrap:wrap;gap:.375rem .875rem;margin:.25rem 0 .625rem;font-size:.8125rem;color:var(--muted)}
 .lprog{display:flex;align-items:center;gap:.625rem;min-width:11.25rem}
@@ -3841,6 +3860,40 @@ pre.mdpre code{font:inherit;background:none;padding:0;border:0}
   .trow.haslc .lcols .lc-who{max-width:none;flex:none}
   .trow.haslc .tgut{min-width:2.25rem}
 }
+/* 2.40.0 (#1191): tablets and an unfolded Fold (600-899 px): the list rows get real columns like on a desktop, narrower and
+   with the column titles; what does not fit falls away on the right instead of moving into a second line (the title keeps
+   at least 10rem). Phones (< 600 px) and the rest of the app (sidebar, dock, dialogs) stay as they are. */
+@media (min-width:600px) and (max-width:899px){
+  .lwrap{container:lrows / inline-size}
+  .trow.hascols{align-items:center}
+  .trow.hascols .chk{margin-top:0}
+  .trow.hascols .tmain{flex-direction:row;align-items:baseline;gap:.5rem;min-width:10rem}
+  .trow.hascols .ttl{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .trow.hascols .meta{flex-wrap:nowrap;overflow:hidden;margin-top:0;min-width:0;flex:1 1 0}
+  .trow.hascols .meta .m-col,.trow.hascols .meta .mlc,.trow.hascols .wcell{display:none}
+  .tcols{display:flex;align-items:center;gap:.5rem;flex:none;font:var(--fs-xs)/1.2 var(--mono);color:var(--text2);font-variant-numeric:tabular-nums;cursor:pointer}
+  .tcols>span{display:inline-flex;align-items:center;justify-content:flex-end;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tcols .c-time{width:3rem}
+  .tcols .c-who{width:1.5rem;overflow:visible}
+  .tcols .c-list{width:6rem;font-family:var(--sans);justify-content:flex-start}
+  .tcols .c-list span{overflow:hidden;text-overflow:ellipsis}
+  .tcols .c-date{width:6.5rem;font-family:var(--sans);gap:.25rem}
+  .tcols .c-date .cdt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tcols .over{color:var(--p5)}
+  .tcols .today{color:var(--accent)}
+  .lchead{display:flex;gap:.5rem;padding-left:.75rem;padding-right:.25rem}
+  .trow.haslc .tmain{flex:1 1 0;min-width:10rem}
+  .trow.haslc .lcols{flex:none;max-width:none;gap:.5rem;font-size:var(--fs-xs);overflow:visible}
+  .trow.haslc .lcols .lc,.lchead .lc{flex:none;max-width:none}
+  .lc.o2{display:inline-flex}
+  /* the same widths for the cells and the column titles (.lcols .lc{width:auto} of the phone rules above weighs more than .lc-due) */
+  :is(.lcols,.lchead) .lc-due{width:6rem}:is(.lcols,.lchead) .lc-tags{width:6rem}:is(.lcols,.lchead) .lc-f{width:5.5rem}:is(.lcols,.lchead) .lc-prio{width:2.75rem}:is(.lcols,.lchead) .lc-deps{width:4.5rem}:is(.lcols,.lchead) .lc-created{width:4.5rem}
+  :is(.lcols,.lchead) .lc-who{width:2.75rem}:is(.lcols,.lchead) .lc-time{width:4rem}:is(.lcols,.lchead) .lc-progress{width:3.75rem}
+  .lcols .lc-prio .lbl,.lcols .lc-deps .lbl{display:none}
+  .lc.o7{display:none}
+  @container lrows (max-width:52rem){ .lc.o5{display:none} }
+  @container lrows (max-width:44rem){ .lc.o3{display:none} }
+}
 /* 2.14.0 (#484): quick add: paper clip + "Add and open" next to Send */
 .qadd .qbtn{flex:none;padding:.375rem;border-radius:.4375rem;color:var(--muted)}
 .qadd .qbtn:hover{color:var(--accent);background:var(--bg4)}
@@ -5684,8 +5737,18 @@ body.lydragging,body.lydragging *{cursor:grabbing!important;-webkit-user-select:
 .ofcrates summary{cursor:pointer;color:var(--text2);margin:.5rem 0}
 .ofcrates .ofcrl{max-height:16rem;overflow:auto;padding:.25rem 0}
 .ofcset{max-width:48rem}
+/* 2.40.0 (#1371): the bar of a form with unsaved input (formguard.js), stays in view while scrolling */
+.fgbar{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.5rem .75rem;margin:0 0 .75rem;border:1px solid var(--accent);border-radius:var(--radius);background:var(--bg2)}
+.fgbar .spacer{flex:1}
+/* 2.40.0 (#1379): the fields of producing / raw data only while their switch is on (also while unsaved) */
+.ofcset:has(#os-prod-on:not(:checked)) .ofcrule[data-rule="prod"],.ofcset:has(#os-raw-on:not(:checked)) .ofcrule[data-rule="raw"]{display:none}
 .ofcset h3{margin:1.25rem 0 .5rem;font-size:var(--fs-m)}
 .ofcset .row{display:flex;gap:.625rem;align-items:center;margin-bottom:.625rem;flex-wrap:wrap}
+/* 2.40.0 (#1382): building blocks of a number scheme (buttons, insert at the caret) and its preview */
+.ofcbb{display:flex;flex-wrap:wrap;gap:.375rem;margin:-.25rem 0 .75rem 10.625rem}
+.ofcbb .btn{min-height:2.25rem}
+.ofcpv.err{color:var(--danger,#c0392b)}
+@media (max-width:599px){ .ofcbb{margin-left:0} }
 .ofcset .row label{min-width:10rem;color:var(--muted);font-size:var(--fs-m)}
 .ofcset .row input:not([type=checkbox]):not([type=file]),.ofcset .row select,.ofcset .row textarea{flex:1;min-width:0}
 .ofcset .row .lacts input.numin{flex:0 0 6rem}
@@ -6084,3 +6147,86 @@ html.mini #app.detail-open{grid-template-columns:minmax(0,1fr) var(--detW,25.5re
 .oimsum{margin:0 0 .5rem}
 .ofdkinds{flex-wrap:wrap}
 @media (max-width:560px){ .oimgrid{grid-template-columns:repeat(2,minmax(0,1fr))} }
+/* 2.40.0 (#1380): the contact persons of a client (dialog cards, the list on the client page) */
+.clk{display:flex;flex-direction:column;gap:.5rem;flex:1;min-width:0}
+.clkc{padding:.5rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2)}
+.clkc .oimgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.clkc .lacts{display:flex;align-items:center;gap:.5rem;margin-top:.25rem}
+.clkc .chkl{min-height:2.75rem}
+.clk > .btn{align-self:flex-start}
+.clklist{list-style:none;margin:.25rem 0 .75rem;padding:0;display:flex;flex-direction:column;gap:.25rem}
+/* 2.40.0 (#1372): the country choice (search field + list; names from the browser) */
+.cty{position:relative;display:flex;flex-direction:column;gap:.125rem;flex:1;min-width:0}
+.cty .ctyq{width:100%;min-height:2.75rem}
+.cty.bad .ctyq{border-color:var(--danger,#c0392b)}
+.ctybad{color:var(--danger,#c0392b);font-size:var(--fs-s)}
+.ctyl{position:absolute;top:100%;left:0;right:0;z-index:50;margin:.125rem 0 0;padding:.25rem 0;list-style:none;max-height:16rem;overflow:auto;
+  background:var(--bg);border:1px solid var(--line2);border-radius:var(--radius);box-shadow:0 .5rem 1.5rem rgba(0,0,0,.18)}
+.ctyl li{display:flex;align-items:center;justify-content:space-between;gap:.5rem;min-height:2.75rem;padding:0 .75rem;cursor:pointer}
+.ctyl li.act,.ctyl li:hover{background:var(--bg2)}
+.ctyl li.on{font-weight:600}
+.ctyl li.sep{border-bottom:1px solid var(--line2)}
+/* 2.40.0 (#1421): the address read from an archived PDF and its proposals */
+.oimaddr{margin:.375rem 0 0;padding-top:.375rem;border-top:1px dashed var(--line2);font-size:var(--fs-s)}
+.oimaddr p{margin:.125rem 0}
+.oimaddr .chkl{min-height:2.75rem}
+/* 2.40.0 (#1345): the organisation as a small second line under the app name, so the icons of the row never cut it short;
+   the agent chat header: the permission badge moves into the second line (with state and model), the name keeps the first */
+.sbrand .sbhome > .sbtxt{flex:0 1 auto;min-width:0;display:flex;flex-direction:column;align-items:flex-start;line-height:1.2}
+.sbrand .sbhome > .sbtxt > span{white-space:nowrap}
+.sbrand .sbtxt .sborg{margin:0;max-width:100%;line-height:1.2}
+@media not all and (pointer:coarse) and (max-width:37.5rem){
+  .chath .chn{flex-direction:row;flex-wrap:wrap;align-items:center;column-gap:0;row-gap:.0625rem}
+  .chath .chnm{display:contents}
+  .chath .chnm b{flex:0 1 auto;min-width:3rem;max-width:none}
+  .chath .chn::before{content:"";order:2;flex-basis:100%;height:0}
+  .chath .chnm .chmode,.chath .chnm .chmode[data-short]{order:3;margin:0 .375rem 0 0}
+  .chath .chnm .chmode::before,.chath .chnm .chmode[data-short]::before,.chath .chnm button.chmode[data-short]::before{content:none;margin:0}
+  .chath .chl2{order:4;flex:1 1 0;min-width:0}
+  .chath .chn:has(.chmode) .chl2::before{content:"\b7";color:var(--muted)}
+}
+@media not all and (pointer:coarse) and (max-width:37.5rem){ @media (max-width:37.5rem){
+  .chath .chnm .chmode[data-short]::before{content:attr(data-short)}
+  .chath .chnm button.chmode[data-short]::before{content:attr(data-short) "\a0\25BE"}
+} }
+/* 2.40.0 (#1361): favourites - the star in the list header (filled when set), "More lists (N)" and the note of a filtered view */
+#top .hfav{flex:none;color:var(--faint)}
+#top .hfav.on{color:var(--accent)}
+#top .hfav.on svg path{fill:currentColor}
+@media (max-width:599px){ #top .hfav{display:none} }  /* phones: the star is in "…" and the long press (the header stays for the title) */
+#side .sfavmore{color:var(--muted)}
+#side .sfavmore .fcar{transition:transform .15s}
+#side .sfavmore.closed .fcar{transform:rotate(-90deg)}
+.favnote{display:flex;align-items:center;gap:.375rem;margin:0 0 .5rem;font-size:var(--fs-s)}
+
+/* ---- 2.40.0 (#1193, agent L): filled select chips + option palette / handle in the field dialog (own block) ---- */
+.fchip.sel.fill{color:var(--fct,#111);background:var(--fc)}
+.cfsel.fill{color:var(--fct,#111);background-color:var(--fc);border-color:var(--fc);font-weight:500}
+.cfsel.fill option{color:var(--text);background:var(--bg2)}
+.optrow .colh{width:1.75rem;height:2.25rem}
+.optrow.drag{background:var(--bg3);box-shadow:inset 0 0 0 .0625rem var(--accent);border-radius:var(--r-s)}
+.optrow .swc{cursor:pointer;width:1.75rem;height:1.75rem}
+.optlist .lrpal{margin:0 0 .25rem 2.25rem;padding:.375rem;border-radius:var(--r-s);background:var(--bg3)}
+.optlist .lrpal button{width:2rem;height:2rem}
+.lrtpl{gap:.5rem;flex-wrap:wrap}
+/* ---- end #1193 ---- */
+/* ---- 2.40.0 D (#1366): PDF in the browser + own download button ---- */
+.oimarch li{display:flex;align-items:center;gap:.25rem}
+.oimarch li>.ofcrow{flex:1;min-width:0}
+.oimarch .oimdl{min-width:2.75rem;min-height:2.75rem;display:inline-flex;align-items:center;justify-content:center}
+@media (max-width:599px){ .ofdhead .ofddl .ofdpdft{display:none} }
+/* ---- 2.40.0 D (#1368 #1381 #1366): office documents ---- */
+.ofddlg .row{align-items:stretch}  /* labels left like in the other dialogs (the column row centred them) */
+.ofddlg .row>label{min-width:0;text-align:start}
+.ofdwarn{margin:0 0 .625rem;padding:.5rem .75rem;border-radius:var(--r-s, .375rem);background:var(--bg3);color:var(--text);font-size:var(--fs-s)}
+.ofdlnote{display:flex;align-items:flex-start;gap:.5rem;margin:0 0 .75rem;padding:.5rem .75rem;border-radius:var(--r, .5rem);background:var(--bg3);font-size:var(--fs-s)}
+.ofdlnote>span{flex:1;min-width:0}
+.ofdfee{color:var(--muted)}
+.ofdgrp{padding:.75rem .25rem .25rem;font-size:var(--fs-s)}
+.ofdfeeinfo{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:.5rem 0;font-size:var(--fs-s)}
+/* ---- end 2.40.0 D ---- */
+/* 2.40.0 (#1344): My tasks in the own order - the grey subtitle "List › Section" under a task (a tap opens the list) */
+.trow .mosub{display:inline-flex;align-items:center;gap:.25rem;max-width:100%;padding:0;border:0;background:none;font:inherit;font-size:var(--fs-xs);color:var(--muted);cursor:pointer;min-width:0}
+.trow .mosub > span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trow .mosub:hover{color:var(--text);text-decoration:underline}
+@media (pointer:coarse){ .trow .mosub{min-height:1.75rem} }

@@ -57,7 +57,7 @@ function viewClients() {
   return id ? clientDetailHtml(d) : clientsGridHtml(d.clients);
 }
 function clientsGridHtml(cs) {
-  if (!cs.length) return `<div class="dash clients"><div class="empty">${ic('brief')}<span>${tr('Clients sit above your lists: hours, budget and the timesheet per client. Only people of your organisation see them.')}</span><button class="btn pri" data-act="client-new">${ic('plus', 's')} ${tr('New client')}</button></div></div>`;
+  if (!cs.length) return `<div class="dash clients"><div class="empty nempty eact">${ic('brief')}<span>${tr('Clients sit above your lists: hours, budget and the timesheet per client. Only people of your organisation see them.')}</span><button class="btn pri" data-act="client-new">${ic('plus', 's')} ${tr('New client')}</button></div></div>`;
   return `<div class="dash clients"><div class="clhead"><span class="spacer"></span><button class="btn sm" data-act="client-new">${ic('plus', 's')} ${tr('New client')}</button></div><div class="dgrid">${cs.map(c => `<section class="dcard clcard"><h2>${clientIco(c)}<a href="#client/${c.id}">${esc(c.name)}</a><span class="spacer"></span><span class="dcn">${c.lists.length || ''}</span></h2>
     ${c.contact || c.email ? `<p class="muted clsub">${esc([c.contact, c.email].filter(Boolean).join(' · '))}</p>` : ''}
     <div class="clnums"><span><b>${esc(fmtHours(c.stats.month_seconds))}</b><small>${esc(monthLabel(c.stats.month))}</small></span><span><b>${esc(fmtHours(c.stats.seconds))}</b><small>${tr('in total')}</small></span>${c.stats.amount ? `<span><b>${esc(fmtMoney(c.stats.amount))}</b><small>${tr('amount')}</small></span>` : ''}</div>
@@ -72,6 +72,7 @@ function clientDetailHtml(c) {
     <div class="clhead">${clientIco(c)}<h2>${esc(c.name)}</h2>${c.org_name ? `<span class="muted">${esc(c.org_name)}</span>` : ''}<span class="spacer"></span>
       <button class="btn sm" data-act="client-edit" data-id="${c.id}">${ic('edit', 's')} ${tr('Edit')}</button></div>
     ${addr.length || c.address ? `<p class="clsub">${addr.join(' · ')}${c.address ? `<br><span class="muted cladr">${esc(c.address)}</span>` : ''}</p>` : ''}
+    ${(c.contacts || []).length > 1 ? `<ul class="clklist" role="list" aria-label="${esc(tr('Contact persons'))}">${c.contacts.map(k => `<li><b>${esc(k.name)}</b>${k.role ? ` <span class="muted">${esc(k.role)}</span>` : ''}${k.is_default ? ` <span class="rotag">${tr('Default')}</span>` : ''}${k.email ? ` · <a href="mailto:${esc(k.email)}">${esc(k.email)}</a>` : ''}${k.phone ? ` · <a href="tel:${esc(k.phone)}">${esc(k.phone)}</a>` : ''}</li>`).join('')}</ul>` : ''}
     <div class="clmon"><button class="iconbtn" data-act="client-month" data-d="-1" aria-label="${esc(tr('Previous month'))}" title="${esc(tr('Previous month'))}">${ic('left', 's')}</button><b>${esc(monthLabel(mon))}</b><button class="iconbtn" data-act="client-month" data-d="1" aria-label="${esc(tr('Next month'))}" title="${esc(tr('Next month'))}">${ic('right', 's')}</button></div>
     <div class="sttiles"><div><b>${esc(hmm(st.month_seconds))}</b><span>${esc(monthLabel(mon))}</span><small>${st.month_amount ? esc(fmtMoney(st.month_amount)) : ''}</small></div>
       <div><b>${esc(hmm(st.seconds))}</b><span>${tr('in total')}</span><small>${st.amount ? esc(fmtMoney(st.amount)) : ''}</small></div>
@@ -102,7 +103,7 @@ function clientModal(c) {
   const md = modal(`<h3>${c ? tr('Edit client') : tr('New client')}</h3>
     <div class="row"><label for="cl-name">${tr('Name')}</label><input id="cl-name" maxlength="80" value="${esc(c?.name || '')}" autocomplete="organization"></div>
     <div class="row"><label for="cl-icon">${tr('Symbol')}</label><input id="cl-icon" maxlength="8" class="numin" value="${esc(c?.icon || '')}" placeholder="🏢"></div>
-    <div class="row"><label for="cl-contact">${tr('Contact person')}</label><input id="cl-contact" maxlength="120" value="${esc(c?.contact || '')}" autocomplete="name"></div>
+    <div class="row clkrow"><label>${tr('Contact persons')}</label><div class="clk" id="cl-contacts"></div></div>
     <div class="row"><label for="cl-email">${tr('E-mail')}</label><input id="cl-email" type="email" maxlength="200" value="${esc(c?.email || '')}" autocomplete="email"></div>
     <div class="row"><label for="cl-phone">${tr('Phone')}</label><input id="cl-phone" type="tel" maxlength="60" value="${esc(c?.phone || '')}" autocomplete="tel"></div>
     <div class="row"><label for="cl-addr">${tr('Address')}</label><textarea id="cl-addr" rows="2" maxlength="500">${esc(c?.address || '')}</textarea></div>
@@ -115,20 +116,22 @@ function clientModal(c) {
     <div class="aerr" role="alert"></div>
     <div class="foot">${c?.can_delete ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${c ? tr('Save') : tr('Add')}</button></div>`);
   md.classList.add('cldlg');
+  clkInit(md, c);
+  const close = fgModal(md);  // 2.40.0 (#1371): the client card asks before unsaved input is lost
   const num = v => v.trim() === '' ? null : v.trim().replace(',', '.');
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-m]'); if (!b) return;
-    if (b.dataset.m === 'close') { md.remove(); return; }
+    if (b.dataset.m === 'close') { close(); return; }
     try {
       if (b.dataset.m === 'del') {
         if (!await askConfirm(tr('Delete the client “{0}”?', c.name), tr('Its lists stay; they only lose the client.'), {ok: tr('Delete'), danger: true})) return;
         await api('DELETE', `/api/clients/${c.id}`); md.remove(); await load(); if (S.route.client === c.id) go('clients'); else render(); clReload(); return;
       }
-      const body = {name: $('#cl-name', md).value, icon: $('#cl-icon', md).value, contact: $('#cl-contact', md).value, email: $('#cl-email', md).value,
+      const body = {name: $('#cl-name', md).value, icon: $('#cl-icon', md).value, contacts: clkValue(md), email: $('#cl-email', md).value,
         phone: $('#cl-phone', md).value, address: $('#cl-addr', md).value, note: $('#cl-note', md).value};
       if ($('#cl-rate', md)) Object.assign(body, {rate: num($('#cl-rate', md).value), budget_h: num($('#cl-bh', md).value), budget_amount: num($('#cl-ba', md).value)});
       if ($('#cl-arch', md)) body.archived = $('#cl-arch', md).checked;
-      for (const el of md.querySelectorAll('[data-clb]')) body[el.dataset.clb] = el.dataset.clb === 'payment_terms_days' ? (el.value.trim() === '' ? null : +el.value.trim()) : el.value;
+      for (const el of md.querySelectorAll('[data-clb]')) if (!(el.dataset.clb === 'country' && !ctyValid(el.value) && el.value === (c?.billing?.country || ''))) body[el.dataset.clb] = el.dataset.clb === 'payment_terms_days' ? (el.value.trim() === '' ? null : +el.value.trim()) : el.value;
       const r = await rawFetch(c ? 'PATCH' : 'POST', c ? `/api/clients/${c.id}` : '/api/clients', body);
       md.remove(); await load(); render(); clReload();
       toast(c ? tr('Saved') : tr('Added: {0}', r.name));
@@ -136,6 +139,44 @@ function clientModal(c) {
     } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
   });
   setTimeout(() => { if (!isTouch()) $('#cl-name', md)?.focus(); }, 50);
+}
+
+// 2.40.0 (#1380): the contact persons of a client in its dialog -- name, function / department, e-mail, phone; one is the
+// default (it fills "contact" and the attention line of new documents). Saved with the client as the whole list.
+function clkInit(md, c) {
+  const ks = (c?.contacts || []).map(k => ({...k}));
+  if (!ks.length && c?.contact) ks.push({name: c.contact, role: '', email: '', phone: '', is_default: true});
+  md._clk = ks;
+  clkDraw(md);
+}
+function clkRead(md) {
+  for (const el of md.querySelectorAll('[data-clk]')) { const k = md._clk[+el.dataset.i]; if (k) k[el.dataset.clk] = el.type === 'radio' ? el.checked : el.value; }
+}
+function clkDraw(md) {
+  const box = $('#cl-contacts', md); if (!box) return;
+  const ks = md._clk;
+  if (ks.length && !ks.some(k => k.is_default)) ks[0].is_default = true;
+  const f = (i, k, label, v, mx, attrs = '') => `<label class="oimfl"><span>${esc(label)}</span><input data-clk="${k}" data-i="${i}" maxlength="${mx}" value="${esc(v || '')}" ${attrs}></label>`;
+  box.innerHTML = ks.map((k, i) => `<div class="clkc"><div class="oimgrid">${f(i, 'name', tr('Name'), k.name, 120, 'autocomplete="off"')}${f(i, 'role', tr('Function or department'), k.role, 120)}${f(i, 'email', tr('E-mail'), k.email, 200, 'type="email" autocomplete="off"')}${f(i, 'phone', tr('Phone'), k.phone, 60, 'type="tel" autocomplete="off"')}</div>
+    <div class="lacts"><label class="chkl"><input type="radio" name="cl-kdef" data-clk="is_default" data-i="${i}" ${k.is_default ? 'checked' : ''}> ${tr('Default')}</label><span class="spacer"></span><button type="button" class="btn sm ghost" data-clk-rm="${i}" aria-label="${esc(tr('Remove {0}', k.name || tr('contact person')))}">${ic('trash', 's')} ${tr('Remove')}</button></div></div>`).join('')
+    + `<button type="button" class="btn sm" data-clk-add>${ic('plus', 's')} ${tr('Add contact person')}</button>`;
+  if (!box._clkOn) {
+    box._clkOn = true;
+    box.addEventListener('click', e => {
+      const add = e.target.closest('[data-clk-add]'), rm = e.target.closest('[data-clk-rm]');
+      if (!add && !rm) return;
+      clkRead(md);
+      if (add) md._clk.push({name: '', role: '', email: '', phone: '', is_default: !md._clk.length});
+      else md._clk.splice(+rm.dataset.clkRm, 1);
+      clkDraw(md);
+      if (add) $(`[data-clk="name"][data-i="${md._clk.length - 1}"]`, md)?.focus();
+    });
+    box.addEventListener('change', e => { if (e.target.dataset?.clk === 'is_default') { clkRead(md); } });
+  }
+}
+function clkValue(md) {
+  clkRead(md);
+  return md._clk.filter(k => (k.name || '').trim()).map(k => ({...(k.id ? {id: k.id} : {}), name: k.name.trim(), role: (k.role || '').trim(), email: (k.email || '').trim(), phone: (k.phone || '').trim(), is_default: !!k.is_default}));
 }
 
 // ---- the list dialog: the client of the list, its forms
@@ -344,10 +385,10 @@ document.addEventListener('change', e => { if (e.target.id === 'wl-org') { WLV.o
 
 // 2.36.2 (#1021, E): billing details of a client for office & finance (structured address, VAT ID, customer number, buyer
 // reference, invoice e-mail, payment terms); folded away, the free address above stays
-const OFX_CL_FIELDS = [['street', N_('Street'), 200], ['zip', N_('Postcode'), 20], ['city', N_('City'), 120], ['country', N_('Country (ISO code)'), 2],
+const OFX_CL_FIELDS = [['street', N_('Street'), 200], ['zip', N_('Postcode'), 20], ['city', N_('City'), 120], ['country', N_('Country'), 2],
   ['vat_id', N_('VAT ID'), 20], ['customer_no', N_('Customer number'), 40], ['buyer_reference', N_('Buyer reference (e.g. routing ID)'), 60],
   ['email_invoice', N_('E-mail for invoices'), 200], ['payment_terms_days', N_('Payment terms (days)'), 3]];
 function ofxClientBillingHtml(b) {
   const filled = OFX_CL_FIELDS.some(([k]) => b[k] != null && b[k] !== '');
-  return `<details class="clbill" ${filled ? 'open' : ''}><summary>${tr('Billing details')}</summary>${OFX_CL_FIELDS.map(([k, n, mx]) => `<div class="row"><label for="clb-${k}">${esc(tr(n))}</label><input id="clb-${k}" data-clb="${k}" maxlength="${mx}" value="${esc(b[k] ?? '')}" ${k === 'payment_terms_days' ? 'inputmode="numeric" class="numin"' : k === 'country' ? 'class="numin" autocapitalize="characters"' : k === 'email_invoice' ? 'type="email" autocomplete="off"' : ''}></div>`).join('')}</details>`;
+  return `<details class="clbill" ${filled ? 'open' : ''}><summary>${tr('Billing details')}</summary>${OFX_CL_FIELDS.map(([k, n, mx]) => (k === 'country' ? `<div class="row"><label for="clb-country-q">${esc(tr(n))}</label>${ctyField('clb-country', b.country, {attrs: 'data-clb="country"', label: tr(n)})}</div>` : `<div class="row"><label for="clb-${k}">${esc(tr(n))}</label><input id="clb-${k}" data-clb="${k}" maxlength="${mx}" value="${esc(b[k] ?? '')}" ${k === 'payment_terms_days' ? 'inputmode="numeric" class="numin"' : k === 'country' ? 'class="numin" autocapitalize="characters"' : k === 'email_invoice' ? 'type="email" autocomplete="off"' : ''}></div>`) + (typeof ofcII === 'function' ? ofcII('cl_' + k) : '')).join('')}</details>`;  // 2.40.0 (#1382): (i) of the terms
 }

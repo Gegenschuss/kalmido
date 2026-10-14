@@ -65,9 +65,17 @@ function announce(msg) {
 const TLK_MD = {x: 0, y: 0, t: 0, n: 0}, TLK_MD_WAIT = 280, TLK_MD_LONG = 450;
 document.addEventListener('pointerdown', e => { if (e.target.closest?.('#d-md')) Object.assign(TLK_MD, {x: e.clientX, y: e.clientY, t: Date.now()}); }, true);
 const tlkMdSel = () => !!String(window.getSelection?.() || '').trim();
+// 2.40.0 (#1203): a tap that stops the scrolling of the task (while it scrolls and up to TLK_MD_SCROLL ms after the last scroll
+// event) never opens the editor; "Edit the description only with the pen" (this device, on by default on touch screens): a tap
+// on the text never opens it, the small pen next to the description does
+const TLK_MD_SCROLL = 500;
+TLK_MD.sc = 0;
+document.addEventListener('scroll', e => { if (e.target?.closest?.('#detail')) TLK_MD.sc = Date.now(); }, true);
+const td_mdPenOnly = () => LS.get('mdPenOnly', null) ?? isTouch();
 function tlkMdClick(e) {
   const t = taskById(S.sel), n = ++TLK_MD.n;
   if (!canEdit(t) || e.target.closest('a, button, input, pre, code, table, .mdcode, [data-mcard]')) return;
+  if (e.detail > 0 && (td_mdPenOnly() || Date.now() - TLK_MD.sc < TLK_MD_SCROLL || TLK_MD.t - TLK_MD.sc < TLK_MD_SCROLL)) return;
   if (e.detail > 1 || tlkMdSel()) return;
   if (e.detail === 1 && (Math.hypot(e.clientX - TLK_MD.x, e.clientY - TLK_MD.y) > 4 || Date.now() - TLK_MD.t > TLK_MD_LONG)) return;
   const open = () => { if (n !== TLK_MD.n || tlkMdSel() || S.sel !== t.id) return; if (tlkIs(t)) tlkToast(t); else editContent(); };
@@ -355,6 +363,9 @@ document.addEventListener('click', async e => {
     case 'prop-open': propOpen(+a.dataset.jid); break;  // 2.3.0
     case 'aiu-more': settingsModal('usage'); break;
     case 'ag-setup': LS.set('aiSub', 'setup'); settingsModal('agents'); break;  // 2.22.0 (#739); 2.27.0 (#955): at "Set up"
+    case 'jobs-more': jobsMore(a); break;  // 2.40.0 (#1432)
+    case 'hist-more': histMore(a); break;
+    case 'news-more': newsMore(a); break;
     case 'jobs-f': S.jobs.f = a.dataset.f; LS.set('jobsFilter', a.dataset.f); S.jobs.items = null; renderView(); break;
     case 'c-react': e.stopPropagation(); commentReact(+a.dataset.cid, a.dataset.e); break;
     case 'c-react-who': e.stopPropagation(); commentReactWho(+a.dataset.cid, a.dataset.e); break;
@@ -466,7 +477,6 @@ document.addEventListener('click', async e => {
     case 'list-menu': listMenu(a, id); break;
     case 'top-more': menu(a, topMoreItems()); break;
     case 'fview': if (a.classList.contains('on')) break; if (a.dataset.k === 'matrix') { mxSet({scope: 'folder:' + a.dataset.f}); go('matrix'); } else go('folder/' + encodeURIComponent(a.dataset.f)); break;  // 2.4.2 (#390)
-    case 'prog-hide': setProgHidden(id, true); break;
     case 'view-list': case 'view-kanban': case 'view-timeline': case 'view-overview': {
       const l = routeList();
       // phones: only the current view is shown (room for ← / →), a tap on it offers the others
@@ -502,6 +512,7 @@ document.addEventListener('click', async e => {
     case 'md-subtasks': mdToSubtasks(); break;
     case 'ms-open': openDetail(+a.dataset.id); break;  // 2.18.0 (#430): a task of the milestone
     case 'ms-copy': { const md = S.msr?.j?.release_notes; if (!md) break; try { await navigator.clipboard.writeText(md); toast(tr('Copied')); } catch { toast(tr('Copy failed')); } break; }
+    case 'md-edit': { const t = taskById(S.sel); if (!canEdit(t)) break; if (tlkIs(t)) tlkToast(t); else editContent(); break; }  // 2.40.0 (#1203): the pen
     case 'md-more': { (S.mdMore ||= new Set()); S.mdMore.has(S.sel) ? S.mdMore.delete(S.sel) : S.mdMore.add(S.sel); const m = $('#d-md'), open = S.mdMore.has(S.sel); if (m) m.classList.toggle('clamp', !open); a.textContent = open ? tr('Show less') : tr('Show more'); a.setAttribute('aria-expanded', open); break; }
     case 'd-jump-cm': { const tl = $('#d-tl'); if (tl) { tl.style.scrollMarginTop = ($('#detail .dtop')?.offsetHeight || 0) + 'px'; tl.scrollIntoView({block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth'}); } break; }  // 2.31.0 (#1054): replaces the Details | Comments tabs; 2.31.1: the heading stays below the sticky panel header
     case 'sec-add': e.stopPropagation(); secAddOpen(+a.dataset.sec || 0); break;
@@ -598,7 +609,7 @@ document.addEventListener('click', async e => {
     case 'mx-reset': LS.del('mx'); render(); break;
     case 'mx-fold': { const p = +a.dataset.p, f = new Set(LS.get('mxFold', [])); f.has(p) ? f.delete(p) : f.add(p); LS.set('mxFold', [...f]); renderView(); $(`.quad[data-quad="${p}"] .qfold`)?.scrollIntoView?.({block: 'nearest'}); break; }
     case 'hint-x': hintDone(a.dataset.k); a.closest('[data-hint]')?.remove(); break;
-    case 'trash-empty': if (await askConfirm(tr('Empty the trash permanently?'), trn('{0} task is deleted for good. This cannot be undone.', '{0} tasks are deleted for good. This cannot be undone.', (S.extra || []).filter(t => !t.keep).length), {ok: tr('Empty'), danger: true})) {
+    case 'trash-empty': if (await askConfirm(tr('Empty the trash permanently?'), trn('{0} task is deleted for good. This cannot be undone.', '{0} tasks are deleted for good. This cannot be undone.', S.hist?.k === 'trash' && S.hist.deletable != null ? S.hist.deletable : (S.extra || []).filter(t => !t.keep).length), {ok: tr('Empty'), danger: true})) {
       const j = await api('DELETE', '/api/trash'); await load(); render();
       if (j.kept) toast(trn('{0} item stays: it is in a list of another owner', '{0} items stay: they are in lists of other owners', j.kept), null, 6000);  // 2.0.5 (#310)
     } break;

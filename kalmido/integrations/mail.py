@@ -15,7 +15,7 @@ from flask import g, jsonify, request
 
 from ..core.config import app, APP_NAME, MAX_FILE_MB, PUBLIC_URL
 from ..core.pg import insert_id, table_exists
-from ..core.i18n import lang, tr, trn
+from ..core.i18n import lang, md_plain, tr, trn
 from ..core.db import body, bump, connect, db, err, iso, local_now, now_utc, uset, usettings
 from ..accounts.session import GATE, me
 from ..core.access import Denied, list_role, need_list, vis_sql, WRITE_ROLES
@@ -314,7 +314,7 @@ def digest_mail_content(c, uid, today):
         if table_exists(c, "agent_jobs") else 0
     unread = news_unread(c, uid)
     chat = tchat_unread(c, uid)
-    line = lambda r: f"- {r['title']}" + (f" ({r['due_time']})" if r["due_time"] else "") + f" · {r['lname']}"  # noqa: E731
+    line = lambda r: f"- {md_plain(r['title'])}" + (f" ({r['due_time']})" if r["due_time"] else "") + f" · {r['lname']}"  # noqa: E731
     parts = []
     for head, xs in ((tr("Overdue", lg=lg), over), (tr("Today", lg=lg), tod), (tr("Tomorrow", lg=lg), tmr)):
         if xs:

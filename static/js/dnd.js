@@ -90,6 +90,7 @@ async function dropTask0(id, el, clientY) {
   } else {
     if (kcol) item.section_id = kcol.dataset.kcol ? +kcol.dataset.kcol : null;
     if (kcol && t.parent_id && !row) { try { await patchTask(id, {parent_id: null, section_id: item.section_id}); } catch { return; } toast(tr('Subtask is now standalone')); return; }
+    if (row && moActive() && await moDrop(t, row, dropAfter(row, clientY))) return;  // 2.40.0 (#1344): My tasks = the own order
     if (row && +row.dataset.id !== id) {
       const target = S.tasks.get(+row.dataset.id);
       if (!target) return;

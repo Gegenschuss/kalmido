@@ -35,12 +35,14 @@ ORDER = (
     "tasks.lifecycle",
     "tasks.attachments",
     "tasks.batch",
+    "tasks.mineorder",  # 2.40.0 (#1344)
     "collab.replies",  # 2.33.0 (#1076): before comments / teamchat / agents.chat (they import it)
     "collab.comments",
     "collab.news",
     "personal.habits",
     "personal.timetrack",
     "accounts.settings",
+    "lists.favorites",  # 2.40.0 (#1361)
     "accounts.layouts",  # 2.32.0 (#1063, #983)
     "accounts.onboarding",
     "accounts.users",
@@ -124,6 +126,9 @@ ORDER = (
     "office.pdfweb",  # 2.36.1 (#1021): quotation PDF + company logo routes (D; the writer office.pdf has no routes)
     "office.ledger",  # 2.36.2 (#1021, #1142, E): finalising, structured company data, office log
     "office.invoices",  # 2.38.0 (#1021, F1): invoices, credit notes, reminders, payments, sending, DATEV inbox
+    "office.doclang",  # 2.40.0 (#1381): language switch of drafts swaps the standard texts (no routes; used by office.docs)
+    "office.countries",  # 2.40.0 (#1372): the ISO 3166-1 alpha-2 list (no routes)
+    "office.contacts_cl",  # 2.40.0 (#1380): contact persons of a client (no routes; used by team.clients, office.docs, legacyimport)
     "office.legacyimport",  # 2.39.1 (#1182): legacy import (clients / services / equipment from .xlsx, archive of old PDFs)
     "team.approvals",
     "team.forms",

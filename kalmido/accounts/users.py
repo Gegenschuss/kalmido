@@ -554,9 +554,9 @@ def _list_icon_set(c, lid, value):
 
 @app.put("/api/lists/<int:lid>/icon")
 def list_icon_preset(lid):
-    """{preset: "kalmido" | "coffee" | ... | null} -- the owner picks a preset icon for the list, or none."""
+    """{preset: "kalmido" | "coffee" | ... | null} -- the owner (or a list admin) picks a preset icon for the list, or none."""
     c = db()
-    need_list(c, lid, owner=True)
+    need_list(c, lid, manage=True)  # 2.40.0 (#1431): owner and list admins
     p = body().get("preset")
     if p is not None and p not in LIST_ICON_PRESETS:
         return err(tr("Invalid value: {0}", "preset"))
@@ -567,7 +567,7 @@ def list_icon_preset(lid):
 def list_icon_upload(lid):
     """multipart "file": an own picture for the list (JPEG / PNG / WebP, up to AVATAR_MAX_MB MB), stored as a square PNG."""
     c = db()
-    need_list(c, lid, owner=True)
+    need_list(c, lid, manage=True)  # 2.40.0 (#1431): owner and list admins
     f = request.files.get("file")
     if not f:
         return err(tr("No file"))
@@ -590,7 +590,7 @@ def list_icon_upload(lid):
 @app.delete("/api/lists/<int:lid>/icon")
 def list_icon_delete(lid):
     c = db()
-    need_list(c, lid, owner=True)
+    need_list(c, lid, manage=True)  # 2.40.0 (#1431): owner and list admins
     return _list_icon_set(c, lid, None)
 
 

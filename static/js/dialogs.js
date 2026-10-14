@@ -138,9 +138,14 @@ function modulesOnToast(on) { if (on?.length) toast(tr('Switched on for you: {0}
 async function projectNextSteps(lid) {
   let ags = [];
   if (collab()) { try { ags = (await api('GET', '/api/users')).users.filter(u => u.agent && !u.disabled); } catch { /* offline */ } }
+  // 2.40.0 (#1414): an agent already in the list (e.g. the folder's default agent) is not offered again; one agent per list,
+  // so then the step only says who is connected
+  const l0 = listById(lid), inL = listAgents(l0);
+  const joined = inL.length ? `<div class="nstep nsjoined"><b>${tr('Coding agent')}</b><span class="muted">${ic('bot', 's')} ${esc(l0?.folder ? tr('{0} is already connected through the folder “{1}”.', inL.map(a => a.display_name || a.username).join(', '), fDisp(l0.folder)) : tr('{0} is already in this list.', inL.map(a => a.display_name || a.username).join(', ')))}</span></div>` : '';
+  if (inL.length) ags = [];
   const md = modal(`<h3>${ic('code', 's')} ${tr('Next steps for {0}', esc(lname(listById(lid))))}</h3>
     <div class="nsteps"><div class="nstep"><b>${tr('Connect a repository')}</b><span class="muted">${tr('GitHub, GitLab, Gitea / Forgejo or Bitbucket: pull requests, commits and CI show up at the tickets, “fixes #id” completes them.')}</span><button class="btn sm" data-m="repo">${ic('git', 's')} ${tr('Repository…')}</button></div>
-    ${ags.length ? `<div class="nstep"><b>${tr('Share with a coding agent')}</b><span class="muted">${tr('Optional: the agent gets the tickets of this list as events, works in the repository and asks for approval before merging.')}</span><div class="row"><select id="ns-agent" aria-label="${esc(tr('Agent'))}">${ags.map(a => `<option value="${a.id}">${esc(a.display_name)}</option>`).join('')}</select><button class="btn sm" data-m="share">${ic('bot', 's')} ${tr('Share')}</button></div></div>` : ''}</div>
+    ${joined}${ags.length ? `<div class="nstep"><b>${tr('Share with a coding agent')}</b><span class="muted">${tr('Optional: the agent gets the tickets of this list as events, works in the repository and asks for approval before merging.')}</span><div class="row"><select id="ns-agent" aria-label="${esc(tr('Agent'))}">${ags.map(a => `<option value="${a.id}">${esc(a.display_name)}</option>`).join('')}</select><button class="btn sm" data-m="share">${ic('bot', 's')} ${tr('Share')}</button></div></div>` : ''}</div>
     <div class="foot"><span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);
   md.classList.add('nsmodal');
   md.addEventListener('click', async e => {
@@ -279,14 +284,15 @@ async function listPatch(id, body, label, o = {}) {
   };
   return histAdd({label: label || tr('Settings of {0}', qn(lname(l))), undo: go(before, after), redo: go(after, before), post: o.post});
 }
-// per user and list: the "x" on the progress bar (stored server-side, so it follows to every device)
-const progHidden = id => (S.settings.hide_progress || '').split(',').includes(String(id));
+// per user and project: the progress bar is off by default (2.40.0, #1190) and switched on in the list options / settings
+// (show_progress, stored server-side, so it follows to every device; the old hide_progress is no longer read)
+const progHidden = id => !(S.settings.show_progress || '').split(',').includes(String(id));
 async function setProgHidden(id, hide) {
-  const ids = (S.settings.hide_progress || '').split(',').filter(x => x && x !== String(id));
-  if (hide) ids.push(String(id));
-  S.settings.hide_progress = ids.join(',');
+  const ids = (S.settings.show_progress || '').split(',').filter(x => x && x !== String(id));
+  if (!hide) ids.push(String(id));
+  S.settings.show_progress = ids.join(',');
   render();
-  try { await api('PATCH', '/api/settings', {hide_progress: S.settings.hide_progress}); } catch { await load(); render(); }
+  try { await api('PATCH', '/api/settings', {show_progress: S.settings.show_progress}); } catch { await load(); render(); }
 }
 // the list's "…" menu (header) and the sidebar's context menu
 const colItem = id => ({label: tr('Shown fields…'), icon: 'columns', cls: 'mcols', fn: () => colModal(id)});
@@ -328,6 +334,7 @@ function listMenuItems(id, anchor) {
   // 2.25.0 (UX-52): list or project is the switch "Project features" in "Edit list…" (no "As a list / As a project" here)
   void k;
   if (collab() && l.shared) items.push({label: tr('Notifications: {0}', bellLabel(l.bell)), icon: BELL_ICON[l.bell || 'default'], rare: 1, fn: () => bellMenu(at(), id)});
+  { const fv = favMenuItem(l); if (fv) items.push(fv); }  // 2.40.0 (#1361): the personal star
   if (progressFor(l) && !l.is_inbox) items.push(progHidden(id) ? {label: tr('Show progress'), icon: 'eye', rare: 1, fn: () => setProgHidden(id, false)} : {label: tr('Hide progress'), icon: 'x', rare: 1, fn: () => setProgHidden(id, true)});
   // U12: archive (with undo) instead of delete; deleting for good only from the archive
   // 2.25.0 (UX-13): delete from every list menu; 2.39.1 (#1188): also list admins, organisation admins (listadmin.js)
@@ -477,7 +484,7 @@ function shareModal(id, opt = {}) {
       box.innerHTML = ppl.map(p => row(cur, p, mng)).join('') +
         (mng ? (users === null ? `<div class="muted mhint">${tr('Loading…')}</div>` : cand.length ? `<div class="mrow madd"><select id="l-adduser" aria-label="${esc(tr('Invite'))}"><option value="">${tr('Share with …')}</option>${cand.map(u => `<option value="${u.id}">${esc(u.display_name)}</option>`).join('')}</select>${roleSel('id="l-addrole"', 'edit')}<button class="btn sm" data-m="share">${ic('plus', 's')} ${tr('Add')}</button></div>`
           : `<div class="muted mhint">${users.filter(u => !u.agent).length > 1 ? tr('Shared with everyone') : tr('No other users yet. An admin can add them in the settings.')}</div>`) + `<details class="rolehelp sdet"><summary>${tr('What the roles may do')}</summary>${ROLES.map(([, n, h]) => `<div><b>${tr(n)}</b> <span class="muted">${tr(h)}</span></div>`).join('')}</details>`
-          : `<div class="muted mhint olock"><span>${esc(tr('Owner'))}: ${esc(cur.owner_name)}</span><button type="button" class="iconbtn" data-m="owner-info" title="${esc(tr('Owner: {0}. Only the owner can rename or archive this list; the owner and list admins manage who is in it.', cur.owner_name))}" aria-label="${esc(tr('Owner: {0}. Only the owner can rename or archive this list; the owner and list admins manage who is in it.', cur.owner_name))}">${ic('lock', 's')}</button></div>`);
+          : `<div class="muted mhint olock"><span>${esc(tr('Owner'))}: ${esc(cur.owner_name)}</span><button type="button" class="iconbtn" data-m="owner-info" title="${esc(tr('Owner: {0}. The owner and list admins rename and archive this list and manage who is in it; the rest of its settings stays with the owner.', cur.owner_name))}" aria-label="${esc(tr('Owner: {0}. The owner and list admins rename and archive this list and manage who is in it; the rest of its settings stays with the owner.', cur.owner_name))}">${ic('lock', 's')}</button></div>`);
     }
     const aw = $('#sh-agwrap', md);
     if (aw) {
@@ -682,15 +689,17 @@ function autoEmoji(name) {
 function listModal(id, folder = '', o = {}) {
   const l = id ? listById(id) : {name: '', color: '', folder, view: 'list', kind: o.kind || 'list', tickets: 0};
   const own = isOwner(l), dis = own ? '' : 'disabled';
+  // 2.40.0 (#1431): a list admin changes name, icon and colour too (the rest stays the owner's)
+  const ladm = !!id && !own && l.role === 'admin' && !l.is_inbox, adis = own || ladm ? '' : 'disabled';
   const m0 = l.name.match(EMO_RE);
   let emo = m0 ? m0[1] : '';
   const base = l.is_inbox && inboxDef(l.name) ? tr('Basket') : m0 ? l.name.slice(m0[0].length) : l.name;  // inbox keeps its stored name unless renamed
   // 1.5.1: an existing list saves itself like the settings (every change at once, "Saved · Undo", one history step each);
   // a new list keeps Cancel / Create
   const md = modal(`${id ? `<div class="lhdr"><h3>${tr('Edit list')}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>` : `<h3>${tr('New list')}</h3>`}
-    <div class="row"><label for="l-name">${tr('Name')}</label><button class="emobtn" id="l-emo" title="${tr('Choose icon')}" ${dis}>${id && l.icon ? licon(l, 'licon m') : sbiEmo(emo) || ic('list')}</button><input id="l-name" value="${esc(base)}" ${dis}></div>
+    <div class="row"><label for="l-name">${tr('Name')}</label><button class="emobtn" id="l-emo" title="${tr('Choose icon')}" ${adis}>${id && l.icon ? licon(l, 'licon m') : sbiEmo(emo) || ic('list')}</button><input id="l-name" value="${esc(base)}" ${adis}></div>
     <div class="emogrid hidden" id="l-emogrid"><button data-emo="" class="none" title="${tr('No icon')}">${ic('ban', 's')}</button>${sbiGrid().map(e => `<button data-emo="${e}" class="${e === emo && !l.icon ? 'on' : ''}">${sbiEmo(e)}</button>`).join('')}<input id="l-emocustom" placeholder="${tr('custom')}" maxlength="8">
-      ${id && own ? `<div class="lipickw"><span class="muted lipl">${tr('Or a picture')}</span>${liconPickHtml(l)}</div>` : ''}</div>
+      ${id && (own || ladm) ? `<div class="lipickw"><span class="muted lipl">${tr('Or a picture')}</span>${liconPickHtml(l)}</div>` : ''}</div>
     <input type="hidden" id="l-kind" value="${(l.kind || 'list') === 'project' ? 'project' : 'list'}">
     <div class="row lkrow" ${l.is_inbox ? 'hidden' : ''}><label id="l-kindlab">${tr('Type|list')}</label><div class="seg lkseg" role="radiogroup" aria-labelledby="l-kindlab"><label class="${(l.kind || 'list') === 'project' ? '' : 'on'}"><input type="radio" name="l-kindr" id="l-kindl" value="list" ${(l.kind || 'list') === 'project' ? '' : 'checked'} ${dis}>${ic('list', 's')} ${tr('Simple list')}</label><label class="${(l.kind || 'list') === 'project' ? 'on' : ''}"><input type="radio" name="l-kindr" id="l-kindp" value="project" ${(l.kind || 'list') === 'project' ? 'checked' : ''} ${dis}>${ic('brief', 's')} ${tr('Project')}</label></div></div>
     <div class="shint lhint" id="l-khint" ${l.is_inbox ? 'hidden' : ''}>${kindHint(l.kind || 'list')}</div>
@@ -712,11 +721,11 @@ function listModal(id, folder = '', o = {}) {
     ${id && progressOn() ? `<div class="row"><label>${tr('Progress')}</label><label class="chkl"><input type="checkbox" id="l-showprog" ${progHidden(id) ? '' : 'checked'}> ${tr('Show the progress bar')}</label><span class="muted">${tr('only for you')}</span></div>` : ''}
     ${id && timeOn() && (own || l.day_hours) ? `<div class="row"><label for="l-dayh">${tr('Hours per day')}</label><input id="l-dayh" inputmode="decimal" value="${l.day_hours != null ? esc(String(l.day_hours).replace('.', LOCALE().startsWith('de') ? ',' : '.')) : ''}" placeholder="${esc(fmtNum(S.timeDayH || 8))}" style="max-width:5rem" ${dis}><span class="muted">${tr('h per day / shift, for the time sum in the header · empty = {0} h (server)', fmtNum(S.timeDayH || 8))}</span></div>` : ''}
     ${timeOn() && (own || l.rate) ? `<div class="row"><label for="l-rate">${tr('Hourly rate')}</label><input id="l-rate" inputmode="decimal" value="${l.rate != null ? esc(String(l.rate).replace('.', LOCALE().startsWith('de') ? ',' : '.')) : ''}" placeholder="${tr('optional')}" style="max-width:6.875rem" ${dis}><span class="muted">${esc(S.settings.time_currency || '')} · ${tr('time reports')}</span></div>` : ''}
-    <div class="row"><label>${tr('Color')}</label><div class="colors" id="l-col" role="group" aria-label="${esc(tr('Color'))}">${LCOLORS.map((c, i) => `<button type="button" style="background:${c || 'var(--bg4)'}" class="${(l.color || '') === c ? 'on' : ''}" aria-pressed="${(l.color || '') === c}" aria-label="${esc(c ? tr('Color {0}', i) : tr('No color'))}" data-c="${c}" ${dis}></button>`).join('')}</div></div>
+    <div class="row"><label>${tr('Color')}</label><div class="colors" id="l-col" role="group" aria-label="${esc(tr('Color'))}">${LCOLORS.map((c, i) => `<button type="button" style="background:${c || 'var(--bg4)'}" class="${(l.color || '') === c ? 'on' : ''}" aria-pressed="${(l.color || '') === c}" aria-label="${esc(c ? tr('Color {0}', i) : tr('No color'))}" data-c="${c}" ${adis}></button>`).join('')}</div></div>
     ${id && !l.is_inbox && statusOn() && l.kind === 'project' ? `<div class="row"><label>${tr('Project status')}</label>${statusPill(l, true, true)}</div>` : ''}
     ${id && own && depsOn() ? `<div class="row"><label>${tr('Dependencies')}</label><label class="chkl"><input type="checkbox" id="l-depshift" ${l.dep_shift ? 'checked' : ''}> ${tr('Move dependent tasks along')}</label></div>
     <div class="shint lhint">${tr('When a task is postponed, the tasks of this list it blocks that would now start too early move by the same number of days (also in the timeline). One undo takes the whole chain back.')}</div>` : ''}
-    ${id && own && fieldsOn() ? `<h4 title="${esc(tr('Own columns for this list: budget, stage, client, …'))}">${tr('Custom fields')}</h4><div class="members" id="l-fields">${fieldsBox(id)}</div>` : id && fieldsOf(id).length ? `<h4>${tr('Custom fields')}</h4><div class="muted mhint">${esc(fieldsOf(id).map(f => f.name).join(', '))} · ${tr('only the owner can change them')}</div>` : ''}
+    ${id && canManage(l) && fieldsOn() ? `<h4 title="${esc(tr('Own columns for this list: budget, stage, client, …'))}">${tr('Custom fields')}</h4><div class="members" id="l-fields">${fieldsBox(id)}</div>` : id && fieldsOf(id).length ? `<h4>${tr('Custom fields')}</h4><div class="muted mhint">${esc(fieldsOf(id).map(f => f.name).join(', '))} · ${tr('only the owner and list admins can change them')}</div>` : ''}
     ${id && !l.is_inbox && (l.kind || 'list') === 'project' ? `<div class="lrepo" ${repoShown(l) ? '' : 'hidden'}><div class="shint keep lhint lrepohint" hidden>${ic('git', 's')} ${tr('Connect a repository (optional)')}</div>${repoBoxHtml(l)}</div>` : ''}
     </div>
     ${id && !l.is_inbox && (l.kind || 'list') !== 'project' && (l.repos || []).length ? repoBoxHtml(l) : ''}
@@ -756,8 +765,9 @@ function listModal(id, folder = '', o = {}) {
       ...($('#l-nag', md) ? {nag: $('#l-nag', md).value} : {}), ...($('#l-dayh', md) ? {day_hours: $('#l-dayh', md).value.trim()} : {}), ...($('#l-dab', md) ? {checklist: $('#l-dab', md).checked} : {}),
       ...($('#l-fam', md) && !$('.lfamrow', md)?.hidden ? {family: $('#l-fam', md).value} : {}),
       ...($('#l-ws', md) ? {org_id: $('#l-ws', md).value ? +$('#l-ws', md).value : null} : {})}  // 2.28.0 (#935)
-      : {folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value};  // members: only their own placement / view
-    if (own && !nm) delete body.name;  // an empty name is never saved (leaving the field puts the saved one back)
+      : {folder: fNorm($('#l-folder', md).value), view: $('#l-view', md).value,  // members: only their own placement / view
+        ...(ladm ? {name: emo + nm, color: $('#l-col button.on', md)?.dataset.c || ''} : {})};  // 2.40.0 (#1431)
+    if ((own || ladm) && !nm) delete body.name;  // an empty name is never saved (leaving the field puts the saved one back)
     return body;
   };
   const lsaved = e => {
@@ -956,7 +966,7 @@ function listModal(id, folder = '', o = {}) {
     if (a === 'del') { if (await listDeleteForGood(id)) md.remove(); }
   });
   md.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.id !== 'l-emocustom' && !e.target.id.startsWith('lp-')) { if (id) { e.preventDefault(); autosave(); } else $('[data-m="save"]', md).click(); } });
-  if (!own) { if (!isTouch()) setTimeout(() => $('#l-folder', md).focus(), 50); return; }
+  if (!own && !ladm) { if (!isTouch()) setTimeout(() => $('#l-folder', md).focus(), 50); return; }
   let emoTouched = !!id;  // 2.22.0 (#682): the suggestion follows the name until the person picks something themselves
   md.addEventListener('click', e => { if (e.target.closest('#l-emogrid [data-emo]')) emoTouched = true; }, true);
   md.addEventListener('input', e => {

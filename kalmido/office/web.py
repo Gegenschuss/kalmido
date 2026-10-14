@@ -15,7 +15,7 @@ from .packs import office_pack, office_pack_codes, office_pack_validate
 from .model import (
     MD_KINDS, office_create, office_delete, office_export, office_gate, office_import, office_org, office_role, office_row,
     office_rows, office_seed_texts, office_settings, office_settings_clean, office_settings_save, office_update, office_number_format,
-    office_number_next, office_scheme_clean,
+    office_number_next, office_scheme_clean, office_scheme_period,
 )
 from .ledger import ofx_company, ofx_company_clean, ofx_company_save, ofx_diff, ofx_log
 
@@ -70,13 +70,19 @@ def office_settings_put():
 
 @app.get("/api/office/number-preview")
 def office_number_preview():
-    """?scheme=… -> {preview, valid} (the settings page shows the next number while typing)."""
+    """?scheme=…&kind=offer|invoice|credit|reminder -> {preview, valid, error, yearly} (the settings page shows the next
+    number while typing; 2.40.0 (#1382): every scheme with its own counter, example values for project / client / initials,
+    yearly = the counter starts again every year)."""
     c, uid, oid = _ctx()
+    kind = request.args.get("kind") or "offer"
+    if kind not in ("offer", "invoice", "credit", "reminder"):
+        kind = "offer"
     try:
         scheme = office_scheme_clean(request.args.get("scheme") or "")
     except BadInput as e:
         return jsonify(preview="", valid=False, error=str(e))
-    return jsonify(preview=office_number_next(c, oid, "offer", scheme, peek=True)[0], valid=True)
+    pv = office_number_next(c, oid, kind, scheme, peek=True, project=tr("Project"), client=tr("Client"), initials="AB")[0]
+    return jsonify(preview=pv, valid=True, yearly=bool(office_scheme_period(scheme)))
 
 
 @app.get("/api/office/packs")

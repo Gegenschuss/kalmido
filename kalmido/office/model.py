@@ -43,7 +43,10 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      # the e-invoice format and the DATEV document inbox (one e-mail address; PDF + XML are mailed there)
                      "invoice_scheme": "", "credit_scheme": "", "reminder_scheme": "", "payment_days": 14, "reminder_fee": 0,
                      "reminder_deadline_days": 10, "einvoice_format": "zugferd", "datev_email": "", "datev_auto": 0,
-                     "invoice_closing_de": "", "invoice_closing_en": "", "reminder_text_de": "", "reminder_text_en": ""}
+                     "invoice_closing_de": "", "invoice_closing_en": "", "reminder_text_de": "", "reminder_text_en": "",
+                     # 2.40.0 (#1379): producing (markup by production days) and the raw data surcharge are switched on per
+                     # organisation; new organisations start without them, fe_office_rules_migrate keeps them for those using them
+                     "producing_on": 0, "raw_on": 0}
 SETTINGS_KEYS = tuple(SETTINGS_DEFAULTS)
 
 
@@ -193,7 +196,7 @@ def office_settings_clean(c, oid, b, cur):
         elif k == "fx_usd":
             out["fx_usd"] = round(_num(v, "fx_usd", 0.0001, 1000), 4)
         elif k in ("offer_scheme", "invoice_scheme", "credit_scheme", "reminder_scheme"):
-            out[k] = office_scheme_clean(v)
+            out[k] = office_scheme_clean(v, FE_SCHEME_NAMES.get(k))
         elif k in ("payment_days", "reminder_deadline_days"):  # 2.38.0 (#1021, F1)
             out[k] = int(_num(v, k, 0, 365))
         elif k == "reminder_fee":
@@ -207,7 +210,7 @@ def office_settings_clean(c, oid, b, cur):
             if v and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", v):
                 raise BadInput(tr("Invalid value: {0}", k))
             out[k] = v[:200]
-        elif k == "datev_auto":
+        elif k in ("datev_auto", "producing_on", "raw_on"):  # 2.40.0 (#1379): the two calculation switches
             out[k] = 1 if v in (1, True, "1", "true") else 0
         elif k in ("invoice_closing_de", "invoice_closing_en", "reminder_text_de", "reminder_text_en"):
             out[k] = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", v or "").strip()[:TEXT_MAX] if isinstance(v, str) else ""
@@ -240,6 +243,31 @@ def office_settings_clean(c, oid, b, cur):
     return out
 
 
+def fe_office_rules_migrate(c):
+    """2.40.0 (#1379), once per database (kalmido_meta fe_office_rules): organisations that use producing or raw data
+    (services, positions of documents, framework contracts with raw data) keep both switched on; the rest starts off.
+    Decided only once, so switching off later stays off."""
+    if c.execute("SELECT 1 FROM kalmido_meta WHERE key='fe_office_rules'").fetchone():
+        return
+    orgs = {r[0] for r in c.execute("SELECT org_id FROM office_settings UNION SELECT org_id FROM office_services UNION SELECT org_id FROM office_docs "
+                                    "UNION SELECT org_id FROM office_contracts").fetchall()}
+    for oid in sorted(orgs):
+        prod = c.execute("SELECT 1 FROM office_services WHERE org_id=? AND producing=1 UNION ALL SELECT 1 FROM office_doc_items i JOIN office_docs d "
+                         "ON d.id=i.doc_id WHERE d.org_id=? AND i.producing=1 LIMIT 1", (oid, oid)).fetchone()
+        raw = c.execute("SELECT 1 FROM office_services WHERE org_id=? AND raw_fee=1 UNION ALL SELECT 1 FROM office_doc_items i JOIN office_docs d "
+                        "ON d.id=i.doc_id WHERE d.org_id=? AND i.raw_fee=1 AND d.raw_mode!='none' UNION ALL SELECT 1 FROM office_contracts "
+                        "WHERE org_id=? AND raw_included=1 LIMIT 1", (oid, oid, oid)).fetchone()
+        r = c.execute("SELECT data FROM office_settings WHERE org_id=?", (oid,)).fetchone()
+        try:
+            d = json.loads(r["data"]) if r and r["data"] else {}
+        except ValueError:
+            d = {}
+        d.setdefault("producing_on", 1 if prod else 0)
+        d.setdefault("raw_on", 1 if raw else 0)
+        office_settings_save(c, oid, d)
+    c.execute("INSERT INTO kalmido_meta(key,value) VALUES('fe_office_rules','1') ON CONFLICT(key) DO NOTHING")
+
+
 def office_settings_save(c, oid, data):
     c.execute("INSERT INTO office_settings(org_id, data, updated_at) VALUES(?,?,?) ON CONFLICT(org_id) DO UPDATE SET data=excluded.data, "
               "updated_at=excluded.updated_at", (oid, json.dumps(data, ensure_ascii=False), iso(now_utc())))
@@ -253,17 +281,26 @@ def office_logo_set(c, oid, name):
 
 
 # ---------------------------------------------------------------- number scheme
-def office_scheme_clean(v):
+# 2.40.0 (#1382): plain-language errors of a number scheme, with the name of the scheme
+FE_SCHEME_NAMES = {"offer_scheme": N_("Quotation numbers"), "invoice_scheme": N_("Invoice numbers"), "credit_scheme": N_("Credit note numbers"),
+                   "reminder_scheme": N_("Reminder numbers")}
+
+
+def office_scheme_clean(v, name=None):
+    def bad(msg, *a):
+        m = tr(msg).replace("{0}", a[0]) if a else tr(msg)  # (no str.format: the texts name the building blocks in braces)
+        raise BadInput(f"{tr(name)}: {m}" if name else m)
     if not isinstance(v, str) or not v.strip():
-        raise BadInput(tr("Invalid value: {0}", "offer_scheme"))
+        bad(N_("The scheme is empty. Example: RE-{yyyy}-{seq:03}"))
     v = v.strip()[:80]
     if "{seq" not in v:
-        raise BadInput(tr("The number scheme needs a {seq} counter"))
+        bad(N_("The running number is missing: add {seq} (or {seq:03} for 001)"))
     rest = SCHEME_RE.sub("", v)
     if "{" in rest or "}" in rest:
-        raise BadInput(tr("Invalid value: {0}", "offer_scheme"))
+        m = re.search(r"\{[^{}]*\}?", rest)
+        bad(N_("Unknown building block {0}. Possible: {yyyy} {yy} {seq} {seq:03} {project} {client} {date} {initials}"), m.group(0) if m else "{")
     if re.search(r"[\\/<>\"'&\x00-\x1f]", rest):  # 2.36.1 review: no markup characters in numbers
-        raise BadInput(tr("Invalid value: {0}", "offer_scheme"))
+        bad(N_("These characters cannot be part of a number: \\ / < > \" ' &"))
     return v
 
 

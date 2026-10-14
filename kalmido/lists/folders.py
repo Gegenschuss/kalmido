@@ -15,7 +15,8 @@ from ..accounts.session import me
 from ..core.access import Denied, need_collab
 from ..personal.timetrack import BadInput
 
-FOLDER_PROPS = ("org_id", "agent_id", "agent_members", "agent_peers", "agent_tidy", "agent_listen")  # 2.30.0 (#1034): agent_listen
+# 2.40.0 (#1373): agent_peers is no folder default any more (agents never address each other); a stored one is ignored
+FOLDER_PROPS = ("org_id", "agent_id", "agent_members", "agent_tidy", "agent_listen")  # 2.30.0 (#1034): agent_listen
 FOLDER_PROPS += ("hide_done",)  # 2.39.1 (#1214): "Hide completed" for the lists of the folder (the client applies it, see showDone)
 FOLDER_APPLY = ("all", "new")
 
@@ -201,6 +202,8 @@ def _clean_props(c, b):
         raise BadInput(tr("Invalid value: {0}", "props"))
     out = {}
     for k, v in b.items():
+        if k == "agent_peers":  # 2.40.0 (#1373): still accepted from old clients, ignored
+            continue
         if k not in FOLDER_PROPS:
             raise BadInput(tr("Invalid value: {0}", k))
         if v is None:
@@ -314,6 +317,8 @@ def list_folder_reset(lid):
     if not r or r[0] != me():
         raise Denied(403, tr("Only the owner can change this list"))
     keys = b.get("keys")
+    if isinstance(keys, list):
+        keys = [k for k in keys if k != "agent_peers"]  # 2.40.0 (#1373): no folder default any more
     if keys is not None and (not isinstance(keys, list) or any(k not in FOLDER_PROPS for k in keys)):
         return err(tr("Invalid value: {0}", "keys"))
     own = [k for k in list_own(c, lid) if keys is not None and k not in keys]
@@ -335,8 +340,11 @@ def folder_list_arrived(c, lid, keep=()):
     if not eff:
         return
     c.execute("UPDATE lists SET folder_own='[]' WHERE id=?", (lid,))
+    # 2.40.0 (#1422): only a kept value that really differs from the folder's counts as the list's own (the list dialog
+    # sends the workspace with every create, the same value as the folder's must not show "differs: Workspace")
+    diff = {x["key"] for x in lm_folder_changes(c, lid, r["folder"])} if keep else set()
     for k in keep:
-        if k in eff:
+        if k in eff and (k in diff or k not in LM_MOVE_KEYS):
             list_own_mark(c, lid, k)
     folder_apply(c, lid, keys=[k for k in FOLDER_PROPS if k not in keep])
 
@@ -391,7 +399,7 @@ def my_folder_props(c, uid):
 # 2.39.1 (#1188): moving a list into a folder with defaults never re-hangs it silently. The app asks first when the move
 # would change the workspace or the agent (both directions: private -> organisation and back) and then sends
 # folder_adopt: true; without it the list keeps its settings and the differing ones count as its own ("differs from the folder").
-LM_MOVE_KEYS = ("org_id", "agent_id", "agent_members", "agent_peers", "agent_tidy", "agent_listen")
+LM_MOVE_KEYS = ("org_id", "agent_id", "agent_members", "agent_tidy", "agent_listen")  # 2.40.0 (#1373): no agent_peers
 
 
 def lm_folder_changes(c, lid, folder):
@@ -438,7 +446,7 @@ def lm_folder_keep(c, lid, keep=()):
     r = c.execute("SELECT owner_id, folder FROM lists WHERE id=?", (lid,)).fetchone()
     if not r or r["owner_id"] != me():
         return
-    diff = {x["key"] for x in lm_folder_changes(c, lid, r["folder"] or "")} | set(keep)
+    diff = {x["key"] for x in lm_folder_changes(c, lid, r["folder"] or "")} | {k for k in keep if k not in LM_MOVE_KEYS}  # 2.40.0 (#1422)
     eff = folder_effective(c, r["owner_id"], r["folder"] or "")[0]
     c.execute("UPDATE lists SET folder_own=? WHERE id=?", (json.dumps(sorted(k for k in diff if k in eff)), lid))
 

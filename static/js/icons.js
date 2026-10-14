@@ -259,7 +259,12 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '
 const cssColor = v => typeof v === 'string' && /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(v) ? v : '';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-const isMobile = () => matchMedia('(max-width:899px)').matches;
+// 2.40.0 (#1430): what cannot change during one synchronous render (media queries, the fields of a list, device settings)
+// is looked up once per render: td_rcRun around render() / renderView(), td_rc(key, fn) inside (outside a render: fn() as before)
+let TD_RC = null, TD_RCN = 0;
+const td_rc = (k, fn) => { if (!TD_RC) return fn(); if (TD_RC.has(k)) return TD_RC.get(k); const v = fn(); TD_RC.set(k, v); return v; };
+function td_rcRun(fn) { if (!TD_RCN++) TD_RC = new Map(); try { return fn(); } finally { if (!--TD_RCN) TD_RC = null; } }
+const isMobile = () => td_rc('mob', () => matchMedia('(max-width:899px)').matches);
 // ---- 2.7.0 (K13, #405): one layout for an unfolded foldable in both orientations. The phone / desktop switch is at
 // 900 px; a near-square touch screen (an unfolded Fold is ~880-910 px each way) sat right on it and flipped between the
 // tab bar and rail + sidebar when turned. Such a screen gets a layout width of at least 900 px in both orientations (the
@@ -392,7 +397,7 @@ try { if (sessionStorage.getItem('kalmido.booted')) document.documentElement.cla
 try { matchMedia('(prefers-color-scheme: light)').addEventListener('change', applyTheme); } catch { /* old browser */ }
 // density per device: compact (default on desktop) | comfortable (default on phones and touch screens)
 const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || '');
-const isTouch = () => { try { return isMobile() || matchMedia('(hover: none)').matches; } catch { return false; } };
+const isTouch = () => td_rc('touch', () => { try { return isMobile() || matchMedia('(hover: none)').matches; } catch { return false; } });
 // 2.16.0 (#642): "Custom" = the sidebar (lists, folders, filters) and the task rows each compact or comfortable; Compact /
 // Comfortable set both (before, the sidebar ignored the density)
 const DENS_OK = v => v === 'compact' || v === 'comfortable';

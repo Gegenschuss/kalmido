@@ -151,10 +151,9 @@ def clean_client(c, uid, b, new=False):
         if v is not None and not isinstance(v, str):
             raise BadInput(tr("Invalid value: {0}", k))
         v = re.sub(r"\s+", " ", (v or "").strip())
-        if k == "country":
-            v = v.upper()
-            if v and not re.fullmatch(r"[A-Z]{2}", v):
-                raise BadInput(tr("Invalid value: {0}", k))
+        if k == "country":  # 2.40.0 (#1372): ISO 3166-1 alpha-2 only (UK -> GB, EL -> GR)
+            from ..office.countries import fk_country
+            v = fk_country(v)
         if k == "vat_id":
             v = v.replace(" ", "").upper()
         if len(v) > CLIENT_BILLING_MAX[k]:
@@ -208,6 +207,8 @@ def client_public(c, uid, r, stats=False, month=None):
                            "budget_amount", "org_id", "created_by", "created_at", "updated_at")}
     d.update(archived=bool(r["archived"]), org_name=org[0] if org else "", lists=lids,
              can_delete=bool(u and (u["is_admin"] or r["created_by"] == uid)))
+    from ..office.contacts_cl import fk_contacts
+    d["contacts"] = fk_contacts(c, r["id"])  # 2.40.0 (#1380): the contact persons, the default first ("contact" = its name)
     if u and (u["kind"] or "user") != "agent":  # 2.36.2: billing fields for people only
         d["billing"] = {k: (r[k] if k in r.keys() else None) for k in CLIENT_BILLING}
     if stats:
@@ -265,8 +266,8 @@ def client_get(cid):
 
 @app.post("/api/clients")
 def client_create():
-    """{name, icon?, color?, contact?, email?, phone?, address?, note?, rate?, budget_h?, budget_amount?, org_id?} -> 201.
-    org_id: one of my organisations (default: my first one)."""
+    """{name, icon?, color?, contact?, contacts?, email?, phone?, address?, note?, rate?, budget_h?, budget_amount?, org_id?} -> 201.
+    org_id: one of my organisations (default: my first one). contacts (2.40.0): [{name, role?, email?, phone?, is_default?}]."""
     c = db()
     uid = me()
     _gate(c)
@@ -278,9 +279,19 @@ def client_create():
     ts = iso(now_utc())
     f.update(created_by=uid, created_at=ts, updated_at=ts)
     cid = insert_id(c, f"INSERT INTO clients({','.join(f)}) VALUES({','.join('?' * len(f))})", list(f.values()))
+    _contacts_from_body(c, cid, f.get("org_id"), body(), f)
     bump(c)
     c.commit()
     return jsonify(client_public(c, uid, need_client(c, cid, uid), stats=True)), 201
+
+
+def _contacts_from_body(c, cid, oid, b, f):
+    """2.40.0 (#1380): {contacts: [...]} replaces the client's contact persons; else the old field contact names the default."""
+    from ..office.contacts_cl import fk_contact_field, fk_put
+    if isinstance(b, dict) and b.get("contacts") is not None:
+        fk_put(c, cid, oid, b["contacts"])
+    elif "contact" in f:
+        fk_contact_field(c, cid, oid, f["contact"])
 
 
 @app.patch("/api/clients/<int:cid>")
@@ -293,6 +304,9 @@ def client_update(cid):
     if f:
         f["updated_at"] = iso(now_utc())
         c.execute(f"UPDATE clients SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), cid])
+        if "org_id" in f:  # 2.40.0 (#1380, review): the contacts move with their client into the other workspace
+            c.execute("UPDATE office_client_contacts SET org_id=? WHERE client_id=?", (f["org_id"], cid))
+    _contacts_from_body(c, cid, need_client(c, cid, uid)["org_id"], body(), f)
     bump(c)
     c.commit()
     return jsonify(client_public(c, uid, need_client(c, cid, uid), stats=True))

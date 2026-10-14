@@ -34,7 +34,8 @@ SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "tim
                   "side_progress",  # 2.36.0 (#1117)
                   "cal_tasks",  # 2.36.1 (#1127)
                   "agent_steps_live", "agent_steps_always",  # 2.32.0 (#1081)
-                  "show_done_default")  # 2.39.1 (#1214): "Hide completed" as the default of every view (0 = hide)
+                  "show_done_default",  # 2.39.1 (#1214): "Hide completed" as the default of every view (0 = hide)
+                  "fav_only")  # 2.40.0 (#1361): the sidebar shows only the favourites
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
                 "detail_split": (20, 85)}  # 2.31.0 (#344)
@@ -76,7 +77,7 @@ def clean_setting(k, v):
         if sv and not valid_hm(sv):
             raise bad
         return sv
-    if k in ("hide_progress", "agents_hidden"):
+    if k in ("hide_progress", "show_progress", "fav_lists", "agents_hidden"):  # 2.40.0: show_progress (#1190), fav_lists (#1361)
         ids = [x.strip() for x in sv.split(",") if x.strip()]
         if len(ids) > 500 or not all(x.isdigit() and len(x) < 12 for x in ids):
             raise bad
@@ -158,6 +159,15 @@ def clean_setting(k, v):
         if any(x not in NEWS_GROUPS for x in ks):
             raise bad
         return ",".join(dict.fromkeys(ks))
+    if k == "mine_view":  # 2.40.0 (#1344): "My tasks" in the own order or grouped by list
+        if sv not in ("own", "lists"):
+            raise bad
+        return sv
+    if k == "fav_views":  # 2.40.0 (#1361): the views filtered to favourites (route keys of the smart views)
+        ks = [x.strip() for x in sv.split(",") if x.strip()]
+        if len(ks) > 40 or not all(re.fullmatch(r"[a-z]{2,12}", x) for x in ks):
+            raise bad
+        return ",".join(dict.fromkeys(ks))
     if k in ("features", "nav_order"):
         if len(sv) > 500 or not re.fullmatch(r"[a-z_,]*", sv):
             raise bad
@@ -186,6 +196,10 @@ def clean_setting(k, v):
         return clean_cal_list(k, v)
     if k == "side_icons":  # 2.36.0 (#1117)
         if sv not in ("line", "emoji", "dot"):
+            raise bad
+        return sv
+    if k == "prio_bg":  # 2.40.0 (#1416): priority as the row's background
+        if sv not in ("", "soft", "strong"):
             raise bad
         return sv
     if k == "comment_order":  # 2.4.2 (#386)
@@ -245,12 +259,15 @@ def clean_done_views(v):
     return json.dumps(out, ensure_ascii=False, separators=(",", ":"))
 
 
-KB_GROUP_VIEWS_MAX, KB_GROUPS_MAX = 100, 400
+# 2.40.0 (#1334): bounded, since the setting travels with every state load: route keys and group ids up to 60 characters
+# (longer ones are left out), up to 200 groups per view and 40 views (the oldest views, i.e. the first keys, fall away)
+KB_GROUP_VIEWS_MAX, KB_GROUPS_MAX, KB_GROUP_KEY_MAX = 40, 200, 60
 
 
 def kb_clean_group_order(v):
     """2.39.1 (#1221): the own order of the groups per view (json object route key -> [group ids such as "l:12"]) -> stored
-    json; an empty list or '' drops it (back to the sidebar order). BadInput if malformed."""
+    json; an empty list or '' drops it (back to the sidebar order). BadInput if malformed; too many / too long entries are
+    cut silently (2.40.0, #1334)."""
     bad = BadInput(tr("Invalid value: {0}", "group_order"))
     if v in (None, ""):
         return "{}"
@@ -258,15 +275,17 @@ def kb_clean_group_order(v):
         o = json.loads(v) if isinstance(v, str) else v
     except ValueError:
         raise bad from None
-    if not isinstance(o, dict) or len(o) > KB_GROUP_VIEWS_MAX:
+    if not isinstance(o, dict) or len(o) > 1000:
         raise bad
     out = {}
     for k, arr in o.items():
-        if not isinstance(k, str) or not 0 < len(k) <= 120 or not isinstance(arr, list) or len(arr) > KB_GROUPS_MAX \
-                or not all(isinstance(x, str) and 0 < len(x) <= 120 for x in arr):
+        if not isinstance(k, str) or not k or not isinstance(arr, list) or len(arr) > 2000 \
+                or not all(isinstance(x, str) and x for x in arr):
             raise bad
-        if arr:
-            out[k] = list(dict.fromkeys(arr))
+        arr = [x for x in dict.fromkeys(arr) if len(x) <= KB_GROUP_KEY_MAX][:KB_GROUPS_MAX]
+        if arr and len(k) <= KB_GROUP_KEY_MAX:
+            out[k] = arr
+    out = dict(list(out.items())[-KB_GROUP_VIEWS_MAX:])
     return json.dumps(out, ensure_ascii=False, separators=(",", ":"))
 
 

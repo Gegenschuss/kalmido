@@ -229,7 +229,7 @@ def openapi_spec():
             "day_hours": nul("number", description="2.7.0: hours of a working day / shift for this list's time sums; null = the server's value"),
             "columns": {"type": ["array", "null"], "items": {"type": "string"}, "description": COL_DOC},
             "agent_members": {"type": "boolean", "description": "2.26.0 (#928): members may see and use the list's agents (default false)"},
-            "agent_peers": {"type": "boolean", "description": "2.26.0 (#928): agents may address each other in this list (default false)"},
+            "agent_peers": {"type": "boolean", "deprecated": True, "description": "2.40.0 (#1373): deprecated, always false -- agents never address each other"},
             "stale_days": nul("integer", description="2.34.0 (#266): an open task counts as stale (GET /stale) after this many idle days; null = the default (7), 0 = never"),
             "agent_followup": {"type": "boolean", "description": "2.34.0 (#266): \"Agent follows up\": the list's agents get its stale tasks once a day (event stale_tasks; default false)"},
             "family": nul("string", enum=[*[x for x in FAM_LIST_KINDS if x], None], description="2.19.0: what the list is for in the Family module: "
@@ -284,9 +284,8 @@ def openapi_spec():
             "agent_members": {"type": "boolean", "description": "2.26.0 (#928): members may see and use the list's agents (chat, "
                               "mention, assign, comment to them). Off (default): only the owner, list admins and instance admins can; "
                               "members still see what the agents do. Owner / list admins, never an agent token"},
-            "agent_peers": {"type": "boolean", "description": "2.26.0 (#928): agents may address each other in this list (an agent's "
-                            "mention / assignment / comment reaches another agent as an event). Off (default): no events between agents. "
-                            "Owner / list admins, never an agent token"},
+            "agent_peers": {"type": "boolean", "deprecated": True, "description": "2.40.0 (#1373): deprecated and ignored -- agents never "
+                            "address each other (no events between agents); still accepted so older clients get no error"},
             "stale_days": nul("integer", minimum=0, maximum=365, description="2.34.0 (#266): stale after this many idle days (null = the default, 0 = never). Owner / list admins, never an agent token"),
             "agent_followup": {"type": "boolean", "description": "2.34.0 (#266): \"Agent follows up\" (event stale_tasks once a day). Owner / list admins, never an agent token"},
             "folder_adopt": {"type": "boolean", "description": "2.39.1 (#1188): with a new folder: the list takes the folder's settings "

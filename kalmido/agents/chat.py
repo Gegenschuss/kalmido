@@ -12,7 +12,7 @@ from flask import g, jsonify, request
 from ..core.config import app, ATT_DIR, MAX_FILE_MB
 from ..core.pg import insert_id
 from ..core.i18n import tr
-from ..core.db import body, bump, db, err, iso, iso_ms, now_utc
+from ..core.db import ag_cursor, ag_cursor_parse, ag_limit, body, bump, db, err, iso, iso_ms, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, need_task, task_visible
 from ..core.serializers import unlink_files
@@ -49,15 +49,62 @@ def agent_jobs_get():
     if request.args.get("id"):  # 2.36.2 (#1141): one job (a "Job #50" link in the chat); not visible = an empty list
         where.append("id=?")
         args.append(as_int(request.args["id"], "id", 1))
+    if not request.args.get("id") and ("limit" in request.args or "before" in request.args):
+        return ag_jobs_page(c, where, args)  # 2.40.0 (#1432): "Load more"; without ?limit / ?before as before
     if request.args.get("state", "all") == "open":
         where.append("state IN ('running','waiting')")
     rows = c.execute(q + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY updated_at DESC, id DESC LIMIT 500", args).fetchall()
     rows = [j for j in rows if job_visible(c, j, me())][:200]
+    return jsonify(jobs=ag_jobs_out(c, rows))
+
+
+def ag_jobs_out(c, rows):
     names = user_names(c, [x for j in rows for x in (j["agent_id"], j["user_id"], j["action_by"])])
     from ..agents.steps import job_steps_count
     jc = job_steps_count(c, me(), [j["id"] for j in rows if j["user_id"] == me()])  # 2.32.0 (#1081): only my own jobs' history
-    return jsonify(jobs=[{**job_dict(c, j, names), "can_act": job_may_act(c, j, me(), "approve"),
-                          "can_stop": job_may_act(c, j, me(), "stop"), "steps": jc.get(j["id"], 0) if j["user_id"] == me() else 0} for j in rows])
+    return [{**job_dict(c, j, names), "can_act": job_may_act(c, j, me(), "approve"),
+             "can_stop": job_may_act(c, j, me(), "stop"), "steps": jc.get(j["id"], 0) if j["user_id"] == me() else 0} for j in rows]
+
+
+AG_JOBS_FIRST, AG_JOBS_MAX, AG_JOBS_SCAN = 20, 200, 5000
+
+
+def ag_jobs_page(c, where, args):
+    """2.40.0 (#1432): ?limit=20 (at most 200) &before=<next>: one page of the ended jobs, newest first; the first page
+    (no before) also brings every running / waiting job (no limit, they stay on top). next = the cursor of the following
+    page, null at the end. Visibility is checked per row while the page fills (at most AG_JOBS_SCAN rows per request;
+    then next continues behind the last row read)."""
+    try:
+        lim = ag_limit(request.args.get("limit"), AG_JOBS_FIRST, AG_JOBS_MAX)
+        cur = ag_cursor_parse(request.args.get("before"))
+    except ValueError:
+        return err(tr("Invalid value: {0}", "before"))
+    uid, cond = me(), " AND ".join(where) + " AND " if where else ""
+    top = []
+    if not cur:
+        top = [j for j in c.execute(f"SELECT * FROM agent_jobs WHERE {cond}state IN ('running','waiting') "
+                                    "ORDER BY updated_at DESC, id DESC", args).fetchall() if job_visible(c, j, uid)]
+    if request.args.get("state", "all") == "open":
+        return jsonify(jobs=ag_jobs_out(c, top), next=None)
+    page, nxt, seen = [], None, 0
+    while True:
+        a = list(args) + ([cur[0], cur[1]] if cur else [])
+        batch = c.execute(f"SELECT * FROM agent_jobs WHERE {cond}state NOT IN ('running','waiting')"
+                          + (" AND (updated_at, id) < (?, ?)" if cur else "") + " ORDER BY updated_at DESC, id DESC LIMIT 200", a).fetchall()
+        for j in batch:
+            seen += 1
+            if job_visible(c, j, uid):
+                if len(page) == lim:  # one more visible row: there is a next page
+                    nxt = ag_cursor(page[-1]["updated_at"], page[-1]["id"])
+                    break
+                page.append(j)
+            cur = (j["updated_at"], j["id"])
+            if seen >= AG_JOBS_SCAN and len(page) < lim:  # long run of rows I may not see: continue next time
+                nxt = ag_cursor(*cur)
+                break
+        if nxt or len(batch) < 200:
+            break
+    return jsonify(jobs=ag_jobs_out(c, top + page), next=nxt)
 
 
 @app.post("/api/agents/jobs/<int:jid>/action")

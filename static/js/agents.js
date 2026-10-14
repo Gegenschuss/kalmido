@@ -345,7 +345,7 @@ function tidyRowHtml(l) {
   const sw = (id, k, label, hint) => `<label class="chkl swl agacc"><span class="swc"><input type="checkbox" role="switch" id="${id}" data-agacc="${k}" ${l[k] ? 'checked' : ''} ${may ? '' : 'disabled'}><span class="swt" aria-hidden="true"></span></span><span>${label}</span></label>
     <div class="shint aghint">${hint}</div>`;  // 2.32.0 (#1058): the explanation behind the (i) at the switch
   const acc = sw('l-agm', 'agent_members', tr('Members may see and use the agent'), tr('Off: only you and list admins can chat with the agent, @mention it or assign it tasks here. Members still see what it does.'))
-    + sw('l-agp', 'agent_peers', tr('Agents may address each other'), tr('Off: what an agent writes or assigns here never reaches another agent. Instructions only ever come from people.'))
+    // 2.40.0 (#1373): "Agents may address each other" is gone -- agents never do (fixed off)
     // 2.34.0 (#266): "Agent follows up": once a day the list's agents get its tasks lying idle and suggest a follow-up as a comment
     + sw('l-agf', 'agent_followup', tr('Agent follows up'), tr('Once a day the agent gets the tasks of this list that lie idle and asks about them in a comment or drafts a reminder. Nothing is sent to anyone outside. Off by default.'));
   return `${acc}<div class="row"><label for="l-tidy">${tr('Agent may tidy up entries')}</label><select id="l-tidy" ${may && cands.length ? '' : 'disabled'}>${TIDY.map(([k, n]) => `<option value="${k}" ${(l.agent_tidy || 'off') === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
@@ -393,15 +393,27 @@ function tidyWire(md, lid) {
 }
 
 // ---- the Agents view: agents with status, jobs (Approve / Reject / Stop), chat
-S.jobs = {items: null, f: LS.get('jobsFilter', 'open'), err: null};
+S.jobs = {items: null, f: LS.get('jobsFilter', 'open'), err: null, older: [], next: null, more: null};
+// 2.40.0 (#1432): "All" loads 20 jobs first, "Load more" adds 50 (running / waiting ones always come with the first page);
+// a change reloads only the first page, the older pages already loaded stay (S.jobs.older, cursor S.jobs.more)
+const JOBS_FIRST = 20, JOBS_MORE = 50;
+const jobsMerge = head => { const ids = new Set(head.map(j => j.id)); return [...head, ...S.jobs.older.filter(j => !ids.has(j.id))]; };
 async function loadJobs() {
   // 2.37.0 (#1161): only the newest request counts -- an older answer that arrives late (a phone that slept in the middle
   // of a request) would bring an ended job back to "Open" until the next change
   const seq = S.jobs.seq = (S.jobs.seq || 0) + 1;
-  let items, err = null;
-  try { items = (await api('GET', '/api/agents/jobs' + (S.jobs.f === 'open' ? '?state=open' : ''))).jobs; }
+  let items, err = null, next = null;
+  try { const j = await api('GET', '/api/agents/jobs' + (S.jobs.f === 'open' ? '?state=open' : '?limit=' + JOBS_FIRST)); items = j.jobs; next = j.next || null; }  // Open: all of them, no pages
   catch (e) { err = e instanceof Offline ? tr('Only available online.') : e.message; }
   if (seq !== S.jobs.seq) return;
+  if (items) {
+    if (S.jobs.older.length) {  // ended jobs a newer one pushed off the first page stay with the older pages (no gap)
+      const ids = new Set(items.map(j => j.id)), m = new Map();
+      for (const j of [...(S.jobs.items || []), ...S.jobs.older]) if (!ids.has(j.id) && !['running', 'waiting'].includes(j.state) && !m.has(j.id)) m.set(j.id, j);
+      S.jobs.older = [...m.values()].sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || '') || b.id - a.id);
+    } else S.jobs.more = next;
+    items = jobsMerge(items); S.jobs.next = S.jobs.more;
+  }
   S.jobs.err = err; S.jobs.items = items || S.jobs.items || [];
   const fj = S.jobFocus;  // 2.36.2 (#1141): #job/<id> -- a finished or older job is fetched on its own; not mine = not found
   if (fj && !S.jobs.err && !S.jobs.items.some(j => j.id === fj)) {
@@ -418,6 +430,20 @@ async function loadJobs() {
 function jobsFront(e) { if ((e.type === 'pageshow' ? e.persisted : !document.hidden) && S.route?.mod === 'agents' && S.jobs.items !== null) loadJobs(); }
 document.addEventListener('visibilitychange', jobsFront);
 window.addEventListener('pageshow', jobsFront);
+async function jobsMore(b) {
+  if (!S.jobs.more) return;
+  if (b) b.disabled = true;
+  const seq = S.jobs.seq;
+  try {
+    const j = await api('GET', `/api/agents/jobs?limit=${JOBS_MORE}&before=${encodeURIComponent(S.jobs.more)}`);
+    if (seq !== S.jobs.seq) return;  // the first page came again meanwhile: the next tap continues from the same cursor
+    S.jobs.older = [...S.jobs.older, ...(j.jobs || [])]; S.jobs.more = S.jobs.next = j.next || null;
+    const head = (S.jobs.items || []).filter(x => !S.jobs.older.some(o => o.id === x.id));
+    S.jobs.items = jobsMerge(head);
+  } catch (e) { if (e instanceof Offline) toast(tr('Only available online.')); if (b) b.disabled = false; return; }
+  if (S.route.mod === 'agents') viewSafeRender();
+}
+const jobsMoreHtml = () => S.jobs.f === 'all' && S.jobs.next ? `<div class="audmore"><button type="button" class="btn sm" data-act="jobs-more">${tr('Load more')}</button></div>` : '';
 function jobFocusShow() {
   const e = document.getElementById('job-' + S.jobFocus);
   if (!e) return;
@@ -440,7 +466,7 @@ function jobHtml(j) {
     ${acts ? `<div class="jobb">${acts}</div>` : ''}</div>`;
 }
 function viewAgents() {
-  if (S.jobs.items === null) { S.jobs.items = []; loadJobs(); aiuLoad().then(() => { if (S.route.mod === 'agents') renderView(); }); }  // 2.1.1: the usage card
+  if (S.jobs.items === null) { S.jobs.items = []; S.jobs.older = []; S.jobs.next = S.jobs.more = null; loadJobs(); aiuLoad().then(() => { if (S.route.mod === 'agents') renderView(); }); }  // 2.1.1: the usage card
   if (S.route.agent && chatFull()) return chatViewHtml(S.route.agent);
   const ags = (S.agents || []).filter(a => wsAgentIn(a));  // 2.28.0 (#935)
   const card = a => `<div class="agcard ${a.enabled ? '' : 'off'}">${avBtn(a.id, a.name, 'avatar lg')}<div class="agi"><b>${esc(a.name)}</b><span class="muted">${esc(agentSt(a))}${a.status_text && agentHst(a) !== 'offline' ? ' · ' + esc(a.status_text) : ''}</span>
@@ -451,7 +477,7 @@ function viewAgents() {
   if (ags.length) {  // 2.32.0 (#1063): the overview is built from blocks (Customize)
     const P = {agents: `<div class="agcards">${ags.map(card).join('')}</div>`, usage: aiuCardHtml(),
       jobs: `<div class="agjh"><h2>${tr('Jobs')}</h2><span class="spacer"></span><div class="seg" role="group"><button class="${S.jobs.f === 'open' ? 'on' : ''}" data-act="jobs-f" data-f="open">${tr('Open|jobs')}</button><button class="${S.jobs.f === 'all' ? 'on' : ''}" data-act="jobs-f" data-f="all">${tr('All')}</button></div></div>
-        ${S.jobs.err ? `<div class="muted mhint">${esc(S.jobs.err)}</div>` : ''}<div class="jobs">${items.length ? items.map(jobHtml).join('') : `<div class="muted mhint">${S.jobs.f === 'open' ? tr('No running or waiting jobs.') : tr('No jobs yet.')}</div>`}</div>`,
+        ${S.jobs.err ? `<div class="muted mhint">${esc(S.jobs.err)}</div>` : ''}<div class="jobs">${items.length ? items.map(jobHtml).join('') : `<div class="muted mhint">${S.jobs.f === 'open' ? tr('No running or waiting jobs.') : tr('No jobs yet.')}</div>`}</div>${jobsMoreHtml()}`,
       hint: `<div class="shint">${tr('Agents report their jobs here. Approve, Reject and Stop go to the agent at once and show up in the task’s history. On a comment of an agent, 👍 / 👎 by the list owner, a list admin or the assignee counts as approval or rejection.')}</div>`};
     return `<div class="agview">${S.ly.view === 'agents' ? '' : `<div class="lybar"><span class="spacer"></span>${lyCustomBtn('agents')}</div>`}${lyHtml('agents', P)}</div>`;
   }
@@ -460,7 +486,7 @@ function viewAgents() {
     ${ags.length ? aiuCardHtml() : ''}
     <div class="agjh"><h2>${tr('Jobs')}</h2><span class="spacer"></span><div class="seg" role="group"><button class="${S.jobs.f === 'open' ? 'on' : ''}" data-act="jobs-f" data-f="open">${tr('Open|jobs')}</button><button class="${S.jobs.f === 'all' ? 'on' : ''}" data-act="jobs-f" data-f="all">${tr('All')}</button></div></div>
     ${S.jobs.err ? `<div class="muted mhint">${esc(S.jobs.err)}</div>` : ''}
-    <div class="jobs">${items.length ? items.map(jobHtml).join('') : `<div class="muted mhint">${S.jobs.f === 'open' ? tr('No running or waiting jobs.') : tr('No jobs yet.')}</div>`}</div>
+    <div class="jobs">${items.length ? items.map(jobHtml).join('') : `<div class="muted mhint">${S.jobs.f === 'open' ? tr('No running or waiting jobs.') : tr('No jobs yet.')}</div>`}</div>${jobsMoreHtml()}
     <div class="shint">${tr('Agents report their jobs here. Approve, Reject and Stop go to the agent at once and show up in the task’s history. On a comment of an agent, 👍 / 👎 by the list owner, a list admin or the assignee counts as approval or rejection.')}</div></div>`;
 }
 async function jobDo(jid, a) {

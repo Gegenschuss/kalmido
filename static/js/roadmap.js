@@ -176,10 +176,10 @@ function rmRowHtml(G, M, r) {
   if (r.type === 'nh') return `<div class="tl-row rm-row rm-nh" data-l="${r.l.id}" style="top:${y}px"><div class="tl-name rm-gname" data-act="rm-ndfold" data-key="${esc(r.key)}" role="button" tabindex="0" aria-expanded="${r.open}">${ic('chev', 's rm-car' + (r.open ? '' : ' closed'))}<span class="n">${tr('No date')}</span><span class="c">${r.n}</span></div><div class="tl-track"></div></div>`;
   if (r.type === 'u') {
     const t = r.t, ed = canEditList(r.l.id) && canEdit(t);
-    return `<div class="tl-row rm-row rm-u" data-l="${r.l.id}" style="top:${y}px"><div class="tl-name rm-tname" data-act="open" data-id="${t.id}">${r.sub ? '<span class="muted">↳ </span>' : ''}<span class="tln">${esc(t.title)}</span></div><div class="tl-track ndt${ed ? ' ed' : ''}" data-nd="${t.id}" data-s0="${G.start}" data-dw="${G.dw}" data-days="${G.days}" title="${ed ? esc(isTouch() ? tr('Tap a day to set the date; hold and drag for a range') : tr('Click a day to set the date, drag across days for a range')) : ''}"></div></div>`;
+    return `<div class="tl-row rm-row rm-u" data-l="${r.l.id}" style="top:${y}px"><div class="tl-name rm-tname" data-act="open" data-id="${t.id}">${r.sub ? '<span class="muted">↳ </span>' : ''}<span class="tln">${mdTitleNL(t.title)}</span></div><div class="tl-track ndt${ed ? ' ed' : ''}" data-nd="${t.id}" data-s0="${G.start}" data-dw="${G.dw}" data-days="${G.days}" title="${ed ? esc(isTouch() ? tr('Tap a day to set the date; hold and drag for a range') : tr('Click a day to set the date, drag across days for a range')) : ''}"></div></div>`;
   }
   const t = r.t, s0 = tlStart0(t), inWin = t.due >= G.start && s0 <= G.end;
-  const name = `<div class="tl-name rm-tname" data-act="open" data-id="${t.id}">${t.parent_id ? '<span class="muted">↳ </span>' : ''}${esc(t.title)}</div>`;
+  const name = `<div class="tl-name rm-tname" data-act="open" data-id="${t.id}">${t.parent_id ? '<span class="muted">↳ </span>' : ''}${mdTitleNL(t.title)}</div>`;
   let bar = '';
   if (inWin) { bar = t.ms ? tlMsHtml(t, G.start, G.dw) : tlBarHtml(t, G.start, G.end, G.dw, S.tlPick && depsOn() ? S.tlPick : null, depsOn()); S.tlL.bars.set(t.id, 1); }
   else bar = `<button type="button" class="rm-off ${t.due < G.start ? 'l' : 'r'}" data-act="rm-jump" data-d="${s0}" title="${esc(tr('Show {0}', fmtDayAbs(s0)))}">${ic(t.due < G.start ? 'left' : 'right', 's')}<span>${esc(fmtDayAbs(t.due < G.start ? t.due : s0))}</span></button>`;

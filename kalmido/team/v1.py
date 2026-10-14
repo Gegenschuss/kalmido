@@ -106,9 +106,12 @@ def pkgc_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "month": {"type": "string"}, "month_seconds": {"type": "integer"}, "month_amount": {"type": "number"},
         "estimate_min": {"type": "integer", "description": "Sum of the tasks' durations (estimate) in minutes"},
         "estimated": {"type": "integer"}, "open": {"type": "integer"}, "done": {"type": "integer"}}}
+    kin = {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string", "maxLength": 120}, "role": {"type": "string"},
+                                            "email": {"type": "string"}, "phone": {"type": "string"}, "is_default": {"type": "boolean"}}}
     schemas["Client"] = {"type": "object", "properties": {
         "id": {"type": "integer"}, "name": {"type": "string"}, "icon": {"type": "string"}, "color": {"type": "string"},
-        "contact": {"type": "string", "description": "Contact person"}, "email": {"type": "string"}, "phone": {"type": "string"},
+        "contact": {"type": "string", "description": "Contact person (2.40.0: the name of the default one of contacts)"}, "email": {"type": "string"}, "phone": {"type": "string"},
+        "contacts": {"type": "array", "items": kin, "description": "2.40.0 (#1380): the contact persons, the default first"},
         "address": {"type": "string"}, "note": {"type": "string"}, "rate": {**num, "description": "Hourly rate for lists without their own"},
         "budget_h": num, "budget_amount": num, "org_id": nul("integer"), "org_name": {"type": "string"}, "archived": {"type": "boolean"},
         "lists": {"type": "array", "items": {"type": "integer"}, "description": "Ids of the client's lists you see"},
@@ -119,6 +122,8 @@ def pkgc_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
     cin = {"type": "object", "additionalProperties": False, "properties": {
         "name": {"type": "string", "maxLength": 80}, "icon": {"type": "string"}, "color": {"type": "string", "description": "#rrggbb"},
         "contact": {"type": "string"}, "email": {"type": "string"}, "phone": {"type": "string"}, "address": {"type": "string"},
+        "contacts": {"type": "array", "items": kin, "description": "2.40.0 (#1380): replaces the whole list (with id = keep / change, "
+                     "without = new, missing = deleted; is_default marks the default, else the first)"},
         "note": {"type": "string"}, "rate": num, "budget_h": num, "budget_amount": num,
         "org_id": nul("integer", description="One of your organisations (default: your first)"), "archived": {"type": "boolean"}}}
     month = q("month", "YYYY-MM: the month of month_seconds / month_amount (default: this month)")

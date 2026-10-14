@@ -205,8 +205,10 @@ function newsText(it, U) {
       restore: tr('{0} restored the list {1} from the archive (admin of {2})', who, q(d.name || ''), q(d.org || '')),
       delete: tr('{0} deleted the list {1} for good (admin of {2}). Its tasks are in the trash of the owner’s basket.', who, q(d.name || ''), q(d.org || '')),
       // 2.39.1 (#1188): a list admin archived / restored / deleted my list
-      larchive: tr('{0} archived your list {1} (list admin)', who, q(d.name || '')), lrestore: tr('{0} restored your list {1} from the archive (list admin)', who, q(d.name || '')),
+      larchive: d.member ? tr('{0} archived the list {1} (list admin)', who, q(d.name || '')) : tr('{0} archived your list {1} (list admin)', who, q(d.name || '')),  // 2.40.0 (#1337): d.member
+      lrestore: d.member ? tr('{0} restored the list {1} from the archive (list admin)', who, q(d.name || '')) : tr('{0} restored your list {1} from the archive (list admin)', who, q(d.name || '')),
       ldelete: tr('{0} deleted your list {1} for good (list admin). Its tasks are in the trash of your basket.', who, q(d.name || '')),
+      lrename: tr('{0} renamed your list {1} to {2} (list admin)', who, q(d.old || ''), q(d.name || '')),  // 2.40.0 (#1431)
       owner: tr('{0} handed the list {1} to {2} (admin of {3})', who, q(d.name || ''), q(d.to || ''), q(d.org || ''))})[d.action] || tr('{0} changed something', who);
     case 'unblock': return d.hidden ? tr('{0} completed a task you cannot see: your task is unblocked', who) : tr('{0} completed {1}: your task is unblocked', who, q(d.title || ''));
     case 'newtask': return tr('{0} added a task', who);
@@ -268,12 +270,12 @@ function viewNews() {
   const shown = vis.filter(([it]) => newsKindOk(it));
   if (mine && mine.length && !vis.length && !dms.length) return bar + `<div class="empty nempty">${ic('bell')}<b>${tab === 'me' ? tr('Nothing for you right now') : tr('No unread news')}</b><span>${tab === 'me' ? tr('Mentions, assignments, replies and direct messages from people land here.') : tr('Everything is read. Switch off “Unread only” to see older news.')}</span></div>`;
   if ((!mine || !mine.length) && !dms.length) return bar + `<div class="empty nempty">${ic('bell')}<b>${tr('No news')}</b><span>${f ? tr('No mentions or assignments.') : esc(newsWhat())}</span></div>`;
-  if (!shown.length && !dms.length) return bar + chips + `<div class="empty nempty">${ic('bell')}<b>${tr('Nothing of this kind.')}</b></div>`;
+  if (!shown.length && !dms.length) return bar + chips + `<div class="empty nempty">${ic('bell')}<b>${tr('Nothing of this kind.')}</b></div>` + newsMoreHtml();
   // 2.28.0 (#987): "All" shows the two sections, what people sent me first, the activity behind it
   const listHtml = () => { if (newsBundled()) return `<div class="nbund">${newsBundledHtml(shown, false)}</div>`; if (tab !== 'all') return `<div class="nlist">${shown.map(([it, i]) => newsItemHtml(it, i)).join('')}</div>`;
     const me_ = shown.filter(([it]) => newsForMe(it)), ac = shown.filter(([it]) => !newsForMe(it));
     return `<div class="nlist">${dms.length || me_.length ? newsSecHead('me', dms.reduce((a, r) => a + r.unread, 0) + me_.filter(([it]) => !it.read).length, true) + dmh + me_.map(([it, i]) => newsItemHtml(it, i)).join('') : ''}${ac.length ? newsSecHead('act', ac.filter(([it]) => !it.read).length, !dms.length && !me_.length) + ac.map(([it, i]) => newsItemHtml(it, i)).join('') : ''}</div>`; };
-  return bar + chips + (tab === 'all' && !newsBundled() ? '' : dmh) + listHtml() + `${isTouch() && !newsBundled() ? `<div class="muted nswipe">${tr('Swipe an item sideways to remove it.')}</div>` : ''}`;
+  return bar + chips + (tab === 'all' && !newsBundled() ? '' : dmh) + listHtml() + newsMoreHtml() + `${isTouch() && !newsBundled() ? `<div class="muted nswipe">${tr('Swipe an item sideways to remove it.')}</div>` : ''}`;
 }
 async function loadNews() {
   if (S.nf.loading) return;
@@ -281,8 +283,9 @@ async function loadNews() {
   if (!collab()) { Object.assign(S.nf, {items: [], f, sig: S.news?.sig ?? '', err: null}); if (S.route.mod === 'news') renderView(); return; }
   S.nf.loading = true;
   try {
-    const j = await rawFetch('GET', '/api/news' + (f ? '?filter=' + f : ''));
-    Object.assign(S.nf, {items: j.items, users: j.users || {}, sig: j.sig, f, err: null});
+    if (S.nf.pgF !== f) Object.assign(S.nf, {pgF: f, n: NEWS_PAGE, next: null});  // 2.40.0 (#1432): read items in pages of 50
+    const j = await rawFetch('GET', `/api/news?limit=${S.nf.n}` + (f ? '&filter=' + f : ''));
+    Object.assign(S.nf, {items: j.items, users: j.users || {}, sig: j.sig, f, err: null, next: j.next || null});
     if (j.avatars) S.avatars = {...(S.avatars || {}), ...j.avatars};
     const changed = !S.news || S.news.unread !== j.unread || S.news.sig !== j.sig || S.news.unread_me !== j.unread_me;
     S.news = {unread: j.unread, unread_me: j.unread_me ?? S.news?.unread_me ?? 0, sig: j.sig};
@@ -292,6 +295,22 @@ async function loadNews() {
   } finally { S.nf.loading = false; }
   if (S.route.mod === 'news') renderView();
 }
+// 2.40.0 (#1432): the feed brings every unread item and the newest 50 read ones; "Load more" adds 50 read ones (a change
+// reloads as many as are loaded, so the list keeps its length)
+const NEWS_PAGE = 50;
+async function newsMore(b) {
+  const f = S.nf.f; if (!S.nf.next || !S.nf.items) return;
+  if (b) b.disabled = true;
+  try {
+    const j = await rawFetch('GET', `/api/news?limit=${NEWS_PAGE}&before=${encodeURIComponent(S.nf.next)}` + (f ? '&filter=' + f : ''));
+    if (S.nf.f !== f || !S.nf.items) return;
+    const ids = new Set(S.nf.items.map(x => x.id));
+    S.nf.items = [...S.nf.items, ...(j.items || []).filter(x => !ids.has(x.id))];
+    S.nf.users = {...S.nf.users, ...(j.users || {})}; S.nf.n += NEWS_PAGE; S.nf.next = j.next || null;
+  } catch (e) { toast(e instanceof Offline ? tr('Only available online.') : e.message); if (b) b.disabled = false; return; }
+  if (S.route.mod === 'news') renderView();
+}
+const newsMoreHtml = () => S.nf.next && !S.nf.unread ? `<div class="audmore"><button type="button" class="btn sm" data-act="news-more">${tr('Load more')}</button></div>` : '';
 // 2.13.0 (#453 A5): "Mark all as read" says how many and can be undone (the server returns the ids it marked)
 async function newsReadAll() {
   const before = (S.nf.items || []).filter(x => !x.read), n = S.news?.unread || before.length;
@@ -412,6 +431,7 @@ function actText0(a, U) {
     case 'event': return tr('The task became an event; the people who came along are invited to it');  // 2.21.0 (#659)
     case 'title': return tr('{0} renamed the task to “{1}”', who, esc(d.to || ''));
     case 'content': return tr('{0} edited the description', who);
+    case 'md_subtasks': return tr('{0} turned checklist items into subtasks', who) + (d.prev && canEdit(taskById(S.sel)) ? ` <button type="button" class="linkbtn" data-act="md-restore" data-aid="${+a.id}">${esc(tr('Restore the description'))}</button>` : '');  // 2.40.0 (#1409)
     case 'due': return d.due ? tr('{0} set the due date to {1}', who, due()) : tr('{0} removed the due date', who);
     case 'snooze': return tr('{0} snoozed the task to {1}', who, due());
     case 'dep_shift': return tr('{0} moved a task that blocks this one, so it moved along to {1}', who, due());

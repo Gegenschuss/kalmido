@@ -471,7 +471,7 @@ def v1_list(d):
             "listen_agent_ids": d.get("listen_agent_ids") or [],  # 2.13.1 (#471)
             "listen_default": bool(d.get("listen_default")),  # 2.30.0 (#1034): the project type lets agents listen in by default
             # 2.26.0 (#928): members may see and use the list's agents / agents may address each other
-            "agent_members": bool(d.get("agent_members")), "agent_peers": bool(d.get("agent_peers")),
+            "agent_members": bool(d.get("agent_members")), "agent_peers": False,  # 2.40.0 (#1373): deprecated, always false
             # 2.34.0 (#266): stale after N idle days (null = the default) / "Agent follows up" (event stale_tasks)
             "stale_days": d.get("stale_days"), "agent_followup": bool(d.get("agent_followup")),
             "icon": d.get("icon") or "",

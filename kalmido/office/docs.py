@@ -172,12 +172,79 @@ def _client(c, oid, cid):
     return dict(r) if r else None
 
 
-def _recipient_from_client(cl):
+def _recipient_from_client(cl, contact=None):
+    """contact (2.40.0 #1380): the chosen contact person's name ("" = none; None = the client's default)."""
     lines = [cl["name"]]
-    if cl.get("contact"):
-        lines.append(cl["contact"])
+    contact = cl.get("contact") if contact is None else contact
+    if contact:
+        lines.append(contact)
     lines += [x.strip() for x in (cl.get("address") or "").replace("\r", "").split("\n") if x.strip()]
     return {"name": cl["name"], "lines": lines[:12]}
+
+
+# 2.40.0 (#1380): the contact person of a document (office_docs.contact_id): NULL = the client's default, 0 = none, else
+# one of the client's contact persons (a deleted one falls back to the default). The "attn." line follows a change.
+def _cur_val(cur, k):
+    return cur[k] if k in cur.keys() else None
+
+
+def fk_doc_contact(c, cid, kid):
+    """The contact person (dict) a document of client cid with contact_id kid is addressed to, None = none."""
+    from .contacts_cl import fk_contact
+    if not cid or kid == 0:
+        return None
+    return fk_contact(c, cid, kid)
+
+
+def fk_doc_contact_name(c, cid, kid):
+    if kid in (None, ""):
+        k = fk_doc_contact(c, cid, None)
+    else:
+        try:
+            k = fk_doc_contact(c, cid, int(kid))
+        except (TypeError, ValueError):
+            raise BadInput(tr("Invalid value: {0}", "contact_id")) from None
+    return k["name"] if k else ""
+
+
+def fk_doc_contact_clean(c, oid, b, cur, f):
+    """contact_id from body b (with the client of f / cur); a new client without one chosen takes its default. Rewrites the
+    attn. line of the recipient unless the body sets the recipient itself."""
+    cid = f["client_id"] if "client_id" in f else _cur_val(cur, "client_id")
+    changed_client = "client_id" in f and f["client_id"] != _cur_val(cur, "client_id")
+    if "contact_id" not in b and not changed_client:
+        return
+    kid = b.get("contact_id")
+    if kid in (None, "") or not cid:
+        kid = None
+    else:
+        if isinstance(kid, bool):
+            raise BadInput(tr("Invalid value: {0}", "contact_id"))
+        try:
+            kid = int(kid)
+        except (TypeError, ValueError):
+            raise BadInput(tr("Invalid value: {0}", "contact_id")) from None
+        if kid and not c.execute("SELECT 1 FROM office_client_contacts WHERE id=? AND client_id=?", (kid, cid)).fetchone():
+            raise BadInput(tr("Invalid value: {0}", "contact_id"))
+    f["contact_id"] = kid
+    if changed_client or b.get("recipient") is not None or "recipient" in f:
+        return
+    old = fk_doc_contact(c, cid, _cur_val(cur, "contact_id"))
+    new = fk_doc_contact(c, cid, kid)
+    on, nn = (old or {}).get("name") or "", (new or {}).get("name") or ""
+    if on == nn:
+        return
+    rec = _j(cur["recipient"], {}) if _cur_val(cur, "recipient") else {}
+    lines = [str(x) for x in (rec.get("lines") or [])]
+    if on and on in [x.strip() for x in lines]:
+        i = [x.strip() for x in lines].index(on)
+        if nn:
+            lines[i] = nn
+        else:
+            lines.pop(i)
+    elif nn:
+        lines.insert(1 if lines else 0, nn)
+    f["recipient"] = json.dumps({"name": rec.get("name") or "", "lines": lines[:12]}, ensure_ascii=False)
 
 
 # ---------------------------------------------------------------- the document as the client sees it
@@ -228,6 +295,9 @@ def doc_public(c, oid, r, admin, items=True):
             if r["kind"] == "credit" and d.get("cancels_id"):
                 x = c.execute("SELECT id, number FROM office_docs WHERE id=? AND org_id=?", (d["cancels_id"], oid)).fetchone()
                 d["cancels"] = {"id": x["id"], "number": x["number"]} if x else None
+    if r["kind"] in ("invoice", "reminder"):  # 2.40.0 (#1368 points 8 + 9)
+        from .invoices import fd_reminder_extra
+        fd_reminder_extra(c, oid, [d])
     d["statuses"] = list(INV_STATUSES.get(r["kind"]) or STATUSES)
     if not admin:
         d["totals"] = {k: v for k, v in d["totals"].items() if k not in ("costs", "margin")}
@@ -238,6 +308,8 @@ def doc_public(c, oid, r, admin, items=True):
             if not admin:
                 it["cost"] = None
         d["items"] = its
+        from .contacts_cl import fk_contacts
+        d["client_contacts"] = fk_contacts(c, r["client_id"]) if r["client_id"] else []  # 2.40.0 (#1380): the choice of contact_id
         d["contract"] = _contract(c, oid, d.get("contract_id"))
         if d["contract"]:
             d["contract"] = {k: d["contract"][k] for k in ("id", "name", "raw_included", "rates", "rights_time_id", "rights_territory_id",
@@ -375,7 +447,8 @@ def _default_text(c, oid, s, kind, lang):
 
 def _apply_contract(c, oid, f, ct, lang, cur_rights):
     """The preset of a framework contract: raw data included, its rights, its closing (each only when it has one)."""
-    f["raw_mode"] = "included" if ct.get("raw_included") else "optional"
+    if office_settings(c, oid).get("raw_on"):  # 2.40.0 (#1379): raw data switched off = the document keeps its mode
+        f["raw_mode"] = "included" if ct.get("raw_included") else "optional"
     rights = dict(cur_rights or {})
     rights.update(_rights_from_contract(c, oid, ct, lang))
     f["rights"] = json.dumps(rights, ensure_ascii=False)
@@ -406,7 +479,8 @@ def clean_doc(c, oid, b, cur, admin):
                 raise Denied(404)
             f["client_id"] = cl["id"]
             if not b.get("recipient") and (not _j(cur["recipient"], {}).get("name") or b.get("recipient_from_client")):
-                f["recipient"] = json.dumps(_recipient_from_client(cl), ensure_ascii=False)
+                f["recipient"] = json.dumps(_recipient_from_client(cl, fk_doc_contact_name(c, cl["id"], b.get("contact_id"))), ensure_ascii=False)
+    fk_doc_contact_clean(c, oid, b, cur, f)
     if "recipient" in b and b.get("recipient") is not None:
         f["recipient"] = json.dumps(_recipient_clean(b["recipient"]), ensure_ascii=False)
     for k, mx in (("project_title", NAME_MAX), ("project_ref", 80), ("intro", TEXT_MAX), ("closing", TEXT_MAX), ("order_ref", 80)):
@@ -467,6 +541,7 @@ def clean_items(c, oid, r, items, admin):
         raise BadInput(tr("Invalid value: {0}", "items"))
     lang = r["lang"]
     ct = _contract(c, oid, r["contract_id"])
+    rules = office_settings(c, oid)  # 2.40.0 (#1379): a service's flags count only while their switch is on
     old = {it["id"]: it for it in doc_items(c, r["id"], oid)}
     out = []
     for i, it in enumerate(items):
@@ -500,7 +575,8 @@ def clean_items(c, oid, r, items, admin):
                         rate = ct["rates"][str(sv["id"])]
                     else:
                         rate = sv["hourly_rate"] if unit == "hour" and sv["hourly_rate"] is not None else sv["daily_rate"]
-                it = {**{"unit": unit, "tax": sv["tax"], "raw_fee": sv["raw_fee"], "producing": sv["producing"], "intext": sv["intext"]},
+                it = {**{"unit": unit, "tax": sv["tax"], "raw_fee": sv["raw_fee"] if rules.get("raw_on") else 0,
+                         "producing": sv["producing"] if rules.get("producing_on") else 0, "intext": sv["intext"]},
                       **{k: v for k, v in it.items() if v not in (None, "")}, "rate": rate}
             row["qty"] = _num(it.get("qty"), "items.qty", 0, 1e6)
             if row["qty"] is None:
@@ -510,6 +586,11 @@ def clean_items(c, oid, r, items, admin):
             row["tax"] = _choice(it.get("tax") or "standard", "items.tax", TAX_KEYS)
             row["raw_fee"] = 1 if it.get("raw_fee") in (1, True, "1", "true") else 0
             row["producing"] = 1 if it.get("producing") in (1, True, "1", "true") else 0
+            # 2.40.0 (#1379, review): a switched-off rule also holds for flags sent through the API; positions that
+            # already carried the flag keep it (existing documents stay as they are)
+            for fk, on in (("producing", "producing_on"), ("raw_fee", "raw_on")):
+                if not rules.get(on) and not (prev or {}).get(fk):
+                    row[fk] = 0
             row["intext"] = _choice(it.get("intext") or "intern", "items.intext", ("intern", "extern"))
             row["discountable"] = 0 if it.get("discountable") in (0, False, "0", "false") else 1
             if admin:
@@ -562,7 +643,7 @@ def doc_create(c, oid, uid, b, admin):
            "fx_rate": s.get("fx_usd") or 1.09, "vat_mode": "vat", "client_id": None, "recipient": json.dumps({"name": "", "lines": []}),
            "project_title": "", "project_ref": "", "date": today.isoformat(),
            "valid_until": (today + timedelta(days=int(s.get("offer_valid_days") or 30))).isoformat(), "contract_id": None,
-           "raw_mode": "optional", "raw_factor": s.get("raw_factor") if s.get("raw_factor") is not None else 0.25,
+           "raw_mode": "optional" if s.get("raw_on") else "none", "raw_factor": s.get("raw_factor") if s.get("raw_factor") is not None else 0.25,
            "prod_quotient": s.get("prod_quotient") or 3, "producing_rate": prod_rate, "discount_pct": 0,
            "intro": _default_text(c, oid, s, "intro", lang), "closing": _default_text(c, oid, s, "closing", lang),
            "rights": json.dumps(rights, ensure_ascii=False), "fields": "[]", "totals": "{}", "created_by": uid, "created_at": ts,
@@ -743,6 +824,9 @@ def odoc_list():
         args += [like, like, like, like]
     pm = inv_paid_map(c, oid) if kind in ("invoice", "credit") else {}
     rows = [doc_brief(r, pm) for r in c.execute(sql + " ORDER BY date DESC, id DESC LIMIT 500", args)]
+    if kind in ("invoice", "reminder"):  # 2.40.0 (#1368 points 8 + 9): open reminder fees, settled reminders ("done")
+        from .invoices import fd_reminder_extra
+        fd_reminder_extra(c, oid, rows)
     if st in ("partial", "overdue"):  # derived states: filtered after the fact
         rows = [x for x in rows if x["state"] == st]
     return jsonify(docs=rows, role=office_role(c, uid, oid), org_id=oid)
@@ -788,16 +872,22 @@ def odoc_update(did):
     if not isinstance(b, dict):
         return err(tr("Invalid data"))
     f = clean_doc(c, oid, b, r, admin)
+    from .doclang import fd_lang_swap, fd_put_titles  # 2.40.0 (#1381, #1363): a new language swaps unchanged standard texts
+    lang_notes, titles = fd_lang_swap(c, oid, r, b, f)
     if f:
         diff = ofx_diff({k: r[k] for k in f if k in r.keys()}, f)
         f["updated_at"] = iso(now_utc())
         c.execute(f"UPDATE office_docs SET {','.join(k + '=?' for k in f)} WHERE id=? AND org_id=?", [*f.values(), did, oid])
         if diff["after"]:
             ofx_log(c, oid, "update", doc_id=did, detail=diff)
+    fd_put_titles(c, oid, did, titles)
     recalc(c, oid, did)
     bump(c)
     c.commit()
-    return jsonify(doc_public(c, oid, doc_row(c, oid, did), admin))
+    out = doc_public(c, oid, doc_row(c, oid, did), admin)
+    if lang_notes:
+        out["lang_notes"] = lang_notes
+    return jsonify(out)
 
 
 @app.put("/api/office/docs/<int:did>/items")

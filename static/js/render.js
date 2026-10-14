@@ -3,12 +3,15 @@
 'use strict';
 
 // ------------------------------------------------------------------ render: shell
-function render() {
+function render() { return td_rcRun(render0); }  // 2.40.0 (#1430): one lookup cache per render (td_rc)
+function render0() {
+  if (td_rsT) { clearTimeout(td_rsT); td_rsT = 0; }  // 2.40.0 (#1430): a bundled live render that waits is done by this one
   _kidsIx = null;  // 2.17.0 (#649): one children index per render, built after any change made before it
   const sk = $('#skip'); if (sk && sk.textContent !== tr('Skip to content')) sk.textContent = tr('Skip to content');  // 2.13.0 (#453 A9)
   document.body.classList.toggle('in-chat', chatFull() && S.route.mod === 'agents' && !!S.route.agent);  // 2.13.0 (#453 P11)
   document.body.classList.toggle('in-team', S.route.mod === 'team');  // 2.17.0 (#419): the conversation fills the view, only its messages scroll
   document.body.classList.toggle('kidmode', !!S.me?.kid);  // 2.19.0 (#653): a kid's simple view (no sidebar, tab bar, + button)
+  for (const k of ['soft', 'strong']) document.body.classList.toggle('prbg-' + k, S.settings?.prio_bg === k);  // 2.40.0 (#1416)
   sideSearchSync(); badgeSync();
   if (S.shop) shopDraw();  // 2.19.0: shopping mode follows every reload (the app's own poll included)
   fitLayout(true); renderSide(); annSync(); ntfAskSync(); renderTop(); renderView(); renderTabs(); quotaNudge();
@@ -329,12 +332,13 @@ function renderSide() {
   // 2.25.0 (UX-03 / UX-49): Plan (the smart lists) as [key, html]: each entry can be hidden in Settings > Appearance > Sidebar;
   // (UX-47) the team chat and News moved to the group "Conversations" with the people and agents
   const hid = x => sideHidden(x);
-  const plan = [['inbox', kbInboxRowTip(row('inbox', ic('inbox'), tr('Basket'), c.lists[inbox()?.id]))], ['today', row('today', ic('sun'), tr('Today'), c.today)], ['tomorrow', row('tomorrow', ic('sunrise'), tr('Tomorrow'), c.tomorrow)],
+  const plan = [['inbox', kbInboxRowTip(row('inbox', ic('inbox'), tr('Basket'), c.lists[inbox()?.id]))],
+    ['assigned', row('assigned', ic('user'), tr('My tasks'), c.assigned)],  // 2.40.0 (#1344): right under the basket, always shown
+    ['today', row('today', ic('sun'), tr('Today'), c.today)], ['tomorrow', row('tomorrow', ic('sunrise'), tr('Tomorrow'), c.tomorrow)],
     ['week', row('week', ic('week'), tr('Next 7 days'), c.week)], ['doable', row('doable', ic('zap'), tr('Now doable'), c.doable)],
     ['pinned', c.pinned || (onTasks && k === 'pinned') ? row('pinned', ic('pin'), tr('Pinned|view'), c.pinned) : ''],  // 2.16.0 (#648): only while something is pinned
     ['waiting', c.waiting || (onTasks && k === 'waiting') ? row('waiting', ic('hourglass'), tr('Waiting on someone'), c.waiting) : ''],
     ['stale', (n => n || (onTasks && k === 'stale') ? row('stale', ic('clock'), tr('Lying idle'), n) : '')(staleCount())],  // 2.34.0 (#266): only while something lies idle
-    ['assigned', collab() && (hasSharing() || c.assigned) ? row('assigned', ic('user'), tr('My tasks'), c.assigned) : ''],
     ['byme', collab() && (hasSharing() || c.byme) ? row('byme', ic('send'), tr('Assigned by me'), c.byme) : '']];  // 2.36.2 (#1138)
   const planHidden = plan.filter(([x, h]) => h && hid('e:' + x) && !(onTasks && k === x)).length;
   const focus = plan.filter(([x, h]) => h && (!hid('e:' + x) || (onTasks && k === x))).map(([, h]) => h).join('')
@@ -378,17 +382,17 @@ function renderSide() {
   const SB = {
     focus: `${grp('focus', tr('Plan|nav'), focus)}`,
     clients: `${clientsSideHtml(onTasks)}`,
-    lists: `<div class="sgroup sg-lists">${head('lists', tr('Lists'), `<button data-act="lists-reorder" class="${S.listReorder ? 'on' : ''}" title="${tr('Sort lists')}">${ic('sort', 's')}</button><button data-act="list-new" title="${tr('New list')}">${ic('plus', 's')}</button>`, lists.length)}${S.listReorder ? `<div class="sreobar" role="group" aria-label="${esc(tr('Sort lists'))}"><span class="sreot"><b>${tr('Sort lists')}</b><small>${esc(tr('Drag by the handle on the left, or use “…”'))}</small></span><button type="button" class="btn sm pri" data-act="lists-reorder">${tr('Done')}</button></div>` : ''}${sideOpen('lists') || S.listReorder ? lh || `<div class="folder">${tr('No lists yet')}</div>` : ''}</div>`,
+    lists: `<div class="sgroup sg-lists">${head('lists', tr('Lists'), `<button data-act="lists-reorder" class="${S.listReorder ? 'on' : ''}" title="${tr('Sort lists')}">${ic('sort', 's')}</button><button data-act="list-new" title="${tr('New list')}">${ic('plus', 's')}</button>`, lists.length)}${S.listReorder ? `<div class="sreobar" role="group" aria-label="${esc(tr('Sort lists'))}"><span class="sreot"><b>${tr('Sort lists')}</b><small>${esc(tr('Drag by the handle on the left, or use “…”'))}</small></span><button type="button" class="btn sm pri" data-act="lists-reorder">${tr('Done')}</button></div>` : ''}${sideOpen('lists') || S.listReorder ? (lh && favListsHtml(lh, lists)) || `<div class="folder">${tr('No lists yet')}</div>` : ''}</div>`,
     filters: `${grp('filters', tr('Filters'), S.filters.map(f => row('f:' + f.id, ic('filter'), f.name, c.filters[f.id])).join(''), `<button data-act="filter-new" title="${esc(tr('New filter') + ' · ' + tr('Combine lists, dates, priorities, tags'))}" aria-label="${tr('New filter')}">${ic('plus', 's')}</button>`, S.filters.length, tr('Combine lists, dates, priorities, tags'))}`,
     tags: `${tags.length ? `<div class="sgroup"><button class="shead stoggle ${tagsOpen ? '' : 'closed'}" data-act="side-tags" aria-expanded="${tagsOpen}">${ic('chev', 's fcar')}<span class="spacer">${tr('Tags')}</span><span class="c">${tagsOpen ? '' : tags.length}</span></button>${tagsOpen ? tags.map(t => row('tag:' + t, ic('tag'), t, c.tags[t])).join('') : ''}</div>` : ''}`,
     views: `${views ? grp('views', tr('Views'), views, '', (views.match(/class="srow smod/g) || []).length) : ''}`,
     areas: `${areas ? grp('areas', tr('Areas|nav'), areas, '', (areas.match(/class="srow smod/g) || []).length) : ''}`,
     team: `${team ? grp('team', tr('Conversations|nav'), team, '', ppl.length + ags.length + grps.length + (convo.match(/class="srow/g) || []).length) : ''}`};
   $('#side').innerHTML = `
-    <div class="sbrand"><button type="button" class="sbhome ${S.route.mod === 'home' ? 'on' : ''}" data-go="home" title="${esc(tr('Start|home'))}" aria-label="${esc(APP_NAME + ': ' + tr('Start|home'))}" ${S.route.mod === 'home' ? 'aria-current="page"' : ''}>${logoSvg(20)}<span>${esc(APP_NAME)}</span>${S.me?.orgs?.[0] && S.me.orgs[0].trim().toLowerCase() !== APP_NAME.toLowerCase() ? `<small class="sborg">${esc(S.me.orgs[0])}</small>` : ''}</button><span class="spacer"></span>${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}${kbFoldAllBtn()}${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(acctLabel())}" aria-label="${esc(acctLabel())}">${av(S.me.id, S.me.display_name)}${netDotHtml()}${updDot() ? `<span class="dot" title="${esc(tr('Update available'))}"></span>` : ''}</button>` : ''}</div>
+    <div class="sbrand"><button type="button" class="sbhome ${S.route.mod === 'home' ? 'on' : ''}" data-go="home" title="${esc(tr('Start|home'))}" aria-label="${esc(APP_NAME + ': ' + tr('Start|home'))}" ${S.route.mod === 'home' ? 'aria-current="page"' : ''}>${logoSvg(20)}<span class="sbtxt"><span>${esc(APP_NAME)}</span>${S.me?.orgs?.[0] && S.me.orgs[0].trim().toLowerCase() !== APP_NAME.toLowerCase() ? `<small class="sborg">${esc(S.me.orgs[0])}</small>` : ''}</span></button><span class="spacer"></span>${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}${kbFoldAllBtn()}${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(acctLabel())}" aria-label="${esc(acctLabel())}">${av(S.me.id, S.me.display_name)}${netDotHtml()}${updDot() ? `<span class="dot" title="${esc(tr('Update available'))}"></span>` : ''}</button>` : ''}</div>
     ${wsBarHtml()}
     <button class="scmd" data-act="palette" title="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${tr('Jump, create, ask an agent…')}</span></button>
-    ${sideGroupOrder().filter(g => !hid('g:' + g) || g === 'lists').map(g => SB[g] || '').join('')}
+    ${favSideHtml(lists, listRow, head)}${sideGroupOrder().filter(g => !hid('g:' + g) || g === 'lists').map(g => SB[g] || '').join('')}
     <div class="sgroup sfoot">
       ${row('all', ic('all'), tr('All'), c.all)}
       ${row('done', ic('done'), tr('Completed'), '')}
@@ -441,7 +445,7 @@ function renderTop0() {
       // tabs become icons (the name stays as aria-label and tooltip)
       if (vc.length > 1 && !isMobile()) acts += `<div class="seg vseg ttabs" role="group" aria-label="${esc(tr('View'))}">${vc.map(([k, n, i]) => `<button class="${v === k ? 'on' : ''}" data-act="view-${k}" data-ico="${i}" title="${esc(tr(n))}" aria-label="${esc(tr(n))}" aria-pressed="${v === k}">${ic(i, 's')}<span class="vtl">${esc(tr(n))}</span></button>`).join('')}</div>`;
       // 2.14.0 (#425): "Columns…" (the list's columns for every member) replaces the per-device field-column switch
-      if (!isMobile() && v === 'list' && !l.archived) acts += `<button class="iconbtn tf ${listCols(l) ? 'on' : ''}" data-act="cols" data-ico="columns" data-id="${l.id}" title="${esc(tr('Shown fields…'))}" aria-label="${esc(tr('Shown fields…'))}" aria-haspopup="dialog">${ic('columns')}</button>`;
+      if (td_colsWide() && v === 'list' && !l.archived) acts += `<button class="iconbtn tf ${listCols(l) ? 'on' : ''}" data-act="cols" data-ico="columns" data-id="${l.id}" title="${esc(tr('Shown fields…'))}" aria-label="${esc(tr('Shown fields…'))}" aria-haspopup="dialog">${ic('columns')}</button>`;
       // 2.6.0 (K12): Share next to the title (desktop / tablets; phones: in "…")
       if (!l.is_inbox && !l.archived && collab() && !isMobile()) acts += `<button class="iconbtn tf shbtn" data-act="share-list" data-ico="users" data-id="${l.id}" title="${esc(tr('Share…'))}" aria-label="${esc(tr('Share…'))}">${ic('users', 's')}<span class="bl">${tr('Share')}</span></button>`;
     }
@@ -451,7 +455,7 @@ function renderTop0() {
   if (fk && feat('matrix') && !isMobile()) acts += `<div class="seg vseg fseg tf" role="group" aria-label="${esc(tr('View'))}"><button class="${m === 'tasks' ? 'on' : ''}" data-act="fview" data-k="list" data-ico="list" data-f="${esc(fk)}" title="${esc(tr('List'))}" aria-pressed="${m === 'tasks'}">${ic('list', 's')}</button><button class="${m === 'matrix' ? 'on' : ''}" data-act="fview" data-k="matrix" data-ico="grid" data-f="${esc(fk)}" title="${esc(tr('Matrix'))}" aria-pressed="${m === 'matrix'}">${ic('grid', 's')}</button></div>`;
   if (m === 'tasks' && k === 'all' && feat('timeline')) { const v = isRoadmap() ? 'timeline' : 'list'; acts += `<div class="seg tf" role="group" aria-label="${tr('View')}"><button class="${v === 'list' ? 'on' : ''}" data-act="rm-view" data-k="list" data-ico="list" title="${tr('List')}" aria-pressed="${v === 'list'}">${ic('list', 's')}</button><button class="${v === 'timeline' ? 'on' : ''}" data-act="rm-view" data-k="timeline" data-ico="timeline" title="${tr('Timeline')}" aria-pressed="${v === 'timeline'}">${ic('timeline', 's')}</button></div>`; }
   if (m === 'tasks' && k === 'inbox') acts += kbSortBtn();  // 2.39.1 (#1219)
-  if (m === 'tasks' && k === 'trash' && (S.extra || []).some(t => !t.keep)) acts += `<button class="btn sm danger" data-act="trash-empty">${tr('Empty')}</button>`;
+  if (m === 'tasks' && k === 'trash' && (S.hist?.k === 'trash' && S.hist.deletable != null ? S.hist.deletable > 0 : (S.extra || []).some(t => !t.keep))) acts += `<button class="btn sm danger" data-act="trash-empty">${tr('Empty')}</button>`;
   if (m === 'tasks' && k === 'done' && (S.extra || []).length) acts += `<button class="btn sm" data-act="done-clean" title="${esc(tr('Move completed tasks to the trash'))}">${ic('trash', 's')}<span class="bl">${tr('Delete completed…')}</span></button>`;
   // 2.24.0 (#906): "Tasks of …" of another person: write to them
   if (m === 'tasks' && k.startsWith('who:') && S.me && +k.slice(4) !== S.me.id && !agentById(+k.slice(4))) acts += `<button class="btn sm tf" data-act="dm" data-uid="${+k.slice(4)}" data-ico="comment" title="${esc(tr('Message'))}">${ic('comment', 's')}<span class="bl">${tr('Message')}</span></button>`;
@@ -477,7 +481,7 @@ function renderTop0() {
   const kl = m === 'tasks' && k.startsWith('l:') ? listById(+k.slice(2)) : null;
   const badge = kl?.kind === 'project' ? `<span class="kbadge" title="${esc(projectParts().join(', '))}">${tr('Project')}</span>` : '';
   S.bandOn = bandAgents().length > 0;  // 2.8.0 (#434): the band shows the agents' dots, the header pill keeps only the robot
-  setHtml($('#top'), `<button class="iconbtn menu" data-act="side" aria-label="${tr('Menu')}">${ic('menu')}</button><h1 title="${esc(title)}">${listIconHtml(kl, {cls: 'h', full: false})}<span class="ht">${esc(title)}</span>${badge}${nOpen ? `<span class="hn" aria-label="${esc(trn('{0} open task', '{0} open tasks', nOpen))}">${nOpen}</span>` : ''}${ms}</h1>${cf}${off}${timerPill()}${pm}${acts}${isMobile() ? '' : histBtns()}${pal}${tnew}${wsChip()}${stChip()}${agentChip()}${bellBtn()}`);  // 2.7.2 (#417): the agents' robot + dots directly before the bell  // 2.7.0 (#405): touch tablets / an unfolded Fold have the room for ← →
+  setHtml($('#top'), `<button class="iconbtn menu" data-act="side" aria-label="${tr('Menu')}">${ic('menu')}</button><h1 title="${esc(title)}">${listIconHtml(kl, {cls: 'h', full: false})}<span class="ht">${esc(title)}</span>${badge}${nOpen ? `<span class="hn" aria-label="${esc(trn('{0} open task', '{0} open tasks', nOpen))}">${nOpen}</span>` : ''}${ms}</h1>${favTopBtn(kl)}${cf}${off}${timerPill()}${pm}${acts}${isMobile() ? '' : histBtns()}${pal}${tnew}${wsChip()}${stChip()}${agentChip()}${bellBtn()}`);  // 2.7.2 (#417): the agents' robot + dots directly before the bell  // 2.7.0 (#405): touch tablets / an unfolded Fold have the room for ← →
   fitTop();
   netDotDraw();  // 2.31.0 (#378): the dot at the own picture follows every change of the connection
 }
@@ -587,6 +591,8 @@ function topMoreItems() {
   { const rl = m === 'tasks' ? routeList() : null; if (rl && isOwner(rl) && !rl.is_inbox && listView(rl) === 'list' && !isOverview()) sec.push(dabItem(rl)); }  // 2.7.2 (#414)
   sec.push(...collapseItems());
   sec.push(...kbGroupResetItems());  // 2.39.1 (#1221)
+  sec.push(...favViewItems());  // 2.40.0 (#1361)
+  { const mo = moViewItems(); if (mo.length) sec.push(...mo); }  // 2.40.0 (#1344): own order / grouped by list
   const mxk = m === 'tasks' ? (k === 'inbox' ? 'l:' + inbox()?.id : k.startsWith('l:') || k.startsWith('f:') || k.startsWith('folder:') ? k : '') : '';
   if (mxk && feat('matrix')) sec.push({label: tr('Show as matrix'), icon: 'grid', fn: () => { mxSet({scope: mxk}); go('matrix'); }});
   const mxs = m === 'matrix' ? mxGet().scope : '';  // 2.4.2 (#390): back from the matrix to the folder / list it shows
@@ -687,8 +693,10 @@ function focusSig(el) {
 // only on the same node (Firefox went back to the previous element after a refocus on a new copy).
 let morphRoot = null;
 function setHtml(el, html) {
-  if (morphRoot !== el) { el.innerHTML = html; return; }
-  const t = document.createElement('template'); t.innerHTML = html; morphKids(el, t.content);
+  const fg = typeof fgKeep === 'function' ? fgKeep(el) : null;  // 2.40.0 (#1371): unsaved form input survives the redraw
+  if (morphRoot !== el) el.innerHTML = html;
+  else { const t = document.createElement('template'); t.innerHTML = html; morphKids(el, t.content); if (typeof infoize === 'function') infoize(el); }  // 2.40.0 (#1382): (i) buttons back after a morph
+  if (fg) fg();
 }
 const mkey = n => n.nodeType !== 1 ? null : ['data-k', 'data-id', 'data-cid', 'data-aid', 'data-jid', 'data-mid', 'data-key', 'data-section'].map(k => n.getAttribute(k)).find(v => v != null) ?? null;
 function morphKids(a, b) {
@@ -720,7 +728,7 @@ function keepFocus(root, fn) {
   if (n && n.offsetParent !== null && !n.disabled) n.focus({preventScroll: true});
   return r;
 }
-function renderView() { const r = keepFocus($('#view'), renderView0); rowRove(); rowMoreWatch(); return r; }
+function renderView() { return td_rcRun(() => { const r = keepFocus($('#view'), renderView0); rowRove(); rowMoreWatch(); td_lcSweep(); return r; }); }
 function renderView0() {
   const m = S.route.mod, el = $('#view');
   // 2.12.2 (#451): the open phone chat is never rebuilt (that took the focus, closed the keyboard and jumped to the top):
@@ -810,7 +818,8 @@ function taskRow(t, opts = {}) {
   if (S.route.key === 'stale' && !opts.trash && staleOf(t)) meta.push(staleChipHtml(t));  // 2.34.0 (#266)
   if (t.approval === 'pending' && t.status === 0 && !opts.trash) meta.push(approvalChip(t));  // 2.23.0 (#463)
   if (t.pinned && !opts.trash) meta.push(`<span class="pinm">${ic('pin', 's')}</span>`);
-  if (lst) meta.push(`<span class="lst${mc}" title="${esc(lst)}">${licMark(listById(t.list_id), 'lsm')}${esc(lst)}</span>`);  // 2.36.2 (#1135)
+  if (lst && moOwn() && !opts.depth) meta.unshift(moSubHtml(t));  // 2.40.0 (#1344): My tasks, own order: "List › Section"
+  else if (lst) meta.push(`<span class="lst${mc}" title="${esc(lst)}">${licMark(listById(t.list_id), 'lsm')}${esc(lst)}</span>`);  // 2.36.2 (#1135)
   // 2.16.0 (#473): overdue is not only red: the alert icon + a word for screen readers
   // 2.31.0 (#1051): in Today a task due today carries no "Today" chip (the view says it), only its time
   const inDay = opts.inToday && t.due === today() && t.status === 0;
@@ -873,8 +882,8 @@ function taskRow(t, opts = {}) {
   const cols = tc ? `<div class="tcols" data-act="open">${timeOn() && (opts.tcols.list || isProject(t.list_id)) ? `<span class="c-time ${time?.live ? 'live' : ''}" title="${time ? time.tip : ''}">${time ? time.txt : ''}</span>` : ''}${collab() ? `<span class="c-who">${who}</span>` : ''}${opts.tcols.list ? `<span class="c-list" title="${esc(lst)}"><span>${esc(lst)}</span></span>` : ''}<span class="c-date ${dueClass(t)}" title="${esc(due)}">${t.start && t.start < t.due ? ic('timeline', 's rngi') : ''}<span class="cdt">${esc(inDay ? t.due_time || '' : dueLabel(t, false))}</span></span></div>` : '';
   let h = `<div class="trow ${t.priority && !opts.checklist ? 'pr' + t.priority : ''} ${opts.checklist ? 'ck' : ''} ${tc || lc ? 'hascols' : ''} ${lc ? 'haslc' : ''} ${t.status ? 'done' : ''} ${opts.depth ? 'sub d' + opts.depth : ''} ${opts.subRow ? 'subrow' : ''} ${S.sel === t.id ? 'sel' : ''} ${gut ? 'hasgut' : ''} ${S.kf === t.id && !opts.subRow ? 'kfocus' : ''} ${S.multi.has(t.id) ? 'msel' : ''} ${ro ? 'ro' : ''} ${opts.next && !opts.depth ? 'flownext' : ''}" data-id="${t.id}" ${opts.drag !== false && !opts.trash && !ro && !isMobile() ? 'draggable="true"' : ''}>
     ${caret}
-    ${opts.trash ? `<span class="chk ${chk}">${t.status === 2 ? ic('check') : ''}</span>` : `<button class="chk ${chk}" data-act="toggle" role="checkbox" aria-checked="${t.status === 2}" aria-label="${esc(isMs(t) ? tr('Complete milestone: {0}', t.title) : tr('Complete: {0}', t.title))}" ${ro ? 'disabled' : ''}>${t.status === 2 ? ic('check') : t.status === -1 ? ic('x') : ''}</button>`}${gut}
-    <div class="tmain" data-act="${opts.trash ? '' : 'open'}"><div class="ttl"${opts.trash ? '' : ` data-kt role="button" tabindex="-1" aria-describedby="${lc ? `tc-${t.id} ` : ''}tm-${t.id}"`}>${esc(t.title)}${tlkIs(t) && !opts.trash ? `<span class="tlkr" role="img" title="${esc(tr('Locked'))}" aria-label="${esc(tr('Locked'))}">${ic('lock', 's')}</span>` : ''}${t.priority && !opts.checklist && !opts.trash && t.status === 0 && !(lc && lc.includes('prio')) ? prioMark(t.priority) : ''}</div><div class="meta" id="tm-${t.id}">${meta.join('')}</div></div>
+    ${opts.trash ? `<span class="chk ${chk}">${t.status === 2 ? ic('check') : ''}</span>` : `<button class="chk ${chk}" data-act="toggle" role="checkbox" aria-checked="${t.status === 2}" aria-label="${esc(isMs(t) ? tr('Complete milestone: {0}', mdPlain(t.title)) : tr('Complete: {0}', mdPlain(t.title)))}" ${ro ? 'disabled' : ''}>${t.status === 2 ? ic('check') : t.status === -1 ? ic('x') : ''}</button>`}${gut}
+    <div class="tmain" data-act="${opts.trash ? '' : 'open'}"><div class="ttl"${opts.trash ? '' : ` data-kt role="button" tabindex="-1" aria-describedby="${lc ? `tc-${t.id} ` : ''}tm-${t.id}"`}>${mdTitle(t.title)}${tlkIs(t) && !opts.trash ? `<span class="tlkr" role="img" title="${esc(tr('Locked'))}" aria-label="${esc(tr('Locked'))}">${ic('lock', 's')}</span>` : ''}${t.priority && !opts.checklist && !opts.trash && t.status === 0 && !(lc && lc.includes('prio')) ? prioMark(t.priority) : ''}</div><div class="meta" id="tm-${t.id}">${meta.join('')}</div></div>
     ${!opts.trash && !ro && t.id > 0 && !isTouch() ? `<button class="iconbtn rpin ${t.pinned ? 'on' : ''}" data-act="pin" title="${esc(t.pinned ? tr('Unpin') : tr('Pin'))}" aria-label="${esc(t.pinned ? tr('Unpin') : tr('Pin'))}" aria-pressed="${!!t.pinned}">${ic('pin', 's')}</button>` : ''}
     ${opts.cols ? `<div class="fcols" data-act="open">${opts.cols.map(f => `<span class="fcell t-${esc(f.type)}">${fieldCell(f, t.fields?.[f.id], t.list_id)}</span>`).join('')}</div>` : ''}
     ${cols}${lcH}
@@ -952,7 +961,7 @@ function fieldText(f, v, lid) {
 function fieldChip(f, v, lid) {
   const txt = fieldText(f, v, lid); if (!txt) return '';
   const tip = esc(f.name + ': ' + (f.type === 'url' ? v : f.type === 'date' ? fmtDate(v) : txt));
-  if (f.type === 'select') { const o = selOpt(f, v); return `<span class="fchip sel" style="${cssColor(o.color) ? '--fc:' + cssColor(o.color) : ''}" title="${tip}">${esc(o.name)}</span>`; }
+  if (f.type === 'select') { const o = selOpt(f, v); return `<span class="fchip sel${lrSelFill(o)}" ${lrSelStyle(o)} title="${tip}">${esc(o.name)}</span>`; }
   if (f.type === 'checkbox') return `<span class="fchip" title="${tip}">${ic('check', 's')}${esc(f.name)}</span>`;
   if (f.type === 'person') return (isTouch() ? av : avBtn)(+v, txt, 'who', `title="${tip}"`);
   if (f.type === 'url') return flkLink(v, 'lnk', `${ic(flkIs(v) ? 'folder' : 'link', 's')}${esc(txt)}`, true);
@@ -961,7 +970,7 @@ function fieldChip(f, v, lid) {
 }
 function fieldCell(f, v, lid) {  // column view (desktop)
   if (v == null || v === '') return '';
-  if (f.type === 'select') { const o = selOpt(f, v); return o ? `<span class="fchip sel" style="${cssColor(o.color) ? '--fc:' + cssColor(o.color) : ''}">${esc(o.name)}</span>` : ''; }
+  if (f.type === 'select') { const o = selOpt(f, v); return o ? `<span class="fchip sel${lrSelFill(o)}" ${lrSelStyle(o)}>${esc(o.name)}</span>` : ''; }
   if (f.type === 'checkbox') return v === '1' ? ic('check', 's') : '';
   if (f.type === 'url') return flkLink(v, 'lnk', esc(urlHost(v)), true);
   return `<span title="${esc(fieldText(f, v, lid))}">${esc(fieldText(f, v, lid))}</span>`;
@@ -981,7 +990,9 @@ const HERON = {
 };
 const heron = (pose, cls = '') => { const [vb, inner] = HERON[pose] || HERON.empty; return `<svg class="heron ${cls}" viewBox="${vb}" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`; };
 const heronEmpty = (pose, title, sub = '') => `<div class="empty hempty">${heron(pose)}<b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>`;
-const fieldCols = lid => !isMobile() && !!LS.get('fcols.' + lid, false) && fieldsOf(lid).length > 0;
+// 2.40.0 (#1191): list columns from 600 px on (tablets, an unfolded Fold); isMobile() (< 900 px) stays for the rest of the app
+const td_colsWide = () => td_rc('colw', () => !isMobile() || matchMedia('(min-width:600px)').matches);
+const fieldCols = lid => td_colsWide() && !!LS.get('fcols.' + lid, false) && fieldsOf(lid).length > 0;
 // ---- 2.14.0 (#425): list columns. One setting per list, the same for every member (owner / list admins change it in
 // "Columns…"): which columns the rows show and in which order, custom fields and the task number included. null = the
 // default layout (date, assignee, time as before; fields as chips). Narrow widths show the first two columns, the rest
@@ -1036,7 +1047,7 @@ function colModal(id) {
   const dis = may ? '' : 'disabled';
   const rowH = (k, i) => `<li class="colr ${on.has(k) ? 'on' : ''}" data-k="${esc(k)}">${may ? `<span class="colh" data-colh title="${esc(tr('Drag to reorder'))}" aria-hidden="true">${ic('grip', 's')}</span>` : ''}<label class="chkl"><input type="checkbox" data-colk="${esc(k)}" ${on.has(k) ? 'checked' : ''} ${dis}><span class="coln">${k.startsWith('f:') ? ic('sliders', 's') : ic(COL_ICON[k], 's')}<span>${esc(names[k])}</span></span></label>${may && k.startsWith('f:') ? tcFieldBtns(k, names[k]) : ''}${may ? `<button type="button" class="iconbtn colmv" data-colmv="-1" ${i ? '' : 'disabled'} title="${esc(tr('Move up'))}" aria-label="${esc(tr('Move up') + ': ' + names[k])}">${ic('chev', 's cup')}</button><button type="button" class="iconbtn colmv" data-colmv="1" ${i < order.length - 1 ? '' : 'disabled'} title="${esc(tr('Move down'))}" aria-label="${esc(tr('Move down') + ': ' + names[k])}">${ic('chev', 's')}</button>` : ''}</li>`;
   const md = modal(`<h3 id="col-t">${ic('columns', 's')}${tr('Shown fields')}</h3>
-    <p class="muted coldesc">${esc(tr('The same for everyone in this list. Phones show the first two fields, the rest in the second line.'))}</p>
+    <p class="muted coldesc">${esc(tr('The same for everyone in this list. Phones show the first two fields, the rest in the second line; tablets show as many columns as fit.'))}</p>
     ${may ? '' : `<p class="rohint">${ic('lock', 's')}${esc(tr('Only the owner and list admins can change the shown fields.'))}</p>`}
     <label class="chkl colnum"><input type="checkbox" id="col-num" ${num ? 'checked' : ''} ${dis}><span class="coln">${ic('hash', 's')}<span>${tr('Task number in front of the title')}</span></span></label>
     <ul class="colls" id="col-ls" aria-labelledby="col-t" tabindex="-1">${order.map(rowH).join('')}</ul>
@@ -1195,9 +1206,24 @@ document.addEventListener('pointerdown', e => {
   const wMax = w0 + room, guide = lcGuide(g);
   g.setPointerCapture?.(e.pointerId); document.body.classList.add('pgdrag'); g.classList.add('drag');
   const mv = ev => { lcwSet(lid, k, Math.min(wMax, w0 - (ev.clientX - x0) / rem)); lcGuide(g, guide); };
-  const up = () => { g.removeEventListener('pointermove', mv); document.body.classList.remove('pgdrag'); g.classList.remove('drag'); guide.remove(); };
-  g.addEventListener('pointermove', mv); g.addEventListener('pointerup', up, {once: true}); g.addEventListener('pointercancel', up, {once: true});
+  const up = () => {
+    if (td_lcDrag?.g === g) td_lcDrag = null;
+    ['pointermove', 'pointerup', 'pointercancel', 'lostpointercapture'].forEach((n, i) => g.removeEventListener(n, i ? up : mv));
+    document.body.classList.remove('pgdrag'); g.classList.remove('drag'); guide.remove();
+  };
+  // 2.40.0 (#1430): a render that replaces the grip loses the capture: lostpointercapture (and the sweep after a render) ends it
+  td_lcDrag = {g, up};
+  g.addEventListener('pointermove', mv); ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(n => g.addEventListener(n, up));
 }, true);
+// 2.40.0 (#1430): after a render: a width drag whose grip is gone ends; guide lines without a running drag go, and so does
+// body.pgdrag when nothing is dragged any more (the detail pane's grip keeps its own)
+let td_lcDrag = null;
+function td_lcSweep() {
+  if (td_lcDrag && !td_lcDrag.g.isConnected) td_lcDrag.up();
+  if (td_lcDrag || document.body.classList.contains('lcmoving')) return;
+  document.querySelectorAll('body > .lcguide').forEach(x => x.remove());
+  if (document.body.classList.contains('pgdrag') && !document.querySelector('.drag')) document.body.classList.remove('pgdrag');
+}
 document.addEventListener('dblclick', e => { const g = e.target.closest?.('.lchead .lcg'); if (g) lcwSet(+g.closest('.lchead').dataset.lid, g.dataset.lcg, null); });
 document.addEventListener('keydown', e => {
   const g = e.target.closest?.('.lchead .lcg'); if (!g) return;
@@ -1335,6 +1361,7 @@ function viewListBody() {
   // the marker becomes the block "tasks"
   const tdc = S.route.key === 'today' ? {brief: briefCard(), wait: waitCard(), review: reviewCard(), overdue: odHead ? '' : overdueBanner(), events: cevTodayBlock()} : null;  // 2.24.0 (UX-35): the planners in "…"  // 2.10.0 (#440): review + planner
   if (tdc) h += '\u0001';
+  h += favViewNote();  // 2.40.0 (#1361): a view filtered to favourites says so
   if (rl && sortOwn()) h += `<div class="onehint sortown">${ic('sort', 's')}<span>${esc(tr('You see your own sort of this shared list.'))}</span><button type="button" class="btn sm" data-act="sort-shared">${tr('Back to the shared sort')}</button></div>`;  // 2.27.0 (#988)
   if (flow && FLOW.cyc) h += `<div class="flowhint">${ic('deps', 's')}${esc(tr('Some tasks block each other in a circle; they are ordered by date.'))}</div>`;
   if (lc && total0(groups)) h += lcHead(rl, lc);
@@ -1365,7 +1392,7 @@ function viewListBody() {
     // 1.7.0 Flow: the first task of each group that waits on nothing is marked "Next" (2.0.4: "Ready to start", and only
     // when some open task shown here waits on something; without dependencies the badge would say nothing)
     const nx = flow && flowDeps ? g.tasks.find(t => t.status === 0 && !t.context && !(t.blocked && dFor(t)))?.id : 0;
-    if (!closed) { const n = Math.max(0, Math.min(g.tasks.length, budget)); h += g.tasks.slice(0, n).map(t => taskRow(t, {showList: showList && !g.lic, tree: true, cols, lc, tcols: {list: showList && !g.lic}, next: t.id === nx, crd, inToday: S.route.key === 'today', ...(v.dsx ? {dsx: showDone(), ...(t.status ? {drag: false} : {})} : {})})).join(''); budget -= n; cut += g.tasks.length - n; }
+    if (!closed) { const n = Math.max(0, Math.min(g.tasks.length, budget)); h += g.tasks.slice(0, n).map(t => taskRow(t, {showList: showList && !g.lic, tree: true, cols, lc, tcols: {list: showList && !g.lic && !moOwn()}, next: t.id === nx, crd, inToday: S.route.key === 'today', ...(v.dsx ? {dsx: showDone(), ...(t.status ? {drag: false} : {})} : {})})).join(''); budget -= n; cut += g.tasks.length - n; }
     if (!closed && g.section !== undefined && !g.tasks.length && !ro) h += `<div class="sdrop" data-section="${g.section ?? ''}">${tr('Drop tasks here')}</div>`;  // shown while a task is dragged
     if (g.name) h += '</div>';
   }
@@ -1377,7 +1404,7 @@ function viewListBody() {
   if (v.list && !ro && !rl?.is_inbox && (!rl || canEditList(rl.id))) h += `<button class="iconbtn secnew" data-act="section-new" style="margin:.375rem 0 0 -.25rem">${ic('plus', 's')} ${tr('Section')}</button>`;
   if (ck) {  // 2.7.2 (#414) "Show completed at the bottom" (was the checklist type): done items stay below in "Done" (open by
     // default), one tap puts them back on the list
-    const k = 'ckdone:' + rl.id, closed = S.collapsed.has(k), done = v.done.slice().sort((a, b) => a.title.localeCompare(b.title, LOCALE()));
+    const k = 'ckdone:' + rl.id, closed = S.collapsed.has(k), done = v.done.slice().sort((a, b) => mdPlain(a.title).localeCompare(mdPlain(b.title), LOCALE()));
     h += `<div class="group ckdone"><div class="ghead ${closed ? 'closed' : ''}" data-act="collapse" data-key="${k}" title="${esc(tr('Ticked-off items land here and can be put back on the list with one tap.'))}">${ic('chev', 's')}${tr('Done|checklist')} <span class="c">${done.length}</span>${done.length && !ro ? `<button class="btn sm gact" data-act="ck-uncheck" data-id="${rl.id}">${ic('undo', 's')} ${tr('Uncheck all')}</button><button class="btn sm gact" data-act="ck-clear" data-id="${rl.id}">${ic('trash', 's')} ${tr('Clear done')}</button>` : ''}</div>`;
     if (done.length) hintDone('ckdone');  // used once: the hint has done its job
     if (!closed) h += done.length ? done.map(t => taskRow(t, {drag: false, cols, lc, ckback: true})).join('') : hintOnce('ckdone', tr('Ticked-off items land here and can be put back on the list with one tap.'), 'ckempty');
@@ -1447,14 +1474,16 @@ function viewHistory() {
   const arr = S.extra || [];
   if (!arr.length) return `<div class="empty">${ic(trash ? 'trash' : 'done')}${trash ? tr('Trash is empty.') : tr('Nothing completed yet.')}</div>`;
   if (trash) {  // 2.0.5: what "Empty" leaves behind (shared lists of other owners) is said up front and marked per row
-    const kept = arr.filter(t => t.keep).length;
+    const kept = S.hist?.k === 'trash' && S.hist.kept != null ? S.hist.kept : arr.filter(t => t.keep).length;  // 2.40.0 (#1432): the whole trash
     return (kept ? `<div class="shint trkeep">${ic('lock', 's')} ${esc(trn('{0} item stays when you empty the trash: it is in a list of another owner, only they can delete it for good.', '{0} items stay when you empty the trash: they are in lists of other owners, only they can delete them for good.', kept))}</div>` : '')
-      + arr.map(t => taskRow(t, {trash: true, showList: true})).join('');
+      + arr.map(t => taskRow(t, {trash: true, showList: true})).join('') + histMoreHtml();
   }
   const g = new Map();
   for (const t of arr) { const d = (t.completed_at ? new Date(t.completed_at) : new Date()); const k = ds(d); if (!g.has(k)) g.set(k, []); g.get(k).push(t); }
-  return [...g.entries()].map(([k, ts]) => `<div class="group"><div class="ghead">${dayLabel(k, true)} <span class="c">${ts.length}</span></div>${ts.map(t => taskRow(t, {showList: true, drag: false, tcols: {list: true}})).join('')}</div>`).join('');
+  return [...g.entries()].map(([k, ts]) => `<div class="group"><div class="ghead">${dayLabel(k, true)} <span class="c">${ts.length}</span></div>${ts.map(t => taskRow(t, {showList: true, drag: false, tcols: {list: true}})).join('')}</div>`).join('') + histMoreHtml();
 }
+// 2.40.0 (#1432): "Load more" under Completed / Trash, only while the server has more
+const histMoreHtml = () => S.hist?.next && S.hist.k === S.route.key ? `<div class="audmore"><button type="button" class="btn sm" data-act="hist-more">${tr('Load more')}</button></div>` : '';
 function viewSearch() {
   return `<div class="search"><input id="searchq" type="search" aria-label="${esc(tr('Search'))}" placeholder="${tr('Search titles and notes')}" autocomplete="off" enterkeyhint="search"></div><div id="sresults">${S.searchRes ? renderSearchRes() : ''}</div><div id="smsgs">${msgSecHtml()}</div>`;
 }

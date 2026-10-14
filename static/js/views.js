@@ -7,12 +7,12 @@ function viewTasks() {
   const k = S.route.key, t0 = today();
   const open = openTasks(true);
   // completed tasks from the last 14 days stay visible (collapsed) in list views
-  const doneRecent = [...S.tasks.values()].filter(t => t.status !== 0 && !t.parent_id && !archHidden(t) && !t.context);
+  const doneRecent = [...S.tasks.values()].filter(t => t.status !== 0 && !t.parent_id && !archHidden(t) && !t.context && favKeep(t, k));  // 2.40.0 (#1361): favKeep
   const doneSince = t => t.completed_at && t.completed_at.slice(0, 10) >= addDays(t0, -1);  // date views: done since yesterday
   // roots = matching tasks whose parent does not match too (a subtask due today shows up in "Heute"
   // even if its parent does not); children are rendered below their root
   const pick = (pred, group, extra = {}) => {
-    const m = open.filter(t => (!t.context || extra.list) && pred(t)), ids = new Set(m.map(t => t.id));
+    const m = open.filter(t => (!t.context || extra.list) && pred(t) && favKeep(t, k)), ids = new Set(m.map(t => t.id));  // 2.40.0 (#1361): only favourites
     return {open: m.filter(t => !t.parent_id || !ids.has(t.parent_id)), group, ...extra};
   };
   // 1.5.1: every view has its own "Show completed" (list "…" menu), so every view offers its completed tasks
@@ -24,7 +24,8 @@ function viewTasks() {
   if (k === 'pinned') return {...pick(t => !!t.pinned, 'list'), done: []};  // 2.16.0 (#648): grouped by list
   if (k === 'stale') return {...pick(t => !!staleOf(t), 'list'), done: []};  // 2.34.0 (#266)
   if (k === 'all') return {...pick(() => true, 'list'), done: doneRecent};
-  if (k === 'assigned') return {...pick(mineAssigned, 'list'), done: doneRecent.filter(t => !!S.me && t.assignee_id === S.me.id)};  // 2.10.0: + my groups' tasks
+  // 2.40.0 (#1344): own order (one group, mineorder.js) or grouped by list as before; without collaboration: every task of mine
+  if (k === 'assigned') return {...pick(moPred(), moView() === 'own' ? 'none' : 'list'), mine: true, done: doneRecent.filter(t => collab() ? !!S.me && t.assignee_id === S.me.id : mineTask(t))};  // 2.10.0: + my groups' tasks
   if (k.startsWith('grp:')) {  // 2.10.0 (#441): open tasks assigned to a group, in the lists I see
     const gid = +k.slice(4);
     return {...pick(t => t.assignee_group_id === gid, 'list'), done: []};
@@ -215,7 +216,7 @@ function sortTasks(arr, m = sortMode()) {
     custom: bySort,
     date: (a, b) => dueKey(a).localeCompare(dueKey(b)) || b.priority - a.priority || bySort(a, b),
     prio: (a, b) => b.priority - a.priority || bySort(a, b),
-    title: (a, b) => a.title.localeCompare(b.title, 'de'),
+    title: (a, b) => mdPlain(a.title).localeCompare(mdPlain(b.title), 'de'),  // 2.40.0 (#1409): by the text, not the marks
     // 2.0.8 (#319): by creation, newest first / oldest first (ties: id, i.e. creation order)
     created: (a, b) => (b.created_at || '').localeCompare(a.created_at || '') || b.id - a.id,
     created_asc: (a, b) => (a.created_at || '').localeCompare(b.created_at || '') || a.id - b.id,
@@ -225,11 +226,11 @@ function sortTasks(arr, m = sortMode()) {
   return arr.sort(f);
 }
 function groupTasks(v) {
-  const all = sortTasks(v.open.slice()), pinned = all.filter(t => t.pinned);
+  const all = v.mine ? moSort(v.open.slice()) : sortTasks(v.open.slice()), pinned = all.filter(t => t.pinned);  // 2.40.0 (#1344): My tasks in the own order
   // 1.7.0: Flow shows one sequence instead of date groups (sections and the folder's lists stay)
   const g = kbOrderGroups(groupRest(v.group === 'date' && sortMode() === 'flow' ? {...v, group: 'none'} : v, all.filter(t => !t.pinned), v.inSec || []));  // 2.39.1 (#1221): own order
   const mine = kbMineGroup();  // 2.39.1 (#1219): My tasks + "From your lists, without a date"
-  if (mine) { const ids = new Set(all.map(t => t.id)); mine.tasks = mine.tasks.filter(t => !ids.has(t.id)); if (mine.tasks.length) g.push(mine); }
+  if (mine) { const ids = new Set(all.map(t => t.id)); mine.tasks = mine.tasks.filter(t => !ids.has(t.id) && favKeep(t)); if (mine.tasks.length) g.push(mine); }
   return pinned.length ? [{id: 'pinned', name: tr('Pinned'), tasks: pinned, cls: 'pin'}, ...g] : g;
 }
 function groupRest(v, arr, dn = []) {  // dn: 2.36.2 (#1136) the completed tasks that stay in their sections
@@ -282,7 +283,7 @@ function quickDefaults() {
   if (k === 'tomorrow') d.due = addDays(today(), 1);
   if (k.startsWith('l:')) d.list_id = +k.slice(2);
   if (k === 'inbox') d.list_id = inbox().id;
-  if (k === 'assigned' && S.me) d.assignee_id = S.me.id;
+  if (k === 'assigned' && S.me && collab()) d.assignee_id = S.me.id;
   if (k.startsWith('who:') && S.me && +k.slice(4) === S.me.id) d.assignee_id = S.me.id;
   if (k.startsWith('who:') && S.me && +k.slice(4) !== S.me.id) {  // 2.36.2 (#1138): for that person, in a list both of us use
     const uid = +k.slice(4), l = dsxWhoList(uid);

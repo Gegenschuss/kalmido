@@ -203,6 +203,11 @@ def inv_missing(c, oid, r, s, pack, items):
         miss.append(tr("tax number or VAT ID"))
     if not co.get("iban"):
         miss.append(tr("IBAN"))
+    from .countries import fk_country_code  # 2.40.0 (#1372): an unknown country code stops here, never silently DE
+    if co.get("country") and fk_country_code(co["country"]) is None:
+        miss.append(tr("valid country of the company (ISO code, now {0})", co["country"]))
+    if cl is not None and "country" in cl.keys() and cl["country"] and fk_country_code(cl["country"]) is None:
+        miss.append(tr("valid country of the client (ISO code, now {0})", cl["country"]))
     if r["kind"] == "invoice" and not (_col(r, "due_date") or _col(r, "payment_days")) and not s.get("payment_days"):
         miss.append(tr("due date or payment days"))
     if r["vat_mode"] == "novat" and (_col(r, "vat_note") or "") not in INV_VAT_NOTES:
@@ -339,16 +344,20 @@ def _put_rows(c, oid, did, rows):
         c.execute(f"INSERT INTO office_doc_items({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
 
 
-def inv_default_texts(c, oid, s, kind, lang):
-    """intro / closing of an invoice, credit note or reminder: the organisation's text (settings), else the pack's."""
+def inv_default_texts(c, oid, s, kind, lang, level=1):
+    """intro / closing of an invoice, credit note or reminder: the organisation's text (settings), else the pack's.
+    2.40.0 (#1368): credit notes have their own closing (credit_closing), reminders an intro / closing per level 1-3."""
     pack = office_pack(s["pack"]) or office_pack("DE") or {}
     texts = pack.get("texts") or {}
     sal = (texts.get("salutation") or {}).get(lang) or ""
-    intro = (texts.get(kind + "_intro") or {}).get(lang) or ""
+    sfx = f"_{level}" if kind == "reminder" and level in (2, 3) else ""
+    intro = (texts.get(kind + "_intro" + sfx) or texts.get(kind + "_intro") or {}).get(lang) or ""
     if sal and intro:
         intro = sal + "\n" + intro
     if kind == "reminder":
-        closing = s.get("reminder_text_" + lang) or (texts.get("reminder_closing") or {}).get(lang) or ""
+        closing = s.get("reminder_text_" + lang) or (texts.get("reminder_closing" + sfx) or texts.get("reminder_closing") or {}).get(lang) or ""
+    elif kind == "credit":
+        closing = (texts.get("credit_closing") or {}).get(lang) or ""
     else:
         closing = s.get("invoice_closing_" + lang) or (texts.get("invoice_closing") or {}).get(lang) or ""
     return intro, closing
@@ -367,7 +376,7 @@ def inv_new_row(c, oid, s, kind, lang, src=None):
            "payment_days": int(s.get("payment_days") or 14) if kind == "invoice" else None, "vat_note": "", "einvoice_format": s.get("einvoice_format") or "zugferd"}
     if src is not None:
         for k in ("lang", "currency", "fx_rate", "vat_mode", "client_id", "recipient", "project_title", "project_ref", "contract_id", "rights", "fields",
-                  "service_from", "service_to", "vat_note"):
+                  "service_from", "service_to", "vat_note", "contact_id"):  # 2.40.0 (#1380): + the contact person
             if k in src.keys() and src[k] is not None:
                 row[k] = src[k]
         row["order_ref"] = _col(src, "order_ref") or src["project_ref"] or ""
@@ -378,19 +387,19 @@ def inv_new_row(c, oid, s, kind, lang, src=None):
             if cl is not None:
                 if cl["payment_terms_days"] and kind == "invoice":
                     row["payment_days"] = int(cl["payment_terms_days"])
-                if cl["buyer_reference"] and kind == "invoice":
+                if cl["buyer_reference"] and kind in ("invoice", "credit"):  # 2.40.0 (#1368): credit notes too
                     row["einvoice_format"] = "xrechnung"
     return row
 
 
 def inv_apply_client(c, oid, row, b):
     """A new draft with a client: its payment terms and (buyer reference = XRechnung) its e-invoice format, unless given."""
-    if not row.get("client_id") or row.get("kind") != "invoice":
+    if not row.get("client_id") or row.get("kind") not in ("invoice", "credit"):  # 2.40.0 (#1368): credit: the format only
         return
     cl = c.execute("SELECT buyer_reference, payment_terms_days FROM clients WHERE id=? AND org_id=?", (row["client_id"], oid)).fetchone()
     if cl is None:
         return
-    if cl["payment_terms_days"] and "payment_days" not in b:
+    if cl["payment_terms_days"] and "payment_days" not in b and row.get("kind") == "invoice":
         row["payment_days"] = int(cl["payment_terms_days"])
     if cl["buyer_reference"] and "einvoice_format" not in b:
         row["einvoice_format"] = "xrechnung"
@@ -410,6 +419,8 @@ def inv_credit_of(c, oid, uid, inv_):
     from .docs import doc_items
     s = office_settings(c, oid)
     row = inv_new_row(c, oid, s, "credit", inv_["lang"], inv_)
+    if _col(inv_, "einvoice_format"):  # 2.40.0 (#1368): the credit note keeps the invoice's e-invoice format (XRechnung)
+        row["einvoice_format"] = inv_["einvoice_format"]
     row["cancels_id"] = inv_["id"]
     row["source_doc_id"] = inv_["id"]
     did = _insert_doc(c, oid, uid, row)
@@ -544,6 +555,7 @@ def inv_make_reminder(c, oid, uid, b):
     if days < 0 or days > 365:
         raise BadInput(tr("Invalid value: {0}", "deadline_days"))
     row = inv_new_row(c, oid, s, "reminder", first["lang"], first)
+    row["intro"], row["closing"] = inv_default_texts(c, oid, s, "reminder", row["lang"], int(level))  # 2.40.0 (#1368): text per level
     row.update(ref_doc_ids=json.dumps(ids), reminder_level=int(level), reminder_fee=float(fee), reminder_deadline_days=days, currency=first["currency"],
                service_from=None, service_to=None, order_ref="", payment_days=None, project_title=first["project_title"])
     did = _insert_doc(c, oid, uid, row)
@@ -584,6 +596,13 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
             rec = {k: (cl[k] if k in cl.keys() else "") for k in ("street", "zip", "city", "country", "vat_id", "customer_no", "buyer_reference", "email_invoice")}
     for k in ("street", "zip", "city", "country", "vat_id", "customer_no", "buyer_reference", "email_invoice"):
         m["recipient"][k] = rec.get(k) or ""
+    # 2.40.0 (#1380): the buyer's contact person (e-invoice BT-56) -- the snapshot's, else the chosen / default one
+    if ofx_locked(r) and r["recipient_snapshot"]:
+        m["recipient"]["contact"] = rec.get("contact") or None
+    else:
+        from .docs import fk_doc_contact
+        k = fk_doc_contact(c, r["client_id"], _col(r, "contact_id"))
+        m["recipient"]["contact"] = {"name": k["name"], "email": k["email"], "phone": k["phone"]} if k else None
     num_label = L.get(kind + "_no") or (L.get("invoice_no", "Rechnung Nr.") if kind == "invoice" else m["title"] + (" No." if lang == "en" else " Nr."))
     meta = [[num_label, r["number"] or ("Draft" if lang == "en" else "Entwurf")]]
     cancels = None
@@ -631,7 +650,7 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
         rows = [[L.get("open_total", "Offener Betrag" if lang == "de" else "Amount outstanding"), tot["net_text"]]]
         if dec(t.get("fee") or 0) > 0:
             rows.append([L.get("reminder_fee", "Mahngebühr" if lang == "de" else "Reminder fee"), t.get("fee_text") or ""])
-        rows.append([L.get("invoice_total", "Rechnungsbetrag" if lang == "de" else "Total"), tot["gross_text"]])
+        rows.append([L.get("reminder_total", "Gesamtbetrag" if lang == "de" else "Total amount due"), tot["gross_text"]])  # 2.40.0 (#1368)
         deadline = ""
         if r["date"] and _col(r, "reminder_deadline_days"):
             deadline = fmt_date((date.fromisoformat(r["date"]) + timedelta(days=int(r["reminder_deadline_days"]))).isoformat(), pack)
@@ -984,3 +1003,77 @@ def inv_mail_status():
     c, uid, oid = _ctx()
     s = office_settings(c, oid)
     return jsonify(smtp=bool(MAIL_OUT_ON), datev_email=s.get("datev_email") or "", datev_auto=int(s.get("datev_auto") or 0))
+
+
+# ---------------------------------------------------------------- 2.40.0 (#1368 points 8 + 9): reminder fee as an open item, settled reminders
+FEE_STATES = ("", "waived", "paid")
+
+
+def fd_reminder_extra(c, oid, rows):
+    """Adds to brief / full reminder dicts: settled (all its invoices paid or cancelled; derived, never stored; state
+    "done"), fee_state and fee_open (the fee of a finalised reminder that is neither paid nor waived: it stays open after
+    the invoice is paid). Invoice dicts get fee_open / fee_reminders from the reminders that name them."""
+    rems = [d for d in rows if d.get("kind") == "reminder"]
+    invs = [d for d in rows if d.get("kind") == "invoice"]
+    if rems:
+        ids = [d["id"] for d in rems]
+        meta = {x["id"]: x for x in c.execute(
+            "SELECT id, ref_doc_ids, reminder_fee, reminder_fee_state, locked_at, currency, lang FROM office_docs WHERE org_id=? AND id IN ("
+            + ",".join("?" * len(ids)) + ")", [oid] + ids)}
+        refs = sorted({int(i) for x in meta.values() for i in _j(x["ref_doc_ids"] or "[]", []) if str(i).isdigit()})
+        pm = inv_paid_map(c, oid, refs) if refs else {}
+        st = {x["id"]: inv_state(x, pm) for x in c.execute(
+            "SELECT * FROM office_docs WHERE org_id=? AND id IN (" + ",".join("?" * len(refs)) + ")", [oid] + refs)} if refs else {}
+        for d in rems:
+            x = meta.get(d["id"])
+            if x is None:
+                continue
+            rid = [int(i) for i in _j(x["ref_doc_ids"] or "[]", []) if str(i).isdigit()]
+            fee = money(dec(x["reminder_fee"] or 0))
+            d["settled"] = bool(x["locked_at"]) and bool(rid) and all(st.get(i) in ("paid", "cancelled") for i in rid)
+            d["fee_state"] = x["reminder_fee_state"] or ""
+            d["fee"] = dstr(fee)
+            d["fee_open"] = dstr(fee) if x["locked_at"] and fee > 0 and not d["fee_state"] else "0.00"
+            d["fee_open_text"] = fmt_money(d["fee_open"], x["lang"], x["currency"])
+            if d["settled"]:
+                d["state"] = "done"
+                d["status_text"] = tr("Settled")
+    if invs:
+        open_fees = {}
+        for x in c.execute("SELECT id, number, ref_doc_ids, reminder_fee FROM office_docs WHERE org_id=? AND kind='reminder' AND locked_at IS NOT NULL "
+                           "AND reminder_fee > 0 AND COALESCE(reminder_fee_state, '') = ''", (oid,)):
+            for i in _j(x["ref_doc_ids"] or "[]", []):
+                open_fees.setdefault(str(i), []).append({"id": x["id"], "number": x["number"], "fee": dstr(money(dec(x["reminder_fee"])))})
+        for d in invs:
+            fl = open_fees.get(str(d["id"])) or []
+            if fl:
+                d["fee_reminders"] = fl
+                tot = sum((dec(f["fee"]) for f in fl), Decimal(0))
+                d["fee_open"] = dstr(tot)
+                d["fee_open_text"] = fmt_money(tot, d.get("lang") or "de", d.get("currency") or "EUR")
+    return rows
+
+
+@app.post("/api/office/docs/<int:did>/fee")
+def fd_fee_post(did):
+    """{state: "waived" | "paid" | ""} the organisation's admin waives the fee of a finalised reminder, marks it paid or
+    opens it again. The reminder document stays unchanged (GoBD); the change is logged."""
+    from .docs import doc_row
+    c, uid, oid = _ctx()
+    doc_row(c, oid, did)
+    if office_role(c, uid, oid) != "admin":
+        raise Denied(403, tr("Only an admin of this organisation can do this"))
+    r = doc_row(c, oid, did)
+    if r["kind"] != "reminder" or not ofx_locked(r) or money(dec(_col(r, "reminder_fee") or 0)) <= 0:
+        raise Denied(409, tr("Only the fee of a finalised reminder can be waived or marked as paid"))
+    b = body()
+    st = b.get("state") if isinstance(b, dict) else None
+    if st not in FEE_STATES:
+        raise BadInput(tr("Invalid value: {0}", "state"))
+    before = _col(r, "reminder_fee_state") or ""
+    if st != before:
+        c.execute("UPDATE office_docs SET reminder_fee_state=? WHERE id=? AND org_id=?", (st, did, oid))
+        ofx_log(c, oid, "reminder_fee", doc_id=did, detail={"before": before, "after": st, "fee": dstr(money(dec(r["reminder_fee"])))})
+        bump(c)
+    c.commit()
+    return _answer(c, oid, uid, did)

@@ -89,7 +89,7 @@ function lmOadmBody(j, row) {
 function lmDoneDefault(key) {
   const m = /^l:(\d+)$/.exec(key || '') || null, fm = /^folder:(.+)$/.exec(key || '') || null;
   let f = '';
-  if (m) { const l = listById(+m[1]); f = l ? (l.folder || '') : ''; }
+  if (m) { const l = listById(+m[1]); f = l && isOwner(l) ? (l.folder || '') : ''; }  // 2.40.0 (#1422): only my own lists (shared lists of others keep theirs)
   else if (fm) f = fm[1];
   if (f && typeof folderEff === 'function') { const e = folderEff(f); if ('hide_done' in e) return !e.hide_done; }
   return S.settings?.show_done_default !== '0';

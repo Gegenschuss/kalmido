@@ -4,8 +4,8 @@ from datetime import timedelta
 from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app, IOS_SHORTCUT_URL, NTFY_IN, NTFY_URL, PUBLIC_URL
-from ..core.i18n import languages
-from ..core.db import db, gsetting, inbox_names, iso, like_escape, local_now, now_utc, usettings
+from ..core.i18n import languages, tr
+from ..core.db import ag_cursor, ag_cursor_parse, db, err, gsetting, inbox_names, iso, like_escape, local_now, now_utc, usettings
 from ..accounts.session import me, user_public
 from ..accounts.pictures import avatar_map, list_icon_url
 from ..core.access import (
@@ -214,6 +214,7 @@ def state():
     from ..events.model import cals_for, events_on
     from ..contacts.model import books_for, contacts_on, task_contacts
     from ..team.clients import clients_brief
+    from ..tasks.mineorder import vw_mine_order
     c = db()
     uid = me()
     s = usettings(c, uid)
@@ -262,6 +263,7 @@ def state():
             trash=c.execute(f"SELECT COUNT(*) FROM tasks WHERE list_id IN {wr_sql()} AND deleted_at IS NOT NULL",
                             (uid, uid)).fetchone()[0]),
         settings={k: v for k, v in s.items() if k not in ("digest_sent", "digest_mail_sent", "review_sent")},
+        mine_order=vw_mine_order(c, uid),  # 2.40.0 (#1344): the own order of "My tasks" {task id: pos}
         notify=notif_matrix(s),  # 2.1.0 (#317)
         ntfy_inbox={"enabled": bool(NTFY_IN["token"]), "server": NTFY_IN["public"], "topic": NTFY_IN["topic"]},
         ntfy_url=NTFY_URL,
@@ -349,19 +351,34 @@ def task_query():
     uid = me()
     scope = request.args.get("scope", "done")
     limit = min(int(request.args.get("limit", 300)), 2000)
+    # 2.40.0 (#1432): completed / trash page by ?before=<next> (completed_at resp. deleted_at + id); next = null at the end
+    try:
+        cur = ag_cursor_parse(request.args.get("before")) if scope in ("done", "trash") else None
+    except ValueError:
+        return err(tr("Invalid value: {0}", "before"))
+    extra = {}
     if scope == "trash":
-        rows = load_tasks(c, f"list_id IN {wr_sql()} AND deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT ?",
-                          (uid, uid, limit))
+        rows = load_tasks(c, f"list_id IN {wr_sql()} AND deleted_at IS NOT NULL" + (" AND (deleted_at, id) < (?, ?)" if cur else "")
+                          + " ORDER BY deleted_at DESC, id DESC LIMIT ?", (uid, uid, *(cur or ()), limit + 1))
         ok = purge_lists(c, uid)
         for t in rows:  # 2.0.5: stays when the trash is emptied (shared list of another owner)
             if t["list_id"] not in ok:
                 t["keep"] = True
+        if not cur:  # 2.40.0 (#1432): "Empty" counts the whole trash, not only the loaded page
+            lids = [r[0] for r in c.execute(f"SELECT list_id FROM tasks WHERE deleted_at IS NOT NULL AND list_id IN {wr_sql()}", (uid, uid))]
+            extra = {"deletable": sum(1 for x in lids if x in ok), "kept": sum(1 for x in lids if x not in ok)}
     elif scope == "search":
         rows = search_tasks(c, uid, request.args.get('q', '').strip(), limit)
     else:
         rows = load_tasks(c, f"list_id IN {vis_sql()} AND deleted_at IS NULL AND status!=0 AND {tvis(c, uid)} "
-                             "ORDER BY completed_at DESC LIMIT ?", (uid, uid, limit))
-    return jsonify(tasks=rows)
+                             + ("AND (COALESCE(completed_at, ''), id) < (?, ?) " if cur else "")
+                             + "ORDER BY COALESCE(completed_at, '') DESC, id DESC LIMIT ?", (uid, uid, *(cur or ()), limit + 1))
+    if scope in ("done", "trash"):
+        more = len(rows) > limit
+        rows = rows[:limit]
+        last = rows[-1] if rows else None
+        extra["next"] = ag_cursor(last["deleted_at" if scope == "trash" else "completed_at"], last["id"]) if more and last else None
+    return jsonify(tasks=rows, **extra)
 
 
 def search_tasks(c, uid, raw, limit):

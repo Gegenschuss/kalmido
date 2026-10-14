@@ -186,6 +186,8 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
         f["assignee_group_id"] = None
     if "assignee_id" in f and _norm(f["assignee_id"]) != _norm(cur["assignee_id"]):
         f["assigned_by"] = me() if f["assignee_id"] else None
+        if f["assignee_id"]:  # 2.40.0 (#1344): newly assigned = on top of the person's own order of "My tasks"
+            c.execute("DELETE FROM user_task_order WHERE user_id=? AND task_id=?", (f["assignee_id"], tid))
     if f.get("assignee_group_id") and f["assignee_group_id"] != cur["assignee_group_id"]:
         f["assigned_by"] = me()
     if "fields" in b:  # custom field values: validated before anything is written (2.39.1 #1217: plain lists too)

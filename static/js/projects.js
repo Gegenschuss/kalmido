@@ -41,7 +41,7 @@ function listHead(l, o = {}) {
   // it lives on the project page and in the list's "…" menu (a status that is set still shows as its pill)
   const p = l.progress || {done: 0, total: 0, overdue: 0}, showP = progressFor(l) && p.total > 0 && !progHidden(l.id), pill = o.noPill ? '' : statusPill(l, true, false), ts = timeSumHtml([l]);
   if (!showP && !pill && !ts) return vsegHtml(l) + famBar(l) + lifeBar(l) + agBandHtml();
-  return `${vsegHtml(l)}${famBar(l) + lifeBar(l)}<div class="lhead">${showP ? `<span class="lprow"><span class="lpg">${progBar(p)}<button class="iconbtn lpx" data-act="prog-hide" data-id="${l.id}" title="${tr('Hide progress')}" aria-label="${tr('Hide progress')}">${ic('x', 's')}</button></span>${progMeta(p)}</span>` : ''}<span class="spacer"></span>${ts}${pill}</div>${statusNote(l)}${agBandHtml()}`;
+  return `${vsegHtml(l)}${famBar(l) + lifeBar(l)}<div class="lhead">${showP ? `<span class="lprow"><span class="lpg">${progBar(p)}</span>${progMeta(p)}</span>` : ''}<span class="spacer"></span>${ts}${pill}</div>${statusNote(l)}${agBandHtml()}`;
 }
 // ---- 2.7.0 (#407): the tracked time of a project list (or of a folder's project lists) in its header, in hours and in
 // working days. Hours per day / shift: the list's own value (list dialog, owner; the same for every member), else the
@@ -112,7 +112,7 @@ function ovRows() {
   }).sort((a, b) => a.risk - b.risk || b.overdue.length - a.overdue.length || b.blocked.length - a.blocked.length || bySort(a.l, b.l));
 }
 function ovTask(t, extra = '') {
-  return `<button class="ovt" data-act="open-id" data-id="${t.id}"><span class="chk p${t.priority}"></span><span class="n">${esc(t.title)}</span>${extra}</button>`;
+  return `<button class="ovt" data-act="open-id" data-id="${t.id}"><span class="chk p${t.priority}"></span><span class="n">${mdTitleNL(t.title)}</span>${extra}</button>`;
 }
 const OV_MAX = 6;
 function ovMore(arr, fn) {
@@ -441,12 +441,24 @@ const blockedNames = t => { const n = (t.blockers || []).map(id => S.tasks.get(i
 const FTYPES = [['text', N_('Text')], ['number', N_('Number')], ['select', N_('Selection')], ['date', N_('Date')], ['checkbox', N_('Checkbox')], ['person', N_('Person')], ['url', N_('Link')]];
 const FT_ICON = {text: 'edit', number: 'chart', select: 'list', date: 'cal', checkbox: 'check', person: 'user', url: 'link'};
 const ftLabel = t => tr((FTYPES.find(x => x[0] === t) || [0, t])[1]);
+// 2.40.0 (#1193): a select option shows as a filled chip in its colour, the text dark or light, whichever reads better
+function lrInk(hex) {
+  let h = (cssColor(hex) || '').slice(1); if (!h) return '';
+  if (h.length === 3) h = [...h].map(x => x + x).join('');
+  const lin = i => { const v = parseInt(h.slice(i, i + 2), 16) / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  const L = 0.2126 * lin(0) + 0.7152 * lin(2) + 0.0722 * lin(4);
+  return 1.05 / (L + 0.05) >= (L + 0.05) / 0.0566 ? '#fff' : '#111';  // contrast with white vs. with #111
+}
+const lrSelFill = o => cssColor(o?.color) ? ' fill' : '';
+const lrSelStyle = o => cssColor(o?.color) ? `style="--fc:${cssColor(o.color)};--fct:${lrInk(cssColor(o.color))}"` : '';
+// the "Status" template of a new select field (#1193): grey, blue, yellow, green out of the list colours
+const LR_STATUS_TPL = [[N_('Not started'), '#94a3b8'], [N_('In progress'), '#6d8cff'], [N_('Waiting'), '#f5b041'], [N_('Done|status'), '#4ade80']];
 function fieldEditor(f, t, ro) {
   const v = t.fields?.[f.id] ?? '', id = `cf-${f.id}`, dis = ro ? 'disabled' : '';
   let c;
   switch (f.type) {
     case 'number': c = `<span class="cfnum"><input id="${id}" data-cf="${f.id}" inputmode="decimal" value="${esc(v === '' ? '' : (+v).toLocaleString(LOCALE(), {useGrouping: false, maximumFractionDigits: 6}))}" ${ro ? 'readonly' : ''} placeholder="–">${f.options?.unit ? `<span class="muted">${esc(f.options.unit)}</span>` : ''}</span>`; break;
-    case 'select': c = `<select id="${id}" data-cf="${f.id}" ${dis}><option value="">–</option>${(f.options?.options || []).map(o => `<option value="${esc(o.id)}" ${o.id === v ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>`; break;
+    case 'select': { const so = selOpt(f, v); c = `<select id="${id}" data-cf="${f.id}" class="cfsel${so ? lrSelFill(so) : ''}" ${so ? lrSelStyle(so) : ''} ${dis}><option value="">–</option>${(f.options?.options || []).map(o => `<option value="${esc(o.id)}" ${o.id === v ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>`; break; }
     case 'date': c = dateIn(id, v, {attrs: `data-cf="${f.id}"`, ro, label: f.name, empty: '–'}); break;
     case 'checkbox': c = `<span><input id="${id}" type="checkbox" data-cf="${f.id}" ${v === '1' ? 'checked' : ''} ${dis}></span>`; break;
     case 'person': c = `<select id="${id}" data-cf="${f.id}" ${dis}><option value="">–</option>${listPeople(listById(t.list_id)).map(p => `<option value="${p.user_id}" ${String(p.user_id) === v ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>`; break;
@@ -468,6 +480,7 @@ async function saveField(el) {
   let v = f.type === 'checkbox' ? (el.checked ? '1' : null) : (el.value || '').trim() || null;
   if (v && f.type === 'url' && !/^https?:\/\//i.test(v) && /^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(v)) v = 'https://' + v;
   if (v && f.type === 'number') v = numIn(v);
+  if (f.type === 'select') { const o = selOpt(f, v); el.classList.toggle('fill', !!lrSelFill(o)); el.style.cssText = o && lrSelFill(o) ? `--fc:${cssColor(o.color)};--fct:${lrInk(cssColor(o.color))}` : ''; }  // #1193
   if ((t.fields?.[fid] ?? null) === v) return;
   try { await patchTask(t.id, {fields: {[fid]: v}}); } catch { renderDetail(); }
 }
@@ -477,12 +490,14 @@ function fieldModal(lid, f, done) {
     <div class="row"><label for="fd-name">${tr('Name')}</label><input id="fd-name" value="${esc(f?.name || '')}" maxlength="60" placeholder="${tr('e.g. Budget, Stage, Client')}"></div>
     <div class="row"><label for="fd-type">${tr('Type')}</label><select id="fd-type" ${edit ? 'disabled' : ''}>${FTYPES.map(([k, n]) => `<option value="${k}" ${st.type === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     <div id="fd-extra"></div>
-    <div class="row" ${colCfg(lid) ? 'hidden' : ''}><label>${tr('Task rows')}</label><label class="chkl"><input type="checkbox" id="fd-pin" ${f?.pinned ? 'checked' : ''}> ${tr('show as a chip (at most 2 fields)')}</label></div>
+    <div class="row" ${colCfg(lid) ? 'hidden' : ''}><label>${tr('Task rows')}</label><label class="chkl"><input type="checkbox" id="fd-pin" ${f?.pinned ? 'checked' : ''}> ${tr('show in the task row (at most 2 fields)')}</label></div>
+    ${colCfg(lid) ? `<div class="shint keep lrcolhint">${tr('Whether the field shows in the task row is set in {0}.', `<button type="button" class="linkbtn" data-m="fd-cols">${esc(tr('Shown fields'))}</button>`)}</div>` : ''}
     <div class="foot">${edit ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   const extra = () => {
     const x = $('#fd-extra', md);
     if (st.type === 'number') x.innerHTML = `<div class="row"><label for="fd-unit">${tr('Unit')}</label><input id="fd-unit" value="${esc(f?.options?.unit || '')}" maxlength="12" placeholder="${tr('optional, e.g. € or h')}" style="max-width:8.75rem"></div>`;
-    else if (st.type === 'select') x.innerHTML = `<h4>${tr('Options')}</h4><div class="optlist">${st.opts.map((o, i) => `<div class="optrow" data-i="${i}"><button class="swc" data-ocol="${i}" style="background:${cssColor(o.color) || 'var(--bg4)'}" title="${tr('Color')}"></button><input data-oname="${i}" value="${esc(o.name)}" maxlength="60" placeholder="${tr('Option')}"><button class="iconbtn" data-orm="${i}" title="${tr('Remove')}">${ic('x', 's')}</button></div>`).join('')}</div><button class="btn sm" data-m="opt-add">${ic('plus', 's')} ${tr('Option')}</button>${edit ? `<div class="shint keep">${tr('Removing an option clears it in all tasks.')}</div>` : ''}`;
+    // 2.40.0 (#1193): a palette per option instead of cycling, a handle to drag (Alt+↑/↓), the Status template for a new field
+    else if (st.type === 'select') x.innerHTML = `<h4>${tr('Options')}</h4>${edit ? '' : `<div class="row lrtpl"><button type="button" class="btn sm" data-m="opt-tpl" title="${esc(tr('Not started, In progress, Waiting, Done'))}">${ic('list', 's')} ${tr('Template “Status”')}</button><button type="button" class="btn sm" data-m="opt-empty">${tr('Start empty')}</button></div>`}<div class="optlist" role="list">${st.opts.map((o, i) => `<div class="optrow" data-i="${i}" role="listitem"><span class="colh" data-oh="${i}" title="${esc(tr('Drag to reorder'))}" aria-hidden="true">${ic('grip', 's')}</span><button type="button" class="swc" data-ocol="${i}" style="background:${cssColor(o.color) || 'var(--bg4)'}" title="${tr('Color')}" aria-label="${esc(tr('Color'))}" aria-expanded="${st.pal === i}"></button><input data-oname="${i}" value="${esc(o.name)}" maxlength="60" placeholder="${tr('Option')}" title="${esc(tr('Alt+↑ / Alt+↓ moves the option'))}"><button type="button" class="iconbtn" data-orm="${i}" title="${tr('Remove')}">${ic('x', 's')}</button></div>${st.pal === i ? `<div class="colors lrpal" role="group" aria-label="${esc(tr('Color'))}">${LCOLORS.map((c, k) => `<button type="button" data-opal="${esc(c)}" style="background:${c || 'var(--bg4)'}" class="${(o.color || '') === c ? 'on' : ''}" aria-pressed="${(o.color || '') === c}" aria-label="${esc(c ? tr('Color {0}', k) : tr('No color'))}"></button>`).join('')}</div>` : ''}`).join('')}</div><button class="btn sm" data-m="opt-add">${ic('plus', 's')} ${tr('Option')}</button>${edit ? `<div class="shint keep">${tr('Removing an option clears it in all tasks.')}</div>` : ''}`;
     else x.innerHTML = st.type === 'person' ? `<div class="shint keep">${tr('Pick the owner or a member of the list.')}</div>` : '';
   };
   extra();
@@ -490,13 +505,17 @@ function fieldModal(lid, f, done) {
   md.addEventListener('input', e => { const i = e.target.dataset.oname; if (i !== undefined) st.opts[+i].name = e.target.value; });
   md.addEventListener('click', async e => {
     const b = e.target.closest('button'); if (!b) return;
-    if (b.dataset.ocol !== undefined) { const o = st.opts[+b.dataset.ocol]; o.color = LCOLORS[(LCOLORS.indexOf(o.color || '') + 1) % LCOLORS.length]; extra(); return; }
-    if (b.dataset.orm !== undefined) { st.opts.splice(+b.dataset.orm, 1); extra(); return; }
+    if (b.dataset.ocol !== undefined) { st.pal = st.pal === +b.dataset.ocol ? null : +b.dataset.ocol; extra(); $(`[data-ocol="${b.dataset.ocol}"]`, md)?.focus(); return; }
+    if (b.dataset.opal !== undefined) { const i = st.pal; st.opts[i].color = b.dataset.opal; st.pal = null; extra(); $(`[data-ocol="${i}"]`, md)?.focus(); return; }
+    if (b.dataset.orm !== undefined) { st.opts.splice(+b.dataset.orm, 1); st.pal = null; extra(); return; }
     const a = b.dataset.m;
+    if (a === 'opt-tpl' || a === 'opt-empty') { st.pal = null; st.opts = a === 'opt-tpl' ? LR_STATUS_TPL.map(([n, c]) => ({id: '', name: tr(n), color: c})) : [{id: '', name: '', color: LCOLORS[1]}]; extra(); return; }
     if (a === 'opt-add') { st.opts.push({id: '', name: '', color: LCOLORS[(st.opts.length % (LCOLORS.length - 1)) + 1]}); extra(); $$('[data-oname]', md).pop()?.focus(); return; }
     if (a === 'close') { md.remove(); return; }
+    if (a === 'fd-cols') { colModal(lid); return; }  // 2.40.0 (#1429): own columns decide what the rows show
     if (a === 'del') {
-      const n = [...S.tasks.values()].filter(t => t.fields?.[f.id] != null).length;
+      // 2.40.0 (#1192): the server counts every task with a value (also those not loaded here); the local count if offline
+      const n = await api('GET', `/api/fields/${f.id}/count`).then(j => j.tasks, () => [...S.tasks.values()].filter(t => t.fields?.[f.id] != null).length);
       if (!await askConfirm(tr('Delete the field “{0}”?', f.name), tr('Its values are deleted in all tasks.') + (n ? ' ' + trn('({0} task with a value)', '({0} tasks with a value)', n) : ''), {ok: tr('Delete'), danger: true})) return;
       try { await api('DELETE', '/api/fields/' + f.id); } catch { return; }
       md.remove(); await load(); render(); done && done(); return;
@@ -509,12 +528,40 @@ function fieldModal(lid, f, done) {
       md.remove(); await load(); render(); done && done();
     }
   });
+  const optMove = (i, j) => {  // #1193: option i to place j (the order is the order of the select and of sorting by the field)
+    if (j < 0 || j >= st.opts.length || i === j) return;
+    const [o] = st.opts.splice(i, 1); st.opts.splice(j, 0, o); st.pal = null; extra();
+  };
+  md.addEventListener('keydown', e => {
+    const i = e.target.dataset?.oname; if (i === undefined || !e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+    e.preventDefault(); const j = +i + (e.key === 'ArrowUp' ? -1 : 1); if (j < 0 || j >= st.opts.length) return;
+    optMove(+i, j); $(`[data-oname="${j}"]`, md)?.focus();
+  });
+  md.addEventListener('pointerdown', e => {  // drag the handle (mouse, pen, touch), like "Shown fields"
+    const h = e.target.closest('[data-oh]'); if (!h) return;
+    e.preventDefault();
+    const ls = $('.optlist', md), row = h.closest('.optrow'), from = +row.dataset.i;
+    if (st.pal != null) { st.pal = null; ls.querySelector('.lrpal')?.remove(); }
+    row.classList.add('drag');
+    const mv = ev => {
+      const rows = [...ls.querySelectorAll('.optrow')];
+      const over = rows.find(r => { const bx = r.getBoundingClientRect(); return r !== row && ev.clientY >= bx.top && ev.clientY < bx.bottom; });
+      if (!over) return;
+      ls.insertBefore(row, rows.indexOf(over) > rows.indexOf(row) ? over.nextSibling : over);
+    };
+    const up = () => {
+      document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', up);
+      const to = [...ls.querySelectorAll('.optrow')].indexOf(row);
+      if (to !== from) optMove(from, to); else { row.classList.remove('drag'); }
+    };
+    document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up); document.addEventListener('pointercancel', up);
+  });
   setTimeout(() => $('#fd-name', md).focus(), 50);
 }
 function fieldsBox(lid) {
   const fs = fieldsAll(lid);
   return fs.map((f, i) => `<div class="mrow" data-fid="${f.id}">${ic(FT_ICON[f.type] || 'edit', 's')}<span class="n">${esc(f.name)}</span><span class="muted">${esc(ftLabel(f.type))}</span>
-    <button class="iconbtn ${f.pinned ? 'on' : ''}" data-fpin="${f.id}" title="${tr('Show as a chip on the task rows')}">${ic('pin', 's')}</button>
+    <button class="iconbtn ${f.pinned ? 'on' : ''}" data-fpin="${f.id}" title="${tr('Show in the task rows')}">${ic('pin', 's')}</button>
     <button class="iconbtn" data-fup="${f.id}" title="${tr('move up')}" ${i ? '' : 'disabled'}>${ic('chev', 's up')}</button>
     <button class="iconbtn" data-fedit="${f.id}" title="${tr('Edit')}">${ic('edit', 's')}</button></div>`).join('') +
     `<div class="mrow"><button class="btn sm" data-m="field-add">${ic('plus', 's')} ${tr('Field')}</button>${fs.length ? '' : hintOnce('fields', tr('Own columns for this list: budget, stage, client, …'))}</div>`;

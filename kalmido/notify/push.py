@@ -18,7 +18,7 @@ from flask import has_request_context, request
 
 from ..core.config import _origin, APP_NAME, NTFY_TOKEN, NTFY_URL, PUBLIC_URL, safe_urlopen, TZ, WATCHDOG_INTERVAL
 from ..core.schema import USER_DEFAULTS
-from ..core.i18n import LANGS, short_day, tr, trn
+from ..core.i18n import LANGS, md_plain, short_day, tr, trn
 from ..core.pg import system_ctx
 from ..core.db import bump, connect, DbError, inbox_default, iso, local_now, now_utc, parse_iso, uset, usettings
 from ..accounts.session import GATE
@@ -51,6 +51,7 @@ def ntfy(title, msg, prio="4", click=None, topic=None, actions=None, admin=False
     from ..notify.alerts import aa_err, aa_fail, aa_ok
     if not topic or not NTFY_TOPIC_RE.fullmatch(topic):
         return False
+    title, msg = md_plain(title), md_plain(msg)  # 2.40.0 (#1409): no Markdown marks in the push
     hdr = {"Title": title.encode("utf-8"), "Priority": prio}  # no Tags header: no emoji icon in the push
     if click:
         hdr["Click"] = click
@@ -407,6 +408,7 @@ def push_reachable(c, uid, s):
 def webpush_payload(title, msg, prio, click=None, actions=None, tag=None, task=None, due=None):
     """What the notification shows, nothing more: title, text, the in-app link (hash only), buttons."""
     hash_ = urllib.parse.urlsplit(click).fragment if click else ""
+    title, msg = md_plain(title), md_plain(msg)  # 2.40.0 (#1409): no Markdown marks in the push
     p = {"title": (title or APP_NAME)[:200], "body": (msg or "")[:1000], "url": "/#" + hash_ if hash_ else "/",
          "prio": int(prio) if str(prio).isdigit() else 4, "ts": int(time.time() * 1000)}
     if tag:

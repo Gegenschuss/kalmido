@@ -64,6 +64,7 @@ TENANT_EXEMPT = {
     "task_deps": _TASK, "pomos": _TASK, "tidy_pending": _TASK, "task_people": _TASK, "comment_reactions": "per comment -> its task",
     "habits": _OWN, "pl_conns": _OWN + " (Paperless connection, unused since 2.36.0, kept)",
     "pl_conn_users": "who could use a shared Paperless connection (unused since 2.36.0, kept)", "pl_tokens": _OWN,
+    "user_task_order": _OWN + " (2.40.0 #1344: the own order of My tasks; rows only for tasks the person sees)",
     "filters": _OWN, "user_settings": _OWN, "sessions": _OWN, "push_subs": _OWN, "templates": _OWN, "cal_subs": _OWN,
     "recovery_codes": _OWN, "webauthn_creds": _OWN, "api_tokens": _OWN, "webhooks": _OWN + " (deliveries only for visible tasks)",
     "imports": _OWN, "sample_items": _OWN, "app_passwords": _OWN, "dav_sync2": _OWN, "journal": _OWN, "contact_care": _OWN,

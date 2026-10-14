@@ -628,11 +628,11 @@ document.addEventListener('touchcancel', sdEnd);
 document.addEventListener('dragend', () => { listDrag = null; folderDrag = null; });
 
 // ---- 2.29.0 (#1030 / #929) folder settings: defaults of my folder for every list in it and its subfolders (workspace, agent,
-// "Members may use it", "Agents may address each other", tidying) next to its people and roles ("Share folder"). A new list
+// "Members may use it", tidying; 2.40.0 #1373: no "Agents may address each other" any more) next to its people and roles ("Share folder"). A new list
 // in the folder gets them; on a change the existing lists follow (or only new ones); a list changed on its own keeps its
 // value ("differs from the folder") until "Back to the folder" in its dialog.
 const FP_ROLES = [['admin', N_('Admin')], ['edit', N_('Member')], ['participant', N_('Participant')], ['view', N_('Viewer')]];
-const FP_KEYS = {org_id: N_('Workspace'), agent_id: N_('Agent'), agent_members: N_('Members may use the agent'), agent_peers: N_('Agents may address each other'), agent_tidy: N_('Tidy up'), agent_listen: N_('Agent listens in'), hide_done: N_('Hide completed')};  // 2.39.1 (#1214): hide_done
+const FP_KEYS = {org_id: N_('Workspace'), agent_id: N_('Agent'), agent_members: N_('Members may use the agent'), agent_tidy: N_('Tidy up'), agent_listen: N_('Agent listens in'), hide_done: N_('Hide completed')};  // 2.39.1 (#1214): hide_done
 function folderEff(path) {
   const parts = String(path || '').split(FSEP).filter(Boolean), out = {};
   for (let i = 1; i <= parts.length; i++) Object.assign(out, (S.folderProps || {})[parts.slice(0, i).join(FSEP)] || {});
@@ -679,8 +679,9 @@ async function folderPropsModal(f) {
     ${nL ? '' : `<div class="shint cnote fsnone">${ic('info', 's')} ${tr('Applies to new lists in this folder. Shared lists of others keep their settings.')}</div>`}
     <p class="muted">${tr('Defaults for every list in this folder and its subfolders, also for new ones. A list can still be changed on its own; it then keeps its value.')}</p>
     ${wsOn() ? sel('fs-ws', 'org_id', [[0, wsName('private')], ...(S.me.workspaces || []).map(w => [w.id, w.name])]) : ''}
-    ${collab() ? sel('fs-ag', 'agent_id', [[0, tr('No agent')], ...users.map(u => [u.id, u.display_name])]) + sel('fs-am', 'agent_members', [[1, tr('On')], [0, tr('Off')]]) + sel('fs-ap', 'agent_peers', [[1, tr('On')], [0, tr('Off')]]) + sel('fs-td', 'agent_tidy', TIDY.map(([k, n]) => [k, tr(n)])) + sel('fs-al', 'agent_listen', [[1, tr('On')], [0, tr('Off: only via @')]]) : ''}
+    ${collab() ? sel('fs-ag', 'agent_id', [[0, tr('No agent')], ...users.map(u => [u.id, u.display_name])]) + sel('fs-am', 'agent_members', [[1, tr('On')], [0, tr('Off')]]) + sel('fs-td', 'agent_tidy', TIDY.map(([k, n]) => [k, tr(n)])) + sel('fs-al', 'agent_listen', [[1, tr('On')], [0, tr('Off: only via @')]]) : ''}
     ${sel('fs-hd', 'hide_done', [[1, tr('On')], [0, tr('Off')]])}
+    <div class="shint lhint fshdhint">${tr('Hide completed: for your own lists in this folder, at once for all of them (also with “Only new lists”). A list where you chose to show or hide completed yourself keeps that choice until “Completed: like the default” in its menu.')}</div>
     ${collab() ? `<div class="row"><label>${tr('People')}</label><button type="button" class="btn sm" data-m="people">${ic('users', 's')} ${tr('People and roles…')}</button></div>` : ''}
     <div class="row"><label>${tr('Repository')}</label><button type="button" class="btn sm" data-m="repos">${ic('git', 's')} ${tr('Repository…')}</button></div>
     <fieldset class="fsapply" ${nL ? '' : 'hidden'}><legend>${tr('Apply to')}</legend>

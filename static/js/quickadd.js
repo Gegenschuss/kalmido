@@ -9,7 +9,7 @@ const TTYPES = [['bug', N_('Bug'), 'bug'], ['feature', N_('Feature'), 'bulb'], [
 const TT_WORDS = {bug: 'bug', fehler: 'bug', feature: 'feature', funktion: 'feature', task: 'task', aufgabe: 'task'};
 const ticketsOn = lid => !!listById(lid)?.tickets;
 // 2.13.0: "Show task numbers" for any list (per device; lists with tickets always show them)
-const idsOn = lid => !!LS.get('ids.' + lid, false);
+const idsOn = lid => td_rc('ids' + lid, () => !!LS.get('ids.' + lid, false));  // 2.40.0 (#1430): once per render
 const ticketsAny = () => S.lists.some(l => l.tickets && !l.archived);
 const ttName = k => tr((TTYPES.find(x => x[0] === k) || [0, ''])[1]);
 const ttChip = t => { const x = TTYPES.find(y => y[0] === t.ttype); return x ? `<span class="ttchip tt-${x[0]}" title="${esc(tr('Type: {0}', tr(x[1])))}">${ic(x[2], 's')}${esc(tr(x[1]))}</span>` : ''; };
