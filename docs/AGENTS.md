@@ -1383,7 +1383,9 @@ every window Claude Code reports), typing dots and working / idle; it puts the q
 prompt and posts the final text of a chat run as the answer (masked; the agent must not also `send_chat` it). An answer
 ending in a block ` ```approval ` (first line the title, further lines what happens on yes) becomes an approval card
 (`approval`, 2.35.0; older servers: Yes / No buttons); the person's answer arrives as `chat_choice` with `approval` and
-starts the next run. A server without steps, host info, plan usage or approval cards (before 2.32 / 2.33 / 2.35) is
+starts the next run. 2.40.0 (approval check): a chat answer that asks to decide or makes a proposal without that block
+goes back to the agent once in the same session (`--resume`: the complete answer with the block, no tools); still none ->
+it is posted with a visible note that nothing happens without an explicit yes (`KALMIDO_APPROVAL_CHECK=0`: off). A server without steps, host info, plan usage or approval cards (before 2.32 / 2.33 / 2.35) is
 detected by its answer (404 / 400) and the feature is switched off once. Keys in the env file: `KALMIDO_EVENTS=1` (same
 as `--events`), `KALMIDO_PROMPT_FILE`, `KALMIDO_STATE_DIR` (event cursor, default `~/.cache/kalmido-agent`),
 `KALMIDO_PERMISSION_MODE`, `KALMIDO_USAGE_LIMIT`, `KALMIDO_USAGE_FILE`, `KALMIDO_USAGE_MAX_AGE_H` (default 6: older

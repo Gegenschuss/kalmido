@@ -18,6 +18,9 @@ that arrive together: one run), the same way a hosted chat service does it:
   - reply reference:  a message that answers an older one carries its quote into the prompt
   - approvals:        an answer ending in an ```approval block (alias ```freigabe) becomes an approval card (2.35.0) or, on older servers,
                       Yes / No buttons; the person's answer comes back as a new run ("Approval: yes - ..."); silence is no
+  - approval check:   a chat answer that asks the person to decide or makes a proposal without an ```approval block goes
+                      back to the agent once (same session, --resume: the complete answer again with the block, no tools);
+                      still none -> the answer gets a visible note that nothing happens without an explicit yes (2.40.0)
   - the answer:       the final text of a chat run is posted into that person's chat (secrets masked) -- the agent must not
                       post it again with send_chat
   - older servers:    a feature the server does not know (404 / 400 unknown field) is switched off once, the rest works
@@ -27,6 +30,7 @@ usage: agent_run.py [--state DIR] [--once-event FILE] [--dry-run] -- COMMAND [AR
   KALMIDO_PROMPT_FILE           optional text put in front of every event (default: read CLAUDE.md, handle the event)
   KALMIDO_STATE_DIR             where the event cursor is kept (default ~/.cache/kalmido-agent)
   KALMIDO_PERMISSION_MODE       the permission mode to report when COMMAND has no --permission-mode
+  KALMIDO_APPROVAL_CHECK        0 = no approval check of chat answers (default 1)
   --once-event FILE             handle the events of FILE (one JSON object per line) and exit (for tests)
 Never prints the token or message contents; the log has event types, ids and lengths only.
 """
@@ -288,6 +292,7 @@ class Stream:
         self.send_step, self.on_model, self.on_usage = send_step, on_model, on_usage
         self.text, self.pending, self.last_sent = "", "", 0.0
         self.result, self.model, self.last_text = None, "", ""
+        self.session_id = ""  # for the one approval_check follow-up in the same session
         self._lock = threading.Lock()  # tick() runs from the reader and from the ticker thread
 
     def feed(self, line):
@@ -299,6 +304,8 @@ class Stream:
         except ValueError:
             return
         t = ev.get("type")
+        if ev.get("session_id") and not self.session_id:
+            self.session_id = str(ev["session_id"])
         if t == "system" and ev.get("subtype") == "init":
             self.model = str(ev.get("model") or "")
             self.on_model(self.model)
@@ -386,7 +393,8 @@ def build_prompt(evs, chat_uid):
     if chat_uid:
         out.append("This is a chat run: your final text (after your last tool call) is posted into this person's chat "
                    "for you. Do not send it again with send_chat. Before each tool call write one short sentence in the "
-                   "person's language about what you do next. If you need the person's approval, end your answer with "
+                   "person's language about what you do next. If you need the person's approval or ask them to decide (a "
+                   "proposal, variants, \"shall I ...?\"), end your answer with "
                    "a block ```approval (first line: what you want to do, optional further lines: what happens on yes) "
                    "and wait: only a yes is a yes, silence never is. Commands, code and configuration the person "
                    "should run or paste go into their own fenced code block with a language (one block per place, one "
@@ -495,6 +503,61 @@ def split_approval(text):
     return text[:m.start()].rstrip(), {"title": title, **({"what": what} if what else {})}
 
 
+# kalmido-capability: approval_check (2.40.0, #1347): a chat answer that asks the person to decide or makes a proposal,
+# but has no ```approval block, goes back to the agent ONCE (same session: the complete answer again, with the block, no
+# tools); if it still has none, the posted answer gets a visible hint. KALMIDO_APPROVAL_CHECK=0 switches it off.
+APPROVAL_CHECK = os.environ.get("KALMIDO_APPROVAL_CHECK", "1").strip() != "0"
+ASKS_DE = re.compile(
+    r"(?im)^[^\n]*(?:\bsoll(?:en)? (?:ich|wir)\b|\bwillst du\b|\bmöchtest du\b|\bwollen wir\b|\bwelche variante\b"
+    r"|\bvariante [0-9a-z]\b|\b(?:mitnehmen|aufnehmen|einplanen|umsetzen|übernehmen|einbauen|vorziehen)\b|\bvorschlag\b"
+    r"|\bvorgeschlagen\b|\bentscheid\w*\b|\boder lieber\b|\bpasst (?:dir )?das\b)[^\n]*\?[ \t*_)]*$"
+    r"|\bantwort (?:von dir )?steht (?:noch )?aus\b|\bwartet auf (?:deine|dein) (?:antwort|entscheidung|ok|go|ja)\b"
+    # proposals as statements, no question mark ("small enough to take it into 2.40")
+    r"|\b(?:mitzunehmen|aufzunehmen|einzuplanen|einzubauen|vorzuziehen|umzusetzen)\b|\bwürde ich\b|\bich würde (?!dich)"
+    r"|\bich schlage vor\b|\b(?:ich )?empfehle(?: ich)?\b|\bmein vorschlag\b|\bpasst\b[^\n]*\b(?:in|zu) (?:paket |release |version )?\d+\.\d+"
+    r"|^[ \t>*_-]*(?:vorschlag|fix|empfehlung)\b[^\n:]{0,30}:")
+ASKS_EN = re.compile(
+    r"(?im)^[^\n]*(?:\bshall (?:i|we)\b|\bshould (?:i|we)\b|\bdo you want\b|\bwould you like\b|\bwhich (?:option|variant)\b"
+    r"|\b(?:option|variant) [0-9a-z]\b|\b(?:include|schedule|implement|take|add|plan|pull)\b[^\n]*\b(?:in|into|for) (?:release |version )?\d+\.\d+"
+    r"|\bor rather\b|\b(?:is|does) (?:that|this) (?:ok|okay|fine|work for you)\b|\bgo ahead\b|\bproceed\b)[^\n]*\?[ \t*_)]*$"
+    r"|\bwaiting for your (?:answer|decision|ok|okay|go|yes|approval)\b|\byour (?:call|decision)\b"
+    r"|\bi would (?!like to thank)|\bi'd (?:suggest|recommend|propose|do|go|take|add|include)\b|\bi (?:suggest|propose|recommend)\b"
+    r"|\bmy (?:suggestion|proposal|recommendation)\b|\b(?:small|worth|easy) enough to (?:include|take|add|fit)\b|\bworth (?:including|adding|taking)\b"
+    r"|\bfits (?:in|into) (?:release |version )?\d+\.\d+"
+    r"|^[ \t>*_-]*(?:proposal|suggestion|fix|recommendation)\b[^\n:]{0,30}:")
+CARD_HINT = {
+    "de": "\n\n_Hinweis vom Starter: Diese Antwort enthält einen Vorschlag oder eine Frage an dich, aber keine Freigabe-Karte. "
+          "Nichts davon passiert ohne dein ausdrückliches Ja._",
+    "en": "\n\n_Note from the launcher: this answer makes a proposal or asks you to decide, but has no approval card. "
+          "Nothing of it happens without your explicit yes._"}
+CARD_FIX = ("(Launcher check: your answer seems to ask the person to decide or to make a proposal (\"{line}\"), but it has no "
+            "```approval block. Write your COMPLETE answer once more, this time with the block at the end (first line: what "
+            "happens on yes). If no decision is needed at all, put that place as a statement instead of a question or "
+            "proposal. Do not run any tools again.)")
+
+
+def asks_without_card(text):
+    """The first line that asks the person to decide or makes a proposal -> (line, "de" / "en"); ("", "") = none. Code
+    blocks, inline code, quotes and lines about cards already posted do not count."""
+    plain = re.sub(r"```.*?(?:```|\Z)", "", text or "", flags=re.S)
+    plain = re.sub(r"`[^`\n]*`", "", plain)
+    plain = "\n".join(x for x in plain.splitlines()
+                      if not x.lstrip().startswith(">") and not re.search(r"(?i)\b(?:karte|cards?)\b", x))
+    hits = [(m.start(), m.group(0), lang) for lang, rx in (("de", ASKS_DE), ("en", ASKS_EN)) for m in [rx.search(plain)] if m]
+    if not hits:
+        return "", ""
+    pos, _, lang = min(hits)
+    end = plain.find("\n", pos)
+    line = plain[plain.rfind("\n", 0, pos) + 1:end if end >= 0 else len(plain)]  # the whole line, not just the words
+    return " ".join(line.split())[:160], lang
+
+
+def result_text(st):
+    """The final answer of a finished run ("" when it failed)."""
+    res = st.result or {}
+    return str(res.get("result") or "").strip() if not res.get("is_error") else ""
+
+
 def chunks(text, n=CHAT_CHUNK):
     out = []
     while len(text) > n:
@@ -593,65 +656,19 @@ class Runner:
         if self.dry:
             print(json.dumps({"args": args, "chat_user_id": uid, "prompt": prompt}, ensure_ascii=False))
             return
-        self.api.status("working", "Answering in the chat" if uid else "Working on an event",
-                        task_id=None if uid else task.get("id"), host=self.host())
-        last_typing = [0.0]
-
-        def on_model(m):
-            if m and m != self.model:
-                self.model = m
-                self.api.status("working", "Answering in the chat" if uid else "Working on an event",
-                                task_id=None if uid else task.get("id"), host=self.host())
-
-        def typing():
-            if uid and time.time() - last_typing[0] >= TYPING_EVERY_S:
-                last_typing[0] = time.time()
-                self.api.typing(uid)
-
-        def on_usage(info):
-            self.usage.seen(info)
-            self.usage.report()
-
-        st = Stream((lambda t: self.api.progress(t, uid)) if uid else (lambda t: False), on_model, on_usage)
-        typing()
-        exe = shutil.which(args[0]) or args[0]  # Windows: claude.exe / claude.cmd (PATHEXT); a .cmd runs through cmd.exe
-        run_args = (["cmd.exe", "/d", "/c", exe] if os.name == "nt" and exe.lower().endswith((".cmd", ".bat")) else [exe]) + args[1:]
-        try:
-            p = subprocess.Popen(run_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                 text=True, encoding="utf-8", errors="replace", bufsize=1)
-        except OSError as e:
-            log(f"cannot start {args[0]}: {type(e).__name__}")
+        what = "Answering in the chat" if uid else "Working on an event"
+        tid = None if uid else task.get("id")
+        self.api.status("working", what, task_id=tid, host=self.host())
+        st, rc = self._exec(args, prompt, uid, what, tid)
+        if st is None:
             self.api.status("error", "The agent command cannot be started")
             return
-        err_tail = []
-
-        def errs():
-            for ln in p.stderr:
-                err_tail.append(ln)
-                del err_tail[:-20]
-        te = threading.Thread(target=errs, daemon=True)
-        te.start()
-        p.stdin.write(prompt)
-        p.stdin.close()
-        stop = threading.Event()
-
-        def ticker():  # typing dots and a throttled step also while the command is quiet
-            while not stop.wait(1):
-                typing()
-                st.tick()
-        tt = threading.Thread(target=ticker, daemon=True)
-        tt.start()
-        for line in p.stdout:
-            st.feed(line)
-        rc = p.wait()
-        stop.set()
-        te.join(2)
-        res = st.result or {}
-        text = str(res.get("result") or "").strip() if not res.get("is_error") else ""
+        text = result_text(st)
         self.usage.report(force=True)
         if uid:
             if text:
                 body, appr = split_approval(redact(text))
+                body, appr = self.check_approval(args, uid, body, appr, st.session_id, what)
                 ids = [int((e.get("data") or {}).get("message", {}).get("id") or 0) for e in evs if e.get("event") == "chat"]
                 reply_to = ids[-1] if len(ids) > 1 and ids[-1] else None  # several messages: say which one it answers
                 parts = chunks(body) or ([""] if appr else [])
@@ -675,6 +692,83 @@ class Runner:
             self.api.status("error", "The last run failed")
         else:
             self.api.status("idle", host=self.host())
+
+    # kalmido-capability: approval_check
+    def check_approval(self, args, uid, body, appr, session_id, what):
+        """2.40.0 (#1347): a chat answer that asks to decide / proposes something without an approval block goes back to
+        the agent once (same session, the complete answer again with the block, no tools); still none -> a visible hint."""
+        if appr or not APPROVAL_CHECK:
+            return body, appr
+        line, lang = asks_without_card(body)
+        if not line:
+            return body, appr
+        log("the answer asks for a decision without an approval block: asking the agent once for the block")
+        if session_id:
+            st2, _ = self._exec(args + ["--resume", session_id], CARD_FIX.format(line=line.replace('"', "'")), uid, what, None,
+                                steps=False)
+            t2 = result_text(st2) if st2 else ""
+            if t2:
+                body, appr = split_approval(redact(t2))
+                self.usage.report(force=True)
+        if not appr:
+            line2, lang2 = asks_without_card(body)
+            if line2:
+                body = body.rstrip() + CARD_HINT[lang2 or lang or "en"]
+        return body, appr
+
+    def _exec(self, args, prompt, uid, what, tid, steps=True):
+        """One headless run of COMMAND (prompt on stdin) -> (Stream, exit code); (None, -1) = it cannot be started. A chat
+        run shows typing dots while it lasts and its prose between tool calls as steps."""
+        last_typing = [0.0]
+
+        def on_model(m):
+            if m and m != self.model:
+                self.model = m
+                self.api.status("working", what, task_id=tid, host=self.host())
+
+        def typing():
+            if uid and time.time() - last_typing[0] >= TYPING_EVERY_S:
+                last_typing[0] = time.time()
+                self.api.typing(uid)
+
+        def on_usage(info):
+            self.usage.seen(info)
+            self.usage.report()
+
+        st = Stream((lambda t: self.api.progress(t, uid)) if uid and steps else (lambda t: False), on_model, on_usage)
+        typing()
+        exe = shutil.which(args[0]) or args[0]  # Windows: claude.exe / claude.cmd (PATHEXT); a .cmd runs through cmd.exe
+        run_args = (["cmd.exe", "/d", "/c", exe] if os.name == "nt" and exe.lower().endswith((".cmd", ".bat")) else [exe]) + args[1:]
+        try:
+            p = subprocess.Popen(run_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                 text=True, encoding="utf-8", errors="replace", bufsize=1)
+        except OSError as e:
+            log(f"cannot start {args[0]}: {type(e).__name__}")
+            return None, -1
+        err_tail = []
+
+        def errs():
+            for ln in p.stderr:
+                err_tail.append(ln)
+                del err_tail[:-20]
+        te = threading.Thread(target=errs, daemon=True)
+        te.start()
+        p.stdin.write(prompt)
+        p.stdin.close()
+        stop = threading.Event()
+
+        def ticker():  # typing dots and a throttled step also while the command is quiet
+            while not stop.wait(1):
+                typing()
+                st.tick()
+        tt = threading.Thread(target=ticker, daemon=True)
+        tt.start()
+        for line in p.stdout:
+            st.feed(line)
+        rc = p.wait()
+        stop.set()
+        te.join(2)
+        return st, rc
 
     def handle(self, evs, save=False):
         for uid, group in self.groups(evs):

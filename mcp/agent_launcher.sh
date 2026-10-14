@@ -29,7 +29,8 @@
 #               agent_launcher.sh -e ~/.config/kalmido/agent.env --events -- claude --mcp-config ~/agent/.mcp.json
 #             Same as KALMIDO_EVENTS=1 in the env file. Optional keys there: KALMIDO_PROMPT_FILE (text in front of every
 #             event), KALMIDO_USAGE_LIMIT (pause new runs at this % of the week), KALMIDO_USAGE_FILE (a status line
-#             file {at, rate_limits}), KALMIDO_STATE_DIR (event cursor). Without --events: the command runs as it is.
+#             file {at, rate_limits}), KALMIDO_STATE_DIR (event cursor), KALMIDO_APPROVAL_CHECK=0 (2.40.0: no check of
+#             chat answers that ask to decide without an ```approval block). Without --events: the command runs as it is.
 # Needs: bash, curl, python3 (JSON), GNU date, setsid (util-linux). See docs/AGENTS.md "Runtime settings" for a systemd unit.
 set -uo pipefail
 
@@ -42,7 +43,7 @@ while [[ $# -gt 0 ]]; do
     --once) ONCE=1; shift ;;
     --events) EVENTS=1; shift ;;
     --) shift; break ;;
-    -h|--help) sed -n '2,39p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,34p' "$0"; exit 0 ;;
     *) break ;;
   esac
 done
@@ -56,7 +57,7 @@ set -a
 set +a
 : "${KALMIDO_URL:?KALMIDO_URL missing in $ENV_FILE}" "${KALMIDO_TOKEN:?KALMIDO_TOKEN missing in $ENV_FILE}"
 [[ "${KALMIDO_EVENTS:-0}" == 1 ]] && EVENTS=1
-# kalmido-capability: steps, model, permission_mode, quota, reply_ref, status_typing, approval, old_server, proposals, message_edited, playbook
+# kalmido-capability: steps, model, permission_mode, quota, reply_ref, status_typing, approval, old_server, proposals, message_edited, playbook, approval_check
 # (event mode: mcp/agent_run.py does them for both launchers, so .sh and .ps1 cannot drift apart)
 if [[ $EVENTS == 1 ]]; then
   RUNNER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent_run.py"

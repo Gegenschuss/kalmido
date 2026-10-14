@@ -138,7 +138,10 @@ A scheduled task (Windows) and a launchd plist (macOS): [docs/AGENTS.md](../docs
 **Event mode (2.35.0):** with `--events` both launchers start [`agent_run.py`](agent_run.py) in front of the command: it
 waits for the agent's events and runs the command once per event, headless with stream-json, and sends steps, model,
 permission mode, typing / status, the plan usage ring, the reply reference and approval cards like a hosted chat service;
-the final text of a chat run is posted as the answer. The command then has no `-p`:
+the final text of a chat run is posted as the answer. The command then has no `-p`. 2.40.0: a chat answer that asks to
+decide or makes a proposal without a final ` ```approval ` block goes back to the agent once (same session, the complete
+answer with the block); still none -> it is posted with a note that nothing happens without an explicit yes
+(`KALMIDO_APPROVAL_CHECK=0` switches this off).
 
 ```sh
 ./agent_launcher.sh -e /path/to/kalmido-agent.env --events -- claude --mcp-config ~/.kalmido-mcp.json

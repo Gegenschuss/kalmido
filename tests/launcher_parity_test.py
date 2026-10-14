@@ -148,5 +148,74 @@ r.handle([{"event": "chat", "seq": 11, "data": {"user": {"id": 7}, "message": {"
 check(saved == [11, 12], f"cursor saved after every group: {saved}")
 check(len(ar.chunks("a" * 9000)) == 2, "long answers are split")
 
+# 2.40.0 (#1347): approval_check - a decision asked / a proposal made without an ```approval block
+for txt in ("Soll ich das gleich einbauen?", "Das ist klein genug, um es in 2.40 mitzunehmen.", "Vorschlag: den Filter zuerst bauen",
+            "Das würde ich vorziehen.", "Passt gut in 2.41.", "Shall I add it to the next release?",
+            "I would take it into 2.40.", "Fix: close the fence first", "Which option do you prefer?"):
+    check(ar.asks_without_card(txt)[0] != "", f"asks: {txt!r}")
+check(ar.asks_without_card("Ok.\nDas ist klein genug, um es mitzunehmen.") == ("Das ist klein genug, um es mitzunehmen.", "de"), "the whole line, German")
+check(ar.asks_without_card("Shall I add it?")[1] == "en", "English line -> English note")
+for txt in ("All builds are green.", "Done, the list has 4 tasks.", "```text\nSoll ich das einbauen?\n```\nFertig.",
+            "> Soll ich das einbauen?\nErledigt wie besprochen.", "Die Karte zu Release 2.40 ist noch offen, soll ich sie umsetzen?",
+            "Which list do you mean?", "Write `shall I` nowhere.", ""):
+    check(ar.asks_without_card(txt) == ("", ""), f"no ask: {txt!r}")
+FAKE = os.path.join(os.getcwd(), "fakeagent.py")
+CALLS = os.path.join(os.getcwd(), "calls.jsonl")
+with open(FAKE, "w") as f:
+    f.write(r'''import json, os, sys
+args, prompt = sys.argv[1:], sys.stdin.read()
+with open(os.environ["FAKE_CALLS"], "a") as f:
+    f.write(json.dumps({"args": args, "prompt": prompt}) + "\n")
+mode, again = os.environ.get("FAKE_MODE"), "--resume" in args
+final = {"fix": "Shall I deploy 1.2 now?" if not again else "Ready to deploy 1.2.\n\n```approval\nDeploy 1.2\n```",
+         "stubborn": "Das ist klein genug, um es in 2.40 mitzunehmen.", "plain": "All builds are green."}[mode]
+print(json.dumps({"type": "system", "subtype": "init", "model": "m", "session_id": "sess-1"}), flush=True)
+print(json.dumps({"type": "result", "subtype": "success", "is_error": False, "result": final, "session_id": "sess-1"}), flush=True)
+''')
+
+
+class StubApi:
+    def __init__(self):
+        self.posts = []
+
+    def chat(self, uid, body, approval=None, reply_to=None, task_id=None):
+        self.posts.append({"uid": uid, "body": body, "approval": approval})
+        return {"id": len(self.posts)}
+
+    def status(self, *a, **k):
+        pass
+
+    typing = progress = quota = status
+
+
+def agent_run(mode, ev=None):
+    os.environ.update(FAKE_MODE=mode, FAKE_CALLS=CALLS)
+    if os.path.exists(CALLS):
+        os.remove(CALLS)
+    rr = ar.Runner([sys.executable, FAKE], os.path.join(os.getcwd(), "state2"))
+    rr.api = rr.usage.api = StubApi()
+    ev = ev or {"event": "chat", "data": {"user": {"id": 7, "name": "Ann"}, "message": {"id": 1, "body": "status?"}}}
+    rr.run(ar.Runner.chat_uid(ev), [ev])
+    with open(CALLS) as f:
+        return rr.api.posts, [json.loads(l) for l in f]
+
+
+posts, calls = agent_run("fix")
+check(len(calls) == 2 and "--resume" not in calls[0]["args"] and calls[1]["args"][-2:] == ["--resume", "sess-1"]
+      and "Launcher check" in calls[1]["prompt"] and "Shall I deploy 1.2 now?" in calls[1]["prompt"], "goes back once, same session")
+check(len(posts) == 1 and posts[0]["approval"] == {"title": "Deploy 1.2"} and "Note from the launcher" not in posts[0]["body"],
+      f"the second answer carries the block: a card, no note: {posts}")
+posts, calls = agent_run("stubborn")
+check(len(calls) == 2 and len(posts) == 1 and posts[0]["approval"] is None and "Hinweis vom Starter" in posts[0]["body"]
+      and posts[0]["body"].startswith("Das ist klein genug"), f"still no block: posted once with the note: {posts}")
+posts, calls = agent_run("plain")
+check(len(calls) == 1 and posts[0]["body"] == "All builds are green.", "a plain answer: one run, no note")
+posts, calls = agent_run("stubborn", {"event": "comment", "data": {"task": {"id": 1}}})
+check(len(calls) == 1 and posts == [], "task events are not checked")
+ar.APPROVAL_CHECK = False  # KALMIDO_APPROVAL_CHECK=0
+posts, calls = agent_run("stubborn")
+check(len(calls) == 1 and "Hinweis" not in posts[0]["body"], "KALMIDO_APPROVAL_CHECK=0 switches it off")
+ar.APPROVAL_CHECK = True
+
 print(f"launcher_parity: {ok} ok, {len(F)} failed")
 sys.exit(1 if F else 0)

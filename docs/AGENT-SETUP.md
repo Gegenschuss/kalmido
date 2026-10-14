@@ -422,6 +422,12 @@ chat messages of one person that arrive together: one run). It does what a hoste
 - **Approvals**: an answer that ends in a block ` ```approval ` (first line: what you want to do, more lines: what happens
   on yes) becomes an approval card with *Yes* / *No* (older servers: two buttons). The answer comes back as a new run
   ("Approval: yes - ..."); no answer is never a yes.
+- **Approval check** (2.40.0): a chat answer that asks the person to decide or makes a proposal (German or English,
+  questions like "shall I ...?" / "soll ich ...?" and statements like "I would ...", "Proposal: ...", "mitzunehmen",
+  "fits in 2.41"; code blocks, quotes and lines about cards already posted do not count) but has no ` ```approval `
+  block goes back to the agent **once** in the same session: the complete answer again, this time with the block, no
+  tools. Still without a block it is posted with a visible note that nothing happens without an explicit yes. Chat runs
+  only; `KALMIDO_APPROVAL_CHECK=0` in `agent.env` switches it off.
 - **The answer**: the final text of a chat run is posted into the person's chat (secrets masked). The agent must not post
   it again with `send_chat` (the prompt says so).
 - **Older servers** (before 2.32 / 2.33 / 2.35): what the server does not know yet is switched off once; the rest runs as

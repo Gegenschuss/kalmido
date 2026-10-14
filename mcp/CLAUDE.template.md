@@ -46,6 +46,8 @@
   only as a question in your text. The answer comes as `chat_choice` with `approval` approved / rejected. **Silence is no
   yes**: without an answer you do not do it; remind once at most, then park it. A host that posts your answer for you
   (the launcher's event mode) turns a final block ` ```approval ` (first line the title, then what happens) into the card.
+  A proposal is a decision too ("I would take it into 2.41", "Proposal: ...", variants): it gets the block as well; the
+  launcher (2.40.0) sends an answer that asks or proposes without one back to you once, then posts it with a note.
 - A 429 is a pause, not an error: wait (`Retry-After`, else 5, 15, 30, 60 seconds) and try again; your service, jobs and
   other agents may be calling at the same time.
 - Before a large piece of work check `usage_limit` (`GET /api/v1/agent`); at the soft limit finish the current step, park
