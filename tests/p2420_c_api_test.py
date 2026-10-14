@@ -65,14 +65,11 @@ def dbx(sql, args=()):
     return dbxm.connect(DATA).execute(sql, args).fetchall()
 
 
-def recovery_key(oid):
-    """The organisation's recovery key, read inside the container through core/orgcrypt.py (the value never leaves the test)."""
-    code = ("import kalmido\nfrom kalmido.core.db import connect\nfrom kalmido.core.orgcrypt import oc_recovery_key\n"
-            f"c = connect()\nprint('RK=' + oc_recovery_key(c, {int(oid)}))\nc.commit()\nc.close()\n")
-    r = subprocess.run(["docker", "exec", "-e", "TASKS_WATCHDOG=0", CT, "python", "-c", code], capture_output=True, text=True, timeout=120)
-    keys = [x[3:] for x in r.stdout.splitlines() if x.startswith("RK=")]
-    assert keys and keys[0], r.stdout[-500:] + r.stderr[-500:]
-    return keys[0]
+def recovery_key(s, oid):
+    """The organisation's recovery key as its admin sees it (Settings > Organisation > Encryption, password confirmed)."""
+    r = s.post(B + f"/api/orgs/{oid}/encryption/recovery", json={"password": "password123"})
+    assert r.ok and r.json().get("recovery_key"), r.text[:200]
+    return r.json()["recovery_key"]
 
 
 def tool(args, stdin=""):
@@ -187,7 +184,7 @@ log = dbx("SELECT user_id, action, target, detail FROM office_doc_log WHERE org_
 check(any(x[0] == ALICE and x[2] == "org" for x in log), f"office log: who exported (size in the detail): {log}")
 
 # ---------------------------------------------------------------- the tool
-RK = recovery_key(ORG)
+RK = recovery_key(A, ORG)
 ZIP = os.path.join(TMP, "org.zip")
 r = tool([ARC, "-o", ZIP], stdin=RK + "\n")
 check(r.returncode == 0 and os.path.isfile(ZIP) and "entries checked" in r.stdout, "tool opens the archive with the recovery key (stdin) " + r.stdout + r.stderr)
@@ -252,7 +249,8 @@ secrets_db = [x[0] for x in dbx("SELECT password_hash FROM users WHERE password_
     + [x[0] for x in dbx("SELECT token_hash FROM api_tokens")]
 leaks = [n for n in ("password_hash", "token_hash", "totp_secret", "pw_hash", "p256dh", "hook_secret", "drop_token", "ical_token") if f'"{n}"' in text]
 check(not leaks, f"no secret field names: {leaks}")
-check(not any(s and s in text for s in secrets_db) and AG_TOKEN not in text and KEY not in text, "no password hash, session / token hash, agent token or server key")
+check(not any(s and s in text for s in secrets_db) and AG_TOKEN not in text and KEY not in text
+      and RK not in text and RK.replace("-", "") not in text, "no password hash, session / token hash, agent token, server key or recovery key")
 check(man["counts"].get("tasks.json") == 2 and "client_encrypted" in man and man["not_included"], "manifest: counts, client-encrypted, not included")
 
 # delete now -> gone; a second export; 24 hours later the archive is gone
