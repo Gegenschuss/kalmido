@@ -187,7 +187,7 @@ const V = B + 'api/v1';
     await o.nav(B + '#l/' + L); await ready(ev);
     await ev(`(() => { chatOpen(${AG}, {float: false}); return 1; })()`); await sleep(1800);
     await ev(`(() => { const b = document.querySelector('#chat-msgs'); b.scrollTop = b.scrollHeight; return 1; })()`); await sleep(300);
-    const g = await ev(`(() => { const m = document.querySelector('.chmodel'), n = document.querySelector('.chnm'); const k = [...document.querySelectorAll('#chat-msgs .csteps')];
+    const g = await ev(`(() => { const m = document.querySelector('.chmodel'), n = document.querySelector('.chn');  /* 2.40.0 (#1345): two-line header, .chnm is display:contents now */ const k = [...document.querySelectorAll('#chat-msgs .csteps')];
       const t = [...document.querySelectorAll('#chat-msgs .cmsg.ag')].pop()?.querySelector('.rxtog');
       return {model: m?.textContent, inHead: !!m && m.getBoundingClientRect().right <= n.getBoundingClientRect().right + 1, kept: k.length, hist: !!document.querySelector('#chat-msgs details.jobv[open] .jvh'),
         tog: t ? getComputedStyle(t).opacity : null}; })()`);

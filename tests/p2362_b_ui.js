@@ -158,7 +158,8 @@ const V = B + 'api/v1';
       await o.nav(B + '#l/' + L); await ready(ev);
       await ev(`(() => { chatOpen(${AG}, {float: false}); return 1; })()`); await sleep(1800);
       const g = await ev(HEAD);
-      check(g && g.bw === '0px' && g.fs <= 12.5 && g.color === g.acc && /▾/.test(g.caret) && /·/.test(g.caret), `${tag}: #1140 "· Auto ▾" without a frame ` + JSON.stringify(g));
+      // 2.40.0 (#1345): at 1440 the badge opens the second header line (before state and model), so no "·" in front of it
+      check(g && g.bw === '0px' && g.fs <= 12.5 && g.color === g.acc && /▾/.test(g.caret) && g.row2, `${tag}: #1140 "Auto ▾" without a frame, in line 2 ` + JSON.stringify(g));
       check(g && g.ah >= 24 && !g.ringOver && !g.ibOver, `${tag}: #1140 the click area (24 px) overlaps nothing ` + JSON.stringify(g));
       await call('PUT', `/api/agents/${AG}/permission-mode`, {mode: ''});
       await ev('load().then(render).then(() => chatLoad())'); await sleep(1200);
