@@ -68,8 +68,8 @@ const typeIn = (w, el, v) => { el.focus(); el.dispatchEvent(new w.FocusEvent('fo
     q.dispatchEvent(new w.FocusEvent('focusin', {bubbles: true}));
     const first = [...md.querySelectorAll('.ctyl li[data-code]')].slice(0, 3).map(li => li.dataset.code).join(',');
     check(first === 'DE,AT,CH', 'country: Germany, Austria, Switzerland on top: ' + first);
-    typeIn(w, q, 'Öst');
-    check(md.querySelector('.ctyl li[data-code]')?.dataset.code === 'AT', 'country: "Öst" finds Austria');
+    typeIn(w, q, 'Austr');  // the names are the browser's in the app language (English here; German: "Öst")
+    check(md.querySelector('.ctyl li[data-code]')?.dataset.code === 'AT', 'country: "Austr" finds Austria first: ' + md.querySelector('.ctyl li[data-code]')?.dataset.code);
     typeIn(w, q, 'at');
     check(md.querySelector('.ctyl li[data-code]')?.dataset.code === 'AT', 'country: "AT" finds Austria');
     click(w, md.querySelector('.ctyl li[data-code="AT"]'));
