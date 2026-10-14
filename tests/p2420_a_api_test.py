@@ -113,7 +113,8 @@ assert A.put(B + f"/api/lists/{L}/members", json={"user_id": ag["id"], "role": "
 T = A.post(B + "/api/tasks", json={"title": "Contract draft", "list_id": L}).json()["id"]
 
 # ================================================================== keys
-check(A.get(B + "/api/e2e/keys").json() == {"set": False}, "keys: none yet")
+# 2.42.0 review: GET also says whether changing / removing the keys asks for the account password
+check(A.get(B + "/api/e2e/keys").json() == {"set": False, "password": True}, "keys: none yet")
 check(requests.get(B + "/api/e2e/keys", headers=H).status_code in (401, 403), "keys: not without login")
 AGH = {"Authorization": "Bearer " + ag["token"]}
 check(requests.get(B + "/api/e2e/keys", headers=AGH).status_code in (401, 403, 404), "keys: an agent token gets nothing")
@@ -130,11 +131,20 @@ g = A.get(B + "/api/e2e/keys").json()
 check(g["set"] and g["pub"]["x"] == ka["pub"]["x"] and g["bundle_pass"]["ct"] == ka["bundle_pass"]["ct"] and "d" not in g["pub"],
       "keys: read back (public key + wrapped bundles)")
 k2 = dict(keys(), pub=ka["pub"])
-r = A.put(B + "/api/e2e/keys", json=k2)
+# 2.42.0 review: replacing existing keys needs the account password (each refusal counts like a failed login: few of them here)
+check(A.put(B + "/api/e2e/keys", json=k2).status_code == 403 and A.put(B + "/api/e2e/keys", json=dict(k2, password="wrong")).status_code == 403
+      and A.get(B + "/api/e2e/keys").json()["bundle_pass"]["ct"] == ka["bundle_pass"]["ct"], "keys: re-wrap without / with a wrong password refused")
+r = A.put(B + "/api/e2e/keys", json=dict(k2, password="password123"))
 check(r.ok and r.json().get("created") is False and A.get(B + "/api/e2e/keys").json()["bundle_pass"]["ct"] == k2["bundle_pass"]["ct"],
       "keys: re-wrapped (new passphrase) with the same public key")
 check(A.put(B + "/api/e2e/keys", json=keys()).status_code == 409, "keys: another public key while keys exist = 409")
-check(Bo.get(B + "/api/e2e/keys").json() == {"set": False}, "keys: per person")
+# repair (the browser found that the stored public key is not the one of its bundle): the bundle's key again, with the password
+k3 = dict(k2, pub=keys()["pub"])
+r = A.put(B + "/api/e2e/keys", json=dict(k3, repair=True, password="password123"))
+check(r.ok and A.get(B + "/api/e2e/keys").json()["pub"]["x"] == k3["pub"]["x"], "keys: repair stores the public key again " + r.text[:150])
+r = A.put(B + "/api/e2e/keys", json=dict(k2, repair=True, password="password123"))
+check(r.ok and A.get(B + "/api/e2e/keys").json()["pub"]["x"] == ka["pub"]["x"], "keys: and back")
+check(Bo.get(B + "/api/e2e/keys").json() == {"set": False, "password": True}, "keys: per person")
 r = AG.get("/tasks/%d" % T)
 check(r.ok, "agent: sees the task (set-up)")
 
@@ -251,8 +261,9 @@ check(A.post(B + f"/api/team/rooms/{DM}/messages", json={"body": "plain again"})
 
 # ================================================================== removing the keys
 Bo.post(B + f"/api/team/rooms/{DM}/e2e", json={"on": True})
-r = A.delete(B + "/api/e2e/keys")
-check(r.ok and r.json()["removed"] is True and A.get(B + "/api/e2e/keys").json() == {"set": False}, "remove: keys gone")
+check(A.delete(B + "/api/e2e/keys").status_code == 403 and A.get(B + "/api/e2e/keys").json()["set"], "remove: not without the password (2.42.0 review)")
+r = A.delete(B + "/api/e2e/keys", json={"password": "password123"})
+check(r.ok and r.json()["removed"] is True and A.get(B + "/api/e2e/keys").json() == {"set": False, "password": True}, "remove: keys gone")
 check(A.get(B + f"/api/tasks/{T}/enc-note").status_code == 404, "remove: my notes go with them")
 check(A.get(B + f"/api/team/rooms/{DM}/messages").json()["room"]["e2e"] is False, "remove: my encrypted DMs are switched off")
 check(A.put(B + "/api/e2e/keys", json=keys()).ok, "remove: new keys can be set up afterwards")
