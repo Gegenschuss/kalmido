@@ -582,6 +582,9 @@ shard 10  # --------------------------------------------------------------- shar
 # settled reminders, language switch of drafts, PDF inline + download, send / reminder dialogs
 fresh; run p2400_d_api "$PY" p2400_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2400_d_ui node p2400_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.40.0 A (#1432): "Load more" for jobs, completed, trash and news (cursors without doubles / gaps, open jobs on top, counters over all)
+fresh; run p2400_a_api "$PY" p2400_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2400_a_ui node p2400_a_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
