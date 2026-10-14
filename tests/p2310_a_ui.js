@@ -34,6 +34,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return ds(d
   await call('POST', '/api/admin/agents', {scopes: ['read', 'tasks:write', 'comments'], username: 'claude', display_name: 'Claude'});  // never connected = offline
   const SW = (await call('POST', '/api/lists', {name: 'Software', kind: 'project', tickets: true})).id;
   await call('PUT', `/api/lists/${SW}/members`, {user_id: BOB, role: 'edit'});
+  await call('PATCH', '/api/settings', {show_progress: String(SW)});  // 2.40.0 (#1190): the progress bar of a project is off by default
   const HOME = (await call('POST', '/api/lists', {name: 'Home'})).id;
   const mk = async (title, list_id, extra = {}) => (await call('POST', '/api/tasks', {title, list_id, ...extra})).id;
   const OVER = await mk('Weekly report', SW, {due: day(-2), priority: 5});

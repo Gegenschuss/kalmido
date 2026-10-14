@@ -22,8 +22,8 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
 const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
 const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,team,notes,pomo';
 // what the menus offered before 2.31 (flat): each of it must still be reachable (main level or the second level)
-const LIST_BEFORE = ['Edit list…', 'Share…', 'Agent: Claude…', 'Agent access', 'Add section…', 'Shown fields…', 'Team chat', 'Move to folder…', 'Tasks from notes…', 'Notifications: Default', 'Hide progress', 'Archive list', 'Delete list…'];
-const RARE = ['Agent access', 'Tasks from notes…', 'Notifications: Default', 'Hide progress'];
+const LIST_BEFORE = ['Edit list…', 'Share…', 'Agent: Claude…', 'Agent access', 'Add section…', 'Shown fields…', 'Team chat', 'Move to folder…', 'Tasks from notes…', 'Notifications: Default', 'Show progress', 'Archive list', 'Delete list…'];  // 2.40.0 (#1190): the bar is off by default
+const RARE = ['Agent access', 'Tasks from notes…', 'Notifications: Default', 'Show progress'];
 
 (async () => {
   await sleep(600);

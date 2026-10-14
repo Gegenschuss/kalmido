@@ -52,6 +52,7 @@ const CONTRAST = `(() => {
   const DEV = await mkAgent('devbot', 'DevBot'), KOL = await mkAgent('kollege', 'Kollege'), ARC = await mkAgent('archivar', 'Archivar');
   const L = (await call('POST', '/api/lists', {name: 'Launch', kind: 'project', tickets: true})).id;
   const W = (await call('POST', '/api/lists', {name: 'Website', kind: 'project'})).id;
+  await call('PATCH', '/api/settings', {show_progress: String(L)});  // 2.40.0 (#1190): the progress bar of a project is off by default
   const PLAIN = (await call('POST', '/api/lists', {name: 'Groceries'})).id;
   for (const u of [BOB, DEV.id]) await call('PUT', `/api/lists/${L}/members`, {user_id: u, role: 'edit'});
   // 2.26.0: one agent per list -- the other two join as in a list from before the update (kept)
