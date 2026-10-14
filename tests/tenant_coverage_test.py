@@ -206,6 +206,8 @@ ROUTES = {
     "DELETE /api/v1/comments/{}/reactions/{}": "comment", "PATCH /api/v1/comments/{}": "comment",
     "DELETE /api/v1/comments/{}": "comment", "PATCH /api/comments/{}": "comment", "DELETE /api/comments/{}": "comment",
     "POST /api/comments/{}/reactions": "comment", "POST /api/comments/{}/apply": "comment",
+    "POST /api/comments/{}/choice": "comment", "GET /api/comments/{}/choice": "comment",  # 2.41.0 (#1383)
+    "POST /api/v1/comments/{}/choice": "comment", "POST /api/v1/comments/{}/withdraw": "comment",
     # ---- contact (16)
     "GET /api/v1/contacts": "contact", "POST /api/v1/contacts": "contact", "GET /api/v1/contacts/{}": "contact",
     "PATCH /api/v1/contacts/{}": "contact", "DELETE /api/v1/contacts/{}": "contact",
