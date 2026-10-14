@@ -237,7 +237,7 @@ check("Managing directors: Erika Muster" in footer("en"), "#1377: back to the de
 
 # ---------------------------------------------------------------- #1382: number schemes
 for kind, scheme, want, yearly in (("invoice", "RE-{yyyy}-{seq:03}", f"RE-{Y}-00", True), ("credit", "R{yy}{seq:03}", f"R{str(Y)[2:]}00", True),
-                                   ("reminder", "MA-{seq:04}", "MA-000", False), ("offer", "{yyyy}-{seq:04}", f"{Y}-000", True)):
+                                   ("reminder", "MA-{seq:04}", "MA-000", False), ("offer", "{yyyy}-{seq:04}", f"{Y}-00", True)):  # 2.40.0 (#1382): the quotations above count (next = 0015)
     j = A.get(B + O + "/number-preview", params={"kind": kind, "scheme": scheme}).json()
     check(j.get("valid") and j["preview"].startswith(want) and j.get("yearly") is yearly, f"#1382: preview of {kind} {j}")
 j = A.get(B + O + "/number-preview", params={"kind": "invoice", "scheme": "RE-{yyyy}"}).json()
