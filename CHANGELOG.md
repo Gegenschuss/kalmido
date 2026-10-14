@@ -7,6 +7,12 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+### Fixed
+- The News badge and an open News view update within the poll again when a comment brings news (#1376).
+- Withdrawing comment questions answers 404 for an unknown comment before the agent check (#1383); the per-area change
+  counters no longer use a case-sensitive LIKE (#1376).
+- Tests that track time switch time tracking on in their lists (#1471).
+
 ## [2.41.0] - 2026-10-14
 
 **In short:** Folders show and manage **who they are shared with** (people, groups and several agents in one Share

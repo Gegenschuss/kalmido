@@ -21,11 +21,15 @@ function lpChanged(a) {
   return Object.keys(a).filter(k => a[k] !== p[k]);
 }
 // called by the poll when v moved, with lpChanged's areas: true = handled here (only light areas changed)
-function lpLive(v, ch) {
+function lpLive(v, ch, n) {
   if (!ch || !ch.length || ch.some(k => !LP_LIGHT.has(k))) return false;
   S.lpN.light++;
   S.v = v;  // the change is known; the state follows bundled
   for (const k of ch) lpAreas.add(k);
+  // 2.41.1 (#1376): news arise from comments / chats (their area moves, not "news"): a new news signature fetches the
+  // news at once (bell badge, tabs, an open News view), not only with the bundled state; with unsaved input the next poll
+  // takes the held-back full way as before
+  if (n !== undefined && collab() && n !== S.news?.sig && !lpBusy()) loadNews();
   if (ch.includes('comments') && S.sel > 0 && (cmtOn() || collab()) && S.tl.id === S.sel) loadTimeline(S.sel);
   if (ch.includes('agentchat') && S.chat.aid && collab()) chatLoad();
   if (!lpT) lpT = setTimeout(lpFollow, LP_DEFER_MS);

@@ -213,11 +213,11 @@ def v1_comment_withdraw(cid):
     b = v1_json()
     reject_unknown(b, ("outcome",))
     c = db()
-    if not is_agent(g.user):
-        raise Denied(403)
     r = c.execute("SELECT * FROM comments WHERE id=? AND deleted_at IS NULL", (cid,)).fetchone()
     if not r or not task_visible(c, r["task_id"], me(), full=True):
         raise Denied(404)
+    if not is_agent(g.user):  # 2.41.1 (#1383): after the lookup, like the neighbours (an unknown comment is 404, not 403)
+        raise Denied(403)
     r2 = lv_withdraw(c, r, me(), b.get("outcome"))
     bump(c)
     c.commit()

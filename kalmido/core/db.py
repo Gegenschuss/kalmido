@@ -771,7 +771,8 @@ def lv_area():
 def lv_versions(c):
     """{area: counter} of every area (0 = never changed)."""
     out = dict.fromkeys(LV_AREA_KEYS, 0)
-    for r in c.execute("SELECT key, value FROM settings WHERE key LIKE 'version:%'"):
+    keys = ["version:" + k for k in LV_AREA_KEYS]  # 2.41.1 (#1376): the known keys, no LIKE (pg_dialect)
+    for r in c.execute(f"SELECT key, value FROM settings WHERE key IN ({','.join('?' * len(keys))})", keys):
         k = r[0][8:]
         if k in out:
             out[k] = int(r[1])

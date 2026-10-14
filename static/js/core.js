@@ -661,7 +661,7 @@ setInterval(async () => {
       if (!first && calEvOn() && !editing()) { calInvalidate(); if (S.route.mod === 'cal' || S.route.key === 'today') renderView(); }
     }
     const chg = v !== S.v || (n !== undefined && collab() && n !== S.news?.sig);
-    if (chg && v !== S.v && !editing() && lpLive(v, lpCh)) { /* 2.41.0 (#1376): only light areas: their parts, the rest bundled */ }
+    if (chg && v !== S.v && !editing() && lpLive(v, lpCh, n)) { /* 2.41.0 (#1376): only light areas: their parts, the rest bundled */ }
     else if (chg && !editing()) { S.viewStale = false; lpFull(); S.lpN.state++; await load(); td_renderSoon(); }  // 2.40.0 (#1430): bundled
     else if (v !== S.v && editing() && S.sel > 0 && (cmtOn() || collab()) && S.tl.id === S.sel && S.tlPollV !== v) { S.tlPollV = v; loadTimeline(S.sel); agentPoll(); }  // 1.9.0
     else if (chg && editing() && S.chat.aid && collab() && S.chatPollV !== `${v}/${n}`) { S.chatPollV = `${v}/${n}`; chatLoad(); agentPoll(); }  // 2.12.2 (#451): typing, the chat still updates (patched)
