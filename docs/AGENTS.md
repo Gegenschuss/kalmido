@@ -1299,6 +1299,12 @@ participant only its own tasks) and only of its own conversations; anything else
 `name`, `mime`, `size` and `base64`, at most `max_bytes` (default 5 MB, at most 20 MB); images also come as an MCP image
 item so the model can look at them. A damaged file on the server answers `410`.
 
+**End-to-end encrypted content (2.42.0).** People can keep an encrypted note on a task, attach encrypted files and
+encrypt a direct message conversation; this is encrypted in their browser and only they hold the keys. An agent sees
+placeholders only: a task says `encrypted_note: true` (never the text), an encrypted file is listed with
+`encrypted: true` and a neutral name, and downloading it or reading its text answers `404`. Encrypted direct messages
+never reach agents (agents take no part in DMs). Do not ask anyone to paste encrypted content into a comment.
+
 **Reading a file as text (2.34.0).** `GET /api/v1/attachments/{id}/text` (MCP `read_attachment`, scope
 `attachments:read`, same rights as the file itself, else `404`) answers `{id, task_id, comment_id, name, mime, size, url,
 kind, text, chars, truncated, message}`:

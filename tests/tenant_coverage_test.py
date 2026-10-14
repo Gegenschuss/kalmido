@@ -404,7 +404,12 @@ ROUTES = {
     "GET /api/team": "team", "POST /api/team/dm": "team", "GET /api/team/rooms/{}/messages": "team",
     "POST /api/team/rooms/{}/messages": "team", "PATCH /api/team/messages/{}": "team",
     "DELETE /api/team/messages/{}": "team", "POST /api/team/messages/{}/reactions": "team",
-    "POST /api/team/rooms/{}/read": "team", "GET /api/v1/team/rooms": "team", "POST /api/v1/team/dm": "team",
+    "POST /api/team/rooms/{}/read": "team",
+    # 2.42.0 (#828, #909): end-to-end encryption -- the person's own keys; a DM partner's public key / the DM switch (need_room,
+    # tchat_coworkers); the encrypted note (need_task) and an encrypted file (need_task + attachment rules) of a task
+    "GET /api/e2e/keys": "own", "PUT /api/e2e/keys": "own", "DELETE /api/e2e/keys": "own", "GET /api/e2e/pub/{}": "team",
+    "POST /api/team/rooms/{}/e2e": "team", "GET /api/tasks/{}/enc-note": "task", "PUT /api/tasks/{}/enc-note": "task",
+    "DELETE /api/tasks/{}/enc-note": "task", "POST /api/tasks/{}/enc-attachments": "attachment", "GET /api/v1/team/rooms": "team", "POST /api/v1/team/dm": "team",
     "GET /api/v1/team/rooms/{}/messages": "team", "POST /api/v1/team/rooms/{}/messages": "team",
     "PATCH /api/v1/team/messages/{}": "team", "DELETE /api/v1/team/messages/{}": "team",
     "POST /api/v1/team/messages/{}/reactions": "team", "POST /api/v1/team/rooms/{}/read": "team",

@@ -625,6 +625,9 @@ fresh; run p2420_c_api "$PY" p2420_c_api_test.py "$KALMIDO_TEST_DATA"
 # 2.42.0 part D: #1376 delta state (only changed tasks), #1383 save an agent's comment as a task
 fresh; run p2420_d_api "$PY" p2420_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2420_d_ui node p2420_d_ui.js "$KALMIDO_TEST_DATA"
+# 2.42.0 part A: #828 encrypted task note + files, #909 encrypted direct messages (end-to-end, in the browser)
+fresh; run p2420_a_api "$PY" p2420_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2420_a_ui node p2420_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.42.0 part B: #828 keys per organisation (office fields, purchase prices, stored files encrypted at rest; orgcrypt_cli), own container with KALMIDO_SECRET_KEY
 fresh; run p2420_b_api "$PY" p2420_b_api_test.py "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres

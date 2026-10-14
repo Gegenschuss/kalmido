@@ -167,6 +167,7 @@ The most used helpers:
 | `collab/notes.py` | Notes of a list / project. |
 | `collab/teamchat.py` | Team chat (rooms and direct messages). |
 | `collab/msgsearch.py` | 2.33.0: search in comments, team chat and agent chats; since 2.37.0 a trigram index (`pg_trgm`) on `kalmido_fold(body)` (unaccent + umlaut folding) per message table, visibility, snippets. |
+| `collab/e2e.py` | 2.42.0 (#828, #909): end-to-end encryption in the browser: the person's public key + wrapped key bundle (`e2e_keys`), the encrypted note of a task (`task_enc_notes`), encrypted task files (`attachments.enc`), the switch of an encrypted DM (`tchat_rooms.e2e`, `tchat_msgs.enc`). Stores ciphertext only; see *End-to-end encryption* below. |
 | `collab/chatsave.py` | 2.37.0 (#1159): a chat message (agent chat, team chat) saved as a task by a person: text, file copies, link back (`#msg/...`); `chat_saves` per person, `saved_task_id` in the chat pages. 2.42.0 (#1383): also an agent's comment on a task (kind `comment`: a subtask of the task or a new task in its list). |
 | `collab/replies.py` | 2.33.0: replies to one message (comments, team chat, agent chat): `reply_to` checks and the short quotes. |
 | `integrations/mail.py` | Tasks by e-mail (IMAP) and the daily summary by e-mail (SMTP). |
@@ -257,6 +258,7 @@ registering the ones of its area.
 | `detail.js` | The detail panel of a task. |
 | `multiedit.js` | 2.26.0: several selected tasks edited at once in the task panel (common values, "Mixed", one undo step). |
 | `sheetdrag.js` | 2.39.1: bottom sheets on phones (menus, date picker, quick add, dialogs) dragged taller / shorter at their grip and swiped down to close. |
+| `e2e.js` | 2.42.0 (#828, #909): end-to-end encryption with WebCrypto: set up / unlock / lock / change / reset the keys (Settings > Account), the encrypted note in the task detail, encrypted files (*Attach encrypted*), encrypted DMs (lock in the DM head, safety number). |
 | `miniwin.js` | 2.39.1: a list in its own small browser window (double / middle click in the sidebar, list menu); the window (`/?mini=1#l/<id>`) shows only the list and keeps its UI state to itself. |
 | `favorites.js` | 2.40.0: favourite lists (#1361): the star, the *Favourites* section of the sidebar, *Only favourites* and the favourites filter of views. |
 | `mineorder.js` | 2.40.0: your own order of *My tasks* (#1344), kept per person on the server (`user_task_order`). |
@@ -397,3 +399,46 @@ Who may see what is decided in one module, `kalmido/core/access.py`:
   address book of people outside it and reports counts and ids as a security alert; other findings are counted as before.
 - **Tests.** `tests/p2362_a_api_test.py` checks leaving an organisation, people in two organisations, side channels,
   token allowlists, the layer directly against the database, and scans every route with a numeric id for a refusal.
+
+## End-to-end encryption (2.42.0)
+
+Optional, per person, done in the browser with WebCrypto (`static/js/e2e.js`); the server (`kalmido/collab/e2e.py`) only
+stores what the browser encrypted. Separate from the server-side keys per organisation (encryption at rest).
+
+**Keys.** Each person who sets it up gets an ECDH P-256 key pair and a random 256-bit *content key* (AES-GCM). Both
+together form the key bundle, which the browser encrypts twice with AES-256-GCM (the AAD binds the user id, the version
+and which wrapping it is):
+
+| Wrapping | Key derivation | Stored |
+|---|---|---|
+| passphrase (at least 10 characters) | PBKDF2-SHA256, 16-byte random salt, 600 000 rounds | `e2e_keys.bundle_pass` `{v, kdf, iter, salt, iv, ct}` |
+| recovery code (160 random bits, shown once as 8 groups of 4 Base32 characters) | HKDF-SHA256, 16-byte random salt | `e2e_keys.bundle_rec` `{v, kdf, salt, iv, ct}` |
+
+The server also keeps the public key (JWK). It never sees the passphrase, the code, the private key or the content key.
+Unlocking (passphrase) imports the keys as non-extractable `CryptoKey`s that live in the tab; *Remember on this device*
+keeps those non-extractable keys in IndexedDB until logout. Changing the passphrase or resetting it with the code
+re-wraps the same bundle. Removing the keys deletes the person's encrypted notes and switches their encrypted DMs off.
+**Passphrase and recovery code lost = the encrypted content is lost**; nobody, not even an admin, can restore it.
+
+**What is encrypted with what.**
+
+| Content | Key | AAD | Who reads it |
+|---|---|---|---|
+| Task note (`task_enc_notes.body` = `{v, iv, ct}`) | content key | `kalmido-note:v1:<task_id>:<user_id>` | only its author |
+| Task file (`attachments.enc = 1`, blob `KENC` 0x01, IV, ciphertext of header length + `{name, type, size}` + bytes) | content key | `kalmido-file:v1:<task_id>:<user_id>` | only its uploader |
+| Direct message in an encrypted DM (`tchat_msgs.enc` = `{v, iv, ct}`, `body` empty) | AES-256-GCM from HKDF-SHA256(ECDH(own private, other public), salt = room id, info `kalmido-dm:v1`) | `kalmido-dm:v1:<room_id>:<sender_id>` | the two people of the DM |
+
+Every nonce is random (12 bytes). The formats carry a version (`v: 1`, `KENC` 0x01) for later changes.
+
+**What the rest of the app sees.** Task outputs carry only `encrypted_note: true` (+ `encrypted_note_mine` for the
+author in the app); encrypted files are listed as such with a neutral name, never previewed, never text-extracted,
+never served to agents or to anyone but the uploader. Encrypted DMs: the server refuses plain text in them (and
+ciphertext in plain rooms), pushes say only "New message from …", search and *Save as task* skip them, edits are new
+ciphertext. A DM is switched by either person, only when both have keys; the switch leaves a notice in the
+conversation. Both sides can compare a safety number (SHA-256 over both public keys, 8 groups of 5 digits); when the
+other person's key changes, the conversation says so.
+
+**Limits.** This protects against the server operator, a reader of the database and the backups. A web app cannot
+protect against a changed script delivered by the server itself. Encrypted DMs have no forward secrecy (a static key
+pair per person): whoever gets the keys later can read older messages too. A task copy does not take the note along.
+

@@ -299,6 +299,15 @@ belong to the list and everyone in it sees them. Attachments are
 listed (name, type, size) in the task; read them with `GET /tasks/{id}/attachments` + `GET /attachments/{id}` (`attachments:read`) and add
 them with `POST /tasks/{id}/attachments` (`attachments:write`).
 
+**End-to-end encrypted content** (2.42.0): a person may keep an encrypted note on a task and attach files encrypted in
+their browser. The API never returns that content: a task with such a note carries `"encrypted_note": true` (absent
+otherwise), an encrypted file is listed with `"encrypted": true` and a neutral name (`encrypted.kenc`), and
+`GET /attachments/{id}` and `GET /attachments/{id}/text` answer `404` for it (only its uploader downloads it, in the app,
+and decrypts it there). Encrypted direct messages (`/team/...`) carry `enc` (`{v, iv, ct}`, or `{sys: "on" | "off"}` for
+the notice that switched it) with an empty `body`; such a conversation refuses plain text (`409`). The keys never leave
+the browser; the app's own endpoints for them (`/api/e2e/keys`, `/api/e2e/pub/{user_id}`, `/api/tasks/{id}/enc-note`,
+`/api/tasks/{id}/enc-attachments`, `/api/team/rooms/{id}/e2e`) are for the signed-in person only (agents `403`).
+
 **Locked tasks** (2.36.0): `locked: true` makes a task read-only **in the app**: title, notes, date and time,
 priority, list, tags, repeat and assignee stay as they are until someone who may change the task unlocks it there
 (comments, checkboxes in the notes, completing / reopening and subtasks stay free; the app's own writes are checked by

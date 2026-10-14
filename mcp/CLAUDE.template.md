@@ -238,6 +238,9 @@
   step, park cleanly and start nothing big until the reset.
 <!-- kalmido-agent-rules:end -->
 
+End-to-end encrypted content (2.42.0) shows only as a placeholder: a task's `encrypted_note: true`, a file with
+`encrypted: true` (not readable for you). Leave it alone; do not ask for its content.
+
 <!-- kalmido-tool-index:start -->
 ## Events and tools (index)
 
