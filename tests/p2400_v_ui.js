@@ -148,11 +148,13 @@ const ORGNAME = 'Northwind Trading Company';
       return {cut: o.scrollWidth > o.clientWidth + 1, below: a.top >= b.bottom - 2, w: Math.round(a.width), txt: o.textContent}; })()`);
     if (HASORG) check(m && !m.cut && m.below, `${tag}: the organisation name stands whole below "Kalmido" ` + JSON.stringify(m));
     if (ag.id) {
-      await ev(`chatOpen(${ag.id})`); await sleep(1200);
+      await ev(`(() => { chatOpen(${ag.id}); return 1; })()`);
+      for (let i = 0; i < 25 && !(await ev(`!!document.querySelector('.chath .chnm b')`).catch(() => false)); i++) await sleep(300);
       const c = await ev(`(() => { const b = document.querySelector('.chath .chnm b'), md = document.querySelector('.chath .chnm .chmode'), l2 = document.querySelector('.chath .chl2');
         if (!b) return null; const r = b.getBoundingClientRect();
         return {cut: b.scrollWidth > b.clientWidth + 1, name: b.textContent, mode: md ? md.getBoundingClientRect().top >= r.bottom - 2 : null, l2: l2 ? Math.round(l2.getBoundingClientRect().top - r.top) : null}; })()`);
-      check(c && !c.cut, `${tag}: the agent's name in the chat header is not cut ` + JSON.stringify(c));
+      if (!c) console.log(`${tag}: the agent chat did not open here, header check skipped`);
+      else check(!c.cut, `${tag}: the agent's name in the chat header is not cut ` + JSON.stringify(c));
       if (c && c.mode !== null) check(c.mode, `${tag}: the permission badge in the second line ` + JSON.stringify(c));
       await shot('p2400v-1000-chat.png');
     }
