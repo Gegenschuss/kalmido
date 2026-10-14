@@ -6301,3 +6301,27 @@ html.mini #app.detail-open{grid-template-columns:minmax(0,1fr) var(--detW,25.5re
 .e2ewarn span,.e2ehint span{flex:1 1 12rem}
 .cmsg.sys{align-self:center;max-width:100%}
 .e2esys{display:inline-flex;align-items:center;gap:.375rem;font-size:var(--fs-xs);padding:.25rem .5rem}
+
+/* 2.43.0 D (#1434) tracked time of a project in a window */
+.tsum[data-tsum]{cursor:pointer;border-radius:var(--r-s,.375rem)}
+.tsum[data-tsum]:hover b,.tsum[data-tsum]:focus-visible b{color:var(--accent)}
+.tzmodal .tzper{display:flex;gap:.5rem;flex-wrap:wrap;margin:.5rem 0}
+.tzmodal .tzsum{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;font-size:var(--fs-l,1.125rem)}
+.tzmodal .tzsum b{font-variant-numeric:tabular-nums}
+.tzmodal .tzsum.over .tbn{color:var(--p5)}
+.tzmodal .tbud{display:inline-block;position:relative;width:6rem;height:.5rem;border-radius:99rem;background:var(--bg4);overflow:hidden}
+.tzmodal .tbud i{position:absolute;left:0;top:0;bottom:0;background:var(--accent)}
+.tzmodal .tzsum.over .tbud i{background:var(--p5)}
+.tzmodal h4{margin:1rem 0 .375rem}
+.tzmodal .tzrow,.tzmodal .tzent{display:flex;align-items:center;gap:.5rem;min-height:2rem;font-size:var(--fs-s)}
+.tzmodal .tzn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tzmodal .tzb{flex:0 0 5rem;height:.375rem;border-radius:99rem;background:var(--bg4);overflow:hidden;position:relative}
+.tzmodal .tzb i{position:absolute;left:0;top:0;bottom:0;background:var(--accent)}
+.tzmodal .tzrow b,.tzmodal .tzent b{font-variant-numeric:tabular-nums}
+.tzmodal .tzdanger{margin-top:1rem;padding-top:.75rem;border-top:1px solid var(--line,var(--bg4))}
+.tzmodal .btn.danger{color:var(--p5)}
+
+/* 2.43.0 D (#1500) a task in its own window: only the task panel */
+html.mini-task #main,html.mini-task #top,html.mini-task .qdock,html.mini-task #detail .dclose,html.mini-task #detail .back,html.mini-task #detail [data-mwtask]{display:none!important}
+html.mini-task #app,html.mini-task #app.detail-open{grid-template-columns:minmax(0,1fr)}
+.mwgone{display:flex;flex-direction:column;align-items:center;gap:.75rem;padding:3rem 1.5rem;text-align:center;color:var(--muted)}

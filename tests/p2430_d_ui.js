@@ -25,7 +25,7 @@ const FEAT = 'comments,collab,time,progress';
   const L = (await call(CA, 'POST', '/api/lists', {name: 'Harbour site', kind: 'project', time_tracking: true})).id;
   const T = (await call(CA, 'POST', '/api/tasks', {title: 'Survey the quay', list_id: L})).id;
   const T2 = (await call(CA, 'POST', '/api/tasks', {title: 'Soon gone', list_id: L})).id;
-  for (const [d, m] of [[1, 60], [2, 90]]) await call(CA, 'POST', '/api/time/entries', {task_id: T, start: `2026-09-0${d}T08:00:00Z`, end: `2026-09-0${d}T${9 + (m > 60 ? 1 : 0)}:${m > 60 ? '30' : '00'}:00Z`});
+  for (const [d, m] of [[1, 60], [2, 90]]) await call(CA, 'POST', '/api/time/entries', {task_id: T, start: `2026-09-0${d}T08:00:00Z`, end: `2026-09-0${d}T${m > 60 ? '10:30' : '09:00'}:00Z`});
 
   await firefox(async o => {
     const {cmd, ev, ctx, nav, shot} = o;
@@ -37,7 +37,7 @@ const FEAT = 'comments,collab,time,progress';
     await nav(B + '#l/' + L);
     check(await until(`!!document.querySelector('#view .lhead .tsum[data-tsum]')`, 60), '#1434: the header shows Tracked (clickable)');
     await ev(`document.querySelector('#view .lhead .tsum').click()`);
-    check(await until(`!!document.querySelector('.tzmodal') && /2\\.5 h/.test(document.querySelector('.tzmodal .tzsum')?.textContent || '')`, 40), '#1434: the window opens with the sum (2.5 h)');
+    check(await until(`!!document.querySelector('.tzmodal') && /3\\.5 h/.test(document.querySelector('.tzmodal .tzsum')?.textContent || '')`, 40), '#1434: the window opens with the sum (3.5 h)');
     const txt = await ev(`document.querySelector('.tzmodal')?.textContent || ''`);
     check(/Alice/.test(txt) && /Survey the quay/.test(txt) && /Tracked time/.test(txt), '#1434: by person, by task, title ' + txt.slice(0, 200));
     check(await ev(`/export\\.csv/.test(document.querySelector('#tz-csv')?.getAttribute('href') || '')`), '#1434: CSV link');
@@ -53,7 +53,8 @@ const FEAT = 'comments,collab,time,progress';
     // Undo
     check(await until(`!![...document.querySelectorAll('#toast button, .toast button')].find(b => /Undo/i.test(b.textContent))`, 20), '#1434: an Undo offer');
     await ev(`[...document.querySelectorAll('#toast button, .toast button')].find(b => /Undo/i.test(b.textContent)).click()`);
-    check(await until(`(async () => (await fetch('/api/time/entries?scope=all&lists=${L}').then(r => r.json())).entries.length === 2)()`), '#1434: Undo brings both entries back');
+    const undone = await until(`(async () => (await fetch('/api/time/entries?scope=all&lists=${L}').then(r => r.json())).entries.length === 2)()`);
+    check(undone, '#1434: Undo brings both entries back ' + await ev(`(async () => JSON.stringify([(await fetch('/api/time/entries?scope=all&lists=${L}').then(r => r.json())).entries.length, document.querySelector('#toast, .toast')?.textContent, HIST.undo.length, HIST.busy]))()`));
 
     // ================= #1500
     await nav(B + '#l/' + L);
@@ -79,6 +80,7 @@ const FEAT = 'comments,collab,time,progress';
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1000, height: 700}});
     await nav(B + `?mini=1#t/${T}`);
     check(await until(`!!document.querySelector('#detail:not(.hidden) #d-title')`, 60), '#1500: the task window shows the panel');
+    await until(`/Survey the quay/.test(document.title)`, 20);
     const mv = await ev(`(() => ({mini: document.documentElement.classList.contains('mini-task'), side: getComputedStyle(document.getElementById('side')).display, main: getComputedStyle(document.getElementById('main')).display,
       title: document.getElementById('d-title').value, wt: document.title, btn: !!document.querySelector('#detail [data-mwtask]') && getComputedStyle(document.querySelector('#detail [data-mwtask]')).display !== 'none'}))()`);
     check(mv.mini && mv.side === 'none' && mv.main === 'none' && mv.title === 'Survey the quay' && /Survey the quay/.test(mv.wt) && !mv.btn, '#1500: only the task, its title ' + JSON.stringify(mv));

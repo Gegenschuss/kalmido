@@ -49,7 +49,7 @@ function listHead(l, o = {}) {
 // Time tracking on only; the running timer counts along.
 const dayHOf = l => +l?.day_hours || S.timeDayH || 8;
 const listSecs = lid => (S.timeLists?.[lid]?.s || 0) + (S.timer && S.timer.list_id === lid ? timerElapsed() : 0);
-function timeSumHtml(lists) {
+function timeSumHtml(lists, name = '') {
   if (!timeOn()) return '';
   const ls = lists.filter(l => l && mtTime(l.id));  // 2.41.0 (#1471): the lists with time tracking on
   if (!ls.length) return '';
@@ -61,10 +61,10 @@ function timeSumHtml(lists) {
   const tip = [tr('Tracked: {0}', fmtDur(sec)), dh.size === 1 ? tr('{0} at {1} h per day', dtxt, fmtNum([...dh][0])) : tr('{0}, each list with its own hours per day', dtxt),
     bud ? tr('Budget: {0} h', fmtNum(bud)) : ''].filter(Boolean).join(' · ');
   const pct = bud ? Math.min(100, Math.round(h / bud * 100)) : 0;
-  return `<span class="tsum ${bud && h > bud ? 'over' : ''}" title="${esc(tip)}" aria-label="${esc(tip)}">${ic('clock', 's')}<span class="tsl">${tr('Tracked')}</span><b>${esc(fmtNum(h))} h</b><span class="tsd">${esc(dtxt)}</span>${bud ? `<span class="tbud" role="img" aria-label="${esc(tr('{0} % of the budget', Math.round(h / bud * 100)))}"><i style="width:${pct}%"></i></span><span class="tbn">${esc(fmtNum(h))}/${esc(fmtNum(bud))} h</span>` : ''}</span>`;
+  return `<span class="tsum ${bud && h > bud ? 'over' : ''}" role="button" tabindex="0" data-tsum="${ls.map(l => l.id).join(',')}" data-tsum-name="${esc(name)}" title="${esc(tip)}" aria-label="${esc(tip)}">${ic('clock', 's')}<span class="tsl">${tr('Tracked')}</span><b>${esc(fmtNum(h))} h</b><span class="tsd">${esc(dtxt)}</span>${bud ? `<span class="tbud" role="img" aria-label="${esc(tr('{0} % of the budget', Math.round(h / bud * 100)))}"><i style="width:${pct}%"></i></span><span class="tbn">${esc(fmtNum(h))}/${esc(fmtNum(bud))} h</span>` : ''}</span>`;
 }
 function folderHead(f) {
-  const ts = timeSumHtml(folderLists(f)), sh = collab() ? folderShrHtml(f) : '';  // 2.41.0 (#1428): the share symbols on the phone too
+  const ts = timeSumHtml(folderLists(f), fName(f)), sh = collab() ? folderShrHtml(f) : '';  // 2.41.0 (#1428): the share symbols on the phone too
   const sht = sh ? (sh.match(/title="([^"]*)"/) || [])[1] || '' : '';
   return (ts || sh ? `<div class="lhead fhd">${sh ? `<span class="fhdsh">${sh}<span class="muted">${sht}</span></span>` : ''}<span class="spacer"></span>${ts}</div>` : '') + agBandHtml();
 }

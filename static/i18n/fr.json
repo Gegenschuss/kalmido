@@ -6522,5 +6522,21 @@
   "Send unencrypted": "Envoyer non chiffré",
   "Encrypt again": "Chiffrer à nouveau",
   "Encrypted content stays with you": "Le contenu chiffré reste chez toi",
-  "End-to-end encrypted task notes, files and direct messages never reach an agent: it only sees that a task has an encrypted note. Put nothing there that the agent should work with.": "Les notes, fichiers et messages directs chiffrés de bout en bout n’atteignent jamais un agent : il voit seulement qu’une tâche a une note chiffrée. N’y mets rien sur quoi l’agent doit travailler."
+  "End-to-end encrypted task notes, files and direct messages never reach an agent: it only sees that a task has an encrypted note. Put nothing there that the agent should work with.": "Les notes, fichiers et messages directs chiffrés de bout en bout n’atteignent jamais un agent : il voit seulement qu’une tâche a une note chiffrée. N’y mets rien sur quoi l’agent doit travailler.",
+  "All time": "Tout le temps",
+  "By person": "Par personne",
+  "By task": "Par tâche",
+  "Latest entries": "Dernières entrées",
+  "Open in time tracking": "Ouvrir dans le suivi du temps",
+  "Delete all times of this project": "Supprimer tous les temps de ce projet",
+  "Nothing to delete: {0} already billed, they stay": "Rien à supprimer : {0} entrées sont déjà facturées et restent",
+  "No time tracked in this project.": "Aucun temps enregistré dans ce projet.",
+  "{0} entries ({1}) of everybody in {2} will be deleted.": "{0} entrées ({1}) de tous dans {2} seront supprimées.",
+  "Your {0} entries ({1}) in {2} will be deleted. Entries of others stay.": "Vos {0} entrées ({1}) dans {2} seront supprimées. Celles des autres restent.",
+  "{0} entries are already billed and stay.": "{0} entrées sont déjà facturées et restent.",
+  "Save a CSV first: it is the only copy afterwards.": "Enregistrez d'abord un CSV : il n'y aura pas d'autre copie.",
+  "Type the project name to confirm": "Saisissez le nom du projet pour confirmer",
+  "{0} time entries deleted": "{0} entrées de temps supprimées",
+  "Not available for agent accounts": "Indisponible pour les comptes d'agent",
+  "This task no longer exists, or it is no longer shared with you.": "Cette tâche n'existe plus ou n'est plus partagée avec vous."
 }

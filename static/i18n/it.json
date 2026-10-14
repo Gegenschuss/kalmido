@@ -6522,5 +6522,21 @@
   "Send unencrypted": "Invia non cifrato",
   "Encrypt again": "Cifra di nuovo",
   "Encrypted content stays with you": "Il contenuto cifrato resta tuo",
-  "End-to-end encrypted task notes, files and direct messages never reach an agent: it only sees that a task has an encrypted note. Put nothing there that the agent should work with.": "Note, file e messaggi diretti cifrati end-to-end non arrivano mai a un agente: vede solo che un’attività ha una nota cifrata. Non metterci nulla su cui l’agente debba lavorare."
+  "End-to-end encrypted task notes, files and direct messages never reach an agent: it only sees that a task has an encrypted note. Put nothing there that the agent should work with.": "Note, file e messaggi diretti cifrati end-to-end non arrivano mai a un agente: vede solo che un’attività ha una nota cifrata. Non metterci nulla su cui l’agente debba lavorare.",
+  "All time": "Tutto il tempo",
+  "By person": "Per persona",
+  "By task": "Per attività",
+  "Latest entries": "Ultime voci",
+  "Open in time tracking": "Apri nel rilevamento tempi",
+  "Delete all times of this project": "Elimina tutti i tempi di questo progetto",
+  "Nothing to delete: {0} already billed, they stay": "Niente da eliminare: {0} voci sono già fatturate e restano",
+  "No time tracked in this project.": "Nessun tempo registrato in questo progetto.",
+  "{0} entries ({1}) of everybody in {2} will be deleted.": "{0} voci ({1}) di tutti in {2} verranno eliminate.",
+  "Your {0} entries ({1}) in {2} will be deleted. Entries of others stay.": "Le tue {0} voci ({1}) in {2} verranno eliminate. Quelle degli altri restano.",
+  "{0} entries are already billed and stay.": "{0} voci sono già fatturate e restano.",
+  "Save a CSV first: it is the only copy afterwards.": "Salva prima un CSV: dopo non ci sarà un'altra copia.",
+  "Type the project name to confirm": "Digita il nome del progetto per confermare",
+  "{0} time entries deleted": "{0} voci di tempo eliminate",
+  "Not available for agent accounts": "Non disponibile per gli account agente",
+  "This task no longer exists, or it is no longer shared with you.": "Questa attività non esiste più o non è più condivisa con te."
 }

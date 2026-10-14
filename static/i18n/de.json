@@ -6522,5 +6522,21 @@
   "Send unencrypted": "Unverschlüsselt senden",
   "Encrypt again": "Wieder verschlüsseln",
   "Encrypted content stays with you": "Verschlüsseltes bleibt bei dir",
-  "End-to-end encrypted task notes, files and direct messages never reach an agent: it only sees that a task has an encrypted note. Put nothing there that the agent should work with.": "Ende-zu-Ende-verschlüsselte Notizen, Dateien und Direktnachrichten erreichen nie einen Agenten: Er sieht nur, dass eine Aufgabe eine verschlüsselte Notiz hat. Schreib dort nichts hinein, womit der Agent arbeiten soll."
+  "End-to-end encrypted task notes, files and direct messages never reach an agent: it only sees that a task has an encrypted note. Put nothing there that the agent should work with.": "Ende-zu-Ende-verschlüsselte Notizen, Dateien und Direktnachrichten erreichen nie einen Agenten: Er sieht nur, dass eine Aufgabe eine verschlüsselte Notiz hat. Schreib dort nichts hinein, womit der Agent arbeiten soll.",
+  "All time": "Gesamte Zeit",
+  "By person": "Nach Person",
+  "By task": "Nach Aufgabe",
+  "Latest entries": "Letzte Einträge",
+  "Open in time tracking": "In der Zeiterfassung öffnen",
+  "Delete all times of this project": "Alle Zeiten dieses Projekts löschen",
+  "Nothing to delete: {0} already billed, they stay": "Nichts zu löschen: {0} Einträge sind schon abgerechnet und bleiben",
+  "No time tracked in this project.": "In diesem Projekt ist keine Zeit erfasst.",
+  "{0} entries ({1}) of everybody in {2} will be deleted.": "{0} Einträge ({1}) von allen in {2} werden gelöscht.",
+  "Your {0} entries ({1}) in {2} will be deleted. Entries of others stay.": "Deine {0} Einträge ({1}) in {2} werden gelöscht. Einträge anderer bleiben.",
+  "{0} entries are already billed and stay.": "{0} Einträge sind schon abgerechnet und bleiben.",
+  "Save a CSV first: it is the only copy afterwards.": "Sichere vorher eine CSV: danach gibt es keine andere Kopie.",
+  "Type the project name to confirm": "Zur Bestätigung den Projektnamen eintippen",
+  "{0} time entries deleted": "{0} Zeiteinträge gelöscht",
+  "Not available for agent accounts": "Für Agenten-Konten nicht verfügbar",
+  "This task no longer exists, or it is no longer shared with you.": "Diese Aufgabe gibt es nicht mehr oder sie ist nicht mehr mit dir geteilt."
 }

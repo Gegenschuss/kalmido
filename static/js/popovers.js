@@ -718,6 +718,7 @@ function taskMenu(anchor, id, o = {}) {
     ...(open && t.id > 0 && collab() && l?.shared && t.approval !== 'pending' ? [{label: tr('Ask for approval…'), icon: 'eye', fn: () => approvalRequest(id)}] : []),
     // pin
     {label: t.pinned ? tr('Unpin') : tr('Pin'), icon: 'pin', fn: () => patchTask(id, {pinned: t.pinned ? 0 : 1})},
+    ...(typeof mw_ok === 'function' && mw_ok() && t.id > 0 ? [{label: tr('Open in its own window'), icon: 'panel', fn: () => mw_taskOpen(id)}] : []),  // 2.43.0 (#1500)
     {head: tr('Time|menu')},
     // time
     ...(feat('pomo') ? [{label: tr('Start focus session'), icon: 'timer', fn: () => { pomoStart(id); go('pomo'); }}] : []),

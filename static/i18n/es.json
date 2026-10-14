@@ -6522,5 +6522,21 @@
   "Send unencrypted": "Enviar sin cifrar",
   "Encrypt again": "Cifrar de nuevo",
   "Encrypted content stays with you": "Lo cifrado se queda contigo",
-  "End-to-end encrypted task notes, files and direct messages never reach an agent: it only sees that a task has an encrypted note. Put nothing there that the agent should work with.": "Las notas, archivos y mensajes directos cifrados de extremo a extremo nunca llegan a un agente: solo ve que una tarea tiene una nota cifrada. No pongas ahí nada con lo que deba trabajar el agente."
+  "End-to-end encrypted task notes, files and direct messages never reach an agent: it only sees that a task has an encrypted note. Put nothing there that the agent should work with.": "Las notas, archivos y mensajes directos cifrados de extremo a extremo nunca llegan a un agente: solo ve que una tarea tiene una nota cifrada. No pongas ahí nada con lo que deba trabajar el agente.",
+  "All time": "Todo el tiempo",
+  "By person": "Por persona",
+  "By task": "Por tarea",
+  "Latest entries": "Últimas entradas",
+  "Open in time tracking": "Abrir en el control de tiempo",
+  "Delete all times of this project": "Eliminar todos los tiempos de este proyecto",
+  "Nothing to delete: {0} already billed, they stay": "Nada que eliminar: {0} entradas ya están facturadas y se quedan",
+  "No time tracked in this project.": "En este proyecto no hay tiempo registrado.",
+  "{0} entries ({1}) of everybody in {2} will be deleted.": "Se eliminarán {0} entradas ({1}) de todos en {2}.",
+  "Your {0} entries ({1}) in {2} will be deleted. Entries of others stay.": "Se eliminarán tus {0} entradas ({1}) en {2}. Las de otros se quedan.",
+  "{0} entries are already billed and stay.": "{0} entradas ya están facturadas y se quedan.",
+  "Save a CSV first: it is the only copy afterwards.": "Guarda antes un CSV: después no habrá otra copia.",
+  "Type the project name to confirm": "Escribe el nombre del proyecto para confirmar",
+  "{0} time entries deleted": "{0} entradas de tiempo eliminadas",
+  "Not available for agent accounts": "No disponible para cuentas de agente",
+  "This task no longer exists, or it is no longer shared with you.": "Esta tarea ya no existe o ya no se comparte contigo."
 }

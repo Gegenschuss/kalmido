@@ -51,3 +51,55 @@ if (MW_ON) {
   const title = () => { const l = MW_ID && listById(MW_ID); if (l) document.title = `${lname(l)} · ${APP_NAME}`; };
   const mwTop = $('#top'); if (mwTop) new MutationObserver(title).observe(mwTop, {childList: true});
 }
+
+// ---- 2.43.0 (#1500): a task in its own small window. Desktop: a middle click on the task row, "Open in its own window" in the task
+// menu or the button in the properties panel opens /?mini=1#t/<id> (window name kalmido-task-<id>: the same task comes back to its
+// window). The window shows only this task's panel (no sidebar / tabs / chat), live like any tab; a deleted task or one that is no
+// longer shared shows a note. UI state is not written back (the MW_ON guards above).
+let MW_TASK = MW_ON ? +(/^#t\/(\d+)/.exec(location.hash) || [])[1] || 0 : 0;
+function mw_taskOpen(id) {
+  if (!taskById(id)) return null;
+  const w = Math.min(520, screen.availWidth || 520), h = Math.min(760, screen.availHeight || 760);
+  const x = Math.max(0, (window.screenX || 0) + (window.outerWidth || 0) - w - 40), y = Math.max(0, (window.screenY || 0) + 60);
+  const win = window.open(`/?mini=1#t/${id}`, 'kalmido-task-' + id, `popup,width=${w},height=${h},left=${x},top=${y}`);
+  if (!win) { toast(tr('The browser blocked the window. Allow pop-ups for this page.')); return null; }
+  try { win.focus(); } catch { /* another origin / closed */ }
+  return win;
+}
+const mw_rowOf = e => { const r = e.target.closest?.('#view .trow[data-id]'); return r && !e.target.closest('a[href]') ? r : null; };  // a real link in the row keeps its own click
+document.addEventListener('mousedown', e => { if (e.button === 1 && mw_ok() && mw_rowOf(e)) e.preventDefault(); });  // no auto-scroll
+document.addEventListener('auxclick', e => {
+  const r = e.button === 1 && mw_ok() && mw_rowOf(e); if (!r || !(+r.dataset.id > 0)) return;
+  e.preventDefault(); mw_taskOpen(+r.dataset.id);
+});
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('[data-mwtask]'); if (!b || !mw_ok()) return;
+  e.preventDefault(); e.stopPropagation(); mw_taskOpen(+b.dataset.mwtask);
+}, true);
+if (MW_ON && MW_TASK) {
+  document.documentElement.classList.add('mini-task');
+  let busy = false, checked = 0;
+  const gone = () => {
+    const d = $('#detail'); if (!d || d.querySelector('.mwgone')) return;
+    S.sel = null; document.title = APP_NAME;
+    d.classList.remove('hidden'); d.classList.add('open'); $('#app').classList.add('detail-open');
+    d.innerHTML = `<div class="mwgone" role="status">${ic('eye', 'l')}<p>${tr('This task no longer exists, or it is no longer shared with you.')}</p></div>`;
+  };
+  // the panel stays open: a closed or replaced panel comes back, the task window follows the task opened in it (a subtask)
+  const sync = async () => {
+    if (!S.booted || busy) return; busy = true;
+    try {
+      if (S.sel > 0) MW_TASK = S.sel;
+      const d = $('#detail'), now = Date.now();
+      if (!taskById(MW_TASK)) {
+        if (d?.querySelector('.mwgone') && now - checked < 15000) return;
+        checked = now;
+        try { putTask(await rawFetch('GET', '/api/tasks/' + MW_TASK)); } catch (e) { if (!(e instanceof Offline)) gone(); return; }
+        if (d?.querySelector('.mwgone')) S.sel = null;
+      }
+      if (S.sel !== MW_TASK) openDetail(MW_TASK);
+      const t = taskById(MW_TASK); if (t) document.title = `${t.title} · ${APP_NAME}`;
+    } finally { busy = false; }
+  };
+  setTimeout(sync, 300); setInterval(sync, 1000);
+}

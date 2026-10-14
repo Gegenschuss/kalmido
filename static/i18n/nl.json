@@ -6522,5 +6522,21 @@
   "Send unencrypted": "Onversleuteld versturen",
   "Encrypt again": "Opnieuw versleutelen",
   "Encrypted content stays with you": "Versleutelde inhoud blijft bij jou",
-  "End-to-end encrypted task notes, files and direct messages never reach an agent: it only sees that a task has an encrypted note. Put nothing there that the agent should work with.": "End-to-end versleutelde notities, bestanden en directe berichten bereiken nooit een agent: die ziet alleen dat een taak een versleutelde notitie heeft. Zet er niets in waarmee de agent moet werken."
+  "End-to-end encrypted task notes, files and direct messages never reach an agent: it only sees that a task has an encrypted note. Put nothing there that the agent should work with.": "End-to-end versleutelde notities, bestanden en directe berichten bereiken nooit een agent: die ziet alleen dat een taak een versleutelde notitie heeft. Zet er niets in waarmee de agent moet werken.",
+  "All time": "Alle tijd",
+  "By person": "Per persoon",
+  "By task": "Per taak",
+  "Latest entries": "Laatste registraties",
+  "Open in time tracking": "Openen in tijdregistratie",
+  "Delete all times of this project": "Alle tijden van dit project verwijderen",
+  "Nothing to delete: {0} already billed, they stay": "Niets te verwijderen: {0} registraties zijn al gefactureerd en blijven",
+  "No time tracked in this project.": "In dit project is geen tijd geregistreerd.",
+  "{0} entries ({1}) of everybody in {2} will be deleted.": "{0} registraties ({1}) van iedereen in {2} worden verwijderd.",
+  "Your {0} entries ({1}) in {2} will be deleted. Entries of others stay.": "Je {0} registraties ({1}) in {2} worden verwijderd. Die van anderen blijven.",
+  "{0} entries are already billed and stay.": "{0} registraties zijn al gefactureerd en blijven.",
+  "Save a CSV first: it is the only copy afterwards.": "Bewaar eerst een CSV: daarna is er geen andere kopie.",
+  "Type the project name to confirm": "Typ de projectnaam om te bevestigen",
+  "{0} time entries deleted": "{0} tijdregistraties verwijderd",
+  "Not available for agent accounts": "Niet beschikbaar voor agentaccounts",
+  "This task no longer exists, or it is no longer shared with you.": "Deze taak bestaat niet meer of wordt niet meer met je gedeeld."
 }

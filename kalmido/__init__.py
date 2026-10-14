@@ -44,6 +44,7 @@ ORDER = (
     "collab.news",
     "personal.habits",
     "personal.timetrack",
+    "personal.timewipe",  # 2.43.0 (#1434)
     "accounts.settings",
     "lists.favorites",  # 2.40.0 (#1361)
     "accounts.layouts",  # 2.32.0 (#1063, #983)
