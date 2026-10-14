@@ -7,6 +7,8 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.40.1] - 2026-10-14
+
 ### Fixed
 - Task panel on narrow screens: the pen next to the description (#1203) no longer takes a row of its own, so the panel
   header fits on a 360 px phone again.
@@ -3984,7 +3986,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.39.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.40.1...HEAD
+[2.40.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.40.1
 [2.39.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.39.0
 [2.38.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.38.0
 [2.37.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.37.1
