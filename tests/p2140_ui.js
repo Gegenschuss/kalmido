@@ -289,7 +289,10 @@ const lst = async id => (await call('GET', '/api/state')).lists.find(l => l.id =
     const lvl = await ev(`(() => { const r = document.querySelector('#view .trow[data-id="${T1}"]'); const t = r.querySelector('.ttl').getBoundingClientRect(); const c = [...r.querySelectorAll('.lcols .lc')].find(e => getComputedStyle(e).display !== 'none' && e.innerHTML.trim()); if (!c) return null; const b = c.getBoundingClientRect(); const lh = parseFloat(getComputedStyle(r.querySelector('.ttl')).lineHeight); return Math.round(Math.abs((b.top + b.height / 2) - (t.top + lh / 2))); })()`);
     check(lvl !== null && lvl <= 4, `${tag}: the cells sit level with the title's first line (off by ${lvl} px)`);
     // phones and narrow list columns (an unfolded Fold with the sidebar): two cells, the rest in line 2, no title row
-    if (phone || !x.head) check(x.cells <= 2 && x.shown + x.mlc === x.all && !x.head, `${tag}: at most two cells, the rest in line 2, no title row ` + JSON.stringify(x));
+    // 2.40.0 (#1191): from 600 px on (tablets, the unfolded Fold at 880) the list has real columns with their titles; what
+    // does not fit is hidden, nothing moves into line 2
+    if (vw >= 600 && vw < 900) check(x.head && x.align <= 2 && x.cells >= 3 && x.mlc === 0 && x.over <= 1, `${tag}: tablet columns with their titles, lined up ` + JSON.stringify(x));
+    else if (phone || !x.head) check(x.cells <= 2 && x.shown + x.mlc === x.all && !x.head, `${tag}: at most two cells, the rest in line 2, no title row ` + JSON.stringify(x));
     else check(x.align <= 2 && x.cells >= 3 && x.shown + x.mlc === x.all, `${tag}: the title row lines up with the cells, the rest in line 2 ` + JSON.stringify(x));
     if (tag === '1920') check(x.shown === x.all && x.mlc === 0, '1920: every column has room, nothing doubled in line 2 ' + JSON.stringify(x));
     check(x.titleW >= 80, `${tag}: the title keeps room ` + JSON.stringify(x));
