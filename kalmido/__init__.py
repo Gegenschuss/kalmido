@@ -14,6 +14,7 @@ ORDER = (
     "core.pg",  # 2.37.0 (#1150): the Postgres layer (core.db re-exports it)
     "core.db",
     "core.rls",  # 2.37.0 (#1150): row-level security, applied by init_db
+    "core.orgcrypt",  # 2.42.0 (#828): keys per organisation, encryption at rest
     "admin.migrate",  # 2.37.0 (#1150): the move from SQLite (migrate-sqlite), used by init_db
     "accounts.session",
     "accounts.pictures",
@@ -37,6 +38,7 @@ ORDER = (
     "tasks.attachments",
     "tasks.batch",
     "tasks.mineorder",  # 2.40.0 (#1344)
+    "tasks.delta",  # 2.42.0 (#1376): GET /api/state/delta
     "collab.replies",  # 2.33.0 (#1076): before comments / teamchat / agents.chat (they import it)
     "collab.comments",
     "collab.news",
@@ -97,6 +99,7 @@ ORDER = (
     "collab.msgsearch",  # 2.33.0 (#1080)
     "collab.chatsave",  # 2.37.0 (#1159)
     "collab.cchoice",  # 2.41.0 (#1383): answer buttons / approval cards in comments
+    "collab.e2e",  # 2.42.0 (#828, #909): end-to-end encryption (keys, encrypted notes / files / DMs)
     "integrations.mail",
     "accounts.invite",
     "family.family",
@@ -140,6 +143,8 @@ ORDER = (
     "admin.clientip",  # 2.33.0 (#834)
     "tasks.stale",  # 2.34.0 (#266)
     "personal.timegaps",  # 2.34.0 (#269)
+    "admin.orgexport",  # 2.42.0 (#833): organisation export (encrypted archive)
+    "admin.orgcrypt_cli",  # 2.42.0 (#828): the organisation keys' start-up pass + command line (no routes)
     "startup",
 )
 MODULES = [importlib.import_module(f"{__name__}.{m}") for m in ORDER]

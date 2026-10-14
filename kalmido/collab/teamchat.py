@@ -137,7 +137,7 @@ def tchat_rooms(c, uid):
              "last": tchat_msg_brief(c, last) if last else None, "last_at": last["created_at"] if last else None}
         if r["kind"] == "dm":
             other = r["b"] if r["a"] == uid else r["a"]
-            d.update(user_id=other, name=names.get(other, "?"))
+            d.update(user_id=other, name=names.get(other, "?"), e2e=bool(r["e2e"]))  # 2.42.0 (#909)
         else:
             l = c.execute("SELECT name, is_inbox, owner_id FROM lists WHERE id=?", (r["list_id"],)).fetchone()
             d.update(list_id=r["list_id"], name=l["name"], members=len(tchat_list_members(c, r["list_id"])))
@@ -188,7 +188,11 @@ def md_brief(text):
 
 def tchat_msg_brief(c, m):
     names = user_names(c, [int(x) for x in MENTION_RE.findall(m["body"])])
-    return {"id": m["id"], "user_id": m["user_id"], "text": comment_plain(c, md_brief(m["body"]), names)[:140], "created_at": m["created_at"]}
+    d = {"id": m["id"], "user_id": m["user_id"], "text": comment_plain(c, md_brief(m["body"]), names)[:140], "created_at": m["created_at"]}
+    if m["enc"]:  # 2.42.0 (#909): an encrypted message / a notice: the app says so (the server has no text)
+        from ..collab.e2e import e2e_msg_parse
+        d["enc"] = (e2e_msg_parse(m["enc"]) or {}).get("sys") or "msg"
+    return d
 
 
 def tchat_rx(c, ids):
@@ -217,7 +221,13 @@ def tchat_msg_dict(c, m, rx=None, quotes=None):
     return {"id": m["id"], "room_id": m["room_id"], "user_id": m["user_id"], "body": "" if m["deleted_at"] else m["body"],
             "task": {"id": t["id"], "title": t["title"]} if t and task_visible(c, t["id"], me()) else None,
             "created_at": m["created_at"], "edited_at": m["edited_at"], "deleted": bool(m["deleted_at"]),
-            "reactions": (rx or {}).get(m["id"], []), "reply_to": rt, "reply": rq}
+            "reactions": (rx or {}).get(m["id"], []), "reply_to": rt, "reply": rq,
+            "enc": None if m["deleted_at"] or not m["enc"] else _e2e_parse(m["enc"])}  # 2.42.0 (#909): {v, iv, ct} | {sys}
+
+
+def _e2e_parse(v):
+    from ..collab.e2e import e2e_msg_parse
+    return e2e_msg_parse(v)
 
 
 def tchat_clean_mentions(c, r, text):
@@ -262,7 +272,7 @@ def tchat_dm():
     c.execute("INSERT INTO tchat_rooms(kind,a,b,created_at) VALUES('dm',?,?,?) ON CONFLICT DO NOTHING", (a, b, iso(now_utc())))
     r = c.execute("SELECT * FROM tchat_rooms WHERE kind='dm' AND a=? AND b=?", (a, b)).fetchone()
     c.commit()
-    return jsonify(id=r["id"], kind="dm", user_id=other, name=user_names(c, [other]).get(other, "?"))
+    return jsonify(id=r["id"], kind="dm", user_id=other, name=user_names(c, [other]).get(other, "?"), e2e=bool(r["e2e"]))
 
 
 @app.get("/api/team/rooms/<int:rid>/messages")
@@ -285,7 +295,7 @@ def tchat_messages(rid):
     lr, muted = tchat_last_read(c, rid, me())
     from ..collab.chatsave import chat_save_of
     saved = chat_save_of(c, me(), "team", [m["id"] for m in rows])  # 2.37.0 (#1159): saved as a task by me
-    return jsonify(room={"id": r["id"], "kind": r["kind"], "list_id": r["list_id"], "muted": muted, "last_read": lr,
+    return jsonify(room={"id": r["id"], "kind": r["kind"], "list_id": r["list_id"], "muted": muted, "last_read": lr, "e2e": bool(r["e2e"]),
                          "members": [{"id": u, "name": names.get(u, "?"), "agent": u in agent_ids(c)} for u in sorted(mem)]},
                    messages=[{**tchat_msg_dict(c, m, rx, qs), "saved_task_id": saved.get(m["id"])} for m in rows], has_more=more,
                    users={str(k): v for k, v in names.items()})
@@ -301,21 +311,26 @@ def tchat_post(rid):
     r = need_room(c, rid)
     b = body()
     text = b.get("body")
-    if not isinstance(text, str) or not text.strip():
+    enc = tchat_e2e_check(r, b)  # 2.42.0 (#909): an encrypted DM takes only ciphertext (and only it takes one)
+    if isinstance(enc, tuple):
+        return enc
+    if enc:
+        text = ""
+    elif not isinstance(text, str) or not text.strip():
         return err(tr("The message is empty"))
     if len(text) > TCHAT_MAX:
         return err(tr("The message is too long (max. {0} characters)", TCHAT_MAX))
     tid = b.get("task_id")
     if tid is not None and (isinstance(tid, bool) or not isinstance(tid, int) or not task_visible(c, tid, me())):
         return err(tr("Invalid value: {0}", "task_id"))
-    text, mentions = tchat_clean_mentions(c, r, text.strip())
+    text, mentions = tchat_clean_mentions(c, r, text.strip()) if not enc else ("", [])
     try:
         orig = reply_check(c, "t", b.get("reply_to"), room_id=rid)
     except BadInput as e:
         return err(str(e))
     ts = iso_ms(now_utc())
-    mid = insert_id(c, "INSERT INTO tchat_msgs(room_id,user_id,body,task_id,created_at,reply_to) VALUES(?,?,?,?,?,?)",
-                    (rid, me(), text, tid, ts, orig["id"] if orig else None))
+    mid = insert_id(c, "INSERT INTO tchat_msgs(room_id,user_id,body,task_id,created_at,reply_to,enc) VALUES(?,?,?,?,?,?,?)",
+                    (rid, me(), text, tid, ts, orig["id"] if orig else None, enc))
     c.execute("UPDATE tchat_rooms SET last_at=? WHERE id=?", (ts, rid))
     c.execute("INSERT INTO tchat_reads(room_id,user_id,last_id) VALUES(?,?,?) ON CONFLICT(room_id,user_id) DO UPDATE SET last_id=excluded.last_id",
               (rid, me(), mid))
@@ -323,6 +338,18 @@ def tchat_post(rid):
     tchat_notify(c, r, m, mentions, replied=orig["user_id"] if orig and orig["user_id"] != me() else None)
     c.commit()
     return jsonify(tchat_msg_dict(c, m)), 201
+
+
+def tchat_e2e_check(r, b):
+    """2.42.0 (#909): the ciphertext of a message to store (JSON text), None for a plain message, or an error response. An
+    encrypted DM refuses plain text; a plain room refuses ciphertext."""
+    from ..collab.e2e import E2E_MSG_MAX, e2e_blob
+    if "e2e" not in r.keys() or not r["e2e"]:
+        return err(tr("This conversation is not encrypted"), 409) if b.get("enc") is not None else None
+    if isinstance(b.get("body"), str) and b["body"].strip():
+        return err(tr("This conversation is end-to-end encrypted: plain text is not accepted"), 409)
+    enc = e2e_blob(b.get("enc"), E2E_MSG_MAX)
+    return enc or err(tr("Invalid value: {0}", "enc"))
 
 
 def tchat_notify(c, r, m, mentions, replied=None):
@@ -337,6 +364,7 @@ def tchat_notify(c, r, m, mentions, replied=None):
     ags = agent_ids(c)
     members = tchat_room_members(c, r)
     text = comment_plain(c, m["body"])
+    sealed = bool(m["enc"])  # 2.42.0 (#909): an encrypted message: the push only says who wrote
     for uid in sorted(members - {sender}):
         if uid in ags:
             if uid in mentions:
@@ -363,7 +391,8 @@ def tchat_notify(c, r, m, mentions, replied=None):
         else:
             ln = c.execute("SELECT name FROM lists WHERE id=?", (r["list_id"],)).fetchone()
             title = tr("{0} in {1}", who, ln["name"] if ln else "?", lg=lg)
-        msg = tr("{0} replied to your message: {1}", who, text, lg=lg) if uid == replied and r["kind"] == "list" else \
+        msg = tr("New message from {0}", who, lg=lg) if sealed else \
+            tr("{0} replied to your message: {1}", who, text, lg=lg) if uid == replied and r["kind"] == "list" else \
             tr("Replied to your message: {0}", text, lg=lg) if uid == replied else text
         g.pushes.append((uid, title, msg[:300], f"{PUBLIC_URL}/#team/{r['id']}", push_prio(s)))
 
@@ -388,7 +417,19 @@ def tchat_edit(mid):
     m, r = need_tmsg(c, mid, edit=True)
     if m["deleted_at"]:
         return err(tr("The message was deleted"), 409)
-    text = body().get("body")
+    b = body()
+    text = b.get("body")
+    if m["enc"] or r["e2e"]:  # 2.42.0 (#909): an encrypted message is changed by encrypting it again (the notices never)
+        from ..collab.e2e import E2E_MSG_MAX, e2e_blob, e2e_msg_parse
+        if (e2e_msg_parse(m["enc"]) or {}).get("sys") or not m["enc"]:
+            return err(tr("This conversation is end-to-end encrypted: plain text is not accepted"), 409)
+        enc = e2e_blob(b.get("enc"), E2E_MSG_MAX)
+        if not enc or (isinstance(text, str) and text.strip()):
+            return err(tr("Invalid value: {0}", "enc"))
+        c.execute("UPDATE tchat_msgs SET enc=?, edited_at=? WHERE id=?", (enc, iso_ms(now_utc()), mid))
+        c.commit()
+        m = c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone()
+        return jsonify(tchat_msg_dict(c, m, tchat_rx(c, [mid])))
     if not isinstance(text, str) or not text.strip():
         return err(tr("The message is empty"))
     if len(text) > TCHAT_MAX:
@@ -408,7 +449,7 @@ def tchat_delete(mid):
     c = db()
     need_tchat(c)
     m, _r = need_tmsg(c, mid, edit="delete")
-    c.execute("UPDATE tchat_msgs SET deleted_at=?, edited_at=?, body='' WHERE id=?", (iso_ms(now_utc()), iso_ms(now_utc()), mid))
+    c.execute("UPDATE tchat_msgs SET deleted_at=?, edited_at=?, body='', enc=NULL WHERE id=?", (iso_ms(now_utc()), iso_ms(now_utc()), mid))
     c.execute("DELETE FROM tchat_rx WHERE message_id=?", (mid,))
     c.commit()
     return jsonify(ok=True, id=mid)
@@ -542,7 +583,8 @@ def team_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "id": {"type": "integer"}, "kind": {"type": "string", "enum": ["dm", "list"]}, "name": {"type": "string"},
         "list_id": {"type": "integer"}, "user_id": {"type": "integer", "description": "dm: the other person"},
         "unread": {"type": "integer"}, "mention": {"type": "boolean", "description": "An unread message mentions you"},
-        "muted": {"type": "boolean"}, "last": nul("object"), "last_at": nul("string", format="date-time")}}
+        "muted": {"type": "boolean"}, "last": nul("object"), "last_at": nul("string", format="date-time"),
+        "e2e": {"type": "boolean", "description": "2.42.0: dm: end-to-end encrypted (messages carry enc, plain text is refused)"}}}
     schemas["TeamRoomPage"] = page("TeamRoom")
     schemas["TeamMessage"] = {"type": "object", "properties": {
         "id": {"type": "integer"}, "room_id": {"type": "integer"}, "user_id": nul("integer"),
@@ -550,7 +592,9 @@ def team_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "created_at": {"type": "string", "format": "date-time"}, "edited_at": nul("string", format="date-time"),
         "deleted": {"type": "boolean"}, "reactions": {"type": "array", "items": {"type": "object"}},
         "reply_to": nul("integer", description="2.33.0: the answered message of this conversation"),
-        "reply": {"anyOf": [ref("ReplyQuote"), {"type": "null"}]}}}
+        "reply": {"anyOf": [ref("ReplyQuote"), {"type": "null"}]},
+        "enc": nul("object", description="2.42.0: an end-to-end encrypted DM: {v, iv, ct} (body empty, only the two people can "
+                   "decrypt it in their browser) or {sys: on | off} (the notice that switched it)")}}
     schemas["TeamMessagePage"] = page("TeamMessage")
     rp, mp = pid(desc="Conversation (room) id"), pid(desc="Message id")
     paths["/team/rooms"] = {"get": op("2.17.0: your team chat conversations (channels of shared lists, direct messages) with unread counts",

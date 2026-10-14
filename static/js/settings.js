@@ -712,7 +712,7 @@ function settingsModal(focus) {
     users: S.me?.is_admin ? admSubsHtml({  // 2.24.0 (#826): Administration in sub-tabs like Agents
       users: usersHtml() + grpHtml() + orphHtml(),
       signin: `<div id="s-signin">${signinHtml(hint)}</div>`,
-      org: orgsHtml() + orgAgentsHtml(hint),
+      org: orgsHtml() + orgAgentsHtml(hint) + ocAdminHtml(hint),  // 2.42.0 (#828): + encryption of organisation data
       server: instanceHtml(chk, hint) + hostHtml(hint) + bkHtml() + stoHtml(),
       log: aaHtml()}, {users: 'users', groups: 'users'}[focus]) : '',  // 1.9.0: users first
     help: `<h4>${tr('Getting started')}</h4>
@@ -778,10 +778,10 @@ function settingsModal(focus) {
     if (k === 'data') templatesDraw(md);
     if (k === 'integr') { icalDraw(md); calsDraw(md); whDraw(md); }
     if (k === 'notify') wpDraw(md);
-    if (k === 'users') { aaDraw(md); bkDraw(md); orphDraw(md); grpDraw(md); }
+    if (k === 'users') { aaDraw(md); bkDraw(md); orphDraw(md); grpDraw(md); ocAdminDraw(md); }
     if (k === 'ai') aiSubShow(md);  // 2.5.1 (#393): only the shown sub-tab loads
     if (k === 'users') admSubShow(md);
-    if (k === 'account') { tfaDraw(md); tokDraw(md); apwDraw(md); }
+    if (k === 'account') { tfaDraw(md); tokDraw(md); apwDraw(md); e2eDraw(md); }
     $(`.snav [data-sec="${k}"]`, md)?.scrollIntoView({block: 'nearest', inline: 'nearest'});
   };
   // ---- autosave
@@ -898,15 +898,15 @@ function settingsModal(focus) {
   agSetupWire(md);  // 2.7.2 (#420)
   if (cur === 'notify') wpDraw(md);
   ntfyShow(md);
-  if (cur === 'users') { aaDraw(md); bkDraw(md); orphDraw(md); grpDraw(md); }
+  if (cur === 'users') { aaDraw(md); bkDraw(md); orphDraw(md); grpDraw(md); ocAdminDraw(md); }  // 2.42.0 (#828): + ocAdminDraw
   aiTblWire(md);
   if (cur === 'ai') aiSubShow(md, {agents: 'agents', usage: 'usage', activity: 'log', agentsafe: 'safe'}[focus]);  // 2.5.1 (#393)
   md.addEventListener('click', e => { const b = e.target.closest('[data-aisub]'); if (b) aiSubShow(md, b.dataset.aisub, true); const g = e.target.closest('[data-aigo]'); if (g) aiSubShow(md, g.dataset.aigo, true); });
   md.addEventListener('click', e => { const b = e.target.closest('[data-admsub]'); if (b) admSubShow(md, b.dataset.admsub, true); });  // 2.24.0 (#826)
   if (S.me?.is_admin) hostWire(md);
   aiuWire(md, only => { const box = $('#s-aiu', md); if (only && box && S.aiu.data) box.innerHTML = aiuHtml(S.aiu.data, Math.max(240, Math.min(720, (box.clientWidth || 560) - 8))); else aiuDraw(md); });  // 2.1.1 (#326)
-  if (cur === 'account' && S.me) { tfaDraw(md); tokDraw(md); apwDraw(md); }
-  if (S.me) { tfaWire(md); tokWire(md); apwWire(md); }
+  if (cur === 'account' && S.me) { tfaDraw(md); tokDraw(md); apwDraw(md); e2eDraw(md); }
+  if (S.me) { tfaWire(md); tokWire(md); apwWire(md); e2eWire(md); }  // 2.42.0 (#828): + end-to-end encryption
   if (S.me?.is_admin) oidcWire(md);
   if (S.me?.is_admin) { aaWire(md); bkWire(md); orphWire(md); }
   md.addEventListener('change', e => { if (e.target.id === 's-mdpen') { LS.set('mdPenOnly', e.target.checked); if (S.sel) renderDetail(); } });  // 2.40.0 (#1203): this device

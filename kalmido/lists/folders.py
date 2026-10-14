@@ -131,6 +131,9 @@ def folder_apply(c, lid, keys=None, force=False, dry=False):
                     continue
                 if not dry:
                     c.execute("UPDATE lists SET org_id=? WHERE id=?", (want, lid))
+                    if want:
+                        from ..admin.orgcrypt_cli import oc_migrate_kick
+                        oc_migrate_kick()  # 2.42.0 (#828): the list's files get the organisation's key now
                 changed += 1
             elif k == "agent_id":
                 v = v or None  # 0 = "no agent"

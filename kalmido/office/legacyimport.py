@@ -30,7 +30,7 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from xml.etree import ElementTree as ET
 
-from flask import jsonify, request, send_file
+from flask import jsonify, request
 
 from ..core.config import app, OFFICE_DIR
 from ..core.i18n import N_, tr
@@ -929,8 +929,9 @@ def fi_archive_add(c, oid, uid, raw, file_name, b):
     # 2.40.0 (#1335): only the ".part" is written here; the caller renames it to its name after the commit (fk_archive_done)
     # and removes it when the commit fails -- an archive-*.pdf never exists without its row
     fd = os.open(p + ".part", os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    from ..core.orgcrypt import oc_seal
     with os.fdopen(fd, "wb") as fh:
-        fh.write(raw)
+        fh.write(oc_seal(c, oid, raw))  # 2.42.0 (#828): sealed with the organisation's key at rest (sha256 = the original)
     c.execute("UPDATE office_archive SET file=? WHERE id=? AND org_id=?", (name, aid, oid))
     _run_count(c, oid, rid)
     return aid, p
@@ -1299,7 +1300,8 @@ def fi_archive_pdf(aid):
     ofx_log(c, oid, "pdf", target="archive", detail={"archive_id": aid}, dedupe_min=10)
     c.commit()
     name = re.sub(r"[^A-Za-z0-9._-]+", "-", r["file_name"] or "").strip("-") or f"archive-{aid}.pdf"
-    resp = send_file(p, mimetype="application/pdf", download_name=name, as_attachment=request.args.get("download") == "1")
+    from ..core.orgcrypt import oc_send_file
+    resp = oc_send_file(c, p, mimetype="application/pdf", download_name=name, as_attachment=request.args.get("download") == "1")  # 2.42.0 (#828)
     resp.headers["Cache-Control"] = "private, no-store"
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["Content-Security-Policy"] = "sandbox"  # a foreign PDF never runs script under the app origin

@@ -104,6 +104,9 @@ def office_settings(c, oid):
         d = json.loads(r["data"]) if r and r["data"] else {}
     except ValueError:
         d = {}
+    if isinstance(d, dict):  # 2.42.0 (#828): the company lines (bank / tax) are encrypted at rest
+        from ..core.orgcrypt import oc_json_load
+        oc_json_load(c, oid, "office_settings", "data", d)
     out = json.loads(json.dumps(SETTINGS_DEFAULTS))
     for k in SETTINGS_KEYS:
         if k in d and d[k] is not None:
@@ -269,6 +272,8 @@ def fe_office_rules_migrate(c):
 
 
 def office_settings_save(c, oid, data):
+    from ..core.orgcrypt import oc_json_store
+    data = oc_json_store(c, oid, "office_settings", "data", data)  # 2.42.0 (#828): the company lines encrypted at rest
     c.execute("INSERT INTO office_settings(org_id, data, updated_at) VALUES(?,?,?) ON CONFLICT(org_id) DO UPDATE SET data=excluded.data, "
               "updated_at=excluded.updated_at", (oid, json.dumps(data, ensure_ascii=False), iso(now_utc())))
 
@@ -380,7 +385,10 @@ MD_KINDS = tuple(MD)
 JSON_COLS = {"items", "rates"}
 
 
-def _row_dict(kind, r):
+def _row_dict(kind, r, c=None, oid=None):
+    if c is not None and kind == "contracts":  # 2.42.0 (#828): the special rates are encrypted at rest
+        from ..core.orgcrypt import oc_dec_fields
+        r = oc_dec_fields(c, oid, "office_contracts", r)
     d = dict(r)
     for k in ("items", "rates"):
         if k in d:
@@ -411,7 +419,7 @@ def office_rows(c, oid, kind, archived=True, q=""):
         else:
             sql += f" AND {m['label']} ILIKE ? ESCAPE '\\'"
             args.append(like)
-    return [_row_dict(kind, r) for r in c.execute(sql + f" ORDER BY {m['order']}", args)]
+    return [_row_dict(kind, r, c, oid) for r in c.execute(sql + f" ORDER BY {m['order']}", args)]
 
 
 def office_row(c, oid, kind, rid):
@@ -423,7 +431,7 @@ def office_row(c, oid, kind, rid):
     r = c.execute(f"SELECT * FROM {MD[kind]['table']} WHERE id=? AND org_id=?", (rid, oid)).fetchone()
     if not r:
         raise Denied(404)
-    return _row_dict(kind, r)
+    return _row_dict(kind, r, c, oid)
 
 
 def _clean_col(c, oid, kind, k, v):
@@ -505,7 +513,8 @@ def _clean_col(c, oid, kind, k, v):
             if rate in (None, ""):
                 continue
             out[str(i)] = _num(rate, k, 0, 1e9)
-        return json.dumps(out)
+        from ..core.orgcrypt import oc_enc_fields
+        return oc_enc_fields(c, oid, "office_contracts", {"rates": json.dumps(out)})["rates"]  # 2.42.0 (#828)
     raise BadInput(tr("Invalid value: {0}", k))
 
 
@@ -550,9 +559,8 @@ def office_in_use(c, kind, rid, oid):
     if kind == "services":
         if c.execute("SELECT 1 FROM office_doc_items WHERE service_id=? AND org_id=? LIMIT 1", (rid, oid)).fetchone():
             return True
-        if c.execute("SELECT 1 FROM office_contracts WHERE org_id=? AND rates ILIKE ? LIMIT 1", (oid, f'%"{rid}":%')).fetchone():
-            return True
-        return False
+        # 2.42.0 (#828): the rates may be encrypted -> compared after decrypting (an organisation has few contracts)
+        return any(str(rid) in (x.get("rates") or {}) for x in office_rows(c, oid, "contracts"))
     if kind == "equipment":
         return bool(c.execute("SELECT 1 FROM office_sets WHERE org_id=? AND items ILIKE ? LIMIT 1", (oid, f'%"equipment_id": {rid},%')).fetchone()
                     or c.execute("SELECT 1 FROM office_sets WHERE org_id=? AND items ILIKE ? LIMIT 1", (oid, f'%"equipment_id": {rid}}}%')).fetchone())

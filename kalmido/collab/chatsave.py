@@ -8,6 +8,11 @@ within the person's storage). chat_saves remembers it per person: saving again a
 second task) while that task exists and is not deleted; afterwards the message can be saved again. The chat pages carry
 saved_task_id per message (only for the person asking).
 
+2.42.0 (#1383): kind "comment": a comment of an agent on a task (msg_id = the comment id; only a comment of an agent, only by
+someone who sees its task) becomes a subtask of that task (as: "sub", the default) or a new task in the same list (as: "list");
+the person needs the right to add tasks there (no list choice). The link points back to the task; the comment's files are
+copied. The task timeline carries saved_task_id per agent comment (for the person asking).
+
 Agents never save (403): they may only offer it -- POST /api/v1/agent/chats/{uid} with offer_save: true shows the button
 "Save as task" under their message, which opens the same dialog for the person."""
 import os
@@ -25,8 +30,9 @@ from ..core.access import Denied, my_inbox, need_list
 from ..tasks.validation import TITLE_MAX, as_int, log_act
 from ..personal.timetrack import BadInput, UnknownFields
 
-CHAT_SAVE_KINDS = ("agent", "team")
-CHAT_SAVE_FIELDS = ("kind", "msg_id", "list_id", "due", "title")
+CHAT_SAVE_KINDS = ("agent", "team", "comment")  # 2.42.0 (#1383): + comment (of an agent, on a task)
+CHAT_SAVE_FIELDS = ("kind", "msg_id", "list_id", "due", "title", "as")
+CHAT_SAVE_AS = ("sub", "list")  # 2.42.0 (#1383): a saved comment: subtask of its task / new task in the same list
 CHAT_SAVE_TITLE = 120  # the title made from the message (the person may type a longer one, up to TITLE_MAX)
 
 
@@ -60,6 +66,8 @@ def _message(c, kind, mid, uid):
     """(text, files [(name, mime, size, path)], where (the conversation), who (the author), created_at, link) of a message uid
     may read, else Denied(404)."""
     from ..collab.comments import user_names
+    if kind == "comment":
+        return dl_comment_message(c, mid)
     if kind == "agent":
         m = c.execute("SELECT * FROM agent_chat WHERE id=?", (mid,)).fetchone()
         if not m or m["user_id"] != uid:  # only the person's own conversation with the agent
@@ -74,7 +82,7 @@ def _message(c, kind, mid, uid):
         raise Denied(404)
     m = c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone()
     r = c.execute("SELECT * FROM tchat_rooms WHERE id=?", (m["room_id"],)).fetchone() if m else None
-    if not m or not tchat_room_ok(c, r, uid) or m["deleted_at"]:
+    if not m or not tchat_room_ok(c, r, uid) or m["deleted_at"] or m["enc"]:  # 2.42.0 (#909): an encrypted DM stays in the chat
         raise Denied(404)
     if r["kind"] == "dm":
         other = r["b"] if r["a"] == uid else r["a"]
@@ -84,6 +92,20 @@ def _message(c, kind, mid, uid):
         where = tr("Team chat {0}", ln["name"] if ln else "?")
     who = user_names(c, [m["user_id"]]).get(m["user_id"], "?") if m["user_id"] else "?"
     return _plain_mentions(c, m["body"]), [], where, who, m["created_at"], f"#msg/t/{r['id']}/{mid}"
+
+
+def dl_comment_message(c, cid):
+    """2.42.0 (#1383): _message of a comment: only an agent's, only on a task the person sees (else 404 / 400)."""
+    from ..collab.comments import need_live_comment, user_names
+    from ..agents.core import agent_ids
+    k, _ = need_live_comment(c, cid)  # 404 gone / task not visible (participants: only their tasks)
+    if k["user_id"] not in agent_ids(c):
+        raise Denied(400, tr("Only comments of agents can be saved as a task"))
+    t = c.execute("SELECT id, title FROM tasks WHERE id=?", (k["task_id"],)).fetchone()
+    files = [(f["name"], f["mime"], f["size"], f["path"]) for f in c.execute(
+        "SELECT name, mime, size, path FROM attachments WHERE comment_id=? ORDER BY id", (cid,))]
+    who = user_names(c, [k["user_id"]]).get(k["user_id"], "?")
+    return k["body"] or "", files, tr("Comment on {0}", t["title"]), who, k["created_at"], f"#t/{t['id']}"
 
 
 def _copy_files(c, tid, uid, files):
@@ -98,6 +120,8 @@ def _copy_files(c, tid, uid, files):
         rel = os.path.join(str(tid), f"{uuid.uuid4().hex[:12]}-{name}")
         os.makedirs(os.path.join(ATT_DIR, str(tid)), exist_ok=True)
         shutil.copyfile(src, os.path.join(ATT_DIR, rel))
+        from ..core.orgcrypt import oc_seal_path, oc_task_org
+        oc_seal_path(c, oc_task_org(c, tid), os.path.join(ATT_DIR, rel))  # 2.42.0 (#828): sealed in an organisation's list
         g.chat_save_new = getattr(g, "chat_save_new", []) + [rel]
         c.execute("INSERT INTO attachments(task_id,name,mime,size,path,created_at,user_id) VALUES(?,?,?,?,?,?,?)",
                   (tid, name, mime, size, rel, ts, uid))
@@ -126,12 +150,18 @@ def chat_save():
         lid = as_int(b["list_id"], "list_id", 1) if b.get("list_id") not in (None, "") else None
     except BadInput as e:
         return err(str(e))
+    if (b.get("as") is not None and (kind != "comment" or b["as"] not in CHAT_SAVE_AS)) or (kind == "comment" and lid):
+        return err(tr("Invalid value: {0}", "as" if b.get("as") is not None else "list_id"))
     uid = me()
     text, files, where, who, at, link = _message(c, kind, mid, uid)
     have = chat_save_of(c, uid, kind, [mid])
     if mid in have:
         t = c.execute("SELECT id, title FROM tasks WHERE id=?", (have[mid],)).fetchone()
         return jsonify(already=True, task_id=t["id"], task={"id": t["id"], "title": t["title"]})
+    parent = None
+    if kind == "comment":  # 2.42.0 (#1383): in the comment's list, as a subtask of its task by default
+        ct = c.execute("SELECT t.id, t.list_id FROM comments k JOIN tasks t ON t.id=k.task_id WHERE k.id=?", (mid,)).fetchone()
+        lid, parent = ct["list_id"], (ct["id"] if b.get("as", "sub") == "sub" else None)
     lid = lid or my_inbox(c, uid)
     need_list(c, lid)  # 404 unknown / not visible, 403 without the right to change the list
     title = b.get("title")
@@ -139,9 +169,11 @@ def chat_save():
         return err(tr("Invalid value: {0}", "title"))
     title = (title or "").strip()[:TITLE_MAX] or chat_save_title(text) or tr("Saved message")
     base = (PUBLIC_URL or request.url_root).rstrip("/")
-    line = f"{tr('Saved from: {0}', where)} · {who}, {at[:10]} · [{tr('Open the message in the chat')}]({base}/{link})"
+    line = f"{tr('Saved from: {0}', where)} · {who}, {at[:10]} · [{tr('Open the comment in the task') if kind == 'comment' else tr('Open the message in the chat')}]({base}/{link})"
     content = (text.rstrip() + "\n\n---\n" if text.strip() else "") + line
     new = {"title": title, "content": content, "list_id": lid}
+    if parent:
+        new["parent_id"] = parent
     if b.get("due") not in (None, ""):
         new["due"] = b["due"]
     try:

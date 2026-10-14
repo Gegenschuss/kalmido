@@ -373,6 +373,9 @@ def list_org_set(c, lid, v):
     for (uid,) in c.execute("SELECT user_id FROM list_members WHERE list_id=? ORDER BY user_id", (lid,)).fetchall():
         ws_check_member(c, lid, uid, org_id=oid or 0)
     c.execute("UPDATE lists SET org_id=? WHERE id=?", (oid, lid))
+    if oid:
+        from ..admin.orgcrypt_cli import oc_migrate_kick
+        oc_migrate_kick()  # 2.42.0 (#828): the list's files get the organisation's key now
     return True
 
 
@@ -617,10 +620,27 @@ def org_delete(oid):
         c.execute("UPDATE agents SET org_id=NULL WHERE org_id=?", (oid,))
         c.execute("UPDATE ev_cals SET org_id=NULL WHERE org_id=?", (oid,))  # 2.30.0 (#1036): they stay with their owners, private
         c.execute("UPDATE books SET org_id=NULL WHERE org_id=?", (oid,))
+        # 2.42.0 (#828): files of lists that left the organisation are sealed with their new organisation's key (or plain),
+        # then the organisation's key is destroyed (what is left encrypted with it can no longer be read) and its office
+        # folder (stored invoices, archive) removed
+        from ..admin.orgcrypt_cli import before_org_delete
+        from ..core.orgcrypt import oc_drop_key
+        before_org_delete(c, oid)
+        oc_drop_key(c, oid)
         c.execute("DELETE FROM orgs WHERE id=?", (oid,))
         bump(c)
         c.commit()
+        oc_drop_office_dir(oid)
         return jsonify(ok=True)
+
+
+def oc_drop_office_dir(oid):
+    """2.42.0 (#828): remove the office folder of a deleted organisation (stored documents, archive PDFs, logos)."""
+    import shutil
+    from ..core.config import OFFICE_DIR
+    d = os.path.join(OFFICE_DIR, str(int(oid)))
+    if os.path.isdir(d) and not os.path.islink(d):
+        shutil.rmtree(d, ignore_errors=True)
 
 
 @app.put("/api/admin/orgs/visibility")

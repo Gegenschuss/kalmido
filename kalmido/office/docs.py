@@ -11,6 +11,7 @@ from flask import g, jsonify, request
 
 from ..core.config import app
 from ..core.pg import insert_id, like_escape, write_lock
+from ..core.orgcrypt import oc_dec_fields, oc_item_store, oc_json_store
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied
@@ -113,12 +114,13 @@ def doc_row(c, oid, did):
     r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (did, oid)).fetchone()
     if not r:
         raise Denied(404)
-    return r
+    return oc_dec_fields(c, oid, "office_docs", r)  # 2.42.0 (#828): sender / internal costs encrypted at rest
 
 
 def doc_items(c, did, oid):
     """The positions of document did; oid (the organisation) is required: 2.36.2 (#1142) every read filters by it."""
-    return [dict(r) for r in c.execute("SELECT * FROM office_doc_items WHERE doc_id=? AND org_id=? ORDER BY sort, id", (did, oid))]
+    return [oc_dec_fields(c, oid, "office_doc_items", r)  # 2.42.0 (#828): cost from cost_enc
+            for r in c.execute("SELECT * FROM office_doc_items WHERE doc_id=? AND org_id=? ORDER BY sort, id", (did, oid))]
 
 
 def _texts(c, oid, kind=None):
@@ -153,7 +155,7 @@ def _contract(c, oid, cid):
     r = c.execute("SELECT * FROM office_contracts WHERE id=? AND org_id=?", (_iid(cid), oid)).fetchone()
     if not r:
         return None
-    d = dict(r)
+    d = oc_dec_fields(c, oid, "office_contracts", r)  # 2.42.0 (#828)
     d["rates"] = _j(d.get("rates"), {})
     return d
 
@@ -270,12 +272,13 @@ def recalc(c, oid, did):
     if ofx_locked(r):
         return _j(r["totals"], {})
     t = doc_totals(c, oid, r)
-    c.execute("UPDATE office_docs SET totals=?, updated_at=? WHERE id=? AND org_id=?", (json.dumps(t, ensure_ascii=False), iso(now_utc()), did, oid))
+    c.execute("UPDATE office_docs SET totals=?, updated_at=? WHERE id=? AND org_id=?",
+              (json.dumps(oc_json_store(c, oid, "office_docs", "totals", t), ensure_ascii=False), iso(now_utc()), did, oid))  # 2.42.0 (#828)
     return t
 
 
 def doc_public(c, oid, r, admin, items=True):
-    d = dict(r)
+    d = oc_dec_fields(c, oid, "office_docs", r)  # 2.42.0 (#828)
     for k, dflt in (("recipient", {}), ("rights", {}), ("fields", []), ("totals", {})):
         d[k] = _j(d.get(k), dflt)
     pm = inv_paid_map(c, oid, [r["id"]]) if r["kind"] in ("invoice", "credit") else {}
@@ -704,6 +707,7 @@ def _put_items(c, oid, r, items, admin):
     for row in rows:
         row["doc_id"] = r["id"]
         row["org_id"] = oid
+        row = oc_item_store(c, oid, row)  # 2.42.0 (#828): the purchase price encrypted at rest
         c.execute(f"INSERT INTO office_doc_items({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
 
 
@@ -984,6 +988,7 @@ def odoc_duplicate(did):
         it = {k: v for k, v in it.items() if k not in DUP_ITEM_SKIP}
         it["doc_id"] = nid
         it["org_id"] = oid
+        it = oc_item_store(c, oid, it)  # 2.42.0 (#828)
         c.execute(f"INSERT INTO office_doc_items({','.join(it)}) VALUES({','.join('?' * len(it))})", list(it.values()))
     if not ofx_number_at_finalize(s, r["kind"]):
         _assign_number(c, oid, nid, s)

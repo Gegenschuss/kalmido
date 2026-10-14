@@ -107,8 +107,10 @@ def _cache_path(key):
 
 def _cache_get(key):
     try:
+        from ..core.orgcrypt import oc_cache_open
         with open(_cache_path(key), encoding="utf-8") as f:
-            return json.load(f)
+            raw = oc_cache_open(f.read())  # 2.42.0 (#828): sealed with a key from KALMIDO_SECRET_KEY (older entries plain)
+        return json.loads(raw) if raw is not None else None
     except (OSError, ValueError):
         return None
 
@@ -117,8 +119,9 @@ def _cache_put(key, val):
     try:
         os.makedirs(CACHE_DIR, exist_ok=True)
         tmp = _cache_path(key) + f".{os.getpid()}.{threading.get_ident()}.tmp"
+        from ..core.orgcrypt import oc_cache_seal
         with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(val, f, ensure_ascii=False)
+            f.write(oc_cache_seal(json.dumps(val, ensure_ascii=False)))  # 2.42.0 (#828): no extracted text in plain on disk
         os.replace(tmp, _cache_path(key))
         full = sorted((os.path.join(CACHE_DIR, n) for n in os.listdir(CACHE_DIR) if n.endswith(".json")), key=os.path.getmtime)
         old = time.time() - CACHE_DAYS * 86400
@@ -243,6 +246,8 @@ def v1_attachment_text_get(aid):
     max_chars = as_int(a.get("max_chars", TEXT_CAP), "max_chars", 1, TEXT_CAP)
     c = db()
     att = need_attachment(c, aid, False)
+    if att["enc"]:  # 2.42.0 (#828): an encrypted file has no text for the server
+        raise Denied(404)
     need_task(c, att["task_id"], write=False, full=True)
     if c.execute("SELECT deleted_at FROM tasks WHERE id=?", (att["task_id"],)).fetchone()[0]:
         raise Denied(404)
@@ -252,8 +257,9 @@ def v1_attachment_text_get(aid):
         return v1_err(413, tr("{0}: larger than {1} MB", att["name"], TEXT_FILE_MB), name="too_large")
     full = os.path.join(ATT_DIR, att["path"])
     try:
-        with open(full, "rb") as f:
-            data = f.read(TEXT_FILE_MB * 1024 * 1024 + 1)
+        from ..core.orgcrypt import OVERHEAD, oc_open
+        with open(full, "rb") as f:  # 2.42.0 (#828): a sealed file is decrypted (the size check above is the plain size)
+            data = oc_open(c, f.read(TEXT_FILE_MB * 1024 * 1024 + 1 + OVERHEAD))
     except OSError:
         return v1_err(404, tr("File damaged or missing"))
     r = text_of_bytes(att["name"], att["mime"], data, max_chars, owner=me())

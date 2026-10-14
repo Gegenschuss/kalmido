@@ -26,6 +26,7 @@ async function loadRoom(rid, older = false) {
   if (S.tc.rid !== rid) return;
   S.tc.room = j.room; S.tc.users = {...S.tc.users, ...j.users}; S.tc.more = j.has_more; S.tc.err = null;
   S.tc.msgs = before ? [...j.messages, ...S.tc.msgs] : j.messages;
+  e2eFromCache(S.tc.msgs); e2eRoomDecrypt(rid);  // 2.42.0 (#909): encrypted DMs (e2e.js)
   const last = S.tc.msgs[S.tc.msgs.length - 1];
   if (last && (!j.room.last_read || last.id > j.room.last_read) && !document.hidden) {
     try { const r = await rawFetch('POST', `/api/team/rooms/${rid}/read`, {last_id: last.id}); if (S.team) S.team.unread = r.unread; } catch { /* offline */ }
@@ -62,7 +63,7 @@ function viewTeam() {
     <div class="tchead"><b>${tr('Conversations')}</b><span class="spacer"></span><button type="button" class="btn sm pri" data-act="tc-new" aria-haspopup="${S.tc.people.length ? 'menu' : 'dialog'}">${ic('plus', 's')}${tr('New message')}</button></div>
     ${S.tc.rooms === null ? `<div class="muted mhint">${tr('Loading…')}</div>` : rooms.length ? rooms.map(r => `<button type="button" class="tcrow ${r.id === rid ? 'on' : ''} ${r.unread ? 'unread' : ''}" data-act="tc-open" data-rid="${r.id}" ${r.id === rid ? 'aria-current="true"' : ''}>
       ${roomIcon(r)}<span class="tcmain"><span class="tcn">${esc(roomName(r))}${r.kind === 'list' ? `<span class="tck">${ic('users', 's')}${r.members}</span>` : ''}</span>
-      <span class="tclast">${r.last ? esc((r.last.user_id === S.me?.id ? tr('You') + ': ' : r.kind === 'list' ? uname(r.last.user_id, S.tc.users) + ': ' : '') + mdBrief(r.last.text)) : `<span class="muted">${tr('No messages yet')}</span>`}</span></span>
+      <span class="tclast">${r.last ? esc((r.last.user_id === S.me?.id ? tr('You') + ': ' : r.kind === 'list' ? uname(r.last.user_id, S.tc.users) + ': ' : '') + (e2eBriefText(r.last) ?? mdBrief(r.last.text))) : `<span class="muted">${tr('No messages yet')}</span>`}</span></span>
       <span class="tcside">${r.last_at ? `<time>${esc(relTime(r.last_at))}</time>` : ''}${r.unread ? `<span class="nbadge ${r.mention ? 'ment' : ''}" aria-label="${esc(trn('{0} unread', '{0} unread', r.unread))}">${r.mention ? '@' : ''}${r.unread}</span>` : ''}${r.muted ? `<span class="tcmute" title="${esc(tr('Muted'))}">${ic('belloff', 's')}</span>` : ''}</span></button>`).join('')
     : `<div class="empty tcempty">${heron('empty')}<b>${tr('No conversations yet')}</b><span>${S.tc.people.length || (S.tc.rooms || []).length ? tr('Write to someone you work with, or share a list: every shared list gets its own chat.') : tr('Share a list with someone: every shared list gets its own chat.')}</span>${S.tc.people.length || (S.tc.rooms || []).length ? `<button type="button" class="btn sm pri" data-act="tc-new">${ic('plus', 's')}${tr('Start a conversation')}</button>` : ''}</div>`}
   </nav>`;
@@ -74,8 +75,8 @@ function tcRoomHtml() {
   const head = `<div class="tcrhead"><button type="button" class="iconbtn tcback" data-act="tc-back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>
     ${r ? roomIcon(r) : ''}<div class="tcrt"><b>${esc(name)}</b>${room && room.kind === 'list' ? `<span class="muted">${esc(room.members.map(m => m.name).slice(0, 6).join(', '))}${room.members.length > 6 ? ' +' + (room.members.length - 6) : ''}</span>` : ''}</div>
     <span class="spacer"></span>${msgSearchBtn('t', rid)}${room && room.kind === 'list' ? `<button type="button" class="iconbtn" data-act="tc-list" data-id="${room.list_id}" title="${esc(tr('Open the list'))}" aria-label="${esc(tr('Open the list'))}">${ic('list')}</button>` : ''}
-    <button type="button" class="iconbtn ${room?.muted ? 'on' : ''}" data-act="tc-mute" aria-pressed="${!!room?.muted}" title="${esc(room?.muted ? tr('Muted: only mentions notify you') : tr('Mute (only mentions notify you)'))}" aria-label="${esc(tr('Mute'))}">${ic(room?.muted ? 'belloff' : 'bell')}</button></div>`;
-  return `${head}${msBarHtml('t', rid)}<div class="chmsgs tcmsgs" id="tc-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${tcMsgsHtml()}</div>
+    ${e2eRoomBtns(room)}<button type="button" class="iconbtn ${room?.muted ? 'on' : ''}" data-act="tc-mute" aria-pressed="${!!room?.muted}" title="${esc(room?.muted ? tr('Muted: only mentions notify you') : tr('Mute (only mentions notify you)'))}" aria-label="${esc(tr('Mute'))}">${ic(room?.muted ? 'belloff' : 'bell')}</button></div>`;
+  return `${head}${e2eRoomNotice(room)}${msBarHtml('t', rid)}<div class="chmsgs tcmsgs" id="tc-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${tcMsgsHtml()}</div>
     ${replyBarHtml('t:' + rid)}<div class="chcomp tccomp"><div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea id="tc-in" rows="1" name="kalmido-team-message" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${esc(tr('Message to {0}…', name.length > 18 ? name.slice(0, 17).trimEnd() + '…' : name))}" aria-label="${esc(tr('Message to {0}…', name))}" enterkeyhint="send" maxlength="8000">${esc(S.drafts['team:' + rid] || '')}</textarea>
     <button type="button" class="btn pri" data-act="tc-send">${ic('send', 's')}<span>${tr('Send')}</span></button></div>`;
 }
@@ -89,7 +90,9 @@ function tcMsgsHtml() {
     const mine = m.user_id === S.me?.id, first = !prev || prev.user_id !== m.user_id || Date.parse(m.created_at) - Date.parse(prev.created_at) > 10 * 60000;
     prev = m;
     const rxr = rxRow(m.reactions || [], {mid: m.id, act: 'tc-react', dis: !!m.deleted || S.tc.edit === m.id, own: mine, key: 't' + m.id});  // 2.18.0 (#651), 2.23.0 (#823)
-    const body = m.deleted ? `<div class="cbub del"><span class="muted">${tr('Message deleted')}</span></div>`
+    const eb = m.deleted ? null : e2eMsgBody(m);  // 2.42.0 (#909): a notice / an encrypted message not decrypted (yet)
+    if (eb && m.enc.sys) { h += `<div class="cmsg sys" data-k="m${m.id}" data-mid="t:${m.id}">${eb}</div>`; prev = null; continue; }
+    const body = m.deleted ? `<div class="cbub del"><span class="muted">${tr('Message deleted')}</span></div>` : eb ? eb
       : S.tc.edit === m.id ? `<div class="cbub tcedit"><div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea class="tc-edit" aria-label="${esc(tr('Edit message'))}" rows="2">${esc(m.body.replace(/<@(\d+)>/g, (_, id) => '@' + uname(+id, U)))}</textarea><div class="tcebtn"><button type="button" class="btn sm" data-act="tc-edit-cancel">${tr('Cancel')}</button><button type="button" class="btn sm pri" data-act="tc-edit-save" data-mid="${m.id}">${tr('Save')}</button></div></div>`
         : `${replyQuoteHtml(m, 't')}<div class="cbub">${commentBody(m.body, U)}</div>`;  // 2.33.0 (#1076): the quote of the answered message
     h += `<div class="cmsg ${mine ? 'me' : 'ag'} ${first ? 'first' : ''}${rxShow('t' + m.id)}" data-k="m${m.id}" data-mid="t:${m.id}">
@@ -128,7 +131,13 @@ async function tcSend() {
   if (!S.tc.room) { try { await loadRoom(rid); } catch { /* sent without the mention lookup */ } }  // 2.24.0: @names need the members
   let m;
   const rto = replyTo('t:' + rid);  // 2.33.0 (#1076)
-  try { m = await rawFetch('POST', `/api/team/rooms/${rid}/messages`, {body: tcMentions(text), ...(rto ? {reply_to: rto} : {})}); }
+  try {
+    // 2.42.0 (#909): an encrypted DM sends only the ciphertext (encrypted in this browser)
+    const enc = S.tc.room?.e2e ? await e2eDmEncrypt(rid, text) : null; if (S.tc.room?.e2e && !enc) return;
+    if (!enc && !await e2eDownOk(rid)) return;  // 2.42.0 (#909): switched off by the server alone -> ask first
+    m = await rawFetch('POST', `/api/team/rooms/${rid}/messages`, {...(enc ? {enc} : {body: tcMentions(text)}), ...(rto ? {reply_to: rto} : {})});
+    if (enc) { m.body = text; m._dec = true; E2E.dec[m.id + ':'] = text; }
+  }
   catch (e) { toast(e instanceof Offline ? tr('You are offline: the message was not sent and stays in the box') : e.message); return; }
   ta.value = ''; delete S.drafts['team:' + rid]; autosize(ta); replySent('t:' + rid);
   S.tc.msgs.push(m);
@@ -147,8 +156,8 @@ function tcMsgMenu(anchor, mid) {
   menu(anchor, [{label: tr('Reply'), icon: 'reply', fn: () => replyStart('t', mid)},
     {label: tr('Copy'), icon: 'copy', fn: () => chatCopy(S.tc.msgs, m, 'team')},  // 2.37.0 (#1165)
     {label: tr('Copy as Markdown'), icon: 'copy', fn: () => chatCopy(S.tc.msgs, m, 'team', true)},  // 2.41.0 (#1374)
-    {label: m.saved_task_id ? tr('Saved as a task: open it') : tr('Save as task'), icon: 'bookmark', fn: () => m.saved_task_id ? chatSaveOpen(m.saved_task_id) : chatSaveModal('team', m, () => tcPatch())},
-    ...(mine ? [{label: tr('Edit'), icon: 'edit', fn: () => { S.tc.edit = mid; tcPatch(); setTimeout(() => { const t = $('#tc-msgs .tc-edit'); if (t) { t.focus(); autosize(t); } }, 0); }},
+    ...(m.enc ? [] : [{label: m.saved_task_id ? tr('Saved as a task: open it') : tr('Save as task'), icon: 'bookmark', fn: () => m.saved_task_id ? chatSaveOpen(m.saved_task_id) : chatSaveModal('team', m, () => tcPatch())}]),  // 2.42.0 (#909): not for encrypted ones
+    ...(mine && !(m.enc && !m._dec) ? [{label: tr('Edit'), icon: 'edit', fn: () => { S.tc.edit = mid; tcPatch(); setTimeout(() => { const t = $('#tc-msgs .tc-edit'); if (t) { t.focus(); autosize(t); } }, 0); }},
       {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => tcMsgDelete(mid)}] : [])]);
 }
 async function tcMsgDelete(mid) {
@@ -165,7 +174,12 @@ async function tcEditSave(mid) {
   // 2.18.0 (#652): saving an emptied message did nothing; it offers to delete the message instead (Cancel: back to the
   // text box, Delete: the focus goes to the message box)
   if (!v) { if (await tcMsgDelete(mid)) $('#tc-in')?.focus(); else $('#tc-msgs .tc-edit')?.focus(); return; }
-  let r; try { r = await rawFetch('PATCH', `/api/team/messages/${mid}`, {body: tcMentions(v)}); } catch (e) { toast(e.message); return; }
+  let r;
+  try {
+    const enc = m.enc ? await e2eDmEncrypt(S.tc.rid, v) : null; if (m.enc && !enc) return;  // 2.42.0 (#909): encrypted again
+    r = await rawFetch('PATCH', `/api/team/messages/${mid}`, enc ? {enc} : {body: tcMentions(v)});
+    if (enc) { r.body = v; r._dec = true; E2E.dec[r.id + ':' + (r.edited_at || '')] = v; }
+  } catch (e) { toast(e.message); return; }
   Object.assign(m, r); S.tc.edit = null; tcPatch();
 }
 async function tcMute() {
@@ -635,10 +649,12 @@ function chatSaveModal(kind, m, done) {
   if (!m || m.deleted) return;
   if (m.saved_task_id) { toast(tr('Already saved as a task'), () => chatSaveOpen(m.saved_task_id), 6000, tr('Open')); return; }
   const ib = inbox(), ls = [ib, ...sideOrder().filter(l => l && !l.is_inbox && !l.archived && canEditList(l.id))].filter(Boolean);
+  const cmt = kind === 'comment';  // 2.42.0 (#1383): an agent's comment: a subtask of its task or a new task in the same list
   const md = modal(`<h3>${ic('bookmark', 's')} ${tr('Save as task')}</h3>
-    <p class="muted">${tr('The task gets the whole message, its files and a link back to it in the chat.')}</p>
+    <p class="muted">${cmt ? tr('The task gets the whole comment, its files and a link back to it.') : tr('The task gets the whole message, its files and a link back to it in the chat.')}</p>
     <div class="row"><label for="cs-title">${tr('Title')}</label><input id="cs-title" maxlength="2000" value="${esc(chatSaveTitle(m.body) || tr('Saved message'))}"></div>
-    <div class="row"><label for="cs-list">${tr('List')}</label><select id="cs-list">${ls.map(l => `<option value="${l.id}" ${l === ib ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>
+    ${cmt ? `<div class="row csas" role="radiogroup" aria-label="${esc(tr('Save as task'))}"><label><input type="radio" name="cs-as" value="sub" checked> ${tr('As a subtask of this task')}</label><label><input type="radio" name="cs-as" value="list"> ${tr('As a new task in the same list')}</label></div>`
+    : `<div class="row"><label for="cs-list">${tr('List')}</label><select id="cs-list">${ls.map(l => `<option value="${l.id}" ${l === ib ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>`}
     <div class="row"><label>${tr('To review by')}</label>${dateIn('cs-due', '', {label: tr('To review by'), empty: tr('No date')})}</div>
     <div class="foot"><div class="calerr" role="alert" id="cs-err" hidden></div><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${ic('bookmark', 's')} ${tr('Save')}</button></div>`);
   md.classList.add('csmodal');
@@ -648,18 +664,27 @@ function chatSaveModal(kind, m, done) {
     const er = $('#cs-err', md); er.hidden = true; b.disabled = true;
     const due = $('#cs-due', md).value, title = $('#cs-title', md).value.trim();
     let j;
-    try { j = await rawFetch('POST', '/api/chat-save', {kind, msg_id: m.id, list_id: +$('#cs-list', md).value, ...(due ? {due} : {}), ...(title ? {title} : {})}); }
+    const where = cmt ? {as: $('[name="cs-as"]:checked', md)?.value || 'sub'} : {list_id: +$('#cs-list', md).value};
+    try { j = await rawFetch('POST', '/api/chat-save', {kind, msg_id: m.id, ...where, ...(due ? {due} : {}), ...(title ? {title} : {})}); }
     catch (x) { er.textContent = x.message; er.hidden = false; b.disabled = false; return; }
     md.remove();
     const tid = j.already ? j.task_id : j.task?.id;
     m.saved_task_id = tid;
-    if (j.task && !j.already) (S.extra ||= []).push(j.task);
+    if (j.task && !j.already) { if (cmt) putTask(j.task); else (S.extra ||= []).push(j.task); }  // 2.42.0 (#1383): a comment's task is in a list I see
     if (done) done();
     toast(j.already ? tr('Already saved as a task') : j.skipped_files?.length ? tr('Saved as a task (without {0}: storage full)', j.skipped_files.join(', ')) : tr('Saved as a task'), () => chatSaveOpen(tid), 6000, tr('Open'));
   });
   setTimeout(() => $('#cs-title', md)?.focus(), 30);
   return md;
 }
+// 2.42.0 (#1383): "Save as task" under an agent's comment in a task (collab.js commentHtml) and its "Saved" mark
+document.addEventListener('click', e => {
+  const a = e.target.closest?.('[data-act="cm-save"],[data-act="cm-saved"]'); if (!a) return;
+  e.preventDefault(); e.stopPropagation();
+  if (a.dataset.act === 'cm-saved') { chatSaveOpen(+a.dataset.tid); return; }
+  const m = (S.tl?.comments || []).find(x => x.id === +a.dataset.cid); if (!m) return;
+  chatSaveModal('comment', m, () => { if (S.sel && S.tl.id === S.sel) loadTimeline(S.sel); });
+});
 // 2.37.0 (#1165): "Copy" in the menu of a chat message: its Markdown text (mentions as @Name). An answer the sender split
 // into parts (each ends with "_(Part 2/3)_", any word) is copied as one text when all its parts are loaded.
 // 2.41.0 (#1374): also "_(2/3)_" (the reference launcher's mark); an agent's closing blocks / host notes stay out (rcpClean)

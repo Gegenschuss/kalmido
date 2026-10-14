@@ -341,6 +341,8 @@ def _put_rows(c, oid, did, rows):
         row["qty"] = float(dec(row.get("qty"), "1"))
         row["rate"] = float(dec(row.get("rate"), "0"))
         row["cost"] = float(dec(row.get("cost"), "0"))
+        from ..core.orgcrypt import oc_item_store
+        row = oc_item_store(c, oid, row)  # 2.42.0 (#828): the purchase price encrypted at rest
         c.execute(f"INSERT INTO office_doc_items({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
 
 

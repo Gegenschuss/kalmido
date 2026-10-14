@@ -66,6 +66,8 @@ TENANT_EXEMPT = {
     "pl_conn_users": "who could use a shared Paperless connection (unused since 2.36.0, kept)", "pl_tokens": _OWN,
     "user_task_order": _OWN + " (2.40.0 #1344: the own order of My tasks; rows only for tasks the person sees)",
     "wait_hidden": _OWN + " (2.41.0 #1205: Waiting-on texts the person took out of their own suggestions)",
+    "e2e_keys": _OWN + " (2.42.0 #828: the person's public key + wrapped key bundle; others only get the public key of a DM partner)",
+    "task_enc_notes": "2.42.0 (#828): one person's encrypted note of a task, bound through the task (need_task) and readable only by its author",
     "filters": _OWN, "user_settings": _OWN, "sessions": _OWN, "push_subs": _OWN, "templates": _OWN, "cal_subs": _OWN,
     "recovery_codes": _OWN, "webauthn_creds": _OWN, "api_tokens": _OWN, "webhooks": _OWN + " (deliveries only for visible tasks)",
     "imports": _OWN, "sample_items": _OWN, "app_passwords": _OWN, "dav_sync2": _OWN, "journal": _OWN, "contact_care": _OWN,

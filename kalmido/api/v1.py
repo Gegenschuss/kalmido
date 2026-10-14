@@ -365,7 +365,10 @@ def v1_task(d):
     out = task_core(d, d["tags"], d.get("fields") or {})
     out["list_tags"] = d.get("ltags") or []
     out.update(blocked=bool(d.get("blocked")), comment_count=d.get("comment_count", 0), context=bool(d.get("context")),
-               attachments=[{k: a[k] for k in ("id", "name", "mime", "size")} for a in d.get("attachments") or []])
+               attachments=[{**{k: a[k] for k in ("id", "name", "mime", "size")}, **({"encrypted": True} if a.get("enc") else {})}
+                            for a in d.get("attachments") or []])
+    if d.get("encrypted_note"):  # 2.42.0 (#828): only that there is one (the content is end-to-end encrypted)
+        out["encrypted_note"] = True
     return out
 
 
@@ -375,7 +378,10 @@ def task_for(c, row, uid):
     tags = [r[0] for r in c.execute("SELECT tag FROM task_tags WHERE task_id=? AND user_id=? ORDER BY tag", (row["id"], uid))]
     fields = {str(r[0]): r[1] for r in c.execute("""SELECT v.field_id, v.value FROM task_field_values v JOIN list_fields f
                                                     ON f.id=v.field_id WHERE v.task_id=? AND f.list_id=?""", (row["id"], row["list_id"]))}
-    return {**task_core(row, tags, fields), "list_tags": ltag_names(c, row["id"])}
+    out = {**task_core(row, tags, fields), "list_tags": ltag_names(c, row["id"])}
+    if c.execute("SELECT 1 FROM task_enc_notes WHERE task_id=? LIMIT 1", (row["id"],)).fetchone():
+        out["encrypted_note"] = True  # 2.42.0 (#828): agents learn only that there is an encrypted note
+    return out
 
 
 V1_TASK_IN = ("title", "notes", "list_id", "section_id", "parent_id", "priority", "due", "due_time", "start", "duration",

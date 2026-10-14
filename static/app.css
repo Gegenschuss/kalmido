@@ -4080,6 +4080,9 @@ body.lcmoving,body.lcmoving *{cursor:grabbing!important;user-select:none!importa
 .cmeta .rx.rxtog{margin-left:.25rem}
 /* 2.37.0 (#1159): a chat message saved as a task (the mark opens the task) and an agent's offer to save it */
 .cmeta .csaved{display:inline-flex;align-items:center;gap:.25rem;border:0;background:none;padding:0 .25rem;min-height:1.5rem;color:var(--accent);font:inherit;font-size:var(--fs-s);cursor:pointer}.cmeta .csaved .i{width:.875rem;height:.875rem}.cmeta .csaved:hover span{text-decoration:underline}
+/* 2.42.0 (#1383): "Saved" in the head of an agent's comment; the dialog's choice subtask / new task (large targets) */
+.chead .csaved{display:inline-flex;align-items:center;gap:.25rem;border:0;background:none;padding:0 .25rem;min-height:1.5rem;color:var(--accent);font:inherit;font-size:var(--fs-s);cursor:pointer}.chead .csaved .i{width:.875rem;height:.875rem}.chead .csaved:hover span{text-decoration:underline}
+.csmodal .csas{display:flex;flex-direction:column;gap:.25rem}.csmodal .csas label{display:flex;align-items:center;gap:.5rem;min-height:2.75rem;cursor:pointer}
 .csoffer{margin:.375rem 0 .125rem}.csoffer .btn{display:inline-flex;align-items:center;gap:.375rem}
 @media (hover:hover) and (pointer:fine){ .cm:not(:hover):not(:focus-within) .rx.rxtog:not([aria-expanded="true"]){opacity:0} }  /* 2.23.0 (#823): the chat's smiley always shows */
 @media (pointer:coarse){ .rx.rxtog{min-width:2.75rem;min-height:2.75rem;margin-top:-.625rem;margin-bottom:-.625rem} .cmeta .rx.rxtog{margin-right:-.5rem} }
@@ -6282,3 +6285,19 @@ html.mini #app.detail-open{grid-template-columns:minmax(0,1fr) var(--detW,25.5re
 .fhead .fshr svg,.fhdsh .fshr svg{width:.875rem;height:.875rem}
 .fhead .fshr.fshweak,.fhdsh .fshweak{opacity:.45}
 .fhdsh{display:inline-flex;align-items:center;gap:.5rem;font-size:var(--fs-s);min-width:0}
+/* 2.42.0 (#828, #909): end-to-end encryption (e2e.js) */
+.e2eform{display:flex;flex-direction:column;gap:.625rem}
+.e2eform input:not([type=checkbox]){min-height:2.75rem}
+.e2ecode{display:block;font-family:var(--mono);font-size:var(--fs-m);letter-spacing:.04em;word-break:break-word;padding:.75rem;margin:.5rem 0;background:var(--bg3);border-radius:var(--r-s);user-select:all}
+.e2einfo{margin-top:.5rem;font-size:var(--fs-s)}
+.e2einfo summary{cursor:pointer;color:var(--muted)}
+.e2enote h5 svg,.e2eatt svg{color:var(--accent)}
+.e2enote textarea{width:100%;min-height:4.5rem}
+.e2emeta{display:flex;align-items:center;gap:.5rem;font-size:var(--fs-xs)}
+.e2eadd .linkbtn{display:inline-flex;align-items:center;gap:.375rem;min-height:2.5rem}
+.e2eatt .attx{display:flex;align-items:center;gap:.5rem;background:none;border:0;color:inherit;text-align:left;cursor:pointer;min-height:2.75rem}
+.e2ewarn,.e2ehint{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:.375rem .5rem;padding:.5rem .75rem;border-radius:var(--r-s);font-size:var(--fs-s);background:var(--bg3)}
+.e2ewarn{border:1px solid var(--danger)}
+.e2ewarn span,.e2ehint span{flex:1 1 12rem}
+.cmsg.sys{align-self:center;max-width:100%}
+.e2esys{display:inline-flex;align-items:center;gap:.375rem;font-size:var(--fs-xs);padding:.25rem .5rem}

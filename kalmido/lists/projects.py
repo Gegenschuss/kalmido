@@ -3,7 +3,7 @@ import mimetypes
 import os
 import uuid
 from datetime import date, timedelta
-from flask import jsonify, request, send_file
+from flask import jsonify, request
 
 from ..core.config import app, ATT_DIR, INLINE_TYPES, MAX_FILE_MB, TZ
 from ..core.pg import insert_id
@@ -534,6 +534,8 @@ def list_file_upload(lid):
             c.rollback()
             unlink_files(saved)
             return err(tr("{0}: the file is empty and was not uploaded", name))
+        from ..core.orgcrypt import oc_list_org, oc_seal_path
+        oc_seal_path(c, oc_list_org(c, lid), full)  # 2.42.0 (#828): a project file of an organisation's list is sealed at rest
         mime = "text/plain" if unexec else (f.mimetype if f.mimetype and f.mimetype != "application/octet-stream" else None) \
             or mimetypes.guess_type(name)[0] or "application/octet-stream"
         c.execute("INSERT INTO list_files(list_id,name,mime,size,path,user_id,created_at) VALUES(?,?,?,?,?,?,?)",
@@ -555,15 +557,16 @@ def need_list_file(c, fid, write):
 def list_file_get(fid):
     a = need_list_file(db(), fid, False)
     full = os.path.join(ATT_DIR, a["path"])
-    if not os.path.isfile(full) or (a["size"] and os.path.getsize(full) != a["size"]):  # 2.13.0: also empty / cut off
+    from ..core.orgcrypt import oc_plain_size, oc_send_file
+    if not os.path.isfile(full) or (a["size"] and oc_plain_size(full) != a["size"]):  # 2.13.0: also empty / cut off (2.42.0: plain size)
         if os.path.isfile(full):
-            print(f"WARNING file {a['id']}: {os.path.getsize(full)} bytes on disk, {a['size']} recorded", flush=True)
+            print(f"WARNING file {a['id']}: {oc_plain_size(full)} bytes on disk, {a['size']} recorded", flush=True)
         e = err(tr("File damaged or missing"), 410 if os.path.isfile(full) else 404)
         e[0].headers["Cache-Control"] = "no-store"  # never cache a broken answer
         return e
     inline = a["mime"] in INLINE_TYPES and request.args.get("dl") != "1"
-    resp = send_file(full, mimetype=a["mime"] if inline else "application/octet-stream",
-                     as_attachment=not inline, download_name=a["name"], conditional=True, max_age=0)
+    resp = oc_send_file(db(), full, mimetype=a["mime"] if inline else "application/octet-stream",
+                        as_attachment=not inline, download_name=a["name"], conditional=True, max_age=0)
     if a["mime"] != "application/pdf":  # the browser pdf viewer does not run inside a sandboxed CSP
         resp.headers["Content-Security-Policy"] = "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox"
     resp.headers["Cache-Control"] = "private, max-age=86400"

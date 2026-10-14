@@ -1192,7 +1192,8 @@ def storage_check():
         for r in c.execute(sql):
             n += 1
             full = os.path.join(ATT_DIR, r["path"] or "")
-            disk = os.path.getsize(full) if r["path"] and os.path.isfile(full) else None
+            from ..core.orgcrypt import oc_plain_size
+            disk = oc_plain_size(full) if r["path"] and os.path.isfile(full) else None  # 2.42.0 (#828): sealed = plain size
             if disk is None or (r["size"] and disk != r["size"]):
                 out.append({"kind": kind, "id": r["id"], "owner": r["owner"], "where": r["where_"] or "", "name": r["name"],
                             "size": r["size"], "disk": disk, "problem": "missing" if disk is None else "empty" if not disk else "size"})

@@ -126,6 +126,11 @@ def timeline(tid):
         | {x["reply"]["user_id"] for x in comments if x.get("reply")}
     seen = c.execute("SELECT seen_id FROM task_seen WHERE user_id=? AND task_id=?", (me(), tid)).fetchone()
     ag = agent_ids(c)
+    from .chatsave import chat_save_of  # 2.42.0 (#1383): an agent's comment I saved as a task
+    saved = chat_save_of(c, me(), "comment", [x["id"] for x in comments if x["user_id"] in ag])
+    for x in comments:
+        if x["id"] in saved:
+            x["saved_task_id"] = saved[x["id"]]
     ppl = task_people(c, t["list_id"]) if collab_all() else []
     for p in ppl:
         if p["id"] in ag:

@@ -327,6 +327,8 @@ def init_db(guard=True, load=None):
         c.execute("CREATE INDEX IF NOT EXISTS tasks_agroup ON tasks(assignee_group_id) WHERE assignee_group_id IS NOT NULL")
         c.execute("DROP INDEX IF EXISTS tasks_tt")  # tt_id is unique per user now (tasks_tt_user)
         c.executescript(TIME_TITLE_TRIGGER)
+        from ..tasks.delta import dl_setup
+        dl_setup(c)  # 2.42.0 (#1376): the change triggers of the delta state
         for stmt in INDEXES.strip().split(";"):
             if stmt.strip():
                 c.execute(stmt)
@@ -740,7 +742,10 @@ def uset(c, uid, key, value):
 
 
 def bump(c):
-    c.execute("UPDATE settings SET value=CAST(CAST(value AS BIGINT)+1 AS TEXT) WHERE key='version'")
+    r = c.execute("UPDATE settings SET value=CAST(CAST(value AS BIGINT)+1 AS TEXT) WHERE key='version' RETURNING value").fetchone()
+    if r:  # 2.42.0 (#1376): the task changes of this transaction belong to the new version (GET /api/state/delta)
+        from ..tasks.delta import dl_stamp
+        dl_stamp(c, int(r[0]))
     # 2.41.0 (#1376): a change counter per area besides the old total v (GET /api/version a): the app reloads and redraws only
     # what an area needs. The area comes from the request's route; outside a request (watchdog, imports in the background)
     # it is "other" (= everything, as before)

@@ -32,6 +32,7 @@ from ..core.config import app, OFFICE_DIR
 from ..core.i18n import N_, tr
 from ..core.db import bump, db, iso, now_utc
 from ..core.pg import write_lock
+from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_json_store, oc_log_detail
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from .model import office_gate, office_org, office_role, office_settings
@@ -110,7 +111,7 @@ def ofx_log(c, oid, action, target="doc", doc_id=None, detail=None, dedupe_min=0
         if c.execute(sql + " LIMIT 1", args).fetchone():
             return
     c.execute("INSERT INTO office_doc_log(org_id, doc_id, user_id, at, action, target, detail) VALUES(?,?,?,?,?,?,?)",
-              (oid, doc_id, uid, iso(at), action, target, _cap(detail)))
+              (oid, doc_id, uid, iso(at), action, target, oc_log_detail(c, oid, _cap(detail))))  # 2.42.0 (#828)
 
 
 def ofx_diff(before, after):
@@ -139,7 +140,7 @@ def ofx_items_brief(rows):
 
 
 def _log_public(c, r):
-    d = dict(r)
+    d = oc_dec_fields(c, r["org_id"], "office_doc_log", r)  # 2.42.0 (#828)
     try:
         d["detail"] = json.loads(d.get("detail") or "{}")
     except ValueError:
@@ -161,6 +162,7 @@ def ofx_log_rows(c, oid, doc_id=None, limit=100):
 # ---------------------------------------------------------------- company (structured)
 def ofx_company(c, oid):
     r = c.execute("SELECT * FROM office_company WHERE org_id=?", (oid,)).fetchone()
+    r = oc_dec_fields(c, oid, "office_company", r) if r else None  # 2.42.0 (#828): bank / tax fields encrypted at rest
     return {k: (r[k] if r else "") or "" for k in COMPANY_COLS}
 
 
@@ -209,6 +211,7 @@ def ofx_company_clean(v, cur):
 
 def ofx_company_save(c, oid, d):
     cols = list(COMPANY_COLS)
+    d = oc_enc_fields(c, oid, "office_company", {k: d.get(k) or "" for k in cols})  # 2.42.0 (#828)
     c.execute(f"INSERT INTO office_company(org_id, {', '.join(cols)}, updated_at) VALUES(?{', ?' * len(cols)}, ?) "
               f"ON CONFLICT(org_id) DO UPDATE SET {', '.join(k + '=excluded.' + k for k in cols)}, updated_at=excluded.updated_at",
               [oid] + [d.get(k) or "" for k in cols] + [iso(now_utc())])
@@ -334,8 +337,9 @@ def ofx_finalize(c, oid, uid, did):
     ts = iso(now_utc())
     c.execute("UPDATE office_docs SET locked_at=?, locked_by=?, sender=?, recipient_snapshot=?, tax_snapshot=?, pack_version=?, totals=?, "
               "updated_at=? WHERE id=? AND org_id=?",
-              (ts, uid, json.dumps(sender, ensure_ascii=False), json.dumps(rsnap, ensure_ascii=False), json.dumps(tsnap, ensure_ascii=False),
-               tsnap["version"], json.dumps(t, ensure_ascii=False), ts, did, oid))
+              (ts, uid, oc_enc_fields(c, oid, "office_docs", {"sender": json.dumps(sender, ensure_ascii=False)})["sender"],  # 2.42.0 (#828)
+               json.dumps(rsnap, ensure_ascii=False), json.dumps(tsnap, ensure_ascii=False),
+               tsnap["version"], json.dumps(oc_json_store(c, oid, "office_docs", "totals", t), ensure_ascii=False), ts, did, oid))
     ofx_log(c, oid, "finalize", doc_id=did, detail={"number": r["number"], "net": t.get("net"), "gross": t.get("gross"),
                                                      "pack_version": tsnap["version"], "logo_sha256": sha})
     if r["kind"] != "offer":  # 2.38.0: status issued, a credit note settles its invoice, the stored PDF / XML (F2)

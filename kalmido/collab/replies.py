@@ -77,6 +77,8 @@ def reply_quotes(c, art, ids):
                           "SELECT name FROM attachments WHERE comment_id=? ORDER BY id LIMIT 1", (i,)).fetchone()
             text = f["name"][:QUOTE_CHARS] if f else ""
         q = {"id": i, "deleted": False, "user_id": uid, "name": names.get(uid, ""), "text": text}
+        if art == "t" and r["enc"]:  # 2.42.0 (#909): an encrypted DM: the app shows the quote after decrypting it (or "encrypted")
+            q["enc"] = True
         if art == "a":
             q["from"] = r["sender"]
         out[i] = q

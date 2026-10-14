@@ -227,6 +227,7 @@ function accountHtml() {
     ${storageHtml()}
     ${wsPaneOn() ? (lmOrgPaneOn() ? lmOrgLinkHtml() : wsPaneHtml(t => `<div class="shint">${t}</div>`)) : ''}
     ${tfaHtml()}
+    ${e2eHtml()}${''/* 2.42.0 (#828, #909) */}
     ${apwHtml()}
     <details class="sdev"><summary>${ic('key', 's')}${tr('Advanced · for developers')}</summary>
     <div class="row"><label>${tr('Upload token')}</label><button class="btn sm" data-m="go-share">${ic('phone', 's')} ${tr('Share from your phone')}</button><span class="muted" style="font-size:var(--fs-s)">${tr('shown and renewed there')}</span></div>
@@ -366,9 +367,13 @@ async function wsPaneDraw(md) {
     ${o.role === 'admin' && j.manage ? `<div class="row wsadd"><input id="ws-add-${o.id}" type="email" placeholder="${esc(tr('Add by e-mail address'))}" aria-label="${esc(tr('Add by e-mail address'))}" autocomplete="off"><button class="btn sm" data-wsadd="${o.id}">${ic('plus', 's')} ${tr('Add')}</button></div>
     <div class="row"><label for="ws-name-${o.id}">${tr('Name')}</label><input id="ws-name-${o.id}" value="${esc(o.name)}" maxlength="60"><label for="ws-dom-${o.id}">${tr('E-mail domains')}</label><input id="ws-dom-${o.id}" value="${esc(o.domains || '')}" placeholder="example.com"><button class="btn sm" data-wssave="${o.id}">${tr('Save')}</button></div>` : ''}
     ${o.role === 'admin' ? `<div class="row"><button type="button" class="btn sm" data-oadm="${o.id}">${ic('list', 's')} ${tr('Lists of the organisation')}</button></div>` : ''}
+    ${o.role === 'admin' ? ocBoxHtml(o) : ''}${''/* 2.42.0 (#828): encryption + recovery key */}
+    ${o.role === 'admin' ? oxBoxHtml(o) : ''}
     ${o.role !== 'admin' || !j.manage ? `<div class="row"><button class="btn sm" data-wsrm="${S.me?.id}" data-oidx="${o.id}">${ic('logout', 's')} ${tr('Leave the organisation')}</button></div>` : ''}</details>`;
   box.innerHTML = (j.orgs.length ? j.orgs.map(org).join('') : `<div class="muted mhint">${tr('You belong to no organisation: everything is private.')}</div>`)
     + (mm ? `<div class="shint keep">${ic('alert', 's')} ${esc(trn('{0} list of yours has an agent of another workspace (from before the workspaces). Open the list’s Share dialog to take it out or keep it.', '{0} lists of yours have an agent of another workspace (from before the workspaces). Open the lists’ Share dialogs to take it out or keep it.', mm))}</div>` : '');
+  oxDraw(box);  // 2.42.0 (#833): the export sections of the organisations I administer
+  ocDraw(box);  // 2.42.0 (#828): their encryption sections
 }
 function wsPaneWire(md) {
   md.addEventListener('change', async e => {
@@ -661,6 +666,7 @@ async function inviteScreen(tok) {
 async function logout() {
   if (OUT.q.length && !await askConfirm(trn('{0} change is not synced yet and will be lost. Log out anyway?', '{0} changes are not synced yet and will be lost. Log out anyway?', OUT.q.length), '', {ok: tr('Log out'), danger: true})) return;
   await wpDisable().catch(() => {});  // this device stops getting the pushes of the account that logs out
+  await e2eForget();  // 2.42.0 (#828): keys remembered on this device go
   try { await fetch('/api/auth/logout', {method: 'POST', headers: {'X-Requested-With': 'kalmido'}}); } catch { /* offline */ }
   clearLocal(); location.replace('/');
 }
@@ -1095,7 +1101,7 @@ async function stoCheck(md) {
   box.innerHTML = !j.problems.length ? `<div class="muted mhint">${esc(trn('{0} file checked, all fine', '{0} files checked, all fine', j.checked))}</div>`
     : `<div class="mhint warn">${esc(trn('{0} damaged or missing file', '{0} damaged or missing files', j.problems.length))}</div><ul class="stol">${j.problems.map(p => `<li><b>${esc(p.name)}</b> <span class="muted">${esc(p.where)} · ${esc(tr(P[p.problem]))}</span>${p.kind === 'attachment' && p.owner ? ` <button class="linkbtn" data-act="open-id" data-id="${p.owner}">${tr('Open')}</button>` : ''}</li>`).join('')}</ul>`;
 }
-const bkHtml = () => `<h4 id="s-bk-h">${tr('Backups')}</h4><div id="s-bk"><div class="muted mhint">${tr('Loading…')}</div></div>`;
+const bkHtml = () => `<h4 id="s-bk-h">${tr('Backups')}</h4><div class="shint">${tr('The server key KALMIDO_SECRET_KEY is not part of a backup: keep it separately. A backup restores the encrypted organisation data only with that key (or with the organisations’ recovery keys).')}</div><div id="s-bk"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 const BK_KIND = {auto: N_('automatic'), manual: N_('manual'), safety: N_('before a restore')};
 const fmtBytes = n => n >= 1e9 ? (n / 1e9).toFixed(1) + ' GB' : n >= 1e6 ? (n / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round((n || 0) / 1e3)) + ' kB';
 async function bkDraw(md, j) {

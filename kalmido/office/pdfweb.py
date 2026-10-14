@@ -26,6 +26,7 @@ from ..core.i18n import tr
 from ..core.db import db, err
 from ..core.access import Denied
 from .model import office_gate, office_logo_set, office_org, office_settings
+from ..core.orgcrypt import oc_read_file, oc_write_file
 from .pdf import office_pdf
 from .einvoice import ein_build
 
@@ -175,9 +176,7 @@ def epdf_store(c, oid, did):
     for ext, data in (("pdf", pdf), ("xml", xml)):
         if data is None:
             continue
-        with open(stem + "." + ext + ".part", "wb") as fh:
-            fh.write(data)
-        os.replace(stem + "." + ext + ".part", stem + "." + ext)
+        oc_write_file(c, oid, stem + "." + ext, data)  # 2.42.0 (#828): sealed with the organisation's key at rest (tmp + replace)
         shas[ext] = hashlib.sha256(data).hexdigest()
     c.execute("UPDATE office_docs SET pdf_sha256=?, xml_sha256=? WHERE id=? AND org_id=?", (shas.get("pdf", ""), shas.get("xml", ""), did, oid))
     ofx_log(c, oid, "store", doc_id=did, detail={"pdf_sha256": shas.get("pdf", ""), "xml_sha256": shas.get("xml", ""), "format": fmt,
@@ -194,11 +193,9 @@ def epdf_doc_files(c, oid, did):
     out = []
     p, x = _stored_or_missing(c, oid, r, "pdf"), _stored_or_missing(c, oid, r, "xml")
     if p:
-        with open(p, "rb") as fh:
-            out.append((name + ".pdf", fh.read(), "application/pdf"))
+        out.append((name + ".pdf", oc_read_file(c, p), "application/pdf"))  # 2.42.0 (#828): decrypted
         if x:
-            with open(x, "rb") as fh:
-                out.append((name + ".xml", fh.read(), "application/xml"))
+            out.append((name + ".xml", oc_read_file(c, x), "application/xml"))
         return out
     pdf, xml, _fmt = _render(c, oid, r)
     out.append((name + ".pdf", pdf, "application/pdf"))
@@ -227,8 +224,7 @@ def opdf_doc_pdf(did):
     c.commit()
     p = _stored_or_missing(c, oid, r, "pdf")
     if p:
-        with open(p, "rb") as fh:
-            data = fh.read()
+        data = oc_read_file(c, p)  # 2.42.0 (#828): the stored PDF/A-3 is sealed at rest, served as the original
     else:
         data = _render(c, oid, r)[0]
     return _file_response(data, epdf_name(r) + ".pdf", "application/pdf", inline=request.args.get("inline") == "1")
@@ -248,8 +244,7 @@ def opdf_doc_xml(did):
     c.commit()
     x = _stored_or_missing(c, oid, r, "xml")
     if x:
-        with open(x, "rb") as fh:
-            data = fh.read()
+        data = oc_read_file(c, x)  # 2.42.0 (#828)
     else:
         data = _render(c, oid, r)[1]
     return _file_response(data, epdf_name(r) + ".xml", "application/xml")

@@ -27,6 +27,7 @@ TABLES = (
     "office_numbers", "office_payments", "office_services", "office_sets", "office_settings", "office_texts",
     "office_import_runs", "office_archive",  # 2.39.1 (#1182)
     "office_client_contacts",  # 2.40.0 (#1380): contact persons of a client (org_id like the client)
+    "org_keys",  # 2.42.0 (#828): the wrapped key of an organisation (read and written by core/orgcrypt.py as "system")
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"

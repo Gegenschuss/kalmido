@@ -64,10 +64,12 @@ def load_tasks(c, where, args=(), full_snips=False):
     ltags = ltags_for(c, ids) if ids else {}
     atts = {}  # the task's own files; files of comments are shown inside their comment (timeline)
     # 2.30.0 (#380): agent = the name of the agent that stored the file ("Created by agent" in the app), else absent
-    for a in c.execute("""SELECT a.id, a.task_id, a.name, a.mime, a.size, a.created_at, u.kind, u.display_name, u.username
+    for a in c.execute("""SELECT a.id, a.task_id, a.name, a.mime, a.size, a.created_at, u.kind, u.display_name, u.username, a.enc, a.enc_by
                           FROM attachments a LEFT JOIN users u ON u.id=a.user_id WHERE a.comment_id IS NULL ORDER BY a.id"""):
         if a["task_id"] in ids:
             d = {k: a[k] for k in ("id", "name", "mime", "size", "created_at")}
+            if a["enc"]:  # 2.42.0 (#828): encrypted in the browser; mine = I uploaded it (only I can open it)
+                d.update(enc=True, enc_mine=bool(viewer) and a["enc_by"] == viewer)
             if a["kind"] == "agent":
                 d["agent"] = a["display_name"] or a["username"]
             atts.setdefault(a["task_id"], []).append(d)
@@ -113,6 +115,8 @@ def load_tasks(c, where, args=(), full_snips=False):
                 aiu[r["task_id"]] = {"tokens": r["tok"] or 0, "cost": round(r["cost"], 4) if r["cost"] is not None else None,
                                      "calls": r["n"]}
     gcode = git_code_for(c, ids) if ids else {}  # 2.2.0 (#271): linked pull requests + commits
+    from ..collab.e2e import e2e_note_flags
+    encn = e2e_note_flags(c, ids, viewer)  # 2.42.0 (#828): tasks with an encrypted note (never its content)
     ppl = people_of(c, ids)  # 2.19.0 (#653): who comes along
     out = []
     for r in rows:
@@ -121,6 +125,10 @@ def load_tasks(c, where, args=(), full_snips=False):
         if r["id"] in gcode and r["id"] not in ctx:
             d["code"] = gcode[r["id"]]
         d["attachments"] = atts.get(r["id"], [])
+        if r["id"] in encn and r["id"] not in ctx:
+            d["encrypted_note"] = True
+            if encn[r["id"]]:
+                d["encrypted_note_mine"] = True
         d["comment_count"], d["unread"], apv = cms.get(r["id"], (0, 0, 0))
         if apv:
             d["approvals_open"] = apv  # 2.41.0 (#1383)

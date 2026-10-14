@@ -3,14 +3,15 @@ import mimetypes
 import os
 import re
 import uuid
-from flask import g, has_request_context, jsonify, request, send_file
+from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app, ATT_DIR, INLINE_TYPES, MAX_FILE_MB
 from ..core.i18n import tr
-from ..core.db import bump, db, err, iso, now_utc
+from ..core.db import bump, db, err, insert_id, iso, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, MANAGE_ROLES, need_task
 from ..core.serializers import unlink_files
+from ..core.orgcrypt import oc_plain_size, oc_seal_path, oc_send_file, oc_task_org
 from ..tasks.validation import log_act
 from ..tasks.tasks import one_task
 
@@ -66,9 +67,9 @@ def attachment_upload(tid):
     return jsonify(one_task(c, tid))
 
 
-def save_attachments(c, tid, files, comment_id=None, saved=None, uid=None):
+def save_attachments(c, tid, files, comment_id=None, saved=None, uid=None, ids=None):
     """Store uploaded werkzeug files for a task (or one of its comments). Returns an error message or
-    None (caller commits; on an error the caller rolls back and unlinks `saved`)."""
+    None (caller commits; on an error the caller rolls back and unlinks `saved`). `ids` (a list) gets the new row ids."""
     from ..notify.alerts import aa_count, aa_oserr
     from ..admin.hosting import quota_guard
     if uid is None:  # the uploader: the signed-in person (/drop passes the token's owner)
@@ -81,6 +82,7 @@ def save_attachments(c, tid, files, comment_id=None, saved=None, uid=None):
         raise
     ts = iso(now_utc())
     agent = uploader_is_agent(c, uid)  # 2.30.0 (#380)
+    org = None
     for f in files:
         name = safe_name(f.filename)
         unexec = agent and unexec_name(name) != name
@@ -102,10 +104,17 @@ def save_attachments(c, tid, files, comment_id=None, saved=None, uid=None):
             return tr("{0}: the file is empty and was not uploaded", name)
         if saved is not None:
             saved.append(rel)
+        if org is None:
+            org = oc_task_org(c, tid) or 0
+        oc_seal_path(c, org, full)  # 2.42.0 (#828): a file of an organisation's list is sealed with its key at rest
         mime = "text/plain" if unexec else (f.mimetype if f.mimetype and f.mimetype != "application/octet-stream" else None) \
             or mimetypes.guess_type(name)[0] or "application/octet-stream"
-        c.execute("INSERT INTO attachments(task_id,name,mime,size,path,created_at,comment_id,user_id) VALUES(?,?,?,?,?,?,?,?)",
-                  (tid, name, mime, size, rel, ts, comment_id, uid))
+        ins = ("INSERT INTO attachments(task_id,name,mime,size,path,created_at,comment_id,user_id) VALUES(?,?,?,?,?,?,?,?)",
+               (tid, name, mime, size, rel, ts, comment_id, uid))
+        if ids is not None:
+            ids.append(insert_id(c, *ins))  # 2.42.0 (#828): the caller marks exactly its own rows
+        else:
+            c.execute(*ins)
     if comment_id is None:
         c.execute("UPDATE tasks SET updated_at=? WHERE id=?", (ts, tid))
     return None
@@ -187,6 +196,9 @@ def need_attachment(c, aid, write):
     a = c.execute("SELECT * FROM attachments WHERE id=?", (aid,)).fetchone()
     if not a:
         raise Denied(404)
+    if not write:  # 2.42.0 (#828): an encrypted file only for its uploader (never for agents)
+        from ..collab.e2e import e2e_att_guard
+        e2e_att_guard(a)
     if a["comment_id"] is None:
         need_task(c, a["task_id"], write, full=True)
         return a
@@ -208,15 +220,16 @@ def send_stored(a):
     """A stored file (row with id, path, name, mime, size: task / comment attachments, 2.13.1 chat files) for the browser or an
     API client: images / pdf / text inline (?dl=1: download) in a sandbox CSP, a damaged file as 410, versioned caching."""
     full = os.path.join(ATT_DIR, a["path"])
-    if not os.path.isfile(full) or (a["size"] and os.path.getsize(full) != a["size"]):  # 2.13.0: also empty / cut off
+    # 2.42.0 (#828): a sealed file is compared by its plain size
+    if not os.path.isfile(full) or (a["size"] and oc_plain_size(full) != a["size"]):  # 2.13.0: also empty / cut off
         if os.path.isfile(full):
-            print(f"WARNING file {a['id']}: {os.path.getsize(full)} bytes on disk, {a['size']} recorded", flush=True)
+            print(f"WARNING file {a['id']}: {oc_plain_size(full)} bytes on disk, {a['size']} recorded", flush=True)
         e = err(tr("File damaged or missing"), 410 if os.path.isfile(full) else 404)
         e[0].headers["Cache-Control"] = "no-store"  # never cache a broken answer
         return e
     inline = a["mime"] in INLINE_TYPES and request.args.get("dl") != "1"
-    resp = send_file(full, mimetype=a["mime"] if inline else "application/octet-stream",
-                     as_attachment=not inline, download_name=a["name"], conditional=True, max_age=0)
+    resp = oc_send_file(db(), full, mimetype=a["mime"] if inline else "application/octet-stream",  # 2.42.0 (#828): sealed -> decrypted
+                        as_attachment=not inline, download_name=a["name"], conditional=True, max_age=0)
     if a["mime"] != "application/pdf":  # the browser pdf viewer does not run inside a sandboxed CSP
         resp.headers["Content-Security-Policy"] = "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox"
     # 2.13.0: the app asks with ?v=<size>: only that versioned address is cached for a day; anything else revalidates

@@ -218,6 +218,7 @@ def state():
     from ..tasks.mineorder import mt_mine_hidden, vw_mine_order
     c = db()
     uid = me()
+    v0 = int(gsetting(c, "version"))  # 2.42.0 (#1376): before the tasks: they are at least this new (the delta starts here)
     s = usettings(c, uid)
     cutoff = iso(now_utc() - timedelta(days=14))
     # checklist lists (package B): every done item stays (the "Done" section is the reusable part of such a list)
@@ -238,7 +239,7 @@ def state():
     u = g.user
     nitems = news_items(c, uid, s)[0]
     return jsonify(
-        v=int(gsetting(c, "version")),
+        v=v0,
         me={**user_public(u), "orgs": _org_names(c, u["id"]), "is_admin": bool(u["is_admin"]), "auth": g.auth_via, "has_password": bool(u["password_hash"]),
             "ntfy_inbox": bool(NTFY_IN["token"]) and inbox_user(c) == uid,
             "workspaces": workspaces_for(c, uid)},  # 2.28.0 (#935): my organisations [{id, name, icon, role}]
