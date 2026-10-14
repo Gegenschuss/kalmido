@@ -40,12 +40,13 @@ def sess(user, pw="password123"):
     return s
 
 
-def vcards(n, photos=False, prefix="lv"):
-    """n invented contacts (fictional names, example.com addresses); photos: ~12 kB of random bytes each."""
+def vcards(n, photos=False, prefix="lv", photo_bytes=1500):
+    """n invented contacts (fictional names, example.com addresses); photos: random bytes (photo_bytes each; the test server
+    takes at most 4 MB per request, TASKS_MAX_FILE_MB=1: 1.5 kB photos keep 1,300 cards below it)."""
     rnd = random.Random(7)
     giv = ["Anna", "Ben", "Clara", "Dario", "Eva", "Finn", "Greta", "Hugo", "Ida", "Jon"]
     fam = ["Muster", "Beispiel", "Probe", "Testmann", "Fiktiv", "Erfunden"]
-    ph = base64.b64encode(bytes(rnd.getrandbits(8) for _ in range(9000))).decode() if photos else ""
+    ph = base64.b64encode(bytes(rnd.getrandbits(8) for _ in range(photo_bytes))).decode() if photos else ""
     out = []
     for i in range(n):
         g, f = giv[i % len(giv)], fam[i % len(fam)]
