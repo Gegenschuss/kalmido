@@ -183,7 +183,8 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   click(w, d.querySelector('#mbar [data-act="mb-menu"]')); await sleep(100);
   const mm = [...d.querySelectorAll('#pop [role="menuitem"]')].map(b => b.textContent);
   // 2.39.0 (#1151): this list has a tidy agent, so More also offers "Tidy up…" for the selected tasks
-  check(mm.join('|') === 'Edit|Select all|Tidy up…|Delete', 'A14 (2.26.0) / #1055: from two tasks More offers "Edit" (the panel as a sheet): ' + mm.join('|'));
+  // 2.43.0 (#1003): and "Subtasks of…" (the selection under another task)
+  check(mm.join('|') === 'Edit|Subtasks of…|Select all|Tidy up…|Delete', 'A14 (2.26.0) / #1055: from two tasks More offers "Edit" (the panel as a sheet): ' + mm.join('|'));
   closeAll(w); w.eval('S.multi.clear(); S.multiMode = false; render()');
   w.eval(`openQuickSheet('Call Bob tomorrow 10:00')`); await sleep(100);
   check(d.body.classList.contains('qsheet-open'), 'P8: the + button hides behind the add sheet');
