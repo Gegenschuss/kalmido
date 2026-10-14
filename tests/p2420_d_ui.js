@@ -53,16 +53,19 @@ const call = async (ck, method, url, body, h = {}) => { const r = await fetch(B 
     };
     const before = await measure(true, 'old');
     check(await ready(`/Delta task old 2/.test(document.querySelector('#view [data-id="${T[3]}"]')?.textContent || '')`, 20), '#1376: the old way shows the change');
-    // marks: an unchanged row, the sidebar
-    await ev(`(() => { document.querySelector('#view [data-id="${T[1]}"]').__keep = 1; const s = document.querySelector('#side .srow, #side button'); if (s) s.__keep = 1; return 1; })()`);
     const after = await measure(false, 'new');
     console.log(`PERF #1376 3 task changes + 3 comments of an agent in 20 s, list open: old way ${before.r} render() / ${before.st} state loads / ${Math.round(before.b / 1024)} kB; delta ${after.r} render() / ${after.st} state loads + ${after.dl} deltas / ${Math.round(after.b / 1024)} kB`);
     check(after.dl >= 2 && after.r < before.r && after.b < before.b, '#1376: the delta: fewer render() calls and bytes ' + JSON.stringify({before, after}));
     check(await ready(`/Delta task new 2/.test(document.querySelector('#view [data-id="${T[3]}"]')?.textContent || '')`, 20), '#1376: the changed row shows the new title');
+    // only task changes (no comments: those move news / sidebar badges by design): marks on an unchanged row and the sidebar
+    await sleep(16000);  // a bundled follow-up of the comments above is done
+    await ev(`(() => { document.querySelector('#view [data-id="${T[1]}"]').__keep = 1; const s = document.querySelector('#side .srow, #side button'); if (s) s.__keep = 1; Object.assign(window.__lp, {r: 0, side: 0, st: 0, dl: 0, b: 0}); return 1; })()`);
+    for (let i = 0; i < 2; i++) { await agPatch(T[3], {title: `Delta task only ${i}`}); await sleep(5000); }
+    const only = await ev(`({...window.__lp})`);
+    check(await ready(`/Delta task only 1/.test(document.querySelector('#view [data-id="${T[3]}"]')?.textContent || '')`, 20), '#1376: the changed row shows the new title (only task changes)');
+    check(only.dl >= 1 && only.r === 0 && only.st === 0, '#1376: task changes come as deltas, no render(), no state load ' + JSON.stringify(only));
     check(await ev(`document.querySelector('#view [data-id="${T[1]}"]')?.__keep === 1`), '#1376: an unchanged row keeps its node (only the changed row is redrawn)');
-    check(await ev(`(document.querySelector('#side .srow, #side button')?.__keep === 1)`), '#1376: the sidebar keeps its nodes');
-    const sideNoTasks = await ev(`window.__lp.side`);
-    check(after.side <= 1 && sideNoTasks <= 1, '#1376: the sidebar is not redrawn for a title change ' + JSON.stringify(after));
+    check(await ev(`(document.querySelector('#side .srow, #side button')?.__keep === 1)`) && only.side === 0, '#1376: the sidebar is not redrawn for a title change ' + JSON.stringify(only));
     // a half-filled form: the data comes, the input stays, the view waits
     await ev(`(() => { const f = document.createElement('form'); f.dataset.fg = 'dl-test'; f.id = 'dlform'; f.innerHTML = '<input id="dlf" value="">'; document.querySelector('#view').appendChild(f); const i = f.querySelector('input'); i.value = 'half filled'; i.dispatchEvent(new Event('input', {bubbles: true})); window.__lp.r = 0; window.__lp.dl = 0; return 1; })()`);
     await agPatch(T[0], {title: 'Alpha changed while typing'});
@@ -70,8 +73,8 @@ const call = async (ck, method, url, body, h = {}) => { const r = await fetch(B 
     check(await ev(`document.querySelector('#dlf')?.value === 'half filled' && S.viewStale === true && window.__lp.r === 0`), '#1376: the input stays, nothing is redrawn');
     await ev(`(() => { fgDone('dl-test'); document.querySelector('#dlform')?.remove(); return 1; })()`);
     check(await ready(`!S.viewStale && /Alpha changed while typing/.test(document.querySelector('#view [data-id="${T[0]}"]')?.textContent || '')`, 30), '#1376: afterwards the view follows');
-    // a deletion by the agent: the row goes
-    await call(null, 'DELETE', `/api/v1/tasks/${T[2]}`, null, AGH);
+    // a deletion (another device of the person): the row goes
+    await call(CA, 'DELETE', `/api/tasks/${T[2]}`);
     check(await ready(`!S.tasks.has(${T[2]}) && !document.querySelector('#view [data-id="${T[2]}"]')`, 40), '#1376: a deleted task leaves the list');
     await shot('p2420d-delta.png');
     S1383: {
