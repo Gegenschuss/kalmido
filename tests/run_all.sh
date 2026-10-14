@@ -619,6 +619,7 @@ fresh; run p2410_d_ui node p2410_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.41.0 part C: #1420 one Share dialog for folders (several agents, public links, ownership), #1423 folder settings like a list's, #1428 share symbols on folders
 fresh; run p2410_c_api "$PY" p2410_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2410_c_ui node p2410_c_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2412_ui node p2412_ui.js "$KALMIDO_TEST_DATA"  # 2.41.2 (#1501): the UI answers at once
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
