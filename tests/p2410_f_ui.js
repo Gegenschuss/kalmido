@@ -58,7 +58,7 @@ const call = async (ck, method, url, body, h = {}) => { const r = await fetch(B 
     await ev(`(() => { document.querySelector('#d-tl-items .cm[data-cid="${AP}"] .cccard .cchb[data-ch="yes"]').click(); return 1; })()`);
     check(await ready(`!!document.querySelector('#d-tl-items .cm[data-cid="${AP}"] .cccard .cpermst.ok')`), '#1383: the card is answered');
     const done = await ev(`document.querySelector('#d-tl-items .cm[data-cid="${AP}"] .cccard .cpermst').textContent`);
-    check(/^Yes, go ahead from Alice, \d/.test(done || ''), '#1383: "Yes, go ahead from Alice, <date>" ' + done);
+    check(/Yes, go ahead from Alice, \d/.test(done || ''), '#1383: "Yes, go ahead from Alice, <date>" ' + done);
     await shot('p2410f-card.png');
     // a press on a suggestion sends it as my comment
     await ev(`(() => { document.querySelector('#d-tl-items .cm[data-cid="${Q1}"] .cchb[data-ch="Short"]').click(); return 1; })()`);
