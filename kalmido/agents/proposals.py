@@ -36,7 +36,7 @@ from ..agents.core import (
 from ..collab.reactions import clean_suggestion, tidy_apply
 from ..agents.chat import (
     chat_delivered, chat_dict, chat_file_access, chat_newest, chat_file_delete, chat_files_of, chat_input, chat_one, chat_post,
-    chat_react_req, chat_reactions_of, chat_unlink_trimmed, APPROVAL_PUSH_HOUR,
+    chat_react_req, chat_reactions_of, chat_unlink_trimmed, cx_notice_post, APPROVAL_PUSH_HOUR,
 )
 
 
@@ -1015,13 +1015,23 @@ def v1_agent_chat_post(uid):
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if not u or is_agent(u) or not agent_shares(c, aid, uid):
         raise Denied(404)
-    fb, files = chat_input(("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "reply_to", "approval", "offer_save"))
+    fb, files = chat_input(("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "reply_to", "approval", "offer_save", "kind"))
     b = fb if fb is not None else v1_json()
     # 2.28.0 (#1005): answer buttons; 2.30.0 (#1041): permission questions (permission, expires_in)
     unknown = sorted(k for k in b if k not in ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "reply_to",
-                                               "approval", "offer_save"))  # 2.33.0: reply_to; 2.35.0 (#1103): approval; 2.37.0 (#1159): offer_save
+                                               "approval", "offer_save", "kind"))  # 2.33.0: reply_to; 2.35.0 (#1103): approval; 2.37.0 (#1159): offer_save
     if unknown:
         raise UnknownFields(unknown)
+    # 2.41.0 (#1206): kind = message (default) | notice (a small grey line, no push, never unread; older servers answer 400)
+    if b.get("kind") not in (None, "", "message", "notice"):
+        raise BadInput(tr("Invalid value: {0}", "kind"))
+    if b.get("kind") == "notice":
+        r = cx_notice_post(c, aid, uid, b, files)
+        bump(c)
+        c.commit()
+        chat_unlink_trimmed()
+        return jsonify(chat_one(c, r, api=True)), 201
+    b.pop("kind", None)
     # 2.37.0 (#1159): offer_save: true = the button "Save as task" under the message; the person saves (POST /api/chat-save),
     # the agent never does
     offer = b.pop("offer_save", None)

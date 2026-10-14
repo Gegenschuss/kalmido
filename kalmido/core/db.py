@@ -384,6 +384,14 @@ def init_db(guard=True, load=None):
             gset(c, "migr_kind272", "1")
             if n:
                 print("list types:", n, "checklists became lists with 'Show completed at the bottom'", flush=True)
+        # 2.41.0 (#1471), once: time tracking became a switch of each list (default off); every list that already holds time
+        # entries gets it on, so no list loses its timer or its tracked time
+        if gsetting(c, "migr_time241") != "1":
+            n = c.execute("UPDATE lists SET time_tracking=1 WHERE time_tracking=0 AND id IN "
+                          "(SELECT DISTINCT list_id FROM time_entries WHERE list_id IS NOT NULL)").rowcount
+            gset(c, "migr_time241", "1")
+            if n:
+                print("time tracking:", n, "lists with time entries keep it (switched on)", flush=True)
         # features_rev 8: the setup's default modules (from before 1.2) get "deps" / "fields" like the users below
         dfs = gsetting(c, "default_features")
         if dfs and gsetting(c, "migr_feat8") != "1":
@@ -560,6 +568,12 @@ def init_db(guard=True, load=None):
         n = ms_migrate(c)
         if n:
             print("milestones:", n, "milestones of project overviews became milestone tasks", flush=True)
+        # 2.41.0 (#1420): a folder's default agent (folder_props) is also its first agent in folder_agents; every start
+        # (a 2.40 that ran on this database after a rollback may have changed it), additive only
+        from ..lists.foldershare import sh_folder_agents_sync
+        n = sh_folder_agents_sync(c)
+        if n:
+            print("folders: took over", n, "folder agent(s)", flush=True)
         if gsetting(c, "migr_auditfix") != "1":  # security audit 2026-09-28, one-shot
             n = c.execute("UPDATE users SET paperless_access=1 WHERE is_admin=1 AND paperless_access=0").rowcount
             counts = repair_data(c)
@@ -727,6 +741,41 @@ def uset(c, uid, key, value):
 
 def bump(c):
     c.execute("UPDATE settings SET value=CAST(CAST(value AS BIGINT)+1 AS TEXT) WHERE key='version'")
+    # 2.41.0 (#1376): a change counter per area besides the old total v (GET /api/version a): the app reloads and redraws only
+    # what an area needs. The area comes from the request's route; outside a request (watchdog, imports in the background)
+    # it is "other" (= everything, as before)
+    c.execute("INSERT INTO settings(key,value) VALUES(?, '1') ON CONFLICT(key) DO UPDATE SET value=CAST(CAST(settings.value AS BIGINT)+1 AS TEXT)",
+              ("version:" + lv_area(),))
+
+
+# 2.41.0 (#1376): route -> area (first match wins). Reactions / apply / decide on comments may change the task: not "comments".
+LV_AREAS = (
+    ("comments", re.compile(r"^/api/(v1/)?(tasks/\d+/comments$|comments/\d+(/choice|/withdraw)?$)")),
+    ("agentchat", re.compile(r"^/api/(agents/\d+/chat|v1/agent/chats|v1/agents/\d+/chat)")),
+    ("team", re.compile(r"^/api/(v1/)?team")),
+    ("office", re.compile(r"^/api/(v1/)?(office|clients)")),
+    ("calendar", re.compile(r"^/api/(v1/)?(events|evcals|cal/|calendars)")),
+    ("news", re.compile(r"^/api/(v1/)?news")),
+    ("tasks", re.compile(r"^/api/(v1/)?(tasks|lists|sections|folders|batch|projects|tags)")),
+)
+LV_AREA_KEYS = tuple(k for k, _ in LV_AREAS) + ("other",)
+
+
+def lv_area():
+    if not has_request_context():
+        return "other"
+    p = request.path
+    return next((k for k, rx in LV_AREAS if rx.match(p)), "other")
+
+
+def lv_versions(c):
+    """{area: counter} of every area (0 = never changed)."""
+    out = dict.fromkeys(LV_AREA_KEYS, 0)
+    for r in c.execute("SELECT key, value FROM settings WHERE key LIKE 'version:%'"):
+        k = r[0][8:]
+        if k in out:
+            out[k] = int(r[1])
+    return out
 
 
 def err(msg, code=400):

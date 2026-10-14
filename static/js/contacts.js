@@ -232,23 +232,63 @@ function ctImport(bookId) {
   const run = async bid => {
     const inp = document.createElement('input');
     inp.type = 'file'; inp.accept = '.vcf,text/vcard,text/x-vcard';
-    inp.onchange = async () => {
-      const f = inp.files[0]; if (!f) return;
-      const fd = new FormData(); fd.append('file', f);
-      try {
-        const r = await fetch(`/api/books/${bid}/import`, {method: 'POST', body: fd, headers: {'X-Requested-With': 'kalmido'}, credentials: 'same-origin'});
-        const j = await r.json();
-        if (!r.ok) { toast(j.error || tr('Import failed')); return; }
-        toast(tr('Imported: {0} new, {1} updated', j.created, j.updated) + (j.errors ? ' · ' + trn('{0} not readable', '{0} not readable', j.errors) : ''), null, 6000);
-        await load().catch(() => {}); ctLoad();
-      } catch { toast(tr('Import failed')); }
-    };
+    inp.onchange = () => { const f = inp.files[0]; if (f) ctImpRun(bid, f); };
     inp.click();
   };
   if (bookId) { run(bookId); return; }
   if (books.length === 1) { run(books[0].id); return; }
   if (!books.length) { api('POST', '/api/books', {name: tr('Contacts'), org_id: wsDefaultOrg()}).then(async b => { await load(); run(b.id); }).catch(() => {}); return; }
   menu($('#view [data-ct="menu"]') || $('#view'), books.map(b => ({label: tr('Into {0}', b.name), icon: 'folder', fn: () => run(b.id)})));
+}
+// 2.41.0 (#1437): the import shows "Import running ..." at once with its progress (upload, then the cards stored in the
+// background) and always ends with a message that stays until it is closed (no 6-second toast): new / updated / not readable,
+// or what went wrong. A large file is imported in the background (?background=1 -> import id, GET /api/books/imports/<id>).
+function ctImpPanel() {
+  let el = $('#ctimp');
+  if (!el) {
+    el = document.createElement('div'); el.id = 'ctimp'; el.className = 'ctimp'; el.setAttribute('role', 'status');
+    el.innerHTML = '<div class="ctimp-t"></div><div class="pbar"><i></i></div><button class="iconbtn" data-ctimp="close" hidden></button>';
+    document.body.appendChild(el);
+    const x = el.querySelector('[data-ctimp="close"]'); x.innerHTML = ic('x'); x.setAttribute('aria-label', tr('Close')); x.title = tr('Close');
+    x.onclick = () => el.remove();
+  }
+  const set = (text, frac, end) => {
+    el.querySelector('.ctimp-t').textContent = text;
+    const bar = el.querySelector('.pbar'); bar.hidden = frac == null; if (frac != null) bar.firstChild.style.width = Math.round(Math.min(1, frac) * 100) + '%';
+    el.querySelector('[data-ctimp="close"]').hidden = !end; el.classList.toggle('done', !!end);
+    if (end) announce(text);
+  };
+  return {el, set};
+}
+function ctImpRun(bid, f) {
+  const p = ctImpPanel();
+  const done = async j => {
+    p.set(tr('Imported: {0} new, {1} updated', j.created, j.updated) + (j.errors ? ' · ' + trn('{0} not readable', '{0} not readable', j.errors) : ''), null, true);
+    await load().catch(() => {}); ctLoad();
+  };
+  const fail = msg => p.set(tr('Import failed') + (msg ? ': ' + msg : ''), null, true);
+  p.set(tr('Import running…'), 0);
+  const x = new XMLHttpRequest();
+  x.open('POST', `/api/books/${bid}/import?background=1`); x.setRequestHeader('X-Requested-With', 'kalmido'); x.withCredentials = true;
+  x.upload.onprogress = e => { if (e.lengthComputable) p.set(tr('Import running…') + ' ' + tr('Uploading {0} %', Math.round(e.loaded / e.total * 100)), e.loaded / e.total * .3); };
+  x.onerror = () => fail(tr('The connection was interrupted'));
+  x.onload = async () => {
+    let j = {}; try { j = JSON.parse(x.responseText); } catch {}
+    // 2.41.0 (#1437): 413 from a proxy in front comes without JSON -> still say why
+    if (x.status >= 400) { fail(j.error || (x.status === 413 ? tr('File too large') : '')); return; }
+    if (!j.import_id) { await done(j); return; }  // small file: answered at once
+    let misses = 0;
+    for (;;) {
+      await new Promise(r => setTimeout(r, 1000));
+      let st;
+      try { st = await rawFetch('GET', `/api/books/imports/${encodeURIComponent(j.import_id)}`); misses = 0; }
+      catch { if (++misses >= 30) { fail(tr('The connection was interrupted')); return; } continue; }
+      if (st.state === 'done') { await done(st); return; }
+      if (st.state === 'failed') { fail(st.error); if (st.created || st.updated) load().catch(() => {}); return; }
+      p.set(tr('Import running…') + ' ' + tr('{0} of {1} contacts', st.done, st.total), .3 + .7 * (st.total ? st.done / st.total : 0));
+    }
+  };
+  x.send((() => { const fd = new FormData(); fd.append('file', f); return fd; })());
 }
 async function ctBooksModal() {
   let users = [];

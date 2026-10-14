@@ -18,6 +18,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.41.0** (2026-10-14): **folders show and manage who they are shared with** (people, groups and several agents in one
+  Share dialog, folder settings that work like a list's), **My tasks** can leave lists out, **time tracking is a switch
+  per list**, recent *Waiting on* entries, chat messages **copy with formatting**, **approval cards in comments** and
+  notices in the agent chat, large **vCard imports** in the background, lighter live updates, a CLA for contributions.
 - **2.40.0** (2026-10-14): Office & finance for **everyday invoicing**: several contacts per client, a country picker,
   document texts that follow the language, Producing as an option, explained settings and number schemes, unsaved input
   is kept, invoice and reminder fixes; **favourite lists**, your **own order in My tasks**, Markdown in task titles,
@@ -1321,6 +1325,7 @@ a project agent: [docs/AGENTS.md](docs/AGENTS.md#coding-agent-workflow).
 ## Time tracking
 
 A module (on by default, *Settings > Modules*) for tracking the time you spend on tasks, for yourself or to bill a client.
+Since 2.41.0 each list switches it on in its settings (*Track time in this list*, off by default, any list type).
 Admins can turn it off for everyone (*Settings > Modules*, *for everyone* next to *Time tracking*): the module
 disappears for all users, the time endpoints answer 403, timers running at that moment are stopped (the entries
 are kept), focus sessions no longer become time entries and no timer reminders go out. Switched back on, all
@@ -1381,11 +1386,12 @@ the task has `"type": "bug" | "feature" | "task" | null`; `GET /api/v1/tasks?typ
 For lists that are projects rather than to-do piles. Set the list's **type** to *Project* (list dialog, the list's
 … menu or right-click in the sidebar): only project lists get dependencies (and the Gantt arrows; 2.41.0: time tracking
 is a switch of its own per list, `time_tracking`, off by default),
-custom fields and progress / status, so a shopping list or a household list never shows timers or fields. The
+custom fields and progress / status, so a shopping list or a household list never shows fields. The
 modules below stay the outer switch: a feature shows when its module is on **and** the list is a project. Switching a
-list back to *List* only hides these things (nothing is deleted; its tracked time is left out of reports until it is
-a project again). The server refuses a timer, a time entry, a dependency, a custom field value or a status on a
-non-project list with a clear message. Lists that already had dependencies, custom fields, a status or at least five
+list back to *List* only hides these things (nothing is deleted). The server refuses a dependency, a custom field value
+or a status on a non-project list with a clear message. Time tracking (2.41.0) has its own switch in the list settings
+for every list type (*Track time in this list*, off by default; lists with time entries got it on with the update):
+without it the server refuses a timer or a new time entry, tracked time stays in the review and reports. Lists that already had dependencies, custom fields, a status or at least five
 minutes of tracked time became projects with the update; checklists stayed checklists. Each person can hide a project's progress bar with the
 small **×** next to it (*Show progress* in the list's … menu or the list dialog brings it back).
 

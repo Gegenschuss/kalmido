@@ -8,6 +8,7 @@
 // are documented at the top of kalmido/personal/timetrack.py. Start / stop carry the device time and a client
 // id, so they can wait in the offline outbox and still land at the right time.
 const timeOn = () => feat('time') && S.timeAll !== false;  // own switch + the admin's switch for the whole server
+const mtTime = lid => !!listById(lid)?.time_tracking;  // 2.41.0 (#1471): the list's own switch "Time tracking" (any type, default off)
 const hmm = s => { s = Math.max(0, Math.round(s)); return `${Math.floor(s / 3600)}:${pad(Math.floor(s % 3600 / 60))}`; };
 const fmtDur = s => fmtH(Math.floor(Math.max(0, s) / 60));
 const fmtClock = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -164,7 +165,7 @@ function parseDur(v) {
   return isNaN(f) || f <= 0 ? null : Math.round(f * 60);
 }
 function targetOptions(tid, lid) {
-  const lists = S.lists.filter(l => (l.kind === 'project' || l.id === lid) && (!l.archived || l.id === lid || (tid && taskById(tid)?.list_id === l.id)));
+  const lists = S.lists.filter(l => (mtTime(l.id) || l.id === lid) && (!l.archived || l.id === lid || (tid && taskById(tid)?.list_id === l.id)));
   const cur = tid && taskById(tid);
   return lists.map(l => {
     const ts = sortTasks(openTasks().filter(t => t.list_id === l.id && !t.parent_id));
@@ -176,7 +177,7 @@ function targetOptions(tid, lid) {
 // new entry (e = null; preset {task_id} | {list_id}) or edit my entry (a running timer: start time, note, task)
 function entryModal(e, preset = {}) {
   const run = !!(e && e.running), s = e ? new Date(e.start) : null, en = e && e.end ? new Date(e.end) : null;
-  const tid = e ? e.task_id : preset.task_id || null, lid = e ? e.list_id : preset.list_id || (tid ? taskById(tid)?.list_id : null) || (isProject(routeList()?.id) ? routeList().id : null) || S.lists.find(l => l.kind === 'project' && !l.archived)?.id;
+  const tid = e ? e.task_id : preset.task_id || null, lid = e ? e.list_id : preset.list_id || (tid ? taskById(tid)?.list_id : null) || (mtTime(routeList()?.id) ? routeList().id : null) || S.lists.find(l => mtTime(l.id) && !l.archived)?.id;  // 2.41.0 (#1471)
   const md = modal(`<h3>${run ? tr('Running timer') : e ? tr('Edit time entry') : tr('Add time')}</h3>
     <div class="row"><label for="te-target">${tr('Task')}</label><select id="te-target">${targetOptions(tid, lid)}</select></div>
     <div class="row"><label>${tr('Date')}</label>${dateIn('te-date', s ? ds(s) : preset.date || ds(new Date()), {max: today(), label: tr('Date'), clear: false})}</div>

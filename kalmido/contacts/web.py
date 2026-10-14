@@ -1,11 +1,16 @@
 """Contacts: the web API (address books, sharing, contacts, search, vCard import / export, links to tasks)."""
 import json
+import secrets
+import threading
+import time
+from datetime import datetime, timezone
 
 from flask import jsonify, request, Response
+from werkzeug.exceptions import RequestEntityTooLarge
 
 from ..core.config import app
 from ..core.i18n import tr
-from ..core.db import body, bump, db, err
+from ..core.db import body, bump, connect, db, err, iso
 from ..accounts.session import me
 from ..core.access import Denied, list_role, need_feat, WRITE_ROLES
 from ..tasks.validation import as_int
@@ -13,10 +18,20 @@ from ..personal.timetrack import BadInput, UnknownFields
 from ..contacts.model import (
     book_create, book_fields, book_member_set, book_public, book_touch, books_for, contact_brief, contact_dict, contact_fields,
     contact_store, contacts_query, CT_KEYS, default_book, import_vcards, link_remove, link_set, my_book_ids, need_book, need_contact,
-    occ_sync, render_vcard,
+    occ_sync, render_vcard, split_vcards, CONTACTS_PER_BOOK, IMPORT_BATCH,
 )
 
-VCF_MAX = 20 * 1024 * 1024
+# 2.41.0 (#1437): never above the request limit (MAX_CONTENT_LENGTH answers 413 before the route), whole MB for the message
+VCF_MAX = min(20, (app.config.get("MAX_CONTENT_LENGTH") or 0) // (1024 * 1024) or 20) * 1024 * 1024
+
+
+@app.errorhandler(RequestEntityTooLarge)
+def ct_too_large(e):
+    """413 from the request limit on a vCard import: JSON with the reason (the app showed "Import failed: " without one)."""
+    p = request.path
+    if not (p.startswith(("/api/books/", "/api/v1/address-books/")) and p.endswith("/import")):
+        return e
+    return err(tr("The file is too large (at most {0} MB)", VCF_MAX // (1024 * 1024)), 413)
 
 
 def _unknown(b, allowed):
@@ -157,7 +172,7 @@ def op_contact_delete(c, uid, cid):
     c.commit()
 
 
-def op_import(c, uid, bid, raw):
+def op_import(c, uid, bid, raw, bg=False):
     need_book(c, bid, write=True)
     if len(raw) > VCF_MAX:
         raise BadInput(tr("The file is too large (at most {0} MB)", VCF_MAX // (1024 * 1024)))
@@ -167,10 +182,78 @@ def op_import(c, uid, bid, raw):
         text = raw.decode("latin-1")
     if "BEGIN:VCARD" not in text.upper():
         raise BadInput(tr("This is not a contacts file (vCard)"))
-    res = import_vcards(c, uid, bid, text)
-    bump(c)
+    cards = split_vcards(text)
+    if bg and len(cards) > IMPORT_SYNC_MAX:
+        return lv_import_start(c, uid, bid, cards)
+    res = import_vcards(c, uid, bid, text, batch=IMPORT_BATCH, cards=cards)  # 2.41.0 (#1437): commits per batch
     c.commit()
     return res
+
+
+# 2.41.0 (#1437): a large vCard file is imported in the background: the request answers at once with an import id, a thread
+# of this process stores the cards in batches (each committed) and GET /api/books/imports/<id> tells the progress. Only the
+# person who started it sees it; the state lives in memory for an hour (one process, like the backup's state).
+IMPORT_SYNC_MAX = 100
+_IMP, _IMP_LOCK = {}, threading.Lock()
+
+
+def lv_import_public(st):
+    d = {k: st[k] for k in ("import_id", "book_id", "state", "total", "done", "created", "updated", "unchanged", "errors", "error")}
+    for k in ("started_at", "ended_at"):
+        d[k] = iso(datetime.fromtimestamp(st[k], timezone.utc)) if st[k] else None
+    return d
+
+
+def lv_import_start(c, uid, bid, cards):
+    iid = secrets.token_urlsafe(12)
+    st = {"import_id": iid, "user_id": uid, "book_id": bid, "state": "running", "total": min(len(cards), CONTACTS_PER_BOOK), "done": 0,
+          "created": 0, "updated": 0, "unchanged": 0, "errors": 0, "error": "", "started_at": time.time(), "ended_at": None}
+    now = time.time()
+    with _IMP_LOCK:
+        for k in [k for k, v in _IMP.items() if v["ended_at"] and now - v["ended_at"] > 3600]:
+            _IMP.pop(k, None)
+        _IMP[iid] = st
+    ctx = c.ctx  # the starter's row-level-security context goes with the thread
+    threading.Thread(target=lv_import_run, args=(st, ctx, uid, bid, cards), daemon=True).start()
+    with _IMP_LOCK:
+        return lv_import_public(st)
+
+
+def lv_import_run(st, ctx, uid, bid, cards):
+    def prog(done, total, res):
+        with _IMP_LOCK:
+            st.update(done=done, **res)
+    c = None
+    try:
+        c = connect()
+        c.set_ctx(*ctx)
+        res = import_vcards(c, uid, bid, None, batch=IMPORT_BATCH, progress=prog, cards=cards)
+        c.commit()
+        with _IMP_LOCK:
+            st.update(state="done", done=st["total"], **res)
+    except Exception as e:  # noqa: BLE001 -- any failure ends the import with a message; the batches before it stay
+        msg = e.text() if isinstance(e, Denied) else str(e) if isinstance(e, BadInput) else ""
+        print("contacts import failed:", type(e).__name__, flush=True)
+        try:
+            if c:
+                c.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        with _IMP_LOCK:
+            st.update(state="failed", error=msg)
+    finally:
+        with _IMP_LOCK:
+            st["ended_at"] = time.time()
+        if c:
+            c.close()
+
+
+def op_import_state(uid, iid):
+    with _IMP_LOCK:
+        st = _IMP.get(iid)
+        if not st or st["user_id"] != uid:
+            raise Denied(404)
+        return lv_import_public(st)
 
 
 def op_export(c, uid, bid):
@@ -236,7 +319,16 @@ def books_import(bid):
     raw = f.read(VCF_MAX + 1) if f else request.get_data(cache=False)[:VCF_MAX + 1]
     if not raw:
         return err(tr("No file"))
-    return jsonify(op_import(db(), me(), bid, raw))
+    # 2.41.0 (#1437): ?background=1 (the app): a large file answers 202 {import_id, state: "running", ...} at once
+    bg = request.args.get("background") in ("1", "true")
+    r = op_import(db(), me(), bid, raw, bg=bg)
+    return (jsonify(r), 202) if "import_id" in r else jsonify(r)
+
+
+@app.get("/api/books/imports/<iid>")
+def books_import_state(iid):
+    need_feat("contacts")
+    return jsonify(op_import_state(me(), iid))
 
 
 @app.get("/api/books/<int:bid>/export.vcf")

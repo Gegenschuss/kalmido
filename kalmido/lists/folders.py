@@ -18,6 +18,8 @@ from ..personal.timetrack import BadInput
 # 2.40.0 (#1373): agent_peers is no folder default any more (agents never address each other); a stored one is ignored
 FOLDER_PROPS = ("org_id", "agent_id", "agent_members", "agent_tidy", "agent_listen")  # 2.30.0 (#1034): agent_listen
 FOLDER_PROPS += ("hide_done",)  # 2.39.1 (#1214): "Hide completed" for the lists of the folder (the client applies it, see showDone)
+FOLDER_PROPS += ("agent_followup",)  # 2.41.0 (#1423): "Agent follows up" as a folder default (2.40 ignores the key)
+FOLDER_PROPS += ("time_tracking",)  # 2.41.0 (#1471): time tracking on / off for the lists of the folder (lists.time_tracking)
 FOLDER_APPLY = ("all", "new")
 
 
@@ -148,7 +150,7 @@ def folder_apply(c, lid, keys=None, force=False, dry=False):
                     finally:
                         g.folder_applying = False
                 changed += 1
-            elif k in ("agent_members", "agent_peers"):
+            elif k in ("agent_members", "agent_peers", "agent_followup", "time_tracking"):  # 2.41.0 (#1423): + agent_followup, (#1471) time_tracking
                 cur = c.execute(f"SELECT {k} FROM lists WHERE id=?", (lid,)).fetchone()[0]
                 if int(bool(v)) == int(cur or 0):
                     continue
@@ -222,7 +224,7 @@ def _clean_props(c, b):
                 if (o is not None and o != me()) or (o is None and not agent_shares(c, v, me()) and not g.user["is_admin"]):
                     raise BadInput(tr("Invalid value: {0}", k))
                 out[k] = v
-        elif k in ("agent_members", "agent_peers", "agent_listen", "hide_done"):
+        elif k in ("agent_members", "agent_peers", "agent_listen", "hide_done", "agent_followup", "time_tracking"):  # 2.41.0 (#1471): time_tracking
             if not isinstance(v, bool) and v not in (0, 1):
                 raise BadInput(tr("Invalid value: {0}", k))
             out[k] = bool(v)
@@ -289,6 +291,9 @@ def folder_props_put():
                       "DO UPDATE SET props=excluded.props, updated_at=excluded.updated_at", (me(), f, json.dumps(props), iso(now_utc())))
         else:
             c.execute("DELETE FROM folder_props WHERE owner_id=? AND folder=?", (me(), f))
+        if "agent_id" in new:  # 2.41.0 (#1420): the one agent of an older client = the folder's first agent (none: no agents)
+            from ..lists.foldershare import sh_folder_agents_from_props
+            sh_folder_agents_from_props(c, me(), f, new["agent_id"] or 0)
     if apply == "all":
         keys = [k for k in new if new[k] is not None]
         if dry:  # what would happen: the new values against every list; rolled back below, nothing stays

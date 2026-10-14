@@ -8,10 +8,10 @@ from flask import g, jsonify, request
 from ..core.config import app
 from ..core.db import db, local_day, local_now
 from ..core.i18n import tr
-from ..core.access import Denied, PROJ_SQL, need_time, tvis, vis_sql
+from ..core.access import Denied, need_time, tvis, vis_sql
 from ..accounts.session import me
 from ..api.v1 import v1_args, v1_feature, v1_view
-from ..personal.timetrack import BadInput, local_bounds
+from ..personal.timetrack import BadInput, local_bounds, MT_TIME_SQL
 
 GAP_DAYS, GAP_DAYS_MAX = 14, 31   # look back this many days (today not included: the day is not over yet)
 GAP_TASKS = 5                      # task examples per day
@@ -26,7 +26,7 @@ def time_gaps(c, uid, viewer=None, days=GAP_DAYS):
     end = local_now().date() - timedelta(days=1)
     start = end - timedelta(days=days - 1)
     lo, hi = local_bounds(start, end)
-    both = f"t.list_id IN {vis_sql()} AND t.list_id IN {vis_sql()} AND t.list_id IN {PROJ_SQL} AND {tvis(c, uid, 't.')} AND {tvis(c, viewer, 't.')}"
+    both = f"t.list_id IN {vis_sql()} AND t.list_id IN {vis_sql()} AND t.list_id IN {MT_TIME_SQL} AND {tvis(c, uid, 't.')} AND {tvis(c, viewer, 't.')}"
     vargs = [uid, uid, viewer, viewer]
     rows = c.execute(f"""
         SELECT x.tid, x.ts, t.title, t.list_id FROM (

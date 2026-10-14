@@ -277,7 +277,15 @@ def agent_comment(c, k):
     from ..collab.replies import reply_of
     rt, rq = reply_of(c, "c", k)  # 2.33.0 (#1076): the comment answers this one (a short quote)
     return {"id": k["id"], "author_id": k["user_id"], "text": comment_plain(c, k["body"]), "body": k["body"], "created_at": k["created_at"],
-            "suggestion": json.loads(k["suggestion"]) if k["suggestion"] else None, "reply_to": rt, "reply": rq}
+            "suggestion": json.loads(k["suggestion"]) if k["suggestion"] else None, "reply_to": rt, "reply": rq,
+            **_lv_comment_choices(k)}
+
+
+def _lv_comment_choices(k):
+    """2.41.0 (#1383): the answer buttons / approval card of the comment and the person's answer (only when it has them)."""
+    from ..collab.cchoice import lv_jload
+    ch = lv_jload(k["choices"]) if "choices" in k.keys() else None
+    return {"choices": ch, "choice": lv_jload(k["choice"])} if ch else {}
 
 
 def agent_comment_events(c, t, cid, mentions, new_mentions, created=True):

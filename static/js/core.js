@@ -128,7 +128,7 @@ const fieldsOn = () => feat('fields');
 // list type (1.2): list | checklist | project. Time tracking, dependencies, custom fields and progress / status only
 // show in project lists, and only while their module is on (the module stays the outer switch)
 const isProject = lid => listById(lid)?.kind === 'project';
-const tFor = t => !!t && timeOn() && isProject(t.list_id);    // time tracking for this task
+const tFor = t => !!t && timeOn() && mtTime(t.list_id);    // time tracking for this task (2.41.0 #1471: the list's switch)
 const dFor = t => !!t && depsOn() && isProject(t.list_id);    // dependencies for this task
 const progressFor = l => !!l && progressOn() && l.kind === 'project';
 const statusFor = l => !!l && statusOn() && l.kind === 'project';
@@ -554,7 +554,7 @@ function applyState(j) {
   S.timeLists = j.time_lists || {}; S.timeDayH = +j.time_day_h || 8;  // 2.7.0 (#407)
   S.fields = j.fields || [];
   S.folderOrders = j.folder_orders || {};  // 2.27.0 (#988): the order of other people's folders I see their lists in
-  S.folderProps = j.folder_props || {}; S.foldersSharedIn = j.folders_shared_in || [];  // 2.29.0 (#1030 / #929)
+  S.folderProps = j.folder_props || {}; S.foldersSharedIn = j.folders_shared_in || []; S.folderShares = j.folder_shares || {};  /* 2.41.0 (#1428) */  // 2.29.0 (#1030 / #929)
   S.collabAll = j.collab_all !== false; S.timeAll = j.time_all !== false; S.about = j.about || {};
   S.calendars = j.calendars || {enabled: false, subs: 0};
   S.api = j.api || {enabled: false}; S.caldav = j.caldav || {enabled: false}; S.webhooks = j.webhooks || {enabled: false}; S.publicLinks = !!j.public_links;
@@ -641,14 +641,17 @@ function putTask(t) { S.tasks.set(t.id, t); _kidsIx = null; }
 // anyway in between takes it along, see render())
 const TD_RS_MS = 300;
 let td_rsT = 0;
-function td_renderSoon() { if (td_rsT) return; td_rsT = setTimeout(() => { td_rsT = 0; if (editing()) S.viewStale = true; else render(); }, TD_RS_MS); }
+// 2.41.0 (#1376): unsaved form input (formguard) holds the redraw back like a focused field; office / clients views are not
+// redrawn by a change of someone else (only the sidebar, header and tabs follow)
+function td_renderSoon() { if (td_rsT) return; td_rsT = setTimeout(() => { td_rsT = 0; if (lpBusy()) S.viewStale = true; else if (lpKeepView()) { renderSide(); renderTop(); renderTabs(); badgeSync(); } else { S.lpN.render++; render(); } }, TD_RS_MS); }
 let td_polling = false;  // 2.40.0 (#1430): a slow answer (many changes elsewhere) does not start a second load + render on top
 setInterval(async () => {
   if (document.hidden || td_polling) return;
   td_polling = true;
   try {
     if (OUT.q.length) { flush(); staleDraw(); return; }  // 2.13.0 (#453 A13): the chip says how many changes wait
-    const {v, n, c, t, ty, app, sp} = await api('GET', '/api/version');
+    const {v, n, c, t, ty, app, sp, a} = await api('GET', '/api/version');
+    const lpCh = lpChanged(a);  // 2.41.0 (#1376): the areas that changed since the last poll
     if (sp !== undefined && sp !== S.stepsSig) { const first = S.stepsSig === undefined; S.stepsSig = sp; if (!first) stepsChanged(); }  // 2.32.0 (#1081)
     verCheck(app);  // 2.27.0 (#968)
     if (ty !== undefined) { const sig = JSON.stringify(ty); if (sig !== S.ctypingSig) { S.ctypingSig = sig; S.ctyping = ty; if (S.sel) agentLive(); } }  // 2.22.0 (#693)
@@ -658,7 +661,8 @@ setInterval(async () => {
       if (!first && calEvOn() && !editing()) { calInvalidate(); if (S.route.mod === 'cal' || S.route.key === 'today') renderView(); }
     }
     const chg = v !== S.v || (n !== undefined && collab() && n !== S.news?.sig);
-    if (chg && !editing()) { S.viewStale = false; await load(); td_renderSoon(); }  // 2.40.0 (#1430): bundled
+    if (chg && v !== S.v && !editing() && lpLive(v, lpCh)) { /* 2.41.0 (#1376): only light areas: their parts, the rest bundled */ }
+    else if (chg && !editing()) { S.viewStale = false; lpFull(); S.lpN.state++; await load(); td_renderSoon(); }  // 2.40.0 (#1430): bundled
     else if (v !== S.v && editing() && S.sel > 0 && (cmtOn() || collab()) && S.tl.id === S.sel && S.tlPollV !== v) { S.tlPollV = v; loadTimeline(S.sel); agentPoll(); }  // 1.9.0
     else if (chg && editing() && S.chat.aid && collab() && S.chatPollV !== `${v}/${n}`) { S.chatPollV = `${v}/${n}`; chatLoad(); agentPoll(); }  // 2.12.2 (#451): typing, the chat still updates (patched)
     else if (S.viewStale && !editing()) viewSafeRender();
@@ -741,7 +745,8 @@ const editing = () => {
   return !!a.closest('#detail,.qadd,.modal,#pop') || a.id !== 'qinput' || !!a.value || isTouch();  // an empty composer of the list survives a re-render (renderView)
 };
 // a re-render of the view a live update asked for while someone types in it: done once the field is left (the poll)
-function viewSafeRender() { if (editing() && $('#view')?.contains(document.activeElement)) { S.viewStale = true; return; } S.viewStale = false; renderView(); }
+// 2.41.0 (#1376): also while a form in the view has unsaved input (formguard)
+function viewSafeRender() { if ((editing() && $('#view')?.contains(document.activeElement)) || lpFormBusy($('#view'))) { S.viewStale = true; return; } S.viewStale = false; renderView(); }
 // 1.9.0 pull-to-refresh (touch, shared lists): pull down at the very top of the list by 4.5rem and let go
 (() => {
   let y0 = null, x0 = 0, pull = 0, el = null;

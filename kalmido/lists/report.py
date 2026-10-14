@@ -54,7 +54,7 @@ def project_status(c, lid, uid, *, frm=None, to=None, with_time=True):
     to = to or today
     frm = frm or (to - timedelta(days=6))
     lo, hi = _bounds(frm, to)
-    lst = c.execute("SELECT id, name, is_inbox, kind, status FROM lists WHERE id=?", (lid,)).fetchone()
+    lst = c.execute("SELECT id, name, is_inbox, kind, status, time_tracking FROM lists WHERE id=?", (lid,)).fetchone()
     vis = tvis(c, uid, "t.")
     base = f"FROM tasks t WHERE t.list_id=? AND t.deleted_at IS NULL AND {vis}"
     cols = "t.id, t.title, t.due, t.due_time, t.status, t.completed_at, t.parent_id, t.ms, t.waiting_at, t.wait_note, t.wait_until"
@@ -98,7 +98,7 @@ def project_status(c, lid, uid, *, frm=None, to=None, with_time=True):
            "upcoming": [row(r, due_time=r["due_time"]) for r in upcoming[:REPORT_LIST_MAX]],
            "milestones": [row(r, done=True, completed_at=r["completed_at"]) for r in reached]
                          + [row(r, done=False) for r in ms_next],
-           "time": _time_of(c, lid, uid, frm, to) if with_time and lst["kind"] == "project" and time_all() else None}
+           "time": _time_of(c, lid, uid, frm, to) if with_time and lst["time_tracking"] and time_all() else None}  # 2.41.0 (#1471): the list's switch
     return out
 
 

@@ -155,9 +155,9 @@ def check_assignee(c, lid, aid):
 # 2.2.1 (#359): the fields the web API's task / list / comment endpoints know (others: warning, see web_fields)
 WEB_TASK_NEW = frozenset(TASK_FIELDS) | {"tags", "ltags", "fields", "people"}
 WEB_TASK_EDIT = WEB_TASK_NEW | {"add_tags", "_prev", "_act"}
-WEB_LIST_NEW = frozenset({"name", "color", "folder", "view", "kind", "checklist", "done_at_bottom", "dep_shift", "tickets", "ptype", "family", "sections", "org_id"})  # 2.28.0 (#935): org_id
+WEB_LIST_NEW = frozenset({"name", "color", "folder", "view", "kind", "checklist", "done_at_bottom", "dep_shift", "tickets", "ptype", "family", "sections", "org_id", "time_tracking"})  # 2.28.0 (#935): org_id; 2.41.0 (#1471): time_tracking
 WEB_LIST_EDIT = frozenset(LIST_FIELDS) | {"client_id", "rate", "agent_tidy", "tidy_agent_id", "listen_agent_ids", "agent_members", "agent_peers", "_prev", "ticket_tpl", "day_hours", "done_at_bottom", "columns", "ptype", "sort_mode", "org_id", "stale_days", "agent_followup", "done_in_section", "folder_adopt"}  # 2.36.2 (#1136): done_in_section
-WEB_COMMENT = frozenset({"body", "suggestion", "reply_to"})  # 2.33.0 (#1076): reply_to
+WEB_COMMENT = frozenset({"body", "suggestion", "reply_to", "choices", "multi", "approval", "expires_in"})  # 2.33.0 (#1076): reply_to; 2.41.0 (#1383): choices
 
 
 @app.post("/api/tasks")
@@ -297,6 +297,8 @@ def set_waiting(c, tid, b):
     c.execute("UPDATE tasks SET waiting_at=?, wait_note=?, wait_until=?, wait_by=?, wait_fired=?, updated_at=? WHERE id=?",
               (cur["waiting_at"] or iso(now_utc()), note, until, me() or None, fired, iso(now_utc()), tid))
     log_act(c, tid, "waiting", {"note": note[:200], "until": until})
+    if note and me():  # 2.41.0 (#1205): a text used again is a suggestion again
+        c.execute("DELETE FROM wait_hidden WHERE user_id=? AND note_key=?", (me(), note.lower()))
 
 
 def clear_waiting(c, tid):
@@ -327,6 +329,57 @@ def task_waiting_clear(tid):
         bump(c)
         c.commit()
     return jsonify(one_task(c, tid))
+
+
+# ---- 2.41.0 (#1205): "Waiting on" suggestions: the texts the signed-in person used before (newest first), from their own
+# history only (activity "waiting" written by them, incl. completed tasks, and the tasks they marked as waiting now) --
+# never another person's text from a shared list. "x" on a suggestion hides it for the person (table wait_hidden); the
+# tasks keep their text. The web app shows at most 8 and filters while typing.
+MT_WAIT_MAX = 50
+
+
+def mt_wait_suggestions(c, uid):
+    rows = c.execute("""SELECT note, MAX(at) AS at FROM (
+                          SELECT data->>'note' AS note, created_at AS at FROM activity
+                           WHERE user_id=? AND kind='waiting' AND COALESCE(data->>'note', '')<>''
+                          UNION ALL SELECT wait_note, waiting_at FROM tasks WHERE wait_by=? AND wait_note<>'' AND waiting_at IS NOT NULL
+                        ) x GROUP BY note ORDER BY MAX(at) DESC LIMIT 400""", (uid, uid)).fetchall()
+    hidden = {r[0] for r in c.execute("SELECT note_key FROM wait_hidden WHERE user_id=?", (uid,))}
+    out, seen = [], set()
+    full = [r["note"].strip() for r in rows]
+    for r in rows:
+        n = r["note"].strip()
+        k = n.lower()
+        if not n or k in seen or k in hidden:
+            continue
+        if len(n) == 200 and any(len(f) > 200 and f.startswith(n) for f in full):
+            continue  # the history keeps 200 characters: the full text of the same entry is in the list already
+        seen.add(k)
+        out.append({"note": n, "at": r["at"]})
+        if len(out) >= MT_WAIT_MAX:
+            break
+    return out
+
+
+@app.get("/api/me/wait-suggestions")
+def mt_wait_suggestions_get():
+    """{items: [{note, at}]}: the signed-in person's earlier "Waiting on" texts, newest first (at most 50)."""
+    c = db()
+    return jsonify(items=mt_wait_suggestions(c, me()))
+
+
+@app.delete("/api/me/wait-suggestions")
+def mt_wait_suggestions_hide():
+    """{note}: takes the text out of the person's suggestions (the tasks keep it). Using it again brings it back."""
+    note = (body() or {}).get("note")
+    if not isinstance(note, str) or not note.strip():
+        return err(tr("Invalid value: {0}", "note"))
+    c = db()
+    uid = me()
+    c.execute("INSERT INTO wait_hidden(user_id, note_key, created_at) VALUES(?,?,?) ON CONFLICT DO NOTHING",
+              (uid, note.strip()[:WAIT_NOTE_MAX].lower(), iso(now_utc())))
+    c.commit()
+    return jsonify(ok=True, items=mt_wait_suggestions(c, uid))
 
 
 def _wd_followups(c, users, S, LG, now):

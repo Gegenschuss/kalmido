@@ -296,36 +296,7 @@ function shareGroupsHtml(cur, mng, roleSel) {
     : `<span class="muted" title="${esc(roleHelp(x.role))}">${esc(roleLabel(x.role))}</span>`}</div>`).join('')
     + (mng && cand.length ? `<div class="mrow madd"><select id="l-addgrp" aria-label="${esc(tr('Share with a group'))}"><option value="">${tr('Share with a group …')}</option>${cand.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('')}</select>${roleSel('id="l-grprole"', 'edit')}<button class="btn sm" data-m="share-grp">${ic('plus', 's')} ${tr('Add')}</button></div>` : '');
 }
-// folder menu "Share with a group…": every own list in the folder (and its subfolders, also later ones)
-async function folderGroupsModal(f) {
-  if (!collab() || !(S.groups || []).length) { toast(tr('An admin creates groups in Settings > Administration')); return; }
-  const md = modal(`<div class="lhdr"><h3>${esc(tr('Share the folder “{0}”', fDisp(f)))}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
-    <div class="shint">${tr('Every list of yours in this folder and its subfolders is shared with the group, also lists you put there later. A list taken out of the folder is no longer shared through it.')}</div>
-    <div class="members" id="fg-list"><div class="muted mhint">${tr('Loading…')}</div></div>
-    <div class="foot"><span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);
-  md.classList.add('shmodal');
-  const roleSel = (attr, cur_, lab) => `<select ${attr} aria-label="${esc(lab || tr('Role'))}">${ROLES.map(([v, n, h]) => `<option value="${v}" title="${esc(tr(h))}" ${v === cur_ ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>`;
-  const draw = async () => {
-    let gs; try { gs = (await calReq('GET', '/api/folders/groups?folder=' + encodeURIComponent(f))).groups; } catch { return; }
-    if (!md.isConnected) return;
-    const cand = (S.groups || []).filter(g => !gs.some(x => x.group_id === g.id));
-    $('#fg-list', md).innerHTML = gs.map(x => `<div class="mrow"><span class="avatar gav">${ic('users', 's')}</span><span class="n">${esc(x.name)}</span>${roleSel(`data-fgrole="${x.group_id}"`, x.role, tr('Role of the group {0}', x.name))}<button class="iconbtn" data-fgrm="${x.group_id}" title="${esc(tr('Stop sharing with the group'))}" aria-label="${esc(tr('Stop sharing with the group {0}', x.name))}">${ic('x', 's')}</button></div>`).join('')
-      + (cand.length ? `<div class="mrow madd"><select id="fg-add" aria-label="${esc(tr('Share with a group'))}"><option value="">${tr('Share with a group …')}</option>${cand.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('')}</select>${roleSel('id="fg-role"', 'edit')}<button class="btn sm" data-m="fg-add">${ic('plus', 's')} ${tr('Add')}</button></div>` : '')
-      || `<div class="muted mhint">${tr('No groups yet')}</div>`;
-  };
-  const act = async fn => { try { await fn(); await load(); render(); draw(); } catch { /* api() showed it */ } };
-  md.addEventListener('change', e => {
-    const r = e.target.closest('[data-fgrole]');
-    if (r) act(() => api('PUT', `/api/folders/groups/${r.dataset.fgrole}`, {folder: f, role: r.value}));
-  });
-  md.addEventListener('click', e => {
-    const b = e.target.closest('button'); if (!b) return;
-    if (b.dataset.m === 'close') { md.remove(); return; }
-    if (b.dataset.m === 'fg-add') { const g = +$('#fg-add', md).value; if (g) act(() => api('PUT', `/api/folders/groups/${g}`, {folder: f, role: $('#fg-role', md).value})); return; }
-    if (b.dataset.fgrm) act(() => api('DELETE', `/api/folders/groups/${b.dataset.fgrm}?folder=${encodeURIComponent(f)}`));
-  });
-  draw();
-}
+// 2.41.0 (#1420): sharing a folder with a group is part of the folder's Share dialog (folderShareModal, sharedlg.js)
 // 2.22.0 (#752): organisations (admins): name, emoji, members; whom people see (everyone / own organisation / own contacts)
 const VIS_UI = [['all', N_('Everyone on this server')], ['org', N_('Only people of their own organisations')], ['contacts', N_('Only people they are connected with (no directory, share by e-mail address)')]];
 // 2.23.0 (#799): the kind of instance comes from the configuration (KALMIDO_INSTANCE_MODE): an organisation shows its name

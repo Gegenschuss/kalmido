@@ -344,6 +344,11 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 /* ---------- toast ---------- */
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(1.5rem + var(--tabs-h) + var(--safe-b));z-index:80;background:var(--bg3);border-radius:var(--radius);padding:.5rem .625rem .5rem .875rem;display:flex;gap:.75rem;align-items:center;box-shadow:var(--shadow);font-size:var(--fs-m);max-width:calc(100vw - 2rem)}
 #toast button{color:var(--accent);font-weight:600}
+/* 2.41.0 (#1437): the vCard import's progress / result: stays until it is closed */
+.ctimp{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(1.5rem + var(--tabs-h) + var(--safe-b));z-index:81;background:var(--bg3);border-radius:var(--radius);padding:.625rem .5rem .625rem .875rem;display:flex;flex-wrap:wrap;gap:.375rem .75rem;align-items:center;box-shadow:var(--shadow);font-size:var(--fs-m);width:min(24rem,calc(100vw - 2rem))}
+.ctimp .ctimp-t{flex:1 1 0;min-width:0}
+.ctimp .pbar{order:3;flex:1 0 100%;height:.25rem;border-radius:2px;background:var(--bg4);overflow:hidden}
+.ctimp .pbar i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
 
 /* ---------- kanban ---------- */
 .kanban{display:flex;gap:.75rem;align-items:flex-start;overflow-x:auto;padding-bottom:1.25rem;scroll-snap-type:x mandatory;min-height:60vh}
@@ -2270,6 +2275,9 @@ body.tl-typing #tabs,body.tl-typing #fab{display:none}
 .chnote{padding:0 .75rem .75rem;margin:0}
 /* 2.12.2 (#451): "Load older messages" above the newest 30, "New message ↓" over the bottom edge of the list while scrolled up */
 .chold{display:flex;justify-content:center;padding:.125rem 0 .25rem}
+/* 2.41.0 (#1206): a notice of the agent (new session, conversation compacted): a small grey line in the middle, no bubble */
+.cnotice{align-self:center;max-width:90%;padding:.125rem .75rem;text-align:center;font-size:var(--fs-xs);line-height:1.4;color:var(--muted);overflow-wrap:anywhere}
+.cnotice a{color:inherit;text-decoration:underline dotted;text-underline-offset:.15em;display:inline-block;min-height:1.5rem;padding:.125rem 0}
 .chnew{position:relative;z-index:2;align-self:center;display:inline-flex;align-items:center;gap:.375rem;min-height:2.75rem;margin:-3.25rem 0 .5rem;padding:0 1rem;border:1px solid var(--line2);border-radius:62.5rem;background:var(--bg2);color:var(--accent);font:inherit;font-size:var(--fs-s);font-weight:600;box-shadow:var(--shadow);cursor:pointer}
 .chnew.hidden{display:none}
 /* 2.12.2 (#453 N4): phone chat with the keyboard up: all the room for the messages (height set by chatFit()) */
@@ -3313,12 +3321,12 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 .chk{width:.875rem;height:.875rem;border-radius:50%;border:1.6px solid var(--text2);margin-top:calc((var(--row-fs) * 1.45 - .875rem) / 2)}
 .chk.p5{border-color:var(--p5)}.chk.p3{border-color:var(--p3)}.chk.p1{border-color:var(--p1)}
 .chk:hover{background:transparent}
-.chk:hover:not(.on):not(.wont)::before{width:.3125rem;height:.3125rem;border:0;border-radius:50%;background:currentColor;transform:none;opacity:.8;color:var(--accent)}
+.chk:hover:not(.on):not(.wont)::before{width:.3125rem;height:.3125rem;border:0;border-radius:50%;background:currentColor;transform:none;opacity:.8;color:var(--accent);inset:0;margin:auto}  /* 2.41.0 (#1477): centred by the box, not by grid rounding */
 .chk.on{background:var(--faint);border-color:var(--faint);color:var(--bg)}
 .chk.on svg{width:.5625rem;height:.5625rem;stroke-width:3}
 .chk.wont{border-style:dashed;border-color:var(--faint)}
 .chk.work{border-color:var(--st-work);border-left-color:transparent;transform:rotate(45deg)}
-.chk.work::before{content:'';position:absolute;width:.3125rem;height:.3125rem;border-radius:50%;background:var(--st-work)}
+.chk.work::before{content:'';position:absolute;width:.3125rem;height:.3125rem;border-radius:50%;background:var(--st-work);inset:0;margin:auto}
 .tgut{flex:none;min-width:3rem;font:var(--fs-s)/1.45 var(--mono);color:var(--muted);font-variant-numeric:tabular-nums;margin-top:calc((var(--row-fs) * 1.45 - var(--fs-s) * 1.45) / 2)}
 .trow.sel .tgut{color:var(--accent)}
 .trow.done .tgut{opacity:.6}
@@ -5568,6 +5576,11 @@ body.ms-typing #tabs,body.ms-typing #fab{display:none}
 .apvgo span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .apvpin .cchoices{margin:0}
 .srow .c.apvc{display:inline-flex;align-items:center;gap:.125rem;color:var(--accent);font-weight:600}
+/* 2.41.0 (#1383): the approval card / answer buttons under an agent's comment; open approvals on the task row */
+.cccard.apv{margin:.375rem 0 .125rem;padding:.5rem .625rem;border:1px solid var(--line);border-left:.1875rem solid var(--line2);border-radius:var(--r-l);background:var(--bg2);max-width:34rem}
+.cccard.apvopen{border-left-color:var(--accent);background:color-mix(in srgb,var(--accent) 6%,var(--bg2))}
+.cccard .cchoices{margin-bottom:0}
+.apvc{display:inline-flex;align-items:center;gap:.125rem;color:var(--accent);font-weight:600}
 .nbadge.apvn{outline:2px solid var(--bg)}
 .btn.apvcard{border-color:var(--accent);color:var(--accent)}
 /* 2.35.0 (#186): file links (network drive, file://): copy-only buttons look like the links they stand for */
@@ -6235,3 +6248,37 @@ html.mini #app.detail-open{grid-template-columns:minmax(0,1fr) var(--detW,25.5re
 .trow .mosub > span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .trow .mosub:hover{color:var(--text);text-decoration:underline}
 @media (pointer:coarse){ .trow .mosub{min-height:1.75rem} }
+/* 2.41.0 (#1365): "My tasks": the small group "From hidden lists" and the folded "Hidden" with one head per list */
+.ghead.mturg,.ghead.mthid{font-weight:500;color:var(--muted)}
+.ghead.mturg{font-size:var(--fs-xs)}
+.mthl{display:flex;align-items:center;gap:.5rem;min-height:2.25rem;padding:.25rem 2px;font-size:var(--fs-xs);color:var(--text2)}
+.mthl .mthn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mthl .linkbtn{flex:none;min-height:2.25rem;padding:0 .25rem}
+@media (pointer:coarse){ .mthl .linkbtn{min-height:2.75rem} }
+/* 2.41.0 (#1205): "Waiting on": the recent entries below the field (big rows on phones, the x with room to spare) */
+.wsug{display:flex;flex-direction:column;margin:-.25rem 0 .5rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg);max-height:18rem;overflow-y:auto}
+.wsug[hidden]{display:none}
+.wsrow{display:flex;align-items:center;gap:.25rem;padding-right:.25rem}
+.wsrow + .wsrow{border-top:1px solid var(--line)}
+.wsrow.on,.wsrow:hover{background:var(--bg2)}
+.wspick{flex:1;min-width:0;min-height:2.5rem;padding:.375rem .75rem;border:0;background:none;font:inherit;color:var(--text);text-align:left;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wsx{flex:none;color:var(--muted)}
+@media (pointer:coarse){ .wspick{min-height:3rem} .wsx{min-width:2.75rem;min-height:2.75rem;margin-left:.75rem} }
+/* 2.41.0 (#1420 / #1423): the folder's Share dialog and settings like the list's: switches with a third state "Not set",
+   "Saved · Undo" in the head, greyed-out parts that do not fit a folder (with the reason) */
+.fsmodal .lhdr .ssaved{display:inline-flex;align-items:center;gap:.375rem;font-size:var(--fs-s);color:var(--muted);opacity:0;margin-left:.75rem}
+.fsmodal .lhdr .ssaved.on{opacity:1}
+.fsmodal .lhdr .ssaved .i{color:var(--ok)}
+.fsw{display:flex;align-items:center;flex-wrap:wrap;gap:.25rem .75rem;margin:.375rem 0}
+.fsw .fsst{font-size:var(--fs-s)}
+.fsw.unset .swc{opacity:.45}
+.fshgrey{display:flex;flex-direction:column;gap:.125rem;margin:.5rem 0;padding:.375rem .625rem;border:1px dashed var(--line2);border-radius:.5rem;opacity:.6}
+.fshgrey small{font-size:var(--fs-s)}
+.fshagsw{margin:-.125rem 0 .375rem 2.75rem}
+.fshowner .muted{margin-left:auto}
+/* 2.41.0 (#1428): a shared folder carries the share symbols of a list; only lists inside shared: weaker */
+.fhead .fshr,.fhdsh .fshr{display:inline-flex;flex:none;gap:2px;color:var(--muted);opacity:.8}
+.fhead .fshr{margin-left:.375rem}
+.fhead .fshr svg,.fhdsh .fshr svg{width:.875rem;height:.875rem}
+.fhead .fshr.fshweak,.fhdsh .fshweak{opacity:.45}
+.fhdsh{display:inline-flex;align-items:center;gap:.5rem;font-size:var(--fs-s);min-width:0}

@@ -831,6 +831,16 @@ CREATE INDEX IF NOT EXISTS office_client_contacts_client ON office_client_contac
 CREATE TABLE IF NOT EXISTS user_task_order (
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, task_id BIGINT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
   pos BIGINT NOT NULL, PRIMARY KEY (user_id, task_id));
+-- 2.41.0 (#1365): lists a person switched off for "My tasks" (row = hidden there; per person, not for the list's members).
+-- Personal like user_task_order: no org_id. 2.40.2 ignores the table
+CREATE TABLE IF NOT EXISTS list_mine_hide (
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, list_id BIGINT NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL, PRIMARY KEY (user_id, list_id));
+-- 2.41.0 (#1205): "Waiting on" suggestions a person took out of their list (key = the text in lower case; the suggestions
+-- themselves come from the person's own waiting history). Personal: no org_id. 2.40.2 ignores the table
+CREATE TABLE IF NOT EXISTS wait_hidden (
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, note_key TEXT NOT NULL, created_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, note_key));
 -- 2.37.0 (#1159): a chat message a person saved as a task (kind agent = agent_chat, team = tchat_msgs; per person: a team
 -- chat message can be saved by several people). A deleted task makes the message savable again (chat_save_of checks it)
 CREATE TABLE IF NOT EXISTS chat_saves (
@@ -852,6 +862,13 @@ CREATE TABLE IF NOT EXISTS playbook_proposals (
   base_version BIGINT NOT NULL DEFAULT 0, state TEXT NOT NULL DEFAULT 'open', created_at TEXT NOT NULL,
   decided_by BIGINT, decided_at TEXT);
 CREATE INDEX IF NOT EXISTS playbook_proposals_list ON playbook_proposals(list_id, state);
+-- 2.41.0 (#1420): the agents of an owner's folder (several; the first by pos is the default for its lists, mirrored into
+-- folder_props.props.agent_id so 2.40 keeps reading it). listen: NULL = not set, 0/1 = "Agent listens in" for that agent.
+-- No org_id (like folder_people / folder_props): the rows belong to a person, the lists keep their own workspace check
+CREATE TABLE IF NOT EXISTS folder_agents (
+  owner_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, folder TEXT NOT NULL,
+  agent_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, pos BIGINT NOT NULL DEFAULT 0, listen BIGINT,
+  created_at TEXT NOT NULL, PRIMARY KEY (owner_id, folder, agent_id));
 """
 # Bumped when the database layout changes (stored in kalmido_meta.schema_version; SQLite: PRAGMA user_version). A backup can be restored when its
 # schema version is not newer than this one (older ones are migrated by init_db).
@@ -1174,6 +1191,15 @@ MIGRATIONS = [
     ("office_docs", "reminder_fee_state", "ALTER TABLE office_docs ADD COLUMN reminder_fee_state TEXT NOT NULL DEFAULT ''"),
     # 2.40.0 (#1377): the word before the management's names in the printed footer ('' = Geschäftsführung, see ledger.FE_MD_LABELS)
     ("office_company", "md_label", "ALTER TABLE office_company ADD COLUMN md_label TEXT NOT NULL DEFAULT ''"),
+    # 2.41.0 (#1206): 'notice' = a small grey line of the agent in its chat (NULL = a normal message); 2.40.2 shows it as a message
+    ("agent_chat", "kind", "ALTER TABLE agent_chat ADD COLUMN kind TEXT"),
+    # 2.41.0 (#1471): time tracking is a switch of each list (any type, default off; was: every project list). Lists that
+    # already hold time entries get it on once (core/db.py init_db, migr_time241); 2.40.2 ignores the column
+    ("lists", "time_tracking", "ALTER TABLE lists ADD COLUMN time_tracking BIGINT NOT NULL DEFAULT 0"),
+    # 2.41.0 (#1383): an agent's comment may carry answer buttons / an approval card like a chat message (choices, the same
+    # json as agent_chat.choices) and the person's answer ({ids, at, user_id, via}, written once); 2.40.2 ignores both
+    ("comments", "choices", "ALTER TABLE comments ADD COLUMN choices JSONB"),
+    ("comments", "choice", "ALTER TABLE comments ADD COLUMN choice JSONB"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

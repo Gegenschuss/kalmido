@@ -7,6 +7,55 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.41.0] - 2026-10-14
+
+**In short:** Folders show and manage **who they are shared with** (people, groups and several agents in one Share
+dialog, folder settings like a list's), **My tasks** can leave lists out, **time tracking** is a switch per list,
+chat messages **copy with formatting**, agents can ask with **approval cards in comments**, large **vCard imports**
+run in the background, and live updates redraw only what changed.
+
+### Added
+- **Share a folder like a list** (#1420): one dialog for people, groups and agents (several agents per folder; the lists
+  get the first one as their default), owner row with *Transfer ownership of all lists*, public read-only links of all
+  lists in the folder at once, *Folder settings…* in the footer. The former folder agent is taken over; the old field stays.
+- **Folders show whether they are shared** (#1428): the person / robot symbols of a list on the folder row (weaker when
+  only lists inside are shared), also folded, in the folder view and on phones; the *New list* hint names the folder's
+  agents; moving a list into a shared folder says *Now shared with …* with Undo.
+- **My tasks per list** (#1365): *Show in My tasks* in the list settings (per person, on by default); tasks of hidden lists
+  wait in a folded *Hidden (N)* group with *Show the list again*; assigned tasks due today or overdue stay visible in a
+  small *From hidden lists* line. The sidebar count leaves hidden tasks out.
+- **Time tracking per list** (#1471): its own switch for every list type, off by default; lists that already have time
+  entries keep it on. Tracked time stays in the review when it is switched off. API field `time_tracking`, folder default.
+- **Waiting on: recent entries** (#1205): up to eight of your own recent entries below the field (filter while typing,
+  x removes one from the suggestions), also in the multi-select dialog.
+- **Copy with formatting** (#1374): *Copy* in the chat puts the rendered message (HTML) and readable plain text on the
+  clipboard; *Copy as Markdown* keeps the raw text. Suggestion / approval blocks are left out.
+- **Notices in the agent chat** (#1206): agents can post a small grey line (`kind: notice`, e.g. after a summary or
+  compaction) without push or unread count; the reference launcher sends one on compaction.
+- **Approval cards, answer buttons and suggestions in comments** (#1383), the same component as in the agent chat
+  (open / answered / expired / withdrawn, only the newest question is live); a press sends the agent one `comment`
+  event with the answer. REST `POST /api/v1/comments/{id}/choice`, MCP `request_comment_approval`,
+  `withdraw_comment_choices`, `add_comment` with `choices`.
+- **Contributor License Agreement** (#1204): [CLA.md](CLA.md); CONTRIBUTING.md points to it, the DCO sign-off stays.
+
+### Changed
+- **Folder settings work like list settings** (#1423): switches with a third state *Not set*, saved at once with Undo,
+  the list's texts and order, *Agent follows up* as a folder default, tidying only with an agent, *Agent listens* per
+  agent, groups and e-mail invitations in the Share dialog.
+- **Large vCard imports** (#1437) run in batches (each one saved, the instance is no longer blocked for other writes)
+  and, above 100 cards, in the background with progress; the result stays until you close it. A too large file says so.
+- **Live updates per area** (#1376): `/api/version` also returns change counters per area (`a`, the total `v` stays);
+  comments, chats, news and calendar reload only their part, the sidebar no longer flickers, unsaved form input holds
+  the redraw back.
+- The *Link* row of a task shows only when a link is set (#1475); *Add link* is in the task menu and under *More details*.
+
+### Fixed
+- Permission limits and token overview name the calendar, contacts and private scopes instead of showing their keys;
+  agents no longer get a *private* box (#1476).
+- The hover dot in the round status circle sits in the middle (#1477).
+- An opened job log stays open (and scrolled) when progress arrives (#1479).
+- The submenu *More list options…* opens at the menu, beside it on computers, instead of the top left corner (#1439).
+
 ## [2.40.2] - 2026-10-14
 
 ### Fixed
@@ -3991,7 +4040,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.40.2...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.41.0...HEAD
+[2.41.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.41.0
 [2.40.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.40.2
 [2.40.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.40.1
 [2.39.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.39.0

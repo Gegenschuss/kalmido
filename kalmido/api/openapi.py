@@ -216,12 +216,13 @@ def openapi_spec():
             "id": {"type": "integer"}, "name": {"type": "string"}, "color": {"type": "string"},
             "folder": {"type": "string", "description": "Your folder path, at most 2 levels: \"Clients/Company X\" (2.4.0); empty = none"},
             "tickets": {"type": "boolean", "description": "Ticket types bug / feature / task on (2.4.0)"},
+            "time_tracking": {"type": "boolean", "description": "2.41.0 (#1471): time tracking on for this list (any type; default off; owner). New time entries need it; tracked time stays visible when it is switched off"},
             "modules_on": {"type": "array", "items": {"type": "string"}, "description": "2.39.1 (#1293): only in the answer of a PATCH with "
                            "columns or project_type: the modules it switched on (custom field columns: [\"fields\"] for the list's owner)"},
             "is_inbox": {"type": "boolean"}, "archived": {"type": "boolean"},
             "done_at_bottom": {"type": "boolean", "description": "2.7.2: \"Show completed at the bottom\": completed tasks stay visible below the open ones and come back with one tap"},
             "checklist": {"type": "boolean", "deprecated": True, "description": "Deprecated (2.7.2): same as done_at_bottom"},
-            "kind": {"type": "string", "enum": list(LIST_KINDS), "description": "List type; project lists have time tracking, dependencies and progress (2.7.2: the type checklist is gone, see done_at_bottom; 2.39.1: custom fields in every list)"},
+            "kind": {"type": "string", "enum": list(LIST_KINDS), "description": "List type; project lists have dependencies and progress (2.41.0: time tracking is the switch time_tracking of any list; 2.7.2: the type checklist is gone, see done_at_bottom; 2.39.1: custom fields in every list)"},
             "view": {"type": "string", "enum": list(LIST_VIEWS)}, "role": {"type": "string", "enum": ["owner", "admin", "edit", "participant", "view"]},
             "owner_id": {"type": "integer"}, "owner_name": {"type": "string"}, "shared": {"type": "boolean"},
             "status": nul("string", enum=[*LIST_STATUSES, None]), "progress": ref("Progress"), "created_at": {"type": "string", "format": "date-time"},
@@ -250,6 +251,7 @@ def openapi_spec():
             "checklist": {"type": "boolean", "deprecated": True, "description": "Deprecated (2.7.2): same as done_at_bottom"},
             "kind": {"type": "string", "enum": [*LIST_KINDS, *LIST_KIND_ALIASES], "description": "list | project; \"checklist\" is a deprecated alias of list + done_at_bottom"},
             "tickets": {"type": "boolean", "description": "Ticket types on (2.4.0)"},
+            "time_tracking": {"type": "boolean", "description": "2.41.0 (#1471): time tracking on for this list (any type; default off; owner). New time entries need it; tracked time stays visible when it is switched off"},
             "project_type": {"type": "string", "enum": list(PTYPES), "description": "2.4.0: a project of a built-in type (sections, "
                              "custom fields, view, ticket types; switches the modules it needs on for you); kind / checklist / tickets are ignored"},
             "sections": {"type": "boolean", "default": False, "description": "2.27.0: with project_type: create the type's standard sections "
@@ -274,6 +276,7 @@ def openapi_spec():
             "view": {"type": "string", "enum": list(LIST_VIEWS)},
             "kind": {"type": "string", "enum": [*LIST_KINDS, *LIST_KIND_ALIASES], "description": "list | project; \"checklist\" is a deprecated alias of list + done_at_bottom"},
             "done_at_bottom": {"type": "boolean", "description": "2.7.2: show completed tasks at the bottom (owner)"},
+            "time_tracking": {"type": "boolean", "description": "2.41.0 (#1471): time tracking on for this list (any type; default off; owner). New time entries need it; tracked time stays visible when it is switched off"},
             "checklist": {"type": "boolean", "deprecated": True, "description": "Deprecated (2.7.2): same as done_at_bottom"},
             "nag": {"type": "string", "enum": list(NAG_VALUES), "description": "Default nag interval of the list's tasks (owner); off / empty = none"},
             "day_hours": nul("number", minimum=1, maximum=24, description="Hours per day / shift (owner); null = the server's value"),
@@ -338,7 +341,12 @@ def openapi_spec():
             "mentions": {"type": "array", "items": {"type": "integer"}}, "created_at": {"type": "string", "format": "date-time"},
             "edited_at": nul("string", format="date-time"), "attachments": {"type": "array", "items": ref("Attachment")},
             "reply_to": nul("integer", description="2.33.0 (#1076): the answered comment of the same task"),
-            "reply": {"anyOf": [ref("ReplyQuote"), {"type": "null"}]}}},
+            "reply": {"anyOf": [ref("ReplyQuote"), {"type": "null"}]},
+            # 2.41.0 (#1383): an agent's answer buttons / approval card, the person's answer and the state
+            "choices": {"type": ["object", "null"], "description": "2.41.0 (#1383): {choices: [{id, label, style?}], multi, approval?: {title, what, std?}, "
+                        "expires_at?, withdrawn_at?, outcome?}"},
+            "choice": {"type": ["object", "null"], "description": "2.41.0: the answer {ids, at, user_id, user_name, via}, written once"},
+            "choice_state": nul("string", description="2.41.0: open | answered | expired | withdrawn")}},
         # 2.33.0 (#1076): the short quote of an answered message (comments, team chat, agent chat)
         "ReplyQuote": {"type": "object", "description": "2.33.0 (#1076): a short quote of the answered message; deleted = the original is gone "
                        "(deleted or trimmed: no text then)", "properties": {
@@ -346,7 +354,14 @@ def openapi_spec():
             "name": {"type": "string"}, "text": {"type": "string", "description": "Plain text, at most 140 characters (+ …)"},
             "from": {"type": "string", "enum": ["user", "agent"], "description": "Agent chat only"}}},
         "CommentInput": {"type": "object", "additionalProperties": False, "required": ["body"], "properties": {"body": {"type": "string", "maxLength": MAX_COMMENT},
-                         "reply_to": {"type": "integer", "description": "2.33.0 (#1076): answer this comment of the same task (else 400); its author is notified like a mention"}}},
+                         "reply_to": {"type": "integer", "description": "2.33.0 (#1076): answer this comment of the same task (else 400); its author is notified like a mention"},
+                         # 2.41.0 (#1383): answer buttons / an approval card like in the agent chat (agents only)
+                         "choices": {"type": "array", "description": "2.41.0 (#1383, agents): answer buttons [{id, label, style?}] (or strings); only the newest "
+                                     "comment's buttons stay live", "items": {"anyOf": [{"type": "string"}, {"type": "object"}]}},
+                         "multi": {"type": "boolean", "description": "2.41.0: several buttons may be picked"},
+                         "approval": {"type": "object", "description": "2.41.0 (#1383, agents): an approval card {title, what?, yes_label?, no_label?} with Yes / No; "
+                                      "stays open until answered, expired or withdrawn"},
+                         "expires_in": {"type": "integer", "description": "2.41.0: seconds an approval card stays open"}}},
         "CommentPage": page("Comment"),
         "TimeEntry": {"type": "object", "properties": {
             "id": {"type": "integer"}, "user_id": {"type": "integer"}, "user_name": {"type": "string"}, "task_id": nul("integer"),

@@ -476,6 +476,7 @@ def v1_list(d):
             "stale_days": d.get("stale_days"), "agent_followup": bool(d.get("agent_followup")),
             "icon": d.get("icon") or "",
             "repos": d.get("repos") or [], "tickets": bool(d.get("tickets")),
+            "time_tracking": bool(d.get("time_tracking")),  # 2.41.0 (#1471): time tracking on for this list
             "nag": d.get("nag") or "", "day_hours": d.get("day_hours"),  # 2.7.0 (#413, #407)
             "columns": d.get("columns"),  # 2.14.0 (#425): the list's columns (null = default)
             "project_type": d.get("ptype") or None,  # 2.18.0 (#408): agency | software | private, null = none
@@ -714,10 +715,12 @@ def v1_list_create():
     v1_args(())
     b = v1_json()
     unknown = sorted(k for k in b if k not in ("name", "color", "folder", "checklist", "done_at_bottom", "kind", "tickets", "project_type", "nag", "day_hours",
-                                               "family", "sections", "org_id"))  # 2.28.0 (#935): org_id
+                                               "family", "sections", "org_id", "time_tracking"))  # 2.28.0 (#935): org_id; 2.41.0 (#1471)
     if unknown:
         raise UnknownFields(unknown)
-    later = {k: b.pop(k) for k in ("nag", "day_hours") if k in b}  # 2.7.0: set right after the list exists
+    later = {k: b.pop(k) for k in ("nag", "day_hours", "time_tracking") if k in b}  # 2.7.0: set right after the list exists
+    if "time_tracking" in later and not isinstance(later["time_tracking"], bool):  # 2.41.0 (#1471)
+        raise BadInput(tr("Invalid value: {0}", "time_tracking"))
     if "nag" in later:
         clean_list_value("nag", later["nag"])
     if "day_hours" in later and clean_day_hours(later["day_hours"]) is False:
@@ -759,7 +762,7 @@ def v1_list_patch(lid):
     unknown = sorted(k for k in b if k not in ("name", "color", "folder", "view", "kind", "nag", "day_hours", "done_at_bottom", "checklist",
                                                "listen_agent_ids", "columns", "archived", "project_type", "family", "life", "trip",
                                                "client_id", "agent_members", "agent_peers", "org_id",
-                                               "stale_days", "agent_followup", "folder_adopt"))  # 2.28.0 (#935); 2.34.0 (#266); 2.39.1 (#1188)
+                                               "stale_days", "agent_followup", "folder_adopt", "time_tracking"))  # 2.28.0 (#935); 2.34.0 (#266); 2.39.1 (#1188); 2.41.0 (#1471)
     if unknown:
         raise UnknownFields(unknown)
     if "family" in b and b["family"] is None:  # 2.19.0 (#653): null = an ordinary list
@@ -770,7 +773,7 @@ def v1_list_patch(lid):
         if b["project_type"] not in (None, "") and b["project_type"] not in PTYPES:
             raise BadInput(tr("Invalid value: {0}", "project_type"))
         b = {**{k: v for k, v in b.items() if k != "project_type"}, "ptype": b["project_type"] or ""}
-    for k in ("checklist", "done_at_bottom", "archived", "agent_members", "agent_peers"):
+    for k in ("checklist", "done_at_bottom", "archived", "agent_members", "agent_peers", "time_tracking"):  # 2.41.0 (#1471): time_tracking
         if k in b and not isinstance(b[k], bool):
             raise BadInput(tr("Invalid value: {0}", k))
     if "folder_adopt" in b and not isinstance(b["folder_adopt"], bool):  # 2.39.1 (#1188): take the new folder's settings
@@ -1166,7 +1169,9 @@ def v1_comment(c, d, names):
             "reactions": d.get("reactions") or [], "suggestion": d.get("suggestion"),
             "body": d["body"], "text": comment_plain(c, d["body"]), "mentions": d["mentions"], "created_at": d["created_at"],
             "edited_at": d["edited_at"], "attachments": [{k: a[k] for k in ("id", "name", "mime", "size")} for a in d["attachments"]],
-            "reply_to": d.get("reply_to"), "reply": d.get("reply")}  # 2.33.0 (#1076)
+            "reply_to": d.get("reply_to"), "reply": d.get("reply"),  # 2.33.0 (#1076)
+            # 2.41.0 (#1383): answer buttons / approval card of an agent's comment, the answer and its state
+            "choices": d.get("choices"), "choice": d.get("choice"), "choice_state": d.get("choice_state")}
 
 
 @app.get("/api/v1/tasks/<int:tid>/comments")
@@ -1180,8 +1185,9 @@ def v1_comments(tid):
     atts = att_dicts(c, "task_id=? AND comment_id IS NOT NULL", (tid,))
     names = user_names(c, [r["user_id"] for r in rows])
     from ..collab.replies import with_replies
-    return jsonify(data=[v1_comment(c, d, names) for d in with_replies(c, "c", with_reactions(c, [{**comment_dict(r, atts), "task_id": tid} for r in rows]))],
-                   next_cursor=None)
+    from ..collab.cchoice import lv_with_choices
+    ds = lv_with_choices(c, tid, rows, with_replies(c, "c", with_reactions(c, [{**comment_dict(r, atts), "task_id": tid} for r in rows])))
+    return jsonify(data=[v1_comment(c, d, names) for d in ds], next_cursor=None)
 
 
 @app.post("/api/v1/tasks/<int:tid>/comments")
@@ -1189,12 +1195,14 @@ def v1_comments(tid):
 def v1_comment_create(tid):
     v1_args(())
     b = v1_json()
-    reject_unknown(b, ("body", "suggestion", "reply_to"))  # 2.2.1 (#359): 400 unknown_field; 2.33.0 (#1076): reply_to
+    # 2.2.1 (#359): 400 unknown_field; 2.33.0 (#1076): reply_to; 2.41.0 (#1383): choices / multi / approval / expires_in
+    reject_unknown(b, ("body", "suggestion", "reply_to", "choices", "multi", "approval", "expires_in"))
     if not isinstance(b.get("body"), str):
         raise BadInput(tr("Expected {0}", '{"body": "..."}'))
     c = db()
     _v1_live(c, tid, write=False, full=True)  # view-only members may comment (as in the app)
-    j = v1_call(comment_create, tid, body={"body": b["body"], **{k: b[k] for k in ("suggestion", "reply_to") if k in b}})
+    j = v1_call(comment_create, tid, body={"body": b["body"], **{k: b[k] for k in ("suggestion", "reply_to", "choices", "multi", "approval",
+                                                                                    "expires_in") if k in b}})
     return jsonify(v1_comment(c, {**j, "task_id": tid}, user_names(c, [me()]))), 201
 
 

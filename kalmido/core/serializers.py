@@ -72,14 +72,19 @@ def load_tasks(c, where, args=(), full_snips=False):
                 d["agent"] = a["display_name"] or a["username"]
             atts.setdefault(a["task_id"], []).append(d)
     # comment count + unread (comments of others newer than the last one I have seen)
+    from ..core.db import iso_ms, now_utc
     cms, uid = {}, (g.user["id"] if has_request_context() and getattr(g, "user", None) else None)
     if uid and ids:
+        # 2.41.0 (#1383): + a = open approval cards of agents in the comments (the task's badge)
         for r in c.execute("""SELECT k.task_id, COUNT(*) AS n,
-                                     SUM(CASE WHEN k.id > COALESCE(s.seen_id, 0) AND k.user_id IS DISTINCT FROM ? THEN 1 ELSE 0 END) AS u
+                                     SUM(CASE WHEN k.id > COALESCE(s.seen_id, 0) AND k.user_id IS DISTINCT FROM ? THEN 1 ELSE 0 END) AS u,
+                                     SUM(CASE WHEN k.choices IS NOT NULL AND k.choice IS NULL AND k.choices->>'approval' IS NOT NULL
+                                              AND k.choices->>'withdrawn_at' IS NULL AND COALESCE(k.choices->>'expires_at', '9') > ?
+                                              THEN 1 ELSE 0 END) AS a
                               FROM comments k LEFT JOIN task_seen s ON s.task_id=k.task_id AND s.user_id=?
-                              WHERE k.deleted_at IS NULL GROUP BY k.task_id""", (uid, uid)):
+                              WHERE k.deleted_at IS NULL GROUP BY k.task_id""", (uid, iso_ms(now_utc()), uid)):
             if r["task_id"] in ids:
-                cms[r["task_id"]] = (r["n"], r["u"] or 0)
+                cms[r["task_id"]] = (r["n"], r["u"] or 0, r["a"] or 0)
     # custom field values (fields of the task's current list) and dependencies: blocked = open blockers
     # (also ones I cannot see), blockers = the open ones I can see, blocking = open tasks waiting on it
     fvs, blk, bing = {}, {}, {}
@@ -116,7 +121,9 @@ def load_tasks(c, where, args=(), full_snips=False):
         if r["id"] in gcode and r["id"] not in ctx:
             d["code"] = gcode[r["id"]]
         d["attachments"] = atts.get(r["id"], [])
-        d["comment_count"], d["unread"] = cms.get(r["id"], (0, 0))
+        d["comment_count"], d["unread"], apv = cms.get(r["id"], (0, 0, 0))
+        if apv:
+            d["approvals_open"] = apv  # 2.41.0 (#1383)
         d["fields"] = fvs.get(r["id"], {})
         d["blocked"] = len(blk.get(r["id"], []))
         d["blockers"] = [b for b, lid in blk.get(r["id"], []) if lid in vis and (lid not in pl or b in pv)]
@@ -128,6 +135,7 @@ def load_tasks(c, where, args=(), full_snips=False):
         if r["id"] in ctx:
             d.update(content="", url=None, attachments=[], comment_count=0, unread=0, fields={},
                      blockers=[], blocked=0, blocking=0, context=True)
+            d.pop("approvals_open", None)
             d.pop("snippets", None)  # 2.35.0 (#1095)
             d.pop("snippets_n", None)
         out.append(d)

@@ -13,7 +13,7 @@ const moActive = () => S.route.mod === 'tasks' && S.route.key === 'assigned';
 const moOwn = () => moActive() && moView() === 'own';
 // what counts as mine: assigned to me or one of my groups; without collaboration every task of my lists (#1344: always shown)
 const moPred = () => collab() ? mineAssigned : mineTask;
-const moFromState = j => OUT.q.some(e => e.url === '/api/tasks/mine-order') ? (S.mineOrder || {}) : (j.mine_order || {});
+const moFromState = j => { mtFromState(j); return OUT.q.some(e => e.url === '/api/tasks/mine-order') ? (S.mineOrder || {}) : (j.mine_order || {}); };
 const moPos = t => { const p = S.mineOrder?.[t.id]; return p == null ? null : +p; };
 function moCmp(a, b) {
   const x = moPos(a), y = moPos(b);
@@ -64,3 +64,48 @@ function moViewItems() {
   const set = v => () => { if (moView() === v) return; S.settings.mine_view = v; render(); api('PATCH', '/api/settings', {mine_view: v}).catch(() => {}); };
   return [{label: tr('Own order'), icon: 'sort', on: moView() === 'own', fn: set('own')}, {label: tr('Grouped by list'), icon: 'list', on: moView() === 'lists', fn: set('lists')}];
 }
+
+// ---- 2.41.0 (#1365): "Show in My tasks" per list, only for me (PUT /api/lists/<id>/in-mine; /api/state mine_hidden = ids of
+// the lists switched off). Their tasks leave "My tasks" for the group "Hidden (N)" at the end (folded until opened, every list
+// with "Show the list again"); my assigned tasks of such a list due today or overdue stay visible in the small group "From
+// hidden lists" above it. The sidebar counts what "My tasks" shows openly (hidden ones only when due today or overdue).
+// The own order (#1344) keeps the hidden tasks' places; the other views do not look at it.
+function mtFromState(j) { if (!OUT.q.some(e => /^\/api\/lists\/\d+\/in-mine$/.test(e.url))) S.mineHidden = new Set(j.mine_hidden || []); }
+const mtHid = t => !!S.mineHidden?.has(t.list_id);
+const mtUrgent = (t, t0 = today()) => !!t.due && t.due <= t0;
+const mtCounts = (t, t0) => !mtHid(t) || mtUrgent(t, t0);
+const mtShown = id => !S.mineHidden?.has(id);
+// views.js groupTasks: the two groups at the end of "My tasks" (hid: hidden roots of my tasks, kb: hidden undated tasks of
+// "From your lists, without a date")
+function mtGroups(hid, kb) {
+  const t0 = today(), urg = hid.filter(t => mtUrgent(t, t0)).sort((a, b) => dueKey(a).localeCompare(dueKey(b)) || a.id - b.id);
+  const ord = kbListOrder().map(l => l.id), rest = [...hid.filter(t => !mtUrgent(t, t0)), ...kb]
+    .sort((a, b) => ord.indexOf(a.list_id) - ord.indexOf(b.list_id) || moCmp(a, b));
+  const out = [];
+  if (urg.length) out.push({id: 'mt:urgent', name: tr('From hidden lists'), tasks: urg, cls: 'mturg'});
+  if (rest.length) out.push({id: 'mt:hidden', name: tr('Hidden'), tasks: rest, cls: 'mthid', folded: true, byList: true});
+  return out;
+}
+// the head of one list inside "Hidden" (render.js viewListBody, before its first task)
+function mtListHead(lid) {
+  const l = listById(lid); if (!l) return '';
+  return `<div class="mthl">${licMark(l, 'lsm')}<span class="mthn">${esc(lname(l))}</span><button type="button" class="linkbtn" data-mt="show" data-id="${l.id}">${esc(tr('Show the list again'))}</button></div>`;
+}
+async function mtSet(id, on, o = {}) {
+  const was = mtShown(id);
+  if (was === on) return;
+  if (!S.mineHidden) S.mineHidden = new Set();
+  if (on) S.mineHidden.delete(id); else S.mineHidden.add(id);
+  render();
+  try {
+    const j = await api('PUT', `/api/lists/${id}/in-mine`, {on});
+    if (Array.isArray(j?.mine_hidden)) S.mineHidden = new Set(j.mine_hidden);
+  } catch { if (was) S.mineHidden.delete(id); else S.mineHidden.add(id); render(); return; }
+  render();
+  o.post?.();
+  if (!o.quiet) toast(on ? tr('{0} shows in My tasks again', lname(listById(id))) : tr('{0} is hidden in My tasks', lname(listById(id))), () => mtSet(id, was, {...o, quiet: true}));
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('[data-mt="show"]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation(); mtSet(+b.dataset.id, true);
+}, true);

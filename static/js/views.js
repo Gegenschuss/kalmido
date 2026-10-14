@@ -25,7 +25,8 @@ function viewTasks() {
   if (k === 'stale') return {...pick(t => !!staleOf(t), 'list'), done: []};  // 2.34.0 (#266)
   if (k === 'all') return {...pick(() => true, 'list'), done: doneRecent};
   // 2.40.0 (#1344): own order (one group, mineorder.js) or grouped by list as before; without collaboration: every task of mine
-  if (k === 'assigned') return {...pick(moPred(), moView() === 'own' ? 'none' : 'list'), mine: true, done: doneRecent.filter(t => collab() ? !!S.me && t.assignee_id === S.me.id : mineTask(t))};  // 2.10.0: + my groups' tasks
+  // 2.41.0 (#1365): the tasks of lists switched off for "My tasks" go to hid (groupTasks: "From hidden lists" / "Hidden")
+  if (k === 'assigned') return {...pick(t => moPred()(t) && !mtHid(t), moView() === 'own' ? 'none' : 'list'), hid: pick(t => moPred()(t) && mtHid(t)).open, mine: true, done: doneRecent.filter(t => collab() ? !!S.me && t.assignee_id === S.me.id : mineTask(t))};  // 2.10.0: + my groups' tasks
   if (k.startsWith('grp:')) {  // 2.10.0 (#441): open tasks assigned to a group, in the lists I see
     const gid = +k.slice(4);
     return {...pick(t => t.assignee_group_id === gid, 'list'), done: []};
@@ -230,7 +231,9 @@ function groupTasks(v) {
   // 1.7.0: Flow shows one sequence instead of date groups (sections and the folder's lists stay)
   const g = kbOrderGroups(groupRest(v.group === 'date' && sortMode() === 'flow' ? {...v, group: 'none'} : v, all.filter(t => !t.pinned), v.inSec || []));  // 2.39.1 (#1221): own order
   const mine = kbMineGroup();  // 2.39.1 (#1219): My tasks + "From your lists, without a date"
-  if (mine) { const ids = new Set(all.map(t => t.id)); mine.tasks = mine.tasks.filter(t => !ids.has(t.id) && favKeep(t)); if (mine.tasks.length) g.push(mine); }
+  let kbHid = [];  // 2.41.0 (#1365): undated tasks of a hidden list go to "Hidden" too
+  if (mine) { const ids = new Set(all.map(t => t.id)); mine.tasks = mine.tasks.filter(t => !ids.has(t.id) && favKeep(t)); kbHid = mine.tasks.filter(mtHid); mine.tasks = mine.tasks.filter(t => !mtHid(t)); if (mine.tasks.length) g.push(mine); }
+  if (v.mine) { const hids = new Set((v.hid || []).map(t => t.id)); g.push(...mtGroups(v.hid || [], kbHid.filter(t => !hids.has(t.id)))); }
   return pinned.length ? [{id: 'pinned', name: tr('Pinned'), tasks: pinned, cls: 'pin'}, ...g] : g;
 }
 function groupRest(v, arr, dn = []) {  // dn: 2.36.2 (#1136) the completed tasks that stay in their sections

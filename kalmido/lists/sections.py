@@ -128,6 +128,8 @@ def folder_rename():
     gf_rename(c, uid, old, new)  # 2.33.0 (#934): the folder's repositories go along
     from ..lists.playbook import pb_folder_rename
     pb_folder_rename(c, uid, old, new)  # 2.39.0 (#1168): the folder's Playbook (and its subfolders') go along
+    from ..lists.foldershare import sh_folder_rename
+    sh_folder_rename(c, uid, old, new)  # 2.41.0 (#1420): the folder's agents go along
     bump(c)
     c.commit()
     return jsonify(ok=True)
@@ -157,6 +159,7 @@ def folder_delete():
     from ..lists.playbook import pb_folder_removed
     pb_folder_removed(c, uid, name, up)  # 2.39.0 (#1168): the subfolders' Playbooks move up; the folder's own one ends empty (history kept)
     c.execute("DELETE FROM folder_people WHERE owner_id=? AND folder=?", (uid, name))  # 2.22.0 (#740): the folder is gone
+    c.execute("DELETE FROM folder_agents WHERE owner_id=? AND folder=?", (uid, name))  # 2.41.0 (#1420)
     bump(c)
     c.commit()
     return jsonify(ok=True)

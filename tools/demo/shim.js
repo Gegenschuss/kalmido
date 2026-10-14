@@ -64,7 +64,7 @@
     const sec = (lid, name, sort) => { const s = {id: nid('section'), list_id: lid, name, sort}; DB.sections.push(s); return s.id; };
     const task = o => { const k = {...clone(TASK_DEF), id: nid('task'), created_at: now, updated_at: now, ...o}; if (k.status && !k.completed_at) { k.completed_at = now; k.completed_by = 1; } DB.tasks.push(k); return k; };
     list({name: 'Eingang', is_inbox: 1, sort: -1});
-    const p = list({name: x.project, kind: 'project', color: '#7c5cff', sort: 1, tickets: 1, status: 'on_track', status_at: now, status_by: 1, status_note: x.status,
+    const p = list({name: x.project, kind: 'project', time_tracking: 1, color: '#7c5cff', sort: 1, tickets: 1,  // 2.41.0 (#1471): time_tracking status: 'on_track', status_at: now, status_by: 1, status_note: x.status,
       description: '', milestones: [{id: 1, name: x.ms1, day: day(4), done: 0}, {id: 2, name: x.ms2, day: day(20), done: 0}]});
     DB.seq.ms = 2;
     const priv = list({name: x.personal, color: '#22c55e', sort: 2});
@@ -174,6 +174,7 @@
       tasks, habits: clone(DB.habits), pomo: null, pomo_today: {count: 0, minutes: 0},
       counts: {done: live().filter(t => t.status !== 0).length, trash: DB.tasks.filter(t => t.deleted_at).length},
       settings: clone(DB.settings), notify: {},
+      mine_hidden: [...(DB.mineHidden || [])],  // 2.41.0 (#1365)
       ntfy_inbox: {enabled: false, server: '', topic: ''}, ntfy_url: '', webpush: {devices: 0, enabled: false, key: ''},
       languages: [{beta: false, code: 'de', name: 'Deutsch'}, {beta: false, code: 'en', name: 'English'}, {beta: true, code: 'es', name: 'Español'},
         {beta: true, code: 'fr', name: 'Français'}, {beta: true, code: 'it', name: 'Italiano'}, {beta: true, code: 'nl', name: 'Nederlands'}],
@@ -407,9 +408,14 @@
     if (l.family === 'shopping') shopAreas(l);
     return listOut(l);
   });
+  // 2.41.0 (#1365): "Show in My tasks" per list; (#1205): the recent "Waiting on" entries (from the demo's own tasks)
+  on('PUT', '/api/lists/(\\d+)/in-mine', (q, b, id) => { listById(id) || gone(); const h = new Set(DB.mineHidden || []); if (b.on) h.delete(+id); else h.add(+id); DB.mineHidden = [...h]; return {ok: true, on: !!b.on, mine_hidden: DB.mineHidden}; });
+  const waitSugg = () => { const hid = new Set(DB.waitHidden || []), seen = new Set(); return DB.tasks.filter(t => t.wait_note).sort((a, b) => (b.waiting_at || '').localeCompare(a.waiting_at || '')).map(t => ({note: t.wait_note, at: t.waiting_at})).filter(x => { const k = x.note.toLowerCase(); if (hid.has(k) || seen.has(k)) return false; seen.add(k); return true; }).slice(0, 50); };
+  on('GET', '/api/me/wait-suggestions', () => ({items: waitSugg()}));
+  on('DELETE', '/api/me/wait-suggestions', (q, b) => { DB.waitHidden = [...new Set([...(DB.waitHidden || []), String(b.note || '').trim().toLowerCase()])]; return {ok: true, items: waitSugg()}; });
   on('PATCH', '/api/lists/(\\d+)', (q, b, id) => {
     const l = listById(id) || gone();
-    for (const k of ['name', 'color', 'folder', 'sort', 'view', 'archived', 'checklist', 'dep_shift', 'kind', 'tickets', 'nag', 'description', 'agent_tidy', 'rate', 'day_hours', 'family']) if (k in b) l[k] = typeof b[k] === 'boolean' ? (b[k] ? 1 : 0) : b[k];
+    for (const k of ['name', 'color', 'folder', 'sort', 'view', 'archived', 'checklist', 'dep_shift', 'kind', 'tickets', 'nag', 'description', 'agent_tidy', 'rate', 'day_hours', 'family', 'time_tracking']) if (k in b) l[k] = typeof b[k] === 'boolean' ? (b[k] ? 1 : 0) : b[k];
     if ('done_at_bottom' in b) l.checklist = b.done_at_bottom ? 1 : 0;
     if ('archived' in b) l.archived_at = b.archived ? iso() : null;
     if ('columns' in b) l.columns = Array.isArray(b.columns) ? [...new Set(b.columns)] : null;  // 2.14.0 (#425)

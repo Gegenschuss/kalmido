@@ -251,7 +251,7 @@ def overview_build(c, lid, uid):
            "task_files": tfiles, "members": members,
            "status": {"current": lst["status"] or None, "note": lst["status_note"] or "", "at": lst["status_at"], "history": status},
            "time": None}
-    if time_all():
+    if time_all() and lst["time_tracking"]:  # 2.41.0 (#1471): "Tracked" only with the list's time tracking on
         t = time_list_totals(c, uid).get(lid) or {"s": 0, "b": None}
         dh = lst["day_hours"] or time_day_h(c)
         out["time"] = {"seconds": t["s"] or 0, "budget_h": t["b"], "day_hours": dh}

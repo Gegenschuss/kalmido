@@ -19,6 +19,7 @@ from ..core.state import visible_lists
 LIST_FIELDS = ("name", "color", "folder", "sort", "view", "archived", "checklist", "dep_shift", "kind", "tickets", "nag",
                "family",  # 2.19.0 (#653): '' | shopping | meals | birthdays | household | packing
                "life", "trip")  # 2.22.0 (#663): '' | contracts | home | health | travel | reading; {from, to, where} of a trip
+LIST_FIELDS += ("time_tracking",)  # 2.41.0 (#1471): time tracking on for this list (owner; any type, default off)
 LIST_KINDS = ("list", "project")
 # 2.7.2 (#414): the type "checklist" (2.7.0 "Shopping & packing list") is gone. Every list has the display option "Show
 # completed at the bottom" instead (column lists.checklist, API field done_at_bottom); kind "checklist" is still accepted
@@ -165,7 +166,7 @@ def clean_list_value(k, v, member=False):
         if not math.isfinite(v):
             raise BadInput(tr("Invalid value: {0}", "sort"))
         return v
-    if k in ("archived", "checklist", "dep_shift", "tickets"):
+    if k in ("archived", "checklist", "dep_shift", "tickets", "time_tracking"):
         return 1 if v else 0
     if k == "kind":
         if v not in LIST_KINDS and v not in LIST_KIND_ALIASES:
@@ -211,6 +212,8 @@ def list_create():
         from ..accounts.orgs import clean_org_id, ws_default_org
         oid = clean_org_id(c, b["org_id"], me()) if "org_id" in b else ws_default_org(c, me(), folder)  # 2.28.0 (#935)
         lid, on = ptype_create(c, me(), b["ptype"], name, folder, color, sections=b.get("sections") is True, org_id=oid)  # 2.27.0 (#972)
+        if "time_tracking" in b:  # 2.41.0 (#1471)
+            c.execute("UPDATE lists SET time_tracking=? WHERE id=?", (clean_list_value("time_tracking", b["time_tracking"]), lid))
         bump(c)
         c.commit()
         return jsonify({**dict(c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()), "modules_on": on})
@@ -235,10 +238,12 @@ def list_create():
     from ..accounts.orgs import clean_org_id, ws_default_org
     oid = clean_org_id(c, b["org_id"], uid) if "org_id" in b else ws_default_org(c, uid, folder)  # 2.28.0 (#935): the workspace
     g.list_keep = ("org_id",) if "org_id" in b else ()  # 2.29.0 (#1030): an explicit workspace beats the folder's default
+    g.list_keep += ("time_tracking",) if "time_tracking" in b else ()  # 2.41.0 (#1471): so does an explicit time tracking
     # 2.2.1 (#359): dep_shift ("Move dependent tasks along") is taken at creation too (before, only PATCH set it)
-    cur_id = insert_id(c, "INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind,dep_shift,tickets,org_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+    cur_id = insert_id(c, "INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind,dep_shift,tickets,org_id,time_tracking) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (name, color, folder, srt, view, iso(now_utc()), uid, dab, kind,
-                     clean_list_value("dep_shift", b.get("dep_shift")), clean_list_value("tickets", b.get("tickets")), oid))
+                     clean_list_value("dep_shift", b.get("dep_shift")), clean_list_value("tickets", b.get("tickets")), oid,
+                     clean_list_value("time_tracking", b.get("time_tracking"))))
     list_created(c, uid, cur_id)  # 2.4.2 (#391) agents, 2.10.0 (#441) groups, 2.22.0 (#740) / 2.25.0 (#931) folder people
     bump(c)
     c.commit()
@@ -262,7 +267,7 @@ def list_update(lid):
     role = need_list(c, lid, write=False)
     given = set(b)  # 2.29.0 (#1030): what this request sets on its own (kept when the list moves into a folder)
     tb_col_on = None  # 2.39.1 (#1293): modules the field columns switched on (None = no field columns sent)
-    tidy0 = c.execute("SELECT agent_tidy, agent_members, agent_peers, folder FROM lists WHERE id=?", (lid,)).fetchone()
+    tidy0 = c.execute("SELECT agent_tidy, agent_members, agent_peers, agent_followup, folder FROM lists WHERE id=?", (lid,)).fetchone()
     if "agent_tidy" in b or "tidy_agent_id" in b:  # 2.0.0: "Agent may tidy up entries" (own permission rule, see
         # list_tidy_update); 2.4.1 (#379): "Tidy up by" (the one agent)
         e = list_tidy_update(c, lid, b.get("agent_tidy"), b.get("tidy_agent_id"), "tidy_agent_id" in b)
@@ -367,6 +372,8 @@ def list_update(lid):
         for k in LIST_FIELDS:
             if k in vals:
                 c.execute(f"UPDATE lists SET {k}=? WHERE id=?", (vals[k], lid))
+        if "time_tracking" in vals:  # 2.41.0 (#1471): set on its own: differs from its folder's default from now on
+            list_own_mark(c, lid, "time_tracking")
         if vals.get("life") == "health":  # 2.22.0 (#663): a health list is never shared with an agent
             c.execute("DELETE FROM list_members WHERE list_id=? AND user_id IN (SELECT id FROM users WHERE kind='agent')", (lid,))
         # 2.22.0 (#747): a list that becomes a shopping list gets no shop areas by itself any more ("Add shop areas")
@@ -417,8 +424,8 @@ def list_update(lid):
             if k in vals:
                 c.execute(f"UPDATE list_members SET {k}=? WHERE list_id=? AND user_id=?", (vals[k], lid, me()))
     if tidy0:  # 2.29.0 (#1030): a tidy / agent access setting changed on its own differs from its folder from now on
-        now = c.execute("SELECT agent_tidy, agent_members, agent_peers FROM lists WHERE id=?", (lid,)).fetchone()
-        for k in ("agent_tidy", "agent_members"):
+        now = c.execute("SELECT agent_tidy, agent_members, agent_peers, agent_followup FROM lists WHERE id=?", (lid,)).fetchone()
+        for k in ("agent_tidy", "agent_members", "agent_followup"):  # 2.41.0 (#1423): + agent_followup
             if k in given and (now[k] or 0) != (tidy0[k] or 0) and vals.get("folder", tidy0["folder"]) == tidy0["folder"]:
                 list_own_mark(c, lid, k)
         if "listen_agent_ids" in given and vals.get("folder", tidy0["folder"]) == tidy0["folder"]:  # 2.30.0 (#1034)
@@ -694,8 +701,9 @@ def folder_people_get():
     from flask import request
     c = db()
     f = clean_folder(request.args.get("folder") or "", strict=False)
-    return jsonify(people=[{"user_id": r[0], "role": r[1]} for r in
-                           c.execute("SELECT user_id, role FROM folder_people WHERE owner_id=? AND folder=? ORDER BY created_at", (me(), f))])
+    return jsonify(people=[{"user_id": r[0], "role": r[1], "name": r[2] or r[3] or ""} for r in  # 2.41.0 (#1420): + name
+                           c.execute("""SELECT p.user_id, p.role, u.display_name, u.username FROM folder_people p JOIN users u ON u.id=p.user_id
+                                        WHERE p.owner_id=? AND p.folder=? ORDER BY p.created_at""", (me(), f))])
 
 
 @app.put("/api/folders/people")
@@ -714,7 +722,13 @@ def folder_people_put():
     except (TypeError, ValueError):
         uid = 0
     from ..accounts.orgs import may_see
-    if not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (uid,)).fetchone() or uid == me() or personal_agent_foreign(c, uid, me()) \
+    if b.get("email") and not uid:  # 2.41.0 (#1423): share the folder by e-mail address, like a list (never says whether it has an account)
+        r = c.execute("SELECT id FROM users WHERE lower(email)=? AND disabled=0 AND COALESCE(kind,'user')!='agent'",
+                      (str(b["email"]).strip().lower()[:200],)).fetchone()
+        if not r or r[0] == me():
+            return jsonify(shared=0, updated=0, by_email=True)
+        uid = r[0]
+    elif not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (uid,)).fetchone() or uid == me() or personal_agent_foreign(c, uid, me()) \
             or not may_see(c, me(), uid):  # 2.22.0 (#752)
         return err(tr("unknown user"), 404)
     from ..agents.core import is_agent
@@ -744,6 +758,8 @@ def folder_people_put():
                                 WHERE list_id=? AND user_id=? AND COALESCE(own_role, role)!=?""", (r2, r2, r2, r["id"], uid, r2)).rowcount
     bump(c)
     c.commit()
+    if b.get("email") and not b.get("user_id"):  # 2.41.0 (#1423): the same answer as for an unknown address
+        return jsonify(shared=0, updated=0, by_email=True)
     return jsonify(shared=n, updated=upd, **({"skipped": skipped, "skipped_reason": tr(ONE_AGENT_MSG)} if skipped else {}))
 
 

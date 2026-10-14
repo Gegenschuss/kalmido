@@ -5,7 +5,7 @@ from flask import jsonify, request
 from ..core.config import app, TZ
 from ..core.db import db, iso, local_day as _local_day, local_now, now_utc
 from ..accounts.session import me
-from ..core.access import PROJ_SQL, time_all
+from ..core.access import time_all
 from ..core.state import visible_lists
 from ..personal.habits import pomo_elapsed
 from ..personal.timetrack import entry_secs
@@ -88,7 +88,7 @@ def stats_api():
 
     # tracked time (module "time"): my entries by the local day they start (running timer up to now)
     t_week, t_list, ref = [0] * STATS_WEEKS, {}, now_utc()
-    for e in c.execute(f"SELECT start, \"end\", seconds, list_id FROM time_entries WHERE user_id=? AND start>=? AND (list_id IS NULL OR list_id IN {PROJ_SQL})", (uid, lo)):
+    for e in c.execute("SELECT start, \"end\", seconds, list_id FROM time_entries WHERE user_id=? AND start>=?", (uid, lo)):  # 2.41.0 (#1471): any list
         d = _local_day(e["start"])
         if d < mon0 or d > today:
             continue

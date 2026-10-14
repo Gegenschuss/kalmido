@@ -220,6 +220,7 @@ def sample_create(c, uid):
                         (uid, ids["concept"], lid, tr("Write the concept and treatment", lg=lg), iso(st),
                          iso(st + timedelta(minutes=90)), 5400, tr("First draft of the treatment", lg=lg), "manual", ts, ts))
         track("time", eid)
+        c.execute("UPDATE lists SET time_tracking=1 WHERE id=?", (lid,))  # 2.41.0 (#1471): the sample tracks time
     if project and "progress" in feats:
         note = tr("Shoot dates confirmed with the client", lg=lg)
         c.execute("UPDATE lists SET status='on_track', status_note=?, status_by=?, status_at=? WHERE id=?", (note, uid, ts, lid))

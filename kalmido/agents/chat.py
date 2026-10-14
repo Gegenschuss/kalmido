@@ -159,9 +159,10 @@ def chat_dict(r, rx=None, files=None, api=False, newest=None, edits=False):
     of the conversation's newest message that is not a permission question (chat_newest), for choice_state."""
     ch = _jload(r["choices"]) if "choices" in r.keys() else None
     ans = _jload(r["choice"]) if "choice" in r.keys() else None
+    kind = (r["kind"] if "kind" in r.keys() else None) or "message"  # 2.41.0 (#1206): message | notice
     return {"id": r["id"], "agent_id": r["agent_id"], "user_id": r["user_id"], "from": r["sender"], "body": r["body"],
-            "task_id": r["task_id"], "created_at": r["created_at"], "delivered_at": r["delivered_at"],
-            "reactions": (rx or {}).get(r["id"], []), "asks": r["sender"] == "agent" and (chat_asks(r["body"]) or bool(ch and (ch.get("permission") or ch.get("approval")))),
+            "task_id": r["task_id"], "created_at": r["created_at"], "delivered_at": r["delivered_at"], "kind": kind,
+            "reactions": (rx or {}).get(r["id"], []), "asks": r["sender"] == "agent" and kind != "notice" and (chat_asks(r["body"]) or bool(ch and (ch.get("permission") or ch.get("approval")))),
             # 2.28.0 (#1005): answer buttons of an agent's message ({choices: [{id, label, style?}], multi}) and the person's
             # answer ({ids, at}); null without. 2.30.0 (#1037 / #1041): choices.permission (a permission question),
             # choices.expires_at; choice_state open | answered | expired (a newer message came, the time ran out) | withdrawn.
@@ -190,8 +191,8 @@ def chat_reply(r):
 # make older buttons expire either. A press on expired buttons answers 409. The agent may withdraw a message's buttons.
 def chat_newest(c, aid, uid):
     """Id of the newest message of the conversation that is not a permission question (0 = none). 2.35.0 (#1103): nor an
-    approval request (it stays open like a permission question)."""
-    r = c.execute("""SELECT MAX(id) FROM agent_chat WHERE agent_id=? AND user_id=?
+    approval request (it stays open like a permission question). 2.41.0 (#1206): nor a notice."""
+    r = c.execute("""SELECT MAX(id) FROM agent_chat WHERE agent_id=? AND user_id=? AND kind IS NULL
                      AND (choices IS NULL OR (COALESCE(choices->>'permission', '0') IN ('0', 'false')
                                               AND choices->>'approval' IS NULL))""", (aid, uid)).fetchone()
     return (r[0] or 0) if r else 0
@@ -573,6 +574,30 @@ def chat_post(c, aid, uid, sender, b, files, allowed_keys=("body", "task_id")):
     return r
 
 
+# ---- 2.41.0 (#1206): a notice of the agent in its chat: one short grey line in the middle like a date divider (e.g. "New
+# session, summary taken over (22:10)" when its host started a fresh session or compacted the conversation). No bubble, no
+# push, never unread, no buttons, no live steps taken along, no event to anyone; it does not make older buttons expire and
+# is no answer to an edited message. At most one file (the summary): a tap on the line opens it.
+NOTICE_MAX = 200
+
+
+def cx_notice_post(c, aid, uid, b, files):
+    """POST /api/v1/agent/chats/{uid} with kind=notice: {body (one line, NOTICE_MAX), file?} -> the new row (caller commits)."""
+    extra = sorted(k for k, v in b.items() if k not in ("body", "kind") and v not in (None, "", False, "false", "0"))
+    if extra:
+        raise BadInput(tr("Invalid value: {0}", ", ".join(extra)))
+    text = " ".join(b["body"].split()) if isinstance(b.get("body"), str) else ""
+    if not text:
+        raise BadInput(tr("The message is empty"))
+    if len(text) > NOTICE_MAX:
+        raise BadInput(tr("The message is too long (max. {0} characters)", NOTICE_MAX))
+    if len(files or []) > 1:
+        raise BadInput(tr("Invalid value: {0}", "file"))
+    r = chat_post(c, aid, uid, "agent", {"body": text}, files)
+    c.execute("UPDATE agent_chat SET kind='notice', read_at=? WHERE id=?", (iso_ms(now_utc()), r["id"]))
+    return c.execute("SELECT * FROM agent_chat WHERE id=?", (r["id"],)).fetchone()
+
+
 def chat_file_row(c, fid):
     r = c.execute("""SELECT f.*, m.agent_id, m.user_id, m.sender FROM chat_files f JOIN agent_chat m ON m.id=f.message_id
                      WHERE f.id=?""", (fid,)).fetchone()
@@ -826,8 +851,8 @@ def med_edits(r):
 
 
 def med_answered(c, m):
-    """Did the agent write in this conversation after message m?"""
-    return bool(c.execute("SELECT 1 FROM agent_chat WHERE agent_id=? AND user_id=? AND sender='agent' AND id>? LIMIT 1",
+    """Did the agent write in this conversation after message m? (2.41.0 #1206: a notice is no answer)"""
+    return bool(c.execute("SELECT 1 FROM agent_chat WHERE agent_id=? AND user_id=? AND sender='agent' AND id>? AND kind IS NULL LIMIT 1",
                           (m["agent_id"], m["user_id"], m["id"])).fetchone())
 
 

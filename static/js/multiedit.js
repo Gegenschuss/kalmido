@@ -154,6 +154,7 @@ function meWaitDialog() {
     <div class="row"><label for="mw-until">${tr('Follow up on')}</label>${dateIn('mw-until', addDays(today(), 7), {min: today(), label: tr('Follow up on'), empty: tr('none')})}</div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Save')}</button></div>`);
   md.classList.add('waitmodal');
+  mtWaitSugg(md, $('#mw-note', md));  // 2.41.0 (#1205): the recent entries
   const save = () => { const v = {note: $('#mw-note', md).value.trim(), until: $('#mw-until', md).value || null}; md.remove(); meWait(v); };
   md.addEventListener('click', e => { const b = e.target.closest('[data-m]'); if (!b) return; if (b.dataset.m === 'close') md.remove(); else if (b.dataset.m === 'ok') save(); });
   $('#mw-note', md).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); save(); } });

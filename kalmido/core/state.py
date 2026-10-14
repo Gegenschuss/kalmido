@@ -192,6 +192,7 @@ def visible_sections(c, uid, tasks=None):
 @app.get("/api/state")
 def state():
     from ..lists.folders import folders_shared_in, my_folder_props
+    from ..lists.foldershare import sh_folder_shares
     from ..notify.caps import notif_ask_state
     from ..lists.groups import groups_for, grp_of_user
     from ..collab.news import news_items, news_sig, news_unread, news_unread_me, notif_matrix
@@ -214,7 +215,7 @@ def state():
     from ..events.model import cals_for, events_on
     from ..contacts.model import books_for, contacts_on, task_contacts
     from ..team.clients import clients_brief
-    from ..tasks.mineorder import vw_mine_order
+    from ..tasks.mineorder import mt_mine_hidden, vw_mine_order
     c = db()
     uid = me()
     s = usettings(c, uid)
@@ -247,6 +248,7 @@ def state():
         lists=(vl := visible_lists(c, uid)),
         folder_orders=folder_orders(c, uid, vl),  # 2.27.0 (#988)
         folder_props=my_folder_props(c, uid), folders_shared_in=folders_shared_in(c, uid),  # 2.29.0 (#1030 / #929)
+        folder_shares=sh_folder_shares(c, uid),  # 2.41.0 (#1428)
         inbox_names=inbox_names(),  # 2.15.0 (#632): default names of an inbox (shown in the UI language)
         filters=[{**dict(r), "rules": json.loads(r["rules"] or "{}")}
                  for r in c.execute("SELECT * FROM filters WHERE user_id=? ORDER BY sort, id", (uid,))],
@@ -264,6 +266,7 @@ def state():
                             (uid, uid)).fetchone()[0]),
         settings={k: v for k, v in s.items() if k not in ("digest_sent", "digest_mail_sent", "review_sent")},
         mine_order=vw_mine_order(c, uid),  # 2.40.0 (#1344): the own order of "My tasks" {task id: pos}
+        mine_hidden=mt_mine_hidden(c, uid),  # 2.41.0 (#1365): ids of the lists I switched off for "My tasks"
         notify=notif_matrix(s),  # 2.1.0 (#317)
         ntfy_inbox={"enabled": bool(NTFY_IN["token"]), "server": NTFY_IN["public"], "topic": NTFY_IN["topic"]},
         ntfy_url=NTFY_URL,

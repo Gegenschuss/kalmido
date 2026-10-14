@@ -767,6 +767,7 @@ document.addEventListener('keydown', async e => {
     }
   }
   if (e.key === 'Escape') {
+    if (t.id === 'd-url') { e.preventDefault(); t.value = taskById(S.sel)?.url || ''; S.editLink = false; renderDetail(); return; }  // 2.41.0 (#1475): cancels
     const lb = $('.lightbox'); if (lb) { lb.remove(); return; }
     const ts = $('.tsheet'); if (ts && !$('.modal')) { $('[data-ts="close"]', ts).click(); return; }
     if (!$('#pop').classList.contains('hidden') || $('.qadd.sheet')) { closePop(); return; }

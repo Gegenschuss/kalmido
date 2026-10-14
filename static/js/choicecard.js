@@ -1,0 +1,87 @@
+// 2.41.0 (#1383): one component for an agent's answer buttons, approval cards and suggestions -- in the agent chat
+// (agentchat.js) and in task comments (collab.js). The data is the same in both places: choices = {choices: [{id, label,
+// style?}], multi, approval?: {title, what, std?}, expires_at?, withdrawn_at?, outcome?}, choice = the answer {ids, at,
+// user_id, user_name?, via}, choice_state open | answered | expired | withdrawn (#1037: only the newest question is live,
+// an approval card stays open until answered). attrs(id) = the data attributes of a button (who handles the press).
+function ccApvHead(ap, open) {
+  return (open ? `<div class="apvh">${ic('lock', 's')}<span>${esc(tr('Approval needed'))}</span></div>` : '')
+    + (ap ? `<div class="apvt">${esc(ap.title)}</div>${ap.what ? `<div class="apvw">${esc(tr('If yes: {0}', ap.what))}</div>` : ''}` : '');
+}
+const ccApvLbl = (ch, id) => { const ap = ch.approval, c = (ch.choices || []).find(x => x.id === id); return ap?.std || !c ? (id === 'yes' ? tr('Yes, go ahead') : tr('No')) : c.label; };
+function ccApvBtns(ch, attrs) {
+  return `<div class="cchoices cperm apvbtns" role="group" aria-label="${esc(tr('Approval needed'))}"><button type="button" class="cchb st-primary cpermb" ${attrs('yes')}>${thumbIc(true)}<span>${esc(ccApvLbl(ch, 'yes'))}</span></button><button type="button" class="cchb cpermb" ${attrs('no')}>${thumbIc(false)}<span>${esc(ccApvLbl(ch, 'no'))}</span></button></div>`;
+}
+// the line of a decided / closed approval card; t = the text of an answered one (the chat: "Approved by … at …")
+function ccApvState(ch, ans, st, t) {
+  const oc = ch.outcome;
+  if (st === 'expired' || (st === 'withdrawn' && oc === 'expired')) return `<div class="cpermst exp" role="status">${ic('clock', 's')}<span>${esc(tr('Not answered – not approved'))}</span></div>`;
+  if (!ans) return `<div class="cpermst exp" role="status"><span>${esc(tr('Closed by the agent'))}</span></div>`;  // review N1: never "Approved"
+  const ok = (ans.ids || []).includes('yes');
+  return `<div class="cpermst ${ok ? 'ok' : 'no'}" role="status">${thumbIc(ok)}<span>${esc(t)}</span></div>`;
+}
+// answer buttons / suggestions (not an approval card): o = {ch, ans, sel (Set of picked ids, multi), attrs(id), pen(c) (the
+// pen next to an open suggestion: its html, or ''), send (the attributes of "Send" with multi), done (the text after an answer)}
+function ccButtons(o) {
+  const {ch, ans} = o, ids = new Set(ans?.ids || []), multi = !!ch.multi, sel = o.sel || new Set();
+  const btn = c => `<button type="button" class="cchb ${c.style ? 'st-' + esc(c.style) : ''} ${ids.has(c.id) || sel.has(c.id) ? 'on' : ''}" ${o.attrs(c.id)} ${ans ? 'disabled' : ''} ${multi ? `aria-pressed="${sel.has(c.id)}"` : ''}>${ids.has(c.id) ? ic('check', 's') : ''}<span>${esc(c.label)}</span></button>`;
+  const pen = c => { const p = o.pen ? o.pen(c) : ''; return p ? `<span class="cchw">${btn(c)}${p}</span>` : btn(c); };
+  return `<div class="cchoices ${ans ? 'done' : ''}" role="group" aria-label="${esc(tr('Answer'))}">${ch.choices.map(ans ? btn : pen).join('')}${multi && !ans && o.send ? `<button type="button" class="btn sm pri cchsend" ${o.send} ${sel.size ? '' : 'disabled'}>${ic('send', 's')} ${tr('Send')}</button>` : ''}${ans ? `<small class="muted cchans">${esc(o.done || tr('Answered'))} · ${fmtWhen(ans.at)}</small>` : ''}</div>`;
+}
+
+// ---- comments: the card under an agent's comment
+S.ccPick = S.ccPick || {};
+const ccWhen = iso => { try { return new Date(iso).toLocaleString(LOCALE(), {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'}); } catch { return ''; } };
+function ccCmtState(c) {
+  const ch = c.choices; if (!ch) return null;
+  if (c.choice) return 'answered';
+  if (c.choice_state && c.choice_state !== 'open') return c.choice_state;
+  if (ch.approval) return ch.expires_at && Date.parse(ch.expires_at) <= Date.now() ? 'expired' : 'open';
+  return (S.tl.comments || []).some(x => x.id > c.id && !x.choices?.approval) ? 'expired' : 'open';  // #1037
+}
+// may I press? people who can edit the task (the server also asks whether the agent takes instructions from me)
+const ccCanAnswer = ro => !ro && !!S.tl.can_write && !!S.me && !isAgentUser(S.me.id);
+function ccCommentHtml(c, ro = false) {
+  const ch = c.choices; if (!ch || !(ch.choices || []).length) return '';
+  const st = ccCmtState(c), ans = c.choice, can = ccCanAnswer(ro);
+  const attrs = id => `data-cc="pick" data-cid="${c.id}" data-ch="${esc(id)}"`;
+  if (ch.approval) {
+    const open = st === 'open', who = ans?.user_name || '';
+    const t = ans ? ((ans.ids || []).includes('yes') ? tr('{0} from {1}, {2}', ccApvLbl(ch, 'yes'), who, ccWhen(ans.at)) : tr('{0} from {1}, {2}', ccApvLbl(ch, 'no'), who, ccWhen(ans.at))) : '';
+    return `<div class="cccard apv${open ? ' apvopen' : ''}" role="group" aria-label="${esc(tr('Approval needed'))}">${ccApvHead(ch.approval, open)}${open ? (can ? ccApvBtns(ch, attrs) : `<div class="cpermst exp"><span>${esc(tr('Waiting for an answer'))}</span></div>`) : ccApvState(ch, ans, st, t)}</div>`;
+  }
+  if (st !== 'open' && st !== 'answered') return '';  // expired / withdrawn: gone, as in the chat
+  if (st === 'open' && !can) return '';
+  return ccButtons({ch, ans, sel: S.ccPick[c.id], attrs, send: `data-cc="send" data-cid="${c.id}"`,
+    done: ans?.user_name ? tr('Answered by {0}', ans.user_name) : '',
+    pen: x => `<button type="button" class="cchpen" data-ccpen="${c.id}" data-ch="${esc(x.id)}" title="${esc(tr('Edit before sending'))}" aria-label="${esc(tr('Edit before sending: {0}', x.label))}">${ic('edit', 's')}</button>`});
+}
+async function ccAnswer(cid, id, send = false) {
+  const c = tlComment(cid); if (!c || c.choice || ccCmtState(c) !== 'open') return;
+  if (c.choices?.multi && !send) { const s = S.ccPick[cid] ||= new Set(); s.has(id) ? s.delete(id) : s.add(id); drawTimeline(); return; }
+  const ids = send ? [...(S.ccPick[cid] || [])] : [id]; if (!ids.length) return;
+  let j;
+  try { j = await capi('POST', `/api/comments/${cid}/choice`, {choice_ids: ids}); }
+  catch { if (S.sel) loadTimeline(S.sel); return; }  // capi said it (409: no longer current, 403): the card follows the server
+  delete S.ccPick[cid];
+  Object.assign(c, {choices: j.choices, choice: j.choice, choice_state: j.choice_state});
+  const t = taskById(S.sel); if (t && c.choices?.approval && t.approvals_open) { t.approvals_open--; viewSafeRender(); }
+  drawTimeline();
+  if (j.answer_comment_id && S.sel) loadTimeline(S.sel);  // a suggestion was sent as my comment
+}
+// the pen: the suggestion into the comment box (not sent), after the text already there
+function ccToBox(cid, id) {
+  const c = tlComment(cid), x = (c?.choices?.choices || []).find(y => String(y.id) === String(id)), ta = $('#c-input');
+  if (!x || !ta) return;
+  const v = ta.value.replace(/\s+$/, '');
+  ta.value = v ? v + (/\n/.test(v) ? '\n' : ' ') + x.label : x.label;
+  ta.dispatchEvent(new Event('input', {bubbles: true}));
+  ta.closest('.ccomp')?.classList.add('used');
+  ta.focus({preventScroll: true}); ta.setSelectionRange(ta.value.length, ta.value.length);
+}
+document.addEventListener('click', e => {
+  const p = e.target.closest?.('[data-ccpen]');
+  if (p) { e.preventDefault(); e.stopPropagation(); ccToBox(+p.dataset.ccpen, p.dataset.ch); return; }
+  const b = e.target.closest?.('[data-cc]'); if (!b || b.disabled) return;
+  e.preventDefault(); e.stopPropagation();
+  ccAnswer(+b.dataset.cid, b.dataset.ch, b.dataset.cc === 'send');
+});

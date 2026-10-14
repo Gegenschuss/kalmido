@@ -118,6 +118,8 @@ def timeline(tid):
             if not o or o["list_id"] not in vis or not task_visible(c, a["data"]["id"], me()):
                 a["data"] = {"hidden": True}
     comments = with_replies(c, "c", with_reactions(c, [comment_dict(r, atts) for r in rows]))
+    from .cchoice import lv_with_choices
+    lv_with_choices(c, tid, rows, comments)  # 2.41.0 (#1383): answer buttons / approval cards
     ids = {x["user_id"] for x in comments + acts} | {m for x in comments for m in x["mentions"]} \
         | {a["data"].get("to") for a in acts if a["kind"] == "assign"} | {a["data"].get("agent") for a in acts} | {a["data"].get("approver") for a in acts} \
         | {a["data"].get("by") for a in acts} | {u["id"] for x in comments for e in x["reactions"] for u in e["users"]} \
@@ -224,9 +226,14 @@ def comment_create(tid):
             sug = {**clean_suggestion(c, t, sug), "state": "open"}
         except BadInput as e:
             return err(str(e))
-    cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,suggestion,reply_to) VALUES(?,?,?,?,?,?,?)",
+    from .cchoice import lv_choices_in, lv_with_choices
+    try:  # 2.41.0 (#1383): an agent's answer buttons / approval card (the chat's format)
+        chs = lv_choices_in(body(), is_agent(g.user)) if not (request.files or request.form) else None
+    except BadInput as e:
+        return err(str(e))
+    cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,suggestion,reply_to,choices) VALUES(?,?,?,?,?,?,?,?)",
                     (tid, me(), text, ",".join(map(str, mentions)), iso_ms(now_utc()),
-                     json.dumps(sug, ensure_ascii=False) if sug else None, orig["id"] if orig else None))
+                     json.dumps(sug, ensure_ascii=False) if sug else None, orig["id"] if orig else None, chs))
     replied = orig["user_id"] if orig and orig["user_id"] != me() else None
     if sug and sug.get("kind") == "merge_request":
         git_merge_link(c, t, sug)
@@ -238,7 +245,10 @@ def comment_create(tid):
         return err(e)
     c.execute("INSERT INTO task_seen(user_id,task_id,seen_id) VALUES(?,?,?) "
               "ON CONFLICT(user_id,task_id) DO UPDATE SET seen_id=GREATEST(task_seen.seen_id, excluded.seen_id)", (me(), tid, cid))
-    pushes = comment_pushes(c, t, cid, text, mentions, mentions, len(files), replied=replied) if collab_all() else []
+    ptext = text
+    if chs and json.loads(chs).get("approval"):  # 2.41.0 (#1383): the push says that an approval is needed
+        ptext = tr("Approval needed") + ": " + json.loads(chs)["approval"]["title"] + ("\n" + text if text else "")
+    pushes = comment_pushes(c, t, cid, ptext, mentions, mentions, len(files), replied=replied) if collab_all() else []
     if collab_all():  # 2.33.0 (#1076): an agent whose comment is answered hears it like a mention
         agent_comment_events(c, t, cid, mentions, mentions + ([replied] if replied and replied not in mentions else []))
     wh_note(c, tid, "comment", cid=cid)
@@ -246,7 +256,7 @@ def comment_create(tid):
     c.commit()
     send_pushes(pushes)
     r = c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone()
-    return jsonify(with_replies(c, "c", with_reactions(c, [comment_dict(r, att_dicts(c, "comment_id=?", (cid,)))]))[0])
+    return jsonify(lv_with_choices(c, tid, [r], with_replies(c, "c", with_reactions(c, [comment_dict(r, att_dicts(c, "comment_id=?", (cid,)))])))[0])
 
 
 @app.patch("/api/comments/<int:cid>")

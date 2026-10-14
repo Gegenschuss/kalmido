@@ -1240,6 +1240,17 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                         body={"type": "object", "required": ["body"], "properties": {"body": {"type": "string"}}}),
             "delete": op("Delete a comment (author, list owner / admins)", "Comments", nobody | errs("403", "404"), [pid("id", "Comment id")],
                          scope="comments")},
+        # 2.41.0 (#1383): answer buttons / approval cards in comments
+        "/comments/{id}/choice": {
+            "post": op("Answer an agent's comment with its buttons (a person's token; agents never answer: 403)", "Comments",
+                       ok(ref("Comment")) | errs("400", "403", "404", "409"), [pid("id", "Comment id")], scope="comments",
+                       body={"type": "object", "required": ["choice_ids"], "properties": {"choice_ids": {"type": "array", "items": {"type": "string"}}}},
+                       desc="Only people who can edit the task; once per comment. A plain button is also posted as your comment with its text "
+                            "(answer_comment_id). The agent gets a comment event with answer.")},
+        "/comments/{id}/withdraw": {
+            "post": op("Withdraw the open buttons / approval card of your own comment (agents)", "Comments",
+                       ok(ref("Comment")) | errs("400", "403", "404", "409"), [pid("id", "Comment id")], scope="comments",
+                       body={"type": "object", "properties": {"outcome": {"type": "string", "enum": ["denied", "expired"]}}})},
         "/folders": {"get": op("Your folders (paths like Clients/Acme) with their number of lists", L, ok(ref("FolderPage")) | errs())},
         "/folders/rename": {"post": op("Rename or move a folder", L, ok(ref("FolderPage")) | acc | errs("400"), scope="structure",
                                        body={"type": "object", "required": ["old", "new"], "properties": {"old": {"type": "string"}, "new": {"type": "string"}}},

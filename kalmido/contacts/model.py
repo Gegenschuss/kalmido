@@ -623,11 +623,13 @@ def new_uid():
     return f"kalmido-ct-{secrets.token_hex(10)}"
 
 
-def contact_store(c, uid, book_id, f, cid=None, uid_=None, href=None, extra=None, version=None, src_digest=None):
-    """Creates (cid None) or changes a contact with validated columns f. Returns its id; the caller commits."""
+def contact_store(c, uid, book_id, f, cid=None, uid_=None, href=None, extra=None, version=None, src_digest=None, bulk=None):
+    """Creates (cid None) or changes a contact with validated columns f. Returns its id; the caller commits.
+    2.41.0 (#1437): bulk = {"occ": bool} from import_vcards: the caller counts once, touches the book and bumps the version
+    once per batch (each per card held the instance-wide version row locked until the end of a large import)."""
     ts = iso_ms(now_utc())  # ms: two changes in one second still differ (expect)
     if cid is None:
-        if c.execute("SELECT COUNT(*) FROM contacts WHERE book_id=?", (book_id,)).fetchone()[0] >= CONTACTS_PER_BOOK:
+        if bulk is None and c.execute("SELECT COUNT(*) FROM contacts WHERE book_id=?", (book_id,)).fetchone()[0] >= CONTACTS_PER_BOOK:
             raise Denied(409, tr("At most {0} contacts per address book", CONTACTS_PER_BOOK))
         uid_ = uid_ or new_uid()
         cols = {k: f.get(k, "" if k not in ("emails", "phones", "addresses", "urls", "groups") else "[]") for k in
@@ -651,6 +653,10 @@ def contact_store(c, uid, book_id, f, cid=None, uid_=None, href=None, extra=None
         r = c.execute("SELECT * FROM contacts WHERE id=?", (cid,)).fetchone()
         c.execute("UPDATE contacts SET search=? WHERE id=?",
                   (search_text({**dict(r), **{k: _jl(r[k]) for k in ("emails", "phones", "addresses", "groups")}}), cid))
+    if bulk is not None:
+        if bulk.get("occ"):
+            occ_sync(c, cid)
+        return cid
     book_touch(c, book_id)
     occ_sync(c, cid)
     bump(c)
@@ -816,12 +822,37 @@ def split_vcards(text):
     return out
 
 
-def import_vcards(c, uid, book_id, text, src_digest=False):
-    """Every vCard of text into the book: the same UID is updated (importing twice changes nothing). -> counts."""
+IMPORT_BATCH = 200
+
+
+def import_vcards(c, uid, book_id, text, src_digest=False, batch=None, progress=None, cards=None):
+    """Every vCard of text into the book: the same UID is updated (importing twice changes nothing). -> counts.
+    2.41.0 (#1437): the book is counted once, birthdays are synced only where the book keeps them, the book is touched and
+    the version bumped once per batch; batch=N commits every N cards (a large import keeps what it did and never holds the
+    instance-wide version row for long); progress(done, total, res) after each batch."""
     res = {"created": 0, "updated": 0, "unchanged": 0, "errors": 0}
-    for i, card in enumerate(split_vcards(text)):
+    cards = split_vcards(text) if cards is None else cards
+    bk = c.execute("SELECT occ_list_id, src_id FROM books WHERE id=?", (book_id,)).fetchone()
+    bulk = {"occ": bool(bk and bk["occ_list_id"] and not bk["src_id"])}
+    have = c.execute("SELECT COUNT(*) FROM contacts WHERE book_id=?", (book_id,)).fetchone()[0]
+    dirty = False
+
+    def flush(i):
+        nonlocal dirty
+        if dirty:
+            book_touch(c, book_id)
+            bump(c)
+            dirty = False
+        if batch:
+            c.commit()
+        if progress:
+            progress(i, len(cards), res)
+
+    for i, card in enumerate(cards):
         if i >= CONTACTS_PER_BOOK:
             break
+        if batch and i and i % batch == 0:
+            flush(i)
         dig = hashlib.sha1(card.encode("utf-8"), usedforsecurity=False).hexdigest()[:20]
         try:
             v = parse_vcard(card)
@@ -840,9 +871,15 @@ def import_vcards(c, uid, book_id, text, src_digest=False):
         f = {k: (json.dumps(v[k], ensure_ascii=False) if isinstance(v[k], list) else v[k]) for k in
              ("kind", "fn", "given", "family", "middle", "prefix", "suffix", "nickname", "org", "dept", "title", "emails", "phones",
               "addresses", "urls", "bday", "anniversary", "note", "groups", "photo")}
+        if not old and have >= CONTACTS_PER_BOOK:
+            flush(i)  # what is stored so far stays (batch) / is committed by the caller
+            raise Denied(409, tr("At most {0} contacts per address book", CONTACTS_PER_BOOK))
         contact_store(c, uid, book_id, f, cid=old["id"] if old else None, uid_=v["uid"], extra=v["extra"], version=v["version"],
-                      src_digest=dig if src_digest else None)
+                      src_digest=dig if src_digest else None, bulk=bulk)
+        have += 0 if old else 1
+        dirty = True
         res["updated" if old else "created"] += 1
+    flush(min(len(cards), CONTACTS_PER_BOOK))
     return res
 
 

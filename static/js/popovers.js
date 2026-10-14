@@ -69,10 +69,23 @@ function menu(anchor, items, back, fsel, title) {
   });
   if (grp) html += '</div>';
   const p = openPop(anchor, `${hd}<div class="menu-list" role="menu"${hd && tt ? ' aria-labelledby="tch-sht"' : ''}>${html}</div>`);
-  const up = () => menu(anchor, items, back, '.msubm');
+  // 2.41.0 (#1439): a live redraw can remove the anchor while the menu is open (its rect is then 0/0 and the second level jumped to the
+  // top left): keep a snapshot of the anchor and the menu's own place, and open the second level from those
+  const pos0 = [p.style.left, p.style.top], snap = {r: anchor?.getBoundingClientRect?.() || {left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0}, om: p.classList.contains('overmodal')};
+  const live = () => anchor?.isConnected ? anchor : {getBoundingClientRect: () => snap.r, closest: sel => snap.om && sel === '.modal' ? {} : null};
+  const up = () => { const m = menu(live(), items, back, '.msubm'); if (!isMobile()) { m.style.left = pos0[0]; m.style.top = pos0[1]; } return m; };
   p._menuBack = back || null;
-  p._menuOpen = it => menu(anchor, [{label: tr('Back'), icon: 'back', cls: 'mback', fn: up}, {head: it.label.replace(/…$/, '')}, ...it.more], up, '[role="menuitem"]:not(.mback):not([disabled])');
-  p.onclick = e => { const b = e.target.closest('[data-i]'); if (!b || b.disabled) return; let it = items[+b.dataset.i]; if (it.row) it = it.row[+b.dataset.j]; if (it.more) { p._menuOpen(it); return; } closePop(); tchSheetT = String(it.label || '').replace(/…$/, ''); try { it.fn(); } finally { tchSheetT = ''; } };
+  p._menuOpen = (it, b) => {
+    const pr = p.getBoundingClientRect(), er = b?.getBoundingClientRect?.();
+    const m = menu(live(), [{label: tr('Back'), icon: 'back', cls: 'mback', fn: up}, {head: it.label.replace(/…$/, '')}, ...it.more], up, '[role="menuitem"]:not(.mback):not([disabled])');
+    if (!isMobile() && pr.width) {  // computer: the second level opens beside the menu, level with the entry; the phone sheet just replaces
+      const w = m.offsetWidth, h = m.offsetHeight; let x = pr.right + 4;
+      if (x + w > innerWidth - 12) x = pr.left - w - 4;
+      m.style.left = Math.max(12, x) + 'px'; m.style.top = Math.max(12, Math.min((er ? er.top - 6 : pr.top), innerHeight - h - 12)) + 'px';
+    }
+    return m;
+  };
+  p.onclick = e => { const b = e.target.closest('[data-i]'); if (!b || b.disabled) return; let it = items[+b.dataset.i]; if (it.row) it = it.row[+b.dataset.j]; if (it.more) { p._menuOpen(it, b); return; } closePop(); tchSheetT = String(it.label || '').replace(/…$/, ''); try { it.fn(); } finally { tchSheetT = ''; } };
   // 2.16.0 (#473): the menu gets the focus (first item); ↑ ↓ Home End move in it, Esc / Tab out close it (keydown below)
   setTimeout(() => { if (document && !p.classList.contains('hidden') && !p.contains(document.activeElement)) ((fsel && p.querySelector(fsel)) || p.querySelector('[role="menuitem"]:not([disabled])'))?.focus({preventScroll: true}); }, 0);
   return p;
@@ -573,6 +586,7 @@ function waitDialog(id) {
     <div class="row"><label for="w-until">${tr('Follow up on')}</label>${dateIn('w-until', t.wait_until || addDays(today(), 7), {min: today(), label: tr('Follow up on'), empty: tr('none')})}</div>
     <div class="foot">${t.waiting_at ? `<button class="btn" data-m="clear">${ic('x', 's')} ${tr('No longer waiting')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Save')}</button></div>`);
   md.classList.add('waitmodal');
+  mtWaitSugg(md, $('#w-note', md));  // 2.41.0 (#1205): the recent entries (before the field's own Enter)
   const save = async () => {
     const body = {note: $('#w-note', md).value.trim(), until: $('#w-until', md).value || null};
     try { putTask(await api('PUT', `/api/tasks/${id}/waiting`, body)); } catch { return; }
@@ -586,6 +600,60 @@ function waitDialog(id) {
   });
   $('#w-note', md).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); save(); } });
   if (!isMobile()) setTimeout(() => $('#w-note', md).focus(), 50);
+}
+// ---- 2.41.0 (#1205): "Waiting on": the person's recent entries below the field (GET /api/me/wait-suggestions, newest
+// first, only their own). They open when typing into the field (on phones also when the dialog opens), filter while
+// typing, at most 8; a tap takes one, the x takes it out of the suggestions only (DELETE, the tasks keep it). Arrow keys
+// walk the list, Enter takes the marked one. Used by waitDialog and the multi-edit's meWaitDialog.
+let MT_WS = null;
+async function mtWsLoad() {
+  try { MT_WS = (await api('GET', '/api/me/wait-suggestions')).items || []; } catch { MT_WS = MT_WS || []; }
+  return MT_WS;
+}
+function mtWaitSugg(md, inp) {
+  if (!inp) return;
+  const box = document.createElement('div');
+  box.className = 'wsug'; box.hidden = true; box.id = inp.id + '-sug';
+  box.setAttribute('role', 'listbox'); box.setAttribute('aria-label', tr('Recent entries'));
+  (inp.closest('.row') || inp).after(box);
+  inp.setAttribute('autocomplete', 'off'); inp.setAttribute('aria-autocomplete', 'list'); inp.setAttribute('aria-controls', box.id); inp.setAttribute('aria-expanded', 'false');
+  let open = false, cur = -1, it = [];
+  const close = () => { open = false; cur = -1; box.hidden = true; inp.setAttribute('aria-expanded', 'false'); inp.removeAttribute('aria-activedescendant'); };
+  const draw = () => {
+    const q = inp.value.trim().toLowerCase();
+    it = (MT_WS || []).filter(x => !q || (x.note.toLowerCase().includes(q) && x.note.toLowerCase() !== q)).slice(0, 8);
+    if (!open || !it.length) { box.hidden = true; inp.setAttribute('aria-expanded', 'false'); return; }
+    cur = Math.min(cur, it.length - 1);
+    box.innerHTML = it.map((x, i) => `<div class="wsrow ${i === cur ? 'on' : ''}" role="option" id="${box.id}-${i}" aria-selected="${i === cur}"><button type="button" class="wspick" data-ws="${i}" tabindex="-1">${esc(x.note)}</button><button type="button" class="iconbtn wsx" data-wsx="${i}" title="${esc(tr('Remove from the suggestions'))}" aria-label="${esc(tr('Remove “{0}” from the suggestions', x.note))}">${ic('x', 's')}</button></div>`).join('');
+    box.hidden = false; inp.setAttribute('aria-expanded', 'true');
+    if (cur >= 0) inp.setAttribute('aria-activedescendant', `${box.id}-${cur}`); else inp.removeAttribute('aria-activedescendant');
+  };
+  const show = () => { open = true; draw(); mtWsLoad().then(() => { if (md.isConnected && open) draw(); }); };
+  const pick = i => { const x = it[i]; if (!x) return; inp.value = x.note; close(); inp.focus(); };
+  inp.addEventListener('input', show);
+  inp.addEventListener('click', () => { if (!open) show(); });
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!open) { show(); return; }
+      if (!it.length) return;
+      cur = e.key === 'ArrowDown' ? (cur + 1) % it.length : (cur <= 0 ? it.length : cur) - 1;
+      draw(); $(`#${box.id}-${cur}`)?.scrollIntoView({block: 'nearest'});
+    } else if (e.key === 'Enter' && open && cur >= 0) { e.preventDefault(); e.stopImmediatePropagation(); pick(cur); }
+    else if (e.key === 'Escape' && open && !box.hidden) { e.preventDefault(); e.stopPropagation(); close(); }
+  });
+  box.addEventListener('mousedown', e => { if (e.target.closest('.wspick')) e.preventDefault(); });  // the field keeps the focus
+  box.addEventListener('click', async e => {
+    const p = e.target.closest('[data-ws]'); if (p) { e.stopPropagation(); pick(+p.dataset.ws); return; }
+    const x = e.target.closest('[data-wsx]'); if (!x) return;
+    e.stopPropagation();
+    const note = it[+x.dataset.wsx]?.note; if (!note) return;
+    MT_WS = (MT_WS || []).filter(y => y.note !== note); draw();
+    try { MT_WS = (await api('DELETE', '/api/me/wait-suggestions', {note})).items || MT_WS; } catch { /* api() showed it */ }
+    if (md.isConnected) { draw(); if (box.hidden) inp.focus(); }
+  });
+  md.addEventListener('focusout', e => { const r = e.relatedTarget; if (open && r && r !== inp && !box.contains(r)) close(); });  // e.g. Tab to the date
+  if (isMobile()) show(); else mtWsLoad();
 }
 async function waitClear(id) {
   const t = taskById(id); if (!t || !t.waiting_at) return;
@@ -659,6 +727,7 @@ function taskMenu(anchor, id, o = {}) {
     // template
     {label: tr('Save as template'), icon: 'copy', fn: () => saveTemplate({task_id: id}, t.title)},
     {label: tr('Duplicate'), icon: 'sub', fn: async () => { const sn = await snipLoad(t).catch(() => []); return createTask({title: t.title, content: t.content, list_id: t.list_id, section_id: t.section_id, priority: t.priority, due: t.due, due_time: t.due_time, reminders: t.reminders, repeat: t.repeat, repeat_from: t.repeat_from, tags: t.tags, parent_id: t.parent_id, url: t.url || null, ...(t.ms ? {ms: 1} : {}), ...(t.milestone_id ? {milestone_id: t.milestone_id} : {}), ...(t.fields && Object.keys(t.fields).length ? {fields: t.fields} : {}), ...(sn.length ? {snippets: sn.map(({id, by, updated_at, ...x}) => x)} : {})}); }},  // 2.35.0 (#1095): the snippets come along (loaded first)
+    ...(t.id > 0 && !t.context && !t.url ? [{label: tr('Add link'), icon: 'link', fn: () => linkAdd(id)}] : []),  // 2.41.0 (#1475)
     ...(t.id > 0 && !t.context && canEdit(t) && !snipShown(t) ? [{label: tr('Add code snippet'), icon: 'code', fn: () => snipOpen(id, 'new')}] : []),  // 2.35.0 (#1095)
     // structure + more
     ...(isMs(t) || (!t.parent_id && !children(t.id).length && t.id > 0) ? [{label: isMs(t) ? tr('Make it a normal task') : tr('Make it a milestone'), icon: 'flag', fn: () => msToggle(id)}] : []),  // 2.18.0 (#430)

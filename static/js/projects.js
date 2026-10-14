@@ -51,7 +51,7 @@ const dayHOf = l => +l?.day_hours || S.timeDayH || 8;
 const listSecs = lid => (S.timeLists?.[lid]?.s || 0) + (S.timer && S.timer.list_id === lid ? timerElapsed() : 0);
 function timeSumHtml(lists) {
   if (!timeOn()) return '';
-  const ls = lists.filter(l => l && l.kind === 'project');
+  const ls = lists.filter(l => l && mtTime(l.id));  // 2.41.0 (#1471): the lists with time tracking on
   if (!ls.length) return '';
   let sec = 0, days = 0, bud = 0;
   for (const l of ls) { const x = listSecs(l.id); sec += x; days += x / 3600 / dayHOf(l); bud += +(S.timeLists?.[l.id]?.b || 0); }
@@ -64,8 +64,9 @@ function timeSumHtml(lists) {
   return `<span class="tsum ${bud && h > bud ? 'over' : ''}" title="${esc(tip)}" aria-label="${esc(tip)}">${ic('clock', 's')}<span class="tsl">${tr('Tracked')}</span><b>${esc(fmtNum(h))} h</b><span class="tsd">${esc(dtxt)}</span>${bud ? `<span class="tbud" role="img" aria-label="${esc(tr('{0} % of the budget', Math.round(h / bud * 100)))}"><i style="width:${pct}%"></i></span><span class="tbn">${esc(fmtNum(h))}/${esc(fmtNum(bud))} h</span>` : ''}</span>`;
 }
 function folderHead(f) {
-  const ts = timeSumHtml(folderLists(f));
-  return (ts ? `<div class="lhead fhd"><span class="spacer"></span>${ts}</div>` : '') + agBandHtml();
+  const ts = timeSumHtml(folderLists(f)), sh = collab() ? folderShrHtml(f) : '';  // 2.41.0 (#1428): the share symbols on the phone too
+  const sht = sh ? (sh.match(/title="([^"]*)"/) || [])[1] || '' : '';
+  return (ts || sh ? `<div class="lhead fhd">${sh ? `<span class="fhdsh">${sh}<span class="muted">${sht}</span></span>` : ''}<span class="spacer"></span>${ts}</div>` : '') + agBandHtml();
 }
 async function statusModal(lid) {
   const l = listById(lid); if (!l) return;

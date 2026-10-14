@@ -46,3 +46,36 @@ def vw_mine_order_put():
     bump(c)
     c.commit()
     return jsonify(ok=True, count=len(rows))
+
+
+# ---- 2.41.0 (#1365): "Show in My tasks" per person and list (table list_mine_hide: a row = switched off). The tasks of such a
+# list move into the folded group "Hidden" at the end of "My tasks" (the web app decides that, from /api/state mine_hidden);
+# assigned tasks of such a list due today or overdue stay visible in a small line of their own. Nothing changes for the
+# list's other members, the tasks or the other views.
+def mt_mine_hidden(c, uid):
+    """Ids of the lists the person switched off for "My tasks" (only lists the person still sees)."""
+    return [r[0] for r in c.execute(f"SELECT list_id FROM list_mine_hide WHERE user_id=? AND list_id IN {vis_sql()} ORDER BY list_id",
+                                    (uid, uid, uid))]
+
+
+@app.put("/api/lists/<int:lid>/in-mine")
+def mt_in_mine_put(lid):
+    """{on: true | false}: show the list's tasks in the signed-in person's "My tasks" (default) or not. Only for the person
+    (shared lists: everyone decides for themselves). 404 for a list the person cannot see."""
+    from ..core.access import list_role
+    from ..core.db import iso, now_utc
+    c = db()
+    uid = me()
+    if not list_role(c, lid, uid):
+        raise Denied(404)
+    on = (body() or {}).get("on")
+    if not isinstance(on, bool):
+        return jsonify(error=tr("Invalid value: {0}", "on")), 400
+    if on:
+        c.execute("DELETE FROM list_mine_hide WHERE user_id=? AND list_id=?", (uid, lid))
+    else:
+        c.execute("INSERT INTO list_mine_hide(user_id, list_id, created_at) VALUES(?,?,?) ON CONFLICT DO NOTHING",
+                  (uid, lid, iso(now_utc())))
+    bump(c)
+    c.commit()
+    return jsonify(ok=True, on=on, mine_hidden=mt_mine_hidden(c, uid))

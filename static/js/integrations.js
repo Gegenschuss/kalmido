@@ -49,7 +49,7 @@ function tokWire(md) {
 // ---- 2.15.0 (#479) permissions (scopes) of tokens and agents: one compact grid of switches, the explanations behind (i),
 // scopes outside the admin's limit greyed out; "write" (a token from before 2.15) shows as every permission
 const SCOPE_ALL = ['read', 'tasks:write', 'comments', 'structure', 'delete', 'attachments:read', 'attachments:write', 'time', 'export', 'account', 'admin-read'];
-const SCOPE_SHORT = {read: N_('Read'), 'tasks:write': N_('Tasks'), comments: N_('Comments'), structure: N_('Structure'), delete: N_('Delete & trash'), 'attachments:read': N_('Read files'), 'attachments:write': N_('Upload files'), time: N_('Time tracking'), export: N_('Export'), account: N_('Account settings'), 'admin-read': N_('Admin read')};
+const SCOPE_SHORT = {read: N_('Read'), 'tasks:write': N_('Tasks'), comments: N_('Comments'), structure: N_('Structure'), delete: N_('Delete & trash'), 'attachments:read': N_('Read files'), 'attachments:write': N_('Upload files'), time: N_('Time tracking'), export: N_('Export'), calendar: N_('Calendar'), contacts: N_('Contacts'), private: N_('Health & journal'), account: N_('Account settings'), 'admin-read': N_('Admin read')};  // 2.41.0 (#1476): calendar / contacts / private had no name
 const scopeExpand = sc => (sc || []).includes('write') ? SCOPE_ALL.filter(x => x !== 'admin-read' || sc.includes('admin-read')) : (sc || []);
 function scopeSummary(sc) {
   const e = scopeExpand(sc);

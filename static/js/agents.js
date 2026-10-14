@@ -450,6 +450,19 @@ function jobFocusShow() {
   e.scrollIntoView?.({block: 'start'});
   e.focus?.({preventScroll: true});
 }
+// 2.41.0 (#1479): a job log stays open (and keeps its scroll position, bottom stays bottom) when the list redraws on live updates
+S.jobLogOpen = {}; S.jobLogPos = {};
+const jobLogEl = e => e.target instanceof Element && e.target.matches?.('details.joblog, details.joblog > pre') ? e.target.closest('details.joblog') : null;
+document.addEventListener('toggle', e => {
+  const d = jobLogEl(e); if (!d) return;
+  S.jobLogOpen[d.dataset.jid] = d.open;
+  const pos = S.jobLogPos[d.dataset.jid], pre = d.querySelector('pre');
+  if (d.open && pos && pre) pre.scrollTop = pos.bottom ? pre.scrollHeight : pos.top;
+}, true);
+document.addEventListener('scroll', e => {
+  const pre = e.target instanceof Element && e.target.matches?.('details.joblog > pre') ? e.target : null; if (!pre) return;
+  S.jobLogPos[pre.parentNode.dataset.jid] = {top: pre.scrollTop, bottom: pre.scrollHeight - pre.scrollTop - pre.clientHeight < 4};
+}, true);
 function jobHtml(j) {
   const mine = j.kind && S.me && j.user_id === S.me.id;  // 2.3.0: a proposal I asked for: reviewed in its dialog
   const acts = [mine && ['requested', 'ready'].includes(j.proposal_state) && `<button class="btn sm ${j.proposal_state === 'ready' ? 'pri' : ''}" data-act="prop-open" data-jid="${j.id}">${ic('bot', 's')} ${j.proposal_state === 'ready' ? tr('Review the proposal') : tr('Open')}</button>`,
@@ -460,7 +473,7 @@ function jobHtml(j) {
   const fo = S.jobFocus === j.id;  // 2.36.2 (#1141): opened by a "Job #id" link: highlighted, log + history unfolded
   return `<div class="job st-${esc(j.state)}${fo ? ' jfocus' : ''}" id="job-${j.id}"${fo ? ' tabindex="-1"' : ''}><div class="jobh"><span class="jst">${esc(tr(JOB_ST[j.state] || j.state))}</span><b>${esc(j.title)}</b><span class="spacer"></span><span class="muted">${esc(j.agent_name)} · ${esc(relTime(j.updated_at))}</span></div>
     ${j.task_id ? `<button class="runtask" data-act="open-id" data-id="${j.task_id}">${ic('arrow', 's')}<span>${esc(j.task_title || '')}</span></button>` : ''}
-    ${j.log ? `<details class="joblog"${fo ? ' open' : ''}><summary>${esc(last.slice(0, 140))}</summary><pre>${esc(j.log)}</pre></details>` : ''}
+    ${j.log ? `<details class="joblog" data-jid="${j.id}"${S.jobLogOpen[j.id] ?? fo ? ' open' : ''}><summary>${esc(last.slice(0, 140))}</summary><pre>${esc(j.log)}</pre></details>` : ''}
     ${j.steps ? jobStepsHtml(j.id, j.steps) : ''}
     ${j.action && !(j.action === 'approve' && j.state === 'waiting') ? `<div class="muted jact">${j.action === 'approve' ? thumbIc(true) + ' ' : j.action === 'reject' ? thumbIc(false) + ' ' : ''}${esc({approve: tr('Approved by {0}', j.action_by_name), reject: tr('Rejected by {0}', j.action_by_name), stop: tr('Stopped by {0}', j.action_by_name)}[j.action] || '')}</div>` : ''}
     ${acts ? `<div class="jobb">${acts}</div>` : ''}</div>`;

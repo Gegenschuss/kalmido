@@ -13,8 +13,8 @@ from ..core.i18n import dec_comma, lang, LANGS, tr
 from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_now, now_utc, parse_iso, usettings
 from ..accounts.session import me, user_public
 from ..core.access import (
-    _pset_sql, Denied, is_project, list_role, need_feat, need_list, need_project, need_task, need_time, plists,
-    PROJ_SQL, pvis, task_visible, time_all, vis_sql,
+    _pset_sql, Denied, list_role, need_feat, need_list, need_task, need_time, plists,
+    pvis, task_visible, time_all, vis_sql,
 )
 from ..core.state import visible_lists
 from ..tasks.validation import DAY_HOURS_DEFAULT
@@ -222,6 +222,21 @@ def need_entry(c, eid):
     return r
 
 
+# 2.41.0 (#1471): time tracking is a switch of each list (lists.time_tracking, any type, default off; before: project lists).
+# New time needs it on; what is tracked already stays visible everywhere (review, reports, totals), also after it is switched off
+MT_TIME_SQL = "(SELECT id FROM lists WHERE time_tracking=1)"
+
+
+def mt_time_on(c, lid):
+    r = c.execute("SELECT time_tracking FROM lists WHERE id=?", (lid,)).fetchone() if lid else None
+    return bool(r and r[0])
+
+
+def mt_need_time(c, lid):
+    if not mt_time_on(c, lid):
+        raise Denied(409, tr("Switch on time tracking in the list settings to track time"))
+
+
 def time_target(c, b):
     """task_id or list_id of an entry from the request -> (task_id, list_id, title); read access needed."""
     tid = b.get("task_id")
@@ -232,14 +247,14 @@ def time_target(c, b):
             raise Denied(404) from None
         need_task(c, tid, write=False, full=True)
         t = c.execute("SELECT list_id, title FROM tasks WHERE id=?", (tid,)).fetchone()
-        need_project(c, t["list_id"], "time")
+        mt_need_time(c, t["list_id"])
         return tid, t["list_id"], t["title"]
     try:
         lid = int(b.get("list_id"))
     except (TypeError, ValueError):
         raise BadInput(tr("Task or list missing")) from None
     need_list(c, lid, write=False)
-    need_project(c, lid, "time")
+    mt_need_time(c, lid)
     return None, lid, ""
 
 
@@ -254,7 +269,7 @@ def time_totals(c, uid):
     """{task_id: [seconds of everyone I can see, my seconds]} of finished entries (the client adds my running timer)."""
     out = {}
     for r in c.execute(f"""SELECT task_id, SUM(seconds) AS s, SUM(CASE WHEN user_id=? THEN seconds ELSE 0 END) AS m
-                           FROM time_entries WHERE task_id IS NOT NULL AND "end" IS NOT NULL AND list_id IN {PROJ_SQL}
+                           FROM time_entries WHERE task_id IS NOT NULL AND "end" IS NOT NULL
                              AND (user_id=? OR list_id IN {vis_sql()}) AND {evis(c, uid, "")} GROUP BY task_id""", (uid, uid, uid, uid)):
         if r["s"]:
             out[r["task_id"]] = [r["s"], r["m"]]
@@ -286,14 +301,14 @@ def time_list_totals(c, uid):
     time: the finished entries (with or without a task; the client adds my running timer) and the sum of a number field
     called "Budget h" (the agency project type's field, any language) over the list's tasks."""
     out = {}
-    for r in c.execute(f"""SELECT list_id, SUM(seconds) AS s FROM time_entries WHERE "end" IS NOT NULL AND list_id IN {PROJ_SQL}
+    for r in c.execute(f"""SELECT list_id, SUM(seconds) AS s FROM time_entries WHERE "end" IS NOT NULL
                            AND (user_id=? OR list_id IN {vis_sql()}) AND {evis(c, uid, "")} GROUP BY list_id""", (uid, uid, uid)):
         if r["s"]:
             out[r["list_id"]] = {"s": r["s"], "b": None}
     names = set(BUDGET_FIELD_NAMES) | {tr("Budget h", lg=x).lower() for x in LANGS}
     part = set(plists(c, uid))  # a participant sees only some tasks: no budget sum there
     for r in c.execute(f"""SELECT f.list_id, f.id, f.name FROM list_fields f WHERE f.type='number' AND f.list_id IN {vis_sql()}
-                           AND f.list_id IN {PROJ_SQL}""", (uid, uid)).fetchall():
+                           AND f.list_id IN {MT_TIME_SQL}""", (uid, uid)).fetchall():
         if (r["name"] or "").strip().lower() not in names or r["list_id"] in part:
             continue
         tot = 0.0
@@ -493,7 +508,7 @@ def focus_to_entry(c, pid):
     if sec < 60 or c.execute("SELECT 1 FROM time_entries WHERE pomo_id=?", (pid,)).fetchone():
         return None
     t = c.execute("SELECT list_id, title FROM tasks WHERE id=?", (p["task_id"],)).fetchone()
-    if not t or not list_role(c, t["list_id"], uid) or not is_project(c, t["list_id"]):
+    if not t or not list_role(c, t["list_id"], uid) or not mt_time_on(c, t["list_id"]):
         return None
     if c.execute("SELECT 1 FROM time_entries WHERE user_id=? AND source='timer' AND start<? AND (\"end\" IS NULL OR \"end\">?)",
                  (uid, p["end"], p["start"])).fetchone():
@@ -513,9 +528,8 @@ def local_bounds(d1, d2):
 def time_rows(c, uid, a):
     """Visible entries for the entry list / report. a: from, to (local dates, inclusive), scope (mine | all),
     user, task_id, lists (csv of list ids; 0 = no list / a list I cannot see)."""
-    # list types: only entries of project lists (and list-less ones); a list turned back into a plain list hides its time
-    where, args = [f"(e.user_id=? OR e.list_id IN {vis_sql()})", f"(e.list_id IS NULL OR e.list_id IN {PROJ_SQL})",
-                   evis(c, uid)], [uid, uid, uid]
+    # 2.41.0 (#1471): every tracked entry counts, whatever the list's type or switch (before: project lists only)
+    where, args = [f"(e.user_id=? OR e.list_id IN {vis_sql()})", evis(c, uid)], [uid, uid, uid]
     try:
         f = date.fromisoformat(a["from"]) if a.get("from") else None
         t = date.fromisoformat(a["to"]) if a.get("to") else None
@@ -627,7 +641,7 @@ def time_report(c, uid, a):
     today = local_now().date()
     lo, hi = local_bounds(today, today)
     mine_today = sum(entry_secs(r, ref) for r in c.execute(
-        f"SELECT start, \"end\", seconds FROM time_entries WHERE user_id=? AND start>=? AND start<? AND (list_id IS NULL OR list_id IN {PROJ_SQL})",
+        "SELECT start, \"end\", seconds FROM time_entries WHERE user_id=? AND start>=? AND start<?",
         (uid, lo, hi)))
     return {"from": f.isoformat() if f else None, "to": t.isoformat() if t else None, "scope": a.get("scope", "mine"),
             "rounding": rm, "currency": s.get("time_currency") or "", "total": tot, "lists": out_lists,

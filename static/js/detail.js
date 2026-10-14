@@ -446,7 +446,7 @@ function renderDetail0() {
         ${ticketsOn(t.list_id) ? `<label for="d-ttype">${tr('Type')}</label><select id="d-ttype" data-sheet-ico="bug" ${ro ? 'disabled' : ''}><option value="">${tr('None')}</option>${TTYPES.map(([k, n, i]) => `<option value="${k}" data-ico="${i}" ${t.ttype === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>` : ''}
         ${msTog ? `<label for="d-ms">${tr('Milestone')}</label><label class="chkl dmsl"><input type="checkbox" id="d-ms" ${msT ? 'checked' : ''} ${ro ? 'disabled' : ''}><i class="msd" aria-hidden="true"></i>${tr('This task is a milestone')}</label>` : ''}
         ${msSel.length ? `<label for="d-msel">${msTog ? tr('Belongs to') : tr('Milestone')}</label><select id="d-msel" data-sheet-ico="flag" ${ro ? 'disabled' : ''}><option value="">${tr('None')}</option>${msSel.map(m => `<option value="${m.id}" ${m.id === t.milestone_id ? 'selected' : ''}>${esc(m.title + (m.due ? ' · ' + fmtDateLoc(m.due) : ''))}</option>`).join('')}</select>` : ''}
-        <label>${tr('Link')}</label>${linkField(t, ro)}
+        ${t.url || S.editLink ? `<label>${tr('Link')}</label>${linkField(t, ro)}` : ro ? '' : `<button type="button" class="btn sm linkadd" data-act="link-edit">${ic('link', 's')} ${tr('Add link')}</button>`}${''/* 2.41.0 (#1475): the Link row only with a link */}
         ${t.id > 0 && !t.context ? aiuTaskLine(t) : ''}
       </div>`,
     custom: ck ? '' : `${fieldsOf(t.list_id).length ? `<div class="dsec cfsec"><h5>${tr('Fields')}</h5><div class="fields cf">${fieldsOf(t.list_id).map(f => fieldEditor(f, t, ro)).join('')}</div></div>` : ''}`,
@@ -536,8 +536,20 @@ async function mdToSubtasks() {
 }
 function linkField(t, ro) {
   if (t.url && !S.editLink) return `<div class="linkf">${flkLink(t.url, 'linkchip', `${ic(flkIs(t.url) ? 'folder' : 'link', 's')}<span>${esc(urlHost(t.url))}</span>`)}${ro ? '' : `<button class="iconbtn" data-act="link-edit" title="${tr('Edit link')}">${ic('edit', 's')}</button><button class="iconbtn" data-act="link-rm" title="${tr('Remove website link')}">${ic('x', 's')}</button>`}</div>`;
-  return ro ? '<span class="muted">–</span>' : `<input id="d-url" type="url" inputmode="url" autocomplete="off" placeholder="${esc(tr('https://… or smb://…'))}" aria-label="${esc(tr('Link'))}" value="${esc(t.url || '')}" enterkeyhint="done">`;
+  return ro ? '' : `<input id="d-url" type="url" inputmode="url" autocomplete="off" placeholder="${esc(tr('https://… or smb://…'))}" aria-label="${esc(tr('Link'))}" value="${esc(t.url || '')}" enterkeyhint="done">`;
 }
+// 2.41.0 (#1475): "Add link" (task menu, More details): opens the panel's link field; Enter saves, Esc / empty cancels
+function linkAdd(id) {
+  if (!canEdit(taskById(id))) { roToast(); return; }
+  if (S.sel !== id) openDetail(id);
+  S.editLink = true; renderDetail();
+  const m = $('#d-more'); if (m) m.open = true;
+  setTimeout(() => $('#d-url')?.focus(), 0);
+}
+document.addEventListener('focusout', e => {  // an empty link field that loses the focus folds away again
+  if (e.target.id !== 'd-url' || !S.editLink) return;
+  setTimeout(() => { if (S.editLink && !taskById(S.sel)?.url && !($('#d-url')?.value || '').trim() && document.activeElement?.id !== 'd-url') { S.editLink = false; renderDetail(); } }, 0);
+});
 async function saveLink(v) {
   const t = taskById(S.sel); if (!t) return;
   v = (v || '').trim();
