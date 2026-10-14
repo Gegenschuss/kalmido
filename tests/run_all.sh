@@ -578,25 +578,28 @@ fresh; run p2391_t_ui node p2391_t_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2391_r_api "$PY" p2391_r_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2391_r_ui node p2391_r_ui.js "$KALMIDO_TEST_DATA"
 shard 10  # --------------------------------------------------------------- shard 10 of 10 (2.40.0: the 2.40 suites, shard 9 is full)
+# 2.40.0 T (#1430): render time of a 300-row table with two fields, 50 live changes (prints the numbers)
+fresh; run p2400_t_perf node p2400_t_perf.js "$KALMIDO_TEST_DATA"
+# 2.40.0 T (#1430 #1203 #1415 #1191 #1416 #1409): guide lines / bundled renders, description tap while scrolling + pen,
+# empty states, list columns from 600 px, priority as background, Markdown in titles (md_plain, checklist -> subtasks + Restore)
+fresh; run p2400_t_api "$PY" p2400_t_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2400_t_ui node p2400_t_ui.js "$KALMIDO_TEST_DATA"
+# 2.40.0 A (#1432): "Load more" for jobs, completed, trash and news (cursors without doubles / gaps, open jobs on top, counters over all)
+fresh; run p2400_a_api "$PY" p2400_a_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2400_a_ui node p2400_a_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2400_l_api "$PY" p2400_l_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2400_l_ui node p2400_l_ui.js "$KALMIDO_TEST_DATA"
 # 2.40.0 D (#1368 #1381 #1363 #1364 #1366 #1336): e-invoice address from free lines, closing / reminder texts, fee as an open item,
 # settled reminders, language switch of drafts, PDF inline + download, send / reminder dialogs
 fresh; run p2400_d_api "$PY" p2400_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2400_d_ui node p2400_d_ui.js "$KALMIDO_TEST_DATA"
-# 2.40.0 A (#1432): "Load more" for jobs, completed, trash and news (cursors without doubles / gaps, open jobs on top, counters over all)
-fresh; run p2400_a_api "$PY" p2400_a_api_test.py "$KALMIDO_TEST_DATA"
-fresh; run p2400_a_ui node p2400_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.40.0 V (#1190 #1334 #1361 #1344 #1345): progress bar off by default, group_order bounds, favourites, My tasks in an own order, org line
+fresh; run p2400_v_api "$PY" p2400_v_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2400_v_ui node p2400_v_ui.js "$KALMIDO_TEST_DATA"
 # 2.40.0 K (#1380 #1372 #1421 #1335): contact persons of a client (migration, list, documents, BT-56, import, undo), the
 # country as an ISO code / choice, the address of an archived PDF with its proposals, the archive file after the commit
 fresh; run p2400_k_api "$PY" p2400_k_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2400_k_ui node p2400_k_ui.js "$KALMIDO_TEST_DATA"
-# 2.40.0 V (#1190 #1334 #1361 #1344 #1345): progress bar off by default, group_order bounds, favourites, My tasks in an own order, org line
-fresh; run p2400_v_api "$PY" p2400_v_api_test.py "$KALMIDO_TEST_DATA"
-fresh; run p2400_v_ui node p2400_v_ui.js "$KALMIDO_TEST_DATA"
-# 2.40.0 part E (office settings): #1378 fetch() writes carry the CSRF header (static check), logo + import; #1371 unsaved input
-# survives view changes and live events (formguard.js); #1379 producing / raw data switches + start migration; #1377 the word
-# before the management's names; #1382 number scheme building blocks, previews, plain errors, (i) of the terms
-fresh; run p2400_e_api "$PY" p2400_e_api_test.py "$KALMIDO_TEST_DATA"
-fresh; run p2400_e_ui node p2400_e_ui.js "$KALMIDO_TEST_DATA"
 # 2.40.0 part E (office settings): #1378 fetch() writes carry the CSRF header (static check), logo + import; #1371 unsaved input
 # survives view changes and live events (formguard.js); #1379 producing / raw data switches + start migration; #1377 the word
 # before the management's names; #1382 number scheme building blocks, previews, plain errors, (i) of the terms
