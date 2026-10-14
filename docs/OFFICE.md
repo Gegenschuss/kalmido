@@ -38,6 +38,15 @@ organisation need not choose.
   brand colour (accent in the print only), document language (de / en), currency (EUR / USD + rate), number scheme with
   a live preview, producing quotient and rate, raw data factor, days a quotation stays valid, default text blocks,
   default rights, country pack with its tax rates, and the import / export of the master data.
+  Since 2.40 producing (a markup by production days) and the raw data surcharge are switches per organisation
+  (`producing_on`, `raw_on`): new organisations start without them; at the first start of 2.40 an organisation that uses
+  them (services, positions, contracts with raw data included) keeps both on, once, so switching off later stays off.
+  Off means: no automatic producing / raw data line in new quotations (raw data "none"), the flags of the catalogue are
+  not taken over, the fields, flags and the contract's "raw data included" are hidden, the spreadsheet import ignores
+  those columns; existing and finalised documents keep what they hold. The company data choose the word before the
+  management's names in the footer (`md_label`: Geschäftsführung, Gesellschafter, Inhaber, Inhaberin, Vorstand, Partner;
+  German or English by the document's language). Unsaved input of these pages survives a change of the view and live
+  updates until it is saved or discarded.
 
 ## Number scheme
 
@@ -170,7 +179,7 @@ stops the finalising of an invoice instead of turning silently into `DE`.
 
 All routes require a signed-in person with the module on and an organisation (`400` with a hint otherwise); writes
 need the organisation's admin. `GET/PUT /api/office/settings`, `GET /api/office/packs`, `GET /api/office/packs/<code>`,
-`POST /api/office/packs/validate`, `GET /api/office/number-preview?scheme=`, and for each of `services`, `equipment`,
+`POST /api/office/packs/validate`, `GET /api/office/number-preview?scheme=&kind=offer|invoice|credit|reminder` (the next number, `yearly` = the counter restarts every year, or a plain-language `error`), and for each of `services`, `equipment`,
 `sets`, `texts`, `contracts`: `GET /api/office/<kind>?q=&archived=1`, `POST /api/office/<kind>`,
 `GET/PATCH/DELETE /api/office/<kind>/<id>` (delete archives a row that documents, contracts or sets still use).
 `GET /api/office/export`, `POST /api/office/import?overwrite=1` (JSON body or multipart `file`). Documents: see
