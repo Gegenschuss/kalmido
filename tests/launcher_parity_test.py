@@ -153,6 +153,16 @@ r.handle([{"event": "chat", "seq": 11, "data": {"user": {"id": 7}, "message": {"
 check(saved == [11, 12], f"cursor saved after every group: {saved}")
 check(len(ar.chunks("a" * 9000)) == 2, "long answers are split")
 
+# 2.40.0 (#1100 tail_blocks): approval / approval-done / suggest at the end, any order and number, only at a line start
+tb = ar.split_tail_blocks("Done.\n\n```suggest\nShow the diff\n```\n\n```approval\nDeploy 1.3\nGoes live.\n```\n```freigabe-erledigt\nTag 1.2\n```")
+check(tb == ("Done.", {"title": "Deploy 1.3", "what": "Goes live."}, ["Show the diff"], ["Tag 1.2"]), f"three blocks in any order: {tb}")
+tb = ar.split_tail_blocks("Two ways.\n```approval\nDeploy 1.3\n```\n```suggest\n- Test first\n2. Wait\nShip\nFourth\n```")
+check(tb == ("Two ways.", {"title": "Deploy 1.3"}, ["Test first", "Wait", "Ship"], []), f"suggest after approval, at most 3: {tb}")
+tb = ar.split_tail_blocks("Run it:\n```bash\nmake\n```")
+check(tb == ("Run it:\n```bash\nmake\n```", None, [], []), f"a code block at the end stays: {tb}")
+tb = ar.split_tail_blocks("I add a ```suggest block\nlater\n```")
+check(tb[2] == [] and tb[0].startswith("I add a"), f"an inline fence is no block: {tb}")
+check(ar.suggest_line(["A", "B"]) == "Next: 1) A  2) B", "numbered suggestion line")
 # 2.40.0 (#1347): approval_check - a decision asked / a proposal made without an ```approval block
 for txt in ("Soll ich das gleich einbauen?", "Das ist klein genug, um es in 2.40 mitzunehmen.", "Vorschlag: den Filter zuerst bauen",
             "Das würde ich vorziehen.", "Passt gut in 2.41.", "Shall I add it to the next release?",

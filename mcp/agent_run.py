@@ -504,6 +504,42 @@ def split_approval(text):
     return text[:m.start()].rstrip(), {"title": title, **({"what": what} if what else {})}
 
 
+TAIL_KINDS = {"approval": "approval", "freigabe": "approval", "approval-done": "done", "freigabe-erledigt": "done",
+              "suggest": "suggest"}
+
+
+def split_tail_blocks(text):
+    """2.40.0 (#1100 tail_blocks): the closing blocks at the end of an answer, in any order and number, each fence at a
+    line start: ```approval (alias ```freigabe), ```approval-done (alias ```freigabe-erledigt: approvals decided in words)
+    and ```suggest (next steps) -> (text, approval {title, what} or None, suggestions [up to 3], done lines)."""
+    lines = (text or "").rstrip().split("\n")
+    appr, sugg, done = None, [], []
+    while len(lines) >= 2 and lines[-1].strip() == "```":
+        j = len(lines) - 2
+        while j >= 0 and not lines[j].startswith("```"):
+            j -= 1
+        m = re.match(r"```([a-z-]+)(?:[ \t][^\n]*)?$", lines[j]) if j >= 0 else None
+        kind = TAIL_KINDS.get(m.group(1)) if m else None
+        if not kind:
+            break
+        inner = [x.strip() for x in lines[j + 1:-1] if x.strip()]
+        lines = lines[:j]
+        while lines and not lines[-1].strip():
+            lines.pop()
+        if kind == "approval" and appr is None:  # the last one wins when there are several
+            _, appr = split_approval("```approval\n" + "\n".join(inner) + "\n```")
+        elif kind == "suggest" and not sugg:
+            sugg = [re.sub(r"^(?:[-*]|\d+[.)])\s*", "", x)[:80] for x in inner][:3]
+        elif kind == "done":
+            done = [re.sub(r"^[-*]\s*", "", x)[:200] for x in inner] + done
+    return "\n".join(lines).rstrip(), appr, [s for s in sugg if s], done
+
+
+def suggest_line(sugg):
+    """Suggestions as one numbered line under the answer (a typed number picks one)."""
+    return "Next: " + "  ".join(f"{i + 1}) {s}" for i, s in enumerate(sugg)) if sugg else ""
+
+
 # kalmido-capability: approval_check (2.40.0, #1347): a chat answer that asks the person to decide or makes a proposal,
 # but has no ```approval block, goes back to the agent ONCE (same session: the complete answer again, with the block, no
 # tools); if it still has none, the posted answer gets a visible hint. KALMIDO_APPROVAL_CHECK=0 switches it off.
@@ -668,8 +704,12 @@ class Runner:
         self.usage.report(force=True)
         if uid:
             if text:
-                body, appr = split_approval(redact(text))
-                body, appr = self.check_approval(args, uid, body, appr, st.session_id, what)
+                body, appr, sugg, done = split_tail_blocks(redact(text))
+                body, appr, sugg = self.check_approval(args, uid, body, appr, sugg, st.session_id, what)
+                if done:  # closing open cards from words is not done by this runner yet
+                    log(f"{len(done)} approval-done line(s) left as they are")
+                if sugg and not appr:
+                    body = (body + "\n\n" if body else "") + suggest_line(sugg)
                 ids = [int((e.get("data") or {}).get("message", {}).get("id") or 0) for e in evs if e.get("event") == "chat"]
                 reply_to = ids[-1] if len(ids) > 1 and ids[-1] else None  # several messages: say which one it answers
                 parts = chunks(body) or ([""] if appr else [])
@@ -695,27 +735,27 @@ class Runner:
             self.api.status("idle", host=self.host())
 
     # kalmido-capability: approval_check
-    def check_approval(self, args, uid, body, appr, session_id, what):
+    def check_approval(self, args, uid, body, appr, sugg, session_id, what):
         """2.40.0 (#1347): a chat answer that asks to decide / proposes something without an approval block goes back to
         the agent once (same session, the complete answer again with the block, no tools); still none -> a visible hint."""
         if appr or not APPROVAL_CHECK:
-            return body, appr
+            return body, appr, sugg
         line, lang = asks_without_card(body)
         if not line:
-            return body, appr
+            return body, appr, sugg
         log("the answer asks for a decision without an approval block: asking the agent once for the block")
         if session_id:
             st2, _ = self._exec(args + ["--resume", session_id], CARD_FIX.format(line=line.replace('"', "'")), uid, what, None,
                                 steps=False)
             t2 = result_text(st2) if st2 else ""
             if t2:
-                body, appr = split_approval(redact(t2))
+                body, appr, sugg, _ = split_tail_blocks(redact(t2))
                 self.usage.report(force=True)
         if not appr:
             line2, lang2 = asks_without_card(body)
             if line2:
                 body = body.rstrip() + CARD_HINT[lang2 or lang or "en"]
-        return body, appr
+        return body, appr, sugg
 
     def _exec(self, args, prompt, uid, what, tid, steps=True):
         """One headless run of COMMAND (prompt on stdin) -> (Stream, exit code); (None, -1) = it cannot be started. A chat
