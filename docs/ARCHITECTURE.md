@@ -38,6 +38,11 @@ development workflow see [CONTRIBUTING.md](../CONTRIBUTING.md).
    writes, logs the activity (`log_act`), queues News, pushes and webhooks (`news_add`, `notify`, `wh_note`), and calls
    `bump(c)`: the data version of the instance goes up.
 4. **Other devices** poll `GET /api/version` every few seconds (`core/pages.py`) and reload the state when it changed.
+   2.41.0 (#1376): besides the total `v` it carries a change counter per area (`a`: tasks, comments, agentchat, team, office,
+   calendar, news, other; `bump()` takes the area from the request's route, background work counts as other). A change of
+   comments, chats, news or calendars only fetches those parts and redraws only the counters that moved (`static/js/liveparts.js`);
+   tasks / lists / other reload the state as before. Office views are never redrawn by someone else's change, and unsaved
+   form input (`formguard.js`) holds redraws back.
 5. **In the background** (`kalmido/startup.py` starts the threads): the watchdog (`notify/push.py`: reminders, nags,
    digests, rotations, clean-ups), the update check, calendar subscriptions, backups, webhook deliveries, mail and Git
    polling. Every thread and request passes the maintenance gate (`GATE` in `accounts/session.py`), so a restore can

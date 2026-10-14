@@ -4,6 +4,9 @@
 //   comment box (nothing sent), a press sends it as my comment; an older question's buttons are gone once a newer comment
 //   came (#1037); the task row shows the open approvals (lock + number); the agent chat still renders its approval card and
 //   buttons through the shared component (choicecard.js)
+// - #1376: live updates per area: agent comments on an open list cost fewer render() calls and state loads than before
+//   (PERF line, the old way = S.lpOff), the sidebar keeps its nodes, a half-filled form (formguard) stays; a tasks change
+//   waits while it has unsaved input
 // - #1437: the vCard import shows "Import running…" with a bar at once and a result that stays until it is closed
 const path = require('path');
 const {execFileSync} = require('child_process');
@@ -76,6 +79,33 @@ const call = async (ck, method, url, body, h = {}) => { const r = await fetch(B 
     check(/cpermst ok/.test(html) && /Approved by Alice at/.test(html), '#1383: the chat card (shared component) ' + html);
     const btns = await ev(`chatChoicesHtml({id: 7, from: 'agent', choices: {choices: [{id: 'a', label: 'A'}], multi: false}, choice: null, choice_state: 'open'})`);
     check(/data-act="chat-choice" data-mid="7" data-cid="a"/.test(btns) && /data-chpen="7"/.test(btns), '#1383: the chat buttons keep their attributes ' + btns);
+
+    // ================= #1376 live updates per area (measurement: the old way S.lpOff = true vs the new one)
+    await ev(`(() => { closeDetail(); go('l/${L}'); return 1; })()`).catch(() => {});
+    await nav(B + '#l/' + L);
+    check(await ready(`typeof lpLive === 'function' && !!document.querySelector('#view') && !!S.lpA`, 40), '#1376: the poll knows the areas (a)');
+    await ev(`(() => { window.__lp = {r: 0, st: 0, b: 0}; const R0 = render; render = function () { window.__lp.r++; return R0.apply(this, arguments); };
+      const F0 = window.fetch; window.fetch = async function (u, o) { const r = await F0.call(this, u, o); if (String(u).includes('/api/state')) { window.__lp.st++; try { window.__lp.b += (await r.clone().text()).length; } catch {} } return r; }; return 1; })()`);
+    const measure = async (off, tag) => {
+      await ev(`(() => { S.lpOff = ${off}; window.__lp.r = 0; window.__lp.st = 0; window.__lp.b = 0; return 1; })()`);
+      for (let i = 0; i < 4; i++) { await agc({body: `${tag} note ${i}`}); await sleep(4500); }
+      await sleep(off ? 5000 : 17000);  // the new way: the bundled follow-up (15 s) is inside the window
+      return ev(`({...window.__lp})`);
+    };
+    const before = await measure(true, 'old');
+    // the sidebar keeps its nodes, a half-filled form in the view stays (new way)
+    await ev(`(() => { const r = document.querySelector('#side .srow'); if (r) r.__lpKeep = 1; const f = document.createElement('form'); f.dataset.fg = 'lp-test'; f.id = 'lpform'; f.innerHTML = '<input id="lpf" value="">'; document.querySelector('#view').appendChild(f); const i = f.querySelector('input'); i.value = 'half filled'; i.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
+    const after = await measure(false, 'new');
+    console.log(`PERF #1376 4 comments of an agent in 20 s, list open: old way ${before.r} render() / ${before.st} state loads / ${Math.round(before.b / 1024)} kB; new way ${after.r} render() / ${after.st} state loads / ${Math.round(after.b / 1024)} kB`);
+    check(after.r < before.r && after.st < before.st, `#1376: fewer full redraws and state loads ${JSON.stringify({before, after})}`);
+    check(await ev(`document.querySelector('#side .srow')?.__lpKeep === 1`), '#1376: comments arriving: the sidebar keeps its nodes (no flicker)');
+    check(await ev(`document.querySelector('#lpf')?.value === 'half filled'`), '#1376: a half-filled form stays while comments arrive');
+    // a change of the tasks area while the form has unsaved input: no redraw until it is saved / discarded
+    await call(null, 'POST', '/api/v1/tasks', {title: 'Made by the agent', list_id: L}, AGH);
+    await sleep(6000);
+    check(await ev(`document.querySelector('#lpf')?.value === 'half filled' && S.viewStale === true`), '#1376: unsaved input holds the full redraw back');
+    await ev(`(() => { fgDone('lp-test'); document.querySelector('#lpform')?.remove(); return 1; })()`);
+    check(await ready(`!S.viewStale && [...document.querySelectorAll('#view .ttl, #view .title')].some(e => /Made by the agent/.test(e.textContent)) || [...document.querySelectorAll('#view')].some(e => /Made by the agent/.test(e.textContent))`, 30), '#1376: afterwards the view follows');
 
     // ================= #1437 the import message stays
     const BK = (await call(CA, 'POST', '/api/books', {name: 'Test'})).id;
