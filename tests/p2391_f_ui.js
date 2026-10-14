@@ -56,7 +56,7 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntraile
   const cards = [...d.querySelectorAll('.oimpv .oimcard')];
   check(cards.length === 3 && cards[0].classList.contains('warn') && /Austria or Switzerland/.test(cards[0].querySelector('.oimwarn')?.textContent || ''), 'preview: the unsure split shows its reason');
   check(cards[1].classList.contains('off') && /Already a client/.test(cards[1].textContent) && !!cards[1].querySelector('select[data-oim-act]'), 'preview: a duplicate is off by default with "what to do"');
-  check(cards[0].querySelector('input[data-k="country"]')?.maxLength === 2 && cards[0].querySelectorAll('input[data-oim-c]').length === 6, 'preview: six editable fields per client');
+  check(!!cards[0].querySelector('.cty input.ctyq') && cards[0].querySelectorAll('input[data-oim-c]').length === 6, 'preview: six editable fields per client (2.40.0 #1372: the country as a choice)');
   check(/Import 2 entries/.test(d.querySelector('[data-oim="import"]')?.textContent || ''), 'import button counts the ticked rows: ' + (d.querySelector('[data-oim="import"]')?.textContent || ''));
   check(/Staff \(2\)/.test(d.querySelector('.oimpv')?.textContent || ''), 'sheets without master data are named');
   const inp = cards[0].querySelector('input[data-k="country"]');

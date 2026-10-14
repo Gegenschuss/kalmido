@@ -121,7 +121,9 @@ is guessed in the background and no language model is involved.
   deselected, and the original text is kept in the client's free address field.
 - **Duplicates**: the normalised company name (without legal form, accents and punctuation) plus the postcode is compared
   with the organisation's clients and within the file. A duplicate is skipped by default; an existing client can instead
-  be merged (only its empty fields are filled) or the row added as a new client.
+  be merged (only its empty fields are filled) or the row added as a new client. 2.40.0: a duplicate that names another
+  contact person is proposed as "Add as contact person to the client" (to the existing client, or to the client of the
+  earlier row of the file); the undo removes the added contact persons again.
 - **Old invoices and quotations** are uploaded as PDF files (several at once, at most 20 MB each, checked by their first
   bytes). The file name proposes the key data: `<project no>_<client>_<project>__<date>_R.pdf` is an invoice,
   `<project>_<client>_KV<n>_<date>_<initials>.pdf` a quotation; dates as `dd.mm.yy`, `dd.mm.yyyy`, `yyyy-mm-dd` or
@@ -129,7 +131,11 @@ is guessed in the background and no language model is involved.
   file name without `.pdf`. An archived document is read-only: the original PDF is stored unchanged (folder 0700, file
   0600, part of every backup) and is never re-rendered, renumbered, sent or turned into an e-invoice. The documents tab
   lists it under "Archive" with the sum of the archived invoices and of the paid ones; the other lists and the reminders
-  do not count it.
+  do not count it. 2.40.0: Kalmido also reads the recipient's address from the text layer of page 1 (not the own sender
+  line; split like a spreadsheet address, unsure splits marked) and proposes, each only with a tick: a new client (no
+  client matches), a contact person for a client that has another one, a note when the address differs from the client
+  card. A scan without text gets a hint - there is no text recognition. The archive file is written only after the
+  database commit.
 - **Numbers**: an archived number is never given to a new document (the automatic number skips it, a manual one is
   refused). The import page proposes to continue the invoice / quotation counter after the highest archived number (a
   number that follows today's scheme, else the project number of the file name); the person confirms, the counter is
@@ -147,6 +153,18 @@ nothing), `POST /api/office/legacy/split` `{address}`, `POST /api/office/legacy/
 `project_no`, `project`, `client_id`, `client_name`, `date`, `amount`, `paid`; 409 for a used number or the same PDF
 twice), `GET /api/office/legacy/archive?kind=`, `PATCH /api/office/legacy/archive/<id>` (only `amount`, `paid`,
 `client_id`), `GET /api/office/legacy/archive/<id>/pdf`, `GET/POST /api/office/legacy/counter` `{kind, last}`.
+2.40.0: the import takes `action` `contact` (with `merge_id` = the existing client or `contact_row` = the earlier row);
+`POST /api/office/legacy/archive/address` (multipart `file`, `client_id`?) -> `{status: ok | no_text | none | busy | error,
+address, unsure, client_id, client_name, new_client, add_contact, address_differs}` (nothing stored); the archive upload
+takes the ticked proposals as `new_client` (JSON `{name, contact, street, zip, city, country}`) and `add_contact`.
+
+**Contact persons (2.40.0)**: a client has several contact persons (name, function / department, e-mail, phone), one of
+them the default (its name stays the client's field `contact`). Quotations, invoices, credit notes and reminders choose
+one (`contact_id`: empty = the default, `0` = none); the attention line of the address follows the choice and the
+e-invoice names the buyer's contact (BT-56, with phone / e-mail). A finalised document keeps its snapshot. **Country**:
+clients and the company take an ISO 3166-1 alpha-2 code, chosen by name (the browser's names, Germany / Austria /
+Switzerland on top, empty = Germany); `UK` becomes `GB`, `EL` `GR`, anything else is refused, and an old unknown value
+stops the finalising of an invoice instead of turning silently into `DE`.
 
 ## Web API
 

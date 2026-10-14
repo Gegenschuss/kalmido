@@ -200,6 +200,7 @@ ROUTES = {
     "POST /api/office/legacy/archive/run": "office", "POST /api/office/legacy/archive": "office", "GET /api/office/legacy/archive": "office",
     "PATCH /api/office/legacy/archive/{}": "office", "GET /api/office/legacy/archive/{}/pdf": "office", "GET /api/office/legacy/counter": "office",
     "POST /api/office/legacy/counter": "office",
+    "POST /api/office/legacy/archive/address": "office",  # 2.40.0 (#1421): the address of an archived PDF (p2400_k_api_test.py)
     # ---- comment (9)
     "POST /api/comments/{}/decide": "comment", "POST /api/v1/comments/{}/reactions": "comment",
     "DELETE /api/v1/comments/{}/reactions/{}": "comment", "PATCH /api/v1/comments/{}": "comment",

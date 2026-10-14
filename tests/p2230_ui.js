@@ -66,7 +66,7 @@ const BASE = 'cal,comments,collab,time,progress,agents';
   click(w, d.querySelector('#side [data-act="client-new"]')); await sleep(200);
   let md = d.querySelector('.modal.cldlg');
   check(md && md.querySelector('#cl-name') && md.querySelector('#cl-rate') && md.querySelector('#cl-bh'), 'the client dialog (with rate and budget)');
-  input(w, md.querySelector('#cl-name'), 'Café Aurora'); md.querySelector('#cl-icon').value = '☕'; md.querySelector('#cl-contact').value = 'Maria';
+  input(w, md.querySelector('#cl-name'), 'Café Aurora'); md.querySelector('#cl-icon').value = '☕'; click(w, md.querySelector('[data-clk-add]')); md.querySelector('[data-clk="name"]').value = 'Maria';  // 2.40.0 (#1380): contact persons as a list
   md.querySelector('#cl-rate').value = '80'; md.querySelector('#cl-bh').value = '10';
   click(w, md.querySelector('[data-m="save"]'));
   await until(() => w.eval('S.route.mod') === 'clients' && d.querySelector('#view .cldetail'));
