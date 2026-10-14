@@ -913,16 +913,20 @@ Web API (signed in as a person): `GET /api/folders/people?folder=` · `PUT /api/
 (null removes a default), apply?: all | new, force?, dry_run?}` (`dry_run: true` only reports what would change);
 `POST /api/lists/{id}/folder-reset` `{keys?}` (*Back to the folder*). 2.41.0: `PUT /api/folders/people` also takes
 `{folder, email, role?}` (the answer is the same whether the address has an account: `{shared: 0, updated: 0, by_email: true}`)
-and `GET` names the people (`name`). The folder's agents: `GET /api/folders/agents?folder=` → `{agents: [{agent_id, name,
-listen, first}], inherited, lists: [{id, name, agent_id}]}` · `PUT /api/folders/agents` `{folder, agent_id, listen?: bool | null,
-first?: true, apply?: all | new}` (adds it or changes it; the first agent's lists follow unless `apply: new`) · `DELETE
-/api/folders/agents` `{folder, agent_id, remove?}` (`remove: true` also takes it out of the folder's lists). An older client
+and `GET` names the people (`name`). The folder's agents: `GET /api/folders/agents?folder=` → `{folder, agents: [{agent_id,
+name, listen, first}], inherited, props, lists: [{id, name, agent_id}]}` (`folder` = the cleaned name, `props` = the folder's
+defaults) · `PUT /api/folders/agents` `{folder, agent_id, listen?: bool | null, first?: true, apply?: all | new}` (adds it or
+changes it; the first agent's lists follow unless `apply: new`) → the same plus `changed` (settings changed on the lists)
+and `skipped: [{id, name, reasons}]` (lists that kept their own value) · `DELETE /api/folders/agents` `{folder, agent_id,
+remove?}` (`remove: true` also takes it out of the folder's lists) → the same plus `removed` (lists it left). An older client
 that writes `props.agent_id` sets the folder's first agent (0 removes the folder's agents). Public links of all own lists
 in the folder: `GET /api/folders/public-links?folder=` · `PUT /api/folders/public-links` `{folder, on: bool, notes?}`
-(read only, no password; health lists never; existing links stay as they are) → `{lists: [{id, name, health, link}],
-created, removed}`. `POST /api/folders/owner` `{folder, user_id}` hands every own list in the folder to that person (the
-rules of *Transfer ownership* per list; you stay list admin) → `{moved, skipped: [{id, name, reason}]}`. `/api/state` has
-`folder_shares` `{folder: {people, groups, agents: [names]}}` of the person's shared folders. `/api/v1`: `GET /folders`,
+(read only, no password; health lists never; existing links stay as they are) → `{enabled, lists: [{id, name, health,
+link}], created, removed}` (`enabled` = public links allowed on this server; `on: true` while they are off: `409`).
+`POST /api/folders/owner` `{folder, user_id}` hands every own list in the folder and its subfolders (not archived, never
+the Inbox) to that person (the rules of *Transfer ownership* per list; you stay list admin) → `{moved, skipped: [{id, name,
+reason}]}`. The folder routes act on the signed-in person's own folders; agent accounts get `403` when they change
+agents, public links or owners. `/api/state` has `folder_shares` `{folder: {people, groups, agents: [names]}}` of the person's shared folders. `/api/v1`: `GET /folders`,
 `POST /folders/rename`, `POST /folders/delete` (see [Endpoints](#endpoints)).
 
 2.39.1: a list moved into another folder takes the folder's workspace and agent settings only with `folder_adopt: true`
