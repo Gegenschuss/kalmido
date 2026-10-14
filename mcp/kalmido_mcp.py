@@ -1269,12 +1269,15 @@ TOOLS += [
 _CLIENT = {"name": {"type": "string"}, "icon": {"type": "string"}, "color": {"type": "string"}, "contact": {"type": "string"},
            "email": {"type": "string"}, "phone": {"type": "string"}, "address": {"type": "string"}, "note": {"type": "string"},
            "rate": {"type": "number"}, "budget_h": {"type": "number"}, "budget_amount": {"type": "number"}, "org_id": {"type": "integer"},
-           "archived": {"type": "boolean"}}
+           "archived": {"type": "boolean"},
+           # 2.40.0 (#1380): the contact persons (the whole list; "contact" stays the default's name)
+           "contacts": {"type": "array", "description": "2.40.0: the contact persons [{id?, name, role?, email?, phone?, is_default?}]: "
+                        "the whole list (with id = keep, without = new, missing = deleted)", "items": {"type": "object"}}}
 _FORM = {"title": {"type": "string"}, "intro": {"type": "string"}, "access": {"type": "string", "enum": ["org", "public"]},
          "section_id": {"type": "integer"}, "ask_email": {"type": "boolean"}}
 TOOLS += [
     ("list_clients", "2.23.0 (module clients): the clients of the user's organisation with their lists, hours (this month / in total), "
-                     "amounts and budget level (ok / warn at 80 % / over).", _obj({"month": {"type": "string", "description": "YYYY-MM"},
+                     "amounts and budget level (ok / warn at 80 % / over); 2.40.0: contacts = the contact persons, the default first.", _obj({"month": {"type": "string", "description": "YYYY-MM"},
                                                                                    "archived": {"type": "boolean"}}),
      lambda api, a: api.call("GET", "/clients", {**_pick(a, ("month",)), **({"archived": "1"} if a.get("archived") else {})})),
     ("get_client", "2.23.0: one client with estimate vs. actual per list (the tasks' durations next to the tracked time).",

@@ -828,6 +828,11 @@ Modules `clients`, `workload`, `forms` (per person, 409 while off); everything w
 `GET /clients` (`?month=YYYY-MM`, `?archived=1`) returns the clients with `lists`, `stats` (`seconds`, `amount`,
 `month_seconds`, `month_amount`, `estimate_min`) and `budget` (`pct_h`, `pct_amount`, `level`: ok / warn / over);
 `GET /clients/{id}` adds `per_list` (estimate vs. actual). `POST /clients`, `PATCH|DELETE /clients/{id}` (`structure`).
+2.40.0 (#1380): `contacts` lists the client's contact persons (`id`, `name`, `role`, `email`, `phone`, `is_default`; the default
+first) and `contact` stays the default's name. `POST` / `PATCH` with `contacts` replace the whole list (an entry with `id` is
+kept / changed, without one added, a missing one deleted; `is_default` marks the default, else the first); writing only
+`contact` renames the default (empty removes it). Office documents choose one with `contact_id` (`null` = the default, `0` = none;
+the "attn." line of the address and the buyer contact BT-56 of the e-invoice follow it; `client_contacts` in the document).
 A list's client: `PATCH /lists/{id}` `{client_id}`. The timesheet of a client is the time report of its lists:
 `GET /time/entries?lists=1,2&from=&to=` (web) or `/api/time/export.csv`.
 
