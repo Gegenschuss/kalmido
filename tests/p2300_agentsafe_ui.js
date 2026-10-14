@@ -50,7 +50,8 @@ const V = B + 'api/v1';
   let md = d.querySelector('.modal');
   const pane = md.querySelector('#aisp-safe');
   check(pane && !pane.hidden && md.querySelector('[data-aisub="safe"]')?.getAttribute('aria-selected') === 'true', '#920: settingsModal(\'agentsafe\') opens Settings > Agents > Use safely');
-  check(pane?.querySelectorAll('.agsafe-rules > li').length === 10 && pane.querySelectorAll('.agsafe-admin li').length === 3, '#920: ten rules and the admins\' part ' + pane?.querySelectorAll('.agsafe-rules > li').length);
+  check(pane?.querySelectorAll('.agsafe-rules > li').length === 11 && // 2.42.0 (#828): + encrypted content stays with you
+    pane.querySelectorAll('.agsafe-admin li').length === 3, '#920: eleven rules and the admins\' part ' + pane?.querySelectorAll('.agsafe-rules > li').length);
   check(/One agent per context/.test(pane?.textContent) && /The same people/.test(pane.textContent) && /Agent access/.test(pane.textContent), '#920: the rules name one agent per context, the same people, the access log');
   check(!/[\u{1F300}-\u{1FAFF}\u{1F44D}]/u.test(pane?.textContent || ''), '#920: no emojis in the rules');
   check(/AGENT-SECURITY\.md/.test(pane?.querySelector('a')?.getAttribute('href') || ''), '#920: the link to the details');
