@@ -122,7 +122,8 @@ const FEAT = 'cal,matrix,habits,stats,comments,collab';
   check(md && md.querySelectorAll('.kbact').length === 8, '#1219 phone: the same actions');
   w.close();
 
-  // ================= #1219 / #1221 My tasks
+  // ================= #1219 / #1221 My tasks (2.40.0, #1344: grouped by list is no longer the default)
+  await call('PATCH', '/api/settings', {mine_view: 'lists'});
   w = await boot({user: 'alice', hash: 'assigned'}); d = w.document;
   const groups = () => [...d.querySelectorAll('#view .group')];
   const mine = groups().find(g => /From your lists, without a date/.test(g.querySelector('.ghead')?.textContent || ''));

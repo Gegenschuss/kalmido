@@ -146,7 +146,7 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   const eveFeatures = (await api(w, 'GET', '/api/state')).settings.features;
   check(!d.querySelector('#view .who'), 'collab off: no assignee chips');  // 2.0.6 (#315): comment chips stay (Comments module)
   check(!d.querySelector('#side .shr'), 'collab off: no shared icon');
-  check(!d.querySelector('#side .srow[data-go="assigned"]'), 'collab off: no "Assigned to me"');
+  check(d.querySelector('#side .srow[data-go="assigned"]'), 'collab off: "My tasks" stays (2.40.0, #1344: always shown)');
   w.eval(`openDetail(${ids.ST})`); await sleep(600);
   check(!d.querySelector('#detail .dwho'), 'collab off: no assignee chip');
   d.querySelector('#d-tl [data-act="tl-menu"]')?.click(); await sleep(50);

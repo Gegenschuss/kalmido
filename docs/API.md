@@ -971,3 +971,17 @@ The stars travel with the person's settings in `GET /api/state` (`settings.fav_l
 order they were starred). Two more settings belong to them (`PATCH /api/settings`): `fav_only` (`"1"` = the sidebar shows
 the favourites and folds every other list under *More lists*) and `fav_views` (comma list of the views that show only tasks
 of favourites: `today`, `tomorrow`, `week`, `doable`, `assigned`). With and without an organisation alike.
+
+## My tasks in an own order (2.40.0)
+
+*My tasks* can be put in a personal order by dragging (the default view; *Grouped by list* shows the list groups as before).
+The order belongs to the person: it never changes the order of the shared lists (`sort` of the tasks), nobody else sees it,
+agents have none (`403`).
+
+| Call | What it does |
+|---|---|
+| `PUT /api/tasks/mine-order` | Web API (the signed-in person): `{ids: [task ids, top first]}` replaces the person's order; ids of tasks the person cannot see are skipped (at most 5000). Answer `{ok, count}` |
+
+`GET /api/state` carries it as `mine_order` (`{task id: position}`, 0 = on top). A task without a position (new, or newly
+assigned) stands above the placed ones, newest first; assigning a task to a person takes its old position away. The setting
+`mine_view` (`PATCH /api/settings`) is `own` (default) or `lists`.
