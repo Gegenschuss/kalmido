@@ -126,6 +126,7 @@ ROUTES = {
     "POST /api/tags/delete": "aggregate", "POST /api/tags/restore": "aggregate", "GET /api/v1/tags": "aggregate",
     "GET /api/v1/search": "aggregate", "GET /api/notes": "aggregate", "GET /api/v1/notes": "aggregate",
     "GET /api/state": "aggregate", "GET /api/tasks": "aggregate", "GET /api/occurrences": "aggregate",
+    "GET /api/state/delta": "aggregate",  # 2.42.0 (#1376): the changed tasks of /api/state (same query; gone only of seen lists)
     "GET /api/dayplan": "aggregate", "GET /api/dayplan/review": "aggregate", "GET /api/v1/dayplan": "aggregate",
     "GET /api/v1/dayplan/review": "aggregate", "GET /api/deps": "aggregate", "POST /api/tasks/purge-done": "aggregate",
     "DELETE /api/trash": "aggregate", "GET /api/roadmap": "aggregate",
