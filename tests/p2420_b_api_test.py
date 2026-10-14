@@ -266,6 +266,23 @@ rc, out, err_ = cli("encrypt-all")
 check(rc == 0 and enc(one("SELECT iban FROM office_company WHERE org_id=?", (ORG,))) and head(path) == b"KENC1\n"
       and one("SELECT value FROM settings WHERE key='org_encrypt'") == "1", f"cli encrypt-all {out[-200:]}")
 
+# ---------------------------------------------------------------- 2.42.0 review: a list moved into the organisation gets sealed now
+PL = A.post(B + "/api/lists", json={"name": "Private-Liste", "org_id": None}).json()["id"]
+if one("SELECT org_id FROM lists WHERE id=?", (PL,)) is not None:
+    A.patch(B + f"/api/lists/{PL}", json={"org_id": None})
+PT = A.post(B + "/api/tasks", json={"title": "p", "list_id": PL}).json()["id"]
+A.post(B + f"/api/tasks/{PT}/attachments", files={"file": ("p.txt", b"private file content", "text/plain")})
+pp = os.path.join(DATA, "attachments", one("SELECT path FROM attachments WHERE task_id=?", (PT,)))
+check(one("SELECT org_id FROM lists WHERE id=?", (PL,)) is None and head(pp) == b"privat", "private list: its file is plain")
+r = A.patch(B + f"/api/lists/{PL}", json={"org_id": ORG})
+check(r.ok and one("SELECT org_id FROM lists WHERE id=?", (PL,)) == ORG, "private list moved into the organisation " + r.text[:150])
+for _ in range(60):
+    if head(pp) == b"KENC1\n":
+        break
+    time.sleep(0.5)
+check(head(pp) == b"KENC1\n" and A.get(B + f"/api/attachments/{one('SELECT id FROM attachments WHERE task_id=?', (PT,))}").content == b"private file content",
+      "moved into the organisation: the file is sealed without a restart and still readable")
+
 # ---------------------------------------------------------------- a wrong server key, then rewrap with the recovery key
 start(key=KEY2, keep=True)
 A = sess("alice")
