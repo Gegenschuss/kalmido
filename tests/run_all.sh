@@ -605,6 +605,10 @@ fresh; run p2400_k_ui node p2400_k_ui.js "$KALMIDO_TEST_DATA"
 # before the management's names; #1382 number scheme building blocks, previews, plain errors, (i) of the terms
 fresh; run p2400_e_api "$PY" p2400_e_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2400_e_ui node p2400_e_ui.js "$KALMIDO_TEST_DATA"
+# 2.41.0 part A (small fixes): #1476 scope names, #1477 hover dot, #1479 job log stays open, #1439 submenu place, #1475 Link row only with a link
+fresh; run p2410_a_ui node p2410_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.41.0 part E (chat): #1374 copy with formatting, #1206 notices in the agent chat
+fresh; run p2410_e_ui node p2410_e_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

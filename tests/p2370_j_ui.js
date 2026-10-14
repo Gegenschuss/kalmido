@@ -107,14 +107,15 @@ const V = B + 'api/v1';
     if (it) it.click();
     return items.map(b => b.querySelector('.ml')?.textContent);
   };
-  let labels = await pick(`#chat-msgs .cmsg[data-mid="a:${one.id}"] [data-act="chat-msg-menu"]`, 'Copy');
-  check(labels.includes('Copy') && labels.includes('Save as task'), '#1165: "Copy" next to "Save as task" in the message menu ' + JSON.stringify(labels));
+  // 2.41.0 (#1374): "Copy" now copies with formatting (p2410_e_ui); the Markdown text is "Copy as Markdown"
+  let labels = await pick(`#chat-msgs .cmsg[data-mid="a:${one.id}"] [data-act="chat-msg-menu"]`, 'Copy as Markdown');
+  check(labels.includes('Copy') && labels.includes('Copy as Markdown') && labels.includes('Save as task'), '#1165: "Copy" next to "Save as task" in the message menu ' + JSON.stringify(labels));
   await until(() => w.__clip.length);
   check(w.__clip[0] === '# Plan\n\nThe **whole** plan:\n\n- one\n- `two`', '#1165: the Markdown text is copied ' + JSON.stringify(w.__clip));
   await until(() => w.__toasts.includes('Copied'));
   check(w.__toasts.includes('Copied'), '#1165: "Copied" ' + JSON.stringify(w.__toasts));
   // a split answer, from its middle part
-  await pick(`#chat-msgs .cmsg[data-mid="a:${parts[1].id}"] [data-act="chat-msg-menu"]`, 'Copy');
+  await pick(`#chat-msgs .cmsg[data-mid="a:${parts[1].id}"] [data-act="chat-msg-menu"]`, 'Copy as Markdown');
   await until(() => w.__clip.length > 1);
   check(w.__clip[1] === 'Part one of the answer.\n\n```bash\necho a\n```\n\nPart two.\n\nPart three, the end.', '#1165: an answer in three parts is copied as one text ' + JSON.stringify(w.__clip[1]));
   await until(() => w.__toasts.includes('Copied (3 parts)'));
@@ -122,12 +123,12 @@ const V = B + 'api/v1';
   // without navigator.clipboard (an http address): the old way
   Object.defineProperty(w.navigator, 'clipboard', {configurable: true, value: undefined});
   w.__exec = null; d.execCommand = c => { w.__exec = c === 'copy' ? d.activeElement?.value : null; return c === 'copy'; };
-  await pick(`#chat-msgs .cmsg[data-mid="a:${one.id}"] [data-act="chat-msg-menu"]`, 'Copy');
+  await pick(`#chat-msgs .cmsg[data-mid="a:${one.id}"] [data-act="chat-msg-menu"]`, 'Copy as Markdown');
   await until(() => w.__exec);
   check(w.__exec === '# Plan\n\nThe **whole** plan:\n\n- one\n- `two`' && !d.querySelector('textarea.cliptmp'), '#1165: without navigator.clipboard the old way copies the same text ' + JSON.stringify(w.__exec));
   // both blocked
   w.__toasts.length = 0; d.execCommand = () => false;
-  await pick(`#chat-msgs .cmsg[data-mid="a:${one.id}"] [data-act="chat-msg-menu"]`, 'Copy');
+  await pick(`#chat-msgs .cmsg[data-mid="a:${one.id}"] [data-act="chat-msg-menu"]`, 'Copy as Markdown');
   await until(() => w.__toasts.length);
   check(w.__toasts.includes('Copy failed, select the text by hand'), '#1165: blocked: "Copy failed, select the text by hand" ' + JSON.stringify(w.__toasts));
   w.close();
@@ -141,8 +142,8 @@ const V = B + 'api/v1';
   w.__clip = [];
   Object.defineProperty(w.navigator, 'clipboard', {configurable: true, value: {writeText: t => { w.__clip.push(t); return Promise.resolve(); }}});
   await until(() => d.querySelector(`#tc-msgs [data-mid="t:${tm.id}"] [data-act="tc-msg-menu"]`));
-  labels = await pick(`#tc-msgs [data-mid="t:${tm.id}"] [data-act="tc-msg-menu"]`, 'Copy');
-  check(labels.includes('Copy') && labels.includes('Save as task'), '#1165: team chat: "Copy" in the same menu ' + JSON.stringify(labels));
+  labels = await pick(`#tc-msgs [data-mid="t:${tm.id}"] [data-act="tc-msg-menu"]`, 'Copy as Markdown');  // 2.41.0 (#1374)
+  check(labels.includes('Copy') && labels.includes('Copy as Markdown') && labels.includes('Save as task'), '#1165: team chat: "Copy" in the same menu ' + JSON.stringify(labels));
   await until(() => w.__clip.length);
   check(w.__clip[0] === 'Hi @Alice, the **minutes**:\n\n- decided A', '#1165: team chat: the text with @Name ' + JSON.stringify(w.__clip));
   await until(() => w.__toasts.includes('Copied'));
