@@ -164,6 +164,8 @@ check([d["name"] for d in h["devices"]] == ["Washing machine", "Old lamp"] and h
 BOB = A.post(B + "/api/users", json={"username": "bob", "display_name": "Bob", "password": "password123"}).json()["id"]
 Bo = sess("bob")
 Bo.patch(B + "/api/settings", json={"tour": "done", "lang": "en", "features": "contacts,care"})
+# 2.40.1: no daily push before the setup below is done (the watchdog fired after 09:00 while Erika was briefly due: CI flake)
+A.patch(B + "/api/settings", json={"allday_time": "23:59"})
 c1 = A.post(B + "/api/contacts", json={"fn": "Erika Mustermann"}).json()
 c2 = A.post(B + "/api/contacts", json={"fn": "Max Muster"}).json()
 c3 = Bo.post(B + "/api/contacts", json={"fn": "Bob's friend"}).json()

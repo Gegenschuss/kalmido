@@ -11,6 +11,8 @@ minor one, anything that needs action on your side a major one.
 - Task panel on narrow screens: the pen next to the description (#1203) no longer takes a row of its own, so the panel
   header fits on a 360 px phone again.
 - Touch tablets and the unfolded Fold: the view switch in a crowded list header stays a 44 x 44 px touch target (#1361).
+- Favourites: removing the star of a list you cannot see answers 404 like starring it (#1361); an own star of a list you
+  lost access to can still be removed.
 
 ## [2.40.0] - 2026-10-14
 
