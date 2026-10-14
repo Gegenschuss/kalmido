@@ -152,6 +152,14 @@ r.cur, r.save_cursor, r.run = 10, saved.append, (lambda u, g: None)
 r.handle([{"event": "chat", "seq": 11, "data": {"user": {"id": 7}, "message": {"id": 1}}}, {"event": "comment", "seq": 12, "data": {}}], save=True)
 check(saved == [11, 12], f"cursor saved after every group: {saved}")
 check(len(ar.chunks("a" * 9000)) == 2, "long answers are split")
+# 2.40.0 (#1100 chunk_fences): fences closed at the cut and opened again, paragraphs first, numbered parts
+cs = ar.chunks("Intro.\n\n```python\n" + "\n".join(f"x = {i}" for i in range(1500)) + "\n```\n\nEnd.")
+check(len(cs) == 2 and all(c.count("```") == 2 for c in cs) and cs[1].startswith("```python\n") and cs[0].endswith("```\n\n_(1/2)_")
+      and cs[1].endswith("_(2/2)_") and all(len(c) <= ar.CHAT_CHUNK for c in cs), f"code block across the cut: {[c[:20] for c in cs]}")
+para = ("word " * 300).strip()
+cs = ar.chunks("\n\n".join([para] * 6))
+check(len(cs) == 2 and all(x == para for c in cs for x in c.rsplit("\n\n_(", 1)[0].split("\n\n")), "cut at a paragraph")
+check(ar.chunks("short") == ["short"], "a short answer has no part number")
 
 # 2.40.0 (#1100 tail_blocks): approval / approval-done / suggest at the end, any order and number, only at a line start
 tb = ar.split_tail_blocks("Done.\n\n```suggest\nShow the diff\n```\n\n```approval\nDeploy 1.3\nGoes live.\n```\n```freigabe-erledigt\nTag 1.2\n```")

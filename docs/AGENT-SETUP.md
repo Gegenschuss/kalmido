@@ -429,7 +429,8 @@ chat messages of one person that arrive together: one run). It does what a hoste
   block goes back to the agent **once** in the same session: the complete answer again, this time with the block, no
   tools. Still without a block it is posted with a visible note that nothing happens without an explicit yes. Chat runs
   only; `KALMIDO_APPROVAL_CHECK=0` in `agent.env` switches it off.
-- **The answer**: the final text of a chat run is posted into the person's chat (secrets masked). The agent must not post
+- **The answer**: the final text of a chat run is posted into the person's chat (secrets masked); a long one in numbered
+  parts, cut at paragraphs, with a code block closed at the cut and opened again in the next part (2.40.0). The agent must not post
   it again with `send_chat` (the prompt says so).
 - **Older servers** (before 2.32 / 2.33 / 2.35): what the server does not know yet is switched off once; the rest runs as
   before.

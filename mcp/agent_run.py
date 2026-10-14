@@ -596,13 +596,26 @@ def result_text(st):
 
 
 def chunks(text, n=CHAT_CHUNK):
+    """2.40.0 (#1100 chunk_fences): a long answer in chat-sized parts, cut at a paragraph (else a line); a code block open
+    at the cut is closed there and opened again (same language) in the next part; several parts are numbered (i/n)."""
+    text = (text or "").strip("\n")
+    n = max(200, n - 40)  # room for the closing fence and the part number
     out = []
     while len(text) > n:
-        cut = text.rfind("\n", 0, n)
-        cut = cut if cut > n // 2 else n
-        out.append(text[:cut])
-        text = text[cut:].lstrip("\n")
-    return out + [text] if text else out
+        cut = text.rfind("\n\n", 0, n)
+        if cut < n // 2:
+            cut = text.rfind("\n", 0, n)
+        if cut < n // 2:
+            cut = n
+        piece, text = text[:cut].rstrip(), text[cut:].lstrip("\n")
+        fences = re.findall(r"^[ \t]*```([^\n`]*)$", piece, re.M)
+        if len(fences) % 2 == 1:  # a code block is open at the cut
+            piece += "\n```"
+            text = "```" + fences[-1].strip() + "\n" + text
+        out.append(piece)
+    if text.strip():
+        out.append(text)
+    return [f"{p}\n\n_({i + 1}/{len(out)})_" for i, p in enumerate(out)] if len(out) > 1 else out
 
 
 class Runner:
