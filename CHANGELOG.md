@@ -7,6 +7,35 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.42.0] - 2026-10-14
+
+**In short:** **End-to-end encryption** in the browser for a private note and files on a task and for direct messages,
+**encryption at rest per organisation** for bank and tax data, purchase rates, framework contract rates and stored
+files, an encrypted **organisation export**, and live updates that load only the changed tasks.
+
+### Added
+- **Encrypted task note and files** (#828): a note per task and person, encrypted in the browser (WebCrypto, AES-GCM;
+  key bundle wrapped with your passphrase and a recovery code). Files can be attached encrypted (no preview, no text
+  search). Only you read them; others, agents, the API, CalDAV, search and mail see only that a note exists.
+  Settings > Account > *End-to-end encryption*: set up, unlock per session (optionally remembered on this device),
+  change the passphrase, reset with the recovery code. Losing both means losing the encrypted content.
+- **Encrypted direct messages** (#909): *Encrypted conversation* per direct chat once both people set up their keys
+  (ECDH P-256 + AES-GCM), a safety number to compare, a warning when the other key changes, push only "New message from".
+- **Encryption per organisation** (#828): with `KALMIDO_SECRET_KEY` set, every organisation gets its own key; bank details,
+  tax number / VAT ID, purchase rates, framework contract rates and the stored files (attachments of the organisation's
+  lists, invoice PDF/XML; the archive original stays PDF/A-3) are encrypted at rest and existing data is encrypted at the
+  first start. Organisation admins can show the recovery key; deleting an organisation destroys its key. Way back before
+  a downgrade: `python -m kalmido.admin.orgcrypt_cli decrypt-all` (see SELF-HOSTING.md).
+- **Organisation export** (#833): Settings > Organisation > *Export*: one encrypted archive of the organisation's lists,
+  tasks, comments, files, calendars, books, office documents and member roles (no private lists, no secrets), ready for
+  24 hours; open it with `tools/kalmido_export_decrypt.py` and the organisation's recovery key. Import comes later.
+- **Save a comment as a task** (#1383): agent comments get *Save as task* (subtask or new task in the same list), like the chat.
+- Reference launcher: suggestion / approval blocks in comment replies become buttons and approval cards (`comment_blocks`).
+
+### Changed
+- Live updates load only the tasks changed since the last version and redraw only those rows (#1376); list or sharing
+  changes still load everything.
+
 ## [2.41.2] - 2026-10-14
 
 ### Changed

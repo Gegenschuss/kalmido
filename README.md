@@ -18,6 +18,10 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.42.0** (2026-10-14): **end-to-end encryption** in the browser for a private task note, files and direct messages
+  (passphrase + recovery code, safety numbers), **encryption at rest per organisation** for bank and tax data, purchase
+  and contract rates and stored files (recovery key, way back with `decrypt-all`), an encrypted **organisation export**,
+  *Save as task* under agent comments, and live updates that load only the changed tasks.
 - **2.41.2** (2026-10-14): **the interface answers at once**: list colours and names, folders, sections, list tags,
   fields and settings show a change right away instead of waiting for the whole state to reload.
 - **2.41.0** (2026-10-14): **folders show and manage who they are shared with** (people, groups and several agents in one
@@ -322,6 +326,9 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
   (also for logging in without a password); admins can require it for everyone
 - **Log in with an OpenID Connect provider** (Authentik, Keycloak, Authelia, Google, ...): code flow with PKCE, only
   accounts an admin created (or automatic accounts, if you want), optional group check and admin group
+- **Encryption** (2.42.0): an end-to-end encrypted note and files per task and encrypted direct messages (WebCrypto in
+  the browser, the server only stores ciphertext), plus encryption at rest with a key per organisation for bank and tax
+  data, purchase and contract rates and stored files (needs `KALMIDO_SECRET_KEY`; see SELF-HOSTING.md)
 - **Automatic backups** of the database and all attachments, daily with retention, optionally encrypted, downloadable,
   and a **restore** right in the app (checked, with a safety backup of the current state first)
 - **Admin alerts** over each admin's own channel (Web Push or ntfy): a new version, devices that stopped taking pushes, watchdog errors, failing integrations, repeated failed logins, low disk space or a failed database check reach the admins, never with task contents
@@ -1707,7 +1714,7 @@ All settings are environment variables in `.env` (see [.env.example](.env.exampl
 | `NTFY_INBOX_URL`, `NTFY_INBOX_TOKEN`, `NTFY_INBOX_TOPIC` | | Optional share inbox: each message on this ntfy topic becomes an inbox task. The topic must be access-controlled (see *Share from your phone*) |
 | `NTFY_INBOX_USER` | first admin | Username whose inbox receives the share inbox |
 | `NTFY_INBOX_PUBLIC` | | Public ntfy URL, if attachment links use a different address than `NTFY_INBOX_URL` |
-| `KALMIDO_SECRET_KEY` | | 2.1.0: 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts (2.2.0) repository tokens and webhook secrets; without it none can be stored. Keep a copy outside the server: losing it means everyone enters their tokens again. Never in the database or backups |
+| `KALMIDO_SECRET_KEY` | | 2.1.0: 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts (2.2.0) repository tokens and webhook secrets; without it none can be stored. Keep a copy outside the server: losing it means everyone enters their tokens again. Never in the database or backups. 2.42.0: also wraps the per-organisation keys (encryption at rest); without it or an organisation's recovery key, encrypted office data and files are lost |
 | `TASKS_MAX_FILE_MB` | `50` | Maximum size per attachment (task and comment files) |
 | `KALMIDO_IMPORT_MAX_MB`, `KALMIDO_IMPORT_MAX_TASKS` | `20`, `20000` | Limits of one import (*Moving from other apps*) |
 | `KALMIDO_IMPORT_RATE` | `30` | Imports and previews per user within 10 minutes |
