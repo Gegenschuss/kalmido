@@ -7,6 +7,8 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.40.2] - 2026-10-14
+
 ### Fixed
 - The pen next to a long (shortened) task description can be clicked again: the shortened text no longer lies over it (#1203).
 
@@ -3989,7 +3991,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.40.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.40.2...HEAD
+[2.40.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.40.2
 [2.40.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.40.1
 [2.39.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.39.0
 [2.38.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.38.0
