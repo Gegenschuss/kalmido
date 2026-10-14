@@ -155,7 +155,8 @@ ROUTES = {
     "DELETE /api/v1/address-books/{}/members/{}": "book", "POST /api/v1/address-books/{}/import": "book",
     "GET /api/v1/address-books/{}/export": "book", "GET /api/books": "book", "POST /api/books": "book",
     "PATCH /api/books/{}": "book", "DELETE /api/books/{}": "book", "PUT /api/books/{}/members": "book",
-    "DELETE /api/books/{}/members/{}": "book", "POST /api/books/{}/import": "book", "GET /api/books/{}/export.vcf": "book",
+    "DELETE /api/books/{}/members/{}": "book", "POST /api/books/{}/import": "book", "GET /api/books/imports/{}": "own",  # 2.41.0 (#1437): only the starter's own import
+    "GET /api/books/{}/export.vcf": "book",
     # ---- calendar (16)
     "POST /api/evcals/{}/import": "calendar", "GET /api/v1/event-calendars": "calendar",
     "POST /api/v1/event-calendars": "calendar", "PATCH /api/v1/event-calendars/{}": "calendar",
