@@ -7,6 +7,77 @@ minor one, anything that needs action on your side a major one.
 
 ## [Unreleased]
 
+## [2.40.0] - 2026-10-14
+
+**In short:** Office & finance gets ready for **everyday invoicing** (several contacts per client, a country picker,
+texts that follow the document language, clearer settings, unsaved input is kept), **favourite lists**, your **own
+order in My tasks**, Markdown in task titles, faster tables and a row of fixes.
+
+### Added
+- **Several contacts per client** (#1380): name, role, mail and phone, one is the default; quotations, invoices, credit
+  notes and reminders pick the contact (the *attn.* line and the buyer contact of the e-invoice follow). The old single
+  contact becomes the default contact, the API keeps `contact`. The import preview offers *Add as contact to the client*
+  for duplicates that only differ in the contact; undoing the import run removes them again.
+- **Archive import reads addresses from PDFs** (#1421): page 1 of an old invoice or quotation suggests a new client, a
+  new contact or flags a different address (always a suggestion with a checkbox, no OCR for scans).
+- **Country as a picker** (#1372) in the client card, company data and import preview (names in your language, search by
+  name or code); the server only accepts ISO 3166 codes (UK becomes GB, EL becomes GR), an unknown stored code stops
+  finalising instead of silently becoming Germany.
+- **Producing and raw-footage surcharge can be switched on and off** (#1379) in the Office settings; off for new
+  organisations, organisations that already use them keep them on. Existing and finalised documents stay as they are.
+- **Selectable label for the managing people** (#1377): managing directors, partners, owner, board on the document footer.
+- **Office settings explained** (#1382): (i) help for the technical terms, number schemes with insertable building blocks,
+  a live preview of the next number for all four schemes and plain-language errors.
+- **Favourites** (#1361): star lists and projects, only for you; a *Favourites* section at the top of the sidebar,
+  *Only favourites* folds the rest under *More lists (N)*, Today, Tomorrow, Next 7 days, Doable now and My tasks can be
+  filtered to favourites.
+- **Your own order in My tasks** (#1344): drag tasks into your personal order (shared lists stay unchanged for
+  others), *List › Section* under each task, new and newly assigned tasks on top; *Grouped by list* stays available
+  (dragging into another group moves the task there). My tasks sits right below the Basket and is always shown.
+- **Markdown in task titles** (#1409): bold, italic, code and links show in rows, calendar, timeline, roadmap and
+  dashboard; push, mail and calendar feed get plain text. *Convert to subtasks* keeps indented lines as the subtask's
+  description and the earlier description can be restored from the activity.
+- **Priority as background** (#1416): an option under Appearance tints rows and cards by priority (off, subtle, strong).
+- **Load more** (#1432): jobs (20, then 50 at a time; running ones always on top), Completed and Trash (100 at a time) and
+  News (50 at a time) no longer load everything at once; counters, *Empty trash* and *Mark all as read* still cover all.
+- **List admins** may manage custom fields (#1192, deleting asks with the number of affected tasks) and change the name,
+  icon and colour of a list (#1431, the owner gets a news item on a rename).
+- **Choice fields** (#1193): colour palette, filled coloured chips with readable text, options can be reordered, a
+  *Status* template.
+- **Reference launcher** (#1347): an answer that asks for a decision or proposes something without an approval block goes
+  back to the agent once, then gets a visible note (`KALMIDO_APPROVAL_CHECK=0` turns it off); blocks only count at the
+  start of a line, closing blocks in any order, long answers keep code blocks intact when split, suggestions become reply
+  buttons. See [docs/AGENT-SETUP.md](docs/AGENT-SETUP.md).
+
+### Changed
+- **Document language** (#1381, #1363, #1368): switching the language of a draft also switches intro, closing, rights
+  texts and position titles that are still the default; texts you changed stay, with a note. The settings show the
+  English texts in the English fields and mark building blocks without English text.
+- **Invoices** (#1368): new closing text without a due-date statement, own closing text for credit notes, reminder texts
+  per level, a credit note takes the e-invoice format of its invoice, buyer address from free address lines read
+  correctly (postcode line), *Total* in reminders and *Qty* in English tables. A reminder fee stays an open item after the
+  invoice is paid (waive or mark paid), fully paid reminders show as done, hints for high fees and not yet due invoices;
+  the send dialog without mail offers *Download PDF*.
+- **PDF buttons** (#1364, #1366): *Preview (PDF)* instead of the raw print model, the PDF opens in the browser with a
+  separate *Download* button (also for archived PDFs).
+- **Project progress bar off by default** (#1190), switched on per project in the list options; the X on the bar is gone.
+- **Columns from 600 px** (#1191): tablets and the unfolded Fold show custom fields as real columns in lists.
+- Sidebar header (#1345): the organisation name gets its own line; the agent chat header keeps the name in full.
+- *Agents may address each other* is gone (#1373), agents never address each other; the API still accepts `agent_peers`
+  and ignores it (deprecated).
+- The word *chip* is gone from the texts (#1429).
+
+### Fixed
+- Office settings: unsaved input survives switching views and live updates, with *Save / Discard* and a question
+  before leaving the page (#1371); logo upload and settings import work again (#1378).
+- Phones: a tap that stops scrolling no longer opens the description editor, a pen button edits it (#1203).
+- Tables: column guide lines no longer stay behind, live changes are bundled into one redraw (#1430).
+- Folders: a new list is no longer marked as different for the same workspace; *Hide completed* now only applies to your
+  own lists, as the dialog says (#1422). A new project in a folder with an agent no longer offers to share it again (#1414).
+- Archiving by a list admin informs the members (#1337); empty-state buttons no longer stick to the text (#1415).
+- Smaller fixes from the 2.39.1 review: size limits for the group order (#1334), the archive PDF is written only after the
+  commit (#1335), an index for the reminder mail count (#1336).
+
 ## [2.39.1] - 2026-10-12
 
 **In short:** Lists with columns now work **like a spreadsheet**, the inbox becomes the **Basket** with a *Sort* mode,

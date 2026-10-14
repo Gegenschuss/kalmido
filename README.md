@@ -18,6 +18,11 @@ Lists, calendar, Eisenhower matrix, habits, a focus timer, time tracking, commen
 
 ## What's new
 
+- **2.40.0** (2026-10-14): Office & finance for **everyday invoicing**: several contacts per client, a country picker,
+  document texts that follow the language, Producing as an option, explained settings and number schemes, unsaved input
+  is kept, invoice and reminder fixes; **favourite lists**, your **own order in My tasks**, Markdown in task titles,
+  priority as background, columns on tablets, *Load more* for jobs, completed, trash and news, list admins manage fields,
+  name and colour.
 - **2.39.1** (2026-10-12): **lists like a spreadsheet** (column lines, drag widths and column order, edit custom-field cells
   in place, custom fields in plain lists), the inbox is now the **Basket** with a *Sort* mode and *My tasks* shows your own
   unshared lists, group headings show where a group comes from, list admins may delete shared lists, *Settings >
