@@ -191,8 +191,9 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   check(/Basket · Tomorrow 10:00/.test(d.querySelector('#toast')?.textContent || '') && /Open/.test(d.querySelector('#toast button')?.textContent || ''), 'P8: where the task went: ' + d.querySelector('#toast')?.textContent);
   closeAll(w); w.close();
 
+  await call('PATCH', '/api/settings', {show_progress: String(P)});  // 2.40.0 (#1190): off by default, no x on the bar
   w = await boot({user: 'alice', hash: 'l/' + P}); d = w.document;
-  check(d.querySelector('#view .lhead .lpg .lpx') && /Next due:/.test(d.querySelector('#view .lhead .lmeta')?.textContent || ''), 'P1: the × stays with the progress bar, "Next due: …"');
+  check(d.querySelector('#view .lhead .lpg') && !d.querySelector('#view .lhead .lpx') && /Next due:/.test(d.querySelector('#view .lhead .lmeta')?.textContent || ''), 'P1: the progress bar (2.40.0: without ×), "Next due: …"');
   w.eval(`setListView(routeList(), 'overview')`); await until(() => d.querySelector('#view .pov'));
   const sst = [...d.querySelectorAll('#view button')].filter(b => /Set status/.test(b.textContent));
   check(sst.length <= 1 && !d.querySelector('#view .lhead .stpill'), 'P1: "Set status" once in the overview ' + sst.map(b => b.className + '@' + (b.closest('[id], section')?.id || b.parentElement.className)).join(', '));

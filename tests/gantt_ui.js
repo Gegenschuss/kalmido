@@ -225,27 +225,29 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
   check(d.querySelector('[data-act="timer-toggle"]'), 'after switching to Project: timer button there');
   w.eval('closeDetail()');
   w.close();
-  // progress "x": per user and list, server-side, back via the list menu and the list dialog
+  // 2.40.0 (#1190): the progress bar of a project is off by default, no x on it; switched on per user and project
+  // (show_progress, server-side) from the list menu and the list dialog
   w = await boot({user: 'alice', hash: 'l/' + HOME}); d = w.document;
-  check(d.querySelector('.lhead .lprog') && d.querySelector('.lhead .lpx[aria-label="Hide progress"]'), 'project list: progress bar with an x');
-  d.querySelector('.lhead .lpx').click();
-  check(await until(async () => (await call('GET', '/api/state')).settings.hide_progress.split(',').includes(String(HOME))) && !d.querySelector('.lhead .lprog'), 'x: bar hidden, stored for the user');
+  check(!d.querySelector('.lhead .lprog') && !d.querySelector('.lhead .lpx'), 'project list: no progress bar by default, no x');
   d.querySelector('#top [data-act="top-more"]').click(); await sleep(100);  // 1.5: the list menu is part of the header's "…"
   pop = d.querySelector('#pop:not(.hidden)');
   if (!/Show progress/.test(pop.textContent)) { pop.querySelector('.msubm')?.click(); await sleep(100); }  // 2.31.0 (#1056): "More list options…"
   const sp = [...pop.querySelectorAll('button')].find(b => /Show progress/.test(b.textContent));
   check(sp, 'list menu: Show progress');
   sp.click();
-  check(await until(() => d.querySelector('.lhead .lprog')), 'Show progress brings it back');
+  check(await until(() => d.querySelector('.lhead .lprog')) && !d.querySelector('.lhead .lpx'), 'Show progress switches it on (without an x)');
+  check(await until(async () => (await call('GET', '/api/state')).settings.show_progress.split(',').includes(String(HOME))), 'stored for the user (show_progress)');
   w.eval(`listModal(${HOME})`); await sleep(200);
   md = lastModal(d);
   check(md.querySelector('#l-showprog') && md.querySelector('#l-showprog').checked, 'list dialog: progress toggle');
   md.querySelector('#l-showprog').checked = false; md.querySelector('#l-showprog').dispatchEvent(new w.Event('change', {bubbles: true}));  // 1.5.1: saves itself
   check(await until(() => !d.querySelector('.lhead .lprog')), 'list dialog: hides it too');
+  md.querySelector('#l-showprog').checked = true; md.querySelector('#l-showprog').dispatchEvent(new w.Event('change', {bubbles: true}));
+  check(await until(() => d.querySelector('.lhead .lprog')), 'list dialog: shows it again');
   const bw = await boot({user: 'bob', hash: 'l/' + PRJ});
-  check(!bw.eval(`progHidden(${HOME})`), 'hiding is per user');
+  check(bw.eval(`progHidden(${HOME})`), 'switching on is per user');
   bw.close();
-  await call('PATCH', '/api/settings', {hide_progress: ''});
+  await call('PATCH', '/api/settings', {show_progress: ''});
   check(errs.length === 0, 'no script errors (list types): ' + errs.join(' | '));
   w.close();
 

@@ -26,6 +26,7 @@ const ds = n => { const d = new Date(Date.now() + n * 864e5); return `${d.getFul
   await call('PUT', `/api/lists/${WORK}/members`, {user_id: BOB, role: 'edit'});
   await call('PUT', `/api/lists/${WORK}/members`, {user_id: CAROL, role: 'view'});
   const BOBL = (await call('POST', '/api/lists', {name: 'Bob private', kind: 'project'}, BK)).id;
+  await call('PATCH', '/api/settings', {show_progress: String(WORK)}); await call('PATCH', '/api/settings', {show_progress: String(WORK)}, BK);  // 2.40.0 (#1190): the bar is off by default in projects
   const t1 = (await call('POST', '/api/tasks', {title: 'Design', list_id: WORK, due: ds(-1)})).id;
   const t2 = (await call('POST', '/api/tasks', {title: 'Build', list_id: WORK, due: ds(0), assignee_id: BOB})).id;
   const t3 = (await call('POST', '/api/tasks', {title: 'Ship', list_id: WORK})).id;

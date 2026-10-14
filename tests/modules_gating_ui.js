@@ -17,6 +17,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   const BOB = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123'})).id;
   await call('PATCH', '/api/settings', {features: ALL});
   const P = (await call('POST', '/api/lists', {name: 'Launch', kind: 'project'})).id;
+  await call('PATCH', '/api/settings', {show_progress: String(P)});  // 2.40.0 (#1190): the bar is off by default in projects
   await call('PUT', `/api/lists/${P}/members`, {user_id: BOB, role: 'edit'});
   const T = (await call('POST', '/api/tasks', {title: 'Write brief', list_id: P, due: ds(0), start: ds(-1)})).id;
   const T2 = (await call('POST', '/api/tasks', {title: 'Review', list_id: P, due: ds(2)})).id;

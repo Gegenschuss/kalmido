@@ -36,6 +36,7 @@ const settings = async () => (await call('GET', '/api/state')).settings;
   const RED = (await call('POST', '/api/lists', {name: '🔴 Red things', color: '#1c7ed6'})).id;
   const PLAIN = (await call('POST', '/api/lists', {name: 'Plain', color: '#2f9e44'})).id;
   const PRJ = (await call('POST', '/api/lists', {name: '🚀 Releases', kind: 'project', color: '#7048e8', folder: 'Work'})).id;
+  await call('PATCH', '/api/settings', {show_progress: String(PRJ)});  // 2.40.0 (#1190): the bar is off by default in projects
   await call('POST', '/api/lists', {name: '🐞 Bugs', folder: 'Work'});
   const T1 = (await call('POST', '/api/tasks', {title: 'Ship it', list_id: PRJ})).id;
   await call('POST', '/api/tasks', {title: 'Write notes', list_id: PRJ});
@@ -106,11 +107,11 @@ const settings = async () => (await call('GET', '/api/state')).settings;
   check(!col(PRJ).prog, 'progress off: no bar in the sidebar');
   check(!!d.querySelector('#view, #main'), 'progress off: the app still renders');
   w.close();
-  await call('PATCH', '/api/settings', {side_progress: '1', hide_progress: String(PRJ)});
+  await call('PATCH', '/api/settings', {side_progress: '1', show_progress: ''});  // 2.40.0 (#1190): switched off per project
   w = await boot({user: 'alice', hash: 'l/' + CART}); d = w.document;
   await until(() => row(PRJ));
   check(!col(PRJ).prog, 'per-list "Hide progress" also hides the sidebar bar');
-  await call('PATCH', '/api/settings', {hide_progress: ''});
+  await call('PATCH', '/api/settings', {show_progress: String(PRJ)});
   w.close();
 
   // ================= Settings > Appearance > Sidebar
