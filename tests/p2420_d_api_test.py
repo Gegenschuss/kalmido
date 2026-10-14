@@ -127,6 +127,14 @@ d = delta(Bo, v5)
 check(r.ok and d.get("full") is False and {t["id"] for t in d["tasks"]} >= {T2, T3}, f"#1376: a batch change {r.status_code} {d}")
 v6 = d["v"]
 
+# 2.42.0 review: a read mark is a change for its reader only (not for everyone who sees the task)
+va6 = A.get(B + "/api/state").json()["v"]
+r = Bo.post(B + f"/api/tasks/{T2}/seen")
+db_ = {t["id"]: t for t in delta(Bo, v6).get("tasks", [])}
+da = delta(A, va6)
+check(r.ok and db_.get(T2, {}).get("unread") == 0, f"#1376: bob's own read mark is in his delta {db_.get(T2)}")
+check(da.get("full") is False and T2 not in {t["id"] for t in da.get("tasks", [])}, f"#1376: bob's read mark is no change for alice {da}")
+
 # the share taken away -> full (what bob sees changed)
 A.delete(B + f"/api/lists/{L}/members/{ids['bob']}")
 d = delta(Bo, v6)
