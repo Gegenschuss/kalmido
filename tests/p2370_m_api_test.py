@@ -179,7 +179,10 @@ check(set(left) == {"list_tags", "task_list_tags"} and left["list_tags"]["source
       "(b) only the merged list tag (and the double tag of a task) differ " + str(left)[:300])
 check(psql("SELECT COUNT(*) FROM tasks") == str(want["tasks"] + want["list_milestones"]), "(b) tasks (+ the milestones of 2.17, now tasks)")
 for t in ("comments", "attachments", "office_doc_items", "agent_chat", "list_members", "time_entries"):
-    check(psql(f"SELECT COUNT(*) FROM {t}") == str(want[t]), f"(b) {t}: {want[t]} rows in Postgres ({psql(f'SELECT COUNT(*) FROM {t}')})")
+    # 2.41.0 (#1471): the lists holding time entries get time tracking on (migr_time241), so the focus sessions of the generic rows
+    # that the watchdog ends right after the start become time entries there (pomo_id set): count the moved rows only
+    w = " WHERE pomo_id IS NULL" if t == "time_entries" else ""
+    check(psql(f"SELECT COUNT(*) FROM {t}{w}") == str(want[t]), f"(b) {t}: {want[t]} rows in Postgres ({psql(f'SELECT COUNT(*) FROM {t}{w}')}, all {psql(f'SELECT COUNT(*) FROM {t}')})")
 for t in ("activity", "notifications"):  # (the app writes / tidies these right after the start: the report's count)
     check(rep.get("tables", {}).get(t, {}).get("written") == want[t], f"(b) {t}: {want[t]} rows copied")
 check(want["tasks"] >= 20000 and want["comments"] >= 50000 and want["activity"] >= 50000, "(b) the fixture is big")
