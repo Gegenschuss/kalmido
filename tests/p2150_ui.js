@@ -244,7 +244,8 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
     await ev(`(() => { aiSubShow(document.querySelector('.smodal'), 'admin', false); return 1; })()`);
     for (let i = 0; i < 20 && !(await ev(`!!document.querySelector('#s-sclim .sclim')`)); i++) await sleep(300);
     const lm = await ev(`(() => { const rows = [...document.querySelectorAll('#s-sclim .chkl')].map(x => x.getBoundingClientRect()); return {n: rows.length, over: document.documentElement.scrollWidth - innerWidth, out: rows.filter(x => x.right > innerWidth + 1).length, minH: Math.round(Math.min(...rows.map(x => x.height)))}; })()`);
-    check(lm.n === 25 && lm.over <= 1 && lm.out === 0 && lm.minH >= 44, `${tag}: the limit grids fit ` + JSON.stringify(lm));
+    check(lm.n === 24 &&  // 2.41.0 (#1476): the agents grid no longer offers "private" (25 -> 24)
+       lm.over <= 1 && lm.out === 0 && lm.minH >= 44, `${tag}: the limit grids fit ` + JSON.stringify(lm));
     await ev(`(() => { document.querySelector('#s-sclim').scrollIntoView({block: 'start'}); return 1; })()`); await sleep(200);
     await shot(`p2150-${tag}-limit.png`);
   }, touch);
