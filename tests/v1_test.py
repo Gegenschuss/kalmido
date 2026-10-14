@@ -182,7 +182,7 @@ check(r.stdout.strip().splitlines()[-1:] == ["False False"], f"KALMIDO_UPDATE_CH
 # ------------------------------------------------------------------ Paperless rows stay in the database, never in an answer
 # 2.36.0 (#1116): the Paperless connection is removed; linked documents stay in paperless_links (the way back) but no task,
 # state or export answer carries them any more
-lid = A.post(B + "/api/lists", json={"name": "Shared", "kind": "project"}).json()["id"]
+lid = A.post(B + "/api/lists", json={"name": "Shared", "kind": "project", "time_tracking": True}).json()["id"]  # 2.41.0 (#1471): time tracking is a switch of the list
 A.put(B + f"/api/lists/{lid}/members", json={"user_id": ids["bob"], "role": "edit"})
 tid = A.post(B + "/api/tasks", json={"title": "with document", "list_id": lid}).json()["id"]
 dbx("INSERT INTO paperless_links(task_id,doc_id,title,correspondent,created,status,added_at) VALUES(?,?,?,?,?,'ok',?)",
@@ -192,7 +192,7 @@ tb = Bo.get(B + f"/api/tasks/{tid}").json()
 check("paperless" not in ta and "paperless" not in tb, "task: no Paperless field")
 sb = [t for t in Bo.get(B + "/api/state").json()["tasks"] if t["id"] == tid][0]
 check("paperless" not in sb and "Salary 2026" not in Bo.get(B + "/api/state").text, "state: no Paperless data")
-blid = Bo.post(B + "/api/lists", json={"name": "Bob own", "kind": "project"}).json()["id"]
+blid = Bo.post(B + "/api/lists", json={"name": "Bob own", "kind": "project", "time_tracking": True}).json()["id"]
 btid = Bo.post(B + "/api/tasks", json={"title": "bob doc", "list_id": blid}).json()["id"]
 dbx("INSERT INTO paperless_links(task_id,doc_id,title,status,added_at) VALUES(?,?,?,'ok',?)", (btid, 815, "Contract", "2026-09-01T00:00:00Z"))
 ex = Bo.get(B + "/api/export.json").json()
@@ -284,7 +284,7 @@ A.patch(B + "/api/admin/settings", json={"collab_all": True})
 A = sess("alice")
 Bo = sess("bob")
 check(A.get(B + "/api/state").json()["time_all"] is True, "time_all on by default")
-tt = A.post(B + "/api/tasks", json={"title": "timed work", "list_id": lid}).json()["id"]  # time tracking: project lists only
+tt = A.post(B + "/api/tasks", json={"title": "timed work", "list_id": lid}).json()["id"]  # time tracking: lists with the switch on (2.41.0 #1471)
 A.post(B + "/api/time/entries", json={"task_id": tt, "start": "2026-09-01T08:00:00Z", "end": "2026-09-01T09:00:00Z"})
 r = A.post(B + "/api/time/start", json={"task_id": tt})
 check(r.ok and A.get(B + "/api/state").json()["timer"], f"timer running before: {r.text[:100]}")

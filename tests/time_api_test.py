@@ -68,13 +68,13 @@ st = A.get(B + "/api/state").json()
 check(st["timer"] is None and st["time_totals"] == {}, "state: no timer, no totals")
 check("time" in st["settings"]["features"].split(",") and st["settings"]["features_rev"] == "10", "new user: module time on, features_rev 10 (2.21.0)")
 check(st["settings"]["time_rounding"] == "0" and st["settings"]["time_focus"] == "1", "time settings defaults")
-WORK = A.post(B + "/api/lists", json={"name": "Work", "kind": "project"}).json()["id"]
-HOME = A.post(B + "/api/lists", json={"name": "Home", "kind": "project"}).json()["id"]
-SH = Bb.post(B + "/api/lists", json={"name": "Shared", "kind": "project"}).json()["id"]
+WORK = A.post(B + "/api/lists", json={"name": "Work", "kind": "project", "time_tracking": True}).json()["id"]  # 2.41.0 (#1471): time tracking is a switch of the list
+HOME = A.post(B + "/api/lists", json={"name": "Home", "kind": "project", "time_tracking": True}).json()["id"]
+SH = Bb.post(B + "/api/lists", json={"name": "Shared", "kind": "project", "time_tracking": True}).json()["id"]
 Bb.put(B + f"/api/lists/{SH}/members", json={"user_id": 1, "role": "edit"})
-VW = Bb.post(B + "/api/lists", json={"name": "Viewonly", "kind": "project"}).json()["id"]
+VW = Bb.post(B + "/api/lists", json={"name": "Viewonly", "kind": "project", "time_tracking": True}).json()["id"]
 Bb.put(B + f"/api/lists/{VW}/members", json={"user_id": 1, "role": "view"})
-PRIV = Bb.post(B + "/api/lists", json={"name": "Bob private", "kind": "project"}).json()["id"]
+PRIV = Bb.post(B + "/api/lists", json={"name": "Bob private", "kind": "project", "time_tracking": True}).json()["id"]
 
 
 def mk(s, **kw):
@@ -262,8 +262,8 @@ Bb.patch(B + "/api/settings", json={"features": "cal,timeline,matrix,habits,pomo
 check(pomo(C, "stopwatch", TP, 10) is None, "focus on a private task of another user: no entry")
 
 # ================= report totals on a seeded dataset (carol, fresh)
-CL = C.post(B + "/api/lists", json={"name": "Client A", "kind": "project"}).json()["id"]
-CL2 = C.post(B + "/api/lists", json={"name": "Client B", "kind": "project"}).json()["id"]
+CL = C.post(B + "/api/lists", json={"name": "Client A", "kind": "project", "time_tracking": True}).json()["id"]  # 2.41.0 (#1471)
+CL2 = C.post(B + "/api/lists", json={"name": "Client B", "kind": "project", "time_tracking": True}).json()["id"]
 C.patch(B + f"/api/lists/{CL}", json={"rate": 100})
 ca = mk(C, title="Design", list_id=CL)
 cb = mk(C, title="Build", list_id=CL)
