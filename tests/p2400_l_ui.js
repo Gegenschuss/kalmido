@@ -102,7 +102,7 @@ const closeAll = d => d.querySelectorAll('.modal').forEach(m => m.remove());
 
   // ================= #1429 a list with own columns: the hint links "Shown fields"
   const COLS = (await call('POST', '/api/lists', {name: 'Columns list'})).id;
-  await call('PATCH', `/api/lists/${COLS}`, {columns: ['title', 'due']});
+  await call('PATCH', `/api/lists/${COLS}`, {columns: ['id', 'due']});  // 2.40.0 (#1429): 'title' is no column key (the server refused the whole list)
   // ================= #1373 / #1414 agents
   const ag = await call('POST', '/api/admin/agents', {scopes: ['read', 'tasks:write', 'comments'], username: 'helper', display_name: 'Helper'});
   await call('PUT', '/api/folders/props', {folder: 'Dev', props: {agent_id: ag.id}});
