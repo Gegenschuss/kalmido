@@ -419,8 +419,8 @@ chat messages of one person that arrive together: one run). It does what a hoste
 - **Status and typing dots** while a run lasts, idle afterwards, error when it failed.
 - **Plan usage ring** from the stream, with the time it was measured (step 10).
 - **Reply reference**: when the person answers an older message, its quote goes into the prompt.
-- **Approvals**: an answer that ends in a block ` ```approval ` (first line: what you want to do, more lines: what happens
-  on yes) becomes an approval card with *Yes* / *No* (older servers: two buttons). The answer comes back as a new run
+- **Approvals**: an answer that ends in a block ` ```approval ` (the fence at the start of a line, 2.40.0: a mention in
+  the prose is no card; first line: what you want to do, more lines: what happens on yes) becomes an approval card with *Yes* / *No* (older servers: two buttons). The answer comes back as a new run
   ("Approval: yes - ..."); no answer is never a yes.
 - **Approval check** (2.40.0): a chat answer that asks the person to decide or makes a proposal (German or English,
   questions like "shall I ...?" / "soll ich ...?" and statements like "I would ...", "Proposal: ...", "mitzunehmen",

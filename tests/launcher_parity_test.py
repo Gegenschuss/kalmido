@@ -89,6 +89,11 @@ check(ar.redact("API_KEY=supersecretvalue1") == "API_KEY=[redacted]", "key=value
 body, ap = ar.split_approval("I would delete the old branch.\n\n```approval\nDelete branch old-ui\nThe branch is gone for good.\n```")
 check(body == "I would delete the old branch." and ap == {"title": "Delete branch old-ui", "what": "The branch is gone for good."}, f"approval block: {ap}")
 check(ar.split_approval("no block")[1] is None, "no block, no approval")
+# 2.40.0 (#1100 approval_anchor): only at a line start
+check(ar.split_approval("Next time I end with a ```approval block.\nThat is all\n```")[1] is None, "an inline mention is no card")
+body, ap = ar.split_approval("Say `approval` or ```approval inline.\n\n```approval\nDeploy 1.3\n```")
+check(ap == {"title": "Deploy 1.3"} and body == "Say `approval` or ```approval inline.", f"the block at a line start counts: {ap}")
+check(ar.split_approval("```approval-done\nDeploy 1.2\n```")[1] is None, "approval-done is no new card")
 check(ar.reply_hint({"id": 5, "name": "Ann", "text": "the blue one?"}) == '(This answers Ann: "the blue one?")', "reply hint")
 check(ar.reply_hint({"id": 5, "from": "agent", "text": "x"}).startswith("(This answers your own message"), "reply to own message")
 check(ar.reply_hint(None) == "", "no reply, no hint")

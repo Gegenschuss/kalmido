@@ -67,7 +67,8 @@ SECRET_RES = [
     re.compile(r"(?i)(?<=://)[^/\s:@]+:[^/\s@]+(?=@)"),
     re.compile(r"(?i)\b([A-Za-z0-9_]{0,30}(?:token|secret|password|passwd|api_?key)[A-Za-z0-9_]{0,30}\"?\s*[:=]\s*\"?)[^\s\"']{8,}"),
 ]
-APPROVAL_RE = re.compile(r"\n*```(?:approval|freigabe)[^\n]*\n(.*?)\n?```\s*$", re.S)
+# 2.40.0 (#1100 approval_anchor): the block counts only at a line start - a mention of it in the prose is no card
+APPROVAL_RE = re.compile(r"(?:\A|\n)[ \t]*\n*```(?:approval|freigabe)(?![\w-])[^\n]*\n(.*?)\n?```\s*$", re.S)
 
 
 def log(msg):
