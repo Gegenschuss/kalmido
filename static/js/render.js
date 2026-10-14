@@ -1120,8 +1120,7 @@ async function colSave(id, next, quiet) {
   const l = listById(id); if (!l) return;
   const prev = Array.isArray(l.columns) ? l.columns : null;
   if (JSON.stringify(prev) === JSON.stringify(next)) return;
-  try { await api('PATCH', '/api/lists/' + id, {columns: next}); } catch { return; }
-  l.columns = next; render();
+  try { await optWrite(optSet(() => listById(id), {columns: next}), () => api('PATCH', '/api/lists/' + id, {columns: next})); } catch { return; }  // 2.41.2 (#1501): at once
   if (quiet) return;
   const go = v => async () => { await colSave(id, v, true); return {}; };
   const e = histAdd({label: tr('Shown fields of {0}', qn(lname(l))), undo: go(prev), redo: go(next), lids: [id]});

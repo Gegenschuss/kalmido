@@ -266,17 +266,26 @@ function staleRowHtml(l) {
     <div class="shint lhint">${tr('Open tasks without a change, comment or time entry for this long show in “Lying idle”.')}</div>`;
 }
 async function staleDaysSet(lid, sel) {
-  try { await api('PATCH', `/api/lists/${lid}`, {stale_days: sel.value === '' ? null : +sel.value}); toast(tr('Saved')); await load(); staleLoad(true); }
+  const sd = sel.value === '' ? null : +sel.value;  // 2.41.2 (#1501): at once, no GET /api/state afterwards
+  try { await optWrite(optSet(() => listById(lid), {stale_days: sd}), () => api('PATCH', `/api/lists/${lid}`, {stale_days: sd})); toast(tr('Saved')); staleLoad(true); }
   catch { const l = listById(lid); sel.value = l?.stale_days == null ? '' : String(l.stale_days); }
 }
 const LIST_HIST = ['name', 'color', 'folder', 'view', 'kind', 'dep_shift', 'rate', 'archived', 'tickets', 'nag', 'day_hours', 'checklist'];  // 2.7.0: nag, day_hours; 2.7.2: checklist = "Show completed at the bottom"
+const LIST_LOCAL = ['name', 'color', 'view', 'dep_shift', 'rate', 'tickets', 'nag', 'day_hours', 'checklist', 'sort_mode', 'done_in_section', 'columns', 'stale_days'];  // 2.41.2 (#1501)
 const lv = (k, v) => k === 'dep_shift' || k === 'archived' || k === 'tickets' || k === 'checklist' ? (v ? 1 : 0) : k === 'rate' || k === 'day_hours' ? (v === '' || v == null ? null : +String(v).replace(',', '.')) : v ?? '';
 async function listPatch(id, body, label, o = {}) {
   const l = listById(id); if (!l) return false;
   const before = {}, after = {};
   for (const k of LIST_HIST) if (k in body && lv(k, l[k]) !== lv(k, body[k])) { before[k] = lv(k, l[k]); after[k] = lv(k, body[k]); }
-  try { await api('PATCH', '/api/lists/' + id, body); } catch { return false; }
-  await load(); render();
+  // 2.41.2 (#1501): what only changes the list itself shows at once (optimistic, no GET /api/state); folder, type, archive
+  // and time tracking have side effects on the server (sharing, modules, hidden tasks) and still reload
+  if (Object.keys(body).every(k => LIST_LOCAL.includes(k))) {
+    const vals = Object.fromEntries(Object.keys(body).map(k => [k, LIST_HIST.includes(k) ? lv(k, body[k]) : body[k]]));
+    try { await optWrite(optSet(() => listById(id), vals), () => api('PATCH', '/api/lists/' + id, body)); } catch { return false; }
+  } else {
+    try { await api('PATCH', '/api/lists/' + id, body); } catch { return false; }
+    await load(); render();
+  }
   if (!Object.keys(before).length) return null;
   const go = (to, from) => async () => {
     const r = await api('PATCH', '/api/lists/' + id, {...to, _prev: from});
@@ -894,13 +903,17 @@ function listModal(id, folder = '', o = {}) {
     if (b.dataset.fedit) { fieldModal(id, fieldById(+b.dataset.fedit), drawFields); return; }
     if (b.dataset.fpin) {
       const f = fieldById(+b.dataset.fpin);
-      try { await api('PATCH', '/api/fields/' + f.id, {pinned: !f.pinned}); } catch { return; }
-      await load(); render(); drawFields(); return;
+      // 2.41.2 (#1501): pinned / order at once (optimistic), no GET /api/state afterwards
+      const pin = !f.pinned;  // before the local change (the request reads it later)
+      try { await optWrite(optSet(() => fieldById(f.id), {pinned: pin}), () => api('PATCH', '/api/fields/' + f.id, {pinned: pin}), () => { render(); drawFields(); }); } catch { /* shown, put back */ }
+      return;
     }
     if (b.dataset.fup) {
       const fs = fieldsOf(id), i = fs.findIndex(f => f.id === +b.dataset.fup); if (i < 1) return;
-      try { await api('PATCH', '/api/fields/' + fs[i].id, {sort: fs[i - 1].sort}); await api('PATCH', '/api/fields/' + fs[i - 1].id, {sort: fs[i].sort === fs[i - 1].sort ? fs[i].sort + 1 : fs[i].sort}); } catch { return; }
-      await load(); render(); drawFields(); return;
+      const a = fs[i], z = fs[i - 1], sa = z.sort, sz = a.sort === z.sort ? a.sort + 1 : a.sort;
+      const put = () => { const x = optSet(() => fieldById(a.id), {sort: sa})(), y = optSet(() => fieldById(z.id), {sort: sz})(); return () => { x?.(); y?.(); }; };
+      try { await optWrite(put, async () => { await api('PATCH', '/api/fields/' + a.id, {sort: sa}); await api('PATCH', '/api/fields/' + z.id, {sort: sz}); }, () => { render(); drawFields(); }); } catch { load().then(() => { render(); drawFields(); }).catch(() => {}); }
+      return;
     }
     if (b.dataset.m === 'share-open') { await autosave(); md.remove(); shareModal(id); return; }  // 2.6.0 (K12)
     if (b.dataset.m === 'tt-tpl') { await autosave(); ticketTplModal(id); return; }

@@ -577,6 +577,29 @@ function applyState(j) {
   if (j.evsig !== undefined && j.evsig !== S.evsig) { S.evsig = j.evsig; if (S.booted) calInvalidate(); }
   // language changed on another device: switch once its file is loaded (the boot awaits it itself)
   if (S.booted && (j.settings.lang || 'en') !== I18N.code) i18nLoad(j.settings.lang).then(ok => { if (ok) render(); });
+  for (const p of OPT) p.put();  // 2.41.2 (#1501): own changes still on the way stay on top of a state fetched meanwhile
+}
+// 2.41.2 (#1501): optimistic writes. A click shows at once: put() changes the local state and returns how to take it back,
+// the request runs behind it (no GET /api/state afterwards; other devices / tabs get it with the live update). An error
+// (api() said why) puts the old state back. While the request runs, a state that arrives (the poll's load()) gets the
+// change again on top, so the own change never flickers back; a state fetched across the write's end is fetched again (wseq).
+const OPT = new Set();
+async function optWrite(put, req, draw = render) {  // draw: how the screen follows (default: everything)
+  const p = {put}, back = put();
+  OPT.add(p); draw();
+  try { return await req(); }
+  catch (e) { OPT.delete(p); back?.(); draw(); throw e; }
+  finally { OPT.delete(p); }
+}
+// the usual put: set vals on the object get() finds (looked up again after a reload); the values before are kept once
+function optSet(get, vals) {
+  let old = null;
+  return () => {
+    const o = get(); if (!o) return null;
+    if (!old) old = Object.fromEntries(Object.keys(vals).map(k => [k, o[k]]));
+    Object.assign(o, vals);
+    return () => { const x = get(); if (x) Object.assign(x, old); };
+  };
 }
 async function load() {
   let j;

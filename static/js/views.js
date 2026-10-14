@@ -359,9 +359,8 @@ function dsxCount(g, v) {
 }
 async function dsxSet(id, on) {
   const l = listById(id); if (!l || dsxFixedOff(l)) return;
-  try { await api('PATCH', '/api/lists/' + id, {done_in_section: on ? 1 : 0}); } catch { return; }
-  const was = l.done_in_section ?? null;
-  await load(); render();
+  const was = l.done_in_section ?? null;  // 2.41.2 (#1501): at once (optimistic)
+  try { await optWrite(optSet(() => listById(id), {done_in_section: on ? 1 : 0}), () => api('PATCH', '/api/lists/' + id, {done_in_section: on ? 1 : 0})); } catch { return; }
   offerUndo(on ? tr('Completed tasks stay in their section') : tr('Completed tasks move to “Completed”'), histAdd({label: tr('Keep completed in their section'),
     undo: async () => { await api('PATCH', '/api/lists/' + id, {done_in_section: was}); await load(); render(); return {skipped: []}; },
     redo: async () => { await api('PATCH', '/api/lists/' + id, {done_in_section: on ? 1 : 0}); await load(); render(); return {skipped: []}; }}));

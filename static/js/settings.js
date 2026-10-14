@@ -194,6 +194,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-sdd': ['show_done_default', N_('Completed tasks'), 'sel'],  // 2.39.1 (#1214)
 };
 const SET_RENDER = ['sidebar', 'prio_bg', 'side_icons', 'side_progress', 'features', 'nav_order', 'show_done_views', 'show_done_default', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'agents_hidden'];
+const SET_SLOW = ['lang', 'features', 'nav_order'];  // 2.41.2 (#1501): drawn once their language file / state is there
 function setVal(el, kind) {  // the value a control stands for; undefined = not valid (nothing is saved)
   const v = el.value;
   if (kind === 'chk') return el.checked ? '1' : '0';
@@ -208,8 +209,8 @@ async function setApply(patch, label, o = {}) {
   const before = {};
   for (const k in patch) before[k] = S.settings[k] ?? '';
   if (Object.keys(patch).every(k => String(before[k]) === String(patch[k]))) return null;
-  try { await api('PATCH', '/api/settings', patch); } catch { settingsSync(); return false; }
-  Object.assign(S.settings, patch);
+  // 2.41.2 (#1501): the value counts at once (a view that reads it while the request runs), put back on an error
+  try { await optWrite(optSet(() => S.settings, patch), () => api('PATCH', '/api/settings', patch), () => { if (Object.keys(patch).some(k => SET_RENDER.includes(k) && !SET_SLOW.includes(k))) render(); }); } catch { settingsSync(); return false; }
   await setAfter(patch);
   const e = histAdd({label: tr('Changed setting: {0}', label), sett: true, post: settingsSync,
     undo: () => setStep(before, patch, label), redo: () => setStep(patch, before, label)});

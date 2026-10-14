@@ -360,9 +360,18 @@ async function folderMove(from, to, label) {
   if (!to || to === from) return;
   { const m = S.lists.find(l => l.mirrored && fUnder(l.folder, from)); if (m) { toast(mirroredMsg(m)); return; } }  // 2.27.0 (#988)
   if (folderNames().includes(to) && !await askConfirm(tr('Merge into “{0}”?', fDisp(to)), tr('A folder of that name exists: the lists go into it.'), {ok: tr('Merge')})) return;
-  try { await api('POST', '/api/folders/rename', {old: from, new: to}); } catch { return; }
-  await load(); render();
+  // 2.41.2 (#1501): the sidebar shows the new name / place at once; what goes along on the server (shares, templates,
+  // repositories, playbook) follows with a reload behind it
+  const mv = p => fUnder(p, from) ? to + p.slice(from.length) : p;
+  const put = () => {
+    const f0 = S.settings.folders, l0 = S.lists.map(l => [l.id, l.folder]);
+    S.settings.folders = JSON.stringify([...new Set(folderNames().map(mv))]);
+    for (const l of S.lists) l.folder = mv(l.folder);
+    return () => { S.settings.folders = f0; for (const [id, f] of l0) { const l = listById(id); if (l) l.folder = f; } };
+  };
+  try { await optWrite(put, () => api('POST', '/api/folders/rename', {old: from, new: to})); } catch { return; }
   if (label) toast(label);
+  load().then(() => render()).catch(() => {});
 }
 function folderMenu(anchor, f) {
   const sub = !!fParent(f), hasSubs = folderSubs(f).length > 0;

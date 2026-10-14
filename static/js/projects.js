@@ -169,8 +169,9 @@ async function setListView(l, v) {  // List / Kanban / Timeline (stored on the s
   if (v === 'overview') { povSet(l, true); render(); return; }
   const was = povOn(l);
   povSet(l, false);
-  if (v !== listView(l)) { await api('PATCH', '/api/lists/' + l.id, {view: v}); await load(); }
-  if (was || v !== listView(l)) render(); else render();
+  // 2.41.2 (#1501): the view switches at once (optimistic), the server follows
+  if (v !== listView(l)) { try { await optWrite(optSet(() => listById(l.id), {view: v}), () => api('PATCH', '/api/lists/' + l.id, {view: v})); } catch { /* shown, put back */ } return; }
+  render();
 }
 // 2.13.0: in projects the overview comes first
 const viewChoices = l => l.is_inbox ? [['list', N_('List'), 'list']] : [...(l.kind === 'project' && !l.is_inbox ? [['overview', N_('Project page'), 'brief']] : []), ['list', N_('List'), 'list'], ...(feat('kanban') ? [['kanban', N_('Kanban'), 'kanban']] : []), ...(feat('timeline') ? [['timeline', N_('Timeline'), 'timeline']] : [])];

@@ -294,29 +294,41 @@ function ltagsBoxHtml(l) {
   return `${lt.length ? lt.map(x => `<div class="mrow" data-ltid="${x.id}"><span class="ltsw" style="${cssColor(x.color) ? 'background:' + cssColor(x.color) : ''}"></span><span class="n">#${esc(x.name)}</span>${may ? `<button class="iconbtn" data-lt="color" title="${tr('Color')}">${ic('palette', 's')}</button><button class="iconbtn" data-lt="ren" title="${tr('Rename')}">${ic('edit', 's')}</button><button class="iconbtn danger" data-lt="del" title="${tr('Delete')}">${ic('trash', 's')}</button>` : ''}</div>`).join('')
     : `<div class="muted mhint">${tr('No list tags yet.')}</div>`}${may ? `<div class="row"><input id="l-ltnew" placeholder="${tr('New list tag')}" maxlength="60"><button class="btn sm" data-lt="new">${ic('plus', 's')} ${tr('Add')}</button></div>` : ''}`;
 }
+// 2.41.2 (#1501): a list tag renamed (to = new name) or deleted (to = null) in the list and on its tasks, locally
+function ltagPut(lid, from, to) {
+  return () => {
+    const l = listById(lid); if (!l) return null;
+    const tags0 = l.tags || [], tk = [...S.tasks.values()].filter(t => t.list_id === lid && (t.ltags || []).includes(from)), was = tk.map(t => [t.id, t.ltags]);
+    l.tags = to == null ? tags0.filter(y => y.name !== from) : tags0.map(y => y.name === from ? {...y, name: to} : y);
+    for (const t of tk) t.ltags = to == null ? t.ltags.filter(g => g !== from) : t.ltags.map(g => g === from ? to : g);
+    return () => { const x = listById(lid); if (x) x.tags = tags0; for (const [id, g] of was) { const t = S.tasks.get(id); if (t) t.ltags = g; } };
+  };
+}
 function ltagsWire(md, lid) {
   const redraw = () => { const b = $('#l-ltags', md); if (b) b.innerHTML = ltagsBoxHtml(listById(lid)); };
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-lt]'); if (!b) return;
     const a = b.dataset.lt, tid = +b.closest('[data-ltid]')?.dataset.ltid, x = listTags(lid).find(y => y.id === tid);
     try {
-      if (a === 'new') { const v = $('#l-ltnew', md).value.trim().replace(/^#/, ''); if (!v) return; await api('POST', `/api/lists/${lid}/tags`, {name: v}); }
-      if (a === 'ren' && x) { const v = await askPrompt(tr('Rename the list tag'), x.name, {ok: tr('Rename')}); if (!v || v.trim() === x.name) return; await api('PATCH', `/api/list-tags/${tid}`, {name: v.trim().replace(/^#/, '')}); }
+      // 2.41.2 (#1501): the list's tags change locally at once (or from the answer), no GET /api/state afterwards
+      if (a === 'new') { const v = $('#l-ltnew', md).value.trim().replace(/^#/, ''); if (!v) return; const t = await api('POST', `/api/lists/${lid}/tags`, {name: v}); const l = listById(lid); if (l && t?.id) l.tags = [...(l.tags || []).filter(y => y.id !== t.id), {id: t.id, name: t.name, color: t.color || ''}]; }
+      if (a === 'ren' && x) { const v = await askPrompt(tr('Rename the list tag'), x.name, {ok: tr('Rename')}); if (!v || v.trim() === x.name) return; const nn = v.trim().replace(/^#/, ''); await optWrite(ltagPut(lid, x.name, nn), () => api('PATCH', `/api/list-tags/${tid}`, {name: nn})); redraw(); return; }
       if (a === 'color' && x) {
         const p = openPop(b, `<div class="colors ltcols" role="group" aria-label="${esc(tr('Color'))}">${LCOLORS.map(c => `<button data-c="${c}" style="background:${c || 'var(--bg4)'}" class="${(x.color || '') === c ? 'on' : ''}" aria-label="${esc(c || tr('No color'))}"></button>`).join('')}</div>`);
         p.onclick = async ev => {
           const cb = ev.target.closest('[data-c]'); if (!cb) return;
           closePop();
-          try { await api('PATCH', `/api/list-tags/${tid}`, {color: cb.dataset.c}); await load(); render(); redraw(); } catch { /* shown */ }
+          try { await optWrite(optSet(() => listTags(lid).find(y => y.id === tid), {color: cb.dataset.c}), () => api('PATCH', `/api/list-tags/${tid}`, {color: cb.dataset.c})); } catch { /* shown, put back */ }
+          redraw();
         };
         return;
       }
       if (a === 'del' && x) {
         if (!await askConfirm(tr('Delete the list tag {0}?', '#' + x.name), tr('It is removed from every task of the list, for everyone.'), {ok: tr('Delete'), danger: true})) return;
-        await api('DELETE', `/api/list-tags/${tid}`);
+        await optWrite(ltagPut(lid, x.name, null), () => api('DELETE', `/api/list-tags/${tid}`));
       }
-    } catch { return; }
-    await load(); render(); redraw();
+    } catch { redraw(); return; }
+    render(); redraw();
   });
   md.addEventListener('keydown', e => { if (e.target.id === 'l-ltnew' && e.key === 'Enter') { e.preventDefault(); $('[data-lt="new"]', md)?.click(); } });
 }

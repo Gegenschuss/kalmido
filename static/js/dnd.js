@@ -157,12 +157,19 @@ async function taskToSection0(id, sid) {
   const msg = before.parent_id ? tr('Subtask is now standalone') + ' · ' + tr('Moved to section {0}', secName(sid)) : tr('Moved to section {0}', secName(sid));
   if (rev) offerUndo(msg, histFields(tr('Moved {0} to section {1}', qn(t.title.slice(0, 40)), secName(sid)), [[before, after, ['section_id']]], {res})); else toast(msg);
 }
+// 2.41.2 (#1501): the sections of list lid in the order ids, locally (S.sections keeps its slots; the server's sort follows)
+const secPut = (lid, ids) => () => {
+  const mine = S.sections.filter(s => s.list_id === lid), at = [], old = mine.map(s => s.id);
+  S.sections.forEach((s, i) => { if (s.list_id === lid) at.push(i); });
+  const ord = [...ids.map(i => mine.find(s => s.id === i)).filter(Boolean), ...mine.filter(s => !ids.includes(s.id))];
+  ord.forEach((s, k) => { s.sort = k; S.sections[at[k]] = s; });
+  return () => secPut(lid, old)();
+};
 // the sections of a list in a new order: one request (one transaction), undo sends the old order back
 async function saveSectionOrder(lid, ids, msg) {
   if (!canEditList(lid)) { roToast(); return; }
   let j;
-  try { j = await api('POST', `/api/lists/${lid}/sections/order`, {ids}); } catch { await load().catch(() => {}); render(); return; }
-  await load(); render();
+  try { j = await optWrite(secPut(lid, ids), () => api('POST', `/api/lists/${lid}/sections/order`, {ids})); } catch { return; }  // 2.41.2 (#1501): at once
   const ord = (ids2, prev) => async () => {
     const r = await api('POST', `/api/lists/${lid}/sections/order`, {ids: ids2.map(secId), _prev: prev.map(secId)});
     return {skipped: r.ok ? [] : [tr('Section order')], none: !r.ok};
@@ -173,7 +180,7 @@ async function saveSectionOrder(lid, ids, msg) {
 async function sectionCreate(lid, name) {
   let s;
   try { s = await api('POST', '/api/sections', {list_id: lid, name}); } catch { return; }
-  await load(); render();
+  { const {moved, skipped, ...row} = s; if (!S.sections.some(x => x.id === row.id)) S.sections.push(row); render(); }  // 2.41.2 (#1501): the answer, no reload
   const nm = qn(name.slice(0, 40));
   histAdd({label: tr('Section {0} added', nm), lids: [lid], sid: s.id,
     undo: async e => { const r = await api('DELETE', '/api/sections/' + secId(e.sid), {_prev: {name, tasks: []}}); return r.ok ? {} : {skipped: [tr('Section {0}', nm)], none: true}; },
@@ -182,8 +189,7 @@ async function sectionCreate(lid, name) {
 async function sectionRename(sid, name) {
   const s0 = S.sections.find(x => x.id === sid); if (!s0) return;
   const old = s0.name, lid = s0.list_id;
-  try { await api('PATCH', '/api/sections/' + sid, {name}); } catch { return; }
-  await load(); render();
+  try { await optWrite(optSet(() => S.sections.find(x => x.id === sid), {name}), () => api('PATCH', '/api/sections/' + sid, {name})); } catch { return; }  // 2.41.2 (#1501): at once
   if (old === name) return;
   const go = (to, from) => async e => { const r = await api('PATCH', '/api/sections/' + secId(e.sid), {name: to, _prev: {name: from}}); return r.conflicts?.length ? {skipped: [tr('Section {0}', qn(from.slice(0, 40)))], none: true} : {}; };
   histAdd({label: tr('Section renamed to {0}', qn(name.slice(0, 40))), lids: [lid], sid, undo: go(old, name), redo: go(name, old)});
@@ -192,7 +198,9 @@ async function sectionDelete(sid) {
   const s0 = S.sections.find(x => x.id === sid); if (!s0) return;
   let r;
   try { r = await api('DELETE', '/api/sections/' + sid); } catch { return; }
-  await load(); render();
+  S.sections = S.sections.filter(x => x.id !== sid);  // 2.41.2 (#1501): its tasks stay without a section; no reload
+  for (const t of S.tasks.values()) if (t.section_id === sid) t.section_id = null;
+  render();
   const sec = r.section || {name: s0.name, sort: s0.sort, list_id: s0.list_id}, nm = qn(sec.name.slice(0, 40));
   const e = histAdd({label: tr('Section {0} deleted', nm), lids: [sec.list_id], sid, tasks: r.tasks || [],
     undo: async x => {
