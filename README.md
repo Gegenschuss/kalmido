@@ -2020,7 +2020,8 @@ security audit yet — reviews and reports are welcome ([SECURITY.md](SECURITY.m
 ## Contributing and contact
 
 Issues, translations and pull requests are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md) and
-[tests/README.md](tests/README.md). Security problems: please report them privately, see [SECURITY.md](SECURITY.md).
+[tests/README.md](tests/README.md). Pull requests need a one-time agreement to the [CLA](CLA.md) (you keep your copyright; the
+project stays AGPL-3.0). Security problems: please report them privately, see [SECURITY.md](SECURITY.md).
 Contact: hello@kalmido.com.
 
 ## License

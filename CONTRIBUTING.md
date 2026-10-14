@@ -106,20 +106,21 @@ yourself. Please mention it in the pull request.
 - CI must be green (tests, i18n, scanners).
 - Update the README when behaviour changes, and add a line to the *Unreleased* section of
   [CHANGELOG.md](CHANGELOG.md) if you like (the maintainer adds it otherwise).
-- Sign off every commit (`git commit -s`), see *License of contributions* below.
+- Sign off every commit (`git commit -s`) and agree to the [CLA](CLA.md), see *License of contributions* below.
 
 ## License of contributions
 
 Kalmido is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0). Contributions are
-accepted under the same license.
+accepted under the same license, plus the CLA below.
 
 - **Developer Certificate of Origin.** Sign off every commit with `git commit -s`. The `Signed-off-by:` line
   certifies that you wrote the change or otherwise have the right to submit it, as stated in the
   [Developer Certificate of Origin 1.1](https://developercertificate.org/).
-- **Additional license grant.** By submitting a contribution you also grant the maintainer (the copyright holder named in
-  LICENSE) the
-  right to license your contribution under other terms, including commercial licenses. The AGPL-3.0 version
-  stays available to everyone.
+- **Contributor License Agreement.** Before a pull request can be merged you agree to the [CLA](CLA.md): you keep
+  the copyright, and you grant the maintainer (the copyright holder named in LICENSE) the right to license your
+  contribution under other terms as well, including commercial licenses. The AGPL-3.0 version stays available to
+  everyone. When you open a pull request, the CLA Assistant bot comments with a link; follow it once with your GitHub
+  account. The DCO sign-off above stays required.
 
 Security problems: please report them privately, see [SECURITY.md](SECURITY.md). General contact:
 hello@kalmido.com.
