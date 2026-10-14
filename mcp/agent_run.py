@@ -23,6 +23,9 @@ that arrive together: one run), the same way a hosted chat service does it:
                       still none -> the answer gets a visible note that nothing happens without an explicit yes (2.40.0)
   - the answer:       the final text of a chat run is posted into that person's chat (secrets masked) -- the agent must not
                       post it again with send_chat
+  - task answers:     the final text of a task run is posted nowhere -- unless it ends with an ```approval or ```suggest
+                      block: then it becomes the agent's comment on that task with the approval card / answer buttons
+                      (2.41+; older servers: the plain comment with the question / the steps as a line) (2.42.0, #1383)
   - older servers:    a feature the server does not know (404 / 400 unknown field) is switched off once, the rest works
 
 usage: agent_run.py [--state DIR] [--once-event FILE] [--dry-run] -- COMMAND [ARGS...]
@@ -238,6 +241,27 @@ class Api:
         return self._post_chat(uid, b)
 
 
+    # kalmido-capability: comment_blocks (2.42.0, #1383)
+    def comment(self, tid, body, approval=None, suggest=None):
+        """The agent's comment on a task with an approval card (2.41+) or answer buttons; an older server (400): the plain
+        comment with the question / the numbered steps."""
+        b = {"body": body or (approval or {}).get("title") or ""}
+        if approval:
+            x = {"approval": {k: v for k, v in approval.items() if k in ("title", "what")}, "expires_in": APPROVAL_TTL_S}
+        elif suggest:
+            x = {"choices": [{"id": f"s{i + 1}", "label": s[:80]} for i, s in enumerate(suggest[:3])]}
+        else:
+            x = {}
+        try:
+            return self.req("POST", f"/tasks/{int(tid)}/comments", {**b, **x}, timeout=60)
+        except ApiError as e:
+            if not x or e.status != 400:
+                raise
+            log("the server has no answer buttons in comments (before 2.41): a plain comment instead")
+        tail = ("**Approval needed:** " + approval["title"] + " (answer with a thumbs up or down)") if approval else suggest_line(suggest)
+        return self.req("POST", f"/tasks/{int(tid)}/comments", {"body": (b["body"] + "\n\n" if b["body"] else "") + tail}, timeout=60)
+
+
 # kalmido-capability: quota
 def windows_from_stream(info, prev):
     """rate_limit_event.rate_limit_info -> rate_limits {key: {used_percentage, resets_at}} (merged into prev). Every window
@@ -434,7 +458,9 @@ def build_prompt(evs, chat_uid):
     else:
         out.append("This is a task event: answer on the task itself (comment) with the Kalmido tools; your final text "
                    "is not posted anywhere. To ask for a decision there, use request_comment_approval (a card with Yes / No); "
-                   "offer up to three next steps as add_comment choices (answer buttons).")
+                   "offer up to three next steps as add_comment choices (answer buttons). Alternatively end your final "
+                   "text with a block ```approval or ```suggest: then that text is posted as your comment on the task "
+                   "with the card / buttons (do not post it again yourself).")
     pb_seen = set()
     for ev in evs:
         x = ev.get("data") or {}
@@ -812,11 +838,27 @@ class Runner:
                     self.api.chat(uid, "Sorry, this run ended without an answer. Please try again.")
                 except Exception:
                     pass
+        elif text and tid:  # kalmido-capability: comment_blocks (2.42.0, #1383): a task answer with a closing block
+            self.task_blocks(tid, text)
         if rc != 0 and not text:
             log(f"the command ended with {rc}")
             self.api.status("error", "The last run failed")
         else:
             self.api.status("idle", host=self.host())
+
+    def task_blocks(self, tid, text):
+        """A task run's final text that ends with ```approval / ```suggest -> the agent's comment on the task with the card /
+        the buttons (approval wins); without such a block nothing is posted (the agent answered with the tools)."""
+        body, appr, sugg, _ = split_tail_blocks(redact(text))
+        if not appr and not sugg:
+            return None
+        try:
+            r = self.api.comment(tid, body, approval=appr, suggest=None if appr else sugg)
+            log(f"task {tid}: answer posted as a comment with {'an approval card' if appr else f'{len(sugg)} buttons'}")
+            return r
+        except Exception as e:
+            log(f"task {tid}: comment with buttons not posted: {type(e).__name__} {getattr(e, 'status', '')}")
+            return None
 
     # kalmido-capability: approval_check
     def check_approval(self, args, uid, body, appr, sugg, session_id, what):

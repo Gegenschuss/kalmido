@@ -120,6 +120,42 @@ g = r.groups([{"event": "chat", "data": {"user": {"id": 7}, "message": {"id": 1}
               {"event": "comment", "data": {"task": {"id": 1}}}, {"event": "reset"}, {"event": "chat", "data": {"user": {"id": 8}, "message": {"id": 3}}},
               {"event": "reaction", "data": {"chat_message": {"id": 1}, "approval": "approved"}}])
 check([(u, len(e)) for u, e in g] == [(7, 2), (None, 1), (8, 1)], f"grouping: {[(u, len(e)) for u, e in g]}")
+# 2.42.0 (#1383, comment_blocks): a task answer that ends with a block becomes the agent's comment with the card / buttons
+
+
+class _CApi:
+    def __init__(self):
+        self.calls = []
+
+    def comment(self, tid, body, approval=None, suggest=None):
+        self.calls.append((tid, body, approval, suggest))
+        return {"id": 1}
+
+
+ra, r.api = r.api, _CApi()
+r.task_blocks(5, "Done.\n\n```suggest\nShip it\nWait\n```")
+r.task_blocks(6, "Ready.\n\n```suggest\nLater\n```\n\n```approval\nDeploy to staging\n```")
+r.task_blocks(7, "Only a line, no block")
+cl = r.api.calls
+check(len(cl) == 2 and cl[0] == (5, "Done.", None, ["Ship it", "Wait"]), f"comment_blocks: suggestions -> buttons {cl[:1]}")
+check(len(cl) == 2 and cl[1][0] == 6 and cl[1][1] == "Ready." and (cl[1][2] or {}).get("title") == "Deploy to staging" and cl[1][3] is None,
+      f"comment_blocks: the approval wins, no block = no comment {cl}")
+r.api = ra
+seen = []
+
+
+def _req(method, path, body=None, query=None, timeout=30):
+    seen.append((path, body))
+    if len(seen) == 1:
+        raise ar.ApiError(400, "Unknown field: choices")
+    return {"id": 2}
+
+
+capi = ar.Api("http://127.0.0.1:9", "t")
+capi.req = _req
+capi.comment(5, "Text", suggest=["Alpha", "Beta"])
+check(len(seen) == 2 and seen[0][0] == "/tasks/5/comments" and "choices" in seen[0][1] and "choices" not in seen[1][1]
+      and "Alpha" in seen[1][1]["body"] and "Beta" in seen[1][1]["body"], f"comment_blocks: an older server gets a plain comment {seen}")
 tmpf = os.path.join(os.getcwd(), "usage.json")
 with open(tmpf, "w") as f:
     json.dump({"at": int(time.time()) - 13 * 3600, "rate_limits": {"seven_day": {"used_percentage": 46}}}, f)

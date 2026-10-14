@@ -440,6 +440,9 @@ chat messages of one person that arrive together: one run). It does what a hoste
 - **The answer**: the final text of a chat run is posted into the person's chat (secrets masked); a long one in numbered
   parts, cut at paragraphs, with a code block closed at the cut and opened again in the next part (2.40.0). The agent must not post
   it again with `send_chat` (the prompt says so).
+- **Task answers** (2.42.0): the final text of a task run is posted nowhere (the agent comments with its tools) -- unless it
+  ends with a block ` ```approval ` or ` ```suggest `: then that text becomes the agent's comment on the task with the
+  approval card / the answer buttons (servers before 2.41: the plain comment with the question / the numbered steps).
 - **Older servers** (before 2.32 / 2.33 / 2.35): what the server does not know yet is switched off once; the rest runs as
   before.
 
