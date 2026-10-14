@@ -1189,7 +1189,9 @@ A `reply_to` of another place, an unknown id or a deleted message is refused wit
 A person can save any message of their agent chat or of the team chat as a task to look at later (the message's menu:
 *Save as task*): the task gets the whole text as Markdown, the message's files (copies) and a link back to the message;
 the list is one the person may change (the inbox by default), a review date is optional. The message then shows a small
-*Saved* mark; saving it again opens the existing task. Agents never save: for a long answer worth keeping (a plan, a
+*Saved* mark; saving it again opens the existing task. 2.42.0 (#1383): the same works under a **comment of an agent** on a
+task (the comment's bookmark button): the task becomes a subtask of that task or a new task in the same list (whoever may
+add tasks there), with the comment's text, its files and a link back to the task. Agents never save: for a long answer worth keeping (a plan, a
 draft, a summary) send it with `offer_save: true` (`POST /api/v1/agent/chats/{user_id}`, MCP `send_chat`); the message
 carries `offer_save` and shows the button *Save as task*, the person decides. No event comes back to the agent.
 
