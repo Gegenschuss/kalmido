@@ -103,7 +103,9 @@ const FEAT = 'cal,comments,collab,office,clients';
   const ss = d.querySelector('#ofd-status'); ss.value = 'sent'; ss.dispatchEvent(new w.Event('change', {bubbles: true}));
   await until(async () => (await call('GET', `/api/office/docs/${doc.id}`)).status === 'sent', 60);
   check((await call('GET', `/api/office/docs/${doc.id}`)).status === 'sent', 'the status select posts the status');
-  check(d.querySelector('a[data-ofd="pdf"]')?.getAttribute('href') === `/api/office/docs/${doc.id}/pdf`, 'the PDF link');
+  // 2.40.0 (#1366): the PDF button opens inline in a new tab, an own button downloads
+  check(d.querySelector('a.ofdpdf[data-ofd="pdf"]')?.getAttribute('href') === `/api/office/docs/${doc.id}/pdf?inline=1` && d.querySelector('a.ofdpdf')?.target === '_blank', 'the PDF link');
+  check(d.querySelector('a.ofddl[data-ofd="pdf"]')?.getAttribute('href') === `/api/office/docs/${doc.id}/pdf` && d.querySelector('a.ofddl')?.hasAttribute('download'), 'the PDF download link');
   d.querySelector('[data-ofd="back"]').click();
   await until(() => d.querySelector('.ofdlist .ofdrow'), 60);
   const row = d.querySelector('.ofdlist .ofdrow');
