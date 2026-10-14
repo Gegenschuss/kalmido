@@ -219,7 +219,8 @@ check(is_err(a.post("/lists", {"name": "x", "owner_id": 2}), 400), "list create:
 check(is_err(a.post("/lists", {"name": ""}), 400), "list create: name required")
 check(is_err(a.post("/lists", {"name": "x", "checklist": "yes"}), 400), "list create: checklist must be boolean")
 L2 = a.post("/lists", {"name": "Private"}).json()
-L3 = a.post("/lists", {"name": "Shared", "kind": "project"}).json()  # project: time entries + fields
+L3 = a.post("/lists", {"name": "Shared", "kind": "project", "time_tracking": True}).json()  # project: time entries + fields
+# 2.41.0 (#1471): time tracking is a switch of each list (default off), no longer implied by the project type
 A.post(B + "/api/sections", json={"list_id": L3["id"], "name": "Now"})
 A.put(B + f"/api/lists/{L3['id']}/members", json={"user_id": 2, "role": "view"})
 d = a.get(f"/lists/{L3['id']}").json()

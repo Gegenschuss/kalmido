@@ -137,7 +137,8 @@ check(next(l for l in Api(dtok).get("/lists").json()["data"] if l["is_inbox"])["
 check(next(l for l in A.get(B + "/api/state").json()["lists"] if l["is_inbox"])["name"] in ("Eingang", "Inbox", "Korb", "Basket"), "alice's inbox has a default name")
 
 # ================================================================== lists + tasks for the rest
-L = A.post(B + "/api/lists", json={"name": "Team", "kind": "project"}).json()["id"]      # alice; bob edit, the agent edit
+L = A.post(B + "/api/lists", json={"name": "Team", "kind": "project", "time_tracking": True}).json()["id"]  # alice; bob edit, the agent edit
+# 2.41.0 (#1471): time tracking is a switch of each list (default off), the timer below needs it
 PRIV = A.post(B + "/api/lists", json={"name": "Private"}).json()["id"]                 # alice only
 CAR = Ca.post(B + "/api/lists", json={"name": "Carol"}).json()["id"]                   # carol only
 assert A.put(B + f"/api/lists/{L}/members", json={"user_id": ids["bob"], "role": "edit"}).ok

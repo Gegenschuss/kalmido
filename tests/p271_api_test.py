@@ -52,7 +52,8 @@ Bo, Vi, Pa, Zo = sess("bob"), sess("vic"), sess("pat"), sess("zoe")
 for x in (A, Bo, Vi, Pa, Zo):
     x.patch(B + "/api/settings", json={"lang": "en", "tour": "done"})
 
-P = A.post(B + "/api/lists", json={"name": "Website relaunch", "kind": "project"}).json()["id"]
+P = A.post(B + "/api/lists", json={"name": "Website relaunch", "kind": "project", "time_tracking": True}).json()["id"]
+# 2.41.0 (#1471): time tracking is a switch of each list (default off); the overview shows "time" only with it
 PL = A.post(B + "/api/lists", json={"name": "Groceries"}).json()["id"]
 for u, role in (("bob", "edit"), ("vic", "view"), ("pat", "participant")):
     check(A.put(B + f"/api/lists/{P}/members", json={"user_id": ids[u], "role": role}).ok, f"share with {u} as {role}")

@@ -179,7 +179,7 @@ async function firefox(fn) {
   w.eval(`openDetail(${T2})`); await sleep(900);
   check(d.querySelector('#detail') && !d.querySelector('[data-act="agent-wake"]') && !/Wake Claude/.test(d.querySelector('#detail').textContent), 'task panel: no Wake button');
   // ================= #385 nothing destructive next to Send: Delete / Track time moved from the footer into "…"
-  await call('PATCH', `/api/lists/${L2}`, {kind: 'project'});
+  await call('PATCH', `/api/lists/${L2}`, {kind: 'project', time_tracking: true});  // 2.41.0 (#1471): time tracking is a switch of each list (default off)
   const T3 = (await call('POST', '/api/tasks', {title: 'Delete me from the menu', list_id: L2})).id;
   w.eval('load().then(render)'); await sleep(700);
   w.eval(`openDetail(${T3})`); await sleep(900);
