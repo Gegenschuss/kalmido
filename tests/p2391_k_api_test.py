@@ -72,8 +72,7 @@ check(r.ok, "#1221: an own order is stored " + r.text[:200])
 go = json.loads(A.get(B + "/api/state").json()["settings"]["group_order"])
 check(go == {"assigned": ["l:3", "l:1"], "tag:x": ["l:2"]}, "#1221: doubles dropped, an empty list removes the view " + json.dumps(go))
 check(A.patch(B + "/api/settings", json={"group_order": {"assigned": ["l:1"]}}).ok, "#1221: an object is fine too")
-for bad in ("[1]", json.dumps({"assigned": "l:1"}), json.dumps({"assigned": [1]}), json.dumps({"": ["l:1"]}), "{x", json.dumps({"a": ["x" * 121]}),
-            json.dumps({f"v{i}": ["l:1"] for i in range(101)})):
+for bad in ("[1]", json.dumps({"assigned": "l:1"}), json.dumps({"assigned": [1]}), json.dumps({"": ["l:1"]}), "{x"):  # 2.40.0 (#1334): too long / too many are cut, see p2400_v_api_test
     check(A.patch(B + "/api/settings", json={"group_order": bad}).status_code == 400, "#1221: refused " + bad[:60])
 check(A.patch(B + "/api/settings", json={"group_order": ""}).ok and A.get(B + "/api/state").json()["settings"]["group_order"] == "{}", "#1221: '' resets")
 check(Bo.get(B + "/api/state").json()["settings"].get("group_order") in ("{}", "", None), "#1221: per person")
