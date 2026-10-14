@@ -435,8 +435,10 @@ author in the app); encrypted files are listed as such with a neutral name, neve
 never served to agents or to anyone but the uploader. Encrypted DMs: the server refuses plain text in them (and
 ciphertext in plain rooms), pushes say only "New message from …", search and *Save as task* skip them, edits are new
 ciphertext. A DM is switched by either person, only when both have keys; the switch leaves a notice in the
-conversation. Both sides can compare a safety number (SHA-256 over both public keys, 8 groups of 5 digits); when the
-other person's key changes, the conversation says so.
+conversation. Both sides can compare a safety number (SHA-256 over both public keys, 8 groups of 5 digits); the own
+public key in it comes from the unlocked key bundle, never from the server. If the server's copy of the own public key
+differs from the bundle, the app warns and refuses to encrypt DMs (changing the passphrase stores the right key again).
+When the other person's key changes, the conversation says so.
 
 **Limits.** This protects against the server operator, a reader of the database and the backups. A web app cannot
 protect against a changed script delivered by the server itself. Encrypted DMs have no forward secrecy (a static key
