@@ -173,17 +173,22 @@ class Api:
 
     # kalmido-capability: notice (2.41.0, #1206)
     def notice(self, uid, text):
-        """A notice in the chat: one small grey line (kind notice), no push, never unread. An older server (400 / 404)
-        gets nothing -- never a normal message instead."""
+        """A notice in the chat: one small grey line (kind notice), no push, never unread. An older server (400 "Unknown
+        field" / 404) gets nothing -- never a normal message instead. Any other error (401, 403, 429, 5xx, network) only
+        loses this one line; the next is tried. One short request (10 s): it never holds the run up for long."""
         if self.notice_ok is False or not uid:
             return False
-        st = self.soft("POST", f"/agent/chats/{uid}", {"body": " ".join(str(text).split())[:200], "kind": "notice"})
-        if st in (400, 404) and not self.notice_ok:
-            self.notice_ok = False
-            log("the server has no chat notices (before 2.41): sending none")
-        elif st == 200:
-            self.notice_ok = True
-        return st == 200
+        try:
+            self.req("POST", f"/agent/chats/{uid}", {"body": " ".join(str(text).split())[:200], "kind": "notice"}, timeout=10)
+        except ApiError as e:
+            if not self.notice_ok and (e.status == 404 or (e.status == 400 and "Unknown field" in e.body)):
+                self.notice_ok = False
+                log("the server has no chat notices (before 2.41): sending none")
+            return False
+        except Exception:
+            return False
+        self.notice_ok = True
+        return True
 
     # kalmido-capability: approval
     def _post_chat(self, uid, b):
@@ -857,7 +862,8 @@ class Runner:
 
         def on_compact():  # 2.41.0 (#1206): a chat run whose conversation was compacted says so in the chat (a notice)
             if uid:
-                self.api.notice(uid, NOTICE_COMPACTED.format(time.strftime("%H:%M")))
+                # a free text from the environment ({x}, a lone brace) never stops the run: only {0} is replaced
+                self.api.notice(uid, NOTICE_COMPACTED.replace("{0}", time.strftime("%H:%M")))
 
         st = Stream((lambda t: self.api.progress(t, uid)) if uid and steps else (lambda t: False), on_model, on_usage, on_compact)
         typing()

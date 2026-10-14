@@ -27,7 +27,7 @@ usage: pwsh -File agent_launcher.ps1 [-e ENV_FILE] [--once] [-- COMMAND ...]
                  is posted as the answer. COMMAND is then the plain agent command without -p. Same as KALMIDO_EVENTS=1.
                  Python: KALMIDO_PYTHON, else python3 / py / python on PATH. See agent_launcher.sh for the optional keys.
                  KALMIDO_APPROVAL_CHECK=0 (2.40.0): no check of chat answers that ask to decide without an approval block.
-                 KALMIDO_NOTICE_COMPACTED (2.41.0): the notice in the chat when a run compacts its conversation.
+                 KALMIDO_NOTICE_COMPACTED (2.41.0): the notice in the chat when a run compacts its conversation, {0} = the time.
 Needs: Windows PowerShell 5.1 or PowerShell 7+. See docs/AGENTS.md "Set up an agent" for a scheduled task.
 #>
 # arguments by hand (no param block): everything after "--" (or the first unknown word) is the command, as in the .sh

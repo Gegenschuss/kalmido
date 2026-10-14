@@ -170,7 +170,9 @@ class Old(BaseHTTPRequestHandler):
     def do_POST(self):
         b = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
         if "/agent/chats/" in self.path:
-            if set(b) - {"body", "task_id", "choices", "reply_to", "approval", "expires_in"}:
+            if SEEN.get("status") and b.get("kind") == "notice":  # 2.41.0 (#1206): a 429 loses only that line
+                return self._send(SEEN["status"], {"error": "Too many requests"})
+            if set(b) - {"body", "task_id", "choices", "reply_to", "approval", "expires_in"} - SEEN.get("ok", set()):
                 return self._send(400, {"error": "Unknown field: " + ",".join(sorted(set(b) - {"body", "task_id", "choices"}))})
             SEEN["posts"].append(b)
             return self._send(201, {"id": len(SEEN["posts"])})
@@ -185,6 +187,19 @@ r = subprocess.run([sys.executable, os.path.join(MCP, "agent_run.py"), "--state"
 check(r.returncode == 0, "old server: the runner ends cleanly " + r.stderr[-300:])
 check([p["body"] for p in SEEN["posts"]] == ["All builds are green."], f"old server: only the answer, no notice as a message: {SEEN['posts']}")
 check("before 2.41" in r.stderr, "old server: notices are switched off (logged) " + r.stderr[-300:])
+
+# 2.41.0 (#1206): a free notice text with braces never stops the run (only {0} becomes the time)
+SEEN.update(posts=[], ok={"kind"})
+r = subprocess.run([sys.executable, os.path.join(MCP, "agent_run.py"), "--state", os.path.join(TMP, "st3"), "--once-event", EV, "--", FAKE],
+                   capture_output=True, text=True, timeout=90, env={**env, "KALMIDO_NOTICE_COMPACTED": "{x} squeezed {0} {"}, cwd=TMP)
+nb = [p["body"] for p in SEEN["posts"] if p.get("kind") == "notice"]
+check(r.returncode == 0 and len(nb) == 1 and re.fullmatch(r"\{x\} squeezed \d\d:\d\d \{", nb[0]), f"launcher: braces in the notice text {nb} " + r.stderr[-300:])
+# a 429 is no old server: nothing sent, notices stay on (no "before 2.41")
+SEEN.update(posts=[], status=429)
+r = subprocess.run([sys.executable, os.path.join(MCP, "agent_run.py"), "--state", os.path.join(TMP, "st4"), "--once-event", EV, "--", FAKE],
+                   capture_output=True, text=True, timeout=90, env=env, cwd=TMP)
+check(r.returncode == 0 and [p["body"] for p in SEEN["posts"]] == ["All builds are green."] and "before 2.41" not in r.stderr,
+      f"launcher: a 429 on the notice does not switch notices off {SEEN['posts']} " + r.stderr[-300:])
 srv.shutdown()
 
 shutil.rmtree(TMP, ignore_errors=True)
