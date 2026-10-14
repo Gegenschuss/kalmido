@@ -324,6 +324,8 @@ ROUTES = {
     # organisation 404, agent refused); the instance switch org_encrypt is the operator's
     "GET /api/orgs/{}/encryption": "org", "POST /api/orgs/{}/encryption/recovery": "org",
     "GET /api/admin/orgcrypt": "admin", "PUT /api/admin/orgcrypt": "admin",
+    # 2.42.0 (#833): the organisation export (its admins only; p2420_c_api_test.py: member 403, other organisation 404, agent refused)
+    "GET /api/orgs/{}/export": "org", "POST /api/orgs/{}/export": "org", "DELETE /api/orgs/{}/export": "org", "GET /api/orgs/{}/export/file": "org",
     # ---- own (119)
     "PUT /api/tasks/mine-order": "own", "GET /api/me/wait-suggestions": "own", "DELETE /api/me/wait-suggestions": "own",  # 2.41.0 (#1205)
     "POST /api/onboarding": "own", "POST /api/sample": "own", "DELETE /api/sample": "own", "PATCH /api/settings": "own",

@@ -11,6 +11,7 @@
  - the office log notes the export; after 24 hours the archive is gone (state + the watchdog's clean-up after a restart)
  - without KALMIDO_SECRET_KEY the export is refused (409, enabled false)
 Starts its OWN container (start.sh) with KALMIDO_SECRET_KEY and the mode workspaces.
+tenant-matrix: org
 usage: p2420_c_api_test.py <datadir>"""
 import base64
 import io
