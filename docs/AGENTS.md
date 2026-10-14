@@ -541,7 +541,8 @@ Three rules decide whether an action of someone reaches an agent as an event:
   list is allowed. Create a separate list for the second agent."; a folder share skips such lists and names them
   (`skipped`), *Share all* names them (`other_agent`). `PUT /api/lists/{id}/agent {"agent_id": id | null}` swaps the
   list's agent in one step (the old one leaves, the new one joins) and answers `previous` for an undo. Lists that had
-  several agents before the update keep them; no new ones are added.
+  several agents before the update keep them; no new ones are added. A folder can name several agents (2.41.0): its lists
+  get the first one, the others only the lists that choose them, so an agent still sees only the lists shared with it.
 - **Lists with different people (2.30.0).** An agent that would sit in two lists whose people circles are neither equal
   nor nested (a *bridge*) is refused with `409` `agent_bridge` and `bridges: [{list_id, name}]`, unless a person who
   manages every list involved (or owns the personal agent) sends `bridge_ok: true`; the same for adding a person to a
@@ -655,7 +656,8 @@ went to every agent of the list).
   the list listens in. All other lists (agency, personal, no project type): off.
 - **A switch in every list:** the list dialog (Share > Agents) has *Agent listens in*, on or off whatever the type; the
   list's "…" menu and the share summary say *Agent listens in* or *Agent only via @*. Folder settings (2.29.0) can set it
-  for all lists of a folder (`agent_listen: true | false` in `PUT /api/folders/props`).
+  for all lists of a folder (`agent_listen: true | false` in `PUT /api/folders/props`); 2.41.0: per agent of the folder in
+  its Share dialog (`PUT /api/folders/agents {folder, agent_id, listen}`).
 - **Tidying is separate:** *Agent may tidy up entries* (`agent_tidy`) is its own switch, default off, independent of
   listening; with tidying on, the tidy agent also gets `tidy` for tasks moved into the list.
 - **Existing lists (update to 2.30):** every list keeps the agents that read every comment before (an explicit choice, or

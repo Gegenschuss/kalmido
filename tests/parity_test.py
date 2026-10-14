@@ -241,6 +241,9 @@ APP_ONLY = [
     ("folder shares with groups: people only (sharing of a list with a group: /lists/{id}/groups)", ("* /api/folders/groups",)),
     ("2.22.0 (#740): sharing a whole folder with a person (and its future lists): people only; single lists: /lists/{id}/members",
      ("* /api/folders/people",)),
+    ("2.41.0 (#1420): a folder's agents, the public links of its lists together and handing all its lists over: people only "
+     "(per list: /lists/{id}/members, /lists/{id}/public-link, /lists/{id}/owner)",
+     ("* /api/folders/agents", "* /api/folders/public-links", "POST /api/folders/owner")),
     ("2.22.0 (#663): the Karakeep connection: its API key is entered by the person; the sync is in the API",
      ("=GET /api/life/karakeep", "=PUT /api/life/karakeep", "=DELETE /api/life/karakeep", "GET /api/life/karakeep/lists")),
     ("2.23.0 (#463): a person's hours per week (their own setting / an admin's) and a QR code image for the screen",

@@ -895,6 +895,13 @@ Folders are paths of their owner (`"folder": "Clients/Company X"`). How they beh
   takes them; changing them asks whether the existing lists follow. A list changed on its own keeps its value
   ("differs from the folder") until *Back to the folder*. What cannot be applied (for example an agent that would
   create a [bridge](#lists-people-and-agents-2300)) is skipped and named.
+- **One Share dialog for a folder** (2.41.0): people, groups, agents, notifications, the public links and the owner, like
+  the dialog of a list. A folder can have **several agents**; a list keeps at most one, so the first agent of the folder is
+  its default (the folder's lists follow it like any folder setting; it is also kept as `props.agent_id`), the others can
+  be chosen per list. *Agent listens in* is stored per agent and reaches the lists where that agent is the agent. The
+  folder settings switch at once (with Undo), *Agent follows up* (`agent_followup`) is a folder default too, and setting a
+  value back to *Not set* leaves the lists with the value they have. A health list never gets an agent or a public link
+  from the folder.
 - **Rename, move, dissolve** act on the folders of the person who does it. The owner's rename or move takes the
   folder's lists (and so their place for every member) and the folder's shares along; dissolving moves the lists one
   level up and ends the folder's share for new lists. A member who renames or dissolves a folder changes only their own
@@ -904,7 +911,18 @@ Web API (signed in as a person): `GET /api/folders/people?folder=` · `PUT /api/
 `{folder, user_id, role?}` · `DELETE /api/folders/people` `{folder, user_id, remove?}`; `GET /api/folders/props?folder=`
 · `PUT /api/folders/props` `{folder, props: {org_id?, agent_id?, agent_members?, agent_tidy?, …}
 (null removes a default), apply?: all | new, force?, dry_run?}` (`dry_run: true` only reports what would change);
-`POST /api/lists/{id}/folder-reset` `{keys?}` (*Back to the folder*). `/api/v1`: `GET /folders`,
+`POST /api/lists/{id}/folder-reset` `{keys?}` (*Back to the folder*). 2.41.0: `PUT /api/folders/people` also takes
+`{folder, email, role?}` (the answer is the same whether the address has an account: `{shared: 0, updated: 0, by_email: true}`)
+and `GET` names the people (`name`). The folder's agents: `GET /api/folders/agents?folder=` → `{agents: [{agent_id, name,
+listen, first}], inherited, lists: [{id, name, agent_id}]}` · `PUT /api/folders/agents` `{folder, agent_id, listen?: bool | null,
+first?: true, apply?: all | new}` (adds it or changes it; the first agent's lists follow unless `apply: new`) · `DELETE
+/api/folders/agents` `{folder, agent_id, remove?}` (`remove: true` also takes it out of the folder's lists). An older client
+that writes `props.agent_id` sets the folder's first agent (0 removes the folder's agents). Public links of all own lists
+in the folder: `GET /api/folders/public-links?folder=` · `PUT /api/folders/public-links` `{folder, on: bool, notes?}`
+(read only, no password; health lists never; existing links stay as they are) → `{lists: [{id, name, health, link}],
+created, removed}`. `POST /api/folders/owner` `{folder, user_id}` hands every own list in the folder to that person (the
+rules of *Transfer ownership* per list; you stay list admin) → `{moved, skipped: [{id, name, reason}]}`. `/api/state` has
+`folder_shares` `{folder: {people, groups, agents: [names]}}` of the person's shared folders. `/api/v1`: `GET /folders`,
 `POST /folders/rename`, `POST /folders/delete` (see [Endpoints](#endpoints)).
 
 2.39.1: a list moved into another folder takes the folder's workspace and agent settings only with `folder_adopt: true`

@@ -475,7 +475,7 @@ L4 = A.post(B + "/api/lists", json={"name": "Moved in"}).json()["id"]
 A.patch(B + f"/api/lists/{L4}", json={"folder": "Home"})
 bl = {l["id"]: l for l in Bo.get(B + "/api/state").json()["lists"]}
 check(L3 in bl and L4 in bl and bl[L3]["folder"] == "Home", "#740: new and moved-in lists are shared too, in the folder")
-check(A.get(B + "/api/folders/people", params={"folder": "Home"}).json()["people"] == [{"user_id": BOB, "role": "view"}], "#740: who the folder is shared with")
+check([{k: p[k] for k in ("user_id", "role")} for p in A.get(B + "/api/folders/people", params={"folder": "Home"}).json()["people"]] == [{"user_id": BOB, "role": "view"}], "#740: who the folder is shared with")  # 2.41.0 (#1420): + name
 A.post(B + "/api/folders/rename", json={"old": "Home", "new": "House"})
 check(A.get(B + "/api/folders/people", params={"folder": "House"}).json()["people"], "#740: a renamed folder keeps its sharing")
 A.delete(B + "/api/folders/people", json={"folder": "House", "user_id": BOB})

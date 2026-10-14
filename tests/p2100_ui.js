@@ -82,9 +82,10 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(await until(async () => ((await call('GET', `/api/lists/${L}/groups`)).groups || []).length === 1), 'remove the group (confirmed)');
   click(w, last(d).querySelector('[data-m="close"]')); await sleep(200);
   // folder menu
-  w.eval('folderGroupsModal("Team")'); await sleep(500);
+  // 2.41.0 (#1420): the groups are a part of the folder's one Share dialog (no own "Share with a group…" dialog)
+  w.eval('folderShareModal("Team", {focus: "grp"})'); await until(() => last(d).querySelector('#fg-add'));
   md = last(d);
-  check(/Share the folder “Team”/.test(md.textContent) && md.querySelector('#fg-add'), 'folder dialog');
+  check(/Share folder “Team”/.test(md.textContent) && md.querySelector('#fg-add'), 'folder dialog');
   change(w, md.querySelector('#fg-add'), String(G1));
   click(w, md.querySelector('[data-m="fg-add"]'));
   check(await until(async () => ((await call('GET', '/api/folders/groups?folder=Team')).groups || []).length === 1), 'folder shared with Office');
