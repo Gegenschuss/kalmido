@@ -331,8 +331,8 @@ only the database and the data folder hold ciphertext.
 - **The keys.** `KALMIDO_SECRET_KEY` (32 random bytes, base64) is the master key. Each organisation gets a random key,
   stored in the database only wrapped with a key derived from the master key. Without `KALMIDO_SECRET_KEY` nothing is
   encrypted (everything as before); *Settings > Organisation > Encryption* says so.
-- **Existing data** is encrypted by a background pass after the start (idempotent, in batches; the log says
-  `orgcrypt: encrypted at rest: ...`). The instance admin can pause it (*Settings > Administration > Organisation >
+- **Existing data** is encrypted by a background pass five minutes after the start, so an update that fails its health check
+  is rolled back before anything changes (idempotent, in batches; the log says `orgcrypt: encrypted at rest: ...`). The instance admin can pause it (*Settings > Administration > Organisation >
   Encrypt organisation data*): then new data is stored unencrypted, encrypted data stays readable.
 - **Keep the master key apart from the backups.** A backup contains the wrapped organisation keys but never
   `KALMIDO_SECRET_KEY`: backup + master key restore everything; a backup alone does not reveal the encrypted data.
