@@ -32,7 +32,7 @@ run() {  # run <name> <cmd...>: prints the summary line, remembers failures
   [[ -n "${ONLY:-}" && " $ONLY " != *" $name "* ]] && return 0
   local out rc
   out=$("$@" 2>&1); rc=$?
-  echo "$out" | grep -E "^FAIL|ok, [0-9]+ failed|Error|Traceback" | head -40
+  echo "$out" | grep -E "^FAIL|^PERF|ok, [0-9]+ failed|Error|Traceback" | head -40
   if [[ $rc -ne 0 ]]; then FAILED+=("$name"); echo "== $name: FAILED (exit $rc)"; echo "$out" | tail -15
     # GitHub Actions: an annotation, readable on the run page (and via the API) without the full log
     if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
