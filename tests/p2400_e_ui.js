@@ -1,0 +1,150 @@
+// 2.40.0 UI tests, part E (office settings), own container (start.sh), Firefox (desktop, mouse):
+// - #1378: the logo upload and the settings import of the page go through with the CSRF header (no "header missing")
+// - #1371: typed but unsaved input of the settings form stays over a change of the view and back, over live events
+//   (a comment from another session, ofcInfo(true), render()) while typing (focus + caret kept), the bar "Unsaved changes"
+//   with Save / Discard, beforeunload asks while unsaved; a dialog with changes asks before Cancel throws them away
+// - #1379: producing / raw data off (new organisation): no rule fields, no flags in the service dialog, no automatic lines
+//   and raw data fields in the quotation editor; the switch shows the fields at once
+// - #1377: the choice of the word before the management's names in the company data
+// - #1382: building block buttons insert at the caret, the preview of every scheme (plain error, counter restart), the
+//   (i) buttons of the terms (settings, company data, client card), also after a redraw
+const path = require('path');
+const {execFileSync} = require('child_process');
+const {sleep, B, login} = require('./boot');
+const F = []; let ok = 0;
+const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
+const firefox = require('./ff')({tag: 'p2400_e_ui', check, shots: 'P2400E_SHOTS'});
+const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
+const DATA = process.argv[2] || path.join(__dirname, '.data');
+execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
+const call = async (ck, method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); return {...j, http: r.status}; };
+const FEAT = 'cal,comments,collab,office,clients';
+
+(async () => {
+  await sleep(600);
+  const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
+  check(r.ok, 'setup');
+  const CA = await login('alice');
+  await call(CA, 'POST', '/api/admin/setup', {lang: 'en', collab_all: true, modules: ['cal', 'comments']});
+  await call(CA, 'PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
+  const st = await call(CA, 'GET', '/api/office/settings');
+  check(st.http === 200 && st.settings.producing_on === 0 && st.settings.raw_on === 0, '#1379: a new organisation starts with producing / raw data off');
+  await call(CA, 'PUT', '/api/office/settings', {company: {name: 'Studio Nordlicht GmbH'}, lang: 'en', company_fields: {name: 'Studio Nordlicht GmbH', city: 'Köln'}});
+  const SV = (await call(CA, 'POST', '/api/office/services', {name_de: 'Dreh', name_en: 'Shoot', daily_rate: 1000, producing: 1, raw_fee: 1})).id;
+  const offer = await call(CA, 'POST', '/api/office/docs', {project_title: 'Imagefilm'});
+  await call(CA, 'PUT', `/api/office/docs/${offer.id}/items`, {items: [{kind: 'service', service_id: SV, qty: 6}]});
+  const task = await call(CA, 'POST', '/api/tasks', {title: 'Drehplan abstimmen'});
+  const CA2 = await login('alice');  // a second session of the same person: its comment is a live event for the page
+
+  const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
+  await firefox(async ({cmd, ev, ctx, nav, shot}) => {
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
+    await nav(B + 'static/icon.svg');
+    await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
+    await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
+    await nav(B + '#office/settings');
+    check(await ready(ev, `!!document.querySelector('#ofc-set #osc-street')`, 80), 'the settings page');
+    await ev(`(() => { window.__t = []; const o = toast; toast = (m, ...a) => { __t.push(String(m)); return o(m, ...a); }; return 1; })()`);
+
+    // ================= #1378 logo + import through the page's own functions (the header comes from the helper)
+    const PNG = '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360000002000154a24f5d0000000049454e44ae426082';
+    await ev(`(async () => { const b = new Uint8Array('${PNG}'.match(/../g).map(h => parseInt(h, 16))); await ofcLogoUpload(new File([b], 'logo.png', {type: 'image/png'})); return 1; })()`);
+    check(await ready(ev, `!!OFC.info?.settings?.logo && __t.includes(tr('Logo saved'))`), '#1378: the logo upload of the page works ' + JSON.stringify(await ev('__t')));
+    await ev(`(async () => { const t = await (await fetch('/api/office/export')).text(); await ofcImport(new File([t], 'office.json', {type: 'application/json'}), false); return 1; })()`);
+    check(await ready(ev, `__t.some(x => /^Imported/.test(x))`), '#1378: the settings import of the page works ' + JSON.stringify(await ev('__t')));
+    check(!(await ev(`__t.some(x => /X-Requested-With/.test(x))`)), '#1378: no "header missing"');
+
+    // ================= #1371 unsaved input
+    await ready(ev, `!!document.querySelector('#ofc-set #osc-street')`);
+    const typ = (id, v) => ev(`(() => { const el = document.getElementById('${id}'); el.focus(); el.value = ${JSON.stringify(v)}; el.dispatchEvent(new Event('input', {bubbles: true})); return el.value; })()`);
+    await typ('osc-street', 'Hafenstraße 12'); await typ('os-valid', '21');
+    check(await ev(`!!document.querySelector('#ofc-set > .fgbar') && /Unsaved changes/.test(document.querySelector('#ofc-set > .fgbar').textContent)`), '#1371: the bar "Unsaved changes" shows');
+    const unload = `(() => { const e = new Event('beforeunload', {cancelable: true}); window.dispatchEvent(e); return e.defaultPrevented; })()`;
+    check(await ev(unload), '#1371: closing the page asks while something is unsaved');
+    await shot('p2400-e-unsaved.png');
+    // leave the view (another module) and come back
+    await ev(`(() => { location.hash = '#inbox'; return 1; })()`);
+    check(await ready(ev, `!document.querySelector('#ofc-set') && S.route.mod !== 'office'`), '#1371: left the settings');
+    await ev(`(() => { location.hash = '#office/settings'; return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('#ofc-set #osc-street')`, 60), '#1371: back on the settings');
+    check(await ev(`document.getElementById('osc-street').value === 'Hafenstraße 12' && document.getElementById('os-valid').value === '21' && !!document.querySelector('#ofc-set > .fgbar')`),
+      '#1371: the typed values are back after the view change ' + await ev(`document.getElementById('osc-street').value + ' / ' + document.getElementById('os-valid').value`));
+    // live events while typing in a field: a comment from another session, ofcInfo(true), render()
+    await ev(`(() => { const el = document.getElementById('osc-city'); el.focus(); el.value = 'Ham'; el.setSelectionRange(3, 3); el.dispatchEvent(new Event('input', {bubbles: true})); window.__rv = 0; const o = renderView; renderView = (...a) => { __rv++; return o(...a); }; return 1; })()`);
+    await call(CA2, 'POST', `/api/tasks/${task.id}/comments`, {body: 'Passt der Dienstag?'});
+    const live = await ready(ev, `__rv > 0`, 40);
+    await ev(`(async () => { await ofcInfo(true); render(); ofcDraw(); return 1; })()`);
+    await sleep(400);
+    const after = await ev(`(() => { const c = document.getElementById('osc-city'); return {city: c.value, focus: document.activeElement === c, caret: c.selectionStart, street: document.getElementById('osc-street').value, valid: document.getElementById('os-valid').value}; })()`);
+    check(after.city === 'Ham' && after.focus && after.caret === 3 && after.street === 'Hafenstraße 12' && after.valid === '21',
+      `#1371: live events (comment ${live ? 'arrived' : 'not seen'}, ofcInfo(true), render) keep the input, the focus and the caret ` + JSON.stringify(after));
+    // Discard puts the saved values back, Save stores the draft
+    await typ('osc-city', 'Hamburg');
+    await ev(`(() => { document.querySelector('#ofc-set > .fgbar [data-fgb="save"]').click(); return 1; })()`);
+    let saved = null;
+    for (let i = 0; i < 40 && !saved; i++) { const j = await call(CA, 'GET', '/api/office/settings'); if (j.company_fields?.street === 'Hafenstraße 12') saved = j; else await sleep(250); }
+    check(saved && saved.company_fields.city === 'Hamburg' && saved.settings.offer_valid_days === 21, '#1371: Save in the bar stores the input ' + JSON.stringify(saved?.company_fields || {}).slice(0, 120));
+    check(await ready(ev, `!document.querySelector('#ofc-set > .fgbar')`) && !(await ev(unload)), '#1371: saved: no bar, no question on closing');
+    await typ('os-valid', '5');
+    await ev(`(() => { document.querySelector('#ofc-set > .fgbar [data-fgb="discard"]').click(); return 1; })()`);
+    check(await ev(`document.getElementById('os-valid').value === '21' && !document.querySelector('#ofc-set > .fgbar') && !FG.d['ofc-set:' + OFC.info.org_id]`), '#1371: Discard puts the saved value back');
+    // a dialog with changes asks before Cancel throws them away
+    await ev(`(() => { ofcModal('services', null); return 1; })()`);
+    await ready(ev, `!!document.querySelector('.modal.ofcdlg #of-name_de')`);
+    await ev(`(() => { const el = document.querySelector('.modal.ofcdlg #of-name_de'); el.value = 'Ton'; el.dispatchEvent(new Event('input', {bubbles: true})); document.querySelector('.modal.ofcdlg [data-m="close"]').click(); return 1; })()`);
+    check(await ready(ev, `[...document.querySelectorAll('.modal')].some(m => /Discard changes/.test(m.textContent))`), '#1371: Cancel in a changed dialog asks first');
+    await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); return 1; })()`);
+
+    // ================= #1379 producing / raw data off
+    const hid = sel => `getComputedStyle(document.querySelector('${sel}')).display === 'none'`;
+    check(await ev(`${hid('.ofcrule[data-rule="prod"]')} && ${hid('.ofcrule[data-rule="raw"]')} && !document.getElementById('os-prod-on').checked`), '#1379 off: the producing / raw data fields are hidden');
+    await ev(`(() => { const c = document.getElementById('os-prod-on'); c.click(); return 1; })()`);
+    check(await ev(`!(${hid('.ofcrule[data-rule="prod"]')}) && ${hid('.ofcrule[data-rule="raw"]')}`), '#1379: switching on shows its fields at once');
+    await ev(`(() => { document.getElementById('os-prod-on').click(); document.querySelector('#ofc-set > .fgbar [data-fgb="discard"]')?.click(); return 1; })()`);
+    await ev(`(() => { ofcModal('services', {...(ofcRow('services', ${SV}) || {id: ${SV}, name_de: 'Dreh'}), producing: 0, raw_fee: 0}); return 1; })()`);
+    await ready(ev, `!!document.querySelector('.modal.ofcdlg #of-name_de')`);
+    check(await ev(`(() => { const p = document.querySelector('.modal.ofcdlg #of-producing'); const q = document.querySelector('.modal.ofcdlg #of-raw_fee'); return !!p && p.closest('.row').hidden && !!q && q.closest('.row').hidden; })()`), '#1379 off: the service dialog hides the unset producing / raw data flags');
+    await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); return 1; })()`);
+    await ev(`(() => { location.hash = '#office/offers/${offer.id}'; return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('.ofdeditor .ofdits')`, 60), 'the quotation editor');
+    check(await ev(`!document.querySelector('#ofd-raw_mode') && !document.querySelector('#ofd-prod_quotient') && !document.querySelector('.ofdautos .ofdauto') && !document.querySelector('.ofdeditor [data-k="producing"]') && !document.querySelector('.ofdeditor [data-k="raw_fee"]')`),
+      '#1379 off: no producing / raw data line, fields or flags in the quotation');
+    await shot('p2400-e-editor-off.png');
+
+    // ================= #1377 + #1382 on the settings page
+    await ev(`(() => { location.hash = '#office/settings'; return 1; })()`);
+    await ready(ev, `!!document.querySelector('#ofc-set #osc-street')`, 60);
+    check(await ev(`document.querySelectorAll('#osc-md_label option').length === 6 && document.getElementById('osc-md_label').value === ''`), '#1377: the word before the names, default Geschäftsführung');
+    await ev(`(() => { const s = document.getElementById('osc-md_label'); s.value = 'owner_f'; s.dispatchEvent(new Event('change', {bubbles: true})); document.querySelector('#ofc-set > .fgbar [data-fgb="save"]').click(); return 1; })()`);
+    let md = '';
+    for (let i = 0; i < 40 && md !== 'owner_f'; i++) { md = (await call(CA, 'GET', '/api/office/settings')).company_fields?.md_label; if (md !== 'owner_f') await sleep(250); }
+    check(md === 'owner_f', '#1377: the choice is saved ' + md);
+    await ready(ev, `!document.querySelector('#ofc-set > .fgbar')`);
+    // building blocks at the caret, the preview with a plain error, then a valid one
+    await ev(`(() => { const el = document.getElementById('os-inv-scheme'); el.focus(); el.value = 'RE-'; el.setSelectionRange(3, 3); el.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
+    await ev(`(() => { document.querySelector('[data-ofc="bb"][data-for="os-inv-scheme"][data-bb="{yyyy}"]').click(); return 1; })()`);
+    check(await ev(`document.getElementById('os-inv-scheme').value === 'RE-{yyyy}' && document.activeElement.id === 'os-inv-scheme' && document.activeElement.selectionStart === 9`), '#1382: a building block goes in at the caret ' + await ev(`document.getElementById('os-inv-scheme').value`));
+    check(await ready(ev, `/running number is missing/.test(document.getElementById('os-inv-scheme-pv').textContent)`), '#1382: the preview says in plain words what is missing ' + await ev(`document.getElementById('os-inv-scheme-pv').textContent`));
+    await ev(`(() => { document.querySelector('[data-ofc="bb"][data-for="os-inv-scheme"][data-bb="{seq:03}"]').click(); return 1; })()`);
+    const Y = new Date().getFullYear();
+    check(await ready(ev, `document.getElementById('os-inv-scheme-pv').textContent.includes('next: RE-${Y}001') && /every year/.test(document.getElementById('os-inv-scheme-pv').textContent)`),
+      '#1382: the invoice preview with the counter restart ' + await ev(`document.getElementById('os-inv-scheme-pv').textContent`));
+    check(await ready(ev, `/^next: /.test(document.getElementById('os-cr-scheme-pv').textContent) && /^next: /.test(document.getElementById('os-rm-scheme-pv').textContent) && /^next: KVA-/.test(document.getElementById('os-preview').textContent)`),
+      '#1382: every scheme shows its next number');
+    const ii = `(() => ['os-inv-scheme', 'os-cr-scheme', 'os-einv', 'os-datev', 'osc-register_court', 'osc-vat_id', 'osc-md_label'].filter(id => !document.querySelector('label[for="' + id + '"] .ib')))()`;
+    check((await ev(ii)).length === 0, '#1382: (i) at the scheme and term rows, missing: ' + JSON.stringify(await ev(ii)));
+    check(await ev(`(() => { const b = document.querySelector('label[for="os-inv-scheme"] .ib'); const src = document.getElementById(b.dataset.ii); return /\\{seq:03\\}/.test(src.textContent) && /finalised/.test(src.textContent) && /RE-2026-001/.test(src.textContent); })()`), '#1382: the scheme (i) has the building blocks, examples and the invoice rule');
+    await ev(`(() => { document.getElementById('os-inv-scheme').value = document.getElementById('os-inv-scheme').defaultValue; document.getElementById('os-inv-scheme').dispatchEvent(new Event('input', {bubbles: true})); document.querySelector('#ofc-set > .fgbar [data-fgb="discard"]')?.click(); document.getElementById('os-pack').focus(); return 1; })()`);
+    await ev(`(async () => { await ofcInfo(true); ofcDraw(); return 1; })()`); await sleep(300);
+    check((await ev(ii)).length === 0, '#1382: the (i) buttons stay after a redraw, missing: ' + JSON.stringify(await ev(ii)));
+    await shot('p2400-e-schemes.png');
+    // the client card
+    await ev(`(() => { clientModal(null); return 1; })()`);
+    await ready(ev, `!!document.querySelector('.modal.cldlg .clbill')`);
+    check(await ev(`(() => { const d = document.querySelector('.modal.cldlg .clbill'); d.open = true; return ['clb-buyer_reference', 'clb-email_invoice', 'clb-payment_terms_days'].every(id => !!d.querySelector('label[for="' + id + '"] .ib')); })()`), '#1382: (i) at buyer reference, invoice e-mail and payment terms of the client card');
+    await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); FG.d = {}; return 1; })()`);
+  }, false);
+
+  console.log(`p2400_e_ui: ${ok} ok, ${F.length} failed`);
+  process.exit(F.length ? 1 : 0);
+})().catch(e => { console.error(e); process.exit(1); });

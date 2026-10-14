@@ -597,6 +597,11 @@ fresh; run p2400_v_ui node p2400_v_ui.js "$KALMIDO_TEST_DATA"
 # before the management's names; #1382 number scheme building blocks, previews, plain errors, (i) of the terms
 fresh; run p2400_e_api "$PY" p2400_e_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2400_e_ui node p2400_e_ui.js "$KALMIDO_TEST_DATA"
+# 2.40.0 part E (office settings): #1378 fetch() writes carry the CSRF header (static check), logo + import; #1371 unsaved input
+# survives view changes and live events (formguard.js); #1379 producing / raw data switches + start migration; #1377 the word
+# before the management's names; #1382 number scheme building blocks, previews, plain errors, (i) of the terms
+fresh; run p2400_e_api "$PY" p2400_e_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2400_e_ui node p2400_e_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
