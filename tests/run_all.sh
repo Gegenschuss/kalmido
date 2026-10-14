@@ -592,10 +592,6 @@ fresh; run p2400_k_ui node p2400_k_ui.js "$KALMIDO_TEST_DATA"
 # 2.40.0 V (#1190 #1334 #1361 #1344 #1345): progress bar off by default, group_order bounds, favourites, My tasks in an own order, org line
 fresh; run p2400_v_api "$PY" p2400_v_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2400_v_ui node p2400_v_ui.js "$KALMIDO_TEST_DATA"
-# 2.40.0 K (#1380 #1372 #1421 #1335): contact persons of a client (migration, list, documents, BT-56, import, undo), the
-# country as an ISO code / choice, the address of an archived PDF with its proposals, the archive file after the commit
-fresh; run p2400_k_api "$PY" p2400_k_api_test.py "$KALMIDO_TEST_DATA"
-fresh; run p2400_k_ui node p2400_k_ui.js "$KALMIDO_TEST_DATA"
 # 2.40.0 part E (office settings): #1378 fetch() writes carry the CSRF header (static check), logo + import; #1371 unsaved input
 # survives view changes and live events (formguard.js); #1379 producing / raw data switches + start migration; #1377 the word
 # before the management's names; #1382 number scheme building blocks, previews, plain errors, (i) of the terms
