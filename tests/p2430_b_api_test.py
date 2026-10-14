@@ -108,5 +108,64 @@ check(r.status_code >= 400, f"#1330: dependencies only between project tasks {r.
 r = Bo.delete(B + f"/api/deps/{S1}/{S2}")
 check(r.ok, f"#1330: the editor's undo removes it {r.status_code}")
 
+# ======================================================================= #1003 several tasks at once
+W = A.post(B + "/api/lists", json={"name": "Team work"}).json()["id"]
+W2 = A.post(B + "/api/lists", json={"name": "Later"}).json()["id"]
+A.put(B + f"/api/lists/{W}/members", json={"user_id": ids["bob"], "role": "edit"})
+A.put(B + f"/api/lists/{W}/members", json={"user_id": ids["carol"], "role": "view"})
+TOP = task(A, "Release notes", W)
+X, Y, Z = task(A, "Collect changes", W), task(A, "Write intro", W), task(A, "Proofread", W)
+DEEP = task(A, "Screenshots", W)
+DK = task(A, "Shot of the list", W, parent_id=DEEP)
+MID = task(A, "Chapter one", W, parent_id=TOP)
+# several onto one: X, Y, Z under TOP in this order (after its own subtask)
+r = batch(A, {X: {"parent_id": TOP, "sort": 10}, Y: {"parent_id": TOP, "sort": 11}, Z: {"parent_id": TOP, "sort": 12}})
+j = r.json()
+check(r.ok and j.get("count") == 3 and not j.get("errors"), f"#1003: three tasks become subtasks in one batch {r.status_code} {j}")
+st = state(A)
+kids = sorted([t for t in st.values() if t.get("parent_id") == TOP], key=lambda t: t["sort"])
+check([t["id"] for t in kids] == [MID, X, Y, Z], f"#1003: their order is kept after the own subtask: {[t['title'] for t in kids]}")
+# depth: DEEP has a subtask; under MID (level 2) it would be level 3 with its child on level 4 -> refused, X2 moves
+X2 = task(A, "Index", W)
+r = batch(A, {X2: {"parent_id": MID, "sort": 0}, DEEP: {"parent_id": MID, "sort": 1}})
+j = r.json()
+st = state(A)
+check(j.get("count") == 1 and any("levels" in x for x in j.get("errors", [])), f"#1003: the one with own subtasks is refused (3 levels), the rest moves: {j}")
+check(st[X2]["parent_id"] == MID and st[DEEP]["parent_id"] is None and st[DK]["parent_id"] == DEEP, "#1003: X2 is on level 3, Screenshots stays with its subtask")
+# out of the parent: order, assignee and dates stay
+O1 = task(A, "Order flowers", W, parent_id=TOP, assignee_id=ids["bob"], due="2030-05-02")
+O2 = task(A, "Book the room", W, parent_id=TOP, due="2030-05-03", due_time="10:00")
+O3 = task(A, "Send invites", W, parent_id=TOP, assignee_id=ids["alice"])
+st = state(A)
+before = {i: dict(st[i]) for i in (O1, O2, O3)}
+base = st[TOP]["sort"]
+r = batch(A, {O1: {"parent_id": None, "section_id": None, "sort": base + 0.25}, O2: {"parent_id": None, "section_id": None, "sort": base + 0.5},
+              O3: {"parent_id": None, "section_id": None, "sort": base + 0.75}})
+check(r.ok and r.json().get("count") == 3, f"#1003: three subtasks out of their parent {r.text[:200]}")
+st = state(A)
+check(all(st[i]["parent_id"] is None for i in (O1, O2, O3)), "#1003: they are standalone")
+check(st[O1]["assignee_id"] == ids["bob"] and st[O3]["assignee_id"] == ids["alice"], "#1003: assignees stay")
+check(st[O1]["due"] == "2030-05-02" and st[O2]["due"] == "2030-05-03" and st[O2]["due_time"] == "10:00", "#1003: dates stay")
+check(st[O1]["sort"] < st[O2]["sort"] < st[O3]["sort"], "#1003: the order stays")
+# the undo: patch_each back to the parent with _prev (what the client's history sends)
+r = batch(A, {i: {"parent_id": TOP, "sort": before[i]["sort"], "_prev": {"parent_id": None, "sort": st[i]["sort"]}} for i in (O1, O2, O3)})
+st = state(A)
+check(r.ok and not r.json().get("conflicts") and all(st[i]["parent_id"] == TOP for i in (O1, O2, O3)), f"#1003: one undo puts all three back {r.text[:200]}")
+# rights: a viewer changes nothing; an editor cannot nest under a task of a list they cannot see
+r = batch(Ca, {O1: {"parent_id": None}, O2: {"parent_id": None}})
+check(r.json().get("count") == 0 and all(state(A)[i]["parent_id"] == TOP for i in (O1, O2)), f"#1003: a viewer changes nothing {r.text[:200]}")
+PRIV = task(A, "Alice private", HID)
+r = batch(Bo, {O1: {"parent_id": PRIV}})
+check(r.json().get("count") == 0 and state(A)[O1]["parent_id"] == TOP, f"#1003: no parent from a list the editor does not see {r.text[:200]}")
+BT = task(Bo, "Bob's own", W)
+r = batch(Bo, {O3: {"parent_id": BT, "sort": 0}, O2: {"parent_id": BT, "sort": 1}})
+st = state(A)
+check(r.json().get("count") == 2 and st[O3]["parent_id"] == BT and st[O3]["assignee_id"] == ids["alice"], f"#1003: an editor regroups in the shared list, assignee kept {r.text[:200]}")
+# to another list (the sidebar drop): standalone there, own subtasks follow
+r = batch(A, {DEEP: {"list_id": W2, "section_id": None}, X2: {"list_id": W2, "section_id": None, "parent_id": None}})
+st = state(A)
+check(r.json().get("count") == 2 and st[DEEP]["list_id"] == W2 and st[DK]["list_id"] == W2 and st[X2]["list_id"] == W2 and st[X2]["parent_id"] is None,
+      f"#1003: into another list, subtasks follow {r.text[:200]}")
+
 print(f"p2430_b_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)

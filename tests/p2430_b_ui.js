@@ -96,6 +96,99 @@ const rowBox = el => { el.getBoundingClientRect = () => ({top: 100, bottom: 140,
   check(errs.length === 0, 'no script errors (#1330): ' + errs.join(' | '));
   w.close();
 
+  // ================= #1003 desktop: several tasks at once
+  const L = (await call('POST', '/api/lists', {name: 'Office'})).id;
+  const sec = async name => (await call('POST', '/api/sections', {name, list_id: L})).id;
+  const SA = await sec('Doing'), SB = await sec('Later');
+  const mo = async (title, section_id, extra = {}) => (await call('POST', '/api/tasks', {title, list_id: L, section_id, ...extra})).id;
+  const PARENT = await mo('Quarterly report', SA);
+  const A1 = await mo('Collect numbers', SA), A2 = await mo('Draw charts', SA), A3 = await mo('Write summary', SA);
+  const DEEP = await mo('Appendix', SA);
+  await mo('Tables', SA, {parent_id: DEEP});
+  const MID = await mo('Chapter one', SA, {parent_id: PARENT});
+  w = await boot({user: 'alice', hash: 'l/' + L, ls: {hintsSeen: ['dgalt'], ['tasks.sort2.l:' + L]: '"prio"'}}); d = w.document;
+  check(await until(() => row(A1) && row(A3)), 'the office list renders');
+  const ttl = id => row(id).querySelector('.ttl');
+  click(w, ttl(A1), {ctrlKey: true}); await sleep(100);
+  click(w, ttl(A2), {ctrlKey: true}); await sleep(100);
+  click(w, ttl(A3), {ctrlKey: true}); await sleep(150);
+  check(w.eval('S.multi.size') === 3, '#1003: three selected');
+  const seen = [...d.querySelectorAll('#view .trow')].map(r => +r.dataset.id).filter(i => [A1, A2, A3].includes(i));
+  calls = spy(w);
+  let ds = dnd(w, row(A2), 'dragstart'); await sleep(50);
+  check(ds.dataTransfer.img === '3 tasks', '#1003: the drag image says "3 tasks": ' + ds.dataTransfer.img);
+  check(/middle of a task/.test(toastText(d)), '#1003: the first multi drag explains the middle: ' + toastText(d));
+  ov = dnd(w, rowBox(row(PARENT)), 'dragover', {clientY: 120});
+  check(ov.defaultPrevented && row(PARENT).classList.contains('dgonto') && /3 tasks become its subtasks/.test(row(PARENT).dataset.dg || ''), '#1003: the middle of a row: "3 tasks become its subtasks"');
+  dnd(w, row(PARENT), 'drop', {clientY: 120}); dnd(w, row(A2), 'dragend');
+  const kidsOf = async pid => (await st()).tasks.filter(t => t.parent_id === pid).sort((a, b) => a.sort - b.sort).map(t => t.id);
+  check(await until(async () => JSON.stringify(await kidsOf(PARENT)) === JSON.stringify([MID, ...seen])), '#1003: subtasks of the report in the order on screen, after its own one: ' + JSON.stringify(seen));
+  check(calls.filter(c => c[0] === 'POST' && /\/api\/tasks\/batch/.test(c[1])).length === 1 && !calls.some(c => c[0] === 'PATCH'), '#1003: ONE batch request');
+  check(await until(() => /3 tasks are now subtasks of “Quarterly report”/.test(toastText(d))), '#1003: the message: ' + toastText(d));
+  d.querySelector('#toast button').click();
+  check(await until(async () => !(await kidsOf(PARENT)).includes(A1) && !(await taskOf(A3)).parent_id), '#1003: ONE Undo puts all three back');
+  check(w.eval('HIST.undo.length') === 0, '#1003: the undo was one history step');
+  // depth: onto "Chapter one" (level 2): Appendix has a subtask -> stays, the others move
+  await w.eval('load().then(render)'); await sleep(300);
+  w.eval(`(() => { S.multi.clear(); [${A1}, ${DEEP}].forEach(i => S.multi.add(i)); renderMultiBar(); render(); })()`); await sleep(150);
+  dnd(w, row(A1), 'dragstart');
+  dnd(w, rowBox(row(MID)), 'dragover', {clientY: 120}); dnd(w, row(MID), 'drop', {clientY: 120}); dnd(w, row(A1), 'dragend');
+  check(await until(async () => (await taskOf(A1)).parent_id === MID), '#1003: Collect numbers is now on level 3');
+  check(!(await taskOf(DEEP)).parent_id, '#1003: Appendix (own subtasks) stays');
+  check(await until(() => /1 task stays: its own subtasks would go deeper than 3 levels/.test(toastText(d))), '#1003: the message counts it: ' + toastText(d));
+  // out onto a section header: standalone in "Later", order kept
+  await w.eval('load().then(render)'); await sleep(300);
+  await call('PATCH', '/api/tasks/' + A1, {parent_id: PARENT}); await call('PATCH', '/api/tasks/' + A2, {parent_id: PARENT});
+  await w.eval('load().then(render)'); await sleep(300);
+  w.eval(`(() => { S.multi.clear(); [${A2}, ${A1}].forEach(i => S.multi.add(i)); renderMultiBar(); render(); })()`); await sleep(150);
+  const head = sid => d.querySelector(`#view .ghead[data-section="${sid}"]`);
+  check(row(A1) && head(SB), '#1003: subtasks and the section header are shown');
+  dnd(w, row(A1), 'dragstart');
+  dnd(w, head(SB), 'dragover'); dnd(w, head(SB), 'drop'); dnd(w, row(A1), 'dragend');
+  check(await until(async () => { const a = await taskOf(A1), b = await taskOf(A2); return !a.parent_id && !b.parent_id && a.section_id === SB && b.section_id === SB && a.sort < b.sort; }), '#1003: standalone in "Later", order kept');
+  // a block before a row (upper part)
+  await w.eval('load().then(render)'); await sleep(300);
+  w.eval(`(() => { S.multi.clear(); [${A1}, ${A2}].forEach(i => S.multi.add(i)); renderMultiBar(); render(); })()`); await sleep(150);
+  dnd(w, row(A1), 'dragstart');
+  ov = dnd(w, rowBox(row(A3)), 'dragover', {clientY: 102});
+  check(row(A3).classList.contains('dropbefore') && !row(A3).classList.contains('dgonto'), '#1003: the upper part: the insert line');
+  dnd(w, row(A3), 'drop', {clientY: 102}); dnd(w, row(A1), 'dragend');
+  check(await until(async () => { const s = (await st()).tasks, g = id => s.find(t => t.id === id); return g(A1).section_id === SA && g(A2).section_id === SA && g(A1).sort < g(A2).sort && g(A2).sort < g(A3).sort; }), '#1003: the block lands before "Write summary" in "Doing"');
+  // the multi panel: "Subtasks of…" and "Out of the parent task"
+  await w.eval('load().then(render)'); await sleep(300);
+  w.eval(`(() => { S.multi.clear(); [${A1}, ${A2}].forEach(i => S.multi.add(i)); renderMultiBar(); render(); })()`);
+  check(await until(() => d.querySelector('#detail.multi [data-act="dg-sub"]')), '#1003: the multi panel has "Subtasks of…"');
+  check(!d.querySelector('#detail.multi [data-act="dg-out"]'), '#1003: no "Out of the parent task" without subtasks');
+  d.querySelector('#detail [data-act="dg-sub"]').click(); await sleep(100);
+  let md = d.querySelector('.dgpick');
+  check(md && md.querySelector(`[data-pick="${A3}"]`) && !md.querySelector(`[data-pick="${A1}"]`), '#1003: the search lists others, not the selection');
+  calls = spy(w);
+  md.querySelector(`[data-pick="${A3}"]`).click();
+  check(await until(async () => (await taskOf(A1)).parent_id === A3 && (await taskOf(A2)).parent_id === A3), '#1003: both are subtasks of "Write summary"');
+  check(calls.filter(c => /\/api\/tasks\/batch/.test(c[1])).length === 1, '#1003: one batch');
+  await sleep(200);
+  check(await until(() => d.querySelector('#detail.multi [data-act="dg-out"]')), '#1003: now "Out of the parent task" is offered');
+  d.querySelector('#detail [data-act="dg-out"]').click();
+  check(await until(async () => { const a = await taskOf(A1), b = await taskOf(A2), c = await taskOf(A3); return !a.parent_id && !b.parent_id && a.sort > c.sort && a.sort < b.sort; }), '#1003: standalone right after their parent, order kept');
+  check(errs.length === 0, 'no script errors (#1003): ' + errs.join(' | '));
+  w.close();
+
+  // ================= #1003 phone: the selection menu
+  w = await boot({user: 'alice', mobile: true, hash: 'l/' + L}); d = w.document;
+  check(await until(() => row(A1)), 'phone: the list renders');
+  w.eval(`(() => { S.multiMode = true; [${A1}, ${A2}].forEach(i => S.multi.add(i)); renderMultiBar(); render(); })()`); await sleep(150);
+  d.querySelector('#mbar [data-act="mb-menu"]').click(); await sleep(100);
+  const sub = [...d.querySelectorAll('#pop:not(.hidden) button')].find(b => /Subtasks of…/.test(b.textContent));
+  check(!!sub, 'phone: "Subtasks of…" in the selection menu');
+  if (sub) {
+    sub.click(); await sleep(100);
+    md = d.querySelector('.dgpick');
+    md?.querySelector(`[data-pick="${PARENT}"]`)?.click();
+    check(await until(async () => (await taskOf(A1)).parent_id === PARENT && (await taskOf(A2)).parent_id === PARENT), 'phone: both under the report');
+  }
+  check(errs.length === 0, 'no script errors (phone): ' + errs.join(' | '));
+  w.close();
+
   console.log(`${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });
