@@ -199,12 +199,14 @@ const type = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input',
   check(w.eval(`LS.get('e2eOn:' + S.me.id + ':${room.id}', null)`) !== null, 'dm: this browser remembers the encrypted DM');
   w.eval(`S.tc.room.e2e = false; e2eRoomDecrypt(${room.id}); renderView()`);
   check(w.eval(`!!E2E.down[${room.id}]`) && !!d.querySelector('.e2ewarn [data-e2e="dm-down-ok"]'), 'dm: a silent downgrade shows a warning');
-  w.eval('window.__ask = 0; askConfirm = async () => { window.__ask++; return false; }');
   const n0 = (await call('GET', `/api/team/rooms/${room.id}/messages`)).messages.length;
   d.querySelector('#tc-in').value = 'would be plain';
-  await w.eval('tcSend()');
+  w.eval('window.__snd = tcSend()');
+  const ask = await until(() => [...d.querySelectorAll('.modal')].find(x => /Send without encryption/.test(x.textContent)), 60);
+  if (ask) ask.querySelector('[data-cd="no"]').click();
+  await w.eval('window.__snd');
   const n1 = (await call('GET', `/api/team/rooms/${room.id}/messages`)).messages.length;
-  check(w.eval('window.__ask') === 1 && n1 === n0, 'dm: nothing sent without the confirmation');
+  check(!!ask && n1 === n0, 'dm: asked first, nothing sent without the confirmation');
   // switched off by a person (notice in the conversation): no warning, the marker goes
   const off = await call('POST', `/api/team/rooms/${room.id}/e2e`, {on: false}, CKB);
   await w.eval(`loadRoom(${room.id})`);
