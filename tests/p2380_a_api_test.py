@@ -336,7 +336,7 @@ check(r.ok and r.json()["number"] == "MA-2026-001" and r.json()["status"] == "is
 rd = A.get(B + f"{D}/{RM['id']}/render").json()
 check(rd["title"] == "Letzte Mahnung" and rd["reminder"]["level"] == 3 and rd["reminder"]["rows"][0]["number"] == "RE-2026-005" and rd["reminder"]["rows"][0]["open_text"] == "30.838,30 €"
       and rd["reminder"]["fee_text"] == "10,00 €" and rd["reminder"]["deadline_text"] and rd["reminder"]["columns"] == ["Rechnung", "Datum", "Fällig", "Betrag"]
-      and rd["totals"]["rows"][-1] == ["Rechnungsbetrag", "30.848,30 €"], f"reminder print model: {rd['title']} {rd['reminder']}")
+      and rd["totals"]["rows"][-1] == ["Gesamtbetrag", "30.848,30 €"], f"reminder print model: {rd['title']} {rd['reminder']}")  # 2.40.0 (#1368): Gesamtbetrag
 # the reminder keeps its snapshot after a payment on the invoice
 A.post(B + f"{D}/{IID}/payments", json={"amount": 100})
 check(A.get(B + f"{D}/{RM['id']}").json()["totals"]["net"] == "30838.30", "finalised reminder keeps the amounts of its day")

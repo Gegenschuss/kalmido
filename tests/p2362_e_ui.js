@@ -57,7 +57,9 @@ const fire = (w, el, type) => el.dispatchEvent(new w.Event(type, {bubbles: true}
   w = await boot({hash: 'office/offers/' + doc.id}); d = w.document;
   await until(() => d.querySelector('.ofdeditor .ofdits .ofdit'), 60);
   const pdf = d.querySelector('a[data-ofd="pdf"]');
-  check(pdf && pdf.getAttribute('aria-label') === 'Download PDF' && /PDF/.test(pdf.textContent) && pdf.getAttribute('href') === `/api/office/docs/${doc.id}/pdf`, '#1146: the PDF button has a label and an aria-label');
+  // 2.40.0 (#1366): the PDF button opens the PDF in the browser, an own button downloads it
+  check(pdf && pdf.getAttribute('aria-label') === 'Open PDF' && /PDF/.test(pdf.textContent) && pdf.getAttribute('href') === `/api/office/docs/${doc.id}/pdf?inline=1`
+    && d.querySelector('a.ofddl')?.getAttribute('href') === `/api/office/docs/${doc.id}/pdf`, '#1146: the PDF button has a label and an aria-label');
   check(!!d.querySelector('[data-ofd="finalize"]') && !!d.querySelector('#ofd-service_from') && !!d.querySelector('#ofd-service_to') && !d.querySelector('input[type="date"]'), 'editor: Finalise, period of service (date pickers, no native date input)');
   check(!d.querySelector('fieldset.ofdfs').disabled && !d.querySelector('.ofdlocked'), 'editor: open before finalising');
   d.querySelector('[data-ofd="finalize"]').click();

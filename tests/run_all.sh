@@ -578,6 +578,10 @@ fresh; run p2391_t_ui node p2391_t_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2391_r_api "$PY" p2391_r_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2391_r_ui node p2391_r_ui.js "$KALMIDO_TEST_DATA"
 shard 10  # --------------------------------------------------------------- shard 10 of 10 (2.40.0: the 2.40 suites, shard 9 is full)
+# 2.40.0 D (#1368 #1381 #1363 #1364 #1366 #1336): e-invoice address from free lines, closing / reminder texts, fee as an open item,
+# settled reminders, language switch of drafts, PDF inline + download, send / reminder dialogs
+fresh; run p2400_d_api "$PY" p2400_d_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2400_d_ui node p2400_d_ui.js "$KALMIDO_TEST_DATA"
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
